@@ -23,10 +23,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     google_api_key: str = ""
     vllm_base_url: str = "http://localhost:8001/v1"
-    vllm_model: str = "Qwen/Qwen2.5-14B-Instruct"
+    vllm_model: str = "Qwen/Qwen3-14B"
+    vllm_enable_thinking: bool = False
 
     classifier_base_model: str = "kakaobank/kf-deberta-base"
-    embedding_model: str = "BAAI/bge-m3"
+    embedding_model: str = "nlpai-lab/KURE-v1"
 
     max_seq_len: int = 512
     chunk_overlap: int = 64

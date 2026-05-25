@@ -2,7 +2,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass
@@ -36,6 +35,26 @@ class DocxExtractor(Extractor):
         return "\n".join(p.text for p in d.paragraphs)
 
 
+class HwpExtractor(Extractor):
+    """HWP/HWPX 통합 추출기. 1차 rhwp-python(Rust, 빠름), 2차 pyhwp(HWP5만)."""
+
+    def supports(self, suffix): return suffix.lower() in {".hwp", ".hwpx"}
+
+    def extract(self, path: Path) -> str:
+        try:
+            import rhwp  # rhwp-python (PyO3 binding to Rust engine)
+            return rhwp.extract_text(str(path))
+        except Exception:
+            pass
+        if path.suffix.lower() == ".hwp":
+            try:
+                from hwp5.hwp5txt import HwpToTextConverter
+                return HwpToTextConverter().convert(str(path))
+            except Exception:
+                pass
+        raise RuntimeError(f"hwp extraction failed for {path}; install rhwp-python or run libreoffice fallback")
+
+
 class TxtExtractor(Extractor):
     def supports(self, suffix): return suffix.lower() in {".txt", ".md"}
 
@@ -43,7 +62,7 @@ class TxtExtractor(Extractor):
         return Path(path).read_text(encoding="utf-8", errors="ignore")
 
 
-_EXTRACTORS: list[Extractor] = [PdfExtractor(), DocxExtractor(), TxtExtractor()]
+_EXTRACTORS: list[Extractor] = [PdfExtractor(), DocxExtractor(), HwpExtractor(), TxtExtractor()]
 
 
 def extract_file(path: str | Path) -> str:

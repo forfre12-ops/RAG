@@ -1,0 +1,20 @@
+{"id":"bc-001","desc":"M&A 협상 중 거래 상대 기업명과 잠정 가격이 명시된 미공개 이사회 안건","candidate_grades":["TS","S1"],"likely":"TS","reason":"전사 운명을 좌우하며 외부 유출 시 거래 무산·소송"}
+{"id":"bc-002","desc":"이미 공시된 사업 인수 발표 자료의 부서 내부 분석본","candidate_grades":["S2","S3"],"likely":"S2","reason":"공시 자체는 공개지만 내부 분석은 비공개 의사결정 자료"}
+{"id":"bc-003","desc":"3개월 후 출시 예정 신제품의 가격표 초안","candidate_grades":["S1","S2"],"likely":"S1","reason":"출시 전 가격 노출 시 경쟁사 대응으로 매출 직격"}
+{"id":"bc-004","desc":"이미 출시된 제품의 가격 인하 검토 메모","candidate_grades":["S1","S2"],"likely":"S1","reason":"가격 인하 가능성 자체가 경쟁 정보"}
+{"id":"bc-005","desc":"내부 조직 개편(부서 통폐합) 초안 문서","candidate_grades":["S1","S2"],"likely":"S2","reason":"외부 유출 시 평판·노조 이슈, 그러나 운영 정보 수준"}
+{"id":"bc-006","desc":"임원 보상 체계 변경안 초안","candidate_grades":["TS","S1"],"likely":"S1","reason":"민감하나 회사 존립까지는 아님"}
+{"id":"bc-007","desc":"공개 특허의 후속 개량 기술 연구노트","candidate_grades":["TS","S1"],"likely":"S1","reason":"이미 공개된 기술의 개량은 1급 수준"}
+{"id":"bc-008","desc":"특허 출원 직전 핵심 알고리즘 명세서","candidate_grades":["TS","S1"],"likely":"TS","reason":"출원 전 유출 시 특허권 상실"}
+{"id":"bc-009","desc":"보도자료 초안 (대외 발표 1일 전)","candidate_grades":["S2","S3"],"likely":"S2","reason":"발표 전까지는 비공개, 발표 후 즉시 S3"}
+{"id":"bc-010","desc":"이미 발표된 보도자료 사본","candidate_grades":["S3"],"likely":"S3","reason":"공개 자료"}
+{"id":"bc-011","desc":"주요 협력사 NDA 초안","candidate_grades":["S1","S2"],"likely":"S2","reason":"법무 표준 양식 수준, 핵심 조건 미확정 단계"}
+{"id":"bc-012","desc":"주요 협력사 NDA 최종본 (협상 가격·조건 포함)","candidate_grades":["TS","S1"],"likely":"S1","reason":"체결된 조건은 거래 핵심"}
+{"id":"bc-013","desc":"분기 매출 추정 보고서 (확정 전)","candidate_grades":["TS","S1"],"likely":"S1","reason":"공시 전 정보 유출 시 내부자거래 위험"}
+{"id":"bc-014","desc":"분기 매출 공시본","candidate_grades":["S3"],"likely":"S3","reason":"공시 자료"}
+{"id":"bc-015","desc":"퇴사자 인수인계 문서 (보안등급 미정 상태)","candidate_grades":["S1","S2"],"likely":"S2","reason":"업무 운영 정보, 다만 포함 내용에 따라 상승 가능"}
+{"id":"bc-016","desc":"R&D 부서 일일 회의록 (실험 결과 일부 포함)","candidate_grades":["S1","S2"],"likely":"S1","reason":"미공개 실험 결과는 1급 수준"}
+{"id":"bc-017","desc":"고객 불만 사례 통계 (개인정보 비식별화)","candidate_grades":["S2","S3"],"likely":"S2","reason":"운영 평판 정보"}
+{"id":"bc-018","desc":"공식 제품 카탈로그 (영업용 배포본)","candidate_grades":["S3"],"likely":"S3","reason":"대외 공개 전제"}
+{"id":"bc-019","desc":"차세대 제품 로드맵 (3개년)","candidate_grades":["TS","S1"],"likely":"TS","reason":"중장기 경쟁 전략 핵심"}
+{"id":"bc-020","desc":"전사 윤리 강령 (사내 공유본)","candidate_grades":["S2","S3"],"likely":"S3","reason":"공개해도 무방, 다만 사내 권장 표시"}

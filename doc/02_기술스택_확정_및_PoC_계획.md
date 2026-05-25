@@ -42,12 +42,19 @@
 
 | 후보 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | 종합 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|
-| **BGE-M3** (BAAI) | ★★★★★ | ★★★★★ | ★★★★★ | ★★★★ | ★★★★★ | ★★★★★ | ★★★★★ | **★★★★★** | 다국어 + 한국어, dense+sparse+colbert 동시, 8192 토큰 |
-| ko-sroberta-multitask | ★★★★★ | ★★★★ | ★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★★ | 경량 한국어 SBERT, 자원 부족 기업용 |
+| **KURE-v1** (고려대 NLP&AI Lab) | ★★★★★ | ★★★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★★★ | **★★★★★** | **BGE-M3 fine-tuned for Korean**, 1024차원, 8192 토큰, MIT. 한국어 retrieval Recall@1 0.5264 vs BGE-M3 0.5178 (+1.6%p), NDCG@1 0.6055 vs 0.5985로 전 영역 우위 |
+| BGE-M3 (BAAI) | ★★★★★ | ★★★★ | ★★★★★ | ★★★★ | ★★★★★ | ★★★★★ | ★★★★★ | ★★★★ | 다국어+한국어, dense+sparse+colbert 동시. KURE의 베이스 모델 |
+| ko-sroberta-multitask | ★★★★★ | ★★★★ | ★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★ | 경량 한국어 SBERT, 자원 부족 기업용 |
 | E5-large-multilingual | ★★★★ | ★★★ | ★★★ | ★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★ | 한국어 특화는 아님 |
 
-**확정**: **BGE-M3 기본 / ko-sroberta 경량 옵션**
-**PoC 필요**: 가이드 문서 + 사내규정 시드에 대한 Top-K 검색 정확도 (P2)
+**확정**: **KURE-v1 기본** (1순위 신규) / **BGE-M3 폴백** / ko-sroberta 경량 옵션
+**이유**:
+- KURE-v1은 BGE-M3 아키텍처를 한국어 retrieval 데이터로 파인튜닝한 모델 → BGE-M3의 dense+sparse+ColBERT multi-vector 출력 호환 유지
+- 한국어 retrieval 벤치마크에서 BGE-M3 대비 일관된 우위 (Recall@1 +1.6%p)
+- 동일 차원·동일 토크나이저이므로 Qdrant 인덱스를 재구축 없이 모델만 swap 가능 → 운영 리스크 낮음
+- 고려대 nlpai-lab 한국 연구기관 산출물, MIT 라이선스
+**HuggingFace**: `nlpai-lab/KURE-v1`
+**PoC 필요**: 가이드 문서 + 사내규정 시드에 대한 KURE-v1 vs BGE-M3 Top-K 검색 정확도 직접 비교 (P2)
 
 ---
 
@@ -63,16 +70,21 @@
 #### OSS On-prem (운영 보안 우려 시 대안)
 | 후보 | 한국어 | VRAM | 추천도 | 비고 |
 |---|---|---|---|---|
-| **Qwen2.5-14B-Instruct** | ★★★★ | 약 30GB (FP16) / 10GB (Q4) | ★★★★★ | 다국어 우수, vLLM 호환 |
+| **Qwen3-14B** | ★★★★ | 약 30GB (FP16) / 10GB (Q4) | ★★★★★ | 2025-05 공개, **thinking/non-thinking 모드** 동적 전환, 100+ 언어 강화, vLLM ≥0.8.5 공식 지원, 컨텍스트 32K(YaRN 131K), Apache 2.0 |
+| Qwen2.5-14B-Instruct | ★★★★ | 약 30GB / 10GB(Q4) | ★★★ | 한 세대 전. Qwen3 출시로 베이스라인에서 강등 |
 | EXAONE 3.5 32B (LG) | ★★★★★ | 약 65GB / 20GB(Q4) | ★★★★ | 한국어 SOTA급, 라이선스 확인 필요 |
 | Llama 3.1-8B + Bllossom | ★★★ | 약 16GB / 5GB(Q4) | ★★★ | 한국어 파인튜닝, 경량 |
 
 **확정**:
 - **상용 기본값: Claude Sonnet 4.6** (한국어·긴 문서·합성 품질)
-- **OSS 기본값: Qwen2.5-14B + vLLM** (Adapter로 교체 가능)
+- **OSS 기본값: Qwen3-14B + vLLM ≥ 0.8.5** (Adapter로 교체 가능)
+  - 합성(FUN-003) 시 `enable_thinking=False` 권장 — 빠른 다량 생성에 적합
+  - 라벨링 경계 판단·평가요소 점수화에는 `enable_thinking=True` (`/think`) 활용
+  - vLLM 기동: `vllm serve Qwen/Qwen3-14B --enable-reasoning --reasoning-parser deepseek_r1`
 - **EXAONE 32B는 라이선스 확인 후 한국어 강화 옵션으로 채택 검토**
 - **추상화**: LLM Provider Adapter (OpenAI/Anthropic/Google/vLLM/Ollama)로 교체 가능하게 설계
-**PoC 필요**: 합성 문서 품질·다양성 평가 + 비용 추정 (P3)
+**참고**: Qwen3의 한국어 정량 성능은 공식 자료에 Qwen2.5 대비 직접 비교 미공개 → PoC P3에서 자체 검증.
+**PoC 필요**: 합성 문서 품질·다양성 평가 + 비용 추정 + Qwen3 thinking/non-thinking 모드 비교 (P3)
 
 ---
 
@@ -118,7 +130,7 @@
 
 | 포맷 | 1순위 | 2순위/fallback |
 |---|---|---|
-| HWP/HWPX | **pyhwp + hwp5** | LibreOffice headless (`soffice --convert-to txt`) |
+| HWP/HWPX | **rhwp-python** (Rust 기반 PyO3 바인딩, HWP+HWPX 통합 API, pyhwp 대비 약 62× 빠름, MIT, v0.6.1 활발 유지) | pyhwp/hwp5 → LibreOffice headless |
 | DOCX | **python-docx** | LibreOffice |
 | PDF (텍스트) | **PyMuPDF (fitz)** | pdfplumber (표 처리) |
 | PDF/이미지 OCR | **PaddleOCR (kor 모델)** | Tesseract+kor → Qwen2-VL (Vision LLM fallback) |
@@ -126,7 +138,12 @@
 | 청크 분할 | **LangChain RecursiveTextSplitter** | 토큰 기반 슬라이딩 윈도우 자체 구현 |
 | 한국어 정규화 | **soynlp + KoNLPy(Mecab-ko)** | hanspell (맞춤법) |
 
-**PoC 필요**: 한국 공문/HWP 추출 품질 (P4)
+**HWP 1순위 변경 사유**:
+- pyhwp는 2016년 이후 미유지·HWP5 전용. 한국 공공기관 문서는 HWPX 비중도 상당.
+- rhwp-python은 Rust 엔진 바인딩으로 추출 속도 우위, HWP+HWPX 단일 API. LangChain `HwpLoader` extra 제공.
+- 단점: 비공식 커뮤니티 패키지(`DanMeon/rhwp-python`) — 운영 리스크 분산을 위해 pyhwp/LibreOffice 폴백 필수 유지.
+
+**PoC 필요**: 한국 공문/HWP/HWPX 추출 품질 + rhwp-python vs pyhwp 비교 (P4)
 
 ---
 
@@ -144,19 +161,19 @@
 
 ---
 
-## 2. 최종 채택 스택 (한 줄 요약)
+## 2. 최종 채택 스택 (한 줄 요약, 2026-05 갱신)
 
 | 레이어 | 채택 |
 |---|---|
 | 분류 모델 | **KF-DeBERTa-base** (기본) / KoELECTRA-base (경량) |
-| 임베딩 | **BGE-M3** (기본) / ko-sroberta (경량) |
+| 임베딩 | **KURE-v1** (한국어 1순위, BGE-M3 fine-tuned) / BGE-M3 폴백 / ko-sroberta 경량 |
 | LLM 상용 | **Claude Sonnet 4.6** (기본) / GPT-4o / Gemini — Adapter 교체 |
-| LLM OSS | **Qwen2.5-14B + vLLM** / EXAONE 3.5(검토) / Llama+Bllossom |
+| LLM OSS | **Qwen3-14B + vLLM ≥ 0.8.5** (thinking/non-thinking) / EXAONE 3.5(검토) / Llama+Bllossom |
 | Vector DB | **Qdrant** (기본) / pgvector 또는 ES |
 | RDB | **PostgreSQL 16 + pgvector + JSONB** |
 | 스토리지 | **MinIO** |
 | 큐/캐시 | **Redis 7 + Celery** |
-| 문서처리 | pyhwp / PyMuPDF / PaddleOCR / unstructured |
+| 문서처리 | **rhwp-python** (HWP/HWPX 1순위) / PyMuPDF / PaddleOCR / unstructured |
 | 학습/실험 | PyTorch + HF Transformers + **MLflow** |
 | 체인/에이전트 | **LangChain + LangGraph** |
 | API | **FastAPI** |
@@ -174,9 +191,9 @@
 | ID | PoC 명 | 검증 목적 | 결과로 결정되는 사항 | 기간 | 산출물 |
 |---|---|---|---|---|---|
 | **P1** | 분류 모델 비교 | KF-DeBERTa vs KoELECTRA, RAG ON/OFF F1·FNR 비교 | 1.1 모델 채택, 1.4 RAG 효과 정량화 | 2주 | 성능 리포트, Confusion Matrix |
-| **P2** | 임베딩·VectorDB 검색 정확도 | BGE-M3 + Qdrant Top-K 검색 적중률 | 1.2, 1.4 채택 확정 | 1주 | Recall@K, Latency 표 |
-| **P3** | LLM 합성 문서 품질 | Claude/GPT/Qwen별 합성 문서 라벨 일치도·다양성·단가 | 1.3 기본값 + 운영 단가 견적 | 1.5주 | 합성문서 1,000건 + 평가 리포트 |
-| **P4** | HWP/PDF/OCR 추출 품질 | 공문·기술문서 30종 추출 정확도 | 1.8 라이브러리 조합 확정 | 1주 | 추출 정확도 매트릭스 |
+| **P2** | 임베딩·VectorDB 검색 정확도 | **KURE-v1 vs BGE-M3** + Qdrant Top-K 검색 적중률 | 1.2, 1.4 채택 확정 | 1주 | Recall@K, NDCG@K, Latency 표 |
+| **P3** | LLM 합성 문서 품질 | Claude/GPT/**Qwen3** 합성 문서 라벨 일치도·다양성·단가, **Qwen3 thinking/non-thinking 비교** | 1.3 기본값 + 운영 단가 견적 | 1.5주 | 합성문서 1,000건 + 평가 리포트 |
+| **P4** | HWP/PDF/OCR 추출 품질 | 공문·기술문서 30종 추출 정확도, **rhwp-python vs pyhwp** 비교 | 1.8 라이브러리 조합 확정 | 1주 | 추출 정확도·속도 매트릭스 |
 | **P5** | 통합 E2E 스모크 | 업로드→전처리→분류→결과 1건 통과 | 인프라 통합 가능성 | 0.5주 | 시연 영상 + 로그 |
 
 **총 PoC 기간: 4주 (병렬 수행 시) ~ 6주 (직렬)** — M1 설계 확정 단계와 중첩 수행 권장.
