@@ -1,0 +1,860 @@
+openapi: 3.0.3
+info:
+  title: Lloydk AI Engine API
+  description: |
+    한국지식재산보호원 AI 영업비밀관리시스템 — 로이드케이 AI 엔진의
+    KL 웹시스템 연동용 REST API 명세.
+
+    담당 기능: FUN-003, FUN-004, FUN-005, FUN-022, FUN-023, FUN-024
+    호출 주체: KL 웹시스템 (Backend)
+    제공 주체: Lloydk AI Engine (FastAPI)
+
+    인증: API Key (서버 간 통신) + 선택적 JWT (관리자 행위 추적)
+    모든 응답은 application/json. 파일 업로드는 multipart/form-data.
+    날짜·시각은 ISO 8601 UTC. 모든 ID는 UUIDv4.
+  version: 1.0.0-draft
+  contact:
+    name: Lloydk AI Engineering
+servers:
+  - url: http://lloydk-api:8000/api/v1
+    description: 온프레미스 Docker 내부망
+  - url: https://{host}/api/v1
+    description: 프로덕션
+    variables:
+      host:
+        default: ai.example.kipra.local
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: classify
+    description: 등급 분류 추론 (FUN-005)
+  - name: confirm
+    description: 분류 결과 확정·재라벨 (FUN-005, FUN-024)
+  - name: training
+    description: 모델 학습·재학습 (FUN-004)
+  - name: synthesis
+    description: 샘플 문서 합성 (FUN-003)
+  - name: guide
+    description: 학습 가이드 문서 (FUN-002 연계)
+  - name: schema
+    description: 등급체계 관리 (FUN-005)
+  - name: metrics
+    description: 성능 지표·리포트 (FUN-024)
+  - name: health
+    description: 상태 확인
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: 헬스 체크
+      security: []
+      responses:
+        '200':
+          description: 정상
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  model_version: { type: string, example: "kf-deberta-cls-v1.3.0" }
+                  uptime_sec: { type: integer, example: 123456 }
+
+  /classify:
+    post:
+      tags: [classify]
+      summary: 단일 문서 등급 분류 (동기)
+      description: |
+        KL이 업로드한 문서를 즉시 분류한다. 길이가 길거나 RAG ON 시
+        타임아웃 우려가 있으면 /classify/async 사용 권장.
+        결과는 staging 상태로 저장되며, /confirm 호출 시 최종 확정.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassifyRequest'
+      responses:
+        '200':
+          description: 분류 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassifyResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413':
+          description: 본문 길이 초과 (use /classify/async)
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /classify/async:
+    post:
+      tags: [classify]
+      summary: 분류 작업 큐 등록 (비동기, 대용량/RAG ON)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassifyAsyncRequest'
+      responses:
+        '202':
+          description: 큐 등록 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id: { type: string, format: uuid }
+                  status_url: { type: string, format: uri }
+                  estimated_sec: { type: integer }
+
+  /classify/batch:
+    post:
+      tags: [classify]
+      summary: 다건 문서 일괄 분류 (비동기 큐, 최대 1000건)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id, documents]
+              properties:
+                tenant_id: { type: string }
+                use_rag: { type: boolean, default: false }
+                documents:
+                  type: array
+                  maxItems: 1000
+                  items: { $ref: '#/components/schemas/DocumentInput' }
+      responses:
+        '202':
+          description: 일괄 작업 등록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batch_id: { type: string, format: uuid }
+                  job_count: { type: integer }
+
+  /classify/jobs/{job_id}:
+    get:
+      tags: [classify]
+      summary: 비동기 분류 작업 상태·결과 조회
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 작업 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /classify/{doc_id}:
+    get:
+      tags: [classify]
+      summary: 문서별 최근 분류 결과 조회
+      parameters:
+        - in: path
+          name: doc_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassifyResponse'
+
+  /confirm:
+    post:
+      tags: [confirm]
+      summary: 관리자 분류 결과 확정 (staging -> production)
+      description: |
+        KL의 관리자가 분류 결과를 확정한다. 확정된 결과는 KL DB의
+        최종 라벨이 되며, Lloydk 측에는 감사 로그로 보관된다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc_id, confirmed_label, actor]
+              properties:
+                doc_id: { type: string }
+                model_version: { type: string }
+                inference_id: { type: string, format: uuid }
+                confirmed_label: { $ref: '#/components/schemas/Grade' }
+                actor: { $ref: '#/components/schemas/Actor' }
+                note: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: 확정 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  confirmation_id: { type: string, format: uuid }
+                  confirmed_at: { type: string, format: date-time }
+
+  /relabel:
+    post:
+      tags: [confirm]
+      summary: 오분류 수정 라벨 등록 (능동학습 입력)
+      description: |
+        관리자가 AI 분류 결과를 잘못된 것으로 판단하고 수정 라벨을
+        부여한 경우. 누적된 재라벨 데이터는 재학습 큐로 자동 전송된다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc_id, original_label, corrected_label, actor]
+              properties:
+                doc_id: { type: string }
+                inference_id: { type: string, format: uuid }
+                original_label: { $ref: '#/components/schemas/Grade' }
+                corrected_label: { $ref: '#/components/schemas/Grade' }
+                reason: { type: string, maxLength: 2000 }
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '200':
+          description: 재라벨 접수
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  relabel_id: { type: string, format: uuid }
+                  queue_size: { type: integer, description: "대기 중인 재라벨 누적 수" }
+                  retrain_threshold: { type: integer, description: "재학습 자동 트리거 임계" }
+
+  /train:
+    post:
+      tags: [training]
+      summary: 모델 학습·재학습 트리거
+      description: |
+        스케줄 또는 KL 관리자 수동 트리거. 진행 상태는 /train/jobs/{id}로 폴링.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [training_type, actor]
+              properties:
+                training_type:
+                  type: string
+                  enum: [full, incremental, hyperparam_search]
+                base_model:
+                  type: string
+                  enum: [kf-deberta-base, koelectra-base]
+                  default: kf-deberta-base
+                dataset_version: { type: string, description: "MLflow dataset tag" }
+                hyperparams:
+                  type: object
+                  additionalProperties: true
+                use_rag: { type: boolean, default: false }
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '202':
+          description: 학습 작업 등록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  train_job_id: { type: string, format: uuid }
+                  status_url: { type: string, format: uri }
+                  websocket_url: { type: string, format: uri }
+
+  /train/jobs/{train_job_id}:
+    get:
+      tags: [training]
+      summary: 학습 작업 진행 상태 조회
+      parameters:
+        - in: path
+          name: train_job_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 학습 상태
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  train_job_id: { type: string, format: uuid }
+                  status:
+                    type: string
+                    enum: [queued, preprocessing, training, evaluating, registering, done, failed]
+                  progress: { type: number, minimum: 0, maximum: 1, example: 0.42 }
+                  current_epoch: { type: integer }
+                  total_epochs: { type: integer }
+                  metrics_so_far:
+                    $ref: '#/components/schemas/Metrics'
+                  started_at: { type: string, format: date-time }
+                  estimated_finish_at: { type: string, format: date-time }
+                  model_version: { type: string, nullable: true }
+                  error: { type: string, nullable: true }
+
+  /train/jobs:
+    get:
+      tags: [training]
+      summary: 학습 작업 이력 목록
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, maximum: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/TrainJobSummary' }
+
+  /synth/generate:
+    post:
+      tags: [synthesis]
+      summary: LLM 기반 학습용 샘플 문서 생성
+      description: |
+        FUN-003. 등급별·도메인별 합성 문서를 LLM으로 생성하고 검수 큐에 적재한다.
+        Adapter로 OpenAI/Anthropic/Google/vLLM 교체 가능.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_grade, count, actor]
+              properties:
+                target_grade: { $ref: '#/components/schemas/Grade' }
+                domain:
+                  type: string
+                  enum: [tech, business, hr, finance, legal, mixed]
+                  default: mixed
+                count: { type: integer, minimum: 1, maximum: 500 }
+                llm_provider:
+                  type: string
+                  enum: [anthropic, openai, google, vllm_qwen, vllm_exaone]
+                  default: anthropic
+                seed_documents:
+                  type: array
+                  items: { type: string, description: "Guide 문서 ID" }
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '202':
+          description: 생성 작업 등록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synth_job_id: { type: string, format: uuid }
+                  expected_count: { type: integer }
+                  estimated_cost_usd: { type: number, format: float }
+
+  /synth/queue:
+    get:
+      tags: [synthesis]
+      summary: 검수 대기 중인 합성 문서 목록 (KL 검수 UI용)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, approved, rejected], default: pending }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SyntheticDoc' }
+
+  /synth/{synth_id}/review:
+    post:
+      tags: [synthesis]
+      summary: 합성 문서 검수 결과 등록 (승인/반려)
+      parameters:
+        - in: path
+          name: synth_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, actor]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, reject]
+                corrected_grade: { $ref: '#/components/schemas/Grade' }
+                comment: { type: string, maxLength: 2000 }
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '200':
+          description: 검수 결과 반영
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synth_id: { type: string, format: uuid }
+                  final_status: { type: string, enum: [approved, rejected] }
+                  added_to_dataset_version: { type: string, nullable: true }
+
+  /guide/documents:
+    post:
+      tags: [guide]
+      summary: 학습 가이드 문서 등록·갱신 (FUN-002 연계)
+      description: |
+        KL이 관리하는 영업비밀 가이드 문서를 Lloydk가 학습 기준으로 사용할 수 있도록
+        등록한다. 등록 시 자동으로 임베딩되어 RAG 인덱스에 반영된다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [guide_id, version, file, actor]
+              properties:
+                guide_id: { type: string }
+                version: { type: string, example: "v2.1" }
+                effective_date: { type: string, format: date }
+                change_summary: { type: string, maxLength: 4000 }
+                file:
+                  type: string
+                  format: binary
+                  description: HWP/DOCX/PDF
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '201':
+          description: 등록 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  guide_id: { type: string }
+                  version: { type: string }
+                  indexed: { type: boolean }
+                  embedding_vector_count: { type: integer }
+                  triggers_retraining: { type: boolean }
+
+  /guide/documents/{guide_id}:
+    get:
+      tags: [guide]
+      summary: 가이드 문서 버전 목록 조회
+      parameters:
+        - in: path
+          name: guide_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 버전 이력
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  guide_id: { type: string }
+                  current_training_version:
+                    type: string
+                    description: "현재 운영 모델이 학습한 기준 버전"
+                  versions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        version: { type: string }
+                        effective_date: { type: string, format: date }
+                        change_summary: { type: string }
+                        registered_at: { type: string, format: date-time }
+
+  /schema/grades:
+    get:
+      tags: [schema]
+      summary: 현재 등급체계 조회
+      responses:
+        '200':
+          description: 등급체계
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  grades:
+                    type: array
+                    items: { $ref: '#/components/schemas/GradeDefinition' }
+
+    put:
+      tags: [schema]
+      summary: 등급체계 변경 (관리자 권한, 재학습 필요성 응답)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grades, actor]
+              properties:
+                grades:
+                  type: array
+                  items: { $ref: '#/components/schemas/GradeDefinition' }
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '200':
+          description: 변경 적용
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  requires_retraining: { type: boolean }
+                  reason: { type: string }
+
+  /metrics/latest:
+    get:
+      tags: [metrics]
+      summary: 운영 중 모델의 최신 성능 지표
+      responses:
+        '200':
+          description: 최신 지표
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsReport'
+
+  /metrics/history:
+    get:
+      tags: [metrics]
+      summary: 모델 버전별 성능 이력
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: 이력
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/MetricsReport' }
+
+  /metrics/confusion-matrix/{model_version}:
+    get:
+      tags: [metrics]
+      summary: 버전별 Confusion Matrix
+      parameters:
+        - in: path
+          name: model_version
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 매트릭스
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_version: { type: string }
+                  labels:
+                    type: array
+                    items: { type: string }
+                  matrix:
+                    type: array
+                    description: "행=정답, 열=예측"
+                    items:
+                      type: array
+                      items: { type: integer }
+                  fnr_by_grade:
+                    type: object
+                    additionalProperties: { type: number }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Grade:
+      type: string
+      description: 등급체계 코드. 관리자가 수정 가능하지만 기본 4단계 제공.
+      enum:
+        - TS    # 특급기밀
+        - S1    # 1급 비밀
+        - S2    # 2급 대외비
+        - S3    # 3급 공개
+
+    GradeDefinition:
+      type: object
+      required: [code, name, order]
+      properties:
+        code: { type: string, example: "S1" }
+        name: { type: string, example: "1급 비밀" }
+        order: { type: integer, description: "높을수록 높은 등급" }
+        description: { type: string }
+        color: { type: string, example: "#D32F2F" }
+
+    Actor:
+      type: object
+      required: [user_id, role]
+      description: 호출자(관리자/시스템) 정보. 감사 로그용.
+      properties:
+        user_id: { type: string }
+        role:
+          type: string
+          enum: [admin, reviewer, system, kl_backend]
+        tenant_id: { type: string }
+        ip: { type: string, nullable: true }
+
+    DocumentInput:
+      type: object
+      required: [doc_id, content]
+      properties:
+        doc_id:
+          type: string
+          description: KL 측 문서 식별자
+        tenant_id: { type: string }
+        title: { type: string }
+        content:
+          type: string
+          description: |
+            전처리 전 텍스트. 길이 제한 1MB.
+            바이너리 파일 분류는 별도 /preprocess/upload 사용.
+        metadata:
+          type: object
+          description: 작성 부서, 문서 유형, 작성일 등 라벨링 보조 정보
+          additionalProperties: true
+        text_already_preprocessed:
+          type: boolean
+          default: false
+
+    ClassifyRequest:
+      allOf:
+        - $ref: '#/components/schemas/DocumentInput'
+        - type: object
+          properties:
+            use_rag:
+              type: boolean
+              default: false
+              description: 사내규정 RAG 컨텍스트 결합 여부
+            rag_namespace:
+              type: string
+              description: 기업별 RAG 인덱스 분리 키
+            return_evidence:
+              type: boolean
+              default: true
+
+    ClassifyAsyncRequest:
+      allOf:
+        - $ref: '#/components/schemas/ClassifyRequest'
+        - type: object
+          properties:
+            callback_url:
+              type: string
+              format: uri
+              description: 완료 시 KL이 받을 콜백 URL (선택)
+
+    ClassifyResponse:
+      type: object
+      required: [inference_id, doc_id, label, confidence, model_version]
+      properties:
+        inference_id: { type: string, format: uuid }
+        doc_id: { type: string }
+        label: { $ref: '#/components/schemas/Grade' }
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.87
+        scores:
+          type: object
+          description: 등급별 확률 분포
+          additionalProperties:
+            type: number
+            minimum: 0
+            maximum: 1
+        evaluation_factors:
+          type: object
+          description: 가이드 4대 평가요소 점수
+          properties:
+            economic_value: { type: number, minimum: 0, maximum: 5 }
+            non_publicity: { type: number, minimum: 0, maximum: 5 }
+            management_level: { type: number, minimum: 0, maximum: 5 }
+            leak_impact: { type: number, minimum: 0, maximum: 5 }
+        evidence:
+          type: array
+          description: 근거 키워드·문맥 span
+          items:
+            type: object
+            properties:
+              start: { type: integer }
+              end: { type: integer }
+              text: { type: string }
+              weight: { type: number }
+              tag: { type: string }
+        rag_context_used:
+          type: array
+          items:
+            type: object
+            properties:
+              source_doc: { type: string }
+              chunk_id: { type: string }
+              score: { type: number }
+        model_version: { type: string }
+        elapsed_ms: { type: integer }
+        status:
+          type: string
+          enum: [staging, confirmed]
+          default: staging
+        warnings:
+          type: array
+          items: { type: string }
+
+    JobStatus:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [queued, running, done, failed, cancelled]
+        progress: { type: number, minimum: 0, maximum: 1 }
+        result:
+          $ref: '#/components/schemas/ClassifyResponse'
+        error: { type: string, nullable: true }
+
+    Metrics:
+      type: object
+      properties:
+        accuracy: { type: number }
+        precision_macro: { type: number }
+        recall_macro: { type: number }
+        f1_macro: { type: number }
+        fnr_overall:
+          type: number
+          description: 미탐율. 보안 핵심 KPI.
+        fnr_by_grade:
+          type: object
+          additionalProperties: { type: number }
+
+    MetricsReport:
+      type: object
+      properties:
+        model_version: { type: string }
+        evaluated_at: { type: string, format: date-time }
+        dataset_version: { type: string }
+        sample_count: { type: integer }
+        metrics: { $ref: '#/components/schemas/Metrics' }
+        notes: { type: string }
+
+    TrainJobSummary:
+      type: object
+      properties:
+        train_job_id: { type: string, format: uuid }
+        status: { type: string }
+        training_type: { type: string }
+        base_model: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        model_version: { type: string, nullable: true }
+        f1_macro: { type: number, nullable: true }
+        fnr_overall: { type: number, nullable: true }
+
+    SyntheticDoc:
+      type: object
+      properties:
+        synth_id: { type: string, format: uuid }
+        target_grade: { $ref: '#/components/schemas/Grade' }
+        domain: { type: string }
+        llm_provider: { type: string }
+        preview: { type: string, description: "본문 앞 200자" }
+        generated_at: { type: string, format: date-time }
+        status: { type: string, enum: [pending, approved, rejected] }
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: |
+            기계 식별용 오류 코드. 예시:
+              LLOYDK_VALIDATION, LLOYDK_AUTH, LLOYDK_NOT_FOUND,
+              LLOYDK_MODEL_NOT_READY, LLOYDK_LLM_PROVIDER_FAIL,
+              LLOYDK_GPU_UNAVAILABLE, LLOYDK_RATE_LIMIT, LLOYDK_INTERNAL
+        message: { type: string }
+        request_id: { type: string, format: uuid }
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: 리소스 없음
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    InternalError:
+      description: 서버 오류
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

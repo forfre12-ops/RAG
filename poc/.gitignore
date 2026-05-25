@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+datasets/raw/
+datasets/external/
+datasets/preprocessed/
+datasets/labeled/
+datasets/synthetic/
+artifacts/
+mlruns/
+reports/
+.ipynb_checkpoints/
