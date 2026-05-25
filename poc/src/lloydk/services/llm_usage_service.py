@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,8 +60,9 @@ class LLMUsageService:
                 pass
 
     def _append_jsonl(self, row: dict) -> None:
-        with self.jsonl_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(row, ensure_ascii=False) + os.linesep)
+        # JSONL은 LF 줄 끝이 표준. CRLF는 파서 호환성 문제 야기.
+        with self.jsonl_path.open("a", encoding="utf-8", newline="") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
     def _insert_db(self, row: dict) -> None:
         from sqlalchemy import text

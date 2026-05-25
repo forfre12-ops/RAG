@@ -53,3 +53,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+filterwarnings = [
+  "ignore:Field .model_version. in ClassifyResponse has conflict with protected namespace .model_.:UserWarning",
+]
