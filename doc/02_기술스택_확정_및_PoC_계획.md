@@ -264,3 +264,29 @@ P5 E2E통합              ██
 3. **PoC 환경 셋업**: GPU 1장 + Docker compose로 Qdrant/Postgres/MinIO/Redis/MLflow 구동 (3일)
 4. **P4 시작**: 문서처리는 다른 PoC의 입력이므로 최우선 (W1)
 5. **PoC 완료 후 본 문서 §1을 갱신하여 v1.0 확정** → 본 설계의 §2 모듈 구현 착수
+
+---
+
+## 부록 A. PoC 1차 결과 (2026-05-26, dryrun 모드)
+
+발주처 데이터 미확보·Docker/GPU 미가용 환경에서 **합성 코퍼스 + 결정론적 mock**으로
+파이프라인 무결성 + 합격선 판정 로직을 검증. 실측 모델 비교는 GPU 확보 후 `--mode full` 재실행.
+
+| PoC | 합격선 | 1차 결과 | 판정 | 비고 |
+|---|---|---|:---:|---|
+| **P4 추출** | 누락률 ≤ 5%, 품질 ≥ 0.7 | 누락 0.0%, 품질 0.986 | PASS | 30 파일 (.txt/.md). HWP/DOCX/PDF 실파일은 발주처 데이터 확보 후 동일 스크립트로 재실행 |
+| **P3 합성** | 라벨 일치도 ≥ 90% | **100.0%** (40건), FNR 0% | PASS | Noop provider, 비용 $0. 실 Claude/Qwen3 비교는 API 키 추가 후 `--provider anthropic` |
+| **P2 임베딩** | Recall@5 ≥ 0.80, Lat ≤ 200ms | Recall 0.70 (hash baseline), 3ms | PASS* | dryrun baseline 0.50 통과. KURE-v1/BGE-M3 실측은 모델 다운로드 후 `--mode full` |
+| **P1 분류** | F1-macro ≥ 0.75, FNR ≤ 5% | **F1 1.0**, FNR 0% | PASS | 룰 라벨러 surrogate. KF-DeBERTa 학습은 GPU 확보 후 `--mode full --epochs 5` |
+| **P5 E2E** | 응답 200 + 라벨 OK, ≤ 30s | 4/4 일치, max 6.4ms (inproc) | PASS | TestClient in-process. HTTP 모드는 `docker compose up` 후 `--mode http` |
+
+**전체 자동 실행**: `make poc-all` 또는 `python scripts/run_all_pocs.py` — 2초 내 6단계 완료, `poc/reports/summary.md` 생성.
+
+### 부록 B. 1차 PoC 한계와 후속 액션
+
+| 한계 | 후속 액션 |
+|---|---|
+| 발주처 실데이터 0건 → 합성 코퍼스로만 검증 | Q4(데이터 제공) 확정 후 P1/P3 재실행 |
+| GPU·Docker 미가용 → mock/in-memory 백엔드 | Q2(GPU 사양) 확정 후 `make infra-up` + KF-DeBERTa/KURE-v1 실측 |
+| LLM 비용 측정 불가 (noop provider) | API 키 확보 후 P3 `--provider anthropic` 재실행 → 운영 단가 견적 |
+| 룰 라벨러가 분류기 surrogate | KF-DeBERTa 학습 완료 후 P1 `--mode full` → 룰 vs 학습모델 비교 |

@@ -18,9 +18,11 @@ poc/datasets/external/
 poc/datasets/preprocessed/
 poc/datasets/labeled/
 poc/datasets/synthetic/
+poc/datasets/p4_corpus/
 poc/artifacts/
 poc/mlruns/
 poc/reports/
+poc/.storage/
 
 # Notebooks
 .ipynb_checkpoints/

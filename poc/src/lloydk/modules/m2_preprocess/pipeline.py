@@ -1,122 +1,66 @@
+"""M2 전체 파이프라인: 파일/텍스트 → 추출 → 정규화 → 청크.
+
+extractor.py / normalizer.py / chunker.py 가 단일 책임. 본 모듈은 조립만.
+"""
+
 from __future__ import annotations
-import re
-from dataclasses import dataclass
+
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from lloydk.modules.m2_preprocess.chunker import Chunk, split
+from lloydk.modules.m2_preprocess.extractor import ExtractResult, extract
+from lloydk.modules.m2_preprocess.normalizer import normalize, quality_score
 
 
 @dataclass
-class Chunk:
-    index: int
-    text: str
-    start_char: int
-    end_char: int
-
-
-class Extractor:
-    def supports(self, suffix: str) -> bool: ...
-    def extract(self, path: Path) -> str: ...
-
-
-class PdfExtractor(Extractor):
-    def supports(self, suffix): return suffix.lower() == ".pdf"
-
-    def extract(self, path: Path) -> str:
-        import fitz  # PyMuPDF
-        doc = fitz.open(path)
-        return "\n".join(p.get_text("text") for p in doc)
-
-
-class DocxExtractor(Extractor):
-    def supports(self, suffix): return suffix.lower() == ".docx"
-
-    def extract(self, path: Path) -> str:
-        from docx import Document
-        d = Document(str(path))
-        return "\n".join(p.text for p in d.paragraphs)
-
-
-class HwpExtractor(Extractor):
-    """HWP/HWPX 통합 추출기. 1차 rhwp-python(Rust, 빠름), 2차 pyhwp(HWP5만)."""
-
-    def supports(self, suffix): return suffix.lower() in {".hwp", ".hwpx"}
-
-    def extract(self, path: Path) -> str:
-        try:
-            import rhwp  # rhwp-python (PyO3 binding to Rust engine)
-            return rhwp.extract_text(str(path))
-        except Exception:
-            pass
-        if path.suffix.lower() == ".hwp":
-            try:
-                from hwp5.hwp5txt import HwpToTextConverter
-                return HwpToTextConverter().convert(str(path))
-            except Exception:
-                pass
-        raise RuntimeError(f"hwp extraction failed for {path}; install rhwp-python or run libreoffice fallback")
-
-
-class TxtExtractor(Extractor):
-    def supports(self, suffix): return suffix.lower() in {".txt", ".md"}
-
-    def extract(self, path: Path) -> str:
-        return Path(path).read_text(encoding="utf-8", errors="ignore")
-
-
-_EXTRACTORS: list[Extractor] = [PdfExtractor(), DocxExtractor(), HwpExtractor(), TxtExtractor()]
-
-
-def extract_file(path: str | Path) -> str:
-    p = Path(path)
-    for ex in _EXTRACTORS:
-        if ex.supports(p.suffix):
-            return ex.extract(p)
-    raise ValueError(f"unsupported format: {p.suffix}")
-
-
-_WHITESPACE = re.compile(r"[ \t]+")
-_NEWLINES = re.compile(r"\n{3,}")
-_BOILERPLATE_PATTERNS = [
-    re.compile(r"페이지\s*\d+\s*/\s*\d+"),
-    re.compile(r"^- ?\d+ ?- ?$", re.MULTILINE),
-]
-
-
-def normalize(text: str) -> str:
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = _WHITESPACE.sub(" ", text)
-    for pat in _BOILERPLATE_PATTERNS:
-        text = pat.sub(" ", text)
-    text = _NEWLINES.sub("\n\n", text)
-    return text.strip()
-
-
-def chunk_text(text: str, max_len: int = 512, overlap: int = 64) -> list[Chunk]:
-    chunks: list[Chunk] = []
-    if not text:
-        return chunks
-    i = 0
-    idx = 0
-    n = len(text)
-    while i < n:
-        end = min(i + max_len, n)
-        chunks.append(Chunk(index=idx, text=text[i:end], start_char=i, end_char=end))
-        if end == n:
-            break
-        i = end - overlap
-        idx += 1
-    return chunks
+class PreprocessResult:
+    text: str                       # 정규화된 풀텍스트
+    chunks: list[Chunk]
+    extraction: ExtractResult
+    quality: float                  # 0.0~1.0
+    metadata: dict = field(default_factory=dict)
 
 
 class PreprocessPipeline:
-    def __init__(self, max_len: int = 512, overlap: int = 64):
-        self.max_len = max_len
-        self.overlap = overlap
+    """ClassifyService 호환 인터페이스 (run_text) + 전체 파일 처리 (run_file)."""
 
+    def __init__(self, *, chunk_size: int | None = None, chunk_overlap: int | None = None) -> None:
+        try:
+            from lloydk.config import settings
+
+            self.chunk_size = chunk_size or settings.chunk_size
+            self.chunk_overlap = chunk_overlap or settings.chunk_overlap
+        except Exception:  # noqa: BLE001
+            # pydantic-settings 미설치 시 합리적 기본값
+            self.chunk_size = chunk_size or 512
+            self.chunk_overlap = chunk_overlap or 64
+
+    # ClassifyService.run_text 호환 — 정규화 텍스트만 반환
     def run_text(self, text: str) -> str:
         return normalize(text)
 
-    def run_file(self, path: str | Path) -> str:
-        return normalize(extract_file(path))
+    # 전체 파일 처리
+    def run_file(self, path: str | Path) -> PreprocessResult:
+        ext = extract(path)
+        return self._finalize(ext)
+
+    # 텍스트 → 풀 결과
+    def run_text_full(self, text: str) -> PreprocessResult:
+        ext = ExtractResult(text=text, method="plain", quality=1.0)
+        return self._finalize(ext)
 
     def chunk(self, text: str) -> list[Chunk]:
-        return chunk_text(text, self.max_len, self.overlap)
+        return split(text, size=self.chunk_size, overlap=self.chunk_overlap)
+
+    def _finalize(self, ext: ExtractResult) -> PreprocessResult:
+        normalized = normalize(ext.text)
+        q = quality_score(ext.text, normalized) if ext.text else 0.0
+        chunks = split(normalized, size=self.chunk_size, overlap=self.chunk_overlap)
+        return PreprocessResult(
+            text=normalized,
+            chunks=chunks,
+            extraction=ext,
+            quality=q,
+            metadata={"chunk_count": len(chunks)},
+        )

@@ -1,86 +1,140 @@
+"""M3 Labeling 통합 파이프라인.
+
+전략:
+  1. rule_engine (키워드 시드) → 1차 라벨
+  2. confidence < threshold → llm_labeler 호출 (선택)
+  3. 결과를 ClassifyService 호환 LabelingResult(Grade/EvaluationFactors/EvidenceSpan)로 변환
+"""
+
 from __future__ import annotations
-import re
-import yaml
+
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
-from lloydk.schemas.common import Grade
-from lloydk.schemas.classify import EvidenceSpan, EvaluationFactors
+from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine, RuleLabelResult
+from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
 
+# ClassifyService 호환 스키마 (있으면 import, 없으면 dataclass 폴백)
+try:
+    from lloydk.schemas.classify import EvaluationFactors, EvidenceSpan
+    from lloydk.schemas.common import Grade
 
-DEFAULT_RULES = """
-version: "2026-05"
-factor_weights:
-  economic_value: 0.30
-  non_publicity:  0.25
-  management_level: 0.15
-  leak_impact:    0.30
-keywords:
-  economic_value:
-    - {pattern: "(매출|수익|마진|단가|원가)", weight: 1.0}
-    - {pattern: "(특허출원|영업이익률|투자유치)", weight: 1.2}
-  non_publicity:
-    - {pattern: "(미공개|대외비|기밀|내부전용)", weight: 1.3}
-  management_level:
-    - {pattern: "(접근권한|보안등급|보호조치)", weight: 1.0}
-  leak_impact:
-    - {pattern: "(소송|손해배상|제재|평판)", weight: 1.5}
-    - {pattern: "(전략|핵심기술|차별화)", weight: 1.0}
-grade_thresholds:
-  TS: 3.6
-  S1: 2.8
-  S2: 1.8
-  S3: 0.0
-"""
+    _HAS_SCHEMA = True
+except Exception:  # noqa: BLE001
+    _HAS_SCHEMA = False
+
+    class Grade(str):  # type: ignore[no-redef]
+        TS = "TS"
+        S1 = "S1"
+        S2 = "S2"
+        S3 = "S3"
+
+    @dataclass
+    class EvidenceSpan:  # type: ignore[no-redef]
+        start: int
+        end: int
+        text: str
+        weight: float = 0.0
+        tag: Optional[str] = None
+
+    @dataclass
+    class EvaluationFactors:  # type: ignore[no-redef]
+        economic_value: float = 0.0
+        non_publicity: float = 0.0
+        management_level: float = 0.0
+        leak_impact: float = 0.0
 
 
 @dataclass
 class LabelingResult:
-    grade: Grade
+    grade: str
+    confidence: float
     factors: EvaluationFactors
     evidence: list[EvidenceSpan] = field(default_factory=list)
+    method: str = "rule"          # rule | rule+llm
+    rule_result: Optional[RuleLabelResult] = None
+
+
+_FACTOR_FIELD_MAP = {
+    "ECONOMIC_VALUE": "economic_value",
+    "NON_PUBLICITY": "non_publicity",
+    "MANAGEMENT_LEVEL": "management_level",
+    "LEAK_IMPACT": "leak_impact",
+}
 
 
 class LabelingPipeline:
-    def __init__(self, rules_path: str | Path | None = None):
-        text = Path(rules_path).read_text(encoding="utf-8") if rules_path else DEFAULT_RULES
-        self.rules = yaml.safe_load(text)
-        self._compiled = self._compile_rules()
+    """rules_path 인자는 하위호환용 — 무시되며 KEYWORD_SEEDS를 사용."""
 
-    def _compile_rules(self):
-        out = {}
-        for factor, items in self.rules["keywords"].items():
-            out[factor] = [(re.compile(it["pattern"]), float(it.get("weight", 1.0))) for it in items]
-        return out
+    def __init__(
+        self,
+        rules_path: str | Path | None = None,  # noqa: ARG002 (하위호환)
+        *,
+        use_llm_fallback: bool = False,
+        llm_threshold: float = 0.3,
+    ) -> None:
+        self.engine = LabelRuleEngine(KEYWORD_SEEDS)
+        self.use_llm_fallback = use_llm_fallback
+        self.llm_threshold = llm_threshold
+        self._llm_labeler = None  # lazy
 
     def label(self, text: str) -> LabelingResult:
-        factor_scores: dict[str, float] = {}
-        evidence: list[EvidenceSpan] = []
+        r = self.engine.label(text)
+        method = "rule"
+        if self.use_llm_fallback and r.confidence < self.llm_threshold:
+            try:
+                from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
 
-        for factor, patterns in self._compiled.items():
-            score = 0.0
-            for pat, w in patterns:
-                for m in pat.finditer(text):
-                    score += w
-                    evidence.append(EvidenceSpan(
-                        start=m.start(), end=m.end(), text=m.group(0),
-                        weight=w, tag=factor,
-                    ))
-            factor_scores[factor] = min(score, 5.0)
+                if self._llm_labeler is None:
+                    self._llm_labeler = LLMLabeler()
+                llm_out = self._llm_labeler.label(text)
+                if llm_out.grade in {"TS", "S1", "S2", "S3"}:
+                    # FNR-safe merge: rule 등급과 LLM 등급 중 더 높은(낮은 order) 등급 선택
+                    from lloydk.modules.m3_labeling.seeds import GRADE_ORDER
 
-        weights = self.rules["factor_weights"]
-        weighted_sum = sum(factor_scores[f] * weights.get(f, 0) for f in factor_scores)
-
-        grade = Grade.S3
-        for code in ("TS", "S1", "S2", "S3"):
-            if weighted_sum >= self.rules["grade_thresholds"][code]:
-                grade = Grade(code)
-                break
+                    rule_order = GRADE_ORDER[r.grade]
+                    llm_order = GRADE_ORDER[llm_out.grade]
+                    if llm_order < rule_order:
+                        r = RuleLabelResult(
+                            grade=llm_out.grade,
+                            confidence=max(r.confidence, llm_out.confidence),
+                            grade_scores=r.grade_scores,
+                            factor_scores={
+                                k: max(v, llm_out.factor_scores.get(k, 0.0))
+                                for k, v in r.factor_scores.items()
+                            },
+                            matched_keywords=r.matched_keywords,
+                            total_score=r.total_score,
+                            method="rule+llm",
+                        )
+                    method = "rule+llm"
+            except Exception:  # noqa: BLE001
+                pass
 
         factors = EvaluationFactors(
-            economic_value=factor_scores.get("economic_value", 0),
-            non_publicity=factor_scores.get("non_publicity", 0),
-            management_level=factor_scores.get("management_level", 0),
-            leak_impact=factor_scores.get("leak_impact", 0),
+            **{
+                _FACTOR_FIELD_MAP[k]: v
+                for k, v in r.factor_scores.items()
+                if k in _FACTOR_FIELD_MAP
+            }
         )
-        return LabelingResult(grade=grade, factors=factors, evidence=evidence[:50])
+        evidence = [
+            EvidenceSpan(
+                start=text.find(m.keyword) if text.find(m.keyword) >= 0 else 0,
+                end=(text.find(m.keyword) + len(m.keyword)) if text.find(m.keyword) >= 0 else len(m.keyword),
+                text=m.keyword,
+                weight=m.score,
+                tag=m.factor,
+            )
+            for m in r.matched_keywords[:50]
+        ]
+        grade_val = Grade(r.grade) if _HAS_SCHEMA else r.grade
+        return LabelingResult(
+            grade=grade_val,
+            confidence=r.confidence,
+            factors=factors,
+            evidence=evidence,
+            method=method,
+            rule_result=r,
+        )

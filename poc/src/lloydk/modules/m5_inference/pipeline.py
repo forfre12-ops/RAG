@@ -6,8 +6,13 @@ from typing import Optional
 from lloydk.config import settings
 from lloydk.schemas.common import Grade
 from lloydk.schemas.classify import EvidenceSpan, EvaluationFactors, RagContextHit
-from lloydk.modules.m2_preprocess.pipeline import chunk_text
+from lloydk.modules.m2_preprocess import split as _chunk_split
 from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
+
+
+def chunk_text(text: str, size: int = 512, overlap: int = 64):
+    """하위호환 wrapper — 새 split()로 위임."""
+    return _chunk_split(text, size=size, overlap=overlap)
 
 
 @dataclass

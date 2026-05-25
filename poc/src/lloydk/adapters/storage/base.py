@@ -1,0 +1,13 @@
+from __future__ import annotations
+
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class ObjectStorage(Protocol):
+    name: str
+
+    def put(self, bucket: str, key: str, data: bytes, *, content_type: str = "application/octet-stream") -> str: ...
+    def get(self, bucket: str, key: str) -> bytes: ...
+    def exists(self, bucket: str, key: str) -> bool: ...
+    def uri(self, bucket: str, key: str) -> str: ...
