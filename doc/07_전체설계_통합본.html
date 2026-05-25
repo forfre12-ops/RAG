@@ -1,0 +1,2261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 전체 설계 통합본 | Whitepaper</title>
+<meta name="description" content="한국어 문서 4단계 보안등급 자동 분류 시스템의 전체 워크플로우, 모델별 장단점, 선택 이유, 의사결정 근거." />
+<link rel="icon" type="image/png" href="assets/lloydk_logo_mark.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+
+<style>
+  /* ============================================================
+     NovaX Design System (Next.js / Vercel inspired)
+     - Geist Sans / Geist Mono
+     - Light mode only
+     - 1px borders, monochrome, subtle accents
+     ============================================================ */
+  :root {
+    --bg:           #ffffff;
+    --bg-surface:   #fafafa;
+    --bg-elevated:  #ffffff;
+    --bg-code:      #fafafa;
+    --bg-nav:       rgba(255,255,255,0.72);
+    --text:         #0a0a0a;
+    --text-soft:    #525252;
+    --text-dim:     #737373;
+    --text-faint:   #a3a3a3;
+    --border:       rgba(0,0,0,0.08);
+    --border-strong:rgba(0,0,0,0.16);
+    --border-soft:  rgba(0,0,0,0.05);
+    --accent:       #0a0a0a;
+    --accent-soft:  #f4f4f4;
+    --accent-blue:  rgba(0,112,243,0.06);
+    /* NovaX radius scale — only these four. pill = 999px. */
+    --radius-sm:    6px;
+    --radius:       8px;
+    --radius-lg:    12px;
+    --radius-pill:  999px;
+    --shadow-sm:    0 1px 2px rgba(0,0,0,.04);
+    --shadow:       0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.06);
+    --font-sans:    "Geist", -apple-system, BlinkMacSystemFont, "Pretendard",
+                    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --font-mono:    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.7;
+    letter-spacing: -0.011em;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    position: relative;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--text); color: var(--bg); }
+
+  /* ===== Navbar (glassmorphism, sticky) ===== */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg-nav);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .nav-inner {
+    max-width: 1320px; margin: 0 auto;
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--text); text-decoration: none;
+    white-space: nowrap; min-width: 0;
+    line-height: 1;
+  }
+  .brand-mark {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    background: #ffffff;
+    border-radius: 999px;
+    padding: 5px;
+    border: 1px solid rgba(0,0,0,0.12);
+  }
+  .brand-mark img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  .brand-name {
+    font-weight: 600; font-size: 15px;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .brand-sep {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: 0 6px;
+    font-weight: 400;
+  }
+  .brand-url {
+    font-family: var(--font-mono);
+    font-size: 13.5px; font-weight: 400;
+    color: var(--text-dim);
+    letter-spacing: 0;
+  }
+  .nav-search {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 10px 6px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s;
+    min-width: 200px;
+  }
+  .nav-search:hover { border-color: var(--border-strong); color: var(--text-soft); }
+  .nav-search kbd {
+    font-family: var(--font-mono); font-size: 10.5px;
+    padding: 1px 6px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--text-dim);
+    margin-left: auto;
+  }
+  .nav-actions { display: flex; align-items: center; gap: 8px; }
+  .nav-link {
+    color: var(--text-soft);
+    text-decoration: none;
+    font-size: 13.5px; font-weight: 500;
+    padding: 6px 10px; border-radius: var(--radius-sm);
+    transition: color .15s;
+  }
+  .nav-link:hover { color: var(--text); }
+  /* ===== Layout ===== */
+  .container {
+    max-width: 1280px; margin: 0 auto;
+    padding: 0 32px;
+  }
+  .article-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 56px;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 40px 48px 120px;
+  }
+  article {
+    min-width: 0;
+    max-width: 920px;
+  }
+
+  /* ===== Article header ===== */
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-dim); text-decoration: none;
+    font-size: 13.5px; font-weight: 500;
+    margin-bottom: 28px;
+    transition: color .15s;
+  }
+  .back-link:hover { color: var(--text); }
+
+  .meta-row {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 20px;
+    font-size: 12.5px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    background: var(--text); color: var(--bg);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  .meta-dot { color: var(--text-faint); }
+  .meta-soft { color: var(--text-dim); }
+  .meta-category { color: var(--text); font-weight: 600; }
+
+  h1.title {
+    font-size: 64px; font-weight: 800;
+    letter-spacing: -0.04em; line-height: 1.04;
+    margin: 0 0 22px;
+    color: var(--text);
+  }
+  .lede {
+    font-size: 21px; font-weight: 300;
+    color: var(--text-soft); line-height: 1.55;
+    margin: 0 0 32px;
+    letter-spacing: -0.012em;
+    max-width: 720px;
+  }
+  .hero-kpis {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin: 0 0 36px;
+  }
+  .hero-kpi {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 5px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 12.5px;
+    color: var(--text-soft);
+    font-family: var(--font-mono);
+  }
+  .hero-kpi b {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .hero-kpi .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--text);
+  }
+  .hero-sep {
+    border: none; border-top: 1px solid var(--border-strong);
+    margin: 48px 0 56px;
+  }
+
+  /* ===== Article body ===== */
+  article h2 {
+    font-size: 32px; font-weight: 700;
+    letter-spacing: -0.028em; line-height: 1.2;
+    margin: 80px 0 10px;
+    scroll-margin-top: 80px;
+    display: flex; align-items: baseline; gap: 14px;
+    flex-wrap: wrap;
+  }
+  article h2 .num {
+    font-family: var(--font-mono);
+    font-size: 12px; font-weight: 500;
+    color: var(--text-dim);
+    margin: 0;
+    letter-spacing: 0;
+    padding: 3px 9px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    line-height: 1;
+  }
+  article h2 + .h2-sub {
+    color: var(--text-dim);
+    font-size: 15.5px;
+    margin: 0 0 28px;
+    max-width: 720px;
+  }
+  /* Section anchor divider */
+  section { position: relative; padding-top: 8px; }
+  article h3 {
+    font-size: 19px; font-weight: 600;
+    letter-spacing: -0.018em;
+    margin: 36px 0 12px;
+  }
+  article h4 {
+    font-size: 15px; font-weight: 600;
+    margin: 24px 0 8px;
+    color: var(--text);
+  }
+  article p { margin: 12px 0; color: var(--text); }
+  article ul, article ol { padding-left: 22px; }
+  article li { margin: 6px 0; }
+  article a {
+    color: var(--text);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-strong);
+    transition: border-color .15s;
+  }
+  article a:hover { border-bottom-color: var(--text); }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    transition: border-color .2s, background .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover {
+    border-color: var(--border-strong);
+  }
+  .card > * { position: relative; }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .card .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card .ctitle {
+    font-weight: 600; font-size: 16px;
+    letter-spacing: -0.015em;
+    margin-bottom: 4px;
+  }
+  .card p { margin: 6px 0 0; font-size: 14px; color: var(--text-soft); }
+
+  /* Risk / safe mono variants — use weight, not color */
+  .card.risk { background: var(--bg); border-color: var(--text); border-width: 1px; }
+  .card.risk .eyebrow { color: var(--text); border-bottom-color: var(--text); }
+  .card.safe { background: var(--bg-surface); }
+  .card.safe .eyebrow { color: var(--text-dim); }
+
+  /* ===== Callouts — NovaX, color via subtle bg + icon. No left rail. ===== */
+  .callout {
+    display: flex; gap: 14px;
+    padding: 14px 18px;
+    margin: 20px 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  /* Variants — micro tinted background + matching icon color */
+  .callout.accent  { background: rgba(0,112,243,0.04);  border-color: rgba(0,112,243,0.18); }
+  .callout.success { background: rgba(22,163,74,0.04);  border-color: rgba(22,163,74,0.20); }
+  .callout.warn    { background: rgba(217,119,6,0.05);  border-color: rgba(217,119,6,0.22); }
+  .callout.danger  { background: rgba(220,38,38,0.04);  border-color: rgba(220,38,38,0.22); }
+  .callout.accent  .callout-icon { color: #0070f3; }
+  .callout.success .callout-icon { color: #16a34a; }
+  .callout.warn    .callout-icon { color: #d97706; }
+  .callout.danger  .callout-icon { color: #dc2626; }
+  .callout.accent  .callout-label { color: #0070f3; }
+  .callout.success .callout-label { color: #16a34a; }
+  .callout.warn    .callout-label { color: #b45309; }
+  .callout.danger  .callout-label { color: #dc2626; }
+  .callout-icon {
+    width: 18px; height: 18px; flex-shrink: 0;
+    margin-top: 4px;
+    color: var(--text-soft);
+  }
+  .callout-body { flex: 1; }
+  .callout-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .callout p { margin: 4px 0; font-size: 14.5px; }
+  .callout ul { margin: 6px 0 0; padding-left: 18px; }
+  .callout li { font-size: 14.5px; margin: 3px 0; }
+
+  /* ===== Tables — NovaX flat, hairlines only ===== */
+  .table-wrap {
+    margin: 20px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-elevated);
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead { background: var(--bg-surface); }
+  thead tr:first-child th:first-child { border-top-left-radius: var(--radius-lg); }
+  thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-lg); }
+  thead th {
+    text-align: left;
+    padding: 12px 16px;
+    font-weight: 500;
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+    color: var(--text);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  /* Pick row — left rule only, no background tint */
+  tbody tr.pick td:first-child {
+    box-shadow: inset 2px 0 0 var(--text);
+    font-weight: 600;
+    padding-left: 18px;
+  }
+  tbody tr.pick td { color: var(--text); }
+  .star { color: var(--text-dim); letter-spacing: -1px; font-size: 11px; white-space: nowrap; }
+
+  /* Pills — NovaX style: flat, narrow, mono */
+  .pill {
+    display: inline-flex; align-items: center;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px; font-weight: 500;
+    font-family: var(--font-mono);
+    letter-spacing: 0;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .pill.accept   { background: var(--text); color: var(--bg); border: 1px solid var(--text); }
+  .pill.fallback { background: transparent; border: 1px solid var(--border-strong); color: var(--text-soft); }
+  .pill.review   { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-dim); }
+  .pill.warn,
+  .pill.danger   { background: transparent; border: 1px solid var(--text); color: var(--text); }
+
+  /* ===== Sequence steps (vertical stepped cards) ===== */
+  .seq {
+    margin: 24px 0;
+    display: flex; flex-direction: column;
+    gap: 0;
+  }
+  .seq-step {
+    display: grid;
+    grid-template-columns: 44px 1fr 110px;
+    align-items: stretch;
+    gap: 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    position: relative;
+  }
+  .seq-step + .seq-arrow { margin: 4px 0 4px 22px; }
+  .seq-arrow {
+    width: 1px; height: 18px;
+    background: var(--border-strong);
+    position: relative;
+  }
+  .seq-arrow::after {
+    content: ""; position: absolute;
+    left: -3px; bottom: -1px;
+    width: 7px; height: 7px;
+    border-right: 1px solid var(--border-strong);
+    border-bottom: 1px solid var(--border-strong);
+    transform: rotate(45deg);
+  }
+  .seq-num {
+    font-family: var(--font-mono);
+    font-size: 13px; font-weight: 600;
+    color: var(--text);
+    display: grid; place-items: center;
+    border-right: 1px solid var(--border);
+    margin-right: 16px;
+  }
+  .seq-body { min-width: 0; }
+  .seq-title {
+    font-weight: 600; font-size: 14.5px;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .seq-actor {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    letter-spacing: 0;
+  }
+  .seq-actor b { color: var(--text); font-weight: 500; }
+  .seq-arrow-inline {
+    color: var(--text-faint);
+    margin: 0 6px;
+  }
+  .seq-sla {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-soft);
+    text-align: right;
+    display: grid; align-content: center;
+    border-left: 1px solid var(--border);
+    padding-left: 14px;
+  }
+  .seq-sla b { color: var(--text); font-weight: 600; }
+  .seq-detail {
+    font-size: 12.5px;
+    color: var(--text-soft);
+    margin-top: 6px;
+    line-height: 1.55;
+  }
+  .seq-detail code {
+    font-size: 11.5px;
+  }
+  /* Branch box (after step 7) */
+  .seq-branch {
+    margin: 14px 0 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    background: var(--bg-surface);
+  }
+  .seq-branch-title {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .seq-branch-row {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 14px;
+    padding: 8px 0;
+    font-size: 13.5px;
+    align-items: center;
+  }
+  .seq-branch-row + .seq-branch-row { border-top: 1px solid var(--border-soft); }
+  .seq-branch-row code { font-size: 12px; }
+  .seq-branch-key {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  @media (max-width: 700px) {
+    .seq-step { grid-template-columns: 36px 1fr; }
+    .seq-sla { grid-column: 2; border-left: none; padding-left: 0; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--border-soft); text-align: left; }
+    .seq-num { margin-right: 10px; }
+  }
+
+  /* ===== Code / ASCII ===== */
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 20px 0;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--text);
+    position: relative;
+  }
+  code {
+    font-family: var(--font-mono);
+    font-size: 88%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: 100%; white-space: pre; }
+  td code, th code { white-space: nowrap; }
+
+  /* ===== Stat grid ===== */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .stat {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    text-align: left;
+    transition: border-color .2s;
+  }
+  .stat .v {
+    font-family: var(--font-mono);
+    font-size: 28px; font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .stat .l {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    letter-spacing: -0.005em;
+  }
+  .stat:hover {
+    border-color: var(--border-strong);
+  }
+
+  /* ===== Blockquote ===== */
+  blockquote {
+    margin: 24px 0;
+    padding: 14px 22px;
+    border-left: 2px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-soft);
+    font-size: 15.5px;
+    border-radius: 0;
+  }
+  blockquote p:first-child { margin-top: 0; }
+  blockquote p:last-child { margin-bottom: 0; }
+  blockquote.feature {
+    border: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text);
+    font-size: 16px;
+    padding: 22px 28px;
+    border-radius: var(--radius-lg);
+    font-style: normal;
+  }
+  blockquote.feature b { color: var(--text); }
+
+  /* ===== TOC sidebar ===== */
+  .toc {
+    position: sticky; top: 80px;
+    align-self: start;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    padding-left: 24px;
+    border-left: 1px solid var(--border);
+  }
+  .toc-label {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .toc ol { list-style: none; padding: 0; margin: 0; counter-reset: tocc; }
+  .toc li { counter-increment: tocc; margin: 0; }
+  .toc a {
+    display: block;
+    padding: 5px 0 5px 12px;
+    margin-left: -1px;
+    border-left: 1px solid transparent;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.45;
+    text-decoration: none;
+    transition: color .15s, border-color .15s;
+  }
+  .toc a:hover { color: var(--text); }
+  .toc a.active {
+    color: var(--text);
+    border-left-color: var(--text);
+    font-weight: 500;
+  }
+
+  /* ===== Footer ===== */
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 80px;
+    padding: 40px 32px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  footer .mono { font-family: var(--font-mono); font-size: 12px; }
+
+  /* ===== Hero backdrop — mono grid + NovaX radial blue glow (dark only) ===== */
+  .hero-bg {
+    position: absolute; top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 1600px;
+    height: 560px;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(to right, var(--border-soft) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border-soft) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: linear-gradient(180deg, black 0%, transparent 85%);
+    -webkit-mask-image: linear-gradient(180deg, black 0%, transparent 85%);
+    opacity: 0.7;
+  }
+  .hero-bg::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, var(--accent-blue), transparent 70%);
+    pointer-events: none;
+  }
+  .article-layout { position: relative; z-index: 1; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1200px) {
+    .nav-search { display: none; }
+  }
+  @media (max-width: 900px) {
+    .article-layout {
+      grid-template-columns: 1fr;
+      gap: 0;
+      padding: 28px 20px 80px;
+      max-width: 100%;
+    }
+    article { max-width: 100%; }
+    .toc { display: none; }
+    h1.title { font-size: 36px; }
+    .lede { font-size: 17px; }
+    article h2 { font-size: 24px; margin-top: 56px; }
+    article h2 .num { font-size: 11px; }
+    .nav-inner { padding: 12px 16px; gap: 8px; }
+    .brand small { display: none; }
+    .nav-link { padding: 6px 8px; font-size: 12.5px; }
+    .hero-kpi { font-size: 11.5px; padding: 5px 10px; }
+    pre { font-size: 11px; padding: 14px 16px; }
+    .card-grid { grid-template-columns: 1fr; }
+    .meta-row { font-size: 11.5px; gap: 6px; }
+  }
+  @media (max-width: 600px) {
+    .nav-link.hide-sm { display: none; }
+    h1.title { font-size: 30px; }
+    .lede { font-size: 15.5px; }
+    article h2 { font-size: 21px; }
+    article h3 { font-size: 16px; }
+    body { font-size: 14.5px; }
+  }
+  @media print {
+    .nav, .toc, footer, .back-link, .nav-search { display: none !important; }
+    .article-layout { grid-template-columns: 1fr; padding: 0; }
+    body { background: white; color: black; }
+    .card, .table-wrap, pre, .callout { box-shadow: none; break-inside: avoid; }
+    .hero-bg { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ NAVBAR ============ -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="assets/lloydk_logo_mark.png" alt="Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">lloydk.co.kr</span>
+    </a>
+    <div class="nav-actions">
+      <div class="nav-search" role="search" aria-label="Search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search whitepaper
+        <kbd>⌘K</kbd>
+      </div>
+      <a class="nav-link" href="#s1">Overview</a>
+      <a class="nav-link" href="#s4">Models</a>
+      <a class="nav-link hide-sm" href="#s9">FNR</a>
+      <a class="nav-link hide-sm" href="#s14">PoC</a>
+    </div>
+  </div>
+</header>
+
+<div class="hero-bg"></div>
+
+<div class="article-layout" id="top">
+
+  <!-- ============ ARTICLE ============ -->
+  <article>
+
+    <a href="#" class="back-link">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      All whitepapers
+    </a>
+
+    <div class="meta-row">
+      <span class="badge">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Whitepaper
+      </span>
+      <span class="meta-dot">•</span>
+      <span class="meta-category">AI / RAG / Security</span>
+      <span class="meta-dot">•</span>
+      <span class="meta-soft">2026-05-26</span>
+      <span class="meta-dot">•</span>
+      <span class="meta-soft">v1.0</span>
+      <span class="meta-dot">•</span>
+      <span class="meta-soft">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        25 min read
+      </span>
+    </div>
+
+    <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>전체 설계 통합본</h1>
+
+    <p class="lede">
+      한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 분류하는 온프레미스 시스템 — 그 설계가 왜 이렇게 굳혔는지, 전체 워크플로우와 모델별 장단점, 선택 이유를 한 문서에 펼친 근거.
+    </p>
+
+    <div class="hero-kpis">
+      <span class="hero-kpi"><span class="dot"></span><b>KF-DeBERTa</b> + KURE-v1 RAG</span>
+      <span class="hero-kpi"><span class="dot"></span>FNR <b>≤ 5%</b> 핵심 KPI</span>
+      <span class="hero-kpi"><span class="dot"></span>온프레미스 <b>Docker</b></span>
+      <span class="hero-kpi"><span class="dot"></span>PoC <b>4주</b> (P1~P5)</span>
+    </div>
+
+    <hr class="hero-sep" />
+
+    <!-- ===== §1 ===== -->
+    <section id="s1">
+      <h2><span class="num">§1</span>프로젝트 한눈에</h2>
+      <p class="h2-sub">무엇을 만들고, 누가 무엇을 책임지는가.</p>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="eyebrow">What</div>
+          <div class="ctitle">4단계 자동 보안 등급 분류</div>
+          <p>한국어 문서(HWP/PDF/DOCX)를 업로드하면 특급·1급·2급·3급을 AI가 자동 추론하고, 근거(evidence span)와 4대 평가요소 점수를 함께 반환합니다.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">Who</div>
+          <div class="ctitle">KOIPA 발주, 기업 온프레미스</div>
+          <p>한국지식재산보호원이 발주한 표준 시스템. 기업이 사내 서버에 Docker Compose로 설치해 운영. 외부 송신 없는 폐쇄망도 지원.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">Split</div>
+          <div class="ctitle">KL 18개 ↔ Lloydk 6개</div>
+          <p>KL은 웹 UI · 권한 · 보관함 · 워터마크 · 감사를, Lloydk는 <b>AI 학습/추론/합성/평가</b>를 REST API로 제공합니다.</p>
+        </div>
+      </div>
+
+      <h3>Lloydk가 책임지는 6개 모듈</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:120px">모듈</th><th style="width:80px">FUN</th><th>책임</th></tr></thead>
+          <tbody>
+            <tr><td><b>M1</b> 합성</td><td><code>FUN-003</code></td><td>LLM 기반 학습용 합성 문서 생성</td></tr>
+            <tr><td><b>M2</b> 전처리</td><td><code>FUN-022</code></td><td>HWP/PDF → 텍스트 → 정규화 → 512토큰 청크</td></tr>
+            <tr><td><b>M3</b> 라벨링</td><td><code>FUN-023</code></td><td>4대 평가요소 점수 + evidence 추출</td></tr>
+            <tr><td><b>M4</b> 학습</td><td><code>FUN-004</code></td><td>BERT 분류기 파인튜닝</td></tr>
+            <tr><td><b>M5</b> 추론</td><td><code>FUN-005</code></td><td>등급 분류 + RAG 보강 + 근거 출력</td></tr>
+            <tr><td><b>M6</b> 평가/능동학습</td><td><code>FUN-024</code></td><td>F1·FNR 집계, 재라벨→자동 재학습 트리거</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <blockquote class="feature">
+        <p><b>핵심 한 줄.</b> 한국어 문서를 받아서 → 분해·정규화 → BERT 모델로 등급 추론 → RAG로 기업별 변동성 보강 → <b>미탐(FNR) 최소화</b>하며 능동학습 루프로 운영.</p>
+      </blockquote>
+    </section>
+
+    <!-- ===== §2 ===== -->
+    <section id="s2">
+      <h2><span class="num">§2</span>전체 워크플로우</h2>
+      <p class="h2-sub">사용자 시점 → 시스템 내부 → 운영 루프, 세 가지 흐름을 차례로.</p>
+
+      <h3>2.1 사용자 한 명이 문서를 올렸을 때</h3>
+<pre>[1] 사용자가 HWP 문서 업로드 (KL 웹 UI)
+       │
+       ▼
+[2] KL 백엔드 → Lloydk API: POST /classify
+       │  Body: {doc_id, content, use_rag, tenant_id, actor}
+       ▼
+┌────────────────────── Lloydk AI Engine ─────────────────────┐
+│                                                             │
+│ [3] M2 전처리 (FUN-022)                                     │
+│     rhwp-python HWP/HWPX → 텍스트 추출                      │
+│     soynlp/KoNLPy 정규화                                    │
+│     머리글·푸터·반복 제거                                   │
+│     512토큰 청크 분할 (overlap 64, 문장 경계 우선)          │
+│     → preprocessed_doc 캐시 (SHA-256 키)                    │
+│                                                             │
+│ [4] M3 라벨링 보조 (FUN-023)                                │
+│     YAML 규칙 기반 4대 요소 점수                            │
+│     (경제적가치/비공지성/관리수준/유출영향도)               │
+│     evidence span 추출                                      │
+│                                                             │
+│ [5] (옵션) RAG 검색                                         │
+│     청크 → KURE-v1 임베딩 → Qdrant Top-K                    │
+│     테넌트 네임스페이스 분리                                │
+│     기업 사내규정·KOIPA 가이드 청크 회수                    │
+│                                                             │
+│ [6] M5 추론 (FUN-005)                                       │
+│     KF-DeBERTa 분류기로 청크별 등급 확률                    │
+│     ChunkAggregator로 문서 단위 어그리게이션 (vote/avg)     │
+│     RAG ON이면 컨텍스트 등급분포로 보정                     │
+│     EvidenceExtractor (attention rollout) → 근거 span       │
+│                                                             │
+│ [7] 응답 구성                                               │
+│     {label, confidence, scores{TS,S1,S2,S3},                │
+│      evaluation_factors{4개}, evidence[10],                 │
+│      model_version, rag_used}                               │
+│     → status: "staging" (관리자 확정 대기)                  │
+│     → inference_result INSERT                               │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+[8] KL이 응답 받아 관리자 UI 표시
+       │
+       ▼
+[9] 관리자 액션:
+     (a) /confirm  → 최종 라벨 확정
+     (b) /relabel  → 능동학습 큐로 (FUN-024)
+                       │
+                       ▼ 큐 100건 누적
+                  자동 재학습 트리거 (Celery)</pre>
+
+      <h3>2.2 학습 워크플로우 (재학습 트리거 시)</h3>
+<pre>[학습 트리거] (관리자 수동 or 능동학습 임계)
+        │
+        ▼
+[M1] 합성 데이터 생성 (FUN-003)
+   · 영업비밀 실데이터는 외부 공개 불가 → LLM 합성으로 보완
+   · Claude Sonnet 4.6 (상용) 또는 Qwen3-14B (OSS) 등급별 800~1,500건
+   · LangChain ChatPromptTemplate + PydanticOutputParser (JSON 보장)
+   · PII 정규식 후처리 + 관리자 검수 (Cohen's Kappa ≥ 0.75)
+        │
+        ▼
+[DatasetBuilder]
+   · 합성 + 공개(AI Hub/공공데이터/DART/영업비밀보호법령) + 재라벨 누적분
+   · Stratified Train 70 / Val 15 / Test 15
+   · M2.Chunker로 청크화 (doc_id 보존하여 누수 차단)
+        │
+        ▼
+[M4] 학습 (FUN-004)
+   · 베이스: KF-DeBERTa-base
+   · 4-class head + class weight (불균형 보정)
+   · AdamW, lr=2e-5, linear warmup 10%, batch 16(24GB)/8(16GB)
+   · Early stop: val_FNR_overall 최소화
+        │
+        ▼
+[M6] 평가 (FUN-024)
+   · Accuracy / Precision / Recall / F1-macro / FNR-by-grade
+   · Confusion Matrix (TS→S2/S3 같은 고등급 미탐 별도 알람)
+   · 미탐 비대칭 가중 cost ×2~×5 옵션
+        │
+        ▼
+[모델 레지스트리]
+   · 가중치 → MinIO 업로드
+   · Postgres train_job + MLflow Model Registry 동시 기록
+   · Staging 등록 → 관리자 승인 → Production 승격 (롤백 가능)</pre>
+
+      <h3>2.3 능동학습 루프</h3>
+<pre>M5 추론 (staging)
+   → KL 관리자 검수 → /relabel
+   → relabel_event INSERT (original, corrected, reason, actor)
+   → ActiveLearningQueue.push (Redis)
+   → if queue.size >= threshold(=100):
+        RetrainTrigger.fire
+          → TrainingService.start(incremental)
+          → M4 재학습 (이전 가중치 + 새 데이터)
+          → 새 model_version Staging 등록
+          → 이전 vs 신규 FNR 비교 리포트 자동 생성
+          → 관리자 승인 시 Production 승격</pre>
+      <p>LangGraph로 이 루프를 상태 머신으로 명시 — <code>idle → collecting → training → evaluating → awaiting_approval → promoted</code>.</p>
+    </section>
+
+    <!-- ===== §3 ===== -->
+    <section id="s3">
+      <h2><span class="num">§3</span>아키텍처 레이어 분해</h2>
+      <p class="h2-sub">배포 단위 한 장 + 코드 레이어 한 장.</p>
+
+      <h3>3.1 배포 단위 (Docker Compose)</h3>
+<pre>┌──────────────────────────────────────────────────────────────────────┐
+│                     기업 사내 서버 (Docker Compose)                  │
+│                                                                      │
+│  ┌────────────┐    ┌─────────────────┐    ┌────────────────────┐    │
+│  │ KL 웹시스템│◀──▶│ Lloydk API      │◀──▶│ Celery Worker      │    │
+│  │ (별도 팀)  │REST│ (FastAPI :8000) │    │ (학습/합성/일괄)   │    │
+│  └────────────┘    └────────┬────────┘    └─────────┬──────────┘    │
+│                             │                       │               │
+│         ┌───────────────────┴───────────────────────┴───────────┐   │
+│         ▼            ▼              ▼            ▼              ▼   │
+│  ┌──────────┐ ┌──────────┐  ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│  │PostgreSQL│ │ Qdrant   │  │ MinIO    │ │ Redis    │ │ MLflow   │ │
+│  │ (메타DB) │ │ (벡터DB) │  │ (S3호환) │ │ (큐/캐시)│ │ (실험UI) │ │
+│  └──────────┘ └──────────┘  └──────────┘ └──────────┘ └──────────┘ │
+│                                                                      │
+│  + GPU (학습/추론) — NVIDIA Container Toolkit                        │
+└──────────────────────────────────────────────────────────────────────┘</pre>
+
+      <h3>3.2 코드 레이어</h3>
+<pre>API (FastAPI 라우터, OpenAPI 1:1)
+  ↓
+Service (도메인 오케스트레이션: classify/training/synthesis/evaluation)
+  ↓
+Modules (M1~M6)
+  ↓
+Adapters (LLM / VectorDB / Storage) ← 모두 Protocol 기반 추상화
+  ↓
+Infra (Postgres/MinIO/Qdrant/Redis/MLflow)</pre>
+
+      <div class="callout accent">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">Design Principles</span>
+          <ul>
+            <li>LLM/VectorDB는 <b>Adapter Pattern</b>으로 교체 가능 (Anthropic ↔ OpenAI ↔ Qwen3+vLLM 무중단 스왑)</li>
+            <li>모델 가중치는 컨테이너 이미지 외부 MinIO 볼륨 → <b>재빌드 없이 모델 교체</b></li>
+            <li>모든 요청에 <code>request_id</code> + <code>actor</code> → 감사 로그 보강</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §4 ===== -->
+    <section id="s4">
+      <h2><span class="num">§4</span>분류 모델: 후보 비교 · 장단점 · 선택 이유</h2>
+      <p class="h2-sub">왜 BERT 인코더인가, 왜 KF-DeBERTa인가, 왜 LLM 분류기는 아닌가.</p>
+
+      <h3>4.1 후보 비교 매트릭스</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>후보</th><th>파라미터</th><th>사전학습 도메인</th><th>토큰</th>
+              <th>한국어</th><th>도메인</th><th>자원</th><th>판정</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="pick">
+              <td>KF-DeBERTa-base</td><td><code>184M</code></td><td>금융·법률 한국어</td><td>512</td>
+              <td><span class="star">★★★★★</span></td><td><span class="star">★★★★★</span></td><td><span class="star">★★★★</span></td>
+              <td><span class="pill accept">채택</span></td>
+            </tr>
+            <tr>
+              <td>KoELECTRA-base</td><td><code>110M</code></td><td>한국어 일반</td><td>512</td>
+              <td><span class="star">★★★★</span></td><td><span class="star">★★★</span></td><td><span class="star">★★★★★</span></td>
+              <td><span class="pill fallback">경량 옵션</span></td>
+            </tr>
+            <tr>
+              <td>KLUE-RoBERTa-large</td><td><code>337M</code></td><td>한국어 NLU 벤치</td><td>512</td>
+              <td><span class="star">★★★★★</span></td><td><span class="star">★★★★</span></td><td><span class="star">★★★</span></td>
+              <td><span class="pill review">검토</span></td>
+            </tr>
+            <tr>
+              <td>KoBigBird</td><td><code>~200M</code></td><td>한국어 + 긴 문서</td><td><b>4096</b></td>
+              <td><span class="star">★★★★</span></td><td><span class="star">★★★★</span></td><td><span class="star">★★★</span></td>
+              <td><span class="pill review">청크 대체</span></td>
+            </tr>
+            <tr>
+              <td>Qwen3-14B (디코더)</td><td><code>14B</code></td><td>다국어 + 코드</td><td>32K~131K</td>
+              <td><span class="star">★★★★</span></td><td><span class="star">★★★</span></td><td><span class="star">★</span></td>
+              <td><span class="pill danger">분류엔 과잉</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>4.2 KF-DeBERTa 채택 이유 (3가지)</h3>
+      <div class="card-grid">
+        <div class="card">
+          <div class="eyebrow">01 · 도메인 적합성</div>
+          <p>영업비밀 후보 문서(매출/원가/특허/계약서/내부지침)는 <b>금융·법률 어휘 비중이 큼</b>. KF-DeBERTa는 카카오뱅크가 한국어+금융+법률 텍스트로 사전학습 → 도메인 임베딩 공간이 이미 정렬되어 있음.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">02 · 효율</div>
+          <p>184M 인코더는 GPU 1장(24GB)에서 batch 16으로 초당 수십 건 추론. 14B 디코더 LLM은 1건당 수 초 + 비용 큼 + 결정성·해석성 떨어짐.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">03 · 해석성</div>
+          <p>attention rollout / IG로 evidence span 추출 가능. 보안 시스템은 <b>"왜 이 등급인지"</b> 근거를 함께 제공해야 함 (관리자 검수·감사 대비).</p>
+        </div>
+      </div>
+
+      <h3>4.3 KoELECTRA를 동시에 유지하는 이유</h3>
+      <p>자원 부족 기업(GPU 16GB 이하·CPU 추론 환경)을 위한 <b>이중 트랙</b>. KoELECTRA-base 110M → CPU 추론도 현실적. 분류 헤드·학습 파이프라인은 동일하므로 동일 데이터셋·동일 평가체계로 두 모델을 함께 학습 → 환경별 골라쓰기.</p>
+
+      <h3>4.4 왜 LLM 분류기를 안 쓰는가</h3>
+      <blockquote><p>"GPT-4 / Claude로 zero-shot 분류하면 안 되나요?"</p></blockquote>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>LLM zero-shot</th><th>BERT fine-tune</th></tr></thead>
+          <tbody>
+            <tr><td>단건 추론 시간</td><td>1.5~5초</td><td><b>0.05~0.2초</b></td></tr>
+            <tr><td>1건당 비용</td><td>$0.005~$0.02</td><td><b>0</b> (자체 GPU)</td></tr>
+            <tr><td>결정 일관성</td><td>프롬프트·온도에 흔들림</td><td><b>가중치 고정 → 재현 가능</b></td></tr>
+            <tr><td>기업별 변동성 학습</td><td>프롬프트로 우겨넣음</td><td><b>데이터로 학습</b></td></tr>
+            <tr><td>외부 송신</td><td>네트워크 필요</td><td><b>오프라인 가능</b></td></tr>
+            <tr><td>FNR 보정</td><td>class_weight 못 씀</td><td><b>비대칭 cost로 미탐 가중</b></td></tr>
+            <tr><td>근거 출력</td><td>자유 텍스트 (검증 어려움)</td><td>attention/IG로 span</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout success">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">Conclusion</span>
+          <p>분류 코어는 BERT, LLM은 <b>합성 데이터 생성·RAG 보강·라벨링 경계 판단</b>에 보조 활용 — 역할 분리.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §5 ===== -->
+    <section id="s5">
+      <h2><span class="num">§5</span>임베딩 모델: 후보 비교 · 장단점 · 선택 이유</h2>
+      <p class="h2-sub">한국어 retrieval에서 무엇이 더 잘 찾는가.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>후보</th><th>차원</th><th>토큰</th><th>한국어 성능</th><th>라이선스</th><th>특징</th></tr>
+          </thead>
+          <tbody>
+            <tr class="pick">
+              <td>KURE-v1 (고려대 nlpai-lab)</td><td><code>1024</code></td><td>8192</td>
+              <td><b>R@1 0.5264 · NDCG@1 0.6055</b></td><td>MIT</td>
+              <td>BGE-M3를 한국어로 fine-tune. <b>+1.6%p 일관 우위</b></td>
+            </tr>
+            <tr>
+              <td>BGE-M3 (BAAI)</td><td><code>1024</code></td><td>8192</td>
+              <td>R@1 0.5178 · NDCG@1 0.5985</td><td>MIT</td>
+              <td>KURE의 베이스. dense+sparse+ColBERT</td>
+            </tr>
+            <tr>
+              <td>ko-sroberta-multitask</td><td><code>768</code></td><td>512</td>
+              <td>중간</td><td>Apache 2.0</td>
+              <td>경량 SBERT, CPU 환경용</td>
+            </tr>
+            <tr>
+              <td>E5-large-multilingual</td><td><code>1024</code></td><td>512</td>
+              <td>다국어 (한국어 특화 X)</td><td>MIT</td>
+              <td>KURE/BGE-M3 대비 한국어 약함</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>KURE-v1을 1순위로 두는 이유</h3>
+      <div class="card-grid">
+        <div class="card"><div class="eyebrow">한국어 우위</div><p>동일 베이스(BGE-M3) 위에서 한국어 retrieval로 fine-tune → 공문/기업문서 검색에서 일관된 성능 향상.</p></div>
+        <div class="card"><div class="eyebrow">Swap-In</div><p>차원·토크나이저 동일 → Qdrant 인덱스 재구축 없이 모델만 교체. BGE-M3로 PoC 시작했어도 무중단 전환.</p></div>
+        <div class="card"><div class="eyebrow">신뢰</div><p>고려대 NLP&amp;AI Lab 한국 연구기관 산출물, MIT 라이선스.</p></div>
+        <div class="card"><div class="eyebrow">PoC P2 검증</div><p>KOIPA 가이드+사내규정 시드로 Top-K 정확도 직접 비교 → 측정 결과로 1순위 확정.</p></div>
+      </div>
+    </section>
+
+    <!-- ===== §6 ===== -->
+    <section id="s6">
+      <h2><span class="num">§6</span>LLM: 상용 · OSS 양쪽 모두 first-class</h2>
+      <p class="h2-sub">대체재가 아닌 보완재. 망 환경(일반망/폐쇄망)에 따라 환경변수로 전환. 합성과 RAG 보강, 두 자리에서 LLM이 필요.</p>
+
+      <h3>6.1 상용 API 비교</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>후보</th><th>한국어</th><th>컨텍스트</th><th>단가 (입력+출력 / 1M tok)</th><th>JSON</th><th>판정</th></tr></thead>
+          <tbody>
+            <tr class="pick">
+              <td>Claude Sonnet 4.6</td><td><span class="star">★★★★★</span></td><td><b>1M</b></td><td><code>$3 + $15</code></td><td><span class="star">★★★★★</span></td>
+              <td><span class="pill accept">채택</span></td>
+            </tr>
+            <tr><td>GPT-4o</td><td><span class="star">★★★★</span></td><td>128K</td><td><code>$2.5 + $10</code></td><td><span class="star">★★★★</span></td><td><span class="pill fallback">2순위</span></td></tr>
+            <tr><td>Gemini 2.5 Pro</td><td><span class="star">★★★★</span></td><td>1M</td><td><code>$1.25 + $10</code></td><td><span class="star">★★★</span></td><td><span class="pill fallback">3순위</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout accent">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">Why Claude Sonnet 4.6</span>
+          <ul>
+            <li>한국어 합성 문서의 자연스러움·전문어휘 적정성에서 1순위 (자체 PoC P3로 검증)</li>
+            <li><b>1M 컨텍스트</b>로 KOIPA 가이드 다발을 한 번에 컨텍스트에 넣고 합성</li>
+            <li>Anthropic tool use 기반 JSON 출력 강제가 안정적</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>6.2 OSS 온프레미스 비교</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>후보</th><th>파라미터</th><th>VRAM (FP16/Q4)</th><th>한국어</th><th>특징</th></tr></thead>
+          <tbody>
+            <tr class="pick">
+              <td>Qwen3-14B</td><td><code>14B</code></td><td><code>~30GB / ~10GB</code></td><td><span class="star">★★★★</span></td>
+              <td>2025-05 공개, thinking/non-thinking 모드, vLLM ≥0.8.5, Apache 2.0</td>
+            </tr>
+            <tr><td>Qwen2.5-14B-Instruct</td><td><code>14B</code></td><td><code>~30GB / ~10GB</code></td><td><span class="star">★★★★</span></td><td>Qwen3 출시로 강등</td></tr>
+            <tr><td>EXAONE 3.5 32B (LG)</td><td><code>32B</code></td><td><code>~65GB / ~20GB</code></td><td><span class="star">★★★★★</span></td><td><b>라이선스 확인 필요</b> (공공사업 호환성)</td></tr>
+            <tr><td>Llama 3.1-8B + Bllossom</td><td><code>8B</code></td><td><code>~16GB / ~5GB</code></td><td><span class="star">★★★</span></td><td>경량, 한국어 fine-tune</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout accent">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">Why Qwen3-14B</span>
+          <ul>
+            <li><b>thinking 모드</b>: 라벨 경계 판단·평가요소 점수화 시 <code>enable_thinking=True</code>로 추론 과정 활용</li>
+            <li><b>non-thinking 모드</b>: 합성 다량 생성(FUN-003) 시 빠른 처리</li>
+            <li>vLLM ≥0.8.5 공식 지원 → 운영 안정성, Apache 2.0 → 공공사업 무리 없음</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>6.3 추상화 — LLM Adapter Pattern</h3>
+<pre>class LLMAdapter(Protocol):
+    name: str
+    def complete(self, messages: list, **opts) -> str: ...
+    def embed(self, texts: list[str]) -> list[list[float]]: ...
+    def estimate_cost(self, messages: list, **opts) -> float: ...</pre>
+      <p>구현체: <code>AnthropicAdapter</code>, <code>OpenAIAdapter</code>, <code>GoogleAdapter</code>, <code>VLLMAdapter</code>, <code>OllamaAdapter</code>. 설정 한 줄(<code>LLM_PROVIDER=anthropic|vllm|...</code>)로 교체.</p>
+    </section>
+
+    <!-- ===== §7 ===== -->
+    <section id="s7">
+      <h2><span class="num">§7</span>Vector DB · RDB · 스토리지 · 큐</h2>
+
+      <h3>7.1 Vector DB</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>후보</th><th>배포 부담</th><th>메타필터</th><th>멀티테넌트</th><th>판정</th></tr></thead>
+          <tbody>
+            <tr class="pick"><td>Qdrant</td><td>Rust 단일 컨테이너</td><td>강력</td><td>네임스페이스 분리</td><td><span class="pill accept">채택</span></td></tr>
+            <tr><td>Milvus</td><td>etcd + MinIO 의존</td><td>강력</td><td>강력</td><td><span class="pill review">배포 부담</span></td></tr>
+            <tr><td>pgvector</td><td>Postgres 통합</td><td>RDB 수준</td><td>RLS 활용</td><td><span class="pill fallback">경량 폴백</span></td></tr>
+            <tr><td>ES + dense_vector</td><td>JVM 무거움</td><td>강력</td><td>강력</td><td><span class="pill fallback">KL이 ES 도입 시</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>7.2 RDB · 스토리지 · 큐</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>영역</th><th>선택</th><th>이유</th></tr></thead>
+          <tbody>
+            <tr><td>RDB</td><td><b>PostgreSQL 16</b> + pgvector + JSONB</td><td>공공기관 표준, JSONB로 가변 라벨/스코어/이력 저장</td></tr>
+            <tr><td>객체 스토리지</td><td><b>MinIO</b></td><td>S3 호환, 모델 가중치 외부화 (재빌드 없이 교체)</td></tr>
+            <tr><td>큐/캐시</td><td><b>Redis 7</b> + Celery</td><td>일괄 분류 비동기, 능동학습 큐, 학습 트리거</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== §8 ===== -->
+    <section id="s8">
+      <h2><span class="num">§8</span>문서 처리 (FUN-022)</h2>
+      <p class="h2-sub">HWP / PDF / OCR — 한국 공공문서 특화 라인업.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>포맷</th><th>1순위</th><th>2순위/fallback</th><th>채택 이유</th></tr></thead>
+          <tbody>
+            <tr><td>HWP / HWPX</td><td><b>rhwp-python</b></td><td>pyhwp → LibreOffice</td><td>Rust PyO3, HWP+HWPX 통합 API, <b>~62×</b> 빠름, MIT</td></tr>
+            <tr><td>DOCX</td><td>python-docx</td><td>LibreOffice</td><td>표준, 안정적</td></tr>
+            <tr><td>PDF (텍스트)</td><td><b>PyMuPDF</b></td><td>pdfplumber</td><td>가장 빠르고 정확</td></tr>
+            <tr><td>PDF (이미지)</td><td><b>PaddleOCR (kor)</b></td><td>Tesseract → Qwen2-VL</td><td>한국어 OCR SOTA, GPU 가속</td></tr>
+            <tr><td>구조 인식</td><td>unstructured</td><td>layoutparser</td><td>머리글/본문/표 분리</td></tr>
+            <tr><td>청크 분할</td><td>LangChain RecursiveTextSplitter</td><td>자체 슬라이딩 윈도우</td><td>한국어 문장 경계 우선</td></tr>
+            <tr><td>한국어 정규화</td><td>soynlp + KoNLPy(Mecab-ko)</td><td>hanspell</td><td>토큰화·맞춤법</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">rhwp-python 1순위 변경 사유</span>
+          <p>한국 공공기관 문서는 HWP5뿐 아니라 <b>HWPX 비중도 큼</b>. pyhwp는 HWPX 미지원·미유지. rhwp-python은 단일 API로 둘 다 처리하고 속도도 우위. 단점은 비공식 커뮤니티 패키지라는 점 → <b>pyhwp/LibreOffice 폴백 필수</b>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §9 ===== -->
+    <section id="s9">
+      <h2><span class="num">§9</span>학습 전략과 KPI — 왜 FNR 최우선인가</h2>
+
+      <div class="card-grid">
+        <div class="card risk">
+          <div class="eyebrow">미탐 (FN) · 핵심 위험</div>
+          <div class="ctitle">고등급 → 저등급으로 분류</div>
+          <p>영업비밀이 낮은 보호등급으로 유통 → <b>유출 사고 직결</b>. 비용 매우 큼.</p>
+        </div>
+        <div class="card safe">
+          <div class="eyebrow">오탐 (FP) · 감수 가능</div>
+          <div class="ctitle">저등급 → 고등급으로 분류</div>
+          <p>업무 불편, 결재 지연. 비용 작음.</p>
+        </div>
+      </div>
+
+      <h3>9.1 손실 함수와 Early Stop</h3>
+      <ul>
+        <li><code>class_weight = inverse frequency</code> — 등급 불균형 보정</li>
+        <li><b>비대칭 cost</b>: TS→S2/S3 같은 고등급 미탐 cost ×2~×5 (옵션)</li>
+        <li><b>Early Stop 기준</b>: accuracy가 아니라 <code>val_FNR_overall</code></li>
+        <li>Confusion Matrix를 등급별로 따로 추적 (TS→S2/S3 케이스 알람)</li>
+      </ul>
+
+      <h3>9.2 하이퍼파라미터 기본값</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>값</th></tr></thead>
+          <tbody>
+            <tr><td>max_seq_len</td><td><code>512</code></td></tr>
+            <tr><td>chunk_overlap</td><td><code>64</code></td></tr>
+            <tr><td>batch_size</td><td><code>16</code> (24GB) / <code>8</code> (16GB)</td></tr>
+            <tr><td>epochs</td><td><code>5</code> (early stop)</td></tr>
+            <tr><td>learning_rate</td><td><code>2e-5</code></td></tr>
+            <tr><td>optimizer</td><td><code>AdamW</code></td></tr>
+            <tr><td>lr_scheduler</td><td>linear warmup 10%</td></tr>
+            <tr><td>class_weight</td><td>inverse frequency</td></tr>
+            <tr><td>eval_metric_best</td><td><b><code>val_fnr_overall ↓</code></b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>9.3 Chunk Aggregation</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>전략</th><th>장점</th><th>단점</th></tr></thead>
+          <tbody>
+            <tr><td>Max-vote</td><td>단순</td><td>고등급 일부 문장이 묻힘</td></tr>
+            <tr><td>Mean-prob</td><td>안정적</td><td>미탐 위험</td></tr>
+            <tr class="pick"><td>Max-prob (any-high)</td><td>미탐 최소화</td><td>오탐 증가 — RAG 보강으로 상쇄</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== §10 ===== -->
+    <section id="s10">
+      <h2><span class="num">§10</span>RAG 결합 방식과 한계</h2>
+
+      <h3>10.1 왜 RAG를 분류에도 쓰는가</h3>
+      <p>기업마다 영업비밀 기준이 다르다. 같은 "매출 자료"라도 A기업은 1급, B기업은 2급일 수 있다. 학습 모델 하나로 모든 기업의 변동성을 다 잡을 수 없다. 그래서 기업별 사내규정·정책을 <b>KURE-v1 임베딩 → Qdrant</b>(테넌트 네임스페이스 분리)에 두고, 추론 시 Top-K로 회수 → 모델 출력을 <b>후처리 보강</b>.</p>
+
+      <h3>10.2 결합 방식 — 모델 입력이 아니라 후처리 보강</h3>
+<pre>BERT 청크 추론 → 청크별 등급 확률
+                    │
+                    ▼ ChunkAggregator
+              문서 단위 등급 확률
+                    │
+       (RAG ON이면)  ▼
+RAG Top-K 가이드 청크의 등급 분포 회수
+                    │
+                    ▼ 가중평균 (α·model + (1-α)·rag)
+              최종 라벨 + confidence</pre>
+      <div class="callout accent">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">왜 모델 입력에 안 넣는가</span>
+          <p>BERT 시퀀스 분류는 학습 시 본 적 없는 외부 컨텍스트 토큰을 입력에 결합하면 <b>학습-추론 분포 불일치</b>(distribution shift)가 생김. 별도 보강 레이어로 처리하면 학습은 깨끗이, 추론은 유연하게.</p>
+        </div>
+      </div>
+
+      <h3>10.3 한계</h3>
+      <ul>
+        <li>RAG 적중률이 낮으면 보강 효과 없음 → KURE-v1으로 retrieval 성능 보강</li>
+        <li>테넌트별 사내규정 데이터가 부족한 기업은 RAG 효과 제한 → <b>RAG는 선택 옵션</b>, OFF 가능</li>
+      </ul>
+    </section>
+
+    <!-- ===== §11 ===== -->
+    <section id="s11">
+      <h2><span class="num">§11</span>합성 데이터 전략 — 왜 불가피한가</h2>
+
+      <h3>11.1 데이터 부족 문제</h3>
+      <ul>
+        <li>영업비밀은 <b>외부 공개 불가</b> → 실데이터 거의 없음</li>
+        <li>공개 데이터(AI Hub/공공데이터/DART)는 영업비밀 라벨이 없음</li>
+        <li>발주처 비밀해제 문서 제공 가능성 낮음</li>
+      </ul>
+
+      <h3>11.2 3중 데이터 전략</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>출처</th><th>비중 (PoC)</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td>공개 데이터</td><td><code>30%</code></td><td>AI Hub 행정문서·계약서, 공공데이터 공문서, DART 공시, 영업비밀보호법령</td></tr>
+            <tr><td>LLM 합성</td><td><code>50%</code></td><td>Claude/Qwen3로 가이드 컨텍스트 기반 가상 사내문서 200~400건/등급, 이중 검수 (Cohen's Kappa ≥ 0.75)</td></tr>
+            <tr><td>재라벨 누적</td><td><code>20%</code></td><td>능동학습 큐에서 100건씩 자동 편입 (운영 후 증가)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>11.3 합성 품질 보증</h3>
+      <ul>
+        <li>시스템 프롬프트에 <b>KOIPA 가이드라인 컨텍스트 강제 주입</b></li>
+        <li><code>PydanticOutputParser</code>로 JSON 스키마 검증 — <code>{title, body, document_type, dept_hint, rationale_tags[]}</code></li>
+        <li><b>PII 정규식 후처리</b>: 주민번호·전화·이메일·계좌·실제 기업명 패턴 차단</li>
+        <li><b>이중 검수자</b>: 두 명이 등급 라벨 일치 여부 확인 → Cohen's Kappa ≥ 0.75 미달 시 폐기</li>
+      </ul>
+
+      <h3>11.4 합성 비용 견적</h3>
+      <div class="stats">
+        <div class="stat"><div class="v">~1.5K</div><div class="l">합성 1건 평균 토큰</div></div>
+        <div class="stat"><div class="v">$0.025</div><div class="l">건당 비용 (Sonnet 4.6)</div></div>
+        <div class="stat"><div class="v">~$20</div><div class="l">PoC 800건 총비용</div></div>
+        <div class="stat"><div class="v">env 한도</div><div class="l">일·월 상한 설정</div></div>
+      </div>
+    </section>
+
+    <!-- ===== §12 ===== -->
+    <section id="s12">
+      <h2><span class="num">§12</span>능동학습 루프 — LangGraph 상태 머신</h2>
+
+      <h3>12.1 상태 전이</h3>
+<pre>idle ── (relabel 발생) ──▶ collecting
+   collecting ── (size ≥ 100) ──▶ training
+       training ── (M4 완료) ──▶ evaluating
+           evaluating ── (FNR 개선) ──▶ awaiting_approval
+                                          │
+              ── (FNR 후퇴) ──▶ rejected   │
+                                          ▼
+                              (관리자 승인) promoted
+                              (관리자 거부) rejected</pre>
+
+      <h3>12.2 안전장치</h3>
+      <ul>
+        <li><b>모든 데이터·모델 버전 보관</b>: MLflow Model Registry + Postgres <code>train_job</code> + MinIO 가중치</li>
+        <li><b>승인 전엔 Staging만</b>: Production은 관리자 명시 승인 후 승격</li>
+        <li><b>롤백</b>: 신규 모델 FNR이 운영 중 후퇴하면 이전 model_version으로 1줄 명령 롤백</li>
+        <li><b>재라벨 출처 추적</b>: <code>relabel_event.actor</code>로 누가 언제 어떻게 수정했는지 감사</li>
+      </ul>
+    </section>
+
+    <!-- ===== §13 ===== -->
+    <section id="s13">
+      <h2><span class="num">§13</span>보안·온프레미스·멀티테넌트</h2>
+
+      <h3>13.1 온프레미스 배포</h3>
+      <ul>
+        <li><b>단일 docker-compose.yml</b>: 6개 컨테이너 일괄 기동</li>
+        <li>모델 가중치는 이미지 외부 MinIO 볼륨 → 재빌드 없이 교체</li>
+        <li>망 환경에 따라 <code>LLM_PROVIDER</code> 환경변수로 전환: 일반망=API, 폐쇄망=vLLM(Qwen3), 하이브리드=둘 다 활성 — 어느 쪽이든 동일 코드</li>
+      </ul>
+
+      <h3>13.2 멀티테넌트</h3>
+      <ul>
+        <li>Qdrant 네임스페이스: <code>tenant_{id}_guides</code>, <code>tenant_{id}_rules</code></li>
+        <li>Postgres 모든 도메인 테이블에 <code>tenant_id</code> 컬럼 + 인덱스</li>
+        <li>API Key 단위로 <code>tenant_id</code> 강제 주입 (FastAPI dependency)</li>
+      </ul>
+
+      <h3>13.3 감사·보안</h3>
+      <ul>
+        <li>모든 요청 <code>request_id</code> + <code>actor{user_id, role, tenant_id}</code> 로깅 → Loki</li>
+        <li>합성 문서 PII 정규식 후처리</li>
+        <li>API Key는 환경변수/Secret 볼륨, 코드 하드코딩 금지</li>
+        <li>텍스트 입력 길이/인코딩 검증 (DoS 방지)</li>
+      </ul>
+    </section>
+
+    <!-- ===== §14 ===== -->
+    <section id="s14">
+      <h2><span class="num">§14</span>PoC 계획 · Go/No-Go</h2>
+
+      <h3>14.1 PoC 5종</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>목적</th><th>결정 사항</th><th>기간</th></tr></thead>
+          <tbody>
+            <tr><td><code>P1</code></td><td>KF-DeBERTa vs KoELECTRA, RAG ON/OFF F1·FNR</td><td>분류 모델·RAG 효과 확정</td><td>2주</td></tr>
+            <tr><td><code>P2</code></td><td>KURE-v1 vs BGE-M3 + Qdrant Top-K</td><td>임베딩 1순위 확정</td><td>1주</td></tr>
+            <tr><td><code>P3</code></td><td>Claude/GPT/Qwen3 합성 품질·단가, Qwen3 thinking 모드 비교</td><td>LLM 기본값·단가 견적</td><td>1.5주</td></tr>
+            <tr><td><code>P4</code></td><td>rhwp-python vs pyhwp 정확도·속도</td><td>추출 라이브러리 조합 확정</td><td>1주</td></tr>
+            <tr><td><code>P5</code></td><td>업로드→전처리→분류→결과 1건 E2E</td><td>인프라 통합 가능성</td><td>0.5주</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>병렬 4주 / 직렬 6주.</p>
+
+      <h3>14.2 합격선 (Go/No-Go)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>PoC</th><th>KPI</th><th>합격선</th></tr></thead>
+          <tbody>
+            <tr><td>P1</td><td>F1-macro (4-class)</td><td>≥ 0.75</td></tr>
+            <tr class="pick"><td>P1</td><td>FNR (특급→하위 미탐)</td><td><b>≤ 5% — 핵심</b></td></tr>
+            <tr><td>P2</td><td>Recall@5</td><td>≥ 0.80</td></tr>
+            <tr><td>P2</td><td>검색 Latency</td><td>≤ 200ms (5만 청크)</td></tr>
+            <tr><td>P3</td><td>합성 라벨 일치도</td><td>≥ 90%</td></tr>
+            <tr><td>P4</td><td>HWP/DOCX/PDF 추출 누락률</td><td>≤ 5%</td></tr>
+            <tr><td>P5</td><td>E2E 1건 처리</td><td>≤ 10초(OFF) / ≤ 30초(ON)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== §15 ===== -->
+    <section id="s15">
+      <h2><span class="num">§15</span>위험·대안·미해결 이슈</h2>
+
+      <h3>15.1 기술 리스크</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>리스크</th><th>영향</th><th>대응</th></tr></thead>
+          <tbody>
+            <tr><td>rhwp-python 비공식 의존</td><td>HWP 추출 실패</td><td>pyhwp + LibreOffice 폴백 필수</td></tr>
+            <tr><td>합성 ≠ 실데이터 분포</td><td>운영 시 성능 후퇴</td><td>능동학습 루프로 보정, 실데이터 비중 점진 확대</td></tr>
+            <tr><td>KF-DeBERTa-base 184M 한계</td><td>경계 사례 미세 분류</td><td>RAG 보강 + 비대칭 cost + 능동학습</td></tr>
+            <tr><td>RAG 적중률 낮은 기업</td><td>RAG 효과 제한</td><td>RAG OFF 옵션, BERT 단독 모드</td></tr>
+            <tr><td>폐쇄망 기업의 API 차단</td><td>API 호출 물리적 불가</td><td>Adapter 패턴으로 <code>vllm</code>(Qwen3) 자동 분기 — first-class 경로</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>15.2 발주처/KL 협의 미해결 항목</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>항목</th><th>협의 대상</th><th>결정 시한</th></tr></thead>
+          <tbody>
+            <tr><td>Q1</td><td>KL 기존 인프라 (ES/Postgres/Redis 보유)</td><td>KL</td><td>PoC 시작 전</td></tr>
+            <tr><td>Q2</td><td>발주처 GPU 사양 (VRAM 24/48/80GB)</td><td>발주처</td><td>PoC 시작 전</td></tr>
+            <tr><td>Q3</td><td>합성 문서 활용 허용 범위</td><td>발주처</td><td>P3 시작 전</td></tr>
+            <tr><td>Q4</td><td>비밀해제 실데이터 제공 가능 여부</td><td>발주처</td><td>PoC 시작 전</td></tr>
+            <tr><td>Q5</td><td>운영 단계 LLM API 예산 상한</td><td>발주처</td><td>P3 종료 전</td></tr>
+            <tr><td>Q6</td><td>EXAONE 라이선스 (공공사업)</td><td>LG/발주처</td><td>OSS LLM 확정 전</td></tr>
+            <tr><td>Q7</td><td>멀티 테넌트 요구 강도</td><td>발주처/KL</td><td>VectorDB 확정 전</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>15.3 향후 검토</h3>
+      <ul>
+        <li><b>GraphRAG</b>: 단일 문서 등급 판정엔 entity graph 효과 제한 → PoC 범위 밖</li>
+        <li><b>EXAONE 3.5 32B</b>: 라이선스 확인 후 한국어 강화 옵션 검토</li>
+        <li><b>Vision LLM (Qwen2-VL)</b>: PaddleOCR 실패율이 PoC P4에서 5% 초과 시 도입</li>
+      </ul>
+    </section>
+
+    <!-- ===== §16 DB Schema ===== -->
+    <section id="s16">
+      <h2><span class="num">§16</span>DB 스키마 설계 (v2)</h2>
+      <p class="h2-sub">18개 테이블 + 4개 운영 뷰. PostgreSQL 16 + pgvector + 파티셔닝.</p>
+
+      <h3>16.1 도메인 분할 — 10블록</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:60px">코드</th><th>도메인</th><th>핵심 테이블</th></tr></thead>
+          <tbody>
+            <tr><td><code>A</code></td><td>테넌트</td><td><code>tenants</code></td></tr>
+            <tr><td><code>B</code></td><td>등급 체계</td><td><code>classification_levels</code> · <code>evaluation_factors</code> · <code>level_keywords</code></td></tr>
+            <tr><td><code>C</code></td><td>문서·청크</td><td><code>documents</code> · <code>chunks</code> (월별 파티션)</td></tr>
+            <tr><td><code>D</code></td><td>라벨</td><td><code>document_labels</code> · <code>document_factor_scores</code></td></tr>
+            <tr class="pick"><td><code>E</code></td><td>추론</td><td><code>classifications</code> · <code>classification_evidence</code></td></tr>
+            <tr><td><code>F</code></td><td>학습</td><td><code>model_versions</code> · <code>training_runs</code> · <code>training_epochs</code> · <code>training_datasets</code></td></tr>
+            <tr class="pick"><td><code>G</code></td><td>보정 (능동학습 진실 소스)</td><td><code>corrections</code></td></tr>
+            <tr><td><code>H</code></td><td>합성</td><td><code>prompt_versions</code> · <code>sample_documents</code></td></tr>
+            <tr><td><code>I</code></td><td>비용</td><td><code>llm_usage</code> (월별 파티션)</td></tr>
+            <tr><td><code>J</code></td><td>감사</td><td><code>audit_log</code> (월별 파티션)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>16.2 ERD 핵심 관계 (텍스트 다이어그램)</h3>
+<pre>tenants ──┬── documents ──┬── chunks (월별 파티션, HNSW vector index)
+          │                ├── document_labels ── classification_levels
+          │                ├── document_factor_scores ── evaluation_factors
+          │                └── classifications ──┬── classification_evidence
+          │                                       └── corrections ── training_runs
+          │                                                            │
+          │                                                            ▼
+          │                                                       training_epochs
+          │                                                            │
+          │                                                            ▼
+          │                                                       training_datasets ── documents
+          │
+          ├── sample_documents ── prompt_versions
+          ├── llm_usage (월별 파티션) ── sample_documents (reference_id)
+          └── audit_log (월별 파티션)
+
+model_versions ─┬─ training_runs (FK)
+                └─ rolled_back_from (self-ref)
+classification_levels ── level_keywords ── evaluation_factors</pre>
+
+      <h3>16.3 핵심 설계 결정 8개</h3>
+      <div class="card-grid">
+        <div class="card">
+          <div class="eyebrow">D1 · 대용량 텍스트 외부화</div>
+          <p><code>documents.raw_text_uri</code>로 MinIO 위치만 PG에 저장. 영업비밀 본문은 S3 호환 스토리지로 분리 → 백업·암호화·DB 비대화 분리.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">D2 · 단일 진실 소스 (corrections)</div>
+          <p>확정 라벨은 <code>corrections</code> 최신 행이 진실. <code>classifications.status</code>는 상태만, predicted_level_id는 변경 금지. <code>v_classification_final</code> 뷰로 통합 조회.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">D3 · 파티셔닝 3종</div>
+          <p><code>chunks</code> / <code>llm_usage</code> / <code>audit_log</code> 모두 월별 RANGE 파티션. 대용량 시계열의 인덱스·VACUUM 성능 확보.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">D4 · HNSW 벡터 인덱스</div>
+          <p>pgvector 0.5+ HNSW (m=16, ef_construction=64). ivfflat 대비 운영 성능 우위. 1024차원 KURE-v1 임베딩 직접 인덱싱.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">D5 · 평가요소 정규화</div>
+          <p>v1의 <code>factor_scores JSONB</code> → v2 <code>document_factor_scores</code> 정규화. FK 무결성·집계 쿼리 효율화.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">D6 · 등급체계 스냅샷</div>
+          <p><code>model_versions.level_snapshot JSONB</code>에 학습 시점 등급 체계 보존. 등급 정의 변경 후에도 과거 모델 해석 가능.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">D7 · 감사 본문 미저장</div>
+          <p><code>audit_log.payload_hash</code>는 SHA-256만 저장. 재현 가능하되 본문은 PG에 안 남김 → 영업비밀 정책 충돌 회피.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">D8 · 가중치 합 트리거</div>
+          <p><code>evaluation_factors.weight</code> 합 = 1.0 강제. DEFERRABLE CONSTRAINT TRIGGER로 트랜잭션 종료 시점 검증.</p>
+        </div>
+      </div>
+
+      <h3>16.4 운영 뷰 4종</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>뷰</th><th>용도</th></tr></thead>
+          <tbody>
+            <tr><td><code>v_classification_final</code></td><td>확정 라벨 단일 진실 소스 (corrections 최신 + 없으면 predicted)</td></tr>
+            <tr><td><code>v_monthly_llm_cost</code></td><td>월별 LLM 비용·토큰·에러율 (development/operation 분리)</td></tr>
+            <tr><td><code>v_model_performance</code></td><td>모델·등급별 confirmed/corrected/underclass/overclass 카운트</td></tr>
+            <tr class="pick"><td><code>v_active_learning_status</code></td><td>재학습 트리거 상태: URGENT(underclass≥10) / RECOMMENDED(총≥50) / OK</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout accent">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">왜 18개 테이블인가</span>
+          <p>v1은 JSONB 위주로 시작했으나, 운영급 무결성·집계 성능·감사 추적을 위해 v2에서 정규화 재작업. 합성/추론/학습/보정/감사 5개 도메인을 모두 외래키로 묶어 데이터 누수·고아 row를 구조적으로 차단.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §17 API 16+ ===== -->
+    <section id="s17">
+      <h2><span class="num">§17</span>API 인터페이스 — 5그룹 21엔드포인트</h2>
+      <p class="h2-sub">OpenAPI 3.1로 명세, KL ↔ Lloydk 단일 계약 문서.</p>
+
+      <h3>17.1 그룹별 엔드포인트</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>그룹</th><th>메서드</th><th>경로</th><th>동기성</th><th>용도</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="5"><b>분류</b></td><td><code>POST</code></td><td><code>/classify</code></td><td><span class="pill accept">sync</span></td><td>단건 분류 (8KB 이하)</td></tr>
+            <tr><td><code>POST</code></td><td><code>/classify/async</code></td><td><span class="pill fallback">async</span></td><td>대용량/RAG ON 비동기</td></tr>
+            <tr><td><code>POST</code></td><td><code>/classify/batch</code></td><td><span class="pill fallback">async</span></td><td>일괄 (≤1000건)</td></tr>
+            <tr><td><code>GET</code></td><td><code>/classify/jobs/{job_id}</code></td><td><span class="pill accept">sync</span></td><td>비동기 작업 상태 조회</td></tr>
+            <tr><td><code>GET</code></td><td><code>/classify/{doc_id}</code></td><td><span class="pill accept">sync</span></td><td>문서 분류 결과 조회</td></tr>
+            <tr><td rowspan="2"><b>보정</b></td><td><code>POST</code></td><td><code>/confirm</code></td><td><span class="pill accept">sync</span></td><td>관리자 확정</td></tr>
+            <tr><td><code>POST</code></td><td><code>/relabel</code></td><td><span class="pill accept">sync</span></td><td>재라벨 (능동학습 큐 push)</td></tr>
+            <tr><td rowspan="3"><b>학습</b></td><td><code>POST</code></td><td><code>/train</code></td><td><span class="pill fallback">async</span></td><td>학습 트리거</td></tr>
+            <tr><td><code>GET</code></td><td><code>/train/jobs/{train_job_id}</code></td><td><span class="pill accept">sync</span></td><td>학습 작업 상태</td></tr>
+            <tr><td><code>GET</code></td><td><code>/train/jobs</code></td><td><span class="pill accept">sync</span></td><td>학습 이력 목록</td></tr>
+            <tr><td rowspan="3"><b>합성</b></td><td><code>POST</code></td><td><code>/synth/generate</code></td><td><span class="pill fallback">async</span></td><td>LLM 합성 시작</td></tr>
+            <tr><td><code>GET</code></td><td><code>/synth/queue</code></td><td><span class="pill accept">sync</span></td><td>검수 대기 큐</td></tr>
+            <tr><td><code>POST</code></td><td><code>/synth/{synth_id}/review</code></td><td><span class="pill accept">sync</span></td><td>검수 결과 제출</td></tr>
+            <tr><td rowspan="2"><b>가이드</b></td><td><code>POST</code></td><td><code>/guide/documents</code></td><td><span class="pill accept">sync</span></td><td>가이드 문서 등록 (RAG 시드)</td></tr>
+            <tr><td><code>GET</code></td><td><code>/guide/documents/{guide_id}</code></td><td><span class="pill accept">sync</span></td><td>가이드 문서 조회</td></tr>
+            <tr><td rowspan="2"><b>스키마</b></td><td><code>GET</code></td><td><code>/schema/grades</code></td><td><span class="pill accept">sync</span></td><td>등급 정의 조회</td></tr>
+            <tr><td><code>PUT</code></td><td><code>/schema/grades</code></td><td><span class="pill accept">sync</span></td><td>등급 정의 갱신 (관리자)</td></tr>
+            <tr><td rowspan="3"><b>지표</b></td><td><code>GET</code></td><td><code>/metrics/latest</code></td><td><span class="pill accept">sync</span></td><td>최신 모델 지표</td></tr>
+            <tr><td><code>GET</code></td><td><code>/metrics/history</code></td><td><span class="pill accept">sync</span></td><td>모델 버전별 추이</td></tr>
+            <tr><td><code>GET</code></td><td><code>/metrics/confusion-matrix/{model_version}</code></td><td><span class="pill accept">sync</span></td><td>Confusion Matrix</td></tr>
+            <tr><td><b>운영</b></td><td><code>GET</code></td><td><code>/healthz</code></td><td><span class="pill accept">sync</span></td><td>헬스 체크 + 의존성</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>17.2 공통 규약</h3>
+      <ul>
+        <li><b>인증</b>: <code>Authorization: Bearer {API_KEY}</code> + <code>X-Tenant-Id</code></li>
+        <li><b>추적</b>: 모든 응답에 <code>X-Request-Id</code> (UUID), <code>audit_log</code> 적재</li>
+        <li><b>Idempotency</b>: <code>POST /classify</code>, <code>/confirm</code>, <code>/relabel</code>은 <code>Idempotency-Key</code> 헤더 지원 (24시간 캐시)</li>
+        <li><b>버저닝</b>: URL prefix <code>/v1/</code>. 하위 호환 깨질 변경은 <code>/v2/</code> 신설</li>
+        <li><b>에러 포맷</b>: RFC 7807 Problem Details (<code>type/title/status/detail/instance</code>)</li>
+        <li><b>스키마</b>: 모든 등급은 <code>Grade enum = TS|S1|S2|S3</code> (DB <code>level_code</code>와 정합)</li>
+      </ul>
+
+      <h3>17.3 비동기 패턴</h3>
+<pre>1. POST /classify/async {doc_id, content, ...}
+       │ 즉시 응답
+       ▼
+   202 Accepted { job_id, status: "queued", poll_url: "/classify/jobs/{id}" }
+       │
+       │ (Celery worker가 큐에서 처리)
+       │
+       ▼
+2. GET /classify/jobs/{job_id}
+       │
+       ▼
+   200 OK { status: "running" | "done" | "failed",
+            progress: 0.0~1.0,
+            result: {...} (done 시),
+            error: {...} (failed 시) }
+
+   또는 webhook 콜백 (KL이 제공한 callback_url에 POST)</pre>
+
+      <div class="callout success">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">동기 vs 비동기 기준</span>
+          <p>본문 <b>8KB 이하 + RAG OFF</b>면 동기, 그 외는 비동기. p50 800ms 목표를 넘는 경로는 동기 API에서 차단. 일괄·학습·합성은 항상 비동기.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §18 Module Dependency Matrix ===== -->
+    <section id="s18">
+      <h2><span class="num">§18</span>모듈 의존 매트릭스</h2>
+      <p class="h2-sub">6개 모듈이 서로 무엇을 호출하는가 — 순환 의존 차단.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>↓ uses / → provides</th>
+              <th>M1 합성</th>
+              <th>M2 전처리</th>
+              <th>M3 라벨링</th>
+              <th>M4 학습</th>
+              <th>M5 추론</th>
+              <th>M6 평가</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><b>M1 합성</b><br/><code>FUN-003</code></td><td>—</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td></tr>
+            <tr><td><b>M2 전처리</b><br/><code>FUN-022</code></td><td>·</td><td>—</td><td>·</td><td>·</td><td>·</td><td>·</td></tr>
+            <tr><td><b>M3 라벨링</b><br/><code>FUN-023</code></td><td>·</td><td>✓</td><td>—</td><td>·</td><td>·</td><td>·</td></tr>
+            <tr><td><b>M4 학습</b><br/><code>FUN-004</code></td><td>✓</td><td>✓</td><td>✓</td><td>—</td><td>·</td><td>·</td></tr>
+            <tr class="pick"><td><b>M5 추론</b><br/><code>FUN-005</code></td><td>·</td><td>✓</td><td>✓</td><td>✓ (가중치)</td><td>—</td><td>·</td></tr>
+            <tr><td><b>M6 평가/능동학습</b><br/><code>FUN-024</code></td><td>·</td><td>·</td><td>·</td><td>✓ (트리거)</td><td>✓</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>18.1 공유 어댑터 (모듈 외부)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>어댑터</th><th>사용 모듈</th><th>역할</th></tr></thead>
+          <tbody>
+            <tr><td><code>LLMAdapter</code> (Anthropic/OpenAI/Google/vLLM)</td><td>M1, M3, M5</td><td>합성 생성, RAG 보강 추론, 경계 판단</td></tr>
+            <tr><td><code>VectorAdapter</code> (Qdrant)</td><td>M5</td><td>RAG Top-K 검색 (테넌트 네임스페이스 분리)</td></tr>
+            <tr><td><code>EmbedAdapter</code> (KURE-v1/BGE-M3)</td><td>M2, M5</td><td>청크 임베딩 생성</td></tr>
+            <tr><td><code>StorageAdapter</code> (MinIO)</td><td>M1~M6 전부</td><td>모델 가중치, 원문 텍스트, 캐시</td></tr>
+            <tr><td><code>QueueAdapter</code> (Redis+Celery)</td><td>M1, M4, M5, M6</td><td>비동기 작업 큐, 능동학습 큐</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>18.2 의존 규칙 (정적 검사)</h3>
+      <ul>
+        <li><b>순환 의존 금지</b>: 위 매트릭스가 상삼각 + 단방향이도록 강제. CI에서 <code>import-linter</code>로 검증.</li>
+        <li><b>레이어 역참조 금지</b>: Module → Adapter → Infra 단방향. Module이 Infra 직접 호출 금지.</li>
+        <li><b>외부 Service 계층</b>이 Module을 오케스트레이션. Module 간 직접 호출 시 Service로 끌어올림.</li>
+      </ul>
+
+      <div class="callout accent">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">M5 추론이 의존 최다인 이유</span>
+          <p>추론 한 번에 M2(전처리) · M3(라벨링 보조) · M4(가중치 로드)가 모두 필요. 그래서 M5는 가장 안정적이어야 하고, 의존 4개가 모두 Protocol 추상화돼 있어야 함 — 교체 시 M5만 영향. 그래서 어댑터 패턴이 가장 강하게 적용된 모듈.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §19 Sequence Diagram ===== -->
+    <section id="s19">
+      <h2><span class="num">§19</span>시퀀스 — <code>POST /classify</code> 1건 호출</h2>
+      <p class="h2-sub">관리자가 문서 1건 업로드 → 분류 결과 받기까지, 7단계.</p>
+
+      <div class="seq">
+        <div class="seq-step">
+          <div class="seq-num">0</div>
+          <div class="seq-body">
+            <div class="seq-title">업로드 · 요청 전달</div>
+            <div class="seq-actor"><b>KL UI</b> <span class="seq-arrow-inline">→</span> <b>KL Backend</b> <span class="seq-arrow-inline">→</span> <b>FastAPI</b></div>
+            <div class="seq-detail">HWP 파일 업로드 후 <code>POST /classify</code> 호출. body: <code>{doc_id, content, use_rag, tenant_id, actor}</code></div>
+          </div>
+          <div class="seq-sla">—</div>
+        </div>
+        <div class="seq-arrow"></div>
+
+        <div class="seq-step">
+          <div class="seq-num">1</div>
+          <div class="seq-body">
+            <div class="seq-title">감사 로그 적재</div>
+            <div class="seq-actor"><b>FastAPI</b> <span class="seq-arrow-inline">→</span> <b>PG</b> (audit_log)</div>
+            <div class="seq-detail"><code>request_id</code> 생성 · <code>actor</code> · <code>payload_hash(SHA-256)</code> 만 저장 (본문 X). 비동기 fire-and-forget.</div>
+          </div>
+          <div class="seq-sla"><b>~2 ms</b><br/>fire&amp;forget</div>
+        </div>
+        <div class="seq-arrow"></div>
+
+        <div class="seq-step">
+          <div class="seq-num">2</div>
+          <div class="seq-body">
+            <div class="seq-title">전처리 · 정규화 · 청크</div>
+            <div class="seq-actor"><b>FastAPI</b> <span class="seq-arrow-inline">→</span> <b>M2</b> (rhwp-py · soynlp)</div>
+            <div class="seq-detail">HWP/PDF 텍스트 추출 → 머리글·푸터 제거 → 512토큰 청크 (overlap 64, 문장 경계 우선). 결과 캐시 키: <code>SHA-256(content)</code>.</div>
+          </div>
+          <div class="seq-sla"><b>50~300 ms</b><br/>문서 크기 의존</div>
+        </div>
+        <div class="seq-arrow"></div>
+
+        <div class="seq-step">
+          <div class="seq-num">3</div>
+          <div class="seq-body">
+            <div class="seq-title">키워드 · 4대 평가요소 점수</div>
+            <div class="seq-actor"><b>FastAPI</b> <span class="seq-arrow-inline">→</span> <b>M3 라벨링</b></div>
+            <div class="seq-detail">YAML 규칙 기반 4대 요소(경제가치/비공지성/관리수준/유출영향도) 점수 + evidence span 추출. 메모리 캐시.</div>
+          </div>
+          <div class="seq-sla"><b>10~30 ms</b><br/>YAML 메모리</div>
+        </div>
+        <div class="seq-arrow"></div>
+
+        <div class="seq-step">
+          <div class="seq-num">4</div>
+          <div class="seq-body">
+            <div class="seq-title">RAG 검색 <span style="color:var(--text-dim);font-weight:400;font-size:12px">(옵션)</span></div>
+            <div class="seq-actor"><b>M5</b> <span class="seq-arrow-inline">→</span> <b>KURE-v1</b> <span class="seq-arrow-inline">→</span> <b>Qdrant</b> Top-K</div>
+            <div class="seq-detail"><code>use_rag=true</code>일 때만. 청크 임베딩 후 테넌트 네임스페이스에서 Top-5 검색. OFF면 단계 스킵.</div>
+          </div>
+          <div class="seq-sla"><b>50~150 ms</b><br/>OFF 시 0</div>
+        </div>
+        <div class="seq-arrow"></div>
+
+        <div class="seq-step">
+          <div class="seq-num">5</div>
+          <div class="seq-body">
+            <div class="seq-title">BERT 분류 + Aggregation</div>
+            <div class="seq-actor"><b>M5 추론</b> (KF-DeBERTa-base, GPU)</div>
+            <div class="seq-detail">청크별 등급 확률 산출 → ChunkAggregator(<code>hybrid</code>: 고등급 임계 초과 시 격상) → RAG ON이면 컨텍스트 등급분포로 가중 보정.</div>
+          </div>
+          <div class="seq-sla"><b>200~500 ms</b><br/>청크 수 비례</div>
+        </div>
+        <div class="seq-arrow"></div>
+
+        <div class="seq-step">
+          <div class="seq-num">6</div>
+          <div class="seq-body">
+            <div class="seq-title">결과 영속화</div>
+            <div class="seq-actor"><b>FastAPI</b> <span class="seq-arrow-inline">→</span> <b>PG</b> (classifications + classification_evidence)</div>
+            <div class="seq-detail">status=<code>staging</code> 로 INSERT. 근거 evidence(최대 10개, contribution 합 ≈ 1.0) 동시 적재.</div>
+          </div>
+          <div class="seq-sla"><b>5~15 ms</b><br/>2건 INSERT</div>
+        </div>
+        <div class="seq-arrow"></div>
+
+        <div class="seq-step">
+          <div class="seq-num">7</div>
+          <div class="seq-body">
+            <div class="seq-title">응답 반환</div>
+            <div class="seq-actor"><b>FastAPI</b> <span class="seq-arrow-inline">→</span> <b>KL Backend</b> <span class="seq-arrow-inline">→</span> <b>KL UI</b></div>
+            <div class="seq-detail">payload: <code>{label, confidence, scores{TS,S1,S2,S3}, evaluation_factors{4}, evidence[≤10], model_version, rag_used}</code>. KL UI는 관리자 검수 화면 표시.</div>
+          </div>
+          <div class="seq-sla"><b>~5 ms</b><br/>직렬화</div>
+        </div>
+
+        <div class="seq-branch">
+          <div class="seq-branch-title">이후 관리자 액션 (별도 호출)</div>
+          <div class="seq-branch-row">
+            <span class="seq-branch-key">(a) 확정</span>
+            <span><code>POST /confirm</code> → <code>classifications.status = confirmed</code>. corrections 미생성 (predicted_level_id가 진실 소스).</span>
+          </div>
+          <div class="seq-branch-row">
+            <span class="seq-branch-key">(b) 재라벨</span>
+            <span><code>POST /relabel</code> → <code>corrections</code> INSERT (<code>direction=underclass</code> 등) → ActiveLearningQueue push → <b>underclass ≥ 10건</b> 누적 시 <code>/train</code> 자동 트리거.</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>19.1 단계별 SLA</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>단계</th><th>예상 비용</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td>① audit_log INSERT</td><td>~2 ms</td><td>비동기 fire-and-forget 가능</td></tr>
+            <tr><td>② 전처리 (rhwp/PDF→청크)</td><td>50~300 ms</td><td>문서 크기·포맷에 따라 변동</td></tr>
+            <tr><td>③ M3 키워드·평가요소</td><td>10~30 ms</td><td>YAML 규칙 메모리 캐시</td></tr>
+            <tr><td>④ RAG (옵션)</td><td>50~150 ms</td><td>OFF 시 0</td></tr>
+            <tr><td>⑤ BERT 추론</td><td>200~500 ms</td><td>청크 수에 비례, GPU 24GB 기준</td></tr>
+            <tr><td>⑥ DB INSERT</td><td>5~15 ms</td><td>classifications + evidence 동시</td></tr>
+            <tr class="pick"><td><b>합계 (RAG OFF, 8KB)</b></td><td><b>p50 ~800 ms</b></td><td>핵심 KPI</td></tr>
+            <tr class="pick"><td><b>합계 (RAG ON)</b></td><td><b>p95 ≤ 1.5 s</b></td><td>30초 한계는 비동기 경로용</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">왜 동기 경로가 800ms 목표인가</span>
+          <p>KL UI의 업로드→결과 표시 UX 기준. 1초를 넘으면 사용자가 "느리다"고 인지(Doherty Threshold). 8KB 이상·RAG ON은 곧장 <code>/classify/async</code>로 우회시켜 동기 경로 보호.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §20 Responsibility Boundary ===== -->
+    <section id="s20">
+      <h2><span class="num">§20</span>KL ↔ Lloydk 책임 경계</h2>
+      <p class="h2-sub">통합 시점에 가장 자주 깨지는 곳 — "누가 무엇을 보장하는가" 명문화.</p>
+
+      <h3>20.1 책임 분담 매트릭스</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>영역</th><th>KL</th><th>Lloydk</th><th>경계 규약</th></tr></thead>
+          <tbody>
+            <tr><td><b>사용자 인증·세션</b></td><td>✓ 단독</td><td>·</td><td>KL이 JWT 발급·검증, Lloydk엔 <code>X-Tenant-Id</code> + <code>actor{id,role}</code>만 전달</td></tr>
+            <tr><td><b>권한 (RBAC)</b></td><td>✓ 단독</td><td>·</td><td>"이 사용자가 이 문서 볼 수 있나"는 KL 책임. Lloydk는 호출이 오면 처리만</td></tr>
+            <tr><td><b>API Key 발급·로테이션</b></td><td>·</td><td>✓</td><td>Lloydk가 KL용 Key 생성, <code>tenants.api_key_hash</code>에 저장. 만료 정책 90일</td></tr>
+            <tr><td><b>문서 원본 보관</b></td><td>✓ 단독</td><td>·</td><td>HWP/PDF 바이너리는 KL 보관함(FUN-007). Lloydk는 content 본문만 받음 (요청 시점에만)</td></tr>
+            <tr><td><b>본문 임시 보관</b></td><td>·</td><td>✓</td><td>전처리 결과 텍스트만 MinIO에 저장 (<code>raw_text_uri</code>). 원본 파일 X. 30일 후 자동 삭제</td></tr>
+            <tr><td><b>AI 분류·근거 산출</b></td><td>·</td><td>✓ 단독</td><td>응답: <code>{label, confidence, evidence[], scores{}, factors{}}</code></td></tr>
+            <tr><td><b>관리자 검수 UI</b></td><td>✓ 단독</td><td>·</td><td>Lloydk는 데이터만 제공, 화면은 KL 책임 (FUN-001~002)</td></tr>
+            <tr><td><b>학습 트리거 결정</b></td><td>관리자 수동</td><td>능동학습 자동</td><td>두 경로 모두 같은 <code>POST /train</code>. <code>trigger_type</code>으로 구분</td></tr>
+            <tr><td><b>워터마크·DRM·반출 차단</b></td><td>✓ 단독</td><td>·</td><td>KL의 FUN-013~015. Lloydk는 분류만, 통제 X</td></tr>
+            <tr><td><b>감사 로그 (KL 행위)</b></td><td>✓</td><td>·</td><td>로그인·다운로드·반출은 KL이 자체 audit</td></tr>
+            <tr><td><b>감사 로그 (AI 행위)</b></td><td>·</td><td>✓</td><td>모든 <code>/classify · /confirm · /relabel · /train</code> 호출을 Lloydk가 <code>audit_log</code> 적재</td></tr>
+            <tr><td><b>PII 마스킹</b></td><td>표시 단계</td><td>합성·로그 단계</td><td>UI에 보여줄 때는 KL, 합성 생성·로그 적재 전에는 Lloydk 정규식 필터</td></tr>
+            <tr><td><b>장애 시 사용자 메시지</b></td><td>✓ 단독</td><td>·</td><td>Lloydk는 RFC 7807 Problem Detail JSON으로 응답, 한국어 메시지 변환은 KL</td></tr>
+            <tr><td><b>요청 한도·Rate Limit</b></td><td>UI 레벨</td><td>API 레벨</td><td>Lloydk가 tenant별 RPS·일일 한도 강제, 초과 시 <code>429</code></td></tr>
+            <tr><td><b>데이터 삭제 (GDPR/개인정보)</b></td><td>요청 수신</td><td>실행</td><td>KL이 <code>DELETE /classify/{doc_id}</code> 호출 → Lloydk가 cascade 삭제 (해시는 audit_log에 잔존)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>20.2 데이터 소유권 분리</h3>
+<pre>┌─────────────── KL 영역 (KIPRA/기업 보관함) ────────────────┐
+│  · HWP/PDF/DOCX 원본 파일 (바이너리)                       │
+│  · 사용자 계정·세션·권한                                   │
+│  · 결재선·반출 이력·워터마크 메타                          │
+│  · 분류 결과의 "표시" (UI 렌더링)                          │
+└────────────────────────────────────────────────────────────┘
+                          │
+                          │  REST API (HTTPS)
+                          │  ─ body: content(text), use_rag, actor
+                          │  ─ headers: Authorization, X-Tenant-Id,
+                          │             X-Request-Id, Idempotency-Key
+                          ▼
+┌────────────── Lloydk 영역 (AI 엔진) ───────────────────────┐
+│  · 청크·임베딩 (KURE-v1 1024차원)                          │
+│  · 분류 결과·evidence·confidence                           │
+│  · 모델 가중치 (MinIO)                                     │
+│  · 합성 문서 (sample_documents)                            │
+│  · audit_log (본문 X, payload_hash만)                      │
+│  · LLM 비용 추적 (llm_usage)                               │
+└────────────────────────────────────────────────────────────┘</pre>
+
+      <h3>20.3 경계 규약 — 자주 깨지는 곳 6개</h3>
+      <div class="card-grid">
+        <div class="card">
+          <div class="eyebrow">R1 · 멱등성</div>
+          <p>같은 <code>doc_id</code> + <code>Idempotency-Key</code>로 들어오는 중복 호출은 Lloydk가 24h 캐시로 동일 응답 반환. KL의 재시도 부담 제거.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">R2 · 동시성 락</div>
+          <p>같은 <code>doc_id</code>에 동시 분류 요청 시 PG advisory lock으로 직렬화. 두 번째 요청은 첫 결과를 받음.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">R3 · 본문 미저장 원칙</div>
+          <p>Lloydk는 원본 바이너리(HWP/PDF) 미수신·미저장. <b>content는 텍스트만, 요청 단위 처리 후 30일 후 자동 삭제</b>. 영구 보관은 KL만.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">R4 · Evidence 노출 정책</div>
+          <p>evidence span은 원문 부분 텍스트라 영업비밀 일부일 수 있음. <b>KL이 UI 표시 시 권한 체크 후 노출</b>. Lloydk는 호출자에게 응답에 포함하되, 가공·마스킹 책임은 KL.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">R5 · 삭제 cascade</div>
+          <p>KL이 문서를 삭제하면 <code>DELETE /classify/{doc_id}</code>를 명시적으로 호출. <b>자동 cascade는 안 함</b>. Lloydk가 받으면 classifications/chunks/evidence cascade 삭제, audit_log는 hash만 잔존.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">R6 · 에러 메시지 변환</div>
+          <p>Lloydk는 항상 RFC 7807 JSON (영문 <code>title/detail</code>). 사용자에게 보이는 한국어 메시지는 KL이 매핑 (예: <code>type=https://lloydk/errors/gpu-oom</code> → "AI 엔진 일시 과부하, 잠시 후 재시도").</p>
+        </div>
+      </div>
+
+      <h3>20.4 통합 시 사전 협의 12개</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>항목</th><th>결정 필요 시한</th></tr></thead>
+          <tbody>
+            <tr><td>I1</td><td>API Key 발급·로테이션 주기·만료 시 회수 흐름</td><td>PoC P5 전</td></tr>
+            <tr><td>I2</td><td>JWT actor payload 스펙 (필수 필드: <code>id, role, tenant_id</code>)</td><td>PoC P5 전</td></tr>
+            <tr><td>I3</td><td>Idempotency-Key 생성 책임 (KL 측 UUID v4)</td><td>PoC P5 전</td></tr>
+            <tr class="pick"><td>I4</td><td><b>Evidence 마스킹 정책</b> (Lloydk 응답 vs KL 표시 단계)</td><td>PoC P1 전</td></tr>
+            <tr><td>I5</td><td>비동기 콜백 webhook 스펙 (재시도·서명)</td><td>PoC P5 전</td></tr>
+            <tr><td>I6</td><td>Rate Limit 임계 (tenant별 RPS, 일일 호출 상한)</td><td>운영 전</td></tr>
+            <tr><td>I7</td><td>등급 정의 변경 시 KL 캐시 무효화 흐름</td><td>운영 전</td></tr>
+            <tr><td>I8</td><td>오류 코드 한국어 매핑 사전 (Lloydk type URI ↔ KL 메시지)</td><td>UAT 전</td></tr>
+            <tr class="pick"><td>I9</td><td><b>문서 삭제 요청 시 cascade 범위</b> (분류 결과까지? 학습셋에 들어간 경우는?)</td><td>운영 전</td></tr>
+            <tr><td>I10</td><td>관리자 검수 UI에 표시할 confidence 임계 (예: ≥0.7만 staging, &lt;0.5는 직접 검수 요청)</td><td>UAT 전</td></tr>
+            <tr><td>I11</td><td>tenant 신규 발급 시 RAG 가이드 시드 등록 절차</td><td>운영 전</td></tr>
+            <tr><td>I12</td><td>장애 시 사용자 노출 메시지 (한국어 톤·표현)</td><td>UAT 전</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">최우선 협의 2건</span>
+          <p><b>I4 (Evidence 마스킹)</b>과 <b>I9 (삭제 cascade)</b>는 영업비밀 정책과 직결 — 잘못 합의되면 운영 중에 법적 리스크. PoC P1 시작 전에 발주처·KL 3자 합의 권장.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== §21 GPU·Cost ===== -->
+    <section id="s21">
+      <h2><span class="num">§21</span>GPU·LLM 비용 시나리오</h2>
+      <p class="h2-sub">상용 API와 OSS는 <b>대체재가 아닌 보완재</b>. 망 환경에 따라 자동 전환.</p>
+
+      <h3>21.0 핵심 전제 — 양쪽 다 쓴다</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>환경</th><th>LLM_PROVIDER</th><th>가능 여부</th><th>주 용도</th></tr></thead>
+          <tbody>
+            <tr><td><b>일반망</b> (인터넷 OK)</td><td><code>anthropic</code> · <code>openai</code> · <code>google</code></td><td>API 자유</td><td>합성 · RAG 보강 · 경계 판단 모두</td></tr>
+            <tr class="pick"><td><b>폐쇄망</b> (외부 송신 차단)</td><td><code>vllm</code> (Qwen3-14B)</td><td><b>API 호출 물리적 불가</b></td><td>전부 OSS로만 — 선택 X, 강제</td></tr>
+            <tr><td><b>하이브리드</b></td><td>두 어댑터 동시 활성</td><td>혼용</td><td>합성은 API (1회성, 품질), 추론 보강은 OSS (지속, 비용)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">중요</span>
+          <p>폐쇄망 환경에서는 Claude/GPT/Gemini API 호출이 <b>네트워크 단에서 차단</b>. "비용 비교 후 선택"이 아니라 OSS 강제. 그래서 우리 설계는 <code>LLMAdapter</code> 추상화로 <b>두 경로 모두 first-class로 지원</b> — 망 환경 따라 환경변수만 바꾸면 동작.</p>
+        </div>
+      </div>
+
+      <h3>21.1 GPU 시나리오 3종</h3>
+      <p style="color:var(--text-dim);font-size:13.5px">LOW는 일반망 전용 (OSS LLM 미포함). 폐쇄망 도입 기업은 <b>MID부터</b> 시작해야 Qwen3 동시 운영 가능.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>시나리오</th><th>GPU</th><th>VRAM</th><th>분류 BERT</th><th>OSS LLM</th><th>합성·RAG 보강</th><th>예상 단가</th></tr></thead>
+          <tbody>
+            <tr><td><b>LOW</b></td><td>RTX 4080 (또는 L4)</td><td><code>16GB</code></td><td>✓ KF-DeBERTa FP16</td><td>✗</td><td>API만 (일반망 전용)</td><td>~220만원 / $0.30·h</td></tr>
+            <tr class="pick"><td><b>MID</b> (권장)</td><td>RTX 4090 (또는 L40S 단일)</td><td><code>24~48GB</code></td><td>✓ KF-DeBERTa</td><td>✓ Qwen3-14B Q4</td><td>API + OSS 둘 다 (폐쇄망 지원)</td><td>~400~1,300만원 / $0.50·h</td></tr>
+            <tr><td><b>HIGH</b></td><td>A100 또는 L40S 2장</td><td><code>40~80GB</code></td><td>✓ + 멀티모달</td><td>✓ Qwen3-14B FP16</td><td>OSS 풀 성능 (대규모·폐쇄망)</td><td>2,000만원+ / $1.5~2·h</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>21.2 OSS LLM 양자화 트레이드오프 (Qwen3-14B 기준)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>정밀도</th><th>VRAM</th><th>품질 (vs FP16)</th><th>속도 (tok/s)</th><th>필요 GPU</th></tr></thead>
+          <tbody>
+            <tr><td>FP16 (풀)</td><td><code>~30GB</code></td><td>100%</td><td>60~80</td><td>A100 40GB / L40S 48GB</td></tr>
+            <tr><td>FP8 / W8A8</td><td><code>~16GB</code></td><td>99%+</td><td>50~70</td><td>RTX 4090 24GB / L4</td></tr>
+            <tr class="pick"><td><b>Q4 (GPTQ/AWQ)</b></td><td><code>~10GB</code></td><td><b>95~97%</b></td><td>30~50</td><td>RTX 4080 16GB / 4090 단일</td></tr>
+            <tr><td>Q3 (실험)</td><td><code>~7GB</code></td><td>85~90%</td><td>20~40</td><td>RTX 4070 12GB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>실무 결론:</b> Q4 양자화로 품질 95%+를 유지하며 <b>4090 1장(~400만원)</b>에서 분류 BERT + Qwen3 동시 운영 가능. 폐쇄망 기업은 이 조합이 사실상 필수, 일반망 + 대규모 운영(월 100K건+) 시도 유효한 선택지.</p>
+
+      <h3>21.3 상용 API 단가 (2026-05 기준)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>모델</th><th>입력 $/1M</th><th>출력 $/1M</th><th>1건 합성 (~3K tok)</th><th>1건 RAG 보강 (~1K tok)</th></tr></thead>
+          <tbody>
+            <tr class="pick"><td>Claude Sonnet 4.6</td><td><code>$3</code></td><td><code>$15</code></td><td>~$0.025</td><td>~$0.008</td></tr>
+            <tr><td>GPT-4o</td><td><code>$2.5</code></td><td><code>$10</code></td><td>~$0.02</td><td>~$0.006</td></tr>
+            <tr><td>Gemini 2.5 Pro</td><td><code>$1.25</code></td><td><code>$10</code></td><td>~$0.015</td><td>~$0.005</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>21.4 비용 비교 — <span style="color:var(--text-dim);font-weight:400">일반망 환경 한정</span></h3>
+      <p style="color:var(--text-dim);font-size:13.5px">폐쇄망은 OSS 강제라 비교 불필요. 아래는 <b>일반망에서 두 옵션 모두 가능할 때</b> 어느 쪽을 기본값으로 둘지의 기준.</p>
+
+      <h4>21.4.1 단순 비용 기준 (인력·관리 비용 제외)</h4>
+<pre>가정:
+  · 분류 1건당 RAG 보강 LLM 호출 1회 (~$0.008 Claude Sonnet 4.6)
+  · OSS GPU 비용 (4090 클라우드): $0.5·h × 24h × 30일 = $360/월 (고정)
+  · 합성은 능동학습 분기 재학습 시만 (월 ~$2.5)
+
+월 비용 비교 (분류 요청 N건/월):
+
+  N=1,000        N=10,000       N=45,000       N=100,000      N=1,000,000
+  ─────────────  ─────────────  ─────────────  ─────────────  ──────────────
+  API:   $8      API:   $80     API:   $360    API:   $800    API:   $8,000
+  OSS:   $360    OSS:   $360    OSS:   $360    OSS:   $360    OSS:   $360
+
+단순 손익분기점: 월 45,000건 (LLM API 호출만 비교 시)</pre>
+
+      <h4>21.4.2 현실 보정 — 숨은 비용 4가지</h4>
+      <div class="card-grid">
+        <div class="card">
+          <div class="eyebrow">H1 · 운영 인력</div>
+          <p>OSS GPU 서버 = DevOps·MLOps 책임 추가. vLLM 버전 관리, 양자화 재실험, 모델 swap, GPU 장애 대응. <b>월 인건비 환산 수백~수천만원</b>.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">H2 · 신뢰성·가용성</div>
+          <p>API는 99.9% SLA + 글로벌 redundancy. 자체 GPU는 단장애점. <b>다운타임 시 폴백 비용 + 사용자 신뢰 비용</b>.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">H3 · 품질 손실</div>
+          <p>Q4 양자화는 평균 95% 품질이지만 <b>경계 사례·법률 문어체에서 FNR 악화 가능</b>. 영업비밀 시스템에선 미탐 1건이 사고로 직결.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow">H4 · 능동학습 부담</div>
+          <p>API는 모델 업데이트 자동(Anthropic이 함). OSS는 <b>새 버전 평가·승격·롤백을 우리가 다 함</b>. MLflow + 평가셋 운영 부담.</p>
+        </div>
+      </div>
+      <p><b>현실 손익분기점:</b> 단순 비용은 월 45K건이지만, 위 4개 보정 시 <b>월 100K~200K건 이상</b>에서야 OSS가 진짜 유리해짐.</p>
+
+      <h4>21.4.3 KOIPA 영업비밀 시스템 실제 규모 추정</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>운영 시나리오</th><th>일 처리량</th><th>월 처리량</th><th>API 비용/월</th><th>OSS 비용/월 (4090)</th><th>유리한 쪽</th></tr></thead>
+          <tbody>
+            <tr class="pick"><td><b>단일 기업 도입</b></td><td>50~200건</td><td>~5,000건</td><td><code>~$40</code></td><td><code>$360+ +인력</code></td><td><span class="pill accept">API 압도</span></td></tr>
+            <tr class="pick"><td><b>중규모 (10개 기업)</b></td><td>500~1,000건</td><td>~25,000건</td><td><code>~$200</code></td><td><code>$360+ +인력</code></td><td><span class="pill accept">API 유리</span></td></tr>
+            <tr><td><b>대규모 통합</b></td><td>3,000~5,000건</td><td>~120,000건</td><td><code>~$960</code></td><td><code>$360+ +인력</code></td><td><span class="pill fallback">OSS 검토 영역</span></td></tr>
+            <tr><td><b>전국 보호원 통합</b></td><td>10,000건+</td><td>~300,000건+</td><td><code>$2,400+</code></td><td><code>$360+ +인력</code></td><td><span class="pill fallback">OSS 진지하게</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout success">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">결론 — 망 환경별 기본값</span>
+          <ul>
+            <li><b>일반망 + 소~중규모 (월 100K건 미만)</b>: API 기본값 (Claude). BERT만 자체 GPU. 인력·관리·신뢰성 우위</li>
+            <li><b>일반망 + 대규모 (월 100K~200K+ 건)</b>: OSS 추가 검토 — 단순 비용은 45K건이 분기점이지만 인력·관리 보정 시 100K건 이상</li>
+            <li><b>폐쇄망 (외부 송신 차단)</b>: 망 정책으로 OSS 강제 — 비용 비교 무의미, 처음부터 Qwen3-14B Q4로 시작</li>
+            <li><b>합성 1회성 비용</b>: PoC 800건 = ~$20, 운영 능동학습 분기 재학습 시 100건/회 = ~$2.5</li>
+            <li><b>설계 원칙</b>: 어느 환경이든 <code>LLMAdapter</code> 추상화로 동일 코드 — 환경변수 한 줄로 전환 (API/OSS/하이브리드)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>21.5 발주처 협의 항목 — GPU·예산 (§15 Q2·Q5 상세화)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>항목</th><th>옵션</th><th>판단 기준</th></tr></thead>
+          <tbody>
+            <tr><td>G1</td><td>GPU 사양 결정</td><td>LOW / MID / HIGH</td><td>예상 일 처리량 + 폐쇄망 요건 여부</td></tr>
+            <tr><td>G2</td><td>GPU 조달 방식</td><td>온프레미스 구매 / 클라우드 임대 / 발주처 제공</td><td>3년 TCO 비교 (구매 vs 클라우드는 ~18개월에 손익분기)</td></tr>
+            <tr class="pick"><td>G3</td><td><b>운영 LLM API 상한</b></td><td>월 $50 / $200 / $500 / 무제한</td><td>예상 분류 건수 × 단가 + 안전 마진</td></tr>
+            <tr><td>G4</td><td>도입 기업의 망 환경</td><td>일반망 / 폐쇄망 / 혼재</td><td>폐쇄망 비중에 따라 OSS LLM GPU 필수 사양 결정</td></tr>
+            <tr><td>G5</td><td>모델 캐시·재학습 빈도</td><td>주간 / 월간 / 능동학습 트리거 only</td><td>GPU 점유 시간 ↔ 모델 신선도</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warn">
+        <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="callout-body">
+          <span class="callout-label">현재 미확정</span>
+          <p>발주처 GPU 제공 사양·LLM API 예산 모두 PoC P3 시작 전 확정 필요. PoC P1·P2는 LOW 시나리오로 진행 가능하므로 GPU 결정과 무관하게 시작 가능.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== APPENDIX A ===== -->
+    <section id="sA">
+      <h2><span class="num">A</span>풀네임·출처</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>약칭</th><th>풀네임</th><th>레지스트리</th></tr></thead>
+          <tbody>
+            <tr><td>KF-DeBERTa</td><td>Kakaobank Financial DeBERTa-v2 base</td><td><code>kakaobank/kf-deberta-base</code></td></tr>
+            <tr><td>KoELECTRA</td><td>Korean ELECTRA base</td><td><code>monologg/koelectra-base-v3-discriminator</code></td></tr>
+            <tr><td>KURE-v1</td><td>Korea University Retrieval Embedding v1</td><td><code>nlpai-lab/KURE-v1</code></td></tr>
+            <tr><td>BGE-M3</td><td>BAAI General Embedding M3</td><td><code>BAAI/bge-m3</code></td></tr>
+            <tr><td>Qwen3-14B</td><td>Alibaba Qwen3 14B dense</td><td><code>Qwen/Qwen3-14B</code></td></tr>
+            <tr><td>Claude Sonnet 4.6</td><td>Anthropic Claude Sonnet 4.6</td><td>API <code>claude-sonnet-4-6</code></td></tr>
+            <tr><td>rhwp-python</td><td>Rust-based HWP/HWPX parser (PyO3)</td><td><code>DanMeon/rhwp-python</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== APPENDIX B ===== -->
+    <section id="sB">
+      <h2><span class="num">B</span>최종 채택 스택</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>레이어</th><th>채택</th><th>한 줄 이유</th></tr></thead>
+          <tbody>
+            <tr><td>분류 모델</td><td><b>KF-DeBERTa-base</b> / KoELECTRA 경량</td><td>한국어+금융·법률 도메인 사전학습</td></tr>
+            <tr><td>임베딩</td><td><b>KURE-v1</b> / BGE-M3 폴백</td><td>BGE-M3 한국어 fine-tune, +1.6%p</td></tr>
+            <tr><td>LLM 상용</td><td><b>Claude Sonnet 4.6</b></td><td>한국어·1M·JSON 안정</td></tr>
+            <tr><td>LLM OSS</td><td><b>Qwen3-14B + vLLM</b></td><td>thinking 모드, Apache 2.0</td></tr>
+            <tr><td>Vector DB</td><td><b>Qdrant</b> / pgvector 폴백</td><td>Rust 단일 컨테이너</td></tr>
+            <tr><td>RDB</td><td>PostgreSQL 16 + pgvector + JSONB</td><td>공공기관 표준</td></tr>
+            <tr><td>스토리지</td><td>MinIO</td><td>S3 호환, 모델 외부화</td></tr>
+            <tr><td>큐/캐시</td><td>Redis 7 + Celery</td><td>비동기 일괄, 능동학습</td></tr>
+            <tr><td>HWP/HWPX</td><td><b>rhwp-python</b></td><td>Rust, pyhwp 대비 62×</td></tr>
+            <tr><td>PDF</td><td>PyMuPDF</td><td>가장 빠르고 정확</td></tr>
+            <tr><td>OCR</td><td>PaddleOCR (kor)</td><td>한국어 OCR SOTA</td></tr>
+            <tr><td>학습</td><td>PyTorch + HF Transformers + MLflow</td><td>표준</td></tr>
+            <tr><td>체인</td><td>LangChain + LangGraph</td><td>합성·능동학습 루프</td></tr>
+            <tr><td>API</td><td>FastAPI</td><td>OpenAPI 자동, 비동기</td></tr>
+            <tr><td>모니터링</td><td>Prometheus + Grafana + Loki</td><td>오픈소스 표준</td></tr>
+            <tr><td>컨테이너</td><td>Docker + docker-compose</td><td>온프레미스 표준</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== CLOSING ===== -->
+    <blockquote class="feature">
+      <p><b>마무리.</b> 한국 영업비밀 도메인에 맞춘 <b>KF-DeBERTa</b> 분류기를 코어로, <b>KURE-v1 + Qdrant RAG</b>로 기업별 변동성을 흡수하고, <b>Claude / Qwen3</b> LLM을 합성·보강에 분리 활용, <b>FNR</b>을 KPI로 능동학습 루프를 도는 온프레미스 Docker 시스템.</p>
+    </blockquote>
+
+  </article>
+
+  <!-- ============ TOC ============ -->
+  <nav class="toc" aria-label="On this page">
+    <div class="toc-label">On this page</div>
+    <ol>
+      <li><a href="#s1">프로젝트 한눈에</a></li>
+      <li><a href="#s2">전체 워크플로우</a></li>
+      <li><a href="#s3">아키텍처 레이어</a></li>
+      <li><a href="#s4">분류 모델 비교·선택</a></li>
+      <li><a href="#s5">임베딩 모델 비교·선택</a></li>
+      <li><a href="#s6">LLM 상용 vs OSS</a></li>
+      <li><a href="#s7">Vector DB · RDB · 큐</a></li>
+      <li><a href="#s8">HWP/PDF/OCR 처리</a></li>
+      <li><a href="#s9">학습 전략과 FNR</a></li>
+      <li><a href="#s10">RAG 결합 방식</a></li>
+      <li><a href="#s11">합성 데이터 전략</a></li>
+      <li><a href="#s12">능동학습 루프</a></li>
+      <li><a href="#s13">보안·멀티테넌트</a></li>
+      <li><a href="#s14">PoC와 Go/No-Go</a></li>
+      <li><a href="#s15">위험·미해결 이슈</a></li>
+      <li><a href="#s16">DB 스키마 v2</a></li>
+      <li><a href="#s17">API 21엔드포인트</a></li>
+      <li><a href="#s18">모듈 의존 매트릭스</a></li>
+      <li><a href="#s19">분류 시퀀스</a></li>
+      <li><a href="#s20">KL↔Lloydk 책임 경계</a></li>
+      <li><a href="#s21">GPU·LLM 비용 시나리오</a></li>
+      <li><a href="#sA">A. 풀네임·출처</a></li>
+      <li><a href="#sB">B. 최종 스택</a></li>
+    </ol>
+  </nav>
+
+</div>
+
+<footer>
+  <div class="mono">Lloydk · KOIPA AI Whitepaper · v1.0 · 2026-05-26</div>
+  <div style="margin-top:6px">Built with the NovaXDB design system aesthetic — Geist · monochrome · 1px borders.</div>
+</footer>
+
+<script>
+  // ===== TOC active highlight (scroll-spy) =====
+  const sections = document.querySelectorAll("section[id]");
+  const tocLinks = document.querySelectorAll(".toc a");
+  const linkMap = {};
+  tocLinks.forEach(a => { linkMap[a.getAttribute("href").slice(1)] = a; });
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = entry.target.id;
+      if (!linkMap[id]) return;
+      if (entry.isIntersecting) {
+        tocLinks.forEach(a => a.classList.remove("active"));
+        linkMap[id].classList.add("active");
+      }
+    });
+  }, { rootMargin: "-25% 0px -65% 0px" });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

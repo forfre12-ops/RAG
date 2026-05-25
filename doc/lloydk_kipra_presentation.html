@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KIPRA AI 영업비밀관리시스템 · Lloydk 파트 설계</title>
+<style>
+  /* ─── NovaXDB-style tokens (Vercel/Geist 모노톤) ─────────────────── */
+  :root {
+    --surface: #ffffff;
+    --subtle:  #fafafa;
+    --elevated:#f4f4f5;
+    --line:    #eaeaea;
+    --line-strong: #cccccc;
+    --ink:     #0a0a0a;
+    --muted:   #666666;
+    --faint:   #999999;
+    --code-bg: #0a0a0a;
+    --code-fg: #e5e5e5;
+    --brand:   #2563eb;
+    --brand-soft:#eff6ff;
+    --accent:  #10b981;
+    --warn:    #f59e0b;
+    --danger:  #dc2626;
+    --radius:  10px;
+    --radius-sm: 6px;
+    --shadow:  0 4px 14px 0 rgba(0,0,0,.05);
+    --font-sans: "Inter","Pretendard",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  html.dark {
+    --surface: #0a0a0a;
+    --subtle:  #0f0f0f;
+    --elevated:#1a1a1a;
+    --line:    #262626;
+    --line-strong:#3a3a3a;
+    --ink:     #ffffff;
+    --muted:   #999999;
+    --faint:   #666666;
+    --brand:   #60a5fa;
+    --brand-soft:#1e3a8a33;
+    color-scheme: dark;
+  }
+  *,*::before,*::after { box-sizing: border-box; }
+  html,body { margin:0; padding:0; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background: var(--surface);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    line-height: 1.6;
+    font-size: 16px;
+    scroll-behavior: smooth;
+  }
+  ::selection { background: #ffe27a; color: #000; }
+  html.dark ::selection { background: #fde047; color: #000; }
+
+  /* ─── Top bar ─────────────────────────────────────────────────── */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1200px; margin: 0 auto;
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand {
+    font-weight: 700; font-size: 15px; letter-spacing: -.01em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .brand-mark {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--ink); color: var(--surface);
+    display:grid; place-items:center; font-size:11px; font-weight:800;
+  }
+  .topbar nav { display: flex; gap: 22px; font-size: 14px; }
+  .topbar nav a { color: var(--muted); text-decoration: none; }
+  .topbar nav a:hover { color: var(--ink); }
+  .top-actions { display:flex; gap:10px; align-items:center; }
+  .btn-icon {
+    width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); cursor: pointer;
+    display:grid; place-items:center;
+    transition: all .15s ease;
+  }
+  .btn-icon:hover { background: var(--subtle); border-color: var(--line-strong); }
+
+  /* ─── Layout ───────────────────────────────────────────────────── */
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 56px;
+    padding: 48px 24px 96px;
+    max-width: 1200px; margin: 0 auto;
+  }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; gap: 24px; padding: 24px 16px 60px; }
+    .toc { display: none; }
+  }
+
+  /* ─── TOC ──────────────────────────────────────────────────────── */
+  .toc {
+    position: sticky; top: 80px; align-self: start;
+    max-height: calc(100vh - 100px); overflow-y: auto;
+    font-size: 13px;
+    padding-right: 8px;
+  }
+  .toc-title {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--faint);
+    margin-bottom: 12px;
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin: 4px 0; }
+  .toc a {
+    display: block; padding: 4px 10px; border-left: 2px solid var(--line);
+    color: var(--muted); text-decoration: none;
+    border-radius: 0 4px 4px 0;
+  }
+  .toc a:hover { color: var(--ink); background: var(--subtle); border-left-color: var(--line-strong); }
+  .toc a.active { color: var(--ink); border-left-color: var(--ink); font-weight: 600; }
+
+  /* ─── Hero ─────────────────────────────────────────────────────── */
+  .hero {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 32px; margin-bottom: 48px;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    color: var(--brand); background: var(--brand-soft);
+    padding: 4px 10px; border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+  h1 {
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.15; letter-spacing: -.02em;
+    margin: 0 0 14px;
+    font-weight: 800;
+  }
+  .lead {
+    font-size: 18px; color: var(--muted);
+    max-width: 720px; margin: 0;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    margin-top: 22px;
+    font-size: 13px; color: var(--faint);
+  }
+  .meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .meta strong { color: var(--ink); font-weight: 600; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .tag {
+    font-size: 11px; padding: 3px 8px; border-radius: 4px;
+    background: var(--subtle); border: 1px solid var(--line);
+    color: var(--muted); font-weight: 500;
+  }
+
+  /* ─── Typography ───────────────────────────────────────────────── */
+  article h2 {
+    font-size: 26px; font-weight: 800; letter-spacing: -.01em;
+    margin: 56px 0 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  article h2:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  article h3 { font-size: 19px; font-weight: 700; margin: 32px 0 10px; }
+  article h4 { font-size: 16px; font-weight: 700; margin: 24px 0 8px; color: var(--ink); }
+  article p { margin: 0 0 16px; color: var(--ink); }
+  article p.muted { color: var(--muted); }
+  article a { color: var(--brand); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); }
+  article a:hover { border-bottom-color: var(--brand); }
+  article strong { font-weight: 700; }
+  article ul, article ol { padding-left: 22px; margin: 0 0 16px; }
+  article li { margin: 4px 0; }
+  article blockquote {
+    border-left: 3px solid var(--ink);
+    padding: 4px 16px; margin: 20px 0;
+    color: var(--muted); font-style: italic;
+    background: var(--subtle); border-radius: 0 6px 6px 0;
+  }
+
+  /* ─── Code blocks (NovaXDB always-dark) ─────────────────────────── */
+  pre {
+    background: var(--code-bg); color: var(--code-fg);
+    border-radius: var(--radius); padding: 16px 18px;
+    overflow-x: auto; font-size: 13px; line-height: 1.55;
+    font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    margin: 18px 0;
+    border: 1px solid #1a1a1a;
+  }
+  code {
+    font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    font-size: .9em;
+    background: var(--elevated); padding: 2px 6px; border-radius: 4px;
+    color: var(--ink);
+  }
+  pre code { background: transparent; padding: 0; color: inherit; }
+
+  /* ─── Tables ───────────────────────────────────────────────────── */
+  table {
+    width: 100%; border-collapse: collapse; margin: 20px 0;
+    font-size: 14px;
+    border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--subtle); font-weight: 600; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  td code { font-size: 12px; }
+
+  /* ─── Cards / callouts ─────────────────────────────────────────── */
+  .grid { display: grid; gap: 16px; }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 760px) { .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px 18px 16px;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .card:hover { border-color: var(--line-strong); }
+  .card-eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); font-weight: 700; }
+  .card h4 { margin: 8px 0 6px; font-size: 16px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .stat {
+    background: var(--subtle); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px;
+  }
+  .stat-num { font-size: 28px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+  .stat-lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .callout {
+    border-left: 3px solid var(--brand);
+    background: var(--brand-soft);
+    padding: 12px 16px; border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 18px 0; font-size: 14px;
+  }
+  .callout.warn  { border-left-color: var(--warn);  background: #fffbeb; }
+  .callout.ok    { border-left-color: var(--accent);background: #ecfdf5; }
+  .callout.danger{ border-left-color: var(--danger);background: #fef2f2; }
+  html.dark .callout       { background: #1e3a8a22; }
+  html.dark .callout.warn  { background: #78350f22; }
+  html.dark .callout.ok    { background: #064e3b22; }
+  html.dark .callout.danger{ background: #7f1d1d22; }
+
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+    background: var(--elevated); color: var(--ink); border: 1px solid var(--line);
+  }
+  .pill.brand { background: var(--brand-soft); color: var(--brand); border-color: transparent; }
+  .pill.ok    { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
+  .pill.warn  { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+  .pill.danger{ background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  html.dark .pill.ok   { background: #064e3b33; color: #34d399; border-color: transparent; }
+  html.dark .pill.warn { background: #78350f33; color: #fbbf24; border-color: transparent; }
+  html.dark .pill.danger { background: #7f1d1d33; color: #f87171; border-color: transparent; }
+
+  /* ─── ASCII diagram boxes (preserve whitespace) ────────────────── */
+  .ascii {
+    background: var(--code-bg); color: var(--code-fg);
+    border-radius: var(--radius); padding: 18px 22px;
+    overflow-x: auto; font-size: 12.5px; line-height: 1.5;
+    font-family: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    white-space: pre; margin: 18px 0;
+    border: 1px solid #1a1a1a;
+  }
+
+  /* ─── Footer ───────────────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--line);
+    margin-top: 80px;
+    padding: 28px 0;
+    color: var(--faint); font-size: 13px;
+    text-align: center;
+  }
+  footer a { color: var(--muted); text-decoration: none; margin: 0 8px; }
+  footer a:hover { color: var(--ink); }
+
+  /* Heading anchors */
+  h2[id], h3[id] { scroll-margin-top: 80px; }
+  h2 a.anchor, h3 a.anchor {
+    margin-left: 8px; color: var(--faint); border: none; opacity: 0;
+    font-size: .7em; transition: opacity .15s;
+  }
+  h2:hover a.anchor, h3:hover a.anchor { opacity: 1; }
+
+  /* Print */
+  @media print {
+    .topbar, .toc, footer { display: none; }
+    .layout { grid-template-columns: 1fr; padding: 0; }
+    body { font-size: 12pt; }
+    pre, .ascii { border: 1px solid #aaa; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">LK</span>
+      Lloydk · KIPRA Whitepaper
+    </div>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#stack">Stack</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#schema">Schema</a>
+      <a href="#qa">Q&amp;A</a>
+    </nav>
+    <div class="top-actions">
+      <button class="btn-icon" id="themeBtn" title="다크모드 토글" aria-label="theme">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ────────── TOC ────────── -->
+  <aside class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#overview">1. 30초 요약</a></li>
+      <li><a href="#problem">2. 풀려는 문제</a></li>
+      <li><a href="#workflow">3. 데이터 흐름</a></li>
+      <li><a href="#architecture">4. 인프라 아키텍처</a></li>
+      <li><a href="#stack">5. 기술 스택</a></li>
+      <li><a href="#schema">6. DB 스키마 v2</a></li>
+      <li><a href="#decisions">7. 핵심 결정</a></li>
+      <li><a href="#qa">8. 예상 Q&amp;A</a></li>
+      <li><a href="#status">9. 진행 상황</a></li>
+    </ol>
+  </aside>
+
+  <!-- ────────── ARTICLE ────────── -->
+  <article>
+
+    <!-- Hero -->
+    <section class="hero">
+      <span class="eyebrow"><span class="dot"></span>Whitepaper · 2026-05</span>
+      <h1>KIPRA AI 영업비밀관리시스템 — Lloydk 파트 설계</h1>
+      <p class="lead">
+        문서를 업로드하면 AI가 4단계 보안등급(특급/1급/2급/3급)을 자동 분류하는
+        온프레미스 Docker 시스템. 한국지식재산보호원이 발주, KL과의 협업 구조로
+        Lloydk는 AI 코어 6개 기능을 담당.
+      </p>
+      <div class="meta">
+        <span><strong>발주처</strong> 한국지식재산보호원</span>
+        <span><strong>담당 파트</strong> Lloydk AI Engine (FUN-003, 004, 005, 022, 023, 024)</span>
+        <span><strong>현 단계</strong> PoC 설계 완료</span>
+      </div>
+      <div class="tags">
+        <span class="tag">AI / NLP</span>
+        <span class="tag">RAG</span>
+        <span class="tag">Korean BERT</span>
+        <span class="tag">On-premise</span>
+        <span class="tag">Active Learning</span>
+        <span class="tag">FastAPI</span>
+      </div>
+    </section>
+
+    <!-- 1. 30초 요약 -->
+    <h2 id="overview">1 · 30초 요약</h2>
+    <p>
+      한 줄 정의: <strong>"한국어 문서를 받아서 → 분해·정규화 → BERT 모델로 등급 추론 →
+      RAG로 보강 → 미탐(FNR) 최소화하며 능동 학습으로 진화하는 온프레미스 시스템"</strong>.
+    </p>
+
+    <div class="grid cols-4" style="margin-top:18px;">
+      <div class="stat"><div class="stat-num">4</div><div class="stat-lbl">등급 단계 (TS/S1/S2/S3)</div></div>
+      <div class="stat"><div class="stat-num">6</div><div class="stat-lbl">담당 모듈 (FUN-003~024)</div></div>
+      <div class="stat"><div class="stat-num">16</div><div class="stat-lbl">REST API 엔드포인트</div></div>
+      <div class="stat"><div class="stat-num">≤ 5%</div><div class="stat-lbl">PoC FNR 목표 (미탐율)</div></div>
+    </div>
+
+    <h3>업무 분담</h3>
+    <div class="ascii">┌──────────────────────────┐         ┌──────────────────────────┐
+│  KL (협력사) — 18개 기능 │ ◀────▶ │  Lloydk — 6개 기능       │
+│                          │  REST   │                          │
+│  웹 UI · 보관함 · 권한   │   API   │  AI 등급분류 엔진        │
+│  워터마크 · 감사 · 배포  │         │  (학습+추론+평가+합성)   │
+└──────────────────────────┘         └──────────────────────────┘</div>
+
+    <!-- 2. 문제 -->
+    <h2 id="problem">2 · 풀려는 문제</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <div class="card-eyebrow">Problem 1</div>
+        <h4>실데이터 부재</h4>
+        <p>영업비밀은 정의상 외부 공개 불가. 학습 데이터를 구할 수 없음.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Problem 2</div>
+        <h4>도메인 전문성</h4>
+        <p>등급 판정은 4대 평가요소(경제가치·비공지성·관리수준·유출영향) 종합. 키워드 매칭으로는 불가.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Problem 3</div>
+        <h4>미탐(FNR) 위험</h4>
+        <p>고등급 → 저등급 오분류 = 즉시 영업비밀 유출 사고. Accuracy가 아니라 FNR이 KPI.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:32px;">해법 — 3중 전략</h3>
+    <ol>
+      <li><strong>데이터 3중 확보</strong> — 공개 데이터(AI Hub·공공데이터·KIPRA 가이드) + LLM 합성(Claude/Qwen3 1,500건 + 이중 검수) + 능동학습(운영 중 누적)</li>
+      <li><strong>한국어 도메인 모델</strong> — KF-DeBERTa(금융·법률 사전학습) + KURE-v1(한국어 retrieval fine-tuned) + RAG로 기업별 사내규정 결합</li>
+      <li><strong>FNR 3-layer 통제</strong> — 손실함수 비대칭 가중치 + DB <code>corrections.direction</code> 추적 + <code>v_active_learning_status</code> 자동 트리거</li>
+    </ol>
+
+    <!-- 3. 데이터 흐름 -->
+    <h2 id="workflow">3 · 데이터 흐름 — 문서 한 건이 들어왔을 때</h2>
+    <div class="ascii">[1] 사용자가 HWP 문서 업로드 (KL 웹 UI)
+       │
+       ▼
+[2] KL 백엔드가 Lloydk API 호출: POST /classify
+       │  Body: {doc_id, content, use_rag, tenant_id}
+       ▼
+┌─────────────────────── Lloydk AI Engine ───────────────────────┐
+│                                                                │
+│  [3] M2 전처리 (FUN-022)                                       │
+│      HWP → rhwp-python으로 텍스트 추출 (HWPX 통합)             │
+│      → 한국어 정규화 · 노이즈 제거                             │
+│      → 512토큰 청크 분할                                       │
+│                                                                │
+│  [4] M3 라벨링 보조 (FUN-023)                                  │
+│      YAML 규칙으로 4대 평가요소 점수                           │
+│      (경제가치/비공지성/관리수준/유출영향도)                   │
+│      → evidence span 추출                                      │
+│                                                                │
+│  [5] (옵션) RAG 검색                                           │
+│      KURE-v1 임베딩 → Qdrant Top-K 검색                       │
+│      → 기업 사내규정·KIPRA 가이드 청크 회수                   │
+│                                                                │
+│  [6] M5 추론 (FUN-005)                                         │
+│      KF-DeBERTa 분류기로 청크별 등급 확률                     │
+│      → 청크 어그리게이션 → 문서 단위 라벨                     │
+│      → RAG ON이면 컨텍스트 등급 분포로 보강                   │
+│                                                                │
+│  [7] 응답 구성                                                 │
+│      {label, confidence, scores, evaluation_factors,           │
+│       evidence, model_version}                                 │
+│      status: "staging" (관리자 확정 대기)                      │
+│      → Postgres inference_result 저장                          │
+└────────────────────────────────────────────────────────────────┘
+       │
+       ▼
+[8] KL이 응답 받아 → 관리자 UI 표시
+       │
+       ▼
+[9] 관리자 확인 → 두 갈래:
+    (a) 맞다 → /confirm → 최종 라벨 확정
+    (b) 틀렸다 → /relabel → 능동학습 큐 (FUN-024)
+                          │
+                          ▼
+              (큐 임계 도달 시 자동 재학습 트리거)</div>
+
+    <h3>학습 루프</h3>
+    <p class="muted">아래는 학습이 트리거된 후의 흐름. 관리자 수동 또는 능동학습 임계 도달로 시작.</p>
+    <div class="ascii">[합성] M1 SyntheticDocGenerator (FUN-003)
+   └─ LangChain + LLM(Claude/Qwen3) + PII 필터 → 검수 큐
+[조립] DatasetBuilder
+   └─ 합성 + 공개 + 능동학습 데이터 → Stratified 70/15/15
+[학습] M4 Trainer (FUN-004)
+   └─ KF-DeBERTa fine-tune · class weight · MLflow 자동 로깅
+   └─ EarlyStop 기준: val_FNR_overall (낮을수록 좋음)
+[평가] M6 Evaluator (FUN-024)
+   └─ Accuracy / Precision / Recall / F1 / FNR + Confusion Matrix
+[배포] MinIO 가중치 업로드 + model_versions 등록 (Staging → 승인 → Production)</div>
+
+    <!-- 4. 인프라 -->
+    <h2 id="architecture">4 · 인프라 아키텍처</h2>
+    <p class="muted">기업 사내 서버에 Docker Compose로 6개 서비스 일괄 기동. 외부 의존 없음.</p>
+    <div class="ascii">┌────────────────────────────────────────────────────────────────────┐
+│                       기업 사내 서버 (Docker Compose)              │
+│                                                                    │
+│  ┌────────────┐  ┌─────────────────┐  ┌────────────────────┐       │
+│  │ KL 웹시스템│⇄ │ Lloydk API      │⇄ │ Celery Worker      │       │
+│  │ (별도 팀)  │  │ (FastAPI :8000) │  │ (학습/합성/일괄)   │       │
+│  └────────────┘  └────────┬────────┘  └─────────┬──────────┘       │
+│                           │                     │                  │
+│        ┌──────────────────┼─────────────────────┼──────────┐       │
+│        ▼          ▼              ▼            ▼            ▼       │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│  │PostgreSQL│ │ Qdrant   │ │ MinIO    │ │ Redis    │ │ MLflow   │ │
+│  │ +pgvector│ │ (벡터DB) │ │ (S3호환) │ │ (큐/캐시)│ │ (실험UI) │ │
+│  │   :5432  │ │   :6333  │ │   :9000  │ │   :6379  │ │   :5000  │ │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ │
+│                                                                    │
+│  + GPU (학습/추론) — NVIDIA Container Toolkit                      │
+└────────────────────────────────────────────────────────────────────┘
+
+외부 옵션:
+- 상용 LLM API (Claude / GPT / Gemini) — 합성 데이터 생성
+- vLLM (Qwen3-14B 온프레미스) — 외부 API 못 쓸 때 OSS 대안</div>
+
+    <!-- 5. 스택 -->
+    <h2 id="stack">5 · 기술 스택 — 왜 이걸 골랐나</h2>
+
+    <h3>5.1 모델</h3>
+    <table>
+      <thead><tr><th>레이어</th><th>채택</th><th>한 줄 이유</th></tr></thead>
+      <tbody>
+        <tr><td>분류 모델 (1순위)</td><td><code>kakaobank/kf-deberta-base</code></td><td>한국어 + <strong>금융·법률 도메인 사전학습</strong> 184M params, MIT</td></tr>
+        <tr><td>분류 (경량)</td><td><code>monologg/koelectra-base-v3</code></td><td>110M, 자원 부족 기업용</td></tr>
+        <tr><td>임베딩 (1순위)</td><td><code>nlpai-lab/KURE-v1</code></td><td>고려대, BGE-M3를 <strong>한국어 retrieval로 fine-tune</strong>. Recall@1 +1.6%p</td></tr>
+        <tr><td>임베딩 (폴백)</td><td><code>BAAI/bge-m3</code></td><td>다국어 + dense·sparse·multi-vector 동시 출력</td></tr>
+        <tr><td>상용 LLM</td><td>Claude Sonnet 4.6</td><td>한국어 합성 품질 최상, 200K~1M 컨텍스트</td></tr>
+        <tr><td>OSS LLM</td><td>Qwen3-14B + vLLM ≥0.8.5</td><td><strong>thinking/non-thinking</strong> 모드, Apache 2.0</td></tr>
+      </tbody>
+    </table>
+
+    <h3>5.2 인프라</h3>
+    <table>
+      <thead><tr><th>레이어</th><th>채택</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>Vector DB</td><td>Qdrant</td><td>Rust 단일 컨테이너, 메타필터 강력, 멀티테넌트 분리</td></tr>
+        <tr><td>RDB</td><td>PostgreSQL 16 + pgvector + JSONB</td><td>공공기관 표준, HNSW 인덱스, 트랜잭션</td></tr>
+        <tr><td>객체 스토리지</td><td>MinIO</td><td>S3 호환, 모델 가중치 외부화로 무중단 교체</td></tr>
+        <tr><td>큐/캐시</td><td>Redis 7 + Celery</td><td>비동기 대량 분류, 학습 트리거</td></tr>
+        <tr><td>실험 추적</td><td>MLflow</td><td>모델 버전·하이퍼파라미터·메트릭 자동 로깅</td></tr>
+      </tbody>
+    </table>
+
+    <h3>5.3 애플리케이션</h3>
+    <table>
+      <thead><tr><th>레이어</th><th>채택</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>API 서버</td><td>FastAPI</td><td>OpenAPI 자동 생성(KL 합의 유리), Pydantic 검증, 비동기 native</td></tr>
+        <tr><td>체인/에이전트</td><td>LangChain + LangGraph</td><td>FUN-003 요구사항 명시, 능동학습 루프 상태 그래프</td></tr>
+        <tr><td>HWP 추출</td><td>rhwp-python</td><td>Rust 기반, HWP+HWPX 통합 API, pyhwp 대비 62× 빠름, MIT</td></tr>
+        <tr><td>PDF / DOCX</td><td>PyMuPDF / python-docx</td><td>표준 라이브러리, 빠름·정확</td></tr>
+        <tr><td>OCR</td><td>PaddleOCR (kor)</td><td>한국어 OCR SOTA, GPU 가속</td></tr>
+        <tr><td>한국어 정규화</td><td>soynlp + KoNLPy (Mecab-ko)</td><td>한국어 토큰화 표준</td></tr>
+        <tr><td>컨테이너</td><td>Docker + docker-compose</td><td>기업 온프레미스 표준, 학습곡선 최소</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <strong>모든 OSS는 Apache 2.0 / MIT / BSD 호환.</strong>
+      공공사업 라이선스 안전. LLM Adapter 패턴으로 Provider 교체 가능.
+    </div>
+
+    <!-- 6. DB Schema -->
+    <h2 id="schema">6 · DB 스키마 v2 — 운영급 설계</h2>
+    <p>v1 → v2 14개 이슈 반영: MinIO 외부화 · 멀티테넌트 · 월별 파티셔닝 · HNSW · audit log · MLflow 연동 · LLM 비용 분리 등.</p>
+
+    <h3>도메인 10개</h3>
+    <div class="grid cols-3">
+      <div class="card"><div class="card-eyebrow">[A]</div><h4>tenants</h4><p>멀티 테넌트 마스터. 단일 운영 시 <code>default</code> 1건.</p></div>
+      <div class="card"><div class="card-eyebrow">[B]</div><h4>등급체계</h4><p>classification_levels + evaluation_factors + level_keywords (정규화)</p></div>
+      <div class="card"><div class="card-eyebrow">[C]</div><h4>documents / chunks</h4><p>원본 텍스트는 MinIO 외부화, PG는 메타·미리보기만. 청크는 월별 파티션 + HNSW.</p></div>
+      <div class="card"><div class="card-eyebrow">[D]</div><h4>document_labels</h4><p>정답 라벨 + 정규화된 factor_scores.</p></div>
+      <div class="card"><div class="card-eyebrow">[E]</div><h4>classifications</h4><p>AI 추론 결과 + evidence(attention/keyword/rag/pattern 4종).</p></div>
+      <div class="card"><div class="card-eyebrow">[F]</div><h4>학습</h4><p>model_versions · training_runs · training_epochs · training_datasets.</p></div>
+      <div class="card"><div class="card-eyebrow">[G]</div><h4>corrections</h4><p><strong>확정 라벨 진실 소스.</strong> direction: underclass/overclass/lateral.</p></div>
+      <div class="card"><div class="card-eyebrow">[H]</div><h4>합성</h4><p>prompt_versions · sample_documents (체인 단계별 ROI 추적).</p></div>
+      <div class="card"><div class="card-eyebrow">[I]</div><h4>llm_usage</h4><p>월 파티션 · billing_phase (development/operation) 분리.</p></div>
+    </div>
+
+    <h3>핵심 운영 뷰 3종</h3>
+    <pre><code>-- 확정 라벨 단일 진실 소스
+v_classification_final
+  → corrections 최신 + 없으면 predicted
+
+-- 모델 성능 추적
+v_model_performance
+  → underclass/overclass 카운트 by model_version × level
+
+-- 능동학습 자동 판정
+v_active_learning_status
+  → underclass ≥10  ⇒ URGENT_RETRAIN
+  → unconsumed ≥50 ⇒ RETRAIN_RECOMMENDED</code></pre>
+
+    <h3>14개 개선 요약</h3>
+    <table>
+      <thead><tr><th>#</th><th>개선</th><th>효과</th></tr></thead>
+      <tbody>
+        <tr><td>F1</td><td>대용량 텍스트 → MinIO 외부화</td><td>TOAST 회피, 100MB HWP 가능</td></tr>
+        <tr><td>F2</td><td>tenant_id 컬럼 + tenants 마스터</td><td>멀티테넌트 사후 마이그레이션 불필요</td></tr>
+        <tr><td>F3</td><td>chunks/llm_usage/audit_log 월 파티션</td><td>1년+ 누적 성능</td></tr>
+        <tr><td>F4</td><td>ivfflat → HNSW (pgvector 0.5+)</td><td>운영 검색 성능</td></tr>
+        <tr><td>F5</td><td>등급 FK ON DELETE RESTRICT</td><td>과거 데이터 무결성</td></tr>
+        <tr><td>F6</td><td>document_factor_scores 정규화</td><td>JSONB FK 무결성 보장</td></tr>
+        <tr><td>F7</td><td>weight 합계 1.0 트리거</td><td>DB 레벨 보장</td></tr>
+        <tr><td>F8</td><td>corrections 단일 진실 소스 + 뷰</td><td>이중 동기화 버그 차단</td></tr>
+        <tr><td>F9</td><td>training_epochs 분리</td><td>JSONB 비대화 방지</td></tr>
+        <tr><td>F10</td><td><strong>audit_log 신규</strong> (필수)</td><td>영업비밀 컴플라이언스</td></tr>
+        <tr><td>F11</td><td>llm_usage 파티션 + reference_type/id</td><td>비용 추적 정확화</td></tr>
+        <tr><td>F12</td><td>sample_documents ↔ llm_usage 연결</td><td>합성 비용 합산</td></tr>
+        <tr><td>F13</td><td>운영 쿼리 인덱스 보강</td><td>staging/pending/recent 조회 최적화</td></tr>
+        <tr><td>F14</td><td>OpenAPI Grade enum ↔ level_code 정합</td><td>코드-DB 동기화</td></tr>
+      </tbody>
+    </table>
+
+    <!-- 7. 핵심 결정 -->
+    <h2 id="decisions">7 · 핵심 결정 6가지</h2>
+
+    <h3>7.1 왜 BERT? LLM도 분류 잘하는데</h3>
+    <p>분류는 <strong>인코더 모델이 디코더 LLM보다 빠르고·정확하고·해석 가능</strong>. 14B LLM은 1건당 수초·달러, KF-DeBERTa는 초당 수십건이며 비용 거의 0. Attention rollout으로 근거 span도 추출. <strong>단, LLM은 합성·RAG·평가 보강에 적극 활용</strong> (역할 분리).</p>
+
+    <h3>7.2 왜 KF-DeBERTa?</h3>
+    <p>영업비밀 문서는 90%+가 경영·기술·법무·계약. KF-DeBERTa는 카카오뱅크가 <strong>한국어 + 금융·법률 도메인</strong>으로 사전학습 — 도메인 일치도가 KLUE-BERT(뉴스), KoBERT(위키)보다 압도적.</p>
+
+    <h3>7.3 왜 KURE-v1?</h3>
+    <p>BGE-M3를 <strong>한국어 retrieval 데이터로 fine-tune한 모델</strong> (고려대 NLP&amp;AI Lab). 베이스가 동일하므로 dense+sparse+multi-vector 호환 유지 + 한국어 Recall@1 +1.6%p. <strong>인덱스 재구축 없이 모델만 swap</strong> 가능 — 운영 리스크 최소.</p>
+
+    <h3>7.4 왜 RAG를 분류에 결합?</h3>
+    <p>기업마다 영업비밀 기준이 다름. 같은 매출 자료도 A기업은 1급, B기업은 2급일 수 있어 학습 모델 하나로 안 됨. <strong>기업별 사내규정을 Qdrant에 임베딩</strong>해두고 추론 시 Top-K로 BERT 출력 보강. RAG는 선택 옵션 — 자원 부족 기업은 OFF 가능.</p>
+
+    <h3>7.5 왜 FNR이 핵심 KPI?</h3>
+    <p>보안 시스템에서 <strong>고등급 → 저등급 미탐 = 즉시 유출 사고</strong>. 저등급 → 고등급 과탐은 업무 불편 수준. 두 오류의 비용이 다르므로:</p>
+    <ul>
+      <li>손실함수 비대칭 가중치 (고등급 미탐 cost ×3~×5)</li>
+      <li>EarlyStop 기준을 accuracy가 아닌 <code>val_FNR_overall</code></li>
+      <li>Confusion Matrix를 등급별로 추적, TS→S2/S3 알람</li>
+    </ul>
+
+    <h3>7.6 어떻게 운영 중에 좋아지나?</h3>
+    <p>LangGraph 능동학습 루프:</p>
+    <div class="ascii">추론 → 관리자 검수 → (오분류) 재라벨 → corrections 누적
+   → underclass 10건 또는 unconsumed 50건 도달
+   → 자동 재학습 트리거 (Celery)
+   → MLflow 평가 → 신모델 FNR 개선 시 Staging
+   → 관리자 승인 → Production 승격
+   → 가중치 MinIO 교체 (무중단)</div>
+
+    <!-- 8. Q&A -->
+    <h2 id="qa">8 · 예상 Q&amp;A</h2>
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="card-eyebrow">Q1</div>
+        <h4>데이터가 부족할 텐데?</h4>
+        <p>공개 데이터(AI Hub·공공데이터·KIPRA 가이드) + LLM 합성 1,500건 + 능동학습 3중 전략. KF-DeBERTa는 이미 도메인 사전학습이라 4,000건이면 충분.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Q2</div>
+        <h4>합성 데이터 위험은?</h4>
+        <p>(1) Claude 70% + Qwen3 30% 혼합으로 스타일 편향 방지. (2) 시스템 프롬프트에 "등급명 본문 직접 표기 금지". (3) PII 정규식 + 검수자 이중 확인.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Q3</div>
+        <h4>Class imbalance는?</h4>
+        <p>데이터: 고등급 over-sample(TS 15/S1 25/S2 30/S3 30). 학습: class_weight=inverse frequency + 비대칭 cost. 가중치는 <code>classification_levels.loss_weight</code> 외부화.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Q4</div>
+        <h4>GPU 부족하면?</h4>
+        <p>KF-DeBERTa-base 184M은 VRAM 16GB로 batch=8 충분. 더 작으면 KoELECTRA(110M)로 전환. INT8/INT4 양자화는 추론 단계 옵션.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Q5</div>
+        <h4>모델 무중단 업데이트?</h4>
+        <p>모델 가중치는 이미지가 아닌 <strong>MinIO 볼륨</strong>. <code>model_versions.is_active</code> 플래그 swap → FastAPI lazy load. 롤백도 동일 메커니즘.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Q6</div>
+        <h4>대량 요청 처리?</h4>
+        <p>동기 <code>/classify</code> + 비동기 <code>/classify/async</code>·<code>/batch</code>. Celery worker가 Redis 큐 소비, 결과 PG 저장, KL polling/webhook 수신.</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Q7</div>
+        <h4>보안 / 컴플라이언스?</h4>
+        <p>API Key + Actor 메타 감사 로그 (<code>audit_log</code>, payload SHA-256만 저장). 멀티테넌트 격리. PII 자동 필터. 영업비밀 원문은 PG 미저장(MinIO 분리).</p>
+      </div>
+      <div class="card">
+        <div class="card-eyebrow">Q8</div>
+        <h4>모니터링?</h4>
+        <p>Prometheus(메트릭) + Grafana(대시보드) + Loki(로그) + MLflow(실험). FNR 임계 초과 시 Alertmanager 자동 알람.</p>
+      </div>
+    </div>
+
+    <!-- 9. 진행 -->
+    <h2 id="status">9 · 진행 상황</h2>
+    <table>
+      <thead><tr><th>영역</th><th>상태</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td>설계 문서 (10종)</td><td><span class="pill ok">완료</span></td><td>00~09 + DB v2</td></tr>
+        <tr><td>OpenAPI 명세 (16 엔드포인트)</td><td><span class="pill ok">완료</span></td><td>KL 검토 대기</td></tr>
+        <tr><td>DB 스키마 v2 (10 도메인)</td><td><span class="pill ok">완료</span></td><td>14개 개선 반영</td></tr>
+        <tr><td>FastAPI 스캐폴드</td><td><span class="pill ok">완료</span></td><td>헬스+규칙폴백 분류 PASS</td></tr>
+        <tr><td>KL·발주처 협의 요청서</td><td><span class="pill warn">전송 대기</span></td><td>Q1~Q7, K1~K5</td></tr>
+        <tr><td>PoC P1~P5 실행</td><td><span class="pill">대기</span></td><td>가이드+API키+GPU 확보 후</td></tr>
+      </tbody>
+    </table>
+
+    <h3>다음 액션</h3>
+    <ol>
+      <li>발주처·KL에 협의 요청서 발송 → 응답 1~2주</li>
+      <li>Anthropic API 키 + 가이드 문서 수령 → P3 합성 소규모 dry-run</li>
+      <li>GPU 환경 확정 → P1 KF-DeBERTa 학습 mini 실험</li>
+      <li>전체 PoC 4주 본 실행 → P1~P5 보고서 → 본 구축</li>
+    </ol>
+
+    <div class="callout" style="margin-top:36px;">
+      <strong>핵심 한 줄 마무리.</strong>
+      한국어 도메인에 맞춘 BERT 분류기를 코어로, LLM은 데이터 합성·RAG 보강에 보조 활용,
+      미탐율을 KPI로 능동학습 루프를 도는 온프레미스 Docker 시스템.
+    </div>
+
+  </article>
+</div>
+
+<footer>
+  <div>© 2026 Lloydk · KIPRA AI 영업비밀관리시스템 · 내부 검토용 자료</div>
+  <div style="margin-top:6px;">
+    <a href="#overview">맨 위로</a>
+    <a href="javascript:window.print()">인쇄</a>
+  </div>
+</footer>
+
+<script>
+  // ─── Dark-mode toggle (NovaXDB next-themes 흉내) ────────────
+  (function () {
+    const KEY = "lk-theme";
+    const root = document.documentElement;
+    const stored = localStorage.getItem(KEY);
+    const prefers = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (stored === "dark" || (!stored && prefers)) root.classList.add("dark");
+    document.getElementById("themeBtn").addEventListener("click", () => {
+      root.classList.toggle("dark");
+      localStorage.setItem(KEY, root.classList.contains("dark") ? "dark" : "light");
+    });
+  })();
+
+  // ─── TOC active highlight ────────────────────────────────────
+  (function () {
+    const links = Array.from(document.querySelectorAll(".toc a"));
+    const targets = links
+      .map(a => document.querySelector(a.getAttribute("href")))
+      .filter(Boolean);
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          links.forEach(l => l.classList.toggle(
+            "active",
+            l.getAttribute("href") === "#" + e.target.id
+          ));
+        }
+      });
+    }, { rootMargin: "-40% 0px -55% 0px" });
+    targets.forEach(t => io.observe(t));
+  })();
+</script>
+
+</body>
+</html>
