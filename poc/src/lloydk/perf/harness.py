@@ -115,7 +115,7 @@ def _detect_trained_model() -> bool:
     실패(DB 미가용·미설치 등) 시 False — dryrun 환경 안전.
     """
     try:
-        import os  # noqa: PLC0415
+        import os
 
         # 명시적 환경변수가 우선 (CI에서 강제 켜기 가능)
         env_flag = os.environ.get("LLOYDK_TRAINED_MODEL", "").lower()
@@ -124,10 +124,10 @@ def _detect_trained_model() -> bool:
         if env_flag in ("0", "false", "no"):
             return False
 
-        from sqlalchemy import select  # noqa: PLC0415
+        from sqlalchemy import select
 
-        from lloydk.db import session_scope  # noqa: PLC0415
-        from lloydk.db.models import ModelVersion  # noqa: PLC0415
+        from lloydk.db import session_scope
+        from lloydk.db.models import ModelVersion
 
         with session_scope() as db:
             mv = db.execute(
@@ -138,7 +138,7 @@ def _detect_trained_model() -> bool:
             # model_uri 있고, base_model이 룰 폴백이 아니라면 학습된 것
             uri = (mv.model_uri or "").strip()
             return bool(uri)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -205,7 +205,7 @@ class ScenarioRunner:
                 else:
                     spec.runner(ctx)
                 error = ""
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 error = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
 
             duration_ms = (time.perf_counter() - t0) * 1000.0

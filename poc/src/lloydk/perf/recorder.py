@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,6 +36,6 @@ def load_history(out_dir: Path | str = "reports/perf", *, mode: str = "dryrun", 
     for f in files:
         try:
             history.append(json.loads(f.read_text(encoding="utf-8")))
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
     return history

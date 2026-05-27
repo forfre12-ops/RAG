@@ -1,7 +1,7 @@
 # 시나리오 성능 KPI 매트릭스
 
 작성일: 2026-05-27 (W10 PSH 착수)
-버전: v1.2
+버전: v1.3
 관련: [doc/19 KL 통합 8시나리오](19_KL_통합_8시나리오.md) · [doc/02 §3.3 PoC 합격선](02_기술스택_확정_및_PoC_계획.md) · [doc/20 시나리오 성능 보고서 HTML](20_시나리오_성능_보고서.html)
 
 > **본 문서의 역할**: doc/19가 시나리오 동작 명세를 정의한다면, 본 문서는 **각 시나리오에 대한 정량 KPI·합격선·측정 방법**을 정의한다. PSH(Performance Scenario Harness)의 입력 명세이자, doc/20 HTML 보고서의 표시 항목 사양.
@@ -169,6 +169,37 @@ W11 신규 — manifest + CHECKSUMS 결정론·완전성.
 | S18.1 | manifest 존재 | bool | True | dry-run 후 manifest.yaml + manifest.json + CHECKSUMS.sha256 3종 존재 |  |
 | S18.2 | manifest 결정론 | bool | True | 2회 dry-run의 artifacts 리스트 동일 (build_tag 제외) |  |
 | S18.3 | dry-run 시간 | ms | ≤ 30000 | 1회 dry-run 경과시간 |  |
+
+### S12. 대용량 일괄 분류 (100/500/1000건)
+
+W12 신규 — 운영 시 야간 일괄 처리 대응.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S12.1 | N=100 throughput | docs/s | ≥ 5 | 100건 batch 처리 시간 환산 |  |
+| S12.2 | N=500 응답 정상 | bool | True | 500건 batch → 202 + total==500 |  |
+| S12.3 | N=1000 응답 정상 | bool | True | 1000건 batch → 202 + total==1000 (경계) |  |
+| S12.4 | N=1001 거부 | bool | True | 1001건 batch → 413 (스펙 약속) |  |
+| S12.5 | N=1000 p95 latency | ms | ≤ 60000 | 1000건 응답 시간 |  |
+
+### S14. ES 정전 후 자동 복구 (DR 리허설)
+
+W12 신규 — doc/11 §6 RTO 4h. dryrun은 ES 가용성만, full은 docker 정전 시뮬레이션.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S14.1 | ES 가용성 확인 가능 | bool | True | GET / 또는 cluster health 응답 (UP/DOWN 식별 가능) |  |
+| S14.2 | 정전 중 error_rate | 비율 | ≤ 0.50 | docker stop 중 5xx 비율. dryrun SKIP | **es** |
+| S14.3 | 복구까지 시간 | ms | ≤ 60000 | docker start → 정상화 polling. dryrun SKIP | **es** |
+
+### S15. 백업·복원 라운드트립
+
+W12 신규 — doc/11 §6.4 백업 3종 실제 복원 가능성.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S15.1 | dr_restore_check 종료 코드 | bool | True | scripts/dr_restore_check.py 호출 → exit 0 또는 명시 SKIP (백업 없음) |  |
+| S15.2 | 백업 3종 최신 (24h 이내) | bool | True | PG·ES·MinIO 백업 파일 mtime 검증. dryrun SKIP | **pg + es + minio** |
 
 ---
 
@@ -349,6 +380,7 @@ python scripts/run_perf_scenarios.py --mode full \
 
 ## 6. 변경 이력
 
+- v1.3 (2026-05-28 W11 후기): §2.6 SKIP 사유별 분류 카드 + §2.7 회귀 시계열 트렌드 HTML 신규. `regression.py`에 `detect_regression_trend`·`summarize_skip_reasons` 추가 (+6 테스트). CI에 F3 PSH 실패 시 GitHub Issue 자동 생성, I3 gitleaks secrets-scan 잡 신규. embedding cache 어댑터 신규 (test_embedding_cache 4 PASS 활성). G3 S2 batch 폴링 보강, G4 noqa 14건 정리. W11 시나리오 S10·S16·S17·S18 4종 13 KPI 추가 등록. PSH dryrun PASS=39 FAIL=0 SKIP=16 (55 KPI). 전체 회귀 385→396.
 - v1.2 (2026-05-28): §5.7 회귀 자동 탐지 + §5.8 PR 코멘트·Pages publish. S5.2/S5.3 dryrun 가드(vc>0일 때만 record). pyproject `[psh]·[evaluation]` extras 그룹화 + matplotlib base 명시. 신규 18 회귀 테스트 (test_perf_regression). 전체 회귀 348→385 (+B1 BM25 19, B2 semantic 5, E1·E2 9, A3 18, C1 정리 −일부, ...).
 - v1.1 (2026-05-28): §5.5 임계 갭 분석 + §5.6 pushgateway 연동 추가. trained_model 자원 플래그로 S1.3·S1.4·S5.4 자동 SKIP 적용. PSH 자체 단위 테스트 50+ 추가 (perf_harness 23 + perf_render 16 + perf_pushgateway 11). HTML §2.5 전체 KPI 추세 표(임계선 sparkline) 신규.
 - v1.0 (2026-05-27): W10 PSH 착수와 함께 신규 작성. S1~S8 × 평균 3.75 KPI = 30 측정점. 핵심 KPI 5종.

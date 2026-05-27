@@ -108,14 +108,14 @@ def push(
     payload = build_exposition(report)
     full_url = url.rstrip("/") + f"/metrics/job/{job}"
 
-    req = urllib.request.Request(  # noqa: S310
+    req = urllib.request.Request(
         full_url,
         data=payload.encode("utf-8"),
         method="PUT",
         headers={"Content-Type": "text/plain; version=0.0.4"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             ok = 200 <= resp.status < 300
             if not ok:
                 logger.warning("pushgateway non-2xx response: %s", resp.status)
@@ -123,6 +123,6 @@ def push(
     except urllib.error.URLError as exc:
         logger.warning("pushgateway URL error: %s", exc)
         return False
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("pushgateway unexpected error: %s", exc)
         return False

@@ -170,6 +170,23 @@ KPIS: list[KPI] = [
     KPI("S18.1", "S18", "manifest 존재", "bool", "ge", True, "bool_all"),
     KPI("S18.2", "S18", "manifest 결정론", "bool", "ge", True, "bool_all"),
     KPI("S18.3", "S18", "dry-run 시간", "ms", "le", 30000, "max"),
+
+    # S12 대용량 일괄 분류 (W12 확장)
+    KPI("S12.1", "S12", "N=100 throughput", "docs/s", "ge", 5, "last"),
+    KPI("S12.2", "S12", "N=500 응답 정상", "bool", "ge", True, "bool_all"),
+    KPI("S12.3", "S12", "N=1000 응답 정상", "bool", "ge", True, "bool_all"),
+    KPI("S12.4", "S12", "N=1001 거부 (413)", "bool", "ge", True, "bool_all"),
+    KPI("S12.5", "S12", "N=1000 p95 latency", "ms", "le", 60000, "p95"),
+
+    # S14 ES 정전 후 자동 복구 (W12 확장)
+    # dryrun: 가용성 식별만. full: docker 시뮬레이션 (require=es + 명시 실행)
+    KPI("S14.1", "S14", "ES 가용성 확인 가능", "bool", "ge", True, "bool_all"),
+    KPI("S14.2", "S14", "정전 중 error_rate", "ratio", "le", 0.50, "last", requires=["es"]),
+    KPI("S14.3", "S14", "복구까지 시간", "ms", "le", 60000, "max", requires=["es"]),
+
+    # S15 백업·복원 라운드트립 (W12 확장)
+    KPI("S15.1", "S15", "dr_restore_check 종료 코드 OK", "bool", "ge", True, "bool_all"),
+    KPI("S15.2", "S15", "백업 3종 최신 (24h)", "bool", "ge", True, "bool_all", requires=["pg", "es", "minio"]),
 ]
 
 
