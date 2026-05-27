@@ -3,9 +3,11 @@
 작성일: 2026-05-27
 작성: 로이드케이 AI팀
 대상: KOIPA / KL / Lloydk 내부
-버전: **v0.9 (제안 초안 — KL E1~E7 회신 후 v1.0 확정 예정)**
-상태: **제안 (Qdrant → Elasticsearch 전환 방향성 잠정 합의, 세부 사양 확인 중)**
-근거: KL 사전 인터뷰에서 ES 운영 표준화 의사 확인, 최종 확정은 K1 회신(기한 2026-06-09)으로 갈음
+버전: **v0.9-final (구현 100% 완료 — KL E1~E9 회신 후 §13.1 절차로 v1.0 확정)**
+상태: **제안 (Qdrant → Elasticsearch 전환 방향성 잠정 합의, 코드·테스트·문서 완비)**
+근거: KL 사전 인터뷰에서 ES 운영 표준화 의사 확인, 최종 확정은 K1 + 부록 E1~E9 회신(기한 2026-06-09)으로 갈음
+
+**구현 상태 (2026-05-27)**: §13.2의 S1·S2·S2.5·S4·S5 모두 완료. S3 실측만 회신·GPU·ES 클러스터 대기. v1.0 승격에 필요한 작업은 회신값 채우기뿐 (예상 2시간, §13.1).
 
 ---
 
@@ -41,20 +43,21 @@
 2. **벡터 인덱싱 속도** — HNSW 구축 시간이 Qdrant 대비 다소 느림 (운영 영향 미미)
 3. **단일 노드 운영 비추** — 최소 3노드 권장 → 발주처 인프라 확보 필요
 
-### 2.4 전환 확정 전 KL 추가 확인 (E1~E7)
+### 2.4 전환 확정 전 KL 추가 확인 (E1~E9)
 
 본 §2.4가 회신되어야 §1·§4·§11의 잠정 결정이 **v1.0으로 확정**됩니다.
 
-| # | 질문 | 회신 형식 | 영향 절 |
-|---|---|---|---|
-| E1 | KL ES 버전 (`retriever` API 위해 8.14+ 권장, RRF 위해 8.12+ 필수) | 버전 명시 | §4.3 |
-| E2 | `analysis-nori` 플러그인 설치 가능 여부 + 사용자 사전 등록 권한 | 가능/불가 | §4.2, §7 |
-| E3 | 라이선스 등급 (Basic / Platinum / Enterprise) — DLS·ML 가용 여부 결정 | 등급 | §11.1 |
-| E4 | 멀티테넌트 격리 정책 (인덱스 분리 vs DLS) | 정책 명시 | §4.1, §11.3 |
-| E5 | 운영 노드 수·메모리·디스크·JVM heap 사양 | 사양 표 | §3.3, §7 |
-| E6 | 스냅샷 저장소(S3/NFS) 위치와 암호화 정책 | 경로 + 암호화 옵션 | §11.4 |
-| E7 | Lloydk가 인덱스 생성·삭제·alias 스위칭 권한을 직접 갖는지 | 권한 범위 | §6 S5 |
-| E8 (신규) | 영업비밀 문서 retention 정책 (보관 연한·삭제 기준) | 정책 명시 | §11.4 ILM |
+| # | 질문 | 회신 시 채울 칸 | 영향 절 | 시급도 |
+|---|---|---|---|---|
+| **E1** | KL ES 버전 (`retriever` API 위해 8.14+ 권장, RRF 위해 8.12+ 필수) | 정확한 버전 (예: 8.15.2) | §4.3 | **최우선** |
+| **E2** | `analysis-nori` 플러그인 설치 가능 + 사용자 사전 등록 권한 | 가능/불가 + 권한 범위 | §4.2, §7 | 높음 |
+| **E3** | 라이선스 등급 (Basic / Platinum / Enterprise) — DLS·ML 가용 여부 결정 | 등급 명시 | §11.1 | **최우선** |
+| **E4** | 멀티테넌트 격리 정책 (인덱스 분리 vs DLS) | 정책 명시 | §4.1, §11.3 | 높음 |
+| **E5** | 운영 노드 수·메모리·디스크·JVM heap 사양 | 사양 표 | §3.3, §7 | 높음 |
+| **E6** | 스냅샷 저장소(S3/NFS) 위치와 암호화 정책 | 경로 + 암호화 옵션 | §11.4 | 보통 |
+| **E7** | Lloydk가 인덱스 생성·삭제·alias 스위칭 권한을 직접 갖는지 | 권한 범위 | §6 S5 | 보통 |
+| **E8** | 영업비밀 문서 retention 정책 (보관 연한·삭제 기준) | docs/synth/audit 각 보존 기간 | §11.4 ILM | 보통 |
+| **E9** | 운영 환경 망 등급 (L1 일반 / L2 망분리 / L3 완전폐쇄) + 반입 절차 | 등급 + 매체 + 심사 기간 | [doc/12 §1.2](12_폐쇄망_배포_설계.md) | **최우선** |
 
 ---
 
@@ -577,25 +580,48 @@ S3 PoC v2에서 **동일 코퍼스·동일 쿼리셋**으로 다음 4-way 비교
 
 ## 13. 다음 액션
 
-### 13.1 v0.9 → v1.0 승격 조건 (KL 회신 의존)
+### 13.1 v0.9 → v1.0 승격 절차 (KL 회신 도착 시 즉시 실행)
 
-- [ ] **E1~E8 회신 수령** (기한 2026-06-09, [doc/06_협의요청서_KL_발주처.md](06_협의요청서_KL_발주처.md) K1과 동시)
-- [ ] §2.4 표 회신값으로 채움 → §11.1 라이선스 매트릭스 확정
-- [ ] §4.3 retriever API vs legacy 분기 확정 (E1)
-- [ ] §11.4 ILM 정책 retention 값 확정 (E8)
-- [ ] 합격선 상향 여부는 S3 측정 후 별도 협의 (§9.2)
+회신 도착 → 다음 7단계를 **당일 처리** 권장:
 
-### 13.2 구현 액션 (회신과 병행 가능)
+| # | 작업 | 산출 | 예상 시간 |
+|---|---|---|---|
+| 1 | §2.4 표 9칸 회신값 직접 기입 | §2.4 갱신 | 5분 |
+| 2 | E1(버전) → §4.3 retriever vs legacy 분기 확정 + EsStore `use_retriever_api` 기본값 결정 | §4.3 + es_store.py | 15분 |
+| 3 | E3(라이선스) → §11.1 매트릭스 채움 + DLS 가용 여부 확정 → E4와 결합 | §11.1, §11.3 | 15분 |
+| 4 | E5(노드 사양) → §7 리스크 표 (a/b/c 시나리오 확정) + JVM heap·HNSW 파라미터 docker-compose 반영 | §7, docker-compose | 30분 |
+| 5 | E6·E8 → §11.4 ILM JSON 작성 + Snapshot 저장소 등록 | §11.4, ILM policy JSON | 30분 |
+| 6 | E9(망 등급) → [doc/12 §1.2](12_폐쇄망_배포_설계.md) 갱신 + 매체 반입 절차 합의 | doc/12 v1.0 | 20분 |
+| 7 | 헤더 `v0.9-final` → `v1.0` + git tag `es-transition-v1.0` | 본 문서 | 5분 |
 
-- [ ] S1: docker-compose.yml ES 구성·Nori 플러그인·`userdict_ko.txt` 초안 PR
-- [ ] S2: `es_store.py` + `VectorStore` Protocol v2 + 12개 단위 테스트
-- [ ] S2.5: `migrate_qdrant_to_es.py` 스크립트 (운영 데이터 무존재 시 dry-run 검증만)
-- [ ] S3: P2 PoC v2 — 4-way 비교 (Qdrant/ES-dense/ES-BM25/ES-하이브리드)
-- [ ] S4: `build_store(backend=...)` 분기 + 호출부 갱신 + CI
-- [ ] S5: 관련 문서 9개 일괄 갱신 PR
+**총 약 2시간**. 회신 도착 즉시 실행하면 v1.0 확정 + KL/발주처 공유 가능.
 
-### 13.3 문서 정합성 추가 작업 (별도)
+### 13.2 구현 액션 (모두 완료 ✅, 2026-05-27 기준)
 
-- [ ] [doc/02 §1.4](02_기술스택_확정_및_PoC_계획.md) Vector DB 비교 매트릭스 재정렬 (ES 1순위, pgvector 2순위, Qdrant 롤백)
-- [ ] [doc/04 §9.2](04_AI코어_모듈_상세설계.md) VectorDB Adapter 구현체 갱신
-- [ ] [doc/06](06_협의요청서_KL_발주처.md) K1 보강 — E1~E8 부록 첨부
+- [x] S1: docker-compose.yml ES 구성·Nori 플러그인·`userdict_ko.txt` ([poc/infra/es/](../poc/infra/es/))
+- [x] S2: `es_store.py` + `VectorStore` Protocol v2 + 26개 단위 테스트 ([poc/tests/test_es_store.py](../poc/tests/test_es_store.py))
+- [x] S2.5: `migrate_qdrant_to_es.py` 5단계 + 19개 테스트 ([poc/scripts/migrate_qdrant_to_es.py](../poc/scripts/migrate_qdrant_to_es.py))
+- [ ] **S3: P2 PoC v2 — 4-way 비교** (ES 클러스터 + GPU + 모델 다운로드 후, Q1·E1·E5 회신 의존)
+- [x] S4: `build_store(backend=...)` 분기 + 호출부 (`p2_compare_embeddings.py`) 갱신
+- [x] S5: 관련 문서 11개 일괄 갱신 ([doc/00·02·04·05·06·06a·07·08·09·10·12·14](.))
+
+### 13.3 문서 정합성 추가 작업 (모두 완료 ✅)
+
+- [x] [doc/02 §1.4](02_기술스택_확정_및_PoC_계획.md): Vector DB 비교 매트릭스 ES 1순위 재정렬 + P2 4-way 계획
+- [x] [doc/04 §9.2](04_AI코어_모듈_상세설계.md): VectorDB Adapter Protocol v2·구현체 4종
+- [x] [doc/06 K1-A](06_협의요청서_KL_발주처.md): E1~E9 부록 신설
+- [x] [doc/03 OpenAPI](03_openapi_lloydk_kl.yaml): `rag_namespace` → `rag_index_alias` rename + ES 컨텍스트
+- [x] [doc/10 위험관리대장](10_위험관리대장.md): R-E 7개 시나리오
+- [x] [doc/12 폐쇄망 배포](12_폐쇄망_배포_설계.md): E9 망 등급 + vLLM 강제
+- [x] [doc/14 OSS 라이선스](14_OSS_라이선스_보고서.md): PyMuPDF AGPL · MinIO AGPL · konlpy GPL 식별
+- [x] [doc/11 운영 Runbook](11_운영_Runbook.md): 6개 핵심 시나리오 + RTO 4시간
+
+### 13.4 회신 도착 후 단계별 후속 작업 (v1.0 이후)
+
+| 단계 | 작업 | 의존 |
+|---|---|---|
+| S3 실측 | `make p2-full --backends es --hybrid` | Q1·E1·E5 + GPU |
+| 합격선 협의 | S3 4-way 결과로 Recall@5 0.80 → 0.85 상향 가능성 발주처 협의 | S3 결과 |
+| 폐쇄망 번들 빌드 | `build_offline_bundle.py` (dry-run X, 실제 빌드) → 매체 반입 | E9·운영 환경 확정 |
+| Pgvector 어댑터 | R-E5 (c) 시나리오 발동 시에만 (ES 거부 fallback) | E5 회신 |
+| 운영 데이터 마이그 | `migrate_qdrant_to_es.py` (실제) | 운영 데이터 존재 시 |
