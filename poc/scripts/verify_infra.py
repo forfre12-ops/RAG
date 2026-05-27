@@ -1,7 +1,7 @@
 """인프라 헬스 체크. docker compose up 후 실행.
 
 검증:
-- PostgreSQL 연결 + pgvector extension 존재 + 핵심 테이블 4종
+- PostgreSQL 연결 + 핵심 테이블 4종 (벡터스토어는 ES 단일 — pgvector 미사용)
 - Elasticsearch 클러스터 상태 + 버전 출력 (기본 백엔드)
 - Qdrant 헬스 (롤백 프로파일 기동 시에만, 기본은 skip)
 - MinIO 버킷 존재
@@ -45,15 +45,14 @@ def check_postgres() -> CheckResult:
     try:
         engine = create_engine(url, pool_pre_ping=True)
         with engine.connect() as conn:
-            ext = conn.execute(text("SELECT extname FROM pg_extension WHERE extname='vector'")).scalar()
             tables = conn.execute(
                 text(
                     "SELECT tablename FROM pg_tables WHERE schemaname='public' "
                     "AND tablename IN ('tenants','documents','classifications','model_versions')"
                 )
             ).scalars().all()
-        ok = ext == "vector" and len(tables) == 4
-        return CheckResult("postgres", ok, f"vector={ext}, tables={sorted(tables)}")
+        ok = len(tables) == 4
+        return CheckResult("postgres", ok, f"tables={sorted(tables)}")
     except Exception as exc:  # noqa: BLE001
         return CheckResult("postgres", False, f"error: {exc}")
 

@@ -6,7 +6,7 @@
 --   [F1] 대용량 텍스트 분리: documents.raw_text → MinIO 외부화
 --   [F2] 멀티 테넌트: tenant_id 컬럼 + tenants 마스터 추가
 --   [F3] 청크 파티셔닝: chunks RANGE PARTITION (tenant_id, created_at)
---   [F4] Vector 인덱스: ivfflat → HNSW (pgvector 0.5+)
+--   [F4] (제거됨) pgvector — 자체 결정으로 ES 단일 벡터스토어 확정. 벡터 인덱스는 ES dense_vector(int8_hnsw) 단독 사용
 --   [F5] FK 보호: classification_levels ON DELETE RESTRICT
 --   [F6] 평가요소 정규화 테이블 추가 (document_factor_scores)
 --   [F7] weight 합계 검증 트리거
@@ -19,7 +19,7 @@
 --   [F14] OpenAPI Grade enum과 코드값 정합 (TS/S1/S2/S3)
 -- ============================================================
 
-CREATE EXTENSION IF NOT EXISTS vector;
+-- pgvector 확장은 사용하지 않습니다 (벡터스토어 = ES 단일, doc/13 §4.1).
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -178,7 +178,7 @@ CREATE TABLE chunks (
     page_end        SMALLINT,
     section_path    TEXT[],
 
-    embedding       vector(1024),                       -- KURE-v1 / BGE-M3 1024차원
+    -- 임베딩 벡터는 ES `secrets-guides-koipa-*` 인덱스에 저장 (chunk_id로 연결)
 
     overlap_prev    SMALLINT        DEFAULT 0,
     overlap_next    SMALLINT        DEFAULT 0,
@@ -187,7 +187,7 @@ CREATE TABLE chunks (
     PRIMARY KEY (chunk_id, created_at)
 ) PARTITION BY RANGE (created_at);
 
-COMMENT ON TABLE chunks IS '문서 분할 청크. 월별 파티션. KURE-v1(1024차원) 임베딩 (FUN-004 Chunk 단위 학습)';
+COMMENT ON TABLE chunks IS '문서 분할 청크. 월별 파티션. 임베딩 벡터는 ES 인덱스 외부화 (FUN-004 Chunk 단위 학습)';
 COMMENT ON COLUMN chunks.section_path IS '한국 공문 구조 보존: [''1장'', ''1.2절'', ''가.'']';
 
 -- 초기 파티션 (운영 시 자동 생성 cron 권장)
@@ -198,9 +198,7 @@ CREATE TABLE chunks_default PARTITION OF chunks DEFAULT;
 
 CREATE INDEX idx_chunk_doc ON chunks(doc_id, chunk_index);
 CREATE INDEX idx_chunk_tenant ON chunks(tenant_id);
--- HNSW (pgvector 0.5+): ivfflat 대비 운영 성능 우위
-CREATE INDEX idx_chunk_embedding_hnsw ON chunks USING hnsw (embedding vector_cosine_ops)
-  WITH (m = 16, ef_construction = 64);
+-- 벡터 HNSW 인덱스는 ES 측에서 관리 (doc/13 §4.2).
 
 
 -- ============================================================

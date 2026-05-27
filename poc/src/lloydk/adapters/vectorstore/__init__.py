@@ -1,4 +1,4 @@
-"""Vector Store — Elasticsearch(기본) / pgvector(폴백) / Qdrant(롤백) / InMemory(dryrun).
+"""Vector Store — Elasticsearch(기본) / Qdrant(롤백) / InMemory(dryrun).
 
 doc/13_벡터DB_ES_전환_계획서.md §8.1 build_store 시그니처.
 
@@ -15,10 +15,10 @@ from __future__ import annotations
 import os
 import warnings
 
-from lloydk.adapters.vectorstore.base import SearchHit, VectorStore
+from lloydk.adapters.vectorstore.base import HybridVectorStore, SearchHit, VectorStore
 from lloydk.adapters.vectorstore.inmemory_store import InMemoryStore
 
-__all__ = ["VectorStore", "SearchHit", "InMemoryStore", "build_store"]
+__all__ = ["VectorStore", "HybridVectorStore", "SearchHit", "InMemoryStore", "build_store"]
 
 
 def build_store(

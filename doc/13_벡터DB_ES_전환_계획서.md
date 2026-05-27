@@ -135,15 +135,27 @@ secrets-{role}-{tenant}-{model}-{version}
 - 차원이 다른 모델로 교체 시 **별도 인덱스 신규 생성 → alias 스위칭** 필수
 - 학습 시점·운영 시점에 어떤 임베딩 모델로 색인됐는지 추적용으로 매 청크의 `version` 필드에 `{model}-{version}` 기록
 
-### 4.1.2 pgvector 대안 (유지)
+### 4.1.2 pgvector — 자체 결정으로 제거 (2026-05-27)
 
-[doc/02_기술스택_확정_및_PoC_계획.md §1.4](02_기술스택_확정_및_PoC_계획.md#L101)의 **"pgvector 대안 (KL이 PostgreSQL만 운영 가능 환경일 때)"** 절은 **본 전환과 별개로 유지**합니다.
+이전 버전에서 "2순위 도입 옵션"으로 명시했던 pgvector는 **자체 결정으로 완전 제거**되었습니다.
 
-- **1순위**: Elasticsearch (본 문서, E1~E7 회신 충족 시 확정)
-- **2순위 폴백**: pgvector — KL이 ES를 거부하거나 E5(인프라 사양) 미달 시 RDB 통합 운영 단순화 옵션
-- **3순위**: Qdrant — 본 계획서의 롤백 경로 (S5 종료 +4주까지만 가동)
+- **1순위 (단일)**: Elasticsearch 8.15.3 — 본 문서 §4.1, docker-compose 잠금
+- **2순위 즉시 가용 롤백**: Qdrant — 본 계획서의 롤백 경로 (S5 종료 +4주까지 가동, `qdrant_store.py` 실재). `VECTOR_BACKEND=qdrant`로 즉시 전환 가능.
 
-pgvector 폴백 경로의 어댑터(`PgvectorStore`)는 본 전환 범위에 포함하지 않으나, **`VectorStore` Protocol을 그대로 구현해 무 호출부 변경**으로 도입 가능하도록 설계 일관성 유지.
+**제거 이유**:
+1. `PgvectorStore` 어댑터 코드 0줄 — "폴백"이라 부를 자격이 없는 죽은 옵션
+2. ES `dense_vector(int8_hnsw)` + BM25 + RRF 하이브리드로 기능 완전 중복
+3. 자체 결정으로 K1(KL 인프라) = "우리 docker-compose 단일 스택"으로 잠금 → ES 거부 시나리오 발생 가능성 차단
+4. `chunks.embedding vector(1024)` 컬럼·`CREATE EXTENSION vector`·HNSW 인덱스 모두 미사용 상태 — `postgres:16-alpine` 기본 이미지에는 pgvector 확장도 없어 실제로는 `init.sql` 적용 시 ERROR 가능성
+
+**제거 범위** (2026-05-27 적용):
+- `poc/migrations/init.sql` — `CREATE EXTENSION vector`·`chunks.embedding`·`idx_chunk_embedding_hnsw` 삭제
+- `doc/07_DB_스키마_v2.sql` — 동일 정리
+- `poc/scripts/verify_infra.py` — `pg_extension WHERE extname='vector'` 검증 제거
+- `poc/src/lloydk/adapters/vectorstore/__init__.py` — docstring "pgvector(폴백)" 제거
+- 본 문서·doc/02·04·08·10·15·00 — 모든 "pgvector 폴백" 언급 정리
+
+**ES 완전 미가용 시 대응**: Qdrant 즉시 롤백 (`docker compose --profile rollback up -d qdrant` + `VECTOR_BACKEND=qdrant`). pgvector 신규 구현은 더 이상 옵션이 아님.
 
 ### 4.2 매핑 (KURE-v1 1024차원 기준)
 
@@ -569,12 +581,12 @@ S3 PoC v2에서 **동일 코퍼스·동일 쿼리셋**으로 다음 4-way 비교
 ## 12. 결정 사항 요약 (v0.9 잠정 — E1~E7 회신 후 v1.0 확정)
 
 1. **Qdrant → Elasticsearch 8.14+ 전환 방향 잠정 합의** (확정은 E1~E7 회신)
-2. **하이브리드 검색(dense kNN + BM25 + RRF)** 채택, retriever API 우선·legacy 폴백
-3. **VectorStore Protocol 확장** (`search_hybrid` 추가) + 비-ES 백엔드 vec-only 폴리필
+2. **하이브리드 검색(dense kNN + BM25 + RRF)은 opt-in 옵션** — 기본 검색 경로는 dense-only. RRF는 EsStore에서만 진짜로 동작하며(`HybridVectorStore` Protocol 만족), P2 측정에서 dense 대비 △Recall ≥ +0.05 입증 시 default 승격 협의. 한국어 영업비밀 도메인 정량 근거 부재(§9.3) 때문에 기본값화는 보류.
+3. **VectorStore Protocol 이원화** (`VectorStore` + 마커 `HybridVectorStore`) — 비-ES 백엔드는 `search_hybrid` 호출 시 RuntimeWarning을 내며 dense-only로 폴백. 조용한 실패 차단.
 4. **인덱스 분리 기반 멀티테넌트**, alias 스위칭으로 무중단 재인덱싱, 모델·차원별 인덱스 매핑 표 도입
-5. **PoC 합격선은 현행 유지** (Recall@5 0.80, NDCG@5 0.75) — S3 4-way 측정 후 v1.1에서 상향 협의
+5. **PoC 합격선은 현행 유지** (Recall@5 0.80, NDCG@5 0.75) — S3 4-way 측정 후 v1.1에서 상향 협의. (d)−(a) Recall ≤ +0.02 또는 p95 +50ms 초과 시 ES 전환 ROI 재평가 trigger.
 6. **총 6.5일 (약 1.5주)**, qdrant 코드 S5+4주 안정화 후 제거
-7. **pgvector는 2순위 폴백으로 유지**, Qdrant는 3순위 롤백 경로
+7. **pgvector는 자체 결정으로 제거** (§4.1.2 참조 — 어댑터 0줄·기능 ES와 중복), Qdrant가 유일한 즉시 가용 롤백 경로
 
 ---
 
@@ -594,7 +606,11 @@ S3 PoC v2에서 **동일 코퍼스·동일 쿼리셋**으로 다음 4-way 비교
 | 6 | E9(망 등급) → [doc/12 §1.2](12_폐쇄망_배포_설계.md) 갱신 + 매체 반입 절차 합의 | doc/12 v1.0 | 20분 |
 | 7 | 헤더 `v0.9-final` → `v1.0` + git tag `es-transition-v1.0` | 본 문서 | 5분 |
 
-**총 약 2시간**. 회신 도착 즉시 실행하면 v1.0 확정 + KL/발주처 공유 가능.
+**총 약 2시간 (best case)** — 회신값이 사전 가정 범위 안일 때.
+
+**Worst case (3~5일)**: E1=8.10(retriever·legacy RRF 모두 미지원 → 클라이언트단 RRF만 가용, num_candidates·필터 설계 약화), E3=Basic(DLS 불가 → §11.3 RBAC·멀티테넌트 단일인덱스 설계 재작성), E5=2GB heap(int8_hnsw·m·ef_construction 전면 재튜닝 + p95 합격선 재협의), E9=L3 폐쇄망(Nori 플러그인·라이선스 매체 반입 절차 +6주). 회신 시나리오에 따라 일정 분기 예상.
+
+⚠️ E3·E5·E9 회신 전엔 운영 파라미터 코드 freeze. 회신 도착 즉시 분기 판단 후 v1.0 확정 + KL/발주처 공유.
 
 ### 13.2 구현 액션 (모두 완료 ✅, 2026-05-27 기준)
 

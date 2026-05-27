@@ -93,23 +93,23 @@
 | 후보 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | 종합 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|
 | **Elasticsearch 8.14+** | ★★★★ | - | ★★★★★ | ★★★★ | ★★★★★ | ★★★★★ | ★★★★★ | **★★★★★** | `dense_vector` HNSW + BM25 + RRF 하이브리드, Kibana/ILM/Watcher 운영 표준, KL 기존 인프라 재사용 |
-| pgvector (PostgreSQL) | ★★★★★ | - | ★★★ | ★★★★★ | ★★★★ | ★★★ | ★★★★★ | ★★★★ | RDB 통합 운영 단순, 대용량 한계 — **2순위 폴백** |
-| Qdrant | ★★★★★ | - | ★★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★★ | Rust 단일 컨테이너, 메타필터 강력 — **3순위 롤백 경로** |
+| ~~pgvector (PostgreSQL)~~ | - | - | - | - | - | - | - | - | **제거됨** (2026-05-27 자체 결정) — ES 단일 확정으로 어댑터 미작성·DB 컬럼 제거 |
+| Qdrant | ★★★★★ | - | ★★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★★ | Rust 단일 컨테이너, 메타필터 강력 — **2순위 즉시 롤백 경로** |
 | Milvus | ★★★ | - | ★★★★ | ★★★ | ★★★★★ | ★★★★★ | ★★★★★ | ★★★ | 대규모 강점이나 etcd+MinIO 의존, 제외 |
 | Vespa | ★★★ | - | ★★★★ | ★★★ | ★★★ | ★★★★★ | ★★★★ | ★★★ | 학습 곡선 가파름, 제외 |
 
-**확정 (2026-05-27 v2)**: **Elasticsearch 8.14+ 1순위 / pgvector 2순위 폴백 / Qdrant 3순위 롤백**
-**이유**: KL 사전 인터뷰에서 ES 운영 표준화 의사 확인, dense_vector + BM25 + RRF 하이브리드로 영업비밀 검색의 키워드+의미 동시 수용, Kibana·ILM·audit log 등 운영 도구가 발주처 컴플라이언스에 부합. KL이 ES를 거부할 시 pgvector(RDB 통합), 그것도 불가면 Qdrant 폴백.
-**상세**: [doc/13_벡터DB_ES_전환_계획서.md](13_벡터DB_ES_전환_계획서.md) (v0.9-final, E1~E8 회신 후 v1.0 확정 예정)
-**확인 필요**: E1~E8 (KL ES 버전·Nori 플러그인·라이선스 등급·테넌트 격리·노드 사양·스냅샷 위치·인덱스 권한·retention)
+**확정 (2026-05-27 자체 결정)**: **Elasticsearch 8.14+ 단일 / Qdrant 즉시 롤백 경로**
+**이유**: KL 사전 인터뷰에서 ES 운영 표준화 의사 확인, dense_vector + BM25 + RRF 하이브리드로 영업비밀 검색의 키워드+의미 동시 수용, Kibana·ILM·audit log 등 운영 도구가 발주처 컴플라이언스에 부합. pgvector는 어댑터 미작성 상태였고 자체 결정으로 ES 단일 잠금 → 죽은 코드 정리.
+**상세**: [doc/13_벡터DB_ES_전환_계획서.md](13_벡터DB_ES_전환_계획서.md)
+**E1~E8 자체 결정값**: ES 8.15.3 (docker-compose 잠금), Nori + 사용자 사전, Basic 라이선스, 인덱스 분리 테넌트, 단일 노드 JVM 4GB, int8_hnsw
 
 ---
 
 ### 1.5 메인 RDB (모델/실험/라벨/이력 메타)
 
-**확정**: **PostgreSQL 16 + pgvector + JSONB**
-**이유**: 공공기관 표준, 트랜잭션·확장성·라이선스 모두 안정. 모델 버전·학습셋 스냅샷·라벨링·능동학습 큐·성능 이력 통합 관리.
-**대안 검토 없음** (MySQL/MariaDB 가능하지만 pgvector·JSONB 활용도가 PG 우위)
+**확정**: **PostgreSQL 16 + JSONB** (벡터 저장은 ES 외부화 — pgvector 미사용)
+**이유**: 공공기관 표준, 트랜잭션·확장성·라이선스 모두 안정. 모델 버전·학습셋 스냅샷·라벨링·능동학습 큐·성능 이력 통합 관리. 임베딩 벡터는 ES `secrets-guides-koipa-*` 인덱스에 저장하여 PG는 관계형 트랜잭션 데이터에만 집중.
+**대안 검토 없음** (MySQL/MariaDB 가능하지만 JSONB 활용도가 PG 우위)
 
 ---
 
@@ -170,8 +170,8 @@
 | 임베딩 | **KURE-v1** (한국어 1순위, BGE-M3 fine-tuned) / BGE-M3 폴백 / ko-sroberta 경량 |
 | LLM 상용 | **Claude Sonnet 4.6** (기본) / GPT-4o / Gemini — Adapter 교체 |
 | LLM OSS | **Qwen3-14B + vLLM ≥ 0.8.5** (thinking/non-thinking) / EXAONE 3.5(검토) / Llama+Bllossom |
-| Vector DB | **Elasticsearch 8.14+** (기본, [doc/13](13_벡터DB_ES_전환_계획서.md)) / pgvector 폴백 / Qdrant 롤백 |
-| RDB | **PostgreSQL 16 + pgvector + JSONB** |
+| Vector DB | **Elasticsearch 8.14+** (기본, [doc/13](13_벡터DB_ES_전환_계획서.md)) / Qdrant 즉시 롤백 |
+| RDB | **PostgreSQL 16 + JSONB** (벡터는 ES 외부화, pgvector 미사용) |
 | 스토리지 | **MinIO** |
 | 큐/캐시 | **Redis 7 + Celery** |
 | 문서처리 | **rhwp-python** (HWP/HWPX 1순위) / PyMuPDF / PaddleOCR / unstructured |
