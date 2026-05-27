@@ -135,14 +135,14 @@ secrets-{role}-{tenant}-{model}-{version}
 - 차원이 다른 모델로 교체 시 **별도 인덱스 신규 생성 → alias 스위칭** 필수
 - 학습 시점·운영 시점에 어떤 임베딩 모델로 색인됐는지 추적용으로 매 청크의 `version` 필드에 `{model}-{version}` 기록
 
-### 4.1.2 pgvector — 자체 결정으로 제거 (2026-05-27)
+### 4.1.2 pgvector·Qdrant 모두 제거 — ES 단일 확정 (2026-05-27)
 
-이전 버전에서 "2순위 도입 옵션"으로 명시했던 pgvector는 **자체 결정으로 완전 제거**되었습니다.
+이전 버전에서 "2순위 도입 옵션"으로 명시했던 **pgvector**와 "즉시 가용 롤백"으로 유지했던 **Qdrant**는 **자체 결정으로 모두 완전 제거**되었습니다.
 
-- **1순위 (단일)**: Elasticsearch 8.15.3 — 본 문서 §4.1, docker-compose 잠금
-- **2순위 즉시 가용 롤백**: Qdrant — 본 계획서의 롤백 경로 (S5 종료 +4주까지 가동, `qdrant_store.py` 실재). `VECTOR_BACKEND=qdrant`로 즉시 전환 가능.
+- **단일 백엔드**: Elasticsearch 8.15.3 — 본 문서 §4.1, docker-compose 잠금
+- ES 미가용 시 즉시 복구가 운영 정책 (별도 롤백 어댑터 없음, `infra/observability/alert_rules.yml` ElasticsearchDown P1 알람)
 
-**제거 이유**:
+**pgvector 제거 이유**:
 1. `PgvectorStore` 어댑터 코드 0줄 — "폴백"이라 부를 자격이 없는 죽은 옵션
 2. ES `dense_vector(int8_hnsw)` + BM25 + RRF 하이브리드로 기능 완전 중복
 3. 자체 결정으로 K1(KL 인프라) = "우리 docker-compose 단일 스택"으로 잠금 → ES 거부 시나리오 발생 가능성 차단
@@ -155,7 +155,13 @@ secrets-{role}-{tenant}-{model}-{version}
 - `poc/src/lloydk/adapters/vectorstore/__init__.py` — docstring "pgvector(폴백)" 제거
 - 본 문서·doc/02·04·08·10·15·00 — 모든 "pgvector 폴백" 언급 정리
 
-**ES 완전 미가용 시 대응**: Qdrant 즉시 롤백 (`docker compose --profile rollback up -d qdrant` + `VECTOR_BACKEND=qdrant`). pgvector 신규 구현은 더 이상 옵션이 아님.
+**Qdrant 제거 이유 (2026-05-27 v2)**:
+1. ES 단일 백엔드 + 관측성 알람으로 ES 즉시 복구가 운영 정책 — 롤백 어댑터의 실효성 미미
+2. `qdrant_store.py`·`migrate_qdrant_to_es.py`·rollback profile·`qdrant_url` 설정·관련 테스트 모두 삭제
+3. doc/10 R-E5 (c) 시나리오: "Qdrant 롤백" → "ES heap 2GB + int8_hnsw 강제 + replicas=0 + 인덱스 분할"으로 변경
+4. `pyproject.toml` `qdrant-client` 의존성 제거
+
+**ES 완전 미가용 시 대응**: P1 알람 즉시 복구 (Runbook §2.2 P0 절차에 ES 포함). InMemoryStore는 테스트 한정 폴백으로 유지.
 
 ### 4.2 매핑 (KURE-v1 1024차원 기준)
 
@@ -586,7 +592,7 @@ S3 PoC v2에서 **동일 코퍼스·동일 쿼리셋**으로 다음 4-way 비교
 4. **인덱스 분리 기반 멀티테넌트**, alias 스위칭으로 무중단 재인덱싱, 모델·차원별 인덱스 매핑 표 도입
 5. **PoC 합격선은 현행 유지** (Recall@5 0.80, NDCG@5 0.75) — S3 4-way 측정 후 v1.1에서 상향 협의. (d)−(a) Recall ≤ +0.02 또는 p95 +50ms 초과 시 ES 전환 ROI 재평가 trigger.
 6. **총 6.5일 (약 1.5주)**, qdrant 코드 S5+4주 안정화 후 제거
-7. **pgvector는 자체 결정으로 제거** (§4.1.2 참조 — 어댑터 0줄·기능 ES와 중복), Qdrant가 유일한 즉시 가용 롤백 경로
+7. **pgvector·Qdrant 모두 자체 결정으로 제거** (§4.1.2 참조) — ES 단일 백엔드 + 관측성 즉시 복구 정책. InMemoryStore만 테스트용 폴백으로 유지.
 
 ---
 

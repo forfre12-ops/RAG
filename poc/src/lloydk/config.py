@@ -13,13 +13,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # 벡터 DB
-    vector_backend: str = "es"  # es | qdrant | inmemory
+    vector_backend: str = "es"  # es | inmemory
     es_url: str = "http://localhost:9200"
     es_username: str = ""
     es_password: str = ""
     es_api_key: str = ""
     es_verify_certs: bool = True
-    qdrant_url: str = "http://localhost:6333"  # 롤백 경로 유지
 
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "lloydk"

@@ -58,9 +58,6 @@ make worker   # celery -A lloydk.workers.celery_app worker -l info
 
 # 또는 docker compose로 한 번에
 docker compose up -d
-
-# 롤백 경로 (Qdrant 병행 가동)
-make infra-up-rollback
 ```
 
 ---
@@ -70,9 +67,8 @@ make infra-up-rollback
 ```
 poc/
 ├── docker-compose.yml          # Postgres/Elasticsearch/MinIO/Redis/MLflow/api/worker
-│                                 (Qdrant는 profile=rollback)
 ├── Dockerfile.api              # FastAPI + PyTorch + Transformers
-├── Makefile                    # poc-all, infra-up, p2-full, migrate-dry, bundle-dry 등
+├── Makefile                    # poc-all, infra-up, p2-full, bundle-dry 등
 ├── migrations/init.sql         # PostgreSQL v2 스키마 (테넌트/파티셔닝/HNSW)
 ├── infra/es/                   # ES 인덱스 템플릿 + Nori 사용자 사전
 │   ├── index_template_secrets.json
@@ -81,7 +77,7 @@ poc/
 │   ├── adapters/               # 외부 의존성 교체 가능 계층
 │   │   ├── llm/                #   noop/anthropic/openai/vllm
 │   │   ├── embedding/          #   hash(드라이런)/KURE-v1/BGE-M3
-│   │   ├── vectorstore/        #   es(기본)/qdrant(롤백)/inmemory(dryrun)
+│   │   ├── vectorstore/        #   es(기본)/inmemory(dryrun)
 │   │   │                       #   Protocol에 search_hybrid 포함, 폴리필 일관
 │   │   └── storage/            #   local(드라이런)/minio
 │   ├── modules/
@@ -111,9 +107,7 @@ poc/
 | `make p2-full` | **P2 4-way (KURE/BGE × ES dense+hybrid)** | ✅ Q1+E1+E5 |
 | `make p1` / `p3` / `p4` / `p5` | 개별 PoC | 일부 ✅ |
 | `make infra-up` | ES 포함 6개 서비스 기동 | ✅ E5 |
-| `make infra-up-rollback` | + Qdrant 병행 가동 | ❌ |
 | `make infra-verify` | 헬스체크 (ES 버전·플러그인) | ✅ E1·E2 |
-| `make migrate-dry` | **Qdrant→ES sample-5 dry-run** | ❌ |
 | `make bundle-dry` | **폐쇄망 번들 manifest dry-run** | ❌ |
 | `make api` / `worker` | 로컬 기동 | ❌ |
 
@@ -126,7 +120,7 @@ poc/
 | PoC | 검증 항목 | 합격선 (v0.9) | 진입점 |
 |---|---|---|---|
 | **P1** | KF-DeBERTa 분류 / 룰 surrogate | F1 ≥ 0.75, FNR ≤ 5% | `p1_train_classifier.py --mode dryrun\|full` |
-| **P2** | KURE/BGE-M3 × ES dense/hybrid 4-way | Recall@5 ≥ 0.80, Lat p50 ≤ 200ms | `p2_compare_embeddings.py --mode dryrun\|full --backends es,inmemory --hybrid` |
+| **P2** | KURE/BGE-M3 × ES dense/hybrid | Recall@5 ≥ 0.80, Lat p50 ≤ 200ms | `p2_compare_embeddings.py --mode dryrun\|full --backends es,inmemory --hybrid` |
 | **P3** | LLM 합성 + 라벨 일치 + 비용 | 라벨 일치 ≥ 90% | `p3_generate_synthetic.py --total 40 --provider noop\|anthropic` |
 | **P4** | HWP/DOCX/PDF/MD 추출 | 누락 ≤ 5%, 품질 ≥ 0.7 | `build_p4_corpus.py` + `p4_extract_eval.py` |
 | **P5** | API E2E 스모크 | 200 OK + 라벨 OK | `p5_e2e_smoke.py --mode inproc\|http` |
@@ -137,7 +131,6 @@ poc/
 - `p3a_eval_rule_labeler.py` — M3 룰 라벨러 자가검증 (12 시나리오)
 - `init_minio_buckets.py` — MinIO 초기 버킷 생성
 - `verify_infra.py` — Postgres / **Elasticsearch (버전 + cluster health)** / MinIO / Redis / MLflow
-- **`migrate_qdrant_to_es.py`** — Qdrant→ES 5단계 마이그레이션 (Extract·Transform·Load·Verify·Swap)
 - **`build_offline_bundle.py`** — 폐쇄망 자기완비 번들 빌더 (dry-run / 실 빌드)
 
 ---
@@ -152,7 +145,6 @@ poc/
 | `VECTOR_BACKEND` | 효과 |
 |---|---|
 | `es` (기본) | Elasticsearch dense_vector + BM25 + RRF 하이브리드 |
-| `qdrant` | 롤백 경로 (vec-only 폴리필) |
 | `inmemory` | dryrun / 강제 in-memory |
 
 `.env` 값만 바꾸면 동일 코드에서 모드·백엔드 전환. 자세한 백엔드 결정 흐름은 [doc/13 §5·§8.1](../doc/13_벡터DB_ES_전환_계획서.md).
@@ -162,9 +154,8 @@ poc/
 ## 테스트
 
 ```bash
-pytest                  # 126개 (어댑터 + 모듈 + 서비스 + API + 마이그 + 번들)
+pytest                  # 어댑터 + 모듈 + 서비스 + API + 번들
 pytest -k es_store      # ES 어댑터만
-pytest -k migration     # 마이그레이션 스크립트
 pytest -k offline       # 폐쇄망 번들
 pytest --tb=short -v    # 상세 실패 표시
 ```
@@ -184,7 +175,7 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 | `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1`(기본) / `BAAI/bge-m3` |
 | `CLASSIFIER_BASE_MODEL` | `kakaobank/kf-deberta-base`(기본) / KoELECTRA |
 | `POC_MODE` | `dryrun`(기본) / `full` |
-| **`VECTOR_BACKEND`** | `es`(기본) / `qdrant` / `inmemory` |
+| **`VECTOR_BACKEND`** | `es`(기본) / `inmemory` |
 | **`ES_URL` / `ES_USERNAME` / `ES_PASSWORD`** | Elasticsearch 접속 |
 
 ---
@@ -195,8 +186,7 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 
 | 작업 | 명령 | 검증 가능? |
 |---|---|---|
-| P2 dryrun 4-way 시뮬레이션 | `make p2 --hybrid` | ✅ ES SKIP 처리 |
-| Qdrant→ES 마이그 sample-5 | `make migrate-dry` | ✅ |
+| P2 dryrun 시뮬레이션 | `make p2 --hybrid` | ✅ ES SKIP 처리 |
 | 폐쇄망 번들 manifest 검증 | `make bundle-dry` | ✅ |
 | EsStore 단위 테스트 (mocked) | `pytest -k es_store` | ✅ |
 | ES 매핑·인덱스 템플릿 검증 | `infra/es/index_template_secrets.json` | ✅ |
@@ -227,12 +217,11 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 - **[doc/15](../doc/15_진척_종합_보고서.md) 진척 종합 보고서 (v1)** — 회신 직전 인덱스 + 즉시 발동 가이드
 
 ### 코드·인프라
-- **벡터 DB Qdrant → Elasticsearch 8.14+ 전환** — `VectorStore` Protocol v2 + `EsStore` 3단 폴백 + Nori + int8_hnsw + alias
-- **`migrate_qdrant_to_es.py`** — Qdrant→ES 5단계 idempotent, dry-run + sample-N
+- **벡터 DB Elasticsearch 8.14+ 단일 백엔드** — `VectorStore` Protocol v2 + `EsStore` 3단 폴백 + Nori + int8_hnsw + alias
 - **`build_offline_bundle.py`** — 폐쇄망 번들 manifest dry-run, doc/12 §3·§4 구현
 - **OpenAPI 03 정합화** — `rag_namespace` → `rag_index_alias` rename + ES 컨텍스트 명시
 - **pyproject 재구성** — 기본 23개 + 7개 extras (hwp·nlp·embedding·llm·orchestration·lint·full·dev) + dead deps 제거
 - **CI 강화** — openapi-lint 잡 추가, bundle-dry · migrate-dry 통합
-- **테스트 48 → 126** (어댑터 36 + 마이그 19 + 번들 23 신규, 0 회귀)
+- **테스트 48 → 126** (어댑터 36 + 번들 23 신규, 0 회귀)
 
 상세 진척과 회신 도착 시 발동 가이드: **[doc/15 종합 보고서](../doc/15_진척_종합_보고서.md)**

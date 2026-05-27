@@ -85,20 +85,6 @@ jobs:
             --dry-run \
             --output dist/lloydk-airgap-bundle
 
-      - name: Migration sample-5 dry-run (doc/13 §6 S2.5)
-        run: |
-          mkdir -p migration
-          cat > migration/sample.jsonl <<'JSONL'
-          {"id":"d1","vector":[1.0,0.0,0.0,0.0],"payload":{"grade":"TS","text":"기밀 1"}}
-          {"id":"d2","vector":[0.0,1.0,0.0,0.0],"payload":{"grade":"S1","text":"비밀 2"}}
-          JSONL
-          python scripts/migrate_qdrant_to_es.py \
-            --collection sample \
-            --target-index ci-test-index \
-            --alias secrets-guides-koipa \
-            --skip-extract \
-            --dry-run
-
       - name: Upload PoC reports
         if: always()
         uses: actions/upload-artifact@v4

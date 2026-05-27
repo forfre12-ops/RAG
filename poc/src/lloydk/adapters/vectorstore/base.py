@@ -4,7 +4,7 @@ v2.1 (2026-05-27): 하이브리드는 별도 Protocol로 분리.
 
 - `VectorStore`: dense kNN 기본 계약. 모든 구현체가 만족.
 - `HybridVectorStore`: BM25 + dense + RRF 진짜 하이브리드. EsStore만 해당.
-- 비-하이브리드 구현체(Qdrant·InMemory)도 `search_hybrid`를 제공하지만
+- 비-하이브리드 구현체(InMemory)도 `search_hybrid`를 제공하지만
   **vec-only 폴리필**이며 호출 시 `RuntimeWarning`을 발생시켜 조용한 실패를 차단.
 - 진짜 하이브리드가 필요한 호출부는 `isinstance(vs, HybridVectorStore)`로 분기.
 

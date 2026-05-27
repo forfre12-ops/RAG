@@ -60,11 +60,7 @@ def sample_compose(tmp_path: Path) -> Path:
         "      context: .\n"
         "      dockerfile: Dockerfile.api\n"
         "    ports:\n"
-        "      - \"8000:8000\"\n"
-        "\n"
-        "  qdrant:\n"
-        "    image: qdrant/qdrant:latest\n"
-        "    profiles: [\"rollback\"]\n",
+        "      - \"8000:8000\"\n",
         encoding="utf-8",
     )
     return path
@@ -100,7 +96,6 @@ def test_extract_components_basic(sample_compose: Path):
     assert components["postgres"].image == "postgres:16-alpine"
     assert components["postgres"].version == "16-alpine"
     assert components["elasticsearch"].version == "8.15.3"
-    assert components["qdrant"].version == "latest"
     # api는 build:만 있고 image: 없으므로 추출 안 됨
     assert "api" not in components
 
@@ -228,30 +223,6 @@ def test_build_manifest_adds_local_build_services(sample_compose: Path, sample_c
     assert "api" in m.components
     assert "worker" in m.components
     assert m.components["api"].image == "lloydk-api:1.0.0"
-
-
-def test_build_manifest_excludes_qdrant_by_default(sample_compose: Path, sample_config: Path):
-    m = build_manifest(
-        version="1.0.0",
-        target_env="test",
-        dry_run=True,
-        compose_path=sample_compose,
-        config_path=sample_config,
-        include_qdrant=False,
-    )
-    assert "qdrant" not in m.components
-
-
-def test_build_manifest_includes_qdrant_when_flag_set(sample_compose: Path, sample_config: Path):
-    m = build_manifest(
-        version="1.0.0",
-        target_env="test",
-        dry_run=True,
-        compose_path=sample_compose,
-        config_path=sample_config,
-        include_qdrant=True,
-    )
-    assert "qdrant" in m.components
 
 
 def test_build_manifest_dry_run_no_sha256(sample_compose: Path, sample_config: Path):

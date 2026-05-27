@@ -3,7 +3,6 @@
 검증:
 - PostgreSQL 연결 + 핵심 테이블 4종 (벡터스토어는 ES 단일 — pgvector 미사용)
 - Elasticsearch 클러스터 상태 + 버전 출력 (기본 백엔드)
-- Qdrant 헬스 (롤백 프로파일 기동 시에만, 기본은 skip)
 - MinIO 버킷 존재
 - Redis PING
 - MLflow API
@@ -88,17 +87,6 @@ def check_elasticsearch() -> CheckResult:
         return CheckResult("elasticsearch", False, f"error: {exc}")
 
 
-def check_qdrant() -> CheckResult:
-    """Qdrant는 롤백 프로파일에서만 가동. 기본은 skip(ok=True)."""
-    if os.environ.get("VECTOR_BACKEND", "es").lower() != "qdrant":
-        return CheckResult("qdrant", True, "skipped (VECTOR_BACKEND != qdrant)")
-    base = os.environ.get("QDRANT_URL", "http://localhost:6333")
-    ok, detail = _http_ok(f"{base}/healthz")
-    if not ok:
-        ok, detail = _http_ok(f"{base}/")
-    return CheckResult("qdrant", ok, detail)
-
-
 def check_minio() -> CheckResult:
     try:
         from minio import Minio
@@ -146,7 +134,6 @@ def main() -> int:
     checks = [
         check_postgres(),
         check_elasticsearch(),
-        check_qdrant(),
         check_minio(),
         check_redis(),
         check_mlflow(),

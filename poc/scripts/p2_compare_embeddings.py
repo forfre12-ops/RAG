@@ -5,7 +5,6 @@ doc/13_벡터DB_ES_전환_계획서.md §9.2 측정 절차.
 지원 백엔드 (--backends 옵션, 콤마 구분):
   - inmemory : dense-only, dryrun 기본
   - es       : Elasticsearch (dense kNN / 하이브리드 RRF)
-  - qdrant   : 롤백 경로 baseline
 
 검색 모드 (--mode 옵션):
   - dryrun       : HashEmbedding + InMemoryStore (모델·서버 불필요)
@@ -308,7 +307,7 @@ def main() -> int:
     ap.add_argument(
         "--backends",
         default="inmemory",
-        help="콤마 구분 백엔드 목록 (es,qdrant,inmemory). dryrun은 기본 inmemory.",
+        help="콤마 구분 백엔드 목록 (es,inmemory). dryrun은 기본 inmemory.",
     )
     ap.add_argument(
         "--hybrid",

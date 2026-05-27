@@ -9,8 +9,8 @@ PY ?= python
 VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
-.PHONY: help venv install env infra-up infra-up-rollback infra-down infra-verify api worker \
-        p2 p2-full migrate-dry bundle-dry licenses licenses-check analyze-synth verify-all \
+.PHONY: help venv install env infra-up infra-down infra-verify api worker \
+        p2 p2-full bundle-dry licenses licenses-check analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports
 
 help:
@@ -18,14 +18,12 @@ help:
 	@echo "  venv         create venv ($(VENV_DIR)) and install -e .[dev]"
 	@echo "  env          copy .env.example -> .env if missing"
 	@echo "  infra-up     docker compose up -d (postgres/elasticsearch/minio/redis/mlflow)"
-	@echo "  infra-up-rollback  docker compose --profile rollback up -d (+qdrant 롤백 가동)"
 	@echo "  infra-down   docker compose down"
 	@echo "  infra-verify python scripts/verify_infra.py"
 	@echo "  api          run FastAPI locally (uvicorn)"
 	@echo "  worker       run Celery worker locally"
 	@echo "  p2           P2 embedding compare (dryrun, inmemory)"
 	@echo "  p2-full      P2 KURE-v1+BGE-M3 × ES dense+hybrid (full 측정, ES 필요)"
-	@echo "  migrate-dry  Qdrant→ES sample-5 dry-run (운영 데이터 무관 검증)"
 	@echo "  bundle-dry   폐쇄망 번들 manifest dry-run (doc/12)"
 	@echo "  licenses     OSS 라이선스 4종 산출 (txt/md/json/cyclonedx, doc/14)"
 	@echo "  licenses-check  직접 의존성 라이선스 위험 검증 (CI용, exit 1 on risk)"
@@ -53,9 +51,6 @@ env:
 
 infra-up:
 	docker compose up -d postgres elasticsearch minio redis mlflow
-
-infra-up-rollback:
-	docker compose --profile rollback up -d postgres elasticsearch qdrant minio redis mlflow
 
 infra-down:
 	docker compose down
@@ -88,15 +83,6 @@ p2:
 p2-full:
 	$(PY) scripts/p2_compare_embeddings.py --mode full --backends es --hybrid
 
-migrate-dry:
-	@# Qdrant 미가용·미설치 환경에서도 동작하도록 sample.jsonl + --skip-extract 사용
-	@mkdir -p migration
-	@printf '{"id":"d1","vector":[1.0,0.0,0.0,0.0],"payload":{"grade":"TS","text":"sample"}}\n' > migration/sample.jsonl
-	@printf '{"id":"d2","vector":[0.0,1.0,0.0,0.0],"payload":{"grade":"S1","text":"sample"}}\n' >> migration/sample.jsonl
-	$(PY) scripts/migrate_qdrant_to_es.py --collection sample --skip-extract --dry-run \
-	    --target-index secrets-guides-koipa-test \
-	    --alias secrets-guides-koipa --old-index secrets-guides-koipa-v0
-
 bundle-dry:
 	$(PY) scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run \
 	    --output dist/lloydk-airgap-bundle
@@ -115,18 +101,16 @@ analyze-synth:
 	    $(PY) scripts/analyze_synthetic.py; \
 	fi
 
-verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + lint + 라이선스 + 분석)
-	@echo "==[1/6]== pytest"
+verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + 번들 + 라이선스 + 분석)
+	@echo "==[1/5]== pytest"
 	@$(PY) -m pytest -q
-	@echo "==[2/6]== PoC 5종 dryrun"
+	@echo "==[2/5]== PoC 5종 dryrun"
 	@$(PY) scripts/run_all_pocs.py
-	@echo "==[3/6]== Qdrant→ES 마이그 dry-run"
-	@$(MAKE) -s migrate-dry
-	@echo "==[4/6]== 폐쇄망 번들 manifest dry-run"
+	@echo "==[3/5]== 폐쇄망 번들 manifest dry-run"
 	@$(MAKE) -s bundle-dry
-	@echo "==[5/6]== OSS 라이선스 위험 (allowlist 모드)"
+	@echo "==[4/5]== OSS 라이선스 위험 (allowlist 모드)"
 	@$(MAKE) -s licenses-check
-	@echo "==[6/6]== 합성 800건 분석"
+	@echo "==[5/5]== 합성 800건 분석"
 	@$(MAKE) -s analyze-synth
 	@echo ""
 	@echo "[verify-all] ALL GREEN"

@@ -29,8 +29,8 @@ groups:
         labels:
           severity: P1
         annotations:
-          summary: "Elasticsearch 다운 → Qdrant 즉시 롤백 검토"
-          runbook: "doc/13 §롤백"
+          summary: "Elasticsearch 다운 → 즉시 복구 (벡터스토어 단일 백엔드)"
+          runbook: "doc/13 §장애대응"
 
   - name: lloydk-performance
     interval: 1m

@@ -43,16 +43,6 @@ services:
       retries: 20
       start_period: 60s
 
-  # 롤백 경로 — `docker compose --profile rollback up`으로만 기동
-  qdrant:
-    image: qdrant/qdrant:latest
-    profiles: ["rollback"]
-    volumes:
-      - E:/antigravity/rag/docker-data/qdrant:/qdrant/storage
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -105,7 +95,6 @@ services:
       ES_URL: http://elasticsearch:9200
       ES_USERNAME: ${ES_USERNAME:-}
       ES_PASSWORD: ${ES_PASSWORD:-}
-      QDRANT_URL: http://qdrant:6333
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-lloydk}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
@@ -143,7 +132,6 @@ services:
       ES_URL: http://elasticsearch:9200
       ES_USERNAME: ${ES_USERNAME:-}
       ES_PASSWORD: ${ES_PASSWORD:-}
-      QDRANT_URL: http://qdrant:6333
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
@@ -155,5 +143,5 @@ services:
 
 volumes:
   # esdata만 named volume 유지 — ES는 fsync 빈도가 높아 bind mount(WSL2↔Windows FS) IO 패널티가 큼.
-  # 나머지(postgres/qdrant/minio/redis/modelcache)는 E:/antigravity/rag/docker-data/ bind mount.
+  # 나머지(postgres/minio/redis/modelcache)는 E:/antigravity/rag/docker-data/ bind mount.
   esdata:

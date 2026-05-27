@@ -1,6 +1,6 @@
 """build_store 백엔드 분기 + 폴리필 일관성 테스트.
 
-doc/13 §5(어댑터)·§8(롤백)·§9(dryrun 한계) 검증.
+doc/13 §5(어댑터)·§9(dryrun 한계) 검증.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def test_explicit_inmemory_backend(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_explicit_argument_overrides_env(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("VECTOR_BACKEND", "qdrant")
+    monkeypatch.setenv("VECTOR_BACKEND", "es")
     vs = build_store(backend="inmemory")
     assert isinstance(vs, InMemoryStore)
 
@@ -123,23 +123,6 @@ def test_protocol_compliance_inmemory():
     # 실제 백엔드 name으로 한 번 더 검증하거나 EsStore 명시 분기를 권장.
     # 본 테스트는 "InMemory는 EsStore가 아니다"라는 운영 사실만 확인.
     assert vs.name != "elasticsearch"
-
-
-def test_qdrant_search_hybrid_warns():
-    """QdrantStore.search_hybrid가 RuntimeWarning을 내야 한다 (조용한 dense 폴백 금지)."""
-    # qdrant_client 미설치/미연결 환경에서도 메서드 자체는 호출 가능해야 하므로
-    # 클라이언트 초기화를 우회한 인스턴스로 폴리필 경로만 검증.
-    from lloydk.adapters.vectorstore.qdrant_store import QdrantStore
-
-    vs = QdrantStore.__new__(QdrantStore)  # __init__ 우회 (qdrant 서버 불필요)
-
-    # search() 호출 차단: 폴리필이 search로 위임하므로 그 직전에 warn이 나야 함.
-    # 위임된 search는 클라이언트가 없어 AttributeError가 나지만, warn은 그 전에 발생.
-    with pytest.warns(RuntimeWarning, match="dense-only로 폴백"):
-        try:
-            vs.search_hybrid("col", query_text="x", query_vec=[0.0], top_k=1)
-        except Exception:
-            pass  # _client 미초기화·qdrant_client 미설치는 본 테스트 관심 밖
 
 
 def test_env_clean_state():

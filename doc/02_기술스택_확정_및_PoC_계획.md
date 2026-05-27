@@ -94,11 +94,11 @@
 |---|---|---|---|---|---|---|---|---|---|
 | **Elasticsearch 8.14+** | ★★★★ | - | ★★★★★ | ★★★★ | ★★★★★ | ★★★★★ | ★★★★★ | **★★★★★** | `dense_vector` HNSW + BM25 + RRF 하이브리드, Kibana/ILM/Watcher 운영 표준, KL 기존 인프라 재사용 |
 | ~~pgvector (PostgreSQL)~~ | - | - | - | - | - | - | - | - | **제거됨** (2026-05-27 자체 결정) — ES 단일 확정으로 어댑터 미작성·DB 컬럼 제거 |
-| Qdrant | ★★★★★ | - | ★★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★★ | Rust 단일 컨테이너, 메타필터 강력 — **2순위 즉시 롤백 경로** |
+| ~~Qdrant~~ | - | - | - | - | - | - | - | - | **제거됨** (2026-05-27 v2 자체 결정) — ES 단일 + 관측성 즉시 복구 정책 |
 | Milvus | ★★★ | - | ★★★★ | ★★★ | ★★★★★ | ★★★★★ | ★★★★★ | ★★★ | 대규모 강점이나 etcd+MinIO 의존, 제외 |
 | Vespa | ★★★ | - | ★★★★ | ★★★ | ★★★ | ★★★★★ | ★★★★ | ★★★ | 학습 곡선 가파름, 제외 |
 
-**확정 (2026-05-27 자체 결정)**: **Elasticsearch 8.14+ 단일 / Qdrant 즉시 롤백 경로**
+**확정 (2026-05-27 v2 자체 결정)**: **Elasticsearch 8.15.3 단일 백엔드** (Qdrant 롤백 어댑터 제거, 관측성 알람 기반 즉시 복구 정책)
 **이유**: KL 사전 인터뷰에서 ES 운영 표준화 의사 확인, dense_vector + BM25 + RRF 하이브리드로 영업비밀 검색의 키워드+의미 동시 수용, Kibana·ILM·audit log 등 운영 도구가 발주처 컴플라이언스에 부합. pgvector는 어댑터 미작성 상태였고 자체 결정으로 ES 단일 잠금 → 죽은 코드 정리.
 **상세**: [doc/13_벡터DB_ES_전환_계획서.md](13_벡터DB_ES_전환_계획서.md)
 **E1~E8 자체 결정값**: ES 8.15.3 (docker-compose 잠금), Nori + 사용자 사전, Basic 라이선스, 인덱스 분리 테넌트, 단일 노드 JVM 4GB, int8_hnsw
@@ -170,7 +170,7 @@
 | 임베딩 | **KURE-v1** (한국어 1순위, BGE-M3 fine-tuned) / BGE-M3 폴백 / ko-sroberta 경량 |
 | LLM 상용 | **Claude Sonnet 4.6** (기본) / GPT-4o / Gemini — Adapter 교체 |
 | LLM OSS | **Qwen3-14B + vLLM ≥ 0.8.5** (thinking/non-thinking) / EXAONE 3.5(검토) / Llama+Bllossom |
-| Vector DB | **Elasticsearch 8.14+** (기본, [doc/13](13_벡터DB_ES_전환_계획서.md)) / Qdrant 즉시 롤백 |
+| Vector DB | **Elasticsearch 8.15.3 단일** ([doc/13](13_벡터DB_ES_전환_계획서.md)) · InMemory(테스트) |
 | RDB | **PostgreSQL 16 + JSONB** (벡터는 ES 외부화, pgvector 미사용) |
 | 스토리지 | **MinIO** |
 | 큐/캐시 | **Redis 7 + Celery** |

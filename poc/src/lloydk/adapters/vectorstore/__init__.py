@@ -1,4 +1,4 @@
-"""Vector Store — Elasticsearch(기본) / Qdrant(롤백) / InMemory(dryrun).
+"""Vector Store — Elasticsearch(기본) / InMemory(dryrun).
 
 doc/13_벡터DB_ES_전환_계획서.md §8.1 build_store 시그니처.
 
@@ -47,17 +47,4 @@ def build_store(
             )
             return InMemoryStore()
 
-    if backend == "qdrant":
-        try:
-            from lloydk.adapters.vectorstore.qdrant_store import QdrantStore  # noqa: PLC0415
-
-            return QdrantStore()
-        except Exception as exc:  # noqa: BLE001
-            warnings.warn(
-                f"[vectorstore] Qdrant unavailable: {exc}. Falling back to InMemoryStore.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            return InMemoryStore()
-
-    raise ValueError(f"unknown VECTOR_BACKEND: {backend!r} (expected: es|qdrant|inmemory)")
+    raise ValueError(f"unknown VECTOR_BACKEND: {backend!r} (expected: es|inmemory)")

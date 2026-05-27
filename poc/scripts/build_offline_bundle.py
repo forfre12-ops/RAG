@@ -228,7 +228,6 @@ _COMPONENT_SIZE_GB: dict[str, float] = {
     "minio": 0.2,
     "redis": 0.1,
     "mlflow": 0.6,
-    "qdrant": 0.3,  # 롤백용
 }
 
 _MODEL_SIZE_GB: dict[str, float] = {
@@ -306,11 +305,8 @@ def build_manifest(
     dry_run: bool,
     compose_path: Path,
     config_path: Path,
-    include_qdrant: bool = False,
 ) -> BundleManifest:
     components = extract_components_from_compose(compose_path)
-    if not include_qdrant:
-        components.pop("qdrant", None)
 
     # 로컬 빌드 이미지 (docker-compose의 `build:` 블록) — image 라인이 없어 자동 추출 불가
     for svc in ("api", "worker"):
@@ -481,7 +477,6 @@ def main() -> int:
     ap.add_argument("--output", default="dist/lloydk-airgap-bundle", help="출력 디렉터리")
     ap.add_argument("--target-env", default="KOIPA-prod")
     ap.add_argument("--dry-run", action="store_true", help="다운로드 없이 manifest만 생성")
-    ap.add_argument("--include-qdrant", action="store_true", help="롤백용 Qdrant 포함")
     ap.add_argument(
         "--compose", default=str(_REPO_ROOT / "docker-compose.yml"),
         help="파싱할 docker-compose.yml 경로",
@@ -498,7 +493,6 @@ def main() -> int:
         dry_run=args.dry_run,
         compose_path=Path(args.compose),
         config_path=Path(args.config),
-        include_qdrant=args.include_qdrant,
     )
 
     out_dir = Path(args.output)

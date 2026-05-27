@@ -805,7 +805,7 @@
           <li><b>벡터 DB: Qdrant → Elasticsearch 8.14+</b> 전환 (KL 기존 인프라 재사용, <a href="13_벡터DB_ES_전환_계획서.md">doc/13</a> 별도 계획서)</li>
           <li><b>검색 방식</b>: dense kNN 단독 → <b>하이브리드(dense kNN + BM25 + RRF)</b>, ES <code>retriever</code> API 8.14+ / legacy <code>rank.rrf</code> 폴백</li>
           <li><b>멀티테넌트</b>: Qdrant 네임스페이스 → <b>ES 인덱스 분리</b> (<code>secrets-{role}-{tenant}-{model}-{version}</code>) + alias 스위칭</li>
-          <li><b>롤백 경로</b>: Qdrant(즉시 가용) — <code>VectorStore</code> Protocol v2로 무 호출부 변경 어댑터 스왑. pgvector는 2026-05-27 자체 결정으로 제거(어댑터 미작성·ES와 기능 중복)</li>
+          <li><b>벡터 백엔드 단일화</b>: ES 단일 + InMemory(테스트). Qdrant·pgvector 모두 2026-05-27 v2에서 제거 — 관측성 알람(ElasticsearchDown P1) 기반 즉시 복구 정책</li>
           <li><b>최종 확정 조건</b>: KL E1~E9 회신 (기한 2026-06-09) → v1.0 승격</li>
         </ul>
       </div>
@@ -1229,7 +1229,7 @@ Infra (Postgres/MinIO/Elasticsearch/Redis/MLflow)</pre>
           <tbody>
             <tr class="pick"><td><b>Elasticsearch 8.14+</b></td><td>JVM (KL 기존 운용)</td><td>강력 + DLS(Platinum)</td><td>인덱스 분리 / DLS</td><td><span class="pill accept">★★★★★ 채택 (1순위)</span></td></tr>
             <tr><td><s>pgvector</s></td><td>-</td><td>-</td><td>-</td><td><span class="pill fallback">제거됨 (2026-05-27 자체 결정 — 어댑터 미작성·ES와 기능 중복)</span></td></tr>
-            <tr><td>Qdrant</td><td>Rust 단일 컨테이너</td><td>강력 (페이로드 인덱스)</td><td>네임스페이스 분리</td><td><span class="pill fallback">3순위 롤백</span></td></tr>
+            <tr><td><s>Qdrant</s></td><td>-</td><td>-</td><td>-</td><td><span class="pill fallback">제거됨 (2026-05-27 v2 자체 결정 — ES 단일 + 관측성 즉시 복구)</span></td></tr>
             <tr><td>Milvus</td><td>etcd + MinIO 의존</td><td>강력</td><td>강력</td><td><span class="pill review">배포 부담</span></td></tr>
           </tbody>
         </table>
@@ -1242,7 +1242,7 @@ Infra (Postgres/MinIO/Elasticsearch/Redis/MLflow)</pre>
             <li>KL 사전 인터뷰에서 ES 운영 표준화 의사 확인 → KL 기존 인프라 재사용으로 운영 부담 감소</li>
             <li><code>dense_vector</code> HNSW + BM25 + RRF 하이브리드로 영업비밀 검색의 키워드+의미 동시 수용 (예: "기술자료임치"·"영업비밀원본증명" 같은 도메인 용어)</li>
             <li>Kibana·ILM·audit log·DLS/FLS·Snapshot 등 운영 도구가 발주처 컴플라이언스(영업비밀 감사 요구)에 부합</li>
-            <li>ES 완전 미가용 시 <b>Qdrant</b>(롤백, <code>qdrant_store.py</code> 실재) 즉시 가동 — <code>docker compose --profile rollback up -d qdrant</code> + <code>VECTOR_BACKEND=qdrant</code>. 어댑터 추상화(<code>VectorStore</code> Protocol)로 무 호출부 변경. pgvector는 자체 결정으로 제거.</li>
+            <li>ES 완전 미가용 시 <b>P1 알람 (ElasticsearchDown)</b> 트리거 + Runbook §2.2 즉시 복구 (DR 시나리오 §6.4). Qdrant 롤백 어댑터·pgvector 모두 2026-05-27 v2에서 제거.</li>
             <li><b>최종 확정 조건</b>: K1 회신 + E1~E9 부록 회신 (기한 2026-06-09)</li>
           </ul>
         </div>
@@ -1451,7 +1451,7 @@ RAG Top-K 가이드 청크의 등급 분포 회수
         <li><b>단일 docker-compose.yml</b>: 6개 컨테이너 (Postgres/Elasticsearch/MinIO/Redis/MLflow/API+Worker) 일괄 기동</li>
         <li>모델 가중치는 이미지 외부 MinIO 볼륨 → 재빌드 없이 교체</li>
         <li>망 환경에 따라 <code>LLM_PROVIDER</code> 환경변수로 전환: 일반망=API, 폐쇄망=vLLM(Qwen3), 하이브리드=둘 다 활성 — 어느 쪽이든 동일 코드</li>
-        <li>벡터 백엔드도 <code>VECTOR_BACKEND</code> 환경변수로 전환: <code>es</code>(기본) / <code>qdrant</code>(롤백) / <code>inmemory</code>(dryrun) — <code>VectorStore</code> Protocol v2로 무 호출부 변경</li>
+        <li>벡터 백엔드는 <code>VECTOR_BACKEND</code> 환경변수로 전환: <code>es</code>(기본) / <code>inmemory</code>(테스트) — Qdrant 롤백은 2026-05-27 v2에서 제거, ES 단일 백엔드 + 관측성 즉시 복구 정책</li>
       </ul>
 
       <h3>13.2 멀티테넌트</h3>
@@ -1760,7 +1760,7 @@ classification_levels ── level_keywords ── evaluation_factors</pre>
           <thead><tr><th>어댑터</th><th>사용 모듈</th><th>역할</th></tr></thead>
           <tbody>
             <tr><td><code>LLMAdapter</code> (Anthropic/OpenAI/Google/vLLM)</td><td>M1, M3, M5</td><td>합성 생성, RAG 보강 추론, 경계 판단</td></tr>
-            <tr><td><code>VectorAdapter</code> (Elasticsearch · Qdrant 즉시 롤백 · InMemory dryrun)</td><td>M5</td><td>RAG 하이브리드(dense kNN + BM25 + RRF) Top-K 검색, 인덱스 분리 멀티테넌트. <code>EsStore</code>만 <code>HybridVectorStore</code> Protocol 만족.</td></tr>
+            <tr><td><code>VectorAdapter</code> (Elasticsearch 단일 · InMemory dryrun)</td><td>M5</td><td>RAG 하이브리드(dense kNN + BM25 + RRF) Top-K 검색, 인덱스 분리 멀티테넌트. <code>EsStore</code>만 <code>HybridVectorStore</code> Protocol 만족. Qdrant 롤백 2026-05-27 v2 제거.</td></tr>
             <tr><td><code>EmbedAdapter</code> (KURE-v1/BGE-M3)</td><td>M2, M5</td><td>청크 임베딩 생성</td></tr>
             <tr><td><code>StorageAdapter</code> (MinIO)</td><td>M1~M6 전부</td><td>모델 가중치, 원문 텍스트, 캐시</td></tr>
             <tr><td><code>QueueAdapter</code> (Redis+Celery)</td><td>M1, M4, M5, M6</td><td>비동기 작업 큐, 능동학습 큐</td></tr>
@@ -2207,7 +2207,7 @@ classification_levels ── level_keywords ── evaluation_factors</pre>
             <tr><td>임베딩</td><td><b>KURE-v1</b> / BGE-M3 폴백</td><td>BGE-M3 한국어 fine-tune, +1.6%p</td></tr>
             <tr><td>LLM 상용</td><td><b>Claude Sonnet 4.6</b></td><td>한국어·1M·JSON 안정</td></tr>
             <tr><td>LLM OSS</td><td><b>Qwen3-14B + vLLM</b></td><td>thinking 모드, Apache 2.0</td></tr>
-            <tr><td>Vector DB</td><td><b>Elasticsearch 8.14+</b> (단일) / Qdrant 즉시 롤백</td><td>KL 기존 인프라 재사용, dense+BM25+RRF 하이브리드. pgvector는 2026-05-27 자체 결정으로 제거</td></tr>
+            <tr><td>Vector DB</td><td><b>Elasticsearch 8.15.3</b> 단일 · InMemory(테스트)</td><td>KL 기존 인프라 재사용, dense+BM25+RRF 하이브리드. Qdrant·pgvector 모두 2026-05-27 v2 자체 결정으로 제거 — 관측성 알람 기반 즉시 복구 정책</td></tr>
             <tr><td>RDB</td><td>PostgreSQL 16 + JSONB</td><td>공공기관 표준, 트랜잭션·라벨·이력 통합 관리 (벡터는 ES 외부화)</td></tr>
             <tr><td>스토리지</td><td>MinIO</td><td>S3 호환, 모델 외부화</td></tr>
             <tr><td>큐/캐시</td><td>Redis 7 + Celery</td><td>비동기 일괄, 능동학습</td></tr>
