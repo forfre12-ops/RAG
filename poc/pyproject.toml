@@ -10,6 +10,7 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "python-multipart>=0.0.9",  # /guide/documents multipart 업로드
+  "prometheus-client>=0.20",  # W7 관측성 — Prometheus exposition
   "pydantic>=2.8",
   "pydantic-settings>=2.4",
   "httpx>=0.27",

@@ -13,7 +13,9 @@ from lloydk.api import guide as guide_api
 from lloydk.api import schema_admin as schema_admin_api
 from lloydk.api import metrics as metrics_api
 from lloydk.api import async_classify as async_classify_api
+from lloydk.api import prom_metrics as prom_metrics_api
 from lloydk.api.middleware import AuditMiddleware
+from lloydk.api.prom_metrics import PrometheusMiddleware
 
 
 @asynccontextmanager
@@ -44,6 +46,10 @@ async def add_request_id(request: Request, call_next):
 # request_id 미들웨어 뒤에 등록해야 request.state.request_id 사용 가능.
 app.add_middleware(AuditMiddleware)
 
+# Prometheus 메트릭 미들웨어 — 모든 요청에 lloydk_requests_total + duration 수집.
+# AuditMiddleware보다 먼저 add_middleware 호출하면 starlette 스택상 더 바깥에 위치.
+app.add_middleware(PrometheusMiddleware)
+
 
 @app.exception_handler(Exception)
 async def unhandled_error(request: Request, exc: Exception):
@@ -64,3 +70,4 @@ app.include_router(synthesis_api.router, prefix="/api/v1")
 app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(schema_admin_api.router, prefix="/api/v1")
 app.include_router(metrics_api.router, prefix="/api/v1")
+app.include_router(prom_metrics_api.router, prefix="/api/v1")

@@ -1,0 +1,90 @@
+name: lloydk-observability
+
+# 관측성 스택 — Prometheus + Grafana + Loki + Promtail.
+# 기본 lloydk-poc 스택과 동일 docker network에 합류해서 api·postgres·elasticsearch를 스크랩.
+# 사용: docker compose -f docker-compose.yml -f infra/observability/docker-compose.observability.yml up -d
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=10GB
+    ports:
+      - "9090:9090"
+    networks: [default]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-lloydk_dev_grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks: [default]
+    depends_on: [prometheus, loki]
+
+  loki:
+    image: grafana/loki:3.2.1
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - lokidata:/loki
+    ports:
+      - "3100:3100"
+    networks: [default]
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [default]
+    depends_on: [loki]
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    environment:
+      DATA_SOURCE_NAME: "postgresql://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk?sslmode=disable"
+    ports:
+      - "9187:9187"
+    networks: [default]
+
+  elasticsearch-exporter:
+    image: quay.io/prometheuscommunity/elasticsearch-exporter:v1.9.0
+    command:
+      - --es.uri=http://elasticsearch:9200
+      - --es.all
+      - --es.indices
+    ports:
+      - "9114:9114"
+    networks: [default]
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    command:
+      - --redis.addr=redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks: [default]
+
+volumes:
+  promdata:
+  grafanadata:
+  lokidata:
+
+networks:
+  default:
+    name: lloydk-poc_default
+    external: true

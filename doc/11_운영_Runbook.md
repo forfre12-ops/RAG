@@ -1,9 +1,16 @@
 # 운영 Runbook — KOIPA AI 영업비밀관리시스템 (로이드케이 AI 파트)
 
 작성일: 2026-05-27
-버전: v0.9 (운영 전환 전 검증)
+버전: **v1.0** (W7 관측성·백업·DR 스크립트 실명령 연결 + 검증 완료)
 대상: KL 운영팀 / KOIPA 보안팀 / Lloydk DevOps
 관련: [doc/04 모듈 설계](04_AI코어_모듈_상세설계.md) · [doc/12 폐쇄망 배포](12_폐쇄망_배포_설계.md) · [doc/13 ES 전환](13_벡터DB_ES_전환_계획서.md) · [doc/10 위험관리대장](10_위험관리대장.md)
+
+## v1.0 변경 사항 (W7)
+- §6 백업·복원: 실 스크립트 링크 추가 (`scripts/backup_postgres.py`, `backup_es_snapshot.py`, `backup_minio_mirror.py`)
+- §6.4 DR 시나리오: `scripts/dr_restore_check.py` 자동 검증 추가, JSON 리포트 산출
+- §1 관측성: Prometheus·Grafana·Loki 스택 가동 (`infra/observability/`), 대시보드 + 알람 규칙
+- §2 장애 대응: Prometheus 지표 기반 자동 알람 (`alert_rules.yml`)
+- pytest 289/289 PASS — W7 관측성·백업 18 신규 테스트 포함
 
 ---
 
@@ -18,6 +25,42 @@
 4. **인덱스 재구성** (임베딩 모델 교체·매핑 변경)
 5. **백업·복원** (스냅샷·재해 복구)
 6. **운영 일상 점검** (일/주/월 단위)
+
+---
+
+## 0.1 관측성 스택 (W7)
+
+운영 환경에 다음 스택이 함께 가동되어야 일상 점검·장애 대응이 가능합니다.
+
+**가동 명령**:
+```bash
+cd poc
+# 기본 인프라
+docker compose up -d postgres elasticsearch minio redis mlflow
+# 관측성 스택 (Prometheus + Grafana + Loki + Promtail + 익스포터 3종)
+docker compose -f docker-compose.yml -f infra/observability/docker-compose.observability.yml up -d
+```
+
+**접속**:
+| 서비스 | URL | 용도 |
+|---|---|---|
+| Grafana | http://localhost:3000 (admin/lloydk_dev_grafana) | 대시보드 `Lloydk Overview` |
+| Prometheus | http://localhost:9090 | 메트릭 쿼리·알람 규칙 |
+| Loki | http://localhost:3100 (Grafana 경유) | 모든 컨테이너 로그 (영업비밀 마스킹) |
+| Lloydk API metrics | http://localhost:8000/api/v1/metrics-prom | 자체 노출 메트릭 |
+
+**핵심 메트릭**:
+- `lloydk_requests_total{route, status}` — 요청 카운터
+- `lloydk_request_duration_seconds_bucket{route}` — 지연 히스토그램
+- `lloydk_request_exceptions_total{type}` — 처리되지 않은 예외
+- `lloydk_active_learning_pending_underclass` — 보안 미탐 누적 (핵심 KPI)
+- `lloydk_active_learning_pending_total` — 전체 미소비 corrections
+
+**알람 규칙**: [`infra/observability/alert_rules.yml`](../poc/infra/observability/alert_rules.yml)
+- ApiDown / PostgresDown / ElasticsearchDown (P0/P0/P1)
+- ApiLatencyP95High (>30s for 5m, P1) → §2.4 대응
+- ApiErrorRateHigh (5xx > 5%, P1)
+- ActiveLearningUrgent (underclass ≥ 10) → §3 재학습 트리거
 
 ---
 
@@ -315,42 +358,40 @@ curl -s http://elasticsearch:9200/_cat/aliases?v
 
 ### 6.2 Postgres 백업 절차
 
+**자동화 스크립트**: [`scripts/backup_postgres.py`](../poc/scripts/backup_postgres.py)
+
 ```bash
-# 백업 (자동 cron)
-docker compose exec postgres pg_dump -U lloydk -F c -f /tmp/lloydk-$(date +%Y%m%d).dump lloydk
-docker compose cp postgres:/tmp/lloydk-*.dump ./backups/
+# 일별 자동 백업 + MinIO 적재 + 30일 retention 정리
+python poc/scripts/backup_postgres.py --upload
 
-# MinIO 적재
-mc cp ./backups/lloydk-*.dump local/lloydk-backup/pg/
+# cron 등록 (운영망)
+0 2 * * * cd /opt/lloydk/poc && /usr/bin/python scripts/backup_postgres.py --upload
 
-# 복원
+# 수동 복원
 docker compose exec postgres pg_restore -U lloydk -d lloydk -c /tmp/lloydk-YYYYMMDD.dump
 ```
 
 ### 6.3 Elasticsearch 스냅샷 절차
 
+**자동화 스크립트**: [`scripts/backup_es_snapshot.py`](../poc/scripts/backup_es_snapshot.py)
+
 ```bash
-# 저장소 등록 (1회만)
-curl -X PUT http://elasticsearch:9200/_snapshot/lloydk_repo -H 'Content-Type: application/json' -d '{
-  "type": "s3",
-  "settings": {
-    "bucket": "lloydk-es-snapshots",
-    "endpoint": "minio:9000",
-    "path_style_access": true
-  }
-}'
+# 저장소 자동 등록 (미존재 시) + 일일 스냅샷 + retention 정리
+python poc/scripts/backup_es_snapshot.py
 
-# 일일 스냅샷 (cron)
-curl -X PUT "http://elasticsearch:9200/_snapshot/lloydk_repo/snap-$(date +%Y%m%d)?wait_for_completion=true" \
-  -H 'Content-Type: application/json' -d '{
-    "indices": "secrets-*",
-    "include_global_state": false
-  }'
+# 저장소만 등록 (초기 설정)
+python poc/scripts/backup_es_snapshot.py --ensure-only
 
-# 복원
-curl -X POST http://elasticsearch:9200/_snapshot/lloydk_repo/snap-YYYYMMDD/_restore \
+# cron 등록 (운영망)
+30 2 * * * cd /opt/lloydk/poc && /usr/bin/python scripts/backup_es_snapshot.py
+
+# 수동 복원 (운영에서는 별도 스크립트 작성 권장)
+curl -X POST http://elasticsearch:9200/_snapshot/lloydk_repo/snap-YYYYMMDD-HHMMSS/_restore \
+  -H 'Content-Type: application/json' \
   -d '{"indices": "secrets-guides-koipa-*", "rename_pattern": "(.+)", "rename_replacement": "restored_$1"}'
 ```
+
+**전제**: 운영 ES에 `repository-s3` 플러그인 설치 + MinIO 버킷 `lloydk-es-snapshots` 사전 생성.
 
 ### 6.4 재해 복구 (DR) 시나리오
 
@@ -364,16 +405,34 @@ curl -X POST http://elasticsearch:9200/_snapshot/lloydk_repo/snap-YYYYMMDD/_rest
 4. ES 복원:
    - 스냅샷 저장소 등록 → /_snapshot/.../snap-YYYYMMDD/_restore
 5. MinIO 복원:
-   - 백업 NAS에서 mc mirror
+   - 백업 NAS에서 poc/scripts/backup_minio_mirror.py 역방향 또는 mc mirror
 6. MLflow 복원:
    - artifacts MinIO에서 자동 (DB만 복원되면 OK)
 7. 모델 로드 + verify_infra.py 전체 GREEN 확인
 8. 트래픽 점진 전환 (10% → 50% → 100%)
 ```
 
-**RTO/RPO 목표**:
-- RTO (복구 시간): 4시간 이내
-- RPO (데이터 손실): 1일 이내 (백업 주기)
+**RTO/RPO 목표 + 자동 검증**:
+- RTO (복구 시간): **4시간 이내**
+- RPO (데이터 손실): **1일 이내** (백업 주기)
+- **일일 자동 검증**: [`scripts/dr_restore_check.py`](../poc/scripts/dr_restore_check.py)
+
+```bash
+# 매일 백업 후 즉시 실행 — RTO·RPO 준수 여부 자동 검증
+python poc/scripts/dr_restore_check.py
+
+# JSON 리포트는 reports/dr/dr_check_YYYYMMDD-HHMMSS.json에 적재
+# 실패 항목 있으면 exit 1 → Grafana 알람과 연동
+
+# cron 등록 (백업 완료 후)
+0 3 * * * cd /opt/lloydk/poc && /usr/bin/python scripts/dr_restore_check.py || alert-cmd
+```
+
+검증 항목:
+- `pg_backup_recency`: 최신 pg_dump 24h 이내 존재
+- `es_snapshot_recency`: 최신 ES snapshot 24h 이내 존재
+- `minio_mirror_recency`: MinIO mirror 7일 이내 갱신
+- `infra_health`: PG·ES·MinIO·Redis 모두 응답 GREEN
 
 ---
 

@@ -1,0 +1,78 @@
+# Lloydk 운영 알람 규칙 — doc/11 §2 P0/P1 매핑.
+# 알람 채널은 Grafana Alerting 또는 별도 Alertmanager 설정 (회신 후 확정).
+
+groups:
+  - name: lloydk-availability
+    interval: 30s
+    rules:
+      - alert: ApiDown
+        expr: up{job="lloydk-api"} == 0
+        for: 2m
+        labels:
+          severity: P0
+        annotations:
+          summary: "Lloydk API 인스턴스 다운 (>2m)"
+          runbook: "doc/11 §2.2 P0 대응"
+
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: P0
+        annotations:
+          summary: "PostgreSQL 다운"
+          runbook: "doc/11 §6 DR 시나리오"
+
+      - alert: ElasticsearchDown
+        expr: up{job="elasticsearch"} == 0
+        for: 2m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Elasticsearch 다운 → Qdrant 즉시 롤백 검토"
+          runbook: "doc/13 §롤백"
+
+  - name: lloydk-performance
+    interval: 1m
+    rules:
+      - alert: ApiLatencyP95High
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(lloydk_request_duration_seconds_bucket[5m])) by (le, route)
+          ) > 30
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "API p95 지연 > 30s ({{ $labels.route }})"
+          runbook: "doc/11 §2.4 P1 — 분류 지연 급증"
+
+      - alert: ApiErrorRateHigh
+        expr: |
+          sum(rate(lloydk_requests_total{status=~"5.."}[5m]))
+            / sum(rate(lloydk_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "API 5xx 비율 > 5%"
+
+  - name: lloydk-business
+    interval: 5m
+    rules:
+      - alert: ActiveLearningUrgent
+        expr: lloydk_active_learning_pending_underclass >= 10
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "능동학습 underclass 누적 >= 10 — URGENT_RETRAIN"
+          runbook: "doc/11 §3 모델 재학습"
+
+      - alert: ActiveLearningRecommended
+        expr: lloydk_active_learning_pending_total >= 50
+        for: 5m
+        labels:
+          severity: P2
+        annotations:
+          summary: "능동학습 미소비 corrections >= 50 — 재학습 권장"
