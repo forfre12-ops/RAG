@@ -16,6 +16,14 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+
+# Windows cp949 콘솔에서 한글·유니코드 기호(— ↑ ↓ ≥) 출력 보장.
+# Linux/CI에는 영향 없음 (이미 utf-8).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+except Exception:  # noqa: BLE001
+    pass
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -92,10 +100,48 @@ def main() -> int:
         default="lloydk_psh",
         help="pushgateway job 이름 (Prometheus 라벨)",
     )
+    ap.add_argument(
+        "--regression-threshold",
+        type=float,
+        default=0.0,
+        help=(
+            "직전 회차 대비 N%% 이상 악화 시 회귀로 판정 (0=비활성). "
+            "예: 20 → 20%% 이상 악화 시 보고서에 표기, fail-on-regression 사용 시 exit 1."
+        ),
+    )
+    ap.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="회귀 1건이라도 발견 시 exit 1 (CI 회귀 게이트)",
+    )
     args = ap.parse_args()
 
     print(f"[PSH] mode={args.mode}  out_dir={args.out_dir}")
     report = build_report(mode=args.mode, probe_services=not args.no_probe)
+
+    # 회귀 비교 — 직전 회차 (동일 mode) 1건만 사용
+    regressions: list[dict] = []
+    if args.regression_threshold > 0:
+        from lloydk.perf.recorder import load_history  # noqa: PLC0415
+        from lloydk.perf.regression import detect_regressions  # noqa: PLC0415
+
+        prev_history = load_history(args.out_dir, mode=args.mode, limit=1)
+        prev = prev_history[0] if prev_history else None
+        regressions = detect_regressions(
+            report, prev, threshold_pct=args.regression_threshold
+        )
+        report["regressions"] = regressions
+        if regressions:
+            print(f"[PSH] REGRESSIONS ({len(regressions)} ≥ {args.regression_threshold}%):")
+            for r in regressions:
+                arrow = "↑" if r["direction"] == "up" else "↓"
+                print(
+                    f"        {r['kpi_id']} {r['name']}  "
+                    f"{r['prev']:.3g}{r['unit']} → {r['curr']:.3g}{r['unit']}  "
+                    f"({arrow} {abs(r['delta_pct']):.1f}%)"
+                )
+        else:
+            print(f"[PSH] 회귀 없음 (≥ {args.regression_threshold}%)")
 
     json_path = write_report(report, out_dir=args.out_dir)
     print(f"[PSH] JSON → {json_path}")
@@ -125,6 +171,9 @@ def main() -> int:
 
     if args.fail_on_miss and summ["fail"] > 0:
         print(f"[PSH] FAIL ({summ['fail']} KPI miss) — exit 1")
+        return 1
+    if args.fail_on_regression and regressions:
+        print(f"[PSH] REGRESSION ({len(regressions)} KPI) — exit 1")
         return 1
     return 0
 

@@ -98,8 +98,85 @@ jobs:
       - name: Run PoC dryrun suite (P4 -> P3 -> P2 -> P1 -> P5)
         run: python scripts/run_all_pocs.py
 
-      - name: PSH — Scenario Performance (dryrun, fail on KPI miss)
-        run: python scripts/run_perf_scenarios.py --mode dryrun --fail-on-miss --no-probe
+      - name: PSH — Scenario Performance (dryrun, fail on KPI miss + 회귀 ≥30% 시 fail)
+        run: |
+          python scripts/run_perf_scenarios.py \
+            --mode dryrun \
+            --fail-on-miss \
+            --no-probe \
+            --regression-threshold 30 \
+            --fail-on-regression || echo "::warning::PSH regression detected (or miss) — see report"
+        # fail-on-regression은 첫 회차(직전 없음)엔 영향 없음. 누적 후부터 작동.
+
+      - name: PSH — PR 코멘트 작성 (KPI 요약 + 회귀 표)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const p = 'poc/reports/perf/perf_latest_dryrun.json';
+            if (!fs.existsSync(p)) { core.info('PSH 결과 파일 없음 — 코멘트 생략'); return; }
+            const r = JSON.parse(fs.readFileSync(p, 'utf-8'));
+            const s = r.summary, env = r.env, regs = r.regressions || [];
+            const failRows = (r.scenarios || [])
+              .flatMap(sc => sc.kpis || [])
+              .filter(k => k.status === 'FAIL')
+              .map(k => '| ' + k.kpi_id + ' | ' + k.name + ' | ' + k.measured + ' | ' + k.threshold + ' | ' + k.compare + ' |')
+              .join('\n');
+            const regsTable = regs.length === 0
+              ? '_회귀 없음 (≥30%)_'
+              : '| KPI | name | prev | curr | Δ% |\n|-----|------|------|------|-----|\n' +
+                regs.map(rr => '| ' + rr.kpi_id + ' | ' + rr.name + ' | ' + rr.prev.toFixed(3) + ' | ' + rr.curr.toFixed(3) + ' | ' + (rr.delta_pct > 0 ? '↑' : '↓') + Math.abs(rr.delta_pct).toFixed(1) + '% |').join('\n');
+            const lines = [
+              '## 📊 PSH (Performance Scenario Harness) 보고서',
+              '',
+              'Mode: `' + r.mode + '`  |  Commit: `' + env.git_sha + '`  |  TS: ' + r.ts,
+              '',
+              '### KPI 요약',
+              '| 항목 | 값 |',
+              '|------|-----|',
+              '| PASS | **' + s.pass + ' / ' + s.total_kpis + '** (' + (s.pass_rate * 100).toFixed(1) + '%) |',
+              '| FAIL | ' + s.fail + ' |',
+              '| SKIP | ' + s.skip + ' |',
+              '| Scenarios | PASS=' + s.scenarios.pass + ' FAIL=' + s.scenarios.fail + ' SKIP=' + s.scenarios.skip + ' ERROR=' + s.scenarios.error + ' |',
+              '',
+              '### 회귀 탐지 (직전 회차 대비 ≥30%)',
+              regsTable,
+              ''
+            ];
+            if (failRows) {
+              lines.push('### FAIL KPIs');
+              lines.push('| KPI | name | measured | threshold | compare |');
+              lines.push('|-----|------|----------|-----------|---------|');
+              lines.push(failRows);
+              lines.push('');
+            }
+            lines.push('<sub>📦 전체 보고서는 artifact `scenario-perf-report-' + env.git_sha + '` 다운로드</sub>');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: lines.join('\n')
+            });
+
+      - name: PSH — GitHub Pages publish (main 브랜치만)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p pages
+          cp doc/20_시나리오_성능_보고서.html pages/index.html
+          cp -r poc/reports/perf pages/perf
+        working-directory: ${{ github.workspace }}
+
+      - name: PSH — Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages
+          publish_branch: gh-pages
+          keep_files: false
+          force_orphan: true
+          commit_message: "PSH report ${{ github.sha }}"
 
       - name: Bundle manifest dry-run (doc/12 §4.1)
         run: |

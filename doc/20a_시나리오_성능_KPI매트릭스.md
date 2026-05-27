@@ -1,7 +1,7 @@
 # 시나리오 성능 KPI 매트릭스
 
 작성일: 2026-05-27 (W10 PSH 착수)
-버전: v1.0
+버전: v1.2
 관련: [doc/19 KL 통합 8시나리오](19_KL_통합_8시나리오.md) · [doc/02 §3.3 PoC 합격선](02_기술스택_확정_및_PoC_계획.md) · [doc/20 시나리오 성능 보고서 HTML](20_시나리오_성능_보고서.html)
 
 > **본 문서의 역할**: doc/19가 시나리오 동작 명세를 정의한다면, 본 문서는 **각 시나리오에 대한 정량 KPI·합격선·측정 방법**을 정의한다. PSH(Performance Scenario Harness)의 입력 명세이자, doc/20 HTML 보고서의 표시 항목 사양.
@@ -98,6 +98,36 @@
 | S8.2 | latest 응답 latency p95 | ms | ≤ 500 | N=10 | |
 | S8.3 | `GET /metrics/confusion-matrix/{ver}` 응답 시간 p95 | ms | ≤ 30000 | N=3 | **PG** |
 | S8.4 | history 페이지네이션 정합 | bool | True | offset/limit 동작 검증 | **PG** |
+
+### S9. 적대적·모호 문서 FNR 스트레스
+
+W10 신규 — KOIPA 핵심 미션 "TS 미탐 최소화" 노이즈 내성 검증.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 | 핵심 |
+|---|---|---|---|---|---|:-:|
+| S9.1 | 변형 일관성 (consistency) | 비율 | ≥ 0.70 | 원문 ↔ 변형 N=10 케이스 × 3 변형의 label 일치율. dryrun 룰 fallback 기준 보수적 합격선 | | |
+| S9.2 | **적대적 FNR (TS→하위)** | 비율 | ≤ 0.05 | TS 케이스 변형 후 미탐율. **requires=trained_model** (dryrun SKIP) | trained_model | ✅ |
+| S9.3 | confidence 변동 표준편차 | 비율 | ≤ 0.20 | 변형 전후 confidence stdev | | |
+
+### S11. 부하 시나리오 (Concurrent Stress)
+
+W10 신규 — 운영 시 다수 기업·동시 호출 대응.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S11.1 | 동시 50 error_rate | 비율 | ≤ 0.01 | threading.Thread 50, 5 RPS × 10초. HTTP 5xx + Exception 비율 |  |
+| S11.2 | 동시 50 p95 latency | ms | ≤ 8000 | 동일 조건 |  |
+| S11.3 | throughput | req/s | ≥ 5 | 총 응답 수 / 경과시간. dryrun 기준 (full 모드는 ≥ 20) |  |
+
+### S13. 멀티 테넌트 격리
+
+W10 신규 — K5 자체결정 (N개사 멀티) — 데이터 누출 사고 방지.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S13.1 | **교차 노출 횟수** | count | == 0 | tenant_B 응답 본문에서 tenant_A 식별자(`ALPHA-7`, tenant-A 키워드) 검색 횟수 | |
+| S13.2 | audit tenant_id 정합 | 비율 | ≥ 0.99 | audit_log.tenant_id == request 헤더 X-Tenant-Id 일치율 | PG |
+| S13.3 | 가이드 인덱스 분리 | bool | True | tenant_A 가이드 검색 결과에 tenant_B doc_id 0건, 역도 동일 |  |
 
 ---
 
@@ -226,9 +256,58 @@ lloydk_psh_kpi_passed == 0
 - 폐쇄망 환경: pushgateway 미가용이면 단순히 옵션 미사용 (기본값 빈 문자열)
 - prometheus_client 의존성 없이 stdlib urllib만 사용 — 추가 패키지 없음
 
+## 5.7 회귀 자동 탐지 (v1.2 신규)
+
+PSH는 직전 회차 대비 측정값의 상대 변화율로 **회귀(regression)**를 자동 탐지합니다. 임계값 절대 통과 여부와 별개로, "이전보다 N% 이상 악화" 패턴을 잡아냅니다.
+
+### 사용법
+```bash
+# 30% 이상 악화 시 보고서에 표기만 (exit 0)
+python scripts/run_perf_scenarios.py --mode dryrun --regression-threshold 30
+
+# CI 게이트: 회귀 1건이라도 발견 시 exit 1
+python scripts/run_perf_scenarios.py --mode full \
+  --regression-threshold 20 --fail-on-regression
+```
+
+### 판정 로직 (poc/src/lloydk/perf/regression.py)
+| 조건 | 동작 |
+|---|---|
+| `compare=le` (latency, FNR) + 측정값 증가 | 회귀 후보 (↑) |
+| `compare=ge` (recall, throughput) + 측정값 감소 | 회귀 후보 (↓) |
+| `unit ∈ {bool, count}` | 비교 제외 (이산값) |
+| 현·이전 어느 쪽이라도 SKIP/ERROR | 비교 제외 |
+| `prev=0` | 비율 계산 의미 없어 제외 |
+| 변화율 < threshold_pct | 회귀 아님 |
+
+### JSON 출력
+`reports/perf/perf_*.json`의 `regressions` 키에 배열로 저장:
+```json
+[
+  {
+    "kpi_id": "S3.2",
+    "name": "relabel p95 latency",
+    "unit": "ms",
+    "prev": 39.1,
+    "curr": 115.0,
+    "delta_pct": 194.9,
+    "direction": "up",
+    "compare": "le",
+    "threshold_pct": 30.0
+  }
+]
+```
+
+## 5.8 GitHub Actions PR 코멘트·Pages publish (v1.2 신규)
+
+- **PR 코멘트**: 각 PR마다 `actions/github-script@v7`이 `perf_latest_dryrun.json`을 읽어 KPI 요약·회귀 표·FAIL 목록을 코멘트로 자동 게시
+- **GitHub Pages**: main 푸시 시 `doc/20_시나리오_성능_보고서.html`을 `peaceiris/actions-gh-pages@v4`로 gh-pages 브랜치에 publish (`/index.html` + `/perf/*.json`)
+- 조건: PR 코멘트는 `github.event_name == 'pull_request'`, Pages는 main 푸시만
+
 ---
 
 ## 6. 변경 이력
 
+- v1.2 (2026-05-28): §5.7 회귀 자동 탐지 + §5.8 PR 코멘트·Pages publish. S5.2/S5.3 dryrun 가드(vc>0일 때만 record). pyproject `[psh]·[evaluation]` extras 그룹화 + matplotlib base 명시. 신규 18 회귀 테스트 (test_perf_regression). 전체 회귀 348→385 (+B1 BM25 19, B2 semantic 5, E1·E2 9, A3 18, C1 정리 −일부, ...).
 - v1.1 (2026-05-28): §5.5 임계 갭 분석 + §5.6 pushgateway 연동 추가. trained_model 자원 플래그로 S1.3·S1.4·S5.4 자동 SKIP 적용. PSH 자체 단위 테스트 50+ 추가 (perf_harness 23 + perf_render 16 + perf_pushgateway 11). HTML §2.5 전체 KPI 추세 표(임계선 sparkline) 신규.
 - v1.0 (2026-05-27): W10 PSH 착수와 함께 신규 작성. S1~S8 × 평균 3.75 KPI = 30 측정점. 핵심 KPI 5종.

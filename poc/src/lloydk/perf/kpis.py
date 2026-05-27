@@ -132,6 +132,23 @@ KPIS: list[KPI] = [
     KPI("S8.2", "S8", "latest p95 latency", "ms", "le", 500, "p95"),
     KPI("S8.3", "S8", "confusion-matrix p95 latency", "ms", "le", 30000, "p95", requires=["pg"]),
     KPI("S8.4", "S8", "history 페이지네이션 정합", "bool", "ge", True, "bool_all", requires=["pg"]),
+
+    # S9 적대적·모호 문서 FNR 스트레스 (W10 확장)
+    KPI("S9.1", "S9", "변형 일관성 (consistency)", "ratio", "ge", 0.70, "last"),
+    # 적대적 FNR도 실 학습 모델 전제 — 룰 fallback에서는 무의미
+    KPI("S9.2", "S9", "적대적 FNR (TS→하위)", "ratio", "le", 0.05, "last", requires=["trained_model"], core=True),
+    KPI("S9.3", "S9", "confidence 변동 stdev", "ratio", "le", 0.20, "last"),
+
+    # S11 부하 시나리오 (W10 확장)
+    KPI("S11.1", "S11", "동시 50 error_rate", "ratio", "le", 0.01, "last"),
+    KPI("S11.2", "S11", "동시 50 p95 latency", "ms", "le", 8000, "p95"),
+    KPI("S11.3", "S11", "throughput", "req/s", "ge", 5, "last"),
+
+    # S13 멀티 테넌트 격리 (W10 확장)
+    # bool/count 핵심 격리 검증. 데이터 누출 사고 방지 KPI
+    KPI("S13.1", "S13", "교차 노출 횟수", "count", "le", 0, "max", core=True),
+    KPI("S13.2", "S13", "audit tenant_id 정합", "ratio", "ge", 0.99, "ratio_true", requires=["pg"]),
+    KPI("S13.3", "S13", "가이드 인덱스 분리", "bool", "ge", True, "bool_all"),
 ]
 
 
