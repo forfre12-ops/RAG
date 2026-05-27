@@ -44,11 +44,13 @@ def _extract_plain(p: Path) -> ExtractResult:
 
 
 def _extract_hwp(p: Path) -> ExtractResult:
-    # 1순위: rhwp-python (HWP+HWPX 통합)
+    # 1순위: rhwp-python 0.5.x (HWP+HWPX 통합, optional extra `[hwp]`)
+    # 활성: pip install -e ".[hwp]"
     try:
         import rhwp  # type: ignore
 
-        text = rhwp.extract_text(str(p))
+        doc = rhwp.parse(str(p))  # 0.5.x API
+        text = doc.extract_text()
         return ExtractResult(text=text, method="rhwp", quality=0.95)
     except Exception:
         pass
