@@ -10,7 +10,7 @@ VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
 .PHONY: help venv install env infra-up infra-up-rollback infra-down infra-verify api worker \
-        p2 p2-full migrate-dry bundle-dry p3 p4 p1 p5 poc-all clean clean-data reports
+        p2 p2-full migrate-dry bundle-dry p3 p3-800 p4 p1 p5 poc-all clean clean-data reports
 
 help:
 	@echo "Targets:"
@@ -27,6 +27,7 @@ help:
 	@echo "  migrate-dry  Qdrant→ES sample-5 dry-run (운영 데이터 무관 검증)"
 	@echo "  bundle-dry   폐쇄망 번들 manifest dry-run (doc/12)"
 	@echo "  p3           P3 synthesize 40 docs with noop provider + label check"
+	@echo "  p3-800       P3 풀 합성 800건 (등급별 200×4, doc/05 계획)"
 	@echo "  p4           P4 build corpus + extraction eval"
 	@echo "  p1           P1 classifier dryrun (rule surrogate)"
 	@echo "  p5           P5 E2E smoke (inproc)"
@@ -69,6 +70,11 @@ p4:
 
 p3:
 	$(PY) scripts/p3_generate_synthetic.py --total 40 --provider noop
+
+p3-800:
+	rm -rf datasets/synthetic
+	$(PY) scripts/p3_generate_synthetic.py --total 800 --provider noop \
+	    --out datasets/synthetic
 
 p2:
 	$(PY) scripts/p2_compare_embeddings.py --mode dryrun --backends inmemory

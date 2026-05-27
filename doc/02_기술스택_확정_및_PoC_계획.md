@@ -276,7 +276,7 @@ P5 E2E통합              ██
 | PoC | 합격선 | 1차 결과 | 판정 | 비고 |
 |---|---|---|:---:|---|
 | **P4 추출** | 누락률 ≤ 5%, 품질 ≥ 0.7 | 누락 0.0%, 품질 0.986 | PASS | 30 파일 (.txt/.md). HWP/DOCX/PDF 실파일은 발주처 데이터 확보 후 동일 스크립트로 재실행 |
-| **P3 합성** | 라벨 일치도 ≥ 90% | **100.0%** (40건), FNR 0% | PASS | Noop provider, 비용 $0. 실 Claude/Qwen3 비교는 API 키 추가 후 `--provider anthropic` |
+| **P3 합성** | 라벨 일치도 ≥ 90% | **100.0%** (**800건**, 2026-05-27 확장), FNR 0% | PASS | Noop provider, 비용 $0. 등급별 균등 200×4, 도메인 6종 분포. 실 Claude/Qwen3 비교는 API 키 추가 후 `--provider anthropic` |
 | **P2 임베딩** | Recall@5 ≥ 0.80, Lat ≤ 200ms | Recall 0.70 (hash baseline), 3ms | PASS* | dryrun baseline 0.50 통과. KURE-v1/BGE-M3 실측은 모델 다운로드 후 `--mode full` |
 | **P1 분류** | F1-macro ≥ 0.75, FNR ≤ 5% | **F1 1.0**, FNR 0% | PASS | 룰 라벨러 surrogate. KF-DeBERTa 학습은 GPU 확보 후 `--mode full --epochs 5` |
 | **P5 E2E** | 응답 200 + 라벨 OK, ≤ 30s | 4/4 일치, max 6.4ms (inproc) | PASS | TestClient in-process. HTTP 모드는 `docker compose up` 후 `--mode http` |
