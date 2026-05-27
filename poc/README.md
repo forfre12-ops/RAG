@@ -2,18 +2,21 @@
 
 한국지식재산보호원(KOIPA) AI 영업비밀관리시스템 / 로이드케이 파트.
 
-설계 문서: [`../doc/`](../doc/) — 00~13.
+설계 문서: [`../doc/`](../doc/) — 00~15.
 
 | 영역 | 문서 |
 |---|---|
+| **종합 진척 보고서 (회신 직전)** | [doc/15](../doc/15_진척_종합_보고서.md) ← **시작 권장** |
 | 사업 개요·기능 분담 | [doc/01](../doc/01_프로젝트_개요_및_로이드케이_파트_설계.md) |
-| 기술 스택·PoC 계획 | [doc/02](../doc/02_기술스택_확정_및_PoC_계획.md) |
+| 기술 스택·PoC 계획 + 부록 A·B·C | [doc/02](../doc/02_기술스택_확정_및_PoC_계획.md) |
 | AI 코어 모듈 상세 | [doc/04](../doc/04_AI코어_모듈_상세설계.md) |
 | 협의요청서 (Q1~Q7, K1~K5, E1~E9) | [doc/06](../doc/06_협의요청서_KL_발주처.md) |
 | 전체 설계 통합본 | [doc/07](../doc/07_전체설계_통합본.md) |
 | **위험관리대장 (31개 위험)** | [doc/10](../doc/10_위험관리대장.md) |
+| **운영 Runbook (6개 시나리오, RTO 4h)** | [doc/11](../doc/11_운영_Runbook.md) |
 | **폐쇄망 배포 설계** | [doc/12](../doc/12_폐쇄망_배포_설계.md) |
-| **벡터DB ES 전환 계획서** | [doc/13](../doc/13_벡터DB_ES_전환_계획서.md) |
+| **벡터DB ES 전환 계획서 v0.9-final** | [doc/13](../doc/13_벡터DB_ES_전환_계획서.md) |
+| **OSS 라이선스 보고서 (AGPL/GPL 위험)** | [doc/14](../doc/14_OSS_라이선스_보고서.md) |
 
 ---
 
@@ -215,12 +218,21 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 
 ## 최근 주요 변경 (2026-05-27)
 
-- **벡터 DB Qdrant → Elasticsearch 8.14+ 전환** ([doc/13](../doc/13_벡터DB_ES_전환_계획서.md))
-  - `VectorStore` Protocol에 `search_hybrid` 추가, 모든 백엔드 폴리필 일관
-  - retriever API(8.14+) / legacy `rank.rrf`(8.12~13) / 클라이언트단 RRF 3단 폴백
-  - Nori 사용자 사전 + int8_hnsw + alias 스위칭
-- **위험관리대장 신설** ([doc/10](../doc/10_위험관리대장.md)) — 31개 위험, 회신 변수 8개 시나리오 매핑
-- **폐쇄망 배포 설계** ([doc/12](../doc/12_폐쇄망_배포_설계.md)) — 자기완비 번들, vLLM 강제, Blue/Green
-- **마이그레이션 스크립트** (`migrate_qdrant_to_es.py`) — 5단계 idempotent, dry-run + sample-5
-- **번들 빌더** (`build_offline_bundle.py`) — manifest dry-run, doc/12 §3·§4 구현
-- **테스트 48 → 126** (어댑터 36 + 마이그 19 + 번들 23 신규)
+### 설계 문서 신규 5종
+- **[doc/10](../doc/10_위험관리대장.md) 위험관리대장 (v0.9, 312줄)** — 31개 위험, 회신 변수 8개 시나리오 트리, 조합 위험 3종
+- **[doc/11](../doc/11_운영_Runbook.md) 운영 Runbook (v0.9, 461줄)** — 장애 P0~P3 / 재학습 Canary / 모델·인덱스 롤백 / 백업 / DR (RTO 4시간)
+- **[doc/12](../doc/12_폐쇄망_배포_설계.md) 폐쇄망 배포 설계 (v0.9, 535줄)** — 자기완비 번들 25~30GB, vLLM 강제, Blue/Green
+- **[doc/13](../doc/13_벡터DB_ES_전환_계획서.md) ES 전환 계획서 (v0.9-final, 615줄)** — retriever API + Nori + int8_hnsw + 마이그 7단계 + 라이선스 매트릭스
+- **[doc/14](../doc/14_OSS_라이선스_보고서.md) OSS 라이선스 보고서 (v0.9, 309줄)** — PyMuPDF·MinIO AGPL · konlpy GPL 위험 식별
+- **[doc/15](../doc/15_진척_종합_보고서.md) 진척 종합 보고서 (v1)** — 회신 직전 인덱스 + 즉시 발동 가이드
+
+### 코드·인프라
+- **벡터 DB Qdrant → Elasticsearch 8.14+ 전환** — `VectorStore` Protocol v2 + `EsStore` 3단 폴백 + Nori + int8_hnsw + alias
+- **`migrate_qdrant_to_es.py`** — Qdrant→ES 5단계 idempotent, dry-run + sample-N
+- **`build_offline_bundle.py`** — 폐쇄망 번들 manifest dry-run, doc/12 §3·§4 구현
+- **OpenAPI 03 정합화** — `rag_namespace` → `rag_index_alias` rename + ES 컨텍스트 명시
+- **pyproject 재구성** — 기본 23개 + 7개 extras (hwp·nlp·embedding·llm·orchestration·lint·full·dev) + dead deps 제거
+- **CI 강화** — openapi-lint 잡 추가, bundle-dry · migrate-dry 통합
+- **테스트 48 → 126** (어댑터 36 + 마이그 19 + 번들 23 신규, 0 회귀)
+
+상세 진척과 회신 도착 시 발동 가이드: **[doc/15 종합 보고서](../doc/15_진척_종합_보고서.md)**
