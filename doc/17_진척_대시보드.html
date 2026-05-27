@@ -449,15 +449,15 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v0.3 · 2026-05-27 W3 종료 시점</span>
+    <span class="meta-soft">v0.4 · 2026-05-27 W4 종료 시점</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 대시보드</h1>
 
   <p class="lede">
-    W1·W2·W3 완료. <b>OpenAPI 20개 path 전부 라우터 구현됨</b> — 외부 의존 없이 W4·W5 즉시 진행 가능.
-    W6에서 GPU·실문서·LLM API 키 3건 차단 발생 — 사업단 예산 결정 필요.
-    pytest 237 PASS, 자체결정으로 회신 의존 변수 16개 동결.
+    W1·W2·W3·W4 완료. <b>FUN-024 평가/능동학습 풀 구현 + /metrics/* 라이브 평가</b>.
+    외부 의존 없이 W5 즉시 진행 가능. W6에서 GPU·실문서·LLM API 키 3건 차단 발생 — 사업단 예산 결정 필요.
+    pytest 256 PASS, 자체결정으로 회신 의존 변수 16개 동결.
   </p>
 
   <!-- ============================================================
@@ -466,21 +466,21 @@
   <div class="hero">
     <div class="hero-progress">
       <div class="label">전체 완성도 (단계별 가중치)</div>
-      <div class="pct">50<span class="of">%</span></div>
-      <div class="bar"><div class="bar-fill" style="width: 50%"></div></div>
+      <div class="pct">60<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 60%"></div></div>
       <div class="by-stage">
         <div class="stage-tick done">W1</div>
         <div class="stage-tick done">W2</div>
         <div class="stage-tick done">W3</div>
-        <div class="stage-tick active">W4</div>
-        <div class="stage-tick">W5</div>
+        <div class="stage-tick done">W4</div>
+        <div class="stage-tick active">W5</div>
         <div class="stage-tick block">W6</div>
         <div class="stage-tick">W7</div>
         <div class="stage-tick">W8</div>
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="num done">237</div><div class="lbl">pytest PASS</div></div>
+      <div class="stat"><div class="num done">256</div><div class="lbl">pytest PASS</div></div>
       <div class="stat"><div class="num">22</div><div class="lbl">API 라우트</div></div>
       <div class="stat"><div class="num block">6</div><div class="lbl">차단 자원</div></div>
       <div class="stat"><div class="num">16</div><div class="lbl">자체결정 동결</div></div>
@@ -546,36 +546,36 @@
     <div class="step-conn"></div>
 
     <!-- W4 -->
-    <div class="step active">
+    <div class="step done">
       <div class="step-num">W4</div>
       <div class="step-body">
-        <div class="step-title">M6 평가/능동학습 (FUN-024)</div>
+        <div class="step-title">M6 평가/능동학습 (FUN-024) — 풀 구현</div>
         <div class="step-desc">
-          현재 <code>modules/m6_evaluation/</code> 디렉터리 부재.
-          FNR per-grade, Confusion Matrix("고등급→저등급" 미탐 알람),
-          corrections 누적 → 재학습 큐, HTML 리포트 (matplotlib + jinja2).
-          <code>/metrics/*</code> 3 라우터의 백엔드 풀 구현.
+          modules/m6_evaluation/ 4파일 신규 (metrics·confusion_matrix·active_learning·report).
+          FNR per-grade, critical/high/medium underclass 알람, HTML 리포트 + CM PNG.
+          MetricsService가 stored→live 폴백으로 운영 중 분류+보정 자동 반영.
+          <code>commit 02f2623</code>
         </div>
       </div>
       <div class="step-status">
-        <span class="pill active">착수 대기 0%</span>
+        <span class="pill done">완료 100%</span>
       </div>
     </div>
     <div class="step-conn"></div>
 
     <!-- W5 -->
-    <div class="step future">
+    <div class="step active">
       <div class="step-num">W5</div>
       <div class="step-body">
-        <div class="step-title">RAG 인덱서 + /guide/documents 백엔드</div>
+        <div class="step-title">RAG 인덱서 + /guide/documents indexed=True</div>
         <div class="step-desc">
           가이드 문서 청크 → KURE-v1 임베딩 → ES <code>secrets-guides-koipa</code> 인덱스.
-          <code>RagIndexer</code> 코드 0줄 — 신규 작성.
-          <code>infra/es/userdict_ko.txt</code> 본문 1~2천 항목 확장 병행.
+          <code>RagIndexer</code> 코드 0줄 — 신규 작성. GuideService.upload()에서
+          호출해 indexed=True로 갱신. infra/es/userdict_ko.txt 본문 확장 병행.
         </div>
       </div>
       <div class="step-status">
-        <span class="pill future">대기</span>
+        <span class="pill active">착수 대기 0%</span>
       </div>
     </div>
     <div class="step-conn"></div>
@@ -645,12 +645,12 @@
         <tr class="pick"><td>W1</td><td>15%</td><td>100%</td><td>15.0%</td><td><span class="pill done">완료</span></td><td>db/session·models, alembic baseline, 12 round-trip tests</td></tr>
         <tr class="pick"><td>W2</td><td>15%</td><td>100%</td><td>15.0%</td><td><span class="pill done">완료</span></td><td>repositories/ 5종, ClassifyService persistence, AuditMiddleware</td></tr>
         <tr class="pick"><td>W3</td><td>20%</td><td>100%</td><td>20.0%</td><td><span class="pill done">완료</span></td><td>OpenAPI 20개 path 라우터 8개 + 서비스 7개 + JobStore, 25 신규 테스트</td></tr>
-        <tr><td>W4</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill active">착수 대기</span></td><td>M6 평가·능동학습, /metrics/* 풀 구현</td></tr>
-        <tr><td>W5</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>RAG 인덱서, /guide/documents indexed=True, 사전·시드 확장</td></tr>
+        <tr class="pick"><td>W4</td><td>10%</td><td>100%</td><td>10.0%</td><td><span class="pill done">완료</span></td><td>M6 4모듈 (metrics·CM·active_learning·report), MetricsService live 폴백, 19 신규 테스트</td></tr>
+        <tr><td>W5</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill active">착수 대기</span></td><td>RAG 인덱서, /guide/documents indexed=True, 사전·시드 확장</td></tr>
         <tr><td>W6</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill block">차단</span></td><td>합성 5,000, KF-DeBERTa 풀 학습, 폐쇄망 번들 25~30GB</td></tr>
         <tr><td>W7</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>Prometheus/Loki/Grafana, 백업 cron, DR 리허설</td></tr>
         <tr><td>W8</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>라이선스 교체, SBOM, KL 통합 8 시나리오</td></tr>
-        <tr class="pick"><td><b>합계</b></td><td>100%</td><td>—</td><td><b>50.0%</b></td><td></td><td></td></tr>
+        <tr class="pick"><td><b>합계</b></td><td>100%</td><td>—</td><td><b>60.0%</b></td><td></td><td></td></tr>
       </tbody>
     </table>
   </div>
@@ -824,8 +824,8 @@
     </div>
     <div class="card done">
       <div class="eyebrow">✓ Tests</div>
-      <div class="ctitle">pytest 237/237 PASS</div>
-      <p>어댑터·전처리·라벨링·추론·API·migration·offline bundle·DB ORM·repository·audit middleware·W3 라우터 25 신규. CI poc-ci + openapi-lint 2잡 GREEN.</p>
+      <div class="ctitle">pytest 256/256 PASS</div>
+      <p>어댑터·전처리·라벨링·추론·API·migration·offline bundle·DB ORM·repository·audit middleware·W3 라우터 25개·W4 M6 평가 19개. CI poc-ci + openapi-lint 2잡 GREEN.</p>
     </div>
     <div class="card done">
       <div class="eyebrow">✓ CI</div>
@@ -853,8 +853,7 @@
     <div class="callout-body">
       <span class="callout-label">START NOW</span>
       <ul>
-        <li><b>W4 M6 평가/능동학습 (1일)</b> — modules/m6_evaluation/ 신규, FNR per-grade, CM, HTML 리포트, /metrics/* 풀 구현</li>
-        <li><b>W5 RAG 인덱서 + /guide/documents indexed=True (1일)</b> — KURE-v1 임베딩 → ES 적재</li>
+        <li><b>W5 RAG 인덱서 + /guide/documents indexed=True (1일)</b> — KURE-v1 임베딩 → ES 적재 + GuideService 결합</li>
         <li><b>병행 작업 (W6 차단 중에도 가능)</b>
           <ul>
             <li>시드 v2 — 영업비밀보호법·시행령 공개문헌으로 등급당 50~100개 키워드</li>
@@ -907,14 +906,13 @@
         <tr><th>시점</th><th>완료 예정</th><th>완성도</th><th>외부 의존</th></tr>
       </thead>
       <tbody>
-        <tr><td>+0 일 (오늘)</td><td>W1·W2·W3 완료</td><td>50%</td><td>없음</td></tr>
-        <tr><td>+1 일</td><td>W4 M6 평가</td><td>60%</td><td>없음</td></tr>
-        <tr><td>+2 일</td><td>W5 RAG 인덱서</td><td>70%</td><td>없음</td></tr>
-        <tr><td>+2~5 일</td><td>병행: 시드 v2 + 사전 확장 + 관측성 표준</td><td>75%</td><td>없음</td></tr>
-        <tr class="pick"><td><b>+5 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b></td><td><b>차단 해소 필요</b></td><td><b>사업단 예산 결정</b></td></tr>
-        <tr><td>+5 ~ +12 일</td><td>W6 합성·학습·번들 실빌드</td><td>85%</td><td>GPU + API 키</td></tr>
-        <tr><td>+12 ~ +16 일</td><td>W7 관측성·DR 리허설</td><td>95%</td><td>없음</td></tr>
-        <tr><td>+16 ~ +23 일</td><td>W8 라이선스·SBOM·KL 통합</td><td>100%</td><td>KL 일정</td></tr>
+        <tr><td>+0 일 (오늘)</td><td>W1·W2·W3·W4 완료</td><td>60%</td><td>없음</td></tr>
+        <tr><td>+1 일</td><td>W5 RAG 인덱서</td><td>70%</td><td>없음</td></tr>
+        <tr><td>+1~4 일</td><td>병행: 시드 v2 + 사전 확장 + 관측성 표준</td><td>75%</td><td>없음</td></tr>
+        <tr class="pick"><td><b>+4 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b></td><td><b>차단 해소 필요</b></td><td><b>사업단 예산 결정</b></td></tr>
+        <tr><td>+4 ~ +11 일</td><td>W6 합성·학습·번들 실빌드</td><td>85%</td><td>GPU + API 키</td></tr>
+        <tr><td>+11 ~ +15 일</td><td>W7 관측성·DR 리허설</td><td>95%</td><td>없음</td></tr>
+        <tr><td>+15 ~ +22 일</td><td>W8 라이선스·SBOM·KL 통합</td><td>100%</td><td>KL 일정</td></tr>
       </tbody>
     </table>
   </div>
@@ -927,6 +925,7 @@
     <table>
       <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
       <tbody>
+        <tr><td>2026-05-27</td><td>v0.4</td><td>W4 종료 — M6 평가/능동학습 풀 (FNR·CM 알람·active learning·HTML 리포트). MetricsService live 폴백. 256 PASS.</td></tr>
         <tr><td>2026-05-27</td><td>v0.3</td><td>W3 종료 — 라우터 8개 + 서비스 7개 + JobStore. OpenAPI 20개 path 전부 구현. 237 PASS.</td></tr>
         <tr><td>2026-05-27</td><td>v0.2</td><td>W2 종료 — Repository 5종 + AuditMiddleware. doc/16·17 신규.</td></tr>
         <tr><td>2026-05-27</td><td>v0.1</td><td>W1 종료 — DB ORM + Alembic baseline. Docker Desktop 설치 완료.</td></tr>
