@@ -22,7 +22,6 @@ services:
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
-      xpack.telemetry.enabled: "false"
       xpack.monitoring.collection.enabled: "false"
       ES_JAVA_OPTS: "-Xms2g -Xmx2g"
       ELASTIC_PASSWORD: ${ES_PASSWORD:-lloydk_dev_es}
