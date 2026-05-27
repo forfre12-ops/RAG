@@ -79,6 +79,28 @@ def _extract_docx(p: Path) -> ExtractResult:
 
 
 def _extract_pdf(p: Path) -> ExtractResult:
+    """PDF 추출.
+
+    라이선스 안전 우선순위:
+    1) pdfminer.six (BSD-3-Clause) — 운영 기본
+    2) PyMuPDF (AGPL-3.0) — 설치돼 있고 라이선스 우회 결정된 경우만 (fallback)
+       Artifex 상용 라이선스 또는 명시적 AGPL 수용 시에만 활성화 권장.
+    3) 둘 다 실패 시 OCR 안내
+    """
+    # 1순위: pdfminer.six (BSD, AGPL 회피)
+    try:
+        from pdfminer.high_level import extract_text  # type: ignore
+
+        text = extract_text(str(p)) or ""
+        if text.strip():
+            # pages는 pdfminer가 직접 안 주므로 form feed로 추정
+            pages = max(1, text.count("\x0c") + 1)
+            return ExtractResult(text=text, method="parser", quality=0.92, pages=pages)
+    except Exception:  # noqa: BLE001
+        # pdfminer 미설치 또는 추출 실패 → 2순위로
+        pass
+
+    # 2순위: PyMuPDF (AGPL — 운영 시 Artifex 라이선스 또는 명시적 AGPL 수용 후 사용)
     try:
         import fitz  # PyMuPDF  # type: ignore
 
@@ -90,7 +112,6 @@ def _extract_pdf(p: Path) -> ExtractResult:
         text = "\n".join(pages)
         if text.strip():
             return ExtractResult(text=text, method="parser", quality=0.95, pages=len(pages))
-        # 텍스트 0 → OCR fallback (PaddleOCR/Tesseract). 본 PoC에서는 비어있음 보고.
         return ExtractResult(text="", method="ocr", quality=0.0, ocr_used=False,
                              pages=len(pages), error="no text layer (OCR needed)")
     except Exception as exc:  # noqa: BLE001

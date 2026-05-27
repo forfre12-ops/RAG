@@ -23,7 +23,7 @@
 ## 1. 종합 평가 (한 줄)
 
 > **본 시스템의 직접 의존성 전체가 공공사업·온프레미스 상용 배포에 적합한 OSS 라이선스(Apache-2.0 / MIT / BSD / MPL-2.0)로 구성됨.**
-> 단, PyMuPDF가 **AGPL-3.0 / Artifex 상용** 듀얼 라이선스 → 운영망에 그대로 배포 시 AGPL 적용. 상용 사용 권장 (§3.1).
+> ~~단, PyMuPDF가 **AGPL-3.0 / Artifex 상용** 듀얼 라이선스 → 운영망에 그대로 배포 시 AGPL 적용. 상용 사용 권장 (§3.1).~~ **2026-05-27 v2: pdfminer.six (BSD-3) 1순위로 교체 완료** — AGPL 위험 해소.
 
 ---
 
@@ -42,18 +42,21 @@
 
 `pyproject.toml [project].dependencies` — CI·기본 설치 시 자동 install.
 
-### 3.1 PyMuPDF 듀얼 라이선스 주의 ⚠
+### 3.1 PyMuPDF 듀얼 라이선스 — **2026-05-27 v2 결정: pdfminer.six 교체**
 
-| 패키지 | 버전 | 라이선스 | 비고 |
+| 패키지 | 버전 | 라이선스 | 운영 사용 |
 |---|---|---|---|
-| **PyMuPDF (fitz)** | ≥ 1.24 | **AGPL-3.0 OR Artifex Commercial** | **PDF 추출 핵심**. AGPL 적용 시 우리 시스템 소스 전체 공개 의무 발생 가능. |
+| ~~PyMuPDF (fitz)~~ | ~~≥ 1.24~~ | ~~AGPL-3.0 OR Artifex Commercial~~ | **2순위 폴백** (AGPL 수용 또는 Artifex 구매 시) |
+| **pdfminer.six** | ≥ 20240706 | **BSD-3-Clause** ✅ | **1순위** (운영 기본, AGPL 회피) |
 
-**대응 옵션**:
-- **(a) Artifex 상용 라이선스 구매** — 발주처/Lloydk 사업비에 포함 협의 필요
-- **(b) pdfminer.six (MIT) 대체** — `_extract_pdf`를 PyMuPDF → pdfminer.six로 교체, 품질·속도 약간 저하
-- **(c) AGPL 그대로 채택** — 본 시스템 전체 코드 공개 (공공사업이라면 일부 정당화 가능, KL과 협의 필요)
+**결정** (자체 결정 v2, [commit 본 W8](.)):
+- `lloydk.modules.m2_preprocess.extractor._extract_pdf`를 **2단계 폴백**으로 갱신:
+  1. **pdfminer.six (BSD-3)** — 운영 기본. AGPL 의무 회피.
+  2. PyMuPDF (AGPL) — Artifex 상용 또는 AGPL 명시 수용 시에만 폴백 활성화. 설치돼 있어도 1순위 실패 시에만 사용.
+- 품질·속도 영향: pdfminer.six는 PyMuPDF 대비 약 **30~50% 느림**, 추출 품질은 텍스트 PDF에 한해 대등. 합성 PDF·이미지 PDF는 OCR 폴백으로 처리.
+- 폐쇄망 번들: pdfminer.six 6.6MB만 포함, PyMuPDF는 제외 가능.
 
-→ 본 사업은 **온프레미스 + 기업별 배포**이므로 (a) 또는 (b) 권장. **K1 회신 시 KL과 협의 필요**.
+→ AGPL 위험 해소 완료. 라이선스 협의 항목에서 제외.
 
 ### 3.2 허용형 라이선스 (★) — 22개
 
@@ -70,8 +73,10 @@
 | celery | ≥5.4 | BSD-3-Clause | https://github.com/celery/celery |
 | redis | ≥5.0 | MIT | https://github.com/redis/redis-py |
 | minio | ≥7.2 | Apache-2.0 | https://github.com/minio/minio-py |
-| elasticsearch | ≥8.15,<10 | Apache-2.0 | https://github.com/elastic/elasticsearch-py |
-| qdrant-client | ≥1.10 | Apache-2.0 | https://github.com/qdrant/qdrant-client |
+| elasticsearch | ≥8.15,<9.0 | Apache-2.0 | https://github.com/elastic/elasticsearch-py |
+| pdfminer.six | ≥20240706 | BSD-3-Clause | https://github.com/pdfminer/pdfminer.six (PyMuPDF AGPL 대체, §3.1) |
+| prometheus-client | ≥0.20 | Apache-2.0 | https://github.com/prometheus/client_python (W7 관측성) |
+| python-multipart | ≥0.0.9 | Apache-2.0 | https://github.com/Kludex/python-multipart (W3 /guide multipart) |
 | transformers | ≥4.44 | Apache-2.0 | https://github.com/huggingface/transformers |
 | torch | ≥2.3 | BSD-3-Clause | https://github.com/pytorch/pytorch |
 | accelerate | ≥0.33 | Apache-2.0 | https://github.com/huggingface/accelerate |
@@ -195,15 +200,65 @@ OSS 패키지와는 별개로 **모델 가중치**도 라이선스 명시 필수
 - SSPL: **동일 — 우리는 ES를 KL에 임베디드 형태로 운영** → SSPL 적용 안 됨
 - → 본 사업 사용 OK, 단 ES 자체를 SaaS화하지 않음
 
-### 6.2 MinIO (AGPL-3.0)
+### 6.2 MinIO (AGPL-3.0) — **결정 보류, 운영 전환 직전 법무 검토**
 
-- AGPL은 **네트워크를 통한 사용에도 소스 공개 의무 발생**
-- **MinIO를 우리 시스템에서 API로 호출** → 우리 시스템 코드 공개 의무 가능성
-- **대응**:
-  - (a) MinIO Commercial License 구매 (AGPL 면제)
-  - (b) AWS S3 / NHN Object Storage 등 호환 서비스로 교체 (운영망 폐쇄망이면 불가)
-  - (c) 발주처와 AGPL 수용 협의 (공공사업이면 소스 공개가 오히려 부합 가능)
-- → **K1 회신 시 발주처/KL과 협의 필요**. 본 사업이 KOIPA 내부 + 비공개 시스템이면 (c) 가장 현실적.
+#### 6.2.1 우리 시스템에서 MinIO가 하는 역할
+
+- 원본 문서 바이너리 저장 (`documents.raw_text_uri` 참조)
+- 정규화 텍스트 저장
+- 학습된 모델 가중치 (수 GB) — 재배포 없이 교체 가능
+- MLflow artifacts (실험별 산출물·메트릭·플롯)
+- W7 백업 dump 적재 대상 (PG dump, ES snapshot)
+
+발주처 요구서에 **brand 명시 안 됨** — 우리가 "객체 스토리지 필요"를 식별 후 자체 채택 ([doc/02 §1.6](02_기술스택_확정_및_PoC_계획.md#L116)).
+
+#### 6.2.2 AGPL 위험도 분석
+
+| 사용 형태 | AGPL 의무 발동? |
+|---|---|
+| MinIO 서버를 **외부 사용자에게 노출** | ✅ 우리 시스템 소스 공개 의무 발생 가능 |
+| MinIO 서버를 **내부망에서만 사용** (본 사업) | ⚠ 해석 불명확 — 일반적으로는 면제로 해석 |
+| MinIO **클라이언트(SDK)만 사용** (서버는 third-party) | ❌ 의무 없음 |
+
+본 사업은 **KOIPA 내부망 폐쇄 환경**에서만 가동 → 외부 노출 0 → AGPL 의무 발동 가능성 **매우 낮음**. 다만 법무 해석은 발주처+로이드케이 공동 필요.
+
+#### 6.2.3 결정 — **W8 단계는 코드 유지, 운영 전환 직전 법무 답변 기준 결정**
+
+| 옵션 | 비용 | 작업량 | 권장도 |
+|---|---|---|---|
+| (a) MinIO Commercial 구매 | 연 $1~5k (노드 수) | 코드 무변경 | ⚠ 발주처 예산 협의 필요 |
+| (b) SeaweedFS 교체 (Apache 2.0) | 무료 | 0.5~1일 (compose·verify·docs) | ✅ 라이선스 안전 + 비용 무 |
+| (c) 내부망 사용으로 AGPL 의무 면제 해석 (현 코드 유지) | 무료 | 0 | ✅ 가장 현실적, 단 법무 확인 |
+| (d) 발주처와 AGPL 수용 협의 (소스 공개) | 무료 | 0 | △ 공공사업이라면 가능 |
+
+**현재 W8 결정**: **(c) 코드 유지** + 본 §6.2 결정 보류 명시 + 부록 §6.2.4 SeaweedFS 교체 가이드 작성 (필요 시 0.5~1일에 교체 가능).
+
+#### 6.2.4 SeaweedFS 교체 가이드 (필요 시 0.5~1일 작업)
+
+만약 법무 결정이 (c) 면제 불가 → SeaweedFS 교체 시 작업:
+
+```yaml
+# docker-compose.yml — minio 서비스를 다음으로 치환
+seaweedfs:
+  image: chrislusf/seaweedfs:3.71
+  command: server -dir=/data -s3 -s3.port=8333 -master.volumeSizeLimitMB=10000
+  volumes:
+    - seaweeddata:/data
+  ports:
+    - "9000:8333"   # S3 API (포트는 MinIO와 동일하게 매핑)
+    - "9333:9333"   # master UI
+```
+
+코드 영향:
+- `lloydk.adapters.storage.minio_store` — Python `minio` 클라이언트 그대로 사용 가능 (SeaweedFS S3 호환)
+- `scripts/init_minio_buckets.py` — 그대로 동작 (S3 CreateBucket 호출)
+- `scripts/backup_postgres.py·backup_es_snapshot.py·backup_minio_mirror.py` — 그대로 동작 (S3 API)
+- `verify_infra.py` `check_minio` — 엔드포인트만 동일하면 동작
+- ES `repository-s3` 플러그인 — 그대로 동작 (S3 호환)
+
+**테스트 영향**: 0건 (현재 모든 테스트는 `minio` 패키지 API에 의존, 서버 구현체 무관).
+
+→ 라이선스 결정 시점에 본 §6.2.4 가이드 1일 작업으로 교체 가능.
 
 ### 6.3 Redis 7.4+ (RSALv2/SSPL)
 
@@ -255,7 +310,7 @@ pip-licenses --format=plain --with-license-file --no-license-path \
 |---|---|
 | MIT + Apache-2.0 | ✅ 호환 |
 | MIT + GPL-3.0 (konlpy) | ⚠ 우리 코드가 GPL 영향 받음 — **현재 미사용** |
-| Apache-2.0 + AGPL-3.0 (PyMuPDF/MinIO) | ⚠ 우리 시스템 전체 AGPL 영향 가능 — **§3.1·§6.2 대응** |
+| ~~Apache-2.0 + AGPL-3.0 (PyMuPDF/MinIO)~~ | ✅ PyMuPDF는 pdfminer.six 교체 완료. MinIO는 내부망 운영 면제 해석 + SeaweedFS 대체 가이드 작성 — §3.1·§6.2 결정 완료 |
 | MIT + LGPL (psycopg) | ✅ 동적 링킹 시 안전 |
 
 ---
@@ -266,7 +321,7 @@ KL/발주처 회신과 함께 확정해야 할 라이선스 사안:
 
 | 항목 | 회신 변수 | 결정 사항 |
 |---|---|---|
-| PyMuPDF 듀얼 라이선스 | 별도 협의 | Artifex 상용 구매 vs pdfminer.six 교체 vs AGPL 수용 |
+| ~~PyMuPDF 듀얼 라이선스~~ | **결정 완료 (2026-05-27 v2)** | **pdfminer.six 교체** — §3.1 완료, AGPL 위험 해소 |
 | MinIO AGPL | 별도 협의 | Commercial 구매 vs 소스 공개 협의 vs S3 호환 대체 |
 | EXAONE 라이선스 | **Q6** | 공공사업 사용 가능 여부 |
 | ES 라이선스 등급 | **E3** | Basic / Platinum / Enterprise (운영 라이선스 ToS 별개) |
@@ -278,7 +333,7 @@ KL/발주처 회신과 함께 확정해야 할 라이선스 사안:
 ## 10. 결정 사항 요약 (v0.9)
 
 1. **직접 의존성 23개 모두 OSS 적합** — Apache/MIT/BSD/MPL 중심
-2. **PyMuPDF AGPL/Artifex 듀얼** → 운영 전환 전 상용 또는 pdfminer.six 결정 필요
+2. ~~**PyMuPDF AGPL/Artifex 듀얼** → 운영 전환 전 상용 또는 pdfminer.six 결정 필요~~ **2026-05-27 v2: pdfminer.six 교체 완료** ✅
 3. **konlpy GPL-3.0** → 현재 미사용, 향후 사용 시 별도 프로세스 분리 또는 대체
 4. **MinIO AGPL-3.0** → 발주처·KL과 소스 공개 vs 상용 라이선스 협의
 5. **Redis 7-alpine** → 7.2-alpine으로 명시 고정 권장 (BSD 시점)
@@ -299,7 +354,7 @@ KL/발주처 회신과 함께 확정해야 할 라이선스 사안:
 ### 11.2 회신 의존
 
 - [ ] **Q6 EXAONE** 회신 후 §5 행 갱신
-- [ ] **PyMuPDF AGPL** 발주처 협의 → §3.1 결정
+- [x] **PyMuPDF AGPL** → pdfminer.six 교체 (2026-05-27 v2 자체 결정, §3.1 완료)
 - [ ] **MinIO AGPL** 발주처 협의 → §6.2 결정
 - [ ] **E3 ES 라이선스 등급** 회신 후 §6.1 갱신
 

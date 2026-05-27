@@ -53,6 +53,26 @@ jobs:
       - name: License risk check (direct deps, with allowlist)
         run: python scripts/dump_licenses.py --check --scope=direct
 
+      - name: Generate SBOM artifacts (txt + md + json + CycloneDX)
+        run: |
+          mkdir -p licenses
+          python scripts/dump_licenses.py --format=text -o licenses/LICENSES.txt
+          python scripts/dump_licenses.py --format=md -o licenses/LICENSES.md
+          python scripts/dump_licenses.py --format=json -o licenses/licenses.json
+          python scripts/dump_licenses.py --format=cyclonedx -o licenses/sbom.cyclonedx.json
+
+      - name: Upload SBOM artifacts (CycloneDX + reports)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: |
+            poc/licenses/LICENSES.txt
+            poc/licenses/LICENSES.md
+            poc/licenses/licenses.json
+            poc/licenses/sbom.cyclonedx.json
+          retention-days: 90  # doc/14 운영 전환 시 발주처 검수 첨부용
+
   test:
     runs-on: ubuntu-latest
     defaults:
