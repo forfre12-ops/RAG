@@ -31,7 +31,6 @@ dependencies = [
   "openai>=1.50",
   "pymupdf>=1.24",
   "python-docx>=1.1",
-  "rhwp-python>=0.6.1",
   "unstructured>=0.15",
   "soynlp>=0.0.493",
   "konlpy>=0.6",
@@ -41,6 +40,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# HWP/HWPX 추출용 (한국 공공문서). 기본 install에선 제외 — extractor.py가 try/except로 graceful 처리.
+# 활성: pip install -e ".[hwp]"
+hwp = [
+  "rhwp-python>=0.5.1",  # 최신 PyPI 버전 (모든 플랫폼 wheel)
+]
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
