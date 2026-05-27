@@ -1,7 +1,21 @@
 # Lloydk AI Engine — PoC
 
 한국지식재산보호원(KOIPA) AI 영업비밀관리시스템 / 로이드케이 파트.
-관련 설계서: [`../doc/`](../doc/) (01~07).
+
+설계 문서: [`../doc/`](../doc/) — 00~13.
+
+| 영역 | 문서 |
+|---|---|
+| 사업 개요·기능 분담 | [doc/01](../doc/01_프로젝트_개요_및_로이드케이_파트_설계.md) |
+| 기술 스택·PoC 계획 | [doc/02](../doc/02_기술스택_확정_및_PoC_계획.md) |
+| AI 코어 모듈 상세 | [doc/04](../doc/04_AI코어_모듈_상세설계.md) |
+| 협의요청서 (Q1~Q7, K1~K5, E1~E9) | [doc/06](../doc/06_협의요청서_KL_발주처.md) |
+| 전체 설계 통합본 | [doc/07](../doc/07_전체설계_통합본.md) |
+| **위험관리대장 (31개 위험)** | [doc/10](../doc/10_위험관리대장.md) |
+| **폐쇄망 배포 설계** | [doc/12](../doc/12_폐쇄망_배포_설계.md) |
+| **벡터DB ES 전환 계획서** | [doc/13](../doc/13_벡터DB_ES_전환_계획서.md) |
+
+---
 
 ## 빠른 시작 (Docker/GPU 없어도 동작)
 
@@ -24,36 +38,48 @@ cat reports/summary.md
 
 종합 PASS면 `reports/`에 P1~P5 개별 리포트(.md/.json)가 생성됩니다.
 
+---
+
 ## 풀 인프라 실행 (협의·GPU 확보 후)
 
 ```bash
-# Postgres / Qdrant / MinIO / Redis / MLflow 기동
+# Postgres / Elasticsearch / MinIO / Redis / MLflow 기동
 make infra-up
-python scripts/verify_infra.py     # 헬스 체크
+python scripts/verify_infra.py     # 헬스 체크 (ES + 다른 서비스)
 python scripts/init_minio_buckets.py
 python scripts/seed_keywords.py --db    # 키워드 시드 DB 적재
 
-# API + Worker
+# API + Worker (env VECTOR_BACKEND=es 기본)
 make api      # uvicorn lloydk.api.app:app --reload
 make worker   # celery -A lloydk.workers.celery_app worker -l info
 
 # 또는 docker compose로 한 번에
 docker compose up -d
+
+# 롤백 경로 (Qdrant 병행 가동)
+make infra-up-rollback
 ```
+
+---
 
 ## 디렉토리 구조
 
 ```
 poc/
-├── docker-compose.yml          # Postgres/Qdrant/MinIO/Redis/MLflow/api/worker
+├── docker-compose.yml          # Postgres/Elasticsearch/MinIO/Redis/MLflow/api/worker
+│                                 (Qdrant는 profile=rollback)
 ├── Dockerfile.api              # FastAPI + PyTorch + Transformers
-├── Makefile                    # poc-all, infra-up, api, worker 등
+├── Makefile                    # poc-all, infra-up, p2-full, migrate-dry, bundle-dry 등
 ├── migrations/init.sql         # PostgreSQL v2 스키마 (테넌트/파티셔닝/HNSW)
+├── infra/es/                   # ES 인덱스 템플릿 + Nori 사용자 사전
+│   ├── index_template_secrets.json
+│   └── userdict_ko.txt
 ├── src/lloydk/
 │   ├── adapters/               # 외부 의존성 교체 가능 계층
 │   │   ├── llm/                #   noop/anthropic/openai/vllm
 │   │   ├── embedding/          #   hash(드라이런)/KURE-v1/BGE-M3
-│   │   ├── vectorstore/        #   inmemory(드라이런)/qdrant
+│   │   ├── vectorstore/        #   es(기본)/qdrant(롤백)/inmemory(dryrun)
+│   │   │                       #   Protocol에 search_hybrid 포함, 폴리필 일관
 │   │   └── storage/            #   local(드라이런)/minio
 │   ├── modules/
 │   │   ├── m1_synthesis/       # FUN-003 합성 문서 생성
@@ -66,46 +92,83 @@ poc/
 │   ├── api/                    # FastAPI (healthz, classify)
 │   ├── workers/                # Celery 비동기 태스크
 │   └── config.py               # pydantic-settings (.env 로드)
-├── scripts/                    # PoC 진입점·시드·평가 CLI (아래 표)
-├── tests/                      # 48개 pytest (어댑터/모듈/서비스/API)
+├── scripts/                    # PoC 진입점·시드·평가·번들·마이그 CLI (아래 표)
+├── tests/                      # 126개 pytest (어댑터/모듈/서비스/API/마이그/번들)
 └── datasets/                   # gitignore 대상 (raw/external/synthetic/p4_corpus)
 ```
 
+---
+
+## Make 타깃 한눈에
+
+| 타깃 | 용도 | 회신 의존 |
+|---|---|---|
+| `make poc-all` | P4→P3→P2→P1→P5 dryrun 일괄 | ❌ |
+| `make p2` | P2 임베딩 dryrun (inmemory) | ❌ |
+| `make p2-full` | **P2 4-way (KURE/BGE × ES dense+hybrid)** | ✅ Q1+E1+E5 |
+| `make p1` / `p3` / `p4` / `p5` | 개별 PoC | 일부 ✅ |
+| `make infra-up` | ES 포함 6개 서비스 기동 | ✅ E5 |
+| `make infra-up-rollback` | + Qdrant 병행 가동 | ❌ |
+| `make infra-verify` | 헬스체크 (ES 버전·플러그인) | ✅ E1·E2 |
+| `make migrate-dry` | **Qdrant→ES sample-5 dry-run** | ❌ |
+| `make bundle-dry` | **폐쇄망 번들 manifest dry-run** | ❌ |
+| `make api` / `worker` | 로컬 기동 | ❌ |
+
+`make help`로 전체 목록.
+
+---
+
 ## PoC 스크립트 매핑
 
-| PoC | 검증 항목 | 합격선 | 진입점 |
+| PoC | 검증 항목 | 합격선 (v0.9) | 진입점 |
 |---|---|---|---|
 | **P1** | KF-DeBERTa 분류 / 룰 surrogate | F1 ≥ 0.75, FNR ≤ 5% | `p1_train_classifier.py --mode dryrun\|full` |
-| **P2** | KURE-v1 vs BGE-M3 검색 / hash baseline | Recall@5 ≥ 0.80, Lat ≤ 200ms | `p2_compare_embeddings.py --mode dryrun\|full` |
+| **P2** | KURE/BGE-M3 × ES dense/hybrid 4-way | Recall@5 ≥ 0.80, Lat p50 ≤ 200ms | `p2_compare_embeddings.py --mode dryrun\|full --backends es,inmemory --hybrid` |
 | **P3** | LLM 합성 + 라벨 일치 + 비용 | 라벨 일치 ≥ 90% | `p3_generate_synthetic.py --total 40 --provider noop\|anthropic` |
 | **P4** | HWP/DOCX/PDF/MD 추출 | 누락 ≤ 5%, 품질 ≥ 0.7 | `build_p4_corpus.py` + `p4_extract_eval.py` |
 | **P5** | API E2E 스모크 | 200 OK + 라벨 OK | `p5_e2e_smoke.py --mode inproc\|http` |
 
 추가 스크립트:
 - `run_all_pocs.py` — P4→P3→P2→P1→P5 일괄 실행 + `summary.md`
-- `seed_keywords.py` — 40개 키워드 시드를 DB 또는 JSON으로 dump
+- `seed_keywords.py` — 40개 키워드 시드 DB 또는 JSON dump
 - `p3a_eval_rule_labeler.py` — M3 룰 라벨러 자가검증 (12 시나리오)
 - `init_minio_buckets.py` — MinIO 초기 버킷 생성
-- `verify_infra.py` — Postgres/Qdrant/MinIO/Redis/MLflow 헬스
+- `verify_infra.py` — Postgres / **Elasticsearch (버전 + cluster health)** / MinIO / Redis / MLflow
+- **`migrate_qdrant_to_es.py`** — Qdrant→ES 5단계 마이그레이션 (Extract·Transform·Load·Verify·Swap)
+- **`build_offline_bundle.py`** — 폐쇄망 자기완비 번들 빌더 (dry-run / 실 빌드)
 
-## 동작 모드 (POC_MODE)
+---
+
+## 동작 모드 (POC_MODE / VECTOR_BACKEND)
 
 | 모드 | 의미 | 사용 케이스 |
 |---|---|---|
 | **dryrun** (기본) | noop LLM + hash embedding + inmemory + local FS | Docker/GPU/API 키 없이 파이프라인·합격선 검증 |
 | **full** | 실제 모델 로드 + 인프라 연결 | 발주처 데이터·GPU·API 키 확보 후 |
 
-`.env`의 `LLM_PROVIDER`/`POC_MODE`/`EMBEDDING_MODEL` 만 바꾸면 동일 코드에서 두 모드 전환 가능.
+| `VECTOR_BACKEND` | 효과 |
+|---|---|
+| `es` (기본) | Elasticsearch dense_vector + BM25 + RRF 하이브리드 |
+| `qdrant` | 롤백 경로 (vec-only 폴리필) |
+| `inmemory` | dryrun / 강제 in-memory |
+
+`.env` 값만 바꾸면 동일 코드에서 모드·백엔드 전환. 자세한 백엔드 결정 흐름은 [doc/13 §5·§8.1](../doc/13_벡터DB_ES_전환_계획서.md).
+
+---
 
 ## 테스트
 
 ```bash
-pytest                  # 48개 (어댑터 + 모듈 + 서비스 + API)
-pytest -k m3            # 라벨링만
+pytest                  # 126개 (어댑터 + 모듈 + 서비스 + API + 마이그 + 번들)
+pytest -k es_store      # ES 어댑터만
+pytest -k migration     # 마이그레이션 스크립트
+pytest -k offline       # 폐쇄망 번들
 pytest --tb=short -v    # 상세 실패 표시
 ```
 
 CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리포트 아티팩트 업로드.
+
+---
 
 ## 환경 변수
 
@@ -118,13 +181,46 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 | `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1`(기본) / `BAAI/bge-m3` |
 | `CLASSIFIER_BASE_MODEL` | `kakaobank/kf-deberta-base`(기본) / KoELECTRA |
 | `POC_MODE` | `dryrun`(기본) / `full` |
+| **`VECTOR_BACKEND`** | `es`(기본) / `qdrant` / `inmemory` |
+| **`ES_URL` / `ES_USERNAME` / `ES_PASSWORD`** | Elasticsearch 접속 |
+
+---
+
+## 회신 의존 작업 (KL E1~E9, 발주처 Q1~Q7)
+
+회신이 도착하면 [doc/10 위험관리대장 §6](../doc/10_위험관리대장.md) 시나리오 매핑을 따라 즉시 1차 대응을 실행합니다. 회신 전까지는 다음 작업이 가능합니다:
+
+| 작업 | 명령 | 검증 가능? |
+|---|---|---|
+| P2 dryrun 4-way 시뮬레이션 | `make p2 --hybrid` | ✅ ES SKIP 처리 |
+| Qdrant→ES 마이그 sample-5 | `make migrate-dry` | ✅ |
+| 폐쇄망 번들 manifest 검증 | `make bundle-dry` | ✅ |
+| EsStore 단위 테스트 (mocked) | `pytest -k es_store` | ✅ |
+| ES 매핑·인덱스 템플릿 검증 | `infra/es/index_template_secrets.json` | ✅ |
+| 분류기 학습 dryrun (룰 surrogate) | `make p1` | ✅ |
+
+---
 
 ## 1차 PoC 결과 (2026-05-26, dryrun)
 
 - P4 추출: 누락 0.0% / 품질 0.986
 - P3 합성: 라벨 일치 100% (40건), FNR 0%, $0
-- P2 임베딩: hash baseline Recall 0.70 (실측은 full 모드)
-- P1 분류: F1 1.0 / FNR 0% (룰 surrogate, 실측은 KF-DeBERTa 학습)
+- P2 임베딩: hash baseline Recall 0.70 (실측은 full 모드 + E1 회신 후 4-way)
+- P1 분류: F1 1.0 / FNR 0% (룰 surrogate, 실측은 KF-DeBERTa 학습 + Q1 회신)
 - P5 E2E: 4/4 라벨 일치, max 4ms (TestClient)
 
-상세는 [`reports/summary.md`](reports/summary.md) 및 [`../doc/02_기술스택_확정_및_PoC_계획.md`](../doc/02_기술스택_확정_및_PoC_계획.md) 부록 A.
+상세는 [`reports/summary.md`](reports/summary.md) 및 [`../doc/02 §부록 A`](../doc/02_기술스택_확정_및_PoC_계획.md).
+
+---
+
+## 최근 주요 변경 (2026-05-27)
+
+- **벡터 DB Qdrant → Elasticsearch 8.14+ 전환** ([doc/13](../doc/13_벡터DB_ES_전환_계획서.md))
+  - `VectorStore` Protocol에 `search_hybrid` 추가, 모든 백엔드 폴리필 일관
+  - retriever API(8.14+) / legacy `rank.rrf`(8.12~13) / 클라이언트단 RRF 3단 폴백
+  - Nori 사용자 사전 + int8_hnsw + alias 스위칭
+- **위험관리대장 신설** ([doc/10](../doc/10_위험관리대장.md)) — 31개 위험, 회신 변수 8개 시나리오 매핑
+- **폐쇄망 배포 설계** ([doc/12](../doc/12_폐쇄망_배포_설계.md)) — 자기완비 번들, vLLM 강제, Blue/Green
+- **마이그레이션 스크립트** (`migrate_qdrant_to_es.py`) — 5단계 idempotent, dry-run + sample-5
+- **번들 빌더** (`build_offline_bundle.py`) — manifest dry-run, doc/12 §3·§4 구현
+- **테스트 48 → 126** (어댑터 36 + 마이그 19 + 번들 23 신규)

@@ -70,5 +70,20 @@ class InMemoryStore:
         scored.sort(key=lambda h: h.score, reverse=True)
         return scored[:top_k]
 
+    def search_hybrid(
+        self,
+        collection: str,
+        query_text: str,  # noqa: ARG002 — BM25 미구현, vec-only 폴리필
+        query_vec: Sequence[float],
+        top_k: int = 5,
+        filter: dict | None = None,
+        **_kwargs: object,
+    ) -> list[SearchHit]:
+        """InMemory 폴리필: query_text 무시, vec-only 검색.
+
+        P2 dryrun에서 BM25 기여도는 측정되지 않음을 알림(doc/13 §5.2).
+        """
+        return self.search(collection, query_vec, top_k=top_k, filter=filter)
+
     def count(self, collection: str) -> int:
         return len(self._cols[collection].ids) if collection in self._cols else 0
