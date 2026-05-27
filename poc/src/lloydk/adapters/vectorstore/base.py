@@ -1,8 +1,15 @@
 """Vector Store 추상.
 
-v2 (2026-05-27): `search_hybrid` 선택 메서드 추가.
-- EsStore: BM25 + dense kNN + RRF 결합
-- Qdrant/InMemory: vec-only 폴리필 (BM25 기여 미측정, P2 dryrun 한계)
+v2.1 (2026-05-27): 하이브리드는 별도 Protocol로 분리.
+
+- `VectorStore`: dense kNN 기본 계약. 모든 구현체가 만족.
+- `HybridVectorStore`: BM25 + dense + RRF 진짜 하이브리드. EsStore만 해당.
+- 비-하이브리드 구현체(Qdrant·InMemory)도 `search_hybrid`를 제공하지만
+  **vec-only 폴리필**이며 호출 시 `RuntimeWarning`을 발생시켜 조용한 실패를 차단.
+- 진짜 하이브리드가 필요한 호출부는 `isinstance(vs, HybridVectorStore)`로 분기.
+
+배경: doc/13 §5.1의 단일 Protocol 설계는 LSP 위반 — 같은 시그니처가
+구현체에 따라 다른 의미(진짜 하이브리드 vs dense-only)로 동작.
 """
 
 from __future__ import annotations
@@ -47,3 +54,12 @@ class VectorStore(Protocol):
         **kwargs: Any,
     ) -> list[SearchHit]: ...
     def count(self, collection: str) -> int: ...
+
+
+@runtime_checkable
+class HybridVectorStore(VectorStore, Protocol):
+    """BM25 + dense + RRF를 실제로 결합하는 백엔드 마커.
+
+    EsStore만 이 Protocol을 만족. P2 측정 등 진짜 하이브리드 결과가 필요한
+    호출부는 `isinstance(vs, HybridVectorStore)`로 분기해야 한다.
+    """

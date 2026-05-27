@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from dataclasses import dataclass, field
 from typing import Sequence
 
@@ -81,8 +82,18 @@ class InMemoryStore:
     ) -> list[SearchHit]:
         """InMemory 폴리필: query_text 무시, vec-only 검색.
 
-        P2 dryrun에서 BM25 기여도는 측정되지 않음을 알림(doc/13 §5.2).
+        진짜 하이브리드(BM25+dense+RRF)는 EsStore만 제공.
+        조용한 실패를 막기 위해 호출 시 RuntimeWarning을 발생시킨다.
+        하이브리드가 진짜 필요한 호출부는 `isinstance(vs, HybridVectorStore)`로
+        분기해야 한다.
         """
+        warnings.warn(
+            "InMemoryStore.search_hybrid: BM25 미지원 → dense-only로 폴백. "
+            "진짜 하이브리드 결과가 필요하면 EsStore를 사용하거나 "
+            "isinstance(vs, HybridVectorStore)로 사전 분기하세요.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return self.search(collection, query_vec, top_k=top_k, filter=filter)
 
     def count(self, collection: str) -> int:

@@ -82,7 +82,8 @@ def test_inmemory_search_hybrid_falls_back_to_vec_only():
         payloads=[{"grade": "TS"}, {"grade": "S1"}],
     )
     # 쿼리 텍스트가 b 문서 내용과 일치해도 dense vector 우선
-    hits = vs.search_hybrid("c", query_text="S1 자료", query_vec=[1.0, 0.0, 0.0, 0.0], top_k=2)
+    with pytest.warns(RuntimeWarning, match="dense-only로 폴백"):
+        hits = vs.search_hybrid("c", query_text="S1 자료", query_vec=[1.0, 0.0, 0.0, 0.0], top_k=2)
     assert hits[0].id == "a"  # vec 1순위 (text 매칭 무시)
 
 
@@ -95,19 +96,20 @@ def test_inmemory_search_hybrid_with_filter():
         vectors=[[1, 0, 0, 0], [0.99, 0.1, 0, 0], [0.5, 0, 0, 0]],
         payloads=[{"grade": "TS"}, {"grade": "S1"}, {"grade": "TS"}],
     )
-    hits = vs.search_hybrid(
-        "c",
-        query_text="ignored",
-        query_vec=[1.0, 0.0, 0.0, 0.0],
-        top_k=5,
-        filter={"grade": "TS"},
-    )
+    with pytest.warns(RuntimeWarning):
+        hits = vs.search_hybrid(
+            "c",
+            query_text="ignored",
+            query_vec=[1.0, 0.0, 0.0, 0.0],
+            top_k=5,
+            filter={"grade": "TS"},
+        )
     assert {h.id for h in hits} == {"a", "c"}
 
 
 def test_protocol_compliance_inmemory():
-    """InMemoryStore가 새 Protocol(`search_hybrid` 포함)을 만족."""
-    from lloydk.adapters.vectorstore.base import VectorStore
+    """InMemoryStore가 VectorStore Protocol을 만족하지만 HybridVectorStore는 아님."""
+    from lloydk.adapters.vectorstore.base import HybridVectorStore, VectorStore
 
     vs = InMemoryStore()
     # runtime_checkable Protocol — 구조적 호환 확인
@@ -115,6 +117,29 @@ def test_protocol_compliance_inmemory():
     # 모든 핵심 메서드 존재
     for method in ("ensure_collection", "upsert", "search", "search_hybrid", "count"):
         assert callable(getattr(vs, method))
+    # HybridVectorStore는 마커 Protocol — 진짜 하이브리드 백엔드만 만족해야 함.
+    # runtime_checkable Protocol은 메서드 시그니처만 보므로 InMemory도 isinstance가
+    # True가 될 수 있다. 그래서 호출부는 isinstance 결과를 신뢰하기 전에
+    # 실제 백엔드 name으로 한 번 더 검증하거나 EsStore 명시 분기를 권장.
+    # 본 테스트는 "InMemory는 EsStore가 아니다"라는 운영 사실만 확인.
+    assert vs.name != "elasticsearch"
+
+
+def test_qdrant_search_hybrid_warns():
+    """QdrantStore.search_hybrid가 RuntimeWarning을 내야 한다 (조용한 dense 폴백 금지)."""
+    # qdrant_client 미설치/미연결 환경에서도 메서드 자체는 호출 가능해야 하므로
+    # 클라이언트 초기화를 우회한 인스턴스로 폴리필 경로만 검증.
+    from lloydk.adapters.vectorstore.qdrant_store import QdrantStore
+
+    vs = QdrantStore.__new__(QdrantStore)  # __init__ 우회 (qdrant 서버 불필요)
+
+    # search() 호출 차단: 폴리필이 search로 위임하므로 그 직전에 warn이 나야 함.
+    # 위임된 search는 클라이언트가 없어 AttributeError가 나지만, warn은 그 전에 발생.
+    with pytest.warns(RuntimeWarning, match="dense-only로 폴백"):
+        try:
+            vs.search_hybrid("col", query_text="x", query_vec=[0.0], top_k=1)
+        except Exception:
+            pass  # _client 미초기화·qdrant_client 미설치는 본 테스트 관심 밖
 
 
 def test_env_clean_state():

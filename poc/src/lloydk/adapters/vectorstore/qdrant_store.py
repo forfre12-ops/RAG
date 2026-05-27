@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Sequence
 
 from lloydk.adapters.vectorstore.base import SearchHit
@@ -76,7 +77,18 @@ class QdrantStore:
         filter: dict | None = None,
         **_kwargs: object,
     ) -> list[SearchHit]:
-        """Qdrant 롤백 경로 폴리필: query_text 무시, dense kNN만 사용."""
+        """Qdrant 롤백 경로 폴리필: query_text 무시, dense kNN만 사용.
+
+        진짜 하이브리드(BM25+dense+RRF)는 EsStore만 제공.
+        조용한 실패를 막기 위해 호출 시 RuntimeWarning을 발생시킨다.
+        """
+        warnings.warn(
+            "QdrantStore.search_hybrid: BM25 미지원 → dense-only로 폴백. "
+            "진짜 하이브리드 결과가 필요하면 EsStore를 사용하거나 "
+            "isinstance(vs, HybridVectorStore)로 사전 분기하세요.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return self.search(collection, query_vec, top_k=top_k, filter=filter)
 
     def count(self, collection: str) -> int:
