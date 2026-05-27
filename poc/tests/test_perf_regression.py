@@ -14,7 +14,11 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.perf.regression import detect_regressions
+from lloydk.perf.regression import (
+    detect_regressions,
+    detect_regression_trend,
+    summarize_skip_reasons,
+)
 
 
 def _kpi(kid: str, *, name: str = "", unit: str = "ms", measured: float = 0.0,
@@ -169,3 +173,102 @@ def test_threshold_parameterized(pct: float, expect: bool):
         assert len(regs) == 1
     else:
         assert len(regs) == 0
+
+
+class TestRegressionTrend:
+    """detect_regression_trend — 시계열 분석."""
+
+    def test_empty_history(self):
+        assert detect_regression_trend([]) == []
+        assert detect_regression_trend([_report(_kpi("S1.1", measured=100.0))]) == []
+
+    def test_consecutive_degrading(self):
+        """3회 연속 latency 증가 → consecutive=2, trend=degrading."""
+        h = [
+            _report(_kpi("S1.1", measured=300.0, compare="le")),  # 최근
+            _report(_kpi("S1.1", measured=200.0, compare="le")),
+            _report(_kpi("S1.1", measured=100.0, compare="le")),  # 가장 오래
+        ]
+        trends = detect_regression_trend(h, threshold_pct=20.0)
+        assert len(trends) == 1
+        t = trends[0]
+        assert t["kpi_id"] == "S1.1"
+        assert t["n_regressions"] == 2
+        assert t["consecutive"] == 2
+        assert t["trend"] == "degrading"
+
+    def test_isolated_spike_not_degrading(self):
+        """단발 회귀 후 회복 → flat 또는 noisy."""
+        h = [
+            _report(_kpi("S1.1", measured=100.0, compare="le")),  # 회복
+            _report(_kpi("S1.1", measured=300.0, compare="le")),  # 스파이크
+            _report(_kpi("S1.1", measured=100.0, compare="le")),
+        ]
+        trends = detect_regression_trend(h, threshold_pct=20.0)
+        # 0→1단계: 100 vs 300 → 개선이라 회귀 아님
+        # 1→2단계: 300 vs 100 → 200% 악화 회귀
+        if trends:
+            assert trends[0]["trend"] in ("flat", "noisy")
+            assert trends[0]["consecutive"] == 0
+
+    def test_improving_only(self):
+        """순수 개선만 있으면 빈 리스트."""
+        h = [
+            _report(_kpi("S1.1", measured=50.0, compare="le")),
+            _report(_kpi("S1.1", measured=100.0, compare="le")),
+            _report(_kpi("S1.1", measured=200.0, compare="le")),
+        ]
+        assert detect_regression_trend(h, threshold_pct=20.0) == []
+
+
+class TestSummarizeSkipReasons:
+    """summarize_skip_reasons — SKIP 사유 분류."""
+
+    def test_empty_report(self):
+        s = summarize_skip_reasons({"scenarios": []})
+        assert s == {"total_skip": 0, "by_reason": {}, "by_scenario": {}}
+
+    def test_classification(self):
+        report = {
+            "scenarios": [
+                {
+                    "scenario": "S1",
+                    "kpis": [
+                        {"kpi_id": "S1.3", "status": "SKIP",
+                         "skip_reason": "missing: trained_model"},
+                        {"kpi_id": "S1.4", "status": "SKIP",
+                         "skip_reason": "missing: trained_model"},
+                        {"kpi_id": "S1.5", "status": "PASS"},
+                    ],
+                },
+                {
+                    "scenario": "S3",
+                    "kpis": [
+                        {"kpi_id": "S3.3", "status": "SKIP",
+                         "skip_reason": "S3 requires PG"},
+                        {"kpi_id": "S3.4", "status": "SKIP",
+                         "skip_reason": "no measurement for key 's3_4'"},
+                    ],
+                },
+            ],
+        }
+        s = summarize_skip_reasons(report)
+        assert s["total_skip"] == 4
+        assert s["by_reason"]["trained_model"] == 2
+        assert s["by_reason"]["pg"] == 1
+        assert s["by_reason"]["no_measurement"] == 1
+        assert s["by_scenario"]["S1"] == 2
+        assert s["by_scenario"]["S3"] == 2
+
+    def test_unclassified_goes_to_other(self):
+        report = {
+            "scenarios": [{
+                "scenario": "S99",
+                "kpis": [
+                    {"kpi_id": "S99.1", "status": "SKIP",
+                     "skip_reason": "weird custom reason"},
+                ],
+            }],
+        }
+        s = summarize_skip_reasons(report)
+        assert s["by_reason"]["other"] == 1

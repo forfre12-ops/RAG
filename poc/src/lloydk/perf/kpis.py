@@ -149,6 +149,27 @@ KPIS: list[KPI] = [
     KPI("S13.1", "S13", "교차 노출 횟수", "count", "le", 0, "max", core=True),
     KPI("S13.2", "S13", "audit tenant_id 정합", "ratio", "ge", 0.99, "ratio_true", requires=["pg"]),
     KPI("S13.3", "S13", "가이드 인덱스 분리", "bool", "ge", True, "bool_all"),
+
+    # S10 RAG 인용 충실도 (W11 확장)
+    KPI("S10.1", "S10", "grounded_ratio", "ratio", "ge", 0.70, "mean"),
+    KPI("S10.2", "S10", "evidence_count", "count", "gt", 0, "min"),
+    KPI("S10.3", "S10", "label-evidence 일관성", "ratio", "ge", 0.80, "ratio_true"),
+
+    # S16 권한·인증 거부 (W11 확장)
+    KPI("S16.1", "S16", "잘못된 키 401 응답", "bool", "ge", True, "bool_all"),
+    KPI("S16.2", "S16", "키 누락 거부", "bool", "ge", True, "bool_all"),
+    KPI("S16.3", "S16", "거부 응답 p95 latency", "ms", "le", 200, "p95"),
+    KPI("S16.4", "S16", "정상 키 200/201", "bool", "ge", True, "bool_all"),
+
+    # S17 감사 로그 무결성 (W11 확장)
+    KPI("S17.1", "S17", "audit_count 정합", "ratio", "ge", 0.95, "last", requires=["pg"], core=True),
+    KPI("S17.2", "S17", "actor_role 일치", "ratio", "ge", 0.99, "ratio_true", requires=["pg"]),
+    KPI("S17.3", "S17", "timestamp 단조 증가", "bool", "ge", True, "bool_all", requires=["pg"]),
+
+    # S18 폐쇄망 번들 무결성 (W11 확장)
+    KPI("S18.1", "S18", "manifest 존재", "bool", "ge", True, "bool_all"),
+    KPI("S18.2", "S18", "manifest 결정론", "bool", "ge", True, "bool_all"),
+    KPI("S18.3", "S18", "dry-run 시간", "ms", "le", 30000, "max"),
 ]
 
 

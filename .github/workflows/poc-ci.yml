@@ -14,6 +14,22 @@ on:
       - '.github/workflows/poc-ci.yml'
 
 jobs:
+  secrets-scan:
+    # I3: gitleaks로 누출 사전 차단. test/licenses-check와 병렬 실행, fail-fast.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # gitleaks full history scan
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 기본 룰셋 사용 (.gitleaks.toml 없으면 내장 default 적용)
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'
+
   openapi-lint:
     runs-on: ubuntu-latest
     steps:
@@ -99,14 +115,16 @@ jobs:
         run: python scripts/run_all_pocs.py
 
       - name: PSH — Scenario Performance (dryrun, fail on KPI miss + 회귀 ≥30% 시 fail)
+        id: psh
         run: |
           python scripts/run_perf_scenarios.py \
             --mode dryrun \
             --fail-on-miss \
             --no-probe \
             --regression-threshold 30 \
-            --fail-on-regression || echo "::warning::PSH regression detected (or miss) — see report"
+            --fail-on-regression
         # fail-on-regression은 첫 회차(직전 없음)엔 영향 없음. 누적 후부터 작동.
+        # F3: 실패 시 step 종료코드 1 그대로 전파 → 이후 if: failure() 트리거
 
       - name: PSH — PR 코멘트 작성 (KPI 요약 + 회귀 표)
         if: github.event_name == 'pull_request'
@@ -158,6 +176,88 @@ jobs:
               repo: context.repo.repo,
               body: lines.join('\n')
             });
+
+      - name: PSH — F3 CI 실패 시 GitHub Issue 자동 생성 (main push 한정)
+        if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const p = 'poc/reports/perf/perf_latest_dryrun.json';
+            let missCount = 'N/A', regCount = 'N/A', gitSha = context.sha, ts = new Date().toISOString();
+            let failKpiTable = '_(PSH 보고서 미생성 — 이전 단계에서 실패)_';
+            let regsTable = '_(N/A)_';
+            if (fs.existsSync(p)) {
+              const r = JSON.parse(fs.readFileSync(p, 'utf-8'));
+              const s = r.summary || {}, env = r.env || {}, regs = r.regressions || [];
+              missCount = s.fail != null ? s.fail : 'N/A';
+              regCount = regs.length;
+              gitSha = env.git_sha || gitSha;
+              ts = r.ts || ts;
+              const failRows = (r.scenarios || [])
+                .flatMap(sc => (sc.kpis || []).map(k => ({...k, scenario: sc.scenario_id || sc.id || ''})))
+                .filter(k => k.status === 'FAIL')
+                .map(k => '| ' + k.kpi_id + ' | ' + k.name + ' | ' + k.measured + ' | ' + k.threshold + ' | ' + k.compare + ' |')
+                .join('\n');
+              if (failRows) {
+                failKpiTable = '| KPI | name | measured | threshold | compare |\n|-----|------|----------|-----------|---------|\n' + failRows;
+              } else {
+                failKpiTable = '_(FAIL KPI 없음 — 회귀로 실패했을 가능성)_';
+              }
+              if (regs.length > 0) {
+                regsTable = '| KPI | name | prev | curr | Δ% |\n|-----|------|------|------|-----|\n' +
+                  regs.map(rr => '| ' + rr.kpi_id + ' | ' + rr.name + ' | ' + rr.prev.toFixed(3) + ' | ' + rr.curr.toFixed(3) + ' | ' + (rr.delta_pct > 0 ? '↑' : '↓') + Math.abs(rr.delta_pct).toFixed(1) + '% |').join('\n');
+              } else {
+                regsTable = '_(회귀 없음)_';
+              }
+            }
+            const runUrl = 'https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId;
+            const title = '[PSH][CI fail] ' + gitSha.substring(0, 7) + ' — KPI miss=' + missCount + ' regression=' + regCount;
+            const body = [
+              '## PSH CI 실패 자동 보고',
+              '',
+              '- **git_sha**: `' + gitSha + '`',
+              '- **실패 시간**: ' + ts,
+              '- **KPI miss 수**: ' + missCount,
+              '- **regression 수**: ' + regCount,
+              '- **Workflow run**: ' + runUrl,
+              '',
+              '### FAIL KPIs',
+              failKpiTable,
+              '',
+              '### 회귀 탐지 (≥30%)',
+              regsTable,
+              '',
+              '<sub>F3: 본 Issue는 `.github/workflows/poc-ci.yml`에 의해 자동 생성되었습니다.</sub>'
+            ].join('\n');
+            // 중복 방지: 동일 SHA(short) 제목으로 열린 Issue 있으면 코멘트만 추가
+            const shortSha = gitSha.substring(0, 7);
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'psh-regression',
+              per_page: 100,
+            });
+            const dup = existing.find(i => i.title.includes(shortSha));
+            if (dup) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: dup.number,
+                body: '재발 — run ' + runUrl + '\n\n' + body,
+              });
+              core.info('Existing issue #' + dup.number + ' updated with comment.');
+            } else {
+              const { data: created } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['ci-failure', 'psh-regression'],
+              });
+              core.info('Created issue #' + created.number);
+            }
 
       - name: PSH — GitHub Pages publish (main 브랜치만)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

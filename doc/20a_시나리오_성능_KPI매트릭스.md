@@ -129,6 +129,47 @@ W10 신규 — K5 자체결정 (N개사 멀티) — 데이터 누출 사고 방�
 | S13.2 | audit tenant_id 정합 | 비율 | ≥ 0.99 | audit_log.tenant_id == request 헤더 X-Tenant-Id 일치율 | PG |
 | S13.3 | 가이드 인덱스 분리 | bool | True | tenant_A 가이드 검색 결과에 tenant_B doc_id 0건, 역도 동일 |  |
 
+### S10. RAG 인용 충실도
+
+W11 신규 — 환각 인용 방지. 응답 evidence가 입력 본문/가이드에 실제 존재하는가.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S10.1 | **grounded_ratio** | 비율 | ≥ 0.70 | evidence 텍스트 중 입력 본문/가이드 substring 존재 비율 (N=5 호출 평균) |  |
+| S10.2 | evidence_count | count | > 0 | return_evidence=true 시 evidence 배열 길이 (min) |  |
+| S10.3 | label-evidence 일관성 | 비율 | ≥ 0.80 | evidence가 분류 label과 같은 등급 키워드를 포함하는 비율 |  |
+
+### S16. 권한·인증 거부
+
+W11 신규 — 잘못된 API Key·role mismatch 일관된 거부.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S16.1 | 잘못된 키 401 응답 | bool | True | X-API-Key=wrong 시 status 401 |  |
+| S16.2 | 키 누락 거부 | bool | True | 헤더 누락 시 status ∈ {401, 422} |  |
+| S16.3 | 거부 응답 p95 latency | ms | ≤ 200 | 인증 실패 빠른 회귀 (N=10) |  |
+| S16.4 | 정상 키 200/201 | bool | True | 컨트롤 — 정상 키는 통과 |  |
+
+### S17. 감사 로그 무결성
+
+W11 신규 — 모든 KL 호출이 audit_log에 actor/role/tenant로 기록.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S17.1 | **audit_count 정합** | 비율 | ≥ 0.95 | (audit 카운트 / 호출 카운트) — N=5 호출 후 동일 actor_id 조회 | **PG** |
+| S17.2 | actor_role 일치 | 비율 | ≥ 0.99 | audit 행의 actor_role == 헤더 X-Actor-Role | **PG** |
+| S17.3 | timestamp 단조 증가 | bool | True | 동일 actor 행들의 created_at이 호출 순서와 일치 | **PG** |
+
+### S18. 폐쇄망 번들 무결성
+
+W11 신규 — manifest + CHECKSUMS 결정론·완전성.
+
+| # | KPI | 단위 | 합격선 | 측정 방법 | 의존 |
+|---|---|---|---|---|---|
+| S18.1 | manifest 존재 | bool | True | dry-run 후 manifest.yaml + manifest.json + CHECKSUMS.sha256 3종 존재 |  |
+| S18.2 | manifest 결정론 | bool | True | 2회 dry-run의 artifacts 리스트 동일 (build_tag 제외) |  |
+| S18.3 | dry-run 시간 | ms | ≤ 30000 | 1회 dry-run 경과시간 |  |
+
 ---
 
 ## 2. 상단 요약 위젯 (HTML 보고서 §0)

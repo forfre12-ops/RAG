@@ -15,6 +15,10 @@ from typing import Any
 
 from lloydk.perf.kpis import core_kpis  # type: ignore
 from lloydk.perf.recorder import load_history  # type: ignore
+from lloydk.perf.regression import (  # type: ignore
+    detect_regression_trend,
+    summarize_skip_reasons,
+)
 
 
 # ----------------------------------------------------------------
@@ -309,6 +313,13 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
     trend_charts = _build_trends(full_history_chrono)
     trend_full = _build_full_kpi_trends(full_history_chrono)
 
+    # F1: 회귀 시계열 트렌드 (최근 5회 인접 비교 누적)
+    skip_block = _build_skip_classification(report)
+
+    # F4: SKIP 사유별 분류 카드
+    history_for_trend = [report] + prev_runs  # 최신순
+    regression_trend_block = _build_regression_trend(history_for_trend)
+
     # 미달 KPI
     misses = _build_misses(scenarios)
 
@@ -374,6 +385,16 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
     SKIP된 KPI는 측정값 0으로 표시되니 컬러 무시.
   </p>
   {trend_full}
+</section>
+
+<section id="skip-classification">
+  <h2><span class="num">§2.6</span> SKIP 사유별 분류</h2>
+  {skip_block}
+</section>
+
+<section id="regression-trend">
+  <h2><span class="num">§2.7</span> 회귀 시계열 트렌드 (최근 {len(history_for_trend)}회)</h2>
+  {regression_trend_block}
 </section>
 
 <section id="misses">
@@ -587,6 +608,107 @@ def _build_full_kpi_trends(history: list[dict]) -> str:
         f"</tr></thead><tbody>"
         f"{''.join(rows)}"
         f"</tbody></table>"
+    )
+
+
+def _build_skip_classification(report: dict) -> str:
+    """F4 — SKIP 사유별·시나리오별 분류 카드."""
+    summ = summarize_skip_reasons(report)
+    total = summ["total_skip"]
+    if total == 0:
+        return '<p style="color:var(--c-pass); font-size:13.5px;">✓ SKIP 0건.</p>'
+
+    reason_labels = {
+        "trained_model": ("학습 모델 미존재", "GPU·학습 사이클 후 자동 활성"),
+        "no_measurement": ("측정값 없음", "시나리오 함수가 해당 회차 record 생략"),
+        "pg": ("PostgreSQL 미가용", "docker compose up postgres"),
+        "es": ("Elasticsearch 미가용", "docker compose up es"),
+        "redis": ("Redis 미가용", "docker compose up redis"),
+        "minio": ("MinIO 미가용", "docker compose up minio"),
+        "llm": ("LLM 미설정", "LLM_PROVIDER + API 키 설정"),
+        "gpu": ("GPU 미가용", "발주처 GPU 확보 후 활성"),
+        "no_reason": ("사유 미기재", "시나리오 함수 점검 필요"),
+        "other": ("기타", "skip_reason 확인"),
+    }
+    cards = []
+    for cat, n in sorted(summ["by_reason"].items(), key=lambda x: -x[1]):
+        label, advice = reason_labels.get(cat, (cat, ""))
+        cards.append(
+            f'<div class="card">'
+            f'<div class="num" style="font-size:28px; font-weight:700; color:var(--c-skip);">{n}</div>'
+            f'<div style="font-size:13px; font-weight:600; margin-top:4px;">{html.escape(label)}</div>'
+            f'<div style="font-size:11.5px; color:var(--text-dim); margin-top:2px;">{html.escape(advice)}</div>'
+            f"</div>"
+        )
+    cards_html = (
+        '<div class="widgets" style="grid-template-columns:repeat(auto-fit, minmax(160px,1fr));">'
+        + "".join(cards)
+        + "</div>"
+    )
+    scen_rows = "".join(
+        f"<tr><td>{html.escape(sid)}</td><td>{n}</td></tr>"
+        for sid, n in sorted(summ["by_scenario"].items(), key=lambda x: -x[1])
+    )
+    scen_table = (
+        f'<table style="margin-top:12px; max-width:480px;">'
+        f"<thead><tr><th>시나리오</th><th>SKIP 수</th></tr></thead>"
+        f"<tbody>{scen_rows}</tbody></table>"
+    )
+    return (
+        f'<p style="font-size:13.5px; margin:0 0 12px;">총 <strong>{total}</strong>건의 SKIP — 사유별 분류:</p>'
+        + cards_html
+        + scen_table
+    )
+
+
+def _build_regression_trend(history: list[dict]) -> str:
+    """F1 — 최근 N회차 회귀 시계열 트렌드."""
+    if len(history) < 2:
+        return (
+            '<p style="color:var(--text-dim); font-size:13px;">'
+            f"측정 누적 중 (N={len(history)}). 2회차 이상부터 트렌드 분석 활성."
+            "</p>"
+        )
+    trends = detect_regression_trend(history, threshold_pct=30.0)
+    if not trends:
+        return (
+            '<p style="color:var(--c-pass); font-size:13.5px;">'
+            f"✓ 최근 {len(history)}회차 시계열에 회귀(≥30%) 없음."
+            "</p>"
+        )
+    trend_color = {
+        "degrading": "var(--c-fail)",
+        "noisy": "var(--c-warn)",
+        "flat": "var(--text-dim)",
+        "improving": "var(--c-pass)",
+    }
+    rows = []
+    for t in trends[:15]:
+        col = trend_color.get(t["trend"], "var(--text-dim)")
+        latest = t.get("latest_delta_pct")
+        latest_str = f"{latest:+.1f}%" if latest is not None else "—"
+        rows.append(
+            f"<tr>"
+            f"<td><code>{html.escape(t['kpi_id'])}</code></td>"
+            f"<td>{html.escape(t['name'])}</td>"
+            f'<td style="text-align:center;">{t["n_regressions"]}</td>'
+            f'<td style="text-align:center;">{t["consecutive"]}</td>'
+            f'<td style="text-align:right; font-family:var(--font-mono);">{latest_str}</td>'
+            f'<td><span style="color:{col}; font-weight:600;">{html.escape(t["trend"])}</span></td>'
+            f"</tr>"
+        )
+    return (
+        f'<p style="font-size:13px; color:var(--text-dim); margin:0 0 8px;">'
+        f"최근 {len(history)}회차 인접 비교(임계 30%) 누적. consecutive≥2는 즉시 점검 필요."
+        "</p>"
+        f'<table><thead><tr>'
+        f'<th style="width:8%">KPI</th>'
+        f'<th>이름</th>'
+        f'<th style="width:10%; text-align:center;">회귀 횟수</th>'
+        f'<th style="width:10%; text-align:center;">연속</th>'
+        f'<th style="width:12%; text-align:right;">최근 Δ%</th>'
+        f'<th style="width:14%">트렌드</th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table>'
     )
 
 

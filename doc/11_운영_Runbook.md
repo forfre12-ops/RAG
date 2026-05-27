@@ -1,9 +1,15 @@
 # 운영 Runbook — KOIPA AI 영업비밀관리시스템 (로이드케이 AI 파트)
 
-작성일: 2026-05-27
-버전: **v1.0** (W7 관측성·백업·DR 스크립트 실명령 연결 + 검증 완료)
+작성일: 2026-05-28
+버전: **v1.1** (W10·W11 PSH 알림 대응 절차 §8 신규 추가)
 대상: KL 운영팀 / KOIPA 보안팀 / Lloydk DevOps
 관련: [doc/04 모듈 설계](04_AI코어_모듈_상세설계.md) · [doc/12 폐쇄망 배포](12_폐쇄망_배포_설계.md) · [doc/13 ES 전환](13_벡터DB_ES_전환_계획서.md) · [doc/10 위험관리대장](10_위험관리대장.md)
+
+## v1.1 변경 사항 (W10·W11)
+- §8 **PSH 알림 대응 절차** 신규 — PR/main push 시 PSH가 KPI 측정 + 회귀 자동 탐지로 CI exit 1 처리. 운영팀 1차 대응 30초 행동·KPI별 책임 모듈 매핑·롤백 기준·false positive 가이드 포함
+- §9·§10·§11·§12로 기존 §8·§9·§10·§11 시프트 (회신 의존 절차·정기 검토·연락망·결정 요약)
+- 관련 코드: [`poc/src/lloydk/perf/`](../poc/src/lloydk/perf/) (scenarios·harness·regression·pushgateway), [`scripts/run_perf_scenarios.py`](../poc/scripts/run_perf_scenarios.py)
+- 관련 보고서: [doc/20a KPI 매트릭스](20a_시나리오_성능_KPI매트릭스.md), [doc/20 HTML 보고서](20_시나리오_성능_보고서.html), GitHub Pages publish
 
 ## v1.0 변경 사항 (W7)
 - §6 백업·복원: 실 스크립트 링크 추가 (`scripts/backup_postgres.py`, `backup_es_snapshot.py`, `backup_minio_mirror.py`)
@@ -468,7 +474,131 @@ python poc/scripts/dr_restore_check.py
 
 ---
 
-## 8. 회신 의존 절차 (v1.0 확정 대기)
+## 8. PSH 알림 대응 절차 (W10·W11 신규)
+
+PSH(Performance Scenario Harness)는 매 PR/main push 시 `poc-ci.yml`의 `test` 잡에서 `scripts/run_perf_scenarios.py --mode dryrun --fail-on-miss --regression-threshold 30 --fail-on-regression`을 실행합니다. KPI 합격선 미달 또는 직전 회차 대비 30% 이상 회귀 시 **CI exit 1**로 PR 머지가 차단됩니다.
+
+본 §8은 PSH FAIL/회귀 알림을 받았을 때 운영팀(Lloydk AI 엔지니어·KL DevOps)이 무엇을 보고 어떻게 대응할지 정의합니다.
+
+### 8.1 알림 수신 시 1차 행동 (30초 이내)
+
+PSH FAIL/회귀 알림은 다음 3채널 중 하나로 도착합니다:
+
+| 채널 | 위치 | 용도 |
+|---|---|---|
+| **PR 코멘트** | 해당 PR 하단에 자동 게시 (`actions/github-script@v7`) | KPI PASS/FAIL/SKIP 요약 + 회귀 표 + FAIL KPI 목록 |
+| **GitHub Pages** | `https://forfre12-ops.github.io/rag/` (main 푸시만) | doc/20 HTML 보고서 + perf JSON 누적 (`/perf/*.json`) |
+| **CI artifact** | Actions run → `scenario-perf-report-{sha}` (90일 보관) | doc/20 HTML + `poc/reports/perf/perf_{ts}_{sha}.json` 전체 |
+
+**30초 안에 다음 3개만 확인하세요**:
+
+```
+1. PR 코멘트의 "FAIL KPIs" 표 → 어느 KPI(S1.x·S5.x·S9.x 등) 떨어졌나
+2. "회귀 탐지 (≥30%)" 표 → 측정값이 직전 회차 대비 ↑/↓ 얼마나 변했나
+3. PR 코멘트 헤더의 Commit SHA → 직전 main 대비 어떤 변경이 있었나 (git log)
+```
+
+→ 1번이 핵심 KPI(S1.4 FNR·S1.3 F1·S5.4 Recall@5)면 즉시 §8.4 롤백 검토. 그 외는 §8.2 매핑 표로 책임 모듈 식별 후 디버깅.
+
+### 8.2 KPI별 책임 모듈 매핑
+
+PSH KPI는 시나리오 단위로 정의되며, FAIL 시 책임 모듈로 즉시 진입할 수 있도록 다음 매핑을 유지합니다.
+
+| 시나리오 | KPI | 1차 책임 모듈 | 2차 책임 (의존) | 디버그 명령 |
+|---|---|---|---|---|
+| **S1.1~S1.2** p50·p95 latency | latency | [`m5_inference`](../poc/src/lloydk/modules/m5_inference/) | api/routes/classify, services/classify | `pytest tests/test_classify_router.py -v` |
+| **S1.3** F1-macro | 정확도 (trained_model) | [`m4_training`](../poc/src/lloydk/modules/m4_training/) | datasets/labeled, MLflow 모델 등록 | `make p1-full` (full 모드) |
+| **S1.4** FNR (TS→하위) | 미탐율 (trained_model) | [`m3_labeling`](../poc/src/lloydk/modules/m3_labeling/) + [`m4_training`](../poc/src/lloydk/modules/m4_training/) | seeds.py v3·Nori 사전 | seeds.py 키워드 누락 확인 → `seed_keywords.py` |
+| **S1.5** 응답 스키마 정합 | bool | api/schemas/classify.py | router 응답 직렬화 | `pytest tests/test_classify_router.py::test_schema -v` |
+| **S2.1~S2.3** async/batch | latency·throughput·bool | api/routes/classify_async, [`workers/`](../poc/src/lloydk/workers/) | Redis Celery 큐 | docker compose logs worker |
+| **S3.1~S3.4** confirm·relabel | latency·정합 | api/routes/confirm, [`repositories/corrections.py`](../poc/src/lloydk/repositories/) | PG corrections 테이블 | `pytest tests/test_corrections_repo.py -v` |
+| **S4.1~S4.4** schema/grades | bool·latency | api/routes/schema_grades, services/schema_grades | PG schema_versions | `pytest tests/test_schema_grades.py -v` |
+| **S5.1~S5.3** 가이드 업로드·인덱싱 | latency·count·throughput | [`m4_training/rag_indexer.py`](../poc/src/lloydk/modules/m4_training/rag_indexer.py), services/guide | adapters/embedding (KURE·hash), adapters/vectorstore (es_store·inmemory) | `make migrate-dry` |
+| **S5.4** Recall@5 | 비율 (es + trained_model) | [`m5_inference/rag_search.py`](../poc/src/lloydk/modules/m5_inference/), adapters/vectorstore/es_store | ES 인덱스 매핑·KURE-v1 가중치 | `pytest tests/test_rag_es.py -v` |
+| **S5.5** GET 가이드 200 | bool | api/routes/guide, services/guide | PG guides 테이블 | `pytest tests/test_guide_router.py -v` |
+| **S6.1~S6.5** 합성 플로우 | latency·라벨일치·USD·bool | [`m1_synthesis`](../poc/src/lloydk/modules/m1_synthesis/), services/synth | adapters/llm (anthropic·openai·noop·vllm·ollama) | `make p3` |
+| **S7.1~S7.3** URGENT_RETRAIN | bool·latency (PG) | [`m6_evaluation/active_learning.py`](../poc/src/lloydk/modules/m6_evaluation/), api/routes/train | PG corrections threshold | `pytest tests/test_active_learning.py -v` |
+| **S8.1~S8.4** metrics·CM | bool·latency (PG) | api/routes/metrics, services/metrics | MLflow 클라이언트 (`metrics router`) | `pytest tests/test_metrics_router.py -v` |
+| **S9.1~S9.3** 적대적 FNR | 비율 | [`m3_labeling`](../poc/src/lloydk/modules/m3_labeling/) + [`m5_inference`](../poc/src/lloydk/modules/m5_inference/) | seeds.py·Nori 사전·변형 일관성 | seeds.py 시드 보강 |
+| **S10.1~S10.3** RAG 인용 충실도 | grounded_ratio | [`m5_inference/rag_search.py`](../poc/src/lloydk/modules/m5_inference/), services/classify (evidence) | adapters/vectorstore, evidence 절단 로직 | `pytest tests/test_rag_grounded.py -v` |
+| **S11.1~S11.3** 부하 | error_rate·latency·throughput | api/middleware, ASGI worker pool | Redis Celery, Postgres connection pool | docker compose up -d --scale worker=N |
+| **S13.1~S13.3** 테넌트 격리 | count·비율·bool | services/guide·classify (tenant_id 필터), adapters/vectorstore | audit_log 미들웨어 | `pytest tests/test_tenant_isolation.py -v` |
+| **S16.1~S16.4** 권한·인증 거부 | bool·latency | [`api/_auth.py`](../poc/src/lloydk/api/_auth.py) | X-API-Key·X-Actor-Role 헤더 검증 | `pytest tests/test_auth.py -v` |
+| **S17.1~S17.3** 감사 로그 무결성 | 비율·bool (PG) | [`repositories/audit.py`](../poc/src/lloydk/repositories/), audit 미들웨어 | PG audit_log 테이블 | `pytest tests/test_audit_repo.py -v` |
+| **S18.1~S18.3** 폐쇄망 번들 | bool·ms | [`scripts/build_offline_bundle.py`](../poc/scripts/build_offline_bundle.py) | manifest yaml/json/CHECKSUMS 산출 | `make bundle-dry` |
+
+**규칙**: 동일 시나리오의 KPI가 동시에 여러 개 FAIL이면 1차 책임 모듈부터 진입. 단일 KPI FAIL이면 PR diff에서 해당 모듈 변경 여부 우선 확인.
+
+### 8.3 회귀 ≥30% 발견 시 대응 분기
+
+PSH는 `compare=le`(latency·FNR) KPI 측정값이 증가하거나 `compare=ge`(recall·throughput) KPI 측정값이 감소하면 회귀로 판정합니다.
+
+| 회귀 폭 | 대상 KPI | 대응 |
+|---|---|---|
+| **30~50% 단일 KPI** | 비핵심 (S1.1·S1.5·S2.1·S3.1·S3.2 등 latency 계열) | 코드 디버깅 후 PR 보완 — 머지 차단 유지 |
+| **30~50% 핵심 KPI** | S1.4 FNR · S1.3 F1 · S5.4 Recall@5 · S9.2 적대적 FNR · S13.1 교차 노출 | 즉시 §8.4 롤백 기준 평가 |
+| **≥50% 단일 KPI (어떤 시나리오든)** | — | 머지 차단 + Lloydk AI 엔지니어 즉시 호출 |
+| **≥30% 동시 다발 (3개 이상 KPI)** | — | 머지 차단 + §8.4 롤백 기준 평가 |
+
+### 8.4 롤백 기준 (직전 main commit으로 revert)
+
+다음 중 하나라도 충족 시 직전 main commit으로 즉시 revert PR 제출:
+
+1. **핵심 KPI 회귀 ≥30%**: S1.4 FNR(↑), S1.3 F1(↓), S5.4 Recall@5(↓), S9.2 적대적 FNR(↑), S13.1 교차 노출(↑)
+2. **다발 회귀 ≥3개 KPI** + 원인 모듈 1시간 내 식별 불가
+3. **S11.1 error_rate >10%** (운영 부하 시나리오에서 5xx 폭증)
+4. **S18.1·S18.2 번들 무결성 FAIL** + 폐쇄망 반입 일정 임박
+
+**revert 명령**:
+```bash
+# 직전 main commit으로 revert PR
+git checkout main
+git pull
+git revert HEAD --no-edit
+git push origin main
+# 또는 PR 통해 머지
+gh pr create --title "revert: PSH 회귀로 main 직전 commit 복귀" --body "PSH report: <artifact URL>"
+```
+
+→ revert 후 5분 내 PSH 재실행 GREEN 확인 → §2.5 RCA 보고서 작성.
+
+### 8.5 False positive 식별 가이드
+
+dryrun 환경에선 일부 KPI가 본질적으로 변동성이 큽니다. 단발성 FAIL을 무조건 회귀로 보지 말고 다음 패턴을 점검하세요.
+
+| KPI | 변동 원인 | False positive 판단 기준 | 권장 행동 |
+|---|---|---|---|
+| **S1.1 p50 latency** | dryrun in-process 호출, GitHub Actions runner 부하 편차 ±30% | 직전 5회 평균 대비 표준편차 1σ 이내 + 합격선(≤500ms) 통과 | 동일 PR 재실행 (re-run job) |
+| **S5.1 업로드 latency p95** | hash 임베딩 + InMemory cold start 영향 | 첫 회차 1~2회 warmup 시간이 포함된 경우 | re-run 후에도 FAIL이면 진짜 회귀 |
+| **S5.3 인덱싱 throughput** | dryrun ≥0.3 chunks/s는 너무 보수적 (doc/20a §5.5 임계 갭) | full 모드 임계 ≥5 적용 후 통과 시 dryrun 임계 갭 이슈 | doc/20a §5.5 mode-aware threshold 결정 가속 |
+| **S11.2 부하 p95 latency** | GitHub Actions runner CPU 격차로 ±50% 흔함 | 동일 PR re-run 시 다른 값 → runner 의존 | re-run 2~3회 평균으로 판정 |
+| **S2.2 batch throughput** | in-process 실행이라 50~200 docs/s 사이 변동 | 어쨌든 ≥5 합격선은 통과 | 합격선 통과 + 회귀만 ≥30% → 동일 PR 재실행 |
+| **S6.2 라벨 일치도** | noop provider 템플릿 기반 — 룰 라벨러 키워드 시드 동기화 안 되면 100%→90% 흔들림 | seeds.py 변경 없는데 회귀 발생 → noop 템플릿 시드 검토 | `poc/src/lloydk/adapters/llm/noop_provider.py` 시드 정렬 확인 |
+
+**규칙**:
+- 단일 KPI 단발성 FAIL → 동일 PR re-run 1회 시도 (Actions UI의 "Re-run failed jobs")
+- 2회 연속 동일 KPI FAIL → false positive 아님, 진짜 회귀
+- **핵심 KPI(S1.3·S1.4·S5.4·S9.2·S13.1)는 false positive 가정 금지** — 1회 FAIL도 즉시 §8.4 평가
+
+### 8.6 PSH 자체 장애 (CI 인프라 이슈)
+
+PSH 코드 자체가 ERROR(시나리오 함수 예외)나 import 실패로 죽는 경우:
+
+```bash
+# 로컬 재현
+cd poc
+pip install -e ".[dev]"
+python scripts/run_perf_scenarios.py --mode dryrun --no-probe -v
+
+# 회귀 비교 비활성 + KPI 미달만 검사
+python scripts/run_perf_scenarios.py --mode dryrun --fail-on-miss --no-regression-check
+```
+
+→ PSH 코드 결함은 일반 PR 흐름으로 수정 (revert 대상 아님). `poc/src/lloydk/perf/` 변경 PR은 별도 detail review.
+
+---
+
+## 9. 회신 의존 절차 (v1.0 확정 대기)
 
 다음 항목은 KL E1~E9 회신 후 확정:
 
@@ -482,7 +612,7 @@ python poc/scripts/dr_restore_check.py
 
 ---
 
-## 9. 정기 검토 일정
+## 10. 정기 검토 일정
 
 | 주기 | 검토 항목 |
 |---|---|
@@ -494,7 +624,7 @@ python poc/scripts/dr_restore_check.py
 
 ---
 
-## 10. 비상 연락망 (회신 후 채움)
+## 11. 비상 연락망 (회신 후 채움)
 
 | 역할 | 담당자 | 연락처 | 1차 대응 시간대 |
 |---|---|---|---|
@@ -507,7 +637,7 @@ python poc/scripts/dr_restore_check.py
 
 ---
 
-## 11. 결정 사항 요약 (v0.9)
+## 12. 결정 사항 요약 (v1.1)
 
 1. **6개 핵심 시나리오** 절차화 — 장애·재학습·롤백·인덱스 재구성·백업·보안
 2. **P0~P3 4단계 장애 등급** + 대응 시간 SLA 명시
@@ -515,6 +645,7 @@ python poc/scripts/dr_restore_check.py
 4. **alias 스위칭 기반 무중단 인덱스 재구성**
 5. **백업 주기**: PG/ES 일 1회, MinIO 주 1회, retention 30~365일
 6. **RTO 4시간 / RPO 1일** 재해 복구 목표
-7. **정기 검토**: 주/월/분기/반기/연 — 빈도별 점검 표준화
+7. **PSH 알림 대응 절차** (§8 신규) — 30초 1차 행동 · KPI×모듈 매핑 19종 · 회귀 30%/50% 분기 · 핵심 KPI 5종 false positive 가정 금지 · revert 기준
+8. **정기 검토**: 주/월/분기/반기/연 — 빈도별 점검 표준화
 
-본 Runbook은 회신 후 v1.0으로 확정. **연 1회 갱신 + 큰 사건 후 즉시 갱신**.
+본 Runbook은 회신 후 v1.0으로 확정. v1.1은 W10·W11 PSH 도입에 맞춰 §8 신규. **연 1회 갱신 + 큰 사건 후 즉시 갱신 + PSH 시나리오 추가 시 §8.2 매핑 표 동기화**.

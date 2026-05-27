@@ -178,6 +178,7 @@ def s2_async_batch(ctx: ScenarioContext) -> None:
                 polling_ok = False
 
         # batch 5건 throughput
+        batch_size = 5
         t0 = time.perf_counter()
         rb = cli.post(
             "/api/v1/classify/batch",
@@ -185,13 +186,54 @@ def s2_async_batch(ctx: ScenarioContext) -> None:
             json={
                 "documents": [
                     {"doc_id": f"psh-b-{i}", "content": f"배치 분류 #{i} " * 10}
-                    for i in range(5)
+                    for i in range(batch_size)
                 ]
             },
         )
         elapsed_s = time.perf_counter() - t0
         if rb.status_code == 202 and elapsed_s > 0:
-            ctx.record("s2_2", 5.0 / elapsed_s)
+            ctx.record("s2_2", batch_size / elapsed_s)
+
+        # batch job 폴링 정합 — doc/20a §S2.3 약속 이행.
+        # 응답의 job_id (단일) 또는 jobs 배열을 받아 각각 status 검증.
+        # dryrun(in-process worker)에서는 즉시 done, 운영(Celery)에서는 queued→running→done 진행.
+        if rb.status_code == 202:
+            body = rb.json()
+            job_ids: list[str] = []
+            if isinstance(body, dict):
+                if body.get("job_id"):
+                    job_ids.append(str(body["job_id"]))
+                for j in body.get("jobs", []) or []:
+                    if isinstance(j, dict) and j.get("job_id"):
+                        job_ids.append(str(j["job_id"]))
+                    elif isinstance(j, str):
+                        job_ids.append(j)
+
+            valid_statuses = {"queued", "running", "done"}
+            for jid in job_ids:
+                # 최대 5초 · 100ms 간격 폴링 — done 도달하면 즉시 종료.
+                poll_deadline = time.perf_counter() + 5.0
+                last_status = ""
+                last_body: dict = {}
+                while time.perf_counter() < poll_deadline:
+                    rj = cli.get(f"/api/v1/classify/jobs/{jid}", headers=_hdr())
+                    if rj.status_code != 200:
+                        polling_ok = False
+                        break
+                    last_body = rj.json()
+                    last_status = last_body.get("status", "")
+                    if last_status not in valid_statuses:
+                        polling_ok = False
+                        break
+                    if last_status == "done":
+                        break
+                    time.sleep(0.1)
+                # status가 done이면 completed==total 검증, 아니면 queued/running로 timeout 무방.
+                if last_status == "done":
+                    total_v = last_body.get("total")
+                    completed_v = last_body.get("completed")
+                    if total_v is not None and completed_v is not None and completed_v != total_v:
+                        polling_ok = False
 
     for lat in async_latencies:
         ctx.record("s2_1", lat)
@@ -254,7 +296,7 @@ def s3_confirm_relabel(ctx: ScenarioContext) -> None:
                 count = CorrectionsRepo(db).count_recent(actor_id="psh-admin")
             ctx.record("s3_3", count >= 1)
             ctx.record("s3_4", True)  # 도달 자체로 통과 (status 전이는 별도)
-        except Exception:  # noqa: BLE001
+        except Exception:
             ctx.record("s3_3", False)
             ctx.record("s3_4", False)
 
@@ -363,7 +405,7 @@ def s5_guide_rag(ctx: ScenarioContext) -> None:
 
             recall = probe_recall_at_k(k=5)
             ctx.record("s5_4", float(recall))
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
 
@@ -425,7 +467,7 @@ def s6_synth(ctx: ScenarioContext) -> None:
                 total += 1
         if total:
             ctx.record("s6_2", correct / total)
-    except Exception:  # noqa: BLE001
+    except Exception:
         # 모듈/시그니처 불일치 시 fallback: doc/02 §부록 D 800건 결과(100%)를 보고용으로 차용
         ctx.record("s6_2", 1.00)
 
@@ -469,7 +511,7 @@ def s7_urgent_retrain(ctx: ScenarioContext) -> None:
 
         status = evaluate_retraining_need(urgent_underclass_threshold=10)
         ctx.record("s7_1", status.retrain_status in {"OK", "RETRAIN_RECOMMENDED", "URGENT_RETRAIN"})
-    except Exception:  # noqa: BLE001
+    except Exception:
         ctx.record("s7_1", True)  # 결정 함수 자체가 import 가능하다는 사실로 통과
 
 
@@ -645,7 +687,7 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
                         errors += 1
                     else:
                         latencies.append(elapsed_ms)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 with lock:
                     errors += 1
 
@@ -774,8 +816,252 @@ def s13_tenant_isolation(ctx: ScenarioContext) -> None:
                 ctx.record("s13_2", getattr(row, "tenant_id", None) == "tenant-a")
             for row in rows_b:
                 ctx.record("s13_2", getattr(row, "tenant_id", None) == "tenant-b")
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
+
+
+# ----------------------------------------------------------------
+# S10. RAG 인용 충실도 — evidence가 입력 본문에 존재하는가
+# ----------------------------------------------------------------
+
+_TS_KEYWORDS = ("특급기밀", "TS등급", "극비", "Top Secret")
+_S1_KEYWORDS = ("1급 비밀", "1급비밀")
+_S2_KEYWORDS = ("대외비", "2급")
+_S3_KEYWORDS = ("공개", "공시", "IR")
+
+_LABEL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "TS": _TS_KEYWORDS,
+    "S1": _S1_KEYWORDS,
+    "S2": _S2_KEYWORDS,
+    "S3": _S3_KEYWORDS,
+}
+
+
+def _evidence_texts(body: dict) -> list[str]:
+    """응답의 evidence 배열에서 텍스트만 추출 (스키마 변형 안전)."""
+    out: list[str] = []
+    ev = body.get("evidence") or []
+    if not isinstance(ev, list):
+        return out
+    for e in ev:
+        if isinstance(e, str):
+            out.append(e)
+        elif isinstance(e, dict):
+            for k in ("text", "snippet", "content", "span"):
+                v = e.get(k)
+                if isinstance(v, str) and v:
+                    out.append(v)
+                    break
+    return out
+
+
+def s10_rag_evidence(ctx: ScenarioContext) -> None:
+    make = _client_factory()
+    cases = [
+        ("ALPHA-MARKER 본 문서는 특급기밀에 해당함 — 핵심 자료", "TS"),
+        ("BRAVO-CODE TS등급 특급기밀 영업비밀 미공개 자료", "TS"),
+        ("CHARLIE-X 1급 비밀 임원 인사 자료 평가", "S1"),
+        ("DELTA-NUM 대외비 사내 규정 직원 평가", "S2"),
+        ("ECHO-TAG 공개 IR 보도자료 분기 실적", "S3"),
+    ]
+    with make() as cli:
+        for content, target in cases:
+            r = cli.post(
+                "/api/v1/classify",
+                headers=_hdr(),
+                json={
+                    "doc_id": f"psh-s10-{uuid.uuid4().hex[:6]}",
+                    "content": content,
+                    "use_rag": False,
+                    "return_evidence": True,
+                },
+            )
+            if r.status_code != 200:
+                continue
+            body = r.json()
+            label = body.get("label", "")
+            ev_texts = _evidence_texts(body)
+            ctx.record("s10_2", len(ev_texts))
+            if not ev_texts:
+                continue
+
+            grounded = sum(1 for t in ev_texts if t and t in content)
+            grounded_ratio = grounded / len(ev_texts)
+            ctx.record("s10_1", grounded_ratio)
+
+            kws = _LABEL_KEYWORDS.get(label, ())
+            evidence_blob = " ".join(ev_texts)
+            ctx.record("s10_3", any(kw in evidence_blob for kw in kws) if kws else False)
+
+
+# ----------------------------------------------------------------
+# S16. 권한·인증 거부
+# ----------------------------------------------------------------
+
+def s16_auth_rejection(ctx: ScenarioContext) -> None:
+    make = _client_factory()
+    payload = {"doc_id": "psh-s16", "content": "권한 거부 시나리오"}
+    latencies: list[float] = []
+
+    with make() as cli:
+        # (a) 잘못된 API Key → 401
+        t0 = time.perf_counter()
+        r_bad = cli.post(
+            "/api/v1/classify",
+            headers={**_hdr(), "X-API-Key": "wrong-key-deliberate"},
+            json=payload,
+        )
+        latencies.append((time.perf_counter() - t0) * 1000.0)
+        ctx.record("s16_1", r_bad.status_code == 401)
+
+        # (b) X-API-Key 헤더 누락 → 422 또는 401
+        t0 = time.perf_counter()
+        r_missing = cli.post(
+            "/api/v1/classify",
+            headers={
+                "X-Actor-Id": "psh", "X-Actor-Role": "kl_backend", "X-Tenant-Id": "default",
+            },
+            json=payload,
+        )
+        latencies.append((time.perf_counter() - t0) * 1000.0)
+        ctx.record("s16_2", r_missing.status_code in (401, 422))
+
+        # (c) 정상 컨트롤 → 200
+        t0 = time.perf_counter()
+        r_ok = cli.post("/api/v1/classify", headers=_hdr(), json=payload)
+        latencies.append((time.perf_counter() - t0) * 1000.0)
+        ctx.record("s16_4", r_ok.status_code in (200, 201))
+
+        # 추가로 p95 측정용 7회 반복 (잘못된 키)
+        for _ in range(7):
+            t0 = time.perf_counter()
+            cli.post(
+                "/api/v1/classify",
+                headers={**_hdr(), "X-API-Key": "wrong"},
+                json=payload,
+            )
+            latencies.append((time.perf_counter() - t0) * 1000.0)
+
+    for lat in latencies:
+        ctx.record("s16_3", lat)
+
+
+# ----------------------------------------------------------------
+# S17. 감사 로그 무결성
+# ----------------------------------------------------------------
+
+def s17_audit_log(ctx: ScenarioContext) -> None:
+    if not ctx.resources.pg:
+        ctx.skip("S17 requires PG")
+        return
+
+    make = _client_factory()
+    actor_id = f"psh-s17-{uuid.uuid4().hex[:8]}"
+    actor_role = "kl_backend"
+    tenant = "default"
+    n_calls = 5
+
+    headers = {
+        "X-API-Key": _api_key(),
+        "X-Actor-Id": actor_id,
+        "X-Actor-Role": actor_role,
+        "X-Tenant-Id": tenant,
+    }
+    with make() as cli:
+        for i in range(n_calls):
+            cli.post(
+                "/api/v1/classify",
+                headers=headers,
+                json={"doc_id": f"psh-s17-{i}", "content": f"감사 로그 검증 호출 {i}"},
+            )
+
+    try:
+        from lloydk.db import session_scope  # type: ignore
+        from lloydk.repositories import AuditRepo  # type: ignore
+
+        with session_scope() as db:
+            rows = AuditRepo(db).recent_for_actor(actor_id) or []
+    except Exception:
+        ctx.record("s17_1", 0.0)
+        ctx.record("s17_3", False)
+        return
+
+    n_audit = len(rows)
+    ratio = (n_audit / n_calls) if n_calls else 0.0
+    ctx.record("s17_1", ratio)
+
+    for row in rows:
+        ctx.record("s17_2", getattr(row, "actor_role", None) == actor_role)
+
+    # timestamp 단조 — created_at이 호출 순서대로 정렬 가능한가
+    timestamps = [getattr(r, "created_at", None) for r in rows]
+    ts_clean = [t for t in timestamps if t is not None]
+    monotone = ts_clean == sorted(ts_clean)
+    ctx.record("s17_3", monotone)
+
+
+# ----------------------------------------------------------------
+# S18. 폐쇄망 번들 무결성
+# ----------------------------------------------------------------
+
+def s18_offline_bundle(ctx: ScenarioContext) -> None:
+    """build_offline_bundle.py --dry-run 2회 실행 → manifest 결정론·완전성 검증."""
+    import shutil
+    import subprocess as _sp
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    # poc 루트 추정 (이 파일 위치 기준)
+    here = _Path(__file__).resolve()
+    poc_root = here.parents[3]  # poc/src/lloydk/perf -> poc
+    script = poc_root / "scripts" / "build_offline_bundle.py"
+    if not script.exists():
+        ctx.skip(f"build_offline_bundle.py not found: {script}")
+        return
+
+    out_a = poc_root / "dist" / "psh-s18-a"
+    out_b = poc_root / "dist" / "psh-s18-b"
+
+    def _run(out: _Path) -> float:
+        if out.exists():
+            shutil.rmtree(out, ignore_errors=True)
+        t0 = time.perf_counter()
+        try:
+            _sp.run(
+                [_sys.executable, str(script), "--version", "test-S18", "--dry-run", "--output", str(out)],
+                cwd=str(poc_root),
+                check=False,
+                timeout=120,
+                capture_output=True,
+            )
+        except Exception:
+            pass
+        return (time.perf_counter() - t0) * 1000.0
+
+    elapsed_a = _run(out_a)
+    _run(out_b)  # 결정론 비교용 — 시간 측정 대상 아님
+
+    files_a = {p.name for p in out_a.glob("*") if p.is_file()} if out_a.exists() else set()
+    manifest_ok = {"manifest.yaml", "manifest.json", "CHECKSUMS.sha256"}.issubset(files_a)
+    ctx.record("s18_1", manifest_ok)
+    ctx.record("s18_3", elapsed_a)
+
+    # 결정론 — manifest.json의 artifacts 리스트 비교 (build_tag·created_at 등 노이즈 필드 제외)
+    determinism_ok = False
+    try:
+        import json as _json
+        ma = _json.loads((out_a / "manifest.json").read_text(encoding="utf-8"))
+        mb = _json.loads((out_b / "manifest.json").read_text(encoding="utf-8"))
+        # 비교 키: artifacts·images·python_packages (있는 것만)
+        keys_to_compare = ("artifacts", "images", "python_packages")
+        determinism_ok = all(ma.get(k) == mb.get(k) for k in keys_to_compare)
+    except Exception:
+        determinism_ok = False
+    ctx.record("s18_2", determinism_ok)
+
+    # 청소
+    shutil.rmtree(out_a, ignore_errors=True)
+    shutil.rmtree(out_b, ignore_errors=True)
 
 
 SPECS: list[ScenarioSpec] = [
@@ -790,4 +1076,8 @@ SPECS: list[ScenarioSpec] = [
     ScenarioSpec("S9", "적대적 문서 FNR 스트레스", s9_adversarial),
     ScenarioSpec("S11", "부하 (Concurrent Stress)", s11_concurrent_stress),
     ScenarioSpec("S13", "멀티 테넌트 격리", s13_tenant_isolation),
+    ScenarioSpec("S10", "RAG 인용 충실도", s10_rag_evidence),
+    ScenarioSpec("S16", "권한·인증 거부", s16_auth_rejection),
+    ScenarioSpec("S17", "감사 로그 무결성", s17_audit_log, requires=["pg"]),
+    ScenarioSpec("S18", "폐쇄망 번들 무결성", s18_offline_bundle),
 ]

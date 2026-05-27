@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 from lloydk.adapters.embedding.base import EmbeddingProvider, EmbeddingResult
+from lloydk.adapters.embedding.cache_layer import CachedEmbedding, EmbeddingCache
 from lloydk.adapters.embedding.hash_embedding import HashEmbedding
 
-__all__ = ["EmbeddingProvider", "EmbeddingResult", "HashEmbedding", "build_embedder"]
+__all__ = [
+    "EmbeddingProvider",
+    "EmbeddingResult",
+    "HashEmbedding",
+    "CachedEmbedding",
+    "EmbeddingCache",
+    "build_embedder",
+]
 
 
 def build_embedder(model_name: str | None = None, *, force_hash: bool = False) -> EmbeddingProvider:

@@ -1,7 +1,7 @@
 # OSS 라이선스 보고서 — KOIPA AI 영업비밀관리시스템 (로이드케이 AI 파트)
 
-작성일: 2026-05-27
-버전: v0.9 (의존성 변경 시 갱신)
+작성일: 2026-05-28
+버전: v0.9.1 (의존성 변경 시 갱신)
 산출: 발주처 검수 산출물 / 공공사업 의무 산출물
 대상: KOIPA / KL / Lloydk 내부 감사
 
@@ -38,7 +38,7 @@
 
 ---
 
-## 3. 기본 dependencies (23개)
+## 3. 기본 dependencies (24개)
 
 `pyproject.toml [project].dependencies` — CI·기본 설치 시 자동 install.
 
@@ -58,7 +58,7 @@
 
 → AGPL 위험 해소 완료. 라이선스 협의 항목에서 제외.
 
-### 3.2 허용형 라이선스 (★) — 22개
+### 3.2 허용형 라이선스 (★) — 23개
 
 | 패키지 | 버전 | 라이선스 | 출처 |
 |---|---|---|---|
@@ -84,6 +84,7 @@
 | evaluate | ≥0.4 | Apache-2.0 | https://github.com/huggingface/evaluate |
 | scikit-learn | ≥1.5 | BSD-3-Clause | https://github.com/scikit-learn/scikit-learn |
 | mlflow | ≥2.16 | Apache-2.0 | https://github.com/mlflow/mlflow |
+| matplotlib | ≥3.9 | PSF-based (matplotlib license, BSD-스타일) | https://matplotlib.org (W11 M6 평가 — confusion-matrix PNG, report.py) |
 | python-docx | ≥1.1 | MIT | https://github.com/python-openxml/python-docx |
 | pyyaml | ≥6.0 | MIT | https://github.com/yaml/pyyaml |
 
@@ -147,11 +148,26 @@ SDK 자체는 OSS — **상용 API 호출 비용은 별개**.
 | langchain-openai | ≥0.2 | MIT | 동상 |
 | langgraph | ≥0.2 | MIT | https://github.com/langchain-ai/langgraph |
 
-### 4.6 `[lint]` / `[dev]`
+### 4.6 `[psh]` — Performance Scenario Harness 보조
+
+| 패키지 | 버전 | 라이선스 | 비고 |
+|---|---|---|---|
+| prometheus-client | ≥0.20 | Apache-2.0 AND BSD-2-Clause | https://github.com/prometheus/client_python — 이미 base에 포함되나 PSH(W11) 명시적 그룹화 |
+
+### 4.7 `[evaluation]` — 평가 산출물 (confusion-matrix·통계 그래프)
+
+| 패키지 | 버전 | 라이선스 | 비고 |
+|---|---|---|---|
+| matplotlib | ≥3.9 | PSF-based (matplotlib license, BSD-스타일) | https://matplotlib.org — 이미 base에 포함되나 평가 워크플로 명시적 그룹화 |
+| seaborn | ≥0.13 | BSD-3-Clause | https://seaborn.pydata.org — 분포 시각화 (선택) |
+
+### 4.8 `[lint]` / `[dev]`
 
 | 패키지 | 라이선스 |
 |---|---|
 | openapi-spec-validator | Apache-2.0 |
+| pip-licenses | MIT |
+| cyclonedx-bom | Apache-2.0 |
 | pytest | MIT |
 | pytest-asyncio | Apache-2.0 |
 | ruff | MIT |
@@ -330,9 +346,9 @@ KL/발주처 회신과 함께 확정해야 할 라이선스 사안:
 
 ---
 
-## 10. 결정 사항 요약 (v0.9)
+## 10. 결정 사항 요약 (v0.9.1)
 
-1. **직접 의존성 23개 모두 OSS 적합** — Apache/MIT/BSD/MPL 중심
+1. **직접 의존성 24개 모두 OSS 적합** — Apache/MIT/BSD/PSF/MPL 중심 (`pip-licenses` 실측 2026-05-28: permissive 18, weak 1=psycopg LGPL, strong 1=PyMuPDF AGPL 듀얼)
 2. ~~**PyMuPDF AGPL/Artifex 듀얼** → 운영 전환 전 상용 또는 pdfminer.six 결정 필요~~ **2026-05-27 v2: pdfminer.six 교체 완료** ✅
 3. **konlpy GPL-3.0** → 현재 미사용, 향후 사용 시 별도 프로세스 분리 또는 대체
 4. **MinIO AGPL-3.0** → 발주처·KL과 소스 공개 vs 상용 라이선스 협의
@@ -350,6 +366,7 @@ KL/발주처 회신과 함께 확정해야 할 라이선스 사안:
 - [x] `docker-compose.yml`의 `redis:7-alpine` → `redis:7.2-alpine` 고정 완료 (BSD 시점, 2026-05-27)
 - [x] `scripts/dump_licenses.py` 신규 (2026-05-27) — 4종 포맷 자동 산출 + CI 검증 잡 통합
 - [x] CI `licenses-check` 잡 추가 — 신규 strong copyleft 의존성 도입 사전 차단
+- [x] **2026-05-28 W11**: matplotlib base 추가(M6 confusion-matrix PNG), seaborn `[evaluation]` extras 추가, `[psh]`·`[evaluation]` 그룹 신설 — pip-licenses 실측: matplotlib=PSF·seaborn=BSD-3, 모두 허용형 ★
 
 ### 11.2 회신 의존
 
