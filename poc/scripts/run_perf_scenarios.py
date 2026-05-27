@@ -34,6 +34,10 @@ POC_ROOT = HERE.parent
 REPO_ROOT = POC_ROOT.parent
 sys.path.insert(0, str(POC_ROOT / "src"))
 
+# PSH는 TestClient inprocess로 분당 수십 호출 — slowapi rate-limit 자동 비활성.
+# 사용자가 명시적으로 RATE_LIMIT_DISABLED=0 설정한 경우만 활성 유지.
+os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
+
 from lloydk.perf import capture_env  # noqa: E402
 from lloydk.perf.harness import (  # noqa: E402
     AvailableResources,

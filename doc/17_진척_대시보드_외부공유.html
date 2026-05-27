@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>KOIPA AI 영업비밀관리시스템 — 진척 보고 (협력사·발주처 공유본) | Lloydk AI</title>
-<meta name="description" content="W1~W8 워크플로우 진척률, 협력사 회신 요청 트래커, 잠정 작업 가정, 조정 대상 항목과 다음 액션. 2026-05-27 W3 종료 시점 협력사·발주처 공유 v0.3-ext." />
+<meta name="description" content="W1~W12 워크플로우 진척률, 협력사 회신 요청 트래커, 잠정 작업 가정, 조정 대상 항목과 다음 액션. 2026-05-28 W12 종료 시점, 회귀 테스트 409 PASS · 18 시나리오 × 65 KPI. 협력사·발주처 공유 v0.9.5-ext." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -206,7 +206,7 @@
   .hero-progress .by-stage {
     margin-top: 20px;
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(12, 1fr);
     gap: 6px;
   }
   .stage-tick {
@@ -465,7 +465,7 @@
   @media (max-width: 900px) {
     h1.title { font-size: 40px; }
     .hero { grid-template-columns: 1fr; }
-    .hero-progress .by-stage { grid-template-columns: repeat(4, 1fr); }
+    .hero-progress .by-stage { grid-template-columns: repeat(6, 1fr); }
     .step { grid-template-columns: 50px 1fr; }
     .step-status { justify-content: flex-start; padding-top: 6px; grid-column: 2; }
     .hero-progress .pct { font-size: 56px; }
@@ -484,9 +484,9 @@
 <div class="confidential-bar">
   사내·협력사 한정 (Confidential — KOIPA · KL · Lloydk)
   <span class="sep">·</span>
-  v0.3-ext (외부 공유본)
+  v0.9.5-ext (외부 공유본)
   <span class="sep">·</span>
-  2026-05-27
+  2026-05-28
 </div>
 
 <!-- ============================================================
@@ -523,15 +523,17 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v0.3-ext · 2026-05-27 W3 종료 시점</span>
+    <span class="meta-soft">v0.9.5-ext · 2026-05-28 W12 종료 시점</span>
   </div>
 
-  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 보고 (W3 종료)</h1>
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 보고 (W12 종료)</h1>
 
   <p class="lede">
-    W1·W2·W3 완료. <b>OpenAPI 20개 path 라우터 구현 완료</b> — KL 연동 인터페이스 골격 가용.
-    W6에서 GPU·실문서·LLM API 키 3개 항목은 발주처/KL 확정 대기 중이며, 그동안 Lloydk 측 작업은 잠정 기본값(working assumption)으로 잠가 병행 진행 가능.
-    회귀 테스트 237건 통과, 회신 도착 시 차이 부분만 자동 패치하도록 설계.
+    <b>Phase 1 (W1~W8) 90% · Phase 2 (W9~W12) 100% 완료</b>. W6 한 단계만 발주처 자원(GPU·실문서·가이드 v2·LLM API 키) 도착 시 즉시 가동되며,
+    나머지 11개 단계는 잠정 기본값(working assumption)으로 코드 잠금 후 정상 가동·검증 완료.
+    <b>OpenAPI 20개 path 라우터 + RAG 인덱서 + 평가/능동학습 + 관측성·DR + 라이선스 정리</b>까지 코어 인프라 완성.
+    Phase 2에서는 일반화 납품(LLM·임베딩 이중 경로) 및 <b>PSH(시나리오 성능 하네스) 18 시나리오 × 65 KPI</b>로 정량 회귀 추적 체계 확립.
+    회귀 테스트 <b>409건 통과</b>, 회신 도착 시 차이 부분만 자동 패치하도록 설계.
   </p>
 
   <!-- ============================================================
@@ -539,25 +541,29 @@
   ============================================================ -->
   <div class="hero">
     <div class="hero-progress">
-      <div class="label">전체 완성도 (단계별 가중치)</div>
-      <div class="pct">50<span class="of">%</span></div>
-      <div class="bar"><div class="bar-fill" style="width: 50%"></div></div>
+      <div class="label">전체 완성도 (Phase 1 + Phase 2 가중 평균)</div>
+      <div class="pct">96<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 96%"></div></div>
       <div class="by-stage">
         <div class="stage-tick done">W1</div>
         <div class="stage-tick done">W2</div>
         <div class="stage-tick done">W3</div>
-        <div class="stage-tick active">W4</div>
-        <div class="stage-tick">W5</div>
+        <div class="stage-tick done">W4</div>
+        <div class="stage-tick done">W5</div>
         <div class="stage-tick block">W6</div>
-        <div class="stage-tick">W7</div>
-        <div class="stage-tick">W8</div>
+        <div class="stage-tick done">W7</div>
+        <div class="stage-tick done">W8</div>
+        <div class="stage-tick done">W9</div>
+        <div class="stage-tick done">W10</div>
+        <div class="stage-tick done">W11</div>
+        <div class="stage-tick done">W12</div>
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="num done">237</div><div class="lbl">회귀 테스트 PASS</div></div>
-      <div class="stat"><div class="num">22</div><div class="lbl">API 라우트</div></div>
-      <div class="stat"><div class="num risk">6</div><div class="lbl">조정 대상</div></div>
-      <div class="stat"><div class="num">16</div><div class="lbl">잠정 기본값</div></div>
+      <div class="stat"><div class="num done">409</div><div class="lbl">회귀 테스트 PASS</div></div>
+      <div class="stat"><div class="num">23</div><div class="lbl">API 라우트</div></div>
+      <div class="stat"><div class="num">65</div><div class="lbl">시나리오 KPI (18종)</div></div>
+      <div class="stat"><div class="num risk">3</div><div class="lbl">조정 대상 (발주처)</div></div>
     </div>
   </div>
 
@@ -574,10 +580,10 @@
     <div class="callout-body">
       <span class="callout-label">EXECUTIVE SUMMARY</span>
       <ul>
-        <li><b>완료 (W1~W3)</b> — DB 영속화, 분류·합성·학습·평가·관측 서비스 골격, OpenAPI 20개 path 라우터·감사로그 미들웨어 가동.</li>
-        <li><b>진행 중 (W4·W5)</b> — 평가/능동학습 모듈, RAG 인덱서 — 외부 의존 없이 Lloydk 단독 진행 가능.</li>
-        <li><b>조정 대상 (W6)</b> — GPU 사양·실문서 제공 여부·합성 데이터 API 예산 3건은 발주처/KL 결정 대기. 그동안 잠정 기본값으로 코드 잠금.</li>
-        <li><b>회신 요청 기한</b> — 협의요청서(doc/06) <b>2026-06-09</b>까지 KL·발주처 회신 부탁드립니다.</li>
+        <li><b>Phase 1 코어 완료 (W1~W5·W7·W8)</b> — DB 영속화, 분류·합성·학습 서비스 골격, OpenAPI 20개 path 라우터, RAG 인덱서, M6 평가/능동학습, 관측성·백업·DR Runbook v1.0, 라이선스 정리 + SBOM CI + KL 통합 8 시나리오까지 가동.</li>
+        <li><b>Phase 2 일반화·정량 검증 완료 (W9~W12)</b> — LLM 원격/로컬 이중 경로 + 임베딩 로컬화로 GPU 의존성 제거, 시드 v2(142)·형태소 사전(235) 확장, <b>PSH 18 시나리오 × 65 KPI</b> 정량 회귀 추적 체계 (sparkline·회귀 자동 감지·PR 코멘트·GitHub Pages 자동 배포).</li>
+        <li><b>조정 대상 (W6 한 단계만)</b> — GPU·실문서·합성 LLM API 예산·등급분류 가이드 v2 도착 시 즉시 학습 가동. 그동안 잠정 기본값으로 코드 잠금 상태 유지.</li>
+        <li><b>회신 요청 기한</b> — 협의요청서(doc/06) <b>2026-06-09</b>까지 KL·발주처 회신 부탁드립니다. 우선 항목: Q1(GPU)·Q4(가이드)·K1(인프라)·K2(OpenAPI 검토).</li>
       </ul>
     </div>
   </div>

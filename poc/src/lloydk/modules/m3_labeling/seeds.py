@@ -22,6 +22,12 @@ v2 확장 정책 (2026-05-27 W9):
 - 등급당 약 40~50개 (총 ~170개) — 운영 수준 진입
 - 도메인 균형: 반도체·바이오·SW·금융·공공·법무·HR·일반 균등
 - 일반화 납품: 특정 산업에 편향되지 않도록 분포 유지
+
+v3 확장 정책 (2026-05-28 W12+, 무중단 블록 1):
+- 등급당 약 100~140개 (총 ~480개) — 운영 풀 진입
+- 도메인 확장: v2(8) + 자동차·화학·소재·통신·에너지·국방·식품·물류·콘텐츠·헬스케어(10) = 18 도메인
+- 4 평가요소 분포 균형 강화: LEAK_IMPACT·ECONOMIC_VALUE·MANAGEMENT_LEVEL·NON_PUBLICITY 각 ~25%
+- 시드 키워드 추가는 공개 출처(영업비밀보호법·시행령·산업기술보호법·KISA·KOTRA 공개 자료)만 사용
 """
 
 from __future__ import annotations
@@ -92,6 +98,72 @@ KEYWORD_SEEDS: list[dict] = [
     {"grade": "TS", "keyword": "주요 소송 전략", "weight": 0.75, "factor": "LEAK_IMPACT"},
     {"grade": "TS", "keyword": "기업분할 검토", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
 
+    # === v3 확장 (W12+ 블록 1, 도메인 일반화) ===
+    # 자동차·전기차
+    {"grade": "TS", "keyword": "배터리 셀 화학식", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "배터리 양극재 조성", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "전고체 전해질 조성", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "자율주행 알고리즘 핵심", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "차세대 플랫폼 설계", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "차량 ECU 펌웨어 소스", "weight": 0.85, "factor": "MANAGEMENT_LEVEL"},
+    # 화학·소재
+    {"grade": "TS", "keyword": "촉매 합성 레시피", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "공정 촉매 조성비", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "OLED 발광 재료 조성", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "포토레지스트 조성", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "특수 코팅 조성식", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    # 통신·네트워크
+    {"grade": "TS", "keyword": "5G 기지국 스택 핵심", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "통신 프로토콜 미공개 확장", "weight": 0.85, "factor": "NON_PUBLICITY"},
+    {"grade": "TS", "keyword": "해저케이블 경로", "weight": 0.85, "factor": "LEAK_IMPACT"},
+    # 에너지·원자력
+    {"grade": "TS", "keyword": "원자로 노심 설계", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "핵연료 농축 절차", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "발전소 SCADA 구성", "weight": 0.9, "factor": "MANAGEMENT_LEVEL"},
+    # 국방·방산
+    {"grade": "TS", "keyword": "유도무기 제어 알고리즘", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "위성 통신 키 체계", "weight": 0.95, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "TS", "keyword": "스텔스 코팅 조성", "weight": 0.95, "factor": "ECONOMIC_VALUE"},
+    # 헬스케어·바이오 확장
+    {"grade": "TS", "keyword": "유전자 편집 표적 서열", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "백신 항원 설계", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "mRNA 변형 서열", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    # 콘텐츠·게임 (산업 보호 대상)
+    {"grade": "TS", "keyword": "게임 코어 엔진 소스", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "콘텐츠 추천 핵심 알고리즘", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    # 보안 운영
+    {"grade": "TS", "keyword": "HSM 마스터 시드", "weight": 0.95, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "TS", "keyword": "루트 CA 개인키", "weight": 0.95, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "TS", "keyword": "OT/SCADA 인증서", "weight": 0.9, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "TS", "keyword": "백도어 위치", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    # 경영 확장
+    {"grade": "TS", "keyword": "비공개 합병 가격", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "비공개 IPO 일정", "weight": 0.9, "factor": "NON_PUBLICITY"},
+    {"grade": "TS", "keyword": "전략 제휴 가격 조건", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    # 정부·공공 확장
+    {"grade": "TS", "keyword": "산업기술 국가핵심기술 지정", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "방산물자 지정", "weight": 0.9, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "보호 대상 기술 분류", "weight": 0.85, "factor": "LEAK_IMPACT"},
+    # 금융 확장
+    {"grade": "TS", "keyword": "리스크 모델 핵심 파라미터", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "트레이딩 시그널 생성식", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "초단타 매매 핵심 로직", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    # AI/데이터 확장
+    {"grade": "TS", "keyword": "기초모델 사전학습 데이터셋", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "RLHF 보상 모델 가중치", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "강화학습 정책 가중치", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    # 식품·바이오 확장
+    {"grade": "TS", "keyword": "비공개 가공 레시피", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "발효 균주 정보", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    # 물류·SCM
+    {"grade": "TS", "keyword": "물류 라우팅 최적화 핵심", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "거래선 단가 변동표", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    # 분석 (등급 표기 명시 확장)
+    {"grade": "TS", "keyword": "1급 보안", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "기밀 1급", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "Eyes-Only", "weight": 0.9, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "Need-to-Know", "weight": 0.85, "factor": "NON_PUBLICITY"},
+
     # ============================================================
     # S1 1급 비밀 — 유출 시 중대한 손해
     # ============================================================
@@ -141,6 +213,68 @@ KEYWORD_SEEDS: list[dict] = [
     {"grade": "S1", "keyword": "신용평가 모델", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
     {"grade": "S1", "keyword": "이자율 산정식", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
 
+    # === v3 확장 (W12+ 블록 1) ===
+    # 자동차·모빌리티
+    {"grade": "S1", "keyword": "차량 BOM 명세", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "차량 단가표", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "리콜 대응 계획", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S1", "keyword": "ADAS 시험 데이터", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    # 화학·소재
+    {"grade": "S1", "keyword": "원재료 단가 협상안", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "공정 수율 데이터", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "제조 BOM", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    # 통신·네트워크
+    {"grade": "S1", "keyword": "네트워크 보안 구성", "weight": 0.8, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "방화벽 룰셋", "weight": 0.8, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "DNS 내부 구성", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    # 에너지
+    {"grade": "S1", "keyword": "발전 비용 구조", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "전력 거래 시장 분석", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    # 국방·방산 (TS 미만 일반)
+    {"grade": "S1", "keyword": "납품 단가 협상", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "방산 입찰 전략", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    # 헬스케어·의료
+    {"grade": "S1", "keyword": "환자 식별 데이터", "weight": 0.85, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "의료 영상 데이터셋", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "보험 청구 데이터", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    # 콘텐츠·게임
+    {"grade": "S1", "keyword": "게임 밸런스 파라미터", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "콘텐츠 라이선스 단가", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "유저 행동 로그", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    # 보안 운영
+    {"grade": "S1", "keyword": "취약점 분석 보고서", "weight": 0.85, "factor": "LEAK_IMPACT"},
+    {"grade": "S1", "keyword": "침투 테스트 결과", "weight": 0.85, "factor": "LEAK_IMPACT"},
+    {"grade": "S1", "keyword": "보안 점검 결과", "weight": 0.8, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "사고 대응 보고서", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S1", "keyword": "비공개 패치 노트", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    # AI/데이터
+    {"grade": "S1", "keyword": "fine-tuning 데이터셋", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "프롬프트 템플릿", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "embedding 모델 구성", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "RAG 검색 인덱스 구조", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    # 식품·물류
+    {"grade": "S1", "keyword": "공급사 단가표", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "물류 비용 분석", "weight": 0.7, "factor": "ECONOMIC_VALUE"},
+    # 인사·HR
+    {"grade": "S1", "keyword": "임원 평가 결과", "weight": 0.85, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "성과급 산정 모델", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "스톡옵션 부여 명단", "weight": 0.85, "factor": "MANAGEMENT_LEVEL"},
+    # 영업·고객
+    {"grade": "S1", "keyword": "주요 고객 ARPU", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "고객 이탈률", "weight": 0.7, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "B2B 가격표", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "할인 정책 매트릭스", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    # 법무 확장
+    {"grade": "S1", "keyword": "비공개 합의서", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S1", "keyword": "분쟁 합의 조건", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S1", "keyword": "라이선스 협상 초안", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    # 등급 표기 확장 — 본 시스템은 TS(특급) > S1(1급) > S2(2급) > S3(공개) 순.
+    # "2급 비밀"은 S2 시드와 충돌 가능해 의도적으로 S1에 두지 않음.
+    {"grade": "S1", "keyword": "Restricted", "weight": 0.85, "factor": "LEAK_IMPACT"},
+    {"grade": "S1", "keyword": "Confidential High", "weight": 0.8, "factor": "LEAK_IMPACT"},
+    {"grade": "S1", "keyword": "1급비밀", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "S1", "keyword": "내부 1급", "weight": 0.85, "factor": "LEAK_IMPACT"},
+
     # ============================================================
     # S2 2급 대외비 — 유출 시 경쟁상 불이익
     # ============================================================
@@ -184,6 +318,53 @@ KEYWORD_SEEDS: list[dict] = [
     {"grade": "S2", "keyword": "협의 의사록", "weight": 0.55, "factor": "NON_PUBLICITY"},
     {"grade": "S2", "keyword": "MOU 초안", "weight": 0.6, "factor": "NON_PUBLICITY"},
 
+    # === v3 확장 (W12+ 블록 1) ===
+    # 자동차
+    {"grade": "S2", "keyword": "차종별 판매 실적", "weight": 0.65, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "딜러 인센티브", "weight": 0.6, "factor": "ECONOMIC_VALUE"},
+    # 통신·네트워크
+    {"grade": "S2", "keyword": "기지국 위치 목록", "weight": 0.7, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "회선 운영 현황", "weight": 0.6, "factor": "MANAGEMENT_LEVEL"},
+    # 에너지
+    {"grade": "S2", "keyword": "발전소 운영 일지", "weight": 0.6, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "전력 수급 계획", "weight": 0.65, "factor": "ECONOMIC_VALUE"},
+    # 식품·물류
+    {"grade": "S2", "keyword": "거래처별 매출", "weight": 0.7, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "물류 거점 운영 현황", "weight": 0.6, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "배송 비용 구조", "weight": 0.6, "factor": "ECONOMIC_VALUE"},
+    # 콘텐츠
+    {"grade": "S2", "keyword": "광고 단가표", "weight": 0.65, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "콘텐츠 사용 실적", "weight": 0.6, "factor": "ECONOMIC_VALUE"},
+    # 헬스케어
+    {"grade": "S2", "keyword": "진료 통계", "weight": 0.6, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "병상 운영률", "weight": 0.55, "factor": "MANAGEMENT_LEVEL"},
+    # IT·운영
+    {"grade": "S2", "keyword": "용량 산정 보고서", "weight": 0.6, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "시스템 모니터링 결과", "weight": 0.55, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "장애 보고서", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S2", "keyword": "변경 관리 대장", "weight": 0.55, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "릴리즈 노트 내부판", "weight": 0.55, "factor": "NON_PUBLICITY"},
+    # 보안·감사
+    {"grade": "S2", "keyword": "감사 결과 요약", "weight": 0.65, "factor": "NON_PUBLICITY"},
+    {"grade": "S2", "keyword": "내부 통제 보고서", "weight": 0.65, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "권한 점검 결과", "weight": 0.65, "factor": "MANAGEMENT_LEVEL"},
+    # 영업·마케팅 확장
+    {"grade": "S2", "keyword": "캠페인 성과", "weight": 0.55, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "프로모션 일정", "weight": 0.6, "factor": "NON_PUBLICITY"},
+    {"grade": "S2", "keyword": "고객 세그먼트 분석", "weight": 0.6, "factor": "ECONOMIC_VALUE"},
+    # HR 확장
+    {"grade": "S2", "keyword": "팀별 KPI", "weight": 0.6, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "근태 통계", "weight": 0.55, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "교육 이수율", "weight": 0.5, "factor": "MANAGEMENT_LEVEL"},
+    # 재무 확장
+    {"grade": "S2", "keyword": "원가 분석 내부판", "weight": 0.7, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "예산 집행 현황", "weight": 0.6, "factor": "ECONOMIC_VALUE"},
+    # 등급 표기 확장
+    {"grade": "S2", "keyword": "Internal Use", "weight": 0.6, "factor": "NON_PUBLICITY"},
+    {"grade": "S2", "keyword": "Internal Only", "weight": 0.65, "factor": "NON_PUBLICITY"},
+    {"grade": "S2", "keyword": "사내 전용", "weight": 0.6, "factor": "NON_PUBLICITY"},
+    {"grade": "S2", "keyword": "비공개 (대외)", "weight": 0.7, "factor": "NON_PUBLICITY"},
+
     # ============================================================
     # S3 3급 공개 — 일반 사내자료 또는 공개 가능
     # ============================================================
@@ -224,4 +405,59 @@ KEYWORD_SEEDS: list[dict] = [
     {"grade": "S3", "keyword": "감사보고서 공개", "weight": 0.8, "factor": "NON_PUBLICITY"},
     {"grade": "S3", "keyword": "지속가능경영 보고서", "weight": 0.75, "factor": "NON_PUBLICITY"},
     {"grade": "S3", "keyword": "ESG 보고서", "weight": 0.75, "factor": "NON_PUBLICITY"},
+
+    # === v3 확장 (W12+ 블록 1) ===
+    # 정부·공공 공개
+    {"grade": "S3", "keyword": "공공입찰 공고", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "정부 통계", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "정책 자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공공데이터 포털", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "오픈데이터", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    # IR·재무 공개
+    {"grade": "S3", "keyword": "분기 IR 자료", "weight": 0.85, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "주주총회 공고", "weight": 0.85, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "전자공시", "weight": 0.85, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "DART 공시", "weight": 0.85, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "EDGAR Filing", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    # 학술·연구 공개
+    {"grade": "S3", "keyword": "학회 발표 자료", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공개 논문", "weight": 0.85, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "프리프린트", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "오픈소스 라이선스", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "GitHub 공개 저장소", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    # 미디어·홍보
+    {"grade": "S3", "keyword": "기자회견 자료", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공식 SNS 게시물", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "유튜브 공식", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "블로그 공식", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    # 안전·환경
+    {"grade": "S3", "keyword": "MSDS 공개판", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "환경 영향 평가 공개", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "안전 인증서", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "ISO 인증 안내", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "ISMS 인증 안내", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    # 제품·기술 공개
+    {"grade": "S3", "keyword": "공개 데이터시트", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공개 사양서", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공개 API 문서", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "사용자 매뉴얼 공개", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "지원 문서", "weight": 0.65, "factor": "NON_PUBLICITY"},
+    # 행사·이벤트
+    {"grade": "S3", "keyword": "개최 안내", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "참가 안내", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "포럼 자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공개 컨퍼런스", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "데모데이 자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    # 인사·채용 공개
+    {"grade": "S3", "keyword": "공개 모집 공고", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공개 채용 일정", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "인턴 모집 공고", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    # 통계·트렌드
+    {"grade": "S3", "keyword": "산업 트렌드 리포트", "weight": 0.65, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공개 시장 보고서", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "오픈 통계자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    # 등급 표기 확장 (Public은 위에 이미 존재)
+    {"grade": "S3", "keyword": "Unclassified", "weight": 0.8, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공개 가능", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "공시 대상", "weight": 0.75, "factor": "NON_PUBLICITY"},
 ]
