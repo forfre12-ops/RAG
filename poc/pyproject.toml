@@ -79,10 +79,12 @@ orchestration = [
   "langgraph>=0.2",
 ]
 
-# OpenAPI yaml 검증 (CI lint)
+# OpenAPI yaml 검증 + 라이선스/SBOM 산출 (CI lint·검수 산출물)
 # 활성: pip install -e ".[lint]"
 lint = [
   "openapi-spec-validator>=0.7",
+  "pip-licenses>=5.0",             # 의존성 라이선스 표 (doc/14)
+  "cyclonedx-bom>=4.5",            # SBOM CycloneDX (doc/14 §7)
 ]
 
 # 모든 옵션 한 번에 설치 (운영 환경용)
