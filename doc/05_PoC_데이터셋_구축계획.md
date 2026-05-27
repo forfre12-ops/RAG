@@ -141,7 +141,7 @@ poc/datasets/
 │  ├─ val.jsonl
 │  └─ test.jsonl
 ├─ rag_index/
-│  └─ guides_v1/                # BGE-M3 임베딩 + Qdrant snapshot
+│  └─ guides_v1/                # KURE-v1 임베딩 + ES snapshot (alias: secrets-guides-koipa)
 ├─ manifests/
 │  ├─ dataset_v1.0.yaml         # 출처·해시·라이선스·생성일
 │  └─ license_report.md
@@ -277,7 +277,7 @@ W4  [Test 셋 분리 + 평가]     최종 모델 평가, 리포트
 - [ ] `poc/datasets/manifests/dataset_v1.0.yaml`
 - [ ] `poc/datasets/manifests/license_report.md`
 - [ ] `poc/datasets/labeled/{train,val,test}.jsonl` (총 4,000건)
-- [ ] `poc/datasets/rag_index/guides_v1/` (Qdrant snapshot)
+- [ ] `poc/datasets/rag_index/guides_v1/` (ES snapshot, `secrets-guides-koipa-kure-v1`)
 - [ ] 합성 프롬프트 v1.0 + 생성 로그
 - [ ] 검수 결과 리포트 (카파, 합격률, 등급별 통계)
 - [ ] 라이선스 보고서
@@ -299,4 +299,4 @@ W4  [Test 셋 분리 + 평가]     최종 모델 평가, 리포트
 ## 10. 다음 단계
 - 본 문서 확정 → **(b) `poc/` 디렉토리 코드 스캐폴딩** 착수
 - 우선 구현: M2 추출(P4), M1 합성(데이터 구축), M4 학습(P1)
-- 도커 컴포즈에 Postgres/Qdrant/MinIO/Redis/MLflow + FastAPI app 포함
+- 도커 컴포즈에 Postgres/Elasticsearch/MinIO/Redis/MLflow + FastAPI app 포함 (자세한 ES 전환은 [doc/13](13_벡터DB_ES_전환_계획서.md))

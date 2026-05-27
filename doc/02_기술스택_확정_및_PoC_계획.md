@@ -92,15 +92,16 @@
 
 | 후보 | C1 | C2 | C3 | C4 | C5 | C6 | C7 | 종합 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|
-| **Qdrant** | ★★★★★ | - | ★★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | **★★★★★** | Rust, 단일 컨테이너, 메타필터 강력, Apache 2.0 |
-| Milvus | ★★★ | - | ★★★★ | ★★★ | ★★★★★ | ★★★★★ | ★★★★★ | ★★★ | 대규모 강점이나 etcd+MinIO 의존 |
-| Vespa | ★★★ | - | ★★★★ | ★★★ | ★★★ | ★★★★★ | ★★★★ | ★★★ | PPTX에 언급되었으나 학습 곡선 가파름 |
-| Elasticsearch + dense_vector | ★★★★ | - | ★★★ | ★★★ | ★★★★★ | ★★★★ | ★★★★★ | ★★★★ | KL이 ES 도입 시 통합 이점 |
-| pgvector (PostgreSQL) | ★★★★★ | - | ★★★ | ★★★★★ | ★★★★ | ★★★ | ★★★★★ | ★★★★ | RDB 통합 운영 단순, 대용량은 한계 |
+| **Elasticsearch 8.14+** | ★★★★ | - | ★★★★★ | ★★★★ | ★★★★★ | ★★★★★ | ★★★★★ | **★★★★★** | `dense_vector` HNSW + BM25 + RRF 하이브리드, Kibana/ILM/Watcher 운영 표준, KL 기존 인프라 재사용 |
+| pgvector (PostgreSQL) | ★★★★★ | - | ★★★ | ★★★★★ | ★★★★ | ★★★ | ★★★★★ | ★★★★ | RDB 통합 운영 단순, 대용량 한계 — **2순위 폴백** |
+| Qdrant | ★★★★★ | - | ★★★★ | ★★★★★ | ★★★★ | ★★★★ | ★★★★★ | ★★★★ | Rust 단일 컨테이너, 메타필터 강력 — **3순위 롤백 경로** |
+| Milvus | ★★★ | - | ★★★★ | ★★★ | ★★★★★ | ★★★★★ | ★★★★★ | ★★★ | 대규모 강점이나 etcd+MinIO 의존, 제외 |
+| Vespa | ★★★ | - | ★★★★ | ★★★ | ★★★ | ★★★★★ | ★★★★ | ★★★ | 학습 곡선 가파름, 제외 |
 
-**확정**: **Qdrant 1순위 / pgvector 대안 (KL이 PostgreSQL만 운영 가능 환경일 때)**
-**이유**: Docker 단일 컨테이너로 기업 배포 부담 최소, BGE-M3의 dense+sparse 모두 수용, 메타필터(기업/부서/등급)로 멀티 테넌트 분리 용이.
-**확인 필요**: KL과 ES 도입 여부 협의 — ES면 dense_vector 플러그인 통합 고려
+**확정 (2026-05-27 v2)**: **Elasticsearch 8.14+ 1순위 / pgvector 2순위 폴백 / Qdrant 3순위 롤백**
+**이유**: KL 사전 인터뷰에서 ES 운영 표준화 의사 확인, dense_vector + BM25 + RRF 하이브리드로 영업비밀 검색의 키워드+의미 동시 수용, Kibana·ILM·audit log 등 운영 도구가 발주처 컴플라이언스에 부합. KL이 ES를 거부할 시 pgvector(RDB 통합), 그것도 불가면 Qdrant 폴백.
+**상세**: [doc/13_벡터DB_ES_전환_계획서.md](13_벡터DB_ES_전환_계획서.md) (v0.9-final, E1~E8 회신 후 v1.0 확정 예정)
+**확인 필요**: E1~E8 (KL ES 버전·Nori 플러그인·라이선스 등급·테넌트 격리·노드 사양·스냅샷 위치·인덱스 권한·retention)
 
 ---
 
@@ -169,7 +170,7 @@
 | 임베딩 | **KURE-v1** (한국어 1순위, BGE-M3 fine-tuned) / BGE-M3 폴백 / ko-sroberta 경량 |
 | LLM 상용 | **Claude Sonnet 4.6** (기본) / GPT-4o / Gemini — Adapter 교체 |
 | LLM OSS | **Qwen3-14B + vLLM ≥ 0.8.5** (thinking/non-thinking) / EXAONE 3.5(검토) / Llama+Bllossom |
-| Vector DB | **Qdrant** (기본) / pgvector 또는 ES |
+| Vector DB | **Elasticsearch 8.14+** (기본, [doc/13](13_벡터DB_ES_전환_계획서.md)) / pgvector 폴백 / Qdrant 롤백 |
 | RDB | **PostgreSQL 16 + pgvector + JSONB** |
 | 스토리지 | **MinIO** |
 | 큐/캐시 | **Redis 7 + Celery** |
@@ -191,7 +192,7 @@
 | ID | PoC 명 | 검증 목적 | 결과로 결정되는 사항 | 기간 | 산출물 |
 |---|---|---|---|---|---|
 | **P1** | 분류 모델 비교 | KF-DeBERTa vs KoELECTRA, RAG ON/OFF F1·FNR 비교 | 1.1 모델 채택, 1.4 RAG 효과 정량화 | 2주 | 성능 리포트, Confusion Matrix |
-| **P2** | 임베딩·VectorDB 검색 정확도 | **KURE-v1 vs BGE-M3** + Qdrant Top-K 검색 적중률 | 1.2, 1.4 채택 확정 | 1주 | Recall@K, NDCG@K, Latency 표 |
+| **P2** | 임베딩·VectorDB 검색 정확도 | **KURE-v1 vs BGE-M3** + **ES dense vs ES 하이브리드(RRF) vs Qdrant** 4-way Top-K 적중률 | 1.2, 1.4 채택 확정 + 합격선 상향 협의 | 1주 | Recall@K, NDCG@K, Latency 표 |
 | **P3** | LLM 합성 문서 품질 | Claude/GPT/**Qwen3** 합성 문서 라벨 일치도·다양성·단가, **Qwen3 thinking/non-thinking 비교** | 1.3 기본값 + 운영 단가 견적 | 1.5주 | 합성문서 1,000건 + 평가 리포트 |
 | **P4** | HWP/PDF/OCR 추출 품질 | 공문·기술문서 30종 추출 정확도, **rhwp-python vs pyhwp** 비교 | 1.8 라이브러리 조합 확정 | 1주 | 추출 정확도·속도 매트릭스 |
 | **P5** | 통합 E2E 스모크 | 업로드→전처리→분류→결과 1건 통과 | 인프라 통합 가능성 | 0.5주 | 시연 영상 + 로그 |
@@ -261,7 +262,7 @@ P5 E2E통합              ██
 
 1. **본 문서를 KL/발주처에 공유** → §4의 Q1~Q7 답변 수집 (1주)
 2. **PoC 데이터셋 1차 구축**: AI Hub·공공데이터 수집 + 가이드 문서 정리 (1주)
-3. **PoC 환경 셋업**: GPU 1장 + Docker compose로 Qdrant/Postgres/MinIO/Redis/MLflow 구동 (3일)
+3. **PoC 환경 셋업**: GPU 1장 + Docker compose로 Elasticsearch/Postgres/MinIO/Redis/MLflow 구동 (3일, ES 마이그레이션 단계 S1은 [doc/13 §6](13_벡터DB_ES_전환_계획서.md) 참고)
 4. **P4 시작**: 문서처리는 다른 PoC의 입력이므로 최우선 (W1)
 5. **PoC 완료 후 본 문서 §1을 갱신하여 v1.0 확정** → 본 설계의 §2 모듈 구현 착수
 
