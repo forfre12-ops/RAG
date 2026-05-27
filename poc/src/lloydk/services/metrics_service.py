@@ -1,8 +1,9 @@
 """Metrics service — /metrics/latest·/history·/confusion-matrix.
 
-PoC 스텁: M6 평가 모듈(W4)이 본격적으로 채울 곳. 본 서비스는
-- 현재 운영 모델(model_versions.is_active=TRUE) 메트릭을 직접 반환
-- M6가 활성화되면 metrics 컬럼 + per_class 추가됨
+설계 (W4 풀 구현):
+- model_versions.metrics JSONB가 있으면 그대로 사용 (학습 후 저장된 stored metrics)
+- 없으면 M6 compute_metrics_from_db로 **라이브 평가** (운영 중 분류·보정 누적분 기반)
+- confusion-matrix는 M6 build_confusion_matrix로 알람까지 산출
 """
 
 from __future__ import annotations
@@ -15,6 +16,15 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from lloydk.db import session_scope
 from lloydk.db.models import ModelVersion
+from lloydk.modules.m6_evaluation import (
+    build_confusion_matrix,
+    compute_metrics_from_db,
+)
+from lloydk.modules.m6_evaluation.confusion_matrix import DEFAULT_LABELS
+from lloydk.modules.m6_evaluation.metrics import (
+    MetricsResult,
+    _fetch_truth_pred_pairs,
+)
 from lloydk.schemas.metrics import ConfusionMatrix, MetricsHistory, MetricsReport
 
 logger = logging.getLogger(__name__)
@@ -29,7 +39,14 @@ class MetricsService:
                 ).scalar_one_or_none()
                 if mv is None:
                     return None
-                return self._to_report(mv)
+                stored = self._from_stored(mv)
+                if stored.sample_count and stored.sample_count > 0:
+                    return stored
+                # stored metrics 없으면 라이브 평가
+                live = compute_metrics_from_db(mv.version_label)
+                if live is None or live.sample_count == 0:
+                    return stored  # 빈 stored 반환 (sample_count=0)
+                return self._from_m6(live, mv)
         except SQLAlchemyError as exc:
             logger.debug("metrics latest skipped: %s", exc)
             return None
@@ -42,7 +59,7 @@ class MetricsService:
                         select(ModelVersion).order_by(ModelVersion.created_at.desc()).limit(limit)
                     ).scalars()
                 )
-                return MetricsHistory(items=[self._to_report(mv) for mv in rows])
+                return MetricsHistory(items=[self._from_stored(mv) for mv in rows])
         except SQLAlchemyError as exc:
             logger.debug("metrics history skipped: %s", exc)
             return MetricsHistory(items=[])
@@ -55,22 +72,44 @@ class MetricsService:
                 ).scalar_one_or_none()
                 if mv is None:
                     return None
-                m = mv.metrics or {}
-                matrix = m.get("confusion_matrix", [])
-                fnr = m.get("fnr_by_grade", {})
-                labels = m.get("labels", ["TS", "S1", "S2", "S3"])
+
+                # stored 우선
+                stored = mv.metrics or {}
+                stored_matrix = stored.get("confusion_matrix")
+                stored_labels = stored.get("labels", list(DEFAULT_LABELS))
+                if stored_matrix:
+                    return ConfusionMatrix(
+                        model_version=model_version,
+                        labels=stored_labels,
+                        matrix=stored_matrix,
+                        fnr_by_grade=stored.get("fnr_by_grade", {}),
+                    )
+
+                # 라이브 — classifications + corrections에서 페어 추출 후 M6로 CM
+                pairs = _fetch_truth_pred_pairs(db, model_version)
+                if not pairs:
+                    return None
+                y_true, y_pred = zip(*pairs)
+                cm_result = build_confusion_matrix(list(y_true), list(y_pred))
+                # FNR by grade는 metrics 한번 더 계산
+                from lloydk.modules.m6_evaluation.metrics import compute_metrics_from_arrays
+                m = compute_metrics_from_arrays(list(y_true), list(y_pred), model_version=model_version)
                 return ConfusionMatrix(
                     model_version=model_version,
-                    labels=labels,
-                    matrix=matrix,
-                    fnr_by_grade=fnr,
+                    labels=cm_result.labels,
+                    matrix=cm_result.matrix,
+                    fnr_by_grade=m.fnr_by_grade,
                 )
         except SQLAlchemyError as exc:
             logger.debug("metrics confusion-matrix skipped: %s", exc)
             return None
 
+    # ------------------------------------------------------------
+    # internals
+    # ------------------------------------------------------------
+
     @staticmethod
-    def _to_report(mv: ModelVersion) -> MetricsReport:
+    def _from_stored(mv: ModelVersion) -> MetricsReport:
         m = mv.metrics or {}
         return MetricsReport(
             model_version=mv.version_label,
@@ -81,5 +120,19 @@ class MetricsService:
             f1_macro=m.get("f1_macro"),
             fnr_overall=m.get("fnr_overall"),
             fnr_by_grade=m.get("fnr_by_grade", {}),
-            sample_count=mv.training_data_count,
+            sample_count=mv.training_data_count or m.get("sample_count") or 0,
+        )
+
+    @staticmethod
+    def _from_m6(live: MetricsResult, mv: ModelVersion) -> MetricsReport:
+        return MetricsReport(
+            model_version=mv.version_label,
+            measured_at=mv.trained_at.isoformat() if mv.trained_at else None,
+            accuracy=live.accuracy,
+            precision_macro=live.precision_macro,
+            recall_macro=live.recall_macro,
+            f1_macro=live.f1_macro,
+            fnr_overall=live.fnr_overall,
+            fnr_by_grade=live.fnr_by_grade,
+            sample_count=live.sample_count,
         )
