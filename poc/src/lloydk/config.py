@@ -34,11 +34,28 @@ class Settings(BaseSettings):
     api_key: str = "lloydk_dev_apikey"
 
     # --- LLM ---
-    llm_provider: str = "noop"  # noop|anthropic|openai|google|vllm
+    # provider 선택: 원격(원격 API) 또는 로컬(OpenAI 호환 endpoint) 자유 선택.
+    # 일반화 납품을 위해 어느 한쪽에 잠금하지 않음.
+    #   noop          : 결정론적 mock (CI·dryrun)
+    #   anthropic     : Claude Sonnet/Opus/Haiku 원격
+    #   openai        : GPT-4o 등 원격
+    #   google        : Gemini 원격 (어댑터 준비 중)
+    #   local_openai  : OpenAI 호환 endpoint (vLLM·Ollama·LM Studio·llama.cpp)
+    #   vllm          : (alias) local_openai와 동일 — 하위호환
+    #   ollama        : (alias) local_openai와 동일 — Ollama 기본 11434 endpoint
+    llm_provider: str = "noop"
     llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     google_api_key: str = ""
+
+    # 로컬 OpenAI 호환 endpoint (vLLM·Ollama·LM Studio·llama.cpp)
+    local_llm_base_url: str = "http://localhost:8001/v1"  # vLLM 기본
+    local_llm_model: str = "Qwen/Qwen3-14B"
+    local_llm_api_key: str = "EMPTY"   # vLLM은 EMPTY, Ollama는 ollama, LM Studio는 lm-studio
+    local_llm_enable_thinking: bool = False  # Qwen3 /think 지시어
+
+    # 하위호환 alias (vllm_*) — 기존 코드·테스트가 참조 중
     vllm_base_url: str = "http://localhost:8001/v1"
     vllm_model: str = "Qwen/Qwen3-14B"
     vllm_enable_thinking: bool = False
