@@ -141,10 +141,19 @@ KPIS: list[KPI] = [
     KPI("S9.2", "S9", "적대적 FNR (TS→하위)", "ratio", "le", 0.05, "last", requires=["trained_model"], core=True),
     KPI("S9.3", "S9", "confidence 변동 stdev", "ratio", "le", 0.20, "last"),
 
-    # S11 부하 시나리오 (W10 확장)
-    KPI("S11.1", "S11", "동시 50 error_rate", "ratio", "le", 0.01, "last"),
-    KPI("S11.2", "S11", "동시 50 p95 latency", "ms", "le", 8000, "p95"),
-    KPI("S11.3", "S11", "throughput", "req/s", "ge", 5, "last"),
+    # S11 부하 시나리오 (W10 확장 + W12+ 블록 6 단계 상향)
+    # error_rate는 모든 단계 누적 — 0.01 유지
+    KPI("S11.1", "S11", "단계별 누적 error_rate", "ratio", "le", 0.01, "last"),
+    # p95는 모든 단계 누적 — 8s 유지 (가장 큰 부하 100/200 워커 반영)
+    KPI("S11.2", "S11", "단계별 p95 latency", "ms", "le", 8000, "p95"),
+    # throughput은 단계 중 최대 (정점 처리량)
+    KPI("S11.3", "S11", "throughput peak", "req/s", "ge", 5, "last"),
+    # W12+ 신규: 메모리 누수 감지 — 전·후 RSS 차분 ≤ 100MB
+    KPI("S11.4", "S11", "메모리 누수 (RSS Δ)", "MB", "le", 100, "last"),
+    # W12+ 신규: 단계 확장성 — scaling ratio / worker ratio.
+    # dryrun(TestClient + Python GIL)에서는 진정한 병렬이 불가능 → 0.15가 현실
+    # full(uvicorn workers)에서는 ≥ 0.5 도달 가능, 합격선 별도 상향 검토 필요
+    KPI("S11.5", "S11", "단계 확장성 (scaling efficiency)", "ratio", "ge", 0.15, "last"),
 
     # S13 멀티 테넌트 격리 (W10 확장)
     # bool/count 핵심 격리 검증. 데이터 누출 사고 방지 KPI

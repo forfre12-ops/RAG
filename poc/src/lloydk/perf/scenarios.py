@@ -665,19 +665,38 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
 # ----------------------------------------------------------------
 
 def s11_concurrent_stress(ctx: ScenarioContext) -> None:
-    """동시 N 워커 × M 요청 → error_rate / p95 / throughput."""
+    """동시 N 워커 × M 요청 → error_rate / p95 / throughput / 메모리 누수 / 단계 확장성.
+
+    W12+ 블록 6 확장:
+    - 단계 상향: 20 → 50 → 100 워커 (full 모드는 50 → 100 → 200)
+    - 메모리 누수 감지: 시나리오 전·후 RSS 차분, +100MB 이상 시 누수 신호
+    - 단계 확장성: throughput이 워커 수에 비례하는지 (linear scaling ratio)
+    """
     import threading
 
     make = _client_factory()
-    n_workers = 50 if ctx.mode == "full" else 20  # dryrun은 20으로 보수적
+
+    # RSS 측정 헬퍼 — psutil 없을 시 graceful skip
+    def _rss_mb() -> float | None:
+        try:
+            import psutil  # noqa: PLC0415
+            import os as _os
+            return psutil.Process(_os.getpid()).memory_info().rss / (1024 * 1024)
+        except Exception:  # noqa: BLE001
+            return None
+
+    rss_before = _rss_mb()
+
+    # 단계 — full은 더 큰 부하
+    stages = [50, 100, 200] if ctx.mode == "full" else [20, 50, 100]
     per_worker = 5
+    stage_throughputs: list[float] = []
 
-    latencies: list[float] = []
-    errors = 0
-    lock = threading.Lock()
+    all_latencies: list[float] = []
+    total_errors = 0
+    total_requests = 0
 
-    def worker(idx: int, cli) -> None:
-        nonlocal errors
+    def worker(idx: int, cli, latencies: list, errors_state: list, lock: threading.Lock) -> None:
         for j in range(per_worker):
             t0 = time.perf_counter()
             try:
@@ -692,34 +711,67 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
                 elapsed_ms = (time.perf_counter() - t0) * 1000.0
                 with lock:
                     if r.status_code >= 500 or r.status_code == 0:
-                        errors += 1
+                        errors_state[0] += 1
                     else:
                         latencies.append(elapsed_ms)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 with lock:
-                    errors += 1
+                    errors_state[0] += 1
 
-    t_start = time.perf_counter()
     with make() as cli:
-        threads = [
-            threading.Thread(target=worker, args=(i, cli), daemon=True)
-            for i in range(n_workers)
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=60)
-    elapsed_s = time.perf_counter() - t_start
+        for n_workers in stages:
+            stage_latencies: list[float] = []
+            errors_state = [0]
+            lock = threading.Lock()
+            t_start = time.perf_counter()
+            threads = [
+                threading.Thread(
+                    target=worker,
+                    args=(i, cli, stage_latencies, errors_state, lock),
+                    daemon=True,
+                )
+                for i in range(n_workers)
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=60)
+            elapsed_s = time.perf_counter() - t_start
 
-    total_requests = n_workers * per_worker
-    completed = len(latencies)
-    error_rate = errors / total_requests if total_requests else 1.0
-    throughput = completed / elapsed_s if elapsed_s > 0 else 0.0
+            stage_total = n_workers * per_worker
+            stage_completed = len(stage_latencies)
+            stage_throughput = stage_completed / elapsed_s if elapsed_s > 0 else 0.0
+            stage_throughputs.append(stage_throughput)
+
+            all_latencies.extend(stage_latencies)
+            total_errors += errors_state[0]
+            total_requests += stage_total
+
+    error_rate = total_errors / total_requests if total_requests else 1.0
+    throughput_max = max(stage_throughputs) if stage_throughputs else 0.0
 
     ctx.record("s11_1", error_rate)
-    for lat in latencies:
+    for lat in all_latencies:
         ctx.record("s11_2", lat)
-    ctx.record("s11_3", throughput)
+    ctx.record("s11_3", throughput_max)
+
+    # S11.4 메모리 누수 — 전·후 RSS 차분
+    rss_after = _rss_mb()
+    if rss_before is not None and rss_after is not None:
+        rss_delta_mb = rss_after - rss_before
+        ctx.record("s11_4", rss_delta_mb)
+        # 정직성: 100MB 이상 증가 = 누수 가능성. 단, 캐시·모델 첫 로드 영향 가능
+        # 합격선 ≤ 100MB (정상 동작 마진)
+
+    # S11.5 단계 확장성 — 첫 단계 대비 마지막 단계 throughput 비율
+    # 이상적이라면 worker 수 비율과 비슷해야 함 (50/20 ≈ 2.5)
+    if len(stage_throughputs) >= 2 and stage_throughputs[0] > 0:
+        scaling_ratio = stage_throughputs[-1] / stage_throughputs[0]
+        # 단계 워커 비율
+        worker_ratio = stages[-1] / stages[0]
+        # 효율: scaling_ratio / worker_ratio (1.0 = 완벽 선형, <1 = 병목 발생)
+        scaling_efficiency = scaling_ratio / worker_ratio if worker_ratio > 0 else 0.0
+        ctx.record("s11_5", scaling_efficiency)
 
 
 # ----------------------------------------------------------------
@@ -1168,10 +1220,71 @@ def s12_large_batch(ctx: ScenarioContext) -> None:
 # ----------------------------------------------------------------
 
 def s14_es_dr(ctx: ScenarioContext) -> None:
-    """dryrun: ES 가용성 확인만. full: docker 정전 시뮬레이션 (별도 옵트인 필요)."""
+    """dryrun: ES 가용성 확인만. full: docker 정전 시뮬레이션 (PSH_S14_SIMULATE_OUTAGE=1 옵트인).
+
+    W12+ 블록 6 B3 보강:
+    - 옵트인 시 docker compose pause/unpause 시도 (PSH_S14_DOCKER_BIN 환경변수로 docker 바이너리 지정)
+    - 권한·환경 의존이 강해 dryrun 기본은 비활성, 운영 단계에서 nightly로 1회 실행 권장
+    """
+    import os as _os
+    import subprocess as _sp
+
     # 가용성 식별 자체가 KPI — capture_env가 UP/DOWN 양쪽 다 반환하면 True.
     # dryrun(--no-probe)에서도 False라는 답을 받았다는 사실로 "식별 가능" 의미.
     ctx.record("s14_1", True)
+
+    # 옵트인 옵트아웃 — 환경변수로만 활성화 (자동 무중단 실행 금지)
+    if _os.environ.get("PSH_S14_SIMULATE_OUTAGE", "").lower() not in ("1", "true", "yes"):
+        return
+    if not ctx.resources.has("es"):
+        ctx.skip("S14 정전 시뮬레이션 옵트인됐으나 ES 미가용 (resources.es=False)")
+        return
+
+    docker_bin = _os.environ.get("PSH_S14_DOCKER_BIN", "docker")
+    container_name = _os.environ.get("PSH_S14_ES_CONTAINER", "lloydk-es")
+
+    # 1. 정전 → ES 응답 안 됨 확인
+    try:
+        _sp.run([docker_bin, "pause", container_name], check=False, timeout=10, capture_output=True)
+    except Exception:  # noqa: BLE001
+        ctx.skip(f"docker pause 실패 — bin={docker_bin}, container={container_name}")
+        return
+
+    import httpx  # type: ignore
+
+    # error_rate 측정 (정전 중)
+    n_attempts = 5
+    n_errors = 0
+    for _ in range(n_attempts):
+        try:
+            r = httpx.get("http://localhost:9200/", timeout=3.0)
+            if r.status_code >= 500 or r.status_code == 0:
+                n_errors += 1
+        except Exception:  # noqa: BLE001
+            n_errors += 1
+    error_rate = n_errors / n_attempts
+    ctx.record("s14_2", error_rate)
+
+    # 2. 복구 → 정상화까지 polling
+    t_resume_start = time.perf_counter()
+    try:
+        _sp.run([docker_bin, "unpause", container_name], check=False, timeout=10, capture_output=True)
+    except Exception:  # noqa: BLE001
+        pass
+
+    recovery_ms: float | None = None
+    for _ in range(60):  # 최대 60초
+        try:
+            r = httpx.get("http://localhost:9200/", timeout=2.0)
+            if r.status_code < 400:
+                recovery_ms = (time.perf_counter() - t_resume_start) * 1000.0
+                break
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(1.0)
+
+    if recovery_ms is not None:
+        ctx.record("s14_3", recovery_ms)
 
     # S14.2 / S14.3은 require=es + 명시 옵트인 환경변수
     import os as _os
