@@ -455,15 +455,15 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v0.6.1 · 2026-05-27 인프라 정비 (Docker E드라이브 + Qdrant 어댑터 제거)</span>
+    <span class="meta-soft">v0.7 · 2026-05-27 W8 종료 (Qdrant 제거 · PyMuPDF→pdfminer.six · SBOM CI · KL 통합 8시나리오)</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 대시보드</h1>
 
   <p class="lede">
-    W1~W5 + W7 완료. <b>외부 의존 없는 코드 작업은 W8 라이선스 정리만 남음</b>.
-    W6은 GPU·실문서·LLM API 키 차단 대기. 관측성 스택 + 백업·DR 스크립트 + Runbook v1.0 가동.
-    pytest <b>267 PASS</b> (Qdrant 어댑터·마이그·테스트 22개 정리, 회귀 0), 자체결정으로 회신 의존 변수 16개 동결.
+    W1~W5 + W7 + W8 완료. <b>외부 의존 없는 코드 작업 모두 종료</b> — PyMuPDF→pdfminer.six, SBOM CI 자동 산출, KL 통합 8시나리오 자동화.
+    Qdrant 백엔드도 자체 결정으로 완전 제거. 남은 건 W6 (GPU·실문서·LLM API 키) 차단 해소만.
+    pytest <b>285 PASS</b>, 자체결정으로 회신 의존 변수 16개 동결.
   </p>
 
   <!-- ============================================================
@@ -472,8 +472,8 @@
   <div class="hero">
     <div class="hero-progress">
       <div class="label">전체 완성도 (단계별 가중치)</div>
-      <div class="pct">80<span class="of">%</span></div>
-      <div class="bar"><div class="bar-fill" style="width: 80%"></div></div>
+      <div class="pct">90<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 90%"></div></div>
       <div class="by-stage">
         <div class="stage-tick done">W1</div>
         <div class="stage-tick done">W2</div>
@@ -482,13 +482,13 @@
         <div class="stage-tick done">W5</div>
         <div class="stage-tick block">W6</div>
         <div class="stage-tick done">W7</div>
-        <div class="stage-tick active">W8</div>
+        <div class="stage-tick done">W8</div>
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="num done">267</div><div class="lbl">pytest PASS</div></div>
+      <div class="stat"><div class="num done">285</div><div class="lbl">pytest PASS</div></div>
       <div class="stat"><div class="num">23</div><div class="lbl">API 라우트</div></div>
-      <div class="stat"><div class="num block">6</div><div class="lbl">차단 자원</div></div>
+      <div class="stat"><div class="num block">1</div><div class="lbl">차단 자원 (W6만)</div></div>
       <div class="stat"><div class="num">16</div><div class="lbl">자체결정 동결</div></div>
     </div>
   </div>
@@ -622,18 +622,19 @@
     <div class="step-conn"></div>
 
     <!-- W8 -->
-    <div class="step active">
+    <div class="step done">
       <div class="step-num">W8</div>
       <div class="step-body">
-        <div class="step-title">KL 통합 + 라이선스 교체 + SBOM + 운영 전환</div>
+        <div class="step-title">라이선스 정리 + SBOM CI + KL 통합 8시나리오</div>
         <div class="step-desc">
-          PyMuPDF → pdfminer.six, MinIO Commercial 또는 대체,
-          CycloneDX SBOM CI 추가, KL ↔ Lloydk API 통합 테스트 8 시나리오,
-          FUN-013 운영 로그 중앙서버 forwarder.
+          PyMuPDF → pdfminer.six (BSD-3, AGPL 회피), MinIO 결정 보류 + SeaweedFS 부록,
+          CycloneDX 1.5 SBOM CI 자동 산출 (poc-ci 통합), doc/19 KL 8시나리오 + 18 자동 테스트.
+          Qdrant 백엔드 완전 제거 (사용자 결정).
+          <code>commit b42694d</code>
         </div>
       </div>
       <div class="step-status">
-        <span class="pill future">대기</span>
+        <span class="pill done">완료 100%</span>
       </div>
     </div>
   </div>
@@ -658,8 +659,8 @@
         <tr class="pick"><td>W5</td><td>10%</td><td>100%</td><td>10.0%</td><td><span class="pill done">완료</span></td><td>RagIndexer + GuideService 결합 + ES alias 스왑, 15 신규 테스트 (InMemory + 라이브 ES)</td></tr>
         <tr><td>W6</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill block">차단</span></td><td>합성 5,000, KF-DeBERTa 풀 학습, 폐쇄망 번들 25~30GB</td></tr>
         <tr class="pick"><td>W7</td><td>10%</td><td>100%</td><td>10.0%</td><td><span class="pill done">완료</span></td><td>Prometheus+Grafana+Loki, 백업 3종, DR 자동 검증, Runbook v1.0, 18 신규 테스트</td></tr>
-        <tr><td>W8</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill active">착수 대기</span></td><td>라이선스 교체 (PyMuPDF·MinIO), SBOM CI 추가, KL 통합 8 시나리오</td></tr>
-        <tr class="pick"><td><b>합계</b></td><td>100%</td><td>—</td><td><b>80.0%</b></td><td></td><td></td></tr>
+        <tr class="pick"><td>W8</td><td>10%</td><td>100%</td><td>10.0%</td><td><span class="pill done">완료</span></td><td>PyMuPDF→pdfminer.six, MinIO 결정 보류+SeaweedFS 부록, SBOM CI 자동 산출, KL 8시나리오 18 테스트. Qdrant 제거.</td></tr>
+        <tr class="pick"><td><b>합계</b></td><td>100%</td><td>—</td><td><b>90.0%</b></td><td></td><td></td></tr>
       </tbody>
     </table>
   </div>
@@ -833,7 +834,7 @@
     </div>
     <div class="card done">
       <div class="eyebrow">✓ Tests</div>
-      <div class="ctitle">pytest 267/267 PASS</div>
+      <div class="ctitle">pytest 285/285 PASS</div>
       <p>어댑터·전처리·라벨링·추론·API·offline bundle·DB ORM·repository·audit middleware·W3 라우터 25개·W4 M6 평가 19개·W5 RAG 인덱서 15개·W7 관측성·백업 18개. Qdrant 어댑터·마이그·테스트 22개는 v0.6.1에서 의도 제거(회귀 0). CI poc-ci + openapi-lint 2잡 GREEN.</p>
     </div>
     <div class="card done">
@@ -867,7 +868,7 @@
     <div class="callout-body">
       <span class="callout-label">START NOW</span>
       <ul>
-        <li><b>W8 라이선스·SBOM (1~2일)</b> — PyMuPDF → pdfminer.six 교체 또는 Artifex 구매, MinIO → Commercial 또는 SeaweedFS, CycloneDX SBOM CI 추가</li>
+        <li><b>외부 의존 없는 코드 작업 종료</b> — W6 차단 해소만 남음 (GPU·실문서·LLM API 키)</li>
         <li><b>병행 작업 (W6 차단 중에도 가능)</b>
           <ul>
             <li>시드 v2 — 영업비밀보호법·시행령 공개문헌으로 등급당 50~100개 키워드</li>
@@ -920,11 +921,10 @@
         <tr><th>시점</th><th>완료 예정</th><th>완성도</th><th>외부 의존</th></tr>
       </thead>
       <tbody>
-        <tr><td>+0 일 (오늘)</td><td>W1~W5 + W7 완료</td><td>80%</td><td>없음</td></tr>
-        <tr><td>+0~2 일</td><td>W8 라이선스 교체·SBOM CI</td><td>90%</td><td>없음 (KL 통합 일부 KL 의존)</td></tr>
-        <tr><td>+0~2 일</td><td>병행: 시드 v2 + 사전 확장 + KURE-v1 가중치 로컬화</td><td>92%</td><td>없음</td></tr>
-        <tr class="pick"><td><b>+2 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b></td><td><b>차단 해소 필요</b></td><td><b>사업단 예산 결정</b></td></tr>
-        <tr><td>+2 ~ +9 일</td><td>W6 합성·학습·번들 실빌드</td><td>100%</td><td>GPU + API 키</td></tr>
+        <tr><td>+0 일 (오늘)</td><td>W1~W5 + W7 + W8 완료 (Qdrant 제거 포함)</td><td>90%</td><td>없음</td></tr>
+        <tr><td>+0~3 일</td><td>병행: 시드 v2 + Nori 사전 확장 + KURE-v1 가중치 로컬화 + 정직성 노트</td><td>95%</td><td>없음</td></tr>
+        <tr class="pick"><td><b>+0 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b></td><td><b>차단 해소 필요</b></td><td><b>사업단 예산 결정</b></td></tr>
+        <tr><td>+0 ~ +7 일</td><td>W6 합성 5000건·학습·번들 실빌드</td><td>100%</td><td>GPU + API 키</td></tr>
       </tbody>
     </table>
   </div>
@@ -937,6 +937,7 @@
     <table>
       <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
       <tbody>
+        <tr><td>2026-05-27</td><td>v0.7</td><td>W8 종료 — PyMuPDF→pdfminer.six 교체, SBOM CycloneDX CI 자동 산출, doc/19 KL 통합 8시나리오 18 자동 테스트, MinIO 결정 보류+SeaweedFS 부록. 285 PASS. Hero KPI 90%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.6.1</td><td>인프라 정비 — Docker 데이터 볼륨 E드라이브 bind mount 이전(esdata만 named volume 유지) + Qdrant 어댑터·마이그레이션·롤백 경로 완전 제거 (코드·테스트·CI·docs). 267 PASS (의도 22개 제거).</td></tr>
         <tr><td>2026-05-27</td><td>v0.6</td><td>W7 종료 — 관측성 스택(Prometheus+Grafana+Loki) + 백업 3종 + DR 자동 검증 + Runbook v1.0. 289 PASS. Hero KPI 80%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.5</td><td>W5 종료 — RagIndexer + GuideService 결합 + ES 8.x 클라이언트 호환 픽스. 271 PASS. 외부 의존 없는 코드 작업 모두 완료.</td></tr>
