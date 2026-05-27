@@ -170,13 +170,56 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 
 | 키 | 용도 |
 |---|---|
-| `LLM_PROVIDER` | `noop`(기본) / `anthropic` / `openai` / `vllm` |
-| `ANTHROPIC_API_KEY` | P3를 실제 Claude로 돌릴 때 |
+| `LLM_PROVIDER` | `noop`(기본) / `anthropic` / `openai` / `google` / `vllm` / `ollama` / `lm_studio` / `local_openai` |
+| `ANTHROPIC_API_KEY` | 원격 — P3를 실제 Claude로 돌릴 때 |
+| `OPENAI_API_KEY` | 원격 — OpenAI GPT-4o 사용 시 |
+| `LOCAL_LLM_BASE_URL` | 로컬 — vLLM·Ollama·LM Studio OpenAI 호환 endpoint |
+| `LOCAL_LLM_MODEL` / `LOCAL_LLM_API_KEY` | 로컬 모델명·인증 |
 | `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1`(기본) / `BAAI/bge-m3` |
 | `CLASSIFIER_BASE_MODEL` | `kakaobank/kf-deberta-base`(기본) / KoELECTRA |
 | `POC_MODE` | `dryrun`(기본) / `full` |
 | **`VECTOR_BACKEND`** | `es`(기본) / `inmemory` |
 | **`ES_URL` / `ES_USERNAME` / `ES_PASSWORD`** | Elasticsearch 접속 |
+
+### LLM 설정 시나리오 (W9 일반화 — 원격/로컬 자유 선택)
+
+본 시스템은 KOIPA 외 다른 기관에도 일반화 납품되는 시스템입니다. LLM·임베딩은 환경에 따라 선택:
+
+**시나리오 A — CI·테스트·dryrun** (가장 가벼움, API 키 불필요)
+```bash
+LLM_PROVIDER=noop
+EMBEDDING_MODEL=nlpai-lab/KURE-v1   # sentence-transformers로 로컬 로드
+```
+
+**시나리오 B — GPU 미보유 + 원격 API 비용 허용** (운영 환경 일반)
+```bash
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxx
+LLM_MODEL=claude-sonnet-4-6
+EMBEDDING_MODEL=nlpai-lab/KURE-v1   # CPU 추론 (느리지만 동작)
+```
+
+**시나리오 C — GPU 보유 + 운영비 0** (폐쇄망 권장)
+```bash
+# Ollama 가동: `ollama serve` + `ollama pull qwen3:14b`
+LLM_PROVIDER=ollama
+LOCAL_LLM_MODEL=qwen3:14b
+EMBEDDING_MODEL=nlpai-lab/KURE-v1   # CUDA 가속
+```
+
+**시나리오 D — vLLM 자체호스팅** (대규모 처리량 필요)
+```bash
+# vLLM 서버 가동: `vllm serve Qwen/Qwen3-14B --port 8001`
+LLM_PROVIDER=vllm
+LOCAL_LLM_BASE_URL=http://localhost:8001/v1
+LOCAL_LLM_MODEL=Qwen/Qwen3-14B
+```
+
+**폐쇄망 사전 캐시** — 모델 가중치를 미리 다운로드:
+```bash
+python scripts/cache_kure_v1.py        # KURE-v1 + BGE-M3 캐시
+python scripts/cache_kure_v1.py --dry-run  # 캐시 존재 여부만 확인
+```
 
 ---
 
@@ -221,7 +264,7 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 - **`build_offline_bundle.py`** — 폐쇄망 번들 manifest dry-run, doc/12 §3·§4 구현
 - **OpenAPI 03 정합화** — `rag_namespace` → `rag_index_alias` rename + ES 컨텍스트 명시
 - **pyproject 재구성** — 기본 23개 + 7개 extras (hwp·nlp·embedding·llm·orchestration·lint·full·dev) + dead deps 제거
-- **CI 강화** — openapi-lint 잡 추가, bundle-dry · migrate-dry 통합
+- **CI 강화** — openapi-lint 잡 추가, bundle-dry 통합 (Qdrant migrate는 2026-05-27 v2 제거)
 - **테스트 48 → 126** (어댑터 36 + 번들 23 신규, 0 회귀)
 
 상세 진척과 회신 도착 시 발동 가이드: **[doc/15 종합 보고서](../doc/15_진척_종합_보고서.md)**

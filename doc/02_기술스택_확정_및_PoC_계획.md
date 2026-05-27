@@ -51,7 +51,7 @@
 **이유**:
 - KURE-v1은 BGE-M3 아키텍처를 한국어 retrieval 데이터로 파인튜닝한 모델 → BGE-M3의 dense+sparse+ColBERT multi-vector 출력 호환 유지
 - 한국어 retrieval 벤치마크에서 BGE-M3 대비 일관된 우위 (Recall@1 +1.6%p)
-- 동일 차원·동일 토크나이저이므로 Qdrant 인덱스를 재구축 없이 모델만 swap 가능 → 운영 리스크 낮음
+- 동일 차원·동일 토크나이저이므로 ES 인덱스를 재구축 없이 모델만 swap 가능 → 운영 리스크 낮음 (Qdrant 시절 동등 이점)
 - 고려대 nlpai-lab 한국 연구기관 산출물, MIT 라이선스
 **HuggingFace**: `nlpai-lab/KURE-v1`
 **PoC 필요**: 가이드 문서 + 사내규정 시드에 대한 KURE-v1 vs BGE-M3 Top-K 검색 정확도 직접 비교 (P2)
@@ -192,7 +192,7 @@
 | ID | PoC 명 | 검증 목적 | 결과로 결정되는 사항 | 기간 | 산출물 |
 |---|---|---|---|---|---|
 | **P1** | 분류 모델 비교 | KF-DeBERTa vs KoELECTRA, RAG ON/OFF F1·FNR 비교 | 1.1 모델 채택, 1.4 RAG 효과 정량화 | 2주 | 성능 리포트, Confusion Matrix |
-| **P2** | 임베딩·VectorDB 검색 정확도 | **KURE-v1 vs BGE-M3** + **ES dense vs ES 하이브리드(RRF) vs Qdrant** 4-way Top-K 적중률 | 1.2, 1.4 채택 확정 + 합격선 상향 협의 | 1주 | Recall@K, NDCG@K, Latency 표 |
+| **P2** | 임베딩·VectorDB 검색 정확도 | **KURE-v1 vs BGE-M3** + **ES dense vs ES 하이브리드(RRF)** 비교 (Qdrant는 2026-05-27 v2 제거) | 1.2, 1.4 채택 확정 + 합격선 상향 협의 | 1주 | Recall@K, NDCG@K, Latency 표 |
 | **P3** | LLM 합성 문서 품질 | Claude/GPT/**Qwen3** 합성 문서 라벨 일치도·다양성·단가, **Qwen3 thinking/non-thinking 비교** | 1.3 기본값 + 운영 단가 견적 | 1.5주 | 합성문서 1,000건 + 평가 리포트 |
 | **P4** | HWP/PDF/OCR 추출 품질 | 공문·기술문서 30종 추출 정확도, **rhwp-python vs pyhwp** 비교 | 1.8 라이브러리 조합 확정 | 1주 | 추출 정확도·속도 매트릭스 |
 | **P5** | 통합 E2E 스모크 | 업로드→전처리→분류→결과 1건 통과 | 인프라 통합 가능성 | 0.5주 | 시연 영상 + 로그 |
@@ -321,7 +321,7 @@ P5 E2E통합              ██
 [doc/13 §9.2](13_벡터DB_ES_전환_계획서.md) 기준: **합격선은 v0.9 그대로 유지** (Recall@5 ≥ 0.80, Lat p50 ≤ 200ms). ES + RRF 도입 효과는 S3 PoC v2에서 **4-way 측정** 후 발주처 협의로 v1.1 갱신.
 
 ```
-(a) Qdrant + KURE-v1          ← baseline
+(a) ES dense + KURE-v1        ← baseline (이전 Qdrant 시점 baseline에서 전환)
 (b) ES + KURE-v1 (dense kNN)  ← 백엔드 효과만
 (c) ES + BM25 only            ← 키워드 기여도
 (d) ES + KURE + BM25 + RRF    ← 하이브리드
@@ -350,7 +350,7 @@ P5 E2E통합              ██
 ```bash
 make poc-all              # P4→P3→P2→P1→P5 dryrun (~2초)
 make p2 --hybrid          # 4-way 시뮬레이션 (ES SKIP 안전망 동작)
-make migrate-dry          # Qdrant→ES sample-5 dry-run
+# make migrate-dry — Qdrant 백엔드 제거(2026-05-27 v2)로 타깃 삭제됨
 make bundle-dry           # 폐쇄망 번들 manifest dry-run
 pytest                    # 126/126 (어댑터·마이그·번들)
 ```

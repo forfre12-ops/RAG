@@ -308,8 +308,8 @@ curl -X POST http://elasticsearch:9200/_aliases -H 'Content-Type: application/js
 
 2. [재인덱싱]
    - guide 청크 전체 → 새 모델로 임베딩 → _bulk
-   - migrate_qdrant_to_es.py와 같은 패턴, source=이전 인덱스
-   - 또는 ES reindex API (동일 클러스터 내)
+   - ES scroll+bulk 패턴 또는 ES reindex API (동일 클러스터 내)
+   - 또는 GuideService를 통한 일괄 재업로드
 
 3. [검증]
    - count 일치
