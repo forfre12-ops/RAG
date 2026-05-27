@@ -450,3 +450,110 @@ python scripts/dump_licenses.py --format=cyclonedx -o sbom.json  # SBOM 산출
 - [ ] **Anthropic API 키 확보 시**: `make p3 --provider anthropic --total 800` → 실 다양성 측정 → 본 §D 갱신
 - [ ] **CI에 `dump_licenses --check --scope=direct`** 추가 — PyMuPDF 외 신규 strong copyleft 의존성 사전 차단
 - [ ] **`docker-compose.yml` Redis `7.2-alpine` 고정** — doc/14 §11.1 RSALv2 회피 권장
+
+---
+
+## 부록 E. W10~W12 PSH·시나리오 확장·블록 1~7 성과 (2026-05-28)
+
+PoC 진척 v3 이후 W10~W12 + 무중단 블록 1~7 작업 누적 결과. doc/15 v5 정합.
+
+### E.1 핵심 산출물 매트릭스
+
+| 영역 | v3 (W9 종료) | **v5 (W12 + 블록 1~7 종료)** | 비고 |
+|---|---|---|---|
+| pytest PASS | 301 | **465** (+164) | +PSH 단위·smoke 4 파일 |
+| 시나리오 | 8 (S1~S8) | **18** (S1~S18) | +S9·S10·S11·S12·S13·S14·S15·S16·S17·S18 |
+| KPI | — | **67** (7 core) | PSH 매트릭스 |
+| dryrun 안정성 | — | PASS 48 / FAIL 0 / SKIP 19 (5회 연속 동일) | rate_limit 우회 + warmup 강화 |
+| 시드 키워드 | v2 142 | **v3 313** | +18 도메인 균형 |
+| Nori 사용자 사전 | v2 235 | **v3 1,002** | 30 도메인 섹션 |
+| 합성 데이터 | 800 | **5,000** | noop, 라벨 일치 100% / FNR 0% |
+| labeled dataset | 미존재 | **train 3,500 / val 748 / test 752** | stratified 70/15/15 |
+| 임베딩 캐시 | — | **412 텍스트 / 9MB** | 7.75s → 0.00s (100% hit) |
+| OpenAPI 정합 | 수동 | **자동 100% 매칭** (21/21) | `scripts/openapi_consistency.py` |
+| SBOM | yaml/json | **+HTML 시각화 (doc/21)** | 173 컴포넌트, 폐쇄망 호환 |
+| 코드 커버리지 | 미측정 | **67%** | pytest-cov 도입 |
+
+### E.2 시나리오 18종 PSH 매트릭스
+
+[doc/19 §2.9~2.11](19_KL_통합_8시나리오.md) + [doc/20a v1.3](20a_시나리오_성능_KPI매트릭스.md) 정합.
+
+| 시나리오 | 영역 | 신규 KPI | 핵심 결과 (dryrun) |
+|---|---|---|---|
+| S1 단일 분류 | 인터페이스 | p50·p95·F1·FNR·schema | F1 1.00 (룰), p50 38ms |
+| S2 비동기 batch | 인터페이스 | async·throughput·polling | warmup 3회 강화 후 안정 |
+| S3 confirm/relabel | 인터페이스 | confirm·relabel·corrections | PG 의존 자동 SKIP |
+| S4 schema/grades | 인터페이스 | grades·retrain 트리거 | dryrun OK |
+| S5 가이드 RAG | 인터페이스 | 인덱싱·throughput·Recall@5 | trained_model 게이팅 |
+| S6 합성 검수 | 인터페이스 | 라벨 일치도·비용 | 일치도 100% (noop) |
+| S7 URGENT_RETRAIN | 인터페이스 | 임계치·queued | PG 의존 |
+| S8 metrics/CM | 인터페이스 | latest·history·CM | latency p95 38ms |
+| **S9 적대적 FNR** | 보안 | 변형 일관성·FNR·confidence | 변형 일관성 100% |
+| **S10 RAG 인용 충실도** | 정직성 | grounded_ratio·label-evidence | 100쌍 평가, 모두 100% |
+| **S11 부하 (Stress)** | 확장성 | error_rate·p95·throughput·**RSS Δ**·**확장성** | 100 워커·메모리 누수 검사 |
+| **S12 대용량 batch** | 확장성 | N=100/500/1000/1001 경계 | 2,050 docs/s |
+| **S13 멀티 테넌트** | 보안 | 교차 노출 0·tenant_id 정합 | 격리 100% |
+| **S14 ES DR 리허설** | 회복력 | 가용성·복구시간 | 옵트인 (`PSH_S14_SIMULATE_OUTAGE=1`) |
+| **S15 백업 라운드트립** | 회복력 | dr_restore_check | 실행 OK |
+| **S16 권한 거부** | 보안 | 401/422·거부 p95 | 38.6ms p95 |
+| **S17 감사 로그** | 컴플라이언스 | audit_count·role·ts 단조 | PG 의존 |
+| **S18 폐쇄망 번들** | 배포 | manifest·결정론·시간 | 151ms dry-run |
+
+### E.3 핵심 인프라 자산 (W10~W12 추가)
+
+| 자산 | 위치 | 역할 |
+|---|---|---|
+| **PSH 측정 하네스** | `poc/src/lloydk/perf/` | env·kpis·harness·recorder·scenarios·regression·pushgateway |
+| **PSH 진입 스크립트** | `poc/scripts/run_perf_scenarios.py` | dryrun/full 모드 + 회귀 게이트 + Pushgateway |
+| **HTML 렌더러** | `poc/scripts/render_perf_report.py` | doc/20 단일 HTML (인라인 SVG·임계선 sparkline) |
+| **OpenAPI 정합 검사** | `poc/scripts/openapi_consistency.py` | YAML ↔ Router (21/21 매칭) |
+| **SBOM HTML 렌더** | `poc/scripts/render_sbom_html.py` | doc/21 (173 컴포넌트) |
+| **임베딩 사전 캐시** | `poc/scripts/prewarm_embeddings.py` | 412 텍스트 / 7.75s → 0.00s |
+| **공개 코퍼스 수집** | `poc/scripts/collect_public_data.py` | 6 출처 매니페스트·검증·JSONL 변환 |
+| **임시 등급 가이드 v1** | `doc/22` | 공개 법령 기반 임시 운영본 |
+| **시드 v3** | `poc/src/lloydk/modules/m3_labeling/seeds.py` | 313 키워드 (TS 86 / S1 82 / S2 67 / S3 78) |
+| **Nori v3** | `poc/infra/es/userdict_ko.txt` | 1,002 항목 (30 도메인) |
+
+### E.4 합격선 갱신 권고 (실측 검증 후)
+
+doc/02 §3.3 합격선은 W6 P1 풀 학습 + Q3 실데이터 도착 후 갱신 권고:
+
+| KPI | 현 합격선 (PoC) | 실측 후 목표 (운영) | 비고 |
+|---|---|---|---|
+| P1 F1-macro | ≥ 0.75 | ≥ 0.85 (실 KF-DeBERTa) | trained_model 도착 시 |
+| P1 FNR (TS) | ≤ 5% | ≤ 2% (운영 목표) | KOIPA 핵심 미션 |
+| P2 Recall@5 | ≥ 0.80 | ≥ 0.85 (KURE-v1 + RRF) | doc/13 §9.2 정합 |
+| P2 Latency | ≤ 200ms | ≤ 100ms | ES + int8_hnsw 최적화 |
+| P5 E2E (RAG OFF) | ≤ 10s | ≤ 3s | 실 인프라 + 캐시 |
+| P5 E2E (RAG ON) | ≤ 30s | ≤ 8s | KURE-v1 + ES |
+
+### E.5 차단 자원 변동 (v3 → v5)
+
+| 자원 | v3 (W9) | **v5 (W12+블록)** | 변경 |
+|---|---|---|---|
+| 합성 5,000건 (2.1) | 차단 | **완료** | `make p3` 5k 자체 해소 |
+| labeled dataset (2.2) | 차단 | **완료** | `build_labeled_dataset --include-all` |
+| 가이드 v2 (1.2) | 차단 | 부분 해소 | doc/22 v1 임시본 작성, 발주처 v2 도착 시 패치 |
+| 실문서 (1.3) | 차단 | 자체결정 동결 | 합성+공개로 진행, 정직성 노트 |
+
+→ 차단 자원 4건 → **1건만 잔존** (가이드 v2, 발주처 회신 의존).
+
+### E.6 정직성 노트 (W10~W12 한계)
+
+1. **dryrun 한계**: 모든 측정은 in-process TestClient + InMemory + Hash 임베딩. 실 인프라 절대 수치는 다름.
+2. **noop 합성의 자기참조성**: 라벨 일치 100%는 룰 라벨러와 noop 합성기가 같은 시드 공유. 실 다양성은 Claude/Qwen3 호출 후 측정.
+3. **F1·FNR·Recall@5는 trained_model 게이팅**: 룰 fallback에서 의미 없는 점수 → dryrun에서 자동 SKIP. 실측은 W6 풀 학습 후.
+4. **공개 코퍼스는 매니페스트만 자동**: 실 다운로드·NDA는 수동.
+5. **S11.5 단계 확장성 0.15 합격선**: TestClient + GIL 한계 반영. full(uvicorn workers)에서 ≥0.5 도달 가능.
+
+### E.7 다음 단계 (W13+)
+
+회신·자원 확보 시점에 따라:
+
+| 트리거 | 액션 |
+|---|---|
+| GPU 확보 | KF-DeBERTa 풀 학습 → P1 F1·FNR 실측 |
+| Anthropic API 키 | `make p3 --provider anthropic --total 5000` → 다양성 실측 |
+| ES UP | `make p2-full` → Recall@5 4-way 비교 |
+| KOIPA 가이드 v2 | doc/22 v1 → v2 패치, 시드 v3 → v4, PSH 회귀 검사 |
+| KL 회신 (K2/K3) | OpenAPI 정합 검사 자동 → 차이만 yaml 패치
