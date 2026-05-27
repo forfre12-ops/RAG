@@ -77,9 +77,10 @@ p3:
 	$(PY) scripts/p3_generate_synthetic.py --total 40 --provider noop
 
 p3-800:
-	rm -rf datasets/synthetic
+	@# 별도 디렉터리 — make poc-all (smoke 40건, datasets/synthetic)과 분리
+	rm -rf datasets/synthetic_800
 	$(PY) scripts/p3_generate_synthetic.py --total 800 --provider noop \
-	    --out datasets/synthetic
+	    --out datasets/synthetic_800
 
 p2:
 	$(PY) scripts/p2_compare_embeddings.py --mode dryrun --backends inmemory
@@ -107,7 +108,12 @@ licenses-check:
 	$(PY) scripts/dump_licenses.py --check --scope=direct
 
 analyze-synth:
-	$(PY) scripts/analyze_synthetic.py
+	@# 풀 합성(800건)이 있으면 그걸 분석, 없으면 smoke 40건 fallback
+	@if [ -d datasets/synthetic_800 ]; then \
+	    $(PY) scripts/analyze_synthetic.py --synth-dir datasets/synthetic_800; \
+	else \
+	    $(PY) scripts/analyze_synthetic.py; \
+	fi
 
 verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + lint + 라이선스 + 분석)
 	@echo "==[1/6]== pytest"

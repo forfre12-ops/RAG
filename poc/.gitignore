@@ -7,7 +7,7 @@ datasets/external/
 datasets/preprocessed/
 datasets/labeled/
 datasets/synthetic/
-datasets/synthetic_smoke/
+datasets/synthetic_800/
 artifacts/
 mlruns/
 reports/

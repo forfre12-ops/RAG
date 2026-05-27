@@ -18,7 +18,7 @@ poc/datasets/external/
 poc/datasets/preprocessed/
 poc/datasets/labeled/
 poc/datasets/synthetic/
-poc/datasets/synthetic_smoke/
+poc/datasets/synthetic_800/
 poc/datasets/p4_corpus/
 poc/artifacts/
 poc/mlruns/
