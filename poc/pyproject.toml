@@ -9,6 +9,7 @@ dependencies = [
   # 웹 프레임워크
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
+  "python-multipart>=0.0.9",  # /guide/documents multipart 업로드
   "pydantic>=2.8",
   "pydantic-settings>=2.4",
   "httpx>=0.27",

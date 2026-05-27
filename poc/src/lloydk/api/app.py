@@ -6,6 +6,13 @@ from fastapi.responses import JSONResponse
 from lloydk.schemas.common import Error
 from lloydk.api import classify as classify_api
 from lloydk.api import health as health_api
+from lloydk.api import confirm as confirm_api
+from lloydk.api import training as training_api
+from lloydk.api import synthesis as synthesis_api
+from lloydk.api import guide as guide_api
+from lloydk.api import schema_admin as schema_admin_api
+from lloydk.api import metrics as metrics_api
+from lloydk.api import async_classify as async_classify_api
 from lloydk.api.middleware import AuditMiddleware
 
 
@@ -50,3 +57,10 @@ async def unhandled_error(request: Request, exc: Exception):
 
 app.include_router(health_api.router, prefix="/api/v1")
 app.include_router(classify_api.router, prefix="/api/v1")
+app.include_router(async_classify_api.router, prefix="/api/v1")
+app.include_router(confirm_api.router, prefix="/api/v1")
+app.include_router(training_api.router, prefix="/api/v1")
+app.include_router(synthesis_api.router, prefix="/api/v1")
+app.include_router(guide_api.router, prefix="/api/v1")
+app.include_router(schema_admin_api.router, prefix="/api/v1")
+app.include_router(metrics_api.router, prefix="/api/v1")
