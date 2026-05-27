@@ -1,21 +1,31 @@
 [project]
 name = "lloydk-ai"
 version = "0.1.0"
-description = "Lloydk AI Engine for KIPRA Trade-Secret System (PoC)"
+description = "Lloydk AI Engine for KOIPA Trade-Secret System (PoC)"
 requires-python = ">=3.11"
+# 기본 dependencies — CI · 핵심 학습/추론 파이프라인 필수
+# 무거운/선택적 의존성은 모두 [project.optional-dependencies]로 분리됨
 dependencies = [
+  # 웹 프레임워크
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic>=2.8",
   "pydantic-settings>=2.4",
+  "httpx>=0.27",
+
+  # DB · 큐 · 스토리지
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.2",
   "alembic>=1.13",
   "celery[redis]>=5.4",
   "redis>=5.0",
   "minio>=7.2",
-  "elasticsearch>=8.15,<10",  # 9.x 클라이언트는 8.x 서버 호환
-  "qdrant-client>=1.10",  # 롤백 경로 유지 (doc/13 §8.3, 2주 안정화 후 제거 검토)
+
+  # 벡터 DB (doc/13)
+  "elasticsearch>=8.15,<10",       # 9.x 클라이언트는 8.x 서버 호환
+  "qdrant-client>=1.10",           # 3순위 롤백 경로 (doc/13 §8.3)
+
+  # ML 코어 (학습·추론 필수)
   "transformers>=4.44",
   "torch>=2.3",
   "accelerate>=0.33",
@@ -23,28 +33,75 @@ dependencies = [
   "evaluate>=0.4",
   "scikit-learn>=1.5",
   "mlflow>=2.16",
+
+  # 표준 문서 추출 (lazy import 기반)
+  "pymupdf>=1.24",
+  "python-docx>=1.1",
+
+  # 유틸
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# HWP/HWPX 추출 (한국 공공문서). extractor.py가 try/except로 graceful 처리.
+# 활성: pip install -e ".[hwp]"
+hwp = [
+  "rhwp-python>=0.5.1",            # 최신 PyPI 0.5.1, 모든 플랫폼 wheel
+]
+
+# 한국어 형태소 분석·정규화 (Mecab 의존, Java JDK 필요할 수 있음)
+# 활성: pip install -e ".[nlp]"
+nlp = [
+  "soynlp>=0.0.493",
+  "konlpy>=0.6",
+]
+
+# 임베딩 가속 (BGE 계열 최적화) — 없으면 sentence-transformers fallback
+# 활성: pip install -e ".[embedding]"
+embedding = [
+  "FlagEmbedding>=1.2",
+  "sentence-transformers>=3.0",    # FlagEmbedding 실패 시 폴백 (hf_embedding.py)
+]
+
+# 상용 LLM API (P3 합성 실측, 운영 옵션)
+# 활성: pip install -e ".[llm]"
+llm = [
+  "anthropic>=0.39",
+  "openai>=1.50",
+]
+
+# 능동학습 체인·오케스트레이션 (향후 RAG·LangGraph 구현 시)
+# 활성: pip install -e ".[orchestration]"
+orchestration = [
   "langchain>=0.3",
   "langchain-anthropic>=0.2",
   "langchain-openai>=0.2",
   "langgraph>=0.2",
-  "anthropic>=0.39",
-  "openai>=1.50",
-  "pymupdf>=1.24",
-  "python-docx>=1.1",
-  "unstructured>=0.15",
+]
+
+# OpenAPI yaml 검증 (CI lint)
+# 활성: pip install -e ".[lint]"
+lint = [
+  "openapi-spec-validator>=0.7",
+]
+
+# 모든 옵션 한 번에 설치 (운영 환경용)
+# 활성: pip install -e ".[full]"
+full = [
+  "rhwp-python>=0.5.1",
   "soynlp>=0.0.493",
   "konlpy>=0.6",
   "FlagEmbedding>=1.2",
-  "pyyaml>=6.0",
-  "httpx>=0.27",
+  "sentence-transformers>=3.0",
+  "anthropic>=0.39",
+  "openai>=1.50",
+  "langchain>=0.3",
+  "langchain-anthropic>=0.2",
+  "langchain-openai>=0.2",
+  "langgraph>=0.2",
 ]
 
-[project.optional-dependencies]
-# HWP/HWPX 추출용 (한국 공공문서). 기본 install에선 제외 — extractor.py가 try/except로 graceful 처리.
-# 활성: pip install -e ".[hwp]"
-hwp = [
-  "rhwp-python>=0.5.1",  # 최신 PyPI 버전 (모든 플랫폼 wheel)
-]
+# 개발 (테스트·린트·노트북)
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
