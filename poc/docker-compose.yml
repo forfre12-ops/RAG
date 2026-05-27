@@ -17,8 +17,37 @@ services:
       interval: 5s
       retries: 10
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.telemetry.enabled: "false"
+      xpack.monitoring.collection.enabled: "false"
+      ES_JAVA_OPTS: "-Xms2g -Xmx2g"
+      ELASTIC_PASSWORD: ${ES_PASSWORD:-lloydk_dev_es}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+      - ./infra/es/userdict_ko.txt:/usr/share/elasticsearch/config/userdict_ko.txt:ro
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      retries: 20
+      start_period: 60s
+
+  # 롤백 경로 — `docker compose --profile rollback up`으로만 기동
   qdrant:
     image: qdrant/qdrant:latest
+    profiles: ["rollback"]
     volumes:
       - qdrantdata:/qdrant/storage
     ports:
@@ -71,6 +100,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-es}
+      ES_URL: http://elasticsearch:9200
+      ES_USERNAME: ${ES_USERNAME:-}
+      ES_PASSWORD: ${ES_PASSWORD:-}
       QDRANT_URL: http://qdrant:6333
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-lloydk}
@@ -83,8 +116,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      qdrant:
-        condition: service_started
+      elasticsearch:
+        condition: service_healthy
       minio:
         condition: service_started
       redis:
@@ -105,6 +138,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
       REDIS_URL: redis://redis:6379/0
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-es}
+      ES_URL: http://elasticsearch:9200
+      ES_USERNAME: ${ES_USERNAME:-}
+      ES_PASSWORD: ${ES_PASSWORD:-}
       QDRANT_URL: http://qdrant:6333
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -117,6 +154,7 @@ services:
 
 volumes:
   pgdata:
+  esdata:
   qdrantdata:
   miniodata:
   redisdata:

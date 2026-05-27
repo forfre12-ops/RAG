@@ -67,5 +67,17 @@ class QdrantStore:
         )
         return [SearchHit(id=str(r.id), score=float(r.score), payload=dict(r.payload or {})) for r in results]
 
+    def search_hybrid(
+        self,
+        collection: str,
+        query_text: str,  # noqa: ARG002 — Qdrant 폴리필은 dense-only
+        query_vec: Sequence[float],
+        top_k: int = 5,
+        filter: dict | None = None,
+        **_kwargs: object,
+    ) -> list[SearchHit]:
+        """Qdrant 롤백 경로 폴리필: query_text 무시, dense kNN만 사용."""
+        return self.search(collection, query_vec, top_k=top_k, filter=filter)
+
     def count(self, collection: str) -> int:
         return self._client.count(collection_name=collection, exact=True).count

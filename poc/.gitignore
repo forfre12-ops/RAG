@@ -10,4 +10,6 @@ datasets/synthetic/
 artifacts/
 mlruns/
 reports/
+dist/
+migration/
 .ipynb_checkpoints/

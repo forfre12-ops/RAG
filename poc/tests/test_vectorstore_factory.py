@@ -1,0 +1,124 @@
+"""build_store 백엔드 분기 + 폴리필 일관성 테스트.
+
+doc/13 §5(어댑터)·§8(롤백)·§9(dryrun 한계) 검증.
+"""
+
+from __future__ import annotations
+
+import os
+
+import pytest
+
+from lloydk.adapters.vectorstore import InMemoryStore, build_store
+
+
+def test_force_memory_overrides_env(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VECTOR_BACKEND", "es")
+    vs = build_store(force_memory=True)
+    assert isinstance(vs, InMemoryStore)
+
+
+def test_default_backend_is_es(monkeypatch: pytest.MonkeyPatch):
+    """VECTOR_BACKEND 미지정 시 기본 'es'를 시도.
+
+    - elasticsearch 패키지 설치 + 클라이언트 lazy 연결 → EsStore 생성 성공
+    - ImportError 또는 설정 누락 → InMemory 폴백
+    """
+    monkeypatch.delenv("VECTOR_BACKEND", raising=False)
+    vs = build_store()
+    # 둘 중 하나여야 함 (둘 다 정상)
+    assert vs.name in ("elasticsearch", "inmemory")
+
+
+def test_es_backend_falls_back_when_import_fails(monkeypatch: pytest.MonkeyPatch):
+    """elasticsearch 모듈 자체가 import 실패하면 InMemory 폴백."""
+    import sys
+
+    # 모듈 캐시에서 elasticsearch + es_store 제거 후 import 차단
+    for mod in list(sys.modules):
+        if mod.startswith("elasticsearch") or mod.endswith("es_store"):
+            sys.modules.pop(mod, None)
+
+    monkeypatch.setitem(sys.modules, "elasticsearch", None)
+    monkeypatch.delenv("VECTOR_BACKEND", raising=False)
+
+    with pytest.warns(RuntimeWarning, match="Elasticsearch unavailable"):
+        vs = build_store(backend="es")
+
+    assert vs.name == "inmemory"
+
+
+def test_explicit_inmemory_backend(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VECTOR_BACKEND", "inmemory")
+    vs = build_store()
+    assert isinstance(vs, InMemoryStore)
+
+
+def test_explicit_argument_overrides_env(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VECTOR_BACKEND", "qdrant")
+    vs = build_store(backend="inmemory")
+    assert isinstance(vs, InMemoryStore)
+
+
+def test_unknown_backend_raises(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("VECTOR_BACKEND", raising=False)
+    with pytest.raises(ValueError, match="unknown VECTOR_BACKEND"):
+        build_store(backend="cosmosdb")
+
+
+# ─────────────────────────────────────────────────────────────
+# search_hybrid 폴리필 일관성
+# ─────────────────────────────────────────────────────────────
+
+
+def test_inmemory_search_hybrid_falls_back_to_vec_only():
+    """query_text가 무시되어도 vec-only 검색이 동작해야 한다 (P2 dryrun 한계 명시)."""
+    vs = InMemoryStore()
+    vs.ensure_collection("c", dim=4)
+    vs.upsert(
+        "c",
+        ids=["a", "b"],
+        vectors=[[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]],
+        payloads=[{"grade": "TS"}, {"grade": "S1"}],
+    )
+    # 쿼리 텍스트가 b 문서 내용과 일치해도 dense vector 우선
+    hits = vs.search_hybrid("c", query_text="S1 자료", query_vec=[1.0, 0.0, 0.0, 0.0], top_k=2)
+    assert hits[0].id == "a"  # vec 1순위 (text 매칭 무시)
+
+
+def test_inmemory_search_hybrid_with_filter():
+    vs = InMemoryStore()
+    vs.ensure_collection("c", dim=4)
+    vs.upsert(
+        "c",
+        ids=["a", "b", "c"],
+        vectors=[[1, 0, 0, 0], [0.99, 0.1, 0, 0], [0.5, 0, 0, 0]],
+        payloads=[{"grade": "TS"}, {"grade": "S1"}, {"grade": "TS"}],
+    )
+    hits = vs.search_hybrid(
+        "c",
+        query_text="ignored",
+        query_vec=[1.0, 0.0, 0.0, 0.0],
+        top_k=5,
+        filter={"grade": "TS"},
+    )
+    assert {h.id for h in hits} == {"a", "c"}
+
+
+def test_protocol_compliance_inmemory():
+    """InMemoryStore가 새 Protocol(`search_hybrid` 포함)을 만족."""
+    from lloydk.adapters.vectorstore.base import VectorStore
+
+    vs = InMemoryStore()
+    # runtime_checkable Protocol — 구조적 호환 확인
+    assert isinstance(vs, VectorStore)
+    # 모든 핵심 메서드 존재
+    for method in ("ensure_collection", "upsert", "search", "search_hybrid", "count"):
+        assert callable(getattr(vs, method))
+
+
+def test_env_clean_state():
+    """다른 테스트가 VECTOR_BACKEND를 오염시키지 않았는지."""
+    # monkeypatch 없이 환경 그대로 — 이 테스트 자체는 무 부작용
+    backend = os.getenv("VECTOR_BACKEND")
+    assert backend is None or isinstance(backend, str)

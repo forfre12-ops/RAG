@@ -2,7 +2,8 @@
 
 검증:
 - PostgreSQL 연결 + pgvector extension 존재 + 핵심 테이블 4종
-- Qdrant 헬스
+- Elasticsearch 클러스터 상태 + 버전 출력 (기본 백엔드)
+- Qdrant 헬스 (롤백 프로파일 기동 시에만, 기본은 skip)
 - MinIO 버킷 존재
 - Redis PING
 - MLflow API
@@ -57,7 +58,41 @@ def check_postgres() -> CheckResult:
         return CheckResult("postgres", False, f"error: {exc}")
 
 
+def check_elasticsearch() -> CheckResult:
+    base = os.environ.get("ES_URL", "http://localhost:9200")
+    try:
+        with urllib.request.urlopen(  # noqa: S310
+            f"{base}/_cluster/health?wait_for_status=yellow&timeout=5s",
+            timeout=6.0,
+        ) as resp:
+            if resp.status != 200:
+                return CheckResult("elasticsearch", False, f"HTTP {resp.status}")
+            payload = json.loads(resp.read().decode("utf-8"))
+        status = payload.get("status")
+        ok = status in ("green", "yellow")
+        # 버전도 같이 가져옴 (retriever API 분기 진단용)
+        version = ""
+        try:
+            with urllib.request.urlopen(f"{base}/", timeout=3.0) as info_resp:  # noqa: S310
+                info = json.loads(info_resp.read().decode("utf-8"))
+                version = info.get("version", {}).get("number", "")
+        except Exception:  # noqa: BLE001
+            pass
+        return CheckResult(
+            "elasticsearch",
+            ok,
+            f"status={status}, version={version or 'unknown'}",
+        )
+    except urllib.error.URLError as exc:
+        return CheckResult("elasticsearch", False, f"unreachable: {exc.reason}")
+    except Exception as exc:  # noqa: BLE001
+        return CheckResult("elasticsearch", False, f"error: {exc}")
+
+
 def check_qdrant() -> CheckResult:
+    """Qdrant는 롤백 프로파일에서만 가동. 기본은 skip(ok=True)."""
+    if os.environ.get("VECTOR_BACKEND", "es").lower() != "qdrant":
+        return CheckResult("qdrant", True, "skipped (VECTOR_BACKEND != qdrant)")
     base = os.environ.get("QDRANT_URL", "http://localhost:6333")
     ok, detail = _http_ok(f"{base}/healthz")
     if not ok:
@@ -109,7 +144,14 @@ def check_mlflow() -> CheckResult:
 
 
 def main() -> int:
-    checks = [check_postgres(), check_qdrant(), check_minio(), check_redis(), check_mlflow()]
+    checks = [
+        check_postgres(),
+        check_elasticsearch(),
+        check_qdrant(),
+        check_minio(),
+        check_redis(),
+        check_mlflow(),
+    ]
     print(json.dumps([c.__dict__ for c in checks], ensure_ascii=False, indent=2))
     failed = [c for c in checks if not c.ok]
     if failed:
