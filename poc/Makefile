@@ -10,7 +10,8 @@ VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
 .PHONY: help venv install env infra-up infra-up-rollback infra-down infra-verify api worker \
-        p2 p2-full migrate-dry bundle-dry p3 p3-800 p4 p1 p5 poc-all clean clean-data reports
+        p2 p2-full migrate-dry bundle-dry licenses licenses-check analyze-synth \
+        p3 p3-800 p4 p1 p5 poc-all clean clean-data reports
 
 help:
 	@echo "Targets:"
@@ -26,6 +27,9 @@ help:
 	@echo "  p2-full      P2 KURE-v1+BGE-M3 × ES dense+hybrid (full 측정, ES 필요)"
 	@echo "  migrate-dry  Qdrant→ES sample-5 dry-run (운영 데이터 무관 검증)"
 	@echo "  bundle-dry   폐쇄망 번들 manifest dry-run (doc/12)"
+	@echo "  licenses     OSS 라이선스 4종 산출 (txt/md/json/cyclonedx, doc/14)"
+	@echo "  licenses-check  직접 의존성 라이선스 위험 검증 (CI용, exit 1 on risk)"
+	@echo "  analyze-synth   합성 데이터셋 800건 종합 분석 (doc/02 §부록 D)"
 	@echo "  p3           P3 synthesize 40 docs with noop provider + label check"
 	@echo "  p3-800       P3 풀 합성 800건 (등급별 200×4, doc/05 계획)"
 	@echo "  p4           P4 build corpus + extraction eval"
@@ -90,6 +94,15 @@ migrate-dry:
 bundle-dry:
 	$(PY) scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run \
 	    --output dist/lloydk-airgap-bundle
+
+licenses:
+	$(PY) scripts/dump_licenses.py --output licenses/
+
+licenses-check:
+	$(PY) scripts/dump_licenses.py --check --scope=direct
+
+analyze-synth:
+	$(PY) scripts/analyze_synthetic.py
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun

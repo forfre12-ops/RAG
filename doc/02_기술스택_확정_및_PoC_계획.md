@@ -356,3 +356,97 @@ pytest                    # 126/126 (어댑터·마이그·번들)
 ```
 
 OpenAPI yaml ES 정합성도 점검 완료 — `rag_namespace` → `rag_index_alias` rename, backend 컨텍스트 명시. KL이 K2 검토를 backend-agnostic하게 진행 가능.
+
+---
+
+## 부록 D. 800건 합성 데이터 실측 분석 (2026-05-27)
+
+회신 대기 기간 동안 PoC 합성 데이터를 40 → 800건으로 확장(`make p3-800`), `scripts/analyze_synthetic.py`로 다각도 분석.
+
+### D.1 분포 균등성
+
+| 등급 | 건수 | CV (변동계수) |
+|---|---:|---|
+| TS | 200 | **0.000** (완벽 균등) |
+| S1 | 200 | |
+| S2 | 200 | |
+| S3 | 200 | |
+
+| 도메인 | 건수 | CV |
+|---|---:|---|
+| tech, business | 136 | **0.0155** (균등) |
+| finance, hr, legal, mixed | 132 | |
+
+**판정**: 등급·도메인 모두 균등 분배 PASS (CV < 0.1 기준).
+
+### D.2 라벨 일치도 (target_grade ↔ predicted_grade)
+
+| | TS | S1 | S2 | S3 |
+|---|---:|---:|---:|---:|
+| **TS** | 200 | 0 | 0 | 0 |
+| **S1** | 0 | 200 | 0 | 0 |
+| **S2** | 0 | 0 | 200 | 0 |
+| **S3** | 0 | 0 | 0 | 200 |
+
+**일치도: 100.00% (800/800)** — M3 룰 라벨러가 합성 시 target 등급을 정확히 재현. FNR (high→low) 0%.
+
+### D.3 본문 길이 통계
+
+| 등급 | 평균 글자 수 | 중앙 | 표준편차 |
+|---|---:|---:|---:|
+| TS | 169 | 169 | 0 |
+| S1 | 199 | 199 | 0 |
+| S2 | 178 | 178 | 0 |
+| S3 | 169 | 169 | 0 |
+
+**관찰**: 등급별 표준편차 0 → noop provider가 결정론적 템플릿을 사용한 증거. 실 LLM(Anthropic/Qwen3) 사용 시 다양성 확보 예상.
+
+### D.4 LLM 사용량·비용 (noop)
+
+- input tokens 합계: 134,246
+- output tokens 합계: 80,200
+- **비용: $0.00** (noop)
+- 평균 지연: 0.0 ms (mock)
+
+**참고**: Anthropic Claude로 동일 800건 생성 시 추정 비용 약 $5~10 (실측은 API 키 확보 후 진행).
+
+### D.5 메타데이터 다양성 (noop의 한계)
+
+| 지표 | 결과 |
+|---|---|
+| document_type unique | **1** ← noop 결정론적 |
+| dept_hint unique | **1** ← 동일 |
+| PII 위반 누적 | 0 |
+| 파싱 에러 | 0 |
+
+**한계 명시**: noop은 단일 템플릿 사용 → 실제 문서 다양성·품질은 측정 불가. 실 LLM 사용 시 doc_type·dept_hint 다양성 확보가 핵심 검증 포인트.
+
+### D.6 OSS 라이선스 자동 검증 (dump_licenses.py)
+
+[doc/14 §11.1](14_OSS_라이선스_보고서.md) 약속 이행 — `scripts/dump_licenses.py` 신규.
+
+| 등급 | 패키지 수 (transitive 포함) |
+|---|---:|
+| 허용형 (MIT/BSD/Apache) | 162 |
+| Weak Copyleft (LGPL/MPL) | 7 |
+| **Strong Copyleft (GPL/AGPL)** | **2** |
+| Unknown | 2 |
+
+**Strong Copyleft 식별**:
+1. **PyMuPDF 1.27.1** (AGPL-3.0 / Artifex Commercial 듀얼) — doc/14 §3.1 예상과 일치, 직접 의존성
+2. **pdf2docx 0.5.9** (AGPL-3.0) — PyMuPDF 의존 transitive
+
+→ doc/14 §3.1 대응안(Artifex 구매 / pdfminer.six 교체 / AGPL 수용) 선택은 발주처 협의 후 결정.
+
+CLI 사용:
+```bash
+python scripts/dump_licenses.py --check                    # CI용 라이선스 검증 (exit 1 on risk)
+python scripts/dump_licenses.py --check --scope=direct     # 직접 의존성만 검사
+python scripts/dump_licenses.py --format=cyclonedx -o sbom.json  # SBOM 산출
+```
+
+### D.7 후속 액션
+
+- [ ] **Anthropic API 키 확보 시**: `make p3 --provider anthropic --total 800` → 실 다양성 측정 → 본 §D 갱신
+- [ ] **CI에 `dump_licenses --check --scope=direct`** 추가 — PyMuPDF 외 신규 strong copyleft 의존성 사전 차단
+- [ ] **`docker-compose.yml` Redis `7.2-alpine` 고정** — doc/14 §11.1 RSALv2 회피 권장

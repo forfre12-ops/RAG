@@ -12,4 +12,5 @@ mlruns/
 reports/
 dist/
 migration/
+licenses/
 .ipynb_checkpoints/
