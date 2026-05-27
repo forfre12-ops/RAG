@@ -23,7 +23,7 @@ dependencies = [
   "minio>=7.2",
 
   # 벡터 DB (doc/13)
-  "elasticsearch>=8.15,<10",       # 9.x 클라이언트는 8.x 서버 호환
+  "elasticsearch>=8.15,<9.0",     # 9.x 클라이언트는 ES 8.x 서버 호환 거부 (Accept v9 header)
   "qdrant-client>=1.10",           # 3순위 롤백 경로 (doc/13 §8.3)
 
   # ML 코어 (학습·추론 필수)

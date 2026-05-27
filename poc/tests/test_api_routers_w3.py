@@ -215,7 +215,10 @@ class TestGuideRouter:
             body = r.json()
             assert body["guide_id"] == gid
             assert body["version"] == "v1.0"
-            assert body["indexed"] is False  # W5에서 True로 갱신
+            # W5 이후: indexed는 ES 가동·임베딩 모델 가용성에 따라 True/False.
+            # 두 경우 모두 키 존재·타입만 검증 (best-effort 응답 보장).
+            assert isinstance(body["indexed"], bool)
+            assert "embedding_vector_count" in body
 
             # 목록 조회
             r2 = cli.get(f"/api/v1/guide/documents/{gid}", headers=HDR)

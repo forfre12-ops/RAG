@@ -22,6 +22,7 @@ async def upload_guide(
     actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
     effective_date: Optional[str] = Form(default=None),
     change_summary: Optional[str] = Form(default=None),
+    doc_type: Optional[str] = Form(default=None),
     file: UploadFile = File(...),
 ):
     try:
@@ -36,6 +37,8 @@ async def upload_guide(
         change_summary=change_summary,
         content_bytes=body,
         actor_user_id=actor_obj.user_id,
+        tenant_id=actor_obj.tenant_id or "default",
+        doc_type=doc_type,
     )
 
 
