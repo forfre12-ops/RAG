@@ -2,6 +2,9 @@
 
 알고리즘:
   1. 텍스트에서 각 키워드의 빈도(또는 정규식 매칭 수) 측정
+     - pattern_type=exact (기본): 단순 부분 문자열
+     - pattern_type=regex      : re.findall
+     - pattern_type=semantic   : 임베딩 코사인 유사도 ≥ threshold 시 1회 매칭
   2. 등급별 점수 = Σ (매칭수 × keyword.weight)
   3. 등급 = argmax (점수)
   4. 4대 평가요소 점수 = Σ (factor별 매칭 가중치) → 0~5 스케일로 normalize
@@ -10,14 +13,20 @@
 
 from __future__ import annotations
 
+import math
+import os
 import re
 from dataclasses import dataclass, field
+from typing import Optional
 
 from lloydk.modules.m3_labeling.seeds import (
     FACTOR_SEEDS,
     GRADE_ORDER,
     KEYWORD_SEEDS,
 )
+
+# semantic 매칭 기본 코사인 임계값. EMB_SEMANTIC_THRESHOLD 환경변수로 오버라이드 가능.
+_DEFAULT_SEMANTIC_THRESHOLD = 0.75
 
 
 @dataclass
@@ -43,11 +52,99 @@ class RuleLabelResult:
 
 
 class LabelRuleEngine:
-    def __init__(self, seeds: list[dict] | None = None, *, fnr_safe: bool = True) -> None:
+    def __init__(
+        self,
+        seeds: list[dict] | None = None,
+        *,
+        fnr_safe: bool = True,
+        embedder: Optional[object] = None,
+        semantic_threshold: Optional[float] = None,
+    ) -> None:
         self.seeds = seeds or KEYWORD_SEEDS
         self.fnr_safe = fnr_safe
         self._factor_weights = {f["code"]: f["weight"] for f in FACTOR_SEEDS}
+        # semantic 매칭 전용 자원 (lazy)
+        self._embedder = embedder
+        env_thr = os.environ.get("EMB_SEMANTIC_THRESHOLD")
+        if semantic_threshold is not None:
+            self.semantic_threshold = float(semantic_threshold)
+        elif env_thr:
+            try:
+                self.semantic_threshold = float(env_thr)
+            except ValueError:
+                self.semantic_threshold = _DEFAULT_SEMANTIC_THRESHOLD
+        else:
+            self.semantic_threshold = _DEFAULT_SEMANTIC_THRESHOLD
+        # seed.value 임베딩 캐시 — 동일 seed 반복 평가 시 재계산 방지
+        self._seed_vec_cache: dict[str, list[float]] = {}
 
+    # ------------------------------------------------------------------
+    # semantic helpers
+    # ------------------------------------------------------------------
+    def _get_embedder(self):
+        """임베딩 어댑터 lazy 초기화.
+
+        우선순위:
+          1. 생성자에서 주입된 embedder (테스트·운영 모두 권장)
+          2. EMB_PROVIDER=hash 환경변수면 HashEmbedding 강제
+          3. 그 외에는 lloydk.adapters.embedding.build_embedder()로 폴백
+        """
+        if self._embedder is not None:
+            return self._embedder
+        from lloydk.adapters.embedding import build_embedder
+
+        provider = (os.environ.get("EMB_PROVIDER") or "").strip().lower()
+        force_hash = provider == "hash"
+        self._embedder = build_embedder(force_hash=force_hash) if force_hash else build_embedder()
+        return self._embedder
+
+    def _embed_text(self, text: str) -> list[float]:
+        emb = self._get_embedder()
+        result = emb.embed([text])
+        return result.vectors[0]
+
+    def _embed_seed(self, seed_value: str) -> list[float]:
+        cached = self._seed_vec_cache.get(seed_value)
+        if cached is not None:
+            return cached
+        vec = self._embed_text(seed_value)
+        self._seed_vec_cache[seed_value] = vec
+        return vec
+
+    @staticmethod
+    def _cosine(a: list[float], b: list[float]) -> float:
+        if not a or not b or len(a) != len(b):
+            return 0.0
+        dot = 0.0
+        na = 0.0
+        nb = 0.0
+        for x, y in zip(a, b):
+            dot += x * y
+            na += x * x
+            nb += y * y
+        denom = math.sqrt(na) * math.sqrt(nb)
+        if denom == 0.0:
+            return 0.0
+        return dot / denom
+
+    def _semantic_match(self, text: str, seed_value: str) -> int:
+        """semantic 평가 — 코사인 유사도 ≥ threshold면 1회 매칭으로 본다.
+
+        주의: 빈도 개념이 없으므로 count는 0 또는 1.
+        """
+        if not text or not seed_value:
+            return 0
+        try:
+            seed_vec = self._embed_seed(seed_value)
+            query_vec = self._embed_text(text)
+        except Exception:  # noqa: BLE001 — 임베딩 실패는 라벨링 전체를 막지 않음
+            return 0
+        sim = self._cosine(query_vec, seed_vec)
+        return 1 if sim >= self.semantic_threshold else 0
+
+    # ------------------------------------------------------------------
+    # main label loop
+    # ------------------------------------------------------------------
     def label(self, text: str) -> RuleLabelResult:
         if not text:
             return RuleLabelResult(
@@ -108,10 +205,11 @@ class LabelRuleEngine:
             warnings=warnings,
         )
 
-    @staticmethod
-    def _count(text: str, kw: str, pattern_type: str) -> int:
+    def _count(self, text: str, kw: str, pattern_type: str) -> int:
         if pattern_type == "regex":
             return len(re.findall(kw, text))
+        if pattern_type == "semantic":
+            return self._semantic_match(text, kw)
         # exact: 단순 부분 문자열 (한국어는 word boundary가 영문과 다름)
         if not kw:
             return 0

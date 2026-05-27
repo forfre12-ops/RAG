@@ -38,7 +38,11 @@ FACTOR_SEEDS: list[dict] = [
 
 # 등급별 키워드 시드.
 # weight: 매칭 시 가중치 (높을수록 그 등급에 강한 신호)
-# pattern_type: exact|regex|semantic (semantic은 임베딩 매칭 — 현재는 placeholder)
+# pattern_type: exact|regex|semantic
+#   - exact   (기본): 부분 문자열 빈도
+#   - regex          : re.findall
+#   - semantic       : 임베딩 코사인 유사도 ≥ EMB_SEMANTIC_THRESHOLD(기본 0.75) 시 1회 매칭
+#                     provider는 EMB_PROVIDER=hash | lloydk.config.settings.embedding_model 사용
 KEYWORD_SEEDS: list[dict] = [
     # ============================================================
     # TS 특급기밀 — 유출 시 회사 존립 위협

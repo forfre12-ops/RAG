@@ -24,16 +24,45 @@ from lloydk.services.guide_service import GuideService
 
 
 def _es_ok() -> bool:
-    """Elasticsearch가 실제로 응답하는지 빠른 체크."""
+    """Elasticsearch가 실제로 응답하는지 + 클라이언트가 호환되는지 빠른 체크.
+
+    ES 9.x 클라이언트는 ES 8.x 서버 호환을 거부(Accept v9)하므로,
+    실제 `info()` 호출까지 통과해야 진짜 사용 가능한 상태.
+    """
     try:
         import urllib.request
         with urllib.request.urlopen("http://localhost:9200/_cluster/health", timeout=2.0) as r:  # noqa: S310
-            return r.status == 200
+            if r.status != 200:
+                return False
+    except Exception:  # noqa: BLE001
+        return False
+    # 클라이언트-서버 호환 확인 (info() RTT)
+    try:
+        from elasticsearch import Elasticsearch  # noqa: PLC0415
+        Elasticsearch(hosts=["http://localhost:9200"], request_timeout=3.0).info()
+        return True
     except Exception:  # noqa: BLE001
         return False
 
 
 _ES = _es_ok()
+
+
+def _purge_test_prefix(prefix: str = "secrets-guides-t") -> None:
+    """테스트 시작 전 잔재 인덱스/alias 일괄 정리.
+
+    `secrets-guides-t<6hex>-*` 패턴은 본 테스트 모듈만 생성하는 unique tenant.
+    다른 차원의 매핑이 잔존하면 매핑 충돌이 발생하므로, 매 세션 시작 시 wipe.
+    """
+    if not _ES:
+        return
+    try:
+        from elasticsearch import Elasticsearch  # noqa: PLC0415
+        client = Elasticsearch(hosts=["http://localhost:9200"], request_timeout=5.0)
+        # wildcard delete (alias도 함께 사라짐)
+        client.options(ignore_status=[404]).indices.delete(index=f"{prefix}*")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 # ============================================================
@@ -117,6 +146,14 @@ class TestInMemoryFlow:
 
 @pytest.mark.skipif(not _ES, reason="Elasticsearch not reachable on :9200")
 class TestEsFlow:
+    def setup_method(self):
+        # 잔재 인덱스(이전 실패 run, 다른 차원 매핑 등) 일괄 정리
+        _purge_test_prefix("secrets-guides-t")
+
+    def teardown_method(self):
+        # 후속 다른 모듈에 영향 없도록 다시 정리
+        _purge_test_prefix("secrets-guides-t")
+
     def test_full_index_and_alias_swap(self):
         from lloydk.adapters.vectorstore import build_store
 

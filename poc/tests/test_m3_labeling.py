@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lloydk.adapters.embedding import HashEmbedding
 from lloydk.modules.m3_labeling import (
     FACTOR_SEEDS,
     GRADE_ORDER,
@@ -92,3 +93,103 @@ def test_pipeline_all_four_grade_scenarios():
         out = pipe.label(text)
         pred = out.grade.value if hasattr(out.grade, "value") else str(out.grade)
         assert pred == truth, f"expected {truth}, got {pred} for {text!r}"
+
+
+# ============================================================
+# semantic pattern_type (임베딩 코사인 매칭) — placeholder 해소
+# ============================================================
+def test_semantic_seed_matches_identical_text():
+    """hash 임베딩은 동일 텍스트면 코사인=1.0 → semantic 매칭 성공."""
+    emb = HashEmbedding(dim=256)
+    eng = LabelRuleEngine(
+        seeds=[
+            {
+                "grade": "TS",
+                "keyword": "기밀 설계 도면",
+                "weight": 1.0,
+                "factor": "ECONOMIC_VALUE",
+                "pattern_type": "semantic",
+            },
+        ],
+        embedder=emb,
+        semantic_threshold=0.75,
+    )
+    out = eng.label("기밀 설계 도면")
+    assert out.grade == "TS"
+    assert any(m.keyword == "기밀 설계 도면" for m in out.matched_keywords)
+    # semantic은 빈도가 없으므로 count는 정확히 1
+    assert all(m.count == 1 for m in out.matched_keywords if m.keyword == "기밀 설계 도면")
+
+
+def test_semantic_seed_rejects_unrelated_text():
+    """완전히 다른 토큰 집합이면 hash 임베딩 코사인이 낮아 미매칭."""
+    emb = HashEmbedding(dim=256)
+    eng = LabelRuleEngine(
+        seeds=[
+            {
+                "grade": "TS",
+                "keyword": "반도체 공정 레시피",
+                "weight": 1.0,
+                "factor": "ECONOMIC_VALUE",
+                "pattern_type": "semantic",
+            },
+        ],
+        embedder=emb,
+        semantic_threshold=0.75,
+    )
+    out = eng.label("점심 식단 안내 김치찌개")
+    # 키워드 매칭이 0이면 기본 S3
+    assert out.grade == "S3"
+    assert out.matched_keywords == []
+
+
+def test_semantic_seed_cache_avoids_recomputation():
+    """동일 seed.value 재평가 시 임베딩 캐시 활용 — _seed_vec_cache에 한 번만 저장."""
+    emb = HashEmbedding(dim=128)
+    eng = LabelRuleEngine(
+        seeds=[
+            {
+                "grade": "S1",
+                "keyword": "내부 API 키",
+                "weight": 1.0,
+                "factor": "MANAGEMENT_LEVEL",
+                "pattern_type": "semantic",
+            },
+        ],
+        embedder=emb,
+        semantic_threshold=0.75,
+    )
+    # 같은 텍스트로 두 번 label 호출
+    eng.label("내부 API 키")
+    eng.label("내부 API 키")
+    # seed.value별로 캐시 항목이 정확히 1개
+    assert "내부 API 키" in eng._seed_vec_cache
+    assert len(eng._seed_vec_cache) == 1
+
+
+def test_semantic_threshold_environment_override(monkeypatch):
+    """EMB_SEMANTIC_THRESHOLD 환경변수로 임계값 오버라이드."""
+    monkeypatch.setenv("EMB_SEMANTIC_THRESHOLD", "0.99")
+    eng = LabelRuleEngine(embedder=HashEmbedding(dim=64))
+    assert abs(eng.semantic_threshold - 0.99) < 1e-9
+
+
+def test_exact_and_regex_paths_unchanged():
+    """semantic 도입이 기존 exact/regex 매칭을 깨뜨리지 않는지 보증."""
+    eng = LabelRuleEngine(
+        seeds=[
+            {"grade": "TS", "keyword": "특급기밀", "weight": 1.0, "factor": "LEAK_IMPACT"},  # exact (기본)
+            {
+                "grade": "S1",
+                "keyword": r"비밀\s*문서",
+                "weight": 0.9,
+                "factor": "NON_PUBLICITY",
+                "pattern_type": "regex",
+            },
+        ],
+    )
+    out = eng.label("이 문서는 특급기밀이며 비밀 문서로 분류된다.")
+    matched_kw = {m.keyword for m in out.matched_keywords}
+    assert "특급기밀" in matched_kw
+    assert any("비밀" in kw for kw in matched_kw)
+    assert out.grade == "TS"
