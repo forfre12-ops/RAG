@@ -12,7 +12,7 @@ FNR per-grade는 본 사업 핵심 KPI. 보안 미탐(undeclass) = 고등급 정
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
+from typing import Sequence
 
 import numpy as np
 from sklearn.metrics import (

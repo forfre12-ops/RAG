@@ -20,8 +20,8 @@ from sklearn.metrics import (
 from lloydk.schemas.common import Grade
 
 _LABEL_LIST: list[str] = [g.value for g in (Grade.TS, Grade.S1, Grade.S2, Grade.S3)]
-_LABEL2ID = {l: i for i, l in enumerate(_LABEL_LIST)}
-_ID2LABEL = {i: l for l, i in _LABEL2ID.items()}
+_LABEL2ID = {label: i for i, label in enumerate(_LABEL_LIST)}
+_ID2LABEL = {i: label for label, i in _LABEL2ID.items()}
 
 
 @dataclass

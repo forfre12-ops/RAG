@@ -1,4 +1,15 @@
 -- ============================================================
+-- ⚠️  DEPRECATED (2026-05-28) — DO NOT USE.
+--
+-- 본 파일은 alembic baseline migration으로 일원화되었습니다.
+-- 실제 schema 소스: `poc/alembic/versions/000000000001_baseline_init.py`
+--
+-- 부트스트랩:
+--     cd poc && alembic upgrade head
+--
+-- 본 .deprecated 파일은 히스토리 추적용으로만 보존됩니다.
+-- 절대 수동 실행하지 마십시오 — alembic_version 동기화가 깨집니다.
+-- ============================================================
 -- 한국지식재산보호원 AI 영업비밀 등급분류 시스템
 -- Lloydk AI 파이프라인 DB 스키마 v2 (PostgreSQL 15+)
 --

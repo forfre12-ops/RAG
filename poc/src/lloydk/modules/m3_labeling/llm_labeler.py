@@ -12,7 +12,6 @@ from dataclasses import dataclass
 
 from lloydk.adapters.llm import build_provider
 from lloydk.adapters.llm.base import LLMProvider
-from lloydk.modules.m3_labeling.seeds import GRADE_ORDER
 
 SYSTEM_PROMPT = """당신은 한국 영업비밀 보호 가이드라인에 정통한 문서 분류 전문가다.
 입력 문서를 분석하여 보안 등급을 분류하고 4대 평가요소 점수를 산정한다.

@@ -30,6 +30,25 @@ jobs:
           GITLEAKS_ENABLE_COMMENTS: 'false'
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'
 
+  ruff-lint:
+    # 코드 스타일·미사용 import·E402·E741 등 정적 분석. fail-fast로 사전 차단.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        run: pip install "ruff>=0.6"
+
+      - name: Lint src + scripts
+        run: ruff check src/ scripts/
+
   openapi-lint:
     runs-on: ubuntu-latest
     steps:
@@ -127,25 +146,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Install psql client for init.sql bootstrap
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-client
-
-      - name: Bootstrap DB schema (init.sql v2) + alembic stamp head
-        # baseline migration은 no-op (init.sql이 19 테이블 생성).
-        # 따라서 psql로 init.sql 먼저 적용 후 alembic upgrade head로 alembic_version 동기화.
-        run: |
-          psql -h localhost -U lloydk -d lloydk -v ON_ERROR_STOP=1 -f migrations/init.sql
-          alembic upgrade head
+      - name: Bootstrap DB schema (alembic 단일 경로)
+        # 2026-05-28: init.sql ↔ alembic 이중 유지 해소. 모든 DDL은 alembic baseline
+        # (000000000001_baseline_init.py)이 단독으로 적용. psql 외부 부트스트랩 제거.
+        run: alembic upgrade head
 
       - name: P3 — Alembic migration drift check (model ↔ migration 동기화 검증)
         # 목적: ORM 모델 변경 후 alembic revision 누락을 사전 차단.
         # 동작:
         #   1) `alembic check` 가능하면 그것으로 drift 즉시 판정.
         #   2) 없거나 실패 시 fallback — autogenerate 시도하여 비어있지 않으면 fail.
-        # init.sql 기반 baseline 위에 추가된 N4 마이그레이션(인덱스 6종)까지
-        # upgrade head 된 상태에서 ORM 메타데이터와 비교.
+        # alembic baseline + N4 인덱스까지 upgrade head 된 상태에서 ORM 메타데이터와 비교.
         run: bash scripts/ci_alembic_drift_check.sh
 
       - name: Run pytest (126 unit + integration tests)

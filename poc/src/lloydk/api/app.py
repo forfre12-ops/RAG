@@ -8,8 +8,6 @@ from slowapi.errors import RateLimitExceeded
 
 from lloydk.config import assert_production_credentials, settings
 from lloydk.schemas.common import Error
-
-logger = logging.getLogger(__name__)
 from lloydk.api import classify as classify_api
 from lloydk.api import health as health_api
 from lloydk.api import confirm as confirm_api
@@ -23,6 +21,8 @@ from lloydk.api import prom_metrics as prom_metrics_api
 from lloydk.api.middleware import AuditMiddleware
 from lloydk.api.prom_metrics import PrometheusMiddleware
 from lloydk.api.rate_limit import limiter, rate_limit_exceeded_handler
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager

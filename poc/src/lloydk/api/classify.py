@@ -1,5 +1,4 @@
 import time
-from uuid import uuid4
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from lloydk.api.rate_limit import limiter

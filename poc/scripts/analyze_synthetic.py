@@ -176,7 +176,7 @@ def format_report(analysis: dict) -> str:
     md: list[str] = []
     md.append("# 합성 데이터셋 종합 분석 리포트")
     md.append("")
-    md.append(f"- 생성: `scripts/analyze_synthetic.py`")
+    md.append("- 생성: `scripts/analyze_synthetic.py`")
     md.append(f"- 코퍼스: **{d['distribution']['total']}건**")
     md.append(f"- 분포 균등성: 등급 CV={d['evenness']['grade_cv']}, 도메인 CV={d['evenness']['domain_cv']}")
     md.append(f"- 라벨 일치도: **{d['label_confusion']['match_rate']:.2%}** ({d['label_confusion']['match_count']}/{d['label_confusion']['total_with_prediction']})")
