@@ -69,7 +69,7 @@ poc/
 ├── docker-compose.yml          # Postgres/Elasticsearch/MinIO/Redis/MLflow/api/worker
 ├── Dockerfile.api              # FastAPI + PyTorch + Transformers
 ├── Makefile                    # poc-all, infra-up, p2-full, bundle-dry 등
-├── migrations/init.sql         # PostgreSQL v2 스키마 (테넌트/파티셔닝/HNSW)
+├── alembic/versions/           # PostgreSQL 스키마 단일 진실 소스 (baseline + 변경분)
 ├── infra/es/                   # ES 인덱스 템플릿 + Nori 사용자 사전
 │   ├── index_template_secrets.json
 │   └── userdict_ko.txt

@@ -269,7 +269,7 @@ def expected_files(components: dict[str, ComponentEntry], models: list[ModelEntr
         "infra-config/es-index-template.json",
         "infra-config/userdict_ko.txt",
         "infra-config/ilm-policy-secrets.json",
-        "db-migrations/init.sql",
+        "db-migrations/alembic/",  # baseline + 후속 revision 전체 (init.sql 폐기)
         "docs/INSTALL.md",
         "docs/OPERATION.md",
         "docs/TROUBLESHOOTING.md",

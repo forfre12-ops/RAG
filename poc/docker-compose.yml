@@ -9,7 +9,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dev}
     volumes:
       - E:/antigravity/rag/docker-data/postgres:/var/lib/postgresql/data
-      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # 2026-05-28: init.sql 자동 부트스트랩 제거 — alembic baseline 단일 경로로 일원화.
+      # 빈 DB 부트스트랩: `docker compose up -d postgres && cd poc && alembic upgrade head`
     ports:
       - "5432:5432"
     healthcheck:

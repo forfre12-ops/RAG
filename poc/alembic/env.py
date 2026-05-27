@@ -1,7 +1,8 @@
 """Alembic 실행 환경. lloydk.db.Base.metadata와 settings.database_url을 사용.
 
-baseline 시점 (init.sql v2가 이미 적용된 상태)에서 alembic stamp head로
-초기 동기화 후, 이후 변경분만 마이그레이션으로 관리.
+2026-05-28: init.sql 외부 부트스트랩 폐기. 모든 DDL은 alembic 단일 경로로 일원화.
+- 신규 DB: `alembic upgrade head` 한 번으로 baseline + 모든 후속 revision 적용.
+- 기존 production DB(80d75521b95a stamp 완료 상태): 자동 호환, 후속 revision만 적용.
 """
 
 from logging.config import fileConfig

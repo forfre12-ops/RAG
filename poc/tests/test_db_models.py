@@ -102,7 +102,7 @@ def test_orm_tables_present_in_database():
     missing = orm_tables - db_tables
     assert not missing, (
         f"ORM tables not found in DB: {missing}. "
-        "Did you run `docker compose up -d postgres` (init.sql auto-applied)?"
+        "Did you run `docker compose up -d postgres && alembic upgrade head`?"
     )
 
 
@@ -119,7 +119,7 @@ def test_default_tenant_seeded():
 
 
 def test_classification_levels_seeded():
-    """init.sql seeds 4 levels with OpenAPI-aligned codes."""
+    """alembic baseline seeds 4 levels with OpenAPI-aligned codes."""
     with session_scope() as s:
         codes = [
             lvl.level_code
@@ -131,7 +131,7 @@ def test_classification_levels_seeded():
 
 
 def test_evaluation_factors_seeded():
-    """init.sql seeds 4 factors with weights summing to 1.0."""
+    """alembic baseline seeds 4 factors with weights summing to 1.0."""
     with session_scope() as s:
         factors = s.query(EvaluationFactor).all()
         codes = {f.factor_code for f in factors}
