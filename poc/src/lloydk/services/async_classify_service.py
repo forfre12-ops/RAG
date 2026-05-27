@@ -30,19 +30,29 @@ class AsyncClassifyService:
         self.classify = ClassifyService.get_instance()
 
     def submit_async(self, req: ClassifyAsyncRequest) -> ClassifyAsyncResponse:
+        logger.debug(
+            "async classify submit enter: doc_id=%s tenant=%s",
+            req.doc_id, getattr(req, "tenant_id", None),
+        )
         job_id = uuid.uuid4()
         self.jobs.create(job_id, payload={"total": 1, "completed": 0})
         # PoC: 즉시 실행 (Celery 발사 대신)
         try:
             result = self.classify.classify(self._strip_async_fields(req))
             self.jobs.update(job_id, status="done", completed=1, results=[result.model_dump(mode="json")])
+            logger.info("async classify done: job_id=%s doc_id=%s", job_id, req.doc_id)
         except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "async classify failed: job_id=%s doc_id=%s err=%s",
+                job_id, req.doc_id, type(exc).__name__, exc_info=True,
+            )
             self.jobs.update(job_id, status="failed", error=str(exc))
         return ClassifyAsyncResponse(
             job_id=job_id, status="queued", status_url=f"/api/v1/classify/jobs/{job_id}"
         )
 
     def submit_batch(self, req: ClassifyBatchRequest) -> ClassifyBatchResponse:
+        logger.debug("async batch submit enter: total=%d", len(req.documents))
         job_id = uuid.uuid4()
         total = len(req.documents)
         self.jobs.create(job_id, payload={"total": total, "completed": 0})
@@ -53,7 +63,12 @@ class AsyncClassifyService:
                 results.append(res.model_dump(mode="json"))
                 self.jobs.update(job_id, completed=len(results))
             self.jobs.update(job_id, status="done", results=results)
+            logger.info("async batch done: job_id=%s total=%d", job_id, total)
         except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "async batch failed: job_id=%s completed=%d total=%d err=%s",
+                job_id, len(results), total, type(exc).__name__, exc_info=True,
+            )
             self.jobs.update(job_id, status="failed", error=str(exc), results=results)
         return ClassifyBatchResponse(
             job_id=job_id,
@@ -63,6 +78,7 @@ class AsyncClassifyService:
         )
 
     def get_status(self, job_id: uuid.UUID) -> Optional[ClassifyJobStatus]:
+        logger.debug("async get_status enter: job_id=%s", job_id)
         job = self.jobs.get(job_id)
         if job is None:
             return None

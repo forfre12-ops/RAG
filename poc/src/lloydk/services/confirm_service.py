@@ -52,6 +52,10 @@ class ConfirmService:
     """관리자 분류 확정 — staging → confirmed."""
 
     def confirm(self, req: ConfirmRequest) -> ConfirmResult:
+        logger.debug(
+            "confirm enter: inference_id=%s doc_id=%s confirmed_label=%s actor=%s",
+            req.inference_id, req.doc_id, req.confirmed_label, req.actor.user_id,
+        )
         warns: list[str] = []
         new_id = uuid.uuid4()
         confirmed_at = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -60,6 +64,10 @@ class ConfirmService:
                 repo = ClassifyRepo(db)
                 cls = self._find_classification(repo, req)
                 if cls is None:
+                    logger.info(
+                        "confirm: classification not found (audit only) — inference_id=%s doc_id=%s",
+                        req.inference_id, req.doc_id,
+                    )
                     warns.append("classification not found in DB — confirmation recorded in audit only")
                     return ConfirmResult(new_id, confirmed_at, persisted=False, warnings=warns)
 
@@ -90,9 +98,13 @@ class ConfirmService:
                         corrected_by=req.actor.user_id,
                         reason=req.note,
                     )
+                logger.info(
+                    "confirm done: classification_id=%s confirmation_id=%s label=%s",
+                    cls.classification_id, new_id, req.confirmed_label,
+                )
                 return ConfirmResult(new_id, confirmed_at, persisted=True, warnings=warns)
         except SQLAlchemyError as exc:
-            logger.debug("confirm persistence skipped: %s", exc)
+            logger.warning("confirm persistence failed: %s", exc)
             warns.append(f"persistence skipped: {type(exc).__name__}")
             return ConfirmResult(new_id, confirmed_at, persisted=False, warnings=warns)
 
@@ -112,6 +124,10 @@ class RelabelService:
     """오분류 수정 — 새 corrections + classification.status='corrected'."""
 
     def relabel(self, req: RelabelRequest) -> RelabelResult:
+        logger.debug(
+            "relabel enter: inference_id=%s doc_id=%s %s→%s actor=%s",
+            req.inference_id, req.doc_id, req.original_label, req.corrected_label, req.actor.user_id,
+        )
         warns: list[str] = []
         new_id = uuid.uuid4()
         try:
@@ -119,6 +135,10 @@ class RelabelService:
                 repo = ClassifyRepo(db)
                 cls = self._find_classification(repo, req)
                 if cls is None:
+                    logger.info(
+                        "relabel: classification not found (audit only) — inference_id=%s doc_id=%s",
+                        req.inference_id, req.doc_id,
+                    )
                     warns.append("classification not found in DB — relabel queued in audit only")
                     return RelabelResult(new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns)
 
@@ -138,6 +158,10 @@ class RelabelService:
                 cls.status = "corrected"
 
                 queue_size = len(repo.unconsumed_corrections())
+                logger.info(
+                    "relabel done: classification_id=%s relabel_id=%s queue_size=%d",
+                    cls.classification_id, new_id, queue_size,
+                )
                 return RelabelResult(
                     relabel_id=new_id,
                     queue_size=queue_size,
@@ -146,7 +170,7 @@ class RelabelService:
                     warnings=warns,
                 )
         except SQLAlchemyError as exc:
-            logger.debug("relabel persistence skipped: %s", exc)
+            logger.warning("relabel persistence failed: %s", exc)
             warns.append(f"persistence skipped: {type(exc).__name__}")
             return RelabelResult(new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns)
 

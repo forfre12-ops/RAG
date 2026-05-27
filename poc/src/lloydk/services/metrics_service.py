@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 class MetricsService:
     def latest(self) -> Optional[MetricsReport]:
+        logger.debug("metrics latest enter")
         try:
             with session_scope() as db:
                 mv = db.execute(
@@ -46,12 +47,17 @@ class MetricsService:
                 live = compute_metrics_from_db(mv.version_label)
                 if live is None or live.sample_count == 0:
                     return stored  # 빈 stored 반환 (sample_count=0)
+                logger.info(
+                    "metrics latest done (live): model_version=%s sample_count=%d",
+                    mv.version_label, live.sample_count,
+                )
                 return self._from_m6(live, mv)
         except SQLAlchemyError as exc:
-            logger.debug("metrics latest skipped: %s", exc)
+            logger.warning("metrics latest skipped: %s", exc)
             return None
 
     def history(self, limit: int = 20) -> MetricsHistory:
+        logger.debug("metrics history enter: limit=%d", limit)
         try:
             with session_scope() as db:
                 rows = list(
@@ -61,10 +67,11 @@ class MetricsService:
                 )
                 return MetricsHistory(items=[self._from_stored(mv) for mv in rows])
         except SQLAlchemyError as exc:
-            logger.debug("metrics history skipped: %s", exc)
+            logger.warning("metrics history skipped: %s", exc)
             return MetricsHistory(items=[])
 
     def confusion_matrix(self, model_version: str) -> Optional[ConfusionMatrix]:
+        logger.debug("metrics confusion_matrix enter: model_version=%s", model_version)
         try:
             with session_scope() as db:
                 mv = db.execute(
@@ -94,6 +101,10 @@ class MetricsService:
                 # FNR by grade는 metrics 한번 더 계산
                 from lloydk.modules.m6_evaluation.metrics import compute_metrics_from_arrays
                 m = compute_metrics_from_arrays(list(y_true), list(y_pred), model_version=model_version)
+                logger.info(
+                    "metrics confusion_matrix done: model_version=%s pairs=%d",
+                    model_version, len(pairs),
+                )
                 return ConfusionMatrix(
                     model_version=model_version,
                     labels=cm_result.labels,
@@ -101,7 +112,7 @@ class MetricsService:
                     fnr_by_grade=m.fnr_by_grade,
                 )
         except SQLAlchemyError as exc:
-            logger.debug("metrics confusion-matrix skipped: %s", exc)
+            logger.warning("metrics confusion-matrix skipped: %s", exc)
             return None
 
     # ------------------------------------------------------------

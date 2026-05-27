@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 import warnings
 from typing import Optional
@@ -20,6 +21,8 @@ from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
 from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
 from lloydk.repositories.classify_repo import ClassifyRepo
 from lloydk.schemas.classify import ClassifyRequest, ClassifyResponse
+
+logger = logging.getLogger(__name__)
 
 
 class ClassifyService:
@@ -40,6 +43,10 @@ class ClassifyService:
     # ------------------------------------------------------------
 
     def classify(self, req: ClassifyRequest) -> ClassifyResponse:
+        logger.debug(
+            "classify enter: doc_id=%s tenant=%s use_rag=%s content_len=%d",
+            req.doc_id, req.tenant_id, req.use_rag, len(req.content or ""),
+        )
         if req.text_already_preprocessed:
             cleaned = req.content
         else:
@@ -56,6 +63,11 @@ class ClassifyService:
         warnings_acc = list(pred.warnings)
         inference_id, persist_warnings = self._try_persist(req, pred)
         warnings_acc.extend(persist_warnings)
+
+        logger.info(
+            "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f",
+            req.doc_id, inference_id, pred.label, float(pred.confidence),
+        )
 
         return ClassifyResponse(
             inference_id=inference_id,
@@ -143,9 +155,17 @@ class ClassifyService:
                 return cls.classification_id, warns
 
         except SQLAlchemyError as exc:
+            logger.error(
+                "classify persistence db error: doc_id=%s err=%s",
+                req.doc_id, type(exc).__name__, exc_info=True,
+            )
             warns.append(f"persistence skipped: db error ({type(exc).__name__})")
             return uuid.uuid4(), warns
         except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "classify persistence unexpected error: doc_id=%s err=%s",
+                req.doc_id, type(exc).__name__, exc_info=True,
+            )
             warnings.warn(
                 f"[classify_service] unexpected persistence error: {exc}",
                 RuntimeWarning,

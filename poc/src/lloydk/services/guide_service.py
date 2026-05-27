@@ -76,6 +76,10 @@ class GuideService:
         tenant_id: str = "default",
         doc_type: Optional[str] = None,
     ) -> GuideUploadResponse:
+        logger.debug(
+            "guide upload enter: guide_id=%s version=%s tenant=%s bytes=%d actor=%s",
+            guide_id, version, tenant_id, len(content_bytes or b""), actor_user_id,
+        )
         text = _decode_best_effort(content_bytes)
         indexer = self._get_indexer()
         result = indexer.index_guide(
@@ -121,6 +125,7 @@ class GuideService:
         )
 
     def list_versions(self, guide_id: str) -> Optional[GuideVersionList]:
+        logger.debug("guide list_versions enter: guide_id=%s", guide_id)
         records = self._guides.get(guide_id)
         if not records:
             return None

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from lloydk.adapters.llm.base import UsageRecord
+
+logger = logging.getLogger(__name__)
 
 
 class LLMUsageService:
@@ -29,7 +32,8 @@ class LLMUsageService:
             self._engine = create_engine(settings.database_url, pool_pre_ping=True)
             with self._engine.connect():
                 pass
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("llm_usage DB engine unavailable, falling back to JSONL: %s", exc)
             self._engine = None
 
     def record(
@@ -42,6 +46,11 @@ class LLMUsageService:
         tenant_id: str = "default",
         billing_phase: str = "development",
     ) -> None:
+        logger.debug(
+            "llm_usage record enter: provider=%s model=%s purpose=%s tenant=%s",
+            getattr(usage, "provider", None), getattr(usage, "model", None),
+            purpose, tenant_id,
+        )
         row = {
             **asdict(usage),
             "purpose": purpose,
@@ -55,9 +64,13 @@ class LLMUsageService:
         if self._engine is not None:
             try:
                 self._insert_db(row)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 # DB 실패해도 JSONL은 남음
-                pass
+                logger.warning("llm_usage DB insert failed (JSONL preserved): %s", exc)
+        logger.info(
+            "llm_usage recorded: provider=%s model=%s cost_usd=%s",
+            row.get("provider"), row.get("model"), row.get("cost_usd"),
+        )
 
     def _append_jsonl(self, row: dict) -> None:
         # JSONL은 LF 줄 끝이 표준. CRLF는 파서 호환성 문제 야기.

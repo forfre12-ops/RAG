@@ -37,6 +37,10 @@ class TrainingService:
 
     def submit(self, req: TrainRequest) -> TrainResponse:
         """학습 작업 등록. DB에 TrainingRun(queued) 1건 생성."""
+        logger.debug(
+            "training submit enter: type=%s base_model=%s actor=%s",
+            req.training_type, req.base_model, req.actor.user_id,
+        )
         run_id = self._create_run(req)
         # JobStore 등록 (DB 미가용 시에도 응답 가능)
         self.jobs.create(
@@ -50,6 +54,7 @@ class TrainingService:
         )
         # NOTE: 운영은 여기서 Celery train_classifier_task.delay(...) 호출.
         # PoC는 GPU/데이터셋 미확보라 'queued' 유지.
+        logger.info("training submit done: train_job_id=%s status=queued", run_id)
         return TrainResponse(
             train_job_id=run_id,
             status_url=f"/api/v1/train/jobs/{run_id}",
@@ -57,6 +62,7 @@ class TrainingService:
         )
 
     def status(self, train_job_id: uuid.UUID) -> Optional[TrainStatus]:
+        logger.debug("training status enter: train_job_id=%s", train_job_id)
         # DB(TrainingRun) 우선, 없으면 JobStore
         run = self._get_run(train_job_id)
         if run is not None:
@@ -77,6 +83,7 @@ class TrainingService:
         )
 
     def list_recent(self, limit: int = 20, status_filter: Optional[str] = None) -> TrainJobList:
+        logger.debug("training list_recent enter: limit=%d filter=%s", limit, status_filter)
         try:
             with session_scope() as db:
                 repo = TrainingRepo(db)
@@ -97,7 +104,7 @@ class TrainingService:
                 ]
                 return TrainJobList(total=len(items), items=items)
         except SQLAlchemyError as exc:
-            logger.debug("train list skipped: %s", exc)
+            logger.warning("train list skipped: %s", exc)
             return TrainJobList(total=0, items=[])
 
     # ------------------------------------------------------------
@@ -116,14 +123,15 @@ class TrainingService:
                 )
                 return run.run_id
         except SQLAlchemyError as exc:
-            logger.debug("training run create skipped (DB unavailable): %s", exc)
+            logger.warning("training run create skipped (DB unavailable): %s", exc)
             return uuid.uuid4()
 
     def _get_run(self, run_id: uuid.UUID):
         try:
             with session_scope() as db:
                 return TrainingRepo(db).get_run(run_id)
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
+            logger.warning("training run lookup failed: run_id=%s err=%s", run_id, exc)
             return None
 
     @staticmethod

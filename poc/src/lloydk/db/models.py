@@ -39,6 +39,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -116,6 +117,13 @@ class LevelKeyword(Base):
 
     __table_args__ = (
         Index("idx_lk_level_active", "level_id", "is_active"),
+        # init.sql 보유 — ORM 동기화 (drift 방지)
+        Index(
+            "idx_lk_keyword_trgm",
+            "keyword",
+            postgresql_using="gin",
+            postgresql_ops={"keyword": "gin_trgm_ops"},
+        ),
     )
 
 
@@ -156,6 +164,27 @@ class Document(Base):
         Index("idx_doc_tenant_status", "tenant_id", "processing_status"),
         Index("idx_doc_format", "source_format"),
         Index("idx_doc_uploaded", "uploaded_at"),
+        # init.sql 보유 — ORM 동기화 (drift 방지)
+        Index(
+            "idx_doc_hash",
+            "tenant_id",
+            "file_hash",
+            unique=True,
+            postgresql_where=text("file_hash IS NOT NULL"),
+        ),
+        Index(
+            "idx_doc_metadata",
+            "metadata",
+            postgresql_using="gin",
+            postgresql_ops={"metadata": "jsonb_path_ops"},
+        ),
+        Index(
+            "idx_doc_pending",
+            "uploaded_at",
+            postgresql_where=text("processing_status = 'pending'"),
+        ),
+        # N4 신규 — 테넌트 스코프 최신 문서 조회 hot path
+        Index("idx_doc_tenant_uploaded", "tenant_id", "uploaded_at"),
     )
 
 
@@ -250,6 +279,14 @@ class Classification(Base):
         Index("idx_cls_doc", "doc_id", "classified_at"),
         Index("idx_cls_tenant_status", "tenant_id", "status"),
         Index("idx_cls_model_level", "model_version", "predicted_level_id", "status"),
+        # init.sql 보유 — ORM 동기화 (drift 방지)
+        Index(
+            "idx_cls_staging",
+            "classified_at",
+            postgresql_where=text("status = 'staging'"),
+        ),
+        # N4 신규 — 테넌트 스코프 최근 분류 시계열 조회 hot path
+        Index("idx_cls_tenant_classified", "tenant_id", "classified_at"),
     )
 
 
@@ -302,6 +339,17 @@ class ModelVersion(Base):
     level_snapshot: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    __table_args__ = (
+        # init.sql 보유 — ORM 동기화 (drift 방지)
+        Index(
+            "idx_mv_active",
+            "is_active",
+            unique=True,
+            postgresql_where=text("is_active = TRUE"),
+        ),
+        Index("idx_mv_mlflow", "mlflow_run_id"),
+    )
+
 
 class TrainingRun(Base):
     __tablename__ = "training_runs"
@@ -332,6 +380,8 @@ class TrainingRun(Base):
         Index("idx_tr_model", "model_version"),
         Index("idx_tr_status", "status"),
         Index("idx_tr_date", "started_at"),
+        # N4 신규 — list_recent_runs() ORDER BY created_at DESC hot path
+        Index("idx_tr_created", "created_at"),
     )
 
 
@@ -385,6 +435,13 @@ class Correction(Base):
         Index("idx_corr_cls", "classification_id"),
         Index("idx_corr_direction", "direction"),
         Index("idx_corr_at", "corrected_at"),
+        # init.sql 보유 — ORM 동기화 (drift 방지)
+        # unconsumed_corrections() WHERE consumed_in_run IS NULL hot path
+        Index(
+            "idx_corr_unconsumed",
+            "consumed_in_run",
+            postgresql_where=text("consumed_in_run IS NULL"),
+        ),
     )
 
 
@@ -433,6 +490,8 @@ class SampleDocument(Base):
         Index("idx_sd_status", "review_status"),
         Index("idx_sd_level", "target_level_id"),
         Index("idx_sd_tenant", "tenant_id"),
+        # N4 신규 — list_pending_review() WHERE review_status=? ORDER BY created_at hot path
+        Index("idx_sd_status_created", "review_status", "created_at"),
     )
 
 
@@ -498,6 +557,11 @@ class AuditLog(Base):
         Index("idx_audit_actor", "actor_id", "occurred_at"),
         Index("idx_audit_target", "target_type", "target_id"),
         Index("idx_audit_action", "action", "occurred_at"),
+        # N4 신규 — 테넌트별 감사 로그 시계열 조회 hot path
+        # (audit_log는 RANGE PARTITION이라 자식 파티션마다 자동 전파)
+        Index("idx_audit_tenant_occurred", "tenant_id", "occurred_at"),
+        # N4 신규 — 테넌트 + 액션 복합 감사 추적 hot path
+        Index("idx_audit_tenant_action", "tenant_id", "action", "occurred_at"),
     )
 
 

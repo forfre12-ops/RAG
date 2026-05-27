@@ -39,6 +39,7 @@ class SchemaAdminService:
         return dt.datetime.now(dt.timezone.utc).strftime("v%Y%m%d-%H%M%S")
 
     def get(self) -> GradesGetResponse:
+        logger.debug("schema get enter")
         try:
             with session_scope() as db:
                 levels = (
@@ -59,13 +60,18 @@ class SchemaAdminService:
                 ]
                 if not grades:
                     grades = list(_DEFAULT_GRADES)
+                logger.info("schema get done: grades_count=%d", len(grades))
                 return GradesGetResponse(version=self._version_tag(), grades=grades)
         except SQLAlchemyError as exc:
-            logger.debug("schema get fell back to default: %s", exc)
+            logger.warning("schema get fell back to default: %s", exc)
             return GradesGetResponse(version=self._version_tag(), grades=list(_DEFAULT_GRADES))
 
     def put(self, req: GradesPutRequest) -> GradesPutResponse:
         """등급체계 변경. 새 코드 추가 / 순서 변경 시 requires_retraining=True."""
+        logger.debug(
+            "schema put enter: grades_count=%d actor=%s",
+            len(req.grades), req.actor.user_id,
+        )
         reasons: list[str] = []
         requires = False
         try:
@@ -124,9 +130,13 @@ class SchemaAdminService:
                     if lv is not None:
                         lv.is_active = False
         except SQLAlchemyError as exc:
-            logger.debug("schema put persistence skipped: %s", exc)
+            logger.error("schema put persistence failed: %s", exc, exc_info=True)
             reasons.append(f"db_error:{type(exc).__name__}")
 
+        logger.info(
+            "schema put done: requires_retraining=%s reasons=%s",
+            requires, reasons,
+        )
         return GradesPutResponse(
             version=self._version_tag(),
             requires_retraining=requires,

@@ -43,6 +43,10 @@ class SynthesisService:
         self.jobs = get_default_store()
 
     def submit(self, req: SynthGenerateRequest) -> SynthGenerateResponse:
+        logger.debug(
+            "synth submit enter: target_grade=%s domain=%s count=%d provider=%s actor=%s",
+            req.target_grade, req.domain, req.count, req.llm_provider, req.actor.user_id,
+        )
         job_id = uuid.uuid4()
         unit = COST_PER_DOC_USD.get(req.llm_provider, 0.01)
         self.jobs.create(
@@ -57,6 +61,10 @@ class SynthesisService:
             },
         )
         # 운영: Celery synthesize_batch.delay(grade=..., count=...) 발사
+        logger.info(
+            "synth submit done: job_id=%s count=%d est_cost_usd=%.4f",
+            job_id, req.count, round(unit * req.count, 4),
+        )
         return SynthGenerateResponse(
             synth_job_id=job_id,
             expected_count=req.count,
@@ -70,6 +78,7 @@ class SynthesisService:
         tenant_id: Optional[str] = None,
         limit: int = 50,
     ) -> SynthQueueResponse:
+        logger.debug("synth queue enter: status=%s tenant=%s limit=%d", status, tenant_id, limit)
         # status 매핑: API 'pending' → DB 'pending_review'
         db_status = {"pending": "pending_review", "approved": "approved", "rejected": "rejected"}.get(status, "pending_review")
 
@@ -98,10 +107,14 @@ class SynthesisService:
                 ]
                 return SynthQueueResponse(total=len(items), items=items)
         except SQLAlchemyError as exc:
-            logger.debug("synth queue skipped: %s", exc)
+            logger.warning("synth queue skipped: %s", exc)
             return SynthQueueResponse(total=0, items=[])
 
     def review(self, synth_id: uuid.UUID, req: SynthReviewRequest) -> Optional[SynthReviewResponse]:
+        logger.debug(
+            "synth review enter: synth_id=%s decision=%s actor=%s",
+            synth_id, req.decision, req.actor.user_id,
+        )
         try:
             with session_scope() as db:
                 repo = SynthRepo(db)
@@ -113,14 +126,19 @@ class SynthesisService:
                     rejection_reason=req.comment if not approved else None,
                 )
                 if sd is None:
+                    logger.info("synth review: sample not found — synth_id=%s", synth_id)
                     return None
+                logger.info(
+                    "synth review done: synth_id=%s final_status=%s",
+                    synth_id, sd.review_status,
+                )
                 return SynthReviewResponse(
                     synth_id=synth_id,
                     final_status=sd.review_status,
                     added_to_dataset_version=None,  # W6 학습 데이터셋 빌드 시 연결
                 )
         except SQLAlchemyError as exc:
-            logger.debug("synth review skipped: %s", exc)
+            logger.warning("synth review skipped: synth_id=%s err=%s", synth_id, exc)
             return None
 
     @staticmethod
