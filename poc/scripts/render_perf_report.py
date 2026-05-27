@@ -167,6 +167,83 @@ def sparkline_svg(values: list[float], *, width: int = 80, height: int = 22, str
     )
 
 
+def _value_passes(v: float, compare: str, threshold: float | None) -> bool:
+    if threshold is None:
+        return True
+    if compare == "le":
+        return v <= threshold
+    if compare == "ge":
+        return v >= threshold
+    if compare == "gt":
+        return v > threshold
+    if compare == "lt":
+        return v < threshold
+    return True
+
+
+def sparkline_with_threshold(
+    values: list[float],
+    *,
+    threshold: float | bool | None = None,
+    compare: str = "le",
+    width: int = 160,
+    height: int = 48,
+) -> str:
+    """임계선이 표시된 sparkline.
+
+    - 측정값(검은 선) + 점별 PASS/FAIL 색(초록/빨강) + 임계선(점선, 주황) 한 차트에
+    - 임계 미달 회차를 즉시 식별 가능
+    - 임계가 None이면 일반 sparkline과 동일 동작
+    """
+    if not values:
+        return ""
+    if len(values) == 1:
+        values = values * 2
+
+    if isinstance(threshold, bool):
+        threshold = 1.0 if threshold else 0.0
+
+    candidates = list(values)
+    if threshold is not None:
+        candidates.append(float(threshold))
+    lo, hi = min(candidates), max(candidates)
+    span = (hi - lo) or 1.0
+    lo -= span * 0.05
+    hi += span * 0.05
+    rng = (hi - lo) or 1.0
+
+    def _y(v: float) -> float:
+        return height - 1 - ((v - lo) / rng) * (height - 2)
+
+    pts = []
+    for i, v in enumerate(values):
+        x = i * (width - 2) / (len(values) - 1) + 1
+        pts.append((x, _y(v), v))
+
+    path_d = "M " + " L ".join(f"{x:.1f},{y:.1f}" for x, y, _ in pts)
+    circles = []
+    for x, y, v in pts:
+        ok = _value_passes(v, compare, threshold) if threshold is not None else True
+        color = "#16a34a" if ok else "#dc2626"
+        circles.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.2" fill="{color}"/>')
+
+    thr_line = ""
+    if threshold is not None:
+        ty = _y(float(threshold))
+        thr_line = (
+            f'<line x1="0" x2="{width}" y1="{ty:.1f}" y2="{ty:.1f}" '
+            f'stroke="#d97706" stroke-width="1" stroke-dasharray="3,3"/>'
+        )
+
+    return (
+        f'<svg class="spark" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
+        f"{thr_line}"
+        f'<path d="{path_d}" fill="none" stroke="#525252" stroke-width="1.2"/>'
+        f"{''.join(circles)}"
+        f"</svg>"
+    )
+
+
 # ----------------------------------------------------------------
 # 보조 함수
 # ----------------------------------------------------------------
@@ -227,8 +304,10 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
     # 시나리오 표
     rows = _build_matrix_rows(scenarios, prev_runs)
 
-    # 추세 (핵심 KPI 4종)
-    trend_charts = _build_trends(prev_runs + [report])
+    # 추세 (핵심 KPI 4종 + 전체 KPI 표)
+    full_history_chrono = list(reversed(prev_runs)) + [report]
+    trend_charts = _build_trends(full_history_chrono)
+    trend_full = _build_full_kpi_trends(full_history_chrono)
 
     # 미달 KPI
     misses = _build_misses(scenarios)
@@ -286,6 +365,15 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
 <section id="trends">
   <h2><span class="num">§2</span> 핵심 KPI 추세 (최근 {len(prev_runs)+1}회)</h2>
   {trend_charts}
+</section>
+
+<section id="trends-full">
+  <h2><span class="num">§2.5</span> 전체 KPI 추세</h2>
+  <p style="color:var(--text-dim); font-size:12.5px; margin:0 0 8px;">
+    각 KPI의 최근 {len(prev_runs)+1}회 측정 추이. 점선=임계, 초록 점=PASS, 빨강 점=FAIL.
+    SKIP된 KPI는 측정값 0으로 표시되니 컬러 무시.
+  </p>
+  {trend_full}
 </section>
 
 <section id="misses">
@@ -394,30 +482,112 @@ def _build_matrix_rows(scenarios: list[dict], prev_runs: list[dict]) -> str:
 
 
 def _build_trends(history: list[dict]) -> str:
-    """핵심 KPI 4종의 추세 sparkline."""
+    """핵심 KPI 4종의 추세 sparkline + 임계선."""
     if len(history) <= 1:
         return '<p style="color:var(--text-dim); font-size:13px;">측정 누적 중 (N=1) — 다음 회차부터 추세 표시.</p>'
 
+    # KPI별 측정값 + 임계·compare 추출 (가장 최근 run에서)
     series: dict[str, list[float]] = {ck.id: [] for ck in core_kpis()}
+    latest_kpi_meta: dict[str, dict] = {}
     for run in history:
         idx = {}
         for s in run.get("scenarios", []):
             for k in s.get("kpis", []):
-                idx[k.get("kpi_id", "")] = float(k.get("measured", 0))
+                kid = k.get("kpi_id", "")
+                idx[kid] = float(k.get("measured", 0))
+                # latest meta (마지막 처리가 가장 최근)
+                latest_kpi_meta[kid] = k
         for ck in core_kpis():
             series[ck.id].append(idx.get(ck.id, 0.0))
 
     cards: list[str] = []
     for ck in core_kpis():
         vals = series[ck.id]
+        meta = latest_kpi_meta.get(ck.id, {})
+        threshold = meta.get("threshold")
+        compare = meta.get("compare", ck.compare if hasattr(ck, "compare") else "le")
+        chart = sparkline_with_threshold(
+            vals, threshold=threshold, compare=compare, width=180, height=44,
+        )
+        # 최근 값이 임계 미달인지로 카드 컬러
+        latest_ok = _value_passes(vals[-1], compare, threshold) if threshold is not None else True
+        cls = "pass" if latest_ok else "fail"
         cards.append(
-            f'<div class="widget">'
+            f'<div class="widget {cls}">'
             f'<div class="lbl">{html.escape(ck.id)} {html.escape(ck.name)}</div>'
-            f'<div class="val" style="font-size:18px;">{sparkline_svg(vals, width=120, height=28)}</div>'
-            f'<div class="sub">{_fmt_value(vals[-1], ck.unit)} (latest, N={len(vals)})</div>'
+            f'<div class="val" style="font-size:14px;">{chart}</div>'
+            f'<div class="sub">{_fmt_value(vals[-1], ck.unit)} · '
+            f'{_fmt_threshold(threshold, compare, ck.unit) if threshold is not None else "—"} · N={len(vals)}</div>'
             f'</div>'
         )
     return f'<div class="widgets">{"".join(cards)}</div>'
+
+
+def _build_full_kpi_trends(history: list[dict]) -> str:
+    """전체 KPI의 추세 — 카테고리(시나리오)별 그룹화 표."""
+    if len(history) <= 1:
+        return ""
+
+    # KPI별 측정값 시계열 + 최근 메타
+    series: dict[str, list[float]] = {}
+    latest_meta: dict[str, dict] = {}
+    scenario_of: dict[str, str] = {}
+    for run in history:
+        run_kpis: dict[str, dict] = {}
+        for s in run.get("scenarios", []):
+            for k in s.get("kpis", []):
+                kid = k.get("kpi_id", "")
+                if not kid:
+                    continue
+                run_kpis[kid] = k
+                latest_meta[kid] = k
+                scenario_of[kid] = s.get("scenario", "")
+        # 모든 알려진 KPI에 대해 측정값 (없으면 0) 추가
+        all_ids = set(series.keys()) | set(run_kpis.keys())
+        for kid in all_ids:
+            if kid not in series:
+                series[kid] = []
+            v = run_kpis.get(kid, {}).get("measured", 0)
+            series[kid].append(float(v))
+
+    # 시나리오별 그룹 정렬
+    grouped: dict[str, list[str]] = {}
+    for kid in sorted(series.keys()):
+        sc = scenario_of.get(kid, "?")
+        grouped.setdefault(sc, []).append(kid)
+
+    rows: list[str] = []
+    for sc in sorted(grouped.keys()):
+        for kid in grouped[sc]:
+            meta = latest_meta.get(kid, {})
+            vals = series[kid]
+            threshold = meta.get("threshold")
+            compare = meta.get("compare", "le")
+            unit = meta.get("unit", "")
+            chart = sparkline_with_threshold(
+                vals, threshold=threshold, compare=compare, width=140, height=32,
+            )
+            status = meta.get("status", "SKIP")
+            rows.append(
+                f"<tr>"
+                f'<td class="cell-mono">{html.escape(kid)}</td>'
+                f"<td>{html.escape(meta.get('name', ''))}</td>"
+                f'<td>{chart}</td>'
+                f'<td class="cell-mono">{_fmt_value(vals[-1], unit)}</td>'
+                f'<td><span class="status-pill {status}">{status}</span></td>'
+                f"</tr>"
+            )
+    return (
+        f'<table style="margin-top:12px;"><thead><tr>'
+        f'<th style="width:8%">KPI</th>'
+        f'<th style="width:30%">이름</th>'
+        f'<th style="width:32%">추이 (임계선=주황, PASS=초록, FAIL=빨강)</th>'
+        f'<th style="width:14%">최근값</th>'
+        f'<th style="width:10%">최근 판정</th>'
+        f"</tr></thead><tbody>"
+        f"{''.join(rows)}"
+        f"</tbody></table>"
+    )
 
 
 def _build_misses(scenarios: list[dict]) -> str:

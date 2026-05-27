@@ -164,6 +164,71 @@ run:
 
 ---
 
+## 5.5 임계 갭 분석 (dryrun ↔ full)
+
+같은 KPI가 dryrun과 full 환경에서 의미가 다른 경우가 있습니다. 단일 threshold로 둘 다 평가하면 한쪽이 과대/과소 판정됩니다. v1.1에서 도큐먼트만, 코드 분기는 v1.2 결정 후 적용 예정.
+
+| KPI | 현 임계 | dryrun 해석 | full 해석 | 권장 |
+|---|---|---|---|---|
+| **S1.3 F1-macro** | ≥ 0.75 | 룰 라벨러 키워드 매칭만으로 정렬된 평가셋에서 우연 통과 가능 | KF-DeBERTa 학습 후 본격 합격선 | `requires=["trained_model"]` 적용됨 — dryrun SKIP. 그대로 유지 |
+| **S1.4 FNR(TS→하위)** | ≤ 0.05 | 룰 fallback에선 키워드 외 의미 무시라 0.2~0.4 흔함 | 보안 미탐 핵심 KPI | `requires=["trained_model"]` 적용됨 — dryrun SKIP |
+| **S5.3 인덱싱 throughput** | ≥ 0.3 chunks/s | hash 임베딩 + InMemory: 모델 로드 비용 없이 1~2 chunks/s 가능 | KURE-v1 + ES: cold 0.4~1.5, warm 10~30 chunks/s | 너무 보수적 — full에선 ≥ 5 chunks/s가 맞음. mode-aware threshold 후보 |
+| **S5.4 Recall@5** | ≥ 0.80 | hash 임베딩에선 우연 매칭 0.3~0.6 | KURE-v1 + 검증셋에서 본 합격선 | `requires=["es","trained_model"]` 적용됨 — dryrun SKIP |
+| **S2.2 batch throughput** | ≥ 5 docs/s | in-process 즉시 실행이라 50~200 docs/s | Celery 실가동 시 5~20 docs/s | mode 무관, 그대로 |
+| **S5.1 업로드+인덱싱 p95 latency** | ≤ 30000 ms | hash 임베딩 + InMemory: 100~500 ms | KURE-v1 cold start: 10~30 s 가능 | 그대로 (full도 마지노선) |
+| **S6.3 비용/건** | ≤ $0.02 | LLM 미가용이라 SKIP | Claude Sonnet 4.6 기준 $0.005~0.015 | `requires=["llm"]` 적용됨, 그대로 |
+
+### 결론
+- 대부분의 핵심 KPI는 `requires`로 dryrun에서 자동 SKIP 처리됨 — 추가 분기 불필요
+- **S5.3 throughput만 mode-aware threshold가 정확** (dryrun ≥ 0.3 / full ≥ 5)
+- v1.2 결정 시: `KPI.threshold`를 `dict[mode, value]`로 확장하거나, 시나리오 함수에서 mode별 ctx.record 키 분리
+
+## 5.6 Prometheus pushgateway 연동 (선택)
+
+운영 환경에서 매 PSH 실행 결과를 Grafana 대시보드로 누적 추적할 수 있도록 옵션 제공.
+
+### 사용법
+```bash
+# CLI
+python scripts/run_perf_scenarios.py --mode dryrun --push-prom http://pushgw:9091
+
+# 또는 환경 변수
+PROM_PUSHGATEWAY_URL=http://pushgw:9091 \
+  python scripts/run_perf_scenarios.py --mode full
+```
+
+### 노출 메트릭
+| 메트릭 | 라벨 | 의미 |
+|---|---|---|
+| `lloydk_psh_summary_pass` | mode, git_sha | PASS 건수 |
+| `lloydk_psh_summary_fail` | mode, git_sha | FAIL 건수 |
+| `lloydk_psh_summary_skip` | mode, git_sha | SKIP 건수 |
+| `lloydk_psh_summary_total` | mode, git_sha | 전체 KPI 수 |
+| `lloydk_psh_pass_rate` | mode, git_sha | PASS / total |
+| `lloydk_psh_kpi_measured` | kpi_id, scenario, unit, compare, mode, git_sha | 측정값 |
+| `lloydk_psh_kpi_threshold` | kpi_id, scenario, unit, compare, mode, git_sha | 임계값 |
+| `lloydk_psh_kpi_passed` | kpi_id, scenario, mode, git_sha | 1=PASS, 0=FAIL, -1=SKIP, -2=ERROR |
+
+### Grafana 쿼리 예시
+```promql
+# PASS 비율 시계열 (mode=full만)
+lloydk_psh_pass_rate{mode="full"}
+
+# 특정 KPI 추세 (FNR)
+lloydk_psh_kpi_measured{kpi_id="S1.4"}
+
+# FAIL인 KPI 즉시 식별
+lloydk_psh_kpi_passed == 0
+```
+
+### 정책
+- 전송 실패는 silent — PSH 자체 결과·CI exit code에 영향 없음
+- 폐쇄망 환경: pushgateway 미가용이면 단순히 옵션 미사용 (기본값 빈 문자열)
+- prometheus_client 의존성 없이 stdlib urllib만 사용 — 추가 패키지 없음
+
+---
+
 ## 6. 변경 이력
 
+- v1.1 (2026-05-28): §5.5 임계 갭 분석 + §5.6 pushgateway 연동 추가. trained_model 자원 플래그로 S1.3·S1.4·S5.4 자동 SKIP 적용. PSH 자체 단위 테스트 50+ 추가 (perf_harness 23 + perf_render 16 + perf_pushgateway 11). HTML §2.5 전체 KPI 추세 표(임계선 sparkline) 신규.
 - v1.0 (2026-05-27): W10 PSH 착수와 함께 신규 작성. S1~S8 × 평균 3.75 KPI = 30 측정점. 핵심 KPI 5종.

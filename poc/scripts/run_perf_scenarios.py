@@ -78,6 +78,20 @@ def main() -> int:
     ap.add_argument("--no-html", action="store_true", help="HTML 렌더 생략")
     ap.add_argument("--no-probe", action="store_true", help="서비스 핑 생략 (오프라인용)")
     ap.add_argument("--fail-on-miss", action="store_true", help="KPI 1건이라도 FAIL 시 exit 1")
+    ap.add_argument(
+        "--push-prom",
+        default=os.environ.get("PROM_PUSHGATEWAY_URL", ""),
+        help=(
+            "Prometheus pushgateway URL (예: http://pushgw:9091). "
+            "환경변수 PROM_PUSHGATEWAY_URL로도 설정 가능. "
+            "전송 실패는 silent — PSH 자체 결과엔 영향 없음."
+        ),
+    )
+    ap.add_argument(
+        "--push-job",
+        default="lloydk_psh",
+        help="pushgateway job 이름 (Prometheus 라벨)",
+    )
     args = ap.parse_args()
 
     print(f"[PSH] mode={args.mode}  out_dir={args.out_dir}")
@@ -99,6 +113,15 @@ def main() -> int:
         html_path = Path(args.html_out)
         render_html(report, out_path=html_path, history_dir=Path(args.out_dir), mode=args.mode)
         print(f"[PSH] HTML → {html_path}")
+
+    if args.push_prom:
+        from lloydk.perf.pushgateway import push  # noqa: PLC0415
+
+        ok = push(report, url=args.push_prom, job=args.push_job)
+        if ok:
+            print(f"[PSH] pushgateway → {args.push_prom} (job={args.push_job})")
+        else:
+            print(f"[PSH] pushgateway 전송 실패 (URL={args.push_prom}) — silent skip")
 
     if args.fail_on_miss and summ["fail"] > 0:
         print(f"[PSH] FAIL ({summ['fail']} KPI miss) — exit 1")
