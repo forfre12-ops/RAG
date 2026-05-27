@@ -3,10 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from lloydk.config import settings
 from lloydk.schemas.common import Error
 from lloydk.api import classify as classify_api
 from lloydk.api import health as health_api
+from lloydk.api.middleware import AuditMiddleware
 
 
 @asynccontextmanager
@@ -31,6 +31,11 @@ async def add_request_id(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
     return response
+
+
+# 감사 미들웨어 — 모든 요청에 audit_log 1건 best-effort 기록.
+# request_id 미들웨어 뒤에 등록해야 request.state.request_id 사용 가능.
+app.add_middleware(AuditMiddleware)
 
 
 @app.exception_handler(Exception)

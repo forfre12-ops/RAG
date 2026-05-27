@@ -1,0 +1,231 @@
+"""Classification + ClassificationEvidence + Correction CRUD.
+
+ClassifyService가 사용. 모든 메서드는 외부 Session을 주입받고
+트랜잭션 commit은 호출자가 책임집니다.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Iterable
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from lloydk.db.models import (
+    Classification,
+    ClassificationEvidence,
+    ClassificationLevel,
+    Correction,
+    Document,
+    Tenant,
+)
+from lloydk.schemas.classify import EvidenceSpan
+from lloydk.schemas.common import Grade
+
+
+class ClassifyRepo:
+    def __init__(self, db: Session):
+        self.db = db
+
+    # ------------------------------------------------------------
+    # Lookup helpers
+    # ------------------------------------------------------------
+
+    def tenant_exists(self, tenant_id: str) -> bool:
+        return self.db.get(Tenant, tenant_id) is not None
+
+    def document_exists(self, doc_id: uuid.UUID) -> bool:
+        return self.db.get(Document, doc_id) is not None
+
+    def level_id_by_code(self, code: Grade | str) -> int | None:
+        """Grade 열거형 또는 코드 문자열을 level_id로 변환."""
+        code_str = code.value if isinstance(code, Grade) else code
+        row = self.db.execute(
+            select(ClassificationLevel.level_id).where(
+                ClassificationLevel.level_code == code_str
+            )
+        ).first()
+        return row[0] if row else None
+
+    # ------------------------------------------------------------
+    # Classification
+    # ------------------------------------------------------------
+
+    def create_classification(
+        self,
+        *,
+        doc_id: uuid.UUID,
+        tenant_id: str,
+        model_version: str,
+        predicted_level_id: int,
+        confidence: float,
+        alternatives: list[dict],
+        chunk_count: int | None = None,
+        rag_used: bool = False,
+        rag_top_k: int | None = None,
+        aggregation_method: str = "hybrid",
+        status: str = "staging",
+        inference_ms: int | None = None,
+    ) -> Classification:
+        cls = Classification(
+            doc_id=doc_id,
+            tenant_id=tenant_id,
+            model_version=model_version,
+            predicted_level_id=predicted_level_id,
+            confidence=confidence,
+            alternatives=alternatives,
+            chunk_count=chunk_count,
+            rag_used=rag_used,
+            rag_top_k=rag_top_k,
+            aggregation_method=aggregation_method,
+            status=status,
+            inference_ms=inference_ms,
+        )
+        self.db.add(cls)
+        self.db.flush()
+        return cls
+
+    def add_evidence(
+        self,
+        classification_id: uuid.UUID,
+        *,
+        chunk_id: uuid.UUID,
+        evidence_type: str,
+        excerpt: str,
+        contribution: float,
+        excerpt_start: int | None = None,
+        excerpt_end: int | None = None,
+        factor_id: int | None = None,
+    ) -> ClassificationEvidence:
+        ev = ClassificationEvidence(
+            classification_id=classification_id,
+            chunk_id=chunk_id,
+            evidence_type=evidence_type,
+            excerpt=excerpt,
+            contribution=contribution,
+            excerpt_start=excerpt_start,
+            excerpt_end=excerpt_end,
+            factor_id=factor_id,
+        )
+        self.db.add(ev)
+        return ev
+
+    def add_evidence_from_spans(
+        self,
+        classification_id: uuid.UUID,
+        *,
+        spans: Iterable[EvidenceSpan],
+        default_chunk_id: uuid.UUID,
+    ) -> int:
+        """EvidenceSpan(스키마) → ClassificationEvidence(DB) 변환 후 일괄 insert.
+
+        InferencePipeline 결과의 evidence_spans를 그대로 받기 위한 헬퍼.
+        chunks 테이블은 파티션이라 chunk_id FK가 없음 — 무결성은 app 레이어 책임.
+        """
+        count = 0
+        for span in spans:
+            self.add_evidence(
+                classification_id,
+                chunk_id=default_chunk_id,
+                evidence_type=span.tag or "keyword_match",
+                excerpt=span.text,
+                contribution=float(span.weight) if span.weight else 0.0,
+                excerpt_start=span.start,
+                excerpt_end=span.end,
+            )
+            count += 1
+        return count
+
+    def list_recent_for_doc(
+        self, doc_id: uuid.UUID, *, limit: int = 10
+    ) -> list[Classification]:
+        return list(
+            self.db.execute(
+                select(Classification)
+                .where(Classification.doc_id == doc_id)
+                .order_by(Classification.classified_at.desc())
+                .limit(limit)
+            ).scalars()
+        )
+
+    def get(self, classification_id: uuid.UUID) -> Classification | None:
+        return self.db.get(Classification, classification_id)
+
+    def update_status(self, classification_id: uuid.UUID, status: str) -> None:
+        cls = self.db.get(Classification, classification_id)
+        if cls is not None:
+            cls.status = status
+
+    # ------------------------------------------------------------
+    # Correction (Active Learning truth source)
+    # ------------------------------------------------------------
+
+    def add_correction(
+        self,
+        *,
+        classification_id: uuid.UUID,
+        original_level_id: int,
+        corrected_level_id: int,
+        corrected_by: str,
+        reason: str | None = None,
+    ) -> Correction:
+        """direction은 등급 order 비교로 자동 결정."""
+        levels = {
+            lv.level_id: lv.level_order
+            for lv in self.db.execute(select(ClassificationLevel)).scalars()
+        }
+        orig_order = levels.get(original_level_id)
+        new_order = levels.get(corrected_level_id)
+        direction = self._direction(orig_order, new_order)
+
+        corr = Correction(
+            classification_id=classification_id,
+            original_level_id=original_level_id,
+            corrected_level_id=corrected_level_id,
+            direction=direction,
+            reason=reason,
+            corrected_by=corrected_by,
+        )
+        self.db.add(corr)
+        self.db.flush()
+        return corr
+
+    @staticmethod
+    def _direction(orig_order: int | None, new_order: int | None) -> str:
+        """등급 order 비교 → direction.
+
+        등급 order: 낮을수록 높은 등급 (TS=1, S3=4).
+        - original=S1(2), corrected=TS(1): new < orig ⇒ 보안 미탐(고등급으로 격상) = underclass
+        - original=TS(1), corrected=S2(3): new > orig ⇒ 과탐 = overclass
+        - 같음 = confirm
+        """
+        if orig_order is None or new_order is None:
+            return "lateral"
+        if new_order < orig_order:
+            return "underclass"
+        if new_order > orig_order:
+            return "overclass"
+        return "confirm"
+
+    def unconsumed_corrections(self) -> list[Correction]:
+        return list(
+            self.db.execute(
+                select(Correction).where(Correction.consumed_in_run.is_(None))
+            ).scalars()
+        )
+
+    def mark_corrections_consumed(
+        self, run_id: uuid.UUID, correction_ids: Iterable[int]
+    ) -> int:
+        import datetime as _dt
+        now = _dt.datetime.now(_dt.timezone.utc)
+        count = 0
+        for cid in correction_ids:
+            corr = self.db.get(Correction, cid)
+            if corr is None:
+                continue
+            corr.consumed_in_run = run_id
+            corr.consumed_at = now
+            count += 1
+        return count
