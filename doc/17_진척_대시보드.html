@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 진척 대시보드 | Lloydk AI</title>
+<meta name="description" content="W1~W8 워크플로우 진척률, 미준비 자원 체크리스트, 자체결정 동결 변수 16개, 차단 항목 6건과 다음 액션. 2026-05-27 W2 종료 시점." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+
+<style>
+  /* ============================================================
+     NovaX Design System (doc/07 V2와 통일)
+     - Geist Sans / Geist Mono, 1px borders, monochrome
+     ============================================================ */
+  :root {
+    --bg:           #ffffff;
+    --bg-surface:   #fafafa;
+    --bg-elevated:  #ffffff;
+    --bg-code:      #fafafa;
+    --bg-nav:       rgba(255,255,255,0.72);
+    --text:         #0a0a0a;
+    --text-soft:    #525252;
+    --text-dim:     #737373;
+    --text-faint:   #a3a3a3;
+    --border:       rgba(0,0,0,0.08);
+    --border-strong:rgba(0,0,0,0.16);
+    --border-soft:  rgba(0,0,0,0.05);
+    --accent:       #0a0a0a;
+    --accent-soft:  #f4f4f4;
+    --radius-sm:    6px;
+    --radius:       8px;
+    --radius-lg:    12px;
+    --radius-pill:  999px;
+    --shadow-sm:    0 1px 2px rgba(0,0,0,.04);
+    --shadow:       0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.06);
+    --font-sans:    "Geist", -apple-system, BlinkMacSystemFont, "Pretendard",
+                    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --font-mono:    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* status colors */
+    --c-done:   #16a34a;
+    --c-active: #0070f3;
+    --c-block:  #dc2626;
+    --c-risk:   #d97706;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.7;
+    letter-spacing: -0.011em;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ===== Navbar ===== */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg-nav);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .nav-inner {
+    max-width: 1320px; margin: 0 auto;
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--text); text-decoration: none;
+    white-space: nowrap;
+  }
+  .brand-mark {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    background: var(--text); color: var(--bg);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 700;
+  }
+  .brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.02em; }
+  .brand-sep  { color: var(--text-dim); font-size: 14px; margin: 0 6px; }
+  .brand-url  { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); }
+  .nav-actions { display: flex; align-items: center; gap: 8px; }
+  .nav-link {
+    color: var(--text-soft); text-decoration: none;
+    font-size: 13.5px; font-weight: 500;
+    padding: 6px 10px; border-radius: var(--radius-sm);
+  }
+  .nav-link:hover { color: var(--text); }
+
+  /* ===== Layout ===== */
+  .container { max-width: 1280px; margin: 0 auto; padding: 40px 32px 120px; }
+
+  /* ===== Article header ===== */
+  .meta-row {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 16px;
+    font-size: 12.5px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    background: var(--text); color: var(--bg);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  .meta-dot { color: var(--text-faint); }
+  .meta-soft { color: var(--text-dim); }
+  .meta-category { color: var(--text); font-weight: 600; }
+  h1.title {
+    font-size: 56px; font-weight: 800;
+    letter-spacing: -0.04em; line-height: 1.04;
+    margin: 0 0 18px;
+  }
+  .lede { font-size: 18px; color: var(--text-soft); margin: 0 0 32px; max-width: 800px; }
+
+  /* ===== Section headings ===== */
+  h2 {
+    font-size: 30px; font-weight: 700;
+    letter-spacing: -0.025em; line-height: 1.2;
+    margin: 56px 0 4px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  .h2-sub {
+    margin: 0 0 24px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  h3 {
+    font-size: 19px; font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 32px 0 10px;
+  }
+
+  /* ===== Hero KPI block ===== */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 24px;
+    margin: 32px 0 40px;
+  }
+  .hero-progress {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+  }
+  .hero-progress .label {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .hero-progress .pct {
+    font-size: 72px; font-weight: 800;
+    letter-spacing: -0.04em; line-height: 1;
+    margin: 6px 0 16px;
+    font-feature-settings: "tnum";
+  }
+  .hero-progress .pct .of {
+    font-size: 32px; color: var(--text-dim); font-weight: 500;
+  }
+  .bar {
+    height: 8px; width: 100%;
+    background: var(--bg-surface);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .bar-fill { height: 100%; background: var(--text); }
+  .hero-progress .by-stage {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+  }
+  .stage-tick {
+    height: 28px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .stage-tick.done {
+    background: var(--text); color: var(--bg); border-color: var(--text);
+  }
+  .stage-tick.active {
+    background: var(--bg); border-color: var(--text); border-width: 1.5px;
+    color: var(--text); font-weight: 600;
+  }
+  .stage-tick.block {
+    background: var(--bg); border: 1px dashed var(--text);
+    color: var(--text-soft);
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .stat {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+  }
+  .stat .num {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1;
+    font-feature-settings: "tnum";
+  }
+  .stat .num.done { color: var(--c-done); }
+  .stat .num.block { color: var(--c-block); }
+  .stat .num.risk { color: var(--c-risk); }
+  .stat .lbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  /* ===== Timeline ===== */
+  .timeline {
+    margin: 24px 0;
+    display: flex; flex-direction: column;
+    gap: 0;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 60px 1fr 140px;
+    align-items: stretch;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .step + .step-conn { margin: 4px 0 4px 30px; }
+  .step-conn {
+    width: 1px; height: 16px;
+    background: var(--border-strong);
+  }
+  .step-num {
+    font-family: var(--font-mono);
+    font-size: 13px; font-weight: 600;
+    color: var(--text-dim);
+    display: flex; align-items: center;
+  }
+  .step.done .step-num { color: var(--c-done); }
+  .step.active .step-num { color: var(--c-active); font-weight: 700; }
+  .step.block .step-num { color: var(--c-block); }
+  .step.future .step-num { color: var(--text-faint); }
+  .step-body {
+    display: flex; flex-direction: column;
+    gap: 4px;
+    padding-right: 16px;
+  }
+  .step-title {
+    font-weight: 600; font-size: 15.5px; letter-spacing: -0.01em;
+  }
+  .step-desc { font-size: 13.5px; color: var(--text-soft); }
+  .step-status {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    position: relative;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .card .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .card .ctitle {
+    font-size: 15px; font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.4;
+  }
+  .card p { margin: 6px 0 0; font-size: 13.5px; color: var(--text-soft); }
+  .card.done .eyebrow { color: var(--c-done); border-bottom-color: rgba(22,163,74,0.2); }
+  .card.active .eyebrow { color: var(--c-active); border-bottom-color: rgba(0,112,243,0.2); }
+  .card.block .eyebrow { color: var(--c-block); border-bottom-color: rgba(220,38,38,0.2); }
+  .card.risk .eyebrow { color: var(--c-risk); border-bottom-color: rgba(217,119,6,0.2); }
+
+  /* ===== Callouts ===== */
+  .callout {
+    display: flex; gap: 14px;
+    padding: 14px 18px;
+    margin: 20px 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .callout.success { background: rgba(22,163,74,0.04);  border-color: rgba(22,163,74,0.20); }
+  .callout.warn    { background: rgba(217,119,6,0.05);  border-color: rgba(217,119,6,0.22); }
+  .callout.danger  { background: rgba(220,38,38,0.04);  border-color: rgba(220,38,38,0.22); }
+  .callout.accent  { background: rgba(0,112,243,0.04);  border-color: rgba(0,112,243,0.18); }
+  .callout-icon { width: 18px; height: 18px; flex-shrink: 0; margin-top: 4px; color: var(--text-soft); }
+  .callout.success .callout-icon { color: var(--c-done); }
+  .callout.warn    .callout-icon { color: var(--c-risk); }
+  .callout.danger  .callout-icon { color: var(--c-block); }
+  .callout.accent  .callout-icon { color: var(--c-active); }
+  .callout-label {
+    display: block; font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .callout.success .callout-label { color: var(--c-done); }
+  .callout.warn    .callout-label { color: #b45309; }
+  .callout.danger  .callout-label { color: var(--c-block); }
+  .callout.accent  .callout-label { color: var(--c-active); }
+  .callout p { margin: 4px 0; font-size: 14.5px; }
+  .callout ul { margin: 6px 0 0; padding-left: 18px; }
+  .callout li { font-size: 14.5px; margin: 3px 0; }
+
+  /* ===== Tables ===== */
+  .table-wrap {
+    margin: 20px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-elevated);
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead { background: var(--bg-surface); }
+  thead th {
+    text-align: left; padding: 12px 16px;
+    font-weight: 500; color: var(--text-dim);
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono); white-space: nowrap;
+  }
+  tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  tbody tr.pick td:first-child {
+    box-shadow: inset 2px 0 0 var(--text);
+    font-weight: 600; padding-left: 18px;
+  }
+
+  /* ===== Pills ===== */
+  .pill {
+    display: inline-flex; align-items: center;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px; font-weight: 500;
+    font-family: var(--font-mono);
+    line-height: 1.5; white-space: nowrap;
+  }
+  .pill.done     { background: var(--c-done); color: var(--bg); border: 1px solid var(--c-done); }
+  .pill.active   { background: var(--c-active); color: var(--bg); border: 1px solid var(--c-active); }
+  .pill.block    { background: var(--c-block); color: var(--bg); border: 1px solid var(--c-block); }
+  .pill.risk     { background: transparent; border: 1px solid var(--c-risk); color: var(--c-risk); }
+  .pill.future   { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-dim); }
+  .pill.lock     { background: var(--text); color: var(--bg); border: 1px solid var(--text); }
+
+  code { font-family: var(--font-mono); font-size: 0.88em; background: var(--bg-code);
+    padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); }
+
+  /* ===== Footer ===== */
+  .footer {
+    border-top: 1px solid var(--border);
+    margin-top: 80px; padding-top: 24px;
+    color: var(--text-dim); font-size: 13px;
+  }
+  .footer a { color: var(--text-soft); }
+
+  @media (max-width: 900px) {
+    h1.title { font-size: 40px; }
+    .hero { grid-template-columns: 1fr; }
+    .hero-progress .by-stage { grid-template-columns: repeat(4, 1fr); }
+    .step { grid-template-columns: 50px 1fr; }
+    .step-status { justify-content: flex-start; padding-top: 6px; grid-column: 2; }
+    .hero-progress .pct { font-size: 56px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAVBAR
+============================================================ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">LK</span>
+      <span class="brand-name">Lloydk AI</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-url">koipa/progress</span>
+    </a>
+    <div class="nav-actions">
+      <a class="nav-link" href="#stages">단계</a>
+      <a class="nav-link" href="#resources">자원</a>
+      <a class="nav-link" href="#decisions">결정</a>
+      <a class="nav-link" href="#next">다음 액션</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HEADER
+============================================================ -->
+<main class="container" id="top">
+
+  <div class="meta-row">
+    <span class="badge">진척 대시보드</span>
+    <span class="meta-category">Lloydk AI 코어</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">FUN-003·004·005·022·023·024</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">v0.2 · 2026-05-27 W2 종료 시점</span>
+  </div>
+
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 대시보드</h1>
+
+  <p class="lede">
+    W1·W2 완료. <b>외부 의존 없이 진행 가능한 W3·W4·W5 즉시 착수 가능.</b>
+    W6에서 GPU·실문서·LLM API 키 3건 차단 발생 — 사업단 예산 결정 필요.
+    pytest 212 PASS, 자체결정으로 회신 의존 변수 16개 동결.
+  </p>
+
+  <!-- ============================================================
+       HERO KPI
+  ============================================================ -->
+  <div class="hero">
+    <div class="hero-progress">
+      <div class="label">전체 완성도 (단계별 가중치)</div>
+      <div class="pct">30<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 30%"></div></div>
+      <div class="by-stage">
+        <div class="stage-tick done">W1</div>
+        <div class="stage-tick done">W2</div>
+        <div class="stage-tick active">W3</div>
+        <div class="stage-tick">W4</div>
+        <div class="stage-tick">W5</div>
+        <div class="stage-tick block">W6</div>
+        <div class="stage-tick">W7</div>
+        <div class="stage-tick">W8</div>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="num done">212</div><div class="lbl">pytest PASS</div></div>
+      <div class="stat"><div class="num">19</div><div class="lbl">ORM 테이블</div></div>
+      <div class="stat"><div class="num block">6</div><div class="lbl">차단 자원</div></div>
+      <div class="stat"><div class="num">16</div><div class="lbl">자체결정 동결</div></div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       1. 단계별 진척
+  ============================================================ -->
+  <h2 id="stages">1. 워크플로우 단계별 진척</h2>
+  <p class="h2-sub">W1~W8 8단계. 각 단계의 가중치(작업량 비례) · 진척 % · 산출물 · 의존 자원.</p>
+
+  <div class="timeline">
+    <!-- W1 -->
+    <div class="step done">
+      <div class="step-num">W1</div>
+      <div class="step-body">
+        <div class="step-title">DB 영속화 계층 — SQLAlchemy 2.0 ORM + Alembic baseline</div>
+        <div class="step-desc">
+          19개 ORM 클래스 (init.sql v2 1:1 매핑), session_scope, alembic stamp head.
+          파티션 부모(audit_log·llm_usage·chunks) INSERT 자동 라우팅 검증.
+          <code>commit 0ea9632</code>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W2 -->
+    <div class="step done">
+      <div class="step-num">W2</div>
+      <div class="step-body">
+        <div class="step-title">Repository 5종 + ClassifyService DB 통합 + AuditMiddleware</div>
+        <div class="step-desc">
+          ClassifyRepo·TrainingRepo·SynthRepo·AuditRepo·LlmUsageRepo, INET 안전 검증,
+          모든 요청에 audit_log 1건 best-effort 기록, 401·500도 success=false로.
+          <code>commit 5d0d59e</code>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W3 -->
+    <div class="step active">
+      <div class="step-num">W3</div>
+      <div class="step-body">
+        <div class="step-title">라우터 8개 신규 — confirm·relabel·training·synthesis·guide·schema·metrics·async</div>
+        <div class="step-desc">
+          OpenAPI 20개 path 중 미연결 18개를 도메인별 8개 라우터로 채움.
+          Celery 워커는 이미 존재 (classify_async·synthesize_batch·train_classifier),
+          라우터·서비스 어댑터 추가만 필요. <b>외부 자원 없이 즉시 착수 가능.</b>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill active">착수 대기 0%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W4 -->
+    <div class="step future">
+      <div class="step-num">W4</div>
+      <div class="step-body">
+        <div class="step-title">M6 평가/능동학습 (FUN-024)</div>
+        <div class="step-desc">
+          현재 <code>modules/m6_evaluation/</code> 디렉터리 부재.
+          FNR per-grade, Confusion Matrix("고등급→저등급" 미탐 알람),
+          corrections 누적 → 재학습 큐, HTML 리포트 (matplotlib + jinja2).
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill future">대기</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W5 -->
+    <div class="step future">
+      <div class="step-num">W5</div>
+      <div class="step-body">
+        <div class="step-title">RAG 인덱서 + /guide/documents 백엔드</div>
+        <div class="step-desc">
+          가이드 문서 청크 → KURE-v1 임베딩 → ES <code>secrets-guides-koipa</code> 인덱스.
+          <code>RagIndexer</code> 코드 0줄 — 신규 작성.
+          <code>infra/es/userdict_ko.txt</code> 본문 1~2천 항목 확장 병행.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill future">대기</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W6 -->
+    <div class="step block">
+      <div class="step-num">W6</div>
+      <div class="step-body">
+        <div class="step-title">학습 데이터셋·합성 5,000건·시드 v2·폐쇄망 번들 실빌드</div>
+        <div class="step-desc">
+          <b>차단 3건</b>: GPU (1.1) + 가이드 v2 (1.2) + Anthropic API 키 (1.4).
+          그 사이 AI팀이 단독 진행 가능: 시드 v2 (영업비밀보호법 공개문헌) + Nori 사전 확장.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill block">차단</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W7 -->
+    <div class="step future">
+      <div class="step-num">W7</div>
+      <div class="step-body">
+        <div class="step-title">관측성·백업·DR 리허설</div>
+        <div class="step-desc">
+          Prometheus·Loki·Grafana 표준 설정 (4.3), pg_dump → MinIO 일별 백업,
+          ES snapshot, MinIO 미러, RTO 4h 검증. doc/11 Runbook v1.0 승격.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill future">대기</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W8 -->
+    <div class="step future">
+      <div class="step-num">W8</div>
+      <div class="step-body">
+        <div class="step-title">KL 통합 + 라이선스 교체 + SBOM + 운영 전환</div>
+        <div class="step-desc">
+          PyMuPDF → pdfminer.six, MinIO Commercial 또는 대체,
+          CycloneDX SBOM CI 추가, KL ↔ Lloydk API 통합 테스트 8 시나리오,
+          FUN-013 운영 로그 중앙서버 forwarder.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill future">대기</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>단계</th>
+          <th>가중치</th>
+          <th>완성도</th>
+          <th>기여 %</th>
+          <th>상태</th>
+          <th>주요 산출물</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="pick"><td>W1</td><td>15%</td><td>100%</td><td>15.0%</td><td><span class="pill done">완료</span></td><td>db/session·models, alembic baseline, 12 round-trip tests</td></tr>
+        <tr class="pick"><td>W2</td><td>15%</td><td>100%</td><td>15.0%</td><td><span class="pill done">완료</span></td><td>repositories/ 5종, ClassifyService persistence, AuditMiddleware</td></tr>
+        <tr><td>W3</td><td>20%</td><td>0%</td><td>0%</td><td><span class="pill active">착수 대기</span></td><td>라우터 8개 + 서비스 6개 + Celery 통합</td></tr>
+        <tr><td>W4</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>M6 평가·능동학습, /metrics/* 3 라우터</td></tr>
+        <tr><td>W5</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>RAG 인덱서, /guide/documents, 사전·시드 확장</td></tr>
+        <tr><td>W6</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill block">차단</span></td><td>합성 5,000, KF-DeBERTa 풀 학습, 폐쇄망 번들 25~30GB</td></tr>
+        <tr><td>W7</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>Prometheus/Loki/Grafana, 백업 cron, DR 리허설</td></tr>
+        <tr><td>W8</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>라이선스 교체, SBOM, KL 통합 8 시나리오</td></tr>
+        <tr class="pick"><td><b>합계</b></td><td>100%</td><td>—</td><td><b>30.0%</b></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================
+       2. 미준비 자원
+  ============================================================ -->
+  <h2 id="resources">2. 미준비 자원 — 누락 방지 체크리스트</h2>
+  <p class="h2-sub">
+    전체 40건: 차단 6 / 지연 14 / 완료·동결 20. 상세는
+    <code>doc/16_미준비_자원_체크리스트.md</code>.
+  </p>
+
+  <h3>2.1 외부 의존 자원</h3>
+  <div class="card-grid">
+
+    <div class="card block">
+      <div class="eyebrow">🔴 차단 · W6</div>
+      <div class="ctitle">GPU (Q1) — 24GB+ VRAM 1장</div>
+      <p>발주처 제공 미확정. 자체 대체: 클라우드 GPU (RunPod·Lambda·Vast 시간당 1~2$, 24h 학습 ≈ $30~50). KF-DeBERTa-base batch=8 가정으로 코드만 잠금.</p>
+    </div>
+
+    <div class="card block">
+      <div class="eyebrow">🔴 차단 · W6</div>
+      <div class="ctitle">KOIPA 등급분류 가이드 v2 (Q4)</div>
+      <p>현재 시드 v0 (seeds.py 79줄, PoC용). 자체 대체: 공개 영업비밀보호법·시행령으로 v1 작성 → 가이드 도착 시 v2 패치. AI팀 단독 진행 가능.</p>
+    </div>
+
+    <div class="card block">
+      <div class="eyebrow">🔴 차단 · 외부 일반화 검증</div>
+      <div class="ctitle">비밀해제 실문서 (Q3)</div>
+      <p>자체결정으로 <b>미제공 가정</b>으로 잠금. 합성+공개 데이터만으로 진행. doc/05·15에 외부 일반화 한계 정직성 노트 필요.</p>
+    </div>
+
+    <div class="card risk">
+      <div class="eyebrow">🟡 지연 · W6</div>
+      <div class="ctitle">Anthropic API 키 (합성 5,000건)</div>
+      <p>현재 noop provider로 동작. P3 풀 합성 시 약 <b>$50~100</b> 예상. 사업단 예산 승인 필요. 대체: Qwen3-14B 자체호스팅 (GPU 의존).</p>
+    </div>
+
+    <div class="card risk">
+      <div class="eyebrow">🟡 지연 · 통합 단계</div>
+      <div class="ctitle">KL 인터페이스 합의 (K2·K3)</div>
+      <p>자체결정으로 X-API-Key + 우리 docker-compose 단일 스택 잠금. KL 회신 차이 시 OpenAPI yaml + 인증 미들웨어만 수 시간 패치.</p>
+    </div>
+
+    <div class="card done">
+      <div class="eyebrow">🟢 완료 · W1 가동</div>
+      <div class="ctitle">PostgreSQL 16 + ES 8.15.3 + Nori</div>
+      <p>docker-compose 잠금, PG 19테이블 적재, ES cluster green, Nori 사용자 사전 마운트. <code>docker compose up -d postgres elasticsearch</code> 검증 완료.</p>
+    </div>
+
+  </div>
+
+  <h3>2.2 데이터셋</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>자원</th><th>현재</th><th>필요 시점</th><th>자체결정</th><th>상태</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>합성 5,000건 (P3 풀)</td><td>smoke 40건만, synthetic_800/ 부재</td><td>W6</td><td>API 키 발급 시 가능</td><td><span class="pill block">차단</span></td></tr>
+        <tr><td>labeled dataset (train·val·test.jsonl)</td><td>datasets/labeled/ 디렉터리 부재</td><td>W6</td><td>합성 완료 후 자동</td><td><span class="pill block">차단</span></td></tr>
+        <tr><td>공개 코퍼스 (AI Hub·모두의말뭉치)</td><td>미신청</td><td>W6 보강 (선택)</td><td>로이드케이 명의 동결</td><td><span class="pill risk">지연</span></td></tr>
+        <tr><td>Nori 사용자 사전</td><td>userdict_ko.txt 63줄 (목표 1~2천 항목)</td><td>W5</td><td>공개 용어 수집 가능</td><td><span class="pill risk">지연</span></td></tr>
+        <tr><td>시드 키워드 v2 (seeds.py)</td><td>v0 79줄</td><td>W6</td><td>공개 문헌 v1 가능</td><td><span class="pill risk">지연</span></td></tr>
+        <tr class="pick"><td>PoC dryrun 합성 40건</td><td>datasets/synthetic/ 40 파일</td><td>회귀</td><td>—</td><td><span class="pill done">완료</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>2.3 라이선스 · 운영 환경</h3>
+  <div class="card-grid">
+    <div class="card risk">
+      <div class="eyebrow">🟡 W8</div>
+      <div class="ctitle">PyMuPDF AGPL → pdfminer.six 교체</div>
+      <p>extractor.py 사용 중. <b>pdfminer.six 교체 권장</b> (BSD, 약간의 추출 품질 손실). 또는 Artifex 상용 구매.</p>
+    </div>
+    <div class="card risk">
+      <div class="eyebrow">🟡 W8</div>
+      <div class="ctitle">MinIO AGPL → Commercial 또는 SeaweedFS</div>
+      <p>W3에서 가동 예정. <b>MinIO Commercial 구매 권장</b>(가장 단순). 또는 SeaweedFS(LGPL)·Garage(MPL)·클라우드 S3.</p>
+    </div>
+    <div class="card risk">
+      <div class="eyebrow">🟡 W7</div>
+      <div class="ctitle">Prometheus / Loki / Grafana</div>
+      <p>infra/observability/ 디렉터리 부재. doc/11 Runbook 선언만. 표준 구성으로 자체 작성 가능 (~반일).</p>
+    </div>
+    <div class="card risk">
+      <div class="eyebrow">🟡 W7</div>
+      <div class="ctitle">백업·DR 리허설</div>
+      <p>pg_dump → MinIO 일별, ES snapshot, MinIO 미러, RTO 4h 검증. 스크립트 0건. 표준 cron+bash로 작성 가능.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">🟢 동결됨</div>
+      <div class="ctitle">Redis 7.2 BSD 시점 고정</div>
+      <p>commit 792cc2a로 docker-compose에 <code>redis:7.2-alpine</code> 잠금. 7.4+ RSALv2/SSPL 이슈 회피.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">🟢 도구 갖춤</div>
+      <div class="ctitle">SBOM (CycloneDX)</div>
+      <p><code>make licenses</code> 타깃 존재 (dump_licenses.py). W8에서 CI에 추가만.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       3. 자체결정 동결
+  ============================================================ -->
+  <h2 id="decisions">3. 자체결정 동결 변수 — 회신 대기 안 함</h2>
+  <p class="h2-sub">
+    doc/06 협의요청서의 Q1~Q7·K1~K5·E1~E9 모두 자체결정으로 잠금. 회신이 다르게 오면 차이 부분만 패치.
+  </p>
+
+  <div class="callout success">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">DECISION LOCKED</span>
+      <p>발주처/KL 회신을 기다리지 않고 로이드케이 내부 결정으로 잠가 후속 모든 잔여 개발이 즉시 착수 가능.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>결정값</th><th>잠금 위치</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Q1</b> GPU</td><td>24GB×1, KF-DeBERTa-base batch=8</td><td><code>trainer.py</code></td></tr>
+        <tr><td><b>Q2</b> 합성 데이터</td><td>사업단 내부 사용만</td><td>자체결정</td></tr>
+        <tr><td><b>Q3</b> 실문서</td><td>미제공 가정, 합성+공개로만</td><td>자체결정</td></tr>
+        <tr><td><b>Q4</b> 가이드</td><td>현 시드 동결, 회신 시 v2 패치</td><td><code>seeds.py</code></td></tr>
+        <tr><td><b>Q5</b> AI Hub</td><td>로이드케이 명의</td><td>자체결정</td></tr>
+        <tr><td><b>Q6</b> EXAONE</td><td>제외</td><td>자체결정</td></tr>
+        <tr><td><b>Q7</b> 검수</td><td>검수자 2명 + AI팀 셀프</td><td>자체결정</td></tr>
+        <tr><td><b>E1</b> ES 버전</td><td>8.15.3</td><td><code>docker-compose.yml</code></td></tr>
+        <tr><td><b>E2</b> Nori 사용자 사전</td><td>자체 작성</td><td><code>infra/es/userdict_ko.txt</code></td></tr>
+        <tr><td><b>E3</b> ES 라이선스</td><td>Basic, 인덱스 분리</td><td>doc/13 §11.1</td></tr>
+        <tr><td><b>E5</b> 노드 사양</td><td>단일 노드 JVM 4GB, int8_hnsw</td><td><code>docker-compose.yml</code></td></tr>
+        <tr><td><b>E9</b> 망 등급</td><td>폐쇄망, 25~30GB 번들</td><td>doc/12</td></tr>
+        <tr><td><b>K1</b> KL 인프라</td><td>우리 docker-compose 단일</td><td><code>docker-compose.yml</code></td></tr>
+        <tr><td><b>K3</b> 인증</td><td>X-API-Key</td><td><code>api/classify.py</code></td></tr>
+        <tr><td><b>K5</b> 멀티테넌트</td><td>tenant_id 컬럼·네임스페이스 분리</td><td>DB 스키마</td></tr>
+        <tr><td><b>pgvector</b></td><td>완전 제거 (ES 단일)</td><td><code>commit 5b77ff4</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================
+       4. 환경 · 검증
+  ============================================================ -->
+  <h2>4. 환경 · 검증 현황</h2>
+  <p class="h2-sub">로컬·CI에서 검증된 항목.</p>
+
+  <div class="card-grid">
+    <div class="card done">
+      <div class="eyebrow">✓ Docker</div>
+      <div class="ctitle">Docker Desktop 4.74.0</div>
+      <p>winget 무인 설치 (UAC 자동), CLI 29.4.3, Compose v5.1.3, WSL2 backend. <code>postgres + elasticsearch</code> 컨테이너 healthy.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ PostgreSQL</div>
+      <div class="ctitle">PG 16 + init.sql v2 자동 적용</div>
+      <p>19개 부모 테이블 + 11개 파티션 子, 시드 4 등급·4 평가요소, Alembic baseline stamp. ORM ↔ DB 100% 일치.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ Elasticsearch</div>
+      <div class="ctitle">ES 8.15.3 cluster green</div>
+      <p>Nori 사용자 사전 마운트, single-node, xpack.security off, JVM 2GB. xpack.telemetry 호환 버그픽스 commit 2bc8823.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ Tests</div>
+      <div class="ctitle">pytest 212/212 PASS</div>
+      <p>어댑터·전처리·라벨링·추론·API·migration·offline bundle·DB ORM·repository·audit middleware. CI poc-ci + openapi-lint 2잡 GREEN.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ CI</div>
+      <div class="ctitle">GitHub Actions</div>
+      <p>poc-ci(pytest + PoC dryrun + bundle-dry + migrate-dry) + openapi-lint. licenses-check 잡 위험 검증.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ Audit</div>
+      <div class="ctitle">audit_log 미들웨어 가동</div>
+      <p>모든 요청 1건 best-effort 기록. healthz·docs·openapi.json 제외. 401/500도 success=false로. INET 안전 검증으로 testclient 가짜 IP 처리.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       5. 다음 액션
+  ============================================================ -->
+  <h2 id="next">5. 다음 액션 — 누락 방지 포커스</h2>
+  <p class="h2-sub">즉시 진행 가능 · 사업단 결정 필요 · 회신 시 패치할 항목.</p>
+
+  <h3>5.1 즉시 진행 가능 (AI팀 단독)</h3>
+  <div class="callout accent">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">START NOW</span>
+      <ul>
+        <li><b>W3 라우터 8개 신규 (2일)</b> — confirm·relabel·training·synthesis·guide·schema·metrics·async</li>
+        <li><b>W4 M6 평가/능동학습 (1일)</b> — modules/m6_evaluation/ 신규, FNR per-grade, CM, HTML 리포트</li>
+        <li><b>W5 RAG 인덱서 + /guide/documents (1일)</b> — KURE-v1 임베딩 → ES 적재</li>
+        <li><b>병행 작업 (W6 차단 중에도 가능)</b>
+          <ul>
+            <li>시드 v2 — 영업비밀보호법·시행령 공개문헌으로 등급당 50~100개 키워드</li>
+            <li>Nori 사용자 사전 — 1~2천 도메인 용어 확장</li>
+            <li>doc/05·15에 "외부 일반화 한계" 정직성 노트 추가</li>
+            <li>W7 관측성 표준 설정 (Prometheus·Loki·Grafana JSON)</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>5.2 사업단 결정 필요</h3>
+  <div class="callout warn">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">BUDGET DECISION</span>
+      <ul>
+        <li><b>GPU 확보 일정</b> — (a) 발주처 GPU 일정 확정 (b) 클라우드 GPU 예산 ~$50/일 (24h 풀 학습 1회 분)</li>
+        <li><b>Anthropic API 예산</b> — 합성 5,000건 약 $50~100. <code>poc/.env</code>의 <code>ANTHROPIC_API_KEY</code> 채우면 즉시 가동</li>
+        <li><b>MinIO Commercial 구매 또는 SeaweedFS 교체 결정</b> — W8 운영 전환 전</li>
+        <li><b>PyMuPDF 교체 또는 Artifex 상용 구매 결정</b> — W8 운영 전환 전</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>5.3 회신 시 패치 (자체결정 차이 발생 시)</h3>
+  <div class="callout">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">PATCH ON ARRIVAL</span>
+      <ul>
+        <li><b>Q4 가이드 도착</b> → <code>seeds.py</code> v1 → v2 패치 + Nori 사전 도메인 용어 추가</li>
+        <li><b>K1 KL ES 운영 거부 (worst case)</b> → Qdrant 즉시 롤백 (<code>VECTOR_BACKEND=qdrant</code>, 코드 실재)</li>
+        <li><b>K3 인증 SSO/JWT</b> → <code>api/middleware.py</code>에 JWT 검증 추가, X-API-Key는 deprecate</li>
+        <li><b>E9 망 등급 차이</b> → doc/12 매체 반입 절차 조정, 번들 구성만 패치</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>5.4 일정 (자체결정으로 외부 의존 최소화)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>시점</th><th>완료 예정</th><th>완성도</th><th>외부 의존</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>+0 일 (오늘)</td><td>W1·W2 완료</td><td>30%</td><td>없음</td></tr>
+        <tr><td>+2 일</td><td>W3 라우터 8개</td><td>50%</td><td>없음</td></tr>
+        <tr><td>+3 일</td><td>W4 M6 평가</td><td>60%</td><td>없음</td></tr>
+        <tr><td>+4 일</td><td>W5 RAG 인덱서</td><td>70%</td><td>없음</td></tr>
+        <tr><td>+4~7 일</td><td>병행: 시드 v2 + 사전 확장 + 관측성 표준</td><td>75%</td><td>없음</td></tr>
+        <tr class="pick"><td><b>+7 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b></td><td><b>차단 해소 필요</b></td><td><b>사업단 예산 결정</b></td></tr>
+        <tr><td>+7 ~ +14 일</td><td>W6 합성·학습·번들 실빌드</td><td>85%</td><td>GPU + API 키</td></tr>
+        <tr><td>+14 ~ +18 일</td><td>W7 관측성·DR 리허설</td><td>95%</td><td>없음</td></tr>
+        <tr><td>+18 ~ +25 일</td><td>W8 라이선스·SBOM·KL 통합</td><td>100%</td><td>KL 일정</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================
+       6. 갱신
+  ============================================================ -->
+  <h2>6. 갱신 이력</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
+      <tbody>
+        <tr><td>2026-05-27</td><td>v0.2</td><td>W2 종료 — Repository 5종 + AuditMiddleware. doc/16·17 신규.</td></tr>
+        <tr><td>2026-05-27</td><td>v0.1</td><td>W1 종료 — DB ORM + Alembic baseline. Docker Desktop 설치 완료.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="h2-sub" style="margin-top: 12px;">
+    <b>갱신 주기</b>: 각 W 단계 종료 시. 자원 상태 변경 시 (특히 GPU·API 키 확보·차단 해소). 회신 도착 시 자체결정과 차이가 있는 항목.
+  </p>
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+  <div class="footer">
+    <p>
+      Lloydk AI · KOIPA AI 영업비밀관리시스템 · FUN-003·004·005·022·023·024 ·
+      <a href="07_전체설계_통합본_V2.html">전체 설계 통합본 V2</a> ·
+      <a href="15_진척_종합_보고서.md">진척 종합 보고서</a> ·
+      <a href="16_미준비_자원_체크리스트.md">미준비 자원 체크리스트</a>
+    </p>
+    <p>2026-05-27 W2 종료 시점 · pytest 212/212 PASS · 외부 의존 없이 W3~W5 진행 가능.</p>
+  </div>
+
+</main>
+
+</body>
+</html>
