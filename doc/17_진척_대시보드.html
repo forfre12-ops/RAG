@@ -30,6 +30,7 @@
     --border-soft:  rgba(0,0,0,0.05);
     --accent:       #0a0a0a;
     --accent-soft:  #f4f4f4;
+    --accent-blue:  rgba(0,112,243,0.06);
     --radius-sm:    6px;
     --radius:       8px;
     --radius-lg:    12px;
@@ -82,10 +83,15 @@
   .brand-mark {
     width: 32px; height: 32px;
     display: grid; place-items: center;
-    background: var(--text); color: var(--bg);
     border-radius: 999px;
-    font-family: var(--font-mono);
-    font-size: 11px; font-weight: 700;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .brand-mark img {
+    width: 32px; height: 32px;
+    object-fit: contain;
+    border-radius: 999px;
+    display: block;
   }
   .brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.02em; }
   .brand-sep  { color: var(--text-dim); font-size: 14px; margin: 0 6px; }
@@ -424,7 +430,7 @@
 <nav class="nav">
   <div class="nav-inner">
     <a class="brand" href="#top">
-      <span class="brand-mark">LK</span>
+      <span class="brand-mark"><img src="assets/lloydk_logo_mark.png" alt="Lloydk AI" /></span>
       <span class="brand-name">Lloydk AI</span>
       <span class="brand-sep">/</span>
       <span class="brand-url">koipa/progress</span>
@@ -449,7 +455,7 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v0.6 · 2026-05-27 W7 종료 시점</span>
+    <span class="meta-soft">v0.6.1 · 2026-05-27 인프라 정비 (Docker E드라이브 + Qdrant 어댑터 제거)</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 대시보드</h1>
@@ -457,7 +463,7 @@
   <p class="lede">
     W1~W5 + W7 완료. <b>외부 의존 없는 코드 작업은 W8 라이선스 정리만 남음</b>.
     W6은 GPU·실문서·LLM API 키 차단 대기. 관측성 스택 + 백업·DR 스크립트 + Runbook v1.0 가동.
-    pytest 289 PASS, 자체결정으로 회신 의존 변수 16개 동결.
+    pytest <b>267 PASS</b> (Qdrant 어댑터·마이그·테스트 22개 정리, 회귀 0), 자체결정으로 회신 의존 변수 16개 동결.
   </p>
 
   <!-- ============================================================
@@ -480,7 +486,7 @@
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="num done">289</div><div class="lbl">pytest PASS</div></div>
+      <div class="stat"><div class="num done">267</div><div class="lbl">pytest PASS</div></div>
       <div class="stat"><div class="num">23</div><div class="lbl">API 라우트</div></div>
       <div class="stat"><div class="num block">6</div><div class="lbl">차단 자원</div></div>
       <div class="stat"><div class="num">16</div><div class="lbl">자체결정 동결</div></div>
@@ -827,8 +833,8 @@
     </div>
     <div class="card done">
       <div class="eyebrow">✓ Tests</div>
-      <div class="ctitle">pytest 289/289 PASS</div>
-      <p>어댑터·전처리·라벨링·추론·API·migration·offline bundle·DB ORM·repository·audit middleware·W3 라우터 25개·W4 M6 평가 19개·W5 RAG 인덱서 15개·W7 관측성·백업 18개. CI poc-ci + openapi-lint 2잡 GREEN.</p>
+      <div class="ctitle">pytest 267/267 PASS</div>
+      <p>어댑터·전처리·라벨링·추론·API·offline bundle·DB ORM·repository·audit middleware·W3 라우터 25개·W4 M6 평가 19개·W5 RAG 인덱서 15개·W7 관측성·백업 18개. Qdrant 어댑터·마이그·테스트 22개는 v0.6.1에서 의도 제거(회귀 0). CI poc-ci + openapi-lint 2잡 GREEN.</p>
     </div>
     <div class="card done">
       <div class="eyebrow">✓ Observability</div>
@@ -900,7 +906,7 @@
       <span class="callout-label">PATCH ON ARRIVAL</span>
       <ul>
         <li><b>Q4 가이드 도착</b> → <code>seeds.py</code> v1 → v2 패치 + Nori 사전 도메인 용어 추가</li>
-        <li><b>K1 KL ES 운영 거부 (worst case)</b> → Qdrant 즉시 롤백 (<code>VECTOR_BACKEND=qdrant</code>, 코드 실재)</li>
+        <li><b>K1 KL ES 운영 거부 (worst case)</b> → 관측성 알람 + Runbook §장애대응(ES 단일 백엔드 즉시 복구). Qdrant 롤백 옵션은 v0.6.1에서 제거.</li>
         <li><b>K3 인증 SSO/JWT</b> → <code>api/middleware.py</code>에 JWT 검증 추가, X-API-Key는 deprecate</li>
         <li><b>E9 망 등급 차이</b> → doc/12 매체 반입 절차 조정, 번들 구성만 패치</li>
       </ul>
@@ -931,6 +937,7 @@
     <table>
       <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
       <tbody>
+        <tr><td>2026-05-27</td><td>v0.6.1</td><td>인프라 정비 — Docker 데이터 볼륨 E드라이브 bind mount 이전(esdata만 named volume 유지) + Qdrant 어댑터·마이그레이션·롤백 경로 완전 제거 (코드·테스트·CI·docs). 267 PASS (의도 22개 제거).</td></tr>
         <tr><td>2026-05-27</td><td>v0.6</td><td>W7 종료 — 관측성 스택(Prometheus+Grafana+Loki) + 백업 3종 + DR 자동 검증 + Runbook v1.0. 289 PASS. Hero KPI 80%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.5</td><td>W5 종료 — RagIndexer + GuideService 결합 + ES 8.x 클라이언트 호환 픽스. 271 PASS. 외부 의존 없는 코드 작업 모두 완료.</td></tr>
         <tr><td>2026-05-27</td><td>v0.4</td><td>W4 종료 — M6 평가/능동학습 풀 (FNR·CM 알람·active learning·HTML 리포트). MetricsService live 폴백. 256 PASS.</td></tr>
