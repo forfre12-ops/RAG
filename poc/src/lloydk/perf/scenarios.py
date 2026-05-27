@@ -936,15 +936,11 @@ def s16_auth_rejection(ctx: ScenarioContext) -> None:
 
         # (c) 정상 컨트롤 → 200/201 (비결정성 방지: 5회 반복 후 다수결)
         # 단발 측정 시 라우터 워밍업·일시 상태로 첫 호출 실패 가능 → ratio_true 집계.
-        import os as _os
         for _ in range(5):
             t0 = time.perf_counter()
             r_ok = cli.post("/api/v1/classify", headers=_hdr(), json=payload)
             latencies.append((time.perf_counter() - t0) * 1000.0)
-            ok = r_ok.status_code in (200, 201)
-            ctx.record("s16_4", ok)
-            if not ok and _os.environ.get("PSH_DEBUG"):
-                print(f"[S16.4 DEBUG] status={r_ok.status_code} body={r_ok.text[:200]}")
+            ctx.record("s16_4", r_ok.status_code in (200, 201))
 
         # 추가로 p95 측정용 7회 반복 (잘못된 키)
         for _ in range(7):
