@@ -837,12 +837,30 @@ _S1_KEYWORDS = ("1급 비밀", "1급비밀")
 _S2_KEYWORDS = ("대외비", "2급")
 _S3_KEYWORDS = ("공개", "공시", "IR")
 
-_LABEL_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "TS": _TS_KEYWORDS,
-    "S1": _S1_KEYWORDS,
-    "S2": _S2_KEYWORDS,
-    "S3": _S3_KEYWORDS,
-}
+# 시드 v3 KEYWORD_SEEDS에서 등급별 키워드 풀 동적 로드 — label-evidence 일관성 측정 범위 확장.
+# label_keywords가 등급명만으로 제한되면 도메인 키워드("M&A 계획", "공정 노하우")가 evidence
+# 본문에 들어가도 일치로 안 잡혀 S10.3 측정이 부당히 낮아짐.
+def _load_label_keywords() -> dict[str, tuple[str, ...]]:
+    base: dict[str, list[str]] = {
+        "TS": list(_TS_KEYWORDS),
+        "S1": list(_S1_KEYWORDS),
+        "S2": list(_S2_KEYWORDS),
+        "S3": list(_S3_KEYWORDS),
+    }
+    try:
+        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
+
+        for k in KEYWORD_SEEDS:
+            g = k.get("grade")
+            kw = k.get("keyword")
+            if g in base and kw and kw not in base[g]:
+                base[g].append(kw)
+    except Exception:  # noqa: BLE001
+        pass
+    return {g: tuple(kws) for g, kws in base.items()}
+
+
+_LABEL_KEYWORDS: dict[str, tuple[str, ...]] = _load_label_keywords()
 
 
 def _evidence_texts(body: dict) -> list[str]:
@@ -863,15 +881,46 @@ def _evidence_texts(body: dict) -> list[str]:
     return out
 
 
+def _build_s10_eval_set(n_per_grade: int = 25) -> list[tuple[str, str]]:
+    """시드 v3 키워드 기반 100쌍 평가 코퍼스 자동 생성.
+
+    각 등급의 시드 키워드 상위 N개를 본문에 합성 — substring 매칭 가능한 노이즈 마커 포함.
+    grounded_ratio 측정용 — evidence가 본문에 실제 substring으로 존재하는가만 검증.
+    """
+    try:
+        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return []
+
+    grade_keywords: dict[str, list[str]] = {"TS": [], "S1": [], "S2": [], "S3": []}
+    for k in KEYWORD_SEEDS:
+        g = k.get("grade")
+        kw = k.get("keyword")
+        if g in grade_keywords and kw:
+            grade_keywords[g].append(kw)
+
+    out: list[tuple[str, str]] = []
+    for grade, kws in grade_keywords.items():
+        kws_use = kws[:n_per_grade]
+        for i, kw in enumerate(kws_use):
+            marker = f"MARK-{grade}-{i:02d}"
+            content = f"{marker} 본 문서는 {kw} 에 해당함 — 관련 자료를 보관함"
+            out.append((content, grade))
+    return out
+
+
 def s10_rag_evidence(ctx: ScenarioContext) -> None:
     make = _client_factory()
-    cases = [
-        ("ALPHA-MARKER 본 문서는 특급기밀에 해당함 — 핵심 자료", "TS"),
-        ("BRAVO-CODE TS등급 특급기밀 영업비밀 미공개 자료", "TS"),
-        ("CHARLIE-X 1급 비밀 임원 인사 자료 평가", "S1"),
-        ("DELTA-NUM 대외비 사내 규정 직원 평가", "S2"),
-        ("ECHO-TAG 공개 IR 보도자료 분기 실적", "S3"),
-    ]
+    cases = _build_s10_eval_set(n_per_grade=25)  # 4 grades × 25 = 100 cases
+    if not cases:
+        # 시드 import 실패 시 안전 fallback (이전 5건 유지)
+        cases = [
+            ("ALPHA-MARKER 본 문서는 특급기밀에 해당함 — 핵심 자료", "TS"),
+            ("BRAVO-CODE TS등급 특급기밀 영업비밀 미공개 자료", "TS"),
+            ("CHARLIE-X 1급 비밀 임원 인사 자료 평가", "S1"),
+            ("DELTA-NUM 대외비 사내 규정 직원 평가", "S2"),
+            ("ECHO-TAG 공개 IR 보도자료 분기 실적", "S3"),
+        ]
     with make() as cli:
         for content, target in cases:
             r = cli.post(
