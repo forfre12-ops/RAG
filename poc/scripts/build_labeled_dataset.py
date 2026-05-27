@@ -22,6 +22,11 @@ def main():
     ap.add_argument("--out", default="datasets/labeled")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--ratio", default="0.7,0.15,0.15")
+    ap.add_argument(
+        "--include-all",
+        action="store_true",
+        help="status 필드 무관 모든 합성 문서 포함 (검수 통과 가정). p3 합성 결과를 직접 학습에 쓸 때 유용.",
+    )
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -32,7 +37,7 @@ def main():
     if synth_root.exists():
         for p in synth_root.rglob("*.json"):
             row = json.loads(p.read_text(encoding="utf-8"))
-            if row.get("status") not in {"approved", "pending"}:
+            if not args.include_all and row.get("status") not in {"approved", "pending"}:
                 continue
             text = (row.get("title", "") + "\n" + row.get("body", "")).strip()
             label = row["target_grade"]
