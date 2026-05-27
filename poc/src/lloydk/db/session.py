@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from typing import Iterator
 
@@ -16,6 +17,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from lloydk.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -56,7 +59,9 @@ def session_scope() -> Iterator[Session]:
     try:
         yield db
         db.commit()
-    except Exception:
+    except Exception as e:
+        # O3: rollback 사유 로깅 — IntegrityError·OperationalError 등 진단 가능
+        logger.error("session_scope rollback: %s", e, exc_info=True)
         db.rollback()
         raise
     finally:

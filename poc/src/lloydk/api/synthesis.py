@@ -1,12 +1,13 @@
 """POST /synth/generate + GET /synth/queue + POST /synth/{id}/review."""
 
-from __future__ import annotations
+# future annotations 비활성: slowapi/pydantic forward-ref 평가에서 fail.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from lloydk.api._auth import require_api_key
+from lloydk.api.rate_limit import limiter
 from lloydk.schemas.synthesis import (
     SynthGenerateRequest,
     SynthGenerateResponse,
@@ -20,7 +21,8 @@ router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_api_key)])
 
 
 @router.post("/synth/generate", response_model=SynthGenerateResponse, status_code=202)
-def synth_generate(req: SynthGenerateRequest):
+@limiter.limit("10/minute")
+def synth_generate(request: Request, req: SynthGenerateRequest):
     return SynthesisService().submit(req)
 
 

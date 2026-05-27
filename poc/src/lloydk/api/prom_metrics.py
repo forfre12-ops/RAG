@@ -5,15 +5,19 @@
 - /api/v1/metrics-prom: prometheus 표준 exposition (text/plain)
 - /healthz·/metrics-prom 자체는 스크랩 제외 (셀프 카운트 회피)
 - route 라벨은 path template (예: /api/v1/classify/{doc_id}) — 카디널리티 폭증 방지
-- active_learning 게이지는 백그라운드 refresh 없이 호출 시점에 lazy 갱신
+- active_learning 게이지는 endpoint lazy 갱신 + 백그라운드 주기 refresh 병행
+  (METRICS_REFRESH_INTERVAL_SEC, 기본 60초). 테스트 환경(TESTING=1)에서는 자동 비활성.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import os
 import time
 from typing import Awaitable, Callable
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -23,6 +27,8 @@ from prometheus_client import (
     generate_latest,
 )
 from starlette.middleware.base import BaseHTTPMiddleware
+
+_logger = logging.getLogger(__name__)
 
 # 자체 레지스트리 — 테스트 격리 + 다중 import 시 중복 등록 방지.
 registry = CollectorRegistry()
@@ -68,6 +74,14 @@ ACTIVE_LEARNING_UNDERCLASS = Gauge(
     registry=registry,
 )
 
+# L2: 임베딩 모델 로드 실패 → fallback 사용 (정확도 저하 위험) 카운트
+EMBEDDING_FALLBACK_TOTAL = Counter(
+    "lloydk_embedding_fallback_total",
+    "Embedding provider fallback to HashEmbedding (model load failed)",
+    ["original_provider"],
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",
@@ -80,11 +94,16 @@ _EXCLUDED = {
 
 
 def _route_template(request: Request) -> str:
-    """카디널리티 안정 — path template 우선, 없으면 raw path."""
+    """카디널리티 안정 — path template 우선, 라우팅 실패 시 'unknown'으로 collapse.
+
+    O1: raw path 노출하면 /api/v1/classify/{uuid}처럼 ID 포함된 경로가
+    수많은 라벨 값을 만들어 Prometheus storage 폭증 위험. 매칭 실패는 unknown으로.
+    """
     route = request.scope.get("route")
     if route is not None and getattr(route, "path", None):
         return route.path
-    return request.url.path
+    # 라우팅 실패 시 — 카디널리티 폭증 차단
+    return "unknown"
 
 
 class PrometheusMiddleware(BaseHTTPMiddleware):
@@ -98,14 +117,16 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         method = request.method
-        # route 템플릿은 dispatch 종료 후에야 결정됨 — try/finally로 measure
         start = time.perf_counter()
-        route_label = path  # 폴백 (라우팅 실패 시)
+        # O2: route_label은 측정 진입 시점에 unknown으로 초기화. 라우팅 후 갱신.
+        # INPROGRESS는 진입 즉시 inc해야 finally에서 짝맞는 dec 가능 (언더플로우 차단).
+        route_label = "unknown"
+        INPROGRESS.labels(method=method, route=route_label).inc()
+        inprogress_inc = True
 
         try:
             response = await call_next(request)
             route_label = _route_template(request)
-            INPROGRESS.labels(method=method, route=route_label).inc()
             status = str(response.status_code)
             REQUEST_COUNT.labels(method=method, route=route_label, status=status).inc()
             return response
@@ -117,12 +138,13 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         finally:
             elapsed = time.perf_counter() - start
             REQUEST_LATENCY.labels(method=method, route=route_label).observe(elapsed)
-            # inprogress는 dispatch 진입 시 inc 못 했지만 (route_label 미정)
-            # gauge 음수 방지 위해 매번 0 set 대신 best-effort dec
-            try:
-                INPROGRESS.labels(method=method, route=route_label).dec()
-            except Exception:  # noqa: BLE001
-                pass
+            # 짝맞춰 dec — O2: 위에서 unknown 라벨로 inc했으므로 동일 라벨로 dec 가능
+            if inprogress_inc:
+                try:
+                    INPROGRESS.labels(method=method, route="unknown").dec()
+                except Exception as exc:  # noqa: BLE001
+                    # K3: 빈 swallow 제거, warning 기록
+                    _logger.warning("INPROGRESS dec failed: %s", exc)
 
 
 # ============================================================
@@ -136,6 +158,7 @@ def _refresh_business_gauges() -> None:
     """active_learning gauge를 호출 시점에 lazy 갱신.
 
     실패해도 메트릭 노출 자체는 중단되지 않게 best-effort.
+    K3: 실패 시 debug 로깅 — DB 미가용은 정상 상태(테스트)일 수 있어 warning 대신 debug.
     """
     try:
         from lloydk.modules.m6_evaluation.active_learning import (
@@ -145,9 +168,8 @@ def _refresh_business_gauges() -> None:
         status = evaluate_retraining_need()
         ACTIVE_LEARNING_TOTAL.set(status.unconsumed_total)
         ACTIVE_LEARNING_UNDERCLASS.set(status.pending_underclass)
-    except Exception:  # noqa: BLE001
-        # DB 미가용·import 실패 시 게이지 값 유지
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("business gauge refresh skipped: %s", exc)
 
 
 @router.get("/metrics-prom", include_in_schema=False)
@@ -158,3 +180,75 @@ def metrics_prom() -> Response:
     _refresh_business_gauges()
     data = generate_latest(registry)
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+
+
+# ============================================================
+# Background refresh — active_learning gauge 주기 갱신
+# ============================================================
+#
+# /metrics-prom 호출이 없으면 게이지가 stale 상태로 남는 문제 해결.
+# Grafana/Prometheus 폴링이 30~60초인 환경에서도 항상 최신 값 노출.
+
+
+def _resolve_refresh_interval() -> float:
+    raw = os.getenv("METRICS_REFRESH_INTERVAL_SEC", "60").strip()
+    try:
+        v = float(raw)
+        return v if v > 0 else 0.0
+    except ValueError:
+        return 60.0
+
+
+def _is_testing() -> bool:
+    """pytest / TestClient 환경 자동 감지 — background task 비활성."""
+    if os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return True
+    return False
+
+
+async def _gauge_refresh_loop(interval: float) -> None:
+    """무한 루프 — interval 마다 _refresh_business_gauges 호출.
+
+    cancel 받으면 즉시 종료. 예외는 삼키고 다음 사이클로 진행.
+    """
+    while True:
+        try:
+            _refresh_business_gauges()
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning("gauge refresh failed: %s", exc)
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            break
+
+
+def register_background_refresh(app: FastAPI) -> None:
+    """FastAPI startup/shutdown 훅 등록 — 메인 lifespan 외부에서 호출.
+
+    테스트 환경(TESTING=1 또는 pytest 실행 중)에서는 task 자체를 만들지 않는다.
+    interval <= 0 이면 사용자가 명시적으로 disable 한 것으로 간주.
+    """
+    if _is_testing():
+        return
+
+    interval = _resolve_refresh_interval()
+    if interval <= 0:
+        return
+
+    @app.on_event("startup")
+    async def _start_refresh_task() -> None:  # noqa: D401
+        loop_task = asyncio.create_task(_gauge_refresh_loop(interval))
+        app.state._prom_refresh_task = loop_task
+
+    @app.on_event("shutdown")
+    async def _stop_refresh_task() -> None:  # noqa: D401
+        task: asyncio.Task | None = getattr(app.state, "_prom_refresh_task", None)
+        if task is None:
+            return
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass

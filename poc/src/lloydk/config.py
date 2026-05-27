@@ -1,4 +1,10 @@
-"""중앙 설정. pydantic-settings로 .env 로드."""
+"""중앙 설정. pydantic-settings로 .env 로드.
+
+보안:
+- dev 자격증명(`api_key`, `minio_secret_key` 등) 디폴트값은 모두 빈 문자열.
+- 로컬 개발은 `.env.dev` 또는 `.env`로 명시적으로 주입 (CI는 환경변수).
+- 빈 자격증명으로 운영 모드(`poc_mode=full`) 진입 시 startup에서 fail-fast.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +15,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     # --- 인프라 ---
+    # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.
     database_url: str = "postgresql+psycopg://lloydk:lloydk_dev@localhost:5432/lloydk"
     redis_url: str = "redis://localhost:6379/0"
 
@@ -21,8 +28,8 @@ class Settings(BaseSettings):
     es_verify_certs: bool = True
 
     minio_endpoint: str = "localhost:9000"
-    minio_access_key: str = "lloydk"
-    minio_secret_key: str = "lloydk_dev_minio"
+    minio_access_key: str = ""
+    minio_secret_key: str = ""  # J1: dev 디폴트 제거. .env 필수.
     minio_secure: bool = False
     minio_bucket_docs: str = "lloydk-docs"
     minio_bucket_models: str = "lloydk-models"
@@ -31,7 +38,12 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = "http://localhost:5000"
 
     # --- API ---
-    api_key: str = "lloydk_dev_apikey"
+    # J1: dev 디폴트 제거. dryrun/테스트는 빈 키 허용, full 모드는 startup에서 fail-fast.
+    api_key: str = ""
+
+    # CORS allow-origins. 운영에서는 .env로 origin allowlist 설정.
+    # 기본값 ["*"]은 PoC·dryrun·테스트 편의를 위함. 운영 배포 시 명시적 origin 필수.
+    cors_allow_origins: list[str] = ["*"]
 
     # --- LLM ---
     # provider 선택: 원격(원격 API) 또는 로컬(OpenAI 호환 endpoint) 자유 선택.
@@ -78,3 +90,22 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def assert_production_credentials() -> None:
+    """운영 모드에서 빈 자격증명 차단. dryrun/테스트는 우회.
+
+    호출 위치: api/app.py startup hook. fail-fast로 운영 미설정 사고 방지.
+    """
+    if settings.poc_mode != "full":
+        return
+    missing: list[str] = []
+    if not settings.api_key:
+        missing.append("LLOYDK_API_KEY")
+    if not settings.minio_secret_key:
+        missing.append("LLOYDK_MINIO_SECRET_KEY")
+    if missing:
+        raise RuntimeError(
+            f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
+            ".env 또는 환경변수로 설정 필요."
+        )

@@ -1,12 +1,14 @@
 """POST /train + GET /train/jobs(/{id}) — 학습 트리거·상태 폴링."""
 
-from __future__ import annotations
+# slowapi limiter가 runtime에 함수 시그니처를 evaluate하므로 future annotations 비활성.
+# (이슈: pydantic forward-ref가 데코레이터 wrap 시점에 해결되지 못함.)
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from lloydk.api._auth import require_api_key
+from lloydk.api.rate_limit import limiter
 from lloydk.schemas.training import (
     TrainJobList,
     TrainRequest,
@@ -19,7 +21,8 @@ router = APIRouter(tags=["training"], dependencies=[Depends(require_api_key)])
 
 
 @router.post("/train", response_model=TrainResponse, status_code=202)
-def train(req: TrainRequest):
+@limiter.limit("10/hour")
+def train(request: Request, req: TrainRequest):
     return TrainingService().submit(req)
 
 

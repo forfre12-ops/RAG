@@ -38,7 +38,10 @@ class MinioStorage:
         try:
             self._client.stat_object(bucket, key)
             return True
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            # K3: NoSuchKey가 정상 케이스이므로 debug 수준만 기록
+            import logging as _logging
+            _logging.getLogger(__name__).debug("minio stat miss %s/%s: %s", bucket, key, exc)
             return False
 
     def uri(self, bucket: str, key: str) -> str:

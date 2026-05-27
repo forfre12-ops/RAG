@@ -12,6 +12,7 @@ dependencies = [
   "python-multipart>=0.0.9",  # /guide/documents multipart 업로드
   "prometheus-client>=0.20",  # W7 관측성 — Prometheus exposition
   "pdfminer.six>=20240706",   # W8 PDF 추출 (BSD-3, AGPL 회피) — PyMuPDF 대체 1순위
+  "slowapi>=0.1.9",           # J4 API rate-limit (분당/시간당 한도, 429 + Retry-After)
 
   # W9 LLM·임베딩 일반화 — 원격/로컬 양쪽 모두 옵션 지원 (납품 일반화)
   "openai>=1.50",                # LocalOpenAIProvider (vLLM·Ollama·LM Studio 공통) + OpenAI 원격

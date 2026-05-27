@@ -1,13 +1,14 @@
 """/classify/async + /classify/batch + /classify/jobs/{id} + /classify/{doc_id} (최근 결과)."""
 
-from __future__ import annotations
+# future annotations 비활성: slowapi limiter가 함수 시그니처 forward-ref 평가에서 fail.
 
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from lloydk.api._auth import require_api_key
+from lloydk.api.rate_limit import limiter
 from lloydk.db import session_scope
 from lloydk.repositories import ClassifyRepo
 from lloydk.schemas.classify import ClassifyResponse
@@ -24,12 +25,17 @@ router = APIRouter(tags=["classify"], dependencies=[Depends(require_api_key)])
 
 
 @router.post("/classify/async", response_model=ClassifyAsyncResponse, status_code=202)
-def classify_async(req: ClassifyAsyncRequest):
+@limiter.limit("60/minute")
+def classify_async(request: Request, req: ClassifyAsyncRequest):
     return AsyncClassifyService().submit_async(req)
 
 
 @router.post("/classify/batch", response_model=ClassifyBatchResponse, status_code=202)
-def classify_batch(req: ClassifyBatchRequest):
+@limiter.limit("60/minute")
+def classify_batch(request: Request, req: ClassifyBatchRequest):
+    # M1 경계값 가드: 빈 배열은 의미 없는 요청 → 400, 1000건 초과는 페이로드 거부 → 413.
+    if len(req.documents) == 0:
+        raise HTTPException(status_code=400, detail="documents must not be empty")
     if len(req.documents) > 1000:
         raise HTTPException(status_code=413, detail="batch size > 1000")
     return AsyncClassifyService().submit_batch(req)
@@ -79,4 +85,7 @@ def classify_recent_for_doc(doc_id: str):
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"db unavailable: {exc}") from exc
+        # J2: 클라이언트에 내부 예외 메시지 노출하지 않음
+        import logging as _logging
+        _logging.getLogger(__name__).error("db unavailable: %s", exc, exc_info=True)
+        raise HTTPException(status_code=503, detail="service temporarily unavailable") from exc

@@ -57,7 +57,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # body는 핸들러보다 먼저 읽어 payload_hash 계산
         try:
             body = await _read_body(request)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            # K3: 빈 swallow 제거, debug 로깅 — multipart 등 비표준 body는 정상적으로 실패 가능
+            logger.debug("audit payload_hash skipped: %s", exc)
             body = b""
         payload_hash = _hash_bytes(body) if body else None
 
