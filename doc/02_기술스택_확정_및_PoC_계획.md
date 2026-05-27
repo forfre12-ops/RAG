@@ -291,3 +291,68 @@ P5 E2E통합              ██
 | GPU·Docker 미가용 → mock/in-memory 백엔드 | Q2(GPU 사양) 확정 후 `make infra-up` + KF-DeBERTa/KURE-v1 실측 |
 | LLM 비용 측정 불가 (noop provider) | API 키 확보 후 P3 `--provider anthropic` 재실행 → 운영 단가 견적 |
 | 룰 라벨러가 분류기 surrogate | KF-DeBERTa 학습 완료 후 P1 `--mode full` → 룰 vs 학습모델 비교 |
+
+---
+
+## 부록 C. 2차 진행 — ES 전환·운영 도구·위험관리 (2026-05-27)
+
+1차 PoC 합격 판정 후, **벡터 DB 전환 + 회신 대기 기간 활용한 운영 전환 자산 확보**에 주력. 외부 의존(GPU·발주처 데이터·KL 인프라) 없이 가능한 작업을 모두 완료.
+
+### C.1 주요 산출물
+
+| 영역 | 산출물 | 라인 |
+|---|---|---|
+| **설계** | [doc/13](13_벡터DB_ES_전환_계획서.md) 벡터DB Qdrant→ES 전환 v0.9-final | 601 |
+| | [doc/10](10_위험관리대장.md) 위험관리대장 v0.9 (31개 위험, 회신 시나리오 매핑) | 312 |
+| | [doc/12](12_폐쇄망_배포_설계.md) 폐쇄망 배포 설계 v0.9 (자기완비 번들 25~30GB) | 535 |
+| **코드** | `EsStore` 어댑터 + `VectorStore` Protocol 확장 (`search_hybrid` 폴리필) | — |
+| | docker-compose ES 8.15.3 서비스 + Nori 사용자 사전 + 인덱스 템플릿 | — |
+| | `migrate_qdrant_to_es.py` (5단계 idempotent + dry-run + sample-N) | 380 |
+| | `build_offline_bundle.py` (manifest dry-run, doc/12 §4.1 명세 구현) | 525 |
+| | `p2_compare_embeddings.py` 재설계 (4-way 비교 `--backends --hybrid`) | — |
+| **테스트** | EsStore 26 + factory 10 + migration 19 + bundle 23 = **신규 78종** | — |
+| | 누적: 48 → **126/126 PASS, 0 회귀** | — |
+| **CI** | bundle-dry / migrate-dry 잡 통합, bundle-manifest 아티팩트 업로드 | — |
+| **문서 정합** | doc/00·02·04·05·06·06a·07·08·09 Qdrant→ES 일괄 갱신 | — |
+| | [doc/06 K1-A E1~E9 부록 신설](06_협의요청서_KL_발주처.md) — ES 8항목 + 망 등급 | — |
+
+### C.2 합격선 결정 (도용 없음)
+
+[doc/13 §9.2](13_벡터DB_ES_전환_계획서.md) 기준: **합격선은 v0.9 그대로 유지** (Recall@5 ≥ 0.80, Lat p50 ≤ 200ms). ES + RRF 도입 효과는 S3 PoC v2에서 **4-way 측정** 후 발주처 협의로 v1.1 갱신.
+
+```
+(a) Qdrant + KURE-v1          ← baseline
+(b) ES + KURE-v1 (dense kNN)  ← 백엔드 효과만
+(c) ES + BM25 only            ← 키워드 기여도
+(d) ES + KURE + BM25 + RRF    ← 하이브리드
+
+→ (d) vs (a) Δ Recall ≥ 0.05 입증 시에만 0.85로 상향 협의
+→ 측정 없이 합격선 상향 금지
+```
+
+### C.3 회신 의존 잔여 작업
+
+회신 도착 시 [doc/10 §6 시나리오 매핑](10_위험관리대장.md)으로 즉시 1차 대응 발동. 외부 의존 없이 가능한 모든 작업은 완료.
+
+| 회신 변수 | 트리거 액션 |
+|---|---|
+| Q1 GPU 사양 | `.env CLASSIFIER_BASE_MODEL` 확정 → P1 `--mode full` |
+| Q3 실문서 | `datasets/raw/koipa/` 적재 → P1 hold-out test set |
+| E1 ES 버전 | EsStore 자동 분기 (retriever/legacy/clientside) — 추가 작업 0 |
+| E3 라이선스 | doc/13 §11.1 라이선스 매트릭스 채움 → DLS vs 인덱스 분리 결정 |
+| E5 노드 사양 | JVM heap·HNSW 파라미터·`int8_hnsw` vs `hnsw` 결정 |
+| E9 망 등급 | doc/12 §1.2 갱신 → v1.0 확정 → 매체 반입 절차 KL 합의 |
+
+### C.4 검증 명령 한 줄 정리
+
+회신 없이도 다음 명령으로 즉시 검증 가능:
+
+```bash
+make poc-all              # P4→P3→P2→P1→P5 dryrun (~2초)
+make p2 --hybrid          # 4-way 시뮬레이션 (ES SKIP 안전망 동작)
+make migrate-dry          # Qdrant→ES sample-5 dry-run
+make bundle-dry           # 폐쇄망 번들 manifest dry-run
+pytest                    # 126/126 (어댑터·마이그·번들)
+```
+
+OpenAPI yaml ES 정합성도 점검 완료 — `rag_namespace` → `rag_index_alias` rename, backend 컨텍스트 명시. KL이 K2 검토를 backend-agnostic하게 진행 가능.

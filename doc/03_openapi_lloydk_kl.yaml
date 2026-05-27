@@ -12,6 +12,10 @@ info:
     인증: API Key (서버 간 통신) + 선택적 JWT (관리자 행위 추적)
     모든 응답은 application/json. 파일 업로드는 multipart/form-data.
     날짜·시각은 ISO 8601 UTC. 모든 ID는 UUIDv4.
+
+    내부 RAG 백엔드: Elasticsearch 8.14+ (`secrets-{role}-{tenant}-{model}-{version}`
+    인덱스 + alias). 본 명세는 backend-agnostic 하므로 KL 측은 RAG 동작 세부를
+    몰라도 호출 가능. 상세 설계는 doc/13 (벡터DB ES 전환 계획서) 참고.
   version: 1.0.0-draft
   contact:
     name: Lloydk AI Engineering
@@ -447,7 +451,9 @@ paths:
       summary: 학습 가이드 문서 등록·갱신 (FUN-002 연계)
       description: |
         KL이 관리하는 영업비밀 가이드 문서를 Lloydk가 학습 기준으로 사용할 수 있도록
-        등록한다. 등록 시 자동으로 임베딩되어 RAG 인덱스에 반영된다.
+        등록한다. 등록 시 자동으로 KURE-v1 임베딩되어 Elasticsearch
+        `secrets-guides-{tenant_id}` alias에 반영된다 (Blue/Green 무중단 스왑).
+        상세: doc/13 §4.1, doc/12 §7.3.
       requestBody:
         required: true
         content:
@@ -475,8 +481,12 @@ paths:
                 properties:
                   guide_id: { type: string }
                   version: { type: string }
-                  indexed: { type: boolean }
-                  embedding_vector_count: { type: integer }
+                  indexed:
+                    type: boolean
+                    description: Elasticsearch 인덱스 적재 완료 여부 (alias 기준)
+                  embedding_vector_count:
+                    type: integer
+                    description: 청크 단위 임베딩 벡터 개수 (KURE-v1 1024차원 기준)
                   triggers_retraining: { type: boolean }
 
   /guide/documents/{guide_id}:
@@ -686,10 +696,15 @@ components:
             use_rag:
               type: boolean
               default: false
-              description: 사내규정 RAG 컨텍스트 결합 여부
-            rag_namespace:
+              description: 사내규정 RAG 컨텍스트 결합 여부 (Elasticsearch dense kNN + BM25 + RRF 하이브리드)
+            rag_index_alias:
               type: string
-              description: 기업별 RAG 인덱스 분리 키
+              description: |
+                선택. RAG 검색 대상 인덱스 alias 명시.
+                미지정 시 `tenant_id` 기반 기본 alias 사용 (`secrets-guides-{tenant_id}`).
+                같은 tenant 내 다중 RAG 인덱스(부서별·정책별)가 필요할 때만 사용.
+                상세: doc/13 §4.1 인덱스 명명 규칙.
+              example: secrets-guides-koipa
             return_evidence:
               type: boolean
               default: true
