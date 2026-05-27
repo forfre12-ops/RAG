@@ -129,6 +129,7 @@ evaluation = [
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",                # 커버리지 측정 (C7 — coverage 80% 목표)
   "ruff>=0.6",
   "ipykernel>=6.29",
 ]
