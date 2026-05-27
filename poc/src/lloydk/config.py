@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     chunk_size: int = 512
     chunk_overlap: int = 64
 
+    # --- 업로드 한도 (DoS 차단) ---
+    # R3: guide upload·classify content 본문 크기 한도. 환경변수 LLOYDK_MAX_UPLOAD_MB로 조정.
+    # 운영 기본 20MB — 대부분 가이드 PDF·DOCX 커버. 초과 시 413 Payload Too Large 반환.
+    max_upload_mb: int = 20
+
     # --- 동작 모드 ---
     # dryrun: 무거운 모델 다운로드 없이 mock으로 검증
     # full: 실제 모델 로드 (GPU/대용량 필요)

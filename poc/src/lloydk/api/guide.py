@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from lloydk.api._auth import require_api_key
+from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.schemas.guide import GuideUploadResponse, GuideVersionList
 from lloydk.services.guide_service import GuideService
@@ -29,7 +30,22 @@ async def upload_guide(
         actor_obj = Actor.model_validate(json.loads(actor))
     except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=f"invalid actor json: {exc}") from exc
+    # R3: 업로드 본문 크기 한도 검증 — OOM·DoS 차단.
+    # 1차: file.size (multipart Content-Length 기반, 클라이언트 신고값).
+    # 2차: read 후 실제 바이트 길이 (조작 방지).
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    declared_size = getattr(file, "size", None)
+    if declared_size is not None and declared_size > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"file too large: {declared_size} bytes > {max_bytes} bytes ({settings.max_upload_mb}MB)",
+        )
     body = await file.read()
+    if len(body) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"file too large: {len(body)} bytes > {max_bytes} bytes ({settings.max_upload_mb}MB)",
+        )
     return GuideService.get_instance().upload(
         guide_id=guide_id,
         version=version,

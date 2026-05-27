@@ -92,6 +92,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '413':
           description: 본문 길이 초과 (use /classify/async)
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalError' }
 
   /classify/async:
@@ -136,14 +137,41 @@ paths:
                   items: { $ref: '#/components/schemas/DocumentInput' }
       responses:
         '202':
-          description: 일괄 작업 등록
+          description: |
+            일괄 작업 등록 (부분 실패 허용).
+            PoC는 즉시 in-process 실행이므로 응답에 completed/failed/failed_doc_ids/errors가
+            즉시 채워진다. 운영 Celery 모드에서는 0/0/[]/[] 로 시작 후 /classify/jobs/{id}로 폴링.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  batch_id: { type: string, format: uuid }
-                  job_count: { type: integer }
+                  job_id: { type: string, format: uuid }
+                  total: { type: integer }
+                  status:
+                    type: string
+                    enum: [queued, running, done, failed, partial]
+                  status_url: { type: string, format: uri }
+                  completed:
+                    type: integer
+                    description: 성공적으로 처리된 건 수 (부분 실패 처리 도입)
+                  failed:
+                    type: integer
+                    description: retry까지 모두 실패한 건 수
+                  failed_doc_ids:
+                    type: array
+                    description: 영구 실패한 doc_id 목록
+                    items: { type: string }
+                  errors:
+                    type: array
+                    description: 영구 실패 사유 (doc_id·error_type·message·attempts)
+                    items:
+                      type: object
+                      properties:
+                        doc_id: { type: string }
+                        error_type: { type: string }
+                        message: { type: string }
+                        attempts: { type: integer }
 
   /classify/jobs/{job_id}:
     get:
@@ -781,8 +809,25 @@ components:
         job_id: { type: string, format: uuid }
         status:
           type: string
-          enum: [queued, running, done, failed, cancelled]
+          enum: [queued, running, done, failed, partial, cancelled]
+          description: |
+            partial — 일부 건은 성공·일부는 영구 실패. completed/failed로 분포 확인.
         progress: { type: number, minimum: 0, maximum: 1 }
+        total: { type: integer }
+        completed: { type: integer, description: 성공 건 수 }
+        failed: { type: integer, description: retry 모두 실패한 건 수 }
+        failed_doc_ids:
+          type: array
+          items: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              doc_id: { type: string }
+              error_type: { type: string }
+              message: { type: string }
+              attempts: { type: integer }
         result:
           $ref: '#/components/schemas/ClassifyResponse'
         error: { type: string, nullable: true }
@@ -870,6 +915,25 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     InternalError:
       description: 서버 오류
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: 호출 한도 초과 (rate-limit). 헤더 Retry-After에 재시도 가능 시간(초) 포함.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: 재시도까지 대기 권장 시간(초)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string, example: LLOYDK_RATE_LIMIT }
+              message: { type: string, example: 'rate limit exceeded: 60 per 1 minute' }
+              retry_after_sec: { type: integer, example: 60 }
+    PayloadTooLarge:
+      description: 업로드 본문 크기 한도(기본 20MB) 초과.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

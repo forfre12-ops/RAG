@@ -5,14 +5,18 @@
 """
 
 from lloydk.repositories.audit_repo import AuditRepo
+from lloydk.repositories.chunk_repo import ChunkRepo
 from lloydk.repositories.classify_repo import ClassifyRepo
+from lloydk.repositories.document_repo import DocumentRepo
 from lloydk.repositories.llm_usage_repo import LlmUsageRepo
 from lloydk.repositories.synth_repo import SynthRepo
 from lloydk.repositories.training_repo import TrainingRepo
 
 __all__ = [
     "AuditRepo",
+    "ChunkRepo",
     "ClassifyRepo",
+    "DocumentRepo",
     "LlmUsageRepo",
     "SynthRepo",
     "TrainingRepo",
