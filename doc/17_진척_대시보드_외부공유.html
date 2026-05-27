@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 진척 보고 (협력사·발주처 공유본) | Lloydk AI</title>
+<meta name="description" content="W1~W8 워크플로우 진척률, 협력사 회신 요청 트래커, 잠정 작업 가정, 조정 대상 항목과 다음 액션. 2026-05-27 W3 종료 시점 협력사·발주처 공유 v0.3-ext." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+
+<style>
+  /* ============================================================
+     NovaX Design System (doc/07 V2와 통일)
+     - Geist Sans / Geist Mono, 1px borders, monochrome
+     ============================================================ */
+  :root {
+    --bg:           #ffffff;
+    --bg-surface:   #fafafa;
+    --bg-elevated:  #ffffff;
+    --bg-code:      #fafafa;
+    --bg-nav:       rgba(255,255,255,0.72);
+    --text:         #0a0a0a;
+    --text-soft:    #525252;
+    --text-dim:     #737373;
+    --text-faint:   #a3a3a3;
+    --border:       rgba(0,0,0,0.08);
+    --border-strong:rgba(0,0,0,0.16);
+    --border-soft:  rgba(0,0,0,0.05);
+    --accent:       #0a0a0a;
+    --accent-soft:  #f4f4f4;
+    --accent-blue:  rgba(0,112,243,0.06);
+    --radius-sm:    6px;
+    --radius:       8px;
+    --radius-lg:    12px;
+    --radius-pill:  999px;
+    --shadow-sm:    0 1px 2px rgba(0,0,0,.04);
+    --shadow:       0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.06);
+    --font-sans:    "Geist", -apple-system, BlinkMacSystemFont, "Pretendard",
+                    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --font-mono:    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* status colors */
+    --c-done:   #16a34a;
+    --c-active: #0070f3;
+    --c-block:  #dc2626;
+    --c-risk:   #d97706;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.7;
+    letter-spacing: -0.011em;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ===== Confidential watermark banner ===== */
+  .confidential-bar {
+    background: var(--text);
+    color: var(--bg);
+    padding: 6px 32px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    font-weight: 500;
+  }
+  .confidential-bar .sep { opacity: 0.4; margin: 0 12px; }
+
+  /* ===== Navbar ===== */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg-nav);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .nav-inner {
+    max-width: 1320px; margin: 0 auto;
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--text); text-decoration: none;
+    white-space: nowrap;
+  }
+  .brand-mark {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border-radius: 999px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .brand-mark img {
+    width: 32px; height: 32px;
+    object-fit: contain;
+    border-radius: 999px;
+    display: block;
+  }
+  .brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.02em; }
+  .brand-sep  { color: var(--text-dim); font-size: 14px; margin: 0 6px; }
+  .brand-url  { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); }
+  .nav-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .nav-link {
+    color: var(--text-soft); text-decoration: none;
+    font-size: 13.5px; font-weight: 500;
+    padding: 6px 10px; border-radius: var(--radius-sm);
+  }
+  .nav-link:hover { color: var(--text); }
+
+  /* ===== Layout ===== */
+  .container { max-width: 1280px; margin: 0 auto; padding: 40px 32px 120px; }
+
+  /* ===== Article header ===== */
+  .meta-row {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 16px;
+    font-size: 12.5px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    background: var(--text); color: var(--bg);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  .badge.ghost { background: transparent; color: var(--text); border: 1px solid var(--border-strong); }
+  .meta-dot { color: var(--text-faint); }
+  .meta-soft { color: var(--text-dim); }
+  .meta-category { color: var(--text); font-weight: 600; }
+  h1.title {
+    font-size: 56px; font-weight: 800;
+    letter-spacing: -0.04em; line-height: 1.04;
+    margin: 0 0 18px;
+  }
+  .lede { font-size: 18px; color: var(--text-soft); margin: 0 0 32px; max-width: 800px; }
+
+  /* ===== Section headings ===== */
+  h2 {
+    font-size: 30px; font-weight: 700;
+    letter-spacing: -0.025em; line-height: 1.2;
+    margin: 56px 0 4px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  .h2-sub {
+    margin: 0 0 24px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  h3 {
+    font-size: 19px; font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 32px 0 10px;
+  }
+
+  /* ===== Hero KPI block ===== */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 24px;
+    margin: 32px 0 40px;
+  }
+  .hero-progress {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+  }
+  .hero-progress .label {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .hero-progress .pct {
+    font-size: 72px; font-weight: 800;
+    letter-spacing: -0.04em; line-height: 1;
+    margin: 6px 0 16px;
+    font-feature-settings: "tnum";
+  }
+  .hero-progress .pct .of {
+    font-size: 32px; color: var(--text-dim); font-weight: 500;
+  }
+  .bar {
+    height: 8px; width: 100%;
+    background: var(--bg-surface);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .bar-fill { height: 100%; background: var(--text); }
+  .hero-progress .by-stage {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+  }
+  .stage-tick {
+    height: 28px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .stage-tick.done {
+    background: var(--text); color: var(--bg); border-color: var(--text);
+  }
+  .stage-tick.active {
+    background: var(--bg); border-color: var(--text); border-width: 1.5px;
+    color: var(--text); font-weight: 600;
+  }
+  .stage-tick.block {
+    background: var(--bg); border: 1px dashed var(--text);
+    color: var(--text-soft);
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .stat {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+  }
+  .stat .num {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1;
+    font-feature-settings: "tnum";
+  }
+  .stat .num.done { color: var(--c-done); }
+  .stat .num.block { color: var(--c-block); }
+  .stat .num.risk { color: var(--c-risk); }
+  .stat .lbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  /* ===== Timeline ===== */
+  .timeline {
+    margin: 24px 0;
+    display: flex; flex-direction: column;
+    gap: 0;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 60px 1fr 140px;
+    align-items: stretch;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .step + .step-conn { margin: 4px 0 4px 30px; }
+  .step-conn {
+    width: 1px; height: 16px;
+    background: var(--border-strong);
+  }
+  .step-num {
+    font-family: var(--font-mono);
+    font-size: 13px; font-weight: 600;
+    color: var(--text-dim);
+    display: flex; align-items: center;
+  }
+  .step.done .step-num { color: var(--c-done); }
+  .step.active .step-num { color: var(--c-active); font-weight: 700; }
+  .step.block .step-num { color: var(--c-block); }
+  .step.future .step-num { color: var(--text-faint); }
+  .step-body {
+    display: flex; flex-direction: column;
+    gap: 4px;
+    padding-right: 16px;
+  }
+  .step-title {
+    font-weight: 600; font-size: 15.5px; letter-spacing: -0.01em;
+  }
+  .step-desc { font-size: 13.5px; color: var(--text-soft); }
+  .step-status {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    position: relative;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .card .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .card .ctitle {
+    font-size: 15px; font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.4;
+  }
+  .card p { margin: 6px 0 0; font-size: 13.5px; color: var(--text-soft); }
+  .card.done .eyebrow { color: var(--c-done); border-bottom-color: rgba(22,163,74,0.2); }
+  .card.active .eyebrow { color: var(--c-active); border-bottom-color: rgba(0,112,243,0.2); }
+  .card.block .eyebrow { color: var(--c-block); border-bottom-color: rgba(220,38,38,0.2); }
+  .card.risk .eyebrow { color: var(--c-risk); border-bottom-color: rgba(217,119,6,0.2); }
+
+  /* ===== Callouts ===== */
+  .callout {
+    display: flex; gap: 14px;
+    padding: 14px 18px;
+    margin: 20px 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .callout.success { background: rgba(22,163,74,0.04);  border-color: rgba(22,163,74,0.20); }
+  .callout.warn    { background: rgba(217,119,6,0.05);  border-color: rgba(217,119,6,0.22); }
+  .callout.danger  { background: rgba(220,38,38,0.04);  border-color: rgba(220,38,38,0.22); }
+  .callout.accent  { background: rgba(0,112,243,0.04);  border-color: rgba(0,112,243,0.18); }
+  .callout-icon { width: 18px; height: 18px; flex-shrink: 0; margin-top: 4px; color: var(--text-soft); }
+  .callout.success .callout-icon { color: var(--c-done); }
+  .callout.warn    .callout-icon { color: var(--c-risk); }
+  .callout.danger  .callout-icon { color: var(--c-block); }
+  .callout.accent  .callout-icon { color: var(--c-active); }
+  .callout-label {
+    display: block; font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .callout.success .callout-label { color: var(--c-done); }
+  .callout.warn    .callout-label { color: #b45309; }
+  .callout.danger  .callout-label { color: var(--c-block); }
+  .callout.accent  .callout-label { color: var(--c-active); }
+  .callout p { margin: 4px 0; font-size: 14.5px; }
+  .callout ul { margin: 6px 0 0; padding-left: 18px; }
+  .callout li { font-size: 14.5px; margin: 3px 0; }
+
+  /* ===== Tables ===== */
+  .table-wrap {
+    margin: 20px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-elevated);
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead { background: var(--bg-surface); }
+  thead th {
+    text-align: left; padding: 12px 16px;
+    font-weight: 500; color: var(--text-dim);
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono); white-space: nowrap;
+  }
+  tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  tbody tr.pick td:first-child {
+    box-shadow: inset 2px 0 0 var(--text);
+    font-weight: 600; padding-left: 18px;
+  }
+
+  /* ===== Pills ===== */
+  .pill {
+    display: inline-flex; align-items: center;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px; font-weight: 500;
+    font-family: var(--font-mono);
+    line-height: 1.5; white-space: nowrap;
+  }
+  .pill.done     { background: var(--c-done); color: var(--bg); border: 1px solid var(--c-done); }
+  .pill.active   { background: var(--c-active); color: var(--bg); border: 1px solid var(--c-active); }
+  .pill.block    { background: var(--c-block); color: var(--bg); border: 1px solid var(--c-block); }
+  .pill.risk     { background: transparent; border: 1px solid var(--c-risk); color: var(--c-risk); }
+  .pill.future   { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-dim); }
+  .pill.lock     { background: var(--text); color: var(--bg); border: 1px solid var(--text); }
+  .pill.wait     { background: transparent; border: 1px solid var(--c-active); color: var(--c-active); }
+
+  code { font-family: var(--font-mono); font-size: 0.88em; background: var(--bg-code);
+    padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); }
+
+  /* ===== Glossary ===== */
+  .glossary dl {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 10px 24px;
+    margin: 0;
+    font-size: 13.5px;
+  }
+  .glossary dt {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--text);
+  }
+  .glossary dd {
+    margin: 0;
+    color: var(--text-soft);
+  }
+
+  /* ===== Footer ===== */
+  .footer {
+    border-top: 1px solid var(--border);
+    margin-top: 80px; padding-top: 24px;
+    color: var(--text-dim); font-size: 13px;
+  }
+  .footer a { color: var(--text-soft); }
+  .footer .contact-block {
+    margin: 16px 0;
+    padding: 16px 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .footer .contact-block dl {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 6px 16px;
+    margin: 0;
+    font-size: 13px;
+  }
+  .footer .contact-block dt { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .footer .contact-block dd { margin: 0; color: var(--text); }
+
+  @media (max-width: 900px) {
+    h1.title { font-size: 40px; }
+    .hero { grid-template-columns: 1fr; }
+    .hero-progress .by-stage { grid-template-columns: repeat(4, 1fr); }
+    .step { grid-template-columns: 50px 1fr; }
+    .step-status { justify-content: flex-start; padding-top: 6px; grid-column: 2; }
+    .hero-progress .pct { font-size: 56px; }
+    .glossary dl { grid-template-columns: 1fr; gap: 4px 0; }
+    .glossary dt { margin-top: 8px; }
+    .footer .contact-block dl { grid-template-columns: 1fr; gap: 2px 0; }
+    .footer .contact-block dt { margin-top: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     CONFIDENTIAL BAR
+============================================================ -->
+<div class="confidential-bar">
+  사내·협력사 한정 (Confidential — KOIPA · KL · Lloydk)
+  <span class="sep">·</span>
+  v0.3-ext (외부 공유본)
+  <span class="sep">·</span>
+  2026-05-27
+</div>
+
+<!-- ============================================================
+     NAVBAR
+============================================================ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark"><img src="assets/lloydk_logo_mark.png" alt="Lloydk AI" /></span>
+      <span class="brand-name">Lloydk AI</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-url">koipa/progress</span>
+    </a>
+    <div class="nav-actions">
+      <a class="nav-link" href="#stages">단계</a>
+      <a class="nav-link" href="#kl-actions">KL 회신 요청</a>
+      <a class="nav-link" href="#resources">자원</a>
+      <a class="nav-link" href="#assumptions">작업 가정</a>
+      <a class="nav-link" href="#next">다음 액션</a>
+      <a class="nav-link" href="#glossary">용어</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HEADER
+============================================================ -->
+<main class="container" id="top">
+
+  <div class="meta-row">
+    <span class="badge">진척 보고</span>
+    <span class="badge ghost">협력사·발주처 공유본</span>
+    <span class="meta-category">Lloydk AI 코어</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">FUN-003·004·005·022·023·024</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">v0.3-ext · 2026-05-27 W3 종료 시점</span>
+  </div>
+
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 보고 (W3 종료)</h1>
+
+  <p class="lede">
+    W1·W2·W3 완료. <b>OpenAPI 20개 path 라우터 구현 완료</b> — KL 연동 인터페이스 골격 가용.
+    W6에서 GPU·실문서·LLM API 키 3개 항목은 발주처/KL 확정 대기 중이며, 그동안 Lloydk 측 작업은 잠정 기본값(working assumption)으로 잠가 병행 진행 가능.
+    회귀 테스트 237건 통과, 회신 도착 시 차이 부분만 자동 패치하도록 설계.
+  </p>
+
+  <!-- ============================================================
+       HERO KPI
+  ============================================================ -->
+  <div class="hero">
+    <div class="hero-progress">
+      <div class="label">전체 완성도 (단계별 가중치)</div>
+      <div class="pct">50<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 50%"></div></div>
+      <div class="by-stage">
+        <div class="stage-tick done">W1</div>
+        <div class="stage-tick done">W2</div>
+        <div class="stage-tick done">W3</div>
+        <div class="stage-tick active">W4</div>
+        <div class="stage-tick">W5</div>
+        <div class="stage-tick block">W6</div>
+        <div class="stage-tick">W7</div>
+        <div class="stage-tick">W8</div>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="num done">237</div><div class="lbl">회귀 테스트 PASS</div></div>
+      <div class="stat"><div class="num">22</div><div class="lbl">API 라우트</div></div>
+      <div class="stat"><div class="num risk">6</div><div class="lbl">조정 대상</div></div>
+      <div class="stat"><div class="num">16</div><div class="lbl">잠정 기본값</div></div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       0. Executive Summary
+  ============================================================ -->
+  <h2 id="summary">0. 핵심 요약</h2>
+  <p class="h2-sub">임원·관리자 1분 리딩용.</p>
+
+  <div class="callout accent">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">EXECUTIVE SUMMARY</span>
+      <ul>
+        <li><b>완료 (W1~W3)</b> — DB 영속화, 분류·합성·학습·평가·관측 서비스 골격, OpenAPI 20개 path 라우터·감사로그 미들웨어 가동.</li>
+        <li><b>진행 중 (W4·W5)</b> — 평가/능동학습 모듈, RAG 인덱서 — 외부 의존 없이 Lloydk 단독 진행 가능.</li>
+        <li><b>조정 대상 (W6)</b> — GPU 사양·실문서 제공 여부·합성 데이터 API 예산 3건은 발주처/KL 결정 대기. 그동안 잠정 기본값으로 코드 잠금.</li>
+        <li><b>회신 요청 기한</b> — 협의요청서(doc/06) <b>2026-06-09</b>까지 KL·발주처 회신 부탁드립니다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       1. 단계별 진척
+  ============================================================ -->
+  <h2 id="stages">1. 워크플로우 단계별 진척</h2>
+  <p class="h2-sub">W1~W8 8단계. 각 단계의 가중치(작업량 비례) · 진척 % · 산출물 · 의존 자원.</p>
+
+  <div class="timeline">
+    <!-- W1 -->
+    <div class="step done">
+      <div class="step-num">W1</div>
+      <div class="step-body">
+        <div class="step-title">DB 영속화 계층 — ORM + 마이그레이션 baseline</div>
+        <div class="step-desc">
+          19개 ORM 클래스 (DB 스키마 1:1 매핑), 세션 관리, 마이그레이션 baseline 확정.
+          파티션 테이블(감사로그·LLM 사용량·청크) 자동 라우팅 검증.
+          <span class="pill lock">v0.1-W1</span>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W2 -->
+    <div class="step done">
+      <div class="step-num">W2</div>
+      <div class="step-body">
+        <div class="step-title">Repository 5종 + ClassifyService DB 통합 + 감사로그 미들웨어</div>
+        <div class="step-desc">
+          분류·학습·합성·감사·LLM사용량 Repository, IP 안전 검증,
+          모든 요청에 감사로그 1건 기록 (인증 실패·서버 오류도 success=false로 기록).
+          <span class="pill lock">v0.2-W2</span>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W3 -->
+    <div class="step done">
+      <div class="step-num">W3</div>
+      <div class="step-body">
+        <div class="step-title">라우터 8개 신규 — OpenAPI 20개 path 전부 구현</div>
+        <div class="step-desc">
+          스키마 7개 + 서비스 7개 + Job 큐 + API 라우터 7개.
+          DB 미가용 시에도 응답 정상 동작 (영속화는 별도 비동기).
+          신규 테스트 25개 추가.
+          <span class="pill lock">v0.3-W3</span>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W4 -->
+    <div class="step active">
+      <div class="step-num">W4</div>
+      <div class="step-body">
+        <div class="step-title">M6 평가·능동학습 (FUN-024)</div>
+        <div class="step-desc">
+          평가 모듈 신규 작성.
+          등급별 미탐률(FNR), Confusion Matrix("고등급→저등급" 미탐 알람),
+          관리자 정정 누적 → 재학습 큐, HTML 리포트.
+          <code>/metrics/*</code> 3 라우터의 백엔드 풀 구현.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill active">착수 대기 0%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W5 -->
+    <div class="step future">
+      <div class="step-num">W5</div>
+      <div class="step-body">
+        <div class="step-title">RAG 인덱서 + 가이드 문서 검색 백엔드</div>
+        <div class="step-desc">
+          가이드 문서 청크 → 임베딩 → 검색엔진 인덱스 적재.
+          인덱서 신규 작성, 형태소 사용자 사전 확장 병행 (목표 1~2천 항목).
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill future">대기</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W6 -->
+    <div class="step block">
+      <div class="step-num">W6</div>
+      <div class="step-body">
+        <div class="step-title">학습 데이터셋·합성 5,000건·시드 v2·폐쇄망 번들 실빌드</div>
+        <div class="step-desc">
+          <b>조정 대상 3건</b>: GPU 사양 확정 (Q1) + 가이드 v2 (Q4) + 합성용 LLM API 예산 (Q2).
+          그 사이 Lloydk가 단독 진행: 공개문헌 기반 시드 v1 + 형태소 사전 확장.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill wait">조정 필요</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W7 -->
+    <div class="step future">
+      <div class="step-num">W7</div>
+      <div class="step-body">
+        <div class="step-title">관측성·백업·재해복구(DR) 리허설</div>
+        <div class="step-desc">
+          메트릭·로그·대시보드 표준 설정, DB·객체스토리지 일별 백업,
+          검색엔진 스냅샷, RTO 4시간 검증. Runbook v1.0 승격.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill future">대기</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W8 -->
+    <div class="step future">
+      <div class="step-num">W8</div>
+      <div class="step-body">
+        <div class="step-title">KL 통합 + 라이선스 교체 + SBOM + 운영 전환</div>
+        <div class="step-desc">
+          AGPL 의존성 교체 (PDF 파서·객체스토리지),
+          SBOM(CycloneDX) CI 추가, KL ↔ Lloydk API 통합 테스트 8 시나리오,
+          운영 로그 중앙서버 forwarder.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill future">대기</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>단계</th>
+          <th>가중치</th>
+          <th>완성도</th>
+          <th>기여 %</th>
+          <th>상태</th>
+          <th>주요 산출물</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="pick"><td>W1</td><td>15%</td><td>100%</td><td>15.0%</td><td><span class="pill done">완료</span></td><td>DB 세션·모델, 마이그레이션 baseline, 12 round-trip 테스트</td></tr>
+        <tr class="pick"><td>W2</td><td>15%</td><td>100%</td><td>15.0%</td><td><span class="pill done">완료</span></td><td>Repository 5종, 분류 서비스 영속화, 감사로그 미들웨어</td></tr>
+        <tr class="pick"><td>W3</td><td>20%</td><td>100%</td><td>20.0%</td><td><span class="pill done">완료</span></td><td>OpenAPI 20개 path 라우터 8개 + 서비스 7개 + Job 큐, 25 신규 테스트</td></tr>
+        <tr><td>W4</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill active">착수 대기</span></td><td>M6 평가·능동학습, /metrics/* 풀 구현</td></tr>
+        <tr><td>W5</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>RAG 인덱서, /guide/documents indexed=True, 사전·시드 확장</td></tr>
+        <tr><td>W6</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill wait">조정 필요</span></td><td>합성 5,000, 분류모델 풀 학습, 폐쇄망 번들</td></tr>
+        <tr><td>W7</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>관측성 스택, 백업 cron, DR 리허설</td></tr>
+        <tr><td>W8</td><td>10%</td><td>0%</td><td>0%</td><td><span class="pill future">대기</span></td><td>라이선스 교체, SBOM, KL 통합 8 시나리오</td></tr>
+        <tr class="pick"><td><b>합계</b></td><td>100%</td><td>—</td><td><b>50.0%</b></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================
+       2. KL·발주처 회신 요청 트래커 (NEW)
+  ============================================================ -->
+  <h2 id="kl-actions">2. 협력사·발주처 회신 요청 트래커</h2>
+  <p class="h2-sub">
+    협의요청서(<code>doc/06</code>) 항목별 회신 상태. 회신 기한: <b>2026-06-09</b>.
+    회신 도착 시 잠정 기본값과의 차이만 자동 패치.
+  </p>
+
+  <h3>2.1 발주처(KOIPA) 회신 요청</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 60px;">ID</th>
+          <th>항목</th>
+          <th>잠정 기본값</th>
+          <th style="width: 100px;">기한</th>
+          <th style="width: 90px;">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Q1</b></td><td>GPU 사양 확정 (VRAM·장수·CUDA)</td><td>24GB VRAM × 1장, batch=8 가정으로 코드 잠금</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>Q2</b></td><td>합성 데이터 활용 범위 + 운영 LLM API 예산 한도</td><td>사업단 내부 사용 한정으로 진행</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>Q3</b></td><td>비밀해제 실문서 제공 가능성·수량</td><td>미제공 가정, 합성+공개문헌만으로 진행</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>Q4</b></td><td>등급분류 가이드 최신본 + 개정 이력</td><td>공개문헌 기반 시드 v1 작성, 가이드 도착 시 v2 패치</td><td>우선 회신 요청</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>Q5</b></td><td>AI Hub·모두의말뭉치 신청 명의</td><td>Lloydk 명의 신청</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>Q6</b></td><td>EXAONE 공공·온프레미스 라이선스 검토</td><td>본 사업 모델 후보에서 제외</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>Q7</b></td><td>등급 경계 사례 공동 검수 워크숍 일정</td><td>검수자 2명 + AI팀 셀프 검수로 진행</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>2.2 KL 회신 요청</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 60px;">ID</th>
+          <th>항목</th>
+          <th>잠정 기본값</th>
+          <th style="width: 100px;">기한</th>
+          <th style="width: 90px;">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><b>K1</b></td><td>KL 기존 인프라 도입 현황 (PG·ES·Redis·MQ·인증)</td><td>Lloydk docker-compose 단일 스택 가정</td><td>우선 회신 요청</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>K2</b></td><td>OpenAPI 명세 16개 엔드포인트 검토</td><td><a href="03_openapi_lloydk_kl.yaml">03_openapi_lloydk_kl.yaml</a> 회신 대기</td><td>우선 회신 요청</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>K3</b></td><td>인증 방식 (API Key vs SSO/JWT)</td><td>API Key (X-API-Key 헤더)로 잠정 구현</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>K4</b></td><td>KL 본 사업 마일스톤·통합 테스트 시점</td><td>PoC E2E 시연 후 본격 통합 가정</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+        <tr><td><b>K5</b></td><td>멀티 테넌트 (단일 vs N개사)</td><td>tenant_id 컬럼·네임스페이스 분리 설계로 양방향 호환</td><td>2026-06-09</td><td><span class="pill wait">대기</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>2.3 OpenAPI 검토 진행 상태 (K2 상세)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>영역</th>
+          <th>엔드포인트 수</th>
+          <th>구현 상태</th>
+          <th>KL 검토 상태</th>
+          <th>검토 포커스</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>classify</td><td>5</td><td><span class="pill done">구현 완료</span></td><td><span class="pill wait">검토 대기</span></td><td>동기·비동기·일괄 호출 패턴이 KL 처리량과 부합하는지</td></tr>
+        <tr><td>confirm/relabel</td><td>2</td><td><span class="pill done">구현 완료</span></td><td><span class="pill wait">검토 대기</span></td><td>관리자 확정·재라벨 워크플로우</td></tr>
+        <tr><td>training</td><td>3</td><td><span class="pill done">구현 완료</span></td><td><span class="pill wait">검토 대기</span></td><td>학습 트리거·진행 상태 폴링 방식</td></tr>
+        <tr><td>synthesis</td><td>3</td><td><span class="pill done">구현 완료</span></td><td><span class="pill wait">검토 대기</span></td><td>검수 큐 UI 노출 방식</td></tr>
+        <tr><td>guide</td><td>2</td><td><span class="pill done">구현 완료</span></td><td><span class="pill wait">검토 대기</span></td><td>가이드 문서 동기화 방식</td></tr>
+        <tr><td>schema</td><td>2</td><td><span class="pill done">구현 완료</span></td><td><span class="pill wait">검토 대기</span></td><td>등급체계 변경 시 재학습 트리거 응답</td></tr>
+        <tr><td>metrics</td><td>3</td><td><span class="pill active">백엔드 W4</span></td><td><span class="pill wait">검토 대기</span></td><td>대시보드 데이터 표시 방식</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout accent">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">REVIEW CHANNEL</span>
+      <p>OpenAPI 검토 회신은 GitHub PR 코멘트 또는 yaml 직접 편집 후 메일 회신 모두 가능. 회신처 하단 푸터 참고.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       3. 미준비 자원
+  ============================================================ -->
+  <h2 id="resources">3. 미준비 자원 — 누락 방지 체크리스트</h2>
+  <p class="h2-sub">
+    전체 40건: 조정 필요 6 / 진행 중 14 / 완료·확정 20. 상세는
+    <code>doc/16_미준비_자원_체크리스트.md</code>.
+  </p>
+
+  <h3>3.1 외부 의존 자원</h3>
+  <div class="card-grid">
+
+    <div class="card risk">
+      <div class="eyebrow">조정 필요 · W6</div>
+      <div class="ctitle">GPU (Q1) — 24GB+ VRAM 1장</div>
+      <p>발주처 제공 일정 회신 대기. 코드는 24GB VRAM 가정으로 잠금. 클라우드 GPU 임차도 대안으로 검토 가능 (단기 학습 한정).</p>
+    </div>
+
+    <div class="card risk">
+      <div class="eyebrow">조정 필요 · W6</div>
+      <div class="ctitle">KOIPA 등급분류 가이드 v2 (Q4)</div>
+      <p>현재 시드 v0 (PoC용). 공개 영업비밀보호법·시행령 기반 v1 작성 병행 → 가이드 도착 시 v2 패치. Lloydk 단독 진행 가능.</p>
+    </div>
+
+    <div class="card risk">
+      <div class="eyebrow">조정 필요 · 외부 일반화 검증</div>
+      <div class="ctitle">비밀해제 실문서 (Q3)</div>
+      <p>잠정 <b>미제공 가정</b>으로 잠금. 합성+공개 데이터만으로 진행. 외부 일반화 검증의 한계는 doc/05·15에 정직성 노트로 명시 예정.</p>
+    </div>
+
+    <div class="card risk">
+      <div class="eyebrow">조정 필요 · W6</div>
+      <div class="ctitle">합성용 LLM API 키 (Q2)</div>
+      <p>현재 noop provider로 동작. 합성 5,000건 풀 가동 시 사업단 예산 승인 필요. 대체안: 자체호스팅 LLM (GPU 의존).</p>
+    </div>
+
+    <div class="card risk">
+      <div class="eyebrow">조정 필요 · 통합 단계</div>
+      <div class="ctitle">KL 인터페이스 합의 (K2·K3)</div>
+      <p>잠정 X-API-Key + Lloydk docker-compose 단일 스택으로 잠금. KL 회신 차이 시 OpenAPI yaml + 인증 미들웨어만 패치하면 됨.</p>
+    </div>
+
+    <div class="card done">
+      <div class="eyebrow">완료 · W1 가동</div>
+      <div class="ctitle">PostgreSQL + Elasticsearch + Nori</div>
+      <p>docker-compose 잠금, PG 19테이블 적재, ES 클러스터 정상, 형태소 사용자 사전 마운트. 기동 검증 완료.</p>
+    </div>
+
+  </div>
+
+  <h3>3.2 데이터셋</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>자원</th><th>현재</th><th>필요 시점</th><th>대응 방안</th><th>상태</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>합성 5,000건 (P3 풀)</td><td>smoke 40건만 보유</td><td>W6</td><td>API 키 확보 시 즉시 가동</td><td><span class="pill wait">조정 필요</span></td></tr>
+        <tr><td>labeled dataset (train·val·test)</td><td>디렉터리 부재</td><td>W6</td><td>합성 완료 후 자동 생성</td><td><span class="pill wait">조정 필요</span></td></tr>
+        <tr><td>공개 코퍼스 (AI Hub·모두의말뭉치)</td><td>미신청</td><td>W6 보강 (선택)</td><td>Lloydk 명의 신청 잠정 결정</td><td><span class="pill risk">진행 중</span></td></tr>
+        <tr><td>Nori 사용자 사전</td><td>63줄 (목표 1~2천 항목)</td><td>W5</td><td>공개 용어 수집 가능</td><td><span class="pill risk">진행 중</span></td></tr>
+        <tr><td>시드 키워드 v2</td><td>v0 79줄</td><td>W6</td><td>공개 문헌 기반 v1 작성 가능</td><td><span class="pill risk">진행 중</span></td></tr>
+        <tr class="pick"><td>PoC dryrun 합성 40건</td><td>40 파일 확보</td><td>회귀</td><td>—</td><td><span class="pill done">완료</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.3 라이선스 · 운영 환경</h3>
+  <div class="card-grid">
+    <div class="card risk">
+      <div class="eyebrow">W8</div>
+      <div class="ctitle">PDF 파서 라이선스 교체</div>
+      <p>현 AGPL 의존성을 BSD 라이선스 파서로 교체 권장 (추출 품질 약간 손실 허용 시) 또는 상용 라이선스 구매. 사업단 결정 필요.</p>
+    </div>
+    <div class="card risk">
+      <div class="eyebrow">W8</div>
+      <div class="ctitle">객체스토리지 라이선스 교체</div>
+      <p>현 AGPL 의존성을 Commercial 구매 또는 LGPL/MPL 대체 솔루션으로 전환. 사업단 결정 필요.</p>
+    </div>
+    <div class="card risk">
+      <div class="eyebrow">W7</div>
+      <div class="ctitle">관측성 스택 (메트릭·로그·대시보드)</div>
+      <p>표준 설정 자체 작성 가능 (~반일 작업). Runbook 선언만 존재.</p>
+    </div>
+    <div class="card risk">
+      <div class="eyebrow">W7</div>
+      <div class="ctitle">백업·DR 리허설</div>
+      <p>DB 일별 백업, 검색엔진 스냅샷, 객체스토리지 미러, RTO 4시간 검증. 표준 cron+bash로 작성 가능.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">확정됨</div>
+      <div class="ctitle">Redis 버전 라이선스 안정화</div>
+      <p>BSD 라이선스 시점 버전으로 docker-compose 잠금. 이후 라이선스 변경 영향 회피.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">도구 갖춤</div>
+      <div class="ctitle">SBOM (CycloneDX)</div>
+      <p>라이선스 덤프 스크립트 보유. W8에서 CI 추가만 진행.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       4. 잠정 작업 가정 (Working Assumptions)
+  ============================================================ -->
+  <h2 id="assumptions">4. 잠정 작업 가정 — 회신 도착 시 자동 패치</h2>
+  <p class="h2-sub">
+    협의요청서의 Q1~Q7·K1~K5·E1~E9 항목에 대해 PoC 진행을 위한 잠정 기본값(working assumption)을 두고 작업 중.
+    회신이 다르게 오면 해당 부분만 패치합니다.
+  </p>
+
+  <div class="callout success">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">DESIGN INTENT</span>
+      <p>회신 도착 전에도 일정 지연 없이 작업이 진행되도록 모든 외부 의존 변수에 합리적 기본값을 두고 구현했습니다. 회신 차이는 코드 변경 범위를 최소화하도록 격리되어 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>잠정 기본값</th><th>패치 영향 범위 (회신 차이 발생 시)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Q1</b> GPU</td><td>24GB×1, 분류모델 base 크기, batch=8</td><td>학습 설정 파일만</td></tr>
+        <tr><td><b>Q2</b> 합성 데이터</td><td>사업단 내부 사용 한정</td><td>운영 정책 문서</td></tr>
+        <tr><td><b>Q3</b> 실문서</td><td>미제공 가정, 합성+공개 데이터로만</td><td>외부 일반화 검증 보고서</td></tr>
+        <tr><td><b>Q4</b> 가이드</td><td>현 시드, 회신 시 v2 패치</td><td>시드 키워드 파일만</td></tr>
+        <tr><td><b>Q5</b> AI Hub</td><td>Lloydk 명의로 신청</td><td>신청서 명의만</td></tr>
+        <tr><td><b>Q6</b> EXAONE</td><td>본 사업 후보에서 제외</td><td>모델 선정 문서</td></tr>
+        <tr><td><b>Q7</b> 검수</td><td>검수자 2명 + AI팀 셀프 검수</td><td>검수 워크플로우 문서</td></tr>
+        <tr><td><b>E1</b> ES 버전</td><td>8.15.3</td><td>docker-compose</td></tr>
+        <tr><td><b>E2</b> 형태소 사용자 사전</td><td>Lloydk 자체 작성</td><td>사전 파일만</td></tr>
+        <tr><td><b>E3</b> ES 라이선스</td><td>Basic, 인덱스 분리</td><td>doc/13 §11.1</td></tr>
+        <tr><td><b>E5</b> 노드 사양</td><td>단일 노드 JVM 4GB, int8_hnsw</td><td>docker-compose</td></tr>
+        <tr><td><b>E9</b> 망 등급</td><td>폐쇄망, 번들 반입 절차</td><td>doc/12 매체 반입 절차</td></tr>
+        <tr><td><b>K1</b> KL 인프라</td><td>Lloydk docker-compose 단일 스택</td><td>compose 파일</td></tr>
+        <tr><td><b>K3</b> 인증</td><td>API Key (X-API-Key)</td><td>API 미들웨어만</td></tr>
+        <tr><td><b>K5</b> 멀티테넌트</td><td>tenant_id 컬럼·네임스페이스 분리</td><td>DB 스키마 (양방향 호환)</td></tr>
+        <tr><td><b>벡터 검색</b></td><td>Elasticsearch dense_vector 단일</td><td>인덱서 어댑터만 (대체 백엔드 옵션 보유)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================
+       5. 환경 · 검증
+  ============================================================ -->
+  <h2 id="verify">5. 환경 · 검증 현황</h2>
+  <p class="h2-sub">로컬·CI에서 검증된 항목.</p>
+
+  <div class="card-grid">
+    <div class="card done">
+      <div class="eyebrow">✓ Docker</div>
+      <div class="ctitle">Docker Desktop 4.74.0</div>
+      <p>무인 설치, CLI 29.4.3, Compose v5.1.3, WSL2 backend. postgres + elasticsearch 컨테이너 정상.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ PostgreSQL</div>
+      <div class="ctitle">PG 16 + init 스크립트 자동 적용</div>
+      <p>19개 부모 테이블 + 11개 파티션 子, 시드 4등급·4평가요소, 마이그레이션 baseline stamp. ORM ↔ DB 100% 일치.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ Elasticsearch</div>
+      <div class="ctitle">ES 8.15.3 클러스터 정상</div>
+      <p>형태소 사용자 사전 마운트, 단일 노드, JVM 2GB. 버전 호환 패치 적용 완료.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ Tests</div>
+      <div class="ctitle">회귀 테스트 237/237 PASS</div>
+      <p>어댑터·전처리·라벨링·추론·API·마이그레이션·번들·DB·Repository·감사로그·W3 라우터 25 신규. CI 모든 잡 정상.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ CI</div>
+      <div class="ctitle">GitHub Actions</div>
+      <p>poc-ci (회귀 + PoC dryrun + 번들-dry + 마이그레이션-dry) + openapi-lint. 라이선스 검증 잡 가동.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ Audit</div>
+      <div class="ctitle">감사로그 미들웨어 가동</div>
+      <p>모든 요청 1건 기록. healthz·docs·openapi.json 제외. 인증 실패·서버 오류도 success=false로 기록.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       6. 다음 액션
+  ============================================================ -->
+  <h2 id="next">6. 다음 액션</h2>
+  <p class="h2-sub">즉시 진행 가능 · 사업단 조정 필요 · 회신 도착 시 패치 항목.</p>
+
+  <h3>6.1 즉시 진행 가능 (Lloydk 단독)</h3>
+  <div class="callout accent">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">START NOW</span>
+      <ul>
+        <li><b>W4 M6 평가·능동학습 (1일)</b> — 평가 모듈 신규, 등급별 미탐률(FNR), Confusion Matrix, HTML 리포트, /metrics/* 풀 구현</li>
+        <li><b>W5 RAG 인덱서 + 가이드 문서 검색 (1일)</b> — 임베딩 → 검색엔진 적재</li>
+        <li><b>병행 작업 (W6 조정 중에도 가능)</b>
+          <ul>
+            <li>시드 v2 — 공개문헌 기반 등급당 50~100개 키워드</li>
+            <li>형태소 사용자 사전 — 1~2천 도메인 용어 확장</li>
+            <li>외부 일반화 한계에 대한 정직성 노트 보강</li>
+            <li>W7 관측성 표준 설정</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>6.2 사업단 조정 대상 항목</h3>
+  <div class="callout warn">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">COORDINATION ITEMS</span>
+      <ul>
+        <li><b>GPU 확보 일정</b> — 발주처 제공 일정 확정 또는 클라우드 GPU 임차 결정 (단기 학습 한정 옵션)</li>
+        <li><b>합성용 LLM API 예산</b> — 합성 5,000건 풀 가동 시 예산 승인 → 즉시 가동 가능</li>
+        <li><b>객체스토리지 라이선스</b> — Commercial 구매 또는 대체 솔루션 채택 결정 (W8 운영 전환 전)</li>
+        <li><b>PDF 파서 라이선스</b> — BSD 대체 채택 또는 상용 구매 결정 (W8 운영 전환 전)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>6.3 회신 도착 시 패치 (잠정 기본값과 차이 발생 시)</h3>
+  <div class="callout">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+    <div class="callout-body">
+      <span class="callout-label">PATCH ON ARRIVAL</span>
+      <ul>
+        <li><b>Q4 가이드 도착</b> → 시드 키워드 v1 → v2 패치 + 형태소 사전 도메인 용어 추가</li>
+        <li><b>K1 KL ES 운영 거부 (만약의 경우)</b> → 별도 벡터 백엔드 즉시 롤백 (코드 실재, 환경변수 변경만)</li>
+        <li><b>K3 인증 SSO/JWT 요구</b> → API 미들웨어에 JWT 검증 추가, API Key는 단계적 폐지</li>
+        <li><b>E9 망 등급 차이</b> → 매체 반입 절차 조정, 번들 구성만 패치</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>6.4 일정 (절대 날짜)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>목표일</th><th>완료 예정</th><th>완성도</th><th>외부 의존</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2026-05-27 (오늘)</td><td>W1·W2·W3 완료</td><td>50%</td><td>없음</td></tr>
+        <tr><td>2026-05-28</td><td>W4 M6 평가</td><td>60%</td><td>없음</td></tr>
+        <tr><td>2026-05-29</td><td>W5 RAG 인덱서</td><td>70%</td><td>없음</td></tr>
+        <tr><td>2026-05-29 ~ 06-01</td><td>병행: 시드 v2 + 사전 확장 + 관측성 표준</td><td>75%</td><td>없음</td></tr>
+        <tr class="pick"><td><b>2026-06-09</b></td><td><b>협의요청서 회신 기한 · W6 학습 가능 시점 (예산 결정 시)</b></td><td><b>조정 항목 해소</b></td><td><b>사업단 조정</b></td></tr>
+        <tr><td>2026-06-01 ~ 06-08</td><td>W6 합성·학습·번들 실빌드 (조건 충족 시)</td><td>85%</td><td>GPU + API 키</td></tr>
+        <tr><td>2026-06-08 ~ 06-12</td><td>W7 관측성·DR 리허설</td><td>95%</td><td>없음</td></tr>
+        <tr><td>2026-06-12 ~ 06-19</td><td>W8 라이선스·SBOM·KL 통합</td><td>100%</td><td>KL 통합 일정</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================
+       7. 용어 사전
+  ============================================================ -->
+  <h2 id="glossary">7. 용어 사전</h2>
+  <p class="h2-sub">본 문서에 사용된 약어·기술 용어 1줄 설명.</p>
+
+  <div class="glossary">
+    <h3>기능 ID</h3>
+    <dl>
+      <dt>FUN-003</dt><dd>문서 분류 — 입력 문서를 4등급(특급기밀·1급비밀·2급대외비·3급공개) 중 하나로 자동 분류</dd>
+      <dt>FUN-004</dt><dd>관리자 확정·재라벨 — AI 분류 결과를 관리자가 검토·확정·정정</dd>
+      <dt>FUN-005</dt><dd>등급체계 변경 — 등급 정의 변경 시 재학습 트리거</dd>
+      <dt>FUN-022</dt><dd>가이드 문서 RAG — 등급분류 가이드 문서를 검색엔진에 인덱싱하여 분류 시 참조</dd>
+      <dt>FUN-023</dt><dd>합성 데이터 생성 — LLM 기반 학습용 합성 영업비밀 문서 생성</dd>
+      <dt>FUN-024</dt><dd>평가·능동학습 — 등급별 미탐률·혼동행렬 산출, 정정 누적 → 재학습 큐</dd>
+    </dl>
+
+    <h3>기술 용어</h3>
+    <dl>
+      <dt>RAG</dt><dd>Retrieval-Augmented Generation — 검색 결과를 컨텍스트로 활용하는 AI 기법</dd>
+      <dt>OpenAPI</dt><dd>API 명세 표준 (Swagger). KL ↔ Lloydk 인터페이스 정의에 사용</dd>
+      <dt>Repository (DB)</dt><dd>데이터 접근 계층 — DB 테이블별 CRUD 로직을 캡슐화</dd>
+      <dt>Job 큐</dt><dd>학습·합성 등 장기 작업의 비동기 큐. 진행률·결과를 폴링으로 조회</dd>
+      <dt>감사로그 미들웨어</dt><dd>모든 API 요청을 자동 기록하는 컴포넌트 — 누가·언제·무엇을·결과를</dd>
+      <dt>FNR (False Negative Rate)</dt><dd>등급별 미탐률 — "고등급을 저등급으로 분류"한 비율 (가장 위험한 오류)</dd>
+      <dt>Confusion Matrix</dt><dd>실제 등급 × 예측 등급의 교차표. 어느 등급 간 혼동이 잦은지 시각화</dd>
+      <dt>Nori</dt><dd>Elasticsearch의 한국어 형태소 분석기. 도메인 용어를 사용자 사전으로 보강</dd>
+      <dt>분류모델</dt><dd>KF-DeBERTa 등 한국어 사전학습 인코더 기반 등급 분류 모델</dd>
+      <dt>임베딩 모델</dt><dd>문장→벡터 변환 모델 (KURE-v1 등). RAG 검색에 사용</dd>
+      <dt>합성 LLM</dt><dd>합성 문서 생성용 대규모 언어모델. 외부 API 또는 자체호스팅 옵션</dd>
+      <dt>SBOM</dt><dd>Software Bill of Materials — 사용 오픈소스 목록·라이선스 명세 (CycloneDX 표준)</dd>
+      <dt>RTO</dt><dd>Recovery Time Objective — 장애 발생 시 복구 목표 시간 (본 사업 4시간)</dd>
+      <dt>DR 리허설</dt><dd>Disaster Recovery — 장애 복구 시나리오 모의 훈련</dd>
+      <dt>폐쇄망 번들</dt><dd>인터넷 차단 환경에 반입할 의존성·모델·이미지 일괄 패키지</dd>
+    </dl>
+  </div>
+
+  <!-- ============================================================
+       8. 갱신
+  ============================================================ -->
+  <h2>8. 갱신 이력</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
+      <tbody>
+        <tr><td>2026-05-28</td><td>v0.4-ext</td><td>시나리오 성능 보고 체계 도입 — 8 시나리오 × 33 KPI 측정 하네스 + 단일 HTML 보고서. 외부 자원 의존 KPI는 자동 SKIP, 룰 fallback 환경에서 F1·FNR·Recall@5는 학습 모델 활성 후 측정.</td></tr>
+        <tr><td>2026-05-27</td><td>v0.3-ext</td><td>외부 공유본 신규. W3 종료 — 라우터 8개 + 서비스 7개 + Job 큐. OpenAPI 20개 path 전부 구현. 237 PASS.</td></tr>
+        <tr><td>2026-05-27</td><td>v0.2-ext</td><td>W2 종료 — Repository 5종 + 감사로그 미들웨어.</td></tr>
+        <tr><td>2026-05-27</td><td>v0.1-ext</td><td>W1 종료 — DB ORM + 마이그레이션 baseline. Docker 환경 구축 완료.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="h2-sub" style="margin-top: 12px;">
+    <b>갱신 주기</b>: 각 W 단계 종료 시 / 조정 항목 상태 변경 시 (특히 GPU·API 키 확보) / 회신 도착 시 잠정 기본값과 차이가 있는 항목.
+    <br/>
+    <b>다음 갱신 예정</b>: 2026-05-29 (W4·W5 완료 후)
+  </p>
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+  <div class="footer">
+    <div class="contact-block">
+      <dl>
+        <dt>발행</dt><dd>Lloydk 사업단 AI팀</dd>
+        <dt>회신처</dt><dd>본 문서 갱신·회신은 협의요청서(<code>doc/06</code>) 명시 채널 사용</dd>
+        <dt>OpenAPI 검토</dt><dd>GitHub PR 코멘트 또는 <code>03_openapi_lloydk_kl.yaml</code> 직접 편집 후 메일 회신</dd>
+        <dt>기밀등급</dt><dd>사내·협력사 한정 (KOIPA · KL · Lloydk 외 공유 금지)</dd>
+        <dt>회신 기한</dt><dd><b>2026-06-09</b> (우선 항목: Q1·Q4·K1·K2)</dd>
+      </dl>
+    </div>
+    <p>
+      Lloydk AI · KOIPA AI 영업비밀관리시스템 · FUN-003·004·005·022·023·024 ·
+      <a href="07_전체설계_통합본_V2.html">전체 설계 통합본 V2</a> ·
+      <a href="06_협의요청서_KL_발주처.md">협의요청서</a> ·
+      <a href="03_openapi_lloydk_kl.yaml">OpenAPI 명세</a>
+    </p>
+    <p>2026-05-27 W3 종료 시점 · 회귀 테스트 237/237 PASS · W4·W5 외부 의존 없이 진행 가능.</p>
+  </div>
+
+</main>
+
+</body>
+</html>
