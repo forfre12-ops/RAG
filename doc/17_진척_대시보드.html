@@ -455,15 +455,15 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v0.7 · 2026-05-27 W8 종료 (Qdrant 제거 · PyMuPDF→pdfminer.six · SBOM CI · KL 통합 8시나리오)</span>
+    <span class="meta-soft">v0.8 · 2026-05-27 W9 일반화 (LLM 이중경로 · 임베딩 로컬화 · 시드 v2 · Nori 사전)</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 대시보드</h1>
 
   <p class="lede">
-    W1~W5 + W7 + W8 완료. <b>외부 의존 없는 코드 작업 모두 종료</b> — PyMuPDF→pdfminer.six, SBOM CI 자동 산출, KL 통합 8시나리오 자동화.
-    Qdrant 백엔드도 자체 결정으로 완전 제거. 남은 건 W6 (GPU·실문서·LLM API 키) 차단 해소만.
-    pytest <b>285 PASS</b>, 자체결정으로 회신 의존 변수 16개 동결.
+    W1~W5 + W7~W9 완료. <b>일반화 납품 시스템으로 전환</b> — LLM 원격/로컬 이중 경로, 임베딩 로컬화, 시드 v2(142), Nori 사전(235).
+    GPU 의존성 제거로 KOIPA 외 여러 기관에 동일 코드 납품 가능. 남은 건 발주처 자원(가이드 v2 + 실문서).
+    pytest <b>301 PASS</b>, 자체결정으로 회신 의존 변수 16개 동결.
   </p>
 
   <!-- ============================================================
@@ -472,8 +472,8 @@
   <div class="hero">
     <div class="hero-progress">
       <div class="label">전체 완성도 (단계별 가중치)</div>
-      <div class="pct">90<span class="of">%</span></div>
-      <div class="bar"><div class="bar-fill" style="width: 90%"></div></div>
+      <div class="pct">95<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 95%"></div></div>
       <div class="by-stage">
         <div class="stage-tick done">W1</div>
         <div class="stage-tick done">W2</div>
@@ -486,9 +486,9 @@
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="num done">285</div><div class="lbl">pytest PASS</div></div>
+      <div class="stat"><div class="num done">301</div><div class="lbl">pytest PASS</div></div>
       <div class="stat"><div class="num">23</div><div class="lbl">API 라우트</div></div>
-      <div class="stat"><div class="num block">1</div><div class="lbl">차단 자원 (W6만)</div></div>
+      <div class="stat"><div class="num block">3</div><div class="lbl">발주처 의존만</div></div>
       <div class="stat"><div class="num">16</div><div class="lbl">자체결정 동결</div></div>
     </div>
   </div>
@@ -937,6 +937,7 @@
     <table>
       <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
       <tbody>
+        <tr><td>2026-05-27</td><td>v0.8</td><td>W9 일반화 — LLM 이중경로(원격 Anthropic/OpenAI ↔ 로컬 vLLM/Ollama/LM Studio, OpenAI 호환 endpoint 통합), 임베딩 로컬화(sentence-transformers + cache_kure_v1.py), 시드 v2(142개, 일반화 도메인), Nori 사전(235항목, 15 카테고리). doc/16 차단 6→3, doc/05 일반화 정직성 노트. 301 PASS. Hero KPI 95%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.7</td><td>W8 종료 — PyMuPDF→pdfminer.six 교체, SBOM CycloneDX CI 자동 산출, doc/19 KL 통합 8시나리오 18 자동 테스트, MinIO 결정 보류+SeaweedFS 부록. 285 PASS. Hero KPI 90%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.6.1</td><td>인프라 정비 — Docker 데이터 볼륨 E드라이브 bind mount 이전(esdata만 named volume 유지) + Qdrant 어댑터·마이그레이션·롤백 경로 완전 제거 (코드·테스트·CI·docs). 267 PASS (의도 22개 제거).</td></tr>
         <tr><td>2026-05-27</td><td>v0.6</td><td>W7 종료 — 관측성 스택(Prometheus+Grafana+Loki) + 백업 3종 + DR 자동 검증 + Runbook v1.0. 289 PASS. Hero KPI 80%.</td></tr>
