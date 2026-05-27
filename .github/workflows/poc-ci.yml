@@ -98,6 +98,9 @@ jobs:
       - name: Run PoC dryrun suite (P4 -> P3 -> P2 -> P1 -> P5)
         run: python scripts/run_all_pocs.py
 
+      - name: PSH — Scenario Performance (dryrun, fail on KPI miss)
+        run: python scripts/run_perf_scenarios.py --mode dryrun --fail-on-miss --no-probe
+
       - name: Bundle manifest dry-run (doc/12 §4.1)
         run: |
           python scripts/build_offline_bundle.py \
@@ -123,4 +126,15 @@ jobs:
             poc/dist/lloydk-airgap-bundle/manifest.json
             poc/dist/lloydk-airgap-bundle/CHECKSUMS.sha256
           retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload scenario performance report (doc/20 HTML + JSON)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-perf-report-${{ github.sha }}
+          path: |
+            doc/20_시나리오_성능_보고서.html
+            poc/reports/perf/
+          retention-days: 90
           if-no-files-found: warn

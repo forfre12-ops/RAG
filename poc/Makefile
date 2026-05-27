@@ -11,7 +11,8 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
 
 .PHONY: help venv install env infra-up infra-down infra-verify api worker \
         p2 p2-full bundle-dry licenses licenses-check analyze-synth verify-all \
-        p3 p3-800 p4 p1 p5 poc-all clean clean-data reports
+        p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
+        perf-scenarios perf-scenarios-full perf-clean-run
 
 help:
 	@echo "Targets:"
@@ -35,6 +36,9 @@ help:
 	@echo "  p1           P1 classifier dryrun (rule surrogate)"
 	@echo "  p5           P5 E2E smoke (inproc)"
 	@echo "  poc-all      P4 -> P3 -> P2 -> P1 -> P5 in order"
+	@echo "  perf-scenarios       PSH 시나리오 성능 dryrun + doc/20 HTML (CI 호환, KPI 미달 시 fail)"
+	@echo "  perf-scenarios-full  PSH 실측 (LLM·GPU·ES·PG 필요, KPI 미달은 warn)"
+	@echo "  perf-clean-run       datasets·dist·__pycache__ 비우고 PSH 재실행 (환경 격차 사전 검증)"
 	@echo "  reports      list generated reports"
 	@echo "  clean-data   remove datasets/synthetic + datasets/p4_corpus + reports"
 
@@ -123,6 +127,26 @@ p5:
 
 poc-all: p4 p3 p2 p1 p5
 	@echo "\nAll PoCs completed. See reports/"
+
+# PSH — 시나리오 성능 보고서 (doc/19 S1~S8 × doc/20a KPI 매트릭스 → doc/20 HTML)
+# 사용:
+#   make perf-scenarios               # dryrun, KPI 미달 시 exit 1
+#   make perf-scenarios-full          # full (LLM·GPU·ES·PG 필요)
+#   make perf-scenarios FAIL_ON_MISS= # KPI 미달도 warn
+FAIL_ON_MISS ?= --fail-on-miss
+perf-scenarios:
+	$(PY) scripts/run_perf_scenarios.py --mode dryrun $(FAIL_ON_MISS)
+
+perf-scenarios-full:
+	$(PY) scripts/run_perf_scenarios.py --mode full
+
+# 환경 격차 사고 방지: datasets·dist·__pycache__ 비우고 PSH 재실행
+# 메모리 패턴 — 로컬 누적 상태로 통과해도 CI clean에서 실패하는 경우 사전 검증
+perf-clean-run:
+	rm -rf datasets/synthetic datasets/p4_corpus reports/perf/perf_*.json dist
+	find . -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
+	pip install -e ".[dev]"
+	$(PY) scripts/run_perf_scenarios.py --mode dryrun --fail-on-miss
 
 reports:
 	@ls -la reports/ 2>/dev/null || echo "no reports yet"
