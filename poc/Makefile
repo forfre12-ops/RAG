@@ -10,7 +10,7 @@ VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
 .PHONY: help venv install env infra-up infra-up-rollback infra-down infra-verify api worker \
-        p2 p2-full migrate-dry bundle-dry licenses licenses-check analyze-synth \
+        p2 p2-full migrate-dry bundle-dry licenses licenses-check analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports
 
 help:
@@ -30,6 +30,7 @@ help:
 	@echo "  licenses     OSS 라이선스 4종 산출 (txt/md/json/cyclonedx, doc/14)"
 	@echo "  licenses-check  직접 의존성 라이선스 위험 검증 (CI용, exit 1 on risk)"
 	@echo "  analyze-synth   합성 데이터셋 800건 종합 분석 (doc/02 §부록 D)"
+	@echo "  verify-all   회신 무관 전체 검증 6단계 (pytest·PoC·migrate·bundle·license·analyze)"
 	@echo "  p3           P3 synthesize 40 docs with noop provider + label check"
 	@echo "  p3-800       P3 풀 합성 800건 (등급별 200×4, doc/05 계획)"
 	@echo "  p4           P4 build corpus + extraction eval"
@@ -87,7 +88,11 @@ p2-full:
 	$(PY) scripts/p2_compare_embeddings.py --mode full --backends es --hybrid
 
 migrate-dry:
-	$(PY) scripts/migrate_qdrant_to_es.py --collection guides_v1 --limit 5 --dry-run \
+	@# Qdrant 미가용·미설치 환경에서도 동작하도록 sample.jsonl + --skip-extract 사용
+	@mkdir -p migration
+	@printf '{"id":"d1","vector":[1.0,0.0,0.0,0.0],"payload":{"grade":"TS","text":"sample"}}\n' > migration/sample.jsonl
+	@printf '{"id":"d2","vector":[0.0,1.0,0.0,0.0],"payload":{"grade":"S1","text":"sample"}}\n' >> migration/sample.jsonl
+	$(PY) scripts/migrate_qdrant_to_es.py --collection sample --skip-extract --dry-run \
 	    --target-index secrets-guides-koipa-test \
 	    --alias secrets-guides-koipa --old-index secrets-guides-koipa-v0
 
@@ -103,6 +108,22 @@ licenses-check:
 
 analyze-synth:
 	$(PY) scripts/analyze_synthetic.py
+
+verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + lint + 라이선스 + 분석)
+	@echo "==[1/6]== pytest"
+	@$(PY) -m pytest -q
+	@echo "==[2/6]== PoC 5종 dryrun"
+	@$(PY) scripts/run_all_pocs.py
+	@echo "==[3/6]== Qdrant→ES 마이그 dry-run"
+	@$(MAKE) -s migrate-dry
+	@echo "==[4/6]== 폐쇄망 번들 manifest dry-run"
+	@$(MAKE) -s bundle-dry
+	@echo "==[5/6]== OSS 라이선스 위험 (allowlist 모드)"
+	@$(MAKE) -s licenses-check
+	@echo "==[6/6]== 합성 800건 분석"
+	@$(MAKE) -s analyze-synth
+	@echo ""
+	@echo "[verify-all] ALL GREEN"
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun

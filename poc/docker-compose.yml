@@ -67,7 +67,9 @@ services:
       - "9001:9001"
 
   redis:
-    image: redis:7-alpine
+    # BSD-3-Clause 시점(7.2.x)으로 고정 — Redis 7.4+는 RSALv2/SSPL 듀얼 (doc/14 §6.3).
+    # 본 사업은 OSS 적합성 위해 BSD 시점 유지. 운영 갱신 시 doc/14 라이선스 재평가.
+    image: redis:7.2-alpine
     command: redis-server --appendonly yes
     volumes:
       - redisdata:/data

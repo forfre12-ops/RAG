@@ -209,7 +209,7 @@ OSS 패키지와는 별개로 **모델 가중치**도 라이선스 명시 필수
 
 - 7.4+부터 라이선스 변경됨
 - 7.2까지는 BSD-3-Clause → **본 사업은 Redis 7-alpine(BSD 시점)을 docker-compose에 고정**해두는 게 안전
-- docker-compose.yml의 `redis:7-alpine`이 어느 minor 버전인지 확인 필요. 7.4+면 7.2-alpine으로 다운 고려.
+- ~~docker-compose.yml의 `redis:7-alpine`이 어느 minor 버전인지 확인 필요. 7.4+면 7.2-alpine으로 다운 고려.~~ → **2026-05-27 `redis:7.2-alpine`으로 고정 완료** (BSD-3-Clause 시점).
 
 ---
 
@@ -292,8 +292,9 @@ KL/발주처 회신과 함께 확정해야 할 라이선스 사안:
 
 ### 11.1 즉시 (회신 무관)
 
-- [ ] `docker-compose.yml`의 `redis:7-alpine`을 `redis:7.2-alpine`으로 고정 (BSD 시점 명시)
-- [ ] `licenses/third-party-licenses.txt` 자동 생성 스크립트 추가 (`scripts/dump_licenses.py`)
+- [x] `docker-compose.yml`의 `redis:7-alpine` → `redis:7.2-alpine` 고정 완료 (BSD 시점, 2026-05-27)
+- [x] `scripts/dump_licenses.py` 신규 (2026-05-27) — 4종 포맷 자동 산출 + CI 검증 잡 통합
+- [x] CI `licenses-check` 잡 추가 — 신규 strong copyleft 의존성 도입 사전 차단
 
 ### 11.2 회신 의존
 

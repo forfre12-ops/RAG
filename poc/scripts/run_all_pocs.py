@@ -17,8 +17,17 @@ _HERE = Path(__file__).resolve().parent
 STEPS: list[tuple[str, list[str]]] = [
     ("build_p4_corpus", [sys.executable, str(_HERE / "build_p4_corpus.py")]),
     ("p4_extract", [sys.executable, str(_HERE / "p4_extract_eval.py")]),
-    ("p3_synth", [sys.executable, str(_HERE / "p3_generate_synthetic.py"), "--total", "40", "--provider", "noop"]),
-    ("p2_embedding", [sys.executable, str(_HERE / "p2_compare_embeddings.py"), "--mode", "dryrun"]),
+    # smoke 전용 디렉터리로 분리 — 별도 명령(make p3-800)으로 만든 datasets/synthetic을 덮어쓰지 않도록
+    ("p3_synth", [
+        sys.executable, str(_HERE / "p3_generate_synthetic.py"),
+        "--total", "40", "--provider", "noop",
+        "--out", "datasets/synthetic_smoke",
+    ]),
+    ("p2_embedding", [
+        sys.executable, str(_HERE / "p2_compare_embeddings.py"),
+        "--mode", "dryrun",
+        "--synth-dir", "datasets/synthetic_smoke",  # smoke 전용
+    ]),
     ("p1_classifier", [sys.executable, str(_HERE / "p1_train_classifier.py"), "--mode", "dryrun"]),
     ("p5_e2e", [sys.executable, str(_HERE / "p5_e2e_smoke.py"), "--mode", "inproc"]),
 ]
