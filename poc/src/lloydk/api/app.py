@@ -9,6 +9,8 @@ from slowapi.errors import RateLimitExceeded
 from lloydk.config import assert_production_credentials, settings
 from lloydk.schemas.common import Error
 from lloydk.api import classify as classify_api
+from lloydk.api import classify_stream as classify_stream_api
+from lloydk.api import explain as explain_api
 from lloydk.api import health as health_api
 from lloydk.api import confirm as confirm_api
 from lloydk.api import training as training_api
@@ -94,6 +96,8 @@ async def unhandled_error(request: Request, exc: Exception):
 
 app.include_router(health_api.router, prefix="/api/v1")
 app.include_router(classify_api.router, prefix="/api/v1")
+app.include_router(classify_stream_api.router, prefix="/api/v1")
+app.include_router(explain_api.router, prefix="/api/v1")
 app.include_router(async_classify_api.router, prefix="/api/v1")
 app.include_router(confirm_api.router, prefix="/api/v1")
 app.include_router(training_api.router, prefix="/api/v1")

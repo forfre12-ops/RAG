@@ -76,3 +76,67 @@ groups:
           severity: P2
         annotations:
           summary: "능동학습 미소비 corrections >= 50 — 재학습 권장"
+
+  - name: lloydk-p1-f2-boost
+    interval: 1m
+    rules:
+      - alert: FnrSpikeOverall
+        # P1-F2: 일별 FNR이 5%를 5분 평균으로 초과하면 알람
+        expr: |
+          100 * (1 - sum(rate(lloydk_classify_correct_total[5m])) / sum(rate(lloydk_classify_total[5m]))) > 5
+        for: 10m
+        labels:
+          severity: P1
+        annotations:
+          summary: "FNR overall > 5% (5m rolling) — 분류 정확도 급락"
+          runbook: "doc/23 §6.6 KPI 회귀 대응"
+
+      - alert: CeleryQueueBacklog
+        # 큐 적체 1,000 초과
+        expr: sum by (queue) (lloydk_celery_queue_length) > 1000
+        for: 5m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Celery 큐 {{ $labels.queue }} 적체 > 1,000"
+          runbook: "doc/23 §6.5 worker scaling"
+
+      - alert: OutboxDlqGrowing
+        # outbox DLQ 누적 변화율 양수 (실패 누적)
+        expr: increase(lloydk_outbox_dlq_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Webhook outbox DLQ 신규 진입 발생"
+          runbook: "doc/25 §9 사고 대응"
+
+      - alert: DriftKlDivergenceHigh
+        # B4 drift KL 임계 초과
+        expr: lloydk_drift_kl_divergence >= 0.5
+        for: 30m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Embedding drift KL ≥ 0.5 — 재학습 검토"
+          runbook: "doc/23 §6.6 KPI 회귀 대응"
+
+      - alert: PiiMaskingMissRate
+        # PII가 ingest 단계에서 자주 노출되면 SRE 알람
+        expr: rate(lloydk_pii_masked_total{pii_type="rrn"}[10m]) == 0 and rate(lloydk_documents_ingested_total[10m]) > 10
+        for: 30m
+        labels:
+          severity: P3
+        annotations:
+          summary: "PII 마스킹 카운트 0 — masker 누락 가능성"
+          runbook: "doc/25 §5.3 PII 마스킹"
+
+      - alert: AuditChainBroken
+        # C4 hash chain verification 실패
+        expr: lloydk_audit_chain_broken_total > 0
+        for: 0m
+        labels:
+          severity: P0
+        annotations:
+          summary: "감사 로그 hash chain 변조 의심 — 즉시 보안팀 통지"
+          runbook: "doc/25 §9 사고 대응 (Critical)"

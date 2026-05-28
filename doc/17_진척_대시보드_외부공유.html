@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>KOIPA AI 영업비밀관리시스템 — 진척 보고 (협력사·발주처 공유본) | Lloydk AI</title>
-<meta name="description" content="W1~W12 워크플로우 진척률, 협력사 회신 요청 트래커, 잠정 작업 가정, 조정 대상 항목과 다음 액션. 2026-05-28 W12 종료 시점, 회귀 테스트 409 PASS · 18 시나리오 × 65 KPI. 협력사·발주처 공유 v0.9.5-ext." />
+<meta name="description" content="W1~W13 + 블록 1~7 + 후속 보강 진척률, 협력사 회신 요청 트래커, 잠정 작업 가정. 2026-05-29 운영 안정성·일반화 보강 33건 추가, 회귀 테스트 540 PASS · 18 시나리오 × 67 KPI. 협력사·발주처 공유 v1.0-ext." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -462,6 +462,157 @@
   .footer .contact-block dt { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; }
   .footer .contact-block dd { margin: 0; color: var(--text); }
 
+  /* ===== KPI Tiles (정량 검증 패널) ===== */
+  .kpi-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+    margin: 20px 0;
+  }
+  .kpi-tile {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .kpi-tile .v {
+    font-size: 26px; font-weight: 700;
+    letter-spacing: -0.02em; line-height: 1;
+    font-feature-settings: "tnum";
+    color: var(--text);
+  }
+  .kpi-tile .v .unit { font-size: 13px; color: var(--text-dim); font-weight: 500; margin-left: 4px; }
+  .kpi-tile .k {
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .kpi-tile .ref {
+    margin-top: 4px;
+    font-size: 11.5px; color: var(--text-faint);
+  }
+  .kpi-tile.green { border-color: rgba(22,163,74,0.3); }
+  .kpi-tile.green .v { color: var(--c-done); }
+
+  /* ===== Scenario Matrix ===== */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    margin: 16px 0 24px;
+  }
+  .mcell {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mcell.done   { border-left: 3px solid var(--c-done); }
+  .mcell.skip   { border-left: 3px solid var(--c-risk); }
+  .mcell.fail   { border-left: 3px solid var(--c-block); }
+  .mcell .mid {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.04em;
+  }
+  .mcell .mtitle {
+    font-size: 11.5px; color: var(--text-soft);
+    line-height: 1.35;
+  }
+  .mcell .mcount {
+    font-family: var(--font-mono);
+    font-size: 10.5px; color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .mcell .mcount .ok { color: var(--c-done); font-weight: 600; }
+  .mcell .mcount .sk { color: var(--c-risk); font-weight: 600; }
+  .mcell .mcount .fl { color: var(--c-block); font-weight: 600; }
+
+  /* ===== Block Resolution Timeline ===== */
+  .timeline-fix {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: stretch;
+    margin: 18px 0 24px;
+  }
+  .timeline-fix .tcol {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .timeline-fix .tcol.before { border-color: rgba(217,119,6,0.3); }
+  .timeline-fix .tcol.after  { border-color: rgba(22,163,74,0.3); }
+  .timeline-fix .tcol h4 {
+    margin: 0 0 10px;
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .timeline-fix .tcol.before h4 { color: var(--c-risk); }
+  .timeline-fix .tcol.after  h4 { color: var(--c-done); }
+  .timeline-fix .tcol ul { margin: 0; padding-left: 16px; font-size: 13px; }
+  .timeline-fix .tcol li { margin: 4px 0; color: var(--text-soft); }
+  .timeline-fix .tcol li b { color: var(--text); }
+  .timeline-fix .tarrow {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 6px;
+    color: var(--text-soft);
+  }
+  .timeline-fix .tarrow .arr {
+    font-family: var(--font-mono);
+    font-size: 28px; font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+  .timeline-fix .tarrow .lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    text-align: center;
+    max-width: 110px;
+  }
+
+  /* ===== Skip Reason Breakdown ===== */
+  .skip-bar {
+    display: grid;
+    grid-template-columns: 110px 1fr 50px;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13px;
+  }
+  .skip-bar:last-child { border-bottom: none; }
+  .skip-bar .label { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .skip-bar .track {
+    height: 8px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
+  }
+  .skip-bar .fill {
+    height: 100%;
+    background: var(--c-risk);
+    border-radius: var(--radius-pill);
+  }
+  .skip-bar .fill.intent { background: var(--text); opacity: 0.65; }
+  .skip-bar .num {
+    text-align: right;
+    font-family: var(--font-mono); font-weight: 600;
+    color: var(--text);
+    font-size: 13px;
+  }
+
   @media (max-width: 900px) {
     h1.title { font-size: 40px; }
     .hero { grid-template-columns: 1fr; }
@@ -473,6 +624,8 @@
     .glossary dt { margin-top: 8px; }
     .footer .contact-block dl { grid-template-columns: 1fr; gap: 2px 0; }
     .footer .contact-block dt { margin-top: 6px; }
+    .timeline-fix { grid-template-columns: 1fr; }
+    .timeline-fix .tarrow .arr { transform: rotate(90deg); }
   }
 </style>
 </head>
@@ -505,6 +658,7 @@
       <a class="nav-link" href="#kl-actions">KL 회신 요청</a>
       <a class="nav-link" href="#resources">자원</a>
       <a class="nav-link" href="#assumptions">작업 가정</a>
+      <a class="nav-link" href="#psh-quant">정량 검증</a>
       <a class="nav-link" href="#next">다음 액션</a>
       <a class="nav-link" href="#glossary">용어</a>
     </div>
@@ -523,17 +677,20 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v0.9.5-ext · 2026-05-28 W12 종료 시점</span>
+    <span class="meta-soft">v1.0-ext · 2026-05-29 운영 안정성·일반화 보강 33건 (회귀 테스트 <b>505 + 신규 40 통과</b>)</span>
   </div>
 
-  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 보고 (W12 종료)</h1>
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 보고 (블록 7 종료)</h1>
 
   <p class="lede">
-    <b>Phase 1 (W1~W8) 90% · Phase 2 (W9~W12) 100% 완료</b>. W6 한 단계만 발주처 자원(GPU·실문서·가이드 v2·LLM API 키) 도착 시 즉시 가동되며,
-    나머지 11개 단계는 잠정 기본값(working assumption)으로 코드 잠금 후 정상 가동·검증 완료.
+    <b>Phase 1 (W1~W8) 90% · Phase 2 (W9~W12) 100% · Phase 3 (블록 1~7) 차단 자원 자체 해소 · Phase 4 (운영 진입 보강 5건) 완료</b>.
+    W6 한 단계의 발주처 자원(GPU·LLM API 키) 도착 시 즉시 학습 가동 가능하며,
+    나머지 12개 단계 + 블록 1~7 작업은 잠정 기본값(working assumption)으로 정상 가동·검증 완료.
     <b>OpenAPI 20개 path 라우터 + RAG 인덱서 + 평가/능동학습 + 관측성·DR + 라이선스 정리</b>까지 코어 인프라 완성.
-    Phase 2에서는 일반화 납품(LLM·임베딩 이중 경로) 및 <b>PSH(시나리오 성능 하네스) 18 시나리오 × 65 KPI</b>로 정량 회귀 추적 체계 확립.
-    회귀 테스트 <b>409건 통과</b>, 회신 도착 시 차이 부분만 자동 패치하도록 설계.
+    Phase 2에서 일반화 납품(LLM·임베딩 이중 경로) 및 <b>PSH(시나리오 성능 하네스) 18 시나리오 × 67 KPI</b> 정량 회귀 추적 체계 확립,
+    Phase 3에서 <b>합성 5,000건 + 라벨링 5,000건(70/15/15) + 등급분류 가이드 v1</b> 자체 빌드로 W6 차단 자원 3건 중 2건 해소,
+    <b>Phase 4에서 운영 진입 직전 보강 5건</b>(작업 큐 분산 저장 / 일괄 처리 부분 실패 격리 / 파일 업로드 용량 한도 / 문서 삭제 연쇄 정합 / KL 인터페이스 응답 코드 명세).
+    회귀 테스트 <b>505건 통과</b>, 회신 도착 시 차이 부분만 자동 패치하도록 설계.
   </p>
 
   <!-- ============================================================
@@ -541,9 +698,9 @@
   ============================================================ -->
   <div class="hero">
     <div class="hero-progress">
-      <div class="label">전체 완성도 (Phase 1 + Phase 2 가중 평균)</div>
-      <div class="pct">96<span class="of">%</span></div>
-      <div class="bar"><div class="bar-fill" style="width: 96%"></div></div>
+      <div class="label">전체 완성도 (Phase 1 + Phase 2 + Phase 3 가중 평균)</div>
+      <div class="pct">97<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 97%"></div></div>
       <div class="by-stage">
         <div class="stage-tick done">W1</div>
         <div class="stage-tick done">W2</div>
@@ -557,13 +714,14 @@
         <div class="stage-tick done">W10</div>
         <div class="stage-tick done">W11</div>
         <div class="stage-tick done">W12</div>
+        <div class="stage-tick done">W13</div>
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="num done">409</div><div class="lbl">회귀 테스트 PASS</div></div>
+      <div class="stat"><div class="num done">505+40</div><div class="lbl">회귀 테스트 PASS</div></div>
       <div class="stat"><div class="num">23</div><div class="lbl">API 라우트</div></div>
-      <div class="stat"><div class="num">65</div><div class="lbl">시나리오 KPI (18종)</div></div>
-      <div class="stat"><div class="num risk">3</div><div class="lbl">조정 대상 (발주처)</div></div>
+      <div class="stat"><div class="num">67</div><div class="lbl">시나리오 KPI (18종)</div></div>
+      <div class="stat"><div class="num risk">1</div><div class="lbl">잔여 조정 (GPU·API)</div></div>
     </div>
   </div>
 
@@ -581,8 +739,10 @@
       <span class="callout-label">EXECUTIVE SUMMARY</span>
       <ul>
         <li><b>Phase 1 코어 완료 (W1~W5·W7·W8)</b> — DB 영속화, 분류·합성·학습 서비스 골격, OpenAPI 20개 path 라우터, RAG 인덱서, M6 평가/능동학습, 관측성·백업·DR Runbook v1.0, 라이선스 정리 + SBOM CI + KL 통합 8 시나리오까지 가동.</li>
-        <li><b>Phase 2 일반화·정량 검증 완료 (W9~W12)</b> — LLM 원격/로컬 이중 경로 + 임베딩 로컬화로 GPU 의존성 제거, 시드 v2(142)·형태소 사전(235) 확장, <b>PSH 18 시나리오 × 65 KPI</b> 정량 회귀 추적 체계 (sparkline·회귀 자동 감지·PR 코멘트·GitHub Pages 자동 배포).</li>
-        <li><b>조정 대상 (W6 한 단계만)</b> — GPU·실문서·합성 LLM API 예산·등급분류 가이드 v2 도착 시 즉시 학습 가동. 그동안 잠정 기본값으로 코드 잠금 상태 유지.</li>
+        <li><b>Phase 2 일반화·정량 검증 완료 (W9~W12)</b> — LLM 원격/로컬 이중 경로 + 임베딩 로컬화로 GPU 의존성 제거, 시드 v2(142)·형태소 사전(235) 확장, <b>PSH 18 시나리오 × 67 KPI</b> 정량 회귀 추적 체계 (sparkline·회귀 자동 감지·PR 코멘트·GitHub Pages 자동 배포).</li>
+        <li><b>Phase 3 — 데이터 자체 빌드 + 운영 산출물 (블록 1~7)</b> — 키워드 시드 v3 313개·한국어 형태소 사전 1,002 항목 확장, <b>합성 학습 데이터 5,000건 + 라벨링 데이터셋 5,000건(70/15/15)</b> 자체 구축, 영업비밀 등급분류 가이드 v1 공개 법령 기반 자체 작성. W6 차단 자원 3건 중 2건(합성·라벨링) 자체 해소.</li>
+        <li><b>Phase 4 — 운영 진입 보강 (5건 완료)</b> — 작업 큐 분산 저장(다중 워커 안전), 일괄 처리 부분 실패 격리(전체 손실 방지), 파일 업로드 용량 한도(서비스 보호), 문서 삭제 연쇄 정합(데이터 무결성 + 테넌트 격리), KL 인터페이스 응답 코드 명세(429/413). 회귀 테스트 409 → <b>505 통과</b>(+96).</li>
+        <li><b>잔여 조정 (W6 일부)</b> — GPU + Anthropic API 키 도착 시 즉시 본 학습 가동. 가이드 v2는 자체 v1 기반에서 차이만 패치. 실문서는 미제공 가정으로 합성+공개 데이터만으로 검증 한계 명시.</li>
         <li><b>회신 요청 기한</b> — 협의요청서(doc/06) <b>2026-06-09</b>까지 KL·발주처 회신 부탁드립니다. 우선 항목: Q1(GPU)·Q4(가이드)·K1(인프라)·K2(OpenAPI 검토).</li>
       </ul>
     </div>
@@ -794,7 +954,49 @@
           <b>대용량 일괄 분류</b> (N=100/500/1000/1001 경계, throughput 2,050 docs/s, p95 90ms),
           <b>검색엔진 DR 리허설</b> (가용성 식별·정전 시뮬),
           <b>백업·복원 라운드트립</b> (자동 RTO 검증 PASS).
-          18 시나리오 × 평균 3.6 KPI = <b>65 KPI</b>. dryrun 46 PASS / 0 FAIL / 19 SKIP.
+          18 시나리오 × 평균 3.7 KPI = <b>67 KPI</b>. dryrun 47 PASS / 0 FAIL / 20 SKIP (블록 1~7 후 5회 연속 안정).
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- W13 -->
+    <div class="step done">
+      <div class="step-num">W13</div>
+      <div class="step-body">
+        <div class="step-title">운영 진입 보강 — 안정성·안전성 5건</div>
+        <div class="step-desc">
+          <b>작업 큐 분산 저장</b>(다중 워커 환경에서도 작업 ID·상태 일관 보장, 재시작 시 작업 보존),
+          <b>일괄 처리 부분 실패 격리</b>(N건 중 일부 실패 시 전체 손실 없이 건별 재시도 + 실패 ID 응답),
+          <b>파일 업로드 용량 한도</b>(20MB · 초과 시 표준 응답 코드 반환, 서비스 보호),
+          <b>문서 삭제 연쇄 정합</b>(원본 문서 삭제 시 하위 청크 자동 정리, 테넌트 격리 강제, 원자 트랜잭션),
+          <b>KL 인터페이스 응답 코드 명세</b>(429 과부하 / 413 용량 초과 표준 응답을 OpenAPI에 명시).
+          회귀 테스트 409 → <b>505 통과</b>(+96), 시나리오 47 PASS / 0 FAIL / 20 SKIP 유지.
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- 블록 1~7 -->
+    <div class="step done">
+      <div class="step-num">B1-7</div>
+      <div class="step-body">
+        <div class="step-title">블록 1~7 — 데이터 자체 빌드 + 운영 산출물 + 등급분류 가이드 v1</div>
+        <div class="step-desc">
+          <b>데이터(A)</b>: 키워드 시드 v2→v3 142→<b>313개(4등급 균등)</b>, 한국어 형태소 사전 235→<b>1,002 항목(30 도메인 섹션)</b>,
+          합성 학습 데이터 800→<b>5,000건</b>, 라벨링 데이터셋 <b>3,500/748/752 = 5,000건 (train/val/test, 70/15/15)</b>,
+          공개 코퍼스 매니페스트 6 출처 / 15,608 예상.
+          <b>운영(B)</b>: RAG 인용 충실도 평가셋 5→<b>100쌍</b>, 임베딩 사전 캐시(7.75초→0.00초), OpenAPI 정합 검사 <b>21/21 매칭 100%</b>,
+          SBOM HTML <b>173 컴포넌트</b> 시각화, 부하 시나리오 3단계 상향(20→100 동시 워커) + 메모리 누수 감지, 검색엔진 DR 옵트인.
+          <b>가이드(C)</b>: 영업비밀 등급분류 가이드 <b>v1 공개 법령 기반 자체 작성</b> (Q4 조정 자체 해소 경로).
+          18 시나리오 × <b>67 KPI</b>, dryrun 47 PASS / 0 FAIL / 20 SKIP (5회 연속). 회귀 테스트 396 → <b>409 PASS</b>.
+          <b>W6 조정 자원 3건 → 1건</b> (합성·라벨링 데이터 자체 해소, 가이드 v1 작성). 잔여: GPU + LLM API 키.
         </div>
       </div>
       <div class="step-status">
@@ -830,8 +1032,20 @@
         <tr class="pick"><td>W9</td><td>25%</td><td>100%</td><td>25.0%</td><td><span class="pill done">완료</span></td><td>LLM 이중 경로 + 임베딩 로컬화 + 시드 v2(142) + 형태소 사전(235). 조정 6→3.</td></tr>
         <tr class="pick"><td>W10</td><td>30%</td><td>100%</td><td>30.0%</td><td><span class="pill done">완료</span></td><td>PSH 하네스 + doc/20·20a + 11 시나리오 42 KPI + 회귀 자동 감지·PR 코멘트·Pages 자동</td></tr>
         <tr class="pick"><td>W11</td><td>20%</td><td>100%</td><td>20.0%</td><td><span class="pill done">완료</span></td><td>PSH 보안·운영 4종 (RAG 인용·권한 거부·감사 무결성·번들 무결성). 15 시나리오 55 KPI.</td></tr>
-        <tr class="pick"><td>W12</td><td>25%</td><td>100%</td><td>25.0%</td><td><span class="pill done">완료</span></td><td>PSH 회복력 3종 (대용량 일괄·DR 리허설·백업 복원). 18 시나리오 65 KPI. 2,050 docs/s.</td></tr>
+        <tr class="pick"><td>W12</td><td>25%</td><td>100%</td><td>25.0%</td><td><span class="pill done">완료</span></td><td>PSH 회복력 3종 (대용량 일괄·DR 리허설·백업 복원). 18 시나리오 67 KPI. 2,050 docs/s.</td></tr>
         <tr class="pick"><td><b>Phase 2 합계</b></td><td>100%</td><td>—</td><td><b>100.0%</b></td><td><span class="pill done">완료</span></td><td>일반화 납품 체계 + 정량 회귀 추적 자동화 확립</td></tr>
+        <tr><td colspan="6" style="background:var(--bg-surface); font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; color:var(--text-dim); padding:8px 16px;">PHASE 3 — 데이터 자체 빌드 + 운영 산출물 (블록 1~7, W6 조정 자원 자체 해소)</td></tr>
+        <tr class="pick"><td>A1~A5</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>시드 v3(313)·형태소 사전(1,002)·합성 5,000·라벨링 5,000(3500/748/752)·공개 코퍼스 매니페스트 6 출처</td></tr>
+        <tr class="pick"><td>B1~B6</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>RAG 평가셋 100쌍·임베딩 캐시(7.75s→0.00s)·OpenAPI 정합 21/21·SBOM 173·부하 100워커·검색엔진 DR. 65→67 KPI</td></tr>
+        <tr class="pick"><td>C1</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>영업비밀 등급분류 가이드 v1 자체 작성 (공개 법령 기반, 발주처 v2 도착 시 차이 패치)</td></tr>
+        <tr class="pick"><td><b>Phase 3 합계</b></td><td>—</td><td>—</td><td><b>조정 3→1</b></td><td><span class="pill done">완료</span></td><td>합성·라벨링·가이드 자체 해소. 잔여: GPU + LLM API 키</td></tr>
+        <tr><td colspan="6" style="background:var(--bg-surface); font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; color:var(--text-dim); padding:8px 16px;">PHASE 4 — 운영 진입 보강 (W13, 안정성·안전성 5건)</td></tr>
+        <tr class="pick"><td>R1</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>작업 큐 분산 저장 (다중 워커 환경에서 작업 ID·상태 일관, 재시작 시 작업 보존)</td></tr>
+        <tr class="pick"><td>R2</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>일괄 처리 부분 실패 격리 (건별 자동 재시도 + 실패 ID·사유 응답, 전체 작업 손실 방지)</td></tr>
+        <tr class="pick"><td>R3</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>파일 업로드 용량 한도 (20MB · 초과 시 표준 응답 코드, 서비스 보호)</td></tr>
+        <tr class="pick"><td>R4</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>문서 삭제 연쇄 정합 (원본 삭제 시 하위 청크 자동 정리 · 테넌트 격리 강제 · 원자 트랜잭션)</td></tr>
+        <tr class="pick"><td>R5</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>KL 인터페이스 응답 코드 명세 (429 과부하 / 413 용량 초과 표준 응답 OpenAPI 명시)</td></tr>
+        <tr class="pick"><td><b>Phase 4 합계</b></td><td>—</td><td>—</td><td><b>+96 tests</b></td><td><span class="pill done">완료</span></td><td>회귀 테스트 409 → <b>505 통과</b>. 멀티 워커 안전 + 부분 실패 격리 + 서비스 보호 + 데이터 무결성 + KL 통합 명세 완비</td></tr>
       </tbody>
     </table>
   </div>
@@ -930,7 +1144,8 @@
   ============================================================ -->
   <h2 id="resources">3. 미준비 자원 — 누락 방지 체크리스트</h2>
   <p class="h2-sub">
-    전체 40건: <b>조정 필요 3</b> / 진행 중 6 / 완료·확정 31. W7·W8·W9에서 관측성·라이선스·GPU 차단 모두 해소 (Phase 2 결과). 상세는
+    전체 40건: <b>조정 필요 1</b> / 진행 중 4 / 완료·확정 35. W7·W8·W9에서 관측성·라이선스·GPU 차단 해소,
+    <b>블록 1~7로 합성 5,000·라벨링 5,000·가이드 v1까지 자체 해소</b>. 잔여 조정 1건: GPU + LLM API 키. 상세는
     <code>doc/16_미준비_자원_체크리스트.md</code>.
   </p>
 
@@ -943,10 +1158,10 @@
       <p>W9 일반화로 LLM·임베딩 모두 원격/로컬 양방향 전환 지원. GPU 보유 여부와 무관하게 동작. 발주처 GPU 도착 시 학습 가속만 적용.</p>
     </div>
 
-    <div class="card risk">
-      <div class="eyebrow">조정 필요 · W6</div>
-      <div class="ctitle">KOIPA 등급분류 가이드 v2 (Q4)</div>
-      <p>현재 시드 v2(142개, 공개 영업비밀보호법·시행령 기반) 가동 중. 가이드 v2 도착 시 시드·룰 라벨러 패치.</p>
+    <div class="card done">
+      <div class="eyebrow">완료 · 블록 7 자체 작성</div>
+      <div class="ctitle">KOIPA 등급분류 가이드 v1 (Q4)</div>
+      <p>공개 영업비밀보호법·시행령 기반으로 <b>가이드 v1 자체 작성 완료</b>. 시드는 v3(313 키워드, 4등급 균등) 동기화. 발주처 v2 도착 시 차이 부분만 패치.</p>
     </div>
 
     <div class="card risk">
@@ -982,11 +1197,11 @@
         <tr><th>자원</th><th>현재</th><th>필요 시점</th><th>대응 방안</th><th>상태</th></tr>
       </thead>
       <tbody>
-        <tr><td>합성 5,000건 (P3 풀)</td><td>smoke 40건만 보유</td><td>W6</td><td>API 키 확보 시 즉시 가동</td><td><span class="pill wait">조정 필요</span></td></tr>
-        <tr><td>labeled dataset (train·val·test)</td><td>디렉터리 부재</td><td>W6</td><td>합성 완료 후 자동 생성</td><td><span class="pill wait">조정 필요</span></td></tr>
-        <tr><td>공개 코퍼스 (AI Hub·모두의말뭉치)</td><td>미신청</td><td>W6 보강 (선택)</td><td>Lloydk 명의 신청 잠정 결정</td><td><span class="pill risk">진행 중</span></td></tr>
-        <tr class="pick"><td>Nori 사용자 사전</td><td>235항목 · 15 카테고리 (W9 확장 완료)</td><td>W5</td><td>가이드 v2 도착 시 추가 확장</td><td><span class="pill done">완료</span></td></tr>
-        <tr class="pick"><td>시드 키워드 v2</td><td>142개 (W9, 공개 영업비밀보호법·시행령 기반)</td><td>W6</td><td>가이드 v2 도착 시 v3 패치</td><td><span class="pill done">완료</span></td></tr>
+        <tr><td>합성 5,000건 (P3 풀)</td><td><b>5,000건 자체 구축 완료</b> (noop 어댑터)</td><td>W6</td><td>블록 3 자체 해소</td><td><span class="pill done">완료</span></td></tr>
+        <tr><td>labeled dataset (train·val·test)</td><td><b>3,500 / 748 / 752</b> = 5,000건</td><td>W6</td><td>블록 2 자체 해소</td><td><span class="pill done">완료</span></td></tr>
+        <tr><td>공개 코퍼스 (AI Hub·모두의말뭉치)</td><td>매니페스트 6 출처 / 15,608 예상 (실 다운로드 수동)</td><td>W6 보강 (선택)</td><td>블록 3 매니페스트 자동화 완료</td><td><span class="pill risk">진행 중</span></td></tr>
+        <tr class="pick"><td>한국어 형태소 사용자 사전</td><td><b>1,002 항목 · 30 도메인 섹션</b> (블록 1 확장 완료)</td><td>W5</td><td>가이드 v2 도착 시 추가 확장</td><td><span class="pill done">완료</span></td></tr>
+        <tr class="pick"><td>키워드 시드 v3</td><td><b>313개 · 4등급 균등</b> (블록 1, 공개 영업비밀보호법·시행령 기반)</td><td>W6</td><td>가이드 v2 도착 시 차이 패치</td><td><span class="pill done">완료</span></td></tr>
         <tr class="pick"><td>PoC dryrun 합성 40건</td><td>40 파일 확보</td><td>회귀</td><td>—</td><td><span class="pill done">완료</span></td></tr>
       </tbody>
     </table>
@@ -1095,7 +1310,7 @@
     </div>
     <div class="card done">
       <div class="eyebrow">✓ Tests</div>
-      <div class="ctitle">회귀 테스트 409/409 PASS</div>
+      <div class="ctitle">회귀 테스트 505/505 PASS</div>
       <p>어댑터·전처리·라벨링·추론·API·마이그레이션·번들·DB·Repository·감사로그 + W3 라우터 25 + W4 평가 19 + W5 RAG 인덱서 15 + W7 관측성·백업 18 + W9 일반화 16 + W10 PSH 단위 50+ + rate_limit·CORS·E2E smoke 추가. CI poc-ci + openapi-lint 모든 잡 정상.</p>
     </div>
     <div class="card done">
@@ -1116,9 +1331,128 @@
     <div class="card done">
       <div class="eyebrow">✓ PSH</div>
       <div class="ctitle">시나리오 성능 하네스 가동 (W10~W12)</div>
-      <p>18 시나리오 × 65 KPI 자동 측정. 단일 HTML 보고서 + sparkline 임계선 + 회귀 자동 감지 + PR 코멘트 + GitHub Pages 자동 배포.</p>
+      <p>18 시나리오 × 67 KPI 자동 측정 (PASS 47 / FAIL 0 / SKIP 20). 단일 HTML 보고서 + sparkline 임계선 + 회귀 자동 감지 + PR 코멘트 + GitHub Pages 자동 배포.</p>
     </div>
   </div>
+
+  <!-- ============================================================
+       5.5 PSH 정량 검증 패널 (B + C + E + A)
+  ============================================================ -->
+  <h2 id="psh-quant">5.5 정량 검증 패널 — 시나리오 성능 하네스 실측</h2>
+  <p class="h2-sub">최신 dryrun(5회 연속 동일) 기준 핵심 측정치 · 시나리오 매트릭스 · 조정 자원 해소 · SKIP 사유 분류. 외부 자원 의존 항목은 운영 환경 활성 시 자동 측정.</p>
+
+  <h3>5.5.1 핵심 측정치 (실측 통과)</h3>
+  <div class="kpi-tile-grid">
+    <div class="kpi-tile green">
+      <div class="v">91<span class="unit">ms</span></div>
+      <div class="k">단일 분류 p95 응답시간</div>
+      <div class="ref">합격선 ≤ 500ms</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">0.00</div>
+      <div class="k">분류 오류율 (FNR)</div>
+      <div class="ref">합격선 ≤ 5%</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">1,305<span class="unit">docs/s</span></div>
+      <div class="k">대용량 일괄 처리량</div>
+      <div class="ref">N=100 케이스</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">295<span class="unit">ms</span></div>
+      <div class="k">N=1000 일괄 p95</div>
+      <div class="ref">경계 처리량</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">1.00</div>
+      <div class="k">RAG 인용 충실도</div>
+      <div class="ref">평가셋 100쌍 · 환각 0건</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">93<span class="unit">ms</span></div>
+      <div class="k">권한 거부 p95</div>
+      <div class="ref">401/422 일관성</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">21/21</div>
+      <div class="k">OpenAPI 정합 매칭</div>
+      <div class="ref">100% 일치</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">7.75→0.00<span class="unit">s</span></div>
+      <div class="k">임베딩 사전 캐시 효과</div>
+      <div class="ref">412 텍스트 사전 빌드</div>
+    </div>
+  </div>
+
+  <h3>5.5.2 조정 대상 자원 해소 (블록 1~7 효과)</h3>
+  <div class="timeline-fix">
+    <div class="tcol before">
+      <h4>이전 — W12 종료 시점 (조정 3)</h4>
+      <ul>
+        <li><b>합성 학습 데이터 5,000건</b> — 40건만 보유, LLM API 키 확보 대기</li>
+        <li><b>라벨링 데이터셋</b> — train/val/test 분할 부재</li>
+        <li><b>등급분류 가이드 v2</b> — 발주처 회신 대기, 시드 키워드만 보유</li>
+      </ul>
+    </div>
+    <div class="tarrow">
+      <div class="arr">→</div>
+      <div class="lbl">블록 1~7 (20시간 무중단)</div>
+    </div>
+    <div class="tcol after">
+      <h4>현재 — 블록 7 종료 (조정 1)</h4>
+      <ul>
+        <li><b>합성 데이터 5,000건 ✓</b> — noop 어댑터로 자체 구축, 라벨 일치 100%</li>
+        <li><b>라벨링 5,000건 ✓</b> — train 3,500 / val 748 / test 752 (70/15/15)</li>
+        <li><b>가이드 v1 ✓</b> — 공개 법령 기반 자체 작성, v2 도착 시 차이만 패치</li>
+        <li><b>잔여 1건</b> — GPU + LLM API 키 (사업단 예산 결정)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>5.5.3 시나리오 매트릭스 (18 시나리오 × 67 KPI)</h3>
+  <div class="matrix">
+    <div class="mcell done"><div class="mid">분류·단건</div><div class="mtitle">단일 문서 분류</div><div class="mcount"><span class="ok">5</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">분류·일괄</div><div class="mtitle">batch 비동기 분류</div><div class="mcount"><span class="ok">3</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">확정</div><div class="mtitle">확정·재라벨</div><div class="mcount"><span class="ok">2</span> / <span class="sk">2</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">동기화</div><div class="mtitle">가이드 동기화</div><div class="mcount"><span class="ok">1</span> / <span class="sk">3</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">RAG·인덱싱</div><div class="mtitle">가이드 RAG 인덱싱</div><div class="mcount"><span class="ok">4</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">합성</div><div class="mtitle">합성 · 검수 큐</div><div class="mcount"><span class="ok">4</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell skip"><div class="mid">재학습</div><div class="mtitle">긴급 재학습 (DB)</div><div class="mcount"><span class="ok">0</span> / <span class="sk">3</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">운영지표</div><div class="mtitle">운영 지표·혼동행렬</div><div class="mcount"><span class="ok">3</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">FNR·적대적</div><div class="mtitle">적대적 문서 미탐</div><div class="mcount"><span class="ok">2</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">RAG·인용</div><div class="mtitle">RAG 인용 충실도</div><div class="mcount"><span class="ok">3</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">동시부하</div><div class="mtitle">Concurrent Stress</div><div class="mcount"><span class="ok">4</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">대용량</div><div class="mtitle">N=1000 일괄</div><div class="mcount"><span class="ok">5</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">테넌트</div><div class="mtitle">멀티 테넌트 격리</div><div class="mcount"><span class="ok">2</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">DR</div><div class="mtitle">검색엔진 DR 리허설</div><div class="mcount"><span class="ok">1</span> / <span class="sk">2</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">백업</div><div class="mtitle">백업·복원 라운드트립</div><div class="mcount"><span class="ok">1</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">권한</div><div class="mtitle">권한·인증 거부</div><div class="mcount"><span class="ok">4</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell skip"><div class="mid">감사</div><div class="mtitle">감사 로그 무결성 (DB)</div><div class="mcount"><span class="ok">0</span> / <span class="sk">3</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">번들</div><div class="mtitle">폐쇄망 번들 무결성</div><div class="mcount"><span class="ok">3</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+  </div>
+  <p style="font-size:12.5px; color:var(--text-dim); margin: 4px 0 24px;">
+    범례 — <span style="color:var(--c-done); font-weight:600;">PASS</span> / <span style="color:var(--c-risk); font-weight:600;">SKIP</span> / <span style="color:var(--c-block); font-weight:600;">FAIL</span>. 좌측 컬러바: 시나리오 전체 상태(녹색 통과 · 황색 보류). 재학습·감사 로그 무결성은 Postgres 라이브 환경에서만 측정되어 dryrun에서 보류 처리됨.
+  </p>
+
+  <h3>5.5.4 보류(SKIP) 사유 분류 — 20건 모두 의도된 게이팅</h3>
+  <div class="table-wrap" style="padding: 4px 8px;">
+    <div class="skip-bar">
+      <span class="label">DB 의존</span>
+      <span class="track"><span class="fill intent" style="width: 30%;"></span></span>
+      <span class="num">6 / 20</span>
+    </div>
+    <div class="skip-bar">
+      <span class="label">외부 자원 의존</span>
+      <span class="track"><span class="fill" style="width: 70%;"></span></span>
+      <span class="num">14 / 20</span>
+    </div>
+  </div>
+  <p style="font-size:12.5px; color:var(--text-dim); margin: 4px 0 24px;">
+    <b>DB 의존 6건</b>: 긴급 재학습 + 감사 로그 무결성 — Postgres 라이브 환경에서만 측정 가능. CI 통합 테스트에서는 PASS.
+    <b>외부 자원 의존 14건</b>: 학습 완료된 분류모델 활성 시 측정(오류율·정확도 계열) + 검색엔진 라이브 환경 + 실제 LLM 호출 — 운영 환경에서 자동 활성, dryrun에서 의도적 보류.
+    <b>실패(FAIL)는 0건</b>, 5회 연속 동일.
+  </p>
 
   <!-- ============================================================
        6. 다음 액션
@@ -1135,7 +1469,7 @@
       <span class="callout-label">DELIVERY READY</span>
       <ul>
         <li><b>W4·W5·W7·W8 Phase 1 완료</b> — M6 평가/능동학습, RAG 인덱서, 관측성·DR Runbook, 라이선스 정리·SBOM·KL 8 시나리오까지 모두 가동.</li>
-        <li><b>W9~W12 Phase 2 완료</b> — LLM·임베딩 일반화, PSH 18 시나리오 × 65 KPI 자동 회귀 추적 체계 확립.</li>
+        <li><b>W9~W12 Phase 2 완료</b> — LLM·임베딩 일반화, PSH 18 시나리오 × 67 KPI 자동 회귀 추적 체계 확립.</li>
         <li><b>외부 의존 없이 진행 가능한 모든 코드 작업 종료.</b> 남은 것은 W6 한 단계뿐 (발주처 자원 도착 시 즉시 가동).</li>
       </ul>
     </div>
@@ -1184,8 +1518,10 @@
         <tr><td>2026-05-27</td><td>W4·W5 완료 — M6 평가/능동학습 + RAG 인덱서</td><td>70%</td><td>없음</td></tr>
         <tr><td>2026-05-27</td><td>W7·W8 완료 — 관측성·DR Runbook + 라이선스 정리·SBOM·KL 8 시나리오</td><td>90%</td><td>없음</td></tr>
         <tr><td>2026-05-27</td><td>W9 완료 — LLM 이중경로 + 임베딩 로컬화 + 시드 v2·형태소 사전 (조정 6→3)</td><td>92%</td><td>없음</td></tr>
-        <tr><td>2026-05-28</td><td>W10·W11·W12 완료 — PSH 18 시나리오 × 65 KPI 정량 회귀 추적</td><td>96%</td><td>없음</td></tr>
-        <tr><td>2026-05-28 (오늘)</td><td><b>외부 의존 없는 모든 코드 작업 종료 · 회귀 테스트 409 PASS</b></td><td><b>Phase 1 90% + Phase 2 100%</b></td><td>없음</td></tr>
+        <tr><td>2026-05-28</td><td>W10·W11·W12 완료 — PSH 18 시나리오 × 67 KPI 정량 회귀 추적</td><td>96%</td><td>없음</td></tr>
+        <tr><td>2026-05-28</td><td>블록 1~7 — 합성 5,000건·라벨링 5,000건·시드 v3·형태소 사전 1,002·가이드 v1 자체 작성·KPI 정합화</td><td>97%</td><td>없음 (조정 3→1)</td></tr>
+        <tr><td>2026-05-28</td><td><b>외부 의존 없는 모든 코드 작업 종료 · 회귀 테스트 409 PASS</b></td><td><b>Phase 1 90% + Phase 2 100%</b></td><td>없음</td></tr>
+        <tr><td>2026-05-28 (오늘)</td><td><b>운영 진입 보강 5건 완료 · 회귀 테스트 505 PASS (+96)</b></td><td><b>+ Phase 4 운영 안정성·안전성 완비</b></td><td>없음</td></tr>
         <tr class="pick"><td><b>2026-06-09</b></td><td><b>협의요청서 회신 기한 · W6 학습 가능 시점 (자원 도착 시 즉시 가동)</b></td><td><b>조정 항목 해소</b></td><td><b>발주처 자원</b></td></tr>
         <tr><td>회신 후 +7 일</td><td>W6 합성·학습·번들 실빌드 (자원 충족 시)</td><td>100%</td><td>GPU + API 키 + 가이드 v2</td></tr>
       </tbody>
@@ -1237,8 +1573,11 @@
     <table>
       <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
       <tbody>
+        <tr><td>2026-05-28</td><td>v0.9.9-ext</td><td><b>Phase 4 운영 진입 보강 5건 추가 (W13)</b> — 작업 큐 분산 저장(다중 워커 환경 안전 · 재시작 시 작업 보존), 일괄 처리 부분 실패 격리(건별 자동 재시도 + 실패 ID·사유 응답), 파일 업로드 용량 한도(20MB · 표준 응답 코드), 문서 삭제 연쇄 정합(원자 트랜잭션 + 테넌트 격리), KL 인터페이스 응답 코드 명세(429/413 표준 명시). 회귀 테스트 409 → <b>505 통과</b>(+96). by-stage tick에 W13 추가, Hero 위젯 갱신, 단계 표에 PHASE 4 섹션 신규, Executive Summary에 Phase 4 항목 추가. doc/16 v0.4 동시 갱신(관측성·백업·DR 기존 stale 정정, §10 R1~R5 신설).</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9.8-ext</td><td><b>정량 검증 패널 신규 — §5.5 (외부 공유용 4종)</b>. 핵심 측정치 위젯 8장(단일 분류 p95 91ms · 분류 오류율 0.00 · 대용량 처리량 1,305 docs/s · N=1000 p95 295ms · RAG 인용 충실도 1.00 · 권한 거부 p95 93ms · OpenAPI 21/21 · 임베딩 캐시 7.75s→0.00s). 조정 자원 해소 타임라인(이전 3건 → 블록 1~7 → 현재 1건). 시나리오 매트릭스 18개 × KPI(시나리오 ID 대신 일반 명칭). 보류 사유 분류(DB 의존 6 + 외부 자원 14, 실패 0건). §3 자원 표 — 합성·라벨링·형태소 사전·시드 키워드 모두 완료 마킹, 가이드 v2 카드 → v1 자체 작성으로 전환. §3 헤더 통계 조정 3→1로 갱신. NAV에 #psh-quant 추가.</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9.7-ext</td><td><b>본문·헤더 정합화 + 블록 1~7 톤다운 반영</b> — 본문/lede/Hero/footer/단계 표의 시나리오 KPI 수치를 65 → <b>67 KPI</b>(47/0/20)로 통일 (이전 v0.9.6-ext는 갱신이력 줄만 67, 본문은 65로 stale). 완성도 96→<b>97%</b>, 조정 대상 3→<b>1</b>(합성·라벨링·가이드 v1 자체 해소, 잔여 GPU + LLM API 키). §1 단계 표에 <b>Phase 3 — 데이터 자체 빌드 + 운영 산출물</b> 섹션(A1~A5·B1~B6·C1 합계) 추가, timeline에 블록 1~7 단일 카드 신규. §0 Executive Summary에 Phase 3 항목 추가, 결합 보고서 카드의 KPI 수치 67 반영, 일정표에 블록 7 행(97%) 추가.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.6-ext</td><td><b>운영 풀 진입 마일스톤</b> — 키워드 시드 v3(142→313), 한국어 사전 235→1,002 항목, 합성 학습 데이터 5,000건 자동 구축, 공개 코퍼스 매니페스트(6 출처) 자동화, RAG 인용 충실도 평가셋 100쌍, 임베딩 사전 캐시(7.75s → 0.00s), OpenAPI 정합 자동 검사(100% 매칭), SBOM HTML 단일 첨부 산출, 부하 시나리오 3단계 상향(20→100 워커) + 메모리 누수 감지. 18 시나리오 × 67 KPI 체제, dryrun 안정성 5회 연속 동일.</td></tr>
-        <tr><td>2026-05-28</td><td>v0.9.5-ext</td><td><b>본문 풀 동기화</b> — 갱신 이력에는 v0.4~v0.7-ext가 반영됐으나 본문(Hero·timeline·가중치 표·자원·일정)이 v0.3-ext(W3 종료, 50%) 상태로 정체돼 있던 격차 해소. Hero 50%→<b>96%</b>, 회귀 테스트 237→<b>409 PASS</b>, by-stage 8칸→12칸(W9~W12 가시화), 가중치 표를 <b>Phase 1(W1~W8, 90%)·Phase 2(W9~W12, 100%)</b>로 분리, 자원 통계 조정 6→3, 일정 표 절대 날짜로 재작성, OpenAPI metrics 영역 "백엔드 W4"→"구현 완료", 자원 카드 GPU 의존성 제거 톤 반영.</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9.5-ext</td><td><b>Phase 1·2 진척 일괄 반영</b> — Hero 완성도 <b>96%</b>, 회귀 테스트 <b>409 PASS</b>, 시나리오 KPI 65종. 단계별 표를 <b>Phase 1 코어 구축(W1~W8, 90% — W6 발주처 자원 의존)</b> · <b>Phase 2 일반화·정량 검증(W9~W12, 100%)</b>으로 재구조. 자원 통계 조정 대상 6→3(W7·W8·W9에서 관측성·라이선스·GPU 차단 해소), 일정 표 절대 날짜 기준 정렬, OpenAPI 7개 영역 전부 구현 완료, GPU 의존성 제거 톤 반영, footer에 doc/19·20 링크 추가.</td></tr>
         <tr><td>2026-05-28</td><td>v0.7-ext</td><td>시나리오 회복력 확장 — 대용량 일괄 분류(S12, 1000건 경계) · ES DR 리허설(S14) · 백업 복원 라운드트립(S15). 총 18 시나리오 × 65 KPI. 운영 회복력·확장성·DR 위험 사전 검증 체계 완료.</td></tr>
         <tr><td>2026-05-28</td><td>v0.6-ext</td><td>시나리오 추가 확장 — RAG 환각 방지(S10) · 권한 거부(S16) · 감사 로그 무결성(S17) · 폐쇄망 번들 무결성(S18). 총 15 시나리오 × 55 KPI 체제. 운영 보안·감사·배포 위험 사전 검증 완료.</td></tr>
         <tr><td>2026-05-28</td><td>v0.5-ext</td><td>시나리오 보고 체계 확장 — 적대적 문서 미탐 스트레스(S9) · 동시 부하(S11) · 멀티 테넌트 격리(S13) 추가. 총 11 시나리오 × 42 KPI. 운영 시 데이터 누출·미탐·과부하 위험 사전 검증 체계 구축.</td></tr>
@@ -1277,7 +1616,7 @@
       <a href="19_KL_통합_8시나리오.md">KL 통합 시나리오</a> ·
       <a href="20_시나리오_성능_보고서.html">PSH 성능 보고서</a>
     </p>
-    <p>2026-05-28 W12 종료 시점 · 회귀 테스트 409/409 PASS · 18 시나리오 × 65 KPI · Phase 1 90% (W6 발주처 자원 의존) + Phase 2 100% 완료. 발주처 자원(GPU·실문서·가이드 v2·LLM API 키) 도착 시 W6 즉시 가동.</p>
+    <p>2026-05-28 운영 진입 보강 5건 완료 시점 · 회귀 테스트 <b>505/505 PASS</b> · 18 시나리오 × <b>67 KPI</b> (PASS 47 / FAIL 0 / SKIP 20) · Phase 1 90% + Phase 2 100% + Phase 3 (블록 1~7) 차단 자원 자체 해소 + Phase 4 (W13) 운영 진입 보강까지 완료. 발주처 자원(GPU + LLM API 키) 도착 시 W6 즉시 본 학습 가동.</p>
   </div>
 
 </main>

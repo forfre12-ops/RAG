@@ -11,9 +11,11 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - promdata:/prometheus
     command:
+      # P1-D6: 회귀 추세 분석을 위해 retention 30d → 90d, size 10GB → 30GB.
+      # 디스크 부족 시 retention.size가 먼저 도달하여 oldest부터 삭제.
       - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.retention.time=30d
-      - --storage.tsdb.retention.size=10GB
+      - --storage.tsdb.retention.time=90d
+      - --storage.tsdb.retention.size=30GB
     ports:
       - "9090:9090"
     networks: [default]

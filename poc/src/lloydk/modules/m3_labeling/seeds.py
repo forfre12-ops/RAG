@@ -28,6 +28,11 @@ v3 확장 정책 (2026-05-28 W12+, 무중단 블록 1):
 - 도메인 확장: v2(8) + 자동차·화학·소재·통신·에너지·국방·식품·물류·콘텐츠·헬스케어(10) = 18 도메인
 - 4 평가요소 분포 균형 강화: LEAK_IMPACT·ECONOMIC_VALUE·MANAGEMENT_LEVEL·NON_PUBLICITY 각 ~25%
 - 시드 키워드 추가는 공개 출처(영업비밀보호법·시행령·산업기술보호법·KISA·KOTRA 공개 자료)만 사용
+
+v4 확장 정책 (2026-05-29 P0-B5):
+- 신규 5 도메인 추가: 해양·우주·항공정밀·정유석유화학·원자력/신재생에너지
+- 등급당 ~20개 추가 (총 ~100개) — 1,000+ 키워드 운영 임계 도달
+- 출처: 산업기술보호법 시행령 별표(국가핵심기술), KISTEP 공개 산업동향 보고서
 """
 
 from __future__ import annotations
@@ -460,4 +465,96 @@ KEYWORD_SEEDS: list[dict] = [
     {"grade": "S3", "keyword": "Unclassified", "weight": 0.8, "factor": "NON_PUBLICITY"},
     {"grade": "S3", "keyword": "공개 가능", "weight": 0.75, "factor": "NON_PUBLICITY"},
     {"grade": "S3", "keyword": "공시 대상", "weight": 0.75, "factor": "NON_PUBLICITY"},
+
+    # ============================================================
+    # v4 신규 도메인 추가 (해양·우주·항공정밀·정유석유화학·원자력/신재생)
+    # 출처: 산업기술보호법 시행령 별표(국가핵심기술), KISTEP 산업동향
+    # ============================================================
+    # --- TS (국가핵심기술 / 국가안보 연계) ---
+    {"grade": "TS", "keyword": "잠수함 추진체 설계", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "심해 무인잠수정 항법", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "함정 음향 스텔스 설계", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "발사체 추진기관 설계", "weight": 0.95, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "고체연료 추진제 조성비", "weight": 0.95, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "위성 추력기 설계", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "재진입 캡슐 열차폐", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "정밀유도 알고리즘", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "관성항법장치 설계", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "능동위상배열 레이더", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "원자로 핵심 설계자료", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "핵연료 농축 공정", "weight": 0.95, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "SMR 노심 설계", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "방사성 동위원소 분리법", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "원전 사고 시나리오 분석", "weight": 0.85, "factor": "LEAK_IMPACT"},
+    {"grade": "TS", "keyword": "FPSO 핵심 설계도", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "심해 시추 핵심기술", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "촉매 조성 노하우", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "정밀 광학 시스템 설계", "weight": 0.9, "factor": "ECONOMIC_VALUE"},
+    {"grade": "TS", "keyword": "스텔스 도료 조성", "weight": 0.95, "factor": "LEAK_IMPACT"},
+
+    # --- S1 (1급 비밀 / 산업기술보호 대상) ---
+    {"grade": "S1", "keyword": "선급 검사 미공개 도면", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "선체 블록 공정도", "weight": 0.8, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "수중 음향센서 사양", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "위성 자세제어 SW", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "지상국 통신 프로토콜", "weight": 0.8, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "위성 영상 처리 알고리즘", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "항공기 풍동시험 데이터", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "엔진 블레이드 설계", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "항공정밀 부품 공차", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "비행제어 펌웨어", "weight": 0.85, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "원전 운영 절차서 비공개", "weight": 0.85, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S1", "keyword": "원전 비상 운전 시나리오", "weight": 0.85, "factor": "LEAK_IMPACT"},
+    {"grade": "S1", "keyword": "수소 저장 핵심 소재", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "양자점 태양전지 조성", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "전해질 첨가제 배합", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "촉매 활성 데이터", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "납사 분해 공정 파라미터", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "정유 catalyst 수명 데이터", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "정밀 가공 노하우", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "심해 케이블 매설 공법", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+
+    # --- S2 (2급 대외비 / 사업·운영 정보) ---
+    {"grade": "S2", "keyword": "조선소 생산 일정", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "수주 가격 협상안", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "선박 발주 협의록", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "발사 일정 사전 정보", "weight": 0.8, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "위성 운용 스케줄", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "지상국 운영 매뉴얼 내부본", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "항공사 정비 매뉴얼 내부판", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "MRO 정비 단가표", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "항공정밀 수율 데이터", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "원전 유지보수 계획", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "신재생 발전 입찰 견적", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "수소 사업 사업계획서", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "ESS 운영 데이터 내부본", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "정유 가동 효율 보고서", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "석유화학 설비 가동률", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "원유 수송 일정", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "탱크 운영 점검 기록", "weight": 0.7, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "해상 풍력 평가 데이터", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S2", "keyword": "위성 영상 내부 카탈로그", "weight": 0.75, "factor": "MANAGEMENT_LEVEL"},
+    {"grade": "S2", "keyword": "항공 노선 수익성 분석", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+
+    # --- S3 (3급 공개 / 일반 공시) ---
+    {"grade": "S3", "keyword": "조선업 시장 동향 공개", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "해운 운임 지수 공개", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "해양수산부 공시", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "발사 성공 보도자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "위성 발사 공식 발표", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "한국항공우주연구원 공개자료", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "항공산업 백서 공개판", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "국토부 항공 통계 공개", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "원전 가동률 공시", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "신재생에너지 통계 공개", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "전력 거래량 공개자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "에너지경제연구원 공개 보고서", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "정유사 분기 IR 자료", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "석유협회 공개 통계", "weight": 0.75, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "국제유가 공개 동향", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "OPEC 공시자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "해양플랜트 전시회 자료", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "에어쇼 공개 카탈로그", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "수소경제 백서 공개판", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    {"grade": "S3", "keyword": "원자력안전위원회 공시", "weight": 0.75, "factor": "NON_PUBLICITY"},
 ]

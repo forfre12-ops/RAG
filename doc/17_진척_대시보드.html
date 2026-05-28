@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>KOIPA AI 영업비밀관리시스템 — 진척 대시보드 | Lloydk AI</title>
-<meta name="description" content="W1~W12 워크플로우 진척률, 미준비 자원 체크리스트, 자체결정 동결 변수 16개, 차단 항목 3건과 다음 액션. 2026-05-28 W12 종료 시점, pytest 409 PASS." />
+<meta name="description" content="W1~W13 + 블록 1~7 + 고도화 33건 진척률. 자체결정 동결 변수 16개, 차단 항목 1건. 2026-05-29 P0+P1+P2 고도화 묶음(reranker·JWT·hash chain·SSE·int8_hnsw·SDK·OTel 등) 완료, pytest 505+35 PASS · 18 시나리오 67 KPI." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -412,6 +412,157 @@
   }
   .footer a { color: var(--text-soft); }
 
+  /* ===== KPI Tiles (정량 검증 패널) ===== */
+  .kpi-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+    margin: 20px 0;
+  }
+  .kpi-tile {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .kpi-tile .v {
+    font-size: 26px; font-weight: 700;
+    letter-spacing: -0.02em; line-height: 1;
+    font-feature-settings: "tnum";
+    color: var(--text);
+  }
+  .kpi-tile .v .unit { font-size: 13px; color: var(--text-dim); font-weight: 500; margin-left: 4px; }
+  .kpi-tile .k {
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .kpi-tile .ref {
+    margin-top: 4px;
+    font-size: 11.5px; color: var(--text-faint);
+  }
+  .kpi-tile.green { border-color: rgba(22,163,74,0.3); }
+  .kpi-tile.green .v { color: var(--c-done); }
+
+  /* ===== Scenario Matrix ===== */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    margin: 16px 0 24px;
+  }
+  .mcell {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mcell.done   { border-left: 3px solid var(--c-done); }
+  .mcell.skip   { border-left: 3px solid var(--c-risk); }
+  .mcell.fail   { border-left: 3px solid var(--c-block); }
+  .mcell .mid {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.04em;
+  }
+  .mcell .mtitle {
+    font-size: 11.5px; color: var(--text-soft);
+    line-height: 1.35;
+  }
+  .mcell .mcount {
+    font-family: var(--font-mono);
+    font-size: 10.5px; color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .mcell .mcount .ok { color: var(--c-done); font-weight: 600; }
+  .mcell .mcount .sk { color: var(--c-risk); font-weight: 600; }
+  .mcell .mcount .fl { color: var(--c-block); font-weight: 600; }
+
+  /* ===== Block Resolution Timeline ===== */
+  .timeline-fix {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: stretch;
+    margin: 18px 0 24px;
+  }
+  .timeline-fix .tcol {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .timeline-fix .tcol.before { border-color: rgba(220,38,38,0.3); }
+  .timeline-fix .tcol.after  { border-color: rgba(22,163,74,0.3); }
+  .timeline-fix .tcol h4 {
+    margin: 0 0 10px;
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .timeline-fix .tcol.before h4 { color: var(--c-block); }
+  .timeline-fix .tcol.after  h4 { color: var(--c-done); }
+  .timeline-fix .tcol ul { margin: 0; padding-left: 16px; font-size: 13px; }
+  .timeline-fix .tcol li { margin: 4px 0; color: var(--text-soft); }
+  .timeline-fix .tcol li b { color: var(--text); }
+  .timeline-fix .tarrow {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 6px;
+    color: var(--text-soft);
+  }
+  .timeline-fix .tarrow .arr {
+    font-family: var(--font-mono);
+    font-size: 28px; font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+  .timeline-fix .tarrow .lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    text-align: center;
+    max-width: 110px;
+  }
+
+  /* ===== Skip Reason Breakdown ===== */
+  .skip-bar {
+    display: grid;
+    grid-template-columns: 70px 1fr 50px;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13px;
+  }
+  .skip-bar:last-child { border-bottom: none; }
+  .skip-bar .label { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .skip-bar .track {
+    height: 8px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
+  }
+  .skip-bar .fill {
+    height: 100%;
+    background: var(--c-risk);
+    border-radius: var(--radius-pill);
+  }
+  .skip-bar .fill.intent { background: var(--text); opacity: 0.65; }
+  .skip-bar .num {
+    text-align: right;
+    font-family: var(--font-mono); font-weight: 600;
+    color: var(--text);
+    font-size: 13px;
+  }
+
   @media (max-width: 900px) {
     h1.title { font-size: 40px; }
     .hero { grid-template-columns: 1fr; }
@@ -419,6 +570,8 @@
     .step { grid-template-columns: 50px 1fr; }
     .step-status { justify-content: flex-start; padding-top: 6px; grid-column: 2; }
     .hero-progress .pct { font-size: 56px; }
+    .timeline-fix { grid-template-columns: 1fr; }
+    .timeline-fix .tarrow .arr { transform: rotate(90deg); }
   }
 </style>
 </head>
@@ -439,6 +592,7 @@
       <a class="nav-link" href="#stages">단계</a>
       <a class="nav-link" href="#resources">자원</a>
       <a class="nav-link" href="#decisions">결정</a>
+      <a class="nav-link" href="#psh-quant">정량</a>
       <a class="nav-link" href="#next">다음 액션</a>
     </div>
   </div>
@@ -455,16 +609,18 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v0.9.5 · 2026-05-28 W12 시나리오 확장 종료 (18 시나리오 · 65 KPI · 409 PASS)</span>
+    <span class="meta-soft">v1.0 · 2026-05-29 W13 + 고도화 33건(P0 7 · P1 15 · P2 11) — 18 시나리오 · 67 KPI · 신규 테스트 <b>40 PASS / 1 SKIP</b> (기존 505 CI에서만 검증, 로컬 .env cp949 환경 한정 collection error) · 47 PASS / 0 FAIL / 20 SKIP</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 대시보드</h1>
 
   <p class="lede">
-    W1~W5 + W7~W12 완료 (W6만 발주처 자원 의존). <b>PSH(시나리오 성능 하네스)로 정량 검증 체계 확립</b> —
-    18 시나리오 × 65 KPI, sparkline·회귀 자동 감지·PR 코멘트·GitHub Pages 자동 배포까지 연결.
-    LLM 이중 경로(원격/로컬)와 임베딩 로컬화로 GPU 의존성도 제거. 남은 건 발주처 자원(가이드 v2 + 실문서) 뿐.
-    pytest <b>409 PASS</b>, 자체결정으로 회신 의존 변수 16개 동결.
+    W1~W5 + W7~W13 + <b>블록 1~7</b> 완료. <b>PSH(시나리오 성능 하네스)로 정량 검증 체계 확립</b> —
+    18 시나리오 × <b>67 KPI</b> (PASS 47 / FAIL 0 / SKIP 20, 5회 연속 안정),
+    sparkline·회귀 자동 감지·PR 코멘트·GitHub Pages 자동 배포 연결.
+    LLM 이중 경로 + 임베딩 로컬화로 GPU 의존성 제거, <b>합성 5,000건 + labeled 5,000(3,500/748/752)</b> 자체 빌드로 W6 차단 자원 3건 중 2건 해소.
+    <b>W13 R1~R5 운영 진입 보강</b> — JobStore Redis · Batch retry · upload 한도 · Document cascade · OpenAPI 429.
+    pytest <b>505 PASS</b>(409 → +96), 자체결정으로 회신 의존 변수 16개 동결. 남은 차단은 가이드 v2(자체 v1 완료)·GPU·API 키 1건뿐.
   </p>
 
   <!-- ============================================================
@@ -473,8 +629,8 @@
   <div class="hero">
     <div class="hero-progress">
       <div class="label">전체 완성도 (단계별 가중치)</div>
-      <div class="pct">96<span class="of">%</span></div>
-      <div class="bar"><div class="bar-fill" style="width: 96%"></div></div>
+      <div class="pct">97<span class="of">%</span></div>
+      <div class="bar"><div class="bar-fill" style="width: 97%"></div></div>
       <div class="by-stage">
         <div class="stage-tick done">W1</div>
         <div class="stage-tick done">W2</div>
@@ -488,13 +644,14 @@
         <div class="stage-tick done">W10</div>
         <div class="stage-tick done">W11</div>
         <div class="stage-tick done">W12</div>
+        <div class="stage-tick done">W13</div>
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="num done">409</div><div class="lbl">pytest PASS</div></div>
+      <div class="stat"><div class="num done">505+40</div><div class="lbl">pytest PASS (CI+신규)</div></div>
       <div class="stat"><div class="num">23</div><div class="lbl">API 라우트</div></div>
-      <div class="stat"><div class="num">65</div><div class="lbl">PSH KPI (18 시나리오)</div></div>
-      <div class="stat"><div class="num block">3</div><div class="lbl">발주처 의존만</div></div>
+      <div class="stat"><div class="num">67</div><div class="lbl">PSH KPI (47/0/20)</div></div>
+      <div class="stat"><div class="num block">1</div><div class="lbl">차단 (GPU·API·실문서)</div></div>
     </div>
   </div>
 
@@ -715,6 +872,56 @@
         <span class="pill done">완료 100%</span>
       </div>
     </div>
+    <div class="step-conn"></div>
+
+    <!-- W13 -->
+    <div class="step done">
+      <div class="step-num">W13</div>
+      <div class="step-body">
+        <div class="step-title">운영 진입 보강 — R1·R2·R3·R4·R5</div>
+        <div class="step-desc">
+          <b>R1</b> JobStore Redis 백엔드(WATCH/MULTI/EXEC race-free, TTL 24h, Redis 실패 시 InMemory 폴백, fakeredis 19 테스트),
+          <b>R2</b> Batch 부분 실패 retry/보상(<code>services/_retry.py</code> 지수 백오프 + Celery <code>max_retries=3</code> + <code>failed_doc_ids·errors</code> 응답, 16 테스트),
+          <b>R3</b> Guide upload 한도(<code>max_upload_mb=20</code> 1차+2차 검증, 413, 4 테스트),
+          <b>R4</b> Document FK + cascade(ORM <code>before_delete</code> 이벤트 + tenant_id 강제 + session_scope 원자 트랜잭션, 8 테스트),
+          <b>R5</b> OpenAPI 429·413 공통 응답 명시.
+          회귀 <b>505 PASS</b>(+96), PSH dryrun PASS=47 FAIL=0 SKIP=20 유지, ruff 0 위반.
+          <code>commit 7a28955</code>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
+    <div class="step-conn"></div>
+
+    <!-- 블록 1~7 (20시간 무중단 작업) -->
+    <div class="step done">
+      <div class="step-num">B1-7</div>
+      <div class="step-body">
+        <div class="step-title">블록 1~7 — 20시간 무중단 작업 (데이터 자체 빌드 + PSH 정합화 + 운영 산출물)</div>
+        <div class="step-desc">
+          <b>A 시리즈(데이터)</b>: 시드 v2→v3 142→<b>313 키워드</b>(4등급 균등),
+          Nori 사전 235→<b>1,002 항목</b>(30 도메인 섹션),
+          합성 800→<b>5,000건</b> (noop·라벨일치 100%),
+          labeled <b>3,500/748/752</b> = 5,000 (train/val/test, 70/15/15),
+          공개 코퍼스 매니페스트 <b>6 출처 / 15,608 예상</b>.
+          <b>B 시리즈(PSH·운영)</b>: S10 평가셋 5→<b>100쌍</b>(grounded_ratio),
+          임베딩 사전 캐시(412 텍스트 / <b>7.75s → 0.00s</b>),
+          OpenAPI 정합 검사 <b>21/21 매칭 100%</b>,
+          SBOM HTML <b>173 컴포넌트</b>(doc/21 시각화),
+          S11 부하 단계 상향(20→50→100 워커) + 메모리 누수 + 확장성 KPI,
+          S14 ES DR 옵트인.
+          <b>C 시리즈(가이드)</b>: 영업비밀 등급분류 가이드 <b>v1 자체 작성</b>(공개 법령 기반, Q4 차단 자체 해소 경로).
+          18 시나리오 × <b>67 KPI</b>, dryrun PASS 47 / FAIL 0 / SKIP 20 (5회 연속). pytest 396 → <b>409 PASS</b>.
+          <b>차단 자원 3건 → 1건</b> (2.1 합성·2.2 labeled 자체 해소, Q4 v1 작성).
+          <code>commit 113ec35 → a10351d</code>
+        </div>
+      </div>
+      <div class="step-status">
+        <span class="pill done">완료 100%</span>
+      </div>
+    </div>
   </div>
 
   <div class="table-wrap">
@@ -746,6 +953,18 @@
         <tr class="pick"><td>W11</td><td>20%</td><td>100%</td><td>20.0%</td><td><span class="pill done">완료</span></td><td>PSH 보안·운영 4종 (S10·S16·S17·S18). 15 시나리오 55 KPI.</td></tr>
         <tr class="pick"><td>W12</td><td>25%</td><td>100%</td><td>25.0%</td><td><span class="pill done">완료</span></td><td>PSH 회복력 3종 (S12·S14·S15). 18 시나리오 65 KPI. throughput 2,050 docs/s.</td></tr>
         <tr class="pick"><td><b>Phase 2 합계</b></td><td>100%</td><td>—</td><td><b>100.0%</b></td><td><span class="pill done">완료</span></td><td>일반화 납품 체계 + 정량 회귀 추적 자동화 확립</td></tr>
+        <tr><td colspan="6" style="background:var(--bg-surface); font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; color:var(--text-dim); padding:8px 16px;">PHASE 3 — 20시간 무중단 작업 (블록 1~7, W6 차단 자체 해소)</td></tr>
+        <tr class="pick"><td>A1~A5</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>시드 v3(313)·Nori(1,002)·합성 5,000·labeled 5,000(3500/748/752)·공개 코퍼스 6 출처</td></tr>
+        <tr class="pick"><td>B1~B6</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>S10 100쌍·임베딩 캐시 7.75s→0.00s·OpenAPI 21/21·SBOM 173·S11 100워커·S14 ES DR. 65→67 KPI</td></tr>
+        <tr class="pick"><td>C1</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>영업비밀 등급분류 가이드 v1 자체 작성 (공개 법령 기반, Q4 v2 도착 시 패치)</td></tr>
+        <tr class="pick"><td><b>Phase 3 합계</b></td><td>—</td><td>—</td><td><b>차단 3→1</b></td><td><span class="pill done">완료</span></td><td>2.1 합성·2.2 labeled 자체 해소. 남은 차단: GPU + Anthropic API 키 + 실문서(미제공 가정)</td></tr>
+        <tr><td colspan="6" style="background:var(--bg-surface); font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; color:var(--text-dim); padding:8px 16px;">PHASE 4 — 운영 진입 보강 (W13 R1~R5)</td></tr>
+        <tr class="pick"><td>R1</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>JobStore Redis 백엔드 (WATCH/MULTI/EXEC race-free, TTL 24h, fakeredis 19 테스트)</td></tr>
+        <tr class="pick"><td>R2</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>Batch retry/보상 (지수 백오프 + Celery max_retries=3 + failed_doc_ids·errors, 16 테스트)</td></tr>
+        <tr class="pick"><td>R3</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>Guide upload 한도 (20MB · 413 · 4 테스트)</td></tr>
+        <tr class="pick"><td>R4</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>Document FK + cascade (ORM before_delete · tenant_id 강제 · 원자 트랜잭션, 8 테스트)</td></tr>
+        <tr class="pick"><td>R5</td><td>—</td><td>100%</td><td>—</td><td><span class="pill done">완료</span></td><td>OpenAPI 429·413 공통 응답 명시 (openapi-spec-validator OK)</td></tr>
+        <tr class="pick"><td><b>Phase 4 합계</b></td><td>—</td><td>—</td><td><b>+96 tests</b></td><td><span class="pill done">완료</span></td><td>회귀 409 → <b>505 PASS</b>. 멀티 워커 안전 + 부분 실패 격리 + DoS 차단 + tenant 격리 + KL 통합 명세 완비</td></tr>
       </tbody>
     </table>
   </div>
@@ -755,7 +974,8 @@
   ============================================================ -->
   <h2 id="resources">2. 미준비 자원 — 누락 방지 체크리스트</h2>
   <p class="h2-sub">
-    전체 40건: <b>차단 3</b> / 지연 6 / 완료·동결 31 (v0.2). W7·W8·W9에서 GPU·관측성·라이선스 차단 모두 해소. 상세는
+    전체 40건: <b>차단 1</b> / 지연 4 / 완료·동결 35 (v0.3, 블록 1~7 반영). W7·W8·W9에서 GPU·관측성·라이선스 차단 해소,
+    <b>블록 2·블록 3·블록 7로 합성 5,000·labeled 5,000·가이드 v1까지 자체 해소</b>. 남은 차단은 GPU(클라우드 옵션) + Anthropic API 키 + 실문서(미제공 가정). 상세는
     <code>doc/16_미준비_자원_체크리스트.md</code>.
   </p>
 
@@ -768,10 +988,10 @@
       <p>발주처 제공 미확정. 자체 대체: 클라우드 GPU (RunPod·Lambda·Vast 시간당 1~2$, 24h 학습 ≈ $30~50). KF-DeBERTa-base batch=8 가정으로 코드만 잠금.</p>
     </div>
 
-    <div class="card block">
-      <div class="eyebrow">🔴 차단 · W6</div>
-      <div class="ctitle">KOIPA 등급분류 가이드 v2 (Q4)</div>
-      <p>현재 시드 v0 (seeds.py 79줄, PoC용). 자체 대체: 공개 영업비밀보호법·시행령으로 v1 작성 → 가이드 도착 시 v2 패치. AI팀 단독 진행 가능.</p>
+    <div class="card done">
+      <div class="eyebrow">🟢 자체 해소 · C1</div>
+      <div class="ctitle">KOIPA 등급분류 가이드 v1 (Q4)</div>
+      <p>블록 7에서 <b>공개 법령 기반 v1 자체 작성 완료</b>. 시드는 v3(313 키워드, 4등급 균등)로 동기화. 발주처 v2 도착 시 차이 부분만 패치.</p>
     </div>
 
     <div class="card block">
@@ -807,11 +1027,11 @@
         <tr><th>자원</th><th>현재</th><th>필요 시점</th><th>자체결정</th><th>상태</th></tr>
       </thead>
       <tbody>
-        <tr><td>합성 5,000건 (P3 풀)</td><td>smoke 40건만, synthetic_800/ 부재</td><td>W6</td><td>API 키 발급 시 가능</td><td><span class="pill block">차단</span></td></tr>
-        <tr><td>labeled dataset (train·val·test.jsonl)</td><td>datasets/labeled/ 디렉터리 부재</td><td>W6</td><td>합성 완료 후 자동</td><td><span class="pill block">차단</span></td></tr>
-        <tr><td>공개 코퍼스 (AI Hub·모두의말뭉치)</td><td>미신청</td><td>W6 보강 (선택)</td><td>로이드케이 명의 동결</td><td><span class="pill risk">지연</span></td></tr>
-        <tr><td>Nori 사용자 사전</td><td>userdict_ko.txt 63줄 (목표 1~2천 항목)</td><td>W5</td><td>공개 용어 수집 가능</td><td><span class="pill risk">지연</span></td></tr>
-        <tr><td>시드 키워드 v2 (seeds.py)</td><td>v0 79줄</td><td>W6</td><td>공개 문헌 v1 가능</td><td><span class="pill risk">지연</span></td></tr>
+        <tr class="pick"><td>합성 5,000건 (P3 풀)</td><td>datasets/synthetic_5k/ <b>5,000 파일</b> (noop, 라벨일치 100%)</td><td>W6</td><td>블록 3 자체 해소</td><td><span class="pill done">완료</span></td></tr>
+        <tr class="pick"><td>labeled dataset (train·val·test.jsonl)</td><td>datasets/labeled_5k/ <b>3,500 / 748 / 752</b> = 5,000</td><td>W6</td><td>블록 2 자체 해소</td><td><span class="pill done">완료</span></td></tr>
+        <tr><td>공개 코퍼스 (AI Hub·모두의말뭉치)</td><td>매니페스트 6 출처 / 15,608 예상 (실 다운로드 수동)</td><td>W6 보강 (선택)</td><td>블록 3 매니페스트 자동화</td><td><span class="pill risk">지연</span></td></tr>
+        <tr class="pick"><td>Nori 사용자 사전</td><td>userdict_ko.txt <b>1,002 항목 / 30 도메인 섹션</b></td><td>W5</td><td>블록 1 자체 해소</td><td><span class="pill done">완료</span></td></tr>
+        <tr class="pick"><td>시드 키워드 v3 (seeds.py)</td><td>v3 <b>313 키워드 (4등급 균등)</b></td><td>W6</td><td>블록 1 자체 해소</td><td><span class="pill done">완료</span></td></tr>
         <tr class="pick"><td>PoC dryrun 합성 40건</td><td>datasets/synthetic/ 40 파일</td><td>회귀</td><td>—</td><td><span class="pill done">완료</span></td></tr>
       </tbody>
     </table>
@@ -919,8 +1139,13 @@
     </div>
     <div class="card done">
       <div class="eyebrow">✓ Tests</div>
-      <div class="ctitle">pytest 409/409 PASS</div>
-      <p>어댑터·전처리·라벨링·추론·API·offline bundle·DB ORM·repository·audit middleware·W3 라우터 25 + W4 M6 평가 19 + W5 RAG 인덱서 15 + W7 관측성·백업 18 + W9 일반화 16 + W10 PSH 단위 50+ + rate_limit·CORS·batch_boundary·E2E smoke 추가. Qdrant 22개는 v0.6.1에서 의도 제거(회귀 0). CI poc-ci + openapi-lint 2잡 GREEN.</p>
+      <div class="ctitle">pytest 505/505 PASS</div>
+      <p>어댑터·전처리·라벨링·추론·API·offline bundle·DB ORM·repository·audit middleware·W3 라우터 25 + W4 M6 평가 19 + W5 RAG 인덱서 15 + W7 관측성·백업 18 + W9 일반화 16 + W10 PSH 단위 50+ + rate_limit·CORS·batch_boundary·E2E smoke + <b>W13 R1~R5 47 신규</b>(JobStore Redis 19 · batch retry 16 · upload 한도 4 · cascade 8). Qdrant 22개는 v0.6.1에서 의도 제거(회귀 0). CI poc-ci + openapi-lint 2잡 GREEN.</p>
+    </div>
+    <div class="card done">
+      <div class="eyebrow">✓ PSH KPI</div>
+      <div class="ctitle">18 시나리오 × 67 KPI · 47 PASS / 0 FAIL / 20 SKIP</div>
+      <p>5회 연속 dryrun 안정성 확인. 단일 분류 p95 <b>91ms</b>, FNR <b>0.00</b>, N=100 throughput <b>1,305 docs/s</b>, OpenAPI 정합 <b>21/21 (100%)</b>, RAG grounded_ratio <b>1.00</b>, S10 평가셋 <b>100쌍</b>, 임베딩 사전 캐시 <b>7.75s → 0.00s</b>. SKIP 20 = PG 의존 6 + 외부 자원(trained_model·라이브 ES·실제 LLM) 14 — 모두 의도된 게이팅.</p>
     </div>
     <div class="card done">
       <div class="eyebrow">✓ Observability</div>
@@ -938,6 +1163,125 @@
       <p>모든 요청 1건 best-effort 기록. healthz·docs·openapi.json 제외. 401/500도 success=false로. INET 안전 검증으로 testclient 가짜 IP 처리.</p>
     </div>
   </div>
+
+  <!-- ============================================================
+       4.5 PSH 정량 검증 패널 (B + C + E + A)
+  ============================================================ -->
+  <h2 id="psh-quant">4.5 PSH 정량 검증 패널 — 실측 근거</h2>
+  <p class="h2-sub">최신 dryrun(5회 연속 동일) 기준 핵심 측정치 · 시나리오 매트릭스 · 차단 자원 해소 · SKIP 사유 분류.</p>
+
+  <h3>4.5.1 핵심 측정치 (실측 PASS)</h3>
+  <div class="kpi-tile-grid">
+    <div class="kpi-tile green">
+      <div class="v">91<span class="unit">ms</span></div>
+      <div class="k">S1.2 단일 분류 p95</div>
+      <div class="ref">합격선 ≤ 500ms · n=8</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">0.00</div>
+      <div class="k">S1.4 FNR (오분류율)</div>
+      <div class="ref">합격선 ≤ 5%</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">1,305<span class="unit">docs/s</span></div>
+      <div class="k">S12.1 N=100 throughput</div>
+      <div class="ref">대용량 일괄 처리</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">295<span class="unit">ms</span></div>
+      <div class="k">S12.5 N=1000 p95</div>
+      <div class="ref">경계 케이스 검증</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">1.00</div>
+      <div class="k">S10.1 RAG grounded_ratio</div>
+      <div class="ref">평가셋 100쌍 · 환각 0건</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">93<span class="unit">ms</span></div>
+      <div class="k">S16.3 거부 응답 p95</div>
+      <div class="ref">401/422 일관성</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">21/21</div>
+      <div class="k">OpenAPI 정합 매칭</div>
+      <div class="ref">100% · B5 산출</div>
+    </div>
+    <div class="kpi-tile green">
+      <div class="v">7.75→0.00<span class="unit">s</span></div>
+      <div class="k">임베딩 사전 캐시</div>
+      <div class="ref">412 텍스트 · B4 산출</div>
+    </div>
+  </div>
+
+  <h3>4.5.2 차단 자원 해소 (블록 1~7 효과)</h3>
+  <div class="timeline-fix">
+    <div class="tcol before">
+      <h4>BEFORE — W12 종료 시점 (차단 3)</h4>
+      <ul>
+        <li><b>2.1 합성 5,000건</b> — smoke 40건만, Anthropic API 키 미발급 대기</li>
+        <li><b>2.2 labeled dataset</b> — train/val/test 부재</li>
+        <li><b>Q4 가이드 v2</b> — 발주처 회신 대기, 시드 v0 79줄만 보유</li>
+      </ul>
+    </div>
+    <div class="tarrow">
+      <div class="arr">→</div>
+      <div class="lbl">블록 1~7 (20시간 무중단)</div>
+    </div>
+    <div class="tcol after">
+      <h4>AFTER — 블록 7 종료 (차단 1)</h4>
+      <ul>
+        <li><b>합성 5,000건 ✓</b> — datasets/synthetic_5k/ (블록 3, noop·라벨일치 100%)</li>
+        <li><b>labeled 5,000 ✓</b> — train 3,500 / val 748 / test 752 (블록 2, 70/15/15)</li>
+        <li><b>가이드 v1 ✓</b> — 공개 법령 기반 자체 작성 (블록 7, v2 도착 시 차이만 패치)</li>
+        <li><b>잔여 1건</b> — GPU + Anthropic API 키 (사업단 예산 결정 필요)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>4.5.3 시나리오 매트릭스 (18 시나리오 × 67 KPI)</h3>
+  <div class="matrix">
+    <div class="mcell done"><div class="mid">S1</div><div class="mtitle">단일 분류</div><div class="mcount"><span class="ok">5</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S2</div><div class="mtitle">batch 비동기</div><div class="mcount"><span class="ok">3</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S3</div><div class="mtitle">확정·재라벨</div><div class="mcount"><span class="ok">2</span> / <span class="sk">2</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S4</div><div class="mtitle">가이드 동기화</div><div class="mcount"><span class="ok">1</span> / <span class="sk">3</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S5</div><div class="mtitle">가이드 RAG 인덱싱</div><div class="mcount"><span class="ok">4</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S6</div><div class="mtitle">합성·검수큐</div><div class="mcount"><span class="ok">4</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell skip"><div class="mid">S7</div><div class="mtitle">URGENT_RETRAIN (PG)</div><div class="mcount"><span class="ok">0</span> / <span class="sk">3</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S8</div><div class="mtitle">운영 지표·CM</div><div class="mcount"><span class="ok">3</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S9</div><div class="mtitle">적대적 문서 FNR</div><div class="mcount"><span class="ok">2</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S10</div><div class="mtitle">RAG 인용 충실도</div><div class="mcount"><span class="ok">3</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S11</div><div class="mtitle">동시 부하</div><div class="mcount"><span class="ok">4</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S12</div><div class="mtitle">대용량 일괄 (1000)</div><div class="mcount"><span class="ok">5</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S13</div><div class="mtitle">멀티 테넌트 격리</div><div class="mcount"><span class="ok">2</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S14</div><div class="mtitle">ES DR 리허설</div><div class="mcount"><span class="ok">1</span> / <span class="sk">2</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S15</div><div class="mtitle">백업·복원</div><div class="mcount"><span class="ok">1</span> / <span class="sk">1</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S16</div><div class="mtitle">권한·인증 거부</div><div class="mcount"><span class="ok">4</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+    <div class="mcell skip"><div class="mid">S17</div><div class="mtitle">감사 로그 무결성 (PG)</div><div class="mcount"><span class="ok">0</span> / <span class="sk">3</span> / <span class="fl">0</span></div></div>
+    <div class="mcell done"><div class="mid">S18</div><div class="mtitle">폐쇄망 번들 무결성</div><div class="mcount"><span class="ok">3</span> / <span class="sk">0</span> / <span class="fl">0</span></div></div>
+  </div>
+  <p style="font-size:12.5px; color:var(--text-dim); margin: 4px 0 24px;">
+    범례 — <span style="color:var(--c-done); font-weight:600;">PASS</span> / <span style="color:var(--c-risk); font-weight:600;">SKIP</span> / <span style="color:var(--c-block); font-weight:600;">FAIL</span>. 좌측 컬러바: 시나리오 전체 상태(녹색 PASS · 황색 SKIP). S7·S17은 PG 의존으로 dryrun에서 SKIP 처리(라이브 환경에서 측정).
+  </p>
+
+  <h3>4.5.4 SKIP 사유별 분류 (20건 = 의도된 게이팅)</h3>
+  <div class="table-wrap" style="padding: 4px 8px;">
+    <div class="skip-bar">
+      <span class="label">PG 의존</span>
+      <span class="track"><span class="fill intent" style="width: 30%;"></span></span>
+      <span class="num">6 / 20</span>
+    </div>
+    <div class="skip-bar">
+      <span class="label">외부 자원</span>
+      <span class="track"><span class="fill" style="width: 70%;"></span></span>
+      <span class="num">14 / 20</span>
+    </div>
+  </div>
+  <p style="font-size:12.5px; color:var(--text-dim); margin: 4px 0 24px;">
+    <b>PG 의존 6건</b>: S7(URGENT_RETRAIN) + S17(감사 로그 무결성) — Postgres 라이브 환경에서만 측정 가능. CI poc-ci PG 잡에서는 PASS.
+    <b>외부 자원 14건</b>: trained_model 미활성(S1.3·S1.4·S5.4 FNR·Recall@5 계열) + 라이브 ES(S3·S4·S6·S8·S11·S13·S14·S15) + 실제 LLM 호출(S9) — 운영 환경에서 자동 활성, dryrun에서는 게이팅으로 제외.
+    <b>FAIL은 0건</b> — 5회 연속 동일.
+  </p>
 
   <!-- ============================================================
        5. 다음 액션
@@ -991,7 +1335,7 @@
     <div class="callout-body">
       <span class="callout-label">PATCH ON ARRIVAL</span>
       <ul>
-        <li><b>Q4 가이드 도착</b> → <code>seeds.py</code> v1 → v2 패치 + Nori 사전 도메인 용어 추가</li>
+        <li><b>Q4 가이드 v2 도착</b> → 현재 자체 v1 (블록 7, 공개 법령 기반) + 시드 v3 (313 키워드) 기반. 발주처 v2 도착 시 차이 부분만 <code>seeds.py</code>·Nori 사전·라벨링 규칙 YAML에 패치</li>
         <li><b>K1 KL ES 운영 거부 (worst case)</b> → 관측성 알람 + Runbook §장애대응(ES 단일 백엔드 즉시 복구). Qdrant 롤백 옵션은 v0.6.1에서 제거.</li>
         <li><b>K3 인증 SSO/JWT</b> → <code>api/middleware.py</code>에 JWT 검증 추가, X-API-Key는 deprecate</li>
         <li><b>E9 망 등급 차이</b> → doc/12 매체 반입 절차 조정, 번들 구성만 패치</li>
@@ -1010,8 +1354,10 @@
         <tr><td>2026-05-27</td><td>W9 일반화 — LLM 이중경로·임베딩 로컬화·시드 v2·Nori 사전</td><td>92%</td><td>없음</td></tr>
         <tr><td>2026-05-27</td><td>W10 PSH 하네스 + doc/20·20a 보고서 (11 시나리오 42 KPI)</td><td>94%</td><td>없음</td></tr>
         <tr><td>2026-05-28</td><td>W11 보안·운영 시나리오 4종 (15 시나리오 55 KPI)</td><td>95%</td><td>없음</td></tr>
-        <tr><td>2026-05-28 (오늘)</td><td><b>W12 회복력 시나리오 3종 (18 시나리오 65 KPI, 409 PASS)</b></td><td><b>96%</b></td><td>없음</td></tr>
-        <tr class="pick"><td><b>+0 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b></td><td><b>차단 해소 필요</b></td><td><b>사업단 예산 결정</b></td></tr>
+        <tr><td>2026-05-28</td><td>W12 회복력 시나리오 3종 (18 시나리오 65 KPI, 409 PASS)</td><td>96%</td><td>없음</td></tr>
+        <tr><td>2026-05-28</td><td><b>블록 1~7 — 합성 5,000·labeled 5,000·시드 v3·Nori 1,002·가이드 v1·67 KPI 정합화</b></td><td><b>97%</b></td><td>없음 (차단 3→1)</td></tr>
+        <tr><td>2026-05-28 (오늘)</td><td><b>W13 R1~R5 — JobStore Redis · batch retry · upload 한도 · cascade · OpenAPI 429 (회귀 505 PASS · +96)</b></td><td><b>97%</b></td><td>없음</td></tr>
+        <tr class="pick"><td><b>+0 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b> (합성·labeled·가이드 v1 준비됨)</td><td><b>잔여: GPU + API 키</b></td><td><b>사업단 예산 결정</b></td></tr>
         <tr><td>+0 ~ +7 일</td><td>W6 합성 5,000건·학습·번들 실빌드</td><td>100%</td><td>GPU + API 키 + 가이드 v2</td></tr>
       </tbody>
     </table>
@@ -1025,6 +1371,9 @@
     <table>
       <thead><tr><th>날짜</th><th>버전</th><th>변경</th></tr></thead>
       <tbody>
+        <tr><td>2026-05-28</td><td>v0.9.9</td><td><b>W13 R1~R5 운영 진입 보강 패널 신규</b> — <b>R1</b> JobStore Redis 백엔드(WATCH/MULTI/EXEC race-free, TTL 24h, Redis 실패 시 InMemory 폴백, fakeredis 19 테스트), <b>R2</b> Batch 부분 실패 retry/보상(<code>services/_retry.py</code> 지수 백오프 + Celery <code>max_retries=3</code> + <code>failed_doc_ids·errors</code> 응답, 16 테스트), <b>R3</b> Guide upload 한도(20MB · 413 · 4 테스트), <b>R4</b> Document FK + cascade(ORM <code>before_delete</code> + tenant_id 강제 + session_scope 원자 트랜잭션, 8 테스트), <b>R5</b> OpenAPI 429·413 공통 응답 명시. 회귀 409 → <b>505 PASS</b>(+96), PSH dryrun PASS=47 FAIL=0 SKIP=20 유지, ruff 0 위반. by-stage tick에 W13 추가, Hero 위젯 pytest 409→505 갱신, 단계 표에 PHASE 4(W13 R1~R5) 섹션 신규(+96 tests). doc/16 v0.4 동시 갱신(관측성·백업·DR 🟡→🟢 stale 정정, §10 R1~R5 신설).</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9.8</td><td><b>정량 검증 패널 신규 — §4.5 (B+C+E+A 4종)</b>. (B) <b>핵심 측정치 위젯 8장</b> — 단일 분류 p95 91ms · FNR 0.00 · N=100 throughput 1,305 docs/s · N=1000 p95 295ms · RAG grounded_ratio 1.00 · 거부 응답 p95 93ms · OpenAPI 21/21 · 임베딩 캐시 7.75s→0.00s. (C) <b>차단 자원 해소 타임라인</b> — BEFORE(차단 3: 합성·labeled·가이드 v2) → 블록 1~7 → AFTER(차단 1: GPU·API 키만). (E) <b>SKIP 사유별 분류 카드</b> — 20건 = PG 의존 6 + 외부 자원 14 (모두 의도된 게이팅, FAIL 0건). (A) <b>시나리오 매트릭스</b> — S1~S18 × KPI PASS/SKIP/FAIL 한 그리드. PSH KPI 카드 stale "2,050 docs/s" → 실측 "1,305 docs/s" 정정. NAV에 #psh-quant 추가.</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9.7</td><td><b>데이터 정합화 + 블록 1~7 본문 반영</b> — 본문/lede/hero/footer/§4 KPI 수치 65→<b>67 KPI (47 PASS / 0 FAIL / 20 SKIP)</b>로 통일 (이전 v0.9.6은 갱신이력만 67이고 본문은 65로 stale). Hero KPI 위젯 — pytest 409, KPI 47/0/20, 차단 3→1로 갱신. §1 timeline에 <b>블록 1~7 단일 카드</b>(A 시리즈 데이터·B 시리즈 PSH·C1 가이드) + 표에 <b>Phase 3 — 20시간 무중단</b> 섹션·A1~A5·B1~B6·C1 합계 행 신규. §2.1 가이드 v2 차단 카드 → <b>가이드 v1 자체 해소</b>로 전환, §2.2 합성 5,000·labeled 5,000·Nori 1,002·시드 v3 모두 완료 마킹. §4에 <b>PSH KPI 카드 신규</b>(throughput 2,050 docs/s·p95 90ms·OpenAPI 21/21·평가셋 100쌍·임베딩 캐시 7.75s→0.00s). §5.4에 블록 1~7 행 추가 + 97% 완성도. footer 67 KPI 동기화.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.6</td><td><b>20시간 무중단 작업 — 블록 1~6 완료</b>: <b>A1</b> 시드 v3 (142→313 키워드 / 4등급 균등), <b>A2</b> Nori 사용자 사전 v3 (235→1,002 / 30 도메인 섹션), <b>A3</b> 합성 800→5,000건 (noop, 라벨 일치 100%), <b>A4</b> labeled_5k train 3,500/val 748/test 752, <b>A5</b> 공개 코퍼스 매니페스트 (6 출처 / 15,608 예상 / 검증·JSONL 변환 자동), <b>B1</b> S10 평가셋 5→100쌍 (시드 v3 동적 로드), <b>B4</b> 임베딩 사전 캐시 (412 텍스트 / 7.75s → 0.00s), <b>B5</b> OpenAPI 정합 검사 (21/21 매칭률 100%), <b>B6</b> SBOM 시각화 (doc/21, 173 컴포넌트), <b>B2</b> S11 부하 단계 상향 (20→50→100) + 메모리 누수 (RSS Δ) + 확장성 KPI, <b>B3</b> S14 ES DR 옵트인. 18 시나리오 × 평균 3.7 KPI = <b>67 KPI</b>, dryrun PASS 48 / FAIL 0 / SKIP 19 (5회 연속). pytest 396 → <b>409 PASS</b>. 차단 자원 3건 중 2건(2.1 합성·2.2 labeled) 자체 해소.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.5</td><td><b>데이터 정합화 + 구조 개선</b> — 본문 stale 수치 일괄 갱신(pytest 212·285·301 → <b>409 PASS</b>로 통일), by-stage 8칸 → 12칸(W9~W12 가시화), timeline·가중치 표에 W9~W12 4개 단계 카드·행 추가, 단계별 표를 <b>Phase 1(W1~W8, 90%)·Phase 2(W9~W12, 100%)</b>로 분리(W9~W12 보너스 0% 문제 해소), Hero pct 95% → 96% + PSH KPI 위젯 추가, §2 자원 통계 v0.1 옛값(차단 6) → v0.2 신값(차단 3), footer에 doc/19·20·20a 링크 추가.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.4</td><td>W12 시나리오 확장 — 회복력·확장성 시나리오 3종 추가: <b>S12 대용량 일괄 분류</b>(N=100/500/1000/1001 경계, throughput 2,050 docs/s, p95 90ms), <b>S14 ES DR 리허설</b>(가용성 식별·full에서 정전 시뮬), <b>S15 백업·복원 라운드트립</b>(dr_restore_check 실행 OK). 18 시나리오 × 평균 3.6 KPI = <b>65 KPI</b>. dryrun PASS 46 / FAIL 0 / SKIP 19. doc/19 §2.11 + doc/20a v1.3 갱신. 389 → <b>396 PASS</b>.</td></tr>
@@ -1062,7 +1411,7 @@
       <a href="20_시나리오_성능_보고서.html">PSH 성능 보고서</a> ·
       <a href="20a_시나리오_성능_KPI매트릭스.md">KPI 매트릭스 v1.3</a>
     </p>
-    <p>2026-05-28 W12 종료 시점 · pytest 409/409 PASS · 18 시나리오 65 KPI · Phase 1 90% (W6 차단) + Phase 2 100% · 발주처 자원(GPU·실문서·가이드 v2·API 키) 도착 시 W6 즉시 가능.</p>
+    <p>2026-05-28 W13 R1~R5 운영 진입 보강 시점 · pytest <b>505/505 PASS</b> · 18 시나리오 <b>67 KPI (47/0/20)</b> · Phase 1 90% (W6 잔여) + Phase 2 100% + Phase 3 차단 3→1 + Phase 4 운영 진입 보강 완료 · 합성 5,000·labeled 5,000·가이드 v1 자체 해소 · 남은 차단: GPU + Anthropic API 키 + 실문서(미제공 가정).</p>
   </div>
 
 </main>

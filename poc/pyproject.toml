@@ -44,7 +44,8 @@ dependencies = [
   "matplotlib>=3.9",  # M6 평가 — confusion-matrix PNG 렌더 (report.py)
 
   # 표준 문서 추출 (lazy import 기반)
-  "pymupdf>=1.24",
+  # PyMuPDF는 AGPL-3.0 — 기본에서 제외, 선택 extra `[pdf-agpl]`로 옵트인.
+  # 운영 기본은 pdfminer.six(BSD-3). doc/14 §5.1 참조.
   "python-docx>=1.1",
 
   # 유틸
@@ -56,6 +57,13 @@ dependencies = [
 # 활성: pip install -e ".[hwp]"
 hwp = [
   "rhwp-python>=0.5.1",            # 최신 PyPI 0.5.1, 모든 플랫폼 wheel
+]
+
+# PyMuPDF AGPL 옵트인 — Artifex 상용 라이선스 또는 명시적 AGPL 수용 환경에서만.
+# 운영 기본은 pdfminer.six(BSD-3). doc/14 §5.1 라이선스 결정 참조.
+# 활성: pip install -e ".[pdf-agpl]"
+pdf-agpl = [
+  "pymupdf>=1.24",
 ]
 
 # 한국어 형태소 분석·정규화 (Mecab 의존, Java JDK 필요할 수 있음)
@@ -70,6 +78,13 @@ nlp = [
 embedding = [
   "FlagEmbedding>=1.2",
   "sentence-transformers>=3.0",    # FlagEmbedding 실패 시 폴백 (hf_embedding.py)
+]
+
+# Reranker (A1) — cross-encoder 재정렬. FlagEmbedding 또는 sentence_transformers.
+# 활성: pip install -e ".[reranker]"
+reranker = [
+  "FlagEmbedding>=1.2",
+  "sentence-transformers>=3.0",
 ]
 
 # 상용 LLM API (P3 합성 실측, 운영 옵션)
@@ -116,6 +131,25 @@ full = [
 # 활성: pip install -e ".[psh]"
 psh = [
   "prometheus-client>=0.20",        # 이미 base에 있지만 명시적 그룹화
+]
+
+# P1-F5: OpenTelemetry 분산 트레이싱
+# 활성: pip install -e ".[otel]"
+otel = [
+  "opentelemetry-api>=1.27",
+  "opentelemetry-sdk>=1.27",
+  "opentelemetry-instrumentation-fastapi>=0.48b0",
+  "opentelemetry-instrumentation-sqlalchemy>=0.48b0",
+  "opentelemetry-instrumentation-redis>=0.48b0",
+  "opentelemetry-instrumentation-httpx>=0.48b0",
+  "opentelemetry-exporter-otlp>=1.27",
+]
+
+# P1-C3: JWT 인증 운영용
+# 활성: pip install -e ".[jwt]"
+jwt = [
+  "cryptography>=43.0",
+  "PyJWT>=2.9",
 ]
 
 # 평가 산출물 (confusion-matrix PNG·통계 그래프)

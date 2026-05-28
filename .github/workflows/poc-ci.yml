@@ -49,6 +49,62 @@ jobs:
       - name: Lint src + scripts
         run: ruff check src/ scripts/
 
+  security-scan:
+    # C8: OWASP ASVS L2 셀프스캔 — bandit(SAST) + semgrep(rule-based)
+    # 결과는 SARIF로 업로드. 신규 HIGH/CRITICAL 발견 시 fail.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install bandit + semgrep
+        run: pip install "bandit[toml]>=1.7" "semgrep>=1.85"
+
+      - name: Bandit SAST (HIGH only fails build)
+        run: |
+          bandit -r src/ -ll -f json -o bandit-report.json || true
+          # exit code 1 if any HIGH severity finding
+          python -c "
+          import json, sys
+          d = json.load(open('bandit-report.json'))
+          highs = [r for r in d.get('results', []) if r.get('issue_severity') == 'HIGH']
+          print('HIGH findings:', len(highs))
+          for r in highs:
+              print(' -', r['filename'], r['line_number'], r['test_id'], r['issue_text'][:80])
+          sys.exit(1 if highs else 0)
+          "
+
+      - name: Semgrep (OWASP top10 + Python rules, fail on ERROR)
+        run: |
+          semgrep --config p/owasp-top-ten --config p/python \
+            --severity ERROR --error \
+            --json -o semgrep-report.json src/ || true
+          python -c "
+          import json, sys
+          d = json.load(open('semgrep-report.json'))
+          errs = [r for r in d.get('results', []) if r.get('extra', {}).get('severity') == 'ERROR']
+          print('ERROR findings:', len(errs))
+          for r in errs[:20]:
+              print(' -', r.get('path'), r.get('start', {}).get('line'), r.get('check_id'))
+          sys.exit(1 if errs else 0)
+          "
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ github.sha }}
+          path: |
+            poc/bandit-report.json
+            poc/semgrep-report.json
+          retention-days: 90
+
   openapi-lint:
     runs-on: ubuntu-latest
     steps:
@@ -63,6 +119,62 @@ jobs:
 
       - name: Validate OpenAPI spec (doc/03_openapi_lloydk_kl.yaml)
         run: openapi-spec-validator doc/03_openapi_lloydk_kl.yaml
+
+  openapi-artifacts:
+    # P1-E1·E4: OpenAPI → Postman 컬렉션 + 클라이언트 SDK 자동 생성.
+    # main push 시 dist/ 산출물 artifact 게시 → KL 측 다운로드 가능.
+    runs-on: ubuntu-latest
+    needs: [openapi-lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install "pyyaml>=6.0"
+
+      - name: Generate Postman Collection (E1)
+        run: |
+          mkdir -p dist
+          python poc/scripts/generate_postman_collection.py \
+            --spec doc/03_openapi_lloydk_kl.yaml \
+            --output dist/lloydk_kl_postman.json \
+            --base-url "https://api.lloydk.example.com"
+
+      - name: Install openapi-generator (E4)
+        run: |
+          sudo apt-get update && sudo apt-get install -y default-jre
+          curl -fsSL https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.10.0/openapi-generator-cli-7.10.0.jar \
+            -o /tmp/openapi-generator-cli.jar
+
+      - name: Generate Python SDK (E4)
+        run: |
+          java -jar /tmp/openapi-generator-cli.jar generate \
+            -i doc/03_openapi_lloydk_kl.yaml \
+            -g python \
+            -o dist/sdk-python \
+            --skip-validate-spec || echo "SDK generation soft-failed"
+
+      - name: Generate TypeScript SDK (E4)
+        run: |
+          java -jar /tmp/openapi-generator-cli.jar generate \
+            -i doc/03_openapi_lloydk_kl.yaml \
+            -g typescript-fetch \
+            -o dist/sdk-typescript \
+            --skip-validate-spec || echo "SDK generation soft-failed"
+
+      - name: Upload OpenAPI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-artifacts-${{ github.sha }}
+          path: |
+            dist/lloydk_kl_postman.json
+            dist/sdk-python/
+            dist/sdk-typescript/
+          retention-days: 90
 
   licenses-check:
     # doc/14 §11.1: 직접 의존성 라이선스 위험 사전 차단

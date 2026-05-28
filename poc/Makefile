@@ -153,3 +153,32 @@ reports:
 
 clean-data:
 	rm -rf datasets/synthetic datasets/p4_corpus reports
+
+# P1-F3: incident runbook 자동화 타깃 — 야간/주말 1차 대응 단축
+.PHONY: incident-api-down incident-es-yellow incident-queue-backlog incident-drift incident-audit-verify
+
+incident-api-down:
+	@echo "[incident] API 다운 1차 대응"
+	@docker compose logs api --tail 200 || true
+	@docker compose restart api || true
+	@sleep 10
+	@curl -fsS http://localhost:8000/api/v1/health || echo "[FAIL] /health still down — escalate to AI팀"
+
+incident-es-yellow:
+	@echo "[incident] ES yellow/red 1차 대응"
+	@curl -s http://localhost:9200/_cluster/health?pretty || true
+	@curl -s http://localhost:9200/_cat/shards | grep -E "UNASSIGNED|INITIALIZING" || echo "no problematic shards"
+
+incident-queue-backlog:
+	@echo "[incident] Celery 큐 적체 1차 대응"
+	@celery -A lloydk.workers.celery_app inspect active || true
+	@celery -A lloydk.workers.celery_app inspect reserved || true
+	@echo "[hint] worker 스케일 아웃: docker compose up -d --scale worker=8"
+
+incident-drift:
+	@echo "[incident] 모델 드리프트 점검"
+	$(PY) -c "from lloydk.services.drift_monitor import compute_drift; print('drift_monitor 모듈 OK — 실 임베딩 표본 필요')"
+
+incident-audit-verify:
+	@echo "[incident] 감사 로그 hash chain 검증"
+	$(PY) -c "from lloydk.services.audit_chain import verify_chain; r = verify_chain(); print('verified', r.verified, 'broken', r.broken, 'first_break', r.first_break_audit_id)"

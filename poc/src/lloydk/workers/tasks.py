@@ -146,3 +146,60 @@ def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
     spec = TrainSpec(**(spec_kwargs or {}))
     report = train_classifier(spec)
     return report.__dict__
+
+
+@celery_app.task(name="lloydk.active_learning_tick")
+def active_learning_tick(mode: str = "auto") -> dict:
+    """P1-A5: Active learning 주기 트리거.
+
+    mode="auto":     beat 30분 주기. URGENT 도달 시 train_classifier 자동 enqueue.
+    mode="snapshot": 일별 스냅샷. 학습 트리거 없이 status만 기록.
+    mode="dry":      평가만 수행. 호출용.
+
+    재학습 트리거 정책:
+    - URGENT_RETRAIN: 즉시 train_classifier_task enqueue (보안 미탐 누적)
+    - RETRAIN_RECOMMENDED: 누적 ≥ recommended_threshold 일 때만 weekly window에 큐잉
+      (간단히는 weekday=월요일 새벽에 한번)
+    - OK: nothing
+    """
+    from datetime import datetime
+    from lloydk.modules.m6_evaluation.active_learning import evaluate_retraining_need
+
+    status = evaluate_retraining_need()
+    payload = status.to_dict()
+    payload["mode"] = mode
+    payload["ts"] = datetime.utcnow().isoformat() + "Z"
+
+    if mode == "snapshot":
+        logger.info("active-learning daily snapshot: %s", payload)
+        return payload
+
+    if mode == "dry":
+        return payload
+
+    # auto mode
+    if status.retrain_status == "URGENT_RETRAIN":
+        logger.warning("URGENT_RETRAIN triggered: %s", status.reason)
+        try:
+            train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
+            payload["triggered"] = "URGENT_RETRAIN"
+        except Exception:  # noqa: BLE001
+            logger.exception("train_classifier_task enqueue failed")
+            payload["triggered"] = "ENQUEUE_FAILED"
+    elif status.retrain_status == "RETRAIN_RECOMMENDED":
+        now = datetime.utcnow()
+        # 월요일 03~05시 범위에만 weekly 트리거 (beat tz 한국 기준)
+        if now.weekday() == 0 and 3 <= now.hour < 5:
+            logger.info("weekly RETRAIN_RECOMMENDED triggered: %s", status.reason)
+            try:
+                train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
+                payload["triggered"] = "RETRAIN_RECOMMENDED"
+            except Exception:  # noqa: BLE001
+                logger.exception("train_classifier_task enqueue failed")
+                payload["triggered"] = "ENQUEUE_FAILED"
+        else:
+            payload["triggered"] = "SKIP_WAIT_WEEKLY_WINDOW"
+    else:
+        payload["triggered"] = "NONE"
+
+    return payload

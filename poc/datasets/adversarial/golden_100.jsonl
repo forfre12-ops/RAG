@@ -1,0 +1,100 @@
+{"id":"adv-001","desc":"M&A 협상 중 거래 상대 기업명과 잠정 가격이 명시된 미공개 이사회 안건","candidate_grades":["TS","S1"],"gold":"TS","reason":"전사 운명 좌우, 거래 무산·소송 리스크","trick":"법적 분쟁/소송 가능성→TS"}
+{"id":"adv-002","desc":"이미 공시된 사업 인수 발표 자료의 부서 내부 분석본","candidate_grades":["S2","S3"],"gold":"S2","reason":"공시 자체는 공개지만 내부 의사결정 분석","trick":"공개+비공개 혼합 → 더 높은 S 등급"}
+{"id":"adv-003","desc":"3개월 후 출시 예정 신제품의 가격표 초안","candidate_grades":["S1","S2"],"gold":"S1","reason":"출시 전 가격 노출→매출 직격","trick":"시점이 미공개 정보 등급 결정"}
+{"id":"adv-004","desc":"이미 출시된 제품의 가격 인하 검토 메모","candidate_grades":["S1","S2"],"gold":"S1","reason":"가격 인하 가능성 자체가 경쟁 정보","trick":"외관상 단순 메모지만 미래 의사결정"}
+{"id":"adv-005","desc":"공개 특허의 후속 개량 기술 연구노트","candidate_grades":["TS","S1"],"gold":"S1","reason":"공개된 기술 개량은 1급","trick":"기반 기술이 공개라고 개량까지 공개는 아님"}
+{"id":"adv-006","desc":"특허 출원 직전 핵심 알고리즘 명세서","candidate_grades":["TS","S1"],"gold":"TS","reason":"출원 전 유출 시 특허권 상실","trick":"시점→TS 상승"}
+{"id":"adv-007","desc":"보도자료 초안 (대외 발표 1일 전)","candidate_grades":["S2","S3"],"gold":"S2","reason":"발표 전까지 비공개","trick":"발표 후 즉시 S3로 강등"}
+{"id":"adv-008","desc":"이미 발표된 보도자료 사본","candidate_grades":["S3"],"gold":"S3","reason":"공개 자료","trick":"표지만 보고 S1 오분류 유도"}
+{"id":"adv-009","desc":"주요 협력사 NDA 초안","candidate_grades":["S1","S2"],"gold":"S2","reason":"법무 표준 양식 수준","trick":"NDA 단어로 TS 오인 유도"}
+{"id":"adv-010","desc":"주요 협력사 NDA 최종본 (협상 가격·조건 포함)","candidate_grades":["TS","S1"],"gold":"S1","reason":"체결된 조건은 거래 핵심","trick":"체결 단계가 등급 결정"}
+{"id":"adv-011","desc":"분기 매출 추정 보고서 (확정 전)","candidate_grades":["TS","S1"],"gold":"S1","reason":"공시 전 정보 유출→내부자거래","trick":"공시 전/후 시점이 결정"}
+{"id":"adv-012","desc":"분기 매출 공시본","candidate_grades":["S3"],"gold":"S3","reason":"공시 자료","trick":"내용 동일하나 시점 후→S3"}
+{"id":"adv-013","desc":"퇴사자 인수인계 문서 (보안등급 미정)","candidate_grades":["S1","S2"],"gold":"S2","reason":"운영 정보 수준","trick":"미정 표기에 S1 오분류 유도"}
+{"id":"adv-014","desc":"R&D 부서 일일 회의록 (실험 결과 일부 포함)","candidate_grades":["S1","S2"],"gold":"S1","reason":"미공개 실험 결과는 1급","trick":"회의록 형식→S2 오인"}
+{"id":"adv-015","desc":"고객 불만 사례 통계 (개인정보 비식별화)","candidate_grades":["S2","S3"],"gold":"S2","reason":"운영 평판 정보","trick":"비식별이라도 통계 자체 비공개"}
+{"id":"adv-016","desc":"공식 제품 카탈로그 (영업용 배포본)","candidate_grades":["S3"],"gold":"S3","reason":"대외 공개 전제","trick":"가격 포함이라고 S1 오분류 유도"}
+{"id":"adv-017","desc":"차세대 제품 로드맵 (3개년)","candidate_grades":["TS","S1"],"gold":"TS","reason":"중장기 경쟁 전략 핵심","trick":"로드맵 단어→S2 오인 유도"}
+{"id":"adv-018","desc":"전사 윤리 강령 (사내 공유본)","candidate_grades":["S2","S3"],"gold":"S3","reason":"공개해도 무방","trick":"사내 공유→S2 오인"}
+{"id":"adv-019","desc":"임원 보상 체계 변경안 초안","candidate_grades":["TS","S1"],"gold":"S1","reason":"민감하나 회사 존립까지는 아님","trick":"임원이라는 단어→TS 오인"}
+{"id":"adv-020","desc":"내부 조직 개편 초안","candidate_grades":["S1","S2"],"gold":"S2","reason":"외부 유출 시 평판 영향","trick":"임원 거론→S1 오인"}
+{"id":"adv-021","desc":"공급망 핵심 부품 단가표 (3년치 갱신 이력)","candidate_grades":["TS","S1"],"gold":"S1","reason":"공급 전략 핵심","trick":"부품이라는 일상어→S2 오인"}
+{"id":"adv-022","desc":"공급망 부품 카탈로그 (제조사 공개판)","candidate_grades":["S3"],"gold":"S3","reason":"공개 자료","trick":"단가 포함이라고 S1 오인"}
+{"id":"adv-023","desc":"고객 명단 — 1차 영업 리드 (개인정보 포함)","candidate_grades":["TS","S1"],"gold":"S1","reason":"개인정보 + 영업기밀","trick":"개인정보보호법 별도 절차 추가 필요"}
+{"id":"adv-024","desc":"마케팅 노출용 가공 고객 리스트 (익명화)","candidate_grades":["S2","S3"],"gold":"S2","reason":"가공된 마케팅 자료","trick":"익명화라고 S3로 오인"}
+{"id":"adv-025","desc":"이사회 의사록 (확정·서명본)","candidate_grades":["TS","S1"],"gold":"S1","reason":"전사 결정 사항","trick":"이사회=TS 단순 오인"}
+{"id":"adv-026","desc":"이사회 의사록 (M&A 결정·미공시)","candidate_grades":["TS","S1"],"gold":"TS","reason":"M&A 결정 포함","trick":"표지 동일, 내용이 다름"}
+{"id":"adv-027","desc":"국가핵심기술 지정 대상 연구노트","candidate_grades":["TS","S1"],"gold":"TS","reason":"산업기술보호법 적용","trick":"법령 적용 여부 미인지"}
+{"id":"adv-028","desc":"국가핵심기술 관련 공개 논문","candidate_grades":["S2","S3"],"gold":"S3","reason":"공개 논문은 공개","trick":"키워드 매치만으로 TS 오인 유도"}
+{"id":"adv-029","desc":"채용 면접 평가 시트 (개인정보)","candidate_grades":["S1","S2"],"gold":"S1","reason":"개인정보 + 인사 결정","trick":"단순 면접→S2 오인"}
+{"id":"adv-030","desc":"채용 모집 공고 (공개)","candidate_grades":["S3"],"gold":"S3","reason":"공개 모집","trick":"채용 단어→S1 오인 유도"}
+{"id":"adv-031","desc":"신약 임상 1상 결과 — 사내본","candidate_grades":["TS","S1"],"gold":"TS","reason":"임상 미공개 결과","trick":"임상 단어만으로 분류"}
+{"id":"adv-032","desc":"신약 임상 결과 — 공식 발표 후","candidate_grades":["S2","S3"],"gold":"S3","reason":"공식 공개","trick":"발표 전/후 구분 시점"}
+{"id":"adv-033","desc":"반도체 공정 레시피 — EUV 핵심 파라미터","candidate_grades":["TS","S1"],"gold":"TS","reason":"원천 노하우","trick":"레시피=경쟁우위 핵심"}
+{"id":"adv-034","desc":"반도체 공정 일반 백서 (학회 공개)","candidate_grades":["S2","S3"],"gold":"S3","reason":"학회 공개","trick":"동일 키워드, 공개 여부가 결정"}
+{"id":"adv-035","desc":"클라우드 인프라 구성도 (자산·IP 포함)","candidate_grades":["S1","S2"],"gold":"S1","reason":"공격 경로 노출","trick":"단순 다이어그램→S2 오인"}
+{"id":"adv-036","desc":"클라우드 인프라 다이어그램 (마케팅 발표용)","candidate_grades":["S2","S3"],"gold":"S3","reason":"발표용 추상화","trick":"동일 형식, 내용 수준 차이"}
+{"id":"adv-037","desc":"내부 가격 협상 가이드 (영업 사원용)","candidate_grades":["S1","S2"],"gold":"S1","reason":"가격 정책 핵심","trick":"가이드 단어→S2 오인"}
+{"id":"adv-038","desc":"공개 가격표 (홈페이지 게시본)","candidate_grades":["S3"],"gold":"S3","reason":"공개 자료","trick":"가격 단어→S1 오인"}
+{"id":"adv-039","desc":"비상 경영 시나리오 (회사 부도 대응)","candidate_grades":["TS","S1"],"gold":"TS","reason":"존립 위협 시나리오","trick":"가상이라도 시나리오 자체 TS"}
+{"id":"adv-040","desc":"전사 리스크 관리 매뉴얼 (개념 정의)","candidate_grades":["S2","S3"],"gold":"S2","reason":"운영 매뉴얼","trick":"리스크 단어→S1 오인"}
+{"id":"adv-041","desc":"M&A 후보 기업 디스커션 메모 (예비)","candidate_grades":["TS","S1"],"gold":"TS","reason":"기밀 후보 거론","trick":"예비라는 단어→S1 오인"}
+{"id":"adv-042","desc":"M&A 사후 통합 PMI 계획 (공개 발표 후)","candidate_grades":["S1","S2"],"gold":"S1","reason":"통합 노하우","trick":"공개 후라도 PMI 자체는 비공개"}
+{"id":"adv-043","desc":"고객사 거래 단가 협상 이메일","candidate_grades":["S1","S2"],"gold":"S1","reason":"거래 핵심 조건","trick":"이메일 형식→S2 오인"}
+{"id":"adv-044","desc":"법인 신용카드 사용 명세서","candidate_grades":["S1","S2"],"gold":"S1","reason":"운영 자산 + 개인정보","trick":"개인정보보호법 절차 추가 필요"}
+{"id":"adv-045","desc":"전사 비용 예산서 (확정 전)","candidate_grades":["S1","S2"],"gold":"S1","reason":"미공시 재무","trick":"예산서 단어→S2 오인"}
+{"id":"adv-046","desc":"전사 비용 예산서 (공시 후 사본)","candidate_grades":["S3"],"gold":"S3","reason":"공시 후 공개","trick":"동일 문서, 시점 차이"}
+{"id":"adv-047","desc":"리스크 평가 — 보안 침해 시뮬레이션 결과","candidate_grades":["TS","S1"],"gold":"S1","reason":"공격 경로 정보","trick":"가상 시뮬레이션→S2 오인"}
+{"id":"adv-048","desc":"공개 보안 인증서 사본 (홈페이지 게시본)","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"보안 단어→S1 오인"}
+{"id":"adv-049","desc":"법무 자문 의견서 (소송 가능성 평가)","candidate_grades":["TS","S1"],"gold":"TS","reason":"소송 전략 핵심","trick":"의견서 단어→S1 오인"}
+{"id":"adv-050","desc":"법무 표준 NDA 양식 (사내 공유)","candidate_grades":["S2","S3"],"gold":"S2","reason":"표준 양식","trick":"NDA→TS 오인"}
+{"id":"adv-051","desc":"노조 단체교섭 협상 카드 (사내 비공개)","candidate_grades":["TS","S1"],"gold":"S1","reason":"노사 분쟁 핵심","trick":"단체교섭=공개라 오인"}
+{"id":"adv-052","desc":"노조 단체교섭 협약문 (체결·공개)","candidate_grades":["S2","S3"],"gold":"S3","reason":"공개 협약","trick":"체결 전/후 시점"}
+{"id":"adv-053","desc":"내부 신고(whistleblowing) 사례 (피신고자 포함)","candidate_grades":["TS","S1"],"gold":"TS","reason":"신고자 보호 + 분쟁","trick":"피신고자 키워드→S2 오인"}
+{"id":"adv-054","desc":"내부 신고 제도 안내문 (사내 공지)","candidate_grades":["S2","S3"],"gold":"S3","reason":"공개 안내","trick":"신고 단어→TS 오인"}
+{"id":"adv-055","desc":"신약 후보물질 화학식","candidate_grades":["TS","S1"],"gold":"TS","reason":"원천 자산","trick":"화학식 단순화→S1 오인"}
+{"id":"adv-056","desc":"공개 학술지 게재 화학식","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"동일 형식, 공개 여부 차이"}
+{"id":"adv-057","desc":"위성 자세제어 알고리즘 소스","candidate_grades":["TS","S1"],"gold":"TS","reason":"국가핵심기술","trick":"소스코드 단어→S1 오인"}
+{"id":"adv-058","desc":"위성 사진 보도자료","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"위성 단어→TS 오인"}
+{"id":"adv-059","desc":"잠수함 음향 스텔스 설계도","candidate_grades":["TS"],"gold":"TS","reason":"국가안보","trick":"안보 키워드 미인지 시 S1 오인"}
+{"id":"adv-060","desc":"잠수함 일반 외관 사진 (공개)","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"잠수함 단어→TS 오인"}
+{"id":"adv-061","desc":"원전 노심 설계 핵심 자료","candidate_grades":["TS"],"gold":"TS","reason":"산업기술보호법","trick":"법령 적용 미인지"}
+{"id":"adv-062","desc":"원전 가동률 공시 자료","candidate_grades":["S3"],"gold":"S3","reason":"공시","trick":"원전 단어→TS 오인"}
+{"id":"adv-063","desc":"발사체 추진제 조성비","candidate_grades":["TS"],"gold":"TS","reason":"국가핵심기술","trick":"조성비 단어→S1 오인"}
+{"id":"adv-064","desc":"발사체 발사 성공 보도자료","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"발사체 단어→TS 오인"}
+{"id":"adv-065","desc":"수출 통제 대상 기술 자료 (전략물자)","candidate_grades":["TS","S1"],"gold":"TS","reason":"전략물자 통제","trick":"수출통제 법령 미인지"}
+{"id":"adv-066","desc":"수출 일반 통계 (산업부 공개)","candidate_grades":["S3"],"gold":"S3","reason":"공개 통계","trick":"수출 단어→TS 오인"}
+{"id":"adv-067","desc":"고객 PII가 포함된 거래 로그","candidate_grades":["TS","S1"],"gold":"S1","reason":"개인정보 + 거래","trick":"개인정보보호법 별도"}
+{"id":"adv-068","desc":"마스킹된 거래 로그 통계","candidate_grades":["S2","S3"],"gold":"S2","reason":"가공 자료","trick":"마스킹=공개라 오인"}
+{"id":"adv-069","desc":"내부 시스템 인증키 (운영용)","candidate_grades":["TS"],"gold":"TS","reason":"인증 자산","trick":"키 단어 단순 매치"}
+{"id":"adv-070","desc":"공개 OAuth 클라이언트 ID","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"클라이언트ID는 공개, 시크릿은 TS"}
+{"id":"adv-071","desc":"개발 환경 default 비밀번호 (변경 전)","candidate_grades":["TS","S1"],"gold":"TS","reason":"운영 침해 위험","trick":"개발용이라 S2 오인"}
+{"id":"adv-072","desc":"개발 환경 README (비밀번호 변경 안내)","candidate_grades":["S2","S3"],"gold":"S3","reason":"안내문","trick":"README 단어→S2 오인"}
+{"id":"adv-073","desc":"고객사 핵심 비밀 컨설팅 보고서","candidate_grades":["TS","S1"],"gold":"TS","reason":"외부 NDA 대상","trick":"컨설팅 단어→S1 오인"}
+{"id":"adv-074","desc":"공개 컨설팅 리포트 (요약본)","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"동일 키워드"}
+{"id":"adv-075","desc":"내부 매출 분석 대시보드 캡처","candidate_grades":["S1","S2"],"gold":"S1","reason":"미공시 매출","trick":"캡처 형식→S2 오인"}
+{"id":"adv-076","desc":"공시 매출 차트 캡처","candidate_grades":["S3"],"gold":"S3","reason":"공시","trick":"동일 형식 차이"}
+{"id":"adv-077","desc":"전사 보안 사고 사례 (피해 규모 포함)","candidate_grades":["TS","S1"],"gold":"S1","reason":"민감 정보","trick":"사고 단어→TS 오인"}
+{"id":"adv-078","desc":"전사 보안 교육 자료 (사내 공유)","candidate_grades":["S2","S3"],"gold":"S3","reason":"교육 안내","trick":"보안 단어→S1 오인"}
+{"id":"adv-079","desc":"고객 핵심 신원 데이터 (성명·주민번호)","candidate_grades":["TS","S1"],"gold":"S1","reason":"개인정보 + 영업기밀","trick":"PII 마스킹 분기 필요"}
+{"id":"adv-080","desc":"비식별 처리된 성명 통계","candidate_grades":["S2","S3"],"gold":"S2","reason":"가공 자료","trick":"비식별=공개 오인"}
+{"id":"adv-081","desc":"신제품 베타 테스트 피드백 (내부)","candidate_grades":["S1","S2"],"gold":"S1","reason":"미출시 정보","trick":"베타 단어→S2 오인"}
+{"id":"adv-082","desc":"신제품 출시 보도자료","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"출시 전/후 시점"}
+{"id":"adv-083","desc":"전사 IT 자산 inventory (IP·OS·버전)","candidate_grades":["S1","S2"],"gold":"S1","reason":"공격 경로 노출","trick":"inventory 단어→S3 오인"}
+{"id":"adv-084","desc":"공식 IT 정책 매뉴얼 (사내 공개)","candidate_grades":["S2","S3"],"gold":"S3","reason":"공식 매뉴얼","trick":"IT 단어→S2 오인"}
+{"id":"adv-085","desc":"전략 파트너십 MOU 협의안 (체결 전)","candidate_grades":["TS","S1"],"gold":"TS","reason":"거래 핵심","trick":"MOU 단어→S1 오인"}
+{"id":"adv-086","desc":"공개 MOU 보도자료","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"체결 전/후"}
+{"id":"adv-087","desc":"신용평가 결과 (외부 기관 평가본)","candidate_grades":["S1","S2"],"gold":"S2","reason":"외부 평가","trick":"공시인 경우 S3"}
+{"id":"adv-088","desc":"신용평가 결과 (공시본)","candidate_grades":["S3"],"gold":"S3","reason":"공시","trick":"동일 자료, 공시 여부"}
+{"id":"adv-089","desc":"내부 감사 결과 보고서 (지적사항 포함)","candidate_grades":["TS","S1"],"gold":"S1","reason":"민감 + 분쟁 가능","trick":"감사 단어→S2 오인"}
+{"id":"adv-090","desc":"내부 감사 매뉴얼 (절차)","candidate_grades":["S2","S3"],"gold":"S3","reason":"절차서","trick":"감사 단어→S1 오인"}
+{"id":"adv-091","desc":"채무 재조정 협상 자료 (대주단)","candidate_grades":["TS","S1"],"gold":"TS","reason":"존립 영향","trick":"재조정 단어→S1 오인"}
+{"id":"adv-092","desc":"공시된 채무 재구조 발표문","candidate_grades":["S3"],"gold":"S3","reason":"공시","trick":"공시 전/후"}
+{"id":"adv-093","desc":"국가 R&D 과제 기획서 (제안서 단계)","candidate_grades":["S1","S2"],"gold":"S1","reason":"미선정 단계","trick":"공모 단어→S3 오인"}
+{"id":"adv-094","desc":"공모 안내문 (공공기관 공고)","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"R&D 단어→S1 오인"}
+{"id":"adv-095","desc":"공급망 다변화 검토 (대안 협력사 명단)","candidate_grades":["TS","S1"],"gold":"S1","reason":"전략 정보","trick":"공급망 단어→S2 오인"}
+{"id":"adv-096","desc":"공급망 일반 통계 보고서","candidate_grades":["S3"],"gold":"S3","reason":"공개","trick":"공급망 단어→S1 오인"}
+{"id":"adv-097","desc":"오픈소스 사용 검토 (라이선스 위반 발견)","candidate_grades":["S1","S2"],"gold":"S1","reason":"법적 리스크","trick":"OSS 단어→S3 오인"}
+{"id":"adv-098","desc":"오픈소스 사용 가이드 (사내)","candidate_grades":["S2","S3"],"gold":"S3","reason":"가이드","trick":"OSS 단어→S1 오인"}
+{"id":"adv-099","desc":"전사 BCP/DR 시나리오 (자산 위치 포함)","candidate_grades":["TS","S1"],"gold":"S1","reason":"운영 핵심 + 공격 경로","trick":"BCP 단어→S2 오인"}
+{"id":"adv-100","desc":"BCP/DR 정책 개요 (사내 공유)","candidate_grades":["S2","S3"],"gold":"S2","reason":"운영 정보","trick":"BCP 단어→TS 오인"}

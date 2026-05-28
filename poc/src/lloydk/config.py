@@ -35,11 +35,21 @@ class Settings(BaseSettings):
     minio_bucket_models: str = "lloydk-models"
     minio_bucket_mlflow: str = "mlflow"
 
+    # P2-C2: 일반화 storage backend — minio | seaweedfs | local
+    storage_backend: str = "minio"
+    storage_endpoint: str = ""        # seaweedfs s3 게이트웨이 URL (예: http://seaweed:8333)
+    storage_verify_tls: bool = True
+
     mlflow_tracking_uri: str = "http://localhost:5000"
 
     # --- API ---
     # J1: dev 디폴트 제거. dryrun/테스트는 빈 키 허용, full 모드는 startup에서 fail-fast.
     api_key: str = ""
+
+    # P1-C3: JWT 인증 모드. api_key(기본) | jwt | both
+    auth_mode: str = "api_key"
+    jwt_jwks_path: str = ""           # JWKS JSON 파일 경로 (kid → key)
+    jwt_public_key: str = ""          # 단일 RS256 공개키 PEM (JWKS 미사용시)
 
     # CORS allow-origins. 운영에서는 .env로 origin allowlist 설정.
     # 기본값 ["*"]은 PoC·dryrun·테스트 편의를 위함. 운영 배포 시 명시적 origin 필수.
@@ -76,6 +86,13 @@ class Settings(BaseSettings):
     classifier_base_model: str = "kakaobank/kf-deberta-base"
     classifier_lightweight_model: str = "monologg/koelectra-base-v3-discriminator"
     embedding_model: str = "nlpai-lab/KURE-v1"
+
+    # --- Reranker (A1) ---
+    # noop  : 입력 순서 유지 (기본, 운영 외)
+    # bge   : BAAI/bge-reranker-v2-m3 (FlagEmbedding 또는 sentence_transformers)
+    # qwen3 : Qwen/Qwen3-Reranker-0.6B
+    reranker_provider: str = "noop"
+    reranker_top_k: int = 50  # retriever 1차 후 reranker로 줄일 입력 크기
     embedding_fallback_model: str = "BAAI/bge-m3"
 
     # --- 청크/처리 ---

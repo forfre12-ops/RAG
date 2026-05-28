@@ -70,8 +70,57 @@ class _LRU:
             return len(self._data)
 
 
+class _RedisCache:
+    """P1-D1: Redis 영속 캐시 백엔드 (옵션).
+
+    in-memory LRU의 보조 — get은 LRU miss 시 fallback, put은 LRU와 함께 갱신.
+    의존성 없으면 noop. Redis 실패는 catch + 로깅, 절대 throw 안 함.
+    """
+
+    def __init__(self, url: str, ttl_seconds: int = 86400, key_prefix: str = "lloydk:emb:"):
+        self._url = url
+        self._ttl = ttl_seconds
+        self._prefix = key_prefix
+        self._client = None
+        self._broken = False
+
+    def _ensure(self) -> bool:
+        if self._broken:
+            return False
+        if self._client is not None:
+            return True
+        try:
+            import redis  # type: ignore
+            self._client = redis.Redis.from_url(self._url, decode_responses=False, socket_timeout=2)
+            self._client.ping()
+            return True
+        except Exception:  # noqa: BLE001
+            self._broken = True
+            return False
+
+    def get(self, key: str) -> list[float] | None:
+        if not self._ensure():
+            return None
+        try:
+            raw = self._client.get(self._prefix + key)  # type: ignore[union-attr]
+            if not raw:
+                return None
+            return json.loads(raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def put(self, key: str, value: list[float]) -> None:
+        if not self._ensure():
+            return
+        try:
+            payload = json.dumps(value).encode("utf-8")
+            self._client.setex(self._prefix + key, self._ttl, payload)  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001
+            return
+
+
 class CachedEmbedding:
-    """EmbeddingProvider wrapper with in-memory LRU + optional disk cache.
+    """EmbeddingProvider wrapper with in-memory LRU + optional disk + optional Redis cache.
 
     Parameters
     ----------
@@ -82,6 +131,11 @@ class CachedEmbedding:
         LRU 최대 항목 수. ``None`` 이면 env ``EMB_CACHE_SIZE`` 또는 1024.
     disk_path:
         ``str|Path|None``. 지정 시 종료 후에도 유지되는 JSON 디스크 캐시.
+    redis_url:
+        ``str|None``. 지정 시 영속 Redis 캐시 백엔드 활성 (P1-D1).
+        실패하면 silent skip — LRU + disk만 동작.
+    redis_ttl:
+        Redis TTL 초. 기본 24h.
     """
 
     name = "cached"
@@ -92,10 +146,13 @@ class CachedEmbedding:
         *,
         cache_size: int | None = None,
         disk_path: str | os.PathLike[str] | None = None,
+        redis_url: str | None = None,
+        redis_ttl: int = 86400,
     ) -> None:
         self._underlying = underlying
         self._lru = _LRU(_resolve_cache_size(cache_size))
         self._disk_path: Path | None = Path(disk_path) if disk_path else None
+        self._redis = _RedisCache(redis_url, ttl_seconds=redis_ttl) if redis_url else None
         self._load_disk()
         # underlying 의 dim/name 을 best-effort 로 전파 (Protocol 호환)
         self.dim = getattr(underlying, "dim", None)
@@ -153,6 +210,13 @@ class CachedEmbedding:
             if cached is not None:
                 out_vectors[i] = list(cached)
                 continue
+            # P1-D1: Redis 영속 캐시 fallback
+            if self._redis is not None:
+                rv = self._redis.get(k)
+                if rv is not None:
+                    out_vectors[i] = list(rv)
+                    self._lru.put(k, list(rv))
+                    continue
             if k in miss_seen:
                 # 같은 배치 안 중복 — underlying 재호출 없이 동일 결과 공유
                 continue
@@ -178,6 +242,9 @@ class CachedEmbedding:
                 key = keys[mi]
                 vec_list = list(map(float, vec))
                 self._lru.put(key, vec_list)
+                # P1-D1: Redis 영속도 함께 갱신 (best-effort)
+                if self._redis is not None:
+                    self._redis.put(key, vec_list)
             self._flush_disk()
 
         # 3) 결과 재구성 — None 자리(중복된 miss / 새 miss) 모두 LRU 에서 채움
