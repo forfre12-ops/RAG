@@ -21,6 +21,7 @@ celery_app.conf.task_routes = {
     "lloydk.train_classifier": {"queue": "learning"},
     "lloydk.index_documents": {"queue": "index"},
     "lloydk.active_learning_tick": {"queue": "learning"},
+    "lloydk.drift_tick": {"queue": "learning"},
 }
 
 # P1-A5: Active Learning 주기 트리거 (Celery beat).
@@ -36,6 +37,13 @@ celery_app.conf.beat_schedule = {
         "task": "lloydk.active_learning_tick",
         "schedule": crontab(minute=0, hour=3),
         "kwargs": {"mode": "snapshot"},
+    },
+    # A4 (2026-05-29): 매 15분 — 운영 임베딩 drift 점검.
+    # alert=True면 lloydk_drift_alert gauge=1 → Grafana 알람 룰 트리거.
+    "drift-check-every-15min": {
+        "task": "lloydk.drift_tick",
+        "schedule": 15 * 60.0,
+        "kwargs": {"limit": 200, "threshold": 0.5},
     },
 }
 celery_app.conf.timezone = "Asia/Seoul"

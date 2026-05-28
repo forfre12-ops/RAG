@@ -69,6 +69,21 @@ class InMemoryStore:
                 col.payloads.append(dict(pl))
         return len(ids)
 
+    def sample_vectors(self, *, limit: int = 200, collection: str | None = None) -> list[list[float]]:
+        """A4: drift_monitor용 — 최근 저장 벡터 표본.
+
+        시간 인덱스 없어 마지막 N개를 그대로 반환. ES 백엔드에서 timestamp range로
+        교체할 것. collection 미지정 시 모든 컬렉션을 합쳐서 표본.
+        """
+        out: list[list[float]] = []
+        cols = [self._cols[collection]] if collection and collection in self._cols else self._cols.values()
+        for col in cols:
+            for vec in col.vectors[-limit:]:
+                out.append(list(vec))
+                if len(out) >= limit:
+                    return out
+        return out
+
     def search(
         self,
         collection: str,

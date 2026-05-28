@@ -82,6 +82,34 @@ EMBEDDING_FALLBACK_TOTAL = Counter(
     registry=registry,
 )
 
+# A4 (2026-05-29): Drift monitor — P1-B4를 운영 신호로 살리기.
+# Celery beat가 drift_tick 호출 → compute_drift() → 본 gauge에 set().
+DRIFT_KL_DIVERGENCE = Gauge(
+    "lloydk_drift_kl_divergence",
+    "KL divergence between train and recent prod embedding cosine distributions",
+    registry=registry,
+)
+DRIFT_COSINE_MEAN = Gauge(
+    "lloydk_drift_cosine_mean",
+    "Mean cosine similarity of recent prod embeddings vs train centroid",
+    registry=registry,
+)
+DRIFT_COSINE_STD = Gauge(
+    "lloydk_drift_cosine_std",
+    "Std of cosine similarity of recent prod embeddings",
+    registry=registry,
+)
+DRIFT_ALERT = Gauge(
+    "lloydk_drift_alert",
+    "1 if KL divergence >= threshold (drift suspected), else 0",
+    registry=registry,
+)
+DRIFT_SAMPLE_SIZE = Gauge(
+    "lloydk_drift_sample_size",
+    "Number of prod embedding samples included in the latest drift report",
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",

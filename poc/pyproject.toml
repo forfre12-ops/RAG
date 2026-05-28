@@ -166,6 +166,7 @@ dev = [
   "pytest-cov>=5.0",                # 커버리지 측정 (C7 — coverage 80% 목표)
   "ruff>=0.6",
   "ipykernel>=6.29",
+  "fakeredis>=2.20",                # B3 — redis 미가용 환경에서 R1·outbox 테스트 통과
 ]
 
 [build-system]

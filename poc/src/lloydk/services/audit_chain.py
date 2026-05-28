@@ -2,13 +2,18 @@
 
 audit_log 테이블에는 payload_hash 컬럼이 이미 존재. 본 모듈은:
 1) payload + prev_row_hash를 결합한 chained hash 산정
-2) 일별/시간별 chain 검증 (변조 시 즉시 검출)
+2) chain 연결성 검증 — 한 row가 변조/삭제되면 다음 row의 prev16이 불일치
+
+설계 한계 (A2 명시):
+- body 본문은 PG에 저장하지 않음(보안). 따라서 본 chain은 *row order + prev 연결성*만
+  검증함. body가 직접 변조됐는지 여부는 별도 WAL(예: minio 객체 timestamping) 필요.
+- 그러나 chain의 핵심 위협 모델(=과거 row 삭제·삽입·재배열)은 본 모듈로 모두 검출됨.
 
 스키마 변경 없이 payload_hash 컬럼에 `prev16:payload32` 형식으로 패킹하여
 하위호환 유지(기존 payload_hash 단일 해시도 검증 시 prev=zeros 가정).
 
 운영시:
-- audit insert 직전 build_chained_hash() 호출하여 payload_hash 값 결정
+- A2(2026-05-29): AuditMiddleware._try_build_chained_hash가 자동으로 chain 형성.
 - 일별 정기 검증: verify_chain() — 변조 발견 시 알람
 - 일별 마지막 hash는 외부 timestamping 서비스로 송부 권장(선택)
 """

@@ -16,8 +16,12 @@ dryrun에서도 동작 — InMemory + Hash 임베딩 사용 가능.
 
 from __future__ import annotations
 
+import json as _json
+import logging as _logging
 import math
+import os as _os
 from dataclasses import dataclass, asdict, field
+from pathlib import Path as _Path
 
 
 @dataclass
@@ -150,3 +154,130 @@ def export_to_prometheus(report: DriftReport) -> dict[str, float]:
         "lloydk_drift_alert": 1.0 if report.alert else 0.0,
         "lloydk_drift_sample_size": float(report.sample_size),
     }
+
+
+def publish_to_prom(report: DriftReport) -> None:
+    """A4: prom_metrics.py의 Gauge에 직접 set. tasks.drift_tick이 호출.
+
+    prom_metrics import는 함수 안에서 — module-load 시점에 circular 회피.
+    """
+    try:
+        from lloydk.api import prom_metrics  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        logger = __import__("logging").getLogger(__name__)
+        logger.warning("publish_to_prom skipped (prom_metrics unavailable): %s", exc)
+        return
+
+    prom_metrics.DRIFT_KL_DIVERGENCE.set(report.kl_divergence)
+    prom_metrics.DRIFT_COSINE_MEAN.set(report.cosine_mean)
+    prom_metrics.DRIFT_COSINE_STD.set(report.cosine_std)
+    prom_metrics.DRIFT_ALERT.set(1.0 if report.alert else 0.0)
+    prom_metrics.DRIFT_SAMPLE_SIZE.set(float(report.sample_size))
+
+
+# ---------------------------------------------------------------------------
+# A4: train centroid 영속 저장 + 운영 임베딩 표본 fetch
+# ---------------------------------------------------------------------------
+
+_logger = _logging.getLogger(__name__)
+
+# 기본 저장 위치 — env로 override 가능. 운영에서는 MinIO/S3로 옮길 수 있음.
+_DEFAULT_CENTROID_PATH = _os.environ.get(
+    "LLOYDK_DRIFT_CENTROID_PATH",
+    str(_Path(__file__).resolve().parents[3] / "datasets" / "drift_train_centroid.json"),
+)
+
+
+def save_train_centroid(vectors: list[list[float]], *, path: str | None = None) -> str:
+    """학습 시점 임베딩 표본으로부터 centroid + 히스토그램을 JSON으로 저장.
+
+    drift 비교 기준점. 학습 파이프라인이 학습 종료 시 1회 호출.
+    """
+    path = path or _DEFAULT_CENTROID_PATH
+    centroid = _centroid(vectors)
+    cos = [cosine(v, centroid) for v in vectors]
+    hist = _histogram(cos, bins=20)
+    payload = {
+        "centroid": centroid,
+        "histogram": hist,
+        "sample_size": len(vectors),
+        "dim": len(centroid),
+    }
+    p = _Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(_json.dumps(payload), encoding="utf-8")
+    _logger.info("drift centroid saved: path=%s n=%d dim=%d", path, len(vectors), len(centroid))
+    return str(p)
+
+
+def load_train_centroid(path: str | None = None) -> dict | None:
+    """저장된 centroid + histogram을 로드. 미존재 시 None."""
+    path = path or _DEFAULT_CENTROID_PATH
+    p = _Path(path)
+    if not p.exists():
+        return None
+    try:
+        return _json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("drift centroid load failed: path=%s err=%s", path, exc)
+        return None
+
+
+def fetch_recent_prod_embeddings(*, limit: int = 200) -> list[list[float]]:
+    """최근 운영 임베딩 표본을 vectorstore에서 가져온다.
+
+    구현 노트: 현 PoC의 InMemoryVectorStore에는 시간 인덱스가 없어
+    전체 청크 중 마지막 N개를 그대로 표본으로 사용. ES 백엔드 도입 후
+    timestamp range로 교체할 것 (P2).
+    """
+    try:
+        from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("fetch_recent_prod_embeddings skipped (vectorstore unavailable): %s", exc)
+        return []
+    try:
+        # force_memory=False면 env VECTOR_BACKEND 따름. ES 미가용 시 InMemory 폴백.
+        store = build_store()
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("vectorstore init failed: %s", exc)
+        return []
+
+    # 어댑터별 표본 메서드 (모든 백엔드가 구현하진 않음 — 폴백 빈 리스트)
+    sample_fn = getattr(store, "sample_vectors", None)
+    if callable(sample_fn):
+        try:
+            return list(sample_fn(limit=limit))
+        except Exception as exc:  # noqa: BLE001
+            _logger.debug("sample_vectors failed: %s", exc)
+            return []
+    return []
+
+
+def run_drift_check(*, limit: int = 200, threshold: float = 0.5) -> DriftReport:
+    """train centroid + 최근 운영 표본으로 drift 비교 → 게이지 갱신 후 보고서 반환.
+
+    centroid 미저장 또는 운영 표본 부재 시 빈 DriftReport (alert=False) 반환.
+    """
+    train = load_train_centroid()
+    prod = fetch_recent_prod_embeddings(limit=limit)
+    if not train or not prod:
+        report = DriftReport(
+            sample_size=len(prod),
+            cosine_mean=0.0,
+            cosine_std=0.0,
+            kl_divergence=0.0,
+            threshold_alert=threshold,
+        )
+        publish_to_prom(report)
+        _logger.info(
+            "drift check skipped: train_centroid=%s prod_n=%d",
+            "yes" if train else "no", len(prod),
+        )
+        return report
+
+    # train_vectors가 직접 필요한 게 아니라 centroid 한 점이면 충분.
+    # compute_drift는 vectors 리스트를 받으므로 centroid 1점을 train_vectors로 전달.
+    train_centroid_vec = train["centroid"]
+    report = compute_drift([train_centroid_vec], prod, threshold_alert=threshold)
+    publish_to_prom(report)
+    return report

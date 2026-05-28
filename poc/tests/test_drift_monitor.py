@@ -52,3 +52,52 @@ def test_export_to_prometheus_keys():
     assert "lloydk_drift_kl_divergence" in metrics
     assert "lloydk_drift_cosine_mean" in metrics
     assert "lloydk_drift_alert" in metrics
+
+
+# ---------------------------------------------------------------------------
+# A4 wiring — centroid 저장/로드 + Prometheus gauge + run_drift_check
+# ---------------------------------------------------------------------------
+
+
+def test_save_and_load_train_centroid(tmp_path):
+    from lloydk.services.drift_monitor import load_train_centroid, save_train_centroid
+
+    p = tmp_path / "centroid.json"
+    vectors = _make_vectors(seed=1, n=50, dim=16)
+    save_train_centroid(vectors, path=str(p))
+    loaded = load_train_centroid(path=str(p))
+    assert loaded is not None
+    assert loaded["sample_size"] == 50
+    assert loaded["dim"] == 16
+    assert len(loaded["centroid"]) == 16
+
+
+def test_publish_to_prom_sets_gauges():
+    from lloydk.api import prom_metrics
+    from lloydk.services.drift_monitor import compute_drift, publish_to_prom
+
+    train = _make_vectors(seed=1, n=50)
+    prod = _make_vectors(seed=2, n=50, shift=2.0)
+    report = compute_drift(train, prod, threshold_alert=0.1)
+    publish_to_prom(report)
+
+    # collect → text 노출에 4개 게이지가 들어 있는지
+    from prometheus_client import generate_latest
+    text = generate_latest(prom_metrics.registry).decode()
+    assert "lloydk_drift_kl_divergence" in text
+    assert "lloydk_drift_cosine_mean" in text
+    assert "lloydk_drift_alert" in text
+    assert "lloydk_drift_sample_size" in text
+
+
+def test_run_drift_check_no_centroid_returns_empty(tmp_path, monkeypatch):
+    """centroid 미저장 → empty report + alert=False."""
+    monkeypatch.setenv("LLOYDK_DRIFT_CENTROID_PATH", str(tmp_path / "missing.json"))
+    # 모듈 reload — env가 module-load 시점에 캐시됨
+    import importlib
+    import lloydk.services.drift_monitor as dm
+    importlib.reload(dm)
+
+    r = dm.run_drift_check()
+    assert r.sample_size == 0
+    assert r.alert is False

@@ -148,6 +148,23 @@ def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
     return report.__dict__
 
 
+@celery_app.task(name="lloydk.drift_tick")
+def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
+    """A4: 운영 임베딩 drift 주기 점검 — Celery beat가 호출.
+
+    drift_monitor.run_drift_check가 train centroid + 최근 운영 표본을 비교하고
+    Prometheus gauge에 직접 set. alert=True면 알람 룰이 페이지.
+    """
+    from lloydk.services.drift_monitor import run_drift_check
+    report = run_drift_check(limit=limit, threshold=threshold)
+    out = report.to_dict()
+    logger.info(
+        "drift_tick: sample=%d kl=%.4f cosine_mean=%.4f alert=%s",
+        report.sample_size, report.kl_divergence, report.cosine_mean, report.alert,
+    )
+    return out
+
+
 @celery_app.task(name="lloydk.active_learning_tick")
 def active_learning_tick(mode: str = "auto") -> dict:
     """P1-A5: Active learning 주기 트리거.

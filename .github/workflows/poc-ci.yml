@@ -226,6 +226,7 @@ jobs:
       run:
         working-directory: ./poc
     # M3: Postgres 서비스 컨테이너 — _pg_ok() 통합 테스트 자동 활성화 (skipif 해제)
+    # B1·B2 (2026-05-29): Redis(R1·outbox) + Elasticsearch(RAG indexer·DR) 추가.
     services:
       postgres:
         image: postgres:16-alpine
@@ -240,10 +241,36 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      elasticsearch:
+        image: elasticsearch:8.15.0
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9200/_cluster/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
     env:
       # pydantic-settings는 case-insensitive로 DATABASE_URL → settings.database_url 매핑
       DATABASE_URL: postgresql+psycopg://lloydk:lloydk_dev_pg@localhost:5432/lloydk
       PGPASSWORD: lloydk_dev_pg
+      # B1: R1·outbox redis 백엔드 테스트가 실 Redis로 동작 (fakeredis 폴백 아님)
+      REDIS_URL_TEST: redis://localhost:6379/15
+      # B2: ES skipif 해제 — _ES 가용 시 RAG indexer/DR 실측
+      ES_URL: http://localhost:9200
     steps:
       - uses: actions/checkout@v4
 

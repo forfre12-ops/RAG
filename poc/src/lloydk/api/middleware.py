@@ -35,6 +35,30 @@ def _hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _try_build_chained_hash(body: bytes) -> str | None:
+    """A2: body → prev_row 결합 → chained hash 패킹.
+
+    audit_chain 또는 DB 미가용 시 단순 sha256 폴백(하위호환).
+    body가 비어도 prev_row만으로 chain 진행 가능 (empty payload).
+    """
+    try:
+        from lloydk.services.audit_chain import build_chained_hash, get_last_hash  # noqa: PLC0415
+    except ImportError:
+        return _hash_bytes(body) if body else None
+    try:
+        prev = get_last_hash()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("audit chain prev fetch failed (db unavailable): %s", exc)
+        return _hash_bytes(body) if body else None
+    try:
+        # payload는 body 그대로(bytes → str sha256 사전 계산해서 넘김)
+        body_hash = _hash_bytes(body) if body else ""
+        return build_chained_hash(body_hash, prev)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("audit chain hash build failed: %s", exc)
+        return _hash_bytes(body) if body else None
+
+
 async def _read_body(request: Request) -> bytes:
     """body를 한 번만 읽고, 다운스트림 핸들러가 재사용할 수 있게 cache."""
     body = await request.body()
@@ -61,7 +85,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
             # K3: 빈 swallow 제거, debug 로깅 — multipart 등 비표준 body는 정상적으로 실패 가능
             logger.debug("audit payload_hash skipped: %s", exc)
             body = b""
-        payload_hash = _hash_bytes(body) if body else None
+
+        # A2 (2026-05-29): 단순 sha256 대신 chained hash로 저장.
+        # 형식 prev16:full32 — verify_chain이 진짜 재계산 가능. DB·chain 모듈 부재 시
+        # 기존 sha256 폴백(하위호환). _try_build_chained_hash는 모든 예외를 silent 처리.
+        payload_hash = _try_build_chained_hash(body)
 
         response: Response | None = None
         error_code: str | None = None

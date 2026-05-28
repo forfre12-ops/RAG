@@ -9,8 +9,6 @@
 본 라우터는 검수자 UI(FUN-024)가 "왜 이 등급?"을 사용자에게 표시하기 위해 사용.
 """
 
-from __future__ import annotations
-
 from collections import defaultdict
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 

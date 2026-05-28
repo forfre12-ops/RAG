@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import uuid
 import warnings
-from typing import Optional
+from typing import Callable, Optional
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -21,6 +21,10 @@ from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
 from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
 from lloydk.repositories.classify_repo import ClassifyRepo
 from lloydk.schemas.classify import ClassifyRequest, ClassifyResponse
+
+# A3: SSE/스트리밍에서 진척 단계를 실제로 노출하기 위한 콜백 시그니처.
+# 호출 측이 None을 넘기면 기존 동작과 동일(no-op).
+StageCallback = Callable[[str], None]
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +46,34 @@ class ClassifyService:
     # Public API
     # ------------------------------------------------------------
 
-    def classify(self, req: ClassifyRequest) -> ClassifyResponse:
+    def classify(
+        self,
+        req: ClassifyRequest,
+        *,
+        on_stage: StageCallback | None = None,
+    ) -> ClassifyResponse:
+        """텍스트를 등급 분류.
+
+        on_stage: 단계 진입 시 호출되는 콜백. 단계 이름 = stages_emitted 참조.
+                  SSE 스트리밍(/classify/stream) 등에서 진척 송신용. 없으면 no-op.
+        """
+        notify = on_stage or (lambda _stage: None)
+
         logger.debug(
             "classify enter: doc_id=%s tenant=%s use_rag=%s content_len=%d",
             req.doc_id, req.tenant_id, req.use_rag, len(req.content or ""),
         )
+        notify("extract")
         if req.text_already_preprocessed:
             cleaned = req.content
         else:
+            notify("normalize")
             cleaned = self.preprocess.run_text(req.content)
 
+        # InferencePipeline 내부에서 embed → retrieve → llm을 거치므로,
+        # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
+        notify("embed")
+        notify("retrieve" if req.use_rag else "llm")
         pred = self.inference.run(
             text=cleaned,
             use_rag=req.use_rag,
@@ -59,10 +81,13 @@ class ClassifyService:
             metadata=req.metadata or {},
             return_evidence=req.return_evidence,
         )
+        notify("llm")
 
         warnings_acc = list(pred.warnings)
+        notify("persist")
         inference_id, persist_warnings = self._try_persist(req, pred)
         warnings_acc.extend(persist_warnings)
+        notify("finalize")
 
         logger.info(
             "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f",

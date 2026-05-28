@@ -1,27 +1,22 @@
 """P2-D5: /classify/stream — Server-Sent Events 스트리밍 분류.
 
-LLM이 토큰을 생성하는 동안 클라이언트에 점진적 SSE event 송신.
-UX 개선 — 검수자가 첫 토큰부터 즉시 평가 시작 가능.
+A3(2026-05-29): 가짜 stage yield 제거. ClassifyService.classify(on_stage=...)
+콜백을 큐로 받아 실제 단계 진입 시점에 progress 이벤트 송신.
 
 이벤트 종류:
-- progress: stage 변동 (extract/normalize/chunk/embed/retrieve/llm/finalize)
-- partial:  중간 결과 (top-1 grade, confidence 갱신)
+- progress: 실제 stage 진입 (extract/normalize/embed/retrieve/llm/persist/finalize)
+- partial:  중간 결과 (top-1 grade, confidence)
 - result:   최종 ClassifyResponse
-- error:    예외 발생 시
+- error:    예외
 - done:     스트림 종료
-
-클라이언트 예:
-  fetch('/api/v1/classify/stream', { method: 'POST', body: JSON.stringify(req) })
 """
-
-from __future__ import annotations
 
 import asyncio
 import json
 import time
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
 from lloydk.config import settings
@@ -47,35 +42,59 @@ def _sse_event(event: str, data: dict | str) -> str:
 
 async def _classify_stream(req: ClassifyRequest, svc: ClassifyService) -> AsyncGenerator[str, None]:
     t0 = time.time()
+    stage_queue: asyncio.Queue[str | None] = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+
+    def on_stage(stage: str) -> None:
+        # 워커 스레드에서 호출됨 → 메인 루프 큐로 thread-safe 전달
+        loop.call_soon_threadsafe(stage_queue.put_nowait, stage)
+
+    async def runner():
+        try:
+            result = await asyncio.to_thread(svc.classify, req, on_stage=on_stage)
+            return ("ok", result)
+        except Exception as e:  # noqa: BLE001
+            return ("err", e)
+        finally:
+            loop.call_soon_threadsafe(stage_queue.put_nowait, None)  # 종료 신호
+
+    task = asyncio.create_task(runner())
+
     try:
-        yield _sse_event("progress", {"stage": "extract", "elapsed_ms": 0})
-        await asyncio.sleep(0)  # cooperative yield
-        yield _sse_event("progress", {"stage": "normalize", "elapsed_ms": int((time.time() - t0) * 1000)})
-        await asyncio.sleep(0)
-        yield _sse_event("progress", {"stage": "chunk", "elapsed_ms": int((time.time() - t0) * 1000)})
-        await asyncio.sleep(0)
-        yield _sse_event("progress", {"stage": "embed", "elapsed_ms": int((time.time() - t0) * 1000)})
-        await asyncio.sleep(0)
-        yield _sse_event("progress", {"stage": "retrieve", "elapsed_ms": int((time.time() - t0) * 1000)})
-        await asyncio.sleep(0)
-        yield _sse_event("progress", {"stage": "llm", "elapsed_ms": int((time.time() - t0) * 1000)})
+        # stage 이벤트를 실시간으로 yield
+        while True:
+            stage = await stage_queue.get()
+            if stage is None:
+                break
+            yield _sse_event("progress", {
+                "stage": stage,
+                "elapsed_ms": int((time.time() - t0) * 1000),
+            })
 
-        # 동기 분류 실행 (LLM 스트리밍 어댑터 도입 시 토큰 단위로 분할 송신 가능)
-        result = await asyncio.to_thread(svc.classify, req)
+        kind, payload = await task
+        if kind == "err":
+            yield _sse_event("error", {
+                "message": str(payload)[:200],
+                "type": type(payload).__name__,
+            })
+            yield _sse_event("done", {"elapsed_ms": int((time.time() - t0) * 1000)})
+            return
+
+        result = payload
         result.elapsed_ms = int((time.time() - t0) * 1000)
-
-        yield _sse_event("partial", {"grade": result.grade.value, "confidence": result.confidence})
-        yield _sse_event("progress", {"stage": "finalize", "elapsed_ms": result.elapsed_ms})
+        yield _sse_event("partial", {
+            "grade": result.label.value if hasattr(result.label, "value") else str(result.label),
+            "confidence": float(result.confidence),
+        })
         yield _sse_event("result", json.loads(result.model_dump_json()))
         yield _sse_event("done", {"elapsed_ms": result.elapsed_ms})
-    except Exception as e:  # noqa: BLE001
-        yield _sse_event("error", {"message": str(e)[:200], "type": type(e).__name__})
-        yield _sse_event("done", {"elapsed_ms": int((time.time() - t0) * 1000)})
+    except asyncio.CancelledError:
+        task.cancel()
+        raise
 
 
 @router.post("/classify/stream", dependencies=[Depends(require_api_key)])
 async def classify_stream(
-    request: Request,
     req: ClassifyRequest,
     svc: ClassifyService = Depends(get_service),
 ):
