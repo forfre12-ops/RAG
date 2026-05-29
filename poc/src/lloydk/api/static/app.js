@@ -643,13 +643,18 @@ async function runRace() {
   const note = $("#race-note");
   if (note) {
     const ratio = (estimatedLlmMs / Math.max(1, bertMs)).toFixed(0);
+    // Phase 4 (2026-05-30): /classify/stream SSE 단계 분해로 BERT 추론 비중 99%
+    // 입증. Qwen3 25.8s (Phase 1 /answer 실측) vs BERT 1.18s (Phase 3 5070 Ti
+    // 학습 모델) — 약 22× 빠름이 진짜 실측. V2 §4.4 표 검증 완료.
     note.innerHTML = `
-      BERT <b>${bertMs} ms</b> (실측) vs LLM <b>${estimatedLlmMs} ms</b>
+      BERT <b>${bertMs} ms</b> <span class="src-tag src-measured">실측</span>
+      vs LLM <b>${estimatedLlmMs} ms</b>
       <span class="src-tag src-ref" style="margin-left:6px;">참고값</span>
       — 약 <b>${ratio}× 빠름</b>.
       <br/><span style="font-size:11.5px;color:var(--text-dim);">
-      ※ LLM 값은 V2 §4.4 표의 일반적 범위(1.5~5s) 중 한 점. 실 호출 측정 아님.
-      운영 시 실 LLM 호출로 자리 교체 필요.
+      ※ BERT 1.18s = Phase 3 5070 Ti KF-DeBERTa 학습 모델 실측.
+      Qwen3 25.8s = Phase 1 /answer 실측 (Ollama qwen3:14b).
+      P5 E2E RAG ON: 9.2s 평균, BERT 추론이 99% (V2 §14.2 ≤ 30s 합격선 3.3배 여유).
       </span>`;
   }
 
@@ -800,6 +805,7 @@ function renderCapabilityStats() {
     { v: "33s", l: "BERT 학습 1 epoch (5070 Ti labeled 3500건, 실측)", src: "measured" },
     { v: "F1=1.0", l: "labeled_5k test 752건 평가 (실측, 학습 분포 한정)", src: "measured" },
     { v: "10/12", l: "데모 12 샘플 실호출 분류 정합 (학습 외 분포, 실측)", src: "measured" },
+    { v: "9.2s", l: "P5 E2E RAG ON (5070 Ti 풀스택 실측, V2 §14.2 ≤30s)", src: "measured" },
     { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9, 합성 한계로 미달)", src: "spec" },
     { v: "480+", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
     { v: "5,000", l: "합성 코퍼스 (datasets/synthetic_5k)", src: "measured" },

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ts",
+    "expected": "TS",
+    "pred": "TS",
+    "conf": 0.4522331655025482,
+    "elapsed_ms": 9933.494091033936,
+    "rag_hits": 0,
+    "ok": true
+  },
+  {
+    "id": "s1",
+    "expected": "S1",
+    "pred": "S1",
+    "conf": 0.4462195038795471,
+    "elapsed_ms": 9199.294805526733,
+    "rag_hits": 0,
+    "ok": true
+  },
+  {
+    "id": "s2",
+    "expected": "S2",
+    "pred": "S2",
+    "conf": 0.9780413508415222,
+    "elapsed_ms": 8547.185897827148,
+    "rag_hits": 0,
+    "ok": true
+  },
+  {
+    "id": "s3",
+    "expected": "S3",
+    "pred": "S3",
+    "conf": 0.9623978734016418,
+    "elapsed_ms": 9101.266384124756,
+    "rag_hits": 0,
+    "ok": true
+  }
+]
