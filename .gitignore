@@ -26,10 +26,25 @@ poc/reports/
 poc/.storage/
 
 # Build artifacts
-poc/dist/                       # 폐쇄망 번들 빌드 출력
-poc/migration/                  # Qdrant→ES 마이그레이션 작업 파일 (JSONL·failed)
-poc/licenses/                   # dump_licenses.py 자동 산출 (doc/14)
-docker-data/                    # Docker bind mount 데이터 (E:/antigravity/rag/docker-data/로 매핑)
+# (인라인 주석은 git이 패턴 일부로 해석하므로 줄 위로 분리)
+# 폐쇄망 번들 빌드 출력
+poc/dist/
+# Qdrant→ES 마이그레이션 작업 파일 (JSONL·failed)
+poc/migration/
+# dump_licenses.py 자동 산출 (doc/14)
+poc/licenses/
+# Docker bind mount 데이터 (E:/antigravity/rag/docker-data/로 매핑)
+docker-data/
+
+# Additional data dirs (PoC 5K 합성·라벨)
+poc/datasets/labeled_5k/
+poc/datasets/synthetic_5k/
+
+# Test artifacts
+poc/.coverage
+
+# Doc backups / 외부 회신용 통합본 (별도 트래킹 안 함)
+doc/bak/
 
 # Notebooks
 .ipynb_checkpoints/
