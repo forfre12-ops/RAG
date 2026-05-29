@@ -15,6 +15,23 @@ QWEN_DIR="$REPO_ROOT/poc/datasets/synthetic_qwen3"
 SOLAR_DIR="$REPO_ROOT/poc/datasets/synthetic_solar"
 QWEN_TARGET=200
 
+# 안전장치: 스크립트 시작 시점의 LOCAL_LLM_MODEL 백업 → 모든 종료 경로에서 복원.
+# 야간 무중단 실패 시(SIGTERM·SIGINT·script crash) .env가 solar로 남는 사고 차단.
+ENV_FILE="$REPO_ROOT/poc/.env"
+ORIGINAL_MODEL=$(grep -E '^LOCAL_LLM_MODEL=' "$ENV_FILE" | head -1 | cut -d'=' -f2)
+echo "[overnight] 시작 시 LOCAL_LLM_MODEL=${ORIGINAL_MODEL} 백업"
+
+restore_env() {
+  if [ -n "$ORIGINAL_MODEL" ] && [ -f "$ENV_FILE" ]; then
+    current=$(grep -E '^LOCAL_LLM_MODEL=' "$ENV_FILE" | head -1 | cut -d'=' -f2)
+    if [ "$current" != "$ORIGINAL_MODEL" ]; then
+      sed -i "s|^LOCAL_LLM_MODEL=.*$|LOCAL_LLM_MODEL=${ORIGINAL_MODEL}|" "$ENV_FILE"
+      echo "[overnight] EXIT trap — LOCAL_LLM_MODEL 복원: ${current} → ${ORIGINAL_MODEL}"
+    fi
+  fi
+}
+trap restore_env EXIT INT TERM
+
 cd "$REPO_ROOT"
 
 echo "[overnight] $(date '+%H:%M:%S') Qwen3 진행 폴링 시작 (목표 ${QWEN_TARGET} 건)"

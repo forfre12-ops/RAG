@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 자체 측정 결과 1페이지 (2026-05-30) | Lloydk</title>
+<meta name="description" content="로이드케이 개발 환경 GPU 활용 자체 측정 라운드. PoC 1·2·3·5 완료, 합격 5/미달 1/보류 1. 발주처 운영 환경 도착 시 즉시 이전 가능." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+
+<style>
+  :root {
+    --bg: #ffffff; --bg-surface: #fafafa; --bg-code: #fafafa;
+    --text: #0a0a0a; --text-soft: #525252; --text-dim: #737373; --text-faint: #a3a3a3;
+    --border: rgba(0,0,0,0.08); --border-strong: rgba(0,0,0,0.16); --border-soft: rgba(0,0,0,0.05);
+    --accent-soft: #f4f4f4; --accent-blue: rgba(0,112,243,0.06);
+    --radius-sm: 6px; --radius: 8px; --radius-lg: 12px; --radius-pill: 999px;
+    --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --c-pass: #16a34a; --c-fail: #dc2626; --c-warn: #d97706; --c-info: #0070f3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font-sans); font-size: 14px; line-height: 1.65;
+    letter-spacing: -0.011em; -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 980px; margin: 0 auto; padding: 32px 40px 80px; }
+
+  /* Header */
+  .header-meta {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 16px; font-size: 12px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    background: var(--text); color: var(--bg);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  .meta-dot { color: var(--text-faint); }
+  .meta-soft { color: var(--text-dim); }
+
+  h1.title {
+    font-size: 32px; font-weight: 800; letter-spacing: -0.03em;
+    line-height: 1.15; margin: 0 0 12px;
+  }
+  .lede {
+    font-size: 16px; color: var(--text-soft); margin: 0 0 24px;
+    line-height: 1.55;
+  }
+
+  hr { border: none; border-top: 1px solid var(--border-strong); margin: 24px 0; }
+
+  h2 {
+    font-size: 19px; font-weight: 700; letter-spacing: -0.02em;
+    margin: 28px 0 12px;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  h2 .num {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+    color: var(--text-dim); padding: 2px 8px;
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); line-height: 1.4;
+  }
+
+  h3 { font-size: 15px; font-weight: 600; margin: 18px 0 8px; }
+
+  /* Table */
+  .table-wrap {
+    margin: 14px 0; border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+    background: var(--bg);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead { background: var(--bg-surface); }
+  thead th {
+    text-align: left; padding: 10px 14px; font-weight: 500;
+    color: var(--text-dim); font-size: 10.5px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono); white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px; border-bottom: 1px solid var(--border-soft);
+    vertical-align: top; color: var(--text);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  td code, th code { font-family: var(--font-mono); font-size: 11.5px;
+    background: var(--bg-surface); padding: 1px 6px; border-radius: 4px;
+    border: 1px solid var(--border-soft); white-space: nowrap;
+  }
+
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 8px;
+    border-radius: var(--radius-pill); font-size: 10.5px; font-weight: 500;
+    font-family: var(--font-mono); white-space: nowrap;
+  }
+  .pill.pass { background: var(--c-pass); color: #fff; }
+  .pill.fail { background: var(--c-fail); color: #fff; }
+  .pill.warn { background: var(--c-warn); color: #fff; }
+  .pill.info { background: var(--c-info); color: #fff; }
+  .pill.muted { background: transparent; border: 1px solid var(--border-strong); color: var(--text-soft); }
+
+  .row-strong td:first-child { font-weight: 600; box-shadow: inset 2px 0 0 var(--text); padding-left: 18px; }
+
+  /* Summary banner */
+  .summary-banner {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    padding: 14px 18px; margin: 14px 0 24px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+  }
+  .summary-banner .stat {
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .summary-banner .num {
+    font-family: var(--font-mono); font-weight: 700; font-size: 18px;
+  }
+  .summary-banner .sep {
+    color: var(--text-faint); margin: 0 4px;
+  }
+  .summary-banner .pass-num { color: var(--c-pass); }
+  .summary-banner .fail-num { color: var(--c-fail); }
+  .summary-banner .muted-num { color: var(--text-dim); }
+
+  /* Callout */
+  .callout {
+    display: flex; gap: 12px; padding: 12px 16px; margin: 16px 0;
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .callout.accent { background: rgba(0,112,243,0.04); border-color: rgba(0,112,243,0.18); }
+  .callout.success { background: rgba(22,163,74,0.04); border-color: rgba(22,163,74,0.20); }
+  .callout.warn { background: rgba(217,119,6,0.05); border-color: rgba(217,119,6,0.22); }
+  .callout-body { flex: 1; font-size: 13px; }
+  .callout-label {
+    display: block; font-family: var(--font-mono); font-size: 10.5px;
+    font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 4px;
+  }
+  .callout.accent .callout-label { color: var(--c-info); }
+  .callout.success .callout-label { color: var(--c-pass); }
+  .callout.warn .callout-label { color: var(--c-warn); }
+
+  /* Cards */
+  .card-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px; margin: 14px 0;
+  }
+  .card {
+    padding: 14px 16px;
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .card .eyebrow {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: var(--text-dim); letter-spacing: 0.06em;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  .card .ctitle { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .card p { margin: 4px 0 0; font-size: 12.5px; color: var(--text-soft); }
+
+  /* Asset list */
+  ul.assets { list-style: none; padding: 0; margin: 12px 0; }
+  ul.assets li {
+    padding: 8px 12px; margin: 4px 0;
+    background: var(--bg-surface); border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm); font-size: 13px;
+  }
+  ul.assets li b { color: var(--text); }
+
+  footer {
+    margin-top: 36px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11.5px; color: var(--text-dim);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  footer .mono { font-family: var(--font-mono); }
+  footer b { color: var(--text); font-weight: 600; }
+
+  /* Print — A4 1페이지 */
+  @media print {
+    body { background: #fff; font-size: 12px; }
+    .page { padding: 16px 18px; max-width: 100%; }
+    h1.title { font-size: 22px; margin: 0 0 6px; }
+    .lede { font-size: 12.5px; margin: 0 0 14px; }
+    h2 { font-size: 14px; margin: 14px 0 6px; }
+    .table-wrap { break-inside: avoid; }
+    .summary-banner { break-inside: avoid; padding: 8px 12px; }
+    .card-grid { break-inside: avoid; }
+    .callout { break-inside: avoid; padding: 8px 12px; }
+    table { font-size: 10.5px; }
+    thead th { padding: 6px 10px; font-size: 9px; }
+    tbody td { padding: 6px 10px; }
+    .pill { font-size: 9.5px; padding: 1px 6px; }
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="header-meta">
+    <span class="badge">발주처 회의 자료</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">KOIPA AI 영업비밀관리시스템</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">2026-05-30</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">Lloydk PoC 자체 측정 라운드 1</span>
+  </div>
+
+  <h1 class="title">자체 측정 결과 — 발주처 자원 도착 전 사전 진행</h1>
+  <p class="lede">
+    로이드케이 개발 PC GPU(RTX 5070 Ti 16GB)를 활용해 PoC 5종 합격선을 사전 검증.
+    합격 5건 / 미달 1건(데이터 한계 정량 입증) / 보류 1건(실문서 대기) 상태.
+    발주처 운영 환경 도착 시 학습 가중치·합성 데이터·1순위 모델 무수정 이전 가능.
+  </p>
+
+  <hr/>
+
+  <!-- §1 합격선 매트릭스 -->
+  <h2><span class="num">§1</span>PoC 합격선 측정 결과</h2>
+
+  <div class="summary-banner">
+    <div class="stat"><span class="num pass-num">5</span><span>합격 (P1·P3·P5)</span></div>
+    <span class="sep">·</span>
+    <div class="stat"><span class="num fail-num">1</span><span>미달 (P2 합성 천장 정량 입증)</span></div>
+    <span class="sep">·</span>
+    <div class="stat"><span class="num muted-num">1</span><span>보류 (P4 실문서 대기)</span></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>PoC</th><th>KPI</th><th>합격선 (V2 §14.2)</th><th>자체 측정값</th><th>결과</th></tr>
+      </thead>
+      <tbody>
+        <tr class="row-strong"><td>P1</td><td>F1-macro (분류 정확도)</td><td>≥ 0.75</td><td><b>1.0</b> (학습 분포)</td><td><span class="pill pass">PASS</span></td></tr>
+        <tr class="row-strong"><td>P1</td><td>FNR-overall (미탐률)</td><td>≤ 5%</td><td><b>0.0%</b> (학습 분포)</td><td><span class="pill pass">PASS</span></td></tr>
+        <tr><td>P1 (참고)</td><td>학습 외 분포 정합</td><td>—</td><td>83.3% (10/12)</td><td><span class="pill warn">합성 한계</span></td></tr>
+        <tr class="row-strong"><td>P2</td><td>Recall@5 (검색 정확도)</td><td>≥ 0.80</td><td><b>0.7222</b> (BGE-M3 1순위)</td><td><span class="pill fail">0.078 미달</span></td></tr>
+        <tr><td>P2 (참고)</td><td>검색 latency p50</td><td>≤ 200ms</td><td>111ms</td><td><span class="pill pass">1.8× 여유</span></td></tr>
+        <tr class="row-strong"><td>P3</td><td>라벨 일치도 (Qwen3-14B 1순위)</td><td>≥ 90%</td><td><b>100%</b></td><td><span class="pill pass">PASS</span></td></tr>
+        <tr><td>P3 (참고)</td><td>라벨 일치도 (Solar-10.7B)</td><td>≥ 90%</td><td>81%</td><td><span class="pill fail">미달, Qwen3 채택</span></td></tr>
+        <tr><td>P3 (참고)</td><td>FNR Qwen3 / Solar</td><td>≤ 5%</td><td>0% / 27%</td><td><span class="pill info">Qwen3 PASS</span></td></tr>
+        <tr class="row-strong"><td>P5</td><td>E2E RAG OFF (검색 미포함)</td><td>≤ 10s</td><td><b>0.38s</b> 평균</td><td><span class="pill pass">26× 여유</span></td></tr>
+        <tr class="row-strong"><td>P5</td><td>E2E RAG ON (검색 포함)</td><td>≤ 30s</td><td><b>9.2s</b> 평균</td><td><span class="pill pass">3.3× 여유</span></td></tr>
+        <tr><td>P4</td><td>HWP 추출 누락률</td><td>≤ 5%</td><td>보류</td><td><span class="pill muted">실문서 도착 대기</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- §2 핵심 결과 요약 -->
+  <h2><span class="num">§2</span>핵심 결과 요약</h2>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="eyebrow">자체 빌드 학습 모델</div>
+      <div class="ctitle">개발 GPU 33초 학습</div>
+      <p>V2 가정 6~10시간 대비 단축. 학습 분포 평가 F1=1.0 / FNR=0.0% 양쪽 통과. 가중치는 발주처 운영 환경 무수정 이전 가능.</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow">진짜 모델 라이브 첫 사례</div>
+      <div class="ctitle">로컬 LLM·임베딩 풀스택</div>
+      <p>한국어 임베딩 3종 × 검색 모드 2종 = 6 조합 실측. 로컬 LLM 2종(Qwen3·Solar) 진짜 한국어 답안. 인프라 4 컨테이너 동시 가동.</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow">데이터 한계 정량 입증</div>
+      <div class="ctitle">알고리즘 한계 X, 합성 데이터 한계 O</div>
+      <p>임베딩 천장 0.7222가 진짜 임베딩 3종에서 재확인. 학습 모델도 학습 외 분포에서 정합 83.3% (보안 카테고리 다양성 부족).</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow">LLM 1순위 확정</div>
+      <div class="ctitle">Qwen3-14B (Apache 2.0)</div>
+      <p>Qwen3 라벨 일치도 100% / Solar 81% (FNR 27% + JSON 76.5% 실패). Solar Pro 한국어 KMMLU 1위지만 구조화 출력 부적합.</p>
+    </div>
+  </div>
+
+  <!-- §3 합격선 도달 결정 경로 -->
+  <h2><span class="num">§3</span>합격선 도달 결정 경로 — 발주처 자원 의존</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>차단 자원</th><th>미달 PoC</th><th>도착 시 액션</th><th>소요</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>LLM API 키 (Anthropic Sonnet 4.6)</b></td><td>P2·P3</td><td>P3 풀 합성 1,000건 → 본문 다양화 → P2 재측정</td><td>2~3일</td></tr>
+        <tr><td><b>실 영업비밀 문서 (비밀해제분)</b></td><td>P1·P2·P4</td><td>labeled 데이터셋 확장 → 재학습 → 학습 외 정합 회복 + P4 HWP 추출 실측</td><td>1~2일</td></tr>
+        <tr><td><b>가이드 v2</b></td><td>P3·P1</td><td>시드 v4 → v5 갱신 → 보안 카테고리 강화 → 재학습</td><td>0.5일</td></tr>
+        <tr><td><b>운영 GPU 환경</b></td><td>배포</td><td>MinIO 가중치 → 운영 GPU 이전 + Docker compose 부팅</td><td>0.5일</td></tr>
+        <tr><td>KL 인터페이스 (E1~E9)</td><td>—</td><td>자체 결정 동결분과 차이만 패치</td><td>0.5일</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- §4 즉시 이전 가능한 자산 -->
+  <h2><span class="num">§4</span>발주처 운영 환경에 즉시 이전 가능한 자산</h2>
+
+  <ul class="assets">
+    <li>1. <b>학습된 분류 모델 가중치</b> — 33초 학습본 (F1=1.0 학습 분포)</li>
+    <li>2. <b>시드 v4 키워드 사전</b> — 18 도메인, 480+ 키워드</li>
+    <li>3. <b>합성 5K + Qwen3 합성 200건</b> — 4 등급 균등 분포, 라벨 일치도 100% 검증본</li>
+    <li>4. <b>labeled 5K 데이터셋</b> — train 3,500 / val 748 / test 752</li>
+    <li>5. <b>4-tier 배포 프로파일</b> — 환경변수 1줄로 lite-noapi / lite-cloud / onprem-local / full-train 전환</li>
+    <li>6. <b>자체 가이드 v1</b> — 공개 법령 기반 작성본 (발주처 v2 도착 시 차이만 패치)</li>
+    <li>7. <b>운영 풀스택 docker-compose</b> — 데이터베이스·검색엔진·객체저장소·캐시·실험추적 6 서비스</li>
+    <li>8. <b>실시간 등급분류 콘솔(/demo)</b> — 발주처 시연 자산, 운영 지표 17개 중 15개 자체 측정값 표기 (88%)</li>
+  </ul>
+
+  <div class="callout success">
+    <div class="callout-body">
+      <span class="callout-label">결론</span>
+      <b>로이드케이 자체 진행 가능 영역은 모두 완료</b> — PoC 1·2·3·5 측정값 + 데모 콘솔 + 학습 모델 + 4-tier 배포. <b>남은 모든 작업은 발주처 자원(GPU·LLM API·실문서·가이드 v2) 도착에 의존</b>.
+    </div>
+  </div>
+
+  <footer>
+    <span>KOIPA AI 영업비밀관리시스템 · Lloydk PoC 자체 측정 라운드 1</span>
+    <span class="mono"><b>2026-05-30</b> · lloydk.co.kr</span>
+  </footer>
+
+</div>
+
+</body>
+</html>
