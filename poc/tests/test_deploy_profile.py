@@ -82,6 +82,11 @@ def test_training_router_visibility(
 
     app.py가 settings.enable_training을 import-time에 평가하므로
     settings 모듈 reload + app 모듈 reload 순서로 강제 재로딩.
+
+    teardown 필수 — reload는 monkeypatch가 풀어주지 않으므로 env 정리 후
+    한 번 더 reload하여 settings.poc_mode/enable_training을 원상복구.
+    안 그러면 후속 테스트(test_smoke 등)가 import-time에 production
+    자격증명 차단에 걸림.
     """
     monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
     monkeypatch.setenv("DEPLOY_PROFILE", profile)
@@ -92,11 +97,17 @@ def test_training_router_visibility(
     import lloydk.api.app as app_mod
     importlib.reload(app_mod)
 
-    paths = {route.path for route in app_mod.app.routes}
-    # training router의 실제 path는 /api/v1/train, /api/v1/train/jobs 등
-    training_paths = {p for p in paths if p.startswith("/api/v1/train")}
+    try:
+        paths = {route.path for route in app_mod.app.routes}
+        # training router의 실제 path는 /api/v1/train, /api/v1/train/jobs 등
+        training_paths = {p for p in paths if p.startswith("/api/v1/train")}
 
-    if training_expected:
-        assert training_paths, f"{profile}: 학습 라우터가 등록되어야 함"
-    else:
-        assert not training_paths, f"{profile}: 학습 라우터가 노출되면 안됨 — {training_paths}"
+        if training_expected:
+            assert training_paths, f"{profile}: 학습 라우터가 등록되어야 함"
+        else:
+            assert not training_paths, f"{profile}: 학습 라우터가 노출되면 안됨 — {training_paths}"
+    finally:
+        # env 원상복구 후 모듈 재reload — 후속 테스트의 settings 오염 차단
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        importlib.reload(cfg_mod)
+        importlib.reload(app_mod)
