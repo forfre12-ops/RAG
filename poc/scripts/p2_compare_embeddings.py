@@ -78,8 +78,14 @@ def evaluate(
     docs: list[dict],
     queries: list[dict],
     top_k: int,
+    reranker_provider: str | None = None,
+    oversample_factor: int = 4,
 ) -> dict:
-    """단일 (embedder × backend × mode) 조합 평가. 백엔드 미가용 시 SKIP 행 반환."""
+    """단일 (embedder × backend × mode) 조합 평가. 백엔드 미가용 시 SKIP 행 반환.
+
+    reranker_provider: None이면 reranker 미적용. "noop"/"bge"/"qwen3" 지정 시
+        1차 dense에서 top_k*oversample_factor만큼 가져온 뒤 cross-encoder로 재정렬.
+    """
     from lloydk.adapters.embedding import build_embedder
     from lloydk.adapters.vectorstore import build_store
 
@@ -88,7 +94,14 @@ def evaluate(
     # CachedEmbedding wrap 시 emb.name="cached"라 모델 구분이 사라짐.
     # underlying 모델명을 우선 노출 — 안 보이면 emb.name 폴백.
     display_name = getattr(emb, "_underlying_name", None) or emb.name
-    label = f"{display_name} / {backend} / {search_mode}"
+    rr_label = f" + rr={reranker_provider}" if reranker_provider else ""
+    label = f"{display_name} / {backend} / {search_mode}{rr_label}"
+
+    # reranker lazy 빌드 — 첫 쿼리에서 모델 다운로드/로드 비용 발생
+    reranker = None
+    if reranker_provider:
+        from lloydk.adapters.reranker import get_reranker
+        reranker = get_reranker(reranker_provider)
     try:
         vs = build_store(backend=backend)
         # 실 연결 확인 — ensure_collection이 첫 요청을 발생시킴
@@ -139,14 +152,52 @@ def evaluate(
     latencies: list[float] = []
     per_query: list[dict] = []
 
+    # reranker 사용 시 1차 dense는 oversample (top_k * factor), reranker로 top_k까지 좁힘
+    first_k = top_k * max(1, oversample_factor) if reranker else top_k
+
+    # 워밍업 1회 — 첫 쿼리는 임베딩 모델 cold start로 lat outlier가 됨(KURE 1차 측정에서
+    # p95=4535ms, avg=1482ms 관측). 첫 쿼리를 한 번 미리 돌려 모델·CUDA 컨텍스트를 데움.
+    # 측정 통계에는 미포함.
+    if queries:
+        try:
+            wq = queries[0]["text"]
+            wqv = emb.embed([wq]).vectors[0]
+            warm_results = (
+                vs.search_hybrid(col, wq, wqv, top_k=first_k)
+                if search_mode == "hybrid"
+                else vs.search(col, wqv, top_k=first_k)
+            )
+            if reranker and warm_results:
+                warm_cands = [r.payload.get("text", "") for r in warm_results]
+                reranker.rerank(wq, warm_cands, top_k=top_k)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[p2] warmup skipped: {exc}", file=sys.stderr)
+
     for q in queries:
         t1 = time.perf_counter()
         qv = emb.embed([q["text"]]).vectors[0]
 
         if search_mode == "hybrid":
-            results = vs.search_hybrid(col, q["text"], qv, top_k=top_k)
+            results = vs.search_hybrid(col, q["text"], qv, top_k=first_k)
         else:
-            results = vs.search(col, qv, top_k=top_k)
+            results = vs.search(col, qv, top_k=first_k)
+
+        # reranker 적용 — payload의 text를 cross-encoder에 넘김
+        if reranker and results:
+            try:
+                cands = [r.payload.get("text", "") for r in results]
+                ranked = reranker.rerank(q["text"], cands, top_k=top_k)
+                # ranked는 RerankResult(index, score, document) 정렬됨 — 원본 results를 그 순서로 슬라이스
+                results = [results[r.index] for r in ranked]
+            except Exception as exc:  # noqa: BLE001
+                # reranker 실패 시 dense 순서로 폴백 (top_k 슬라이스)
+                print(f"[p2] reranker failed for q={q['text']!r}: {exc}", file=sys.stderr)
+                results = results[:top_k]
+        elif reranker and not results:
+            results = []
+        else:
+            # reranker 미사용 경로는 first_k == top_k이므로 그대로
+            pass
 
         latencies.append((time.perf_counter() - t1) * 1000)
         hit = any(r.payload.get("grade") == q["expected_grade"] for r in results)
@@ -171,6 +222,8 @@ def evaluate(
         "embedder": display_name,
         "backend": backend,
         "search_mode": search_mode,
+        "reranker": reranker_provider,
+        "oversample_factor": oversample_factor if reranker_provider else None,
         "label": label,
         "status": "OK",
         "dim": emb.dim,
@@ -325,6 +378,18 @@ def main() -> int:
         default=3,
         help="등급당 쿼리 개수. dryrun=3 권장, full=9+ (총 36+) 권장.",
     )
+    ap.add_argument(
+        "--reranker",
+        default=None,
+        choices=["noop", "bge", "qwen3"],
+        help="reranker 적용. 지정 시 1차 dense에서 oversample 후 cross-encoder 재정렬. 미지정 시 미적용.",
+    )
+    ap.add_argument(
+        "--oversample-factor",
+        type=int,
+        default=4,
+        help="reranker 사용 시 1차 dense에서 top_k × factor만큼 가져옴. 기본 4.",
+    )
     ap.add_argument("--report", default="reports/p2_embedding_report.md")
     args = ap.parse_args()
 
@@ -342,7 +407,11 @@ def main() -> int:
     print(f"[p2] mode={args.mode}, combos={len(combos)}, backends={backends}, hybrid={args.hybrid}")
 
     rows = [
-        evaluate(emb, backend, search_mode, docs, queries, args.top_k)
+        evaluate(
+            emb, backend, search_mode, docs, queries, args.top_k,
+            reranker_provider=args.reranker,
+            oversample_factor=args.oversample_factor,
+        )
         for emb, backend, search_mode in combos
     ]
     verdict = write_report(rows, Path(args.report))

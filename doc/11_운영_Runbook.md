@@ -647,5 +647,42 @@ python scripts/run_perf_scenarios.py --mode dryrun --fail-on-miss --no-regressio
 6. **RTO 4시간 / RPO 1일** 재해 복구 목표
 7. **PSH 알림 대응 절차** (§8 신규) — 30초 1차 행동 · KPI×모듈 매핑 19종 · 회귀 30%/50% 분기 · 핵심 KPI 5종 false positive 가정 금지 · revert 기준
 8. **정기 검토**: 주/월/분기/반기/연 — 빈도별 점검 표준화
+9. **운영 토글 환경변수 3종 표준화** (§13 신규, 2026-05-29) — `RATE_LIMIT_DISABLED`·`SLOWAPI_SKIP_DOTENV`·`AUDIT_DISABLED`. 테스트·dryrun·일반화 납품 단계에서만 활성, 운영 진입 시 반드시 off 검증
 
 본 Runbook은 회신 후 v1.0으로 확정. v1.1은 W10·W11 PSH 도입에 맞춰 §8 신규. **연 1회 갱신 + 큰 사건 후 즉시 갱신 + PSH 시나리오 추가 시 §8.2 매핑 표 동기화**.
+
+## 13. 운영 토글 환경변수 (테스트·dryrun·일반화 납품용)
+
+운영 동작에 영향 없이 외부 의존성 부재 환경(테스트·dryrun·일부 납품 단계)에서 API 서버를 안전 구동하기 위한 환경변수 스위치. 모두 truthy(`1`/`true`/`yes`/`on`)에서 활성. 기본은 모두 off.
+
+| 환경변수 | 켜는 시점 | 동작 | 끄면(기본) |
+|---|---|---|---|
+| `RATE_LIMIT_DISABLED` | 단위 테스트·dryrun | slowapi Limiter 완전 비활성. 429 응답 안 떨어짐 | 분당 120 기본 한도 + 라우터별 한도 |
+| `SLOWAPI_SKIP_DOTENV` | 윈도우 한국어 로케일 로컬 개발 | Limiter가 cwd `.env`를 자동 스캔하지 않음(존재하지 않는 sentinel 경로 지정) — `.env` UTF-8 한글이 cp949로 강제 디코드되어 UnicodeDecodeError로 부팅 차단되는 사고 우회 | starlette가 cwd `.env` 자동 발견·읽기 시도 |
+| `AUDIT_DISABLED` | Postgres 부재 환경 라이브 테스트 | `AuditMiddleware`의 `_try_build_chained_hash`·`_record` 양쪽 진입부에서 즉시 noop·sha256 폴백 → DB connect TCP timeout 회피 | 매 요청 audit_log 1건 best-effort 기록 + 체인 해시 |
+
+**실 운영(Postgres·Redis·ES 모두 가용)에서는 모두 off가 정답**. 켜진 채로 운영 진입 시:
+- `RATE_LIMIT_DISABLED=1` → DDoS·과부하 방어 0
+- `SLOWAPI_SKIP_DOTENV=1` → `.env`에 정의한 slowapi 한도 설정이 안 읽힘
+- `AUDIT_DISABLED=1` → audit_log 없어 보안 사고·법적 추적 불가
+
+**테스트·dryrun 표준 조합** (로컬 단위 테스트 실행 시):
+
+```bash
+cd poc
+SLOWAPI_SKIP_DOTENV=1 AUDIT_DISABLED=1 RATE_LIMIT_DISABLED=1 PYTHONPATH=src \
+  python -m pytest tests/test_api_answer.py -x -q
+```
+
+**라이브 호출 확인용 uvicorn 부팅** (외부 DB·ES 없이 부팅):
+
+```bash
+PYTHONPATH=poc/src SLOWAPI_SKIP_DOTENV=1 AUDIT_DISABLED=1 RATE_LIMIT_DISABLED=1 \
+  API_KEY=devkey LLOYDK_API_KEY=devkey \
+  python -m uvicorn lloydk.api.app:app --host 127.0.0.1 --port 18080
+```
+
+각 스위치 등장 배경:
+- `AUDIT_DISABLED`: 2026-05-29, `/answer` 라이브 호출 시 `AuditMiddleware`가 Postgres TCP timeout으로 응답을 hang시키던 결함(`curl exit 56`) 회피용으로 신설. 코드 위치: `poc/src/lloydk/api/middleware.py`
+- `SLOWAPI_SKIP_DOTENV`: 2026-05-29, 윈도우 한국어 로케일에서 `poc/.env` UTF-8 한글을 starlette가 cp949로 강제 디코드해 pytest collection이 차단되던 결함 우회용으로 신설. 코드 위치: `poc/src/lloydk/api/rate_limit.py`
+- `RATE_LIMIT_DISABLED`: 슬로우API 한도 일괄 비활성. dryrun·테스트 표준 스위치. 코드 위치: `poc/src/lloydk/api/rate_limit.py`
