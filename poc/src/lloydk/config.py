@@ -150,6 +150,9 @@ class Settings(BaseSettings):
     # --- Models ---
     classifier_base_model: str = "kakaobank/kf-deberta-base"
     classifier_lightweight_model: str = "monologg/koelectra-base-v3-discriminator"
+    # Phase 3 (5070 Ti 풀가동): 학습 가중치 디렉토리. 비어있으면 rule-fallback 유지.
+    # .env: CLASSIFIER_MODEL_DIR=artifacts/classifier-1ep/v-ae3f5371 형식.
+    classifier_model_dir: str = ""
     embedding_model: str = "nlpai-lab/KURE-v1"
 
     # 임베딩 어댑터 선택:

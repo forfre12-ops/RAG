@@ -794,21 +794,22 @@ function renderCapabilityStats() {
   if (!wrap) return;
   // src: "measured" 실측 / "spec" 명세·합격선·코드 사실 / "ref" V2 통합본 참고값.
   const items = [
-    { v: "0.05~0.2s", l: "BERT 추론 (V2 §4.4 참고값)", src: "ref" },
+    // Phase 3 실측 (2026-05-30): KF-DeBERTa labeled_5k 1ep 학습 + RTX 5070 Ti
+    { v: "1.18s", l: "BERT 추론 (KF-DeBERTa 학습 모델, 5070 Ti 실측)", src: "measured" },
     { v: "1.5~5s", l: "LLM zero-shot (V2 §4.4 참고값)", src: "ref" },
-    { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9)", src: "spec" },
+    { v: "33s", l: "BERT 학습 1 epoch (5070 Ti labeled 3500건, 실측)", src: "measured" },
+    { v: "F1=1.0", l: "labeled_5k test 752건 평가 (실측, 학습 분포 한정)", src: "measured" },
+    { v: "10/12", l: "데모 12 샘플 실호출 분류 정합 (학습 외 분포, 실측)", src: "measured" },
+    { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9, 합성 한계로 미달)", src: "spec" },
     { v: "480+", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
-    { v: "18", l: "산업 도메인 (seeds.py 주석)", src: "measured" },
     { v: "5,000", l: "합성 코퍼스 (datasets/synthetic_5k)", src: "measured" },
-    // Phase 2 실측 (2026-05-30): BGE-M3 / KURE / dragonkue 3-way × ES dense+hybrid
-    { v: "0.7222", l: "Recall@5 BGE-M3 dense ES (P2 3-way 실측, 합성 5K 천장)", src: "measured" },
+    // Phase 2 실측 (2026-05-30): BGE-M3 / KURE / dragonkue 3-way
+    { v: "0.7222", l: "Recall@5 BGE-M3 dense ES (P2 3-way 실측, 합성 천장)", src: "measured" },
     { v: "111ms", l: "검색 latency p50 (BGE-M3 dense ES, 실측)", src: "measured" },
-    { v: "67", l: "PSH KPI 시나리오 (회귀 매트릭스)", src: "measured" },
     { v: "540+", l: "단위 테스트 PASS (회귀 기준)", src: "measured" },
     { v: "4", l: "배포 프로파일 (lite-noapi 외 3)", src: "measured" },
     { v: "≤ 30s", l: "E2E 합격선 (V2 §14.2 목표)", src: "spec" },
     { v: "$0", l: "온프레미스 추론 비용 (자체 GPU 가정)", src: "spec" },
-    { v: "Docker", l: "온프레미스 배포 (compose 1줄)", src: "measured" },
   ];
   wrap.innerHTML = "";
   items.forEach((it) => {

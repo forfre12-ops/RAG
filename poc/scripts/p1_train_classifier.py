@@ -140,6 +140,13 @@ def main() -> int:
     ap.add_argument("--test", default=None, help="test.jsonl (없으면 datasets/synthetic 사용)")
     ap.add_argument("--report", default="reports/p1_classifier_report.md")
     ap.add_argument("--epochs", type=int, default=5)
+    # Phase 3 (5070 Ti 풀가동) — labeled_5k 경로/배치 사이즈 명시 제어용
+    ap.add_argument("--train-path", default=None, help="full 모드 학습 train.jsonl")
+    ap.add_argument("--val-path", default=None, help="full 모드 학습 val.jsonl")
+    ap.add_argument("--test-path", default=None, help="full 모드 학습 test.jsonl")
+    ap.add_argument("--batch-size", type=int, default=None, help="full 모드 배치 사이즈")
+    ap.add_argument("--base-model", default=None, help="full 모드 base 모델 ID")
+    ap.add_argument("--output-dir", default=None, help="가중치 출력 경로")
     args = ap.parse_args()
 
     if args.test:
@@ -154,7 +161,21 @@ def main() -> int:
     if args.mode == "full":
         from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
 
-        spec = TrainSpec(epochs=args.epochs)
+        spec_kwargs = {"epochs": args.epochs}
+        if args.train_path:
+            spec_kwargs["train_path"] = args.train_path
+        if args.val_path:
+            spec_kwargs["val_path"] = args.val_path
+        if args.test_path:
+            spec_kwargs["test_path"] = args.test_path
+        if args.batch_size:
+            spec_kwargs["batch_size"] = args.batch_size
+        if args.base_model:
+            spec_kwargs["base_model"] = args.base_model
+        if args.output_dir:
+            spec_kwargs["output_dir"] = args.output_dir
+        spec = TrainSpec(**spec_kwargs)
+        print(f"[p1] full mode spec: {spec_kwargs}", file=sys.stderr)
         report = train_classifier(spec)
         print(json.dumps(report.__dict__, ensure_ascii=False, indent=2, default=str))
         return 0

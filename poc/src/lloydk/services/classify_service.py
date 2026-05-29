@@ -36,7 +36,12 @@ class ClassifyService:
 
     def __init__(self):
         self.preprocess = PreprocessPipeline()
-        self.inference = InferencePipeline()
+        # Phase 3 (5070 Ti 풀가동) — 학습 가중치 디렉토리가 settings 또는
+        # 환경변수에 명시되면 InferencePipeline 이 자동 로드. 미명시·미존재 시
+        # rule-fallback 그대로(기존 동작 호환).
+        from lloydk.config import settings as _settings  # noqa: PLC0415
+        model_dir = getattr(_settings, "classifier_model_dir", "") or None
+        self.inference = InferencePipeline(model_dir=model_dir)
 
     @classmethod
     def get_instance(cls) -> "ClassifyService":

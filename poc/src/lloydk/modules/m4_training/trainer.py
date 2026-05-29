@@ -164,12 +164,24 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         report_to=["mlflow"],
     )
 
-    trainer = WeightedTrainer(
-        model=model, args=args,
-        train_dataset=ds_train, eval_dataset=ds_val,
-        tokenizer=tok, data_collator=DataCollatorWithPadding(tok),
-        compute_metrics=compute_metrics,
-    )
+    # transformers v5+ 호환: Trainer.__init__ 가 `tokenizer` → `processing_class`로 이름
+    # 변경됨. v4 에서는 tokenizer 가, v5 에서는 processing_class 가 표준.
+    # 두 경로 모두 시도 (런타임 버전 호환).
+    try:
+        trainer = WeightedTrainer(
+            model=model, args=args,
+            train_dataset=ds_train, eval_dataset=ds_val,
+            processing_class=tok,
+            data_collator=DataCollatorWithPadding(tok),
+            compute_metrics=compute_metrics,
+        )
+    except TypeError:  # v4 폴백
+        trainer = WeightedTrainer(
+            model=model, args=args,
+            train_dataset=ds_train, eval_dataset=ds_val,
+            tokenizer=tok, data_collator=DataCollatorWithPadding(tok),
+            compute_metrics=compute_metrics,
+        )
 
     with mlflow.start_run() as run:
         mlflow.log_params(asdict(spec))
