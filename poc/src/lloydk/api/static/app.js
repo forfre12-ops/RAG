@@ -800,6 +800,9 @@ function renderCapabilityStats() {
     { v: "480+", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
     { v: "18", l: "산업 도메인 (seeds.py 주석)", src: "measured" },
     { v: "5,000", l: "합성 코퍼스 (datasets/synthetic_5k)", src: "measured" },
+    // Phase 2 실측 (2026-05-30): BGE-M3 / KURE / dragonkue 3-way × ES dense+hybrid
+    { v: "0.7222", l: "Recall@5 BGE-M3 dense ES (P2 3-way 실측, 합성 5K 천장)", src: "measured" },
+    { v: "111ms", l: "검색 latency p50 (BGE-M3 dense ES, 실측)", src: "measured" },
     { v: "67", l: "PSH KPI 시나리오 (회귀 매트릭스)", src: "measured" },
     { v: "540+", l: "단위 테스트 PASS (회귀 기준)", src: "measured" },
     { v: "4", l: "배포 프로파일 (lite-noapi 외 3)", src: "measured" },

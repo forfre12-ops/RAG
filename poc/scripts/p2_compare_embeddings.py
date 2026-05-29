@@ -347,9 +347,16 @@ def _resolve_combinations(
     mode: str,
     backends: list[str],
     hybrid: bool,
+    models_override: list[str] | None = None,
 ) -> list[tuple[str, str, str]]:
-    """(embedder_name, backend, search_mode) 조합 목록 산출."""
-    if mode == "dryrun":
+    """(embedder_name, backend, search_mode) 조합 목록 산출.
+
+    models_override가 주어지면 mode와 무관하게 해당 목록을 사용한다.
+    Phase 2 (5070 Ti 풀가동) — KURE/BGE-M3/dragonkue 3-way 측정을 위해 도입.
+    """
+    if models_override:
+        embedders = list(models_override)
+    elif mode == "dryrun":
         embedders = ["hash"]
     elif mode == "full":
         embedders = ["nlpai-lab/KURE-v1", "BAAI/bge-m3"]
@@ -410,6 +417,15 @@ def main() -> int:
         help="reranker 사용 시 1차 dense에서 top_k × factor만큼 가져옴. 기본 4.",
     )
     ap.add_argument("--report", default="reports/p2_embedding_report.md")
+    ap.add_argument(
+        "--models",
+        default=None,
+        help=(
+            "콤마 구분 임베딩 모델 ID 목록. 지정 시 --mode와 무관하게 해당 모델만 측정. "
+            "Phase 2 (5070 Ti 풀가동) 3-way 측정용. "
+            "예: nlpai-lab/KURE-v1,BAAI/bge-m3,dragonkue/BGE-m3-ko"
+        ),
+    )
     args = ap.parse_args()
 
     synth_dir = Path(args.synth_dir)
@@ -422,9 +438,14 @@ def main() -> int:
     print(f"[p2] query_style={args.query_style}, query_count={len(queries)}")
 
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
-    combos = _resolve_combinations(args.mode, backends, args.hybrid)
+    models_override = None
+    if args.models:
+        models_override = [m.strip() for m in args.models.split(",") if m.strip()]
+    combos = _resolve_combinations(args.mode, backends, args.hybrid, models_override)
 
     print(f"[p2] mode={args.mode}, combos={len(combos)}, backends={backends}, hybrid={args.hybrid}")
+    if models_override:
+        print(f"[p2] models override: {models_override}")
 
     rows = [
         evaluate(
