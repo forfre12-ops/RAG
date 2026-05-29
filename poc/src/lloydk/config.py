@@ -118,9 +118,14 @@ def assert_production_credentials() -> None:
     """운영 모드에서 빈 자격증명 차단. dryrun/테스트는 우회.
 
     호출 위치: api/app.py startup hook. fail-fast로 운영 미설정 사고 방지.
+
+    D1 (2026-05-29): env가 비었어도 secrets_manager(Vault/AWS SM)에서 채워올
+    수 있도록 한 번 fill_from_secrets_manager()를 시도한 뒤 missing 판정.
+    LLOYDK_SECRETS_BACKEND=env(기본)는 사실상 no-op이라 dev 동작에 영향 없음.
     """
     if settings.poc_mode != "full":
         return
+    fill_from_secrets_manager()
     missing: list[str] = []
     if not settings.api_key:
         missing.append("LLOYDK_API_KEY")
@@ -129,5 +134,57 @@ def assert_production_credentials() -> None:
     if missing:
         raise RuntimeError(
             f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
-            ".env 또는 환경변수로 설정 필요."
+            ".env / 환경변수 / secrets_manager(Vault·AWS SM)로 설정 필요."
         )
+
+
+# D1 (2026-05-29): secrets_manager 호출처 일원화.
+# settings는 pydantic-settings로 부팅 시점에 env를 빨아들이지만, 운영 환경에서는
+# Vault/AWS SM이 진실 소스. fill_from_secrets_manager()가 빈 자리만 SM 값으로 채움.
+_SECRETS_FILLED = False
+
+
+def fill_from_secrets_manager() -> dict:
+    """secrets_manager 백엔드에서 빈 자격증명만 보충.
+
+    멱등 — 모듈 lifetime 1회만 실제 fill (idempotent guard).
+    backend=env(기본)는 os.getenv 그대로라 settings와 같은 값. SM 백엔드일 때만 의미.
+
+    Returns:
+        {key: source} — 어느 값이 어디서 왔는지 (env / sm-vault / sm-aws / skipped).
+    """
+    global _SECRETS_FILLED
+    if _SECRETS_FILLED:
+        return {"_status": "already_filled"}
+
+    try:
+        from lloydk.services.secrets_manager import get_secrets_manager  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        # SM 모듈 부재 — 기본 동작 유지
+        return {"_status": "secrets_manager_unavailable"}
+
+    sm = get_secrets_manager()
+    sources: dict[str, str] = {"_status": "ok", "_backend": sm.name}
+
+    # 보충 후보: 운영에 필요한 자격증명만 (전체 settings 덮어쓰기 금지)
+    candidates = [
+        ("api_key", "LLOYDK_API_KEY"),
+        ("minio_secret_key", "LLOYDK_MINIO_SECRET_KEY"),
+        ("anthropic_api_key", "ANTHROPIC_API_KEY"),
+        ("openai_api_key", "OPENAI_API_KEY"),
+        ("es_password", "ES_PASSWORD"),
+        ("es_api_key", "ES_API_KEY"),
+    ]
+    for attr, key in candidates:
+        if getattr(settings, attr, ""):
+            sources[attr] = "env"
+            continue
+        v = sm.get(key)
+        if v:
+            setattr(settings, attr, v)
+            sources[attr] = f"sm-{sm.name}"
+        else:
+            sources[attr] = "missing"
+
+    _SECRETS_FILLED = True
+    return sources
