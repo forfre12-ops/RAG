@@ -1,0 +1,17 @@
+# MLflow 2.16.2 + Postgres backend 의존성 (psycopg2-binary) 동봉.
+#
+# 기존 docker-compose.yml 는 ghcr.io/mlflow/mlflow:v2.16.2 vanilla 를 받아왔으나
+# psycopg2 가 미포함이라 backend-store-uri=postgresql:// 사용 시 부팅 실패:
+#   ModuleNotFoundError: No module named 'psycopg2'
+#
+# Phase 4 (5070 Ti 풀가동 야간 무중단) 에서 본 Dockerfile 로 빌드 전환.
+#
+# 빌드:
+#   docker compose build mlflow
+# 검증:
+#   docker compose up -d mlflow
+#   curl http://localhost:5000/
+
+FROM ghcr.io/mlflow/mlflow:v2.16.2
+
+RUN pip install --no-cache-dir psycopg2-binary

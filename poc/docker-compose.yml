@@ -72,12 +72,22 @@ services:
       - "6379:6379"
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.16.2
+    # Phase 4 (5070 Ti 풀가동): vanilla 이미지 → psycopg2-binary 동봉 빌드.
+    # Dockerfile.mlflow 가 v2.16.2 베이스에 pip install psycopg2-binary 적용.
+    #
+    # Backend는 SQLite 로 변경 (우리 lloydk DB 와 MLflow alembic 충돌 회피).
+    # 운영 환경은 별도 mlflow DB 분리 또는 별도 Postgres 인스턴스 권장.
+    build:
+      context: ./infra/mlflow
+      dockerfile: Dockerfile.mlflow
+    image: lloydk/mlflow:2.16.2-psycopg
     command: >
       mlflow server
-      --backend-store-uri postgresql://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      --backend-store-uri sqlite:////mlflow-data/mlflow.db
       --default-artifact-root s3://mlflow/
       --host 0.0.0.0
+    volumes:
+      - mlflow_data:/mlflow-data
     environment:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-lloydk}
@@ -170,3 +180,4 @@ volumes:
   # esdata만 named volume 유지 — ES는 fsync 빈도가 높아 bind mount(WSL2↔Windows FS) IO 패널티가 큼.
   # 나머지(postgres/minio/redis/modelcache)는 E:/antigravity/rag/docker-data/ bind mount.
   esdata:
+  mlflow_data:  # MLflow SQLite (Phase 4 야간 작업)
