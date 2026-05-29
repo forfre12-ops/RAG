@@ -213,10 +213,15 @@ class CachedEmbedding:
         miss_indices: list[int] = []
         miss_texts: list[str] = []
         miss_seen: dict[str, int] = {}  # key -> miss_texts 내 위치
+        # §4 (2026-05-29): hit/miss 카운터 — prom 미설치 환경에서는 silent skip
+        lru_hits = 0
+        redis_hits = 0
+        misses = 0
         for i, (t, k) in enumerate(zip(texts_list, keys)):
             cached = self._lru.get(k)
             if cached is not None:
                 out_vectors[i] = list(cached)
+                lru_hits += 1
                 continue
             # P1-D1: Redis 영속 캐시 fallback
             if self._redis is not None:
@@ -224,6 +229,7 @@ class CachedEmbedding:
                 if rv is not None:
                     out_vectors[i] = list(rv)
                     self._lru.put(k, list(rv))
+                    redis_hits += 1
                     continue
             if k in miss_seen:
                 # 같은 배치 안 중복 — underlying 재호출 없이 동일 결과 공유
@@ -231,6 +237,8 @@ class CachedEmbedding:
             miss_seen[k] = len(miss_texts)
             miss_indices.append(i)
             miss_texts.append(t)
+            misses += 1
+        self._record_cache_counters(lru_hits, redis_hits, misses)
 
         dim_hint: int | None = self.dim
         model_hint: str | None = None
@@ -278,7 +286,31 @@ class CachedEmbedding:
     # ---- 디버그/내성 ------------------------------------------------------
 
     def cache_info(self) -> dict[str, int]:
-        return {"size": len(self._lru), "capacity": self._lru._capacity}
+        return {
+            "size": len(self._lru),
+            "capacity": self._lru._capacity,
+            "lru_hits": int(getattr(self, "_lru_hits_total", 0)),
+            "redis_hits": int(getattr(self, "_redis_hits_total", 0)),
+            "misses": int(getattr(self, "_misses_total", 0)),
+        }
+
+    def _record_cache_counters(self, lru_hits: int, redis_hits: int, misses: int) -> None:
+        """§4: 누적 카운터 + prom Counter 노출. prom 미설치 환경 silent skip."""
+        # 인스턴스 누적 (테스트·디버그용)
+        self._lru_hits_total = getattr(self, "_lru_hits_total", 0) + lru_hits
+        self._redis_hits_total = getattr(self, "_redis_hits_total", 0) + redis_hits
+        self._misses_total = getattr(self, "_misses_total", 0) + misses
+        # prom Counter
+        try:
+            from lloydk.api import prom_metrics  # noqa: PLC0415
+            if lru_hits:
+                prom_metrics.EMBEDDING_CACHE_HIT_TOTAL.labels(layer="lru").inc(lru_hits)
+            if redis_hits:
+                prom_metrics.EMBEDDING_CACHE_HIT_TOTAL.labels(layer="redis").inc(redis_hits)
+            if misses:
+                prom_metrics.EMBEDDING_CACHE_MISS_TOTAL.inc(misses)
+        except Exception:  # noqa: BLE001
+            pass
 
     def clear(self) -> None:
         with self._lru._lock:

@@ -200,6 +200,18 @@ class InferencePipeline:
                 logger.debug("encode failed: %s", exc)
                 return []
 
+        def _encode_batch(texts: list[str]):
+            """§1: 확장 쿼리 N개 1회 forward — KURE p50 629ms × 4쿼리 단축."""
+            if not texts:
+                return []
+            try:
+                result = embedder.embed(texts)
+                vectors = getattr(result, "vectors", None) or result
+                return list(vectors)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("encode_batch failed: %s", exc)
+                return []
+
         # metadata로 필터 전달 가능 (tenant_id 등 호출자가 보낸 거)
         filter_ = None
         if isinstance(metadata, dict):
@@ -212,6 +224,7 @@ class InferencePipeline:
                 store=store,
                 collection=collection,
                 query_text=query,
+                encode_batch=_encode_batch,
                 encode=_encode,
                 method=method,
                 top_k=top_k,

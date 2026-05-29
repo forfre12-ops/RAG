@@ -73,6 +73,18 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
             logger.debug("answer: encode failed: %s", exc)
             return []
 
+    def _encode_batch(texts: list[str]):
+        """§1: 확장 쿼리 N개를 1회 forward로 인코딩 — KURE p50 629ms × 4쿼리 단축."""
+        if not texts:
+            return []
+        try:
+            result = embedder.embed(texts)
+            vectors = getattr(result, "vectors", None) or result
+            return list(vectors)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("answer: encode_batch failed: %s", exc)
+            return []
+
     # tenant 필터: 요청 tenant_id 우선, 없으면 metadata.tenant_id
     filter_ = None
     tenant = req.tenant_id
@@ -87,6 +99,7 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
             collection=collection,
             query_text=req.query,
             encode=_encode,
+            encode_batch=_encode_batch,
             method=method,
             top_k=req.top_k,
             filter=filter_,
@@ -116,16 +129,31 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
 @limiter.limit("30/minute")
 def answer(request: Request, req: RagAnswerRequest) -> RagAnswerResult:
     t0 = time.time()
+    t_retrieve_start = time.perf_counter()
     hits = _fetch_hits(req)
+    retrieve_secs = time.perf_counter() - t_retrieve_start
+
+    t_synth_start = time.perf_counter()
     result = synthesize_answer(
         query=req.query,
         hits=hits,
         grade=req.grade,
     )
-    # elapsed는 본 응답 스키마에 없음 — 로그로만 남김(prom_metrics_api가 별도 측정)
+    synth_secs = time.perf_counter() - t_synth_start
+
+    # prom_metrics 노출 — registry 없는 환경(import 실패)에서는 silent skip
+    try:
+        from lloydk.api import prom_metrics  # noqa: PLC0415
+        prom_metrics.ANSWER_PHASE_DURATION.labels(phase="retrieve").observe(retrieve_secs)
+        prom_metrics.ANSWER_PHASE_DURATION.labels(phase="synthesize").observe(synth_secs)
+    except Exception:  # noqa: BLE001
+        pass
+
     logger.info(
-        "answer done: q_len=%d hits=%d fallback=%s elapsed_ms=%d",
+        "answer done: q_len=%d hits=%d fallback=%s "
+        "retrieve_ms=%d synth_ms=%d elapsed_ms=%d",
         len(req.query), len(hits), result.deterministic_fallback,
+        int(retrieve_secs * 1000), int(synth_secs * 1000),
         int((time.time() - t0) * 1000),
     )
     return result

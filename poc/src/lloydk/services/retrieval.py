@@ -112,6 +112,7 @@ def expand_then_search(
     collection: str,
     query_text: str,
     encode: Callable[[str], Sequence[float]],
+    encode_batch: Callable[[list[str]], list[Sequence[float]]] | None = None,
     method: str = "rule",
     top_k: int = 5,
     filter: dict | None = None,
@@ -123,7 +124,9 @@ def expand_then_search(
     """query_text → 확장 N → 각 쿼리로 search_hybrid → RRF 결합 → reranker 재정렬.
 
     method: rule | llm | hybrid (query_expansion 모듈의 expand_* 함수와 동일)
-    encode: 텍스트 → dense vector 함수 (테스트 가능성 위해 외부 주입)
+    encode: 텍스트 → dense vector 함수 (테스트 가능성 위해 외부 주입). 단건 폴백.
+    encode_batch: 선택. 확장된 쿼리 N개를 1회 forward로 인코딩(KURE/BGE forward
+                  비용 절감). 미주입 시 encode를 N회 호출하는 기존 경로로 폴백.
     max_queries: 폭주 차단 — 확장된 쿼리 N개를 이만큼만 사용
     use_reranker: True면 settings.reranker_provider 기반으로 자동 wiring.
                   noop이면 비용 없이 RRF 순서 유지(NoopReranker의 결정론적 점수).
@@ -148,13 +151,31 @@ def expand_then_search(
     # reranker 사용 시 1차 retrieval은 oversample
     first_k = top_k * max(1, oversample_factor) if use_reranker else top_k
 
-    result_sets: list[list[SearchHit]] = []
-    for q in queries:
+    # §1 (2026-05-29): 확장 쿼리 N개를 1회 batch encode로 처리 — KURE p50 629ms ×
+    # 4쿼리 = 2.4s를 단일 forward pass로 흡수. encode_batch 미주입 시 단건 폴백.
+    vecs: list[Sequence[float] | None] = [None] * len(queries)
+    if encode_batch is not None:
         try:
-            vec = list(encode(q))
+            batch_result = encode_batch(queries)
+            if len(batch_result) == len(queries):
+                vecs = [list(v) for v in batch_result]
+            else:
+                logger.warning(
+                    "encode_batch length mismatch (got %d, expected %d) — single fallback",
+                    len(batch_result), len(queries),
+                )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("encode failed for q=%r: %s", q, exc)
-            continue
+            logger.warning("encode_batch failed (%s) — single fallback", exc)
+
+    result_sets: list[list[SearchHit]] = []
+    for i, q in enumerate(queries):
+        vec = vecs[i]
+        if vec is None:
+            try:
+                vec = list(encode(q))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("encode failed for q=%r: %s", q, exc)
+                continue
         try:
             hits = store.search_hybrid(
                 collection=collection,

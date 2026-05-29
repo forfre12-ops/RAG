@@ -137,20 +137,25 @@ class ClassifyRepo:
 
         InferencePipeline 결과의 evidence_spans를 그대로 받기 위한 헬퍼.
         chunks 테이블은 파티션이라 chunk_id FK가 없음 — 무결성은 app 레이어 책임.
+
+        §5 (2026-05-29): N+1 라운드트립 제거 — 단건 add_evidence 호출 대신
+        ORM 객체 리스트를 한 번에 add_all. 분류당 evidence 7~11개 환경에서
+        DB 라운드트립 50ms→10ms 추정. add_all 미구현 stub session에서는 단건
+        폴백으로 호환성 유지.
         """
-        count = 0
+        objs: list[ClassificationEvidence] = []
         for span in spans:
-            self.add_evidence(
-                classification_id,
+            objs.append(ClassificationEvidence(
+                classification_id=classification_id,
                 chunk_id=default_chunk_id,
                 evidence_type=span.tag or "keyword_match",
                 excerpt=span.text,
                 contribution=float(span.weight) if span.weight else 0.0,
                 excerpt_start=span.start,
                 excerpt_end=span.end,
-            )
-            count += 1
-        return count
+            ))
+        self._bulk_or_add(objs)
+        return len(objs)
 
     def add_rag_evidence_from_hits(
         self,
@@ -167,24 +172,38 @@ class ClassifyRepo:
         - excerpt는 RagContextHit가 본문을 별도로 안 들고 있어 source_doc 식별자를 보존만 함.
           본문이 필요하면 호출자가 별도 lookup하여 excerpt 갱신.
         - contribution은 hit.score를 [0,1]로 clamp.
+
+        §5: 동일하게 add_all로 묶음 insert. add_all 미구현 stub session에서는
+        단건 폴백.
         """
-        count = 0
+        objs: list[ClassificationEvidence] = []
         for hit in hits:
             ref_doc = _try_uuid(hit.source_doc)
             chunk = _try_uuid(hit.chunk_id) or default_chunk_id
             score = max(0.0, min(1.0, float(hit.score)))
             excerpt = f"[rag] doc={hit.source_doc} chunk={hit.chunk_id}"[:excerpt_max_len]
-            self.add_evidence(
-                classification_id,
+            objs.append(ClassificationEvidence(
+                classification_id=classification_id,
                 chunk_id=chunk,
                 evidence_type="rag_context",
                 excerpt=excerpt,
                 contribution=score,
                 rag_ref_doc_id=ref_doc,
                 rag_similarity=score,
-            )
-            count += 1
-        return count
+            ))
+        self._bulk_or_add(objs)
+        return len(objs)
+
+    def _bulk_or_add(self, objs: list) -> None:
+        """§5 helper: add_all 우선, 미구현 시 단건 add 루프 폴백."""
+        if not objs:
+            return
+        add_all = getattr(self.db, "add_all", None)
+        if callable(add_all):
+            add_all(objs)
+            return
+        for o in objs:
+            self.db.add(o)
 
     def list_recent_for_doc(
         self, doc_id: uuid.UUID, *, limit: int = 10

@@ -47,8 +47,34 @@ async def lifespan(app: FastAPI):
         setup_tracing(app)
     except Exception as exc:  # noqa: BLE001
         logger.warning("OTel setup skipped: %s", exc)
-    # warm-up hooks here (load model registry, etc.)
+    _warmup_models(settings)
     yield
+
+
+def _warmup_models(settings_obj) -> None:
+    """임베더·reranker 모델을 부팅 시 1회 호출하여 cold start 비용 흡수.
+
+    KURE/BGE 첫 호출에서 측정된 p95 32s가 운영 첫 요청에 노출되지 않도록.
+    hash/noop provider 환경(lite-noapi·dryrun)에서는 즉시 반환되므로 사실상 no-op.
+    실패해도 부팅은 막지 않음 — 모델 다운로드 차단·HF rate limit 등 환경 이슈와 분리.
+    """
+    if settings_obj.poc_mode == "dryrun":
+        return
+    try:
+        from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
+        emb = build_embedder()
+        emb.embed(["warmup"])
+        logger.info("embedder warmup ok — provider=%s", settings_obj.embedding_provider)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("embedder warmup skipped: %s", exc)
+    if settings_obj.reranker_provider not in ("", "noop"):
+        try:
+            from lloydk.adapters.reranker import get_reranker  # noqa: PLC0415
+            rr = get_reranker()
+            rr.rerank("warmup", ["doc1", "doc2"], top_k=1)
+            logger.info("reranker warmup ok — provider=%s", settings_obj.reranker_provider)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("reranker warmup skipped: %s", exc)
 
 
 app = FastAPI(

@@ -82,6 +82,30 @@ EMBEDDING_FALLBACK_TOTAL = Counter(
     registry=registry,
 )
 
+# §7 (2026-05-29): /answer 단계별 latency — retrieve(쿼리 확장 + ES 검색 + reranker)
+# vs synthesize(LLM 답안 합성). 운영 SLO 정의 + §1 batch encode 효과 정량 입증.
+ANSWER_PHASE_DURATION = Histogram(
+    "lloydk_answer_phase_duration_seconds",
+    "POST /answer per-phase latency",
+    ["phase"],  # retrieve | synthesize
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0),
+    registry=registry,
+)
+
+# §4 (2026-05-29): CachedEmbedding 적중률 측정 — Redis 캐시 ROI 추적.
+# 운영 진입 시 캐시 적중률 = 임베딩 API 비용 절감 근거.
+EMBEDDING_CACHE_HIT_TOTAL = Counter(
+    "lloydk_embedding_cache_hit_total",
+    "Embedding cache hits (LRU or redis)",
+    ["layer"],  # lru | redis | disk
+    registry=registry,
+)
+EMBEDDING_CACHE_MISS_TOTAL = Counter(
+    "lloydk_embedding_cache_miss_total",
+    "Embedding cache misses (forwarded to underlying embedder)",
+    registry=registry,
+)
+
 # A4 (2026-05-29): Drift monitor — P1-B4를 운영 신호로 살리기.
 # Celery beat가 drift_tick 호출 → compute_drift() → 본 gauge에 set().
 DRIFT_KL_DIVERGENCE = Gauge(
