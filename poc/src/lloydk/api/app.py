@@ -1,9 +1,11 @@
 import logging
+from pathlib import Path
 from uuid import uuid4
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 
 from lloydk.config import assert_production_credentials, settings
@@ -157,3 +159,12 @@ app.include_router(prom_metrics_api.router, prefix="/api/v1")
 
 # 백그라운드 메트릭 refresh — TESTING=1 또는 pytest 환경이면 자동 skip.
 prom_metrics_api.register_background_refresh(app)
+
+# 데모 콘솔 정적 마운트 — /demo/ 경로에 단일 페이지 SPA.
+# OpenAPI 에는 노출되지 않음(StaticFiles 자동 제외). 디렉토리 없으면 silent skip.
+_STATIC_DIR = Path(__file__).parent / "static"
+if _STATIC_DIR.is_dir():
+    app.mount("/demo", StaticFiles(directory=str(_STATIC_DIR), html=True), name="demo")
+    logger.info("demo console mounted at /demo/ (static dir=%s)", _STATIC_DIR)
+else:
+    logger.info("demo console not mounted (no static dir at %s)", _STATIC_DIR)

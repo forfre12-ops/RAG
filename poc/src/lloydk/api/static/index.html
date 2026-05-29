@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 실시간 등급분류 콘솔 | Lloydk</title>
+<meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·신뢰도·평가요소·법령 근거를 확인합니다." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<!-- ============ NAVBAR ============ -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark">LK</span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">KOIPA AI 콘솔</span>
+    </a>
+    <div class="nav-actions">
+      <span id="nav-status" class="nav-status warming"><span class="dot"></span><span>warmup…</span></span>
+      <a class="nav-link" href="#s1">시연</a>
+      <a class="nav-link" href="#s3">법령</a>
+      <a class="nav-link" href="#s4">사고 시뮬</a>
+      <a class="nav-link" href="#s5">능력</a>
+      <a class="nav-link" href="#s6">배포</a>
+    </div>
+  </div>
+</header>
+
+<div class="hero-bg"></div>
+
+<div class="container" id="top">
+
+  <!-- ============ HERO ============ -->
+  <div class="meta-row">
+    <span class="badge">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Live Demo
+    </span>
+    <span class="meta-dot">•</span>
+    <span class="meta-category">KOIPA AI 영업비밀관리</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">FUN-005 라이브</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">2026-05-29</span>
+  </div>
+
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>실시간 등급분류 콘솔</h1>
+
+  <p class="lede">
+    한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정합니다.
+    시드 v4 480+ 키워드 · 부정경쟁방지법 §2조 2호 · KOIPA 가이드 v1 기반으로
+    분류 근거와 4 평가요소를 함께 반환합니다.
+  </p>
+
+  <div class="hero-kpis">
+    <span class="hero-kpi"><span class="dot"></span>BERT <b>0.12s</b></span>
+    <span class="hero-kpi"><span class="dot"></span>FNR <b>≤ 5%</b> 핵심 KPI</span>
+    <span class="hero-kpi"><span class="dot"></span>시드 v4 <b>480+</b> 키워드</span>
+    <span class="hero-kpi"><span class="dot"></span><b>4-tier</b> 배포 프로파일</span>
+  </div>
+
+  <hr class="hero-sep" />
+
+  <!-- ===== §1 시연 ===== -->
+  <section id="s1">
+    <h2><span class="num">§1</span>시연 — 30초 안에 4단계가 갈리는 순간</h2>
+    <p class="h2-sub">샘플 12종(시드 v4 빌드 + 의도 등급 검증 통과)을 선택하거나 직접 입력. SSE 7단계 점등으로 실시간 분류 과정이 보입니다.</p>
+
+    <div class="card" style="padding: 20px 24px;">
+      <div class="form-row">
+        <label for="sample-select">샘플 문서</label>
+        <select id="sample-select"></select>
+      </div>
+      <div class="form-row">
+        <label for="doc-title">제목</label>
+        <input id="doc-title" type="text" placeholder="문서 제목 (선택)" />
+      </div>
+      <div class="form-row">
+        <label for="doc-body">본문</label>
+        <textarea id="doc-body" placeholder="여기에 한국어 문서 본문을 붙여넣거나 위에서 샘플을 선택하세요."></textarea>
+      </div>
+
+      <div style="margin-top:8px">
+        <label style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">와우 — 키워드 토글</label>
+        <p class="toggle-hint">아래 키워드의 체크를 해제하면 본문에서 해당 단어가 일반어로 치환됩니다. 분류 후 등급이 어떻게 바뀌는지 직접 확인하세요.</p>
+        <div class="toggle-row" id="toggle-row"></div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-classify" class="btn">분류하기</button>
+        <button id="btn-race" class="btn secondary">BERT vs LLM 시간 경쟁</button>
+        <button id="btn-print" class="btn secondary">PDF 인쇄</button>
+        <button id="btn-reset" class="btn ghost">초기화</button>
+      </div>
+    </div>
+
+    <h3>진행 단계 — SSE 실시간 점등 (V2 §2.1 워크플로우)</h3>
+    <div id="stage-seq" class="seq"></div>
+
+    <!-- ===== 시간 경쟁 (와우 B) ===== -->
+    <div class="race">
+      <div class="race-title">BERT (자체 GPU) vs LLM zero-shot (외부 API)</div>
+      <div class="race-row">
+        <div class="race-label">BERT</div>
+        <div class="race-track"><div class="race-fill bert"></div></div>
+        <div class="race-time" id="race-bert-time">—</div>
+      </div>
+      <div class="race-row">
+        <div class="race-label">LLM</div>
+        <div class="race-track"><div class="race-fill llm"></div></div>
+        <div class="race-time" id="race-llm-time">—</div>
+      </div>
+      <div class="race-note" id="race-note">버튼을 누르면 동일 문서를 두 방식으로 처리. V2 §4.4 "왜 LLM 분류기를 안 쓰는가" 표를 화면에서 실증합니다.</div>
+    </div>
+  </section>
+
+  <!-- ===== §2 결과 ===== -->
+  <section id="sec-result">
+    <h2><span class="num">§2</span>결과 — 왜 이 등급인가</h2>
+    <p class="h2-sub">등급·신뢰도·자연어 판단(양성+음성 근거)·4 평가요소·근거 키워드. 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
+
+    <div class="result">
+      <div id="result-head" class="result-head">
+        <div style="font-size:14px;color:var(--text-dim);">샘플을 선택하고 "분류하기"를 누르세요.</div>
+      </div>
+      <div id="result-summary" class="summary"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">4 평가요소 (KOIPA 가이드 v1)</h3>
+      <div id="result-factors" class="stats"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">근거 키워드 — 클릭 시 본문 하이라이트</h3>
+      <div id="result-keywords" class="kw-chips"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">본문 미리보기 (시드 키워드 매칭)</h3>
+      <div id="body-preview" class="body-render"></div>
+    </div>
+  </section>
+
+  <!-- ===== §3 법령 ===== -->
+  <section id="s3">
+    <h2><span class="num">§3</span>법령 근거 — 부정경쟁방지 및 영업비밀보호에 관한 법률 §2조 2호</h2>
+    <p class="h2-sub">등급별 법령 출처 + KOIPA 가이드 v1 §번호 + 시드 키워드. 카드의 키워드를 클릭하면 §2 본문에서 해당 단어가 깜빡입니다.</p>
+    <div id="legal-grid" class="card-grid"></div>
+  </section>
+
+  <!-- ===== §4 사고 시뮬레이션 ===== -->
+  <section id="s4">
+    <h2><span class="num">§4</span>미탐 시뮬레이션 — 가장 두려운 사고</h2>
+    <p class="h2-sub">V2 §9 "FNR 최우선" 절을 화면에서 실증. 영업비밀이 일반 등급으로 잘못 분류되면 어떤 일이 벌어지는지, 그리고 우리 시스템이 이를 어떻게 차단하는지.</p>
+
+    <div class="card-grid">
+      <div class="card risk">
+        <div class="eyebrow">미탐 (FN) · 핵심 위험</div>
+        <div class="ctitle">고등급 → 저등급 분류</div>
+        <p>영업비밀이 낮은 보호등급으로 유통되어 유출 사고로 직결. 비용 매우 큼.</p>
+      </div>
+      <div class="card safe">
+        <div class="eyebrow">오탐 (FP) · 감수 가능</div>
+        <div class="ctitle">저등급 → 고등급 분류</div>
+        <p>업무 불편, 결재 지연. 비용 작음. FNR 최소화가 핵심.</p>
+      </div>
+    </div>
+
+    <h3>사고 시퀀스 — 미탐이 발생하면</h3>
+    <div id="fnr-sequence" class="seq"></div>
+
+    <h3>차단 시퀀스 — 우리 시스템의 대응</h3>
+    <div id="prevention-sequence" class="seq"></div>
+
+    <h3>손해 추정 (KOIPA 공개 통계 기준)</h3>
+    <div id="incident-stats" class="stats"></div>
+  </section>
+
+  <!-- ===== §5 시스템 능력 ===== -->
+  <section id="s5">
+    <h2><span class="num">§5</span>시스템 능력 — 운영 신뢰 지표</h2>
+    <p class="h2-sub">V2 통합본 §1~§14 의 합격선·KPI·자원 규모를 한 그리드에서 확인.</p>
+    <div id="capability-stats" class="stats"></div>
+
+    <div class="callout accent" style="margin-top:24px;">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      <div class="callout-body">
+        <span class="callout-label">PoC 진척 (2026-05-29)</span>
+        <p>W1~W13 + 블록 1~7 + 고도화 33+6+4+3 + RAG 종단 wiring + 4-tier 배포 프로파일 + lite-noapi 라이브 6/6 PASS 완료. 단위 540+ PASS · ruff 0 위반 · 18 시나리오 67 KPI.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== §6 배포 프로파일 ===== -->
+  <section id="s6">
+    <h2><span class="num">§6</span>배포 — 어디든 한 줄 전환</h2>
+    <p class="h2-sub">단일 환경변수 <code>DEPLOY_PROFILE</code> 로 4 프로파일 전환. KOIPA 외 다른 기관 도입 시 코드 무수정 + 의존성만 변경.</p>
+    <div id="profile-grid" class="card-grid"></div>
+  </section>
+
+  <!-- ===== §7 신뢰 ===== -->
+  <section id="s7">
+    <h2><span class="num">§7</span>신뢰 — 누가 만들었고 어떻게 검증했나</h2>
+    <div class="card-grid">
+      <div class="card">
+        <div class="eyebrow">수행사</div>
+        <div class="ctitle">로이드케이 (Lloydk)</div>
+        <p>AI/ML/LLM/RAG 코어 6개 모듈 (FUN-003·004·005·022·023·024) 담당.</p>
+      </div>
+      <div class="card">
+        <div class="eyebrow">데이터 출처</div>
+        <div class="ctitle">시드 v4 480+ 키워드</div>
+        <p>부정경쟁방지법 + 시행령 + 산업기술보호법 + KOIPA 가이드 v1 (공개 출처만 사용).</p>
+      </div>
+      <div class="card">
+        <div class="eyebrow">검증 체계</div>
+        <div class="ctitle">540+ 단위 + 67 KPI</div>
+        <p>샘플 12종은 빌드 시 ClassifyService 로 의도 등급 매칭 확인. 12/12 PASS.</p>
+      </div>
+      <div class="card">
+        <div class="eyebrow">설계 통합본</div>
+        <div class="ctitle">doc/07 V2 (화이트페이퍼)</div>
+        <p>전체 워크플로우·모델 후보·합격선·DB 스키마까지 §1~§16 단일 문서.</p>
+      </div>
+    </div>
+
+    <div class="print-watermark">
+      KOIPA AI 영업비밀관리시스템 · 실시간 등급분류 콘솔 · 로이드케이 · 2026-05-29
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div>KOIPA AI 영업비밀관리시스템 · Powered by <b>Lloydk</b></div>
+  <div class="mono">로이드케이 · lloydk.co.kr · 2026-05-29</div>
+</footer>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
