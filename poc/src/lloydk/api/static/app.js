@@ -806,6 +806,9 @@ function renderCapabilityStats() {
     { v: "F1=1.0", l: "labeled_5k test 752건 평가 (실측, 학습 분포 한정)", src: "measured" },
     { v: "10/12", l: "데모 12 샘플 실호출 분류 정합 (학습 외 분포, 실측)", src: "measured" },
     { v: "9.2s", l: "P5 E2E RAG ON (5070 Ti 풀스택 실측, V2 §14.2 ≤30s)", src: "measured" },
+    // Phase 5 실측 (2026-05-30 02:35): Qwen3 vs Solar 각 200건 합성 비교
+    { v: "100%", l: "P3 Qwen3 라벨 일치도 (200건, V2 §14.2 ≥90% PASS)", src: "measured" },
+    { v: "81%", l: "P3 Solar 라벨 일치도 (200건, FNR 27% JSON 76.5% 실패 — Qwen3 채택)", src: "measured" },
     { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9, 합성 한계로 미달)", src: "spec" },
     { v: "480+", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
     { v: "5,000", l: "합성 코퍼스 (datasets/synthetic_5k)", src: "measured" },

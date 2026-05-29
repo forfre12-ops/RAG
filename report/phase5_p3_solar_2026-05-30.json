@@ -1,0 +1,28 @@
+{
+  "provider": "local_openai",
+  "model": "solar:10.7b",
+  "total_requested": 200,
+  "total_generated": 200,
+  "failures": 0,
+  "by_grade": {
+    "TS": 50,
+    "S1": 50,
+    "S2": 50,
+    "S3": 50
+  },
+  "by_domain": {
+    "tech": 36,
+    "business": 36,
+    "finance": 32,
+    "hr": 32,
+    "legal": 32,
+    "mixed": 32
+  },
+  "label_match_rate": 0.81,
+  "fnr_underclass": 0.27,
+  "cost_usd_total": 0.0,
+  "input_tokens_total": 91730,
+  "output_tokens_total": 83138,
+  "pii_violations_total": 5,
+  "parse_errors": 153
+}
