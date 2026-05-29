@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 배포 프로파일 + 적용된 backend 부팅 로그 — 운영 사고 사전 차단
+    logger.info(
+        "lloydk startup — profile=%s mode=%s llm=%s embedding=%s reranker=%s "
+        "vector=%s storage=%s training=%s",
+        settings.deploy_profile, settings.poc_mode,
+        settings.llm_provider, settings.embedding_provider, settings.reranker_provider,
+        settings.vector_backend, settings.storage_backend, settings.enable_training,
+    )
     # J1: 운영 모드에서 빈 자격증명 차단 (dryrun/테스트는 우회)
     assert_production_credentials()
     # D2 (2026-05-29): OpenTelemetry 트레이싱 활성. OTEL_EXPORTER_OTLP_ENDPOINT
@@ -109,7 +117,12 @@ app.include_router(explain_api.router, prefix="/api/v1")
 app.include_router(async_classify_api.router, prefix="/api/v1")
 app.include_router(answer_api.router, prefix="/api/v1")
 app.include_router(confirm_api.router, prefix="/api/v1")
-app.include_router(training_api.router, prefix="/api/v1")
+# 학습 라우터는 settings.enable_training=True (full-train 프로파일)에서만 등록.
+# lite-*·onprem에서는 OpenAPI에도 노출되지 않아 고객사가 "있는데 안 쓴다"는 인식 자체가 없음.
+if settings.enable_training:
+    app.include_router(training_api.router, prefix="/api/v1")
+else:
+    logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
 app.include_router(synthesis_api.router, prefix="/api/v1")
 app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(schema_admin_api.router, prefix="/api/v1")

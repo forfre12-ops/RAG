@@ -4,15 +4,80 @@
 - dev 자격증명(`api_key`, `minio_secret_key` 등) 디폴트값은 모두 빈 문자열.
 - 로컬 개발은 `.env.dev` 또는 `.env`로 명시적으로 주입 (CI는 환경변수).
 - 빈 자격증명으로 운영 모드(`poc_mode=full`) 진입 시 startup에서 fail-fast.
+
+배포 프로파일 (2026-05-29 추가):
+- LLOYDK_DEPLOY_PROFILE 한 줄로 4-tier 납품 모드 전환:
+    lite-noapi    : GPU·외부 API 모두 없음 (noop LLM + hash embedding + inmemory + 학습 OFF)
+    lite-cloud    : GPU 없음, 외부 LLM 사용 (anthropic/openai + KURE/hash + ES + 학습 OFF)
+    onprem-local  : GPU 보유, 폐쇄망 (local_openai/ollama + KURE/BGE + ES + 학습 OFF)
+    full-train    : 풀스펙 (자유 + KURE/BGE + ES + 학습 ON, KOIPA 풀스펙 대상)
+프로파일은 미설정 키에만 default를 채움 — 사용자가 .env로 명시한 값은 항상 우선.
 """
 
 from __future__ import annotations
 
+import logging
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+DEPLOY_PROFILES = ("lite-noapi", "lite-cloud", "onprem-local", "full-train")
+
+# 프로파일별 강제 default — .env/env에 명시 없으면 이 값으로 채움.
+# 명시값은 항상 우선 (override 가능).
+_PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
+    "lite-noapi": {
+        "llm_provider": "noop",
+        "embedding_provider": "hash",
+        "reranker_provider": "noop",
+        "vector_backend": "inmemory",
+        "storage_backend": "local",
+        "enable_training": False,
+        "poc_mode": "dryrun",
+    },
+    "lite-cloud": {
+        "llm_provider": "anthropic",
+        "embedding_provider": "hf",
+        "reranker_provider": "noop",
+        "vector_backend": "es",
+        "storage_backend": "minio",
+        "enable_training": False,
+        "poc_mode": "full",
+    },
+    "onprem-local": {
+        "llm_provider": "ollama",
+        "embedding_provider": "hf",
+        "reranker_provider": "bge",
+        "vector_backend": "es",
+        "storage_backend": "minio",
+        "enable_training": False,
+        "poc_mode": "full",
+    },
+    "full-train": {
+        "llm_provider": "anthropic",
+        "embedding_provider": "hf",
+        "reranker_provider": "bge",
+        "vector_backend": "es",
+        "storage_backend": "minio",
+        "enable_training": True,
+        "poc_mode": "full",
+    },
+}
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
+
+    # --- 배포 프로파일 ---
+    # 4-tier 납품 모드. .env에 LLOYDK_DEPLOY_PROFILE=... 한 줄로 전환.
+    # 빈 문자열이면 프로파일 미적용 (개별 키만 사용).
+    deploy_profile: str = "lite-noapi"
+
+    # 학습 기능 활성 — full-train 프로파일에서만 True. lite-*·onprem 에서는 False.
+    # False면 /api/v1/training/* 라우터 등록 자체 skip (OpenAPI에서 사라짐).
+    enable_training: bool = False
 
     # --- 인프라 ---
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.
@@ -87,6 +152,11 @@ class Settings(BaseSettings):
     classifier_lightweight_model: str = "monologg/koelectra-base-v3-discriminator"
     embedding_model: str = "nlpai-lab/KURE-v1"
 
+    # 임베딩 어댑터 선택:
+    #   hash : hash_embedding (결정론, GPU·다운로드 불필요, lite-noapi 기본)
+    #   hf   : hf_embedding (sentence-transformers, KURE/BGE 로컬 캐시, full/onprem 기본)
+    embedding_provider: str = "hash"
+
     # --- Reranker (A1) ---
     # noop  : 입력 순서 유지 (기본, 운영 외)
     # bge   : BAAI/bge-reranker-v2-m3 (FlagEmbedding 또는 sentence_transformers)
@@ -120,7 +190,43 @@ class Settings(BaseSettings):
     poc_mode: str = "dryrun"
 
 
+def apply_profile_defaults(s: Settings) -> dict[str, str]:
+    """LLOYDK_DEPLOY_PROFILE에 따라 미설정 키만 default로 채움.
+
+    명시값(.env 또는 env)은 항상 우선 — 빈 문자열이거나 환경변수 미설정인 키만
+    프로파일 default로 덮어씀. 같은 인스턴스를 in-place 수정.
+
+    Returns: {field: "profile" | "explicit"} — 어느 키가 어디서 왔는지.
+    """
+    sources: dict[str, str] = {}
+    profile = (s.deploy_profile or "").lower()
+    if not profile:
+        return {"_status": "no_profile"}
+    if profile not in DEPLOY_PROFILES:
+        logger.warning(
+            "unknown deploy_profile=%r, expected one of %s — skipping",
+            profile, DEPLOY_PROFILES,
+        )
+        return {"_status": f"unknown_profile:{profile}"}
+
+    # Settings는 env_prefix 없이 필드명 그대로 env에 매핑됨 (예: LLM_PROVIDER).
+    # 그래서 명시 여부는 환경변수의 대문자 필드명으로 판정.
+    defaults = _PROFILE_DEFAULTS[profile]
+    for field, default in defaults.items():
+        env_name = field.upper()
+        explicit = os.environ.get(env_name) is not None
+        if explicit:
+            sources[field] = "explicit"
+            continue
+        setattr(s, field, default)
+        sources[field] = "profile"
+    sources["_profile"] = profile
+    sources["_status"] = "ok"
+    return sources
+
+
 settings = Settings()
+apply_profile_defaults(settings)
 
 
 def assert_production_credentials() -> None:
