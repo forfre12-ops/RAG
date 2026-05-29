@@ -277,7 +277,7 @@ P5 E2E통합              ██
 |---|---|---|:---:|---|
 | **P4 추출** | 누락률 ≤ 5%, 품질 ≥ 0.7 | 누락 0.0%, 품질 0.986 | PASS | 30 파일 (.txt/.md). HWP/DOCX/PDF 실파일은 발주처 데이터 확보 후 동일 스크립트로 재실행 |
 | **P3 합성** | 라벨 일치도 ≥ 90% | **100.0%** (**800건**, 2026-05-27 확장), FNR 0% | PASS | Noop provider, 비용 $0. 등급별 균등 200×4, 도메인 6종 분포. 실 Claude/Qwen3 비교는 API 키 추가 후 `--provider anthropic` |
-| **P2 임베딩** | Recall@5 ≥ 0.80, Lat ≤ 200ms | Recall 0.70 (hash baseline), 3ms | PASS* | dryrun baseline 0.50 통과. KURE-v1/BGE-M3 실측은 모델 다운로드 후 `--mode full` |
+| **P2 임베딩** | Recall@5 ≥ 0.80, Lat p50 ≤ 200ms | dryrun 0.70 (hash) / **실측 KURE-v1 0.667·629ms** / **BGE-M3 0.700·568ms** (n=5000, q=30) | FAIL | 2026-05-29 GPU 실측. dryrun PASS는 합격선 0.50 기준. 실측 합격선 미달 사유: (a) 시드 키워드 기반 "…관련 자료" 쿼리 패턴이 진짜 사용자 의도와 거리 (b) dense-only — ES 하이브리드(BM25+RRF)·reranker 미적용 (c) Lat에 쿼리 임베딩 forward 포함. 하이브리드·reranker·실 가이드 v2 쿼리 적용 후 합격선 재판정 |
 | **P1 분류** | F1-macro ≥ 0.75, FNR ≤ 5% | **F1 1.0**, FNR 0% | PASS | 룰 라벨러 surrogate. KF-DeBERTa 학습은 GPU 확보 후 `--mode full --epochs 5` |
 | **P5 E2E** | 응답 200 + 라벨 OK, ≤ 30s | 4/4 일치, max 6.4ms (inproc) | PASS | TestClient in-process. HTTP 모드는 `docker compose up` 후 `--mode http` |
 

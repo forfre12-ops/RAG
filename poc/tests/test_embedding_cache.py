@@ -117,3 +117,23 @@ class TestEmbeddingCache:
         # → 권장 동작: last_batch에 신규 텍스트만 존재
         if underlying.call_count == before + 1:
             assert "신규 텍스트" in underlying.last_batch
+
+    def test_different_models_do_not_share_cache_keys(self):
+        """동일 텍스트라도 underlying 모델명이 다르면 캐시 키가 달라야 한다.
+
+        P2 KURE-v1 vs BGE-M3 비교에서 두 모델이 같은 텍스트로 같은 키를 잡아
+        먼저 임베딩한 모델의 벡터를 두 번째 모델이 cache hit으로 받아오던 결함
+        가드. cache_layer._hash_key가 model 인자를 받아 분리하도록 변경된 게
+        실제로 적용됐는지 행동으로 검증.
+        """
+        from lloydk.adapters.embedding.cache_layer import _hash_key
+        text = "한국어 영업비밀 문서"
+        k_none = _hash_key(text)
+        k_kure = _hash_key(text, "nlpai-lab/KURE-v1")
+        k_bge = _hash_key(text, "BAAI/bge-m3")
+        # 모델 미지정 폴백은 기존 해시와 동일 (하위호환)
+        assert k_none == _hash_key(text, None)
+        # 모델 지정 시 키가 폴백과도, 다른 모델과도 달라야
+        assert k_kure != k_none
+        assert k_bge != k_none
+        assert k_kure != k_bge

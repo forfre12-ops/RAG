@@ -24,7 +24,15 @@ from typing import Iterable, Sequence
 from lloydk.adapters.embedding.base import EmbeddingResult
 
 
-def _hash_key(text: str) -> str:
+def _hash_key(text: str, model: str | None = None) -> str:
+    """텍스트 + underlying 모델명 결합 SHA1.
+
+    model 미지정 시 텍스트 단독 — 하위호환. 동일 텍스트가 다른 임베딩 모델에서
+    같은 키로 충돌하던 결함(KURE-v1 / BGE-M3 비교가 캐시 hit으로 동일 벡터를
+    돌려받던 사고)을 차단한다.
+    """
+    if model:
+        return hashlib.sha1(f"{model}\x1f{text}".encode("utf-8")).hexdigest()
     return hashlib.sha1(text.encode("utf-8")).hexdigest()
 
 
@@ -198,7 +206,7 @@ class CachedEmbedding:
     def embed(self, texts: Sequence[str] | Iterable[str]) -> EmbeddingResult:
         texts_list = list(texts)
         n = len(texts_list)
-        keys = [_hash_key(t) for t in texts_list]
+        keys = [_hash_key(t, self._underlying_name) for t in texts_list]
 
         # 1) hit/miss 분리 — 동일 텍스트가 배치 내 중복돼도 underlying 호출은 1회만
         out_vectors: list[list[float] | None] = [None] * n

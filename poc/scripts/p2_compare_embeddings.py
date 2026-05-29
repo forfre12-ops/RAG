@@ -85,7 +85,10 @@ def evaluate(
 
     emb = build_embedder(embedder_name, force_hash=(embedder_name == "hash"))
 
-    label = f"{emb.name} / {backend} / {search_mode}"
+    # CachedEmbedding wrap 시 emb.name="cached"라 모델 구분이 사라짐.
+    # underlying 모델명을 우선 노출 — 안 보이면 emb.name 폴백.
+    display_name = getattr(emb, "_underlying_name", None) or emb.name
+    label = f"{display_name} / {backend} / {search_mode}"
     try:
         vs = build_store(backend=backend)
         # 실 연결 확인 — ensure_collection이 첫 요청을 발생시킴
@@ -94,7 +97,7 @@ def evaluate(
     except Exception as exc:  # noqa: BLE001
         print(f"[p2] SKIP {label}: {type(exc).__name__}: {exc}", file=sys.stderr)
         return {
-            "embedder": emb.name,
+            "embedder": display_name,
             "backend": backend,
             "search_mode": search_mode,
             "label": label,
@@ -123,7 +126,7 @@ def evaluate(
     except Exception as exc:  # noqa: BLE001
         print(f"[p2] SKIP {label}: upsert failed — {exc}", file=sys.stderr)
         return {
-            "embedder": emb.name, "backend": backend, "search_mode": search_mode,
+            "embedder": display_name, "backend": backend, "search_mode": search_mode,
             "label": label, "dim": emb.dim, "status": "SKIP",
             "skip_reason": f"upsert: {exc}",
             "recall_at_k": 0.0, "latency_ms_p50": 0.0, "latency_ms_p95": 0.0,
@@ -165,7 +168,7 @@ def evaluate(
         else max(latencies, default=0)
     )
     return {
-        "embedder": emb.name,
+        "embedder": display_name,
         "backend": backend,
         "search_mode": search_mode,
         "label": label,
@@ -316,6 +319,12 @@ def main() -> int:
     )
     ap.add_argument("--synth-dir", default="datasets/synthetic")
     ap.add_argument("--top-k", type=int, default=5)
+    ap.add_argument(
+        "--queries-per-grade",
+        type=int,
+        default=3,
+        help="등급당 쿼리 개수. dryrun=3 권장, full=9+ (총 36+) 권장.",
+    )
     ap.add_argument("--report", default="reports/p2_embedding_report.md")
     args = ap.parse_args()
 
@@ -325,7 +334,7 @@ def main() -> int:
         return 2
 
     docs = load_corpus(synth_dir)
-    queries = make_queries(per_grade=3)
+    queries = make_queries(per_grade=args.queries_per_grade)
 
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     combos = _resolve_combinations(args.mode, backends, args.hybrid)
