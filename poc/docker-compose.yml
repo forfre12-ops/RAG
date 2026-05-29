@@ -142,6 +142,25 @@ services:
       - ./src:/app/src
       - E:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
 
+  # D3 (2026-05-29): P2-C7 mTLS 종료 nginx — opt-in profile.
+  # 활성: docker compose --profile mtls up -d nginx-mtls
+  # 사전 작업: bash infra/mtls/generate_dev_certs.sh (server/ca/client 인증서 발급)
+  # 운영: ./infra/mtls/certs를 PKI/cert-manager 산출물로 교체.
+  nginx-mtls:
+    profiles: ["mtls"]
+    image: nginx:1.27-alpine
+    depends_on:
+      - api
+    ports:
+      - "443:443"
+    volumes:
+      - ./infra/mtls/nginx.mtls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/mtls/certs:/etc/nginx/mtls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t || exit 1"]
+      interval: 30s
+      retries: 3
+
 volumes:
   # esdata만 named volume 유지 — ES는 fsync 빈도가 높아 bind mount(WSL2↔Windows FS) IO 패널티가 큼.
   # 나머지(postgres/minio/redis/modelcache)는 E:/antigravity/rag/docker-data/ bind mount.

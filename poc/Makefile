@@ -10,7 +10,7 @@ VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
 .PHONY: help venv install env infra-up infra-down infra-verify api worker \
-        p2 p2-full bundle-dry licenses licenses-check analyze-synth verify-all \
+        p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run
 
@@ -28,6 +28,7 @@ help:
 	@echo "  bundle-dry   폐쇄망 번들 manifest dry-run (doc/12)"
 	@echo "  licenses     OSS 라이선스 4종 산출 (txt/md/json/cyclonedx, doc/14)"
 	@echo "  licenses-check  직접 의존성 라이선스 위험 검증 (CI용, exit 1 on risk)"
+	@echo "  sbom-publish    licenses + doc/21_OSS_SBOM_보고서.html 자동 갱신 (D4)"
 	@echo "  analyze-synth   합성 데이터셋 800건 종합 분석 (doc/02 §부록 D)"
 	@echo "  verify-all   회신 무관 전체 검증 6단계 (pytest·PoC·migrate·bundle·license·analyze)"
 	@echo "  p3           P3 synthesize 40 docs with noop provider + label check"
@@ -96,6 +97,14 @@ licenses:
 
 licenses-check:
 	$(PY) scripts/dump_licenses.py --check --scope=direct
+
+# D4 (2026-05-29): SBOM 4종 산출 + doc/21 HTML 자동 갱신.
+# CI main 잡 + 로컬에서 `make sbom-publish`로 동시 호출 가능.
+# doc/21 자동 commit은 별도 (blast radius 차단) — CI는 artifact 업로드만.
+sbom-publish: licenses
+	$(PY) scripts/render_sbom_html.py \
+	    --in licenses/sbom.cyclonedx.json \
+	    --out ../doc/21_OSS_SBOM_보고서.html
 
 analyze-synth:
 	@# 풀 합성(800건)이 있으면 그걸 분석, 없으면 smoke 40건 fallback

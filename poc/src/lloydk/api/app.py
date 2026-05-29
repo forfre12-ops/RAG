@@ -31,6 +31,13 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # J1: 운영 모드에서 빈 자격증명 차단 (dryrun/테스트는 우회)
     assert_production_credentials()
+    # D2 (2026-05-29): OpenTelemetry 트레이싱 활성. OTEL_EXPORTER_OTLP_ENDPOINT
+    # 미설정 또는 opentelemetry 미설치 시 silent no-op (반환값 False).
+    try:
+        from lloydk.obs.otel import setup_tracing  # noqa: PLC0415
+        setup_tracing(app)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("OTel setup skipped: %s", exc)
     # warm-up hooks here (load model registry, etc.)
     yield
 

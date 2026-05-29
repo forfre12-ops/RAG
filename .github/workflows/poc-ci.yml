@@ -208,7 +208,16 @@ jobs:
           python scripts/dump_licenses.py --format=json -o licenses/licenses.json
           python scripts/dump_licenses.py --format=cyclonedx -o licenses/sbom.cyclonedx.json
 
-      - name: Upload SBOM artifacts (CycloneDX + reports)
+      # D4 (2026-05-29): doc/21_OSS_SBOM_보고서.html 자동 갱신.
+      # 자동 commit은 의도적으로 안 함 — 운영자 PR 머지로 진실 소스 유지(blast radius 차단).
+      # 변경된 doc/21은 sbom artifact에 함께 업로드되어 검수 첨부 가능.
+      - name: Render doc/21 OSS SBOM HTML (auto-update artifact)
+        run: |
+          python scripts/render_sbom_html.py \
+            --in licenses/sbom.cyclonedx.json \
+            --out ../doc/21_OSS_SBOM_보고서.html
+
+      - name: Upload SBOM artifacts (CycloneDX + reports + doc/21 HTML)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -218,6 +227,7 @@ jobs:
             poc/licenses/LICENSES.md
             poc/licenses/licenses.json
             poc/licenses/sbom.cyclonedx.json
+            doc/21_OSS_SBOM_보고서.html
           retention-days: 90  # doc/14 운영 전환 시 발주처 검수 첨부용
 
   test:
