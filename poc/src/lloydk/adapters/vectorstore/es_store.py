@@ -59,6 +59,7 @@ class EsStore:
 
         self._client = Elasticsearch(**kwargs)
         self._server_version: tuple[int, int, int] | None = None
+        self._license_type: str | None = None
 
     # ─────────────────────────────────────────────────────────────
     # 서버 버전 감지 (retriever API vs legacy 분기)
@@ -74,11 +75,32 @@ class EsStore:
         self._server_version = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
         return self._server_version
 
+    def license_type(self) -> str:
+        if self._license_type is not None:
+            return self._license_type
+        try:
+            resp = self._client.license.get()
+            self._license_type = resp.get("license", {}).get("type", "basic")
+        except Exception:  # noqa: BLE001
+            self._license_type = "basic"
+        return self._license_type
+
+    def _rrf_licensed(self) -> bool:
+        # RRF (retriever API + legacy rank.rrf) 모두 platinum+ 라이선스 필요.
+        # basic/gold는 clientside RRF로 폴백.
+        return self.license_type() in {"platinum", "enterprise", "trial"}
+
     def supports_retriever_api(self) -> bool:
-        return self.server_version() >= self.RETRIEVER_API_MIN_VERSION
+        return (
+            self.server_version() >= self.RETRIEVER_API_MIN_VERSION
+            and self._rrf_licensed()
+        )
 
     def supports_legacy_rrf(self) -> bool:
-        return self.server_version() >= self.LEGACY_RRF_MIN_VERSION
+        return (
+            self.server_version() >= self.LEGACY_RRF_MIN_VERSION
+            and self._rrf_licensed()
+        )
 
     # ─────────────────────────────────────────────────────────────
     # 인덱스 관리

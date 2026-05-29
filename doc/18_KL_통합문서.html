@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — KL 통합 가이드 | Lloydk AI</title>
+<meta name="description" content="KL ↔ Lloydk AI API 통합 명세: 21개 엔드포인트 상세, 인증, 상태값, 오류 코드, 통합 체크리스트. 2026-05-27 기준." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+
+<style>
+  /* ============================================================
+     NovaX Design System (doc/07 V2와 통일)
+     - Geist Sans / Geist Mono, 1px borders, monochrome
+     ============================================================ */
+  :root {
+    --bg:           #ffffff;
+    --bg-surface:   #fafafa;
+    --bg-elevated:  #ffffff;
+    --bg-code:      #fafafa;
+    --bg-nav:       rgba(255,255,255,0.72);
+    --text:         #0a0a0a;
+    --text-soft:    #525252;
+    --text-dim:     #737373;
+    --text-faint:   #a3a3a3;
+    --border:       rgba(0,0,0,0.08);
+    --border-strong:rgba(0,0,0,0.16);
+    --border-soft:  rgba(0,0,0,0.05);
+    --accent:       #0a0a0a;
+    --accent-soft:  #f4f4f4;
+    --accent-blue:  rgba(0,112,243,0.06);
+    --radius-sm:    6px;
+    --radius:       8px;
+    --radius-lg:    12px;
+    --radius-pill:  999px;
+    --shadow-sm:    0 1px 2px rgba(0,0,0,.04);
+    --shadow:       0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.06);
+    --font-sans:    "Geist", -apple-system, BlinkMacSystemFont, "Pretendard",
+                    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    --font-mono:    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* status colors */
+    --c-done:   #16a34a;
+    --c-active: #0070f3;
+    --c-block:  #dc2626;
+    --c-risk:   #d97706;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.7;
+    letter-spacing: -0.011em;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ===== Navbar ===== */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg-nav);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .nav-inner {
+    max-width: 1320px; margin: 0 auto;
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--text); text-decoration: none;
+    white-space: nowrap;
+  }
+  .brand-mark {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border-radius: 999px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .brand-mark img {
+    width: 32px; height: 32px;
+    object-fit: contain;
+    border-radius: 999px;
+    display: block;
+  }
+  .brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.02em; }
+  .brand-sep  { color: var(--text-dim); font-size: 14px; margin: 0 6px; }
+  .brand-url  { font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); }
+  .nav-actions { display: flex; align-items: center; gap: 8px; }
+  .nav-link {
+    color: var(--text-soft); text-decoration: none;
+    font-size: 13.5px; font-weight: 500;
+    padding: 6px 10px; border-radius: var(--radius-sm);
+  }
+  .nav-link:hover { color: var(--text); }
+
+  /* ===== Layout ===== */
+  .container { max-width: 1280px; margin: 0 auto; padding: 40px 32px 120px; }
+
+  /* ===== Article header ===== */
+  .meta-row {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 16px;
+    font-size: 12.5px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    background: var(--text); color: var(--bg);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  .badge.ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border-strong);
+  }
+  .badge.success { background: var(--c-done); }
+  .badge.warn    { background: var(--c-risk); }
+  .badge.danger  { background: var(--c-block); }
+  .badge.active  { background: var(--c-active); }
+  .meta-dot  { color: var(--text-faint); }
+  .meta-soft { color: var(--text-dim); }
+  .meta-category { color: var(--text); font-weight: 600; }
+  h1.title {
+    font-size: 48px; font-weight: 800;
+    letter-spacing: -0.04em; line-height: 1.06;
+    margin: 0 0 18px;
+  }
+  .lede { font-size: 18px; color: var(--text-soft); margin: 0 0 32px; max-width: 800px; }
+
+  /* ===== Section headings ===== */
+  h2 {
+    font-size: 28px; font-weight: 700;
+    letter-spacing: -0.025em; line-height: 1.2;
+    margin: 56px 0 4px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  .h2-sub {
+    margin: 0 0 24px;
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+  h3 {
+    font-size: 19px; font-weight: 600;
+    letter-spacing: -0.015em; line-height: 1.3;
+    margin: 32px 0 12px;
+  }
+  h4 {
+    font-size: 15px; font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 24px 0 8px;
+  }
+
+  /* ===== Table ===== */
+  .table-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow-x: auto;
+    margin: 16px 0 24px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  thead { background: var(--bg-surface); }
+  thead th {
+    padding: 11px 16px;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--accent-soft); }
+  code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+  }
+
+  /* ===== Callout ===== */
+  .callout {
+    display: flex; gap: 14px;
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    border: 1px solid;
+    margin: 16px 0;
+  }
+  .callout.accent  { background: rgba(0,112,243,0.04); border-color: rgba(0,112,243,0.18); }
+  .callout.success { background: rgba(22,163,74,0.04); border-color: rgba(22,163,74,0.20); }
+  .callout.warn    { background: rgba(217,119,6,0.05); border-color: rgba(217,119,6,0.22); }
+  .callout.danger  { background: rgba(220,38,38,0.04); border-color: rgba(220,38,38,0.22); }
+  .callout-icon { font-size: 18px; flex-shrink: 0; line-height: 1.6; }
+  .callout-body { flex: 1; }
+  .callout-label {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .callout.accent  .callout-label { color: #0070f3; }
+  .callout.success .callout-label { color: var(--c-done); }
+  .callout.warn    .callout-label { color: var(--c-risk); }
+  .callout.danger  .callout-label { color: var(--c-block); }
+  .callout p { margin: 0; font-size: 14px; color: var(--text-soft); }
+
+  /* ===== Card ===== */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 16px 0 24px; }
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: var(--border-strong); }
+  .card .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card .ctitle { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+  .card p { font-size: 14px; color: var(--text-soft); margin: 0; }
+
+  /* ===== Method badge ===== */
+  .method {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    min-width: 44px; text-align: center;
+  }
+  .method.get    { background: rgba(22,163,74,0.10);  color: #15803d; border: 1px solid rgba(22,163,74,0.25); }
+  .method.post   { background: rgba(0,112,243,0.10);  color: #0055cc; border: 1px solid rgba(0,112,243,0.25); }
+  .method.put    { background: rgba(217,119,6,0.10);  color: #92400e; border: 1px solid rgba(217,119,6,0.25); }
+  .method.delete { background: rgba(220,38,38,0.10);  color: #991b1b; border: 1px solid rgba(220,38,38,0.25); }
+
+  /* ===== Status pill ===== */
+  .pill {
+    display: inline-flex; align-items: center;
+    padding: 2px 10px; border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+  }
+  .pill.done     { background: rgba(22,163,74,0.12);  color: #15803d; }
+  .pill.active   { background: rgba(0,112,243,0.10);  color: #0055cc; }
+  .pill.pending  { background: var(--bg-surface);     color: var(--text-dim); border: 1px solid var(--border-strong); }
+  .pill.warn     { background: rgba(217,119,6,0.10);  color: #92400e; }
+  .pill.danger   { background: rgba(220,38,38,0.10);  color: #991b1b; }
+
+  /* ===== Endpoint block ===== */
+  .endpoint {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .endpoint-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .endpoint-path {
+    font-family: var(--font-mono);
+    font-size: 14px; font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .endpoint-desc {
+    font-size: 13px; color: var(--text-dim);
+    margin-left: auto;
+  }
+  .endpoint-body { padding: 16px 18px; }
+  .endpoint-body p { margin: 0 0 10px; font-size: 14px; color: var(--text-soft); }
+  .endpoint-body p:last-child { margin-bottom: 0; }
+
+  /* ===== Pre / Code block ===== */
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0;
+    color: var(--text);
+  }
+
+  /* ===== Checklist ===== */
+  .checklist { list-style: none; padding: 0; margin: 12px 0 20px; }
+  .checklist li {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 14px;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-icon { flex-shrink: 0; font-size: 16px; margin-top: 2px; }
+  .check-label { color: var(--text); }
+  .check-note  { font-size: 12.5px; color: var(--text-dim); }
+
+  /* ===== Divider ===== */
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* ===== Footer ===== */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px;
+    max-width: 1280px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px;
+    font-size: 13px; color: var(--text-dim);
+  }
+  footer a { color: var(--text-dim); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+
+  /* ===== TOC sidebar ===== */
+  .page-layout {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 48px;
+    max-width: 1280px; margin: 0 auto;
+    padding: 40px 32px 120px;
+    align-items: start;
+  }
+  .toc {
+    position: sticky; top: 80px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+  .toc-label {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .toc a {
+    display: block;
+    font-size: 13px; color: var(--text-soft);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-left: 2px solid var(--border);
+    margin-bottom: 2px;
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .toc a:hover { color: var(--text); border-color: var(--border-strong); }
+  .toc a.active { color: var(--text); border-color: var(--text); font-weight: 500; }
+  .toc .toc-sub a { padding-left: 20px; font-size: 12.5px; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1000px) {
+    .page-layout { grid-template-columns: 1fr; padding: 32px 20px 80px; }
+    .toc { display: none; }
+  }
+  @media (max-width: 640px) {
+    h1.title { font-size: 32px; }
+    h2 { font-size: 22px; }
+    .nav-inner { padding: 12px 16px; }
+    .endpoint-header { flex-wrap: wrap; gap: 8px; }
+    .endpoint-desc { margin-left: 0; }
+  }
+  @media print {
+    .nav, .toc, footer { display: none; }
+    .page-layout { grid-template-columns: 1fr; padding: 0; }
+    .card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     NAVBAR
+============================================================ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark"><img src="assets/lloydk_logo_mark.png" alt="Lloydk AI" /></span>
+      <span class="brand-name">Lloydk AI</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-url">koipa/kl-integration</span>
+    </a>
+    <div class="nav-actions">
+      <a class="nav-link" href="#overview">개요</a>
+      <a class="nav-link" href="#auth">인증</a>
+      <a class="nav-link" href="#endpoints">엔드포인트</a>
+      <a class="nav-link" href="#states">상태값</a>
+      <a class="nav-link" href="#errors">오류</a>
+      <a class="nav-link" href="#checklist">체크리스트</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================
+     PAGE LAYOUT
+============================================================ -->
+<div class="page-layout">
+<main>
+
+<!-- ===== Article Header ===== -->
+<div class="meta-row">
+  <span class="badge">KL 통합</span>
+  <span class="badge ghost">PoC v1</span>
+  <span class="meta-dot">·</span>
+  <span class="meta-soft">2026-05-27 기준</span>
+  <span class="meta-dot">·</span>
+  <span class="meta-category">Lloydk AI → KL</span>
+</div>
+<h1 class="title" id="top">KL 통합 가이드</h1>
+<p class="lede">KL 시스템이 Lloydk AI API를 연동하기 위한 인증·엔드포인트·상태값·오류 처리 레퍼런스. 21개 엔드포인트, 실제 구현 기준 작성.</p>
+
+<div class="callout warn">
+  <span class="callout-icon">⚠️</span>
+  <div class="callout-body">
+    <div class="callout-label">PoC 단계 제약</div>
+    <p>현재 PoC v1 기준입니다. Idempotency Key와 Rate Limit 헤더는 미구현 상태이며 본사업 전 추가될 예정입니다. 비동기 작업 큐는 메모리 기반(재시작 시 초기화)입니다.</p>
+  </div>
+</div>
+
+<!-- ===== §1 개요 ===== -->
+<h2 id="overview">§1 &nbsp;통합 개요</h2>
+<p class="h2-sub">아키텍처·베이스 URL·버전 관리</p>
+
+<div class="card-grid">
+  <div class="card">
+    <div class="eyebrow">Base URL</div>
+    <div class="ctitle"><code>http://&lt;host&gt;:8000/api/v1</code></div>
+    <p>온프레미스 배포. HTTPS/포트는 인프라 협의 후 확정.</p>
+  </div>
+  <div class="card">
+    <div class="eyebrow">API 버전</div>
+    <div class="ctitle">v1</div>
+    <p>URL path prefix로 버전 관리. 향후 v2 출시 전까지 하위 호환 유지.</p>
+  </div>
+  <div class="card">
+    <div class="eyebrow">콘텐츠 타입</div>
+    <div class="ctitle"><code>application/json</code></div>
+    <p>요청·응답 모두 JSON. 가이드 문서 업로드는 <code>multipart/form-data</code>.</p>
+  </div>
+  <div class="card">
+    <div class="eyebrow">인코딩</div>
+    <div class="ctitle">UTF-8</div>
+    <p>한국어 문서 처리 기반. 모든 문자열 필드 UTF-8 인코딩 필수.</p>
+  </div>
+</div>
+
+<h3>전체 엔드포인트 요약</h3>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>영역</th>
+        <th>메서드</th>
+        <th>경로</th>
+        <th>설명</th>
+        <th>구현</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Health</td>      <td><span class="method get">GET</span></td>    <td><code>/healthz</code></td>                             <td>헬스체크</td>                  <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Classify</td>    <td><span class="method post">POST</span></td>   <td><code>/classify</code></td>                           <td>동기 분류</td>                 <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Classify</td>    <td><span class="method post">POST</span></td>   <td><code>/classify/async</code></td>                     <td>비동기 분류 요청</td>          <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Classify</td>    <td><span class="method post">POST</span></td>   <td><code>/classify/batch</code></td>                     <td>배치 분류 (최대 1000건)</td>   <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Classify</td>    <td><span class="method get">GET</span></td>     <td><code>/classify/jobs/{job_id}</code></td>             <td>비동기 작업 상태 조회</td>     <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Classify</td>    <td><span class="method get">GET</span></td>     <td><code>/classify/{doc_id}</code></td>                  <td>문서 분류 결과 조회</td>       <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Confirm</td>     <td><span class="method post">POST</span></td>   <td><code>/confirm</code></td>                           <td>관리자 등급 확정</td>          <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Confirm</td>     <td><span class="method post">POST</span></td>   <td><code>/relabel</code></td>                           <td>관리자 재라벨</td>             <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Training</td>    <td><span class="method post">POST</span></td>   <td><code>/train</code></td>                             <td>학습 트리거</td>               <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Training</td>    <td><span class="method get">GET</span></td>     <td><code>/train/jobs/{train_job_id}</code></td>          <td>학습 작업 상태 조회</td>       <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Training</td>    <td><span class="method get">GET</span></td>     <td><code>/train/jobs</code></td>                        <td>학습 작업 목록</td>            <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Synthesis</td>   <td><span class="method post">POST</span></td>   <td><code>/synth/generate</code></td>                    <td>합성 문서 생성</td>            <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Synthesis</td>   <td><span class="method get">GET</span></td>     <td><code>/synth/queue</code></td>                       <td>검수 큐 조회</td>              <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Synthesis</td>   <td><span class="method post">POST</span></td>   <td><code>/synth/{synth_id}/review</code></td>           <td>합성 문서 검수 처리</td>       <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Guide</td>       <td><span class="method post">POST</span></td>   <td><code>/guide/documents</code></td>                   <td>가이드 문서 업로드</td>        <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Guide</td>       <td><span class="method get">GET</span></td>     <td><code>/guide/documents/{guide_id}</code></td>        <td>가이드 문서 조회</td>          <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Schema</td>      <td><span class="method get">GET</span></td>     <td><code>/schema/grades</code></td>                     <td>등급체계 조회</td>             <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Schema</td>      <td><span class="method put">PUT</span></td>     <td><code>/schema/grades</code></td>                     <td>등급체계 갱신 (재학습 트리거)</td><td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Metrics</td>     <td><span class="method get">GET</span></td>     <td><code>/metrics/latest</code></td>                    <td>최신 모델 성능 지표</td>       <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Metrics</td>     <td><span class="method get">GET</span></td>     <td><code>/metrics/history</code></td>                   <td>성능 이력</td>                 <td><span class="pill done">✓ 구현</span></td></tr>
+      <tr><td>Metrics</td>     <td><span class="method get">GET</span></td>     <td><code>/metrics/confusion-matrix/{model_version}</code></td><td>혼동 행렬</td>            <td><span class="pill done">✓ 구현</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== §2 인증 ===== -->
+<h2 id="auth">§2 &nbsp;인증</h2>
+<p class="h2-sub">API Key 방식. 모든 엔드포인트에 필수.</p>
+
+<h3>헤더</h3>
+<pre>X-API-Key: &lt;your-api-key&gt;</pre>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>헤더</th><th>타입</th><th>필수</th><th>설명</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>X-API-Key</code></td>
+        <td>string</td>
+        <td><span class="pill danger">필수</span></td>
+        <td>사전 발급된 API 키. 미포함 또는 잘못된 키 → <code>401 Unauthorized</code></td>
+      </tr>
+      <tr>
+        <td><code>X-Request-ID</code></td>
+        <td>string (UUID)</td>
+        <td><span class="pill pending">선택</span></td>
+        <td>클라이언트 제공 요청 추적 ID. 미제공 시 서버가 UUID 생성 후 응답 헤더에 반환.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="callout warn">
+  <span class="callout-icon">⚠️</span>
+  <div class="callout-body">
+    <div class="callout-label">SSO / JWT 협의 필요</div>
+    <p>현재 API Key 방식입니다. KL이 SSO/JWT 기반을 요구할 경우 명세 갱신이 필요합니다 (K3 협의 항목). 결정 전까지 API Key로 통합 테스트 진행 가능합니다.</p>
+  </div>
+</div>
+
+<h3>Actor 메타 (선택)</h3>
+<p>요청 본문에 <code>actor</code> 객체를 포함해 KL 관리자 정보를 전달할 수 있습니다. 감사 로그(audit_log)에 기록됩니다.</p>
+<pre>{
+  "actor": {
+    "user_id": "kl-admin-001",
+    "role": "admin",
+    "tenant_id": "koipa"
+  }
+}</pre>
+
+<!-- ===== §3 엔드포인트 ===== -->
+<h2 id="endpoints">§3 &nbsp;엔드포인트 상세</h2>
+<p class="h2-sub">21개 엔드포인트 — 요청/응답 구조, 파라미터, 주의사항</p>
+
+<!-- 3.1 Health -->
+<h3>3.1 &nbsp;Health</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/healthz</span>
+    <span class="endpoint-desc">서비스 생존 확인</span>
+  </div>
+  <div class="endpoint-body">
+    <p>인증 불필요. 로드밸런서·K8s probe에 활용 권장.</p>
+    <strong>응답 200</strong>
+    <pre>{ "status": "ok", "version": "1.0.0", "ts": "2026-05-27T09:00:00Z" }</pre>
+  </div>
+</div>
+
+<!-- 3.2 Classify -->
+<h3>3.2 &nbsp;Classify — 문서 분류</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/classify</span>
+    <span class="endpoint-desc">동기 분류 (단건, 응답 대기)</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>요청 본문</strong>
+    <pre>{
+  "doc_id":   "doc-uuid-001",          // 필수, KL 문서 식별자
+  "content":  "계약서 전문 텍스트...",  // 필수, 분류할 문서 내용
+  "metadata": {                        // 선택
+    "title": "2026년 기술 계약서",
+    "author": "홍길동"
+  },
+  "actor": { "user_id": "kl-user-01", "role": "user", "tenant_id": "koipa" }
+}</pre>
+    <strong>응답 200</strong>
+    <pre>{
+  "doc_id":     "doc-uuid-001",
+  "grade":      "S1",             // TS | S1 | S2 | S3
+  "confidence": 0.923,
+  "rationale":  "영업비밀 핵심 기술 정보 포함...",
+  "status":     "staging",        // 초기값: staging
+  "model_ver":  "kf-deberta-v1.2",
+  "created_at": "2026-05-27T09:01:00Z"
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/classify/async</span>
+    <span class="endpoint-desc">비동기 분류 요청 (job ID 반환)</span>
+  </div>
+  <div class="endpoint-body">
+    <p>요청 본문은 <code>POST /classify</code>와 동일. 즉시 <code>job_id</code>를 반환하고 처리는 백그라운드에서 진행.</p>
+    <strong>응답 202</strong>
+    <pre>{
+  "job_id": "job-uuid-001",
+  "status": "queued"
+}</pre>
+    <p>이후 <code>GET /classify/jobs/{job_id}</code>로 폴링.</p>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/classify/batch</span>
+    <span class="endpoint-desc">배치 분류 (최대 1000건)</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>요청 본문</strong>
+    <pre>{
+  "documents": [
+    { "doc_id": "doc-001", "content": "..." },
+    { "doc_id": "doc-002", "content": "..." }
+  ]
+}</pre>
+    <p>1000건 초과 시 <code>413 Payload Too Large</code> 반환.</p>
+    <strong>응답 202</strong>
+    <pre>{
+  "job_id": "batch-job-001",
+  "count":  2,
+  "status": "queued"
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/classify/jobs/{job_id}</span>
+    <span class="endpoint-desc">비동기 작업 상태 폴링</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>응답 200 — 진행 중</strong>
+    <pre>{ "job_id": "job-uuid-001", "status": "running", "progress": 0.4 }</pre>
+    <strong>응답 200 — 완료</strong>
+    <pre>{
+  "job_id":  "job-uuid-001",
+  "status":  "done",
+  "results": [
+    { "doc_id": "doc-001", "grade": "S1", "confidence": 0.91 }
+  ]
+}</pre>
+    <p><strong>폴링 권장 간격</strong>: 2초. 완료 후 결과는 24시간 보관.</p>
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <div class="callout-label">PoC 제약</div>
+        <p>작업 큐가 메모리 기반입니다. 서비스 재시작 시 진행 중인 job은 초기화됩니다. 본사업에서 Redis/DB 기반으로 교체 예정.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/classify/{doc_id}</span>
+    <span class="endpoint-desc">문서 분류 결과 조회</span>
+  </div>
+  <div class="endpoint-body">
+    <p>특정 문서의 최신 분류 결과를 반환. 확정(confirm) 이후에도 원본 AI 추론 결과를 포함.</p>
+    <strong>응답 200</strong>
+    <pre>{
+  "doc_id":     "doc-uuid-001",
+  "grade":      "S1",
+  "confidence": 0.923,
+  "status":     "confirmed",
+  "confirmed_by": "kl-admin-001",
+  "confirmed_at": "2026-05-27T10:00:00Z"
+}</pre>
+  </div>
+</div>
+
+<!-- 3.3 Confirm / Relabel -->
+<h3>3.3 &nbsp;Confirm / Relabel — 관리자 확정</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/confirm</span>
+    <span class="endpoint-desc">AI 분류 결과 확정 (grade 변경 없음)</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>요청 본문</strong>
+    <pre>{
+  "doc_id": "doc-uuid-001",
+  "actor":  { "user_id": "kl-admin-001", "role": "admin", "tenant_id": "koipa" }
+}</pre>
+    <strong>응답 200</strong>
+    <pre>{ "doc_id": "doc-uuid-001", "status": "confirmed", "confirmed_at": "2026-05-27T10:00:00Z" }</pre>
+    <p>상태 전이: <code>staging</code> → <code>confirmed</code></p>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/relabel</span>
+    <span class="endpoint-desc">등급 재라벨 (AI 결과와 다른 등급으로 확정)</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>요청 본문</strong>
+    <pre>{
+  "doc_id":        "doc-uuid-001",
+  "corrected_grade": "S2",          // TS | S1 | S2 | S3
+  "reason":        "법무팀 검토 결과 2급으로 조정",
+  "actor":         { "user_id": "kl-admin-001", "role": "admin", "tenant_id": "koipa" }
+}</pre>
+    <strong>응답 200</strong>
+    <pre>{ "doc_id": "doc-uuid-001", "status": "corrected", "corrected_grade": "S2" }</pre>
+    <p>상태 전이: <code>staging</code> → <code>corrected</code></p>
+    <p>correction 데이터는 자동으로 능동학습 후보 풀에 추가되어 다음 학습 사이클에 반영됩니다.</p>
+  </div>
+</div>
+
+<!-- 3.4 Training -->
+<h3>3.4 &nbsp;Training — 모델 학습</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/train</span>
+    <span class="endpoint-desc">학습 트리거</span>
+  </div>
+  <div class="endpoint-body">
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <div class="callout-label">PoC 제약 — GPU 미확보</div>
+        <p>현재 실제 학습 로직은 stub 상태입니다. GPU/데이터셋 확보 후 활성화됩니다. job_id는 반환되며 상태 폴링은 가능합니다.</p>
+      </div>
+    </div>
+    <strong>요청 본문</strong>
+    <pre>{
+  "trigger_reason": "weekly_schedule",  // weekly_schedule | correction_threshold | manual
+  "actor": { "user_id": "kl-admin-001", "role": "admin", "tenant_id": "koipa" }
+}</pre>
+    <strong>응답 202</strong>
+    <pre>{ "train_job_id": "train-001", "status": "queued" }</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/train/jobs/{train_job_id}</span>
+    <span class="endpoint-desc">학습 작업 상태 조회</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>status 값</strong>: <code>queued</code> → <code>preprocessing</code> → <code>training</code> → <code>evaluating</code> → <code>registering</code> → <code>done</code> / <code>failed</code>
+    <pre>{
+  "train_job_id": "train-001",
+  "status":       "training",
+  "progress":     0.35,
+  "epoch":        2,
+  "loss":         0.421
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/train/jobs</span>
+    <span class="endpoint-desc">학습 작업 목록</span>
+  </div>
+  <div class="endpoint-body">
+    <p>Query params: <code>?limit=20&amp;offset=0&amp;status=done</code></p>
+    <pre>{ "total": 5, "items": [ { "train_job_id": "train-001", "status": "done", ... } ] }</pre>
+  </div>
+</div>
+
+<!-- 3.5 Synthesis -->
+<h3>3.5 &nbsp;Synthesis — 합성 문서</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/synth/generate</span>
+    <span class="endpoint-desc">합성 문서 생성 요청</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>요청 본문</strong>
+    <pre>{
+  "target_grade": "S1",
+  "count":        5,
+  "domain":       "semiconductor",  // 선택
+  "actor": { "user_id": "kl-admin-001", "role": "admin", "tenant_id": "koipa" }
+}</pre>
+    <strong>응답 202</strong>
+    <pre>{ "synth_job_id": "synth-001", "status": "queued", "count": 5 }</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/synth/queue</span>
+    <span class="endpoint-desc">검수 대기 합성 문서 목록</span>
+  </div>
+  <div class="endpoint-body">
+    <p>Query params: <code>?status=pending_review&amp;limit=20</code></p>
+    <pre>{
+  "total": 12,
+  "items": [
+    { "synth_id": "s-001", "grade": "S1", "review_status": "pending_review", "preview": "..." }
+  ]
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/synth/{synth_id}/review</span>
+    <span class="endpoint-desc">합성 문서 검수 처리</span>
+  </div>
+  <div class="endpoint-body">
+    <strong>요청 본문</strong>
+    <pre>{
+  "decision": "approved",    // approved | rejected
+  "comment":  "품질 양호",   // 선택
+  "actor": { "user_id": "kl-admin-001", "role": "admin", "tenant_id": "koipa" }
+}</pre>
+    <p>상태 전이: <code>pending_review</code> → <code>approved</code> / <code>rejected</code></p>
+  </div>
+</div>
+
+<!-- 3.6 Guide -->
+<h3>3.6 &nbsp;Guide — 등급분류 가이드</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method post">POST</span>
+    <span class="endpoint-path">/api/v1/guide/documents</span>
+    <span class="endpoint-desc">가이드 문서 업로드 (RAG 인덱싱)</span>
+  </div>
+  <div class="endpoint-body">
+    <p>Content-Type: <code>multipart/form-data</code></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td><code>file</code></td><td>file (PDF/DOCX/TXT)</td><td>가이드 파일 (필수)</td></tr>
+          <tr><td><code>title</code></td><td>string</td><td>문서 제목 (필수)</td></tr>
+          <tr><td><code>version</code></td><td>string</td><td>버전 태그 (예: v2.3)</td></tr>
+          <tr><td><code>effective_date</code></td><td>date string</td><td>시행일 (YYYY-MM-DD)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <strong>응답 201</strong>
+    <pre>{ "guide_id": "guide-001", "indexed": true, "chunk_count": 42 }</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/guide/documents/{guide_id}</span>
+    <span class="endpoint-desc">가이드 문서 조회</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "guide_id":      "guide-001",
+  "title":         "KOIPA 영업비밀 등급분류 가이드 v2.3",
+  "version":       "v2.3",
+  "effective_date":"2026-01-01",
+  "indexed":       true,
+  "chunk_count":   42,
+  "uploaded_at":   "2026-05-01T09:00:00Z"
+}</pre>
+  </div>
+</div>
+
+<!-- 3.7 Schema -->
+<h3>3.7 &nbsp;Schema — 등급체계 관리</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/schema/grades</span>
+    <span class="endpoint-desc">현재 등급체계 조회</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "grades": [
+    { "code": "TS", "label": "특급기밀", "level": 1 },
+    { "code": "S1", "label": "1급 비밀", "level": 2 },
+    { "code": "S2", "label": "2급 대외비", "level": 3 },
+    { "code": "S3", "label": "3급 공개",   "level": 4 }
+  ],
+  "version": "v1.0",
+  "updated_at": "2026-01-01T00:00:00Z"
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method put">PUT</span>
+    <span class="endpoint-path">/api/v1/schema/grades</span>
+    <span class="endpoint-desc">등급체계 갱신 + 재학습 트리거</span>
+  </div>
+  <div class="endpoint-body">
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <div class="callout-label">주의 — 재학습 자동 발생</div>
+        <p>등급체계 변경 시 자동으로 재학습 job이 큐에 추가됩니다. 운영 중 호출 전 충분한 검토 필요.</p>
+      </div>
+    </div>
+    <strong>요청 본문</strong>
+    <pre>{
+  "grades": [ ... ],
+  "reason": "KOIPA 가이드 v2.4 반영",
+  "actor": { "user_id": "kl-admin-001", "role": "admin", "tenant_id": "koipa" }
+}</pre>
+    <strong>응답 200</strong>
+    <pre>{ "version": "v1.1", "retrain_job_id": "train-002", "updated_at": "2026-05-27T09:00:00Z" }</pre>
+  </div>
+</div>
+
+<!-- 3.8 Metrics -->
+<h3>3.8 &nbsp;Metrics — 모델 성능</h3>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/metrics/latest</span>
+    <span class="endpoint-desc">최신 모델 성능 지표</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "model_version": "kf-deberta-v1.2",
+  "macro_f1":   0.881,
+  "accuracy":   0.904,
+  "per_grade":  { "TS": 0.92, "S1": 0.89, "S2": 0.87, "S3": 0.86 },
+  "eval_date":  "2026-05-20",
+  "sample_count": 1240
+}</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/metrics/history</span>
+    <span class="endpoint-desc">모델 성능 이력</span>
+  </div>
+  <div class="endpoint-body">
+    <p>Query params: <code>?limit=10&amp;order=desc</code></p>
+    <pre>{ "total": 5, "items": [ { "model_version": "...", "macro_f1": 0.881, "eval_date": "..." } ] }</pre>
+  </div>
+</div>
+
+<div class="endpoint">
+  <div class="endpoint-header">
+    <span class="method get">GET</span>
+    <span class="endpoint-path">/api/v1/metrics/confusion-matrix/{model_version}</span>
+    <span class="endpoint-desc">혼동 행렬</span>
+  </div>
+  <div class="endpoint-body">
+    <pre>{
+  "model_version": "kf-deberta-v1.2",
+  "matrix": {
+    "TS": { "TS": 92, "S1": 5, "S2": 2, "S3": 1 },
+    "S1": { "TS": 3, "S1": 89, "S2": 6, "S3": 2 },
+    "S2": { "TS": 1, "S1": 4, "S2": 87, "S3": 8 },
+    "S3": { "TS": 0, "S1": 2, "S2": 10, "S3": 88 }
+  }
+}</pre>
+  </div>
+</div>
+
+<!-- ===== §4 상태값 ===== -->
+<h2 id="states">§4 &nbsp;상태값 레퍼런스</h2>
+<p class="h2-sub">도메인별 상태 문자열 — 이넘 아닌 string 타입으로 DB 저장</p>
+
+<div class="callout accent">
+  <span class="callout-icon">ℹ️</span>
+  <div class="callout-body">
+    <div class="callout-label">구현 노트</div>
+    <p>PoC v1에서 상태값은 Python <code>Enum</code> 클래스 없이 DB string 컬럼으로 관리됩니다. 예외: 등급(grade)은 <code>Grade(str, Enum)</code>으로 정의됨 (TS/S1/S2/S3).</p>
+  </div>
+</div>
+
+<h3>분류(Classification) 상태</h3>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>상태값</th><th>의미</th><th>전이 조건</th></tr></thead>
+    <tbody>
+      <tr><td><code>staging</code></td><td>AI 추론 완료, 관리자 확정 대기</td><td>분류 완료 직후 초기값</td></tr>
+      <tr><td><code>confirmed</code></td><td>관리자가 AI 등급을 그대로 확정</td><td><code>POST /confirm</code> 호출</td></tr>
+      <tr><td><code>corrected</code></td><td>관리자가 등급을 수정해서 확정</td><td><code>POST /relabel</code> 호출</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3>문서(Document) 처리 상태</h3>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>상태값</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>pending</code></td><td>전처리 대기</td></tr>
+      <tr><td><code>processing</code></td><td>전처리 진행 중</td></tr>
+      <tr><td><code>done</code></td><td>전처리 완료, 분류 가능</td></tr>
+      <tr><td><code>failed</code></td><td>전처리 실패</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3>학습(TrainingRun) 상태</h3>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>상태값</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>queued</code></td><td>큐 대기</td></tr>
+      <tr><td><code>preprocessing</code></td><td>데이터 전처리</td></tr>
+      <tr><td><code>training</code></td><td>학습 진행 중</td></tr>
+      <tr><td><code>evaluating</code></td><td>평가 중</td></tr>
+      <tr><td><code>registering</code></td><td>모델 등록 중</td></tr>
+      <tr><td><code>done</code></td><td>완료</td></tr>
+      <tr><td><code>failed</code></td><td>실패</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3>합성 문서(SampleDocument) 검수 상태</h3>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>상태값</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>pending_review</code></td><td>검수 대기</td></tr>
+      <tr><td><code>approved</code></td><td>검수 승인</td></tr>
+      <tr><td><code>rejected</code></td><td>검수 반려</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3>비동기 Job 상태</h3>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>상태값</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td><code>queued</code></td><td>작업 큐 대기</td></tr>
+      <tr><td><code>running</code></td><td>처리 중</td></tr>
+      <tr><td><code>done</code></td><td>완료</td></tr>
+      <tr><td><code>failed</code></td><td>실패</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== §5 오류 코드 ===== -->
+<h2 id="errors">§5 &nbsp;오류 코드</h2>
+<p class="h2-sub">HTTP 상태 코드 + 응답 본문 구조</p>
+
+<h3>표준 오류 응답 형식</h3>
+<pre>{
+  "error_code": "INVALID_GRADE",
+  "message":    "grade must be one of: TS, S1, S2, S3",
+  "request_id": "req-uuid-001"
+}</pre>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>HTTP</th><th>error_code</th><th>원인</th><th>대응</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>400</td><td><code>VALIDATION_ERROR</code></td><td>필수 파라미터 누락, 잘못된 형식</td><td>요청 본문 검토</td></tr>
+      <tr><td>400</td><td><code>INVALID_GRADE</code></td><td>grade 값이 TS/S1/S2/S3 외 값</td><td>허용 값 확인</td></tr>
+      <tr><td>401</td><td><code>UNAUTHORIZED</code></td><td>X-API-Key 누락 또는 잘못된 키</td><td>키 재확인</td></tr>
+      <tr><td>403</td><td><code>FORBIDDEN</code></td><td>권한 부족 (role 불일치)</td><td>actor.role 확인</td></tr>
+      <tr><td>404</td><td><code>NOT_FOUND</code></td><td>doc_id / job_id / guide_id 없음</td><td>ID 재확인</td></tr>
+      <tr><td>409</td><td><code>ALREADY_CONFIRMED</code></td><td>이미 confirmed/corrected 상태인 문서에 재확정 시도</td><td>상태 확인 후 relabel 사용</td></tr>
+      <tr><td>413</td><td><code>BATCH_TOO_LARGE</code></td><td>배치 1000건 초과</td><td>청크로 분할 요청</td></tr>
+      <tr><td>422</td><td><code>UNPROCESSABLE</code></td><td>파싱 불가 문서 (빈 콘텐츠 등)</td><td>문서 내용 검토</td></tr>
+      <tr><td>429</td><td><code>RATE_LIMITED</code></td><td>(본사업 추가 예정) 속도 제한 초과</td><td>Retry-After 헤더 참조</td></tr>
+      <tr><td>500</td><td><code>INTERNAL_ERROR</code></td><td>서버 내부 오류</td><td>X-Request-ID로 로그 추적</td></tr>
+      <tr><td>503</td><td><code>SERVICE_UNAVAILABLE</code></td><td>모델 로딩 중 / GPU 자원 부족</td><td>헬스체크 후 재시도</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="callout accent">
+  <span class="callout-icon">ℹ️</span>
+  <div class="callout-body">
+    <div class="callout-label">요청 추적</div>
+    <p>모든 응답 헤더에 <code>X-Request-ID</code>가 포함됩니다. 오류 발생 시 이 값을 로이드케이 기술지원에 전달하면 서버 로그에서 즉시 추적 가능합니다.</p>
+  </div>
+</div>
+
+<!-- ===== §6 미구현 항목 ===== -->
+<h2 id="not-implemented">§6 &nbsp;PoC 미구현 — 본사업 예정</h2>
+<p class="h2-sub">현재 PoC v1에서 구현되지 않은 항목. 본사업 전 추가 예정.</p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>항목</th><th>설명</th><th>예정 시점</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Idempotency Key</strong></td>
+        <td>동일 요청 중복 처리 방지. <code>Idempotency-Key</code> 헤더 기반 Redis 캐싱으로 구현 예정.</td>
+        <td>본사업 W1</td>
+      </tr>
+      <tr>
+        <td><strong>Rate Limit</strong></td>
+        <td>IP/API-Key 기준 속도 제한. <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, <code>Retry-After</code> 헤더 제공 예정.</td>
+        <td>본사업 W1</td>
+      </tr>
+      <tr>
+        <td><strong>영속 Job 큐</strong></td>
+        <td>현재 메모리 기반 → Redis/DB 기반으로 교체. 재시작 시 작업 유지.</td>
+        <td>본사업 W2</td>
+      </tr>
+      <tr>
+        <td><strong>Webhook</strong></td>
+        <td>비동기 작업 완료 시 KL 시스템에 push 알림. 폴링 제거 가능.</td>
+        <td>본사업 W3</td>
+      </tr>
+      <tr>
+        <td><strong>멀티 테넌트</strong></td>
+        <td>K5 협의 결과에 따라 tenant_id 기반 데이터 격리 강화. (DB 컬럼은 이미 존재)</td>
+        <td>K5 회신 후</td>
+      </tr>
+      <tr>
+        <td><strong>실 학습 로직</strong></td>
+        <td><code>POST /train</code> 현재 stub. GPU 확보(Q1) 후 KF-DeBERTa 파인튜닝 활성화.</td>
+        <td>Q1 회신 후</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== §7 통합 체크리스트 ===== -->
+<h2 id="checklist">§7 &nbsp;KL 통합 체크리스트</h2>
+<p class="h2-sub">통합 테스트 전 KL 측 확인 항목</p>
+
+<h3>인프라 / 인증</h3>
+<ul class="checklist">
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">API Key 발급 확인</div>
+      <div class="check-note">로이드케이로부터 API Key 수령 및 테스트 환경 접속 확인</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">인증 방식 최종 결정 (K3 협의)</div>
+      <div class="check-note">API Key 유지 or SSO/JWT 전환 결정 후 통합 일정 확정</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">네트워크 접근 권한</div>
+      <div class="check-note">KL 서버 → Lloydk AI 서버 포트 8000 허용 (또는 HTTPS 포트)</div>
+    </div>
+  </li>
+</ul>
+
+<h3>기본 연동</h3>
+<ul class="checklist">
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">헬스체크 확인</div>
+      <div class="check-note"><code>GET /api/v1/healthz</code> → 200 OK 응답 확인</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">단건 분류 테스트</div>
+      <div class="check-note"><code>POST /api/v1/classify</code> — 실제 문서로 grade 반환 확인</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">confirm / relabel 워크플로우</div>
+      <div class="check-note">staging → confirmed / corrected 상태 전이 KL UI 연동 확인</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">가이드 문서 업로드</div>
+      <div class="check-note"><code>POST /api/v1/guide/documents</code> — KOIPA 가이드 PDF 업로드 및 indexed: true 확인</div>
+    </div>
+  </li>
+</ul>
+
+<h3>고급 연동</h3>
+<ul class="checklist">
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">배치 분류 + 폴링</div>
+      <div class="check-note"><code>POST /classify/batch</code> → <code>GET /classify/jobs/{id}</code> 폴링 2초 간격 확인</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">메트릭 대시보드 연동</div>
+      <div class="check-note"><code>GET /metrics/latest</code> 데이터를 KL 대시보드에 표시</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">오류 처리 확인</div>
+      <div class="check-note">401, 404, 409, 413 등 오류 응답을 KL UI에서 적절히 표시</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">☐</span>
+    <div>
+      <div class="check-label">X-Request-ID 로깅</div>
+      <div class="check-note">KL 애플리케이션 로그에 X-Request-ID 기록 (오류 추적용)</div>
+    </div>
+  </li>
+</ul>
+
+<h3>협의 대기 항목 (K1~K5)</h3>
+<ul class="checklist">
+  <li>
+    <span class="check-icon">⏳</span>
+    <div>
+      <div class="check-label">K1 — KL 인프라 현황 회신</div>
+      <div class="check-note">PostgreSQL·ES·Redis·인증 사용 여부 → ES 있으면 Qdrant 대체 검토</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">⏳</span>
+    <div>
+      <div class="check-label">K2 — OpenAPI 명세 검토</div>
+      <div class="check-note"><code>03_openapi_lloydk_kl.yaml</code> 16개 엔드포인트 KL 검토 의견</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">⏳</span>
+    <div>
+      <div class="check-label">K3 — 인증 방식 최종 결정</div>
+      <div class="check-note">API Key / SSO / JWT 결정 → 명세 갱신 여부</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">⏳</span>
+    <div>
+      <div class="check-label">K4 — KL 통합 일정 마일스톤</div>
+      <div class="check-note">통합 테스트 가능 시점 확인 → PoC E2E 시연 일정 조율</div>
+    </div>
+  </li>
+  <li>
+    <span class="check-icon">⏳</span>
+    <div>
+      <div class="check-label">K5 — 멀티 테넌트 요구 강도</div>
+      <div class="check-note">단일 or N개사 → Qdrant 네임스페이스·Postgres tenant_id 정책 결정</div>
+    </div>
+  </li>
+</ul>
+
+</main>
+
+<!-- ===== TOC ===== -->
+<aside class="toc">
+  <div class="toc-label">목차</div>
+  <a href="#overview">§1 통합 개요</a>
+  <a href="#auth">§2 인증</a>
+  <a href="#endpoints">§3 엔드포인트</a>
+  <div class="toc-sub">
+    <a href="#endpoints">Health</a>
+    <a href="#endpoints">Classify</a>
+    <a href="#endpoints">Confirm/Relabel</a>
+    <a href="#endpoints">Training</a>
+    <a href="#endpoints">Synthesis</a>
+    <a href="#endpoints">Guide</a>
+    <a href="#endpoints">Schema</a>
+    <a href="#endpoints">Metrics</a>
+  </div>
+  <a href="#states">§4 상태값</a>
+  <a href="#errors">§5 오류 코드</a>
+  <a href="#not-implemented">§6 미구현 항목</a>
+  <a href="#checklist">§7 체크리스트</a>
+</aside>
+</div>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div>
+    <strong>Lloydk AI</strong> · KOIPA AI 영업비밀관리시스템
+    <span style="margin: 0 8px; color: var(--border-strong)">|</span>
+    doc/18 · KL 통합 가이드 · 2026-05-27
+  </div>
+  <div style="font-family: var(--font-mono); font-size: 12px;">
+    PoC v1 · 내부 배포용
+  </div>
+</footer>
+
+</body>
+</html>

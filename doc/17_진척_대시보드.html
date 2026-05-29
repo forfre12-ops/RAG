@@ -609,7 +609,7 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v1.0 · 2026-05-29 W13 + 고도화 33건(P0 7 · P1 15 · P2 11) — 18 시나리오 · 67 KPI · 신규 테스트 <b>40 PASS / 1 SKIP</b> (기존 505 CI에서만 검증, 로컬 .env cp949 환경 한정 collection error) · 47 PASS / 0 FAIL / 20 SKIP</span>
+    <span class="meta-soft">v1.0 · 2026-05-29 W13 + 고도화 33건(P0 7 · P1 15 · P2 11) — 18 시나리오 · 67 KPI · 신규 테스트 <b>40 PASS / 1 SKIP</b> (기존 505 CI에서만 검증, 로컬 .env cp949 환경 한정 collection error) · 47 PASS / 0 FAIL / 20 SKIP · <b>P2 ES 하이브리드 실측 완료</b>: KURE/BGE × dense/hybrid 4-way 0.667~0.700 (합격선 0.80 미달, 시드 쿼리 환경 천장 확정 — 가이드 v2 대기)</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 대시보드</h1>
@@ -621,6 +621,7 @@
     LLM 이중 경로 + 임베딩 로컬화로 GPU 의존성 제거, <b>합성 5,000건 + labeled 5,000(3,500/748/752)</b> 자체 빌드로 W6 차단 자원 3건 중 2건 해소.
     <b>W13 R1~R5 운영 진입 보강</b> — JobStore Redis · Batch retry · upload 한도 · Document cascade · OpenAPI 429.
     pytest <b>505 PASS</b>(409 → +96), 자체결정으로 회신 의존 변수 16개 동결. 남은 차단은 가이드 v2(자체 v1 완료)·GPU·API 키 1건뿐.
+    <br/><b>P2 검색 품질 실측 완료 (2026-05-29)</b> — KURE-v1·BGE-M3 × dense·hybrid(BM25+RRF) 4-way 측정, Recall@5 0.667~0.700 (합격선 0.80 미달). dense → hybrid 갱신폭 KURE +0.033/BGE 0. <b>시드 키워드 쿼리 환경의 천장 0.700 확정</b> — reranker(효과 0)·RRF 모두 미달, 합격선 도달은 KOIPA 가이드 v2 도착 후 진짜 의도형 쿼리 30종 재작성 또는 v1.1 합격선 협의 갱신 필요. 측정 중 발견한 ES basic 라이선스 RRF 차단 사전결함도 동시 정리(license-aware fallback, +4 단위).
   </p>
 
   <!-- ============================================================

@@ -107,10 +107,17 @@ def test_rrf_combine_disjoint_preserves_order():
 # ─────────────────────────────────────────────────────────────
 
 
-def _make_store_with_version(version_str: str) -> tuple[EsStore, MagicMock]:
-    """ES 서버 미가용 환경에서 EsStore를 mock하여 생성."""
+def _make_store_with_version(
+    version_str: str, license_type: str = "platinum"
+) -> tuple[EsStore, MagicMock]:
+    """ES 서버 미가용 환경에서 EsStore를 mock하여 생성.
+
+    license_type 기본값을 platinum으로 두어 RRF 분기 테스트가 라이선스에 안 막히게 한다.
+    basic 환경 분기 검증은 별도 케이스에서 명시적으로 지정.
+    """
     mock_client = MagicMock()
     mock_client.info.return_value = {"version": {"number": version_str}}
+    mock_client.license.get.return_value = {"license": {"type": license_type}}
 
     with patch("elasticsearch.Elasticsearch", return_value=mock_client):
         store = EsStore(url="http://mock:9200")
@@ -136,6 +143,32 @@ def test_server_version_pre_rrf():
     store, _ = _make_store_with_version("8.10.4")
     assert store.supports_retriever_api() is False
     assert store.supports_legacy_rrf() is False
+
+
+def test_basic_license_falls_back_to_clientside_rrf():
+    # ES 8.15 + basic 라이선스: RRF 모두 미허용 → clientside RRF 폴백
+    store, _ = _make_store_with_version("8.15.3", license_type="basic")
+    assert store.license_type() == "basic"
+    assert store.supports_retriever_api() is False
+    assert store.supports_legacy_rrf() is False
+
+
+def test_platinum_license_allows_retriever_api():
+    store, _ = _make_store_with_version("8.15.3", license_type="platinum")
+    assert store.supports_retriever_api() is True
+
+
+def test_trial_license_allows_rrf():
+    store, _ = _make_store_with_version("8.13.0", license_type="trial")
+    assert store.supports_legacy_rrf() is True
+
+
+def test_license_lookup_failure_treated_as_basic():
+    store, client = _make_store_with_version("8.15.3")
+    client.license.get.side_effect = RuntimeError("license api unavailable")
+    store._license_type = None
+    assert store.license_type() == "basic"
+    assert store.supports_retriever_api() is False
 
 
 def test_server_version_unparseable():
