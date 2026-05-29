@@ -13,8 +13,6 @@
 - retrieval/LLM 어느 쪽이든 실패해도 200 응답 + warnings에 사유. 5xx는 진짜 예외만.
 """
 
-from __future__ import annotations
-
 import logging
 import time
 

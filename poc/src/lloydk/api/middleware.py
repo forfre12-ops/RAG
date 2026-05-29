@@ -41,6 +41,9 @@ def _try_build_chained_hash(body: bytes) -> str | None:
     audit_chain 또는 DB 미가용 시 단순 sha256 폴백(하위호환).
     body가 비어도 prev_row만으로 chain 진행 가능 (empty payload).
     """
+    import os  # noqa: PLC0415
+    if os.getenv("AUDIT_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return _hash_bytes(body) if body else None
     try:
         from lloydk.services.audit_chain import build_chained_hash, get_last_hash  # noqa: PLC0415
     except ImportError:
@@ -122,6 +125,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         error_code: str | None,
     ) -> None:
         """audit_log insert. DB 미가용·schema 부재 등 모든 예외는 silent."""
+        import os  # noqa: PLC0415
+        if os.getenv("AUDIT_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
+            return
         try:
             from lloydk.db import session_scope  # noqa: PLC0415
             from lloydk.repositories.audit_repo import AuditRepo  # noqa: PLC0415
