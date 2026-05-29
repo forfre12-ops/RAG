@@ -93,14 +93,14 @@ def test_answer_accepts_grade_and_metadata():
 
 
 def test_openapi_lists_answer_path():
-    """app의 OpenAPI 스펙에 /answer가 노출됐는지 확인."""
+    """app의 OpenAPI 스펙에 /answer가 노출됐는지 확인 — prefix /api/v1 포함."""
     with TestClient(app) as cli:
         r = cli.get("/api/v1/openapi.json")
         assert r.status_code == 200
         spec = r.json()
         paths = spec.get("paths", {})
-        assert "/answer" in paths
-        post = paths["/answer"].get("post")
+        # FastAPI는 router include 시 prefix를 path에 합쳐 노출 (/api/v1/answer)
+        assert "/api/v1/answer" in paths, f"expected /api/v1/answer in paths, got: {sorted(paths)}"
+        post = paths["/api/v1/answer"].get("post")
         assert post is not None
-        # tag 분리
         assert "answer" in post.get("tags", [])

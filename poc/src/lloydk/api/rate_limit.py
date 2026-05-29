@@ -38,11 +38,23 @@ def tenant_or_ip_key(request: Request) -> str:
 # headers_enabled=False — X-RateLimit-* 헤더 자동 주입을 비활성 (endpoint signature에
 # response: Response 파라미터를 강제하지 않기 위함). 429 응답에는 핸들러가 Retry-After
 # 헤더를 명시 주입하므로 클라이언트는 retry 정보를 받음.
+#
+# config_filename: 기본은 None (slowapi가 cwd `.env`를 자동 발견 후 starlette Config로
+# 로드). Windows 한국어 로케일에서 .env가 UTF-8인데 starlette가 cp949로 강제 디코드해
+# UnicodeDecodeError를 일으키는 사고가 보고됨 — SLOWAPI_SKIP_DOTENV=1로 우회 가능
+# (존재하지 않는 sentinel 경로를 넘기면 starlette `os.path.isfile` 검사로 skip).
+def _resolve_config_filename() -> str | None:
+    if os.getenv("SLOWAPI_SKIP_DOTENV", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return "/__lloydk_skip_dotenv__"  # 존재하지 않는 경로 → starlette skip
+    return None
+
+
 limiter = Limiter(
     key_func=tenant_or_ip_key,
     default_limits=["120/minute"],
     enabled=not _is_disabled(),
     headers_enabled=False,
+    config_filename=_resolve_config_filename(),
 )
 
 
