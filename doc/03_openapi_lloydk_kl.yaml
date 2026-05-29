@@ -681,7 +681,7 @@ paths:
                 $ref: '#/components/schemas/RagAnswerResult'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422':
-          description: 요청 검증 실패 (예: query 길이 위반)
+          description: "요청 검증 실패 (예: query 길이 위반)"
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalError' }
 
@@ -860,7 +860,7 @@ components:
           default: true
         metadata:
           type: object
-          description: 추가 filter (예: dept_id). tenant_id는 본문 tenant_id 우선.
+          description: "추가 filter (예: dept_id). tenant_id는 본문 tenant_id 우선."
           additionalProperties: true
 
     RagCitation:

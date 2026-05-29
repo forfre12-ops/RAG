@@ -37,7 +37,7 @@ def test_required_endpoints_present(openapi_spec):
     # KL ↔ Lloydk 핵심 endpoint들이 명세에 존재해야
     required_substrings = [
         "/classify",
-        "/health",
+        "/healthz",
     ]
     found = " ".join(paths.keys())
     for sub in required_substrings:
@@ -98,7 +98,7 @@ def test_error_response_envelope():
 
 
 def test_health_endpoint_shape():
-    """/health 응답이 OpenAPI에 명시된 필드를 모두 포함."""
+    """/healthz 응답이 OpenAPI에 명시된 필드를 모두 포함."""
     # .env에 한국어 주석이 있으면 starlette Config가 cp949로 읽다 UnicodeDecodeError.
     # 환경 의존 이슈라 starlette config import 실패 시 skip.
     try:
@@ -108,7 +108,7 @@ def test_health_endpoint_shape():
         pytest.skip(".env cp949 디코딩 실패 환경 — 운영 PYTHONIOENCODING=utf-8 권장")
 
     with TestClient(app) as client:
-        r = client.get("/api/v1/health")
+        r = client.get("/api/v1/healthz")
         assert r.status_code == 200
         body = r.json()
         assert "status" in body

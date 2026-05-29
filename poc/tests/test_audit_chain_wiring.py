@@ -11,8 +11,21 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from lloydk.api.middleware import _try_build_chained_hash
 from lloydk.services.audit_chain import ZERO16, parse_chained_hash
+
+
+@pytest.fixture(autouse=True)
+def _unset_audit_disabled(monkeypatch):
+    """본 모듈은 chain 동작 자체를 검증하므로 AUDIT_DISABLED env를 풀어줌.
+
+    commit 4a11bd0의 라이브 검증용 AUDIT_DISABLED 스위치가 conftest/세션 env에
+    set돼 있으면 middleware._try_build_chained_hash가 chain 호출 전에 sha256
+    폴백으로 빠져 본 모듈의 wiring 검증이 무력화됨.
+    """
+    monkeypatch.delenv("AUDIT_DISABLED", raising=False)
 
 
 def test_chain_format_when_db_available():
