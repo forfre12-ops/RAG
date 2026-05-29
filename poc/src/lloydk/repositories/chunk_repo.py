@@ -17,11 +17,20 @@
 from __future__ import annotations
 
 import uuid
+from typing import Iterable, Sequence
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from lloydk.db.models import Chunk
+
+# 표적 2 (2026-05-29): chunk 영속화는 ClassifyService가 호출.
+# tiktoken 미설치 환경에서도 동작하도록 token_count는 char_count/4 휴리스틱으로 폴백.
+
+
+def _estimate_token_count(text: str) -> int:
+    """tiktoken 미설치 환경 폴백 — 한국어/영문 혼용 ≈ char/4 (보수적)."""
+    return max(1, len(text) // 4)
 
 
 class ChunkRepo:
@@ -42,6 +51,94 @@ class ChunkRepo:
             .where(Chunk.doc_id == doc_id, Chunk.tenant_id == tenant_id)
         )
         return int(self.db.execute(stmt).scalar() or 0)
+
+    def get_by_doc_id(
+        self,
+        doc_id: uuid.UUID | str,
+        tenant_id: str,
+        *,
+        limit: int | None = None,
+    ) -> list[Chunk]:
+        stmt = (
+            select(Chunk)
+            .where(Chunk.doc_id == doc_id, Chunk.tenant_id == tenant_id)
+            .order_by(Chunk.chunk_index)
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(self.db.execute(stmt).scalars())
+
+    # ------------------------------------------------------------
+    # Insert (표적 2)
+    # ------------------------------------------------------------
+
+    def upsert_chunks(
+        self,
+        *,
+        doc_id: uuid.UUID,
+        tenant_id: str,
+        chunks: Iterable,
+        replace_existing: bool = True,
+    ) -> list[uuid.UUID]:
+        """PreprocessPipeline의 chunks(Chunk dataclass) → DB chunks 테이블 일괄 insert.
+
+        Args:
+            doc_id: 소속 문서 UUID (FK는 파티션 제약으로 DB에 없음, app 레이어 책임)
+            tenant_id: 테넌트 격리 — 필수
+            chunks: PreprocessPipeline.chunk() 또는 PreprocessResult.chunks (Chunk dataclass)
+                    필수 속성: index, text, char_count, overlap_prev, overlap_next
+            replace_existing: True면 같은 doc_id의 기존 chunks 먼저 삭제 (재처리 시 중복 방지)
+
+        Returns:
+            insert된 chunk_id 리스트 (PG가 server_default로 채움 → flush 후 확보).
+        """
+        if not tenant_id:
+            raise ValueError("tenant_id is required for chunk insert")
+
+        if replace_existing:
+            self.delete_by_doc_id(doc_id, tenant_id)
+
+        rows: list[Chunk] = []
+        for c in chunks:
+            text = getattr(c, "text", None)
+            if not text:
+                continue
+            row = Chunk(
+                doc_id=doc_id,
+                tenant_id=tenant_id,
+                chunk_index=int(getattr(c, "index", len(rows))),
+                content=text,
+                token_count=_estimate_token_count(text),
+                char_count=int(getattr(c, "char_count", len(text))),
+                overlap_prev=int(getattr(c, "overlap_prev", 0) or 0),
+                overlap_next=int(getattr(c, "overlap_next", 0) or 0),
+            )
+            self.db.add(row)
+            rows.append(row)
+        if rows:
+            self.db.flush()
+        return [r.chunk_id for r in rows]
+
+    def chunk_ids_by_index(
+        self,
+        doc_id: uuid.UUID | str,
+        tenant_id: str,
+        indices: Sequence[int],
+    ) -> dict[int, uuid.UUID]:
+        """chunk_index → chunk_id 매핑. Evidence 영속화 시 진짜 chunk_id 조회용."""
+        if not indices:
+            return {}
+        rows = (
+            self.db.execute(
+                select(Chunk.chunk_index, Chunk.chunk_id)
+                .where(
+                    Chunk.doc_id == doc_id,
+                    Chunk.tenant_id == tenant_id,
+                    Chunk.chunk_index.in_(list(indices)),
+                )
+            )
+        ).all()
+        return {int(idx): cid for idx, cid in rows}
 
     # ------------------------------------------------------------
     # Cascade delete

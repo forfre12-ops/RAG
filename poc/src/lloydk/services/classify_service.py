@@ -17,8 +17,10 @@ from typing import Callable, Optional
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from lloydk.modules.m2_preprocess.chunker import Chunk as _PreprocessChunk
 from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
 from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
+from lloydk.repositories.chunk_repo import ChunkRepo
 from lloydk.repositories.classify_repo import ClassifyRepo
 from lloydk.schemas.classify import ClassifyRequest, ClassifyResponse
 
@@ -70,6 +72,14 @@ class ClassifyService:
             notify("normalize")
             cleaned = self.preprocess.run_text(req.content)
 
+        # 표적 2 (2026-05-29): chunks 생성. 영속화는 _try_persist 단계에서 doc/tenant 가용 시 시도.
+        # PoC PreprocessPipeline.chunk()는 외부 의존 없이 항상 동작.
+        try:
+            chunks: list[_PreprocessChunk] = self.preprocess.chunk(cleaned) if cleaned else []
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("classify chunk split failed (fallback []): %s", exc)
+            chunks = []
+
         # InferencePipeline 내부에서 embed → retrieve → llm을 거치므로,
         # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
         notify("embed")
@@ -85,7 +95,7 @@ class ClassifyService:
 
         warnings_acc = list(pred.warnings)
         notify("persist")
-        inference_id, persist_warnings = self._try_persist(req, pred)
+        inference_id, persist_warnings = self._try_persist(req, pred, chunks=chunks)
         warnings_acc.extend(persist_warnings)
         notify("finalize")
 
@@ -114,13 +124,20 @@ class ClassifyService:
     # ------------------------------------------------------------
 
     def _try_persist(
-        self, req: ClassifyRequest, pred: InferenceResult
+        self,
+        req: ClassifyRequest,
+        pred: InferenceResult,
+        *,
+        chunks: list[_PreprocessChunk] | None = None,
     ) -> tuple[uuid.UUID, list[str]]:
         """Best-effort 영속화.
 
         반환: (inference_id, warning_list)
         - 성공: classifications.classification_id 사용
         - 실패: 새 UUID + warning에 사유 기록 (예외 안 던짐)
+
+        chunks가 주어지고 doc/tenant가 가용하면 chunks 테이블에 영속화하고
+        Evidence chunk_id를 진짜 chunks row UUID로 매핑(표적 2).
         """
         warns: list[str] = []
         doc_uuid = self._parse_doc_uuid(req.doc_id)
@@ -158,6 +175,25 @@ class ClassifyService:
                     if code != pred.label.value
                 ]
 
+                # 표적 2: chunks 영속화 (있을 때만). 실패해도 classification 자체는 저장됨.
+                chunk_repo = ChunkRepo(db)
+                first_chunk_id: uuid.UUID | None = None
+                chunk_count: int | None = None
+                if chunks:
+                    try:
+                        ids = chunk_repo.upsert_chunks(
+                            doc_id=doc_uuid,
+                            tenant_id=tenant_id,
+                            chunks=chunks,
+                            replace_existing=True,
+                        )
+                        chunk_count = len(ids)
+                        first_chunk_id = ids[0] if ids else None
+                    except Exception as exc:  # noqa: BLE001
+                        # chunks insert 실패는 분류 자체에는 영향 없음
+                        logger.warning("chunk upsert failed (continuing): %s", exc)
+                        warns.append(f"chunks persist failed: {type(exc).__name__}")
+
                 cls = repo.create_classification(
                     doc_id=doc_uuid,
                     tenant_id=tenant_id,
@@ -165,16 +201,19 @@ class ClassifyService:
                     predicted_level_id=level_id,
                     confidence=float(pred.confidence),
                     alternatives=alternatives,
-                    chunk_count=None,
+                    chunk_count=chunk_count,
                     rag_used=bool(pred.rag_context),
                     rag_top_k=len(pred.rag_context) or None,
                 )
+
+                # Evidence chunk_id 결정: chunks가 영속화됐으면 진짜 첫 chunk_id, 아니면 임시 UUID
+                evidence_default_chunk = first_chunk_id or uuid.uuid4()
 
                 if pred.evidence:
                     repo.add_evidence_from_spans(
                         cls.classification_id,
                         spans=pred.evidence,
-                        default_chunk_id=uuid.uuid4(),  # PoC: 청크 영속화 전이라 임시 UUID
+                        default_chunk_id=evidence_default_chunk,
                     )
 
                 # 2026-05-29: RAG context도 ClassificationEvidence에 영속화.
@@ -183,7 +222,7 @@ class ClassifyService:
                     n_rag = repo.add_rag_evidence_from_hits(
                         cls.classification_id,
                         hits=pred.rag_context,
-                        default_chunk_id=uuid.uuid4(),
+                        default_chunk_id=evidence_default_chunk,
                     )
                     if n_rag != len(pred.rag_context):
                         warns.append(
