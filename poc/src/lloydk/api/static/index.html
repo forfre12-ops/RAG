@@ -101,10 +101,7 @@
       </div>
     </div>
 
-    <h3>진행 단계 — SSE 실시간 점등 (V2 §2.1 워크플로우)</h3>
-    <div id="stage-seq" class="seq"></div>
-
-    <!-- ===== 시간 경쟁 (와우 B) ===== -->
+    <!-- ===== 시간 경쟁 (와우 B) — 분류 버튼 바로 아래 ===== -->
     <div class="race">
       <div class="race-title">BERT (자체 GPU) vs LLM zero-shot (외부 API)</div>
       <div class="race-row">
@@ -121,12 +118,15 @@
     </div>
   </section>
 
-  <!-- ===== §2 결과 ===== -->
+  <!-- ===== §2 결과 — 진행바를 카드 맨 위로 이동해 한 시야에 표시 ===== -->
   <section id="sec-result">
     <h2><span class="num">§2</span>결과 — 왜 이 등급인가</h2>
     <p class="h2-sub">등급·신뢰도·자연어 판단(양성+음성 근거)·4 평가요소·근거 키워드. 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
 
-    <div class="result">
+    <div class="result" id="result-card">
+      <h3 style="font-size:13px;margin:0 0 12px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">진행 단계 — SSE 실시간 점등</h3>
+      <div id="stage-seq" class="seq" style="margin-bottom:18px;"></div>
+
       <div id="result-head" class="result-head">
         <div style="font-size:14px;color:var(--text-dim);">샘플을 선택하고 "분류하기"를 누르세요.</div>
       </div>

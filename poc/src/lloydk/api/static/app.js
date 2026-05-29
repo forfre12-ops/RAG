@@ -268,6 +268,9 @@ async function runClassify() {
   STAGES.forEach((s) => { stageMap[s.key] = "pending"; });
   renderStages(stageMap);
 
+  // 결과 영역으로 자동 스크롤 — §2 가 한참 아래라 사용자가 못 보는 사고 방지.
+  scrollToResult();
+
   const t0 = performance.now();
   let lastStageT = t0;
 
@@ -385,6 +388,55 @@ function renderResult(data, elapsedMs) {
   renderKeywordChips(data.evidence || []);
   // 본문 하이라이트
   renderBodyPreview($("#doc-body").value);
+  // 결과 도착 시점에 한 번 더 스크롤 + 강조 펄스 + 토스트 (사용자 시선 확보).
+  scrollToResult({ flash: true });
+  showResultToast(grade, elapsed);
+}
+
+function scrollToResult({ flash = false } = {}) {
+  const sec = $("#sec-result");
+  if (!sec) return;
+  // 진행바도 sec-result 안에 있으므로 sec-result 헤더로 스크롤하면
+  // 진행바 점등 + 결과 카드 갱신을 한 시야에서 본다.
+  sec.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (flash) {
+    const card = sec.querySelector(".result");
+    if (!card) return;
+    card.classList.remove("flash-card");
+    void card.offsetWidth;
+    card.classList.add("flash-card");
+    setTimeout(() => card.classList.remove("flash-card"), 1400);
+  }
+}
+
+let _toastTimer = null;
+function showResultToast(grade, elapsedMs) {
+  let toast = $("#result-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "result-toast";
+    toast.className = "toast";
+    document.body.appendChild(toast);
+  }
+  toast.className = `toast g-${grade}`;
+  toast.innerHTML = `
+    <span class="toast-grade">${grade}</span>
+    <span>분류 완료 · ${elapsedMs} ms</span>
+    <a id="toast-jump">결과 보기 →</a>
+  `;
+  // forced reflow 후 show 클래스
+  void toast.offsetWidth;
+  toast.classList.add("show");
+  const jump = toast.querySelector("#toast-jump");
+  if (jump) {
+    jump.addEventListener("click", () => {
+      scrollToResult({ flash: true });
+    });
+  }
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 4200);
 }
 
 function renderSummary(data) {

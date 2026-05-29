@@ -717,6 +717,61 @@ section h3 {
   0%   { background: rgba(217,119,6,0.55); }
   100% { background: rgba(217,119,6,0.18); }
 }
+@keyframes resultPop {
+  0%   { box-shadow: 0 0 0 0 rgba(0,112,243,0.55); border-color: rgba(0,112,243,0.55); transform: scale(1); }
+  40%  { box-shadow: 0 0 0 12px rgba(0,112,243,0); border-color: rgba(0,112,243,0.30); transform: scale(1.005); }
+  100% { box-shadow: 0 0 0 0 rgba(0,112,243,0); border-color: var(--border-strong); transform: scale(1); }
+}
+.result.flash-card {
+  animation: resultPop 1.3s ease-out;
+}
+
+/* ===== Toast — 결과 도착 알림 (페이지 어디에 있어도 보임) ===== */
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
+  padding: 12px 18px 12px 16px;
+  background: var(--text);
+  color: var(--bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+  max-width: 360px;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.toast .toast-grade {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+.toast.g-TS .toast-grade { background: var(--c-ts); color: #fff; }
+.toast.g-S1 .toast-grade { background: var(--c-s1); color: #fff; }
+.toast.g-S2 .toast-grade { background: var(--c-s2); color: #fff; }
+.toast.g-S3 .toast-grade { background: var(--c-s3); color: #fff; }
+.toast a {
+  color: var(--bg);
+  text-decoration: underline;
+  cursor: pointer;
+  margin-left: 8px;
+}
 .pulse-dot {
   display: inline-block;
   width: 7px; height: 7px;
