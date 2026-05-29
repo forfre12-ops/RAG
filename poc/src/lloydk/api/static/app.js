@@ -210,13 +210,14 @@ function renderBodyPreview(text) {
 // ──────────────────────────────────────────────────────────────────────
 // 분류 호출 (와우 2 — SSE 7단계 점등)
 // ──────────────────────────────────────────────────────────────────────
+// 서버 ClassifyService 가 실제 emit 하는 stage 이름과 1:1 매칭.
+// 서버 SSE 검증 결과: extract / normalize / embed / llm / persist / finalize.
 const STAGES = [
   { key: "extract", label: "본문 추출" },
   { key: "normalize", label: "정규화" },
-  { key: "chunk", label: "청크 분할" },
   { key: "embed", label: "임베딩" },
-  { key: "retrieve", label: "RAG 검색" },
-  { key: "classify", label: "BERT 추론" },
+  { key: "llm", label: "분류 추론" },
+  { key: "persist", label: "저장" },
   { key: "finalize", label: "결과 합성" },
 ];
 
@@ -283,8 +284,8 @@ async function runClassify() {
       },
       onEvent: ({ event, data }) => {
         if (event === "progress") {
-          const k = (data && data.stage) || "";
-          const matched = STAGES.find((s) => s.key.includes(k) || k.includes(s.key));
+          const k = ((data && data.stage) || "").toLowerCase();
+          const matched = STAGES.find((s) => s.key === k);
           if (matched) {
             // 이전 active 들을 done 으로
             STAGES.forEach((s) => {
@@ -421,7 +422,7 @@ function renderSummary(data) {
   const factorTxt = topFactors.length > 0
     ? `4 평가요소 중 ${topFactors
         .map(([k, v]) => `<b>${factorLabels[k] || k}(${v.toFixed(2)})</b>`)
-        .join("·")}가 임계치를 초과했습니다.`
+        .join("·")}가 가장 높게 측정되었습니다.`
     : "";
 
   const wrap = $("#result-summary");
@@ -444,14 +445,22 @@ function renderFactors(f) {
     management_level: "관리 수준",
     leak_impact: "유출 시 영향도",
   };
+  // 서버 응답은 키워드 가중치 누적값이라 등급에 따라 0~5+ 범위.
+  // 화면 표시는 4 요소 중 상대값을 0~1로 정규화해서 비교 가능하게 한다.
   wrap.innerHTML = "";
-  Object.entries(labels).forEach(([k, l]) => {
-    const v = typeof f[k] === "number" ? f[k] : 0;
+  const values = Object.keys(labels).map((k) => (typeof f[k] === "number" ? f[k] : 0));
+  const maxV = Math.max(1, ...values);
+  Object.entries(labels).forEach(([k, l], i) => {
+    const v = values[i];
+    const norm = maxV > 0 ? v / maxV : 0;
     const stat = document.createElement("div");
     stat.className = "stat";
     stat.innerHTML = `
       <div class="v">${v.toFixed(2)}</div>
       <div class="l">${l}</div>
+      <div style="margin-top:8px;height:4px;background:var(--bg);border-radius:999px;overflow:hidden;">
+        <div style="width:${(norm * 100).toFixed(0)}%;height:100%;background:var(--text);"></div>
+      </div>
     `;
     wrap.appendChild(stat);
   });
@@ -779,12 +788,14 @@ function renderProfiles() {
 // Config row binding
 // ──────────────────────────────────────────────────────────────────────
 function bindConfig() {
-  $("#cfg-endpoint").value = state.endpoint;
-  $("#cfg-apikey").value = state.apiKey;
-  $("#cfg-tenant").value = state.tenant;
-  $("#cfg-endpoint").addEventListener("change", (e) => { state.endpoint = e.target.value || window.location.origin; });
-  $("#cfg-apikey").addEventListener("change", (e) => { state.apiKey = e.target.value; });
-  $("#cfg-tenant").addEventListener("change", (e) => { state.tenant = e.target.value; });
+  // config row 는 발주처 시연에서 노출되지 않도록 HTML 에서 생략됨.
+  // 개발자가 직접 추가했을 때만 바인딩 (null-safe).
+  const ep = $("#cfg-endpoint");
+  const ak = $("#cfg-apikey");
+  const tn = $("#cfg-tenant");
+  if (ep) { ep.value = state.endpoint; ep.addEventListener("change", (e) => { state.endpoint = e.target.value || window.location.origin; }); }
+  if (ak) { ak.value = state.apiKey; ak.addEventListener("change", (e) => { state.apiKey = e.target.value; }); }
+  if (tn) { tn.value = state.tenant; tn.addEventListener("change", (e) => { state.tenant = e.target.value; }); }
 }
 
 // ──────────────────────────────────────────────────────────────────────
