@@ -19,6 +19,7 @@ from lloydk.api import guide as guide_api
 from lloydk.api import schema_admin as schema_admin_api
 from lloydk.api import metrics as metrics_api
 from lloydk.api import async_classify as async_classify_api
+from lloydk.api import answer as answer_api
 from lloydk.api import prom_metrics as prom_metrics_api
 from lloydk.api.middleware import AuditMiddleware
 from lloydk.api.prom_metrics import PrometheusMiddleware
@@ -106,6 +107,7 @@ app.include_router(classify_api.router, prefix="/api/v1")
 app.include_router(classify_stream_api.router, prefix="/api/v1")
 app.include_router(explain_api.router, prefix="/api/v1")
 app.include_router(async_classify_api.router, prefix="/api/v1")
+app.include_router(answer_api.router, prefix="/api/v1")
 app.include_router(confirm_api.router, prefix="/api/v1")
 app.include_router(training_api.router, prefix="/api/v1")
 app.include_router(synthesis_api.router, prefix="/api/v1")

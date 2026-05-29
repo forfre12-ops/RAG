@@ -655,6 +655,36 @@ paths:
                     type: object
                     additionalProperties: { type: number }
 
+  /answer:
+    post:
+      tags: [answer]
+      summary: RAG 답안 합성 — query + RAG hits → LLM 답안 + 인용
+      description: |
+        분류와 별개 단계. 질의를 받아 RAG 검색(facade)으로 컨텍스트 hits를 모은 뒤
+        LLM(원격/로컬/noop)으로 답안을 합성한다. 인용 출처(citations)는 hits 순서대로
+        rank를 부여해 반환. noop·LLM 부재·생성 실패는 `deterministic_fallback=true`로
+        결정론적 안내를 반환하며 5xx가 아닌 200으로 끝남(warnings에 사유).
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RagAnswerRequest'
+      responses:
+        '200':
+          description: 답안 합성 완료 (deterministic_fallback 여부는 응답 필드 참조)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagAnswerResult'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422':
+          description: 요청 검증 실패 (예: query 길이 위반)
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -802,6 +832,79 @@ components:
         warnings:
           type: array
           items: { type: string }
+
+    RagAnswerRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: 사용자 질의
+        tenant_id:
+          type: string
+          description: tenant 필터(요청 본문 우선, 없으면 metadata.tenant_id)
+        namespace:
+          type: string
+          description: RAG collection 명. 미지정 시 settings.rag_default_collection.
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+        grade:
+          $ref: '#/components/schemas/Grade'
+        use_reranker:
+          type: boolean
+          default: true
+        metadata:
+          type: object
+          description: 추가 filter (예: dept_id). tenant_id는 본문 tenant_id 우선.
+          additionalProperties: true
+
+    RagCitation:
+      type: object
+      required: [source_doc, chunk_id, score, rank]
+      properties:
+        source_doc: { type: string }
+        chunk_id: { type: string }
+        score: { type: number }
+        rank: { type: integer, description: 1부터 시작 }
+
+    RagAnswerUsage:
+      type: object
+      required: [provider, model, input_tokens, output_tokens, cost_usd]
+      properties:
+        provider: { type: string }
+        model: { type: string }
+        input_tokens: { type: integer }
+        output_tokens: { type: integer }
+        cost_usd: { type: number }
+        latency_ms: { type: integer, default: 0 }
+        success: { type: boolean, default: true }
+
+    RagAnswerResult:
+      type: object
+      required: [answer, deterministic_fallback]
+      properties:
+        answer: { type: string }
+        citations:
+          type: array
+          items: { $ref: '#/components/schemas/RagCitation' }
+        grade:
+          $ref: '#/components/schemas/Grade'
+          nullable: true
+        usage:
+          allOf:
+            - $ref: '#/components/schemas/RagAnswerUsage'
+          nullable: true
+        warnings:
+          type: array
+          items: { type: string }
+        deterministic_fallback:
+          type: boolean
+          description: LLM 미사용·실패 시 true (결정론적 안내 응답)
 
     JobStatus:
       type: object
