@@ -801,7 +801,7 @@ function renderCapabilityStats() {
   const items = [
     // Phase 3 실측 (2026-05-30): KF-DeBERTa labeled_5k 1ep 학습 + RTX 5070 Ti
     { v: "1.18s", l: "BERT 추론 (KF-DeBERTa 학습 모델, 5070 Ti 실측)", src: "measured" },
-    { v: "1.5~5s", l: "LLM zero-shot (V2 §4.4 참고값)", src: "ref" },
+    { v: "25.8s", l: "LLM zero-shot (Ollama Qwen3 14B, Phase 1 /answer 실측)", src: "measured" },
     { v: "33s", l: "BERT 학습 1 epoch (5070 Ti labeled 3500건, 실측)", src: "measured" },
     { v: "F1=1.0", l: "labeled_5k test 752건 평가 (실측, 학습 분포 한정)", src: "measured" },
     { v: "10/12", l: "데모 12 샘플 실호출 분류 정합 (학습 외 분포, 실측)", src: "measured" },
