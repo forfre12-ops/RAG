@@ -677,7 +677,7 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v1.0-ext · 2026-05-29 운영 안정성·일반화 보강 33건 + 후속 6+4+3+1+4+1+1+1건 (회귀 테스트 <b>540 PASS + 신규 108 통과</b> · CI 환경 보강 별도)</span>
+    <span class="meta-soft">v1.0-ext · 2026-05-29 운영 안정성·일반화 보강 33건 + 후속 6+4+3+1+4+1+1+1+1건 (회귀 테스트 <b>540 PASS + 신규 119 통과</b> · CI 환경 보강 별도)</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 보고 (블록 7 종료)</h1>
@@ -1529,7 +1529,8 @@
         <tr><td>2026-05-29</td><td><b>후속 4건 — 호출 체인 닫음(분석 단계에서 발견한 미연결 자리): ① 웹훅 자동 배송(지금까지 큐에만 쌓이고 안 보내지던 자리에 60초 주기 워커) ② 학습 후 누적 corrections 자동 소비 ③ 전처리에 PII 마스킹 자동 적용(기본 활성) ④ 임베딩 캐시에 Redis 영속 백엔드 자동 활성화</b> · 신규 15 통과</td><td><b>+ wiring 사각지대 2차</b></td><td>없음</td></tr>
         <tr><td>2026-05-29</td><td><b>후속 1건 — 검색 결과를 cross-encoder 재정렬기(reranker)로 한 단계 더 정렬. 1차 검색에서 4배 oversample → 의미 기반 재정렬 → 최종 top-k. BGE 등 실 모델 미설치 환경에서는 noop으로 안전 동작</b> · 신규 13 통과</td><td><b>+ 2단계 retrieval 완성</b></td><td>없음</td></tr>
         <tr><td>2026-05-29</td><td><b>후속 1건 — 분류 시 청크 본문을 chunks 테이블에 자동 저장. 분류 근거(evidence) 행이 임시 식별자 대신 진짜 청크 row를 참조하도록 연결. 같은 문서 재분류 시 기존 청크 자동 교체. 청크 저장 실패는 분류 자체에 영향 없음(격리)</b> · 신규 8 통과</td><td><b>+ 청크-근거 정합성</b></td><td>없음</td></tr>
-        <tr><td>2026-05-29 (오늘)</td><td><b>후속 1건 — RAG 검색 종단 wiring: use_rag=true 분류 요청 시 추론 모듈이 실제로 검색 facade를 호출해 RAG 인용 컨텍스트를 채움. 벡터스토어/임베더 부재·실패는 분류 자체에 영향 없이 빈 컨텍스트로 폴백. namespace/tenant 메타데이터가 검색 필터로 자동 전달. 위 chunks·evidence·reranker 단계와 종단 연결됨</b> · 신규 11 통과</td><td><b>+ RAG 종단 wiring 완성</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29</td><td><b>후속 1건 — RAG 검색 종단 wiring: use_rag=true 분류 요청 시 추론 모듈이 실제로 검색 facade를 호출해 RAG 인용 컨텍스트를 채움. 벡터스토어/임베더 부재·실패는 분류 자체에 영향 없이 빈 컨텍스트로 폴백. namespace/tenant 메타데이터가 검색 필터로 자동 전달. 위 chunks·evidence·reranker 단계와 종단 연결됨</b> · 신규 11 통과</td><td><b>+ RAG 종단 wiring 완성</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29 (오늘)</td><td><b>후속 1건 — RAG 검색 품질 평가 함수: 평가 모듈(M6)에 검색 정확도 지표(Recall@k·MRR·nDCG)를 in-system 함수로 추가. 운영 중 분류기가 저장한 RAG 인용 출처를 기준으로 정답 집합(외부 주입)과 비교해 검색 품질을 즉시 측정 가능. 기존에는 별도 비교 스크립트에만 있어 운영 보고에 재사용 불가했음</b> · 신규 11 통과</td><td><b>+ 검색 품질 보고 가능</b></td><td>없음</td></tr>
         <tr class="pick"><td><b>2026-06-09</b></td><td><b>협의요청서 회신 기한 · W6 학습 가능 시점 (자원 도착 시 즉시 가동)</b></td><td><b>조정 항목 해소</b></td><td><b>발주처 자원</b></td></tr>
         <tr><td>회신 후 +7 일</td><td>W6 합성·학습·번들 실빌드 (자원 충족 시)</td><td>100%</td><td>GPU + API 키 + 가이드 v2</td></tr>
       </tbody>
