@@ -621,7 +621,9 @@
     LLM 이중 경로 + 임베딩 로컬화로 GPU 의존성 제거, <b>합성 5,000건 + labeled 5,000(3,500/748/752)</b> 자체 빌드로 W6 차단 자원 3건 중 2건 해소.
     <b>W13 R1~R5 운영 진입 보강</b> — JobStore Redis · Batch retry · upload 한도 · Document cascade · OpenAPI 429.
     pytest <b>505 PASS</b>(409 → +96), 자체결정으로 회신 의존 변수 16개 동결. 남은 차단은 가이드 v2(자체 v1 완료)·GPU·API 키 1건뿐.
-    <br/><b>P2 검색 품질 실측 완료 (2026-05-29)</b> — KURE-v1·BGE-M3 × dense·hybrid(BM25+RRF) 4-way 측정, Recall@5 0.667~0.700 (합격선 0.80 미달). dense → hybrid 갱신폭 KURE +0.033/BGE 0. <b>시드 키워드 쿼리 환경의 천장 0.700 확정</b> — reranker(효과 0)·RRF 모두 미달, 합격선 도달은 KOIPA 가이드 v2 도착 후 진짜 의도형 쿼리 30종 재작성 또는 v1.1 합격선 협의 갱신 필요. 측정 중 발견한 ES basic 라이선스 RRF 차단 사전결함도 동시 정리(license-aware fallback, +4 단위).
+    <br/><b>P2 검색 품질 실측 완료 (2026-05-29)</b> — KURE-v1·BGE-M3 × dense·hybrid(BM25+RRF) 4-way 측정, Recall@5 0.667~0.700 (합격선 0.80 미달). dense → hybrid 갱신폭 KURE +0.033/BGE 0. <b>시드 키워드 쿼리 환경의 천장 0.700 확정</b> — reranker(효과 0)·RRF 모두 미달.
+    <br/><b>P2 천장 원인 정량 입증 (의도형 쿼리 30종 추가 측정)</b> — 가이드 v1 기반 자연어 의도형 쿼리는 시드 쿼리 대비 오히려 <b>-0.067 ~ -0.133 하락</b> (KURE 0.600, BGE 0.567). 진짜 천장 원인은 알고리즘이 아닌 <b>합성 5K 코퍼스 본문 boilerplate</b> — 등급당 키워드 5종 반복 나열로 다양한 의도 매칭 불가. <b>합격선 도달 결정 경로</b>: 발주처 LLM API 키 도착 → P3 풀 모드 LLM 합성 → 본문 다양화 → 0.80 도달 시도. 측정 중 ES basic 라이선스 RRF 차단 사전결함도 동시 정리(license-aware fallback, +4 단위).
+    <br/><b>4-tier 배포 프로파일 (commit 5a2b4e0)</b> — LLOYDK_DEPLOY_PROFILE 한 줄로 lite-noapi/lite-cloud/onprem-local/full-train 4-tier 납품 모드 전환. enable_training=False면 training_api 라우터 등록 자체 skip → OpenAPI에서 사라짐. 신규 11 PASS.
   </p>
 
   <!-- ============================================================

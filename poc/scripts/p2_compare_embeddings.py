@@ -29,6 +29,9 @@ _HERE = Path(__file__).resolve().parent
 _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
+# scripts/도 sys.path에 — p2_intent_queries 같은 동급 모듈 import 위해
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -51,7 +54,16 @@ def load_corpus(synth_dir: Path) -> list[dict]:
     return docs
 
 
-def make_queries(per_grade: int = 3) -> list[dict]:
+def make_queries(per_grade: int = 3, style: str = "seed") -> list[dict]:
+    """쿼리 생성. style: "seed" (기존 {kw} 관련 자료) | "intent" (의도형 30종 고정).
+
+    intent 모드는 per_grade를 무시하고 p2_intent_queries.INTENT_QUERIES를 그대로 반환.
+    seed 모드는 등급당 per_grade개 키워드를 `{kw} 관련 자료` 패턴으로 생성.
+    """
+    if style == "intent":
+        from p2_intent_queries import INTENT_QUERIES
+        return list(INTENT_QUERIES)
+
     from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
 
     grade_kws: dict[str, list[str]] = {"TS": [], "S1": [], "S2": [], "S3": []}
@@ -376,7 +388,14 @@ def main() -> int:
         "--queries-per-grade",
         type=int,
         default=3,
-        help="등급당 쿼리 개수. dryrun=3 권장, full=9+ (총 36+) 권장.",
+        help="등급당 쿼리 개수. dryrun=3 권장, full=9+ (총 36+) 권장. intent 스타일은 무시됨.",
+    )
+    ap.add_argument(
+        "--query-style",
+        default="seed",
+        choices=["seed", "intent"],
+        help="쿼리 스타일. seed: `{kw} 관련 자료` 시드 키워드 기반(기본). "
+             "intent: 의도형 30종 고정 (scripts/p2_intent_queries.py).",
     )
     ap.add_argument(
         "--reranker",
@@ -399,7 +418,8 @@ def main() -> int:
         return 2
 
     docs = load_corpus(synth_dir)
-    queries = make_queries(per_grade=args.queries_per_grade)
+    queries = make_queries(per_grade=args.queries_per_grade, style=args.query_style)
+    print(f"[p2] query_style={args.query_style}, query_count={len(queries)}")
 
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     combos = _resolve_combinations(args.mode, backends, args.hybrid)

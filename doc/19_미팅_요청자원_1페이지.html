@@ -186,17 +186,23 @@
   <div class="grid-4">
 
     <div class="card">
-      <div class="card-num">REQUEST #1</div>
+      <div class="card-num">REQUEST #1 · 최우선</div>
       <div class="row">
         <h3>LLM API 키 또는 비용 승인</h3>
         <span class="pill pill-block">차단</span>
+        <span class="pill pill-active">P2 합격선 결정타</span>
       </div>
       <p class="why">
         <b>차단 중인 작업</b>: P3 합성 풀 모드(800·5,000건 노출 시), RAG 답안 합성 LLM 실호출, KF-DeBERTa 학습 보조 라벨링.
         현재 noop provider로 동작 — 라벨 일치 100%이지만 LLM 의미해석 미반영.
       </p>
+      <p class="why" style="background:rgba(0,112,243,.06); border-left:3px solid var(--c-active); padding:8px 12px; margin:10px 0;">
+        <b>P2 검색 품질 합격선 도달의 결정적 차단</b> — 본 미팅 직전 정량 입증.
+        의도형 쿼리 추가 측정 결과 시드 대비 <b>-0.067~-0.133 하락</b>으로 천장 원인이 알고리즘이 아닌 <b>합성 코퍼스 boilerplate</b>임이 확정.
+        LLM API 키 도착 → P3 풀 합성 → 본문 다양화가 합격선 0.80 도달의 결정 경로.
+      </p>
       <div class="when">
-        <b>받으면 즉시 가능</b>: <code>.env</code>에 키 채우고 <code>make poc-all</code> 또는 <code>--provider anthropic</code> 재실행 → doc/02 §부록 A 갱신 (당일).
+        <b>받으면 즉시 가능</b>: <code>.env</code>에 키 채우고 <code>make poc-all</code> 또는 <code>--provider anthropic</code> 재실행 → P3 풀 합성 → P2 재측정 → doc/02 §부록 A 갱신 (당일~3일).
       </div>
       <p style="margin-top:10px; font-size:12.5px; color:var(--text-dim);">
         예상 비용: P3 풀 합성 약 $50~100, 전체 PoC 약 $200 추산. 운영 단계는 발주처 부담(원 합의).
@@ -246,13 +252,11 @@
         <span class="pill pill-risk">위험·우회중</span>
       </div>
       <p class="why">
-        <b>차단 중인 작업</b>: P2 검색 품질 합격선 도달.
-        <b>1차 실측 결과 천장 0.700</b>(합격선 0.80) — KURE-v1·BGE-M3 × dense·hybrid 4-way 모두 0.667~0.700, reranker·RRF 모두 효과 0.
-        시드 키워드 쿼리 환경의 한계.
+        <b>차단 중인 작업</b>: 시드 키워드·Nori 사전·라벨링 규칙 v4 정밀화. (P2 합격선은 #1로 결정 — 본 자원은 시드 갱신 효율 증가)
+        1차 실측 결과 시드 쿼리 0.700, 의도형 0.567~0.667 — 시드든 의도형이든 합성 본문 boilerplate가 천장 결정 요인.
       </p>
       <div class="when">
-        <b>받으면 즉시 가능</b>: v2 키워드로 시드 v4·Nori 사전·라벨링 YAML 패치 → 의도형 쿼리 30종 재작성 → 재측정.
-        합격선 도달 또는 v1.1 합격선 v2 협의 갱신 의사결정.
+        <b>받으면 즉시 가능</b>: v2 키워드로 시드 v4·Nori 사전·라벨링 YAML 패치. P3 풀 합성과 결합 시 합격선 도달 가속.
       </div>
       <p style="margin-top:10px; font-size:12.5px; color:var(--text-dim);">
         현재 우회: 공개 법령 기반 자체 v1 (시드 v3 313 키워드, 18 도메인) — 가이드 v2 도착 시 diff만 패치.
@@ -317,8 +321,13 @@
         <td><span class="pill pill-done">즉시 가능</span></td>
       </tr>
       <tr>
-        <td>P2 검색 품질 4-way</td>
-        <td>KURE/BGE × dense/hybrid 실측 리포트 (천장 0.700 노출)</td>
+        <td>P2 검색 품질 4-way + 의도형 입증</td>
+        <td>KURE/BGE × dense/hybrid 실측 + 의도형 30종 추가 측정 (천장 원인이 알고리즘이 아닌 합성 boilerplate임을 정량 입증)</td>
+        <td><span class="pill pill-done">즉시 가능</span></td>
+      </tr>
+      <tr>
+        <td>4-tier 배포 프로파일</td>
+        <td>LLOYDK_DEPLOY_PROFILE 한 줄로 lite-noapi/lite-cloud/onprem-local/full-train 전환 라이브 시연</td>
         <td><span class="pill pill-done">즉시 가능</span></td>
       </tr>
       <tr>
@@ -351,9 +360,9 @@
     <tbody>
       <tr>
         <td><b>D+0</b></td>
-        <td>API 키 적용 → P3 풀 합성 재실행 → doc/02 §부록 A 갱신</td>
+        <td>API 키 적용 → P3 풀 합성 재실행 → P2 재측정으로 합격선 0.80 도달 검증 → doc/02 §부록 A 갱신</td>
         <td>요청 #1</td>
-        <td>당일</td>
+        <td>당일~3일</td>
       </tr>
       <tr>
         <td><b>D+1</b></td>
