@@ -141,11 +141,52 @@ def synthesize_batch(
 
 @celery_app.task(name="lloydk.train_classifier")
 def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
+    """학습 시작 — 표적 5 (2026-05-29): unconsumed corrections를 자동 소비.
+
+    학습이 끝난 뒤 같은 corrections가 다음 train tick에서 또 끌려오지 않게,
+    train_run_id로 mark. report에 consumed_count도 함께 반환.
+    """
     from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
+    from lloydk.modules.m6_evaluation.active_learning import consume_corrections_for_run
 
     spec = TrainSpec(**(spec_kwargs or {}))
     report = train_classifier(spec)
-    return report.__dict__
+    out = dict(report.__dict__)
+
+    # run_id 결정: report에 있으면 그것을, 없으면 신규 UUID.
+    run_id = getattr(report, "run_id", None) or getattr(report, "training_run_id", None)
+    if not run_id:
+        import uuid as _uuid
+        run_id = _uuid.uuid4()
+    try:
+        import uuid as _uuid
+        run_uuid = run_id if hasattr(run_id, "hex") else _uuid.UUID(str(run_id))
+        n = consume_corrections_for_run(run_uuid)
+        out["corrections_consumed"] = n
+        out["corrections_run_id"] = str(run_uuid)
+        if n > 0:
+            logger.info("train_classifier: consumed %d corrections under run_id=%s", n, run_uuid)
+    except Exception:  # noqa: BLE001
+        logger.exception("consume_corrections_for_run failed (run_id=%s) — corrections 누적 가능", run_id)
+        out["corrections_consumed"] = -1
+    return out
+
+
+@celery_app.task(name="lloydk.deliver_outbox_tick")
+def deliver_outbox_tick(limit: int = 50) -> dict:
+    """Outbox webhook 배송 주기 트리거.
+
+    enqueue된 webhook을 실제로 송신하는 워커. beat가 60초마다 호출.
+    배송 실패는 outbox 내부에서 지수 백오프 후 재시도, max_attempts 초과 시 DLQ stream으로.
+    """
+    from lloydk.services.outbox import deliver_once, get_outbox_store, http_send_via_httpx
+    store = get_outbox_store()
+    out = deliver_once(store, http_send=http_send_via_httpx, limit=limit)
+    if out["dlq"] > 0:
+        logger.warning("outbox tick: %s — DLQ 발생", out)
+    elif out["sent"] > 0 or out["failed"] > 0:
+        logger.info("outbox tick: %s", out)
+    return out
 
 
 @celery_app.task(name="lloydk.drift_tick")

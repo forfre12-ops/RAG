@@ -22,6 +22,7 @@ celery_app.conf.task_routes = {
     "lloydk.index_documents": {"queue": "index"},
     "lloydk.active_learning_tick": {"queue": "learning"},
     "lloydk.drift_tick": {"queue": "learning"},
+    "lloydk.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
 }
 
 # P1-A5: Active Learning 주기 트리거 (Celery beat).
@@ -44,6 +45,13 @@ celery_app.conf.beat_schedule = {
         "task": "lloydk.drift_tick",
         "schedule": 15 * 60.0,
         "kwargs": {"limit": 200, "threshold": 0.5},
+    },
+    # 표적 7 (2026-05-29): 매 60초 — webhook outbox 배송.
+    # enqueue된 KL 콜백을 실제로 송신. 실패는 outbox 내부에서 지수 백오프, max_attempts 후 DLQ.
+    "outbox-deliver-every-60s": {
+        "task": "lloydk.deliver_outbox_tick",
+        "schedule": 60.0,
+        "kwargs": {"limit": 50},
     },
 }
 celery_app.conf.timezone = "Asia/Seoul"

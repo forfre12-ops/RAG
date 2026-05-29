@@ -1360,7 +1360,13 @@
         <tr><td>2026-05-29</td><td><b>고도화 6건 — A1 Outbox Redis ZSET+DLQ stream · A3 SSE 진짜 stage callback(ClassifyService.on_stage hook) · A4 Drift wiring(Celery beat 15분 + Prometheus 5개 gauge + train centroid persist) · A2 Audit chain wiring(middleware → build_chained_hash) · B1+B3 CI Redis service + fakeredis dev extras · B2 CI ES 8.15 service. 회귀 540 PASS + 신규 18 통과, ruff 0, explain.py future-annotations 사전 결함 동시 수정</b></td><td><b>스켈레톤 → 실가동</b></td><td>없음</td></tr>
         <tr><td>2026-05-29</td><td><b>고도화 4건 — A5 active-learning tick 분기 검증(URGENT/RECOMMENDED weekly window/OK·enqueue 실패 폴백 단위 9건) · A6 Query expansion 사용처 facade(services/retrieval.expand_then_search + RRF 결합 + hybrid 실패 시 dense 폴백 7건) · C 정리(chunker_v2 = m2_preprocess/chunker.py.split_v2 정확, calibration = scripts/calibrate_classifier.py — 위치만 문서화) · D1 secrets_manager 일원화(assert_production_credentials에서 fill_from_secrets_manager 호출, env 비면 Vault/AWS SM에서 자동 보충 8건). 합계 신규 24 PASS, 회귀 영향 0, ruff 0</b></td><td><b>+ wiring 사각지대 4건 닫음</b></td><td>없음</td></tr>
         <tr><td>2026-05-29</td><td><b>고도화 3건 — D2 OTel app 마운트 wiring(api/app.lifespan에 setup_tracing(app) 호출 + 예외 silent guard, 정적 검증 3건) · D3 mTLS docker-compose profile(nginx-mtls 서비스 opt-in profiles=[\"mtls\"] + cert/conf 마운트, 정적 검증 4건) · D4 SBOM 자동 갱신 hook(Makefile sbom-publish 타깃 + CI doc/21 자동 render + sbom artifact 첨부, 자동 commit은 의도적 제외, 정적 검증 4건). 합계 신규 11 PASS, 회귀 영향 0, ruff 0</b></td><td><b>+ 일반화 납품 강도</b></td><td>없음</td></tr>
-        <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — RAG evidence DB 영속화(ClassifyRepo.add_rag_evidence_from_hits 신규, pred.rag_context를 ClassificationEvidence로 저장, evidence_type='rag_context' + rag_ref_doc_id/rag_similarity 컬럼 활용, score [0,1] clamp + UUID 파싱 폴백 + excerpt 길이 제한, ClassifyService._try_persist에 호출 추가, 단위 8 PASS)</b></td><td><b>+ RAG 검수 추적성</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29</td><td><b>고도화 1건 — RAG evidence DB 영속화(ClassifyRepo.add_rag_evidence_from_hits 신규, pred.rag_context를 ClassificationEvidence로 저장, evidence_type='rag_context' + rag_ref_doc_id/rag_similarity 컬럼 활용, score [0,1] clamp + UUID 파싱 폴백 + excerpt 길이 제한, ClassifyService._try_persist에 호출 추가, 단위 8 PASS)</b></td><td><b>+ RAG 검수 추적성</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29 (오늘)</td><td><b>고도화 4건 — 호출 체인 닫음(wiring 사각지대 2차):
+        ① outbox webhook 배송 자동화(workers/tasks.deliver_outbox_tick + Celery beat 60초 주기 + queue=index) — 지금까지 enqueue만 되고 안 보내지던 사각지대 해소
+        ② consume_corrections_for_run wiring(train_classifier_task가 학습 후 자동 호출, 실패해도 학습 결과는 반환) — corrections 무한 누적 방지
+        ③ PII masker 자동 적용(PreprocessPipeline에 mask_pii 호출 + settings.pii_masking_enabled, 기본 True, pii_counts 메타데이터 보존)
+        ④ CachedEmbedding redis_url 자동 주입(_redis_url_for_emb_cache: EMB_REDIS_URL → EMB_REDIS_ENABLED → settings.redis_url 우선순위) — _RedisCache 백엔드 활성화
+        신규 15 PASS · 회귀 영향 0 · ruff 0</b></td><td><b>+ wiring 사각지대 2차</b></td><td>없음</td></tr>
         <tr class="pick"><td><b>+0 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b> (합성·labeled·가이드 v1 준비됨)</td><td><b>잔여: GPU + API 키</b></td><td><b>사업단 예산 결정</b></td></tr>
         <tr><td>+0 ~ +7 일</td><td>W6 합성 5,000건·학습·번들 실빌드</td><td>100%</td><td>GPU + API 키 + 가이드 v2</td></tr>
       </tbody>
@@ -1415,7 +1421,7 @@
       <a href="20_시나리오_성능_보고서.html">PSH 성능 보고서</a> ·
       <a href="20a_시나리오_성능_KPI매트릭스.md">KPI 매트릭스 v1.3</a>
     </p>
-    <p>2026-05-29 W13 + 33건 + 후속 6+4+3+<b>1건(RAG evidence 영속화)</b> 완료 시점 · pytest <b>540 + 신규 61 PASS</b> (outbox redis 8·SSE 3·drift wiring 3·audit chain wiring 4·tick 분기 9·retrieval facade 7·secrets wiring 8·OTel 3·mTLS profile 4·SBOM hook 4·RAG evidence 8) · ruff 0 위반 · 18 시나리오 <b>67 KPI (47/0/20)</b> · Phase 1 90% (W6 잔여) + Phase 2 100% + Phase 3 차단 3→1 + Phase 4 운영 진입 보강 완료. 누적 47건(33+6+4+3+1). 남은 차단: GPU + Anthropic API 키 + 실문서(미제공 가정).</p>
+    <p>2026-05-29 W13 + 33건 + 후속 6+4+3+1+<b>4건(wiring 2차)</b> 완료 시점 · pytest <b>540 + 신규 76 PASS</b> (outbox redis 8·SSE 3·drift wiring 3·audit chain wiring 4·tick 분기 9·retrieval facade 7·secrets wiring 8·OTel 3·mTLS profile 4·SBOM hook 4·RAG evidence 8·wiring 2차 15) · ruff 0 위반 · 18 시나리오 <b>67 KPI (47/0/20)</b> · Phase 1 90% (W6 잔여) + Phase 2 100% + Phase 3 차단 3→1 + Phase 4 운영 진입 보강 완료. 누적 51건(33+6+4+3+1+4). 남은 차단: GPU + Anthropic API 키 + 실문서(미제공 가정).</p>
   </div>
 
 </main>

@@ -31,13 +31,38 @@ def _cache_enabled() -> bool:
     return raw not in {"0", "false", "no", "off", ""}
 
 
+def _redis_url_for_emb_cache() -> str | None:
+    """표적 3 (2026-05-29): CachedEmbedding에 Redis 영속 백엔드 자동 주입.
+
+    우선순위:
+      1. env ``EMB_REDIS_URL`` 명시값 (캐시 전용 redis 분리 가능)
+      2. env ``EMB_REDIS_ENABLED=0|false`` → None (강제 비활성)
+      3. settings.redis_url (broker와 공유, 운영 기본 경로)
+      4. 로드 실패 → None (LRU만 동작)
+    """
+    explicit = os.getenv("EMB_REDIS_URL", "").strip()
+    if explicit:
+        return explicit
+    if os.getenv("EMB_REDIS_ENABLED", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return None
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+        return settings.redis_url or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _maybe_wrap_cache(provider: EmbeddingProvider) -> EmbeddingProvider:
-    """HashEmbedding 은 캐시 의미 없음(이미 결정론적 해시). 그 외는 LRU wrap."""
+    """HashEmbedding 은 캐시 의미 없음(이미 결정론적 해시). 그 외는 LRU + Redis wrap.
+
+    Redis URL은 환경/settings에서 자동 해석. redis 패키지 미설치 또는 연결 실패 시
+    LRU만 동작 (CachedEmbedding._RedisCache가 silent skip).
+    """
     if isinstance(provider, HashEmbedding):
         return provider
     if not _cache_enabled():
         return provider
-    return CachedEmbedding(provider)
+    return CachedEmbedding(provider, redis_url=_redis_url_for_emb_cache())
 
 
 def build_embedder(model_name: str | None = None, *, force_hash: bool = False) -> EmbeddingProvider:
