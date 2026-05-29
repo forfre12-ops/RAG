@@ -616,9 +616,11 @@ async function runRace() {
     renderResult(r.data, bertMs);
   }
 
-  // LLM — 운영 추정치 시뮬레이션 (lite-noapi 에서는 실호출 없음 안내)
-  // V2 §4.4 표 기준: LLM zero-shot 1.5~5초 평균
-  const estimatedLlmMs = 4800;
+  // LLM — V2 §4.4 표 참고값으로 진행 막대 시뮬레이션.
+  // 실 호출이 아니라 "비교 기준값" 시각화. lite-noapi 환경에서는 LLM 자체가
+  // 호출되지 않으므로 실측 불가. 운영 시 LLM_PROVIDER=anthropic 등으로 실 호출하면
+  // 별도 실측 라운드 필요(현재 코드는 표시 안 함).
+  const estimatedLlmMs = 4800;  // V2 §4.4 "1.5~5s" 중 상한 근처값 (참고)
   const llmIsReal = state.health && state.health.llm_provider &&
     !["noop", "", "hash"].includes(state.health.llm_provider);
   const startLlm = performance.now();
@@ -628,20 +630,27 @@ async function runRace() {
       const elapsed = performance.now() - startLlm;
       const ratio = Math.min(1, elapsed / estimatedLlmMs);
       if (llmFill) llmFill.style.width = (ratio * 100).toFixed(1) + "%";
-      if (llmTime) llmTime.textContent = Math.round(elapsed) + " ms";
+      if (llmTime) llmTime.textContent = Math.round(elapsed) + " ms (참고값)";
       if (ratio >= 1) {
         clearInterval(tick);
-        if (llmTime) llmTime.textContent = estimatedLlmMs + " ms" + (llmIsReal ? "" : " (예상)");
+        if (llmTime) llmTime.textContent = estimatedLlmMs + " ms (참고값)";
         resolve();
       }
     }, interval);
   });
 
-  // 결론
+  // 결론 — LLM 값이 실측이 아님을 항상 명시.
   const note = $("#race-note");
   if (note) {
     const ratio = (estimatedLlmMs / Math.max(1, bertMs)).toFixed(0);
-    note.innerHTML = `BERT <b>${bertMs} ms</b> vs LLM ${llmIsReal ? "" : "(예상)"} <b>${estimatedLlmMs} ms</b> — <b>${ratio}× 빠름</b>. V2 §4.4 표 실증.`;
+    note.innerHTML = `
+      BERT <b>${bertMs} ms</b> (실측) vs LLM <b>${estimatedLlmMs} ms</b>
+      <span class="src-tag src-ref" style="margin-left:6px;">참고값</span>
+      — 약 <b>${ratio}× 빠름</b>.
+      <br/><span style="font-size:11.5px;color:var(--text-dim);">
+      ※ LLM 값은 V2 §4.4 표의 일반적 범위(1.5~5s) 중 한 점. 실 호출 측정 아님.
+      운영 시 실 LLM 호출로 자리 교체 필요.
+      </span>`;
   }
 
   $("#btn-classify").disabled = false;
@@ -756,7 +765,21 @@ function renderIncident() {
     INCIDENT.estimates.forEach((e) => {
       const s = document.createElement("div");
       s.className = "stat";
-      s.innerHTML = `<div class="v">${escapeHtml(e.value)}</div><div class="l">${escapeHtml(e.label)}</div>`;
+      const flagClass = {
+        "예시": "src-ref",
+        "목표": "src-spec",
+        "법령": "src-spec",
+        "실측": "src-measured",
+      }[e.flag] || "src-ref";
+      const flag = e.flag
+        ? `<span class="src-tag ${flagClass}">${escapeHtml(e.flag)}</span>`
+        : "";
+      s.innerHTML = `
+        <div class="v">${escapeHtml(e.value)}</div>
+        <div class="l">${escapeHtml(e.label)}</div>
+        <div style="margin-top:6px;">${flag}</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">${escapeHtml(e.note)}</div>
+      `;
       s.title = e.note;
       stWrap.appendChild(s);
     });
@@ -769,25 +792,33 @@ function renderIncident() {
 function renderCapabilityStats() {
   const wrap = $("#capability-stats");
   if (!wrap) return;
+  // src: "measured" 실측 / "spec" 명세·합격선·코드 사실 / "ref" V2 통합본 참고값.
   const items = [
-    { v: "0.12s", l: "BERT 추론 (V2 §4.4)" },
-    { v: "4.8s", l: "LLM zero-shot (V2 §4.4)" },
-    { v: "≤ 5%", l: "FNR 핵심 KPI (V2 §9)" },
-    { v: "480+", l: "시드 v4 키워드" },
-    { v: "18", l: "산업 도메인" },
-    { v: "5,000", l: "합성 코퍼스 (P3)" },
-    { v: "67", l: "PSH KPI 시나리오" },
-    { v: "540+", l: "단위 테스트 PASS" },
-    { v: "4", l: "배포 프로파일" },
-    { v: "≤ 30s", l: "E2E (RAG ON, V2 §14.2)" },
-    { v: "$0", l: "추론 비용 (자체 GPU)" },
-    { v: "Docker", l: "온프레미스 배포" },
+    { v: "0.05~0.2s", l: "BERT 추론 (V2 §4.4 참고값)", src: "ref" },
+    { v: "1.5~5s", l: "LLM zero-shot (V2 §4.4 참고값)", src: "ref" },
+    { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9)", src: "spec" },
+    { v: "480+", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
+    { v: "18", l: "산업 도메인 (seeds.py 주석)", src: "measured" },
+    { v: "5,000", l: "합성 코퍼스 (datasets/synthetic_5k)", src: "measured" },
+    { v: "67", l: "PSH KPI 시나리오 (회귀 매트릭스)", src: "measured" },
+    { v: "540+", l: "단위 테스트 PASS (회귀 기준)", src: "measured" },
+    { v: "4", l: "배포 프로파일 (lite-noapi 외 3)", src: "measured" },
+    { v: "≤ 30s", l: "E2E 합격선 (V2 §14.2 목표)", src: "spec" },
+    { v: "$0", l: "온프레미스 추론 비용 (자체 GPU 가정)", src: "spec" },
+    { v: "Docker", l: "온프레미스 배포 (compose 1줄)", src: "measured" },
   ];
   wrap.innerHTML = "";
   items.forEach((it) => {
     const s = document.createElement("div");
     s.className = "stat";
-    s.innerHTML = `<div class="v">${it.v}</div><div class="l">${it.l}</div>`;
+    const tag = it.src === "measured" ? `<span class="src-tag src-measured">실측</span>`
+      : it.src === "spec" ? `<span class="src-tag src-spec">명세</span>`
+      : `<span class="src-tag src-ref">참고</span>`;
+    s.innerHTML = `
+      <div class="v">${it.v}</div>
+      <div class="l">${it.l}</div>
+      <div style="margin-top:6px;">${tag}</div>
+    `;
     wrap.appendChild(s);
   });
 }
