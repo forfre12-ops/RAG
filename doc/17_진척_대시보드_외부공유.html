@@ -677,7 +677,7 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">v1.0-ext · 2026-05-29 운영 안정성·일반화 보강 33건 + 후속 6+4+3+1+4건 (회귀 테스트 <b>540 PASS + 신규 76 통과</b> · CI 환경 보강 별도)</span>
+    <span class="meta-soft">v1.0-ext · 2026-05-29 운영 안정성·일반화 보강 33건 + 후속 6+4+3+1+4+1건 (회귀 테스트 <b>540 PASS + 신규 89 통과</b> · CI 환경 보강 별도)</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>진척 보고 (블록 7 종료)</h1>
@@ -1526,7 +1526,8 @@
         <tr><td>2026-05-29</td><td><b>후속 4건 — 능동학습 자동 트리거 분기 검증(긴급 재학습·주간 권장·실패 폴백) · 검색 쿼리 확장 사용처 wiring(동의어/약어 자동 확장 + RRF 결합) · 청크 v2·캘리브레이션 위치 정리 · 자격증명 백엔드 일원화(Vault/AWS Secrets Manager 자동 보충)</b> · 합계 신규 32 통과</td><td><b>+ wiring 사각지대 닫음</b></td><td>없음</td></tr>
         <tr><td>2026-05-29</td><td><b>후속 3건 — 분산 트레이싱 자동 활성(OTel app 마운트, 운영 미설정 시 silent skip) · 양방향 TLS 옵트인 프로파일(docker compose --profile mtls) · 의존성 SBOM 자동 갱신 hook(CI 산출물에 보고서 HTML 첨부)</b> · 합계 신규 11 통과</td><td><b>+ 일반화 납품 강도</b></td><td>없음</td></tr>
         <tr><td>2026-05-29</td><td><b>후속 1건 — RAG 검색 결과(인용 출처·청크 ID·유사도 점수)를 분류 evidence 테이블에 영속화. 검수자가 "왜 이 등급?"을 보면서 모델이 참조한 RAG 인용을 추적 가능</b> · 신규 8 통과</td><td><b>+ RAG 검수 추적성</b></td><td>없음</td></tr>
-        <tr><td>2026-05-29 (오늘)</td><td><b>후속 4건 — 호출 체인 닫음(분석 단계에서 발견한 미연결 자리): ① 웹훅 자동 배송(지금까지 큐에만 쌓이고 안 보내지던 자리에 60초 주기 워커) ② 학습 후 누적 corrections 자동 소비 ③ 전처리에 PII 마스킹 자동 적용(기본 활성) ④ 임베딩 캐시에 Redis 영속 백엔드 자동 활성화</b> · 신규 15 통과</td><td><b>+ wiring 사각지대 2차</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29</td><td><b>후속 4건 — 호출 체인 닫음(분석 단계에서 발견한 미연결 자리): ① 웹훅 자동 배송(지금까지 큐에만 쌓이고 안 보내지던 자리에 60초 주기 워커) ② 학습 후 누적 corrections 자동 소비 ③ 전처리에 PII 마스킹 자동 적용(기본 활성) ④ 임베딩 캐시에 Redis 영속 백엔드 자동 활성화</b> · 신규 15 통과</td><td><b>+ wiring 사각지대 2차</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29 (오늘)</td><td><b>후속 1건 — 검색 결과를 cross-encoder 재정렬기(reranker)로 한 단계 더 정렬. 1차 검색에서 4배 oversample → 의미 기반 재정렬 → 최종 top-k. BGE 등 실 모델 미설치 환경에서는 noop으로 안전 동작</b> · 신규 13 통과</td><td><b>+ 2단계 retrieval 완성</b></td><td>없음</td></tr>
         <tr class="pick"><td><b>2026-06-09</b></td><td><b>협의요청서 회신 기한 · W6 학습 가능 시점 (자원 도착 시 즉시 가동)</b></td><td><b>조정 항목 해소</b></td><td><b>발주처 자원</b></td></tr>
         <tr><td>회신 후 +7 일</td><td>W6 합성·학습·번들 실빌드 (자원 충족 시)</td><td>100%</td><td>GPU + API 키 + 가이드 v2</td></tr>
       </tbody>
