@@ -19,7 +19,12 @@ services:
       retries: 10
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    # Phase 0.2 (5070 Ti 풀가동): vanilla 이미지 → analysis-nori 동봉 빌드.
+    # Dockerfile.es 가 8.15.3 베이스에 elasticsearch-plugin install analysis-nori 적용.
+    build:
+      context: ./infra/es
+      dockerfile: Dockerfile.es
+    image: lloydk/elasticsearch:8.15.3-nori
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"

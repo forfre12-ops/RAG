@@ -183,3 +183,15 @@ addopts = "-ra"
 filterwarnings = [
   "ignore:Field .model_version. in ClassifyResponse has conflict with protected namespace .model_.:UserWarning",
 ]
+# Phase 0.3 (5070 Ti 풀가동) — 회귀 분리 markers.
+# 기본 `pytest` 는 lite-noapi 빠른 회귀(현재 540+ 케이스) 그대로 실행.
+# 풀스택/GPU/모델 다운이 필요한 케이스는 명시적으로 marker 부착 → 별도 실행.
+markers = [
+  "fullstack: requires running docker compose (postgres + es + minio + redis + mlflow). 활성화: pytest -m fullstack",
+  "gpu: requires CUDA GPU (sm_120 또는 호환). 활성화: pytest -m gpu",
+  "model_download: downloads HuggingFace models (~수GB). 활성화: pytest -m model_download",
+  "phase2: Phase 2 KURE/BGE-M3/dragonkue 3-way embedding 측정",
+  "phase3: Phase 3 KF-DeBERTa 학습 + P1 F1/FNR 측정",
+  "phase4: Phase 4 P5 E2E 풀스택 측정",
+  "phase5: Phase 5 Qwen3/Solar P3 합성 비교",
+]
