@@ -20,8 +20,18 @@ from lloydk.db.models import (
     Document,
     Tenant,
 )
-from lloydk.schemas.classify import EvidenceSpan
+from lloydk.schemas.classify import EvidenceSpan, RagContextHit
 from lloydk.schemas.common import Grade
+
+
+def _try_uuid(value: str | None) -> uuid.UUID | None:
+    """문자열 → UUID. 실패하면 None (DB 컬럼이 nullable)."""
+    if not value:
+        return None
+    try:
+        return uuid.UUID(value)
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 class ClassifyRepo:
@@ -97,7 +107,10 @@ class ClassifyRepo:
         excerpt_start: int | None = None,
         excerpt_end: int | None = None,
         factor_id: int | None = None,
+        rag_ref_doc_id: uuid.UUID | None = None,
+        rag_similarity: float | None = None,
     ) -> ClassificationEvidence:
+        """rag_ref_doc_id/rag_similarity는 evidence_type='rag_context'에서 사용."""
         ev = ClassificationEvidence(
             classification_id=classification_id,
             chunk_id=chunk_id,
@@ -107,6 +120,8 @@ class ClassifyRepo:
             excerpt_start=excerpt_start,
             excerpt_end=excerpt_end,
             factor_id=factor_id,
+            rag_ref_doc_id=rag_ref_doc_id,
+            rag_similarity=rag_similarity,
         )
         self.db.add(ev)
         return ev
@@ -133,6 +148,40 @@ class ClassifyRepo:
                 contribution=float(span.weight) if span.weight else 0.0,
                 excerpt_start=span.start,
                 excerpt_end=span.end,
+            )
+            count += 1
+        return count
+
+    def add_rag_evidence_from_hits(
+        self,
+        classification_id: uuid.UUID,
+        *,
+        hits: Iterable[RagContextHit],
+        default_chunk_id: uuid.UUID,
+        excerpt_max_len: int = 500,
+    ) -> int:
+        """RagContextHit(스키마) → ClassificationEvidence(DB)로 RAG 검색 결과를 영속화.
+
+        - evidence_type='rag_context' 고정. RAG 출처 식별 + 검수자가 인용 정확도 검증 가능.
+        - source_doc·chunk_id 문자열을 UUID로 파싱(실패 시 None — DB는 nullable이라 OK).
+        - excerpt는 RagContextHit가 본문을 별도로 안 들고 있어 source_doc 식별자를 보존만 함.
+          본문이 필요하면 호출자가 별도 lookup하여 excerpt 갱신.
+        - contribution은 hit.score를 [0,1]로 clamp.
+        """
+        count = 0
+        for hit in hits:
+            ref_doc = _try_uuid(hit.source_doc)
+            chunk = _try_uuid(hit.chunk_id) or default_chunk_id
+            score = max(0.0, min(1.0, float(hit.score)))
+            excerpt = f"[rag] doc={hit.source_doc} chunk={hit.chunk_id}"[:excerpt_max_len]
+            self.add_evidence(
+                classification_id,
+                chunk_id=chunk,
+                evidence_type="rag_context",
+                excerpt=excerpt,
+                contribution=score,
+                rag_ref_doc_id=ref_doc,
+                rag_similarity=score,
             )
             count += 1
         return count

@@ -177,6 +177,19 @@ class ClassifyService:
                         default_chunk_id=uuid.uuid4(),  # PoC: 청크 영속화 전이라 임시 UUID
                     )
 
+                # 2026-05-29: RAG context도 ClassificationEvidence에 영속화.
+                # rag_used=True인데 본 단계가 실패해도 classification 자체는 저장됨(트랜잭션 동일).
+                if pred.rag_context:
+                    n_rag = repo.add_rag_evidence_from_hits(
+                        cls.classification_id,
+                        hits=pred.rag_context,
+                        default_chunk_id=uuid.uuid4(),
+                    )
+                    if n_rag != len(pred.rag_context):
+                        warns.append(
+                            f"rag evidence partial persist: {n_rag}/{len(pred.rag_context)}"
+                        )
+
                 return cls.classification_id, warns
 
         except SQLAlchemyError as exc:
