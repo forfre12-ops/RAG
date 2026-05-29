@@ -84,8 +84,8 @@ def expand_llm(query: str, *, n: int = 3, provider=None) -> QueryExpansion:
         return QueryExpansion(original=query)
     try:
         if provider is None:
-            from lloydk.adapters.llm import get_llm  # type: ignore
-            provider = get_llm()
+            from lloydk.adapters.llm import build_provider  # noqa: PLC0415
+            provider = build_provider()
     except Exception as e:  # noqa: BLE001
         logger.debug("LLM provider load failed (%s) — falling back to rule", e)
         return expand_rule(query)
@@ -96,10 +96,13 @@ def expand_llm(query: str, *, n: int = 3, provider=None) -> QueryExpansion:
         f"원본: {query}"
     )
     try:
-        text = provider.generate(prompt)
+        raw = provider.generate(prompt)
     except Exception as e:  # noqa: BLE001
         logger.debug("LLM generate failed (%s) — falling back to rule", e)
         return expand_rule(query)
+
+    # provider.generate는 LLMResponse를 반환 — .text 추출. 테스트용으로 str 직접 반환 시 그대로.
+    text = raw.text if hasattr(raw, "text") else str(raw)
 
     import json
     try:
