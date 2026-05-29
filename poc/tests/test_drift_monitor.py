@@ -91,13 +91,22 @@ def test_publish_to_prom_sets_gauges():
 
 
 def test_run_drift_check_no_centroid_returns_empty(tmp_path, monkeypatch):
-    """centroid 미저장 → empty report + alert=False."""
+    """centroid 미저장 → empty report + alert=False.
+
+    teardown 필수 — reload는 monkeypatch가 풀어주지 않으므로 env 정리 후
+    한 번 더 reload하여 후속 테스트(prometheus 게이지·다른 drift 테스트)의
+    drift_monitor 모듈 상태 오염을 차단.
+    """
     monkeypatch.setenv("LLOYDK_DRIFT_CENTROID_PATH", str(tmp_path / "missing.json"))
     # 모듈 reload — env가 module-load 시점에 캐시됨
     import importlib
     import lloydk.services.drift_monitor as dm
     importlib.reload(dm)
 
-    r = dm.run_drift_check()
-    assert r.sample_size == 0
-    assert r.alert is False
+    try:
+        r = dm.run_drift_check()
+        assert r.sample_size == 0
+        assert r.alert is False
+    finally:
+        monkeypatch.delenv("LLOYDK_DRIFT_CENTROID_PATH", raising=False)
+        importlib.reload(dm)
