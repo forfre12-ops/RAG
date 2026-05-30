@@ -1,0 +1,34 @@
+# 2026-05-30: 윈도우 재설치 후 로컬 개발 환경 오버라이드.
+# 1) 컨테이너 → 호스트 Ollama(qwen3:14b): localhost 대신 host.docker.internal.
+# 2) datasets 마운트 — 재색인 스크립트 입력.
+# 3) GPU passthrough — BGE-M3 임베딩을 5070 Ti 로 (CPU 0.6 docs/s → GPU 대폭 향상).
+# compose 가 base docker-compose.yml 에 자동 병합한다 (별도 -f 불필요).
+services:
+  api:
+    environment:
+      LLM_PROVIDER: local_openai
+      LOCAL_LLM_BASE_URL: http://host.docker.internal:11434/v1
+      LOCAL_LLM_MODEL: qwen3:14b
+      LOCAL_LLM_API_KEY: ollama
+    volumes:
+      - ./datasets:/app/datasets:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  worker:
+    environment:
+      LLM_PROVIDER: local_openai
+      LOCAL_LLM_BASE_URL: http://host.docker.internal:11434/v1
+      LOCAL_LLM_MODEL: qwen3:14b
+      LOCAL_LLM_API_KEY: ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

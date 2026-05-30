@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: lloydk
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dev}
     volumes:
-      - E:/antigravity/rag/docker-data/postgres:/var/lib/postgresql/data
+      - D:/antigravity/rag/docker-data/postgres:/var/lib/postgresql/data
       # 2026-05-28: init.sql 자동 부트스트랩 제거 — alembic baseline 단일 경로로 일원화.
       # 빈 DB 부트스트랩: `docker compose up -d postgres && cd poc && alembic upgrade head`
     ports:
@@ -56,7 +56,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lloydk}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
     volumes:
-      - E:/antigravity/rag/docker-data/minio:/data
+      - D:/antigravity/rag/docker-data/minio:/data
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -67,7 +67,7 @@ services:
     image: redis:7.2-alpine
     command: redis-server --appendonly yes
     volumes:
-      - E:/antigravity/rag/docker-data/redis:/data
+      - D:/antigravity/rag/docker-data/redis:/data
     ports:
       - "6379:6379"
 
@@ -131,7 +131,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./scripts:/app/scripts
-      - E:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
+      - D:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
     ports:
       - "8000:8000"
 
@@ -155,7 +155,7 @@ services:
       - postgres
     volumes:
       - ./src:/app/src
-      - E:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
+      - D:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
 
   # D3 (2026-05-29): P2-C7 mTLS 종료 nginx — opt-in profile.
   # 활성: docker compose --profile mtls up -d nginx-mtls
@@ -178,6 +178,7 @@ services:
 
 volumes:
   # esdata만 named volume 유지 — ES는 fsync 빈도가 높아 bind mount(WSL2↔Windows FS) IO 패널티가 큼.
-  # 나머지(postgres/minio/redis/modelcache)는 E:/antigravity/rag/docker-data/ bind mount.
+  # 나머지(postgres/minio/redis/modelcache)는 D:/antigravity/rag/docker-data/ bind mount.
+  # 2026-05-30: 윈도우 재설치로 드라이브 레터 E:→D: 변경되어 경로 수정.
   esdata:
   mlflow_data:  # MLflow SQLite (Phase 4 야간 작업)
