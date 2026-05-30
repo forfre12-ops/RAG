@@ -211,3 +211,12 @@ Solar 미달 결정적 사유:
 **PoC 5종 합격선: 합격 5 (P1·P3·P5) / 미달 1 (P2 합성 천장 정량 입증) / 보류 1 (P4 실문서 대기).**
 
 **남은 모든 작업은 발주처 자원 도착에 의존.** 5070 Ti 활용 단계 종료.
+
+---
+
+## 후속 (당일 09시대)
+
+- **사고 #2 해소** — `scripts/overnight_solar_after_qwen3.sh`에 `trap restore_env EXIT INT TERM` + 시작 시점 ORIGINAL_MODEL 백업 + 정상 종료 시 명시 sed 복원 추가 (commit `429cf18` "chore(closing): overnight 안전장치 trap"). 어떤 종료 경로에서도 `.env`가 `solar`로 남는 사고 차단.
+- **Phase 8 고도화 9건 추가 commit** (`eeb5603`) — B1-2 ES docs 5,200건 영구 인덱싱(/answer citations 0→3 실측) · B1-3 Qwen3+5K 재학습(confidence 0.632→0.746) · C1-1 KoBigBird 비교(F1=1.0 동등) · C2-1 arctic 4-way 확장 · C2-2 dragonkue reranker · C3-1 thinking on/off(+39%) · C3-7 JSON retry · C5-4 본문 길이 4 band · B3-3 errors_ko.js 50항.
+- 데모 §5 실측 비율 88%(17 카드) → 86%(22 카드, measured 15→19).
+- **doc/15·16·17(내부+외부)·31 v9/v0.7 갱신** — Phase 8 사실 lede·자산 표·잔존 차단표에 반영.
