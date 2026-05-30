@@ -440,6 +440,26 @@ python poc/scripts/dr_restore_check.py
 - `minio_mirror_recency`: MinIO mirror 7일 이내 갱신
 - `infra_health`: PG·ES·MinIO·Redis 모두 응답 GREEN
 
+### 6.5 DR 리허설 1회 실측 (2026-05-30)
+
+dev 환경(Windows + Docker Desktop 4컨테이너)에서 4종 백업·점검 스크립트 1회 실 실행 결과 — RTO 4h 절차 자동화 가능성 입증.
+
+| 스크립트 | 실 실행 결과 | 산출물 | 소요 |
+|---|---|---|---|
+| `backup_postgres.py` | ✅ PASS | `backups/pg/lloydk-20260530-005406.dump` (1.75MB, custom format) | 2.5초 |
+| `backup_minio_mirror.py` | ✅ PASS (빈 버킷 0건 다운로드 정상) | `backups/minio/{lloydk-docs,lloydk-models,mlflow}/` | 0.1초 |
+| `backup_es_snapshot.py` | ⚠️ dev SKIP — `repository-s3` 플러그인 미설치 | (운영 ES에 사전 설치 가정) | — |
+| `dr_restore_check.py --skip-infra` | ⚠️ 부분 PASS (PG ✅, ES ❌ repo 미등록, MinIO ❌ 빈 버킷) | `reports/dr/dr_check_20260530-095458.json` | 1.7초 |
+
+**dev 한계 명시**: dev ES에는 S3 plugin이 없어 운영 환경 검증으로 위임. 운영 ES에 `bin/elasticsearch-plugin install repository-s3` 사전 설치 후 본 절차 재실행 시 ES snapshot도 GREEN.
+
+**운영 전환 시 1회 실측 체크리스트**:
+- [ ] 운영 ES에 `repository-s3` 플러그인 설치 검증
+- [ ] MinIO `lloydk-backup`·`lloydk-es-snapshots` 버킷 사전 생성
+- [ ] cron 등록 — pg 02:00 / es 02:30 / mirror 03:00 / dr_restore_check 03:30
+- [ ] staging 호스트에서 `scripts/dr_drill.py` 1회 풀 실행(11 단계, ~30분 예상)
+- [ ] 산출 리포트(`reports/dr/`)를 Grafana 알람과 연동
+
 ---
 
 ## 7. 보안 사고 대응
@@ -624,16 +644,40 @@ python scripts/run_perf_scenarios.py --mode dryrun --fail-on-miss --no-regressio
 
 ---
 
-## 11. 비상 연락망 (회신 후 채움)
+## 11. 비상 연락망 + SLA (로이드케이 측 자체결정 잠금 + KL·KOIPA 회신 의존)
 
-| 역할 | 담당자 | 연락처 | 1차 대응 시간대 |
-|---|---|---|---|
-| Lloydk PM | ___ | ___ | 평일 9~18시 |
-| Lloydk AI 엔지니어 | ___ | ___ | on-call (24/7) |
-| KL 개발 PM | ___ (K4 회신) | ___ | 평일 9~18시 |
-| KL DevOps | ___ | ___ | on-call |
-| KOIPA 보안팀 | ___ | ___ | 평일 9~18시 |
-| 클라우드 GPU 임대 (R-Q1 c 시나리오) | AWS Korea / Lambda Labs | ___ | 24/7 |
+### 11.1 비상 연락망
+
+| 역할 | 담당자 | 연락처 | 1차 대응 시간대 | 상태 |
+|---|---|---|---|---|
+| Lloydk PM | 김택용 (forfre12@gmail.com) | (사내 공식 연락처 운영 진입 시 등록) | 평일 9~18시 | 🟢 자체 잠금 |
+| Lloydk AI 엔지니어 (1차) | 김택용 | 동상 | on-call 09~22시 | 🟢 자체 잠금 |
+| Lloydk AI 엔지니어 (2차/백업) | (사업단 인원 1명) | TBD | on-call (24/7) | 🟡 운영 진입 직전 확정 |
+| KL 개발 PM | TBD (K4 회신 의존) | TBD | 평일 9~18시 | 🟡 회신 의존 |
+| KL DevOps | TBD | TBD | on-call | 🟡 회신 의존 |
+| KOIPA 보안팀 | TBD | TBD | 평일 9~18시 | 🟡 회신 의존 |
+| 클라우드 GPU 임대 (R-Q1 c 시나리오) | AWS Korea / Lambda Labs | aws.amazon.com/ko/contact-us | 24/7 | 🟢 옵션 |
+
+### 11.2 SLA (자체결정 잠금)
+
+| 장애 등급 | 정의 | 1차 응답 | 복구 목표 | 비고 |
+|---|---|---|---|---|
+| **P0** | API 전면 다운 / 데이터 손실 / 보안 사고 | 30분 이내 | RTO 4h | 24/7 on-call 즉시 발동 |
+| **P1** | 핵심 기능 부분 다운(분류/RAG 한쪽) · KPI 핵심 5종 회귀 ≥50% | 1시간 | 8시간 | 평일 9~22시 1차 대응 |
+| **P2** | 비핵심 기능 장애 · 회귀 30~50% · 알람 false positive 의심 | 4시간 | 24시간 | 평일 업무시간 대응 |
+| **P3** | 개선·문의·문서 갱신 | 1 영업일 | 1주일 | 백로그 큐 |
+
+**핵심 KPI 5종 (즉시 P1 발동 대상, doc/15 §1)**:
+S1.4 FNR-overall · S1.3 F1-macro · S5.4 Recall@5 · S9.2 적대적 FNR · S13.1 멀티테넌트 교차 노출
+
+### 11.3 통지 채널
+
+| 채널 | 용도 | 발동 조건 |
+|---|---|---|
+| Prometheus → Alertmanager → 이메일 | P0/P1 자동 알람 | `alert_rules.yml` 규칙 매칭 |
+| Grafana 대시보드 모니터링 | P2/P3 일상 모니터링 | 수동 확인 |
+| GitHub Issue + PR 코멘트 | PSH 회귀 자동 탐지 | CI exit 1 |
+| 사내 이메일 (운영 진입 후) | P0/P1 1차 보고 | 운영팀 등록 후 |
 
 ---
 

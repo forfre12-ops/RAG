@@ -1,0 +1,201 @@
+version: "1.0"
+generated_at: "2026-05-30"
+purpose: |
+  KOIPA AI 영업비밀관리시스템 학습·평가 데이터셋 정본 매니페스트.
+  P1(분류) · P2(임베딩) · P3(합성) · P4(추출) PoC 5종 + Phase 8 고도화 산출물.
+  자체결정으로 발주처 실문서 미제공 가정. 합성·공개·골든셋 3중 구성.
+
+owner: lloydk
+contact: forfre12@gmail.com
+
+datasets:
+
+  # ------------------------------------------------------------
+  # 합성 코퍼스 (P3 · ES 영구 인덱싱 · P2 측정 입력)
+  # ------------------------------------------------------------
+
+  synthetic_5k:
+    path: poc/datasets/synthetic_5k/
+    files: 5000
+    size_mb: 4.5
+    format: per-doc json (synth_id, target_grade, domain, title, body, ...)
+    provider: noop (deterministic mock)
+    purpose: |
+      P3 dryrun + P2 임베딩 천장 측정용. noop 결정론적 생성이라
+      본문 단조성으로 Recall@5 천장 0.7222 정량 입증의 입력.
+    grades: { TS: 1250, S1: 1250, S2: 1250, S3: 1250 }
+    license: MIT (LloydK 자체 생성)
+    indexed_in_es: true
+    es_index: docs
+
+  synthetic_qwen3:
+    path: poc/datasets/synthetic_qwen3/
+    files: 200
+    size_mb: 0.3
+    format: per-doc json
+    provider: local_openai (Qwen3 14B Q4_K_M, Ollama)
+    purpose: |
+      Phase 5 P3 200건 비교. 라벨 일치도 100% · FNR 0% PASS → Qwen3 1순위 확정 근거.
+    grades: { TS: 50, S1: 50, S2: 50, S3: 50 }
+    license: Apache 2.0 (Qwen3 출력)
+    indexed_in_es: true
+    es_index: docs
+
+  synthetic_solar:
+    path: poc/datasets/synthetic_solar/
+    files: 200
+    size_mb: 0.5
+    format: per-doc json
+    provider: local_openai (Solar 10.7B Q4_0, Ollama)
+    purpose: |
+      Phase 5 P3 비교. 라벨 일치도 81% · FNR 27% · JSON 76.5% 실패 → 미달 입증.
+    grades: { TS: 50, S1: 50, S2: 50, S3: 50 }
+    license: CC-BY-NC-4.0 (Solar 출력, 비상업)
+    indexed_in_es: false
+    note: 비상업 라이선스로 운영 코퍼스 제외, 비교 측정용으로만 유지
+
+  synthetic:
+    path: poc/datasets/synthetic/
+    files: 120
+    size_mb: 0.1
+    format: per-doc json
+    provider: noop
+    purpose: PoC dryrun · CI smoke (40~120건)
+    license: MIT
+    indexed_in_es: false
+
+  # ------------------------------------------------------------
+  # labeled 학습 데이터셋 (KF-DeBERTa P1 입력)
+  # ------------------------------------------------------------
+
+  labeled_5k:
+    path: poc/datasets/labeled_5k/
+    files:
+      train.jsonl: 3500
+      val.jsonl: 748
+      test.jsonl: 752
+    total_lines: 5000
+    size_mb: 2.7
+    split: stratified 70/15/15 by grade
+    source: synthetic_5k + 룰 라벨러 검증
+    purpose: |
+      Phase 3 KF-DeBERTa 1ep 학습 입력. 학습 분포 F1=1.0 / FNR=0.0% PASS.
+      학습 외 분포 정합 83.3% (합성 데이터 한계 정량 입증).
+    license: MIT (LloydK 자체 생성)
+
+  labeled_5k_plus_qwen3:
+    path: poc/datasets/labeled_5k_plus_qwen3/
+    files:
+      train.jsonl: 3700
+      val.jsonl: 748
+      test.jsonl: 752
+    total_lines: 5200
+    size_mb: 2.8
+    split: stratified 70/15/15 by grade
+    source: synthetic_5k + synthetic_qwen3 + 룰 라벨러 검증
+    purpose: |
+      Phase 8 KF-DeBERTa 재학습 입력. confidence 0.632 → 0.746 개선 입증.
+      미탐 1단계 개선 동시 확인.
+    license: MIT + Apache 2.0 (혼합)
+
+  # ------------------------------------------------------------
+  # 골든셋 (S9 적대적 FNR · 분류 회귀 게이트)
+  # ------------------------------------------------------------
+
+  adversarial_golden_100:
+    path: poc/datasets/adversarial/golden_100.jsonl
+    lines: 100
+    size_mb: 0.0
+    format: jsonl (doc_id, text, expected_grade, attack_type, rationale)
+    purpose: |
+      S9 적대적 FNR 게이트 100건. P1-B3 (2026-05-29 P1 묶음).
+      attack_type: 동음이의어·약어 치환·문맥 분산·rule keyword 누락.
+    license: MIT (LloydK 자체 큐레이션)
+
+  # ------------------------------------------------------------
+  # P4 추출 코퍼스 (HWP/PDF/DOCX)
+  # ------------------------------------------------------------
+
+  p4_corpus:
+    path: poc/datasets/p4_corpus/
+    files: 30
+    size_mb: 0.0
+    format: 다양 (HWP / DOCX / PDF / TXT)
+    purpose: P4 추출 PoC 입력. 누락 ≤ 5% · 품질 ≥ 0.7 합격선 측정.
+    note: |
+      현재 30파일은 LloydK 자체 작성 보일러플레이트. 발주처 실문서 도착 시
+      datasets/raw/koipa/로 적재 + P4 재측정.
+    license: MIT (LloydK 자체 생성)
+
+# ------------------------------------------------------------
+# ES 영구 인덱싱 (Phase 8 B1-2)
+# ------------------------------------------------------------
+
+es_indices:
+  docs:
+    total_docs: 5200
+    size_mb: 107.4
+    embedder: BAAI/bge-m3
+    backend: Elasticsearch 8.15
+    purpose: /answer 라이브 citations 0→3 실측 + P2 ES 측정 입력
+    populated_at: "2026-05-30"
+    populated_from: [synthetic_5k, synthetic_qwen3]
+  p2_cached_es:
+    total_docs: 5000
+    size_mb: 101.8
+    embedder: BAAI/bge-m3
+    purpose: P2 측정 캐시
+  secrets-guides-default-cached-v1.0:
+    total_docs: 4672
+    size_mb: 108
+    purpose: 가이드 RAG (다중 임베딩 캐시)
+  secrets-guides-default-nlpai-lab-kure-v1-v1.0:
+    total_docs: 169
+    size_mb: 3.7
+    embedder: nlpai-lab/KURE-v1
+    purpose: 가이드 RAG (KURE-v1 임베딩)
+
+# ------------------------------------------------------------
+# 데이터셋 합격선 (학습·평가 게이팅)
+# ------------------------------------------------------------
+
+acceptance:
+  p1_train:
+    F1_macro: ">= 0.75"
+    FNR_overall: "<= 5%"
+    measured: { F1: 1.0, FNR: 0.0, scope: "학습 분포" }
+    status: PASS
+  p2_retrieval:
+    Recall_at_5: ">= 0.80"
+    latency_p50_ms: "<= 200"
+    measured: { Recall: 0.7222, latency: 110.98, embedder: BGE-M3, mode: dense }
+    status: FAIL (합성 천장, 알고리즘 X)
+  p3_synthesis:
+    label_match_rate: ">= 90%"
+    FNR_underclass: "<= 5%"
+    measured_qwen3: { label_match: 1.0, FNR: 0.0 }
+    measured_solar: { label_match: 0.81, FNR: 0.27 }
+    status: PASS (Qwen3) / FAIL (Solar)
+
+# ------------------------------------------------------------
+# 정직성 노트
+# ------------------------------------------------------------
+
+honesty_notes:
+  - |
+    발주처 실문서 미제공 가정 자체결정 잠금 상태.
+    합성+공개+골든셋 3중으로 운영 일반화 가능하나 외부 일반화 검증은 한계.
+  - |
+    synthetic_5k는 noop provider라 본문 boilerplate. 합성 천장 0.7222 정량 입증의
+    1차 원인. 합격선 도달은 Qwen3 풀 합성 (현재 1,200건 백그라운드 진행 중) 또는
+    Anthropic API 키 도착 후 결정.
+  - |
+    p4_corpus 30건은 자체 생성 보일러플레이트. 실 HWP/PDF 추출 품질은 발주처
+    실문서 도착 후 재측정.
+
+# ------------------------------------------------------------
+# 변경 이력
+# ------------------------------------------------------------
+
+changelog:
+  - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }

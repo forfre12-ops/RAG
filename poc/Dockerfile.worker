@@ -3,8 +3,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential libpq-dev curl libreoffice-core libreoffice-writer \
-      tesseract-ocr tesseract-ocr-kor poppler-utils \
+      build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -14,5 +13,4 @@ COPY src ./src
 COPY scripts ./scripts
 RUN pip install --upgrade pip && pip install -e .
 
-EXPOSE 8000
-CMD ["uvicorn", "lloydk.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["celery", "-A", "lloydk.workers.celery_app", "worker", "--loglevel=info", "-Q", "classify,index,synthesis,learning"]

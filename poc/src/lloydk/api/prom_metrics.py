@@ -289,12 +289,10 @@ def register_background_refresh(app: FastAPI) -> None:
     if interval <= 0:
         return
 
-    @app.on_event("startup")
     async def _start_refresh_task() -> None:  # noqa: D401
         loop_task = asyncio.create_task(_gauge_refresh_loop(interval))
         app.state._prom_refresh_task = loop_task
 
-    @app.on_event("shutdown")
     async def _stop_refresh_task() -> None:  # noqa: D401
         task: asyncio.Task | None = getattr(app.state, "_prom_refresh_task", None)
         if task is None:
@@ -304,3 +302,6 @@ def register_background_refresh(app: FastAPI) -> None:
             await task
         except (asyncio.CancelledError, Exception):  # noqa: BLE001
             pass
+
+    app.router.on_startup.append(_start_refresh_task)
+    app.router.on_shutdown.append(_stop_refresh_task)

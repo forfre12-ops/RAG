@@ -467,6 +467,180 @@ def print_checklist(manifest: BundleManifest, *, stream=sys.stdout) -> None:
 
 
 # ─────────────────────────────────────────────────────────────
+# 실 빌드
+# ─────────────────────────────────────────────────────────────
+
+
+def _docker_save(image: str, dest: Path) -> bool:
+    """docker save → tar. 이미지 미존재 시 pull 시도."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        print(f"  [skip] already exists: {dest.name}", file=sys.stderr)
+        return True
+    # 로컬 이미지 존재 확인
+    check = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True, text=True,
+    )
+    if check.returncode != 0:
+        print(f"  [pull] {image}", file=sys.stderr)
+        pull = subprocess.run(["docker", "pull", image], capture_output=True, text=True)
+        if pull.returncode != 0:
+            print(f"  [WARN] pull failed: {image}\n{pull.stderr[-200:]}", file=sys.stderr)
+            return False
+    print(f"  [save] {image} -> {dest.name}", file=sys.stderr)
+    r = subprocess.run(
+        ["docker", "save", "-o", str(dest), image],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        print(f"  [ERR] docker save failed: {r.stderr[-200:]}", file=sys.stderr)
+        return False
+    size_mb = dest.stat().st_size / 1_048_576
+    print(f"  [ok]   {dest.name}  {size_mb:.0f}MB", file=sys.stderr)
+    return True
+
+
+def _pip_download(out_dir: Path) -> bool:
+    """pip download -r requirements → wheels/."""
+    wheels_dir = out_dir / "wheels"
+    wheels_dir.mkdir(parents=True, exist_ok=True)
+    req = _REPO_ROOT / "requirements.txt"
+    if not req.exists():
+        # pyproject.toml 기반 프로젝트 — pip freeze, git+file 의존성 제외
+        print("  [pip] no requirements.txt, exporting from venv (skip editable/git deps)", file=sys.stderr)
+        r = subprocess.run(
+            [sys.executable, "-m", "pip", "freeze", "--exclude-editable"],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            return False
+        # git+ / file: / @ file: 라인 제거 (폐쇄망 번들에 포함 불가)
+        lines = [
+            l for l in r.stdout.splitlines()
+            if not l.startswith("git+") and not l.startswith("-e ") and "@ file:" not in l
+        ]
+        req = out_dir / "_requirements_freeze.txt"
+        req.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    r = subprocess.run(
+        [sys.executable, "-m", "pip", "download", "-r", str(req),
+         "-d", str(wheels_dir), "--no-deps", "-q"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        print(f"  [WARN] pip download partial: {r.stderr[-300:]}", file=sys.stderr)
+    count = sum(1 for _ in wheels_dir.glob("*.whl"))
+    print(f"  [pip]  {count} wheels -> {wheels_dir}", file=sys.stderr)
+    return True
+
+
+def _copy_infra(out_dir: Path) -> None:
+    """docker-compose, env template, ES 설정 파일 복사."""
+    import shutil
+
+    infra = out_dir / "infra-config"
+    infra.mkdir(parents=True, exist_ok=True)
+
+    for src, dst in [
+        (_REPO_ROOT / "docker-compose.yml",              infra / "docker-compose.yml"),
+        (_REPO_ROOT / "infra" / "es" / "userdict_ko.txt", infra / "userdict_ko.txt"),
+    ]:
+        if src.exists():
+            shutil.copy2(src, dst)
+
+    # .env template
+    env_template = infra / ".env.template"
+    env_example = _REPO_ROOT / ".env.example"
+    if env_example.exists():
+        import shutil as _sh
+        _sh.copy2(env_example, env_template)
+    else:
+        env_template.write_text(
+            "# Copy this to .env and fill in values\n"
+            "DATABASE_URL=postgresql://lloydk:lloydk_dev@postgres:5432/lloydk\n"
+            "ES_URL=http://elasticsearch:9200\n"
+            "REDIS_URL=redis://redis:6379/0\n"
+            "MINIO_ENDPOINT=minio:9000\n"
+            "LLM_PROVIDER=vllm\n"
+            "DEPLOY_PROFILE=onprem-local\n",
+            encoding="utf-8",
+        )
+
+    # alembic migrations
+    alembic_src = _REPO_ROOT / "alembic"
+    alembic_dst = out_dir / "db-migrations" / "alembic"
+    if alembic_src.exists() and not alembic_dst.exists():
+        import shutil as _sh
+        _sh.copytree(alembic_src, alembic_dst)
+
+    # install.sh
+    install_sh = out_dir / "install.sh"
+    install_sh.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "BUNDLE_DIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\n\n"
+        "echo '=== Lloydk Airgap Bundle Install ==='\n"
+        "# 1) docker load\n"
+        "for tar in \"$BUNDLE_DIR/docker-images\"/*.tar; do\n"
+        "  echo \"Loading $tar ...\"\n"
+        "  docker load -i \"$tar\"\n"
+        "done\n\n"
+        "# 2) pip install from wheels\n"
+        "pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" \\\n"
+        "  -r \"$BUNDLE_DIR/python-deps/requirements.lock.txt\" || true\n\n"
+        "# 3) env 설정\n"
+        "cp \"$BUNDLE_DIR/infra-config/.env.template\" .env\n"
+        "echo 'Edit .env, then run: docker compose up -d'\n",
+        encoding="utf-8",
+    )
+    install_sh.chmod(0o755)
+
+    # verify.sh
+    verify_sh = out_dir / "verify.sh"
+    verify_sh.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "echo '=== Bundle Verify ==='\n"
+        "cd \"$(dirname \"$0\")\"\n"
+        "sha256sum -c CHECKSUMS.sha256 && echo 'Checksums OK' || echo 'CHECKSUM MISMATCH'\n",
+        encoding="utf-8",
+    )
+    verify_sh.chmod(0o755)
+
+
+def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
+    """실 빌드: docker save + pip download + infra 파일 복사."""
+    print("\n=== Lloydk Airgap Bundle - BUILD ===", file=sys.stderr)
+    images_dir = out_dir / "docker-images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    failed: list[str] = []
+
+    # docker save
+    for svc, entry in manifest.components.items():
+        ok = _docker_save(entry.image, images_dir / f"{svc}.tar")
+        if not ok:
+            failed.append(f"docker:{svc}")
+
+    # pip download
+    pip_dir = out_dir / "python-deps"
+    pip_dir.mkdir(parents=True, exist_ok=True)
+    if not _pip_download(pip_dir):
+        failed.append("pip-download")
+
+    # infra 파일
+    _copy_infra(out_dir)
+
+    if failed:
+        print(f"\n[bundle] partial build — failed: {failed}", file=sys.stderr)
+        print("[bundle] run verify.sh after deploying to confirm checksums", file=sys.stderr)
+        return 1
+
+    print("\n[bundle] all components saved OK", file=sys.stderr)
+    return 0
+
+
+# ─────────────────────────────────────────────────────────────
 # CLI
 # ─────────────────────────────────────────────────────────────
 
@@ -505,14 +679,15 @@ def main() -> int:
         print(f"\n[bundle] dry-run OK -> {paths['yaml']}", file=sys.stderr)
         return 0
 
-    # 실제 빌드는 다음 단계 — 회신 + KL 환경 확정 후 구현
-    print(
-        "\n[bundle] ERROR: actual build mode not yet implemented.\n"
-        "        Use --dry-run for manifest generation.\n"
-        "        Actual build will be implemented after K1/E1~E9 회신.",
-        file=sys.stderr,
-    )
-    return 2
+    # ── 실 빌드 ──────────────────────────────────────────────
+    rc = build_bundle(manifest, out_dir)
+    if rc == 0:
+        all_files = list(out_dir.rglob("*"))
+        actual_files = [f for f in all_files if f.is_file()]
+        write_checksums(out_dir, actual_files)
+        print_checklist(manifest)
+        print(f"\n[bundle] build OK -> {out_dir}", file=sys.stderr)
+    return rc
 
 
 if __name__ == "__main__":

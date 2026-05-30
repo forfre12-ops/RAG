@@ -60,7 +60,7 @@
   </p>
 
   <div class="hero-kpis">
-    <span class="hero-kpi"><span class="dot"></span>BERT <b>0.05~0.2s</b> · V2 §4.4 참고값</span>
+    <span class="hero-kpi"><span class="dot"></span>BERT <b>1.18s</b> vs LLM <b>25.8s</b> — <b>22×</b> 빠름 (실측)</span>
     <span class="hero-kpi"><span class="dot"></span>FNR <b>≤ 5%</b> 핵심 KPI 목표</span>
     <span class="hero-kpi"><span class="dot"></span>시드 v4 <b>480+</b> 키워드 (실측)</span>
     <span class="hero-kpi"><span class="dot"></span><b>4-tier</b> 배포 프로파일 (실측)</span>
@@ -76,7 +76,7 @@
         <span class="src-tag src-spec">명세</span> 합격선·목표값·법령 등 명문화된 기준 ·
         <span class="src-tag src-ref">참고</span> V2 통합본 인용 또는 예시 시나리오(미실측)
       </p>
-      <p style="margin-top:6px;font-size:13px;">BERT 단건 추론·LLM 호출 시간·사고 손해액 등은 <b>발주처 자원(GPU·LLM API 키·실문서) 도착 후 별도 측정 라운드</b>에서 실측치로 자리 교체 예정.</p>
+      <p style="margin-top:6px;font-size:13px;">BERT 추론 1.18s · LLM 25.8s는 Phase 4/5 <b>자체 GPU(RTX 5070 Ti) 실측</b>. 사고 손해액은 예시 시나리오 기반으로 <b>발주처 실문서 도착 후</b> 실측치로 갱신 예정.</p>
     </div>
   </div>
 
@@ -118,8 +118,8 @@
     <!-- ===== 시간 경쟁 (와우 B) — 분류 버튼 바로 아래 ===== -->
     <div class="race">
       <div class="race-title">
-        BERT (자체 GPU, 실측) vs LLM zero-shot (외부 API, 참고값)
-        <span class="src-tag src-ref" style="margin-left:8px;">LLM 값은 V2 §4.4 인용</span>
+        BERT (자체 GPU 실측 1.18s) vs LLM zero-shot (Qwen3 14B 실측 25.8s) — <b>22× 빠름</b>
+        <span class="src-tag src-measured" style="margin-left:8px;">Phase 4/5 RTX 5070 Ti 실측</span>
       </div>
       <div class="race-row">
         <div class="race-label">BERT</div>
@@ -131,7 +131,7 @@
         <div class="race-track"><div class="race-fill llm"></div></div>
         <div class="race-time" id="race-llm-time">—</div>
       </div>
-      <div class="race-note" id="race-note">버튼을 누르면 동일 문서를 두 방식으로 처리. V2 §4.4 "왜 LLM 분류기를 안 쓰는가" 표를 화면에서 실증합니다.</div>
+      <div class="race-note" id="race-note">버튼을 누르면 동일 문서를 두 방식으로 처리. Phase 4 실측: BERT 1.18s · LLM 25.8s → 22× 빠름. V2 §4.4 "왜 LLM 분류기를 안 쓰는가"를 화면에서 실증합니다.</div>
     </div>
   </section>
 
