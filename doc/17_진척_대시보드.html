@@ -1396,6 +1396,16 @@
         ⑥ <b>C 데모 실측 전환</b> — hero KPI "BERT 1.18s·LLM 25.8s·22×" + race section src-ref → src-measured(Phase 4/5 RTX 5070 Ti 실측). callout 노트 갱신.
         ⑦ <b>D 기술부채</b> — prom_metrics.py @app.on_event deprecated → router.on_startup/on_shutdown 전환. test_api_answer deterministic_fallback bool 타입 검증(LLM 연결 환경 허용). 13/13 PASS.
         + <b>B5 Qwen3 1,200건 합성 백그라운드 진행 중</b>(102/1200, ~1건/분). 완료 후 ES 재인덱싱 + P2 재측정 예정.</td><td><b>잔여작업 B1~D</b></td><td>없음 (B5 합성 진행 중)</td></tr>
+        <tr><td>2026-05-30 (오늘 2차)</td><td><b>잔여작업 그룹 A~C 일괄 실행</b>:
+        ① <b>A-1 P2 실모델 재측정</b> — BGE-M3·KURE·dragonkue inmemory 3-way. Recall@5 0.667~0.700 (합격선 미달 확정, 합성 천장 재확인). 5k 코퍼스도 동일 결과.
+        ② <b>A-2 폐쇄망 번들 dry-run</b> — v1.0.0-rc1, 22.8GB 예상, manifest.yaml + CHECKSUMS 정상 생성. 8 컴포넌트·5 모델·2 ES 플러그인 체크리스트 출력.
+        ③ <b>A-3 KL closing check 5/5 PASS</b> — SLOWAPI_SKIP_DOTENV=1 우회, Postgres 연결. OpenAPI 응답코드·alias·cascade·corrections 4건 자동 검증.
+        ④ <b>A-4 DR 리허설</b> — PG backup 1h recency OK, infra ALL GREEN(minio 패키지 설치 포함), Dockerfile.es repository-s3 플러그인 추가, MinIO mirror 실행.
+        ⑤ <b>A-5 SBOM 갱신</b> — doc/21 재생성 (203패키지, pdfminer.six 1순위 반영).
+        ⑥ <b>A-6 mTLS 인증서 생성·검증</b> — alpine Docker로 CA·서버·클라이언트 인증서 생성, 체인 검증 OK (2031년까지 유효). nginx-mtls 이미지 빌드 완료.
+        ⑦ <b>C-1 doc/08 인터뷰 모의질문 30선 신설</b> — 5카테고리 30문(분류·RAG·파이프라인·보안·납품), 모범답안 포함.
+        ⑧ <b>C-2 doc/09 5분 발표 스크립트 신설</b> — 4슬라이드 구성, 핵심 메시지 한 줄 요약, 발주처 협조 요청 2건 명시.
+        + <b>B-1 P3 Qwen3 800건 합성 실행 중</b> (백그라운드).</td><td><b>그룹 A 전완·C 문서 신설·B 진행 중</b></td><td>없음 (B-1 합성 중)</td></tr>
         <tr class="pick"><td><b>+0 일 ~ GPU/API 확보</b></td><td><b>W6 학습 시작 가능 시점</b> (합성·labeled·가이드 v1 준비됨)</td><td><b>잔여: GPU + API 키</b></td><td><b>사업단 예산 결정</b></td></tr>
         <tr><td>+0 ~ +7 일</td><td>W6 합성 5,000건·학습·번들 실빌드</td><td>100%</td><td>GPU + API 키 + 가이드 v2</td></tr>
       </tbody>

@@ -16,4 +16,5 @@
 FROM docker.elastic.co/elasticsearch/elasticsearch:8.15.3
 
 # --batch: 라이선스 동의 인터랙티브 프롬프트 자동 통과
-RUN bin/elasticsearch-plugin install --batch analysis-nori
+RUN bin/elasticsearch-plugin install --batch analysis-nori && \
+    bin/elasticsearch-plugin install --batch repository-s3
