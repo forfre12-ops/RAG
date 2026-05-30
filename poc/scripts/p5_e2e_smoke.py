@@ -75,7 +75,7 @@ def via_http(url: str, api_key: str) -> list[dict]:
         for s in SAMPLES:
             payload = {**s}
             payload.pop("expected_grade", None)
-            payload.update({"use_rag": False, "return_evidence": True})
+            payload.update({"use_rag": True, "return_evidence": True})
             t0 = time.perf_counter()
             r = cli.post(
                 f"{url}/api/v1/classify",
@@ -104,7 +104,7 @@ def via_inproc() -> list[dict]:
         for s in SAMPLES:
             payload = {**s}
             payload.pop("expected_grade", None)
-            payload.update({"use_rag": False, "return_evidence": True})
+            payload.update({"use_rag": True, "return_evidence": True})
             t0 = time.perf_counter()
             r = cli.post(
                 "/api/v1/classify",
