@@ -11,7 +11,10 @@ services:
       LOCAL_LLM_MODEL: qwen3:14b
       LOCAL_LLM_API_KEY: ollama
     volumes:
-      - ./datasets:/app/datasets:ro
+      # 재색인 입력 + labeled 데이터셋 재빌드 출력 (rw).
+      - ./datasets:/app/datasets
+      # 학습 산출물(분류기 가중치) 호스트 영속화 — .env CLASSIFIER_MODEL_DIR 가 참조.
+      - ./artifacts:/app/artifacts
     deploy:
       resources:
         reservations:
