@@ -57,3 +57,9 @@ doc/bak/
 Thumbs.db
 poc/backups/
 poc/datasets/synthetic_qwen3_1200/
+
+poc/datasets/oss_corpus/
+poc/datasets/synthetic_qwen3_800/
+poc/datasets/realistic_corpus/
+poc/reports/p2_oss*.md
+poc/reports/p2_oss*.json

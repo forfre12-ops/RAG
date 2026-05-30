@@ -39,14 +39,15 @@ if str(_HERE) not in sys.path:
 # ─────────────────────────────────────────────────────────────
 
 
-def load_corpus(synth_dir: Path) -> list[dict]:
+def load_corpus(synth_dir: Path, max_chars: int = 1500) -> list[dict]:
     docs: list[dict] = []
     for f in sorted(synth_dir.glob("*.json")):
         d = json.loads(f.read_text(encoding="utf-8"))
+        text = f"{d['title']}\n\n{d['body']}"
         docs.append(
             {
                 "id": d["synth_id"],
-                "text": f"{d['title']}\n\n{d['body']}",
+                "text": text[:max_chars],
                 "grade": d["target_grade"],
                 "domain": d["domain"],
             }
@@ -76,6 +77,24 @@ def make_queries(
             raise ValueError("doc_derived 스타일은 synth_dir 필수")
         from p2_doc_derived_queries import build_doc_derived_queries
         return build_doc_derived_queries(synth_dir, n_per_grade=per_grade)
+
+    if style == "koipa":
+        # OSS/KOIPA 코퍼스용 — 문서 본문 문장 추출 쿼리 (doc_id 기준 hit)
+        # synth_dir 옆에 *_eval_queries.json 파일 자동 탐색
+        candidates = [
+            Path("datasets/oss_eval_queries.json"),
+            Path("datasets/koipa_eval_queries.json"),
+        ]
+        if synth_dir is not None:
+            parent = synth_dir.parent
+            candidates += list(parent.glob("*_eval_queries.json"))
+        for qp in candidates:
+            if qp.exists():
+                return json.loads(qp.read_text(encoding="utf-8"))
+        raise FileNotFoundError(
+            "koipa/oss 쿼리 파일 없음. "
+            "python scripts/p2_oss_corpus_builder.py 먼저 실행"
+        )
 
     from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
 
@@ -153,25 +172,33 @@ def evaluate(
             "per_query": [],
         }
 
+    # 100건씩 배치 임베딩 → 즉시 ES 적재 (진행 상황 실시간 확인 가능)
+    BATCH = 100
     t0 = time.perf_counter()
-    doc_vecs = emb.embed([d["text"] for d in docs]).vectors
+    total = len(docs)
+    for batch_start in range(0, total, BATCH):
+        batch = docs[batch_start: batch_start + BATCH]
+        batch_vecs = emb.embed([d["text"] for d in batch]).vectors
+        payloads_batch = [
+            {"grade": d["grade"], "text": d["text"], "doc_id": d["id"]}
+            for d in batch
+        ]
+        try:
+            vs.upsert(col, [d["id"] for d in batch], batch_vecs, payloads_batch)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[p2] SKIP {label}: upsert failed — {exc}", file=sys.stderr)
+            return {
+                "embedder": display_name, "backend": backend, "search_mode": search_mode,
+                "label": label, "dim": emb.dim, "status": "SKIP",
+                "skip_reason": f"upsert: {exc}",
+                "recall_at_k": 0.0, "latency_ms_p50": 0.0, "latency_ms_p95": 0.0,
+                "latency_ms_avg": 0.0, "embed_corpus_ms": 0.0,
+                "corpus_size": len(docs), "query_count": len(queries),
+                "top_k": top_k, "per_query": [],
+            }
+        done = min(batch_start + BATCH, total)
+        print(f"[p2] {label} 적재: {done}/{total}", flush=True)
     embed_corpus_ms = (time.perf_counter() - t0) * 1000
-
-    # text도 payload에 저장 — 하이브리드에서 BM25가 사용
-    payloads = [{"grade": d["grade"], "text": d["text"], "doc_id": d["id"]} for d in docs]
-    try:
-        vs.upsert(col, [d["id"] for d in docs], doc_vecs, payloads)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[p2] SKIP {label}: upsert failed — {exc}", file=sys.stderr)
-        return {
-            "embedder": display_name, "backend": backend, "search_mode": search_mode,
-            "label": label, "dim": emb.dim, "status": "SKIP",
-            "skip_reason": f"upsert: {exc}",
-            "recall_at_k": 0.0, "latency_ms_p50": 0.0, "latency_ms_p95": 0.0,
-            "latency_ms_avg": 0.0, "embed_corpus_ms": round(embed_corpus_ms, 1),
-            "corpus_size": len(docs), "query_count": len(queries),
-            "top_k": top_k, "per_query": [],
-        }
 
     hits = 0
     latencies: list[float] = []
@@ -421,12 +448,13 @@ def main() -> int:
     ap.add_argument(
         "--query-style",
         default="seed",
-        choices=["seed", "intent", "doc_derived"],
+        choices=["seed", "intent", "doc_derived", "koipa"],
         help=(
             "쿼리 스타일. "
             "seed: `{kw} 관련 자료` 시드 키워드 기반(기본). "
             "intent: 의도형 30종 고정 (scripts/p2_intent_queries.py). "
-            "doc_derived: 합성 문서 title 파생, hit=doc_id 기준 (더 엄밀한 평가)."
+            "doc_derived: 합성 문서 title 파생, hit=doc_id 기준 (더 엄밀한 평가). "
+            "koipa: KOIPA 기출문제 본문 문장 쿼리, hit=doc_id 기준 (가장 현실적)."
         ),
     )
     ap.add_argument(
