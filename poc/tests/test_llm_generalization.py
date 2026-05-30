@@ -38,11 +38,13 @@ class TestBuildProviderAliases:
         assert "1234" in str(p._client.base_url)
 
     def test_local_openai_uses_settings_default(self):
+        from lloydk.config import settings
         p = build_provider("local_openai")
         assert isinstance(p, LocalOpenAIProvider)
         assert p.name == "local_openai"
-        # settings.local_llm_base_url 기본 (vLLM 8001)
-        assert "8001" in str(p._client.base_url)
+        # settings.local_llm_base_url 값을 그대로 사용하는지 검증 (포트 고정 X)
+        expected = (settings.local_llm_base_url or settings.vllm_base_url).rstrip("/") + "/"
+        assert str(p._client.base_url) == expected
 
     def test_unknown_raises(self):
         with pytest.raises(ValueError, match="unknown LLM provider"):

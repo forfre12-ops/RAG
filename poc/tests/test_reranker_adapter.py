@@ -31,7 +31,10 @@ def test_noop_empty_candidates():
     assert r.rerank("q", []) == []
 
 
-def test_get_reranker_default_is_noop():
+def test_get_reranker_default_is_noop(monkeypatch):
+    # .env의 RERANKER_PROVIDER 값에 무관하게 no-arg 호출 시 noop fallback 검증.
+    from lloydk.config import settings
+    monkeypatch.setattr(settings, "reranker_provider", "")
     r = get_reranker()
     assert r.name == "noop"
 
