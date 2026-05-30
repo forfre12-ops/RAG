@@ -51,10 +51,21 @@ def run(total: int, out_dir: Path, provider_name: str | None) -> dict:
     fnr_under = 0
     high_grade_total = 0
 
+    # C5-4 (2026-05-30): 합성 문서 길이 다양화. 등급당 4 길이 카테고리 균등 분배.
+    # 이전 500~1500 고정 → 200~10,000 범위로 확대. 실 사내 문서 분포 모사
+    # (메모 / 사내보고서 / 정책서 / 정관·계약 4 카테고리).
+    LENGTH_BANDS = [
+        (200, 600),     # 메모·간단 통지
+        (600, 1800),    # 사내 보고서 표준
+        (1800, 4500),   # 정책 문서·검토 보고
+        (4500, 10000),  # 계약·정관·기술 사양서
+    ]
+
     for grade in GRADES:
         for i in range(per_grade):
             domain = DOMAINS[i % len(DOMAINS)]
-            req = SynthRequest(target_grade=grade, domain=domain, count=1, len_min=500, len_max=1500)
+            band = LENGTH_BANDS[i % len(LENGTH_BANDS)]
+            req = SynthRequest(target_grade=grade, domain=domain, count=1, len_min=band[0], len_max=band[1])
             try:
                 doc = gen.generate_one(req)
             except Exception as exc:  # noqa: BLE001

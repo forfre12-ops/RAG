@@ -1,0 +1,6 @@
+[overnight] 01:45:54 Qwen3 진행 폴링 시작 (목표 200 건)
+[overnight] 02:19:59 Qwen3 완료 (200건)
+[overnight] 02:19:59 Qwen3 최종 200 건. Solar 합성 진입.
+[overnight] .env LOCAL_LLM_MODEL → solar:10.7b 변경
+LOCAL_LLM_MODEL=solar:10.7b
+[overnight] 02:19:59 Solar 합성 시작 (목표 200건)

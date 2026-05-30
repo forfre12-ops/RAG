@@ -134,8 +134,19 @@ class SyntheticDocGenerator:
             len_min=req.len_min,
             len_max=req.len_max,
         )
+        # C3-7 (2026-05-30): JSON 파싱 실패 시 최대 2회 재시도. Solar 등 JSON 출력
+        # 안정성 약한 LLM 에서 76.5% → 30% 미만으로 실패율 감소 기대.
+        # 재시도 시 temperature 낮춰 deterministic 시도 + system prompt 강화.
+        max_retries = 2
+        attempt = 0
         resp = self.llm.generate(user, system=SYSTEM_PROMPT, temperature=0.7, max_tokens=2048)
         parsed = self._parse(resp.text)
+        while parsed is None and attempt < max_retries:
+            attempt += 1
+            # 재시도: temperature 0.3, system prompt 에 "반드시 유효한 JSON 만 출력" 추가
+            retry_system = SYSTEM_PROMPT + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
+            resp = self.llm.generate(user, system=retry_system, temperature=0.3, max_tokens=2048)
+            parsed = self._parse(resp.text)
 
         if parsed is None:
             # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용

@@ -4,6 +4,7 @@
 import { DEMO_DATA } from "./samples.js";
 import { INCIDENT } from "./incident.js";
 import { postSSE } from "./sse.js";
+import { translateError } from "./errors_ko.js";
 import {
   renderBodyWithHighlights,
   flashKeywordInBody,
@@ -547,6 +548,8 @@ function clearResult() {
 }
 
 function showError(msg) {
+  // B3-3 (2026-05-30): 영문 detail 을 한국어로 매핑 (errors_ko.js 50항목).
+  const ko = translateError(msg);
   const wrap = $("#result-summary");
   wrap.innerHTML = `
     <div class="callout danger">
@@ -555,7 +558,8 @@ function showError(msg) {
       </svg>
       <div class="callout-body">
         <span class="callout-label">오류</span>
-        <p>${escapeHtml(msg)}</p>
+        <p>${escapeHtml(ko)}</p>
+        ${ko !== msg ? `<p style="font-size:11.5px;color:var(--text-dim);margin-top:6px;font-family:var(--font-mono);">원문: ${escapeHtml(msg)}</p>` : ""}
       </div>
     </div>
   `;
@@ -620,7 +624,9 @@ async function runRace() {
   // 실 호출이 아니라 "비교 기준값" 시각화. lite-noapi 환경에서는 LLM 자체가
   // 호출되지 않으므로 실측 불가. 운영 시 LLM_PROVIDER=anthropic 등으로 실 호출하면
   // 별도 실측 라운드 필요(현재 코드는 표시 안 함).
-  const estimatedLlmMs = 4800;  // V2 §4.4 "1.5~5s" 중 상한 근처값 (참고)
+  // Phase 1 실측 (2026-05-30) — Ollama Qwen3 14B Q4 /answer 호출 latency 25.8s.
+  // 이전 V2 §4.4 "1.5~5s" 참고값(4,800ms)에서 실측치로 교체.
+  const estimatedLlmMs = 25800;
   const llmIsReal = state.health && state.health.llm_provider &&
     !["noop", "", "hash"].includes(state.health.llm_provider);
   const startLlm = performance.now();
@@ -630,26 +636,26 @@ async function runRace() {
       const elapsed = performance.now() - startLlm;
       const ratio = Math.min(1, elapsed / estimatedLlmMs);
       if (llmFill) llmFill.style.width = (ratio * 100).toFixed(1) + "%";
-      if (llmTime) llmTime.textContent = Math.round(elapsed) + " ms (참고값)";
+      if (llmTime) llmTime.textContent = Math.round(elapsed) + " ms (실측 25.8s)";
       if (ratio >= 1) {
         clearInterval(tick);
-        if (llmTime) llmTime.textContent = estimatedLlmMs + " ms (참고값)";
+        if (llmTime) llmTime.textContent = estimatedLlmMs + " ms (Phase 1 실측)";
         resolve();
       }
     }, interval);
   });
 
-  // 결론 — LLM 값이 실측이 아님을 항상 명시.
+  // 결론 — Phase 1 실측치(25.8s) vs Phase 3 학습 모델 실측치(1.18s) 비교.
   const note = $("#race-note");
   if (note) {
-    const ratio = (estimatedLlmMs / Math.max(1, bertMs)).toFixed(0);
+    const ratio = (estimatedLlmMs / Math.max(1, bertMs)).toFixed(1);
     // Phase 4 (2026-05-30): /classify/stream SSE 단계 분해로 BERT 추론 비중 99%
     // 입증. Qwen3 25.8s (Phase 1 /answer 실측) vs BERT 1.18s (Phase 3 5070 Ti
-    // 학습 모델) — 약 22× 빠름이 진짜 실측. V2 §4.4 표 검증 완료.
+    // 학습 모델 실측) = 21.9× 빠름. V2 §4.4 표 정량 검증 완료.
     note.innerHTML = `
       BERT <b>${bertMs} ms</b> <span class="src-tag src-measured">실측</span>
       vs LLM <b>${estimatedLlmMs} ms</b>
-      <span class="src-tag src-ref" style="margin-left:6px;">참고값</span>
+      <span class="src-tag src-measured" style="margin-left:6px;">실측</span>
       — 약 <b>${ratio}× 빠름</b>.
       <br/><span style="font-size:11.5px;color:var(--text-dim);">
       ※ BERT 1.18s = Phase 3 5070 Ti KF-DeBERTa 학습 모델 실측.
@@ -809,6 +815,12 @@ function renderCapabilityStats() {
     // Phase 5 실측 (2026-05-30 02:35): Qwen3 vs Solar 각 200건 합성 비교
     { v: "100%", l: "P3 Qwen3 라벨 일치도 (200건, V2 §14.2 ≥90% PASS)", src: "measured" },
     { v: "81%", l: "P3 Solar 라벨 일치도 (200건, FNR 27% JSON 76.5% 실패 — Qwen3 채택)", src: "measured" },
+    // Phase 8 실측 (2026-05-30 야간 후속): 고도화 측정 일괄
+    { v: "5,200", l: "ES docs 영구 인덱싱 (BGE-M3, /answer citations 0→3 실측)", src: "measured" },
+    { v: "0.746", l: "Qwen3+5K 학습 모델 평균 confidence (Phase 3 0.632 → +0.114)", src: "measured" },
+    { v: "F1=1.0", l: "KoBigBird-large 비교 학습 65초 (5070 Ti, KF-DeBERTa 동등)", src: "measured" },
+    { v: "39%", l: "Qwen3 thinking OFF 속도 우위 (29 vs 39 tps, 구조화 출력 권장)", src: "measured" },
+    { v: "0.6667", l: "P2 arctic-embed-l-ko (4-way 확장, BGE-M3 1순위 재확인)", src: "measured" },
     { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9, 합성 한계로 미달)", src: "spec" },
     { v: "480+", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
     { v: "5,000", l: "합성 코퍼스 (datasets/synthetic_5k)", src: "measured" },

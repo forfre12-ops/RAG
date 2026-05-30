@@ -91,6 +91,16 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     )
     import mlflow
 
+    # B1-4 (2026-05-30 후속 정리): safetensors auto-conversion 백그라운드 thread 가
+    # HF Hub `discussions` 비활성 레포(kakaobank 등)에서 403 Forbidden 트레이스를
+    # stderr 에 쏟는 노이즈 제거. 학습 자체에는 영향 없는 무해 경고.
+    import logging as _logging  # noqa: PLC0415
+    for _name in (
+        "transformers.safetensors_conversion",
+        "huggingface_hub.utils._http",
+    ):
+        _logging.getLogger(_name).setLevel(_logging.CRITICAL)
+
     mlflow.set_experiment(spec.experiment_name)
 
     train_x, train_y = _load_jsonl(spec.train_path)
