@@ -54,15 +54,28 @@ def load_corpus(synth_dir: Path) -> list[dict]:
     return docs
 
 
-def make_queries(per_grade: int = 3, style: str = "seed") -> list[dict]:
-    """쿼리 생성. style: "seed" (기존 {kw} 관련 자료) | "intent" (의도형 30종 고정).
+def make_queries(
+    per_grade: int = 3,
+    style: str = "seed",
+    synth_dir: Path | None = None,
+) -> list[dict]:
+    """쿼리 생성.
 
-    intent 모드는 per_grade를 무시하고 p2_intent_queries.INTENT_QUERIES를 그대로 반환.
-    seed 모드는 등급당 per_grade개 키워드를 `{kw} 관련 자료` 패턴으로 생성.
+    style:
+      "seed"        : {kw} 관련 자료 패턴 (기존 기본값).
+      "intent"      : 의도형 30종 고정 (p2_intent_queries.py).
+      "doc_derived" : 합성 문서 title 파생 쿼리. hit=doc_id 기준 (더 엄밀).
+                      synth_dir 필수. 등급당 per_grade개 샘플링.
     """
     if style == "intent":
         from p2_intent_queries import INTENT_QUERIES
         return list(INTENT_QUERIES)
+
+    if style == "doc_derived":
+        if synth_dir is None:
+            raise ValueError("doc_derived 스타일은 synth_dir 필수")
+        from p2_doc_derived_queries import build_doc_derived_queries
+        return build_doc_derived_queries(synth_dir, n_per_grade=per_grade)
 
     from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
 
@@ -212,14 +225,22 @@ def evaluate(
             pass
 
         latencies.append((time.perf_counter() - t1) * 1000)
-        hit = any(r.payload.get("grade") == q["expected_grade"] for r in results)
+        expected_doc_id = q.get("expected_doc_id")
+        if expected_doc_id is not None:
+            # doc_derived 스타일: 특정 문서 ID가 top-K에 있으면 hit
+            hit = any(r.payload.get("doc_id") == expected_doc_id for r in results)
+        else:
+            # seed/intent 스타일: 올바른 등급 문서가 top-K에 있으면 hit
+            hit = any(r.payload.get("grade") == q["expected_grade"] for r in results)
         if hit:
             hits += 1
         per_query.append(
             {
                 "query": q["text"],
                 "expected_grade": q["expected_grade"],
+                "expected_doc_id": expected_doc_id,
                 "top_grades": [r.payload.get("grade") for r in results],
+                "top_doc_ids": [r.payload.get("doc_id") for r in results],
                 "top_scores": [round(r.score, 3) for r in results],
                 "hit": hit,
             }
@@ -400,9 +421,13 @@ def main() -> int:
     ap.add_argument(
         "--query-style",
         default="seed",
-        choices=["seed", "intent"],
-        help="쿼리 스타일. seed: `{kw} 관련 자료` 시드 키워드 기반(기본). "
-             "intent: 의도형 30종 고정 (scripts/p2_intent_queries.py).",
+        choices=["seed", "intent", "doc_derived"],
+        help=(
+            "쿼리 스타일. "
+            "seed: `{kw} 관련 자료` 시드 키워드 기반(기본). "
+            "intent: 의도형 30종 고정 (scripts/p2_intent_queries.py). "
+            "doc_derived: 합성 문서 title 파생, hit=doc_id 기준 (더 엄밀한 평가)."
+        ),
     )
     ap.add_argument(
         "--reranker",
@@ -434,7 +459,11 @@ def main() -> int:
         return 2
 
     docs = load_corpus(synth_dir)
-    queries = make_queries(per_grade=args.queries_per_grade, style=args.query_style)
+    queries = make_queries(
+        per_grade=args.queries_per_grade,
+        style=args.query_style,
+        synth_dir=synth_dir if args.query_style == "doc_derived" else None,
+    )
     print(f"[p2] query_style={args.query_style}, query_count={len(queries)}")
 
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
