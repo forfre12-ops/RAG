@@ -1,0 +1,2898 @@
+[
+  {
+    "embedder": "BAAI/bge-m3",
+    "backend": "es",
+    "search_mode": "dense",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "BAAI/bge-m3 / es / dense",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.7222,
+    "latency_ms_p50": 52.57,
+    "latency_ms_p95": 60.28,
+    "latency_ms_avg": 51.59,
+    "embed_corpus_ms": 288.8,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.818,
+          0.818,
+          0.818,
+          0.818,
+          0.818
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.765,
+          0.765,
+          0.765,
+          0.765,
+          0.765
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.725,
+          0.725,
+          0.725,
+          0.725,
+          0.725
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.718,
+          0.718,
+          0.718,
+          0.718,
+          0.718
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.804,
+          0.804,
+          0.804,
+          0.804,
+          0.804
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.841,
+          0.841,
+          0.841,
+          0.841,
+          0.841
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.804,
+          0.804,
+          0.804,
+          0.804,
+          0.804
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.791,
+          0.791,
+          0.791,
+          0.791,
+          0.791
+        ],
+        "hit": true
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.808,
+          0.808,
+          0.808,
+          0.808,
+          0.808
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.813,
+          0.813,
+          0.813,
+          0.813,
+          0.813
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.83,
+          0.83,
+          0.83,
+          0.83,
+          0.83
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.778,
+          0.778,
+          0.778,
+          0.778,
+          0.778
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.786,
+          0.786,
+          0.786,
+          0.786,
+          0.786
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.824,
+          0.824,
+          0.824,
+          0.824,
+          0.824
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.822,
+          0.822,
+          0.822,
+          0.822,
+          0.822
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.821,
+          0.821,
+          0.821,
+          0.821,
+          0.821
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.778,
+          0.778,
+          0.778,
+          0.778,
+          0.778
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.791,
+          0.791,
+          0.791,
+          0.791,
+          0.791
+        ],
+        "hit": true
+      }
+    ]
+  },
+  {
+    "embedder": "BAAI/bge-m3",
+    "backend": "es",
+    "search_mode": "hybrid",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "BAAI/bge-m3 / es / hybrid",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.7222,
+    "latency_ms_p50": 225.98,
+    "latency_ms_p95": 261.86,
+    "latency_ms_avg": 229.6,
+    "embed_corpus_ms": 77.2,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.066,
+          0.063,
+          0.061,
+          0.059,
+          0.057
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.095,
+          0.091,
+          0.087,
+          0.083,
+          0.08
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.066,
+          0.063,
+          0.061,
+          0.059,
+          0.057
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.066,
+          0.063,
+          0.061,
+          0.059,
+          0.057
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      }
+    ]
+  },
+  {
+    "embedder": "nlpai-lab/KURE-v1",
+    "backend": "es",
+    "search_mode": "dense",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "nlpai-lab/KURE-v1 / es / dense",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.6667,
+    "latency_ms_p50": 48.5,
+    "latency_ms_p95": 53.01,
+    "latency_ms_avg": 49.01,
+    "embed_corpus_ms": 64.7,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.809,
+          0.809,
+          0.809,
+          0.809,
+          0.809
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.77,
+          0.77,
+          0.77,
+          0.77,
+          0.77
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.716,
+          0.716,
+          0.716,
+          0.716,
+          0.716
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.71,
+          0.71,
+          0.71,
+          0.71,
+          0.71
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.808,
+          0.808,
+          0.808,
+          0.808,
+          0.808
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.838,
+          0.838,
+          0.838,
+          0.838,
+          0.838
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.805,
+          0.805,
+          0.805,
+          0.805,
+          0.805
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.787,
+          0.787,
+          0.787,
+          0.787,
+          0.787
+        ],
+        "hit": true
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.797,
+          0.797,
+          0.797,
+          0.797,
+          0.797
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.81,
+          0.81,
+          0.81,
+          0.81,
+          0.81
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.819,
+          0.819,
+          0.819,
+          0.819,
+          0.819
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.772,
+          0.772,
+          0.772,
+          0.772,
+          0.772
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.775,
+          0.775,
+          0.775,
+          0.775,
+          0.775
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.807,
+          0.807,
+          0.807,
+          0.807,
+          0.807
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.809,
+          0.809,
+          0.809,
+          0.809,
+          0.809
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.81,
+          0.81,
+          0.81,
+          0.81,
+          0.81
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.76,
+          0.76,
+          0.76,
+          0.76,
+          0.76
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.775,
+          0.775,
+          0.775,
+          0.775,
+          0.775
+        ],
+        "hit": false
+      }
+    ]
+  },
+  {
+    "embedder": "nlpai-lab/KURE-v1",
+    "backend": "es",
+    "search_mode": "hybrid",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "nlpai-lab/KURE-v1 / es / hybrid",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.7222,
+    "latency_ms_p50": 170.52,
+    "latency_ms_p95": 179.26,
+    "latency_ms_avg": 170.7,
+    "embed_corpus_ms": 70.9,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.066,
+          0.063,
+          0.061,
+          0.059,
+          0.057
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.059,
+          0.057,
+          0.054,
+          0.053,
+          0.051
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.095,
+          0.091,
+          0.087,
+          0.083,
+          0.08
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      }
+    ]
+  },
+  {
+    "embedder": "dragonkue/BGE-m3-ko",
+    "backend": "es",
+    "search_mode": "dense",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "dragonkue/BGE-m3-ko / es / dense",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.7222,
+    "latency_ms_p50": 51.37,
+    "latency_ms_p95": 53.3,
+    "latency_ms_avg": 51.27,
+    "embed_corpus_ms": 54.0,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.779,
+          0.779,
+          0.779,
+          0.779,
+          0.779
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.741,
+          0.741,
+          0.741,
+          0.741,
+          0.741
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.656,
+          0.656,
+          0.656,
+          0.656,
+          0.656
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.673,
+          0.673,
+          0.673,
+          0.673,
+          0.673
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.772,
+          0.772,
+          0.772,
+          0.772,
+          0.772
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.811,
+          0.811,
+          0.811,
+          0.811,
+          0.811
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.75,
+          0.75,
+          0.75,
+          0.75,
+          0.75
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.746,
+          0.746,
+          0.746,
+          0.746,
+          0.746
+        ],
+        "hit": true
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.757,
+          0.757,
+          0.757,
+          0.757,
+          0.757
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.78,
+          0.78,
+          0.78,
+          0.78,
+          0.78
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.791,
+          0.791,
+          0.791,
+          0.791,
+          0.791
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.723,
+          0.723,
+          0.723,
+          0.723,
+          0.723
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.738,
+          0.738,
+          0.738,
+          0.738,
+          0.738
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.776,
+          0.776,
+          0.776,
+          0.776,
+          0.776
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.779,
+          0.779,
+          0.779,
+          0.779,
+          0.779
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.778,
+          0.778,
+          0.778,
+          0.778,
+          0.778
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.719,
+          0.719,
+          0.719,
+          0.719,
+          0.719
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.729,
+          0.729,
+          0.729,
+          0.729,
+          0.729
+        ],
+        "hit": true
+      }
+    ]
+  },
+  {
+    "embedder": "dragonkue/BGE-m3-ko",
+    "backend": "es",
+    "search_mode": "hybrid",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "dragonkue/BGE-m3-ko / es / hybrid",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.7222,
+    "latency_ms_p50": 178.35,
+    "latency_ms_p95": 187.44,
+    "latency_ms_avg": 177.07,
+    "embed_corpus_ms": 59.3,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.066,
+          0.063,
+          0.061,
+          0.059,
+          0.057
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.095,
+          0.091,
+          0.087,
+          0.083,
+          0.08
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.066,
+          0.063,
+          0.061,
+          0.059,
+          0.057
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      }
+    ]
+  },
+  {
+    "embedder": "dragonkue/snowflake-arctic-embed-l-v2.0-ko",
+    "backend": "es",
+    "search_mode": "dense",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "dragonkue/snowflake-arctic-embed-l-v2.0-ko / es / dense",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.6667,
+    "latency_ms_p50": 111.41,
+    "latency_ms_p95": 118.57,
+    "latency_ms_avg": 108.34,
+    "embed_corpus_ms": 2699.8,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.797,
+          0.797,
+          0.797,
+          0.797,
+          0.797
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.757,
+          0.757,
+          0.757,
+          0.757,
+          0.757
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.678,
+          0.678,
+          0.678,
+          0.678,
+          0.678
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.678,
+          0.678,
+          0.678,
+          0.678,
+          0.678
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.767,
+          0.767,
+          0.767,
+          0.767,
+          0.767
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.831,
+          0.831,
+          0.831,
+          0.831,
+          0.831
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.759,
+          0.759,
+          0.759,
+          0.759,
+          0.759
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.773,
+          0.773,
+          0.773,
+          0.773,
+          0.773
+        ],
+        "hit": false
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.743,
+          0.743,
+          0.743,
+          0.743,
+          0.743
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.759,
+          0.759,
+          0.759,
+          0.759,
+          0.759
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.785,
+          0.785,
+          0.785,
+          0.785,
+          0.785
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.766,
+          0.766,
+          0.766,
+          0.766,
+          0.766
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.759,
+          0.759,
+          0.759,
+          0.759,
+          0.759
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.796,
+          0.796,
+          0.796,
+          0.796,
+          0.796
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.786,
+          0.786,
+          0.786,
+          0.786,
+          0.786
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.801,
+          0.801,
+          0.801,
+          0.801,
+          0.801
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.707,
+          0.707,
+          0.707,
+          0.707,
+          0.707
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.733,
+          0.733,
+          0.733,
+          0.733,
+          0.733
+        ],
+        "hit": true
+      }
+    ]
+  },
+  {
+    "embedder": "dragonkue/snowflake-arctic-embed-l-v2.0-ko",
+    "backend": "es",
+    "search_mode": "hybrid",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "dragonkue/snowflake-arctic-embed-l-v2.0-ko / es / hybrid",
+    "status": "OK",
+    "dim": 1024,
+    "corpus_size": 5000,
+    "query_count": 18,
+    "top_k": 5,
+    "recall_at_k": 0.6667,
+    "latency_ms_p50": 211.16,
+    "latency_ms_p95": 217.8,
+    "latency_ms_avg": 210.12,
+    "embed_corpus_ms": 63.4,
+    "per_query": [
+      {
+        "query": "특급기밀 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "Top Secret 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "TS등급 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "극비 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "M&A 계획 관련 자료",
+        "expected_grade": "TS",
+        "top_grades": [
+          "TS",
+          "TS",
+          "TS",
+          "TS",
+          "TS"
+        ],
+        "top_scores": [
+          0.059,
+          0.057,
+          0.055,
+          0.053,
+          0.051
+        ],
+        "hit": true
+      },
+      {
+        "query": "1급 비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.059,
+          0.057,
+          0.054,
+          0.053,
+          0.051
+        ],
+        "hit": true
+      },
+      {
+        "query": "영업비밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S1",
+          "S3",
+          "S1",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "기밀 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "TS",
+          "S3",
+          "TS",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "사외비 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S3",
+          "S2",
+          "S3",
+          "S2",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "공정 노하우 관련 자료",
+        "expected_grade": "S1",
+        "top_grades": [
+          "S1",
+          "S1",
+          "S1",
+          "S1",
+          "S1"
+        ],
+        "top_scores": [
+          0.059,
+          0.057,
+          0.054,
+          0.053,
+          0.051
+        ],
+        "hit": true
+      },
+      {
+        "query": "대외비 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "2급 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S2",
+          "S2",
+          "S2",
+          "S2",
+          "S2"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "Confidential 관련 자료",
+        "expected_grade": "S2",
+        "top_grades": [
+          "S3",
+          "TS",
+          "S3",
+          "TS",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": false
+      },
+      {
+        "query": "보도자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시자료 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공개특허 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      },
+      {
+        "query": "공시 재무제표 관련 자료",
+        "expected_grade": "S3",
+        "top_grades": [
+          "S3",
+          "S3",
+          "S3",
+          "S3",
+          "S3"
+        ],
+        "top_scores": [
+          0.048,
+          0.048,
+          0.045,
+          0.045,
+          0.043
+        ],
+        "hit": true
+      }
+    ]
+  }
+]
