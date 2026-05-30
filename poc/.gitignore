@@ -2,12 +2,16 @@
 __pycache__/
 *.pyc
 .env
+.env.backup-*
 datasets/raw/
 datasets/external/
 datasets/preprocessed/
 datasets/labeled/
+datasets/labeled_5k_plus_qwen3/
 datasets/synthetic/
 datasets/synthetic_800/
+datasets/synthetic_qwen3/
+datasets/synthetic_solar/
 artifacts/
 mlruns/
 reports/
