@@ -132,8 +132,11 @@ def test_assert_production_credentials_raises_when_missing_everywhere():
     config_mod.settings.poc_mode = "full"
 
     fake = _FakeSM()  # 빈 SM
+    # TESTING/PYTEST_CURRENT_TEST를 falsy로 만들어 운영 경로(raise) 실행.
+    # 10cea2e에서 추가된 pytest 환경 skip을 우회하여 함수 자체 동작을 검증.
     try:
-        with patch("lloydk.services.secrets_manager.get_secrets_manager", return_value=fake):
+        with patch("lloydk.services.secrets_manager.get_secrets_manager", return_value=fake), \
+             patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": ""}):
             try:
                 config_mod.assert_production_credentials()
             except RuntimeError as exc:
