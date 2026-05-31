@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from lloydk.api._auth import require_api_key
+from lloydk.api._jwt_auth import require_auth
 from lloydk.schemas.schema_admin import (
     GradesGetResponse,
     GradesPutRequest,
@@ -12,7 +12,7 @@ from lloydk.schemas.schema_admin import (
 )
 from lloydk.services.schema_admin_service import SchemaAdminService
 
-router = APIRouter(tags=["schema"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["schema"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/schema/grades", response_model=GradesGetResponse)

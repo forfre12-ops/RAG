@@ -82,6 +82,15 @@ EMBEDDING_FALLBACK_TOTAL = Counter(
     registry=registry,
 )
 
+# RAG context / fetch 실패 — 벡터스토어·임베더·검색 중 오류 발생 시 증가.
+# logger.warning과 함께 운영 대시보드에서 retrieval 장애를 가시화.
+RAG_CONTEXT_FAILURE_TOTAL = Counter(
+    "lloydk_rag_context_failure_total",
+    "RAG context build failures (vectorstore/embedder/search error)",
+    ["stage"],  # build_rag_context | fetch_hits
+    registry=registry,
+)
+
 # §7 (2026-05-29): /answer 단계별 latency — retrieve(쿼리 확장 + ES 검색 + reranker)
 # vs synthesize(LLM 답안 합성). 운영 SLO 정의 + §1 batch encode 효과 정량 입증.
 ANSWER_PHASE_DURATION = Histogram(

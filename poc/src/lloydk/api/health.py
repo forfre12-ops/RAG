@@ -2,6 +2,10 @@
 
 데모 콘솔(/demo)이 상단 상태 배지·warmup 폴링·LLM vs BERT 시간 경쟁 비교
 시 운영 vs noop 분기에 사용. 운영 라우터에는 영향 없음.
+
+status 값:
+  ok       : 모든 구성 요소가 기대 상태로 동작 중.
+  degraded : 일부 구성 요소가 비정상 — 요청은 처리되지만 정확도/기능 저하 가능.
 """
 
 from __future__ import annotations
@@ -16,10 +20,35 @@ router = APIRouter(tags=["health"])
 _START = time.time()
 
 
+def _check_model() -> dict:
+    """InferencePipeline 로드 상태 확인.
+
+    - classifier_model_dir 설정 + 로드 실패 → degraded (모델 기대했는데 rule-fallback 중)
+    - classifier_model_dir 미설정 → rule_fallback (의도된 상태)
+    - 정상 로드 → loaded
+    """
+    model_expected = bool(getattr(settings, "classifier_model_dir", ""))
+    try:
+        from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
+        svc = ClassifyService.get_instance()
+        model_loaded = svc.inference._model is not None
+    except Exception:
+        return {"status": "unknown", "degraded": model_expected}
+
+    if model_loaded:
+        return {"status": "loaded", "degraded": False}
+    if model_expected:
+        return {"status": "degraded", "degraded": True}
+    return {"status": "rule_fallback", "degraded": False}
+
+
 @router.get("/healthz")
 def healthz():
+    model_check = _check_model()
+    overall = "degraded" if model_check["degraded"] else "ok"
+
     return {
-        "status": "ok",
+        "status": overall,
         "model_version": "poc",
         "uptime_sec": int(time.time() - _START),
         # 데모 콘솔 표시용 추가 필드 — 운영에는 무해.
@@ -31,4 +60,7 @@ def healthz():
         # warmup 완료 여부 — lifespan 의 _warmup_models 가 끝나면 True.
         # uptime ≥ 2s 면 warmup 끝났다고 본다 (lite-noapi 에서는 즉시 반환).
         "warmup_done": (time.time() - _START) >= 2.0,
+        "checks": {
+            "model": model_check["status"],
+        },
     }

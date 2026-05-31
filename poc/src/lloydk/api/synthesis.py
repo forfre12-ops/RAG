@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from lloydk.api._auth import require_api_key
+from lloydk.api._jwt_auth import require_auth
 from lloydk.api.rate_limit import limiter
 from lloydk.schemas.synthesis import (
     SynthGenerateRequest,
@@ -17,7 +17,7 @@ from lloydk.schemas.synthesis import (
 )
 from lloydk.services.synthesis_service import SynthesisService
 
-router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_auth)])
 
 
 @router.post("/synth/generate", response_model=SynthGenerateResponse, status_code=202)

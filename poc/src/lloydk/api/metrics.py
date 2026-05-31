@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from lloydk.api._auth import require_api_key
+from lloydk.api._jwt_auth import require_auth
 from lloydk.schemas.metrics import ConfusionMatrix, MetricsHistory, MetricsReport
 from lloydk.services.metrics_service import MetricsService
 
-router = APIRouter(tags=["metrics"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["metrics"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/metrics/latest", response_model=MetricsReport)

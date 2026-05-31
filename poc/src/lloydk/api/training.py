@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from lloydk.api._auth import require_api_key
+from lloydk.api._jwt_auth import require_auth
 from lloydk.api.rate_limit import limiter
 from lloydk.schemas.training import (
     TrainJobList,
@@ -17,7 +17,7 @@ from lloydk.schemas.training import (
 )
 from lloydk.services.training_service import TrainingService
 
-router = APIRouter(tags=["training"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["training"], dependencies=[Depends(require_auth)])
 
 
 @router.post("/train", response_model=TrainResponse, status_code=202)

@@ -10,19 +10,14 @@
 """
 
 from collections import defaultdict
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 
+from lloydk.api._jwt_auth import require_auth
 from lloydk.api.rate_limit import limiter
-from lloydk.config import settings
 from lloydk.schemas.classify import ClassifyRequest, ClassifyResponse
 from lloydk.services.classify_service import ClassifyService
 
 router = APIRouter(tags=["classify"])
-
-
-def require_api_key(x_api_key: str = Header(...)):
-    if x_api_key != settings.api_key:
-        raise HTTPException(status_code=401, detail="invalid api key")
 
 
 def get_service() -> ClassifyService:
@@ -89,7 +84,7 @@ def _factor_decomposition(result: ClassifyResponse) -> dict:
     return {"rows": rows, "total": total}
 
 
-@router.post("/classify/explain", dependencies=[Depends(require_api_key)])
+@router.post("/classify/explain", dependencies=[Depends(require_auth)])
 @limiter.limit("30/minute")
 def classify_explain(
     request: Request,

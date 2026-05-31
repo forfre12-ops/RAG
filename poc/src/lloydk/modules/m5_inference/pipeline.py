@@ -83,7 +83,7 @@ class InferencePipeline:
                     metadata=metadata,
                 )
             except Exception as exc:  # noqa: BLE001
-                logger.debug("rag_context build failed (silent): %s", exc)
+                logger.warning("rag_context build failed: %s", exc)
                 hits = []
             if hits:
                 result.rag_context = hits
@@ -181,13 +181,13 @@ class InferencePipeline:
         try:
             store = build_store()
         except Exception as exc:  # noqa: BLE001
-            logger.debug("vectorstore build failed: %s", exc)
+            logger.warning("vectorstore build failed: %s", exc)
             return []
 
         try:
             embedder = build_embedder()
         except Exception as exc:  # noqa: BLE001
-            logger.debug("embedder build failed: %s", exc)
+            logger.warning("embedder build failed: %s", exc)
             return []
 
         def _encode(t: str):
@@ -231,7 +231,7 @@ class InferencePipeline:
                 filter=filter_,
             )
         except Exception as exc:  # noqa: BLE001
-            logger.debug("expand_then_search failed: %s", exc)
+            logger.warning("expand_then_search failed: %s", exc)
             return []
 
         # SearchHit → RagContextHit 변환

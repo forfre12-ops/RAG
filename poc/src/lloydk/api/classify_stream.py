@@ -16,19 +16,14 @@ import json
 import time
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from lloydk.config import settings
+from lloydk.api._jwt_auth import require_auth
 from lloydk.schemas.classify import ClassifyRequest
 from lloydk.services.classify_service import ClassifyService
 
 router = APIRouter(tags=["classify"])
-
-
-def require_api_key(x_api_key: str = Header(...)):
-    if x_api_key != settings.api_key:
-        raise HTTPException(status_code=401, detail="invalid api key")
 
 
 def get_service() -> ClassifyService:
@@ -93,7 +88,7 @@ async def _classify_stream(req: ClassifyRequest, svc: ClassifyService) -> AsyncG
         raise
 
 
-@router.post("/classify/stream", dependencies=[Depends(require_api_key)])
+@router.post("/classify/stream", dependencies=[Depends(require_auth)])
 async def classify_stream(
     req: ClassifyRequest,
     svc: ClassifyService = Depends(get_service),

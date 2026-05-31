@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from lloydk.api._auth import require_api_key
+from lloydk.api._jwt_auth import require_auth
 from lloydk.schemas.confirm import (
     ConfirmRequest,
     ConfirmResponse,
@@ -21,13 +21,13 @@ from lloydk.services.confirm_service import (
 router = APIRouter(tags=["confirm"])
 
 
-@router.post("/confirm", response_model=ConfirmResponse, dependencies=[Depends(require_api_key)])
+@router.post("/confirm", response_model=ConfirmResponse, dependencies=[Depends(require_auth)])
 def confirm(req: ConfirmRequest):
     result = ConfirmService().confirm(req)
     return to_confirm_response(result)
 
 
-@router.post("/relabel", response_model=RelabelResponse, dependencies=[Depends(require_api_key)])
+@router.post("/relabel", response_model=RelabelResponse, dependencies=[Depends(require_auth)])
 def relabel(req: RelabelRequest):
     result = RelabelService().relabel(req)
     return to_relabel_response(result)

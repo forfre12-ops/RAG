@@ -7,13 +7,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from lloydk.api._auth import require_api_key
+from lloydk.api._jwt_auth import require_auth
 from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.schemas.guide import GuideUploadResponse, GuideVersionList
 from lloydk.services.guide_service import GuideService
 
-router = APIRouter(tags=["guide"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["guide"], dependencies=[Depends(require_auth)])
 
 
 @router.post("/guide/documents", response_model=GuideUploadResponse, status_code=201)

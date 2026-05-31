@@ -16,8 +16,9 @@
 import logging
 import time
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 
+from lloydk.api._jwt_auth import require_auth
 from lloydk.api.rate_limit import limiter
 from lloydk.config import settings
 from lloydk.schemas.classify import RagContextHit
@@ -29,9 +30,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["answer"])
 
 
-def require_api_key(x_api_key: str = Header(...)):
-    if x_api_key != settings.api_key:
-        raise HTTPException(status_code=401, detail="invalid api key")
+def _inc_rag_failure(stage: str) -> None:
+    try:
+        from lloydk.api.prom_metrics import RAG_CONTEXT_FAILURE_TOTAL  # noqa: PLC0415
+        RAG_CONTEXT_FAILURE_TOTAL.labels(stage=stage).inc()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
@@ -55,13 +59,15 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
     try:
         store = build_store()
     except Exception as exc:  # noqa: BLE001
-        logger.debug("answer: vectorstore build failed: %s", exc)
+        logger.warning("answer: vectorstore build failed: %s", exc)
+        _inc_rag_failure("fetch_hits")
         return []
 
     try:
         embedder = build_embedder()
     except Exception as exc:  # noqa: BLE001
-        logger.debug("answer: embedder build failed: %s", exc)
+        logger.warning("answer: embedder build failed: %s", exc)
+        _inc_rag_failure("fetch_hits")
         return []
 
     def _encode(t: str):
@@ -106,7 +112,8 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
             use_reranker=req.use_reranker,
         )
     except Exception as exc:  # noqa: BLE001
-        logger.debug("answer: expand_then_search failed: %s", exc)
+        logger.warning("answer: expand_then_search failed: %s", exc)
+        _inc_rag_failure("fetch_hits")
         return []
 
     out: list[RagContextHit] = []
@@ -124,7 +131,7 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
 @router.post(
     "/answer",
     response_model=RagAnswerResult,
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_auth)],
 )
 @limiter.limit("30/minute")
 def answer(request: Request, req: RagAnswerRequest) -> RagAnswerResult:

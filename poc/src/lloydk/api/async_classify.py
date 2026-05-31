@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from lloydk.api._auth import require_api_key
+from lloydk.api._jwt_auth import require_auth
 from lloydk.api.rate_limit import limiter
 from lloydk.db import session_scope
 from lloydk.repositories import ClassifyRepo
@@ -21,7 +21,7 @@ from lloydk.schemas.classify_async import (
 )
 from lloydk.services.async_classify_service import AsyncClassifyService
 
-router = APIRouter(tags=["classify"], dependencies=[Depends(require_api_key)])
+router = APIRouter(tags=["classify"], dependencies=[Depends(require_auth)])
 
 
 @router.post("/classify/async", response_model=ClassifyAsyncResponse, status_code=202)

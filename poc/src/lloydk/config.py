@@ -254,6 +254,11 @@ def assert_production_credentials() -> None:
             f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
             ".env / 환경변수 / secrets_manager(Vault·AWS SM)로 설정 필요."
         )
+    if settings.cors_allow_origins == ["*"]:
+        logger.warning(
+            "SECURITY: CORS allow-origins=[\"*\"] — production 배포에서는 "
+            "LLOYDK_CORS_ALLOW_ORIGINS=https://your.domain.com 으로 명시하세요."
+        )
 
 
 # D1 (2026-05-29): secrets_manager 호출처 일원화.
