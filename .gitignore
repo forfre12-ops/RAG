@@ -55,6 +55,7 @@ doc/bak/
 .claude/
 .DS_Store
 Thumbs.db
+~$*
 poc/backups/
 poc/datasets/synthetic_qwen3_1200/
 
