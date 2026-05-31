@@ -17,7 +17,7 @@ from lloydk.modules.m3_labeling.rule_engine import RuleLabelResult, build_rule_e
 # ClassifyService 호환 스키마 (있으면 import, 없으면 dataclass 폴백)
 try:
     from lloydk.schemas.classify import EvaluationFactors, EvidenceSpan
-    from lloydk.schemas.common import Grade
+    from lloydk.schemas.common import Grade, GradeRegistry
 
     _HAS_SCHEMA = True
 except Exception:  # noqa: BLE001
@@ -28,6 +28,11 @@ except Exception:  # noqa: BLE001
         S1 = "S1"
         S2 = "S2"
         S3 = "S3"
+
+    class GradeRegistry:  # type: ignore[no-redef]
+        @classmethod
+        def get_order(cls) -> dict[str, int]:
+            return {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
 
     @dataclass
     class EvidenceSpan:  # type: ignore[no-redef]
@@ -55,12 +60,23 @@ class LabelingResult:
     rule_result: Optional[RuleLabelResult] = None
 
 
-_FACTOR_FIELD_MAP = {
-    "ECONOMIC_VALUE": "economic_value",
-    "NON_PUBLICITY": "non_publicity",
-    "MANAGEMENT_LEVEL": "management_level",
-    "LEAK_IMPACT": "leak_impact",
-}
+def _get_factor_field_map() -> dict[str, str]:
+    """FactorRegistry에서 현재 활성 factor_code → field_name 매핑 반환.
+
+    DB에 커스텀 factor가 있으면 그것을 사용, 없으면 기본 4요소 반환.
+    """
+    if _HAS_SCHEMA:
+        try:
+            from lloydk.schemas.common import FactorRegistry  # noqa: PLC0415
+            return FactorRegistry.get_field_map()
+        except Exception:  # noqa: BLE001
+            pass
+    return {
+        "ECONOMIC_VALUE": "economic_value",
+        "NON_PUBLICITY": "non_publicity",
+        "MANAGEMENT_LEVEL": "management_level",
+        "LEAK_IMPACT": "leak_impact",
+    }
 
 
 class LabelingPipeline:
@@ -90,12 +106,14 @@ class LabelingPipeline:
                 if self._llm_labeler is None:
                     self._llm_labeler = LLMLabeler()
                 llm_out = self._llm_labeler.label(text)
-                if llm_out.grade in {"TS", "S1", "S2", "S3"}:
+                # GradeRegistry에서 현재 활성 등급 목록을 로드해 유효성 검사
+                active_grade_order = GradeRegistry.get_order()
+                if llm_out.grade in active_grade_order:
                     # FNR-safe merge: rule 등급과 LLM 등급 중 더 높은(낮은 order) 등급 선택
-                    from lloydk.modules.m3_labeling.seeds import GRADE_ORDER
-
-                    rule_order = GRADE_ORDER[r.grade]
-                    llm_order = GRADE_ORDER[llm_out.grade]
+                    rule_order = active_grade_order.get(
+                        r.grade.value if hasattr(r.grade, "value") else r.grade, 99
+                    )
+                    llm_order = active_grade_order.get(llm_out.grade, 99)
                     if llm_order < rule_order:
                         r = RuleLabelResult(
                             grade=llm_out.grade,
@@ -113,13 +131,14 @@ class LabelingPipeline:
             except Exception:  # noqa: BLE001
                 pass
 
-        factors = EvaluationFactors(
-            **{
-                _FACTOR_FIELD_MAP[k]: v
-                for k, v in r.factor_scores.items()
-                if k in _FACTOR_FIELD_MAP
-            }
-        )
+        if _HAS_SCHEMA:
+            factors = EvaluationFactors.from_factor_scores(r.factor_scores)
+        else:
+            # 스키마 미가용 폴백 — dataclass EvaluationFactors에 직접 매핑
+            field_map = _get_factor_field_map()
+            factors = EvaluationFactors(
+                **{field_map[k]: v for k, v in r.factor_scores.items() if k in field_map}
+            )
         evidence = [
             EvidenceSpan(
                 start=text.find(m.keyword) if text.find(m.keyword) >= 0 else 0,

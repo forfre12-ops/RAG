@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from lloydk.db import session_scope
 from lloydk.db.models import ClassificationLevel
-from lloydk.schemas.common import GradeDefinition, GradeRegistry
+from lloydk.schemas.common import FactorRegistry, GradeDefinition, GradeRegistry
 from lloydk.schemas.schema_admin import (
     GradesGetResponse,
     GradesPutRequest,
@@ -133,8 +133,9 @@ class SchemaAdminService:
             logger.error("schema put persistence failed: %s", exc, exc_info=True)
             reasons.append(f"db_error:{type(exc).__name__}")
 
-        # 등급체계 변경 후 GradeRegistry 캐시 무효화 — 다음 추론부터 새 등급 반영
+        # 등급·요소 변경 후 캐시 무효화 — 다음 추론부터 새 등급/요소 반영
         GradeRegistry.invalidate()
+        FactorRegistry.invalidate()
         logger.info(
             "schema put done: requires_retraining=%s reasons=%s",
             requires, reasons,

@@ -79,6 +79,69 @@ class GradeRegistry:
         _logger.info("GradeRegistry cache invalidated")
 
 
+class FactorRegistry:
+    """평가요소 코드를 DB에서 동적으로 로드하는 런타임 레지스트리.
+
+    다른 프로젝트에서 evaluation_factors 테이블에 도메인별 요소를 등록하면
+    코드 변경 없이 자동 반영됩니다.
+
+    - DB 가용 시: evaluation_factors 테이블에서 활성 요소 로드
+    - DB 미가용 시: 기본 4요소(영업비밀 도메인)로 폴백
+    - schema PUT 후 invalidate()를 호출하면 다음 조회 시 재로드
+    """
+
+    # 기본 4요소 — 영업비밀 도메인 폴백
+    _DEFAULT_MAP: dict[str, str] = {
+        "ECONOMIC_VALUE": "economic_value",
+        "NON_PUBLICITY": "non_publicity",
+        "MANAGEMENT_LEVEL": "management_level",
+        "LEAK_IMPACT": "leak_impact",
+    }
+
+    _cache: dict[str, str] | None = None  # {factor_code: snake_case_name}
+
+    @classmethod
+    def get_field_map(cls) -> dict[str, str]:
+        """factor_code → snake_case 이름 매핑 반환.
+
+        DB에 factor가 있으면 그것을 사용, 없으면 기본 4요소 반환.
+        반환값은 EvaluationFactors.scores의 key와 named field 이름에 모두 사용됨.
+        """
+        if cls._cache is not None:
+            return dict(cls._cache)
+        try:
+            from lloydk.db import session_scope  # noqa: PLC0415
+            from lloydk.db.models import EvaluationFactor  # noqa: PLC0415
+            with session_scope() as db:
+                factors = (
+                    db.query(EvaluationFactor)
+                    .filter(EvaluationFactor.is_active.is_(True))
+                    .all()
+                )
+                if factors:
+                    cls._cache = {
+                        f.factor_code: f.factor_code.lower()
+                        for f in factors
+                    }
+                    _logger.debug("FactorRegistry loaded from DB: %s", list(cls._cache))
+                    return dict(cls._cache)
+        except Exception as exc:  # noqa: BLE001
+            _logger.debug("FactorRegistry DB load failed, using default: %s", exc)
+        cls._cache = dict(cls._DEFAULT_MAP)
+        return dict(cls._cache)
+
+    @classmethod
+    def get_codes(cls) -> list[str]:
+        """활성 평가요소 코드 목록 반환."""
+        return list(cls.get_field_map())
+
+    @classmethod
+    def invalidate(cls) -> None:
+        """캐시 무효화 — schema PUT 후 호출해 다음 조회 시 재로드."""
+        cls._cache = None
+        _logger.info("FactorRegistry cache invalidated")
+
+
 class Actor(BaseModel):
     user_id: str
     role: str = Field(pattern=r"^(admin|reviewer|system|kl_backend)$")

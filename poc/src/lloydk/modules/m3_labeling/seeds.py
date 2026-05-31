@@ -44,6 +44,18 @@ _logger = logging.getLogger(__name__)
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
 
 
+def get_factor_codes() -> list[str]:
+    """FactorRegistry에서 현재 활성 평가요소 코드 목록 반환.
+
+    DB에 커스텀 factor가 있으면 그것을, 없으면 FACTOR_SEEDS 기반 기본값 반환.
+    """
+    try:
+        from lloydk.schemas.common import FactorRegistry  # noqa: PLC0415
+        return FactorRegistry.get_codes()
+    except Exception:  # noqa: BLE001
+        return [f["code"] for f in FACTOR_SEEDS]
+
+
 def get_grade_order() -> dict[str, int]:
     """GradeRegistry에서 현재 활성 등급의 우선순위 매핑 반환.
 
