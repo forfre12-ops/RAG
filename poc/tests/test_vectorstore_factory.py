@@ -112,7 +112,7 @@ def test_inmemory_search_hybrid_with_filter():
 
 def test_protocol_compliance_inmemory():
     """InMemoryStore가 VectorStore Protocol을 만족하지만 HybridVectorStore는 아님."""
-    from lloydk.adapters.vectorstore.base import HybridVectorStore, VectorStore
+    from lloydk.adapters.vectorstore.base import VectorStore
 
     vs = InMemoryStore()
     # runtime_checkable Protocol — 구조적 호환 확인

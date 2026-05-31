@@ -16,7 +16,6 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from build_offline_bundle import (  # noqa: E402
-    BundleManifest,
     ComponentEntry,
     ModelEntry,
     PluginEntry,

@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -29,8 +30,6 @@ _HERE = Path(__file__).resolve().parent
 _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
-
-import argparse
 
 
 # ── 텍스트 정제 ──────────────────────────────────────────────
@@ -397,7 +396,7 @@ def main() -> int:
         print(f"[oss]   누적 {len(all_docs):,}건 | 등급분포: {dist}")
 
     # ── 저장 ──────────────────────────────────────────────────
-    print(f"\n[oss] === 저장 ===")
+    print("\n[oss] === 저장 ===")
     for doc in all_docs:
         save = {k: v for k, v in doc.items()
                 if k not in ("grade_confidence", "char_len")}
@@ -415,7 +414,7 @@ def main() -> int:
     )
 
     # ── 최종 리포트 ───────────────────────────────────────────
-    print(f"\n[oss] ==================== 완료 ====================")
+    print("\n[oss] ==================== 완료 ====================")
     print(f"[oss] 문서: {len(all_docs):,}건 / 목표 {target:,}건")
     print(f"[oss] 쿼리: {len(queries):,}건")
 
@@ -444,7 +443,7 @@ def main() -> int:
 
     # ── 원본 스냅샷 (--snapshot-raw) ──────────────────────────────
     if args.snapshot_raw:
-        print(f"\n[oss] === 원본 스냅샷 저장 (--snapshot-raw) ===")
+        print("\n[oss] === 원본 스냅샷 저장 (--snapshot-raw) ===")
         _write_snapshot(all_docs, out_dir)
 
     return 0

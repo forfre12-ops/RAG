@@ -115,6 +115,8 @@ class Settings(BaseSettings):
     auth_mode: str = "api_key"
     jwt_jwks_path: str = ""           # JWKS JSON 파일 경로 (kid → key)
     jwt_public_key: str = ""          # 단일 RS256 공개키 PEM (JWKS 미사용시)
+    jwt_issuer: str = ""              # iss claim 검증값. 빈 문자열이면 검증 skip (개발용)
+    jwt_audience: str = ""            # aud claim 검증값. 빈 문자열이면 검증 skip (개발용)
 
     # CORS allow-origins. 운영에서는 .env로 origin allowlist 설정.
     # 기본값 ["*"]은 PoC·dryrun·테스트 편의를 위함. 운영 배포 시 명시적 origin 필수.
@@ -254,10 +256,35 @@ def assert_production_credentials() -> None:
             f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
             ".env / 환경변수 / secrets_manager(Vault·AWS SM)로 설정 필요."
         )
+    # CORS=["*"] 운영에서 오류
     if settings.cors_allow_origins == ["*"]:
-        logger.warning(
-            "SECURITY: CORS allow-origins=[\"*\"] — production 배포에서는 "
+        raise RuntimeError(
+            "SECURITY: CORS allow-origins=[\"*\"]는 운영 모드에서 허용되지 않습니다. "
             "LLOYDK_CORS_ALLOW_ORIGINS=https://your.domain.com 으로 명시하세요."
+        )
+
+    # RATE_LIMIT_DISABLED 운영에서 오류
+    if os.environ.get("RATE_LIMIT_DISABLED", "").strip() in {"1", "true", "yes"}:
+        raise RuntimeError(
+            "RATE_LIMIT_DISABLED=1 은 운영 모드에서 허용되지 않습니다. "
+            "부하 테스트 후 반드시 제거하세요."
+        )
+
+    # rule-fallback-v0 운영 차단 — 모델 디렉토리가 명시됐는데 없으면 즉시 오류
+    if settings.classifier_model_dir:
+        from pathlib import Path  # noqa: PLC0415
+        model_path = Path(settings.classifier_model_dir)
+        if not model_path.exists():
+            raise RuntimeError(
+                f"CLASSIFIER_MODEL_DIR={settings.classifier_model_dir!r} 경로가 존재하지 않습니다. "
+                "운영 모드에서 모델 미로드 시 rule-fallback-v0으로 조용히 넘어가지 않습니다. "
+                "경로를 수정하거나 CLASSIFIER_MODEL_DIR을 비워 rule-fallback 의도를 명시하세요."
+            )
+    else:
+        # 모델 디렉토리 미설정 = rule-fallback 의도. 운영에서 경고만.
+        logger.warning(
+            "CLASSIFIER_MODEL_DIR 미설정 — rule-fallback-v0으로 분류됩니다. "
+            "운영에서 모델 추론이 필요하면 CLASSIFIER_MODEL_DIR을 설정하세요."
         )
 
 

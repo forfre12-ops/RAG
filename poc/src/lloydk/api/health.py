@@ -19,6 +19,10 @@ from lloydk.config import settings
 router = APIRouter(tags=["health"])
 _START = time.time()
 
+# app.py lifespan이 _warmup_models 완료 후 True로 설정.
+# uptime 기반 추정 대신 실제 startup 완료 여부를 나타냄.
+STARTUP_COMPLETE: bool = False
+
 
 def _check_model() -> dict:
     """InferencePipeline 로드 상태 확인.
@@ -57,9 +61,9 @@ def healthz():
         "llm_provider": getattr(settings, "llm_provider", "unknown"),
         "vector_backend": getattr(settings, "vector_backend", "unknown"),
         "reranker_provider": getattr(settings, "reranker_provider", "noop"),
-        # warmup 완료 여부 — lifespan 의 _warmup_models 가 끝나면 True.
-        # uptime ≥ 2s 면 warmup 끝났다고 본다 (lite-noapi 에서는 즉시 반환).
-        "warmup_done": (time.time() - _START) >= 2.0,
+        # warmup 완료 여부 — lifespan의 _warmup_models 완료 후 True.
+        # app.py startup이 끝나야 True가 되므로 uptime 기반 추정보다 정확.
+        "warmup_done": STARTUP_COMPLETE,
         "checks": {
             "model": model_check["status"],
         },

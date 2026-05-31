@@ -10,14 +10,12 @@ Trigger: `docker compose up -d postgres` then `pytest tests/test_db_models.py`.
 
 from __future__ import annotations
 
-import os
 import uuid
 
 import pytest
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.config import settings
 from lloydk.db import Base, SessionLocal, engine, session_scope
 from lloydk.db.models import (
     AuditLog,
@@ -26,17 +24,9 @@ from lloydk.db.models import (
     ClassificationLevel,
     Correction,
     Document,
-    DocumentFactorScore,
-    DocumentLabel,
     EvaluationFactor,
-    LevelKeyword,
     LlmUsage,
-    ModelVersion,
-    SampleDocument,
     Tenant,
-    TrainingDataset,
-    TrainingEpoch,
-    TrainingRun,
 )
 
 
@@ -65,7 +55,7 @@ pytestmark = pytest.mark.skipif(
 # ============================================================
 
 def test_orm_metadata_has_expected_tables():
-    """Sanity: all 19 ORM-mapped parent tables present in Base.metadata."""
+    """Sanity: all ORM-mapped parent tables present in Base.metadata."""
     expected = {
         "tenants",
         "classification_levels",
@@ -86,6 +76,7 @@ def test_orm_metadata_has_expected_tables():
         "sample_documents",
         "llm_usage",
         "audit_log",
+        "guides",          # N5: GuideService DB 이전
     }
     actual = set(Base.metadata.tables.keys())
     missing = expected - actual

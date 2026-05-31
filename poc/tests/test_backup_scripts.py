@@ -12,10 +12,8 @@ import datetime as dt
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
-import pytest
 
 
 # 스크립트 디렉터리를 sys.path에 추가

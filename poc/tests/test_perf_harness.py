@@ -9,13 +9,12 @@
 
 from __future__ import annotations
 
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from lloydk.perf.harness import AvailableResources, _detect_trained_model
-from lloydk.perf.kpis import KPI, KPIS, aggregate, kpi_by_id, passes
+from lloydk.perf.kpis import KPIS, aggregate, kpi_by_id, passes
 
 
 class TestAggregate:

@@ -18,6 +18,7 @@ from lloydk.api import confirm as confirm_api
 from lloydk.api import training as training_api
 from lloydk.api import synthesis as synthesis_api
 from lloydk.api import guide as guide_api
+from lloydk.api import documents as documents_api
 from lloydk.api import schema_admin as schema_admin_api
 from lloydk.api import metrics as metrics_api
 from lloydk.api import async_classify as async_classify_api
@@ -50,6 +51,10 @@ async def lifespan(app: FastAPI):
     except Exception as exc:  # noqa: BLE001
         logger.warning("OTel setup skipped: %s", exc)
     _warmup_models(settings)
+    # health.py warmup_done 플래그 — lifespan 완료 시점에 True로 세팅.
+    # uptime 기반 추정 대신 실제 startup 완료를 정확히 반영.
+    from lloydk.api import health as _health_mod  # noqa: PLC0415
+    _health_mod.STARTUP_COMPLETE = True
     yield
 
 
@@ -153,6 +158,7 @@ else:
     logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
 app.include_router(synthesis_api.router, prefix="/api/v1")
 app.include_router(guide_api.router, prefix="/api/v1")
+app.include_router(documents_api.router, prefix="/api/v1")
 app.include_router(schema_admin_api.router, prefix="/api/v1")
 app.include_router(metrics_api.router, prefix="/api/v1")
 app.include_router(prom_metrics_api.router, prefix="/api/v1")

@@ -74,6 +74,23 @@ ACTIVE_LEARNING_UNDERCLASS = Gauge(
     registry=registry,
 )
 
+# 학습 가중치 미로드 → rule-fallback-v0 사용 횟수.
+# 운영에서 이 값이 올라가면 모델 로딩 실패 또는 경로 미설정 신호.
+RULE_FALLBACK_TOTAL = Counter(
+    "lloydk_rule_fallback_total",
+    "Classifications served by rule-fallback-v0 (model weights not loaded)",
+    registry=registry,
+)
+
+# classify DB 영속화 실패 횟수 — inference_id가 임시 UUID로 대체됨.
+# 운영에서 이 값이 올라가면 DB 연결 장애 또는 데이터 정합성 문제 신호.
+CLASSIFY_PERSIST_FAILURE_TOTAL = Counter(
+    "lloydk_classify_persist_failure_total",
+    "Classify persistence failures (DB unavailable or error, inference_id is ephemeral UUID)",
+    ["reason"],  # db_error | unexpected | no_tenant | no_doc | no_level | import_error
+    registry=registry,
+)
+
 # L2: 임베딩 모델 로드 실패 → fallback 사용 (정확도 저하 위험) 카운트
 EMBEDDING_FALLBACK_TOTAL = Counter(
     "lloydk_embedding_fallback_total",

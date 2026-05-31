@@ -6,7 +6,6 @@ encode_batch 미주입·길이 불일치·예외 시 단건 encode로 폴백.
 
 from __future__ import annotations
 
-import pytest
 
 from lloydk.adapters.vectorstore.base import SearchHit
 

@@ -100,9 +100,33 @@ def verify_jwt(token: str) -> JWTClaims:
     _verify_signature(signing_input, signature, key)
 
     now = int(time.time())
-    exp = int(payload.get("exp", 0))
-    if exp and exp < now:
+
+    # exp — 필수. 없거나 만료된 토큰 즉시 거부.
+    exp = payload.get("exp")
+    if exp is None:
+        raise JWTError("token missing exp claim")
+    if int(exp) < now:
         raise JWTError("token expired")
+
+    # nbf (not before) — 있으면 검증. 미래 토큰 조기 사용 차단.
+    nbf = payload.get("nbf")
+    if nbf is not None and int(nbf) > now:
+        raise JWTError("token not yet valid (nbf)")
+
+    # iss (issuer) — settings.jwt_issuer 설정 시 반드시 일치해야 함.
+    expected_iss = getattr(settings, "jwt_issuer", "")
+    if expected_iss:
+        if str(payload.get("iss", "")) != expected_iss:
+            raise JWTError(f"issuer mismatch: expected {expected_iss!r}")
+
+    # aud (audience) — settings.jwt_audience 설정 시 payload aud에 포함되어야 함.
+    expected_aud = getattr(settings, "jwt_audience", "")
+    if expected_aud:
+        aud = payload.get("aud")
+        aud_list = [aud] if isinstance(aud, str) else (aud or [])
+        if expected_aud not in aud_list:
+            raise JWTError(f"audience mismatch: {expected_aud!r} not in {aud_list}")
+
     iat = int(payload.get("iat", 0))
 
     return JWTClaims(
@@ -110,7 +134,7 @@ def verify_jwt(token: str) -> JWTClaims:
         tenant=str(payload.get("tenant", "")),
         roles=tuple(payload.get("roles", []) or []),
         kid=kid,
-        exp=exp,
+        exp=int(exp),
         iat=iat,
     )
 

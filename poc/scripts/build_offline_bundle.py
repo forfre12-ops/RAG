@@ -517,8 +517,8 @@ def _pip_download(out_dir: Path) -> bool:
             return False
         # git+ / file: / @ file: 라인 제거 (폐쇄망 번들에 포함 불가)
         lines = [
-            l for l in r.stdout.splitlines()
-            if not l.startswith("git+") and not l.startswith("-e ") and "@ file:" not in l
+            line for line in r.stdout.splitlines()
+            if not line.startswith("git+") and not line.startswith("-e ") and "@ file:" not in line
         ]
         req = out_dir / "_requirements_freeze.txt"
         req.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -532,6 +532,65 @@ def _pip_download(out_dir: Path) -> bool:
     count = sum(1 for _ in wheels_dir.glob("*.whl"))
     print(f"  [pip]  {count} wheels -> {wheels_dir}", file=sys.stderr)
     return True
+
+
+def _copy_ocr_binaries(out_dir: Path) -> None:
+    """Tesseract + kor.traineddata + poppler 바이너리를 번들에 포함.
+
+    폐쇄망 배포 시 pip wheels 만으로는 OCR이 동작하지 않음.
+    시스템 바이너리를 ocr-binaries/ 디렉터리에 복사해 두고 install.sh 가 설치.
+
+    Windows 번들 빌더 기준 경로:
+      Tesseract: C:/Program Files/Tesseract-OCR/ 또는 환경변수 TESSERACT_DIR
+      poppler  : ~/tools/poppler/bin/ 또는 환경변수 POPPLER_DIR
+    """
+    import shutil
+    import os
+
+    ocr_dir = out_dir / "ocr-binaries"
+
+    # ── Tesseract ──────────────────────────────────────────────────
+    tess_src_candidates = [
+        os.environ.get("TESSERACT_DIR", ""),
+        r"C:\Program Files\Tesseract-OCR",
+    ]
+    tess_src = next((Path(p) for p in tess_src_candidates if p and Path(p).exists()), None)
+    if tess_src:
+        tess_dst = ocr_dir / "tesseract"
+        tess_dst.mkdir(parents=True, exist_ok=True)
+        # 실행파일만 (전체 설치본은 너무 크므로 exe + dll)
+        for pattern in ("tesseract.exe", "*.dll"):
+            for f in tess_src.glob(pattern):
+                shutil.copy2(f, tess_dst / f.name)
+        # kor.traineddata
+        tessdata_src = tess_src / "tessdata"
+        if tessdata_src.exists():
+            tessdata_dst = ocr_dir / "tessdata"
+            tessdata_dst.mkdir(exist_ok=True)
+            for lang in ("kor.traineddata", "eng.traineddata"):
+                src_f = tessdata_src / lang
+                if src_f.exists():
+                    shutil.copy2(src_f, tessdata_dst / lang)
+        print(f"  [ocr]  Tesseract 바이너리 → {tess_dst}", file=sys.stderr)
+    else:
+        print("  [WARN] Tesseract 미발견 — TESSERACT_DIR 환경변수로 경로 지정 필요", file=sys.stderr)
+
+    # ── poppler ────────────────────────────────────────────────────
+    poppler_src_candidates = [
+        os.environ.get("POPPLER_DIR", ""),
+        str(Path.home() / "tools" / "poppler" / "bin"),
+        r"C:\Program Files\poppler\bin",
+    ]
+    poppler_src = next((Path(p) for p in poppler_src_candidates if p and (Path(p) / "pdftoppm.exe").exists()), None)
+    if poppler_src:
+        poppler_dst = ocr_dir / "poppler" / "bin"
+        poppler_dst.mkdir(parents=True, exist_ok=True)
+        for f in poppler_src.glob("*"):
+            if f.is_file():
+                shutil.copy2(f, poppler_dst / f.name)
+        print(f"  [ocr]  poppler 바이너리 → {poppler_dst}", file=sys.stderr)
+    else:
+        print("  [WARN] poppler 미발견 — POPPLER_DIR 환경변수로 경로 지정 필요", file=sys.stderr)
 
 
 def _copy_infra(out_dir: Path) -> None:
@@ -573,6 +632,11 @@ def _copy_infra(out_dir: Path) -> None:
         import shutil as _sh
         _sh.copytree(alembic_src, alembic_dst)
 
+    # ── OCR 시스템 바이너리 번들 ──────────────────────────────────
+    # Tesseract 실행파일 + kor.traineddata, poppler 바이너리를 번들에 포함.
+    # 폐쇄망에서 OCR 동작 필수 — pip wheels 만으로는 부족.
+    _copy_ocr_binaries(out_dir)
+
     # install.sh
     install_sh = out_dir / "install.sh"
     install_sh.write_text(
@@ -588,7 +652,22 @@ def _copy_infra(out_dir: Path) -> None:
         "# 2) pip install from wheels\n"
         "pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" \\\n"
         "  -r \"$BUNDLE_DIR/python-deps/requirements.lock.txt\" || true\n\n"
-        "# 3) env 설정\n"
+        "# 3) OCR 바이너리 설치 (Linux 온프레미스 기준)\n"
+        "if [ -d \"$BUNDLE_DIR/ocr-binaries/tesseract\" ]; then\n"
+        "  echo '[OCR] Tesseract 설치 중 ...'\n"
+        "  dpkg -i \"$BUNDLE_DIR/ocr-binaries/tesseract\"/*.deb 2>/dev/null || \\\n"
+        "    cp -r \"$BUNDLE_DIR/ocr-binaries/tesseract/bin/\" /usr/local/bin/ || true\n"
+        "  cp \"$BUNDLE_DIR/ocr-binaries/tessdata/kor.traineddata\" \\\n"
+        "     /usr/share/tesseract-ocr/5/tessdata/ 2>/dev/null || \\\n"
+        "     mkdir -p /usr/local/share/tessdata && \\\n"
+        "     cp \"$BUNDLE_DIR/ocr-binaries/tessdata/kor.traineddata\" \\\n"
+        "        /usr/local/share/tessdata/ || true\n"
+        "fi\n"
+        "if [ -d \"$BUNDLE_DIR/ocr-binaries/poppler\" ]; then\n"
+        "  echo '[OCR] poppler 설치 중 ...'\n"
+        "  cp -r \"$BUNDLE_DIR/ocr-binaries/poppler/bin/\"* /usr/local/bin/ || true\n"
+        "fi\n\n"
+        "# 4) env 설정\n"
         "cp \"$BUNDLE_DIR/infra-config/.env.template\" .env\n"
         "echo 'Edit .env, then run: docker compose up -d'\n",
         encoding="utf-8",

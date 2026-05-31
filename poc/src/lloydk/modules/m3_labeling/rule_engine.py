@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 import re
@@ -24,6 +25,8 @@ from lloydk.modules.m3_labeling.seeds import (
     GRADE_ORDER,
     KEYWORD_SEEDS,
 )
+
+logger = logging.getLogger(__name__)
 
 # semantic 매칭 기본 코사인 임계값. EMB_SEMANTIC_THRESHOLD 환경변수로 오버라이드 가능.
 _DEFAULT_SEMANTIC_THRESHOLD = 0.75
@@ -214,3 +217,17 @@ class LabelRuleEngine:
         if not kw:
             return 0
         return text.count(kw)
+
+
+def build_rule_engine_from_db(**kwargs) -> LabelRuleEngine:
+    """DB level_keywords에서 시드를 로드해 LabelRuleEngine 생성.
+
+    다른 프로젝트에서 DB에 도메인 키워드를 등록하면 코드 변경 없이 룰 엔진이 갱신됩니다.
+    DB 미가용 또는 키워드 없음 → KEYWORD_SEEDS로 자동 폴백.
+    """
+    from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS, load_seeds_from_db  # noqa: PLC0415
+    seeds = load_seeds_from_db()
+    if seeds is None:
+        logger.debug("build_rule_engine_from_db: DB 미가용, KEYWORD_SEEDS 폴백")
+        seeds = KEYWORD_SEEDS
+    return LabelRuleEngine(seeds=seeds, **kwargs)

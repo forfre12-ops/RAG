@@ -3,12 +3,34 @@
 라이브러리 로드 실패는 graceful degrade — 라이브러리가 없는 환경에서도 .txt/.md는 처리.
 extractor가 반환하는 ExtractResult는 추출 메서드·품질·OCR 사용 여부를 포함해
 DB `documents.extraction_method/quality/ocr_used` 와 1:1.
+
+OCR 엔진: Tesseract 5.x + 한국어팩 (kor.traineddata) — Apache 2.0.
+  - 시스템 경로 자동 탐지 후 환경변수 TESSERACT_CMD 로 override 가능.
+  - 폐쇄망 초기 설치: winget install UB-Mannheim.TesseractOCR 후 kor.traineddata 복사.
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+# Tesseract 실행파일 경로 — 환경변수 > Windows 기본 경로 > PATH
+_TESS_DEFAULT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+TESSERACT_CMD = os.environ.get("TESSERACT_CMD") or (
+    _TESS_DEFAULT if Path(_TESS_DEFAULT).exists() else "tesseract"
+)
+
+# poppler 경로 (pdf2image가 사용) — 환경변수 > 사용자 tools > None(PATH 탐색)
+_POPPLER_CANDIDATES = [
+    os.environ.get("POPPLER_PATH", ""),
+    str(Path.home() / "tools" / "poppler" / "bin"),
+    r"C:\Program Files\poppler\bin",
+]
+POPPLER_PATH: str | None = next(
+    (p for p in _POPPLER_CANDIDATES if p and (Path(p) / "pdftoppm.exe").exists()),
+    None,
+)
 
 
 @dataclass
@@ -32,6 +54,8 @@ def extract(path: str | Path) -> ExtractResult:
         return _extract_docx(p)
     if suffix in ("pdf",):
         return _extract_pdf(p)
+    if suffix in ("jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"):
+        return _extract_image_ocr(p)
     return ExtractResult(text="", method="plain", quality=0.0, error=f"unsupported: {suffix}")
 
 
@@ -45,11 +69,10 @@ def _extract_plain(p: Path) -> ExtractResult:
 
 def _extract_hwp(p: Path) -> ExtractResult:
     # 1순위: rhwp-python 0.5.x (HWP+HWPX 통합, optional extra `[hwp]`)
-    # 활성: pip install -e ".[hwp]"
     try:
         import rhwp  # type: ignore
 
-        doc = rhwp.parse(str(p))  # 0.5.x API
+        doc = rhwp.parse(str(p))
         text = doc.extract_text()
         return ExtractResult(text=text, method="rhwp", quality=0.95)
     except Exception:
@@ -81,38 +104,100 @@ def _extract_docx(p: Path) -> ExtractResult:
 def _extract_pdf(p: Path) -> ExtractResult:
     """PDF 추출.
 
-    라이선스 안전 우선순위:
-    1) pdfminer.six (BSD-3-Clause) — 운영 기본
-    2) PyMuPDF (AGPL-3.0) — 설치돼 있고 라이선스 우회 결정된 경우만 (fallback)
-       Artifex 상용 라이선스 또는 명시적 AGPL 수용 시에만 활성화 권장.
-    3) 둘 다 실패 시 OCR 안내
+    1) pdfminer.six (BSD-3) — 텍스트 레이어 있는 경우
+    2) PyMuPDF (AGPL) — 설치된 경우 fallback
+    3) Tesseract OCR — 텍스트 레이어 없는 스캔본
     """
-    # 1순위: pdfminer.six (BSD, AGPL 회피)
+    # 1순위: pdfminer.six
     try:
         from pdfminer.high_level import extract_text  # type: ignore
 
         text = extract_text(str(p)) or ""
         if text.strip():
-            # pages는 pdfminer가 직접 안 주므로 form feed로 추정
             pages = max(1, text.count("\x0c") + 1)
             return ExtractResult(text=text, method="parser", quality=0.92, pages=pages)
     except Exception:  # noqa: BLE001
-        # pdfminer 미설치 또는 추출 실패 → 2순위로
         pass
 
-    # 2순위: PyMuPDF (AGPL — 운영 시 Artifex 라이선스 또는 명시적 AGPL 수용 후 사용)
+    # 2순위: PyMuPDF (AGPL 옵트인)
     try:
-        import fitz  # PyMuPDF  # type: ignore
+        import fitz  # type: ignore
 
         doc = fitz.open(str(p))
         try:
-            pages = [page.get_text() for page in doc]
+            page_texts = [page.get_text() for page in doc]
+            n_pages = len(page_texts)
         finally:
             doc.close()
-        text = "\n".join(pages)
+        text = "\n".join(page_texts)
         if text.strip():
-            return ExtractResult(text=text, method="parser", quality=0.95, pages=len(pages))
-        return ExtractResult(text="", method="ocr", quality=0.0, ocr_used=False,
-                             pages=len(pages), error="no text layer (OCR needed)")
+            return ExtractResult(text=text, method="parser", quality=0.95, pages=n_pages)
+        # 텍스트 레이어 없음 → OCR 시도
+        return _ocr_pdf_pages(p, n_pages)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 3순위: pdfminer로 읽혔지만 빈 텍스트 → OCR 시도
+    return _ocr_pdf_pages(p, None)
+
+
+def _ocr_pdf_pages(p: Path, n_pages: int | None) -> ExtractResult:
+    """PDF 페이지를 이미지로 변환 후 Tesseract OCR."""
+    try:
+        from pdf2image import convert_from_path  # type: ignore
+
+        kwargs = {"dpi": 200}
+        if POPPLER_PATH:
+            kwargs["poppler_path"] = POPPLER_PATH
+        images = convert_from_path(str(p), **kwargs)
+        texts = [_tess_image(img) for img in images]
+        text = "\n".join(t for t in texts if t)
+        if text.strip():
+            return ExtractResult(
+                text=text, method="ocr", quality=0.75,
+                ocr_used=True, pages=len(images),
+            )
+    except Exception:  # noqa: BLE001
+        pass
+    return ExtractResult(
+        text="", method="ocr", quality=0.0, ocr_used=False,
+        pages=n_pages, error="OCR failed (no text layer, pdf2image/tesseract unavailable)",
+    )
+
+
+def _extract_image_ocr(p: Path) -> ExtractResult:
+    """이미지 파일(jpg/png/tiff 등) 직접 OCR."""
+    try:
+        from PIL import Image  # type: ignore
+
+        img = Image.open(str(p))
+        text = _tess_image(img)
+        if text.strip():
+            return ExtractResult(text=text, method="ocr", quality=0.75, ocr_used=True)
+        return ExtractResult(text="", method="ocr", quality=0.0, ocr_used=True,
+                             error="OCR produced empty text")
     except Exception as exc:  # noqa: BLE001
-        return ExtractResult(text="", method="parser", quality=0.0, error=str(exc))
+        return ExtractResult(text="", method="ocr", quality=0.0,
+                             ocr_used=True, error=str(exc))
+
+
+def _tess_image(img) -> str:
+    """PIL Image → Tesseract OCR 텍스트. kor+eng 병행 인식."""
+    import pytesseract  # type: ignore
+
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+    langs = "+".join(_available_tess_langs(["kor", "eng"]))
+    return pytesseract.image_to_string(img, lang=langs, config="--psm 3")
+
+
+def _available_tess_langs(preferred: list[str]) -> list[str]:
+    """설치된 언어팩 중 preferred 교집합. 없으면 eng 폴백."""
+    try:
+        import pytesseract  # type: ignore
+
+        pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+        installed = set(pytesseract.get_languages())
+        result = [lg for lg in preferred if lg in installed]
+        return result if result else ["eng"]
+    except Exception:  # noqa: BLE001
+        return ["eng"]

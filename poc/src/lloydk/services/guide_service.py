@@ -2,7 +2,10 @@
 
 흐름 (W5):
 - 업로드 파일 수신 (multipart)
-- 텍스트 디코딩 → RagIndexer.index_guide(...) → ES 적재 + alias 스왑
+- 포맷 자동 감지 → extract() 텍스트 추출 (HWP/PDF/DOCX/TXT 지원)
+  이전: _decode_best_effort() 로 바이트 직접 디코딩 → HWP/PDF 깨짐
+  변경: m2_preprocess.extractor.extract() 경유 → 실제 파서 사용
+- RagIndexer.index_guide(...) → ES 적재 + alias 스왑
 - 메타 기록 (in-memory, 운영은 PG 'guides' 테이블 신설 권장)
 - ES 미가용 또는 임베딩 실패 시 indexed=False + warnings (best-effort)
 """
@@ -11,10 +14,14 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import os
+import tempfile
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
+from lloydk.modules.m2_preprocess.extractor import extract as _extract_file
 from lloydk.modules.m4_training.rag_indexer import RagIndexer
 from lloydk.schemas.guide import GuideUploadResponse, GuideVersionItem, GuideVersionList
 
@@ -64,6 +71,55 @@ class GuideService:
             self._indexer = RagIndexer()
         return self._indexer
 
+    def _persist_guide(self, rec: _GuideRecord, doc_type: Optional[str], filename: Optional[str]) -> None:
+        """guides 테이블에 버전 이력 저장 (best-effort)."""
+        try:
+            from lloydk.db import session_scope  # noqa: PLC0415
+            from lloydk.repositories.guide_repo import GuideRepo  # noqa: PLC0415
+            with session_scope() as db:
+                GuideRepo(db).create(
+                    guide_id=rec.guide_id,
+                    version=rec.version,
+                    tenant_id="default",
+                    effective_date=rec.effective_date,
+                    change_summary=rec.change_summary,
+                    doc_type=doc_type,
+                    filename=filename,
+                    indexed=rec.indexed,
+                    embedding_vector_count=rec.embedding_vector_count,
+                    index_name=rec.index_name,
+                    alias=rec.alias,
+                    model=rec.model,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("guide persist to DB skipped: %s", exc)
+
+    def list_versions_from_db(self, guide_id: str) -> Optional["GuideVersionList"]:
+        """DB에서 버전 이력 조회. DB 미가용 시 None."""
+        try:
+            from lloydk.db import session_scope  # noqa: PLC0415
+            from lloydk.repositories.guide_repo import GuideRepo  # noqa: PLC0415
+            with session_scope() as db:
+                rows = GuideRepo(db).list_versions(guide_id)
+                if not rows:
+                    return None
+                return GuideVersionList(
+                    guide_id=guide_id,
+                    current_training_version=GuideRepo(db).latest_training_version(guide_id),
+                    versions=[
+                        GuideVersionItem(
+                            version=r.version,
+                            effective_date=r.effective_date,
+                            change_summary=r.change_summary,
+                            registered_at=r.registered_at.isoformat() if r.registered_at else "",
+                        )
+                        for r in rows
+                    ],
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("guide list_versions_from_db failed: %s", exc)
+            return None
+
     def upload(
         self,
         *,
@@ -75,12 +131,13 @@ class GuideService:
         actor_user_id: str,
         tenant_id: str = "default",
         doc_type: Optional[str] = None,
+        filename: Optional[str] = None,
     ) -> GuideUploadResponse:
         logger.debug(
             "guide upload enter: guide_id=%s version=%s tenant=%s bytes=%d actor=%s",
             guide_id, version, tenant_id, len(content_bytes or b""), actor_user_id,
         )
-        text = _decode_best_effort(content_bytes)
+        text = _extract_text(content_bytes, filename=filename or "guide.txt")
         indexer = self._get_indexer()
         result = indexer.index_guide(
             guide_id=guide_id,
@@ -104,6 +161,7 @@ class GuideService:
             model=result.model,
         )
         self._guides[guide_id].append(rec)
+        self._persist_guide(rec, doc_type=doc_type, filename=filename)
 
         if result.warnings:
             logger.info(
@@ -126,6 +184,11 @@ class GuideService:
 
     def list_versions(self, guide_id: str) -> Optional[GuideVersionList]:
         logger.debug("guide list_versions enter: guide_id=%s", guide_id)
+        # DB 우선 — 가용 시 영속 데이터 반환 (재시작 후에도 유지)
+        db_result = self.list_versions_from_db(guide_id)
+        if db_result is not None:
+            return db_result
+        # DB 미가용 폴백: in-memory
         records = self._guides.get(guide_id)
         if not records:
             return None
@@ -144,12 +207,30 @@ class GuideService:
         )
 
 
-def _decode_best_effort(data: bytes) -> str:
-    """업로드 바이트를 텍스트로 디코딩. UTF-8 우선 → CP949 폴백 → 무손실 latin-1."""
-    for enc in ("utf-8", "utf-8-sig", "cp949", "euc-kr"):
-        try:
-            return data.decode(enc)
-        except (UnicodeDecodeError, LookupError):
-            continue
-    return data.decode("latin-1", errors="replace")
+def _extract_text(data: bytes, filename: str = "guide.txt") -> str:
+    """파일 바이트 → 텍스트. 포맷 자동 감지(HWP/PDF/DOCX/TXT).
+
+    임시파일 경유로 extract() 를 호출해 실제 파서를 탄다.
+    추출 실패(라이브러리 없음, 스캔본 등)는 빈 문자열 반환 + 로그 — indexed=False 처리.
+    평문 포맷(txt/md)은 extract() 내부에서 UTF-8/CP949 자동 처리.
+    """
+    suffix = Path(filename).suffix or ".txt"
+    tmp_path: Optional[str] = None
+    try:
+        fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        result = _extract_file(tmp_path)
+        if result.error:
+            logger.warning("guide extract warning: %s (file=%s)", result.error, filename)
+        return result.text or ""
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("guide extract failed: %s (file=%s)", exc, filename)
+        return ""
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 

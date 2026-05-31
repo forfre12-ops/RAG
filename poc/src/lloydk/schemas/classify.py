@@ -8,7 +8,7 @@ class DocumentInput(BaseModel):
     doc_id: str
     tenant_id: Optional[str] = None
     title: Optional[str] = None
-    content: str = Field(max_length=1_048_576)
+    content: Optional[str] = Field(default=None, max_length=1_048_576)
     metadata: Optional[dict] = None
     text_already_preprocessed: bool = False
 

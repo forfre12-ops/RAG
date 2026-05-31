@@ -77,7 +77,6 @@ class TestEmbeddingDefault:
     def test_build_embedder_returns_hf_when_available(self):
         # build_embedder는 settings.embedding_model 기본 = nlpai-lab/KURE-v1
         # HF 로드 실패 시 HashEmbedding 폴백 — 본 환경은 sentence-transformers 설치돼 있음
-        from lloydk.adapters.embedding.hash_embedding import HashEmbedding
         emb = build_embedder()
         # 둘 중 하나라도 동작하면 OK (KURE-v1 다운로드 환경 의존성)
         assert emb is not None

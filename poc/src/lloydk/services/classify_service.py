@@ -71,11 +71,28 @@ class ClassifyService:
             req.doc_id, req.tenant_id, req.use_rag, len(req.content or ""),
         )
         notify("extract")
+        # content가 없으면 normalized_text_uri에서 읽어오기 (doc_id 전용 분류 경로)
+        content = req.content
+        if not content:
+            content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id or "default")
+        if not content:
+            warnings_acc = [f"content empty and doc_id={req.doc_id!r} not found in storage — cannot classify"]
+            return ClassifyResponse(
+                inference_id=uuid.uuid4(),
+                doc_id=req.doc_id,
+                label="S3",
+                confidence=0.0,
+                scores={},
+                model_version="none",
+                elapsed_ms=0,
+                status="error",
+                warnings=warnings_acc,
+            )
         if req.text_already_preprocessed:
-            cleaned = req.content
+            cleaned = content
         else:
             notify("normalize")
-            cleaned = self.preprocess.run_text(req.content)
+            cleaned = self.preprocess.run_text(content)
 
         # 표적 2 (2026-05-29): chunks 생성. 영속화는 _try_persist 단계에서 doc/tenant 가용 시 시도.
         # PoC PreprocessPipeline.chunk()는 외부 의존 없이 항상 동작.
@@ -156,6 +173,7 @@ class ClassifyService:
         try:
             from lloydk.db import session_scope  # noqa: PLC0415
         except ImportError as exc:
+            self._inc_persist_failure("import_error")
             warns.append(f"persistence skipped: db module unavailable ({exc})")
             return uuid.uuid4(), warns
 
@@ -163,14 +181,17 @@ class ClassifyService:
             with session_scope() as db:
                 repo = ClassifyRepo(db)
                 if not repo.tenant_exists(tenant_id):
+                    self._inc_persist_failure("no_tenant")
                     warns.append(f"persistence skipped: tenant_id={tenant_id!r} not found in DB")
                     return uuid.uuid4(), warns
                 if not repo.document_exists(doc_uuid):
+                    self._inc_persist_failure("no_doc")
                     warns.append(f"persistence skipped: doc_id={doc_uuid} not found in documents")
                     return uuid.uuid4(), warns
 
                 level_id = repo.level_id_by_code(pred.label)
                 if level_id is None:
+                    self._inc_persist_failure("no_level")
                     warns.append(f"persistence skipped: unknown level code {pred.label!r}")
                     return uuid.uuid4(), warns
 
@@ -237,6 +258,7 @@ class ClassifyService:
                 return cls.classification_id, warns
 
         except SQLAlchemyError as exc:
+            self._inc_persist_failure("db_error")
             logger.error(
                 "classify persistence db error: doc_id=%s err=%s",
                 req.doc_id, type(exc).__name__, exc_info=True,
@@ -244,6 +266,7 @@ class ClassifyService:
             warns.append(f"persistence skipped: db error ({type(exc).__name__})")
             return uuid.uuid4(), warns
         except Exception as exc:  # noqa: BLE001
+            self._inc_persist_failure("unexpected")
             logger.error(
                 "classify persistence unexpected error: doc_id=%s err=%s",
                 req.doc_id, type(exc).__name__, exc_info=True,
@@ -255,6 +278,50 @@ class ClassifyService:
             )
             warns.append(f"persistence skipped: unexpected error ({type(exc).__name__})")
             return uuid.uuid4(), warns
+
+    def _fetch_content_by_doc_id(self, doc_id: str, tenant_id: str) -> str:
+        """doc_id로 documents.normalized_text_uri → storage에서 텍스트 읽기.
+
+        ingestion 완료 문서는 normalized_text_uri를 갖고 있다.
+        storage·DB 미가용 시 빈 문자열 반환 — 호출자가 처리.
+        """
+        doc_uuid = self._parse_doc_uuid(doc_id)
+        if doc_uuid is None:
+            return ""
+        try:
+            from lloydk.adapters.storage import build_storage  # noqa: PLC0415
+            from lloydk.db import session_scope  # noqa: PLC0415
+            from lloydk.repositories.document_repo import DocumentRepo  # noqa: PLC0415
+        except ImportError:
+            return ""
+        try:
+            with session_scope() as db:
+                doc = DocumentRepo(db).get(doc_uuid)
+                if doc is None or not doc.normalized_text_uri:
+                    return ""
+                uri = doc.normalized_text_uri
+            # file:// URI → LocalStorage, s3:// or minio:// → MinioStorage
+            storage = build_storage()
+            # URI → bucket/key 분해
+            # 형식: file://…/<bucket>/<key> 또는 s3://<bucket>/<key>
+            import re as _re  # noqa: PLC0415
+            m = _re.match(r"(?:file|s3|minio)://[^/]*/([^/]+)/(.+)", uri)
+            if not m:
+                return ""
+            bucket, key = m.group(1), m.group(2)
+            data = storage.get(bucket, key)
+            return data.decode("utf-8", errors="replace")
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_fetch_content_by_doc_id failed: %s", exc)
+            return ""
+
+    @staticmethod
+    def _inc_persist_failure(reason: str) -> None:
+        try:
+            from lloydk.api.prom_metrics import CLASSIFY_PERSIST_FAILURE_TOTAL  # noqa: PLC0415
+            CLASSIFY_PERSIST_FAILURE_TOTAL.labels(reason=reason).inc()
+        except Exception:  # noqa: BLE001
+            pass
 
     @staticmethod
     def _parse_doc_uuid(value: str) -> Optional[uuid.UUID]:

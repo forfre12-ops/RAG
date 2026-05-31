@@ -256,11 +256,11 @@ def main() -> int:
         print()
 
     print("[koipa] 완료. 다음 명령으로 P2 재측정:")
-    print(f"  python scripts/p2_compare_embeddings.py \\")
-    print(f"    --mode full --backends es --hybrid \\")
+    print("  python scripts/p2_compare_embeddings.py \\")
+    print("    --mode full --backends es --hybrid \\")
     print(f"    --synth-dir {out_dir} \\")
-    print(f"    --query-style koipa \\")
-    print(f"    --report reports/p2_koipa.md")
+    print("    --query-style koipa \\")
+    print("    --report reports/p2_koipa.md")
 
     return 0
 

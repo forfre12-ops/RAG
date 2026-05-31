@@ -14,7 +14,6 @@ from sqlalchemy.exc import OperationalError
 
 from lloydk.db import SessionLocal, engine
 from lloydk.db.models import (
-    Classification,
     ClassificationLevel,
     Correction,
     Document,

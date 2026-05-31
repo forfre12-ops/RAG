@@ -21,6 +21,58 @@ class DocumentRepo:
     def get(self, doc_id: uuid.UUID | str) -> Document | None:
         return self.db.get(Document, doc_id)
 
+    def create(
+        self,
+        *,
+        tenant_id: str,
+        filename: str,
+        source_format: str,
+        file_hash: str | None = None,
+        file_size_bytes: int | None = None,
+        raw_text_uri: str | None = None,
+        normalized_text_uri: str | None = None,
+        text_preview: str | None = None,
+        char_count: int | None = None,
+        extraction_method: str | None = None,
+        extraction_quality: float | None = None,
+        ocr_used: bool = False,
+        processing_status: str = "ready",
+        external_ref: str | None = None,
+        metadata: dict | None = None,
+        created_by: str | None = None,
+    ) -> Document:
+        """``documents`` 행 1건 생성. 업로드 ingestion의 진실 소스.
+
+        doc_id는 PG server_default(gen_random_uuid)가 채우므로 flush 후 확보된다.
+        provenance(원본 보관 위치·해시·포맷·추출 메서드)를 1:1로 기록 — 감사·증빙 요건.
+        """
+        if not tenant_id:
+            raise ValueError("tenant_id is required for document create")
+        if not filename:
+            raise ValueError("filename is required for document create")
+
+        doc = Document(
+            tenant_id=tenant_id,
+            filename=filename,
+            source_format=(source_format or "bin")[:10],
+            file_hash=file_hash,
+            file_size_bytes=file_size_bytes,
+            raw_text_uri=raw_text_uri,
+            normalized_text_uri=normalized_text_uri,
+            text_preview=text_preview,
+            char_count=char_count,
+            extraction_method=extraction_method,
+            extraction_quality=extraction_quality,
+            ocr_used=ocr_used,
+            processing_status=processing_status,
+            external_ref=external_ref,
+            metadata_=metadata or {},
+            created_by=created_by,
+        )
+        self.db.add(doc)
+        self.db.flush()  # doc_id 확보 — 이후 chunks가 FK처럼 참조
+        return doc
+
     def delete(self, doc_id: uuid.UUID | str, tenant_id: str) -> int:
         """단일 Document 삭제 — tenant 검증 포함.
 

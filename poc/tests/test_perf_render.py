@@ -13,7 +13,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
 
 # scripts/ 임포트를 위해 sys.path 추가
 _SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"

@@ -19,7 +19,7 @@ import argparse
 import json
 import random
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from uuid import uuid4
 
@@ -121,7 +121,7 @@ def main() -> int:
         req = SynthRequest(target_grade=s["grade"], domain=s["domain"], count=1)
         try:
             docs = gen.generate(req)
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             n_fail += 1
             continue
         for d in docs:

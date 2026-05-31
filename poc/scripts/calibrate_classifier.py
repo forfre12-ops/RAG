@@ -25,7 +25,7 @@ from pathlib import Path
 def softmax(logits: list[float], temperature: float = 1.0) -> list[float]:
     if temperature <= 0:
         temperature = 1e-3
-    scaled = [l / temperature for l in logits]
+    scaled = [v / temperature for v in logits]
     m = max(scaled)
     exps = [math.exp(s - m) for s in scaled]
     z = sum(exps)

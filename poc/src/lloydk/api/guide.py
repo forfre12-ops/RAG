@@ -55,6 +55,7 @@ async def upload_guide(
         actor_user_id=actor_obj.user_id,
         tenant_id=actor_obj.tenant_id or "default",
         doc_type=doc_type,
+        filename=file.filename or f"{guide_id}.txt",
     )
 
 

@@ -6,11 +6,6 @@ from fastapi.testclient import TestClient
 
 from lloydk.api.app import app
 from lloydk.api.prom_metrics import (
-    ACTIVE_LEARNING_TOTAL,
-    ACTIVE_LEARNING_UNDERCLASS,
-    INPROGRESS,
-    REQUEST_COUNT,
-    REQUEST_LATENCY,
     registry,
 )
 from lloydk.config import settings

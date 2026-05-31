@@ -1,0 +1,253 @@
+"""DocumentIngestionService — 업로드 파일을 분류 대상 문서로 적재.
+
+현장 흐름 (지금까지 코드에 없던 본체):
+  파일 bytes
+    → extract() 포맷 라우팅 (txt/md/csv/docx/pdf/hwp/hwpx, 미지원/스캔본은 OCR 대상 표시)
+    → 원본 bytes를 object storage 저장 (raw_text_uri = 감사·증빙 원본)
+    → 정규화 + PII 마스킹 + 청크 (PreprocessPipeline.run_file)
+    → 정규화 텍스트도 storage 저장 (normalized_text_uri)
+    → documents 행 생성 (DocumentRepo.create — provenance 1:1)
+    → chunks 테이블 적재 (ChunkRepo.upsert_chunks)
+  이후 ClassifyService.classify(doc_id) 가 "이미 존재하는 documents"를 소비.
+
+설계 노트:
+- 가이드 문서(GuideService)와는 별도 도메인 — 이쪽은 등급 판정 대상 비밀문서.
+- DB·object storage 미가용 시 best-effort: persisted=False + warnings 로 안전 반환
+  (classify_service 의 best-effort 영속화 패턴과 동일 철학).
+- extract()는 path를 받으므로 임시파일 경유. 원본 진실 소스는 storage(raw_text_uri).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import os
+import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+from lloydk.adapters.storage import build_storage
+from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline, PreprocessResult
+from lloydk.repositories.chunk_repo import ChunkRepo
+from lloydk.repositories.document_repo import DocumentRepo
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class IngestResult:
+    doc_id: Optional[object]            # uuid.UUID | None (DB 미가용 시 None)
+    tenant_id: str
+    filename: str
+    source_format: str
+    file_hash: str
+    file_size_bytes: int
+    extraction_method: str
+    extraction_quality: float
+    ocr_used: bool
+    char_count: int
+    chunk_count: int
+    raw_text_uri: str
+    normalized_text_uri: Optional[str]
+    persisted: bool
+    warnings: list[str] = field(default_factory=list)
+
+
+class DocumentIngestionService:
+    """파일 업로드 → documents/chunks 적재 + 원본 보관 오케스트레이션.
+
+    부품 주입형 — 테스트에서는 LocalStorage + stub session 으로 격리.
+    운영에서는 build_storage()(MinIO) + session_scope.
+    """
+
+    RAW_BUCKET = "documents-raw"
+    NORM_BUCKET = "documents-normalized"
+
+    def __init__(self, *, storage=None, preprocess: PreprocessPipeline | None = None):
+        self._storage = storage
+        self.preprocess = preprocess or PreprocessPipeline()
+
+    def _get_storage(self):
+        if self._storage is None:
+            self._storage = build_storage()
+        return self._storage
+
+    # ------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------
+
+    def ingest(
+        self,
+        *,
+        filename: str,
+        content_bytes: bytes,
+        tenant_id: str,
+        doc_type: Optional[str] = None,
+        external_ref: Optional[str] = None,
+        created_by: Optional[str] = None,
+        db=None,
+        persist: bool = True,
+    ) -> IngestResult:
+        """파일 1건 적재. 실패(추출 0, DB·storage 미가용)는 warnings로 안전 반환."""
+        warns: list[str] = []
+        source_format = (Path(filename).suffix.lstrip(".").lower() or "bin")[:10]
+        file_hash = hashlib.sha256(content_bytes).hexdigest()
+        size = len(content_bytes)
+        base_key = f"{tenant_id}/{file_hash}"
+
+        # 1) 원본 보관 (진실 소스)
+        storage = self._get_storage()
+        raw_uri = storage.put(self.RAW_BUCKET, f"{base_key}/{filename}", content_bytes)
+
+        # 2) 추출 + 정규화 + PII 마스킹 + 청크
+        pre = self._preprocess(filename, content_bytes, warns)
+        ext = pre.extraction if pre else None
+        text = pre.text if pre else ""
+
+        if ext and ext.error:
+            warns.append(f"extract: {ext.error}")
+        if not text:
+            warns.append("no text extracted (parser/OCR needed)")
+
+        # 3) 정규화 텍스트 보관
+        norm_uri: Optional[str] = None
+        if text:
+            norm_uri = storage.put(
+                self.NORM_BUCKET, f"{base_key}/normalized.txt", text.encode("utf-8")
+            )
+
+        # 4) DB 영속화 (best-effort)
+        doc_id = None
+        persisted = False
+        if persist:
+            doc_id, persisted, pwarns = self._persist(
+                db=db,
+                tenant_id=tenant_id,
+                filename=filename,
+                source_format=source_format,
+                file_hash=file_hash,
+                size=size,
+                raw_uri=raw_uri,
+                norm_uri=norm_uri,
+                pre=pre,
+                doc_type=doc_type,
+                external_ref=external_ref,
+                created_by=created_by,
+            )
+            warns.extend(pwarns)
+
+        return IngestResult(
+            doc_id=doc_id,
+            tenant_id=tenant_id,
+            filename=filename,
+            source_format=source_format,
+            file_hash=file_hash,
+            file_size_bytes=size,
+            extraction_method=(ext.method if ext else "none"),
+            extraction_quality=(float(ext.quality) if ext else 0.0),
+            ocr_used=(bool(ext.ocr_used) if ext else False),
+            char_count=len(text),
+            chunk_count=(len(pre.chunks) if pre else 0),
+            raw_text_uri=raw_uri,
+            normalized_text_uri=norm_uri,
+            persisted=persisted,
+            warnings=warns,
+        )
+
+    # ------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------
+
+    def _preprocess(
+        self, filename: str, content_bytes: bytes, warns: list[str]
+    ) -> Optional[PreprocessResult]:
+        """임시파일 경유로 extract → normalize → PII → chunk."""
+        suffix = Path(filename).suffix or ".bin"
+        tmp_path: Optional[str] = None
+        try:
+            fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(content_bytes)
+            return self.preprocess.run_file(tmp_path)
+        except Exception as exc:  # noqa: BLE001
+            warns.append(f"preprocess failed: {type(exc).__name__}: {exc}")
+            return None
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+    def _persist(
+        self,
+        *,
+        db,
+        tenant_id: str,
+        filename: str,
+        source_format: str,
+        file_hash: str,
+        size: int,
+        raw_uri: str,
+        norm_uri: Optional[str],
+        pre: Optional[PreprocessResult],
+        doc_type: Optional[str],
+        external_ref: Optional[str],
+        created_by: Optional[str],
+    ) -> tuple[object, bool, list[str]]:
+        warns: list[str] = []
+        ext = pre.extraction if pre else None
+        text = pre.text if pre else ""
+
+        def _do(session) -> object:
+            doc = DocumentRepo(session).create(
+                tenant_id=tenant_id,
+                filename=filename,
+                source_format=source_format,
+                file_hash=file_hash,
+                file_size_bytes=size,
+                raw_text_uri=raw_uri,
+                normalized_text_uri=norm_uri,
+                text_preview=(text[:2000] or None),
+                char_count=(len(text) or None),
+                extraction_method=(ext.method if ext else None),
+                extraction_quality=(float(ext.quality) if ext else None),
+                ocr_used=(bool(ext.ocr_used) if ext else False),
+                processing_status=("ready" if text else "failed"),
+                external_ref=external_ref,
+                metadata=({"doc_type": doc_type} if doc_type else None),
+                created_by=created_by,
+            )
+            if pre and pre.chunks:
+                ChunkRepo(session).upsert_chunks(
+                    doc_id=doc.doc_id,
+                    tenant_id=tenant_id,
+                    chunks=pre.chunks,
+                    replace_existing=True,
+                )
+            return doc.doc_id
+
+        # 주입 세션 (테스트·트랜잭션 합류)
+        if db is not None:
+            try:
+                return _do(db), True, warns
+            except Exception as exc:  # noqa: BLE001
+                logger.error("ingest persist failed: %s", exc, exc_info=True)
+                warns.append(f"persist failed: {type(exc).__name__}")
+                return None, False, warns
+
+        # 자체 session_scope (운영 기본)
+        try:
+            from lloydk.db import session_scope  # noqa: PLC0415
+        except ImportError as exc:
+            warns.append(f"persist skipped: db module unavailable ({exc})")
+            return None, False, warns
+        try:
+            with session_scope() as session:
+                doc_id = _do(session)
+            return doc_id, True, warns
+        except Exception as exc:  # noqa: BLE001
+            logger.error("ingest persist (scope) failed: %s", exc, exc_info=True)
+            warns.append(f"persist skipped: {type(exc).__name__}")
+            return None, False, warns

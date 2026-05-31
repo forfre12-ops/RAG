@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from lloydk.config import settings
-from lloydk.schemas.common import Grade
+from lloydk.schemas.common import Grade, GradeRegistry
 from lloydk.schemas.classify import EvidenceSpan, EvaluationFactors, RagContextHit
 from lloydk.modules.m2_preprocess import split as _chunk_split
 from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
@@ -34,6 +34,22 @@ class InferenceResult:
 _LABELS = [Grade.TS, Grade.S1, Grade.S2, Grade.S3]
 
 
+def _get_labels() -> list:
+    """GradeRegistry에서 현재 활성 등급 목록 반환.
+
+    DB에 커스텀 등급이 있으면 그것을, 없으면 기본 _LABELS를 반환.
+    Grade enum에 없는 코드는 문자열로 반환 (다른 프로젝트 호환).
+    """
+    codes = GradeRegistry.get_codes()
+    labels = []
+    for code in codes:
+        try:
+            labels.append(Grade(code))
+        except ValueError:
+            labels.append(code)
+    return labels or _LABELS
+
+
 class InferencePipeline:
     """
     PoC 추론기.
@@ -46,7 +62,9 @@ class InferencePipeline:
         self.labeling = LabelingPipeline()
         self._model = None
         self._tokenizer = None
-        self._id2label: dict[int, Grade] = {i: g for i, g in enumerate(_LABELS)}
+        # GradeRegistry에서 동적 로드 — 다른 프로젝트의 커스텀 등급 자동 반영
+        active = _get_labels()
+        self._id2label: dict[int, object] = dict(enumerate(active))
         if self.model_dir and self.model_dir.exists():
             self._load_model()
 
@@ -59,6 +77,10 @@ class InferencePipeline:
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._model.to(self._device)
 
+    # FNR-safe override: rule engine이 이 점수 이상으로 TS를 잡으면 모델 결과 무시.
+    # 모델이 TS 미학습 도메인(M&A·암호·국방 등)을 S1/S2/S3로 내릴 때 방어.
+    _FNR_RULE_TS_THRESHOLD = 3.0
+
     def run(
         self,
         text: str,
@@ -69,6 +91,26 @@ class InferencePipeline:
     ) -> InferenceResult:
         if self._model is not None:
             result = self._run_model(text, use_rag, return_evidence)
+            # FNR-safe: rule engine이 TS를 강하게 잡는데 모델이 낮은 등급을 줬으면 TS로 올림.
+            if result.label != Grade.TS:
+                try:
+                    rule_res = self.labeling.engine.label(text)
+                    ts_score = rule_res.grade_scores.get("TS", 0.0)
+                    if ts_score >= self._FNR_RULE_TS_THRESHOLD:
+                        from lloydk.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
+                        if GRADE_ORDER.get(rule_res.grade, 99) < GRADE_ORDER.get(result.label.value, 99):
+                            result = InferenceResult(
+                                label=Grade.TS,
+                                confidence=max(result.confidence, rule_res.confidence),
+                                scores={**result.scores, "TS": max(result.scores.get("TS", 0), 0.7)},
+                                factors=result.factors,
+                                evidence=result.evidence,
+                                rag_context=result.rag_context,
+                                model_version=result.model_version,
+                                warnings=result.warnings + [f"fnr-safe override: rule TS score={ts_score:.1f}"],
+                            )
+                except Exception:  # noqa: BLE001
+                    pass
         else:
             result = self._run_rule_fallback(text, return_evidence)
 
@@ -94,12 +136,22 @@ class InferencePipeline:
         return result
 
     def _run_rule_fallback(self, text: str, return_evidence: bool) -> InferenceResult:
+        try:
+            from lloydk.api.prom_metrics import RULE_FALLBACK_TOTAL  # noqa: PLC0415
+            RULE_FALLBACK_TOTAL.inc()
+        except Exception:  # noqa: BLE001
+            pass
         lab = self.labeling.label(text)
-        scores = {g.value: 0.05 for g in _LABELS}
-        scores[lab.grade.value] = 0.85
+        # grade_scores를 합계로 나눠 [0,1] 확률로 변환 (rule engine은 원시 점수 반환)
+        raw = (lab.rule_result.grade_scores if lab.rule_result else {}) or {}
+        total_raw = sum(raw.values())
+        if total_raw > 0:
+            scores = {g.value: round(raw.get(g.value, 0.0) / total_raw, 4) for g in _LABELS}
+        else:
+            scores = {g.value: 0.0 for g in _LABELS}
         return InferenceResult(
             label=lab.grade,
-            confidence=0.85,
+            confidence=lab.confidence,
             scores=scores,
             factors=lab.factors,
             evidence=lab.evidence if return_evidence else [],

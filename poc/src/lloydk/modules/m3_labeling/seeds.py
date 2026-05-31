@@ -37,7 +37,76 @@ v4 확장 정책 (2026-05-29 P0-B5):
 
 from __future__ import annotations
 
+import logging
+
+_logger = logging.getLogger(__name__)
+
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+
+
+def get_grade_order() -> dict[str, int]:
+    """GradeRegistry에서 현재 활성 등급의 우선순위 매핑 반환.
+
+    DB에 커스텀 등급이 있으면 그것을, 없으면 GRADE_ORDER 상수를 반환.
+    FNR-safe 로직(더 높은 등급 우선 선택)에서 사용.
+    """
+    try:
+        from lloydk.schemas.common import GradeRegistry  # noqa: PLC0415
+        return GradeRegistry.get_order()
+    except Exception:  # noqa: BLE001
+        return GRADE_ORDER
+
+
+def load_seeds_from_db() -> list[dict] | None:
+    """DB level_keywords + evaluation_factors 테이블에서 KEYWORD_SEEDS 형식으로 로드.
+
+    다른 프로젝트에서 도메인 키워드를 DB에 등록하면 코드 변경 없이 룰 엔진에 반영됩니다.
+
+    Returns:
+        list[dict] — KEYWORD_SEEDS와 동일한 형식 (keyword, grade, factor, weight, pattern_type)
+        None       — DB 미가용 또는 키워드 없음 → 호출자가 KEYWORD_SEEDS로 폴백
+    """
+    try:
+        from lloydk.db import session_scope  # noqa: PLC0415
+        from lloydk.db.models import ClassificationLevel, EvaluationFactor, LevelKeyword  # noqa: PLC0415
+        with session_scope() as db:
+            level_map = {
+                lv.level_id: lv.level_code
+                for lv in db.query(ClassificationLevel)
+                .filter(ClassificationLevel.is_active.is_(True))
+                .all()
+            }
+            factor_map = {
+                f.factor_id: f.factor_code
+                for f in db.query(EvaluationFactor)
+                .filter(EvaluationFactor.is_active.is_(True))
+                .all()
+            }
+            keywords = (
+                db.query(LevelKeyword)
+                .filter(LevelKeyword.is_active.is_(True))
+                .all()
+            )
+            seeds = []
+            for kw in keywords:
+                grade = level_map.get(kw.level_id)
+                if not grade:
+                    continue
+                factor = factor_map.get(kw.factor_id) if kw.factor_id else "ECONOMIC_VALUE"
+                seeds.append({
+                    "keyword": kw.keyword,
+                    "grade": grade,
+                    "factor": factor or "ECONOMIC_VALUE",
+                    "weight": float(kw.weight or 1.0),
+                    "pattern_type": kw.pattern_type or "exact",
+                })
+            if seeds:
+                _logger.debug("load_seeds_from_db: %d keywords loaded", len(seeds))
+                return seeds
+            return None
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("load_seeds_from_db failed, caller will use KEYWORD_SEEDS: %s", exc)
+        return None
 
 # 4대 평가 요소 (DB evaluation_factors 정합)
 FACTOR_SEEDS: list[dict] = [

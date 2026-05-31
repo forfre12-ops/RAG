@@ -59,6 +59,16 @@ hwp = [
   "rhwp-python>=0.5.1",            # 최신 PyPI 0.5.1, 모든 플랫폼 wheel
 ]
 
+# OCR — Tesseract 5.x + 한국어팩 (Apache 2.0, 무료).
+# 시스템 선설치 필요: winget install UB-Mannheim.TesseractOCR 후 kor.traineddata 복사.
+# 스캔 PDF는 pdf2image + poppler 추가 필요 (poppler Windows 바이너리 별도).
+# 활성: pip install -e ".[ocr]"
+ocr = [
+  "pytesseract>=0.3.10",           # Tesseract Python 래퍼 (MIT)
+  "Pillow>=10.0",                   # 이미지 처리 (PIL 대체, HPND)
+  "pdf2image>=1.16",               # 스캔 PDF → 이미지 변환 (MIT), poppler 별도 필요
+]
+
 # PyMuPDF AGPL 옵트인 — Artifex 상용 라이선스 또는 명시적 AGPL 수용 환경에서만.
 # 운영 기본은 pdfminer.six(BSD-3). doc/14 §5.1 라이선스 결정 참조.
 # 활성: pip install -e ".[pdf-agpl]"

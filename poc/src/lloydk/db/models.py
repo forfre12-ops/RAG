@@ -565,6 +565,36 @@ class AuditLog(Base):
     )
 
 
+# ============================================================
+# [K] 가이드 문서 버전 이력
+# ============================================================
+
+class Guide(Base):
+    """가이드 문서 업로드 이력 — GuideService in-memory 대체."""
+    __tablename__ = "guides"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    guide_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(50), nullable=False, default="default")
+    version: Mapped[str] = mapped_column(String(50), nullable=False)
+    effective_date: Mapped[str | None] = mapped_column(String(30))
+    change_summary: Mapped[str | None] = mapped_column(Text)
+    doc_type: Mapped[str | None] = mapped_column(String(50))
+    filename: Mapped[str | None] = mapped_column(String(500))
+    indexed: Mapped[bool] = mapped_column(Boolean, default=False)
+    embedding_vector_count: Mapped[int] = mapped_column(Integer, default=0)
+    index_name: Mapped[str | None] = mapped_column(String(300))
+    alias: Mapped[str | None] = mapped_column(String(300))
+    model: Mapped[str | None] = mapped_column(String(100))
+    registered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_guides_guide_id", "guide_id"),
+        Index("idx_guides_tenant_guide", "tenant_id", "guide_id"),
+        Index("idx_guides_registered", "registered_at"),
+    )
+
+
 __all__ = [
     "Tenant",
     "ClassificationLevel",
@@ -585,4 +615,5 @@ __all__ = [
     "SampleDocument",
     "LlmUsage",
     "AuditLog",
+    "Guide",
 ]

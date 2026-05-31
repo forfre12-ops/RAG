@@ -16,9 +16,9 @@ Phase 5  : doc/15 v12 갱신 + 최종 git commit + 보고서
 from __future__ import annotations
 
 import io
-import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -163,7 +163,6 @@ print("\n\n【 Phase 2 — labeled dataset 재빌드 (OSS + B-1) 】")
 combined_dir = _POC / "datasets" / "labeled_oss_combined_tmp"
 combined_dir.mkdir(exist_ok=True)
 
-import shutil
 copied = 0
 for src_dir in [_POC / "datasets" / "oss_corpus",
                 _POC / "datasets" / "synthetic_qwen3_800"]:
@@ -354,7 +353,7 @@ report_md = f"""# 야간 오토파일럿 보고서 — 2026-05-31
 ---
 
 ## 실패 항목
-{chr(10).join(f'- {l}' for l in failed_list) if failed_list else '- 없음 (전체 PASS)'}
+{chr(10).join(f'- {item}' for item in failed_list) if failed_list else '- 없음 (전체 PASS)'}
 
 ---
 

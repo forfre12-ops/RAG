@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import json
 import random
-import sys
 import uuid
 from pathlib import Path
 
@@ -624,11 +623,11 @@ def main() -> int:
             break
 
     print("\n[corpus] Done. P2 re-eval:")
-    print(f"  python scripts/p2_compare_embeddings.py")
-    print(f"    --mode full --backends es --hybrid")
+    print("  python scripts/p2_compare_embeddings.py")
+    print("    --mode full --backends es --hybrid")
     print(f"    --synth-dir {out_dir}")
-    print(f"    --query-style koipa")
-    print(f"    --report reports/p2_realistic.md")
+    print("    --query-style koipa")
+    print("    --report reports/p2_realistic.md")
     return 0
 
 

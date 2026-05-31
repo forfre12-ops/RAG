@@ -12,8 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine, RuleLabelResult
-from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+from lloydk.modules.m3_labeling.rule_engine import RuleLabelResult, build_rule_engine_from_db
 
 # ClassifyService 호환 스키마 (있으면 import, 없으면 dataclass 폴백)
 try:
@@ -74,7 +73,9 @@ class LabelingPipeline:
         use_llm_fallback: bool = False,
         llm_threshold: float = 0.3,
     ) -> None:
-        self.engine = LabelRuleEngine(KEYWORD_SEEDS)
+        # DB에 키워드가 있으면 DB 우선, 없으면 KEYWORD_SEEDS 폴백.
+        # 다른 프로젝트는 level_keywords 테이블에 도메인 키워드를 등록하면 자동 반영.
+        self.engine = build_rule_engine_from_db()
         self.use_llm_fallback = use_llm_fallback
         self.llm_threshold = llm_threshold
         self._llm_labeler = None  # lazy
