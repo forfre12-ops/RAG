@@ -296,6 +296,43 @@ def build_eval_queries(docs: list[dict]) -> list[dict]:
 
 # ── 메인 ─────────────────────────────────────────────────────
 
+def _write_snapshot(docs: list[dict], out_dir: Path) -> None:
+    """필터 통과한 원본 행을 raw 스냅샷으로 저장.
+
+    폐쇄망 재현성·감리 증빙 요건 (manifest D7/D8의 auto_collect=true 연동).
+    저장 위치: datasets/raw/D7_oss_precedents/ 및 D8_oss_financial_reports/
+    각 파일: {synth_id}_raw.json (원본 body + 메타 전체)
+    """
+    raw_base = out_dir.parent.parent / "raw"
+    buckets: dict[str, Path] = {
+        "판례": raw_base / "D7_oss_precedents",
+        "금융보고서": raw_base / "D8_oss_financial_reports",
+    }
+    for bucket in buckets.values():
+        bucket.mkdir(parents=True, exist_ok=True)
+
+    counts: dict[str, int] = {}
+    for doc in docs:
+        src = doc.get("source", "기타")
+        bucket = buckets.get(src, raw_base / "D9_oss_other")
+        bucket.mkdir(parents=True, exist_ok=True)
+        fpath = bucket / f"{doc['synth_id']}_raw.json"
+        fpath.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+        counts[src] = counts.get(src, 0) + 1
+
+    # 스냅샷 manifest 기록 (수집일 + 건수)
+    import datetime
+    snap_meta = {
+        "snapshot_at": datetime.datetime.utcnow().isoformat() + "Z",
+        "counts": counts,
+        "total": sum(counts.values()),
+    }
+    (raw_base / "oss_snapshot_meta.json").write_text(
+        json.dumps(snap_meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"[oss] raw snapshot: {snap_meta}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="datasets/oss_corpus")
@@ -303,6 +340,8 @@ def main() -> int:
     ap.add_argument("--target", type=int, default=3000)
     ap.add_argument("--min-confidence", type=float, default=0.60,
                     help="M3 라벨러 신뢰도 최소값 (미달 시 제외)")
+    ap.add_argument("--snapshot-raw", action="store_true",
+                    help="필터 통과 원본을 datasets/raw/D7·D8 에 스냅샷 저장 (재현성·감리 증빙)")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
@@ -402,6 +441,11 @@ def main() -> int:
     if len(all_docs) < target:
         print(f"\n[oss] WARNING: {target - len(all_docs):,}건 부족")
         print("[oss]   → 소스 데이터 필터링 후 수량 미달. 현재 수집분으로 진행 권장.")
+
+    # ── 원본 스냅샷 (--snapshot-raw) ──────────────────────────────
+    if args.snapshot_raw:
+        print(f"\n[oss] === 원본 스냅샷 저장 (--snapshot-raw) ===")
+        _write_snapshot(all_docs, out_dir)
 
     return 0
 
