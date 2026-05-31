@@ -245,6 +245,10 @@ def assert_production_credentials() -> None:
     """
     if settings.poc_mode != "full":
         return
+    # pytest/TestClient 환경에서는 운영 자격증명 검사 skip.
+    # conftest.py가 TESTING=1 을 설정하거나 pytest가 PYTEST_CURRENT_TEST를 주입.
+    if os.environ.get("TESTING", "").strip().lower() in {"1", "true"} or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
     fill_from_secrets_manager()
     missing: list[str] = []
     if not settings.api_key:

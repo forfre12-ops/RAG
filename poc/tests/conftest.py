@@ -12,6 +12,16 @@ import pytest
 # test_rate_limit.py는 fixture로 명시적 활성화 후 검증.
 os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 
+# 테스트용 API key 고정 — settings.api_key="" 기본값이면 require_auth가 빈 문자열을
+# falsy로 보고 즉시 401 반환하므로 로직 테스트까지 도달하지 못함.
+# test_api.py의 "wrong-key" / 헤더 없음 → 401 검증은 이 값 설정 후에도 정상 동작.
+os.environ.setdefault("API_KEY", "test-key")
+
+# 테스트 환경 표시 — assert_production_credentials, PrometheusMiddleware 등이
+# poc_mode=full 환경에서도 운영 fail-fast를 skip하도록 함.
+# prom_metrics._is_testing()과 동일한 패턴.
+os.environ.setdefault("TESTING", "1")
+
 # .env에 AUDIT_DISABLED=1이 있어도 테스트에서는 감사 로그를 활성화.
 # audit middleware가 os.getenv로 직접 읽으므로 여기서 강제 설정.
 os.environ["AUDIT_DISABLED"] = "0"

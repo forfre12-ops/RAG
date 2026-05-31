@@ -188,12 +188,16 @@ def require_auth(
     request: Request,
     authorization: str | None = Header(default=None),
     x_api_key: str | None = Header(default=None),
+    x_tenant_id: str | None = Header(default=None),
 ):
     """모드 자동 선택 — settings.auth_mode=jwt|api_key.
 
     - api_key (default): X-API-Key 검증
     - jwt: Authorization: Bearer 검증
     - both: 둘 중 하나 만족
+
+    JWT 모드에서는 X-Tenant-Id 헤더와 JWT claim의 tenant가 다르면 401 반환.
+    api_key 모드에서는 X-Tenant-Id가 있어도 JWT claim이 없어 비교 불가 — 그대로 통과.
     """
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
     if mode in ("api_key", "both"):
@@ -205,8 +209,25 @@ def require_auth(
         if not authorization:
             raise HTTPException(status_code=401, detail="missing authorization")
         try:
-            claims = verify_jwt(authorization[7:].strip() if authorization.lower().startswith("bearer ") else authorization)
-            return {"mode": "jwt", "claims": claims}
+            claims = verify_jwt(
+                authorization[7:].strip()
+                if authorization.lower().startswith("bearer ")
+                else authorization
+            )
         except JWTError as e:
             raise HTTPException(status_code=401, detail=f"invalid jwt: {e}")
+
+        # X-Tenant-Id 헤더와 JWT claim tenant 불일치 차단.
+        # 헤더가 없으면 JWT claim을 신뢰 — 헤더가 있을 때만 검증.
+        if x_tenant_id and claims.tenant and x_tenant_id != claims.tenant:
+            logger.warning(
+                "tenant mismatch: header=%r jwt_claim=%r path=%s",
+                x_tenant_id, claims.tenant, request.url.path,
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="tenant mismatch: X-Tenant-Id does not match JWT claim",
+            )
+
+        return {"mode": "jwt", "claims": claims}
     raise HTTPException(status_code=401, detail="unauthenticated")

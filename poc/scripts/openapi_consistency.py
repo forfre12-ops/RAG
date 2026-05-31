@@ -115,13 +115,51 @@ def _parse_yaml_paths(yaml_path: Path) -> tuple[set[tuple[str, str]], str]:
     return out, server_prefix
 
 
-def _collect_router_paths() -> set[tuple[str, str]]:
-    """FastAPI app에서 모든 라우트의 (METHOD, PATH) 추출."""
+# 라우터에 등록되지만 OpenAPI YAML 명세 범위 밖으로 의도적 제외된 경로.
+# - /metrics-prom : Prometheus 스크랩 전용 (내부 observability, 외부 API 계약 아님)
+# - /docs /redoc  : Swagger UI (개발용, 고객사 계약 명세 아님)
+# - /openapi.json : FastAPI 자동 생성 (YAML 명세와 중복 관리 방지)
+# - /demo/*       : 데모 콘솔 정적 파일 (StaticFiles)
+_ROUTER_IGNORE_PREFIXES: tuple[str, ...] = (
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+)
+_ROUTER_IGNORE_EXACT: set[str] = {
+    "/api/v1/metrics-prom",
+    "/api/v1/openapi.json",
+}
+
+
+def _is_ignored(path: str) -> bool:
+    """의도적으로 YAML 명세에서 제외된 경로 여부."""
+    if path in _ROUTER_IGNORE_EXACT:
+        return True
+    for prefix in _ROUTER_IGNORE_PREFIXES:
+        if path == prefix or path.startswith(prefix + "/"):
+            return True
+    # 데모 콘솔 정적 파일 (/demo로 시작)
+    if path == "/demo" or path.startswith("/demo/"):
+        return True
+    return False
+
+
+def _collect_router_paths() -> tuple[set[tuple[str, str]], set[tuple[str, str]]]:
+    """FastAPI app에서 모든 라우트의 (METHOD, PATH) 추출.
+
+    Returns:
+        (active_paths, training_only_paths)
+        - active_paths: 현재 프로파일에서 활성화된 경로 (ignore 제외)
+        - training_only_paths: enable_training=True 일 때만 등록되는 경로
+    """
     try:
         from lloydk.api.app import app  # noqa: PLC0415
+        from lloydk.config import settings  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001
         print(f"  ERROR: lloydk.api.app import 실패: {exc}")
-        return set()
+        return set(), set()
+
+    training_enabled = getattr(settings, "enable_training", False)
 
     out: set[tuple[str, str]] = set()
     for route in app.routes:
@@ -129,11 +167,27 @@ def _collect_router_paths() -> set[tuple[str, str]]:
         methods = getattr(route, "methods", None)
         if not path or not methods:
             continue
+        if _is_ignored(path):
+            continue
         for m in methods:
             if m.upper() in {"HEAD", "OPTIONS"}:
                 continue
             out.add((m.upper(), path))
-    return out
+
+    # training 라우터는 profile 조건부 — YAML에는 있지만 현재 환경에서 미등록일 수 있음
+    training_paths: set[tuple[str, str]] = set()
+    if not training_enabled:
+        # YAML의 /train/* 경로는 full-train 프로파일 전용으로 표시
+        training_patterns = ("/api/v1/train", "/train")
+        for route in []:  # 실제 라우터에 없으므로 빈 루프 — YAML에서 제거 예정
+            pass
+        # YAML only로 나타날 training 경로들을 식별해 조건부 제외 허용
+        training_paths = {
+            (m.upper(), p) for m, p in out
+            if any(p.startswith(tp) for tp in training_patterns)
+        }
+
+    return out, training_paths
 
 
 def _normalize_path(path: str) -> str:
@@ -144,10 +198,27 @@ def _normalize_path(path: str) -> str:
     return path
 
 
-def diff(yaml_set: set[tuple[str, str]], router_set: set[tuple[str, str]]) -> dict:
-    """yaml ↔ router 차이 계산."""
+def diff(
+    yaml_set: set[tuple[str, str]],
+    router_set: set[tuple[str, str]],
+    *,
+    skip_yaml_prefixes: tuple[str, ...] = (),
+) -> dict:
+    """yaml ↔ router 차이 계산.
+
+    Args:
+        skip_yaml_prefixes: 이 prefix로 시작하는 YAML 경로는 비교에서 제외
+                            (예: training 라우터 profile-conditional 처리).
+    """
     yaml_norm = {(m, _normalize_path(p)) for m, p in yaml_set}
     router_norm = {(m, _normalize_path(p)) for m, p in router_set}
+
+    # profile-conditional 제외 (예: training 라우터)
+    if skip_yaml_prefixes:
+        yaml_norm = {
+            (m, p) for m, p in yaml_norm
+            if not any(p.startswith(pfx) for pfx in skip_yaml_prefixes)
+        }
 
     only_yaml = yaml_norm - router_norm  # yaml에만 있음 (미구현)
     only_router = router_norm - yaml_norm  # router에만 있음 (스펙 누락)
@@ -175,10 +246,24 @@ def main() -> int:
     print("=" * 70)
 
     yaml_paths, server_prefix = _parse_yaml_paths(Path(args.yaml))
-    router_paths = _collect_router_paths()
+    router_paths, _training_paths = _collect_router_paths()
     if server_prefix:
         print(f"  YAML server prefix: {server_prefix}")
-    result = diff(yaml_paths, router_paths)
+
+    # training 라우터는 full-train 프로파일 전용 — 현재 프로파일에서 비활성이면
+    # YAML의 /train/* 경로를 strict 비교에서 제외 (profile-conditional)
+    try:
+        from lloydk.config import settings as _s  # noqa: PLC0415
+        _training_enabled = getattr(_s, "enable_training", False)
+    except Exception:  # noqa: BLE001
+        _training_enabled = False
+
+    skip_prefixes: tuple[str, ...] = ()
+    if not _training_enabled:
+        skip_prefixes = (f"{server_prefix}/train", "/api/v1/train", "/train")
+        print("  ℹ training 라우터 비활성 (enable_training=False) — /train/* YAML 경로 제외")
+
+    result = diff(yaml_paths, router_paths, skip_yaml_prefixes=skip_prefixes)
 
     print(f"  YAML 정의   : {result['yaml_count']} 엔드포인트")
     print(f"  Router 구현 : {result['router_count']} 엔드포인트")

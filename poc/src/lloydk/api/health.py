@@ -1,11 +1,14 @@
-"""GET /healthz — 헬스체크 + 데모 콘솔용 backend 정보.
+"""헬스체크 엔드포인트 — live / ready / deep 3계층.
 
-데모 콘솔(/demo)이 상단 상태 배지·warmup 폴링·LLM vs BERT 시간 경쟁 비교
-시 운영 vs noop 분기에 사용. 운영 라우터에는 영향 없음.
+  GET /healthz       : 하위호환 단일 엔드포인트 (기존 동작 유지)
+  GET /healthz/live  : 프로세스 생존 여부 (k8s liveness probe)
+  GET /healthz/ready : 서비스 가능 여부 — DB/ES/MinIO/model 준비 상태 (readiness probe)
+  GET /healthz/deep  : 전체 구성요소 상세 진단 (운영 대시보드용)
 
 status 값:
-  ok       : 모든 구성 요소가 기대 상태로 동작 중.
-  degraded : 일부 구성 요소가 비정상 — 요청은 처리되지만 정확도/기능 저하 가능.
+  ok       : 모든 필수 구성요소 준비 완료
+  degraded : 일부 구성요소 비정상 — 요청 처리는 되지만 정확도/기능 저하 가능
+  down     : 필수 구성요소 실패 — 서비스 불가
 """
 
 from __future__ import annotations
@@ -20,49 +23,146 @@ router = APIRouter(tags=["health"])
 _START = time.time()
 
 # app.py lifespan이 _warmup_models 완료 후 True로 설정.
-# uptime 기반 추정 대신 실제 startup 완료 여부를 나타냄.
 STARTUP_COMPLETE: bool = False
 
 
-def _check_model() -> dict:
-    """InferencePipeline 로드 상태 확인.
+# ──────���───────────────────────────────────────
+# 개별 구성요소 probe
+# ──────────────────────────────────────────────
 
-    - classifier_model_dir 설정 + 로드 실패 → degraded (모델 기대했는데 rule-fallback 중)
-    - classifier_model_dir 미설정 → rule_fallback (의도된 상태)
-    - 정상 로드 → loaded
-    """
+def _check_model() -> dict:
     model_expected = bool(getattr(settings, "classifier_model_dir", ""))
     try:
         from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
         svc = ClassifyService.get_instance()
         model_loaded = svc.inference._model is not None
     except Exception:
-        return {"status": "unknown", "degraded": model_expected}
-
+        return {"status": "unknown", "ok": not model_expected}
     if model_loaded:
-        return {"status": "loaded", "degraded": False}
+        return {"status": "loaded", "ok": True}
     if model_expected:
-        return {"status": "degraded", "degraded": True}
-    return {"status": "rule_fallback", "degraded": False}
+        return {"status": "degraded", "ok": False}
+    return {"status": "rule_fallback", "ok": True}
+
+
+def _check_db() -> dict:
+    try:
+        from lloydk.db import session_scope  # noqa: PLC0415
+        with session_scope() as db:
+            db.execute(__import__("sqlalchemy").text("SELECT 1"))
+        return {"status": "ok", "ok": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": False, "detail": type(exc).__name__}
+
+
+def _check_es() -> dict:
+    if getattr(settings, "vector_backend", "inmemory") == "inmemory":
+        return {"status": "skipped", "ok": True}
+    try:
+        from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
+        store = build_store()
+        client = getattr(store, "_client", None)
+        if client is not None:
+            client.ping()
+        return {"status": "ok", "ok": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": False, "detail": type(exc).__name__}
+
+
+def _check_storage() -> dict:
+    if getattr(settings, "storage_backend", "local") == "local":
+        return {"status": "skipped", "ok": True}
+    try:
+        from lloydk.adapters.storage import build_storage  # noqa: PLC0415
+        storage = build_storage()
+        # bucket_exists 또는 list_buckets로 연결 확인
+        if hasattr(storage, "_client"):
+            storage._client.list_buckets()
+        return {"status": "ok", "ok": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": False, "detail": type(exc).__name__}
+
+
+def _check_embedder() -> dict:
+    try:
+        from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
+        emb = build_embedder()
+        emb.embed(["probe"])
+        return {"status": "ok", "ok": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": False, "detail": type(exc).__name__}
+
+
+# ──────────────────────────────────────────────
+# 엔드포인트
+# ──────────────────────────────────────────────
+
+@router.get("/healthz/live")
+def healthz_live():
+    """k8s liveness probe — 프로세스 생존 여부만 확인. 항상 200."""
+    return {"status": "ok", "uptime_sec": int(time.time() - _START)}
+
+
+@router.get("/healthz/ready")
+def healthz_ready():
+    """k8s readiness probe — 서비스 가능 여부.
+
+    DB / vectorstore / storage / model 모두 준비돼야 ready.
+    하나라도 실패하면 503 반환 — 로드밸런서가 트래픽 차단하도록.
+    """
+    checks = {
+        "model": _check_model(),
+        "db": _check_db(),
+        "vectorstore": _check_es(),
+        "storage": _check_storage(),
+        "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
+                   "ok": STARTUP_COMPLETE},
+    }
+    all_ok = all(c["ok"] for c in checks.values())
+    status_code = 200 if all_ok else 503
+    return (
+        {"status": "ok" if all_ok else "not_ready", "checks": checks},
+        status_code,
+    )
+
+
+@router.get("/healthz/deep")
+def healthz_deep():
+    """전체 구성요소 상세 진단 — 운영 대시보드/수동 점검용."""
+    checks = {
+        "model": _check_model(),
+        "db": _check_db(),
+        "vectorstore": _check_es(),
+        "storage": _check_storage(),
+        "embedder": _check_embedder(),
+        "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
+                   "ok": STARTUP_COMPLETE},
+    }
+    degraded = [k for k, v in checks.items() if not v["ok"]]
+    overall = "ok" if not degraded else ("degraded" if len(degraded) < len(checks) else "down")
+    return {
+        "status": overall,
+        "degraded": degraded,
+        "uptime_sec": int(time.time() - _START),
+        "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
+        "checks": checks,
+    }
 
 
 @router.get("/healthz")
 def healthz():
+    """하위호환 단일 엔드포인트 — 기존 /healthz 동작 유지 + 데모 콘솔용 필드."""
     model_check = _check_model()
-    overall = "degraded" if model_check["degraded"] else "ok"
-
+    overall = "ok" if model_check["ok"] else "degraded"
     return {
         "status": overall,
         "model_version": "poc",
         "uptime_sec": int(time.time() - _START),
-        # 데모 콘솔 표시용 추가 필드 — 운영에는 무해.
         "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
         "embedding_provider": getattr(settings, "embedding_provider", "unknown"),
         "llm_provider": getattr(settings, "llm_provider", "unknown"),
         "vector_backend": getattr(settings, "vector_backend", "unknown"),
         "reranker_provider": getattr(settings, "reranker_provider", "noop"),
-        # warmup 완료 여부 — lifespan의 _warmup_models 완료 후 True.
-        # app.py startup이 끝나야 True가 되므로 uptime 기반 추정보다 정확.
         "warmup_done": STARTUP_COMPLETE,
         "checks": {
             "model": model_check["status"],
