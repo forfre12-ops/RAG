@@ -13,7 +13,7 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold check-manifest human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold operational-readiness release-gate \
+        gold-set retrieval-gold check-data check-gold check-manifest human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-manifest \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
         test-lite test-slow test-fullstack test-model-download test-full
@@ -156,6 +156,11 @@ retrieval-gold: ## doc_id retrieval gold set 생성
 p1-retrain-dataset: ## P1 retraining JSONL build only
 	$(PY) scripts/build_p1_retrain_dataset.py
 
+p1-boundary: ## Build focused P1 boundary report from the latest llm gold eval
+	$(PY) scripts/build_p1_boundary_report.py \
+	    --report reports/p1_v3_llm_gold_direct.json \
+	    --out reports/p1_boundary_report.md
+
 p1-eval-v3: ## Evaluate trained P1 v3 on gold tiers
 	$(PY) scripts/eval_p1_model_gold.py \
 	    --model-dir artifacts/classifier_p1_retrain_v3/v-3443785f \
@@ -287,6 +292,10 @@ operational-readiness: ## Build combined P1/P2/data readiness report
 
 release-gate: operational-readiness ## Strict release gate; requires every readiness gate to PASS
 	$(PY) scripts/check_release_gate.py
+
+release-manifest: operational-readiness p1-boundary ## Hash release evidence artifacts
+	$(PY) scripts/build_release_manifest.py \
+	    --out reports/release_artifact_manifest.json
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun

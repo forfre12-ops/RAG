@@ -28,8 +28,10 @@ python scripts/import_review_corrections.py datasets/corrections/human_review_qu
 
 ```bash
 make check-manifest
+make p1-boundary
 make operational-readiness
 make release-gate
+make release-manifest
 ```
 
 `make release-gate` must print `PASS`.
@@ -61,8 +63,10 @@ Run after ES reindex, embedding-model change, or release candidate build:
 
 ```bash
 make p2-full-gold
+make p1-boundary
 make operational-readiness
 make release-gate
+make release-manifest
 ```
 
 ## 5. Final Test Pass

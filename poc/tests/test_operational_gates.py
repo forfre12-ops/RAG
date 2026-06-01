@@ -1,7 +1,13 @@
 import json
 from pathlib import Path
 
-from scripts import build_human_review_queue, build_operational_readiness, check_release_gate
+from scripts import (
+    build_human_review_queue,
+    build_operational_readiness,
+    build_p1_boundary_report,
+    build_release_manifest,
+    check_release_gate,
+)
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -124,3 +130,44 @@ def test_human_review_queue_prioritizes_high_risk_underclassification(tmp_path, 
     rows = out.read_text(encoding="utf-8-sig").splitlines()
     assert rows[0].startswith("doc_id,model_label,human_label")
     assert rows[1].startswith("a,S3,S2")
+
+
+def test_p1_boundary_report_writes_priority_sections(tmp_path, monkeypatch):
+    source = tmp_path / "p1.json"
+    _write_json(
+        source,
+        {
+            "model_dir": "model",
+            "mode": "direct",
+            "metrics": {"n": 2, "f1_macro": 0.5, "high_risk_to_s3": 1},
+            "pattern_counts": {"S2->S3": 1},
+            "priority_errors": {
+                "high_risk_to_s3": [{"doc_id": "a", "true": "S2", "pred": "S3", "label_source": "llm"}],
+                "s3_overclassified": [],
+            },
+        },
+    )
+    out = tmp_path / "boundary.md"
+    monkeypatch.setattr("sys.argv", ["build_p1_boundary_report.py", "--report", str(source), "--out", str(out)])
+
+    assert build_p1_boundary_report.main() == 0
+    text = out.read_text(encoding="utf-8")
+    assert "High-Risk Downgraded To S3" in text
+    assert "S2->S3" in text
+
+
+def test_release_manifest_marks_missing_files(tmp_path, monkeypatch):
+    present = tmp_path / "present.txt"
+    present.write_text("ok", encoding="utf-8")
+    out = tmp_path / "manifest.json"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["build_release_manifest.py", "--out", str(out), "--files", "present.txt", "missing.txt"],
+    )
+
+    assert build_release_manifest.main() == 0
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["status"] == "INCOMPLETE"
+    assert payload["missing"] == ["missing.txt"]
+    assert payload["artifacts"][0]["sha256"]

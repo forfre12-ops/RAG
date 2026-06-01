@@ -144,6 +144,36 @@ def write_report(payload: dict, out: Path) -> None:
     out.with_suffix(".json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def summarize_errors(rows: list[dict], y_true: list[str], y_pred: list[str], preds: list[dict], limit: int) -> dict:
+    pattern_counts: Counter = Counter()
+    high_risk_to_s3: list[dict] = []
+    s3_overclassified: list[dict] = []
+    for r, t, p, pred in zip(rows, y_true, y_pred, preds):
+        if t == p:
+            continue
+        pattern_counts[f"{t}->{p}"] += 1
+        item = {
+            "doc_id": r.get("doc_id"),
+            "label_source": r.get("label_source"),
+            "true": t,
+            "pred": p,
+            "confidence": pred.get("confidence"),
+            "text_preview": r.get("text", "")[:400],
+            "warnings": pred.get("warnings", []),
+        }
+        if t in {"TS", "S1", "S2"} and p == "S3" and len(high_risk_to_s3) < limit:
+            high_risk_to_s3.append(item)
+        if t == "S3" and p in {"TS", "S1", "S2"} and len(s3_overclassified) < limit:
+            s3_overclassified.append(item)
+    return {
+        "pattern_counts": dict(pattern_counts.most_common()),
+        "priority_errors": {
+            "high_risk_to_s3": high_risk_to_s3,
+            "s3_overclassified": s3_overclassified,
+        },
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", required=True)
@@ -185,6 +215,7 @@ def main() -> int:
         "error_count": len(errors),
         "errors_sample": errors[: args.examples],
     }
+    payload.update(summarize_errors(rows, y_true, y_pred, preds, args.examples))
     write_report(payload, Path(args.report))
     print(json.dumps({k: payload[k] for k in ("mode", "metrics", "prediction_distribution", "error_count")}, ensure_ascii=False, indent=2))
     return 0

@@ -290,8 +290,10 @@ Before an operational release, run:
 ```bash
 make check-manifest
 make human-review-queue
+make p1-boundary
 make operational-readiness
 make release-gate
+make release-manifest
 make p2-full-gold
 ```
 
