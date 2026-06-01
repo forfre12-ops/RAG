@@ -60,6 +60,7 @@ poc/logs/
 
 # 생성된 혼합 학습 subset
 poc/datasets/gold_real/train_subset.jsonl
+poc/datasets/corrections/
 
 # Test artifacts
 poc/.coverage

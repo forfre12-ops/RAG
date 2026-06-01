@@ -13,7 +13,7 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold check-manifest eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold operational-readiness release-gate \
+        gold-set retrieval-gold check-data check-gold check-manifest human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold operational-readiness release-gate \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
         test-lite test-slow test-fullstack test-model-download test-full
@@ -190,6 +190,11 @@ check-gold: ## gold_real 강화 검사 — label_source 3층 분리 리포트 �
 
 check-manifest: ## dataset_v1.0.yaml count/lineage consistency
 	$(PY) scripts/check_dataset_manifest.py
+
+human-review-queue: ## Build CSV queue for external human review import
+	$(PY) scripts/build_human_review_queue.py \
+	    --limit 40 \
+	    --out datasets/corrections/human_review_queue.csv
 
 eval-gold: ## P1 llm_judge_gold eval (gold_real/ 구축 후 사용 가능)
 	$(PY) scripts/p1_train_classifier.py \

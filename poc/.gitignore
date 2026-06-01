@@ -4,6 +4,7 @@ __pycache__/
 .env
 .env.backup-*
 datasets/raw/
+datasets/corrections/
 datasets/external/
 datasets/preprocessed/
 datasets/labeled/

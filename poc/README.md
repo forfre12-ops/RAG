@@ -289,9 +289,11 @@ Before an operational release, run:
 
 ```bash
 make check-manifest
+make human-review-queue
 make operational-readiness
 make release-gate
 make p2-full-gold
 ```
 
 Strict release requires all readiness gates to be `PASS`. The current non-code blocker is external human review gold: `human_review=0/40`.
+See [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) for the reviewer import, rollback, and final release sequence.

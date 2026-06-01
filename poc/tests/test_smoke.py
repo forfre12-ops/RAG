@@ -14,6 +14,8 @@ def test_healthz():
         assert data["operational_config"]["rag"]["embedding_model"] == "nlpai-lab/KURE-v1"
         assert data["operational_config"]["rag"]["search_mode"] == "hybrid"
         assert data["operational_config"]["rag"]["chunk_size"] == 1200
+        assert "readiness" in data
+        assert data["readiness"]["status"] in {"ok", "missing", "error"}
 
 
 def test_classify_rule_fallback():

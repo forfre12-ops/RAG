@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from scripts import build_operational_readiness, check_release_gate
+from scripts import build_human_review_queue, build_operational_readiness, check_release_gate
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -85,3 +85,42 @@ def test_release_gate_requires_every_gate_to_pass(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.argv", ["check_release_gate.py", "--readiness", str(readiness)])
 
     assert check_release_gate.main() == 1
+
+
+def test_human_review_queue_prioritizes_high_risk_underclassification(tmp_path, monkeypatch):
+    report = tmp_path / "p1_report.json"
+    _write_json(
+        report,
+        {
+            "errors_sample": [
+                {"doc_id": "a", "true": "S2", "pred": "S3", "text_preview": "needs review"},
+                {"doc_id": "b", "true": "S3", "pred": "S1", "text_preview": "less urgent"},
+            ]
+        },
+    )
+    gold = tmp_path / "gold.jsonl"
+    gold.write_text(
+        json.dumps({"doc_id": "a", "text": "full text", "label": "S2", "label_source": "llm_judge_primary"})
+        + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "queue.csv"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_human_review_queue.py",
+            "--report",
+            str(report),
+            "--gold",
+            str(gold),
+            "--out",
+            str(out),
+            "--limit",
+            "2",
+        ],
+    )
+
+    assert build_human_review_queue.main() == 0
+    rows = out.read_text(encoding="utf-8-sig").splitlines()
+    assert rows[0].startswith("doc_id,model_label,human_label")
+    assert rows[1].startswith("a,S3,S2")

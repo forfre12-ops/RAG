@@ -13,7 +13,9 @@ status 값:
 
 from __future__ import annotations
 
+import json
 import time
+from pathlib import Path
 
 from fastapi import APIRouter
 
@@ -107,6 +109,23 @@ def _operational_config() -> dict:
     }
 
 
+def _readiness_snapshot() -> dict:
+    path = Path("reports/operational_readiness.json")
+    if not path.exists():
+        return {"status": "missing", "path": str(path)}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "path": str(path), "detail": type(exc).__name__}
+    blocked = [g for g in payload.get("gates", []) if g.get("status") != "PASS"]
+    return {
+        "status": "ok",
+        "path": str(path),
+        "verdict": payload.get("verdict", "UNKNOWN"),
+        "blocked_gates": [g.get("name") for g in blocked],
+    }
+
+
 # ──────────────────────────────────────────────
 # 엔드포인트
 # ──────────────────────────────────────────────
@@ -160,6 +179,7 @@ def healthz_deep():
         "uptime_sec": int(time.time() - _START),
         "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
         "operational_config": _operational_config(),
+        "readiness": _readiness_snapshot(),
         "checks": checks,
     }
 
@@ -182,6 +202,7 @@ def healthz():
         "classifier_model_dir": operational_config["classifier_model_dir"],
         "rag": operational_config["rag"],
         "operational_config": operational_config,
+        "readiness": _readiness_snapshot(),
         "warmup_done": STARTUP_COMPLETE,
         "checks": {
             "model": model_check["status"],

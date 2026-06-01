@@ -2,6 +2,15 @@ name: poc-ci
 
 on:
   workflow_dispatch:
+    inputs:
+      run_release_gate:
+        description: 'Run strict release gate (requires local evaluation reports/artifacts)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   push:
     branches: [main]
     paths:
@@ -632,3 +641,29 @@ jobs:
 
       - name: Run fullstack marker tests
         run: make test-fullstack
+
+  release-gate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_release_gate == 'true'
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'poc/pyproject.toml'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Validate manifest and strict release gate
+        run: |
+          make check-manifest
+          make operational-readiness
+          make release-gate
