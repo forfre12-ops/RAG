@@ -13,10 +13,10 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set check-data check-gold eval-gold eval-p2-gold \
+        gold-set retrieval-gold check-data check-gold eval-gold eval-p2-gold p1-retrain-dataset \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
-        test-lite test-full
+        test-lite test-slow test-fullstack test-model-download test-full
 
 help:
 	@echo "Targets:"
@@ -150,6 +150,12 @@ verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + 번�
 gold-set: ## gold set 생성 (test_set_v2 → datasets/gold/classification_gold.jsonl)
 	$(PY) scripts/make_gold_set.py
 
+retrieval-gold: ## doc_id retrieval gold set 생성
+	$(PY) scripts/make_retrieval_gold.py --source datasets/oss_eval_queries.json --out datasets/gold_real/retrieval_gold.jsonl --n 80
+
+p1-retrain-dataset: ## P1 retraining JSONL build only
+	$(PY) scripts/build_p1_retrain_dataset.py
+
 check-data: ## 데이터 품질 검사 — synthetic split + synthetic masked eval (exit 1 on FAIL)
 	$(PY) scripts/check_data_quality.py \
 	    --train datasets/labeled_v2_balanced/train.jsonl \
@@ -241,7 +247,9 @@ import-review-dry: ## 검수 import dry-run (파일/DB 수정 없음)
 eval-p2-gold: ## P2 doc_id 기준 Recall@5 (oss_eval_queries.json 또는 retrieval_gold.jsonl)
 	$(PY) scripts/p2_compare_embeddings.py \
 	    --mode dryrun --backends inmemory \
-	    --queries-file datasets/oss_eval_queries.json \
+	    --synth-dir datasets/oss_corpus \
+	    --queries-file datasets/gold_real/retrieval_gold.jsonl \
+	    --report-only \
 	    --report reports/p2_gold_eval_report.md
 
 p1:
@@ -249,6 +257,15 @@ p1:
 
 test-lite: ## 빠른 테스트 suite (2분 이내 목표, CI 기본 — slow/fullstack/model_download 제외)
 	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow"
+
+test-slow: ## slow marker tests only
+	$(PY) -m pytest -q -m slow
+
+test-fullstack: ## fullstack marker tests only
+	$(PY) -m pytest -q -m fullstack
+
+test-model-download: ## model_download marker tests only
+	$(PY) -m pytest -q -m model_download
 
 test-full: ## 전체 테스트 suite (인프라 + GPU 필요)
 	$(PY) -m pytest -q

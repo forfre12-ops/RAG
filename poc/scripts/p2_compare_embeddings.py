@@ -33,6 +33,8 @@ if str(_SRC) not in sys.path:
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
+from lloydk.config import settings
+
 
 # ─────────────────────────────────────────────────────────────
 # 코퍼스 / 쿼리
@@ -291,15 +293,24 @@ def evaluate(
 
         latencies.append((time.perf_counter() - t1) * 1000)
         expected_doc_id = q.get("expected_doc_id")
-        if expected_doc_id is not None:
+        relevant_doc_ids = q.get("relevant_doc_ids") or ([expected_doc_id] if expected_doc_id else [])
+        relevant_doc_ids = [str(x) for x in relevant_doc_ids if x]
+        if relevant_doc_ids:
             # doc_id 또는 base_doc_id (청킹 시) 기준 hit
             # 청킹된 경우 chunk ID = "{base_id}-c{i}" 형태
-            hit = any(
-                r.payload.get("doc_id") == expected_doc_id
-                or r.payload.get("base_doc_id") == expected_doc_id
-                or str(r.payload.get("doc_id", "")).startswith(expected_doc_id + "-c")
-                for r in results
-            )
+            relevant_set = set(relevant_doc_ids)
+            hit = False
+            for r in results:
+                doc_id = str(r.payload.get("doc_id", ""))
+                base_doc_id = str(r.payload.get("base_doc_id", ""))
+                if (
+                    doc_id in relevant_set
+                    or base_doc_id in relevant_set
+                    or any(doc_id.startswith(rel + "-c") for rel in relevant_set)
+                    or any(doc_id.startswith(rel + ":c") for rel in relevant_set)
+                ):
+                    hit = True
+                    break
         else:
             # seed/intent 스타일: 올바른 등급 문서가 top-K에 있으면 hit
             hit = any(r.payload.get("grade") == q["expected_grade"] for r in results)
@@ -310,8 +321,10 @@ def evaluate(
                 "query": q["text"],
                 "expected_grade": q["expected_grade"],
                 "expected_doc_id": expected_doc_id,
+                "relevant_doc_ids": relevant_doc_ids,
                 "top_grades": [r.payload.get("grade") for r in results],
                 "top_doc_ids": [r.payload.get("doc_id") for r in results],
+                "top_base_doc_ids": [r.payload.get("base_doc_id") for r in results],
                 "top_scores": [round(r.score, 3) for r in results],
                 "hit": hit,
             }
@@ -350,6 +363,34 @@ def evaluate(
 
 def write_report(rows: list[dict], out: Path, *, best_config_mode: bool = True) -> str:
     """4-way 비교 리포트. baseline 행과 △ 컬럼 포함. SKIP 행은 따로 표시."""
+    from lloydk.modules.m6_evaluation.retrieval_metrics import (
+        compute_retrieval_metrics_from_arrays,
+    )
+
+    for r in rows:
+        per_query = r.get("per_query") or []
+        preds: list[list[str]] = []
+        rels: list[list[str]] = []
+        qids: list[str] = []
+        for i, pq in enumerate(per_query):
+            relevant = pq.get("relevant_doc_ids") or (
+                [pq["expected_doc_id"]] if pq.get("expected_doc_id") else []
+            )
+            if not relevant:
+                continue
+            preds.append(pq.get("top_base_doc_ids") or pq.get("top_doc_ids") or [])
+            rels.append(relevant)
+            qids.append(pq.get("query") or str(i))
+        if preds:
+            metrics = compute_retrieval_metrics_from_arrays(
+                preds, rels, top_k=int(r.get("top_k", 5)), query_ids=qids,
+            )
+            r["retrieval_metrics"] = {
+                k: round(v, 4) if isinstance(v, float) else v
+                for k, v in metrics.to_dict().items()
+                if k != "per_query"
+            }
+
     is_dryrun = any(r["embedder"] == "hash" for r in rows)
     recall_threshold = 0.50 if is_dryrun else 0.80
 
@@ -423,6 +464,22 @@ def write_report(rows: list[dict], out: Path, *, best_config_mode: bool = True) 
         "- 본 측정 결과를 발주처와 협의하여 v1.1에서 합격선 갱신 여부 확정",
     ]
 
+    metric_rows = [r for r in ok_rows if r.get("retrieval_metrics")]
+    if metric_rows:
+        md += [
+            "",
+            "## Retrieval Gold Metrics",
+            "",
+            "| Config | N | Recall@K | MRR | nDCG@K | Precision@K |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+        for r in metric_rows:
+            m = r["retrieval_metrics"]
+            md.append(
+                f"| {r['label']} | {m['sample_count']} | {m['recall_at_k']:.3f} | "
+                f"{m['mrr']:.3f} | {m['ndcg_at_k']:.3f} | {m['precision_at_k']:.3f} |"
+            )
+
     overall = "PASS" if (best_pass if best_config_mode else overall_pass) else "FAIL"
     md[2] = f"- **종합 판정**: {overall}"
     if best_config_mode:
@@ -494,9 +551,9 @@ def main() -> int:
         help="ES 백엔드에서 dense·hybrid 두 모드 모두 측정",
     )
     ap.add_argument("--synth-dir", default="datasets/synthetic")
-    ap.add_argument("--chunk-size", type=int, default=1200,
+    ap.add_argument("--chunk-size", type=int, default=settings.rag_index_chunk_size,
                     help="청크 크기(글자). 0=청킹 없음. 기본 1200은 운영 후보(KURE+ES hybrid) 기준.")
-    ap.add_argument("--chunk-overlap", type=int, default=100,
+    ap.add_argument("--chunk-overlap", type=int, default=settings.rag_index_chunk_overlap,
                     help="청크 간 중복 글자 수 (기본 100)")
     ap.add_argument("--top-k", type=int, default=5)
     ap.add_argument(
@@ -546,6 +603,11 @@ def main() -> int:
         help="모든 측정 조합이 기준을 통과해야 PASS. 기본은 best operational config 기준.",
     )
     ap.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Always exit 0 after writing the report. Useful for dryrun gold metric snapshots.",
+    )
+    ap.add_argument(
         "--models",
         default=None,
         help=(
@@ -570,18 +632,25 @@ def main() -> int:
         if not qfile.exists():
             print(f"[p2] --queries-file 없음: {qfile}", file=sys.stderr)
             return 2
-        raw = json.loads(qfile.read_text(encoding="utf-8"))
-        if isinstance(raw, list):
-            raw_queries = raw
+        qtext = qfile.read_text(encoding="utf-8")
+        if qfile.suffix.lower() == ".jsonl":
+            raw_queries = [json.loads(line) for line in qtext.splitlines() if line.strip()]
         else:
-            raw_queries = list(raw.values()) if isinstance(raw, dict) else []
+            raw = json.loads(qtext)
+            if isinstance(raw, list):
+                raw_queries = raw
+            else:
+                raw_queries = list(raw.values()) if isinstance(raw, dict) else []
         # 필드 정규화: query/text 둘 다 지원
         queries = []
         for q in raw_queries:
+            relevant_doc_ids = q.get("relevant_doc_ids") or []
+            expected_doc_id = q.get("expected_doc_id") or (relevant_doc_ids[0] if relevant_doc_ids else None)
             entry = {
                 "text": q.get("query") or q.get("text", ""),
                 "expected_grade": q.get("expected_grade", ""),
-                "expected_doc_id": q.get("expected_doc_id") or q.get("relevant_doc_ids", [None])[0] if q.get("relevant_doc_ids") else q.get("expected_doc_id"),
+                "expected_doc_id": expected_doc_id,
+                "relevant_doc_ids": relevant_doc_ids or ([expected_doc_id] if expected_doc_id else []),
             }
             if entry["text"]:
                 queries.append(entry)
@@ -620,6 +689,8 @@ def main() -> int:
     summary = [{k: v for k, v in r.items() if k != "per_query"} for r in rows]
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print(f"\n[p2] verdict: {verdict} -> {args.report}")
+    if args.report_only:
+        return 0
     return 0 if verdict == "PASS" else 1
 
 

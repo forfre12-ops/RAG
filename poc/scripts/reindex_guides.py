@@ -67,8 +67,8 @@ def main() -> int:
 
     store = build_store()
     embedder = build_embedder()
-    chunk_size = settings.chunk_size
-    chunk_overlap = settings.chunk_overlap
+    chunk_size = settings.rag_index_chunk_size
+    chunk_overlap = settings.rag_index_chunk_overlap
 
     # 컬렉션 보장 (dim 은 임베더 차원). 이미 있으면 skip.
     store.ensure_collection(collection, embedder.dim)

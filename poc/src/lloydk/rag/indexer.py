@@ -65,8 +65,8 @@ class RagIndexer:
     ):
         self.store = store if store is not None else build_store()
         self.embedder = embedder if embedder is not None else build_embedder()
-        self.chunk_size = chunk_size or settings.chunk_size
-        self.chunk_overlap = chunk_overlap or settings.chunk_overlap
+        self.chunk_size = chunk_size or settings.rag_index_chunk_size
+        self.chunk_overlap = chunk_overlap or settings.rag_index_chunk_overlap
         self.collection_prefix = collection_prefix
 
     def index_guide(

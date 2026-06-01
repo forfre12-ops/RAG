@@ -308,8 +308,8 @@ jobs:
         # alembic baseline + N4 인덱스까지 upgrade head 된 상태에서 ORM 메타데이터와 비교.
         run: bash scripts/ci_alembic_drift_check.sh
 
-      - name: Run pytest (126 unit + integration tests)
-        run: pytest tests/ -v --tb=short
+      - name: Run pytest lite (slow/fullstack/model_download excluded)
+        run: make test-lite
 
       - name: Run PoC dryrun suite (P4 -> P3 -> P2 -> P1 -> P5)
         run: python scripts/run_all_pocs.py

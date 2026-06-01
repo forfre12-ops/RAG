@@ -98,6 +98,20 @@ datasets:
       미탐 1단계 개선 동시 확인.
     license: MIT + Apache 2.0 (혼합)
 
+  labeled_p1_retrain_v3:
+    path: poc/datasets/labeled_p1_retrain_v3/train.jsonl
+    files:
+      train.jsonl: 6238
+      manifest.json: 1
+    total_lines: 6238
+    format: jsonl (text, label, source, optional doc_id/domain)
+    source: labeled_oss_v1/train + rag_corpus_v2(label_match=true) + gold_real repeated x3
+    grade_distribution: { TS: 1147, S1: 1192, S2: 1678, S3: 2221 }
+    purpose: |
+      P1 v3 retraining input prepared on 2026-06-01.
+      Full training command is recorded in poc/datasets/labeled_p1_retrain_v3/manifest.json.
+    license: mixed internal/generated/public-derived evaluation records
+
   # ------------------------------------------------------------
   # 골든셋 (S9 적대적 FNR · 분류 회귀 게이트)
   # ------------------------------------------------------------
@@ -330,9 +344,10 @@ gold:
     updated_at: "2026-06-01"
   retrieval_gold:
     path: poc/datasets/gold_real/retrieval_gold.jsonl
-    eval_type: human_review
-    lines: null  # 미구축
-    note: 30 query 목표. expected_doc_ids 기준 Recall/MRR/nDCG 평가용.
+    eval_type: oss_eval_doc_id
+    lines: 80
+    source: oss_eval_queries.json
+    note: expected_doc_id/relevant_doc_ids based Recall/MRR/nDCG evaluation set generated on 2026-06-01.
 
 changelog:
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }

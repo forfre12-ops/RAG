@@ -87,7 +87,16 @@ def compute_retrieval_metrics_from_arrays(
             skipped += 1
             continue
 
-        ranked = [str(x) for x in predictions[i][:top_k]]
+        ranked = []
+        seen = set()
+        for x in predictions[i]:
+            doc_id = str(x)
+            if doc_id in seen:
+                continue
+            ranked.append(doc_id)
+            seen.add(doc_id)
+            if len(ranked) >= top_k:
+                break
         hit_set = relevant_set.intersection(ranked)
 
         recall = len(hit_set) / len(relevant_set)

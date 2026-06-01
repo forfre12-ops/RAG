@@ -2,7 +2,6 @@
 import json
 import os
 import sys
-import uuid
 from pathlib import Path
 
 os.chdir(Path(__file__).resolve().parent.parent)
@@ -12,6 +11,7 @@ load_dotenv(".env")
 
 from lloydk.adapters.embedding import build_embedder
 from lloydk.adapters.vectorstore import build_store
+from lloydk.config import settings
 from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
 
 COLLECTION = "docs"
@@ -35,7 +35,10 @@ def main():
 
     store    = build_store()
     embedder = build_embedder()
-    pipe     = PreprocessPipeline()
+    pipe     = PreprocessPipeline(
+        chunk_size=settings.rag_index_chunk_size,
+        chunk_overlap=settings.rag_index_chunk_overlap,
+    )
 
     dim = getattr(embedder, "dim", 1024)
     store.ensure_collection(COLLECTION, dim=dim)
@@ -56,13 +59,19 @@ def main():
         if not chunks:
             chunks = [type("C", (), {"text": clean})()]
 
+        base_doc_id = d.get("synth_id") or d.get("doc_id") or f.stem
+
         for ci, chunk in enumerate(chunks):
             text = getattr(chunk, "text", None) or (chunk.get("text", clean) if isinstance(chunk, dict) else clean)
             if not text or not text.strip():
                 continue
-            batch_ids.append(str(uuid.uuid4()))
+            chunk_id = f"{base_doc_id}:c{ci}"
+            batch_ids.append(chunk_id)
             batch_texts.append(text)
             batch_payloads.append({
+                "id":          chunk_id,
+                "doc_id":      base_doc_id,
+                "base_doc_id": base_doc_id,
                 "text":        text,
                 "grade":       d.get("target_grade"),
                 "domain":      d.get("domain"),

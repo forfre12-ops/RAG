@@ -78,6 +78,16 @@ def test_multiple_relevants_partial_hit():
     assert r.ndcg_at_k == pytest.approx(expected)
 
 
+def test_duplicate_retrieved_doc_ids_count_once():
+    preds = [["a", "a", "a", "b", "c"]]
+    rels = [{"a"}]
+    r = compute_retrieval_metrics_from_arrays(preds, rels, top_k=5)
+
+    assert r.recall_at_k == 1.0
+    assert r.mrr == 1.0
+    assert r.ndcg_at_k == 1.0
+
+
 def test_empty_relevants_skipped_from_sample():
     preds = [["a", "b"], ["c", "d"]]
     rels = [{"a"}, set()]  # 두 번째 쿼리는 relevant 없음
