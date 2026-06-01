@@ -40,6 +40,27 @@ docker-data/
 poc/datasets/labeled_5k/
 poc/datasets/synthetic_5k/
 
+# 혼합 학습셋 (대용량, artifact — 로컬 전용)
+poc/datasets/labeled_mixed/
+poc/datasets/labeled_mixed_v2/
+poc/datasets/labeled_mixed_v3/
+poc/datasets/labeled_v2_balanced/
+
+# deprecated 격리 데이터
+poc/datasets/legacy_synthetic/
+
+# 추가 코퍼스 (대용량)
+poc/datasets/p3_realtest/
+poc/datasets/rag_corpus_v2/
+poc/datasets/test_set_v2/
+poc/datasets/test_docs_pdf/
+
+# 실행 로그
+poc/logs/
+
+# 생성된 혼합 학습 subset
+poc/datasets/gold_real/train_subset.jsonl
+
 # Test artifacts
 poc/.coverage
 

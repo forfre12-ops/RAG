@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.fullstack
 from lloydk.perf.regression import (
     detect_regressions,
     detect_regression_trend,

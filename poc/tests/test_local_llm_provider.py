@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+pytestmark = pytest.mark.model_download
 # ---- 어댑터 존재 확인 (없으면 skip) ---------------------------------------
 
 try:

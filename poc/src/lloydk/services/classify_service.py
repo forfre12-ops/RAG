@@ -31,6 +31,15 @@ StageCallback = Callable[[str], None]
 logger = logging.getLogger(__name__)
 
 
+def _try_uuid_str(value: str | None) -> "uuid.UUID | None":
+    if not value:
+        return None
+    try:
+        return uuid.UUID(value)
+    except (ValueError, AttributeError):
+        return None
+
+
 class ClassifyService:
     _instance: "ClassifyService | None" = None
 
@@ -102,6 +111,43 @@ class ClassifyService:
             logger.debug("classify chunk split failed (fallback []): %s", exc)
             chunks = []
 
+        # ── Corrections 반영: DB에 검증된 라벨이 있으면 모델 추론 스킵 ───────────
+        # human_review / koipa_case_based / nkt_designated 등 is_verified=True 라벨
+        # 우선순위: human_review > koipa_case_based > llm_judge_consensus > ...
+        verified_label = self._get_verified_label(req.doc_id)
+        if verified_label is not None:
+            from lloydk.schemas.common import Grade  # noqa: PLC0415
+            inference_id = uuid.uuid4()
+            logger.info(
+                "classify doc_id=%s: verified label applied (labeled_by=%s, level=%s) — inference skipped",
+                req.doc_id, verified_label.labeled_by, verified_label.level_code,
+            )
+            # Audit trail — best-effort DB 기록
+            self._audit_verified_label(
+                doc_id=req.doc_id,
+                tenant_id=req.tenant_id or "default",
+                level_code=verified_label.level_code,
+                labeled_by=verified_label.labeled_by,
+                reviewer_id=verified_label.labeler_id,
+                inference_id=inference_id,
+            )
+            notify("finalize")
+            return ClassifyResponse(
+                inference_id=inference_id,
+                doc_id=req.doc_id,
+                label=Grade(verified_label.level_code),
+                confidence=float(verified_label.confidence or 0.95),
+                scores={verified_label.level_code: float(verified_label.confidence or 0.95)},
+                model_version=f"human_review:{verified_label.labeled_by}",
+                elapsed_ms=0,
+                status="staging",
+                warnings=[
+                    f"verified_label_applied: labeled_by={verified_label.labeled_by},"
+                    f" reviewer={verified_label.labeler_id or 'system'},"
+                    f" level={verified_label.level_code} — inference skipped"
+                ],
+            )
+
         # InferencePipeline 내부에서 embed → retrieve → llm을 거치므로,
         # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
         notify("embed")
@@ -140,6 +186,94 @@ class ClassifyService:
             status="staging",
             warnings=warnings_acc,
         )
+
+    # ------------------------------------------------------------
+    # Verified Label Audit Trail
+    # ------------------------------------------------------------
+
+    def _audit_verified_label(
+        self,
+        *,
+        doc_id: str,
+        tenant_id: str,
+        level_code: str,
+        labeled_by: str,
+        reviewer_id: str | None,
+        inference_id: "uuid.UUID",
+    ) -> None:
+        """검증된 라벨 적용 이벤트를 audit_log에 best-effort 기록."""
+        try:
+            from lloydk.db import SessionLocal  # noqa: PLC0415
+            from lloydk.db.models import AuditLog  # noqa: PLC0415
+            import datetime as _dt  # noqa: PLC0415
+
+            db = SessionLocal()
+            try:
+                entry = AuditLog(
+                    request_id=inference_id,
+                    tenant_id=tenant_id,
+                    actor_id=reviewer_id or labeled_by,
+                    actor_role="human_review",
+                    action="verified_label_applied",
+                    target_type="document",
+                    target_id=doc_id,
+                    payload_hash=None,
+                    success=True,
+                    occurred_at=_dt.datetime.now(_dt.timezone.utc),
+                )
+                db.add(entry)
+                db.commit()
+                logger.debug("audit verified_label_applied: doc_id=%s level=%s", doc_id, level_code)
+            except Exception as exc:  # noqa: BLE001
+                db.rollback()
+                logger.debug("audit write failed (non-critical): %s", exc)
+            finally:
+                db.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_audit_verified_label skipped: %s", exc)
+
+    # ------------------------------------------------------------
+    # Verified Label Lookup (Corrections 반영)
+    # ------------------------------------------------------------
+
+    def _get_verified_label(self, doc_id_str: str) -> "object | None":
+        """doc_id에 대한 검증된 DocumentLabel 반환.
+
+        DB 가용 시 조회. 없거나 실패하면 None (모델 추론으로 계속).
+        반환 타입: DocumentLabel with .level_code, .labeled_by, .confidence 속성.
+        """
+        try:
+            from lloydk.db import SessionLocal  # noqa: PLC0415
+            from lloydk.repositories.classify_repo import ClassifyRepo  # noqa: PLC0415
+            from lloydk.db.models import ClassificationLevel  # noqa: PLC0415
+            from sqlalchemy import select  # noqa: PLC0415
+
+            doc_uuid = _try_uuid_str(doc_id_str)
+            if doc_uuid is None:
+                return None
+
+            db = SessionLocal()
+            try:
+                repo = ClassifyRepo(db)
+                dl = repo.get_verified_document_label(doc_uuid)
+                if dl is None:
+                    return None
+                # level_code 조회
+                level = db.execute(
+                    select(ClassificationLevel).where(
+                        ClassificationLevel.level_id == dl.level_id
+                    )
+                ).scalar_one_or_none()
+                if level is None:
+                    return None
+                # level_code를 dl에 동적으로 attach (반환값 단순화)
+                dl.level_code = level.level_code
+                return dl
+            finally:
+                db.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_get_verified_label failed (non-critical): %s", exc)
+            return None
 
     # ------------------------------------------------------------
     # Persistence (best-effort)
@@ -303,9 +437,9 @@ class ClassifyService:
             # file:// URI → LocalStorage, s3:// or minio:// → MinioStorage
             storage = build_storage()
             # URI → bucket/key 분해
-            # 형식: file://…/<bucket>/<key> 또는 s3://<bucket>/<key>
+            # 형식: s3://<bucket>/<key> 또는 minio://<host>/<bucket>/<key> 또는 file://<bucket>/<key>
             import re as _re  # noqa: PLC0415
-            m = _re.match(r"(?:file|s3|minio)://[^/]*/([^/]+)/(.+)", uri)
+            m = _re.match(r"(?:s3|minio|file)://([^/]+)/(.+)", uri)
             if not m:
                 return ""
             bucket, key = m.group(1), m.group(2)

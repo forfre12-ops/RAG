@@ -15,7 +15,8 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
         perf-scenarios perf-scenarios-full perf-clean-run \
         gold-set check-data check-gold eval-gold eval-p2-gold \
         recover-llm-judge \
-        eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers
+        eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
+        test-lite test-full
 
 help:
 	@echo "Targets:"
@@ -48,6 +49,8 @@ help:
 	@echo "  eval-human-gold  ③ human_review_gold_eval (gold_real의 human_review 건 한정)"
 	@echo "  eval-all-tiers   위 3가지 순차 실행 + 통합 요약"
 	@echo "  recover-llm-judge  uncertain_cases → llm_judge_primary 회수"
+	@echo "  test-lite    빠른 테스트 (2분 이내, slow/fullstack/model_download 제외)"
+	@echo "  test-full    전체 테스트 (인프라 + GPU 필요)"
 	@echo "  p1           P1 classifier dryrun (synthetic_masked eval)"
 	@echo "  p5           P5 E2E smoke (inproc)"
 	@echo "  poc-all      P4 -> P3 -> P2 -> P1 -> P5 in order"
@@ -129,8 +132,8 @@ analyze-synth:
 	fi
 
 verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + 번들 + 라이선스 + 분석 + 데이터 품질)
-	@echo "==[1/6]== pytest"
-	@$(PY) -m pytest -q
+	@echo "==[1/6]== pytest lite (slow/fullstack/model_download 제외)"
+	@$(MAKE) -s test-lite
 	@echo "==[2/6]== 데이터 품질 검사 (FAIL 시 abort)"
 	@$(MAKE) -s check-data
 	@echo "==[3/6]== PoC 5종 dryrun"
@@ -194,7 +197,7 @@ eval-human-gold: ## ③ human_review_gold_eval — gold_real의 human_review 건
 	$(PY) scripts/p1_train_classifier.py \
 	    --mode dryrun \
 	    --eval-type human_review_gold \
-	    --label-source-filter human_review \
+	    --label-source-filter human_review,public_definitive,koipa_case_based,nkt_designated \
 	    --report reports/eval_human_review_gold.md
 	@echo "[tier-3] human_review_gold_eval → reports/eval_human_review_gold.md"
 
@@ -211,6 +214,12 @@ tiers = [ \
 [print(f'  {label}: n={d.get(\"n\",\"N/A\")}  F1={d.get(\"f1_macro\",\"N/A\")}  FNR_ts={d.get(\"fnr_by_grade\",{}).get(\"TS\",\"N/A\")}') \
  if (p := pathlib.Path(f)) and p.exists() and (d := json.loads(p.read_text(encoding=\"utf-8\"))) else print(f'  {label}: N/A (미실행)') \
  for label, f in tiers]"
+
+active-learning: ## active learning 트리거 — corrections 현황 + 재학습 권고
+	$(PY) scripts/check_active_learning.py --threshold 30
+
+active-learning-file: ## DB 없이 파일 기반 corrections 확인
+	$(PY) scripts/check_active_learning.py --file-only --threshold 30
 
 recover-llm-judge: ## uncertain_cases → llm_judge_primary 회수 (S3→S2/S1 + conf>=0.85)
 	$(PY) scripts/recover_llm_judge.py
@@ -237,6 +246,12 @@ eval-p2-gold: ## P2 doc_id 기준 Recall@5 (oss_eval_queries.json 또는 retriev
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun
+
+test-lite: ## 빠른 테스트 suite (2분 이내 목표, CI 기본 — slow/fullstack/model_download 제외)
+	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow"
+
+test-full: ## 전체 테스트 suite (인프라 + GPU 필요)
+	$(PY) -m pytest -q
 
 p5:
 	$(PY) scripts/p5_e2e_smoke.py --mode inproc

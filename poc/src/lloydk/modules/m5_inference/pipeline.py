@@ -79,7 +79,14 @@ class InferencePipeline:
 
     # FNR-safe override: rule engine이 이 점수 이상으로 TS를 잡으면 모델 결과 무시.
     # 모델이 TS 미학습 도메인(M&A·암호·국방 등)을 S1/S2/S3로 내릴 때 방어.
-    _FNR_RULE_TS_THRESHOLD = 3.0
+    # settings.fnr_rule_ts_threshold로 외부 조정 가능. 기본값 3.0.
+    @property
+    def _FNR_RULE_TS_THRESHOLD(self) -> float:  # type: ignore[override]
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            return float(settings.fnr_rule_ts_threshold)
+        except Exception:
+            return 3.0
 
     def run(
         self,
@@ -113,6 +120,33 @@ class InferencePipeline:
                     pass
         else:
             result = self._run_rule_fallback(text, return_evidence)
+
+        # Source-type prior: 판례/공개 문서는 정의상 S3 — 모델이 TS/S1로 과분류 방어.
+        # metadata에 source_type="court_decision" 또는 source="판례" 가 있을 때만 적용.
+        # settings.source_prior_enabled=True (기본 False) 시 활성화.
+        try:
+            from lloydk.config import settings as _s  # noqa: PLC0415
+            if getattr(_s, "source_prior_enabled", False) and metadata:
+                src = metadata.get("source_type", "") or metadata.get("source", "")
+                _PUBLIC_SOURCES = {"court_decision", "판례", "public_disclosure", "공시", "채용공고", "보도자료"}
+                if any(s in str(src) for s in _PUBLIC_SOURCES):
+                    _GRADE_ORDER_LOCAL = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+                    if _GRADE_ORDER_LOCAL.get(result.label.value, 99) < 3:  # TS or S1 → cap at S2
+                        result.warnings = list(result.warnings) + [
+                            f"source-prior: {src!r} is public → grade capped at S2"
+                        ]
+                        result = InferenceResult(
+                            label=Grade.S2,
+                            confidence=min(result.confidence, 0.7),
+                            scores={**result.scores, "S2": max(result.scores.get("S2", 0), 0.6)},
+                            factors=result.factors,
+                            evidence=result.evidence,
+                            rag_context=result.rag_context,
+                            model_version=result.model_version,
+                            warnings=result.warnings,
+                        )
+        except Exception:  # noqa: BLE001
+            pass
 
         # 표적 1 (2026-05-29): use_rag=True면 retrieval facade 호출하여 rag_context 채움.
         # rule-fallback / _run_model 어느 경로든 동일하게 RAG context 보강 — 분류 본문은 안 건드림.

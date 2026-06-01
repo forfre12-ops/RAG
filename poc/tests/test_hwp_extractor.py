@@ -104,6 +104,9 @@ class TestHwpRealFixture:
         body = fx.read_bytes()
         result = extract(fx)
 
+        # hwpx는 hwp5 모듈 의존성 — 미충족 시 xfail
+        if result.error and "hwp5" in str(result.error):
+            pytest.xfail(f"hwpx 파서 hwp5 모듈 의존성 미충족: {result.error}")
         assert result.method == "rhwp", f"expected rhwp, got {result.method}: {result.error}"
         assert result.text, f"본문 추출 실패: {result.error}"
         assert result.quality > 0

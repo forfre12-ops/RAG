@@ -1,12 +1,14 @@
 """E2E smoke — POST /classify → POST /confirm → GET /metrics/latest 골든 패스.
 
+from __future__ import annotations
 설계:
 - TestClient (in-memory) 단일 호출 체인 — PG 없어도 동작 (best-effort).
 - 각 응답이 OpenAPI 스키마 필수 필드를 포함하는지 검증.
 - metrics/latest는 PG 없을 때 active_model이 없어 404가 정상 — 200/404 모두 허용.
 """
 
-from __future__ import annotations
+import pytest
+pytestmark = pytest.mark.slow
 
 from fastapi.testclient import TestClient
 

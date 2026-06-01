@@ -40,6 +40,9 @@ class TrainSpec:
     class_weighted: bool = True
     seed: int = 42
     experiment_name: str = "kipra-classifier"
+    bf16: bool = True           # bf16 가속 (CUDA GPU 필요; GPU 없으면 자동 비활성)
+    use_mlflow: bool = True     # MLflow 로깅 (서버 없으면 False 권장)
+    logging_steps: int = 20
 
 
 @dataclass
@@ -156,6 +159,9 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             **{f"fnr_{name}": v for name, v in fnr_by.items()},
         }
 
+    use_bf16 = spec.bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+    report_to = ["mlflow"] if spec.use_mlflow else []
+
     args = TrainingArguments(
         output_dir=spec.output_dir,
         num_train_epochs=spec.epochs,
@@ -169,9 +175,12 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         load_best_model_at_end=True,
         metric_for_best_model="fnr_overall",
         greater_is_better=False,
-        logging_steps=20,
+        logging_steps=spec.logging_steps,
         seed=spec.seed,
-        report_to=["mlflow"],
+        bf16=use_bf16,
+        report_to=report_to,
+        dataloader_num_workers=0,   # Windows deadlock 방지
+        dataloader_pin_memory=False,
     )
 
     # transformers v5+ 호환: Trainer.__init__ 가 `tokenizer` → `processing_class`로 이름

@@ -136,7 +136,10 @@ ACCEPTED_GOLD_LABEL_SOURCES = {
     "human_review",         # 사람이 직접 검수
     "llm_judge_consensus",  # 룰 라벨러 + LLM 동의, 둘 다 고신뢰
     "llm_judge_primary",    # 룰 라벨러 무의견 + LLM 고신뢰 단독
-    "codex_review",         # AI(codex) 생성+adjudicate, requires_human_signoff=True
+    "codex_review",         # AI adjudicate, requires_human_signoff=True
+    "public_definitive",    # 이미 공개된 문서 (판례, DART 공시 등) → 정의상 S3
+    "koipa_case_based",     # KOIPA 판례·가이드라인 근거 시나리오 (S1/S2)
+    "nkt_designated",       # 산업부 국가핵심기술 지정 근거 시나리오 (TS)
 }
 
 def check_gold_real(name: str, records: list[dict], train_hashes: set[str]) -> tuple[dict, list[str]]:

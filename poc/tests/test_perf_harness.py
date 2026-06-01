@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.fullstack
 from lloydk.perf.harness import AvailableResources, _detect_trained_model
 from lloydk.perf.kpis import KPIS, aggregate, kpi_by_id, passes
 

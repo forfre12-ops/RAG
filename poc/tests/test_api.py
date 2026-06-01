@@ -1,6 +1,8 @@
 """FastAPI API — 인증/healthz/classify."""
-
 from __future__ import annotations
+
+import pytest
+pytestmark = pytest.mark.slow
 
 from fastapi.testclient import TestClient
 

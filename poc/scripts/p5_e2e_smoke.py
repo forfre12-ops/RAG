@@ -21,48 +21,11 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 
-SAMPLES = [
-    {
-        "doc_id": "smoke-ts-001",
-        "tenant_id": "poc",
-        "title": "차세대 제품 설계도",
-        "content": (
-            "본 문서는 특급기밀 등급의 차세대 제품 설계도와 핵심 원천기술 명세를 담는다. "
-            "M&A 계획과 회사 매각 협상 진행 중이며 임직원 인사 이동 사항을 포함한다."
-        ),
-        "expected_grade": "TS",
-    },
-    {
-        "doc_id": "smoke-s1-001",
-        "tenant_id": "poc",
-        "title": "신제품 개발 로드맵",
-        "content": (
-            "1급 비밀로 분류된 영업비밀 자료. 공정 노하우와 원가 구조, 고객 데이터베이스 분석. "
-            "신제품 개발 로드맵과 알고리즘 소스코드, 마케팅 전략 포함."
-        ),
-        "expected_grade": "S1",
-    },
-    {
-        "doc_id": "smoke-s2-001",
-        "tenant_id": "poc",
-        "title": "분기 사업 검토",
-        "content": (
-            "대외비 2급 자료. 내부 검토용 분기 매출 보고서, 사업 계획 초안, "
-            "거래처 명단, 예산 배정 검토 자료. 조직 개편 검토."
-        ),
-        "expected_grade": "S2",
-    },
-    {
-        "doc_id": "smoke-s3-001",
-        "tenant_id": "poc",
-        "title": "신제품 출시 보도자료",
-        "content": (
-            "공시 및 공고용 보도자료. 회사 소개와 채용 공고, 이용약관 외부 공지. "
-            "FAQ 및 사보 콘텐츠 모음. 공개 가능 자료."
-        ),
-        "expected_grade": "S3",
-    },
-]
+import json as _json
+SAMPLES = _json.loads(
+    (Path(__file__).parent.parent / 'datasets/test_set_v2/smoke_samples.json')
+    .read_text('utf-8')
+)
 
 
 def via_http(url: str, api_key: str) -> list[dict]:

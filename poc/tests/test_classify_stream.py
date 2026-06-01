@@ -9,6 +9,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
 from lloydk.api.app import app

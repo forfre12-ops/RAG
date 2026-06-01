@@ -24,15 +24,63 @@ GRADE_KR = {
     "S3": "3급 공개",
 }
 
+# GRADE_KEYWORDS는 룰 라벨러(M3)에서 weak label 생성용으로만 사용.
+# generator 프롬프트에 직접 주입하지 않는다 — 키워드 leakage 차단.
 GRADE_KEYWORDS = {
-    "TS": "특급기밀, 핵심 원천기술, M&A 계획, 차세대 제품 설계도, 임직원 인사 이동",
+    "TS": (
+        "특급기밀, 핵심 원천기술, M&A 계획, 차세대 제품 설계도, 임직원 인사 이동, "
+        "암호화 알고리즘 키, 제로데이 취약점, HSM 마스터 시드, 루트 CA 개인키, "
+        "반도체 공정 레시피, EUV 공정 파라미터, 신약 후보물질, 임상 1상 결과, "
+        "인수합병 실사 보고서, 비공개 합병 가격, 비공개 IPO 일정, "
+        "유도무기 제어 알고리즘, 국가핵심기술, 방위산업기술, "
+        "배터리 양극재 조성, 전고체 전해질 조성, 자율주행 핵심 알고리즘, "
+        "RLHF 보상 모델 가중치, 기초모델 사전학습 데이터셋"
+    ),
     "S1": "1급 비밀, 영업비밀, 공정 노하우, 원가 구조, 고객 데이터베이스, 마케팅 전략",
     "S2": "대외비, 내부 검토, 분기 매출, 사업 계획, 거래처 명단",
     "S3": "보도자료, 공시, 채용 공고, 회사 소개, 이용약관, 외부 공지",
 }
 
+# V2: 등급명 대신 상황/맥락으로 문서 특성을 유도.
+# 생성된 문서가 등급을 "직접 표기"하는 것이 아니라 "판단 근거"를 담도록 유도.
+GRADE_SITUATION_PROMPTS = {
+    "TS": {
+        "situation": (
+            "유출 시 회사 존립 또는 국가 안보에 심각한 피해를 줄 수 있는 최고 전략 자료. "
+            "예: 아직 공개되지 않은 핵심 원천기술 내용, 진행 중인 비공개 M&A 실사, "
+            "암호 키·취약점 등 보안 운영 정보, 정부 방산 기밀에 준하는 기술 명세."
+        ),
+        "disclosure_scope": "극소수 C-level 임원 및 특정 업무 담당자만 접근 가능. 외부 공유 절대 불가.",
+        "harm_potential": "경쟁사 기술 복제, 진행 중인 인수협상 무력화, 보안 인프라 침해 가능.",
+    },
+    "S1": {
+        "situation": (
+            "유출 시 회사의 경쟁우위나 사업 기회에 상당한 피해를 주는 영업비밀 수준 자료. "
+            "예: 핵심 공정 노하우, 원가 구조, 주요 고객사 데이터, 미공개 마케팅 전략."
+        ),
+        "disclosure_scope": "해당 사업부 임원·팀장급 이상. 외부 공유 금지.",
+        "harm_potential": "경쟁사 가격 역산, 고객 이탈 유도, 영업 전략 무력화 가능.",
+    },
+    "S2": {
+        "situation": (
+            "외부 공개 시 회사 이미지나 협상력에 불이익을 줄 수 있는 내부 검토 자료. "
+            "예: 확정 전 분기 매출 초안, 내부 사업 계획 검토안, 거래처 협상 조건."
+        ),
+        "disclosure_scope": "내부 검토 단계. 부서 내 공유 가능, 외부 미공개.",
+        "harm_potential": "협상력 약화, 미확정 정보로 인한 시장 혼란 가능.",
+    },
+    "S3": {
+        "situation": (
+            "대외 공개를 전제로 작성되었거나, 이미 공개된 정보에 준하는 일반 자료. "
+            "예: 보도자료 초안, 채용 공고, 공시 자료, 회사 소개, 이용약관."
+        ),
+        "disclosure_scope": "외부 공개 가능 또는 공개 예정.",
+        "harm_potential": "해당 없음 또는 경미.",
+    },
+}
+
 SYSTEM_PROMPT = """당신은 한국의 영업비밀 등급분류 가이드 전문가다.
-주어진 등급 정의를 근거로 가상의 사내 문서를 작성한다.
+주어진 문서 상황·맥락을 읽고 해당 상황에 실재할 법한 가상의 사내 문서를 작성한다.
 
 [준수]
 - 실재 기업명/인명/주민번호/연락처/이메일 등 PII 금지
@@ -40,13 +88,20 @@ SYSTEM_PROMPT = """당신은 한국의 영업비밀 등급분류 가이드 전�
 - 출력은 반드시 다음 JSON 한 객체:
   {"title": str, "body": str, "document_type": str, "dept_hint": str, "rationale_tags": [str, ...]}
 - 그 외 텍스트(설명, 코드펜스) 출력 금지
-- 본문에 핵심 키워드가 자연스럽게 등장하도록 작성"""
 
-USER_TEMPLATE = """[등급]
-코드: {grade_code} ({grade_name})
+[중요 — 등급 표기 금지]
+- 제목·본문에 등급명(TS, S1, S2, S3, 특급기밀, 1급 비밀, 2급, 3급, 대외비, 기밀, 비밀, 극비) 직접 기재 금지
+- "이 문서는 ○급 비밀입니다" 같은 분류 표기 금지
+- 대신 문서의 내용과 맥락 자체가 민감도를 드러내도록 작성"""
 
-[등급 키워드 (자연스럽게 본문에 녹여 사용)]
-{keywords}
+USER_TEMPLATE_V2 = """[문서 상황]
+{situation}
+
+[공개 범위]
+{disclosure_scope}
+
+[잠재적 피해 가능성]
+{harm_potential}
 
 [도메인]
 {domain}
@@ -57,7 +112,8 @@ USER_TEMPLATE = """[등급]
 [작성 길이]
 한국어 {len_min}~{len_max}자
 
-위 조건에 부합하는 가상의 사내 문서를 JSON 객체로 작성하시오."""
+위 상황에 해당하는 가상의 사내 문서를 JSON 객체로 작성하시오.
+등급명(비밀, 기밀, TS, S1, S2, S3 등)은 문서 내용에 포함하지 마시오."""
 
 DOMAIN_DOC_TYPES = {
     "tech": "연구노트, 설계명세, 시험성적서, 알고리즘 설명서",
@@ -66,6 +122,13 @@ DOMAIN_DOC_TYPES = {
     "hr": "임원 평가, 보상 체계, 인사 이동안",
     "legal": "NDA 초안, MOU, 라이선스 계약 검토",
     "mixed": "내부 보고서, 회의록, 의사결정 문서",
+    # TS 전용 특화 도메인 (FNR 개선 목적)
+    "security": "암호 키 관리 보고서, 취약점 분석서, HSM 운영 지침, 보안 인증서 관리 대장",
+    "ma": "인수합병 실사 보고서, 기업가치 평가서, 주식 매수 계획안, 비공개 합병 의향서",
+    "defense": "방위산업 기술 명세, 국가핵심기술 보호 계획, 무기체계 설계 검토, 방산물자 기술 문서",
+    "semiconductor": "공정 레시피 명세, EUV 파라미터 설계서, 수율 개선 연구노트, 반도체 설계 도면",
+    "bio": "신약 후보물질 연구노트, 임상시험 프로토콜, 화합물 합성 경로, FDA 전략 기획서",
+    "ai": "사전학습 데이터셋 명세, 모델 가중치 관리 문서, RLHF 보상 설계서, 핵심 알고리즘 특허 전략",
 }
 
 _PII_PATTERNS = [
@@ -125,10 +188,11 @@ class SyntheticDocGenerator:
 
     def generate_one(self, req: SynthRequest) -> SynthDoc:
         grade_code = req.target_grade.value if hasattr(req.target_grade, "value") else str(req.target_grade)
-        user = USER_TEMPLATE.format(
-            grade_code=grade_code,
-            grade_name=GRADE_KR.get(grade_code, grade_code),
-            keywords=GRADE_KEYWORDS.get(grade_code, ""),
+        situation = GRADE_SITUATION_PROMPTS.get(grade_code, GRADE_SITUATION_PROMPTS["S3"])
+        user = USER_TEMPLATE_V2.format(
+            situation=situation["situation"],
+            disclosure_scope=situation["disclosure_scope"],
+            harm_potential=situation["harm_potential"],
             domain=req.domain,
             doc_types=DOMAIN_DOC_TYPES.get(req.domain, DOMAIN_DOC_TYPES["mixed"]),
             len_min=req.len_min,
@@ -151,7 +215,7 @@ class SyntheticDocGenerator:
         if parsed is None:
             # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용
             body = resp.text or _fallback_body(grade_code, req.domain)
-            title = f"[{GRADE_KR.get(grade_code)}] {DOMAIN_DOC_TYPES.get(req.domain, '내부 자료')} 합성 v{abs(hash(user)) % 10000:04d}"
+            title = f"{DOMAIN_DOC_TYPES.get(req.domain, '내부 자료').split(',')[0].strip()} 합성 v{abs(hash(user)) % 10000:04d}"
             doc_type = DOMAIN_DOC_TYPES.get(req.domain, "내부 자료").split(",")[0].strip()
             return SynthDoc(
                 target_grade=grade_code,
@@ -186,18 +250,19 @@ class SyntheticDocGenerator:
 
 
 def _fallback_body(grade_code: str, domain: str) -> str:
-    """Noop provider 등 비-LLM 모드용 fallback. 등급별 키워드를 본문에 명시 포함."""
-    kws = GRADE_KEYWORDS.get(grade_code, "")
-    # 키워드를 2회씩 본문에 포함하여 룰 라벨러가 확실히 매칭하도록 보강
-    kw_sentences = ". ".join(f"{kw} 관련 사항을 다룬다" for kw in kws.split(", ")) + "."
+    """Noop provider / CI 파이프라인 연결 테스트용 fallback.
+
+    실제 품질 평가에 사용하지 않는다 (label_source: noop_fallback 으로 구분).
+    등급명·키워드를 본문에 직접 삽입하지 않는다.
+    """
+    situation = GRADE_SITUATION_PROMPTS.get(grade_code, GRADE_SITUATION_PROMPTS["S3"])
     return (
-        f"본 문서는 {GRADE_KR.get(grade_code, grade_code)} 등급 {domain} 도메인 자료이다.\n\n"
-        "1. 개요\n"
-        f"{kw_sentences}\n\n"
+        f"[Noop fallback — {domain} 도메인 합성 문서]\n\n"
+        "1. 문서 개요\n"
+        f"본 자료는 {situation['disclosure_scope']} 조건에 해당하는 내부 문서이다.\n\n"
         "2. 주요 내용\n"
-        f"본 자료는 {kws} 등 핵심 키워드를 포함한다. "
-        "합성 파이프라인 검증을 위해 결정론적으로 생성되었으며, 실제 LLM 사용 시에는 "
-        "가이드라인 기반의 자연스러운 사내 문서로 채워진다.\n\n"
+        f"{situation['situation']}\n\n"
         "3. 결론\n"
-        f"{kws}에 관한 검토 결과를 종합하여 차기 회의에 보고한다."
+        "합성 파이프라인 연결 테스트 목적으로 생성되었으며, "
+        "실제 LLM 호출 시 이 내용은 해당 맥락에 맞는 자연스러운 문서로 대체된다."
     )

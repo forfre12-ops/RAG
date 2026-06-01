@@ -1,6 +1,8 @@
 """ClassifyService + LLMUsageService — 외부 인프라 없이 동작 확인."""
 
 from __future__ import annotations
+import pytest
+pytestmark = pytest.mark.slow
 
 import json
 from pathlib import Path

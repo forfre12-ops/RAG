@@ -10,24 +10,31 @@ from lloydk.adapters.reranker.noop_reranker import NoopReranker
 
 __all__ = ["Reranker", "RerankResult", "NoopReranker", "get_reranker"]
 
+_RERANKER_CACHE: dict[str, Reranker] = {}
+
 
 def get_reranker(provider: str | None = None) -> Reranker:
     """settings.reranker_provider 또는 명시 인자로 백엔드 선택.
 
-    Returns:
-        Reranker 인스턴스
+    프로세스 내 싱글톤 — 모델 로드 비용(~수초)을 최초 1회로 한정.
     """
     from lloydk.config import settings
 
     name = (provider or getattr(settings, "reranker_provider", "noop") or "noop").lower()
 
-    if name == "noop":
-        return NoopReranker()
-    if name == "bge":
-        from lloydk.adapters.reranker.bge_reranker import BgeReranker
-        return BgeReranker()
-    if name == "qwen3":
-        from lloydk.adapters.reranker.bge_reranker import BgeReranker
-        return BgeReranker(model_name="Qwen/Qwen3-Reranker-0.6B")
+    if name in _RERANKER_CACHE:
+        return _RERANKER_CACHE[name]
 
-    return NoopReranker()
+    if name == "noop":
+        instance: Reranker = NoopReranker()
+    elif name == "bge":
+        from lloydk.adapters.reranker.bge_reranker import BgeReranker
+        instance = BgeReranker()
+    elif name == "qwen3":
+        from lloydk.adapters.reranker.bge_reranker import BgeReranker
+        instance = BgeReranker(model_name="Qwen/Qwen3-Reranker-0.6B")
+    else:
+        instance = NoopReranker()
+
+    _RERANKER_CACHE[name] = instance
+    return instance

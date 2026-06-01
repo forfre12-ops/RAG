@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from typing import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from lloydk.db.models import (
@@ -18,6 +18,7 @@ from lloydk.db.models import (
     ClassificationLevel,
     Correction,
     Document,
+    DocumentLabel,
     Tenant,
 )
 from lloydk.schemas.classify import EvidenceSpan, RagContextHit
@@ -226,6 +227,39 @@ class ClassifyRepo:
             cls.status = status
 
     # ------------------------------------------------------------
+    # DocumentLabel (Human Review / Verified Gold)
+    # ------------------------------------------------------------
+
+    def get_verified_document_label(self, doc_id: uuid.UUID) -> DocumentLabel | None:
+        """doc_id에 대한 검증된 라벨 조회 (is_verified=True 우선).
+
+        human_review → llm_judge_consensus → llm_judge_primary 우선순위로 반환.
+        없으면 None → 모델 추론으로 계속 진행.
+        """
+        _LABEL_SOURCE_PRIORITY = {
+            "human_review": 1,
+            "koipa_case_based": 2,
+            "nkt_designated": 2,
+            "codex_review": 3,
+            "public_definitive": 4,
+            "llm_judge_consensus": 5,
+            "llm_judge_primary": 6,
+        }
+
+        rows = list(
+            self.db.execute(
+                select(DocumentLabel)
+                .where(DocumentLabel.doc_id == doc_id)
+                .where(DocumentLabel.review_status == "accepted" if hasattr(DocumentLabel, "review_status") else DocumentLabel.is_verified.is_(True))
+            ).scalars()
+        )
+        if not rows:
+            return None
+
+        # 우선순위 정렬 후 최우선 반환
+        rows.sort(key=lambda r: _LABEL_SOURCE_PRIORITY.get(r.labeled_by, 99))
+        return rows[0]
+
     # Correction (Active Learning truth source)
     # ------------------------------------------------------------
 
@@ -282,6 +316,15 @@ class ClassifyRepo:
                 select(Correction).where(Correction.consumed_in_run.is_(None))
             ).scalars()
         )
+
+    def count_recent_corrections(self, actor_id: str | None = None, limit_days: int = 1) -> int:
+        """최근 N일간 corrections 건수 — PSH S3 KPI용."""
+        import datetime as _dt
+        cutoff = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=limit_days)
+        q = select(func.count()).select_from(Correction).where(Correction.corrected_at >= cutoff)
+        if actor_id:
+            q = q.where(Correction.corrected_by == actor_id)
+        return self.db.scalar(q) or 0
 
     def mark_corrections_consumed(
         self, run_id: uuid.UUID, correction_ids: Iterable[int]

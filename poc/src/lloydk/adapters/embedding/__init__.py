@@ -65,9 +65,13 @@ def _maybe_wrap_cache(provider: EmbeddingProvider) -> EmbeddingProvider:
     return CachedEmbedding(provider, redis_url=_redis_url_for_emb_cache())
 
 
+_EMBEDDER_CACHE: dict[str, EmbeddingProvider] = {}
+
+
 def build_embedder(model_name: str | None = None, *, force_hash: bool = False) -> EmbeddingProvider:
     """기본은 HuggingFace 로드. 드라이런/오프라인이면 HashEmbedding.
 
+    프로세스 내 싱글톤 — HF 모델 로드 비용을 최초 1회로 한정.
     underlying provider 생성 직후 ``EMB_CACHE_ENABLED`` 기본 ON 이면
     ``CachedEmbedding`` 으로 wrap 하여 반환한다.
     """
@@ -76,10 +80,16 @@ def build_embedder(model_name: str | None = None, *, force_hash: bool = False) -
     name = model_name or settings.embedding_model
     if force_hash or name == "hash":
         return HashEmbedding(dim=1024)
+
+    if name in _EMBEDDER_CACHE:
+        return _EMBEDDER_CACHE[name]
+
     try:
         from lloydk.adapters.embedding.hf_embedding import HFEmbedding
 
-        return _maybe_wrap_cache(HFEmbedding(name))
+        provider = _maybe_wrap_cache(HFEmbedding(name))
+        _EMBEDDER_CACHE[name] = provider
+        return provider
     except Exception as exc:  # noqa: BLE001
         # 모델 로드 실패(네트워크/디스크/CUDA) 시 HashEmbedding으로 폴백 + 경고.
         # L2: Prometheus counter 증가로 운영 대시보드에서 정확도 저하 위험 가시화.

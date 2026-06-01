@@ -1,5 +1,6 @@
 """POST /api/v1/answer — RAG 답안 합성 엔드포인트 테스트.
 
+from __future__ import annotations
 테스트 범위:
 - 인증 누락 → 401/422
 - 잘못된 키 → 401
@@ -10,7 +11,8 @@
 - /answer가 OpenAPI yaml에 등록됨 (openapi.json 노출 확인)
 """
 
-from __future__ import annotations
+import pytest
+pytestmark = pytest.mark.slow
 
 from fastapi.testclient import TestClient
 

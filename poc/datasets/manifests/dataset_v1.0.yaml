@@ -160,22 +160,85 @@ es_indices:
 # ------------------------------------------------------------
 
 acceptance:
-  p1_train:
-    F1_macro: ">= 0.75"
-    FNR_overall: "<= 5%"
-    measured: { F1: 1.0, FNR: 0.0, scope: "학습 분포" }
-    status: PASS
+  # -------------------------------------------------------
+  # P1 분류 — F1 지표는 eval_type 별로 구분해서 보고한다
+  # -------------------------------------------------------
+  p1_classification:
+    pass_criteria: { F1_macro: ">= 0.75", FNR_underclass: "<= 5%" }
+    current_model: artifacts/classifier_mixed_v2/v-44384f0c
+    model_spec: KF-DeBERTa-base, max_seq=256, bf16, 5ep, labeled_v2_balanced+gold_real×3+public_gold×5
+    model_history:
+      v-1ac43d0f: "OSS only, gold_real F1=0.322"
+      v-37d130b7: "mixed v1, gold_real F1=0.545, S1_R=0.20"
+      v-44384f0c: "mixed v2 (current), gold_real F1=0.487, S1_R=0.68, FNR=0.000"
+    eval_tiers:
+      synthetic_masked_eval:
+        eval_type: synthetic_masked
+        source: gold/classification_gold.jsonl (test_set_v2 기반, 144건)
+        measured: { F1: 1.000, FNR: 0.000 }
+        note: "합성 파이프라인 내부 일관성 확인용. 운영 성능 근거 불가."
+      llm_judge_gold:
+        eval_type: llm_judge_pseudo_gold
+        source: gold_real/classification_gold.jsonl (710건)
+        filter: llm_judge_primary, llm_judge_consensus, codex_review
+        measured_rule_labeler:  { F1: 0.366, FNR: 0.714, n: 610 }
+        measured_ml_v3_direct:  { F1: 0.487, FNR: 0.441, n: 710, note: "S1_R=0.68, S2_R=0.49" }
+        measured_ml_v3_api:     { F1: 0.487, FNR: 0.000, n: 710, note: "FNR-safe 오버라이드, TS/S1/S2 R=1.00" }
+        note: "LLM pseudo-gold. 운영 참고용. TS/S1 recall 대폭 개선."
+      human_review_gold:
+        eval_type: human_review_pseudo
+        source: gold_real/classification_gold.jsonl
+        filter: human_review, public_definitive, koipa_case_based, nkt_designated
+        gold_breakdown:
+          human_review: 0건          # 발주처 실문서 (미입수)
+          public_definitive: 45건    # 공개 판례 (정의상 S3)
+          koipa_case_based: 35건     # 대법원/KOIPA 영업비밀 판결 기반 S1/S2
+          nkt_designated: 15건       # 국가핵심기술 지정 고시 기반 TS
+          total: 100건 — 법적 근거 명시
+        measured_rule_labeler: { F1: 0.546, FNR: 0.486, n: 100 }
+        measured_ml_v3_api:    { F1: 0.561, FNR: 0.000, n: 100, note: "TS/S1/S2 R=1.00, S3 과분류" }
+        note: |
+          법적 근거 있는 pseudo-gold. 발주처 실문서 human_review 입수 시 자동 편입.
+          FNR=0.000: 민감 문서 미탐 없음 (보안 시스템 핵심 지표 충족).
+      in_distribution:
+        eval_type: oss_corpus_val
+        source: labeled_oss_v1/val.jsonl (680건)
+        measured_ml_v3: { F1: 0.774, FNR: 0.225 }
+        note: "in-distribution PASS 기준(0.75) 충족."
+      external_holdout:
+        eval_type: external
+        source: (미구축)
+        measured: null
+
   p2_retrieval:
-    Recall_at_5: ">= 0.80"
-    latency_p50_ms: "<= 200"
-    measured: { Recall: 0.7222, latency: 110.98, embedder: BGE-M3, mode: dense }
-    status: FAIL (합성 천장, 알고리즘 X)
+    pass_criteria: { Recall_at_5: ">= 0.80", latency_p50_ms: "<= 200" }
+    eval_tiers:
+      grade_hit:
+        note: "같은 등급 문서 검색 시 hit — 완화된 지표. 운영 성능 근거 불가."
+        measured: { Recall: 0.7222, latency: 110.98, embedder: BGE-M3, mode: dense }
+        status: FAIL (합성 천장)
+      doc_id_hit:
+        note: "expected_doc_id 기준 Recall@5 — 진짜 RAG 지표."
+        source: oss_eval_queries.json (2112건, expected_doc_id 포함), corpus=oss_corpus 3754건
+        measured_hash_dryrun:    { Recall: 0.487, note: "hash embedder — 하한값" }
+        measured_kure_v1_dense:  { Recall: 0.510, latency_p50_ms: 47 }
+        measured_kure_v1_hybrid: { Recall: 0.624, latency_p50_ms: 173, note: "BM25+dense RRF, 최고성능" }
+        measured_bge_m3_dense:   { Recall: 0.453, latency_p50_ms: 46 }
+        measured_bge_m3_hybrid:  { Recall: 0.596, latency_p50_ms: 163 }
+        gap_vs_grade_hit: "grade-hit 0.722 vs doc_id 0.624 (hybrid) — 과대측정 13% 감소"
+        measured_kure_v1_hybrid_bge_reranker: { Recall: 0.621, latency_p50_ms: 1206, note: "reranker 효과 없음, 7x 느림" }
+        measured_bge_m3_hybrid_bge_reranker: { Recall: 0.625, latency_p50_ms: 1242 }
+        improvement_path: "쿼리 확장(llm/hybrid 방식), 더 큰 코퍼스, 파인튜닝 임베더"
+        best_config: "KURE-v1 + ES hybrid (BM25+dense RRF), reranker 불필요"
+        reranker_verdict: "BGE reranker는 doc_id matching에 효과 없음 — latency만 7배 증가"
+        status: FAIL (목표 0.80 미달. 현재 최고: KURE-v1 hybrid 0.624)
+
   p3_synthesis:
-    label_match_rate: ">= 90%"
-    FNR_underclass: "<= 5%"
+    pass_criteria: { label_match_rate: ">= 90%", FNR_underclass: "<= 5%" }
     measured_qwen3: { label_match: 1.0, FNR: 0.0 }
     measured_solar: { label_match: 0.81, FNR: 0.27 }
-    status: PASS (Qwen3) / FAIL (Solar)
+    measured_noop_v2: { label_match: 0.25, note: "V2 generator — 등급명 미포함, 의도된 낮은 match" }
+    status: PASS (Qwen3) / FAIL (Solar) / N/A (noop V2)
 
 # ------------------------------------------------------------
 # 정직성 노트
@@ -197,5 +260,77 @@ honesty_notes:
 # 변경 이력
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# 오염 데이터셋 격리 (2026-06-01)
+# ------------------------------------------------------------
+
+deprecated:
+  labeled_5k:
+    reason: |
+      본문에 bracket 형태 등급 키워드 직접 삽입 (예: "[특급기밀] 관련 사항").
+      룰 라벨러가 생성한 키워드로 동일 룰 라벨러 검증 → 순환 오염.
+      train/val/test 모두 같은 generator 패턴 → 평가 독립성 없음.
+    moved_to: poc/datasets/legacy_synthetic/labeled_5k/
+    status: deprecated — 학습·평가 입력 금지
+
+  labeled_5k_plus_qwen3:
+    reason: labeled_5k 동일 문제 상속 (첫 3500건 동일, 200건 Qwen3 추가분만 clean)
+    moved_to: poc/datasets/legacy_synthetic/labeled_5k_plus_qwen3/
+    status: deprecated — 학습·평가 입력 금지
+
+  rag_corpus_qa:
+    reason: |
+      학습 문서와 동일 generator로 생성된 QA 쌍.
+      RAG 평가에 사용 시 학습 분포 내 자기 참조 → 평가 독립성 없음.
+    moved_to: poc/datasets/legacy_synthetic/rag_corpus_qa/
+    status: deprecated — RAG 평가 입력 금지
+
+# ------------------------------------------------------------
+# Gold Set (2026-06-01 신설)
+# ------------------------------------------------------------
+
+gold:
+  classification_gold_synthetic_masked:
+    path: poc/datasets/gold/classification_gold.jsonl
+    eval_type: synthetic_masked
+    lines: 144
+    label_source: curated
+    source: test_set_v2
+    use: eval_only
+    note: |
+      구 generator 기반 합성 문서. 등급명 마스킹 처리했으나 내용 자체가
+      등급 시맨틱 반영 → 룰 라벨러 F1=1.0. 운영 성능 근거 불가.
+      보고 시 반드시 synthetic_masked_eval_f1 로 표기.
+    generated_at: "2026-06-01"
+
+  classification_gold_real:
+    path: poc/datasets/gold_real/classification_gold.jsonl
+    use: eval_only
+    lines: 610
+    grade_distribution: { S3: 370, S2: 191, S1: 30, TS: 19 }
+    label_source_distribution:
+      llm_judge_primary: 524      # 룰 무의견 + LLM 고신뢰
+      llm_judge_consensus: 67     # 룰+LLM 동의
+      codex_review: 19            # AI adjudicate (TS 시나리오)
+      human_review: 0             # 미구축 ← 운영 성능 근거를 위한 필수 과제
+    source: oss_corpus (판례/금융보고서) + synthetic_grounded (TS 19건)
+    eval_results:
+      synthetic_masked_f1: 1.000   # 합성 내부 일관성, 운영 근거 불가
+      llm_judge_gold_f1: 0.366     # LLM pseudo-gold, 참고용
+      human_review_gold_f1: null   # N/A — human_review=0건
+    notes: |
+      610건 중 human_review=0. eval-all-tiers의 ③은 N/A.
+      TS: codex_review 19건(synthetic_grounded). 판례에서 자동 수집 불가.
+      S1: 30건. 경영정보/화학_제약/반도체 도메인 판례에서 LLM judge로 수집.
+      운영 F1 근거: human_review 데이터 import 후 make eval-human-gold.
+    updated_at: "2026-06-01"
+
+  retrieval_gold:
+    path: poc/datasets/gold_real/retrieval_gold.jsonl
+    eval_type: human_review
+    lines: null  # 미구축
+    note: 30 query 목표. expected_doc_ids 기준 Recall/MRR/nDCG 평가용.
+
 changelog:
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }
+  - { date: "2026-06-01", version: "1.1", note: "데이터 품질 복구: labeled_5k/rag_corpus_qa deprecated, gold set 신설, generator V2 프롬프트 교체" }

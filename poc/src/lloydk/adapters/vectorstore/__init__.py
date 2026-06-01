@@ -20,12 +20,15 @@ from lloydk.adapters.vectorstore.inmemory_store import InMemoryStore
 
 __all__ = ["VectorStore", "HybridVectorStore", "SearchHit", "InMemoryStore", "build_store"]
 
+_STORE_CACHE: dict[str, VectorStore] = {}
+
 
 def build_store(
     *,
     backend: str | None = None,
     force_memory: bool = False,
 ) -> VectorStore:
+    """프로세스 내 싱글톤 — ES 연결 수립 비용을 최초 1회로 한정."""
     if force_memory:
         return InMemoryStore()
 
@@ -34,11 +37,16 @@ def build_store(
     if backend == "inmemory":
         return InMemoryStore()
 
+    if backend in _STORE_CACHE:
+        return _STORE_CACHE[backend]
+
     if backend == "es":
         try:
             from lloydk.adapters.vectorstore.es_store import EsStore  # noqa: PLC0415
 
-            return EsStore()
+            store = EsStore()
+            _STORE_CACHE[backend] = store
+            return store
         except Exception as exc:  # noqa: BLE001
             warnings.warn(
                 f"[vectorstore] Elasticsearch unavailable: {exc}. Falling back to InMemoryStore.",

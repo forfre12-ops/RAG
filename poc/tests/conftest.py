@@ -37,6 +37,48 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 
+def _check_postgres() -> bool:
+    """Postgres 5432 포트 빠른 연결 확인 (0.5초 이내)."""
+    import socket
+    try:
+        sock = socket.create_connection(("localhost", 5432), timeout=0.5)
+        sock.close()
+        return True
+    except OSError:
+        return False
+
+
+def _check_es() -> bool:
+    """ES 9200 포트 빠른 연결 확인 (0.5초 이내)."""
+    import socket
+    try:
+        sock = socket.create_connection(("localhost", 9200), timeout=0.5)
+        sock.close()
+        return True
+    except OSError:
+        return False
+
+
+# 모듈 로드 시점에 한 번만 확인 (세션 전체에서 재사용)
+_PG_AVAILABLE = _check_postgres()
+_ES_AVAILABLE = _check_es()
+
+# pytest marker 기반 자동 skip
+# fullstack: Postgres + ES + 기타 인프라 필요
+# 인프라 없을 때 TestClient 사용 테스트가 30s 타임아웃으로 블로킹되는 것 방지
+def pytest_collection_modifyitems(config, items):
+    """인프라 없을 때 fullstack/slow 마커 테스트 자동 skip."""
+    infra_up = _PG_AVAILABLE and _ES_AVAILABLE
+    for item in items:
+        if not infra_up:
+            # TestClient를 쓰는 테스트는 infra 없으면 skip
+            markers = [m.name for m in item.iter_markers()]
+            if "fullstack" in markers:
+                item.add_marker(pytest.mark.skip(reason="fullstack: postgres/es not available"))
+        if not _ES_AVAILABLE and "fullstack" in [m.name for m in item.iter_markers()]:
+            item.add_marker(pytest.mark.skip(reason="fullstack: es not available"))
+
+
 @pytest.fixture(autouse=True)
 def _restore_settings():
     """test_secrets_manager_wiring 등이 settings를 직접 변경 후 미복원하는 것을 방지.

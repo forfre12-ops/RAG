@@ -39,19 +39,52 @@ if str(_HERE) not in sys.path:
 # ─────────────────────────────────────────────────────────────
 
 
-def load_corpus(synth_dir: Path, max_chars: int = 1500) -> list[dict]:
+def load_corpus(
+    synth_dir: Path,
+    max_chars: int = 1500,
+    chunk_size: int = 0,
+    chunk_overlap: int = 100,
+) -> list[dict]:
+    """문서 코퍼스 로드.
+
+    chunk_size > 0: 각 문서를 chunk_size 글자 단위로 분할 + overlap 적용.
+    청킹 시 hit 판정은 base_doc_id 기준으로 집계.
+    """
     docs: list[dict] = []
     for f in sorted(synth_dir.glob("*.json")):
         d = json.loads(f.read_text(encoding="utf-8"))
-        text = f"{d['title']}\n\n{d['body']}"
-        docs.append(
-            {
-                "id": d["synth_id"],
-                "text": text[:max_chars],
+        base_id = d.get("synth_id") or d.get("source_file") or f.stem
+        title = d.get("title", "")
+        body = d.get("body", "")
+        full_text = f"{title}\n\n{body}"
+
+        if chunk_size > 0:
+            # 슬라이딩 윈도우 청킹
+            step = max(1, chunk_size - chunk_overlap)
+            chunks = []
+            start = 0
+            while start < len(full_text):
+                end = start + chunk_size
+                chunks.append(full_text[start:end])
+                if end >= len(full_text):
+                    break
+                start += step
+            for i, chunk in enumerate(chunks):
+                docs.append({
+                    "id": f"{base_id}-c{i}",
+                    "base_doc_id": base_id,  # hit 판정용 원본 ID
+                    "text": chunk,
+                    "grade": d["target_grade"],
+                    "domain": d["domain"],
+                })
+        else:
+            docs.append({
+                "id": base_id,
+                "base_doc_id": base_id,
+                "text": full_text[:max_chars],
                 "grade": d["target_grade"],
                 "domain": d["domain"],
-            }
-        )
+            })
     return docs
 
 
@@ -254,8 +287,14 @@ def evaluate(
         latencies.append((time.perf_counter() - t1) * 1000)
         expected_doc_id = q.get("expected_doc_id")
         if expected_doc_id is not None:
-            # doc_derived 스타일: 특정 문서 ID가 top-K에 있으면 hit
-            hit = any(r.payload.get("doc_id") == expected_doc_id for r in results)
+            # doc_id 또는 base_doc_id (청킹 시) 기준 hit
+            # 청킹된 경우 chunk ID = "{base_id}-c{i}" 형태
+            hit = any(
+                r.payload.get("doc_id") == expected_doc_id
+                or r.payload.get("base_doc_id") == expected_doc_id
+                or str(r.payload.get("doc_id", "")).startswith(expected_doc_id + "-c")
+                for r in results
+            )
         else:
             # seed/intent 스타일: 올바른 등급 문서가 top-K에 있으면 hit
             hit = any(r.payload.get("grade") == q["expected_grade"] for r in results)
@@ -438,6 +477,11 @@ def main() -> int:
         help="ES 백엔드에서 dense·hybrid 두 모드 모두 측정",
     )
     ap.add_argument("--synth-dir", default="datasets/synthetic")
+    ap.add_argument("--chunk-size", type=int, default=0,
+                    help="청크 크기(글자). 0=청킹 없음(기본). 양수=슬라이딩 윈도우 청킹."
+                         " 긴 문서(oss_corpus)에서 Recall 향상 기대. 예: --chunk-size 1200")
+    ap.add_argument("--chunk-overlap", type=int, default=100,
+                    help="청크 간 중복 글자 수 (기본 100)")
     ap.add_argument("--top-k", type=int, default=5)
     ap.add_argument(
         "--queries-per-grade",
@@ -469,6 +513,16 @@ def main() -> int:
         default=4,
         help="reranker 사용 시 1차 dense에서 top_k × factor만큼 가져옴. 기본 4.",
     )
+    ap.add_argument(
+        "--queries-file",
+        default=None,
+        help=(
+            "외부 쿼리 JSONL/JSON 파일 경로. 지정 시 --query-style 무시.\n"
+            "각 레코드: {text|query, expected_doc_id(권장), expected_grade(없으면 grade hit 불가)}\n"
+            "expected_doc_id 있으면 doc_id 기준 Recall — 진짜 RAG 지표.\n"
+            "예: datasets/gold_real/retrieval_gold.jsonl, datasets/oss_eval_queries.json"
+        ),
+    )
     ap.add_argument("--report", default="reports/p2_embedding_report.md")
     ap.add_argument(
         "--models",
@@ -486,13 +540,42 @@ def main() -> int:
         print("[p2] no corpus — run p3 first", file=sys.stderr)
         return 2
 
-    docs = load_corpus(synth_dir)
-    queries = make_queries(
-        per_grade=args.queries_per_grade,
-        style=args.query_style,
-        synth_dir=synth_dir if args.query_style == "doc_derived" else None,
-    )
-    print(f"[p2] query_style={args.query_style}, query_count={len(queries)}")
+    docs = load_corpus(synth_dir,
+                       chunk_size=getattr(args, "chunk_size", 0),
+                       chunk_overlap=getattr(args, "chunk_overlap", 100))
+
+    if args.queries_file:
+        qfile = Path(args.queries_file)
+        if not qfile.exists():
+            print(f"[p2] --queries-file 없음: {qfile}", file=sys.stderr)
+            return 2
+        raw = json.loads(qfile.read_text(encoding="utf-8"))
+        if isinstance(raw, list):
+            raw_queries = raw
+        else:
+            raw_queries = list(raw.values()) if isinstance(raw, dict) else []
+        # 필드 정규화: query/text 둘 다 지원
+        queries = []
+        for q in raw_queries:
+            entry = {
+                "text": q.get("query") or q.get("text", ""),
+                "expected_grade": q.get("expected_grade", ""),
+                "expected_doc_id": q.get("expected_doc_id") or q.get("relevant_doc_ids", [None])[0] if q.get("relevant_doc_ids") else q.get("expected_doc_id"),
+            }
+            if entry["text"]:
+                queries.append(entry)
+        has_doc_ids = sum(1 for q in queries if q.get("expected_doc_id"))
+        print(
+            f"[p2] queries-file={args.queries_file}, count={len(queries)}, "
+            f"doc_id_based={has_doc_ids}/{len(queries)}"
+        )
+    else:
+        queries = make_queries(
+            per_grade=args.queries_per_grade,
+            style=args.query_style,
+            synth_dir=synth_dir if args.query_style == "doc_derived" else None,
+        )
+        print(f"[p2] query_style={args.query_style}, query_count={len(queries)}")
 
     backends = [b.strip() for b in args.backends.split(",") if b.strip()]
     models_override = None

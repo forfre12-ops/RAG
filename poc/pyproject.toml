@@ -203,6 +203,7 @@ markers = [
   "fullstack: requires running docker compose (postgres + es + minio + redis + mlflow). 활성화: pytest -m fullstack",
   "gpu: requires CUDA GPU (sm_120 또는 호환). 활성화: pytest -m gpu",
   "model_download: downloads HuggingFace models (~수GB). 활성화: pytest -m model_download",
+  "slow: loads ML model or does heavy inference (>10s expected). make test-lite 에서 제외",
   "phase2: Phase 2 KURE/BGE-M3/dragonkue 3-way embedding 측정",
   "phase3: Phase 3 KF-DeBERTa 학습 + P1 F1/FNR 측정",
   "phase4: Phase 4 P5 E2E 풀스택 측정",

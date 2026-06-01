@@ -16,9 +16,10 @@ from pathlib import Path
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--synth-dir", default="datasets/synthetic")
+    ap.add_argument("--synth-dir", default="datasets/synthetic/accepted",
+                    help="검수 완료 합성 JSON 디렉토리 (Phase 4 이후: synthetic/accepted/)")
     ap.add_argument("--extra", default=None,
-                    help="추가 라벨 JSONL ({text,label,...} per line)")
+                    help="추가 라벨 JSONL ({text,label,...} per line). labeled_v2_balanced/train.jsonl 권장")
     ap.add_argument("--out", default="datasets/labeled")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--ratio", default="0.7,0.15,0.15")

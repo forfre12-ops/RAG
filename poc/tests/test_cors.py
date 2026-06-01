@@ -1,12 +1,14 @@
 """CORS 미들웨어 검증 (J3).
 
+from __future__ import annotations
 - OPTIONS preflight는 허용 origin에 대해 access-control-allow-origin 헤더 응답
 - 허용된 origin 요청 → access-control-allow-origin 헤더 포함
 - 허용되지 않은 origin → 헤더 미포함 (브라우저 차단)
 - allow_credentials=False
 """
 
-from __future__ import annotations
+import pytest
+pytestmark = pytest.mark.slow
 
 from fastapi.testclient import TestClient
 

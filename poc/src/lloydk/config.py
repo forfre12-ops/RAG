@@ -155,6 +155,19 @@ class Settings(BaseSettings):
     # Phase 3 (5070 Ti 풀가동): 학습 가중치 디렉토리. 비어있으면 rule-fallback 유지.
     # .env: CLASSIFIER_MODEL_DIR=artifacts/classifier-1ep/v-ae3f5371 형식.
     classifier_model_dir: str = ""
+
+    # FNR-safe 오버라이드 threshold (pipeline.py).
+    # 룰 엔진의 TS 점수가 이 값 이상이고 룰 등급이 모델 등급보다 높으면 TS로 올림.
+    # 높일수록 오버라이드 빈도 감소 (S3 과분류 완화), 낮출수록 FNR 안전성 강화.
+    # 권장 범위: 2.5~5.0. 기본 3.0. 운영 데이터 누적 후 조정.
+    fnr_rule_ts_threshold: float = 3.0
+
+    # Source-type prior: 판례/공개 문서 TS/S1 과분류 방어 (기본 False).
+    # True로 설정하면 metadata.source="판례"|"court_decision" 등 공개 문서는 S2 이하로 제한.
+    # 주의: 실제 TS 포함 판례 문서도 S2로 내려갈 수 있음 — FNR 위험 존재.
+    # 운영 데이터로 검증 후 활성화 권장.
+    source_prior_enabled: bool = False
+
     embedding_model: str = "nlpai-lab/KURE-v1"
 
     # 임베딩 어댑터 선택:

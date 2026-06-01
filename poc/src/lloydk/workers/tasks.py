@@ -48,8 +48,8 @@ def _record_compensation(job_id: str | None, partial_results: list[dict], reason
 @celery_app.task(
     name="lloydk.classify_async",
     bind=True,
-    max_retries=3,
-    default_retry_delay=10,
+    max_retries=2,
+    default_retry_delay=1,
 )
 def classify_async(self: Any, payload: dict, job_id: str | None = None) -> dict:
     """단일 문서 분류 비동기 task.
@@ -87,8 +87,8 @@ def classify_async(self: Any, payload: dict, job_id: str | None = None) -> dict:
 @celery_app.task(
     name="lloydk.synthesize_batch",
     bind=True,
-    max_retries=3,
-    default_retry_delay=10,
+    max_retries=2,
+    default_retry_delay=1,
 )
 def synthesize_batch(
     self: Any,

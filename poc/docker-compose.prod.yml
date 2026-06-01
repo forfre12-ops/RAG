@@ -1,0 +1,63 @@
+# docker-compose.prod.yml — 운영 환경 오버라이드
+# 사용: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# 차이점(dev vs prod):
+#   - GPU passthrough 없음 (임베딩 CPU 모드 또는 외부 서비스)
+#   - LLM: Ollama 로컬 대신 Anthropic/OpenAI 원격 API
+#   - 볼륨: src/ hot-reload 마운트 없음 (불변 이미지)
+#   - CORS: 명시적 origin만 허용
+#   - 헬스체크: 더 엄격한 interval/threshold
+services:
+  api:
+    environment:
+      # 원격 LLM (API 키는 .env.prod.secrets 또는 secrets manager에서 주입)
+      LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
+      LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
+      # 임베딩: CPU 모드 (GPU 없음)
+      EMBEDDING_PROVIDER: hf
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-BAAI/bge-m3}"
+      # 운영 CORS — 명시적 origin
+      CORS_ALLOW_ORIGINS: '["${ALLOWED_ORIGIN:-https://app.example.com}"]'
+    volumes:
+      # 불변 이미지 — src hot-reload 마운트 없음
+      # artifacts는 external volume 또는 공유 스토리지로 대체
+      - prod_artifacts:/app/artifacts:ro
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthz/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  worker:
+    environment:
+      LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
+      LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  postgres:
+    ports:
+      # 운영: localhost에서만 접근 (외부 노출 차단)
+      - "127.0.0.1:5432:5432"
+
+  elasticsearch:
+    ports:
+      - "127.0.0.1:9200:9200"
+
+  minio:
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+
+volumes:
+  prod_artifacts:
+    external: true
+    name: "${PROD_ARTIFACTS_VOLUME:-lloydk_prod_artifacts}"

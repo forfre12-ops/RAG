@@ -11,6 +11,7 @@ import io
 import json
 
 import pytest
+pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
 from lloydk.adapters.storage import LocalStorage

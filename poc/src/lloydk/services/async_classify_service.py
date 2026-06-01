@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 
 class AsyncClassifyService:
     # 클래스 수준 — 테스트에서 빠른 진행 위해 monkeypatch 가능.
-    BATCH_MAX_ATTEMPTS = 3       # 1회 본 시도 + 2회 retry (요구사항)
-    BATCH_BASE_DELAY = 0.5       # base_delay; 지수 백오프 0.5/1.0초
+    BATCH_MAX_ATTEMPTS = 3       # 1회 본 시도 + 2회 retry
+    BATCH_BASE_DELAY = 0.1       # base_delay; 지수 백오프 0.1/0.2초 (기존 0.5에서 단축)
 
     def __init__(self, sleep_fn: Callable[[float], None] = time.sleep):
         self.jobs = get_default_store()

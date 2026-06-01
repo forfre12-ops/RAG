@@ -1,9 +1,10 @@
 """API 키 없이 결정론적 응답 — 파이프라인 검증·CI용.
 
-설계:
-- 프롬프트에서 등급 코드(TS/S1/S2/S3)를 추출
-- 해당 등급의 핵심 키워드만 본문에 포함 (다등급 신호어 회피)
-- 출력은 generator.py가 파싱하는 JSON 형식
+설계 (V2):
+- 등급 코드/키워드를 본문/제목에 직접 삽입하지 않음
+- 문서 유형과 상황 설명을 기반으로 중립적 더미 내용 생성
+- label_match_rate ~25% 예상 (의도적 — 파이프라인 연결 확인용, 품질 측정용 아님)
+- 실제 품질 평가는 Qwen3/Claude 등 실 LLM 사용
 """
 
 from __future__ import annotations
@@ -13,28 +14,75 @@ import time
 
 from lloydk.adapters.llm.base import LLMResponse, UsageRecord, estimate_cost_usd
 
-
-_GRADE_KW = {
-    "TS": "특급기밀, 핵심 원천기술, M&A 계획, 차세대 제품 설계도",
-    "S1": "1급 비밀, 공정 노하우, 원가 구조, 고객 데이터베이스, 마케팅 전략",
-    "S2": "대외비, 내부 검토, 분기 매출, 사업 계획, 거래처 명단",
-    "S3": "보도자료, 공시, 채용 공고, 회사 소개, 이용약관",
+# 도메인별 중립 문장 (등급명 없음)
+_DOMAIN_BODY = {
+    "tech": (
+        "본 문서는 기술 연구 및 개발 관련 내부 자료이다. "
+        "시스템 설계 검토 결과와 성능 측정 데이터를 포함한다. "
+        "관련 팀과의 협의를 통해 다음 단계 일정을 확정할 예정이다."
+    ),
+    "business": (
+        "본 문서는 사업 전략 검토 내용을 정리한 내부 자료이다. "
+        "시장 동향 분석 및 파트너십 검토 결과가 포함되어 있다. "
+        "경영진 보고를 위한 요약본은 별도 작성 예정이다."
+    ),
+    "finance": (
+        "본 문서는 재무 현황 및 자금 계획을 다룬 내부 자료이다. "
+        "분기별 수익 추정치와 비용 집행 현황이 포함되어 있다. "
+        "CFO 검토 후 최종 확정될 예정이다."
+    ),
+    "hr": (
+        "본 문서는 인사 운영 관련 내부 검토 자료이다. "
+        "조직 구성 방안 및 보상 체계 검토 내용이 포함되어 있다. "
+        "인사위원회 심의 후 확정된다."
+    ),
+    "legal": (
+        "본 문서는 계약 및 법무 검토 관련 내부 자료이다. "
+        "NDA 초안 검토 결과와 주요 조항 분석 내용이 포함되어 있다. "
+        "법무팀 최종 검토 후 서명 절차를 진행한다."
+    ),
+    "mixed": (
+        "본 문서는 내부 검토를 위해 작성된 자료이다. "
+        "주요 논의 사항과 의사결정 배경이 포함되어 있다. "
+        "관련 부서 확인 후 배포될 예정이다."
+    ),
 }
-_GRADE_KR = {"TS": "특급기밀", "S1": "1급 비밀", "S2": "2급 대외비", "S3": "3급 공개"}
+
+_DOMAIN_TITLES = {
+    "tech": "기술 검토 보고서",
+    "business": "사업 현황 보고서",
+    "finance": "재무 현황 보고서",
+    "hr": "인사 운영 검토서",
+    "legal": "법무 검토 보고서",
+    "mixed": "내부 검토 보고서",
+}
+
+_DOMAIN_TYPES = {
+    "tech": "연구노트",
+    "business": "사업계획서",
+    "finance": "결산 초안",
+    "hr": "임원 평가",
+    "legal": "NDA 초안",
+    "mixed": "내부 보고서",
+}
 
 
-def _infer_grade(prompt: str) -> str:
-    m = re.search(r"코드:\s*(TS|S1|S2|S3)", prompt)
+def _infer_domain(prompt: str) -> str:
+    """USER_TEMPLATE_V2의 [도메인] 필드에서 도메인 추출."""
+    m = re.search(r"\[도메인\]\s*\n?(.+?)(?:\n|$)", prompt)
     if m:
-        return m.group(1)
-    for code, kr in _GRADE_KR.items():
-        if kr in prompt:
-            return code
-    return "S3"
+        raw = m.group(1).strip()
+        for key in _DOMAIN_BODY:
+            if key in raw:
+                return key
+    return "mixed"
 
 
 class NoopProvider:
-    """프롬프트의 등급 코드를 추출해 등급별 키워드를 결정론적으로 출력."""
+    """CI/파이프라인 연결 테스트용 결정론적 더미 응답.
+
+    V2: 등급명/키워드 직접 삽입 없음. label_match_rate ~25% 예상 (정상).
+    """
 
     name = "noop"
     model = "noop"
@@ -48,22 +96,22 @@ class NoopProvider:
         *,
         system: str | None = None,
         max_tokens: int = 1024,
-        temperature: float = 0.7,  # noqa: ARG002 - API 호환
+        temperature: float = 0.7,  # noqa: ARG002
     ) -> LLMResponse:
         start = time.perf_counter()
-        grade = _infer_grade(prompt)
-        keywords = _GRADE_KW[grade]
-        kw_phrase = ". ".join(f"{kw} 관련 사항" for kw in keywords.split(", "))
-        title = f"[{_GRADE_KR[grade]}] 내부 보고서"
-        body = f"{kw_phrase}. 본 자료는 {keywords} 관련 내용을 다룬다. {kw_phrase}."
+        domain = _infer_domain(prompt)
+        title = _DOMAIN_TITLES.get(domain, "내부 보고서")
+        body = _DOMAIN_BODY.get(domain, _DOMAIN_BODY["mixed"])
+        doc_type = _DOMAIN_TYPES.get(domain, "내부 보고서")
 
+        # JSON 이스케이프 (개행 없는 body라 간단)
         text = (
             "{\n"
             f'  "title": "{title}",\n'
             f'  "body": "{body}",\n'
-            '  "document_type": "내부 보고서",\n'
+            f'  "document_type": "{doc_type}",\n'
             '  "dept_hint": "기획팀",\n'
-            f'  "rationale_tags": ["{grade}"]\n'
+            '  "rationale_tags": ["noop"]\n'
             "}"
         )
         text = text[: max(max_tokens * 4, 512)]
@@ -80,7 +128,7 @@ class NoopProvider:
                 cost_usd=estimate_cost_usd(self.model, in_tok, out_tok),
                 latency_ms=int((time.perf_counter() - start) * 1000),
             ),
-            meta={"deterministic": True, "grade": grade},
+            meta={"deterministic": True, "domain": domain},
         )
 
     def count_tokens(self, text: str) -> int:

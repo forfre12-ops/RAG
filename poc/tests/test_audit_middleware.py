@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError

@@ -82,11 +82,17 @@ class LocalOpenAIProvider:
         messages.append({"role": "user", "content": full_user})
 
         try:
+            # Qwen3 thinking mode 제어 — Ollama/vLLM extra_body로 전달
+            extra: dict = {}
+            if "qwen" in self.model.lower():
+                extra["think"] = bool(self.enable_thinking)
+
             resp = self._client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                extra_body=extra or None,
             )
             text = resp.choices[0].message.content or ""
             in_tok = getattr(resp.usage, "prompt_tokens", 0) if resp.usage else 0

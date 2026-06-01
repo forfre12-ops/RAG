@@ -74,6 +74,7 @@ def run(total: int, out_dir: Path, provider_name: str | None) -> dict:
                 continue
 
             full_text = f"{doc.title}\n\n{doc.body}"
+            label_source = "noop_fallback" if doc.parse_error == "non-json response" else "synthetic_llm"
             rec = {
                 "synth_id": str(uuid4()),
                 "target_grade": grade,
@@ -84,6 +85,7 @@ def run(total: int, out_dir: Path, provider_name: str | None) -> dict:
                 "dept_hint": doc.dept_hint,
                 "rationale_tags": doc.rationale_tags,
                 "llm_provider": doc.llm_provider,
+                "label_source": label_source,
                 "pii_violations": doc.pii_violations,
                 "parse_error": doc.parse_error,
                 "generated_at": int(time.time()),
@@ -174,7 +176,8 @@ def write_report(summary: dict, out_md: Path) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--total", type=int, default=40, help="총 생성 건수 (4 등급에 균등 분배)")
-    ap.add_argument("--out", default="datasets/synthetic")
+    ap.add_argument("--out", default="datasets/synthetic/draft",
+                    help="생성 결과 저장 경로 (검수 전 draft). 검수 후 synthetic/accepted/로 이동.")
     ap.add_argument("--provider", default=None, help="noop|anthropic|openai|vllm (생략 시 settings)")
     ap.add_argument("--report", default="reports/p3_synthesis_report.md")
     args = ap.parse_args()
