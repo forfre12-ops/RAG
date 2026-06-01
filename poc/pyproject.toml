@@ -50,6 +50,9 @@ dependencies = [
 
   # 유틸
   "pyyaml>=6.0",
+
+  # 보안 — API key hash (bcrypt, 운영 필수)
+  "bcrypt>=4.0",
 ]
 
 [project.optional-dependencies]

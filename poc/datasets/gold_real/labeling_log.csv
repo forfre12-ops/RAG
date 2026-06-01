@@ -1,0 +1,2 @@
+doc_id,label,reviewer_id,review_date,review_status,notes
+# 예시: abc123,S1,r1,2026-06-01,accepted,경계 사례 - S1/S2 고민했으나 원가 구조 포함으로 S1 결정

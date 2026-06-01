@@ -14,7 +14,7 @@ from lloydk.api.app import app
 from lloydk.config import settings
 
 
-HDR = {"X-API-Key": settings.api_key}
+HDR = {"X-API-Key": settings.api_key, "X-Actor-Role": "admin"}
 ACTOR = {"user_id": "smoke-e2e-user", "role": "admin"}
 
 

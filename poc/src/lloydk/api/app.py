@@ -9,6 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 
 from lloydk.config import assert_production_credentials, settings
+from lloydk.api._rbac import require_role
+from fastapi import Depends
 from lloydk.schemas.common import Error
 from lloydk.api import classify as classify_api
 from lloydk.api import classify_stream as classify_stream_api
@@ -24,6 +26,7 @@ from lloydk.api import metrics as metrics_api
 from lloydk.api import async_classify as async_classify_api
 from lloydk.api import answer as answer_api
 from lloydk.api import prom_metrics as prom_metrics_api
+from lloydk.api import admin as admin_api
 from lloydk.api.middleware import AuditMiddleware
 from lloydk.api.prom_metrics import PrometheusMiddleware
 from lloydk.api.rate_limit import limiter, rate_limit_exceeded_handler
@@ -153,15 +156,22 @@ app.include_router(confirm_api.router, prefix="/api/v1")
 # 학습 라우터는 settings.enable_training=True (full-train 프로파일)에서만 등록.
 # lite-*·onprem에서는 OpenAPI에도 노출되지 않아 고객사가 "있는데 안 쓴다"는 인식 자체가 없음.
 if settings.enable_training:
-    app.include_router(training_api.router, prefix="/api/v1")
+    app.include_router(
+        training_api.router, prefix="/api/v1",
+        dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
+    )
 else:
     logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
 app.include_router(synthesis_api.router, prefix="/api/v1")
 app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(documents_api.router, prefix="/api/v1")
-app.include_router(schema_admin_api.router, prefix="/api/v1")
+app.include_router(
+    schema_admin_api.router, prefix="/api/v1",
+    dependencies=[Depends(require_role("admin", "reviewer", "system", "kl_backend"))],
+)
 app.include_router(metrics_api.router, prefix="/api/v1")
 app.include_router(prom_metrics_api.router, prefix="/api/v1")
+app.include_router(admin_api.router, prefix="/api/v1")
 
 # 백그라운드 메트릭 refresh — TESTING=1 또는 pytest 환경이면 자동 skip.
 prom_metrics_api.register_background_refresh(app)

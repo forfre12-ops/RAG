@@ -12,7 +12,10 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
 .PHONY: help venv install env infra-up infra-down infra-verify api worker \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
-        perf-scenarios perf-scenarios-full perf-clean-run
+        perf-scenarios perf-scenarios-full perf-clean-run \
+        gold-set check-data check-gold eval-gold eval-p2-gold \
+        recover-llm-judge \
+        eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers
 
 help:
 	@echo "Targets:"
@@ -34,7 +37,18 @@ help:
 	@echo "  p3           P3 synthesize 40 docs with noop provider + label check"
 	@echo "  p3-800       P3 풀 합성 800건 (등급별 200×4, doc/05 계획)"
 	@echo "  p4           P4 build corpus + extraction eval"
-	@echo "  p1           P1 classifier dryrun (rule surrogate)"
+	@echo "  gold-set     gold set 생성 (test_set_v2 → datasets/gold/classification_gold.jsonl)"
+	@echo "  check-data   데이터 품질 검사 — synthetic split + synthetic masked eval"
+	@echo "  check-gold   gold_real/ 강화 검사 — label_source 3층 분리 리포트 포함"
+	@echo "  eval-gold    P1 human_labeled_gold F1 (gold_real/ 구축 후 사용)"
+	@echo "  eval-p2-gold P2 doc_id 기준 Recall@5 (oss_eval_queries.json)"
+	@echo "  --- 3층 평가 (신뢰도 계층별 분리) ---"
+	@echo "  eval-synthetic   ① synthetic_masked_eval  (gold/classification_gold.jsonl)"
+	@echo "  eval-llm-gold    ② llm_judge_gold_eval    (gold_real의 llm_judge 건 한정)"
+	@echo "  eval-human-gold  ③ human_review_gold_eval (gold_real의 human_review 건 한정)"
+	@echo "  eval-all-tiers   위 3가지 순차 실행 + 통합 요약"
+	@echo "  recover-llm-judge  uncertain_cases → llm_judge_primary 회수"
+	@echo "  p1           P1 classifier dryrun (synthetic_masked eval)"
 	@echo "  p5           P5 E2E smoke (inproc)"
 	@echo "  poc-all      P4 -> P3 -> P2 -> P1 -> P5 in order"
 	@echo "  perf-scenarios       PSH 시나리오 성능 dryrun + doc/20 HTML (CI 호환, KPI 미달 시 fail)"
@@ -74,7 +88,7 @@ p4:
 	$(PY) scripts/p4_extract_eval.py
 
 p3:
-	$(PY) scripts/p3_generate_synthetic.py --total 40 --provider noop
+	$(PY) scripts/p3_generate_synthetic.py --total 40 --provider noop --out datasets/synthetic/draft
 
 p3-800:
 	@# 별도 디렉터리 — make poc-all (smoke 40건, datasets/synthetic)과 분리
@@ -114,19 +128,112 @@ analyze-synth:
 	    $(PY) scripts/analyze_synthetic.py; \
 	fi
 
-verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + 번들 + 라이선스 + 분석)
-	@echo "==[1/5]== pytest"
+verify-all: ## 회신 무관 가능한 전체 검증 (pytest + dryrun PoC + 번들 + 라이선스 + 분석 + 데이터 품질)
+	@echo "==[1/6]== pytest"
 	@$(PY) -m pytest -q
-	@echo "==[2/5]== PoC 5종 dryrun"
+	@echo "==[2/6]== 데이터 품질 검사 (FAIL 시 abort)"
+	@$(MAKE) -s check-data
+	@echo "==[3/6]== PoC 5종 dryrun"
 	@$(PY) scripts/run_all_pocs.py
-	@echo "==[3/5]== 폐쇄망 번들 manifest dry-run"
+	@echo "==[4/6]== 폐쇄망 번들 manifest dry-run"
 	@$(MAKE) -s bundle-dry
-	@echo "==[4/5]== OSS 라이선스 위험 (allowlist 모드)"
+	@echo "==[5/6]== OSS 라이선스 위험 (allowlist 모드)"
 	@$(MAKE) -s licenses-check
-	@echo "==[5/5]== 합성 800건 분석"
+	@echo "==[6/6]== 합성 800건 분석"
 	@$(MAKE) -s analyze-synth
 	@echo ""
 	@echo "[verify-all] ALL GREEN"
+
+gold-set: ## gold set 생성 (test_set_v2 → datasets/gold/classification_gold.jsonl)
+	$(PY) scripts/make_gold_set.py
+
+check-data: ## 데이터 품질 검사 — synthetic split + synthetic masked eval (exit 1 on FAIL)
+	$(PY) scripts/check_data_quality.py \
+	    --train datasets/labeled_v2_balanced/train.jsonl \
+	    --test  datasets/gold/classification_gold.jsonl
+
+llm-judge-dry: ## LLM judge 비용 추정 (실제 호출 없음)
+	$(PY) scripts/make_llm_judge_gold.py --dry-run --n 200
+
+llm-judge: ## LLM-as-judge gold set 생성 (ANTHROPIC_API_KEY 필요)
+	$(PY) scripts/make_llm_judge_gold.py --provider anthropic --n 200 --min-llm-conf 0.7
+
+llm-judge-local: ## LLM-as-judge (로컬 Qwen3/Ollama, 무료)
+	$(PY) scripts/make_llm_judge_gold.py --provider local_openai --n 300
+
+check-gold: ## gold_real 강화 검사 — label_source 3층 분리 리포트 포함 (exit 1 on FAIL)
+	$(PY) scripts/check_data_quality.py \
+	    --train datasets/labeled_v2_balanced/train.jsonl \
+	    --gold  datasets/gold_real/classification_gold.jsonl \
+	    --report reports/gold_real_quality_report.json
+
+eval-gold: ## P1 llm_judge_gold eval (gold_real/ 구축 후 사용 가능)
+	$(PY) scripts/p1_train_classifier.py \
+	    --mode dryrun \
+	    --eval-type llm_judge_gold \
+	    --report reports/p1_gold_real_eval_report.md
+
+# ── 3층 평가 타겟 (신뢰도 계층별 분리) ──────────────────────────────────────
+
+eval-synthetic: ## ① synthetic_masked_eval — gold/classification_gold.jsonl 기준
+	$(PY) scripts/p1_train_classifier.py \
+	    --mode dryrun \
+	    --eval-type synthetic_masked \
+	    --report reports/eval_synthetic_masked.md
+	@echo "[tier-1] synthetic_masked_eval → reports/eval_synthetic_masked.md"
+
+eval-llm-gold: ## ② llm_judge_gold_eval — gold_real의 llm_judge_primary/consensus/codex_review 한정
+	$(PY) scripts/p1_train_classifier.py \
+	    --mode dryrun \
+	    --eval-type llm_judge_gold \
+	    --label-source-filter llm_judge_primary,llm_judge_consensus,codex_review \
+	    --report reports/eval_llm_judge_gold.md
+	@echo "[tier-2] llm_judge_gold_eval → reports/eval_llm_judge_gold.md"
+
+eval-human-gold: ## ③ human_review_gold_eval — gold_real의 human_review 건 한정 (없으면 N/A)
+	$(PY) scripts/p1_train_classifier.py \
+	    --mode dryrun \
+	    --eval-type human_review_gold \
+	    --label-source-filter human_review \
+	    --report reports/eval_human_review_gold.md
+	@echo "[tier-3] human_review_gold_eval → reports/eval_human_review_gold.md"
+
+eval-all-tiers: eval-synthetic eval-llm-gold eval-human-gold  ## 3층 순차 실행
+	@echo ""
+	@echo "=== 3층 평가 요약 ==="
+	@$(PY) -c " \
+import json, pathlib; \
+tiers = [ \
+  ('① synthetic_masked',   'reports/eval_synthetic_masked.json'), \
+  ('② llm_judge_gold',     'reports/eval_llm_judge_gold.json'), \
+  ('③ human_review_gold',  'reports/eval_human_review_gold.json'), \
+]; \
+[print(f'  {label}: n={d.get(\"n\",\"N/A\")}  F1={d.get(\"f1_macro\",\"N/A\")}  FNR_ts={d.get(\"fnr_by_grade\",{}).get(\"TS\",\"N/A\")}') \
+ if (p := pathlib.Path(f)) and p.exists() and (d := json.loads(p.read_text(encoding=\"utf-8\"))) else print(f'  {label}: N/A (미실행)') \
+ for label, f in tiers]"
+
+recover-llm-judge: ## uncertain_cases → llm_judge_primary 회수 (S3→S2/S1 + conf>=0.85)
+	$(PY) scripts/recover_llm_judge.py
+	@$(MAKE) -s check-gold
+
+import-review: ## 검수 CSV/JSONL → corrections/ + gold_real + DB document_labels
+	@[ -n "$(INPUT)" ] || (echo "usage: make import-review INPUT=corrections.csv [TENANT=default]"; exit 1)
+	$(PY) scripts/import_review_corrections.py $(INPUT) \
+	    --merge-gold \
+	    --write-db \
+	    --tenant-id $${TENANT:-default}
+	@$(MAKE) -s check-gold
+
+import-review-dry: ## 검수 import dry-run (파일/DB 수정 없음)
+	@[ -n "$(INPUT)" ] || (echo "usage: make import-review-dry INPUT=corrections.csv"; exit 1)
+	$(PY) scripts/import_review_corrections.py $(INPUT) \
+	    --merge-gold --write-db --dry-run
+
+eval-p2-gold: ## P2 doc_id 기준 Recall@5 (oss_eval_queries.json 또는 retrieval_gold.jsonl)
+	$(PY) scripts/p2_compare_embeddings.py \
+	    --mode dryrun --backends inmemory \
+	    --queries-file datasets/oss_eval_queries.json \
+	    --report reports/p2_gold_eval_report.md
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun

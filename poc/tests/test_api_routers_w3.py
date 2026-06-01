@@ -34,7 +34,7 @@ def _pg_ok() -> bool:
 
 
 _PG = _pg_ok()
-HDR = {"X-API-Key": settings.api_key}
+HDR = {"X-API-Key": settings.api_key, "X-Actor-Role": "admin"}
 ACTOR = {"user_id": "test-user", "role": "admin"}
 
 

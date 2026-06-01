@@ -137,7 +137,7 @@ class TestS3ConfirmRelabel:
         with TestClient(app) as cli:
             r = cli.post(
                 "/api/v1/relabel",
-                headers=_hdr(),
+                headers=_hdr(role="admin"),
                 json={
                     "doc_id": "kl-doc-2",
                     "original_label": "S2",

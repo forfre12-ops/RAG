@@ -184,6 +184,53 @@ def require_jwt(authorization: str = Header(...)) -> JWTClaims:
         raise HTTPException(status_code=401, detail=f"invalid jwt: {e}")
 
 
+def _check_api_key_hash(raw_key: str, stored_hash: str) -> bool:
+    """저장된 hash와 raw key 비교.
+
+    지원 포맷 (자동 감지):
+      $2b$... — bcrypt (운영 표준)
+      sha256:<hex> — 구형 포맷 (마이그레이션 경로)
+    """
+    if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
+        try:
+            import bcrypt  # noqa: PLC0415
+            return bcrypt.checkpw(raw_key.encode(), stored_hash.encode())
+        except Exception:  # noqa: BLE001
+            return False
+    if stored_hash.startswith("sha256:"):
+        import hashlib  # noqa: PLC0415
+        return hashlib.sha256(raw_key.encode()).hexdigest() == stored_hash[7:]
+    # 레거시: 64자 hex (SHA-256 plain)
+    import hashlib  # noqa: PLC0415
+    return hashlib.sha256(raw_key.encode()).hexdigest() == stored_hash
+
+
+def hash_api_key(raw_key: str) -> str:
+    """새 API 키를 bcrypt hash로 변환. 키 생성/교체 시 사용."""
+    import bcrypt  # noqa: PLC0415
+    return bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt(rounds=12)).decode()
+
+
+def _verify_tenant_api_key(tenant_id: str, api_key: str) -> None:
+    """tenant.api_key_hash 와 요청 키를 비교. hash 미설정 시 통과 (하위호환).
+
+    DB 미가용 시 skip — best-effort.
+    """
+    try:
+        from lloydk.db import session_scope  # noqa: PLC0415
+        from lloydk.db.models import Tenant  # noqa: PLC0415
+        with session_scope() as db:
+            tenant = db.get(Tenant, tenant_id)
+            if tenant is None or not tenant.api_key_hash:
+                return  # hash 미설정 → 검증 skip
+            if not _check_api_key_hash(api_key, tenant.api_key_hash):
+                raise HTTPException(status_code=401, detail="invalid tenant api key")
+    except HTTPException:
+        raise
+    except Exception:  # noqa: BLE001
+        pass  # DB 미가용 → skip
+
+
 def require_auth(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -202,7 +249,11 @@ def require_auth(
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
     if mode in ("api_key", "both"):
         if x_api_key and x_api_key == settings.api_key:
-            return {"mode": "api_key"}
+            actor_role = request.headers.get("x-actor-role", "system")
+            # tenant API key hash 검증 (설정된 경우)
+            if x_tenant_id and x_api_key:
+                _verify_tenant_api_key(x_tenant_id, x_api_key)
+            return {"mode": "api_key", "actor_role": actor_role}
         if mode == "api_key":
             raise HTTPException(status_code=401, detail="invalid api key")
     if mode in ("jwt", "both"):
