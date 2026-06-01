@@ -277,6 +277,21 @@ python scripts/cache_kure_v1.py --dry-run  # 캐시 존재 여부만 확인
 - LLM pseudo-gold remains weaker: direct F1=0.547 on n=610, with 17 S2 -> S3 cases. This is the remaining P1 boundary to improve.
 - P2 retrieval operational config is KURE-v1 + Elasticsearch hybrid + chunk_size=1200 / overlap=100. On `retrieval_gold.jsonl` 80 doc-id queries: Recall@5=0.925, MRR=0.842, nDCG@5=0.862, p50=174 ms.
 - Retrieval gold is `datasets/gold_real/retrieval_gold.jsonl`; `make eval-p2-gold` gives a dryrun snapshot, `make p2-full-gold` runs the KURE-v1 + ES full measurement.
+- `make operational-readiness` builds the combined P1/P2/data readiness report. Current verdict is `CONDITIONALLY_READY`.
+- `make release-gate` is stricter and currently blocks release until at least 40 `human_review` gold samples are added.
 - `test-lite` passes: `python -m pytest -q -m "not fullstack and not model_download and not slow"` -> 570 passed, 4 skipped, 203 deselected in about 95 seconds.
 - CI default pytest path now runs `make test-lite`; slow/fullstack/model_download suites are separated as explicit Make targets.
 - `gold_real` now has 777 records: S3 420, S2 232, S1 70, TS 55. `human_review` is still 0 and remains the main evidence gap.
+
+## Release Gates (2026-06-02)
+
+Before an operational release, run:
+
+```bash
+make check-manifest
+make operational-readiness
+make release-gate
+make p2-full-gold
+```
+
+Strict release requires all readiness gates to be `PASS`. The current non-code blocker is external human review gold: `human_review=0/40`.

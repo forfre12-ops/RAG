@@ -81,7 +81,7 @@ def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
     return Gate("P2 retrieval", status, detail), {"best_config": best}
 
 
-def _data_gates(gold_path: Path, retrieval_gold_path: Path) -> tuple[list[Gate], dict]:
+def _data_gates(gold_path: Path, retrieval_gold_path: Path, min_human_review: int) -> tuple[list[Gate], dict]:
     gold_n, grade_counts, source_counts = _count_jsonl(gold_path)
     retrieval_n, _, retrieval_sources = _count_jsonl(retrieval_gold_path)
     human_review = source_counts.get("human_review", 0)
@@ -93,8 +93,8 @@ def _data_gates(gold_path: Path, retrieval_gold_path: Path) -> tuple[list[Gate],
         ),
         Gate(
             "human review gold",
-            "BLOCKED" if human_review == 0 else "PASS",
-            f"human_review={human_review}; external reviewed samples still required",
+            "BLOCKED" if human_review < min_human_review else "PASS",
+            f"human_review={human_review}/{min_human_review}; external reviewed samples still required",
         ),
         Gate(
             "retrieval gold size",
@@ -164,15 +164,16 @@ def main() -> int:
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
     ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v3/v-3443785f")
     ap.add_argument("--out", default="reports/operational_readiness.md")
+    ap.add_argument("--min-human-review", type=int, default=40)
     args = ap.parse_args()
 
     p1_gate, p1_payload = _p1_gate(_load_json(Path(args.p1_public)), _load_json(Path(args.p1_llm)))
     p2_gate, p2_payload = _p2_gate(_load_json(Path(args.p2)))
-    data_gates, data_payload = _data_gates(Path(args.gold), Path(args.retrieval_gold))
+    data_gates, data_payload = _data_gates(Path(args.gold), Path(args.retrieval_gold), args.min_human_review)
 
     gate_objects = [p1_gate, p2_gate, *data_gates]
     next_actions = [
-        "Collect human_review gold samples; this is the only blocked readiness gate.",
+        f"Collect at least {args.min_human_review} human_review gold samples; this is the only blocked readiness gate.",
         "Review LLM pseudo-gold S2->S3 cases and either relabel or add boundary examples.",
         "Promote CLASSIFIER_MODEL_DIR to the P1 v3 model after release approval.",
         "Run p2-full-gold after every ES reindex or embedding-model change.",
@@ -182,6 +183,7 @@ def main() -> int:
         "verdict": _overall(gate_objects),
         "current_model": args.model_dir,
         "retrieval_config": "KURE-v1 + Elasticsearch hybrid + chunk=1200/overlap=100",
+        "release_gate_policy": {"min_human_review": args.min_human_review},
         "gates": [g.__dict__ for g in gate_objects],
         "p1": p1_payload,
         "p2": p2_payload,

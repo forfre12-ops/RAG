@@ -94,6 +94,19 @@ def _check_embedder() -> dict:
         return {"status": "error", "ok": False, "detail": type(exc).__name__}
 
 
+def _operational_config() -> dict:
+    return {
+        "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
+        "rag": {
+            "collection": getattr(settings, "rag_default_collection", "docs"),
+            "embedding_model": getattr(settings, "rag_operational_embedding_model", ""),
+            "search_mode": getattr(settings, "rag_operational_search_mode", ""),
+            "chunk_size": getattr(settings, "rag_index_chunk_size", None),
+            "chunk_overlap": getattr(settings, "rag_index_chunk_overlap", None),
+        },
+    }
+
+
 # ──────────────────────────────────────────────
 # 엔드포인트
 # ──────────────────────────────────────────────
@@ -146,6 +159,7 @@ def healthz_deep():
         "degraded": degraded,
         "uptime_sec": int(time.time() - _START),
         "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
+        "operational_config": _operational_config(),
         "checks": checks,
     }
 
@@ -155,6 +169,7 @@ def healthz():
     """하위호환 단일 엔드포인트 — 기존 /healthz 동작 유지 + 데모 콘솔용 필드."""
     model_check = _check_model()
     overall = "ok" if model_check["ok"] else "degraded"
+    operational_config = _operational_config()
     return {
         "status": overall,
         "model_version": "poc",
@@ -164,14 +179,9 @@ def healthz():
         "llm_provider": getattr(settings, "llm_provider", "unknown"),
         "vector_backend": getattr(settings, "vector_backend", "unknown"),
         "reranker_provider": getattr(settings, "reranker_provider", "noop"),
-        "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
-        "rag": {
-            "collection": getattr(settings, "rag_default_collection", "docs"),
-            "embedding_model": getattr(settings, "rag_operational_embedding_model", ""),
-            "search_mode": getattr(settings, "rag_operational_search_mode", ""),
-            "chunk_size": getattr(settings, "rag_index_chunk_size", None),
-            "chunk_overlap": getattr(settings, "rag_index_chunk_overlap", None),
-        },
+        "classifier_model_dir": operational_config["classifier_model_dir"],
+        "rag": operational_config["rag"],
+        "operational_config": operational_config,
         "warmup_done": STARTUP_COMPLETE,
         "checks": {
             "model": model_check["status"],

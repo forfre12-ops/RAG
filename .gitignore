@@ -92,3 +92,7 @@ poc/models/
 
 # doc 검증 스크린샷·스크립트 (작업산출물, 트래킹 불필요)
 doc/result/
+doc/temp_pptx.zip
+doc/temp_pptx/
+doc/temp_xlsx.zip
+doc/temp_xlsx/

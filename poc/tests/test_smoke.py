@@ -9,7 +9,11 @@ def test_healthz():
     with TestClient(app) as cli:
         r = cli.get("/api/v1/healthz")
         assert r.status_code == 200
-        assert r.json()["status"] == "ok"
+        data = r.json()
+        assert data["status"] == "ok"
+        assert data["operational_config"]["rag"]["embedding_model"] == "nlpai-lab/KURE-v1"
+        assert data["operational_config"]["rag"]["search_mode"] == "hybrid"
+        assert data["operational_config"]["rag"]["chunk_size"] == 1200
 
 
 def test_classify_rule_fallback():

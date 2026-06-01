@@ -1,5 +1,5 @@
 version: "1.0"
-generated_at: "2026-05-30"
+generated_at: "2026-06-02"
 purpose: |
   KOIPA AI 영업비밀관리시스템 학습·평가 데이터셋 정본 매니페스트.
   P1(분류) · P2(임베딩) · P3(합성) · P4(추출) PoC 5종 + Phase 8 고도화 산출물.
@@ -340,12 +340,14 @@ gold:
     source: oss_corpus + public_scenario + synthetic_grounded
     eval_results:
       synthetic_masked_f1: 1.000
-      llm_judge_gold_f1: 0.498
-      human_review_gold_f1: 0.561
+      llm_judge_gold_f1: 0.547
+      public_case_nkt_gold_f1: 0.830
+      public_case_nkt_fnr_ts_s1: 0.000
+      public_case_nkt_ts_s1_s2_to_s3: 0
     notes: |
       777 records after high-risk boundary supplement. human_review=0 remains.
-      TS/S1/S2 coverage improved, but operational F1 still requires additional reviewed data and model training.
-    updated_at: "2026-06-01"
+      P1 retrain v3 passes the public/case/nkt gate, but strict release still requires human_review samples.
+    updated_at: "2026-06-02"
   retrieval_gold:
     path: poc/datasets/gold_real/retrieval_gold.jsonl
     eval_type: oss_eval_doc_id
@@ -356,3 +358,4 @@ gold:
 changelog:
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }
   - { date: "2026-06-01", version: "1.1", note: "데이터 품질 복구: labeled_5k/rag_corpus_qa deprecated, gold set 신설, generator V2 프롬프트 교체" }
+  - { date: "2026-06-02", version: "1.2", note: "P1 retrain v3 and P2 KURE-v1 ES hybrid gold metrics reflected; release remains blocked on human_review=0." }

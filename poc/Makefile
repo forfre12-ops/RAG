@@ -13,7 +13,7 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold check-manifest eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold operational-readiness \
+        gold-set retrieval-gold check-data check-gold check-manifest eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold operational-readiness release-gate \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
         test-lite test-slow test-fullstack test-model-download test-full
@@ -279,6 +279,9 @@ p2-full-gold: ## KURE-v1 + ES dense/hybrid full eval on retrieval_gold
 operational-readiness: ## Build combined P1/P2/data readiness report
 	$(PY) scripts/build_operational_readiness.py \
 	    --out reports/operational_readiness.md
+
+release-gate: operational-readiness ## Strict release gate; requires every readiness gate to PASS
+	$(PY) scripts/check_release_gate.py
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun
