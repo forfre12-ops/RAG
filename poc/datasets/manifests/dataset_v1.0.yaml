@@ -222,16 +222,19 @@ acceptance:
         source: oss_eval_queries.json (2112건, expected_doc_id 포함), corpus=oss_corpus 3754건
         measured_hash_dryrun:    { Recall: 0.487, note: "hash embedder — 하한값" }
         measured_kure_v1_dense:  { Recall: 0.510, latency_p50_ms: 47 }
-        measured_kure_v1_hybrid: { Recall: 0.624, latency_p50_ms: 173, note: "BM25+dense RRF, 최고성능" }
-        measured_bge_m3_dense:   { Recall: 0.453, latency_p50_ms: 46 }
-        measured_bge_m3_hybrid:  { Recall: 0.596, latency_p50_ms: 163 }
-        gap_vs_grade_hit: "grade-hit 0.722 vs doc_id 0.624 (hybrid) — 과대측정 13% 감소"
-        measured_kure_v1_hybrid_bge_reranker: { Recall: 0.621, latency_p50_ms: 1206, note: "reranker 효과 없음, 7x 느림" }
-        measured_bge_m3_hybrid_bge_reranker: { Recall: 0.625, latency_p50_ms: 1242 }
-        improvement_path: "쿼리 확장(llm/hybrid 방식), 더 큰 코퍼스, 파인튜닝 임베더"
-        best_config: "KURE-v1 + ES hybrid (BM25+dense RRF), reranker 불필요"
-        reranker_verdict: "BGE reranker는 doc_id matching에 효과 없음 — latency만 7배 증가"
-        status: FAIL (목표 0.80 미달. 현재 최고: KURE-v1 hybrid 0.624)
+        measured_kure_v1_hybrid:          { Recall: 0.624, latency_p50_ms: 173, note: "청킹 없음" }
+        measured_bge_m3_dense:            { Recall: 0.453, latency_p50_ms: 46, note: "청킹 없음" }
+        measured_bge_m3_hybrid:           { Recall: 0.596, latency_p50_ms: 163, note: "청킹 없음" }
+        measured_kure_v1_dense_chunk1200: { Recall: 0.647, latency_p50_ms: 47 }
+        measured_kure_v1_hybrid_chunk1200: { Recall: 0.808, latency_p50_ms: 167, note: "★ 목표 0.80 달성 ★" }
+        measured_bge_m3_dense_chunk1200:  { Recall: 0.572, latency_p50_ms: 45 }
+        measured_bge_m3_hybrid_chunk1200: { Recall: 0.790, latency_p50_ms: 166 }
+        measured_kure_v1_hybrid_bge_reranker: { Recall: 0.621, latency_p50_ms: 1206, note: "reranker 효과 없음" }
+        gap_vs_grade_hit: "grade-hit 0.722 vs doc_id 0.808 (chunked hybrid) — 실제 성능이 더 높음"
+        best_config: "KURE-v1 + ES hybrid + 1200자 청킹 (3754문서 → 15331벡터)"
+        chunk_strategy: "chunk_size=1200자, overlap=200자 — p2_compare_embeddings.py --chunk-size 1200"
+        reranker_verdict: "BGE reranker는 효과 없음 — latency 7배 증가, Recall 오히려 소폭 감소"
+        status: PASS (KURE-v1 hybrid + 청킹 Recall@5=0.808 ≥ 0.80 목표 달성)
 
   p3_synthesis:
     pass_criteria: { label_match_rate: ">= 90%", FNR_underclass: "<= 5%" }
