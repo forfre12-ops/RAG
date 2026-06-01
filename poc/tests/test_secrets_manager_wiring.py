@@ -147,6 +147,36 @@ def test_assert_production_credentials_raises_when_missing_everywhere():
         config_mod.settings.poc_mode = original_mode
 
 
+def test_assert_production_credentials_blocks_trust_actor_role_header():
+    """운영 모드 + API_KEY_TRUST_ACTOR_ROLE_HEADER=True → RuntimeError (위조 차단)."""
+    config_mod._SECRETS_FILLED = True  # SM 보충 skip
+    original_mode = config_mod.settings.poc_mode
+    original_trust = config_mod.settings.api_key_trust_actor_role_header
+    original_api = config_mod.settings.api_key
+    original_minio = config_mod.settings.minio_secret_key
+    original_cors = config_mod.settings.cors_allow_origins
+    # 자격증명·CORS는 통과시키고, trust_header 검사에만 도달하도록 구성.
+    config_mod.settings.poc_mode = "full"
+    config_mod.settings.api_key = "x"
+    config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.cors_allow_origins = ["https://app.example.com"]
+    config_mod.settings.api_key_trust_actor_role_header = True
+    try:
+        with patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": ""}):
+            try:
+                config_mod.assert_production_credentials()
+            except RuntimeError as exc:
+                assert "ACTOR_ROLE" in str(exc)
+            else:
+                raise AssertionError("운영 모드 + trust_header=True → RuntimeError 기대")
+    finally:
+        config_mod.settings.poc_mode = original_mode
+        config_mod.settings.api_key_trust_actor_role_header = original_trust
+        config_mod.settings.api_key = original_api
+        config_mod.settings.minio_secret_key = original_minio
+        config_mod.settings.cors_allow_origins = original_cors
+
+
 def test_secrets_manager_protocol():
     """EnvSecretsManager가 SecretsManager Protocol 만족."""
     assert isinstance(EnvSecretsManager(), SecretsManager)

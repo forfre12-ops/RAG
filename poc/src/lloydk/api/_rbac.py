@@ -19,12 +19,19 @@ def require_role(*allowed_roles: str):
     require_auth 반환 dict의 'actor_role' 키를 참조.
     api_key 모드에서는 X-Actor-Role 헤더 또는 기본값 'system' 사용.
     """
+    allowed = frozenset(allowed_roles)
+
     async def _check(auth_context: dict = Depends(require_auth)) -> dict:
-        actor_role = auth_context.get("actor_role", "system")
-        if actor_role not in allowed_roles:
+        # actor_roles(복수, JWT claim) 우선. 없으면 actor_role 단일로 폴백.
+        roles = set(auth_context.get("actor_roles") or ())
+        if not roles:
+            single = auth_context.get("actor_role")
+            if single:
+                roles = {single}
+        if roles.isdisjoint(allowed):
             raise HTTPException(
                 status_code=403,
-                detail=f"forbidden: role '{actor_role}' not in {list(allowed_roles)}",
+                detail=f"forbidden: roles {sorted(roles)} not in {sorted(allowed)}",
             )
         return auth_context
     return _check

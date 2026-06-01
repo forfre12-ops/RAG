@@ -118,6 +118,26 @@ class Settings(BaseSettings):
     jwt_issuer: str = ""              # iss claim 검증값. 빈 문자열이면 검증 skip (개발용)
     jwt_audience: str = ""            # aud claim 검증값. 빈 문자열이면 검증 skip (개발용)
 
+    # RBAC actor_role 소스 (보안: X-Actor-Role 헤더 위조 차단).
+    # api_key 모드는 단일 공유키라 키 보유자=신뢰된 시스템 호출자. role은 서버가 고정.
+    #   api_key_role: api_key 인증 성공 시 부여되는 역할 (require_role 검사 대상).
+    #   api_key_trust_actor_role_header: True면 X-Actor-Role 헤더로 역할 자칭 허용
+    #     (개발·테스트 편의). 운영(poc_mode=full)에서 True면 startup fail-fast.
+    #     헤더값은 항상 Actor enum(admin|reviewer|system|kl_backend)으로 검증.
+    api_key_role: str = "system"
+    api_key_trust_actor_role_header: bool = False
+
+    # --- DB 커넥션 풀 (운영 동시성) ---
+    # 기본 5+10=15는 dev용. 운영은 동시 요청 수에 맞춰 DB_POOL_SIZE/DB_MAX_OVERFLOW 조정.
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+
+    # --- Celery worker safety limits ---
+    celery_result_expires: int = 24 * 60 * 60
+    celery_task_soft_time_limit: int = 300
+    celery_task_time_limit: int = 600
+    celery_worker_max_tasks_per_child: int = 100
+
     # CORS allow-origins. 운영에서는 .env로 origin allowlist 설정.
     # 기본값 ["*"]은 PoC·dryrun·테스트 편의를 위함. 운영 배포 시 명시적 origin 필수.
     cors_allow_origins: list[str] = ["*"]
@@ -291,6 +311,15 @@ def assert_production_credentials() -> None:
         raise RuntimeError(
             "RATE_LIMIT_DISABLED=1 은 운영 모드에서 허용되지 않습니다. "
             "부하 테스트 후 반드시 제거하세요."
+        )
+
+    # X-Actor-Role 헤더 신뢰는 운영에서 권한 위조 경로 — 차단.
+    # RBAC가 필요하면 auth_mode=jwt(서명된 roles claim) 사용.
+    if settings.api_key_trust_actor_role_header:
+        raise RuntimeError(
+            "SECURITY: API_KEY_TRUST_ACTOR_ROLE_HEADER=True 는 운영 모드에서 허용되지 않습니다. "
+            "X-Actor-Role 헤더로 누구나 admin 자칭이 가능합니다. "
+            "역할 분리가 필요하면 AUTH_MODE=jwt 를 사용하세요."
         )
 
     # rule-fallback-v0 운영 차단 — 모델 디렉토리가 명시됐는데 없으면 즉시 오류

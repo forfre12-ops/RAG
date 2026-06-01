@@ -13,6 +13,16 @@ celery_app.conf.task_serializer = "json"
 celery_app.conf.result_serializer = "json"
 celery_app.conf.accept_content = ["json"]
 
+# 작업 수명 제한 — Redis 백엔드 결과 무한 축적 + 멈춘 작업 무한 점유 방지.
+# result_expires: 완료 결과 TTL(초). 24h 후 자동 정리.
+# task_soft_time_limit: SoftTimeLimitExceeded 예외로 graceful 정리 유도(5분).
+# task_time_limit: 강제 SIGKILL(10분) — soft보다 항상 크게.
+# worker_max_tasks_per_child: N작업마다 워커 재생성 — 메모리 누수(모델 로드) 차단.
+celery_app.conf.result_expires = settings.celery_result_expires
+celery_app.conf.task_soft_time_limit = settings.celery_task_soft_time_limit
+celery_app.conf.task_time_limit = settings.celery_task_time_limit
+celery_app.conf.worker_max_tasks_per_child = settings.celery_worker_max_tasks_per_child
+
 # P1-D3: 큐 분리 — classify/index/synthesis/learning.
 # 워커 기동 시 `-Q classify,index,synthesis,learning` 또는 큐별 분리 가능.
 celery_app.conf.task_routes = {

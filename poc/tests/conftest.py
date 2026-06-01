@@ -17,6 +17,10 @@ os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 # test_api.py의 "wrong-key" / 헤더 없음 → 401 검증은 이 값 설정 후에도 정상 동작.
 os.environ.setdefault("API_KEY", "test-key")
 
+# RBAC: 테스트는 X-Actor-Role 헤더로 역할을 자칭(HDR={"X-Actor-Role":"admin"}).
+# 운영에서는 헤더 신뢰가 차단되지만(config fail-fast), 테스트는 명시적으로 opt-in.
+os.environ.setdefault("API_KEY_TRUST_ACTOR_ROLE_HEADER", "true")
+
 # 테스트 환경 표시 — assert_production_credentials, PrometheusMiddleware 등이
 # poc_mode=full 환경에서도 운영 fail-fast를 skip하도록 함.
 # prom_metrics._is_testing()과 동일한 패턴.

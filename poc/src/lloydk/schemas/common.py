@@ -154,3 +154,6 @@ class Error(BaseModel):
     message: str
     request_id: Optional[str] = None
     details: Optional[dict] = None
+    # 클라이언트 재시도 가능 여부 — True면 동일 요청 재시도가 성공할 수 있음
+    # (timeout·일시적 백엔드 장애 등). False면 재시도 무의미(잘못된 입력·영구 오류).
+    retryable: bool = False

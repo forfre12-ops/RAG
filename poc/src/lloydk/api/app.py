@@ -142,6 +142,7 @@ async def unhandled_error(request: Request, exc: Exception):
         code="LLOYDK_INTERNAL",
         message="internal server error",  # 상세는 서버 로그 참조
         request_id=rid,
+        retryable=True,  # 미처리 500은 일시적 장애일 수 있음 — 클라이언트 재시도 허용
     )
     return JSONResponse(status_code=500, content=err.model_dump())
 

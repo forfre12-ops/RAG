@@ -38,6 +38,15 @@ def test_celery_routes_include_outbox_queue():
     assert "lloydk.deliver_outbox_tick" in routes
 
 
+def test_celery_worker_limits_follow_settings():
+    from lloydk.config import settings
+    from lloydk.workers.celery_app import celery_app
+    assert celery_app.conf.result_expires == settings.celery_result_expires
+    assert celery_app.conf.task_soft_time_limit == settings.celery_task_soft_time_limit
+    assert celery_app.conf.task_time_limit == settings.celery_task_time_limit
+    assert celery_app.conf.worker_max_tasks_per_child == settings.celery_worker_max_tasks_per_child
+
+
 def test_deliver_outbox_tick_invokes_deliver_once():
     """task 본문이 deliver_once를 store + http_send와 함께 호출."""
     from lloydk.workers.tasks import deliver_outbox_tick

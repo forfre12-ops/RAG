@@ -211,10 +211,47 @@ def hash_api_key(raw_key: str) -> str:
     return bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt(rounds=12)).decode()
 
 
+# 유효한 RBAC 역할 — schemas.common.Actor 패턴과 일치.
+VALID_ROLES: frozenset[str] = frozenset({"admin", "reviewer", "system", "kl_backend"})
+
+# 역할 우선순위 (높을수록 권한 큼) — JWT claim에 복수 역할 시 대표 역할 선정용.
+_ROLE_RANK: dict[str, int] = {"system": 0, "reviewer": 1, "kl_backend": 2, "admin": 3}
+
+
+def _highest_role(roles: tuple[str, ...]) -> str:
+    """복수 역할 중 최고 권한 역할 반환. 빈 입력이면 빈 문자열."""
+    valid = [r for r in roles if r in VALID_ROLES]
+    if not valid:
+        return ""
+    return max(valid, key=lambda r: _ROLE_RANK.get(r, -1))
+
+
+def _resolve_api_key_roles(request: Request) -> tuple[str, ...]:
+    """api_key 인증 시 actor 역할 결정.
+
+    보안: 기본은 서버 설정 settings.api_key_role 고정 (단일 공유키 = 신뢰된 호출자).
+    X-Actor-Role 헤더 신뢰는 settings.api_key_trust_actor_role_header=True일 때만 허용
+    (개발·테스트 편의). 운영(poc_mode=full)에서는 config가 startup fail-fast로 차단.
+    헤더값은 항상 VALID_ROLES로 검증 — 임의 문자열 자칭 거부.
+    """
+    if getattr(settings, "api_key_trust_actor_role_header", False):
+        hdr = (request.headers.get("x-actor-role") or "").strip()
+        if hdr:
+            if hdr not in VALID_ROLES:
+                raise HTTPException(status_code=403, detail=f"invalid actor role: {hdr!r}")
+            return (hdr,)
+    role = (getattr(settings, "api_key_role", "system") or "system").strip()
+    if role not in VALID_ROLES:
+        raise HTTPException(status_code=403, detail=f"invalid configured api key role: {role!r}")
+    return (role,)
+
+
 def _verify_tenant_api_key(tenant_id: str, api_key: str) -> None:
     """tenant.api_key_hash 와 요청 키를 비교. hash 미설정 시 통과 (하위호환).
 
-    DB 미가용 시 skip — best-effort.
+    보안: hash가 설정된 테넌트는 DB 오류로 검증 불가 시 fail-closed(401) —
+    DB 장애를 틈탄 검증 우회를 차단. DB 미가용 자체는 운영에서 서비스 불가 상태이므로
+    fail-closed가 안전. 테넌트 부재·hash 미설정은 하위호환 통과.
     """
     try:
         from lloydk.db import session_scope  # noqa: PLC0415
@@ -222,13 +259,15 @@ def _verify_tenant_api_key(tenant_id: str, api_key: str) -> None:
         with session_scope() as db:
             tenant = db.get(Tenant, tenant_id)
             if tenant is None or not tenant.api_key_hash:
-                return  # hash 미설정 → 검증 skip
+                return  # hash 미설정 → 검증 skip (하위호환)
             if not _check_api_key_hash(api_key, tenant.api_key_hash):
                 raise HTTPException(status_code=401, detail="invalid tenant api key")
     except HTTPException:
         raise
-    except Exception:  # noqa: BLE001
-        pass  # DB 미가용 → skip
+    except Exception as exc:  # noqa: BLE001
+        # DB 조회 실패 — hash 설정 여부를 알 수 없으므로 fail-closed.
+        logger.error("tenant api key verification failed (DB error), denying: %s", exc)
+        raise HTTPException(status_code=503, detail="tenant verification unavailable") from exc
 
 
 def require_auth(
@@ -249,11 +288,12 @@ def require_auth(
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
     if mode in ("api_key", "both"):
         if x_api_key and x_api_key == settings.api_key:
-            actor_role = request.headers.get("x-actor-role", "system")
+            # 보안: 역할은 서버 설정에서 결정 (X-Actor-Role 헤더 위조 차단).
+            roles = _resolve_api_key_roles(request)
             # tenant API key hash 검증 (설정된 경우)
             if x_tenant_id and x_api_key:
                 _verify_tenant_api_key(x_tenant_id, x_api_key)
-            return {"mode": "api_key", "actor_role": actor_role}
+            return {"mode": "api_key", "actor_role": roles[0], "actor_roles": roles}
         if mode == "api_key":
             raise HTTPException(status_code=401, detail="invalid api key")
     if mode in ("jwt", "both"):
@@ -280,5 +320,13 @@ def require_auth(
                 detail="tenant mismatch: X-Tenant-Id does not match JWT claim",
             )
 
-        return {"mode": "jwt", "claims": claims}
+        # 보안: 서명된 roles claim을 RBAC 소스로 연결. VALID_ROLES만 채택.
+        # roles가 비면 actor_role="" → require_role에서 권한 부족으로 403.
+        jwt_roles = tuple(r for r in claims.roles if r in VALID_ROLES)
+        return {
+            "mode": "jwt",
+            "claims": claims,
+            "actor_role": _highest_role(jwt_roles),
+            "actor_roles": jwt_roles,
+        }
     raise HTTPException(status_code=401, detail="unauthenticated")
