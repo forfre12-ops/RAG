@@ -13,7 +13,7 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold \
+        gold-set retrieval-gold check-data check-gold check-manifest eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold operational-readiness \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
         test-lite test-slow test-fullstack test-model-download test-full
@@ -188,6 +188,9 @@ check-gold: ## gold_real 강화 검사 — label_source 3층 분리 리포트 �
 	    --gold  datasets/gold_real/classification_gold.jsonl \
 	    --report reports/gold_real_quality_report.json
 
+check-manifest: ## dataset_v1.0.yaml count/lineage consistency
+	$(PY) scripts/check_dataset_manifest.py
+
 eval-gold: ## P1 llm_judge_gold eval (gold_real/ 구축 후 사용 가능)
 	$(PY) scripts/p1_train_classifier.py \
 	    --mode dryrun \
@@ -272,6 +275,10 @@ p2-full-gold: ## KURE-v1 + ES dense/hybrid full eval on retrieval_gold
 	    --queries-file datasets/gold_real/retrieval_gold.jsonl \
 	    --chunk-size 1200 --chunk-overlap 100 \
 	    --report reports/p2_gold_kure_es_hybrid_v3.md
+
+operational-readiness: ## Build combined P1/P2/data readiness report
+	$(PY) scripts/build_operational_readiness.py \
+	    --out reports/operational_readiness.md
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun

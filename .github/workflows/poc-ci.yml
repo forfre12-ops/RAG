@@ -1,6 +1,7 @@
 name: poc-ci
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -230,7 +231,7 @@ jobs:
             doc/21_OSS_SBOM_보고서.html
           retention-days: 90  # doc/14 운영 전환 시 발주처 검수 첨부용
 
-  test:
+  test-lite:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -310,6 +311,9 @@ jobs:
 
       - name: Run pytest lite (slow/fullstack/model_download excluded)
         run: make test-lite
+
+      - name: Validate dataset manifest
+        run: make check-manifest
 
       - name: Run PoC dryrun suite (P4 -> P3 -> P2 -> P1 -> P5)
         run: python scripts/run_all_pocs.py
@@ -515,3 +519,116 @@ jobs:
             poc/reports/perf/
           retention-days: 90
           if-no-files-found: warn
+
+  test-slow:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'poc/pyproject.toml'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run slow marker tests
+        run: make test-slow
+
+  test-model-download:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'poc/pyproject.toml'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run model_download marker tests
+        run: make test-model-download
+
+  test-fullstack:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    defaults:
+      run:
+        working-directory: ./poc
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lloydk
+          POSTGRES_PASSWORD: lloydk_dev_pg
+          POSTGRES_DB: lloydk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lloydk -d lloydk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      elasticsearch:
+        image: elasticsearch:8.15.0
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9200/_cluster/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://lloydk:lloydk_dev_pg@localhost:5432/lloydk
+      PGPASSWORD: lloydk_dev_pg
+      REDIS_URL_TEST: redis://localhost:6379/15
+      ES_URL: http://localhost:9200
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'poc/pyproject.toml'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Bootstrap DB schema
+        run: alembic upgrade head
+
+      - name: Run fullstack marker tests
+        run: make test-fullstack

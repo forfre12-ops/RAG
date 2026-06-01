@@ -32,17 +32,18 @@ STARTUP_COMPLETE: bool = False
 
 def _check_model() -> dict:
     model_expected = bool(getattr(settings, "classifier_model_dir", ""))
+    model_dir = getattr(settings, "classifier_model_dir", "")
     try:
         from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
         svc = ClassifyService.get_instance()
         model_loaded = svc.inference._model is not None
     except Exception:
-        return {"status": "unknown", "ok": not model_expected}
+        return {"status": "unknown", "ok": not model_expected, "model_dir": model_dir}
     if model_loaded:
-        return {"status": "loaded", "ok": True}
+        return {"status": "loaded", "ok": True, "model_dir": model_dir}
     if model_expected:
-        return {"status": "degraded", "ok": False}
-    return {"status": "rule_fallback", "ok": True}
+        return {"status": "degraded", "ok": False, "model_dir": model_dir}
+    return {"status": "rule_fallback", "ok": True, "model_dir": model_dir}
 
 
 def _check_db() -> dict:
@@ -163,6 +164,14 @@ def healthz():
         "llm_provider": getattr(settings, "llm_provider", "unknown"),
         "vector_backend": getattr(settings, "vector_backend", "unknown"),
         "reranker_provider": getattr(settings, "reranker_provider", "noop"),
+        "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
+        "rag": {
+            "collection": getattr(settings, "rag_default_collection", "docs"),
+            "embedding_model": getattr(settings, "rag_operational_embedding_model", ""),
+            "search_mode": getattr(settings, "rag_operational_search_mode", ""),
+            "chunk_size": getattr(settings, "rag_index_chunk_size", None),
+            "chunk_overlap": getattr(settings, "rag_index_chunk_overlap", None),
+        },
         "warmup_done": STARTUP_COMPLETE,
         "checks": {
             "model": model_check["status"],
