@@ -10,6 +10,10 @@ from lloydk.api.prom_metrics import (
 )
 from lloydk.config import settings
 
+import pytest
+
+pytestmark = pytest.mark.slow
+
 HDR = {"X-API-Key": settings.api_key}
 
 

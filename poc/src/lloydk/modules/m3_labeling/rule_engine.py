@@ -54,6 +54,50 @@ class RuleLabelResult:
     warnings: list[str] = field(default_factory=list)
 
 
+_HIGH_RISK_PATTERNS: list[tuple[str, str, float, str]] = [
+    ("TS", r"\b(?:DRAM|HBM|EUV|CVD|ALD|ICP-RIE|SiH4|N2O|sccm|Torr|Li6PS5Cl|Li2S|P2S5|LiCl|ZrO2|NMC|mAh/g)\b", 1.6, "ECONOMIC_VALUE"),
+    ("TS", r"\b(?:HSM|FIPS|master\s*key|root\s*CA|SCADA|zero[- ]day|CFAR|MIMO|RLHF|LLM)\b", 1.6, "MANAGEMENT_LEVEL"),
+    ("TS", r"\b(?:DCF|NDA|PMI|Post[- ]Merger|IPO|M&A|CFO|valuation|merger|acquisition)\b", 1.4, "NON_PUBLICITY"),
+    ("S1", r"\b(?:GMP|DMF|PLC|TFT[- ]LCD|QKD|source\s*code|API|patent|license|trade\s*secret)\b", 1.2, "ECONOMIC_VALUE"),
+    ("S1", r"\b(?:EBITDA|BUY|target\s*price|cost\s*structure|customer\s*(?:list|database)|pricing\s*model)\b", 1.0, "ECONOMIC_VALUE"),
+    ("S2", r"\b(?:Weekly|Guide\s*Book|OEM|BEV|IRA|AMPC|CDMO|LNG|WTI|GHz|GWh|LTE|ETF|OECD)\b", 0.9, "NON_PUBLICITY"),
+    ("S2", r"\b(?:internal\s*(?:review|plan|memo)|draft|negotiation|vendor|supplier|budget|forecast)\b", 1.0, "NON_PUBLICITY"),
+]
+
+
+def _apply_high_risk_overrides(
+    text: str,
+    grade_scores: dict[str, float],
+    factor_raw: dict[str, float],
+    matches: list[MatchedKeyword],
+) -> None:
+    """Add conservative pattern boosts for real-gold documents.
+
+    The seeded Korean keywords cover curated synthetic text well, but public
+    reports and technical snippets often contain English acronyms only. These
+    boosts reduce the common S2/S1/TS -> S3 fall-through without changing the
+    tie-breaking policy.
+    """
+    for grade, pattern, weight, factor in _HIGH_RISK_PATTERNS:
+        found = re.findall(pattern, text, flags=re.IGNORECASE)
+        if not found:
+            continue
+        count = len(found)
+        score = count * weight
+        grade_scores[grade] += score
+        factor_raw[factor] += score
+        matches.append(
+            MatchedKeyword(
+                keyword=pattern,
+                grade=grade,
+                factor=factor,
+                count=count,
+                weight=weight,
+                score=score,
+            )
+        )
+
+
 class LabelRuleEngine:
     def __init__(
         self,
@@ -179,6 +223,8 @@ class LabelRuleEngine:
             )
             grade_scores[grade] += score
             factor_raw[factor] += score
+
+        _apply_high_risk_overrides(text, grade_scores, factor_raw, matches)
 
         # 등급 결정
         total = sum(grade_scores.values())

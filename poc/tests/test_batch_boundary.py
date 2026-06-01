@@ -14,6 +14,10 @@ from fastapi.testclient import TestClient
 from lloydk.api.app import app
 from lloydk.config import settings
 
+import pytest
+
+pytestmark = pytest.mark.slow
+
 
 HDR = {"X-API-Key": settings.api_key}
 

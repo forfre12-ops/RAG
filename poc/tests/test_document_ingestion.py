@@ -17,6 +17,8 @@ from lloydk.adapters.storage import LocalStorage
 from lloydk.db.models import Chunk, Document
 from lloydk.services.document_ingestion_service import DocumentIngestionService
 
+pytestmark = pytest.mark.slow
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 

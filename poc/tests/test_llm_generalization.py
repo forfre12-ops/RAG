@@ -13,6 +13,8 @@ from lloydk.adapters.embedding import build_embedder
 from lloydk.adapters.llm import NoopProvider, build_provider
 from lloydk.adapters.llm.local_openai_provider import LocalOpenAIProvider
 
+pytestmark = pytest.mark.model_download
+
 
 class TestBuildProviderAliases:
     def test_noop(self):

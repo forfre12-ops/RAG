@@ -33,6 +33,7 @@ def test_default_backend_is_es(monkeypatch: pytest.MonkeyPatch):
 def test_es_backend_falls_back_when_import_fails(monkeypatch: pytest.MonkeyPatch):
     """elasticsearch 모듈 자체가 import 실패하면 InMemory 폴백."""
     import sys
+    import lloydk.adapters.vectorstore as vectorstore_mod
 
     # 모듈 캐시에서 elasticsearch + es_store 제거 후 import 차단
     for mod in list(sys.modules):
@@ -41,6 +42,7 @@ def test_es_backend_falls_back_when_import_fails(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setitem(sys.modules, "elasticsearch", None)
     monkeypatch.delenv("VECTOR_BACKEND", raising=False)
+    vectorstore_mod._STORE_CACHE.clear()
 
     with pytest.warns(RuntimeWarning, match="Elasticsearch unavailable"):
         vs = build_store(backend="es")

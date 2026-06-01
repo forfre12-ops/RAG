@@ -161,6 +161,8 @@ class Settings(BaseSettings):
     # 높일수록 오버라이드 빈도 감소 (S3 과분류 완화), 낮출수록 FNR 안전성 강화.
     # 권장 범위: 2.5~5.0. 기본 3.0. 운영 데이터 누적 후 조정.
     fnr_rule_ts_threshold: float = 3.0
+    fnr_rule_s1_threshold: float = 2.2
+    fnr_rule_s2_threshold: float = 1.6
 
     # Source-type prior: 판례/공개 문서 TS/S1 과분류 방어 (기본 False).
     # True로 설정하면 metadata.source="판례"|"court_decision" 등 공개 문서는 S2 이하로 제한.
@@ -196,6 +198,10 @@ class Settings(BaseSettings):
     rag_default_collection: str = "docs"
     rag_default_top_k: int = 5
     rag_query_expansion_method: str = "rule"  # rule | llm | hybrid
+    rag_index_chunk_size: int = 1200
+    rag_index_chunk_overlap: int = 100
+    rag_operational_embedding_model: str = "nlpai-lab/KURE-v1"
+    rag_operational_search_mode: str = "hybrid"
 
     # --- 업로드 한도 (DoS 차단) ---
     # R3: guide upload·classify content 본문 크기 한도. 환경변수 LLOYDK_MAX_UPLOAD_MB로 조정.

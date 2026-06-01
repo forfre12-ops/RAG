@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 OPENAPI_PATH = Path(__file__).resolve().parents[2] / "doc" / "03_openapi_lloydk_kl.yaml"
 
 

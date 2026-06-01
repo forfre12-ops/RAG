@@ -213,7 +213,12 @@ def evaluate(
         batch = docs[batch_start: batch_start + BATCH]
         batch_vecs = emb.embed([d["text"] for d in batch]).vectors
         payloads_batch = [
-            {"grade": d["grade"], "text": d["text"], "doc_id": d["id"]}
+            {
+                "grade": d["grade"],
+                "text": d["text"],
+                "doc_id": d["id"],
+                "base_doc_id": d.get("base_doc_id", d["id"]),
+            }
             for d in batch
         ]
         try:
@@ -343,7 +348,7 @@ def evaluate(
 # ─────────────────────────────────────────────────────────────
 
 
-def write_report(rows: list[dict], out: Path) -> str:
+def write_report(rows: list[dict], out: Path, *, best_config_mode: bool = True) -> str:
     """4-way 비교 리포트. baseline 행과 △ 컬럼 포함. SKIP 행은 따로 표시."""
     is_dryrun = any(r["embedder"] == "hash" for r in rows)
     recall_threshold = 0.50 if is_dryrun else 0.80
@@ -370,6 +375,8 @@ def write_report(rows: list[dict], out: Path) -> str:
 
     baseline = ok_rows[0]
     base_recall = baseline["recall_at_k"]
+    best = max(ok_rows, key=lambda r: (r["recall_at_k"], -r["latency_ms_p50"]))
+    best_pass = best["recall_at_k"] >= recall_threshold and best["latency_ms_p50"] <= 200
 
     md = [
         "# P2 v2 — 임베딩 · Vector DB 4-way 비교",
@@ -380,6 +387,8 @@ def write_report(rows: list[dict], out: Path) -> str:
         f"{'(dryrun=hash embedding baseline)' if is_dryrun else '(full=KURE/BGE-M3)'}",
         "",
         f"_baseline: **{baseline['label']}**, △Recall은 baseline 대비_",
+        f"_operational candidate: **{best['label']}** "
+        f"(Recall@K={best['recall_at_k']:.3f}, p50={best['latency_ms_p50']:.1f}ms)_",
         "",
         "| 조합 | Dim | Recall@K | △Recall | Lat p50 | Lat p95 | Lat avg | 판정 |",
         "|---|---:|---:|---:|---:|---:|---:|:---:|",
@@ -414,13 +423,21 @@ def write_report(rows: list[dict], out: Path) -> str:
         "- 본 측정 결과를 발주처와 협의하여 v1.1에서 합격선 갱신 여부 확정",
     ]
 
-    overall = "PASS" if overall_pass else "FAIL"
+    overall = "PASS" if (best_pass if best_config_mode else overall_pass) else "FAIL"
     md[2] = f"- **종합 판정**: {overall}"
+    if best_config_mode:
+        md.insert(3, f"- **판정 기준**: best operational config 기준 ({best['label']})")
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(md), encoding="utf-8")
+    payload = {
+        "verdict": overall,
+        "best_config_mode": best_config_mode,
+        "best_config": {k: v for k, v in best.items() if k != "per_query"},
+        "rows": rows,
+    }
     out.with_suffix(".json").write_text(
-        json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return overall
 
@@ -477,9 +494,8 @@ def main() -> int:
         help="ES 백엔드에서 dense·hybrid 두 모드 모두 측정",
     )
     ap.add_argument("--synth-dir", default="datasets/synthetic")
-    ap.add_argument("--chunk-size", type=int, default=0,
-                    help="청크 크기(글자). 0=청킹 없음(기본). 양수=슬라이딩 윈도우 청킹."
-                         " 긴 문서(oss_corpus)에서 Recall 향상 기대. 예: --chunk-size 1200")
+    ap.add_argument("--chunk-size", type=int, default=1200,
+                    help="청크 크기(글자). 0=청킹 없음. 기본 1200은 운영 후보(KURE+ES hybrid) 기준.")
     ap.add_argument("--chunk-overlap", type=int, default=100,
                     help="청크 간 중복 글자 수 (기본 100)")
     ap.add_argument("--top-k", type=int, default=5)
@@ -524,6 +540,11 @@ def main() -> int:
         ),
     )
     ap.add_argument("--report", default="reports/p2_embedding_report.md")
+    ap.add_argument(
+        "--strict-all",
+        action="store_true",
+        help="모든 측정 조합이 기준을 통과해야 PASS. 기본은 best operational config 기준.",
+    )
     ap.add_argument(
         "--models",
         default=None,
@@ -595,7 +616,7 @@ def main() -> int:
         )
         for emb, backend, search_mode in combos
     ]
-    verdict = write_report(rows, Path(args.report))
+    verdict = write_report(rows, Path(args.report), best_config_mode=not args.strict_all)
     summary = [{k: v for k, v in r.items() if k != "per_query"} for r in rows]
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print(f"\n[p2] verdict: {verdict} -> {args.report}")

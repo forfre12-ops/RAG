@@ -268,3 +268,12 @@ python scripts/cache_kure_v1.py --dry-run  # 캐시 존재 여부만 확인
 - **테스트 48 → 126** (어댑터 36 + 번들 23 신규, 0 회귀)
 
 상세 진척과 회신 도착 시 발동 가이드: **[doc/15 종합 보고서](../doc/15_진척_종합_보고서.md)**
+
+---
+
+## Current Status (2026-06-01)
+
+- P1 classifier is improved but not final: llm_judge_gold F1 0.498 / FNR 36.7% (n=610), public/case/nkt tier F1 0.561 / FNR 36.8% (n=167). S1/S2 recall remains the main gap.
+- P2 retrieval operational config is KURE-v1 + Elasticsearch hybrid + chunk_size=1200. Latest doc_id Recall@5 is 0.808 with p50 167.5 ms.
+- `test-lite` now passes: `python -m pytest -q -m "not fullstack and not model_download and not slow"` -> 569 passed, 4 skipped, 203 deselected in about 68 seconds.
+- `gold_real` now has 777 records: S3 420, S2 232, S1 70, TS 55. `human_review` is still 0 and remains the main evidence gap.

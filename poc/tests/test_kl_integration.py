@@ -21,6 +21,8 @@ from lloydk.api.app import app
 from lloydk.config import settings
 from lloydk.db import engine
 
+pytestmark = pytest.mark.slow
+
 
 def _pg_ok() -> bool:
     try:

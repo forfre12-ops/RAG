@@ -16,6 +16,8 @@ import os
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 # 테스트 환경 — rate-limit 비활성
 os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 

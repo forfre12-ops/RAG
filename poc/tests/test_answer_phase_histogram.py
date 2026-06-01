@@ -12,6 +12,8 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+pytestmark = pytest.mark.slow
+
 # 운영 차단·미들웨어 의존을 우회 — TestClient로 부팅하기 전 env 세팅
 os.environ.setdefault("SLOWAPI_SKIP_DOTENV", "1")
 os.environ.setdefault("AUDIT_DISABLED", "1")

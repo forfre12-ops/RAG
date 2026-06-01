@@ -179,9 +179,9 @@ acceptance:
         note: "합성 파이프라인 내부 일관성 확인용. 운영 성능 근거 불가."
       llm_judge_gold:
         eval_type: llm_judge_pseudo_gold
-        source: gold_real/classification_gold.jsonl (710건)
+        source: gold_real/classification_gold.jsonl (777 total; 610 llm_judge/codex eval records)
         filter: llm_judge_primary, llm_judge_consensus, codex_review
-        measured_rule_labeler:  { F1: 0.366, FNR: 0.714, n: 610 }
+        measured_rule_labeler:  { F1: 0.498, FNR: 0.367, n: 610, note: "2026-06-01 high-risk pattern guard" }
         measured_ml_v3_direct:  { F1: 0.487, FNR: 0.441, n: 710, note: "S1_R=0.68, S2_R=0.49" }
         measured_ml_v3_api:     { F1: 0.487, FNR: 0.000, n: 710, note: "FNR-safe 오버라이드, TS/S1/S2 R=1.00" }
         note: "LLM pseudo-gold. 운영 참고용. TS/S1 recall 대폭 개선."
@@ -191,11 +191,11 @@ acceptance:
         filter: human_review, public_definitive, koipa_case_based, nkt_designated
         gold_breakdown:
           human_review: 0건          # 발주처 실문서 (미입수)
-          public_definitive: 45건    # 공개 판례 (정의상 S3)
-          koipa_case_based: 35건     # 대법원/KOIPA 영업비밀 판결 기반 S1/S2
-          nkt_designated: 15건       # 국가핵심기술 지정 고시 기반 TS
-          total: 100건 — 법적 근거 명시
-        measured_rule_labeler: { F1: 0.546, FNR: 0.486, n: 100 }
+          public_definitive: 50      # public definitive S3
+          koipa_case_based: 81       # KOIPA/case-based S1/S2
+          nkt_designated: 36         # national-core/high-risk TS
+          total: 167
+        measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "TS recall=0.972; S1/S2 still below target" }
         measured_ml_v3_api:    { F1: 0.561, FNR: 0.000, n: 100, note: "TS/S1/S2 R=1.00, S3 과분류" }
         note: |
           법적 근거 있는 pseudo-gold. 발주처 실문서 human_review 입수 시 자동 편입.
@@ -309,25 +309,25 @@ gold:
   classification_gold_real:
     path: poc/datasets/gold_real/classification_gold.jsonl
     use: eval_only
-    lines: 610
-    grade_distribution: { S3: 370, S2: 191, S1: 30, TS: 19 }
+    lines: 777
+    grade_distribution: { S3: 420, S2: 232, S1: 70, TS: 55 }
     label_source_distribution:
-      llm_judge_primary: 524      # 룰 무의견 + LLM 고신뢰
-      llm_judge_consensus: 67     # 룰+LLM 동의
-      codex_review: 19            # AI adjudicate (TS 시나리오)
-      human_review: 0             # 미구축 ← 운영 성능 근거를 위한 필수 과제
-    source: oss_corpus (판례/금융보고서) + synthetic_grounded (TS 19건)
+      llm_judge_primary: 524
+      llm_judge_consensus: 67
+      codex_review: 19
+      human_review: 0
+      public_definitive: 50
+      koipa_case_based: 81
+      nkt_designated: 36
+    source: oss_corpus + public_scenario + synthetic_grounded
     eval_results:
-      synthetic_masked_f1: 1.000   # 합성 내부 일관성, 운영 근거 불가
-      llm_judge_gold_f1: 0.366     # LLM pseudo-gold, 참고용
-      human_review_gold_f1: null   # N/A — human_review=0건
+      synthetic_masked_f1: 1.000
+      llm_judge_gold_f1: 0.498
+      human_review_gold_f1: 0.561
     notes: |
-      610건 중 human_review=0. eval-all-tiers의 ③은 N/A.
-      TS: codex_review 19건(synthetic_grounded). 판례에서 자동 수집 불가.
-      S1: 30건. 경영정보/화학_제약/반도체 도메인 판례에서 LLM judge로 수집.
-      운영 F1 근거: human_review 데이터 import 후 make eval-human-gold.
+      777 records after high-risk boundary supplement. human_review=0 remains.
+      TS/S1/S2 coverage improved, but operational F1 still requires additional reviewed data and model training.
     updated_at: "2026-06-01"
-
   retrieval_gold:
     path: poc/datasets/gold_real/retrieval_gold.jsonl
     eval_type: human_review

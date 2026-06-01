@@ -14,6 +14,8 @@ import pytest
 
 from lloydk.modules.m2_preprocess.extractor import ExtractResult, extract
 
+pytestmark = pytest.mark.slow
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 

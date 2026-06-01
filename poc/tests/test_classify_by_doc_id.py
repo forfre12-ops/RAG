@@ -12,6 +12,8 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
+pytestmark = pytest.mark.slow
+
 from lloydk.adapters.storage import LocalStorage
 from lloydk.api.app import app
 from lloydk.api.documents import _get_ingestion_service

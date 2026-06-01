@@ -88,6 +88,22 @@ class InferencePipeline:
         except Exception:
             return 3.0
 
+    @property
+    def _FNR_RULE_S1_THRESHOLD(self) -> float:
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            return float(settings.fnr_rule_s1_threshold)
+        except Exception:
+            return 2.2
+
+    @property
+    def _FNR_RULE_S2_THRESHOLD(self) -> float:
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            return float(settings.fnr_rule_s2_threshold)
+        except Exception:
+            return 1.6
+
     def run(
         self,
         text: str,
@@ -103,18 +119,35 @@ class InferencePipeline:
                 try:
                     rule_res = self.labeling.engine.label(text)
                     ts_score = rule_res.grade_scores.get("TS", 0.0)
+                    s1_score = rule_res.grade_scores.get("S1", 0.0)
+                    s2_score = rule_res.grade_scores.get("S2", 0.0)
+                    from lloydk.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
+
+                    override_grade = None
+                    override_score = 0.0
                     if ts_score >= self._FNR_RULE_TS_THRESHOLD:
-                        from lloydk.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
-                        if GRADE_ORDER.get(rule_res.grade, 99) < GRADE_ORDER.get(result.label.value, 99):
+                        override_grade, override_score = Grade.TS, ts_score
+                    elif s1_score >= self._FNR_RULE_S1_THRESHOLD:
+                        override_grade, override_score = Grade.S1, s1_score
+                    elif s2_score >= self._FNR_RULE_S2_THRESHOLD:
+                        override_grade, override_score = Grade.S2, s2_score
+
+                    if override_grade is not None:
+                        if GRADE_ORDER.get(override_grade.value, 99) < GRADE_ORDER.get(result.label.value, 99):
                             result = InferenceResult(
-                                label=Grade.TS,
+                                label=override_grade,
                                 confidence=max(result.confidence, rule_res.confidence),
-                                scores={**result.scores, "TS": max(result.scores.get("TS", 0), 0.7)},
+                                scores={
+                                    **result.scores,
+                                    override_grade.value: max(result.scores.get(override_grade.value, 0), 0.7),
+                                },
                                 factors=result.factors,
                                 evidence=result.evidence,
                                 rag_context=result.rag_context,
                                 model_version=result.model_version,
-                                warnings=result.warnings + [f"fnr-safe override: rule TS score={ts_score:.1f}"],
+                                warnings=result.warnings + [
+                                    f"fnr-safe override: rule {override_grade.value} score={override_score:.1f}"
+                                ],
                             )
                 except Exception:  # noqa: BLE001
                     pass
