@@ -179,12 +179,13 @@ acceptance:
   # -------------------------------------------------------
   p1_classification:
     pass_criteria: { F1_macro: ">= 0.75", FNR_underclass: "<= 5%" }
-    current_model: artifacts/classifier_mixed_v2/v-44384f0c
-    model_spec: KF-DeBERTa-base, max_seq=256, bf16, 5ep, labeled_v2_balanced+gold_real×3+public_gold×5
+    current_model: artifacts/classifier_p1_retrain_v3/v-3443785f
+    model_spec: KF-DeBERTa-base, max_seq=512, bf16, 5ep, labeled_p1_retrain_v3
     model_history:
       v-1ac43d0f: "OSS only, gold_real F1=0.322"
       v-37d130b7: "mixed v1, gold_real F1=0.545, S1_R=0.20"
-      v-44384f0c: "mixed v2 (current), gold_real F1=0.487, S1_R=0.68, FNR=0.000"
+      v-44384f0c: "mixed v2, gold_real F1=0.487, S1_R=0.68, FNR=0.000"
+      v-3443785f: "p1_retrain_v3 current, OSS test F1=0.794; public/case/nkt direct F1=0.830, TS/S1/S2->S3=0"
     eval_tiers:
       synthetic_masked_eval:
         eval_type: synthetic_masked
@@ -198,6 +199,7 @@ acceptance:
         measured_rule_labeler:  { F1: 0.498, FNR: 0.367, n: 610, note: "2026-06-01 high-risk pattern guard" }
         measured_ml_v3_direct:  { F1: 0.487, FNR: 0.441, n: 710, note: "S1_R=0.68, S2_R=0.49" }
         measured_ml_v3_api:     { F1: 0.487, FNR: 0.000, n: 710, note: "FNR-safe 오버라이드, TS/S1/S2 R=1.00" }
+        measured_ml_retrain_v3_direct: { F1: 0.547, FNR_TS_S1: 0.000, n: 610, TS_S1_S2_to_S3: 17, note: "S2->S3 remains on pseudo tier" }
         note: "LLM pseudo-gold. 운영 참고용. TS/S1 recall 대폭 개선."
       human_review_gold:
         eval_type: human_review_pseudo
@@ -211,6 +213,7 @@ acceptance:
           total: 167
         measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "TS recall=0.972; S1/S2 still below target" }
         measured_ml_v3_api:    { F1: 0.561, FNR: 0.000, n: 100, note: "TS/S1/S2 R=1.00, S3 과분류" }
+        measured_ml_retrain_v3_direct: { F1: 0.830, FNR_TS_S1: 0.000, n: 167, TS_S1_S2_to_S3: 0, note: "TS/S1/S2 recall all 1.00; S3 recall 0.46" }
         note: |
           법적 근거 있는 pseudo-gold. 발주처 실문서 human_review 입수 시 자동 편입.
           FNR=0.000: 민감 문서 미탐 없음 (보안 시스템 핵심 지표 충족).
@@ -240,15 +243,16 @@ acceptance:
         measured_bge_m3_dense:            { Recall: 0.453, latency_p50_ms: 46, note: "청킹 없음" }
         measured_bge_m3_hybrid:           { Recall: 0.596, latency_p50_ms: 163, note: "청킹 없음" }
         measured_kure_v1_dense_chunk1200: { Recall: 0.647, latency_p50_ms: 47 }
-        measured_kure_v1_hybrid_chunk1200: { Recall: 0.808, latency_p50_ms: 167, note: "★ 목표 0.80 달성 ★" }
+        measured_kure_v1_hybrid_chunk1200: { Recall: 0.808, latency_p50_ms: 167, note: "oss_eval_queries 2112건" }
+        measured_kure_v1_hybrid_retrieval_gold80: { Recall: 0.925, MRR: 0.842, nDCG_at_5: 0.862, latency_p50_ms: 174, n: 80, note: "retrieval_gold.jsonl 80건, 2026-06-02 PASS" }
         measured_bge_m3_dense_chunk1200:  { Recall: 0.572, latency_p50_ms: 45 }
         measured_bge_m3_hybrid_chunk1200: { Recall: 0.790, latency_p50_ms: 166 }
         measured_kure_v1_hybrid_bge_reranker: { Recall: 0.621, latency_p50_ms: 1206, note: "reranker 효과 없음" }
         gap_vs_grade_hit: "grade-hit 0.722 vs doc_id 0.808 (chunked hybrid) — 실제 성능이 더 높음"
-        best_config: "KURE-v1 + ES hybrid + 1200자 청킹 (3754문서 → 15331벡터)"
-        chunk_strategy: "chunk_size=1200자, overlap=200자 — p2_compare_embeddings.py --chunk-size 1200"
+        best_config: "KURE-v1 + ES hybrid + 1200자 청킹 (oss_corpus 3754문서 → 14755벡터 in latest eval)"
+        chunk_strategy: "chunk_size=1200자, overlap=100자 — settings.rag_index_chunk_size/overlap"
         reranker_verdict: "BGE reranker는 효과 없음 — latency 7배 증가, Recall 오히려 소폭 감소"
-        status: PASS (KURE-v1 hybrid + 청킹 Recall@5=0.808 ≥ 0.80 목표 달성)
+        status: PASS (KURE-v1 hybrid + 청킹 Recall@5=0.925 on retrieval_gold80)
 
   p3_synthesis:
     pass_criteria: { label_match_rate: ">= 90%", FNR_underclass: "<= 5%" }

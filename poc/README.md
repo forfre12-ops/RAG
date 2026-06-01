@@ -271,12 +271,12 @@ python scripts/cache_kure_v1.py --dry-run  # 캐시 존재 여부만 확인
 
 ---
 
-## Current Status (2026-06-01)
+## Current Status (2026-06-02)
 
-- P1 classifier is improved but not final: llm_judge_gold F1 0.498 / FNR 36.7% (n=610), public/case/nkt tier F1 0.561 / FNR 36.8% (n=167). S1/S2 recall remains the main gap.
-- P1 retrain input is prepared at `datasets/labeled_p1_retrain_v3/train.jsonl` (6,238 rows; TS 1,147 / S1 1,192 / S2 1,678 / S3 2,221). The exact full training command is in `datasets/labeled_p1_retrain_v3/manifest.json`.
-- P2 retrieval operational config is KURE-v1 + Elasticsearch hybrid + chunk_size=1200. Latest doc_id Recall@5 is 0.808 with p50 167.5 ms.
-- Retrieval gold is now `datasets/gold_real/retrieval_gold.jsonl` with 80 doc-id queries; `make eval-p2-gold` reports Recall/MRR/nDCG@5 from that set.
-- `test-lite` now passes: `python -m pytest -q -m "not fullstack and not model_download and not slow"` -> 569 passed, 4 skipped, 203 deselected in about 68 seconds.
+- P1 retrain v3 is trained at `artifacts/classifier_p1_retrain_v3/v-3443785f`. OSS holdout F1=0.794; public/case/nkt direct gold F1=0.830 with TS/S1/S2 -> S3 = 0.
+- LLM pseudo-gold remains weaker: direct F1=0.547 on n=610, with 17 S2 -> S3 cases. This is the remaining P1 boundary to improve.
+- P2 retrieval operational config is KURE-v1 + Elasticsearch hybrid + chunk_size=1200 / overlap=100. On `retrieval_gold.jsonl` 80 doc-id queries: Recall@5=0.925, MRR=0.842, nDCG@5=0.862, p50=174 ms.
+- Retrieval gold is `datasets/gold_real/retrieval_gold.jsonl`; `make eval-p2-gold` gives a dryrun snapshot, `make p2-full-gold` runs the KURE-v1 + ES full measurement.
+- `test-lite` passes: `python -m pytest -q -m "not fullstack and not model_download and not slow"` -> 570 passed, 4 skipped, 203 deselected in about 95 seconds.
 - CI default pytest path now runs `make test-lite`; slow/fullstack/model_download suites are separated as explicit Make targets.
 - `gold_real` now has 777 records: S3 420, S2 232, S1 70, TS 55. `human_review` is still 0 and remains the main evidence gap.

@@ -14,7 +14,12 @@ from fastapi.testclient import TestClient
 
 from lloydk.api import app as app_module
 from lloydk.api.app import app
-from lloydk.config import settings
+from lloydk.config import Settings, settings
+
+
+def _allowed_origin() -> str:
+    origins = settings.cors_allow_origins or ["*"]
+    return "https://example.com" if origins == ["*"] else origins[0]
 
 
 def test_cors_preflight_options_allows_origin(monkeypatch):
@@ -25,7 +30,7 @@ def test_cors_preflight_options_allows_origin(monkeypatch):
         r = cli.options(
             "/api/v1/healthz",
             headers={
-                "Origin": "https://example.com",
+                "Origin": _allowed_origin(),
                 "Access-Control-Request-Method": "GET",
                 "Access-Control-Request-Headers": "X-API-Key",
             },
@@ -35,14 +40,14 @@ def test_cors_preflight_options_allows_origin(monkeypatch):
         hdrs = {k.lower(): v for k, v in r.headers.items()}
         assert "access-control-allow-origin" in hdrs
         # "*" 또는 echo된 origin 모두 허용 (allow_credentials=False라 "*" 가능)
-        assert hdrs["access-control-allow-origin"] in {"*", "https://example.com"}
+        assert hdrs["access-control-allow-origin"] in {"*", _allowed_origin()}
         assert "access-control-allow-methods" in hdrs
 
 
 def test_cors_allowed_origin_returns_header():
     """일반 요청에 Origin 헤더 포함 → access-control-allow-origin 응답."""
     with TestClient(app) as cli:
-        r = cli.get("/api/v1/healthz", headers={"Origin": "https://allowed.example.com"})
+        r = cli.get("/api/v1/healthz", headers={"Origin": _allowed_origin()})
         assert r.status_code == 200
         hdrs = {k.lower(): v for k, v in r.headers.items()}
         assert "access-control-allow-origin" in hdrs
@@ -88,6 +93,6 @@ def test_cors_disallowed_origin_no_header(monkeypatch):
 
 def test_cors_settings_field_default_wildcard():
     """settings.cors_allow_origins 기본값 검증 — ["*"]."""
-    assert settings.cors_allow_origins == ["*"]
+    assert Settings.model_fields["cors_allow_origins"].default == ["*"]
     # app_module을 통해 import 경로도 점검
     assert hasattr(app_module, "settings") or hasattr(app_module, "app")

@@ -13,7 +13,7 @@ ACTIVATE = . $(VENV_DIR)/bin/activate
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold eval-gold eval-p2-gold p1-retrain-dataset \
+        gold-set retrieval-gold check-data check-gold eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p2-full-gold \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
         test-lite test-slow test-fullstack test-model-download test-full
@@ -156,6 +156,18 @@ retrieval-gold: ## doc_id retrieval gold set 생성
 p1-retrain-dataset: ## P1 retraining JSONL build only
 	$(PY) scripts/build_p1_retrain_dataset.py
 
+p1-eval-v3: ## Evaluate trained P1 v3 on gold tiers
+	$(PY) scripts/eval_p1_model_gold.py \
+	    --model-dir artifacts/classifier_p1_retrain_v3/v-3443785f \
+	    --mode direct \
+	    --label-source-filter public_definitive,koipa_case_based,nkt_designated \
+	    --report reports/p1_v3_public_gold_direct.md
+	$(PY) scripts/eval_p1_model_gold.py \
+	    --model-dir artifacts/classifier_p1_retrain_v3/v-3443785f \
+	    --mode direct \
+	    --label-source-filter llm_judge_primary,llm_judge_consensus,codex_review \
+	    --report reports/p1_v3_llm_gold_direct.md
+
 check-data: ## 데이터 품질 검사 — synthetic split + synthetic masked eval (exit 1 on FAIL)
 	$(PY) scripts/check_data_quality.py \
 	    --train datasets/labeled_v2_balanced/train.jsonl \
@@ -251,6 +263,15 @@ eval-p2-gold: ## P2 doc_id 기준 Recall@5 (oss_eval_queries.json 또는 retriev
 	    --queries-file datasets/gold_real/retrieval_gold.jsonl \
 	    --report-only \
 	    --report reports/p2_gold_eval_report.md
+
+p2-full-gold: ## KURE-v1 + ES dense/hybrid full eval on retrieval_gold
+	$(PY) scripts/p2_compare_embeddings.py \
+	    --mode full --models nlpai-lab/KURE-v1 \
+	    --backends es --hybrid \
+	    --synth-dir datasets/oss_corpus \
+	    --queries-file datasets/gold_real/retrieval_gold.jsonl \
+	    --chunk-size 1200 --chunk-overlap 100 \
+	    --report reports/p2_gold_kure_es_hybrid_v3.md
 
 p1:
 	$(PY) scripts/p1_train_classifier.py --mode dryrun
