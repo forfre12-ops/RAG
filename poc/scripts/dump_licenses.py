@@ -143,18 +143,112 @@ def _parse_pyproject_deps(pyproject_path: Path) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────
+# 의존성 폐포 (closure) — 프로젝트 실제 의존만, 오염된 venv 무관
+# ─────────────────────────────────────────────────────────────
+# 배경(2026-06-02): 기존 venv scope는 활성 환경 전체를 덤프해 프로젝트와 무관한
+# 패키지(Flask/playwright/pymongo 등)까지 SBOM에 섞였다. 본 closure scope는
+# lloydk-ai의 선언 의존성(+ 납품 extras)의 transitive 폐포만 importlib.metadata로
+# 산출 → 어떤 환경에서 돌려도 깨끗한 프로젝트 스코프 SBOM. pip-licenses 불필요.
+
+
+def _canon(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name.strip()).lower()
+
+
+def _dependency_closure(root: str = "lloydk-ai", extras: tuple[str, ...] = ()) -> set[str]:
+    """root 패키지의 선언 의존성 + 선택 extras의 transitive 폐포(설치 메타데이터 기반).
+
+    extras는 root 패키지에만 적용(전이 의존의 optional extra는 자동 포함하지 않음 —
+    pip 설치 시맨틱과 동일). 미설치 패키지는 폐포에 이름만 남고 버전/라이선스는 미상.
+    """
+    import importlib.metadata as im
+
+    def req_name(r: str) -> str:
+        return _canon(re.split(r"[<>=!~;\[(\s]", r.strip(), maxsplit=1)[0])
+
+    def extra_of(r: str) -> str | None:
+        m = re.search(r"extra\s*==\s*['\"]([^'\"]+)['\"]", r)
+        return m.group(1) if m else None
+
+    sel = set(extras)
+    root_c = _canon(root)
+    seen: set[str] = set()
+    queue: list[tuple[str, bool]] = [(root_c, True)]
+    while queue:
+        name, is_root = queue.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        try:
+            reqs = im.requires(name) or []
+        except im.PackageNotFoundError:
+            continue
+        for r in reqs:
+            ex = extra_of(r)
+            if ex is not None and not (is_root and ex in sel):
+                continue  # extra-gated: root의 선택 extras만 포함
+            dep = req_name(r)
+            if dep and dep not in seen:
+                queue.append((dep, False))
+    seen.discard(root_c)  # 프로젝트 자신 제외
+    return seen
+
+
+def _dist_info(canon_name: str) -> dict | None:
+    """설치된 dist의 (실제 이름·버전·라이선스·URL) — importlib.metadata. 미설치면 None."""
+    import importlib.metadata as im
+
+    try:
+        md = im.metadata(canon_name)
+    except im.PackageNotFoundError:
+        return None
+    name = md.get("Name", canon_name)
+    version = md.get("Version", "") or ""
+    # 라이선스: License-Expression(PEP 639) > License classifier > License 필드 첫 줄
+    lic = md.get("License-Expression") or ""
+    if not lic:
+        cls = [c for c in (md.get_all("Classifier") or []) if c.startswith("License ::")]
+        lic = "; ".join(c.split("::")[-1].strip() for c in cls)
+    if not lic:
+        raw = (md.get("License") or "").strip()
+        lic = raw.splitlines()[0][:80] if raw else ""
+    url = md.get("Home-page") or ""
+    if not url:
+        for pu in (md.get_all("Project-URL") or []):
+            if "," in pu:
+                url = pu.split(",", 1)[1].strip()
+                break
+    return {"name": name, "version": version, "license": lic or "UNKNOWN", "url": url}
+
+
+# ─────────────────────────────────────────────────────────────
 # 패키지 정보 정규화
 # ─────────────────────────────────────────────────────────────
 
 
-def collect_packages(*, scope: str = "venv") -> list[dict]:
+def collect_packages(*, scope: str = "venv", extras: tuple[str, ...] = ()) -> list[dict]:
     """현재 환경의 패키지 라이선스 정보 수집.
 
     scope:
-      - "venv": pip-licenses (전체 transitive 포함)
+      - "closure": lloydk-ai 선언 의존성 + extras의 transitive 폐포만 (importlib.metadata,
+        pip-licenses 불필요). **발주처 제출 SBOM 권장** — 오염된 venv와 무관하게 프로젝트
+        의존만 산출. 미설치 폐포 패키지는 라이선스 미상으로 표기.
+      - "venv": pip-licenses (활성 환경 전체 transitive — 오염 위험, 진단용)
       - "direct": pyproject dependencies만 — venv에서 해당 패키지 라이선스 매핑
       - "pyproject": pyproject 텍스트만 (venv 없을 때 폴백, 이름만)
     """
+    if scope == "closure":
+        names = _dependency_closure("lloydk-ai", extras=extras)
+        out: list[dict] = []
+        for c in sorted(names):
+            info = _dist_info(c)
+            if info is None:
+                info = {"name": c, "version": "", "license": "UNKNOWN (not installed)", "url": ""}
+            info["tier"] = classify_license(info["license"])
+            info["dual_license_note"] = DUAL_LICENSE_PACKAGES.get(info["name"])
+            out.append(info)
+        return out
+
     venv_data = _run_pip_licenses()
 
     if scope == "venv":
@@ -354,8 +448,14 @@ _FORMATTERS = {
     "plain": ("third-party-licenses.txt", format_plain),
     "markdown": ("third-party-licenses.md", format_markdown),
     "json": ("third-party-licenses.json", format_json),
-    "cyclonedx": ("sbom.json", format_cyclonedx),
+    # sbom.cyclonedx.json — render_sbom_html.py(DEFAULT_IN)·Makefile sbom-publish가 읽는
+    # 정식 이름. (과거 'sbom.json'이라 `make licenses`가 stale 입력을 렌더하던 버그 수정.)
+    "cyclonedx": ("sbom.cyclonedx.json", format_cyclonedx),
 }
+
+# 발주처 제출 SBOM의 기본 extras — 배포 런타임 + 운영 + 평가/성능 도구.
+# dev/lint(개발 전용)·pdf-agpl(선택적 AGPL)은 제외. --extras로 재정의 가능.
+_DEFAULT_SBOM_EXTRAS = ("full", "jwt", "otel", "ocr", "hwp", "evaluation", "psh")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -374,8 +474,13 @@ def main() -> int:
         help="출력 디렉터리 또는 파일 경로",
     )
     ap.add_argument(
-        "--scope", choices=["venv", "direct", "pyproject"], default="venv",
-        help="venv: 전체 transitive / direct: 직접 의존성만 (venv 정보 사용) / pyproject: 이름만 폴백",
+        "--scope", choices=["closure", "venv", "direct", "pyproject"], default="venv",
+        help="closure: 프로젝트 의존 폐포만(제출 SBOM 권장) / venv: 활성환경 전체(진단) / "
+             "direct: 직접 의존성만 / pyproject: 이름만 폴백",
+    )
+    ap.add_argument(
+        "--extras", default=",".join(_DEFAULT_SBOM_EXTRAS),
+        help=f"closure scope에 포함할 extras(쉼표구분). 기본: {','.join(_DEFAULT_SBOM_EXTRAS)}",
     )
     ap.add_argument(
         "--check", action="store_true",
@@ -387,7 +492,8 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    packages = collect_packages(scope=args.scope)
+    extras = tuple(e.strip() for e in args.extras.split(",") if e.strip())
+    packages = collect_packages(scope=args.scope, extras=extras)
     if not packages:
         print("[licenses] no packages collected (pip-licenses 미설치 + pyproject 부재?)", file=sys.stderr)
         return 2

@@ -1,7 +1,8 @@
 # 문서 Ingestion·파서 개발계획
 
-> 최종 업데이트: 2026-05-31
-> 상태: 핵심 파이프라인 구현·테스트 완료 / 업로드 API·HWP 샘플 검증 진행 중
+> 최종 업데이트: 2026-06-02
+> 상태: 핵심 파이프라인 + 업로드 API(`POST /documents`) + RAG 인덱싱 브리지 구현·테스트 완료.
+> 잔여는 실샘플 의존 2건뿐 — HWP5 바이너리 실파일, 스캔본 PDF OCR 픽스처(§5).
 
 ---
 
@@ -121,48 +122,29 @@ ocr = [
 | 이미지 OCR | "Trade Secret ALD" 인식 | ✅ |
 | documents 행 provenance | 7개 필드 1:1 검증 | ✅ |
 | 미지원 포맷 graceful | 원본 보관 + 경고만 | ✅ |
-| hwp / hwpx / 한국어 pdf | 샘플 있으면 자동 실행 | ⏭ skip |
+| hwpx / 한국어 pdf | `TestRealFixtures` 자동 실행 (sample.hwpx·sample_kr.pdf) | ✅ PASS |
+| hwp(HWP5 바이너리) | 실샘플 수령 대기 | ⏭ skip |
 
 ---
 
-## 5. 잔여 작업 (우선순위 순)
+## 5. 잔여 작업
 
-### P1 — 업로드 API 엔드포인트 (협력사 입구)
-`POST /documents` multipart 신설. `DocumentIngestionService.ingest()` 호출.
-```
-Form: tenant_id, filename, doc_type, actor(JSON), external_ref
-File: 실제 파일 (hwp/pdf/docx/txt, 최대 N MB)
-Response: { doc_id, source_format, file_hash, chunk_count, warnings }
-```
-`POST /guide/documents` 와 분리 유지 (도메인 다름).
+> **2026-06-02 정정:** 아래 P1·P4·P5·P6은 **이미 완료**되어 §4(완료) 항목으로 편입.
+> 실질 잔여는 외부 실샘플에 의존하는 P2·P3 2건뿐이다(코드는 준비됨, 자동 실행만 대기).
 
-### P2 — HWP 실파일 투입
-발주처·협력사로부터 더미 `.hwp` / `.hwpx` 샘플 수령
-→ `poc/tests/fixtures/`에 두면 `TestRealFixtures` 자동 실행
-→ rhwp 추출 품질 확인, 깨짐 있으면 pyhwp 폴백 경로 점검.
+**완료 확인 (구현·등재·문서화 끝):**
+- ~~P1 업로드 API~~ → **완료**. `POST /documents` multipart 구현([api/documents.py](../poc/src/lloydk/api/documents.py), `app.py` 라우터 등록), `DocumentIngestionService.ingest()` 본체 완성, RAG 인덱싱 브리지(`index_for_rag`) 포함. `POST /guide/documents`와 분리 유지.
+- ~~P4 OSS 시험지 출처~~ → **완료**. `datasets/raw/manifest.yaml`에 D7(`joonhok-exo-ai/korean_law_open_data_precedents`)·D8(`nmixx-fin/synthetic_financial_report_korean`) 등재. (단 `hf_revision`이 `main` 핀이라 커밋해시 고정은 재현성 보강 TODO로 잔존.)
+- ~~P5 가이드 extract() 배선~~ → **완료**. `GuideService`가 `_decode_best_effort` 대신 `m2_preprocess.extractor.extract()` 경유([guide_service.py](../poc/src/lloydk/services/guide_service.py)). 저장은 `guides` 테이블 유지.
+- ~~P6 협력사 API 계약서~~ → **완료**. `POST /documents` 스펙이 [doc/03 OpenAPI](03_openapi_lloydk_kl.yaml)에 명시(필드·인증·413/422/500·DocumentUploadResponse).
 
-### P3 — 스캔 PDF OCR (pdf2image + poppler)
-현재 Tesseract는 설치됐으나 `pdf2image`가 요구하는 **poppler** 바이너리 미설치.
-```
-winget install osm-poppler.poppler   # 또는 conda/chocolatey
-pip install pdf2image
-```
-설치 후 스캔본 PDF 픽스처 추가 → `_ocr_pdf_pages()` 검증.
+**실질 잔여 (외부 실샘플 의존 — 코드는 준비됨):**
 
-### P4 — OSS 시험지 출처 관리
-`poc/datasets/raw/manifest.yaml` D7·D8 등재:
-- `joonhok-exo-ai/korean_law_open_data_precedents` (판례)
-- `nmixx-fin/synthetic_financial_report_korean` (금융보고서)
-각 HF revision 해시, 수집일, 라이선스 기록 → 평가셋 재현성 보장.
+### P2 — HWP5 바이너리 실파일 투입
+hwpx·한국어 PDF는 픽스처로 `TestRealFixtures` PASS 확인됨. 남은 것은 구형 **HWP5 바이너리**(`sample.hwp`) 실샘플 수령 → `poc/tests/fixtures/`에 두면 자동 실행, rhwp 추출 품질·pyhwp 폴백 점검.
 
-### P5 — 가이드 업로드 extract() 배선
-`GuideService._decode_best_effort()`를 `extract()`로 교체.
-HWP 가이드를 올려도 파싱된 텍스트가 ES에 색인되도록.
-저장은 `guides` 테이블 (documents와 분리).
-
-### P6 — 협력사 API 계약서
-`POST /documents` 스펙 (필드 정의, 인증, 에러코드, 허용 포맷·한도, 필수 메타) 별도 문서화.
-P1 완료 후 OpenAPI spec 기반으로 작성.
+### P3 — 스캔본 PDF OCR 픽스처
+poppler 바이너리는 설치 완료(`%USERPROFILE%\tools\poppler\bin`, [extractor.py](../poc/src/lloydk/modules/m2_preprocess/extractor.py) 자동 탐지). 남은 것은 **스캔본 PDF 픽스처 추가** → `_ocr_pdf_pages()` 실증.
 
 ---
 
