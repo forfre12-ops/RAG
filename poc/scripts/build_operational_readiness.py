@@ -268,12 +268,14 @@ def _write_md(payload: dict, out: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--p1-public", default="reports/p1_v3_public_gold_direct.json")
-    ap.add_argument("--p1-llm", default="reports/p1_v3_llm_gold_direct.json")
+    # 2026-06-03: 디오염 홀드아웃 기준으로 전환. v3 public/llm gold 리포트는 train-on-test
+    # 오염(0.830은 암기)이라 폐기. P1 게이트는 cost2의 정직 홀드아웃 평가를 읽는다.
+    ap.add_argument("--p1-public", default="reports/p1_cost2_holdout_direct.json")
+    ap.add_argument("--p1-llm", default="reports/p1_cost2_holdout_direct.json")
     ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v3/v-3443785f",
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_cost2/v-437ec196",
                     help="evaluated model — the one the F1/FNR reports describe")
     ap.add_argument("--deployed-model", default=os.environ.get("CLASSIFIER_MODEL_DIR", ""),
                     help="live deployment model (defaults to CLASSIFIER_MODEL_DIR env)")
@@ -344,11 +346,13 @@ def main() -> int:
         "Reporting is split by source: public/case/nkt (definitive) vs llm_judge pseudo. "
         "Treat the pseudo-set F1 as the conservative bound, not the public-set F1.",
         "Review LLM pseudo-gold S2->S3 cases and either relabel or add boundary examples.",
-        "Promote CLASSIFIER_MODEL_DIR to the P1 v3 model after release approval.",
+        "DONE 2026-06-03: deployed model promoted v3 -> v4_cost2 (honest holdout). P1 gate now reads "
+        "the de-contaminated holdout (F1 0.634 < 0.75) instead of v3's contaminated 0.830 — readiness "
+        "honestly FAILs P1. Real fix is diverse S1 data, not a model swap (threshold/cost already tapped out).",
         "Run p2-full-gold after every ES reindex or embedding-model change.",
     ]
     payload = {
-        "generated_at": "2026-06-02",
+        "generated_at": "2026-06-03",
         "verdict": _overall(gate_objects),
         "evaluated_model": _norm_model(args.model_dir),
         "deployed_model": _norm_model(args.deployed_model) or "unknown",
