@@ -295,9 +295,30 @@ def main() -> int:
     gate_objects = [p1_gate, p2_gate, *data_gates, parity_gate]
     public_f1 = p1_payload.get("public", {}).get("f1_macro", 0)
     pseudo_f1 = p1_payload.get("llm_pseudo", {}).get("f1_macro", 0)
+
+    # 블로커 요약을 동적으로 생성 — 과거엔 "human-review가 유일 블로커"를 하드코딩하면서
+    # model parity 게이트도 BLOCKED를 내보내 리포트가 자기모순이었다. human_review는
+    # 외부 의존(실제 검수 라벨)이라 진짜 블로커지만, model parity는 배포 시
+    # CLASSIFIER_MODEL_DIR 설정으로 자가해소되는 내부 액션이므로 구분해 표기한다.
+    parity_blocked = parity_gate.status == "BLOCKED"
+    hr_blocked = any(
+        g.name == "human review gold" and g.status == "BLOCKED" for g in data_gates
+    )
+    if hr_blocked:
+        blocker_line = (
+            "human_review gold is the only EXTERNALLY-DEPENDENT release blocker "
+            "(needs real human-reviewed samples; cannot be auto-filled)."
+        )
+    else:
+        blocker_line = "No externally-dependent human_review blocker remains."
+    if parity_blocked:
+        blocker_line += (
+            " NOTE: the 'model parity' gate is also currently BLOCKED, but it self-resolves "
+            "at deploy time by setting CLASSIFIER_MODEL_DIR to the evaluated model "
+            "(internal deploy action, not an external dependency)."
+        )
     known_limitations = [
-        "human_review gold = 0; the human-review gate is the only release blocker. "
-        "Everything else below is by design, not an open defect.",
+        blocker_line + " Everything else below is by design, not an open defect.",
         f"Classifier F1 is source-dependent: public/case/nkt direct = {public_f1:.3f} (upper bound), "
         f"llm_judge pseudo = {pseudo_f1:.3f} (lower bound). Never cite a single F1 without its source.",
         "Pseudo-label noise: ~47% of court-ruling records in the llm_judge tiers are over-graded S1/S2 "
@@ -316,7 +337,8 @@ def main() -> int:
         f"({_norm_model(args.deployed_model) or 'unknown'}); the 'model parity' gate blocks release until they match.",
     ]
     next_actions = [
-        f"Collect at least {args.min_human_review} human_review gold samples; this is the only blocked readiness gate.",
+        f"Collect at least {args.min_human_review} human_review gold samples; "
+        "the only externally-dependent blocked gate (model parity self-resolves via CLASSIFIER_MODEL_DIR).",
         f"Human-review gate now also requires high-risk underclass rate <= {args.max_high_risk_underclass:.2f} "
         "(human=TS/S1/S2 but model=S3); a filled queue alone no longer passes it.",
         "Reporting is split by source: public/case/nkt (definitive) vs llm_judge pseudo. "

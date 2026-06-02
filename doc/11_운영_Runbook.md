@@ -522,7 +522,14 @@ PSH FAIL/회귀 알림은 다음 3채널 중 하나로 도착합니다:
 
 ### 8.2 KPI별 책임 모듈 매핑
 
-PSH KPI는 시나리오 단위로 정의되며, FAIL 시 책임 모듈로 즉시 진입할 수 있도록 다음 매핑을 유지합니다.
+PSH KPI는 시나리오 단위로 정의되며, FAIL 시 책임 모듈로 즉시 진입할 수 있도록 매핑을 유지합니다.
+
+> **⚠ 권위 있는 매핑은 코드에 있습니다(2026-06-02 정정).** 시나리오→책임 모듈의 단일 진실원은
+> [`poc/src/lloydk/perf/kpis.py`](../poc/src/lloydk/perf/kpis.py)의 `_SCENARIO_MODULES`이며,
+> [`tests/test_kpi_module_map.py`](../poc/tests/test_kpi_module_map.py)가 매핑 경로의 실재를 CI에서
+> 검증합니다(모듈 rename/삭제 시 drift를 즉시 차단). 모듈 경로가 바뀌면 표가 아니라 `_SCENARIO_MODULES`를
+> 먼저 고치세요. 아래 표는 사람이 읽는 보조 자료이며, "디버그 명령" 열은 best-effort 예시입니다
+> (일부 테스트 파일명은 리포지토리 변경으로 stale할 수 있으니 실제 `poc/tests/` 디렉터리를 확인).
 
 | 시나리오 | KPI | 1차 책임 모듈 | 2차 책임 (의존) | 디버그 명령 |
 |---|---|---|---|---|
@@ -543,7 +550,7 @@ PSH KPI는 시나리오 단위로 정의되며, FAIL 시 책임 모듈로 즉시
 | **S10.1~S10.3** RAG 인용 충실도 | grounded_ratio | [`m5_inference/rag_search.py`](../poc/src/lloydk/modules/m5_inference/), services/classify (evidence) | adapters/vectorstore, evidence 절단 로직 | `pytest tests/test_rag_grounded.py -v` |
 | **S11.1~S11.3** 부하 | error_rate·latency·throughput | api/middleware, ASGI worker pool | Redis Celery, Postgres connection pool | docker compose up -d --scale worker=N |
 | **S13.1~S13.3** 테넌트 격리 | count·비율·bool | services/guide·classify (tenant_id 필터), adapters/vectorstore | audit_log 미들웨어 | `pytest tests/test_tenant_isolation.py -v` |
-| **S16.1~S16.4** 권한·인증 거부 | bool·latency | [`api/_auth.py`](../poc/src/lloydk/api/_auth.py) | X-API-Key·X-Actor-Role 헤더 검증 | `pytest tests/test_auth.py -v` |
+| **S16.1~S16.4** 권한·인증 거부 | bool·latency | [`api/_jwt_auth.py`](../poc/src/lloydk/api/_jwt_auth.py) + [`api/_rbac.py`](../poc/src/lloydk/api/_rbac.py) | X-API-Key·서명된 JWT roles claim·tenant 결속 | `pytest tests/test_rbac_security.py tests/test_tenant_isolation_security.py -v` |
 | **S17.1~S17.3** 감사 로그 무결성 | 비율·bool (PG) | [`repositories/audit.py`](../poc/src/lloydk/repositories/), audit 미들웨어 | PG audit_log 테이블 | `pytest tests/test_audit_repo.py -v` |
 | **S18.1~S18.3** 폐쇄망 번들 | bool·ms | [`scripts/build_offline_bundle.py`](../poc/scripts/build_offline_bundle.py) | manifest yaml/json/CHECKSUMS 산출 | `make bundle-dry` |
 

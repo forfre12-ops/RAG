@@ -202,6 +202,50 @@ KPIS: list[KPI] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# KPI → 책임 모듈 매핑 (운영 인시던트 트리아지)
+# ---------------------------------------------------------------------------
+# doc/11 §8.2가 사람이 손으로 유지하던 KPI→모듈 표는 실재하지 않는 테스트 파일·make
+# 타깃을 가리키며 이미 stale(drift)했다. 이제 **코드를 단일 진실원**으로 삼고, 시나리오
+# 단위로 책임 모듈(어느 서브시스템을 볼지)을 매핑한다. test_kpi_module_map.py가 (a) 모든
+# KPI 시나리오에 매핑이 있고 (b) 매핑된 경로가 실재하는지 CI에서 검증해 재발 drift를 차단한다.
+# 경로는 poc 루트 상대. 시나리오 단위라 70개 KPI마다 일일이 손대지 않아도 정확성이 유지된다.
+_SCENARIO_MODULES: dict[str, tuple[str, ...]] = {
+    "S1":  ("src/lloydk/modules/m5_inference", "src/lloydk/modules/m2_preprocess",
+            "src/lloydk/services/classify_service.py", "src/lloydk/api/classify.py"),
+    "S2":  ("src/lloydk/services/async_classify_service.py", "src/lloydk/api/async_classify.py",
+            "src/lloydk/workers"),
+    "S3":  ("src/lloydk/services/confirm_service.py", "src/lloydk/api/confirm.py"),
+    "S4":  ("src/lloydk/services/schema_admin_service.py", "src/lloydk/api/schema_admin.py"),
+    "S5":  ("src/lloydk/services/document_ingestion_service.py", "src/lloydk/rag",
+            "src/lloydk/api/documents.py"),
+    "S6":  ("src/lloydk/services/synthesis_service.py", "src/lloydk/modules/m1_synthesis"),
+    "S7":  ("src/lloydk/modules/m4_training", "src/lloydk/workers"),
+    "S8":  ("src/lloydk/modules/m6_evaluation",),
+    "S9":  ("src/lloydk/modules/m5_inference", "src/lloydk/modules/m3_labeling"),
+    "S10": ("src/lloydk/rag", "src/lloydk/perf/scenarios.py"),
+    "S11": ("src/lloydk/perf",),
+    "S12": ("src/lloydk/services/async_classify_service.py", "src/lloydk/api/async_classify.py"),
+    "S13": ("src/lloydk/repositories", "src/lloydk/api/_jwt_auth.py", "src/lloydk/api/_rbac.py"),
+    "S14": ("src/lloydk/adapters/vectorstore", "src/lloydk/adapters/storage"),
+    "S15": ("scripts/dr_restore_check.py", "scripts/backup_postgres.py"),
+    "S16": ("src/lloydk/api/_jwt_auth.py", "src/lloydk/api/_rbac.py"),
+    "S17": ("src/lloydk/api/middleware.py", "src/lloydk/repositories/audit_repo.py",
+            "src/lloydk/services/audit_chain.py"),
+    "S18": ("scripts/build_offline_bundle.py",),
+}
+
+
+def modules_for_scenario(scenario: str) -> tuple[str, ...]:
+    """시나리오 ID(S1~S18) → 책임 모듈 경로 목록(poc 루트 상대). 미정의면 빈 튜플."""
+    return _SCENARIO_MODULES.get(scenario, ())
+
+
+def modules_for_kpi(kpi: KPI) -> tuple[str, ...]:
+    """KPI → 책임 모듈. 인시던트 시 'KPI Sx.y FAIL → 이 모듈을 보라'의 코드 진실원."""
+    return modules_for_scenario(kpi.scenario)
+
+
 def kpi_by_id(kpi_id: str) -> KPI:
     for k in KPIS:
         if k.id == kpi_id:

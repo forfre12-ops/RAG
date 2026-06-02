@@ -75,6 +75,16 @@ def load_input(path: Path) -> list[dict]:
         return _load_jsonl(path)
 
 
+# 무결성: human_review 라벨은 '실제 사람이 사인오프한 기록'이어야 한다. reviewer_id를
+# 비워두면 과거엔 조용히 "human"으로 채워져, build_review_assist가 의도적으로 비워둔
+# 미검수 행이 그대로 human_review로 승격될 수 있었다(설계 의도 위반). 빈 값과 비고유
+# placeholder를 거부해 검수 출처 추적성·사인오프 보증의 구멍을 막는다. (Claude가
+# reviewer_id를 채우는 것은 여전히 금지 — 본 검증은 '빈 값 거부'만 한다.)
+_PLACEHOLDER_REVIEWERS = frozenset(
+    {"", "human", "reviewer", "tbd", "-", "n/a", "na", "system", "ai", "claude", "unknown", "none"}
+)
+
+
 def validate_record(row: dict, idx: int) -> tuple[dict | None, list[str]]:
     errors: list[str] = []
 
@@ -88,6 +98,14 @@ def validate_record(row: dict, idx: int) -> tuple[dict | None, list[str]]:
         errors.append(f"[row {idx}] model_label 무효: {model_label!r}")
     if human_label not in VALID_LABELS:
         errors.append(f"[row {idx}] human_label 무효: {human_label!r}")
+
+    reviewer_id = (row.get("reviewer_id") or "").strip()
+    if reviewer_id.lower() in _PLACEHOLDER_REVIEWERS:
+        errors.append(
+            f"[row {idx}] reviewer_id 없음/placeholder({reviewer_id!r}) — "
+            "human_review는 실제 검수자 식별자가 필수(사인오프 보증). "
+            "build_review_assist가 비워둔 행을 사람이 확인·기입해야 함."
+        )
 
     if errors:
         return None, errors
@@ -104,7 +122,7 @@ def validate_record(row: dict, idx: int) -> tuple[dict | None, list[str]]:
         "review_decision":  decision,
         "reason_code":      (row.get("reason_code") or "").strip(),
         "reason_text":      (row.get("reason_text") or "").strip(),
-        "reviewer_id":      (row.get("reviewer_id") or "human").strip(),
+        "reviewer_id":      reviewer_id,
         "review_status":    "accepted",
         "text":             (row.get("text") or "").strip(),
         "domain":           (row.get("domain") or "").strip(),
