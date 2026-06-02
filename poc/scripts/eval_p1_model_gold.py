@@ -103,7 +103,15 @@ def predict_api_like(model_dir: Path, rows: list[dict]) -> list[dict]:
     pipe = InferencePipeline(model_dir=model_dir)
     preds = []
     for row in rows:
-        out = pipe.run(row["text"], return_evidence=False)
+        # source_prior 게이트가 동작하려면 gold의 source/source_type을 metadata로 전달.
+        # (gold는 top-level `source`를 갖지만 pipeline은 metadata.source_type/source를 참조 —
+        #  미전달 시 source_prior가 영구 무발동이었음.)
+        md = {}
+        if row.get("source"):
+            md["source"] = row["source"]
+        if row.get("source_type"):
+            md["source_type"] = row["source_type"]
+        out = pipe.run(row["text"], return_evidence=False, metadata=md or None)
         label = out.label.value if hasattr(out.label, "value") else str(out.label)
         preds.append(
             {

@@ -154,9 +154,16 @@ class InferencePipeline:
         else:
             result = self._run_rule_fallback(text, return_evidence)
 
-        # Source-type prior: 판례/공개 문서는 정의상 S3 — 모델이 TS/S1로 과분류 방어.
-        # metadata에 source_type="court_decision" 또는 source="판례" 가 있을 때만 적용.
+        # Source-type prior: 판례/공개 문서는 비공지성 실패로 정의상 하향 등급 —
+        # 모델의 상위등급 과분류를 방어. metadata.source_type/source가 공개 소스일 때만 적용.
         # settings.source_prior_enabled=True (기본 False) 시 활성화.
+        #
+        # cap 레벨은 settings.source_prior_cap_grade로 선택 (기본 "S2"):
+        #   "S2": TS/S1 예측을 S2로 cap (부분 완화 — S3 과분류는 안 건드림, FNR 위험 작음).
+        #   "S3": TS/S1/S2 예측을 S3로 cap (S3 과분류 완전 완화 — FNR 위험 큼,
+        #         판례 기반 S1/S2 시나리오(koipa_case_based)나 국가핵심기술 고시는 손상).
+        # 주의: 단순 source 매칭이라 '공개 판례지만 정답이 S1/S2'인 케이스를 망칠 수 있음.
+        # 운영 활성화 전 reports/p1_*_source_prior_* 측정으로 F1/FNR trade-off 확인 필수.
         try:
             from lloydk.config import settings as _s  # noqa: PLC0415
             if getattr(_s, "source_prior_enabled", False) and metadata:
@@ -164,14 +171,19 @@ class InferencePipeline:
                 _PUBLIC_SOURCES = {"court_decision", "판례", "public_disclosure", "공시", "채용공고", "보도자료"}
                 if any(s in str(src) for s in _PUBLIC_SOURCES):
                     _GRADE_ORDER_LOCAL = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
-                    if _GRADE_ORDER_LOCAL.get(result.label.value, 99) < 3:  # TS or S1 → cap at S2
+                    cap_code = (getattr(_s, "source_prior_cap_grade", "S2") or "S2").upper()
+                    if cap_code not in _GRADE_ORDER_LOCAL:
+                        cap_code = "S2"
+                    cap_rank = _GRADE_ORDER_LOCAL[cap_code]
+                    cur_rank = _GRADE_ORDER_LOCAL.get(result.label.value, 99)
+                    if cur_rank < cap_rank:  # 예측이 cap보다 상위(숫자 작음)면 cap으로 하향
                         result.warnings = list(result.warnings) + [
-                            f"source-prior: {src!r} is public → grade capped at S2"
+                            f"source-prior: {src!r} is public → grade capped at {cap_code}"
                         ]
                         result = InferenceResult(
-                            label=Grade.S2,
+                            label=Grade[cap_code],
                             confidence=min(result.confidence, 0.7),
-                            scores={**result.scores, "S2": max(result.scores.get("S2", 0), 0.6)},
+                            scores={**result.scores, cap_code: max(result.scores.get(cap_code, 0), 0.6)},
                             factors=result.factors,
                             evidence=result.evidence,
                             rag_context=result.rag_context,

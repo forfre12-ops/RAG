@@ -184,11 +184,13 @@ class Settings(BaseSettings):
     fnr_rule_s1_threshold: float = 2.2
     fnr_rule_s2_threshold: float = 1.6
 
-    # Source-type prior: 판례/공개 문서 TS/S1 과분류 방어 (기본 False).
-    # True로 설정하면 metadata.source="판례"|"court_decision" 등 공개 문서는 S2 이하로 제한.
-    # 주의: 실제 TS 포함 판례 문서도 S2로 내려갈 수 있음 — FNR 위험 존재.
-    # 운영 데이터로 검증 후 활성화 권장.
+    # Source-type prior: 판례/공개 문서 상위등급 과분류 방어 (기본 False).
+    # True면 metadata.source="판례"|"court_decision" 등 공개 문서의 상위 예측을 하향.
+    # 주의: 실제 TS 포함 판례 문서도 내려갈 수 있음 — FNR 위험 존재.
+    # 운영 데이터로 검증 후 활성화 권장 (reports/p1_*_source_prior_* 측정).
     source_prior_enabled: bool = False
+    # cap 레벨: "S2"(TS/S1만 하향, 안전) | "S3"(TS/S1/S2 하향, S3 과분류 완전완화·FNR 위험 큼).
+    source_prior_cap_grade: str = "S2"
 
     embedding_model: str = "nlpai-lab/KURE-v1"
 
