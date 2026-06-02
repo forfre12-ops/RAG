@@ -254,6 +254,10 @@ def main() -> int:
     ap.add_argument("--batch-size", type=int, default=None)
     ap.add_argument("--base-model", default=None)
     ap.add_argument("--output-dir", default=None)
+    ap.add_argument("--fnr-cost-multiplier", type=float, default=None,
+                    help="고등급(TS/S1) 손실 가중 배수. >1이면 미탐 비용↑ → FNR↓ (권장 2.0~3.0)")
+    ap.add_argument("--early-stop-metric", default=None,
+                    help="best 모델 선택 지표 (기본 fnr_high). fnr_overall 등으로 오버라이드 가능")
     ap.add_argument("--no-mlflow", action="store_true",
                     help="MLflow 로깅 비활성화 (서버 없는 환경 또는 속도 우선)")
     ap.add_argument("--no-bf16", action="store_true", help="bf16 비활성화")
@@ -282,7 +286,9 @@ def main() -> int:
         spec_kwargs: dict = {"epochs": args.epochs}
         for k, v in [("train_path", args.train_path), ("val_path", args.val_path),
                      ("test_path", args.test_path), ("batch_size", args.batch_size),
-                     ("base_model", args.base_model), ("output_dir", args.output_dir)]:
+                     ("base_model", args.base_model), ("output_dir", args.output_dir),
+                     ("fnr_cost_multiplier", args.fnr_cost_multiplier),
+                     ("early_stop_metric", args.early_stop_metric)]:
             if v is not None:
                 spec_kwargs[k] = v
         if getattr(args, "no_mlflow", False):
