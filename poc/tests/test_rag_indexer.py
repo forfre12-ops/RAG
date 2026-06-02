@@ -236,6 +236,7 @@ class TestGuideServiceBinding:
     pytestmark = pytest.mark.slow
 
     def setup_method(self):
+        from lloydk.services.guide_service import GuideService
         # 각 테스트마다 fresh singleton + InMemory 인덱서
         GuideService.reset_singleton()
 

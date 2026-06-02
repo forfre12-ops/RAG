@@ -53,15 +53,24 @@ def test_classify_still_works_with_audit_middleware():
 def test_healthz_excluded_from_audit():
     """/healthz는 audit_log 제외 (노이즈 차단)."""
     with TestClient(app) as cli:
+        before_count = None
+        if _PG:
+            from lloydk.db import session_scope
+            from lloydk.db.models import AuditLog
+
+            with session_scope() as db:
+                before_count = db.query(AuditLog).filter(AuditLog.action == "healthz").count()
+
         r = cli.get("/api/v1/healthz")
         assert r.status_code == 200
     # PG 가용 시 audit_log에 healthz 항목이 없어야 함은 별도 검증
     if _PG:
         from lloydk.db import session_scope
-        from lloydk.repositories import AuditRepo
+        from lloydk.db.models import AuditLog
+
         with session_scope() as db:
-            recent = AuditRepo(db).recent_for_action("healthz", limit=5)
-            assert len(recent) == 0
+            after_count = db.query(AuditLog).filter(AuditLog.action == "healthz").count()
+            assert after_count == before_count
 
 
 # ============================================================
