@@ -300,6 +300,10 @@ def main() -> int:
         "Everything else below is by design, not an open defect.",
         f"Classifier F1 is source-dependent: public/case/nkt direct = {public_f1:.3f} (upper bound), "
         f"llm_judge pseudo = {pseudo_f1:.3f} (lower bound). Never cite a single F1 without its source.",
+        "Pseudo-label noise: ~47% of court-ruling records in the llm_judge tiers are over-graded S1/S2 "
+        "(published rulings should be S3 — non-publicity fails). This deflates the pseudo-set F1 and inflates "
+        "apparent high-risk->S3 'errors'. Quantify via scripts/analyze_label_noise.py; route corrections "
+        "through the human-review loop, do not auto-relabel.",
         "The production path (m5_inference, api-like) applies an FNR-safe override that intentionally "
         "over-classifies toward higher grades: precision/F1 drop but high-risk under-classification (TS/S1/S2 -> S3) "
         "is driven to ~0. A low api-mode F1 is the safety trade-off working, not a regression.",
