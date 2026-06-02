@@ -222,6 +222,11 @@ def synthesize_answer(
             deterministic_fallback=True,
         )
 
+    # 인용 정합성 검증: 프롬프트는 [n] 인용을 강제하지만(build_answer_prompt) 출력이
+    # 계약을 지키는지 한 번도 확인하지 않았다. 답변이 hits 범위 밖 인덱스를 인용하거나
+    # (환각 인용) 출처가 있는데 인용을 0개 달면 warnings에 남긴다. 거부는 하지 않음.
+    warnings_acc.extend(_citation_warnings(text, len(hits)))
+
     return RagAnswerResult(
         answer=text.strip(),
         citations=citations,
@@ -230,3 +235,19 @@ def synthesize_answer(
         warnings=warnings_acc,
         deterministic_fallback=False,
     )
+
+
+def _citation_warnings(answer_text: str, n_hits: int) -> list[str]:
+    """LLM 답변의 인용 인덱스를 hits 범위와 대조해 경고 생성(프롬프트 노출 캡 반영)."""
+    from lloydk.modules.m6_evaluation.answer_metrics import citation_metrics  # noqa: PLC0415
+
+    cm = citation_metrics(answer_text, n_hits, max_index=_MAX_HITS_IN_PROMPT)
+    out: list[str] = []
+    if cm["out_of_range"]:
+        out.append(
+            f"citation out-of-range: {cm['out_of_range']} "
+            f"(only {min(_MAX_HITS_IN_PROMPT, n_hits)} hits shown) — possible hallucinated citation"
+        )
+    if cm["cites_no_source"]:
+        out.append("answer cites no source despite available hits")
+    return out

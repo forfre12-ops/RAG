@@ -14,7 +14,7 @@ RAG 검색(/answer)은 별도 벡터 컬렉션을 조회하므로, 업로드 문
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Sequence
 
 
 @dataclass

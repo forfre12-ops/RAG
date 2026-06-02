@@ -10,6 +10,11 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 
 import httpx
 
+from lloydk.modules.m6_evaluation.answer_metrics import (  # noqa: E402
+    citation_metrics,
+    grounding_signals,
+)
+
 API_URL = "http://localhost:8000"
 API_KEY = "devkey"
 
@@ -51,16 +56,34 @@ with httpx.Client(timeout=300.0) as cli:
                 ans   = data.get("answer", "")
                 hits  = data.get("hits_used", data.get("context_hits", []))
                 warns = data.get("warnings", [])
-                ok    = bool(ans and len(ans) > 20)
+                citations = data.get("citations", [])
+                fallback = bool(data.get("deterministic_fallback", False))
+                # 근거성 신호 — 사람 gold 없이 산출. zero-hit/LLM 무발동을 통과시키던
+                # len(ans)>20 휴리스틱의 사각지대를 제거(합성-청크-투입 수정의 회귀 안전망).
+                ground = grounding_signals(ans, n_hits=len(hits), deterministic_fallback=fallback)
+                cm = citation_metrics(ans, len(hits))
+                # ok = 비어있지 않은 답 + 실제 검색 hit + LLM 발동 + 근거(인용 범위내) 존재.
+                ok = bool(ans and len(ans) > 20 and len(hits) > 0 and not fallback and ground["grounded"])
                 print(f"\n  [{q['domain']}/{q['grade']}] {elapsed_ms:.0f}ms")
                 print(f"  Q: {q['query'][:50]}...")
                 print(f"  A: {ans[:120]}...")
-                print(f"  검색 {len(hits)}건 | 경고: {len(warns)}")
+                print(
+                    f"  검색 {len(hits)}건 | 인용 {cm['n_cited']} | "
+                    f"fallback={fallback} | grounded={ground['grounded']} | 경고 {len(warns)}"
+                )
+                if ground["reasons"]:
+                    print(f"  ⚠ {'; '.join(ground['reasons'])}")
                 results.append({
                     "domain": q["domain"], "grade": q["grade"],
                     "query": q["query"], "answer_len": len(ans),
                     "hits": len(hits), "elapsed_ms": round(elapsed_ms),
                     "ok": ok, "warnings": warns,
+                    "deterministic_fallback": fallback,
+                    "n_cited": cm["n_cited"],
+                    "citations_out_of_range": cm["out_of_range"],
+                    "grounded": ground["grounded"],
+                    "hallucination_risk": ground["hallucination_risk"],
+                    "grounding_reasons": ground["reasons"],
                 })
             else:
                 print(f"\n  [{q['domain']}/{q['grade']}] FAIL {r.status_code}: {r.text[:80]}")
@@ -73,11 +96,16 @@ with httpx.Client(timeout=300.0) as cli:
                              "ok": False, "elapsed_ms": round(elapsed_ms)})
 
 ok_count = sum(1 for r in results if r.get("ok"))
+grounded_count = sum(1 for r in results if r.get("grounded"))
+fallback_count = sum(1 for r in results if r.get("deterministic_fallback"))
+halluc_count = sum(1 for r in results if r.get("hallucination_risk"))
 avg_ms   = sum(r.get("elapsed_ms", 0) for r in results) / max(len(results), 1)
 avg_len  = sum(r.get("answer_len", 0) for r in results) / max(len(results), 1)
 
 print(f"\n{'='*60}")
-print(f"  결과: {ok_count}/{len(results)} 응답 정상")
+print(f"  결과: {ok_count}/{len(results)} 응답 정상(근거 있음)")
+print(f"  근거 답변(grounded): {grounded_count}/{len(results)}")
+print(f"  fallback(LLM/RAG 무발동): {fallback_count} | 환각 위험: {halluc_count}")
 print(f"  평균 레이턴시: {avg_ms:.0f}ms")
 print(f"  평균 답변 길이: {avg_len:.0f}자")
 print(f"{'='*60}")
@@ -85,4 +113,4 @@ print(f"{'='*60}")
 Path("reports").mkdir(exist_ok=True)
 Path("reports/answer_e2e_report.json").write_text(
     json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-print(f"\n  상세 결과: reports/answer_e2e_report.json")
+print("\n  상세 결과: reports/answer_e2e_report.json")
