@@ -40,7 +40,9 @@ def _pg_ok() -> bool:
         return False
 
 
-_PG = _pg_ok()
+def _require_pg() -> None:
+    if not _pg_ok():
+        pytest.skip("Postgres not reachable")
 
 
 # ============================================================
@@ -159,7 +161,14 @@ class TestReport:
 # DB-backed tests
 # ============================================================
 
-pytestmark_db = pytest.mark.skipif(not _PG, reason="Postgres not reachable")
+def db_backed(obj):
+    obj = pytest.mark.fullstack(obj)
+    return pytest.mark.usefixtures("require_pg")(obj)
+
+
+@pytest.fixture
+def require_pg():
+    _require_pg()
 
 
 @pytest.fixture
@@ -202,7 +211,7 @@ def _seed_classification(db, tenant_id: str, levels: dict, model_version: str, c
     return cls
 
 
-@pytestmark_db
+@db_backed
 class TestMetricsFromDB:
     def test_no_classifications_returns_none(self):
         result = compute_metrics_from_db(f"v-unseen-{uuid.uuid4().hex[:6]}")
@@ -256,7 +265,7 @@ class TestMetricsFromDB:
                     s.query(Classification).filter_by(model_version=version).delete()
 
 
-@pytestmark_db
+@db_backed
 class TestActiveLearning:
     def test_status_ok_when_no_pending(self):
         # 다른 테스트의 pending이 있을 수 있어 절대 조건은 아님
@@ -320,7 +329,7 @@ class TestActiveLearning:
                 s.query(_TR).filter_by(run_id=run.run_id).delete()
 
 
-@pytestmark_db
+@db_backed
 class TestMetricsServiceLive:
     def test_active_model_with_stored_metrics_returns_them(self, db):
         from lloydk.services.metrics_service import MetricsService

@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 import tempfile
 
+import pytest
+
 from lloydk.adapters.llm.base import UsageRecord
 from lloydk.api.prom_metrics import (
     LLM_CALLS_TOTAL,
@@ -17,6 +19,8 @@ from lloydk.api.prom_metrics import (
     LLM_TOKENS_TOTAL,
 )
 from lloydk.services.llm_usage_service import LLMUsageService
+
+pytestmark = pytest.mark.slow
 
 
 def _v(counter, labels) -> float:

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import pytest
+pytestmark = pytest.mark.slow
 
 from lloydk.schemas.classify import ClassifyRequest
 from lloydk.schemas.classify_async import ClassifyAsyncRequest, ClassifyBatchRequest

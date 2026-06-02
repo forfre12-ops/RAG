@@ -38,10 +38,12 @@ def _pg_ok() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(
-    not _pg_ok(),
-    reason="Postgres not reachable — start docker compose up -d postgres",
-)
+pytestmark = pytest.mark.fullstack
+
+
+def _require_pg() -> None:
+    if not _pg_ok():
+        pytest.skip("Postgres not reachable - start docker compose up -d postgres")
 
 
 # ============================================================
@@ -51,6 +53,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture
 def db():
     """rollback fixture — 트랜잭션 격리."""
+    _require_pg()
     session = SessionLocal()
     try:
         yield session

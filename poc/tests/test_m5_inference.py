@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from lloydk.modules.m5_inference import InferencePipeline
+
+pytestmark = pytest.mark.slow
 
 
 def test_rule_fallback_predicts_all_grades():

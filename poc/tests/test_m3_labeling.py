@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from lloydk.adapters.embedding import HashEmbedding
 from lloydk.modules.m3_labeling import (
     FACTOR_SEEDS,
@@ -57,6 +59,7 @@ def test_rule_engine_fnr_safe_picks_higher_grade_on_tie():
     assert out.grade == "TS"
 
 
+@pytest.mark.slow
 def test_pipeline_returns_evaluation_factors():
     pipe = LabelingPipeline()
     out = pipe.label("1급 비밀 영업비밀 공정 노하우 원가 구조")
@@ -72,6 +75,7 @@ def test_pipeline_returns_evaluation_factors():
     assert total > 0.0
 
 
+@pytest.mark.slow
 def test_pipeline_evidence_extracted():
     pipe = LabelingPipeline()
     out = pipe.label("특급기밀 차세대 제품 설계도")
@@ -80,6 +84,7 @@ def test_pipeline_evidence_extracted():
     assert "특급기밀" in texts or "차세대 제품 설계도" in texts
 
 
+@pytest.mark.slow
 def test_pipeline_all_four_grade_scenarios():
     """묶음 D 자가검증의 압축판 — 4 등급 각각 분류 가능 확인."""
     pipe = LabelingPipeline()

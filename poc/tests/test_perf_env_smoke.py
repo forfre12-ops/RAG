@@ -1,6 +1,8 @@
 """perf/env.py 단위 smoke 테스트 — capture_env + 서비스 핑 함수 검증."""
 from __future__ import annotations
 
+import pytest
+
 
 from lloydk.perf.env import (
     EnvSnapshot,
@@ -43,6 +45,8 @@ class TestEnvSnapshot:
 
 
 class TestProbeFunctions:
+    pytestmark = pytest.mark.slow
+
     """각 서비스 핑 함수가 미가용 환경에서도 안전하게 반환."""
 
     def test_pg_returns_string(self):
@@ -95,6 +99,7 @@ class TestCaptureEnv:
         assert env.services.postgres == "UNKNOWN"
         assert env.services.elasticsearch == "UNKNOWN"
 
+    @pytest.mark.slow
     def test_with_probe_returns_known(self):
         """probe_services=True 시 UP/DOWN 둘 중 하나로 결정."""
         env = capture_env(probe_services=True, probe_pytest=False)

@@ -46,7 +46,6 @@ def _pg_ok() -> bool:
         return False
 
 
-_PG = _pg_ok()
 _OPENAPI = _load_openapi()
 
 
@@ -116,11 +115,13 @@ class TestGuideAliasSwap:
 # ============================================================
 
 
-@pytest.mark.skipif(not _PG, reason="PG unavailable")
+@pytest.mark.fullstack
 class TestSchemaGradesCascade:
     """doc/19 §4 — schema/grades PUT 시 빠진 등급은 is_active=false."""
 
     def test_omitted_grade_marked_inactive(self):
+        if not _pg_ok():
+            pytest.skip("PG unavailable")
         from fastapi.testclient import TestClient
 
         from lloydk.api.app import app
@@ -161,7 +162,7 @@ class TestSchemaGradesCascade:
 # ============================================================
 
 
-@pytest.mark.skipif(not _PG, reason="PG unavailable")
+@pytest.mark.fullstack
 class TestCorrectionsConsumed:
     """doc/19 §4 — 분류 → 보정 → 재학습 사이클이 consumed_in_run으로 닫힘."""
 

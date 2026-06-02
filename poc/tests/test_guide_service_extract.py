@@ -16,6 +16,7 @@ import zipfile
 from unittest.mock import MagicMock
 
 import pytest
+pytestmark = pytest.mark.slow
 
 from lloydk.modules.m4_training.rag_indexer import IndexResult
 from lloydk.services.guide_service import GuideService, _extract_text

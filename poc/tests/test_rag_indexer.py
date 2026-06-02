@@ -20,7 +20,6 @@ from lloydk.modules.m4_training.rag_indexer import (
     RagIndexer,
     _safe_token,
 )
-from lloydk.services.guide_service import GuideService
 
 
 def _es_ok() -> bool:
@@ -45,16 +44,13 @@ def _es_ok() -> bool:
         return False
 
 
-_ES = _es_ok()
-
-
 def _purge_test_prefix(prefix: str = "secrets-guides-t") -> None:
     """테스트 시작 전 잔재 인덱스/alias 일괄 정리.
 
     `secrets-guides-t<6hex>-*` 패턴은 본 테스트 모듈만 생성하는 unique tenant.
     다른 차원의 매핑이 잔존하면 매핑 충돌이 발생하므로, 매 세션 시작 시 wipe.
     """
-    if not _ES:
+    if not _es_ok():
         return
     try:
         from elasticsearch import Elasticsearch  # noqa: PLC0415
@@ -144,9 +140,11 @@ class TestInMemoryFlow:
 # ============================================================
 
 
-@pytest.mark.skipif(not _ES, reason="Elasticsearch not reachable on :9200")
+@pytest.mark.fullstack
 class TestEsFlow:
     def setup_method(self):
+        if not _es_ok():
+            pytest.skip("Elasticsearch not reachable on :9200")
         # 잔재 인덱스(이전 실패 run, 다른 차원 매핑 등) 일괄 정리
         _purge_test_prefix("secrets-guides-t")
 
@@ -235,14 +233,18 @@ class TestEsFlow:
 
 
 class TestGuideServiceBinding:
+    pytestmark = pytest.mark.slow
+
     def setup_method(self):
         # 각 테스트마다 fresh singleton + InMemory 인덱서
         GuideService.reset_singleton()
 
     def teardown_method(self):
+        from lloydk.services.guide_service import GuideService
         GuideService.reset_singleton()
 
     def test_upload_uses_injected_indexer(self):
+        from lloydk.services.guide_service import GuideService
         idx = RagIndexer(store=InMemoryStore(), embedder=HashEmbedding(dim=1024))
         svc = GuideService(indexer=idx)
         res = svc.upload(
@@ -256,6 +258,7 @@ class TestGuideServiceBinding:
         assert res.triggers_retraining is False
 
     def test_list_versions_after_upload(self):
+        from lloydk.services.guide_service import GuideService
         idx = RagIndexer(store=InMemoryStore(), embedder=HashEmbedding(dim=1024))
         svc = GuideService(indexer=idx)
         for v in ("v1.0", "v1.1"):
@@ -270,6 +273,7 @@ class TestGuideServiceBinding:
         assert [v.version for v in vl.versions] == ["v1.0", "v1.1"]
 
     def test_decoding_handles_cp949(self):
+        from lloydk.services.guide_service import GuideService
         idx = RagIndexer(store=InMemoryStore(), embedder=HashEmbedding(dim=1024))
         svc = GuideService(indexer=idx)
         # CP949로 인코딩된 한글 — 운영에서 종종 들어옴

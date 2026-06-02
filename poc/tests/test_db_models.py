@@ -42,12 +42,14 @@ def _postgres_available() -> bool:
         return False
 
 
-_PG_OK = _postgres_available()
+pytestmark = pytest.mark.fullstack
 
-pytestmark = pytest.mark.skipif(
-    not _PG_OK,
-    reason="Postgres not reachable on settings.database_url — start docker compose up -d postgres",
-)
+
+def _require_postgres() -> None:
+    if not _postgres_available():
+        pytest.skip(
+            "Postgres not reachable on settings.database_url - start docker compose up -d postgres"
+        )
 
 
 # ============================================================
@@ -87,6 +89,7 @@ def test_orm_metadata_has_expected_tables():
 
 def test_orm_tables_present_in_database():
     """All ORM-mapped tables must exist in the real Postgres schema."""
+    _require_postgres()
     insp = inspect(engine)
     db_tables = set(insp.get_table_names())
     orm_tables = set(Base.metadata.tables.keys())
@@ -102,6 +105,7 @@ def test_orm_tables_present_in_database():
 # ============================================================
 
 def test_default_tenant_seeded():
+    _require_postgres()
     with session_scope() as s:
         t = s.get(Tenant, "default")
         assert t is not None
@@ -111,6 +115,7 @@ def test_default_tenant_seeded():
 
 def test_classification_levels_seeded():
     """alembic baseline seeds 4 levels with OpenAPI-aligned codes."""
+    _require_postgres()
     with session_scope() as s:
         codes = [
             lvl.level_code
@@ -123,6 +128,7 @@ def test_classification_levels_seeded():
 
 def test_evaluation_factors_seeded():
     """alembic baseline seeds 4 factors with weights summing to 1.0."""
+    _require_postgres()
     with session_scope() as s:
         factors = s.query(EvaluationFactor).all()
         codes = {f.factor_code for f in factors}
@@ -143,6 +149,7 @@ def test_evaluation_factors_seeded():
 @pytest.fixture
 def db_session():
     """Provide a session and roll back at the end — keeps the DB clean."""
+    _require_postgres()
     session = SessionLocal()
     try:
         yield session

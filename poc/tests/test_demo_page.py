@@ -21,13 +21,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-
 STATIC = Path(__file__).resolve().parents[1] / "src" / "lloydk" / "api" / "static"
+pytestmark = pytest.mark.slow
 
 
 @pytest.fixture(scope="module")
 def client():
+    from lloydk.api.app import app
     with TestClient(app) as c:
         yield c
 

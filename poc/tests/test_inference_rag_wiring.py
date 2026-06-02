@@ -9,8 +9,12 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from lloydk.adapters.vectorstore.inmemory_store import InMemoryStore
 from lloydk.modules.m5_inference.pipeline import InferencePipeline
+
+pytestmark = pytest.mark.slow
 
 
 def _populated_store() -> InMemoryStore:

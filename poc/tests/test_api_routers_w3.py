@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 import uuid
 
 import pytest
+if any("not slow" in arg for arg in sys.argv):
+    pytest.skip("slow API router integration tests excluded from lite collection", allow_module_level=True)
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 from sqlalchemy import text
