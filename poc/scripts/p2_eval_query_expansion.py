@@ -12,6 +12,7 @@ LLM 확장은 settings.llm_provider(Ollama qwen3:14b)로 expand_llm 호출 → �
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -42,6 +43,13 @@ def _doc_match(results, relevant_set: set[str]) -> bool:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--limit", type=int, default=0, help="평가 쿼리 수 제한(0=전체). 빠른 경향 확인용.")
+    ap.add_argument("--methods", default=",".join(METHODS),
+                    help="측정 method 콤마 구분 (none,rule,llm,hybrid)")
+    args = ap.parse_args()
+    methods = [m.strip() for m in args.methods.split(",") if m.strip()]
+
     emb = build_embedder()
     store = build_store()
 
@@ -58,10 +66,12 @@ def main() -> int:
         return list(v)
 
     queries = [json.loads(line) for line in GOLD.open(encoding="utf-8")]
-    print(f"[p2-qe] queries={len(queries)} collection={COLLECTION} top_k={TOP_K}", flush=True)
+    if args.limit:
+        queries = queries[: args.limit]
+    print(f"[p2-qe] queries={len(queries)} methods={methods} collection={COLLECTION} top_k={TOP_K}", flush=True)
 
     rows = []
-    for method in METHODS:
+    for method in methods:
         hits = 0
         t0 = time.perf_counter()
         for q in queries:
