@@ -177,6 +177,38 @@ def test_assert_production_credentials_blocks_trust_actor_role_header():
         config_mod.settings.cors_allow_origins = original_cors
 
 
+def test_assert_production_credentials_blocks_audit_disabled():
+    """운영 모드 + AUDIT_DISABLED=1 → RuntimeError (감사로그 부재 = 법적 추적 불가)."""
+    config_mod._SECRETS_FILLED = True
+    original_mode = config_mod.settings.poc_mode
+    original_trust = config_mod.settings.api_key_trust_actor_role_header
+    original_api = config_mod.settings.api_key
+    original_minio = config_mod.settings.minio_secret_key
+    original_cors = config_mod.settings.cors_allow_origins
+    config_mod.settings.poc_mode = "full"
+    config_mod.settings.api_key = "x"
+    config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.cors_allow_origins = ["https://app.example.com"]
+    config_mod.settings.api_key_trust_actor_role_header = False
+    try:
+        with patch.dict(
+            os.environ,
+            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": "", "AUDIT_DISABLED": "1"},
+        ):
+            try:
+                config_mod.assert_production_credentials()
+            except RuntimeError as exc:
+                assert "AUDIT_DISABLED" in str(exc)
+            else:
+                raise AssertionError("운영 모드 + AUDIT_DISABLED=1 → RuntimeError 기대")
+    finally:
+        config_mod.settings.poc_mode = original_mode
+        config_mod.settings.api_key_trust_actor_role_header = original_trust
+        config_mod.settings.api_key = original_api
+        config_mod.settings.minio_secret_key = original_minio
+        config_mod.settings.cors_allow_origins = original_cors
+
+
 def test_secrets_manager_protocol():
     """EnvSecretsManager가 SecretsManager Protocol 만족."""
     assert isinstance(EnvSecretsManager(), SecretsManager)

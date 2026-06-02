@@ -18,8 +18,19 @@ class DocumentRepo:
     def __init__(self, db: Session):
         self.db = db
 
-    def get(self, doc_id: uuid.UUID | str) -> Document | None:
-        return self.db.get(Document, doc_id)
+    def get(self, doc_id: uuid.UUID | str, tenant_id: str | None = None) -> Document | None:
+        """doc_id로 Document 조회.
+
+        보안: tenant_id가 주어지면 소유 tenant가 일치할 때만 반환(객체 수준 권한).
+        타 tenant 문서면 None → 교차테넌트 본문/메타 유출 차단. tenant_id=None은
+        하위호환(스코프 미적용) — 신규 호출은 가능한 한 tenant_id를 넘길 것.
+        """
+        doc = self.db.get(Document, doc_id)
+        if doc is None:
+            return None
+        if tenant_id is not None and doc.tenant_id != tenant_id:
+            return None
+        return doc
 
     def create(
         self,

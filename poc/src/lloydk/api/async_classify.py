@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from lloydk.api._jwt_auth import require_auth
+from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
 from lloydk.api.rate_limit import limiter
 from lloydk.db import session_scope
 from lloydk.repositories import ClassifyRepo
@@ -50,16 +50,18 @@ def classify_job_status(job_id: UUID):
 
 
 @router.get("/classify/{doc_id}", response_model=ClassifyResponse)
-def classify_recent_for_doc(doc_id: str):
+def classify_recent_for_doc(doc_id: str, request: Request):
     """doc_id의 최근 분류 결과 1건 (DB 진실 소스)."""
     try:
         doc_uuid = uuid.UUID(doc_id)
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail="doc_id must be a UUID") from exc
+    # 보안: 인증 tenant로 스코프 — 교차테넌트 분류 결과 열람 차단(미검증/레거시는 None=미스코프).
+    eff_tenant = resolve_effective_tenant(request, None)
     try:
         with session_scope() as db:
             repo = ClassifyRepo(db)
-            recent = repo.list_recent_for_doc(doc_uuid, limit=1)
+            recent = repo.list_recent_for_doc(doc_uuid, tenant_id=eff_tenant, limit=1)
             if not recent:
                 raise HTTPException(status_code=404, detail="no classification for doc_id")
             cls = recent[0]

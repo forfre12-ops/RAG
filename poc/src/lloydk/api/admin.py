@@ -11,7 +11,7 @@ import string
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from lloydk.api._jwt_auth import hash_api_key, require_auth
+from lloydk.api._jwt_auth import hash_api_key
 from lloydk.api._rbac import require_role
 
 router = APIRouter(prefix="/admin", tags=["admin"])

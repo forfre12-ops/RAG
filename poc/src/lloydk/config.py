@@ -184,6 +184,13 @@ class Settings(BaseSettings):
     fnr_rule_s1_threshold: float = 2.2
     fnr_rule_s2_threshold: float = 1.6
 
+    # 저신뢰 검수 라우팅 임계값. 모델 confidence가 이 값 미만이면 응답을
+    # status="needs_review"로 표시하고 warning에 검수 권고를 남긴다. **거부(reject)는
+    # 하지 않음** — 고위험 도메인에서 저신뢰라고 응답을 막으면 FNR이 악화되므로
+    # '플래그+검수권고'까지만. 데모 콘솔(api/static/incident.js)이 광고하는 0.7과 일치.
+    # 임계 수치 자체의 정밀 튜닝은 운영 human_review 라벨 누적 후 PR곡선으로 조정.
+    review_confidence_threshold: float = 0.7
+
     # Source-type prior: 판례/공개 문서 상위등급 과분류 방어 (기본 False).
     # True면 metadata.source="판례"|"court_decision" 등 공개 문서의 상위 예측을 하향.
     # 주의: 실제 TS 포함 판례 문서도 내려갈 수 있음 — FNR 위험 존재.
@@ -309,10 +316,18 @@ def assert_production_credentials() -> None:
         )
 
     # RATE_LIMIT_DISABLED 운영에서 오류
-    if os.environ.get("RATE_LIMIT_DISABLED", "").strip() in {"1", "true", "yes"}:
+    if os.environ.get("RATE_LIMIT_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
         raise RuntimeError(
             "RATE_LIMIT_DISABLED=1 은 운영 모드에서 허용되지 않습니다. "
             "부하 테스트 후 반드시 제거하세요."
+        )
+
+    # AUDIT_DISABLED 운영에서 오류 — audit_log 부재 시 보안 사고·법적 추적 불가.
+    # (middleware.py가 이 변수로 감사 기록을 noop 처리하므로 운영에선 fail-fast 차단.)
+    if os.environ.get("AUDIT_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
+        raise RuntimeError(
+            "AUDIT_DISABLED=1 은 운영 모드(poc_mode=full)에서 허용되지 않습니다. "
+            "audit_log가 없으면 보안 사고·법적 추적이 불가합니다."
         )
 
     # X-Actor-Role 헤더 신뢰는 운영에서 권한 위조 경로 — 차단.

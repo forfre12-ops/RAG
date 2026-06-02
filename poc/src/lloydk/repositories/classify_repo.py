@@ -46,8 +46,19 @@ class ClassifyRepo:
     def tenant_exists(self, tenant_id: str) -> bool:
         return self.db.get(Tenant, tenant_id) is not None
 
-    def document_exists(self, doc_id: uuid.UUID) -> bool:
-        return self.db.get(Document, doc_id) is not None
+    def document_exists(self, doc_id: uuid.UUID, tenant_id: str | None = None) -> bool:
+        """문서 존재 확인.
+
+        보안: tenant_id가 주어지면 그 tenant 소유일 때만 True(객체 수준 권한).
+        교차테넌트 doc_id로 분류가 엉뚱한 tenant 밑에 영속화(orphan)되는 것을 차단.
+        tenant_id=None은 하위호환(스코프 미적용).
+        """
+        doc = self.db.get(Document, doc_id)
+        if doc is None:
+            return False
+        if tenant_id is not None and doc.tenant_id != tenant_id:
+            return False
+        return True
 
     def level_id_by_code(self, code: Grade | str) -> int | None:
         """Grade 열거형 또는 코드 문자열을 level_id로 변환."""
@@ -207,16 +218,18 @@ class ClassifyRepo:
             self.db.add(o)
 
     def list_recent_for_doc(
-        self, doc_id: uuid.UUID, *, limit: int = 10
+        self, doc_id: uuid.UUID, *, tenant_id: str | None = None, limit: int = 10
     ) -> list[Classification]:
-        return list(
-            self.db.execute(
-                select(Classification)
-                .where(Classification.doc_id == doc_id)
-                .order_by(Classification.classified_at.desc())
-                .limit(limit)
-            ).scalars()
-        )
+        """doc_id의 최근 분류 결과.
+
+        보안: tenant_id가 주어지면 그 tenant의 분류만 반환(교차테넌트 결과 열람 차단).
+        tenant_id=None은 하위호환(스코프 미적용).
+        """
+        stmt = select(Classification).where(Classification.doc_id == doc_id)
+        if tenant_id is not None:
+            stmt = stmt.where(Classification.tenant_id == tenant_id)
+        stmt = stmt.order_by(Classification.classified_at.desc()).limit(limit)
+        return list(self.db.execute(stmt).scalars())
 
     def get(self, classification_id: uuid.UUID) -> Classification | None:
         return self.db.get(Classification, classification_id)
@@ -230,11 +243,17 @@ class ClassifyRepo:
     # DocumentLabel (Human Review / Verified Gold)
     # ------------------------------------------------------------
 
-    def get_verified_document_label(self, doc_id: uuid.UUID) -> DocumentLabel | None:
+    def get_verified_document_label(
+        self, doc_id: uuid.UUID, *, tenant_id: str | None = None
+    ) -> DocumentLabel | None:
         """doc_id에 대한 검증된 라벨 조회 (is_verified=True 우선).
 
         human_review → llm_judge_consensus → llm_judge_primary 우선순위로 반환.
         없으면 None → 모델 추론으로 계속 진행.
+
+        보안: tenant_id가 주어지면 그 tenant 소유 문서의 라벨만 반환(Document 조인).
+        DocumentLabel은 자체 tenant_id가 없으므로 documents.tenant_id로 스코프한다.
+        교차테넌트 검증 등급(human_review 결과) 유출 차단. tenant_id=None은 하위호환.
         """
         _LABEL_SOURCE_PRIORITY = {
             "human_review": 1,
@@ -246,13 +265,17 @@ class ClassifyRepo:
             "llm_judge_primary": 6,
         }
 
-        rows = list(
-            self.db.execute(
-                select(DocumentLabel)
-                .where(DocumentLabel.doc_id == doc_id)
-                .where(DocumentLabel.review_status == "accepted" if hasattr(DocumentLabel, "review_status") else DocumentLabel.is_verified.is_(True))
-            ).scalars()
+        verified_cond = (
+            DocumentLabel.review_status == "accepted"
+            if hasattr(DocumentLabel, "review_status")
+            else DocumentLabel.is_verified.is_(True)
         )
+        stmt = select(DocumentLabel).where(DocumentLabel.doc_id == doc_id).where(verified_cond)
+        if tenant_id is not None:
+            stmt = stmt.join(Document, DocumentLabel.doc_id == Document.doc_id).where(
+                Document.tenant_id == tenant_id
+            )
+        rows = list(self.db.execute(stmt).scalars())
         if not rows:
             return None
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from lloydk.api._jwt_auth import require_auth
 from lloydk.api._rbac import require_role
 from lloydk.schemas.confirm import (
     ConfirmRequest,

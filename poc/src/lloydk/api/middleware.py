@@ -5,7 +5,8 @@
 - DB 미가용·테이블 부재 시 silent skip (테스트·dryrun 환경 보호)
 - payload는 SHA-256 해시만. 본문은 PG에 저장하지 않음.
 - /healthz·/docs·/openapi.json은 audit 제외 (노이즈 차단)
-- actor_id는 X-Actor-Id 헤더, role은 X-Actor-Role 헤더로 받음 (옵션)
+- actor_id·tenant_id·role은 인증이 해소한 request.state.auth_*를 우선 사용.
+  인증이 신원을 못 채운 요청(인증 실패 등)에만 X-Actor-Id/X-Tenant-Id 헤더로 폴백.
 """
 
 from __future__ import annotations
@@ -135,9 +136,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return
 
         action = _derive_action(request)
-        actor_id = request.headers.get("x-actor-id")
-        actor_role = request.headers.get("x-actor-role")
-        tenant_id = request.headers.get("x-tenant-id")
+        # 보안: 인증이 해소한 신원(request.state.auth_*)을 우선 사용 — 위조 가능한
+        # X-Actor-Id/X-Tenant-Id 헤더로 감사 기록이 날조되는 것을 차단. 인증이
+        # 신원을 못 채운 경우(인증 실패/미인증 요청)에만 헤더로 폴백(success=False로 이미 구분됨).
+        auth_actor = getattr(request.state, "auth_actor", None)
+        auth_tenant = getattr(request.state, "auth_tenant", None)
+        auth_role = getattr(request.state, "auth_role", None)
+        actor_id = auth_actor if auth_actor is not None else request.headers.get("x-actor-id")
+        actor_role = auth_role if auth_role is not None else request.headers.get("x-actor-role")
+        tenant_id = auth_tenant if auth_tenant is not None else request.headers.get("x-tenant-id")
         request_id = getattr(request.state, "request_id", None)
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent")

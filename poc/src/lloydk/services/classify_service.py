@@ -83,7 +83,7 @@ class ClassifyService:
         # content가 없으면 normalized_text_uri에서 읽어오기 (doc_id 전용 분류 경로)
         content = req.content
         if not content:
-            content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id or "default")
+            content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id)
         if not content:
             warnings_acc = [f"content empty and doc_id={req.doc_id!r} not found in storage — cannot classify"]
             return ClassifyResponse(
@@ -114,7 +114,7 @@ class ClassifyService:
         # ── Corrections 반영: DB에 검증된 라벨이 있으면 모델 추론 스킵 ───────────
         # human_review / koipa_case_based / nkt_designated 등 is_verified=True 라벨
         # 우선순위: human_review > koipa_case_based > llm_judge_consensus > ...
-        verified_label = self._get_verified_label(req.doc_id)
+        verified_label = self._get_verified_label(req.doc_id, req.tenant_id)
         if verified_label is not None:
             from lloydk.schemas.common import Grade  # noqa: PLC0415
             inference_id = uuid.uuid4()
@@ -167,9 +167,20 @@ class ClassifyService:
         warnings_acc.extend(persist_warnings)
         notify("finalize")
 
+        # 저신뢰 검수 라우팅: confidence가 임계 미만이면 needs_review로 표시(거부 아님).
+        # 데모 콘솔이 광고하는 'low-confidence 게이트'의 서버측 구현 — 검수자 큐 노출 근거.
+        status = "staging"
+        threshold = self._review_confidence_threshold()
+        if float(pred.confidence) < threshold:
+            status = "needs_review"
+            warnings_acc.append(
+                f"low-confidence: confidence={float(pred.confidence):.2f} < {threshold:.2f}"
+                " — review recommended"
+            )
+
         logger.info(
-            "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f",
-            req.doc_id, inference_id, pred.label, float(pred.confidence),
+            "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f status=%s",
+            req.doc_id, inference_id, pred.label, float(pred.confidence), status,
         )
 
         return ClassifyResponse(
@@ -183,9 +194,17 @@ class ClassifyService:
             rag_context_used=pred.rag_context,
             model_version=pred.model_version,
             elapsed_ms=0,
-            status="staging",
+            status=status,
             warnings=warnings_acc,
         )
+
+    @staticmethod
+    def _review_confidence_threshold() -> float:
+        try:
+            from lloydk.config import settings as _settings  # noqa: PLC0415
+            return float(getattr(_settings, "review_confidence_threshold", 0.7))
+        except Exception:  # noqa: BLE001
+            return 0.7
 
     # ------------------------------------------------------------
     # Verified Label Audit Trail
@@ -236,11 +255,14 @@ class ClassifyService:
     # Verified Label Lookup (Corrections 반영)
     # ------------------------------------------------------------
 
-    def _get_verified_label(self, doc_id_str: str) -> "object | None":
+    def _get_verified_label(self, doc_id_str: str, tenant_id: str | None = None) -> "object | None":
         """doc_id에 대한 검증된 DocumentLabel 반환.
 
         DB 가용 시 조회. 없거나 실패하면 None (모델 추론으로 계속).
         반환 타입: DocumentLabel with .level_code, .labeled_by, .confidence 속성.
+
+        보안: tenant_id가 주어지면 그 tenant 소유 문서의 검증 라벨만 반환 —
+        교차테넌트 검증 등급 유출 차단.
         """
         try:
             from lloydk.db import SessionLocal  # noqa: PLC0415
@@ -255,7 +277,7 @@ class ClassifyService:
             db = SessionLocal()
             try:
                 repo = ClassifyRepo(db)
-                dl = repo.get_verified_document_label(doc_uuid)
+                dl = repo.get_verified_document_label(doc_uuid, tenant_id=tenant_id)
                 if dl is None:
                     return None
                 # level_code 조회
@@ -318,9 +340,11 @@ class ClassifyService:
                     self._inc_persist_failure("no_tenant")
                     warns.append(f"persistence skipped: tenant_id={tenant_id!r} not found in DB")
                     return uuid.uuid4(), warns
-                if not repo.document_exists(doc_uuid):
+                if not repo.document_exists(doc_uuid, tenant_id=tenant_id):
                     self._inc_persist_failure("no_doc")
-                    warns.append(f"persistence skipped: doc_id={doc_uuid} not found in documents")
+                    warns.append(
+                        f"persistence skipped: doc_id={doc_uuid} not found for tenant={tenant_id!r}"
+                    )
                     return uuid.uuid4(), warns
 
                 level_id = repo.level_id_by_code(pred.label)
@@ -413,11 +437,13 @@ class ClassifyService:
             warns.append(f"persistence skipped: unexpected error ({type(exc).__name__})")
             return uuid.uuid4(), warns
 
-    def _fetch_content_by_doc_id(self, doc_id: str, tenant_id: str) -> str:
+    def _fetch_content_by_doc_id(self, doc_id: str, tenant_id: str | None) -> str:
         """doc_id로 documents.normalized_text_uri → storage에서 텍스트 읽기.
 
         ingestion 완료 문서는 normalized_text_uri를 갖고 있다.
         storage·DB 미가용 시 빈 문자열 반환 — 호출자가 처리.
+
+        보안: tenant_id가 주어지면 그 tenant 소유 문서만 읽음 — 교차테넌트 본문 유출 차단.
         """
         doc_uuid = self._parse_doc_uuid(doc_id)
         if doc_uuid is None:
@@ -430,7 +456,7 @@ class ClassifyService:
             return ""
         try:
             with session_scope() as db:
-                doc = DocumentRepo(db).get(doc_uuid)
+                doc = DocumentRepo(db).get(doc_uuid, tenant_id=tenant_id)
                 if doc is None or not doc.normalized_text_uri:
                     return ""
                 uri = doc.normalized_text_uri

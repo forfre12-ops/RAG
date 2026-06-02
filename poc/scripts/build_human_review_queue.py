@@ -30,6 +30,16 @@ def _is_ruling(row: dict) -> bool:
     return sum(1 for m in RULING_MARKERS if m in text) >= 2
 
 
+def _confidence(row: dict) -> float:
+    """검수 우선순위 보조키용 모델 confidence. 동일 priority 내에서 저신뢰를 먼저
+    검수하도록 한다. 부재 시 1.0(=가장 덜 시급)으로 둬 기존 정렬을 보존(하위호환)."""
+    for k in ("confidence", "score", "model_confidence"):
+        v = row.get(k)
+        if isinstance(v, (int, float)):
+            return float(v)
+    return 1.0
+
+
 def _model_preds(report_paths: list[Path]) -> dict[str, str]:
     """리포트 errors에서 doc_id -> 모델 예측. 미수록 고위험 doc은 호출부에서 라벨=예측 가정."""
     preds: dict[str, str] = {}
@@ -52,7 +62,7 @@ def build_high_risk_queue(
     우선순위: 0=모델이 S3로 과소분류(진짜 위험) > 1=llm 라벨(불확실) > 2=신뢰출처.
     이미 human_review인 건은 제외.
     """
-    cands: list[tuple[int, dict]] = []
+    cands: list[tuple[int, float, dict]] = []
     for doc_id, src in gold_by_id.items():
         if src.get("label_source") == "human_review":
             continue
@@ -69,9 +79,10 @@ def build_high_risk_queue(
             pr = 1  # LLM 단독 라벨 — 가장 불확실
         else:
             pr = 2  # nkt/koipa/codex 등 신뢰출처 — 커버리지용
-        cands.append((pr, _row(doc_id, model, label, src)))
-    cands.sort(key=lambda item: item[0])
-    return [row for _, row in cands[:limit]]
+        cands.append((pr, _confidence(src), _row(doc_id, model, label, src)))
+    # 동일 priority 내에서는 저신뢰(confidence 낮음) 우선 검수.
+    cands.sort(key=lambda item: (item[0], item[1]))
+    return [row for _, _, row in cands[:limit]]
 FIELDNAMES = [
     "doc_id",
     "model_label",
@@ -123,7 +134,7 @@ def _row(doc_id: str, model_label: str, human_label: str, source: dict) -> dict:
 
 
 def build_queue(report: dict, gold_by_id: dict[str, dict], limit: int) -> list[dict]:
-    candidates: list[tuple[int, dict]] = []
+    candidates: list[tuple[int, float, dict]] = []
     seen: set[str] = set()
 
     # 1) Full high-risk underclassification list. errors_sample is truncated
@@ -136,7 +147,7 @@ def build_queue(report: dict, gold_by_id: dict[str, dict], limit: int) -> list[d
         true_label = str(err.get("true", "")).upper()
         pred_label = str(err.get("pred", "")).upper()
         source = {**gold_by_id.get(doc_id, {}), **err}
-        candidates.append((0, _row(doc_id, pred_label, true_label, source)))
+        candidates.append((0, _confidence(source), _row(doc_id, pred_label, true_label, source)))
         seen.add(doc_id)
 
     for err in report.get("errors_sample", []):
@@ -147,7 +158,7 @@ def build_queue(report: dict, gold_by_id: dict[str, dict], limit: int) -> list[d
         pred_label = str(err.get("pred", "")).upper()
         priority = 0 if true_label in HIGH_RISK and pred_label == "S3" else 1
         source = {**gold_by_id.get(doc_id, {}), **err}
-        candidates.append((priority, _row(doc_id, pred_label, true_label, source)))
+        candidates.append((priority, _confidence(source), _row(doc_id, pred_label, true_label, source)))
         seen.add(doc_id)
 
     for doc_id, source in gold_by_id.items():
@@ -159,11 +170,12 @@ def build_queue(report: dict, gold_by_id: dict[str, dict], limit: int) -> list[d
         if label not in {"TS", "S1", "S2", "S3"}:
             continue
         priority = 2 if label in HIGH_RISK else 3
-        candidates.append((priority, _row(doc_id, "", label, source)))
+        candidates.append((priority, _confidence(source), _row(doc_id, "", label, source)))
         seen.add(doc_id)
 
-    candidates.sort(key=lambda item: item[0])
-    return [row for _, row in candidates[:limit]]
+    # 동일 priority 내에서는 저신뢰(confidence 낮음) 우선 검수.
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return [row for _, _, row in candidates[:limit]]
 
 
 def main() -> int:
