@@ -226,6 +226,25 @@ def test_human_review_queue_prioritizes_high_risk_underclassification(tmp_path, 
     assert rows[1].startswith("a,S3,S2")
 
 
+def test_high_risk_queue_excludes_rulings_and_prioritizes_underclass():
+    gold = {
+        "ruling1": {"doc_id": "ruling1", "source": "판례", "label": "S2", "label_source": "llm_judge_primary", "text": "x"},
+        "fin_under": {"doc_id": "fin_under", "source": "금융보고서", "label": "S2", "label_source": "llm_judge_primary", "text": "투자 전략"},
+        "fin_ok": {"doc_id": "fin_ok", "source": "금융보고서", "label": "S1", "label_source": "koipa_case_based", "text": "원가 구조"},
+        "s3doc": {"doc_id": "s3doc", "source": "금융보고서", "label": "S3", "label_source": "llm_judge_primary", "text": "공개 보도자료"},
+        "reviewed": {"doc_id": "reviewed", "source": "금융보고서", "label": "S2", "label_source": "human_review", "text": "이미 검수"},
+    }
+    preds = {"fin_under": "S3"}  # 모델이 S3로 과소분류
+    queue = build_human_review_queue.build_high_risk_queue(gold, preds, limit=10)
+    ids = [r["doc_id"] for r in queue]
+    assert "ruling1" not in ids        # 판례 제외
+    assert "s3doc" not in ids          # 고위험 아님 제외
+    assert "reviewed" not in ids       # 이미 human_review 제외
+    assert ids[0] == "fin_under"       # underclass 최우선
+    assert set(ids) == {"fin_under", "fin_ok"}
+    assert queue[0]["model_label"] == "S3" and queue[0]["human_label"] == "S2"
+
+
 def test_p1_boundary_report_writes_priority_sections(tmp_path, monkeypatch):
     source = tmp_path / "p1.json"
     _write_json(
