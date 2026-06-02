@@ -124,6 +124,7 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
             source_doc=source_doc,
             chunk_id=str(h.id),
             score=float(h.score),
+            text=str(payload.get("text") or payload.get("content") or ""),
         ))
     return out
 

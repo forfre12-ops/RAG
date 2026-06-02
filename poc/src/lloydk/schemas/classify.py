@@ -80,6 +80,7 @@ class RagContextHit(BaseModel):
     source_doc: str
     chunk_id: str
     score: float
+    text: str = ""  # 검색된 청크 본문 — 답변 합성 프롬프트에 실제 근거로 투입
 
 
 class ClassifyResponse(BaseModel):

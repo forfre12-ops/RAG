@@ -40,6 +40,7 @@ _DEFAULT_GRADE_DESCRIPTIONS: dict[str, str] = {
 
 _MAX_QUERY_PREVIEW = 800
 _MAX_HITS_IN_PROMPT = 5
+_MAX_SNIPPET_CHARS = 1000  # 출처 청크 본문 프롬프트 투입 상한
 
 
 def build_answer_prompt(
@@ -67,9 +68,9 @@ def build_answer_prompt(
     if hits:
         lines = []
         for i, h in enumerate(hits[:_MAX_HITS_IN_PROMPT], start=1):
-            lines.append(
-                f"  [{i}] source={h.source_doc} chunk={h.chunk_id} score={h.score:.3f}"
-            )
+            snippet = " ".join((getattr(h, "text", "") or "").split())[:_MAX_SNIPPET_CHARS]
+            header = f"  [{i}] source={h.source_doc} score={h.score:.3f}"
+            lines.append(f"{header}\n      {snippet}" if snippet else header)
         citation_block = "\n[인용 가능 출처]\n" + "\n".join(lines)
 
     rules = (
