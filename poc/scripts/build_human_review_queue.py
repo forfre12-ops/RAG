@@ -67,6 +67,19 @@ def build_queue(report: dict, gold_by_id: dict[str, dict], limit: int) -> list[d
     candidates: list[tuple[int, dict]] = []
     seen: set[str] = set()
 
+    # 1) Full high-risk underclassification list. errors_sample is truncated
+    # (e.g. 80 rows), so the genuinely dangerous TS/S1/S2 -> S3 cases must be
+    # pulled from priority_errors, which carries the complete set.
+    for err in report.get("priority_errors", {}).get("high_risk_to_s3", []):
+        doc_id = str(err.get("doc_id", ""))
+        if not doc_id or doc_id in seen:
+            continue
+        true_label = str(err.get("true", "")).upper()
+        pred_label = str(err.get("pred", "")).upper()
+        source = {**gold_by_id.get(doc_id, {}), **err}
+        candidates.append((0, _row(doc_id, pred_label, true_label, source)))
+        seen.add(doc_id)
+
     for err in report.get("errors_sample", []):
         doc_id = str(err.get("doc_id", ""))
         if not doc_id or doc_id in seen:

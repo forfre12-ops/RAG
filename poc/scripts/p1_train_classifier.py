@@ -100,7 +100,11 @@ def evaluate_dryrun(rows: list[dict]) -> dict:
         pred = out.grade.value if hasattr(out.grade, "value") else str(out.grade)
         y_true.append(r["label"])
         y_pred.append(pred)
-    return compute_metrics(y_true, y_pred)
+    metrics = compute_metrics(y_true, y_pred)
+    # dryrun 예측기는 m3 키워드 규칙 라벨러이지 학습된 v3 모델이 아니다.
+    # 운영 모델 성능은 eval_p1_model_gold.py(m5_inference / 트랜스포머) 참조.
+    metrics["predictor"] = "m3_labeling.rule_engine (keyword seeds; NOT the trained v3 model)"
+    return metrics
 
 
 def compute_metrics(y_true: list[str], y_pred: list[str]) -> dict:
@@ -152,12 +156,16 @@ def write_report(metrics: dict, mode: str, out: Path) -> str:
     lsf = metrics.get("label_source_filter")
     filter_note = f" [filter: {','.join(lsf)}]" if lsf else ""
 
+    # 주의: --mode dryrun 예측기는 m3 규칙 라벨러이며 학습된 v3 모델이 아니다.
+    # 따라서 이 리포트의 F1/판정은 '운영 모델 성능'이 아니라 '규칙 라벨러 성능'이다.
+    # 운영 모델 성능 근거는 eval_p1_model_gold.py(m5_inference 트랜스포머) 리포트.
     eval_notes = {
         "synthetic_masked":  "⚠ synthetic_masked — 합성 파이프라인 연결 확인용. 운영 근거 불가.",
-        "llm_judge_gold":    "~ llm_judge_gold — LLM pseudo-gold. 운영 참고용.",
-        "human_review_gold": "✓ human_review_gold — 사람 검수 기준. 운영 성능 근거 가능.",
+        "llm_judge_gold":    "~ llm_judge_gold — LLM pseudo-gold 대상, 규칙 라벨러 예측. 운영 참고용.",
+        "human_review_gold": "⚠ human_review_gold — 규칙 라벨러(m3) 예측이며 학습 모델 아님. 운영 모델 성능은 eval_p1_model_gold 참조.",
     }
     eval_note = eval_notes.get(eval_type, eval_type)
+    predictor = metrics.get("predictor")
 
     # n=0 → N/A (human_review_gold 미구축 등)
     if metrics.get("n", 0) == 0:
@@ -186,7 +194,8 @@ def write_report(metrics: dict, mode: str, out: Path) -> str:
         f"# P1 — 분류 모델 평가 리포트 ({mode})",
         "",
         f"- **eval_type**: `{eval_type}`{filter_note} — {eval_note}",
-        f"- **판정**: {verdict}",
+        f"- **predictor**: `{predictor}`" if predictor else "",
+        f"- **판정**: {verdict} (예측기 기준 — 위 predictor 주의)",
         f"- F1-macro ≥ 0.75: {metrics['f1_macro']:.3f} ({'PASS' if f1_pass else 'FAIL'})",
         f"- FNR(특급→하위 미탐) ≤ 5%: {metrics['fnr_underclass']*100:.2f}% ({'PASS' if fnr_pass else 'FAIL'})",
         f"- Accuracy: {metrics['accuracy']:.3f} (n={metrics['n']})",

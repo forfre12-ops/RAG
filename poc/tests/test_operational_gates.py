@@ -77,6 +77,83 @@ def test_operational_readiness_blocks_when_human_review_below_minimum(tmp_path, 
     assert payload["release_gate_policy"]["min_human_review"] == 40
 
 
+def _readiness_argv(tmp_path, gold, **extra):
+    _write_json(
+        tmp_path / "p1_public.json",
+        {"metrics": {"f1_macro": 0.83, "fnr_underclass": 0.0, "high_risk_to_s3": 0}},
+    )
+    _write_json(tmp_path / "p1_llm.json", {"metrics": {"f1_macro": 0.55, "high_risk_to_s3": 17}})
+    _write_json(
+        tmp_path / "p2.json",
+        {
+            "best_config": {
+                "label": "KURE / es / hybrid",
+                "latency_ms_p50": 174,
+                "retrieval_metrics": {"recall_at_k": 0.925, "mrr": 0.842, "ndcg_at_k": 0.862},
+            }
+        },
+    )
+    retrieval = tmp_path / "retrieval_gold.jsonl"
+    retrieval.write_text(
+        "\n".join(json.dumps({"source": "oss_eval_doc_id"}) for _ in range(80)) + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "readiness.md"
+    argv = [
+        "build_operational_readiness.py",
+        "--p1-public", str(tmp_path / "p1_public.json"),
+        "--p1-llm", str(tmp_path / "p1_llm.json"),
+        "--p2", str(tmp_path / "p2.json"),
+        "--gold", str(gold),
+        "--retrieval-gold", str(retrieval),
+        "--out", str(out),
+        "--min-human-review", "40",
+    ]
+    for k, v in extra.items():
+        argv += [k, v]
+    monkeypatch_argv = argv
+    return monkeypatch_argv, out
+
+
+def _gold_with_human_review(tmp_path, n_underclass: int):
+    """700 records: 40 human_review (n_underclass of them high-risk -> S3), rest public."""
+    lines = []
+    for i in range(40):
+        if i < n_underclass:
+            rec = {"label": "S2", "model_label": "S3", "label_source": "human_review"}
+        else:
+            rec = {"label": "S3", "model_label": "S3", "label_source": "human_review"}
+        lines.append(json.dumps(rec))
+    for _ in range(660):
+        lines.append(json.dumps({"label": "S3", "label_source": "public_definitive"}))
+    gold = tmp_path / "classification_gold.jsonl"
+    gold.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return gold
+
+
+def test_human_review_gate_fails_when_underclass_exceeds_threshold(tmp_path, monkeypatch):
+    # 2 high-risk (label S2) records, both predicted S3 -> underclass rate 1.0 > 0.10.
+    gold = _gold_with_human_review(tmp_path, n_underclass=2)
+    argv, out = _readiness_argv(tmp_path, gold)
+    monkeypatch.setattr("sys.argv", argv)
+    assert build_operational_readiness.main() == 1  # FAIL verdict -> non-zero exit
+    payload = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+    hr_gate = next(g for g in payload["gates"] if g["name"] == "human review gold")
+    assert hr_gate["status"] == "FAIL"
+    assert payload["verdict"] == "FAIL"
+
+
+def test_human_review_gate_passes_with_clean_labels(tmp_path, monkeypatch):
+    gold = _gold_with_human_review(tmp_path, n_underclass=0)
+    argv, out = _readiness_argv(tmp_path, gold)
+    monkeypatch.setattr("sys.argv", argv)
+    assert build_operational_readiness.main() == 0
+    payload = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+    hr_gate = next(g for g in payload["gates"] if g["name"] == "human review gold")
+    assert hr_gate["status"] == "PASS"
+    assert payload["verdict"] == "PASS"
+
+
 def test_release_gate_requires_every_gate_to_pass(tmp_path, monkeypatch):
     readiness = tmp_path / "readiness.json"
     readiness.write_text(

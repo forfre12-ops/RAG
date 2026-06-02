@@ -113,8 +113,39 @@ def validate_record(row: dict, idx: int) -> tuple[dict | None, list[str]]:
     }, []
 
 
+def _to_gold_record(r: dict, base: dict | None = None) -> dict:
+    """Build a human_review gold record, preserving fields of an existing
+    record when promoting a pseudo-labeled doc."""
+    rec = dict(base) if base else {}
+    rec.update({
+        "doc_id":         r["doc_id"],
+        "text":           r["text"] or rec.get("text", ""),
+        "label":          r["human_label"],
+        "model_label":    r["model_label"],
+        "label_source":   "human_review",
+        "reviewer_id":    r["reviewer_id"],
+        "review_status":  "accepted",
+        "source":         rec.get("source", "real_deidentified"),
+        "domain":         r.get("domain") or rec.get("domain", ""),
+        "document_type":  r.get("document_type") or rec.get("document_type", ""),
+        "evidence_spans": rec.get("evidence_spans", []),
+        "notes":          (
+            f"correction import: model={r['model_label']} → human={r['human_label']}, "
+            f"reason={r.get('reason_code','')}"
+        ),
+    })
+    return rec
+
+
 def merge_into_gold(records: list[dict], dry_run: bool) -> int:
-    """text가 있는 human_label 정정 건을 gold_real에 편입."""
+    """text가 있는 human_label 검수 건을 gold_real에 편입.
+
+    기존 doc_id(보통 llm_judge pseudo 라벨)는 SKIP하지 않고 human_review로
+    '승격'한다. 휴먼 라벨이 최상위 권위이므로 같은 문서를 사람이 검수하면
+    label_source가 human_review로 바뀌어야 readiness 게이트가 이를 인식한다.
+    (예전 append-only + SKIP 동작은 큐가 기존 gold 문서로 구성되는 탓에
+    human_review 레코드를 0건만 만들어 게이트가 영원히 BLOCKED였다.)
+    """
     mergeable = [
         r for r in records
         if r.get("text") and r.get("review_decision") in ("correct", "corrected")
@@ -123,45 +154,26 @@ def merge_into_gold(records: list[dict], dry_run: bool) -> int:
         print("[INFO] gold_real 편입 가능 건 없음 (text 필드 필요)")
         return 0
 
-    existing_ids: set[str] = set()
-    if GOLD_REAL_PATH.exists():
-        for rec in _load_jsonl(GOLD_REAL_PATH):
-            if rec.get("doc_id"):
-                existing_ids.add(rec["doc_id"])
+    existing = _load_jsonl(GOLD_REAL_PATH) if GOLD_REAL_PATH.exists() else []
+    index = {rec["doc_id"]: i for i, rec in enumerate(existing) if rec.get("doc_id")}
 
-    new_gold: list[dict] = []
+    promoted = added = 0
     for r in mergeable:
-        if r["doc_id"] in existing_ids:
-            print(f"[SKIP] 이미 gold_real 존재: {r['doc_id']}")
-            continue
-        new_gold.append({
-            "doc_id":         r["doc_id"],
-            "text":           r["text"],
-            "label":          r["human_label"],
-            "label_source":   "human_review",
-            "reviewer_id":    r["reviewer_id"],
-            "review_status":  "accepted",
-            "source":         "real_deidentified",
-            "domain":         r.get("domain", ""),
-            "document_type":  r.get("document_type", ""),
-            "evidence_spans": [],
-            "notes":          (
-                f"correction import: model={r['model_label']} → human={r['human_label']}, "
-                f"reason={r.get('reason_code','')}"
-            ),
-        })
+        if r["doc_id"] in index:
+            i = index[r["doc_id"]]
+            existing[i] = _to_gold_record(r, base=existing[i])
+            promoted += 1
+        else:
+            existing.append(_to_gold_record(r))
+            added += 1
 
     if dry_run:
-        print(f"[DRY-RUN] gold_real 편입 예정: {len(new_gold)}건")
-        return len(new_gold)
+        print(f"[DRY-RUN] gold_real human_review 승격 {promoted}건, 신규 {added}건")
+        return promoted + added
 
-    if new_gold:
-        with open(GOLD_REAL_PATH, "a", encoding="utf-8") as f:
-            for rec in new_gold:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        print(f"[OK] gold_real에 {len(new_gold)}건 편입 (human_review)")
-
-    return len(new_gold)
+    _save_jsonl(GOLD_REAL_PATH, existing)
+    print(f"[OK] gold_real human_review: 승격 {promoted}건, 신규 {added}건 (총 {len(existing)}건)")
+    return promoted + added
 
 
 def _doc_id_to_uuid(doc_id: str) -> uuid.UUID:
