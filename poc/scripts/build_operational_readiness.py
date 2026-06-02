@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -188,6 +189,33 @@ def _data_gates(
     }
 
 
+def _norm_model(p: str) -> str:
+    return (p or "").replace("\\", "/").strip().rstrip("/")
+
+
+def _model_parity_gate(evaluated: str, deployed: str) -> Gate:
+    """The F1/FNR gates describe the *evaluated* model. If the *deployed* model
+    (CLASSIFIER_MODEL_DIR) differs, those numbers do not describe what is live —
+    so readiness cannot be claimed on them. BLOCKED until the deploy is promoted.
+    """
+    ev, dp = _norm_model(evaluated), _norm_model(deployed)
+    if not dp:
+        return Gate(
+            "model parity",
+            "BLOCKED",
+            f"deployed model unknown (CLASSIFIER_MODEL_DIR unset); evaluated={ev}. "
+            "Cannot confirm the gated metrics describe the live model.",
+        )
+    if ev == dp:
+        return Gate("model parity", "PASS", f"deployed == evaluated ({ev})")
+    return Gate(
+        "model parity",
+        "BLOCKED",
+        f"deployed={dp} != evaluated={ev}; F1/FNR gates describe the evaluated model, "
+        "not what is live. Promote CLASSIFIER_MODEL_DIR before release.",
+    )
+
+
 def _overall(gates: list[Gate]) -> str:
     if any(g.status == "FAIL" for g in gates):
         return "FAIL"
@@ -203,7 +231,8 @@ def _write_md(payload: dict, out: Path) -> None:
         "",
         f"- Verdict: **{payload['verdict']}**",
         f"- Generated at: `{payload['generated_at']}`",
-        f"- Current model: `{payload['current_model']}`",
+        f"- Evaluated model: `{payload['evaluated_model']}`",
+        f"- Deployed model: `{payload['deployed_model']}`",
         f"- Retrieval config: `{payload['retrieval_config']}`",
         "",
         "## Gates",
@@ -244,7 +273,10 @@ def main() -> int:
     ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v3/v-3443785f")
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v3/v-3443785f",
+                    help="evaluated model — the one the F1/FNR reports describe")
+    ap.add_argument("--deployed-model", default=os.environ.get("CLASSIFIER_MODEL_DIR", ""),
+                    help="live deployment model (defaults to CLASSIFIER_MODEL_DIR env)")
     ap.add_argument("--out", default="reports/operational_readiness.md")
     ap.add_argument("--min-human-review", type=int, default=40)
     ap.add_argument("--max-high-risk-underclass", type=float, default=0.10)
@@ -259,7 +291,8 @@ def main() -> int:
         args.max_high_risk_underclass,
     )
 
-    gate_objects = [p1_gate, p2_gate, *data_gates]
+    parity_gate = _model_parity_gate(args.model_dir, args.deployed_model)
+    gate_objects = [p1_gate, p2_gate, *data_gates, parity_gate]
     public_f1 = p1_payload.get("public", {}).get("f1_macro", 0)
     pseudo_f1 = p1_payload.get("llm_pseudo", {}).get("f1_macro", 0)
     known_limitations = [
@@ -275,6 +308,8 @@ def main() -> int:
         "use reports/p1_v3_*_gold_direct.* (eval_p1_model_gold.py) for the trained model.",
         "Operational cost of the over-classification (S3 docs flagged as S1/S2 -> reviewer false-positive load) "
         "is not yet quantified; defer until real human_review labels exist.",
+        f"Evaluated model ({_norm_model(args.model_dir)}) may differ from the live deployment "
+        f"({_norm_model(args.deployed_model) or 'unknown'}); the 'model parity' gate blocks release until they match.",
     ]
     next_actions = [
         f"Collect at least {args.min_human_review} human_review gold samples; this is the only blocked readiness gate.",
@@ -289,7 +324,8 @@ def main() -> int:
     payload = {
         "generated_at": "2026-06-02",
         "verdict": _overall(gate_objects),
-        "current_model": args.model_dir,
+        "evaluated_model": _norm_model(args.model_dir),
+        "deployed_model": _norm_model(args.deployed_model) or "unknown",
         "retrieval_config": "KURE-v1 + Elasticsearch hybrid + chunk=1200/overlap=100",
         "release_gate_policy": {
             "min_human_review": args.min_human_review,

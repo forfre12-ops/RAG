@@ -108,6 +108,9 @@ def _readiness_argv(tmp_path, gold, **extra):
         "--retrieval-gold", str(retrieval),
         "--out", str(out),
         "--min-human-review", "40",
+        # parity gate: default evaluated == deployed so it PASSes unless a test overrides
+        "--model-dir", "m-eval",
+        "--deployed-model", "m-eval",
     ]
     for k, v in extra.items():
         argv += [k, v]
@@ -152,6 +155,20 @@ def test_human_review_gate_passes_with_clean_labels(tmp_path, monkeypatch):
     hr_gate = next(g for g in payload["gates"] if g["name"] == "human review gold")
     assert hr_gate["status"] == "PASS"
     assert payload["verdict"] == "PASS"
+
+
+def test_model_parity_gate_blocks_when_deployed_differs(tmp_path, monkeypatch):
+    gold = _gold_with_human_review(tmp_path, n_underclass=0)  # clean human-review
+    argv, out = _readiness_argv(tmp_path, gold, **{"--deployed-model": "m-other"})
+    monkeypatch.setattr("sys.argv", argv)
+    build_operational_readiness.main()
+    payload = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+    parity = next(g for g in payload["gates"] if g["name"] == "model parity")
+    assert parity["status"] == "BLOCKED"
+    # otherwise-clean readiness drops to CONDITIONALLY_READY purely on parity
+    assert payload["verdict"] == "CONDITIONALLY_READY"
+    assert payload["deployed_model"] == "m-other"
+    assert payload["evaluated_model"] == "m-eval"
 
 
 def test_release_gate_requires_every_gate_to_pass(tmp_path, monkeypatch):
