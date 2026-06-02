@@ -40,6 +40,10 @@ class DocumentUploadResponse(BaseModel):
     chunk_count: int
     persisted: bool
     warnings: list[str]
+    # index_for_rag=true 일 때만 채워짐 — 업로드 문서를 RAG 검색 대상으로 적재한 결과
+    rag_indexed: bool = False
+    rag_collection: Optional[str] = None
+    rag_vector_count: int = 0
 
 
 @router.post("/documents", response_model=DocumentUploadResponse, status_code=201)
@@ -47,6 +51,8 @@ async def upload_document(
     actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
     doc_type: Optional[str] = Form(default=None),
     external_ref: Optional[str] = Form(default=None, description="외부 문서 ID (EDMS 등)"),
+    index_for_rag: bool = Form(default=False, description="True면 업로드 문서를 RAG 검색 컬렉션에도 적재"),
+    rag_namespace: Optional[str] = Form(default=None, description="RAG 적재 컬렉션(미지정 시 settings.rag_upload_collection)"),
     file: UploadFile = File(...),
     svc: DocumentIngestionService = Depends(_get_ingestion_service),
 ):
@@ -90,6 +96,17 @@ async def upload_document(
         created_by=actor_obj.user_id,
     )
 
+    rag_indexed = False
+    rag_collection: Optional[str] = None
+    rag_vector_count = 0
+    if index_for_rag and result.persisted and result.doc_id is not None:
+        rag_collection = (rag_namespace or "").strip() or getattr(
+            settings, "rag_upload_collection", "uploads"
+        )
+        rag_indexed, rag_vector_count = _index_uploaded_doc(
+            result.doc_id, tenant_id, rag_collection, result.warnings
+        )
+
     return DocumentUploadResponse(
         doc_id=(str(result.doc_id) if result.doc_id is not None else None),
         filename=result.filename,
@@ -103,4 +120,33 @@ async def upload_document(
         chunk_count=result.chunk_count,
         persisted=result.persisted,
         warnings=result.warnings,
+        rag_indexed=rag_indexed,
+        rag_collection=rag_collection if rag_indexed else None,
+        rag_vector_count=rag_vector_count,
     )
+
+
+def _index_uploaded_doc(
+    doc_id, tenant_id: str, collection: str, warnings: list[str]
+) -> tuple[bool, int]:
+    """업로드된 문서의 DB chunks를 RAG 검색 컬렉션에 적재. 실패는 warnings에 누적."""
+    try:
+        from lloydk.db import SessionLocal  # noqa: PLC0415
+        from lloydk.rag.document_indexer import index_document_for_rag  # noqa: PLC0415
+        from lloydk.repositories.chunk_repo import ChunkRepo  # noqa: PLC0415
+
+        db = SessionLocal()
+        try:
+            rows = ChunkRepo(db).get_by_doc_id(doc_id, tenant_id)
+            chunks = [(c.chunk_index, c.content) for c in rows]
+        finally:
+            db.close()
+
+        res = index_document_for_rag(
+            doc_id=str(doc_id), tenant_id=tenant_id, collection=collection, chunks=chunks
+        )
+        warnings.extend(f"rag-index: {w}" for w in res.warnings)
+        return res.indexed, res.vector_count
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"rag-index failed: {type(exc).__name__}: {exc}")
+        return False, 0
