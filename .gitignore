@@ -97,3 +97,6 @@ doc/temp_pptx.zip
 doc/temp_pptx/
 doc/temp_xlsx.zip
 doc/temp_xlsx/
+
+# 재현 가능한 미배포 애블레이션 (relabel_public_to_s3.py로 재생성)
+poc/datasets/labeled_p1_retrain_v4_relabel/train.jsonl

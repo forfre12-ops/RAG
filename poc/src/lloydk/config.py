@@ -191,13 +191,16 @@ class Settings(BaseSettings):
     # 임계 수치 자체의 정밀 튜닝은 운영 human_review 라벨 누적 후 PR곡선으로 조정.
     review_confidence_threshold: float = 0.7
 
-    # Source-type prior: 판례/공개 문서 상위등급 과분류 방어 (기본 False).
-    # True면 metadata.source="판례"|"court_decision" 등 공개 문서의 상위 예측을 하향.
-    # 주의: 실제 TS 포함 판례 문서도 내려갈 수 있음 — FNR 위험 존재.
-    # 운영 데이터로 검증 후 활성화 권장 (reports/p1_*_source_prior_* 측정).
-    source_prior_enabled: bool = False
-    # cap 레벨: "S2"(TS/S1만 하향, 안전) | "S3"(TS/S1/S2 하향, S3 과분류 완전완화·FNR 위험 큼).
-    source_prior_cap_grade: str = "S2"
+    # Source-type prior = 비공지성 게이트 (Gate 1). doc/22 §4.0 · doc/32 §2.
+    # 이미 공개된 출처(판례·공시·보도자료 등)의 문서는 내용과 무관하게 S3 — 부정경쟁방지법
+    # §2.2 비공지성 미충족 → 영업비밀 불성립. 가중합(내용) 결과를 게이트가 덮어쓴다.
+    # 실측 근거: 게이트 미적용 시 진짜 공개판례의 85%가 비밀로 과분류(reports/p1_real_public_fpr).
+    # 이 게이트는 metadata.source가 공개 출처일 때만 발동하므로 비공개(내부) 문서의 고위험
+    # 탐지는 전혀 건드리지 않는다(데이터 재라벨과 달리 FNR 트레이드오프 없음).
+    # 유일한 실제 위험은 출처 메타데이터 무결성(비밀을 공개 출처로 오태깅) — ML이 아닌 ingest 책임.
+    source_prior_enabled: bool = True
+    # cap 레벨: "S3"(공개=S3 강제, 법리 정합·권장) | "S2"(부분완화, TS/S1만 하향 — 레거시).
+    source_prior_cap_grade: str = "S3"
 
     embedding_model: str = "nlpai-lab/KURE-v1"
 

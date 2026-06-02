@@ -1,0 +1,23 @@
+{
+  "purpose": "v4_clean train with real published rulings relabeled TS/S1/S2 -> S3 (provenance/non-publicity gate at data level). doc/32 step 1.",
+  "source_train": "datasets/labeled_p1_retrain_v4_clean/train.jsonl",
+  "rows": 5911,
+  "flipped_to_s3": {
+    "S1": 726,
+    "S2": 999,
+    "TS": 649
+  },
+  "total_flipped": 2374,
+  "label_before": {
+    "S1": 1135,
+    "S2": 1588,
+    "S3": 2092,
+    "TS": 1096
+  },
+  "label_after": {
+    "S3": 4466,
+    "S1": 409,
+    "S2": 589,
+    "TS": 447
+  }
+}
