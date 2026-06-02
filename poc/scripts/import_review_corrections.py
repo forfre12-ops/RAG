@@ -132,6 +132,7 @@ def _to_gold_record(r: dict, base: dict | None = None) -> dict:
         "notes":          (
             f"correction import: model={r['model_label']} → human={r['human_label']}, "
             f"reason={r.get('reason_code','')}"
+            + (f" | {r['reason_text']}" if r.get("reason_text") else "")
         ),
     })
     return rec
