@@ -215,13 +215,31 @@ acceptance:
         measured_ml_v3_api:    { F1: 0.561, FNR: 0.000, n: 100, note: "TS/S1/S2 R=1.00, S3 과분류" }
         measured_ml_retrain_v3_direct: { F1: 0.830, FNR_TS_S1: 0.000, n: 167, TS_S1_S2_to_S3: 0, note: "TS/S1/S2 recall all 1.00; S3 recall 0.46" }
         note: |
+          ⚠ 오염 주의: 이 167건 전부 labeled_p1_retrain_v3 학습셋에 x3 포함 → F1=0.830/FNR=0.000은 암기.
+          디오염 측정은 clean_holdout tier 참조: raw F1≈0.63 / 운영 파이프라인 FNR 2.8%(TS 100%).
           법적 근거 있는 pseudo-gold. 발주처 실문서 human_review 입수 시 자동 편입.
-          FNR=0.000: 민감 문서 미탐 없음 (보안 시스템 핵심 지표 충족).
       in_distribution:
         eval_type: oss_corpus_val
         source: labeled_oss_v1/val.jsonl (680건)
         measured_ml_v3: { F1: 0.774, FNR: 0.225 }
         note: "in-distribution PASS 기준(0.75) 충족."
+      clean_holdout:
+        eval_type: decontaminated_holdout
+        source: gold_real/holdout_eval.jsonl (109건, gold_real에서 층화 분리, 학습셋과 누수 0 검증)
+        builder: scripts/build_p1_holdout_split.py
+        contamination_warning: |
+          ⚠ 위 llm_judge_gold / human_review_gold tier 수치(0.547 / 0.830)는 train-on-test 오염이다.
+          gold_real 777건 전체가 labeled_p1_retrain_v3 학습셋에 x3 반복 포함됐고,
+          그 중 343건(44.1%)은 oss_train에도 중복 존재한다. 즉 평가 문서를 학습에서 본 암기 점수.
+        measured_v3_contaminated:   { F1_all: 0.894, F1_legal: 0.938, F1_llm: 0.789, FNR: 0.000, note: "구 v3 모델 — 이 109건을 x3 학습. 암기 베이스라인." }
+        measured_v4_clean_raw:      { F1_all: 0.632, F1_legal: 0.684, F1_llm: 0.535, FNR: 0.167, high_risk_to_s3: 6, S1_recall: 0.316, model: artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9, note: "홀드아웃 제외 재학습, raw 모델 직접추론 — 진짜 일반화." }
+        measured_v4_clean_apilike:  { F1_all: 0.694, FNR: 0.028, high_risk_to_s3: 1, TS_recall: 1.000, S1_recall: 0.526, TS_precision: 0.531, note: "★ release 판단 지표. 운영 파이프라인(source_prior+FNR-safe 게이트). TS 전건 검출, 과분류로 미탐 차단." }
+        inflation: "raw F1 약 0.26 인플레이션. 단 운영 게이트가 FNR을 0.167→0.028로 회수(TS 100%) — 대가는 TS precision 0.53 과분류."
+        report: reports/p1_contamination_audit.md
+        verdict: "보안 축은 디오염 후에도 운영 파이프라인 기준 통과(FNR 2.8% ≤ 5%, TS recall 100%). 단 과분류=검수부하 구조이며 n=109(고위험 36) 신뢰구간 넓음. 납품 단단한 수치는 gold_real 전체 k-fold clean CV 필요."
+        note: |
+          보고 시: public_case_nkt_f1=0.830 / FNR=0.000(오염) 대신 system FNR 2.8% on clean holdout(TS 100%) 사용.
+          v4 clean의 oss in-dist test F1=0.783은 v3(0.794)와 동등 → 모델 약화가 아니라 인플레이션 제거.
       external_holdout:
         eval_type: external
         source: (미구축)
@@ -340,13 +358,20 @@ gold:
     source: oss_corpus + public_scenario + synthetic_grounded
     eval_results:
       synthetic_masked_f1: 1.000
-      llm_judge_gold_f1: 0.547
-      public_case_nkt_gold_f1: 0.830
-      public_case_nkt_fnr_ts_s1: 0.000
+      llm_judge_gold_f1: 0.547           # ⚠ train-on-test 오염 (gold_real 전체가 학습셋에 x3)
+      public_case_nkt_gold_f1: 0.830     # ⚠ 동일 오염. clean_holdout 진짜값 F1≈0.68
+      public_case_nkt_fnr_ts_s1: 0.000   # ⚠ 오염 산물. clean 측정 FNR=0.167
       public_case_nkt_ts_s1_s2_to_s3: 0
+      clean_holdout_raw_f1_all: 0.632    # 디오염 재학습 v4, raw 모델 (reports/p1_contamination_audit.md)
+      clean_holdout_raw_fnr: 0.167
+      clean_holdout_system_fnr: 0.028    # ★ 운영 파이프라인(게이트) 기준 release 지표. TS recall 100%
+      clean_holdout_system_f1_all: 0.694
     notes: |
+      ⚠ gold_real 전체(777)가 labeled_p1_retrain_v3 학습셋에 x3 포함, 343건은 oss_train에도 중복.
+      위 llm_judge_gold_f1 / public_case_nkt_gold_f1 는 평가 독립성 없음(암기). 운영 근거 금지.
+      디오염 측정은 acceptance.p1_classification.eval_tiers.clean_holdout 참조.
+      release 판단은 운영 파이프라인 기준 system FNR 2.8%(≤5% 통과, TS 100%) — 과분류 트레이드오프.
       777 records after high-risk boundary supplement. human_review=0 remains.
-      P1 retrain v3 passes the public/case/nkt gate, but strict release still requires human_review samples.
     updated_at: "2026-06-02"
   retrieval_gold:
     path: poc/datasets/gold_real/retrieval_gold.jsonl
@@ -359,3 +384,4 @@ changelog:
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }
   - { date: "2026-06-01", version: "1.1", note: "데이터 품질 복구: labeled_5k/rag_corpus_qa deprecated, gold set 신설, generator V2 프롬프트 교체" }
   - { date: "2026-06-02", version: "1.2", note: "P1 retrain v3 and P2 KURE-v1 ES hybrid gold metrics reflected; release remains blocked on human_review=0." }
+  - { date: "2026-06-02", version: "1.3", note: "오염 감사: gold_real F1(0.547/0.830)이 train-on-test임을 입증. 디오염 홀드아웃 109건+v4 재학습 → raw F1≈0.63/FNR 0.167. 단 운영 파이프라인(게이트)은 clean에서도 FNR 2.8%·TS recall 100% 유지 → 보안 축 통과. clean_holdout tier 신설. reports/p1_contamination_audit.md." }
