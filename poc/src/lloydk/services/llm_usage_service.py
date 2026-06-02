@@ -67,10 +67,36 @@ class LLMUsageService:
             except Exception as exc:  # noqa: BLE001
                 # DB 실패해도 JSONL은 남음
                 logger.warning("llm_usage DB insert failed (JSONL preserved): %s", exc)
+        self._emit_metrics(row, purpose)
         logger.info(
             "llm_usage recorded: provider=%s model=%s cost_usd=%s",
             row.get("provider"), row.get("model"), row.get("cost_usd"),
         )
+
+    @staticmethod
+    def _emit_metrics(row: dict, purpose: str) -> None:
+        """Prometheus 토큰·비용 카운터 갱신. 메트릭 실패가 비용 기록을 막지 않도록 격리."""
+        try:
+            from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                LLM_CALLS_TOTAL,
+                LLM_COST_USD_TOTAL,
+                LLM_TOKENS_TOTAL,
+            )
+            provider = row.get("provider") or "unknown"
+            model = row.get("model") or "unknown"
+            in_tok = int(row.get("input_tokens") or 0)
+            out_tok = int(row.get("output_tokens") or 0)
+            if in_tok:
+                LLM_TOKENS_TOTAL.labels(provider, model, purpose, "input").inc(in_tok)
+            if out_tok:
+                LLM_TOKENS_TOTAL.labels(provider, model, purpose, "output").inc(out_tok)
+            cost = float(row.get("cost_usd") or 0.0)
+            if cost:
+                LLM_COST_USD_TOTAL.labels(provider, model, purpose).inc(cost)
+            success = "true" if row.get("success", True) else "false"
+            LLM_CALLS_TOTAL.labels(provider, model, purpose, success).inc()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("llm_usage metric emit skipped: %s", exc)
 
     def _append_jsonl(self, row: dict) -> None:
         # JSONL은 LF 줄 끝이 표준. CRLF는 파서 호환성 문제 야기.

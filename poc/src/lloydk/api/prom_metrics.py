@@ -132,6 +132,27 @@ EMBEDDING_CACHE_MISS_TOTAL = Counter(
     registry=registry,
 )
 
+# LLM 토큰·비용 관측성 — LLMUsageService.record()가 모든 호출에서 갱신.
+# 라벨 카디널리티: provider/model/purpose는 유한 집합. tenant_id는 폭증 위험이라 제외.
+LLM_TOKENS_TOTAL = Counter(
+    "lloydk_llm_tokens_total",
+    "LLM tokens consumed",
+    ["provider", "model", "purpose", "type"],  # type: input | output
+    registry=registry,
+)
+LLM_COST_USD_TOTAL = Counter(
+    "lloydk_llm_cost_usd_total",
+    "LLM cost in USD (provider 단가표 기준 추정)",
+    ["provider", "model", "purpose"],
+    registry=registry,
+)
+LLM_CALLS_TOTAL = Counter(
+    "lloydk_llm_calls_total",
+    "LLM API calls",
+    ["provider", "model", "purpose", "success"],  # success: true | false
+    registry=registry,
+)
+
 # A4 (2026-05-29): Drift monitor — P1-B4를 운영 신호로 살리기.
 # Celery beat가 drift_tick 호출 → compute_drift() → 본 gauge에 set().
 DRIFT_KL_DIVERGENCE = Gauge(
