@@ -91,8 +91,29 @@ def _call(word: str, key: str, rows: int, page: int) -> bytes:
         return r.read()
 
 
+class KiprisApiError(RuntimeError):
+    """KIPRIS returned successYN=N (e.g. expired deadline, unregistered key)."""
+
+
+def _check_response(xml_bytes: bytes) -> None:
+    """Raise KiprisApiError if the API header reports failure (resultCode != 00)."""
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError:
+        return
+    hdr = root.find("header")
+    if hdr is None:
+        return
+    success = (hdr.findtext("successYN") or "").strip().upper()
+    code = (hdr.findtext("resultCode") or "").strip()
+    msg = (hdr.findtext("resultMsg") or "").strip()
+    if success == "N" or (code and code not in ("00", "0", "")):
+        raise KiprisApiError(f"resultCode={code} {msg}")
+
+
 def _parse_items(xml_bytes: bytes) -> list[dict]:
     """Extract title + abstract + application number from a getWordSearch response."""
+    _check_response(xml_bytes)
     out = []
     try:
         root = ET.fromstring(xml_bytes)
