@@ -168,7 +168,14 @@ class InferencePipeline:
             from lloydk.config import settings as _s  # noqa: PLC0415
             if getattr(_s, "source_prior_enabled", False) and metadata:
                 src = metadata.get("source_type", "") or metadata.get("source", "")
-                _PUBLIC_SOURCES = {"court_decision", "판례", "public_disclosure", "공시", "채용공고", "보도자료"}
+                # 공개 출처 = 비공지성 실패(이미 공개됨) → S3 cap. 공개특허/등록특허/공보는
+                # '공개를 택한' 문서라 doc/32 §3 설계대로 게이트가 S3로 cap해야 한다
+                # (콘텐츠 모델은 기술내용을 고등급으로 보지만 provenance가 공개라 영업비밀 불성립).
+                # 정밀 토큰만 등록 — bare "특허"는 내부 '특허전략' 문서를 오인 cap(FNR)할 수 있어 제외.
+                _PUBLIC_SOURCES = {
+                    "court_decision", "판례", "public_disclosure", "공시", "채용공고", "보도자료",
+                    "공개특허", "등록특허", "공개공보", "특허공보", "published_patent",
+                }
                 if any(s in str(src) for s in _PUBLIC_SOURCES):
                     _GRADE_ORDER_LOCAL = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
                     cap_code = (getattr(_s, "source_prior_cap_grade", "S2") or "S2").upper()
