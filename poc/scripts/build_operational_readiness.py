@@ -270,12 +270,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     # 2026-06-03: 디오염 홀드아웃 기준으로 전환. v3 public/llm gold 리포트는 train-on-test
     # 오염(0.830은 암기)이라 폐기. P1 게이트는 cost2의 정직 홀드아웃 평가를 읽는다.
-    ap.add_argument("--p1-public", default="reports/p1_cost2_holdout_direct.json")
-    ap.add_argument("--p1-llm", default="reports/p1_cost2_holdout_direct.json")
+    ap.add_argument("--p1-public", default="reports/p1_step3_holdout_direct.json")
+    ap.add_argument("--p1-llm", default="reports/p1_step3_holdout_direct.json")
     ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_cost2/v-437ec196",
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb",
                     help="evaluated model — the one the F1/FNR reports describe")
     ap.add_argument("--deployed-model", default=os.environ.get("CLASSIFIER_MODEL_DIR", ""),
                     help="live deployment model (defaults to CLASSIFIER_MODEL_DIR env)")
@@ -349,6 +349,15 @@ def main() -> int:
         "DONE 2026-06-03: deployed model promoted v3 -> v4_cost2 (honest holdout). P1 gate now reads "
         "the de-contaminated holdout (F1 0.634 < 0.75) instead of v3's contaminated 0.830 — readiness "
         "honestly FAILs P1. Real fix is diverse S1 data, not a model swap (threshold/cost already tapped out).",
+        "DONE 2026-06-03 (step3): promoted v4_cost2 -> v4_step3. Added REAL patent content "
+        "(AIHub national-key-tech -> TS/S1) + a mundane admin-doc S3 corpus, fixing the dominant "
+        "failure: over-classification of routine internal docs. On a clean hand-written OOD set, "
+        "mundane over-classification dropped 93% -> 0% with secret-miss still 0; real-data signals "
+        "hold (patent high-grade recall 1.0, public-ruling over-class 0.002). P1 gate still FAILs on "
+        "the gold_real holdout (F1 0.635, FNR 0.361), but all 15 high->S3 'misses' are llm_judge-"
+        "mislabeled public court/market text that step3 correctly downgrades (legally_grounded "
+        "high->S3 = 0) -- FNR inflated by ~47% pseudo-label noise, not real regression. Remaining: "
+        "real S2 data (0 examples; DART path) and deployment recall (structurally unmeasurable).",
         "Run p2-full-gold after every ES reindex or embedding-model change.",
     ]
     payload = {
