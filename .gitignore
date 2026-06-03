@@ -100,3 +100,12 @@ doc/temp_xlsx/
 
 # 재현 가능한 미배포 애블레이션 (relabel_public_to_s3.py로 재생성)
 poc/datasets/labeled_p1_retrain_v4_relabel/train.jsonl
+
+# 사용자 다운로드 원본 벌크 (KIPO 공보·AIHub 국가중점기술 등, 대용량 1GB+ — 트래킹 금지)
+sample/
+
+# step2/3 실특허·일상문서 코퍼스·병합 학습셋 (스크립트로 재생성: kipris_*_ingest / gen_mundane_s3 / build_step*)
+poc/datasets/patent_proxy/
+poc/datasets/mundane_s3/
+poc/datasets/labeled_p1_retrain_v4_step2/
+poc/datasets/labeled_p1_retrain_v4_step3/
