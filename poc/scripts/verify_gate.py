@@ -1,6 +1,6 @@
 """Quick verification of the provenance (non-publicity) gate, Gate 1.
 
-Runs the SAME content model (cost2) on real published rulings two ways:
+Runs the SAME deployed content model (.env CLASSIFIER_MODEL_DIR) on real published rulings two ways:
   - WITHOUT source metadata  -> raw content model (expected: over-classifies)
   - WITH source="판례"        -> gate caps public-source docs to S3
 
@@ -25,8 +25,10 @@ except (AttributeError, ValueError):
     pass
 
 from lloydk.modules.m5_inference.pipeline import InferencePipeline  # noqa: E402
+from lloydk.config import settings as _settings  # noqa: E402
 
-MODEL = "artifacts/classifier_p1_retrain_v4_cost2/v-437ec196"
+# 게이트는 '실제 배포 중인' 콘텐츠 모델로 검증해야 의미 있음 = .env CLASSIFIER_MODEL_DIR.
+MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb"
 PREC = {"판례", "판례(1000+)", "판례(2000+)", "판례(3000+)"}
 
 

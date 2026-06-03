@@ -35,6 +35,10 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from eval_p1_model_gold import compute_metrics, predict_direct  # noqa: E402
+from lloydk.config import settings as _settings  # noqa: E402
+
+# 배포 모델 단일 진실원 = .env CLASSIFIER_MODEL_DIR (버전 하드코딩 드리프트 방지).
+_DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb"
 
 LEGAL = {"public_definitive", "koipa_case_based", "nkt_designated"}
 LLMJ = {"llm_judge_primary", "llm_judge_consensus", "codex_review"}
@@ -113,7 +117,7 @@ def _fmt(ci: dict) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_cost2/v-437ec196")
+    ap.add_argument("--model-dir", default=_DEPLOYED_MODEL)
     ap.add_argument("--holdout", default="datasets/gold_real/holdout_eval.jsonl")
     ap.add_argument("--report", default="reports/p1_trusted_ci")
     ap.add_argument("--n-boot", type=int, default=5000)

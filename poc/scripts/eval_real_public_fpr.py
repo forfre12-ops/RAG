@@ -41,6 +41,10 @@ except (AttributeError, ValueError):
     pass
 
 from eval_p1_model_gold import predict_direct  # noqa: E402
+from lloydk.config import settings as _settings  # noqa: E402
+
+# 배포 모델 단일 진실원 = .env CLASSIFIER_MODEL_DIR. 버전 문자열 하드코딩이 드리프트 원인이라 제거.
+_DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb"
 
 LABELS = ("TS", "S1", "S2", "S3")
 PREC_SOURCES = {"판례", "판례(1000+)", "판례(2000+)", "판례(3000+)"}
@@ -83,7 +87,7 @@ def _bootstrap_ci(flags: list[int], n_boot: int, rng: random.Random) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_cost2/v-437ec196")
+    ap.add_argument("--model-dir", default=_DEPLOYED_MODEL)
     ap.add_argument("--oss-dir", default="datasets/oss_corpus")
     ap.add_argument("--train", default="datasets/labeled_p1_retrain_v4_clean/train.jsonl")
     ap.add_argument("--report", default="reports/p1_real_public_fpr")
