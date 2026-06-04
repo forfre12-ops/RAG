@@ -1,4 +1,4 @@
-"""M2 Preprocess — HWP/DOCX/PDF 추출 + 정규화 + 청크 (FUN-022)."""
+"""M2 Preprocess — HWP/DOCX/XLSX/PDF 추출 + 정규화 + 청크 (FUN-022)."""
 
 from lloydk.modules.m2_preprocess.chunker import Chunk, split, split_v2
 from lloydk.modules.m2_preprocess.extractor import ExtractResult, extract

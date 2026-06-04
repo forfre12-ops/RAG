@@ -52,6 +52,8 @@ def extract(path: str | Path) -> ExtractResult:
         return _extract_hwp(p)
     if suffix in ("docx",):
         return _extract_docx(p)
+    if suffix in ("xlsx", "xlsm", "xls"):
+        return _extract_excel(p)
     if suffix in ("pdf",):
         return _extract_pdf(p)
     if suffix in ("jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"):
@@ -99,6 +101,55 @@ def _extract_docx(p: Path) -> ExtractResult:
         return ExtractResult(text="\n".join(parts), method="parser", quality=0.97)
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="parser", quality=0.0, error=str(exc))
+
+
+def _extract_excel(p: Path) -> ExtractResult:
+    """Excel(.xlsx/.xlsm/.xls) → 시트별 행을 텍스트로.
+
+    표 구조는 셀을 ' | '로 잇고 시트마다 '[sheet: 이름]' 헤더를 붙인다(DOCX 표와 동일 방식).
+    .xlsx/.xlsm은 openpyxl(read_only·data_only=수식 대신 값), .xls는 xlrd(설치 시).
+    라이브러리 미설치/파싱 실패는 graceful degrade — 빈 텍스트 + error.
+    """
+    suffix = p.suffix.lower().lstrip(".")
+    if suffix in ("xlsx", "xlsm"):
+        try:
+            from openpyxl import load_workbook  # type: ignore
+        except ImportError as exc:
+            return ExtractResult(text="", method="openpyxl", quality=0.0,
+                                 error=f"openpyxl not installed: {exc}")
+        try:
+            wb = load_workbook(str(p), read_only=True, data_only=True)
+        except Exception as exc:  # noqa: BLE001
+            return ExtractResult(text="", method="openpyxl", quality=0.0, error=str(exc))
+        parts: list[str] = []
+        for ws in wb.worksheets:
+            parts.append(f"[sheet: {ws.title}]")
+            for row in ws.iter_rows(values_only=True):
+                cells = [str(c) for c in row if c is not None and str(c).strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+        wb.close()
+        return ExtractResult(text="\n".join(parts), method="openpyxl", quality=0.95)
+
+    # .xls (구형 바이너리) — openpyxl 미지원이라 xlrd 필요. 미설치 시 변환 안내.
+    try:
+        import xlrd  # type: ignore
+    except ImportError as exc:
+        return ExtractResult(text="", method="xlrd", quality=0.0,
+                             error=f".xls requires xlrd (or convert to .xlsx): {exc}")
+    try:
+        book = xlrd.open_workbook(str(p))
+    except Exception as exc:  # noqa: BLE001
+        return ExtractResult(text="", method="xlrd", quality=0.0, error=str(exc))
+    parts = []
+    for sh in book.sheets():
+        parts.append(f"[sheet: {sh.name}]")
+        for r in range(sh.nrows):
+            cells = [str(sh.cell_value(r, c)).strip() for c in range(sh.ncols)]
+            cells = [c for c in cells if c]
+            if cells:
+                parts.append(" | ".join(cells))
+    return ExtractResult(text="\n".join(parts), method="xlrd", quality=0.9)
 
 
 def _extract_pdf(p: Path) -> ExtractResult:

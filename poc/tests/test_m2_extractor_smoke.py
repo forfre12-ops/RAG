@@ -127,6 +127,49 @@ class TestHwpFallback:
         assert isinstance(result, ExtractResult)
 
 
+class TestExcelExtraction:
+    """Excel(.xlsx/.xlsm/.xls) 추출 — 시트·표 셀을 텍스트로 (FUN-022 갭 보강 2026-06-05)."""
+
+    def test_xlsx_extraction_real(self, tmp_path: Path):
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "단가표"
+        ws.append(["품목", "단가"])
+        ws.append(["반도체 웨이퍼", 12000])
+        ws2 = wb.create_sheet("비고")
+        ws2.append(["기밀", "대외비"])
+        p = tmp_path / "secret.xlsx"
+        wb.save(str(p))
+
+        result = extract(p)
+        assert result.method == "openpyxl"
+        assert result.quality > 0.5
+        assert "단가표" in result.text          # 시트명 헤더
+        assert "반도체 웨이퍼" in result.text     # 셀 값
+        assert "12000" in result.text
+        assert "대외비" in result.text           # 2번째 시트도
+        assert "|" in result.text                # 표 셀 구분자
+
+    def test_xlsx_corrupt_graceful(self, tmp_path: Path):
+        p = tmp_path / "fake.xlsx"
+        p.write_bytes(b"not a real xlsx")
+        result = extract(p)
+        assert isinstance(result, ExtractResult)
+        assert result.quality == 0.0
+        assert result.error is not None
+
+    def test_xls_graceful_degrade(self, tmp_path: Path):
+        """구형 .xls — xlrd 있으면 파싱 시도(에러), 없으면 변환 안내. 둘 다 graceful."""
+        p = tmp_path / "old.xls"
+        p.write_bytes(b"\xd0\xcf\x11\xe0not a real xls")
+        result = extract(p)
+        assert isinstance(result, ExtractResult)
+        assert result.quality == 0.0
+        assert result.error is not None
+
+
 class TestStringPath:
     def test_accepts_string_path(self, tmp_path: Path):
         """extract()는 str·Path 둘 다 받음."""

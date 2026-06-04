@@ -47,6 +47,7 @@ dependencies = [
   # PyMuPDF는 AGPL-3.0 — 기본에서 제외, 선택 extra `[pdf-agpl]`로 옵트인.
   # 운영 기본은 pdfminer.six(BSD-3). doc/14 §5.1 참조.
   "python-docx>=1.1",
+  "openpyxl>=3.1",            # W8 Excel(.xlsx/.xlsm) 추출 (MIT). 구형 .xls는 xlrd 필요(선택).
 
   # 유틸
   "pyyaml>=6.0",
