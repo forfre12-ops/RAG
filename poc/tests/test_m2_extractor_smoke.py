@@ -236,6 +236,53 @@ class TestDocExtraction:
         assert result.quality > 0.5
 
 
+class TestPiiMaskingOnTables:
+    """추출된 표 셀의 PII가 마스킹되는지 — 신규 포맷(xlsx/pptx) + 보안 결합 검증.
+
+    감사(2026-06-05): 표/이미지 내 PII 마스킹 미검증. 표 셀도 추출 텍스트에 포함되므로
+    rule 마스킹이 적용됨을 end-to-end로 고정(영업비밀 시스템 — PII 누출 방지).
+    """
+
+    def test_pii_in_xlsx_cell_is_masked(self, tmp_path: Path):
+        from openpyxl import Workbook
+
+        from lloydk.modules.m2_preprocess.pii_masker import mask_pii
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["담당자", "주민번호", "연락처"])
+        ws.append(["홍길동", "900101-1234567", "010-1234-5678"])
+        p = tmp_path / "pii.xlsx"
+        wb.save(str(p))
+
+        text = extract(p).text
+        assert "900101-1234567" in text          # 추출은 원문 그대로
+        masked = mask_pii(text)
+        assert "[RRN]" in masked.text             # 주민번호 마스킹
+        assert "900101-1234567" not in masked.text
+        assert "[PHONE]" in masked.text           # 전화번호도
+        assert "010-1234-5678" not in masked.text
+
+    def test_pii_in_pptx_is_masked(self, tmp_path: Path):
+        from pptx import Presentation
+        from pptx.util import Inches
+
+        from lloydk.modules.m2_preprocess.pii_masker import mask_pii
+
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+        tb = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(5), Inches(1))
+        tb.text_frame.text = "계약 담당 이메일 secret@corp.co.kr 사업자 123-45-67890"
+        p = tmp_path / "pii.pptx"
+        prs.save(str(p))
+
+        masked = mask_pii(extract(p).text)
+        assert "[EMAIL]" in masked.text
+        assert "secret@corp.co.kr" not in masked.text
+        assert "[BIZNO]" in masked.text
+        assert "123-45-67890" not in masked.text
+
+
 class TestStringPath:
     def test_accepts_string_path(self, tmp_path: Path):
         """extract()는 str·Path 둘 다 받음."""
