@@ -48,6 +48,8 @@ dependencies = [
   # 운영 기본은 pdfminer.six(BSD-3). doc/14 §5.1 참조.
   "python-docx>=1.1",
   "openpyxl>=3.1",            # W8 Excel(.xlsx/.xlsm) 추출 (MIT). 구형 .xls는 xlrd 필요(선택).
+  "python-pptx>=0.6",         # W8 PowerPoint(.pptx/.pptm) 추출 (MIT).
+  # 구형 .doc(Word 97-2003)은 시스템 antiword CLI 필요(pip 아님). 없으면 .docx 변환 안내.
 
   # 유틸
   "pyyaml>=6.0",

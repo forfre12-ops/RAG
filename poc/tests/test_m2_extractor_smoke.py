@@ -170,6 +170,72 @@ class TestExcelExtraction:
         assert result.error is not None
 
 
+class TestPptxExtraction:
+    """PowerPoint(.pptx) 추출 — 슬라이드·도형 텍스트 (FUN-022 갭 보강 2026-06-05)."""
+
+    def test_pptx_extraction_real(self, tmp_path: Path):
+        from pptx import Presentation
+        from pptx.util import Inches
+
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        slide.shapes.title.text = "영업비밀 사업계획"
+        tb = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(4), Inches(1))
+        tb.text_frame.text = "신제품 단가 12000원 대외비"
+        p = tmp_path / "plan.pptx"
+        prs.save(str(p))
+
+        result = extract(p)
+        assert result.method == "pptx"
+        assert result.quality > 0.5
+        assert "[slide 1]" in result.text
+        assert "영업비밀 사업계획" in result.text     # 제목 도형
+        assert "대외비" in result.text                # 텍스트박스
+
+    def test_pptx_corrupt_graceful(self, tmp_path: Path):
+        p = tmp_path / "fake.pptx"
+        p.write_bytes(b"not a real pptx")
+        result = extract(p)
+        assert isinstance(result, ExtractResult)
+        assert result.quality == 0.0
+        assert result.error is not None
+
+
+class TestDocExtraction:
+    """구형 .doc(Word 97-2003) — antiword CLI 경로 (FUN-022 갭 보강 2026-06-05)."""
+
+    def test_doc_without_antiword_graceful(self, tmp_path: Path, monkeypatch):
+        import shutil
+
+        monkeypatch.setattr(shutil, "which", lambda name: None)
+        p = tmp_path / "old.doc"
+        p.write_bytes(b"\xd0\xcf\x11\xe0fake doc")
+        result = extract(p)
+        assert result.method == "antiword"
+        assert result.quality == 0.0
+        assert "antiword" in (result.error or "") or "docx" in (result.error or "")
+
+    def test_doc_routes_to_antiword(self, tmp_path: Path, monkeypatch):
+        """.doc는 antiword 경로 — subprocess 모킹으로 추출 배선 검증."""
+        import shutil
+        import subprocess
+        from types import SimpleNamespace
+
+        monkeypatch.setattr(shutil, "which", lambda name: "antiword")
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda args, **kw: SimpleNamespace(
+                returncode=0, stdout="구형 워드 본문 영업비밀 단가표".encode("utf-8"), stderr=b""
+            ),
+        )
+        p = tmp_path / "old.doc"
+        p.write_bytes(b"\xd0\xcf\x11\xe0fake")
+        result = extract(p)
+        assert result.method == "antiword"
+        assert "영업비밀" in result.text
+        assert result.quality > 0.5
+
+
 class TestStringPath:
     def test_accepts_string_path(self, tmp_path: Path):
         """extract()는 str·Path 둘 다 받음."""

@@ -52,8 +52,12 @@ def extract(path: str | Path) -> ExtractResult:
         return _extract_hwp(p)
     if suffix in ("docx",):
         return _extract_docx(p)
+    if suffix in ("doc",):
+        return _extract_doc(p)
     if suffix in ("xlsx", "xlsm", "xls"):
         return _extract_excel(p)
+    if suffix in ("pptx", "pptm"):
+        return _extract_pptx(p)
     if suffix in ("pdf",):
         return _extract_pdf(p)
     if suffix in ("jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"):
@@ -151,6 +155,70 @@ def _extract_excel(p: Path) -> ExtractResult:
             if cells:
                 parts.append(" | ".join(cells))
     return ExtractResult(text="\n".join(parts), method="xlrd", quality=0.9)
+
+
+def _extract_doc(p: Path) -> ExtractResult:
+    """구형 .doc(Word 97-2003) → antiword CLI 추출.
+
+    python-docx는 .docx(OOXML) 전용이라 .doc 바이너리는 못 읽는다. 시스템에 antiword가
+    있으면 그것으로 텍스트 추출, 없으면 graceful degrade(.docx 변환 안내).
+    한국어는 antiword 매핑 의존 — UTF-8 매핑(-m UTF-8.txt) 우선 시도 후 기본.
+    """
+    import shutil
+    import subprocess
+
+    exe = shutil.which("antiword")
+    if not exe:
+        return ExtractResult(
+            text="", method="antiword", quality=0.0,
+            error=".doc 추출에는 antiword 필요 (또는 .docx로 변환)",
+        )
+    out = None
+    for args in ([exe, "-m", "UTF-8.txt", str(p)], [exe, str(p)]):
+        try:
+            out = subprocess.run(args, capture_output=True, timeout=60)
+        except Exception as exc:  # noqa: BLE001
+            return ExtractResult(text="", method="antiword", quality=0.0, error=str(exc))
+        if out.returncode == 0 and out.stdout.strip():
+            return ExtractResult(
+                text=out.stdout.decode("utf-8", errors="replace"),
+                method="antiword", quality=0.9,
+            )
+    err = (out.stderr.decode("utf-8", errors="replace") if out and out.stderr else "")[:200]
+    return ExtractResult(text="", method="antiword", quality=0.0,
+                         error=err or "antiword: no text extracted")
+
+
+def _extract_pptx(p: Path) -> ExtractResult:
+    """PowerPoint(.pptx/.pptm) → 슬라이드별 도형 텍스트 + 표.
+
+    슬라이드마다 '[slide N]' 헤더. 텍스트 도형·표 셀을 추출(이미지/차트 제외).
+    .ppt(구형 바이너리)는 python-pptx 미지원 — 미지원 처리(변환 권장).
+    """
+    try:
+        from pptx import Presentation  # type: ignore
+    except ImportError as exc:
+        return ExtractResult(text="", method="pptx", quality=0.0,
+                             error=f"python-pptx not installed: {exc}")
+    try:
+        prs = Presentation(str(p))
+    except Exception as exc:  # noqa: BLE001
+        return ExtractResult(text="", method="pptx", quality=0.0, error=str(exc))
+    parts: list[str] = []
+    for i, slide in enumerate(prs.slides):
+        parts.append(f"[slide {i + 1}]")
+        for shape in slide.shapes:
+            if getattr(shape, "has_text_frame", False):
+                for para in shape.text_frame.paragraphs:
+                    t = "".join(r.text for r in para.runs) or para.text
+                    if t.strip():
+                        parts.append(t)
+            if getattr(shape, "has_table", False):
+                for row in shape.table.rows:
+                    cells = [c.text for c in row.cells if c.text.strip()]
+                    if cells:
+                        parts.append(" | ".join(cells))
+    return ExtractResult(text="\n".join(parts), method="pptx", quality=0.95)
 
 
 def _extract_pdf(p: Path) -> ExtractResult:
