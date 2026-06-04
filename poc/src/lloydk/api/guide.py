@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
-from lloydk.api._jwt_auth import require_auth
+from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
 from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.schemas.guide import GuideUploadResponse, GuideVersionList
@@ -18,6 +18,7 @@ router = APIRouter(tags=["guide"], dependencies=[Depends(require_auth)])
 
 @router.post("/guide/documents", response_model=GuideUploadResponse, status_code=201)
 async def upload_guide(
+    request: Request,
     guide_id: str = Form(...),
     version: str = Form(...),
     actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
@@ -53,7 +54,8 @@ async def upload_guide(
         change_summary=change_summary,
         content_bytes=body,
         actor_user_id=actor_obj.user_id,
-        tenant_id=actor_obj.tenant_id or "default",
+        # 보안: 클라이언트가 보낸 actor.tenant_id를 인증 컨텍스트에 결속(위조 차단). 불일치 시 403.
+        tenant_id=resolve_effective_tenant(request, actor_obj.tenant_id) or "default",
         doc_type=doc_type,
         filename=file.filename or f"{guide_id}.txt",
     )

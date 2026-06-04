@@ -27,6 +27,8 @@ router = APIRouter(tags=["classify"], dependencies=[Depends(require_auth)])
 @router.post("/classify/async", response_model=ClassifyAsyncResponse, status_code=202)
 @limiter.limit("60/minute")
 def classify_async(request: Request, req: ClassifyAsyncRequest):
+    # 보안: 비동기 작업도 tenant 결속 — 위조한 tenant로 분류 영속화/조회 차단.
+    req.tenant_id = resolve_effective_tenant(request, req.tenant_id)
     return AsyncClassifyService().submit_async(req)
 
 
@@ -38,6 +40,9 @@ def classify_batch(request: Request, req: ClassifyBatchRequest):
         raise HTTPException(status_code=400, detail="documents must not be empty")
     if len(req.documents) > 1000:
         raise HTTPException(status_code=413, detail="batch size > 1000")
+    # 보안: 배치 내 각 문서의 tenant_id를 인증 컨텍스트에 결속(위조 차단).
+    for d in req.documents:
+        d.tenant_id = resolve_effective_tenant(request, d.tenant_id)
     return AsyncClassifyService().submit_batch(req)
 
 

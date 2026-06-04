@@ -51,7 +51,7 @@ class RelabelResult:
 class ConfirmService:
     """관리자 분류 확정 — staging → confirmed."""
 
-    def confirm(self, req: ConfirmRequest) -> ConfirmResult:
+    def confirm(self, req: ConfirmRequest, *, tenant_id: str | None = None) -> ConfirmResult:
         logger.debug(
             "confirm enter: inference_id=%s doc_id=%s confirmed_label=%s actor=%s",
             req.inference_id, req.doc_id, req.confirmed_label, req.actor.user_id,
@@ -62,7 +62,7 @@ class ConfirmService:
         try:
             with session_scope() as db:
                 repo = ClassifyRepo(db)
-                cls = self._find_classification(repo, req)
+                cls = self._find_classification(repo, req, tenant_id)
                 if cls is None:
                     logger.info(
                         "confirm: classification not found (audit only) — inference_id=%s doc_id=%s",
@@ -109,21 +109,25 @@ class ConfirmService:
             return ConfirmResult(new_id, confirmed_at, persisted=False, warnings=warns)
 
     @staticmethod
-    def _find_classification(repo: ClassifyRepo, req: ConfirmRequest):
+    def _find_classification(repo: ClassifyRepo, req: ConfirmRequest, tenant_id: str | None = None):
         if req.inference_id is not None:
-            return repo.get(req.inference_id)
+            cls = repo.get(req.inference_id)
+            # 보안: 교차테넌트 분류 접근 차단 — tenant 불일치면 미존재로 취급.
+            if cls is not None and tenant_id is not None and cls.tenant_id != tenant_id:
+                return None
+            return cls
         try:
             doc_uuid = uuid.UUID(req.doc_id)
         except (ValueError, TypeError):
             return None
-        recent = repo.list_recent_for_doc(doc_uuid, limit=1)
+        recent = repo.list_recent_for_doc(doc_uuid, tenant_id=tenant_id, limit=1)
         return recent[0] if recent else None
 
 
 class RelabelService:
     """오분류 수정 — 새 corrections + classification.status='corrected'."""
 
-    def relabel(self, req: RelabelRequest) -> RelabelResult:
+    def relabel(self, req: RelabelRequest, *, tenant_id: str | None = None) -> RelabelResult:
         logger.debug(
             "relabel enter: inference_id=%s doc_id=%s %s→%s actor=%s",
             req.inference_id, req.doc_id, req.original_label, req.corrected_label, req.actor.user_id,
@@ -133,7 +137,7 @@ class RelabelService:
         try:
             with session_scope() as db:
                 repo = ClassifyRepo(db)
-                cls = self._find_classification(repo, req)
+                cls = self._find_classification(repo, req, tenant_id)
                 if cls is None:
                     logger.info(
                         "relabel: classification not found (audit only) — inference_id=%s doc_id=%s",
@@ -175,14 +179,18 @@ class RelabelService:
             return RelabelResult(new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns)
 
     @staticmethod
-    def _find_classification(repo: ClassifyRepo, req: RelabelRequest):
+    def _find_classification(repo: ClassifyRepo, req: RelabelRequest, tenant_id: str | None = None):
         if req.inference_id is not None:
-            return repo.get(req.inference_id)
+            cls = repo.get(req.inference_id)
+            # 보안: 교차테넌트 분류 접근 차단 — tenant 불일치면 미존재로 취급.
+            if cls is not None and tenant_id is not None and cls.tenant_id != tenant_id:
+                return None
+            return cls
         try:
             doc_uuid = uuid.UUID(req.doc_id)
         except (ValueError, TypeError):
             return None
-        recent = repo.list_recent_for_doc(doc_uuid, limit=1)
+        recent = repo.list_recent_for_doc(doc_uuid, tenant_id=tenant_id, limit=1)
         return recent[0] if recent else None
 
 

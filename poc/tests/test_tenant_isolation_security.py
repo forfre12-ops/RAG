@@ -189,3 +189,89 @@ def test_list_recent_for_doc_scoped_by_tenant(db, two_tenants_doc):
     assert repo.list_recent_for_doc(ctx.doc_b.doc_id, tenant_id=ctx.tenant_a, limit=1) == []
     # 소유 tenant(B)는 봄
     assert len(repo.list_recent_for_doc(ctx.doc_b.doc_id, tenant_id=ctx.tenant_b, limit=1)) == 1
+
+
+# ---------------------------------------------------------------------------
+# confirm/relabel 서비스 계층 tenant 스코프 (lite, repo mock — DB 불필요)
+# 회귀(2026-06-05): /confirm·/relabel의 _find_classification이 inference_id/doc_id를
+# tenant 검증 없이 조회해, 타 tenant로 인증한 reviewer가 남의 분류를 confirm/relabel할
+# 수 있었다(IDOR). 서비스가 유효 tenant로 스코프하는지 고정한다.
+# ---------------------------------------------------------------------------
+
+class _MockClassifyRepo:
+    """ClassifyRepo 모사 — get()은 tenant 무관 반환(실제와 동일), list는 tenant 스코프."""
+
+    def __init__(self, *, cls=None, recent=None):
+        self._cls = cls
+        self._recent = list(recent or [])
+        self.list_tenant_calls: list = []
+
+    def get(self, classification_id):  # noqa: ARG002
+        return self._cls
+
+    def list_recent_for_doc(self, doc_id, *, tenant_id=None, limit=10):  # noqa: ARG002
+        self.list_tenant_calls.append(tenant_id)
+        rows = [c for c in self._recent if tenant_id is None or c.tenant_id == tenant_id]
+        return rows[:limit]
+
+
+def _confirm_req(*, inference_id=None, doc_id=None):
+    from lloydk.schemas.common import Actor, Grade
+    from lloydk.schemas.confirm import ConfirmRequest
+
+    return ConfirmRequest(
+        doc_id=doc_id or str(uuid.uuid4()),
+        inference_id=inference_id,
+        confirmed_label=Grade.S3,
+        actor=Actor(user_id="u1", role="reviewer", tenant_id="A"),
+    )
+
+
+def _relabel_req(*, inference_id=None, doc_id=None):
+    from lloydk.schemas.common import Actor, Grade
+    from lloydk.schemas.confirm import RelabelRequest
+
+    return RelabelRequest(
+        doc_id=doc_id or str(uuid.uuid4()),
+        inference_id=inference_id,
+        original_label=Grade.S2,
+        corrected_label=Grade.S1,
+        actor=Actor(user_id="u1", role="reviewer", tenant_id="A"),
+    )
+
+
+def test_confirm_find_classification_blocks_cross_tenant_by_inference_id():
+    from lloydk.services.confirm_service import ConfirmService
+
+    cls_b = SimpleNamespace(tenant_id="B", classification_id=uuid.uuid4())
+    repo = _MockClassifyRepo(cls=cls_b)
+    req = _confirm_req(inference_id=uuid.uuid4())
+    # 타 tenant(A)가 inference_id로 B 소유 분류 조회 → 차단(None)
+    assert ConfirmService._find_classification(repo, req, "A") is None
+    # 소유 tenant(B)는 조회됨
+    assert ConfirmService._find_classification(repo, req, "B") is cls_b
+    # tenant_id=None(레거시)은 하위호환 — 조회됨
+    assert ConfirmService._find_classification(repo, req, None) is cls_b
+
+
+def test_confirm_find_classification_scopes_doc_id_lookup_by_tenant():
+    from lloydk.services.confirm_service import ConfirmService
+
+    cls_b = SimpleNamespace(tenant_id="B", classification_id=uuid.uuid4())
+    repo = _MockClassifyRepo(recent=[cls_b])
+    req = _confirm_req(doc_id=str(uuid.uuid4()))
+    # 타 tenant(A)로 doc 조회 → list_recent_for_doc에 tenant_id="A" 전달 → 빈 결과
+    assert ConfirmService._find_classification(repo, req, "A") is None
+    assert repo.list_tenant_calls[-1] == "A"
+    # 소유 tenant(B)는 조회됨
+    assert ConfirmService._find_classification(repo, req, "B") is cls_b
+
+
+def test_relabel_find_classification_blocks_cross_tenant_by_inference_id():
+    from lloydk.services.confirm_service import RelabelService
+
+    cls_b = SimpleNamespace(tenant_id="B", classification_id=uuid.uuid4())
+    repo = _MockClassifyRepo(cls=cls_b)
+    req = _relabel_req(inference_id=uuid.uuid4())
+    assert RelabelService._find_classification(repo, req, "A") is None
+    assert RelabelService._find_classification(repo, req, "B") is cls_b

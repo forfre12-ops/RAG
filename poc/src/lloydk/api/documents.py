@@ -11,10 +11,10 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from lloydk.api._jwt_auth import require_auth
+from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
 from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.services.document_ingestion_service import DocumentIngestionService
@@ -48,6 +48,7 @@ class DocumentUploadResponse(BaseModel):
 
 @router.post("/documents", response_model=DocumentUploadResponse, status_code=201)
 async def upload_document(
+    request: Request,
     actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
     doc_type: Optional[str] = Form(default=None),
     external_ref: Optional[str] = Form(default=None, description="외부 문서 ID (EDMS 등)"),
@@ -85,7 +86,9 @@ async def upload_document(
         raise HTTPException(status_code=422, detail="empty file")
 
     filename = file.filename or "unknown"
-    tenant_id = actor_obj.tenant_id or "default"
+    # 보안: 클라이언트가 보낸 actor.tenant_id를 인증 컨텍스트에 결속(위조 차단). 불일치 시 403.
+    # 이후 ingest·RAG 적재가 이 유효 tenant로 스코프돼 교차테넌트 문서 적재를 막는다.
+    tenant_id = resolve_effective_tenant(request, actor_obj.tenant_id) or "default"
 
     result = svc.ingest(
         filename=filename,
