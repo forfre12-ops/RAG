@@ -70,21 +70,22 @@ def _extract_plain(p: Path) -> ExtractResult:
 
 
 def _extract_hwp(p: Path) -> ExtractResult:
-    # 1순위: rhwp-python 0.5.x (HWP+HWPX 통합, optional extra `[hwp]`)
+    """HWP5/HWPX 추출 — rhwp-python(Rust PyO3, HWP5+HWPX 통합 파서, extra ``[hwp]``).
+
+    rhwp가 .hwp(바이너리)·.hwpx 둘 다 파싱한다. 미설치/파싱 실패는 graceful degrade.
+    구 pyhwp/hwp5 폴백 제거(2026-06-05): 설치돼 있던 hwp5 0.1.0은 무관 패키지였고
+    ``hwp5.extract_text`` API도 부재해 항상 실패하던 죽은 경로였다.
+    """
     try:
         import rhwp  # type: ignore
-
-        doc = rhwp.parse(str(p))
-        text = doc.extract_text()
-        return ExtractResult(text=text, method="rhwp", quality=0.95)
-    except Exception:
-        pass
-    # 2순위: pyhwp (HWP5 전용)
+    except ImportError as exc:
+        return ExtractResult(
+            text="", method="rhwp", quality=0.0,
+            error=f"HWP 추출에는 rhwp-python 필요 (pip install '.[hwp]'): {exc}",
+        )
     try:
-        import hwp5  # type: ignore
-
-        text = hwp5.extract_text(str(p))  # type: ignore[attr-defined]
-        return ExtractResult(text=text, method="parser", quality=0.85)
+        text = rhwp.parse(str(p)).extract_text()
+        return ExtractResult(text=text, method="rhwp", quality=0.95)
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="rhwp", quality=0.0, error=str(exc))
 
