@@ -7,6 +7,7 @@ already exist in the workspace, then writes a compact Markdown/JSON gate report.
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
 import os
 from collections import Counter
@@ -193,6 +194,28 @@ def _norm_model(p: str) -> str:
     return (p or "").replace("\\", "/").strip().rstrip("/")
 
 
+def _deployed_model_default() -> str:
+    """배포 모델 단일 진실원 = settings.classifier_model_dir(.env).
+
+    raw os.environ는 .env가 셸에 export되지 않은 컨텍스트에선 비어 보여 parity를
+    엉뚱하게 BLOCKED로 만든다(게이트 판정이 *실행 방식*에 좌우되는 버그). settings를
+    우선 읽어 실제 .env 설정을 반영하고, 실패 시 os.environ로 폴백한다.
+    """
+    try:
+        import sys
+
+        _src = Path(__file__).resolve().parent.parent / "src"
+        if str(_src) not in sys.path:
+            sys.path.insert(0, str(_src))
+        from lloydk.config import settings  # noqa: PLC0415
+
+        if settings.classifier_model_dir:
+            return settings.classifier_model_dir
+    except Exception:  # noqa: BLE001
+        pass
+    return os.environ.get("CLASSIFIER_MODEL_DIR", "")
+
+
 def _model_parity_gate(evaluated: str, deployed: str) -> Gate:
     """The F1/FNR gates describe the *evaluated* model. If the *deployed* model
     (CLASSIFIER_MODEL_DIR) differs, those numbers do not describe what is live —
@@ -268,23 +291,29 @@ def _write_md(payload: dict, out: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    # 2026-06-03: 디오염 홀드아웃 기준으로 전환. v3 public/llm gold 리포트는 train-on-test
-    # 오염(0.830은 암기)이라 폐기. P1 게이트는 cost2의 정직 홀드아웃 평가를 읽는다.
-    ap.add_argument("--p1-public", default="reports/p1_step3_holdout_direct.json")
+    # 2026-06-05: 티어 분리. p1-public = *법적근거 티어*(real-ish 라벨: public_definitive/
+    # koipa_case_based/nkt_designated)를 신뢰 신호로(게이트 판정 기준). p1-llm = 전체 홀드아웃
+    # (llm_judge ~47% 노이즈 포함)을 보수적 하한으로. 'FAIL on 노이즈'를 'FAIL on 진짜 약점'과
+    # 구분한다. 두 리포트는 `make p1-eval`이 배포 모델로 생성(단일 진실원).
+    ap.add_argument("--p1-public", default="reports/p1_step3_legal_direct.json")
     ap.add_argument("--p1-llm", default="reports/p1_step3_holdout_direct.json")
     ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
     ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb",
                     help="evaluated model — the one the F1/FNR reports describe")
-    ap.add_argument("--deployed-model", default=os.environ.get("CLASSIFIER_MODEL_DIR", ""),
-                    help="live deployment model (defaults to CLASSIFIER_MODEL_DIR env)")
+    ap.add_argument("--deployed-model", default=_deployed_model_default(),
+                    help="live deployment model (defaults to settings.classifier_model_dir / .env)")
     ap.add_argument("--out", default="reports/operational_readiness.md")
     ap.add_argument("--min-human-review", type=int, default=40)
     ap.add_argument("--max-high-risk-underclass", type=float, default=0.10)
     args = ap.parse_args()
 
-    p1_gate, p1_payload = _p1_gate(_load_json(Path(args.p1_public)), _load_json(Path(args.p1_llm)))
+    p1_public_report = _load_json(Path(args.p1_public))
+    p1_gate, p1_payload = _p1_gate(p1_public_report, _load_json(Path(args.p1_llm)))
+    # evaluated 모델 = 리포트가 *실제로* 기술하는 모델(report.model_dir)을 진실원으로.
+    # parity 게이트가 "F1 리포트가 라이브 배포 모델을 기술하나?"를 정확히 묻게 한다.
+    evaluated_model = p1_public_report.get("model_dir") or args.model_dir
     p2_gate, p2_payload = _p2_gate(_load_json(Path(args.p2)))
     data_gates, data_payload = _data_gates(
         Path(args.gold),
@@ -293,7 +322,7 @@ def main() -> int:
         args.max_high_risk_underclass,
     )
 
-    parity_gate = _model_parity_gate(args.model_dir, args.deployed_model)
+    parity_gate = _model_parity_gate(evaluated_model, args.deployed_model)
     gate_objects = [p1_gate, p2_gate, *data_gates, parity_gate]
     public_f1 = p1_payload.get("public", {}).get("f1_macro", 0)
     pseudo_f1 = p1_payload.get("llm_pseudo", {}).get("f1_macro", 0)
@@ -335,7 +364,7 @@ def main() -> int:
         "use reports/p1_v3_*_gold_direct.* (eval_p1_model_gold.py) for the trained model.",
         "Operational cost of the over-classification (S3 docs flagged as S1/S2 -> reviewer false-positive load) "
         "is not yet quantified; defer until real human_review labels exist.",
-        f"Evaluated model ({_norm_model(args.model_dir)}) may differ from the live deployment "
+        f"Evaluated model ({_norm_model(evaluated_model)}) may differ from the live deployment "
         f"({_norm_model(args.deployed_model) or 'unknown'}); the 'model parity' gate blocks release until they match.",
     ]
     next_actions = [
@@ -361,9 +390,9 @@ def main() -> int:
         "Run p2-full-gold after every ES reindex or embedding-model change.",
     ]
     payload = {
-        "generated_at": "2026-06-03",
+        "generated_at": _dt.date.today().isoformat(),
         "verdict": _overall(gate_objects),
-        "evaluated_model": _norm_model(args.model_dir),
+        "evaluated_model": _norm_model(evaluated_model),
         "deployed_model": _norm_model(args.deployed_model) or "unknown",
         "retrieval_config": "KURE-v1 + Elasticsearch hybrid + chunk=1200/overlap=100",
         "release_gate_policy": {

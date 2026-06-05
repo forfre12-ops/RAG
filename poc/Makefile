@@ -161,7 +161,18 @@ p1-boundary: ## Build focused P1 boundary report from the latest llm gold eval
 	    --report reports/p1_v3_llm_gold_direct.json \
 	    --out reports/p1_boundary_report.md
 
-p1-eval-v3: ## Evaluate trained P1 v3 on gold tiers
+# 운영 P1 평가 — 배포 모델(.env CLASSIFIER_MODEL_DIR과 일치해야 하며 readiness parity
+# 게이트가 검증)을 두 티어로 평가해 operational-readiness가 읽는 리포트를 생성(단일 진실원).
+# 법적근거 티어 = 신뢰 신호(게이트 판정), 전체 홀드아웃 = 노이즈 포함 보수적 하한.
+P1_MODEL ?= artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb
+p1-eval: ## 배포 P1 모델을 gold 티어(법적근거+전체)로 평가 → readiness 입력 생성
+	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \
+	    --label-source-filter public_definitive,koipa_case_based,nkt_designated \
+	    --report reports/p1_step3_legal_direct.md
+	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \
+	    --report reports/p1_step3_holdout_direct.md
+
+p1-eval-v3: ## [legacy] v3 모델 gold 티어 평가 — 운영 경로 아님(역사 비교용)
 	$(PY) scripts/eval_p1_model_gold.py \
 	    --model-dir artifacts/classifier_p1_retrain_v3/v-3443785f \
 	    --mode direct \
@@ -286,9 +297,11 @@ p2-full-gold: ## KURE-v1 + ES dense/hybrid full eval on retrieval_gold
 	    --chunk-size 1200 --chunk-overlap 100 \
 	    --report reports/p2_gold_kure_es_hybrid_v3.md
 
-operational-readiness: ## Build combined P1/P2/data readiness report
+operational-readiness: ## Build combined P1/P2/data readiness report (reads existing eval JSONs)
 	$(PY) scripts/build_operational_readiness.py \
 	    --out reports/operational_readiness.md
+
+readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 빌드 (권장 진입점)
 
 release-gate: operational-readiness ## Strict release gate; requires every readiness gate to PASS
 	$(PY) scripts/check_release_gate.py
