@@ -303,7 +303,10 @@ operational-readiness: ## Build combined P1/P2/data readiness report (reads exis
 
 readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 빌드 (권장 진입점)
 
-release-gate: operational-readiness ## Strict release gate; requires every readiness gate to PASS
+adversarial-gate: ## 적대 회귀 게이트 — golden_100 위험 미탐(고비밀→S3) baseline 초과 시 FAIL
+	$(PY) scripts/eval_adversarial.py
+
+release-gate: operational-readiness adversarial-gate ## Strict release gate; requires every readiness gate to PASS
 	$(PY) scripts/check_release_gate.py
 
 release-manifest: operational-readiness p1-boundary ## Hash release evidence artifacts
