@@ -1,5 +1,5 @@
 version: "1.0"
-generated_at: "2026-06-02"
+generated_at: "2026-06-05"
 purpose: |
   KOIPA AI 영업비밀관리시스템 학습·평가 데이터셋 정본 매니페스트.
   P1(분류) · P2(임베딩) · P3(합성) · P4(추출) PoC 5종 + Phase 8 고도화 산출물.
@@ -7,6 +7,20 @@ purpose: |
 
 owner: lloydk
 contact: forfre12@gmail.com
+
+# 운영 현황 (2026-06-05) — readiness/배포 모델 정합 (reports/operational_readiness.json)
+current_status:
+  deployed_model: artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb   # step3 (.env CLASSIFIER_MODEL_DIR)
+  p1_classifier:
+    legal_tier_f1: 0.889       # 법적근거 티어(진짜 라벨) — high-risk->S3 = 0 (위험 미탐 없음)
+    full_holdout_f1: 0.635     # 전체 홀드아웃 — llm_judge ~47% 오라벨 노이즈 포함 보수적 하한
+    gate: FAIL                 # FNR 0.092 > 0.05 (S1 경계, 데이터 제약) + human_review 미충족
+  p2_retrieval:
+    recall_at_5: 0.925         # KURE-v1 + ES hybrid, chunk 1200/100
+    gate: PASS
+  human_review_gold: "0/40"    # 외부 의존(발주처 사람 라벨) — 유일한 진짜 릴리즈 블로커
+  model_parity: PASS
+  readiness_verdict: FAIL
 
 datasets:
 

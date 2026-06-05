@@ -23,6 +23,7 @@ poc/datasets/p4_corpus/
 poc/artifacts/
 poc/mlruns/
 poc/reports/
+/reports/
 poc/.storage/
 
 # Build artifacts
