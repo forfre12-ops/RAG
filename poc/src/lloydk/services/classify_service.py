@@ -85,16 +85,28 @@ class ClassifyService:
         if not content:
             content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id)
         if not content:
-            warnings_acc = [f"content empty and doc_id={req.doc_id!r} not found in storage — cannot classify"]
+            # fail-SECURE (미탐 절대 금지): 본문을 못 읽으면 등급을 판단할 수 없다.
+            # 과거엔 label="S3"(공개)로 폴백했는데, 이는 '읽지 못한 비밀문서를 공개로
+            # 흘리는' 전형적 미탐 경로였다. 보수적으로 최고등급(Grade.TS)으로 격리하고
+            # status를 needs_review로 두어 사람 검수 큐에 강제 노출 — 절대 공개(S3)로
+            # 떨어뜨리지 않는다. (ClassifyResponse.label은 Grade 필수라 UNCLASSIFIED를
+            # 표현할 수 없으므로, 가장 안전한 '최고등급 + 검수필요'로 표현한다.)
+            from lloydk.schemas.common import Grade  # noqa: PLC0415
+            top_grade = self._highest_grade()
+            warnings_acc = [
+                f"content empty and doc_id={req.doc_id!r} not found in storage —"
+                f" cannot classify; fail-SECURE isolating at highest grade"
+                f" ({top_grade}) and routing to human_review (never defaults to public/S3)"
+            ]
             return ClassifyResponse(
                 inference_id=uuid.uuid4(),
                 doc_id=req.doc_id,
-                label="S3",
+                label=Grade(top_grade),
                 confidence=0.0,
-                scores={},
+                scores={top_grade: 1.0},
                 model_version="none",
                 elapsed_ms=0,
-                status="error",
+                status="needs_review",
                 warnings=warnings_acc,
             )
         if req.text_already_preprocessed:
@@ -197,6 +209,28 @@ class ClassifyService:
             status=status,
             warnings=warnings_acc,
         )
+
+    @staticmethod
+    def _highest_grade() -> str:
+        """가장 높은(가장 비밀) 등급 코드 반환 — fail-SECURE 격리용.
+
+        GradeRegistry.get_codes()는 level_order 오름차순(= 비밀이 가장 높은 등급이
+        선두)으로 반환하므로 [0]이 최고등급. DB 미가용/빈 목록이면 Grade.TS로 폴백.
+        """
+        try:
+            from lloydk.schemas.common import Grade, GradeRegistry  # noqa: PLC0415
+            codes = GradeRegistry.get_codes()
+            if codes:
+                # Grade enum으로 표현 가능한 코드만 채택 (응답 schema가 Grade 필수)
+                for code in codes:
+                    try:
+                        Grade(code)
+                        return code
+                    except ValueError:
+                        continue
+            return Grade.TS.value
+        except Exception:  # noqa: BLE001
+            return "TS"
 
     @staticmethod
     def _review_confidence_threshold() -> float:

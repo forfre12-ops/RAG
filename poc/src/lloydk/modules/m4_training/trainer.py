@@ -44,9 +44,13 @@ class TrainSpec:
     fnr_cost_multiplier: float = 1.0
     # 고등급 코드(미탐 핵심 대상). class weight 증폭 + fnr_high 지표 계산 기준.
     high_grade_codes: tuple[str, ...] = ("TS", "S1")
-    # best 모델 선택 지표. 기본을 fnr_overall → fnr_high(고등급 미탐)로 변경:
-    # 실제 KPI(고등급을 저등급으로 놓치지 않기)와 최적화 타깃을 일치시킨다.
-    early_stop_metric: str = "fnr_high"
+    # best 모델 선택 지표.
+    # 주의: fnr_high 단독은 '전부 TS' degenerate 예측기에 의해 0으로 게이밍된다
+    # (진짜 고등급을 절대 놓치지 않으니 fnr_high=0이지만 무의미한 모델).
+    # → 과분류(over_class_rate)와 degenerate penalty를 합한 합성 지표를 기본으로 한다.
+    #   fnr_high_balanced = fnr_high + over_class_rate + degenerate_penalty (낮을수록 좋음).
+    # 순수 fnr_high를 원하면 명시적으로 "fnr_high"로 설정 가능(권장하지 않음).
+    early_stop_metric: str = "fnr_high_balanced"
     seed: int = 42
     experiment_name: str = "kipra-classifier"
     bf16: bool = True           # bf16 가속 (CUDA GPU 필요; GPU 없으면 자동 비활성)
@@ -104,6 +108,38 @@ def _compute_fnr_high(cm: np.ndarray, high_ids: list[int]) -> float:
         pos += int(cm[i].sum())
         fn_under += int(sum(cm[i, j] for j in range(n) if j > i))
     return float(fn_under / pos) if pos else 0.0
+
+
+def _compute_over_class_rate(cm: np.ndarray, high_ids: list[int]) -> float:
+    """고등급 과분류율 = 진짜 저등급(비-고등급) 표본을 고등급으로 오예측한 비율.
+
+    fnr_high 단독 최소화는 '전부 TS' 같은 degenerate 예측기에 의해 0으로 게이밍된다
+    (진짜 고등급을 절대 놓치지 않으니까). 이를 막기 위한 짝지표:
+    저등급 진짜 표본 중 몇 %를 고등급으로 끌어올렸는가. degenerate '전부-TS'면
+    저등급 전부가 TS로 가므로 이 값이 1.0에 수렴 → 합성 지표가 폭증해 선택 거부.
+    """
+    high = set(high_ids)
+    n = cm.shape[0]
+    low_ids = [i for i in range(n) if i not in high]
+    over, pos = 0, 0
+    for i in low_ids:
+        pos += int(cm[i].sum())
+        over += int(sum(cm[i, j] for j in range(n) if j in high))
+    return float(over / pos) if pos else 0.0
+
+
+def _compute_degenerate_penalty(cm: np.ndarray) -> float:
+    """단일클래스 degenerate 예측기 가드.
+
+    예측이 사실상 한 클래스에 몰려 있으면(예: 전부 TS) 큰 패널티(1.0)를 반환.
+    confusion matrix의 열 합(= 각 등급으로 예측된 표본 수)에서 한 열이 전체의
+    >=99%를 차지하면 degenerate로 간주. 합성 best-metric에 가산되어 선택을 막는다.
+    """
+    total = int(cm.sum())
+    if total <= 0:
+        return 0.0
+    col_sums = cm.sum(axis=0)
+    return 1.0 if int(col_sums.max()) >= 0.99 * total else 0.0
 
 
 def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
@@ -190,9 +226,16 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         cm = confusion_matrix(labels, preds, labels=list(_ID2LABEL.keys()))
         fnr, fnr_by = _compute_fnr(cm)
         fnr_high = _compute_fnr_high(cm, high_ids)
+        over_class = _compute_over_class_rate(cm, high_ids)
+        degenerate = _compute_degenerate_penalty(cm)
+        # 합성 best-metric (낮을수록 좋음): 미탐(fnr_high)을 최소화하되 과분류와
+        # degenerate '전부-한클래스'를 강하게 패널티해 게이밍을 막는다.
+        fnr_high_balanced = float(fnr_high + over_class + degenerate)
         return {
             "accuracy": acc, "precision_macro": p, "recall_macro": r,
             "f1_macro": f, "fnr_overall": fnr, "fnr_high": fnr_high,
+            "over_class_rate": over_class, "degenerate_penalty": degenerate,
+            "fnr_high_balanced": fnr_high_balanced,
             **{f"fnr_{name}": v for name, v in fnr_by.items()},
         }
 

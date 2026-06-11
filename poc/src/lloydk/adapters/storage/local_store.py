@@ -11,9 +11,21 @@ class LocalStorage:
     def __init__(self, root: str = ".storage") -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        # 경로 탈출 검증 기준 — 심볼릭 링크까지 해소한 절대 루트.
+        self._root_resolved = self.root.resolve()
 
     def _path(self, bucket: str, key: str) -> Path:
         p = self.root / bucket / key
+        # 폐쇄망 기본 백엔드 — bucket/key 에 ../ 가 섞이면 루트 밖에 쓰일 수 있다.
+        # 최종 해소 경로가 루트 하위가 아니면 거부(fail-closed).
+        resolved = p.resolve()
+        try:
+            resolved.relative_to(self._root_resolved)
+        except ValueError as exc:
+            raise ValueError(
+                f"path traversal blocked: key escapes storage root "
+                f"(bucket={bucket!r}, key={key!r})"
+            ) from exc
         p.parent.mkdir(parents=True, exist_ok=True)
         return p
 

@@ -48,6 +48,36 @@ class RelabelResult:
     warnings: list[str]
 
 
+def _find_classification_scoped(repo: ClassifyRepo, req, tenant_id: str | None):
+    """confirm/relabel 공용 분류 조회 — tenant로 스코프(쓰기 경로 IDOR 차단).
+
+    보안(H10): 쓰기 경로는 ``inference_id``만으로 임의 테넌트 분류에 쓰지 못한다.
+    - inference_id 경로: ``repo.get``은 tenant 무관 반환이므로, 조회된 분류의
+      ``tenant_id``가 호출자 유효 tenant와 정확히 일치할 때만 통과(fail-CLOSED).
+      호출자 tenant=None(단일 공유키 레거시)이면, 분류가 실제 tenant 소유
+      (cls.tenant_id 존재)일 때 거부 — 미검증 호출자가 inference_id를 추측해 타
+      테넌트 분류를 confirm/relabel 하는 것을 막는다. cls.tenant_id도 None인
+      단일테넌트 분류만 통과(하위호환).
+    - doc_id 경로: ``list_recent_for_doc(tenant_id=...)``가 repo 계층에서 스코프.
+      tenant=None은 repo 정책(레거시 하위호환)을 따른다.
+    """
+    if req.inference_id is not None:
+        cls = repo.get(req.inference_id)
+        if cls is None:
+            return None
+        cls_tenant = getattr(cls, "tenant_id", None)
+        # fail-CLOSED: tenant가 정확히 일치할 때만 쓰기 허용(None==None만 레거시 통과).
+        if cls_tenant != tenant_id:
+            return None
+        return cls
+    try:
+        doc_uuid = uuid.UUID(req.doc_id)
+    except (ValueError, TypeError):
+        return None
+    recent = repo.list_recent_for_doc(doc_uuid, tenant_id=tenant_id, limit=1)
+    return recent[0] if recent else None
+
+
 class ConfirmService:
     """관리자 분류 확정 — staging → confirmed."""
 
@@ -110,18 +140,7 @@ class ConfirmService:
 
     @staticmethod
     def _find_classification(repo: ClassifyRepo, req: ConfirmRequest, tenant_id: str | None = None):
-        if req.inference_id is not None:
-            cls = repo.get(req.inference_id)
-            # 보안: 교차테넌트 분류 접근 차단 — tenant 불일치면 미존재로 취급.
-            if cls is not None and tenant_id is not None and cls.tenant_id != tenant_id:
-                return None
-            return cls
-        try:
-            doc_uuid = uuid.UUID(req.doc_id)
-        except (ValueError, TypeError):
-            return None
-        recent = repo.list_recent_for_doc(doc_uuid, tenant_id=tenant_id, limit=1)
-        return recent[0] if recent else None
+        return _find_classification_scoped(repo, req, tenant_id)
 
 
 class RelabelService:
@@ -180,18 +199,7 @@ class RelabelService:
 
     @staticmethod
     def _find_classification(repo: ClassifyRepo, req: RelabelRequest, tenant_id: str | None = None):
-        if req.inference_id is not None:
-            cls = repo.get(req.inference_id)
-            # 보안: 교차테넌트 분류 접근 차단 — tenant 불일치면 미존재로 취급.
-            if cls is not None and tenant_id is not None and cls.tenant_id != tenant_id:
-                return None
-            return cls
-        try:
-            doc_uuid = uuid.UUID(req.doc_id)
-        except (ValueError, TypeError):
-            return None
-        recent = repo.list_recent_for_doc(doc_uuid, tenant_id=tenant_id, limit=1)
-        return recent[0] if recent else None
+        return _find_classification_scoped(repo, req, tenant_id)
 
 
 def to_confirm_response(result: ConfirmResult) -> ConfirmResponse:

@@ -250,8 +250,10 @@ def test_confirm_find_classification_blocks_cross_tenant_by_inference_id():
     assert ConfirmService._find_classification(repo, req, "A") is None
     # 소유 tenant(B)는 조회됨
     assert ConfirmService._find_classification(repo, req, "B") is cls_b
-    # tenant_id=None(레거시)은 하위호환 — 조회됨
-    assert ConfirmService._find_classification(repo, req, None) is cls_b
+    # tenant_id=None(미검증 호출자)이 inference_id로 실-tenant(B) 분류 쓰기 시도 →
+    # fail-CLOSED(None). (H10 2026-06-11: 쓰기 경로는 tenant 정확 일치만 허용 —
+    # inference_id 추측을 통한 교차테넌트 confirm/relabel 차단.)
+    assert ConfirmService._find_classification(repo, req, None) is None
 
 
 def test_confirm_find_classification_scopes_doc_id_lookup_by_tenant():

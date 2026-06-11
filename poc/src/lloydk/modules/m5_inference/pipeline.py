@@ -62,7 +62,9 @@ class InferencePipeline:
         self.labeling = LabelingPipeline()
         self._model = None
         self._tokenizer = None
-        # GradeRegistry에서 동적 로드 — 다른 프로젝트의 커스텀 등급 자동 반영
+        # GradeRegistry 순서는 **rule-fallback 경로 전용** id→등급 매핑.
+        # 학습 모델이 로드되면 _load_model에서 모델 config.id2label로 덮어쓴다
+        # (softmax 인덱스는 학습 시점 순서에 고정되어 있고 DB level_order와 무관).
         active = _get_labels()
         self._id2label: dict[int, object] = dict(enumerate(active))
         if self.model_dir and self.model_dir.exists():
@@ -73,9 +75,68 @@ class InferencePipeline:
         import torch
         self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir))
         self._model = AutoModelForSequenceClassification.from_pretrained(str(self.model_dir))
+        # ── id2label은 학습 체크포인트 config에서 가져온다 (fail-closed) ──────────
+        # 학습기(m4_training/trainer.py)는 num_labels 인덱스 0..N을 고정 순서
+        # [TS,S1,S2,S3]에 매핑해 config.id2label에 baked한다. 추론에서 이 순서를
+        # GradeRegistry(DB level_order)로 재구성하면, DB 순서가 다를 때 softmax
+        # 인덱스가 엉뚱한 등급에 매핑되어 '미탐(비밀→공개)'을 일으킨다.
+        # → 반드시 모델 자신의 config.id2label로 매핑하고, 길이·코드집합이
+        #   기대(GradeRegistry 코드집합)와 불일치하면 로드를 거부한다.
+        cfg_id2label = self._id2label_from_config()
+        if cfg_id2label is None:
+            # config 매핑을 신뢰할 수 없으면 모델을 폐기(fail-closed) — rule-fallback로.
+            self._model = None
+            self._tokenizer = None
+            raise ValueError(
+                "model config.id2label is missing/invalid or its code set does not match "
+                "the active grade registry; refusing to load (fail-closed) to avoid "
+                "mis-mapping softmax indices to wrong grades (missed-detection risk)"
+            )
+        self._id2label = cfg_id2label
         self._model.eval()
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._model.to(self._device)
+
+    def _id2label_from_config(self) -> dict[int, object] | None:
+        """학습 체크포인트 config.id2label → {int index: Grade|str} 매핑.
+
+        검증(fail-closed):
+          - config.id2label가 없으면 None.
+          - 인덱스가 0..N-1 연속이 아니면 None.
+          - 코드 집합이 현재 활성 등급 코드집합과 다르면 None
+            (학습-DB 등급 스키마 mismatch → 인덱스 오매핑 방지).
+        매핑 자체는 config 인덱스를 그대로 보존한다(순서를 재정렬하지 않는다).
+        """
+        cfg = getattr(self._model, "config", None)
+        raw = getattr(cfg, "id2label", None)
+        if not raw or not isinstance(raw, dict):
+            return None
+
+        # config.id2label 키는 int 또는 str("0"..)일 수 있다 — int로 정규화.
+        mapping: dict[int, str] = {}
+        try:
+            for k, v in raw.items():
+                mapping[int(k)] = str(v)
+        except (ValueError, TypeError):
+            return None
+
+        n = len(mapping)
+        if n == 0 or sorted(mapping.keys()) != list(range(n)):
+            return None  # 인덱스가 0..N-1 연속이 아님 → 신뢰 불가
+
+        # 코드집합 일치 검증: 학습 체크포인트 등급집합 == 현재 활성 등급집합
+        active_codes = set(GradeRegistry.get_codes())
+        if active_codes and set(mapping.values()) != active_codes:
+            return None
+
+        out: dict[int, object] = {}
+        for idx in range(n):
+            code = mapping[idx]
+            try:
+                out[idx] = Grade(code)
+            except ValueError:
+                out[idx] = code  # 커스텀 등급(다른 프로젝트) 호환 — 문자열 보존
+        return out
 
     # FNR-safe override: rule engine이 이 점수 이상으로 TS를 잡으면 모델 결과 무시.
     # 모델이 TS 미학습 도메인(M&A·암호·국방 등)을 S1/S2/S3로 내릴 때 방어.
@@ -350,12 +411,26 @@ class InferencePipeline:
                 logger.debug("encode_batch failed: %s", exc)
                 return []
 
-        # metadata로 필터 전달 가능 (tenant_id 등 호출자가 보낸 거)
+        # 테넌트 격리는 fail-CLOSED. 호출자가 멀티테넌트 컨텍스트를 신호(metadata dict
+        # 전달)했는데 tenant_id가 비어 있으면 — 테넌트가 '미확정'이므로 무격리 검색으로
+        # 떨어뜨리지 않고 빈 컨텍스트를 반환한다(교차테넌트 유출 차단). 분류 본문은
+        # run()에서 graceful degradation으로 그대로 진행되고 RAG context만 비게 된다.
+        #
+        # 구분:
+        #   metadata is None  → 멀티테넌트 미관여(단일테넌트/레거시 호출). 필터 없이 검색.
+        #   metadata == {}    → 동일하게 미관여로 본다(빈 컨텍스트 시그널 없음).
+        #   metadata = {...} (tenant_id 없음/빈값) → 멀티테넌트 요청인데 테넌트 분실 →
+        #                       fail-CLOSED(빈 컨텍스트). 이게 H8이 막으려는 fail-open 경로.
         filter_ = None
-        if isinstance(metadata, dict):
+        if isinstance(metadata, dict) and metadata:
             tenant = metadata.get("tenant_id")
-            if tenant:
-                filter_ = {"tenant_id": tenant}
+            if not tenant or not str(tenant).strip():
+                logger.warning(
+                    "rag_context: tenant_id undetermined in a populated metadata context — "
+                    "returning empty context (fail-closed) to prevent cross-tenant leakage"
+                )
+                return []
+            filter_ = {"tenant_id": tenant}
 
         try:
             hits = expand_then_search(

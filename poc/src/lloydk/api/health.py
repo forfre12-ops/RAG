@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from lloydk.config import settings
 
@@ -153,9 +154,11 @@ def healthz_ready():
     }
     all_ok = all(c["ok"] for c in checks.values())
     status_code = 200 if all_ok else 503
-    return (
-        {"status": "ok" if all_ok else "not_ready", "checks": checks},
-        status_code,
+    # 튜플 반환은 FastAPI가 배열로 직렬화하고 상태는 항상 200이 됨 →
+    # 비정상 시 로드밸런서가 트래픽을 차단하려면 실제 503을 내려야 한다.
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "ok" if all_ok else "not_ready", "checks": checks},
     )
 
 

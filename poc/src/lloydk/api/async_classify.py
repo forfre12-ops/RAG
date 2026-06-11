@@ -43,12 +43,19 @@ def classify_batch(request: Request, req: ClassifyBatchRequest):
     # 보안: 배치 내 각 문서의 tenant_id를 인증 컨텍스트에 결속(위조 차단).
     for d in req.documents:
         d.tenant_id = resolve_effective_tenant(request, d.tenant_id)
-    return AsyncClassifyService().submit_batch(req)
+    # 보안(H9): job을 호출자 effective tenant로 결속 — 이후 조회 스코프의 기준.
+    job_tenant = resolve_effective_tenant(request, None)
+    return AsyncClassifyService().submit_batch(req, tenant_id=job_tenant)
 
 
 @router.get("/classify/jobs/{job_id}", response_model=ClassifyJobStatus)
-def classify_job_status(job_id: UUID):
-    res = AsyncClassifyService().get_status(job_id)
+def classify_job_status(job_id: UUID, request: Request):
+    # 보안(H9): job_id만으로 결과를 주지 않음 — 호출자 effective tenant가 job에
+    # 보존된 tenant와 일치할 때만 반환. 불일치/미검증이면 404(존재 노출도 차단).
+    requester_tenant = resolve_effective_tenant(request, None)
+    res = AsyncClassifyService().get_status(
+        job_id, requester_tenant=requester_tenant, enforce_tenant=True
+    )
     if res is None:
         raise HTTPException(status_code=404, detail="job not found")
     return res

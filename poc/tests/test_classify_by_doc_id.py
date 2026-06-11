@@ -51,8 +51,13 @@ class TestClassifyByDocId:
         assert r.status_code == 200, r.text
         assert "label" in r.json()
 
-    def test_content_none_without_db_doc_returns_error(self, client_with_storage):
-        """content 없고 doc_id가 DB에 없으면 error 상태 반환."""
+    def test_content_none_without_db_doc_fail_secure_isolates(self, client_with_storage):
+        """content 없고 doc_id도 못 읽으면 — fail-SECURE (H2).
+
+        본문을 못 읽은 문서를 공개(S3)로 흘리던 과거 동작(미탐 경로)을 제거했다.
+        이제는 최고등급(TS)으로 격리하고 status=needs_review(검수 큐)로 둔다 —
+        절대 공개로 폴백하지 않는다.
+        """
         client, _, _ = client_with_storage
         payload = {
             "doc_id": str(uuid.uuid4()),
@@ -61,7 +66,8 @@ class TestClassifyByDocId:
         r = client.post("/api/v1/classify", headers=_hdr(), json=payload)
         assert r.status_code == 200, r.text
         j = r.json()
-        assert j["status"] == "error"
+        assert j["status"] == "needs_review"  # 'error'로 공개 폴백하지 않음
+        assert j["label"] == "TS"  # 최고등급 격리 (fail-secure)
         assert j["warnings"]
 
     def test_upload_then_classify_by_doc_id(self, client_with_storage, tmp_path):
