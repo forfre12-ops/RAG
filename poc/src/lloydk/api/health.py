@@ -74,17 +74,41 @@ def _check_es() -> dict:
 
 
 def _check_storage() -> dict:
-    if getattr(settings, "storage_backend", "local") == "local":
-        return {"status": "skipped", "ok": True}
+    """M-health-storage: ingestion이 실제로 쓰는 build_storage() 결과를 기준으로 점검.
+
+    기존 버그: storage_backend=local이면 무조건 skip(ok)했지만, backend=minio라도
+    build_storage()가 MinIO 미가용 시 LocalStorage로 *조용히 폴백*한다. 이때 폴백
+    인스턴스는 _client가 없어 list_buckets 점검을 건너뛰고 ok로 통과 →
+    ingestion은 MinIO를 기대하는데 health는 정상이라 보고하는 불일치.
+
+    수정:
+    - 설정상 local 백엔드: 폴백이 아니라 의도된 구성 → skipped(ok).
+    - 설정상 원격(minio/seaweedfs): build_storage() 결과를 확인.
+        * 결과가 local 인스턴스면 = MinIO→Local 폴백 발생 → degraded(ok=False).
+        * 원격 인스턴스면 _client 연결(list_buckets)로 실연결 확인.
+    """
+    backend = getattr(settings, "storage_backend", "local")
+    if backend == "local":
+        return {"status": "skipped", "ok": True, "backend": backend}
     try:
         from lloydk.adapters.storage import build_storage  # noqa: PLC0415
         storage = build_storage()
-        # bucket_exists 또는 list_buckets로 연결 확인
-        if hasattr(storage, "_client"):
-            storage._client.list_buckets()
-        return {"status": "ok", "ok": True}
+        resolved = getattr(storage, "name", type(storage).__name__)
+        client = getattr(storage, "_client", None)
+        if client is None:
+            # 원격 백엔드를 기대했지만 _client 없는 인스턴스(LocalStorage 등)로 폴백됨.
+            return {
+                "status": "degraded",
+                "ok": False,
+                "backend": backend,
+                "resolved": resolved,
+                "detail": "remote storage unavailable; fell back to local",
+            }
+        # 원격 클라이언트 — 실제 연결 확인.
+        client.list_buckets()
+        return {"status": "ok", "ok": True, "backend": backend, "resolved": resolved}
     except Exception as exc:  # noqa: BLE001
-        return {"status": "error", "ok": False, "detail": type(exc).__name__}
+        return {"status": "error", "ok": False, "backend": backend, "detail": type(exc).__name__}
 
 
 def _check_embedder() -> dict:

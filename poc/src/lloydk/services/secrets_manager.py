@@ -11,9 +11,20 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
+
+# L-secrets-ttl (W3-D): Vault/AWS 백엔드가 secret을 프로세스 lifetime 무기한 캐싱하면
+# 키 로테이션이 무력화된다. TTL이 지나면 캐시를 무효화하고 백엔드를 다시 읽는다.
+# env LLOYDK_SECRETS_CACHE_TTL_SEC로 조정(기본 300초). 0 이하면 캐시 비활성(매번 조회).
+def _default_cache_ttl() -> float:
+    raw = os.getenv("LLOYDK_SECRETS_CACHE_TTL_SEC", "300").strip()
+    try:
+        return float(raw)
+    except ValueError:
+        return 300.0
 
 
 @runtime_checkable
@@ -48,13 +59,25 @@ class VaultSecretsManager:
 
     name = "vault"
 
-    def __init__(self, *, url: str, token: str, mount: str = "secret", path: str = "lloydk"):
+    def __init__(
+        self,
+        *,
+        url: str,
+        token: str,
+        mount: str = "secret",
+        path: str = "lloydk",
+        cache_ttl: Optional[float] = None,
+    ):
         self._url = url
         self._token = token
         self._mount = mount
         self._path = path
         self._client = None
-        self._cache: dict[str, str] = {}
+        # None 센티넬 = 미로드. 빈 dict({})는 "로드했으나 secret 없음" — 구분해야
+        # 빈 결과를 매번 재조회하지 않는다(기존 `if self._cache:`는 빈 dict를 미로드로 오인).
+        self._cache: Optional[dict[str, str]] = None
+        self._cache_at: float = 0.0
+        self._cache_ttl: float = _default_cache_ttl() if cache_ttl is None else cache_ttl
 
     def _ensure(self):
         if self._client is not None:
@@ -68,13 +91,26 @@ class VaultSecretsManager:
             raise RuntimeError("Vault authentication failed")
         return self._client
 
+    def _cache_fresh(self) -> bool:
+        if self._cache is None:
+            return False
+        if self._cache_ttl <= 0:
+            return False  # TTL 0 → 캐시 비활성, 항상 재조회
+        return (time.monotonic() - self._cache_at) < self._cache_ttl
+
+    def invalidate(self) -> None:
+        """캐시 즉시 무효화 — 키 로테이션 후 강제 재로드용."""
+        self._cache = None
+        self._cache_at = 0.0
+
     def _load_all(self) -> dict[str, str]:
-        if self._cache:
-            return self._cache
+        if self._cache_fresh():
+            return self._cache  # type: ignore[return-value]
         c = self._ensure()
         resp = c.secrets.kv.v2.read_secret_version(path=self._path, mount_point=self._mount)
         data = resp.get("data", {}).get("data", {}) or {}
         self._cache = {str(k): str(v) for k, v in data.items()}
+        self._cache_at = time.monotonic()
         return self._cache
 
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
@@ -100,11 +136,20 @@ class AwsSecretsManager:
 
     name = "aws"
 
-    def __init__(self, *, secret_id: str, region: str = "ap-northeast-2"):
+    def __init__(
+        self,
+        *,
+        secret_id: str,
+        region: str = "ap-northeast-2",
+        cache_ttl: Optional[float] = None,
+    ):
         self._secret_id = secret_id
         self._region = region
         self._client = None
-        self._cache: dict[str, str] = {}
+        # None 센티넬 = 미로드 (빈 dict와 구분 — VaultSecretsManager 참고).
+        self._cache: Optional[dict[str, str]] = None
+        self._cache_at: float = 0.0
+        self._cache_ttl: float = _default_cache_ttl() if cache_ttl is None else cache_ttl
 
     def _ensure(self):
         if self._client is not None:
@@ -116,15 +161,28 @@ class AwsSecretsManager:
         self._client = boto3.client("secretsmanager", region_name=self._region)
         return self._client
 
+    def _cache_fresh(self) -> bool:
+        if self._cache is None:
+            return False
+        if self._cache_ttl <= 0:
+            return False
+        return (time.monotonic() - self._cache_at) < self._cache_ttl
+
+    def invalidate(self) -> None:
+        """캐시 즉시 무효화 — 키 로테이션 후 강제 재로드용."""
+        self._cache = None
+        self._cache_at = 0.0
+
     def _load_all(self) -> dict[str, str]:
-        if self._cache:
-            return self._cache
+        if self._cache_fresh():
+            return self._cache  # type: ignore[return-value]
         c = self._ensure()
         resp = c.get_secret_value(SecretId=self._secret_id)
         import json
         s = resp.get("SecretString", "{}")
         data = json.loads(s) if s else {}
         self._cache = {str(k): str(v) for k, v in data.items()}
+        self._cache_at = time.monotonic()
         return self._cache
 
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
@@ -166,3 +224,15 @@ def get_secrets_manager() -> SecretsManager:
     else:
         _default = EnvSecretsManager()
     return _default
+
+
+def invalidate_secrets_cache() -> None:
+    """전역 secrets manager의 캐시를 무효화 — 키 로테이션 후 강제 재로드용.
+
+    백엔드가 invalidate()를 지원하면(Vault/AWS) 호출. env 백엔드는 캐시가 없어 no-op.
+    """
+    sm = _default
+    if sm is not None:
+        invalidate = getattr(sm, "invalidate", None)
+        if callable(invalidate):
+            invalidate()

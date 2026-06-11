@@ -25,6 +25,21 @@ from lloydk.rag.query_expansion import expand_hybrid, expand_llm, expand_rule
 logger = logging.getLogger(__name__)
 
 
+def _record_hybrid_degrade() -> None:
+    """hybrid→dense 폴백을 prom counter로 가시화.
+
+    retrieval은 도메인 독립 코어이므로 lloydk.api에 강결합하지 않는다. 메트릭은
+    best-effort로만 증가시키고(미가용·import 실패 무시), 가시성의 1차 보장은 호출부
+    WARNING 로그가 담당한다.
+    """
+    try:
+        from lloydk.api.prom_metrics import RAG_CONTEXT_FAILURE_TOTAL  # noqa: PLC0415
+
+        RAG_CONTEXT_FAILURE_TOTAL.labels(stage="hybrid_degrade").inc()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 _RRF_K = 60.0  # 표준 RRF 상수 (Cormack et al. 2009)
 
 
@@ -173,7 +188,12 @@ def expand_then_search(
                 filter=filter,
             )
         except Exception as exc:  # noqa: BLE001
-            logger.debug("search_hybrid failed (%s) — falling back to dense search", exc)
+            # hybrid→dense 저하는 BM25 절반이 조용히 사라지는 것이므로 관측 가능해야 한다.
+            # WARNING 로그 + prom counter(stage='hybrid_degrade')로 가시화.
+            logger.warning(
+                "search_hybrid failed (%s) — falling back to dense search (BM25 path lost)", exc
+            )
+            _record_hybrid_degrade()
             try:
                 hits = store.search(collection=collection, query=vec, top_k=first_k, filter=filter)
             except Exception as exc2:  # noqa: BLE001

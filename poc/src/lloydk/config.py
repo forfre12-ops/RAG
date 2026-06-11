@@ -272,11 +272,15 @@ def apply_profile_defaults(s: Settings) -> dict[str, str]:
         return {"_status": f"unknown_profile:{profile}"}
 
     # Settings는 env_prefix 없이 필드명 그대로 env에 매핑됨 (예: LLM_PROVIDER).
-    # 그래서 명시 여부는 환경변수의 대문자 필드명으로 판정.
+    # [M-config-env] 명시 판정을 os.environ(대문자 필드명)으로만 하면, pydantic-settings가
+    # .env 파일에서 읽은 값(os.environ에는 없음)을 '미설정'으로 오인해 프로파일이 .env
+    # 지정값을 덮어쓴다. model_fields_set(env·.env·생성자 kwargs 모두 포함)을 우선 근거로
+    # 삼고, 환경변수 존재는 보조 근거로 OR 결합 — '미설정 키에만 default 채움' 보장.
+    fields_set = getattr(s, "model_fields_set", set())
     defaults = _PROFILE_DEFAULTS[profile]
     for field, default in defaults.items():
         env_name = field.upper()
-        explicit = os.environ.get(env_name) is not None
+        explicit = field in fields_set or os.environ.get(env_name) is not None
         if explicit:
             sources[field] = "explicit"
             continue

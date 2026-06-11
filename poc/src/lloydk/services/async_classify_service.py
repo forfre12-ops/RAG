@@ -56,9 +56,16 @@ class AsyncClassifyService:
             payload={"total": 1, "completed": 0, "tenant_id": req.tenant_id},
         )
         # PoC: 즉시 실행 (Celery 발사 대신)
+        callback_payload: dict
         try:
             result = self.classify.classify(self._strip_async_fields(req))
-            self.jobs.update(job_id, status="done", completed=1, results=[result.model_dump(mode="json")])
+            result_json = result.model_dump(mode="json")
+            self.jobs.update(job_id, status="done", completed=1, results=[result_json])
+            callback_payload = {
+                "job_id": str(job_id),
+                "status": "done",
+                "results": [result_json],
+            }
             logger.info("async classify done: job_id=%s doc_id=%s", job_id, req.doc_id)
         except Exception as exc:  # noqa: BLE001
             logger.error(
@@ -66,6 +73,15 @@ class AsyncClassifyService:
                 job_id, req.doc_id, type(exc).__name__, exc_info=True,
             )
             self.jobs.update(job_id, status="failed", error=str(exc))
+            callback_payload = {
+                "job_id": str(job_id),
+                "status": "failed",
+                "error": str(exc),
+            }
+        # M-callback: callback_url 이 있으면 outbox webhook 발사 — _strip_async_fields
+        # 가 callback_url 을 떼어내 분류 자체엔 영향 없게 하면서도, 여기서 결과를
+        # outbox 로 publish 해 webhook 이 실제로 울리게 한다(과거엔 영원히 안 울림).
+        self._publish_callback(getattr(req, "callback_url", None), callback_payload)
         return ClassifyAsyncResponse(
             job_id=job_id, status="queued", status_url=f"/api/v1/classify/jobs/{job_id}"
         )
@@ -138,6 +154,20 @@ class AsyncClassifyService:
             job_id, total, completed, failed, final_status,
         )
 
+        # M-callback: 배치도 동일하게 callback_url 이 있으면 outbox webhook 발사.
+        self._publish_callback(
+            getattr(req, "callback_url", None),
+            {
+                "job_id": str(job_id),
+                "status": final_status,
+                "total": total,
+                "completed": completed,
+                "failed": failed,
+                "failed_doc_ids": failed_ids,
+                "results": results,
+            },
+        )
+
         return ClassifyBatchResponse(
             job_id=job_id,
             total=total,
@@ -190,6 +220,34 @@ class AsyncClassifyService:
             results=results,
             error=job.get("error"),
         )
+
+    @staticmethod
+    def _publish_callback(callback_url: str | None, payload: dict) -> None:
+        """callback_url 이 있으면 job 결과를 outbox webhook 으로 publish.
+
+        M-callback: callback_url 은 webhook outbox 의 존재 이유인데 그동안
+        _strip_async_fields 에서 떨어져 나가고 outbox 로 넘어가지 않아 webhook 이
+        절대 울리지 않았다. 여기서 outbox.publish 로 적재 → worker(deliver_once)가
+        재시도·DLQ 포함 신뢰성 있게 전달한다.
+
+        best-effort: outbox 적재 실패가 분류 결과 자체를 폐기하면 안 되므로,
+        예외는 삼키고 로깅만 한다(분류는 이미 job_store 에 영속화됨).
+        """
+        if not callback_url:
+            return
+        try:
+            from lloydk.services.outbox import (  # noqa: PLC0415
+                get_outbox_store,
+                publish,
+            )
+
+            publish(get_outbox_store(), target_url=callback_url, payload=payload)
+            logger.info("callback enqueued to outbox: url=%s job=%s", callback_url, payload.get("job_id"))
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "callback enqueue failed (non-critical): url=%s err=%s",
+                callback_url, type(exc).__name__, exc_info=True,
+            )
 
     @staticmethod
     def _strip_async_fields(req: ClassifyAsyncRequest) -> ClassifyRequest:

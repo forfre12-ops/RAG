@@ -28,10 +28,11 @@ def test_profile_applies_defaults(profile: str, monkeypatch: pytest.MonkeyPatch)
     # 환경변수 청소 — 명시값 간섭 제거
     for field in _PROFILE_DEFAULTS[profile].keys():
         monkeypatch.delenv(field.upper(), raising=False)
-    # Settings는 .env도 자동 로드. 테스트 격리 위해 env_file 끄고 인스턴스화.
-    monkeypatch.setenv("PYDANTIC_SETTINGS_NO_ENV_FILE", "1")
-
-    s = Settings(deploy_profile=profile)
+    # [Wave3 M-config-env] explicit 판정이 model_fields_set로 강화돼, 레포 .env가
+    # 프로파일 필드를 명시하면 그 값이 정당하게 '우선'된다(.env 지정값 보존이 새 계약).
+    # 이 테스트는 '미설정 키만 프로파일이 채운다'는 격리 동작을 검증하므로 .env를
+    # 실제로 끈다(_env_file=None). 옛 PYDANTIC_SETTINGS_NO_ENV_FILE 플래그는 무효였음.
+    s = Settings(deploy_profile=profile, _env_file=None)
     sources = apply_profile_defaults(s)
 
     assert sources["_status"] == "ok"
@@ -43,8 +44,11 @@ def test_profile_applies_defaults(profile: str, monkeypatch: pytest.MonkeyPatch)
 
 def test_explicit_env_wins_over_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     # lite-noapi default는 llm_provider=noop. env로 anthropic 명시 시 그대로 유지.
+    # [Wave3 M-config-env] 다른 프로파일 필드(embedding_provider 등)의 'default 채움'을
+    # 검증하려면 레포 .env(EMBEDDING_PROVIDER=hf 등)와 격리해야 하므로 _env_file=None.
+    # llm_provider는 kwarg로 명시 → model_fields_set에 포함 → explicit로 인식돼야 한다.
     monkeypatch.setenv("LLM_PROVIDER", "anthropic")
-    s = Settings(deploy_profile="lite-noapi", llm_provider="anthropic")
+    s = Settings(deploy_profile="lite-noapi", llm_provider="anthropic", _env_file=None)
     sources = apply_profile_defaults(s)
 
     assert s.llm_provider == "anthropic"
@@ -90,7 +94,12 @@ def test_training_router_visibility(
     """
     monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
     monkeypatch.setenv("DEPLOY_PROFILE", profile)
-    monkeypatch.delenv("ENABLE_TRAINING", raising=False)
+    # [Wave3 M-config-env] 모듈 reload 경로의 Settings()는 레포 .env(ENABLE_TRAINING=false,
+    # onprem-local)를 읽는다. explicit 판정이 강화돼 .env의 false가 프로파일을 정당하게
+    # 이긴다(=새 계약). 따라서 ENABLE_TRAINING을 지우면 .env의 false가 남아 full-train도
+    # 학습이 꺼진다. 이 테스트의 본 목적은 'settings.enable_training → train 라우터 등록'
+    # 배선 검증이므로, 기대값을 os.environ에 명시(explicit)해 .env 간섭을 제거한다.
+    monkeypatch.setenv("ENABLE_TRAINING", "true" if training_expected else "false")
 
     import lloydk.config as cfg_mod
     importlib.reload(cfg_mod)
