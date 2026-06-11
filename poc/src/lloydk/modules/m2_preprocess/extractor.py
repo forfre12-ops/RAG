@@ -32,6 +32,23 @@ POPPLER_PATH: str | None = next(
     None,
 )
 
+# OCR DoS 가드 — 수백쪽 스캔 PDF 한 건이 pdf2image/Tesseract를 수십분~OOM으로 몰지
+# 않도록 변환 페이지 수에 보수적 상한을 둔다. settings.ocr_max_pages가 있으면 그 값을,
+# 없으면 모듈 상수(50)를 사용. 0 이하면 무제한으로 본다(명시적 opt-out).
+_OCR_MAX_PAGES_DEFAULT = 50
+
+
+def _ocr_max_pages() -> int:
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+
+        v = getattr(settings, "ocr_max_pages", None)
+        if v is not None:
+            return int(v)
+    except Exception:  # noqa: BLE001
+        pass
+    return _OCR_MAX_PAGES_DEFAULT
+
 
 @dataclass
 class ExtractResult:
@@ -114,6 +131,13 @@ def _extract_excel(p: Path) -> ExtractResult:
     표 구조는 셀을 ' | '로 잇고 시트마다 '[sheet: 이름]' 헤더를 붙인다(DOCX 표와 동일 방식).
     .xlsx/.xlsm은 openpyxl(read_only·data_only=수식 대신 값), .xls는 xlrd(설치 시).
     라이브러리 미설치/파싱 실패는 graceful degrade — 빈 텍스트 + error.
+
+    데이터 누락 가드(2026-06):
+      - 숨김(hidden/veryHidden) 시트도 포함한다. 숨김 시트에 비밀 수치가 들어 있을 수
+        있으므로 sheet_state로 거르지 않고 모두 추출하되 헤더에 상태를 표기한다.
+      - data_only=True는 '캐시된 수식 값'을 읽는다. 엑셀이 한 번도 계산·저장하지 않은
+        수식 셀은 캐시가 없어 None으로 나와 누락될 수 있다. None인 수식 셀이 감지되면
+        error에 경고를 남겨 후속 검수가 LibreOffice 재계산 등을 판단하게 한다.
     """
     suffix = p.suffix.lower().lstrip(".")
     if suffix in ("xlsx", "xlsm"):
@@ -127,14 +151,25 @@ def _extract_excel(p: Path) -> ExtractResult:
         except Exception as exc:  # noqa: BLE001
             return ExtractResult(text="", method="openpyxl", quality=0.0, error=str(exc))
         parts: list[str] = []
+        # read_only 워크북도 hidden/veryHidden 시트를 worksheets에 노출하므로
+        # 추가 필터 없이 전부 순회 — sheet_state는 헤더 표기로만 사용.
         for ws in wb.worksheets:
-            parts.append(f"[sheet: {ws.title}]")
+            state = getattr(ws, "sheet_state", "visible")
+            header = f"[sheet: {ws.title}]" if state == "visible" else f"[sheet: {ws.title} ({state})]"
+            parts.append(header)
             for row in ws.iter_rows(values_only=True):
                 cells = [str(c) for c in row if c is not None and str(c).strip()]
                 if cells:
                     parts.append(" | ".join(cells))
         wb.close()
-        return ExtractResult(text="\n".join(parts), method="openpyxl", quality=0.95)
+
+        # 수식 캐시 부재(None) 가능성 감지 — data_only 모드에서 수식 셀이 None이면
+        # 값 누락. read_only 워크북은 셀 데이터타입을 못 보므로 별도 워크북을
+        # data_only=False로 재오픈해 수식 존재 여부만 가볍게 점검한다(실패는 무시).
+        warn = _excel_formula_cache_warning(str(p))
+        return ExtractResult(
+            text="\n".join(parts), method="openpyxl", quality=0.95, error=warn,
+        )
 
     # .xls (구형 바이너리) — openpyxl 미지원이라 xlrd 필요. 미설치 시 변환 안내.
     try:
@@ -155,6 +190,41 @@ def _extract_excel(p: Path) -> ExtractResult:
             if cells:
                 parts.append(" | ".join(cells))
     return ExtractResult(text="\n".join(parts), method="xlrd", quality=0.9)
+
+
+def _excel_formula_cache_warning(path: str) -> str | None:
+    """data_only=True에서 수식 캐시 부재로 값이 None일 위험을 가볍게 점검.
+
+    data_only=False로 재오픈해 수식 셀(value가 '='로 시작) 중 별도 캐시 워크북에서
+    None인 게 있는지 본다. 라이브러리/파싱 실패는 조용히 None(경고 없음) — best-effort.
+    LibreOffice 재계산 같은 본격 복구는 범위 밖(risks 참조).
+    """
+    try:
+        from openpyxl import load_workbook  # type: ignore
+
+        wb_f = load_workbook(path, read_only=True, data_only=False)
+        wb_v = load_workbook(path, read_only=True, data_only=True)
+    except Exception:  # noqa: BLE001
+        return None
+    missing = 0
+    try:
+        for ws_f, ws_v in zip(wb_f.worksheets, wb_v.worksheets):
+            for row_f, row_v in zip(ws_f.iter_rows(), ws_v.iter_rows()):
+                for cf, cv in zip(row_f, row_v):
+                    fv = cf.value
+                    if isinstance(fv, str) and fv.startswith("=") and cv.value is None:
+                        missing += 1
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        wb_f.close()
+        wb_v.close()
+    if missing:
+        return (
+            f"warning: {missing} formula cell(s) had no cached value (data_only) — "
+            "값이 누락됐을 수 있음. LibreOffice 등으로 재계산 후 재추출 권장."
+        )
+    return None
 
 
 def _extract_doc(p: Path) -> ExtractResult:
@@ -262,20 +332,44 @@ def _extract_pdf(p: Path) -> ExtractResult:
 
 
 def _ocr_pdf_pages(p: Path, n_pages: int | None) -> ExtractResult:
-    """PDF 페이지를 이미지로 변환 후 Tesseract OCR."""
+    """PDF 페이지를 이미지로 변환 후 Tesseract OCR.
+
+    DoS 가드: convert_from_path를 first_page/last_page로 [1, max_pages] 범위만
+    렌더한다. 상한을 넘는 페이지는 변환·OCR하지 않고 경고를 error에 남긴다(잘림 표기).
+    상한이 0 이하면 무제한(opt-out).
+    """
     try:
         from pdf2image import convert_from_path  # type: ignore
 
-        kwargs = {"dpi": 200}
+        kwargs: dict = {"dpi": 200}
         if POPPLER_PATH:
             kwargs["poppler_path"] = POPPLER_PATH
+
+        max_pages = _ocr_max_pages()
+        truncated = False
+        last_page: int | None = None
+        if max_pages and max_pages > 0:
+            # n_pages를 아는 경우 초과 여부를 미리 판정, 모르면 상한까지만 렌더.
+            last_page = max_pages
+            if n_pages is not None and n_pages > max_pages:
+                truncated = True
+            kwargs["first_page"] = 1
+            kwargs["last_page"] = last_page
+
         images = convert_from_path(str(p), **kwargs)
+        # n_pages를 몰랐어도 렌더 결과가 상한과 같으면 잘렸을 수 있음(보수적 표기).
+        if last_page is not None and len(images) >= last_page and n_pages is None:
+            truncated = True
         texts = [_tess_image(img) for img in images]
         text = "\n".join(t for t in texts if t)
         if text.strip():
+            note = (
+                f"OCR truncated to first {last_page} of {n_pages or '?'} pages (DoS guard)"
+                if truncated else None
+            )
             return ExtractResult(
                 text=text, method="ocr", quality=0.75,
-                ocr_used=True, pages=len(images),
+                ocr_used=True, pages=len(images), error=note,
             )
     except Exception:  # noqa: BLE001
         pass

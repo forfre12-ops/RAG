@@ -1,7 +1,8 @@
 """API Rate-limit — slowapi 기반.
 
 설계:
-- key_func: X-Tenant-Id 헤더 우선, 없으면 클라이언트 IP 폴백
+- key_func: 검증된 신원(request.state.auth_tenant→auth_actor) 우선, 없으면 IP 폴백
+  (위조 가능한 원시 X-Tenant-Id 헤더는 키로 쓰지 않음 — 한도 우회/버킷 고갈 차단)
 - 라우터별 다른 한도 (분당 60/10, 시간당 10 등) — 데코레이터로 명시
 - RATE_LIMIT_DISABLED=1 → 모든 한도 비활성 (테스트·dryrun 환경 보호)
 - TestClient는 host 헤더가 "testclient"라 IP 충돌 가능 → 환경변수 자동 비활성 권장
@@ -26,10 +27,25 @@ def _is_disabled() -> bool:
 
 
 def tenant_or_ip_key(request: Request) -> str:
-    """X-Tenant-Id 우선, 없으면 클라이언트 IP."""
-    tenant = request.headers.get("x-tenant-id")
-    if tenant:
-        return f"tenant:{tenant}"
+    """rate-limit 키 — 검증된 신원 우선, 없으면 IP.
+
+    M-ratelimit-key (Track B): 과거 구현은 검증 안 된 원시 X-Tenant-Id 헤더를 키로
+    썼다. 공격자가 임의의 X-Tenant-Id를 위조하면 매 요청마다 새 버킷을 차지해 한도를
+    우회하거나, 거꾸로 피해 테넌트의 헤더를 흉내내 그 버킷을 고갈시킬 수 있다.
+
+    수정: 인증이 해소한 *authoritative* 신원만 키로 쓴다.
+      1) request.state.auth_tenant — JWT claim(서명됨) 또는 hash 검증된 api_key tenant.
+         require_auth 의존성이 이 값을 채운다(_jwt_auth._stash_auth). 미검증 X-Tenant-Id
+         헤더는 여기 들어오지 않으므로 위조 불가.
+      2) request.state.auth_actor — 검증된 actor(주로 JWT sub).
+      3) 그 외(미인증·검증불가) → 클라이언트 IP. 검증 불가 헤더를 단독 키로 쓰지 않는다.
+    """
+    auth_tenant = getattr(request.state, "auth_tenant", None)
+    if auth_tenant:
+        return f"tenant:{auth_tenant}"
+    auth_actor = getattr(request.state, "auth_actor", None)
+    if auth_actor:
+        return f"actor:{auth_actor}"
     return f"ip:{get_remote_address(request)}"
 
 

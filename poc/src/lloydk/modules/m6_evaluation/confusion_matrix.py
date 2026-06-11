@@ -133,8 +133,15 @@ def detect_underclass_alarms(
                 continue
             rate = count / row_sum
             sev = _severity_from_order_diff(p_order - t_order)
-            # critical은 1건만 있어도 알람, 나머지는 비율·count 임계
-            if sev == "critical" or (count >= alarm_count_threshold and rate >= alarm_rate_threshold):
+            # [M-confusion-gate] critical·high severity 미탐은 count>=1이면 무조건 알람
+            # (rate 게이팅 제거). 고위험 미탐(예: TS→S2 = high)이 소량이면 예전엔 rate
+            # 미달로 경보가 누락됐다 — fail-SECURE 위반. rate는 medium/low 같은 저위험
+            # 셀의 노이즈 게이팅에만 쓴다.
+            if sev in ("critical", "high"):
+                _fire = count >= 1
+            else:
+                _fire = count >= alarm_count_threshold and rate >= alarm_rate_threshold
+            if _fire:
                 alarms.append(
                     UnderclassAlarm(
                         truth=t,

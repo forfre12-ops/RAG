@@ -18,13 +18,38 @@ _SEPARATORS = ["\n\n", "\n", "。", ". ", " ", ""]
 # - "Ⅰ.", "Ⅱ.", "1.", "1.1", "1.1.1"
 # - "[1]", "(1)"
 # - markdown "#"
+#
+# 숫자 헤딩 과민성 수정(2026-06): 기존 ``\d+(\.\d+){0,3}\s*[.．、]?\s+\S`` 는
+#   '2024.', '1. 5억원', '3 명' 같은 일반 본문줄을 헤딩으로 오인해 과분절을 유발했다.
+#   (임베딩/reranking 품질 저하). 제약을 강화:
+#     - 번호가 '단일 숫자'면 뒤에 구분자([.．、]) 필수 ('3 명'처럼 구분자 없는 단일숫자 배제),
+#       '다단계 번호'(1.1, 1.1.1)는 자체 점이 섹션 의미라 트레일링 구분자 선택.
+#     - 제목 텍스트 길이 하한 2자 이상 (한두 글자 단위명 배제).
+#     - 제목 첫 글자는 숫자/통화기호가 아니어야 함 ('1. 5억원'·'1. 12,000원' 같은
+#       금액 나열을 헤딩에서 제외).
+#     - 단독 4자리 연도('2024.')는 _NUMERIC_HEADING_EXCLUDE로 별도 차단.
 _HEADING_PATTERNS = [
     re.compile(r"^\s*제\s*\d+\s*[조절장항호]", re.MULTILINE),
     re.compile(r"^\s*[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\s*[.．、]", re.MULTILINE),
-    re.compile(r"^\s*\d+(\.\d+){0,3}\s*[.．、]?\s+\S", re.MULTILINE),
+    # 다단계 번호(1.1, 1.1.1 …): 트레일링 구분자 선택, 제목(숫자·통화 아님 2자+) 필수.
+    re.compile(
+        r"^\s*\d{1,2}(\.\d{1,2}){1,3}\s*[.．、]?\s+(?![\d₩$￦])\S{2,}",
+        re.MULTILINE,
+    ),
+    # 단일 번호(1, 2 …): 트레일링 구분자([.．、]) 필수 + 제목(숫자·통화 아님 2자+).
+    re.compile(
+        r"^\s*\d{1,2}\s*[.．、]\s+(?![\d₩$￦])\S{2,}",
+        re.MULTILINE,
+    ),
     re.compile(r"^\s*[\[\(]\d+[\]\)]", re.MULTILINE),
     re.compile(r"^\s*#{1,6}\s+\S", re.MULTILINE),
 ]
+
+# 위 숫자 헤딩 패턴에 걸려도 헤딩이 아닌 줄(연도 단독·날짜 등) 추가 배제.
+# 예: '2024.', '2024. 1.', '2024. 1. 5.' (날짜) — 섹션 번호가 아니라 일자 표기.
+_NUMERIC_HEADING_EXCLUDE = re.compile(
+    r"^\s*(?:19|20)\d{2}\s*[.．、](?:\s*\d{1,2}\s*[.．、]?)*\s*$"
+)
 
 # 문장 경계 — 한국어 종결 + 영문 . ? !
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?。？！])\s+|(?<=[다요죠음임함])\.\s+")
@@ -145,7 +170,8 @@ def _split_by_heading(text: str) -> list[tuple[str, str]]:
             if line_end == -1:
                 line_end = len(text)
             heading_line = text[line_start:line_end].strip()
-            if heading_line:
+            # 연도·날짜 단독줄('2024.', '2024. 1. 5.')은 섹션 헤딩이 아니므로 제외.
+            if heading_line and not _NUMERIC_HEADING_EXCLUDE.match(heading_line):
                 matches.append((line_start, heading_line))
 
     if not matches:

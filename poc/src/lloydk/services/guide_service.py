@@ -37,6 +37,9 @@ class _GuideRecord:
     registered_at: str
     indexed: bool
     embedding_vector_count: int
+    # M-guide-tenant (Track B): 업로드가 받은 실제 tenant_id를 기록한다. 과거엔
+    # _persist_guide가 "default"로 하드코딩해 모든 테넌트 이력이 한 행으로 혼합됐다.
+    tenant_id: str = "default"
     index_name: Optional[str] = None
     alias: Optional[str] = None
     model: Optional[str] = None
@@ -51,8 +54,10 @@ class GuideService:
     _instance: "GuideService | None" = None
 
     def __init__(self, indexer: RagIndexer | None = None):
-        self._guides: dict[str, list[_GuideRecord]] = defaultdict(list)
-        self._current_training_version: dict[str, str] = {}
+        # M-guide-tenant: in-memory 폴백 저장소도 (tenant_id, guide_id)로 키해
+        # 테넌트 간 이력 혼합을 막는다.
+        self._guides: dict[tuple[str, str], list[_GuideRecord]] = defaultdict(list)
+        self._current_training_version: dict[tuple[str, str], str] = {}
         self._indexer = indexer  # None이면 upload 시점에 lazy 생성 (테스트 주입 용이)
 
     @classmethod
@@ -72,7 +77,11 @@ class GuideService:
         return self._indexer
 
     def _persist_guide(self, rec: _GuideRecord, doc_type: Optional[str], filename: Optional[str]) -> None:
-        """guides 테이블에 버전 이력 저장 (best-effort)."""
+        """guides 테이블에 버전 이력 저장 (best-effort).
+
+        M-guide-tenant: 과거엔 tenant_id를 "default"로 하드코딩해 모든 테넌트의 가이드
+        이력이 한 행으로 섞였다. 이제 업로드가 결속한 실제 tenant_id(rec.tenant_id)로 저장한다.
+        """
         try:
             from lloydk.db import session_scope  # noqa: PLC0415
             from lloydk.repositories.guide_repo import GuideRepo  # noqa: PLC0415
@@ -80,7 +89,7 @@ class GuideService:
                 GuideRepo(db).create(
                     guide_id=rec.guide_id,
                     version=rec.version,
-                    tenant_id="default",
+                    tenant_id=rec.tenant_id or "default",
                     effective_date=rec.effective_date,
                     change_summary=rec.change_summary,
                     doc_type=doc_type,
@@ -94,18 +103,25 @@ class GuideService:
         except Exception as exc:  # noqa: BLE001
             logger.debug("guide persist to DB skipped: %s", exc)
 
-    def list_versions_from_db(self, guide_id: str) -> Optional["GuideVersionList"]:
-        """DB에서 버전 이력 조회. DB 미가용 시 None."""
+    def list_versions_from_db(
+        self, guide_id: str, tenant_id: str = "default"
+    ) -> Optional["GuideVersionList"]:
+        """DB에서 버전 이력 조회. DB 미가용 시 None.
+
+        M-guide-tenant: tenant_id로 스코프해 다른 테넌트의 가이드 이력이 새지 않게 한다.
+        """
         try:
             from lloydk.db import session_scope  # noqa: PLC0415
             from lloydk.repositories.guide_repo import GuideRepo  # noqa: PLC0415
             with session_scope() as db:
-                rows = GuideRepo(db).list_versions(guide_id)
+                rows = GuideRepo(db).list_versions(guide_id, tenant_id=tenant_id)
                 if not rows:
                     return None
                 return GuideVersionList(
                     guide_id=guide_id,
-                    current_training_version=GuideRepo(db).latest_training_version(guide_id),
+                    current_training_version=GuideRepo(db).latest_training_version(
+                        guide_id, tenant_id=tenant_id
+                    ),
                     versions=[
                         GuideVersionItem(
                             version=r.version,
@@ -156,11 +172,12 @@ class GuideService:
             registered_at=dt.datetime.now(dt.timezone.utc).isoformat(),
             indexed=result.indexed,
             embedding_vector_count=result.vector_count,
+            tenant_id=tenant_id or "default",
             index_name=result.index_name,
             alias=result.alias,
             model=result.model,
         )
-        self._guides[guide_id].append(rec)
+        self._guides[(rec.tenant_id, guide_id)].append(rec)
         self._persist_guide(rec, doc_type=doc_type, filename=filename)
 
         if result.warnings:
@@ -182,19 +199,22 @@ class GuideService:
             triggers_retraining=False,  # PoC: 항상 false. 운영은 effective_date·diff로 판단.
         )
 
-    def list_versions(self, guide_id: str) -> Optional[GuideVersionList]:
-        logger.debug("guide list_versions enter: guide_id=%s", guide_id)
+    def list_versions(
+        self, guide_id: str, tenant_id: str = "default"
+    ) -> Optional[GuideVersionList]:
+        logger.debug("guide list_versions enter: guide_id=%s tenant=%s", guide_id, tenant_id)
+        tenant_id = tenant_id or "default"
         # DB 우선 — 가용 시 영속 데이터 반환 (재시작 후에도 유지)
-        db_result = self.list_versions_from_db(guide_id)
+        db_result = self.list_versions_from_db(guide_id, tenant_id=tenant_id)
         if db_result is not None:
             return db_result
         # DB 미가용 폴백: in-memory
-        records = self._guides.get(guide_id)
+        records = self._guides.get((tenant_id, guide_id))
         if not records:
             return None
         return GuideVersionList(
             guide_id=guide_id,
-            current_training_version=self._current_training_version.get(guide_id),
+            current_training_version=self._current_training_version.get((tenant_id, guide_id)),
             versions=[
                 GuideVersionItem(
                     version=r.version,

@@ -195,13 +195,15 @@ class InferencePipeline:
 
                     if override_grade is not None:
                         if GRADE_ORDER.get(override_grade.value, 99) < GRADE_ORDER.get(result.label.value, 99):
+                            # [M-renorm] override 등급을 strict argmax로 만들고 재정규화 +
+                            # confidence=scores[label] 재계산 (label/scores/confidence 정합).
+                            new_scores, new_conf = self._enforce_label_consistency(
+                                result.scores, override_grade.value, floor=0.7
+                            )
                             result = InferenceResult(
                                 label=override_grade,
-                                confidence=max(result.confidence, rule_res.confidence),
-                                scores={
-                                    **result.scores,
-                                    override_grade.value: max(result.scores.get(override_grade.value, 0), 0.7),
-                                },
+                                confidence=new_conf,
+                                scores=new_scores,
                                 factors=result.factors,
                                 evidence=result.evidence,
                                 rag_context=result.rag_context,
@@ -248,10 +250,15 @@ class InferencePipeline:
                         result.warnings = list(result.warnings) + [
                             f"source-prior: {src!r} is public → grade capped at {cap_code}"
                         ]
+                        # [M-renorm] cap 등급을 strict argmax로 만들고 재정규화. cap은 하향이라
+                        # confidence는 그 의미(불확실성↑)를 보존해 0.7 상한을 추가로 적용.
+                        new_scores, new_conf = self._enforce_label_consistency(
+                            result.scores, cap_code, floor=0.6
+                        )
                         result = InferenceResult(
                             label=Grade[cap_code],
-                            confidence=min(result.confidence, 0.7),
-                            scores={**result.scores, cap_code: max(result.scores.get(cap_code, 0), 0.6)},
+                            confidence=min(new_conf, 0.7),
+                            scores=new_scores,
                             factors=result.factors,
                             evidence=result.evidence,
                             rag_context=result.rag_context,
@@ -282,6 +289,36 @@ class InferencePipeline:
 
         return result
 
+    @staticmethod
+    def _enforce_label_consistency(
+        scores: dict[str, float], label: str, floor: float
+    ) -> tuple[dict[str, float], float]:
+        """[M-renorm] override/cap 후 scores·argmax·confidence 정합 강제 (fail-SECURE).
+
+        FNR-safe override(고등급 0.7)·source-prior cap(0.6)은 한 등급 score만 max()로
+        바꾸고 재정규화/argmax 재확정을 하지 않아, label은 TS인데 scores argmax는 S3가
+        되는 등 불일치(미탐 은폐)가 가능했다. 여기서:
+
+          1. label의 score를 floor 이상으로 올리되, **반드시 strict argmax**가 되도록
+             다른 모든 등급보다 epsilon만큼 크게 만든다(동률도 label 우선 → 미탐 방지).
+          2. scores 합=1로 재정규화.
+          3. confidence = 재정규화된 scores[label] 반환.
+
+        반환: (정규화된 scores, confidence). scores는 항상 합≈1, argmax==label.
+        """
+        s = {k: max(float(v), 0.0) for k, v in scores.items()}
+        s.setdefault(label, 0.0)
+        # label을 다른 모든 등급보다 엄격히 크게 (strict argmax 보장).
+        others_max = max((v for k, v in s.items() if k != label), default=0.0)
+        eps = 1e-6
+        s[label] = max(s[label], floor, others_max + eps)
+        total = sum(s.values())
+        if total > 0:
+            s = {k: v / total for k, v in s.items()}
+        else:  # 모든 score 0 — label에 전량 부여 (fail-SECURE)
+            s = {k: (1.0 if k == label else 0.0) for k in s}
+        return s, float(s[label])
+
     def _run_rule_fallback(self, text: str, return_evidence: bool) -> InferenceResult:
         try:
             from lloydk.api.prom_metrics import RULE_FALLBACK_TOTAL  # noqa: PLC0415
@@ -306,12 +343,62 @@ class InferencePipeline:
             warnings=["model weights not loaded — using rule-based fallback"],
         )
 
+    # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.
+    # 이 등급들의 문서확률은 청크 평균이 아니라 max(가장 강한 청크)로 잡아,
+    # 수식 한 문단 같은 핵심 비밀이 다수의 평범한 청크에 희석되어 미탐되는 것을 막는다.
+    _SEVERE_AGG_CODES = ("TS", "S1")
+
+    def _aggregate_chunk_probs(self, chunk_probs, chunk_weights):
+        """청크별 softmax → 문서 확률 벡터 (most-severe-wins, fail-SECURE).
+
+        [M-agg] 단순 비가중 평균은 핵심 비밀이 담긴 한 청크(예: 수식 한 문단)를
+        다수의 평범한 청크에 희석시켜 미탐을 만든다. 그래서:
+
+          - 저등급(S2/S3 등): 길이 가중 평균 — 일반 동작 보존.
+          - 고등급(TS/S1): 가장 강한 청크의 확률을 반영(max) — 한 청크의 강한
+            비밀 신호가 평균에 묻히지 않게. argmax는 이 보강된 벡터에서 재확정.
+
+        반환 벡터는 비정규(고등급 max 보강으로 합>1 가능)일 수 있다 — 이건 의도적이다.
+        호출부는 이 벡터로 argmax/confidence를 잡으며, confidence는 [0,1]로 clamp한다.
+        """
+        import torch
+
+        if chunk_probs.ndim == 1:
+            chunk_probs = chunk_probs.unsqueeze(0)
+        n_chunks = chunk_probs.shape[0]
+
+        # 길이 가중 평균 (가중치 부재/0합이면 균등 평균으로 폴백).
+        w = None
+        if chunk_weights and len(chunk_weights) == n_chunks:
+            w = torch.tensor(chunk_weights, dtype=chunk_probs.dtype)
+            if float(w.sum()) <= 0:
+                w = None
+        if w is not None:
+            weighted = (chunk_probs * w.unsqueeze(1)).sum(dim=0) / w.sum()
+        else:
+            weighted = chunk_probs.mean(dim=0)
+
+        doc_prob = weighted.clone()
+        # 고등급: max 청크 확률로 보강 (most-severe-wins). 단조 비감소 — 평균보다
+        # 낮아지지 않으므로 미탐 방향으로 후퇴할 수 없다.
+        chunk_max = chunk_probs.max(dim=0).values
+        severe_idx = {
+            i for i, g in self._id2label.items()
+            if (g.value if hasattr(g, "value") else str(g)) in self._SEVERE_AGG_CODES
+        }
+        for i in severe_idx:
+            doc_prob[i] = torch.maximum(doc_prob[i], chunk_max[i])
+        return doc_prob
+
     def _run_model(self, text: str, use_rag: bool, return_evidence: bool) -> InferenceResult:
         import torch
         import torch.nn.functional as F
 
         chunks = chunk_text(text, settings.max_seq_len * 3, settings.chunk_overlap)
         chunk_texts = [c.text for c in chunks] or [text]
+        # 길이 가중치: 짧은 노이즈 청크가 평균을 흔들지 않도록 char 수로 가중.
+        # 0 길이/공백 청크는 1로 floor (가중치 0이 되어 사라지지 않게).
+        chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
 
         probs = []
         with torch.no_grad():
@@ -323,11 +410,17 @@ class InferencePipeline:
                 ).to(self._device)
                 logits = self._model(**enc).logits
                 probs.append(F.softmax(logits, dim=-1).cpu())
-        doc_prob = torch.cat(probs).mean(dim=0)
-        scores = {g.value: float(doc_prob[i]) for i, g in self._id2label.items()}
+        chunk_probs = torch.cat(probs)  # [n_chunks, n_labels]
+        doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
+        # argmax는 보강된 doc_prob에서 확정 (most-severe-wins 반영). 표시용 scores는
+        # 합=1로 재정규화한다 — 정규화는 모든 인덱스를 같은 상수로 나누므로 argmax 순서를
+        # 보존(label 안정)하고, scores·label·confidence 정합을 유지한다.
         pred_idx = int(doc_prob.argmax().item())
         pred = self._id2label[pred_idx]
-        conf = float(doc_prob[pred_idx])
+        total = float(doc_prob.sum())
+        norm = (doc_prob / total) if total > 0 else doc_prob
+        scores = {g.value: float(norm[i]) for i, g in self._id2label.items()}
+        conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
 
         lab = self.labeling.label(text)  # 보조 evidence/factors
         # use_rag은 run() 레벨에서 통합 처리 — 본 함수 시그니처는 호환 위해 유지.

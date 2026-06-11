@@ -105,8 +105,18 @@ def test_rate_limit_disabled_env_bypasses(monkeypatch):
         limiter.reset()
 
 
-def test_rate_limit_tenant_isolation(enable_limiter):
-    """서로 다른 X-Tenant-Id는 독립 카운터 — 한 테넌트가 한도 채워도 다른 테넌트는 통과."""
+def test_rate_limit_unverified_tenant_header_shares_bucket(enable_limiter):
+    """[M-ratelimit-key, 2026-06-11] 계약 갱신(보안): *검증 안 된* X-Tenant-Id 헤더는
+    더 이상 독립 rate-limit 버킷을 만들지 않는다.
+
+    과거 계약은 원시 X-Tenant-Id 헤더로 버킷을 분리했다 → 공격자가 헤더를 위조해 매
+    요청마다 새 버킷을 차지하면 한도를 우회할 수 있었다. 이제 key_func는 인증이 해소한
+    authoritative 신원(request.state.auth_tenant/auth_actor)만 쓰고, 미검증 헤더는
+    IP 폴백으로 합쳐진다. 따라서 같은 클라이언트(같은 IP)가 다른 X-Tenant-Id를 보내도
+    같은 버킷을 공유하므로, 한쪽이 한도를 채우면 다른 쪽도 막혀야 한다.
+
+    (검증된 신원이 독립 버킷을 받는 *양성* 경로는 tests/test_audit_w2_b.py 에서 단위로 고정.)
+    """
     payload = {
         "target_grade": "S2",
         "count": 1,
@@ -116,12 +126,12 @@ def test_rate_limit_tenant_isolation(enable_limiter):
     hdr_a = {"X-API-Key": settings.api_key, "X-Tenant-Id": "tenant-a"}
     hdr_b = {"X-API-Key": settings.api_key, "X-Tenant-Id": "tenant-b"}
     with TestClient(app) as cli:
-        # tenant-a 한도까지 채움
+        # tenant-a 헤더로 한도까지 채움
         for _ in range(10):
             cli.post("/api/v1/synth/generate", headers=hdr_a, json=payload)
-        # tenant-a 11번째 호출 → 429
+        # tenant-a 11번째 → 429 (버킷 고갈)
         r_a = cli.post("/api/v1/synth/generate", headers=hdr_a, json=payload)
-        # tenant-b 1번째 호출 → 202 (독립 카운터)
+        # tenant-b 헤더지만 검증 안 됨 → 같은 IP 버킷 공유 → 역시 429
         r_b = cli.post("/api/v1/synth/generate", headers=hdr_b, json=payload)
         assert r_a.status_code == 429
-        assert r_b.status_code == 202
+        assert r_b.status_code == 429

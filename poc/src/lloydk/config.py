@@ -240,6 +240,12 @@ class Settings(BaseSettings):
     # 운영 기본 20MB — 대부분 가이드 PDF·DOCX 커버. 초과 시 413 Payload Too Large 반환.
     max_upload_mb: int = 20
 
+    # OCR DoS 가드 — 스캔 PDF 한 건을 OCR할 때 변환·인식할 최대 페이지 수.
+    # 수백쪽 스캔본 한 건이 pdf2image/Tesseract를 수십분~OOM으로 모는 것을 차단.
+    # 초과 페이지는 변환하지 않고 '잘림' 경고를 남긴다. 0 이하면 무제한(명시적 opt-out).
+    # 보수적 기본 50쪽 — 대부분의 정상 문서를 커버하면서 악성·사고성 대용량은 차단.
+    ocr_max_pages: int = 50
+
     # --- 동작 모드 ---
     # dryrun: 무거운 모델 다운로드 없이 mock으로 검증
     # full: 실제 모델 로드 (GPU/대용량 필요)
