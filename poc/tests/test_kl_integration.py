@@ -177,7 +177,7 @@ class TestS4SchemaGrades:
             current = cli.get("/api/v1/schema/grades", headers=_hdr()).json()
             r = cli.put(
                 "/api/v1/schema/grades",
-                headers=_hdr(),
+                headers=_hdr(role="admin"),
                 json={"grades": current["grades"], "actor": _actor(role="admin")},
             )
         assert r.status_code == 200
