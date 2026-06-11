@@ -40,6 +40,10 @@ class MatchedKeyword:
     count: int
     weight: float
     score: float                # = count * weight
+    # [M-rule-evidence] 실제 매치 substring의 본문 내 위치(있으면 evidence span에 정확히 사용).
+    # exact/regex/semantic 시드 매칭은 None(파이프라인이 text.find로 첫 위치 탐색).
+    start: Optional[int] = None
+    end: Optional[int] = None
 
 
 @dataclass
@@ -77,25 +81,31 @@ def _apply_high_risk_overrides(
     reports and technical snippets often contain English acronyms only. These
     boosts reduce the common S2/S1/TS -> S3 fall-through without changing the
     tie-breaking policy.
+
+    [M-rule-evidence] 매치를 MatchedKeyword로 기록할 때 keyword에 정규식 원문이 아니라
+    실제 매치된 substring(re.finditer의 group(0))과 span을 저장한다. 그래야 pipeline의
+    evidence span(text.find(keyword))이 정규식이 아닌 실제 본문 토큰을 가리킨다.
+    [M-rule-factor] grade_scores/factor_raw는 키가 없을 수 있으므로 KeyError 대신
+    setdefault로 누산한다(DB LevelKeyword가 시드 외 factor_code를 가질 때 방어).
     """
     for grade, pattern, weight, factor in _HIGH_RISK_PATTERNS:
-        found = re.findall(pattern, text, flags=re.IGNORECASE)
-        if not found:
-            continue
-        count = len(found)
-        score = count * weight
-        grade_scores[grade] += score
-        factor_raw[factor] += score
-        matches.append(
-            MatchedKeyword(
-                keyword=pattern,
-                grade=grade,
-                factor=factor,
-                count=count,
-                weight=weight,
-                score=score,
+        for mo in re.finditer(pattern, text, flags=re.IGNORECASE):
+            matched = mo.group(0)
+            score = weight  # finditer는 매치당 1회 → count=1
+            grade_scores[grade] = grade_scores.get(grade, 0.0) + score
+            factor_raw[factor] = factor_raw.get(factor, 0.0) + score
+            matches.append(
+                MatchedKeyword(
+                    keyword=matched,
+                    grade=grade,
+                    factor=factor,
+                    count=1,
+                    weight=weight,
+                    score=score,
+                    start=mo.start(),
+                    end=mo.end(),
+                )
             )
-        )
 
 
 class LabelRuleEngine:
@@ -221,8 +231,10 @@ class LabelRuleEngine:
             matches.append(
                 MatchedKeyword(keyword=kw, grade=grade, factor=factor, count=count, weight=weight, score=score)
             )
-            grade_scores[grade] += score
-            factor_raw[factor] += score
+            # [M-rule-factor] DB LevelKeyword가 시드 외 grade/factor_code를 가지면 KeyError가
+            # 나므로 setdefault 누산(get+더하기)으로 방어. 미초기화 키는 0.0에서 시작.
+            grade_scores[grade] = grade_scores.get(grade, 0.0) + score
+            factor_raw[factor] = factor_raw.get(factor, 0.0) + score
 
         _apply_high_risk_overrides(text, grade_scores, factor_raw, matches)
 
@@ -233,10 +245,16 @@ class LabelRuleEngine:
             conf = 0.0
             warnings = ["no keyword matched → default S3"]
         else:
-            # argmax. 동점이면 FNR-safe 옵션에 따라 더 높은 등급(낮은 order) 선택
+            # argmax. 동점이면 FNR-safe 옵션에 따라 더 높은 등급(낮은 order) 선택.
+            # [M-rule-factor] DB 시드가 GRADE_ORDER 외 등급을 더했을 수 있어 order 조회는
+            # KeyError 대신 큰 값(낮은 우선순위)으로 폴백 — 미지 등급은 동점 시 후순위.
             top_score = max(grade_scores.values())
             tops = [g for g, s in grade_scores.items() if s == top_score]
-            chosen = min(tops, key=lambda g: GRADE_ORDER[g]) if self.fnr_safe else tops[0]
+            chosen = (
+                min(tops, key=lambda g: GRADE_ORDER.get(g, 999))
+                if self.fnr_safe
+                else tops[0]
+            )
             conf = top_score / total
             warnings = []
 

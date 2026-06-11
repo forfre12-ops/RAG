@@ -75,9 +75,12 @@ class TestMetricsFromArrays:
         assert m.accuracy == 0.0
         assert m.confusion_matrix == []
 
-    def test_mismatched_length_returns_zero(self):
-        m = compute_metrics_from_arrays(["TS"], ["TS", "S1"])
-        assert m.sample_count == 0
+    def test_mismatched_length_raises(self):
+        # [M-metrics-len] 계약 갱신: 옛 로직은 길이 불일치를 조용히 all-zeros(sample_count=0)로
+        # 반환해 데이터/파이프라인 버그를 은폐했다(FNR=0.0 → 미탐 회귀를 게이트가 못 잡음).
+        # 이제 ValueError를 raise한다. 안전(fail-SECURE)을 위해 옛 계약으로 되돌리지 않는다.
+        with pytest.raises(ValueError):
+            compute_metrics_from_arrays(["TS"], ["TS", "S1"])
 
 
 class TestConfusionMatrix:

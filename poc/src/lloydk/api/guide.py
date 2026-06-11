@@ -62,8 +62,11 @@ async def upload_guide(
 
 
 @router.get("/guide/documents/{guide_id}", response_model=GuideVersionList)
-def list_guide_versions(guide_id: str):
-    res = GuideService.get_instance().list_versions(guide_id)
+def list_guide_versions(guide_id: str, request: Request):
+    # 읽기경로도 인증 tenant로 스코프 — 업로드(쓰기)가 실제 tenant로 격리 저장하므로
+    # 조회도 동일 tenant로 해야 비-default tenant 가이드가 노출된다(W2 후속).
+    tenant_id = resolve_effective_tenant(request, None) or "default"
+    res = GuideService.get_instance().list_versions(guide_id, tenant_id=tenant_id)
     if res is None:
         raise HTTPException(status_code=404, detail="guide_id not found")
     return res

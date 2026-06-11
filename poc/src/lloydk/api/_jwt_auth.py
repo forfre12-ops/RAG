@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass
 
@@ -25,6 +26,57 @@ from fastapi import Header, HTTPException, Request
 from lloydk.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _is_production() -> bool:
+    """운영 강제(fail-fast) 적용 여부.
+
+    poc_mode=full 이면서 테스트(TestClient/pytest) 환경이 아닐 때만 True.
+    dev/test/dryrun은 항상 False — 운영 전용 엄격성이 비파괴.
+    """
+    if getattr(settings, "poc_mode", "dryrun") != "full":
+        return False
+    if os.environ.get("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return False
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return False
+    return True
+
+
+def assert_production_auth_config() -> None:
+    """운영(poc_mode=full) 진입 시 인증 모드별 confused-deputy 차단 설정을 강제.
+
+    호출 위치: api/app.py startup hook(assert_production_credentials 인접) 권장. dev/test/
+    dryrun은 _is_production()=False라 즉시 반환(비파괴).
+
+    L-jwt-aud: jwt 모드인데 jwt_issuer/jwt_audience가 비면 같은 키로 서명된 타 용도
+      토큰을 수락(confused deputy). 둘 다 설정돼야 함.
+    L-apikey-honor: api_key 모드는 단일 공유키라 본 함수에서 막진 않으나, 테넌트별
+      api_key_hash 미등록 시 body tenant 무검증 통과(honor-system)임을 경고로 노출.
+    """
+    if not _is_production():
+        return
+    mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
+    if mode in ("jwt", "both"):
+        missing: list[str] = []
+        if not getattr(settings, "jwt_issuer", ""):
+            missing.append("LLOYDK_JWT_ISSUER")
+        if not getattr(settings, "jwt_audience", ""):
+            missing.append("LLOYDK_JWT_AUDIENCE")
+        if missing:
+            raise RuntimeError(
+                f"SECURITY: auth_mode={mode!r} 운영 모드인데 {', '.join(missing)} 미설정. "
+                "iss/aud 미검증 시 같은 키로 서명된 타 용도 JWT를 수락(confused deputy)합니다. "
+                "JWT_ISSUER / JWT_AUDIENCE 를 명시하세요."
+            )
+    if mode in ("api_key", "both"):
+        # 단일 공유키 자체는 운영에서 허용(서비스 호출자=신뢰). 다만 테넌트별 api_key_hash가
+        # 등록돼 있지 않으면 X-Tenant-Id가 honor-system으로 통과됨을 운영자에게 경고.
+        logger.warning(
+            "auth_mode=%s 운영 — 테넌트별 api_key_hash 미등록 테넌트의 X-Tenant-Id는 "
+            "honor-system으로 통과합니다(스코프 결속에는 미사용). 테넌트 격리가 필요하면 "
+            "각 테넌트에 api_key_hash 를 등록하세요.", mode,
+        )
 
 
 @dataclass
@@ -114,13 +166,19 @@ def verify_jwt(token: str) -> JWTClaims:
         raise JWTError("token not yet valid (nbf)")
 
     # iss (issuer) — settings.jwt_issuer 설정 시 반드시 일치해야 함.
+    # L-jwt-aud: 운영(poc_mode=full)에서는 미설정 자체가 confused-deputy 위험이므로
+    # fail-fast. dev/test/dryrun은 미설정 시 기존처럼 검증 skip(비파괴).
     expected_iss = getattr(settings, "jwt_issuer", "")
+    if not expected_iss and _is_production():
+        raise JWTError("jwt_issuer not configured in production (confused deputy risk)")
     if expected_iss:
         if str(payload.get("iss", "")) != expected_iss:
             raise JWTError(f"issuer mismatch: expected {expected_iss!r}")
 
     # aud (audience) — settings.jwt_audience 설정 시 payload aud에 포함되어야 함.
     expected_aud = getattr(settings, "jwt_audience", "")
+    if not expected_aud and _is_production():
+        raise JWTError("jwt_audience not configured in production (confused deputy risk)")
     if expected_aud:
         aud = payload.get("aud")
         aud_list = [aud] if isinstance(aud, str) else (aud or [])
@@ -362,10 +420,21 @@ def require_auth(
             roles = _resolve_api_key_roles(request)
             # tenant API key hash 검증 (설정된 경우). hash 일치 시에만 tenant가
             # authoritative — 그때만 audit/스코프 결속에 사용(미검증 헤더 신뢰 금지).
+            # L-apikey-honor: 운영(poc_mode=full)에서 X-Tenant-Id를 주장하는데 해당
+            # 테넌트에 api_key_hash가 등록돼 있지 않으면 honor-system 통과를 막고 거부
+            # (fail-closed). dev/단일테넌트는 비파괴(검증 skip, body tenant 그대로 사용).
             verified_tenant: str | None = None
             if x_tenant_id and x_api_key:
                 if _verify_tenant_api_key(x_tenant_id, x_api_key):
                     verified_tenant = x_tenant_id
+                elif _is_production():
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            "tenant api_key_hash not registered; cannot honor X-Tenant-Id "
+                            "in production"
+                        ),
+                    )
             _stash_auth(
                 request, mode="api_key", tenant=verified_tenant, actor=None, role=roles[0]
             )

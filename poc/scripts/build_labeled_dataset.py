@@ -10,8 +10,19 @@
 import argparse
 import json
 import random
+import re
 from collections import defaultdict
 from pathlib import Path
+
+
+def _norm_key(text: str) -> str:
+    """[M-dataset-leak] 분할 누수 방지용 정규화 키.
+
+    합성 m1·--extra JSONL에는 동일/유사 텍스트가 빈번해, 정규화 없이 라벨 내 셔플 후
+    비율 슬라이스하면 같은 내용이 train/test를 가로질러 누수(평가 낙관 편향)된다.
+    공백을 모두 제거한 텍스트를 키로 써서 같은 내용이 한 split에만 가게 한다.
+    """
+    return re.sub(r"\s+", "", text or "")
 
 
 def main():
@@ -62,7 +73,21 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     tr, va, te = (float(x) for x in args.ratio.split(","))
     train, val, test = [], [], []
+    total_dropped = 0
     for label, rows in by_label.items():
+        # [M-dataset-leak] 분할 전에 정규화 텍스트 키로 dedup — 동일 내용이 train/test
+        # 양쪽에 걸려 평가가 낙관적으로 편향되는 것을 차단. 첫 등장 행만 유지.
+        seen: set[str] = set()
+        unique_rows = []
+        for row in rows:
+            key = _norm_key(row.get("text", ""))
+            if key and key in seen:
+                continue
+            seen.add(key)
+            unique_rows.append(row)
+        dropped = len(rows) - len(unique_rows)
+        total_dropped += dropped
+        rows = unique_rows
         rng.shuffle(rows)
         n = len(rows)
         n_tr = int(n * tr)
@@ -70,7 +95,9 @@ def main():
         train += rows[:n_tr]
         val += rows[n_tr:n_tr + n_va]
         test += rows[n_tr + n_va:]
-        print(f"{label}: total={n} tr={n_tr} va={n_va} te={n - n_tr - n_va}")
+        print(f"{label}: total={n} (deduped -{dropped}) tr={n_tr} va={n_va} te={n - n_tr - n_va}")
+    if total_dropped:
+        print(f"dedup: dropped {total_dropped} duplicate rows (split-leak guard)")
 
     rng.shuffle(train)
     rng.shuffle(val)

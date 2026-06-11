@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import hmac
 import json
 import logging
+import os
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -35,6 +37,46 @@ from lloydk.db.models import AuditLog
 logger = logging.getLogger(__name__)
 
 ZERO16 = "0" * 16
+
+# M-audit-hmac (W3-D): 키 없는 sha256 체인은 prev16:full32 쌍만 일관되면 공격자가
+# 과거 row를 통째로 재서명(rewrite)할 수 있다(서버 비밀 불필요). 서버 보관 비밀키로
+# HMAC 링크를 만들면 키 없는 재작성이 불가능해진다.
+#   - 비밀키는 settings.audit_chain_secret 또는 env LLOYDK_AUDIT_CHAIN_SECRET.
+#   - 키가 설정돼 있으면 HMAC-SHA256으로 체인 링크 생성(운영 권장).
+#   - 키가 비어 있으면 기존 sha256 동작 유지(dev/test 비파괴) — 단, 운영(poc_mode=full)
+#     에서는 1회 경고 로그를 남긴다.
+_PROD_WARNED = False
+
+
+def _chain_secret() -> str:
+    """체인 HMAC 비밀키 — settings 우선, env 폴백. 빈 문자열이면 키 없음(레거시 sha256)."""
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+
+        v = getattr(settings, "audit_chain_secret", "") or ""
+    except Exception:  # noqa: BLE001
+        v = ""
+    if not v:
+        v = os.getenv("LLOYDK_AUDIT_CHAIN_SECRET", "") or ""
+    return v
+
+
+def _maybe_warn_prod_no_secret(secret: str) -> None:
+    """운영(poc_mode=full)인데 체인 비밀키가 없으면 1회 경고(비파괴, raise 안 함)."""
+    global _PROD_WARNED
+    if secret or _PROD_WARNED:
+        return
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+
+        if getattr(settings, "poc_mode", "dryrun") == "full":
+            _PROD_WARNED = True
+            logger.warning(
+                "audit chain HMAC secret 미설정 — 키 없는 sha256 체인은 과거 row "
+                "재작성 위협에 취약합니다. LLOYDK_AUDIT_CHAIN_SECRET 설정을 권장합니다."
+            )
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _stable_payload_repr(payload: dict | str | None) -> str:
@@ -49,16 +91,34 @@ def sha256_hex(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
+def _link_hex(secret: str, prev_row_hash: str, payload_repr: str) -> str:
+    """체인 링크 다이제스트 — 비밀키가 있으면 HMAC-SHA256, 없으면 평문 sha256.
+
+    HMAC 입력은 `{prev}|{payload}` — prev에 본 row 링크를 결속해 순서/삽입/삭제와
+    payload 변조를 모두 검출한다. 비밀키가 없으면 키 없는 재작성을 막을 수 없으므로
+    하위호환 sha256으로 폴백한다.
+    """
+    msg = f"{prev_row_hash}|{payload_repr}"
+    if secret:
+        return hmac.new(secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
+    return sha256_hex(msg)
+
+
 def build_chained_hash(payload: dict | str | None, prev_row_hash: str) -> str:
-    """payload + prev_row_hash → 64자 sha256.
+    """payload + prev_row_hash → 64자 다이제스트.
 
     payload_hash 컬럼에는 `prev16:full32` 패킹 형식으로 저장:
     - prev16: prev_row_hash 앞 16자
     - full32: 결합된 64자 hash 앞 32자
     합계 49자(콜론 포함). String(64) 컬럼 한도 안에 들어감.
+
+    M-audit-hmac: settings.audit_chain_secret(또는 env) 설정 시 HMAC-SHA256으로 링크를
+    생성해 키 없는 재작성을 차단. 미설정 시 기존 sha256 동작 유지(비파괴).
     """
+    secret = _chain_secret()
+    _maybe_warn_prod_no_secret(secret)
     payload_repr = _stable_payload_repr(payload)
-    combined = sha256_hex(f"{prev_row_hash}|{payload_repr}")
+    combined = _link_hex(secret, prev_row_hash, payload_repr)
     prev16 = (prev_row_hash or ZERO16)[:16]
     return f"{prev16}:{combined[:32]}"
 

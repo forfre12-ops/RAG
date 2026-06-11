@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 
 from lloydk.config import assert_production_credentials, settings
 from lloydk.api._rbac import require_role
+from lloydk.api._jwt_auth import require_auth
 from fastapi import Depends
 from lloydk.schemas.common import Error
 from lloydk.api import classify as classify_api
@@ -34,6 +35,46 @@ from lloydk.api.rate_limit import limiter, rate_limit_exceeded_handler
 logger = logging.getLogger(__name__)
 
 
+# M-schema-perm (Track B): /schema/grades 의 GET/PUT 권한 분리.
+#
+# GET(읽기, 등급체계 조회)은 broad 역할(admin/reviewer/system/kl_backend)에 허용한다.
+# PUT(전역 등급체계 추가/비활성 + 재학습 트리거 = 시스템 전역 파괴적 쓰기)는 admin 전용으로
+# 좁힌다. 'system'은 공유 api_key의 기본역할이라, 이를 허용하면 사실상 무권한으로
+# 전역 등급체계를 바꿀 수 있어 위험하다.
+#
+# 라우터 모듈(schema_admin.py)을 건드리지 않고 app.py 한 곳에서 메서드별로 분기하기 위해
+# 메서드-aware 의존성 하나를 라우터-include 수준에 부착한다. 변경 actor는 AuditMiddleware가
+# request.state.auth_*(위조 불가)로 이미 audit_log에 남긴다.
+_SCHEMA_GRADES_READ_ROLES = frozenset({"admin", "reviewer", "system", "kl_backend"})
+_SCHEMA_GRADES_WRITE_ROLES = frozenset({"admin"})
+
+
+async def _schema_grades_rbac(request: Request, auth_context: dict = Depends(require_auth)):
+    """GET → read 역할, 쓰기(PUT/POST/DELETE/PATCH) → admin 전용.
+
+    fail-closed: 읽기(GET/HEAD/OPTIONS) 외의 메서드는 모두 admin 권한을 요구한다 —
+    미래에 추가될 쓰기 엔드포인트가 실수로 broad 역할에 노출되지 않도록.
+    require_role과 동일하게 actor_roles(복수, JWT claim) 우선, 없으면 actor_role 단일 폴백.
+    """
+    roles = set(auth_context.get("actor_roles") or ())
+    if not roles:
+        single = auth_context.get("actor_role")
+        if single:
+            roles = {single}
+    allowed = (
+        _SCHEMA_GRADES_READ_ROLES
+        if request.method in ("GET", "HEAD", "OPTIONS")
+        else _SCHEMA_GRADES_WRITE_ROLES
+    )
+    if roles.isdisjoint(allowed):
+        from fastapi import HTTPException  # noqa: PLC0415
+        raise HTTPException(
+            status_code=403,
+            detail=f"forbidden: roles {sorted(roles)} not in {sorted(allowed)}",
+        )
+    return auth_context
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 배포 프로파일 + 적용된 backend 부팅 로그 — 운영 사고 사전 차단
@@ -46,6 +87,10 @@ async def lifespan(app: FastAPI):
     )
     # J1: 운영 모드에서 빈 자격증명 차단 (dryrun/테스트는 우회)
     assert_production_credentials()
+    # L-jwt-aud / L-apikey-honor: 운영 인증모드 confused-deputy 차단 설정 강제.
+    # _is_production()=False(dev/test/dryrun)면 즉시 반환(비파괴).
+    from lloydk.api._jwt_auth import assert_production_auth_config  # noqa: PLC0415
+    assert_production_auth_config()
     # D2 (2026-05-29): OpenTelemetry 트레이싱 활성. OTEL_EXPORTER_OTLP_ENDPOINT
     # 미설정 또는 opentelemetry 미설치 시 silent no-op (반환값 False).
     try:
@@ -168,7 +213,7 @@ app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(documents_api.router, prefix="/api/v1")
 app.include_router(
     schema_admin_api.router, prefix="/api/v1",
-    dependencies=[Depends(require_role("admin", "reviewer", "system", "kl_backend"))],
+    dependencies=[Depends(_schema_grades_rbac)],
 )
 app.include_router(metrics_api.router, prefix="/api/v1")
 app.include_router(prom_metrics_api.router, prefix="/api/v1")

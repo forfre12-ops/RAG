@@ -85,16 +85,28 @@ class ClassifyService:
         if not content:
             content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id)
         if not content:
-            warnings_acc = [f"content empty and doc_id={req.doc_id!r} not found in storage — cannot classify"]
+            # fail-SECURE (미탐 절대 금지): 본문을 못 읽으면 등급을 판단할 수 없다.
+            # 과거엔 label="S3"(공개)로 폴백했는데, 이는 '읽지 못한 비밀문서를 공개로
+            # 흘리는' 전형적 미탐 경로였다. 보수적으로 최고등급(Grade.TS)으로 격리하고
+            # status를 needs_review로 두어 사람 검수 큐에 강제 노출 — 절대 공개(S3)로
+            # 떨어뜨리지 않는다. (ClassifyResponse.label은 Grade 필수라 UNCLASSIFIED를
+            # 표현할 수 없으므로, 가장 안전한 '최고등급 + 검수필요'로 표현한다.)
+            from lloydk.schemas.common import Grade  # noqa: PLC0415
+            top_grade = self._highest_grade()
+            warnings_acc = [
+                f"content empty and doc_id={req.doc_id!r} not found in storage —"
+                f" cannot classify; fail-SECURE isolating at highest grade"
+                f" ({top_grade}) and routing to human_review (never defaults to public/S3)"
+            ]
             return ClassifyResponse(
                 inference_id=uuid.uuid4(),
                 doc_id=req.doc_id,
-                label="S3",
+                label=Grade(top_grade),
                 confidence=0.0,
-                scores={},
+                scores={top_grade: 1.0},
                 model_version="none",
                 elapsed_ms=0,
-                status="error",
+                status="needs_review",
                 warnings=warnings_acc,
             )
         if req.text_already_preprocessed:
@@ -197,6 +209,28 @@ class ClassifyService:
             status=status,
             warnings=warnings_acc,
         )
+
+    @staticmethod
+    def _highest_grade() -> str:
+        """가장 높은(가장 비밀) 등급 코드 반환 — fail-SECURE 격리용.
+
+        GradeRegistry.get_codes()는 level_order 오름차순(= 비밀이 가장 높은 등급이
+        선두)으로 반환하므로 [0]이 최고등급. DB 미가용/빈 목록이면 Grade.TS로 폴백.
+        """
+        try:
+            from lloydk.schemas.common import Grade, GradeRegistry  # noqa: PLC0415
+            codes = GradeRegistry.get_codes()
+            if codes:
+                # Grade enum으로 표현 가능한 코드만 채택 (응답 schema가 Grade 필수)
+                for code in codes:
+                    try:
+                        Grade(code)
+                        return code
+                    except ValueError:
+                        continue
+            return Grade.TS.value
+        except Exception:  # noqa: BLE001
+            return "TS"
 
     @staticmethod
     def _review_confidence_threshold() -> float:
@@ -334,6 +368,13 @@ class ClassifyService:
             return uuid.uuid4(), warns
 
         try:
+            # ── Step 1: classification 영속화 (자체 커밋) ──────────────────────
+            # M-classify-tx: classification 을 evidence 와 같은 트랜잭션에 묶으면
+            # add_evidence/add_rag_evidence 실패 시 이미 만든 classification 까지
+            # 롤백돼 '분류는 됐는데 기록은 사라지는' 미탐성 손실이 생긴다. 그래서
+            # classification(+chunks)은 여기서 먼저 commit 해 classification_id 를
+            # 확보하고, evidence/RAG-evidence 는 아래 Step 2 에서 best-effort 로
+            # 별도 트랜잭션에 적재한다(실패해도 분류 폐기 안 함).
             with session_scope() as db:
                 repo = ClassifyRepo(db)
                 if not repo.tenant_exists(tenant_id):
@@ -389,31 +430,11 @@ class ClassifyService:
                     rag_used=bool(pred.rag_context),
                     rag_top_k=len(pred.rag_context) or None,
                 )
-
+                classification_id = cls.classification_id
                 # Evidence chunk_id 결정: chunks가 영속화됐으면 진짜 첫 chunk_id, 아니면 임시 UUID
                 evidence_default_chunk = first_chunk_id or uuid.uuid4()
-
-                if pred.evidence:
-                    repo.add_evidence_from_spans(
-                        cls.classification_id,
-                        spans=pred.evidence,
-                        default_chunk_id=evidence_default_chunk,
-                    )
-
-                # 2026-05-29: RAG context도 ClassificationEvidence에 영속화.
-                # rag_used=True인데 본 단계가 실패해도 classification 자체는 저장됨(트랜잭션 동일).
-                if pred.rag_context:
-                    n_rag = repo.add_rag_evidence_from_hits(
-                        cls.classification_id,
-                        hits=pred.rag_context,
-                        default_chunk_id=evidence_default_chunk,
-                    )
-                    if n_rag != len(pred.rag_context):
-                        warns.append(
-                            f"rag evidence partial persist: {n_rag}/{len(pred.rag_context)}"
-                        )
-
-                return cls.classification_id, warns
+            # ← session_scope 종료 = classification commit 확정. 이후 evidence 실패는
+            #   여기 영속화된 classification 을 더는 롤백할 수 없다.
 
         except SQLAlchemyError as exc:
             self._inc_persist_failure("db_error")
@@ -436,6 +457,47 @@ class ClassifyService:
             )
             warns.append(f"persistence skipped: unexpected error ({type(exc).__name__})")
             return uuid.uuid4(), warns
+
+        # ── Step 2: evidence / RAG-evidence 영속화 (best-effort, 별도 트랜잭션) ──
+        # M-classify-tx: 여기서 실패하더라도 Step 1 에서 이미 commit 된
+        # classification 은 보존된다. evidence 는 보강 메타라 손실돼도 분류
+        # 결과(등급)는 유지 — 미탐(분류 자체 유실) 위험을 evidence 손실로
+        # 격하한다. 실패는 warning 으로만 보고하고 classification_id 는 그대로 반환.
+        if pred.evidence or pred.rag_context:
+            try:
+                from lloydk.db import session_scope  # noqa: PLC0415
+
+                with session_scope() as db2:
+                    repo2 = ClassifyRepo(db2)
+                    if pred.evidence:
+                        repo2.add_evidence_from_spans(
+                            classification_id,
+                            spans=pred.evidence,
+                            default_chunk_id=evidence_default_chunk,
+                        )
+                    if pred.rag_context:
+                        n_rag = repo2.add_rag_evidence_from_hits(
+                            classification_id,
+                            hits=pred.rag_context,
+                            default_chunk_id=evidence_default_chunk,
+                        )
+                        if n_rag != len(pred.rag_context):
+                            warns.append(
+                                f"rag evidence partial persist: {n_rag}/{len(pred.rag_context)}"
+                            )
+            except Exception as exc:  # noqa: BLE001
+                # evidence 실패는 classification 을 폐기하지 않는다 — warning 만.
+                self._inc_persist_failure("evidence_error")
+                logger.warning(
+                    "classify evidence persist failed (classification kept): "
+                    "classification_id=%s err=%s",
+                    classification_id, type(exc).__name__, exc_info=True,
+                )
+                warns.append(
+                    f"evidence persist failed (classification kept): {type(exc).__name__}"
+                )
+
+        return classification_id, warns
 
     def _fetch_content_by_doc_id(self, doc_id: str, tenant_id: str | None) -> str:
         """doc_id로 documents.normalized_text_uri → storage에서 텍스트 읽기.

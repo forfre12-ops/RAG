@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -95,10 +96,14 @@ class DocumentIngestionService:
         file_hash = hashlib.sha256(content_bytes).hexdigest()
         size = len(content_bytes)
         base_key = f"{tenant_id}/{file_hash}"
+        # 경로 탈출 방어 — 사용자 filename 을 그대로 스토리지 키에 합성하면
+        # ..\..\ 형태로 .storage 루트 밖에 쓸 수 있다(MinIO 폴백 LocalStorage = 폐쇄망 기본).
+        # 키에는 디렉터리 성분을 제거한 basename 만 사용하고, .,.. ,빈값은 해시로 대체.
+        safe_name = self._safe_key_name(filename, file_hash)
 
         # 1) 원본 보관 (진실 소스)
         storage = self._get_storage()
-        raw_uri = storage.put(self.RAW_BUCKET, f"{base_key}/{filename}", content_bytes)
+        raw_uri = storage.put(self.RAW_BUCKET, f"{base_key}/{safe_name}", content_bytes)
 
         # 2) 추출 + 정규화 + PII 마스킹 + 청크
         pre = self._preprocess(filename, content_bytes, warns)
@@ -158,6 +163,22 @@ class DocumentIngestionService:
     # ------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------
+
+    @staticmethod
+    def _safe_key_name(filename: str, fallback: str) -> str:
+        """사용자 filename 에서 디렉터리 성분을 제거한 안전한 basename 반환.
+
+        ..\\..\\evil.txt, /etc/passwd, C:\\x\\y.txt 같은 입력에서 경로 탈출 성분을
+        제거한다. 결과가 비거나 '.'/'..' 이면 file_hash 로 대체(키 충돌·탈출 방지).
+        백슬래시(윈도우 경로 구분자)도 분해 대상 — PurePosixPath 만으로는 누락된다.
+        """
+        raw = filename or ""
+        # 윈도우/유닉스 구분자 모두 처리: 마지막 구분자 뒤 성분만.
+        base = re.split(r"[\\/]", raw)[-1]
+        base = Path(base).name.strip()
+        if not base or base in {".", ".."}:
+            return fallback
+        return base
 
     def _preprocess(
         self, filename: str, content_bytes: bytes, warns: list[str]

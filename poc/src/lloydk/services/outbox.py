@@ -74,6 +74,10 @@ class OutboxStore:
 class InMemoryOutboxStore(OutboxStore):
     name = "memory"
 
+    # in-flight visibility timeout — dequeue된 메시지는 이 시간 동안 보이지 않음
+    # (Redis 백엔드의 invisible_until=now+600 과 동일). 워커 크래시 대비 자동 재진입.
+    VISIBILITY_TIMEOUT_SEC = 600
+
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._items: dict[str, OutboxMessage] = {}
@@ -84,11 +88,29 @@ class InMemoryOutboxStore(OutboxStore):
             self._items[msg.id] = msg
 
     def dequeue_ready(self, *, limit: int = 10) -> list[OutboxMessage]:
+        """ready 메시지를 반환하면서 in-flight 표시(visibility timeout)한다.
+
+        M-outbox-inflight: Redis 백엔드와 동일하게, 반환 직전 락 아래에서
+        ``next_retry_at = now + VISIBILITY_TIMEOUT_SEC`` 로 bump 해 두 번째
+        워커가 같은 메시지를 즉시 다시 집지 못하게 한다(중복 webhook 차단).
+
+        M-outbox-attempts: Redis 는 dequeue 시 score 를 bump 하지만 attempts
+        는 deliver_once 가 증가시킨다. InMemory 도 동일 계약을 유지하려고
+        dequeue 시점엔 attempts 를 건드리지 않되, in-flight bump 만 persist 한다.
+        반환 메시지는 store 가 보관한 동일 객체(참조)라 deliver_once 의
+        ``msg.attempts += 1`` 후 ``store.update(msg)`` 가 그대로 persist 된다.
+        """
         now = time.time()
+        invisible_until = now + self.VISIBILITY_TIMEOUT_SEC
         with self._lock:
             ready = [m for m in self._items.values() if m.next_retry_at <= now]
-        ready.sort(key=lambda m: m.next_retry_at)
-        return ready[:limit]
+            ready.sort(key=lambda m: m.next_retry_at)
+            picked = ready[:limit]
+            # in-flight 표시 — 반환 후 두 번째 dequeue가 같은 메시지를 못 집게.
+            for m in picked:
+                m.next_retry_at = invisible_until
+                self._items[m.id] = m
+        return picked
 
     def update(self, msg: OutboxMessage) -> None:
         with self._lock:

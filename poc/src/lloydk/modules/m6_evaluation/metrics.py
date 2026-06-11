@@ -67,10 +67,21 @@ def compute_metrics_from_arrays(
     labels: Sequence[str] | None = None,
     model_version: str = "n/a",
 ) -> MetricsResult:
-    """y_true·y_pred는 등급 코드 문자열 (TS·S1·S2·S3) 시퀀스."""
+    """y_true·y_pred는 등급 코드 문자열 (TS·S1·S2·S3) 시퀀스.
+
+    [M-metrics-len] 길이 불일치(n != len(y_pred))는 데이터/파이프라인 버그다 —
+    예전엔 조용히 all-zeros(0.0 통과)를 반환해 버그를 은폐했다(예: FNR=0.0으로 보여
+    미탐 회귀를 게이트가 못 잡음). 이제 ValueError를 raise한다. n==0만 N/A(빈 결과)로
+    두고 caller/report가 N/A로 취급한다.
+    """
     label_list = list(labels) if labels else list(DEFAULT_LABELS)
     n = len(y_true)
-    if n == 0 or n != len(y_pred):
+    if n != len(y_pred):
+        raise ValueError(
+            f"y_true/y_pred length mismatch: {n} != {len(y_pred)} "
+            "(data/pipeline bug — refusing to silently return all-zeros)"
+        )
+    if n == 0:
         return _empty_result(model_version, label_list)
 
     cm = confusion_matrix(y_true, y_pred, labels=label_list)
@@ -118,7 +129,8 @@ def compute_metrics_from_db(
     """DB의 classifications + corrections로 진실 라벨 vs 예측 라벨 페어 추출.
 
     진실 라벨:
-      - corrections.direction != 'confirm' 인 가장 최신 corrected_level → 정답
+      - 가장 최신 correction의 corrected_level → 정답 (direction 무관 — confirm 포함).
+        [M-metrics-confirm] confirm은 '사람이 그 값으로 최종 동의'한 신호라 무시하면 안 됨.
       - 보정 없으면 → predicted_level이 정답 (확정 가정)
 
     None 반환: DB 미가용 / 해당 model_version 분류 0건.
@@ -179,13 +191,17 @@ def _fetch_truth_pred_pairs(
     if not cls_list:
         return []
 
-    # 각 classification의 최신 corrections (direction!=confirm) 1건 lookup
+    # 각 classification의 가장 최신 correction 1건 lookup.
+    # [M-metrics-confirm] direction 무관. 예전엔 direction!='confirm'만 봤는데,
+    # '처음 교정(S3→TS) 후 나중에 그 값(TS)으로 confirm'된 경우 confirm을 무시하면
+    # 더 오래된(또는 다른) correction을 정답으로 잡아 정답이 왜곡됐다. confirm은
+    # '사람이 그 값으로 최종 동의'한 가장 신뢰할 신호이므로 최신 correction의
+    # corrected_level_id를 그대로 정답으로 쓴다.
     cls_ids = [c.classification_id for c in cls_list]
     corr_rows = list(
         db.execute(
             select(Correction)
             .where(Correction.classification_id.in_(cls_ids))
-            .where(Correction.direction != "confirm")
             .order_by(Correction.corrected_at.desc())
         ).scalars()
     )

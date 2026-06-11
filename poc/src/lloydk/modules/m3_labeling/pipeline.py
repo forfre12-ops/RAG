@@ -115,16 +115,42 @@ class LabelingPipeline:
                     )
                     llm_order = active_grade_order.get(llm_out.grade, 99)
                     if llm_order < rule_order:
+                        # [M-merge-conf] LLM이 더 높은 등급을 제안해 승격할 때, rule의
+                        # grade_scores/total_score(argmax가 rule 등급)를 그대로 쓰면 선택
+                        # 등급과 confidence/argmax가 불일치한다. 선택 등급(=llm_out.grade)에
+                        # 정합하도록 confidence를 재계산하고 grade_scores도 그 등급이 argmax가
+                        # 되게 보정한다. FNR-safe 승격이므로 confidence는 LLM의 신뢰도를
+                        # 우선 채택(rule confidence는 다른 등급에 대한 값이라 의미가 다름).
+                        merged_factor_scores = {
+                            k: max(v, llm_out.factor_scores.get(k, 0.0))
+                            for k, v in r.factor_scores.items()
+                        }
+                        # llm_out에만 있는 factor_code도 누락 없이 포함
+                        for k, v in llm_out.factor_scores.items():
+                            if k not in merged_factor_scores:
+                                merged_factor_scores[k] = v
+                        chosen_grade = llm_out.grade
+                        # grade_scores를 복사해 선택 등급이 최댓값(argmax)이 되도록 보정.
+                        merged_grade_scores = dict(r.grade_scores)
+                        prev_top = max(merged_grade_scores.values()) if merged_grade_scores else 0.0
+                        merged_grade_scores[chosen_grade] = max(
+                            merged_grade_scores.get(chosen_grade, 0.0), prev_top
+                        )
+                        merged_total = sum(merged_grade_scores.values())
+                        # confidence: LLM 신뢰도와, 보정된 grade_scores에서의 비중 중 큰 값.
+                        score_ratio = (
+                            merged_grade_scores[chosen_grade] / merged_total
+                            if merged_total > 0
+                            else 0.0
+                        )
+                        merged_conf = round(max(llm_out.confidence, score_ratio), 4)
                         r = RuleLabelResult(
-                            grade=llm_out.grade,
-                            confidence=max(r.confidence, llm_out.confidence),
-                            grade_scores=r.grade_scores,
-                            factor_scores={
-                                k: max(v, llm_out.factor_scores.get(k, 0.0))
-                                for k, v in r.factor_scores.items()
-                            },
+                            grade=chosen_grade,
+                            confidence=merged_conf,
+                            grade_scores={g: round(s, 4) for g, s in merged_grade_scores.items()},
+                            factor_scores=merged_factor_scores,
                             matched_keywords=r.matched_keywords,
-                            total_score=r.total_score,
+                            total_score=round(merged_total, 4),
                             method="rule+llm",
                         )
                     method = "rule+llm"
@@ -139,16 +165,27 @@ class LabelingPipeline:
             factors = EvaluationFactors(
                 **{field_map[k]: v for k, v in r.factor_scores.items() if k in field_map}
             )
-        evidence = [
-            EvidenceSpan(
-                start=text.find(m.keyword) if text.find(m.keyword) >= 0 else 0,
-                end=(text.find(m.keyword) + len(m.keyword)) if text.find(m.keyword) >= 0 else len(m.keyword),
-                text=m.keyword,
-                weight=m.score,
-                tag=m.factor,
+        # [M-rule-evidence] m.keyword는 이제 실제 매치 substring(정규식 원문 아님).
+        # 정확한 span(m.start/m.end)이 있으면 그대로 쓰고, 없으면 text.find로 첫 위치 탐색.
+        evidence = []
+        for m in r.matched_keywords[:50]:
+            if getattr(m, "start", None) is not None and getattr(m, "end", None) is not None:
+                start, end = m.start, m.end
+            else:
+                idx = text.find(m.keyword)
+                if idx >= 0:
+                    start, end = idx, idx + len(m.keyword)
+                else:
+                    start, end = 0, len(m.keyword)
+            evidence.append(
+                EvidenceSpan(
+                    start=start,
+                    end=end,
+                    text=m.keyword,
+                    weight=m.score,
+                    tag=m.factor,
+                )
             )
-            for m in r.matched_keywords[:50]
-        ]
         grade_val = Grade(r.grade) if _HAS_SCHEMA else r.grade
         return LabelingResult(
             grade=grade_val,

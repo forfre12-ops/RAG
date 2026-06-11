@@ -95,11 +95,13 @@ def get_storage(provider: Optional[str] = None):
 
     name = (provider or getattr(settings, "storage_backend", "minio") or "minio").lower()
     if name == "local":
-        from lloydk.adapters.storage.local_store import LocalStore
-        return LocalStore()
+        # 클래스명은 LocalStorage (이전 오타 LocalStore는 존재하지 않아 ImportError였음).
+        from lloydk.adapters.storage.local_store import LocalStorage
+        return LocalStorage()
     if name == "minio":
-        from lloydk.adapters.storage.minio_store import MinioStore
-        return MinioStore()
+        # 클래스명은 MinioStorage (이전 오타 MinioStore는 존재하지 않았음).
+        from lloydk.adapters.storage.minio_store import MinioStorage
+        return MinioStorage()
     if name in ("seaweedfs", "s3"):
         endpoint = getattr(settings, "storage_endpoint", "") or "http://localhost:8333"
         return SeaweedFSStore(

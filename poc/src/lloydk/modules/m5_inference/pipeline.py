@@ -62,7 +62,9 @@ class InferencePipeline:
         self.labeling = LabelingPipeline()
         self._model = None
         self._tokenizer = None
-        # GradeRegistry에서 동적 로드 — 다른 프로젝트의 커스텀 등급 자동 반영
+        # GradeRegistry 순서는 **rule-fallback 경로 전용** id→등급 매핑.
+        # 학습 모델이 로드되면 _load_model에서 모델 config.id2label로 덮어쓴다
+        # (softmax 인덱스는 학습 시점 순서에 고정되어 있고 DB level_order와 무관).
         active = _get_labels()
         self._id2label: dict[int, object] = dict(enumerate(active))
         if self.model_dir and self.model_dir.exists():
@@ -73,9 +75,68 @@ class InferencePipeline:
         import torch
         self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir))
         self._model = AutoModelForSequenceClassification.from_pretrained(str(self.model_dir))
+        # ── id2label은 학습 체크포인트 config에서 가져온다 (fail-closed) ──────────
+        # 학습기(m4_training/trainer.py)는 num_labels 인덱스 0..N을 고정 순서
+        # [TS,S1,S2,S3]에 매핑해 config.id2label에 baked한다. 추론에서 이 순서를
+        # GradeRegistry(DB level_order)로 재구성하면, DB 순서가 다를 때 softmax
+        # 인덱스가 엉뚱한 등급에 매핑되어 '미탐(비밀→공개)'을 일으킨다.
+        # → 반드시 모델 자신의 config.id2label로 매핑하고, 길이·코드집합이
+        #   기대(GradeRegistry 코드집합)와 불일치하면 로드를 거부한다.
+        cfg_id2label = self._id2label_from_config()
+        if cfg_id2label is None:
+            # config 매핑을 신뢰할 수 없으면 모델을 폐기(fail-closed) — rule-fallback로.
+            self._model = None
+            self._tokenizer = None
+            raise ValueError(
+                "model config.id2label is missing/invalid or its code set does not match "
+                "the active grade registry; refusing to load (fail-closed) to avoid "
+                "mis-mapping softmax indices to wrong grades (missed-detection risk)"
+            )
+        self._id2label = cfg_id2label
         self._model.eval()
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._model.to(self._device)
+
+    def _id2label_from_config(self) -> dict[int, object] | None:
+        """학습 체크포인트 config.id2label → {int index: Grade|str} 매핑.
+
+        검증(fail-closed):
+          - config.id2label가 없으면 None.
+          - 인덱스가 0..N-1 연속이 아니면 None.
+          - 코드 집합이 현재 활성 등급 코드집합과 다르면 None
+            (학습-DB 등급 스키마 mismatch → 인덱스 오매핑 방지).
+        매핑 자체는 config 인덱스를 그대로 보존한다(순서를 재정렬하지 않는다).
+        """
+        cfg = getattr(self._model, "config", None)
+        raw = getattr(cfg, "id2label", None)
+        if not raw or not isinstance(raw, dict):
+            return None
+
+        # config.id2label 키는 int 또는 str("0"..)일 수 있다 — int로 정규화.
+        mapping: dict[int, str] = {}
+        try:
+            for k, v in raw.items():
+                mapping[int(k)] = str(v)
+        except (ValueError, TypeError):
+            return None
+
+        n = len(mapping)
+        if n == 0 or sorted(mapping.keys()) != list(range(n)):
+            return None  # 인덱스가 0..N-1 연속이 아님 → 신뢰 불가
+
+        # 코드집합 일치 검증: 학습 체크포인트 등급집합 == 현재 활성 등급집합
+        active_codes = set(GradeRegistry.get_codes())
+        if active_codes and set(mapping.values()) != active_codes:
+            return None
+
+        out: dict[int, object] = {}
+        for idx in range(n):
+            code = mapping[idx]
+            try:
+                out[idx] = Grade(code)
+            except ValueError:
+                out[idx] = code  # 커스텀 등급(다른 프로젝트) 호환 — 문자열 보존
+        return out
 
     # FNR-safe override: rule engine이 이 점수 이상으로 TS를 잡으면 모델 결과 무시.
     # 모델이 TS 미학습 도메인(M&A·암호·국방 등)을 S1/S2/S3로 내릴 때 방어.
@@ -134,13 +195,15 @@ class InferencePipeline:
 
                     if override_grade is not None:
                         if GRADE_ORDER.get(override_grade.value, 99) < GRADE_ORDER.get(result.label.value, 99):
+                            # [M-renorm] override 등급을 strict argmax로 만들고 재정규화 +
+                            # confidence=scores[label] 재계산 (label/scores/confidence 정합).
+                            new_scores, new_conf = self._enforce_label_consistency(
+                                result.scores, override_grade.value, floor=0.7
+                            )
                             result = InferenceResult(
                                 label=override_grade,
-                                confidence=max(result.confidence, rule_res.confidence),
-                                scores={
-                                    **result.scores,
-                                    override_grade.value: max(result.scores.get(override_grade.value, 0), 0.7),
-                                },
+                                confidence=new_conf,
+                                scores=new_scores,
                                 factors=result.factors,
                                 evidence=result.evidence,
                                 rag_context=result.rag_context,
@@ -187,10 +250,15 @@ class InferencePipeline:
                         result.warnings = list(result.warnings) + [
                             f"source-prior: {src!r} is public → grade capped at {cap_code}"
                         ]
+                        # [M-renorm] cap 등급을 strict argmax로 만들고 재정규화. cap은 하향이라
+                        # confidence는 그 의미(불확실성↑)를 보존해 0.7 상한을 추가로 적용.
+                        new_scores, new_conf = self._enforce_label_consistency(
+                            result.scores, cap_code, floor=0.6
+                        )
                         result = InferenceResult(
                             label=Grade[cap_code],
-                            confidence=min(result.confidence, 0.7),
-                            scores={**result.scores, cap_code: max(result.scores.get(cap_code, 0), 0.6)},
+                            confidence=min(new_conf, 0.7),
+                            scores=new_scores,
                             factors=result.factors,
                             evidence=result.evidence,
                             rag_context=result.rag_context,
@@ -221,6 +289,36 @@ class InferencePipeline:
 
         return result
 
+    @staticmethod
+    def _enforce_label_consistency(
+        scores: dict[str, float], label: str, floor: float
+    ) -> tuple[dict[str, float], float]:
+        """[M-renorm] override/cap 후 scores·argmax·confidence 정합 강제 (fail-SECURE).
+
+        FNR-safe override(고등급 0.7)·source-prior cap(0.6)은 한 등급 score만 max()로
+        바꾸고 재정규화/argmax 재확정을 하지 않아, label은 TS인데 scores argmax는 S3가
+        되는 등 불일치(미탐 은폐)가 가능했다. 여기서:
+
+          1. label의 score를 floor 이상으로 올리되, **반드시 strict argmax**가 되도록
+             다른 모든 등급보다 epsilon만큼 크게 만든다(동률도 label 우선 → 미탐 방지).
+          2. scores 합=1로 재정규화.
+          3. confidence = 재정규화된 scores[label] 반환.
+
+        반환: (정규화된 scores, confidence). scores는 항상 합≈1, argmax==label.
+        """
+        s = {k: max(float(v), 0.0) for k, v in scores.items()}
+        s.setdefault(label, 0.0)
+        # label을 다른 모든 등급보다 엄격히 크게 (strict argmax 보장).
+        others_max = max((v for k, v in s.items() if k != label), default=0.0)
+        eps = 1e-6
+        s[label] = max(s[label], floor, others_max + eps)
+        total = sum(s.values())
+        if total > 0:
+            s = {k: v / total for k, v in s.items()}
+        else:  # 모든 score 0 — label에 전량 부여 (fail-SECURE)
+            s = {k: (1.0 if k == label else 0.0) for k in s}
+        return s, float(s[label])
+
     def _run_rule_fallback(self, text: str, return_evidence: bool) -> InferenceResult:
         try:
             from lloydk.api.prom_metrics import RULE_FALLBACK_TOTAL  # noqa: PLC0415
@@ -245,12 +343,62 @@ class InferencePipeline:
             warnings=["model weights not loaded — using rule-based fallback"],
         )
 
+    # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.
+    # 이 등급들의 문서확률은 청크 평균이 아니라 max(가장 강한 청크)로 잡아,
+    # 수식 한 문단 같은 핵심 비밀이 다수의 평범한 청크에 희석되어 미탐되는 것을 막는다.
+    _SEVERE_AGG_CODES = ("TS", "S1")
+
+    def _aggregate_chunk_probs(self, chunk_probs, chunk_weights):
+        """청크별 softmax → 문서 확률 벡터 (most-severe-wins, fail-SECURE).
+
+        [M-agg] 단순 비가중 평균은 핵심 비밀이 담긴 한 청크(예: 수식 한 문단)를
+        다수의 평범한 청크에 희석시켜 미탐을 만든다. 그래서:
+
+          - 저등급(S2/S3 등): 길이 가중 평균 — 일반 동작 보존.
+          - 고등급(TS/S1): 가장 강한 청크의 확률을 반영(max) — 한 청크의 강한
+            비밀 신호가 평균에 묻히지 않게. argmax는 이 보강된 벡터에서 재확정.
+
+        반환 벡터는 비정규(고등급 max 보강으로 합>1 가능)일 수 있다 — 이건 의도적이다.
+        호출부는 이 벡터로 argmax/confidence를 잡으며, confidence는 [0,1]로 clamp한다.
+        """
+        import torch
+
+        if chunk_probs.ndim == 1:
+            chunk_probs = chunk_probs.unsqueeze(0)
+        n_chunks = chunk_probs.shape[0]
+
+        # 길이 가중 평균 (가중치 부재/0합이면 균등 평균으로 폴백).
+        w = None
+        if chunk_weights and len(chunk_weights) == n_chunks:
+            w = torch.tensor(chunk_weights, dtype=chunk_probs.dtype)
+            if float(w.sum()) <= 0:
+                w = None
+        if w is not None:
+            weighted = (chunk_probs * w.unsqueeze(1)).sum(dim=0) / w.sum()
+        else:
+            weighted = chunk_probs.mean(dim=0)
+
+        doc_prob = weighted.clone()
+        # 고등급: max 청크 확률로 보강 (most-severe-wins). 단조 비감소 — 평균보다
+        # 낮아지지 않으므로 미탐 방향으로 후퇴할 수 없다.
+        chunk_max = chunk_probs.max(dim=0).values
+        severe_idx = {
+            i for i, g in self._id2label.items()
+            if (g.value if hasattr(g, "value") else str(g)) in self._SEVERE_AGG_CODES
+        }
+        for i in severe_idx:
+            doc_prob[i] = torch.maximum(doc_prob[i], chunk_max[i])
+        return doc_prob
+
     def _run_model(self, text: str, use_rag: bool, return_evidence: bool) -> InferenceResult:
         import torch
         import torch.nn.functional as F
 
         chunks = chunk_text(text, settings.max_seq_len * 3, settings.chunk_overlap)
         chunk_texts = [c.text for c in chunks] or [text]
+        # 길이 가중치: 짧은 노이즈 청크가 평균을 흔들지 않도록 char 수로 가중.
+        # 0 길이/공백 청크는 1로 floor (가중치 0이 되어 사라지지 않게).
+        chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
 
         probs = []
         with torch.no_grad():
@@ -262,11 +410,17 @@ class InferencePipeline:
                 ).to(self._device)
                 logits = self._model(**enc).logits
                 probs.append(F.softmax(logits, dim=-1).cpu())
-        doc_prob = torch.cat(probs).mean(dim=0)
-        scores = {g.value: float(doc_prob[i]) for i, g in self._id2label.items()}
+        chunk_probs = torch.cat(probs)  # [n_chunks, n_labels]
+        doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
+        # argmax는 보강된 doc_prob에서 확정 (most-severe-wins 반영). 표시용 scores는
+        # 합=1로 재정규화한다 — 정규화는 모든 인덱스를 같은 상수로 나누므로 argmax 순서를
+        # 보존(label 안정)하고, scores·label·confidence 정합을 유지한다.
         pred_idx = int(doc_prob.argmax().item())
         pred = self._id2label[pred_idx]
-        conf = float(doc_prob[pred_idx])
+        total = float(doc_prob.sum())
+        norm = (doc_prob / total) if total > 0 else doc_prob
+        scores = {g.value: float(norm[i]) for i, g in self._id2label.items()}
+        conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
 
         lab = self.labeling.label(text)  # 보조 evidence/factors
         # use_rag은 run() 레벨에서 통합 처리 — 본 함수 시그니처는 호환 위해 유지.
@@ -350,12 +504,26 @@ class InferencePipeline:
                 logger.debug("encode_batch failed: %s", exc)
                 return []
 
-        # metadata로 필터 전달 가능 (tenant_id 등 호출자가 보낸 거)
+        # 테넌트 격리는 fail-CLOSED. 호출자가 멀티테넌트 컨텍스트를 신호(metadata dict
+        # 전달)했는데 tenant_id가 비어 있으면 — 테넌트가 '미확정'이므로 무격리 검색으로
+        # 떨어뜨리지 않고 빈 컨텍스트를 반환한다(교차테넌트 유출 차단). 분류 본문은
+        # run()에서 graceful degradation으로 그대로 진행되고 RAG context만 비게 된다.
+        #
+        # 구분:
+        #   metadata is None  → 멀티테넌트 미관여(단일테넌트/레거시 호출). 필터 없이 검색.
+        #   metadata == {}    → 동일하게 미관여로 본다(빈 컨텍스트 시그널 없음).
+        #   metadata = {...} (tenant_id 없음/빈값) → 멀티테넌트 요청인데 테넌트 분실 →
+        #                       fail-CLOSED(빈 컨텍스트). 이게 H8이 막으려는 fail-open 경로.
         filter_ = None
-        if isinstance(metadata, dict):
+        if isinstance(metadata, dict) and metadata:
             tenant = metadata.get("tenant_id")
-            if tenant:
-                filter_ = {"tenant_id": tenant}
+            if not tenant or not str(tenant).strip():
+                logger.warning(
+                    "rag_context: tenant_id undetermined in a populated metadata context — "
+                    "returning empty context (fail-closed) to prevent cross-tenant leakage"
+                )
+                return []
+            filter_ = {"tenant_id": tenant}
 
         try:
             hits = expand_then_search(

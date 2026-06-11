@@ -247,7 +247,7 @@ class EsStore:
         top_k: int = 5,
         filter: dict | None = None,
         rrf_window: int = 50,
-        rrf_constant: int = 20,
+        rrf_constant: int = 60,
         use_retriever_api: bool | None = None,
     ) -> list[SearchHit]:
         """BM25 + dense kNN + RRF 하이브리드.
@@ -255,6 +255,10 @@ class EsStore:
         - 8.14+: retriever API
         - 8.12~8.13: legacy `rank.rrf`
         - <8.12: 클라이언트단 RRF
+
+        rrf_constant 기본값은 60(Cormack et al. 2009 표준). 모든 경로(retriever
+        rank_constant / legacy rank_constant / clientside _rrf_combine k)가 동일
+        상수를 쓰도록 통일해 경로별 융합 결과 편차를 제거한다.
         """
         es_filter = _build_term_filters(filter)
         num_candidates = _num_candidates_for(top_k, has_filter=bool(es_filter))
@@ -390,12 +394,42 @@ class EsStore:
     # ─────────────────────────────────────────────────────────────
     # alias 관리 (무중단 재인덱싱용)
     # ─────────────────────────────────────────────────────────────
-    def swap_alias(self, alias: str, new_index: str, old_index: str | None = None) -> None:
+    def delete_index(self, name: str) -> bool:
+        """인덱스 삭제. 존재하지 않으면 no-op. 삭제 시도 결과를 bool로 반환.
+
+        blue/green 재색인 누적 방지용 — alias swap 성공 후 이전 인덱스 정리.
+        실패해도 raise하지 않고 False를 반환(정리 실패가 재색인 자체를 무효화하면 안 됨).
+        """
+        try:
+            if not self._client.indices.exists(index=name):
+                return False
+            self._client.indices.delete(index=name)
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    def swap_alias(
+        self,
+        alias: str,
+        new_index: str,
+        old_index: str | None = None,
+        *,
+        delete_old: bool = True,
+    ) -> None:
+        """alias를 new_index로 원자적 스위칭.
+
+        delete_old=True(기본)면 swap이 성공하고 old_index가 new_index와 다를 때
+        old_index를 삭제해 blue/green 재색인 누적을 막는다. 삭제는 best-effort(실패 무시).
+        """
         actions: list[dict] = []
-        if old_index:
+        if old_index and old_index != new_index:
             actions.append({"remove": {"index": old_index, "alias": alias}})
         actions.append({"add": {"index": new_index, "alias": alias}})
         self._client.indices.update_aliases(actions=actions)
+
+        # swap이 성공한 뒤에만 옛 인덱스 정리 — 위 호출이 raise하면 여기 도달 안 함.
+        if delete_old and old_index and old_index != new_index:
+            self.delete_index(old_index)
 
 
 # ─────────────────────────────────────────────────────────────

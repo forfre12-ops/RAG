@@ -142,6 +142,72 @@ def compute_drift(
     )
 
 
+def compute_drift_from_centroid(
+    train_centroid: list[float],
+    train_histogram: list[float],
+    prod_vectors: list[list[float]],
+    *,
+    bins: int = 20,
+    threshold_alert: float = 0.5,
+) -> DriftReport:
+    """저장된 학습 centroid + histogram으로 운영 표본 drift 비교.
+
+    버그 수정(2026-06): 기존 run_drift_check는 centroid '한 점'을 train_vectors로
+    compute_drift에 넘겼다. 그러면 _centroid([c])=c → train_cos=[cosine(c,c)]=[1.0]
+    이 되어 학습분포 히스토그램이 value=1.0의 델타함수가 되고, 운영 cos가 1.0 근처가
+    아니면 KL이 폭주하거나(혹은 prod도 1.0 부근이면 0) 사실상 무의미한 값이 됐다.
+    여기서는 학습 시 저장해 둔 진짜 histogram을 p_hist로 직접 쓰고, 운영 표본을 같은
+    centroid에 대해 코사인 → q_hist로 만들어 KL을 산출한다(분포 대 분포).
+
+    Args:
+        train_centroid: 학습 표본의 centroid (load_train_centroid["centroid"]).
+        train_histogram: 학습 표본의 cos 분포 histogram (load_train_centroid["histogram"]).
+        prod_vectors: 운영 환경 최근 임베딩 표본.
+    """
+    if not train_centroid or not prod_vectors:
+        return DriftReport(
+            sample_size=len(prod_vectors) if prod_vectors else 0,
+            cosine_mean=0.0,
+            cosine_std=0.0,
+            kl_divergence=0.0,
+            bins=bins,
+            threshold_alert=threshold_alert,
+        )
+
+    prod_cos = [cosine(v, train_centroid) for v in prod_vectors]
+    q_hist = _histogram(prod_cos, bins=bins)
+
+    # 저장 histogram의 bin 수가 다르면(과거 저장본) 운영 bin 수에 맞춰 재정규화 대신
+    # 안전하게 동일 길이일 때만 KL — 길이 불일치면 _kl_divergence가 0을 반환하므로
+    # prod 분포로부터 자기 histogram을 train 자리로 폴백(=드리프트 0 회피).
+    if len(train_histogram) == len(q_hist):
+        p_hist = list(train_histogram)
+    else:
+        _logger.warning(
+            "drift: stored histogram bins=%d != current bins=%d — 재계산 불가, KL=0 폴백",
+            len(train_histogram), len(q_hist),
+        )
+        p_hist = list(q_hist)
+
+    kl = _kl_divergence(p_hist, q_hist)
+
+    mean = sum(prod_cos) / len(prod_cos)
+    var = sum((x - mean) ** 2 for x in prod_cos) / len(prod_cos)
+    std = math.sqrt(var)
+
+    return DriftReport(
+        sample_size=len(prod_vectors),
+        cosine_mean=round(mean, 4),
+        cosine_std=round(std, 4),
+        kl_divergence=round(kl, 4),
+        bins=bins,
+        histogram_train=[round(h, 4) for h in p_hist],
+        histogram_prod=[round(h, 4) for h in q_hist],
+        threshold_alert=threshold_alert,
+        alert=kl >= threshold_alert,
+    )
+
+
 def export_to_prometheus(report: DriftReport) -> dict[str, float]:
     """Prometheus gauge 노출용 메트릭 값.
 
@@ -275,9 +341,26 @@ def run_drift_check(*, limit: int = 200, threshold: float = 0.5) -> DriftReport:
         )
         return report
 
-    # train_vectors가 직접 필요한 게 아니라 centroid 한 점이면 충분.
-    # compute_drift는 vectors 리스트를 받으므로 centroid 1점을 train_vectors로 전달.
-    train_centroid_vec = train["centroid"]
-    report = compute_drift([train_centroid_vec], prod, threshold_alert=threshold)
+    # 저장된 centroid + histogram을 직접 사용 — centroid 한 점을 train_vectors로
+    # 넘기면 학습분포가 1.0 델타함수가 돼 드리프트가 무의미해지는 버그를 회피.
+    train_centroid_vec = train.get("centroid") or []
+    train_hist = train.get("histogram") or []
+    if not train_hist:
+        # 과거(히스토그램 미저장) centroid 파일 폴백 — 최소한 cosine_mean은 의미 있게
+        # 산출하되 KL은 0(델타함수 회피 불가)으로 둔다. 재저장 권장.
+        _logger.warning("drift: stored centroid has no histogram — KL 산출 불가, 재저장 권장")
+        report = DriftReport(
+            sample_size=len(prod),
+            cosine_mean=round(
+                sum(cosine(v, train_centroid_vec) for v in prod) / len(prod), 4
+            ) if train_centroid_vec else 0.0,
+            cosine_std=0.0,
+            kl_divergence=0.0,
+            threshold_alert=threshold,
+        )
+    else:
+        report = compute_drift_from_centroid(
+            train_centroid_vec, train_hist, prod, threshold_alert=threshold,
+        )
     publish_to_prom(report)
     return report

@@ -240,6 +240,12 @@ class Settings(BaseSettings):
     # 운영 기본 20MB — 대부분 가이드 PDF·DOCX 커버. 초과 시 413 Payload Too Large 반환.
     max_upload_mb: int = 20
 
+    # OCR DoS 가드 — 스캔 PDF 한 건을 OCR할 때 변환·인식할 최대 페이지 수.
+    # 수백쪽 스캔본 한 건이 pdf2image/Tesseract를 수십분~OOM으로 모는 것을 차단.
+    # 초과 페이지는 변환하지 않고 '잘림' 경고를 남긴다. 0 이하면 무제한(명시적 opt-out).
+    # 보수적 기본 50쪽 — 대부분의 정상 문서를 커버하면서 악성·사고성 대용량은 차단.
+    ocr_max_pages: int = 50
+
     # --- 동작 모드 ---
     # dryrun: 무거운 모델 다운로드 없이 mock으로 검증
     # full: 실제 모델 로드 (GPU/대용량 필요)
@@ -266,11 +272,15 @@ def apply_profile_defaults(s: Settings) -> dict[str, str]:
         return {"_status": f"unknown_profile:{profile}"}
 
     # Settings는 env_prefix 없이 필드명 그대로 env에 매핑됨 (예: LLM_PROVIDER).
-    # 그래서 명시 여부는 환경변수의 대문자 필드명으로 판정.
+    # [M-config-env] 명시 판정을 os.environ(대문자 필드명)으로만 하면, pydantic-settings가
+    # .env 파일에서 읽은 값(os.environ에는 없음)을 '미설정'으로 오인해 프로파일이 .env
+    # 지정값을 덮어쓴다. model_fields_set(env·.env·생성자 kwargs 모두 포함)을 우선 근거로
+    # 삼고, 환경변수 존재는 보조 근거로 OR 결합 — '미설정 키에만 default 채움' 보장.
+    fields_set = getattr(s, "model_fields_set", set())
     defaults = _PROFILE_DEFAULTS[profile]
     for field, default in defaults.items():
         env_name = field.upper()
-        explicit = os.environ.get(env_name) is not None
+        explicit = field in fields_set or os.environ.get(env_name) is not None
         if explicit:
             sources[field] = "explicit"
             continue
