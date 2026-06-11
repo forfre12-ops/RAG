@@ -87,6 +87,10 @@ async def lifespan(app: FastAPI):
     )
     # J1: 운영 모드에서 빈 자격증명 차단 (dryrun/테스트는 우회)
     assert_production_credentials()
+    # L-jwt-aud / L-apikey-honor: 운영 인증모드 confused-deputy 차단 설정 강제.
+    # _is_production()=False(dev/test/dryrun)면 즉시 반환(비파괴).
+    from lloydk.api._jwt_auth import assert_production_auth_config  # noqa: PLC0415
+    assert_production_auth_config()
     # D2 (2026-05-29): OpenTelemetry 트레이싱 활성. OTEL_EXPORTER_OTLP_ENDPOINT
     # 미설정 또는 opentelemetry 미설치 시 silent no-op (반환값 False).
     try:
