@@ -14,7 +14,10 @@
 
 설계 노트:
 - chunks·llm_usage·audit_log는 RANGE PARTITION 테이블. 부모만 매핑.
-- v_classification_final 등 운영 뷰는 raw SQL이나 별도 read-only 모델로 다룸.
+- 보정/성능 집계 운영 뷰 3개(v_classification_final·v_model_performance·
+  v_active_learning_status)는 migration f1e2d3c4b5a6에서 DROP — 동일 로직이
+  metrics.py/active_learning.py/confirm_service.py에 코드로 단일화됨. 비용 집계
+  뷰 v_monthly_llm_cost만 잔존(raw SQL로 조회).
 - weight 합계 검증 트리거는 DB 측 보장 — ORM은 검증 안 함.
 - INET 타입은 sqlalchemy.dialects.postgresql.INET 사용.
 """

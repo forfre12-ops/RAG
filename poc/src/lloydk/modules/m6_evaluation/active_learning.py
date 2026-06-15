@@ -1,6 +1,6 @@
 """Active Learning — corrections 누적 → 재학습 큐 push.
 
-설계 (doc/04 §6.3 + init.sql v_active_learning_status):
+설계 (doc/04 §6.3 — 과거 v_active_learning_status 뷰 로직을 코드로 단일화):
 - unconsumed_corrections ≥ urgent_threshold 또는
   pending_underclass ≥ urgent_underclass_threshold → URGENT_RETRAIN
 - unconsumed_corrections ≥ recommended_threshold → RETRAIN_RECOMMENDED

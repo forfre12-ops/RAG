@@ -28,7 +28,7 @@ from lloydk.schemas.confirm import (
 
 logger = logging.getLogger(__name__)
 
-RETRAIN_THRESHOLD_DEFAULT = 10  # underclass 누적 >= 이면 URGENT_RETRAIN (init.sql v_active_learning_status)
+RETRAIN_THRESHOLD_DEFAULT = 10  # underclass 누적 >= 이면 URGENT_RETRAIN (active_learning.py 단일 진실원)
 
 
 @dataclass
