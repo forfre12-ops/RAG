@@ -168,7 +168,7 @@ class ClassifyService:
             text=cleaned,
             use_rag=req.use_rag,
             rag_namespace=req.rag_namespace,
-            metadata=req.metadata or {},
+            metadata=self._effective_metadata(req),
             return_evidence=req.return_evidence,
         )
         notify("llm")
@@ -188,6 +188,15 @@ class ClassifyService:
             warnings_acc.append(
                 f"low-confidence: confidence={float(pred.confidence):.2f} < {threshold:.2f}"
                 " — review recommended"
+            )
+
+        # [②·③ 충돌] 출처 cap(하향)이 강한 상향 신호(TS/S1)를 덮은 경우 — pipeline이 남긴
+        # cap-conflict 신호 — confidence와 무관하게 검수 라우팅. 진짜 공개문서는 사람이
+        # 즉시 확인하고, 내부 비밀의 '공개' 오태깅(silent miss)은 여기서 걸러진다.
+        if status != "needs_review" and any("cap-conflict" in w for w in warnings_acc):
+            status = "needs_review"
+            warnings_acc.append(
+                "cap-conflict: source-cap overrode a high content grade — routed to human review"
             )
 
         logger.info(
@@ -551,3 +560,36 @@ class ClassifyService:
             return uuid.UUID(value)
         except (ValueError, TypeError, AttributeError):
             return None
+
+    def _effective_metadata(self, req: ClassifyRequest) -> dict:
+        """분류 metadata 구성 — 요청 metadata에 저장된 문서 출처(provenance)를 보강.
+
+        Gate-1(출처 게이트, source-prior)은 metadata.source_type/source가 있을 때만
+        발동한다(InferencePipeline.run). 업로드→ingest→doc_id 분류 흐름에서는 요청에
+        출처가 없으므로, documents.metadata_에 적재된 source_type/source를 여기서
+        hydrate해 게이트가 실제로 발동하도록 한다.
+
+        - 요청이 출처를 명시했으면 그대로 둔다(요청 우선 — 덮어쓰지 않음).
+        - tenant 스코프로 문서를 조회한다(교차테넌트 출처 유출 차단).
+        - best-effort: DB 미가용·문서 부재·content 직접분류(doc_id 없음)면 요청 metadata 그대로.
+        """
+        meta = dict(req.metadata or {})
+        if meta.get("source_type") or meta.get("source"):
+            return meta
+        doc_uuid = self._parse_doc_uuid(req.doc_id)
+        if doc_uuid is None:
+            return meta
+        try:
+            from lloydk.db import session_scope  # noqa: PLC0415
+            from lloydk.repositories.document_repo import DocumentRepo  # noqa: PLC0415
+
+            with session_scope() as db:
+                doc = DocumentRepo(db).get(doc_uuid, tenant_id=req.tenant_id)
+                stored = getattr(doc, "metadata_", None) if doc is not None else None
+                if isinstance(stored, dict):
+                    src = stored.get("source_type") or stored.get("source")
+                    if src:
+                        meta["source_type"] = src
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_effective_metadata hydrate skipped (non-critical): %s", exc)
+        return meta

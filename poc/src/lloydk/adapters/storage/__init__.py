@@ -35,7 +35,7 @@ def _build_seaweedfs() -> ObjectStorage:
     )
 
 
-def build_storage(
+def _build_inner(
     *,
     force_local: bool = False,
     local_root: str | None = None,
@@ -81,3 +81,44 @@ def build_storage(
             stacklevel=2,
         )
         return LocalStorage(root=local_root or ".storage")
+
+
+def _maybe_encrypt(storage: ObjectStorage) -> ObjectStorage:
+    """settings.storage_encryption_enabled면 EncryptingStorage로 래핑.
+
+    대상 버킷(기본 documents-raw)만 at-rest 암호화한다. 키 미설정 시 EncryptingStorage가
+    예외를 던져(fail-closed) 평문으로 조용히 떨어지지 않는다 — 운영 진입은
+    assert_production_credentials가 키 존재를 사전 강제한다. settings 로드 실패·암호화
+    비활성이면 원본 storage를 그대로 반환(드라이런·테스트 비파괴).
+    """
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return storage
+    if not getattr(settings, "storage_encryption_enabled", False):
+        return storage
+    from lloydk.adapters.storage.encrypted_store import EncryptingStorage  # noqa: PLC0415
+
+    buckets = set(getattr(settings, "storage_encrypted_buckets", None) or ["documents-raw"])
+    return EncryptingStorage(
+        storage,
+        key_material=getattr(settings, "storage_encryption_key", ""),
+        buckets=buckets,
+    )
+
+
+def build_storage(
+    *,
+    force_local: bool = False,
+    local_root: str | None = None,
+    backend: str | None = None,
+) -> ObjectStorage:
+    """storage_backend 기준 단일 팩토리 + 선택적 at-rest 암호화 래핑.
+
+    내부 백엔드(_build_inner)를 구성한 뒤, settings.storage_encryption_enabled면
+    EncryptingStorage로 감싸 대상 버킷(documents-raw 등)을 투명하게 암·복호화한다.
+    호출부는 변경 없이 동일한 put/get 인터페이스를 쓴다.
+    """
+    return _maybe_encrypt(
+        _build_inner(force_local=force_local, local_root=local_root, backend=backend)
+    )

@@ -218,20 +218,46 @@ class ClassifyRepo:
             self.db.add(o)
 
     def list_recent_for_doc(
-        self, doc_id: uuid.UUID, *, tenant_id: str | None = None, limit: int = 10
+        self,
+        doc_id: uuid.UUID,
+        *,
+        tenant_id: str | None = None,
+        limit: int = 10,
+        for_update: bool = False,
     ) -> list[Classification]:
         """doc_id의 최근 분류 결과.
 
         보안: tenant_id가 주어지면 그 tenant의 분류만 반환(교차테넌트 결과 열람 차단).
         tenant_id=None은 하위호환(스코프 미적용).
+
+        for_update=True면 반환 행을 잠근다(동시 검수 확정 직렬화). doc_id 경로의
+        confirm/relabel이 최신 분류 1건을 안전하게 갱신하도록 쓴다.
         """
         stmt = select(Classification).where(Classification.doc_id == doc_id)
         if tenant_id is not None:
             stmt = stmt.where(Classification.tenant_id == tenant_id)
         stmt = stmt.order_by(Classification.classified_at.desc()).limit(limit)
+        if for_update:
+            stmt = stmt.with_for_update()
         return list(self.db.execute(stmt).scalars())
 
-    def get(self, classification_id: uuid.UUID) -> Classification | None:
+    def get(
+        self, classification_id: uuid.UUID, *, for_update: bool = False
+    ) -> Classification | None:
+        """classification 단건 조회.
+
+        for_update=True면 행 잠금(SELECT ... FOR UPDATE)으로 조회한다 — 동시 검수
+        확정(confirm/relabel)이 같은 분류를 건드릴 때 트랜잭션을 직렬화해 status
+        race·중복 correction을 막는다. SELECT FOR UPDATE를 지원하지 않는 백엔드
+        (SQLite 테스트)에서는 SQLAlchemy가 잠금 절을 안전하게 생략한다.
+        """
+        if for_update:
+            stmt = (
+                select(Classification)
+                .where(Classification.classification_id == classification_id)
+                .with_for_update()
+            )
+            return self.db.execute(stmt).scalar_one_or_none()
         return self.db.get(Classification, classification_id)
 
     def update_status(self, classification_id: uuid.UUID, status: str) -> None:
@@ -315,6 +341,29 @@ class ClassifyRepo:
         self.db.add(corr)
         self.db.flush()
         return corr
+
+    def correction_exists(
+        self,
+        classification_id: uuid.UUID,
+        corrected_level_id: int,
+        corrected_by: str,
+    ) -> bool:
+        """동일 (classification, 교정등급, 교정자) correction 존재 여부 — 멱등성 가드.
+
+        같은 검수자가 같은 분류를 같은 등급으로 두 번 확정/정정해도(중복 클릭·재시도)
+        correction이 2건 쌓이지 않게 한다. 행 잠금(get for_update)과 함께 쓰면 동시
+        확정에서도 단일 correction만 남는다.
+        """
+        row = self.db.execute(
+            select(Correction.correction_id)
+            .where(
+                Correction.classification_id == classification_id,
+                Correction.corrected_level_id == corrected_level_id,
+                Correction.corrected_by == corrected_by,
+            )
+            .limit(1)
+        ).first()
+        return row is not None
 
     @staticmethod
     def _direction(orig_order: int | None, new_order: int | None) -> str:

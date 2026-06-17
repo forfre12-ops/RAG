@@ -25,11 +25,27 @@ class Base(DeclarativeBase):
     """모든 ORM 모델의 베이스 클래스."""
 
 
+def _engine_connect_args() -> dict:
+    """연결이 무한 대기하지 않도록 connect_timeout 주입 (운영 부팅 행 방지).
+
+    PG가 일시 불가일 때 GradeRegistry·FactorRegistry·세션이 연결 대기로 워커 부팅·
+    추론기 생성을 무한 블록하는 것을 막는다 — 타임아웃 후 빠르게 예외 → 각 호출부의
+    try/except가 폴백 처리한다. connect_timeout(초)은 PostgreSQL(psycopg/libpq) 전용이라
+    해당 드라이버 URL에만 주입한다(SQLite 등에는 미적용).
+    """
+    url = settings.database_url or ""
+    timeout = int(getattr(settings, "db_connect_timeout", 5) or 0)
+    if url.startswith("postgresql") and timeout > 0:
+        return {"connect_timeout": timeout}
+    return {}
+
+
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
+    connect_args=_engine_connect_args(),
     future=True,
 )
 

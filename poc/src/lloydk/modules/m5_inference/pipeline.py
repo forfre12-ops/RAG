@@ -165,6 +165,22 @@ class InferencePipeline:
         except Exception:
             return 1.6
 
+    @property
+    def _temperature(self) -> float:
+        """서빙 softmax temperature scaling 계수.
+
+        분류기 softmax는 학습에 없던 새 문체(OOD)에서 과신(overconfident)하는 경향이
+        있어, confidence 게이트(0.7)가 보정 안 된 값 위에 설 수 있다. T>1이면 logit을
+        나눠 분포를 부드럽게 해 과신을 완화(calibration)한다. 기본 1.0 = 무보정(기존
+        동작 보존). 평가에서 측정한 temperature를 settings.classifier_temperature로 주입.
+        """
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            t = float(settings.classifier_temperature)
+            return t if t > 0 else 1.0
+        except Exception:
+            return 1.0
+
     def run(
         self,
         text: str,
@@ -247,9 +263,20 @@ class InferencePipeline:
                     cap_rank = _GRADE_ORDER_LOCAL[cap_code]
                     cur_rank = _GRADE_ORDER_LOCAL.get(result.label.value, 99)
                     if cur_rank < cap_rank:  # 예측이 cap보다 상위(숫자 작음)면 cap으로 하향
-                        result.warnings = list(result.warnings) + [
+                        pre_cap_code = result.label.value
+                        cap_warnings = [
                             f"source-prior: {src!r} is public → grade capped at {cap_code}"
                         ]
+                        # [②·③ 충돌] 출처 cap(하향)이 강한 상향 신호(TS/S1)를 덮으면 자동
+                        # 확정하지 않는다 — cap-conflict 경고를 남겨 classify_service가
+                        # needs_review로 라우팅(진짜 공개문서는 사람 확인, 내부 비밀의 '공개'
+                        # 오태깅은 silent miss로 새지 않게). 출처 cap은 상향 가드를 무인으로 안 덮음.
+                        if pre_cap_code in ("TS", "S1"):
+                            cap_warnings.append(
+                                f"cap-conflict: public-source cap overrode high content grade "
+                                f"{pre_cap_code} → routing to human review (verify provenance)"
+                            )
+                        result.warnings = list(result.warnings) + cap_warnings
                         # [M-renorm] cap 등급을 strict argmax로 만들고 재정규화. cap은 하향이라
                         # confidence는 그 의미(불확실성↑)를 보존해 0.7 상한을 추가로 적용.
                         new_scores, new_conf = self._enforce_label_consistency(
@@ -346,7 +373,15 @@ class InferencePipeline:
     # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.
     # 이 등급들의 문서확률은 청크 평균이 아니라 max(가장 강한 청크)로 잡아,
     # 수식 한 문단 같은 핵심 비밀이 다수의 평범한 청크에 희석되어 미탐되는 것을 막는다.
-    _SEVERE_AGG_CODES = ("TS", "S1")
+    # settings.severe_agg_codes로 조정 가능(기본 TS·S1 — S2·S3는 표준 집계).
+    @property
+    def _SEVERE_AGG_CODES(self) -> tuple:
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            codes = getattr(settings, "severe_agg_codes", None)
+            return tuple(codes) if codes else ("TS", "S1")
+        except Exception:  # noqa: BLE001
+            return ("TS", "S1")
 
     def _aggregate_chunk_probs(self, chunk_probs, chunk_weights):
         """청크별 softmax → 문서 확률 벡터 (most-severe-wins, fail-SECURE).
@@ -409,6 +444,10 @@ class InferencePipeline:
                     padding=True, return_tensors="pt",
                 ).to(self._device)
                 logits = self._model(**enc).logits
+                # 서빙 캘리브레이션: T>1이면 분포를 부드럽게 해 OOD 과신 완화. T=1.0=무보정.
+                temp = self._temperature
+                if temp != 1.0:
+                    logits = logits / temp
                 probs.append(F.softmax(logits, dim=-1).cpu())
         chunk_probs = torch.cat(probs)  # [n_chunks, n_labels]
         doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)

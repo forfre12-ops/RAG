@@ -105,6 +105,15 @@ class Settings(BaseSettings):
     storage_endpoint: str = ""        # seaweedfs s3 게이트웨이 URL (예: http://seaweed:8333)
     storage_verify_tls: bool = True
 
+    # 원본 at-rest 봉투 암호화 (adapters/storage/encrypted_store.py).
+    # 원본 영업비밀 바이너리(documents-raw)는 증빙용으로 보관하지만 평문 저장은 유출
+    # 리스크다. enabled=True면 build_storage()가 EncryptingStorage로 래핑해 대상 버킷을
+    # AES-256-GCM으로 암·복호화한다(인프라 SSE 불요, 폐쇄망 LocalStorage에서도 동작).
+    # 기본 False(비파괴) — 운영 진입 시 enabled=True면 키가 필수(startup fail-fast).
+    storage_encryption_enabled: bool = False
+    storage_encryption_key: str = ""          # 고엔트로피 시크릿(SHA-256으로 32B 키 유도)
+    storage_encrypted_buckets: list[str] = ["documents-raw"]  # 암호화 대상 버킷
+
     mlflow_tracking_uri: str = "http://localhost:5000"
 
     # --- API ---
@@ -131,6 +140,10 @@ class Settings(BaseSettings):
     # 기본 5+10=15는 dev용. 운영은 동시 요청 수에 맞춰 DB_POOL_SIZE/DB_MAX_OVERFLOW 조정.
     db_pool_size: int = 5
     db_max_overflow: int = 10
+    # DB 연결 타임아웃(초). PG 일시 불가 시 연결이 무한 대기하면 GradeRegistry·세션 등이
+    # 워커 부팅/추론기 생성을 무한 블록한다 → 타임아웃 후 빠르게 예외 → 호출부 폴백.
+    # PostgreSQL(libpq) connect_timeout으로 주입. 0 이하면 미적용. 운영은 3~10s 권장.
+    db_connect_timeout: int = 5
 
     # --- Celery worker safety limits ---
     celery_result_expires: int = 24 * 60 * 60
@@ -176,6 +189,14 @@ class Settings(BaseSettings):
     # .env: CLASSIFIER_MODEL_DIR=artifacts/classifier-1ep/v-ae3f5371 형식.
     classifier_model_dir: str = ""
 
+    # 서빙 softmax temperature scaling 계수 (pipeline.py 추론 경로).
+    # 분류기 softmax는 OOD(학습에 없던 새 문체)에서 과신(overconfident)하는 경향이 있어
+    # 0.7 confidence 게이트가 보정 안 된 값 위에 설 수 있다. T>1이면 분포를 부드럽게 해
+    # 과신을 완화한다(calibration). 기본 1.0 = 무보정(기존 동작 보존). 평가에서 측정한
+    # temperature를 .env로 주입: CLASSIFIER_TEMPERATURE=1.3 형식. 신뢰도 분포 모니터링은
+    # drift_monitor와 연계한다(§9.3).
+    classifier_temperature: float = 1.0
+
     # FNR-safe 오버라이드 threshold (pipeline.py).
     # 룰 엔진의 TS 점수가 이 값 이상이고 룰 등급이 모델 등급보다 높으면 TS로 올림.
     # 높일수록 오버라이드 빈도 감소 (S3 과분류 완화), 낮출수록 FNR 안전성 강화.
@@ -183,6 +204,12 @@ class Settings(BaseSettings):
     fnr_rule_ts_threshold: float = 3.0
     fnr_rule_s1_threshold: float = 2.2
     fnr_rule_s2_threshold: float = 1.6
+
+    # 청크 집계에서 most-severe-wins(max-pooling)를 적용할 고등급 코드.
+    # 이 등급들은 청크 평균이 아니라 가장 강한 청크로 잡아 한 단락의 비밀 신호가 희석되어
+    # 미탐되는 것을 막는다. 기본 TS·S1 — S2·S3는 표준(길이가중) 집계(S2→S3 희석은 고등급
+    # 미탐보다 저위험, S2까지 max하면 과분류↑). 도메인에 따라 .env로 조정.
+    severe_agg_codes: list[str] = ["TS", "S1"]
 
     # 저신뢰 검수 라우팅 임계값. 모델 confidence가 이 값 미만이면 응답을
     # status="needs_review"로 표시하고 warning에 검수 권고를 남긴다. **거부(reject)는
@@ -326,6 +353,14 @@ def assert_production_credentials() -> None:
         raise RuntimeError(
             "SECURITY: CORS allow-origins=[\"*\"]는 운영 모드에서 허용되지 않습니다. "
             "LLOYDK_CORS_ALLOW_ORIGINS=https://your.domain.com 으로 명시하세요."
+        )
+
+    # 원본 at-rest 암호화가 켜졌는데 키가 없으면 평문 저장 위험 — fail-fast.
+    if settings.storage_encryption_enabled and not settings.storage_encryption_key:
+        raise RuntimeError(
+            "SECURITY: STORAGE_ENCRYPTION_ENABLED=1 인데 STORAGE_ENCRYPTION_KEY 미설정. "
+            "원본 at-rest 암호화 키가 없으면 평문으로 저장됩니다. "
+            "키를 설정하거나(권장) 암호화를 끄세요."
         )
 
     # RATE_LIMIT_DISABLED 운영에서 오류

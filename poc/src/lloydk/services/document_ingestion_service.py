@@ -85,12 +85,18 @@ class DocumentIngestionService:
         content_bytes: bytes,
         tenant_id: str,
         doc_type: Optional[str] = None,
+        source_type: Optional[str] = None,
         external_ref: Optional[str] = None,
         created_by: Optional[str] = None,
         db=None,
         persist: bool = True,
     ) -> IngestResult:
-        """파일 1건 적재. 실패(추출 0, DB·storage 미가용)는 warnings로 안전 반환."""
+        """파일 1건 적재. 실패(추출 0, DB·storage 미가용)는 warnings로 안전 반환.
+
+        source_type: 문서 출처(provenance). 공개 출처(court_decision·공시·published_patent
+            등)면 분류 시 Gate-1(비공지성 게이트)이 발동해 S3로 cap한다. documents.metadata_
+            에 적재되어 doc_id 분류 경로에서 hydrate된다(ClassifyService._effective_metadata).
+        """
         warns: list[str] = []
         source_format = (Path(filename).suffix.lstrip(".").lower() or "bin")[:10]
         file_hash = hashlib.sha256(content_bytes).hexdigest()
@@ -137,6 +143,7 @@ class DocumentIngestionService:
                 norm_uri=norm_uri,
                 pre=pre,
                 doc_type=doc_type,
+                source_type=source_type,
                 external_ref=external_ref,
                 created_by=created_by,
             )
@@ -214,6 +221,7 @@ class DocumentIngestionService:
         norm_uri: Optional[str],
         pre: Optional[PreprocessResult],
         doc_type: Optional[str],
+        source_type: Optional[str],
         external_ref: Optional[str],
         created_by: Optional[str],
     ) -> tuple[object, bool, list[str]]:
@@ -237,7 +245,14 @@ class DocumentIngestionService:
                 ocr_used=(bool(ext.ocr_used) if ext else False),
                 processing_status=("ready" if text else "failed"),
                 external_ref=external_ref,
-                metadata=({"doc_type": doc_type} if doc_type else None),
+                metadata=(
+                    {
+                        k: v
+                        for k, v in {"doc_type": doc_type, "source_type": source_type}.items()
+                        if v
+                    }
+                    or None
+                ),
                 created_by=created_by,
             )
             if pre and pre.chunks:

@@ -61,8 +61,9 @@ def _find_classification_scoped(repo: ClassifyRepo, req, tenant_id: str | None):
     - doc_id 경로: ``list_recent_for_doc(tenant_id=...)``가 repo 계층에서 스코프.
       tenant=None은 repo 정책(레거시 하위호환)을 따른다.
     """
+    # for_update=True: 조회 행을 잠가 동시 검수 확정을 직렬화(status race·중복 correction 방지).
     if req.inference_id is not None:
-        cls = repo.get(req.inference_id)
+        cls = repo.get(req.inference_id, for_update=True)
         if cls is None:
             return None
         cls_tenant = getattr(cls, "tenant_id", None)
@@ -74,7 +75,7 @@ def _find_classification_scoped(repo: ClassifyRepo, req, tenant_id: str | None):
         doc_uuid = uuid.UUID(req.doc_id)
     except (ValueError, TypeError):
         return None
-    recent = repo.list_recent_for_doc(doc_uuid, tenant_id=tenant_id, limit=1)
+    recent = repo.list_recent_for_doc(doc_uuid, tenant_id=tenant_id, limit=1, for_update=True)
     return recent[0] if recent else None
 
 
@@ -110,23 +111,26 @@ class ConfirmService:
                     warns.append(f"unknown confirmed_label {req.confirmed_label!r}")
                     return ConfirmResult(new_id, confirmed_at, persisted=True, warnings=warns)
 
-                if target_level_id != cls.predicted_level_id:
-                    # 자동으로 corrections 기록 (direction은 order로 산출)
+                # corrections 멱등 기록 — 동일 (분류·교정등급·검수자) 중복 방지.
+                # 행 잠금(_find_classification_scoped의 for_update)과 함께 동작해
+                # 중복 클릭·재시도·동시 확정에도 correction은 1건만 남는다.
+                reason = req.note or (
+                    "confirmed with different label"
+                    if target_level_id != cls.predicted_level_id
+                    else None
+                )
+                if repo.correction_exists(cls.classification_id, target_level_id, req.actor.user_id):
+                    warns.append(
+                        "idempotent: confirmation already recorded for this classification/label/actor"
+                    )
+                else:
+                    # direction은 add_correction이 등급 order로 자동 산출(confirm/under/over).
                     repo.add_correction(
                         classification_id=cls.classification_id,
                         original_level_id=cls.predicted_level_id,
                         corrected_level_id=target_level_id,
                         corrected_by=req.actor.user_id,
-                        reason=req.note or "confirmed with different label",
-                    )
-                else:
-                    # 같은 등급 확정 — confirm 방향
-                    repo.add_correction(
-                        classification_id=cls.classification_id,
-                        original_level_id=cls.predicted_level_id,
-                        corrected_level_id=cls.predicted_level_id,
-                        corrected_by=req.actor.user_id,
-                        reason=req.note,
+                        reason=reason,
                     )
                 logger.info(
                     "confirm done: classification_id=%s confirmation_id=%s label=%s",
@@ -171,13 +175,19 @@ class RelabelService:
                     warns.append("unknown grade code")
                     return RelabelResult(new_id, 0, RETRAIN_THRESHOLD_DEFAULT, persisted=False, warnings=warns)
 
-                repo.add_correction(
-                    classification_id=cls.classification_id,
-                    original_level_id=orig_id,
-                    corrected_level_id=corr_id,
-                    corrected_by=req.actor.user_id,
-                    reason=req.reason,
-                )
+                # 멱등 기록 — 동일 (분류·교정등급·검수자) 중복 방지(행 잠금과 함께).
+                if repo.correction_exists(cls.classification_id, corr_id, req.actor.user_id):
+                    warns.append(
+                        "idempotent: relabel already recorded for this classification/label/actor"
+                    )
+                else:
+                    repo.add_correction(
+                        classification_id=cls.classification_id,
+                        original_level_id=orig_id,
+                        corrected_level_id=corr_id,
+                        corrected_by=req.actor.user_id,
+                        reason=req.reason,
+                    )
                 cls.status = "corrected"
 
                 queue_size = len(repo.unconsumed_corrections())
