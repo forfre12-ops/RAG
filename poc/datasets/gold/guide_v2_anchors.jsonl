@@ -1,0 +1,31 @@
+{"kind": "factor_level_example", "factor": "secrecy", "level": 0, "examples": ["학위논문", "공개특허 정보"], "provenance": "guide_p11", "note": "불특정 다수에게 공개된 정보"}
+{"kind": "factor_level_example", "factor": "secrecy", "level": 1, "examples": ["제안서", "계약서"], "provenance": "guide_p11", "note": "통상적 방법으로 입수하기 어려운 정보"}
+{"kind": "factor_level_example", "factor": "secrecy", "level": 2, "examples": ["연구개발 결과", "신규사업 투자계획"], "provenance": "guide_p11", "note": "보유자를 통하지 않고서는 알 수 없는 정보"}
+{"kind": "factor_level_example", "factor": "value", "level": 0, "examples": ["소모품 내역"], "provenance": "guide_p11", "note": "경제적 가치가 없는 정보"}
+{"kind": "factor_level_example", "factor": "value", "level": 1, "examples": ["시장조사 보고서"], "provenance": "guide_p11", "note": "취득·개발에 비용 또는 노력이 투입된 정보"}
+{"kind": "factor_level_example", "factor": "value", "level": 2, "examples": ["고객정보", "설계도면", "소스코드"], "provenance": "guide_p11", "note": "상당한 비용 또는 노력이 투입된 정보"}
+{"kind": "factor_level_example", "factor": "management", "level": 0, "examples": ["홍보자료", "신고 자료"], "provenance": "guide_p11", "note": "비밀로 관리할 수 없거나 임직원 이외에 모두 알아야 하는 정보"}
+{"kind": "factor_level_example", "factor": "management", "level": 1, "examples": ["실험 데이터"], "provenance": "guide_p11", "note": "임직원 일부만 자체적으로 공개하는 정보"}
+{"kind": "factor_level_example", "factor": "management", "level": 2, "examples": ["제품/공정 정보", "경영계획"], "provenance": "guide_p11", "note": "승인된 자에 한해 공개되는 정보"}
+{"kind": "svm_anchor", "doc_type": "조직도", "secrecy": 1, "value": 1, "management": 1, "svm": 1, "grade": "S2", "provenance": "guide_p12", "authoritative": true}
+{"kind": "svm_anchor", "doc_type": "내선번호", "secrecy": 0, "value": 0, "management": 0, "svm": 0, "grade": "S3", "provenance": "guide_p12", "authoritative": true}
+{"kind": "svm_anchor", "doc_type": "인사평가보고서", "secrecy": 1, "value": 2, "management": 2, "svm": 4, "grade": "S1", "provenance": "guide_p12", "authoritative": true}
+{"kind": "svm_anchor", "doc_type": "중장기 경영계획", "secrecy": 2, "value": 2, "management": 2, "svm": 8, "grade": "TS", "provenance": "guide_p12", "authoritative": true, "note": "p6 예시표는 동일 문서를 1급(S1)으로 분류 — 변이. 발주처 협의 필요(README 참조)."}
+{"kind": "svm_anchor", "doc_type": "사무실 배치도", "secrecy": 1, "value": 1, "management": 0, "svm": 0, "grade": "S3", "provenance": "guide_p12", "authoritative": true, "note": "M=0(관리성 없음) → 곱=0 → 공개. 곱셈 게이트 예시."}
+{"kind": "grade_example", "category": "인사", "doc_type": "직원 개인정보·인사기록카드·급여·연봉·조직도", "grade": "S2", "provenance": "guide_p6", "needs_review": true}
+{"kind": "grade_example", "category": "인사", "doc_type": "근태·출퇴근·휴가·복지·퇴직 정보", "grade": "S3", "provenance": "guide_p6", "needs_review": true}
+{"kind": "grade_example", "category": "인사", "doc_type": "교육계획·교육결과 보고서", "grade": "S3", "provenance": "guide_p6", "needs_review": true}
+{"kind": "grade_example", "category": "총무", "doc_type": "사업계획(중장기 경영계획·투자계획·신규 투자계획)", "grade": "S1", "provenance": "guide_p6", "needs_review": true, "note": "p12 워크드 예시는 중장기 경영계획을 TS로 산정 — 변이."}
+{"kind": "grade_example", "category": "총무", "doc_type": "경영전략·경영분석 보고서", "grade": "S2", "provenance": "guide_p6", "needs_review": true}
+{"kind": "grade_example", "category": "총무", "doc_type": "임원 회의록·이사회 회의록", "grade": "S1", "provenance": "guide_p6", "needs_review": true}
+{"kind": "grade_example", "category": "총무", "doc_type": "주주총회 의사록·이사회 명단", "grade": "S3", "provenance": "guide_p6", "needs_review": true}
+{"kind": "grade_example", "category": "회계", "doc_type": "자금계획·자금수지 정보", "grade": "S1", "provenance": "guide_p7", "needs_review": true}
+{"kind": "grade_example", "category": "회계", "doc_type": "매출입(전표·세금계산서·재무제표·손익계산서)", "grade": "S2", "provenance": "guide_p7", "needs_review": true}
+{"kind": "grade_example", "category": "회계", "doc_type": "원가분석·제품별 단가표·판매가격 정보", "grade": "S1", "provenance": "guide_p7", "needs_review": true}
+{"kind": "grade_example", "category": "회계", "doc_type": "법인세·부가세·취득세·세무조정 계산서", "grade": "S3", "provenance": "guide_p7", "needs_review": true}
+{"kind": "grade_example", "category": "연구개발", "doc_type": "연구개발 계획서·신제품 개발계획", "grade": "S1", "provenance": "guide_p8", "needs_review": true}
+{"kind": "grade_example", "category": "연구개발", "doc_type": "연구개발 보고서·성과물·실험결과·시제품 성능", "grade": "S1", "provenance": "guide_p8", "needs_review": true}
+{"kind": "grade_example", "category": "연구개발", "doc_type": "연구개발 노트·개발 회의록", "grade": "S2", "provenance": "guide_p8", "needs_review": true}
+{"kind": "grade_example", "category": "연구개발", "doc_type": "특허·실용신안·디자인(등록 공개분)", "grade": "S3", "provenance": "guide_p8", "needs_review": true}
+{"kind": "grade_example", "category": "생산제조", "doc_type": "생산계획·공장 배치도·생산라인 공정도", "grade": "S2", "provenance": "guide_p9", "needs_review": true}
+{"kind": "grade_example", "category": "구매", "doc_type": "원부자재 구매·발주·단가 정보", "grade": "S3", "provenance": "guide_p8", "needs_review": true}
