@@ -1,0 +1,30 @@
+{
+  "TS": {
+    "doc_id": "G50-TS-03",
+    "conf": 0.7718,
+    "title": "암호 키 관리 보고서",
+    "svm": "2x2x2=8",
+    "pdf": "datasets/gold/formats/pdf/G50-TS-03.pdf"
+  },
+  "S1": {
+    "doc_id": "G50-S1-06",
+    "conf": 0.9997,
+    "title": "AI 기반 고객 분석 알고리즘 설계 문서",
+    "svm": "2x2x1=4",
+    "pdf": "datasets/gold/formats/pdf/G50-S1-06.pdf"
+  },
+  "S2": {
+    "doc_id": "G50-S2-09",
+    "conf": 0.9988,
+    "title": "제3분기 매출 예측 검토 및 협력사 협상 조건 검토 보고서",
+    "svm": "1x1x1=1",
+    "pdf": "datasets/gold/formats/pdf/G50-S2-09.pdf"
+  },
+  "S3": {
+    "doc_id": "G50-S3-12",
+    "conf": 0.997,
+    "title": "2024년 제4분기 신제품 출시 계획 공지",
+    "svm": "0x0x0=0",
+    "pdf": "datasets/gold/formats/pdf/G50-S3-12.pdf"
+  }
+}
