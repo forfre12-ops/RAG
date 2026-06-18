@@ -110,10 +110,11 @@ USER_TEMPLATE_V2 = """[문서 상황]
 {doc_types}
 
 [작성 길이]
-한국어 {len_min}~{len_max}자
+body는 한국어 {len_min}자 이상 {len_max}자 이내. 단답 금지 — 여러 단락으로, 구체적 항목·수치·일정·금액·기술 사양 등 세부를 실제 사내 문서처럼 충실히 작성.
 
 위 상황에 해당하는 가상의 사내 문서를 JSON 객체로 작성하시오.
-등급명(비밀, 기밀, TS, S1, S2, S3 등)은 문서 내용에 포함하지 마시오."""
+- body는 반드시 {len_min}자 이상의 상세 문서(여러 단락).
+- 등급명(비밀, 기밀, TS, S1, S2, S3, 대외비, 극비 등)은 문서 내용에 포함하지 마시오."""
 
 DOMAIN_DOC_TYPES = {
     "tech": "연구노트, 설계명세, 시험성적서, 알고리즘 설명서",
@@ -203,13 +204,13 @@ class SyntheticDocGenerator:
         # 재시도 시 temperature 낮춰 deterministic 시도 + system prompt 강화.
         max_retries = 2
         attempt = 0
-        resp = self.llm.generate(user, system=SYSTEM_PROMPT, temperature=0.7, max_tokens=2048)
+        resp = self.llm.generate(user, system=SYSTEM_PROMPT, temperature=0.7, max_tokens=3500)
         parsed = self._parse(resp.text)
         while parsed is None and attempt < max_retries:
             attempt += 1
             # 재시도: temperature 0.3, system prompt 에 "반드시 유효한 JSON 만 출력" 추가
             retry_system = SYSTEM_PROMPT + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
-            resp = self.llm.generate(user, system=retry_system, temperature=0.3, max_tokens=2048)
+            resp = self.llm.generate(user, system=retry_system, temperature=0.3, max_tokens=3500)
             parsed = self._parse(resp.text)
 
         if parsed is None:

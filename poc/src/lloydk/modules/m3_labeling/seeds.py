@@ -293,6 +293,12 @@ KEYWORD_SEEDS: list[dict] = [
     # 재무·고객
     {"grade": "S1", "keyword": "원가 구조", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
     {"grade": "S1", "keyword": "원가율", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    # [pilot] 자금계획류 — 가이드 회계 예시표상 자금계획 정보 = 1급 비밀(S1)
+    {"grade": "S1", "keyword": "자금계획", "weight": 0.8, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "자금조달 전략", "weight": 0.78, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "자금조달 방안", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "자금수지", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
+    {"grade": "S1", "keyword": "재무 모델링", "weight": 0.72, "factor": "ECONOMIC_VALUE"},
     {"grade": "S1", "keyword": "고객 데이터베이스", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
     {"grade": "S1", "keyword": "고객 정보", "weight": 0.75, "factor": "ECONOMIC_VALUE"},
     {"grade": "S1", "keyword": "VIP 고객 명단", "weight": 0.85, "factor": "ECONOMIC_VALUE"},
