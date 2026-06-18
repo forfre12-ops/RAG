@@ -55,6 +55,16 @@ def grade_from_svm(s: int, v: int, m: int) -> str:
     return "S3"
 
 
+def svm_levels_for_grade(grade: str) -> tuple[int, int, int]:
+    """등급을 재구성하는 표준 S/V/M 레벨 (표시 정합용).
+
+    TS→(2,2,2)=8 · S1→(2,2,1)=4 · S2→(1,1,1)=1 · S3→(0,0,0)=0.
+    곱셈 산정값이 FNR-safe 보정으로 최종 등급과 달라질 때, 표시 S/V/M을 최종 등급에
+    정합화해 'S0·V0·M0인데 TS' 같은 모순 표기(검수 신뢰도 훼손)를 막는다.
+    """
+    return {"TS": (2, 2, 2), "S1": (2, 2, 1), "S2": (1, 1, 1), "S3": (0, 0, 0)}.get(grade, (1, 1, 1))
+
+
 @dataclass
 class MatchedKeyword:
     keyword: str
@@ -328,6 +338,12 @@ class LabelRuleEngine:
                     f"svm={svm_val}({svm_grade})↔content({content_grade}) → FNR-safe {final}"
                 ]
             chosen = final
+            # [표시 정합 B2/A3] FNR-safe 보정으로 svm_grade≠chosen이면 표시 S/V/M을 최종 등급에
+            # 정합화. 예: public 게이트로 svm=S3지만 content=TS → chosen=TS → S/V/M도 TS 기준 표시.
+            # (그렇지 않으면 'S0·V0·M0인데 TS' 모순 표기가 검수자에게 노출됨)
+            if grade_from_svm(s_lv, v_lv, m_lv) != chosen:
+                s_lv, v_lv, m_lv = svm_levels_for_grade(chosen)
+                svm_val = s_lv * v_lv * m_lv
             # 정본 3요건은 레벨(0/1/2)로 덮되, 커스텀 factor 키는 보존(merge — genericity 계약).
             factor_scores = {**factor_scores, "SECRECY": float(s_lv), "VALUE": float(v_lv), "MANAGEMENT": float(m_lv)}
 

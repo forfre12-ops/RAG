@@ -249,10 +249,10 @@ class _MockClassifyRepo:
         self._recent = list(recent or [])
         self.list_tenant_calls: list = []
 
-    def get(self, classification_id):  # noqa: ARG002
+    def get(self, classification_id, *, for_update=False):  # noqa: ARG002
         return self._cls
 
-    def list_recent_for_doc(self, doc_id, *, tenant_id=None, limit=10):  # noqa: ARG002
+    def list_recent_for_doc(self, doc_id, *, tenant_id=None, limit=10, for_update=False):  # noqa: ARG002
         self.list_tenant_calls.append(tenant_id)
         rows = [c for c in self._recent if tenant_id is None or c.tenant_id == tenant_id]
         return rows[:limit]

@@ -62,6 +62,7 @@ class InferencePipeline:
         self.labeling = LabelingPipeline()
         self._model = None
         self._tokenizer = None
+        self._model_temperature: float | None = None  # [A1] 모델 동봉 temperature.json 자동로드값
         # GradeRegistry 순서는 **rule-fallback 경로 전용** id→등급 매핑.
         # 학습 모델이 로드되면 _load_model에서 모델 config.id2label로 덮어쓴다
         # (softmax 인덱스는 학습 시점 순서에 고정되어 있고 DB level_order와 무관).
@@ -96,6 +97,18 @@ class InferencePipeline:
         self._model.eval()
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._model.to(self._device)
+        # [A1] 모델 아티팩트 동봉 temperature.json 자동 로드(보정 자동연결).
+        # 보정 스크립트(calibrate_classifier.py)가 모델 폴더에 {"temperature": T}를 남기면
+        # 서빙이 자동으로 logit/T 적용. settings.classifier_temperature가 명시(≠1.0)면 그게 우선.
+        try:
+            import json as _json  # noqa: PLC0415
+            _tpath = self.model_dir / "temperature.json"
+            if _tpath.exists():
+                _t = float(_json.loads(_tpath.read_text(encoding="utf-8")).get("temperature", 0))
+                if _t > 0:
+                    self._model_temperature = _t
+        except Exception:  # noqa: BLE001
+            self._model_temperature = None
 
     def _id2label_from_config(self) -> dict[int, object] | None:
         """학습 체크포인트 config.id2label → {int index: Grade|str} 매핑.
@@ -177,9 +190,14 @@ class InferencePipeline:
         try:
             from lloydk.config import settings  # noqa: PLC0415
             t = float(settings.classifier_temperature)
-            return t if t > 0 else 1.0
-        except Exception:
-            return 1.0
+            if t > 0 and abs(t - 1.0) > 1e-9:
+                return t  # .env로 명시 주입된 값이 최우선
+        except Exception:  # noqa: BLE001
+            pass
+        # [A1] settings 미지정(=1.0)이면 모델 동봉 temperature.json 사용(보정 자동연결).
+        if self._model_temperature and self._model_temperature > 0:
+            return self._model_temperature
+        return 1.0
 
     def run(
         self,
@@ -416,6 +434,9 @@ class InferencePipeline:
         doc_prob = weighted.clone()
         # 고등급: max 청크 확률로 보강 (most-severe-wins). 단조 비감소 — 평균보다
         # 낮아지지 않으므로 미탐 방향으로 후퇴할 수 없다.
+        # [B3 검토 후 보류] 짧은 노이즈 청크 과분류를 막으려 최소길이 필터를 시도했으나,
+        # 짧은 *비밀* 청크(예: "마스터 키: …")도 함께 배제돼 미탐(FNR)을 유발 → 영업비밀
+        # 시스템은 과분류가 안전 방향이므로 필터 미적용. 전체 청크 severe-max 유지(FNR 우선).
         chunk_max = chunk_probs.max(dim=0).values
         severe_idx = {
             i for i, g in self._id2label.items()
@@ -464,13 +485,33 @@ class InferencePipeline:
         lab = self.labeling.label(text)  # 보조 evidence/factors
         # use_rag은 run() 레벨에서 통합 처리 — 본 함수 시그니처는 호환 위해 유지.
         del use_rag
+        # [A3] 모델 등급 ↔ 룰 factors 정합. 룰이 미탐(곱=0/낮음)인데 모델이 고등급이면
+        # 표시 S/V/M을 모델 등급에 정합화(+경고) — 'S0·V0·M0인데 TS' 모순 표기 방지.
+        factors = lab.factors
+        a3_warn: list[str] = []
+        pred_code = pred.value if hasattr(pred, "value") else str(pred)
+        if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
+            try:
+                from lloydk.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade  # noqa: PLC0415
+                fsv = int(float(getattr(factors, "secrecy", 0)))
+                fvv = int(float(getattr(factors, "value", 0)))
+                fmv = int(float(getattr(factors, "management", 0)))
+                if grade_from_svm(fsv, fvv, fmv) != pred_code:
+                    s2, v2, m2 = svm_levels_for_grade(pred_code)
+                    factors = EvaluationFactors.from_factor_scores(
+                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
+                    )
+                    a3_warn = [f"factors aligned to model grade {pred_code} (rule under-detected S/V/M)"]
+            except Exception:  # noqa: BLE001
+                factors = lab.factors
         return InferenceResult(
             label=pred,
             confidence=conf,
             scores=scores,
-            factors=lab.factors,
+            factors=factors,
             evidence=lab.evidence if return_evidence else [],
             model_version=str(self.model_dir.name) if self.model_dir else "model",
+            warnings=a3_warn,
         )
 
     # ------------------------------------------------------------

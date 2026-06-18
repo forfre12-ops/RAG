@@ -300,6 +300,17 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         trainer.save_model(str(out_dir))
         tok.save_pretrained(str(out_dir))
 
+        # [드리프트 배선] 학습 표본 임베딩으로 train centroid 저장 → run_drift_check 활성화.
+        # 기존: centroid 미저장이라 drift_tick이 영원히 skip(드리프트 감지 무력). 베스트에포트(비치명적).
+        try:
+            from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
+            from lloydk.services.drift_monitor import save_train_centroid  # noqa: PLC0415
+            _vecs = build_embedder().embed(train_x[:200]).vectors
+            if _vecs:
+                save_train_centroid(_vecs)
+        except Exception:  # noqa: BLE001
+            pass
+
         result = TrainReport(
             model_version=f"v-{run.info.run_id[:8]}",
             accuracy=float(acc),
