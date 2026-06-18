@@ -14,7 +14,11 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.modules.m3_labeling.seeds import FACTOR_SEEDS, KEYWORD_SEEDS  # noqa: E402
+from lloydk.modules.m3_labeling.seeds import (  # noqa: E402
+    FACTOR_SEEDS,
+    KEYWORD_SEEDS,
+    to_canonical_factor,
+)
 
 OUT_JSON = _HERE.parent / "datasets" / "level_keywords_seed.json"
 
@@ -41,7 +45,8 @@ def to_db() -> int:
             inserted = 0
             for seed in KEYWORD_SEEDS:
                 lvl = level_map.get(seed["grade"])
-                fct = factor_map.get(seed["factor"])
+                # 레거시 4요소 태그 → 정본 3요건(S·V·M)으로 정규화 후 DB factor_id 조회
+                fct = factor_map.get(to_canonical_factor(seed["factor"]))
                 if not lvl:
                     continue
                 conn.execute(
