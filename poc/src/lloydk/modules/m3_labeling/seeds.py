@@ -481,7 +481,8 @@ KEYWORD_SEEDS: list[dict] = [
     # ============================================================
     # S3 3급 공개 — 일반 사내자료 또는 공개 가능
     # ============================================================
-    {"grade": "S3", "keyword": "공개", "weight": 0.7, "factor": "NON_PUBLICITY"},
+    # [pilot fix] 바 "공개" 시드 제거 — "외부 공개 시(유출 위험)" 경고문·"비공개"(substring)에 오매칭해
+    # 비밀문서를 S3로 과소분류시킴. 공개 판정은 구체 마커(보도자료·공시·공개특허 등)로만.
     {"grade": "S3", "keyword": "공개가능", "weight": 0.75, "factor": "NON_PUBLICITY"},
     {"grade": "S3", "keyword": "Public", "weight": 0.6, "factor": "NON_PUBLICITY"},
     {"grade": "S3", "keyword": "보도자료", "weight": 0.9, "factor": "NON_PUBLICITY"},
