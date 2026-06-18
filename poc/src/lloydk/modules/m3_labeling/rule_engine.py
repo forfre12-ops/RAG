@@ -78,6 +78,7 @@ class RuleLabelResult:
     matched_keywords: list[MatchedKeyword]
     total_score: float
     method: str = "rule_keyword"
+    svm: int = 0                         # 정본 B안: S×V×M 곱 (0/1/2/4/8). multiplicative 모드 산출.
     warnings: list[str] = field(default_factory=list)
 
 
@@ -139,9 +140,12 @@ class LabelRuleEngine:
         fnr_safe: bool = True,
         embedder: Optional[object] = None,
         semantic_threshold: Optional[float] = None,
+        method: Optional[str] = None,
     ) -> None:
         self.seeds = seeds or KEYWORD_SEEDS
         self.fnr_safe = fnr_safe
+        # 정본 B안: 등급 = S×V×M(multiplicative). additive = 레거시 가중합.
+        self.method = method or "multiplicative"
         self._factor_weights = {f["code"]: f["weight"] for f in FACTOR_SEEDS}
         # semantic 매칭 전용 자원 (lazy)
         self._embedder = embedder
@@ -289,9 +293,43 @@ class LabelRuleEngine:
             folded[cf] = folded.get(cf, 0.0) + val
         factor_raw = folded
 
-        # 3요건(S/V/M) 평가요소 정규화 (0~5)
+        # 3요건(S/V/M) 평가요소 정규화 (0~5) — additive/표시용
         max_factor = max(factor_raw.values()) if factor_raw and max(factor_raw.values()) > 0 else 1.0
         factor_scores = {k: round(min(5.0, (v / max_factor) * 5.0), 2) for k, v in factor_raw.items()}
+
+        # ── 정본 B안: 등급 = S×V×M (multiplicative) ──
+        # 원칙(doc/22 v2 §3.6): 요소값 0은 "근거 없음"이 아니라 "공개/가치없음/관리안됨이 *입증*된
+        # 경우"에만. 기본 floor=1 → 곱셈 붕괴(과소분류) 방지. 곱 결과가 콘텐츠 등급보다 낮으면
+        # FNR-safe 콘텐츠 가드(R2)로 끌어올림(silent 하향 차단).
+        svm_val = 0
+        # B안 곱셈은 영업비밀 4등급 스킴에만 적용 — 커스텀 등급(타 프로젝트 DB 스킴)은 우회(genericity 보존).
+        if self.method == "multiplicative" and total > 0 and chosen in ("TS", "S1", "S2", "S3"):
+            content_grade = chosen
+            public = any(
+                mm.grade == "S3" and to_canonical_factor(mm.factor) == "SECRECY" for mm in matches
+            )
+            strong = content_grade in ("TS", "S1")
+            has_mgmt = any(
+                to_canonical_factor(mm.factor) == "MANAGEMENT" and mm.grade in ("TS", "S1")
+                for mm in matches
+            )
+            s_lv = 0 if (public or content_grade == "S3") else (2 if strong else 1)
+            v_lv = 2 if strong else (0 if content_grade == "S3" else 1)
+            m_lv = 2 if has_mgmt else (0 if content_grade == "S3" else 1)
+            svm_val = s_lv * v_lv * m_lv
+            svm_grade = grade_from_svm(s_lv, v_lv, m_lv)
+            final = (
+                min([svm_grade, content_grade], key=lambda g: GRADE_ORDER.get(g, 999))
+                if self.fnr_safe
+                else svm_grade
+            )
+            if svm_grade != content_grade:
+                warnings = warnings + [
+                    f"svm={svm_val}({svm_grade})↔content({content_grade}) → FNR-safe {final}"
+                ]
+            chosen = final
+            # 정본 3요건은 레벨(0/1/2)로 덮되, 커스텀 factor 키는 보존(merge — genericity 계약).
+            factor_scores = {**factor_scores, "SECRECY": float(s_lv), "VALUE": float(v_lv), "MANAGEMENT": float(m_lv)}
 
         return RuleLabelResult(
             grade=chosen,
@@ -300,6 +338,7 @@ class LabelRuleEngine:
             factor_scores=factor_scores,
             matched_keywords=matches,
             total_score=round(total, 4),
+            svm=svm_val,
             warnings=warnings,
         )
 

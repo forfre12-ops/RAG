@@ -229,6 +229,9 @@ class Settings(BaseSettings):
     # cap 레벨: "S3"(공개=S3 강제, 법리 정합·권장) | "S2"(부분완화, TS/S1만 하향 — 레거시).
     source_prior_cap_grade: str = "S3"
 
+    # 등급 산정법(정본 가이드 B안): multiplicative(S×V×M 곱셈) | additive(레거시 4요소 가중합).
+    labeling_method: str = "multiplicative"
+
     embedding_model: str = "nlpai-lab/KURE-v1"
 
     # 임베딩 어댑터 선택:
