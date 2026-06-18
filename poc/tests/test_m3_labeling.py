@@ -14,10 +14,10 @@ from lloydk.modules.m3_labeling import (
 )
 
 
-def test_factor_weights_sum_to_one():
-    """DB trigger와 동일 제약 — 가중치 합 ≈ 1.0."""
-    s = sum(f["weight"] for f in FACTOR_SEEDS)
-    assert abs(s - 1.0) < 0.01
+def test_canonical_factors_are_three_requisites():
+    """정본 B안 — 평가요소는 3요건(S·V·M). 곱셈식이라 가산 가중치 합 제약 없음."""
+    codes = {f["code"] for f in FACTOR_SEEDS}
+    assert codes == {"SECRECY", "VALUE", "MANAGEMENT"}
 
 
 def test_grade_order_has_all_four_levels():
@@ -63,15 +63,11 @@ def test_rule_engine_fnr_safe_picks_higher_grade_on_tie():
 def test_pipeline_returns_evaluation_factors():
     pipe = LabelingPipeline()
     out = pipe.label("1급 비밀 영업비밀 공정 노하우 원가 구조")
-    assert hasattr(out.factors, "economic_value")
-    assert hasattr(out.factors, "leak_impact")
+    assert hasattr(out.factors, "secrecy")
+    assert hasattr(out.factors, "value")
+    assert hasattr(out.factors, "management")
     # 적어도 한 factor는 점수가 잡혀야 함
-    total = (
-        out.factors.economic_value
-        + out.factors.non_publicity
-        + out.factors.management_level
-        + out.factors.leak_impact
-    )
+    total = out.factors.secrecy + out.factors.value + out.factors.management
     assert total > 0.0
 
 

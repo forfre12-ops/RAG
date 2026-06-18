@@ -44,10 +44,9 @@ except Exception:  # noqa: BLE001
 
     @dataclass
     class EvaluationFactors:  # type: ignore[no-redef]
-        economic_value: float = 0.0
-        non_publicity: float = 0.0
-        management_level: float = 0.0
-        leak_impact: float = 0.0
+        secrecy: float = 0.0
+        value: float = 0.0
+        management: float = 0.0
 
 
 @dataclass
@@ -72,10 +71,9 @@ def _get_factor_field_map() -> dict[str, str]:
         except Exception:  # noqa: BLE001
             pass
     return {
-        "ECONOMIC_VALUE": "economic_value",
-        "NON_PUBLICITY": "non_publicity",
-        "MANAGEMENT_LEVEL": "management_level",
-        "LEAK_IMPACT": "leak_impact",
+        "SECRECY": "secrecy",
+        "VALUE": "value",
+        "MANAGEMENT": "management",
     }
 
 

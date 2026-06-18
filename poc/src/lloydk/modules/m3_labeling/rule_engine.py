@@ -24,12 +24,35 @@ from lloydk.modules.m3_labeling.seeds import (
     FACTOR_SEEDS,
     GRADE_ORDER,
     KEYWORD_SEEDS,
+    to_canonical_factor,
 )
 
 logger = logging.getLogger(__name__)
 
 # semantic 매칭 기본 코사인 임계값. EMB_SEMANTIC_THRESHOLD 환경변수로 오버라이드 가능.
 _DEFAULT_SEMANTIC_THRESHOLD = 0.75
+
+
+# ── 정본 가이드 B안: 등급 = 비공지성(S) × 경제적유용성(V) × 비밀관리성(M) ──
+# 각 요소 0/1/2 → 곱 ∈ {0,1,2,4,8}. 한 요소라도 0이면 곱=0 → 공개(S3).
+# (doc/22 v2 §1.2 / 영업비밀 등급분류 가이드 11~12p. 매핑은 DB·설정 오버라이드 가능 — R3)
+SVM_GRADE_MAP: dict[int, str] = {8: "TS", 4: "S1", 2: "S2", 1: "S2", 0: "S3"}
+
+
+def grade_from_svm(s: int, v: int, m: int) -> str:
+    """정본 곱셈식 등급 산정 — 등급 = S×V×M.
+
+    8→TS(특급기밀/극비) · 4→S1(1급 비밀) · 1·2→S2(2급 대외비) · 0→S3(3급 공개).
+    범위 비교로 구현해 이론상 곱값(0/1/2/4/8) 외의 입력도 안전하게 처리한다.
+    """
+    product = int(s) * int(v) * int(m)
+    if product >= 8:
+        return "TS"
+    if product >= 4:
+        return "S1"
+    if product >= 1:
+        return "S2"
+    return "S3"
 
 
 @dataclass
@@ -258,7 +281,15 @@ class LabelRuleEngine:
             conf = top_score / total
             warnings = []
 
-        # 4대 평가요소 정규화 (0~5)
+        # 레거시 4요소 factor → 정본 3요건(S/V/M)으로 폴딩 (B안 정합, doc/22 v2 §3).
+        # 유출영향도는 VALUE로 흡수(R4). 키워드 재태깅 없이 to_canonical_factor로 정규화.
+        folded: dict[str, float] = {}
+        for code, val in factor_raw.items():
+            cf = to_canonical_factor(code)
+            folded[cf] = folded.get(cf, 0.0) + val
+        factor_raw = folded
+
+        # 3요건(S/V/M) 평가요소 정규화 (0~5)
         max_factor = max(factor_raw.values()) if factor_raw and max(factor_raw.values()) > 0 else 1.0
         factor_scores = {k: round(min(5.0, (v / max_factor) * 5.0), 2) for k, v in factor_raw.items()}
 

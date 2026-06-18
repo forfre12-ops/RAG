@@ -71,10 +71,9 @@ def test_classify_response_schema_roundtrip():
         "confidence": 0.85,
         "scores": {"TS": 0.05, "S1": 0.10, "S2": 0.85, "S3": 0.0},
         "evaluation_factors": EvaluationFactors(
-            economic_value=0.7,
-            non_publicity=0.6,
-            management_level=0.5,
-            leak_impact=0.7,
+            secrecy=0.6,
+            value=0.7,
+            management=0.5,
         ),
         "evidence": [],
         "rag_context_used": [],

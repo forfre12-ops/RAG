@@ -120,13 +120,40 @@ def load_seeds_from_db() -> list[dict] | None:
         _logger.debug("load_seeds_from_db failed, caller will use KEYWORD_SEEDS: %s", exc)
         return None
 
-# 4대 평가 요소 (DB evaluation_factors 정합)
-FACTOR_SEEDS: list[dict] = [
+# [레거시·A안 보조] 4요소 가중합 모델 (A안 100점 보조 모드 전용·하위호환).
+FACTOR_SEEDS_LEGACY_V1: list[dict] = [
     {"code": "ECONOMIC_VALUE", "name": "경제적 가치", "weight": 0.30},
     {"code": "NON_PUBLICITY", "name": "비공지성", "weight": 0.25},
     {"code": "MANAGEMENT_LEVEL", "name": "관리수준", "weight": 0.15},
     {"code": "LEAK_IMPACT", "name": "유출 시 영향도", "weight": 0.30},
 ]
+
+# ── 정본 평가요소: 가이드 3요건 (B안 S×V×M) ──
+# weight는 곱셈식에서 미사용(하위호환 KeyError 방지용 1.0). 등급 = S×V×M.
+FACTOR_SEEDS: list[dict] = [
+    {"code": "SECRECY", "name": "비공지성(S)", "weight": 1.0},       # 0이면 곱=0 → 공개 게이트
+    {"code": "VALUE", "name": "경제적 유용성(V)", "weight": 1.0},
+    {"code": "MANAGEMENT", "name": "비밀관리성(M)", "weight": 1.0},
+]
+CANONICAL_FACTOR_SEEDS: list[dict] = FACTOR_SEEDS  # 별칭 (정본 = FACTOR_SEEDS)
+
+# 레거시 4요소 factor 태그 → 정본 3요건 매핑 (300+ 시드 재태깅 없이 정합).
+# 유출영향도는 정본 3요건에 없음 → 가치 신호로 흡수(R4: 등급 loss_weight로 별도 관리).
+LEGACY_FACTOR_ALIAS: dict[str, str] = {
+    "NON_PUBLICITY": "SECRECY",
+    "ECONOMIC_VALUE": "VALUE",
+    "MANAGEMENT_LEVEL": "MANAGEMENT",
+    "LEAK_IMPACT": "VALUE",
+    # 정본 코드는 그대로 통과
+    "SECRECY": "SECRECY",
+    "VALUE": "VALUE",
+    "MANAGEMENT": "MANAGEMENT",
+}
+
+
+def to_canonical_factor(factor_code: str) -> str:
+    """레거시 4요소 코드를 정본 3요건 코드로 정규화. 이미 정본이면 그대로 반환."""
+    return LEGACY_FACTOR_ALIAS.get(factor_code, factor_code)
 
 # 등급별 키워드 시드.
 # weight: 매칭 시 가중치 (높을수록 그 등급에 강한 신호)

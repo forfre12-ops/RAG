@@ -452,10 +452,9 @@ function renderSummary(data) {
     .slice(0, 2);
 
   const factorLabels = {
-    economic_value: "경제적 가치",
-    non_publicity: "비공지성",
-    management_level: "관리 수준",
-    leak_impact: "유출 시 영향도",
+    secrecy: "비공지성(S)",
+    value: "경제적 유용성(V)",
+    management: "비밀관리성(M)",
   };
 
   // 음성 근거 — 더 상위 등급의 키워드가 안 들어왔다
@@ -473,7 +472,7 @@ function renderSummary(data) {
     ? `「${matched.join("」 「")}」 키워드가 감지되었습니다.`
     : "본문에서 시드 키워드 매칭이 없어 기본 등급으로 판정되었습니다.";
   const factorTxt = topFactors.length > 0
-    ? `4 평가요소 중 ${topFactors
+    ? `3요건(S·V·M) 중 ${topFactors
         .map(([k, v]) => `<b>${factorLabels[k] || k}(${v.toFixed(2)})</b>`)
         .join("·")}가 가장 높게 측정되었습니다.`
     : "";
@@ -493,10 +492,9 @@ function gradeLabel(g) {
 function renderFactors(f) {
   const wrap = $("#result-factors");
   const labels = {
-    economic_value: "경제적 가치",
-    non_publicity: "비공지성",
-    management_level: "관리 수준",
-    leak_impact: "유출 시 영향도",
+    secrecy: "비공지성(S)",
+    value: "경제적 유용성(V)",
+    management: "비밀관리성(M)",
   };
   // 서버 응답은 키워드 가중치 누적값이라 등급에 따라 0~5+ 범위.
   // 화면 표시는 4 요소 중 상대값을 0~1로 정규화해서 비교 가능하게 한다.
