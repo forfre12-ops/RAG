@@ -114,11 +114,10 @@
 [가이드 컨텍스트]
 {GUIDE_CHUNKS}
 
-[등급 기준]
-경제적 가치: {V_THRESHOLD}
-비공지성: {NP_THRESHOLD}
-관리수준: {ML_THRESHOLD}
-유출 시 영향도: {LI_THRESHOLD}
+[등급 기준] (정본 3요건, 각 0/1/2 → 등급 = S×V×M)
+비공지성(S): {S_LEVEL}
+경제적 유용성(V): {V_LEVEL}
+비밀관리성(M): {M_LEVEL}
 
 [제약]
 - 실재 기업/인명/주민번호/연락처 금지
@@ -183,9 +182,9 @@ poc/datasets/
   "text": "...",
   "metadata": {"dept": "R&D", "doc_type": "연구노트", "created_at": "2026-04-12"},
   "label": "TS",
-  "factor_scores": {"economic_value": 4.2, "non_publicity": 4.5,
-                    "management_level": 3.8, "leak_impact": 4.7},
-  "evidence_spans": [{"start": 123, "end": 178, "text": "...", "factor": "leak_impact"}],
+  "factor_scores": {"secrecy": 2, "value": 2, "management": 2},
+  "svm": 8,
+  "evidence_spans": [{"start": 123, "end": 178, "text": "...", "factor": "secrecy"}],
   "license": "Public-Nuri-1|AIHub|Synthetic-Lloydk|...",
   "created_at": "2026-05-30T10:00:00Z"
 }

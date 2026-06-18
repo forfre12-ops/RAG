@@ -9,7 +9,7 @@
 --   [F4] (제거됨) pgvector — 자체 결정으로 ES 단일 벡터스토어 확정. 벡터 인덱스는 ES dense_vector(int8_hnsw) 단독 사용
 --   [F5] FK 보호: classification_levels ON DELETE RESTRICT
 --   [F6] 평가요소 정규화 테이블 추가 (document_factor_scores)
---   [F7] weight 합계 검증 트리거
+--   [F7] (B안) weight 합계 트리거 비활성 — A안 100점 보조 모드 전용
 --   [F8] 보정/확정 진실 소스 단일화 (corrections만)
 --   [F9] training_epochs 분리 (training_log JSONB 제거)
 --   [F10] audit_log 추가 (영업비밀 시스템 필수)
@@ -90,14 +90,15 @@ CREATE TABLE evaluation_factors (
     updated_at      TIMESTAMPTZ     DEFAULT NOW()
 );
 
-COMMENT ON TABLE evaluation_factors IS '등급 판단 4대 평가 요소 (FUN-023)';
+COMMENT ON TABLE evaluation_factors IS '등급 판단 정본 3요건 S·V·M — 등급=S×V×M 곱셈 (FUN-023, 정본 가이드 B안)';
 
+-- 정본 3요건 (B안 곱셈식). weight는 B안에서 미사용(A안 100점 보조 모드에서만).
 INSERT INTO evaluation_factors (factor_code, factor_name, weight) VALUES
-  ('ECONOMIC_VALUE',   '경제적 가치',       0.30),
-  ('NON_PUBLICITY',    '비공지성',          0.25),
-  ('MANAGEMENT_LEVEL', '관리수준',          0.15),
-  ('LEAK_IMPACT',      '유출 시 영향도',    0.30)
+  ('SECRECY',    '비공지성(S)',      1.00),   -- 0이면 곱=0 → 공개 게이트
+  ('VALUE',      '경제적 유용성(V)', 1.00),
+  ('MANAGEMENT', '비밀관리성(M)',    1.00)
 ON CONFLICT DO NOTHING;
+-- 유출영향도는 별도 요소 아님 → classification_levels.loss_weight + 등급별 FNR로 관리(R4).
 
 
 CREATE TABLE level_keywords (
@@ -229,11 +230,11 @@ CREATE INDEX idx_dl_labeled_by ON document_labels(labeled_by);
 CREATE TABLE document_factor_scores (
     doc_id          UUID            NOT NULL REFERENCES documents(doc_id) ON DELETE CASCADE,
     factor_id       INT             NOT NULL REFERENCES evaluation_factors(factor_id) ON DELETE RESTRICT,
-    score           DECIMAL(4,2)    NOT NULL CHECK (score >= 0 AND score <= 5),
+    score           SMALLINT        NOT NULL CHECK (score >= 0 AND score <= 2),  -- S/V/M 각 0·1·2 (B안)
     PRIMARY KEY (doc_id, factor_id)
 );
 
-COMMENT ON TABLE document_factor_scores IS '4대 평가요소 점수의 정규화 저장. FK 무결성 보장';
+COMMENT ON TABLE document_factor_scores IS '정본 3요건 S·V·M 점수(각 0~2) 정규화 저장. FK 무결성 보장';
 
 
 -- ============================================================
@@ -588,24 +589,10 @@ CREATE TRIGGER trg_ef_updated BEFORE UPDATE ON evaluation_factors
   FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
 
--- evaluation_factors.weight 합계 = 1.0 보장
-CREATE OR REPLACE FUNCTION check_factor_weights_sum() RETURNS TRIGGER AS $$
-DECLARE
-  total DECIMAL(4,3);
-BEGIN
-  SELECT COALESCE(SUM(weight), 0) INTO total
-  FROM evaluation_factors WHERE is_active = TRUE;
-  IF ABS(total - 1.0) > 0.01 THEN
-    RAISE EXCEPTION 'evaluation_factors active weight sum must be 1.0 (current: %)', total;
-  END IF;
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE CONSTRAINT TRIGGER trg_factor_weights_sum
-  AFTER INSERT OR UPDATE OR DELETE ON evaluation_factors
-  DEFERRABLE INITIALLY DEFERRED
-  FOR EACH ROW EXECUTE FUNCTION check_factor_weights_sum();
+-- (v2/B안) 정본 가이드는 곱셈식 등급 = S×V×M(각 0~2)이라 가산 가중치를 쓰지 않는다.
+-- 따라서 weight 합계=1.0 보장 트리거는 비활성화한다(3요소이므로 합계 1.0도 성립 안 함).
+-- weight 컬럼·sum 트리거는 A안(5요소 100점 가산식) 보조 모드를 켤 때만 사용 →
+-- A안 보조 활성화 시에만 check_factor_weights_sum 트리거를 재생성할 것(git 이력에 원본 보존).
 
 
 -- ============================================================
