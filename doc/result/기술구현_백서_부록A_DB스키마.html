@@ -1,0 +1,737 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>부록 A — DB 스키마 | KOIPA AI 기술 구현 백서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.80);
+  --text:#0a0a0a; --text-soft:#525252; --text-dim:#737373; --text-faint:#a3a3a3;
+  --border:rgba(0,0,0,0.08); --border-strong:rgba(0,0,0,0.16);
+  --pass:#2a2a2a; --fail:#525252; --warn:#737373; --pend:#737373;
+  --radius-sm:6px; --radius:8px; --radius-lg:12px; --radius-pill:999px;
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.65;letter-spacing:-0.01em;-webkit-font-smoothing:antialiased;}
+::selection{background:var(--text);color:var(--bg);}
+
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;white-space:nowrap;min-width:0;line-height:1;}
+.brand-mark{width:32px;height:32px;display:grid;place-items:center;flex-shrink:0;background:#ffffff;border-radius:8px;padding:5px;border:1px solid rgba(0,0,0,0.12);overflow:hidden;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;color:var(--text);}
+.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400;}
+.brand-url{font-family:var(--font-mono);font-size:13.5px;font-weight:400;color:var(--text-dim);letter-spacing:0;}
+.nav-search{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:13px;cursor:pointer;transition:all .15s;min-width:200px;}
+.nav-search:hover{border-color:var(--border-strong);color:var(--text-soft);}
+.nav-search kbd{font-family:var(--font-mono);font-size:10.5px;padding:1px 6px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--text-dim);margin-left:auto;}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+.nav-link{color:var(--text-soft);text-decoration:none;font-size:13.5px;font-weight:500;padding:6px 10px;border-radius:var(--radius-sm);transition:color .15s;}
+.nav-link:hover{color:var(--text);}
+.brand-sub{font-size:13px;color:var(--text-dim);}
+.nav-pills{display:flex;gap:6px;}
+.nav-pill{font-size:12px;padding:4px 10px;border-radius:var(--radius-pill);background:var(--bg-surface);border:1px solid var(--border);color:var(--text-dim);text-decoration:none;font-family:var(--font-mono);}
+.nav-pill:hover{border-color:var(--border-strong);color:var(--text);}
+.nav-pill.active{background:var(--text);color:var(--bg);border-color:var(--text);}
+
+.page{max-width:1380px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:0;padding:0 32px;}
+.sidebar{position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:28px 0;border-right:1px solid var(--border);}
+.sidebar::-webkit-scrollbar{width:3px;}.sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
+.toc-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 20px 10px;font-family:var(--font-mono);}
+.toc-item{display:block;padding:4px 20px;font-size:12.5px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .12s;line-height:1.4;}
+.toc-item:hover{color:var(--text);border-left-color:var(--border-strong);}
+.toc-item.active{color:var(--text);border-left-color:var(--text);font-weight:600;}
+.toc-group{margin-top:12px;}
+.toc-group-label{font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 20px 4px;font-family:var(--font-mono);}
+.toc-item.sub{padding-left:30px;font-size:12px;}
+
+article{padding:40px 0 100px 48px;min-width:0;}
+.meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:var(--radius-pill);background:var(--text);color:var(--bg);font-size:9.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--font-mono);}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+h1.title{font-size:40px;font-weight:800;letter-spacing:-0.04em;line-height:1.08;margin:0 0 16px;}
+.lede{font-size:16px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0 0 32px;max-width:640px;}
+.hero-sep{border:none;border-top:1px solid var(--border-strong);margin:36px 0 44px;}
+section{padding-top:4px;}
+article h2{font-size:24px;font-weight:700;letter-spacing:-0.025em;margin:64px 0 8px;scroll-margin-top:80px;display:flex;align-items:baseline;gap:12px;}
+article h2 .num{font-family:var(--font-mono);font-size:10.5px;font-weight:500;color:var(--text-dim);padding:2px 7px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);line-height:1;}
+article h2+.h2-sub{color:var(--text-dim);font-size:13.5px;margin:0 0 20px;max-width:640px;}
+article h3{font-size:16px;font-weight:600;margin:28px 0 10px;letter-spacing:-0.015em;}
+article p{margin:10px 0;color:var(--text);}
+
+/* ===== Table ===== */
+.tbl-wrap{overflow-x:auto;margin:12px 0;border-radius:var(--radius-lg);border:1px solid var(--border);min-width:0;}
+table{min-width:0;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead{background:var(--bg-surface);}
+th{padding:9px 13px;text-align:left;font-weight:600;font-size:11px;letter-spacing:0.02em;color:var(--text-soft);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:8px 13px;border-bottom:1px solid rgba(0,0,0,0.05);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--bg-surface);}
+.td-pk{color:#404040;font-weight:700;font-family:var(--font-mono);font-size:11.5px;}
+.td-fk{color:rgba(0,0,0,.55);font-weight:600;font-family:var(--font-mono);font-size:11.5px;}
+.td-col{font-family:var(--font-mono);font-size:12px;}
+.td-type{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);}
+.td-nn{font-size:11px;text-align:center;}
+.td-nn.yes{color:rgba(0,0,0,.45);}
+.td-pass{color:var(--text);font-weight:600;}
+.td-warn{color:rgba(0,0,0,.55);}
+.td-center{text-align:center;}
+code{font-family:var(--font-mono);font-size:12px;background:var(--bg-code);padding:1px 5px;border-radius:4px;border:1px solid var(--border);}
+pre{background:var(--bg-code);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;font-family:var(--font-mono);font-size:12px;line-height:1.6;margin:12px 0;}
+
+/* ===== Group header ===== */
+.group-header{display:flex;align-items:center;gap:10px;margin:48px 0 12px;}
+.group-badge{padding:3px 10px;border-radius:var(--radius-pill);font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:0.05em;background:var(--text);color:var(--bg);}
+.group-title{font-size:18px;font-weight:700;letter-spacing:-0.02em;}
+.group-desc{font-size:13px;color:var(--text-dim);margin:-8px 0 12px;}
+
+/* ===== Index chip ===== */
+.idx-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:var(--radius-pill);font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-dim);margin:2px;}
+
+/* ===== ERD relations ===== */
+.rel-list{list-style:none;padding:0;margin:8px 0;font-size:12.5px;}
+.rel-list li{padding:4px 0;display:flex;align-items:center;gap:8px;color:var(--text-soft);}
+.rel-list li code{font-size:11.5px;}
+.rel-arrow{color:var(--text-faint);font-size:12px;}
+
+/* ===== Partition callout ===== */
+.partition-box{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.12);border-radius:var(--radius);padding:12px 14px;margin:10px 0;font-size:13px;}
+
+footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color:var(--text-dim);display:flex;justify-content:space-between;max-width:1380px;margin:0 auto;}
+@media(max-width:1200px){.nav-search{display:none;}}
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;padding:0 20px;}
+  .sidebar{display:none;}
+  article{padding:28px 0 60px;}
+  h1.title{font-size:32px;}
+}
+@media(max-width:600px){
+  .nav-inner{padding:12px 14px;}
+  .brand-url{display:none;}
+  .nav-link.hide-sm{display:none;}
+  .page{padding:0 14px;}
+  h1.title{font-size:26px;}
+  article{padding:20px 0 50px;}
+  .tbl-wrap{border-radius:4px;}
+  table{font-size:11.5px;}
+  th,td{padding:6px 8px;}
+  .group-title{font-size:16px;}
+  footer{flex-direction:column;gap:4px;padding:16px 14px;}
+}
+@media(max-width:480px){
+  .nav-inner{padding:10px 12px;gap:4px;}
+  .nav-link{font-size:12px;padding:4px 6px;}
+  h1.title{font-size:22px;letter-spacing:-0.03em;}
+  .lede{font-size:13.5px;}
+  article{padding:16px 0 40px;}
+  table{font-size:11px;}
+  th,td{padding:5px 6px;}
+  .group-title{font-size:15px;}
+  code{font-size:11px;}
+  footer{font-size:11px;padding:14px 12px;}
+}
+@media print{
+  .nav,.sidebar,footer{display:none!important;}
+  .page{grid-template-columns:1fr;padding:0;}
+  article{padding:0;}
+  body{font-size:12px;}
+  table{break-inside:avoid;}
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAREAAAERCAYAAABclJOOAAAqkUlEQVR4nO2deVBVZ9bun41xHkAGJ0RxIo4YJyKCCooCShzQOKDG6KexOuncP1Ldfav6v/T9bn1VN3XrVveXSnUSYxLjHI0TigOIA0bjHCdsZ1FUnCfUaGTfevbhpEw6DnDO2e979l6/KqrTiZ69ec85z17vetd6lmGaJgRBEKpLSLX/piAIgoiIIAi+IpGIIAg+ISIiCIJPiIgIguATIiKCIPiEiIggCD4hIiIIgk+IiAiC4BMiIoIg+ISIiCAIPiEiIgiCT4iICILgEyIigiD4hIiIIAg+ISIiCIJPiIgIguATIiKCIPiEiIggCD4hIiIIgk+IiAiC4BMiIoIg+ISIiCAIPiEiIgiCT7zi218XfuHsVRPT3wWKTwH3HsjCOI2Y5kBmGvB//2qovhXdkEjEX8RGGcgeCUSEVa5qhfw4aQ3u3QVOngJOl8nIyN8gIuJP/jjZQFx7oH5dv76soAE37wDHTgKLv1N9J9ohIuJv3kgHOnaQpXUid+4Aa/OBooMSjTyFiIi/mTbGwIB+QONGQM0afn95QSE//QScKwE2FMjb8BQiIoEgPQ1oEwvUrhOQlxcU8fgJcPMesHUnMGepRCOViIgEgsQuBrKGAGGNAvLygkoqgBMngNwN8jZUIiISKMaNBjrFebY1grMofwAcPw18ulCiERGRANI6wkC/vkB0tCyz03hSAdy4DixeARw563ohkUgkkEzMBnrGVyZYZakdRflD4NhxYPlauB35ZAeS6DAD6YOA2JZAnVoBvZRgMxUVwN37QNEOYOkGV0cjIiKBZkSKgdd7Aw3ry3I7jhDg6DHgu9VwMyIidjB1PNA0AqjBtgtZcufAcvhy4NgpYGGea6MR+UTbQd9uBgYPBNrE2HI5webakWtXgRWrgdJbrhQSERG7GD8W6Na1MhoRHMW9cmDHbiA3D25ERMQuusUaSB0A1K0NhMiyO4rHpkdItuwAdh5xXTQin2Y7GZEBpA0EwhrYelkh0FR4tjVHioGV7jvyFRGxk4jaBnLeBJo1k+Y8J1J6Cdi2Ayg64KpoRETEbjKTDMR3AcLCbL+0EGAePwEuXga+XgTc5h7HHYiIqGBCNtAjXnIjTixAu3cX+GEvsL4QbsG1IpKXl2euW79ezdNicIKB1GQgPEy2NU7jwSPgzAVg81ag9IYrohFXisjBgwfNjz76CP/7P//T+mclNzEyE0joCTRgJavgOHbuAWbPhxtwpYjk5eXh0KFDOHLkCNavX6/mJmIiDIzKApo2AWrXVHMPQoCoAC5fAXbsAo6XOj4aCXHjNmbr1q24du0abt68ic2bN0PZtmZipoHOcUCjRm58K5zN3XLg1Flg3hI4Hdd9cpcuXYqjR4/+8v8PHz6MJYsXq7VSbNdG3fWFwHHrlqdupGC3o6MRV4nImjVrzIMHD1pRiJerV68yL2JFKEpuKme4gaS+QOMGkmR1Go9+Bi5eAtY729jZNSJy+fJlc8GCBbhw4QLu3bv3y79/8OABLl68iIULF+L27dtqhCQ9pdLYubaSywsBPPJ9+Bj4fifw8TzHRiOuEZHVq1Zhy5YtuHHjxr/9t1u3bln/bcWKFUruDYndxNjZyZwuAdZvAq7ec6SQuEJEDhw4YG7esoXRCB49evRv/53RCP9bQUEBT2zUvNFv5wCvtgdCGyq5vBBgY+czTLJ+68hldoWILFq0CPv378eTJ0+e+WcoLvv27cO8efOghKgGBgYkAdHN3fK2uGtbc70yyXrglOOiEcd/Wvfu3WsWFRXh/PnzL/yz586dw7Zt2yg4at7o/5gCJPauHCItOIoHDz0DwVc7z3PE8SLy1VdfoaSk5FfJ1GfBP0OxYQJWCaE1DevIt20roG6dyrdHfqq3Bprx5Alw94GnAM1hxs6vwMEsWbLEXLly5a+OdF8EE69r1qzBoEGDzMzMTENJl29hmol9P3oKloSq8/gx8PAhcO0K8OCxPitYAaD4BLBqLTB2KJyCY0Xk9OnTJkvaKSBMnL4s/LOMRtauXYvevXubUVFR9gvJ//mfBk5dNnHnru2XdkyR16Fi4LOvgPOXPDkJLagAbt8Fjh4HlqwzMS7DEV6ZjhURbkmYKK2KgBAmX7mt2blzJ77++mv86U9/ghLaNTOAZmqu7QRS+7DQy7SOVk+eVX03v46SrlwFvlsDJPQwEds06IVEw82j75w4ccKKQk6ePFnt12BzHrdCpaXOb6ByLFMmAt276lcJfK/cM/RqtaLmTz/jSBH54osvrMrUqkYhvz3y5Wt88sknfr03wUa6tDIwMBmoVweoGaKXA1r5fWD7bmC7IisKP6LRyvqHrVu3WoVlt2/ffm5dyIvg3+Vr5Ofno6ioKOjfaNeSnQVrlGlDdkprxM9PgKPFwIrgN3Z2nIisXr0aRw4fxp07d3x+Lb4GfUe4rRGCFB6bT54AxETr15t0rhTYvA3YqqguyU84SkQ+/+wzc8eOHdY2xpcoxAtfg9saJlnnzJkT1G+0q0ntbaB3d6BJuF4f+YoK4Mo1YPZcBDMarajv5BcU8GjXLwLiha915swZa1sjBDFjRwKvxQO1X9HLILu8HNizH1i4JmgfUhqtpm988sknJvtjLl265PfXZnPe3r17rWv4/cUFe0h+zUD/RP3MsX96DJwvA9ZvBo6cD8rPV4hT+mMWL178u23+/opG+NrLly/HsWPHgvKNFgBkpQPdugD16uq3HD/sBuZ8jWDEESKyceNGHD9+HHfvBq7Ck0nW4uJiq5JVCFJiwg2MHlZpjq1TkrUCuHYd2PMjsPd40D2kgl5EcnNzTXbePssrxF/wtUtLS63cCK8ZsAsJgWXyCAPdOgNhmpljP3wEnC8Fvl6IYEOjVawetDX88ccfbbse/Vh5TSGIGTUc6Nge2nHvLrDte2Dd9qB6SAW1iKxcudKkczvNlu2C1+I1ly9fHlRvtPAUI1IMJCUCofX1SrI++tkzr2bjFuDGT0Hz+QoJduPlQG9jfguvxWsykVtWVhY0b7TwGzIGAe3b6JUbecJZvg89niPzFI4xcYuIcH4Mh1AF6kTmefCaNHZeJZWswUuPDgbGjQQah0IvKoAz54B1+UEzyzcoRWTz5s3mpk2bbI9CfhuNsEdH2SxfwXfenWygSyegsWZ9NfceAmdKgHlLEQwEpYhwYh0Ly1SzZ88efPPNN6pvQ/CFgf2BVjGafRUqgFu3gbUbgV1HtX9I6bRyL825khKrw1Y1HHq1rahIunyDmT/mGHid5tiacf8hcPykR0g0JyhFpFevXmjRooXq27Ac0C7Q2Hn+fNW3Ivhaydq9E1Cvnl7NeffoOfIDsEDvuqSgFJGxY8eie/fuqFWrlupbsZKsGzZulCPfYCa1l4G0gUB4qF7NeaT4OLB8DXRGsxV7OeLj4420tDREREQoFxImWbmtoefI8ePBV7IsVDJtMtAqGqij/sH0K+7fB06eAeau1PazFZQiQrKzs5GZmWkJiUrYnEf/Elayfvfdd0rvRfCB1hEGhqR6Zv7oxOMnwNVrwLJVwImLWgpJ0IpIaGioMWXKFMTExKBuXfVdmRyQVVhYyHETWr7Rwkt6jvSIB+rW1mtbc7fckxvJ1dPYWaOVqjopKSlG7969tUiy3rp1C6dOncI///lP1bciVJfYKAOD+nu6fGu9oleS9fETYHMRsH6Hdg8pjVaqekycOBFXrlzB2bNn/epoVl3PkYJNm5C+das5YMAAdfNELt/1DL6qEcTPCL6XoWFA0/r2ruPYDAOF35vIywce3tRnLnJFhefId9UaID0ROhH0IpKcnGzs27/f3L59O65fv66kgvVpzxGaROfm5mLAgAFqbuJquYn/9ZFnePQvohpMYlL5peWTt1kT4J2pJgYn2CskI7OA/YeBO/eAn36CNly8AuzYAyzPNzE6TZuhV0EvIiRr+HBsLiwEhYRRieok6/fff49PP/3UnDVrlv1vdFR9Aw3rmbh6HSi7ApgmoM3HrYpaUnoJ+OeXQLt2JmIj7PsthiYYWN3VxPXrni+uNtEIPOZFi5cDyYmm9V5rgCNEpG3btkZ2drZJQ2W6m/kytMofQkKzaJoXzZo1S81NjHoDKCkFTpxBUMORkz8eBtbnA7PG23vtnDeBG7eAvE2ANRNcByGp8FSyHjwCrM0Hpo6EDgRTnPtcJk+ebHTq1Anh4RwLoBaaRdMo6eOPP1aTBOvbxTP5LbShXn4Z1TExvnQNKNwO7Dxi71omdjMweIDHAU2nNfzpEVB6BcjfDOw/oUWS1TEiQrKyshAXFwcduHbtGubNn89GQTVv9BvDgN499CrlrhYVAJst5yvw1xhGY2eWw6svIfgVFU+Aw4eBZXoMVXOUiOTk5BiDBg1C8+bNlVeylpeX49TJk+BgcSW0aGhg6gSgSaReNQ/V4fpNYP9B+yfFNWtoYMp4ICpCvzUsuwbs3g/sV18lrdnK+CcaadeuHRo2bKj0PnhKxGiExknKjJ1HDzbQKQ4IbYCghtsaJlm/mmf/tccONdBZwzW8e9+T85qr3gHNcSLy2muvGcOHD0ejRnoYzdD35Ouvv1Zbhdm1S/C/1RwHsnUHsGSD/YI8cRzQvRu0484djwMaj3wVEuSfrN9n5syZ6NKlC5o0aaL6Vixj5yNHjmDevHnqopFByUB4A70ShFXlpyee05KNhcCJy/auZVaygYH9Ko2dQ/SK0MquAoVFngJDRWi0Iv4jIiLCSE1NtfpqVMMjXwoJTaWV9dUMGwLEtQPqaGRKXB0em8BOTopTsK1JH+RZw9p1oN2a7N4PLFBnpehIESEffPCBkZycDB1gJeuBAwcsuwAldG5tYOKbQLjajmffqQCulAE7dgN7bB5n2q2tgak5QKRua1gBnD4LbChUFo04VkS8SdYePXooz48wycqSfDrEb926VU00Mn2Mge6dgSj1dTQ+cf9noLQUWLLC/mtPHW0gnmvYGFpxn8bO54Bv1AxVc7SIpKWlWeZFLECrUaOGciHZu3cvFqmcnsfiqdhWgOK18I0KWM2FmzYD+TvtF+Q0rmFr/Zobb90Blq0BdhyyfU00Wwn/8+6776Jly5bK60YIcyO79+zBhg0KThjI9LEG+r3u8csIZiGx5tZeAnI3Atcf2ruW08Z6jJ1fqalX7cjDyjETK9fZfmmNViEwxMbGGnRA69ixoxbGziyJV+qAlpEGtG/rEZJghW3xDOH37gcWK1jL4UOATu2BeholWa01ue+ZnvfZEluF1fEiQiZMmGA5xNMBTfW2hqMumBtZvHixmmgkOd7AwCQgjKbEQRyNkFNngfUF9s+tTX7N05vENayp2RrSc2SNvVXSrhARdvmyHJ4OaKq3NewwvnDhAtasWcP6ETVC8u50TzTSoE5wfwTKHwKnmVBcZP+133nbc+Rbr55ea/jgJ+DUOeD/fWnbZ0uj3z6wTJw40RKSyMhI5XUj3Nawy5fzhJXQIsxAWn+gdStNWtx9aETjLGZ6j9p95Nsq3MCgykS1TjypLMpbXwgcOWvLmrhGRMi4ceOsJKvqI19CO0fOE1Y2ZoLl8N27ArU1SxBWlTvlnmKrVXnq1rDuK3qt4cP7wOFiIHeDLZfT6De358g3KSlJC2NndvnSIX727NlqbiA63EDmYCCisX77+qpCF0gWoNk9KS46zMCwoUDzZnoZO7OK9X45ULQTWLU54GviKhEhY8aM0WJ6ntfYmQ5oyo58R6QaSB8MNFLb8ew7FZ4k64YC+y89PNlAWqrHAEob6A5vAidPA+s3wVEicuvWLXPnzp2mytksffv2NWii3KxZM+XzalgOzy7fvDwFobiXyeOAmBZAXfV1ND5BT9n9h4DFa+z/bI0fBTRv7tka6gSHXu3ZDywLbJevrSLy0Ucf4b/+678wZ84cqGTUqFFISEjgACzoAI2d//Hf/61GWBM6G+iXADRtGvyB6bUbHn+NUzZ3+SZ0NtC3j8edXhsqZ9VcvgIsWgKU3gjYmtj2qWH0sWPHDqv0m1+as2ftyRz/Hi1atDDefPNNyypA9baGMDeyqaCA/TVq1iRnPNCrB4KeBw+Bo/9SMyluynigZ3doBQvQysuBA8Uew+lgFxEa8/BEorS0FCdOnMA333wDlYwbN86g54jqWb7k8uXL1ixfZUnWbrGe4qlIDYunqgKfvNduAZu2ABu22yvI8W0MpPYHwnUzdn4MXKbZ9VZgd2BOAm0RkV27dplr1661Rk0SdrSyLb6wsFCpIxOjkW7d9HCs4tqwboRrpeQGRqTDqmRVbCvpF4qPA8vX2n/dYUOBZB3XsMKTG5m7AEErIpwIx5kwPNYk/F9GJcpMjCsZPXq0ZV6kw7aGSVauEcVWCRF1DEzIBqKbB3+S9eZt4McjwBqbbReaNjAw+U1PbkSnaMRrdn3gILD9oBl0IjJnzhyzsLDQCtm9Iy55vMlohBPrZs+erTQaycjIQIcOHVC/fn2Vt/HLmtDYeeHChWrWJCPJQHwnQJOEs09dvhcuAfO/BW7/bO9aZiYZ6NoJCAuDVnBbwzUJgOdIwEWE0QafsL8HvUeVdrRWGjtPmjRJeTm8l5MnT6qLRsjoLKDLq8F/UsOO1gOMRhREu5PHAj266reGNLvO3wYsL/CrsIYEOgo5duyYVVT1e9y8edP60iibFFfJH/7wB4MFaJxXoxquyeHDh5mIVrMm6UkGUgcATRvrV/dQFX7+mck3oHCbbT0kv5CaYGBAMhDFRHVNvaIRzvKllaIfj3wDJiLsCVmyZAkuXrz43Nm4FJjFixfj0CH7HZmehg5osbGxUA2b87hmTLKqM3ZOA15tD9QJ4i7fJ/TXeATs2gssVBDtDkkF4joAdTXyHPGuyw+7gdn+Ox0N2Cdk1apVVk0IE4YvOpUoLi5WG8IDHL5tGTurTrASDiVnNLJ69Wo1N9Ah2sDI4Z6+Gs3yg1WjArh0Bfj+B+CAzXNrO8cYGDkMaKy+2fPfOH8R2PY9cMw/D6mAiEh+fr65bds2awKcN5n6ooQijXpWrVqlNBoZNmwYevTsicaNG2sxPa+goIA/atbknfEG4rsA4aHBX4BWUgp8o2BS3B8mGlaXr27Gzkw8n7sILPJPhBYQEVm4cKE1IqEqsIeEs1lUkpKSYgweNAhhYWFKHdC8niN79uxRuyZsLKMpsU5t7tWB9Ul5G4FVCuqShnrXULOQjjuE9fnA5r0+r4nfPx15eXkmDXdoSlwVmBvhtmbJEnv9IX/LlClTrNyIDp4jXEOupbIu36kjDQzoB9TUzC+jOpWsV24A+VuAMptns0wdbSC5L1Cnpl4O8YxGTpf45fTKr7/V1atXTT45X5RMfVYIf+XKFSxbtoyl8cqEpGPHjkZ6ejotFaEariHXkmvKDmglN8EqzK4d9TIlrk4PyU9Msu731I7YTdZQoGN7vZKslrHzI2Dvj8CcZaY2IsJE4Lp166wcR3VgNMJcirJJcZWMHz/eGnrVoEED5cbOXEvW2ixfvlzNDSR0MqyQPKxRkCdZeWR4wtOcd/W+zV2+XQwMSqlcQ42iEWL5sPjWnOe334g+Ifyw8zTmRcnUF02KY0KxqKjIVDlmgtEIHdBUe45wTSiutFJUZuw88y0guhnwSpCrCLc1ly4Dn39t/7Xffwdo1VIvBzSeXrEArfgk8HH1B877TUS+/fZbK5laXQHxwr/P3AiPiFUyduxYK8mq+qTGuyZMPDNhrYSoBgaGpXvqHoIdK8maD+w6aq8gh9c2rJk/GmyT/01Ymb/M2wAcOGUqE5E9u3ebPKI9deqUP17Osgug54jKaITkTJqEFtHR1rZGNaz83bhxozpj5ykTgITeQJ1awZ1kvfcQOHAYyLV/UhxyxgJ9e3rySzqt4f0HwL4fgdXVc9jzy28y+4svrAY7Hk36A3b5nj9/Xt2Tt5Lk5GSjT+/eiIqKgmq4tpye9/HHH6u5gah6BtIHAS2bAbV1CsmryZbtwGybTwKbNjTwRiYQE+0RY52qWB88BrbvApZU/STQZxFhgRgdy1hl6c8vDCtZGY2sXLlS+ZFvnz59oAOcnseO6Nxcm13Nn+5QTU8DGrFDVaMnaXU4WwJs3GL/dQcnGBg2BAhtpNcaMgCwjJ3zq/xXffotLl68aK7Ly7OcyrxeIf6CCdqjR49ak+LOlZQoE5KEhAQjbfBgqzlPdUk814Tl8PRn4XG6kpvIeRNoFQPU0+hJWh1u3AEOFfuUUKw2E8bquYZlV4E9P1bZ2NknEaHF4a7du63En7+2Mk/D12WU84Uq28BKxo0fj8GDB2thpUhYyUq7SSXEtzUwKBmIidHrSVodbt8CVuQC+xX01aQke05rdFtDdvny9OrEy5tdV3tze+LECZMGOsxdBEJAvDAPQCHh9Tp06GBAAaGhoUZOTo5JH1QWxAXy930ZuOZMZPOeaDpt+w384W2Pe9f+g57/r9n34OUIAQwDqF8PqMt5ujbz7n8ATSI9CU3WIumyhkYNT+K3CsWFhmlWT4Q//PBD86uvvrJsDgMNy9CZm/jb3/6mRES88Eu7efNmS9hU06ZNG8yYMQN//etf1a1JWbmJEKPyC6DLt6CKVZs84mzRUN0anr9l6nPiVQH8zJ+fPdP9XhaKSFV/tmzZYiYmJpqNGzemAgX8p0GDBmZcXJyZt26dWZ379dfPxo0bzREjRtjyO7/oh2uflJTEbmmlayI/puvXIMQXy0N/J1OfBTtaGfEU5Fc9c+zvWb4pKSmIjo5WnmTl2rMuZ8MGe4Y2C8KzqLKIfPnll2ZRUdGvjJftgNeisfPnn32m9Mg3PSODTXpoqHgsANeD7wHfiwULFihdE8HdVFlEeLx4/PhxqKraXKbY2Llzp07W9Lzw8HDoAN8L1S0CgrupkogwCvjXv/71TOPlQOM1dlY2t/YpK8XevXsjxjrmVIvXh4Wm2KrvRXAnLy0ix44dM+cvWGD7Nua3sJL12yVLOHZS+bya9u3bK7cK8HqO0Nj51KnqNVAJgi0iwqcdqyW9ozBV4TV25pdGJW+99ZZl7MwuX9VCwkpWdvmq9mER3ElIVeoS4uLilNsGeo2dWYC2ePFi5cbOnTt3tjxZVcLIkFaKLEBTZqUouJaQqkyKy8rKsibFqX7yEh08R/r27WvN8lVt7OwVV0YjixYtUnofgvuoUmL1vffesyIS1dEI4ZOXZejKJsVVMnPmTG3WhGMmaAylevSG4C5CqtpDMnbMGCuEV413NguHXqns8o2OjjYyMzPRrl07qIZJVpbk09i5rKxMhETQs05k5jvvGP369bOevKpDePpr7Nq1C2tyc5Xex4QJE9CrVy/Lj1X1mjBCy8/Px4oVK5Teh+AeQnyZW1u/fn2ojkbKysqsL42ySXEADZ0NrkmzZs2Ul8N7DZ24JjTPVnozgiuologMHTrUSrLSNlD1pDiG8Dx6Vn28SWPnMWPGWIln1XBdjhw5gu8UV/cK7qDa/cdszWdCUfXxJjl9+rQ1r0ZlNEKmTZ+O1q1ba2HsTM8R9tXs2rVLohFBTxHhpDgWW9E2UIcnL7c1c+bMUd5X07dvX2tejWoYodE1n+5zghBIfHJCYTSSmJioRdUm8wC7d++mQ7zSJ+9bb70F9tWoxpsbYeezarNrwdn4JCJt27a1JsUxoah6UhyfvDSMpteJstksALp162YlWXUwdqbnCDufaXZ9/vx5ERIhIPjsyTZmzBhrWxMaGgod+OGHH+h5ovQesrOzrRMs1cbOjEZ4grVv3z7Mnz9f6b0IziXEXyF8y5gYLRKKzI2wr4Zdx6ruwTJ2njTJsgpQvSYUEiZZmXiWLl9BWxHhpLhePXtqMSmOniM8rfn000+V3kdGerrRvXt3LY586VDPXiNWsgqCv/GbxTSTrKza1AEKybp165T3kOTk5IBCojrpTNj5TPuEwsJCyY0IeooIO1qHDhmCVq1aaZFkvXDhglW1ef36dWVfmpSUFGPo0KGWsbPqNWGSlWbXYuws+Bu/DrsYnpVFywDlJsbMA9AhnknWefPmQbXnSJcuXbRYE5oXsQCNZttKb0ZwFCH+7iFha7wOuRHC3AiPfFUeb8bGxhpjx461Tmp02NYwN/Ltt9+yeVGERPAL1Z6A9zzeeecdk1sJzqZRCb+0bNHnpLg///nPSqfnTZgwwRq1wSpS1bB5curUqejfvz/ad+jwy783ORFOcDQVFRVWfZc/X7Pas3ifx4gRI6wvS0lJidK5tV4rRRZbpaakmL379FEmJMyNME9Do2vVs3x5DM6B4Hl5eb/qfeIHTHA2pmkiPT3d9OdDNSAikpWVZRQXF5v0+uBJicovDUu/2dGau2YNevfpo+w+pk+fbpSUlJgs/GIBmMo18Voo0I9Fhy2WYK+IsBjS7y8aiJ/Dhw+bVLzIyEjlc2v5k5aWZtLYWeXs2D179pgDBw40IyIilK+H/LhvDSIjI83MzEyTD3h/fq4DNoq8S5cuv3iOqO4hIYxGli1bpvQeevXqZa2JLklWwT3UqlXL6nFj7RI78P364oF++mZnZ5vNmjVTrsK1atUyu3btan7xxRdKoxH+8Gkg0Yj6J7ObfqKjo82cnJyAfPYDFol4GT58uDWvRjXeAdjLly9X3kMyetQoayi4INhFfHw8xo8fH5DXDrEjoUh/DR08R5jk3bp1q/J5NTS7pg+LDmbXgrOpUaOGtX0eMGAAT02NoBQRMnLkSC2MnXkiwvJv1rDk5eUpjUYGp6XxvF75mgjOJiwsDF27drUqpwOFLSIyYMAAg0Ki2l/DKySs2lRt7MwuX76xOnjUCs6kbt26VjKVFdPx8fFGUIsIeXvaNOvJy22NalhJS9tA1R2tnFfDhkXVniOCMwkLC7PykeywDyS2iUjrVq2MlJQUy6hHBzg9j54jKntIaKU4cOBAyyFeEPwNUwhDhgyxTLLgBBEh06dPt4yddagbYbXmnj17lM9mmTx5Ml5//XVJsgp+T6byu8a6kEBjq4iwy5fKyGhEB8+RU6dOWbN8Vc5mYeGPd3qe6jURnEH9+vWtKIQzogMdhdguIl5j59GjR2tjF6DDpLiJEycaSUlJyj1HBGcQHh6OjIwMmoXb0nBqu4iQSZMmWUrJOgkd/EfZKLh3716lSVaGnToYOwvBTUREBNq3b2+lDuxCiYi89tprVgEaQ3jV0Crg5MmTVmu8SvjU6NGjhzYRmhCcNG/eHIxq/e0Zop2IEJri6DApzptk3bJlC3Jzc5VGIyxL7tatm8pbEIKcxMREmoLZek1lIsLiF07P4zm26hCeVaw0UaKJcVlZmTIhSU1N1SbxLAQXjRo1srx8mUzlAYYrRISwLZ7RiGoR8TqgceiV6gHYb4wYYUUjUg4vVAUm5TmJcvTo0ba79ykVkfDw8F9MjHWAR740dj5XUqIsGmFRHpNikhsRqgK/Q2+//TZUoFRECJWzX79+aNOmjepbsbp8KSTfzJ2r9D54DN63b1/rBEsQXgRtJejhy9lPcKOIkOwxY6z9nA6VrPRkZXNeUVGR0iSr14dFrAKE58HcWc+ePa0+LFVoISLsaGXVJotkVAsJBzwxGqETuupohCMduB4iJMKzBISzngcPHmxZb8LNIuJNsrJOQnUBGpOs3Nawy3fu3LlKoxFm2rmtEbsA4ffg54IPmkB6hQSViLRr18544403tDF2Pnz4sBbGzjqtiaCfV0h2djb/V+lgNqWGxc8ydm7SpIlyY9saNWqYHTt2NP/+j38oN3bWxexafvRZg9jYWHPGjBnKP5u2GDVXlTGVSVbVcFtDz5HVq1axSc9UvdXTwexa0INatWqhc+fOlu2oDmgnIjk5OdaRrw4mxsyN7N27l+XwSu9j2rRpRkJCghZrIqgXkPDwcCsXwkmTOrwf2omI93izQ4cOyqs2GY3wtGbTpk3MjyiNRpgb4XBy1WsiqK9M7dSpE0aNGqXNW6GliCQmJmpTyUohOX78uDUUXCU0u5bpee6mVuUUu4kTJvh/ip1uA739wbRp01BQUGAVf3FboZKzZ89aniMrV640R44caajsfN6/fz9CQkLw+PFj69/xnwXnU1FRgXr16qF79+7W3CJohLYi0rRpU+ONESPMu/fu4YedO1XfjtWgt3jxYvqh8qTEUHUM/v7775v0hqW41qxZU8VtCIoi4qZNm6J/crJ262/wiEZXrl+/bn744Yf48ssvLU9ULqQq2GlMw5e//OUvmDFjhlZPAkFQidaxcEREhMGSXh38Ne7du4cTJ05YSdYDBw7oq7yCYDNaiwhhDoKnNTzW0oEDBw5g0aJFqm9DELRBexHxGjvTKkCH6Xk0dt65cyd7ayQaEYRgEREaO7PYioklXYydVTugCYIuBIWIeEcqsMtXh4rNGzduID8/H0uXLpVoRHA9QSMijEZYbMWqTdWerI8ePcLFixctISktLRUhEVxN0IiIt6+Gxs6qJ8XxqJlHzjR2Vj2vRhBUE1Qi4h2ATX8NHbY1rGRlNHL+/HmJRgTXEnQikpmZadAaXwcTYzbnnTlzBp9//rnqWxEEZQSdiBAOBGcnow7RCD1Hli5disLCQolGBFcSlCLCubWDBg2y2uJVCwlzI+fPn8eqVauU3ocgqCIoRcQbjbAkXrVdAJOsLInfvXs3Pv30U4lGBNcRtCISGxtrcNZGixYttDAxPnbsmEQjgisJWhEh48aNMzi3VodKVrbmnz59Gn//+98lGhFcRVCLCKEDWteuXbUxdl67di0OHTokQiK4hqAXkREjRljGzsyNqE6y0oFt3759WL16tdL7EAQ7CXoRIbQKiI+PVz4pzjs9r7CwkC5oEo0IrsARItKjRw9rUpwO0Yguxs6CYBeOEBEyceJEtG/fXgvPkZKSEtAHVfWYCUGwA8eICM2TR4wYYc2r0QH6jsydOxfnSkpESARH4xgRIbNmzTKSkpK0mBR39+5dy0pxrWxrBIfjKBEhg9PSEB0drdzYmeXw3NbQ2Hnnzp0SjQiOxXEikpGebpkXRUZGQgeYG5krniOCg3GciJAZM2ZoY+xcVlaGvfv2YevWrRKNCI7EkSISFxdnvP7661qUw3u7fOfMmaP6VgQhIDhSRLzRCIVEB9hXs2XLFlopSjQiOA7Higjn1mZmZlpHvqqNnRmN0Ng5NzcXy5cvFyERHIXWs3j9wZQpU8yCggJcunRJ9a1Yp0YtY2LQ8dVXUU/x6ZFgDxWmicePH1stGWwWTUxMdNwc51fgcGbNmmV5fbD4i6MeVHL16lXcv38fJefOISTEsUGg8Dt07NgR7733HpyI40UkOTmZQ8FNbimOHDmi9F4oYqqFTLCfTp06oU+fPmjbtq3johDiisfh2DFjrC5f1QVogvuoVasWevXqZY06cSquEJHeffoYqSkpVgGaCIlgp4BERUVxzAm6dOniyCjENSJCMjIzQfOi0NBQ1bciuISoqCgMHTrUmtwIB+MaEYmJiTHoEN+sWTOJRoSA06BBA+s0btKkSY5fbdeICBk/frzBBBeFRBACSYsWLazId/DgwY6OQlwnIk9PzxOEQFGjRg267VlGWW7AdSLCWb6JiYlaWCkKzkymNmnSBAMGDEBCQoLjoxBXiggZOXKkFY2oNnYWnEdYWBirUjE8KwtuwZUi0q1bN2P8+PESjQh+pW7dulYyddy4cWjdqpUrohDXigj54x//aMTFxWnhOSI4g8jISCvCZQIfLsK1IkJYBNS2bVvVtyE4hLi4OGur7DZcLSLvvvuukZycbJ3pS5JV8CWZGhkZiYEDB1rzod22kq4WETJs2DC0bt1aCtCEalO/fn3LtyYzI8OVq+h6EWExUE5OjlWiLAjVITIyEhMmTrR6tNy4gq4XETJlyhRrP8vaEUGoCk2aNLGSqf/j/fddKSBERKSyr4a5ER7PCUJViImJsXIhbkZE5CkHtKR+/STBKlSJ/v3744MPPnBtFEJERCqJiooy0jMy6PtgjeEUhOfBzwj7Y4YPH+76hRIReYqRI0ca7Hlg6bIc+QrPgp+N8PBwJuWRlpbm6iiEiIj8hgkTJqB5ixZy5Cs8ty6E+bOZM2fKKomI/DtJSUlGysCBVu2IIPwer776KjIyMqxJixAkEvk9srOzfzF2lm2N4IWfBVY309jKLV4hL4NsZ34H+kAMGTLEmuXL0FUQCB8qPNJlzxUnLMqqeBAReQZZWVli7Cz8CnZ8M5k6evRoEZCnEBF5zpEvtzX0Y5VoROA2pkV0tLXVFX6NiMhzGDNmjNG1a1fpqxHQsmVLJPbti9TUVIlC3DZG01fYnHfjxg2UlpaqvhVBId27d5dk6jMQEXkJY+cTJ0+axcXFME3zRX9ccCDczqalpbnGeLmqiIi8BOzQfHD/vlleXo4nT55UeZGF4BaQFs2bY8aMGSIgz8CQp6sgCL4giVVBEHxCREQQBJ8QEREEwSdERARB8AkREUEQfEJERBAEnxAREQTBJ0REBEHwCRERQRB8QkREEASfEBERBMEnREQEQfAJERFBEHxCREQQBJ8QEREEwSdERARB8AkREUEQfEJERBAEnxAREQTBJ0REBEHwCRERQRB8QkREEASfEBERBMEnREQEQYAv/H94e7YLewGYSQAAAABJRU5ErkJggg==" alt="Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">lloydk.co.kr</span>
+    </a>
+    <div class="nav-actions">
+      <div class="nav-search" role="search" aria-label="Search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search whitepaper
+        <kbd>⌘K</kbd>
+      </div>
+      <a class="nav-link" href="기술구현_백서_v5.html">← 본문</a>
+      <a class="nav-link" href="#overview">ERD</a>
+      <a class="nav-link hide-sm" href="#grp-c">문서</a>
+      <a class="nav-link hide-sm" href="#grp-e">추론</a>
+    </div>
+  </div>
+</header>
+</nav>
+
+<div class="page">
+  <aside class="sidebar">
+    <div class="toc-title">DB 그룹</div>
+    <a class="toc-item" href="#overview">개요 · ERD</a>
+    <div class="toc-group">
+      <div class="toc-group-label">도메인</div>
+      <a class="toc-item" href="#grp-a">A 테넌트</a>
+      <a class="toc-item sub" href="#t-tenants">tenants</a>
+      <a class="toc-item" href="#grp-b">B 등급체계</a>
+      <a class="toc-item sub" href="#t-classification-levels">classification_levels</a>
+      <a class="toc-item sub" href="#t-evaluation-factors">evaluation_factors</a>
+      <a class="toc-item sub" href="#t-level-keywords">level_keywords</a>
+      <a class="toc-item" href="#grp-c">C 문서</a>
+      <a class="toc-item sub" href="#t-documents">documents</a>
+      <a class="toc-item sub" href="#t-chunks">chunks (파티션)</a>
+      <a class="toc-item" href="#grp-d">D 라벨링</a>
+      <a class="toc-item sub" href="#t-document-labels">document_labels</a>
+      <a class="toc-item sub" href="#t-factor-scores">document_factor_scores</a>
+      <a class="toc-item" href="#grp-e">E 추론</a>
+      <a class="toc-item sub" href="#t-classifications">classifications</a>
+      <a class="toc-item sub" href="#t-evidence">classification_evidence</a>
+      <a class="toc-item" href="#grp-f">F 학습</a>
+      <a class="toc-item sub" href="#t-model-versions">model_versions</a>
+      <a class="toc-item sub" href="#t-training-runs">training_runs</a>
+      <a class="toc-item sub" href="#t-training-epochs">training_epochs</a>
+      <a class="toc-item sub" href="#t-training-datasets">training_datasets</a>
+      <a class="toc-item" href="#grp-g">G 보정</a>
+      <a class="toc-item" href="#grp-h">H 합성</a>
+      <a class="toc-item" href="#grp-i">I 비용 (파티션)</a>
+      <a class="toc-item" href="#grp-j">J 감사 (파티션)</a>
+      <a class="toc-item" href="#grp-k">K 가이드 문서</a>
+      <a class="toc-item sub" href="#t-guides">guides</a>
+    </div>
+  </aside>
+
+  <article>
+    <div class="meta-row">
+      <span class="badge">부록 A</span>
+      <span class="badge outline">DB Schema</span>
+      <span style="color:var(--text-dim);font-size:12px;">·</span>
+      <span style="color:var(--text-dim);font-size:12px;">PostgreSQL 16 · SQLAlchemy ORM · 19테이블</span>
+      <span style="color:var(--text-dim);font-size:12px;">·</span>
+      <span style="color:var(--text-dim);font-size:12px;">2026-06-19 갱신</span>
+    </div>
+    <h1 class="title">DB 스키마</h1>
+    <p class="lede">19개 테이블, 11개 도메인 그룹. chunks·llm_usage·audit_log는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
+    <hr class="hero-sep">
+
+    <!-- Overview -->
+    <section id="overview">
+      <h2><span class="num">개요</span> ERD 관계 요약</h2>
+      <div class="group-desc">핵심 외래키 관계</div>
+      <ul class="rel-list">
+        <li><code>documents</code> <span class="rel-arrow">→</span> <code>tenants</code> (tenant_id)</li>
+        <li><code>chunks</code> <span class="rel-arrow">→</span> <code>documents</code> (doc_id) · <code>tenants</code></li>
+        <li><code>classifications</code> <span class="rel-arrow">→</span> <code>documents</code> · <code>classification_levels</code> · <code>tenants</code></li>
+        <li><code>classification_evidence</code> <span class="rel-arrow">→</span> <code>classifications</code> · <code>evaluation_factors</code></li>
+        <li><code>document_labels</code> <span class="rel-arrow">→</span> <code>documents</code> · <code>classification_levels</code></li>
+        <li><code>level_keywords</code> <span class="rel-arrow">→</span> <code>classification_levels</code> · <code>evaluation_factors</code></li>
+        <li><code>training_runs</code> <span class="rel-arrow">→</span> <code>model_versions</code></li>
+        <li><code>model_versions</code> <span class="rel-arrow">→</span> <code>model_versions</code> (rolled_back_from, self FK — 롤백 출처)</li>
+        <li><code>training_epochs</code> <span class="rel-arrow">→</span> <code>training_runs</code></li>
+        <li><code>corrections</code> <span class="rel-arrow">→</span> <code>classifications</code> · <code>classification_levels</code> · <code>training_runs</code></li>
+        <li><code>sample_documents</code> <span class="rel-arrow">→</span> <code>tenants</code> · <code>classification_levels</code> · <code>prompt_versions</code></li>
+        <li><code>llm_usage</code> <span class="rel-arrow">→</span> <code>tenants</code></li>
+        <li><code>guides</code> <span class="rel-arrow">→</span> <code>tenants</code> (tenant_id, 논리 FK)</li>
+      </ul>
+      <div class="partition-box">⚡ <b>파티션 테이블 3개</b> — <code>chunks</code> · <code>llm_usage</code> · <code>audit_log</code>는 <code>RANGE PARTITION BY (created_at / called_at / occurred_at)</code> 월별 분리. ORM은 부모만 매핑하며, INSERT는 자동 라우팅.</div>
+    </section>
+
+    <!-- Group A -->
+    <div class="group-header" id="grp-a">
+      <span class="group-badge">A</span>
+      <span class="group-title">테넌트</span>
+    </div>
+    <div class="group-desc">멀티테넌트 격리의 최상위 단위. 모든 문서·분류·감사 레코드가 tenant_id로 스코핑된다. 객체 수준 권한(doc_id 소유권, IDOR/BOLA 방지)은 스키마 변경 없이 <b>앱 레이어</b>에서 강제된다 — 인증 신원을 body tenant_id에 결속(불일치 시 403)하고, DocumentRepo·ClassifyRepo 조회를 tenant_id로 스코프하여 교차 테넌트 조회를 차단한다.</div>
+
+    <section id="t-tenants">
+      <h3>tenants</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">tenant_id</td><td class="td-type">VARCHAR(50) PK</td><td class="td-nn yes">●</td><td>테넌트 식별자 (e.g. "koipa-prod")</td></tr>
+          <tr><td class="td-col">name</td><td class="td-type">VARCHAR(200)</td><td class="td-nn yes">●</td><td>테넌트 표시명</td></tr>
+          <tr><td class="td-col">rag_enabled</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>RAG 검색 활성 여부 (기본 true)</td></tr>
+          <tr><td class="td-col">active_model_version</td><td class="td-type">VARCHAR(50)</td><td></td><td>현재 활성 모델 버전 레이블</td></tr>
+          <tr><td class="td-col">api_key_hash</td><td class="td-type">VARCHAR(128)</td><td></td><td>API 키 SHA-256 해시 (원문 미저장)</td></tr>
+          <tr><td class="td-col">metadata_</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>확장 속성 (기본 {})</td></tr>
+          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>비활성화 소프트 삭제</td></tr>
+          <tr><td class="td-col">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td>생성 시각</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- Group B -->
+    <div class="group-header" id="grp-b">
+      <span class="group-badge">B</span>
+      <span class="group-title">등급체계</span>
+    </div>
+    <div class="group-desc">TS·S1·S2·S3 등급 정의, 평가 인자(정본 3요건 S·V·M), 키워드 시드.</div>
+
+    <section id="t-classification-levels">
+      <h3>classification_levels</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">level_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">level_code</td><td class="td-type">VARCHAR(20) UNIQUE</td><td class="td-nn yes">●</td><td>TS · S1 · S2 · S3</td></tr>
+          <tr><td class="td-col">level_name</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>特급機密 / 기밀 / 대외비 / 일반</td></tr>
+          <tr><td class="td-col">level_order</td><td class="td-type">SMALLINT</td><td class="td-nn yes">●</td><td>정렬 순서 (1=최고등급)</td></tr>
+          <tr><td class="td-col">color_hex</td><td class="td-type">VARCHAR(7)</td><td></td><td>UI 표시 색상 (#525252 등)</td></tr>
+          <tr><td class="td-col">loss_weight</td><td class="td-type">NUMERIC(4,2)</td><td></td><td>class_weighted loss 가중치</td></tr>
+          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">created_by</td><td class="td-type">VARCHAR(50)</td><td></td><td></td></tr>
+        </tbody>
+      </table></div>
+      <div><span class="idx-chip">IDX is_active, level_order</span></div>
+    </section>
+
+    <section id="t-evaluation-factors">
+      <h3>evaluation_factors</h3>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">정본 <b>3요건</b> 체계. 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M), 각 요건 0·1·2점의 <b>곱셈식</b>(B안, 2026-06-18 전환). 곱 매핑 8→TS · 4→S1 · 1·2→S2 · 0→S3. 곱셈식이라 <code>weight</code> 컬럼은 미사용(하위호환 1.0). 레거시 4요소는 <code>is_active=FALSE</code>로 보존(키워드 시드 태그 및 FK 정합 유지, migration <code>c7d8e9f0a1b2</code>). 정본/레거시 매핑은 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 폴딩(LEAK_IMPACT→VALUE).</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">factor_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">factor_code</td><td class="td-type">VARCHAR(30) UNIQUE</td><td class="td-nn yes">●</td><td>정본: SECRECY · VALUE · MANAGEMENT (is_active=TRUE) / 레거시(is_active=FALSE): NON_PUBLICITY · ECONOMIC_VALUE · MANAGEMENT_LEVEL · LEAK_IMPACT</td></tr>
+          <tr><td class="td-col">factor_name</td><td class="td-type">VARCHAR(100)</td><td class="td-nn yes">●</td><td>비공지성(S) / 경제적 유용성(V) / 비밀관리성(M)</td></tr>
+          <tr><td class="td-col">weight</td><td class="td-type">NUMERIC(3,2)</td><td class="td-nn yes">●</td><td>미사용 (곱셈식 등급 = S×V×M, 가중치 가산 안 함). 하위호환 기본 1.0. weight 합계=1.0 트리거 제거됨</td></tr>
+          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>정본 3요건 TRUE · 레거시 4요소 FALSE</td></tr>
+        </tbody>
+      </table></div>
+      <div class="partition-box" style="margin-top:8px;">요건별 점수 기준(LLM 라벨러 정본 룰브릭) — <b>S</b>: 0=이미 공개·1=통상적 입수 곤란·2=보유자 통하지 않곤 모름 / <b>V</b>: 0=가치 없음·1=비용·노력 투입·2=상당한 비용·노력 / <b>M</b>: 0=공개·관리 안됨·1=임직원 일부 공유·2=승인된 자만. 한 요건이라도 0이면 곱=0 → S3.</div>
+    </section>
+
+    <section id="t-level-keywords">
+      <h3>level_keywords</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">keyword_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">level_id</td><td class="td-type">FK → classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">keyword</td><td class="td-type">VARCHAR(200)</td><td class="td-nn yes">●</td><td>예: "영업비밀" · "M&A" · "연구노트"</td></tr>
+          <tr><td class="td-col">pattern_type</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>exact / regex / semantic</td></tr>
+          <tr><td class="td-fk">factor_id</td><td class="td-type">FK → evaluation_factors</td><td></td><td>키워드와 연결되는 평가 인자</td></tr>
+          <tr><td class="td-col">weight</td><td class="td-type">NUMERIC(3,2)</td><td></td><td>해당 키워드의 등급 기여 가중치</td></tr>
+          <tr><td class="td-col">source</td><td class="td-type">VARCHAR(30)</td><td></td><td>manual / seed_v4 / llm_generated</td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">IDX level_id, is_active</span>
+        <span class="idx-chip">GIN keyword gin_trgm_ops (트라이그램 검색)</span>
+      </div>
+    </section>
+
+    <!-- Group C -->
+    <div class="group-header" id="grp-c">
+      <span class="group-badge">C</span>
+      <span class="group-title">문서</span>
+    </div>
+    <div class="group-desc">원문 문서 메타데이터와 청크 파티션 테이블.</div>
+
+    <section id="t-documents">
+      <h3>documents</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">doc_id</td><td class="td-type">UUID PK (gen_random_uuid)</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">tenant_id</td><td class="td-type">FK → tenants</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">external_ref</td><td class="td-type">VARCHAR(100)</td><td></td><td>KL 시스템 연계 ID</td></tr>
+          <tr><td class="td-col">filename</td><td class="td-type">VARCHAR(500)</td><td class="td-nn yes">●</td><td>원본 파일명</td></tr>
+          <tr><td class="td-col">source_format</td><td class="td-type">VARCHAR(10)</td><td class="td-nn yes">●</td><td>hwp / docx / pdf / txt</td></tr>
+          <tr><td class="td-col">file_size_bytes</td><td class="td-type">BIGINT</td><td></td><td></td></tr>
+          <tr><td class="td-col">file_hash</td><td class="td-type">VARCHAR(64)</td><td></td><td>SHA-256, UNIQUE (tenant_id, file_hash) 파셜 인덱스</td></tr>
+          <tr><td class="td-col">metadata_</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>확장 속성(기본 {}). <b>source_type</b>(출처 provenance — 공개 출처면 분류 시 Gate-1이 S3로 cap)·<b>doc_type</b> 등. GIN 인덱스.</td></tr>
+          <tr><td class="td-col">raw_text_uri</td><td class="td-type">VARCHAR(500)</td><td></td><td>MinIO <code>documents-raw</code> 경로 (원본 파일 — <b>at-rest 암호화 대상</b>)</td></tr>
+          <tr><td class="td-col">normalized_text_uri</td><td class="td-type">VARCHAR(500)</td><td></td><td>MinIO <code>documents-normalized</code> 경로 (마스킹된 정규화 텍스트)</td></tr>
+          <tr><td class="td-col">text_preview</td><td class="td-type">VARCHAR(2000)</td><td></td><td>UI 미리보기용 앞 2000자</td></tr>
+          <tr><td class="td-col">char_count</td><td class="td-type">INTEGER</td><td></td><td>전체 문자 수</td></tr>
+          <tr><td class="td-col">extraction_method</td><td class="td-type">VARCHAR(30)</td><td></td><td>parser / ocr</td></tr>
+          <tr><td class="td-col">extraction_quality</td><td class="td-type">NUMERIC(3,2)</td><td></td><td>0.0~1.0, M2 품질 점수</td></tr>
+          <tr><td class="td-col">ocr_used</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>OCR 사용 여부</td></tr>
+          <tr><td class="td-col">processing_status</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>pending / processing / done / error</td></tr>
+          <tr><td class="td-col">error_message</td><td class="td-type">TEXT</td><td></td><td>처리 오류 메시지</td></tr>
+          <tr><td class="td-col">uploaded_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">processed_at</td><td class="td-type">TIMESTAMPTZ</td><td></td><td></td></tr>
+          <tr><td class="td-col">created_by</td><td class="td-type">VARCHAR(50)</td><td></td><td></td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">IDX tenant_id, processing_status</span>
+        <span class="idx-chip">IDX source_format</span>
+        <span class="idx-chip">IDX uploaded_at</span>
+        <span class="idx-chip">UNIQUE (tenant_id, file_hash) WHERE NOT NULL</span>
+        <span class="idx-chip">GIN metadata JSONB</span>
+        <span class="idx-chip">PARTIAL idx_doc_pending WHERE status='pending'</span>
+        <span class="idx-chip">IDX tenant_id, uploaded_at (hot path)</span>
+      </div>
+
+      <h4 style="font-size:14px;margin:18px 0 8px;">데이터 흐름 · at-rest 암호화 (단계별 PII·보관)</h4>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">백서 §5가 참조하는 단계별 데이터 흐름표. 원본만 at-rest 암호화하고, 분류·색인·검수 화면에는 마스킹 텍스트만 흐른다.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>단계</th><th>저장소</th><th>PII</th><th>암호화</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>원본 바이너리</td><td class="td-col">MinIO documents-raw</td><td>포함</td><td><b>at-rest(AES-256-GCM)</b></td><td>증빙 원본 · raw_text_uri</td></tr>
+          <tr><td>정규화 텍스트</td><td class="td-col">MinIO documents-normalized</td><td><b>마스킹됨</b></td><td>전송 TLS</td><td>분류·색인 입력 · normalized_text_uri</td></tr>
+          <tr><td>청크</td><td class="td-col">PG chunks (월별 파티션)</td><td>마스킹됨</td><td>전송 TLS</td><td>정규화 텍스트에서 생성</td></tr>
+          <tr><td>임베딩·색인</td><td class="td-col">Elasticsearch</td><td>마스킹됨</td><td>전송 TLS</td><td>마스킹 텍스트만 색인</td></tr>
+          <tr><td>감사 로그</td><td class="td-col">PG audit_log (월별 파티션)</td><td>해시만</td><td>전송 TLS</td><td>payload_hash(SHA-256)</td></tr>
+        </tbody>
+      </table></div>
+      <div class="partition-box" style="margin-top:8px;">원본 at-rest 암호화는 <code>STORAGE_ENCRYPTION_ENABLED</code>로 활성(documents-raw만 대상, EncryptingStorage). 보관기간·삭제 정책은 운영 정책으로 확정(본개발).</div>
+    </section>
+
+    <section id="t-chunks">
+      <h3>chunks <span style="font-size:12px;font-weight:400;color:var(--text-dim);font-family:var(--font-mono);">RANGE PARTITION (created_at)</span></h3>
+      <div class="partition-box">월별 자식 파티션으로 자동 라우팅. ORM은 부모만 매핑. INSERT는 created_at 기준 분배.</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">chunk_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">doc_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td>documents 참조</td></tr>
+          <tr><td class="td-col">tenant_id</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">chunk_index</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td>문서 내 청크 순서 (0-based)</td></tr>
+          <tr><td class="td-col">content</td><td class="td-type">TEXT</td><td class="td-nn yes">●</td><td>청크 본문 (512 token 기준)</td></tr>
+          <tr><td class="td-col">token_count</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td>최대 512</td></tr>
+          <tr><td class="td-col">char_count</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">page_start / page_end</td><td class="td-type">SMALLINT</td><td></td><td>원문 페이지 범위</td></tr>
+          <tr><td class="td-col">section_path</td><td class="td-type">TEXT[]</td><td></td><td>계층 섹션 경로 (예: ["3장", "3.1절"])</td></tr>
+          <tr><td class="td-col">overlap_prev / overlap_next</td><td class="td-type">SMALLINT</td><td></td><td>overlap 토큰 수 (기본 64)</td></tr>
+          <tr><td class="td-col">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td>파티션 키</td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">PK (chunk_id, created_at)</span>
+        <span class="idx-chip">IDX doc_id, chunk_index</span>
+        <span class="idx-chip">IDX tenant_id</span>
+      </div>
+      <p style="font-size:12.5px;color:var(--text-dim);">벡터 임베딩은 Elasticsearch <code>docs</code> 인덱스에 별도 저장 (dense_vector 1024-dim, int8_hnsw).</p>
+    </section>
+
+    <!-- Group D -->
+    <div class="group-header" id="grp-d">
+      <span class="group-badge">D</span>
+      <span class="group-title">라벨링</span>
+    </div>
+    <div class="group-desc">M3 자동 라벨링 및 사람 검수 결과 저장.</div>
+
+    <section id="t-document-labels">
+      <h3>document_labels</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk td-fk">doc_id</td><td class="td-type">UUID PK FK→documents CASCADE</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">level_id</td><td class="td-type">FK → classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">labeled_by</td><td class="td-type">VARCHAR(30)</td><td class="td-nn yes">●</td><td>rule / llm / human</td></tr>
+          <tr><td class="td-col">labeler_id</td><td class="td-type">VARCHAR(50)</td><td></td><td>사람 라벨러 ID</td></tr>
+          <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(3,2)</td><td></td><td>룰/LLM 신뢰도</td></tr>
+          <tr><td class="td-col">total_score</td><td class="td-type">NUMERIC(4,2)</td><td></td><td>평가 인자 합산 점수</td></tr>
+          <tr><td class="td-col">is_verified</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>검수 완료 여부</td></tr>
+          <tr><td class="td-col">verified_by</td><td class="td-type">VARCHAR(50)</td><td></td><td></td></tr>
+          <tr><td class="td-col">labeled_at / verified_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●/</td><td></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="t-factor-scores">
+      <h3>document_factor_scores</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk td-fk">doc_id</td><td class="td-type">UUID PK FK→documents CASCADE</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-pk td-fk">factor_id</td><td class="td-type">INTEGER PK FK→evaluation_factors</td><td class="td-nn yes">●</td><td>정본 3요건(S·V·M) 중 하나</td></tr>
+          <tr><td class="td-col">score</td><td class="td-type">NUMERIC(4,2)</td><td class="td-nn yes">●</td><td><b>0~2</b> (CHECK <code>ck_dfs_score_0_2</code>) — B안 각 요건 0·1·2. 기존 0~5 제약은 migration <code>c7d8e9f0a1b2</code>에서 0~2로 교체</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- Group E -->
+    <div class="group-header" id="grp-e">
+      <span class="group-badge">E</span>
+      <span class="group-title">추론</span>
+    </div>
+    <div class="group-desc">M5 분류 결과와 근거 청크.</div>
+
+    <section id="t-classifications">
+      <h3>classifications</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">classification_id</td><td class="td-type">UUID PK</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">doc_id</td><td class="td-type">FK → documents</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">tenant_id</td><td class="td-type">FK → tenants</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">model_version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>v-dd3abab9 형식</td></tr>
+          <tr><td class="td-fk">predicted_level_id</td><td class="td-type">FK → classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(5,4)</td><td class="td-nn yes">●</td><td>0.0000~1.0000</td></tr>
+          <tr><td class="td-col">alternatives</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>[{level_code, score}] 전체 등급 softmax</td></tr>
+          <tr><td class="td-col">aggregation_method</td><td class="td-type">VARCHAR(20)</td><td></td><td>hybrid / rule / llm</td></tr>
+          <tr><td class="td-col">chunk_count</td><td class="td-type">SMALLINT</td><td></td><td>분류에 사용된 청크 수</td></tr>
+          <tr><td class="td-col">rag_used</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>RAG 검색 사용 여부</td></tr>
+          <tr><td class="td-col">rag_top_k / rag_agreement</td><td class="td-type">SMALLINT / BOOLEAN</td><td></td><td>RAG 검색 수 / RAG와 분류기 일치 여부</td></tr>
+          <tr><td class="td-col">status</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>staging / confirmed / rejected</td></tr>
+          <tr><td class="td-col">inference_ms</td><td class="td-type">INTEGER</td><td></td><td>추론 소요 ms</td></tr>
+          <tr><td class="td-col">classified_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td></td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">IDX doc_id, classified_at</span>
+        <span class="idx-chip">IDX tenant_id, status</span>
+        <span class="idx-chip">IDX model_version, level_id, status</span>
+        <span class="idx-chip">PARTIAL idx_cls_staging WHERE status='staging'</span>
+        <span class="idx-chip">IDX tenant_id, classified_at (hot path)</span>
+      </div>
+    </section>
+
+    <section id="t-evidence">
+      <h3>classification_evidence</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">evidence_id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">classification_id</td><td class="td-type">FK → classifications CASCADE</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">chunk_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">evidence_type</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>keyword / rag / model</td></tr>
+          <tr><td class="td-fk">factor_id</td><td class="td-type">FK → evaluation_factors</td><td></td><td></td></tr>
+          <tr><td class="td-col">excerpt</td><td class="td-type">TEXT</td><td class="td-nn yes">●</td><td>근거 문장 발췌</td></tr>
+          <tr><td class="td-col">excerpt_start / excerpt_end</td><td class="td-type">INTEGER</td><td></td><td>원문 내 문자 위치</td></tr>
+          <tr><td class="td-col">contribution</td><td class="td-type">NUMERIC(4,3)</td><td class="td-nn yes">●</td><td>분류 결정 기여도 (0~1)</td></tr>
+          <tr><td class="td-col">attention_scores</td><td class="td-type">JSONB</td><td></td><td>BERT attention 가중치</td></tr>
+          <tr><td class="td-col">rag_ref_doc_id</td><td class="td-type">UUID</td><td></td><td>RAG 참조 문서 ID</td></tr>
+          <tr><td class="td-col">rag_similarity</td><td class="td-type">NUMERIC(4,3)</td><td></td><td>코사인 유사도</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- Group F -->
+    <div class="group-header" id="grp-f">
+      <span class="group-badge">F</span>
+      <span class="group-title">학습</span>
+    </div>
+    <div class="group-desc">모델 버전 관리, 학습 실행 추적, 에폭별 메트릭, 학습 데이터셋 구성.</div>
+
+    <section id="t-model-versions">
+      <h3>model_versions</h3>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">모델 버전 레지스트리 — 항상 register(이력), activate는 배포게이트 통과 AND <code>retrain_auto_activate=True</code>일 때만(보수적). 핫리로드(<code>POST /admin/model/reload</code>)는 활성 버전의 <code>model_uri</code>로 InferencePipeline 재구성. 자동 롤백 시 직전 활성으로 복귀하며 <code>rolled_back_from</code>/<code>rollback_reason</code>에 출처 기록.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">version_id</td><td class="td-type">UUID PK</td><td></td></tr>
+          <tr><td class="td-col">version_label</td><td class="td-type">VARCHAR(50) UNIQUE</td><td>v-dd3abab9 형식 (해시 기반)</td></tr>
+          <tr><td class="td-col">base_model</td><td class="td-type">VARCHAR(100)</td><td>kakaobank/kf-deberta-base</td></tr>
+          <tr><td class="td-col">model_type</td><td class="td-type">VARCHAR(20)</td><td>classifier / reranker (기본 classifier)</td></tr>
+          <tr><td class="td-col">trained_at</td><td class="td-type">TIMESTAMPTZ</td><td>학습 완료 시각</td></tr>
+          <tr><td class="td-fk">training_run_id</td><td class="td-type">UUID</td><td>학습 실행 참조 (training_runs.run_id)</td></tr>
+          <tr><td class="td-col">training_data_count</td><td class="td-type">INTEGER</td><td>학습 샘플 수</td></tr>
+          <tr><td class="td-col">metrics</td><td class="td-type">JSONB</td><td>F1, FNR, Recall@5 등 최종 메트릭</td></tr>
+          <tr><td class="td-col">model_uri</td><td class="td-type">VARCHAR(500)</td><td>MinIO 경로 (핫리로드 시 이 경로로 재구성)</td></tr>
+          <tr><td class="td-col">model_size_mb</td><td class="td-type">INTEGER</td><td>모델 크기 (MB)</td></tr>
+          <tr><td class="td-col">mlflow_run_id</td><td class="td-type">VARCHAR(64)</td><td>MLflow 실험 추적 ID</td></tr>
+          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td>활성 모델 1개 보장 (partial UNIQUE <code>idx_mv_active</code> WHERE is_active=TRUE)</td></tr>
+          <tr><td class="td-col">activated_at</td><td class="td-type">TIMESTAMPTZ</td><td>활성화 시각</td></tr>
+          <tr><td class="td-col">deactivated_at</td><td class="td-type">TIMESTAMPTZ</td><td>비활성화 시각</td></tr>
+          <tr><td class="td-fk">rolled_back_from</td><td class="td-type">UUID FK (self → version_id)</td><td>자동 롤백 출처 버전</td></tr>
+          <tr><td class="td-col">rollback_reason</td><td class="td-type">TEXT</td><td>롤백 사유 (예: fnr_high &gt; baseline+tolerance)</td></tr>
+          <tr><td class="td-col">level_snapshot</td><td class="td-type">JSONB</td><td>학습 시점 등급체계 스냅샷</td></tr>
+          <tr><td class="td-col">created_at</td><td class="td-type">TIMESTAMPTZ</td><td>등록 시각</td></tr>
+        </tbody>
+      </table></div>
+      <div><span class="idx-chip">UNIQUE PARTIAL idx_mv_active (is_active) WHERE is_active=TRUE</span><span class="idx-chip">IDX mlflow_run_id</span></div>
+    </section>
+
+    <section id="t-training-runs">
+      <h3>training_runs</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">run_id</td><td class="td-type">UUID PK</td><td></td></tr>
+          <tr><td class="td-fk">model_version</td><td class="td-type">FK → model_versions</td><td></td></tr>
+          <tr><td class="td-col">status</td><td class="td-type">VARCHAR(20)</td><td>queued / running / done / failed</td></tr>
+          <tr><td class="td-col">total_samples</td><td class="td-type">INTEGER</td><td>전체 학습 샘플 수</td></tr>
+          <tr><td class="td-col">train_count / val_count / test_count</td><td class="td-type">INTEGER</td><td>split 구성</td></tr>
+          <tr><td class="td-col">split_method</td><td class="td-type">VARCHAR(30)</td><td>stratified (기본)</td></tr>
+          <tr><td class="td-col">hyperparameters</td><td class="td-type">JSONB</td><td>epochs, lr, batch_size, warmup_ratio 등</td></tr>
+          <tr><td class="td-col">gpu_info</td><td class="td-type">JSONB</td><td>GPU 모델, VRAM, CUDA 버전</td></tr>
+          <tr><td class="td-col">final_metrics</td><td class="td-type">JSONB</td><td>F1, FNR, 혼동행렬</td></tr>
+          <tr><td class="td-col">trigger_type</td><td class="td-type">VARCHAR(30)</td><td>manual / scheduled / active_learning</td></tr>
+          <tr><td class="td-col">duration_sec</td><td class="td-type">INTEGER</td><td>실제 소요 초 (1epoch ≈ 33s)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="t-training-epochs">
+      <h3>training_epochs</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk td-fk">run_id</td><td class="td-type">UUID PK FK→training_runs CASCADE</td><td></td></tr>
+          <tr><td class="td-pk">epoch</td><td class="td-type">INTEGER PK</td><td></td></tr>
+          <tr><td class="td-col">train_loss / val_loss</td><td class="td-type">NUMERIC</td><td></td></tr>
+          <tr><td class="td-col">val_metrics</td><td class="td-type">JSONB</td><td>F1, FNR, confusion matrix per epoch</td></tr>
+          <tr><td class="td-col">learning_rate</td><td class="td-type">NUMERIC</td><td>스케줄러 적용 후 실제 lr</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="t-training-datasets">
+      <h3>training_datasets</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td></td></tr>
+          <tr><td class="td-fk">run_id</td><td class="td-type">FK → training_runs CASCADE</td><td></td></tr>
+          <tr><td class="td-fk">doc_id</td><td class="td-type">FK → documents</td><td></td></tr>
+          <tr><td class="td-col">split_type</td><td class="td-type">VARCHAR(10)</td><td>train / val / test</td></tr>
+          <tr><td class="td-fk">level_id</td><td class="td-type">FK → classification_levels</td><td>학습 시점 레이블</td></tr>
+        </tbody>
+      </table></div>
+      <div><span class="idx-chip">UNIQUE (run_id, doc_id)</span></div>
+    </section>
+
+    <!-- Group G -->
+    <div class="group-header" id="grp-g">
+      <span class="group-badge">G</span>
+      <span class="group-title">보정 — corrections</span>
+    </div>
+    <div class="group-desc">검수자 수정 결과. Active Learning 재학습 입력의 진실 소스. 능동학습 폐곡선: 분류 → 검수자 교정 → 교정 재빌드(unconsumed → {text,label}) → 학습셋 병합(train만) → 학습 → 등록 → 게이트 → 핫리로드. <b>반영분만 소비</b>(consumed_in_run·consumed_at) — 미반영은 무손실.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="td-pk">correction_id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td></td></tr>
+        <tr><td class="td-fk">classification_id</td><td class="td-type">FK → classifications CASCADE</td><td></td></tr>
+        <tr><td class="td-fk">original_level_id</td><td class="td-type">FK → classification_levels</td><td>AI 예측 등급</td></tr>
+        <tr><td class="td-fk">corrected_level_id</td><td class="td-type">FK → classification_levels</td><td>검수자 확정 등급 (confirm 시 predicted와 동일)</td></tr>
+        <tr><td class="td-col">direction</td><td class="td-type">VARCHAR(10)</td><td>underclass(미탐 보정) / overclass(과분류 보정) / lateral(동위 변경) / confirm(보정 없이 확정)</td></tr>
+        <tr><td class="td-col">reason</td><td class="td-type">TEXT</td><td>보정 사유</td></tr>
+        <tr><td class="td-col">corrected_by</td><td class="td-type">VARCHAR(50)</td><td>검수자 ID</td></tr>
+        <tr><td class="td-col">corrected_at</td><td class="td-type">TIMESTAMPTZ</td><td>보정 시각 (재빌드 결정성: corrected_at desc + correction_id desc)</td></tr>
+        <tr><td class="td-fk">consumed_in_run</td><td class="td-type">UUID FK→training_runs</td><td>재학습에 반영된 run_id (NULL=미소비)</td></tr>
+        <tr><td class="td-col">consumed_at</td><td class="td-type">TIMESTAMPTZ</td><td>재학습 반영 시각</td></tr>
+      </tbody>
+    </table></div>
+    <div>
+      <span class="idx-chip">IDX classification_id</span>
+      <span class="idx-chip">IDX direction</span>
+      <span class="idx-chip">IDX corrected_at</span>
+      <span class="idx-chip">PARTIAL idx_corr_unconsumed (consumed_in_run) WHERE consumed_in_run IS NULL — 능동학습 hot path</span>
+    </div>
+
+    <!-- Group H -->
+    <div class="group-header" id="grp-h">
+      <span class="group-badge">H</span>
+      <span class="group-title">합성 — prompt_versions · sample_documents</span>
+    </div>
+    <div class="group-desc">M1 합성 문서 생성 이력 및 프롬프트 버전 관리.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>테이블</th><th>주요 컬럼</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="td-col">prompt_versions</td><td class="td-col">prompt_version (PK) · chain_stage · template · avg_quality_score · approval_rate</td><td>합성 프롬프트 버전 추적 (outline / body / qc)</td></tr>
+        <tr><td class="td-col">sample_documents</td><td class="td-col">sample_id (UUID PK) · target_level_id · llm_provider · llm_model · generated_content · quality_score · review_status</td><td>Qwen3/Claude 합성 결과 저장 · pending_review → approved 흐름</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- Group I -->
+    <div class="group-header" id="grp-i">
+      <span class="group-badge">I</span>
+      <span class="group-title">비용 — llm_usage <span style="font-size:12px;font-weight:400;font-family:var(--font-mono);">RANGE PARTITION</span></span>
+    </div>
+    <div class="group-desc">LLM API 호출 비용 추적. 월별 파티션으로 분리.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="td-pk">usage_id + called_at</td><td class="td-type">BIGINT + TIMESTAMPTZ PK</td><td>복합 PK (파티션 키 포함)</td></tr>
+        <tr><td class="td-col">provider / model</td><td class="td-type">VARCHAR</td><td>anthropic / openai / ollama · claude-sonnet-4-6 등</td></tr>
+        <tr><td class="td-col">purpose</td><td class="td-type">VARCHAR(30)</td><td>synthesis / answer / labeling / classify</td></tr>
+        <tr><td class="td-col">input_tokens / output_tokens</td><td class="td-type">INTEGER</td><td>청구 기준 토큰</td></tr>
+        <tr><td class="td-col">cost_usd / cost_krw</td><td class="td-type">NUMERIC</td><td>USD 6자리 / KRW 2자리</td></tr>
+        <tr><td class="td-col">billing_phase</td><td class="td-type">VARCHAR(20)</td><td>development / poc / production</td></tr>
+        <tr><td class="td-col">latency_ms</td><td class="td-type">INTEGER</td><td>LLM 응답 레이턴시</td></tr>
+      </tbody>
+    </table></div>
+    <div class="partition-box" style="margin-top:8px;">📊 <b>운영 뷰</b> — 월별 비용 집계 뷰 <code>v_monthly_llm_cost</code>만 유지(raw SQL 조회). 보정·성능 집계 뷰 3개(<code>v_classification_final</code>·<code>v_model_performance</code>·<code>v_active_learning_status</code>)는 migration <code>f1e2d3c4b5a6</code>에서 <b>DROP</b> — 동일 로직을 <code>metrics.py</code>·<code>active_learning.py</code>·<code>confirm_service.py</code> 코드로 단일 진실원화(보정 미탐 집계의 이중 진실원 위험 제거).</div>
+
+    <!-- Group J -->
+    <div class="group-header" id="grp-j">
+      <span class="group-badge">J</span>
+      <span class="group-title">감사 — audit_log <span style="font-size:12px;font-weight:400;font-family:var(--font-mono);">RANGE PARTITION</span></span>
+    </div>
+    <div class="group-desc">모든 API 호출 기록. 영업비밀 시스템 법적 요건. SHA-256 해시 체인으로 변조 탐지.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="td-pk">audit_id + occurred_at</td><td class="td-type">BIGINT + TIMESTAMPTZ PK</td><td>복합 PK (파티션 키 포함)</td></tr>
+        <tr><td class="td-col">request_id</td><td class="td-type">UUID</td><td>API 요청 추적 ID</td></tr>
+        <tr><td class="td-col">tenant_id / actor_id / actor_role</td><td class="td-type">VARCHAR</td><td>멀티테넌트 + 행위자 식별</td></tr>
+        <tr><td class="td-col">action</td><td class="td-type">VARCHAR(50)</td><td>classify / upload / confirm / train / explain 등</td></tr>
+        <tr><td class="td-col">target_type / target_id</td><td class="td-type">VARCHAR</td><td>대상 리소스 타입 / ID</td></tr>
+        <tr><td class="td-col">payload_hash</td><td class="td-type">VARCHAR(64)</td><td>SHA-256 해시 체인 (이전 레코드 연결)</td></tr>
+        <tr><td class="td-col">ip_address</td><td class="td-type">INET</td><td>접속 IP</td></tr>
+        <tr><td class="td-col">success / error_code</td><td class="td-type">BOOLEAN / VARCHAR</td><td>성공 여부 + 오류 코드</td></tr>
+      </tbody>
+    </table></div>
+    <div>
+      <span class="idx-chip">IDX actor_id, occurred_at</span>
+      <span class="idx-chip">IDX target_type, target_id</span>
+      <span class="idx-chip">IDX action, occurred_at</span>
+      <span class="idx-chip">IDX tenant_id, occurred_at (hot path)</span>
+      <span class="idx-chip">IDX tenant_id, action, occurred_at (hot path)</span>
+    </div>
+
+    <!-- Group K -->
+    <div class="group-header" id="grp-k">
+      <span class="group-badge">K</span>
+      <span class="group-title">가이드 문서</span>
+    </div>
+    <div class="group-desc">KOIPA 가이드라인·교육 자료 버전 이력. GuideService in-memory → DB 이전 (migration b1c2d3e4f5a6). 다중 워커 일관성 및 서버 재시작 후 메타 유지 보장.</div>
+
+    <section id="t-guides">
+      <h3>guides</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">guide_id</td><td class="td-type">VARCHAR(200)</td><td class="td-nn yes">●</td><td>가이드 식별자 (파일명 기반)</td></tr>
+          <tr><td class="td-col">tenant_id</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>논리 테넌트 (기본 "default")</td></tr>
+          <tr><td class="td-col">version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>가이드 버전 (예: v2)</td></tr>
+          <tr><td class="td-col">effective_date</td><td class="td-type">VARCHAR(30)</td><td></td><td>시행 일자</td></tr>
+          <tr><td class="td-col">change_summary</td><td class="td-type">TEXT</td><td></td><td>변경 요약</td></tr>
+          <tr><td class="td-col">doc_type</td><td class="td-type">VARCHAR(50)</td><td></td><td>koipa_guide / training_manual / keyword_seed</td></tr>
+          <tr><td class="td-col">filename</td><td class="td-type">VARCHAR(500)</td><td></td><td>원본 파일명</td></tr>
+          <tr><td class="td-col">indexed</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>ES 지식베이스 인덱싱 완료 여부 (기본 false)</td></tr>
+          <tr><td class="td-col">embedding_vector_count</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td>인덱싱된 벡터 수 (기본 0)</td></tr>
+          <tr><td class="td-col">index_name</td><td class="td-type">VARCHAR(300)</td><td></td><td>ES 인덱스명</td></tr>
+          <tr><td class="td-col">alias</td><td class="td-type">VARCHAR(300)</td><td></td><td>ES 인덱스 alias</td></tr>
+          <tr><td class="td-col">model</td><td class="td-type">VARCHAR(100)</td><td></td><td>임베딩 모델</td></tr>
+          <tr><td class="td-col">registered_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td>등록 시각 (now() 기본값)</td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">IDX guide_id</span>
+        <span class="idx-chip">IDX tenant_id, guide_id</span>
+        <span class="idx-chip">IDX registered_at</span>
+      </div>
+      <p style="font-size:12.5px;color:var(--text-dim);">가이드 원문 벡터는 ES 별도 인덱스(alias 기반 blue/green 전환). <code>/api/v1/guide</code> POST → 인덱싱 완료 후 <code>indexed=true</code>, <code>embedding_vector_count</code> 갱신.</p>
+    </section>
+
+  </article>
+</div>
+
+<footer>
+  <span>부록 A — DB 스키마 · KOIPA AI 기술 구현 백서 v5.0 · 2026-06-19 갱신</span>
+  <span>PostgreSQL 16 · SQLAlchemy ORM · 19테이블 기준</span>
+</footer>
+
+<script>
+const items = document.querySelectorAll('.toc-item[href^="#"]');
+const secs = [...items].map(i=>document.querySelector(i.getAttribute('href'))).filter(Boolean);
+const obs = new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){items.forEach(i=>i.classList.remove('active'));const l=document.querySelector(`.toc-item[href="#${e.target.id}"]`);if(l)l.classList.add('active');}});},{rootMargin:'-15% 0px -70% 0px'});
+secs.forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>
