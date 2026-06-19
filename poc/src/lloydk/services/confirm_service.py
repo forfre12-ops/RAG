@@ -37,6 +37,7 @@ class ConfirmResult:
     confirmed_at: str
     persisted: bool
     warnings: list[str]
+    second_review_required: bool = False
 
 
 @dataclass
@@ -46,6 +47,38 @@ class RelabelResult:
     retrain_threshold: int
     persisted: bool
     warnings: list[str]
+    second_review_required: bool = False
+
+
+def _apply_dual_review_gate(
+    repo, cls, corrected_level_id: int, corrected_label: str, *, base_status: str, warns: list[str]
+) -> tuple[str, bool]:
+    """[C-cons] 고등급 변경 2인검토 게이트.
+
+    settings.high_grade_dual_review=False(기본)면 base_status 그대로(동작 보존).
+    True이고 corrected_label이 고등급이면, 이 분류를 그 등급으로 교정한 **고유 검수자가 2인
+    이상**일 때만 확정(base_status), 아니면 'needs_second_review'로 보류. correction은 이미
+    기록된 뒤 호출되므로 현재 검수자가 집합에 포함된다.
+
+    반환: (적용할 status, second_review_required).
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    if not getattr(settings, "high_grade_dual_review", False):
+        return base_status, False
+    high_codes = set(getattr(settings, "high_grade_review_codes", ["TS", "S1"]))
+    if corrected_label not in high_codes:
+        return base_status, False
+    reviewers = repo.distinct_reviewers_for_level(cls.classification_id, corrected_level_id)
+    if len(reviewers) >= 2:
+        warns.append(
+            f"dual-review satisfied: {len(reviewers)} distinct reviewers agree on {corrected_label}"
+        )
+        return base_status, False
+    warns.append(
+        f"high-grade change to {corrected_label} needs a second distinct reviewer "
+        f"({len(reviewers)}/2) — held as needs_second_review"
+    )
+    return "needs_second_review", True
 
 
 def _find_classification_scoped(repo: ClassifyRepo, req, tenant_id: str | None):
@@ -132,11 +165,19 @@ class ConfirmService:
                         corrected_by=req.actor.user_id,
                         reason=reason,
                     )
-                logger.info(
-                    "confirm done: classification_id=%s confirmation_id=%s label=%s",
-                    cls.classification_id, new_id, req.confirmed_label,
+                # [C-cons] 고등급 확정도 2인검토 통과 전까지 보류(기본 off → 'confirmed' 그대로).
+                status, second_required = _apply_dual_review_gate(
+                    repo, cls, target_level_id, req.confirmed_label, base_status="confirmed", warns=warns
                 )
-                return ConfirmResult(new_id, confirmed_at, persisted=True, warnings=warns)
+                cls.status = status
+                logger.info(
+                    "confirm done: classification_id=%s confirmation_id=%s label=%s status=%s",
+                    cls.classification_id, new_id, req.confirmed_label, status,
+                )
+                return ConfirmResult(
+                    new_id, confirmed_at, persisted=True, warnings=warns,
+                    second_review_required=second_required,
+                )
         except SQLAlchemyError as exc:
             logger.warning("confirm persistence failed: %s", exc)
             warns.append(f"persistence skipped: {type(exc).__name__}")
@@ -188,12 +229,16 @@ class RelabelService:
                         corrected_by=req.actor.user_id,
                         reason=req.reason,
                     )
-                cls.status = "corrected"
+                # [C-cons] 고등급 변경은 2인검토 통과 전까지 needs_second_review로 보류(기본 off).
+                status, second_required = _apply_dual_review_gate(
+                    repo, cls, corr_id, req.corrected_label, base_status="corrected", warns=warns
+                )
+                cls.status = status
 
                 queue_size = len(repo.unconsumed_corrections())
                 logger.info(
-                    "relabel done: classification_id=%s relabel_id=%s queue_size=%d",
-                    cls.classification_id, new_id, queue_size,
+                    "relabel done: classification_id=%s relabel_id=%s queue_size=%d status=%s",
+                    cls.classification_id, new_id, queue_size, status,
                 )
                 return RelabelResult(
                     relabel_id=new_id,
@@ -201,6 +246,7 @@ class RelabelService:
                     retrain_threshold=RETRAIN_THRESHOLD_DEFAULT,
                     persisted=True,
                     warnings=warns,
+                    second_review_required=second_required,
                 )
         except SQLAlchemyError as exc:
             logger.warning("relabel persistence failed: %s", exc)

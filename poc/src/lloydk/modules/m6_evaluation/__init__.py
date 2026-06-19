@@ -24,6 +24,12 @@ from lloydk.modules.m6_evaluation.active_learning import (
     ActiveLearningStatus,
     evaluate_retraining_need,
 )
+from lloydk.modules.m6_evaluation.deploy_gate import (
+    DeployDecision,
+    GateCheck,
+    evaluate_deploy_gate,
+)
+from lloydk.modules.m6_evaluation.serving_eval import evaluate_via_serving
 from lloydk.modules.m6_evaluation.report import (
     render_html_report,
     render_confusion_matrix_png,
@@ -43,6 +49,10 @@ __all__ = [
     "detect_underclass_alarms",
     "ActiveLearningStatus",
     "evaluate_retraining_need",
+    "DeployDecision",
+    "GateCheck",
+    "evaluate_deploy_gate",
+    "evaluate_via_serving",
     "render_html_report",
     "render_confusion_matrix_png",
     "RetrievalMetricsResult",

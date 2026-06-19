@@ -139,35 +139,119 @@ def synthesize_batch(
         raise
 
 
+def _create_training_run_guarded(
+    spec_kwargs: dict, *, total_samples: int, trigger: str = "active_learning"
+):
+    """실제 TrainingRun 1건 생성 → run_id 반환(소비 FK·감사용). DB 미가용 시 None.
+
+    [A2-① 정합] 기존엔 report.run_id(부재) → 랜덤 UUID로 소비를 시도했으나, 그 UUID는
+    training_runs에 없어 consumed_in_run FK가 깨졌다(소비 실패 → 교정 무한누적). 실제
+    TrainingRun을 만들어 그 run_id로만 소비해 FK 무결성과 감사추적을 보장한다.
+    """
+    try:
+        import uuid as _uuid  # noqa: PLC0415
+        from lloydk.db import session_scope  # noqa: PLC0415
+        from lloydk.repositories import TrainingRepo  # noqa: PLC0415
+        with session_scope() as db:
+            run = TrainingRepo(db).create_run(
+                total_samples=total_samples,
+                hyperparameters=spec_kwargs,
+                trigger_type=trigger,
+            )
+            rid = run.run_id
+            return rid if hasattr(rid, "hex") else _uuid.UUID(str(rid))
+    except Exception:  # noqa: BLE001
+        logger.warning("training run create skipped (DB unavailable) — 소비/등록 best-effort 진행")
+        return None
+
+
 @celery_app.task(name="lloydk.train_classifier")
 def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
-    """학습 시작 — 표적 5 (2026-05-29): unconsumed corrections를 자동 소비.
+    """재학습 — 교정 반영 → 학습 → 등록 → 게이트 → (조건부)활성 → 반영분만 소비.
 
-    학습이 끝난 뒤 같은 corrections가 다음 train tick에서 또 끌려오지 않게,
-    train_run_id로 mark. report에 consumed_count도 함께 반환.
+    doc/36 본개발 #1 (A2-①②·C-ver):
+      A2-①: unconsumed corrections를 {text,label}로 재빌드해 학습셋에 병합(반영). 그리고
+             **실제 학습에 반영된 correction_id만** 소비한다(반영 없이 소비 = 유실, 차단).
+      A2-②/C-ver: 학습 모델을 ModelVersion으로 등록하고 배포 합격선 게이트(fnr_high·f1)를
+             평가. 활성(activate)은 게이트 통과 + settings.retrain_auto_activate(기본 False)
+             둘 다일 때만 — 미검증 모델 자동배포 차단.
     """
-    from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
-    from lloydk.modules.m6_evaluation.active_learning import consume_corrections_for_run
+    from lloydk.config import settings  # noqa: PLC0415
+    from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.active_learning import consume_corrections_for_run  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.corrections_rebuild import (  # noqa: PLC0415
+        build_labeled_rows_from_corrections,
+        merge_into_train_jsonl,
+    )
+    from lloydk.services.training_service import register_and_gate_model  # noqa: PLC0415
 
-    spec = TrainSpec(**(spec_kwargs or {}))
+    spec_kwargs = dict(spec_kwargs or {})
+
+    # ── [A2-①] 교정→라벨 재빌드 + 학습셋 병합(train만 증강, 홀드아웃 불변) ──────────
+    rebuild = build_labeled_rows_from_corrections()
+    incorporated_ids: list[int] = []
+    if getattr(rebuild, "rows", None):
+        try:
+            import uuid as _uuid  # noqa: PLC0415
+            base_train = spec_kwargs.get("train_path") or TrainSpec().train_path
+            out_path = f"{settings.retrain_dataset_dir}/train_corr_{_uuid.uuid4().hex[:8]}.jsonl"
+            merged = merge_into_train_jsonl(base_train, rebuild, out_path)
+            if merged:
+                spec_kwargs["train_path"] = merged
+                incorporated_ids = list(rebuild.correction_ids)
+                logger.info(
+                    "train_classifier: %d corrections(%d docs) merged into train set",
+                    len(incorporated_ids), rebuild.row_count,
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("corrections merge failed — 기본 학습셋으로 진행")
+            incorporated_ids = []
+
+    # 소비 FK·감사용 실제 TrainingRun (학습 전 생성).
+    run_uuid = _create_training_run_guarded(
+        spec_kwargs, total_samples=getattr(rebuild, "row_count", 0)
+    )
+
+    # ── 학습 ────────────────────────────────────────────────────────────────────
+    spec = TrainSpec(**spec_kwargs)
     report = train_classifier(spec)
     out = dict(report.__dict__)
+    out["corrections_incorporated"] = len(incorporated_ids)
 
-    # run_id 결정: report에 있으면 그것을, 없으면 신규 UUID.
-    run_id = getattr(report, "run_id", None) or getattr(report, "training_run_id", None)
-    if not run_id:
-        import uuid as _uuid
-        run_id = _uuid.uuid4()
+    # ── [C-ver/A2-②] 등록 + 배포 게이트(활성은 게이트 통과 + opt-in 시에만) ────────
+    model_uri = None
     try:
-        import uuid as _uuid
-        run_uuid = run_id if hasattr(run_id, "hex") else _uuid.UUID(str(run_id))
-        n = consume_corrections_for_run(run_uuid)
-        out["corrections_consumed"] = n
-        out["corrections_run_id"] = str(run_uuid)
-        if n > 0:
-            logger.info("train_classifier: consumed %d corrections under run_id=%s", n, run_uuid)
+        _mv = getattr(report, "model_version", None)
+        _od = getattr(spec, "output_dir", None)
+        if _mv and _od:
+            model_uri = f"{_od}/{_mv}"
     except Exception:  # noqa: BLE001
-        logger.exception("consume_corrections_for_run failed (run_id=%s) — corrections 누적 가능", run_id)
+        model_uri = None
+    try:
+        out["deploy"] = register_and_gate_model(
+            report,
+            training_run_id=run_uuid,
+            training_data_count=getattr(rebuild, "row_count", None) or None,
+            model_uri=model_uri,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("register_and_gate_model failed — 등록/게이트 생략")
+        out["deploy"] = {"registered": False, "reason": "exception"}
+
+    # ── [A2-①] 소비 — 실제 반영된 교정만, 실제 run_id로 (반영 없으면 소비 안 함=무손실) ──
+    out["corrections_run_id"] = str(run_uuid) if run_uuid else None
+    if not incorporated_ids or run_uuid is None:
+        out["corrections_consumed"] = 0
+        if rebuild.correction_ids and run_uuid is None:
+            logger.info("교정 반영했으나 TrainingRun 미생성(DB) — 소비 보류(다음 tick 재시도, 무손실)")
+        return out
+    try:
+        n = consume_corrections_for_run(run_uuid, correction_ids=incorporated_ids)
+        out["corrections_consumed"] = n
+        if n > 0:
+            logger.info("train_classifier: consumed %d incorporated corrections under run_id=%s", n, run_uuid)
+    except Exception:  # noqa: BLE001
+        logger.exception("consume_corrections_for_run failed (run_id=%s) — corrections 누적 가능", run_uuid)
         out["corrections_consumed"] = -1
     return out
 

@@ -10,10 +10,11 @@ PoC 흐름:
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import logging
 import uuid
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -29,6 +30,163 @@ from lloydk.schemas.training import (
 from lloydk.services.job_store import get_default_store
 
 logger = logging.getLogger(__name__)
+
+
+# 모델 활성 전환 직렬화용 advisory lock 키(임의 고정 64-bit 상수). 같은 키 = 같은 임계영역.
+_MODEL_ACTIVATION_LOCK_KEY = 0x10AD_AC71_AC10_0001
+
+
+def _advisory_xact_lock(db, key: int) -> None:
+    """PostgreSQL 트랜잭션 advisory lock 획득(best-effort). PG 외/실패는 무시(degrade)."""
+    try:
+        from sqlalchemy import text  # noqa: PLC0415
+        db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": int(key)})
+    except Exception:  # noqa: BLE001
+        logger.debug("advisory lock unavailable (non-PG backend?) — proceeding without serialization")
+
+
+def _report_metrics(report: Any) -> dict:
+    """TrainReport(dataclass)/dict/객체 → metric dict 정규화 (ModelVersion.metrics 저장용)."""
+    if isinstance(report, dict):
+        return dict(report)
+    if dataclasses.is_dataclass(report) and not isinstance(report, type):
+        return dataclasses.asdict(report)
+    to_dict = getattr(report, "to_dict", None)
+    if callable(to_dict):
+        try:
+            d = to_dict()
+            if isinstance(d, dict):
+                return d
+        except Exception:  # noqa: BLE001
+            pass
+    d = getattr(report, "__dict__", None)
+    return dict(d) if isinstance(d, dict) else {}
+
+
+def register_and_gate_model(
+    report: Any,
+    *,
+    training_run_id: uuid.UUID | None = None,
+    training_data_count: int | None = None,
+    model_uri: str | None = None,
+    mlflow_run_id: str | None = None,
+) -> dict:
+    """재학습 모델을 ModelVersion으로 **등록(C-ver)** 하고 배포 합격선 **게이트** 평가 (A2-②).
+
+    정책(fail-SECURE):
+      - register는 항상 시도한다 — 합격 여부와 무관하게 이력·롤백 대상 보존.
+      - activate(운영 전환)는 **게이트 통과 AND settings.retrain_auto_activate=True** 모두
+        충족할 때만. 기본 retrain_auto_activate=False라 자동배포는 일어나지 않는다(등록만).
+      - baseline = 현재 활성 ModelVersion.metrics. 없으면 최초 배포로 게이트가 처리.
+
+    DB 미가용/오류 → {'registered': False, 'reason': ...} (학습 결과 자체는 호출부가 보존).
+    반환 dict: registered/version_id/activated/gate(decision dict)/reason.
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate  # noqa: PLC0415
+
+    metrics = _report_metrics(report)
+    version_label = str(metrics.get("model_version") or f"v-{uuid.uuid4().hex[:8]}")
+    base_model = str(metrics.get("base_model") or getattr(settings, "classifier_base_model", "unknown"))
+
+    try:
+        with session_scope() as db:
+            # [A2 동시성 락] 모델 활성 전환을 직렬화 — 두 재학습이 동시에 register/activate하며
+            # is_active 부분 UNIQUE 인덱스를 다투거나 서로의 활성을 덮어쓰는 레이스를 막는다.
+            # pg_advisory_xact_lock은 트랜잭션 종료(commit/rollback) 시 자동 해제. PG 외 백엔드는 무시.
+            _advisory_xact_lock(db, _MODEL_ACTIVATION_LOCK_KEY)
+            repo = TrainingRepo(db)
+            baseline = repo.get_active()
+            baseline_metrics = dict(baseline.metrics) if baseline and baseline.metrics else None
+            baseline_label = baseline.version_label if baseline else None
+
+            decision = evaluate_deploy_gate(
+                metrics,
+                baseline_metrics,
+                fnr_high_tolerance=float(getattr(settings, "retrain_fnr_high_tolerance", 0.02)),
+                f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
+                candidate_version=version_label,
+                baseline_version=baseline_label,
+            )
+
+            # 동일 label 재등록 방지(멱등) — 이미 있으면 그 버전 사용.
+            existing = repo.get_by_label(version_label)
+            if existing is not None:
+                mv = existing
+            else:
+                mv = repo.register_model_version(
+                    version_label=version_label,
+                    base_model=base_model,
+                    metrics=metrics,
+                    training_run_id=training_run_id,
+                    mlflow_run_id=mlflow_run_id,
+                    model_uri=model_uri,
+                )
+                if training_data_count is not None:
+                    mv.training_data_count = int(training_data_count)
+
+            auto = bool(getattr(settings, "retrain_auto_activate", False))
+            activated = False
+            if decision.passed and auto:
+                repo.activate_model_version(mv.version_id)
+                activated = True
+                logger.warning(
+                    "retrain auto-activated: %s (gate passed, baseline=%s)",
+                    version_label, baseline_label,
+                )
+            else:
+                logger.info(
+                    "retrain registered (not activated): %s gate_passed=%s auto_activate=%s",
+                    version_label, decision.passed, auto,
+                )
+
+            return {
+                "registered": True,
+                "version_id": str(mv.version_id),
+                "version_label": version_label,
+                "activated": activated,
+                "auto_activate": auto,
+                "gate": decision.to_dict(),
+            }
+    except SQLAlchemyError as exc:
+        logger.warning("register_and_gate_model skipped (DB unavailable): %s", exc)
+        return {"registered": False, "reason": f"db_unavailable:{type(exc).__name__}"}
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("register_and_gate_model failed")
+        return {"registered": False, "reason": f"error:{type(exc).__name__}:{exc}"}
+
+
+def rollback_active_model(reason: str) -> dict:
+    """현재 활성 모델을 직전 활성으로 즉시 복귀 (C-ver 롤백 트리거).
+
+    용도: 새로 활성된 모델이 운영에서 미탐 회귀를 보이거나 잘못 활성됐을 때 한 호출로 복귀.
+    활성 전환과 동일한 advisory lock으로 직렬화. DB 미가용/복귀후보 없음 → rolled_back=False.
+    """
+    try:
+        with session_scope() as db:
+            _advisory_xact_lock(db, _MODEL_ACTIVATION_LOCK_KEY)
+            repo = TrainingRepo(db)
+            before = repo.get_active()
+            restored = repo.rollback_to_previous(reason=reason)
+            if restored is None:
+                return {
+                    "rolled_back": False,
+                    "reason": "no_previous_version",
+                    "active": before.version_label if before else None,
+                }
+            logger.warning(
+                "model rollback: %s → %s (reason=%s)",
+                before.version_label if before else None, restored.version_label, reason,
+            )
+            return {
+                "rolled_back": True,
+                "from": before.version_label if before else None,
+                "to": restored.version_label,
+                "reason": reason,
+            }
+    except SQLAlchemyError as exc:
+        logger.warning("rollback_active_model skipped (DB unavailable): %s", exc)
+        return {"rolled_back": False, "reason": f"db_unavailable:{type(exc).__name__}"}
 
 
 class TrainingService:

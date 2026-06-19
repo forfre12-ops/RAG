@@ -365,6 +365,23 @@ class ClassifyRepo:
         ).first()
         return row is not None
 
+    def distinct_reviewers_for_level(
+        self, classification_id: uuid.UUID, corrected_level_id: int
+    ) -> set[str]:
+        """이 분류를 해당 등급으로 교정한 **서로 다른 검수자** 집합 (C-cons 2인검토용).
+
+        고등급 변경의 합의(2인 이상)를 판정하는 근거. 같은 검수자가 여러 번 교정해도 1명으로 센다.
+        """
+        rows = self.db.execute(
+            select(Correction.corrected_by)
+            .where(
+                Correction.classification_id == classification_id,
+                Correction.corrected_level_id == corrected_level_id,
+            )
+            .distinct()
+        ).scalars()
+        return {r for r in rows if r}
+
     @staticmethod
     def _direction(orig_order: int | None, new_order: int | None) -> str:
         """등급 order 비교 → direction.

@@ -202,6 +202,34 @@ class TrainingRepo:
             select(ModelVersion).where(ModelVersion.is_active.is_(True))
         ).scalar_one_or_none()
 
+    def rollback_to_previous(self, *, reason: str) -> ModelVersion | None:
+        """현재 활성 모델을 비활성화하고 **직전에 활성이던 모델**로 복귀 (C-ver 롤백).
+
+        직전 활성 = deactivated_at이 가장 최근인(=가장 마지막에 내려간) 버전, 현재 활성 제외.
+        복귀 대상에 `rolled_back_from`(어느 버전에서 되돌렸는지)·`rollback_reason`을 기록한다.
+        복귀 후보가 없으면(이력 1개뿐) None 반환 — 호출부는 '롤백 불가'로 처리.
+
+        용도: 게이트 통과 모델이 운영에서 미탐 회귀를 보이거나 잘못 활성된 경우 직전으로 즉시 복귀.
+        """
+        current = self.get_active()
+        prev = self.db.execute(
+            select(ModelVersion)
+            .where(
+                ModelVersion.is_active.is_(False),
+                ModelVersion.deactivated_at.is_not(None),
+                *( [ModelVersion.version_id != current.version_id] if current else [] ),
+            )
+            .order_by(ModelVersion.deactivated_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if prev is None:
+            return None
+        # activate_model_version이 기존 활성 전부 비활성화 + prev 활성화를 원자적으로 처리.
+        self.activate_model_version(prev.version_id)
+        prev.rolled_back_from = current.version_id if current else None
+        prev.rollback_reason = reason
+        return prev
+
     def get_by_label(self, version_label: str) -> ModelVersion | None:
         return self.db.execute(
             select(ModelVersion).where(ModelVersion.version_label == version_label)

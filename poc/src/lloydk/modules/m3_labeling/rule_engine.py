@@ -108,6 +108,8 @@ def _apply_high_risk_overrides(
     grade_scores: dict[str, float],
     factor_raw: dict[str, float],
     matches: list[MatchedKeyword],
+    *,
+    weight_multiplier: float = 1.0,
 ) -> None:
     """Add conservative pattern boosts for real-gold documents.
 
@@ -116,16 +118,23 @@ def _apply_high_risk_overrides(
     boosts reduce the common S2/S1/TS -> S3 fall-through without changing the
     tie-breaking policy.
 
+    [B1] weight_multiplier(settings.rule_high_risk_weight_multiplier)로 부스트 영향력을
+    코드 변경 없이 조정한다. 1.0=기본(동작 보존). 골든셋 PR곡선에서 범용 약어의 단독 과분류가
+    확인되면 이 값을 낮춰(예 0.6) 영향을 줄인다. <=0이면 부스트 비활성(조기 반환).
+
     [M-rule-evidence] 매치를 MatchedKeyword로 기록할 때 keyword에 정규식 원문이 아니라
     실제 매치된 substring(re.finditer의 group(0))과 span을 저장한다. 그래야 pipeline의
     evidence span(text.find(keyword))이 정규식이 아닌 실제 본문 토큰을 가리킨다.
     [M-rule-factor] grade_scores/factor_raw는 키가 없을 수 있으므로 KeyError 대신
     setdefault로 누산한다(DB LevelKeyword가 시드 외 factor_code를 가질 때 방어).
     """
+    if weight_multiplier <= 0:
+        return
     for grade, pattern, weight, factor in _HIGH_RISK_PATTERNS:
+        eff_weight = weight * weight_multiplier
         for mo in re.finditer(pattern, text, flags=re.IGNORECASE):
             matched = mo.group(0)
-            score = weight  # finditer는 매치당 1회 → count=1
+            score = eff_weight  # finditer는 매치당 1회 → count=1
             grade_scores[grade] = grade_scores.get(grade, 0.0) + score
             factor_raw[factor] = factor_raw.get(factor, 0.0) + score
             matches.append(
@@ -134,7 +143,7 @@ def _apply_high_risk_overrides(
                     grade=grade,
                     factor=factor,
                     count=1,
-                    weight=weight,
+                    weight=eff_weight,
                     score=score,
                     start=mo.start(),
                     end=mo.end(),
@@ -151,11 +160,23 @@ class LabelRuleEngine:
         embedder: Optional[object] = None,
         semantic_threshold: Optional[float] = None,
         method: Optional[str] = None,
+        high_risk_weight_multiplier: Optional[float] = None,
     ) -> None:
         self.seeds = seeds or KEYWORD_SEEDS
         self.fnr_safe = fnr_safe
         # 정본 B안: 등급 = S×V×M(multiplicative). additive = 레거시 가중합.
         self.method = method or "multiplicative"
+        # [B1] 고위험 패턴 가중치 배수 — 생성자 주입 > settings > 1.0(기본, 동작 보존).
+        if high_risk_weight_multiplier is not None:
+            self.high_risk_weight_multiplier = float(high_risk_weight_multiplier)
+        else:
+            try:
+                from lloydk.config import settings  # noqa: PLC0415
+                self.high_risk_weight_multiplier = float(
+                    getattr(settings, "rule_high_risk_weight_multiplier", 1.0)
+                )
+            except Exception:  # noqa: BLE001
+                self.high_risk_weight_multiplier = 1.0
         self._factor_weights = {f["code"]: f["weight"] for f in FACTOR_SEEDS}
         # semantic 매칭 전용 자원 (lazy)
         self._embedder = embedder
@@ -273,7 +294,10 @@ class LabelRuleEngine:
             grade_scores[grade] = grade_scores.get(grade, 0.0) + score
             factor_raw[factor] = factor_raw.get(factor, 0.0) + score
 
-        _apply_high_risk_overrides(text, grade_scores, factor_raw, matches)
+        _apply_high_risk_overrides(
+            text, grade_scores, factor_raw, matches,
+            weight_multiplier=self.high_risk_weight_multiplier,
+        )
 
         # 등급 결정
         total = sum(grade_scores.values())

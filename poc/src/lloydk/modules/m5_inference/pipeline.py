@@ -179,6 +179,46 @@ class InferencePipeline:
             return 1.6
 
     @property
+    def _escalation_tau(self) -> float | None:
+        """서빙 escalation τ (C-esc). None=순수 argmax(동작 보존). 0<τ<1만 유효."""
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            t = settings.classifier_escalation_tau
+            if t is None:
+                return None
+            t = float(t)
+            if 0.0 < t < 1.0:
+                return t
+        except Exception:  # noqa: BLE001
+            pass
+        return None
+
+    def _code_at(self, idx: int) -> str:
+        g = self._id2label[idx]
+        return g.value if hasattr(g, "value") else str(g)
+
+    def _select_pred_idx(self, probs) -> int:
+        """[C-esc] 예측 인덱스 선택 — escalation τ 또는 argmax.
+
+        τ=None: 순수 argmax(기존 동작). τ 설정 시: 가장 심각한 등급(GRADE_ORDER 작은 값)부터
+        검사해 prob ≥ τ 인 첫 등급 채택, 없으면 argmax 폴백. eval_fnr_threshold_sweep와 동일 규칙.
+        probs는 list/torch.Tensor 모두 허용(float 인덱싱). most-severe-wins 집계가 반영된 벡터.
+        """
+        n = len(self._id2label)
+
+        def _argmax() -> int:
+            return max(range(n), key=lambda i: float(probs[i]))
+
+        tau = self._escalation_tau
+        if tau is None:
+            return _argmax()
+        from lloydk.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
+        for i in sorted(range(n), key=lambda j: GRADE_ORDER.get(self._code_at(j), 999)):
+            if float(probs[i]) >= tau:
+                return i
+        return _argmax()
+
+    @property
     def _temperature(self) -> float:
         """서빙 softmax temperature scaling 계수.
 
@@ -472,13 +512,13 @@ class InferencePipeline:
                 probs.append(F.softmax(logits, dim=-1).cpu())
         chunk_probs = torch.cat(probs)  # [n_chunks, n_labels]
         doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
-        # argmax는 보강된 doc_prob에서 확정 (most-severe-wins 반영). 표시용 scores는
-        # 합=1로 재정규화한다 — 정규화는 모든 인덱스를 같은 상수로 나누므로 argmax 순서를
-        # 보존(label 안정)하고, scores·label·confidence 정합을 유지한다.
-        pred_idx = int(doc_prob.argmax().item())
-        pred = self._id2label[pred_idx]
+        # 표시용 scores는 합=1로 재정규화 (모든 인덱스를 같은 상수로 나눠 순서 보존).
         total = float(doc_prob.sum())
         norm = (doc_prob / total) if total > 0 else doc_prob
+        # [C-esc] 예측 인덱스: escalation τ(가장 심각한 등급 중 prob≥τ) 또는 argmax(τ=None=동작보존).
+        # most-severe-wins 집계가 반영된 norm에서 확정. τ는 평가 스윕과 동일 규칙(서빙↔평가 정합).
+        pred_idx = self._select_pred_idx(norm)
+        pred = self._id2label[pred_idx]
         scores = {g.value: float(norm[i]) for i, g in self._id2label.items()}
         conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
 

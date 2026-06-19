@@ -67,39 +67,93 @@ def test_deliver_outbox_tick_invokes_deliver_once():
 # ---------------------------------------------------------------------------
 
 
-def test_train_classifier_task_consumes_corrections():
-    """train_classifier 호출 후 consume_corrections_for_run이 호출되어야 함."""
+class _FakeReport:
+    """TrainReport 대역 — __dict__로 out 구성 + 게이트/등록 입력."""
+    def __init__(self):
+        self.model_version = "v-test1234"
+        self.accuracy = 0.85
+        self.f1_macro = 0.82
+        self.fnr_high = 0.03
+
+
+def _patch_retrain_closure(*, rebuild, run_uuid, consume):
+    """A2 재배선 협력자들을 한 번에 패치(컨텍스트 매니저 리스트 반환).
+
+    DB·학습 없이 train_classifier_task의 배선 계약만 검증한다.
+    """
+    from lloydk.modules.m6_evaluation.corrections_rebuild import RebuildResult  # noqa: F401
+    return [
+        patch("lloydk.modules.m4_training.trainer.train_classifier", return_value=_FakeReport()),
+        patch("lloydk.modules.m4_training.trainer.TrainSpec", lambda **kw: object()),
+        patch("lloydk.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
+              return_value=rebuild),
+        patch("lloydk.modules.m6_evaluation.corrections_rebuild.merge_into_train_jsonl",
+              return_value="datasets/demo_retrain/merged.jsonl"),
+        patch("lloydk.workers.tasks._create_training_run_guarded", return_value=run_uuid),
+        patch("lloydk.services.training_service.register_and_gate_model",
+              return_value={"registered": True, "activated": False, "gate": {"passed": True}}),
+        patch("lloydk.modules.m6_evaluation.active_learning.consume_corrections_for_run", consume),
+    ]
+
+
+def test_train_classifier_task_consumes_only_incorporated():
+    """[A2-①] 재빌드에 반영된 correction_id만 그 run_id로 소비."""
+    import contextlib
+    from unittest.mock import MagicMock
+    from lloydk.modules.m6_evaluation.corrections_rebuild import RebuildResult
     from lloydk.workers.tasks import train_classifier_task
 
-    class FakeReport:
-        def __init__(self):
-            self.run_id = uuid.uuid4()
-            self.accuracy = 0.85
+    rebuild = RebuildResult(
+        rows=[{"text": "비밀", "label": "TS"}], correction_ids=[101, 102], doc_count=1, reason="ok",
+    )
+    run_uuid = uuid.uuid4()
+    consume = MagicMock(return_value=2)
+    with contextlib.ExitStack() as stack:
+        for cm in _patch_retrain_closure(rebuild=rebuild, run_uuid=run_uuid, consume=consume):
+            stack.enter_context(cm)
+        out = train_classifier_task(spec_kwargs={"train_path": "base.jsonl"})
 
-    fake_report = FakeReport()
-    with patch("lloydk.modules.m4_training.trainer.train_classifier", return_value=fake_report):
-        with patch("lloydk.modules.m6_evaluation.active_learning.consume_corrections_for_run",
-                   return_value=7) as consume:
-            with patch("lloydk.modules.m4_training.trainer.TrainSpec", lambda **kw: object()):
-                out = train_classifier_task()
     assert consume.call_count == 1
-    assert out.get("corrections_consumed") == 7
-    assert "corrections_run_id" in out
+    _, kwargs = consume.call_args
+    assert kwargs.get("correction_ids") == [101, 102]      # 반영분만
+    assert out.get("corrections_consumed") == 2
+    assert out.get("corrections_incorporated") == 2
+    assert out.get("corrections_run_id") == str(run_uuid)
+    assert out["deploy"]["registered"] is True
+
+
+def test_train_classifier_task_no_consume_without_incorporation():
+    """[A2-① 안전성] 반영된 교정이 없으면 소비하지 않는다(반영 없이 소비=유실 차단)."""
+    import contextlib
+    from unittest.mock import MagicMock
+    from lloydk.modules.m6_evaluation.corrections_rebuild import RebuildResult
+    from lloydk.workers.tasks import train_classifier_task
+
+    rebuild = RebuildResult(rows=[], correction_ids=[], reason="no_unconsumed_corrections")
+    consume = MagicMock(return_value=9)
+    with contextlib.ExitStack() as stack:
+        for cm in _patch_retrain_closure(rebuild=rebuild, run_uuid=uuid.uuid4(), consume=consume):
+            stack.enter_context(cm)
+        out = train_classifier_task(spec_kwargs={"train_path": "base.jsonl"})
+
+    assert consume.call_count == 0                          # 소비 호출 자체가 없어야
+    assert out.get("corrections_consumed") == 0
+    assert out.get("corrections_incorporated") == 0
 
 
 def test_train_classifier_task_handles_consume_failure():
-    """consume_corrections가 실패해도 학습 자체 결과는 반환."""
+    """consume_corrections가 실패해도 학습 자체 결과는 반환(-1 마크)."""
+    import contextlib
+    from unittest.mock import MagicMock
+    from lloydk.modules.m6_evaluation.corrections_rebuild import RebuildResult
     from lloydk.workers.tasks import train_classifier_task
 
-    class FakeReport:
-        def __init__(self):
-            self.run_id = uuid.uuid4()
-
-    with patch("lloydk.modules.m4_training.trainer.train_classifier", return_value=FakeReport()):
-        with patch("lloydk.modules.m6_evaluation.active_learning.consume_corrections_for_run",
-                   side_effect=RuntimeError("db down")):
-            with patch("lloydk.modules.m4_training.trainer.TrainSpec", lambda **kw: object()):
-                out = train_classifier_task()
+    rebuild = RebuildResult(rows=[{"text": "x", "label": "S1"}], correction_ids=[5], reason="ok")
+    consume = MagicMock(side_effect=RuntimeError("db down"))
+    with contextlib.ExitStack() as stack:
+        for cm in _patch_retrain_closure(rebuild=rebuild, run_uuid=uuid.uuid4(), consume=consume):
+            stack.enter_context(cm)
+        out = train_classifier_task(spec_kwargs={"train_path": "base.jsonl"})
     assert out.get("corrections_consumed") == -1
 
 

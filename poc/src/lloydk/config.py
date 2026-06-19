@@ -197,6 +197,12 @@ class Settings(BaseSettings):
     # drift_monitor와 연계한다(§9.3).
     classifier_temperature: float = 1.0
 
+    # 서빙 escalation τ (pipeline._run_model, C-esc). None(기본)=순수 argmax(동작 보존).
+    # 값(0<τ<1)을 주면 severity-ordered escalation: 가장 심각한 등급 g 중 prob(g) ≥ τ 인 것을
+    # 채택, 없으면 argmax 폴백 — FNR을 더 낮추는 방향(고등급 적극 승격). τ를 낮출수록 미탐↓·과분류↑.
+    # 운영점 τ는 scripts/eval_fnr_threshold_sweep.py로 골든셋 PR곡선을 측정해 확정한다(동일 규칙).
+    classifier_escalation_tau: float | None = None
+
     # FNR-safe 오버라이드 threshold (pipeline.py).
     # 룰 엔진의 TS 점수가 이 값 이상이고 룰 등급이 모델 등급보다 높으면 TS로 올림.
     # 높일수록 오버라이드 빈도 감소 (S3 과분류 완화), 낮출수록 FNR 안전성 강화.
@@ -231,6 +237,32 @@ class Settings(BaseSettings):
 
     # 등급 산정법(정본 가이드 B안): multiplicative(S×V×M 곱셈) | additive(레거시 4요소 가중합).
     labeling_method: str = "multiplicative"
+
+    # 고등급(TS/S1) 변경 2인검토 (C-cons, doc/36). 기본 False=단일검수자 즉시확정(동작 보존).
+    # True면 고등급으로의 confirm/relabel은 **서로 다른 2인**이 같은 등급에 동의해야 확정되고,
+    # 1인만 동의한 동안은 classification.status='needs_second_review'로 보류된다(편향·오염 방지).
+    # 정식 정책(검토자 자격·시니어 사인오프 범위)은 발주처 협의로 확정 — 본 플래그는 그 메커니즘.
+    high_grade_dual_review: bool = False
+    high_grade_review_codes: list[str] = ["TS", "S1"]
+
+    # 룰 엔진 고위험 패턴(_HIGH_RISK_PATTERNS, 범용 영문약어 EUV·API·M&A 등) 가중치 배수 (B1).
+    # 1.0=기본(동작 보존). 범용 약어의 단독 과분류가 골든셋 PR곡선에서 확인되면 이 값을 낮춰
+    # (예 0.6) 코드 변경 없이 영향력을 하향한다. 과분류는 FNR-safe 방향이라 0 결함은 아니나
+    # 검수부하·정밀도 관점의 운영 레버. 0이면 고위험 패턴 부스트 비활성.
+    rule_high_risk_weight_multiplier: float = 1.0
+
+    # --- 재학습 배포 합격선 게이트 (A2-②/C-ver, doc/36 본개발 #1) ---
+    # 재학습 모델은 train_classifier_task에서 항상 ModelVersion으로 등록(C-ver, 이력 보존)하되,
+    # 운영 활성화(activate)는 **합격선 게이트 통과 + 아래 opt-in** 모두 충족할 때만.
+    # retrain_auto_activate 기본 False = "등록만, 자동 활성 안 함"(미검증 모델 자동배포 차단).
+    # 운영에서 자동배포를 켜려면 명시적으로 True 설정 + 게이트 허용오차를 데이터로 확정.
+    retrain_auto_activate: bool = False
+    # 게이트: 후보 fnr_high(고등급 미탐율) ≤ baseline + 이 허용오차여야 활성 허용(미탐 악화 차단).
+    retrain_fnr_high_tolerance: float = 0.02
+    # 게이트: 후보 f1_macro ≥ baseline - 이 허용오차여야 활성 허용(전반 성능 붕괴 차단).
+    retrain_f1_drop_tolerance: float = 0.05
+    # 교정→라벨 재빌드/병합 학습셋 출력 디렉토리(A2-①).
+    retrain_dataset_dir: str = "datasets/demo_retrain"
 
     embedding_model: str = "nlpai-lab/KURE-v1"
 
