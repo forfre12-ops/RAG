@@ -414,6 +414,24 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <div class="tl-desc">운영 환경에서 사람 확정 모드로 시범 운영하며 실제 정확도(미탐률)를 측정하고, 기준 충족 시 정식 오픈한다(§11.1).</div>
         </li>
       </ul>
+
+      <h4>사업 일정 (감리·보고 게이트)</h4>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>기간</th><th>주요 내용</th></tr></thead>
+          <tbody>
+            <tr><td>6월</td><td>분석 및 설계</td></tr>
+            <tr><td>7월 ~ 8월</td><td>AI 모델 개발 · 데이터셋 구축 · 성능 검증</td></tr>
+            <tr><td><b>8월 초</b></td><td><b>설계감리</b></td></tr>
+            <tr><td>9월 초</td><td>1차 개발 완료 목표</td></tr>
+            <tr><td><b>9월</b></td><td><b>중간보고</b></td></tr>
+            <tr><td>9월 ~ 11월</td><td>시스템 연계 및 통합 테스트 (KL 관리시스템 ↔ AI API, §6)</td></tr>
+            <tr><td><b>11월 ~ 12월</b></td><td>베타 테스트 · 결과 보완 / <b>종료감리</b></td></tr>
+            <tr><td><b>12월</b></td><td><b>완료보고 및 오픈</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 1~6 개발단계는 본 일정의 6월(설계)~12월(오픈)에 대응한다. 골든셋 1,000건은 8월 설계감리까지 단계 구축(§5.4), 실데이터 정밀화는 본개발(§11). 품질 검증 기간 확보를 위해 조기 개발을 추진한다.</p>
     </section>
 
     <!-- ============================
@@ -592,7 +610,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <line x1="118" y1="58" x2="132" y2="58" stroke="#525252" stroke-width="1.5" marker-end="url(#wf-arr)"/>
           <rect x="132" y="36" width="168" height="44" rx="6" fill="#fff" stroke="rgba(0,0,0,.14)" stroke-width="1.3"/>
           <text x="216" y="56" text-anchor="middle" font-size="11" font-weight="600" fill="#0a0a0a" font-family="Geist,sans-serif">② 텍스트 추출 (M2)</text>
-          <text x="216" y="70" text-anchor="middle" font-size="8.5" fill="#737373" font-family="Geist Mono,monospace">hwp5 · python-docx · pdfminer.six</text>
+          <text x="216" y="70" text-anchor="middle" font-size="8.5" fill="#737373" font-family="Geist Mono,monospace">rhwp · python-docx · pdfminer.six</text>
 
           <!-- ③ 정규화·청킹 -->
           <line x1="300" y1="58" x2="314" y2="58" stroke="#525252" stroke-width="1.5" marker-end="url(#wf-arr)"/>
@@ -604,7 +622,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <line x1="454" y1="58" x2="468" y2="58" stroke="#525252" stroke-width="1.5" marker-end="url(#wf-arr)"/>
           <rect x="468" y="36" width="120" height="44" rx="6" fill="#fff" stroke="rgba(0,0,0,.14)" stroke-width="1.3"/>
           <text x="528" y="56" text-anchor="middle" font-size="11" font-weight="600" fill="#0a0a0a" font-family="Geist,sans-serif">④ PII 마스킹</text>
-          <text x="528" y="70" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">12패턴</text>
+          <text x="528" y="70" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">11패턴</text>
 
           <!-- ⑤ 저장 -->
           <line x1="588" y1="58" x2="602" y2="58" stroke="#525252" stroke-width="1.5" marker-end="url(#wf-arr)"/>
@@ -684,11 +702,11 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>단계</th><th>처리 주체</th><th>동작</th><th>기록·저장소</th></tr></thead>
           <tbody>
             <tr><td class="td-code">①<br>업로드 접수</td><td>api (FastAPI :18030)</td><td><code>require_auth</code> 인증 후 요청 tenant를 인증 신원에 결속(불일치 403, §2.3). HWP/DOCX/PDF 원문 수신 후, PG 메타 저장과 분류 작업 발행을 <b>같은 트랜잭션 경계로 결속</b>한다 — 커밋된 작업만 Outbox(ZSET)에 오르고, 미발행분은 릴레이가 재발행하며 반복 실패는 DLQ로 보낸다(이중 쓰기 유실 차단). 여기까지가 <b>동기</b> 응답 구간, 이후 ②–⑦은 Celery worker가 <b>비동기</b> 처리.</td><td>원문 → MinIO <code>lloydk-docs</code> · 메타 → PG · 감사 기록</td></tr>
-            <tr><td class="td-code">②<br>텍스트 추출 (M2)</td><td>worker</td><td>확장자별 파서 분기 — <b>HWP → hwp5, DOCX → python-docx, PDF → pdfminer.six</b>(PyMuPDF AGPL 리스크 회피). 본문 텍스트를 추출한다.</td><td>—</td></tr>
+            <tr><td class="td-code">②<br>텍스트 추출 (M2)</td><td>worker</td><td>확장자별 파서 분기 — <b>HWP → rhwp-python, DOCX → python-docx, PDF → pdfminer.six</b>(PyMuPDF AGPL 리스크 회피). 본문 텍스트를 추출한다.</td><td>—</td></tr>
             <tr><td class="td-code">③<br>정규화 · 청킹</td><td>worker</td><td>불용어·공백·특수문자 정규화 후 <b>512 token / 64 token overlap</b> 슬라이딩 윈도우로 분할. 분류기(512 토큰 한도)·검색 양쪽이 다루는 처리 단위가 된다.</td><td>—</td></tr>
-            <tr><td class="td-code">④<br>PII 마스킹</td><td>worker</td><td>주민번호·전화·이메일·계좌·사업자번호 등 <b>구조적 식별자 12패턴</b>을 마스킹한다(고객사 특화 패턴·개체명(NER) 마스킹은 옵션). <b>추출 텍스트에 적용</b>되어 분류·색인·검수 화면 어디에도 원본 PII가 흐르지 않는다.</td><td>—</td></tr>
+            <tr><td class="td-code">④<br>PII 마스킹</td><td>worker</td><td>주민번호·전화·이메일·계좌·사업자번호 등 <b>구조적 식별자 11패턴</b>을 마스킹한다(고객사 특화 패턴·개체명(NER) 마스킹은 옵션). <b>추출 텍스트에 적용</b>되어 분류·색인·검수 화면 어디에도 원본 PII가 흐르지 않는다.</td><td>—</td></tr>
             <tr><td class="td-code">⑤<br>저장</td><td>worker</td><td><b>원본 바이너리</b>는 증빙용으로 <b>암호화 보관</b>하고, <b>마스킹된 정규화 텍스트·청크</b>만 분류·색인 경로로 보낸다. 원본·마스킹본·청크·임베딩·색인 각 단계의 PII 잔존·암호화·보관기간 정책은 데이터 흐름표(부록 A)로 관리한다.</td><td>원본(암호화) → MinIO · <code>chunks</code> → PG(월별 파티션)</td></tr>
-            <tr><td class="td-code">⑥<br>등급 추론 (M5)</td><td>worker</td><td>해당 문서에 사람이 확정한 라벨이 이미 있으면 <b>즉시 그 라벨 사용</b>(<code>_get_verified_label</code>, 모델 추론 생략). 그 외에는 청크별 KF-DeBERTa softmax를 집계하되 <b>고등급(TS·S1)은 최고-위험 청크 우선(max-pooling)</b>으로 잡고, <b>3요건 곱셈 등급(S×V×M, 하단 '등급 산정 방식')과 출처·콘텐츠 2-게이트·미탐 판정 가드</b>(하단 '등급 하향 방어')를 적용해 <b>등급 + confidence</b>를 산출한다. "판단 불가"는 없다 — 항상 산출. 동시에 <b>RAG 근거 검색이 병렬</b>로 돈다(하단 RAG 참고 방식).</td><td>분류 결과 → PG</td></tr>
+            <tr><td class="td-code">⑥<br>등급 추론 (M5)</td><td>worker</td><td>해당 문서에 사람이 확정한 라벨이 이미 있으면 <b>즉시 그 라벨 사용</b>(<code>_get_verified_label</code>, 모델 추론 생략). 그 외에는 청크별 KF-DeBERTa softmax를 집계하되 <b>고등급(TS·S1)은 최고-위험 청크 우선(max-pooling)</b>으로 잡고, <b>3요건 곱셈 등급(S×V×M, 하단 '등급 산정 방식')과, 업로드 <u>메타정보(출처·문서유형)를 결합</u>한 출처·콘텐츠 2-게이트·미탐 판정 가드</b>(하단 '등급 하향 방어')를 적용해 <b>등급 + confidence</b>를 산출한다. "판단 불가"는 없다 — 항상 산출. 동시에 <b>RAG 근거 검색이 병렬</b>로 돈다(하단 RAG 참고 방식).</td><td>분류 결과 → PG</td></tr>
             <tr><td class="td-code">⑦<br>confidence 게이트</td><td>worker/api</td><td>confidence ≥ 0.7(<code>review_confidence_threshold</code>, 고정 설정) → <b>⑦a staging 임시저장</b>(관리자 검토 대기). 미만 → <b>⑦b</b> <code>status="needs_review"</code> + warning, <b>검수자 큐 자동 배분</b>(동률 시 저신뢰 우선 정렬).</td><td>PG</td></tr>
             <tr><td class="td-code">⑧<br>사람 최종 확정</td><td>관리자 / 검수자 (UI)</td><td>⑦a: 관리자가 staging 결과 검토 후 <b>최종 등급 확정</b>(FUN-005: 임시저장 → 관리자 최종확정). ⑦b: 검수자가 <b>라벨 + 사유</b> 부여 → 해당 문서에 즉시 정답 반영, 동시에 <code>corrections</code>에 적재(모델 갱신 절차의 입력 — 갱신 자체는 자동 아님). <b>등급의 최종 결정권자는 항상 사람이다.</b></td><td>PG (verified label · <code>corrections</code>)</td></tr>
             <tr><td class="td-code">공통<br>감사·관측</td><td>전 구간 상시</td><td>전 단계 API 호출 SHA-256 해시 체인 기록(사후 변조 탐지), Prometheus 지표 노출, Drift Monitor 15분 주기 분포 감시(§9).</td><td>PG <code>audit_log</code>(월별 파티션)</td></tr>
@@ -696,6 +714,19 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
       <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 등급 <b>확정 이후</b>의 활용(워터마크·반출승인·이력 등)은 KL 담당 범위(§1.2)다. 본 워크플로우는 업로드부터 등급 확정까지의 Lloydk(AI 코어) 구간을 다룬다. 엔드포인트·요청/응답 필드 명세는 부록 B 참조.</p>
+
+      <h4>판단근거(XAI) — 2단계 설명</h4>
+      <p>"왜 이 등급인가"를 운영 자원 여건에 맞춰 2단계로 제공한다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>단계</th><th>제공</th><th>자원</th></tr></thead>
+          <tbody>
+            <tr><td class="td-code">① 상시 (기본)</td><td><b>feature-attribution</b> — 토큰 기여도 + 3요건(S/V/M) 분해 + 근거 문구·위치를 <code>/classify/explain</code>로 <b>항상</b> 반환. 검수자 UI가 근거를 시각화(FUN-024).</td><td class="td-pass">자원 무관(상시)</td></tr>
+            <tr><td class="td-code">② 조건부</td><td>운영 환경에 GPU·LLM 자원 여건이 충족되면 LLM 기반 <b>자연어 설명</b>을 추가 생성(toggle).</td><td class="td-warn">GPU·LLM 자원 충족 시 — 부족하면 ①로 <b>graceful degrade</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 근거 제공(①)은 자원과 무관하게 항상 보장되고, 자연어 설명(②)은 자원 여건에 따라 선택적으로 보강된다(KL 참고자료 §1-2 "GPU가 존재하더라도 운영 자원 여건 충족 시 LLM 설명 생성" 정합).</p>
 
       <h4>분류기의 RAG "참고" 방식 — 근거 첨부, 등급 불개입</h4>
       <p>"분류기가 RAG를 참고한다"의 정확한 의미는 다음과 같다.</p>
@@ -801,7 +832,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <span class="callout-icon">⚠</span>
         <div class="callout-body"><b>데이터 자동 학습은 신중히 검토 후 진행한다.</b> 운영 중 쌓인 검수 결과로 모델을 다시 학습시키는 "능동학습"은, 데이터 분포가 변하면 <b>정확성을 일정하게 보장하기 어렵고</b> 잘못된 자동 반영이 미탐(비밀문서 누락) 위험으로 이어질 수 있다. 따라서 본 사업에서는 <b>수집·재학습·배포·롤백 폐곡선을 모두 갖추되 자동 활성·자동 롤백은 기본 OFF</b>로 두고(§2.4.1), 모델 교체는 <b>관리자가 평가 결과를 신중히 검토·승인한 경우에만</b> 단계적으로 진행한다.</div>
       </div>
-      <p>운영 중 자동으로 일어나는 일은 <b>아래 G1(검수 결과 수집)까지</b>이며, 모델 교체는 G2~G4 절차를 관리자가 수동으로 수행할 때만 일어난다. 이 절차가 진행 중이거나 수행되지 않아도 운영 분류(①–⑧)는 기존 모델로 정상 동작한다.</p>
+      <p>운영 중 <b>상시 자동</b>은 <b>G1(검수 결과 수집)</b>이며, 누적 임계 도달 시 스케줄러(Celery beat, 30분 주기)가 <b>G2(재학습)·G3(평가 게이트)까지 자동 수행</b>해 새 "후보 모델"을 만들 수 있다. 다만 <b>G4(운영 교체·활성)는 <code>retrain_auto_activate</code> 기본 OFF로 차단</b>되어 관리자 사인오프가 있어야만 일어난다 — 즉 <b>무인(無人) 자동 '배포'는 없다</b>(후보 생성·채점은 자동이어도 운영 반영은 사람 승인). 이 절차가 진행 중이거나 수행되지 않아도 운영 분류(①–⑧)는 기존 모델로 정상 동작한다.</p>
       <div style="margin:16px 0;overflow-x:auto;">
         <svg viewBox="0 0 840 240" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;min-width:680px;display:block;" aria-label="모델 갱신 절차">
           <defs>
@@ -832,7 +863,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
           <!-- G1 → G2 -->
           <line x1="164" y1="86" x2="230" y2="86" stroke="#525252" stroke-width="1.5" marker-end="url(#g-arr)"/>
-          <text x="197" y="120" text-anchor="middle" font-size="8.5" fill="#737373" font-family="Geist,sans-serif">N≥40 누적 시</text>
+          <text x="197" y="120" text-anchor="middle" font-size="8.5" fill="#737373" font-family="Geist,sans-serif">N≥50 누적 시</text>
           <text x="197" y="132" text-anchor="middle" font-size="8.5" fill="#737373" font-family="Geist,sans-serif">관리자 트리거</text>
 
           <!-- G2 재학습 -->
@@ -877,8 +908,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th>단계</th><th>자동/수동</th><th>동작</th></tr></thead>
           <tbody>
-            <tr><td class="td-code">G1<br>수집</td><td class="td-pass">자동 (상시)</td><td>검수자가 ⑦b에서 수정한 라벨이 <code>corrections</code> 테이블에 쌓인다. <b>운영 중 자동으로 도는 것은 여기까지다.</b></td></tr>
-            <tr><td class="td-code">G2<br>재학습 실행</td><td class="td-warn">수동</td><td>corrections 누적 N건(기본 40+) 도달 시 <b>관리자가 직접 트리거</b>하여 새 모델 "후보"를 배치 학습한다(M4). 학습 중에도 기존 운영 모델은 그대로 서비스한다.</td></tr>
+            <tr><td class="td-code">G1<br>수집</td><td class="td-pass">자동 (상시)</td><td>검수자가 ⑦b에서 수정한 라벨이 <code>corrections</code> 테이블에 쌓인다. <b>이 수집은 상시 자동이다.</b></td></tr>
+            <tr><td class="td-code">G2<br>재학습 실행</td><td class="td-warn">스케줄러 자동 / 또는 수동</td><td>corrections 누적이 임계(권장 기본 <b>50</b>, 보안 미탐 누적 ≥10 시 긴급) 도달 시 스케줄러(또는 관리자)가 트리거하여 새 모델 "후보"를 배치 학습한다(M4). 학습 중에도 기존 운영 모델은 그대로 서비스한다.</td></tr>
             <tr><td class="td-code">G3<br>검증 (평가 게이트)</td><td class="td-warn">수동 트리거 · 자동 채점</td><td>새 후보를 평가셋으로 채점한다 — <b>F1 · FNR(비밀문서 미탐률, TS·S1 핵심) · 적대 케이스</b>. 하나라도 기준 미달이면 후보를 폐기한다(M6). 결과는 MLflow에 지표·혼동행렬로 남는다.</td></tr>
             <tr><td class="td-code">G4<br>승인 · 교체</td><td class="td-warn">수동</td><td>관리자가 G3 결과를 확인하고 <b>사인오프한 경우에만</b> 운영 모델을 교체한다(MLflow/MinIO 이력). 자동 활성 스위치(<code>retrain_auto_activate</code>)는 <b>기본 비활성(OFF)</b>이라, 끄여 있는 한 무인 자동 배포는 일어나지 않는다(§2.4.1 폐곡선). 교체는 핫리로드(<code>/admin/model/reload</code>)로 <b>프로세스 재기동 없이</b> 반영된다.</td></tr>
           </tbody>
@@ -910,7 +941,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>층</th><th>동작</th><th>효과</th></tr></thead>
           <tbody>
             <tr><td><b>① 즉시 override</b><br>(사람 라벨)</td><td>도메인 관리자가 라벨·사유를 부여한 문서는 <b>그 라벨을 직접 정답으로</b> 사용(모델 추론 건너뜀)</td><td class="td-pass">해당 문서 100% 정확 — 재학습을 기다리지 않고 즉시 반영</td></tr>
-            <tr><td><b>② 게이트형 재학습</b><br>(주기·수동)</td><td>corrections가 N건(기본 40+) 누적되면 <b>자동이 아니라 관리자 트리거</b> → F1/FNR/적대 게이트 통과 → <b>사람 승인 후</b> 배포</td><td class="td-pass">신규 문서 일반화 향상 — 재현·감사 가능</td></tr>
+            <tr><td><b>② 게이트형 재학습</b><br>(주기·자동/수동)</td><td>corrections가 N건(권장 <b>50</b>, 미탐 누적 ≥10 시 긴급) 누적되면 스케줄러(또는 관리자) 트리거 → F1/FNR/적대 게이트 통과 → <b>사람 승인(G4) 후</b> 배포</td><td class="td-pass">신규 문서 일반화 향상 — 재현·감사 가능</td></tr>
             <tr><td><b>③ 자동 배포 기본 차단</b></td><td>자동 활성 스위치(<code>retrain_auto_activate</code>)·자동 롤백(<code>auto_rollback_enabled</code>) 모두 <b>기본 OFF</b>. 모든 모델 교체는 게이트(fail-closed) + 사람 사인오프 경유</td><td class="td-pass">FNR 회귀(비밀→공개 유출) 원천 차단</td></tr>
           </tbody>
         </table>
@@ -1071,7 +1102,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>4.1 API 레이어</h3>
-      <p>외부(KL 웹 시스템)와의 연동은 표준 REST API로 제공하며, 모든 요청은 인증을 거친다. 전체 엔드포인트 명세는 부록 B에서 확인할 수 있다.</p>
+      <p>외부(<b>KL 영업비밀 관리시스템</b>)와의 연동은 표준 REST API로 제공하며, 모든 요청은 인증을 거친다. <b>KL 관리시스템 ↔ AI 서비스 연계의 세부 인터페이스 규격(요청/응답 필드·콜백·오류 코드)은 양 파트 개발 후 별도 협의로 확정</b>한다(KL 참고자료 §6 정합 — 통합 테스트 9~11월, §1.3 일정). 현재 구현 기준 전체 엔드포인트 명세는 부록 B에서 확인할 수 있다.</p>
       <div class="appendix-links">
         <a class="appendix-link" href="기술구현_백서_부록B_API명세.html">→ 부록 B — API 명세 전체 <span class="al-arrow">↗</span></a>
       </div>
@@ -1085,14 +1116,14 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="h2-sub">학습 데이터 확보 계획, 합성 데이터 생성, 그리고 독립적인 평가 데이터 구성.</p>
 
       <h3>5.1 학습 데이터 확보 계획</h3>
-      <p>공개 판례·법률·공시 등 다양한 출처에서 도메인 데이터를 확보하고, 발주처 가이드·실데이터로 보강한다.</p>
+      <p>공개 판례·법률·공시 등 다양한 출처에서 도메인 데이터를 확보하고, <b>발주처 정본 가이드(수령·반영 완료)</b>·실데이터로 보강한다.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>코드</th><th>출처</th><th>용도</th><th>확보 계획</th></tr></thead>
           <tbody>
             <tr><td class="td-code">D1</td><td>국가법령정보센터 영업비밀법 판례</td><td>TS·S1 고품질 실례</td><td><span class="tag neutral">수집 대상 확정</span></td></tr>
             <tr><td class="td-code">D2</td><td>AI Hub 법률·계약 코퍼스</td><td>S1·S2 다양성</td><td><span class="tag neutral">수집 대상 확정</span></td></tr>
-            <tr><td class="td-code">D3</td><td>KOIPA 가이드 문서</td><td>도메인 정합</td><td><span class="tag pend">발주처 회신 대기</span></td></tr>
+            <tr><td class="td-code">D3</td><td>KOIPA 영업비밀 등급분류 가이드(정본)</td><td>등급정의·예시·도메인 정합</td><td><span class="tag pass">수령·반영 완료 (2026-06-18, doc/22 v2)</span></td></tr>
             <tr><td class="td-code">D4</td><td>MODU 말뭉치</td><td>S2·S3 일반 문서</td><td><span class="tag neutral">수집 대상 확정</span></td></tr>
             <tr><td class="td-code">D5</td><td>KIPRA 지식재산 보고서</td><td>도메인 어휘 강화</td><td><span class="tag neutral">수집 대상 확정</span></td></tr>
             <tr><td class="td-code">D6</td><td>DART 기업 공시</td><td>S3 공개 문서</td><td><span class="tag neutral">수집 대상 확정</span></td></tr>
@@ -1106,8 +1137,15 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h3>5.3 독립 평가 데이터 구성</h3>
       <p>모델 성능을 객관적으로 측정하기 위해, <b>학습에 사용하지 않은 별도의 실제 문서</b>(공개 판례·기업 공시 등)로 평가셋을 따로 구성한다. 학습 데이터와 평가 데이터를 분리해야, 모델이 정답을 외운 것이 아니라 새로운 문서에도 일반화되는지를 정직하게 확인할 수 있다. 최종 정밀화는 발주처 실데이터를 확보한 본개발 단계에서 진행한다(§11).</p>
 
-      <h3>5.4 골든셋 — 본셋 500건 (4등급 균형)</h3>
-      <p>모델·룰셋 평가의 정답 기준이 되는 골든셋은 <b>본셋 500건</b>으로 구성한다. <b>TS·S1·S2·S3 각 125건씩(25%) 4등급을 균형</b> 있게 배치해, 특정 등급에 치우치지 않고 등급별 성능(특히 고등급 미탐률)을 정직하게 측정한다(<code>poc/datasets/gold/golden500.jsonl</code>).</p>
+      <h3>5.4 골든셋 — 1,000건 이상 목표 · 고객 검토형 단계 구축</h3>
+      <p>모델·룰셋 평가의 정답 기준이 되는 골든셋은 발주처 합의대로 <b>1,000건 이상</b>을 목표로, <b>고객사 검토를 거쳐 단계적으로</b> 구축한다.</p>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>구축 계획(고객 검토형):</b>
+          <b>1단계</b> — 판단근거를 함께 담은 <b>검토본 100건을 HTML로 큐레이션</b>해 <b>고객사가 등급·근거를 직접 검토·확인</b>한다.
+          <b>2단계</b> — 고객 확인 후 동일 기준으로 <b>나머지 900건을 생성</b>해 <b>총 1,000건 이상</b>을 완성한다.
+          <b>현재</b> — 룰+LLM 이중라벨로 <b>후보 500건</b>을 생성(<code>poc/datasets/gold/golden500.jsonl</code>)해 방법론·등급균형(<b>TS·S1·S2·S3 각 25%</b>)·판단근거 대장을 검증했고, 이를 토대로 1단계 100건 검토본을 만든다.</div>
+      </div>
       <div class="card-grid col4" style="margin:16px 0;">
         <div class="card"><div class="card-label">TS</div><div class="card-value sm">125</div></div>
         <div class="card"><div class="card-label">S1</div><div class="card-value sm">125</div></div>
@@ -1115,9 +1153,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="card card-pass"><div class="card-label">S3 · 합계</div><div class="card-value sm">125 · 500</div></div>
       </div>
       <ul>
-        <li><b>도메인 6종:</b> 반도체(EUV)·방위사업·M&amp;A·AI·바이오약물·보안. 각 문서 600~1,000자 + 구체 기술지표 포함.</li>
-        <li><b>무결성 검증:</b> DOCX/PDF 추출-재삽입 100% 일치 검증. S/V/M 독립판독 × 곱 ↔ 등급 정합 <b>500/500</b>.</li>
+        <li><b>도메인 12종:</b> 반도체(EUV)·방위사업·M&amp;A·AI·바이오약물·보안·금융·기술·인사·법무·일반사무·혼합. 각 문서 600~1,300자(생성 스펙) + 구체 기술지표 포함.</li>
+        <li><b>무결성 검증:</b> 포맷 변환본(파일럿 52건) 추출 왕복 점검 + S/V/M 독립판독 × 곱 ↔ 등급 정합 <b>500/500</b>.</li>
         <li><b>대장:</b> 판단근거 대장(<code>golden500_evidence.md</code>), 검수시트(<code>golden500_review_sheet.csv</code>).</li>
+        <li><b>검수 상태:</b> 후보 500건은 룰+LLM 이중라벨 완료 — <b>자동확정 146건</b>(룰↔LLM 일치) · <b>검토 필요 354건</b>(룰↔LLM 불일치). <b>1단계로 100건 HTML 검토본을 고객사에 제출·확인</b>받고, 확인 후 동일 기준으로 <b>900건 확장 → 총 1,000건 이상</b> 완성. 완전검증 골든셋은 고객 검토·확정 이후 확정한다.</li>
       </ul>
       <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 초기 파일럿 52건(<code>golden50.jsonl</code>)은 자동확정 17/52·전문가 검수필요 35/52(67%)로, 본셋 500건 확장의 근거가 됐다.</p>
 
@@ -1138,20 +1177,20 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="h2-sub">자동화 테스트와 5단계 프로토타입(PoC) 검증으로 타당성을 확인했다.</p>
 
       <h3>6.1 자동화 테스트</h3>
-      <p>핵심 로직은 자동화 테스트로 지속 검증한다. GPU·외부 API 키 없이도 돌릴 수 있는 경량 테스트로 일상적인 회귀를 막고, 전체 컨테이너를 띄운 통합 테스트로 실제 동작을 확인한다. 문서 포맷 추출·분류·보안 격리·개인정보 마스킹 등 주요 기능에 회귀 방지 테스트를 둔다. 현재 <b>pytest 385/385 PASS(회귀 0)</b>, API 라우트 <b>23개</b>, 설계문서 21개를 유지한다.</p>
+      <p>핵심 로직은 자동화 테스트로 지속 검증한다. GPU·외부 API 키 없이도 돌릴 수 있는 경량 테스트로 일상적인 회귀를 막고, 전체 컨테이너를 띄운 통합 테스트로 실제 동작을 확인한다. 문서 포맷 추출·분류·보안 격리·개인정보 마스킹 등 주요 기능에 회귀 방지 테스트를 둔다. 현재 <b>pytest 약 1,181건(122파일)</b> — 경량 빠른회귀 858건·풀스택 103건·GPU/모델 마커 별도, 회귀 0, API 라우트 <b>31개</b>, 설계문서 32개를 유지한다.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>검증 층</th><th>대상</th><th>결과</th></tr></thead>
           <tbody>
-            <tr><td><b>단위</b></td><td>핵심 로직(룰엔진·집계·게이트 등)</td><td class="td-pass">385/385</td></tr>
+            <tr><td><b>단위·경량</b></td><td>핵심 로직(룰엔진·집계·게이트 등)</td><td class="td-pass">858 (lite)</td></tr>
             <tr><td><b>DB-backed</b></td><td>PG 스키마·트랜잭션·파티션</td><td class="td-pass">20/20</td></tr>
-            <tr><td><b>풀스택</b></td><td>PG + Elasticsearch 통합 경로</td><td class="td-pass">95/95</td></tr>
+            <tr><td><b>풀스택</b></td><td>PG + Elasticsearch 통합 경로</td><td class="td-pass">103/103</td></tr>
             <tr><td><b>실 GPU E2E</b></td><td>교정 → 학습 → 배포 → 핫리로드 폐곡선</td><td class="td-pass">7/7</td></tr>
-            <tr><td><b>라이브 API 데모</b></td><td>PDF → S1(0.997) → confirm/relabel → 재학습 큐</td><td class="td-pass">동작 확인</td></tr>
+            <tr><td><b>라이브 API 데모</b></td><td>PDF → S1(1.000) → confirm/relabel → 재학습 큐</td><td class="td-pass">동작 확인</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 성능 시나리오(PSH) S1~S13(11종)×30+ KPI를 CI에서 자동 측정하고 회귀를 자동 탐지한다(pytest + dryrun + PSH + PR 코멘트 + GitHub Pages 리포트).</p>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 성능 시나리오(PSH) S1~S18(18종)×30+ KPI를 CI에서 자동 측정하고 회귀를 자동 탐지한다(pytest + dryrun + PSH + PR 코멘트 + GitHub Pages 리포트).</p>
 
       <h3>6.2 5단계 프로토타입(PoC) 검증</h3>
       <p>핵심 기능을 5개 항목으로 나누어 합격 기준을 정의한다. 이 기준은 <b>본개발 정식 오픈을 판정하는 목표치(운영 게이트)</b>이며, 프로토타입에서의 <b>실측값과 그 한계</b>는 §7에 분리해 제시한다 — 합성·공개 데이터 기준이므로 "측정"이 아니라 "타당성 확인"으로 읽어야 한다.</p>
@@ -1418,8 +1457,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
       <h3>11.3 발주처 협조가 필요한 자원</h3>
       <ol>
-        <li><b>실 업무 문서</b> — 분류 모델 학습·정밀화와 문서 추출 품질 검증의 핵심 입력</li>
-        <li><b>등급 분류 가이드</b> — 도메인 기준(키워드·등급체계) 보강</li>
+        <li><b>실 업무 문서</b> — 분류 모델 학습·정밀화와 문서 추출 품질 검증의 핵심 입력 <span class="tag pend">미확보</span></li>
+        <li><b>등급 분류 가이드</b> — <b>정본 수령·반영 완료(2026-06-18, doc/22 v2)</b>. 향후 발주처 갱신본 도착 시 패치(선택). <span class="tag pass">해소</span></li>
         <li><b>운영 초기 검수 라벨</b> — 모델 개선용 데이터. 자동 반영이 아니라 <b>신중히 검토 후 단계적으로 반영</b>한다(§2.4).</li>
       </ol>
 
