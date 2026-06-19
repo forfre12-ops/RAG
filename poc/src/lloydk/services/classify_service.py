@@ -97,6 +97,21 @@ class ClassifyService:
             cls._instance = cls()
         return cls._instance
 
+    def reload_model(self) -> dict:
+        """서빙 추론 파이프라인을 **활성 ModelVersion 기준으로 재구성** (런타임 핫리로드).
+
+        activate_model_version/rollback 후 프로세스 재기동 없이 새 모델을 서빙에 반영한다
+        (싱글톤이라 init 시점 모델을 유지하던 한계 해소). admin 엔드포인트(POST /admin/model/reload)가
+        호출. 반환: 재로드 후 model_dir·model_version·로드여부.
+        """
+        new_dir = _resolve_serving_model_dir()
+        self.inference = InferencePipeline(model_dir=new_dir)
+        loaded = getattr(self.inference, "_model", None) is not None
+        version = (str(self.inference.model_dir.name)
+                   if getattr(self.inference, "model_dir", None) else "rule-fallback")
+        logger.info("classify model reloaded: dir=%s version=%s loaded=%s", new_dir, version, loaded)
+        return {"reloaded": True, "model_dir": new_dir, "model_version": version, "model_loaded": loaded}
+
     # ------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------

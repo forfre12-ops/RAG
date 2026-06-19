@@ -9,6 +9,8 @@ from __future__ import annotations
 from contextlib import contextmanager
 from types import SimpleNamespace
 
+import pytest
+
 import lloydk.services.classify_service as cs
 
 
@@ -93,3 +95,45 @@ def test_resolve_disabled_uses_env(monkeypatch):
     # disabled면 _active_model_dir 호출 자체가 없어야(폴백 직행)
     monkeypatch.setattr(cs, "_active_model_dir", lambda: (_ for _ in ()).throw(AssertionError("called")))
     assert cs._resolve_serving_model_dir() == "envdir"
+
+
+# ── reload_model (런타임 핫리로드) ───────────────────────────────────────────
+
+
+def test_reload_model_rebuilds_inference():
+    svc = cs.ClassifyService()        # TESTING → env(빈값) → rule-fallback, 모델 로드 없음
+    old = svc.inference
+    info = svc.reload_model()
+    assert info["reloaded"] is True
+    assert svc.inference is not old   # 추론기 재구성됨
+    assert "model_version" in info
+
+
+def test_reload_model_reports_fallback_when_no_dir(monkeypatch):
+    monkeypatch.setattr(cs, "_resolve_serving_model_dir", lambda: None)
+    svc = cs.ClassifyService()
+    info = svc.reload_model()
+    assert info["model_version"] == "rule-fallback"
+    assert info["model_loaded"] is False
+    assert info["model_dir"] is None
+
+
+@pytest.mark.fullstack
+def test_admin_reload_endpoint_requires_admin_and_reloads():
+    from fastapi.testclient import TestClient
+
+    from lloydk.api.app import app
+    from lloydk.config import settings
+
+    with TestClient(app) as cli:
+        # 비admin은 거부
+        r_forbidden = cli.post("/api/v1/admin/model/reload",
+                               headers={"X-API-Key": settings.api_key, "X-Actor-Role": "reviewer"})
+        assert r_forbidden.status_code in (401, 403)
+        # admin은 200 + reloaded
+        r = cli.post("/api/v1/admin/model/reload",
+                     headers={"X-API-Key": settings.api_key, "X-Actor-Role": "admin"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["reloaded"] is True
+        assert "model_version" in body
