@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 import warnings
 from typing import Callable, Optional
@@ -40,6 +41,44 @@ def _try_uuid_str(value: str | None) -> "uuid.UUID | None":
         return None
 
 
+def _active_model_dir() -> Optional[str]:
+    """활성 ModelVersion.model_uri가 로컬 디렉토리면 그 경로, 아니면 None (C-ver 서빙 배선).
+
+    register_and_gate/rollback이 활성화한 버전을 서빙이 실제로 집어들게 한다. model_uri가
+    없거나(미등록)·원격 URI거나·존재하지 않는 경로면 None → 호출부가 env로 폴백(동작 보존).
+    DB 미가용·예외는 모두 None(폴백). 베스트에포트.
+    """
+    try:
+        from pathlib import Path  # noqa: PLC0415
+
+        from lloydk.db import session_scope  # noqa: PLC0415
+        from lloydk.repositories import TrainingRepo  # noqa: PLC0415
+        with session_scope() as db:
+            active = TrainingRepo(db).get_active()
+            uri = getattr(active, "model_uri", None) if active else None
+        if uri:
+            p = Path(str(uri))
+            if p.exists() and p.is_dir():
+                logger.info("serving from active ModelVersion: %s", uri)
+                return str(p)
+            logger.warning("active ModelVersion model_uri not a local dir (%s) — env fallback", uri)
+    except Exception:  # noqa: BLE001
+        logger.debug("active model resolution failed — env fallback")
+    return None
+
+
+def _resolve_serving_model_dir() -> Optional[str]:
+    """서빙 모델 디렉토리 결정 — 활성 ModelVersion 우선, 없으면 env classifier_model_dir.
+
+    settings.serving_prefer_active_model=False 또는 TESTING이면 env 직행(빠름·결정론).
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    env_dir = getattr(settings, "classifier_model_dir", "") or None
+    if os.environ.get("TESTING") or not getattr(settings, "serving_prefer_active_model", True):
+        return env_dir
+    return _active_model_dir() or env_dir
+
+
 class ClassifyService:
     _instance: "ClassifyService | None" = None
 
@@ -48,8 +87,8 @@ class ClassifyService:
         # Phase 3 (5070 Ti 풀가동) — 학습 가중치 디렉토리가 settings 또는
         # 환경변수에 명시되면 InferencePipeline 이 자동 로드. 미명시·미존재 시
         # rule-fallback 그대로(기존 동작 호환).
-        from lloydk.config import settings as _settings  # noqa: PLC0415
-        model_dir = getattr(_settings, "classifier_model_dir", "") or None
+        # [C-ver] 활성 ModelVersion이 있으면 그 model_uri를 우선(activate/rollback이 서빙에 반영).
+        model_dir = _resolve_serving_model_dir()
         self.inference = InferencePipeline(model_dir=model_dir)
 
     @classmethod

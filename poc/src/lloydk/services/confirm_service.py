@@ -69,6 +69,23 @@ def _apply_dual_review_gate(
     if corrected_label not in high_codes:
         return base_status, False
     reviewers = repo.distinct_reviewers_for_level(cls.classification_id, corrected_level_id)
+    # [C-cons 신뢰도 배선] min_reliability>0이면 저신뢰 검수자 동의는 정족수에서 제외.
+    # 같은 db 세션으로 신뢰도 계산(방금 추가한 교정 반영). 이력 없는 신규 검수자는 신뢰(1.0).
+    min_rel = float(getattr(settings, "high_grade_review_min_reliability", 0.0))
+    if min_rel > 0 and reviewers:
+        from lloydk.modules.m6_evaluation.reviewer_trust import (  # noqa: PLC0415
+            compute_reviewer_reliability,
+        )
+        rel = {r["reviewer_id"]: r["reliability"]
+               for r in compute_reviewer_reliability(db=repo.db)}
+        trusted = {rv for rv in reviewers if rel.get(rv, 1.0) >= min_rel}
+        low = reviewers - trusted
+        if low:
+            warns.append(
+                f"low-trust reviewer(s) {sorted(low)} excluded from quorum "
+                f"(reliability < {min_rel})"
+            )
+        reviewers = trusted
     if len(reviewers) >= 2:
         warns.append(
             f"dual-review satisfied: {len(reviewers)} distinct reviewers agree on {corrected_label}"

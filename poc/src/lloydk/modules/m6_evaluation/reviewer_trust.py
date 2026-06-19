@@ -22,26 +22,34 @@ from lloydk.db.models import Correction
 logger = logging.getLogger(__name__)
 
 
-def compute_reviewer_reliability(*, min_corrections: int = 1) -> list[dict]:
+def compute_reviewer_reliability(*, min_corrections: int = 1, db=None) -> list[dict]:
     """전체 검수자 신뢰도 목록 (신뢰도 desc, 동률 시 교정수 desc).
 
     각 항목: reviewer_id · total(교정수) · agreed(최신합의 일치수) · reliability(=agreed/total) ·
     overturned(번복수=total-agreed) · last_correction_at.
     min_corrections 미만 검수자는 제외(표본 부족 노이즈 차단).
+
+    db 주입 시: 그 세션으로 조회(호출부의 미커밋 트랜잭션도 반영 — 2인검토 게이트가 방금 추가한
+    교정을 보게). 미주입 시: 자체 session_scope(읽기 전용), DB 미가용 시 빈 목록.
     """
+    if db is not None:
+        return _reliability_from_session(db, min_corrections)
     try:
-        with session_scope() as db:
-            corrs = list(
-                db.execute(
-                    select(Correction).order_by(
-                        Correction.corrected_at.desc(), Correction.correction_id.desc()
-                    )
-                ).scalars()
-            )
+        with session_scope() as s:
+            return _reliability_from_session(s, min_corrections)
     except SQLAlchemyError as exc:
         logger.debug("reviewer reliability skipped: %s", exc)
         return []
 
+
+def _reliability_from_session(db, min_corrections: int) -> list[dict]:
+    corrs = list(
+        db.execute(
+            select(Correction).order_by(
+                Correction.corrected_at.desc(), Correction.correction_id.desc()
+            )
+        ).scalars()
+    )
     if not corrs:
         return []
 

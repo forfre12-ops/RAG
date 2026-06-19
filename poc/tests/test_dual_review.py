@@ -17,6 +17,7 @@ from lloydk.services.confirm_service import _apply_dual_review_gate
 class _FakeRepo:
     def __init__(self, reviewers):
         self._reviewers = set(reviewers)
+        self.db = object()  # 신뢰도 게이트가 compute_reviewer_reliability(db=repo.db) 호출
 
     def distinct_reviewers_for_level(self, classification_id, level_id):
         return self._reviewers
@@ -68,6 +69,45 @@ def test_high_grade_two_reviewers_confirmed():
     assert status == "corrected"
     assert second is False
     assert any("dual-review satisfied" in w for w in warns)
+
+
+# ── 신뢰도 배선 (C-cons 고도화) ──────────────────────────────────────────────
+
+
+def _gate_trust(monkeypatch, reviewers, rel_map, min_rel):
+    """min_reliability + reviewer_trust 모킹으로 게이트 호출."""
+    from lloydk.config import settings
+    import lloydk.modules.m6_evaluation.reviewer_trust as rt
+    monkeypatch.setattr(settings, "high_grade_dual_review", True)
+    monkeypatch.setattr(settings, "high_grade_review_codes", ["TS", "S1"])
+    monkeypatch.setattr(settings, "high_grade_review_min_reliability", min_rel)
+    monkeypatch.setattr(rt, "compute_reviewer_reliability",
+                        lambda **kw: [{"reviewer_id": k, "reliability": v} for k, v in rel_map.items()])
+    warns: list[str] = []
+    return _apply_dual_review_gate(_FakeRepo(reviewers), _Cls(), 1, "TS",
+                                   base_status="corrected", warns=warns) + (warns,)
+
+
+def test_low_trust_reviewer_excluded_from_quorum(monkeypatch):
+    # a=0.9(신뢰), b=0.2(저신뢰) · min_rel 0.5 → b 제외 → 정족수 1<2 → 보류
+    status, second, warns = _gate_trust(monkeypatch, {"a", "b"}, {"a": 0.9, "b": 0.2}, 0.5)
+    assert status == "needs_second_review"
+    assert second is True
+    assert any("low-trust" in w for w in warns)
+
+
+def test_two_trusted_reviewers_confirmed(monkeypatch):
+    # 둘 다 신뢰 ≥ 0.5 → 정족수 2 → 확정
+    status, second, _ = _gate_trust(monkeypatch, {"a", "b"}, {"a": 0.9, "b": 0.8}, 0.5)
+    assert status == "corrected"
+    assert second is False
+
+
+def test_new_reviewer_trusted_by_default(monkeypatch):
+    # c는 신뢰도 이력 없음(map에 없음) → 1.0 취급(신뢰) → a(0.9)+c → 정족수 2 → 확정
+    status, second, _ = _gate_trust(monkeypatch, {"a", "c"}, {"a": 0.9}, 0.5)
+    assert status == "corrected"
+    assert second is False
 
 
 # ── DB-backed: relabel 경로 통합 ─────────────────────────────────────────────

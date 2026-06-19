@@ -189,6 +189,13 @@ class Settings(BaseSettings):
     # .env: CLASSIFIER_MODEL_DIR=artifacts/classifier-1ep/v-ae3f5371 형식.
     classifier_model_dir: str = ""
 
+    # 서빙 모델 선택 (C-ver 폐곡선 마감) — True면 ClassifyService가 **활성 ModelVersion**
+    # (register_and_gate/rollback이 활성화한 버전)의 model_uri를 우선 로드하고, 없거나 로컬
+    # 디렉토리가 아니면 classifier_model_dir(env)로 폴백한다. 이로써 activate/rollback이 실제
+    # 서빙 모델을 바꾼다(기존엔 env만 읽어 DB 장부와 서빙이 분리됐음). 활성 버전이 없으면
+    # 기존 동작(env) 그대로라 동작 보존. 모델 전환은 서비스 초기화(재기동) 시점에 반영.
+    serving_prefer_active_model: bool = True
+
     # 서빙 softmax temperature scaling 계수 (pipeline.py 추론 경로).
     # 분류기 softmax는 OOD(학습에 없던 새 문체)에서 과신(overconfident)하는 경향이 있어
     # 0.7 confidence 게이트가 보정 안 된 값 위에 설 수 있다. T>1이면 분포를 부드럽게 해
@@ -244,6 +251,10 @@ class Settings(BaseSettings):
     # 정식 정책(검토자 자격·시니어 사인오프 범위)은 발주처 협의로 확정 — 본 플래그는 그 메커니즘.
     high_grade_dual_review: bool = False
     high_grade_review_codes: list[str] = ["TS", "S1"]
+    # 2인검토 정족수 계산 시 검수자 신뢰도(reviewer_trust) 하한. 0.0(기본)=신뢰도 무시(동작 보존).
+    # >0이면 신뢰도가 이 값 미만인 검수자의 동의는 정족수에서 제외(이력 없는 신규 검수자는 신뢰).
+    # 자주 번복되는 저신뢰 검수자만으론 고등급 변경이 확정되지 않게 — 시니어 사인오프 정책의 근거.
+    high_grade_review_min_reliability: float = 0.0
 
     # 룰 엔진 고위험 패턴(_HIGH_RISK_PATTERNS, 범용 영문약어 EUV·API·M&A 등) 가중치 배수 (B1).
     # 1.0=기본(동작 보존). 범용 약어의 단독 과분류가 골든셋 PR곡선에서 확인되면 이 값을 낮춰

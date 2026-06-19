@@ -32,6 +32,7 @@ celery_app.conf.task_routes = {
     "lloydk.index_documents": {"queue": "index"},
     "lloydk.active_learning_tick": {"queue": "learning"},
     "lloydk.drift_tick": {"queue": "learning"},
+    "lloydk.auto_rollback_tick": {"queue": "learning"},
     "lloydk.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
 }
 
@@ -55,6 +56,12 @@ celery_app.conf.beat_schedule = {
         "task": "lloydk.drift_tick",
         "schedule": 15 * 60.0,
         "kwargs": {"limit": 200, "threshold": 0.5},
+    },
+    # C-ver 자동 롤백 (2026-06-19): 매 60분 — 활성 모델 라이브 미탐 회귀 점검.
+    # settings.auto_rollback_enabled=True일 때만 실제 롤백, 기본은 판정·로깅만(동작 보존).
+    "auto-rollback-check-hourly": {
+        "task": "lloydk.auto_rollback_tick",
+        "schedule": 60 * 60.0,
     },
     # 표적 7 (2026-05-29): 매 60초 — webhook outbox 배송.
     # enqueue된 KL 콜백을 실제로 송신. 실패는 outbox 내부에서 지수 백오프, max_attempts 후 DLQ.
