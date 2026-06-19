@@ -46,13 +46,29 @@ override만으로 이미 FNR_TS=0이므로 τ는 그렇게 낮출 필요가 없�
   비용은 F1 −2.8%p(검수부하 소폭↑). 발주처가 "고등급은 단 한 건도 못 놓침"을 요구하면 이 값.
 - **τ ≤ 0.25 비권장** — 미탐 한계효용은 0이고 F1·정밀도만 급락.
 
-## B1 함의 (범용약어 weight 배수)
+## B1 실측 — 범용약어 weight 배수 (서빙경로, τ=argmax)
 
-서빙의 9배 안전 개선을 만드는 룰 override에는 `_HIGH_RISK_PATTERNS`(EUV·M&A·API 등 범용약어)가
-포함된다. 즉 범용약어 down-weight(`rule_high_risk_weight_multiplier`)는 **과분류↓**와
-**미탐↑(override 약화)** 를 동시에 일으킬 수 있어, **반드시 서빙경로(`evaluate_via_serving`)에서**
-multiplier를 0.4~1.0로 스윕해 FNR_TS=0을 유지하는 최저 배수를 찾아 확정해야 한다(다음 측정 과제).
-원시 룰 점수만 보고 내리면 배포 미탐을 못 본다.
+`rule_high_risk_weight_multiplier`를 1.0→0.0으로 스윕(배수마다 파이프라인 재생성):
+
+| 배수 | 방향성 FNR | FNR_TS | FNR_S1 | F1 | Acc |
+|---:|---:|---:|---:|---:|---:|
+| **1.00 (현재 기본)** | 0.018 | 0.000 | 0.053 | **0.686** | 0.706 |
+| 0.80 | 0.037 | 0.000 | 0.053 | 0.685 | 0.706 |
+| 0.60 | 0.055 | 0.000 | 0.158 | 0.657 | 0.688 |
+| 0.40 | 0.083 | 0.000 | 0.210 | 0.640 | 0.679 |
+| 0.00 (부스트 off) | 0.092 | 0.059 | 0.210 | 0.631 | 0.670 |
+
+**발견**:
+- **FNR_TS는 배수 0.4까지 0 유지** — TS recall은 범용약어 부스트에 비의존(모델+타 룰이 잡음).
+  배수 0(완전 비활성)에서만 FNR_TS=0.059로 상승.
+- **FNR_S1은 민감** — 배수↓ 따라 0.053→0.21로 악화. 즉 범용약어는 **S1 recall에 load-bearing**.
+- F1도 배수 1.0에서 최고(0.686), 낮출수록 단조 하락.
+
+**결론 (정정)**: 이 실 홀드아웃에서 범용약어 down-weight는 **FNR↑·F1↓만 유발 — 순손해**.
+"범용약어 단독 과분류"가 net 결함으로 나타나지 않는다(백로그의 "과분류는 FNR-safe 방향이라
+안전 결함 아님" 자기진단과 일치). **B1 권장: `rule_high_risk_weight_multiplier=1.0` 유지.**
+레버는 갖추되, 현 증거로는 내리지 않는다. 향후 *공개 S3 문서에 범용약어가 다수 섞여 과분류가
+실측되는 홀드아웃*이 확보되면 그때 이 스윕으로 재판단(메커니즘은 준비됨).
 
 ## 재현
 
@@ -66,6 +82,20 @@ python scripts/eval_serving_path.py \
   --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
   --gold datasets/gold_real/holdout_eval.jsonl --taus 0,0.35,0.25,0.15 \
   --report reports/serving_path_eval_clean.md
+# B1 범용약어 배수 스윕 (서빙경로)
+python scripts/eval_serving_path.py \
+  --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+  --gold datasets/gold_real/holdout_eval.jsonl --multipliers 1.0,0.8,0.6,0.4,0.0 \
+  --report reports/b1_multiplier_sweep_clean.md
 ```
 
-근거 산출물: `reports/fnr_threshold_sweep_clean.{md,json}` · `reports/serving_path_eval_clean.{md,json}`
+근거 산출물(`poc/reports/`, gitignore): `fnr_threshold_sweep_clean.{md,json}` ·
+`serving_path_eval_clean.{md,json}` · `b1_multiplier_sweep_clean.{md,json}`
+
+## 요약 — 운영점 확정
+
+| 항목 | 확정값 | 근거 |
+|---|---|---|
+| escalation τ | **None(argmax) 기본**, 고등급 미탐0 강제 시 **0.35** | 서빙 FNR_TS=0 이미 충족; τ=0.35는 S1까지 0(F1 −2.8%p) |
+| 범용약어 배수 | **1.0 유지** | 낮추면 FNR↑·F1↓만 발생(순손해) |
+| FNR 측정 경로 | **서빙경로(`evaluate_via_serving`) 필수** | 원시 argmax는 배포 FNR을 9배 과대평가 |
