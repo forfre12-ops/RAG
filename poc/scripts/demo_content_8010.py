@@ -6,12 +6,11 @@ classify(content)→confirm→relabel을 실 HTTP로 시연해 이번 세션 작
 from __future__ import annotations
 
 import io
-import json
 import sys
 import uuid
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-import httpx
+import httpx  # noqa: E402  (stdout UTF-8 래핑 후 import — 데모 출력 인코딩 보장)
 
 BASE = "http://localhost:8010"
 H = {"X-API-Key": "devkey"}
@@ -43,7 +42,7 @@ def main() -> int:
             d = r.json()
             print(f"\n[{name}]")
             print(f"  • 등급      : {d['label']} ({GDESC.get(d['label'],'')})  conf={d['confidence']:.3f}  model={d['model_version']}")
-            print(f"  • 점수      : " + "  ".join(f"{k}={v:.3f}" for k, v in (d.get('scores') or {}).items()))
+            print("  • 점수      : " + "  ".join(f"{k}={v:.3f}" for k, v in (d.get('scores') or {}).items()))
             ef = d.get("evaluation_factors") or {}
             if ef:
                 print(f"  • 3요건 SVM : S={ef.get('secrecy')} V={ef.get('value')} M={ef.get('management')}")

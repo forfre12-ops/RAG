@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import io
 import sys
-import uuid
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-import httpx
+import httpx  # noqa: E402  (stdout UTF-8 래핑 후 import — 데모 출력 인코딩 보장)
 
 BASE = "http://localhost:8010"
 H = {"X-API-Key": "devkey"}
