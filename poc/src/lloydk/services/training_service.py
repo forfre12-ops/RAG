@@ -156,6 +156,59 @@ def register_and_gate_model(
         return {"registered": False, "reason": f"error:{type(exc).__name__}:{exc}"}
 
 
+def evaluate_rollback_need(
+    *, min_samples: int | None = None, fnr_high_tolerance: float | None = None
+) -> dict:
+    """활성 모델이 운영에서 미탐 회귀를 보이는지 판정 (C-ver 자동 롤백 고도화).
+
+    등록 시점 baseline(`ModelVersion.metrics.fnr_high`) 대비, **라이브 운영 데이터**
+    (classifications + corrections, `compute_metrics_from_db`)로 측정한 방향성 미탐(고등급)이
+    tolerance를 넘으면 should_rollback=True. 표본이 min_samples 미만이면 판단 보류(무동작).
+
+    순수 판정만 — 실제 롤백은 호출부(auto_rollback_tick)가 settings.auto_rollback_enabled일 때 수행.
+    DB 미가용/활성 모델 없음/baseline·라이브 데이터 부족 → should_rollback=False(안전).
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.metrics import compute_metrics_from_db  # noqa: PLC0415
+
+    min_samples = int(min_samples if min_samples is not None
+                      else getattr(settings, "rollback_min_samples", 20))
+    tol = float(fnr_high_tolerance if fnr_high_tolerance is not None
+                else getattr(settings, "rollback_fnr_high_tolerance", 0.10))
+    try:
+        with session_scope() as db:
+            active = TrainingRepo(db).get_active()
+            if active is None:
+                return {"should_rollback": False, "reason": "no_active_model"}
+            label = active.version_label
+            base_fnr = (active.metrics or {}).get("fnr_high")
+    except SQLAlchemyError as exc:
+        return {"should_rollback": False, "reason": f"db_unavailable:{type(exc).__name__}"}
+
+    if base_fnr is None:
+        return {"should_rollback": False, "reason": "no_baseline_fnr_high", "active": label}
+
+    live = compute_metrics_from_db(label)
+    if live is None or live.sample_count < min_samples:
+        return {
+            "should_rollback": False, "reason": "insufficient_live_data",
+            "active": label, "samples": (live.sample_count if live else 0), "min_samples": min_samples,
+        }
+
+    by = live.fnr_underclass_by_grade or {}
+    live_fnr = ((by.get("TS", 0.0) + by.get("S1", 0.0)) / 2) if by else live.fnr_underclass_overall
+    regressed = live_fnr > float(base_fnr) + tol
+    return {
+        "should_rollback": bool(regressed),
+        "active": label,
+        "baseline_fnr_high": float(base_fnr),
+        "live_fnr_high": round(float(live_fnr), 4),
+        "tolerance": tol,
+        "samples": live.sample_count,
+        "reason": "live fnr_high regressed beyond tolerance" if regressed else "within tolerance",
+    }
+
+
 def rollback_active_model(reason: str) -> dict:
     """현재 활성 모델을 직전 활성으로 즉시 복귀 (C-ver 롤백 트리거).
 

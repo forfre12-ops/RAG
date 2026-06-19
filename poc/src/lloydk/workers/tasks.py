@@ -273,6 +273,35 @@ def deliver_outbox_tick(limit: int = 50) -> dict:
     return out
 
 
+@celery_app.task(name="lloydk.auto_rollback_tick")
+def auto_rollback_tick() -> dict:
+    """C-ver 자동 롤백 주기 점검 — 활성 모델 라이브 미탐 회귀 시 직전 활성으로 복귀.
+
+    evaluate_rollback_need로 baseline 대비 라이브 fnr_high 회귀를 판정하고,
+    settings.auto_rollback_enabled(기본 False)이고 회귀가 확인되면 rollback_active_model 실행.
+    기본은 판정만 하고 롤백은 안 함(동작 보존) — beat가 주기 호출.
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    from lloydk.services.training_service import (  # noqa: PLC0415
+        evaluate_rollback_need,
+        rollback_active_model,
+    )
+
+    decision = evaluate_rollback_need()
+    out = dict(decision)
+    out["auto_rollback_enabled"] = bool(getattr(settings, "auto_rollback_enabled", False))
+    if decision.get("should_rollback") and out["auto_rollback_enabled"]:
+        reason = (
+            f"auto-rollback: live fnr_high {decision.get('live_fnr_high')} > "
+            f"baseline {decision.get('baseline_fnr_high')} + tol {decision.get('tolerance')}"
+        )
+        out["rollback"] = rollback_active_model(reason)
+        logger.warning("auto-rollback executed: %s", out["rollback"])
+    else:
+        logger.info("auto_rollback_tick: %s (enabled=%s)", decision.get("reason"), out["auto_rollback_enabled"])
+    return out
+
+
 @celery_app.task(name="lloydk.drift_tick")
 def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
     """A4: 운영 임베딩 drift 주기 점검 — Celery beat가 호출.

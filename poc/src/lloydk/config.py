@@ -264,6 +264,13 @@ class Settings(BaseSettings):
     # 교정→라벨 재빌드/병합 학습셋 출력 디렉토리(A2-①).
     retrain_dataset_dir: str = "datasets/demo_retrain"
 
+    # 자동 롤백 (C-ver 고도화) — 활성 모델이 운영에서 미탐 회귀를 보이면 직전 활성으로 복귀.
+    # 기본 False=수동 롤백만(동작 보존). True면 auto_rollback_tick이 라이브 FNR을 등록 baseline과
+    # 비교해 tolerance 초과 회귀 시 rollback_active_model 호출. 표본이 min 미만이면 판단 보류(무동작).
+    auto_rollback_enabled: bool = False
+    rollback_fnr_high_tolerance: float = 0.10   # 라이브 fnr_high ≤ baseline + 이 값이어야 유지(배포 게이트보다 느슨)
+    rollback_min_samples: int = 20              # 라이브 표본이 이 미만이면 롤백 판단 보류
+
     embedding_model: str = "nlpai-lab/KURE-v1"
 
     # 임베딩 어댑터 선택:
