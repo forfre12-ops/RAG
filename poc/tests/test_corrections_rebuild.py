@@ -109,7 +109,7 @@ def _pg_ok() -> bool:
 
 
 def db_backed(obj):
-    obj = pytest.mark.fullstack(obj)
+    # PG만 필요(ES 불요) — fullstack 게이트 대신 require_pg로 PG-down만 skip.
     return pytest.mark.usefixtures("require_pg")(obj)
 
 

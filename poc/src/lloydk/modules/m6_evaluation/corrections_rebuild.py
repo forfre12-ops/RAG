@@ -103,9 +103,13 @@ def build_labeled_rows_from_corrections(
                 for lv in db.execute(select(ClassificationLevel)).scalars()
             }
 
+            # 최신 교정 우선 — corrected_at desc + correction_id desc(보조).
+            # PostgreSQL now()는 트랜잭션 내 고정값이라 같은 트랜잭션/동시각 교정은 corrected_at이
+            # 동일할 수 있다. 단조증가 correction_id를 2차 키로 써 '진짜 마지막' 교정을 결정한다
+            # (보조키 없으면 동시각 교정에서 옛 등급이 정답으로 잡혀 미탐 라벨 유입 가능).
             corr_stmt = (
                 select(Correction)
-                .order_by(Correction.corrected_at.desc())
+                .order_by(Correction.corrected_at.desc(), Correction.correction_id.desc())
             )
             if only_unconsumed:
                 corr_stmt = corr_stmt.where(Correction.consumed_in_run.is_(None))

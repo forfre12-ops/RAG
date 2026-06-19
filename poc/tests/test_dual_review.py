@@ -84,7 +84,7 @@ def _pg_ok() -> bool:
 
 
 def db_backed(obj):
-    obj = pytest.mark.fullstack(obj)
+    # PG만 필요(ES 불요) — fullstack 게이트 대신 require_pg로 PG-down만 skip.
     return pytest.mark.usefixtures("require_pg")(obj)
 
 
@@ -124,10 +124,11 @@ class TestRelabelDualReviewLive:
         s.add(cls)
         s.commit()
         cid = cls.classification_id
+        did = str(doc.doc_id)
         try:
             svc = RelabelService()
             req1 = RelabelRequest(
-                inference_id=cid, original_label="S3", corrected_label="TS",
+                doc_id=did, inference_id=cid, original_label="S3", corrected_label="TS",
                 reason="비밀", actor=Actor(user_id="reviewer-1", role="reviewer"),
             )
             r1 = svc.relabel(req1, tenant_id=tid)
@@ -137,7 +138,7 @@ class TestRelabelDualReviewLive:
 
             # 다른 검수자가 같은 등급에 동의 → 확정
             req2 = RelabelRequest(
-                inference_id=cid, original_label="S3", corrected_label="TS",
+                doc_id=did, inference_id=cid, original_label="S3", corrected_label="TS",
                 reason="동의", actor=Actor(user_id="reviewer-2", role="reviewer"),
             )
             r2 = svc.relabel(req2, tenant_id=tid)
