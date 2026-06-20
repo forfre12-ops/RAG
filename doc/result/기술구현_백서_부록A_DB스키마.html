@@ -216,7 +216,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <span style="color:var(--text-dim);font-size:12px;">·</span>
       <span style="color:var(--text-dim);font-size:12px;">PostgreSQL 16 · SQLAlchemy ORM · 20테이블</span>
       <span style="color:var(--text-dim);font-size:12px;">·</span>
-      <span style="color:var(--text-dim);font-size:12px;">2026-06-19 갱신</span>
+      <span style="color:var(--text-dim);font-size:12px;">2026-06-20 갱신</span>
     </div>
     <h1 class="title">DB 스키마</h1>
     <p class="lede">20개 테이블, 11개 도메인 그룹. tb_chunks·tb_llm_usage·tb_audit_log는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
@@ -257,6 +257,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         <li><code>tb_guides</code> <span class="rel-arrow">→</span> <code>tb_tenants</code> (tenant_id, 논리 FK)</li>
       </ul>
       <div class="partition-box">⚡ <b>파티션 테이블 3개</b> — <code>tb_chunks</code> · <code>tb_llm_usage</code> · <code>tb_audit_log</code>는 <code>RANGE PARTITION BY (created_at / called_at / occurred_at)</code> 월별 분리. ORM은 부모만 매핑하며, INSERT는 자동 라우팅.</div>
+      <div class="partition-box">🔄 <b>월별 파티션 자동 롤오버</b> — 정적 생성(baseline)에 더해, 백필 migration <code>e5f6a7b8c9d0</code>이 2026-06~2027-06(13개월) 파티션을 선생성하고 이후는 beat 잡 <code>ensure_partitions_tick</code>(<code>partitions.ensure_partitions</code>, 향후 N개월·기본 3)이 매일 연장한다. <code>CREATE TABLE IF NOT EXISTS … PARTITION OF</code>라 멱등. 향후 월 파티션을 선생성해 <code>*_default</code> 파티션 비대화와 후속 attach 시 검증 락을 방지한다.</div>
     </section>
 
     <!-- Group A -->
@@ -375,6 +376,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
           <tr><td class="td-col">error_message</td><td class="td-type">TEXT</td><td></td><td>처리 오류 메시지</td></tr>
           <tr><td class="td-col">uploaded_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">processed_at</td><td class="td-type">TIMESTAMPTZ</td><td></td><td></td></tr>
+          <tr><td class="td-col">deleted_at</td><td class="td-type">TIMESTAMPTZ</td><td></td><td>논리 삭제(soft-delete) 시각. 기본 <code>NULL</code>=활성. <code>soft_delete()</code>가 <code>NOW()</code>를 세팅하면 조회에서만 숨긴다(물리 delete/cascade는 그대로 유지). migration <code>f6a7b8c9d0e1</code>.</td></tr>
           <tr><td class="td-col">created_by</td><td class="td-type">VARCHAR(50)</td><td></td><td></td></tr>
         </tbody>
       </table></div>
@@ -635,6 +637,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       <span class="idx-chip">IDX direction</span>
       <span class="idx-chip">IDX corrected_at</span>
       <span class="idx-chip">PARTIAL idx_corr_unconsumed (consumed_in_run) WHERE consumed_in_run IS NULL — 능동학습 hot path</span>
+      <span class="idx-chip">UNIQUE uq_corr_cls_level_by (classification_id, corrected_level_id, corrected_by) — 중복 보정 방지 최종 방어선 · migration f6a7b8c9d0e1</span>
     </div>
 
     <!-- Group H -->
@@ -730,6 +733,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         <span class="idx-chip">IDX guide_id</span>
         <span class="idx-chip">IDX tenant_id, guide_id</span>
         <span class="idx-chip">IDX registered_at</span>
+        <span class="idx-chip">UNIQUE uq_guides_id_version_tenant (guide_id, version, tenant_id) — 버전 이력 중복 방지 · migration d4e5f6a7b8c9</span>
       </div>
       <p style="font-size:12.5px;color:var(--text-dim);">가이드 원문 벡터는 ES 별도 인덱스(alias 기반 blue/green 전환). <code>/api/v1/guide</code> POST → 인덱싱 완료 후 <code>indexed=true</code>, <code>embedding_vector_count</code> 갱신.</p>
     </section>
@@ -738,7 +742,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
 </div>
 
 <footer>
-  <span>부록 A — DB 스키마 · KOIPA AI 기술 구현 백서 v5.0 · 2026-06-19 갱신</span>
+  <span>부록 A — DB 스키마 · KOIPA AI 기술 구현 백서 v5.0 · 2026-06-20 갱신</span>
   <span>PostgreSQL 16 · SQLAlchemy ORM · 20테이블 기준</span>
 </footer>
 

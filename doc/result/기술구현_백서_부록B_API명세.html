@@ -251,15 +251,17 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           </tbody>
         </table>
         <h3 style="margin-top:16px;">인증 모드</h3>
-        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>apikey</code>(API 키 전용) · <code>both</code>(둘 다 허용). 모든 라우터가 <code>require_auth</code>로 통일되어 설정이 실제 적용된다. <code>X-Tenant-Id</code> 헤더와 JWT claim의 tenant 불일치 시 401 반환 (하위호환: 헤더 없으면 JWT claim 신뢰).</p>
+        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>apikey</code>(API 키 전용) · <code>both</code>(둘 다 허용). 모든 라우터가 <code>require_auth</code>로 통일되어 설정이 실제 적용된다. <code>X-Tenant-Id</code> 헤더와 JWT claim의 tenant 불일치 시 401 반환 (하위호환: 헤더 없으면 JWT claim 신뢰). API 키 검증은 <strong>상수시간 비교</strong>(<code>hmac.compare_digest</code>)로 수행되어 바이트 단위 early-exit 타이밍 사이드채널을 차단한다(동작 동일, 보안 강화).</p>
         <h3 style="margin-top:16px;">객체 수준 권한 (테넌트 격리 · IDOR/BOLA 차단)</h3>
         <p style="font-size:13px;">인증 신원이 <code>request.state</code>에 저장되고, 요청 body의 <code>tenant_id</code>는 인증된 tenant에 <strong>결속</strong>된다(<code>resolve_effective_tenant</code>). body tenant_id가 인증 tenant와 불일치하면 <code>403</code> 반환. JWT에 tenant claim이 없는데 tenant_id를 주장해도 <code>403</code>. 모든 doc 조회(본문 fetch · 검증 등급 · 최근 분류 결과)는 이 유효 tenant로 스코프되어 <strong>타 tenant의 doc_id로 본문·등급·분류 결과를 열람할 수 없다</strong>(앱 레이어 enforcement, DB 스키마 변경 없음). 감사 로그의 actor_id/tenant_id도 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다.</p>
         <h3 style="margin-top:16px;">Rate Limit</h3>
-        <p style="font-size:13px;">SlowAPI 기반. 기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /answer 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 키는 <strong>검증된 신원</strong>(인증 tenant→actor) 우선, 미인증 시 IP 폴백 — 위조 가능한 원시 <code>X-Tenant-Id</code> 헤더는 키로 쓰지 않는다(한도 우회·버킷 고갈 차단). 초과 시 <code>429</code> + <code>Retry-After</code> 헤더. <code>RATE_LIMIT_DISABLED=1</code>로 비활성(테스트·dryrun).</p>
+        <p style="font-size:13px;">SlowAPI 기반. 기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/stream <strong>30/분</strong> · /classify/explain 30/분 · /answer 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 키는 <strong>검증된 신원</strong>(인증 tenant→actor) 우선, 미인증 시 IP 폴백 — 위조 가능한 원시 <code>X-Tenant-Id</code> 헤더는 키로 쓰지 않는다(한도 우회·버킷 고갈 차단). 초과 시 <code>429</code> + <code>Retry-After</code> 헤더. <code>RATE_LIMIT_DISABLED=1</code>로 비활성(테스트·dryrun).</p>
         <h3 style="margin-top:16px;">미들웨어</h3>
         <p style="font-size:13px;">모든 요청은 <code>api/middleware.py</code>를 통해 감사 로그(tb_audit_log)에 기록되고, OTel span이 생성된다.</p>
+        <h3 style="margin-top:16px;">요청 본문 크기 한도 (DoS 가드)</h3>
+        <p style="font-size:13px;">전역 ASGI 가드(<code>BodySizeLimitMiddleware</code>)가 <strong>본문 파싱 전</strong>에 요청 본문 크기를 검사한다. <code>Content-Length</code> 헤더가 한도를 초과하면 본문을 읽기도 전에 즉시 <code>413</code>, <code>Content-Length</code> 없는 chunked 요청은 누적 바이트가 한도를 넘는 순간 <code>413</code>을 반환한다(대용량 JSON body OOM 차단). 한도는 설정 <code>max_request_body_mb</code>(기본 <strong>25MB</strong>, 환경변수 <code>LLOYDK_MAX_REQUEST_BODY_MB</code>)로 조정한다. 응답 바디: <code>{"detail":"request body too large","code":"LLOYDK_BODY_TOO_LARGE"}</code>. 멀티파트 업로드(<code>/documents</code>·<code>/guide/documents</code>)는 라우터의 <code>max_upload_mb</code>(기본 20MB)로 별도 처리되므로 이 한도는 일반 JSON 본문에 적용된다. 스택 최외곽에 등록되어 다른 미들웨어·핸들러보다 먼저 차단한다.</p>
         <h3 style="margin-top:16px;">멱등성 (Idempotency-Key) <span style="font-size:11px;color:var(--text-dim);font-weight:400;">— 선택 헤더 · 발주처 요건 외 운영 강화</span></h3>
-        <p style="font-size:13px;">변경성 요청(POST/PUT/PATCH)에 <code>Idempotency-Key</code> 헤더를 붙이면 동일 키 재요청을 <strong>1회만 처리</strong>하고 저장된 응답을 재현한다(응답에 <code>X-Idempotent-Replay: true</code>). 처리 중 동일 키 재요청은 <code>409</code>. 네트워크 타임아웃 재시도로 인한 <code>confirm·relabel·train</code> 중복 실행을 방지한다. <strong>헤더 미전달 시 무영향</strong>(기존 동작 유지). 저장소는 redis(미가용 시 in-memory 폴백, TTL 24h). <em>요건에 명시된 기능은 아니며, 변경성 API 재시도 안전을 위한 운영 강화로 본개발 정식 채택을 전제로 한다.</em></p>
+        <p style="font-size:13px;">변경성 요청(POST/PUT/PATCH)에 <code>Idempotency-Key</code> 헤더를 붙이면 동일 키 재요청을 <strong>1회만 처리</strong>하고 저장된 응답을 재현한다(응답에 <code>X-Idempotent-Replay: true</code>). 처리 중 동일 키 재요청은 <code>409</code>. 네트워크 타임아웃 재시도로 인한 <code>confirm·relabel·train</code> 중복 실행을 방지한다. <strong>헤더 미전달 시 무영향</strong>(기존 동작 유지). 저장소는 redis(미가용 시 in-memory 폴백, TTL 24h). 멱등성 키는 <strong>주체(자격증명·테넌트)별 네임스페이스로 격리</strong>된다 — 가용한 자격증명 헤더(<code>Authorization</code>/<code>X-API-Key</code>) + <code>X-Tenant-Id</code>를 SHA-256으로 해시해 키 prefix로 사용하므로, 같은 키 값이라도 다른 주체는 다른 네임스페이스로 분리되어 <strong>교차테넌트 응답 replay가 차단</strong>된다(원시 비밀은 키에 노출하지 않음). <em>요건에 명시된 기능은 아니며, 변경성 API 재시도 안전을 위한 운영 강화로 본개발 정식 채택을 전제로 한다.</em></p>
       </div>
     </section>
 
@@ -323,7 +325,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">Server-Sent Events 방식으로 분류 단계별 진행 상황을 실시간 스트림으로 반환한다. 가짜 progress가 아니라 <code>ClassifyService.classify(on_stage=...)</code> 콜백을 큐로 받아 <strong>실제 단계 진입 시점</strong>에 이벤트를 송신한다. 6단계: <code>extract → normalize → embed → retrieve → llm → persist → finalize</code>. 이벤트 종류: <code>progress</code>(stage 진입) · <code>partial</code>(top-1 grade/confidence) · <code>result</code>(최종 ClassifyResponse) · <code>error</code> · <code>done</code>(종료).</p>
+        <p class="ep-desc">Server-Sent Events 방식으로 분류 단계별 진행 상황을 실시간 스트림으로 반환한다. 가짜 progress가 아니라 <code>ClassifyService.classify(on_stage=...)</code> 콜백을 큐로 받아 <strong>실제 단계 진입 시점</strong>에 이벤트를 송신한다. 6단계: <code>extract → normalize → embed → retrieve → llm → persist → finalize</code>. 이벤트 종류: <code>progress</code>(stage 진입) · <code>partial</code>(top-1 grade/confidence) · <code>result</code>(최종 ClassifyResponse) · <code>error</code> · <code>done</code>(종료). 스트림 시작 전에 body의 <code>tenant_id</code>가 인증 컨텍스트에 결속되며 불일치 시 <code>403</code>. 스트림은 요청당 워커 스레드를 점유하므로 한도를 <strong>분당 30회</strong>로 명시 강화했다(기존 default 120/분 → 강화). 또한 클라이언트 disconnect를 주기적으로 폴링해 연결이 끊기면 진행 중 작업을 협조적으로 취소하고 스트림을 조기 종료한다(점유 축소).</p>
         <h4>Request Body</h4>
         <p style="font-size:13px;">/classify 와 동일 (<code>ClassifyRequest</code>)</p>
         <h4>Response (SSE)</h4>
@@ -349,6 +351,8 @@ data: {"elapsed_ms":380}</pre>
         <div class="status-chips">
           <span class="sc s2xx">200 스트림 시작</span>
           <span class="sc s4xx">400 Bad Request</span>
+          <span class="sc s4xx">403 tenant_id 불일치</span>
+          <span class="sc s4xx">429 Rate Limit (30/분)</span>
         </div>
       </div>
     </div>
@@ -438,6 +442,7 @@ data: {"elapsed_ms":380}</pre>
       </div>
       <div class="ep-body">
         <p class="ep-desc">RAG 질의응답. 검색 facade(<code>expand_then_search</code>: 쿼리 확장 → RRF 융합 → reranker)로 관련 청크를 수집하고 LLM(Qwen3/Claude)으로 한국어 답변을 합성한다. 검색·LLM 어느 쪽이 실패해도 <code>200</code> + <code>warnings</code>에 사유, <code>deterministic_fallback=true</code>로 처리(5xx는 진짜 예외만). 검색은 인증 tenant로만 스코프되고, 결과를 payload.tenant_id로 사후 필터해 교차테넌트 누출을 fail-CLOSED로 차단한다. 분당 30 한도. 본 엔드포인트는 등급 분류를 하지 않으며, <code>grade</code>는 호출자가 별도 단계에서 전달할 수 있다.</p>
+        <p style="font-size:13px;"><strong>인용 정합성 관측·집행</strong>: LLM 답변의 인용 번호를 검색된 근거(hits) 범위와 대조해, 존재하지 않는 근거 번호(out-of-range = 환각 인용)나 무인용 경고를 <code>warnings</code>에 남기고, 환각 인용 개수를 기계 판독용 마커 <code>hallucination_risk:&lt;n&gt;</code>로 노출한다. 설정 <code>answer_enforce_citations=true</code>(opt-in, <strong>기본 off=기존 동작</strong>)이면 out-of-range 인용이 1건 이상일 때 답변을 <strong>deterministic 답변으로 강등</strong>(<code>deterministic_fallback=true</code>)하고 강등 사유를 <code>warnings</code>에 기록한다.</p>
         <h4>Request Body — RagAnswerRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
@@ -459,7 +464,7 @@ data: {"elapsed_ms":380}</pre>
             <tr><td class="f-name">grade</td><td class="f-type">string | null</td><td>요청에 전달된 등급 에코</td></tr>
             <tr><td class="f-name">usage</td><td class="f-type">object | null</td><td>{provider, model, input_tokens, output_tokens, cost_usd, latency_ms, success} (tb_llm_usage 기록)</td></tr>
             <tr><td class="f-name">deterministic_fallback</td><td class="f-type">boolean</td><td>true이면 LLM 미사용/실패</td></tr>
-            <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>인용 정합성 경고 (범위초과/무인용 등)</td></tr>
+            <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>인용 정합성 경고 (범위초과/무인용 등) + <code>hallucination_risk:&lt;n&gt;</code> 관측 신호(n=환각 인용 개수). 집행 활성 시 강등 사유 포함</td></tr>
           </tbody>
         </table>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">400 query 누락</span><span class="sc s4xx">429 Rate Limit</span></div>
@@ -474,7 +479,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">JWT</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">특정 분류 결과의 근거를 자연어로 설명한다. tb_classification_evidence 테이블의 excerpt와 contribution을 LLM으로 요약. factor는 정본 3요건(SECRECY·VALUE·MANAGEMENT)으로 귀속된다(레거시 4요소는 LEGACY_FACTOR_ALIAS로 3요건에 자동 폴딩).</p>
+        <p class="ep-desc">특정 분류 결과의 근거를 자연어로 설명한다. tb_classification_evidence 테이블의 excerpt와 contribution을 LLM으로 요약. factor는 정본 3요건(SECRECY·VALUE·MANAGEMENT)으로 귀속된다(레거시 4요소는 LEGACY_FACTOR_ALIAS로 3요건에 자동 폴딩). body의 <code>tenant_id</code>는 인증 컨텍스트에 결속되며 불일치 시 <code>403</code>(IDOR 차단 — 위조한 tenant_id로 타 테넌트 문서·검증라벨·근거 토큰 노출 방지).</p>
         <h4>Request / Response 핵심 필드</h4>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>설명</th></tr></thead>
@@ -485,7 +490,7 @@ data: {"elapsed_ms":380}</pre>
             <tr><td>RES</td><td class="f-name">confidence_analysis</td><td>confidence 높은/낮은 이유 분석</td></tr>
           </tbody>
         </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">404 classification 없음</span></div>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 tenant_id 불일치</span><span class="sc s4xx">404 classification 없음</span></div>
       </div>
     </div>
 
@@ -1036,7 +1041,8 @@ lloydk_embedding_cache_miss_total</pre>
           <tr><td>404</td><td><code>DOC_NOT_FOUND</code></td><td>문서 없음</td><td>doc_id 확인</td></tr>
           <tr><td>404</td><td><code>CLASSIFICATION_NOT_FOUND</code></td><td>분류 결과 없음</td><td>classification_id 확인</td></tr>
           <tr><td>409</td><td><code>DUPLICATE_DOC</code></td><td>동일 해시 문서 존재</td><td>file_hash 중복 (테넌트 내)</td></tr>
-          <tr><td>413</td><td><code>FILE_TOO_LARGE</code></td><td>파일 크기 초과</td><td>20MB 이하 업로드 (max_upload_mb)</td></tr>
+          <tr><td>413</td><td><code>FILE_TOO_LARGE</code></td><td>파일 크기 초과 (멀티파트 업로드)</td><td>20MB 이하 업로드 (max_upload_mb)</td></tr>
+          <tr><td>413</td><td><code>LLOYDK_BODY_TOO_LARGE</code></td><td>요청 본문 크기 초과 (일반 JSON, 전역 ASGI 가드)</td><td>본문 25MB 이하로 (max_request_body_mb)</td></tr>
           <tr><td>422</td><td><code>VALIDATION_ERROR</code></td><td>Pydantic 검증 실패</td><td>detail 배열에서 필드별 오류 확인</td></tr>
           <tr><td>429</td><td><code>LLOYDK_RATE_LIMIT</code></td><td>요청 한도 초과</td><td>라우터별 한도(기본 120/분, /train 10/시간 등). Retry-After 헤더 이후 재시도</td></tr>
           <tr><td>503</td><td><code>MODEL_WARMING_UP</code></td><td>모델 로딩 중</td><td>warmup_done=true 확인 후 재시도 (최대 82초)</td></tr>

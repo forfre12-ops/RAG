@@ -215,10 +215,10 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <div class="meta-row">
       <span class="badge">부록 C</span>
       <span class="badge outline">지표 · 용어 해설</span>
-      <span style="color:var(--text-dim);font-size:12px;">· 평가지표 · 측정 방법 · 오픈소스 · 2026-06-19 갱신</span>
+      <span style="color:var(--text-dim);font-size:12px;">· 평가지표 · 측정 방법 · 오픈소스 · 2026-06-20 갱신</span>
     </div>
     <h1 class="title">지표·용어 해설</h1>
-    <p class="lede">기술 구현 백서 §6~§7에 나오는 평가지표와 용어를, 비전문가도 이해할 수 있도록 풀어 설명한다. 각 지표를 <b>어떤 모델·오픈소스로, 어떻게 측정해 수치를 얻는지</b>까지 정리한 참고 자료다. <b>등급 산정은 3요건(비공지성 S × 경제적 유용성 V × 비밀관리성 M) 곱셈식</b>을 기준으로 한다(2026-06-19 갱신).</p>
+    <p class="lede">기술 구현 백서 §6~§7에 나오는 평가지표와 용어를, 비전문가도 이해할 수 있도록 풀어 설명한다. 각 지표를 <b>어떤 모델·오픈소스로, 어떻게 측정해 수치를 얻는지</b>까지 정리한 참고 자료다. <b>등급 산정은 3요건(비공지성 S × 경제적 유용성 V × 비밀관리성 M) 곱셈식</b>을 기준으로 한다(2026-06-20 갱신).</p>
     <hr class="hero-sep">
 
     <section id="basics">
@@ -246,12 +246,14 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td><b>review_burden · high_to_s3</b></td><td>검수 부담 · 고등급→S3 오분류</td><td><b>review_burden</b> = 모델이 고등급으로 판정한 비율(사람이 검수해야 할 양). <b>high_to_s3</b> = 고등급(TS·S1) 문서를 S3(공개)로 잘못 떨어뜨린 비율 — 가장 치명적인 미탐 형태라 별도 추적한다.</td></tr>
           <tr><td><b>Recall@5 (재현율@5)</b></td><td>검색이 정답을 상위 5건에 올리는 비율</td><td>검색해서 상위 5건을 가져왔을 때 정답 문서가 그 안에 든 비율. 0.80 = 10번 중 8번은 상위 5건 안에 정답이 있음. "@5"는 "상위 5건 기준".</td></tr>
           <tr><td><b>MRR · Precision@K</b></td><td>검색 순위 품질 지표</td><td><b>MRR(평균 역순위)</b> = 정답이 처음 등장한 순위의 역수 평균(정답이 위쪽에 올수록 높음). <b>Precision@K</b> = 상위 K건 중 정답 비율. Recall@5와 함께 검색(RAG) 품질을 본다.</td></tr>
-          <tr><td><b>ECE · temperature</b></td><td>신뢰도 보정(캘리브레이션) 지표</td><td><b>ECE(기대 보정 오차)</b> = 모델 confidence와 실제 정답률의 차이(작을수록 잘 보정됨). <b>temperature(온도)</b> = softmax 보정 계수로 <code>temperature.json</code>을 자동 로드해 적용. <b>T&gt;1이면 과신을 완화</b>한다(confidence 게이트가 보정된 값 위에서 동작).</td></tr>
+          <tr><td><b>ECE · temperature</b></td><td>신뢰도 보정(캘리브레이션) 지표</td><td><b>ECE(기대 보정 오차)</b> = 모델 confidence와 실제 정답률의 차이(작을수록 잘 보정됨). <b>temperature(온도)</b> = softmax 보정 계수로 <code>temperature.json</code>을 자동 로드해 적용. <b>T&gt;1이면 과신을 완화</b>한다(confidence 게이트가 보정된 값 위에서 동작). 서빙은 temperature를 *적용*만 하므로, 보정이 실제로 맞는지는 아래 <b>캘리브레이션 측정</b> 항목처럼 런타임에서 ECE로 점검한다.</td></tr>
+          <tr><td><b>캘리브레이션 측정 (ECE·Brier·reliability)</b></td><td>0.7 게이트가 실제 정확도와 맞는지 런타임 점검</td><td>서빙은 temperature 보정을 적용만 하므로, 그 보정이 실제로 맞는지를 <b>런타임</b>에서 측정한다. DB의 분류 결과 + 검수 교정에서 <b>(confidence, 정답여부)</b>를 뽑아 ① <b>ECE(기대 보정 오차)</b> = bin별 |평균 confidence − 실제 정확도|를 표본수로 가중 평균(0=완벽 보정), ② <b>Brier score</b> = 예측 confidence와 정답(1/0)의 제곱오차 평균(낮을수록 보정·정확), ③ <b>reliability bin</b> = confidence를 10등분해 bin별 평균 confidence·실제 정확도·격차(gap)를 산출 — 을 계산한다. 핵심은 <b>0.7 confidence 게이트가 실제 정확도와 정합하는지</b> 점검하는 것. <b>ECE↑이면 temperature 재보정 신호</b>다. 코드 <code>m6_evaluation/calibration.py</code>(<code>expected_calibration_error</code>·<code>brier_score</code>·<code>reliability_bins</code>), 평가 리포트(report.py)에 <b>reliability 섹션</b>(ECE·Brier·표본수 + bin 표)으로 노출.</td></tr>
           <tr><td><b>임베딩 (Embedding)</b></td><td>문서를 숫자 벡터로 바꾸는 기술</td><td>"의미가 비슷한지"를 계산할 수 있도록 문서를 벡터로 변환한다. 근거 검색(RAG)의 핵심 기술.</td></tr>
           <tr><td><b>라벨 일치도</b></td><td>학습 데이터 품질 지표</td><td>합성 LLM이 "이 등급으로 만들었다"고 한 문서가 실제 그 등급 기준에 맞게 생성됐는지의 일치율. 라벨이 틀린 데이터로 배우면 모델도 틀리게 배운다.</td></tr>
           <tr><td><b>누락률 · 품질</b></td><td>문서 추출 정확도</td><td>누락률 = 원문 중 추출에서 빠진 비율(낮을수록 좋음). 품질 = 추출 텍스트가 원문과 얼마나 일치하는지 점수(0~1).</td></tr>
           <tr><td><b>E2E (End-to-End)</b></td><td>전체 흐름 테스트</td><td>업로드부터 등급 산출까지 시스템이 끝까지 정상 동작하는지 확인하는 테스트.</td></tr>
           <tr><td><b>confidence (신뢰도)</b></td><td>분류 결과의 확신 정도 (0~1)</td><td>모델이 이 등급 판단을 얼마나 확신하는지(temperature 보정 적용 후 값). 기준 미만이면 거부가 아니라 사람 검수 큐로 보낸다.</td></tr>
+          <tr><td><b>reviewer reliability (검수자 신뢰도)</b></td><td>동료 합의 기반 검수자 신뢰도 (recency 편향 제거)</td><td>검수자별 신뢰도를 <b>동료 합의(peer corroboration)</b>로 산정한다 — 한 교정이 신뢰도 표본이 되려면 그 분류의 최종 등급을 <b>본인 이외의 검수자도</b> 함께 선택했어야 한다(<b>reliability = agreed ÷ comparable</b>, comparable = 동료 비교 가능 표본). 과거 방식은 "분류의 최신 교정"을 그 자체로 합의로 삼고 <b>최신 보정자를 자동으로 합의에 동의</b>로 카운트해, 마지막에 손댄 사람의 신뢰도가 무조건 오르는 <b>self-reference·recency 편향</b>이 있었다. 이를 제거해 정확성이 아닌 최신성을 보상하던 게이밍 여지를 막았다. 본인만 손댄 분류(동료 비교 불가)는 표본에서 제외하며, 표본 부족 검수자는 게이트가 신뢰 기본값(1.0)으로 취급해 신규·소수 보정자 신뢰 의도를 보존한다. 코드 <code>m6_evaluation/reviewer_trust.py</code>(<code>compute_reviewer_reliability</code>).</td></tr>
         </tbody>
       </table>
     </div>
@@ -270,8 +272,12 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td><b>출처 게이트 (비공지성·Gate-1)</b></td><td>공개 출처면 S3로 상한</td><td>판례·공시 등 이미 공개된 출처 문서는 내용이 비밀급이어도 영업비밀이 될 수 없어(부정경쟁방지법 §2.2 비공지성) 등급을 S3로 cap한다 — S×V×M에서 <b>S(비공지성)=0 → 곱=0 → S3</b>와 같은 귀결이다. 내부 문서엔 적용 안 됨. (학습셋 오염 사례: 공개 판례·심결을 고등급으로 오라벨한 데이터를 정제·제외해 고등급 미탐을 크게 낮췄다.)</td></tr>
           <tr><td><b>충돌 라우팅 (cap-conflict)</b></td><td>출처 cap이 고등급을 덮으면 사람에게</td><td>출처 게이트(하향)가 콘텐츠 가드(상향, TS/S1)를 덮을 때 자동 확정하지 않고 검수자에게 보낸다. 진짜 공개문서는 사람이 확인, 내부비밀의 출처 오태깅은 여기서 걸러진다.</td></tr>
           <tr><td><b>최고-위험 청크 집계 (max-pooling)</b></td><td>고등급은 가장 강한 청크 채택</td><td>긴 문서를 청크로 나눠 분류할 때, 고등급(TS·S1)은 평균이 아니라 가장 강한 청크로 잡아 한 단락의 비밀이 평균에 희석되어 미탐되는 것을 막는다.</td></tr>
+          <tr><td><b>룰 폴백 집계 (severe-agg + escalation τ)</b></td><td>모델 미로드 시에도 룰 폴백을 고등급 max-pooling + τ로 집계</td><td>모델 가중치가 로드되지 않아 <b>룰 기반 폴백</b>으로 분류할 때도, 모델 경로와 동일하게 청크별 등급을 <b>most-severe-wins</b>(고등급 max-pooling, 대상 등급은 <code>severe_agg_codes</code> 기본 <b>TS·S1</b>)로 집계하고 <b>escalation τ</b>(<code>classifier_escalation_tau</code>)를 적용한다. 과거 룰 폴백은 문서를 1회 라벨링해 청크 집계·τ를 우회했는데, 그러면 한 청크에 든 비밀 신호가 다수의 평범한 청크에 <b>희석</b>되어 모델 경로보다 미탐(FNR) 위험이 컸다. τ를 적용하면 가장 심각한 등급부터 prob≥τ인 첫 등급을 채택하고, <b>τ=None이면 argmax</b>(기존 동작 보존)다. 코드 <code>m5_inference/pipeline.py</code>(<code>_run_rule_fallback</code>·<code>_aggregate_chunk_probs</code>·<code>_select_pred_idx</code>).</td></tr>
           <tr><td><b>캘리브레이션 (temperature scaling)</b></td><td>모델 신뢰도 과신 보정</td><td>분류기가 학습에 없던 새 문체에서 과하게 확신(과신)하는 것을 완화해, confidence 게이트가 보정된 값 위에서 동작하게 한다. <code>temperature.json</code>을 자동 로드해 서빙 softmax에 적용하며, <b>T&gt;1이면 과신을 완화</b>한다(보정 품질은 ECE로 측정).</td></tr>
-          <tr><td><b>드리프트 (Drift)</b></td><td>운영 분포 변화 감지</td><td>운영 입력의 임베딩 분포(centroid)·분류 신뢰도·정정율을 학습 시점과 비교해 성능 저하를 조기 감지·경보한다. 학습 시 임베딩 centroid를 저장해 운영 분포와의 거리로 판정한다(거버넌스 <b>C-drift</b>).</td></tr>
+          <tr><td><b>드리프트 (Drift)</b></td><td>운영 분포 변화 감지</td><td>운영 입력의 임베딩 분포(centroid)·분류 신뢰도·정정율을 학습 시점과 비교해 성능 저하를 조기 감지·경보한다. 학습 시 임베딩 centroid를 저장해 운영 분포와의 거리로 판정한다(거버넌스 <b>C-drift</b>). 판정 신호는 학습 분포 대비 <b>KL divergence</b>와 아래 <b>cosine_mean shift</b>를 함께 본다.</td></tr>
+          <tr><td><b>drift 히스테리시스 (연속위반)</b></td><td>단발 스파이크 무시, N회 연속 위반 시 경보</td><td>임베딩 drift 경보가 일시적 단발 스파이크에 바로 켜지지 않도록, 임계를 <b>N회 연속 위반</b>했을 때만 alert를 켠다. 연속 위반 횟수는 상태 파일(<code>drift_state.json</code>)에 영속하며, 위반이 아니면 0으로 리셋해 스파이크가 누적되지 않게 한다. 필요 연속 횟수는 설정 <code>LLOYDK_DRIFT_CONSECUTIVE_REQUIRED</code>로 조정(<b>기본 1 = 기존 단발 동작 보존</b>, 2~3으로 올리면 단발 억제). 코드 <code>services/drift_monitor.py</code>(<code>run_drift_check</code>).</td></tr>
+          <tr><td><b>drift unknown 표기 (은폐 방지)</b></td><td>bin 불일치 시 KL=0 폴백 대신 재샘플링/unknown</td><td>저장된 학습 히스토그램의 bin 수가 현재와 다를 때, 과거에는 KL=0(=drift 없음)으로 폴백해 진짜 drift를 숨기는 <b>false-negative(은폐)</b> 위험이 있었다. 개선: bin이 다르면 누적분포(CDF) <b>선형보간 재샘플링</b>으로 같은 bin 수에 맞춰 분포 대 분포로 KL을 산출하고, 재샘플링조차 불가능한 경우(히스토그램 부재 등)에만 <b>alert_status="unknown"</b>으로 표기해 'drift 없음'으로 오인되지 않게 한다.</td></tr>
+          <tr><td><b>cosine_mean shift</b></td><td>분포 중심 이동 신호 (KL과 별개)</td><td>학습 표본은 자기 centroid 대비 cosine이 1.0 부근에 몰리므로, 운영 입력의 평균 cosine(<b>cosine_mean</b>)이 1.0에서 멀어질수록 분포 중심이 이동(=drift)했다고 본다. KL divergence와 <b>독립된 보조 신호</b>로, 임계(<code>LLOYDK_DRIFT_COSINE_SHIFT_THRESHOLD</code>, 기본 0=비활성)를 넘으면 위반으로 판정한다. KL을 신뢰할 수 없는 unknown 상황에서는 이 cosine 이동 신호만으로 보수적으로 판단한다.</td></tr>
           <tr><td><b>FNR-safe 오버라이드</b></td><td>불일치 시 더 높은 등급 채택</td><td>S×V×M 등급과 콘텐츠(룰·모델) 등급이 어긋날 때 <b>더 민감한(높은) 등급</b>을 채택해 미탐을 막는 안전장치. 서빙 경로에 항상 적용되어 원시 argmax보다 미탐률이 크게 낮아진다.</td></tr>
           <tr><td><b>needs_review</b></td><td>거부 아닌 사람 검수 라우팅</td><td>저신뢰·충돌 등으로 자동 확정이 부적절할 때의 응답 상태. 분류를 막지 않고 검수자 큐로 보내 사람이 최종 확정한다.</td></tr>
         </tbody>
@@ -283,9 +289,9 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <table class="full">
         <thead><tr><th style="width:14%;">약어</th><th style="width:26%;">한 줄</th><th>풀이</th></tr></thead>
         <tbody>
-          <tr><td><b>C-esc</b></td><td>에스컬레이션 임계값 (escalation τ)</td><td>고등급 미탐을 더 강하게 막기 위한 confidence 임계값. 기본은 <b>None(argmax)</b> — 서빙 경로의 방향성 FNR이 이미 0.018, FNR_TS=0이라 추가 조정이 불필요. 발주처 요구 시 <b>τ=0.35</b>로 고등급(TS·S1) 미탐을 모두 0으로 강제할 수 있으나 F1이 약 2.8%p 하락한다(τ≤0.25는 과분류 급증으로 비권장).</td></tr>
+          <tr><td><b>C-esc</b></td><td>에스컬레이션 임계값 (escalation τ)</td><td>고등급 미탐을 더 강하게 막기 위한 confidence 임계값. 기본은 <b>None(argmax)</b> — 서빙 경로의 방향성 FNR이 이미 0.018, FNR_TS=0이라 추가 조정이 불필요. 발주처 요구 시 <b>τ=0.35</b>로 고등급(TS·S1) 미탐을 모두 0으로 강제할 수 있으나 F1이 약 2.8%p 하락한다(τ≤0.25는 과분류 급증으로 비권장). 같은 τ·most-severe-wins 규칙은 모델 미로드 시의 <b>룰 폴백 경로에도 동일</b>하게 적용된다(위 "룰 폴백 집계" 항목 참조).</td></tr>
           <tr><td><b>C-eval</b></td><td>서빙경로 평가 (evaluate_via_serving)</td><td>모델을 실제 배포(서빙) 경로 전체 — 캘리브레이션 + FNR-safe 오버라이드 + 최고-위험 청크 집계 — 를 통과시켜 측정하는 평가 방식. <b>평가 결과가 실배포 동작과 일치</b>함을 보장한다. 원시 argmax로 재면 미탐을 약 9배 과소평가(원시 FNR 0.167 vs 서빙 FNR 0.018).</td></tr>
-          <tr><td><b>C-cons</b></td><td>검수자 신뢰도 · 2인 검토 (reviewer trust)</td><td>검수자별 신뢰도 = 최신 합의와 일치한 비율(agreed/total)로 산출하고 번복(overturned) 이력을 추적한다. 고등급 문서는 신뢰도 기준을 적용한 <b>2인 검토 게이트</b>로 확정한다.</td></tr>
+          <tr><td><b>C-cons</b></td><td>검수자 신뢰도 · 2인 검토 (reviewer trust)</td><td>검수자별 신뢰도 = <b>동료 합의(peer corroboration)와 일치한 비율</b>(agreed/comparable)로 산출하고 번복(overturned) 이력을 추적한다. 고등급 문서는 신뢰도 기준을 적용한 <b>2인 검토 게이트</b>로 확정한다. (아래 "reviewer reliability" 항목 참조 — 본인 최신 보정에 자동 동의하던 self-reference·recency 편향을 제거.)</td></tr>
           <tr><td><b>C-ver</b></td><td>모델 버전 · 롤백 (version & rollback)</td><td>학습된 모델은 항상 버전으로 등록(이력 보존)되며, 배포 게이트를 통과하고 자동 활성화가 켜진 경우에만 활성화한다(기본은 수동·보수적). 라이브 운영 데이터의 fnr_high가 기준을 초과하면 <b>직전 활성 버전으로 자동 롤백</b>한다.</td></tr>
           <tr><td><b>C-drift</b></td><td>드리프트 centroid (분포 변화 감지)</td><td>학습 시점의 임베딩 centroid를 저장해 운영 입력 분포와 비교, 거리가 멀어지면 성능 저하를 조기 경보한다(위 "드리프트" 항목 참조).</td></tr>
         </tbody>
@@ -358,7 +364,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 </div>
 
 <footer>
-  <span>부록 C — 지표·용어 해설 · KOIPA AI 기술 구현 백서 v5.0 · 2026-06-19 갱신</span>
+  <span>부록 C — 지표·용어 해설 · KOIPA AI 기술 구현 백서 v5.0 · 2026-06-20 갱신</span>
   <span>평가지표 · 측정 방법 · 오픈소스 스택</span>
 </footer>
 
