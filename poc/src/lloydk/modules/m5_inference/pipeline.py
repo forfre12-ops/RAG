@@ -404,28 +404,124 @@ class InferencePipeline:
             s = {k: (1.0 if k == label else 0.0) for k in s}
         return s, float(s[label])
 
+    def _rule_grade_scores_to_prob(self, grade_scores: dict) -> list[float] | None:
+        """[#23] 룰 등급점수(grade_scores) → self._id2label 인덱스 정렬 확률벡터.
+
+        모델 경로의 청크 집계 헬퍼(_aggregate_chunk_probs/_select_pred_idx)는
+        '인덱스가 등급에 정렬된 prob 벡터'를 입력으로 받는다. 룰 엔진은 등급별
+        원시 점수(grade_scores)를 주므로, 합으로 나눠 [0,1] 확률분포로 변환하고
+        _id2label 인덱스 순서에 맞춰 벡터화한다(softmax 출력과 동일한 형태).
+        모든 점수 0이면 None(해당 청크는 신호 없음 → 집계에서 0벡터로 처리).
+        """
+        total = float(sum(v for v in grade_scores.values() if v and v > 0))
+        if total <= 0:
+            return None
+        vec: list[float] = []
+        for i in range(len(self._id2label)):
+            code = self._code_at(i)
+            vec.append(max(float(grade_scores.get(code, 0.0)), 0.0) / total)
+        return vec
+
     def _run_rule_fallback(self, text: str, return_evidence: bool) -> InferenceResult:
         try:
             from lloydk.api.prom_metrics import RULE_FALLBACK_TOTAL  # noqa: PLC0415
             RULE_FALLBACK_TOTAL.inc()
         except Exception:  # noqa: BLE001
             pass
+        # evidence/factors는 전체 문서 기준 룰 라벨링에서 가져온다(표시 정합 보존).
         lab = self.labeling.label(text)
-        # grade_scores를 합계로 나눠 [0,1] 확률로 변환 (rule engine은 원시 점수 반환)
-        raw = (lab.rule_result.grade_scores if lab.rule_result else {}) or {}
-        total_raw = sum(raw.values())
-        if total_raw > 0:
-            scores = {g.value: round(raw.get(g.value, 0.0) / total_raw, 4) for g in _LABELS}
-        else:
-            scores = {g.value: 0.0 for g in _LABELS}
+        warnings = ["model weights not loaded — using rule-based fallback"]
+
+        # [#23] rule-fallback도 모델 경로와 동일하게 청크 most-severe-wins + escalation τ 적용.
+        # 기존엔 전체 문서를 1회 라벨링해 grade_scores를 단순 합 정규화 → lab.grade를 그대로
+        # 라벨로 써서 청크 most-severe(_aggregate_chunk_probs)·τ(_select_pred_idx)를 우회했다.
+        # 모델 미로드 환경(다수 PoC)에서 한 청크에 든 핵심 비밀이 다수의 평범한 청크에 희석돼
+        # 미탐(FNR) 위험이 모델 경로보다 컸다. → 문서를 청크 분할, 청크별 룰 점수를 등급
+        # 확률분포로 변환해 모델 경로의 동일 헬퍼에 태운다(FNR-safe: 미탐↓, 단조 비후퇴).
+        # 실패(예: torch 부재)는 silent 폴백 — 기존 단일패스 동작을 그대로 보존한다.
+        pred = None
+        scores: dict[str, float] | None = None
+        conf: float | None = None
+        try:
+            import torch  # noqa: PLC0415
+
+            chunks = chunk_text(text, settings.max_seq_len * 3, settings.chunk_overlap)
+            chunk_texts = [c.text for c in chunks] or [text]
+            chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
+
+            n_labels = len(self._id2label)
+            chunk_vecs: list[list[float]] = []
+            for ct in chunk_texts:
+                gs = self.labeling.engine.label(ct).grade_scores
+                vec = self._rule_grade_scores_to_prob(gs)
+                chunk_vecs.append(vec if vec is not None else [0.0] * n_labels)
+
+            chunk_probs = torch.tensor(chunk_vecs, dtype=torch.float32)
+            # 모델 경로와 동일 집계: 고등급(severe_agg_codes 기본 TS·S1) max-pooling.
+            doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
+            total = float(doc_prob.sum())
+            norm = (doc_prob / total) if total > 0 else doc_prob
+            # 모든 청크가 무신호(합=0)면 룰 신호가 없는 것 → 단일패스 폴백으로.
+            if float(norm.sum()) > 0:
+                # [C-esc] τ 설정 시 동일 severity-ordered 규칙으로 라벨 선택, τ=None이면 argmax.
+                pred_idx = self._select_pred_idx(norm)
+                pred = self._id2label[pred_idx]
+                scores = {self._code_at(i): round(float(norm[i]), 4) for i in range(n_labels)}
+                conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
+        except Exception:  # noqa: BLE001 — 청크 집계 실패는 단일패스 폴백으로(동작 보존)
+            pred = None
+            scores = None
+            conf = None
+
+        if pred is None or scores is None or conf is None:
+            # 단일패스 폴백 — grade_scores를 합계로 나눠 [0,1] 확률로 변환 (기존 동작 보존).
+            raw = (lab.rule_result.grade_scores if lab.rule_result else {}) or {}
+            total_raw = sum(raw.values())
+            if total_raw > 0:
+                scores = {g.value: round(raw.get(g.value, 0.0) / total_raw, 4) for g in _LABELS}
+            else:
+                scores = {g.value: 0.0 for g in _LABELS}
+            return InferenceResult(
+                label=lab.grade,
+                confidence=lab.confidence,
+                scores=scores,
+                factors=lab.factors,
+                evidence=lab.evidence if return_evidence else [],
+                model_version="rule-fallback-v0",
+                warnings=warnings,
+            )
+
+        # [#23] 청크 집계로 선택한 등급이 단일패스(lab.grade)보다 높으면(승격) 경고를 남겨
+        # 청크 희석 미탐을 방어했음을 표기. 표시 S/V/M factors도 선택 등급에 정합화해
+        # 'S0·V0·M0인데 TS' 같은 모순 표기를 막는다(모델 경로 A3와 동일 의도).
+        lab_code = lab.grade.value if hasattr(lab.grade, "value") else str(lab.grade)
+        pred_code = pred.value if hasattr(pred, "value") else str(pred)
+        factors = lab.factors
+        if pred_code != lab_code:
+            warnings = warnings + [
+                f"chunk severe-agg/escalation: rule grade {lab_code} → {pred_code} "
+                "(most-severe-wins over chunks; FNR-safe)"
+            ]
+            if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
+                try:
+                    from lloydk.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+                        svm_levels_for_grade,
+                    )
+                    s2, v2, m2 = svm_levels_for_grade(pred_code)
+                    factors = EvaluationFactors.from_factor_scores(
+                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
+                    )
+                except Exception:  # noqa: BLE001
+                    factors = lab.factors
+
         return InferenceResult(
-            label=lab.grade,
-            confidence=lab.confidence,
+            label=pred,
+            confidence=conf,
             scores=scores,
-            factors=lab.factors,
+            factors=factors,
             evidence=lab.evidence if return_evidence else [],
             model_version="rule-fallback-v0",
-            warnings=["model weights not loaded — using rule-based fallback"],
+            warnings=warnings,
         )
 
     # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.

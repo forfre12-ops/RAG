@@ -16,6 +16,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
+# #15: v1 split(순수 문자 단위)은 한국어 조항/문장 중간을 절단하고 heading_path
+#      메타를 유실한다. 운영 권장 split_v2(헤딩·문장 경계 보존)로 전환한다.
+from lloydk.config import settings
+from lloydk.modules.m2_preprocess import split_v2
+
 
 @dataclass
 class DocIndexResult:
@@ -44,7 +49,28 @@ def index_document_for_rag(
         chunks: (chunk_index, text) 시퀀스.
         store/embedder: 미주입 시 build_store()/build_embedder() 기본 결정.
     """
-    norm = [(int(idx), txt) for idx, txt in chunks if (txt or "").strip()]
+    # #15: 입력 (chunk_index, text)를 split_v2로 재분할 — 헤딩/문장 경계를 보존하고
+    #      각 (서브)청크의 heading_path 메타를 회수한다. 입력 chunk_index는 출처
+    #      순서를 유지하기 위해 src_idx로 보존하고, split 결과는 0..N으로 재번호한다.
+    #      청크 크기 정책은 기존 설정값(rag_index_chunk_size/overlap)을 그대로 사용.
+    norm: list[tuple[int, str, list[str]]] = []  # (chunk_idx, text, heading_path)
+    for _src_idx, raw in chunks:
+        body = (raw or "").strip()
+        if not body:
+            continue
+        sub_chunks = split_v2(
+            body,
+            size=settings.rag_index_chunk_size,
+            overlap=settings.rag_index_chunk_overlap,
+            respect_heading=True,
+            respect_sentence=True,
+        )
+        # split_v2가 (이론상) 빈 결과를 주면 원문 그대로 1청크로 폴백.
+        if not sub_chunks:
+            norm.append((len(norm), body, []))
+            continue
+        for c in sub_chunks:
+            norm.append((len(norm), c.text, list(c.heading_path)))
     if not norm:
         return DocIndexResult(False, collection, 0, 0, ["no non-empty chunks"])
 
@@ -59,7 +85,7 @@ def index_document_for_rag(
     except Exception as exc:  # noqa: BLE001
         return DocIndexResult(False, collection, len(norm), 0, [f"adapter build failed: {exc}"])
 
-    texts = [t for _, t in norm]
+    texts = [t for _, t, _ in norm]
     try:
         emb = embedder.embed(texts)
     except Exception as exc:  # noqa: BLE001
@@ -83,10 +109,18 @@ def index_document_for_rag(
     else:
         warns.append("store has no delete(); stale chunks may remain on re-index")
 
-    ids = [f"{doc_id}:c{idx}" for idx, _ in norm]
+    ids = [f"{doc_id}:c{idx}" for idx, _, _ in norm]
     payloads = [
-        {"doc_id": str(doc_id), "chunk_idx": idx, "tenant_id": tenant_id, "text": txt}
-        for idx, txt in norm
+        # #15: split_v2가 부여한 섹션 경로(heading_path)를 payload에 적재 —
+        #      검색·표시·reranking에 활용 가능. 필드명은 indexer.py 컨벤션과 일치.
+        {
+            "doc_id": str(doc_id),
+            "chunk_idx": idx,
+            "tenant_id": tenant_id,
+            "text": txt,
+            "heading_path": heading_path,
+        }
+        for idx, txt, heading_path in norm
     ]
     try:
         n = store.upsert(collection, ids, emb.vectors, payloads)

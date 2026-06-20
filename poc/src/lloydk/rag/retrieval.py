@@ -203,7 +203,14 @@ def expand_then_search(
 
     if not result_sets:
         return []
-    fused = _rrf_combine(result_sets)
+    # #14(이중 RRF 방지): store.search_hybrid가 이미 BM25+dense를 RRF 융합한 점수를
+    # 반환한다. 단일 result_set(확장쿼리 1개)일 때 outer RRF를 또 적용하면 store의
+    # 원점수가 무의미한 1/(60+rank)로 평탄화되므로, 그대로 원점수·순서를 보존한다.
+    # 멀티쿼리(확장 2개+)일 때만 outer RRF로 rank 기반 멀티쿼리 융합을 수행한다.
+    if len(result_sets) == 1:
+        fused = result_sets[0]
+    else:
+        fused = _rrf_combine(result_sets)
 
     if not use_reranker:
         return fused[:top_k]

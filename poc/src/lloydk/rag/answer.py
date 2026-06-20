@@ -224,8 +224,41 @@ def synthesize_answer(
 
     # 인용 정합성 검증: 프롬프트는 [n] 인용을 강제하지만(build_answer_prompt) 출력이
     # 계약을 지키는지 한 번도 확인하지 않았다. 답변이 hits 범위 밖 인덱스를 인용하거나
-    # (환각 인용) 출처가 있는데 인용을 0개 달면 warnings에 남긴다. 거부는 하지 않음.
-    warnings_acc.extend(_citation_warnings(text, len(hits)))
+    # (환각 인용) 출처가 있는데 인용을 0개 달면 warnings에 남긴다.
+    cite_warnings, out_of_range = _citation_warnings(text, len(hits))
+    warnings_acc.extend(cite_warnings)
+
+    # #16: 환각 인용 관측 신호 노출.
+    # RagAnswerResult 스키마에 별도 필드를 추가하려면 schemas/rag_answer.py를 고쳐야 하는데
+    # 본 작업은 answer.py 단일 파일만 수정 가능하므로, 호출부가 파싱할 수 있도록
+    # warnings에 기계 판독용 구조 마커("hallucination_risk:<n>")로 노출한다.
+    # n = out-of-range(존재하지 않는 근거 번호) 인용 개수.
+    n_out_of_range = len(out_of_range)
+    warnings_acc.append(f"hallucination_risk:{n_out_of_range}")
+
+    # #16: 인용 검증을 경고만이 아니라 집행(enforce)으로 승격 — opt-in, 기본 비활성.
+    # config.py를 건드리지 않고 settings에서 getattr 기본 False로 읽어 기존 동작 보존.
+    enforce = False
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+
+        enforce = bool(getattr(settings, "answer_enforce_citations", False))
+    except Exception as exc:  # noqa: BLE001 — settings 미구성 시에도 기존 동작 유지
+        logger.debug("rag_answer: settings load failed (%s) — enforce off", exc)
+
+    # 심각한 인용 문제 = out-of-range citation 존재(존재하지 않는 근거 번호 인용).
+    if enforce and n_out_of_range > 0:
+        warnings_acc.append(
+            "citation enforcement: out-of-range citation → demoted to deterministic answer"
+        )
+        return RagAnswerResult(
+            answer=_deterministic_answer(query=query, hits=hits, grade=grade, grade_descriptions=desc_map),
+            citations=citations,
+            grade=grade,
+            usage=usage,
+            warnings=warnings_acc,
+            deterministic_fallback=True,
+        )
 
     return RagAnswerResult(
         answer=text.strip(),
@@ -237,17 +270,23 @@ def synthesize_answer(
     )
 
 
-def _citation_warnings(answer_text: str, n_hits: int) -> list[str]:
-    """LLM 답변의 인용 인덱스를 hits 범위와 대조해 경고 생성(프롬프트 노출 캡 반영)."""
+def _citation_warnings(answer_text: str, n_hits: int) -> tuple[list[str], list[int]]:
+    """LLM 답변의 인용 인덱스를 hits 범위와 대조해 경고·out-of-range 목록 생성.
+
+    Returns:
+        (warnings, out_of_range): out_of_range는 범위를 벗어난 인용 번호 리스트
+        (#16: 호출부가 hallucination_risk 카운트로 재사용).
+    """
     from lloydk.modules.m6_evaluation.answer_metrics import citation_metrics  # noqa: PLC0415
 
     cm = citation_metrics(answer_text, n_hits, max_index=_MAX_HITS_IN_PROMPT)
     out: list[str] = []
-    if cm["out_of_range"]:
+    out_of_range: list[int] = list(cm["out_of_range"])
+    if out_of_range:
         out.append(
-            f"citation out-of-range: {cm['out_of_range']} "
+            f"citation out-of-range: {out_of_range} "
             f"(only {min(_MAX_HITS_IN_PROMPT, n_hits)} hits shown) — possible hallucinated citation"
         )
     if cm["cites_no_source"]:
         out.append("answer cites no source despite available hits")
-    return out
+    return out, out_of_range

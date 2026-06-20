@@ -24,7 +24,9 @@ from lloydk.adapters.embedding import build_embedder
 from lloydk.adapters.vectorstore import build_store
 from lloydk.adapters.vectorstore.base import VectorStore
 from lloydk.config import settings
-from lloydk.modules.m2_preprocess import split as chunk_split
+# #15: v1 split(순수 문자 단위)은 한국어 조항/문장 중간을 절단하고 heading_path
+#       메타를 유실한다. 운영 권장 split_v2(헤딩·문장 경계 보존)로 전환한다.
+from lloydk.modules.m2_preprocess import split_v2 as chunk_split
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +96,15 @@ class RagIndexer:
         version_safe = _safe_token(version)
         new_index = f"{alias}-{model_safe}-{version_safe}"
 
-        chunks = chunk_split(text, size=self.chunk_size, overlap=self.chunk_overlap)
+        # #15: split_v2 — 헤딩/문장 경계 보존. 청크 크기 정책(size/overlap)은 기존
+        #      설정값(rag_index_chunk_size/overlap)을 그대로 전달해 보존한다.
+        chunks = chunk_split(
+            text,
+            size=self.chunk_size,
+            overlap=self.chunk_overlap,
+            respect_heading=True,
+            respect_sentence=True,
+        )
         if not chunks:
             warns.append("no chunks produced from text")
             return IndexResult(
@@ -151,6 +161,11 @@ class RagIndexer:
                 "effective_date": effective_date,
                 "created_at": now,
                 "text": chunk_texts[i],
+                # #15: split_v2가 부여한 섹션 경로 — 검색·표시·reranking에 활용.
+                "heading_path": list(chunks[i].heading_path),
+                # #15: 청크 추가 메타(overlap 길이) — 위치/경계 정보 가능 범위 보존.
+                "overlap_prev": chunks[i].overlap_prev,
+                "overlap_next": chunks[i].overlap_next,
                 **base_extra,
             }
             for i in range(len(chunks))

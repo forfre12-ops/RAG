@@ -12,15 +12,21 @@ id들만 소비하도록 한다(반영 없이 소비 = 유실, 을 원천 차단
 
 순수 DB 조회 — 모델·GPU 불요. DB 미가용/빈 결과는 빈 RebuildResult로 graceful degrade.
 4등급 스킴(TS/S1/S2/S3) 외 커스텀 등급 교정은 trainer(_LABEL2ID)가 모르므로 제외한다.
+
+[#25] merge_into_train_jsonl은 holdout(val/test)와 doc_id/본문이 겹치는 교정 문서를
+train append에서 강제 제외해 train↔holdout 평가 누수를 차단한다("파일 불변"만으로는
+같은 doc_id가 양쪽에 존재 가능 → 누수). 등급별 cap(stratify)도 opt-in으로 지원한다.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
+from typing import Iterable, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -45,9 +51,16 @@ _DEFAULT_MIN_CHARS = 10
 class RebuildResult:
     rows: list[dict] = field(default_factory=list)        # [{"text":.., "label":..}, ..]
     correction_ids: list[int] = field(default_factory=list)  # 실제 포함된 correction_id (소비 대상)
+    # [#25] rows[i] 의 출처 문서 doc_id (rows와 같은 순서·길이). 홀드아웃 누수 차단을
+    # doc_id 기준으로도 강제하기 위해 보관한다. 기본 빈 리스트 = 기존 호출부 동작 보존
+    # (doc_id 미상이면 merge가 텍스트 기준 누수 차단으로 graceful degrade).
+    doc_ids: list = field(default_factory=list)
     doc_count: int = 0
     skipped_no_text: int = 0
     skipped_bad_label: int = 0
+    # [#25] merge_into_train_jsonl이 holdout 중복으로 train에서 제외한 교정 행 수
+    # (병합 시점에 갱신). 0 = 제외 없음/미수행. 호출부가 제외 건수를 조회할 수 있게 노출.
+    excluded_holdout: int = 0
     reason: str = ""
 
     @property
@@ -146,6 +159,7 @@ def build_labeled_rows_from_corrections(
                     doc_label[doc_id] = code
 
             rows: list[dict] = []
+            row_doc_ids: list = []  # [#25] rows와 1:1 정렬 — 홀드아웃 doc_id 누수 차단용
             consumed_ids: list[int] = []
             skipped_no_text = 0
             for doc_id, label in doc_label.items():
@@ -154,11 +168,13 @@ def build_labeled_rows_from_corrections(
                     skipped_no_text += 1
                     continue  # 본문 없는 문서는 라벨을 날조하지 않음 + 소비도 안 함
                 rows.append({"text": text, "label": label})
+                row_doc_ids.append(doc_id)
                 consumed_ids.extend(doc_corr_ids.get(doc_id, []))
 
             return RebuildResult(
                 rows=rows,
                 correction_ids=sorted(set(consumed_ids)),
+                doc_ids=row_doc_ids,
                 doc_count=len(rows),
                 skipped_no_text=skipped_no_text,
                 skipped_bad_label=skipped_bad_label,
@@ -169,21 +185,156 @@ def build_labeled_rows_from_corrections(
         return RebuildResult(reason=f"db_unavailable:{type(exc).__name__}")
 
 
+# [#25] 홀드아웃 누수 차단 — 텍스트 정규화 키.
+# build_p1_holdout_split.py의 _norm과 동일 의도(공백 접기 + 소문자)로, train↔holdout가
+# 같은 문서를 서로 다른 공백/대소문자로 적어도 동일 본문으로 잡아 누수를 막는다.
+# doc_id가 한쪽이라도 누락(None)이면 doc_id 매칭이 무력화되므로 텍스트 키가 안전망이다.
+_WS_RE = re.compile(r"\s+")
+
+
+def _norm_text(text: object) -> str:
+    return _WS_RE.sub(" ", str(text)).strip().lower()
+
+
+def _load_holdout_keys(
+    paths: Iterable[str | Path],
+) -> tuple[set[str], set]:
+    """홀드아웃(val/test) jsonl들에서 (정규화 텍스트 집합, doc_id 집합)을 읽는다.
+
+    누락/깨진 파일·라인은 조용히 건너뛴다(홀드아웃이 없으면 빈 집합 → 차단 없음).
+    doc_id 키 이름은 데이터 스키마(build_p1_holdout_split.py: "doc_id")를 따른다.
+    """
+    text_keys: set[str] = set()
+    doc_ids: set = set()
+    for p in paths:
+        if not p:
+            continue
+        path = Path(p)
+        if not path.exists():
+            continue
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError as exc:  # 읽기 실패는 차단 불가 → 경고 후 무시(fail-open, 아래서 경고)
+            logger.warning("holdout 읽기 실패(누수 차단 약화): %s (%s)", path, exc)
+            continue
+        for line in raw.splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            txt = row.get("text")
+            if txt:
+                text_keys.add(_norm_text(txt))
+            did = row.get("doc_id")
+            if did is not None:
+                doc_ids.add(did)
+    return text_keys, doc_ids
+
+
+def _apply_grade_cap(
+    rows: list[dict],
+    doc_ids: list,
+    *,
+    per_grade_cap: int | None,
+) -> tuple[list[dict], list]:
+    """[#25-(2)] 등급별 cap/stratify — 보정이 특정 등급에 몰릴 때 train 분포 왜곡 완화.
+
+    per_grade_cap=None(기본) → 캡 없음(동작 보존). 정수면 각 label당 최대 그 수만 남긴다
+    (입력 순서 = 최신 교정 우선이므로 최신부터 채택). doc_ids는 rows와 정렬을 맞춰 함께 자른다.
+    """
+    if per_grade_cap is None or per_grade_cap <= 0:
+        return rows, doc_ids
+    kept_rows: list[dict] = []
+    kept_dids: list = []
+    seen: Counter = Counter()
+    aligned_dids = doc_ids if len(doc_ids) == len(rows) else [None] * len(rows)
+    for row, did in zip(rows, aligned_dids):
+        label = row.get("label")
+        if seen[label] >= per_grade_cap:
+            continue
+        seen[label] += 1
+        kept_rows.append(row)
+        kept_dids.append(did)
+    return kept_rows, kept_dids
+
+
 def merge_into_train_jsonl(
     base_train_path: str | Path | None,
     result: RebuildResult,
     out_path: str | Path,
+    *,
+    holdout_paths: Sequence[str | Path] | None = None,
+    per_grade_cap: int | None = None,
 ) -> str | None:
     """기존 train.jsonl(base) + 교정 행을 합쳐 새 학습셋을 만든다(A2-① 반영).
 
     **train만** 증강한다 — val/test(홀드아웃)는 건드리지 않아 배포 게이트(deploy_gate)가
     교정 누출 없는 안정 홀드아웃에서 fnr_high를 측정하도록 보장한다(C-eval 정합).
 
+    [#25] 단, "파일을 안 건드리는 것"만으로는 누수가 막히지 않는다 — 같은 doc_id/본문이
+    holdout에도 있고 train에도 append되면 평가 누수다. 그래서 holdout_paths(val/test jsonl)를
+    받아 그 (doc_id ∪ 정규화 텍스트) 집합과 겹치는 교정 행을 train append에서 **제외(enforce)**
+    한다. 제외 건수는 로깅한다.
+      - holdout_paths 미지정 → 기존처럼 동작하되 누수 차단 불가를 1회 경고(하위호환).
+      - per_grade_cap: 선택적 등급별 상한(stratify). 기본 None=캡 없음(동작 보존).
+
     base가 없거나 비어 있으면 교정 행만으로 학습셋을 만든다(경고 수준 — 소량 학습 위험은
-    호출부 책임). 교정 행도 없으면 None 반환(병합 불필요 → 호출부는 기본 경로 학습).
+    호출부 책임). 교정 행(제외 후)도 없으면 None 반환(병합 불필요 → 호출부는 기본 경로 학습).
     """
     if not result.rows:
         return None
+
+    # ── [#25] 등급별 cap/stratify(opt-in) — 누수 차단보다 먼저 적용해 캡 후 분포를 본다 ──
+    rows, row_doc_ids = _apply_grade_cap(
+        list(result.rows), list(result.doc_ids), per_grade_cap=per_grade_cap
+    )
+
+    # ── [#25] 홀드아웃 누수 차단(enforce): holdout과 겹치는 교정 행 제외 ──────────────
+    if holdout_paths is None:
+        # 하위호환: 미지정이면 기존 동작 유지. 단 누수 차단이 비활성임을 경고로 남긴다
+        # (조용한 누수보다 시끄러운 경고가 안전).
+        logger.warning(
+            "merge_into_train_jsonl: holdout_paths 미지정 → train↔holdout 누수 차단 비활성. "
+            "val/test 경로를 넘기면 중복 문서를 train append에서 제외한다.",
+        )
+        hold_texts: set[str] = set()
+        hold_doc_ids: set = set()
+    else:
+        hold_texts, hold_doc_ids = _load_holdout_keys(holdout_paths)
+
+    excluded = 0
+    if hold_texts or hold_doc_ids:
+        kept_rows: list[dict] = []
+        aligned_dids = row_doc_ids if len(row_doc_ids) == len(rows) else [None] * len(rows)
+        for row, did in zip(rows, aligned_dids):
+            in_holdout = (did is not None and did in hold_doc_ids) or (
+                _norm_text(row.get("text", "")) in hold_texts
+            )
+            if in_holdout:
+                excluded += 1
+                continue  # 홀드아웃과 겹치는 보정 문서는 train에 넣지 않는다(평가 누수 차단)
+            kept_rows.append(row)
+        rows = kept_rows
+
+    # [#25] 제외 건수를 result에 기록(반환/조회 가능) + 로깅(반환·로깅 둘 다).
+    try:
+        result.excluded_holdout = excluded
+    except Exception:  # noqa: BLE001 — result가 dataclass가 아니어도(mock 등) 머지는 진행
+        pass
+    if excluded:
+        logger.warning(
+            "[#25] holdout 누수 차단: 교정 %d행을 train append에서 제외(holdout 중복)", excluded
+        )
+
+    if not rows:
+        # 캡/누수차단 후 남은 교정 행이 없으면 병합할 게 없다 → 호출부는 기본 경로 학습.
+        logger.info(
+            "merged train set: 제외 후 교정 행 0(excluded=%d) → 병합 생략(None)", excluded
+        )
+        return None
+
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     n_base = 0
@@ -195,11 +346,11 @@ def merge_into_train_jsonl(
                     if line.strip():
                         f.write(line + "\n")
                         n_base += 1
-        for row in result.rows:
+        for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
     logger.info(
-        "merged train set: base=%d + corrections=%d → %s",
-        n_base, len(result.rows), out,
+        "merged train set: base=%d + corrections=%d (excluded_holdout=%d) → %s",
+        n_base, len(rows), excluded, out,
     )
     return str(out)
 
