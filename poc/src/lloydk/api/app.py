@@ -76,6 +76,97 @@ async def _schema_grades_rbac(request: Request, auth_context: dict = Depends(req
     return auth_context
 
 
+# #13: JSON 본문 크기 DoS 가드 (ASGI 미들웨어).
+#
+# /classify/batch 등 JSON 본문은 Pydantic 파싱 후에야 413으로 막혀, 인증된 호출자가
+# 대용량 body(예: 1000×1MB)로 OOM을 유발할 수 있다(멀티파트 업로드는 max_upload_mb로
+# 막히지만 일반 JSON body는 무방비). 이 미들웨어는 **본문 파싱 전에** 크기를 검사한다.
+#
+# 구현 노트:
+# - Starlette BaseHTTPMiddleware에서 body를 미리 소비하면 다운스트림(AuditMiddleware 등)이
+#   못 읽으므로, 순수 ASGI 미들웨어로 작성해 body를 소비하지 않는다.
+# - 1차: Content-Length 헤더가 한도 초과면 본문을 읽기도 전에 즉시 413.
+# - 2차: Content-Length 없는 chunked 요청은 receive를 래핑해 누적 바이트가 한도를 넘는 순간
+#   413(정상 본문은 그대로 다운스트림에 전달 — body를 가로채 캐시하지 않음).
+# - 등록 위치는 가장 바깥(파싱·다른 미들웨어보다 먼저 차단) — app.add_middleware 마지막 호출.
+class _BodyTooLarge(Exception):
+    """chunked 본문 누적이 한도를 넘었음을 알리는 내부 sentinel (다운스트림 메모리 누적 차단용)."""
+
+
+class BodySizeLimitMiddleware:
+    """Content-Length(우선)·스트리밍 누적 크기로 JSON 본문 한도를 강제하는 ASGI 미들웨어."""
+
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        # HTTP 요청만 검사 — websocket/lifespan은 그대로 통과.
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_413():
+            # body 파싱 전에 413을 직접 반환(다른 미들웨어/핸들러에 도달시키지 않음).
+            await send({
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [(b"content-type", b"application/json")],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": (
+                    b'{"detail":"request body too large",'
+                    b'"code":"LLOYDK_BODY_TOO_LARGE"}'
+                ),
+            })
+
+        # 1차: Content-Length 헤더 기반 사전 차단 (본문을 읽지 않음).
+        for name, value in scope.get("headers", []):
+            if name == b"content-length":
+                try:
+                    declared = int(value)
+                except (TypeError, ValueError):
+                    declared = -1
+                if declared > self.max_bytes:
+                    await send_413()
+                    return
+                break
+
+        # 2차: Content-Length 없는 chunked 요청 — receive를 래핑해 누적 크기 가드.
+        # body bytes는 그대로 통과시켜 다운스트림이 정상적으로 읽게 하되(가로채 캐시 금지),
+        # 누적이 한도를 넘는 순간 **가드가 직접 413을 보내고** sentinel 예외로 다운스트림을
+        # 중단한다. 그래야 다운스트림이 대용량 body를 끝까지 메모리에 모으기 전에 차단되어
+        # OOM 방지가 실효를 갖는다. 가드가 413을 보낸 뒤에는 다운스트림이 풀리며 내보내는
+        # 응답(예: 500)을 send에서 모두 억제해 단일 응답만 유지한다.
+        received = 0
+        guard_owns_response = False
+
+        async def guarded_receive():
+            nonlocal received, guard_owns_response
+            message = await receive()
+            if message.get("type") == "http.request":
+                received += len(message.get("body", b"") or b"")
+                if received > self.max_bytes:
+                    # 가드가 응답을 점유 — 413을 직접 쓰고 다운스트림을 unwind.
+                    guard_owns_response = True
+                    await send_413()
+                    raise _BodyTooLarge()
+            return message
+
+        async def guarded_send(message):
+            # 가드가 이미 413을 보냈으면 다운스트림 응답(중복 start·500 등)은 버린다.
+            if guard_owns_response:
+                return
+            await send(message)
+
+        try:
+            await self.app(scope, guarded_receive, guarded_send)
+        except _BodyTooLarge:
+            # 413은 guarded_receive에서 이미 전송됨 — 여기서는 예외만 흡수.
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 배포 프로파일 + 적용된 backend 부팅 로그 — 운영 사고 사전 차단
@@ -178,6 +269,15 @@ app.add_middleware(
 # RATE_LIMIT_DISABLED=1로 비활성 가능 (TestClient·dryrun).
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+# #13: JSON 본문 크기 DoS 가드 — 가장 마지막 add_middleware = 스택 최외곽.
+# body 파싱·다른 미들웨어보다 먼저 Content-Length를 검사해 대용량 body를 즉시 차단한다.
+# 멀티파트 업로드(documents/guide)는 라우터에서 max_upload_mb로 처리되므로, 이 한도는
+# 일반 JSON에 적용되되 정상 요청·dryrun/테스트는 통과하도록 충분히 크게(기본 25MB) 잡는다.
+app.add_middleware(
+    BodySizeLimitMiddleware,
+    max_bytes=settings.max_request_body_mb * 1024 * 1024,
+)
 
 
 @app.exception_handler(Exception)

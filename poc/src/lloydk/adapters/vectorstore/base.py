@@ -44,6 +44,15 @@ class VectorStore(Protocol):
         top_k: int = 5,
         filter: dict | None = None,
     ) -> list[SearchHit]: ...
+    # #17: 재인덱싱 고아 청크 제거용 삭제 계약. ids(정확 id) 또는 filter(예: doc_id)
+    # 중 적어도 하나로 대상 지정. 삭제 건수를 반환. 대상이 없으면 0(멱등).
+    def delete(
+        self,
+        collection: str,
+        *,
+        ids: Sequence[str] | None = None,
+        filter: dict | None = None,
+    ) -> int: ...
     def search_hybrid(
         self,
         collection: str,

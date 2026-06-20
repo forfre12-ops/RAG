@@ -248,16 +248,25 @@ class LabelRuleEngine:
             return 0.0
         return dot / denom
 
-    def _semantic_match(self, text: str, seed_value: str) -> int:
+    def _semantic_match(
+        self, text: str, seed_value: str, *, query_vec: Optional[list[float]] = None
+    ) -> int:
         """semantic 평가 — 코사인 유사도 ≥ threshold면 1회 매칭으로 본다.
 
         주의: 빈도 개념이 없으므로 count는 0 또는 1.
+
+        #22: 동일 문서의 중복 임베딩 제거. label() 1회 호출에서 문서 벡터를
+        한 번만 계산해 query_vec으로 주입하면 seed마다의 _embed_text(text)
+        재계산을 피한다. query_vec 미주입 시(단독 호출·테스트)에는 기존처럼
+        문서 벡터를 직접 계산해 동작·폴백 경로를 그대로 보존한다.
         """
         if not text or not seed_value:
             return 0
         try:
             seed_vec = self._embed_seed(seed_value)
-            query_vec = self._embed_text(text)
+            # #22: 호출자가 미리 계산한 문서 벡터가 있으면 재사용, 없으면 1회 계산.
+            if query_vec is None:
+                query_vec = self._embed_text(text)
         except Exception:  # noqa: BLE001 — 임베딩 실패는 라벨링 전체를 막지 않음
             return 0
         sim = self._cosine(query_vec, seed_vec)
@@ -282,13 +291,25 @@ class LabelRuleEngine:
         grade_scores: dict[str, float] = {g: 0.0 for g in GRADE_ORDER}
         factor_raw: dict[str, float] = {f["code"]: 0.0 for f in FACTOR_SEEDS}
 
+        # #22: 문서(쿼리) 벡터를 label() 1회 호출에서 단 한 번만 계산해 모든 semantic
+        # seed 비교에 재사용한다. 기존엔 seed마다 _semantic_match가 _embed_text(text)를
+        # 호출해 동일 문서를 N회 재임베딩했다(seed 벡터만 캐시). semantic seed가
+        # 있을 때만 1회 임베딩하며, 실패하면 None으로 둬 seed별 폴백(매칭 0) 경로를 보존한다.
+        doc_query_vec: Optional[list[float]] = None
+        has_semantic = any(s.get("pattern_type") == "semantic" for s in self.seeds)
+        if has_semantic:
+            try:
+                doc_query_vec = self._embed_text(text)
+            except Exception:  # noqa: BLE001 — 임베딩 실패는 라벨링 전체를 막지 않음(폴백 보존)
+                doc_query_vec = None
+
         for seed in self.seeds:
             kw = seed["keyword"]
             grade = seed["grade"]
             factor = seed["factor"]
             weight = float(seed["weight"])
             pattern_type = seed.get("pattern_type", "exact")
-            count = self._count(text, kw, pattern_type)
+            count = self._count(text, kw, pattern_type, query_vec=doc_query_vec)
             if count == 0:
                 continue
             score = count * weight
@@ -390,11 +411,14 @@ class LabelRuleEngine:
             warnings=warnings,
         )
 
-    def _count(self, text: str, kw: str, pattern_type: str) -> int:
+    def _count(
+        self, text: str, kw: str, pattern_type: str, *, query_vec: Optional[list[float]] = None
+    ) -> int:
         if pattern_type == "regex":
             return len(re.findall(kw, text))
         if pattern_type == "semantic":
-            return self._semantic_match(text, kw)
+            # #22: label()이 1회 계산한 문서 벡터를 그대로 전달(중복 임베딩 제거).
+            return self._semantic_match(text, kw, query_vec=query_vec)
         # exact: 단순 부분 문자열 (한국어는 word boundary가 영문과 다름)
         if not kw:
             return 0

@@ -320,6 +320,14 @@ class Settings(BaseSettings):
     # 운영 기본 20MB — 대부분 가이드 PDF·DOCX 커버. 초과 시 413 Payload Too Large 반환.
     max_upload_mb: int = 20
 
+    # #13: JSON 본문 크기 DoS 가드 — 일반 JSON body(/classify/batch 등)의 상한.
+    # 멀티파트 업로드는 위 max_upload_mb로 막히지만, JSON body는 Pydantic 파싱 후에야
+    # 413이 떠서 인증된 호출자가 대용량 body(예: 1000×1MB)로 OOM을 유발할 수 있다.
+    # app.py의 미들웨어가 **파싱 전에** Content-Length(또는 스트리밍 누적 크기)를 검사해
+    # 이 한도를 넘으면 413을 반환한다. 업로드 멀티파트보다 충분히 크게 잡아(기본 25MB)
+    # 정상 JSON 요청·dryrun/테스트는 통과하게 한다. 환경변수 LLOYDK_MAX_REQUEST_BODY_MB로 조정.
+    max_request_body_mb: int = 25
+
     # OCR DoS 가드 — 스캔 PDF 한 건을 OCR할 때 변환·인식할 최대 페이지 수.
     # 수백쪽 스캔본 한 건이 pdf2image/Tesseract를 수십분~OOM으로 모는 것을 차단.
     # 초과 페이지는 변환하지 않고 '잘림' 경고를 남긴다. 0 이하면 무제한(명시적 opt-out).

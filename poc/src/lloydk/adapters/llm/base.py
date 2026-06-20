@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import random
+import time
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, TypeVar, runtime_checkable
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -47,6 +54,47 @@ PRICE_TABLE: dict[str, tuple[float, float]] = {
 def estimate_cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
     in_price, out_price = PRICE_TABLE.get(model, (0.0, 0.0))
     return (input_tokens / 1_000_000) * in_price + (output_tokens / 1_000_000) * out_price
+
+
+# 작업 #18: provider 간 재시도 비대칭 해소용 공통 헬퍼.
+# anthropic_provider.py의 full-jitter 지수 백오프 패턴을 일반화하여
+# openai/vllm/local_openai에서 재사용한다(429/5xx/타임아웃/연결 오류 재시도).
+def retry_with_backoff(
+    fn: Callable[[], T],
+    *,
+    is_retryable: Callable[[BaseException], bool],
+    max_retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 8.0,
+    label: str = "llm",
+) -> T:
+    """fn()을 호출하고, 재시도 가능한 예외면 full-jitter 지수 백오프로 재시도.
+
+    - 총 시도 횟수 = 1 + max_retries (0회차 본 호출 + max_retries회 재시도).
+    - 재시도 소진/비재시도성 예외는 마지막 예외를 그대로 raise(호출부가 폴백 처리).
+    - 결정성·테스트 친화: sleep=time.sleep, jitter=random.uniform 표준 사용.
+    """
+    last_exc: BaseException | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if is_retryable(exc) and attempt < max_retries:
+                # full-jitter: [0, min(base*2^n, cap)) 범위에서 랜덤 대기.
+                cap = min(base_delay * (2 ** attempt), max_delay)
+                delay = random.uniform(0.0, cap)
+                logger.warning(
+                    "%s call failed (%s) — retry %d/%d after %.2fs",
+                    label, type(exc).__name__, attempt + 1, max_retries, delay,
+                )
+                time.sleep(delay)
+                continue
+            # 비재시도성이거나 재시도 소진 — 마지막 예외를 호출부로 전달.
+            raise
+    # 도달 불가(루프는 성공 시 return, 실패 시 raise). 타입 안정성용 방어.
+    assert last_exc is not None
+    raise last_exc
 
 
 @runtime_checkable

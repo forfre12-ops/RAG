@@ -70,6 +70,19 @@ def index_document_for_rag(
     except Exception as exc:  # noqa: BLE001
         return DocIndexResult(False, collection, len(norm), 0, [f"ensure_collection failed: {exc}"])
 
+    # #17: 재인덱싱 고아 청크 제거 — 같은 doc_id를 더 적은 청크로 재업로드하면
+    # 이전 {doc_id}:c{N} 청크가 upsert만으로는 stale로 남는다. upsert 전에 해당
+    # doc_id의 기존 청크를 선삭제해 멱등 재인덱싱을 보장한다.
+    # delete 미구현 스토어(구버전)는 best-effort로 건너뛰고 warning만 남긴다.
+    delete = getattr(store, "delete", None)
+    if callable(delete):
+        try:
+            delete(collection, filter={"doc_id": str(doc_id)})
+        except Exception as exc:  # noqa: BLE001
+            warns.append(f"stale chunk pre-delete failed: {exc}")
+    else:
+        warns.append("store has no delete(); stale chunks may remain on re-index")
+
     ids = [f"{doc_id}:c{idx}" for idx, _ in norm]
     payloads = [
         {"doc_id": str(doc_id), "chunk_idx": idx, "tenant_id": tenant_id, "text": txt}

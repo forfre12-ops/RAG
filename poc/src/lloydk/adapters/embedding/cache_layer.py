@@ -13,6 +13,7 @@ scripts/cache_kure_v1.py 는 HF Hub 모델 가중치 다운로드 스크립트�
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import json
 import os
@@ -48,6 +49,21 @@ def _resolve_cache_size(explicit: int | None) -> int:
     return 1024
 
 
+def _resolve_flush_every() -> int:
+    """#24: 주기 디스크 플러시 임계치. env ``EMB_CACHE_FLUSH_EVERY`` 로 조정.
+
+    이 수만큼 신규 항목이 누적되면 디스크에 기록한다(매 배치 전체 재작성 폐기).
+    1 이상으로 강제 — 0/음수/파싱 실패 시 기본 64.
+    """
+    raw = os.getenv("EMB_CACHE_FLUSH_EVERY")
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    return 64
+
+
 class _LRU:
     """Thread-safe LRU. dict-of-list[float]."""
 
@@ -76,6 +92,13 @@ class _LRU:
     def __len__(self) -> int:  # 디버그용
         with self._lock:
             return len(self._data)
+
+    def snapshot(self) -> "list[tuple[str, list[float]]]":
+        """#24: 락 안에서 항목 스냅샷 — 디스크 플러시 중 동시 쓰기로 인한
+        'RuntimeError: OrderedDict mutated during iteration' 을 차단한다.
+        값은 얕은 복사(list(v))로 떼어 외부 순회 중 변형 영향을 받지 않게 한다."""
+        with self._lock:
+            return [(k, list(v)) for k, v in self._data.items()]
 
 
 class _RedisCache:
@@ -161,7 +184,17 @@ class CachedEmbedding:
         self._lru = _LRU(_resolve_cache_size(cache_size))
         self._disk_path: Path | None = Path(disk_path) if disk_path else None
         self._redis = _RedisCache(redis_url, ttl_seconds=redis_ttl) if redis_url else None
+        # #24: O(N) 전체 재작성 회피용 dirty 추적.
+        #  - _dirty: 마지막 플러시 이후 미반영 신규 항목 수(>0 일 때만 기록).
+        #  - _flush_every: 이만큼 누적되면 주기 플러시(매 miss 배치마다 전체
+        #    직렬화하던 동작을 N건 누적/종료 시 플러시로 전환).
+        self._dirty = 0
+        self._flush_every = _resolve_flush_every()
+        self._flush_lock = threading.Lock()
         self._load_disk()
+        # #24: 디스크 영속 의미 보존 — 프로세스 종료 시 반드시 마지막 플러시.
+        if self._disk_path is not None:
+            atexit.register(self._flush_disk)
         # underlying 의 dim/name 을 best-effort 로 전파 (Protocol 호환)
         self.dim = getattr(underlying, "dim", None)
         self._underlying_name = getattr(underlying, "name", "unknown")
@@ -180,16 +213,38 @@ class CachedEmbedding:
             return
 
     def _flush_disk(self) -> None:
+        # #24: 락 안 스냅샷으로 안전 직렬화 + dirty 리셋. 변경분이 없으면 skip.
         if self._disk_path is None:
             return
-        try:
-            self._disk_path.parent.mkdir(parents=True, exist_ok=True)
-            payload = {k: v for k, v in self._lru._data.items()}  # snapshot
-            self._disk_path.write_text(
-                json.dumps(payload, ensure_ascii=False), encoding="utf-8"
-            )
-        except Exception:
+        # 동시 플러시 직렬화 — 파일 부분 기록/경쟁 방지.
+        with self._flush_lock:
+            if self._dirty <= 0:
+                return
+            try:
+                # #24: _lru._data 직접 순회(락 없음) 대신 LRU 락 안 스냅샷 사용 →
+                # 동시 put 으로 인한 "dict changed size during iteration" 차단.
+                items = self._lru.snapshot()
+                self._disk_path.parent.mkdir(parents=True, exist_ok=True)
+                payload = {k: v for k, v in items}
+                self._disk_path.write_text(
+                    json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+                )
+                self._dirty = 0
+            except Exception:
+                # 기록 실패 시 dirty 를 유지 → 다음 기회(주기/종료)에 재시도.
+                return
+
+    def _mark_dirty(self, count: int) -> None:
+        """#24: 신규 항목 수만큼 dirty 증가, 임계치 도달 시에만 주기 플러시.
+
+        매 miss 배치마다 전체 LRU 를 통째로 재직렬화하던 O(N) 동작을 대체한다.
+        실제 디스크 영속은 (a) N건 누적 또는 (b) atexit 종료 플러시로만 발생.
+        """
+        if self._disk_path is None or count <= 0:
             return
+        self._dirty += count
+        if self._dirty >= self._flush_every:
+            self._flush_disk()
 
     # ---- core -------------------------------------------------------------
 
@@ -261,7 +316,9 @@ class CachedEmbedding:
                 # P1-D1: Redis 영속도 함께 갱신 (best-effort)
                 if self._redis is not None:
                     self._redis.put(key, vec_list)
-            self._flush_disk()
+            # #24: 매 배치 전체 재작성 폐기 — 신규 항목 수만큼 dirty 표시 후
+            # 임계치 도달 시에만 기록. 종료 시 atexit 가 나머지를 보장한다.
+            self._mark_dirty(len(miss_indices))
 
         # 3) 결과 재구성 — None 자리(중복된 miss / 새 miss) 모두 LRU 에서 채움
         final: list[list[float]] = []
@@ -315,6 +372,10 @@ class CachedEmbedding:
     def clear(self) -> None:
         with self._lru._lock:
             self._lru._data.clear()
+        # #24: 비운 직후 dirty 를 0 으로 — atexit/주기 플러시가 삭제한 파일을
+        # 되살리지 않도록(clear 의미 보존). 플러시 락과 정합 위해 함께 갱신.
+        with self._flush_lock:
+            self._dirty = 0
         if self._disk_path is not None and self._disk_path.exists():
             try:
                 self._disk_path.unlink()

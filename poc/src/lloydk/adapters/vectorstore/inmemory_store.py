@@ -69,6 +69,41 @@ class InMemoryStore:
                 col.payloads.append(dict(pl))
         return len(ids)
 
+    def delete(
+        self,
+        collection: str,
+        *,
+        ids: Sequence[str] | None = None,
+        filter: dict | None = None,
+    ) -> int:
+        """#17: 재인덱싱 고아 청크 제거. ids 또는 filter(예: {"doc_id": ...})로 삭제.
+
+        - filter: payload 필드 일치 항목 제거(예: doc_id 기준).
+        - ids: 정확 id 일치 항목 제거.
+        - 컬렉션이 없거나 대상이 없으면 0 반환(멱등).
+        - 제거된 항목 수를 반환.
+        """
+        col = self._cols.get(collection)
+        if col is None or (not ids and not filter):
+            return 0
+
+        id_set = set(ids) if ids else None
+        keep_i: list[int] = []
+        removed = 0
+        for i, (_id, pl) in enumerate(zip(col.ids, col.payloads, strict=True)):
+            match_id = id_set is not None and _id in id_set
+            match_filter = filter is not None and all(pl.get(k) == v for k, v in filter.items())
+            if match_id or match_filter:
+                removed += 1
+            else:
+                keep_i.append(i)
+
+        if removed:
+            col.ids = [col.ids[i] for i in keep_i]
+            col.vectors = [col.vectors[i] for i in keep_i]
+            col.payloads = [col.payloads[i] for i in keep_i]
+        return removed
+
     def sample_vectors(self, *, limit: int = 200, collection: str | None = None) -> list[list[float]]:
         """A4: drift_monitor용 — 최근 저장 벡터 표본.
 

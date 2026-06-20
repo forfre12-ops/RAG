@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = pytest.mark.fullstack
+# #33: 인프라 비의존 순수함수 테스트 — fullstack 오마킹 제거(기본 pytest에서 수집·실행).
 from lloydk.perf.regression import (
     detect_regressions,
     detect_regression_trend,

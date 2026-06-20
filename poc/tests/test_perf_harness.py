@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.fullstack
+# #33: 인프라 비의존 순수함수 테스트 — fullstack 오마킹 제거(기본 pytest에서 수집·실행).
 from lloydk.perf.harness import AvailableResources, _detect_trained_model
 from lloydk.perf.kpis import KPIS, aggregate, kpi_by_id, passes
 
