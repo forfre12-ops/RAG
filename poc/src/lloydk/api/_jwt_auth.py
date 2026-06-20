@@ -15,6 +15,7 @@ PyJWT가 설치돼 있으면 그것을 사용, 아니면 표준 라이브러리�
 from __future__ import annotations
 
 import base64
+import hmac
 import json
 import logging
 import os
@@ -415,7 +416,9 @@ def require_auth(
     """
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
     if mode in ("api_key", "both"):
-        if x_api_key and x_api_key == settings.api_key:
+        # 상수시간 비교(hmac.compare_digest) — 평문 `==`의 바이트단위 early-exit
+        # 타이밍 사이드채널 차단. 빈 settings.api_key는 인증 불가(가드 유지).
+        if x_api_key and settings.api_key and hmac.compare_digest(x_api_key, settings.api_key):
             # 보안: 역할은 서버 설정에서 결정 (X-Actor-Role 헤더 위조 차단).
             roles = _resolve_api_key_roles(request)
             # tenant API key hash 검증 (설정된 경우). hash 일치 시에만 tenant가

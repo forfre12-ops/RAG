@@ -24,16 +24,19 @@ celery_app.conf.task_time_limit = settings.celery_task_time_limit
 celery_app.conf.worker_max_tasks_per_child = settings.celery_worker_max_tasks_per_child
 
 # P1-D3: 큐 분리 — classify/index/synthesis/learning.
-# 워커 기동 시 `-Q classify,index,synthesis,learning` 또는 큐별 분리 가능.
+# 워커는 `-Q classify,index,synthesis,learning,celery`로 모든 큐를 구독해야 한다
+# (docker-compose worker / Makefile worker 참조). 미구독 큐의 작업은 소비되지 않는다.
+# 주의: 여기 라우팅하는 task name은 반드시 tasks.py에 실제 정의돼 있어야 한다
+# (미정의 name을 라우팅하면 호출 시 NotRegistered). 'index' 큐는 deliver_outbox_tick이 사용.
 celery_app.conf.task_routes = {
     "lloydk.classify_async": {"queue": "classify"},
     "lloydk.synthesize_batch": {"queue": "synthesis"},
     "lloydk.train_classifier": {"queue": "learning"},
-    "lloydk.index_documents": {"queue": "index"},
     "lloydk.active_learning_tick": {"queue": "learning"},
     "lloydk.drift_tick": {"queue": "learning"},
     "lloydk.auto_rollback_tick": {"queue": "learning"},
     "lloydk.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
+    "lloydk.ensure_partitions_tick": {"queue": "index"},  # DDL, 경량 I/O
 }
 
 # P1-A5: Active Learning 주기 트리거 (Celery beat).
@@ -69,6 +72,13 @@ celery_app.conf.beat_schedule = {
         "task": "lloydk.deliver_outbox_tick",
         "schedule": 60.0,
         "kwargs": {"limit": 50},
+    },
+    # #5 파티션 롤오버 — 매일 02:10, 향후 3개월 월 파티션 보장(IF NOT EXISTS 멱등).
+    # baseline은 정적 파티션만 생성하므로 이게 없으면 _default가 비대해진다.
+    "ensure-partitions-daily": {
+        "task": "lloydk.ensure_partitions_tick",
+        "schedule": crontab(minute=10, hour=2),
+        "kwargs": {"months_ahead": 3},
     },
 }
 celery_app.conf.timezone = "Asia/Seoul"

@@ -530,7 +530,7 @@ function renderKeywordChips(evidence) {
     const w = typeof e.weight === "number" ? e.weight : 0;
     const intensity = Math.min(1, Math.max(0.15, w));
     chip.style.background = `rgba(0,0,0,${intensity * 0.12 + 0.04})`;
-    chip.innerHTML = `${e.text} <span class="w">${w.toFixed(2)}</span>`;
+    chip.innerHTML = `${escapeHtml(e.text)} <span class="w">${w.toFixed(2)}</span>`;
     chip.addEventListener("click", () => {
       flashKeywordInBody($("#body-preview"), e.text);
     });

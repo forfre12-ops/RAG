@@ -54,7 +54,8 @@ class ModelEntry:
     dim: int | None
     sha256: str | None
     license: str
-    role: str  # classifier | embedding | llm | embedding_fallback
+    role: str  # classifier | classifier_trained | embedding | llm | embedding_fallback
+    source_path: str | None = None  # 빌드 호스트의 원본 경로(학습 모델 디렉토리 등). 복사 대상.
 
 
 @dataclass
@@ -212,6 +213,22 @@ def extract_models_from_config(config_path: Path) -> list[ModelEntry]:
     return models
 
 
+def resolve_classifier_model_dir(explicit: str | None) -> Path | None:
+    """학습된 분류기 가중치 디렉토리 해석 — 폐쇄망 번들에 동봉할 대상.
+
+    우선순위: --classifier-model-dir 인자 → env CLASSIFIER_MODEL_DIR →
+    env LLOYDK_CLASSIFIER_MODEL_DIR. 미설정이면 None(베이스 모델만 번들 — 경고 대상).
+    서빙은 이 디렉토리에서 가중치 + temperature.json(보정)을 로드하므로, 빠지면
+    폐쇄망에서 미학습·무보정으로 동작한다(#40).
+    """
+    import os  # noqa: PLC0415
+    cand = explicit or os.environ.get("CLASSIFIER_MODEL_DIR") or os.environ.get("LLOYDK_CLASSIFIER_MODEL_DIR")
+    if not cand:
+        return None
+    p = Path(cand)
+    return p if p.exists() else None
+
+
 def default_es_plugins(es_version: str) -> list[PluginEntry]:
     return [
         PluginEntry(name="analysis-nori", version=es_version),
@@ -232,6 +249,7 @@ _COMPONENT_SIZE_GB: dict[str, float] = {
 
 _MODEL_SIZE_GB: dict[str, float] = {
     "classifier": 0.7,
+    "classifier_trained": 0.7,
     "classifier_lightweight": 0.5,
     "embedding": 2.0,
     "embedding_fallback": 2.0,
@@ -305,6 +323,7 @@ def build_manifest(
     dry_run: bool,
     compose_path: Path,
     config_path: Path,
+    classifier_model_dir: Path | None = None,
 ) -> BundleManifest:
     components = extract_components_from_compose(compose_path)
 
@@ -316,6 +335,24 @@ def build_manifest(
         )
 
     models = extract_models_from_config(config_path)
+    # #40: 학습된 분류기 가중치 + temperature.json을 번들에 동봉. config.py가 가리키는
+    # HF 베이스 모델만으론 폐쇄망에서 미학습·무보정으로 동작한다.
+    if classifier_model_dir is not None:
+        has_temp = (classifier_model_dir / "temperature.json").exists()
+        models.append(ModelEntry(
+            name="classifier-trained",
+            dim=None,
+            sha256=None,
+            license="internal-trained",
+            role="classifier_trained",
+            source_path=str(classifier_model_dir),
+        ))
+        if not has_temp:
+            print(
+                f"  [WARN] {classifier_model_dir}/temperature.json 없음 — 보정(temperature) "
+                "미동봉. 서빙이 T=1.0(무보정)로 동작합니다. calibrate_classifier.py 실행 권장.",
+                file=sys.stderr,
+            )
     es_version = components.get("elasticsearch", ComponentEntry("", "8.15.3")).version
     plugins = default_es_plugins(es_version)
     size = estimate_total_size(components, models, plugins)
@@ -687,6 +724,39 @@ def _copy_infra(out_dir: Path) -> None:
     verify_sh.chmod(0o755)
 
 
+def _copy_trained_classifier(manifest: "BundleManifest", out_dir: Path) -> bool:
+    """학습된 분류기 디렉토리(가중치+config+temperature.json)를 models/classifier-trained로 복사.
+
+    manifest.models에 role=classifier_trained 항목이 없으면(=학습 모델 미지정) 경고 후
+    True 반환(베이스 모델만 번들 — 빌드 자체는 실패 아님). 지정됐는데 복사 실패 시 False.
+    """
+    import shutil  # noqa: PLC0415
+
+    trained = next((m for m in manifest.models if m.role == "classifier_trained"), None)
+    if trained is None or not trained.source_path:
+        print(
+            "  [WARN] 학습 분류기 미지정 — 베이스 모델만 번들됩니다(폐쇄망에서 rule-fallback). "
+            "--classifier-model-dir 또는 CLASSIFIER_MODEL_DIR로 학습 가중치를 지정하세요(#40).",
+            file=sys.stderr,
+        )
+        return True
+    src = Path(trained.source_path)
+    if not src.exists():
+        print(f"  [ERR] classifier model dir 없음: {src}", file=sys.stderr)
+        return False
+    dst = out_dir / "models" / "classifier-trained"
+    if dst.exists():
+        print(f"  [skip] already exists: {dst}", file=sys.stderr)
+        return True
+    shutil.copytree(src, dst)
+    has_temp = (dst / "temperature.json").exists()
+    print(
+        f"  [model] classifier-trained -> {dst}  (temperature.json: {'포함' if has_temp else '없음'})",
+        file=sys.stderr,
+    )
+    return True
+
+
 def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
     """실 빌드: docker save + pip download + infra 파일 복사."""
     print("\n=== Lloydk Airgap Bundle - BUILD ===", file=sys.stderr)
@@ -709,6 +779,10 @@ def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
 
     # infra 파일
     _copy_infra(out_dir)
+
+    # #40: 학습된 분류기 모델(가중치 + temperature.json) 복사
+    if not _copy_trained_classifier(manifest, out_dir):
+        failed.append("classifier-trained")
 
     if failed:
         print(f"\n[bundle] partial build — failed: {failed}", file=sys.stderr)
@@ -738,7 +812,14 @@ def main() -> int:
         "--config", default=str(_REPO_ROOT / "src" / "lloydk" / "config.py"),
         help="파싱할 config.py 경로",
     )
+    ap.add_argument(
+        "--classifier-model-dir", default=None,
+        help="학습된 분류기 가중치 디렉토리(가중치+temperature.json). "
+             "미지정 시 env CLASSIFIER_MODEL_DIR/LLOYDK_CLASSIFIER_MODEL_DIR 사용(#40)",
+    )
     args = ap.parse_args()
+
+    classifier_model_dir = resolve_classifier_model_dir(args.classifier_model_dir)
 
     manifest = build_manifest(
         version=args.version,
@@ -746,6 +827,7 @@ def main() -> int:
         dry_run=args.dry_run,
         compose_path=Path(args.compose),
         config_path=Path(args.config),
+        classifier_model_dir=classifier_model_dir,
     )
 
     out_dir = Path(args.output)

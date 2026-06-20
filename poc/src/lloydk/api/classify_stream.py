@@ -16,10 +16,10 @@ import json
 import time
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
-from lloydk.api._jwt_auth import require_auth
+from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
 from lloydk.schemas.classify import ClassifyRequest
 from lloydk.services.classify_service import ClassifyService
 
@@ -90,9 +90,13 @@ async def _classify_stream(req: ClassifyRequest, svc: ClassifyService) -> AsyncG
 
 @router.post("/classify/stream", dependencies=[Depends(require_auth)])
 async def classify_stream(
+    request: Request,
     req: ClassifyRequest,
     svc: ClassifyService = Depends(get_service),
 ):
+    # 보안(IDOR): SSE 스트림 시작 전에 body tenant_id를 인증 컨텍스트에 결속.
+    # 불일치 시 resolve_effective_tenant가 403을 던져 스트림 전에 차단된다.
+    req.tenant_id = resolve_effective_tenant(request, req.tenant_id)
     return StreamingResponse(
         _classify_stream(req, svc),
         media_type="text/event-stream",

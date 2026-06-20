@@ -27,10 +27,14 @@ class LLMResponse:
     meta: dict = field(default_factory=dict)
 
 
-# USD per 1M tokens, 2026-05 시점 공개 단가.
+# USD per 1M tokens (input, output), 2026-06 시점 공개 단가.
+# Opus 4.x는 입력 $5 / 출력 $25 — 과거 $15/$75 표기는 오기였음(비용 3배 과대계상).
+# 기본/권장 모델 claude-opus-4-8 누락 시 estimate_cost_usd 폴백이 cost=0을 기록하므로 명시.
 PRICE_TABLE: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-opus-4-7": (15.0, 75.0),
+    "claude-opus-4-8": (5.0, 25.0),
+    "claude-opus-4-7": (5.0, 25.0),
+    "claude-opus-4-6": (5.0, 25.0),
     "claude-haiku-4-5": (1.0, 5.0),
     "gpt-4o": (2.5, 10.0),
     "gpt-4o-mini": (0.15, 0.6),

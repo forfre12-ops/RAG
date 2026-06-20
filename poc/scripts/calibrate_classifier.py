@@ -77,9 +77,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="A6: temperature scaling calibration")
     parser.add_argument("--val", type=Path, required=False, help="val.jsonl (없으면 dummy)")
     parser.add_argument("--model-dir", type=Path, default=Path("artifacts/classifier"))
-    parser.add_argument("--output", type=Path, default=Path("artifacts/classifier/temperature.json"))
+    # 기본 출력은 model-dir/temperature.json — 서빙(m5 pipeline)이 model_dir에서만 T를
+    # 읽으므로, --output을 생략하면 보정 결과가 서빙이 읽는 곳에 정확히 떨어진다.
+    # (과거 고정 default 'artifacts/classifier/temperature.json'은 --model-dir을 다르게
+    #  주면 죽은 경로에 기록돼 보정이 서빙에 반영되지 않는 사고가 있었다.)
+    parser.add_argument("--output", type=Path, default=None,
+                        help="기본: <model-dir>/temperature.json")
     parser.add_argument("--n-bins", type=int, default=10)
+    parser.add_argument("--allow-dummy", action="store_true",
+                        help="실제 val logits가 없을 때 더미로 진행(검증 전용). 미지정 시 fail-loud.")
     args = parser.parse_args()
+    if args.output is None:
+        args.output = args.model_dir / "temperature.json"
 
     # 실제 학습된 모델이 없으면 dummy logits로 dry 실행
     if args.val and args.val.exists():
@@ -102,6 +111,17 @@ def main() -> int:
             args.val = None
 
     if not args.val or not args.val.exists():
+        # #10: 더미 logits로 적합한 T는 의미 없다 — 실수로 배포되지 않게 fail-loud.
+        # 검증·CI 목적이면 --allow-dummy를 명시해야 진행한다.
+        if not args.allow_dummy:
+            print(
+                "[ERR] 실제 val logits 없음 — 더미 logits로 만든 temperature는 배포 금지.\n"
+                "      --val <logits·label_idx 포함 jsonl>를 제공하거나, 검증 목적이면 "
+                "--allow-dummy를 명시하세요.",
+                file=sys.stderr,
+            )
+            return 1
+        print("[WARN] --allow-dummy: 더미 logits로 진행 — 산출 T는 배포 금지(검증 전용).", file=sys.stderr)
         # dummy: over-confident logits
         logits_list = [
             [3.0, 1.0, 0.5, 0.2], [2.5, 1.2, 0.7, 0.1], [3.5, 0.8, 0.3, 0.1],

@@ -117,6 +117,16 @@ def _try_build_chained_hash(body: bytes) -> str | None:
         return _hash_bytes(body) if body else None
 
 
+def _raw_body_hash(body: bytes) -> str:
+    """체인 패킹 전 raw body sha256(hex). 빈 body는 ""(체인은 빈 payload로 계속).
+
+    #4: 과거엔 dispatch에서 prev를 락 없이 미리 읽어 체인을 만들었다(payload_hash). 동시
+    요청이 같은 prev를 읽어 체인이 분기됐다. 이제 dispatch는 raw 해시만 만들고, prev-read+
+    패킹은 _record의 advisory-locked insert 트랜잭션 안에서 수행한다(build_chained_hash_locked).
+    """
+    return _hash_bytes(body) if body else ""
+
+
 async def _read_body(request: Request) -> bytes:
     """body를 한 번만 읽고, 다운스트림 핸들러가 재사용할 수 있게 cache."""
     body = await request.body()
@@ -144,10 +154,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
             logger.debug("audit payload_hash skipped: %s", exc)
             body = b""
 
-        # A2 (2026-05-29): 단순 sha256 대신 chained hash로 저장.
-        # 형식 prev16:full32 — verify_chain이 진짜 재계산 가능. DB·chain 모듈 부재 시
-        # 기존 sha256 폴백(하위호환). _try_build_chained_hash는 모든 예외를 silent 처리.
-        payload_hash = _try_build_chained_hash(body)
+        # #4: dispatch는 raw body sha256만 계산. 체이닝(prev 읽기 + prev16:full32 패킹)은
+        # _record의 advisory-locked insert 트랜잭션에서 수행해 동시요청 체인 분기를 막는다.
+        payload_hash = _raw_body_hash(body)
 
         response: Response | None = None
         error_code: str | None = None
@@ -230,15 +239,25 @@ class AuditMiddleware(BaseHTTPMiddleware):
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent")
 
+        # #4: prev-read + insert를 같은 advisory-locked 트랜잭션에 묶어 체인 분기 차단.
+        try:
+            from lloydk.services.audit_chain import build_chained_hash_locked  # noqa: PLC0415
+        except ImportError:
+            build_chained_hash_locked = None  # type: ignore[assignment]
+
         try:
             with session_scope() as db:
+                ph = payload_hash
+                if build_chained_hash_locked is not None:
+                    # payload_hash는 raw body 해시(또는 ""). 같은 tx에서 lock→prev→패킹.
+                    ph = build_chained_hash_locked(db, payload_hash or "", tenant_id=None)
                 AuditRepo(db).record(
                     action=action,
                     actor_id=actor_id,
                     actor_role=actor_role,
                     tenant_id=tenant_id,
                     request_id=request_id,
-                    payload_hash=payload_hash,
+                    payload_hash=ph,
                     ip_address=ip,
                     user_agent=ua,
                     success=success,

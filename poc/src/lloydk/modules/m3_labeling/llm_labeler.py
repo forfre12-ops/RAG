@@ -35,7 +35,8 @@ SYSTEM_PROMPT = """당신은 한국 영업비밀 등급분류 가이드(정본)�
 - 보도자료·채용공고·공시(S=0) → S3
 
 출력(JSON only, 다른 텍스트 금지):
-{"grade":"TS|S1|S2|S3","secrecy":0,"value":0,"management":0,"rationale":"1문장"}"""
+{"grade":"TS|S1|S2|S3","secrecy":0,"value":0,"management":0,"confidence":0.0,"rationale":"1문장"}
+- confidence: 이 등급 판단의 확신도(0~1). 요소 점수가 명확하면 1에 가깝게, 모호하면 낮게."""
 
 
 @dataclass
@@ -59,11 +60,38 @@ class LLMLabeler:
         svm_scores = {k: float(parsed[k]) for k in ("secrecy", "value", "management") if k in parsed}
         return LLMLabelResult(
             grade=parsed.get("grade", "S3"),
-            confidence=float(parsed.get("confidence", 0.0)),
+            # LLM이 보고한 confidence를 [0,1]로 클램프해 사용. 누락·무효(과거엔 스키마에
+            # 없어 항상 0.0이 돼 m3 병합 max(llm_conf, score_ratio)에서 LLM 기여가 소거됐다)
+            # 시 SVM 요소 점수의 '결정성'에서 폴백 신뢰도를 유도한다.
+            confidence=_coerce_confidence(parsed.get("confidence"), svm_scores),
             factor_scores=svm_scores,
             rationale=str(parsed.get("rationale", "")),
             raw_text=resp.text,
         )
+
+
+def _coerce_confidence(raw: object, svm: dict[str, float]) -> float:
+    """LLM 보고 confidence를 [0,1]로 정규화. 없거나 무효면 SVM 폴백."""
+    try:
+        v = float(raw)  # type: ignore[arg-type]
+        if 0.0 <= v <= 1.0:
+            return round(v, 4)
+    except (TypeError, ValueError):
+        pass
+    return _svm_confidence(svm)
+
+
+def _svm_confidence(svm: dict[str, float]) -> float:
+    """프롬프트 confidence 부재 시 폴백 — 세 요소 판단의 '결정성'.
+
+    0/2점은 결정적(certainty=1.0), 1점은 모호(0.0). 평균을 0.5~1.0로 사상한다
+    (완전 모호여도 0.5 — 0.0은 LLM 기여를 다시 소거하므로 피한다). 골든셋 누적 후
+    이 폴백이 정답률과 상관되는지 검증해 필요시 margin 기반으로 교체할 것.
+    """
+    if not svm:
+        return 0.5
+    cert = [min(1.0, abs(float(v) - 1.0)) for v in svm.values()]
+    return round(0.5 + 0.5 * (sum(cert) / len(cert)), 4)
 
 
 def _safe_parse_json(text: str) -> dict:

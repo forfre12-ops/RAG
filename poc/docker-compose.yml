@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: lloydk
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dev}
     volumes:
-      - D:/antigravity/rag/docker-data/postgres:/var/lib/postgresql/data
+      - ../docker-data/postgres:/var/lib/postgresql/data
       # 2026-05-28: init.sql 자동 부트스트랩 제거 — alembic baseline 단일 경로로 일원화.
       # 빈 DB 부트스트랩: `docker compose up -d postgres && cd poc && alembic upgrade head`
     ports:
@@ -56,7 +56,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lloydk}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
     volumes:
-      - D:/antigravity/rag/docker-data/minio:/data
+      - ../docker-data/minio:/data
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -67,7 +67,7 @@ services:
     image: redis:7.2-alpine
     command: redis-server --appendonly yes
     volumes:
-      - D:/antigravity/rag/docker-data/redis:/data
+      - ../docker-data/redis:/data
     ports:
       - "6379:6379"
 
@@ -131,7 +131,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./scripts:/app/scripts
-      - D:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
+      - ../docker-data/modelcache:/root/.cache/huggingface
     ports:
       - "8000:8000"
 
@@ -139,7 +139,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    command: celery -A lloydk.workers.celery_app worker -l info
+    # -Q 없이 기동하면 default(celery) 큐만 소비 → task_routes로 classify/index/
+    # synthesis/learning 큐에 보낸 작업이 영영 소비되지 않는다. 모든 큐를 구독한다.
+    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
@@ -155,7 +157,25 @@ services:
       - postgres
     volumes:
       - ./src:/app/src
-      - D:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
+      - ../docker-data/modelcache:/root/.cache/huggingface
+
+  # Celery beat — beat_schedule(drift 15분·auto-rollback 60분·outbox 60초·active-learning
+  # 30분)의 주기 트리거를 발행한다. 이 서비스가 없으면 폐곡선 자동화가 전혀 동작하지 않는다.
+  # 단일 인스턴스만 띄울 것(다중 beat = 중복 tick).
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: celery -A lloydk.workers.celery_app beat -l info
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      REDIS_URL: redis://redis:6379/0
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      - redis
+    volumes:
+      - ./src:/app/src
 
   # D3 (2026-05-29): P2-C7 mTLS 종료 nginx — opt-in profile.
   # 활성: docker compose --profile mtls up -d nginx-mtls
@@ -178,7 +198,8 @@ services:
 
 volumes:
   # esdata만 named volume 유지 — ES는 fsync 빈도가 높아 bind mount(WSL2↔Windows FS) IO 패널티가 큼.
-  # 나머지(postgres/minio/redis/modelcache)는 D:/antigravity/rag/docker-data/ bind mount.
-  # 2026-05-30: 윈도우 재설치로 드라이브 레터 E:→D: 변경되어 경로 수정.
+  # 나머지(postgres/minio/redis/modelcache)는 ../docker-data/ (repo 루트) bind mount.
+  # 2026-06-18: 드라이브 레터 의존 제거 — 절대경로(D:/) → compose 파일 기준 상대경로(../docker-data).
+  #   소스 위치 이동(E:→D:→F:) 시 경로 수정 불필요. docker-data는 repo 루트에 위치(.gitignore 처리됨).
   esdata:
   mlflow_data:  # MLflow SQLite (Phase 4 야간 작업)

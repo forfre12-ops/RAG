@@ -134,6 +134,29 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <p>알람 없음 — 미탐 셀이 임계 이하입니다.</p>
 {% endif %}
 
+<h2>5. 캘리브레이션 (Confidence ↔ 정확도)</h2>
+{% if calibration %}
+<div class="kpi-grid">
+  <div class="kpi"><div class="v">{{ "%.4f"|format(calibration.ece) }}</div><div class="l">ECE</div></div>
+  <div class="kpi"><div class="v">{{ "%.4f"|format(calibration.brier) }}</div><div class="l">Brier</div></div>
+  <div class="kpi"><div class="v">{{ calibration.sample_count }}</div><div class="l">Samples</div></div>
+</div>
+<table>
+<thead><tr><th>신뢰도 구간</th><th>건수</th><th>평균신뢰도</th><th>정확도</th><th>gap</th></tr></thead>
+<tbody>
+{% for bn in calibration.bins %}
+  <tr><td>{{ "%.1f"|format(bn.lo) }}–{{ "%.1f"|format(bn.hi) }}</td><td>{{ bn.count }}</td>
+      <td>{{ "%.4f"|format(bn.avg_confidence) }}</td><td>{{ "%.4f"|format(bn.accuracy) }}</td>
+      <td>{{ "%.4f"|format(bn.gap) }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<p style="font-size:12px;color:#525252">ECE가 높으면 confidence가 실제 정확도와 어긋남 —
+0.7 게이트의 의미가 약해진다. temperature 재보정(calibrate_classifier.py) 또는 drift 점검 필요.</p>
+{% else %}
+<p><i>캘리브레이션 데이터 없음 (분류·교정 표본 부족).</i></p>
+{% endif %}
+
 </body>
 </html>
 """
@@ -145,6 +168,7 @@ def render_html_report(
     *,
     measured_at: Optional[str] = None,
     include_cm_image: bool = True,
+    calibration: object | None = None,
 ) -> str:
     """평가 결과를 단일 HTML 문자열로 렌더링.
 
@@ -172,4 +196,5 @@ def render_html_report(
         per_class=metrics.per_class,
         cm_png_b64=cm_png_b64,
         alarms=[a.to_dict() for a in cm_result.alarms],
+        calibration=(calibration.to_dict() if hasattr(calibration, "to_dict") else calibration),
     )

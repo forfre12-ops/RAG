@@ -9,7 +9,7 @@ PY ?= python
 VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
-.PHONY: help venv install env infra-up infra-down infra-verify api worker \
+.PHONY: help venv install env infra-up infra-down infra-verify api worker beat \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
@@ -84,7 +84,10 @@ api:
 	uvicorn lloydk.api.app:app --reload --host 0.0.0.0 --port 8000
 
 worker:
-	celery -A lloydk.workers.celery_app worker -l info
+	celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+
+beat:
+	celery -A lloydk.workers.celery_app beat -l info
 
 p4:
 	$(PY) scripts/build_p4_corpus.py

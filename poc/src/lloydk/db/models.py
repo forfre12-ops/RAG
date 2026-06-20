@@ -55,7 +55,7 @@ from lloydk.db.session import Base
 # ============================================================
 
 class Tenant(Base):
-    __tablename__ = "tenants"
+    __tablename__ = "tb_tenants"
 
     tenant_id: Mapped[str] = mapped_column(String(50), primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -72,7 +72,7 @@ class Tenant(Base):
 # ============================================================
 
 class ClassificationLevel(Base):
-    __tablename__ = "classification_levels"
+    __tablename__ = "tb_classification_levels"
 
     level_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     level_code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
@@ -92,7 +92,7 @@ class ClassificationLevel(Base):
 
 
 class EvaluationFactor(Base):
-    __tablename__ = "evaluation_factors"
+    __tablename__ = "tb_evaluation_factors"
 
     factor_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     factor_code: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
@@ -105,13 +105,13 @@ class EvaluationFactor(Base):
 
 
 class LevelKeyword(Base):
-    __tablename__ = "level_keywords"
+    __tablename__ = "tb_level_keywords"
 
     keyword_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     keyword: Mapped[str] = mapped_column(String(200), nullable=False)
     pattern_type: Mapped[str] = mapped_column(String(20), nullable=False, default="exact")
-    factor_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_factors.factor_id", ondelete="RESTRICT"))
+    factor_id: Mapped[int | None] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"))
     weight: Mapped[float | None] = mapped_column(Numeric(3, 2), default=1.0)
     source: Mapped[str | None] = mapped_column(String(30), default="manual")
     example_context: Mapped[str | None] = mapped_column(Text)
@@ -135,10 +135,10 @@ class LevelKeyword(Base):
 # ============================================================
 
 class Document(Base):
-    __tablename__ = "documents"
+    __tablename__ = "tb_documents"
 
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.tenant_id"), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tb_tenants.tenant_id"), nullable=False)
     external_ref: Mapped[str | None] = mapped_column(String(100))
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
     source_format: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -193,7 +193,7 @@ class Document(Base):
 
 class Chunk(Base):
     """청크 파티션 부모. 실제 INSERT는 월별 子 파티션으로 자동 라우팅."""
-    __tablename__ = "chunks"
+    __tablename__ = "tb_chunks"
 
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), server_default=func.gen_random_uuid())
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -223,10 +223,10 @@ class Chunk(Base):
 # ============================================================
 
 class DocumentLabel(Base):
-    __tablename__ = "document_labels"
+    __tablename__ = "tb_document_labels"
 
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="CASCADE"), primary_key=True)
-    level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
+    level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     labeled_by: Mapped[str] = mapped_column(String(30), nullable=False)
     labeler_id: Mapped[str | None] = mapped_column(String(50))
     confidence: Mapped[float | None] = mapped_column(Numeric(3, 2))
@@ -244,14 +244,16 @@ class DocumentLabel(Base):
 
 
 class DocumentFactorScore(Base):
-    __tablename__ = "document_factor_scores"
+    __tablename__ = "tb_document_factor_scores"
 
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="CASCADE"), primary_key=True)
-    factor_id: Mapped[int] = mapped_column(ForeignKey("evaluation_factors.factor_id", ondelete="RESTRICT"), primary_key=True)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
+    factor_id: Mapped[int] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"), primary_key=True)
     score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
 
     __table_args__ = (
-        CheckConstraint("score >= 0 AND score <= 5", name="ck_dfs_score_range"),
+        # 정본 B안 3요건(S·V·M)은 0·1·2점 — migration c7d8e9f0a1b2가 DB CHECK를
+        # 0~5에서 0~2로 교체. ORM도 동기화(이전엔 0~5로 drift). 제약명도 DB와 일치.
+        CheckConstraint("score >= 0 AND score <= 2", name="ck_dfs_score_0_2"),
     )
 
 
@@ -260,13 +262,13 @@ class DocumentFactorScore(Base):
 # ============================================================
 
 class Classification(Base):
-    __tablename__ = "classifications"
+    __tablename__ = "tb_classifications"
 
     classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="RESTRICT"), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.tenant_id"), nullable=False)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tb_tenants.tenant_id"), nullable=False)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
-    predicted_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    predicted_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
     alternatives: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid")
@@ -294,13 +296,13 @@ class Classification(Base):
 
 
 class ClassificationEvidence(Base):
-    __tablename__ = "classification_evidence"
+    __tablename__ = "tb_classification_evidence"
 
     evidence_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classifications.classification_id", ondelete="CASCADE"), nullable=False)
+    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     evidence_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    factor_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_factors.factor_id", ondelete="RESTRICT"))
+    factor_id: Mapped[int | None] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"))
     excerpt: Mapped[str] = mapped_column(Text, nullable=False)
     excerpt_start: Mapped[int | None] = mapped_column(Integer)
     excerpt_end: Mapped[int | None] = mapped_column(Integer)
@@ -321,7 +323,7 @@ class ClassificationEvidence(Base):
 # ============================================================
 
 class ModelVersion(Base):
-    __tablename__ = "model_versions"
+    __tablename__ = "tb_model_versions"
 
     version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     version_label: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
@@ -337,7 +339,7 @@ class ModelVersion(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     activated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     deactivated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
-    rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("model_versions.version_id"))
+    rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     rollback_reason: Mapped[str | None] = mapped_column(Text)
     level_snapshot: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -355,10 +357,10 @@ class ModelVersion(Base):
 
 
 class TrainingRun(Base):
-    __tablename__ = "training_runs"
+    __tablename__ = "tb_training_runs"
 
     run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    model_version: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("model_versions.version_id"))
+    model_version: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     mlflow_run_id: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), default="queued")
     started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
@@ -389,9 +391,9 @@ class TrainingRun(Base):
 
 
 class TrainingEpoch(Base):
-    __tablename__ = "training_epochs"
+    __tablename__ = "tb_training_epochs"
 
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("training_runs.run_id", ondelete="CASCADE"), primary_key=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), primary_key=True)
     epoch: Mapped[int] = mapped_column(Integer, primary_key=True)
     train_loss: Mapped[float | None] = mapped_column(Numeric)
     val_loss: Mapped[float | None] = mapped_column(Numeric)
@@ -401,13 +403,13 @@ class TrainingEpoch(Base):
 
 
 class TrainingDataset(Base):
-    __tablename__ = "training_datasets"
+    __tablename__ = "tb_training_datasets"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("training_runs.run_id", ondelete="CASCADE"), nullable=False)
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="RESTRICT"), nullable=False)
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), nullable=False)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
     split_type: Mapped[str] = mapped_column(String(10), nullable=False)
-    level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("run_id", "doc_id", name="uq_td_run_doc"),
@@ -421,17 +423,17 @@ class TrainingDataset(Base):
 # ============================================================
 
 class Correction(Base):
-    __tablename__ = "corrections"
+    __tablename__ = "tb_corrections"
 
     correction_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classifications.classification_id", ondelete="CASCADE"), nullable=False)
-    original_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
-    corrected_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
+    original_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    corrected_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)
     corrected_by: Mapped[str] = mapped_column(String(50), nullable=False)
     corrected_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    consumed_in_run: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("training_runs.run_id"))
+    consumed_in_run: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id"))
     consumed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
@@ -453,7 +455,7 @@ class Correction(Base):
 # ============================================================
 
 class PromptVersion(Base):
-    __tablename__ = "prompt_versions"
+    __tablename__ = "tb_prompt_versions"
 
     prompt_version: Mapped[str] = mapped_column(String(30), primary_key=True)
     chain_stage: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -467,16 +469,16 @@ class PromptVersion(Base):
 
 
 class SampleDocument(Base):
-    __tablename__ = "sample_documents"
+    __tablename__ = "tb_sample_documents"
 
     sample_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id"))
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.tenant_id"), nullable=False)
-    target_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id"))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tb_tenants.tenant_id"), nullable=False)
+    target_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     doc_type: Mapped[str | None] = mapped_column(String(50))
-    outline_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("prompt_versions.prompt_version"))
-    body_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("prompt_versions.prompt_version"))
-    qc_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("prompt_versions.prompt_version"))
+    outline_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
+    body_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
+    qc_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
     llm_provider: Mapped[str] = mapped_column(String(30), nullable=False)
     llm_model: Mapped[str] = mapped_column(String(50), nullable=False)
     generated_outline: Mapped[str | None] = mapped_column(Text)
@@ -504,7 +506,7 @@ class SampleDocument(Base):
 
 class LlmUsage(Base):
     """월별 파티션 부모. INSERT는 called_at 기준 자동 라우팅."""
-    __tablename__ = "llm_usage"
+    __tablename__ = "tb_llm_usage"
 
     usage_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
     provider: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -512,7 +514,7 @@ class LlmUsage(Base):
     purpose: Mapped[str] = mapped_column(String(30), nullable=False)
     reference_type: Mapped[str | None] = mapped_column(String(20))
     reference_id: Mapped[str | None] = mapped_column(String(100))
-    tenant_id: Mapped[str | None] = mapped_column(ForeignKey("tenants.tenant_id"))
+    tenant_id: Mapped[str | None] = mapped_column(ForeignKey("tb_tenants.tenant_id"))
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     # total_tokens는 DB측 generated column. ORM은 server_default 미설정으로 read-only처럼 처리.
@@ -538,7 +540,7 @@ class LlmUsage(Base):
 
 class AuditLog(Base):
     """월별 파티션 부모. 모든 API 호출 기록 (영업비밀 시스템 필수, doc/04 §9.5)."""
-    __tablename__ = "audit_log"
+    __tablename__ = "tb_audit_log"
 
     audit_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
     request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -574,7 +576,7 @@ class AuditLog(Base):
 
 class Guide(Base):
     """가이드 문서 업로드 이력 — GuideService in-memory 대체."""
-    __tablename__ = "guides"
+    __tablename__ = "tb_guides"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     guide_id: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -592,6 +594,9 @@ class Guide(Base):
     registered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
+        # 동시 업로드 시 중복 버전 행 방지(최종 방어선) — GuideRepo.upsert의
+        # select-then-insert는 락이 없어 race에서 중복을 만들 수 있다.
+        UniqueConstraint("guide_id", "version", "tenant_id", name="uq_guides_id_version_tenant"),
         Index("idx_guides_guide_id", "guide_id"),
         Index("idx_guides_tenant_guide", "tenant_id", "guide_id"),
         Index("idx_guides_registered", "registered_at"),

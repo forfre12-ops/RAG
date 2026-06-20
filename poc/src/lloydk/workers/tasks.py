@@ -273,6 +273,21 @@ def deliver_outbox_tick(limit: int = 50) -> dict:
     return out
 
 
+@celery_app.task(name="lloydk.ensure_partitions_tick")
+def ensure_partitions_tick(months_ahead: int = 3) -> dict:
+    """월별 RANGE 파티션 롤오버 (#5) — beat가 매일 호출.
+
+    향후 N개월 파티션을 미리 생성해 _default 비대화·프루닝 무력화를 막는다.
+    CREATE IF NOT EXISTS라 멱등. failed가 있으면 롤오버 지연(런북 필요)이라 경고.
+    """
+    from lloydk.services.partitions import ensure_partitions  # noqa: PLC0415
+
+    out = ensure_partitions(months_ahead=months_ahead)
+    if out.get("failed"):
+        logger.warning("ensure_partitions_tick: 일부 파티션 생성 실패 — %s", out["failed"])
+    return out
+
+
 @celery_app.task(name="lloydk.auto_rollback_tick")
 def auto_rollback_tick() -> dict:
     """C-ver 자동 롤백 주기 점검 — 활성 모델 라이브 미탐 회귀 시 직전 활성으로 복귀.
