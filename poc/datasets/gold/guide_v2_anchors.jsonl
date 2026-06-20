@@ -9,7 +9,7 @@
 {"kind": "factor_level_example", "factor": "management", "level": 2, "examples": ["제품/공정 정보", "경영계획"], "provenance": "guide_p11", "note": "승인된 자에 한해 공개되는 정보"}
 {"kind": "svm_anchor", "doc_type": "조직도", "secrecy": 1, "value": 1, "management": 1, "svm": 1, "grade": "S2", "provenance": "guide_p12", "authoritative": true}
 {"kind": "svm_anchor", "doc_type": "내선번호", "secrecy": 0, "value": 0, "management": 0, "svm": 0, "grade": "S3", "provenance": "guide_p12", "authoritative": true}
-{"kind": "svm_anchor", "doc_type": "인사평가보고서", "secrecy": 1, "value": 2, "management": 2, "svm": 4, "grade": "S1", "provenance": "guide_p12", "authoritative": true}
+{"kind": "svm_anchor", "doc_type": "인사평가보고서", "secrecy": 1, "value": 2, "management": 2, "svm": 4, "grade": "S2", "provenance": "guide_p12", "authoritative": true, "guide_p12_grade": "S1", "note": "v2.2 보정: 가이드 p12 원본은 곱4→1급(S1)이나, s<2(완전 비공개 아님)면 1급 상향 보류 → S2. 적용서 §3.7 차이 #6."}
 {"kind": "svm_anchor", "doc_type": "중장기 경영계획", "secrecy": 2, "value": 2, "management": 2, "svm": 8, "grade": "TS", "provenance": "guide_p12", "authoritative": true, "note": "p6 예시표는 동일 문서를 1급(S1)으로 분류 — 변이. 발주처 협의 필요(README 참조)."}
 {"kind": "svm_anchor", "doc_type": "사무실 배치도", "secrecy": 1, "value": 1, "management": 0, "svm": 0, "grade": "S3", "provenance": "guide_p12", "authoritative": true, "note": "M=0(관리성 없음) → 곱=0 → 공개. 곱셈 게이트 예시."}
 {"kind": "grade_example", "category": "인사", "doc_type": "인력관리(직원 개인정보·인사기록카드·급여·연봉·조직도)", "grade": "S2", "provenance": "guide_p6", "needs_review": true}

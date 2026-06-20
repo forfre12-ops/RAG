@@ -110,3 +110,14 @@ poc/datasets/patent_proxy/
 poc/datasets/mundane_s3/
 poc/datasets/labeled_p1_retrain_v4_step2/
 poc/datasets/labeled_p1_retrain_v4_step3/
+
+# 대용량 학습데이터·생성물·런타임 산출물 (스크립트로 재생성, 트래킹 금지) — 2026-06-20
+poc/datasets/labeled_bpilot/
+poc/datasets/demo_retrain/
+poc/datasets/drift_train_centroid.json
+# 임시 작업 산출물 / 일회성 스크래치 (_ 접두사 = throwaway 컨벤션)
+poc/.tmp_guide/
+poc/scripts/_*.py
+poc/scripts/_*.json
+# 참고용 클라이언트 PDF (기밀 — 트래킹 금지)
+doc/*.pdf
