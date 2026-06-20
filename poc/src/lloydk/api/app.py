@@ -169,6 +169,13 @@ class BodySizeLimitMiddleware:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # #30: 구조화(JSON) 로깅 — opt-in. LLOYDK_LOG_JSON truthy일 때만 root logger 교체.
+    #      미설정(기본)이면 완전 no-op이라 기존 로깅·테스트 출력을 보존한다.
+    try:
+        from lloydk.obs.otel import setup_logging  # noqa: PLC0415
+        setup_logging()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("structured logging setup skipped: %s", exc)
     # 배포 프로파일 + 적용된 backend 부팅 로그 — 운영 사고 사전 차단
     logger.info(
         "lloydk startup — profile=%s mode=%s llm=%s embedding=%s reranker=%s "

@@ -82,3 +82,21 @@ celery_app.conf.beat_schedule = {
     },
 }
 celery_app.conf.timezone = "Asia/Seoul"
+
+
+# #30: 워커 부팅 시점 구조화(JSON) 로깅 setup — opt-in(LLOYDK_LOG_JSON truthy 시에만).
+# worker_process_init은 각 워커 프로세스가 부팅될 때 발생하므로 fork된 자식에도 적용된다.
+# 기본(미설정)은 setup_logging() 내부에서 no-op이라 기존 로깅을 보존한다. import/연결
+# 실패는 모두 흡수 — 로깅 설정이 워커 부팅을 막지 않는다(동작 보존).
+try:
+    from celery.signals import worker_process_init  # noqa: E402
+
+    @worker_process_init.connect
+    def _init_worker_logging(**_kwargs):  # pragma: no cover - 워커 런타임 시그널
+        try:
+            from lloydk.obs.otel import setup_logging
+            setup_logging()
+        except Exception:  # noqa: BLE001
+            pass
+except Exception:  # noqa: BLE001
+    pass

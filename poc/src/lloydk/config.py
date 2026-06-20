@@ -19,9 +19,30 @@ from __future__ import annotations
 import logging
 import os
 
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
+
+# ── #31 설정 검증용 허용 열거값 ──────────────────────────────────────────────
+# 의도: 위험한 값(오타·범위밖·관계위반)이 조용히 통과해 런타임에서 폭발하는 것을
+# 부팅 시점에 fail-fast로 막는다. 단 하위호환 alias(vllm/ollama 등 기존 .env/코드가
+# 쓰는 값)는 반드시 통과시킨다 — 현존 사용값을 깨지 않는 것이 최우선(비파괴).
+# 각 집합은 어댑터 팩토리(adapters/*/__init__.py)의 분기·.env*·테스트 실측값을 합집합으로 둠.
+_VALID_AUTH_MODE = {"api_key", "jwt", "both"}
+# llm: noop/anthropic/openai/google + 로컬 OpenAI 호환(local_openai)와 그 alias들.
+_VALID_LLM_PROVIDER = {
+    "noop", "anthropic", "openai", "google",
+    "local_openai", "vllm", "ollama", "lm_studio",
+}
+# embedding: hash(드라이런)·hf(KURE/BGE). 하위호환 alias 일부 포함(huggingface/kure/bge).
+_VALID_EMBEDDING_PROVIDER = {"hash", "hf", "huggingface", "kure", "kure-v1", "bge", "bgem3"}
+_VALID_RERANKER_PROVIDER = {"noop", "bge", "qwen3"}
+_VALID_VECTOR_BACKEND = {"es", "inmemory"}
+_VALID_STORAGE_BACKEND = {"minio", "seaweedfs", "s3", "local"}
+_VALID_POC_MODE = {"dryrun", "full"}
+_VALID_LABELING_METHOD = {"multiplicative", "additive"}
+_VALID_SOURCE_PRIOR_CAP_GRADE = {"S2", "S3"}
 
 DEPLOY_PROFILES = ("lite-noapi", "lite-cloud", "onprem-local", "full-train")
 
@@ -338,6 +359,187 @@ class Settings(BaseSettings):
     # dryrun: 무거운 모델 다운로드 없이 mock으로 검증
     # full: 실제 모델 로드 (GPU/대용량 필요)
     poc_mode: str = "dryrun"
+
+    # ── #31 검증 로직 ─────────────────────────────────────────────────────────
+    # 배경: 이전엔 field_validator/Field 제약이 전무해 위험한 값(임계 범위밖, 음수 풀크기,
+    # soft>hard 타임리밋, chunk_overlap>=chunk_size, auth_mode/provider 오타 등)이 조용히
+    # 통과해 런타임에서야 터졌다. pydantic v2 validator로 부팅 시점 fail-fast 한다.
+    # 비파괴 원칙: 모든 기존 기본값·.env·conftest 세팅값·프로파일 적용 결과는 통과해야 한다.
+
+    # 1) 비율/임계 — [0,1] 범위여야 하는 필드들.
+    @field_validator(
+        "review_confidence_threshold",
+        "retrain_fnr_high_tolerance",
+        "retrain_f1_drop_tolerance",
+        "rollback_fnr_high_tolerance",
+        "high_grade_review_min_reliability",
+        "classifier_temperature",  # T>0 이지만 통상 (0,~]; 아래서 양수만 확인 → 여기선 제외 불가, 별도 처리
+    )
+    @classmethod
+    def _check_unit_interval(cls, v: float, info) -> float:  # noqa: ANN001
+        # classifier_temperature는 0~1이 아니라 '양수'만 요구(1.0 기본, 1.3 등 >1 정상).
+        if info.field_name == "classifier_temperature":
+            if v <= 0:
+                raise ValueError(f"{info.field_name}는 0보다 커야 합니다 (got {v}).")
+            return v
+        if not (0.0 <= v <= 1.0):
+            raise ValueError(f"{info.field_name}는 0~1 범위여야 합니다 (got {v}).")
+        return v
+
+    # escalation τ: None(순수 argmax) 허용, 값이면 0<τ<1 (양 끝 배제 — 0/1은 의미 없음).
+    @field_validator("classifier_escalation_tau")
+    @classmethod
+    def _check_escalation_tau(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if not (0.0 < v < 1.0):
+            raise ValueError(f"classifier_escalation_tau는 None이거나 0<τ<1 이어야 합니다 (got {v}).")
+        return v
+
+    # 2) 양수/음수 제약 — 풀·업로드·청크·시퀀스·타임리밋 등.
+    @field_validator("db_pool_size", "max_upload_mb", "max_request_body_mb", "chunk_size", "max_seq_len")
+    @classmethod
+    def _check_ge_one(cls, v: int, info) -> int:  # noqa: ANN001
+        if v < 1:
+            raise ValueError(f"{info.field_name}는 1 이상이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("db_max_overflow", "ocr_max_pages")
+    @classmethod
+    def _check_ge_zero(cls, v: int, info) -> int:  # noqa: ANN001
+        # ocr_max_pages는 0 이하=무제한(명시적 opt-out)이라 음수도 의미상 허용되지만,
+        # 혼란을 줄이기 위해 음수는 금지(0=무제한으로 통일).
+        if v < 0:
+            raise ValueError(f"{info.field_name}는 0 이상이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator(
+        "celery_task_soft_time_limit",
+        "celery_task_time_limit",
+        "celery_result_expires",
+        "celery_worker_max_tasks_per_child",
+    )
+    @classmethod
+    def _check_positive(cls, v: int, info) -> int:  # noqa: ANN001
+        if v <= 0:
+            raise ValueError(f"{info.field_name}는 양수여야 합니다 (got {v}).")
+        return v
+
+    @field_validator("reranker_top_k", "rag_default_top_k")
+    @classmethod
+    def _check_top_k(cls, v: int, info) -> int:  # noqa: ANN001
+        if v < 1:
+            raise ValueError(f"{info.field_name}는 1 이상이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("rag_index_chunk_size")
+    @classmethod
+    def _check_rag_chunk_size(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError(f"rag_index_chunk_size는 1 이상이어야 합니다 (got {v}).")
+        return v
+
+    @field_validator("rag_index_chunk_overlap", "chunk_overlap", "rollback_min_samples")
+    @classmethod
+    def _check_nonneg_int(cls, v: int, info) -> int:  # noqa: ANN001
+        if v < 0:
+            raise ValueError(f"{info.field_name}는 0 이상이어야 합니다 (got {v}).")
+        return v
+
+    # 4) 열거값 — 알려진 집합 검증(오타 fail-fast). 하위호환 alias는 모두 포함했다.
+    #    case-insensitive 비교(.lower()) — Settings.model_config의 case_sensitive=False 와 정합.
+    #    deploy_profile은 의도적으로 검증하지 않는다: apply_profile_defaults가 unknown을
+    #    '경고 후 skip'으로 처리(test_unknown_profile_is_skipped가 weird-mode를 통과시킴).
+    @field_validator("auth_mode")
+    @classmethod
+    def _check_auth_mode(cls, v: str) -> str:
+        if v.lower() not in _VALID_AUTH_MODE:
+            raise ValueError(f"auth_mode는 {sorted(_VALID_AUTH_MODE)} 중 하나여야 합니다 (got {v!r}).")
+        return v
+
+    @field_validator("llm_provider")
+    @classmethod
+    def _check_llm_provider(cls, v: str) -> str:
+        if v.lower() not in _VALID_LLM_PROVIDER:
+            raise ValueError(f"llm_provider는 {sorted(_VALID_LLM_PROVIDER)} 중 하나여야 합니다 (got {v!r}).")
+        return v
+
+    @field_validator("embedding_provider")
+    @classmethod
+    def _check_embedding_provider(cls, v: str) -> str:
+        if v.lower() not in _VALID_EMBEDDING_PROVIDER:
+            raise ValueError(
+                f"embedding_provider는 {sorted(_VALID_EMBEDDING_PROVIDER)} 중 하나여야 합니다 (got {v!r})."
+            )
+        return v
+
+    @field_validator("reranker_provider")
+    @classmethod
+    def _check_reranker_provider(cls, v: str) -> str:
+        if v.lower() not in _VALID_RERANKER_PROVIDER:
+            raise ValueError(
+                f"reranker_provider는 {sorted(_VALID_RERANKER_PROVIDER)} 중 하나여야 합니다 (got {v!r})."
+            )
+        return v
+
+    @field_validator("vector_backend")
+    @classmethod
+    def _check_vector_backend(cls, v: str) -> str:
+        if v.lower() not in _VALID_VECTOR_BACKEND:
+            raise ValueError(f"vector_backend는 {sorted(_VALID_VECTOR_BACKEND)} 중 하나여야 합니다 (got {v!r}).")
+        return v
+
+    @field_validator("storage_backend")
+    @classmethod
+    def _check_storage_backend(cls, v: str) -> str:
+        if v.lower() not in _VALID_STORAGE_BACKEND:
+            raise ValueError(f"storage_backend는 {sorted(_VALID_STORAGE_BACKEND)} 중 하나여야 합니다 (got {v!r}).")
+        return v
+
+    @field_validator("poc_mode")
+    @classmethod
+    def _check_poc_mode(cls, v: str) -> str:
+        if v.lower() not in _VALID_POC_MODE:
+            raise ValueError(f"poc_mode는 {sorted(_VALID_POC_MODE)} 중 하나여야 합니다 (got {v!r}).")
+        return v
+
+    @field_validator("labeling_method")
+    @classmethod
+    def _check_labeling_method(cls, v: str) -> str:
+        if v.lower() not in _VALID_LABELING_METHOD:
+            raise ValueError(f"labeling_method는 {sorted(_VALID_LABELING_METHOD)} 중 하나여야 합니다 (got {v!r}).")
+        return v
+
+    @field_validator("source_prior_cap_grade")
+    @classmethod
+    def _check_source_prior_cap_grade(cls, v: str) -> str:
+        if v.upper() not in _VALID_SOURCE_PRIOR_CAP_GRADE:
+            raise ValueError(
+                f"source_prior_cap_grade는 {sorted(_VALID_SOURCE_PRIOR_CAP_GRADE)} 중 하나여야 합니다 (got {v!r})."
+            )
+        return v
+
+    # 3) 상호관계 — 한 필드만으로 판단 불가한 제약(model_validator, mode='after').
+    #    너무 엄격하면 프로파일 적용·부분 .env를 깨므로 '명백한 모순'만 잡는다.
+    @model_validator(mode="after")
+    def _check_cross_field(self) -> Settings:
+        # celery: soft(우아한 종료 시도) < hard(강제 kill). soft>=hard면 soft가 무의미.
+        if self.celery_task_soft_time_limit >= self.celery_task_time_limit:
+            raise ValueError(
+                "celery_task_soft_time_limit < celery_task_time_limit 이어야 합니다 "
+                f"(soft={self.celery_task_soft_time_limit}, hard={self.celery_task_time_limit})."
+            )
+        # 청크: overlap >= size면 슬라이딩 윈도가 전진하지 못함(무한·중복).
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError(
+                f"chunk_overlap < chunk_size 이어야 합니다 (overlap={self.chunk_overlap}, size={self.chunk_size})."
+            )
+        if self.rag_index_chunk_overlap >= self.rag_index_chunk_size:
+            raise ValueError(
+                "rag_index_chunk_overlap < rag_index_chunk_size 이어야 합니다 "
+                f"(overlap={self.rag_index_chunk_overlap}, size={self.rag_index_chunk_size})."
+            )
+        return self
 
 
 def apply_profile_defaults(s: Settings) -> dict[str, str]:

@@ -21,6 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from lloydk.modules.m2_preprocess.chunker import Chunk as _PreprocessChunk
 from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
 from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
+from lloydk.obs.otel import span  # #29: 비즈니스(수동) span 헬퍼 — 미설치/미활성 시 no-op
 from lloydk.repositories.chunk_repo import ChunkRepo
 from lloydk.repositories.classify_repo import ClassifyRepo
 from lloydk.schemas.classify import ClassifyRequest, ClassifyResponse
@@ -127,151 +128,168 @@ class ClassifyService:
         on_stage: 단계 진입 시 호출되는 콜백. 단계 이름 = stages_emitted 참조.
                   SSE 스트리밍(/classify/stream) 등에서 진척 송신용. 없으면 no-op.
         """
-        notify = on_stage or (lambda _stage: None)
+        # #29: classify 진입 span — 비민감 식별값만(테넌트/문서 유무·모델버전·use_rag).
+        #      문서 본문 등 민감정보는 절대 부착하지 않는다. OTel 미활성 시 no-op.
+        with span(
+            "classify",
+            **{
+                "lloydk.has_tenant": req.tenant_id is not None,
+                "lloydk.has_doc_id": bool(req.doc_id),
+                "lloydk.has_content": bool(req.content),
+                "lloydk.use_rag": bool(req.use_rag),
+                # model_version은 model_dir 폴더명에서 안전 도출(없으면 rule-fallback).
+                # InferencePipeline 자체엔 model_version 속성이 없으므로 직접 참조 금지.
+                "lloydk.model_dir": (
+                    str(self.inference.model_dir.name)
+                    if getattr(self.inference, "model_dir", None) else "rule-fallback"
+                ),
+            },
+        ):
+            notify = on_stage or (lambda _stage: None)
 
-        logger.debug(
-            "classify enter: doc_id=%s tenant=%s use_rag=%s content_len=%d",
-            req.doc_id, req.tenant_id, req.use_rag, len(req.content or ""),
-        )
-        notify("extract")
-        # content가 없으면 normalized_text_uri에서 읽어오기 (doc_id 전용 분류 경로)
-        content = req.content
-        if not content:
-            content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id)
-        if not content:
-            # fail-SECURE (미탐 절대 금지): 본문을 못 읽으면 등급을 판단할 수 없다.
-            # 과거엔 label="S3"(공개)로 폴백했는데, 이는 '읽지 못한 비밀문서를 공개로
-            # 흘리는' 전형적 미탐 경로였다. 보수적으로 최고등급(Grade.TS)으로 격리하고
-            # status를 needs_review로 두어 사람 검수 큐에 강제 노출 — 절대 공개(S3)로
-            # 떨어뜨리지 않는다. (ClassifyResponse.label은 Grade 필수라 UNCLASSIFIED를
-            # 표현할 수 없으므로, 가장 안전한 '최고등급 + 검수필요'로 표현한다.)
-            from lloydk.schemas.common import Grade  # noqa: PLC0415
-            top_grade = self._highest_grade()
-            warnings_acc = [
-                f"content empty and doc_id={req.doc_id!r} not found in storage —"
-                f" cannot classify; fail-SECURE isolating at highest grade"
-                f" ({top_grade}) and routing to human_review (never defaults to public/S3)"
-            ]
+            logger.debug(
+                "classify enter: doc_id=%s tenant=%s use_rag=%s content_len=%d",
+                req.doc_id, req.tenant_id, req.use_rag, len(req.content or ""),
+            )
+            notify("extract")
+            # content가 없으면 normalized_text_uri에서 읽어오기 (doc_id 전용 분류 경로)
+            content = req.content
+            if not content:
+                content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id)
+            if not content:
+                # fail-SECURE (미탐 절대 금지): 본문을 못 읽으면 등급을 판단할 수 없다.
+                # 과거엔 label="S3"(공개)로 폴백했는데, 이는 '읽지 못한 비밀문서를 공개로
+                # 흘리는' 전형적 미탐 경로였다. 보수적으로 최고등급(Grade.TS)으로 격리하고
+                # status를 needs_review로 두어 사람 검수 큐에 강제 노출 — 절대 공개(S3)로
+                # 떨어뜨리지 않는다. (ClassifyResponse.label은 Grade 필수라 UNCLASSIFIED를
+                # 표현할 수 없으므로, 가장 안전한 '최고등급 + 검수필요'로 표현한다.)
+                from lloydk.schemas.common import Grade  # noqa: PLC0415
+                top_grade = self._highest_grade()
+                warnings_acc = [
+                    f"content empty and doc_id={req.doc_id!r} not found in storage —"
+                    f" cannot classify; fail-SECURE isolating at highest grade"
+                    f" ({top_grade}) and routing to human_review (never defaults to public/S3)"
+                ]
+                return ClassifyResponse(
+                    inference_id=uuid.uuid4(),
+                    doc_id=req.doc_id,
+                    label=Grade(top_grade),
+                    confidence=0.0,
+                    scores={top_grade: 1.0},
+                    model_version="none",
+                    elapsed_ms=0,
+                    status="needs_review",
+                    warnings=warnings_acc,
+                )
+            if req.text_already_preprocessed:
+                cleaned = content
+            else:
+                notify("normalize")
+                cleaned = self.preprocess.run_text(content)
+
+            # 표적 2 (2026-05-29): chunks 생성. 영속화는 _try_persist 단계에서 doc/tenant 가용 시 시도.
+            # PoC PreprocessPipeline.chunk()는 외부 의존 없이 항상 동작.
+            try:
+                chunks: list[_PreprocessChunk] = self.preprocess.chunk(cleaned) if cleaned else []
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("classify chunk split failed (fallback []): %s", exc)
+                chunks = []
+
+            # ── Corrections 반영: DB에 검증된 라벨이 있으면 모델 추론 스킵 ───────────
+            # human_review / koipa_case_based / nkt_designated 등 is_verified=True 라벨
+            # 우선순위: human_review > koipa_case_based > llm_judge_consensus > ...
+            verified_label = self._get_verified_label(req.doc_id, req.tenant_id)
+            if verified_label is not None:
+                from lloydk.schemas.common import Grade  # noqa: PLC0415
+                inference_id = uuid.uuid4()
+                logger.info(
+                    "classify doc_id=%s: verified label applied (labeled_by=%s, level=%s) — inference skipped",
+                    req.doc_id, verified_label.labeled_by, verified_label.level_code,
+                )
+                # Audit trail — best-effort DB 기록
+                self._audit_verified_label(
+                    doc_id=req.doc_id,
+                    tenant_id=req.tenant_id or "default",
+                    level_code=verified_label.level_code,
+                    labeled_by=verified_label.labeled_by,
+                    reviewer_id=verified_label.labeler_id,
+                    inference_id=inference_id,
+                )
+                notify("finalize")
+                return ClassifyResponse(
+                    inference_id=inference_id,
+                    doc_id=req.doc_id,
+                    label=Grade(verified_label.level_code),
+                    confidence=float(verified_label.confidence or 0.95),
+                    scores={verified_label.level_code: float(verified_label.confidence or 0.95)},
+                    model_version=f"human_review:{verified_label.labeled_by}",
+                    elapsed_ms=0,
+                    status="staging",
+                    warnings=[
+                        f"verified_label_applied: labeled_by={verified_label.labeled_by},"
+                        f" reviewer={verified_label.labeler_id or 'system'},"
+                        f" level={verified_label.level_code} — inference skipped"
+                    ],
+                )
+
+            # InferencePipeline 내부에서 embed → retrieve → llm을 거치므로,
+            # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
+            notify("embed")
+            notify("retrieve" if req.use_rag else "llm")
+            pred = self.inference.run(
+                text=cleaned,
+                use_rag=req.use_rag,
+                rag_namespace=req.rag_namespace,
+                metadata=self._effective_metadata(req),
+                return_evidence=req.return_evidence,
+            )
+            notify("llm")
+
+            warnings_acc = list(pred.warnings)
+            notify("persist")
+            inference_id, persist_warnings = self._try_persist(req, pred, chunks=chunks)
+            warnings_acc.extend(persist_warnings)
+            notify("finalize")
+
+            # 저신뢰 검수 라우팅: confidence가 임계 미만이면 needs_review로 표시(거부 아님).
+            # 데모 콘솔이 광고하는 'low-confidence 게이트'의 서버측 구현 — 검수자 큐 노출 근거.
+            status = "staging"
+            threshold = self._review_confidence_threshold()
+            if float(pred.confidence) < threshold:
+                status = "needs_review"
+                warnings_acc.append(
+                    f"low-confidence: confidence={float(pred.confidence):.2f} < {threshold:.2f}"
+                    " — review recommended"
+                )
+
+            # [②·③ 충돌] 출처 cap(하향)이 강한 상향 신호(TS/S1)를 덮은 경우 — pipeline이 남긴
+            # cap-conflict 신호 — confidence와 무관하게 검수 라우팅. 진짜 공개문서는 사람이
+            # 즉시 확인하고, 내부 비밀의 '공개' 오태깅(silent miss)은 여기서 걸러진다.
+            if status != "needs_review" and any("cap-conflict" in w for w in warnings_acc):
+                status = "needs_review"
+                warnings_acc.append(
+                    "cap-conflict: source-cap overrode a high content grade — routed to human review"
+                )
+
+            logger.info(
+                "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f status=%s",
+                req.doc_id, inference_id, pred.label, float(pred.confidence), status,
+            )
+
             return ClassifyResponse(
-                inference_id=uuid.uuid4(),
+                inference_id=inference_id,
                 doc_id=req.doc_id,
-                label=Grade(top_grade),
-                confidence=0.0,
-                scores={top_grade: 1.0},
-                model_version="none",
+                label=pred.label,
+                confidence=pred.confidence,
+                scores=pred.scores,
+                evaluation_factors=pred.factors,
+                evidence=pred.evidence,
+                rag_context_used=pred.rag_context,
+                model_version=pred.model_version,
                 elapsed_ms=0,
-                status="needs_review",
+                status=status,
                 warnings=warnings_acc,
             )
-        if req.text_already_preprocessed:
-            cleaned = content
-        else:
-            notify("normalize")
-            cleaned = self.preprocess.run_text(content)
-
-        # 표적 2 (2026-05-29): chunks 생성. 영속화는 _try_persist 단계에서 doc/tenant 가용 시 시도.
-        # PoC PreprocessPipeline.chunk()는 외부 의존 없이 항상 동작.
-        try:
-            chunks: list[_PreprocessChunk] = self.preprocess.chunk(cleaned) if cleaned else []
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("classify chunk split failed (fallback []): %s", exc)
-            chunks = []
-
-        # ── Corrections 반영: DB에 검증된 라벨이 있으면 모델 추론 스킵 ───────────
-        # human_review / koipa_case_based / nkt_designated 등 is_verified=True 라벨
-        # 우선순위: human_review > koipa_case_based > llm_judge_consensus > ...
-        verified_label = self._get_verified_label(req.doc_id, req.tenant_id)
-        if verified_label is not None:
-            from lloydk.schemas.common import Grade  # noqa: PLC0415
-            inference_id = uuid.uuid4()
-            logger.info(
-                "classify doc_id=%s: verified label applied (labeled_by=%s, level=%s) — inference skipped",
-                req.doc_id, verified_label.labeled_by, verified_label.level_code,
-            )
-            # Audit trail — best-effort DB 기록
-            self._audit_verified_label(
-                doc_id=req.doc_id,
-                tenant_id=req.tenant_id or "default",
-                level_code=verified_label.level_code,
-                labeled_by=verified_label.labeled_by,
-                reviewer_id=verified_label.labeler_id,
-                inference_id=inference_id,
-            )
-            notify("finalize")
-            return ClassifyResponse(
-                inference_id=inference_id,
-                doc_id=req.doc_id,
-                label=Grade(verified_label.level_code),
-                confidence=float(verified_label.confidence or 0.95),
-                scores={verified_label.level_code: float(verified_label.confidence or 0.95)},
-                model_version=f"human_review:{verified_label.labeled_by}",
-                elapsed_ms=0,
-                status="staging",
-                warnings=[
-                    f"verified_label_applied: labeled_by={verified_label.labeled_by},"
-                    f" reviewer={verified_label.labeler_id or 'system'},"
-                    f" level={verified_label.level_code} — inference skipped"
-                ],
-            )
-
-        # InferencePipeline 내부에서 embed → retrieve → llm을 거치므로,
-        # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
-        notify("embed")
-        notify("retrieve" if req.use_rag else "llm")
-        pred = self.inference.run(
-            text=cleaned,
-            use_rag=req.use_rag,
-            rag_namespace=req.rag_namespace,
-            metadata=self._effective_metadata(req),
-            return_evidence=req.return_evidence,
-        )
-        notify("llm")
-
-        warnings_acc = list(pred.warnings)
-        notify("persist")
-        inference_id, persist_warnings = self._try_persist(req, pred, chunks=chunks)
-        warnings_acc.extend(persist_warnings)
-        notify("finalize")
-
-        # 저신뢰 검수 라우팅: confidence가 임계 미만이면 needs_review로 표시(거부 아님).
-        # 데모 콘솔이 광고하는 'low-confidence 게이트'의 서버측 구현 — 검수자 큐 노출 근거.
-        status = "staging"
-        threshold = self._review_confidence_threshold()
-        if float(pred.confidence) < threshold:
-            status = "needs_review"
-            warnings_acc.append(
-                f"low-confidence: confidence={float(pred.confidence):.2f} < {threshold:.2f}"
-                " — review recommended"
-            )
-
-        # [②·③ 충돌] 출처 cap(하향)이 강한 상향 신호(TS/S1)를 덮은 경우 — pipeline이 남긴
-        # cap-conflict 신호 — confidence와 무관하게 검수 라우팅. 진짜 공개문서는 사람이
-        # 즉시 확인하고, 내부 비밀의 '공개' 오태깅(silent miss)은 여기서 걸러진다.
-        if status != "needs_review" and any("cap-conflict" in w for w in warnings_acc):
-            status = "needs_review"
-            warnings_acc.append(
-                "cap-conflict: source-cap overrode a high content grade — routed to human review"
-            )
-
-        logger.info(
-            "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f status=%s",
-            req.doc_id, inference_id, pred.label, float(pred.confidence), status,
-        )
-
-        return ClassifyResponse(
-            inference_id=inference_id,
-            doc_id=req.doc_id,
-            label=pred.label,
-            confidence=pred.confidence,
-            scores=pred.scores,
-            evaluation_factors=pred.factors,
-            evidence=pred.evidence,
-            rag_context_used=pred.rag_context,
-            model_version=pred.model_version,
-            elapsed_ms=0,
-            status=status,
-            warnings=warnings_acc,
-        )
 
     @staticmethod
     def _highest_grade() -> str:
