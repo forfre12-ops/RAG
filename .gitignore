@@ -115,6 +115,7 @@ poc/datasets/labeled_p1_retrain_v4_step3/
 poc/datasets/labeled_bpilot/
 poc/datasets/demo_retrain/
 poc/datasets/drift_train_centroid.json
+poc/datasets/drift_state.json
 # 임시 작업 산출물 / 일회성 스크래치 (_ 접두사 = throwaway 컨벤션)
 poc/.tmp_guide/
 poc/scripts/_*.py
