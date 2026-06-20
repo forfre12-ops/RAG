@@ -131,10 +131,21 @@
 <li>#42 프론트엔드 XSS — <code>api/static/admin.html</code>, <code>api/static/app.js</code></li>
 </ol>
 
-<h2>남은 미착수 (후순위)</h2>
+<h2>3차(Tier 2/3 잔여 전부) — 배치 병렬 구현 완료</h2>
+<p style="font-size:13px;color:#525252">파일분할 병렬구현 → 배치별 통합테스트 → 커밋. 모든 동작변경은 보수적(opt-in/no-op/FNR-safe).</p>
 <ul>
-<li>#11 reviewer_trust recency 편향 (동료 합의 재설계 — 거버넌스 정책 협의 필요)</li>
-<li>#13 batch body ASGI 가드, #14~#39 중 검색·성능·견고성 항목, #26b corrections UNIQUE(Low)</li>
+<li><b>Batch1 견고성</b> <code>422d730</code>: #13 body가드 · #17 고아청크 · #18 provider 재시도 · #19 ES bulk · #20 임베딩 dim · #22 룰 재임베딩 · #24 캐시 플러시 · #33 fullstack 오마킹</li>
+<li><b>Batch2 검색품질</b> <code>1e2491a</code>: #15 split_v2 · #16 인용 집행 · #23 rule-fallback τ · #25 holdout 누수 · #14 이중 RRF</li>
+<li><b>Batch3 운영성</b> <code>81f94a6</code>: #29 OTel span · #30 구조화로깅+Celery trace · #31 config 검증 · #39 drift 히스테리시스</li>
+<li><b>Batch4 데이터/DB/API</b> <code>606036f</code>: #27 N+1 · #28 공유풀 · #32 SSE · #36 storage list/delete · #37 인덱스명 · #38 soft-delete · #26b corrections UNIQUE (마이그레이션 <code>f6a7b8c9d0e1</code>)</li>
+<li><b>Batch5</b> <code>7425ed7</code>: #35 outbox 원자성 · #34 워커 tick 단위테스트</li>
+<li><b>#11 reviewer_trust</b> <code>47da347</code>: self-reference 편향 제거(동료 합의). 임계 정책은 발주처 협의·기본값 보존.</li>
+</ul>
+
+<h2>남은 것 (코드 아님)</h2>
+<ul>
+<li><b>#4/#5 Postgres 실경로 검증</b>: advisory-lock·파티션 DDL은 dialect 가드로 비-PG 우회 → 로컬 lite 미실행. 배포 전 <code>make infra-up &amp;&amp; alembic upgrade head</code> 후 PG로 1회 검증 권장.</li>
+<li><b>#11 신뢰도 임계 정책</b>: <code>high_grade_review_min_reliability</code> 운영값·검토자 자격 — 발주처 협의로 확정.</li>
 </ul>
 
 </body>
