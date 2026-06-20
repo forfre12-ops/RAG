@@ -293,14 +293,22 @@ class TrainingService:
             progress=0.0,
         )
 
-    def list_recent(self, limit: int = 20, status_filter: Optional[str] = None) -> TrainJobList:
-        logger.debug("training list_recent enter: limit=%d filter=%s", limit, status_filter)
+    def list_recent(
+        self, limit: int = 20, status_filter: Optional[str] = None, offset: int = 0
+    ) -> TrainJobList:
+        logger.debug(
+            "training list_recent enter: limit=%d offset=%d filter=%s",
+            limit, offset, status_filter,
+        )
         try:
             with session_scope() as db:
                 repo = TrainingRepo(db)
-                runs = repo.list_recent_runs(limit=limit)
-                if status_filter:
-                    runs = [r for r in runs if r.status == status_filter]
+                # status_filter·offset를 DB로 내려 페이지네이션 정합 보장
+                # (이전엔 파이썬 레벨 필터 + total=페이지크기로 부정확).
+                runs = repo.list_recent_runs(
+                    limit=limit, offset=offset, status_filter=status_filter
+                )
+                total = repo.count_runs(status_filter=status_filter)
                 items = [
                     TrainJobSummary(
                         train_job_id=r.run_id,
@@ -313,7 +321,7 @@ class TrainingService:
                     )
                     for r in runs
                 ]
-                return TrainJobList(total=len(items), items=items)
+                return TrainJobList(total=total, items=items)
         except SQLAlchemyError as exc:
             logger.warning("train list skipped: %s", exc)
             return TrainJobList(total=0, items=[])

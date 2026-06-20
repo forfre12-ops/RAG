@@ -29,19 +29,19 @@ _REMAP: list[tuple[str, str]] = [
     ("LEAK_IMPACT", "VALUE"),       # 유출영향도는 VALUE로 흡수(R4)
     ("MANAGEMENT_LEVEL", "MANAGEMENT"),
 ]
-_FK_TABLES = ("level_keywords", "document_factor_scores", "classification_evidence")
+_FK_TABLES = ("tb_level_keywords", "tb_document_factor_scores", "tb_classification_evidence")
 _LEGACY_CODES = ("ECONOMIC_VALUE", "NON_PUBLICITY", "MANAGEMENT_LEVEL", "LEAK_IMPACT")
 
 
 def upgrade() -> None:
     # 1) weight 합계=1.0 트리거 제거 (먼저 — 이후 factor 변경이 sum=1.0 위반으로 막히지 않게)
-    op.execute("DROP TRIGGER IF EXISTS trg_factor_weights_sum ON evaluation_factors;")
+    op.execute("DROP TRIGGER IF EXISTS trg_factor_weights_sum ON tb_evaluation_factors;")
     op.execute("DROP FUNCTION IF EXISTS check_factor_weights_sum();")
 
     # 2) 정본 3요건 seed (weight 미사용 — 곱셈식. KeyError 방지용 1.0)
     op.execute(
         """
-        INSERT INTO evaluation_factors (factor_code, factor_name, weight, is_active) VALUES
+        INSERT INTO tb_evaluation_factors (factor_code, factor_name, weight, is_active) VALUES
           ('SECRECY',    '비공지성(S)',      1.0, TRUE),
           ('VALUE',      '경제적 유용성(V)', 1.0, TRUE),
           ('MANAGEMENT', '비밀관리성(M)',    1.0, TRUE)
@@ -55,25 +55,25 @@ def upgrade() -> None:
             op.execute(
                 f"""
                 UPDATE {tbl} SET factor_id =
-                    (SELECT factor_id FROM evaluation_factors WHERE factor_code = '{canon}')
+                    (SELECT factor_id FROM tb_evaluation_factors WHERE factor_code = '{canon}')
                 WHERE factor_id =
-                    (SELECT factor_id FROM evaluation_factors WHERE factor_code = '{legacy}');
+                    (SELECT factor_id FROM tb_evaluation_factors WHERE factor_code = '{legacy}');
                 """
             )
 
     # 4) 레거시 4요소 비활성화 (삭제 시 FK RESTRICT 위반 → 비활성으로 레지스트리에서 제외)
     legacy_in = ", ".join(f"'{c}'" for c in _LEGACY_CODES)
     op.execute(
-        f"UPDATE evaluation_factors SET is_active = FALSE WHERE factor_code IN ({legacy_in});"
+        f"UPDATE tb_evaluation_factors SET is_active = FALSE WHERE factor_code IN ({legacy_in});"
     )
 
     # 5) document_factor_scores.score CHECK 0~5 → 0~2 (S/V/M 각 0·1·2)
     #    컬럼 타입(DECIMAL)은 유지 — 값 제약만 변경(비침습).
     op.execute(
-        "ALTER TABLE document_factor_scores DROP CONSTRAINT IF EXISTS document_factor_scores_score_check;"
+        "ALTER TABLE tb_document_factor_scores DROP CONSTRAINT IF EXISTS document_factor_scores_score_check;"
     )
     op.execute(
-        "ALTER TABLE document_factor_scores ADD CONSTRAINT ck_dfs_score_0_2 "
+        "ALTER TABLE tb_document_factor_scores ADD CONSTRAINT ck_dfs_score_0_2 "
         "CHECK (score >= 0 AND score <= 2);"
     )
 
@@ -82,18 +82,18 @@ def downgrade() -> None:
     # lossy: 정본→레거시 factor_id 역remap은 모호(VALUE←ECONOMIC_VALUE|LEAK_IMPACT)하므로 생략.
     # CHECK·활성상태·트리거만 원복.
     op.execute(
-        "ALTER TABLE document_factor_scores DROP CONSTRAINT IF EXISTS ck_dfs_score_0_2;"
+        "ALTER TABLE tb_document_factor_scores DROP CONSTRAINT IF EXISTS ck_dfs_score_0_2;"
     )
     op.execute(
-        "ALTER TABLE document_factor_scores ADD CONSTRAINT document_factor_scores_score_check "
+        "ALTER TABLE tb_document_factor_scores ADD CONSTRAINT document_factor_scores_score_check "
         "CHECK (score >= 0 AND score <= 5);"
     )
     legacy_in = ", ".join(f"'{c}'" for c in _LEGACY_CODES)
     op.execute(
-        f"UPDATE evaluation_factors SET is_active = TRUE WHERE factor_code IN ({legacy_in});"
+        f"UPDATE tb_evaluation_factors SET is_active = TRUE WHERE factor_code IN ({legacy_in});"
     )
     op.execute(
-        "UPDATE evaluation_factors SET is_active = FALSE "
+        "UPDATE tb_evaluation_factors SET is_active = FALSE "
         "WHERE factor_code IN ('SECRECY', 'VALUE', 'MANAGEMENT');"
     )
     op.execute(
@@ -101,7 +101,7 @@ def downgrade() -> None:
         CREATE OR REPLACE FUNCTION check_factor_weights_sum() RETURNS TRIGGER AS $$
         DECLARE total DECIMAL(4,3);
         BEGIN
-          SELECT COALESCE(SUM(weight), 0) INTO total FROM evaluation_factors WHERE is_active = TRUE;
+          SELECT COALESCE(SUM(weight), 0) INTO total FROM tb_evaluation_factors WHERE is_active = TRUE;
           IF ABS(total - 1.0) > 0.01 THEN
             RAISE EXCEPTION 'evaluation_factors active weight sum must be 1.0 (current: %)', total;
           END IF;
@@ -111,6 +111,6 @@ def downgrade() -> None:
     )
     op.execute(
         "CREATE CONSTRAINT TRIGGER trg_factor_weights_sum AFTER INSERT OR UPDATE OR DELETE "
-        "ON evaluation_factors DEFERRABLE INITIALLY DEFERRED "
+        "ON tb_evaluation_factors DEFERRABLE INITIALLY DEFERRED "
         "FOR EACH ROW EXECUTE FUNCTION check_factor_weights_sum();"
     )

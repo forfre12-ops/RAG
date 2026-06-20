@@ -77,20 +77,25 @@ class SynthesisService:
         status: str = "pending",
         tenant_id: Optional[str] = None,
         limit: int = 50,
+        offset: int = 0,
     ) -> SynthQueueResponse:
-        logger.debug("synth queue enter: status=%s tenant=%s limit=%d", status, tenant_id, limit)
+        logger.debug(
+            "synth queue enter: status=%s tenant=%s limit=%d offset=%d",
+            status, tenant_id, limit, offset,
+        )
         # status 매핑: API 'pending' → DB 'pending_review'
         db_status = {"pending": "pending_review", "approved": "approved", "rejected": "rejected"}.get(status, "pending_review")
 
         try:
             with session_scope() as db:
                 repo = SynthRepo(db)
-                samples = (
-                    repo.list_pending_review(tenant_id=tenant_id, limit=limit)
-                    if db_status == "pending_review"
-                    else []
-                )
-                # 승인/반려 조회는 별도 — repo에 메서드 추가 대신 raw query 회피, PoC는 pending만
+                if db_status == "pending_review":
+                    samples = repo.list_pending_review(tenant_id=tenant_id, limit=limit, offset=offset)
+                    # total = limit/offset 무관 전체 건수 (페이지네이션 메타)
+                    total = repo.count_pending_review(tenant_id=tenant_id)
+                else:
+                    # 승인/반려 조회는 PoC 미구현 — pending만 페이지네이션 지원
+                    samples, total = [], 0
                 items = [
                     SyntheticDocItem(
                         synth_id=s.sample_id,
@@ -105,7 +110,7 @@ class SynthesisService:
                     )
                     for s in samples
                 ]
-                return SynthQueueResponse(total=len(items), items=items)
+                return SynthQueueResponse(total=total, items=items)
         except SQLAlchemyError as exc:
             logger.warning("synth queue skipped: %s", exc)
             return SynthQueueResponse(total=0, items=[])

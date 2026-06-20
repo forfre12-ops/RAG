@@ -33,23 +33,28 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SEMANTIC_THRESHOLD = 0.75
 
 
-# ── 정본 가이드 B안: 등급 = 비공지성(S) × 경제적유용성(V) × 비밀관리성(M) ──
-# 각 요소 0/1/2 → 곱 ∈ {0,1,2,4,8}. 한 요소라도 0이면 곱=0 → 공개(S3).
-# (doc/22 v2 §1.2 / 영업비밀 등급분류 가이드 11~12p. 매핑은 DB·설정 오버라이드 가능 — R3)
-SVM_GRADE_MAP: dict[int, str] = {8: "TS", 4: "S1", 2: "S2", 1: "S2", 0: "S3"}
+# ── 정본 가이드 B안 v2.2: 등급 = 비공지성(S) × 경제적유용성(V) × 비밀관리성(M) ──
+# s==2·v==2 분기 선행: m=0이어도 s==2·v==2이면 S1(관리 미공식화 고가치 영업비밀).
+# 이 분기가 없으면 s=2,v=2,m=0 → 곱=0 → S3 미탐 — v2.2 골든셋 FNR 분석에서 명문화.
+# 곱 전용 매핑(아래)은 s=2·v=2·m=0 엣지를 처리하지 못하므로 grade_from_svm() 사용 권장.
+# (doc/22 v2.2 §4.5~§4.6 / 영업비밀 등급분류 가이드 11~12p.)
+SVM_GRADE_MAP: dict[int, str] = {8: "TS", 4: "TS", 2: "S2", 1: "S2", 0: "S3"}  # 근사값 — 직접 사용 금지
 
 
 def grade_from_svm(s: int, v: int, m: int) -> str:
-    """정본 곱셈식 등급 산정 — 등급 = S×V×M.
+    """정본 곱셈식 등급 산정 v2.2 — 등급 = S×V×M + S1 운영 기준.
 
-    8→TS(특급기밀/극비) · 4→S1(1급 비밀) · 1·2→S2(2급 대외비) · 0→S3(3급 공개).
-    범위 비교로 구현해 이론상 곱값(0/1/2/4/8) 외의 입력도 안전하게 처리한다.
+    v2.2 분기 (doc/22 §4.5~§4.6, 골든셋 100건 실증):
+      s==2 AND v==2 → m==0: S1 / m≥1(곱≥4): TS
+      그 외          → 곱≥1: S2 / 곱==0: S3
+
+    s=2,v=2,m=0 → 곱=0이나 S1 확정(관리 미공식화 고가치 영업비밀).
+    s<2 OR v<2이면 최고 등급은 S2(비공지성·경제가치 불완전 → S1/TS 미해당).
     """
-    product = int(s) * int(v) * int(m)
-    if product >= 8:
-        return "TS"
-    if product >= 4:
-        return "S1"
+    s, v, m = int(s), int(v), int(m)
+    product = s * v * m
+    if s == 2 and v == 2:
+        return "TS" if product >= 4 else "S1"
     if product >= 1:
         return "S2"
     return "S3"
@@ -58,11 +63,12 @@ def grade_from_svm(s: int, v: int, m: int) -> str:
 def svm_levels_for_grade(grade: str) -> tuple[int, int, int]:
     """등급을 재구성하는 표준 S/V/M 레벨 (표시 정합용).
 
-    TS→(2,2,2)=8 · S1→(2,2,1)=4 · S2→(1,1,1)=1 · S3→(0,0,0)=0.
-    곱셈 산정값이 FNR-safe 보정으로 최종 등급과 달라질 때, 표시 S/V/M을 최종 등급에
-    정합화해 'S0·V0·M0인데 TS' 같은 모순 표기(검수 신뢰도 훼손)를 막는다.
+    TS→(2,2,2) · S1→(2,2,0) · S2→(1,1,1) · S3→(0,0,0).
+    v2.2: S1 표준형은 (2,2,1)=4가 아닌 (2,2,0)=0 — grade_from_svm(2,2,0)==S1 정합.
+    FNR-safe 보정으로 svm_grade≠chosen일 때 표시 S/V/M을 최종 등급에 맞춰
+    'S0·V0·M0인데 TS' 같은 모순 표기를 막는다. (doc/22 v2.2 §4.5)
     """
-    return {"TS": (2, 2, 2), "S1": (2, 2, 1), "S2": (1, 1, 1), "S3": (0, 0, 0)}.get(grade, (1, 1, 1))
+    return {"TS": (2, 2, 2), "S1": (2, 2, 0), "S2": (1, 1, 1), "S3": (0, 0, 0)}.get(grade, (1, 1, 1))
 
 
 @dataclass
@@ -349,7 +355,9 @@ class LabelRuleEngine:
             )
             s_lv = 0 if (public or content_grade == "S3") else (2 if strong else 1)
             v_lv = 2 if strong else (0 if content_grade == "S3" else 1)
-            m_lv = 2 if has_mgmt else (0 if content_grade == "S3" else 1)
+            # v2.2: S1 전형은 s=2·v=2·m=0 — 관리 키워드 없는 S1 콘텐츠에 m=1을 주면
+            # grade_from_svm(2,2,1)=TS가 되어 FNR-safe가 TS로 과상향시킴.
+            m_lv = 2 if has_mgmt else (0 if content_grade in ("S3", "S1") else 1)
             svm_val = s_lv * v_lv * m_lv
             svm_grade = grade_from_svm(s_lv, v_lv, m_lv)
             final = (

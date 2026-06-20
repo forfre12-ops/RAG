@@ -29,6 +29,7 @@ from lloydk.api import answer as answer_api
 from lloydk.api import prom_metrics as prom_metrics_api
 from lloydk.api import admin as admin_api
 from lloydk.api.middleware import AuditMiddleware
+from lloydk.api._idempotency_mw import IdempotencyMiddleware
 from lloydk.api.prom_metrics import PrometheusMiddleware
 from lloydk.api.rate_limit import limiter, rate_limit_exceeded_handler
 
@@ -157,6 +158,11 @@ app.add_middleware(AuditMiddleware)
 # Prometheus 메트릭 미들웨어 — 모든 요청에 lloydk_requests_total + duration 수집.
 # AuditMiddleware보다 먼저 add_middleware 호출하면 starlette 스택상 더 바깥에 위치.
 app.add_middleware(PrometheusMiddleware)
+
+# 멱등성 미들웨어 — Idempotency-Key 헤더가 있는 변경성 요청을 1회만 처리.
+# AuditMiddleware/Prometheus보다 바깥(나중 add)이라 캐시 히트 시 핸들러·감사 중복 실행 차단.
+# 헤더 없으면 무영향(즉시 통과) — 기존 동작 비파괴.
+app.add_middleware(IdempotencyMiddleware)
 
 # CORS — 운영 origin allowlist는 settings.cors_allow_origins (.env).
 # allow_credentials=False (allow_origins=["*"] 호환).

@@ -29,7 +29,7 @@ its CONTENT to teach the Gate-2 content model. source="공개특허" → gate ca
 
 Usage
 -----
-  python scripts/kipris_bulk_ingest.py --root D:/antigravity/rag/sample --dry-run
+  python scripts/kipris_bulk_ingest.py --root ../sample --dry-run
   python scripts/kipris_bulk_ingest.py --root <bulk_root>            # → datasets/patent_proxy/raw.jsonl
 """
 

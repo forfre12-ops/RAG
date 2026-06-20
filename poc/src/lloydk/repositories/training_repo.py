@@ -6,7 +6,7 @@ import datetime as dt
 import uuid
 from typing import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from lloydk.db.models import (
@@ -84,14 +84,24 @@ class TrainingRepo:
     def get_run(self, run_id: uuid.UUID) -> TrainingRun | None:
         return self.db.get(TrainingRun, run_id)
 
-    def list_recent_runs(self, *, limit: int = 20) -> list[TrainingRun]:
+    def list_recent_runs(
+        self, *, limit: int = 20, offset: int = 0, status_filter: str | None = None
+    ) -> list[TrainingRun]:
+        stmt = select(TrainingRun)
+        if status_filter:
+            stmt = stmt.where(TrainingRun.status == status_filter)
         return list(
             self.db.execute(
-                select(TrainingRun)
-                .order_by(TrainingRun.created_at.desc())
-                .limit(limit)
+                stmt.order_by(TrainingRun.created_at.desc()).limit(limit).offset(offset)
             ).scalars()
         )
+
+    def count_runs(self, *, status_filter: str | None = None) -> int:
+        """페이지네이션 total — limit/offset과 무관한 전체 학습 작업 수."""
+        stmt = select(func.count()).select_from(TrainingRun)
+        if status_filter:
+            stmt = stmt.where(TrainingRun.status == status_filter)
+        return int(self.db.execute(stmt).scalar_one())
 
     # ------------------------------------------------------------
     # TrainingEpoch

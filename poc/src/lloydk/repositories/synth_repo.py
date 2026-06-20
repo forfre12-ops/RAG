@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from lloydk.db.models import PromptVersion, SampleDocument
@@ -54,13 +54,26 @@ class SynthRepo:
         self.db.flush()
         return sd
 
-    def list_pending_review(self, *, tenant_id: str | None = None, limit: int = 50) -> list[SampleDocument]:
+    def list_pending_review(
+        self, *, tenant_id: str | None = None, limit: int = 50, offset: int = 0
+    ) -> list[SampleDocument]:
         stmt = select(SampleDocument).where(SampleDocument.review_status == "pending_review")
         if tenant_id:
             stmt = stmt.where(SampleDocument.tenant_id == tenant_id)
         return list(
-            self.db.execute(stmt.order_by(SampleDocument.created_at).limit(limit)).scalars()
+            self.db.execute(
+                stmt.order_by(SampleDocument.created_at).limit(limit).offset(offset)
+            ).scalars()
         )
+
+    def count_pending_review(self, *, tenant_id: str | None = None) -> int:
+        """페이지네이션 total — limit/offset과 무관한 전체 대기 건수."""
+        stmt = select(func.count()).select_from(SampleDocument).where(
+            SampleDocument.review_status == "pending_review"
+        )
+        if tenant_id:
+            stmt = stmt.where(SampleDocument.tenant_id == tenant_id)
+        return int(self.db.execute(stmt).scalar_one())
 
     def review(
         self,

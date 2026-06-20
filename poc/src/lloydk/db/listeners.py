@@ -3,7 +3,7 @@
 목적:
 - ``chunks`` 테이블은 RANGE PARTITION (created_at) 부모라서 PG 16에서도
   ``documents.doc_id`` 를 가리키는 FK를 받을 수 없음. 결과적으로
-  ``DELETE FROM documents WHERE doc_id=?`` 만 실행하면 ``chunks`` 자식
+  ``DELETE FROM tb_documents WHERE doc_id=?`` 만 실행하면 ``chunks`` 자식
   파티션의 행이 고아로 남고, 감사 추적성·스토리지 회수가 무너진다.
 - 정공법은 ``DocumentService.delete_document`` 트랜잭션 내에서
   ``ChunkRepo.delete_by_doc_id`` → ``DocumentRepo.delete`` → audit_log 순으로

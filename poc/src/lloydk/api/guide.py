@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
+from lloydk.api._rbac import require_role
 from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.schemas.guide import GuideUploadResponse, GuideVersionList
@@ -16,7 +17,14 @@ from lloydk.services.guide_service import GuideService
 router = APIRouter(tags=["guide"], dependencies=[Depends(require_auth)])
 
 
-@router.post("/guide/documents", response_model=GuideUploadResponse, status_code=201)
+# 가이드 문서 업로드(FUN-002)는 전역 기준 문서를 바꾸는 변경성 작업 →
+# admin/kl_backend로 제한. 버전 조회(GET)는 인증된 사용자면 허용(tenant 스코프).
+@router.post(
+    "/guide/documents",
+    response_model=GuideUploadResponse,
+    status_code=201,
+    dependencies=[Depends(require_role("admin", "kl_backend"))],
+)
 async def upload_guide(
     request: Request,
     guide_id: str = Form(...),

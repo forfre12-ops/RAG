@@ -41,32 +41,32 @@ _NEW_INDEXES: list[tuple[str, str]] = [
     (
         "idx_audit_tenant_occurred",
         "CREATE INDEX IF NOT EXISTS idx_audit_tenant_occurred "
-        "ON audit_log (tenant_id, occurred_at)",
+        "ON tb_audit_log (tenant_id, occurred_at)",
     ),
     (
         "idx_cls_tenant_classified",
         "CREATE INDEX IF NOT EXISTS idx_cls_tenant_classified "
-        "ON classifications (tenant_id, classified_at)",
+        "ON tb_classifications (tenant_id, classified_at)",
     ),
     (
         "idx_doc_tenant_uploaded",
         "CREATE INDEX IF NOT EXISTS idx_doc_tenant_uploaded "
-        "ON documents (tenant_id, uploaded_at)",
+        "ON tb_documents (tenant_id, uploaded_at)",
     ),
     (
         "idx_tr_created",
         "CREATE INDEX IF NOT EXISTS idx_tr_created "
-        "ON training_runs (created_at)",
+        "ON tb_training_runs (created_at)",
     ),
     (
         "idx_sd_status_created",
         "CREATE INDEX IF NOT EXISTS idx_sd_status_created "
-        "ON sample_documents (review_status, created_at)",
+        "ON tb_sample_documents (review_status, created_at)",
     ),
     (
         "idx_audit_tenant_action",
         "CREATE INDEX IF NOT EXISTS idx_audit_tenant_action "
-        "ON audit_log (tenant_id, action, occurred_at)",
+        "ON tb_audit_log (tenant_id, action, occurred_at)",
     ),
 ]
 

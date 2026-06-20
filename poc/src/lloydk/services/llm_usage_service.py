@@ -108,7 +108,7 @@ class LLMUsageService:
 
         sql = text(
             """
-            INSERT INTO llm_usage
+            INSERT INTO tb_llm_usage
               (provider, model, purpose, reference_type, reference_id, tenant_id,
                input_tokens, output_tokens, cost_usd, billing_phase, latency_ms,
                success, error_code, called_at)
