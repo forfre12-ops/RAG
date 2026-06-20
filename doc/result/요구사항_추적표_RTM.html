@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>요구사항 추적표 (RTM) — 가이드·RFP → 구현 → 검증 | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --bg-nav:rgba(255,255,255,.88);
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:220px; --article-max:920px; --container:1360px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:4px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 36px;max-width:680px;}
+h2{font-size:clamp(19px,2.6vw,24px);font-weight:700;letter-spacing:-.03em;margin:46px 0 12px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:46px 0 22px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{border-radius:0;padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:0;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.done{background:var(--text);color:var(--bg);}
+.tag.wip{background:#3f3f46;color:#fff;}
+.tag.plan{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.dep{background:#fefce8;color:#92400e;border:1px solid #fbbf24;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="../assets/lloydk_logo_mark.png" alt="Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">요구사항 추적표 (RTM)</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">RTM</span></div>
+  </div>
+</nav>
+
+<div class="article-layout">
+<article>
+
+  <div class="meta-row">
+    <span class="badge">DOC-RTM-01</span>
+    <span class="badge outline">감리 대응</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">2026-06-20</span>
+  </div>
+
+  <h1 class="title">요구사항 추적표 (RTM)</h1>
+  <p class="lede">제안요청서(RFP) 기능·성능 요건과 발주처 정본 가이드 등급기준이 <strong>어느 설계 문서 → 어느 구현(코드) → 어느 검증(테스트)</strong>으로 충족되는지 추적하는 표. 감리의 "요구사항 → 구현 증빙" 요청에 대응한다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">상태 범례</div>
+    <p><span class="tag done">완료</span> PoC 검증 완료 · <span class="tag wip">정밀화</span> 본개발 보강 중 · <span class="tag plan">예정</span> 본개발 착수 · <span class="tag dep">발주처</span> 발주처 자료·결정 의존</p>
+  </div>
+
+  <hr/>
+
+  <div class="section-sep" id="s1">
+    <span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">기능 요건 (FUN)</span>
+  </div>
+  <h2>기능 요구사항 — AI 코어 6모듈</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>요구사항</th><th class="center">모듈</th><th>설계 문서</th><th>구현 (코드)</th><th>검증</th><th class="center">상태</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>FUN-003</code></td>
+          <td>합성문서 생성 — LLM 프롬프트 체인 → 등급 라벨 자동 → 검수 후 학습셋 편입</td>
+          <td class="center">M1</td>
+          <td>백서 §05 데이터 구축</td>
+          <td><code>m3_labeling/seeds.py</code> · 합성 생성 스크립트</td>
+          <td>골든셋 100건 · 합성 라벨 검수</td>
+          <td class="center"><span class="tag done">완료</span></td>
+        </tr>
+        <tr>
+          <td><code>FUN-022</code></td>
+          <td>문서 전처리·청킹 — HWP/DOCX/PDF/XLSX/PPTX 추출 + 정규화 + PII 마스킹</td>
+          <td class="center">M2</td>
+          <td>백서 §04 · 가이드 V3</td>
+          <td><code>m2_preprocess/extractor.py</code></td>
+          <td>HWP/DOCX/PDF 추출 테스트</td>
+          <td class="center"><span class="tag done">완료</span></td>
+        </tr>
+        <tr>
+          <td><code>FUN-023</code></td>
+          <td>가이드 기반 라벨링 — 3요건(S·V·M) 독립 판독(각 0·1·2) → 곱셈 등급 + 근거(키워드·문맥) 출력</td>
+          <td class="center">M3</td>
+          <td><strong>적용서 v2.2 §1.2·§3.7·§4</strong></td>
+          <td><code>m3_labeling/rule_engine.py</code> <code>grade_from_svm()</code></td>
+          <td><code>tests/test_svm_grade.py</code> (10/10) · 골든셋</td>
+          <td class="center"><span class="tag done">완료</span></td>
+        </tr>
+        <tr>
+          <td><code>FUN-004</code></td>
+          <td>분류 모델 학습 — KF-DeBERTa, Train/Val/Test 자동분리, RAG 옵션, 온프렘 GPU</td>
+          <td class="center">M4</td>
+          <td>백서 §03 모델선정 · §06 검증</td>
+          <td><code>m4_training/trainer</code> · <code>p1_train_classifier.py</code> · <code>m2_preprocess/chunker.py</code> <code>split_v2()</code></td>
+          <td>재학습 파이프라인 · MLflow 기록 · <code>tests/test_chunker_v2.py</code></td>
+          <td class="center"><span class="tag wip">정밀화</span></td>
+        </tr>
+        <tr>
+          <td><code>FUN-005</code></td>
+          <td>문서 분류 추론 — 출처+콘텐츠 2단계 판정, 등급체계 자체 수정, 임시저장→관리자 최종확정</td>
+          <td class="center">M5</td>
+          <td>적용서 §3.4·§3.5 · 백서 §04 · 보안 설계서 §04</td>
+          <td><code>m5_inference/pipeline.py</code> · <code>classify_service</code> · <code>api/explain.py</code> · <code>repositories/document_repo.py</code> <code>get()</code> (객체수준 인가)</td>
+          <td>FNR-safe override · verified_label · 콘솔 E2E · <code>tests/test_tenant_isolation_security.py</code> (IDOR)</td>
+          <td class="center"><span class="tag done">완료</span></td>
+        </tr>
+        <tr>
+          <td><code>FUN-024</code></td>
+          <td>검수자 큐 배분 · 심층지표 — confidence 게이트 → 검수자 큐, FNR 핵심관리, 능동학습</td>
+          <td class="center">M5·M6</td>
+          <td>적용서 §3.4 · 테스트전략 §03</td>
+          <td><code>confirm/relabel</code> · <code>m6_evaluation/calibration.py</code> (ECE) · <code>m6_evaluation/reviewer_trust.py</code> (동료합의) · 거버넌스 콘솔</td>
+          <td>능동학습 폐곡선 실측 · <code>tests/test_reviewer_trust.py</code> · <code>test_dual_review.py</code></td>
+          <td class="center"><span class="tag wip">정밀화</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr/>
+
+  <div class="section-sep" id="s2">
+    <span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">가이드 등급기준</span>
+  </div>
+  <h2>발주처 정본 가이드 → 구현 추적</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>가이드 항목</th><th>출처(PDF)</th><th>설계 문서</th><th>구현</th><th>검증</th><th class="center">상태</th></tr></thead>
+      <tbody>
+        <tr><td>3요건 S/V/M 0·1·2 배점</td><td>p11</td><td>적용서 §1.2</td><td><code>FACTOR_SEEDS</code> (S/V/M)</td><td>test_svm_grade · 골든셋</td><td class="center"><span class="tag done">완료</span></td></tr>
+        <tr><td>S×V×M 곱셈 4단계 매핑</td><td>p12</td><td>적용서 §1.2·§3.7</td><td><code>grade_from_svm()</code></td><td>test_svm_grade (워크드 예시)</td><td class="center"><span class="tag done">완료</span></td></tr>
+        <tr><td>직무별 등급 예시표</td><td>p6~9</td><td>적용서 §4.1~4.3</td><td>시드 키워드 · 골든셋 정답지</td><td>골든셋 분류근거 보고서</td><td class="center"><span class="tag done">완료</span></td></tr>
+        <tr><td>v2.2 곱셈 보정 (2·2·0→S1 등)</td><td>p12 정정</td><td>적용서 §3.7·§7.2</td><td><code>grade_from_svm</code> 분기 (토글화 예정)</td><td>골든셋 FNR 실증</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td>A안 5요소 100점 (사람 수기)</td><td>p4~5</td><td>적용서 §6</td><td>미구현 (자가진단 보조 — 선택)</td><td>—</td><td class="center"><span class="tag plan">예정</span></td></tr>
+        <tr><td>공개특허 = S3 (예시 정정)</td><td>p6~9 정정</td><td>적용서 §3.6·§7.2</td><td>Gate-1 출처 게이트</td><td>실데이터 공개특허 코퍼스</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr/>
+
+  <div class="section-sep" id="s3">
+    <span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">성능·관리 요건</span>
+  </div>
+  <h2>성능·프로젝트 관리 요건 (PER / PMR) + 연동</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>요구사항</th><th>설계 문서</th><th>현황</th><th class="center">상태</th></tr></thead>
+      <tbody>
+        <tr><td><code>PMR-002</code></td><td>90% 정확도 측정 기준 + 실데이터 제공</td><td>테스트전략 §02 · 안건서 A3·A5</td><td>측정 기준·실데이터 발주처 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td><code>PER-002</code></td><td>GPU·서버 사양 (학습·서빙)</td><td>백서 §08 배포 · 안건서 A6</td><td>RTX 5070 Ti 실측 · 운영 사양 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td><code>R6</code></td><td>S/M 메타데이터 인터페이스 (KL 연동)</td><td><strong>KL ICD v0.9</strong> · 적용서 §3.5</td><td>출처 1필드만 명세 — 보안표시·접근범위 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td><code>FUN-005a</code></td><td>등급체계 관리자 추가/변경/삭제 (설정화)</td><td>적용서 §3.5 R3 · 부록A</td><td><code>schema/grades</code> API · DB 주도</td><td class="center"><span class="tag done">완료</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">추적 요약</div>
+    <p>기능 요건(FUN) 6모듈 — <strong>4건 완료 · 2건 본개발 정밀화</strong>. 가이드 등급기준 — 핵심 곱셈·예시 <strong>완료</strong>, 보정·공개특허·A안은 발주처 결정/협조 의존. 성능·연동(PER/PMR/R6) — <strong>발주처 합의 후 확정</strong>(화요일 안건 A2·A3·A5·A6 + KL ICD).</p>
+  </div>
+
+  <div class="section-sep" id="sp0"><span class="section-sep-num">★</span><span class="section-sep-line"></span><span class="section-sep-title">본개발 보강 요구 (P0)</span></div>
+  <h2>비기능 요구 — 품질·운영·보안</h2>
+  <p>프로토타입 검증 결과 식별된 본개발 우선 보강 요구. 상세 설계는 보안 설계서·운영 런북·데이터 거버넌스 계획에 정리되어 있다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>요구사항</th><th class="center">영역</th><th>설계 문서</th><th class="center">상태</th></tr></thead>
+    <tbody>
+      <tr><td><code>NFR-DAT-01</code></td><td>인간검증 골든셋 500건+ 구축 · 학습/평가 라벨 순환성 차단 · 게이트 임계 재보정</td><td class="center">데이터</td><td>데이터 거버넌스 계획 §04</td><td class="center"><span class="tag plan">예정</span></td></tr>
+      <tr><td><code>NFR-OPS-01</code></td><td>분산 상태 외부화 — 비동기 실배선(Celery 큐배선·beat 주기작업) · Redis 강제(폴백 fail-closed) · 모델 reload 멀티레플리카 팬아웃</td><td class="center">운영</td><td>운영 런북 §03·§05</td><td class="center"><span class="tag wip">정밀화</span></td></tr>
+      <tr><td><code>NFR-SEC-01</code></td><td>감사 체인 비밀키 + 빈 키 기동 거부(fail-fast) + 정기 무결성 검증·알람 + 정준(canonical) 직렬화로 체인 해시 결정화</td><td class="center">보안</td><td>보안 설계서 §05</td><td class="center"><span class="tag wip">정밀화</span></td></tr>
+      <tr><td><code>NFR-SEC-02</code></td><td>테넌트 격리 deny-by-default + Postgres RLS · 저장 암호화 기본 활성</td><td class="center">보안</td><td>보안 설계서 §04·§06</td><td class="center"><span class="tag plan">예정</span></td></tr>
+      <tr><td><code>NFR-OPS-02</code></td><td>안전망 활성화(자동롤백·서킷브레이커) · 운영 런북·알람룰·SLO 정의</td><td class="center">운영</td><td>운영 런북 §04·§06·§07</td><td class="center"><span class="tag plan">예정</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">하드닝 통제 (SEC / OPS / DQ)</span></div>
+  <h2>보안·운영·품질 하드닝 — 구현·검증 추적</h2>
+  <p>이번 차수에 적용된 보안·운영·데이터무결성·분류/검색 품질·견고성 보강. 각 통제는 구현 파일과 자동화 테스트를 근거로 추적한다. P0 비기능 요구(NFR-SEC·OPS-01)의 일부 항목은 본 표의 통제로 구현 착수되어 정밀화 단계로 갱신됐다.</p>
+
+  <h2>보안 통제</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>요구사항</th><th class="center">영역</th><th>구현 (코드)</th><th>검증</th><th class="center">상태</th></tr></thead>
+    <tbody>
+      <tr><td><code>SEC-IDOR-01</code></td><td>객체수준 인가 — classify·stream·explain 응답 전 소유 테넌트 검증(IDOR 차단)</td><td class="center">보안</td><td><code>api/_jwt_auth.py</code> <code>resolve_effective_tenant()</code> · <code>api/explain.py</code> · <code>repositories/document_repo.py</code> <code>get()</code></td><td><code>tests/test_tenant_isolation_security.py</code> · <code>test_classify_by_doc_id.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>SEC-IDP-01</code></td><td>멱등성 키 격리 — 자격증명·테넌트별 네임스페이스로 키 충돌·교차참조 차단</td><td class="center">보안</td><td><code>api/_idempotency_mw.py</code> <code>_principal_namespace()</code> · <code>services/idempotency.py</code></td><td><code>tests/test_idempotency.py</code> · <code>test_confirm_idempotency.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>SEC-KEY-01</code></td><td>API 키 상수시간 비교 — 타이밍 사이드채널 차단(<code>hmac.compare_digest</code>)</td><td class="center">보안</td><td><code>api/_jwt_auth.py</code> <code>require_auth()</code></td><td><code>tests/test_rbac_security.py</code> · <code>test_audit_w3_d.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>SEC-XSS-01</code></td><td>출력 이스케이프 — 콘솔 근거/사용자입력 렌더 시 HTML 이스케이프, <code>innerHTML</code> 미사용</td><td class="center">보안</td><td><code>api/static/app.js</code> <code>escapeHtml()</code> · <code>static/highlight.js</code>(textContent 조립) · <code>static/admin.html</code></td><td>프런트 렌더 점검 · 침투 점검 항목</td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>SEC-DOS-01</code></td><td>요청 본문 DoS 가드 — content-length 사전검사 + 스트리밍 누적크기 한도, 초과 시 413</td><td class="center">보안</td><td><code>api/app.py</code> <code>BodySizeLimitMiddleware</code> · <code>config.py</code> <code>max_request_body_mb</code></td><td>한도 초과 413 검증</td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>SEC-AUD-01</code></td><td>감사 체인 직렬화 — 정준 JSON(sort_keys) 결정적 직렬화로 해시 체인 안정화</td><td class="center">보안</td><td><code>services/audit_chain.py</code> <code>_stable_payload_repr()</code>·<code>build_chained_hash()</code>·<code>verify_chain()</code></td><td><code>tests/test_audit_chain_wiring.py</code> · <code>test_audit_w3_d.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>운영·데이터무결성 통제</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>요구사항</th><th class="center">영역</th><th>구현 (코드)</th><th>검증</th><th class="center">상태</th></tr></thead>
+    <tbody>
+      <tr><td><code>OPS-CEL-01</code></td><td>Celery 큐 배선·라우팅 + beat 주기작업(능동학습·드리프트·자동롤백·아웃박스·파티션)</td><td class="center">운영</td><td><code>workers/celery_app.py</code> <code>task_routes</code>·<code>beat_schedule</code> · <code>workers/tasks.py</code></td><td><code>tests/test_workers_tasks_tick.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>OPS-PART-01</code></td><td>파티션 롤오버 — 월별 RANGE 파티션 사전 생성(감사·청크·LLM사용), default 적재 방지</td><td class="center">운영</td><td><code>services/partitions.py</code> <code>ensure_partitions()</code> · <code>alembic/…_partition_backfill.py</code></td><td><code>tests/test_workers_tasks_tick.py</code>(ensure_partitions_tick)</td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>OPS-AIR-01</code></td><td>폐쇄망 오프라인 번들 — 모델·이미지·의존성 동봉 + 매니페스트·체크섬</td><td class="center">운영</td><td><code>scripts/build_offline_bundle.py</code> <code>BundleManifest</code> · <code>config.py</code>(onprem-local 프로필)</td><td><code>tests/test_offline_bundle.py</code>(dry-run 검증)</td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>DQ-UNQ-01</code></td><td>데이터 무결성 — corrections·guides UNIQUE 제약(경쟁상태 중복 차단) + 사전 중복정리</td><td class="center">데이터</td><td><code>db/models.py</code> <code>uq_corr_cls_level_by</code>·<code>uq_guides_id_version_tenant</code> · alembic 마이그레이션 2종</td><td><code>tests/test_confirm_idempotency.py</code> · <code>test_corrections_rebuild.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>DQ-SDEL-01</code></td><td>문서 소프트삭제 — <code>deleted_at</code> 컬럼·기본 숨김 조회·멱등 삭제(데이터·청크 보존)</td><td class="center">데이터</td><td><code>db/models.py</code> <code>deleted_at</code> · <code>repositories/document_repo.py</code> <code>soft_delete()</code> · <code>services/document_service.py</code></td><td>소프트삭제 조회필터 · 감사(action=document.soft_delete)</td><td class="center"><span class="tag done">완료</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>분류·검색 품질·견고성 통제</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>ID</th><th>요구사항</th><th class="center">영역</th><th>구현 (코드)</th><th>검증</th><th class="center">상태</th></tr></thead>
+    <tbody>
+      <tr><td><code>DQ-CAL-01</code></td><td>신뢰도 보정 측정 — ECE(기대보정오차)·Brier·신뢰도 빈, DB연계 산출</td><td class="center">품질</td><td><code>m6_evaluation/calibration.py</code> <code>expected_calibration_error()</code>·<code>compute_calibration_from_db()</code></td><td>보정지표 산출 · 평가 리포트 연계</td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>DQ-TAU-01</code></td><td>규칙 폴백 임계 τ — 신뢰도 기반 등급 에스컬레이션(τ 가드, 0&lt;τ&lt;1 검증)</td><td class="center">품질</td><td><code>m5_inference/pipeline.py</code> <code>_escalation_tau</code>·<code>_select_pred_idx()</code></td><td><code>tests/test_escalation_tau.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>DQ-SPL-01</code></td><td>split_v2 — 헤딩 보존 + 문장경계 하이브리드 청킹(운영 권장)</td><td class="center">품질</td><td><code>m2_preprocess/chunker.py</code> <code>split_v2()</code></td><td><code>tests/test_chunker_v2.py</code> · <code>test_audit_w2_c.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>DQ-CIT-01</code></td><td>인용 집행 — 출처내 근거·인용번호 강제, out-of-range 인용 시 결정적 답변 강등(opt-in)</td><td class="center">품질</td><td><code>rag/answer.py</code> <code>build_answer_prompt()</code>·<code>_citation_warnings()</code> · <code>schemas/rag_answer.py</code></td><td><code>tests/test_rag_answer_service.py</code> · <code>test_api_answer.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>DQ-RRF-01</code></td><td>이중 RRF — 다중쿼리 확장 시 외부 RRF 적용, 단일 결과셋은 이중융합 방지</td><td class="center">검색</td><td><code>rag/retrieval.py</code> <code>_rrf_combine()</code>·<code>expand_then_search()</code> · <code>services/retrieval.py</code></td><td><code>tests/test_retrieval_facade.py</code> · <code>test_retrieval_reranker.py</code> · <code>test_es_store.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>DQ-REV-01</code></td><td>검수자 동료합의 — 최종합의 대비 일치율로 신뢰도 산출(자기참조 제외), 고등급 검토 게이트</td><td class="center">품질</td><td><code>m6_evaluation/reviewer_trust.py</code> <code>compute_reviewer_reliability()</code> · <code>services/confirm_service.py</code></td><td><code>tests/test_reviewer_trust.py</code> · <code>test_dual_review.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>OPS-RET-01</code></td><td>프로바이더 재시도 — 지수 백오프 재시도 + 배치 부분실패 격리</td><td class="center">견고성</td><td><code>services/_retry.py</code> <code>call_with_retry()</code>·<code>iter_with_partial_failure()</code> · LLM/ES 어댑터</td><td><code>tests/test_batch_retry.py</code> · <code>test_rate_limit.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>OPS-ESB-01</code></td><td>ES 벌크 색인 — <code>helpers.bulk</code> 일괄 upsert + 부분실패 수집·경고 노출</td><td class="center">견고성</td><td><code>adapters/vectorstore/es_store.py</code> <code>upsert()</code></td><td><code>tests/test_es_store.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>OPS-DIM-01</code></td><td>임베딩 차원 검증 — 최초 임베딩 시 실제 dim 확정·불일치 가드</td><td class="center">견고성</td><td><code>adapters/embedding/hf_embedding.py</code> <code>embed()</code> · <code>adapters/vectorstore/inmemory_store.py</code> <code>ensure_collection()</code></td><td><code>tests/test_adapters_embedding_vector.py</code> · <code>test_vectorstore_factory.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>OPS-NP1-01</code></td><td>N+1 질의 제거 — 근거 스팬·RAG 히트 배치 삽입(add_all 1회)</td><td class="center">견고성</td><td><code>repositories/classify_repo.py</code> <code>add_evidence_from_spans()</code>·<code>add_rag_evidence_from_hits()</code></td><td><code>tests/test_classify_repo_bulk_evidence.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+      <tr><td><code>OPS-OTL-01</code></td><td>관측성 — OpenTelemetry 추적(FastAPI·SQLAlchemy·Redis·httpx·Celery) + 구조적 로깅(의존성 미설치 시 무해 스킵)</td><td class="center">견고성</td><td><code>obs/otel.py</code> <code>setup_tracing()</code>·<code>span()</code> · <code>services/classify_service.py</code>·<code>services/retrieval.py</code></td><td><code>tests/test_otel_wiring.py</code></td><td class="center"><span class="tag done">완료</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout">
+    <div class="callout-label">하드닝 요약</div>
+    <p>이번 차수 보안 6 · 운영/데이터무결성 5 · 분류·검색 품질·견고성 11 = <strong>22개 통제</strong>를 구현·자동화 테스트 근거로 추적. P0 비기능 요구 중 <strong>NFR-SEC-01·NFR-OPS-01</strong>은 본 통제로 구현 착수되어 <span class="tag wip">정밀화</span>로 갱신.</p>
+  </div>
+
+  <div class="footnote">
+    <p>근거: 제안요청서(FUN-003·004·005·022·023·024 / PMR-002 / PER-002) · 발주처 정본 가이드 PDF · 적용서 v2.2 · 테스트 전략 문서 · 하드닝 통제 구현·테스트(SEC/OPS/DQ)</p>
+    <p>관련: <a href="보안_설계서.html">보안 설계서</a> · <a href="운영_런북.html">운영 런북</a> · <a href="데이터_거버넌스_계획.html">데이터 거버넌스</a> · <a href="영업비밀_등급분류_기준_적용서_v2.2.html">적용서 v2.2</a> · <a href="기술구현_백서_v5.html">기술구현 백서 v5</a> · <a href="테스트_전략_및_이력.html">테스트 전략·이력</a> · <a href="발주처_의사결정_안건서.html">의사결정 안건서</a> · <a href="WBS_본개발_작업분해구조.html">WBS</a></p>
+  </div>
+
+</article>
+
+<aside class="toc-aside">
+  <nav class="toc">
+    <div class="toc-title">목차</div>
+    <a href="#s1">01 · 기능 요건 (FUN)</a>
+    <a href="#s2">02 · 가이드 등급기준</a>
+    <a href="#s3">03 · 성능·관리 요건</a>
+    <a href="#s4">04 · 하드닝 통제 (SEC/OPS/DQ)</a>
+  </nav>
+</aside>
+
+</div>
+
+<footer>
+  <strong>KOIPA AI 영업비밀관리시스템</strong> — 요구사항 추적표(RTM) · 2026-06-20<br>
+  RFP·가이드 요구사항 → 설계 → 구현 → 검증 추적
+</footer>
+
+<script>
+(function(){
+  const links=document.querySelectorAll('.toc a[href^="#"]');
+  const headings=Array.from(links).map(l=>{const id=l.getAttribute('href').slice(1);return{link:l,el:document.getElementById(id)};}).filter(x=>x.el);
+  function update(){const y=window.scrollY+100;let cur=headings[0];for(const h of headings){if(h.el.getBoundingClientRect().top+window.scrollY<=y)cur=h;}links.forEach(l=>l.classList.remove('active'));if(cur)cur.link.classList.add('active');}
+  window.addEventListener('scroll',update,{passive:true});update();
+})();
+</script>
+
+</body>
+</html>

@@ -272,6 +272,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <a class="nav-link" href="#s03">모델 선정</a>
       <a class="nav-link hide-sm" href="#s07">검증 결과</a>
       <a class="nav-link hide-sm" href="#s11">개발 방안</a>
+      <a class="nav-link hide-sm" href="#s12">보안 하드닝</a>
     </div>
   </div>
 </header>
@@ -294,6 +295,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <a class="toc-item" href="#s09">09 운영·관제</a>
       <a class="toc-item" href="#s10">10 프로토타입 한계·본개발 정밀화</a>
       <a class="toc-item" href="#s11">11 본개발 진행 방안</a>
+      <a class="toc-item" href="#s12">12 보안·운영 하드닝</a>
     </div>
     <div class="toc-group">
       <div class="toc-group-label">별지</div>
@@ -309,7 +311,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <!-- Header -->
     <div class="meta-row">
       <span class="badge">Whitepaper</span>
-      <span class="badge blue">v5.1 · 2026-06-19 갱신</span>
+      <span class="badge blue">v5.1 · 2026-06-20 갱신</span>
       <span class="meta-dot">·</span>
       <span class="meta-soft">프로토타입 검증 · 모델 선정 · 개발 방안</span>
       <span class="meta-dot">·</span>
@@ -1526,12 +1528,88 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
     </section>
 
+    <!-- ============================
+         12. 보안·운영 하드닝
+         ============================ -->
+    <section id="s12">
+      <h2><span class="num">12</span> 보안·운영 하드닝</h2>
+      <p class="h2-sub">이번 차수에 적용한 보안·운영 강화 26건의 개괄. 세부 스펙(스키마·엔드포인트·지표 정의)은 부록 A·B·C에 정리되어 있다.</p>
+
+      <div class="callout pass">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body">이번 차수에서는 영업비밀 데이터의 <b>조직 간 격리</b>와 <b>감사 무결성</b>, 그리고 <b>폐곡선 자동화의 실동작 배선</b>을 중심으로 보안·운영·데이터 정합·분류 신뢰성·검색 품질·견고성 6개 축에 걸쳐 26건을 강화했다. 전 항목은 <b>보수적 적용 원칙</b>(opt-in / no-op / 미탐(FNR)-안전)을 따르며, 기존 운영 분류 흐름(①–⑧, §2.4)과 사람 최종 확정 원칙(§11)은 그대로 유지된다.</div>
+      </div>
+
+      <h3>12.1 보안 — 접근 격리·무결성</h3>
+      <p>인증 신원에 결속된 조직(tenant) 스코프를 <b>요청 경로 전반</b>으로 확장하고, 외부 입력이 신뢰 경계를 넘지 못하도록 입력·인증·기록 단을 강화했다(설계 원칙은 §2.3).</p>
+      <div class="card-grid col2" style="margin:16px 0;">
+        <div class="card"><div class="card-label">객체수준 인가 (IDOR 차단)</div><div class="card-desc">분류·스트리밍·근거설명(<code>/classify·stream·explain</code>) 등 단건 조회 경로를 모두 인증 조직에 결속해, 다른 조직 자원 식별자를 알아도 열람·조작이 불가하도록 차단한다.</div></div>
+        <div class="card"><div class="card-label">멱등성 키 교차조직 격리</div><div class="card-desc">중복 제출 방지용 멱등성 키를 조직 단위로 분리해, 같은 키 값이 조직 경계를 넘어 결과를 공유하거나 충돌하지 않게 한다.</div></div>
+        <div class="card"><div class="card-label">API 키 상수시간 비교</div><div class="card-desc">API 키 검증을 상수시간 비교로 수행해, 응답 시간차로 키를 추측하는 타이밍 공격 표면을 제거한다.</div></div>
+        <div class="card"><div class="card-label">저장형 XSS 방어</div><div class="card-desc">검수 사유·라벨 등 사용자 입력이 화면에 다시 노출되는 경로에서 스크립트 주입을 무력화한다(저장형 XSS).</div></div>
+        <div class="card"><div class="card-label">요청 본문 DoS 가드</div><div class="card-desc">과대 요청 본문을 사전 한도로 거절해, 단일 요청이 메모리·처리 자원을 고갈시키는 것을 막는다.</div></div>
+        <div class="card"><div class="card-label">감사 로그 체인 직렬화</div><div class="card-desc">해시 체인 감사로그(§2.3·§9)의 동시 기입을 자문 잠금(advisory-lock)으로 직렬화해, 동시 쓰기에서도 체인 연속성과 변조 탐지 성질을 보전한다.</div></div>
+      </div>
+
+      <h3>12.2 운영 배선 — 폐곡선 자동화·폐쇄망</h3>
+      <p>능동학습 폐곡선(§2.4·§2.4.1)의 자동화 경로가 <b>실제로 동작</b>하도록 작업 큐와 스케줄러를 명시 배선하고, 폐쇄망 납품 시 모델·보정값이 함께 반입되도록 했다.</p>
+      <ul>
+        <li><b>작업 큐 구독·전용 스케줄러</b> — 비동기 워커가 지정 큐를 구독하고(<code>-Q</code>), 주기 작업은 전용 스케줄러(beat) 서비스로 분리해 폐곡선 점검(드리프트·자동 롤백 판정 등, §9)이 운영 중 실제로 주기 실행된다.</li>
+        <li><b>월별 파티션 자동 롤오버</b> — 대량 데이터 테이블의 월별 파티션을 사전 생성·롤오버해, 월 경계에서 적재가 막히지 않도록 한다(파티션 구조는 부록 A).</li>
+        <li><b>폐쇄망 번들 동봉</b> — 오프라인 설치 번들(§8.3)에 학습된 분류 모델과 신뢰도 보정값(<code>temperature.json</code>, §10·④)을 함께 동봉해, 인터넷 없이 즉시 분류·검수가 가능하다.</li>
+      </ul>
+
+      <h3>12.3 데이터 무결성</h3>
+      <div class="card-grid col2" style="margin:16px 0;">
+        <div class="card"><div class="card-label">정정·가이드 유일성 제약</div><div class="card-desc">검수 정정(corrections)·등급 가이드(guide)에 유일성(UNIQUE) 제약을 두어 중복 적재·정합 어긋남을 차단한다.</div></div>
+        <div class="card"><div class="card-label">소프트 삭제 보존</div><div class="card-desc">삭제를 물리 삭제가 아닌 소프트 삭제로 처리해 감사·복구를 위한 이력을 보존한다.</div></div>
+      </div>
+
+      <h3>12.4 분류 신뢰성·캘리브레이션</h3>
+      <p>분류 결과의 <b>신뢰도를 측정·보정</b>하고, 규칙 폴백을 미탐 안전 방향으로 정렬했다. 모든 신호는 등급을 임의로 낮추지 않고 의심 시 검수로 보낸다(미탐 0 우선, §2·§10).</p>
+      <ul>
+        <li><b>LLM 라벨러 신뢰도(confidence)</b> — 합성·라벨링 단계 LLM 출력에 신뢰도를 부여해 저신뢰 라벨을 식별·검수에 활용한다.</li>
+        <li><b>캘리브레이션 런타임 측정(ECE·Brier)</b> — 신뢰도 보정 품질을 운영 중 측정(ECE·Brier)해 "자신만만하게 틀린" 사각을 모니터링한다(§9.3).</li>
+        <li><b>규칙 폴백 미탐 안전화</b> — 규칙 기반 폴백의 집계를 심각도 우선(severe-agg)으로 두고, 상향 에스컬레이션 임계값(τ)을 적용해 비밀문서 누락(미탐)을 줄이는 방향으로 정렬한다.</li>
+        <li><b>검수자 동료합의 신뢰도</b> — 다중 검수자 라벨의 합의 정도를 신뢰도로 반영해 검수 품질을 정량화한다.</li>
+      </ul>
+
+      <h3>12.5 검색 품질</h3>
+      <div class="card-grid col3" style="margin:16px 0;">
+        <div class="card"><div class="card-label">청킹 경계 개선 (split_v2)</div><div class="card-desc">조항·문장 경계를 인식하는 분할로, 근거 검색에 쓰는 청크의 의미 단위를 정돈한다(③ 청킹, §2.4).</div></div>
+        <div class="card"><div class="card-label">인용 집행 (opt-in)</div><div class="card-desc">근거 인용 표기를 선택 적용(opt-in)으로 집행해, 검수 화면 근거의 추적성을 높인다.</div></div>
+        <div class="card"><div class="card-label">이중 RRF 정리</div><div class="card-desc">하이브리드 검색의 순위 융합(RRF) 경로를 정리해 중복 집계를 제거한다.</div></div>
+      </div>
+
+      <h3>12.6 견고성·관측성</h3>
+      <p>외부 의존(LLM·검색·임베딩)의 실패를 <b>흐름을 멈추지 않고</b> 흡수하고(graceful degradation), 운영 가시성을 높였다.</p>
+      <ul>
+        <li><b>LLM 제공자 재시도 통일</b> — 제공자 호출 재시도 정책을 일원화해 일시 오류에 일관되게 대응한다.</li>
+        <li><b>검색 색인 부분실패 로깅</b> — 대량 색인(bulk) 시 부분 실패를 누락 없이 로깅해 원인 추적·재처리를 가능하게 한다.</li>
+        <li><b>임베딩 차원 실측·캐시 플러시</b> — 임베딩 차원을 실측으로 확인하고, 모델·설정 변경 시 캐시를 안전하게 비운다.</li>
+        <li><b>N+1 조회 제거</b> — 반복 조회 패턴을 제거해 응답 지연을 줄인다.</li>
+        <li><b>분산추적·구조화 로깅</b> — OpenTelemetry 스팬과 구조화 로깅으로 요청 단위 추적성을 확보한다(관측 도구 연동은 §9.1).</li>
+      </ul>
+
+      <h3>12.7 적용 원칙·검증</h3>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>보수적 적용·검증.</b> 26건 전 항목을 <b>opt-in / no-op / 미탐(FNR)-안전</b> 원칙으로 적용해 기존 분류 결과와 운영 흐름을 바꾸지 않으며, 경량 회귀 테스트는 전수 통과했다(이번 차수 기준 912건 규모, §6.1). 데이터베이스 마이그레이션은 <b>단일 head</b>로 정합을 유지한다.</div>
+      </div>
+
+      <div class="appendix-links" style="margin-top:32px;">
+        <a class="appendix-link" href="기술구현_백서_부록A_DB스키마.html">→ 부록 A — DB 스키마</a>
+        <a class="appendix-link" href="기술구현_백서_부록B_API명세.html">→ 부록 B — API 명세</a>
+        <a class="appendix-link" href="기술구현_백서_부록C_지표용어해설.html">→ 부록 C — 지표·용어 해설</a>
+      </div>
+    </section>
+
   </article>
 </div>
 
 <!-- Footer -->
 <footer>
-  <span>KOIPA AI 영업비밀관리시스템 — 기술 구현 백서 v5.1 · 2026-06-19 갱신 · Lloydk AI Engine</span>
+  <span>KOIPA AI 영업비밀관리시스템 — 기술 구현 백서 v5.1 · 2026-06-20 갱신 · Lloydk AI Engine</span>
   <span>프로토타입 검증 · 모델 선정 · 본개발 방안</span>
 </footer>
 

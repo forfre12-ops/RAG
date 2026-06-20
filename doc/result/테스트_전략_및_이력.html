@@ -311,9 +311,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
   <article>
     <div class="meta-row">
       <span class="badge">Test Strategy</span>
-      <span class="badge blue">v1.3</span>
+      <span class="badge blue">v1.4</span>
       <span style="color:var(--text-dim);font-size:12.5px;">·</span>
-      <span style="color:var(--text-dim);font-size:12.5px;">2026-06-19 갱신</span>
+      <span style="color:var(--text-dim);font-size:12.5px;">2026-06-20 갱신</span>
       <span style="color:var(--text-dim);font-size:12.5px;">·</span>
       <span style="color:var(--text-dim);font-size:12.5px;">KOIPA AI 영업비밀관리시스템</span>
     </div>
@@ -323,8 +323,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <div class="card-grid col4" style="margin:0 0 32px;">
       <div class="card card-dark">
         <div class="card-label">테스트 현황</div>
-        <div class="card-value sm">385/385</div>
-        <div class="card-desc">pytest PASS · 회귀 0</div>
+        <div class="card-value sm">~912/912</div>
+        <div class="card-desc">lite pytest PASS · 회귀 0</div>
       </div>
       <div class="card card-dark">
         <div class="card-label">현 배포 모델</div>
@@ -842,7 +842,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
          ============================================================ -->
     <section id="s07">
       <h2><span class="num">04</span> 일자별 테스트 이력</h2>
-      <p class="h2-sub">2026-05-26 ~ 06-19 커밋 기반 실행 기록. 실행 횟수는 커밋 기준 추정.</p>
+      <p class="h2-sub">2026-05-26 ~ 06-20 커밋 기반 실행 기록. 실행 횟수는 커밋 기준 추정.</p>
 
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
@@ -1192,6 +1192,34 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               </td>
             </tr>
 
+            <tr>
+              <td class="log-date">2026-06-20</td>
+              <td class="log-count">다수</td>
+              <td class="log-count">—</td>
+              <td class="log-pass">~912/912</td>
+              <td class="log-pass">0</td>
+              <td>
+                <span class="tag real">설계검토 하드닝 26건 — 워커/멱등성/회귀게이트</span><br>
+                <div style="font-size:12px;margin-top:4px;">
+                  lite 스위트 <b>약 912 PASS</b> · 0 FAIL (인프라 비의존)<br>
+                  워커 tick 단위테스트 <b>11건</b> 신규 (DB/redis 비의존 mock)<br>
+                  멱등성 스토어 단위테스트 · outbox 원자성 테스트 갱신<br>
+                  perf 회귀로직(detect_regressions)·집계 하니스 <b>기본 pytest 실행</b>
+                </div>
+              </td>
+              <td><span class="env-badge env-dry">lite-noapi</span></td>
+              <td style="font-size:12.5px;">
+                <b>4차 설계검토 하드닝 26건 (보수적 · opt-in/no-op/FNR-safe)</b><br>
+                워커 tick 단위테스트 11건: auto_rollback_tick(활성/회귀 분기)·deliver_outbox_tick(DLQ/info)·ensure_partitions_tick·train_classifier_task(조기반환/등록예외 폴백) — DB·redis 비의존 mock<br>
+                멱등성 스토어 단위테스트(acquire·in-flight 차단·저장후 차단·release·만료 재시도)<br>
+                outbox 원자성 테스트 갱신: dequeue가 deepcopy 스냅샷 반환(동일참조→스냅샷)에 단언 정합<br>
+                회귀 게이트 개선(#33): perf 순수 단위테스트의 fullstack 오마킹 제거 → KPI 회귀 로직·집계 하니스가 기본 pytest(lite)에서 수집·실행<br>
+                검증 방식: 파일분할 병렬구현 → 배치별 타깃테스트 → 배치별 커밋(Batch1~5+#11)<br>
+                PG 의존 테스트(advisory-lock·파티션 DDL·일부 repo)는 dialect 가드로 비-PG 환경 skip — 배포 전 PG 백엔드 1회 검증 권장<br>
+                커밋 7425ed7·09b2169 등 · 브랜치 fix/design-review-hardening
+              </td>
+            </tr>
+
           </tbody>
         </table>
       </div>
@@ -1199,9 +1227,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h3>누적 추이</h3>
       <div class="card-grid col4" style="margin:16px 0;">
         <div class="card card-dark">
-          <div class="card-label">현행 pytest</div>
-          <div class="card-value">385/385</div>
-          <div class="card-desc">PASS · 회귀 0</div>
+          <div class="card-label">현행 lite pytest</div>
+          <div class="card-value sm">~912/912</div>
+          <div class="card-desc">PASS · 회귀 0 (인프라 비의존)</div>
         </div>
         <div class="card card-dark">
           <div class="card-label">검증 피라미드</div>
@@ -1217,6 +1245,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <div class="card-label">실측 완료 PoC</div>
           <div class="card-value">P1~P5</div>
           <div class="card-desc">Phase 0~8 전체</div>
+        </div>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body">
+          <b>lite 스위트(약 912 PASS)는 인프라 비의존</b> 단위·순수함수 회귀입니다. PG 의존 테스트(advisory-lock·파티션 DDL·일부 repo)는 <b>dialect 가드</b>로 비-PG 환경에서 자동 skip되며 카운트에 포함되지 않습니다. 배포 전 <b>PostgreSQL 백엔드로 1회 검증</b>을 권장합니다. 4차 하드닝 26건은 파일분할 병렬구현 → 배치별 타깃테스트 → 배치별 커밋으로 진행했으며, 전 항목 보수적(opt-in/no-op/FNR-safe)으로 적용했습니다.
         </div>
       </div>
     </section>
