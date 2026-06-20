@@ -50,8 +50,8 @@ li{margin-bottom:4px;font-size:14px;line-height:1.65;}
 .nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
 .nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
-.brand-mark{width:30px;height:30px;background:var(--bg-inverse);border-radius:6px;display:grid;place-items:center;flex-shrink:0;}
-.brand-mark svg{width:16px;height:16px;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);overflow:visible;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
 .brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
 .brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
 .brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
@@ -186,7 +186,7 @@ pre code{background:none;border:none;padding:0;font-size:12.5px;line-height:1.65
 .case-body{font-size:12.5px;color:var(--text-dim);line-height:1.6;}
 
 /* ─── TAGS (monochrome) ─── */
-.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--radius-pill);font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:.05em;white-space:nowrap;}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:.05em;white-space:nowrap;}
 /* 4 shades only */
 .tag.filled{background:var(--text);color:var(--bg);}
 .tag.dark{background:#3f3f46;color:#fff;}
@@ -374,15 +374,8 @@ footer strong{color:var(--text-dim);}
 <nav class="nav">
   <div class="nav-inner">
     <a href="#" class="brand">
-      <div class="brand-mark">
-        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="6" height="6" rx="1.5" fill="white"/>
-          <rect x="9" y="1" width="6" height="6" rx="1.5" fill="white" fill-opacity=".55"/>
-          <rect x="1" y="9" width="6" height="6" rx="1.5" fill="white" fill-opacity=".55"/>
-          <rect x="9" y="9" width="6" height="6" rx="1.5" fill="white" fill-opacity=".25"/>
-        </svg>
-      </div>
-      <span class="brand-name">Lloydk</span>
+      <div class="brand-mark"><img src="../assets/lloydk_logo_mark.png" alt="Lloydk" /></div>
+      <span class="brand-name">로이드케이</span>
       <span class="brand-sep">/</span>
       <span class="brand-sub">KOIPA AI 영업비밀 분류 시스템</span>
     </a>
@@ -661,6 +654,24 @@ footer strong{color:var(--text-dim);}
   </div>
 </div>
 
+<!-- ─── v2.2 신규: S1 판단 기준 명문화 ─── -->
+<div class="callout inset" style="margin-top:18px;">
+  <div class="callout-label">🔖 S1 판단 기준 명문화 — v2.2 기준</div>
+  <p>
+    <strong>비밀관리성 M=0이어도 비공지성 S=2 · 경제적 유용성 V=2이면 S1 확정.</strong><br/>
+    형식적 관리 체계가 없더라도 내용 자체가 비공개·고가치이면 S1로 판정합니다(부정경쟁방지법 §2.2 실질 해석 기준).
+  </p>
+  <p style="margin-top:8px;font-size:13px;color:var(--text-dim);">전형 유형 6가지:</p>
+  <ul>
+    <li><strong>알고리즘 파라미터</strong> — 내부 미공개 모델 가중치·하이퍼파라미터</li>
+    <li><strong>축적 노하우</strong> — 반복 실험으로 쌓인 공정 최적화 조건</li>
+    <li><strong>비공식 열람 제한 전략</strong> — 공식 DRM 없이 구두·이메일로만 열람 통제된 전략 문서</li>
+    <li><strong>NDA만 있는 문서</strong> — 비밀유지계약서만 존재하고 별도 보안 시스템 없는 계약 조건</li>
+    <li><strong>승인 전 임상 데이터</strong> — 규제기관 제출 전 미공개 임상시험 결과</li>
+    <li><strong>계리 테이블</strong> — 보험·금융사의 내부 손해율·요율 산출 테이블</li>
+  </ul>
+</div>
+
 <h3>등급은 어떻게 정해지나? — 3요건 곱셈 (S × V × M)</h3>
 <p>
   등급은 점수를 더해서 매기지 않습니다. <strong>부정경쟁방지법의 영업비밀 3요건</strong>을 각각 0·1·2점으로 채점한 뒤
@@ -684,6 +695,103 @@ footer strong{color:var(--text-dim);}
   <div class="node"><span class="cond">S × V × M = 4</span><span class="arrow">→</span><span class="result"><strong>S1</strong> (1급 비밀)</span></div>
   <div class="node"><span class="cond">S × V × M = 1 또는 2</span><span class="arrow">→</span><span class="result"><strong>S2</strong> (2급 대외비)</span></div>
   <div class="node"><span class="cond">S × V × M = 0</span><span class="arrow">→</span><span class="result"><strong>S3</strong> (공개 — 한 요건이라도 0)</span></div>
+</div>
+
+<div class="callout" style="border-left:3px solid #f59e0b;background:#fffbeb;">
+  <div class="callout-label" style="color:#92400e;">⚠ 가이드 원본 vs v2.2 보정 — 발주처 승인 필요</div>
+  <p>위 4단계 매핑은 <strong>발주처 정본 가이드 원본(스캔본 11~12p 직접 대조)</strong> 그대로입니다. v2.2는 골든셋 실증으로 <strong>2곳을 보정</strong>했습니다 — ① <code>S=2·V=2·M=0</code>: 가이드는 곱=0이라 <strong>공개(S3)</strong>지만 v2.2는 <strong>S1</strong>(미탐 방지), ② <code>S=1·V=2·M=2</code> 등 <code>S&lt;2</code>의 곱=4: 가이드는 <strong>1급 비밀</strong>이나 v2.2는 <strong>S2</strong>(과분류 방지). 가이드 예시값을 정정하는 것이라 <strong>"가이드 기본값 + 보정 토글"</strong>로 분리해 발주처 승인 후 적용을 권고합니다. A안(Σ5요소 100점)은 경영·재무 판단값 65점을 포함해 AI 산출 불가 → <strong>사람 수기</strong> 자가진단. <em>(상세: 등급분류 기준 적용서 v2.2 §3.7)</em></p>
+</div>
+
+<!-- ─── v2.2 신규: 등급 결정 분기표 ─── -->
+<h3 style="margin-top:28px;">골든셋 실증 기반 — 등급 결정 분기표</h3>
+<p>곱셈 결과만으로 등급이 확정되지 않는 경계 케이스를 처리하는 v2.2 분기 로직입니다. S=2·V=2 조합은 M 값에 따라 TS 또는 S1로 분기됩니다.</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>조건</th>
+      <th>세부 분기</th>
+      <th>결정 등급</th>
+      <th>비고</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>S=2 AND V=2</strong></td>
+      <td>M=0</td>
+      <td><span class="tag dark">S1</span></td>
+      <td>비밀관리성 없어도 고비공지·고가치 → S1 확정 (v2.2 명문화)</td>
+    </tr>
+    <tr>
+      <td><strong>S=2 AND V=2</strong></td>
+      <td>M=1</td>
+      <td><span class="tag filled">TS</span></td>
+      <td>접근자 지정만 있어도 최고기밀 수준 충족</td>
+    </tr>
+    <tr>
+      <td><strong>S=2 AND V=2</strong></td>
+      <td>M=2</td>
+      <td><span class="tag filled">TS</span></td>
+      <td>3요건 모두 최고점 → TS (S×V×M = 8)</td>
+    </tr>
+    <tr>
+      <td><strong>그 외</strong></td>
+      <td>S=0 (공개됨)</td>
+      <td><span class="tag mid">S3</span></td>
+      <td>비공지성 0 → 영업비밀 요건 미충족</td>
+    </tr>
+    <tr>
+      <td><strong>그 외</strong></td>
+      <td>S×V×M ≥ 1</td>
+      <td><span class="tag mid">S2</span></td>
+      <td>1~2점대 — 대외비 수준</td>
+    </tr>
+    <tr>
+      <td><strong>그 외</strong></td>
+      <td>S×V×M = 0</td>
+      <td><span class="tag mid">S3</span></td>
+      <td>한 요건이라도 0 → 공개</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ─── v2.2 신규: 도메인별 앵커 표 ─── -->
+<h3 style="margin-top:28px;">골든셋 실증 기반 — 도메인별 S·V·M 앵커 표 (100건 실증)</h3>
+<p>골든셋 100건을 도메인별로 분석해 도출한 S·V·M 점수 앵커입니다. 신규 문서 판정 시 해당 유형과 대조하여 채점 기준으로 활용합니다.</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>요건</th>
+      <th>2점 — 앵커 유형</th>
+      <th>1점 — 앵커 유형</th>
+      <th>0점 — 앵커 유형</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>S — 비공지성</strong></td>
+      <td>알고리즘·파라미터, 승인 전 임상 데이터, M&amp;A 협상 조건 — 보유자 경유 없이 입수 불가</td>
+      <td>내부 기획·예산 초안, 진행 중 협상 내용 — 통상적 입수 곤란</td>
+      <td>공개 특허·판례·보도자료·공시 문서 — 외부 공개됨</td>
+    </tr>
+    <tr>
+      <td><strong>V — 경제적 유용성</strong></td>
+      <td>복제 즉각 피해 유형 — 경쟁사 복제 시 즉시 매출·기술 손실 발생 (공정 파라미터·신약 합성경로·계리 테이블)</td>
+      <td>간접 기여 유형 — 비용·시간 절감에 기여하나 단독으로 즉각적 피해는 없음 (마케팅 전략 초안·거래처 협상 조건)</td>
+      <td>공개 동등 유형 — 해당 정보를 공개 경로로 동등하게 획득 가능 (법원 판결문·표준 스펙 문서)</td>
+    </tr>
+    <tr>
+      <td><strong>M — 비밀관리성</strong></td>
+      <td>에어갭·HSM·공식 통제 — 물리 격리 또는 하드웨어 보안 모듈·공식 비밀관리규정 적용</td>
+      <td>접근자 지정 — 열람자 명단 지정, NDA 체결, 접근 로그 존재</td>
+      <td>비공식 제한 — 구두·이메일로만 "내부용"이라고 언급, 공식 통제 수단 없음</td>
+    </tr>
+  </tbody>
+</table>
 </div>
 
 <div class="callout inset">
@@ -723,7 +831,7 @@ footer strong{color:var(--text-dim);}
   <div class="kpi-card">
     <div class="kpi-label">분류 F1 (서빙·홀드아웃 109)</div>
     <div class="kpi-value pass">0.686</div>
-    <div class="kpi-sub">KF-DeBERTa v-dd3abab9</div>
+    <div class="kpi-sub">KF-DeBERTa v-f9b5cedb</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">P2 검색 Recall@5</div>
@@ -1047,7 +1155,7 @@ footer strong{color:var(--text-dim);}
         <tr><td><code>scores</code></td><td>{TS:0.93, S1:0.04, S2:0.02, S3:0.01}</td><td>각 등급별 확률</td></tr>
         <tr><td><code>evaluation_factors</code></td><td>{secrecy:2, value:2, management:2}</td><td>3요건 점수 (각 0·1·2) — 곱이 등급</td></tr>
         <tr><td><code>evidence</code></td><td>[{start:122, end:180, factor:"SECRECY"}]</td><td>판단 근거 텍스트 구간</td></tr>
-        <tr><td><code>model_version</code></td><td>v-dd3abab9</td><td>사용된 모델 버전</td></tr>
+        <tr><td><code>model_version</code></td><td>v-f9b5cedb</td><td>사용된 모델 버전</td></tr>
         </tbody>
       </table>
       </div>
@@ -1077,7 +1185,7 @@ footer strong{color:var(--text-dim);}
     <div class="step-body">
       <div class="step-title">DB 저장 (Best-effort)</div>
       <p>분류 결과를 PostgreSQL에 저장합니다. <strong>"Best-effort"</strong>란 저장에 실패해도 응답은 정상적으로 반환한다는 뜻입니다. DB 장애가 있어도 분류 서비스가 중단되지 않습니다.</p>
-      <p>저장 항목: <strong>classifications</strong> (예측 등급, 신뢰도, 모델), <strong>classification_evidence</strong> (근거 구간), <strong>chunks</strong> (텍스트 조각), <strong>audit_log</strong> (감사 기록)</p>
+      <p>저장 항목: <strong>tb_classifications</strong> (예측 등급, 신뢰도, 모델), <strong>tb_classification_evidence</strong> (근거 구간), <strong>tb_chunks</strong> (텍스트 조각), <strong>tb_audit_log</strong> (감사 기록)</p>
       <p><strong>원본 파일</strong>은 MinIO에 <strong>at-rest 암호화(AES-256-GCM)</strong>로 보관하고, 분류·검색 경로에는 <strong>PII 마스킹된 텍스트만</strong> 사용합니다(원본·마스킹본 분리 — 원본은 증빙용).</p>
     </div>
   </div>
@@ -1107,7 +1215,7 @@ footer strong{color:var(--text-dim);}
      "text": "EUV 리소그래피 공정 파라미터",
      "factor": "SECRECY", "weight": 0.91}
   ],
-  "model_version": "v-dd3abab9",
+  "model_version": "v-f9b5cedb",
   "status": "staging",
   "warnings": []
 }</code></pre>
@@ -1237,7 +1345,7 @@ footer strong{color:var(--text-dim);}
   <thead><tr><th>항목</th><th>값</th></tr></thead>
   <tbody>
   <tr><td>모델 ID</td><td><code>kakaobank/kf-deberta-base</code></td></tr>
-  <tr><td>활성 버전</td><td><code>v-dd3abab9</code> (classifier_p1_retrain_v4_clean)</td></tr>
+  <tr><td>활성 버전</td><td><code>v-f9b5cedb</code> (classifier_p1_retrain_v4_clean)</td></tr>
   <tr><td>파라미터 수</td><td>약 1억 1천만 개</td></tr>
   <tr><td>출력</td><td>TS/S1/S2/S3 확률 4개 + 최고 확률 등급</td></tr>
   <tr><td>학습 데이터</td><td>labeled_clean_nolegal 2,591건 (법률 코퍼스 오염 정제본)</td></tr>
@@ -1466,7 +1574,7 @@ footer strong{color:var(--text-dim);}
   </div>
   <div class="case-card">
     <div class="case-title"><span class="tag mid">사람 검수</span> AI가 틀렸을 때</div>
-    <div class="case-body"><code>make import-review INPUT=corrections.csv</code>로 사람이 수정한 라벨을 <code>document_labels</code> 테이블에 저장. 이후 동일 문서 분류 시 AI 추론 없이 검증 라벨 반환.</div>
+    <div class="case-body"><code>make import-review INPUT=tb_corrections.csv</code>로 사람이 수정한 라벨을 <code>tb_document_labels</code> 테이블에 저장. 이후 동일 문서 분류 시 AI 추론 없이 검증 라벨 반환.</div>
   </div>
   <div class="case-card">
     <div class="case-title"><span class="tag light">판례 문서</span> 공개 법원 자료</div>
@@ -1569,7 +1677,7 @@ footer strong{color:var(--text-dim);}
       <div class="sc-num"><div class="sc-circle">3</div><div class="sc-line"></div></div>
       <div class="sc-body">
         <div class="sc-who">시스템</div>
-        <div class="sc-what">수정 내용이 <code>document_labels</code> 테이블에 저장됨. <strong>이후 동일 문서를 분류 요청하면 AI 추론 없이 S1 즉시 반환.</strong> 감사 로그에 "박보안이 S2→S1 수정" 기록.</div>
+        <div class="sc-what">수정 내용이 <code>tb_document_labels</code> 테이블에 저장됨. <strong>이후 동일 문서를 분류 요청하면 AI 추론 없이 S1 즉시 반환.</strong> 감사 로그에 "박보안이 S2→S1 수정" 기록.</div>
       </div>
     </div>
   </div>
@@ -1593,42 +1701,42 @@ footer strong{color:var(--text-dim);}
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box mid">chunks</div>
+    <div class="flow-box mid">tb_chunks</div>
     <span style="font-size:12.5px;color:var(--text-dim);">텍스트 청크 (순번, 내용, 크기)</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box fill">classifications</div>
+    <div class="flow-box fill">tb_classifications</div>
     <span style="font-size:12.5px;color:var(--text-dim);">분류 결과 (예측 등급, 신뢰도, 모델 버전)</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:40px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box">classification_evidence</div>
+    <div class="flow-box">tb_classification_evidence</div>
     <span style="font-size:12.5px;color:var(--text-dim);">근거 구간 (텍스트 위치, 평가요소, 가중치)</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box mid">document_labels</div>
+    <div class="flow-box mid">tb_document_labels</div>
     <span style="font-size:12.5px;color:var(--text-dim);">사람이 검증한 라벨 (is_verified=True면 AI 우선)</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box">corrections</div>
+    <div class="flow-box">tb_corrections</div>
     <span style="font-size:12.5px;color:var(--text-dim);">사람 정정 이력 (원래 등급→수정 등급)</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box mid">model_versions</div>
+    <div class="flow-box mid">tb_model_versions</div>
     <span style="font-size:12.5px;color:var(--text-dim);">모델 버전 이력 (활성 1개만, 롤백 정보 포함)</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box mid">training_runs</div>
+    <div class="flow-box mid">tb_training_runs</div>
     <span style="font-size:12.5px;color:var(--text-dim);">재학습 실행 기록 (어떤 정정을 소비했는지)</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;padding-left:20px;flex-wrap:wrap;">
     <span style="color:var(--text-faint);">↳</span>
-    <div class="flow-box">audit_log</div>
+    <div class="flow-box">tb_audit_log</div>
     <span style="font-size:12.5px;color:var(--text-dim);">모든 요청의 감사 기록 (누가, 언제, 무엇을 · 항상 기록)</span>
   </div>
 </div>
@@ -1637,9 +1745,9 @@ footer strong{color:var(--text-dim);}
   <div class="callout-label">🔁 스키마가 3요건 곱셈으로 바뀐 점 (alembic 마이그레이션)</div>
   <ul>
     <li><strong>evaluation_factors</strong>: 정본 3요건(SECRECY·VALUE·MANAGEMENT)만 활성. 옛 4요소는 비활성으로 보존. 곱셈식이라 가중치(weight)는 미사용.</li>
-    <li><strong>document_factor_scores</strong>: 점수 제약을 <strong>0~5 → 0~2</strong>로 변경(각 요건 0·1·2). 가중치 합계=1.0 검사 트리거 제거.</li>
-    <li><strong>model_versions</strong>: 롤백 추적용 <code>rolled_back_from</code>·<code>rollback_reason</code> 추가. 활성 버전은 항상 1개만(부분 유니크 인덱스).</li>
-    <li><strong>corrections</strong>: 능동학습 소비 추적용 <code>consumed_in_run</code>·<code>consumed_at</code> 추가. 미소비 정정만 빠르게 찾는 부분 인덱스가 재학습 핫패스.</li>
+    <li><strong>tb_document_factor_scores</strong>: 점수 제약을 <strong>0~5 → 0~2</strong>로 변경(각 요건 0·1·2). 가중치 합계=1.0 검사 트리거 제거.</li>
+    <li><strong>tb_model_versions</strong>: 롤백 추적용 <code>rolled_back_from</code>·<code>rollback_reason</code> 추가. 활성 버전은 항상 1개만(부분 유니크 인덱스).</li>
+    <li><strong>tb_corrections</strong>: 능동학습 소비 추적용 <code>consumed_in_run</code>·<code>consumed_at</code> 추가. 미소비 정정만 빠르게 찾는 부분 인덱스가 재학습 핫패스.</li>
   </ul>
 </div>
 
@@ -1711,7 +1819,7 @@ footer strong{color:var(--text-dim);}
 
 {
   "status": "healthy",
-  "model": {"status": "loaded", "version": "v-dd3abab9"},
+  "model": {"status": "loaded", "version": "v-f9b5cedb"},
   "postgres": {"ok": true},
   "elasticsearch": {"ok": true},
   "redis": {"ok": true}

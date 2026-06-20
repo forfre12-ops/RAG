@@ -44,8 +44,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans
 .nav-link.hide-sm{}
 
 /* ===== Layout ===== */
-.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:200px minmax(0,1fr);gap:0;padding:0 32px;}
-.sidebar{position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0 32px 0;border-right:1px solid var(--border);}
+.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0 32px 0;border-right:1px solid var(--border);}
 .sidebar::-webkit-scrollbar{width:3px;} .sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
 .toc-title{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 24px 10px;font-family:var(--font-mono);}
 .toc-item{display:block;padding:5px 24px;font-size:13px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .15s;line-height:1.4;}
@@ -123,7 +123,7 @@ code{font-family:var(--font-mono);font-size:12.5px;background:var(--bg-code);pad
 pre code{background:none;border:none;padding:0;}
 
 /* ===== Pills / Tags ===== */
-.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--radius-pill);font-size:11px;font-weight:600;font-family:var(--font-mono);border:1px solid;}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;font-family:var(--font-mono);border:1px solid;}
 .tag.pass{color:var(--text);border-color:rgba(0,0,0,.15);background:rgba(0,0,0,.04);}
 .tag.fail{color:rgba(0,0,0,.45);border-color:rgba(0,0,0,.15);background:rgba(0,0,0,.04);}
 .tag.warn{color:rgba(0,0,0,.55);border-color:rgba(0,0,0,.15);background:rgba(0,0,0,.04);}
@@ -581,7 +581,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>2.4 시스템 워크플로우</h3>
-      <p>이 절은 <b>운영 서버에서 상시 도는 흐름만</b>을 기준으로 기술한다. 운영 중 자동으로 동작하는 것은 <b>문서 분류 워크플로우(①–⑧) 하나뿐</b>이다 — 문서가 업로드되면 파싱·마스킹을 거쳐 분류기(M5)가 등급 + confidence를 산출하고, 마지막 확정은 항상 사람이 한다. 학습 데이터 준비·초기 학습·색인은 <b>운영 전 구축 단계에서 1회</b> 수행하며(하단 구축 단계 표), <b>모델 재학습은 운영 중 자동으로 돌지 않는다</b> — 관리자 수동 절차로만 수행한다(하단 모델 갱신 절차 · §2.4.1). 모든 단계는 감사 체인(PG audit_log)에 기록된다(§9).</p>
+      <p>이 절은 <b>운영 서버에서 상시 도는 흐름만</b>을 기준으로 기술한다. 운영 중 자동으로 동작하는 것은 <b>문서 분류 워크플로우(①–⑧) 하나뿐</b>이다 — 문서가 업로드되면 파싱·마스킹을 거쳐 분류기(M5)가 등급 + confidence를 산출하고, 마지막 확정은 항상 사람이 한다. 학습 데이터 준비·초기 학습·색인은 <b>운영 전 구축 단계에서 1회</b> 수행하며(하단 구축 단계 표), <b>모델 재학습은 운영 중 자동으로 돌지 않는다</b> — 관리자 수동 절차로만 수행한다(하단 모델 갱신 절차 · §2.4.1). 모든 단계는 감사 체인(PG tb_audit_log)에 기록된다(§9).</p>
       <div style="margin:16px 0;overflow-x:auto;">
         <svg viewBox="0 0 840 330" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;min-width:680px;display:block;" aria-label="운영 분류 워크플로우">
           <defs>
@@ -677,13 +677,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <line x1="99" y1="240" x2="99" y2="186" stroke="#a3a3a3" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#wf-arr-dim)"/>
           <text x="110" y="218" font-size="8.5" fill="#a3a3a3" font-family="Geist,sans-serif">⑥과 병렬 · 근거 첨부만 (등급 불개입)</text>
 
-          <!-- ⑦b → corrections (점선) -->
+          <!-- ⑦b → tb_corrections (점선) -->
           <line x1="384" y1="216" x2="384" y2="248" stroke="#a3a3a3" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#wf-arr-dim)"/>
-          <text x="384" y="264" text-anchor="middle" font-size="8.5" fill="#a3a3a3" font-family="Geist,sans-serif">수정 라벨 → corrections 적재</text>
+          <text x="384" y="264" text-anchor="middle" font-size="8.5" fill="#a3a3a3" font-family="Geist,sans-serif">수정 라벨 → tb_corrections 적재</text>
           <text x="384" y="276" text-anchor="middle" font-size="8.5" fill="#a3a3a3" font-family="Geist,sans-serif">(모델 갱신의 입력 · 갱신은 수동 절차)</text>
 
           <!-- 하단 공통 -->
-          <text x="420" y="316" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">전 단계 공통: SHA-256 감사 체인(PG audit_log) 기록 · Prometheus 지표 · Drift Monitor 15분 주기 (§9)</text>
+          <text x="420" y="316" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">전 단계 공통: SHA-256 감사 체인(PG tb_audit_log) 기록 · Prometheus 지표 · Drift Monitor 15분 주기 (§9)</text>
         </svg>
       </div>
 
@@ -705,11 +705,11 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-code">②<br>텍스트 추출 (M2)</td><td>worker</td><td>확장자별 파서 분기 — <b>HWP → rhwp-python, DOCX → python-docx, PDF → pdfminer.six</b>(PyMuPDF AGPL 리스크 회피). 본문 텍스트를 추출한다.</td><td>—</td></tr>
             <tr><td class="td-code">③<br>정규화 · 청킹</td><td>worker</td><td>불용어·공백·특수문자 정규화 후 <b>512 token / 64 token overlap</b> 슬라이딩 윈도우로 분할. 분류기(512 토큰 한도)·검색 양쪽이 다루는 처리 단위가 된다.</td><td>—</td></tr>
             <tr><td class="td-code">④<br>PII 마스킹</td><td>worker</td><td>주민번호·전화·이메일·계좌·사업자번호 등 <b>구조적 식별자 11패턴</b>을 마스킹한다(고객사 특화 패턴·개체명(NER) 마스킹은 옵션). <b>추출 텍스트에 적용</b>되어 분류·색인·검수 화면 어디에도 원본 PII가 흐르지 않는다.</td><td>—</td></tr>
-            <tr><td class="td-code">⑤<br>저장</td><td>worker</td><td><b>원본 바이너리</b>는 증빙용으로 <b>암호화 보관</b>하고, <b>마스킹된 정규화 텍스트·청크</b>만 분류·색인 경로로 보낸다. 원본·마스킹본·청크·임베딩·색인 각 단계의 PII 잔존·암호화·보관기간 정책은 데이터 흐름표(부록 A)로 관리한다.</td><td>원본(암호화) → MinIO · <code>chunks</code> → PG(월별 파티션)</td></tr>
+            <tr><td class="td-code">⑤<br>저장</td><td>worker</td><td><b>원본 바이너리</b>는 증빙용으로 <b>암호화 보관</b>하고, <b>마스킹된 정규화 텍스트·청크</b>만 분류·색인 경로로 보낸다. 원본·마스킹본·청크·임베딩·색인 각 단계의 PII 잔존·암호화·보관기간 정책은 데이터 흐름표(부록 A)로 관리한다.</td><td>원본(암호화) → MinIO · <code>tb_chunks</code> → PG(월별 파티션)</td></tr>
             <tr><td class="td-code">⑥<br>등급 추론 (M5)</td><td>worker</td><td>해당 문서에 사람이 확정한 라벨이 이미 있으면 <b>즉시 그 라벨 사용</b>(<code>_get_verified_label</code>, 모델 추론 생략). 그 외에는 청크별 KF-DeBERTa softmax를 집계하되 <b>고등급(TS·S1)은 최고-위험 청크 우선(max-pooling)</b>으로 잡고, <b>3요건 곱셈 등급(S×V×M, 하단 '등급 산정 방식')과, 업로드 <u>메타정보(출처·문서유형)를 결합</u>한 출처·콘텐츠 2-게이트·미탐 판정 가드</b>(하단 '등급 하향 방어')를 적용해 <b>등급 + confidence</b>를 산출한다. "판단 불가"는 없다 — 항상 산출. 동시에 <b>RAG 근거 검색이 병렬</b>로 돈다(하단 RAG 참고 방식).</td><td>분류 결과 → PG</td></tr>
             <tr><td class="td-code">⑦<br>confidence 게이트</td><td>worker/api</td><td>confidence ≥ 0.7(<code>review_confidence_threshold</code>, 고정 설정) → <b>⑦a staging 임시저장</b>(관리자 검토 대기). 미만 → <b>⑦b</b> <code>status="needs_review"</code> + warning, <b>검수자 큐 자동 배분</b>(동률 시 저신뢰 우선 정렬).</td><td>PG</td></tr>
-            <tr><td class="td-code">⑧<br>사람 최종 확정</td><td>관리자 / 검수자 (UI)</td><td>⑦a: 관리자가 staging 결과 검토 후 <b>최종 등급 확정</b>(FUN-005: 임시저장 → 관리자 최종확정). ⑦b: 검수자가 <b>라벨 + 사유</b> 부여 → 해당 문서에 즉시 정답 반영, 동시에 <code>corrections</code>에 적재(모델 갱신 절차의 입력 — 갱신 자체는 자동 아님). <b>등급의 최종 결정권자는 항상 사람이다.</b></td><td>PG (verified label · <code>corrections</code>)</td></tr>
-            <tr><td class="td-code">공통<br>감사·관측</td><td>전 구간 상시</td><td>전 단계 API 호출 SHA-256 해시 체인 기록(사후 변조 탐지), Prometheus 지표 노출, Drift Monitor 15분 주기 분포 감시(§9).</td><td>PG <code>audit_log</code>(월별 파티션)</td></tr>
+            <tr><td class="td-code">⑧<br>사람 최종 확정</td><td>관리자 / 검수자 (UI)</td><td>⑦a: 관리자가 staging 결과 검토 후 <b>최종 등급 확정</b>(FUN-005: 임시저장 → 관리자 최종확정). ⑦b: 검수자가 <b>라벨 + 사유</b> 부여 → 해당 문서에 즉시 정답 반영, 동시에 <code>tb_corrections</code>에 적재(모델 갱신 절차의 입력 — 갱신 자체는 자동 아님). <b>등급의 최종 결정권자는 항상 사람이다.</b></td><td>PG (verified label · <code>tb_corrections</code>)</td></tr>
+            <tr><td class="td-code">공통<br>감사·관측</td><td>전 구간 상시</td><td>전 단계 API 호출 SHA-256 해시 체인 기록(사후 변조 탐지), Prometheus 지표 노출, Drift Monitor 15분 주기 분포 감시(§9).</td><td>PG <code>tb_audit_log</code>(월별 파티션)</td></tr>
           </tbody>
         </table>
       </div>
@@ -750,20 +750,77 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </tbody>
         </table>
       </div>
+      <p style="margin:12px 0 6px;"><b>가이드 원본(p12) 4단계 곱셈 매핑</b> — 발주처 정본 가이드(스캔본 11~12p 직접 대조) 그대로. v2.2는 이를 골든셋 실증으로 2곳 보정한다(아래 ② 분기표 + 보정 콜아웃 참조).</p>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>곱 (S×V×M)</th><th>등급</th><th>의미</th></tr></thead>
+          <thead><tr><th>곱 (S×V×M)</th><th>가이드 원본 등급</th><th>의미</th></tr></thead>
           <tbody>
-            <tr><td class="td-code">8</td><td class="td-pass"><b>TS</b> 특급기밀</td><td>2×2×2 — 세 요건 모두 최고</td></tr>
-            <tr><td class="td-code">4</td><td class="td-pass"><b>S1</b> 기밀</td><td>요건 곱이 4</td></tr>
-            <tr><td class="td-code">1 · 2</td><td><b>S2</b> 대외비</td><td>요건 곱이 1 또는 2</td></tr>
-            <tr><td class="td-code">0</td><td class="td-warn"><b>S3</b> 일반/공개</td><td>한 요건이라도 0이면 곱=0 → 영업비밀 불성립</td></tr>
+            <tr><td class="td-code">8</td><td class="td-pass"><b>TS</b> 극비</td><td>2×2×2 — 세 요건 모두 최고</td></tr>
+            <tr><td class="td-code">4</td><td class="td-pass"><b>S1</b> 비밀</td><td>곱이 4 — 예: s=2·v=2·m=1, s=2·v=1·m=2, s=1·v=2·m=2 <small>(★ v2.2 보정: s=2·v=2면 TS, s&lt;2면 S2 — 곱4가 항상 S1은 아님)</small></td></tr>
+            <tr><td class="td-code">1 · 2</td><td><b>S2</b> 대외비</td><td>곱이 1 또는 2</td></tr>
+            <tr><td class="td-code">0</td><td class="td-warn"><b>S3</b> 일반/공개</td><td>한 요건이라도 0이면 곱=0 → 공개 <small>(★ v2.2 보정: s=2·v=2·m=0은 예외로 S1)</small></td></tr>
           </tbody>
         </table>
       </div>
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
         <div class="callout-body"><b>FNR-safe 규칙:</b> 곱셈으로 산정한 등급과 콘텐츠 신호(키워드·룰)가 잡은 등급이 불일치하면 <b>더 높은(민감한) 등급을 채택</b>한다(미탐 방지). 레거시 4요소(경제가치·비공지성·관리수준·유출영향도)는 키워드 시드 태그로만 잔존하며 3요건(S·V·M)으로 자동 폴딩되고(유출영향도→유용성 V), 점수·등급은 100% 곱셈식으로 산정한다.</div>
+      </div>
+
+      <h4>v2.2 운영 보강 — 골든셋 실증 기반</h4>
+      <p>골든셋 100건 실증 결과를 반영하여 경계 케이스 분기 규칙과 도메인별 S/V/M 기본값 앵커를 명문화한다. 아래 기준은 자동 라벨링(M3)의 판단 로직과 검수자 가이드에 공통 적용된다.</p>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠</span>
+        <div class="callout-body"><b>가이드 원본 대조 — 발주처 승인 필요:</b> 아래 v2.2 분기는 가이드 원본 곱셈 매핑(p12)을 <b>2곳 보정</b>한 것이다. ① <code>s=2·v=2·m=0</code>: 가이드 곱=0→<b>공개</b>지만 v2.2는 <b>S1</b>(미탐 방지). ② <code>1·2·2</code> 등 <code>s&lt;2</code>의 곱=4: 가이드는 <b>1급 비밀</b>이나 v2.2는 <b>S2</b>(과분류 방지). 둘 다 골든셋 근거가 있으나 가이드 예시값을 정정하는 것이므로, <b>가이드 순수 곱셈을 기본값으로 두고 v2.2 보정을 설정 토글</b>로 분리해 발주처 승인 후 활성화할 것을 권고한다. A안(Σ5요소 100점, p4~5)은 경영·재무 판단값 65점을 포함해 AI 산출 불가 → <b>사람 수기 자가진단</b>으로 역할 분담. <i>(상세: 등급분류 기준 적용서 v2.2 §3.7)</i></div>
+      </div>
+
+      <h5 style="margin:18px 0 8px; font-size:0.95em; color:var(--c-text);">① S1 등급 판단 기준 명문화</h5>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>조합</th><th>등급</th><th>해설</th></tr></thead>
+          <tbody>
+            <tr><td class="td-code">s=2, v=2, m=0</td><td class="td-pass"><b>S1</b> 확정</td><td>관리가 미명문화된 고가치 영업비밀. 비공지성·유용성 모두 최고이나 공식 관리체계 부재 → <b>TS가 아닌 S1</b></td></tr>
+            <tr><td class="td-code">s=2, v=2, m=1</td><td class="td-pass"><b>TS</b></td><td>접근자 지정·비공개 명시로 관리 최소 요건 충족 → TS 진입</td></tr>
+            <tr><td class="td-code">s=2, v=2, m=2</td><td class="td-pass"><b>TS</b></td><td>공식 등급표기+물리적 통제까지 갖춤 → TS 최고 수준</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout info" style="margin-bottom:16px;">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>S1 vs TS 분기 핵심:</b> <b>m=0 → S1</b>, <b>m≥1 → TS</b>. 비공지성·유용성이 아무리 높아도 관리가 전혀 명문화되지 않은 상태에서는 TS가 아닌 S1이 된다. S1 전형 유형: 알고리즘 파라미터, 축적 노하우, 비공식 열람 제한 전략, NDA만 있는 M&amp;A 자문, 승인 전 임상 데이터, 계리 테이블.</div>
+      </div>
+
+      <h5 style="margin:18px 0 8px; font-size:0.95em; color:var(--c-text);">② 경계 케이스 분기표 (s==2 AND v==2 기준)</h5>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>조건</th><th>m 값</th><th>등급</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="3"><b>s==2 AND v==2</b></td><td class="td-code">m==0</td><td class="td-pass"><b>S1</b></td></tr>
+            <tr><td class="td-code">m==1</td><td class="td-pass"><b>TS</b></td></tr>
+            <tr><td class="td-code">m==2</td><td class="td-pass"><b>TS</b></td></tr>
+            <tr><td rowspan="3"><b>s==2 AND v==2 아닌 경우</b></td><td class="td-code">s==0 (어느 v·m)</td><td class="td-warn"><b>S3</b></td></tr>
+            <tr><td class="td-code">곱(S×V×M) ≥ 1</td><td><b>S2</b></td></tr>
+            <tr><td class="td-code">곱(S×V×M) == 0</td><td class="td-warn"><b>S3</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h5 style="margin:18px 0 8px; font-size:0.95em; color:var(--c-text);">③ 도메인별 S/V/M 기본값 앵커 (골든셋 100건 실증)</h5>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>요건</th><th>점수</th><th>해당 문서 유형 / 상황</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="3"><b>S · 비공지성</b></td><td class="td-code">S=2</td><td>특허출원 전 설계서·알고리즘 파라미터·임상데이터·M&amp;A 조건</td></tr>
+            <tr><td class="td-code">S=1</td><td>내부 기획·계획·협상 중 문서</td></tr>
+            <tr><td class="td-code">S=0</td><td>공개 보도자료·공시·등록특허·학술논문</td></tr>
+            <tr><td rowspan="2"><b>V · 경제적 유용성</b></td><td class="td-code">V=2</td><td>복제 시 수익 직접 잠식 / 경쟁사 R&amp;D 수년 단축</td></tr>
+            <tr><td class="td-code">V=1</td><td>경쟁 우위 간접 기여 (사업계획·예산안)</td></tr>
+            <tr><td rowspan="3"><b>M · 비밀관리성</b></td><td class="td-code">M=2</td><td>공식 등급표기 + 물리적 통제 (에어갭·HSM·방사청 인가)</td></tr>
+            <tr><td class="td-code">M=1</td><td>접근자 지정 + 비공개 명시 (공식 등급 미부여 가능)</td></tr>
+            <tr><td class="td-code">M=0</td><td>관리 미명문화, 비공식 열람 제한만 존재</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <h4>등급 하향 방어 — 출처·콘텐츠 2-게이트와 미탐 판정 가드</h4>
@@ -792,7 +849,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td><b>접수됨</b></td><td>① 원문 저장 + 작업 발행 완료</td><td>→ 처리 중</td></tr>
             <tr><td><b>처리 중</b></td><td>worker가 ②–⑥ 비동기 수행</td><td>→ 자동 분류 / needs_review / 실패</td></tr>
             <tr><td><b>자동 분류 (staging)</b></td><td>confidence ≥ 0.7</td><td>→ 관리자 검토(⑧) → <b>확정</b></td></tr>
-            <tr><td class="td-code"><b>needs_review</b></td><td>confidence &lt; 0.7 (분류는 됐으나 사람 검증 필요)</td><td>→ 검수자 라벨링(⑧) → <b>확정</b> (+ corrections 적재)</td></tr>
+            <tr><td class="td-code"><b>needs_review</b></td><td>confidence &lt; 0.7 (분류는 됐으나 사람 검증 필요)</td><td>→ 검수자 라벨링(⑧) → <b>확정</b> (+ tb_corrections 적재)</td></tr>
             <tr><td><b>확정 (verified)</b></td><td>관리자 확정 또는 검수 완료</td><td>최종 등급. 이후 동일 문서 재분류 시 즉시 override · KL측 후속 기능의 입력</td></tr>
             <tr><td><b>실패</b></td><td>비동기 처리 오류</td><td>→ DLQ 적재 → 재처리(§2.3). 유실 없음</td></tr>
           </tbody>
@@ -859,7 +916,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <!-- G1 수집 (자동) -->
           <rect x="14" y="64" width="150" height="44" rx="6" fill="rgba(0,0,0,.04)" stroke="rgba(0,0,0,.22)" stroke-width="1.5"/>
           <text x="89" y="83" text-anchor="middle" font-size="11" font-weight="600" fill="#2a2a2a" font-family="Geist,sans-serif">G1 수집 (자동 · 상시)</text>
-          <text x="89" y="97" text-anchor="middle" font-size="9.5" fill="#525252" font-family="Geist Mono,monospace">검수 corrections 누적</text>
+          <text x="89" y="97" text-anchor="middle" font-size="9.5" fill="#525252" font-family="Geist Mono,monospace">검수 tb_corrections 누적</text>
 
           <!-- G1 → G2 -->
           <line x1="164" y1="86" x2="230" y2="86" stroke="#525252" stroke-width="1.5" marker-end="url(#g-arr)"/>
@@ -908,8 +965,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th>단계</th><th>자동/수동</th><th>동작</th></tr></thead>
           <tbody>
-            <tr><td class="td-code">G1<br>수집</td><td class="td-pass">자동 (상시)</td><td>검수자가 ⑦b에서 수정한 라벨이 <code>corrections</code> 테이블에 쌓인다. <b>이 수집은 상시 자동이다.</b></td></tr>
-            <tr><td class="td-code">G2<br>재학습 실행</td><td class="td-warn">스케줄러 자동 / 또는 수동</td><td>corrections 누적이 임계(권장 기본 <b>50</b>, 보안 미탐 누적 ≥10 시 긴급) 도달 시 스케줄러(또는 관리자)가 트리거하여 새 모델 "후보"를 배치 학습한다(M4). 학습 중에도 기존 운영 모델은 그대로 서비스한다.</td></tr>
+            <tr><td class="td-code">G1<br>수집</td><td class="td-pass">자동 (상시)</td><td>검수자가 ⑦b에서 수정한 라벨이 <code>tb_corrections</code> 테이블에 쌓인다. <b>이 수집은 상시 자동이다.</b></td></tr>
+            <tr><td class="td-code">G2<br>재학습 실행</td><td class="td-warn">스케줄러 자동 / 또는 수동</td><td>tb_corrections 누적이 임계(권장 기본 <b>50</b>, 보안 미탐 누적 ≥10 시 긴급) 도달 시 스케줄러(또는 관리자)가 트리거하여 새 모델 "후보"를 배치 학습한다(M4). 학습 중에도 기존 운영 모델은 그대로 서비스한다.</td></tr>
             <tr><td class="td-code">G3<br>검증 (평가 게이트)</td><td class="td-warn">수동 트리거 · 자동 채점</td><td>새 후보를 평가셋으로 채점한다 — <b>F1 · FNR(비밀문서 미탐률, TS·S1 핵심) · 적대 케이스</b>. 하나라도 기준 미달이면 후보를 폐기한다(M6). 결과는 MLflow에 지표·혼동행렬로 남는다.</td></tr>
             <tr><td class="td-code">G4<br>승인 · 교체</td><td class="td-warn">수동</td><td>관리자가 G3 결과를 확인하고 <b>사인오프한 경우에만</b> 운영 모델을 교체한다(MLflow/MinIO 이력). 자동 활성 스위치(<code>retrain_auto_activate</code>)는 <b>기본 비활성(OFF)</b>이라, 끄여 있는 한 무인 자동 배포는 일어나지 않는다(§2.4.1 폐곡선). 교체는 핫리로드(<code>/admin/model/reload</code>)로 <b>프로세스 재기동 없이</b> 반영된다.</td></tr>
           </tbody>
@@ -941,7 +998,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>층</th><th>동작</th><th>효과</th></tr></thead>
           <tbody>
             <tr><td><b>① 즉시 override</b><br>(사람 라벨)</td><td>도메인 관리자가 라벨·사유를 부여한 문서는 <b>그 라벨을 직접 정답으로</b> 사용(모델 추론 건너뜀)</td><td class="td-pass">해당 문서 100% 정확 — 재학습을 기다리지 않고 즉시 반영</td></tr>
-            <tr><td><b>② 게이트형 재학습</b><br>(주기·자동/수동)</td><td>corrections가 N건(권장 <b>50</b>, 미탐 누적 ≥10 시 긴급) 누적되면 스케줄러(또는 관리자) 트리거 → F1/FNR/적대 게이트 통과 → <b>사람 승인(G4) 후</b> 배포</td><td class="td-pass">신규 문서 일반화 향상 — 재현·감사 가능</td></tr>
+            <tr><td><b>② 게이트형 재학습</b><br>(주기·자동/수동)</td><td>tb_corrections가 N건(권장 <b>50</b>, 미탐 누적 ≥10 시 긴급) 누적되면 스케줄러(또는 관리자) 트리거 → F1/FNR/적대 게이트 통과 → <b>사람 승인(G4) 후</b> 배포</td><td class="td-pass">신규 문서 일반화 향상 — 재현·감사 가능</td></tr>
             <tr><td><b>③ 자동 배포 기본 차단</b></td><td>자동 활성 스위치(<code>retrain_auto_activate</code>)·자동 롤백(<code>auto_rollback_enabled</code>) 모두 <b>기본 OFF</b>. 모든 모델 교체는 게이트(fail-closed) + 사람 사인오프 경유</td><td class="td-pass">FNR 회귀(비밀→공개 유출) 원천 차단</td></tr>
           </tbody>
         </table>
@@ -1009,7 +1066,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </tbody>
         </table>
       </div>
-      <p>현재 활성 모델은 <b>KF-DeBERTa <code>v-dd3abab9</code></b>(법률 오염 정제 후 학습셋 <code>labeled_clean_nolegal</code> 2,591건으로 fine-tune)이다. 비즈니스 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43)에서의 서빙경로 실측은 다음과 같다.</p>
+      <p>현재 활성 모델은 <b>KF-DeBERTa <code>v-f9b5cedb</code></b>(법률 오염 정제 후 학습셋 <code>labeled_clean_nolegal</code> 2,591건으로 fine-tune)이다. 비즈니스 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43)에서의 서빙경로 실측은 다음과 같다.</p>
       <div class="card-grid col4" style="margin:16px 0;">
         <div class="card card-pass"><div class="card-label">F1_macro</div><div class="card-value sm">0.686</div><div class="card-desc">4등급 F1 단순평균</div></div>
         <div class="card card-pass"><div class="card-label">방향성 FNR</div><div class="card-value sm">0.018</div><div class="card-desc">고등급(TS·S1)→저등급 미탐</div></div>
@@ -1221,7 +1278,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>7.1 분류 모델 — 타당성 확인 · 모델 선정 완료</h3>
-      <p>분류 모델로 <b>KF-DeBERTa</b>(활성 <code>v-dd3abab9</code>)를 선정하고, 4단계 보안등급 분류가 정상 동작함을 확인했다. 비즈니스 홀드아웃 109건 기준 서빙경로 실측은 <b>F1_macro 0.686 · 방향성 FNR 0.018 · Accuracy 0.706 · FNR_TS 0.000</b>이다(§3.2). 다만 학습에 포함되지 않은 새로운 문체에서는 일부 문서가 실제보다 낮은 등급으로 분류되는 경향이 관찰되었다. 이를 줄이기 위해 <b>발주처 실데이터로 보강·정밀화</b>하는 것이 본개발의 핵심 과제이며, 비밀문서 미탐(누락)을 가장 중요한 관리 지표로 두고, 저신뢰 오류는 검수 라우팅으로, <b>고신뢰 하향 오분류는 §2의 판정 시점 미탐 가드(최고-위험 청크 집계·콘텐츠 가드)</b>로 별도 차단한다.</p>
+      <p>분류 모델로 <b>KF-DeBERTa</b>(활성 <code>v-f9b5cedb</code>)를 선정하고, 4단계 보안등급 분류가 정상 동작함을 확인했다. 비즈니스 홀드아웃 109건 기준 서빙경로 실측은 <b>F1_macro 0.686 · 방향성 FNR 0.018 · Accuracy 0.706 · FNR_TS 0.000</b>이다(§3.2). 다만 학습에 포함되지 않은 새로운 문체에서는 일부 문서가 실제보다 낮은 등급으로 분류되는 경향이 관찰되었다. 이를 줄이기 위해 <b>발주처 실데이터로 보강·정밀화</b>하는 것이 본개발의 핵심 과제이며, 비밀문서 미탐(누락)을 가장 중요한 관리 지표로 두고, 저신뢰 오류는 검수 라우팅으로, <b>고신뢰 하향 오분류는 §2의 판정 시점 미탐 가드(최고-위험 청크 집계·콘텐츠 가드)</b>로 별도 차단한다.</p>
 
       <h3>7.2 검색(임베딩) 모델 — 모델 선정 완료</h3>
       <p>검색 모델로 <b>KURE-v1</b>(한국어 특화, BGE-M3 폴백)을 선정했다. 합성 코퍼스에서의 초기 검색 정확도는 <b>Recall@5 약 0.67~0.72로 목표(0.80)에 미달</b>했다. 원인은 검색 알고리즘이 아니라 <b>합성 데이터 본문이 비슷한 표현을 반복하는 다양성 부족</b>이다 — 쿼리와 정답 문서가 거의 같은 표현을 공유해 변별이 어려운 구조였다(데이터 한계). 실문서의 표현 다양성이 확보되면 향상되며, 목표 충족 여부는 본개발 실데이터로 재측정·확정한다.</p>
@@ -1250,7 +1307,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>7.6 운영점 실측 — 평가↔서빙 갭과 운영 임계값</h3>
-      <p>동일 모델(<code>v-dd3abab9</code>)·동일 홀드아웃(109건)이라도 <b>"무엇으로 재느냐"에 따라 안전성 수치가 크게 달라진다</b>는 점을 실측으로 확인했다. 원시 argmax로 재면 안전성을 과대평가하므로, <b>실배포 경로 전체를 통과시켜 측정(C-eval)</b>해야 운영 동작과 일치한다.</p>
+      <p>동일 모델(<code>v-f9b5cedb</code>)·동일 홀드아웃(109건)이라도 <b>"무엇으로 재느냐"에 따라 안전성 수치가 크게 달라진다</b>는 점을 실측으로 확인했다. 원시 argmax로 재면 안전성을 과대평가하므로, <b>실배포 경로 전체를 통과시켜 측정(C-eval)</b>해야 운영 동작과 일치한다.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>측정 경로</th><th>방향성 FNR</th><th>FNR_TS</th><th>F1</th><th>Accuracy</th></tr></thead>

@@ -34,7 +34,7 @@ poc/dist/
 poc/migration/
 # dump_licenses.py 자동 산출 (doc/14)
 poc/licenses/
-# Docker bind mount 데이터 (E:/antigravity/rag/docker-data/로 매핑)
+# Docker bind mount 데이터 (repo 루트 ../docker-data/ 로 매핑 — compose 파일 기준 상대경로)
 docker-data/
 
 # Additional data dirs (PoC 5K 합성·라벨)

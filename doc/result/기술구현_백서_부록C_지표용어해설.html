@@ -45,8 +45,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans
 .nav-pill:hover{border-color:var(--border-strong);color:var(--text);}
 .nav-pill.active{background:var(--text);color:var(--bg);border-color:var(--text);}
 
-.page{max-width:1380px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:0;padding:0 32px;}
-.sidebar{position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:28px 0;border-right:1px solid var(--border);}
+.page{max-width:1380px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:28px 0;border-right:1px solid var(--border);}
 .sidebar::-webkit-scrollbar{width:3px;}.sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
 .toc-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 20px 10px;font-family:var(--font-mono);}
 .toc-item{display:block;padding:4px 20px;font-size:12px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .12s;line-height:1.4;}
@@ -349,6 +349,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <h3>이 수치를 어떻게 믿을 수 있나</h3>
       <p style="font-size:13.5px;">모든 정확도 지표는 <b>정답지(라벨)와 대조</b>해 업계 표준 방식·오픈소스로 측정하며, <b>학습 데이터와 평가 데이터를 분리</b>해 객관성을 확보한다. 즉 모델이 외운 답이 아니라 새 문서에도 통하는지를 본다.</p>
       <p style="font-size:13.5px;">정답지의 품질이 곧 신뢰도이므로, <b>실제 운영 정확도는 발주처 실데이터로 검증하는 본개발 단계에서 확정</b>한다. 프로토타입 수치는 타당성 확인과 모델 선정을 위한 것이다(백서 §10 · §11).</p>
+      <p style="font-size:13.5px;"><b>골든셋 계층</b> — 채점 정답이 부여된 평가용 문서 집합으로 단계적으로 확장한다. <b>golden100</b>(100건, 1차 실증·분류근거 보고 대상) → <b>golden500</b>(500건, 확장 평가셋) → <b>본개발 1,000건</b>(발주처 실데이터 기반 목표). 문서별 인용 시점이 달라 건수가 다르게 보일 수 있다.</p>
     </div>
 
     <p style="margin-top:32px;font-size:13px;color:var(--text-dim);">본 부록은 백서 §6(검증 방법) · §7(프로토타입 검증 결과)의 보조 자료다. 더 깊은 측정 절차·평가셋 구성은 요청 시 별도 제공한다.</p>

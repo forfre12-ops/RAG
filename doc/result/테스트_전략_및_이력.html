@@ -41,8 +41,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans
 .nav-link:hover{color:var(--text);}
 
 /* ===== Layout ===== */
-.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:200px minmax(0,1fr);gap:0;padding:0 32px;}
-.sidebar{position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0;border-right:1px solid var(--border);}
+.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0;border-right:1px solid var(--border);}
 .sidebar::-webkit-scrollbar{width:3px;}.sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
 .toc-title{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 24px 10px;font-family:var(--font-mono);}
 .toc-item{display:block;padding:5px 24px;font-size:13px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .15s;line-height:1.4;}
@@ -117,7 +117,7 @@ tbody tr:hover td{background:var(--bg-surface);}
 code{font-family:var(--font-mono);font-size:12.5px;background:var(--bg-code);padding:2px 5px;border-radius:4px;border:1px solid var(--border);}
 
 /* ===== Tags ===== */
-.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--radius-pill);font-size:11px;font-weight:600;font-family:var(--font-mono);border:1px solid;}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;font-family:var(--font-mono);border:1px solid;}
 .tag.pass{color:var(--text);border-color:rgba(0,0,0,.2);background:rgba(0,0,0,.04);}
 .tag.fail{color:rgba(0,0,0,.5);border-color:rgba(0,0,0,.18);background:rgba(0,0,0,.03);}
 .tag.warn{color:rgba(0,0,0,.5);border-color:rgba(0,0,0,.15);background:rgba(0,0,0,.03);}
@@ -328,7 +328,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="card card-dark">
         <div class="card-label">현 배포 모델</div>
-        <div class="card-value sm">v-dd3abab9</div>
+        <div class="card-value sm">v-f9b5cedb</div>
         <div class="card-desc">KF-DeBERTa · 서빙 FNR 0.018</div>
       </div>
       <div class="card card-muted">
@@ -429,7 +429,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <div class="flow-card real-step">
                 <div class="flow-step-name">⑦ KF-DeBERTa 추론 <span class="tag real">진짜</span></div>
                 <div class="flow-step-lib">kakaobank/kf-deberta-base fine-tuned · 110M params · p50 ~10ms</div>
-                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 현 배포 v-dd3abab9: 홀드아웃109 F1_macro=0.686 · 서빙 방향성 FNR=0.018 · FNR_TS=0.000.</div>
+                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 현 배포 v-f9b5cedb: 홀드아웃109 F1_macro=0.686 · 서빙 방향성 FNR=0.018 · FNR_TS=0.000.</div>
               </div>
             </div>
 
@@ -438,7 +438,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <div class="flow-card real-step">
                 <div class="flow-step-name">⑧ 응답 반환 · DB 저장</div>
                 <div class="flow-step-lib">PostgreSQL 16 · Celery Outbox · SHA-256 감사 체인</div>
-                <div class="flow-step-desc">classifications·classification_evidence 테이블 적재. Outbox ZSET로 감사 로그 원자 기록. MLflow run_id 추적.</div>
+                <div class="flow-step-desc">tb_classifications·tb_classification_evidence 테이블 적재. Outbox ZSET로 감사 로그 원자 기록. MLflow run_id 추적.</div>
                 <div class="flow-tags"><span class="tag real">PostgreSQL</span><span class="tag real">audit chain</span><span class="tag real">MLflow</span></div>
               </div>
             </div>
@@ -625,7 +625,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <p style="font-size:12.5px;color:var(--text-soft);">
         <b>핵심:</b> "실측"의 GPU 의존 항목(분류 F1·FNR·Recall@5·E2E)은 <b>RTX 5070 Ti로 이미 측정 완료</b>입니다 — GPU는 블로커가 아닙니다. <b>유일하게 남은 미측정은 발주처 실문서(폐쇄망 반출 불가)</b> 의존 항목뿐.
-        <span style="color:var(--text-dim);">* 검증 피라미드: 단위 385/385 · DB-backed 20/20 · 풀스택(PG+ES) 95/95 · 실 GPU E2E 7/7(corrections→train→deploy→reload 능동학습 폐곡선) · 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐). PSH S1~S13(11종)×30+ KPI 회귀 자동탐지.</span>
+        <span style="color:var(--text-dim);">* 검증 피라미드: 단위 385/385 · DB-backed 20/20 · 풀스택(PG+ES) 95/95 · 실 GPU E2E 7/7(tb_corrections→train→deploy→reload 능동학습 폐곡선) · 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐). PSH S1~S13(11종)×30+ KPI 회귀 자동탐지.</span>
       </p>
     </section>
 
@@ -730,7 +730,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
         <div class="callout pass">
           <span class="callout-icon">✓</span>
-          <div class="callout-body"><b>FNR-safe:</b> S×V×M 등급과 콘텐츠 모델 등급이 불일치하면 <b>더 높은(민감) 등급을 채택</b>해 미탐을 방지합니다. 레거시 4요소(ECONOMIC_VALUE·NON_PUBLICITY·MANAGEMENT_LEVEL·LEAK_IMPACT)는 키워드 시드 태그로만 잔존하며 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 자동 폴딩(LEAK_IMPACT→VALUE) — 점수·등급은 100% 곱셈식. alembic <code>evaluation_factors</code> 3요건화, <code>document_factor_scores.score</code> 제약 0~2.</div>
+          <div class="callout-body"><b>FNR-safe:</b> S×V×M 등급과 콘텐츠 모델 등급이 불일치하면 <b>더 높은(민감) 등급을 채택</b>해 미탐을 방지합니다. 레거시 4요소(ECONOMIC_VALUE·NON_PUBLICITY·MANAGEMENT_LEVEL·LEAK_IMPACT)는 키워드 시드 태그로만 잔존하며 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 자동 폴딩(LEAK_IMPACT→VALUE) — 점수·등급은 100% 곱셈식. alembic <code>evaluation_factors</code> 3요건화, <code>tb_document_factor_scores.score</code> 제약 0~2.</div>
         </div>
       </div>
     </section>
@@ -742,8 +742,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h2><span class="num">03</span> 운영점 실측 · 능동학습 폐곡선 <span style="font-size:13px;color:var(--text-dim);font-weight:500;">(2026-06-19)</span></h2>
       <p class="h2-sub">동일 모델·홀드아웃이라도 원시 argmax와 실배포 서빙경로의 안전성이 크게 다릅니다. 운영점(C-esc/C-eval/B1)을 실측해 확정했습니다.</p>
 
-      <h3>10.0 모델 선정 — KF-DeBERTa (v-dd3abab9)</h3>
-      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 현재 활성 <code>v-dd3abab9</code>는 법률 정제 학습셋 <code>labeled_clean_nolegal</code> 2,591건으로 학습. 홀드아웃 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b> · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
+      <h3>10.0 모델 선정 — KF-DeBERTa (v-f9b5cedb)</h3>
+      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 현재 활성 <code>v-f9b5cedb</code>는 법률 정제 학습셋 <code>labeled_clean_nolegal</code> 2,591건으로 학습. 홀드아웃 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b> · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
       <div class="tbl-wrap">
         <table>
           <thead>
@@ -760,7 +760,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p style="font-size:12.5px;color:var(--text-soft);">참고: OSS 공개데이터 학습(v12, 2026-05-31) KF-DeBERTa F1 <b>0.848</b>은 <b>정제 전 벤치마크 수치</b>(법률 오염 전)입니다. 현행 운영값은 서빙경로 F1 0.686.</p>
 
       <h3>10.1 평가↔서빙 갭 — 서빙경로 평가(C-eval)</h3>
-      <p style="font-size:13px;">측정: KF-DeBERTa <code>classifier_p1_retrain_v4_clean/v-dd3abab9</code>, 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43). <code>evaluate_via_serving</code>로 실배포 경로 전체(보정+FNR-safe override+most-severe 집계)를 통과해 측정 → 평가=배포 동작 일치를 보장.</p>
+      <p style="font-size:13px;">측정: KF-DeBERTa <code>classifier_p1_retrain_v4_clean/v-f9b5cedb</code>, 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43). <code>evaluate_via_serving</code>로 실배포 경로 전체(보정+FNR-safe override+most-severe 집계)를 통과해 측정 → 평가=배포 동작 일치를 보장.</p>
       <div class="tbl-wrap">
         <table>
           <thead>
@@ -790,12 +790,12 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>10.3 능동학습 폐곡선 (A2/C-ver) — 실 GPU E2E 7/7</h3>
-      <p style="font-size:13px;">분류 → 검수자 교정(corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다.</p>
+      <p style="font-size:13px;">분류 → 검수자 교정(tb_corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>단계</th><th>구현</th><th>동작</th></tr></thead>
           <tbody>
-            <tr><td>교정 재빌드</td><td class="td-code">corrections_rebuild.py</td><td>unconsumed corrections → {text,label}. 결정성 <code>corrected_at desc + correction_id desc</code>. <b>반영분만 소비</b>(consumed_in_run), 미반영=무손실. val/test 홀드아웃은 증강 안함(지표 신뢰성)</td></tr>
+            <tr><td>교정 재빌드</td><td class="td-code">corrections_rebuild.py</td><td>unconsumed tb_corrections → {text,label}. 결정성 <code>corrected_at desc + correction_id desc</code>. <b>반영분만 소비</b>(consumed_in_run), 미반영=무손실. val/test 홀드아웃은 증강 안함(지표 신뢰성)</td></tr>
             <tr><td>배포 게이트</td><td class="td-code">deploy_gate.py</td><td><b>fail-closed</b>: degenerate 거부 + fnr_high 필수(없으면 거부) + fnr_high ≤ baseline+tol + f1 ≥ baseline−tol</td></tr>
             <tr><td>버전 등록·활성</td><td class="td-code">training_service.py</td><td>항상 register(이력). activate는 게이트통과 AND <code>retrain_auto_activate=True</code>(기본 False)일 때만 = 보수적</td></tr>
             <tr><td>모델 핫리로드</td><td class="td-code">POST /admin/model/reload</td><td>활성 ModelVersion.model_uri로 InferencePipeline 재구성. <b>프로세스 재기동 불요</b></td></tr>
@@ -807,7 +807,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="callout pass">
         <span class="callout-icon">✓</span>
-        <div class="callout-body"><b>실 GPU E2E 7/7 PASS</b>: corrections→train→deploy→reload 폐곡선 전체. 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐)로 검증.</div>
+        <div class="callout-body"><b>실 GPU E2E 7/7 PASS</b>: tb_corrections→train→deploy→reload 폐곡선 전체. 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐)로 검증.</div>
       </div>
 
       <!-- ============================================================
@@ -833,7 +833,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             </tbody>
           </table>
         </div>
-        <p style="font-size:12.5px;color:var(--text-soft);">홀드아웃에서 판례 제거(<code>holdout_business.jsonl</code> 90건), 원본은 아카이브 보관. 현행 활성 모델 v-dd3abab9는 <code>labeled_clean_nolegal</code> 2,591건으로 학습되었습니다.</p>
+        <p style="font-size:12.5px;color:var(--text-soft);">홀드아웃에서 판례 제거(<code>holdout_business.jsonl</code> 90건), 원본은 아카이브 보관. 현행 활성 모델 v-f9b5cedb는 <code>labeled_clean_nolegal</code> 2,591건으로 학습되었습니다.</p>
       </div>
     </section>
 
@@ -1184,9 +1184,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
                 <b>채점 정본 전환 + 능동학습 배선 (현행화)</b><br>
                 채점 4요소 가산 → <b>3요건 S×V×M 곱셈</b>(grade_from_svm)<br>
                 법률코퍼스 오염 발견(판례 56%·오라벨 67%) → labeled_clean_nolegal 2,591건 재학습<br>
-                v-dd3abab9 활성 · 운영점 확정(C-esc 기본 None·B1 1.0 유지·C-eval 서빙평가)<br>
-                능동학습 폐곡선 배선(corrections→train→deploy→reload) · 핫리로드 · 자동롤백<br>
-                alembic: evaluation_factors 3요건화 · score 0~2 · model_versions 롤백 FK<br>
+                v-f9b5cedb 활성 · 운영점 확정(C-esc 기본 None·B1 1.0 유지·C-eval 서빙평가)<br>
+                능동학습 폐곡선 배선(tb_corrections→train→deploy→reload) · 핫리로드 · 자동롤백<br>
+                alembic: evaluation_factors 3요건화 · score 0~2 · tb_model_versions 롤백 FK<br>
                 신규 API: /admin/model/reload · /train · /classify/stream · /answer · /relabel<br>
                 pytest 385/385 PASS · 회귀 0 · API 라우트 23개
               </td>
@@ -1231,7 +1231,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout info">
         <span class="callout-icon">🔁</span>
         <div class="callout-body">
-          <b>현행 활성 모델 (2026-06-19): v-dd3abab9</b> — 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,591건</b>으로 재학습한 모델입니다(§10.4). 아래 표의 step3 계보(14,461건)는 정제 직전 배포본의 데이터 구성으로, 정제 효과 비교 기준(baseline)입니다.
+          <b>현행 활성 모델 (2026-06-19): v-f9b5cedb</b> — 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,591건</b>으로 재학습한 모델입니다(§10.4). 아래 표의 step3 계보(14,461건)는 정제 직전 배포본의 데이터 구성으로, 정제 효과 비교 기준(baseline)입니다.
         </div>
       </div>
 
@@ -1707,7 +1707,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
 <footer>
   <span>테스트 전략 · 환경 · 이력 · KOIPA AI 영업비밀관리시스템 — Lloydk AI Engine</span>
-  <span>2026-06-19 갱신 · pytest 385/385 · 채점 S×V×M · 능동학습 폐곡선 · v-dd3abab9</span>
+  <span>2026-06-19 갱신 · pytest 385/385 · 채점 S×V×M · 능동학습 폐곡선 · v-f9b5cedb</span>
 </footer>
 
 <script>
