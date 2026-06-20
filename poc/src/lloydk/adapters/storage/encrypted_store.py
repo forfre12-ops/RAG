@@ -74,6 +74,13 @@ class EncryptingStorage:
     def uri(self, bucket: str, key: str) -> str:
         return self._inner.uri(bucket, key)
 
+    # #36: 키 목록·삭제는 암호화와 무관(평문/암호문 모두 같은 키로 저장됨) — 내부 backend에 그대로 위임.
+    def list_keys(self, bucket: str, prefix: str = "") -> list[str]:
+        return self._inner.list_keys(bucket, prefix)
+
+    def delete(self, bucket: str, key: str) -> None:
+        self._inner.delete(bucket, key)
+
     # --- crypto --------------------------------------------------------------
 
     def _encrypt(self, data: bytes) -> bytes:

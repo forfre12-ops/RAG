@@ -222,6 +222,11 @@ class RagIndexer:
 _TOKEN_RE = re.compile(r"[^a-z0-9._\-]")
 
 
+_TOKEN_MAX_LEN = 50
+# #37: truncation 시 충돌 방지용 해시 suffix 규격. "-" + sha1 앞 8자 = 9자.
+_HASH_SUFFIX_LEN = 8
+
+
 def _safe_token(value: str) -> str:
     """벡터스토어 인덱스명에 안전한 토큰으로 변환 (lowercase, alnum + . _ -)."""
     if not value:
@@ -231,4 +236,14 @@ def _safe_token(value: str) -> str:
     safe = safe.strip("-._")
     if not safe:
         safe = hashlib.sha1(value.encode("utf-8")).hexdigest()[:8]
-    return safe[:50]
+    # #37 (멀티테넌트 인덱스명 충돌): 50자 truncation이 실제로 일어나면
+    #      앞 50자가 같은 서로 다른 tenant/version이 같은 인덱스/alias로 붕괴해
+    #      보안 제품의 데이터 격리가 깨진다. truncation이 발생한 경우에 한해
+    #      원본(value)의 짧은 해시 suffix를 부착해 항상 유일성을 보장한다.
+    #      (truncation이 없으면 suffix 미부착 — 기존 인덱스명 그대로 보존, 비파괴.)
+    if len(safe) > _TOKEN_MAX_LEN:
+        suffix = hashlib.sha1(value.encode("utf-8")).hexdigest()[:_HASH_SUFFIX_LEN]
+        head_len = _TOKEN_MAX_LEN - _HASH_SUFFIX_LEN - 1  # "-" 1자 확보
+        head = safe[:head_len].strip("-._")
+        return f"{head}-{suffix}"
+    return safe

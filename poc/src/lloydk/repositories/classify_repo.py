@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from typing import Iterable
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from lloydk.db.models import (
@@ -322,9 +322,18 @@ class ClassifyRepo:
         reason: str | None = None,
     ) -> Correction:
         """direction은 등급 order 비교로 자동 결정."""
+        # #27(풀스캔 제거): ClassificationLevel 전체를 dict로 적재하지 않고
+        # direction 산출에 필요한 두 level_id(원본·교정)만 WHERE level_id IN (...)으로
+        # 조회한다. 등급 수가 늘어도(다중 등급체계) 조회 비용이 일정하게 유지된다.
+        # original==corrected(confirm) 같은 경우 IN 집합이 1건으로 줄어드는 것도 OK.
+        wanted = {original_level_id, corrected_level_id}
         levels = {
-            lv.level_id: lv.level_order
-            for lv in self.db.execute(select(ClassificationLevel)).scalars()
+            level_id: level_order
+            for level_id, level_order in self.db.execute(
+                select(
+                    ClassificationLevel.level_id, ClassificationLevel.level_order
+                ).where(ClassificationLevel.level_id.in_(wanted))
+            ).all()
         }
         orig_order = levels.get(original_level_id)
         new_order = levels.get(corrected_level_id)
@@ -420,12 +429,25 @@ class ClassifyRepo:
     ) -> int:
         import datetime as _dt
         now = _dt.datetime.now(_dt.timezone.utc)
-        count = 0
-        for cid in correction_ids:
-            corr = self.db.get(Correction, cid)
-            if corr is None:
-                continue
-            corr.consumed_in_run = run_id
-            corr.consumed_at = now
-            count += 1
-        return count
+        # #27(N+1 제거): id별 db.get→객체 갱신 루프를 단일 bulk UPDATE 1쿼리로 대체.
+        # 반환값 의미(실제 갱신된 correction 건수)는 result.rowcount로 보존한다.
+        # 빈 id 집합이면 IN () 빈 UPDATE를 피하고 0 반환.
+        ids = list(correction_ids)
+        if not ids:
+            return 0
+        # synchronize_session="fetch"로 세션 동기화를 요청하되, 일부 백엔드/버전
+        # (예: SQLite + SA 2.0.x)에서 identity map에 이미 로드된 인스턴스가
+        # 즉시 만료되지 않는 경우가 있어, 갱신 대상 중 세션에 로드된 객체는
+        # 명시적으로 expire하여 후속 db.get이 신선한 consumed_* 값을 보게 한다.
+        # (SQLite/PG 양쪽에서 동작 — 기존 루프 방식의 "갱신 반영" 의미 보존.)
+        result = self.db.execute(
+            update(Correction)
+            .where(Correction.correction_id.in_(ids))
+            .values(consumed_in_run=run_id, consumed_at=now)
+            .execution_options(synchronize_session="fetch")
+        )
+        id_set = set(ids)
+        for corr in list(self.db.identity_map.values()):
+            if isinstance(corr, Correction) and corr.correction_id in id_set:
+                self.db.expire(corr)
+        return result.rowcount or 0

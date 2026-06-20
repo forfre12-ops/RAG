@@ -46,3 +46,16 @@ class MinioStorage:
 
     def uri(self, bucket: str, key: str) -> str:
         return f"s3://{bucket}/{key}"
+
+    # --- #36: 객체 열거·삭제 (보존정책·재처리·마이그레이션용) -----------------
+
+    def list_keys(self, bucket: str, prefix: str = "") -> list[str]:
+        # list_objects(prefix, recursive) 로 키를 열거. 버킷 미존재 시 빈 목록.
+        if not self._client.bucket_exists(bucket):
+            return []
+        objs = self._client.list_objects(bucket, prefix=prefix, recursive=True)
+        return sorted(o.object_name for o in objs)
+
+    def delete(self, bucket: str, key: str) -> None:
+        # remove_object — 없는 키도 예외 없이 멱등 처리되는 S3 시맨틱.
+        self._client.remove_object(bucket, key)

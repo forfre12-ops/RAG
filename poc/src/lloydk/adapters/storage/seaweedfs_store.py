@@ -78,6 +78,33 @@ class SeaweedFSStore:
     def uri(self, bucket: str, key: str) -> str:
         return f"s3://{bucket}/{key}"
 
+    # --- #36: 객체 열거·삭제 (보존정책·재처리·마이그레이션용) -----------------
+
+    @staticmethod
+    def _norm_key(key: str) -> str:
+        # #36-(4): MinIO/SeaweedFS는 키 검증이 없어 신규 delete/list 에 한해 일관 정규화.
+        # 선행 슬래시 제거·../ 세그먼트 차단(S3 키에 .. 가 섞이면 의도치 않은 객체 지목).
+        k = key.lstrip("/")
+        if ".." in k.split("/"):
+            raise ValueError(f"invalid object key (path traversal): {key!r}")
+        return k
+
+    def list_keys(self, bucket: str, prefix: str = "") -> list[str]:
+        # S3 ListObjectsV2 페이지네이터로 prefix 매칭 키를 전부 열거.
+        c = self._ensure()
+        prefix = prefix.lstrip("/")
+        keys: list[str] = []
+        paginator = c.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                keys.append(obj["Key"])
+        return sorted(keys)
+
+    def delete(self, bucket: str, key: str) -> None:
+        # S3 delete_object — 없는 키도 멱등. 키는 정규화/검증 후 삭제.
+        c = self._ensure()
+        c.delete_object(Bucket=bucket, Key=self._norm_key(key))
+
     def ensure_bucket(self, bucket: str) -> None:
         c = self._ensure()
         try:

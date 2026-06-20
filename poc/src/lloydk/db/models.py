@@ -163,6 +163,12 @@ class Document(Base):
     processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[str | None] = mapped_column(String(50))
 
+    # #38 soft-delete/보존정책 — 논리 삭제 시각. NULL이면 활성(미삭제) 행.
+    # 기본 None이라 기존 행/테스트 비파괴. 물리 delete/cascade는 그대로 두고
+    # soft_delete()가 이 값을 NOW()로 세팅, 조회 메서드는 NULL만 노출한다.
+    # 실제 보존기간 만료 후 purge(물리삭제) 잡은 본 작업 범위 밖(운영 정책).
+    deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+
     __table_args__ = (
         Index("idx_doc_tenant_status", "tenant_id", "processing_status"),
         Index("idx_doc_format", "source_format"),
@@ -437,6 +443,15 @@ class Correction(Base):
     consumed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
+        # #26b 최종 방어선 — 같은 (분류·보정등급·보정자) 조합 중복 보정 행 방지.
+        # confirm/보정 경로가 select-then-insert일 때 race로 중복이 생기면
+        # active learning 라벨이 중복 가중되므로 DB UNIQUE로 막는다.
+        UniqueConstraint(
+            "classification_id",
+            "corrected_level_id",
+            "corrected_by",
+            name="uq_corr_cls_level_by",
+        ),
         Index("idx_corr_cls", "classification_id"),
         Index("idx_corr_direction", "direction"),
         Index("idx_corr_at", "corrected_at"),

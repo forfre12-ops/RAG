@@ -39,6 +39,8 @@ class DeleteDocumentResult:
     document_deleted: int  # 0 또는 1
     chunks_deleted: int
     audit_recorded: bool
+    # #38 soft-delete 경로일 때 True. 기본(물리 cascade) 경로는 False라 기존 비파괴.
+    soft_deleted: bool = False
 
 
 class DocumentService:
@@ -59,23 +61,30 @@ class DocumentService:
         actor_role: Optional[str] = None,
         request_id: uuid.UUID | str | None = None,
         db: Optional[Session] = None,
+        soft: bool = False,
     ) -> DeleteDocumentResult:
         """Document + 종속 Chunk 트랜잭션 cascade 삭제.
 
-        흐름:
+        흐름(기본, soft=False — 물리삭제, 기존 동작 보존):
           1) ChunkRepo.delete_by_doc_id  (tenant 격리 강제)
           2) DocumentRepo.delete         (없으면 0행 — idempotent)
           3) AuditRepo.record            (action=document.delete)
 
         외부 세션이 주입되면 트랜잭션 경계는 호출자가 책임지고, 미주입 시
         ``session_scope`` 로 자체 commit/rollback 한다.
+
+        #38: soft=True면 물리삭제/cascade 대신 Document.deleted_at만 세팅하는
+        논리 삭제 경로로 분기(opt-in). 청크/감사 행은 보존되며 조회에서만 숨는다.
+        보존기간 만료 후 물리 회수(purge)는 별도 운영 잡 — 본 서비스 범위 밖.
         """
         if not tenant_id:
             raise ValueError("tenant_id is required for document delete")
         doc_uuid = self._coerce_uuid(doc_id)
 
+        runner = self._soft_delete_with_session if soft else self._delete_with_session
+
         if db is not None:
-            return self._delete_with_session(
+            return runner(
                 db,
                 doc_id=doc_uuid,
                 tenant_id=tenant_id,
@@ -85,7 +94,7 @@ class DocumentService:
             )
 
         with session_scope() as scoped:
-            return self._delete_with_session(
+            return runner(
                 scoped,
                 doc_id=doc_uuid,
                 tenant_id=tenant_id,
@@ -93,6 +102,31 @@ class DocumentService:
                 actor_role=actor_role,
                 request_id=request_id,
             )
+
+    def soft_delete_document(
+        self,
+        *,
+        doc_id: uuid.UUID | str,
+        tenant_id: str,
+        actor_id: Optional[str] = None,
+        actor_role: Optional[str] = None,
+        request_id: uuid.UUID | str | None = None,
+        db: Optional[Session] = None,
+    ) -> DeleteDocumentResult:
+        """#38 논리 삭제 편의 진입점 — ``delete_document(..., soft=True)`` 위임.
+
+        기존 ``delete_document`` 시그니처/기본 동작을 건드리지 않고 soft-delete를
+        명시적으로 호출하고 싶은 경로용. 보존정책 준수(데이터 보존 + 조회 차단).
+        """
+        return self.delete_document(
+            doc_id=doc_id,
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            actor_role=actor_role,
+            request_id=request_id,
+            db=db,
+            soft=True,
+        )
 
     @staticmethod
     def _delete_with_session(
@@ -138,6 +172,56 @@ class DocumentService:
             document_deleted=document_deleted,
             chunks_deleted=chunks_deleted,
             audit_recorded=True,
+        )
+
+    @staticmethod
+    def _soft_delete_with_session(
+        db: Session,
+        *,
+        doc_id: uuid.UUID,
+        tenant_id: str,
+        actor_id: Optional[str],
+        actor_role: Optional[str],
+        request_id: uuid.UUID | str | None,
+    ) -> DeleteDocumentResult:
+        """#38 논리 삭제 — Document.deleted_at만 세팅. 청크/감사 행은 보존.
+
+        물리 cascade와 달리 ChunkRepo는 건드리지 않는다(데이터 보존이 목적).
+        감사 로그는 action=document.soft_delete 로 별도 기록.
+        """
+        doc_repo = DocumentRepo(db)
+        audit_repo = AuditRepo(db)
+
+        document_deleted = doc_repo.soft_delete(doc_id, tenant_id)
+
+        audit_repo.record(
+            action="document.soft_delete",
+            actor_id=actor_id,
+            actor_role=actor_role,
+            tenant_id=tenant_id,
+            target_type="document",
+            target_id=str(doc_id),
+            request_id=request_id,
+            payload={
+                "doc_id": str(doc_id),
+                "tenant_id": tenant_id,
+                "document_deleted": document_deleted,
+                "soft": True,
+            },
+            success=document_deleted == 1,
+            error_code=None if document_deleted == 1 else "not_found_or_cross_tenant_or_already_deleted",
+        )
+
+        logger.info(
+            "document.soft_delete: doc_id=%s tenant=%s doc_deleted=%d actor=%s",
+            doc_id, tenant_id, document_deleted, actor_id,
+        )
+
+        return DeleteDocumentResult(
+            document_deleted=document_deleted,
+            chunks_deleted=0,  # 논리 삭제는 청크 보존
+            audit_recorded=True,
+            soft_deleted=True,
         )
 
 

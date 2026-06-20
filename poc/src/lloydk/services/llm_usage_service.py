@@ -1,4 +1,4 @@
-"""LLM 호출 비용 기록 서비스 — DB `llm_usage` 또는 JSONL 누적."""
+"""LLM 호출 비용 기록 서비스 — DB `tb_llm_usage` 또는 JSONL 누적."""
 
 from __future__ import annotations
 
@@ -15,26 +15,19 @@ logger = logging.getLogger(__name__)
 
 
 class LLMUsageService:
-    """DB 연결 가능 시 SQLAlchemy로 적재, 실패 시 로컬 JSONL."""
+    """DB 연결 가능 시 공유 풀(session_scope)로 적재, 실패 시 로컬 JSONL.
+
+    #28: 과거에는 __init__에서 자체 create_engine + connect 테스트를 하고
+    _insert_db도 별도 풀(self._engine.begin())을 가져, db/session.py의 공유
+    engine/풀(pool_size·pool_pre_ping)을 우회했다(커넥션 누수·풀 분열). 또
+    repositories/llm_usage_repo.py가 데드코드였다. 이제 공유 ``session_scope()``
+    와 ``LlmUsageRepo``를 통해 적재한다 — 자체 엔진/풀을 제거하고 풀을 단일화.
+    DB 미가용 시 JSONL 폴백(best-effort) 동작은 그대로 보존한다.
+    """
 
     def __init__(self, *, jsonl_path: str = "poc/reports/llm_usage.jsonl") -> None:
         self.jsonl_path = Path(jsonl_path)
         self.jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-        self._engine = None
-        self._try_engine()
-
-    def _try_engine(self) -> None:
-        try:
-            from sqlalchemy import create_engine
-
-            from lloydk.config import settings
-
-            self._engine = create_engine(settings.database_url, pool_pre_ping=True)
-            with self._engine.connect():
-                pass
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("llm_usage DB engine unavailable, falling back to JSONL: %s", exc)
-            self._engine = None
 
     def record(
         self,
@@ -51,6 +44,7 @@ class LLMUsageService:
             getattr(usage, "provider", None), getattr(usage, "model", None),
             purpose, tenant_id,
         )
+        called_at = datetime.now(timezone.utc)
         row = {
             **asdict(usage),
             "purpose": purpose,
@@ -58,15 +52,13 @@ class LLMUsageService:
             "reference_id": reference_id,
             "tenant_id": tenant_id,
             "billing_phase": billing_phase,
-            "called_at": datetime.now(timezone.utc).isoformat(),
+            "called_at": called_at.isoformat(),
         }
+        # JSONL은 항상 먼저 남긴다 — DB 적재가 실패해도 비용 기록은 보존.
         self._append_jsonl(row)
-        if self._engine is not None:
-            try:
-                self._insert_db(row)
-            except Exception as exc:  # noqa: BLE001
-                # DB 실패해도 JSONL은 남음
-                logger.warning("llm_usage DB insert failed (JSONL preserved): %s", exc)
+        # #28: 공유 풀(session_scope) + LlmUsageRepo로 best-effort 적재.
+        self._insert_db(usage, purpose, reference_type, reference_id, tenant_id,
+                        billing_phase, called_at)
         self._emit_metrics(row, purpose)
         logger.info(
             "llm_usage recorded: provider=%s model=%s cost_usd=%s",
@@ -103,20 +95,43 @@ class LLMUsageService:
         with self.jsonl_path.open("a", encoding="utf-8", newline="") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    def _insert_db(self, row: dict) -> None:
-        from sqlalchemy import text
+    def _insert_db(
+        self,
+        usage: UsageRecord,
+        purpose: str,
+        reference_type: Optional[str],
+        reference_id: Optional[str],
+        tenant_id: str,
+        billing_phase: str,
+        called_at: datetime,
+    ) -> None:
+        """#28: 공유 session_scope() + LlmUsageRepo 경유 적재(best-effort).
 
-        sql = text(
-            """
-            INSERT INTO tb_llm_usage
-              (provider, model, purpose, reference_type, reference_id, tenant_id,
-               input_tokens, output_tokens, cost_usd, billing_phase, latency_ms,
-               success, error_code, called_at)
-            VALUES
-              (:provider, :model, :purpose, :reference_type, :reference_id, :tenant_id,
-               :input_tokens, :output_tokens, :cost_usd, :billing_phase, :latency_ms,
-               :success, :error_code, :called_at)
-            """
-        )
-        with self._engine.begin() as conn:
-            conn.execute(sql, row)
+        DB 미가용·적재 실패 시 예외를 흡수한다 — JSONL은 이미 남았으므로
+        비용 기록 자체는 보존된다(기존 폴백 의미 유지). session_scope import는
+        함수 안에서 — settings.database_url 변경 가능성·테스트 격리 보장.
+        """
+        try:
+            from lloydk.db import session_scope  # noqa: PLC0415
+            from lloydk.repositories.llm_usage_repo import LlmUsageRepo  # noqa: PLC0415
+
+            with session_scope() as db:
+                LlmUsageRepo(db).record(
+                    provider=usage.provider,
+                    model=usage.model,
+                    purpose=purpose,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    cost_usd=usage.cost_usd,
+                    tenant_id=tenant_id,
+                    reference_type=reference_type,
+                    reference_id=reference_id,
+                    billing_phase=billing_phase,
+                    latency_ms=getattr(usage, "latency_ms", None) or None,
+                    success=usage.success,
+                    error_code=usage.error_code,
+                    called_at=called_at,
+                )
+        except Exception as exc:  # noqa: BLE001
+            # DB 실패해도 JSONL은 남음 (best-effort).
+            logger.warning("llm_usage DB insert failed (JSONL preserved): %s", exc)
