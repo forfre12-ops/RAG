@@ -252,6 +252,27 @@ class Settings(BaseSettings):
     # 임계 수치 자체의 정밀 튜닝은 운영 human_review 라벨 누적 후 PR곡선으로 조정.
     review_confidence_threshold: float = 0.7
 
+    # 룰-폴백 자동확정 최소 증거량 (Gate: sparse-evidence → 검수 라우팅).
+    # rule 엔진 confidence는 top_score/total이라, 단일·저가중 키워드 1개가 한 등급에 전 질량을
+    # 몰면 confidence=1.0이 된다 — '단 하나의 약한 매치'가 최고신뢰로 자동확정되는 미보정 경로.
+    # 골든셋 100건 룰-폴백 실증: TS 문서 5건이 TS신호 0(절대점수 ev≤0.85)인데 S1/S2로
+    # conf=1.0 자동확정돼 검수 게이트(conf<0.7)를 그대로 통과하는 silent FNR 확인(모델·LLM폴백이
+    # 없는 폐쇄망 초기상태). 자동확정에 필요한 절대 룰 점수 하한 — 미만이면 'sparse-evidence'
+    # 경고를 남겨 classify_service가 confidence와 무관하게 needs_review로 라우팅한다.
+    # 0이면 비활성(동작 보존). 기본 0.9 = 골든셋에서 silent FNR 5→0, 검수부하 +18/100.
+    # 정밀 튜닝은 운영 human_review 라벨 누적 후 PR곡선으로 조정.
+    rule_fallback_min_evidence: float = 0.9
+
+    # LLM 2차의견 게이트 (모델 경로 사각지대 방어). 기본 False = 동작 보존.
+    # 학습모델은 보정(temperature)해도 일부 TS를 '확신에 찬 오답'으로 무인 미탐한다(룰·모델
+    # 공통 사각지대). 골든셋 실증: 보정모델이 G50-TS-10/24를 conf로 S1 자동확정(검수 누락)인데,
+    # 로컬 LLM(qwen3:14b/ollama)은 둘 다 TS(conf 0.95)로 정확히 잡았다. True면 **모델이 비-TS
+    # 등급을 자동확정하려 할 때만** LLM 2차의견을 호출해, LLM이 더 높은(FNR-safe) 등급을 제시하면
+    # 'llm-secondopinion' 경고로 needs_review 라우팅한다(자동 승급이 아니라 사람 확인). 검수만
+    # 라우팅하므로 등급을 무인으로 바꾸지 않는다. 비용: 자동확정 비-TS 건당 LLM 1콜(폐쇄망
+    # 온프렘 GPU 전제). LLM 미가용·오류는 silent 폴백(기존 자동확정 유지 — 게이트가 죽어도 안전).
+    model_secondopinion_llm_enabled: bool = False
+
     # Source-type prior = 비공지성 게이트 (Gate 1). doc/22 §4.0 · doc/32 §2.
     # 이미 공개된 출처(판례·공시·보도자료 등)의 문서는 내용과 무관하게 S3 — 부정경쟁방지법
     # §2.2 비공지성 미충족 → 영업비밀 불성립. 가중합(내용) 결과를 게이트가 덮어쓴다.

@@ -293,9 +293,11 @@ class InferencePipeline:
 
         # Source-type prior: 판례/공개 문서는 비공지성 실패로 정의상 하향 등급 —
         # 모델의 상위등급 과분류를 방어. metadata.source_type/source가 공개 소스일 때만 적용.
-        # settings.source_prior_enabled=True (기본 False) 시 활성화.
+        # settings.source_prior_enabled (config 기본 True=운영 활성) 시 발동.
+        # 아래 getattr 2번째 인자(False/"S2")는 속성 자체가 없을 때만 쓰는 방어용
+        # 폴백이지 운영 기본값이 아니다 — 운영 기본은 config.py 기준 활성·S3.
         #
-        # cap 레벨은 settings.source_prior_cap_grade로 선택 (기본 "S2"):
+        # cap 레벨은 settings.source_prior_cap_grade로 선택 (config 기본 "S3"):
         #   "S2": TS/S1 예측을 S2로 cap (부분 완화 — S3 과분류는 안 건드림, FNR 위험 작음).
         #   "S3": TS/S1/S2 예측을 S3로 cap (S3 과분류 완전 완화 — FNR 위험 큼,
         #         판례 기반 S1/S2 시나리오(koipa_case_based)나 국가핵심기술 고시는 손상).
@@ -431,6 +433,24 @@ class InferencePipeline:
         # evidence/factors는 전체 문서 기준 룰 라벨링에서 가져온다(표시 정합 보존).
         lab = self.labeling.label(text)
         warnings = ["model weights not loaded — using rule-based fallback"]
+
+        # [sparse-evidence gate] rule confidence(top/total)는 단일·저가중 키워드 1개만 매칭돼도
+        # 한 등급에 전 질량이 몰리면 1.0이 된다. 즉 '단 하나의 약한 매치'가 conf=1.0으로 자동확정돼
+        # 저신뢰 게이트(conf<0.7)를 통과하는 silent FNR이 생긴다(골든셋 TS 5건: TS신호 0인데
+        # S1/S2로 conf=1.0 확정). 절대 룰 점수(ev)가 settings.rule_fallback_min_evidence 미만이면
+        # 경고를 남겨 classify_service가 confidence와 무관하게 needs_review로 라우팅한다.
+        # ev==0(무신호)은 conf=0으로 이미 저신뢰 게이트가 잡으므로 0<ev<floor 구간만 표기한다.
+        try:
+            _min_ev = float(settings.rule_fallback_min_evidence)
+        except Exception:  # noqa: BLE001
+            _min_ev = 0.0
+        if _min_ev > 0:
+            _ev_total = sum((lab.rule_result.grade_scores if lab.rule_result else {}).values())
+            if 0.0 < _ev_total < _min_ev:
+                warnings.append(
+                    f"sparse-evidence: rule total score {_ev_total:.2f} < {_min_ev:.2f} "
+                    "— thin single-match basis, routed to human review (FNR-safe)"
+                )
 
         # [#23] rule-fallback도 모델 경로와 동일하게 청크 most-severe-wins + escalation τ 적용.
         # 기존엔 전체 문서를 1회 라벨링해 grade_scores를 단순 합 정규화 → lab.grade를 그대로

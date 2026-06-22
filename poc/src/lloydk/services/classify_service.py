@@ -271,6 +271,27 @@ class ClassifyService:
                     "cap-conflict: source-cap overrode a high content grade — routed to human review"
                 )
 
+            # [sparse-evidence] 룰-폴백 자동확정이 빈약한 증거(단일·저가중 매치 1개)에 기댄 경우 —
+            # pipeline이 남긴 sparse-evidence 신호 — confidence(단일매치=1.0일 수 있음)와 무관하게
+            # 검수 라우팅. 단 하나의 약한 키워드로 최고신뢰 자동확정되는 silent FNR(골든셋 TS 5건)
+            # 을 차단한다. 모델·LLM폴백 없는 폐쇄망 초기상태의 미보정 confidence 경로 방어.
+            if status != "needs_review" and any("sparse-evidence" in w for w in warnings_acc):
+                status = "needs_review"
+                warnings_acc.append(
+                    "sparse-evidence: rule auto-confirm rested on thin evidence — routed to human review"
+                )
+
+            # [llm-secondopinion] 모델 경로 사각지대 방어 (opt-in, 기본 off).
+            # 학습모델이 비-TS 등급을 자동확정하려 할 때만 LLM 2차의견을 받아, LLM이 더 높은
+            # (FNR-safe) 등급을 제시하면 needs_review로 라우팅한다. 보정해도 남는 '확신에 찬
+            # 과소분류'(룰·모델 공통 사각지대, 예: 골든셋 TS-10/24)를 사람이 확인하게 만든다.
+            # 등급은 무인으로 바꾸지 않음(검수 라우팅만). LLM 미가용·오류는 silent 폴백.
+            if status != "needs_review":
+                so = self._llm_second_opinion(cleaned, pred.label)
+                if so is not None:
+                    status = "needs_review"
+                    warnings_acc.append(so)
+
             logger.info(
                 "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f status=%s",
                 req.doc_id, inference_id, pred.label, float(pred.confidence), status,
@@ -312,6 +333,37 @@ class ClassifyService:
             return Grade.TS.value
         except Exception:  # noqa: BLE001
             return "TS"
+
+    @staticmethod
+    def _llm_second_opinion(text: str, model_label) -> str | None:
+        """모델 자동확정(비-TS)에 대한 LLM 2차의견. 더 높은 등급 제시 시 검수 사유 문자열 반환.
+
+        반환 None = 라우팅 변경 없음(게이트 비활성·이미 TS·LLM이 동급/하급·LLM 오류).
+        FNR-safe: LLM이 **더 높은(낮은 order)** 등급을 제시할 때만 검수로 올린다(승급 아님).
+        모든 예외는 None으로 흡수 — LLM이 죽어도 분류·기존 자동확정 동작을 막지 않는다(fail-safe).
+        """
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            if not getattr(settings, "model_secondopinion_llm_enabled", False):
+                return None
+            from lloydk.schemas.common import Grade, GradeRegistry  # noqa: PLC0415
+            order = GradeRegistry.get_order()
+            top_code = next(iter(order), "TS")  # 가장 높은(비밀) 등급 코드
+            model_code = model_label.value if hasattr(model_label, "value") else str(model_label)
+            if model_code == top_code:
+                return None  # 이미 최고등급 자동확정 — 과소분류 위험 없음
+            from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: PLC0415
+            llm = LLMLabeler().label(text)
+            if llm.grade not in order:
+                return None
+            if order.get(llm.grade, 99) < order.get(model_code, 99):
+                return (
+                    f"llm-secondopinion: model auto-confirmed {model_code} but LLM proposes higher "
+                    f"{llm.grade} (conf={llm.confidence:.2f}) — routed to human review (FNR-safe)"
+                )
+        except Exception:  # noqa: BLE001 — LLM 미가용·오류는 기존 자동확정 유지(fail-safe)
+            return None
+        return None
 
     @staticmethod
     def _review_confidence_threshold() -> float:
