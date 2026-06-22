@@ -177,6 +177,14 @@ __NAV__
         <div class="card"><div class="card-label">② 목적함수</div><div class="card-value sm">비용민감·순서형</div><div class="card-desc">고등급 과소분류에 큰 페널티 + 순서형(TS&gt;S1&gt;S2&gt;S3) → 안전을 모델에 내장, 외부 보철 불요</div></div>
         <div class="card"><div class="card-label">③ 불확실성</div><div class="card-value sm">conformal</div><div class="card-desc">학습 불요. 보장된 등급집합 → 단일등급이면 자동확정, 복수면 검수</div></div>
       </div>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>최우선 재학습 타깃(실증).</b> 합의 게이트를 통과한 잔여 미탐의 정체는 <b>인사·재무 관리문서를 한 단계 낮게 본 "공유 사각지대"</b>다 — golden500 S1→S2 미탐 7건이 전부 임원 보상·자금조달·고객원가 문서이고, <b>룰·모델이 둘 다 S2로 합의</b>해 불일치 기반 게이트를 통과했다(합의 게이트로는 구조적으로 못 잡음). 로컬 LLM(qwen3) 2차의견은 이 중 <b>4/7만 S1로 회복</b>(임원 보상 문서는 LLM도 일부 놓침)이라 독립 신호로 부분 도움이나 단독 해법은 아니다. → <b>인사·재무(임원 보상·자금조달·고객별 매출·원가구조) S1 예시를 라벨링해 재학습</b>하는 것이 가장 효과 큰 본개발 타깃이며, 그 전까지는 TS/S1 자동확정분 표본감사로 보완한다.</div>
+      </div>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>메타데이터 상향 게이트 — 재학습 전 결정론적 차단(구현됨, opt-in).</b> 이 사각지대의 본질은 내용 분류기가 <b>비밀관리성(M)·출처(S)를 못 본다</b>는 것 — 그 축은 <b>문서가 아니라 메타데이터</b>에 있다. KL ICD R6(보안표시·접근범위)를 상향 신호로 쓰는 게이트(<code>metadata_floor_enabled</code>)를 붙였다: ① <b>보안표시</b>가 예측보다 높으면 그 등급으로 상향 floor(명시표기 우선, 하향은 안 함); ② 표기 없고 <b>접근범위가 제한적</b>(임원/승인자 한정)인데 예측이 낮으면 검수 라우팅. 실증(7건 사각지대): 보안표시=기밀 → <b>7/7 S1 상향</b>, 접근범위=임원한정 → <b>7/7 검수</b>. 즉 메타데이터만 신뢰 가능하면 <b>재학습 전에 결정론적으로</b> 닫힌다. 단 <b>메타데이터 신뢰도에 전적 의존</b>(KL이 정확히 줘야) — 부재·오기 문서는 사각지대 잔존이라 재학습과 병행한다.</div>
+      </div>
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
         <div class="callout-body"><b>학습이 막히는 경우의 공백.</b> 현재 서빙의 교정 반영(<code>_get_verified_label</code>)은 <b>같은 doc_id에만</b> 동작한다 — 비슷한 <b>새</b> 문서엔 효과가 없다. 학습 없이 시스템이 축적으로 좋아지려면, 교정을 룰/규칙으로 <b>일반화</b>하거나 임베딩 kNN 교정 메모리가 필요하다. 학습이 없으면 TS·S1 표본감사는 영구 상수다.</div>
