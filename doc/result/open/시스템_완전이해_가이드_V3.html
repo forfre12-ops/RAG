@@ -1338,6 +1338,7 @@ footer strong{color:var(--text-dim);}
   <tr><td>출력</td><td>TS/S1/S2/S3 확률 4개 + 최고 확률 등급</td></tr>
   <tr><td>학습 데이터</td><td>labeled_clean_nolegal 2,591건 (법률 코퍼스 오염 정제본)</td></tr>
   <tr><td>홀드아웃 F1 (서빙경로)</td><td>0.686 · 방향성 FNR 0.018 · FNR_TS 0.000 · Acc 0.706 (109건)</td></tr>
+  <tr><td>⚠ 버전 정합</td><td>위 0.686/0.018은 <strong>clean 모델 <code>v-dd3abab9</code></strong> 측정값(<code>reports/fnr_threshold_sweep</code>·<code>b1_multiplier_sweep_clean</code>)이고, 활성 포인터 <code>v-f9b5cedb</code>(step3)와 <strong>서로 다른 모델</strong>이다(step3 실측 F1은 셋별 0.63~0.89). 배포 포인터·광고 지표 정합(.env <code>CLASSIFIER_MODEL_DIR</code> 확정·재측정)은 본개발 과제. <strong>모든 수치는 합성 골든셋(OOD) 기준 — 실데이터 검증 전 정식 아님.</strong></td></tr>
   <tr><td>추론 속도</td><td>CPU 싱글 문서 p50 약 10ms</td></tr>
   </tbody>
 </table>

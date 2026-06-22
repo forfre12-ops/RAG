@@ -187,7 +187,7 @@ __NAV__
       </div>
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
-        <div class="callout-body"><b>학습이 막히는 경우의 공백.</b> 현재 서빙의 교정 반영(<code>_get_verified_label</code>)은 <b>같은 doc_id에만</b> 동작한다 — 비슷한 <b>새</b> 문서엔 효과가 없다. 학습 없이 시스템이 축적으로 좋아지려면, 교정을 룰/규칙으로 <b>일반화</b>하거나 임베딩 kNN 교정 메모리가 필요하다. 학습이 없으면 TS·S1 표본감사는 영구 상수다.</div>
+        <div class="callout-body"><b>학습이 막히는 경우의 공백.</b> 서빙의 교정 반영(<code>_get_verified_label</code>)은 doc_id가 업로드마다 유니크해 재업로드에 안 먹혔는데, <b>내용해시(file_hash) 재사용</b>(<code>verified_label_content_reuse</code>, 기본 on)을 추가해 <b>동일 내용 재업로드</b>엔 검증등급이 전파되게 했다(구현 완료). 다만 <b>유사한 새 문서</b>로의 일반화는 여전히 안 된다 — 그건 임베딩 kNN(다른 등급 전파 위험)이라 보류했고, 근본은 재학습의 몫이다. 학습이 없으면 TS·S1 표본감사는 영구 상수다.</div>
       </div>
     </section>
 

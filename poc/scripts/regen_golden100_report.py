@@ -87,7 +87,7 @@ def main() -> int:
         #   · S3(공개) 예측은 conf 단독 허용(S3 conf 정밀도 94%)
         agree = (rule_g == model_g)
         if conf < thresh:
-            status, review_reason = "review", f"저신뢰 conf {conf:.2f} < {thresh:.2f}"
+            status, review_reason = "review", f"저신뢰 conf {conf:.3f} < {thresh:.2f}"
         elif model_g != "S3" and not agree:
             status, review_reason = "review", f"룰·모델 불일치 (룰 {rule_g} ≠ 모델 {model_g})"
         else:
@@ -125,13 +125,13 @@ def main() -> int:
     # head는 기존 golden100 보고서에서 CSS/스타일을 그대로 차용(폼 일관성). 새 파일이면 golden100을 템플릿으로.
     tmpl = HTML if HTML.exists() else Path("../doc/result/open/golden100_분류근거_보고서.html")
     head = tmpl.read_text(encoding="utf-8").split("</head>")[0] + "</head>"
-    body_html = build_body(out, temp, thresh, auto, review, under, under_ts, rule_acc, model_acc, total=len(out))
+    body_html = build_body(out, temp, thresh, auto, review, under, under_ts, rule_acc, model_acc, total=len(out), dataset=JSONL.stem)
     HTML.write_text(head + "\n" + body_html, encoding="utf-8")
     print(f"wrote {HTML}")
     return 0
 
 
-def build_body(out, temp, thresh, auto, review, under, under_ts, rule_acc, model_acc, total=100) -> str:
+def build_body(out, temp, thresh, auto, review, under, under_ts, rule_acc, model_acc, total=100, dataset="golden") -> str:
     data_json = json.dumps(out, ensure_ascii=False)
     # JS는 일반 문자열(템플릿 리터럴 포함) — DATA만 주입
     js = r"""
@@ -142,7 +142,7 @@ def build_body(out, temp, thresh, auto, review, under, under_ts, rule_acc, model
       <h1>골든셋 분류 근거 보고서</h1>
       <span class="sub">Golden v2 · 실제 분류기 출력 기반 · __TOTAL__건 · 룰엔진 + 보정 학습모델(T=__TEMP__)</span>
     </div>
-    <span class="header-meta">golden100_labeled_v2 · 실엔진 재생성 · 검수 판정 = 등급차등·합의 게이트(권장)</span>
+    <span class="header-meta">__DATASET__ · 실엔진 재생성 · 검수 판정 = 다단 게이트(저신뢰·합의·희소근거·메타floor, opt-in)</span>
   </div>
 </header>
 
@@ -249,8 +249,8 @@ function toggleBody(btn){ const p=btn.nextElementSibling; const open=p.classList
 function renderStats(){
   const total=DATA.length;
   const byGrade={TS:0,S1:0,S2:0,S3:0};
-  let autoCount=0,reviewCount=0,underCount=0;
-  DATA.forEach(r=>{byGrade[r.target]=(byGrade[r.target]||0)+1; if(r.status==='auto')autoCount++; else reviewCount++; if(r.under)underCount++;});
+  let autoCount=0,reviewCount=0,underCount=0,underHigh=0;
+  DATA.forEach(r=>{byGrade[r.target]=(byGrade[r.target]||0)+1; if(r.status==='auto')autoCount++; else reviewCount++; if(r.under){underCount++; if(r.target==='TS'||r.target==='S1')underHigh++;}});
   document.getElementById('stats-bar').innerHTML=`
     <div class="stat-card"><div class="num">${total}</div><div class="lbl">전체</div></div>
     <div class="stat-card"><div class="num">${byGrade.TS}</div><div class="lbl">TS</div></div>
@@ -259,7 +259,8 @@ function renderStats(){
     <div class="stat-card"><div class="num">${byGrade.S3}</div><div class="lbl">S3</div></div>
     <div class="stat-card"><div class="num">${autoCount}</div><div class="lbl">자동확정</div></div>
     <div class="stat-card"><div class="num">${reviewCount}</div><div class="lbl">검수 필요</div></div>
-    <div class="stat-card" style="border-color:#fca5a5"><div class="num" style="color:#dc2626">${underCount}</div><div class="lbl">⚠ 미탐(과소)</div></div>`;
+    <div class="stat-card" style="border-color:#fca5a5"><div class="num" style="color:#dc2626">${underCount}</div><div class="lbl">⚠ 미탐(과소)</div></div>
+    <div class="stat-card" style="border-color:#dc2626"><div class="num" style="color:#dc2626">${underHigh}</div><div class="lbl">⚠ 고등급(TS·S1) 미탐</div></div>`;
 }
 
 function applyFilters(){
@@ -292,7 +293,7 @@ renderStats(); applyFilters();
 </html>
 """
     js = (js.replace("__TEMP__", f"{temp:.1f}").replace("__THRESH__", f"{thresh:.2f}")
-            .replace("__TOTAL__", str(total)).replace("__DATA__", data_json))
+            .replace("__TOTAL__", str(total)).replace("__DATASET__", dataset).replace("__DATA__", data_json))
     return js
 
 
