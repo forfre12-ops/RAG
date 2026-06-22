@@ -1459,8 +1459,8 @@ footer strong{color:var(--text-dim);}
   </div>
   <div class="conf-row">
     <div class="conf-score">0.95 이상</div>
-    <div class="conf-meaning">AI가 거의 확실하게 판단. 판단 근거가 명확한 경우 (예: 문서에 핵심 기술 내용 포함).</div>
-    <div class="conf-action">자동 처리 OK — 사람 검토 선택사항</div>
+    <div class="conf-meaning">softmax 파생 점수가 높음. 다만 높은 confidence가 정확을 보장하지는 않으므로(OOD 과신), 자동확정 여부는 이 수치 단독이 아니라 합의 게이트로 판단합니다.</div>
+    <div class="conf-action">예측이 <strong>공개(S3)</strong>이거나 <strong>룰등급==모델등급(합의)</strong>일 때만 자동확정 — 그 외 고등급은 사람 검토로 라우팅</div>
   </div>
   <div class="conf-row">
     <div class="conf-score">0.80~0.95</div>
@@ -1486,6 +1486,22 @@ footer strong{color:var(--text-dim);}
     응답 <code>status</code>를 <strong>"needs_review"</strong>로 표시하고 <code>warnings</code>에 검수 권고를 남깁니다.
     <strong>거부(reject)가 아니라 표시</strong>입니다 — 고위험 미탐(FNR)을 막기 위해 결과는 그대로 반환하되 사람 검토로 라우팅합니다.
     검수 큐는 신뢰도가 같을 때 <strong>저신뢰 항목을 먼저</strong> 보여주도록 정렬됩니다.
+  </p>
+</div>
+
+<div class="callout dark">
+  <div class="callout-label">⚡ 신규 — 자동확정/검수는 confidence 단독이 아니라 다단 게이트로 결정 (둘 다 opt-in · 기본 OFF)</div>
+  <p>
+    confidence는 분류기가 학습한 신뢰도가 아니라 <strong>softmax 파생값</strong>이라 OOD(학습 분포 밖)에서 과신하며 정답/오답 판별력이 낮습니다(골든500 AUROC 0.58).
+    그래서 자동확정은 confidence 임계(기본 0.7) 단독이 아니라 아래 두 게이트로 판단합니다. <strong>둘 다 opt-in이며 기본은 OFF</strong>라 켜기 전에는 기존 동작이 그대로입니다.
+  </p>
+  <ul>
+    <li><strong>① 희소근거 게이트(<code>rule_fallback_min_evidence</code>)</strong> — 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단합니다(golden100 무성 TS 미탐 5→0).</li>
+    <li><strong>② 합의 게이트(<code>agreement_gate_enabled</code>)</strong> — 자동확정은 예측이 <strong>공개등급(S3)</strong>이거나 <strong>룰등급==모델등급</strong>일 때만 허용하고, 그 외 불일치는 사람 검수로 보냅니다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). TS/S1 자동확정분은 표본감사합니다.</li>
+  </ul>
+  <p style="margin-top:8px;">
+    합의 게이트 적용 시 재생성 기준 — golden100: 자동확정 35 / 검수 65 (미탐 0), golden500: 자동확정 189 / 검수 311 (TS·S1 미탐 8).
+    모든 수치는 합성 골든셋(OOD) 기준이며 실데이터(human_review) 검증 전에는 정식 FNR/정확도 수치가 아닙니다.
   </p>
 </div>
 
@@ -1972,8 +1988,8 @@ footer strong{color:var(--text-dim);}
   <div class="gloss-card">
     <div class="gloss-term">Confidence (신뢰도)</div>
     <div class="gloss-eng">Confidence Score</div>
-    <div class="gloss-def">AI가 자신의 판단을 얼마나 확신하는지 0~1로 나타낸 수치. 높을수록 확실. 0.95 이상이면 거의 확실, 0.70 미만이면 사람 검토 필요.</div>
-    <div class="gloss-ex">예: confidence=0.932 = "TS가 맞을 확률 93.2%"</div>
+    <div class="gloss-def">logits→온도→softmax→청크집계→정규화로 만든 <strong>softmax 파생 점수</strong>(0~1)이며, 보정된 정답확률이 아닙니다. OOD에서 과신하고(골든500 ECE 0.18, 정답/오답 AUROC 0.58) 높은 confidence가 정확을 보장하지 않습니다. 그래서 자동확정은 confidence 단독이 아니라 합의 게이트로 판단합니다.</div>
+    <div class="gloss-ex">예: confidence=0.932은 softmax 파생 점수가 0.932라는 뜻이며 "정답일 확률 93.2%"가 아닙니다.</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">청킹</div>
