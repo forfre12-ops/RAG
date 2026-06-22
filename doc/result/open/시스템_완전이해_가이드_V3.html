@@ -1167,6 +1167,7 @@ footer strong{color:var(--text-dim);}
         <ul>
           <li><strong>청크 집계(max-pooling):</strong> 긴 문서를 토막내 분류할 때 고급 비밀(TS·S1)은 평균이 아니라 <strong>가장 강한 토막</strong>을 따릅니다 — 한 단락의 비밀이 평균에 묻혀 미탐되지 않게(S2·S3는 표준 평균).</li>
           <li><strong>출처 게이트(비공지성, 기본 ON):</strong> 공개 출처(판례·공시·공개특허 등)는 내용과 무관하게 <strong>S3로 하향(cap)</strong> — 이미 공개된 건 영업비밀이 아니므로(부정경쟁방지법 §2.2). 실데이터 과분류 0.85→0.002.</li>
+          <li><strong>메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, opt-in·기본 OFF):</strong> 출처 하향의 <strong>상향 대칭</strong> — KL ICD R6 보안표시(<code>top_secret→TS</code>·<code>secret→S1</code>·<code>confidential→S2</code>)가 예측보다 높으면 그 등급으로 <strong>상향 floor</strong>하고(명시표기 우선·하향 안 함), 접근범위가 제한적인데 예측이 낮으면 검수로 라우팅합니다.</li>
           <li><strong>충돌 시 사람에게(cap-conflict):</strong> 출처 하향이 고급 비밀 신호를 덮으면 자동 확정하지 않고 <code>needs_review</code>로 보냅니다 — 내부 비밀이 '공개'로 오태깅돼 새는 것을 막기 위함.</li>
         </ul>
       </div>
@@ -1493,11 +1494,12 @@ footer strong{color:var(--text-dim);}
   <div class="callout-label">⚡ 신규 — 자동확정/검수는 confidence 단독이 아니라 다단 게이트로 결정 (둘 다 opt-in · 기본 OFF)</div>
   <p>
     confidence는 분류기가 학습한 신뢰도가 아니라 <strong>softmax 파생값</strong>이라 OOD(학습 분포 밖)에서 과신하며 정답/오답 판별력이 낮습니다(골든500 AUROC 0.58).
-    그래서 자동확정은 confidence 임계(기본 0.7) 단독이 아니라 아래 두 게이트로 판단합니다. <strong>둘 다 opt-in이며 기본은 OFF</strong>라 켜기 전에는 기존 동작이 그대로입니다.
+    그래서 자동확정은 confidence 임계(기본 0.7) 단독이 아니라 아래 게이트들로 판단합니다. <strong>모두 opt-in이며 기본은 OFF</strong>라 켜기 전에는 기존 동작이 그대로입니다.
   </p>
   <ul>
     <li><strong>① 희소근거 게이트(<code>rule_fallback_min_evidence</code>)</strong> — 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단합니다(golden100 무성 TS 미탐 5→0).</li>
     <li><strong>② 합의 게이트(<code>agreement_gate_enabled</code>)</strong> — 자동확정은 예측이 <strong>공개등급(S3)</strong>이거나 <strong>룰등급==모델등급</strong>일 때만 허용하고, 그 외 불일치는 사람 검수로 보냅니다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). TS/S1 자동확정분은 표본감사합니다.</li>
+    <li><strong>③ 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>)</strong> — KL ICD R6의 <strong>보안표시·접근범위</strong>로, 내용 분류기가 못 보는 비밀관리성(M)·출처(S)를 보완합니다. 출처 게이트(공개출처→S3 하향)의 <strong>상향 대칭</strong>으로, ① 보안표시(<code>top_secret→TS</code>·<code>secret→S1</code>·<code>confidential→S2</code>)가 예측보다 높으면 그 등급으로 <strong>상향 floor</strong>(명시표기 우선·하향은 하지 않음), ② 접근범위가 제한적(<code>approved_only/designated/department</code>)인데 예측이 낮으면 검수로 라우팅합니다. 인사·재무 S1 사각지대를 재학습 전 결정론적으로 차단합니다(KL 마킹 신뢰 전제).</li>
   </ul>
   <p style="margin-top:8px;">
     합의 게이트 적용 시 재생성 기준 — golden100: 자동확정 35 / 검수 65 (미탐 0), golden500: 자동확정 189 / 검수 311 (TS·S1 미탐 8).

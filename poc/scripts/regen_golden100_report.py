@@ -153,7 +153,7 @@ def build_body(out, temp, thresh, auto, review, under, under_ts, rule_acc, model
     <h3>이 보고서 읽는 법</h3>
     <div class="legend-grid" style="grid-template-columns:repeat(2,1fr)">
       <div class="legend-item"><span class="grade-lbl" style="color:#16a34a">실</span><p><b>실제 분류기 출력</b>입니다. 룰=LabelRuleEngine, 모델=보정 학습모델(bpilot_v2, T=__TEMP__)의 실제 등급·confidence. (과거 픽스처 llm열 아님)</p></div>
-      <div class="legend-item"><span class="grade-lbl">검</span><p><b>검수필요</b> = 등급차등·합의 게이트 판정 — 저신뢰(conf&lt;__THRESH__)이거나 비공개등급에서 룰·모델 불일치면 사람에게 올림. conf 단독은 신뢰 불가(AUROC 0.58)라 합의를 본다. golden은 경계만 모은 스트레스셋이라 실트래픽 검수율은 이보다 낮음.</p></div>
+      <div class="legend-item"><span class="grade-lbl">검</span><p><b>검수필요</b> = 다단 게이트(전부 opt-in·기본 OFF) 판정 — ① 저신뢰(conf&lt;__THRESH__) ② 비공개등급에서 룰·모델 불일치(합의 게이트) ③ 희소근거(단일 약한 키워드 룰폴백) ④ 메타데이터: KL ICD 보안표시가 예측보다 높으면 상향 floor·접근범위 제한인데 예측 낮으면 검수. conf 단독은 신뢰 불가(AUROC 0.58)라 합의·메타로 보강. <b>수치는 합성 골든셋(OOD) 기준 — 실데이터·인간검증 전이라 정식 FNR/정확도 아님</b>(경계만 모은 스트레스셋이라 실트래픽 검수율은 더 낮음).</p></div>
       <div class="legend-item"><span class="grade-lbl mark-n">⚠</span><p><b>미탐(과소분류)</b> = 모델이 정답보다 낮은 등급을 confidence로 자동확정한 경우. 검수가 못 잡는 진짜 위험 — TS/S1 미탐은 표본감사로 보완해야 함.</p></div>
       <div class="legend-item"><span class="grade-lbl">등</span><p>TS 최고기밀 · S1 영업비밀 · S2 대외비 · S3 일반공개. 등급은 비공지성(S)×경제가치(V)×비밀관리(M).</p></div>
     </div>
