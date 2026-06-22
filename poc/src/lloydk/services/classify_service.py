@@ -506,6 +506,10 @@ class ClassifyService:
                 repo = ClassifyRepo(db)
                 dl = repo.get_verified_document_label(doc_uuid, tenant_id=tenant_id)
                 if dl is None:
+                    # doc_id는 업로드마다 유니크 → 같은 내용 재업로드는 새 doc_id라 위에서 못 잡는다.
+                    # 동일 file_hash(동일 바이트)의 다른 문서에 검증 라벨이 있으면 재사용(추론 스킵).
+                    dl = self._verified_label_by_content(db, repo, doc_uuid, tenant_id)
+                if dl is None:
                     return None
                 # level_code 조회
                 level = db.execute(
@@ -523,6 +527,41 @@ class ClassifyService:
         except Exception as exc:  # noqa: BLE001
             logger.debug("_get_verified_label failed (non-critical): %s", exc)
             return None
+
+    @staticmethod
+    def _verified_label_by_content(db, repo, doc_uuid, tenant_id) -> "object | None":
+        """동일 내용(file_hash) 문서의 검증 라벨 재사용 — doc_id는 업로드마다 유니크하므로,
+        같은 내용 재업로드(다른 doc_id)에도 사람이 검증한 등급을 적용한다.
+
+        '유사'가 아니라 **정확히 동일 sha256**만 매칭하므로 다른 등급 전파 위험이 없다(동일
+        바이트=동일 등급). settings.verified_label_content_reuse=False면 비활성(기존 doc_id-only).
+        tenant 스코프 유지 — 교차테넌트 검증등급 유출 차단. 모든 예외는 None(추론으로 계속).
+        """
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            if not getattr(settings, "verified_label_content_reuse", True):
+                return None
+            from lloydk.db.models import Document  # noqa: PLC0415
+            from sqlalchemy import select  # noqa: PLC0415
+
+            cur = db.get(Document, doc_uuid)
+            fh = getattr(cur, "file_hash", None) if cur is not None else None
+            if not fh:
+                return None
+            stmt = select(Document.doc_id).where(
+                Document.file_hash == fh, Document.doc_id != doc_uuid
+            )
+            if tenant_id is not None:
+                stmt = stmt.where(Document.tenant_id == tenant_id)
+            for row in db.execute(stmt).all():
+                sib_id = row[0]
+                dl = repo.get_verified_document_label(sib_id, tenant_id=tenant_id)
+                if dl is not None:
+                    return dl
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_verified_label_by_content skipped: %s", exc)
+            return None
+        return None
 
     # ------------------------------------------------------------
     # Persistence (best-effort)

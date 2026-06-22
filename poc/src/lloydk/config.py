@@ -291,6 +291,14 @@ class Settings(BaseSettings):
     # 안 함). 메타데이터 신뢰도에 의존하며 오류/부재는 silent 폴백(기존 동작 보존).
     metadata_floor_enabled: bool = False
 
+    # 검증 라벨 내용해시(file_hash) 재사용 (기본 True). doc_id는 업로드마다 gen_random_uuid라
+    # 유니크 → 같은 문서를 *재업로드*하면 새 doc_id가 되어, 기존 doc_id 기반 검증라벨 재사용
+    # (_get_verified_label)이 안 먹혔다. 동일 내용(동일 sha256)은 등급이 같은 게 자명하므로,
+    # doc_id 매칭 실패 시 같은 file_hash·같은 tenant의 다른 문서에 사람이 검증한 라벨이 있으면
+    # 그것을 적용한다(추론 스킵). '유사'가 아니라 '정확히 동일 바이트'만 매칭하므로 위험 없음
+    # (다른 등급 전파 불가). False면 기존 doc_id-only 동작. cross-tenant는 차단(tenant 스코프).
+    verified_label_content_reuse: bool = True
+
     # Source-type prior = 비공지성 게이트 (Gate 1). doc/22 §4.0 · doc/32 §2.
     # 이미 공개된 출처(판례·공시·보도자료 등)의 문서는 내용과 무관하게 S3 — 부정경쟁방지법
     # §2.2 비공지성 미충족 → 영업비밀 불성립. 가중합(내용) 결과를 게이트가 덮어쓴다.
