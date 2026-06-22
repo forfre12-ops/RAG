@@ -281,6 +281,16 @@ class Settings(BaseSettings):
     # 단 자동확정 커버리지↓(검수↑) — '확신 있는 것만 자동확정'의 비용. 룰 산출 실패는 silent 폴백.
     agreement_gate_enabled: bool = False
 
+    # 메타데이터 상향 floor 게이트 (KL ICD R6 — 보안표시·접근범위). 기본 False = 동작 보존.
+    # 내용 분류기는 비밀관리성(M)·출처(S)를 못 봐서 인사·재무 비밀이 일상 내부문서(S2)로 보이는
+    # 사각지대가 생긴다(golden500 S1→S2 미탐 7건). KL ICD가 주는 보안표시(security_marking)·
+    # 접근범위(access_scope)로 그 축을 보완한다. True면: ① security_marking이 예측보다 높은 등급을
+    # 가리키면 그 등급으로 *상향* floor(명시표기 우선, ICD §4.2 — 하향은 안 함, 안전하게 높은 쪽);
+    # ② 표기 없고 access_scope가 제한적(approved_only/designated/department)인데 예측이 낮으면
+    # 'metadata-access-conflict'로 needs_review 라우팅(ICD §4.4 — 관리수준 높은 문서를 낮게 자동확정
+    # 안 함). 메타데이터 신뢰도에 의존하며 오류/부재는 silent 폴백(기존 동작 보존).
+    metadata_floor_enabled: bool = False
+
     # Source-type prior = 비공지성 게이트 (Gate 1). doc/22 §4.0 · doc/32 §2.
     # 이미 공개된 출처(판례·공시·보도자료 등)의 문서는 내용과 무관하게 S3 — 부정경쟁방지법
     # §2.2 비공지성 미충족 → 영업비밀 불성립. 가중합(내용) 결과를 게이트가 덮어쓴다.

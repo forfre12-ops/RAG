@@ -281,6 +281,15 @@ class ClassifyService:
                     "sparse-evidence: rule auto-confirm rested on thin evidence — routed to human review"
                 )
 
+            # [metadata-access-conflict] ICD 접근범위가 제한적인데 내용 예측이 낮은 경우 — pipeline이
+            # 남긴 신호 — confidence와 무관하게 검수 라우팅(ICD §4.4: 관리수준 높은 문서를 낮게
+            # 자동확정하지 않음). security_marking 상향 floor는 pipeline에서 이미 등급에 반영됨.
+            if status != "needs_review" and any("metadata-access-conflict" in w for w in warnings_acc):
+                status = "needs_review"
+                warnings_acc.append(
+                    "metadata-access-conflict: restricted access_scope vs low predicted grade — routed to human review"
+                )
+
             # [agreement-gate] 등급차등 + 룰·모델 합의 게이트 (opt-in, 기본 off).
             # conf 단독 자동확정은 신뢰성이 측정으로 부정됨(golden500: AUROC 0.58, 자동확정
             # 정밀도 63%, 고등급 미탐 46). 확신을 conf가 아니라 *독립 신호(룰 합의)*에서 얻는다:

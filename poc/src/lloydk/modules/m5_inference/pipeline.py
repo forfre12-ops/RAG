@@ -361,6 +361,46 @@ class InferencePipeline:
         except Exception:  # noqa: BLE001
             pass
 
+        # [metadata-floor] ICD R6 S/V/M 메타데이터 상향 게이트 (opt-in, 기본 OFF).
+        # 내용 분류기는 비밀관리성(M)·출처(S)를 못 본다 — 인사·재무 비밀이 일상 내부문서(S2)로
+        # 보이는 사각지대(golden500 S1→S2 미탐 7건, 룰·모델 공유)가 그 결과. KL ICD가 주는
+        # 보안표시·접근범위로 그 축을 보완한다(ICD §3·§4):
+        #  (1) security_marking 명시표기 우선(§4.2): 표기 등급이 예측보다 *높으면* 그 등급으로 상향
+        #      floor(안전하게 높은 쪽 — 하향은 안 함, 출처 cap은 위 source_prior가 담당).
+        #  (2) 표기 없고 access_scope가 제한적인데 예측이 낮으면 'metadata-access-conflict' →
+        #      needs_review(§4.4 — 관리수준 높은 문서를 낮게 자동확정하지 않음).
+        # 메타데이터 오류/부재는 silent 폴백(기존 동작 보존). source_prior(하향) 다음에 적용.
+        try:
+            from lloydk.config import settings as _ms  # noqa: PLC0415
+            if getattr(_ms, "metadata_floor_enabled", False) and metadata:
+                _ORD = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+                cur = result.label.value if hasattr(result.label, "value") else str(result.label)
+                mark = str(metadata.get("security_marking", "") or "").strip().lower()
+                scope = str(metadata.get("access_scope", "") or "").strip().lower()
+                _MARK = {"top_secret": "TS", "secret": "S1", "confidential": "S2"}
+                if mark in _MARK and _ORD[_MARK[mark]] < _ORD.get(cur, 99):
+                    floor_code = _MARK[mark]
+                    new_scores, new_conf = self._enforce_label_consistency(
+                        result.scores, floor_code, floor=0.7
+                    )
+                    result = InferenceResult(
+                        label=Grade[floor_code], confidence=new_conf, scores=new_scores,
+                        factors=result.factors, evidence=result.evidence,
+                        rag_context=result.rag_context, model_version=result.model_version,
+                        warnings=result.warnings + [
+                            f"metadata-floor: security_marking={mark} → grade raised {cur}→{floor_code} (ICD §4.2 명시표기 우선)"
+                        ],
+                        rule_grade=result.rule_grade,
+                    )
+                elif mark in ("", "none") and scope in ("approved_only", "designated", "department"):
+                    low_thr = "S1" if scope == "approved_only" else "S2"
+                    if _ORD.get(cur, 99) > _ORD[low_thr]:
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-access-conflict: access_scope={scope}(제한 접근)인데 예측 {cur} → 검수 라우팅 (ICD §4.4)"
+                        ]
+        except Exception:  # noqa: BLE001 — 메타데이터 처리 오류는 분류를 막지 않음(fail-safe)
+            pass
+
         # 표적 1 (2026-05-29): use_rag=True면 retrieval facade 호출하여 rag_context 채움.
         # rule-fallback / _run_model 어느 경로든 동일하게 RAG context 보강 — 분류 본문은 안 건드림.
         # 모든 외부 의존(벡터스토어/임베더/reranker) 실패는 silent + 빈 컨텍스트 폴백.
