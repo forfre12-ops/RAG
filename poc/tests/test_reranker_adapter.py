@@ -1,6 +1,6 @@
 """A1: Reranker 어댑터 smoke 테스트.
 
-운영 환경에서 BGE/Qwen3 cross-encoder 로드는 lazy이며, 본 테스트는 noop만 강제 검증.
+운영 환경에서 BGE cross-encoder 로드는 lazy이며, 본 테스트는 noop만 강제 검증.
 bge backend는 import 가능 여부만 확인.
 """
 

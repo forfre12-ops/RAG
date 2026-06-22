@@ -1,4 +1,4 @@
-"""BgeReranker — BGE-reranker-v2-m3 / Qwen3-Reranker cross-encoder.
+"""BgeReranker — BGE-reranker-v2-m3 cross-encoder.
 
 lazy import — FlagEmbedding 또는 sentence_transformers.CrossEncoder 둘 다 지원.
 설치되어 있지 않으면 import 시점에 ImportError, get_reranker가 catch하여 noop 폴백 권장.

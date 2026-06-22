@@ -30,9 +30,6 @@ def get_reranker(provider: str | None = None) -> Reranker:
     elif name == "bge":
         from lloydk.adapters.reranker.bge_reranker import BgeReranker
         instance = BgeReranker()
-    elif name == "qwen3":
-        from lloydk.adapters.reranker.bge_reranker import BgeReranker
-        instance = BgeReranker(model_name="Qwen/Qwen3-Reranker-0.6B")
     else:
         instance = NoopReranker()
 

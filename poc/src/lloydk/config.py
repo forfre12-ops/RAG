@@ -37,7 +37,7 @@ _VALID_LLM_PROVIDER = {
 }
 # embedding: hash(드라이런)·hf(KURE/BGE). 하위호환 alias 일부 포함(huggingface/kure/bge).
 _VALID_EMBEDDING_PROVIDER = {"hash", "hf", "huggingface", "kure", "kure-v1", "bge", "bgem3"}
-_VALID_RERANKER_PROVIDER = {"noop", "bge", "qwen3"}
+_VALID_RERANKER_PROVIDER = {"noop", "bge"}
 _VALID_VECTOR_BACKEND = {"es", "inmemory"}
 _VALID_STORAGE_BACKEND = {"minio", "seaweedfs", "s3", "local"}
 _VALID_POC_MODE = {"dryrun", "full"}
@@ -313,7 +313,6 @@ class Settings(BaseSettings):
     # --- Reranker (A1) ---
     # noop  : 입력 순서 유지 (기본, 운영 외)
     # bge   : BAAI/bge-reranker-v2-m3 (FlagEmbedding 또는 sentence_transformers)
-    # qwen3 : Qwen/Qwen3-Reranker-0.6B
     reranker_provider: str = "noop"
     reranker_top_k: int = 50  # retriever 1차 후 reranker로 줄일 입력 크기
     embedding_fallback_model: str = "BAAI/bge-m3"
