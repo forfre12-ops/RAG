@@ -29,6 +29,10 @@ class InferenceResult:
     rag_context: list[RagContextHit] = field(default_factory=list)
     model_version: str = "poc"
     warnings: list[str] = field(default_factory=list)
+    # [agreement-gate 재사용] run()이 이미 산출한 **원시 룰등급**(rule_result.grade) — 합의
+    # 게이트가 룰엔진을 두 번 돌리지 않게 노출. label과 별개(label은 모델/청크집계/override
+    # 결과, rule_grade는 단일패스 raw 룰등급). None이면 호출부가 폴백 재계산.
+    rule_grade: Optional[str] = None
 
 
 _LABELS = [Grade.TS, Grade.S1, Grade.S2, Grade.S3]
@@ -285,6 +289,7 @@ class InferencePipeline:
                                 warnings=result.warnings + [
                                     f"fnr-safe override: rule {override_grade.value} score={override_score:.1f}"
                                 ],
+                                rule_grade=result.rule_grade,
                             )
                 except Exception:  # noqa: BLE001
                     pass
@@ -351,6 +356,7 @@ class InferencePipeline:
                             rag_context=result.rag_context,
                             model_version=result.model_version,
                             warnings=result.warnings,
+                            rule_grade=result.rule_grade,
                         )
         except Exception:  # noqa: BLE001
             pass
@@ -509,6 +515,7 @@ class InferencePipeline:
                 evidence=lab.evidence if return_evidence else [],
                 model_version="rule-fallback-v0",
                 warnings=warnings,
+                rule_grade=getattr(lab.rule_result, "grade", None),
             )
 
         # [#23] 청크 집계로 선택한 등급이 단일패스(lab.grade)보다 높으면(승격) 경고를 남겨
@@ -542,6 +549,7 @@ class InferencePipeline:
             evidence=lab.evidence if return_evidence else [],
             model_version="rule-fallback-v0",
             warnings=warnings,
+            rule_grade=getattr(lab.rule_result, "grade", None),
         )
 
     # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.
@@ -668,6 +676,7 @@ class InferencePipeline:
             evidence=lab.evidence if return_evidence else [],
             model_version=str(self.model_dir.name) if self.model_dir else "model",
             warnings=a3_warn,
+            rule_grade=getattr(lab.rule_result, "grade", None),
         )
 
     # ------------------------------------------------------------

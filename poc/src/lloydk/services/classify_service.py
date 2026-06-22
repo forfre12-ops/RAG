@@ -281,6 +281,19 @@ class ClassifyService:
                     "sparse-evidence: rule auto-confirm rested on thin evidence — routed to human review"
                 )
 
+            # [agreement-gate] 등급차등 + 룰·모델 합의 게이트 (opt-in, 기본 off).
+            # conf 단독 자동확정은 신뢰성이 측정으로 부정됨(golden500: AUROC 0.58, 자동확정
+            # 정밀도 63%, 고등급 미탐 46). 확신을 conf가 아니라 *독립 신호(룰 합의)*에서 얻는다:
+            #   · 예측이 공개등급(S3): conf만으로 자동확정 허용(S3 conf 정밀도 94%, 과소분류 불가)
+            #   · 예측이 그 외(TS/S1/S2): 룰엔진과 등급이 합의해야 자동확정, 불일치면 검수
+            # 측정(golden500): 자동확정 정밀도 63→81%, 고등급 미탐 46→8. 등급은 무인으로 바꾸지
+            # 않고 검수 라우팅만 한다. 룰 산출 실패는 silent 폴백(게이트가 죽어도 분류는 진행).
+            if status != "needs_review":
+                ag = self._agreement_gate(pred, cleaned)
+                if ag is not None:
+                    status = "needs_review"
+                    warnings_acc.append(ag)
+
             # [llm-secondopinion] 모델 경로 사각지대 방어 (opt-in, 기본 off).
             # 학습모델이 비-TS 등급을 자동확정하려 할 때만 LLM 2차의견을 받아, LLM이 더 높은
             # (FNR-safe) 등급을 제시하면 needs_review로 라우팅한다. 보정해도 남는 '확신에 찬
@@ -333,6 +346,44 @@ class ClassifyService:
             return Grade.TS.value
         except Exception:  # noqa: BLE001
             return "TS"
+
+    def _agreement_gate(self, pred, text: str) -> str | None:
+        """등급차등 + 룰·모델 합의 게이트. 자동확정 부적격이면 검수 사유 문자열, 적격이면 None.
+
+        반환 None = 라우팅 변경 없음(게이트 비활성 · 공개등급 예측 · 룰==모델 합의 · 룰산출 실패).
+        - 공개등급(level_order 최하, 보통 S3) 예측: conf 단독 신뢰(정밀도 94%) → 합의 불요(None).
+        - 그 외 등급(TS/S1/S2): 룰엔진 등급 != 모델 등급이면 검수 라우팅(불일치=확신 부족).
+        rule==model로 자동확정된 TS/S1은 등급은 유지하되 운영상 표본감사 대상(별도 프로세스).
+        모든 예외는 None으로 흡수 — 룰엔진이 죽어도 분류·기존 자동확정을 막지 않는다(fail-safe).
+
+        룰등급은 pred.rule_grade(run()이 이미 산출한 **원시** 룰등급)를 재사용해 룰엔진 2회
+        실행을 피한다(특히 semantic 시드 시 문서 임베딩 중복 방지). 미설정 시에만 text로 폴백
+        재계산한다. 비교 기준은 보고서 'rule열'(eng.label(text).grade, 원시 룰등급)과 동일.
+        """
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            if not getattr(settings, "agreement_gate_enabled", False):
+                return None
+            from lloydk.schemas.common import GradeRegistry  # noqa: PLC0415
+            codes = GradeRegistry.get_codes()  # level_order asc(비밀이 선두) → [-1]=최하(공개)
+            public_code = codes[-1] if codes else "S3"
+            model_label = getattr(pred, "label", pred)
+            model_code = model_label.value if hasattr(model_label, "value") else str(model_label)
+            if model_code == public_code:
+                return None  # 공개등급: conf 단독으로 신뢰(과소분류 위험 없는 최하등급)
+            # run()이 노출한 원시 룰등급 재사용 — 없으면 폴백 재계산(룰엔진 1회).
+            rule_g = getattr(pred, "rule_grade", None)
+            if rule_g is None:
+                rule_g = self.inference.labeling.engine.label(text).grade
+            rule_code = rule_g.value if hasattr(rule_g, "value") else str(rule_g)
+            if rule_code != model_code:
+                return (
+                    f"agreement-gate: model={model_code} vs rule={rule_code} disagree on "
+                    "non-public grade — routed to human review (conf alone insufficient)"
+                )
+        except Exception:  # noqa: BLE001 — 룰엔진 미가용·오류는 기존 자동확정 유지(fail-safe)
+            return None
+        return None
 
     @staticmethod
     def _llm_second_opinion(text: str, model_label) -> str | None:

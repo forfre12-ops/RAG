@@ -273,6 +273,14 @@ class Settings(BaseSettings):
     # 온프렘 GPU 전제). LLM 미가용·오류는 silent 폴백(기존 자동확정 유지 — 게이트가 죽어도 안전).
     model_secondopinion_llm_enabled: bool = False
 
+    # 등급차등 + 룰·모델 합의 자동확정 게이트 (Gate). 기본 False = 동작 보존(conf 단독).
+    # conf 단독 자동확정은 신뢰성 부정됨(golden500: AUROC 0.58, 자동확정 정밀도 63%, 고등급
+    # 미탐 46). True면 자동확정 조건을 좁힌다: 공개등급(S3) 예측은 conf 단독 허용(S3 conf
+    # 정밀도 94%), 그 외(TS/S1/S2)는 룰엔진과 등급이 합의할 때만 자동확정·불일치면 needs_review.
+    # 등급은 무인 변경 없이 검수 라우팅만. 측정(golden500): 자동확정 정밀도 63→81%, 미탐 46→8,
+    # 단 자동확정 커버리지↓(검수↑) — '확신 있는 것만 자동확정'의 비용. 룰 산출 실패는 silent 폴백.
+    agreement_gate_enabled: bool = False
+
     # Source-type prior = 비공지성 게이트 (Gate 1). doc/22 §4.0 · doc/32 §2.
     # 이미 공개된 출처(판례·공시·보도자료 등)의 문서는 내용과 무관하게 S3 — 부정경쟁방지법
     # §2.2 비공지성 미충족 → 영업비밀 불성립. 가중합(내용) 결과를 게이트가 덮어쓴다.
