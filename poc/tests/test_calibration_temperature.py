@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+import importlib.util
+import json
+from pathlib import Path
+
 import pytest
 
 from lloydk.modules.m5_inference.pipeline import InferencePipeline
+
+
+def _load_calibrate_module():
+    """scripts/calibrate_classifier.py를 파일경로로 로드(scripts는 sys.path에 없음)."""
+    script = Path(__file__).resolve().parents[1] / "scripts" / "calibrate_classifier.py"
+    spec = importlib.util.spec_from_file_location("_calibrate_classifier", script)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 @pytest.fixture(autouse=True)
@@ -47,3 +60,62 @@ def test_temperature_softens_confidence():
     p_t1 = F.softmax(logits, dim=-1).max().item()
     p_t2 = F.softmax(logits / 2.0, dim=-1).max().item()
     assert p_t2 < p_t1
+
+
+# ---------------------------------------------------------------------------
+# 보정 배선 회귀 — trainer가 남긴 실 logits로 temperature.json을 산출하는 경로.
+# (torch 불필요: calibrate_classifier는 순수 파이썬 softmax/NLL로 T를 적합.)
+# ---------------------------------------------------------------------------
+
+
+def _overconfident_rows() -> list[dict]:
+    """trainer.py가 val_logits.jsonl에 쓰는 포맷({logits, label_idx})의 과신 표본."""
+    return [
+        {"logits": [3.0, 1.0, 0.5, 0.2], "label_idx": 0},
+        {"logits": [2.5, 1.2, 0.7, 0.1], "label_idx": 0},
+        {"logits": [3.5, 0.8, 0.3, 0.1], "label_idx": 1},  # 일부러 틀린 정답(과신 유도)
+        {"logits": [1.0, 3.0, 0.5, 0.2], "label_idx": 1},
+        {"logits": [0.8, 2.5, 1.0, 0.3], "label_idx": 2},  # 과신/오답
+        {"logits": [0.5, 0.8, 3.0, 1.0], "label_idx": 2},
+        {"logits": [0.3, 1.0, 2.8, 0.9], "label_idx": 3},  # 과신/오답
+        {"logits": [0.2, 0.3, 0.5, 3.0], "label_idx": 3},
+    ]
+
+
+def test_calibrate_reads_model_dir_val_logits(tmp_path, monkeypatch):
+    """trainer가 남긴 <model-dir>/val_logits.jsonl을 --val 없이 자동 사용해
+    실 logits로 temperature.json을 산출(더미/--allow-dummy 우회, exit 0)."""
+    mod = _load_calibrate_module()
+    model_dir = tmp_path / "v-abcd1234"
+    model_dir.mkdir()
+    with (model_dir / "val_logits.jsonl").open("w", encoding="utf-8") as f:
+        for row in _overconfident_rows():
+            f.write(json.dumps(row) + "\n")
+
+    # --allow-dummy 없이, --val 없이 — model dir 동봉 logits만으로 성공해야 한다.
+    monkeypatch.setattr(
+        "sys.argv",
+        ["calibrate_classifier.py", "--model-dir", str(model_dir)],
+    )
+    rc = mod.main()
+    assert rc == 0
+
+    tpath = model_dir / "temperature.json"
+    assert tpath.exists(), "보정이 모델 dir에 temperature.json을 남겨야 함(서빙 자동로드)"
+    report = json.loads(tpath.read_text(encoding="utf-8"))
+    assert report["temperature"] > 0
+    # 실 표본 개수 그대로 — 더미(12건) 분기를 타지 않았음을 확인.
+    assert report["n_samples"] == len(_overconfident_rows())
+
+
+def test_calibrate_fails_loud_without_logits(tmp_path, monkeypatch):
+    """val_logits.jsonl도 --val도 없으면 fail-loud(rc=1) — 더미 T 배포 금지 보존."""
+    mod = _load_calibrate_module()
+    model_dir = tmp_path / "v-empty"
+    model_dir.mkdir()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["calibrate_classifier.py", "--model-dir", str(model_dir)],
+    )
+    assert mod.main() == 1
+    assert not (model_dir / "temperature.json").exists()

@@ -90,6 +90,16 @@ def main() -> int:
     if args.output is None:
         args.output = args.model_dir / "temperature.json"
 
+    # [보정 배선] --val 미지정 시 모델 dir에 동봉된 val_logits.jsonl 자동 탐색.
+    # trainer.py가 학습 종료 시 검증셋 per-row logits를 <model-dir>/val_logits.jsonl로
+    # 남긴다 → --val 없이도 *실제* logits로 보정해 더미/배포금지 분기를 우회한다.
+    # 사용자가 --val을 명시하면 그게 최우선(기존 동작 보존).
+    if not args.val:
+        _auto = args.model_dir / "val_logits.jsonl"
+        if _auto.exists():
+            args.val = _auto
+            print(f"[INFO] val 미지정 — 모델 동봉 {_auto} 사용(실 logits 보정).", file=sys.stderr)
+
     # 실제 학습된 모델이 없으면 dummy logits로 dry 실행
     if args.val and args.val.exists():
         logits_list: list[list[float]] = []
