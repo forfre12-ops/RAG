@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from lloydk.modules.m2_preprocess.chunker import Chunk, split
+from lloydk.modules.m2_preprocess.chunker import Chunk, split_v2
 from lloydk.modules.m2_preprocess.extractor import ExtractResult, extract
 from lloydk.modules.m2_preprocess.normalizer import normalize, quality_score
 from lloydk.modules.m2_preprocess.pii_masker import mask_pii
@@ -73,7 +73,16 @@ class PreprocessPipeline:
         return self._finalize(ext)
 
     def chunk(self, text: str) -> list[Chunk]:
-        return split(text, size=self.chunk_size, overlap=self.chunk_overlap)
+        # #15: 운영 권장 split_v2 — 헤딩/문장 경계 보존 + heading_path 메타 적재.
+        #      RAG indexer(rag/indexer.py, rag/document_indexer.py)와 동일 진입점 사용.
+        #      청크 크기 정책(size/overlap)은 기존 설정값 그대로 전달해 보존한다.
+        return split_v2(
+            text,
+            size=self.chunk_size,
+            overlap=self.chunk_overlap,
+            respect_heading=True,
+            respect_sentence=True,
+        )
 
     def _finalize(self, ext: ExtractResult) -> PreprocessResult:
         normalized = normalize(ext.text)
@@ -83,7 +92,15 @@ class PreprocessPipeline:
             mres = mask_pii(normalized)
             normalized = mres.text
             pii_counts = dict(mres.counts)
-        chunks = split(normalized, size=self.chunk_size, overlap=self.chunk_overlap)
+        # #15: split_v2로 청크 — heading_path 등 섹션 메타가 청크에 실린다.
+        #      (ingestion 청크가 v1처럼 헤딩 경로를 누락하던 문제 해소.)
+        chunks = split_v2(
+            normalized,
+            size=self.chunk_size,
+            overlap=self.chunk_overlap,
+            respect_heading=True,
+            respect_sentence=True,
+        )
         return PreprocessResult(
             text=normalized,
             chunks=chunks,
