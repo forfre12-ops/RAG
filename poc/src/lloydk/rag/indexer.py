@@ -207,6 +207,14 @@ class RagIndexer:
         return f"{self.collection_prefix}-{safe}"
 
     def _current_alias_target(self, alias: str) -> str | None:
+        # 비-ES 스토어(PgVectorStore 등)는 current_alias_target 훅을 제공 — ES `_client`
+        # 하드코딩을 벗어나 백엔드 무관하게 blue/green 이전 인덱스를 조회한다.
+        hook = getattr(self.store, "current_alias_target", None)
+        if callable(hook):
+            try:
+                return hook(alias)
+            except Exception:  # noqa: BLE001
+                return None
         client = getattr(self.store, "_client", None)
         if client is None:
             return None

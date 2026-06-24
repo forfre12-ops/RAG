@@ -60,15 +60,27 @@ def _check_db() -> dict:
 
 
 def _check_es() -> dict:
+    """벡터스토어 헬스 — 백엔드 무관. ES는 _client.ping, PG(pgvector)는 engine SELECT 1.
+
+    이전엔 ES `_client` 만 봐서 PG 백엔드는 _client 부재로 점검 없이 ok(false-ok)였다.
+    PgVectorStore 는 _engine(SQLAlchemy)으로 실연결을 확인한다.
+    """
     if getattr(settings, "vector_backend", "inmemory") == "inmemory":
         return {"status": "skipped", "ok": True}
     try:
         from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
         store = build_store()
         client = getattr(store, "_client", None)
-        if client is not None:
+        if client is not None:          # ES
             client.ping()
-        return {"status": "ok", "ok": True}
+            return {"status": "ok", "ok": True}
+        engine = getattr(store, "_engine", None)
+        if engine is not None:          # PG (pgvector)
+            from sqlalchemy import text  # noqa: PLC0415
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return {"status": "ok", "ok": True}
+        return {"status": "ok", "ok": True}  # inmemory 폴백 등 — 점검 대상 없음
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "ok": False, "detail": type(exc).__name__}
 
