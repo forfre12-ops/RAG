@@ -10,7 +10,7 @@ VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
 .PHONY: help venv install env infra-up infra-down infra-verify api worker beat \
-        revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down \
+        revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
@@ -96,6 +96,12 @@ revalidate-pg-bench:
 
 revalidate-pg-down:
 	docker compose -f docker-compose.pgvector.yml down
+
+# 크럭스: stock dev postgres(:5432)만으로 실 ts_rank 검증 — 커스텀 이미지(pgvector/pg_bigm) 불요.
+# 게이트의 단일 핵심 불확실성(실 ts_rank ≈ 프록시 87%?)을 최소 비용으로 푼다.
+revalidate-tsrank-crux:
+	docker compose up -d postgres
+	$(PY) scripts/revalidate_pg_tsrank_crux.py
 
 api:
 	uvicorn lloydk.api.app:app --reload --host 0.0.0.0 --port 8000
