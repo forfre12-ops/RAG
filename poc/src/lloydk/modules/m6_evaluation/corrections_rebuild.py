@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,6 +38,7 @@ from lloydk.db.models import (
     Correction,
     Document,
 )
+from lloydk.hygiene import normalize_text
 
 logger = logging.getLogger(__name__)
 
@@ -185,15 +185,11 @@ def build_labeled_rows_from_corrections(
         return RebuildResult(reason=f"db_unavailable:{type(exc).__name__}")
 
 
-# [#25] 홀드아웃 누수 차단 — 텍스트 정규화 키.
-# build_p1_holdout_split.py의 _norm과 동일 의도(공백 접기 + 소문자)로, train↔holdout가
-# 같은 문서를 서로 다른 공백/대소문자로 적어도 동일 본문으로 잡아 누수를 막는다.
+# [#25] 홀드아웃 누수 차단 — 텍스트 정규화 키 (lloydk.hygiene 정본 위임).
+# train↔holdout가 같은 문서를 서로 다른 공백/대소문자로 적어도 동일 본문으로 잡아 누수를 막는다.
 # doc_id가 한쪽이라도 누락(None)이면 doc_id 매칭이 무력화되므로 텍스트 키가 안전망이다.
-_WS_RE = re.compile(r"\s+")
-
-
 def _norm_text(text: object) -> str:
-    return _WS_RE.sub(" ", str(text)).strip().lower()
+    return normalize_text(text, keep_spaces=True, lower=True)
 
 
 def _load_holdout_keys(
