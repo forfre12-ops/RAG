@@ -23,7 +23,7 @@ help:
 	@echo "Targets:"
 	@echo "  venv         create venv ($(VENV_DIR)) and install -e .[dev]"
 	@echo "  env          copy .env.example -> .env if missing"
-	@echo "  infra-up     docker compose up -d (postgres/elasticsearch/minio/redis/mlflow)"
+	@echo "  infra-up     docker compose up -d (postgres/minio/redis/mlflow)"
 	@echo "  infra-down   docker compose down"
 	@echo "  infra-verify python scripts/verify_infra.py"
 	@echo "  api          run FastAPI locally (uvicorn)"
@@ -73,7 +73,7 @@ env:
 	@[ -f .env ] || cp .env.example .env
 
 infra-up:
-	docker compose up -d postgres elasticsearch minio redis mlflow
+	docker compose up -d postgres minio redis mlflow
 
 infra-down:
 	docker compose down
@@ -396,7 +396,7 @@ clean-data:
 	rm -rf datasets/synthetic datasets/p4_corpus reports
 
 # P1-F3: incident runbook 자동화 타깃 — 야간/주말 1차 대응 단축
-.PHONY: incident-api-down incident-es-yellow incident-queue-backlog incident-drift incident-audit-verify
+.PHONY: incident-api-down incident-queue-backlog incident-drift incident-audit-verify
 
 incident-api-down:
 	@echo "[incident] API 다운 1차 대응"
@@ -404,11 +404,6 @@ incident-api-down:
 	@docker compose restart api || true
 	@sleep 10
 	@curl -fsS http://localhost:8000/api/v1/health || echo "[FAIL] /health still down — escalate to AI팀"
-
-incident-es-yellow:
-	@echo "[incident] ES yellow/red 1차 대응"
-	@curl -s http://localhost:9200/_cluster/health?pretty || true
-	@curl -s http://localhost:9200/_cat/shards | grep -E "UNASSIGNED|INITIALIZING" || echo "no problematic shards"
 
 incident-queue-backlog:
 	@echo "[incident] Celery 큐 적체 1차 대응"

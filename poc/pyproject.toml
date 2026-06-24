@@ -30,8 +30,8 @@ dependencies = [
   "redis>=5.0",
   "minio>=7.2",
 
-  # 벡터 DB (doc/13)
-  "elasticsearch>=8.15,<9.0",     # 9.x 클라이언트는 ES 8.x 서버 호환 거부 (Accept v9 header)
+  # 벡터 DB: pgvector(psycopg 경유, 별도 패키지 불요) — ES 제거(의사결정_대장 §03 ⓑ).
+  # 레거시 es 백엔드(es_store.py)가 필요하면 `elasticsearch>=8.15,<9.0`를 별도 설치.
 
   # ML 코어 (학습·추론 필수)
   "transformers>=4.44",

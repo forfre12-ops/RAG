@@ -62,7 +62,7 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "llm_provider": "anthropic",
         "embedding_provider": "hf",
         "reranker_provider": "noop",
-        "vector_backend": "es",
+        "vector_backend": "pg",
         "storage_backend": "minio",
         "enable_training": False,
         "poc_mode": "full",
@@ -71,7 +71,7 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "llm_provider": "ollama",
         "embedding_provider": "hf",
         "reranker_provider": "bge",
-        "vector_backend": "es",
+        "vector_backend": "pg",
         "storage_backend": "minio",
         "enable_training": False,
         "poc_mode": "full",
@@ -80,7 +80,7 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "llm_provider": "anthropic",
         "embedding_provider": "hf",
         "reranker_provider": "bge",
-        "vector_backend": "es",
+        "vector_backend": "pg",
         "storage_backend": "minio",
         "enable_training": True,
         "poc_mode": "full",
@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # 벡터 DB
-    vector_backend: str = "es"  # es | inmemory
+    vector_backend: str = "pg"  # pg(기본, pgvector dense+ts_rank 하이브리드) | es(레거시) | inmemory
     es_url: str = "http://localhost:9200"
     es_username: str = ""
     es_password: str = ""
@@ -758,8 +758,6 @@ def fill_from_secrets_manager() -> dict:
         ("minio_secret_key", "LLOYDK_MINIO_SECRET_KEY"),
         ("anthropic_api_key", "ANTHROPIC_API_KEY"),
         ("openai_api_key", "OPENAI_API_KEY"),
-        ("es_password", "ES_PASSWORD"),
-        ("es_api_key", "ES_API_KEY"),
     ]
     for attr, key in candidates:
         if getattr(settings, attr, ""):

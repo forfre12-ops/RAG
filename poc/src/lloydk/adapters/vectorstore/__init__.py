@@ -32,7 +32,7 @@ def build_store(
     if force_memory:
         return InMemoryStore()
 
-    backend = (backend or os.getenv("VECTOR_BACKEND", "es")).lower()
+    backend = (backend or os.getenv("VECTOR_BACKEND", "pg")).lower()
 
     if backend == "inmemory":
         return InMemoryStore()

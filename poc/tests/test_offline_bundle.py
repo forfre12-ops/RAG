@@ -104,13 +104,15 @@ def test_extract_components_handles_missing_file(tmp_path: Path):
 
 
 def test_extract_components_real_project_compose():
-    """실제 프로젝트 docker-compose.yml에서 ES·postgres·minio·redis·mlflow가 추출되어야 함."""
+    """실제 프로젝트 docker-compose.yml에서 postgres·minio·redis·mlflow가 추출되어야 함."""
     real = Path(__file__).resolve().parents[1] / "docker-compose.yml"
     components = extract_components_from_compose(real)
-    for expected in ("postgres", "elasticsearch", "minio", "redis", "mlflow"):
+    for expected in ("postgres", "minio", "redis", "mlflow"):
         assert expected in components, f"missing: {expected}"
-    # ES 이미지가 8.15+ 라인이어야 retriever API 분기와 정합 (nori 빌드 태그 포함 허용)
-    assert "8.15.3" in components["elasticsearch"].image
+    # ES 제거(의사결정_대장 §03 ⓑ) — elasticsearch 서비스는 더 이상 없어야 한다.
+    assert "elasticsearch" not in components
+    # postgres는 pgvector 이미지(dense 백엔드)
+    assert "pgvector" in components["postgres"].image
 
 
 # ─────────────────────────────────────────────────────────────

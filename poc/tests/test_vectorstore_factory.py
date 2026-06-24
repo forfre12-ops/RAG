@@ -18,16 +18,15 @@ def test_force_memory_overrides_env(monkeypatch: pytest.MonkeyPatch):
     assert isinstance(vs, InMemoryStore)
 
 
-def test_default_backend_is_es(monkeypatch: pytest.MonkeyPatch):
-    """VECTOR_BACKEND 미지정 시 기본 'es'를 시도.
+def test_default_backend_is_pg(monkeypatch: pytest.MonkeyPatch):
+    """VECTOR_BACKEND 미지정 시 기본 'pg'(PgVectorStore) — 의사결정_대장 §03 ⓑ 확정.
 
-    - elasticsearch 패키지 설치 + 클라이언트 lazy 연결 → EsStore 생성 성공
-    - ImportError 또는 설정 누락 → InMemory 폴백
+    PgVectorStore는 지연 연결(SQLAlchemy 풀)이라 생성만으로 연결 안 함 → name='postgres'.
+    (레거시 es 백엔드는 backend='es' 명시 시 그대로 사용 가능.)
     """
     monkeypatch.delenv("VECTOR_BACKEND", raising=False)
     vs = build_store()
-    # 둘 중 하나여야 함 (둘 다 정상)
-    assert vs.name in ("elasticsearch", "inmemory")
+    assert vs.name == "postgres"
 
 
 def test_es_backend_falls_back_when_import_fails(monkeypatch: pytest.MonkeyPatch):

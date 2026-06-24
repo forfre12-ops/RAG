@@ -36,6 +36,11 @@ os.environ["AUDIT_DISABLED"] = "0"
 # matrix는 자기 fixture에서 monkeypatch로 override하므로 영향 없음.
 os.environ.setdefault("ENABLE_TRAINING", "true")
 
+# 벡터 백엔드 기본 inmemory — 테스트는 실 PG/ES 불요(이전 es→inmemory 폴백과 동일 효과).
+# 기본을 pg로 바꾼 뒤(§03 ⓑ) pg는 지연연결이라 폴백이 없으므로, 테스트는 명시적 inmemory로.
+# 실 백엔드 테스트(test_default_backend_is_pg 등)는 자체 delenv/setenv로 override.
+os.environ.setdefault("VECTOR_BACKEND", "inmemory")
+
 _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
