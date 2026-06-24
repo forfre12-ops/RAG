@@ -38,7 +38,7 @@ _VALID_LLM_PROVIDER = {
 # embedding: hash(드라이런)·hf(KURE/BGE). 하위호환 alias 일부 포함(huggingface/kure/bge).
 _VALID_EMBEDDING_PROVIDER = {"hash", "hf", "huggingface", "kure", "kure-v1", "bge", "bgem3"}
 _VALID_RERANKER_PROVIDER = {"noop", "bge"}
-_VALID_VECTOR_BACKEND = {"es", "inmemory"}
+_VALID_VECTOR_BACKEND = {"es", "pg", "pgvector", "postgres", "inmemory"}
 _VALID_STORAGE_BACKEND = {"minio", "seaweedfs", "s3", "local"}
 _VALID_POC_MODE = {"dryrun", "full"}
 _VALID_LABELING_METHOD = {"multiplicative", "additive"}

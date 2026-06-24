@@ -55,4 +55,13 @@ def build_store(
             )
             return InMemoryStore()
 
-    raise ValueError(f"unknown VECTOR_BACKEND: {backend!r} (expected: es|inmemory)")
+    # PG-native (의사결정_대장 §03 경로 ⓑ). EXPERIMENTAL — §03 재검증 게이트 전 기본 아님.
+    # 연결은 지연(SQLAlchemy 풀) — 생성 시 미접속, 쿼리 시점에 오류 표면화(es 와 동일 정책).
+    if backend in ("pg", "pgvector", "postgres"):
+        from lloydk.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
+
+        store = PgVectorStore()
+        _STORE_CACHE[backend] = store
+        return store
+
+    raise ValueError(f"unknown VECTOR_BACKEND: {backend!r} (expected: es|pg|inmemory)")
