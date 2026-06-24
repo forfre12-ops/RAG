@@ -58,11 +58,14 @@ def upgrade() -> None:
             tenant_id   TEXT,
             chunk_idx   INTEGER,
             content     TEXT        NOT NULL,
+            -- 어휘 채점용 **bigram 토큰** 문자열(앱사이드 PgVectorStore._bigram 가 채움).
+            -- NL(비발췌) 재검증(scripts/_bench_pg_lexical_revalidation.py --tag nl) 실측:
+            --   plain to_tsvector('simple', content)=어절(eojeol)은 NL R@5 47%로 붕괴(굴절/조사
+            --   변형에 어절 통매칭 실패), bigram 토큰의 ts_rank 는 87%(≈nori-BM25 89%). 그래서
+            --   tsv 는 content 가 아니라 bigram_text 에서 생성한다(분석기 없이 한국어 견고).
+            bigram_text TEXT,
             embedding   vector({EMBED_DIM}),
-            -- ts_rank 채점 채널. 한국어 'simple' config = 무분석기(어절). 형태소 사전토큰화가
-            -- 필요하면 앱사이드에서 토큰을 공백조인해 content 에 적재(또는 별도 컬럼) — 본 경로(ⓑ)는
-            -- 무분석기 ts_rank(~80-85%) 수용. GENERATED 라 적재 시 자동 갱신.
-            tsv         tsvector    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content, ''))) STORED,
+            tsv         tsvector    GENERATED ALWAYS AS (to_tsvector('simple', coalesce(bigram_text, ''))) STORED,
             payload     JSONB       NOT NULL DEFAULT '{{}}'::jsonb,
             created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (collection, id)

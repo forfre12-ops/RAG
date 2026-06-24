@@ -9,9 +9,12 @@ alembic a1b2c3d4e5f6 (tb_rag_vectors / tb_rag_aliases).
 
 설계 노트 (실측·적대검증 반영, scripts/_bench_pg_lexical_revalidation.py):
   - dense 는 pgvector 코사인(embedding <=> q). 저장소 무관(ES 와 동일 품질).
-  - 어휘 채점은 **ts_rank_cd(IDF 없음, ~80-85%)** — raw pg_bigm/pg_trgm 유사도를
-    랭커로 쓰면 62-71%로 붕괴하므로 **pg_bigm 은 GIN 후보생성기로만** 사용하고
-    재채점은 ts_rank 로 한다(여기선 tsv @@ query 후보 = ts_rank 채널이 그 역할).
+  - 어휘 채점은 **bigram 토큰 위의 ts_rank_cd(IDF 없음)** — NL(비발췌) 재검증 실측:
+    bigram-ts_rank 87% ≈ nori-BM25 89%(-2pp), 반면 어절(plain tsvector 'simple')은
+    NL 에서 47%로 붕괴(굴절/조사 변형). 그래서 tsv 는 content 가 아니라 **bigram_text**
+    (앱사이드 _bigram)에서 생성하고, 질의도 같은 bigram 토큰화로 plainto_tsquery 한다.
+    raw pg_bigm/pg_trgm 유사도를 **랭커로 쓰면 62-71%(NL 67/54)로 붕괴**하므로 금지
+    (필요 시 pg_bigm GIN 은 후보생성 가속용으로만).
     nori 동급(BM25/IDF, ~94%)이 필요하면 BM25 확장(ParadeDB/pg_search·VectorChord-bm25)
     또는 앱사이드 BM25 로 업그레이드(=경로 ⓒ).
   - dense + 어휘 융합은 RRF(k=60) — es_store 와 동일 상수.
@@ -23,6 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Sequence
 
 from lloydk.adapters.vectorstore.base import SearchHit
@@ -54,6 +58,23 @@ class PgVectorStore:
     @staticmethod
     def _vec_lit(vec: Sequence[float]) -> str:
         return "[" + ",".join(repr(float(x)) for x in vec) + "]"
+
+    # ── 한국어 어휘 채널 토큰화: 영문/숫자 단어 + 한글 2-gram (pg_bigm 근사) ──
+    # NL 재검증 실측: 이 bigram 채널의 ts_rank 가 nori 동급(87% vs 89%), 반면 어절(eojeol)은
+    # NL 에서 47%로 붕괴. tsv 는 이 문자열로 생성하고, 질의도 같은 토큰화로 plainto_tsquery 한다.
+    _ASCII = re.compile(r"[a-z0-9]+")
+    _HAN = re.compile(r"[가-힣]+")
+
+    @classmethod
+    def _bigram(cls, text: str) -> str:
+        text = (text or "").lower()
+        toks = cls._ASCII.findall(text)
+        for run in cls._HAN.findall(text):
+            if len(run) < 2:
+                toks.append(run)
+            else:
+                toks.extend(run[i:i + 2] for i in range(len(run) - 1))
+        return " ".join(toks)
 
     def _filter_sql(self, filter: dict | None, params: dict, prefix: str = "f") -> str:
         """filter dict → AND 절. 전용 컬럼은 직접, 그 외는 payload ->> 비교."""
@@ -92,30 +113,33 @@ class PgVectorStore:
         rows = []
         for _id, vec, pl in zip(ids, vectors, payloads, strict=True):
             pl = dict(pl)
+            content = pl.get("text") or pl.get("content") or ""
             rows.append({
                 "collection": collection,
                 "id": str(_id),
                 "doc_id": pl.get("doc_id"),
                 "tenant_id": pl.get("tenant_id"),
                 "chunk_idx": pl.get("chunk_idx"),
-                "content": pl.get("text") or pl.get("content") or "",
+                "content": content,
+                "bigram_text": self._bigram(content),   # ts_rank 어휘 채널(분석기 없는 한국어 견고)
                 "embedding": self._vec_lit(vec),
                 "payload": json.dumps(pl, ensure_ascii=False),
             })
         sql = text(
             """
             INSERT INTO tb_rag_vectors
-                (collection, id, doc_id, tenant_id, chunk_idx, content, embedding, payload)
+                (collection, id, doc_id, tenant_id, chunk_idx, content, bigram_text, embedding, payload)
             VALUES
-                (:collection, :id, :doc_id, :tenant_id, :chunk_idx, :content,
+                (:collection, :id, :doc_id, :tenant_id, :chunk_idx, :content, :bigram_text,
                  (:embedding)::vector, (:payload)::jsonb)
             ON CONFLICT (collection, id) DO UPDATE SET
-                doc_id    = EXCLUDED.doc_id,
-                tenant_id = EXCLUDED.tenant_id,
-                chunk_idx = EXCLUDED.chunk_idx,
-                content   = EXCLUDED.content,
-                embedding = EXCLUDED.embedding,
-                payload   = EXCLUDED.payload
+                doc_id      = EXCLUDED.doc_id,
+                tenant_id   = EXCLUDED.tenant_id,
+                chunk_idx   = EXCLUDED.chunk_idx,
+                content     = EXCLUDED.content,
+                bigram_text = EXCLUDED.bigram_text,
+                embedding   = EXCLUDED.embedding,
+                payload     = EXCLUDED.payload
             """
         )
         with self._engine.begin() as conn:
@@ -189,7 +213,8 @@ class PgVectorStore:
         from sqlalchemy import text  # noqa: PLC0415
 
         params: dict[str, Any] = {
-            "collection": collection, "q": self._vec_lit(query_vec), "qt": query_text,
+            "collection": collection, "q": self._vec_lit(query_vec),
+            "qt": self._bigram(query_text),   # 질의도 동일 bigram 토큰화 → tsv 와 정합
             "cand": rrf_window, "k": rrf_constant, "topk": top_k,
         }
         fwhere = self._filter_sql(filter, params)
