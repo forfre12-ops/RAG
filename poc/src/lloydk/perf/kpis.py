@@ -113,8 +113,8 @@ KPIS: list[KPI] = [
     KPI("S5.2", "S5", "embedding_vector_count > 0", "count", "gt", 0, "min"),
     # dryrun: hash 임베딩 + InMemory 백엔드. full: KURE-v1 + ES. 합격선은 보수적 0.3 (도달 검증 + full 시 회귀 추적)
     KPI("S5.3", "S5", "인덱싱 throughput", "chunks/s", "ge", 0.3, "last"),
-    # Recall@5는 실 ES + 학습된 모델(또는 풀 임베딩) 전제. dryrun(hash 임베딩)에선 SKIP.
-    KPI("S5.4", "S5", "Recall@5", "ratio", "ge", 0.80, "last", requires=["es", "trained_model"], core=True),
+    # Recall@5는 실 PG 벡터스토어(pgvector) + 학습된 모델(또는 풀 임베딩) 전제. dryrun(hash 임베딩)에선 SKIP.
+    KPI("S5.4", "S5", "Recall@5", "ratio", "ge", 0.80, "last", requires=["pg", "trained_model"], core=True),
     KPI("S5.5", "S5", "후속 GET 200", "bool", "ge", True, "bool_all"),
 
     # S6
