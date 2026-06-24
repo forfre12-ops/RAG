@@ -22,7 +22,6 @@ from build_offline_bundle import (  # noqa: E402
     _MODEL_META,
     _simple_yaml_dump,
     build_manifest,
-    default_es_plugins,
     estimate_total_size,
     expected_files,
     extract_components_from_compose,
@@ -178,11 +177,11 @@ def test_estimate_size_scales_with_components():
 def test_estimate_size_llm_dominates():
     """LLM 14B 모델이 단독으로 약 10GB 차지 → 전체 추정에 큰 비중."""
     components: dict[str, ComponentEntry] = {}
-    no_llm = estimate_total_size(components, [], default_es_plugins("8.15.3"))
+    no_llm = estimate_total_size(components, [], [])
     with_llm = estimate_total_size(
         components,
         [ModelEntry(name="Qwen/Qwen3-14B", dim=None, sha256=None, license="Apache-2.0", role="llm")],
-        default_es_plugins("8.15.3"),
+        [],
     )
     assert with_llm - no_llm >= 9.0
 
@@ -197,14 +196,6 @@ def test_expected_files_lists_required_artifacts():
     assert "CHECKSUMS.sha256" in files
     assert any(f.startswith("docker-images/postgres") for f in files)
     assert any(f.startswith("models/foo-bar/") for f in files)
-
-
-def test_default_es_plugins_includes_nori_and_s3():
-    plugins = default_es_plugins("8.15.3")
-    names = [p.name for p in plugins]
-    assert "analysis-nori" in names
-    assert "repository-s3" in names
-    assert all(p.version == "8.15.3" for p in plugins)
 
 
 # ─────────────────────────────────────────────────────────────

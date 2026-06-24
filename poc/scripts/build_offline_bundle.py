@@ -229,13 +229,6 @@ def resolve_classifier_model_dir(explicit: str | None) -> Path | None:
     return p if p.exists() else None
 
 
-def default_es_plugins(es_version: str) -> list[PluginEntry]:
-    return [
-        PluginEntry(name="analysis-nori", version=es_version),
-        PluginEntry(name="repository-s3", version=es_version),
-    ]
-
-
 # 컴포넌트별 예상 크기 (GB, doc/12 §3.2 기반 추정)
 _COMPONENT_SIZE_GB: dict[str, float] = {
     "api": 1.5,
@@ -280,14 +273,9 @@ def expected_files(components: dict[str, ComponentEntry], models: list[ModelEntr
     files.extend([
         "python-deps/wheels/",
         "python-deps/_requirements_no_torch.txt",
-        "es-plugins/analysis-nori-{ver}.zip",
-        "es-plugins/repository-s3-{ver}.zip",
         "infra-config/docker-compose.yml",
         "infra-config/docker-compose.airgap.yml",
         "infra-config/.env.template",
-        "infra-config/index_template_secrets.json",
-        "infra-config/userdict_ko.txt",
-        "infra-config/ilm-policy-secrets.json",
         "db-migrations/alembic/",  # baseline + 후속 revision 전체 (init.sql 폐기)
         "docs/INSTALL.md",
         "docs/OPERATION.md",
@@ -354,8 +342,7 @@ def build_manifest(
                 "미동봉. 서빙이 T=1.0(무보정)로 동작합니다. calibrate_classifier.py 실행 권장.",
                 file=sys.stderr,
             )
-    es_version = components.get("elasticsearch", ComponentEntry("", "8.15.3")).version
-    plugins = default_es_plugins(es_version)
+    plugins: list[PluginEntry] = []  # ES 제거(의사결정_대장 §03 ⓑ) — 번들에 검색엔진 플러그인 없음
     size = estimate_total_size(components, models, plugins)
     files = expected_files(components, models)
 
@@ -490,10 +477,6 @@ def print_checklist(manifest: BundleManifest, *, stream=sys.stdout) -> None:
     for m in manifest.models:
         dim = f"dim={m.dim}" if m.dim else "-"
         p(f"  - [{m.role:22s}] {m.name}  ({m.license}, {dim})")
-
-    p(f"\n[ES plugins: {len(manifest.es_plugins)}]")
-    for plg in manifest.es_plugins:
-        p(f"  - {plg.name}-{plg.version}.zip")
 
     p("\n[Files expected]")
     for f in manifest.files_expected:
@@ -642,9 +625,6 @@ def _copy_infra(out_dir: Path) -> None:
         (_REPO_ROOT / "docker-compose.yml",              infra / "docker-compose.yml"),
         # 폐쇄망 전용 compose (image 참조·beat 서비스·named 볼륨) — 운영 배포는 이걸 사용.
         (_REPO_ROOT / "docker-compose.airgap.yml",       infra / "docker-compose.airgap.yml"),
-        (_REPO_ROOT / "infra" / "es" / "userdict_ko.txt", infra / "userdict_ko.txt"),
-        # ES 인덱스 템플릿 (secrets-* 패턴) — 운영 시 사전 적용.
-        (_REPO_ROOT / "infra" / "es" / "index_template_secrets.json", infra / "index_template_secrets.json"),
     ]:
         if src.exists():
             shutil.copy2(src, dst)
@@ -666,7 +646,7 @@ def _copy_infra(out_dir: Path) -> None:
         env_template.write_text(
             "# Copy this to .env and fill in values\n"
             "DATABASE_URL=postgresql://lloydk:lloydk_dev@postgres:5432/lloydk\n"
-            "ES_URL=http://elasticsearch:9200\n"
+            "VECTOR_BACKEND=pg\n"
             "REDIS_URL=redis://redis:6379/0\n"
             "MINIO_ENDPOINT=minio:9000\n"
             "LLM_PROVIDER=vllm\n"
