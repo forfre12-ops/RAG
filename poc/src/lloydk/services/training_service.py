@@ -27,6 +27,7 @@ from lloydk.schemas.training import (
     TrainResponse,
     TrainStatus,
 )
+from lloydk.services.async_classify_service import _celery_dispatch_available
 from lloydk.services.job_store import get_default_store
 
 logger = logging.getLogger(__name__)
@@ -263,9 +264,24 @@ class TrainingService:
                 "actor": req.actor.user_id,
             },
         )
-        # NOTE: 운영은 여기서 Celery train_classifier_task.delay(...) 호출.
-        # PoC는 GPU/데이터셋 미확보라 'queued' 유지.
-        logger.info("training submit done: train_job_id=%s status=queued", run_id)
+        # 운영(브로커 가용)은 여기서 Celery train_classifier_task.delay() 발사.
+        # 발사해도 worker가 아직 안 돈 시점이라 TrainingRun/Job 상태는 'queued'로 남는다
+        # (status 폴링 정합 보존). 테스트/브로커 미가용/eager는 발사하지 않고 'queued'만
+        # 반환 — PoC는 GPU/데이터셋 미확보라 동기 in-process 학습을 트리거하지 않는다.
+        if _celery_dispatch_available():
+            try:
+                from lloydk.workers.tasks import train_classifier_task  # noqa: PLC0415
+
+                spec_kwargs = dict(req.hyperparams) if req.hyperparams else None
+                train_classifier_task.delay(spec_kwargs)
+                logger.info("training enqueued to celery: train_job_id=%s status=queued", run_id)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "celery enqueue failed for training — left as queued: train_job_id=%s",
+                    run_id, exc_info=True,
+                )
+        else:
+            logger.info("training submit done: train_job_id=%s status=queued", run_id)
         return TrainResponse(
             train_job_id=run_id,
             status_url=f"/api/v1/train/jobs/{run_id}",

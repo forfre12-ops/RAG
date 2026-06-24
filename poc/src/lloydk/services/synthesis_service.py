@@ -23,6 +23,7 @@ from lloydk.schemas.synthesis import (
     SynthReviewRequest,
     SynthReviewResponse,
 )
+from lloydk.services.async_classify_service import _celery_dispatch_available
 from lloydk.services.job_store import get_default_store
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,24 @@ class SynthesisService:
                 "actor": req.actor.user_id,
             },
         )
-        # 운영: Celery synthesize_batch.delay(grade=..., count=...) 발사
+        # 운영(브로커 가용): 실제 Celery synthesize_batch.delay() 발사 → worker가 생성·검수큐 적재.
+        # 테스트/브로커 미가용/eager는 발사하지 않고 작업 등록만(동작·테스트 보존, dryrun 의미).
+        if _celery_dispatch_available():
+            try:
+                from lloydk.workers.tasks import synthesize_batch  # noqa: PLC0415
+
+                synthesize_batch.delay(
+                    req.target_grade.value,
+                    req.count,
+                    domain=req.domain,
+                    job_id=str(job_id),
+                )
+                logger.info("synth enqueued to celery: job_id=%s count=%d", job_id, req.count)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "celery enqueue failed for synth — left as registered: job_id=%s",
+                    job_id, exc_info=True,
+                )
         logger.info(
             "synth submit done: job_id=%s count=%d est_cost_usd=%.4f",
             job_id, req.count, round(unit * req.count, 4),
