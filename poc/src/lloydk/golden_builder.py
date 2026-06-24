@@ -184,3 +184,62 @@ def make_label_fn(
         return LabelPair(rule_grade, float(rr.confidence), llm_grade, float(lr.confidence))
 
     return label_fn
+
+
+@dataclass
+class PromoteResult:
+    added: int
+    skipped_duplicate: int
+    skipped_leaked: int
+    skipped_not_gold: int
+    total_candidates: int
+    gold_total: int  # 병합 후 gold 건수
+
+
+def promote_candidates(
+    candidates: Sequence[dict],
+    existing_gold: Sequence[dict],
+    *,
+    holdout_texts: Sequence[str] | None = None,
+    text_key: str = "text",
+) -> tuple[list[dict], PromoteResult]:
+    """빌더 후보(build_<id>.jsonl)를 기존 gold에 게이트 통과분만 병합 (G4).
+
+    게이트:
+      (1) label 없음/등급외(검수대상·빈건) → skip(not_gold)
+      (2) 기존 gold와 본문 중복(정규화 text_hash) → skip(duplicate)
+      (3) holdout 누출(text_hash) → skip(leaked) — 학습/평가 순환성 차단
+
+    정본 파일을 직접 쓰지 않고 '병합된 리스트 + 통계'를 반환한다. 호출부(CLI/엔드포인트/
+    운영자)가 check_data_quality 게이트 통과 후 기록을 결정한다(정본 보호).
+    """
+    merged = list(existing_gold)
+    seen = {text_hash(r.get(text_key, "")) for r in merged if r.get(text_key)}
+    holdout_hashes = {text_hash(t) for t in (holdout_texts or [])}
+
+    added = skip_dup = skip_leak = skip_notgold = 0
+    for c in candidates:
+        text = (c.get(text_key) or "").strip()
+        if not text or c.get("label") not in _LABELS:
+            skip_notgold += 1
+            continue
+        h = text_hash(text)
+        if h in seen:
+            skip_dup += 1
+            continue
+        if h in holdout_hashes:
+            skip_leak += 1
+            continue
+        merged.append(c)
+        seen.add(h)
+        added += 1
+
+    result = PromoteResult(
+        added=added,
+        skipped_duplicate=skip_dup,
+        skipped_leaked=skip_leak,
+        skipped_not_gold=skip_notgold,
+        total_candidates=len(candidates),
+        gold_total=len(merged),
+    )
+    return merged, result
