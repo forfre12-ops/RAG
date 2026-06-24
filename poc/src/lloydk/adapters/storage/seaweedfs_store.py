@@ -59,18 +59,19 @@ class SeaweedFSStore:
 
     def put(self, bucket: str, key: str, data: bytes, *, content_type: str = "application/octet-stream") -> str:
         c = self._ensure()
+        key = self._norm_key(key)
         c.put_object(Bucket=bucket, Key=key, Body=data, ContentType=content_type)
         return self.uri(bucket, key)
 
     def get(self, bucket: str, key: str) -> bytes:
         c = self._ensure()
-        obj = c.get_object(Bucket=bucket, Key=key)
+        obj = c.get_object(Bucket=bucket, Key=self._norm_key(key))
         return obj["Body"].read()
 
     def exists(self, bucket: str, key: str) -> bool:
         c = self._ensure()
         try:
-            c.head_object(Bucket=bucket, Key=key)
+            c.head_object(Bucket=bucket, Key=self._norm_key(key))
             return True
         except Exception:  # noqa: BLE001
             return False
@@ -82,7 +83,7 @@ class SeaweedFSStore:
 
     @staticmethod
     def _norm_key(key: str) -> str:
-        # #36-(4): MinIO/SeaweedFS는 키 검증이 없어 신규 delete/list 에 한해 일관 정규화.
+        # #36-(4): MinIO/SeaweedFS는 키 검증이 없어 put/get/list/delete 전반에 일관 정규화.
         # 선행 슬래시 제거·../ 세그먼트 차단(S3 키에 .. 가 섞이면 의도치 않은 객체 지목).
         k = key.lstrip("/")
         if ".." in k.split("/"):
@@ -92,7 +93,7 @@ class SeaweedFSStore:
     def list_keys(self, bucket: str, prefix: str = "") -> list[str]:
         # S3 ListObjectsV2 페이지네이터로 prefix 매칭 키를 전부 열거.
         c = self._ensure()
-        prefix = prefix.lstrip("/")
+        prefix = self._norm_key(prefix) if prefix else ""
         keys: list[str] = []
         paginator = c.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
