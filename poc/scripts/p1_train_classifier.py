@@ -248,6 +248,8 @@ def main() -> int:
     ap.add_argument("--test", default=None, help="(하위 호환) gold JSONL 직접 지정")
     ap.add_argument("--report", default="reports/p1_classifier_report.md")
     ap.add_argument("--epochs", type=int, default=5)
+    ap.add_argument("--seed", type=int, default=None,
+                    help="학습 시드(모델 init·데이터 셔플). 미지정 시 TrainSpec 기본 42.")
     ap.add_argument("--train-path", default=None)
     ap.add_argument("--val-path", default=None)
     ap.add_argument("--test-path", default=None)
@@ -288,7 +290,8 @@ def main() -> int:
                      ("test_path", args.test_path), ("batch_size", args.batch_size),
                      ("base_model", args.base_model), ("output_dir", args.output_dir),
                      ("fnr_cost_multiplier", args.fnr_cost_multiplier),
-                     ("early_stop_metric", args.early_stop_metric)]:
+                     ("early_stop_metric", args.early_stop_metric),
+                     ("seed", args.seed)]:
             if v is not None:
                 spec_kwargs[k] = v
         if getattr(args, "no_mlflow", False):
