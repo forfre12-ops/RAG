@@ -59,6 +59,8 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-s
 if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
+from lloydk.modules.m3_labeling.consensus import evaluate_consensus  # noqa: E402 (sys.path 설정 후)
+
 LABELS = ["TS", "S1", "S2", "S3"]
 
 
@@ -333,48 +335,20 @@ def main() -> int:
         in_tok = _estimate_tokens(text[:4000])
         total_cost += (in_tok * 3.0 + 150 * 15.0) / 1_000_000
 
-        agree = (rule_grade == llm_grade)
-        rule_no_opinion = rule_conf < 0.05   # 룰 라벨러가 키워드 못 찾음 → 의견 없음
-        conf_ok = (rule_conf >= args.min_rule_conf and llm_conf >= args.min_llm_conf)
-
-        # Gold 판정:
-        #  A) 두 판정자 동의 + 둘 다 신뢰도 충족
-        #  B) 룰 라벨러 의견 없음(conf≈0) + 두 판정자 동의 + LLM 신뢰도 높음
-        #  C) 룰 라벨러 의견 없음(conf≈0) + LLM이 S1/S2/TS + LLM 신뢰도 높음
-        #     → 룰 무의견=사실상 "모르겠다"이므로 LLM 단독 판단 허용
-        #     → S3는 이미 90건 있어 편향 심화 방지를 위해 제외
-        llm_upper = llm_grade in ("TS", "S1", "S2")
-        is_gold = (
-            (agree and conf_ok)                                          # A
-            or (agree and rule_no_opinion and llm_conf >= args.min_llm_conf)  # B
-            or (rule_no_opinion and llm_upper and llm_conf >= args.min_llm_conf)  # C
+        # 합의 게이트 (m3_labeling.consensus로 추출 — 빌더·라벨링 자동화와 동일 규칙)
+        verdict = evaluate_consensus(
+            rule_grade, rule_conf, llm_grade, llm_conf,
+            min_rule_conf=args.min_rule_conf, min_llm_conf=args.min_llm_conf,
         )
-
-        if is_gold:
-            if conf_ok:
-                status = "gold_consensus"
-            elif agree:
-                status = "gold_llm_primary"
-            else:
-                status = "gold_llm_upper"   # C: 룰 무의견 + LLM S1/S2/TS
-        elif agree:
-            status = "low_conf"
-        else:
-            status = "disagree"
+        agree = verdict.agree
+        is_gold = verdict.is_gold
+        status = verdict.status
+        label_src = verdict.label_source
+        review_st = verdict.review_status
         print(
             f"rule={rule_grade}({rule_conf:.2f}) llm={llm_grade}({llm_conf:.2f}) "
             f"→ {status} ({elapsed_ms}ms)"
         )
-
-        if is_gold:
-            if conf_ok:
-                label_src = "llm_judge_consensus"   # 룰+LLM 둘 다 의견 있고 동의
-            else:
-                label_src = "llm_judge_primary"      # 룰 무의견, LLM 단독 고신뢰
-            review_st = "accepted"
-        else:
-            label_src = "llm_judge_uncertain"
-            review_st = "needs_review"
 
         rec = {
             "doc_id": doc_id,
