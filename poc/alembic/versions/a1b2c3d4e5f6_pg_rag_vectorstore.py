@@ -55,7 +55,6 @@ def upgrade() -> None:
             collection  TEXT        NOT NULL,
             id          TEXT        NOT NULL,
             doc_id      TEXT,
-            tenant_id   TEXT,
             chunk_idx   INTEGER,
             content     TEXT        NOT NULL,
             -- 어휘 채점용 **bigram 토큰** 문자열(앱사이드 PgVectorStore._bigram 가 채움).
@@ -92,8 +91,7 @@ def upgrade() -> None:
         END$$;
         """
     )
-    # 스코프 필터 hot path.
-    op.execute("CREATE INDEX IF NOT EXISTS idx_ragvec_coll_tenant ON tb_rag_vectors (collection, tenant_id)")
+    # 스코프 필터 hot path. (tenant_id 인덱스 제거 — 2026-06-24 테넌트 전면 제거 결정)
     op.execute("CREATE INDEX IF NOT EXISTS idx_ragvec_coll_doc ON tb_rag_vectors (collection, doc_id)")
 
     # alias → collection (무중단 재색인 blue/green). ES alias swap 대체.
@@ -111,7 +109,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP TABLE IF EXISTS tb_rag_aliases")
     op.execute("DROP INDEX IF EXISTS idx_ragvec_coll_doc")
-    op.execute("DROP INDEX IF EXISTS idx_ragvec_coll_tenant")
     op.execute("DROP INDEX IF EXISTS idx_ragvec_content_bigm")
     op.execute("DROP INDEX IF EXISTS idx_ragvec_tsv")
     op.execute("DROP INDEX IF EXISTS idx_ragvec_embedding")

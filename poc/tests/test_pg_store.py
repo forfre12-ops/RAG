@@ -32,10 +32,10 @@ def test_bigram_korean_and_ascii():
 def test_filter_sql_column_vs_payload():
     store = PgVectorStore(engine=object())  # 헬퍼만 검증 — engine 미사용
     params: dict = {}
-    clause = store._filter_sql({"tenant_id": "acme", "doc_type": "legal"}, params)
-    assert "tenant_id = :f0" in clause                 # 전용 컬럼은 직접 비교
+    clause = store._filter_sql({"doc_id": "d-001", "doc_type": "legal"}, params)
+    assert "doc_id = :f0" in clause                     # 전용 컬럼은 직접 비교
     assert "payload ->> 'doc_type' = :f1" in clause    # 그 외는 payload JSONB
-    assert params["f0"] == "acme" and params["f1"] == "legal"
+    assert params["f0"] == "d-001" and params["f1"] == "legal"
     assert store._filter_sql(None, {}) == ""           # 빈 필터는 빈 절
 
 

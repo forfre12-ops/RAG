@@ -38,14 +38,15 @@ _CAND_N = 50         # RRF 입력 후보 윈도우 (es_store _num_candidates_for
 _EMBED_DIM = 1024    # KURE-v1 / BGE-M3 (마이그레이션 vector(1024) 와 일치)
 
 # payload 의 어느 키를 전용 컬럼으로 승격할지 (나머지는 payload JSONB).
-_COL_KEYS = ("doc_id", "tenant_id")
+# tenant_id 는 2026-06-24 전면 제거 결정(KL 포털이 격리) — 본 PG 층은 tenant-free.
+_COL_KEYS = ("doc_id",)
 
 
 class PgVectorStore:
     name = "postgres"
 
     # filter 키 중 전용 컬럼으로 직접 비교할 것(나머지는 payload ->> key).
-    _COLUMN_FILTERS = {"doc_id", "tenant_id", "chunk_idx"}
+    _COLUMN_FILTERS = {"doc_id", "chunk_idx"}
 
     def __init__(self, engine: Any | None = None) -> None:
         # SQLAlchemy 엔진 재사용(풀링·connect_timeout 상속). 지연 연결 — 생성 시 미접속.
@@ -118,7 +119,6 @@ class PgVectorStore:
                 "collection": collection,
                 "id": str(_id),
                 "doc_id": pl.get("doc_id"),
-                "tenant_id": pl.get("tenant_id"),
                 "chunk_idx": pl.get("chunk_idx"),
                 "content": content,
                 "bigram_text": self._bigram(content),   # ts_rank 어휘 채널(분석기 없는 한국어 견고)
@@ -128,13 +128,12 @@ class PgVectorStore:
         sql = text(
             """
             INSERT INTO tb_rag_vectors
-                (collection, id, doc_id, tenant_id, chunk_idx, content, bigram_text, embedding, payload)
+                (collection, id, doc_id, chunk_idx, content, bigram_text, embedding, payload)
             VALUES
-                (:collection, :id, :doc_id, :tenant_id, :chunk_idx, :content, :bigram_text,
+                (:collection, :id, :doc_id, :chunk_idx, :content, :bigram_text,
                  (:embedding)::vector, (:payload)::jsonb)
             ON CONFLICT (collection, id) DO UPDATE SET
                 doc_id      = EXCLUDED.doc_id,
-                tenant_id   = EXCLUDED.tenant_id,
                 chunk_idx   = EXCLUDED.chunk_idx,
                 content     = EXCLUDED.content,
                 bigram_text = EXCLUDED.bigram_text,
