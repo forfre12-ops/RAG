@@ -15,9 +15,9 @@ from lloydk.perf.harness import AvailableResources, ScenarioContext
 
 class TestImports:
     def test_specs_registered(self):
-        """SPECS 리스트에 18개 시나리오가 모두 등록."""
+        """SPECS 리스트에 17개 시나리오가 등록(S13 멀티테넌트 격리 시나리오는 tenant 제거로 삭제)."""
         scenario_ids = {s.id for s in sc.SPECS}
-        expected = {f"S{i}" for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]}
+        expected = {f"S{i}" for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18]}
         assert scenario_ids == expected, f"missing: {expected - scenario_ids}, extra: {scenario_ids - expected}"
 
     def test_all_runners_callable(self):
@@ -68,7 +68,6 @@ class TestHelpers:
         assert "X-API-Key" in h
         assert "X-Actor-Id" in h
         assert "X-Actor-Role" in h
-        assert "X-Tenant-Id" in h
         assert h["X-Actor-Role"] == "kl_backend"
 
     def test_hdr_admin_role(self):

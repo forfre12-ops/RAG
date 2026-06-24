@@ -5,8 +5,9 @@
 - DB 미가용·테이블 부재 시 silent skip (테스트·dryrun 환경 보호)
 - payload는 SHA-256 해시만. 본문은 PG에 저장하지 않음.
 - /healthz·/docs·/openapi.json은 audit 제외 (노이즈 차단)
-- actor_id·tenant_id·role은 인증이 해소한 request.state.auth_*를 우선 사용.
-  인증이 신원을 못 채운 요청(인증 실패 등)에만 X-Actor-Id/X-Tenant-Id 헤더로 폴백.
+- actor_id·role은 인증이 해소한 request.state.auth_*를 우선 사용.
+  인증이 신원을 못 채운 요청(인증 실패 등)에만 X-Actor-Id 헤더로 폴백.
+- tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), audit에 tenant 기록 없음.
 """
 
 from __future__ import annotations
@@ -227,14 +228,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         action = _derive_action(request)
         # 보안: 인증이 해소한 신원(request.state.auth_*)을 우선 사용 — 위조 가능한
-        # X-Actor-Id/X-Tenant-Id 헤더로 감사 기록이 날조되는 것을 차단. 인증이
-        # 신원을 못 채운 경우(인증 실패/미인증 요청)에만 헤더로 폴백(success=False로 이미 구분됨).
+        # X-Actor-Id 헤더로 감사 기록이 날조되는 것을 차단. 인증이 신원을 못 채운
+        # 경우(인증 실패/미인증 요청)에만 헤더로 폴백(success=False로 이미 구분됨).
+        # tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), audit에 tenant 기록 없음.
         auth_actor = getattr(request.state, "auth_actor", None)
-        auth_tenant = getattr(request.state, "auth_tenant", None)
         auth_role = getattr(request.state, "auth_role", None)
         actor_id = auth_actor if auth_actor is not None else request.headers.get("x-actor-id")
         actor_role = auth_role if auth_role is not None else request.headers.get("x-actor-role")
-        tenant_id = auth_tenant if auth_tenant is not None else request.headers.get("x-tenant-id")
         request_id = getattr(request.state, "request_id", None)
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent")
@@ -250,12 +250,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 ph = payload_hash
                 if build_chained_hash_locked is not None:
                     # payload_hash는 raw body 해시(또는 ""). 같은 tx에서 lock→prev→패킹.
-                    ph = build_chained_hash_locked(db, payload_hash or "", tenant_id=None)
+                    # tenant 제거: 전역 단일 체인(per-tenant 체인 없음).
+                    ph = build_chained_hash_locked(db, payload_hash or "")
                 AuditRepo(db).record(
                     action=action,
                     actor_id=actor_id,
                     actor_role=actor_role,
-                    tenant_id=tenant_id,
                     request_id=request_id,
                     payload_hash=ph,
                     ip_address=ip,

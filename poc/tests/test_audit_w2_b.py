@@ -2,9 +2,12 @@
 
 대상 (배정 파일):
   - api/app.py             — M-schema-perm: PUT /schema/grades admin 전용(GET은 broad)
-  - api/rate_limit.py      — M-ratelimit-key: 검증된 신원 우선 키, 미검증 헤더 단독 키 금지
+  - api/rate_limit.py      — M-ratelimit-key: 검증된 신원(KL cred/actor) 우선 키, 미검증 헤더 단독 키 금지
   - schemas/common.py      — M-cache: GradeRegistry/FactorRegistry TTL 재로드(멀티워커)
-  - services/guide_service.py — M-guide-tenant: 가이드 이력을 실제 tenant_id로 스코프
+  - services/guide_service.py — 가이드 이력 in-memory/DB 영속
+
+tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). per-tenant 스코프 검증 케이스는
+기능 제거로 삭제·전역(global)으로 단순화됨.
 
 DB/ES/네트워크 없이 도는 단위 수준 테스트. (DB가 있으면 더 강한 통합 테스트가 별도로 존재.)
 """
@@ -85,47 +88,40 @@ def test_schema_put_admin_in_multi_role_passes():
 
 
 # ===========================================================================
-# M-ratelimit-key — 검증된 신원 우선, 미검증 X-Tenant-Id 헤더 단독 키 금지
+# M-ratelimit-key — 검증된 KL cred(actor) 우선, 미검증 헤더 단독 키 금지
+# (tenant 제거: 단일 KL 인증이라 버킷은 actor/IP 기준; 격리는 KL 포털 전담)
 # ===========================================================================
-def test_key_uses_verified_auth_tenant():
-    from lloydk.api.rate_limit import tenant_or_ip_key
+def test_key_uses_auth_actor():
+    from lloydk.api.rate_limit import cred_or_ip_key
 
-    req = _FakeRequest(auth_tenant="acme", auth_actor=None)
-    assert tenant_or_ip_key(req) == "tenant:acme"
-
-
-def test_key_uses_auth_actor_when_no_tenant():
-    from lloydk.api.rate_limit import tenant_or_ip_key
-
-    req = _FakeRequest(auth_tenant=None, auth_actor="user-7")
-    assert tenant_or_ip_key(req) == "actor:user-7"
+    req = _FakeRequest(auth_actor="user-7")
+    assert cred_or_ip_key(req) == "actor:user-7"
 
 
-def test_key_ignores_unverified_tenant_header():
-    """[M-ratelimit-key] 위조 가능한 원시 X-Tenant-Id 헤더는 키에 쓰지 않는다.
+def test_key_ignores_unverified_header():
+    """[M-ratelimit-key] 위조 가능한 원시 헤더는 키에 쓰지 않는다.
 
-    auth_tenant/auth_actor가 비면(미검증) IP 폴백으로만 키가 결정돼야 한다 —
-    헤더값 'forged-tenant'가 키에 절대 반영되면 안 됨.
+    auth_actor가 비면(미검증) IP 폴백으로만 키가 결정돼야 한다 —
+    헤더값 'forged'가 키에 절대 반영되면 안 됨.
     """
-    from lloydk.api.rate_limit import tenant_or_ip_key
+    from lloydk.api.rate_limit import cred_or_ip_key
 
     req = _FakeRequest(
-        headers={"X-Tenant-Id": "forged-tenant"},
+        headers={"X-Tenant-Id": "forged"},
         client_host="9.9.9.9",
-        auth_tenant=None,
         auth_actor=None,
     )
-    key = tenant_or_ip_key(req)
+    key = cred_or_ip_key(req)
     assert key == "ip:9.9.9.9"
-    assert "forged-tenant" not in key
+    assert "forged" not in key
 
 
-def test_key_distinct_verified_tenants_get_distinct_buckets():
-    """검증된 서로 다른 tenant는 독립 키(=독립 버킷)를 받는다 — 정상 격리는 유지."""
-    from lloydk.api.rate_limit import tenant_or_ip_key
+def test_key_distinct_verified_actors_get_distinct_buckets():
+    """검증된 서로 다른 actor는 독립 키(=독립 버킷)를 받는다."""
+    from lloydk.api.rate_limit import cred_or_ip_key
 
-    a = tenant_or_ip_key(_FakeRequest(auth_tenant="t-a", auth_actor=None))
-    b = tenant_or_ip_key(_FakeRequest(auth_tenant="t-b", auth_actor=None))
+    a = cred_or_ip_key(_FakeRequest(auth_actor="a-1"))
+    b = cred_or_ip_key(_FakeRequest(auth_actor="a-2"))
     assert a != b
 
 
@@ -198,7 +194,8 @@ def test_registry_ttl_env_parsing(monkeypatch):
 
 
 # ===========================================================================
-# M-guide-tenant — 가이드 이력을 실제 tenant_id로 스코프 (DB 미가용 in-memory 경로)
+# Guide 이력 — 전역(global) 네임스페이스 (DB 미가용 in-memory 경로)
+# tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). guide_id 단독으로 키.
 # ===========================================================================
 class _StubIndexResult:
     def __init__(self):
@@ -212,14 +209,14 @@ class _StubIndexResult:
 
 
 class _StubIndexer:
-    """index_guide 호출 시 tenant_id를 캡처하는 스텁 — ES 미사용."""
+    """index_guide 호출을 캡처하는 스텁 — ES 미사용."""
 
     def __init__(self):
-        self.seen_tenants: list[str] = []
+        self.seen_guides: list[str] = []
 
-    def index_guide(self, *, guide_id, version, tenant_id, text,
+    def index_guide(self, *, guide_id, version, text,
                     doc_type=None, effective_date=None, **kw):
-        self.seen_tenants.append(tenant_id)
+        self.seen_guides.append(guide_id)
         return _StubIndexResult()
 
 
@@ -229,60 +226,52 @@ def _svc_with_stub():
     return GuideService(indexer=_StubIndexer())
 
 
-def test_persist_uses_real_tenant_not_hardcoded_default():
-    """[M-guide-tenant] 업로드가 받은 실제 tenant_id가 인덱서·레코드까지 전달된다.
-
-    과거엔 _persist_guide가 "default"로 하드코딩해 모든 테넌트 이력이 한 행으로 혼합됐다.
-    """
+def test_persist_records_guide_in_memory():
+    """업로드가 인덱서·in-memory 레코드까지 guide_id로 전달된다(전역 네임스페이스)."""
     svc = _svc_with_stub()
     svc.upload(
         guide_id="g1", version="v1", effective_date=None, change_summary=None,
-        content_bytes=b"hello guide", actor_user_id="u1", tenant_id="tenant-acme",
+        content_bytes=b"hello guide", actor_user_id="u1",
         filename="g1.txt",
     )
-    # 인덱서에 실제 tenant 전달
-    assert svc._indexer.seen_tenants == ["tenant-acme"]
-    # in-memory 레코드가 실제 tenant로 키됨 (default 아님)
-    assert ("tenant-acme", "g1") in svc._guides
-    assert ("default", "g1") not in svc._guides
-    rec = svc._guides[("tenant-acme", "g1")][0]
-    assert rec.tenant_id == "tenant-acme"
+    # 인덱서에 guide_id 전달
+    assert svc._indexer.seen_guides == ["g1"]
+    # in-memory 레코드가 guide_id로 키됨
+    assert "g1" in svc._guides
+    rec = svc._guides["g1"][0]
+    assert rec.guide_id == "g1"
+    assert rec.version == "v1"
 
 
-def test_list_versions_is_tenant_scoped_in_memory():
-    """다른 테넌트가 같은 guide_id를 올려도 이력이 섞이지 않는다(테넌트별 분리 조회)."""
+def test_list_versions_accumulates_history_in_memory():
+    """같은 guide_id의 여러 버전이 이력으로 누적된다(전역 조회)."""
     svc = _svc_with_stub()
     svc.upload(guide_id="shared", version="vA", effective_date=None, change_summary="A",
-               content_bytes=b"a", actor_user_id="u", tenant_id="t1", filename="s.txt")
+               content_bytes=b"a", actor_user_id="u", filename="s.txt")
     svc.upload(guide_id="shared", version="vB", effective_date=None, change_summary="B",
-               content_bytes=b"b", actor_user_id="u", tenant_id="t2", filename="s.txt")
+               content_bytes=b"b", actor_user_id="u", filename="s.txt")
 
-    res_t1 = svc.list_versions("shared", tenant_id="t1")
-    res_t2 = svc.list_versions("shared", tenant_id="t2")
-    assert res_t1 is not None and res_t2 is not None
-    v_t1 = [v.version for v in res_t1.versions]
-    v_t2 = [v.version for v in res_t2.versions]
-    assert v_t1 == ["vA"]
-    assert v_t2 == ["vB"]
-    # 누수 없음: t1 조회에 t2의 vB가 보이면 안 됨
-    assert "vB" not in v_t1
-    assert "vA" not in v_t2
+    res = svc.list_versions("shared")
+    assert res is not None
+    versions = [v.version for v in res.versions]
+    assert versions == ["vA", "vB"]
 
 
-def test_list_versions_unknown_tenant_returns_none():
+def test_list_versions_unknown_guide_returns_none():
     svc = _svc_with_stub()
     svc.upload(guide_id="g", version="v", effective_date=None, change_summary=None,
-               content_bytes=b"x", actor_user_id="u", tenant_id="real", filename="g.txt")
-    # 존재하지 않는 테넌트로 조회하면 None (다른 테넌트 데이터 노출 금지)
-    assert svc.list_versions("g", tenant_id="ghost") is None
+               content_bytes=b"x", actor_user_id="u", filename="g.txt")
+    # 존재하지 않는 guide_id 조회하면 None
+    assert svc.list_versions("ghost") is None
 
 
-def test_guide_record_default_tenant_backward_compat():
-    """_GuideRecord.tenant_id 기본값은 'default' — 기존 호출 호환."""
+def test_guide_record_fields():
+    """_GuideRecord 기본 생성 — tenant 필드 없음(전역 네임스페이스)."""
     from lloydk.services.guide_service import _GuideRecord
 
     rec = _GuideRecord(
         guide_id="g", version="v", effective_date=None, change_summary=None,
         registered_at="now", indexed=False, embedding_vector_count=0,
     )
-    assert rec.tenant_id == "default"
+    assert rec.guide_id == "g"
+    assert not hasattr(rec, "tenant_id")

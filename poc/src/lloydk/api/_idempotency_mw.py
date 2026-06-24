@@ -27,22 +27,23 @@ _MUTATING = frozenset({"POST", "PUT", "PATCH"})
 
 
 def _principal_namespace(request: Request) -> str:
-    """멱등성 키 네임스페이스 — 교차 주체(테넌트/API키) 충돌·응답 replay 누출 차단.
+    """멱등성 키 네임스페이스 — 교차 주체(KL 자격) 충돌·응답 replay 누출 차단.
+
+    tenant 제거: 단일 고객사 엔진이라 교차고객 replay 위험이 없다(고객사 격리는
+    KL 포털 전담). 네임스페이스는 KL cred(Authorization/X-API-Key) 기준으로만 잡는다.
 
     이 미들웨어는 인증 의존성(require_auth)보다 **먼저** 실행되므로 그 시점엔
-    request.state.auth_tenant가 아직 비어 있다(rate_limit의 tenant_or_ip_key와 다른 제약).
-    따라서 미들웨어 시점에 가용한 자격증명 헤더(Authorization/X-API-Key) + X-Tenant-Id를
-    SHA-256으로 해시해 키 prefix로 쓴다. 같은 주체의 요청은 같은 헤더를 보내므로
-    네임스페이스가 일관되고(저장↔재현 매칭), 다른 주체는 다른 네임스페이스로 분리된다.
-    원시 비밀은 키에 노출하지 않는다(해시 16자만).
+    request.state.auth_*가 아직 비어 있다. 따라서 미들웨어 시점에 가용한 자격증명
+    헤더(Authorization/X-API-Key)를 SHA-256으로 해시해 키 prefix로 쓴다. 같은 주체의
+    요청은 같은 헤더를 보내므로 네임스페이스가 일관되고(저장↔재현 매칭) 다른 cred는
+    분리된다. 원시 비밀은 키에 노출하지 않는다(해시 16자만).
     """
     cred = (
         request.headers.get("authorization")
         or request.headers.get("x-api-key")
         or (request.client.host if request.client else "anon")
     )
-    tenant = request.headers.get("x-tenant-id") or ""
-    return hashlib.sha256(f"{cred}|{tenant}".encode()).hexdigest()[:16]
+    return hashlib.sha256(cred.encode()).hexdigest()[:16]
 
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
@@ -53,7 +54,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if not raw_key or request.method not in _MUTATING:
             return await call_next(request)
 
-        # 주체별 네임스페이스로 격리 — 교차테넌트 키 충돌·응답 replay 누출 차단.
+        # cred별 네임스페이스로 격리 — 교차 KL cred 키 충돌·응답 replay 누출 차단.
         key = f"{_principal_namespace(request)}:{raw_key}"
 
         # 지연 import — 미들웨어 로드 시점에 redis 연결을 강제하지 않음.

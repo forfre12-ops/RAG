@@ -12,7 +12,7 @@
 from collections import defaultdict
 from fastapi import APIRouter, Depends, Request
 
-from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
+from lloydk.api._jwt_auth import require_auth
 from lloydk.api.rate_limit import limiter
 from lloydk.schemas.classify import ClassifyRequest, ClassifyResponse
 from lloydk.services.classify_service import ClassifyService
@@ -89,9 +89,7 @@ def classify_explain(
 
     응답: ClassifyResponse + {explain: {evidence_aggregated, factor_decomposition}}
     """
-    # 보안(IDOR): /classify와 동일하게 body tenant_id를 인증 컨텍스트에 결속.
-    # 누락 시 위조한 tenant_id로 타 테넌트 문서·검증라벨·근거 토큰까지 노출된다.
-    req.tenant_id = resolve_effective_tenant(request, req.tenant_id)
+    # tenant 제거: 격리는 KL 포털 전담 → 무스코프 분류.
     result = svc.classify(req)
     body = result.model_dump(mode="json")
     body["explain"] = {

@@ -13,8 +13,8 @@
 설계 노트:
 - Service는 ``session_scope`` 컨텍스트를 직접 열거나, 외부 주입 세션을
   쓸 수 있도록 두 API 를 제공 (테스트 격리·기존 흐름 호환).
-- tenant_id는 모든 경로에서 강제 검증. cross-tenant 삭제는
-  ValueError 가 아닌 단순 0행 반환으로 처리 (정보 누출 방지).
+- tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). 삭제는 doc_id 단독으로
+  스코프하며, 없는 문서는 단순 0행 반환으로 멱등 처리한다.
 """
 
 from __future__ import annotations
@@ -56,7 +56,6 @@ class DocumentService:
         self,
         *,
         doc_id: uuid.UUID | str,
-        tenant_id: str,
         actor_id: Optional[str] = None,
         actor_role: Optional[str] = None,
         request_id: uuid.UUID | str | None = None,
@@ -66,7 +65,7 @@ class DocumentService:
         """Document + 종속 Chunk 트랜잭션 cascade 삭제.
 
         흐름(기본, soft=False — 물리삭제, 기존 동작 보존):
-          1) ChunkRepo.delete_by_doc_id  (tenant 격리 강제)
+          1) ChunkRepo.delete_by_doc_id  (doc_id 단독)
           2) DocumentRepo.delete         (없으면 0행 — idempotent)
           3) AuditRepo.record            (action=document.delete)
 
@@ -77,8 +76,6 @@ class DocumentService:
         논리 삭제 경로로 분기(opt-in). 청크/감사 행은 보존되며 조회에서만 숨는다.
         보존기간 만료 후 물리 회수(purge)는 별도 운영 잡 — 본 서비스 범위 밖.
         """
-        if not tenant_id:
-            raise ValueError("tenant_id is required for document delete")
         doc_uuid = self._coerce_uuid(doc_id)
 
         runner = self._soft_delete_with_session if soft else self._delete_with_session
@@ -87,7 +84,6 @@ class DocumentService:
             return runner(
                 db,
                 doc_id=doc_uuid,
-                tenant_id=tenant_id,
                 actor_id=actor_id,
                 actor_role=actor_role,
                 request_id=request_id,
@@ -97,7 +93,6 @@ class DocumentService:
             return runner(
                 scoped,
                 doc_id=doc_uuid,
-                tenant_id=tenant_id,
                 actor_id=actor_id,
                 actor_role=actor_role,
                 request_id=request_id,
@@ -107,7 +102,6 @@ class DocumentService:
         self,
         *,
         doc_id: uuid.UUID | str,
-        tenant_id: str,
         actor_id: Optional[str] = None,
         actor_role: Optional[str] = None,
         request_id: uuid.UUID | str | None = None,
@@ -120,7 +114,6 @@ class DocumentService:
         """
         return self.delete_document(
             doc_id=doc_id,
-            tenant_id=tenant_id,
             actor_id=actor_id,
             actor_role=actor_role,
             request_id=request_id,
@@ -133,7 +126,6 @@ class DocumentService:
         db: Session,
         *,
         doc_id: uuid.UUID,
-        tenant_id: str,
         actor_id: Optional[str],
         actor_role: Optional[str],
         request_id: uuid.UUID | str | None,
@@ -142,30 +134,28 @@ class DocumentService:
         doc_repo = DocumentRepo(db)
         audit_repo = AuditRepo(db)
 
-        chunks_deleted = chunk_repo.delete_by_doc_id(doc_id, tenant_id)
-        document_deleted = doc_repo.delete(doc_id, tenant_id)
+        chunks_deleted = chunk_repo.delete_by_doc_id(doc_id)
+        document_deleted = doc_repo.delete(doc_id)
 
         audit_repo.record(
             action="document.delete",
             actor_id=actor_id,
             actor_role=actor_role,
-            tenant_id=tenant_id,
             target_type="document",
             target_id=str(doc_id),
             request_id=request_id,
             payload={
                 "doc_id": str(doc_id),
-                "tenant_id": tenant_id,
                 "chunks_deleted": chunks_deleted,
                 "document_deleted": document_deleted,
             },
             success=document_deleted == 1,
-            error_code=None if document_deleted == 1 else "not_found_or_cross_tenant",
+            error_code=None if document_deleted == 1 else "not_found",
         )
 
         logger.info(
-            "document.delete: doc_id=%s tenant=%s chunks_deleted=%d doc_deleted=%d actor=%s",
-            doc_id, tenant_id, chunks_deleted, document_deleted, actor_id,
+            "document.delete: doc_id=%s chunks_deleted=%d doc_deleted=%d actor=%s",
+            doc_id, chunks_deleted, document_deleted, actor_id,
         )
 
         return DeleteDocumentResult(
@@ -179,7 +169,6 @@ class DocumentService:
         db: Session,
         *,
         doc_id: uuid.UUID,
-        tenant_id: str,
         actor_id: Optional[str],
         actor_role: Optional[str],
         request_id: uuid.UUID | str | None,
@@ -192,29 +181,27 @@ class DocumentService:
         doc_repo = DocumentRepo(db)
         audit_repo = AuditRepo(db)
 
-        document_deleted = doc_repo.soft_delete(doc_id, tenant_id)
+        document_deleted = doc_repo.soft_delete(doc_id)
 
         audit_repo.record(
             action="document.soft_delete",
             actor_id=actor_id,
             actor_role=actor_role,
-            tenant_id=tenant_id,
             target_type="document",
             target_id=str(doc_id),
             request_id=request_id,
             payload={
                 "doc_id": str(doc_id),
-                "tenant_id": tenant_id,
                 "document_deleted": document_deleted,
                 "soft": True,
             },
             success=document_deleted == 1,
-            error_code=None if document_deleted == 1 else "not_found_or_cross_tenant_or_already_deleted",
+            error_code=None if document_deleted == 1 else "not_found_or_already_deleted",
         )
 
         logger.info(
-            "document.soft_delete: doc_id=%s tenant=%s doc_deleted=%d actor=%s",
-            doc_id, tenant_id, document_deleted, actor_id,
+            "document.soft_delete: doc_id=%s doc_deleted=%d actor=%s",
+            doc_id, document_deleted, actor_id,
         )
 
         return DeleteDocumentResult(

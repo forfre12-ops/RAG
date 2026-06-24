@@ -154,10 +154,11 @@ def verify_chain(
     *,
     since: dt.datetime | None = None,
     until: dt.datetime | None = None,
-    tenant_id: str | None = None,
     limit: int = 10000,
 ) -> ChainVerificationResult:
     """audit_log 행을 occurred_at 순으로 읽으며 hash chain 검증.
+
+    tenant 제거: 격리는 KL 포털 전담 — 감사 체인은 항상 전역 단일 체인.
 
     Returns:
         ChainVerificationResult — broken>0이면 변조 의심.
@@ -169,8 +170,6 @@ def verify_chain(
                 q = q.where(AuditLog.occurred_at >= since)
             if until:
                 q = q.where(AuditLog.occurred_at <= until)
-            if tenant_id:
-                q = q.where(AuditLog.tenant_id == tenant_id)
             q = q.limit(limit)
             rows = list(db.execute(q).scalars())
     except SQLAlchemyError as e:
@@ -216,13 +215,14 @@ def _advisory_xact_lock(db) -> None:
         logger.debug("audit advisory lock skipped: %s", exc)
 
 
-def last_hash_in_session(db, tenant_id: str | None = None) -> str:
-    """제공된 세션(=같은 트랜잭션)에서 직전 chained full32를 읽는다 — race-free 체인용."""
+def last_hash_in_session(db) -> str:
+    """제공된 세션(=같은 트랜잭션)에서 직전 chained full32를 읽는다 — race-free 체인용.
+
+    tenant 제거: 격리는 KL 포털 전담 — 전역 단일 체인.
+    """
     q = select(AuditLog.payload_hash).order_by(
         AuditLog.occurred_at.desc(), AuditLog.audit_id.desc()
     )
-    if tenant_id:
-        q = q.where(AuditLog.tenant_id == tenant_id)
     row = db.execute(q.limit(1)).first()
     if not row or not row[0]:
         return ZERO16
@@ -230,25 +230,26 @@ def last_hash_in_session(db, tenant_id: str | None = None) -> str:
     return full32 or ZERO16
 
 
-def build_chained_hash_locked(db, body_hash: str, *, tenant_id: str | None = None) -> str:
+def build_chained_hash_locked(db, body_hash: str) -> str:
     """advisory lock → 같은 트랜잭션에서 prev 읽기 → 체인 패킹 (#4 race 수정).
 
     반환값을 **같은 트랜잭션에서** INSERT해야 race-free 단일 체인이 보장된다. lock은
-    트랜잭션 종료 시 자동 해제. 전역 체인이라 tenant_id=None(기본)으로 모든 audit insert를
-    직렬화한다(선형 해시 체인의 본질적 제약 — 병렬화하려면 per-tenant 체인 설계 필요).
+    트랜잭션 종료 시 자동 해제. 전역 단일 체인이 모든 audit insert를 직렬화한다(선형
+    해시 체인의 본질적 제약). tenant 제거: 격리는 KL 포털 전담.
     """
     _advisory_xact_lock(db)
-    prev = last_hash_in_session(db, tenant_id=tenant_id)
+    prev = last_hash_in_session(db)
     return build_chained_hash(body_hash, prev)
 
 
-def get_last_hash(tenant_id: str | None = None) -> str:
-    """가장 최근 audit_log row의 chained full32 — 다음 row의 prev 입력용."""
+def get_last_hash() -> str:
+    """가장 최근 audit_log row의 chained full32 — 다음 row의 prev 입력용.
+
+    tenant 제거: 격리는 KL 포털 전담 — 전역 단일 체인.
+    """
     try:
         with session_scope() as db:
             q = select(AuditLog.payload_hash).order_by(AuditLog.occurred_at.desc(), AuditLog.audit_id.desc())
-            if tenant_id:
-                q = q.where(AuditLog.tenant_id == tenant_id)
             row = db.execute(q.limit(1)).first()
     except SQLAlchemyError:
         return ZERO16

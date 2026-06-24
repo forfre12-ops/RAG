@@ -132,7 +132,6 @@ def compute_metrics_from_arrays(
 def compute_metrics_from_db(
     model_version: str,
     *,
-    tenant_id: str | None = None,
     labels: Sequence[str] | None = None,
 ) -> MetricsResult | None:
     """DB의 classifications + corrections로 진실 라벨 vs 예측 라벨 페어 추출.
@@ -146,7 +145,7 @@ def compute_metrics_from_db(
     """
     try:
         with session_scope() as db:
-            pairs = _fetch_truth_pred_pairs(db, model_version, tenant_id=tenant_id)
+            pairs = _fetch_truth_pred_pairs(db, model_version)
     except SQLAlchemyError:
         return None
 
@@ -213,8 +212,6 @@ def _fnr_underclass_from_cm(cm: np.ndarray, labels: Sequence[str]) -> tuple[floa
 def _fetch_truth_pred_pairs(
     db: Session,
     model_version: str,
-    *,
-    tenant_id: str | None = None,
 ) -> list[tuple[str, str]]:
     # level_id → code 매핑
     code_by_id = {
@@ -224,8 +221,6 @@ def _fetch_truth_pred_pairs(
 
     # classifications 조회
     stmt = select(Classification).where(Classification.model_version == model_version)
-    if tenant_id:
-        stmt = stmt.where(Classification.tenant_id == tenant_id)
     cls_list = list(db.execute(stmt).scalars())
     if not cls_list:
         return []

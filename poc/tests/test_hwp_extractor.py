@@ -82,7 +82,6 @@ class TestHwpCodePath:
             res = svc.ingest(
                 filename="guide.hwp",
                 content_bytes=hwp_bytes,
-                tenant_id="t1",
                 persist=False,
             )
 
@@ -90,7 +89,7 @@ class TestHwpCodePath:
         assert res.char_count > 0
         assert res.chunk_count >= 1
         # 원본 HWP 바이트가 보관됐는지
-        assert storage.get(svc.RAW_BUCKET, f"t1/{res.file_hash}/guide.hwp") == hwp_bytes
+        assert storage.get(svc.RAW_BUCKET, f"{res.file_hash}/guide.hwp") == hwp_bytes
 
 
 # ---------------------------------------------------------------------------
@@ -119,8 +118,8 @@ class TestHwpRealFixture:
 
         storage = LocalStorage(root=str(tmp_path / "store"))
         svc = DocumentIngestionService(storage=storage)
-        res = svc.ingest(filename=name, content_bytes=body, tenant_id="t1", persist=False)
+        res = svc.ingest(filename=name, content_bytes=body, persist=False)
 
         assert res.char_count > 0, f"ingestion 후 본문 없음: {res.warnings}"
         assert res.chunk_count >= 1
-        assert storage.get(svc.RAW_BUCKET, f"t1/{res.file_hash}/{name}") == body
+        assert storage.get(svc.RAW_BUCKET, f"{res.file_hash}/{name}") == body

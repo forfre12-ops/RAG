@@ -37,11 +37,11 @@ def _api_key() -> str:
 
 
 def _hdr(role: str = "kl_backend") -> dict:
+    # tenant 제거: 격리는 KL 포털 전담 — X-Tenant-Id 헤더 없음.
     return {
         "X-API-Key": _api_key(),
         "X-Actor-Id": "psh-runner",
         "X-Actor-Role": role,
-        "X-Tenant-Id": "default",
     }
 
 
@@ -76,7 +76,6 @@ def s1_sync_classify(ctx: ScenarioContext) -> None:
                     headers=_hdr(),
                     json={
                         "doc_id": f"psh-s1-{i}-{uuid.uuid4().hex[:6]}",
-                        "tenant_id": "default",
                         "content": content,
                         "use_rag": False,
                         "return_evidence": True,
@@ -262,7 +261,6 @@ def s3_confirm_relabel(ctx: ScenarioContext) -> None:
                 json={
                     "doc_id": str(_uuid.uuid4()),
                     "content": f"PSH S3 테스트 문서 {i}. 영업비밀 분류 시나리오 검수자 확정.",
-                    "tenant_id": "default",
                     "use_rag": False,
                 },
             )
@@ -802,112 +800,6 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
 
 
 # ----------------------------------------------------------------
-# S13. 멀티 테넌트 격리
-# ----------------------------------------------------------------
-
-def s13_tenant_isolation(ctx: ScenarioContext) -> None:
-    """tenant-a / tenant-b 가이드 + 분류 → 응답 본문 교차 노출 검증."""
-    make = _client_factory()
-    actor_a = {"user_id": "psh-tenant-a", "role": "admin"}
-    actor_b = {"user_id": "psh-tenant-b", "role": "admin"}
-
-    marker_a = f"ALPHA-{uuid.uuid4().hex[:6]}"
-    marker_b = f"BRAVO-{uuid.uuid4().hex[:6]}"
-    body_a = f"tenant-A 전용 특급기밀 분류 규정 {marker_a} — 식별자 노출 금지"
-    body_b = f"tenant-B 전용 분류 가이드 {marker_b} — 다른 테넌트 노출 금지"
-
-    def _hdr_for(tenant: str) -> dict:
-        from lloydk.config import settings as _s
-
-        return {
-            "X-API-Key": _s.api_key,
-            "X-Actor-Id": f"psh-{tenant}",
-            "X-Actor-Role": "admin",
-            "X-Tenant-Id": tenant,
-        }
-
-    exposure_count = 0
-    isolation_ok = True
-    gid_a = f"psh-tn-a-{uuid.uuid4().hex[:6]}"
-    gid_b = f"psh-tn-b-{uuid.uuid4().hex[:6]}"
-
-    with make() as cli:
-        cli.post(
-            "/api/v1/guide/documents",
-            headers=_hdr_for("tenant-a"),
-            data={
-                "guide_id": gid_a,
-                "version": "v1.0",
-                "effective_date": "2026-06-01",
-                "actor": json.dumps(actor_a),
-                "doc_type": "guideline",
-            },
-            files={"file": ("a.txt", io.BytesIO(body_a.encode("utf-8")), "text/plain")},
-        )
-        cli.post(
-            "/api/v1/guide/documents",
-            headers=_hdr_for("tenant-b"),
-            data={
-                "guide_id": gid_b,
-                "version": "v1.0",
-                "effective_date": "2026-06-01",
-                "actor": json.dumps(actor_b),
-                "doc_type": "guideline",
-            },
-            files={"file": ("b.txt", io.BytesIO(body_b.encode("utf-8")), "text/plain")},
-        )
-
-        # tenant-b가 자기 가이드 조회 → tenant-a 식별자 노출되면 안 됨
-        rb_list = cli.get(f"/api/v1/guide/documents/{gid_b}", headers=_hdr_for("tenant-b"))
-        if rb_list.status_code == 200:
-            payload = rb_list.text
-            exposure_count += payload.count(marker_a)
-            exposure_count += payload.count("tenant-A 전용")
-
-        # tenant-b 분류 호출 (use_rag=true) → evidence에 tenant-a 식별자 노출되면 안 됨
-        cls_b = cli.post(
-            "/api/v1/classify",
-            headers=_hdr_for("tenant-b"),
-            json={
-                "doc_id": f"psh-s13-{uuid.uuid4().hex[:6]}",
-                "tenant_id": "tenant-b",
-                "content": "이 문서는 분류 규정에 따라 평가됩니다.",
-                "use_rag": True,
-                "return_evidence": True,
-            },
-        )
-        if cls_b.status_code == 200:
-            evidence_txt = json.dumps(cls_b.json(), ensure_ascii=False)
-            exposure_count += evidence_txt.count(marker_a)
-            exposure_count += evidence_txt.count(gid_a)
-
-        # tenant-a 가이드를 tenant-b가 직접 조회 — 격리 OK면 본문 또는 marker_a 노출 X
-        cross_get = cli.get(f"/api/v1/guide/documents/{gid_a}", headers=_hdr_for("tenant-b"))
-        if cross_get.status_code == 200 and marker_a in cross_get.text:
-            isolation_ok = False
-            exposure_count += 1
-
-    ctx.record("s13_1", exposure_count)
-    ctx.record("s13_3", isolation_ok)
-
-    # audit tenant_id 정합 — PG 필요
-    if ctx.resources.pg:
-        try:
-            from lloydk.db import session_scope  # type: ignore
-            from lloydk.repositories import AuditRepo  # type: ignore
-
-            with session_scope() as db:
-                rows_a = AuditRepo(db).recent_for_actor("psh-tenant-a") or []
-                rows_b = AuditRepo(db).recent_for_actor("psh-tenant-b") or []
-            for row in rows_a:
-                ctx.record("s13_2", getattr(row, "tenant_id", None) == "tenant-a")
-            for row in rows_b:
-                ctx.record("s13_2", getattr(row, "tenant_id", None) == "tenant-b")
-        except Exception:
-            pass
-
-
-# ----------------------------------------------------------------
 # S10. RAG 인용 충실도 — evidence가 입력 본문에 존재하는가
 # ----------------------------------------------------------------
 
@@ -1056,7 +948,7 @@ def s16_auth_rejection(ctx: ScenarioContext) -> None:
         r_missing = cli.post(
             "/api/v1/classify",
             headers={
-                "X-Actor-Id": "psh", "X-Actor-Role": "kl_backend", "X-Tenant-Id": "default",
+                "X-Actor-Id": "psh", "X-Actor-Role": "kl_backend",
             },
             json=payload,
         )
@@ -1097,14 +989,12 @@ def s17_audit_log(ctx: ScenarioContext) -> None:
     make = _client_factory()
     actor_id = f"psh-s17-{uuid.uuid4().hex[:8]}"
     actor_role = "kl_backend"
-    tenant = "default"
     n_calls = 5
 
     headers = {
         "X-API-Key": _api_key(),
         "X-Actor-Id": actor_id,
         "X-Actor-Role": actor_role,
-        "X-Tenant-Id": tenant,
     }
     with make() as cli:
         for i in range(n_calls):
@@ -1372,7 +1262,6 @@ SPECS: list[ScenarioSpec] = [
     ScenarioSpec("S8", "운영 지표·CM", s8_metrics),
     ScenarioSpec("S9", "적대적 문서 FNR 스트레스", s9_adversarial),
     ScenarioSpec("S11", "부하 (Concurrent Stress)", s11_concurrent_stress),
-    ScenarioSpec("S13", "멀티 테넌트 격리", s13_tenant_isolation),
     ScenarioSpec("S10", "RAG 인용 충실도", s10_rag_evidence),
     ScenarioSpec("S16", "권한·인증 거부", s16_auth_rejection),
     ScenarioSpec("S17", "감사 로그 무결성", s17_audit_log, requires=["pg"]),

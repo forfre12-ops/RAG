@@ -6,7 +6,7 @@ RAG 검색(/answer)은 별도 벡터 컬렉션을 조회하므로, 업로드 문
 
 설계 원칙:
 - 평가 코퍼스("docs")를 오염시키지 않도록 **별도 컬렉션**(호출자가 지정)에 적재한다.
-- payload에 tenant_id를 넣어 /answer의 tenant 필터(filter={"tenant_id": ...})와 정합.
+- tenant 제거: 격리는 KL 포털 전담 — payload에 tenant 스코프 없음(무스코핑 전역 검색).
 - chunks는 (chunk_index, text) 시퀀스로 주입 → DB 비의존, 단위 테스트 격리 가능.
 - 임베딩/스토어 실패는 indexed=False + warnings로 조용히 반환(업로드 자체는 성공 유지).
 """
@@ -34,7 +34,6 @@ class DocIndexResult:
 def index_document_for_rag(
     *,
     doc_id: str,
-    tenant_id: str,
     collection: str,
     chunks: Sequence[tuple[int, str]],
     store=None,
@@ -44,7 +43,6 @@ def index_document_for_rag(
 
     Args:
         doc_id: 문서 식별자(검색 결과 doc_id/citation에 사용).
-        tenant_id: payload에 기록 → tenant 필터 정합.
         collection: 적재 대상 검색 컬렉션(평가용 "docs"와 분리할 것).
         chunks: (chunk_index, text) 시퀀스.
         store/embedder: 미주입 시 build_store()/build_embedder() 기본 결정.
@@ -116,7 +114,6 @@ def index_document_for_rag(
         {
             "doc_id": str(doc_id),
             "chunk_idx": idx,
-            "tenant_id": tenant_id,
             "text": txt,
             "heading_path": heading_path,
         }

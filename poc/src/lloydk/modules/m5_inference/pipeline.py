@@ -789,26 +789,9 @@ class InferencePipeline:
                 logger.debug("encode_batch failed: %s", exc)
                 return []
 
-        # 테넌트 격리는 fail-CLOSED. 호출자가 멀티테넌트 컨텍스트를 신호(metadata dict
-        # 전달)했는데 tenant_id가 비어 있으면 — 테넌트가 '미확정'이므로 무격리 검색으로
-        # 떨어뜨리지 않고 빈 컨텍스트를 반환한다(교차테넌트 유출 차단). 분류 본문은
-        # run()에서 graceful degradation으로 그대로 진행되고 RAG context만 비게 된다.
-        #
-        # 구분:
-        #   metadata is None  → 멀티테넌트 미관여(단일테넌트/레거시 호출). 필터 없이 검색.
-        #   metadata == {}    → 동일하게 미관여로 본다(빈 컨텍스트 시그널 없음).
-        #   metadata = {...} (tenant_id 없음/빈값) → 멀티테넌트 요청인데 테넌트 분실 →
-        #                       fail-CLOSED(빈 컨텍스트). 이게 H8이 막으려는 fail-open 경로.
+        # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진이라 per-customer 경계 없음).
+        # 무스코핑 전역 검색 — filter 없음.
         filter_ = None
-        if isinstance(metadata, dict) and metadata:
-            tenant = metadata.get("tenant_id")
-            if not tenant or not str(tenant).strip():
-                logger.warning(
-                    "rag_context: tenant_id undetermined in a populated metadata context — "
-                    "returning empty context (fail-closed) to prevent cross-tenant leakage"
-                )
-                return []
-            filter_ = {"tenant_id": tenant}
 
         try:
             hits = expand_then_search(

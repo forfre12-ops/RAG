@@ -44,10 +44,10 @@ class GoldenBuildService:
         self.jobs.create(
             job_id,
             payload={
+                # tenant 제거: 격리는 KL 포털 전담 — 골든 빌드 잡은 전역 네임스페이스.
                 "kind": "golden_build",
                 "source_type": req.source_type,
                 "actor": req.actor.user_id,
-                "tenant_id": req.actor.tenant_id,
                 "submitted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             },
         )

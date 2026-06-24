@@ -164,29 +164,6 @@ def test_build_rag_context_uses_namespace_collection():
     assert "docs" in seen_collection
 
 
-def test_build_rag_context_metadata_tenant_id_becomes_filter():
-    """metadata.tenant_id가 retrieval filter로 전달."""
-    store = _populated_store()
-    embedder = _FakeEmbedder()
-
-    captured_filters: list = []
-    original = store.search_hybrid
-
-    def spy(*, collection, query_text, query_vec, top_k, filter=None, **kwargs):
-        captured_filters.append(filter)
-        return original(collection=collection, query_text=query_text,
-                        query_vec=query_vec, top_k=top_k, filter=filter, **kwargs)
-
-    store.search_hybrid = spy  # type: ignore[method-assign]
-
-    with patch("lloydk.adapters.vectorstore.build_store", return_value=store):
-        with patch("lloydk.adapters.embedding.build_embedder", return_value=embedder):
-            pipe = InferencePipeline()
-            pipe._build_rag_context(query="M&A", namespace=None, metadata={"tenant_id": "tenantX"})
-
-    assert any(f and f.get("tenant_id") == "tenantX" for f in captured_filters)
-
-
 def test_build_rag_context_searchhit_to_rag_context_hit_conversion():
     """SearchHit → RagContextHit 변환: source_doc은 payload.doc_id 우선."""
     store = _populated_store()

@@ -246,10 +246,7 @@ class _RecordingClassifyRepo:
     def __init__(self, db):
         self.db = db
 
-    def tenant_exists(self, tenant_id):
-        return True
-
-    def document_exists(self, doc_id, tenant_id=None):
+    def document_exists(self, doc_id):
         return True
 
     def level_id_by_code(self, code):
@@ -300,7 +297,6 @@ def test_evidence_failure_does_not_discard_classification(monkeypatch):
 
     class _Req:
         doc_id = "12345678-1234-5678-1234-567812345678"
-        tenant_id = "t-1"
 
     cid, warns = svc._try_persist(_Req(), _Pred(), chunks=[])  # noqa: SLF001
 
@@ -339,7 +335,6 @@ def test_classification_returned_when_no_evidence(monkeypatch):
 
     class _Req:
         doc_id = "12345678-1234-5678-1234-567812345678"
-        tenant_id = "t-1"
 
     cid, warns = svc._try_persist(_Req(), _Pred(), chunks=[])  # noqa: SLF001
     assert cid == _RecordingClassifyRepo.created_classification_id

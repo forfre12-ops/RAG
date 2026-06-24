@@ -166,7 +166,8 @@ def setup_logging() -> bool:
                 if val:
                     payload["trace_id" if fld == "otelTraceID" else "span_id"] = val
             # 도메인 식별자 — extra로 들어온 경우만(있을 때만).
-            for fld in ("tenant_id", "job_id"):
+            # tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), tenant_id 로깅 없음.
+            for fld in ("job_id",):
                 val = getattr(record, fld, None)
                 if val is not None:
                     payload[fld] = val

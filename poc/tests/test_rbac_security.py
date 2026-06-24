@@ -121,7 +121,7 @@ def test_require_role_multi_role_intersection():
 
 def test_jwt_claims_roles_wiring():
     """verify_jwt 결과 형태 모사: VALID_ROLES만 채택돼 actor_role에 반영되는지."""
-    claims = JWTClaims(sub="u1", tenant="t1", roles=("admin", "garbage"))
+    claims = JWTClaims(sub="u1", roles=("admin", "garbage"))
     valid = tuple(r for r in claims.roles if r in _jwt_auth.VALID_ROLES)
     assert valid == ("admin",)
     assert _highest_role(valid) == "admin"

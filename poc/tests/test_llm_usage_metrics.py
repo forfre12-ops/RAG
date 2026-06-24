@@ -42,7 +42,6 @@ def test_record_increments_token_and_cost_counters():
     _svc().record(
         UsageRecord(provider=p, model=m, input_tokens=120, output_tokens=45, cost_usd=0.0021),
         purpose=purpose,
-        tenant_id="t1",
     )
 
     assert _v(LLM_TOKENS_TOTAL, (p, m, purpose, "input")) == before_in + 120

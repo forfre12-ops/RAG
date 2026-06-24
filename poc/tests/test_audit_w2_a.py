@@ -191,7 +191,7 @@ def test_mrenorm_source_prior_cap_keeps_consistency(monkeypatch):
     monkeypatch.setattr(pipe.labeling.engine, "label", lambda _t: _RuleRes())
 
     res = pipe.run(text="공개 판례 본문", use_rag=False,
-                   metadata={"tenant_id": "t1", "source": "court_decision"})
+                   metadata={"source": "court_decision"})
 
     assert res.label == Grade.S3, "공개 출처는 S3로 cap (비공지성 게이트)"
     assert max(res.scores, key=res.scores.get) == "S3"

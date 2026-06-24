@@ -1,8 +1,8 @@
 """API Rate-limit — slowapi 기반.
 
 설계:
-- key_func: 검증된 신원(request.state.auth_tenant→auth_actor) 우선, 없으면 IP 폴백
-  (위조 가능한 원시 X-Tenant-Id 헤더는 키로 쓰지 않음 — 한도 우회/버킷 고갈 차단)
+- key_func: 검증된 신원(request.state.auth_actor=KL cred) 우선, 없으면 IP 폴백
+  (tenant 제거: 단일 KL 인증이라 버킷은 KL cred/actor 기준; 격리는 KL 포털 전담)
 - 라우터별 다른 한도 (분당 60/10, 시간당 10 등) — 데코레이터로 명시
 - RATE_LIMIT_DISABLED=1 → 모든 한도 비활성 (테스트·dryrun 환경 보호)
 - TestClient는 host 헤더가 "testclient"라 IP 충돌 가능 → 환경변수 자동 비활성 권장
@@ -26,23 +26,18 @@ def _is_disabled() -> bool:
     return val in {"1", "true", "yes", "on"}
 
 
-def tenant_or_ip_key(request: Request) -> str:
-    """rate-limit 키 — 검증된 신원 우선, 없으면 IP.
+def cred_or_ip_key(request: Request) -> str:
+    """rate-limit 키 — 검증된 KL 자격(actor) 우선, 없으면 IP.
 
-    M-ratelimit-key (Track B): 과거 구현은 검증 안 된 원시 X-Tenant-Id 헤더를 키로
-    썼다. 공격자가 임의의 X-Tenant-Id를 위조하면 매 요청마다 새 버킷을 차지해 한도를
-    우회하거나, 거꾸로 피해 테넌트의 헤더를 흉내내 그 버킷을 고갈시킬 수 있다.
+    tenant 제거: 단일 고객사 엔진이라 per-tenant 버킷 개념이 없다. 버킷은 검증된
+    KL cred(actor/API키 기준)로 잡고, 미인증이면 IP로 폴백한다.
 
-    수정: 인증이 해소한 *authoritative* 신원만 키로 쓴다.
-      1) request.state.auth_tenant — JWT claim(서명됨) 또는 hash 검증된 api_key tenant.
-         require_auth 의존성이 이 값을 채운다(_jwt_auth._stash_auth). 미검증 X-Tenant-Id
-         헤더는 여기 들어오지 않으므로 위조 불가.
-      2) request.state.auth_actor — 검증된 actor(주로 JWT sub).
-      3) 그 외(미인증·검증불가) → 클라이언트 IP. 검증 불가 헤더를 단독 키로 쓰지 않는다.
+    M-ratelimit-key (Track B): 키는 *authoritative* 신원만 쓴다(위조 가능한 원시
+    헤더 금지 — 한도 우회/버킷 고갈 차단).
+      1) request.state.auth_actor — 검증된 actor(JWT sub). api_key 모드는 단일 KL
+         공유키라 actor가 비어 IP 폴백으로 자연 수렴(KL=단일 호출자).
+      2) 그 외(미인증) → 클라이언트 IP. 검증 불가 헤더를 단독 키로 쓰지 않는다.
     """
-    auth_tenant = getattr(request.state, "auth_tenant", None)
-    if auth_tenant:
-        return f"tenant:{auth_tenant}"
     auth_actor = getattr(request.state, "auth_actor", None)
     if auth_actor:
         return f"actor:{auth_actor}"
@@ -66,7 +61,7 @@ def _resolve_config_filename() -> str | None:
 
 
 limiter = Limiter(
-    key_func=tenant_or_ip_key,
+    key_func=cred_or_ip_key,
     default_limits=["120/minute"],
     enabled=not _is_disabled(),
     headers_enabled=False,

@@ -7,7 +7,7 @@
 
     indexer = RagIndexer()  # settings 기반 자동 결정
     result = indexer.index_guide(
-        guide_id="doc-001", version="v1", tenant_id="acme", text="..."
+        guide_id="doc-001", version="v1", text="..."
     )
 """
 
@@ -45,8 +45,9 @@ class IndexResult:
 class RagIndexer:
     """문서 텍스트를 벡터스토어에 적재하는 범용 인덱서.
 
-    인덱스 명명 패턴: `{collection_prefix}-{tenant_id}-{model}-{version}`
+    인덱스 명명 패턴: `{collection_prefix}-{model}-{version}`
     alias로 라우팅 → Blue/Green 무중단 스왑 지원.
+    (tenant 제거: 격리는 KL 포털 전담 — 단일 고객사 엔진이라 인덱스명 per-customer 분리 불요)
 
     부품 주입형 — 테스트에서는 InMemoryStore + HashEmbedding으로 격리.
     운영에서는 build_store()/build_embedder()의 기본 결정.
@@ -76,7 +77,6 @@ class RagIndexer:
         *,
         guide_id: str,
         version: str,
-        tenant_id: str,
         text: str,
         doc_type: str | None = None,
         effective_date: str | None = None,
@@ -91,7 +91,7 @@ class RagIndexer:
         조용히 반환하고 warnings에 사유 누적.
         """
         warns: list[str] = []
-        alias = self._alias_name(tenant_id)
+        alias = self._alias_name()
         model_safe = _safe_token(self.embedder.name if hasattr(self.embedder, "name") else "emb")
         version_safe = _safe_token(version)
         new_index = f"{alias}-{model_safe}-{version_safe}"
@@ -155,7 +155,6 @@ class RagIndexer:
                 "id": ids[i],
                 "doc_id": guide_id,
                 "chunk_idx": i,
-                "tenant_id": tenant_id,
                 "doc_type": doc_type,
                 "version": version,
                 "effective_date": effective_date,
@@ -202,9 +201,9 @@ class RagIndexer:
             warnings=warns,
         )
 
-    def _alias_name(self, tenant_id: str) -> str:
-        safe = _safe_token(tenant_id)
-        return f"{self.collection_prefix}-{safe}"
+    def _alias_name(self) -> str:
+        # tenant 제거: 격리는 KL 포털 전담 — alias는 collection_prefix 단일값.
+        return f"{self.collection_prefix}"
 
     def _current_alias_target(self, alias: str) -> str | None:
         # 비-ES 스토어(PgVectorStore 등)는 current_alias_target 훅을 제공 — ES `_client`
@@ -244,11 +243,10 @@ def _safe_token(value: str) -> str:
     safe = safe.strip("-._")
     if not safe:
         safe = hashlib.sha1(value.encode("utf-8")).hexdigest()[:8]
-    # #37 (멀티테넌트 인덱스명 충돌): 50자 truncation이 실제로 일어나면
-    #      앞 50자가 같은 서로 다른 tenant/version이 같은 인덱스/alias로 붕괴해
-    #      보안 제품의 데이터 격리가 깨진다. truncation이 발생한 경우에 한해
-    #      원본(value)의 짧은 해시 suffix를 부착해 항상 유일성을 보장한다.
-    #      (truncation이 없으면 suffix 미부착 — 기존 인덱스명 그대로 보존, 비파괴.)
+    # #37 (인덱스명 충돌): 50자 truncation이 실제로 일어나면 앞 50자가 같은
+    #      서로 다른 model/version이 같은 인덱스/alias로 붕괴할 수 있다. truncation이
+    #      발생한 경우에 한해 원본(value)의 짧은 해시 suffix를 부착해 항상 유일성을
+    #      보장한다. (truncation이 없으면 suffix 미부착 — 기존 인덱스명 그대로 보존, 비파괴.)
     if len(safe) > _TOKEN_MAX_LEN:
         suffix = hashlib.sha1(value.encode("utf-8")).hexdigest()[:_HASH_SUFFIX_LEN]
         head_len = _TOKEN_MAX_LEN - _HASH_SUFFIX_LEN - 1  # "-" 1자 확보

@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import time
-import uuid
 
 import pytest
 
@@ -44,11 +43,12 @@ def _es_ok() -> bool:
         return False
 
 
-def _purge_test_prefix(prefix: str = "secrets-guides-t") -> None:
+def _purge_test_prefix(prefix: str = "secrets-guides-hash-") -> None:
     """테스트 시작 전 잔재 인덱스/alias 일괄 정리.
 
-    `secrets-guides-t<6hex>-*` 패턴은 본 테스트 모듈만 생성하는 unique tenant.
-    다른 차원의 매핑이 잔존하면 매핑 충돌이 발생하므로, 매 세션 시작 시 wipe.
+    `secrets-guides-hash-*` 패턴은 본 테스트 모듈만 생성(HashEmbedding 모델 토큰).
+    실 운영 인덱스(kure 등)는 건드리지 않는다. 다른 차원의 매핑이 잔존하면
+    매핑 충돌이 발생하므로, 매 세션 시작 시 wipe.
     """
     if not _es_ok():
         return
@@ -101,13 +101,13 @@ class TestInMemoryFlow:
     def test_index_short_text_one_chunk(self):
         text = "본 가이드는 영업비밀의 등급 분류 기준을 정의한다."
         r = self._make().index_guide(
-            guide_id="g1", version="v1.0", tenant_id="koipa", text=text,
+            guide_id="g1", version="v1.0", text=text,
         )
         assert isinstance(r, IndexResult)
         assert r.indexed is True
         assert r.chunk_count >= 1
         assert r.vector_count == r.chunk_count
-        assert r.alias == "secrets-guides-koipa"
+        assert r.alias == "secrets-guides"
         assert r.index_name.startswith(r.alias)
         assert r.model == "hash"
         assert r.warnings == []
@@ -115,23 +115,23 @@ class TestInMemoryFlow:
     def test_index_long_text_multiple_chunks(self):
         # 청크 분할이 작동하도록 길게
         text = "한 단락 본문. " * 300
-        r = self._make().index_guide(guide_id="g2", version="v2.0", tenant_id="koipa", text=text)
+        r = self._make().index_guide(guide_id="g2", version="v2.0", text=text)
         assert r.indexed is True
         assert r.chunk_count >= 2
         assert r.vector_count == r.chunk_count
 
     def test_empty_text_returns_not_indexed(self):
-        r = self._make().index_guide(guide_id="g3", version="v1", tenant_id="koipa", text="")
+        r = self._make().index_guide(guide_id="g3", version="v1", text="")
         assert r.indexed is False
         assert r.chunk_count == 0
         assert any("no chunks" in w for w in r.warnings)
 
     def test_index_name_includes_safe_tokens(self):
         r = self._make().index_guide(
-            guide_id="g4", version="V 2.1!", tenant_id="KL Inc.", text="간단 본문 " * 50,
+            guide_id="g4", version="V 2.1!", text="간단 본문 " * 50,
         )
-        # tenant_id KL Inc. → kl-inc, version V 2.1! → v-2.1
-        assert "kl-inc" in r.alias
+        # version V 2.1! → v-2.1 (인덱스명 safe-token)
+        assert r.alias == "secrets-guides"
         assert "v-2.1" in r.index_name
 
 
@@ -146,23 +146,22 @@ class TestEsFlow:
         if not _es_ok():
             pytest.skip("Elasticsearch not reachable on :9200")
         # 잔재 인덱스(이전 실패 run, 다른 차원 매핑 등) 일괄 정리
-        _purge_test_prefix("secrets-guides-t")
+        _purge_test_prefix("secrets-guides-hash-")
 
     def teardown_method(self):
         # 후속 다른 모듈에 영향 없도록 다시 정리
-        _purge_test_prefix("secrets-guides-t")
+        _purge_test_prefix("secrets-guides-hash-")
 
     def test_full_index_and_alias_swap(self):
         from lloydk.adapters.vectorstore import build_store
 
         store = build_store(backend="es")
         idx = RagIndexer(store=store, embedder=HashEmbedding(dim=1024))
-        tenant = f"t{uuid.uuid4().hex[:6]}"
         text = "본 가이드는 영업비밀의 등급 분류 기준을 정의한다. " * 50
 
         try:
             r = idx.index_guide(
-                guide_id="es-guide-1", version="v1.0", tenant_id=tenant, text=text,
+                guide_id="es-guide-1", version="v1.0", text=text,
             )
             assert r.indexed is True
             assert r.chunk_count >= 1
@@ -197,16 +196,15 @@ class TestEsFlow:
 
         store = build_store(backend="es")
         idx = RagIndexer(store=store, embedder=HashEmbedding(dim=1024))
-        tenant = f"t{uuid.uuid4().hex[:6]}"
         text = "본문 한 줄. " * 50
 
         created_indices: list[str] = []
         try:
-            r1 = idx.index_guide(guide_id="g-bg", version="v1.0", tenant_id=tenant, text=text)
+            r1 = idx.index_guide(guide_id="g-bg", version="v1.0", text=text)
             created_indices.append(r1.index_name)
             assert r1.indexed is True
 
-            r2 = idx.index_guide(guide_id="g-bg", version="v2.0", tenant_id=tenant, text=text)
+            r2 = idx.index_guide(guide_id="g-bg", version="v2.0", text=text)
             created_indices.append(r2.index_name)
             assert r2.indexed is True
             assert r2.index_name != r1.index_name
@@ -252,7 +250,7 @@ class TestGuideServiceBinding:
             guide_id="g-x", version="v1.0",
             effective_date="2026-06-01", change_summary="initial",
             content_bytes=("본 가이드 본문. " * 100).encode("utf-8"),
-            actor_user_id="u-1", tenant_id="koipa", doc_type="guideline",
+            actor_user_id="u-1", doc_type="guideline",
         )
         assert res.indexed is True
         assert res.embedding_vector_count >= 1

@@ -36,7 +36,6 @@ def _hdr() -> dict:
         "X-API-Key": _api_key(),
         "X-Actor-Id": "test-uploader",
         "X-Actor-Role": "kl_backend",
-        "X-Tenant-Id": "default",
     }
 
 
@@ -51,7 +50,7 @@ def client():
 
 @pytest.fixture
 def actor_json() -> str:
-    return json.dumps({"user_id": "test-uploader", "role": "kl_backend", "tenant_id": "default"})
+    return json.dumps({"user_id": "test-uploader", "role": "kl_backend"})
 
 
 class TestGuideUploadLimit:

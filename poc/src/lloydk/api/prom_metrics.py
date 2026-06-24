@@ -87,7 +87,8 @@ RULE_FALLBACK_TOTAL = Counter(
 CLASSIFY_PERSIST_FAILURE_TOTAL = Counter(
     "lloydk_classify_persist_failure_total",
     "Classify persistence failures (DB unavailable or error, inference_id is ephemeral UUID)",
-    ["reason"],  # db_error | unexpected | no_tenant | no_doc | no_level | import_error
+    # tenant 제거: 'no_tenant' reason 라벨 폐기(단일 고객사 엔진, tenant 스코프 없음).
+    ["reason"],  # db_error | unexpected | no_doc | no_level | import_error
     registry=registry,
 )
 
@@ -133,7 +134,8 @@ EMBEDDING_CACHE_MISS_TOTAL = Counter(
 )
 
 # LLM 토큰·비용 관측성 — LLMUsageService.record()가 모든 호출에서 갱신.
-# 라벨 카디널리티: provider/model/purpose는 유한 집합. tenant_id는 폭증 위험이라 제외.
+# 라벨 카디널리티: provider/model/purpose는 유한 집합.
+# tenant 제거: LLM 비용은 전역 집계(단일 고객사 엔진, tenant 태그 없음).
 LLM_TOKENS_TOTAL = Counter(
     "lloydk_llm_tokens_total",
     "LLM tokens consumed",

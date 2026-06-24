@@ -6,7 +6,6 @@ from .common import FactorRegistry, Grade
 
 class DocumentInput(BaseModel):
     doc_id: str
-    tenant_id: Optional[str] = None
     title: Optional[str] = None
     content: Optional[str] = Field(default=None, max_length=1_048_576)
     metadata: Optional[dict] = None

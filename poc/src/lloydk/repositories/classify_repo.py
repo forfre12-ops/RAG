@@ -19,7 +19,6 @@ from lloydk.db.models import (
     Correction,
     Document,
     DocumentLabel,
-    Tenant,
 )
 from lloydk.schemas.classify import EvidenceSpan, RagContextHit
 from lloydk.schemas.common import Grade
@@ -43,22 +42,12 @@ class ClassifyRepo:
     # Lookup helpers
     # ------------------------------------------------------------
 
-    def tenant_exists(self, tenant_id: str) -> bool:
-        return self.db.get(Tenant, tenant_id) is not None
-
-    def document_exists(self, doc_id: uuid.UUID, tenant_id: str | None = None) -> bool:
+    def document_exists(self, doc_id: uuid.UUID) -> bool:
         """문서 존재 확인.
 
-        보안: tenant_id가 주어지면 그 tenant 소유일 때만 True(객체 수준 권한).
-        교차테넌트 doc_id로 분류가 엉뚱한 tenant 밑에 영속화(orphan)되는 것을 차단.
-        tenant_id=None은 하위호환(스코프 미적용).
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
         """
-        doc = self.db.get(Document, doc_id)
-        if doc is None:
-            return False
-        if tenant_id is not None and doc.tenant_id != tenant_id:
-            return False
-        return True
+        return self.db.get(Document, doc_id) is not None
 
     def level_id_by_code(self, code: Grade | str) -> int | None:
         """Grade 열거형 또는 코드 문자열을 level_id로 변환."""
@@ -78,7 +67,6 @@ class ClassifyRepo:
         self,
         *,
         doc_id: uuid.UUID,
-        tenant_id: str,
         model_version: str,
         predicted_level_id: int,
         confidence: float,
@@ -92,7 +80,6 @@ class ClassifyRepo:
     ) -> Classification:
         cls = Classification(
             doc_id=doc_id,
-            tenant_id=tenant_id,
             model_version=model_version,
             predicted_level_id=predicted_level_id,
             confidence=confidence,
@@ -221,21 +208,17 @@ class ClassifyRepo:
         self,
         doc_id: uuid.UUID,
         *,
-        tenant_id: str | None = None,
         limit: int = 10,
         for_update: bool = False,
     ) -> list[Classification]:
         """doc_id의 최근 분류 결과.
 
-        보안: tenant_id가 주어지면 그 tenant의 분류만 반환(교차테넌트 결과 열람 차단).
-        tenant_id=None은 하위호환(스코프 미적용).
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
 
         for_update=True면 반환 행을 잠근다(동시 검수 확정 직렬화). doc_id 경로의
         confirm/relabel이 최신 분류 1건을 안전하게 갱신하도록 쓴다.
         """
         stmt = select(Classification).where(Classification.doc_id == doc_id)
-        if tenant_id is not None:
-            stmt = stmt.where(Classification.tenant_id == tenant_id)
         stmt = stmt.order_by(Classification.classified_at.desc()).limit(limit)
         if for_update:
             stmt = stmt.with_for_update()
@@ -270,16 +253,14 @@ class ClassifyRepo:
     # ------------------------------------------------------------
 
     def get_verified_document_label(
-        self, doc_id: uuid.UUID, *, tenant_id: str | None = None
+        self, doc_id: uuid.UUID
     ) -> DocumentLabel | None:
         """doc_id에 대한 검증된 라벨 조회 (is_verified=True 우선).
 
         human_review → llm_judge_consensus → llm_judge_primary 우선순위로 반환.
         없으면 None → 모델 추론으로 계속 진행.
 
-        보안: tenant_id가 주어지면 그 tenant 소유 문서의 라벨만 반환(Document 조인).
-        DocumentLabel은 자체 tenant_id가 없으므로 documents.tenant_id로 스코프한다.
-        교차테넌트 검증 등급(human_review 결과) 유출 차단. tenant_id=None은 하위호환.
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
         """
         _LABEL_SOURCE_PRIORITY = {
             "human_review": 1,
@@ -297,10 +278,6 @@ class ClassifyRepo:
             else DocumentLabel.is_verified.is_(True)
         )
         stmt = select(DocumentLabel).where(DocumentLabel.doc_id == doc_id).where(verified_cond)
-        if tenant_id is not None:
-            stmt = stmt.join(Document, DocumentLabel.doc_id == Document.doc_id).where(
-                Document.tenant_id == tenant_id
-            )
         rows = list(self.db.execute(stmt).scalars())
         if not rows:
             return None

@@ -17,7 +17,6 @@ import {
 const state = {
   endpoint: window.location.origin,
   apiKey: "devkey",
-  tenant: "",
   currentSampleId: null,
   currentSample: null,
   toggledOff: new Set(), // 와우 A — off 된 키워드들
@@ -282,7 +281,6 @@ async function runClassify() {
         doc_id: state.currentSampleId || "demo-input",
         title: title || "demo",
         content: body,
-        tenant_id: state.tenant || null,
         use_rag: false,
         return_evidence: true,
       },
@@ -325,7 +323,6 @@ async function runClassify() {
       doc_id: state.currentSampleId || "demo-input",
       title: title || "demo",
       content: body,
-      tenant_id: state.tenant || null,
       use_rag: false,
       return_evidence: true,
     });
@@ -896,12 +893,11 @@ function renderProfiles() {
 function bindConfig() {
   // config row 는 발주처 시연에서 노출되지 않도록 HTML 에서 생략됨.
   // 개발자가 직접 추가했을 때만 바인딩 (null-safe).
+  // tenant 제거: 격리는 KL 포털 전담. cfg-tenant 바인딩 없음.
   const ep = $("#cfg-endpoint");
   const ak = $("#cfg-apikey");
-  const tn = $("#cfg-tenant");
   if (ep) { ep.value = state.endpoint; ep.addEventListener("change", (e) => { state.endpoint = e.target.value || window.location.origin; }); }
   if (ak) { ak.value = state.apiKey; ak.addEventListener("change", (e) => { state.apiKey = e.target.value; }); }
-  if (tn) { tn.value = state.tenant; tn.addEventListener("change", (e) => { state.tenant = e.target.value; }); }
 }
 
 // ──────────────────────────────────────────────────────────────────────

@@ -140,7 +140,7 @@ class TestRelabelDualReviewLive:
         from lloydk.config import settings
         from lloydk.db import SessionLocal, session_scope
         from lloydk.db.models import (
-            Classification, ClassificationLevel, Correction, Document, Tenant,
+            Classification, ClassificationLevel, Correction, Document,
         )
         from lloydk.repositories import ClassifyRepo
         from lloydk.schemas.common import Actor
@@ -150,15 +150,12 @@ class TestRelabelDualReviewLive:
         monkeypatch.setattr(settings, "high_grade_dual_review", True)
 
         s = SessionLocal()
-        tid = f"dr-{uuid.uuid4().hex[:8]}"
-        s.add(Tenant(tenant_id=tid, name=tid))
-        s.flush()
         levels = {lv.level_code: lv.level_id for lv in s.query(ClassificationLevel).all()}
-        doc = Document(tenant_id=tid, filename="x.pdf", source_format="pdf")
+        doc = Document(filename="x.pdf", source_format="pdf")
         s.add(doc)
         s.flush()
         cls = Classification(
-            doc_id=doc.doc_id, tenant_id=tid, model_version="v-dr",
+            doc_id=doc.doc_id, model_version="v-dr",
             predicted_level_id=levels["S3"], confidence=0.9, alternatives=[],
         )
         s.add(cls)
@@ -171,7 +168,7 @@ class TestRelabelDualReviewLive:
                 doc_id=did, inference_id=cid, original_label="S3", corrected_label="TS",
                 reason="비밀", actor=Actor(user_id="reviewer-1", role="reviewer"),
             )
-            r1 = svc.relabel(req1, tenant_id=tid)
+            r1 = svc.relabel(req1)
             assert r1.second_review_required is True
             with session_scope() as db:
                 assert ClassifyRepo(db).get(cid).status == "needs_second_review"
@@ -181,7 +178,7 @@ class TestRelabelDualReviewLive:
                 doc_id=did, inference_id=cid, original_label="S3", corrected_label="TS",
                 reason="동의", actor=Actor(user_id="reviewer-2", role="reviewer"),
             )
-            r2 = svc.relabel(req2, tenant_id=tid)
+            r2 = svc.relabel(req2)
             assert r2.second_review_required is False
             with session_scope() as db:
                 assert ClassifyRepo(db).get(cid).status == "corrected"

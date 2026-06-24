@@ -17,7 +17,6 @@ from lloydk.db.models import (
     ClassificationLevel,
     Correction,
     Document,
-    Tenant,
 )
 from lloydk.repositories import (
     AuditRepo,
@@ -64,18 +63,8 @@ def db():
 
 
 @pytest.fixture
-def tenant_id(db) -> str:
-    """매 테스트마다 고유 tenant_id 생성 (rollback에서 정리됨)."""
-    tid = f"t-{uuid.uuid4().hex[:8]}"
-    db.add(Tenant(tenant_id=tid, name=f"Tenant {tid}"))
-    db.flush()
-    return tid
-
-
-@pytest.fixture
-def document(db, tenant_id) -> Document:
+def document(db) -> Document:
     doc = Document(
-        tenant_id=tenant_id,
         filename="doc.pdf",
         source_format="pdf",
         processing_status="done",
@@ -97,20 +86,17 @@ def levels(db) -> dict[str, int]:
 # ============================================================
 
 class TestClassifyRepo:
-    def test_lookup_helpers(self, db, tenant_id, document):
+    def test_lookup_helpers(self, db, document):
         repo = ClassifyRepo(db)
-        assert repo.tenant_exists(tenant_id) is True
-        assert repo.tenant_exists("does-not-exist") is False
         assert repo.document_exists(document.doc_id) is True
         assert repo.document_exists(uuid.uuid4()) is False
         assert repo.level_id_by_code("TS") is not None
         assert repo.level_id_by_code("NOPE") is None
 
-    def test_create_classification(self, db, tenant_id, document, levels):
+    def test_create_classification(self, db, document, levels):
         repo = ClassifyRepo(db)
         cls = repo.create_classification(
             doc_id=document.doc_id,
-            tenant_id=tenant_id,
             model_version="v-test",
             predicted_level_id=levels["S1"],
             confidence=0.92,
@@ -123,13 +109,12 @@ class TestClassifyRepo:
         assert cls.status == "staging"
         assert float(cls.confidence) == pytest.approx(0.92, abs=1e-4)
 
-    def test_evidence_round_trip_from_spans(self, db, tenant_id, document, levels):
+    def test_evidence_round_trip_from_spans(self, db, document, levels):
         from lloydk.schemas.classify import EvidenceSpan
 
         repo = ClassifyRepo(db)
         cls = repo.create_classification(
             doc_id=document.doc_id,
-            tenant_id=tenant_id,
             model_version="v",
             predicted_level_id=levels["TS"],
             confidence=0.85,
@@ -154,12 +139,11 @@ class TestClassifyRepo:
         )
         assert len(evs) == 2
 
-    def test_correction_direction_underclass(self, db, tenant_id, document, levels):
+    def test_correction_direction_underclass(self, db, document, levels):
         """원본 S2(3) → 보정 TS(1): order 감소 = underclass (보안 미탐)."""
         repo = ClassifyRepo(db)
         cls = repo.create_classification(
             doc_id=document.doc_id,
-            tenant_id=tenant_id,
             model_version="v",
             predicted_level_id=levels["S2"],
             confidence=0.7,
@@ -174,11 +158,10 @@ class TestClassifyRepo:
         )
         assert corr.direction == "underclass"
 
-    def test_correction_direction_overclass_and_confirm(self, db, tenant_id, document, levels):
+    def test_correction_direction_overclass_and_confirm(self, db, document, levels):
         repo = ClassifyRepo(db)
         cls = repo.create_classification(
             doc_id=document.doc_id,
-            tenant_id=tenant_id,
             model_version="v",
             predicted_level_id=levels["TS"],
             confidence=0.6,
@@ -202,11 +185,10 @@ class TestClassifyRepo:
         )
         assert conf.direction == "confirm"
 
-    def test_mark_corrections_consumed(self, db, tenant_id, document, levels):
+    def test_mark_corrections_consumed(self, db, document, levels):
         repo = ClassifyRepo(db)
         cls = repo.create_classification(
             doc_id=document.doc_id,
-            tenant_id=tenant_id,
             model_version="v",
             predicted_level_id=levels["S2"],
             confidence=0.5,
@@ -284,7 +266,7 @@ class TestTrainingRepo:
         assert active is not None
         assert active.version_id == mv.version_id
 
-    def test_register_dataset_rows(self, db, tenant_id, document, levels):
+    def test_register_dataset_rows(self, db, document, levels):
         repo = TrainingRepo(db)
         run = repo.create_run(total_samples=1)
         # 같은 문서를 한 split에만 등록 (UNIQUE(run_id, doc_id))
@@ -299,10 +281,9 @@ class TestTrainingRepo:
 # ============================================================
 
 class TestSynthRepo:
-    def test_sample_lifecycle(self, db, tenant_id, levels):
+    def test_sample_lifecycle(self, db, levels):
         repo = SynthRepo(db)
         sd = repo.create_sample(
-            tenant_id=tenant_id,
             target_level_id=levels["S1"],
             llm_provider="anthropic",
             llm_model="claude-sonnet-4-6",
@@ -312,7 +293,7 @@ class TestSynthRepo:
         )
         assert sd.review_status == "pending_review"
 
-        pending = repo.list_pending_review(tenant_id=tenant_id)
+        pending = repo.list_pending_review()
         assert any(s.sample_id == sd.sample_id for s in pending)
 
         reviewed = repo.review(sd.sample_id, approved=True, reviewed_by="qa@test")
@@ -320,10 +301,9 @@ class TestSynthRepo:
         assert reviewed.review_status == "approved"
         assert reviewed.reviewed_at is not None
 
-    def test_review_rejection(self, db, tenant_id, levels):
+    def test_review_rejection(self, db, levels):
         repo = SynthRepo(db)
         sd = repo.create_sample(
-            tenant_id=tenant_id,
             target_level_id=levels["S3"],
             llm_provider="noop",
             llm_model="noop",
@@ -389,7 +369,7 @@ class TestAuditRepo:
 # ============================================================
 
 class TestLlmUsageRepo:
-    def test_record_and_aggregate(self, db, tenant_id):
+    def test_record_and_aggregate(self, db):
         repo = LlmUsageRepo(db)
         repo.record(
             provider="anthropic",
@@ -398,7 +378,6 @@ class TestLlmUsageRepo:
             input_tokens=1000,
             output_tokens=500,
             cost_usd=0.01,
-            tenant_id=tenant_id,
             billing_phase="development",
         )
         repo.record(
@@ -408,7 +387,6 @@ class TestLlmUsageRepo:
             input_tokens=2000,
             output_tokens=800,
             cost_usd=0.02,
-            tenant_id=tenant_id,
             billing_phase="development",
         )
         db.flush()
@@ -416,5 +394,5 @@ class TestLlmUsageRepo:
         in_tokens, out_tokens = repo.total_tokens(billing_phase="development")
         assert in_tokens >= 3000
         assert out_tokens >= 1300
-        cost = repo.total_cost_usd(billing_phase="development", tenant_id=tenant_id)
+        cost = repo.total_cost_usd(billing_phase="development")
         assert cost >= 0.029  # 0.01 + 0.02 (부동소수 오차 여유)

@@ -1,7 +1,6 @@
-"""17테이블 ORM 매핑 (init.sql v2 1:1).
+"""ORM 매핑 (init.sql v2 기반).
 
 도메인 그룹:
-  A 테넌트:       Tenant
   B 등급체계:     ClassificationLevel, EvaluationFactor, LevelKeyword
   C 문서:         Document, Chunk
   D 라벨링:       DocumentLabel, DocumentFactorScore
@@ -49,22 +48,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from lloydk.db.session import Base
 
-
-# ============================================================
-# [A] 테넌트
-# ============================================================
-
-class Tenant(Base):
-    __tablename__ = "tb_tenants"
-
-    tenant_id: Mapped[str] = mapped_column(String(50), primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    rag_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    active_model_version: Mapped[str | None] = mapped_column(String(50))
-    api_key_hash: Mapped[str | None] = mapped_column(String(128))
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+# tenant 제거: 격리는 KL 포털 전담 (2026-06-24 멀티테넌트 전면 제거 결정).
+# Lloydk는 단일 고객사 엔진 — per-customer 경계는 상류(KL 포털 라우팅)가 보장.
 
 
 # ============================================================
@@ -138,7 +123,6 @@ class Document(Base):
     __tablename__ = "tb_documents"
 
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tb_tenants.tenant_id"), nullable=False)
     external_ref: Mapped[str | None] = mapped_column(String(100))
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
     source_format: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -170,13 +154,14 @@ class Document(Base):
     deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     __table_args__ = (
-        Index("idx_doc_tenant_status", "tenant_id", "processing_status"),
+        # idx_doc_status — tenant 제거로 idx_doc_tenant_status 의 prefix 컬럼만 잔존.
+        Index("idx_doc_status", "processing_status"),
         Index("idx_doc_format", "source_format"),
         Index("idx_doc_uploaded", "uploaded_at"),
-        # init.sql 보유 — ORM 동기화 (drift 방지)
+        # init.sql 보유 — ORM 동기화 (drift 방지).
+        # tenant 제거: file_hash 단독 UNIQUE(중복 업로드 dedup). 격리는 KL 포털 전담.
         Index(
             "idx_doc_hash",
-            "tenant_id",
             "file_hash",
             unique=True,
             postgresql_where=text("file_hash IS NOT NULL"),
@@ -192,8 +177,6 @@ class Document(Base):
             "uploaded_at",
             postgresql_where=text("processing_status = 'pending'"),
         ),
-        # N4 신규 — 테넌트 스코프 최신 문서 조회 hot path
-        Index("idx_doc_tenant_uploaded", "tenant_id", "uploaded_at"),
     )
 
 
@@ -203,7 +186,6 @@ class Chunk(Base):
 
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), server_default=func.gen_random_uuid())
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(String(50), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -218,7 +200,6 @@ class Chunk(Base):
     __table_args__ = (
         PrimaryKeyConstraint("chunk_id", "created_at"),
         Index("idx_chunk_doc", "doc_id", "chunk_index"),
-        Index("idx_chunk_tenant", "tenant_id"),
         # init.sql의 PARTITION BY RANGE (created_at)는 ORM이 관리하지 않음.
         # SQLAlchemy의 declarative로는 표현이 부정확해 DB측에만 둠.
     )
@@ -272,7 +253,6 @@ class Classification(Base):
 
     classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tb_tenants.tenant_id"), nullable=False)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     predicted_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
@@ -288,7 +268,8 @@ class Classification(Base):
 
     __table_args__ = (
         Index("idx_cls_doc", "doc_id", "classified_at"),
-        Index("idx_cls_tenant_status", "tenant_id", "status"),
+        # idx_cls_status — tenant 제거로 idx_cls_tenant_status 의 status 컬럼만 잔존.
+        Index("idx_cls_status", "status"),
         Index("idx_cls_model_level", "model_version", "predicted_level_id", "status"),
         # init.sql 보유 — ORM 동기화 (drift 방지)
         Index(
@@ -296,8 +277,8 @@ class Classification(Base):
             "classified_at",
             postgresql_where=text("status = 'staging'"),
         ),
-        # N4 신규 — 테넌트 스코프 최근 분류 시계열 조회 hot path
-        Index("idx_cls_tenant_classified", "tenant_id", "classified_at"),
+        # 최근 분류 시계열 조회 hot path (tenant 제거 — 전역 스코프).
+        Index("idx_cls_classified", "classified_at"),
     )
 
 
@@ -488,7 +469,6 @@ class SampleDocument(Base):
 
     sample_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id"))
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tb_tenants.tenant_id"), nullable=False)
     target_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     doc_type: Mapped[str | None] = mapped_column(String(50))
     outline_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
@@ -509,7 +489,6 @@ class SampleDocument(Base):
     __table_args__ = (
         Index("idx_sd_status", "review_status"),
         Index("idx_sd_level", "target_level_id"),
-        Index("idx_sd_tenant", "tenant_id"),
         # N4 신규 — list_pending_review() WHERE review_status=? ORDER BY created_at hot path
         Index("idx_sd_status_created", "review_status", "created_at"),
     )
@@ -529,7 +508,6 @@ class LlmUsage(Base):
     purpose: Mapped[str] = mapped_column(String(30), nullable=False)
     reference_type: Mapped[str | None] = mapped_column(String(20))
     reference_id: Mapped[str | None] = mapped_column(String(100))
-    tenant_id: Mapped[str | None] = mapped_column(ForeignKey("tb_tenants.tenant_id"))
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     # total_tokens는 DB측 generated column. ORM은 server_default 미설정으로 read-only처럼 처리.
@@ -559,7 +537,6 @@ class AuditLog(Base):
 
     audit_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
     request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    tenant_id: Mapped[str | None] = mapped_column(String(50))
     actor_id: Mapped[str | None] = mapped_column(String(50))
     actor_role: Mapped[str | None] = mapped_column(String(30))
     action: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -577,11 +554,6 @@ class AuditLog(Base):
         Index("idx_audit_actor", "actor_id", "occurred_at"),
         Index("idx_audit_target", "target_type", "target_id"),
         Index("idx_audit_action", "action", "occurred_at"),
-        # N4 신규 — 테넌트별 감사 로그 시계열 조회 hot path
-        # (audit_log는 RANGE PARTITION이라 자식 파티션마다 자동 전파)
-        Index("idx_audit_tenant_occurred", "tenant_id", "occurred_at"),
-        # N4 신규 — 테넌트 + 액션 복합 감사 추적 hot path
-        Index("idx_audit_tenant_action", "tenant_id", "action", "occurred_at"),
     )
 
 
@@ -595,7 +567,6 @@ class Guide(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     guide_id: Mapped[str] = mapped_column(String(200), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(String(50), nullable=False, default="default")
     version: Mapped[str] = mapped_column(String(50), nullable=False)
     effective_date: Mapped[str | None] = mapped_column(String(30))
     change_summary: Mapped[str | None] = mapped_column(Text)
@@ -611,15 +582,14 @@ class Guide(Base):
     __table_args__ = (
         # 동시 업로드 시 중복 버전 행 방지(최종 방어선) — GuideRepo.upsert의
         # select-then-insert는 락이 없어 race에서 중복을 만들 수 있다.
-        UniqueConstraint("guide_id", "version", "tenant_id", name="uq_guides_id_version_tenant"),
+        # tenant 제거: (guide_id, version) 전역 UNIQUE. 격리는 KL 포털 전담.
+        UniqueConstraint("guide_id", "version", name="uq_guides_id_version"),
         Index("idx_guides_guide_id", "guide_id"),
-        Index("idx_guides_tenant_guide", "tenant_id", "guide_id"),
         Index("idx_guides_registered", "registered_at"),
     )
 
 
 __all__ = [
-    "Tenant",
     "ClassificationLevel",
     "EvaluationFactor",
     "LevelKeyword",

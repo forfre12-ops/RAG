@@ -224,12 +224,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
             <p class="hint">X-Actor-Role 헤더 + confirm/relabel actor.role.</p>
           </div>
         </div>
-        <div class="row3">
-          <div class="field">
-            <label class="fld">Tenant ID</label>
-            <input id="cfg-tenant" type="text" value="default" />
-            <p class="hint">시드된 테넌트는 default 1개.</p>
-          </div>
+        <div class="row2">
           <div class="field">
             <label class="fld">User ID (actor)</label>
             <input id="cfg-user" type="text" value="admin@koipa" />
@@ -347,7 +342,6 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
       <div class="card-body">
         <div class="btn-row">
           <button class="btn red" onclick="reloadModel()">활성 모델 핫리로드</button>
-          <button class="btn sec sm" onclick="rotateKey()">테넌트 API 키 교체</button>
         </div>
         <div id="reload-result"></div>
         <div class="warnbox" style="display:none" id="rollback-note"></div>
@@ -401,10 +395,9 @@ const cfg = () => ({
   base: $('cfg-base').value.replace(/\/$/,''),
   key: $('cfg-key').value,
   role: $('cfg-role').value,
-  tenant: $('cfg-tenant').value.trim() || null,
   user: $('cfg-user').value.trim() || 'console',
 });
-const actor = () => { const c=cfg(); return {user_id:c.user, role:c.role, tenant_id:c.tenant}; };
+const actor = () => { const c=cfg(); return {user_id:c.user, role:c.role}; };
 
 // XSS 방어 — 문서 본문 유래(근거 text/tag) 및 사용자 입력(title/doc_id)을 innerHTML에
 // 넣기 전 이스케이프. 실데이터 문서/제목에 HTML이 섞이면 운영 콘솔에서 실행될 수 있다.
@@ -429,9 +422,7 @@ function gradeTag(g){ return `<span class="tag g-${g}">${g}</span>`; }
 async function api(method, path, body){
   const c=cfg();
   const headers={'X-API-Key':c.key, 'X-Actor-Role':c.role};
-  // 주의: X-Tenant-Id 헤더는 보내지 않는다. POC_MODE=full(운영)에서 해당 테넌트에
-  // api_key_hash가 미등록이면 fail-closed 403. tenant는 body(actor.tenant_id /
-  // classify tenant_id)로 전달되어 단일 공유키 환경에서 스코프된다.
+  // tenant 제거: 격리는 KL 포털 전담. 단일 KL 인증(API키+서명 JWT)만 사용한다.
   if(body) headers['Content-Type']='application/json; charset=utf-8';
   const url=c.base+path;
   log(`${method} ${path}`, 'req');
@@ -477,7 +468,7 @@ function populateSamples(){
 function pickSample(i){ const s=SAMPLES[+i]; if(!s) return; $('cl-docid').value=s.id; $('cl-title').value=s.t; $('cl-body').value=s.b; $('cl-result').innerHTML=''; }
 
 async function classifyOne(doc_id, title, content){
-  const body={doc_id, title, content, tenant_id:cfg().tenant, return_evidence:true};
+  const body={doc_id, title, content, return_evidence:true};
   const d=await api('POST','/classify',body);
   enqueue(d, title); markFlow(1);
   return d;
@@ -618,16 +609,7 @@ async function reloadModel(){
     markFlow(4); loadMetrics();
   }catch(e){ $('reload-result').innerHTML=`<div class="warnbox">리로드 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`; }
 }
-async function rotateKey(){
-  const c=cfg(); if(!c.tenant){ alert('Tenant ID가 필요합니다.'); return; }
-  if(!confirm(`테넌트 '${c.tenant}'의 API 키를 새로 발급·교체합니다. 기존 키는 무효화됩니다. 진행할까요?`)) return;
-  try{
-    const d=await api('POST',`/admin/tenants/${encodeURIComponent(c.tenant)}/rotate-api-key`);
-    const note=$('rollback-note'); note.style.display='block';
-    note.innerHTML=`새 API 키 (한 번만 노출 — 안전히 저장): <code style="user-select:all">${d.api_key}</code>`;
-    log(`API 키 교체 완료: ${c.tenant}`,'ok');
-  }catch(e){ alert('키 교체 실패: '+(e.status||'')+' '+(e.data?.detail||e.message)); }
-}
+// tenant 제거: 테넌트 API 키 교체(rotateKey)는 단일 KL 인증 모델에서 불필요 — KL이 cred 발급/회전 전담.
 
 /* ---- 5. METRICS ---- */
 async function loadMetrics(){

@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
+from lloydk.api._jwt_auth import require_auth
 from lloydk.api.rate_limit import limiter
 from lloydk.db import session_scope
 from lloydk.repositories import ClassifyRepo
@@ -27,8 +27,7 @@ router = APIRouter(tags=["classify"], dependencies=[Depends(require_auth)])
 @router.post("/classify/async", response_model=ClassifyAsyncResponse, status_code=202)
 @limiter.limit("60/minute")
 def classify_async(request: Request, req: ClassifyAsyncRequest):
-    # 보안: 비동기 작업도 tenant 결속 — 위조한 tenant로 분류 영속화/조회 차단.
-    req.tenant_id = resolve_effective_tenant(request, req.tenant_id)
+    # tenant 제거: 격리는 KL 포털 전담 → 무스코프 제출.
     return AsyncClassifyService().submit_async(req)
 
 
@@ -40,40 +39,31 @@ def classify_batch(request: Request, req: ClassifyBatchRequest):
         raise HTTPException(status_code=400, detail="documents must not be empty")
     if len(req.documents) > 1000:
         raise HTTPException(status_code=413, detail="batch size > 1000")
-    # 보안: 배치 내 각 문서의 tenant_id를 인증 컨텍스트에 결속(위조 차단).
-    for d in req.documents:
-        d.tenant_id = resolve_effective_tenant(request, d.tenant_id)
-    # 보안(H9): job을 호출자 effective tenant로 결속 — 이후 조회 스코프의 기준.
-    job_tenant = resolve_effective_tenant(request, None)
-    return AsyncClassifyService().submit_batch(req, tenant_id=job_tenant)
+    # tenant 제거: 격리는 KL 포털 전담 → 무스코프 배치 제출.
+    return AsyncClassifyService().submit_batch(req)
 
 
 @router.get("/classify/jobs/{job_id}", response_model=ClassifyJobStatus)
-def classify_job_status(job_id: UUID, request: Request):
-    # 보안(H9): job_id만으로 결과를 주지 않음 — 호출자 effective tenant가 job에
-    # 보존된 tenant와 일치할 때만 반환. 불일치/미검증이면 404(존재 노출도 차단).
-    requester_tenant = resolve_effective_tenant(request, None)
-    res = AsyncClassifyService().get_status(
-        job_id, requester_tenant=requester_tenant, enforce_tenant=True
-    )
+def classify_job_status(job_id: UUID):
+    # tenant 제거: 격리는 KL 포털 전담(인증된 KL만 접근) → job_id로 무스코프 조회.
+    res = AsyncClassifyService().get_status(job_id)
     if res is None:
         raise HTTPException(status_code=404, detail="job not found")
     return res
 
 
 @router.get("/classify/{doc_id}", response_model=ClassifyResponse)
-def classify_recent_for_doc(doc_id: str, request: Request):
+def classify_recent_for_doc(doc_id: str):
     """doc_id의 최근 분류 결과 1건 (DB 진실 소스)."""
     try:
         doc_uuid = uuid.UUID(doc_id)
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail="doc_id must be a UUID") from exc
-    # 보안: 인증 tenant로 스코프 — 교차테넌트 분류 결과 열람 차단(미검증/레거시는 None=미스코프).
-    eff_tenant = resolve_effective_tenant(request, None)
+    # tenant 제거: 격리는 KL 포털 전담 → 무스코프 조회.
     try:
         with session_scope() as db:
             repo = ClassifyRepo(db)
-            recent = repo.list_recent_for_doc(doc_uuid, tenant_id=eff_tenant, limit=1)
+            recent = repo.list_recent_for_doc(doc_uuid, limit=1)
             if not recent:
                 raise HTTPException(status_code=404, detail="no classification for doc_id")
             cls = recent[0]

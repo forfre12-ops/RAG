@@ -35,15 +35,15 @@ def _hdr():
     return {"X-API-Key": settings.api_key or "test-key"}
 
 
-def _actor(tenant: str = "default") -> str:
-    return json.dumps({"user_id": "test-uploader", "role": "kl_backend", "tenant_id": tenant})
+def _actor() -> str:
+    return json.dumps({"user_id": "test-uploader", "role": "kl_backend"})
 
 
-def _post(client, filename: str, body: bytes, tenant: str = "default", **extra):
+def _post(client, filename: str, body: bytes, **extra):
     return client.post(
         "/api/v1/documents",
         headers=_hdr(),
-        data={"actor": _actor(tenant), **extra},
+        data={"actor": _actor(), **extra},
         files={"file": (filename, io.BytesIO(body), "application/octet-stream")},
     )
 
@@ -104,16 +104,14 @@ class TestDocumentUploadMeta:
         r = _post(client, "m.txt", body, doc_type="기술보고서", external_ref="EDMS-001")
         assert r.status_code == 201, r.text
 
-    def test_tenant_isolation(self, client):
-        body = b"tenant a document"
-        r1 = _post(client, "a.txt", body, tenant="tenant_a")
-        r2 = _post(client, "a.txt", body, tenant="tenant_b")
+    def test_same_content_same_hash(self, client):
+        body = b"same content document"
+        r1 = _post(client, "a.txt", body)
+        r2 = _post(client, "a.txt", body)
         assert r1.status_code == 201
         assert r2.status_code == 201
-        # 같은 파일이라도 테넌트가 다르면 별도 ingestion
-        # (doc_id는 DB 없으면 None이므로 file_hash로 비교)
-        assert r1.json()["file_hash"] == r2.json()["file_hash"]  # 내용 동일
-        # persisted 여부와 무관하게 응답은 정상
+        # 같은 내용 → 같은 file_hash (content-addressed)
+        assert r1.json()["file_hash"] == r2.json()["file_hash"]
 
 
 # ---------------------------------------------------------------------------

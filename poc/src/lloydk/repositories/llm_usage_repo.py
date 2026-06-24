@@ -24,7 +24,6 @@ class LlmUsageRepo:
         output_tokens: int,
         cost_usd: float,
         cost_krw: float | None = None,
-        tenant_id: str | None = None,
         reference_type: str | None = None,
         reference_id: str | None = None,
         billing_phase: str = "development",
@@ -43,7 +42,6 @@ class LlmUsageRepo:
             output_tokens=output_tokens,
             cost_usd=cost_usd,
             cost_krw=cost_krw,
-            tenant_id=tenant_id,
             reference_type=reference_type,
             reference_id=reference_id,
             billing_phase=billing_phase,
@@ -60,13 +58,11 @@ class LlmUsageRepo:
         self,
         *,
         billing_phase: str | None = None,
-        tenant_id: str | None = None,
     ) -> float:
+        # tenant 제거: LLM 비용 전역 집계(단일 고객사 엔진, KL 포털 격리).
         stmt = select(func.coalesce(func.sum(LlmUsage.cost_usd), 0))
         if billing_phase:
             stmt = stmt.where(LlmUsage.billing_phase == billing_phase)
-        if tenant_id:
-            stmt = stmt.where(LlmUsage.tenant_id == tenant_id)
         return float(self.db.execute(stmt).scalar_one() or 0)
 
     def total_tokens(self, *, billing_phase: str | None = None) -> tuple[int, int]:

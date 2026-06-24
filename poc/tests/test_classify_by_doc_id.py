@@ -35,7 +35,7 @@ def _hdr():
 
 
 def _actor():
-    return json.dumps({"user_id": "tester", "role": "kl_backend", "tenant_id": "default"})
+    return json.dumps({"user_id": "tester", "role": "kl_backend"})
 
 
 class TestClassifyByDocId:

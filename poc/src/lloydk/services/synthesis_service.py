@@ -93,13 +93,13 @@ class SynthesisService:
         self,
         *,
         status: str = "pending",
-        tenant_id: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> SynthQueueResponse:
+        # tenant 제거: 격리는 KL 포털 전담 — 합성 큐는 전역 네임스페이스.
         logger.debug(
-            "synth queue enter: status=%s tenant=%s limit=%d offset=%d",
-            status, tenant_id, limit, offset,
+            "synth queue enter: status=%s limit=%d offset=%d",
+            status, limit, offset,
         )
         # status 매핑: API 'pending' → DB 'pending_review'
         db_status = {"pending": "pending_review", "approved": "approved", "rejected": "rejected"}.get(status, "pending_review")
@@ -108,9 +108,9 @@ class SynthesisService:
             with session_scope() as db:
                 repo = SynthRepo(db)
                 if db_status == "pending_review":
-                    samples = repo.list_pending_review(tenant_id=tenant_id, limit=limit, offset=offset)
+                    samples = repo.list_pending_review(limit=limit, offset=offset)
                     # total = limit/offset 무관 전체 건수 (페이지네이션 메타)
-                    total = repo.count_pending_review(tenant_id=tenant_id)
+                    total = repo.count_pending_review()
                 else:
                     # 승인/반려 조회는 PoC 미구현 — pending만 페이지네이션 지원
                     samples, total = [], 0

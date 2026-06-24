@@ -155,11 +155,7 @@ KPIS: list[KPI] = [
     # full(uvicorn workers)에서는 ≥ 0.5 도달 가능, 합격선 별도 상향 검토 필요
     KPI("S11.5", "S11", "단계 확장성 (scaling efficiency)", "ratio", "ge", 0.15, "last"),
 
-    # S13 멀티 테넌트 격리 (W10 확장)
-    # bool/count 핵심 격리 검증. 데이터 누출 사고 방지 KPI
-    KPI("S13.1", "S13", "교차 노출 횟수", "count", "le", 0, "max", core=True),
-    KPI("S13.2", "S13", "audit tenant_id 정합", "ratio", "ge", 0.99, "ratio_true", requires=["pg"]),
-    KPI("S13.3", "S13", "가이드 인덱스 분리", "bool", "ge", True, "bool_all"),
+    # S13(멀티 테넌트 격리) 제거: 격리는 KL 포털 전담 — 단일 고객사 엔진이라 시나리오·KPI 불요.
 
     # S10 RAG 인용 충실도 (W11 확장)
     KPI("S10.1", "S10", "grounded_ratio", "ratio", "ge", 0.70, "mean"),
@@ -226,7 +222,6 @@ _SCENARIO_MODULES: dict[str, tuple[str, ...]] = {
     "S10": ("src/lloydk/rag", "src/lloydk/perf/scenarios.py"),
     "S11": ("src/lloydk/perf",),
     "S12": ("src/lloydk/services/async_classify_service.py", "src/lloydk/api/async_classify.py"),
-    "S13": ("src/lloydk/repositories", "src/lloydk/api/_jwt_auth.py", "src/lloydk/api/_rbac.py"),
     "S14": ("src/lloydk/adapters/vectorstore", "src/lloydk/adapters/storage"),
     "S15": ("scripts/dr_restore_check.py", "scripts/backup_postgres.py"),
     "S16": ("src/lloydk/api/_jwt_auth.py", "src/lloydk/api/_rbac.py"),

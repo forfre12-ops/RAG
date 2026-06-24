@@ -22,7 +22,6 @@ class SynthRepo:
     def create_sample(
         self,
         *,
-        tenant_id: str,
         target_level_id: int,
         llm_provider: str,
         llm_model: str,
@@ -36,7 +35,6 @@ class SynthRepo:
         qc_prompt_version: str | None = None,
     ) -> SampleDocument:
         sd = SampleDocument(
-            tenant_id=tenant_id,
             target_level_id=target_level_id,
             llm_provider=llm_provider,
             llm_model=llm_model,
@@ -55,24 +53,22 @@ class SynthRepo:
         return sd
 
     def list_pending_review(
-        self, *, tenant_id: str | None = None, limit: int = 50, offset: int = 0
+        self, *, limit: int = 50, offset: int = 0
     ) -> list[SampleDocument]:
+        # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
         stmt = select(SampleDocument).where(SampleDocument.review_status == "pending_review")
-        if tenant_id:
-            stmt = stmt.where(SampleDocument.tenant_id == tenant_id)
         return list(
             self.db.execute(
                 stmt.order_by(SampleDocument.created_at).limit(limit).offset(offset)
             ).scalars()
         )
 
-    def count_pending_review(self, *, tenant_id: str | None = None) -> int:
+    def count_pending_review(self) -> int:
         """페이지네이션 total — limit/offset과 무관한 전체 대기 건수."""
+        # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
         stmt = select(func.count()).select_from(SampleDocument).where(
             SampleDocument.review_status == "pending_review"
         )
-        if tenant_id:
-            stmt = stmt.where(SampleDocument.tenant_id == tenant_id)
         return int(self.db.execute(stmt).scalar_one())
 
     def review(

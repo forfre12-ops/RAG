@@ -29,7 +29,6 @@ def test_e2e_classify_confirm_metrics_golden_path():
             headers=HDR,
             json={
                 "doc_id": "smoke-e2e-001",
-                "tenant_id": "test",
                 "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 M&A 계획",
                 "use_rag": False,
                 "return_evidence": True,

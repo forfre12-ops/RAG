@@ -36,13 +36,13 @@ class LLMUsageService:
         purpose: str,
         reference_type: Optional[str] = None,
         reference_id: Optional[str] = None,
-        tenant_id: str = "default",
         billing_phase: str = "development",
     ) -> None:
+        # tenant 제거: 격리는 KL 포털 전담 — LLM 비용은 전역 집계(tenant 태그 없음).
         logger.debug(
-            "llm_usage record enter: provider=%s model=%s purpose=%s tenant=%s",
+            "llm_usage record enter: provider=%s model=%s purpose=%s",
             getattr(usage, "provider", None), getattr(usage, "model", None),
-            purpose, tenant_id,
+            purpose,
         )
         called_at = datetime.now(timezone.utc)
         row = {
@@ -50,14 +50,13 @@ class LLMUsageService:
             "purpose": purpose,
             "reference_type": reference_type,
             "reference_id": reference_id,
-            "tenant_id": tenant_id,
             "billing_phase": billing_phase,
             "called_at": called_at.isoformat(),
         }
         # JSONL은 항상 먼저 남긴다 — DB 적재가 실패해도 비용 기록은 보존.
         self._append_jsonl(row)
         # #28: 공유 풀(session_scope) + LlmUsageRepo로 best-effort 적재.
-        self._insert_db(usage, purpose, reference_type, reference_id, tenant_id,
+        self._insert_db(usage, purpose, reference_type, reference_id,
                         billing_phase, called_at)
         self._emit_metrics(row, purpose)
         logger.info(
@@ -101,7 +100,6 @@ class LLMUsageService:
         purpose: str,
         reference_type: Optional[str],
         reference_id: Optional[str],
-        tenant_id: str,
         billing_phase: str,
         called_at: datetime,
     ) -> None:
@@ -123,7 +121,6 @@ class LLMUsageService:
                     input_tokens=usage.input_tokens,
                     output_tokens=usage.output_tokens,
                     cost_usd=usage.cost_usd,
-                    tenant_id=tenant_id,
                     reference_type=reference_type,
                     reference_id=reference_id,
                     billing_phase=billing_phase,

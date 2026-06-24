@@ -108,7 +108,7 @@ def compute_calibration_from_arrays(
 
 
 def compute_calibration_from_db(
-    model_version: str, *, tenant_id: str | None = None, n_bins: int = 10
+    model_version: str, *, n_bins: int = 10
 ) -> CalibrationResult | None:
     """DB 분류+교정에서 (confidence, 정답여부) 추출 후 ECE/Brier 계산.
 
@@ -117,7 +117,7 @@ def compute_calibration_from_db(
     """
     try:
         with session_scope() as db:
-            rows = _fetch_conf_correct(db, model_version, tenant_id=tenant_id)
+            rows = _fetch_conf_correct(db, model_version)
     except SQLAlchemyError:
         return None
     if not rows:
@@ -129,14 +129,12 @@ def compute_calibration_from_db(
     )
 
 
-def _fetch_conf_correct(db, model_version: str, *, tenant_id: str | None = None):
+def _fetch_conf_correct(db, model_version: str):
     code_by_id = {
         lv.level_id: lv.level_code
         for lv in db.execute(select(ClassificationLevel)).scalars()
     }
     stmt = select(Classification).where(Classification.model_version == model_version)
-    if tenant_id:
-        stmt = stmt.where(Classification.tenant_id == tenant_id)
     cls_list = list(db.execute(stmt).scalars())
     if not cls_list:
         return []

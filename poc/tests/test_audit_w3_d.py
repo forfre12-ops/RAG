@@ -7,8 +7,6 @@
                     (무기한 캐싱→키 로테이션 무력 차단). 빈 dict vs 미로드를 None 센티넬로 구분.
   [L-jwt-aud]       api/_jwt_auth.py — 운영 jwt 모드에서 jwt_issuer/jwt_audience 미설정 시
                     confused-deputy fail-fast. dev/test 비파괴.
-  [L-apikey-honor]  api/_jwt_auth.py — 운영 api_key 모드에서 테넌트 api_key_hash 미등록인데
-                    X-Tenant-Id 주장 시 거부(fail-closed). dev/단일테넌트 비파괴.
   [L-audit-noalarm] api/middleware.py — 감사 insert 실패를 prom 카운터로 노출 +
                     고위험 액션 fail-closed 옵션(settings/env 플래그, 기본 off).
   [M-health-storage] api/health.py — _check_storage가 build_storage() 결과 기준으로 점검,
@@ -276,7 +274,7 @@ def test_verify_jwt_dev_skips_iss_aud_nondestructive():
         return base64.urlsafe_b64encode(_json.dumps(d).encode()).rstrip(b"=").decode()
 
     header = _b64({"alg": "RS256", "kid": "default"})
-    payload = _b64({"sub": "u1", "tenant": "t1", "exp": int(_time.time()) + 3600})
+    payload = _b64({"sub": "u1", "exp": int(_time.time()) + 3600})
     token = f"{header}.{payload}.{_b64({'sig': 'x'})}"
 
     with patch.object(ja, "_is_production", return_value=False), \
@@ -286,12 +284,6 @@ def test_verify_jwt_dev_skips_iss_aud_nondestructive():
          patch.object(ja.settings, "jwt_audience", "", create=True):
         claims = ja.verify_jwt(token)
     assert claims.sub == "u1"
-    assert claims.tenant == "t1"
-
-
-# ===========================================================================
-# [L-apikey-honor] 운영 api_key 모드: 미등록 테넌트 X-Tenant-Id 거부
-# ===========================================================================
 
 
 def _make_request(headers: dict, path: str = "/api/v1/classify"):
@@ -313,55 +305,6 @@ def _make_request(headers: dict, path: str = "/api/v1/classify"):
             self.client = None  # _record: request.client.host 분기에서 None 처리
 
     return _Req()
-
-
-def test_require_auth_rejects_unregistered_tenant_in_production():
-    """운영 + X-Tenant-Id 주장 + 테넌트 api_key_hash 미등록 → 403 (honor-system 차단)."""
-    from fastapi import HTTPException
-
-    import lloydk.api._jwt_auth as ja
-
-    req = _make_request({"x-api-key": "k", "x-tenant-id": "tenantA"})
-    with patch.object(ja, "_is_production", return_value=True), \
-         patch.object(ja.settings, "auth_mode", "api_key", create=True), \
-         patch.object(ja.settings, "api_key", "k", create=True), \
-         patch.object(ja, "_resolve_api_key_roles", return_value=("system",)), \
-         patch.object(ja, "_verify_tenant_api_key", return_value=False):
-        with pytest.raises(HTTPException) as ei:
-            ja.require_auth(req, authorization=None, x_api_key="k", x_tenant_id="tenantA")
-    assert ei.value.status_code == 403
-    assert "api_key_hash" in str(ei.value.detail)
-
-
-def test_require_auth_dev_honors_unregistered_tenant_nondestructive():
-    """dev/단일테넌트: 미등록 테넌트도 통과(verified_tenant=None, body로 스코프) — 비파괴."""
-    import lloydk.api._jwt_auth as ja
-
-    req = _make_request({"x-api-key": "k", "x-tenant-id": "tenantA"})
-    with patch.object(ja, "_is_production", return_value=False), \
-         patch.object(ja.settings, "auth_mode", "api_key", create=True), \
-         patch.object(ja.settings, "api_key", "k", create=True), \
-         patch.object(ja, "_resolve_api_key_roles", return_value=("system",)), \
-         patch.object(ja, "_verify_tenant_api_key", return_value=False):
-        out = ja.require_auth(req, authorization=None, x_api_key="k", x_tenant_id="tenantA")
-    assert out["mode"] == "api_key"
-    # 미검증 → authoritative tenant 미결속
-    assert getattr(req.state, "auth_tenant", None) is None
-
-
-def test_require_auth_verified_tenant_still_works_in_production():
-    """운영이라도 hash 검증 통과한 테넌트는 정상 결속."""
-    import lloydk.api._jwt_auth as ja
-
-    req = _make_request({"x-api-key": "k", "x-tenant-id": "tenantA"})
-    with patch.object(ja, "_is_production", return_value=True), \
-         patch.object(ja.settings, "auth_mode", "api_key", create=True), \
-         patch.object(ja.settings, "api_key", "k", create=True), \
-         patch.object(ja, "_resolve_api_key_roles", return_value=("system",)), \
-         patch.object(ja, "_verify_tenant_api_key", return_value=True):
-        out = ja.require_auth(req, authorization=None, x_api_key="k", x_tenant_id="tenantA")
-    assert out["mode"] == "api_key"
-    assert req.state.auth_tenant == "tenantA"
 
 
 # ===========================================================================

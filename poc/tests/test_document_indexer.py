@@ -12,7 +12,7 @@ def test_indexes_chunks_and_makes_them_searchable():
     store = InMemoryStore()
     chunks = [(0, "BX-7 배터리 양산 2026년 9월 목표 단가 78달러"), (1, "양극재 니켈 92퍼센트 대외비")]
     res = index_document_for_rag(
-        doc_id="doc-1", tenant_id="acme", collection="uploads-test",
+        doc_id="doc-1", collection="uploads-test",
         chunks=chunks, store=store, embedder=_emb(),
     )
     assert res.indexed is True
@@ -23,13 +23,12 @@ def test_indexes_chunks_and_makes_them_searchable():
     hits = store.search("uploads-test", emb.vectors[0], top_k=2)
     assert hits, "indexed chunk should be retrievable"
     assert any((h.payload or {}).get("doc_id") == "doc-1" for h in hits)
-    assert any((h.payload or {}).get("tenant_id") == "acme" for h in hits)
 
 
 def test_empty_chunks_returns_not_indexed():
     store = InMemoryStore()
     res = index_document_for_rag(
-        doc_id="d", tenant_id="t", collection="c",
+        doc_id="d", collection="c",
         chunks=[(0, "   "), (1, "")], store=store, embedder=_emb(),
     )
     assert res.indexed is False

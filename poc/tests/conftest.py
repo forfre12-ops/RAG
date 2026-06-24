@@ -77,15 +77,14 @@ _ES_AVAILABLE = _check_es()
 # 인프라 없을 때 TestClient 사용 테스트가 30s 타임아웃으로 블로킹되는 것 방지
 def pytest_collection_modifyitems(config, items):
     """인프라 없을 때 fullstack/slow 마커 테스트 자동 skip."""
-    infra_up = _PG_AVAILABLE and _ES_AVAILABLE
+    # ES 제거(§03 PG 단일화) — fullstack 게이트는 Postgres 가용성만 본다.
+    infra_up = _PG_AVAILABLE
     for item in items:
         if not infra_up:
             # TestClient를 쓰는 테스트는 infra 없으면 skip
             markers = [m.name for m in item.iter_markers()]
             if "fullstack" in markers:
-                item.add_marker(pytest.mark.skip(reason="fullstack: postgres/es not available"))
-        if not _ES_AVAILABLE and "fullstack" in [m.name for m in item.iter_markers()]:
-            item.add_marker(pytest.mark.skip(reason="fullstack: es not available"))
+                item.add_marker(pytest.mark.skip(reason="fullstack: postgres not available"))
 
 
 @pytest.fixture(autouse=True)

@@ -3,7 +3,7 @@
 흐름:
   1. PreprocessPipeline로 텍스트 정규화
   2. InferencePipeline로 등급 예측 + 근거 추출
-  3. **best-effort DB 영속화** (tenant·doc 존재 + DB 가용 시에만)
+  3. **best-effort DB 영속화** (doc 존재 + DB 가용 시에만)
      실패해도 응답은 정상 — warnings에 안내만 추가 (테스트·dryrun 환경 보호)
   4. ClassifyResponse 반환 (inference_id = DB classification_id 또는 신규 UUID)
 """
@@ -128,12 +128,11 @@ class ClassifyService:
         on_stage: 단계 진입 시 호출되는 콜백. 단계 이름 = stages_emitted 참조.
                   SSE 스트리밍(/classify/stream) 등에서 진척 송신용. 없으면 no-op.
         """
-        # #29: classify 진입 span — 비민감 식별값만(테넌트/문서 유무·모델버전·use_rag).
+        # #29: classify 진입 span — 비민감 식별값만(문서 유무·모델버전·use_rag).
         #      문서 본문 등 민감정보는 절대 부착하지 않는다. OTel 미활성 시 no-op.
         with span(
             "classify",
             **{
-                "lloydk.has_tenant": req.tenant_id is not None,
                 "lloydk.has_doc_id": bool(req.doc_id),
                 "lloydk.has_content": bool(req.content),
                 "lloydk.use_rag": bool(req.use_rag),
@@ -148,14 +147,14 @@ class ClassifyService:
             notify = on_stage or (lambda _stage: None)
 
             logger.debug(
-                "classify enter: doc_id=%s tenant=%s use_rag=%s content_len=%d",
-                req.doc_id, req.tenant_id, req.use_rag, len(req.content or ""),
+                "classify enter: doc_id=%s use_rag=%s content_len=%d",
+                req.doc_id, req.use_rag, len(req.content or ""),
             )
             notify("extract")
             # content가 없으면 normalized_text_uri에서 읽어오기 (doc_id 전용 분류 경로)
             content = req.content
             if not content:
-                content = self._fetch_content_by_doc_id(req.doc_id, req.tenant_id)
+                content = self._fetch_content_by_doc_id(req.doc_id)
             if not content:
                 # fail-SECURE (미탐 절대 금지): 본문을 못 읽으면 등급을 판단할 수 없다.
                 # 과거엔 label="S3"(공개)로 폴백했는데, 이는 '읽지 못한 비밀문서를 공개로
@@ -187,7 +186,7 @@ class ClassifyService:
                 notify("normalize")
                 cleaned = self.preprocess.run_text(content)
 
-            # 표적 2 (2026-05-29): chunks 생성. 영속화는 _try_persist 단계에서 doc/tenant 가용 시 시도.
+            # 표적 2 (2026-05-29): chunks 생성. 영속화는 _try_persist 단계에서 doc 가용 시 시도.
             # PoC PreprocessPipeline.chunk()는 외부 의존 없이 항상 동작.
             try:
                 chunks: list[_PreprocessChunk] = self.preprocess.chunk(cleaned) if cleaned else []
@@ -198,7 +197,7 @@ class ClassifyService:
             # ── Corrections 반영: DB에 검증된 라벨이 있으면 모델 추론 스킵 ───────────
             # human_review / koipa_case_based / nkt_designated 등 is_verified=True 라벨
             # 우선순위: human_review > koipa_case_based > llm_judge_consensus > ...
-            verified_label = self._get_verified_label(req.doc_id, req.tenant_id)
+            verified_label = self._get_verified_label(req.doc_id)
             if verified_label is not None:
                 from lloydk.schemas.common import Grade  # noqa: PLC0415
                 inference_id = uuid.uuid4()
@@ -209,7 +208,6 @@ class ClassifyService:
                 # Audit trail — best-effort DB 기록
                 self._audit_verified_label(
                     doc_id=req.doc_id,
-                    tenant_id=req.tenant_id or "default",
                     level_code=verified_label.level_code,
                     labeled_by=verified_label.labeled_by,
                     reviewer_id=verified_label.labeler_id,
@@ -441,7 +439,6 @@ class ClassifyService:
         self,
         *,
         doc_id: str,
-        tenant_id: str,
         level_code: str,
         labeled_by: str,
         reviewer_id: str | None,
@@ -457,7 +454,6 @@ class ClassifyService:
             try:
                 entry = AuditLog(
                     request_id=inference_id,
-                    tenant_id=tenant_id,
                     actor_id=reviewer_id or labeled_by,
                     actor_role="human_review",
                     action="verified_label_applied",
@@ -482,14 +478,11 @@ class ClassifyService:
     # Verified Label Lookup (Corrections 반영)
     # ------------------------------------------------------------
 
-    def _get_verified_label(self, doc_id_str: str, tenant_id: str | None = None) -> "object | None":
+    def _get_verified_label(self, doc_id_str: str) -> "object | None":
         """doc_id에 대한 검증된 DocumentLabel 반환.
 
         DB 가용 시 조회. 없거나 실패하면 None (모델 추론으로 계속).
         반환 타입: DocumentLabel with .level_code, .labeled_by, .confidence 속성.
-
-        보안: tenant_id가 주어지면 그 tenant 소유 문서의 검증 라벨만 반환 —
-        교차테넌트 검증 등급 유출 차단.
         """
         try:
             from lloydk.db import SessionLocal  # noqa: PLC0415
@@ -504,11 +497,11 @@ class ClassifyService:
             db = SessionLocal()
             try:
                 repo = ClassifyRepo(db)
-                dl = repo.get_verified_document_label(doc_uuid, tenant_id=tenant_id)
+                dl = repo.get_verified_document_label(doc_uuid)
                 if dl is None:
                     # doc_id는 업로드마다 유니크 → 같은 내용 재업로드는 새 doc_id라 위에서 못 잡는다.
                     # 동일 file_hash(동일 바이트)의 다른 문서에 검증 라벨이 있으면 재사용(추론 스킵).
-                    dl = self._verified_label_by_content(db, repo, doc_uuid, tenant_id)
+                    dl = self._verified_label_by_content(db, repo, doc_uuid)
                 if dl is None:
                     return None
                 # level_code 조회
@@ -529,13 +522,13 @@ class ClassifyService:
             return None
 
     @staticmethod
-    def _verified_label_by_content(db, repo, doc_uuid, tenant_id) -> "object | None":
+    def _verified_label_by_content(db, repo, doc_uuid) -> "object | None":
         """동일 내용(file_hash) 문서의 검증 라벨 재사용 — doc_id는 업로드마다 유니크하므로,
         같은 내용 재업로드(다른 doc_id)에도 사람이 검증한 등급을 적용한다.
 
         '유사'가 아니라 **정확히 동일 sha256**만 매칭하므로 다른 등급 전파 위험이 없다(동일
         바이트=동일 등급). settings.verified_label_content_reuse=False면 비활성(기존 doc_id-only).
-        tenant 스코프 유지 — 교차테넌트 검증등급 유출 차단. 모든 예외는 None(추론으로 계속).
+        모든 예외는 None(추론으로 계속).
         """
         try:
             from lloydk.config import settings  # noqa: PLC0415
@@ -551,11 +544,9 @@ class ClassifyService:
             stmt = select(Document.doc_id).where(
                 Document.file_hash == fh, Document.doc_id != doc_uuid
             )
-            if tenant_id is not None:
-                stmt = stmt.where(Document.tenant_id == tenant_id)
             for row in db.execute(stmt).all():
                 sib_id = row[0]
-                dl = repo.get_verified_document_label(sib_id, tenant_id=tenant_id)
+                dl = repo.get_verified_document_label(sib_id)
                 if dl is not None:
                     return dl
         except Exception as exc:  # noqa: BLE001
@@ -580,12 +571,11 @@ class ClassifyService:
         - 성공: classifications.classification_id 사용
         - 실패: 새 UUID + warning에 사유 기록 (예외 안 던짐)
 
-        chunks가 주어지고 doc/tenant가 가용하면 chunks 테이블에 영속화하고
+        chunks가 주어지고 doc가 가용하면 chunks 테이블에 영속화하고
         Evidence chunk_id를 진짜 chunks row UUID로 매핑(표적 2).
         """
         warns: list[str] = []
         doc_uuid = self._parse_doc_uuid(req.doc_id)
-        tenant_id = req.tenant_id or "default"
 
         if doc_uuid is None:
             warns.append(f"persistence skipped: doc_id={req.doc_id!r} is not a UUID")
@@ -609,14 +599,10 @@ class ClassifyService:
             # 별도 트랜잭션에 적재한다(실패해도 분류 폐기 안 함).
             with session_scope() as db:
                 repo = ClassifyRepo(db)
-                if not repo.tenant_exists(tenant_id):
-                    self._inc_persist_failure("no_tenant")
-                    warns.append(f"persistence skipped: tenant_id={tenant_id!r} not found in DB")
-                    return uuid.uuid4(), warns
-                if not repo.document_exists(doc_uuid, tenant_id=tenant_id):
+                if not repo.document_exists(doc_uuid):
                     self._inc_persist_failure("no_doc")
                     warns.append(
-                        f"persistence skipped: doc_id={doc_uuid} not found for tenant={tenant_id!r}"
+                        f"persistence skipped: doc_id={doc_uuid} not found"
                     )
                     return uuid.uuid4(), warns
 
@@ -640,7 +626,6 @@ class ClassifyService:
                     try:
                         ids = chunk_repo.upsert_chunks(
                             doc_id=doc_uuid,
-                            tenant_id=tenant_id,
                             chunks=chunks,
                             replace_existing=True,
                         )
@@ -653,7 +638,6 @@ class ClassifyService:
 
                 cls = repo.create_classification(
                     doc_id=doc_uuid,
-                    tenant_id=tenant_id,
                     model_version=pred.model_version,
                     predicted_level_id=level_id,
                     confidence=float(pred.confidence),
@@ -731,13 +715,11 @@ class ClassifyService:
 
         return classification_id, warns
 
-    def _fetch_content_by_doc_id(self, doc_id: str, tenant_id: str | None) -> str:
+    def _fetch_content_by_doc_id(self, doc_id: str) -> str:
         """doc_id로 documents.normalized_text_uri → storage에서 텍스트 읽기.
 
         ingestion 완료 문서는 normalized_text_uri를 갖고 있다.
         storage·DB 미가용 시 빈 문자열 반환 — 호출자가 처리.
-
-        보안: tenant_id가 주어지면 그 tenant 소유 문서만 읽음 — 교차테넌트 본문 유출 차단.
         """
         doc_uuid = self._parse_doc_uuid(doc_id)
         if doc_uuid is None:
@@ -750,7 +732,7 @@ class ClassifyService:
             return ""
         try:
             with session_scope() as db:
-                doc = DocumentRepo(db).get(doc_uuid, tenant_id=tenant_id)
+                doc = DocumentRepo(db).get(doc_uuid)
                 if doc is None or not doc.normalized_text_uri:
                     return ""
                 uri = doc.normalized_text_uri
@@ -793,7 +775,6 @@ class ClassifyService:
         hydrate해 게이트가 실제로 발동하도록 한다.
 
         - 요청이 출처를 명시했으면 그대로 둔다(요청 우선 — 덮어쓰지 않음).
-        - tenant 스코프로 문서를 조회한다(교차테넌트 출처 유출 차단).
         - best-effort: DB 미가용·문서 부재·content 직접분류(doc_id 없음)면 요청 metadata 그대로.
         """
         meta = dict(req.metadata or {})
@@ -807,7 +788,7 @@ class ClassifyService:
             from lloydk.repositories.document_repo import DocumentRepo  # noqa: PLC0415
 
             with session_scope() as db:
-                doc = DocumentRepo(db).get(doc_uuid, tenant_id=req.tenant_id)
+                doc = DocumentRepo(db).get(doc_uuid)
                 stored = getattr(doc, "metadata_", None) if doc is not None else None
                 if isinstance(stored, dict):
                     src = stored.get("source_type") or stored.get("source")

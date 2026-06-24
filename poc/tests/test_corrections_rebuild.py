@@ -24,7 +24,6 @@ from lloydk.db.models import (
     ClassificationLevel,
     Correction,
     Document,
-    Tenant,
 )
 from lloydk.modules.m6_evaluation.corrections_rebuild import (
     RebuildResult,
@@ -130,37 +129,29 @@ def db():
 
 
 @pytest.fixture
-def tenant_id(db):
-    tid = f"reb-{uuid.uuid4().hex[:8]}"
-    db.add(Tenant(tenant_id=tid, name=f"Tenant {tid}"))
-    db.flush()
-    return tid
-
-
-@pytest.fixture
 def levels(db):
     return {lv.level_code: lv.level_id for lv in db.query(ClassificationLevel).all()}
 
 
-def _seed_doc_with_chunks(db, tenant_id, *, chunks=None, preview=None) -> Document:
+def _seed_doc_with_chunks(db, *, chunks=None, preview=None) -> Document:
     doc = Document(
-        tenant_id=tenant_id, filename="x.pdf", source_format="pdf",
+        filename="x.pdf", source_format="pdf",
         text_preview=preview,
     )
     db.add(doc)
     db.flush()
     for i, content in enumerate(chunks or []):
         db.add(Chunk(
-            doc_id=doc.doc_id, tenant_id=tenant_id, chunk_index=i,
+            doc_id=doc.doc_id, chunk_index=i,
             content=content, token_count=len(content.split()), char_count=len(content),
         ))
     db.flush()
     return doc
 
 
-def _seed_cls(db, tenant_id, levels, doc, code, version) -> Classification:
+def _seed_cls(db, levels, doc, code, version) -> Classification:
     cls = Classification(
-        doc_id=doc.doc_id, tenant_id=tenant_id, model_version=version,
+        doc_id=doc.doc_id, model_version=version,
         predicted_level_id=levels[code], confidence=0.9, alternatives=[],
     )
     db.add(cls)
@@ -170,10 +161,10 @@ def _seed_cls(db, tenant_id, levels, doc, code, version) -> Classification:
 
 @db_backed
 class TestRebuildLive:
-    def test_chunk_text_and_latest_label(self, db, tenant_id, levels):
+    def test_chunk_text_and_latest_label(self, db, levels):
         version = f"v-reb-{uuid.uuid4().hex[:6]}"
-        doc = _seed_doc_with_chunks(db, tenant_id, chunks=["마스터 키: ABCDEF 공정 파라미터 표"])
-        cls = _seed_cls(db, tenant_id, levels, doc, "S3", version)
+        doc = _seed_doc_with_chunks(db, chunks=["마스터 키: ABCDEF 공정 파라미터 표"])
+        cls = _seed_cls(db, levels, doc, "S3", version)
         # 두 교정: 먼저 S2, 나중에 TS — 최신(TS)이 정답
         c1 = Correction(classification_id=cls.classification_id,
                         original_level_id=levels["S3"], corrected_level_id=levels["S2"],
@@ -187,7 +178,7 @@ class TestRebuildLive:
         db.flush()
         db.commit()
         try:
-            res = build_labeled_rows_from_corrections(tenant_id=tenant_id)
+            res = build_labeled_rows_from_corrections()
             assert res.row_count == 1
             assert res.rows[0]["label"] == "TS"          # 최신 교정
             assert "마스터 키" in res.rows[0]["text"]      # 본문은 chunk
@@ -200,19 +191,19 @@ class TestRebuildLive:
                 ).delete(synchronize_session=False)
                 s.query(Classification).filter_by(model_version=version).delete()
 
-    def test_text_preview_fallback_and_skip_when_no_text(self, db, tenant_id, levels):
+    def test_text_preview_fallback_and_skip_when_no_text(self, db, levels):
         version = f"v-reb2-{uuid.uuid4().hex[:6]}"
         # 문서 A: chunk 없음, preview 있음 → preview 사용
-        doc_a = _seed_doc_with_chunks(db, tenant_id, preview="프리뷰 본문 충분히 김 영업비밀")
-        cls_a = _seed_cls(db, tenant_id, levels, doc_a, "S3", version)
+        doc_a = _seed_doc_with_chunks(db, preview="프리뷰 본문 충분히 김 영업비밀")
+        cls_a = _seed_cls(db, levels, doc_a, "S3", version)
         ca = Correction(classification_id=cls_a.classification_id,
                         original_level_id=levels["S3"], corrected_level_id=levels["S1"],
                         direction="underclass", corrected_by="qa")
         db.add(ca)
         db.flush()
         # 문서 B: chunk도 preview도 없음 → 제외 + 소비 안 됨
-        doc_b = _seed_doc_with_chunks(db, tenant_id)
-        cls_b = _seed_cls(db, tenant_id, levels, doc_b, "S3", version)
+        doc_b = _seed_doc_with_chunks(db)
+        cls_b = _seed_cls(db, levels, doc_b, "S3", version)
         cb = Correction(classification_id=cls_b.classification_id,
                         original_level_id=levels["S3"], corrected_level_id=levels["TS"],
                         direction="underclass", corrected_by="qa")
@@ -220,7 +211,7 @@ class TestRebuildLive:
         db.flush()
         db.commit()
         try:
-            res = build_labeled_rows_from_corrections(tenant_id=tenant_id)
+            res = build_labeled_rows_from_corrections()
             assert res.row_count == 1
             assert res.rows[0]["label"] == "S1"
             assert "프리뷰 본문" in res.rows[0]["text"]

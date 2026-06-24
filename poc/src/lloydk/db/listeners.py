@@ -45,28 +45,19 @@ def _cascade_chunks_on_document_delete(
     DocumentService.delete_document 가 이미 ChunkRepo로 청크를 정리했어도
     멱등이라 안전 — 0행 추가 삭제.
     """
+    # tenant 제거: doc_id 단독으로 chunk 정리 충분 (격리는 KL 포털 전담).
     doc_id = target.doc_id
-    tenant_id = target.tenant_id
-    if doc_id is None or tenant_id is None:
+    if doc_id is None:
         # 비정상 상태 — 무결성을 위해 단순히 스킵 (예: 트랜잭션 외부에서
         # detached 인스턴스로 호출된 케이스).
-        logger.debug(
-            "cascade skip: doc_id=%s tenant_id=%s (unbound state)",
-            doc_id, tenant_id,
-        )
+        logger.debug("cascade skip: doc_id=%s (unbound state)", doc_id)
         return
 
-    stmt = delete(Chunk).where(
-        Chunk.doc_id == doc_id,
-        Chunk.tenant_id == tenant_id,
-    )
+    stmt = delete(Chunk).where(Chunk.doc_id == doc_id)
     result = connection.execute(stmt)
     deleted = int(result.rowcount or 0)
     if deleted > 0:
-        logger.info(
-            "cascade chunks: doc_id=%s tenant_id=%s deleted=%d",
-            doc_id, tenant_id, deleted,
-        )
+        logger.info("cascade chunks: doc_id=%s deleted=%d", doc_id, deleted)
 
 
 def register_listeners() -> None:

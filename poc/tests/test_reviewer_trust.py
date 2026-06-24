@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from lloydk.db import SessionLocal, engine, session_scope
-from lloydk.db.models import Classification, ClassificationLevel, Correction, Document, Tenant
+from lloydk.db.models import Classification, ClassificationLevel, Correction, Document
 from lloydk.modules.m6_evaluation.reviewer_trust import (
     compute_reviewer_reliability,
     reviewer_reliability,
@@ -67,16 +67,13 @@ class TestReviewerReliabilityLive:
         good, good2, bad = f"good-{tag}", f"good2-{tag}", f"bad-{tag}"
         s = SessionLocal()
         try:
-            tid = f"rt-{tag}"
-            s.add(Tenant(tenant_id=tid, name=tid))
-            s.flush()
             lv = {x.level_code: x.level_id for x in s.query(ClassificationLevel).all()}
 
             def _cls():
-                d = Document(tenant_id=tid, filename="x.pdf", source_format="pdf")
+                d = Document(filename="x.pdf", source_format="pdf")
                 s.add(d)
                 s.flush()
-                c = Classification(doc_id=d.doc_id, tenant_id=tid, model_version=f"v-{tag}",
+                c = Classification(doc_id=d.doc_id, model_version=f"v-{tag}",
                                    predicted_level_id=lv["S3"], confidence=0.9, alternatives=[])
                 s.add(c)
                 s.flush()

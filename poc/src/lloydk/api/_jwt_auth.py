@@ -6,7 +6,8 @@
 - 알고리즘 RS256만 허용 (HS256·none 거부)
 - exp(만료) 강제 — 부재 또는 만료 시 401
 - kid claim으로 키 로테이션 지원 (settings.jwt_jwks_path에서 JWKS 로드)
-- claims: sub, tenant, roles, exp, iat, kid
+- claims: sub, roles, exp, iat, kid
+  (tenant 제거: Lloydk는 단일 고객사 엔진, 격리는 KL 포털 전담)
 
 PyJWT가 설치돼 있으면 그것을 사용, 아니면 표준 라이브러리만으로 검증(서명 부분은 cryptography 필요).
 운영 환경: `pip install -e ".[jwt]"` 권장.
@@ -52,8 +53,9 @@ def assert_production_auth_config() -> None:
 
     L-jwt-aud: jwt 모드인데 jwt_issuer/jwt_audience가 비면 같은 키로 서명된 타 용도
       토큰을 수락(confused deputy). 둘 다 설정돼야 함.
-    L-apikey-honor: api_key 모드는 단일 공유키라 본 함수에서 막진 않으나, 테넌트별
-      api_key_hash 미등록 시 body tenant 무검증 통과(honor-system)임을 경고로 노출.
+
+    tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). 테넌트별 api_key_hash·
+    honor-system 경고는 더 이상 없음.
     """
     if not _is_production():
         return
@@ -70,20 +72,12 @@ def assert_production_auth_config() -> None:
                 "iss/aud 미검증 시 같은 키로 서명된 타 용도 JWT를 수락(confused deputy)합니다. "
                 "JWT_ISSUER / JWT_AUDIENCE 를 명시하세요."
             )
-    if mode in ("api_key", "both"):
-        # 단일 공유키 자체는 운영에서 허용(서비스 호출자=신뢰). 다만 테넌트별 api_key_hash가
-        # 등록돼 있지 않으면 X-Tenant-Id가 honor-system으로 통과됨을 운영자에게 경고.
-        logger.warning(
-            "auth_mode=%s 운영 — 테넌트별 api_key_hash 미등록 테넌트의 X-Tenant-Id는 "
-            "honor-system으로 통과합니다(스코프 결속에는 미사용). 테넌트 격리가 필요하면 "
-            "각 테넌트에 api_key_hash 를 등록하세요.", mode,
-        )
 
 
 @dataclass
 class JWTClaims:
+    # tenant 제거: 단일 고객사 엔진, 격리는 KL 포털 전담.
     sub: str
-    tenant: str = ""
     roles: tuple[str, ...] = ()
     kid: str = ""
     exp: int = 0
@@ -190,7 +184,6 @@ def verify_jwt(token: str) -> JWTClaims:
 
     return JWTClaims(
         sub=str(payload.get("sub", "")),
-        tenant=str(payload.get("tenant", "")),
         roles=tuple(payload.get("roles", []) or []),
         kid=kid,
         exp=int(exp),
@@ -243,31 +236,8 @@ def require_jwt(authorization: str = Header(...)) -> JWTClaims:
         raise HTTPException(status_code=401, detail=f"invalid jwt: {e}")
 
 
-def _check_api_key_hash(raw_key: str, stored_hash: str) -> bool:
-    """저장된 hash와 raw key 비교.
-
-    지원 포맷 (자동 감지):
-      $2b$... — bcrypt (운영 표준)
-      sha256:<hex> — 구형 포맷 (마이그레이션 경로)
-    """
-    if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
-        try:
-            import bcrypt  # noqa: PLC0415
-            return bcrypt.checkpw(raw_key.encode(), stored_hash.encode())
-        except Exception:  # noqa: BLE001
-            return False
-    if stored_hash.startswith("sha256:"):
-        import hashlib  # noqa: PLC0415
-        return hashlib.sha256(raw_key.encode()).hexdigest() == stored_hash[7:]
-    # 레거시: 64자 hex (SHA-256 plain)
-    import hashlib  # noqa: PLC0415
-    return hashlib.sha256(raw_key.encode()).hexdigest() == stored_hash
-
-
-def hash_api_key(raw_key: str) -> str:
-    """새 API 키를 bcrypt hash로 변환. 키 생성/교체 시 사용."""
-    import bcrypt  # noqa: PLC0415
-    return bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt(rounds=12)).decode()
+# tenant 제거: per-tenant api_key_hash 검증·생성 헬퍼(_check_api_key_hash·
+# hash_api_key) 삭제. 인증은 단일 KL 자격(공유 X-API-Key 또는 서명 JWT)만 사용.
 
 
 # 유효한 RBAC 역할 — schemas.common.Actor 패턴과 일치.
@@ -305,114 +275,37 @@ def _resolve_api_key_roles(request: Request) -> tuple[str, ...]:
     return (role,)
 
 
-def _verify_tenant_api_key(tenant_id: str, api_key: str) -> bool:
-    """tenant.api_key_hash 와 요청 키를 비교. hash 미설정 시 통과 (하위호환).
-
-    보안: hash가 설정된 테넌트는 DB 오류로 검증 불가 시 fail-closed(401) —
-    DB 장애를 틈탄 검증 우회를 차단. DB 미가용 자체는 운영에서 서비스 불가 상태이므로
-    fail-closed가 안전. 테넌트 부재·hash 미설정은 하위호환 통과.
-
-    반환: hash가 설정돼 있고 일치 검증을 통과하면 ``True`` (= 이 tenant_id는
-    인증상 authoritative). hash 미설정(하위호환 통과)이면 ``False`` (= tenant_id를
-    신뢰할 근거 없음 — 테넌트 스코프 결속에 쓰지 않음). 불일치/오류는 예외.
-    """
-    try:
-        from lloydk.db import session_scope  # noqa: PLC0415
-        from lloydk.db.models import Tenant  # noqa: PLC0415
-        with session_scope() as db:
-            tenant = db.get(Tenant, tenant_id)
-            if tenant is None or not tenant.api_key_hash:
-                return False  # hash 미설정 → 검증 skip (하위호환), 신뢰 불가
-            if not _check_api_key_hash(api_key, tenant.api_key_hash):
-                raise HTTPException(status_code=401, detail="invalid tenant api key")
-            return True  # hash 일치 → 이 tenant_id는 검증됨
-    except HTTPException:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        # DB 조회 실패 — hash 설정 여부를 알 수 없으므로 fail-closed.
-        logger.error("tenant api key verification failed (DB error), denying: %s", exc)
-        raise HTTPException(status_code=503, detail="tenant verification unavailable") from exc
-
-
 def _stash_auth(
     request: Request,
     *,
     mode: str,
-    tenant: str | None,
     actor: str | None,
     role: str | None,
 ) -> None:
     """해소된 인증 신원을 request.state에 저장.
 
-    엔드포인트(tenant 결속)와 audit 미들웨어(위조 불가 actor/tenant 기록)가
-    원시 헤더 대신 이 값을 사용한다. tenant는 *authoritative* 한 경우에만 채운다
-    (서명된 JWT claim, 또는 hash 검증된 api_key tenant). 그렇지 않으면 None.
+    audit 미들웨어(위조 불가 actor 기록)와 rate-limit이 원시 헤더 대신 이 값을
+    사용한다. tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), per-customer
+    경계 없음.
     """
     request.state.auth_mode = mode
-    request.state.auth_tenant = tenant or None
     request.state.auth_actor = actor or None
     request.state.auth_role = role or None
-
-
-def resolve_effective_tenant(request: Request, body_tenant_id: str | None) -> str | None:
-    """요청 body의 tenant_id를 인증 컨텍스트에 결속해 *유효 tenant*를 반환.
-
-    이후 모든 doc 조회(content fetch / verified label / 영속화)는 이 값으로
-    스코프돼야 한다 — 객체 수준 권한(IDOR/BOLA) 차단의 핵심.
-
-    정책:
-    - jwt: claims.tenant(서명됨)가 진실. body가 다르면 403. tenant claim이 없는
-      JWT가 tenant_id를 주장하면 스코프 보증 불가 → 403.
-    - api_key + hash 검증된 X-Tenant-Id: 그 tenant가 진실. body가 다르면 403.
-    - api_key + 미검증(단일 공유키 레거시): authoritative tenant 부재 → body를
-      그대로 사용(하위호환). 이 경우에도 repo 계층이 body tenant로 스코프하므로
-      "주장한 tenant의 문서"만 접근 가능.
-    """
-    auth_mode = getattr(request.state, "auth_mode", "api_key")
-    auth_tenant = getattr(request.state, "auth_tenant", None)
-    body_tenant_id = body_tenant_id or None
-
-    if auth_mode == "jwt":
-        if auth_tenant:
-            if body_tenant_id and body_tenant_id != auth_tenant:
-                raise HTTPException(
-                    status_code=403,
-                    detail="tenant_id does not match authenticated tenant",
-                )
-            return auth_tenant
-        # tenant claim 없는 JWT — tenant 주장은 거부(스코프 보증 불가)
-        if body_tenant_id:
-            raise HTTPException(
-                status_code=403,
-                detail="JWT has no tenant claim; cannot assert tenant_id",
-            )
-        return None
-
-    # api_key / both
-    if auth_tenant:  # hash 검증된 X-Tenant-Id
-        if body_tenant_id and body_tenant_id != auth_tenant:
-            raise HTTPException(
-                status_code=403,
-                detail="tenant_id does not match verified X-Tenant-Id",
-            )
-        return auth_tenant
-    return body_tenant_id
 
 
 def require_auth(
     request: Request,
     authorization: str | None = Header(default=None),
     x_api_key: str | None = Header(default=None),
-    x_tenant_id: str | None = Header(default=None),
 ):
     """모드 자동 선택 — settings.auth_mode=jwt|api_key.
 
     - api_key (default): X-API-Key 검증
-    - jwt: Authorization: Bearer 검증
+    - jwt: Authorization: Bearer 검증 (KL 서명 JWT, KL이 유일 발급자)
     - both: 둘 중 하나 만족
 
-    JWT 모드에서는 X-Tenant-Id 헤더와 JWT claim의 tenant가 다르면 401 반환.
-    api_key 모드에서는 X-Tenant-Id가 있어도 JWT claim이 없어 비교 불가 — 그대로 통과.
+    tenant 제거: 단일 KL 인증이 곧 인증의 전부(서명검증). 고객사 격리는 KL 포털
+    라우팅이 상류에서 전담하므로 Lloydk 내부엔 per-customer 경계가 없다.
     """
     mode = (getattr(settings, "auth_mode", "api_key") or "api_key").lower()
     if mode in ("api_key", "both"):
@@ -421,26 +314,7 @@ def require_auth(
         if x_api_key and settings.api_key and hmac.compare_digest(x_api_key, settings.api_key):
             # 보안: 역할은 서버 설정에서 결정 (X-Actor-Role 헤더 위조 차단).
             roles = _resolve_api_key_roles(request)
-            # tenant API key hash 검증 (설정된 경우). hash 일치 시에만 tenant가
-            # authoritative — 그때만 audit/스코프 결속에 사용(미검증 헤더 신뢰 금지).
-            # L-apikey-honor: 운영(poc_mode=full)에서 X-Tenant-Id를 주장하는데 해당
-            # 테넌트에 api_key_hash가 등록돼 있지 않으면 honor-system 통과를 막고 거부
-            # (fail-closed). dev/단일테넌트는 비파괴(검증 skip, body tenant 그대로 사용).
-            verified_tenant: str | None = None
-            if x_tenant_id and x_api_key:
-                if _verify_tenant_api_key(x_tenant_id, x_api_key):
-                    verified_tenant = x_tenant_id
-                elif _is_production():
-                    raise HTTPException(
-                        status_code=403,
-                        detail=(
-                            "tenant api_key_hash not registered; cannot honor X-Tenant-Id "
-                            "in production"
-                        ),
-                    )
-            _stash_auth(
-                request, mode="api_key", tenant=verified_tenant, actor=None, role=roles[0]
-            )
+            _stash_auth(request, mode="api_key", actor=None, role=roles[0])
             return {"mode": "api_key", "actor_role": roles[0], "actor_roles": roles}
         if mode == "api_key":
             raise HTTPException(status_code=401, detail="invalid api key")
@@ -456,25 +330,12 @@ def require_auth(
         except JWTError as e:
             raise HTTPException(status_code=401, detail=f"invalid jwt: {e}")
 
-        # X-Tenant-Id 헤더와 JWT claim tenant 불일치 차단.
-        # 헤더가 없으면 JWT claim을 신뢰 — 헤더가 있을 때만 검증.
-        if x_tenant_id and claims.tenant and x_tenant_id != claims.tenant:
-            logger.warning(
-                "tenant mismatch: header=%r jwt_claim=%r path=%s",
-                x_tenant_id, claims.tenant, request.url.path,
-            )
-            raise HTTPException(
-                status_code=401,
-                detail="tenant mismatch: X-Tenant-Id does not match JWT claim",
-            )
-
         # 보안: 서명된 roles claim을 RBAC 소스로 연결. VALID_ROLES만 채택.
         # roles가 비면 actor_role="" → require_role에서 권한 부족으로 403.
         jwt_roles = tuple(r for r in claims.roles if r in VALID_ROLES)
         _stash_auth(
             request,
             mode="jwt",
-            tenant=claims.tenant,
             actor=claims.sub,
             role=_highest_role(jwt_roles),
         )

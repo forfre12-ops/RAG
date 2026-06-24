@@ -98,7 +98,6 @@ def build_labeled_rows_from_corrections(
     only_unconsumed: bool = True,
     min_chars: int = _DEFAULT_MIN_CHARS,
     trainable_labels: Sequence[str] = _TRAINABLE_LABELS,
-    tenant_id: str | None = None,
 ) -> RebuildResult:
     """unconsumed corrections를 {text,label} 행으로 복원.
 
@@ -130,13 +129,11 @@ def build_labeled_rows_from_corrections(
             if not corrections:
                 return RebuildResult(reason="no_unconsumed_corrections")
 
-            # classification_id → doc_id (+ tenant) 매핑
+            # classification_id → doc_id 매핑
             cls_ids = {c.classification_id for c in corrections}
             cls_stmt = select(Classification).where(
                 Classification.classification_id.in_(cls_ids)
             )
-            if tenant_id:
-                cls_stmt = cls_stmt.where(Classification.tenant_id == tenant_id)
             doc_by_cls = {
                 c.classification_id: c.doc_id
                 for c in db.execute(cls_stmt).scalars()
@@ -149,7 +146,7 @@ def build_labeled_rows_from_corrections(
             for corr in corrections:  # 이미 corrected_at desc
                 doc_id = doc_by_cls.get(corr.classification_id)
                 if doc_id is None:
-                    continue  # tenant 스코프 밖 또는 분류 없음
+                    continue  # 분류 없음
                 code = code_by_id.get(corr.corrected_level_id)
                 if code not in label_set:
                     skipped_bad_label += 1
