@@ -106,8 +106,8 @@ poc/
 | `make p2` | P2 임베딩 dryrun (inmemory) | ❌ |
 | `make p2-full` | **P2 4-way (KURE/BGE × ES dense+hybrid)** | ✅ Q1+E1+E5 |
 | `make p1` / `p3` / `p4` / `p5` | 개별 PoC | 일부 ✅ |
-| `make infra-up` | ES 포함 6개 서비스 기동 | ✅ E5 |
-| `make infra-verify` | 헬스체크 (ES 버전·플러그인) | ✅ E1·E2 |
+| `make infra-up` | postgres(pgvector)·minio·redis·mlflow 기동 | ✅ E5 |
+| `make infra-verify` | 헬스체크 (postgres/minio/redis/mlflow) | ✅ E1·E2 |
 | `make bundle-dry` | **폐쇄망 번들 manifest dry-run** | ❌ |
 | `make api` / `worker` | 로컬 기동 | ❌ |
 
@@ -130,7 +130,7 @@ poc/
 - `seed_keywords.py` — 40개 키워드 시드 DB 또는 JSON dump
 - `p3a_eval_rule_labeler.py` — M3 룰 라벨러 자가검증 (12 시나리오)
 - `init_minio_buckets.py` — MinIO 초기 버킷 생성
-- `verify_infra.py` — Postgres / **Elasticsearch (버전 + cluster health)** / MinIO / Redis / MLflow
+- `verify_infra.py` — Postgres(pgvector) / MinIO / Redis / MLflow
 - **`build_offline_bundle.py`** — 폐쇄망 자기완비 번들 빌더 (dry-run / 실 빌드)
 
 ---
@@ -144,10 +144,11 @@ poc/
 
 | `VECTOR_BACKEND` | 효과 |
 |---|---|
-| `es` (기본) | Elasticsearch dense_vector + BM25 + RRF 하이브리드 |
+| `pg` (기본) | Postgres pgvector dense + bigram-tsvector ts_rank 하이브리드 (의사결정_대장 §03 ⓑ) |
 | `inmemory` | dryrun / 강제 in-memory |
+| `es` | (레거시) elasticsearch 패키지 별도 설치 시에만 |
 
-`.env` 값만 바꾸면 동일 코드에서 모드·백엔드 전환. 자세한 백엔드 결정 흐름은 [doc/13 §5·§8.1](../doc/13_벡터DB_ES_전환_계획서.md).
+`.env` 값만 바꾸면 동일 코드에서 모드·백엔드 전환. ES→PG 전환 근거는 의사결정_대장 §03 (실 PG 측정: 하이브리드 R@5 85% > dense 76%, ts_rank_cd 아닌 ts_rank+norm1).
 
 ---
 
@@ -178,8 +179,8 @@ CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리
 | `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1`(기본) / `BAAI/bge-m3` |
 | `CLASSIFIER_BASE_MODEL` | `kakaobank/kf-deberta-base`(기본) / KoELECTRA |
 | `POC_MODE` | `dryrun`(기본) / `full` |
-| **`VECTOR_BACKEND`** | `es`(기본) / `inmemory` |
-| **`ES_URL` / `ES_USERNAME` / `ES_PASSWORD`** | Elasticsearch 접속 |
+| **`VECTOR_BACKEND`** | `pg`(기본) / `inmemory` / `es`(레거시) |
+| **`DATABASE_URL`** | Postgres(pgvector) — 트랜잭션 + 벡터스토어 겸용 |
 
 ### LLM 설정 시나리오 (W9 일반화 — 원격/로컬 자유 선택)
 
