@@ -149,3 +149,38 @@ def build_golden_set(
         dropped_leaked=dropped_leak,
         stats=stats,
     )
+
+
+_LABELS = ("TS", "S1", "S2", "S3")
+
+
+def make_label_fn(
+    provider: str = "noop",
+    *,
+    rule_pipeline=None,
+    llm_labeler=None,
+) -> Callable[[str], LabelPair]:
+    """실 라벨러(룰 LabelingPipeline + LLM LLMLabeler)를 묶어 label_fn 생성 — 운영용.
+
+    build_golden_set에 주입할 운영 label_fn. 무거운 m3/provider 의존은 lazy import라
+    `build_golden_set`만 쓰는 경로(테스트 포함)는 가볍게 유지된다. 테스트는 fake label_fn을
+    직접 주입한다(이 팩토리를 거치지 않음). make_llm_judge_gold의 run_rule/llm_labeler와 동일 구성.
+    """
+    from lloydk.modules.m3_labeling import LabelingPipeline  # lazy
+
+    rp = rule_pipeline or LabelingPipeline()
+    if llm_labeler is None:
+        from lloydk.adapters.llm import build_provider  # lazy
+        from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # lazy
+
+        llm_labeler = LLMLabeler(provider=build_provider(provider))
+    ll = llm_labeler
+
+    def label_fn(text: str) -> LabelPair:
+        rr = rp.label(text)
+        rule_grade = rr.grade.value if hasattr(rr.grade, "value") else str(rr.grade)
+        lr = ll.label(text)
+        llm_grade = lr.grade if lr.grade in _LABELS else "S3"
+        return LabelPair(rule_grade, float(rr.confidence), llm_grade, float(lr.confidence))
+
+    return label_fn
