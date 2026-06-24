@@ -155,3 +155,69 @@ def test_synthesize_answer_clean_citations_no_warning():
         query="질문", hits=_hits(3), provider=_FakeProvider("근거 [1]과 [2]에 따르면 그렇다.")
     )
     assert not any("out-of-range" in w or "cites no source" in w for w in res.warnings)
+
+
+# ---------------------------------------------------------------------------
+# answer_enforce_citations (config 플래그) — 환각 인용 집행/관측
+# ---------------------------------------------------------------------------
+
+def test_enforce_citations_off_keeps_llm_answer_with_warning():
+    """기본 OFF: out-of-range 인용이 있어도 LLM 답변 유지 + 경고만(동작 보존)."""
+    from lloydk import config as config_mod
+
+    saved = config_mod.settings.answer_enforce_citations
+    config_mod.settings.answer_enforce_citations = False
+    try:
+        res = synthesize_answer(
+            query="질문", hits=_hits(3), provider=_FakeProvider("근거 [1] 그리고 [9].")
+        )
+    finally:
+        config_mod.settings.answer_enforce_citations = saved
+
+    # OFF면 LLM 답변 그대로 — 강등 안 함.
+    assert res.deterministic_fallback is False
+    assert res.answer == "근거 [1] 그리고 [9]."
+    # 경고는 남는다 (관측 신호).
+    assert any("out-of-range" in w for w in res.warnings)
+    assert any(w.startswith("hallucination_risk:") for w in res.warnings)
+    # 집행 강등 마커는 없어야 한다.
+    assert not any("citation enforcement" in w for w in res.warnings)
+
+
+def test_enforce_citations_on_demotes_out_of_range_to_deterministic():
+    """ON: out-of-range 인용이 있으면 결정론적 답변으로 강등(환각 인용 차단)."""
+    from lloydk import config as config_mod
+
+    saved = config_mod.settings.answer_enforce_citations
+    config_mod.settings.answer_enforce_citations = True
+    try:
+        res = synthesize_answer(
+            query="질문", hits=_hits(3), provider=_FakeProvider("근거 [1] 그리고 [9].")
+        )
+    finally:
+        config_mod.settings.answer_enforce_citations = saved
+
+    # 강등 → deterministic, LLM 텍스트는 폐기.
+    assert res.deterministic_fallback is True
+    assert "[9]" not in res.answer
+    assert any("citation enforcement" in w for w in res.warnings)
+    # citations은 강등 경로에서도 보존.
+    assert len(res.citations) == 3
+
+
+def test_enforce_citations_on_clean_answer_not_demoted():
+    """ON이어도 인용이 정상(범위 내)이면 LLM 답변 유지 — 깨끗한 답변은 강등 안 함."""
+    from lloydk import config as config_mod
+
+    saved = config_mod.settings.answer_enforce_citations
+    config_mod.settings.answer_enforce_citations = True
+    try:
+        res = synthesize_answer(
+            query="질문", hits=_hits(3), provider=_FakeProvider("근거 [1]과 [2]에 따르면 그렇다.")
+        )
+    finally:
+        config_mod.settings.answer_enforce_citations = saved
+
+    assert res.deterministic_fallback is False
+    assert res.answer == "근거 [1]과 [2]에 따르면 그렇다."
+    assert not any("citation enforcement" in w for w in res.warnings)

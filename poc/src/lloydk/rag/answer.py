@@ -237,12 +237,13 @@ def synthesize_answer(
     warnings_acc.append(f"hallucination_risk:{n_out_of_range}")
 
     # #16: 인용 검증을 경고만이 아니라 집행(enforce)으로 승격 — opt-in, 기본 비활성.
-    # config.py를 건드리지 않고 settings에서 getattr 기본 False로 읽어 기존 동작 보존.
+    # settings.answer_enforce_citations(config.py에 정식 필드, 기본 False)로 켠다.
+    # settings 자체 로드가 실패하는 비정상 환경에서도 기존 동작(경고만) 유지.
     enforce = False
     try:
         from lloydk.config import settings  # noqa: PLC0415
 
-        enforce = bool(getattr(settings, "answer_enforce_citations", False))
+        enforce = bool(settings.answer_enforce_citations)
     except Exception as exc:  # noqa: BLE001 — settings 미구성 시에도 기존 동작 유지
         logger.debug("rag_answer: settings load failed (%s) — enforce off", exc)
 

@@ -382,6 +382,16 @@ class Settings(BaseSettings):
     rag_operational_embedding_model: str = "nlpai-lab/KURE-v1"
     rag_operational_search_mode: str = "hybrid"
 
+    # RAG /answer 인용 강제(citation enforcement). 기본 False = 동작 보존(경고만).
+    # synthesize_answer는 LLM 답변의 [n] 인용을 hits 범위와 대조해 환각 인용
+    # (존재하지 않는 근거 번호 인용 = out-of-range)을 warnings의 'hallucination_risk:<n>'
+    # 마커로 관측만 한다. True면 그 경고를 집행(enforce)으로 승격한다: out-of-range 인용이
+    # 1건이라도 있으면 해당 LLM 답변을 폐기하고 결정론적(deterministic) 답변으로 강등해
+    # 환각 인용이 사용자에게 노출되는 것을 차단한다(citations·grade는 보존). 기본 False라
+    # 현 동작 불변 — 인용 품질을 강하게 보장해야 하는 배포에서만 .env로 opt-in한다.
+    # 이전엔 settings에 미정의라 미문서화 env(getattr 폴백)로만 동작했다(정식화).
+    answer_enforce_citations: bool = False
+
     # --- 업로드 한도 (DoS 차단) ---
     # R3: guide upload·classify content 본문 크기 한도. 환경변수 LLOYDK_MAX_UPLOAD_MB로 조정.
     # 운영 기본 20MB — 대부분 가이드 PDF·DOCX 커버. 초과 시 413 Payload Too Large 반환.
