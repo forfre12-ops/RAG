@@ -31,6 +31,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 import sys
 import uuid
 from datetime import datetime
@@ -81,8 +82,23 @@ def load_input(path: Path) -> list[dict]:
 # placeholder를 거부해 검수 출처 추적성·사인오프 보증의 구멍을 막는다. (Claude가
 # reviewer_id를 채우는 것은 여전히 금지 — 본 검증은 '빈 값 거부'만 한다.)
 _PLACEHOLDER_REVIEWERS = frozenset(
-    {"", "human", "reviewer", "tbd", "-", "n/a", "na", "system", "ai", "claude", "unknown", "none"}
+    {"", "human", "reviewer", "tbd", "-", "n/a", "na", "system", "ai", "ai_assist",
+     "claude", "unknown", "none", "auto", "bot", "llm"}
 )
+# ai_assist·llm_judge_*·claude-x 등 머신 생성 식별자는 사람 사인오프가 아니므로 거부.
+# (build_review_assist는 reviewer_id를 비워 두지만, 누군가 'ai_assist'로 채워 .signed.csv를
+#  만들면 정확매칭 placeholder를 빠져나가 human_review로 위장 승격되는 구멍이 있었다.)
+# "aiden" 같은 사람 이름 오탐을 막으려 접두사 뒤 구분자(_/-)를 요구한다.
+_MACHINE_REVIEWER_PREFIX = re.compile(r"^(ai|llm|gpt|claude|bot|auto)[_\-]")
+
+
+def _is_machine_reviewer(reviewer_id: str) -> bool:
+    r = reviewer_id.strip().lower()
+    return (
+        r in _PLACEHOLDER_REVIEWERS
+        or "assist" in r
+        or bool(_MACHINE_REVIEWER_PREFIX.match(r))
+    )
 
 
 def validate_record(row: dict, idx: int) -> tuple[dict | None, list[str]]:
@@ -100,10 +116,10 @@ def validate_record(row: dict, idx: int) -> tuple[dict | None, list[str]]:
         errors.append(f"[row {idx}] human_label 무효: {human_label!r}")
 
     reviewer_id = (row.get("reviewer_id") or "").strip()
-    if reviewer_id.lower() in _PLACEHOLDER_REVIEWERS:
+    if _is_machine_reviewer(reviewer_id):
         errors.append(
-            f"[row {idx}] reviewer_id 없음/placeholder({reviewer_id!r}) — "
-            "human_review는 실제 검수자 식별자가 필수(사인오프 보증). "
+            f"[row {idx}] reviewer_id 없음/placeholder/머신생성({reviewer_id!r}) — "
+            "human_review는 실제 사람 검수자 식별자가 필수(사인오프 보증). "
             "build_review_assist가 비워둔 행을 사람이 확인·기입해야 함."
         )
 

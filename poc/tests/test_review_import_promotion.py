@@ -68,3 +68,29 @@ def test_unknown_doc_is_appended_as_human_review(tmp_path, monkeypatch):
     assert len(rows) == 2
     assert by_id["new1"]["label_source"] == "human_review"
     assert by_id["new1"]["label"] == "S1"
+
+
+def test_machine_reviewer_id_rejected():
+    # human_review는 사람 사인오프만 인정 — ai_assist 등 머신 식별자는 거부.
+    # (build_review_assist 사전작성본이 위장 서명으로 승격되는 구멍 차단)
+    for rid in ("ai_assist", "AI_ASSIST", "llm_judge_anthropic", "claude-review",
+                "auto", "bot_x", "", "human"):
+        assert iric._is_machine_reviewer(rid), f"머신 id 미차단: {rid!r}"
+    for rid in ("r1", "reviewer-1", "kim@corp.com", "aiden_kim", "홍길동"):
+        assert not iric._is_machine_reviewer(rid), f"사람 id 오차단: {rid!r}"
+
+
+def test_validate_record_rejects_ai_assist():
+    row = {"doc_id": "d1", "model_label": "S1", "human_label": "S3",
+           "reviewer_id": "ai_assist", "text": "t"}
+    rec, errs = iric.validate_record(row, 1)
+    assert rec is None
+    assert any("reviewer_id" in e for e in errs)
+
+
+def test_validate_record_accepts_real_reviewer():
+    row = {"doc_id": "d1", "model_label": "S1", "human_label": "S3",
+           "reviewer_id": "r1", "text": "t"}
+    rec, errs = iric.validate_record(row, 1)
+    assert rec is not None and not errs
+    assert rec["reviewer_id"] == "r1"
