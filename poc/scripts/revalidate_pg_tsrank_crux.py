@@ -114,32 +114,38 @@ def main() -> int:
         n = cur.execute("SELECT count(*) FROM crux_lex").fetchone()[0]
         print(f"[pg] crux_lex 적재 {n} (stock PG, 확장 불요)")
 
-        hits = []
-        for qb in q_big:
-            cur.execute(
-                """
-                SELECT id FROM crux_lex
-                WHERE tsv @@ plainto_tsquery('simple', %(q)s)
-                ORDER BY ts_rank_cd(tsv, plainto_tsquery('simple', %(q)s)) DESC
-                LIMIT 10
-                """,
-                {"q": qb},
-            )
-            hits.append([r[0] for r in cur.fetchall()])
-
+        # OR 의미(BM25 정합): bigram 토큰을 ' | ' 로 묶어 to_tsquery (plainto=AND라 패러프레이즈서 0매치).
+        qors = [(" | ".join(qb.split()) or "__nomatch__") for qb in q_big]
+        # ts_rank 변형 스윕 — IDF 없는 코어 채점의 천장 탐색. norm: 0=길이무시, 1=1+log(len),
+        # 16=1+log(unique words), 32=rank/(rank+1). cd=cover density(근접) vs plain.
+        VARIANTS = [
+            ("ts_rank_cd n0", "ts_rank_cd(tsv, to_tsquery('simple', %(q)s))"),
+            ("ts_rank_cd n1", "ts_rank_cd(tsv, to_tsquery('simple', %(q)s), 1)"),
+            ("ts_rank_cd n16", "ts_rank_cd(tsv, to_tsquery('simple', %(q)s), 16)"),
+            ("ts_rank    n0", "ts_rank(tsv, to_tsquery('simple', %(q)s))"),
+            ("ts_rank    n1", "ts_rank(tsv, to_tsquery('simple', %(q)s), 1)"),
+            ("ts_rank    n16", "ts_rank(tsv, to_tsquery('simple', %(q)s), 16)"),
+        ]
+        var_hits: dict[str, list] = {name: [] for name, _ in VARIANTS}
+        for name, rankexpr in VARIANTS:
+            sql = (f"SELECT id FROM crux_lex WHERE tsv @@ to_tsquery('simple', %(q)s) "
+                   f"ORDER BY {rankexpr} DESC LIMIT 10")
+            for qor in qors:
+                cur.execute(sql, {"q": qor})
+                var_hits[name].append([r[0] for r in cur.fetchall()])
         cur.execute("DROP TABLE IF EXISTS crux_lex")
 
-    print("\n=== 실 PG ts_rank_cd (bigram 토큰) Recall — 프록시 대조 ===")
-    for k in (1, 5, 10):
-        ov, by = recall_by_grade(hits, q_gold, q_grade, k)
-        print(f"  R@{k:<2} 전체={ov*100:>3.0f}%  " + "  ".join(f"{g}={by[g]*100:>3.0f}%" for g in GRADES))
-
-    ov5, _ = recall_by_grade(hits, q_gold, q_grade, 5)
-    print("\n[프록시 NL@5 기대치] bigram ts_rank≈87% · morph≈85% (scripts/_bench_pg_lexical_revalidation --tag nl)")
-    print(f"[실 PG ts_rank@5] {ov5*100:.0f}%")
-    delta = ov5 * 100 - 87
-    verdict = "ⓑ 확정(±5pp 이내)" if abs(delta) <= 5 else ("ⓑ 우세" if delta > 0 else "ⓒ(BM25 확장) 검토 — 프록시 대비 퇴행")
-    print(f"[게이트] Δ(실−프록시)={delta:+.0f}pp → {verdict}")
+    print("\n=== 실 PG ts_rank 변형별 Recall@5 (NL, bigram OR; IDF 없는 코어의 천장) ===")
+    best_name, best = None, 0.0
+    for name, _ in VARIANTS:
+        ov, by = recall_by_grade(var_hits[name], q_gold, q_grade, 5)
+        if ov > best:
+            best_name, best = name, ov
+        print(f"  {name:16s} 전체={ov*100:>3.0f}%  " + "  ".join(f"{g}={by[g]*100:>3.0f}%" for g in GRADES))
+    print(f"\n[프록시 NL@5] bigram ts_rank(idf=1 근사)≈87% · morph≈85%")
+    print(f"[실 PG 최선] {best_name} = {best*100:.0f}%   Δ(실−프록시)={best*100-87:+.0f}pp")
+    print("[해석] PG 코어 ts_rank 는 IDF 부재 → 어떤 변형도 IDF 프록시를 못 따라감이 확인되면")
+    print("       어휘 nori-동급엔 ⓒ(BM25 확장) 또는 앱사이드 BM25 필요. (dense 결합은 별도 측정)")
     return 0
 
 

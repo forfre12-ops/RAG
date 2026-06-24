@@ -212,9 +212,12 @@ class PgVectorStore:
         """
         from sqlalchemy import text  # noqa: PLC0415
 
+        # OR 의미(BM25 정합): plainto_tsquery 는 모든 토큰 AND라 패러프레이즈서 0매치(크럭스서 실측)
+        # → bigram 을 ' | ' 로 묶어 to_tsquery. 토큰은 [가-힣]{2}/[a-z0-9]+ 라 tsquery 특수문자 없음.
+        q_or = " | ".join(self._bigram(query_text).split()) or "__nomatch__"
         params: dict[str, Any] = {
             "collection": collection, "q": self._vec_lit(query_vec),
-            "qt": self._bigram(query_text),   # 질의도 동일 bigram 토큰화 → tsv 와 정합
+            "qt": q_or,
             "cand": rrf_window, "k": rrf_constant, "topk": top_k,
         }
         fwhere = self._filter_sql(filter, params)
@@ -231,11 +234,11 @@ class PgVectorStore:
             l AS (
                 SELECT id, payload, content,
                        row_number() OVER (
-                           ORDER BY ts_rank_cd(tsv, plainto_tsquery('simple', :qt)) DESC
+                           ORDER BY ts_rank_cd(tsv, to_tsquery('simple', :qt)) DESC
                        ) AS rn
                 FROM tb_rag_vectors
                 WHERE collection = :collection
-                  AND tsv @@ plainto_tsquery('simple', :qt){fwhere}
+                  AND tsv @@ to_tsquery('simple', :qt){fwhere}
                 LIMIT :cand
             ),
             fused AS (
