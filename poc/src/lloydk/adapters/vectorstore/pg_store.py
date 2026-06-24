@@ -234,7 +234,9 @@ class PgVectorStore:
             l AS (
                 SELECT id, payload, content,
                        row_number() OVER (
-                           ORDER BY ts_rank_cd(tsv, to_tsquery('simple', :qt)) DESC
+                           -- ts_rank(plain, norm=1: 1+log(len) 길이정규화) — cover-density(ts_rank_cd)는
+                           -- OR-매칭 흩어진 bigram에 근접도 0이라 붕괴(실측 39%); plain+norm1=87%(≈nori). 크럭스 스윕 근거.
+                           ORDER BY ts_rank(tsv, to_tsquery('simple', :qt), 1) DESC
                        ) AS rn
                 FROM tb_rag_vectors
                 WHERE collection = :collection
