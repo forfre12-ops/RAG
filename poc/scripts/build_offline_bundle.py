@@ -279,12 +279,13 @@ def expected_files(components: dict[str, ComponentEntry], models: list[ModelEntr
         files.append(f"models/{m.name.replace('/', '-')}/")
     files.extend([
         "python-deps/wheels/",
-        "python-deps/requirements.lock.txt",
+        "python-deps/_requirements_no_torch.txt",
         "es-plugins/analysis-nori-{ver}.zip",
         "es-plugins/repository-s3-{ver}.zip",
         "infra-config/docker-compose.yml",
+        "infra-config/docker-compose.airgap.yml",
         "infra-config/.env.template",
-        "infra-config/es-index-template.json",
+        "infra-config/index_template_secrets.json",
         "infra-config/userdict_ko.txt",
         "infra-config/ilm-policy-secrets.json",
         "db-migrations/alembic/",  # baseline + 후속 revision 전체 (init.sql 폐기)
@@ -639,10 +640,21 @@ def _copy_infra(out_dir: Path) -> None:
 
     for src, dst in [
         (_REPO_ROOT / "docker-compose.yml",              infra / "docker-compose.yml"),
+        # 폐쇄망 전용 compose (image 참조·beat 서비스·named 볼륨) — 운영 배포는 이걸 사용.
+        (_REPO_ROOT / "docker-compose.airgap.yml",       infra / "docker-compose.airgap.yml"),
         (_REPO_ROOT / "infra" / "es" / "userdict_ko.txt", infra / "userdict_ko.txt"),
+        # ES 인덱스 템플릿 (secrets-* 패턴) — 운영 시 사전 적용.
+        (_REPO_ROOT / "infra" / "es" / "index_template_secrets.json", infra / "index_template_secrets.json"),
     ]:
         if src.exists():
             shutil.copy2(src, dst)
+
+    # docs — INSTALL 절차서 등 (manifest files_expected의 docs/INSTALL.md 충족)
+    docs_dst = out_dir / "docs"
+    docs_dst.mkdir(parents=True, exist_ok=True)
+    install_md = _REPO_ROOT / "docs" / "INSTALL.md"
+    if install_md.exists():
+        shutil.copy2(install_md, docs_dst / "INSTALL.md")
 
     # .env template
     env_template = infra / ".env.template"
@@ -688,7 +700,7 @@ def _copy_infra(out_dir: Path) -> None:
         "done\n\n"
         "# 2) pip install from wheels\n"
         "pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" \\\n"
-        "  -r \"$BUNDLE_DIR/python-deps/requirements.lock.txt\" || true\n\n"
+        "  -r \"$BUNDLE_DIR/python-deps/_requirements_no_torch.txt\" || true\n\n"
         "# 3) OCR 바이너리 설치 (Linux 온프레미스 기준)\n"
         "if [ -d \"$BUNDLE_DIR/ocr-binaries/tesseract\" ]; then\n"
         "  echo '[OCR] Tesseract 설치 중 ...'\n"
@@ -705,8 +717,9 @@ def _copy_infra(out_dir: Path) -> None:
         "  cp -r \"$BUNDLE_DIR/ocr-binaries/poppler/bin/\"* /usr/local/bin/ || true\n"
         "fi\n\n"
         "# 4) env 설정\n"
-        "cp \"$BUNDLE_DIR/infra-config/.env.template\" .env\n"
-        "echo 'Edit .env, then run: docker compose up -d'\n",
+        "[ -f .env ] || cp \"$BUNDLE_DIR/infra-config/.env.template\" .env\n"
+        "echo 'Next: edit .env, then follow docs/INSTALL.md:'\n"
+        "echo '  docker compose --env-file .env -f infra-config/docker-compose.airgap.yml up -d'\n",
         encoding="utf-8",
     )
     install_sh.chmod(0o755)
