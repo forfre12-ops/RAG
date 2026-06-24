@@ -139,6 +139,41 @@ def synthesize_batch(
         raise
 
 
+@celery_app.task(
+    name="lloydk.golden_build",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=2,
+)
+def golden_build_task(self: Any, req_dict: dict, job_id: str | None = None) -> dict:
+    """통합 골든셋 빌드(위생→라벨→합의→조립)를 워커에서 실행 (G3b).
+
+    GoldenBuildService.run_build이 JobStore 상태(running→done/failed)와 run-스코프 후보
+    파일 출력을 소유한다. 일시 예외 → self.retry(2**attempts). 최종 실패 시 run_build이
+    이미 status=failed를 기록(부분결과 없음 → partial 보상 불필요)하므로 그대로 재발생.
+    """
+    import uuid as _uuid
+
+    from lloydk.schemas.golden import GoldenBuildRequest
+    from lloydk.services.golden_build_service import GoldenBuildService
+
+    try:
+        req = GoldenBuildRequest(**req_dict)
+        return GoldenBuildService().run_build(req, _uuid.UUID(job_id))
+    except Exception as exc:  # noqa: BLE001
+        attempts = self.request.retries
+        max_r = self.max_retries or 0
+        if attempts < max_r:
+            countdown = 2 ** attempts
+            logger.warning(
+                "golden_build retry: attempts=%d/%d countdown=%ds err=%s",
+                attempts + 1, max_r, countdown, type(exc).__name__,
+            )
+            raise self.retry(exc=exc, countdown=countdown) from exc
+        logger.warning("golden_build exhausted: job_id=%s err=%s", job_id, exc)
+        raise
+
+
 def _create_training_run_guarded(
     spec_kwargs: dict, *, total_samples: int, trigger: str = "active_learning"
 ):

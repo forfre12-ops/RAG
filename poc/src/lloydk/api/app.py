@@ -20,6 +20,7 @@ from lloydk.api import health as health_api
 from lloydk.api import confirm as confirm_api
 from lloydk.api import training as training_api
 from lloydk.api import synthesis as synthesis_api
+from lloydk.api import golden as golden_api
 from lloydk.api import guide as guide_api
 from lloydk.api import documents as documents_api
 from lloydk.api import schema_admin as schema_admin_api
@@ -322,6 +323,7 @@ if settings.enable_training:
 else:
     logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
 app.include_router(synthesis_api.router, prefix="/api/v1")
+app.include_router(golden_api.router, prefix="/api/v1")
 app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(documents_api.router, prefix="/api/v1")
 app.include_router(

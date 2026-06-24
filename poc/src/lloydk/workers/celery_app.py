@@ -32,6 +32,7 @@ celery_app.conf.task_routes = {
     "lloydk.classify_async": {"queue": "classify"},
     "lloydk.synthesize_batch": {"queue": "synthesis"},
     "lloydk.train_classifier": {"queue": "learning"},
+    "lloydk.golden_build": {"queue": "learning"},  # 빌더 — train과 자원 풀 공유
     "lloydk.active_learning_tick": {"queue": "learning"},
     "lloydk.drift_tick": {"queue": "learning"},
     "lloydk.auto_rollback_tick": {"queue": "learning"},
