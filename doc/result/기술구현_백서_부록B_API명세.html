@@ -273,7 +273,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/classify</span>
         <span class="ep-summary">동기 문서 분류</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">문서 텍스트를 4등급(TS/S1/S2/S3)으로 분류한다. M2 전처리 → M5 추론 순서로 실행. confidence가 임계값(<code>review_confidence_threshold</code>=0.7) 미만이면 응답 <code>status="needs_review"</code>로 표시하고 warning에 검수 권고를 남긴다(<strong>거부 아님</strong> — 고위험 FNR 보호). 검수자 큐는 동률 시 저신뢰를 우선 정렬한다. body의 <code>tenant_id</code>는 인증 tenant에 결속되며 불일치 시 <code>403</code>.</p>
@@ -322,7 +322,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/classify/stream</span>
         <span class="ep-summary">SSE 스트리밍 분류</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">Server-Sent Events 방식으로 분류 단계별 진행 상황을 실시간 스트림으로 반환한다. 가짜 progress가 아니라 <code>ClassifyService.classify(on_stage=...)</code> 콜백을 큐로 받아 <strong>실제 단계 진입 시점</strong>에 이벤트를 송신한다. 6단계: <code>extract → normalize → embed → retrieve → llm → persist → finalize</code>. 이벤트 종류: <code>progress</code>(stage 진입) · <code>partial</code>(top-1 grade/confidence) · <code>result</code>(최종 ClassifyResponse) · <code>error</code> · <code>done</code>(종료). 스트림 시작 전에 body의 <code>tenant_id</code>가 인증 컨텍스트에 결속되며 불일치 시 <code>403</code>. 스트림은 요청당 워커 스레드를 점유하므로 한도를 <strong>분당 30회</strong>로 명시 강화했다(기존 default 120/분 → 강화). 또한 클라이언트 disconnect를 주기적으로 폴링해 연결이 끊기면 진행 중 작업을 협조적으로 취소하고 스트림을 조기 종료한다(점유 축소).</p>
@@ -362,7 +362,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/classify/async</span>
         <span class="ep-summary">비동기 분류 작업 제출</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">Celery 워커에 분류 작업을 위임하고 job_id를 즉시 반환한다. 단건 대용량 문서에 사용. 분당 60 한도. 작업도 인증 tenant에 결속된다.</p>
@@ -385,7 +385,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/classify/batch</span>
         <span class="ep-summary">배치 분류 작업 제출 (최대 1000건)</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">여러 문서를 한 번에 제출한다. 빈 배열은 <code>400</code>, 1000건 초과는 <code>413</code>으로 거부한다(M1 경계값 가드). 배치 내 각 문서의 tenant_id가 인증 컨텍스트에 결속되고, job 자체도 호출자 effective tenant에 결속된다. 분당 60 한도.</p>
@@ -409,7 +409,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/classify/jobs/{job_id}</span>
         <span class="ep-summary">비동기/배치 작업 결과 조회</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">/classify/async·/classify/batch로 제출한 작업의 상태 및 결과를 조회한다. <strong>job_id만으로 결과를 주지 않는다</strong> — 호출자 effective tenant가 job에 보존된 tenant와 일치할 때만 반환하고, 불일치/미검증이면 존재 노출 차단을 위해 <code>404</code>(H9 IDOR 차단).</p>
@@ -438,7 +438,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/answer</span>
         <span class="ep-summary">RAG 질의 응답</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">RAG 질의응답. 검색 facade(<code>expand_then_search</code>: 쿼리 확장 → RRF 융합 → reranker)로 관련 청크를 수집하고 LLM(Qwen3/Claude)으로 한국어 답변을 합성한다. 검색·LLM 어느 쪽이 실패해도 <code>200</code> + <code>warnings</code>에 사유, <code>deterministic_fallback=true</code>로 처리(5xx는 진짜 예외만). 검색은 인증 tenant로만 스코프되고, 결과를 payload.tenant_id로 사후 필터해 교차테넌트 누출을 fail-CLOSED로 차단한다. 분당 30 한도. 본 엔드포인트는 등급 분류를 하지 않으며, <code>grade</code>는 호출자가 별도 단계에서 전달할 수 있다.</p>
@@ -476,7 +476,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/classify/explain</span>
         <span class="ep-summary">분류 결정 설명 (토큰 기여도 + S·V·M 요건 + RAG context)</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">특정 분류 결과의 근거를 자연어로 설명한다. tb_classification_evidence 테이블의 excerpt와 contribution을 LLM으로 요약. factor는 정본 3요건(SECRECY·VALUE·MANAGEMENT)으로 귀속된다(레거시 4요소는 LEGACY_FACTOR_ALIAS로 3요건에 자동 폴딩). body의 <code>tenant_id</code>는 인증 컨텍스트에 결속되며 불일치 시 <code>403</code>(IDOR 차단 — 위조한 tenant_id로 타 테넌트 문서·검증라벨·근거 토큰 노출 방지).</p>
@@ -603,7 +603,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/guide/documents/{guide_id}</span>
         <span class="ep-summary">가이드 버전 이력 조회</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">특정 guide_id의 등록된 버전 이력을 조회한다. 인증 tenant로 스코프된다(쓰기와 동일 tenant 격리).</p>
@@ -659,7 +659,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/train/jobs/{train_job_id} · /api/v1/train/jobs</span>
         <span class="ep-summary">학습 작업 상태 · 목록 조회</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc"><code>GET /train/jobs/{train_job_id}</code>는 단일 학습 작업의 진행 상태(TrainStatus)를, <code>GET /train/jobs</code>는 최근 작업 목록(TrainJobList)을 반환한다.</p>
@@ -697,7 +697,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/documents</span>
         <span class="ep-summary">분류 대상 문서 업로드 · Ingestion</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">실제 업무 파일(HWP/PDF/DOCX/TXT)을 업로드하여 자동 전처리·인덱싱한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 원본 Object Storage 저장 → documents/tb_chunks DB 적재. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정 요청.</p>
@@ -750,7 +750,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/schema/grades</span>
         <span class="ep-summary">현재 등급체계 조회</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">DB <code>tb_classification_levels</code>에서 현재 활성 등급 정의를 조회한다. GradeRegistry가 런타임에 이 값을 사용한다.</p>
@@ -933,7 +933,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/metrics/latest</span>
         <span class="ep-summary">최신 모델 성능 지표</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">현재 활성 모델의 최신 F1·FNR·Recall@5 등 성능 지표를 반환한다. M6 평가 모듈이 갱신.</p>
@@ -959,7 +959,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/metrics/history</span>
         <span class="ep-summary">모델 성능 이력</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">모델 버전별 성능 지표 이력을 반환한다. PSH 스파크라인 대시보드 데이터 소스.</p>
@@ -979,7 +979,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/metrics/confusion-matrix/{model_version}</span>
         <span class="ep-summary">혼동 행렬</span>
-        <span class="ep-auth">JWT</span>
+        <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">특정 모델 버전의 4×4 혼동 행렬(TS/S1/S2/S3)을 반환한다. M6 평가 완료 후 MLflow에서 로드.</p>
