@@ -1,0 +1,32 @@
+# ES→PG 단일화 재검증 스택 (의사결정_대장 §03 게이트용) — 독립·비파괴.
+#
+# 기본 dev 스택(docker-compose.yml)의 postgres(:5432, alpine)와 충돌하지 않도록
+# 별도 이름/포트(:5433)로 pgvector+pg_bigm 인스턴스만 띄운다. ES 스택은 그대로 둔다.
+#
+# 사용:
+#   docker compose -f docker-compose.pgvector.yml up -d --build
+#   DATABASE_URL=postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk alembic upgrade head
+#   VECTOR_BACKEND=pg DATABASE_URL=...5433... python scripts/revalidate_pg_lexical.py
+# 자세한 절차·합격 게이트: infra/postgres/README.md
+
+name: lloydk-pgvector-revalid
+
+services:
+  postgres-pgvector:
+    build:
+      context: ./infra/postgres
+      dockerfile: Dockerfile.pgvector
+    image: lloydk/postgres:16-pgvector-pgbigm
+    environment:
+      POSTGRES_DB: lloydk
+      POSTGRES_USER: lloydk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dev}
+    ports:
+      # host 5433 → container 5432 (dev postgres :5432 와 비충돌)
+      - "5433:5432"
+    volumes:
+      - ../docker-data/postgres-pgvector:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lloydk"]
+      interval: 5s
+      retries: 10

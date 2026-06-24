@@ -10,6 +10,7 @@ VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
 .PHONY: help venv install env infra-up infra-down infra-verify api worker beat \
+        revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
@@ -79,6 +80,22 @@ infra-down:
 
 infra-verify:
 	$(PY) scripts/verify_infra.py
+
+# ── ES→PG 단일화 재검증 (의사결정_대장 §03 게이트; infra/postgres/README.md) ──
+# 기본 dev 스택과 격리된 pgvector+pg_bigm PG(:5433). ES 스택 비건드림.
+REVALID_DB ?= postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk
+
+revalidate-pg-up:
+	docker compose -f docker-compose.pgvector.yml up -d --build
+
+revalidate-pg-migrate:
+	DATABASE_URL=$(REVALID_DB) $(PY) -m alembic upgrade head
+
+revalidate-pg-bench:
+	VECTOR_BACKEND=pg DATABASE_URL=$(REVALID_DB) $(PY) scripts/revalidate_pg_lexical.py
+
+revalidate-pg-down:
+	docker compose -f docker-compose.pgvector.yml down
 
 api:
 	uvicorn lloydk.api.app:app --reload --host 0.0.0.0 --port 8000
@@ -191,6 +208,12 @@ check-data: ## 데이터 품질 검사 — synthetic split + synthetic masked ev
 	$(PY) scripts/check_data_quality.py \
 	    --train datasets/labeled_v2_balanced/train.jsonl \
 	    --test  datasets/gold/classification_gold.jsonl
+
+check-leakage: ## holdout↔train 텍스트해시 누출 게이트 (exit 1 on FAIL; 데이터 위생)
+	$(PY) scripts/check_data_quality.py \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --holdout datasets/gold_real/holdout_eval.jsonl,datasets/gold_real/holdout_business.jsonl \
+	    --report reports/leakage_report.json
 
 llm-judge-dry: ## LLM judge 비용 추정 (실제 호출 없음)
 	$(PY) scripts/make_llm_judge_gold.py --dry-run --n 200
