@@ -9,6 +9,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
 
 from lloydk.api._jwt_auth import require_auth
 from lloydk.api._rbac import require_role
@@ -41,3 +42,16 @@ def golden_job_status(job_id: UUID) -> GoldenBuildStatus:
     if st is None:
         raise HTTPException(status_code=404, detail="golden build job not found")
     return st
+
+
+@router.get(
+    "/golden/jobs/{job_id}/review.html",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+)
+def golden_job_review_html(job_id: UUID) -> HTMLResponse:
+    """빌드 잡의 후보를 지재원 관리자 검수용 인터랙티브 HTML로 반환."""
+    html = GoldenBuildService().render_review(job_id)
+    if html is None:
+        raise HTTPException(status_code=404, detail="golden build review not found")
+    return HTMLResponse(content=html)

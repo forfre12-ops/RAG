@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from lloydk.golden_builder import GoldenBuildResult, build_golden_set, make_label_fn
+from lloydk.golden_review_html import render_review_html_from_jsonl
 from lloydk.schemas.golden import (
     GoldenBuildRequest,
     GoldenBuildResponse,
@@ -122,6 +123,20 @@ class GoldenBuildService:
             uncertain_path=job.get("uncertain_path"),
             error=job.get("error"),
         )
+
+    def render_review(self, job_id: uuid.UUID, *, title: str = "골든셋 후보 검토본") -> Optional[str]:
+        """완료된 빌드 잡의 후보(build·uncertain)를 지재원 관리자 검수용 HTML로 렌더.
+
+        JobStore에서 잡의 출력 경로를 찾아 render_review_html_from_jsonl로 렌더.
+        잡이 없거나 출력 경로가 없으면 None. (지재원 관리자가 URL로 바로 검수)
+        """
+        job = self.jobs.get(job_id)
+        if job is None:
+            return None
+        paths = [p for p in (job.get("gold_path"), job.get("uncertain_path")) if p]
+        if not paths:
+            return None
+        return render_review_html_from_jsonl(paths, title=title, subtitle=f"job {job_id}")
 
     # ------------------------------------------------------------------ helpers
     def _load_docs(self, req: GoldenBuildRequest) -> list[dict]:

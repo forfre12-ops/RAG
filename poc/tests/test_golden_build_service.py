@@ -75,6 +75,30 @@ def test_corpus_source_jsonl(tmp_path):
     assert st.gold_count == 1  # "제목\n\ngold 본문" → gold
 
 
+def test_render_review_returns_html_for_completed_job(tmp_path):
+    req = GoldenBuildRequest(
+        source_type="inline",
+        docs=[
+            {"doc_id": "d1", "text": "gold 문서", "domain": "legal"},
+            {"doc_id": "d2", "text": "검수대상 문서"},
+        ],
+        out_dir=str(tmp_path),
+        actor=_ACTOR,
+    )
+    svc = GoldenBuildService()
+    resp = svc.submit(req, label_fn=_fake_label_fn)
+    html = svc.render_review(resp.golden_job_id)
+    assert html is not None
+    assert html.startswith("<!doctype html>")
+    assert "d1" in html and "d2" in html        # gold + uncertain 둘 다 포함
+    assert f"job {resp.golden_job_id}" in html   # subtitle
+
+
+def test_render_review_unknown_job_is_none():
+    svc = GoldenBuildService()
+    assert svc.render_review(uuid.uuid4()) is None
+
+
 def test_holdout_leakage_excluded(tmp_path):
     holdout = tmp_path / "holdout.jsonl"
     holdout.write_text(json.dumps({"text": "누출문서"}) + "\n", encoding="utf-8")
