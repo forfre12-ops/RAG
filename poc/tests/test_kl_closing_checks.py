@@ -174,7 +174,7 @@ class TestCorrectionsConsumed:
         # corrections 테이블에 해당하는 ORM 클래스 찾기 (__tablename__ = 'corrections')
         cls = None
         for name, obj in inspect.getmembers(db_models):
-            if inspect.isclass(obj) and getattr(obj, "__tablename__", None) == "corrections":
+            if inspect.isclass(obj) and getattr(obj, "__tablename__", None) == "tb_corrections":
                 cls = obj
                 break
         assert cls is not None, "corrections 테이블 매핑 ORM 클래스 미발견"

@@ -180,4 +180,12 @@ class TestRegisterAndGateLive:
             assert isinstance(out["rolled_back"], bool)
         finally:
             with session_scope() as s:
-                s.query(ModelVersion).filter_by(version_label=only).delete()
+                mv = s.query(ModelVersion).filter_by(version_label=only).first()
+                if mv is not None:
+                    # rolled_back_from self-FK 참조를 먼저 끊고 삭제(공유 DB 정리)
+                    s.query(ModelVersion).filter_by(rolled_back_from=mv.version_id).update(
+                        {"rolled_back_from": None}, synchronize_session=False
+                    )
+                    s.query(ModelVersion).filter_by(version_label=only).delete(
+                        synchronize_session=False
+                    )

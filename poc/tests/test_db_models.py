@@ -57,26 +57,26 @@ def _require_postgres() -> None:
 
 def test_orm_metadata_has_expected_tables():
     """Sanity: all ORM-mapped parent tables present in Base.metadata."""
-    expected = {
-        "classification_levels",
-        "evaluation_factors",
-        "level_keywords",
-        "documents",
-        "chunks",
-        "document_labels",
-        "document_factor_scores",
-        "classifications",
-        "classification_evidence",
-        "model_versions",
-        "training_runs",
-        "training_epochs",
-        "training_datasets",
-        "corrections",
-        "prompt_versions",
-        "sample_documents",
-        "llm_usage",
-        "audit_log",
-        "guides",          # N5: GuideService DB 이전
+    expected = {                          # ORM __tablename__ 은 tb_ 접두사 규약
+        "tb_classification_levels",
+        "tb_evaluation_factors",
+        "tb_level_keywords",
+        "tb_documents",
+        "tb_chunks",
+        "tb_document_labels",
+        "tb_document_factor_scores",
+        "tb_classifications",
+        "tb_classification_evidence",
+        "tb_model_versions",
+        "tb_training_runs",
+        "tb_training_epochs",
+        "tb_training_datasets",
+        "tb_corrections",
+        "tb_prompt_versions",
+        "tb_sample_documents",
+        "tb_llm_usage",
+        "tb_audit_log",
+        "tb_guides",          # N5: GuideService DB 이전
     }
     actual = set(Base.metadata.tables.keys())
     missing = expected - actual
@@ -117,19 +117,18 @@ def test_classification_levels_seeded():
 
 
 def test_evaluation_factors_seeded():
-    """alembic baseline seeds 4 factors with weights summing to 1.0."""
+    """alembic baseline seeds the 4 grade factors with weights summing to 1.0.
+
+    공유 DB라 타 테스트가 추가 factor를 남길 수 있으므로 baseline 4요소의
+    존재·가중합만 검증(exact-match 금지).
+    """
     _require_postgres()
     with session_scope() as s:
-        factors = s.query(EvaluationFactor).all()
-        codes = {f.factor_code for f in factors}
-        assert codes == {
-            "ECONOMIC_VALUE",
-            "NON_PUBLICITY",
-            "MANAGEMENT_LEVEL",
-            "LEAK_IMPACT",
-        }
-        total = sum(float(f.weight) for f in factors)
-        assert abs(total - 1.0) < 0.01, f"factor weights must sum to ~1.0 (got {total})"
+        factors = {f.factor_code: float(f.weight) for f in s.query(EvaluationFactor).all()}
+        baseline = {"ECONOMIC_VALUE", "NON_PUBLICITY", "MANAGEMENT_LEVEL", "LEAK_IMPACT"}
+        assert baseline.issubset(factors.keys()), f"baseline 4요소 누락: {baseline - factors.keys()}"
+        total = sum(factors[c] for c in baseline)
+        assert abs(total - 1.0) < 0.01, f"baseline factor weights must sum to ~1.0 (got {total})"
 
 
 # ============================================================
