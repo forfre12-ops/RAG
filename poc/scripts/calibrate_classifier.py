@@ -17,60 +17,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 
+_SRC = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
-def softmax(logits: list[float], temperature: float = 1.0) -> list[float]:
-    if temperature <= 0:
-        temperature = 1e-3
-    scaled = [v / temperature for v in logits]
-    m = max(scaled)
-    exps = [math.exp(s - m) for s in scaled]
-    z = sum(exps)
-    return [e / z for e in exps]
-
-
-def neg_log_likelihood(logits_list: list[list[float]], labels: list[int], T: float) -> float:
-    nll = 0.0
-    for logits, y in zip(logits_list, labels):
-        probs = softmax(logits, temperature=T)
-        p = max(probs[y], 1e-9)
-        nll -= math.log(p)
-    return nll / max(len(labels), 1)
-
-
-def expected_calibration_error(logits_list: list[list[float]], labels: list[int], T: float, n_bins: int = 10) -> float:
-    bins: list[list[tuple[float, int]]] = [[] for _ in range(n_bins)]
-    for logits, y in zip(logits_list, labels):
-        probs = softmax(logits, temperature=T)
-        pred = max(range(len(probs)), key=lambda i: probs[i])
-        conf = probs[pred]
-        bin_idx = min(int(conf * n_bins), n_bins - 1)
-        bins[bin_idx].append((conf, 1 if pred == y else 0))
-
-    ece = 0.0
-    n = max(len(labels), 1)
-    for bucket in bins:
-        if not bucket:
-            continue
-        acc = sum(b[1] for b in bucket) / len(bucket)
-        conf = sum(b[0] for b in bucket) / len(bucket)
-        ece += (len(bucket) / n) * abs(conf - acc)
-    return ece
-
-
-def find_best_temperature(logits_list: list[list[float]], labels: list[int], lo: float = 0.05, hi: float = 5.0, steps: int = 200) -> float:
-    best_T = 1.0
-    best_nll = neg_log_likelihood(logits_list, labels, 1.0)
-    for i in range(steps + 1):
-        T = lo + (hi - lo) * (i / steps)
-        nll = neg_log_likelihood(logits_list, labels, T)
-        if nll < best_nll:
-            best_nll = nll
-            best_T = T
-    return best_T
+# [중복 제거] 온도 스케일링 핵심은 m6_evaluation.temperature 로 일원화 — trainer 자동연결과 공유.
+from lloydk.modules.m6_evaluation.temperature import (  # noqa: E402
+    expected_calibration_error,
+    find_best_temperature,
+    neg_log_likelihood,
+)
 
 
 def main() -> int:

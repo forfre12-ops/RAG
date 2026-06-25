@@ -182,6 +182,12 @@ retrieval-gold: ## doc_id retrieval gold set 생성
 p1-retrain-dataset: ## P1 retraining JSONL build only
 	$(PY) scripts/build_p1_retrain_dataset.py
 
+# 온도 보정 — trainer 가 학습 직후 temperature.json 을 자동 산출(서빙 자동 로드)하지만,
+# 재보정이 필요할 때 수동 실행. <CAL_MODEL_DIR>/val_logits.jsonl(학습 시 동봉)을 자동 사용.
+CAL_MODEL_DIR ?= artifacts/classifier
+calibrate: ## 학습된 모델의 val_logits 로 temperature.json 재산출 (CAL_MODEL_DIR=...)
+	$(PY) scripts/calibrate_classifier.py --model-dir $(CAL_MODEL_DIR)
+
 p1-boundary: ## Build focused P1 boundary report from the latest llm gold eval
 	$(PY) scripts/build_p1_boundary_report.py \
 	    --report reports/p1_v3_llm_gold_direct.json \

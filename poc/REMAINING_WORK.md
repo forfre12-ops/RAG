@@ -92,7 +92,13 @@ lite pytest **922 passed / 0 failed** (14 skip 환경성). 변경된 스트림 �
 - [x] D3 rank15 — `GoldenBuildRequest.out_dir` 기본 `datasets/gold_real`→`datasets/gold_real/builds`(정본과 산출물 분리)
 - [x] D4 D-3 — `seed_active_model_version.py` import·repo 메서드 검증 + METRICS 하드코딩 시드 명시 주석(커밋 준비 완료)
 
-> ⏭ 남은 배치 후보(미착수): **C**(감사 HMAC fail-fast+Settings 필드+정기검증 태스크 · 저장암호화 .env 예시 · train→calibrate 자동연결) — HMAC fail-fast는 prod startup hard-fail이라 착수 전 확인 권장.
+### 🔨 배치 C 완료 (2026-06-25, 보안/운영 강화 — lite 966 passed)
+
+- [x] C1 D-4 — 감사체인 HMAC: `Settings.audit_chain_secret` 필드 + 운영(poc_mode=full) **startup fail-fast**(assert_production_credentials, NFR-SEC-01) + secrets_manager 후보 추가 + `verify_audit_chain_tick` Celery 태스크/일별 beat(broken>0→P0 AuditChainBroken). 테스트 정합 3건
+- [x] C2 B-storage-enc — `STORAGE_ENCRYPTION_ENABLED/KEY` .env.prod.example·.env.onprem-local 추가(영업비밀 평문저장 방지, fail-fast는 기존 배선)
+- [x] C3 calib-NEW-1 — train→calibrate **자동연결**: trainer가 학습 직후 val logits로 temperature.json 자동 산출(서빙 자동 로드, MEMORY T≈3) + 온도 로직 `m6_evaluation/temperature.py`로 일원화(스크립트 중복 제거) + Makefile `calibrate` 타깃 + 테스트 5건
+
+> ✅ **코드-가능 배치 A/B/C/D 모두 완료.** 이후 잔여는 전부 외부 의존(human_review 실라벨·실문서 9월·라이브 PG/redis/GPU·DR 리허설·PII NER 가중치) 또는 발주처/VP 결정(A안 환산표·고객사 API ICD·airgap postgres 토폴로지)으로, 본 저장소 코드만으로는 더 진행 불가.
 
 ---
 

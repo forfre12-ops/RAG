@@ -160,6 +160,13 @@ class Settings(BaseSettings):
     api_key_role: str = "system"
     api_key_trust_actor_role_header: bool = False
 
+    # NFR-SEC-01: 감사체인 HMAC 비밀키. 설정 시 audit_log hash chain을 HMAC-SHA256으로 링크해
+    # 키 없는 과거 row 재작성(rewrite)을 차단(audit_chain._link_hex). 빈 값이면 레거시 sha256
+    # 폴백(dev/test 비파괴). 운영(poc_mode=full)에서는 assert_production_credentials가 fail-fast.
+    # env: AUDIT_CHAIN_SECRET(필드명) 또는 LLOYDK_AUDIT_CHAIN_SECRET(audit_chain._chain_secret
+    # os.getenv 폴백 + secrets_manager 후보) — 둘 중 하나면 충분.
+    audit_chain_secret: str = ""
+
     # --- DB 커넥션 풀 (운영 동시성) ---
     # 기본 5+10=15는 dev용. 운영은 동시 요청 수에 맞춰 DB_POOL_SIZE/DB_MAX_OVERFLOW 조정.
     db_pool_size: int = 5
@@ -670,6 +677,10 @@ def assert_production_credentials() -> None:
         missing.append("LLOYDK_API_KEY")
     if not settings.minio_secret_key:
         missing.append("LLOYDK_MINIO_SECRET_KEY")
+    # NFR-SEC-01: 감사체인 HMAC 비밀키. 미설정 시 키 없는 sha256 폴백 → 과거 row 재작성 가능.
+    # 실효 시크릿(필드 또는 LLOYDK_ env) 기준으로 판정 — 둘 다 비면 운영 startup 차단.
+    if not (settings.audit_chain_secret or os.environ.get("LLOYDK_AUDIT_CHAIN_SECRET", "").strip()):
+        missing.append("LLOYDK_AUDIT_CHAIN_SECRET")
     if missing:
         raise RuntimeError(
             f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
@@ -764,6 +775,7 @@ def fill_from_secrets_manager() -> dict:
     candidates = [
         ("api_key", "LLOYDK_API_KEY"),
         ("minio_secret_key", "LLOYDK_MINIO_SECRET_KEY"),
+        ("audit_chain_secret", "LLOYDK_AUDIT_CHAIN_SECRET"),
         ("anthropic_api_key", "ANTHROPIC_API_KEY"),
         ("openai_api_key", "OPENAI_API_KEY"),
     ]

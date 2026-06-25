@@ -312,12 +312,33 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             val_pred = trainer.predict(ds_val)
             val_logits = val_pred.predictions
             val_labels = val_pred.label_ids
+            _cal_logits: list[list[float]] = []
+            _cal_labels: list[int] = []
             with (out_dir / "val_logits.jsonl").open("w", encoding="utf-8") as _vf:
                 for _lg, _yl in zip(val_logits, val_labels):
+                    _row = [float(x) for x in np.asarray(_lg).ravel()]
+                    _cal_logits.append(_row)
+                    _cal_labels.append(int(_yl))
                     _vf.write(json.dumps({
-                        "logits": [float(x) for x in np.asarray(_lg).ravel()],
+                        "logits": _row,
                         "label_idx": int(_yl),
                     }, ensure_ascii=False) + "\n")
+            # [train→calibrate 자동연결] 학습 직후 같은 val logits 로 temperature.json 을
+            # out_dir 에 산출 → 서빙(m5 pipeline)이 자동 로드(MEMORY: 미보정 서빙 시 OOD 과신).
+            # 수동 2-step(calibrate_classifier.py)을 운영자가 잊어도 보정이 적용된다. 자동 '활성'
+            # 과는 분리(등록만) — 베스트에포트(실패해도 학습 산출물 보존).
+            try:
+                from lloydk.modules.m6_evaluation.temperature import (  # noqa: PLC0415
+                    fit_temperature_report,
+                )
+                if _cal_logits and _cal_labels:
+                    _rep = fit_temperature_report(_cal_logits, _cal_labels)
+                    _rep["source"] = "trainer-auto"
+                    (out_dir / "temperature.json").write_text(
+                        json.dumps(_rep, ensure_ascii=False, indent=2), encoding="utf-8"
+                    )
+            except Exception:  # noqa: BLE001 — 자동 보정 실패는 학습/dump 를 막지 않음
+                pass
         except Exception:  # noqa: BLE001 — 보정 dump 실패는 학습을 막지 않음
             pass
 

@@ -369,6 +369,28 @@ def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
     return out
 
 
+@celery_app.task(name="lloydk.verify_audit_chain_tick")
+def verify_audit_chain_tick(limit: int = 100000) -> dict:
+    """NFR-SEC-01: 감사 로그 hash chain 정기 무결성 검증 — Celery beat 일별 호출.
+
+    verify_chain이 broken>0 검출 시 lloydk_audit_chain_broken_total 증가(P0 AuditChainBroken
+    알람) + warning 로그. 변조(과거 row 삭제·삽입·재배열·payload 변조) 의심을 운영에 노출한다.
+    """
+    from lloydk.services.audit_chain import verify_chain
+    res = verify_chain(limit=limit)
+    logger.info(
+        "verify_audit_chain_tick: total=%d verified=%d broken=%d first_break=%s",
+        res.total_rows, res.verified, res.broken, res.first_break_audit_id,
+    )
+    return {
+        "total_rows": res.total_rows,
+        "verified": res.verified,
+        "broken": res.broken,
+        "first_break_audit_id": res.first_break_audit_id,
+        "ok": res.ok(),
+    }
+
+
 @celery_app.task(name="lloydk.active_learning_tick")
 def active_learning_tick(mode: str = "auto") -> dict:
     """P1-A5: Active learning 주기 트리거.

@@ -36,6 +36,7 @@ celery_app.conf.task_routes = {
     "lloydk.active_learning_tick": {"queue": "learning"},
     "lloydk.drift_tick": {"queue": "learning"},
     "lloydk.auto_rollback_tick": {"queue": "learning"},
+    "lloydk.verify_audit_chain_tick": {"queue": "learning"},
     "lloydk.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
     "lloydk.ensure_partitions_tick": {"queue": "index"},  # DDL, 경량 I/O
 }
@@ -80,6 +81,12 @@ celery_app.conf.beat_schedule = {
         "task": "lloydk.ensure_partitions_tick",
         "schedule": crontab(minute=10, hour=2),
         "kwargs": {"months_ahead": 3},
+    },
+    # NFR-SEC-01 감사체인 무결성 — 매일 03:30. broken>0이면 lloydk_audit_chain_broken_total↑
+    # → P0 AuditChainBroken 알람. 과거 row 변조·삭제·재배열 정기 검출.
+    "verify-audit-chain-daily": {
+        "task": "lloydk.verify_audit_chain_tick",
+        "schedule": crontab(minute=30, hour=3),
     },
 }
 celery_app.conf.timezone = "Asia/Seoul"
