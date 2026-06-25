@@ -348,6 +348,13 @@ def deliver_once(
             )
             store.move_to_dlq(msg)
             dlq += 1
+            # NEW-H2: OutboxDlqGrowing 알람용 메트릭. best-effort(프로메테우스 미가용 무시).
+            try:
+                from lloydk.api.prom_metrics import OUTBOX_DLQ_TOTAL  # noqa: PLC0415
+
+                OUTBOX_DLQ_TOTAL.inc()
+            except Exception:  # noqa: BLE001
+                pass
         else:
             msg.next_retry_at = time.time() + _backoff_seconds(msg.attempts)
             store.update(msg)

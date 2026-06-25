@@ -35,6 +35,67 @@ lite pytest **922 passed / 0 failed** (14 skip 환경성). 변경된 스트림 �
 
 ---
 
+## 🔁 2026-06-25 재대조 (현재 코드 vs 목록 — 10클러스터 감사)
+
+> 2026-06-24 이후 커밋(테넌트 전면 제거·ES→PG 단일화·골든 빌더·감사 HMAC 문서화)으로 다수 항목이 stale.
+> 아래는 현재 코드 직접 대조 결과. 이후 작업은 이 절을 기준으로 한다.
+
+### stale 정정 (목록이 코드보다 뒤처짐 — done_since / superseded)
+
+| 항목 | 정정 |
+|------|------|
+| A-1 | `test_pg_store.py 0건`은 틀림 — 5 PASS. default 이미 `pg`, ES는 core/prod/airgap compose 제거. **partial**(잔여=라이브 PG NL 게이트 실행만). |
+| Top-3/C-4 | 온도보정 코드 체인 **완결**(trainer val_logits→calibrate 자동탐색→서빙 자동로드, test 통과). C-4 'dump 안 함'은 사실 아님 → **done_since**. 잔여=실 학습 1회(GPU). |
+| Top-7/A-2 | `.delay()` 발사·브로커감지 폴백·'queued' 정정 3서비스 완료 → **done_since**. 잔여=라이브 redis 검증. 배치는 의도적 in-process(건별 격리). |
+| D-2 | base·airgap compose에 redis+worker+beat(drift/rollback/outbox/active-learning/partitions) 전부 배선 → **done_since**. 잔여=prod override beat·src마운트. |
+| D-9 | OTel(setup_tracing)·Prometheus/Grafana/Loki 풀스택·25+메트릭 존재 → **done_since**. 'OTEL_/PROM_ env 키 없음'은 os.getenv 직접사용이라 오판. |
+| D-10 | dr_drill.py 실 10-stage 드릴+RTO 게이트+exit2, test 통과 → placeholder 아님(**partial**). 잔여=실 RTO 리허설(인프라). |
+| D-13 | per-tenant RLS는 테넌트 전면제거로 **superseded**. 저장암호화는 B 항목으로 단일화. |
+| B-JWT | `_jwt_auth.py` confused-deputy fail-fast + iss/aud 거부 + RS256/exp/nbf + startup 호출 완료 → **done_since**. 잔여=.env.prod.example 주석해제. |
+| D-3 | `seed_active_model_version.py` 멱등 구현·의존성 해소 → 지금 **커밋 가능**(현재 untracked). |
+| F/M2 split_v2 | pipeline.py chunk()/finalize() 둘 다 split_v2 호출 → **done_since**. |
+| F/citation | `answer_enforce_citations` 정식 필드+answer.py enforce 배선 → **done_since**. |
+| F/storage 키위생 | minio/seaweedfs 양쪽 `_norm_key` 전 경로 적용 → **done_since**(단 폐쇄망=local이라 운영 적용성은 superseded). |
+| F/m4_training shim | query_expansion·rag_indexer는 정상 backward-compat shim → 버그 아님(재분류). |
+
+### 신규 발견 (목록에 없던 것)
+
+- **NEW-H1 (HIGH)** — drift 모니터 실배포 영구 no-op: `sample_vectors`가 inmemory_store.py:107에만 존재, pg_store.py 0건. default=pg 전환으로 celery beat 15분 drift 태스크가 매 주기 빈 표본 skip. → **do_now rank1**.
+- **NEW-H2 (HIGH)** — P0 `AuditChainBroken` 등 alert 7종이 미정의 메트릭 참조로 영구 미발화: alert_rules.yml ↔ prom_metrics.py 정의 0건(`audit_chain_broken_total`·`classify_correct/total`·`celery_queue_length`·`outbox_dlq_total`·`pii_masked_total`·`documents_ingested_total`). → **do_now rank4**.
+- **NEW-H3 (HIGH)** — 활성 서빙 모델 v-dd3abab9 무보정(T=1.0) 서빙: model_dir에 temperature.json 부재 → MEMORY 'T≈3' 위반. (blocked: GPU/실데이터로 calibrate 실행 필요.)
+- **NEW-M1** — `serving_eval.py:61-67` run() 예외→pred='TS'가 고등급 정답 크래시를 '정탐'으로 둔갑시켜 FNR 은폐 → deploy_gate 미탐모델 통과. → **do_now rank2**.
+- **NEW-M2** — `deploy_gate` 최초배포 절대 FNR floor 부재(fnr 10%도 통과). → **do_now rank3**.
+- **NEW-M3** — `import_review_corrections.py:281` `Document(tenant_id=...)` 테넌트 제거 후 런타임 깨짐(9월 승급 DB 경로, 미테스트). → do_now(배치B).
+- **NEW-M4** — 고객사 연동 API 4종 + `tb_self_assessments`가 코드에 전무 + 본 목록 A절 누락(KL ICD 대기).
+- **NEW-M5** — `ElasticsearchDown`(P1)·`elasticsearch-exporter`가 제거된 ES 가리켜 영구 false page. → do_now(배치B).
+
+### 🔨 배치 A 완료 (2026-06-25, 코드만으로 가능한 안전 구멍 — lite 948 passed)
+
+- [x] rank1 NEW-H1 — `PgVectorStore.sample_vectors` 구현 (+ `_parse_vec`, test_pg_store 5건 추가) → drift 모니터 실배포 활성화
+- [x] rank2 NEW-M1 — `serving_eval` 실패 pred='TS'→최저심각도(미탐 집계)로 수정 (고등급 크래시가 FNR 거짓 inflate 차단), 회귀테스트 교체
+- [x] rank3 NEW-M2 — `deploy_gate` `first_deploy_fnr_high_max` floor 추가(기본 None=비파괴) + config `deploy_gate_first_deploy_fnr_high_max` + training_service 배선 + test 4건
+- [x] rank4 NEW-H2 — prom_metrics 7종 정의 + 배선(audit_chain verify_chain·document_ingest·mask_pii·outbox DLQ·celery LLEN 프로브); classify_correct/total은 정의만(정답 필요, FnrSpike NaN 무발화)
+
+### 🔨 배치 B 완료 (2026-06-25, 대형 리팩터 드리프트 정리 — lite 950 passed)
+
+- [x] B1 NEW-M3 — `import_review_corrections.py` tenant_id 6곳 제거(`Document(tenant_id=)` 런타임 깨짐 해소) + write_to_db 페이크세션 회귀테스트 2건
+- [x] B2 — `config.py` onprem-local/full-train `storage_backend` minio→**local** + docstring ES→PG + `.env.onprem-local` ES/MINIO 블록 제거
+- [x] B3 — vectorstore `__init__.py`·`pg_store.py` docstring/주석 default=**pg** 정정(라이브-PG NL 재검증 caveat는 유지)
+- [x] B4 — observability compose·prometheus·alert에서 죽은 ES(exporter/job/ElasticsearchDown) 제거; airgap compose minio·mlflow 제거 + **로컬FS storagedata 볼륨**(/app/.storage) 추가
+- [x] B5 — `build_offline_bundle`: BundlePolicies.vector_backend_default→pg, --compose 기본→airgap(api/worker image 추출), ES size·env MINIO→STORAGE_BACKEND=local; test 갱신. dry-run 검증 통과
+- ⚠️ 보류: airgap **postgres 제거(KL 제공)**는 deploy-db 토폴로지 VP 7항목 확인 대기 → 미변경
+
+### 🔨 배치 D 완료 (2026-06-25, 게이트/골든 운영화 — lite 961 passed)
+
+- [x] D1 NEW-S1 — agreement_gate·model_secondopinion_llm·metadata_floor **flag-ON 단위테스트 8건**(tests/test_safety_gates_flag_on.py) → 운영에서 켤 근거 확보(데이터 불요, monkeypatch+스텁)
+- [x] D2 rank12 — `scripts/promote_golden_candidates.py` 신설(빌더 후보→정본 게이트 승격 명시적 호출부) + CLI 글루 테스트 3건. promote_candidates가 라이브러리 함수로만 존재하던 갭 해소
+- [x] D3 rank15 — `GoldenBuildRequest.out_dir` 기본 `datasets/gold_real`→`datasets/gold_real/builds`(정본과 산출물 분리)
+- [x] D4 D-3 — `seed_active_model_version.py` import·repo 메서드 검증 + METRICS 하드코딩 시드 명시 주석(커밋 준비 완료)
+
+> ⏭ 남은 배치 후보(미착수): **C**(감사 HMAC fail-fast+Settings 필드+정기검증 태스크 · 저장암호화 .env 예시 · train→calibrate 자동연결) — HMAC fail-fast는 prod startup hard-fail이라 착수 전 확인 권장.
+
+---
+
 ## (A) 핵심 미완 기능 · 마이그레이션
 
 - [ ] **A-1. ES→PG(pgvector+pg_bigm) 단일화** — `pg_store.py` EXPERIMENTAL 미검증 스캐폴드, test_pg_store.py 0건. 완료: ①이미지 오프라인 빌드 ②NL 재검증 쿼리셋 ③`revalidate_pg_lexical.py` ④R@5 nori~94% ±5pp ⑤default 전환+문서 반영. 갭: ts_rank IDF 없음(~80-85%)+tsvector `simple`. >10pp 퇴행 시 경로 ⓒ(ParadeDB/VectorChord-bm25).

@@ -30,17 +30,9 @@ services:
       interval: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
-    volumes:
-      - miniodata:/data
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+  # minio 제거 — 폐쇄망 저장소는 로컬FS(file://) 결정(2026-06-24, MinIO 미사용).
+  # 문서/원본은 api·worker 의 storagedata 볼륨(/app/.storage)에 보관. 원본 at-rest 암호화는
+  # STORAGE_ENCRYPTION_ENABLED/KEY 로 활성(.env.prod.example).
 
   redis:
     image: redis:7.2-alpine
@@ -51,24 +43,9 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
 
-  mlflow:
-    image: lloydk/mlflow:2.16.2-psycopg
-    command: >
-      mlflow server
-      --backend-store-uri sqlite:////mlflow-data/mlflow.db
-      --default-artifact-root s3://mlflow/
-      --host 0.0.0.0
-    environment:
-      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set in .env}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set in .env}
-    volumes:
-      - mlflowdata:/mlflow-data
-    depends_on:
-      postgres: { condition: service_healthy }
-      minio:    { condition: service_started }
-    ports:
-      - "127.0.0.1:5000:5000"
+  # mlflow 제거 — 폐쇄망(고객사) 배포는 추론 전용(enable_training=False)이라 모델 트래킹/레지스트리
+  # 불요. 학습·MLflow 는 지재원(Lloydk) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
+  # 의존했으므로 minio 제거와 함께 제거.)
 
   api:
     image: lloydk-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
@@ -77,10 +54,7 @@ services:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
       POC_MODE: ${POC_MODE:-full}
       LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
@@ -93,9 +67,9 @@ services:
       TRANSFORMERS_OFFLINE: "1"
     volumes:
       - ../models:/models:ro        # 사전 동봉 모델 (분류기 학습본·임베딩·HF 캐시)
+      - storagedata:/app/.storage   # 로컬FS 문서·원본 보관(WORKDIR=/app, LocalStorage root=.storage)
     depends_on:
       postgres: { condition: service_healthy }
-      minio: { condition: service_started }
       redis: { condition: service_started }
     ports:
       - "8000:8000"
@@ -122,10 +96,7 @@ services:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS. api 와 동일 storagedata 볼륨 공유.
       POC_MODE: ${POC_MODE:-full}
       LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
@@ -137,6 +108,7 @@ services:
       TRANSFORMERS_OFFLINE: "1"
     volumes:
       - ../models:/models:ro
+      - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본
     depends_on:
       - redis
       - postgres
@@ -174,6 +146,5 @@ services:
 
 volumes:
   pgdata:
-  miniodata:
   redisdata:
-  mlflowdata:
+  storagedata:     # 로컬FS 문서·원본 보관(api·worker 공유) — minio/mlflowdata 대체

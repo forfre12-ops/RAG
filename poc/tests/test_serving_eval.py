@@ -54,14 +54,25 @@ def test_underclassification_counts_in_fnr():
     assert m.accuracy == 0.5
 
 
-def test_run_failure_is_fail_secure_TS():
-    # run() 실패 시 조용히 빼지 않고 TS로 집계(fail-secure) → 정답 S3면 과분류(안전)로 카운트
+def test_run_failure_on_high_grade_counts_as_miss():
+    # [NEW-M1 회귀] 고등급(TS) 정답에서 run() 크래시는 '미탐'으로 잡혀야 한다.
+    # (옛 버그: pred='TS' fail-secure라 TS=TS '정탐'으로 둔갑 → FNR 0.0 거짓 → 게이트 통과)
+    rows = [{"text": "x", "label": "TS"}]
+    pipe = _FakePipe({}, raise_on="x")
+    m = evaluate_via_serving(rows, pipeline=pipe)
+    assert m.sample_count == 1
+    # 최저심각도(S3)로 집계 → TS 정답에 대해 under-classification(미탐) = 1.0
+    assert m.fnr_underclass_by_grade["TS"] == 1.0
+    assert m.accuracy == 0.0          # 크래시를 '정탐'으로 카운트하지 않음
+
+
+def test_run_failure_on_low_grade_no_false_underclass():
+    # 최저등급(S3) 정답의 크래시는 S3로 집계 → 허위 under-class를 만들지 않음(보수성 유지).
     rows = [{"text": "x", "label": "S3"}]
     pipe = _FakePipe({}, raise_on="x")
     m = evaluate_via_serving(rows, pipeline=pipe)
     assert m.sample_count == 1
-    # S3 정답인데 TS로 예측 = 과분류(저→고). under-class FNR엔 안 잡힘.
-    assert m.fnr_underclass_overall == 0.0
+    assert m.fnr_underclass_overall == 0.0   # S3는 더 낮은 등급이 없어 under-class 불가
 
 
 def test_accepts_expected_grade_key():

@@ -126,6 +126,7 @@ def evaluate_deploy_gate(
     fnr_high_tolerance: float = DEFAULT_FNR_HIGH_TOLERANCE,
     f1_drop_tolerance: float = DEFAULT_F1_DROP_TOLERANCE,
     require_baseline: bool = False,
+    first_deploy_fnr_high_max: Optional[float] = None,
     candidate_version: Optional[str] = None,
     baseline_version: Optional[str] = None,
 ) -> DeployDecision:
@@ -137,6 +138,9 @@ def evaluate_deploy_gate(
         fnr_high_tolerance: 후보 fnr_high ≤ baseline + 이 값이어야 통과. (악화 허용 상한)
         f1_drop_tolerance:  후보 f1_macro ≥ baseline - 이 값이어야 통과. (성능 하락 허용)
         require_baseline:   True면 baseline 부재 자체를 미통과로(엄격 운영).
+        first_deploy_fnr_high_max: [NEW-M2] 최초 배포(baseline 없음) 절대 FNR floor.
+            None(기본)이면 미적용(동작 보존). 설정 시 baseline 없는 첫 모델도
+            fnr_high ≤ 이 값이어야 통과(미탐 하한 — fnr=10% 같은 미탐모델 무조건 통과 차단).
         *_version: 로깅/감사용 라벨.
 
     Returns:
@@ -203,6 +207,17 @@ def evaluate_deploy_gate(
             "baseline_present", True,
             "활성 baseline 없음 — 최초 배포로 간주(degenerate 아니면 통과)",
         ))
+        # [NEW-M2] 최초 배포 절대 FNR floor — baseline 비교가 불가능한 첫 모델의 미탐 하한.
+        # floor 미설정(None)이면 동작 보존(첫 모델 통과). cand_fnr None(미보유)이면 위
+        # fnr_high_present 가 이미 fail-closed 거부하므로 여기선 값이 있을 때만 검사.
+        if first_deploy_fnr_high_max is not None and cand_fnr is not None:
+            ok = cand_fnr <= first_deploy_fnr_high_max
+            checks.append(GateCheck(
+                "first_deploy_fnr_floor", ok,
+                f"최초배포 고등급 미탐율 후보={cand_fnr:.4f} ≤ floor={first_deploy_fnr_high_max:.4f} "
+                f"→ {'OK' if ok else 'floor 초과-거부'}",
+                cand_fnr, first_deploy_fnr_high_max,
+            ))
 
     passed = all(c.passed for c in checks)
     failed = [c.name for c in checks if not c.passed]

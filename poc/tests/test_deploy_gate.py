@@ -35,6 +35,41 @@ def test_first_deploy_blocked_when_require_baseline():
     assert "baseline_present" in dec.reason
 
 
+# ── [NEW-M2] 최초 배포 절대 FNR floor ────────────────────────────────────────
+
+
+def test_first_deploy_floor_blocks_high_fnr():
+    # floor 설정 시, baseline 없는 첫 모델도 미탐 하한 초과면 거부(fnr=10% 무조건통과 차단).
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.10, f1_macro=0.8), None, first_deploy_fnr_high_max=0.05,
+    )
+    assert dec.passed is False
+    assert "first_deploy_fnr_floor" in dec.reason
+
+
+def test_first_deploy_floor_allows_within():
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.03, f1_macro=0.8), None, first_deploy_fnr_high_max=0.05,
+    )
+    assert dec.passed is True
+
+
+def test_first_deploy_floor_none_preserves_passthrough():
+    # floor 미설정(기본 None) → 기존 동작 보존: 높은 fnr도 첫 배포 통과(degenerate 아니면).
+    dec = evaluate_deploy_gate(_report(fnr_high=0.10, f1_macro=0.7), None)
+    assert dec.passed is True
+    assert not any(c.name == "first_deploy_fnr_floor" for c in dec.checks)
+
+
+def test_floor_ignored_when_baseline_present():
+    # baseline 있으면 floor 분기(else)에 안 들어감 — 회귀 비교가 우선.
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.06), _report(fnr_high=0.05), first_deploy_fnr_high_max=0.01,
+    )
+    assert dec.passed is True   # +0.01 ≤ 회귀허용 0.02 통과, floor(0.01)는 미적용
+    assert not any(c.name == "first_deploy_fnr_floor" for c in dec.checks)
+
+
 # ── fnr_high 회귀 차단 (미탐 악화) ───────────────────────────────────────────
 
 

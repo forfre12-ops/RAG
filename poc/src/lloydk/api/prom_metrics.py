@@ -183,6 +183,64 @@ DRIFT_SAMPLE_SIZE = Gauge(
     registry=registry,
 )
 
+# ── NEW-H2: alert_rules.yml 이 참조하나 정의가 없던 메트릭 (alert 영구 no-data 해소) ──
+# 이 7종은 infra/observability/alert_rules.yml 의 P0~P3 룰이 참조하는데 prom_metrics 에
+# 정의가 없어 시계열 자체가 생성되지 않았다 → 알람이 영원히 평가 불가(특히 P0 AuditChainBroken).
+
+# C4 감사 hash-chain 검증 실패 — verify_chain()이 broken>0 검출 시 증가(P0 AuditChainBroken).
+AUDIT_CHAIN_BROKEN_TOTAL = Counter(
+    "lloydk_audit_chain_broken_total",
+    "Audit log hash-chain breaks detected by verify_chain (tamper suspected)",
+    registry=registry,
+)
+
+# 문서 적재 건수 — PiiMaskingMissRate 의 분모(유입은 있는데 PII 마스킹 0이면 masker 누락 의심).
+DOCUMENTS_INGESTED_TOTAL = Counter(
+    "lloydk_documents_ingested_total",
+    "Documents ingested via DocumentIngestionService.ingest()",
+    registry=registry,
+)
+
+# PII 마스킹 건수(타입별) — mask_pii()가 타입별로 증가. rrn 등 핵심 타입 알람.
+PII_MASKED_TOTAL = Counter(
+    "lloydk_pii_masked_total",
+    "PII tokens masked, by type (rrn, email, phone_mobile, ...)",
+    ["pii_type"],
+    registry=registry,
+)
+
+# Webhook outbox DLQ 진입 — deliver_once()가 max_attempts 소진 시 증가(OutboxDlqGrowing).
+OUTBOX_DLQ_TOTAL = Counter(
+    "lloydk_outbox_dlq_total",
+    "Webhook outbox messages moved to DLQ (max attempts exhausted)",
+    registry=registry,
+)
+
+# Celery 큐 적체(큐별) — /metrics-prom 스크랩 시 redis LLEN 으로 best-effort 갱신(CeleryQueueBacklog).
+CELERY_QUEUE_LENGTH = Gauge(
+    "lloydk_celery_queue_length",
+    "Pending tasks per Celery queue (redis LLEN, best-effort at scrape time)",
+    ["queue"],
+    registry=registry,
+)
+
+# 실시간 분류 정확도 신호용 — FnrSpikeOverall = 100*(1 - correct/total).
+# ⚠️ '정탐' 판정에는 정답(ground truth)이 필요하나 서빙 시점엔 알 수 없다. 두 카운터를
+# 함께 증가시키지 않으면(예: total만) expr 가 100%로 거짓 발화하므로, 정답이 확정되는
+# 경로(corrections/confirm)에서만 동반 증가시켜야 한다. 현재는 **정의만**(둘 다 0 → expr
+# 가 0/0=NaN → 무발화, 안전). 운영 실시간 미탐 신호는 이미 배선된
+# lloydk_active_learning_pending_underclass(ActiveLearningUrgent)를 1차로 사용한다.
+CLASSIFY_TOTAL = Counter(
+    "lloydk_classify_total",
+    "Classifications with a later-known ground truth (denominator for live FNR; not yet wired)",
+    registry=registry,
+)
+CLASSIFY_CORRECT_TOTAL = Counter(
+    "lloydk_classify_correct_total",
+    "Ground-truth-correct classifications (numerator for live FNR; not yet wired)",
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",
@@ -255,6 +313,40 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 router = APIRouter()
 
 
+# Celery 큐명 — celery_app.task_routes 와 정합(미구독/미정의 큐는 LLEN 0으로 무해).
+_CELERY_QUEUES = ("classify", "synthesis", "learning", "index", "celery")
+
+
+def _refresh_celery_queue_gauges() -> None:
+    """Celery 큐 길이를 redis LLEN 으로 best-effort 갱신(NEW-H2 CeleryQueueBacklog).
+
+    celery(redis 브로커)는 큐를 큐명 list 키로 보관하므로 LLEN 으로 적체를 읽는다.
+    redis 미가용/미설치면 skip(게이지 미설정 → alert no-data → 거짓 발화 없음). API
+    프로세스에서 브로커를 직접 조회하므로 워커-프로세스 메트릭 분산 문제와 무관.
+    테스트(TESTING) 환경에서는 redis 연결 시도 자체를 건너뛴다(CI 지연·플래키 방지).
+    """
+    if _is_testing():
+        return
+    try:
+        import redis  # noqa: PLC0415
+
+        from lloydk.config import settings  # noqa: PLC0415
+
+        client = redis.Redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=0.5,
+            socket_timeout=0.5,
+        )
+        for q in _CELERY_QUEUES:
+            try:
+                CELERY_QUEUE_LENGTH.labels(queue=q).set(float(client.llen(q)))
+            except Exception:  # noqa: BLE001
+                continue
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("celery queue gauge refresh skipped: %s", exc)
+
+
 def _refresh_business_gauges() -> None:
     """active_learning gauge를 호출 시점에 lazy 갱신.
 
@@ -271,6 +363,8 @@ def _refresh_business_gauges() -> None:
         ACTIVE_LEARNING_UNDERCLASS.set(status.pending_underclass)
     except Exception as exc:  # noqa: BLE001
         _logger.debug("business gauge refresh skipped: %s", exc)
+    # NEW-H2: Celery 큐 적체도 동반 갱신(best-effort, 독립 try).
+    _refresh_celery_queue_gauges()
 
 
 @router.get("/metrics-prom", include_in_schema=False)

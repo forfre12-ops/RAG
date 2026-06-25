@@ -106,6 +106,7 @@ def register_and_gate_model(
                 baseline_metrics,
                 fnr_high_tolerance=float(getattr(settings, "retrain_fnr_high_tolerance", 0.02)),
                 f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
+                first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
                 candidate_version=version_label,
                 baseline_version=baseline_label,
             )

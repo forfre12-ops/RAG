@@ -21,7 +21,7 @@
   python scripts/import_review_corrections.py corrections.csv
   python scripts/import_review_corrections.py corrections.jsonl --merge-gold
   python scripts/import_review_corrections.py corrections.csv --dry-run
-  python scripts/import_review_corrections.py corrections.csv --write-db [--tenant-id default]
+  python scripts/import_review_corrections.py corrections.csv --write-db
   python scripts/import_review_corrections.py corrections.csv --merge-gold --write-db
 """
 from __future__ import annotations
@@ -225,7 +225,7 @@ def _doc_id_to_uuid(doc_id: str) -> uuid.UUID:
         return uuid.UUID(padded)
 
 
-def write_to_db(records: list[dict], tenant_id: str, dry_run: bool) -> dict:
+def write_to_db(records: list[dict], dry_run: bool) -> dict:
     """human_review 검수 결과를 document_labels 테이블에 upsert.
 
     text 있는 레코드:
@@ -278,7 +278,8 @@ def write_to_db(records: list[dict], tenant_id: str, dry_run: bool) -> dict:
                     continue
                 doc = Document(
                     doc_id=doc_uuid,
-                    tenant_id=tenant_id,
+                    # tenant_id 제거: 2026-06-24 멀티테넌트 전면 제거(KL 단일 클라이언트).
+                    # 모델에 tenant_id 컬럼이 없어 이 인자를 주면 TypeError(런타임 깨짐)였다.
                     filename=f"human_review_{raw_doc_id[:8]}.txt",
                     source_format="txt",
                     text_preview=text[:2000],
@@ -342,8 +343,7 @@ def parse_args() -> argparse.Namespace:
                    help="text 있는 건을 gold_real/classification_gold.jsonl 에도 편입")
     p.add_argument("--write-db",   action="store_true",
                    help="document_labels 테이블에 human_review label upsert (DB 연결 필요)")
-    p.add_argument("--tenant-id",  default="default",
-                   help="--write-db 시 사용할 tenant_id (기본: default)")
+    # --tenant-id 제거: 2026-06-24 멀티테넌트 전면 제거(KL 단일 클라이언트).
     p.add_argument("--dry-run",    action="store_true")
     return p.parse_args()
 
@@ -388,7 +388,7 @@ def main() -> int:
         if args.merge_gold:
             merge_into_gold(valid, dry_run=True)
         if args.write_db:
-            write_to_db(valid, tenant_id=args.tenant_id, dry_run=True)
+            write_to_db(valid, dry_run=True)
         return 0
 
     # ── corrections/ 적재 ───────────────────────────────────────────────────
@@ -423,7 +423,7 @@ def main() -> int:
 
     # ── DB write (--write-db) ────────────────────────────────────────────────
     if args.write_db:
-        db_result = write_to_db(valid, tenant_id=args.tenant_id, dry_run=False)
+        db_result = write_to_db(valid, dry_run=False)
         print(f"[OK] DB write: {db_result}")
 
     # ── 정정 요약 CSV ─────────────────────────────────────────────────────────

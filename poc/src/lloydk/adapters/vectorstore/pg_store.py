@@ -3,9 +3,11 @@
 의사결정_대장 §03 경로 ⓑ(ts_rank 코어 + pg_bigm 후보)의 구현. 스키마는 마이그레이션
 alembic a1b2c3d4e5f6 (tb_rag_vectors / tb_rag_aliases).
 
-⚠️ EXPERIMENTAL — **실 PG(pgvector 포함 이미지) 대상 미검증 스캐폴드.** 라이브 PG 부재로
-   본 파일은 정적 검토용 골격이다. ES 폐기·기본 백엔드 전환은 §03 재검증 게이트
-   (실 PG연산자 × 실코퍼스 × 자연어(비발췌)쿼리)를 통과한 뒤에만. 현재 기본 백엔드는 'es' 유지.
+상태(2026-06-24): §03 결정으로 **기본 백엔드는 pg** 이며 ES 서비스는 core/prod/airgap
+   compose 에서 제거됐다(build_store 기본값도 'pg'). 단위·정적 검증(test_pg_store)은 통과.
+⚠️ 단, **라이브 PG(pgvector 포함 이미지) × 실코퍼스 × 자연어(비발췌) 쿼리 재검증 게이트는
+   미실행**(실 PG 부재). dense 채널은 저장소 무관(ES 동급)이나 어휘(ts_rank/bigram) 채널의
+   실 R@5 는 scripts/revalidate_pg_lexical.py 로 확정 후 본 caveat 제거. >10pp 퇴행 시 경로 ⓒ.
 
 설계 노트 (실측·적대검증 반영, scripts/_bench_pg_lexical_revalidation.py):
   - dense 는 pgvector 코사인(embedding <=> q). 저장소 무관(ES 와 동일 품질).
@@ -59,6 +61,24 @@ class PgVectorStore:
     @staticmethod
     def _vec_lit(vec: Sequence[float]) -> str:
         return "[" + ",".join(repr(float(x)) for x in vec) + "]"
+
+    @staticmethod
+    def _parse_vec(raw: Any) -> list[float]:
+        """pgvector 값 → float 리스트. SELECT 시 텍스트 '[a,b,...]'로 직렬화돼 돌아오므로
+        _vec_lit 의 역연산. 이미 시퀀스면 그대로 캐스팅(드라이버/타입어댑터 차이 대비)."""
+        if raw is None:
+            return []
+        if isinstance(raw, (list, tuple)):
+            return [float(x) for x in raw]
+        s = str(raw).strip()
+        if s.startswith("[") and s.endswith("]"):
+            s = s[1:-1]
+        if not s:
+            return []
+        try:
+            return [float(x) for x in s.split(",") if x.strip()]
+        except ValueError:
+            return []
 
     # ── 한국어 어휘 채널 토큰화: 영문/숫자 단어 + 한글 2-gram (pg_bigm 근사) ──
     # NL 재검증 실측: 이 bigram 채널의 ts_rank 가 nori 동급(87% vs 89%), 반면 어절(eojeol)은
@@ -268,6 +288,46 @@ class PgVectorStore:
                 {"c": collection},
             ).scalar()
         return int(r or 0)
+
+    # ── drift 모니터 표본 (A4) ──
+    def sample_vectors(self, *, limit: int = 200, collection: str | None = None) -> list[list[float]]:
+        """drift_monitor 용 — 최근 저장 임베딩 표본(created_at DESC).
+
+        [NEW-H1] default 백엔드가 'pg'로 전환된 뒤 이 메서드가 없으면 drift_monitor 의
+        _sample_prod_vectors 가 빈 표본을 받아 **실배포에서 drift 점검이 영구 no-op**이
+        된다(celery beat drift_tick 이 매 15분 skip). inmemory_store.sample_vectors 와
+        동일 시그니처. created_at(마이그레이션 a1b2c3d4e5f6) 으로 최근 N개. collection
+        미지정 시 전 컬렉션 합산.
+
+        pgvector embedding 컬럼은 SELECT 시 텍스트 '[a,b,...]' 로 돌아오므로 _parse_vec 로 파싱.
+        """
+        from sqlalchemy import text  # noqa: PLC0415
+
+        params: dict[str, Any] = {"limit": int(limit)}
+        where = "embedding IS NOT NULL"
+        if collection:
+            where += " AND collection = :collection"
+            params["collection"] = collection
+        sql = text(
+            f"""
+            SELECT embedding FROM tb_rag_vectors
+            WHERE {where}
+            ORDER BY created_at DESC
+            LIMIT :limit
+            """
+        )
+        try:
+            with self._engine.connect() as conn:
+                rows = conn.execute(sql, params).fetchall()
+        except Exception as exc:  # noqa: BLE001 — drift 표본은 best-effort(미가용 시 빈 표본)
+            logger.debug("pg sample_vectors failed: %s", exc)
+            return []
+        out: list[list[float]] = []
+        for r in rows:
+            vec = self._parse_vec(r[0])
+            if vec:
+                out.append(vec)
+        return out
 
     # ── alias (무중단 재색인 blue/green) — ES swap_alias 대체 ──
     def swap_alias(

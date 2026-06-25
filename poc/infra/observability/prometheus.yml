@@ -28,11 +28,7 @@ scrape_configs:
         labels:
           service: postgres
 
-  - job_name: elasticsearch
-    static_configs:
-      - targets: [elasticsearch-exporter:9114]
-        labels:
-          service: elasticsearch
+  # elasticsearch job 제거 — ES→PG 단일화(§03). pgvector 는 postgres-exporter 로 커버.
 
   - job_name: redis
     static_configs:

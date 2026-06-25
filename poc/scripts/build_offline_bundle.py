@@ -67,7 +67,7 @@ class PluginEntry:
 
 @dataclass
 class BundlePolicies:
-    vector_backend_default: str = "es"
+    vector_backend_default: str = "pg"   # §03 ES→Postgres 단일화(2026-06-24). ES 폐기.
     llm_provider_default: str = "vllm"
     qwen3_thinking_mode: bool = False
 
@@ -234,7 +234,7 @@ _COMPONENT_SIZE_GB: dict[str, float] = {
     "api": 1.5,
     "worker": 1.5,
     "postgres": 0.4,
-    "elasticsearch": 1.0,
+    # elasticsearch 제거 — §03 ES→PG 단일화. (dev compose 잔존 minio/mlflow는 추정용으로만 유지)
     "minio": 0.2,
     "redis": 0.1,
     "mlflow": 0.6,
@@ -615,7 +615,7 @@ def _copy_ocr_binaries(out_dir: Path) -> None:
 
 
 def _copy_infra(out_dir: Path) -> None:
-    """docker-compose, env template, ES 설정 파일 복사."""
+    """docker-compose(airgap 포함), env template, alembic, OCR 바이너리 복사. (ES 설정 폐기 — §03)"""
     import shutil
 
     infra = out_dir / "infra-config"
@@ -648,7 +648,7 @@ def _copy_infra(out_dir: Path) -> None:
             "DATABASE_URL=postgresql://lloydk:lloydk_dev@postgres:5432/lloydk\n"
             "VECTOR_BACKEND=pg\n"
             "REDIS_URL=redis://redis:6379/0\n"
-            "MINIO_ENDPOINT=minio:9000\n"
+            "STORAGE_BACKEND=local\n"   # 폐쇄망=로컬FS(file://). MinIO 미사용.
             "LLM_PROVIDER=vllm\n"
             "DEPLOY_PROFILE=onprem-local\n",
             encoding="utf-8",
@@ -798,8 +798,10 @@ def main() -> int:
     ap.add_argument("--target-env", default="KOIPA-prod")
     ap.add_argument("--dry-run", action="store_true", help="다운로드 없이 manifest만 생성")
     ap.add_argument(
-        "--compose", default=str(_REPO_ROOT / "docker-compose.yml"),
-        help="파싱할 docker-compose.yml 경로",
+        # 폐쇄망 번들은 airgap compose 를 파싱한다(image: 태그 보유 → api/worker 이미지 추출 가능).
+        # dev compose(docker-compose.yml)는 api/worker 가 build: 라 image 추출 불가 + minio/mlflow 잔존.
+        "--compose", default=str(_REPO_ROOT / "docker-compose.airgap.yml"),
+        help="파싱할 docker-compose 경로(기본: airgap)",
     )
     ap.add_argument(
         "--config", default=str(_REPO_ROOT / "src" / "lloydk" / "config.py"),

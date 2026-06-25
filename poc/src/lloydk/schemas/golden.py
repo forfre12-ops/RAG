@@ -22,7 +22,10 @@ class GoldenBuildRequest(BaseModel):
     min_rule_conf: float = Field(default=0.5, ge=0.0, le=1.0)
     min_llm_conf: float = Field(default=0.7, ge=0.0, le=1.0)
     holdout_path: Optional[str] = None                       # 누출 차단용 홀드아웃 jsonl
-    out_dir: str = Field(default="datasets/gold_real")       # run-스코프 후보 출력 위치
+    # run-스코프 후보 출력 위치. 정본(datasets/gold_real/classification_gold.jsonl)과 산출물이
+    # 섞이지 않게 builds/ 하위로 분리(run-스코프 파일명이라 덮어쓰진 않으나 위생). 승격은
+    # scripts/promote_golden_candidates.py 로 명시적 게이트 통과 후 정본에 병합.
+    out_dir: str = Field(default="datasets/gold_real/builds")
     actor: Actor
 
 

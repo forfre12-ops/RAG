@@ -8,9 +8,9 @@
 배포 프로파일 (2026-05-29 추가):
 - LLOYDK_DEPLOY_PROFILE 한 줄로 4-tier 납품 모드 전환:
     lite-noapi    : GPU·외부 API 모두 없음 (noop LLM + hash embedding + inmemory + 학습 OFF)
-    lite-cloud    : GPU 없음, 외부 LLM 사용 (anthropic/openai + KURE/hash + ES + 학습 OFF)
-    onprem-local  : GPU 보유, 폐쇄망 (local_openai/ollama + KURE/BGE + ES + 학습 OFF)
-    full-train    : 풀스펙 (자유 + KURE/BGE + ES + 학습 ON, KOIPA 풀스펙 대상)
+    lite-cloud    : GPU 없음, 외부 LLM 사용 (anthropic/openai + KURE/hash + PG + 학습 OFF)
+    onprem-local  : GPU 보유, 폐쇄망 (local_openai/ollama + KURE/BGE + PG + 로컬FS저장 + 학습 OFF)
+    full-train    : 풀스펙 (자유 + KURE/BGE + PG + 로컬FS저장 + 학습 ON, KOIPA 풀스펙 대상)
 프로파일은 미설정 키에만 default를 채움 — 사용자가 .env로 명시한 값은 항상 우선.
 """
 
@@ -72,7 +72,9 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "embedding_provider": "hf",
         "reranker_provider": "bge",
         "vector_backend": "pg",
-        "storage_backend": "minio",
+        # 폐쇄망=로컬FS(file://) — 2026-06-24 결정(MinIO 미사용, 원본만 EncryptingStorage 래핑).
+        # 이전 'minio' 기본은 결정과 모순되는 드리프트였다.
+        "storage_backend": "local",
         "enable_training": False,
         "poc_mode": "full",
     },
@@ -81,7 +83,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "embedding_provider": "hf",
         "reranker_provider": "bge",
         "vector_backend": "pg",
-        "storage_backend": "minio",
+        # MinIO 미사용 결정 정합(번들도 minio 제거). 학습 산출물·문서는 로컬FS.
+        "storage_backend": "local",
         "enable_training": True,
         "poc_mode": "full",
     },
@@ -341,6 +344,10 @@ class Settings(BaseSettings):
     retrain_fnr_high_tolerance: float = 0.02
     # 게이트: 후보 f1_macro ≥ baseline - 이 허용오차여야 활성 허용(전반 성능 붕괴 차단).
     retrain_f1_drop_tolerance: float = 0.05
+    # [NEW-M2] 최초 배포(baseline 없음) 절대 FNR floor — baseline 비교가 불가능한 첫 모델이
+    # fnr_high 가 이 값을 초과하면 거부(미탐 하한). None(기본)=floor 미적용(동작 보존, 첫
+    # 모델은 degenerate 아니면 통과). 실데이터 human_review PR곡선으로 값 확정 후 설정 권장.
+    deploy_gate_first_deploy_fnr_high_max: float | None = None
     # 교정→라벨 재빌드/병합 학습셋 출력 디렉토리(A2-①).
     retrain_dataset_dir: str = "datasets/demo_retrain"
 

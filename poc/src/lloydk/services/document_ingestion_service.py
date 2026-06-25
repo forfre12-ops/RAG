@@ -147,6 +147,14 @@ class DocumentIngestionService:
             )
             warns.extend(pwarns)
 
+        # NEW-H2: 적재 카운트 — PiiMaskingMissRate 알람 분모. best-effort.
+        try:
+            from lloydk.api.prom_metrics import DOCUMENTS_INGESTED_TOTAL  # noqa: PLC0415
+
+            DOCUMENTS_INGESTED_TOTAL.inc()
+        except Exception:  # noqa: BLE001
+            pass
+
         return IngestResult(
             doc_id=doc_id,
             filename=filename,

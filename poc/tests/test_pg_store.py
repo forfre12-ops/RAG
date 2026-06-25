@@ -51,3 +51,72 @@ def test_ensure_collection_dim_guard():
     store.ensure_collection("c", 1024)            # vector(1024)와 일치 → ok
     with pytest.raises(ValueError):
         store.ensure_collection("c", 768)         # 차원 불일치 → fail-fast
+
+
+# ── drift 표본(NEW-H1) — _parse_vec 순수 + sample_vectors 페이크 엔진 ──
+
+def test_parse_vec_formats_and_roundtrip():
+    assert PgVectorStore._parse_vec("[0.1,0.2,0.3]") == [0.1, 0.2, 0.3]
+    assert PgVectorStore._parse_vec([1, 2, 3]) == [1.0, 2.0, 3.0]   # 이미 시퀀스
+    assert PgVectorStore._parse_vec("[]") == []
+    assert PgVectorStore._parse_vec(None) == []
+    assert PgVectorStore._parse_vec("garbage") == []                 # 파싱 불가 → 빈 리스트
+    v = [0.5, -1.25, 3.0]
+    assert PgVectorStore._parse_vec(PgVectorStore._vec_lit(v)) == v  # _vec_lit ↔ _parse_vec 왕복
+
+
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def fetchall(self):
+        return self._rows
+
+
+class _FakeConn:
+    def __init__(self, rows):
+        self._rows = rows
+        self.captured = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def execute(self, sql, params=None):
+        self.captured = (str(sql), params)
+        return _FakeResult(self._rows)
+
+
+class _FakeEngine:
+    def __init__(self, rows):
+        self._rows = rows
+        self.conn = None
+
+    def connect(self):
+        self.conn = _FakeConn(self._rows)
+        return self.conn
+
+
+def test_sample_vectors_parses_rows():
+    store = PgVectorStore(engine=_FakeEngine([("[0.1,0.2]",), ("[0.3,0.4]",)]))
+    assert store.sample_vectors(limit=10) == [[0.1, 0.2], [0.3, 0.4]]
+
+
+def test_sample_vectors_collection_filter_and_params():
+    eng = _FakeEngine([("[1,2]",)])
+    out = PgVectorStore(engine=eng).sample_vectors(limit=5, collection="docs")
+    assert out == [[1.0, 2.0]]
+    sql, params = eng.conn.captured
+    assert "collection = :collection" in sql                 # 컬렉션 필터 절 포함
+    assert params == {"limit": 5, "collection": "docs"}
+
+
+def test_sample_vectors_db_error_returns_empty():
+    class _BoomEngine:
+        def connect(self):
+            raise RuntimeError("no live PG")
+
+    # best-effort — PG 미가용 시 drift 표본은 빈 리스트(예외 전파 금지)
+    assert PgVectorStore(engine=_BoomEngine()).sample_vectors(limit=3) == []

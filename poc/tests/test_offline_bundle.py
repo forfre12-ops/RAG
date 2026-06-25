@@ -241,7 +241,7 @@ def test_build_manifest_policies_force_vllm(sample_compose: Path, sample_config:
         compose_path=sample_compose,
         config_path=sample_config,
     )
-    assert m.policies.vector_backend_default == "es"
+    assert m.policies.vector_backend_default == "pg"   # §03 ES→PG 단일화
     assert m.policies.llm_provider_default == "vllm"
     assert m.policies.qwen3_thinking_mode is False
 

@@ -192,6 +192,19 @@ def verify_chain(
         last_hash = stored_full32 or last_hash
         verified += 1
 
+    if broken:
+        # NEW-H2: P0 AuditChainBroken 알람용 메트릭. best-effort(프로메테우스 미가용 무시).
+        try:
+            from lloydk.api.prom_metrics import AUDIT_CHAIN_BROKEN_TOTAL  # noqa: PLC0415
+
+            AUDIT_CHAIN_BROKEN_TOTAL.inc(broken)
+        except Exception:  # noqa: BLE001
+            pass
+        logger.warning(
+            "audit chain verify: %d/%d rows broken (first_break_audit_id=%s) — 변조 의심",
+            broken, len(rows), first_break,
+        )
+
     return ChainVerificationResult(
         total_rows=len(rows),
         verified=verified,

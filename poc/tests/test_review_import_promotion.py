@@ -94,3 +94,67 @@ def test_validate_record_accepts_real_reviewer():
     rec, errs = iric.validate_record(row, 1)
     assert rec is not None and not errs
     assert rec["reviewer_id"] == "r1"
+
+
+# ── [NEW-M3] write_to_db tenant 잔재 제거 회귀 ────────────────────────────────
+
+
+class _FakeSession:
+    def __init__(self):
+        self.added = []
+        self.executed = []
+        self.committed = False
+
+    def add(self, o):
+        self.added.append(o)
+
+    def flush(self):
+        pass
+
+    def execute(self, stmt):
+        self.executed.append(stmt)
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class _FakeRepo:
+    def __init__(self, db):
+        pass
+
+    def level_id_by_code(self, code):
+        return 1
+
+    def document_exists(self, doc_uuid):
+        return False
+
+
+def test_write_to_db_dry_run_signature_has_no_tenant():
+    # 시그니처에서 tenant_id 제거 — 인자 없이 호출 가능(dry-run).
+    out = iric.write_to_db([], dry_run=True)
+    assert out.get("dry_run") is True
+
+
+def test_write_to_db_constructs_document_without_tenant(monkeypatch):
+    # 테넌트 제거 후 Document(tenant_id=...) 잔재로 write_to_db 가 런타임에 깨졌었다(TypeError).
+    # 페이크 세션으로 DB 없이 Document 생성 경로를 태워 더는 깨지지 않음을 확인.
+    import lloydk.db as db_mod
+    import lloydk.repositories.classify_repo as repo_mod
+
+    fake = _FakeSession()
+    monkeypatch.setattr(db_mod, "SessionLocal", lambda: fake)
+    monkeypatch.setattr(repo_mod, "ClassifyRepo", _FakeRepo)
+
+    rec = _correction("a1b2c3d4" * 5, "S3", "TS", text="영업비밀 본문")  # 40자 sha1 hex
+    out = iric.write_to_db([rec], dry_run=False)
+
+    assert out["written"] == 1
+    assert fake.committed is True
+    assert len(fake.added) == 1                       # Document 1건 생성됨
+    assert not hasattr(fake.added[0], "tenant_id")    # tenant 컬럼 부재(제거 정합)

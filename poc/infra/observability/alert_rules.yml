@@ -23,14 +23,7 @@ groups:
           summary: "PostgreSQL 다운"
           runbook: "doc/11 §6 DR 시나리오"
 
-      - alert: ElasticsearchDown
-        expr: up{job="elasticsearch"} == 0
-        for: 2m
-        labels:
-          severity: P1
-        annotations:
-          summary: "Elasticsearch 다운 → 즉시 복구 (벡터스토어 단일 백엔드)"
-          runbook: "doc/13 §장애대응"
+      # ElasticsearchDown 제거 — ES→PG 단일화(§03). 벡터스토어 장애는 PostgresDown(P0)이 커버.
 
   - name: lloydk-performance
     interval: 1m
@@ -82,6 +75,9 @@ groups:
     rules:
       - alert: FnrSpikeOverall
         # P1-F2: 일별 FNR이 5%를 5분 평균으로 초과하면 알람
+        # NEW-H2 주의: lloydk_classify_correct_total/total 은 prom_metrics 에 정의됐으나
+        # 아직 증가 배선 전(정탐 판정에 정답 필요 — corrections/confirm 경로에서 동반 증가 예정).
+        # 둘 다 0이면 expr=0/0=NaN 으로 무발화(안전). 운영 1차 미탐 신호는 ActiveLearningUrgent 사용.
         expr: |
           100 * (1 - sum(rate(lloydk_classify_correct_total[5m])) / sum(rate(lloydk_classify_total[5m]))) > 5
         for: 10m

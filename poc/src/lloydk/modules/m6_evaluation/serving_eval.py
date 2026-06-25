@@ -15,13 +15,32 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional, Sequence
 
-from lloydk.modules.m6_evaluation.metrics import MetricsResult, compute_metrics_from_arrays
+from lloydk.modules.m6_evaluation.metrics import (
+    DEFAULT_LABELS,
+    MetricsResult,
+    _GRADE_SEVERITY,
+    compute_metrics_from_arrays,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def _label_code(label: Any) -> str:
     return label.value if hasattr(label, "value") else str(label)
+
+
+def _least_severe_grade(labels: Optional[Sequence[str]]) -> str:
+    """가장 낮은 심각도(=least sensitive) 등급 코드 — 서빙 실패의 보수적 대체 예측.
+
+    _GRADE_SEVERITY 값이 가장 큰(=덜 민감한) 등급. labels 가 심각도 맵에 없으면
+    마지막 라벨로 폴백. 이 값을 실패 pred 로 쓰면 고등급 정답 문서의 크래시가
+    under-classification(미탐)으로 집계된다(아래 설명 참조).
+    """
+    candidates = list(labels) if labels else list(DEFAULT_LABELS)
+    known = [g for g in candidates if g in _GRADE_SEVERITY]
+    if known:
+        return max(known, key=lambda g: _GRADE_SEVERITY[g])
+    return candidates[-1] if candidates else "S3"
 
 
 def evaluate_via_serving(
@@ -50,6 +69,9 @@ def evaluate_via_serving(
 
     y_true: list[str] = []
     y_pred: list[str] = []
+    # [NEW-M1] 서빙 실패 시 보수적 대체 예측 = 최저심각도 등급. (사유는 except 블록 참조)
+    fail_pred = _least_severe_grade(labels)
+    error_count = 0
     for row in rows:
         label = row.get("label") or row.get("expected_grade")
         text = row.get("text", "")
@@ -59,12 +81,24 @@ def evaluate_via_serving(
             result = pipeline.run(text, use_rag=use_rag, metadata=metadata)
             pred = _label_code(result.label)
         except Exception as exc:  # noqa: BLE001
-            # 서빙 실패 = 운영에서도 분류 못 함. 평가에서 조용히 빼지 않고 가장 안전한
-            # 방향(미탐 회피)으로 최고등급(TS)을 부여해 fail-SECURE로 집계한다.
-            logger.warning("serving eval: run() failed on a doc → fail-secure TS: %s", exc)
-            pred = "TS"
+            # 서빙 실패 = 운영에서도 그 문서를 분류 못 함. 이전엔 pred='TS'(최고등급)를 줘
+            # "fail-secure"라 했으나, **게이트 평가에서는** 고등급(TS/S1) 정답 문서의
+            # 크래시가 '정탐'(예: TS 정답을 TS로 맞힘)으로 둔갑해 FNR(미탐율)을 거짓으로
+            # 낮춘다 → deploy_gate 가 크래시-회피 모델을 통과시키는 안전 구멍이었다(NEW-M1).
+            # 평가에서는 가장 보수적으로 — 분류 불능을 '미탐'으로 본다: 최저심각도 등급을
+            # 부여해 고등급 정답이면 under-classification(FN)으로 잡히게 한다.
+            error_count += 1
+            logger.debug("serving eval: run() failed on a doc → miss(%s): %s", fail_pred, exc)
+            pred = fail_pred
         y_true.append(_label_code(label))
         y_pred.append(pred)
+
+    if error_count:
+        logger.warning(
+            "serving eval: %d/%d 문서 run() 실패 → '%s'(최저심각도)로 미탐 집계 "
+            "(게이트 보수화 — 크래시가 FNR을 거짓 inflate하지 않도록)",
+            error_count, len(rows), fail_pred,
+        )
 
     return compute_metrics_from_arrays(
         y_true, y_pred, labels=labels, model_version=model_version
