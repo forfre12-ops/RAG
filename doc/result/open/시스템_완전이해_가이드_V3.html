@@ -455,7 +455,7 @@ footer strong{color:var(--text-dim);}
     <li>문서 업로드 → <strong>2~3초 → 등급 + 판단 근거</strong> 반환.</li>
     <li>"영업비밀"이란 단어가 없어도 <strong>내용의 의미를 보고 판단</strong>합니다.</li>
     <li>현행 모델 KF-DeBERTa <strong>F1 0.686 · 미탐율(FNR) 0.018</strong> (서빙경로, 홀드아웃 109건).</li>
-    <li>AI가 틀리면 사람이 수정, 그 판정이 <strong>재학습→핫리로드로 모델에 반영</strong>됩니다.</li>
+    <li>AI가 틀리면 사람이 수정 — <strong>정정은 진단·교정 데이터로 축적</strong>되며, 재학습 반영 방식은 미확정(A 무반출 기본 / B 온사이트 / C 문서반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이고 모델은 상시 재학습하지 않습니다(지재원 자기 골든셋 1차학습 + 드리프트 트리거 단발).</li>
     <li>인터넷 없는 폐쇄망에서도 <strong>로컬 AI 모델로 완전 동작</strong>합니다.</li>
     <li>질문을 입력하면 관련 문서를 찾아 <strong>AI가 답변을 생성</strong>합니다.</li>
     <li>모든 분류 요청이 <strong>감사 로그에 기록</strong>됩니다.</li>
@@ -1902,7 +1902,7 @@ footer strong{color:var(--text-dim);}
 <table>
   <thead><tr><th>항목</th><th>현황</th><th>해결 방법</th><th>우선순위</th></tr></thead>
   <tbody>
-  <tr><td><strong>발주처 실문서</strong></td><td>실문서 F1=N/A (합성+공개로 진행 중)</td><td>발주처 실데이터 제공 시 <code>relabel</code>·재학습으로 확정</td><td><span class="tag filled">최우선</span></td></tr>
+  <tr><td><strong>발주처 실문서</strong></td><td>실문서 F1=N/A (합성+공개로 진행 중)</td><td>발주처 실데이터는 2026-09 1차학습용으로 망 내에서 사용(<code>relabel</code>) — 반영 경로는 미확정(A 무반출 기본 / B 온사이트 / C 반출, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>), 원문 반출 없이 집계 진단지표만 환류(A안)</td><td><span class="tag filled">최우선</span></td></tr>
   <tr><td><strong>P2 청킹 — RAG 검색 인덱스 <span style="font-size:.85em;font-weight:400;color:var(--text-dim);">(요건 외 부가)</span></strong></td><td>테스트 0.808, 운영 인덱스 미청킹</td><td><code>index_rag_corpus.py --chunk-size 1200</code> 재인덱싱</td><td><span class="tag outline">부가</span></td></tr>
   <tr><td><strong>가이드 정본 v2</strong></td><td><strong>해결</strong> — 발주처 정본 가이드 v2 수령·반영 완료(2026-06-18)</td><td>완료 · 향후 발주처 갱신본 도착 시 패치(선택)</td><td><span class="tag mid">해결</span></td></tr>
   <tr><td><strong>법률 코퍼스 정제</strong></td><td><strong>해결</strong> — 오염 56% 제거 후 test 78→93%, FNR 21→8%</td><td>완료 · 잔여: 출처불명 제3문체</td><td><span class="tag mid">해결</span></td></tr>

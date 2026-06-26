@@ -414,7 +414,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <section id="s08">
       <h2><span class="num">08</span> 본질 로드맵</h2>
       <p class="h2-sub">게이트는 다리(임시). 본질은 학습 시스템 개선이다.</p>
-      <p>게이트는 "못 믿을 모델을 안전하게 우회"하는 장치다. 근본 해법은 셋이며, <b>재학습 가능 여부</b>에 따라 갈린다(본 프로젝트는 주기적 재학습 가능).</p>
+      <p>게이트는 "못 믿을 모델을 안전하게 우회"하는 장치다. 근본 해법은 셋이며, <b>재학습 가능 여부</b>에 따라 갈린다(본 프로젝트는 재학습 가능 — 단 상시가 아니라 실데이터 1차학습(2026-09) 후 드리프트/이벤트 트리거 단발).</p>
       <div class="card-grid col3" style="margin:16px 0;">
         <div class="card card-pass"><div class="card-label">① 능동학습 환류</div><div class="card-value sm">최우선</div><div class="card-desc">검수→검증라벨→재학습. 검수가 데이터 엔진이 되어 미탐·검수량이 시간이 갈수록 감소. (corrections_rebuild·active_learning 존재)</div></div>
         <div class="card"><div class="card-label">② 목적함수</div><div class="card-value sm">비용민감·순서형</div><div class="card-desc">고등급 과소분류에 큰 페널티 + 순서형(TS&gt;S1&gt;S2&gt;S3) → 안전을 모델에 내장, 외부 보철 불요</div></div>
@@ -444,7 +444,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </ul>
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
-        <div class="callout-body"><b>요약.</b> "conf만 믿고 자동확정해도 되나"라는 물음에 데이터가 <b>No</b>라고 답했고(AUROC 0.58), 그 대안으로 <b>등급차등·합의 게이트</b>를 설계·측정·적대검증해 정밀도 63→81%·고등급 미탐 46→8을 확인했다. 본질은 <b>실데이터 능동학습 환류</b>이며, 그 전까지 게이트와 표본감사가 안전을 떠받친다.</div>
+        <div class="callout-body"><b>요약.</b> "conf만 믿고 자동확정해도 되나"라는 물음에 데이터가 <b>No</b>라고 답했고(AUROC 0.58), 그 대안으로 <b>등급차등·합의 게이트</b>를 설계·측정·적대검증해 정밀도 63→81%·고등급 미탐 46→8을 확인했다. 본질은 <b>실데이터 능동학습 환류</b>(정책 미확정: 기본 A안 무반출·집계진단 환류, 재학습 주체=지재원 골든셋)이며, 그 전까지 게이트와 표본감사가 안전을 떠받친다.</div>
       </div>
     </section>
 

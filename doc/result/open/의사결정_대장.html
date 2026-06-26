@@ -133,7 +133,7 @@ footer strong{color:var(--text-dim);}
       <tr><td><code>A2</code></td><td>v2.2 곱셈 보정 2건 활성화 여부</td><td>가이드 원본 곱셈 vs v2.2 보정(2·2·0→S1, 1·2·2→S2). 둘 다 골든셋 근거</td><td>설정 토글 제공 후 정책 승인</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td><code>A3</code></td><td>90% 정확도 측정 기준</td><td>어느 코퍼스·지표로 합격 판정. 운영 코퍼스 0.925 vs OSS 0.623</td><td>운영 코퍼스 기준 + FNR 동반</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td><code>A4</code></td><td>등급 한국어/영문 표시명 확정</td><td>TS/S1/S2/S3 ↔ 한국어 명칭</td><td>§4.4 표대로</td><td class="center"><span class="tag plan">미결</span></td></tr>
-      <tr><td><code>A5</code></td><td>실데이터(회원사 실문서) 제공 시점·범위</td><td>본개발 검증·인간 골든셋의 토대. 현재 합성 위주</td><td>조기 제공 요청(크리티컬)</td><td class="center"><span class="tag dep">발주처 의존</span></td></tr>
+      <tr><td><code>A5</code></td><td>실데이터(회원사 실문서) 제공 시점·범위</td><td>본개발 검증·인간 골든셋의 토대. 현재 합성 위주. <strong>실문서 = 2026-09 1차학습 코퍼스(필수)</strong>; 1차학습 전 모델은 합성 기반, 상시 재학습 안 함(드리프트 단발)</td><td>조기 제공 요청(크리티컬)</td><td class="center"><span class="tag dep">발주처 의존</span></td></tr>
       <tr><td><code>A6</code></td><td>GPU·서버 사양 확정</td><td>운영 목표 A100 vs PoC 실측 RTX 5070 Ti. 폐쇄망 설치 포함</td><td>운영=A100급, 실측=5070Ti 명시</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td><code>A7</code></td><td><strong>골든셋 라벨링·검증 주체·절차</strong> <span class="tag wip">신규</span></td><td>AI사가 임의 라벨링 시 신뢰성 문제(라벨 순환성)</td><td><strong>2단계</strong> — 임시(Lloydk) → 정식(발주처 전문가 검증·승인)</td><td class="center"><span class="tag plan">미결</span></td></tr>
     </tbody>
@@ -170,7 +170,7 @@ footer strong{color:var(--text-dim);}
   <div class="table-wrap"><table>
     <thead><tr><th>항목</th><th>배경 · 선택지</th><th>추천</th><th class="center">상태</th></tr></thead>
     <tbody>
-      <tr><td>폐곡선·자동롤백 활성</td><td>기본 OFF. 언제·어떤 임계로 켤지</td><td>모니터링 동반 활성</td><td class="center"><span class="tag plan">미결</span></td></tr>
+      <tr><td>폐곡선·자동롤백 활성</td><td>기본 OFF. 언제·어떤 임계로 켤지. <strong>환류=재학습 방식은 미확정 3안</strong>(A 무반출·기본 / B 온사이트 학습 / C 문서단위 반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>); <strong>채널 분리</strong>(고객 문서=무반출, 집계 진단지표만 필수 환류). 모델은 상시 재학습하지 않음 — 폐곡선/자동롤백 임계는 1차학습 후 드리프트 트리거 단발</td><td>모니터링 동반 활성</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td>임베딩 모델 운영 선택</td><td>KURE-v1(BGE-M3 한국어 파인튜닝판) vs BGE-M3(일반 MTEB 높음)</td><td><strong>KURE-v1 확정</strong> — 우리 코퍼스 dense 실측: 발췌(80)·NL(190) 양쪽 모두 KURE ≥ BGE (@5 +1.6~3.8pp, @1 +5~7pp). 일반 벤치는 BGE 우위라도 우리 한국어 도메인은 특화판 KURE 우위. (dense·합성 한계 — 실데이터 재확인 P2)</td><td class="center"><span class="tag done">결정(실측)</span></td></tr>
       <tr><td><strong>A안 점수→등급 환산 규칙</strong> <span class="tag wip">신규</span></td><td>5요소 100점 → 등급 환산표 미정</td><td>가이드 기준 환산표 확정</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td>분산 상태 외부화</td><td>비동기 인라인·인프로세스 폴백</td><td>Celery 실배선·Redis 강제·reload 팬아웃</td><td class="center"><span class="tag plan">미결</span></td></tr>

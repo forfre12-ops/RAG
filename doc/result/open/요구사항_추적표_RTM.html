@@ -168,11 +168,11 @@ footer strong{color:var(--text-dim);}
         </tr>
         <tr>
           <td><code>FUN-024</code></td>
-          <td>검수자 큐 배분 · 심층지표 — 자동확정·검수 라우팅은 confidence(softmax 파생, 단독 신뢰불가 · OOD AUROC 0.58) 임계 단독이 아닌 다단 게이트로 결정: 희소근거 게이트(<code>rule_fallback_min_evidence</code>) + 합의 게이트(<code>agreement_gate_enabled</code>) + 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, 입력=KL ICD <code>security_marking</code>/<code>access_scope</code> — 보안표시가 예측보다 높으면 상향 floor·접근범위 제한 시 검수 라우팅, <code>source_prior</code> 하향의 상향 대칭, 세 게이트 모두 opt-in·기본 OFF) → 검수자 큐, FNR 핵심관리, 능동학습</td>
+          <td>검수자 큐 배분 · 심층지표 — 자동확정·검수 라우팅은 confidence(softmax 파생, 단독 신뢰불가 · OOD AUROC 0.58) 임계 단독이 아닌 다단 게이트로 결정: 희소근거 게이트(<code>rule_fallback_min_evidence</code>) + 합의 게이트(<code>agreement_gate_enabled</code>) + 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, 입력=KL ICD <code>security_marking</code>/<code>access_scope</code> — 보안표시가 예측보다 높으면 상향 floor·접근범위 제한 시 검수 라우팅, <code>source_prior</code> 하향의 상향 대칭, 세 게이트 모두 opt-in·기본 OFF) → 검수자 큐, FNR 핵심관리, 능동학습 환류(정책 미확정 — 기본 A안: 지재원 골든셋 재학습·집계 진단 환류·고객문서 무반출)</td>
           <td class="center">M5·M6</td>
           <td>적용서 §3.4 · 테스트전략 §03</td>
           <td><code>confirm/relabel</code> · <code>m6_evaluation</code> · 거버넌스 콘솔</td>
-          <td>능동학습 폐곡선 실측 · 검수자 신뢰도</td>
+          <td>검수→집계 진단 환류 실측(재학습 환류 정책 A/B/C 미확정) · 검수자 신뢰도</td>
           <td class="center"><span class="tag wip">정밀화</span></td>
         </tr>
       </tbody>

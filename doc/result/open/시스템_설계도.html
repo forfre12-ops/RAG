@@ -181,7 +181,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
         <div class="grp-l">고객사 폐쇄망 호스트 · 배포 번들 (추론 전용 · 온프렘 GPU)</div>
         <div class="diag" style="margin:0;">
           <div class="node"><div class="nt">API</div><div class="nd">FastAPI · 분류/검색/관리 엔드포인트</div></div>
-          <div class="node"><div class="nt">Worker · Beat</div><div class="nd">Celery · 비동기 분류·색인·재학습</div></div>
+          <div class="node"><div class="nt">Worker · Beat</div><div class="nd">Celery · 비동기 분류·색인 (모델 핫리로드, 재학습 아님 — 재학습은 지재원·환류 미확정 §05)</div></div>
           <div class="node"><div class="nt">Redis</div><div class="nd">Celery 브로커·백엔드 · 잡상태·아웃박스/DLQ (인메모리 LRU가 캐시)</div></div>
         </div>
         <div class="diag" style="margin:6px 0 0;">
@@ -331,7 +331,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
   <!-- ⑤ 운영 라이프사이클 (골든셋·학습·배포 통합) -->
   <section id="s5">
-    <div class="sec-head"><span class="n">05</span><h2>운영 라이프사이클 — 골든셋 → 학습 → 배포 (폐곡선)</h2></div>
+    <div class="sec-head"><span class="n">05</span><h2>운영 라이프사이클 — 골든셋 → 학습 → 배포 (라이프사이클 · 환류 미확정)</h2></div>
     <div class="sec-sub">데이터(골든셋) → 모델(학습) → 배포 → 운영의 사이클. 지재원이 <b>A·B</b>(골든셋·학습)를, 고객사가 <b>C</b>(배포·운영)를 맡는다. 운영 환류는 <b>미확정 결정</b>(무반출·온사이트·반출 3안 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>): 기본(무반출)에선 <b>집계 진단지표만</b> 지재원으로 가고(문서·교정은 망 내 잔류), 재학습은 지재원이 자기 골든셋으로 실데이터 1차학습 후 드리프트/이벤트 단발로 수행한다.</div>
 
     <div class="grp" style="flex:1 1 100%;">

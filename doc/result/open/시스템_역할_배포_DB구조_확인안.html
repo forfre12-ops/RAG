@@ -299,7 +299,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
                          · 서명·체크섬 · 보안매체 반입 · KL이 설치(alembic upgrade)
 
 OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 자체가 결정 대상
-                         · A안(기본) = 문서 무반출·집계 진단지표만 · C안 = 문서단위 반출 -&gt; 재학습</div>
+                         · A안(기본) = 문서 무반출·집계 진단지표만 · B안 = 온사이트 학습(고객 망내 폐루프, TS미탐 치명 고객 기본권고) · C안 = 문서단위 반출 -&gt; 재학습</div>
     <div class="ok-box"><span class="ok-label">확정</span>고객사는 <b>외부망과 통신하지 않는다(완전 폐쇄망)</b> — 온프렘 LLM(Qwen3-14B·GPU)·번들 모델(분류기)·로컬 스토리지·로컬 DB로 완결. <b>분류 등급결정 핫패스는 LLM-free</b>(분류기+룰+RAG검색+메타, 333ms); 온프렘 LLM은 <b>RAG /answer 답변합성·선택적 2차판정</b> 전용. 학습은 지재원에서만. <b>역방향 환류(고객사→지재원)는 미확정</b> — 반출 여부 자체가 §6 확인 5의 결정 대상이다(기본 권고: 문서 무반출·집계 진단만 환류).</div>
 
     <h2 id="confirm"><span class="num">6</span> 확인 · 합의 필요</h2>

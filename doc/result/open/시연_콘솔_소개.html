@@ -119,7 +119,7 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <h1 class="title">시연 콘솔 소개</h1>
-  <p class="lede">시스템에는 두 개의 웹 콘솔이 있습니다 — <strong>실시간 분류 데모</strong>(등급 판정을 눈으로)와 <strong>거버넌스 폐곡선 콘솔</strong>(분류 → 검수 → 재학습 → 모델 리로드 → 메트릭을 한 화면에서). 본 문서는 화면 흐름과 접속법을 설명합니다. <strong>실제 동작은 서버 가동 시</strong>이며, 정적 문서로는 버튼이 동작하지 않습니다.</p>
+  <p class="lede">시스템에는 두 개의 웹 콘솔이 있습니다 — <strong>실시간 분류 데모</strong>(등급 판정을 눈으로)와 <strong>거버넌스 운영 흐름(검수·교정) 콘솔</strong>(검수·교정·메트릭을 한 화면에서). 본 문서는 화면 흐름과 접속법을 설명합니다. <strong>실제 동작은 서버 가동 시</strong>이며, 정적 문서로는 버튼이 동작하지 않습니다.<br><span class="meta-soft">※ 환류=재학습은 미확정(A 무반출 기본 / B 온사이트 / C 반출). 기본 A안은 집계 진단지표만 환류·재학습은 지재원이 자기 골든셋으로(고객문서 미사용)·상시 아님.</span></p>
 
   <div class="callout dark">
     <div class="callout-label">접속 주소 (서버 가동 시)</div>
@@ -151,7 +151,7 @@ footer strong{color:var(--text-dim);}
     <span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">거버넌스 콘솔</span>
   </div>
   <h2>② 거버넌스 폐곡선 콘솔</h2>
-  <p>운영의 핵심인 <strong>거버넌스 폐곡선</strong>(분류 → 검수 → 재학습 → 모델 핫리로드 → 메트릭)을 한 화면에서 밟는 E2E 검증 콘솔. 기존 <code>/api/v1</code> 엔드포인트를 그대로 호출합니다.</p>
+  <p>운영 <strong>거버넌스 흐름</strong>(분류 → 검수 → 재학습 → 모델 핫리로드 → 메트릭)을 한 화면에서 시연하는 E2E 검증 콘솔. 기존 <code>/api/v1</code> 엔드포인트를 그대로 호출합니다. <span class="meta-soft">(재학습 환류 정책은 미확정 — 기본 A안=무반출·집계진단만)</span></p>
 
   <div class="flow">
     <span class="flow-step"><b>1</b> 분류</span><span class="flow-arrow">→</span>
@@ -164,7 +164,7 @@ footer strong{color:var(--text-dim);}
   <div class="steps">
     <div class="step"><div class="step-n">1</div><div class="step-b"><div class="st">분류 실행</div><div class="sd">골든셋 샘플(등급별 2건) 또는 직접 입력 → <code>POST /classify</code>. 등급·신뢰도·S/V/M·근거 표시. "골든셋 8건 일괄 분류"로 검수 큐에 한 번에 적재.</div></div></div>
     <div class="step"><div class="step-n">2</div><div class="step-b"><div class="st">검수 큐 — 확정/재라벨</div><div class="sd">자동확정·검수 라우팅은 신뢰도 임계(기본 0.7) 단독이 아니라 <strong>다단 게이트</strong>로 결정합니다. 신뢰도 게이트에 더해 (옵션) <strong>합의 게이트</strong>(예측이 공개등급이거나 룰등급==모델등급일 때만 자동확정)·<strong>희소근거 게이트</strong>(단일 약한 키워드만의 룰-폴백 자동확정 차단)를 통과하지 못한 건은 자동 플래그 → 사람 검수로 보냅니다. 두 게이트는 <strong>opt-in·기본 OFF</strong>라 기본 동작은 신뢰도 게이트 그대로입니다. → <code>POST /confirm</code>(확정)·<code>/relabel</code>(등급 교정). 재학습 큐·임계 표시.</div></div></div>
-    <div class="step"><div class="step-n">3</div><div class="step-b"><div class="st">재학습 트리거</div><div class="sd"><code>POST /train</code> + 작업 목록 폴링. 누적 corrections가 임계 도달 시 재학습.</div></div></div>
+    <div class="step"><div class="step-n">3</div><div class="step-b"><div class="st">재학습 트리거</div><div class="sd"><code>POST /train</code> + 작업 목록 폴링. 누적 corrections가 임계 도달 시 재학습. <span class="meta-soft">단발 트리거(드리프트/이벤트)이며 상시 재학습 아님; 기본 A안 재학습 주체=지재원 골든셋.</span></div></div></div>
     <div class="step"><div class="step-n">4</div><div class="step-b"><div class="st">모델 핫리로드</div><div class="sd"><code>POST /admin/model/reload</code> — 활성 모델을 프로세스 재기동 없이 서빙 반영.</div></div></div>
     <div class="step"><div class="step-n">5</div><div class="step-b"><div class="st">메트릭 · FNR 게이트</div><div class="sd"><code>GET /metrics/*</code> — 정확도·등급별 FNR·이력·등급체계 조회.</div></div></div>
   </div>

@@ -103,7 +103,7 @@ footer strong{color:var(--text-dim);}
     <span class="meta-soft">2026-06-22</span>
   </div>
   <h1 class="title">모델 카드 (Model Card)</h1>
-  <p class="lede">KOIPA 영업비밀 등급 분류 모델의 명세를 <strong>한 장</strong>으로 모았다 — 모델·학습 데이터·평가 결과·입출력·세이프티·한계. AI 시스템의 신뢰성·재현성·책임성 근거 문서이며, 모델 변경 시 함께 갱신한다.</p>
+  <p class="lede">KOIPA 영업비밀 등급 분류 모델의 명세를 <strong>한 장</strong>으로 모았다 — 모델·학습 데이터·평가 결과·입출력·세이프티·한계. AI 시스템의 신뢰성·재현성·책임성 근거 문서이며, 모델 변경 시 함께 갱신한다. <strong>모델은 상시 재학습하지 않는다</strong> — 2026-09 실문서 1차학습이 필수이고 이후에는 드리프트/이벤트 트리거 단발에 한한다. 고객사는 추론 전용(B안 예외)이며, 환류=재학습 방식은 미확정 결정(기본 A안 — 무반출·집계 진단지표만 환류, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이다.</p>
 
   <div class="callout inset">
     <div class="callout-label">한눈 요약</div>
@@ -148,7 +148,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>분리</td><td>학습/검증/홀드아웃 분리, 홀드아웃 109건 · 업무 holdout 90건</td></tr>
     </tbody>
   </table></div>
-  <div class="callout"><div class="callout-label">⚠ 데이터 한계 (본개발 P0)</div><p><strong>인간검증 골든셋 미구축</strong> — 학습·평가 라벨이 동일한 룰+LLM에서 파생되어 <strong>라벨 순환성</strong> 위험이 있다. 발주처 실데이터·전문가 검증으로 본개발에서 재보정 필요. (데이터 거버넌스 계획 §04)</p></div>
+  <div class="callout"><div class="callout-label">⚠ 데이터 한계 (본개발 P0)</div><p><strong>인간검증 골든셋 미구축</strong> — 학습·평가 라벨이 동일한 룰+LLM에서 파생되어 <strong>라벨 순환성</strong> 위험이 있다. 발주처 실문서(2026-09)로 모델 1차학습·재보정을 수행하며, 이후에는 상시 재학습이 아니라 드리프트/이벤트 단발에 한한다. (데이터 거버넌스 계획 §04)</p></div>
 
   <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">평가 결과</span></div>
   <div class="table-wrap"><table>
@@ -190,10 +190,11 @@ footer strong{color:var(--text-dim);}
     <tbody>
       <tr><td>합성·LLM 라벨 기반</td><td>실데이터 정확도는 더 낮을 수 있음(라벨 순환성)</td><td>인간검증 골든셋 500건+ 구축</td></tr>
       <tr><td>인간검증 골든셋 0건</td><td>현 지표가 미검증 라벨 기준</td><td>전문가 검증 후 게이트 재보정</td></tr>
-      <tr><td>실데이터 미검증</td><td>운영 정확도 미확정</td><td>발주처 실문서로 재검증(백서 §10·§11)</td></tr>
+      <tr><td>실데이터 미검증</td><td>운영 정확도 미확정</td><td>발주처 실문서(2026-09)로 모델 1차학습·재검증, 이후 드리프트/이벤트 단발만(백서 §10·§11)</td></tr>
       <tr><td>도메인 한정</td><td>한국어·영업비밀 외 미보장</td><td>용도 외 사용 금지</td></tr>
     </tbody>
   </table></div>
+  <div class="callout inset"><div class="callout-label">환류·재학습 정책 (미확정)</div><p>검수 확정·교정은 단일 배포 내부 <code>tb_corrections</code>에 기록되나, <strong>고객 교정·원문의 재학습 사용·반출은 미확정 결정</strong>이다(기본 A안 — 무반출: 고객 교정·원문은 망 내 잔류, 재학습은 지재원이 자기 골든셋으로 수행(고객문서 미사용), 집계 진단지표(오분류율·혼동행렬·문서식별 불가)만 환류. <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>). 등급산정 'A안'(5요소 자가진단)과 환류 'A안'(무반출)은 <strong>별개의 동명이의</strong>다.</p></div>
   <div class="footnote">관련: <a href="테스트_전략_및_이력.html">테스트 전략·이력</a> · <a href="데이터_거버넌스_계획.html">데이터 거버넌스 계획</a> · <a href="영업비밀_등급분류_기준_적용서_v2.2.html">등급분류 기준 적용서 v2.2</a> · <a href="기술구현_백서_부록C_지표용어해설.html">부록C 지표·용어</a></div>
 
 </article>
