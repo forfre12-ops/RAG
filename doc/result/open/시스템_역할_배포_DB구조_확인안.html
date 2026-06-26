@@ -252,7 +252,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 │ · DB: 로이드케이 운영    │                    │ · DB: KL 운영            │
 └─────────────────────────┘                    └─────────────────────────┘
         ▲ 네트워크 연결 없음 — 고객사→지재원 직결 불가 (폐쇄망) ▲</div>
-    <div class="ok-box"><span class="ok-label">확정</span>고객사는 폐쇄망이라 지재원에 붙을 수 없음. 골든 번들(모델+골든셋+스키마)은 매체로 반입. <b>로이드케이는 고객사에 라이브 접속이 0</b> → 지재원 DB 권한만으로 충분. <span class="logical-name">단, 역방향(고객사→지재원) 검수교정 반출·재학습은 <b>미확정</b> — §6 확인 5의 결정 대상(기본 권고: 무반출)</span></div>
+    <div class="ok-box"><span class="ok-label">확정</span>고객사는 폐쇄망이라 지재원에 붙을 수 없음. 골든 번들(모델+골든셋+스키마)은 매체로 반입. <b>로이드케이는 고객사에 라이브 접속이 0</b> → 지재원 DB 권한만으로 충분. <span class="logical-name">단, 역방향(고객사→지재원) 검수교정 반출·재학습은 <b>미확정</b> — §6 확인 5의 결정 대상(기본 권고: 문서 무반출·집계 진단만 환류)</span></div>
 
     <h2 id="db"><span class="num">3</span> DB 구조 — 고객사 KL PostgreSQL · schema 분리</h2>
     <p class="h2-sub">KL이 어드민도 PostgreSQL로 개발 → 고객사 PostgreSQL은 <b>KL이 제공·운영</b>. 그 한 대를 schema로 나눠 공유.</p>
@@ -299,8 +299,8 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
                          · 서명·체크섬 · 보안매체 반입 · KL이 설치(alembic upgrade)
 
 OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 자체가 결정 대상
-                         · 기본 권고(A안) = 무반출 · C안 채택 시에만 CSV/JSONL 반출 -&gt; 재학습</div>
-    <div class="ok-box"><span class="ok-label">확정</span>고객사는 <b>외부망과 통신하지 않는다(완전 폐쇄망)</b> — 온프렘 LLM(Qwen3-14B·GPU)·번들 모델(분류기)·로컬 스토리지·로컬 DB로 완결. <b>분류 등급결정 핫패스는 LLM-free</b>(분류기+룰+RAG검색+메타, 333ms); 온프렘 LLM은 <b>RAG /answer 답변합성·선택적 2차판정</b> 전용. 학습은 지재원에서만. <b>역방향 환류(고객사→지재원)는 미확정</b> — 반출 여부 자체가 §6 확인 5의 결정 대상이다(기본 권고: 무반출).</div>
+                         · A안(기본) = 문서 무반출·집계 진단지표만 · C안 = 문서단위 반출 -&gt; 재학습</div>
+    <div class="ok-box"><span class="ok-label">확정</span>고객사는 <b>외부망과 통신하지 않는다(완전 폐쇄망)</b> — 온프렘 LLM(Qwen3-14B·GPU)·번들 모델(분류기)·로컬 스토리지·로컬 DB로 완결. <b>분류 등급결정 핫패스는 LLM-free</b>(분류기+룰+RAG검색+메타, 333ms); 온프렘 LLM은 <b>RAG /answer 답변합성·선택적 2차판정</b> 전용. 학습은 지재원에서만. <b>역방향 환류(고객사→지재원)는 미확정</b> — 반출 여부 자체가 §6 확인 5의 결정 대상이다(기본 권고: 문서 무반출·집계 진단만 환류).</div>
 
     <h2 id="confirm"><span class="num">6</span> 확인 · 합의 필요</h2>
     <p class="h2-sub">아래 항목이 위 구조의 전제입니다. 맞는지 / KL과 합의가 됐는지 확인 바랍니다.</p>
@@ -309,15 +309,16 @@ OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 
     <div class="nego"><span class="nego-label">확인 2</span><b>schema 분리</b> — 같은 KL DB에 <code>ai_agent</code>(LK)·<code>admin</code>(KL) 두 schema. 별도 DB(메타디비) 대신 schema 분리로 가는 것 동의하나? (doc_id FK 때문)</div>
     <div class="nego"><span class="nego-label">확인 3</span><b>확장 설치</b> — KL PG에 <b>pgvector(필수)</b> 설치 가능한가? (벡터검색 필수) pg_bigm은 선택 — 한국어 후보생성 가속용이고, 랭킹은 코어 <code>ts_rank</code>(별도 확장 불요)가 담당.</div>
     <div class="nego"><span class="nego-label">확인 4</span><b>스키마 적용 주체·FK 권한</b> — 로이드케이 마이그레이션(ai_agent DDL)을 <b>KL이 적용</b>하나, 아니면 로이드케이 컨테이너에 일시 DDL 권한을 주나? cross-schema FK(<code>ai_agent</code>→<code>admin.tb_documents</code>)는 <b>admin.tb_documents 선생성 + 로이드케이 계정에 REFERENCES 권한</b>이 전제(SELECT만으론 FK 생성 불가).</div>
-    <div class="nego"><span class="nego-label">확인 5</span><b>보정 환류 — "포맷"이 아니라 "반출 여부"가 먼저다.</b> 고객사 검수교정을 지재원으로 반출해 재학습하는 그림은 세 가지로 막힌다: ① <code>tb_corrections</code>를 DB→파일로 뽑는 <b>export 도구가 아직 없다</b>(현 <code>import_review_corrections.py</code>는 import 전용·트리거 미연결), ② 반출 포맷이 라벨(<code>doc_id·model_label·human_label·reason</code>)뿐이면 <b>원문 텍스트가 없어 분류기 재학습 자체가 불가</b>(학습은 <code>Chunk.content</code> 필요·원문은 고객사에만 존재), ③ <code>reason</code> 자유텍스트가 원문 발췌를 담을 수 있어 "메타데이터-only도 무해하지 않다". → <b>폐쇄망 고객이 문서단위 검수데이터 반출에 동의하겠는가</b>를 먼저 결정해야 한다(컬럼 규약은 그 다음 문제). 아래 A/B/C 중 택1.</div>
+    <div class="nego"><span class="nego-label">확인 5</span><b>보정 환류 — "포맷"이 아니라 "반출 여부"가 먼저다.</b> 고객사 검수교정을 지재원으로 반출해 재학습하는 그림은 세 가지로 막힌다: ① <code>tb_corrections</code>를 DB→파일로 뽑는 <b>export 도구가 아직 없다</b>(현 <code>import_review_corrections.py</code>는 import 전용·트리거 미연결), ② 반출 포맷이 라벨(<code>doc_id·model_label·human_label·reason</code>)뿐이면 <b>원문 텍스트가 없어 분류기 재학습 자체가 불가</b>(학습은 <code>Chunk.content</code> 필요·원문은 고객사에만 존재), ③ <code>reason</code> 자유텍스트가 원문 발췌를 담을 수 있어 "메타데이터-only도 무해하지 않다". → <b>폐쇄망 고객이 문서단위 검수데이터 반출에 동의하겠는가</b>를 먼저 결정해야 한다(컬럼 규약은 그 다음 문제). <b>두 채널을 구분하라</b> — ① <b>문서 채널</b>(doc_id·원문·발췌)은 어느 안이든 <b>망 밖으로 내보내지 않는다</b>; ② <b>집계 진단 채널</b>(등급별 오분류율·혼동행렬 카운트·문서식별 불가)은 지재원이 현장 성능을 보고 <b>고등급 사각지대</b>를 잡는 데 쓰는 <b>필수 환류</b>다. 아래 A/B/C 중 택1(②는 공통 필수).</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th style="width:120px;">안</th><th>무엇</th><th style="width:150px;">망 밖 반출</th><th style="width:120px;">권고</th></tr></thead>
       <tbody>
-        <tr><td><b>A</b> 무반출</td><td>교정은 <b>고객사 망 내 잔류</b> → 로컬 룰·키워드·임계 보정 + Confusion Matrix 모니터링. 모델 가중치 재학습은 <b>지재원이 자기 골든셋으로</b>(고객문서 미사용), 고객 교정은 "약점 유형" 진단신호로만 활용.</td><td>0 (또는 동의 시 <b>문서단위가 아닌 집계지표</b>만)</td><td><b>기본 권고</b></td></tr>
-        <tr><td><b>B</b> 온사이트 학습</td><td>학습 루프를 <b>고객사 망 안에서 닫음</b> — 교정→로컬 재학습→로컬 활성화. 고객사 GPU(Qwen3-14B) 활용. 지재원은 베이스 모델만 반입.</td><td>0</td><td>고객이 자기 코퍼스 학습을 명시 요구 시</td></tr>
+        <tr><td><b>A</b> 무반출</td><td>교정은 <b>고객사 망 내 잔류</b> → 로컬 룰·키워드·임계 보정 + Confusion Matrix 모니터링. 모델 가중치 재학습은 <b>지재원이 자기 골든셋으로</b>(고객문서 미사용). 지재원은 <b>집계 진단지표</b>를 받아 고등급 사각지대를 찾아 자기 골든을 보강.</td><td>문서 0 · <b>집계 진단지표는 필수 환류</b>(등급별 오분류율 등·문서식별 불가)</td><td><b>기본 권고</b></td></tr>
+        <tr><td><b>B</b> 온사이트 학습</td><td>학습 루프를 <b>고객사 망 안에서 닫음</b> — 교정→로컬 재학습→로컬 활성화. 고객사 GPU(Qwen3-14B) 활용. 지재원은 베이스 모델만 반입.</td><td>0</td><td>고객이 자기 코퍼스 학습 요구 시 · <b>최고 보안등급(TS 미탐 치명) 고객은 기본 권고</b></td></tr>
         <tr><td><b>C</b> 문서단위 반출</td><td>as-drawn — 검수교정(원문 포함)을 보안매체로 반출해 지재원 재학습. 분류기 직접 재학습엔 이 방식만 가능.</td><td><b>문서단위(원문/발췌)</b></td><td>데이터주권·계약 합의 필수 · 비권장</td></tr>
       </tbody>
     </table></div>
+    <div class="nego" style="font-size:12.5px;"><span class="nego-chip">근거</span> 가장 치명적 실패=<b>고등급 미탐</b>(TS/S1↓)인데, 이 사각지대는 룰·LLM 2차로 근본교정이 안 되고(LLM 2차 7건 중 4건만 회복) <b>재학습으로만</b> 교정된다. 따라서 <b>완전 무반출(집계지표조차 0)은 고등급 사각지대를 측정조차 못 해 위험</b> — A안에서도 집계 진단 환류는 옵션이 아니라 필수다(문서·원문·발췌는 어느 안이든 반출 금지).</div>
     <div class="nego"><span class="nego-label">확인 6</span><b>번들 슬림화</b> — 폐쇄망 번들에서 postgres·minio·mlflow 제거(DB=KL, 스토리지=로컬FS, 학습=지재원). 동의하나?</div>
     <div class="nego"><span class="nego-label">확인 7</span><b>AI 화면 구축 주체</b> — 등급체계·키워드 관리·검수·성능분석 화면(FUN-005·023·024)을 <b>로이드케이가 구축</b>하고 KL 셸에 통합? 화면 분담선 합의 필요.</div>
 
