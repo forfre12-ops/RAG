@@ -34,7 +34,7 @@ _CANDIDATE_SOURCES = {"rule_llm_agreement"}
 _MACHINE_PREFIXES = ("llm_judge", "ai_assist", "codex", "model", "machine", "public_gold", "auto")
 
 
-def _is_human_reviewer(reviewer_id: object) -> bool:
+def is_human_reviewer(reviewer_id: object) -> bool:
     rid = str(reviewer_id or "").strip().lower()
     if not rid:
         return False
@@ -44,7 +44,7 @@ def _is_human_reviewer(reviewer_id: object) -> bool:
 def tier_of(record: dict) -> str:
     """레코드의 논리 tier를 파생. label_source 우선, locked는 사람 서명까지 요구."""
     src = record.get("label_source")
-    if src == "human_review" and _is_human_reviewer(record.get("reviewer_id")):
+    if src == "human_review" and is_human_reviewer(record.get("reviewer_id")):
         return TIER_LOCKED
     if src in _LEGAL_SOURCES:
         return TIER_LEGAL_FLOOR
