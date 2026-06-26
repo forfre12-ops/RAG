@@ -176,7 +176,7 @@ footer strong{color:var(--text-dim);}
   <p>나중에 골든셋을 늘리는 절차는 이제 <b>설계가 아니라 구현된 파이프라인</b>이다:</p>
   <div class="callout inset"><div class="callout-label">/golden/build 파이프라인</div>
   <p>① 위생(중복·누출 제거) &rarr; ② 라벨(룰 + LLM) &rarr; ③ 합의(gold 후보 / 검수대상) &rarr; ④ run-스코프 후보파일 <span class="meta-soft">(정본 직접변경 금지)</span> &rarr; ⑤ 검토본 HTML &rarr; ⑥ <b>지재원 관리자 검수·서명</b>(human_review 승급) &rarr; ⑦ promote 게이트(중복·누출·비gold 차단) &rarr; 정본 편입.</p></div>
-  <p><b>두 검수 루프 분리(혼동 금지)</b> : 골든셋 검수(지재원 관리자 + AI agent &rarr; human_review 평가 진실) ↔ 운영 업로드 검수(회원사 폐쇄망 &rarr; 자동확정 안 된 것 &rarr; 교정 &rarr; 재학습). 회원사 교정이 자동으로 ★★★★★ 골든이 되지는 않는다.</p>
+  <p><b>두 검수 루프 분리(혼동 금지)</b> : 골든셋 검수(지재원 관리자 + AI agent &rarr; human_review 평가 진실) ↔ 운영 업로드 검수(회원사 폐쇄망 &rarr; 자동확정 안 된 것 &rarr; 교정 &rarr; <code>tb_corrections</code> 적재). 이 교정의 재학습 반영 방식은 <b>미확정 결정</b>(A/B/C — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이며 기본 권고는 <b>무반출(A안)</b> — 교정·원문은 망 내 잔류(반출 금지), 재학습은 지재원이 자기 골든셋으로(고객문서 미사용)·집계 진단지표만 환류. 회원사 교정이 자동으로 ★★★★★ 골든이 되지는 않는다.</p>
   <p><b>9월 실데이터</b> : 같은 빌더에 입력만 실데이터로. 불변 원칙 — 고등급(S1/TS)은 <b>실문서로만</b>, 순환성 차단, reviewer_id는 <b>지재원 관리자 실계정만</b>(머신/ai_assist 거부).</p>
 
   <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">최선 평가·남은 것</span></div>

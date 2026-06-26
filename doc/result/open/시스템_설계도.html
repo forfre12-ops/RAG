@@ -205,7 +205,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
   <!-- ② 배포 구조 -->
   <section id="s2">
     <div class="sec-head"><span class="n">02</span><h2>배포 구조 — 지재원(학습) / 고객사(추론)</h2></div>
-    <div class="sec-sub">지재원은 골든셋·학습을 담당하고, 학습된 모델을 <b>오프라인 골든 번들</b>로 고객사에 배포. 고객사는 추론만 수행하며 보정 라벨을 환류한다.</div>
+    <div class="sec-sub">지재원은 골든셋·학습을 담당하고, 학습된 모델을 <b>오프라인 골든 번들</b>로 고객사에 배포. 고객사는 추론만 수행한다. 운영 환류 방식은 <b>미확정 결정</b>(무반출·온사이트·반출 3안 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이며 기본 권고=<b>무반출</b>: 교정·원문은 망 내 잔류(반출 금지), 망 밖으로는 <b>집계 진단지표</b>(오분류율·혼동행렬, 문서식별 불가)만 환류.</div>
     <div class="deploy">
       <div class="zone">
         <div class="zl"><span class="zt">지재원 (중앙)</span><span class="zb">GPU · 학습</span></div>
@@ -215,7 +215,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       </div>
       <div class="conn">
         <div><div class="a">→</div>골든 번들</div>
-        <div><div class="a">←</div>보정 환류</div>
+        <div><div class="a">←</div>집계 진단 환류(문서 미반출)</div>
       </div>
       <div class="zone">
         <div class="zl"><span class="zt">고객사 (폐쇄망)</span><span class="zb">추론 · 온프렘 GPU</span></div>
@@ -332,7 +332,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
   <!-- ⑤ 운영 라이프사이클 (골든셋·학습·배포 통합) -->
   <section id="s5">
     <div class="sec-head"><span class="n">05</span><h2>운영 라이프사이클 — 골든셋 → 학습 → 배포 (폐곡선)</h2></div>
-    <div class="sec-sub">데이터(골든셋) → 모델(학습) → 배포 → 운영 → <b>환류</b>가 하나의 닫힌 루프로 돈다. 지재원이 <b>A·B</b>를, 고객사가 <b>C</b>를 맡고, 고객 보정이 A로 되돌아간다.</div>
+    <div class="sec-sub">데이터(골든셋) → 모델(학습) → 배포 → 운영의 사이클. 지재원이 <b>A·B</b>(골든셋·학습)를, 고객사가 <b>C</b>(배포·운영)를 맡는다. 운영 환류는 <b>미확정 결정</b>(무반출·온사이트·반출 3안 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>): 기본(무반출)에선 <b>집계 진단지표만</b> 지재원으로 가고(문서·교정은 망 내 잔류), 재학습은 지재원이 자기 골든셋으로 실데이터 1차학습 후 드리프트/이벤트 단발로 수행한다.</div>
 
     <div class="grp" style="flex:1 1 100%;">
       <div class="grp-l">지재원 · A. 골든셋 구축</div>
@@ -389,8 +389,8 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     </div>
     <div style="font-size:12px;color:var(--dim);margin:7px 2px 0;">배포 후 운영 점검(버전·평가 재확인·미탐 모니터)과 롤백 절차는 <b>운영 런북(본개발)</b>에서 정의한다.</div>
     <div class="band gray">
-      <div class="bt">↺ 폐곡선 (능동학습 루프)</div>
-      <p>고객사 검수 교정 라벨 → <b>A. 골든셋</b>으로 증분 환류 → 재학습(B) → 평가 게이트 → 재배포(C). <b>운영할수록 정답셋이 실데이터 분포에 가까워진다.</b></p>
+      <div class="bt">↺ 환류 — 방식 미확정(무반출·온사이트·반출 3안)</div>
+      <p><b>기본 권고(무반출)</b>: 고객사에서 나가는 건 <b>집계 진단지표</b>(오분류율·혼동행렬, 문서식별 불가)뿐 → <b>A. 골든셋</b> 보강 우선순위 참고. 재학습(B)은 지재원이 자기 골든셋으로 <b>실데이터 1차학습 + 드리프트/이벤트 단발</b> 수행 → 재배포(C). 교정·문서는 고객사 망 내 잔류(반출 금지); 문서단위 반출 후 중앙 재학습은 비권장 옵션이다.</p>
     </div>
   </section>
 </div>

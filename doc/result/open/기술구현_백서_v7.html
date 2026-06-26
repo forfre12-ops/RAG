@@ -548,7 +548,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>2.1.2 배포 토폴로지 — 지재원(골든셋·학습) / 고객사 agent(추론)</h3>
-      <p>본 시스템은 <b>2-tier 배포</b>다. 중앙의 <b>지재원</b> 1곳은 골든셋 구성과 모델 학습만 담당하고, <b>고객사 AI agent</b> N곳은 추론(등급 분류)·RAG 보조·감사만 담당한다. 학습 결과(분류기·참조 임베딩)는 <b>오프라인 골든 번들</b>로 export해 고객사에 적재하고, 고객사가 수집한 보정 라벨은 지재원으로 모아 재학습 후 다시 오프라인 재배포한다. 고객사 웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위이며, 고객사 agent는 OpenAPI 계약만 노출한다.</p>
+      <p>본 시스템은 <b>2-tier 배포</b>다. 중앙의 <b>지재원</b> 1곳은 골든셋 구성과 모델 학습만 담당하고, <b>고객사 AI agent</b> N곳은 추론(등급 분류)·RAG 보조·감사만 담당한다. 학습 결과(분류기·참조 임베딩)는 <b>오프라인 골든 번들</b>로 export해 고객사에 적재한다. 고객사 교정의 활용 방식은 <b>미확정 결정(A/B/C)</b>이며 <b>기본 권고는 A안</b> — 교정·원문은 고객사 망 내 잔류(반출 금지), 재학습은 지재원이 <b>자기 골든셋으로</b> 수행(고객문서 미사용)하고, 망 밖으로는 문서식별 불가한 <b>집계 진단지표(등급별 오분류율·혼동행렬)만</b> 환류한다. 모델은 상시 재학습이 아니라 실데이터 1차학습 + 드리프트/이벤트 트리거 단발이다. 고객사 웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위이며, 고객사 agent는 OpenAPI 계약만 노출한다.</p>
 
       <div style="margin:16px 0;overflow-x:auto;">
         <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;min-width:600px;display:block;" aria-label="2-tier 배포 토폴로지">
@@ -595,10 +595,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <text x="290" y="170" text-anchor="middle" font-size="9.5" fill="#404040" font-family="Geist,sans-serif">① 번들 적재</text>
           <text x="290" y="184" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">pgvector·참조테이블</text>
 
-          <!-- 고객사 → 지재원: 보정 라벨 재학습 -->
-          <line x1="356" y1="290" x2="224" y2="290" stroke="#737373" stroke-width="1.2" marker-end="url(#tp-arr)"/>
-          <text x="290" y="282" text-anchor="middle" font-size="9.5" fill="#525252" font-family="Geist,sans-serif">② 보정 라벨 수집</text>
-          <text x="290" y="306" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">→ 재학습 → 오프라인 재배포</text>
+          <!-- 고객사 → 지재원: 집계 진단지표만 환류 (A안, 문서 반출 없음) -->
+          <line x1="356" y1="290" x2="224" y2="290" stroke="#737373" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#tp-arr)"/>
+          <text x="290" y="282" text-anchor="middle" font-size="9.5" fill="#525252" font-family="Geist,sans-serif">② 집계 진단 환류(A안)</text>
+          <text x="290" y="306" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">오분류율·혼동행렬 · 문서 반출 없음</text>
 
           <!-- 하단 캡션 -->
           <text x="380" y="350" text-anchor="middle" font-size="9.5" fill="#a3a3a3" font-family="Geist Mono,monospace">중앙 학습 → 오프라인 번들 → N곳 추론 (폐쇄망 · 온프렘 GPU)</text>
@@ -629,7 +629,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
 
       <h3>2.1.3 골든셋 구축 워크플로우 · 검수 콘솔 (지재원)</h3>
-      <p>지재원의 핵심 업무는 <b>골든셋(정답 라벨 데이터) 구축</b>이다. 합성·수집 → 자동 1차 라벨 → <b>사람 검수</b> → 골든셋 편입 → 학습 → 고객사 보정 환류의 폐곡선으로 운영하며, 대부분 단계는 파이프라인으로 구현돼 있다. 사람 검수·라벨링은 <b>지재원 내부 검수 콘솔</b>(Lloydk 제공)로 수행하며, 이는 KL의 고객 영업비밀관리시스템과는 <b>별개의 도구</b>다.</p>
+      <p>지재원의 핵심 업무는 <b>골든셋(정답 라벨 데이터) 구축</b>이다. 합성·수집 → 자동 1차 라벨 → <b>사람 검수</b> → 골든셋 편입 → 학습의 사이클로 운영하며, 대부분 단계는 파이프라인으로 구현돼 있다(고객 운영신호 환류 방식은 미확정 결정 A/B/C — 기본 A안은 집계 진단지표만). 사람 검수·라벨링은 <b>지재원 내부 검수 콘솔</b>(Lloydk 제공)로 수행하며, 이는 KL의 고객 영업비밀관리시스템과는 <b>별개의 도구</b>다.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>단계</th><th>내용</th><th>산출 · 도구</th></tr></thead>
@@ -640,7 +640,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-warn"><b>④ 사람 검수 · 라벨링</b></td><td>검수자가 한 화면에서 <b>accept / correct</b> → 최종 라벨 · 검수자 · 근거 기록</td><td><b>검수 콘솔 (지재원 · 본개발)</b></td></tr>
             <tr><td><b>⑤ 골든셋 편입</b></td><td>accepted만 골든셋에 편입, 버전 · 근거 · 검수자 감사 기록</td><td>편입 파이프라인</td></tr>
             <tr><td><b>⑥ 학습 · 배포</b></td><td>골든셋 → 모델 학습 → <b>오프라인 골든 번들</b>로 고객사 배포</td><td>학습 파이프라인</td></tr>
-            <tr><td><b>⑦ 능동학습 환류</b></td><td>고객사 보정 라벨 → 지재원 검수 큐(③)로 환류 → 골든셋 갱신 → 재학습</td><td>(③ · ④ 콘솔 공유)</td></tr>
+            <tr><td><b>⑦ 진단 환류 <span style="font-weight:400">(미확정 A/B/C)</span></b></td><td><b>기본 A안</b>: 고객사 <b>집계 진단지표</b>(오분류율·혼동행렬, 문서식별 불가)만 환류 → 골든셋 보강 우선순위 참고(교정·문서는 망 내 잔류). 문서단위 반출 후 중앙 재학습=C안(비권장), 망 내 로컬 재학습=B안(최고보안)</td><td>(집계 지표 · 결정 대기)</td></tr>
           </tbody>
         </table>
       </div>
@@ -1436,9 +1436,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="gs-step hl"><div class="n">④ 사람 검수</div><div class="t">accept / correct</div><div class="d">검수 콘솔 — 최종 라벨·검수자·근거 기록</div></div>
         <div class="gs-step"><div class="n">⑤ 골든셋 편입</div><div class="t">accepted만 편입</div><div class="d">버전·근거·검수자 감사 기록</div></div>
         <div class="gs-step"><div class="n">⑥ 학습·배포</div><div class="t">모델 학습 → 번들</div><div class="d">오프라인 골든 번들로 고객사 배포</div></div>
-        <div class="gs-step"><div class="n">⑦ 환류</div><div class="t">고객 보정 회수</div><div class="d">보정 라벨 → ③ 검수 큐로 환류</div></div>
+        <div class="gs-step"><div class="n">⑦ 진단 환류</div><div class="t">집계 지표(A안)</div><div class="d">오분류율·혼동행렬 → 골든셋 보강 우선순위(문서 미반출)</div></div>
       </div>
-      <div class="gs-loop"><b>폐곡선(능동학습).</b> ⑦ 고객사 보정 라벨이 ③ 검수 큐로 되돌아가 골든셋을 갱신·재학습한다 — 운영할수록 정답셋이 실데이터 분포에 가까워진다(§2.4.1). 단계별 구축 계획(검토본 100건 → 1,000건 확장)은 위 5.4 참조.</div>
+      <div class="gs-loop"><b>환류 방식은 미확정 결정(A/B/C, §2.1.2).</b> 기본 A안은 ⑦ 집계 진단지표(오분류율·혼동행렬, 문서식별 불가)만 회수해 골든셋 보강 우선순위에 참고하고, 교정·문서는 고객사 망 내 잔류한다. 모델은 상시 재학습이 아니라 실데이터 1차학습 + 드리프트/이벤트 트리거 단발이다(§2.4.1). 단계별 구축 계획(검토본 100건 → 1,000건 확장)은 위 5.4 참조.</div>
 
       <h3>5.5 학습 데이터셋 구성 (프로토타입 기준)</h3>
       <div class="card-grid col4" style="margin:16px 0;">
