@@ -121,6 +121,8 @@ poc/datasets/labeled_p1_retrain_v4_step3/
 # 대용량 학습데이터·생성물·런타임 산출물 (스크립트로 재생성, 트래킹 금지) — 2026-06-20
 poc/datasets/labeled_bpilot/
 poc/datasets/demo_retrain/
+# A/B S1 합성 실험 중간데이터 (16MB, ab_qwen_gemma_s1 산출물 — git 비대화 회피)
+poc/datasets/ab_s1/
 poc/datasets/drift_train_centroid.json
 poc/datasets/drift_state.json
 # 임시 작업 산출물 / 일회성 스크래치 (_ 접두사 = throwaway 컨벤션)
