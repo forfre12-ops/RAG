@@ -117,12 +117,14 @@ def load_oss_corpus(
     return docs
 
 
-def run_rule_labeler(text: str) -> tuple[str, float]:
+def run_rule_labeler(text: str) -> tuple[str, float, bool]:
     from lloydk.modules.m3_labeling import LabelingPipeline
+    from lloydk.modules.m3_labeling.rule_engine import has_real_evidence
     pipe = LabelingPipeline()
     result = pipe.label(text)
     grade = result.grade.value if hasattr(result.grade, "value") else str(result.grade)
-    return grade, float(result.confidence)
+    evidence = bool(result.rule_result) and has_real_evidence(result.rule_result)
+    return grade, float(result.confidence), evidence
 
 
 _JUDGE_SYSTEM = """당신은 한국 영업비밀 보호 가이드라인에 정통한 문서 분류 전문가다.
@@ -317,7 +319,7 @@ def main() -> int:
 
         # 1. 룰 라벨러
         try:
-            rule_grade, rule_conf = run_rule_labeler(text)
+            rule_grade, rule_conf, rule_evidence = run_rule_labeler(text)
         except Exception as e:
             print(f"rule_err={e}")
             continue
@@ -335,10 +337,13 @@ def main() -> int:
         in_tok = _estimate_tokens(text[:4000])
         total_cost += (in_tok * 3.0 + 150 * 15.0) / 1_000_000
 
-        # 합의 게이트 (m3_labeling.consensus로 추출 — 빌더·라벨링 자동화와 동일 규칙)
+        # 합의 게이트 (P1: conf 비사용 — 합의+근거+self-consistency). 이 레거시 스크립트는 단일 LLM
+        # 호출이라 self_consistency 미측정(=1.0); 정식 경로는 /golden/build·ConsensusJudge다.
         verdict = evaluate_consensus(
-            rule_grade, rule_conf, llm_grade, llm_conf,
-            min_rule_conf=args.min_rule_conf, min_llm_conf=args.min_llm_conf,
+            rule_grade, llm_grade,
+            has_real_evidence=rule_evidence,
+            self_consistency=1.0,
+            sort_conf=llm_conf,
         )
         agree = verdict.agree
         is_gold = verdict.is_gold

@@ -14,10 +14,10 @@ _ACTOR = Actor(user_id="t1", role="admin")
 
 
 def _fake_label_fn(text: str) -> LabelPair:
-    # "gold" 포함 → 동의·고신뢰(gold_consensus), 아니면 불일치(uncertain)
+    # "gold" 포함 → 합의+근거(gold_candidate), 아니면 불일치(needs_review)
     if "gold" in text:
-        return LabelPair("S1", 0.8, "S1", 0.9)
-    return LabelPair("S2", 0.6, "S1", 0.9)
+        return LabelPair("S1", 0.8, "S1", 0.9, has_real_evidence=True)
+    return LabelPair("S2", 0.6, "S1", 0.9, has_real_evidence=True)
 
 
 def test_submit_inproc_writes_outputs_and_status(tmp_path):
@@ -46,7 +46,7 @@ def test_submit_inproc_writes_outputs_and_status(tmp_path):
     gold = [json.loads(l) for l in gold_path.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert len(gold) == 1
     assert gold[0]["doc_id"] == "d1" and gold[0]["label"] == "S1"
-    assert gold[0]["label_source"] == "llm_judge_consensus" and gold[0]["source"] == "판례"
+    assert gold[0]["label_source"] == "rule_llm_agreement" and gold[0]["source"] == "판례"
 
     unc_path = tmp_path / f"uncertain_{resp.golden_job_id}.jsonl"
     unc = [json.loads(l) for l in unc_path.read_text(encoding="utf-8").splitlines() if l.strip()]

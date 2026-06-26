@@ -81,13 +81,12 @@ class GoldenBuildService:
         try:
             docs = self._load_docs(req)
             holdout = self._load_holdout(req)
-            lf = label_fn or make_label_fn(req.llm_provider)
+            lf = label_fn or make_label_fn(req.llm_provider, sensitive=req.sensitive)
             result = build_golden_set(
                 docs,
                 label_fn=lf,
                 holdout_texts=holdout,
-                min_rule_conf=req.min_rule_conf,
-                min_llm_conf=req.min_llm_conf,
+                min_self_consistency=req.min_self_consistency,
             )
             gold_path, unc_path = self._write_outputs(req, job_id, result)
             self.jobs.update(

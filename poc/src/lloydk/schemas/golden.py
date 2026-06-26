@@ -17,10 +17,12 @@ class GoldenBuildRequest(BaseModel):
     n: int = Field(default=200, ge=1, le=5000)
     llm_provider: str = Field(
         default="noop",
-        pattern=r"^(anthropic|openai|google|vllm_qwen|vllm_exaone|local_openai|noop)$",
+        pattern=r"^(anthropic|openai|google|gemini|vllm_qwen|vllm_exaone|local_openai|noop)$",
     )
-    min_rule_conf: float = Field(default=0.5, ge=0.0, le=1.0)
-    min_llm_conf: float = Field(default=0.7, ge=0.0, le=1.0)
+    sensitive: bool = Field(default=False)  # True=실고객 비밀 → airgap(Qwen), 공개 클라우드 금지
+    min_rule_conf: float = Field(default=0.5, ge=0.0, le=1.0)        # 레거시(게이트 미사용)
+    min_llm_conf: float = Field(default=0.7, ge=0.0, le=1.0)         # 레거시(게이트 미사용)
+    min_self_consistency: float = Field(default=0.67, ge=0.0, le=1.0)
     holdout_path: Optional[str] = None                       # 누출 차단용 홀드아웃 jsonl
     # run-스코프 후보 출력 위치. 정본(datasets/gold_real/classification_gold.jsonl)과 산출물이
     # 섞이지 않게 builds/ 하위로 분리(run-스코프 파일명이라 덮어쓰진 않으나 위생). 승격은

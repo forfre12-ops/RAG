@@ -1,8 +1,13 @@
 """통합 골든셋 빌더 코어 — 후보 문서를 〈위생→라벨→합의→조립〉으로 골든후보/검수대상 분류.
 
-G1(consensus.evaluate_consensus) + G2(hygiene)를 부품으로 조립한 순수 코어.
+P1 재설계(2026-06): 합의 게이트가 conf 대신 〈합의(rule==llm)+실제 근거 span+self-consistency〉로
+gold_candidate를 판정한다(consensus.evaluate_consensus). label_fn은 ConsensusJudge(주 판정자 k샘플
+self-consistency + Qwen 섀도)를 묶어 has_real_evidence/self_consistency/shadow_grade/airgap을 함께 낸다.
 라벨러를 주입(label_fn)받으므로 DB/Celery/LLM 없이 단위 테스트 가능하다.
 서비스·Celery·route 계층(G3b)이 이 코어를 감싸 비동기/잡/검수큐로 노출한다.
+
+gold_candidate는 평가정답(locked_gold_eval)이 아니다 — 사람 서명이 진실을 만든다(P3).
+needs_review = 사람 판정 대기(review_priority로 정렬, LLM은 보조).
 """
 from __future__ import annotations
 
@@ -13,20 +18,30 @@ from typing import Callable, Sequence
 from lloydk.hygiene import text_hash
 from lloydk.modules.m3_labeling.consensus import evaluate_consensus
 
+# 게이트 버전 스탬프 — 각 산출 레코드에 박아 재현/감사 가능하게(구 conf 게이트=암묵 v1).
+GATE_VERSION = "v2_agreement_evidence"
+
 
 @dataclass
 class LabelPair:
-    """label_fn 반환형 — 룰/LLM 라벨 + 신뢰도."""
+    """label_fn 반환형 — 룰/LLM 라벨 + 게이트 입력.
+
+    rule_conf/llm_conf는 정렬(sort_conf)용일 뿐 admission엔 쓰이지 않는다(P1 재설계).
+    """
 
     rule_grade: str
     rule_conf: float
     llm_grade: str
-    llm_conf: float
+    llm_conf: float = 0.0              # sort-only(평균 자가보고 conf)
+    has_real_evidence: bool = False    # 룰이 실제 한국어 시드 근거를 냈는가(약어 단독 제외)
+    self_consistency: float = 1.0      # 주 판정자 k샘플 다수표 비율(1.0=만장일치)
+    shadow_grade: str | None = None    # Qwen 섀도 등급(상용 주판정 시)
+    airgap: bool = False               # 주 판정자가 온프렘 Qwen(상용 미연동/민감문서)
 
 
 @dataclass
 class GoldenRecord:
-    """빌더 1건 결과 — gold(평가정본 후보) 또는 uncertain(검수대상)."""
+    """빌더 1건 결과 — gold_candidate(자동 후보) 또는 needs_review(검수대상)."""
 
     doc_id: str
     text: str
@@ -39,6 +54,11 @@ class GoldenRecord:
     llm_grade: str
     llm_confidence: float
     agreement: bool
+    flags: tuple = ()
+    review_priority: float = 0.0
+    self_consistency: float = 1.0
+    shadow_grade: str | None = None
+    gate_version: str = GATE_VERSION
     source: str = ""
     domain: str = ""
 
@@ -58,6 +78,11 @@ class GoldenRecord:
             "llm_grade": self.llm_grade,
             "llm_confidence": self.llm_confidence,
             "agreement": self.agreement,
+            "flags": list(self.flags),
+            "review_priority": self.review_priority,
+            "self_consistency": self.self_consistency,
+            "shadow_grade": self.shadow_grade,
+            "gate_version": self.gate_version,
         }
 
 
@@ -75,18 +100,18 @@ def build_golden_set(
     *,
     label_fn: Callable[[str], LabelPair],
     holdout_texts: Sequence[str] | None = None,
-    min_rule_conf: float = 0.5,
-    min_llm_conf: float = 0.7,
+    min_self_consistency: float = 0.67,
     text_key: str = "text",
     id_key: str = "doc_id",
+    **_legacy,  # 구 min_rule_conf/min_llm_conf 흡수(게이트 미사용; 서비스 호출 호환)
 ) -> GoldenBuildResult:
-    """후보 docs를 골든후보(gold)/검수대상(uncertain)으로 분류.
+    """후보 docs를 골든후보(gold_candidate)/검수대상(needs_review)으로 분류.
 
     단계:
       (1) 위생 — 정규화 text_hash로 본문 중복 제거 + holdout/train 누출 제거(G2)
-      (2) 라벨 — label_fn(text)로 룰·LLM 라벨 획득(주입)
-      (3) 합의 — evaluate_consensus로 gold/uncertain 판정(G1)
-      (4) 조립 — GoldenRecord 버킷팅 + 통계
+      (2) 라벨 — label_fn(text)로 룰·판정자 라벨 + 근거·self-consistency·섀도 획득(주입)
+      (3) 합의 — evaluate_consensus로 gold_candidate/needs_review 판정(G1, conf 비사용)
+      (4) 조립 — GoldenRecord 버킷팅 + review_priority 정렬 + 통계
 
     빈 본문은 건너뛴다. 동일 본문(공백차이 무시)은 첫 건만 남기고 중복 카운트.
     holdout_texts와 본문해시가 겹치면 누출로 드롭(학습/평가 순환성 차단).
@@ -113,8 +138,14 @@ def build_golden_set(
 
         lp = label_fn(text)
         verdict = evaluate_consensus(
-            lp.rule_grade, lp.rule_conf, lp.llm_grade, lp.llm_conf,
-            min_rule_conf=min_rule_conf, min_llm_conf=min_llm_conf,
+            lp.rule_grade,
+            lp.llm_grade,
+            has_real_evidence=lp.has_real_evidence,
+            self_consistency=lp.self_consistency,
+            shadow_grade=lp.shadow_grade,
+            airgap=lp.airgap,
+            sort_conf=lp.llm_conf,
+            min_self_consistency=min_self_consistency,
         )
         rec = GoldenRecord(
             doc_id=doc.get(id_key) or h[:16],
@@ -128,10 +159,17 @@ def build_golden_set(
             llm_grade=lp.llm_grade,
             llm_confidence=round(lp.llm_conf, 4),
             agreement=verdict.agree,
+            flags=verdict.flags,
+            review_priority=round(verdict.review_priority, 4),
+            self_consistency=round(lp.self_consistency, 4),
+            shadow_grade=lp.shadow_grade,
             source=doc.get("source", ""),
             domain=doc.get("domain", ""),
         )
         (gold if verdict.is_gold else uncertain).append(rec)
+
+    # 검수대상은 review_priority 내림차순(ts_downgrade·고등급·애매도 먼저) — 사람 큐 정렬.
+    uncertain.sort(key=lambda r: r.review_priority, reverse=True)
 
     stats = {
         "input": len(docs),
@@ -141,6 +179,7 @@ def build_golden_set(
         "dropped_leaked": dropped_leak,
         "gold_by_grade": dict(Counter(r.label for r in gold)),
         "gold_by_status": dict(Counter(r.status for r in gold)),
+        "uncertain_by_status": dict(Counter(r.status for r in uncertain)),
     }
     return GoldenBuildResult(
         gold=gold,
@@ -158,30 +197,42 @@ def make_label_fn(
     provider: str = "noop",
     *,
     rule_pipeline=None,
-    llm_labeler=None,
+    judge=None,
+    sensitive: bool = False,
 ) -> Callable[[str], LabelPair]:
-    """실 라벨러(룰 LabelingPipeline + LLM LLMLabeler)를 묶어 label_fn 생성 — 운영용.
+    """운영 label_fn — 룰 LabelingPipeline + ConsensusJudge(주 판정자 self-consistency + Qwen 섀도).
 
-    build_golden_set에 주입할 운영 label_fn. 무거운 m3/provider 의존은 lazy import라
-    `build_golden_set`만 쓰는 경로(테스트 포함)는 가볍게 유지된다. 테스트는 fake label_fn을
-    직접 주입한다(이 팩토리를 거치지 않음). make_llm_judge_gold의 run_rule/llm_labeler와 동일 구성.
+    provider = 주 판정자(상용 택일 anthropic|gemini|openai; 미지정/비-상용/민감 시 온프렘 Qwen).
+    sensitive=True면 공개 클라우드로 보내지 않고 airgap(Qwen) 라우팅(데이터 거버넌스).
+    무거운 m3/provider 의존은 lazy import라 build_golden_set만 쓰는 경로(테스트 포함)는 가볍게 유지된다.
+    테스트는 fake label_fn을 직접 주입한다(이 팩토리를 거치지 않음).
     """
     from lloydk.modules.m3_labeling import LabelingPipeline  # lazy
+    from lloydk.modules.m3_labeling.rule_engine import has_real_evidence as _has_evidence  # lazy
 
     rp = rule_pipeline or LabelingPipeline()
-    if llm_labeler is None:
-        from lloydk.adapters.llm import build_provider  # lazy
-        from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # lazy
+    if judge is None:
+        from lloydk.modules.m3_labeling.judge import build_consensus_judge  # lazy
 
-        llm_labeler = LLMLabeler(provider=build_provider(provider))
-    ll = llm_labeler
+        judge = build_consensus_judge(primary_name=provider, sensitive=sensitive)
+    jl = judge
 
     def label_fn(text: str) -> LabelPair:
         rr = rp.label(text)
         rule_grade = rr.grade.value if hasattr(rr.grade, "value") else str(rr.grade)
-        lr = ll.label(text)
-        llm_grade = lr.grade if lr.grade in _LABELS else "S3"
-        return LabelPair(rule_grade, float(rr.confidence), llm_grade, float(lr.confidence))
+        evidence = bool(rr.rule_result) and _has_evidence(rr.rule_result)
+        jres = jl.judge(text)
+        llm_grade = jres.grade if jres.grade in _LABELS else "S3"
+        return LabelPair(
+            rule_grade=rule_grade,
+            rule_conf=float(rr.confidence),
+            llm_grade=llm_grade,
+            llm_conf=float(jres.mean_conf),
+            has_real_evidence=evidence,
+            self_consistency=float(jres.self_consistency),
+            shadow_grade=jres.shadow_grade,
+            airgap=jres.airgap,
+        )
 
     return label_fn
 

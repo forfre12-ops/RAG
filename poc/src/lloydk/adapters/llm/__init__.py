@@ -38,6 +38,19 @@ def build_provider(name: str | None = None) -> LLMProvider:
         from lloydk.adapters.llm.openai_provider import OpenAIProvider
 
         return OpenAIProvider()
+    if chosen in ("google", "gemini"):
+        # Gemini는 OpenAI 호환 endpoint 재사용(신규 SDK 불요). gemini-2.5-pro는 PRICE_TABLE에 존재.
+        from lloydk.adapters.llm.local_openai_provider import LocalOpenAIProvider
+
+        # llm_model이 gemini 계열일 때만 사용, 아니면 기본 gemini-2.5-pro
+        # (llm_model 기본값=claude-sonnet-4-6이 Gemini 호출에 새는 것 방지).
+        _gm = settings.llm_model if "gemini" in (settings.llm_model or "").lower() else "gemini-2.5-pro"
+        return LocalOpenAIProvider(
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            api_key=settings.google_api_key or "EMPTY",
+            model=_gm,
+            provider_label="gemini",
+        )
     if chosen in ("local_openai", "vllm", "ollama", "lm_studio"):
         # 모든 OpenAI 호환 로컬 endpoint는 LocalOpenAIProvider 단일 어댑터로 처리.
         # provider_label로 telemetry에 구분 가능.

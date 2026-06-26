@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 _VALID_AUTH_MODE = {"api_key", "jwt", "both"}
 # llm: noop/anthropic/openai/google + 로컬 OpenAI 호환(local_openai)와 그 alias들.
 _VALID_LLM_PROVIDER = {
-    "noop", "anthropic", "openai", "google",
+    "noop", "anthropic", "openai", "google", "gemini",
     "local_openai", "vllm", "ollama", "lm_studio",
 }
 # embedding: hash(드라이런)·hf(KURE/BGE). 하위호환 alias 일부 포함(huggingface/kure/bge).
@@ -212,6 +212,16 @@ class Settings(BaseSettings):
     vllm_base_url: str = "http://localhost:8001/v1"
     vllm_model: str = "Qwen/Qwen3-14B"
     vllm_enable_thinking: bool = False
+
+    # --- ConsensusJudge (골든 게이트 self-consistency + Qwen 섀도) ---
+    # 주 판정자=상용 택일(anthropic|gemini|openai), 미연동/민감문서면 airgap(Qwen 주판정).
+    judge_primary_provider: str = "anthropic"
+    judge_shadow_provider: str = "vllm"        # 섀도=배포급 Qwen3-14B (production_suspect 탐지)
+    judge_shadow_enabled: bool = True
+    judge_k_min: int = 3                        # self-consistency 최소 샘플(만장일치면 여기서 멈춤)
+    judge_k_max: int = 5                        # 의견 갈릴 때 최대(adaptive-k)
+    judge_temperature: float = 0.7             # 표 분산용(>0 필요)
+    judge_min_self_consistency: float = 0.67   # 미만이면 low_agreement → needs_review
 
     # --- Models ---
     classifier_base_model: str = "kakaobank/kf-deberta-base"

@@ -59,7 +59,7 @@ def _display_records(records: Sequence[dict]) -> list[dict]:
             "llm": str(r.get("llm_grade", "")),
             "conf": round(float(r.get("llm_confidence") or 0.0), 3),
             "status": str(r.get("status", "")),
-            "is_gold": r.get("review_status") == "accepted",
+            "is_gold": r.get("review_status") in ("accepted", "gold_candidate"),
             "agree": bool(r.get("agreement")),
             "domain": str(r.get("domain", "") or r.get("source", "")),
             "preview": text[:150].replace("\n", " "),

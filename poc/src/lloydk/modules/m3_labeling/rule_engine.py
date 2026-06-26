@@ -98,6 +98,21 @@ class RuleLabelResult:
     warnings: list[str] = field(default_factory=list)
 
 
+def has_real_evidence(result: "RuleLabelResult") -> bool:
+    """룰이 실제 한국어 시드 span을 냈는가 — 영어 약어 단독 부스트는 근거로 치지 않는다.
+
+    규약(rule_engine 내부): 시드 매칭은 MatchedKeyword.start=None(기본값)으로 append되고,
+    _apply_high_risk_overrides의 영어 약어 부스트는 start=mo.start()를 채운다. 따라서
+    `start is None`이 시드 vs 약어 판별자다. 합의 게이트(consensus.evaluate_consensus)의
+    has_real_evidence 인자로 전달된다.
+
+    주의: grade=='S3'를 추가로 제외하지 말 것 — admission이 rule==llm을 이미 요구하므로 그러면
+    S3 문서가 이 게이트로는 영영 gold가 못 된다. 근거 = "실제 시드가 떴다"는 등급 무관 사실.
+    (start 규약이 바뀌면 test_rule_engine_evidence가 깨져 알려준다.)
+    """
+    return any(mk.start is None for mk in result.matched_keywords)
+
+
 _HIGH_RISK_PATTERNS: list[tuple[str, str, float, str]] = [
     ("TS", r"\b(?:DRAM|HBM|EUV|CVD|ALD|ICP-RIE|SiH4|N2O|sccm|Torr|Li6PS5Cl|Li2S|P2S5|LiCl|ZrO2|NMC|mAh/g)\b", 1.6, "ECONOMIC_VALUE"),
     ("TS", r"\b(?:HSM|FIPS|master\s*key|root\s*CA|SCADA|zero[- ]day|CFAR|MIMO|RLHF|LLM)\b", 1.6, "MANAGEMENT_LEVEL"),

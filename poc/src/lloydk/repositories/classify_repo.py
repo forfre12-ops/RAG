@@ -268,6 +268,7 @@ class ClassifyRepo:
             "nkt_designated": 2,
             "codex_review": 3,
             "public_definitive": 4,
+            "rule_llm_agreement": 5,   # P1 신규 게이트(룰·LLM 합의+근거) — 구 llm_judge_consensus 동급
             "llm_judge_consensus": 5,
             "llm_judge_primary": 6,
         }
