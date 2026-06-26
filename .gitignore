@@ -11,6 +11,9 @@ __pycache__/
 # Env / secrets
 .env
 *.env.local
+.env.bak*
+*.env.bak*
+poc/*.log
 
 # Data / artifacts (PoC)
 poc/datasets/raw/
