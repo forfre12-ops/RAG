@@ -187,12 +187,13 @@ footer strong{color:var(--text-dim);}
     <thead><tr><th>작업</th><th>주기</th><th>내용</th></tr></thead>
     <tbody>
       <tr><td>drift 점검</td><td>15분</td><td>운영 임베딩 드리프트 자가측정 → 임계 초과 시 알람 게이지.</td></tr>
-      <tr><td>active-learning</td><td>30분</td><td>검수 누적 임계 도달 시 재학습 권고/큐잉(+일별 03:00 스냅샷).</td></tr>
+      <tr><td>active-learning</td><td>30분</td><td>검수 누적 임계 도달 시 재학습 권고/큐잉(+일별 03:00 스냅샷). <strong>학습 사이트(지재원)에서만 실효</strong> — 추론 전용 고객사에선 트레이너가 없어 큐잉이 무동작이고, 보정은 로컬 룰·진단용으로만 누적된다.</td></tr>
       <tr><td>auto-rollback 점검</td><td>60분</td><td>활성 모델 라이브 미탐 회귀 점검(기본은 판정·로깅만, opt-in 시 실제 롤백).</td></tr>
       <tr><td>outbox 배송</td><td>60초</td><td>enqueue된 콜백 실송신. 실패는 지수 백오프, max_attempts 후 DLQ.</td></tr>
       <tr><td><strong>파티션 롤오버</strong></td><td>매일 02:10</td><td>향후 N개월 월 파티션 자동 생성(<code>_default</code> 비대화 방지). 아래 참조.</td></tr>
     </tbody>
   </table></div>
+  <div class="callout"><div class="callout-label">폐곡선 범위 · 재학습 주기</div><p>위 beat 자동화 중 <strong>active-learning→재학습</strong> 구간은 <strong>학습 사이트(지재원)</strong> 한정이다. 고객사는 추론 전용이라 그 tick은 무동작이며, 검수 보정은 로컬에 누적돼 <strong>룰·키워드·임계 보정과 진단(Confusion Matrix)</strong>에만 쓰인다. 고객사 보정을 지재원으로 반출할지는 미확정이다(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인 5</a>, 기본 권고: 무반출). 모델은 상시 재학습되지 않으며, <strong>실데이터 1차 학습(2026-09) 후 드리프트·이벤트 트리거 시 단발</strong> 재학습한다.</p></div>
   <h2>파티션 롤오버</h2>
   <ul>
     <li><strong>자동 연장</strong> — beat가 매일 02:10 <code>ensure_partitions_tick</code>을 호출해 향후 N개월 월 파티션을 미리 생성한다(<code>CREATE TABLE IF NOT EXISTS</code> 멱등). 대상: <code>tb_chunks</code>·<code>tb_llm_usage</code>·<code>tb_audit_log</code>.</li>
