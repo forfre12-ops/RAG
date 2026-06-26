@@ -34,7 +34,7 @@ def _tier(ls: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", required=True)
-    ap.add_argument("--holdout", default="datasets/gold_real/holdout_eval.jsonl")
+    ap.add_argument("--holdout", default="datasets/gold_real/holdout_eval.clean.jsonl")  # clean=train 누출 제거(dirty 109건 중 67건=61%가 train_subset 중복 → 암기 부풀림)
     ap.add_argument("--report", default="reports/p1_holdout_eval.json")
     args = ap.parse_args()
 

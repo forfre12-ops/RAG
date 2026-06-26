@@ -277,9 +277,10 @@ def main() -> int:
                     help="gold_real JSONL — 강화 검사 (human_review 필수, 합성 마커 금지)")
     ap.add_argument("--train-pool", default="datasets/gold_real/train_subset.jsonl",
                     help="누출 게이트: holdout과 텍스트해시 교차검증할 학습 풀")
-    ap.add_argument("--holdout", default=None,
-                    help="누출 게이트 대상 holdout/test (쉼표로 여러 개). "
-                         "지정 시에만 train-pool과 텍스트해시 누출 검사 수행(opt-in)")
+    ap.add_argument("--holdout",
+                    default="datasets/gold_real/holdout_eval.clean.jsonl,datasets/gold_real/holdout_business.clean.jsonl",
+                    help="누출 게이트 대상 holdout/test (쉼표로 여러 개). 기본=정화 홀드아웃 → "
+                         "train-pool과 텍스트해시 누출 검사를 기본 수행(fail-closed). 빈 문자열('')로 비활성.")
     ap.add_argument("--report", default="reports/data_quality_report.json")
     args = ap.parse_args()
 

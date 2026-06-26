@@ -46,7 +46,7 @@ def load_rows(path: Path) -> list[dict]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", required=True)
-    ap.add_argument("--gold", default="datasets/gold_real/holdout_eval.jsonl")
+    ap.add_argument("--gold", default="datasets/gold_real/holdout_eval.clean.jsonl")  # clean=train 누출 제거(dirty 109건 중 67건=61%가 train_subset 중복 → 암기 부풀림)
     ap.add_argument("--taus", default="0,0.35,0.25,0.15", help="쉼표구분. 0=τ미적용(argmax)")
     ap.add_argument("--multipliers", default="",
                     help="쉼표구분 rule_high_risk_weight_multiplier 스윕(B1). 주면 τ=None 고정, "

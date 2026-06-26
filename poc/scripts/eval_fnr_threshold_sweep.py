@@ -140,7 +140,7 @@ def metrics_for(y_true: list[str], y_pred: list[str]) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", required=True)
-    ap.add_argument("--gold", default="datasets/gold_real/holdout_eval.jsonl")
+    ap.add_argument("--gold", default="datasets/gold_real/holdout_eval.clean.jsonl")  # clean=train 누출 제거(dirty 109건 중 67건=61%가 train_subset 중복 → 암기 부풀림)
     ap.add_argument("--report", default="reports/fnr_threshold_sweep.md")
     ap.add_argument("--thresholds", default="", help="쉼표구분 임계 목록 (기본 그리드 사용 시 생략)")
     ap.add_argument("--fnr-target", type=float, default=0.05, help="목표 FNR (운영점 추천용)")
