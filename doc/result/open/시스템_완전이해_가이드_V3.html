@@ -538,13 +538,13 @@ footer strong{color:var(--text-dim);}
     </div>
   </div>
   <div class="reason-row">
-    <div class="reason-q">📦 왜 Elasticsearch?</div>
+    <div class="reason-q">📦 왜 PostgreSQL pgvector?</div>
     <div class="reason-a">
-      AI 개발을 맡은 로이드케이가 검색·벡터 엔진으로 ES 8.15를 채택해 시스템에 포함·납품합니다.
-      <strong>키워드 검색과 의미 검색을 하나의 엔진에서 처리</strong>하는 것이 핵심 이유입니다.
-      ES는 BM25(키워드) + Dense(의미) Hybrid 검색을 하나의 인덱스에서 처리하고, 한국어 형태소 분석(Nori)까지 내장합니다.
-      Qdrant·Pinecone 같은 전용 벡터 DB는 의미 검색만 강하고 키워드·한국어 검색이 약해 별도 검색엔진을 또 붙여야 하며, 별도 서버 + 라이선스 비용 + 운영 부담이 추가됩니다.
-      ES 하나면 폐쇄망 단일 스택으로 끝나 설치·운영이 단순합니다(상세 근거는 기술백서 §3.1).
+      AI 개발을 맡은 로이드케이가 검색·벡터 엔진으로 PostgreSQL pgvector를 채택해 시스템에 포함·납품합니다.
+      <strong>의미 검색·키워드 검색·트랜잭션을 하나의 DB에서 처리</strong>하는 것이 핵심 이유입니다.
+      pgvector(의미 dense) + bigram tsvector·ts_rank(어휘)를 PostgreSQL 안에서 RRF로 결합하고, 감사장부·확정/보정 트랜잭션도 같은 DB가 담당합니다.
+      별도 검색엔진(Elasticsearch 등)을 붙이면 서버·JVM·라이선스(RRF=platinum)·이중쓰기 정합 부담이 추가되는데, PG는 어차피 필수라 신규 컴포넌트 0으로 끝납니다.
+      실 PG 풀스택 측정(2026-06-24)으로 하이브리드(85%)가 dense 단독(76%)보다 우수함을 확인했습니다(쿼리가 합성·LLM 생성이라 실 운영쿼리 모니터는 본개발 · 의사결정_대장 §03, ES→PG 단일화).
     </div>
   </div>
   <div class="reason-row">
@@ -581,13 +581,10 @@ footer strong{color:var(--text-dim);}
     </div>
   </div>
   <div class="reason-row">
-    <div class="reason-q">🏢 왜 멀티테넌트?</div>
+    <div class="reason-q">🏢 왜 멀티테넌트를 안 쓰나?</div>
     <div class="reason-a">
-      본 사업은 지재원 <strong>단일 기관 온프렘 배포</strong>이며, 기본 테넌트(<code>default</code>) 하나로 운영됩니다.
-      tenant_id는 "여러 고객사 분리"가 목적이 아니라, <strong>데이터 격리 코드를 처음부터 깔아 두는 방어적 설계</strong>입니다 —
-      향후 부서·기관 단위 분리나 KL(원청)의 타 기관 확장 배포가 생겨도 구조 변경 없이 격리가 보장됩니다.
-      모든 DB 쿼리에 tenant_id 필터가 강제 적용되고, 요청 본문의 tenant_id를 인증된 신원에 묶어(불일치 시 403) 경계를 한 번 더 봉합합니다.
-      <span style="opacity:.85;">단, 단일 기관 내부의 실제 접근통제(누가 어떤 등급 문서를 보는가)는 테넌트가 아니라 <strong>권한(RBAC)·등급 인가</strong>로 처리합니다.</span>
+      고객사 간 분리는 <strong>구조</strong>로 끝납니다 — 각 고객사가 <strong>독립 폐쇄망에 따로 배포</strong>되고 고객사 페이지·접근은 <strong>KL(원청) 포털이 일원 관리</strong>하므로, 한 서버가 여러 고객사를 섞어 담는 멀티테넌시 자체가 필요 없습니다.
+      <span style="opacity:.85;">단일 기관 배포 내부의 실제 접근통제(누가 어떤 등급 문서를 보는가)는 <strong>권한(RBAC)·등급 인가</strong>로 처리합니다.</span>
     </div>
   </div>
 </div>
@@ -923,8 +920,7 @@ footer strong{color:var(--text-dim);}
 <tbody>
 <tr><td><strong>API 서버</strong></td><td>FastAPI (Python)</td><td>8000</td><td>모든 HTTP 요청을 받아서 처리하는 메인 서버</td></tr>
 <tr><td><strong>Worker</strong></td><td>Celery + Redis</td><td>—</td><td>시간이 오래 걸리는 작업을 백그라운드에서 처리</td></tr>
-<tr><td><strong>PostgreSQL</strong></td><td>PostgreSQL 16</td><td>5432</td><td>문서, 분류 결과, 사용자 정보 저장하는 관계형 DB</td></tr>
-<tr><td><strong>Elasticsearch</strong></td><td>ES 8.15 + nori</td><td>9200</td><td>문서를 AI 벡터로 변환해서 저장하고 의미 기반 검색 제공</td></tr>
+<tr><td><strong>PostgreSQL + pgvector</strong></td><td>PostgreSQL 16 (pgvector)</td><td>5432</td><td>문서·분류결과·사용자정보 관계형 저장 + AI 벡터(pgvector dense)·키워드(ts_rank) 하이브리드 검색 — DB 통합</td></tr>
 <tr><td><strong>MinIO</strong></td><td>MinIO (S3 호환)</td><td>9000</td><td>원본 문서 파일(HWP, PDF 등) 저장소</td></tr>
 <tr><td><strong>Redis</strong></td><td>Redis 7.2</td><td>6379</td><td>임베딩 결과 캐시, Celery 작업 큐</td></tr>
 <tr><td><strong>MLflow</strong></td><td>MLflow 2.16</td><td>5000</td><td>AI 모델 학습 과정(손실값, F1 점수) 추적 관리</td></tr>
@@ -986,7 +982,7 @@ footer strong{color:var(--text-dim);}
 <div class="case-grid">
   <div class="case-card">
     <div class="case-title"><span class="tag mid">API Key</span> 가장 간단한 방식</div>
-    <div class="case-body">헤더에 <code>X-API-Key: your-key</code>를 담아 요청. 각 테넌트(회사)마다 별도 키를 발급. 키는 bcrypt 해시로 DB에 저장.</div>
+    <div class="case-body">헤더에 <code>X-API-Key: your-key</code>를 담아 요청. 연동 주체·역할마다 별도 키를 발급. 키는 bcrypt 해시로 DB에 저장.</div>
   </div>
   <div class="case-card">
     <div class="case-title"><span class="tag dark">JWT 토큰</span> 더 강력한 보안</div>
@@ -997,12 +993,12 @@ footer strong{color:var(--text-dim);}
 <div class="callout inset">
   <div class="callout-label">🔒 객체 수준 권한 — 남의 문서 ID로 훔쳐보기(IDOR) 차단</div>
   <p>
-    인증만 통과하면 끝이 아닙니다. 요청 본문의 <code>tenant_id</code>는 <strong>인증된 신원의 tenant에 결속</strong>되어,
-    A사로 로그인한 사람이 본문에 B사 tenant를 적어 넣으면 <code>403</code>으로 거부됩니다.
-    또한 <strong>문서 조회·검증 라벨·분류 이력 등 모든 doc 단위 조회가 호출자의 tenant로 스코프</strong>되어,
-    남의 회사 <code>doc_id</code>를 끼워 넣어 본문이나 분류 결과를 열람하는 교차 테넌트 유출(IDOR/BOLA)이 막힙니다.
-    감사 로그의 행위자(actor)·tenant도 위조 가능한 헤더가 아니라 <strong>인증 컨텍스트에서 도출</strong>합니다.
-    (앱 레이어에서 강제 — DB 스키마 변경 없음.)
+    인증만 통과하면 끝이 아닙니다. 요청은 <strong>인증된 신원의 권한·열람등급에 결속</strong>되어,
+    권한·등급을 벗어난 문서를 본문에 끼워 넣으면 <code>403</code>으로 거부됩니다.
+    또한 <strong>문서 조회·검증 라벨·분류 이력 등 모든 doc 단위 조회가 호출자의 권한·등급으로 스코프</strong>되어,
+    남의 <code>doc_id</code>를 끼워 넣어 본문이나 분류 결과를 열람하는 객체 수준 인가 우회(IDOR/BOLA)가 막힙니다.
+    감사 로그의 행위자(actor)·역할도 위조 가능한 헤더가 아니라 <strong>인증 컨텍스트에서 도출</strong>합니다.
+    (앱 레이어에서 강제.)
   </p>
 </div>
 
@@ -1213,7 +1209,7 @@ footer strong{color:var(--text-dim);}
       <div class="step-title">DB 저장 (Best-effort)</div>
       <p>분류 결과를 PostgreSQL에 저장합니다. <strong>"Best-effort"</strong>란 저장에 실패해도 응답은 정상적으로 반환한다는 뜻입니다. DB 장애가 있어도 분류 서비스가 중단되지 않습니다.</p>
       <p>저장 항목: <strong>tb_classifications</strong> (예측 등급, 신뢰도, 모델), <strong>tb_classification_evidence</strong> (근거 구간), <strong>tb_chunks</strong> (텍스트 조각), <strong>tb_audit_log</strong> (감사 기록)</p>
-      <p><strong>원본 파일</strong>은 MinIO에 <strong>at-rest 암호화(AES-256-GCM)</strong>로 보관하고, 분류·검색 경로에는 <strong>PII 마스킹된 텍스트만</strong> 사용합니다(원본·마스킹본 분리 — 원본은 증빙용).</p>
+      <p><strong>원본 파일</strong>은 로컬 파일시스템에 <strong>at-rest 암호화(AES-256-GCM)</strong>로 보관하고, 분류·검색 경로에는 <strong>PII 마스킹된 텍스트만</strong> 사용합니다(원본·마스킹본 분리 — 원본은 증빙용).</p>
     </div>
   </div>
 
@@ -1311,7 +1307,7 @@ footer strong{color:var(--text-dim);}
 
 <p><code>POST /api/v1/answer</code>에 자연어 질문을 보내면 두 단계로 답변을 만듭니다:</p>
 <ul style="line-height:1.7;">
-  <li><strong>① 검색</strong> — 질문을 <strong>KURE-v1</strong>로 벡터화 → Elasticsearch <strong>Hybrid</strong>(의미+키워드+RRF)로 관련 문서 5개 검색. <span style="color:var(--text-dim);">(KURE-v1 + 1200자 청킹 기준 Recall@5 = 0.808)</span></li>
+  <li><strong>① 검색</strong> — 질문을 <strong>KURE-v1</strong>로 벡터화 → PostgreSQL <strong>하이브리드</strong>(pgvector 의미 + ts_rank 어휘 + RRF)로 관련 문서 5개 검색. <span style="color:var(--text-dim);">(실 PG NL 측정 하이브리드 Recall@5 ≈ 0.85 &gt; dense 단독 0.76, 의사결정_대장 §03)</span></li>
   <li><strong>② 생성</strong> — 검색된 문서를 근거로 LLM이 답변 + 인용 목록 생성. 일반망 <strong>Claude Sonnet 4.6</strong> · 폐쇄망 <strong>Qwen3-14B</strong>(Ollama) · CI <strong>Noop</strong>.</li>
 </ul>
 <p style="font-size:13px;color:var(--text-soft);">답변의 인용 번호(<code>[1]</code>,<code>[2]</code>)를 실제 검색 결과와 대조해 <strong>환각·무인용을 자동 경고</strong>합니다(<code>modules/m6_evaluation/answer_metrics.py</code>).</p>
@@ -1408,7 +1404,7 @@ footer strong{color:var(--text-dim);}
   <div class="oss-card"><div class="oss-name">FastAPI</div><div class="oss-role">메인 웹 프레임워크 (API 서버)</div><div class="oss-lic">MIT · Python</div></div>
   <div class="oss-card"><div class="oss-name">Celery</div><div class="oss-role">비동기 태스크 큐 (백그라운드 처리)</div><div class="oss-lic">BSD-3 · Python</div></div>
   <div class="oss-card"><div class="oss-name">PostgreSQL 16</div><div class="oss-role">관계형 데이터베이스</div><div class="oss-lic">PostgreSQL</div></div>
-  <div class="oss-card"><div class="oss-name">Elasticsearch 8.15</div><div class="oss-role">벡터 DB + Hybrid 검색 (nori 형태소)</div><div class="oss-lic">Elastic Basic (무료)</div></div>
+  <div class="oss-card"><div class="oss-name">pgvector</div><div class="oss-role">PostgreSQL 벡터 DB + 하이브리드(dense+ts_rank)</div><div class="oss-lic">PostgreSQL License</div></div>
   <div class="oss-card"><div class="oss-name">MinIO</div><div class="oss-role">S3 호환 오브젝트 스토리지</div><div class="oss-lic">AGPL-3.0</div></div>
   <div class="oss-card"><div class="oss-name">Redis 7.2</div><div class="oss-role">인메모리 캐시 + Celery Broker</div><div class="oss-lic">BSD-3</div></div>
   <div class="oss-card"><div class="oss-name">MLflow 2.16</div><div class="oss-role">모델 학습 실험 추적 관리</div><div class="oss-lic">Apache 2.0</div></div>
@@ -1532,7 +1528,7 @@ footer strong{color:var(--text-dim);}
   <tbody>
   <tr><td>① 단위 테스트</td><td>pytest 전체</td><td>약 1,200건</td><td>로직 단위 정합 · 회귀 0</td></tr>
   <tr><td>② DB 연동</td><td>실 PostgreSQL</td><td>20/20</td><td>저장·조회 경로 검증</td></tr>
-  <tr><td>③ 풀스택</td><td>PostgreSQL + Elasticsearch</td><td>103/103</td><td>분류·검색 통합 동작</td></tr>
+  <tr><td>③ 풀스택</td><td>PostgreSQL + pgvector</td><td>103/103</td><td>분류·검색 통합 동작</td></tr>
   <tr><td>④ 실 GPU E2E</td><td>능동학습 폐곡선 전 과정</td><td>7/7</td><td>정정→재학습→배포→핫리로드 실증</td></tr>
   <tr><td>⑤ 라이브 API 데모</td><td>실서버 호출</td><td>통과</td><td>PDF→S1(0.997)→confirm/relabel→재학습 큐</td></tr>
   </tbody>
@@ -1670,7 +1666,7 @@ footer strong{color:var(--text-dim);}
 </div>
 
 <h2 id="db">데이터는 어떻게 저장되나요?</h2>
-<p>PostgreSQL에 <strong>약 20개 테이블</strong>이 있습니다. 핵심 흐름만 설명합니다. (모두 <code>tenant_id</code>로 회사별 격리, 대용량 테이블은 시간 기준 RANGE 파티션.)</p>
+<p>PostgreSQL에 <strong>약 20개 테이블</strong>이 있습니다. 핵심 흐름만 설명합니다. (고객사별 폐쇄망 분리배포로 격리, 대용량 테이블은 시간 기준 RANGE 파티션.)</p>
 
 <div style="margin:18px 0;display:flex;flex-direction:column;gap:8px;">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -1799,7 +1795,7 @@ footer strong{color:var(--text-dim);}
   "status": "healthy",
   "model": {"status": "loaded", "version": "v-f9b5cedb"},
   "postgres": {"ok": true},
-  "elasticsearch": {"ok": true},
+  "vectorstore": {"ok": true},
   "redis": {"ok": true}
 }</code></pre>
 
@@ -1860,7 +1856,7 @@ footer strong{color:var(--text-dim);}
   <tbody>
   <tr><td>LLM</td><td>anthropic / openai / local_openai / noop</td><td><code>LLM_PROVIDER</code></td></tr>
   <tr><td>임베딩</td><td>hf (KURE/BGE) / hash (테스트)</td><td><code>EMBEDDING_PROVIDER</code></td></tr>
-  <tr><td>벡터 DB</td><td>es (Elasticsearch) / inmemory</td><td><code>VECTOR_BACKEND</code></td></tr>
+  <tr><td>벡터 DB</td><td>pg (pgvector, 기본) / inmemory</td><td><code>VECTOR_BACKEND</code></td></tr>
   <tr><td>Reranker</td><td>bge / noop</td><td><code>RERANKER_PROVIDER</code></td></tr>
   <tr><td>파일 스토리지</td><td>minio / local</td><td><code>STORAGE_BACKEND</code></td></tr>
   </tbody>
@@ -2003,8 +1999,8 @@ footer strong{color:var(--text-dim);}
   <div class="gloss-card">
     <div class="gloss-term">Hybrid 검색</div>
     <div class="gloss-eng">Hybrid Search</div>
-    <div class="gloss-def">키워드가 일치하는 문서를 찾는 BM25 방식 + 의미가 비슷한 문서를 찾는 Dense 방식을 결합. 두 방식의 장점을 합쳐 검색 정확도를 높입니다.</div>
-    <div class="gloss-ex">예: "반도체 EUV" 검색 → BM25로 정확한 용어 + Dense로 유사 개념 모두 검색</div>
+    <div class="gloss-def">키워드가 일치하는 문서를 찾는 어휘 방식(PG ts_rank) + 의미가 비슷한 문서를 찾는 Dense 방식(pgvector)을 RRF로 결합. 두 방식의 장점을 합쳐 검색 정확도를 높입니다.</div>
+    <div class="gloss-ex">예: "반도체 EUV" 검색 → 어휘(ts_rank)로 정확한 용어 + Dense로 유사 개념 모두 검색</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">BM25</div>
@@ -2015,8 +2011,8 @@ footer strong{color:var(--text-dim);}
   <div class="gloss-card">
     <div class="gloss-term">멀티테넌트</div>
     <div class="gloss-eng">Multi-tenant</div>
-    <div class="gloss-def">여러 회사(테넌트)가 같은 서버를 쓰면서도 각 회사의 데이터가 완전히 격리되는 구조. A사가 B사 데이터를 볼 수 없습니다.</div>
-    <div class="gloss-ex">예: 회사A와 회사B가 같은 시스템을 쓰지만 서로의 문서 못 봄</div>
+    <div class="gloss-def">여러 회사가 한 서버를 공유하며 데이터가 격리되는 구조. <strong>본 시스템은 미채택</strong> — 고객사마다 독립 폐쇄망에 분리 배포하므로 한 서버가 여러 고객사를 담지 않습니다.</div>
+    <div class="gloss-ex">예: 본 시스템은 고객사마다 별도 배포 → 멀티테넌시 불요</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">API</div>
@@ -2028,7 +2024,7 @@ footer strong{color:var(--text-dim);}
     <div class="gloss-term">컨테이너 (Docker)</div>
     <div class="gloss-eng">Container</div>
     <div class="gloss-def">각 서비스를 독립된 "상자" 안에서 실행하는 방식. 상자 안에 필요한 모든 프로그램이 들어있어 어느 컴퓨터에서도 동일하게 실행됩니다.</div>
-    <div class="gloss-ex">예: PostgreSQL, Elasticsearch, API 서버 각각 별도 컨테이너로 실행</div>
+    <div class="gloss-ex">예: PostgreSQL, MinIO, API 서버 각각 별도 컨테이너로 실행</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">LLM</div>

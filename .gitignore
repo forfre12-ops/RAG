@@ -93,7 +93,11 @@ poc/certs/
 poc/models/
 
 # doc 검증 스크린샷·스크립트 (작업산출물, 트래킹 불필요)
-doc/result/
+# 단, doc/result/open/*.html 는 공유 정본이라 추적(아카이브 하위폴더는 제외)
+doc/result/*
+!doc/result/open/
+doc/result/open/*
+!doc/result/open/*.html
 doc/temp_pptx.zip
 doc/temp_pptx/
 doc/temp_xlsx.zip
