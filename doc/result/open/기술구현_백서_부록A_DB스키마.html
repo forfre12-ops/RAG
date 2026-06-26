@@ -568,7 +568,7 @@ LIMIT  5;</pre>
       <span class="group-badge">F</span>
       <span class="group-title">보정 — tb_corrections</span>
     </div>
-    <div class="group-desc">검수자 수정 결과. Active Learning 재학습 입력의 진실 소스. 능동학습 폐곡선: 분류 → 검수자 교정 → 교정 재빌드(unconsumed → {text,label}) → 학습셋 병합(train만) → 학습 → 등록 → 게이트 → 핫리로드. <b>반영분만 소비</b>(consumed_in_run·consumed_at) — 미반영은 무손실.</div>
+    <div class="group-desc">검수자 수정 결과. Active Learning 재학습 입력의 진실 소스. 능동학습 폐곡선: 분류 → 검수자 교정 → 교정 재빌드(unconsumed → {text,label}) → 학습셋 병합(train만) → 학습 → 등록 → 게이트 → 핫리로드. <b>반영분만 소비</b>(consumed_in_run·consumed_at) — 미반영은 무손실. <b>※ 환류 정책:</b> 본 폐곡선은 단일 배포 내부 메커니즘이다. 고객 교정·원문의 망 밖 반출·재학습 사용 여부는 미확정(기본 A안: 무반출 — 지재원 자기 골든셋 재학습·집계 진단지표만 환류, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>). 모델은 상시 재학습하지 않으며 트리거(scheduled/active_learning)는 실데이터 1차학습 후 드리프트/이벤트 단발이다.</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
       <tbody>

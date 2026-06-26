@@ -243,7 +243,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <span style="color:var(--text-dim);font-size:12px;">· FastAPI · OpenAPI 3.0 · Base URL: /api/v1</span>
     </div>
     <h1 class="title">API 명세</h1>
-    <p class="lede"><strong>Lloydk(수행사) AI 코어 API</strong> — 분류·설명·RAG·검수/능동학습·학습·합성·등급체계·문서 수집(M2)·운영. KL ↔ Lloydk 서버 간 통신 기준이며 Lloydk는 KL 단일 신뢰 클라이언트를 전제로 한다. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)이며 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다. 능동학습 폐곡선(relabel → tb_corrections → 재학습 → 모델 핫리로드)이 배선됨.</p>
+    <p class="lede"><strong>Lloydk(수행사) AI 코어 API</strong> — 분류·설명·RAG·검수/능동학습·학습·합성·등급체계·문서 수집(M2)·운영. KL ↔ Lloydk 서버 간 통신 기준이며 Lloydk는 KL 단일 신뢰 클라이언트를 전제로 한다. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)이며 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다. 능동학습 폐곡선(relabel → tb_corrections → 재학습 → 모델 핫리로드)이 배선됨 — 단 이는 <b>단일 배포 내부 메커니즘</b>이며, 고객 교정·원문의 망 밖 반출·재학습 사용 여부는 <b>미확정</b>(기본 A안: 무반출·지재원 자기 골든셋 재학습·집계 진단지표만 환류, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>). 모델은 상시 재학습하지 않는다(실데이터 1차학습 후 드리프트/이벤트 단발).</p>
     <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Lloydk(AI 에이전트)가 제공하는 API만</b> 다룬다. <b>가이드 관리·문서 메타데이터·회원사 자가진단·LLM 비용 등 KL 소유 대상 API는 KL이 직접 제공</b>하므로 제외한다. <span class="nego-chip">협의 필요</span>(주황색)는 KL과 인터페이스 합의가 남은 항목이다.</p>
     <hr class="hero-sep">
 
