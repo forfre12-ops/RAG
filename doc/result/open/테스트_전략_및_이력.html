@@ -798,7 +798,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>10.3 능동학습 폐곡선 (A2/C-ver) — 실 GPU E2E 7/7</h3>
-      <p style="font-size:13px;">분류 → 검수자 교정(tb_corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다.</p>
+      <p style="font-size:13px;">분류 → 검수자 교정(tb_corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다. <span style="color:var(--text-dim,#71717a);">단 이는 단일 배포 내부 메커니즘이며, 모델은 상시 재학습하지 않습니다 — 실데이터 1차학습(2026-09) 후 드리프트/이벤트 단발. 고객사는 추론 전용(B안 예외)이고, 고객 교정·원문 등 문서 채널은 망 밖 반출 금지·집계 진단지표만 환류한다(환류=재학습 미확정 A/B/C, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>).</span></p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>단계</th><th>구현</th><th>동작</th></tr></thead>
@@ -1710,7 +1710,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <span class="phase-item-icon">🎯</span>
               <div class="phase-item-body">
                 <div class="phase-item-title">발주처 실문서 재학습 → 제3 문체 recall 측정</div>
-                <div class="phase-item-desc">폐쇄망 내 실 영업비밀 문서로 학습셋 보강. step3 재학습. 진짜 미공개 비밀(특허·판례 외 문체) 재현율의 첫 실측 — 구조적으로 여기서만 가능.</div>
+                <div class="phase-item-desc">폐쇄망 내 실 영업비밀 문서로 학습셋 보강. step3 재학습. 진짜 미공개 비밀(특허·판례 외 문체) 재현율의 첫 실측 — 구조적으로 여기서만 가능. 환류=재학습은 미확정(A 무반출 기본 / B 온사이트 / C 반출); 본 항목은 B안(고객 망 내 온사이트 학습)에 해당하며 문서·발췌는 어느 안이든 망 밖 반출 금지, 기본 A안에서는 지재원이 자기 골든셋으로 재학습하고 집계 진단지표만 환류한다.</div>
               </div>
             </li>
             <li class="phase-item">
