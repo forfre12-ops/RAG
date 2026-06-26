@@ -448,7 +448,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>서비스</th><th>버전</th><th>역할</th><th>포트</th><th>특이사항</th></tr></thead>
           <tbody>
             <tr><td class="td-code">postgres + pgvector</td><td>16</td><td>문서·분류·학습 메타 + <b>벡터검색</b>(트랜잭션 정본에 통합)</td><td>5432</td><td>월별 파티셔닝 · pgvector HNSW · ts_rank(bigram) 한국어 렉시컬</td></tr>
-            <tr><td class="td-code">minio</td><td>—</td><td>문서·모델 스토리지(S3 호환)</td><td>9000</td><td>문서·모델·실험 데이터 분리 저장</td></tr>
+            <tr><td class="td-code">로컬FS</td><td>—</td><td>문서·모델·아티팩트 스토리지(file://)</td><td>—</td><td>원본 AES-256-GCM 암호화 · MinIO 미사용</td></tr>
             <tr><td class="td-code">redis</td><td>7.2</td><td>Celery 브로커·백엔드 · 잡상태·아웃박스/DLQ</td><td>6379</td><td>폐쇄망 적합 · 임베딩 캐시는 인메모리 LRU</td></tr>
             <tr><td class="td-code">mlflow</td><td>2.16.2</td><td>학습 실험 추적</td><td>5000</td><td>모델 버전·지표 이력 관리</td></tr>
             <tr><td class="td-code">api + worker</td><td>—</td><td>추론 API 서버 + 비동기 워커</td><td>18030</td><td>운영 모드 자동 적용</td></tr>
@@ -456,7 +456,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
 
-      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 표는 <b>지재원 풀 스택</b> 기준이다. <b>고객사 폐쇄망 번들 = api·worker·beat·redis·vLLM</b>(Qwen3-14B — RAG <code>/answer</code>·선택적 2차판정, 분류 핫패스엔 미사용) <b>+ KL 제공 PostgreSQL</b>, 스토리지=로컬 파일시스템. <b>minio·mlflow·학습 파이프라인은 지재원 전용</b>(번들 미포함). tier별 구성은 §2.1.2 참조.</p>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 표는 <b>지재원 풀 스택</b> 기준이다. <b>고객사 폐쇄망 번들 = api·worker·beat·redis·vLLM</b>(Qwen3-14B — RAG <code>/answer</code>·선택적 2차판정, 분류 핫패스엔 미사용) <b>+ KL 제공 PostgreSQL</b>, 스토리지=로컬 파일시스템. <b>mlflow·학습 파이프라인은 지재원 전용</b>(번들 미포함 · 스토리지=로컬FS로 MinIO 미사용). tier별 구성은 §2.1.2 참조.</p>
 
       <h3>2.1.1 서버 구조도</h3>
       <div style="margin:16px 0;overflow-x:auto;">
@@ -507,7 +507,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <line x1="253" y1="222" x2="76" y2="257" stroke="#737373" stroke-width="1.2" marker-end="url(#arr)"/>
           <!-- to Redis -->
           <line x1="300" y1="222" x2="218" y2="257" stroke="#737373" stroke-width="1.2" marker-end="url(#arr)"/>
-          <!-- to MinIO -->
+          <!-- to 로컬FS -->
           <line x1="370" y1="222" x2="370" y2="257" stroke="#737373" stroke-width="1.2" marker-end="url(#arr)"/>
           <!-- to pgvector -->
           <line x1="450" y1="222" x2="520" y2="257" stroke="#404040" stroke-width="1.2" marker-end="url(#arr-blue)"/>
@@ -527,11 +527,11 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <text x="218" y="292" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist,sans-serif">:6379  ·  Broker</text>
           <text x="218" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">Outbox  ·  임베딩캐시</text>
 
-          <!-- MinIO -->
+          <!-- 로컬FS -->
           <rect x="312" y="257" width="116" height="62" rx="6" fill="#fff" stroke="rgba(0,0,0,.13)" stroke-width="1.3"/>
-          <text x="370" y="276" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0a0a0a" font-family="Geist Mono,monospace">minio</text>
-          <text x="370" y="292" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist,sans-serif">:9000  ·  S3 스토리지</text>
-          <text x="370" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">docs / models / mlflow</text>
+          <text x="370" y="276" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0a0a0a" font-family="Geist Mono,monospace">로컬FS</text>
+          <text x="370" y="292" text-anchor="middle" font-size="10" fill="#525252" font-family="Geist,sans-serif">file://  ·  로컬 스토리지</text>
+          <text x="370" y="308" text-anchor="middle" font-size="9.5" fill="#737373" font-family="Geist,sans-serif">docs / models / artifacts</text>
 
           <!-- pgvector (postgres 내장) -->
           <rect x="462" y="257" width="116" height="62" rx="6" fill="rgba(0,0,0,.03)" stroke="rgba(0,0,0,.18)" stroke-width="1.3" stroke-dasharray="5,3"/>
@@ -990,7 +990,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-code">B1<br>코퍼스 준비</td><td>M1 합성 / 운영자</td><td>M1 LLM 합성(등급·도메인·4-band 길이 다양화, §5.2) + 공개·OSS 코퍼스(§5.3)로 학습 데이터 풀을 구성한다.</td></tr>
             <tr><td class="td-code">B2<br>라벨 후보 생성 (M3)</td><td>배치 도구</td><td>키워드 룰 엔진이 1차 라벨 후보를 부여하고, 룰 확신이 임계값 미달이면 LLM이 폴백으로 후보를 생성한다. <b>3요건(비공지성 S·경제적 유용성 V·비밀관리성 M)을 각 0·1·2로 독립 판독</b>하고 그 근거를 동반 출력한 뒤, <b>곱(S×V×M)으로 등급을 산정</b>한다(FUN-023). <b>기계는 "후보"까지만 단다.</b></td></tr>
             <tr><td class="td-code">B3<br>사람 검수 · 학습셋 확정</td><td>관리자</td><td>라벨 후보를 검수하여 학습셋에 편입한다(FUN-003: 라벨 자동 부여 → 관리자 검수 후 편입).</td></tr>
-            <tr><td class="td-code">B4<br>초기 모델 학습 (M4)</td><td>배치 (GPU)</td><td>KF-DeBERTa fine-tune. MLflow run_id로 전 과정 추적, safetensors로 <b>지재원 내부 모델 저장소</b>(MinIO <code>lloydk-models</code> — 지재원 학습 전용, KL 원문저장과는 별개)에 저장 → 오프라인 번들로 고객사에 배포된다.</td></tr>
+            <tr><td class="td-code">B4<br>초기 모델 학습 (M4)</td><td>배치 (GPU)</td><td>KF-DeBERTa fine-tune. MLflow run_id로 전 과정 추적, safetensors로 <b>지재원 내부 모델 저장소</b>(로컬FS/MLflow 아티팩트 <code>lloydk-models</code> — 지재원 학습 전용, KL 원문저장과는 별개)에 저장 → 오프라인 번들로 고객사에 배포된다.</td></tr>
             <tr><td class="td-code">B5<br>기준문서 색인 (pgvector)</td><td>배치 (<code>rag_indexer</code>)</td><td>dense 벡터(pgvector HNSW) + ts_rank bigram 렉시컬로 PostgreSQL에 색인한다. 이 색인이 운영 ⑥의 <b>RAG 근거 검색 풀</b>이 된다.</td></tr>
           </tbody>
         </table>
@@ -1080,7 +1080,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-code">G1<br>수집</td><td class="td-pass">자동 (상시)</td><td>검수자가 ⑦b에서 수정한 라벨이 <code>tb_corrections</code> 테이블에 쌓인다. <b>이 수집은 상시 자동이다.</b></td></tr>
             <tr><td class="td-code">G2<br>재학습 실행</td><td class="td-warn">스케줄러 자동 / 또는 수동</td><td>tb_corrections 누적이 임계(권장 기본 <b>50</b>, 보안 미탐 누적 ≥10 시 긴급) 도달 시 스케줄러(또는 관리자)가 트리거하여 새 모델 "후보"를 배치 학습한다(M4). 학습 중에도 기존 운영 모델은 그대로 서비스한다.</td></tr>
             <tr><td class="td-code">G3<br>검증 (평가 게이트)</td><td class="td-warn">수동 트리거 · 자동 채점</td><td>새 후보를 평가셋으로 채점한다 — <b>F1 · FNR(비밀문서 미탐률, TS·S1 핵심) · 적대 케이스</b>. 하나라도 기준 미달이면 후보를 폐기한다(M6). 결과는 MLflow에 지표·혼동행렬로 남는다.</td></tr>
-            <tr><td class="td-code">G4<br>승인 · 교체</td><td class="td-warn">수동</td><td>관리자가 G3 결과를 확인하고 <b>사인오프한 경우에만</b> 운영 모델을 교체한다(MLflow/MinIO 이력). 자동 활성 스위치(<code>retrain_auto_activate</code>)는 <b>기본 비활성(OFF)</b>이라, 끄여 있는 한 무인 자동 배포는 일어나지 않는다(§2.4.1 폐곡선). 교체는 핫리로드(<code>/admin/model/reload</code>)로 <b>프로세스 재기동 없이</b> 반영된다.</td></tr>
+            <tr><td class="td-code">G4<br>승인 · 교체</td><td class="td-warn">수동</td><td>관리자가 G3 결과를 확인하고 <b>사인오프한 경우에만</b> 운영 모델을 교체한다(MLflow 이력). 자동 활성 스위치(<code>retrain_auto_activate</code>)는 <b>기본 비활성(OFF)</b>이라, 끄여 있는 한 무인 자동 배포는 일어나지 않는다(§2.4.1 폐곡선). 교체는 핫리로드(<code>/admin/model/reload</code>)로 <b>프로세스 재기동 없이</b> 반영된다.</td></tr>
           </tbody>
         </table>
       </div>

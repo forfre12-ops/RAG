@@ -921,9 +921,9 @@ footer strong{color:var(--text-dim);}
 <tr><td><strong>API 서버</strong></td><td>FastAPI (Python)</td><td>8000</td><td>모든 HTTP 요청을 받아서 처리하는 메인 서버</td></tr>
 <tr><td><strong>Worker</strong></td><td>Celery + Redis</td><td>—</td><td>시간이 오래 걸리는 작업을 백그라운드에서 처리</td></tr>
 <tr><td><strong>PostgreSQL + pgvector</strong></td><td>PostgreSQL 16 (pgvector)</td><td>5432</td><td>문서·분류결과·사용자정보 관계형 저장 + AI 벡터(pgvector dense)·키워드(ts_rank) 하이브리드 검색 — DB 통합</td></tr>
-<tr><td><strong>MinIO</strong></td><td>MinIO (S3 호환)</td><td>9000</td><td>원본 문서 파일(HWP, PDF 등) 저장소</td></tr>
+<tr><td><strong>로컬 스토리지</strong></td><td>파일시스템(file://)</td><td>—</td><td>원본 문서 파일(HWP, PDF 등) 저장 — AES-256-GCM 암호화 (MinIO 미사용)</td></tr>
 <tr><td><strong>Redis</strong></td><td>Redis 7.2</td><td>6379</td><td>임베딩 결과 캐시, Celery 작업 큐</td></tr>
-<tr><td><strong>MLflow</strong></td><td>MLflow 2.16</td><td>5000</td><td>AI 모델 학습 과정(손실값, F1 점수) 추적 관리</td></tr>
+<tr><td><strong>MLflow</strong> (지재원 전용)</td><td>MLflow 2.16</td><td>—</td><td>모델 학습 추적 — <strong>지재원에서만</strong>, 고객사 번들 미포함</td></tr>
 </tbody>
 </table>
 </div>
@@ -1405,7 +1405,6 @@ footer strong{color:var(--text-dim);}
   <div class="oss-card"><div class="oss-name">Celery</div><div class="oss-role">비동기 태스크 큐 (백그라운드 처리)</div><div class="oss-lic">BSD-3 · Python</div></div>
   <div class="oss-card"><div class="oss-name">PostgreSQL 16</div><div class="oss-role">관계형 데이터베이스</div><div class="oss-lic">PostgreSQL</div></div>
   <div class="oss-card"><div class="oss-name">pgvector</div><div class="oss-role">PostgreSQL 벡터 DB + 하이브리드(dense+ts_rank)</div><div class="oss-lic">PostgreSQL License</div></div>
-  <div class="oss-card"><div class="oss-name">MinIO</div><div class="oss-role">S3 호환 오브젝트 스토리지</div><div class="oss-lic">AGPL-3.0</div></div>
   <div class="oss-card"><div class="oss-name">Redis 7.2</div><div class="oss-role">인메모리 캐시 + Celery Broker</div><div class="oss-lic">BSD-3</div></div>
   <div class="oss-card"><div class="oss-name">MLflow 2.16</div><div class="oss-role">모델 학습 실험 추적 관리</div><div class="oss-lic">Apache 2.0</div></div>
   <div class="oss-card"><div class="oss-name">HuggingFace Transformers</div><div class="oss-role">ML 모델 로딩/추론</div><div class="oss-lic">Apache 2.0</div></div>
@@ -1858,7 +1857,7 @@ footer strong{color:var(--text-dim);}
   <tr><td>임베딩</td><td>hf (KURE/BGE) / hash (테스트)</td><td><code>EMBEDDING_PROVIDER</code></td></tr>
   <tr><td>벡터 DB</td><td>pg (pgvector, 기본) / inmemory</td><td><code>VECTOR_BACKEND</code></td></tr>
   <tr><td>Reranker</td><td>bge / noop</td><td><code>RERANKER_PROVIDER</code></td></tr>
-  <tr><td>파일 스토리지</td><td>minio / local</td><td><code>STORAGE_BACKEND</code></td></tr>
+  <tr><td>파일 스토리지</td><td>local (file://, 폐쇄망 기본)</td><td><code>STORAGE_BACKEND</code></td></tr>
   </tbody>
 </table>
 </div>
@@ -2024,7 +2023,7 @@ footer strong{color:var(--text-dim);}
     <div class="gloss-term">컨테이너 (Docker)</div>
     <div class="gloss-eng">Container</div>
     <div class="gloss-def">각 서비스를 독립된 "상자" 안에서 실행하는 방식. 상자 안에 필요한 모든 프로그램이 들어있어 어느 컴퓨터에서도 동일하게 실행됩니다.</div>
-    <div class="gloss-ex">예: PostgreSQL, MinIO, API 서버 각각 별도 컨테이너로 실행</div>
+    <div class="gloss-ex">예: PostgreSQL, Redis, API 서버 각각 별도 컨테이너로 실행</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">LLM</div>

@@ -112,7 +112,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>대상 환경</td><td>KOIPA AI 영업비밀관리시스템 운영망 (폐쇄망/에어갭 — 인터넷 차단, 매체 반입)</td></tr>
       <tr><td>배포 단위</td><td>폐쇄망 배포 번들 (docker 이미지 + python 의존성 + 모델 + DB 마이그레이션 + 구성)</td></tr>
       <tr><td>추정 크기</td><td>~23GB (매체 반입 1회)</td></tr>
-      <tr><td>아키텍처</td><td>단일 노드 docker compose 스택 — API·Worker·Beat + PostgreSQL(pgvector)·MinIO·Redis·MLflow</td></tr>
+      <tr><td>아키텍처</td><td>단일 노드 docker compose 스택 — API·Worker·Beat·Redis + PostgreSQL(pgvector) · 로컬 파일시스템 (MinIO 미사용 · MLflow는 지재원 전용·번들 미포함)</td></tr>
       <tr><td>망 등급</td><td>폐쇄망 전제 · <span class="tag dep">확인필요</span> 매체 반입 신청·승인 절차</td></tr>
     </tbody>
   </table></div>
@@ -125,9 +125,9 @@ footer strong{color:var(--text-dim);}
     <thead><tr><th>컴포넌트</th><th>버전</th><th>포트</th><th>역할</th><th>라이선스·주의</th></tr></thead>
     <tbody>
       <tr><td><strong>PostgreSQL + pgvector</strong></td><td>16 (pgvector)</td><td>5432</td><td>메타데이터·감사장부·모델버전(월 파티션) + 벡터검색(pgvector dense + bigram-tsvector ts_rank 하이브리드)</td><td>PostgreSQL License</td></tr>
-      <tr><td><strong>MinIO</strong></td><td>S3 호환</td><td>9000 / 9001</td><td>객체스토리지 — 원문·모델·아티팩트</td><td><strong>AGPL-3.0</strong> — 운영 전환 시 상용구매 또는 대체 검토</td></tr>
+      <tr><td><strong>로컬 스토리지</strong></td><td>파일시스템(file://)</td><td>—</td><td>원문·산출물 보관 — 원본 AES-256-GCM 암호화 (MinIO 미사용)</td><td>해당 없음</td></tr>
       <tr><td><strong>Redis</strong></td><td>7.2</td><td>6379</td><td>캐시 · 작업 큐 브로커</td><td>BSD-3 (7.2 시점 고정)</td></tr>
-      <tr><td><strong>MLflow</strong></td><td>2.16</td><td>5000</td><td>실험·모델 레지스트리</td><td>Apache-2.0</td></tr>
+      <tr><td><strong>MLflow</strong> (지재원 전용)</td><td>2.16</td><td>—</td><td>실험·모델 레지스트리 — <strong>지재원에서만</strong>, 고객사 번들 미포함</td><td>Apache-2.0</td></tr>
       <tr><td><strong>nginx (mTLS)</strong></td><td>1.27</td><td>443</td><td>mTLS 종료 — 옵션</td><td>BSD-2. 인증서는 발주처/KL PKI 산출물로 교체</td></tr>
       <tr><td><strong>API</strong></td><td>FastAPI</td><td>8000</td><td>분류·검색·확정·재학습·관리 API</td><td>자체</td></tr>
       <tr><td><strong>Worker / Beat</strong></td><td>Celery</td><td>—</td><td>비동기 분류·인덱싱·능동학습·주기작업</td><td>자체</td></tr>
@@ -178,7 +178,7 @@ footer strong{color:var(--text-dim);}
     <li><strong>OS·런타임</strong> — Ubuntu 22.04 LTS, Docker Engine + Compose v2 정상 동작.</li>
     <li><strong>GPU</strong> — <code>nvidia-smi</code> 인식 + <code>--gpus all</code> 동작 확인. <span class="tag dep">확인필요</span> Driver·CUDA·Container Toolkit 버전. 미충족 시 CPU 프로파일로 폴백(추론 성능 하락).</li>
     <li><strong>디스크</strong> — 번들 ~23GB + 이미지·모델·데이터 볼륨. Data SSD 여유 확인.</li>
-    <li><strong>포트</strong> — 5432·9000·9001·6379·5000·8000 (+ mTLS 443) 내부 가용. 방화벽 규칙은 망 정책에 맞춰 신청.</li>
+    <li><strong>포트</strong> — 5432·6379·8000 (+ mTLS 443) 내부 가용 (MinIO 9000/9001·MLflow 5000 불요). 방화벽 규칙은 망 정책에 맞춰 신청.</li>
     <li><strong>커널 파라미터</strong> — 기본값으로 충분(별도 검색엔진 mmap·memlock 튜닝 불요 — pgvector 통합).</li>
     <li><strong>로컬 LLM 서버</strong> — onprem-local 프로파일은 vLLM/Ollama 서버 기동 + Qwen3-14B 적재가 선행되어야 한다(별도 프로세스).</li>
     <li><strong>OCR</strong> — 스캔 PDF 처리를 위해 Tesseract(한국어 데이터)·poppler 시스템 바이너리 설치(번들 동봉분 사용).</li>
@@ -214,11 +214,11 @@ cp infra-config/.env.template .env
 vi .env   # 엔드포인트·시크릿·배포 프로파일·로컬 LLM endpoint
 
 # 5) 인프라 기동 → DB 부트스트랩
-docker compose up -d postgres minio redis mlflow
+docker compose up -d postgres redis
 docker compose run --rm api alembic upgrade head   # 스키마 + 파티션 + 벡터(tb_rag_vectors) (컨테이너 내 실행)
 
 # 6) 스토리지 초기화
-#   MinIO 버킷: lloydk-docs / lloydk-models / mlflow
+#   로컬 스토리지(.storage) 디렉토리 자동 생성 — 별도 버킷 불요
 #   벡터검색: 별도 초기화 불요 (tb_rag_vectors는 alembic 마이그레이션이 생성)
 
 # 7) 모델 배치 → 전체 기동
@@ -253,7 +253,7 @@ docker compose up -d
   <h2>기동 후 점검</h2>
   <ul>
     <li><strong>헬스체크</strong> — <code>/api/v1/healthz/live</code>(프로세스)·<code>/ready</code>(의존성 실측)·<code>/deep</code>(전체).</li>
-    <li><strong>컨테이너</strong> — API·Worker·Beat·PostgreSQL(pgvector)·MinIO·Redis·MLflow 전부 기동. Worker는 전 큐 구독, Beat는 단일 인스턴스.</li>
+    <li><strong>컨테이너</strong> — API·Worker·Beat·PostgreSQL(pgvector)·Redis 기동(스토리지=로컬FS · MLflow=지재원 전용). Worker는 전 큐 구독, Beat는 단일 인스턴스.</li>
     <li><strong>스모크 분류</strong> — 샘플 문서 업로드 → 분류 → 등급·신뢰도 반환 확인.</li>
     <li><strong>검색</strong> — pgvector 확장 설치 + <code>tb_rag_vectors</code> 적재 건수 확인, <code>/ready</code> 의존성 통과.</li>
     <li><strong>관측성</strong> — 모니터링 타깃 정상, KPI 대시보드·알람 로드.</li>
@@ -266,7 +266,7 @@ docker compose up -d
     <li><strong>시크릿</strong> — 환경변수의 모든 비밀값은 <strong>템플릿 기본값을 운영용 강한 값으로 교체</strong>. 시크릿 관리(env/Vault 등) 추상화 지원.</li>
     <li><strong>mTLS</strong> — 옵션. 운영 인증서는 발주처/KL PKI 산출물로 교체.</li>
     <li><strong>인증</strong> — API Key 인증·RBAC. 고객사 간 격리는 폐쇄망 분리배포·KL 포털.</li>
-    <li><strong>라이선스</strong> — MinIO(AGPL) 상용구매/교체, PDF 추출 라이브러리 BSD 전환 등 컴플라이언스 점검. 운영 전환 시 SBOM(CycloneDX) 첨부.</li>
+    <li><strong>라이선스</strong> — PDF 추출 라이브러리 BSD 전환 등 컴플라이언스 점검. 운영 전환 시 SBOM(CycloneDX) 첨부. (MinIO 미사용으로 AGPL 이슈 해소)</li>
   </ul>
 
   <div class="section-sep" id="s11"><span class="section-sep-num">11</span><span class="section-sep-line"></span><span class="section-sep-title">현재 번들 상태 · 선결 과제</span></div>

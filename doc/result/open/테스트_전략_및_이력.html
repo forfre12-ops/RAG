@@ -392,8 +392,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <div class="flow-card real-step">
                 <div class="flow-step-name">④ M2 전처리</div>
                 <div class="flow-step-lib">hwp5 · python-docx · pdfminer.six · PII 11패턴</div>
-                <div class="flow-step-desc">HWP/DOCX/PDF 실파싱. 주민·외국인·법인·카드·전화·이메일·여권·IP·사번·사업자 등 11패턴 PII 마스킹(+선택 NER). 512자 / 64자 overlap 청킹(M2 분류용). MinIO 저장.</div>
-                <div class="flow-tags"><span class="tag real">실파일</span><span class="tag real">PII mask</span><span class="tag real">MinIO</span></div>
+                <div class="flow-step-desc">HWP/DOCX/PDF 실파싱. 주민·외국인·법인·카드·전화·이메일·여권·IP·사번·사업자 등 11패턴 PII 마스킹(+선택 NER). 512자 / 64자 overlap 청킹(M2 분류용). 로컬FS 저장.</div>
+                <div class="flow-tags"><span class="tag real">실파일</span><span class="tag real">PII mask</span><span class="tag real">로컬FS</span></div>
               </div>
             </div>
 
@@ -1050,7 +1050,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
                 rag_corpus_v2 720건 (6도메인 균형) · test_set_v2 144건 + PDF<br>
                 classifier_v2_ep5 재학습 5epoch (F1 0.817→0.855, FNR 18%→14.6%)<br>
                 PSH 18시나리오 실측 44/67 KPI PASS<br>
-                MinIO URI regex 버그 수정 (doc_id 분류 E2E 완성)<br>
+                스토리지 URI regex 버그 수정 (doc_id 분류 E2E 완성)<br>
                 RBAC 구현 (_rbac.py · training/schema_admin admin 전용)<br>
                 API key hash 검증 로직 추가<br>
                 S2 Celery retry 지연 10s→1s · S10 use_rag=True 수정<br>
