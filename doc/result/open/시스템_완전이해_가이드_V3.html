@@ -969,7 +969,7 @@ footer strong{color:var(--text-dim);}
 <tr><td><code>POST /api/v1/documents</code></td><td>동기</td><td>HWP/PDF/DOCX 파일 업로드 및 등록 (최대 20MB)</td></tr>
 <tr><td><code>POST /api/v1/relabel</code></td><td>동기</td><td>분류 재라벨 — 사람 정정(correction)을 능동학습 입력으로 등록</td></tr>
 <tr><td><code>POST /api/v1/confirm</code></td><td>동기</td><td>분류 결과를 검증 라벨로 확정</td></tr>
-<tr><td><code>POST /api/v1/train</code></td><td>동기 (admin)</td><td>재학습 트리거 — 정정 데이터로 모델 다시 학습 (10회/시간)</td></tr>
+<tr><td><code>POST /api/v1/train</code></td><td>동기 (admin)</td><td>재학습 트리거 — 정정 데이터로 모델 다시 학습 (10회/시간) <span style="color:var(--text-dim);">※ 환류=재학습 정책 미확정·기본 A안 무반출(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)</span></td></tr>
 <tr><td><code>POST /api/v1/admin/model/reload</code></td><td>동기 (admin)</td><td>모델 핫리로드 — 프로세스 재기동 없이 새 모델로 교체</td></tr>
 <tr><td><code>PUT /api/v1/schema/grades</code></td><td>동기 (admin)</td><td>등급 체계 변경 (조회는 <code>GET</code>)</td></tr>
 <tr><td><code>GET /api/v1/healthz</code></td><td>동기</td><td>시스템 상태 확인 (공개)</td></tr>
@@ -1032,7 +1032,7 @@ footer strong{color:var(--text-dim);}
     </div>
 
     <p style="margin:12px 0 2px;padding-top:10px;border-top:1px dashed var(--border,#d8dee6);color:var(--text-dim);">
-      <b>두 흐름을 잇는 다리</b> — ①의 끝 "관리자 최종확정·정정"이 쌓여 ②의 입력이 됩니다. 그래서 <b>닫힌 고리(폐곡선)</b>가 됩니다. 또 <b>M3 규칙엔진은 양쪽에 등장</b> — 분류 때는 안전망, 재학습 때는 라벨러.
+      <b>두 흐름을 잇는 다리</b> — ①의 끝 "관리자 최종확정·정정"이 쌓여 ②의 입력이 됩니다. 그래서 <b>닫힌 고리(폐곡선)</b>가 됩니다. 또 <b>M3 규칙엔진은 양쪽에 등장</b> — 분류 때는 안전망, 재학습 때는 라벨러. <span style="color:var(--text-dim);">※ 이 폐곡선의 학습 위치·고객문서 사용은 미확정(A 무반출 기본 / B 온사이트 / C 반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>); 기본은 고객 원문 무반출, 집계 진단지표만 환류.</span>
     </p>
   </div>
 </div>
@@ -1439,7 +1439,7 @@ footer strong{color:var(--text-dim);}
   <tr><td><strong>P2 RAG — Recall@5</strong> <span style="font-size:.85em;color:var(--text-dim);">(요건 외 부가)</span></td><td>Recall@5 ≥ 0.80</td><td>0.808 <span style="color:var(--text-dim);font-size:.85em;">(평가셋)</span></td><td><span class="tag mid">측정 · 실데이터 재확정</span></td></tr>
   <tr><td><strong>P2 RAG — 검색 지연</strong></td><td>p50 ≤ 200ms</td><td>167ms</td><td><span class="tag mid">PASS</span></td></tr>
   <tr><td><strong>단위 테스트 (pytest)</strong></td><td>전통과 · 회귀 0</td><td>약 1,200건</td><td><span class="tag mid">PASS</span></td></tr>
-  <tr><td><strong>실 GPU E2E (능동학습 폐곡선)</strong></td><td>7/7 (정정→학습→배포→리로드)</td><td>7/7</td><td><span class="tag mid">PASS</span></td></tr>
+  <tr><td><strong>실 GPU E2E (능동학습 폐곡선)</strong></td><td>7/7 (정정→학습→배포→리로드; 메커니즘 실증, 환류 정책 미확정)</td><td>7/7</td><td><span class="tag mid">PASS</span></td></tr>
   <tr><td><strong>운영 성능 F1 (실문서)</strong></td><td>발주처 실데이터 기준 측정 필요</td><td>N/A</td><td><span class="tag light">보류</span></td></tr>
   </tbody>
 </table>
@@ -1735,7 +1735,7 @@ footer strong{color:var(--text-dim);}
 <h2 id="active-learning">AI가 틀리면 어떻게 스스로 좋아지나요?</h2>
 <p>
   사람이 고친 내용이 그냥 기록에만 남는 게 아니라, <strong>다시 학습 → 새 모델 배포 → 즉시 교체</strong>까지 한 바퀴 도는 닫힌 고리(폐곡선)로 연결돼 있습니다.
-  이 전 과정을 실 GPU에서 끝까지(7/7) 통과시켜 실제로 도는 것을 확인했습니다.
+  이 전 과정을 실 GPU에서 끝까지(7/7) 통과시켜 실제로 도는 것을 확인했습니다. <span style="color:var(--text-dim);">단, 이 폐곡선은 단일 배포 내부 메커니즘이고 모델은 상시 재학습하지 않습니다 — 실데이터 1차학습(2026-09) 후 드리프트/이벤트 트리거 단발입니다. 고객 교정·원문의 재학습 사용·반출은 미확정(기본 A안 무반출·집계 진단만 환류, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>).</span>
 </p>
 
 <div class="flow">
@@ -1772,7 +1772,7 @@ footer strong{color:var(--text-dim);}
   <div class="callout-label">📖 재학습은 언제 자동으로 트리거되나?</div>
   <p>
     백그라운드 작업이 정기적으로 점검합니다: 고등급 <strong>미탐이 10건 넘게 쌓이면 즉시 재학습(URGENT)</strong>,
-    <strong>정정이 50건 넘게 쌓이면 정기 재학습(권장)</strong>으로 큐에 올립니다.
+    <strong>정정이 50건 넘게 쌓이면 정기 재학습(권장)</strong>으로 큐에 올립니다(상시 아님 — 실데이터 1차학습 후 드리프트/이벤트 단발 트리거).
     검수자별 신뢰도(과거 합의 일치율)도 추적해서, 고등급 문서는 신뢰도 높은 2인 검토 게이트에 활용할 수 있습니다.
   </p>
 </div>
@@ -1906,7 +1906,7 @@ footer strong{color:var(--text-dim);}
   <tr><td><strong>P2 청킹 — RAG 검색 인덱스 <span style="font-size:.85em;font-weight:400;color:var(--text-dim);">(요건 외 부가)</span></strong></td><td>테스트 0.808, 운영 인덱스 미청킹</td><td><code>index_rag_corpus.py --chunk-size 1200</code> 재인덱싱</td><td><span class="tag outline">부가</span></td></tr>
   <tr><td><strong>가이드 정본 v2</strong></td><td><strong>해결</strong> — 발주처 정본 가이드 v2 수령·반영 완료(2026-06-18)</td><td>완료 · 향후 발주처 갱신본 도착 시 패치(선택)</td><td><span class="tag mid">해결</span></td></tr>
   <tr><td><strong>법률 코퍼스 정제</strong></td><td><strong>해결</strong> — 오염 56% 제거 후 test 78→93%, FNR 21→8%</td><td>완료 · 잔여: 출처불명 제3문체</td><td><span class="tag mid">해결</span></td></tr>
-  <tr><td><strong>능동학습 자동화</strong></td><td><strong>해결</strong> — 정정→재학습→배포게이트→핫리로드→자동롤백 폐곡선 배선(GPU E2E 7/7)</td><td>완료 · 자동 활성/롤백은 기본 OFF(보수적)</td><td><span class="tag mid">해결</span></td></tr>
+  <tr><td><strong>능동학습 자동화</strong></td><td><strong>배선 해결</strong>(엔지니어링) — 정정→재학습→배포게이트→핫리로드→자동롤백 폐곡선 GPU E2E 7/7. 단 <b>환류=재학습 운영 채택·학습 위치는 미확정</b>(A 무반출 권고/B 온사이트/C 반출)</td><td>배선 완료 · 자동 활성/롤백 기본 OFF(보수적) · 운영 정책 미확정</td><td><span class="tag mid">해결</span></td></tr>
   </tbody>
 </table>
 </div>
