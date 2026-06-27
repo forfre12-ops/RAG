@@ -509,6 +509,28 @@ footer strong{color:var(--text-dim);}
   </p>
 </div>
 
+<div class="callout inset">
+  <div class="callout-label">🔍 한 걸음 더 — "검색"과 "분류기"는 일하는 방식이 다릅니다</div>
+  <p>
+    같은 "의미"를 쓰더라도 방식이 갈립니다.
+    <strong>키워드·벡터 검색은 "찾아보기(조회)"</strong>입니다. 새 문서가 들어오면 예전에 본 문서 중
+    <strong>가장 비슷한 것</strong>을 찾아 <strong>그 옆 문서의 등급을 빌려옵니다</strong>.
+    비슷한 예가 있으면 맞지만, 표현이 조금만 바뀌거나 닮은 예가 없으면 엉뚱한 등급을 빌려옵니다.
+  </p>
+  <p style="margin-top:8px;">
+    <strong>분류기는 "문서를 직접 읽기"</strong>입니다. 옆 문서를 빌리지 않고, 문장 속에서
+    <strong>각 단어가 그 맥락에서 무슨 뜻인지</strong>를 따져 직접 등급을 매깁니다 —
+    <strong>경험 많은 검수자가 처음 보는 문서라도 끝까지 읽고 판단하는 것</strong>과 같습니다.
+    그래서 <strong>처음 보는 표현</strong>에도 더 안정적이고, 실측에서도 분류기가 정확도·미탐(FNR) 모두 앞섭니다.
+    (실제로는 분류기가 등급을 결정하고, 키워드 룰은 근거 표시·교차검증으로 함께 씁니다.)
+  </p>
+  <p style="margin-top:8px;font-size:13px;">
+    👉 두 방식을 같은 데이터로 직접 맞붙인 결과는
+    <a href="검색단독_vs_분류기_등급분류_비교.html" style="color:#3b6ea5;font-weight:600;">검색 단독 vs 검색+분류기 등급분류 비교</a>
+    문서에서 자세히 볼 수 있습니다.
+  </p>
+</div>
+
 <!-- ═══ 00-B ═══ -->
 <div class="section-sep">
   <span class="section-sep-num">00-B</span>

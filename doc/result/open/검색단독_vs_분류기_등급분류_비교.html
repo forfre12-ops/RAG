@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ES 단독 vs ES+분류기 — 등급분류 방식 비교</title>
+<title>검색 단독 vs 검색+분류기 — 등급분류 방식 비교</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
@@ -188,7 +188,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <div class="nav-actions">
       <div class="nav-search" role="search" aria-label="문서">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        ES 단독 vs ES+분류기 비교
+        검색 단독 vs 검색+분류기 비교
       </div>
     </div>
   </div>
@@ -199,12 +199,12 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <div class="toc-title">목차</div>
     <div class="toc-group">
       <a class="toc-item active" href="#s01">01 한눈에 보기 — 결론 먼저</a>
-      <a class="toc-item" href="#s02">02 왜 ES만으로는 안 되나 — 비유로 쉽게</a>
+      <a class="toc-item" href="#s02">02 왜 검색만으로는 안 되나 — 비유로 쉽게</a>
       <a class="toc-item" href="#s03">03 두 방식 정의</a>
       <a class="toc-item" href="#s04">04 검색은 잘 된다 — 분류는 다르다</a>
       <a class="toc-item" href="#s05">05 결과 수치 — 정확도·미탐·분포</a>
       <a class="toc-item" href="#s5b">06 키워드 룩업으로는 왜 등급을 못 매기나</a>
-      <a class="toc-item" href="#s06">07 ES 단독(가장 높은 등급)의 함정</a>
+      <a class="toc-item" href="#s06">07 검색 단독(가장 높은 등급)의 함정</a>
       <a class="toc-item" href="#s07">08 장단점 종합 비교</a>
       <a class="toc-item" href="#s08">09 결론 · 권고</a>
       <a class="toc-item" href="#s09">10 측정 방법 · 한계</a>
@@ -216,22 +216,23 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <span class="badge">실측 비교 보고서</span>
       <span class="badge blue">2026-06 · 의사결정 보조</span>
       <span class="meta-dot">·</span>
-      <span class="meta-soft">ES(BM25) 단독 검색분류 vs ES+분류기</span>
+      <span class="meta-soft">검색 단독 분류 (BM25 실측) vs 검색+분류기</span>
       <span class="meta-dot">·</span>
       <span class="meta-soft">Lloydk AI Engine</span>
     </div>
 
-    <h1 class="title">ES 단독 vs ES + 분류기</h1>
-    <p class="lede">"분류기를 빼고 <b>ES에서 BM25로 조회한 상위 5건 중 가장 높은 등급</b>을 그대로 매기면 되지 않나"라는 안(案)을, 동일 테스트셋·누출 0 조건에서 분류기와 정면 실측해 비교한다. 핵심 결론: <b>검색은 우수(R@5 94%)하지만 그 방식의 등급분류 정확도는 20%로 붕괴</b>하며, 사실상 <span class="v-bad">"무조건 1급비밀(TS) 도장기"</span>가 된다.</p>
+    <h1 class="title">검색 단독 vs 검색 + 분류기</h1>
+    <p class="lede">"분류기를 빼고 <b>검색엔진에서 BM25로 조회한 상위 5건 중 가장 높은 등급</b>을 그대로 매기면 되지 않나"라는 안(案)을, 동일 테스트셋·누출 0 조건에서 분류기와 정면 실측해 비교한다. 핵심 결론: <b>검색은 우수(R@5 94%)하지만 그 방식의 등급분류 정확도는 20%로 붕괴</b>하며, 사실상 <span class="v-bad">"무조건 1급비밀(TS) 도장기"</span>가 된다.</p>
 
-    <div class="callout" style="margin:10px 0;"><span class="callout-icon">ℹ️</span>
-      <div class="callout-body"><b>맥락.</b> 본 비교는 '검색 단독 분류'(분류기 없이 검색 상위 등급을 그대로 채택) 방안을 당시 검색엔진 <b>Elasticsearch</b>로 실측한 기록이다. 시스템은 이후 <b>PostgreSQL pgvector로 단일화</b>됐으나(의사결정_대장 §03), 핵심 결론 — <b>"검색 단독 분류는 붕괴(20%), 분류기 필수"</b> — 은 검색엔진과 무관하게 성립한다(검색=retrieval, 등급분류=모델). PG 검색으로 바꿔도 동일하다.</div>
+    <div class="callout" style="margin:10px 0;"><span class="callout-icon">⚠️</span>
+      <div class="callout-body"><b>오해 주의 — 이건 "ES가 나쁘다"가 아니라 "검색 단독으로 등급분류"가 안 된다는 얘기다.</b> 본 비교는 그 방안을 당시 검색엔진 <b>Elasticsearch(BM25)</b>로 실측한 기록일 뿐이고, 결함은 <b>엔진이 아니라 방법</b>(분류기 없이 검색 이웃의 등급을 투표로 채택)에 있다. 그래서 <b>PostgreSQL pgvector(dense)·BM25·하이브리드 어느 것으로 바꿔도 결과는 같다.</b> (본문에서 "검색 단독"은 특정 엔진이 아니라 이 <b>방법</b> — 분류기 없이 검색 이웃 등급을 채택 — 을 가리킨다. 실측만 당시 ES로 했을 뿐이다.)
+      <br><br>실제로 <b>dense 벡터 kNN(=pgvector가 쓰는 바로 그 방식)도 동일 조건에서 별도 실측</b>해 같은 붕괴를 확인했다 — <b>벡터 kNN 최선 49%</b>, 레퍼런스에 따라 <b>28~76%로 출렁</b>이며, S1(고가치 영업비밀) 검출은 5~9%, "최고등급" 집계는 전부 TS로 퇴행한다(<b>기술구현_백서 v7 §검색 vs 분류</b> · <b>시스템_설계도</b>: 분류기 59–77% vs 검색기반 kNN 38–49%). 시스템은 이후 <b>pgvector로 단일화</b>됐지만(의사결정_대장 §03) "검색=retrieval, 등급분류=모델"이라는 역할 분리는 그대로다. <b>요약: 분류기를 빼고 무엇으로 검색하든 결과는 같다.</b></div>
     </div>
 
     <div class="hero-kpis">
-      <div class="hero-kpi bad"><b>ES 단독</b> 정확도 20%</div>
-      <div class="hero-kpi good"><b>ES+분류기</b> 정확도 59%</div>
-      <div class="hero-kpi bad"><b>ES 단독</b> 문서 54%를 TS로 (실제 7%)</div>
+      <div class="hero-kpi bad"><b>검색 단독</b> 정확도 20%</div>
+      <div class="hero-kpi good"><b>검색+분류기</b> 정확도 59%</div>
+      <div class="hero-kpi bad"><b>검색 단독</b> 문서 54%를 TS로 (실제 7%)</div>
       <div class="hero-kpi good"><b>분류기</b> 고등급 미탐 5%</div>
       <div class="hero-kpi">BM25 <b>검색</b> R@5 94%</div>
     </div>
@@ -243,45 +244,45 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h2><span class="num">01</span> 한눈에 보기 — 결론 먼저</h2>
       <p class="h2-sub">전문 용어 없이 핵심부터. 쉬운 비유 설명은 02장, 상세 근거는 05~06장에서.</p>
 
-      <div class="appr-head bad">방식 A · ES 단독 — BM25 조회 후 상위 5 중 "가장 높은 등급" 선택 <span class="tagn">검토안</span></div>
+      <div class="appr-head bad">방식 A · 검색 단독 — BM25 조회 후 상위 5 중 "가장 높은 등급" 선택 <span class="tagn">검토안</span></div>
       <div class="band bad">
         <div class="bt">결과: 사실상 분류 포기</div>
         <p>업로드 문서를 검색해 비슷한 골든셋 5건을 찾은 뒤, 그중 제일 높은 등급을 매기는 방식이다. 미탐(비밀을 공개로 흘림)은 거의 0이 되지만 — 그 이유가 <b>문서의 절반 이상(54%)을 1급비밀(TS)로 찍기 때문</b>이다. 실제 TS는 7%뿐인데 말이다. 미탐을 안 해서가 아니라 <b>전부 최고등급으로 밀어서</b> 미탐이 0이다. 이는 <b>모델도 검색도 필요 없는 "무조건 TS"</b>와 같은 결과다.</p>
       </div>
 
-      <div class="appr-head good">방식 B · ES + 분류기 — 분류기가 1차 등급 산출, ES 검색은 근거·후보 보완 <span class="tagn">권장</span></div>
+      <div class="appr-head good">방식 B · 검색 + 분류기 — 분류기가 1차 등급 산출, 검색은 근거·후보 보완 <span class="tagn">권장</span></div>
       <div class="band good">
         <div class="bt">결과: 정확도·미탐 모두 양호</div>
-        <p>학습된 분류기(DeBERTa)가 등급을 매기고, ES 검색은 "왜 이 등급인지" 유사 근거 제시·후보 좁히기로 보완한다. <b>정확도 59~65%, 고등급 미탐 5~14%</b>로 두 축 모두 방식 A를 크게 앞선다. 과탐(전부 TS) 없이 정상 분포를 유지한다.</p>
+        <p>학습된 분류기(DeBERTa)가 등급을 매기고, 검색은 "왜 이 등급인지" 유사 근거 제시·후보 좁히기로 보완한다. <b>정확도 59~65%, 고등급 미탐 5~14%</b>로 두 축 모두 방식 A를 크게 앞선다. 과탐(전부 TS) 없이 정상 분포를 유지한다.</p>
       </div>
 
       <div class="callout good">
         <span class="callout-icon">✓</span>
-        <div class="callout-body"><b>한 줄 요약.</b> ES의 강점은 <b>검색</b>(BM25 R@5 94%)이지 <b>분류</b>가 아니다. "가장 높은 등급 선택"은 검색을 분류로 오용한 것이라, 검색이 아무리 좋아도 <b>"무조건 TS"</b>로 퇴행한다. 분류기를 1차로 두고 ES 검색을 보완으로 쓰는 방식 B가 정답이다.</div>
+        <div class="callout-body"><b>한 줄 요약.</b> 검색엔진의 강점은 <b>검색</b>(BM25 R@5 94%)이지 <b>분류</b>가 아니다. "가장 높은 등급 선택"은 검색을 분류로 오용한 것이라, 검색이 아무리 좋아도 <b>"무조건 TS"</b>로 퇴행한다. 분류기를 1차로 두고 검색을 보완으로 쓰는 방식 B가 정답이다.</div>
       </div>
     </section>
 
     <!-- 02 · 초보자 쉬운 설명 -->
     <section id="s02">
-      <h2><span class="num">02</span> 왜 "ES만으로"는 안 되나 — 비유로 쉽게</h2>
+      <h2><span class="num">02</span> 왜 "검색만으로"는 안 되나 — 비유로 쉽게</h2>
       <p class="h2-sub">전문 용어를 일상 비유로 바꿔, "검색은 잘하는데 왜 등급은 못 매기나"를 그림처럼 설명한다. 실제 숫자 근거는 05~06장.</p>
 
       <div class="callout info">
         <span class="callout-icon">🔑</span>
-        <div class="callout-body"><b>딱 한 문장.</b> ES는 <b>"비슷한 문서를 찾아오는 일(검색)"</b>의 달인이다. 하지만 <b>"이 문서가 몇 급 비밀이냐(등급)"</b>를 정하는 건 완전히 다른 일이다. <b>비슷한 걸 잘 찾아온다고 해서, 등급을 잘 매기는 건 아니다.</b> "ES만으로 등급까지 매기자"는 안(案)이 무너지는 이유가 전부 여기서 나온다.</div>
+        <div class="callout-body"><b>딱 한 문장.</b> 검색엔진은 <b>"비슷한 문서를 찾아오는 일(검색)"</b>의 달인이다. 하지만 <b>"이 문서가 몇 급 비밀이냐(등급)"</b>를 정하는 건 완전히 다른 일이다. <b>비슷한 걸 잘 찾아온다고 해서, 등급을 잘 매기는 건 아니다.</b> "검색만으로 등급까지 매기자"는 안(案)이 무너지는 이유가 전부 여기서 나온다.</div>
       </div>
 
       <h3>비유 1 — 도서관 사서에게 "보안등급"을 맡기면? <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">(검색 ≠ 등급)</span></h3>
       <div class="band warn">
         <div class="bt">주제로 찾는 것 ≠ 비밀로 나누는 것</div>
-        <p>ES(BM25)는 <b>주제가 비슷한 책을 귀신같이 찾아오는 사서</b>와 같다. "반도체 책 줘" 하면 반도체 책을 한 아름 안아온다 — 이건 정말 잘한다(실측 검색 정확도 94%).</p>
+        <p>검색엔진(BM25)은 <b>주제가 비슷한 책을 귀신같이 찾아오는 사서</b>와 같다. "반도체 책 줘" 하면 반도체 책을 한 아름 안아온다 — 이건 정말 잘한다(실측 검색 정확도 94%).</p>
         <p>그런데 <b>"보안등급"은 책의 주제가 아니라, '세상에 공개됐는지·회사가 비밀로 관리하는지'로 갈린다.</b> 같은 "반도체" 주제 안에도 <b>서점에서 파는 공개 스펙시트</b>도 있고, <b>밖에 나가면 회사가 망하는 1급 비밀 레시피</b>도 있다. 주제는 똑같지만 등급은 정반대다. 주제로 책을 찾는 사서에게 "이거 1급 비밀이야?"라고 물으면 답을 알 수 없다 — <b>그건 애초에 사서의 일이 아니기 때문이다.</b></p>
       </div>
 
       <h3>비유 2 — 옆자리 5명 점수 보고 "제일 높은 점수" 베끼기 <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">("상위 5 중 최고등급"이 실제로 하는 일)</span></h3>
       <div class="band warn">
-        <div class="bt">"ES 단독" 방식이 등급을 정하는 계산</div>
-        <p>"ES 단독" 방식은 이렇게 등급을 정한다: <b>① 새 문서와 비슷한 문서 5개를 찾고 → ② 그 5개의 등급 중 제일 높은(심각한) 것을 그대로 베낀다.</b></p>
+        <div class="bt">"검색 단독" 방식이 등급을 정하는 계산</div>
+        <p>"검색 단독" 방식은 이렇게 등급을 정한다: <b>① 새 문서와 비슷한 문서 5개를 찾고 → ② 그 5개의 등급 중 제일 높은(심각한) 것을 그대로 베낀다.</b></p>
         <p>전학 온 학생의 성적을, <b>가까이 앉은 5명 중 제일 잘하는 애의 점수로 매기는 것</b>과 같다. 5명 중 <b>단 한 명이라도</b> 전교 1등이 끼어 있으면, 새 학생도 자동으로 전교 1등이 된다. "제일 높은 걸 고른다"는 규칙이라, <b>비슷한 문서 5개 중 1급비밀(TS)이 단 하나만 껴 있어도 → 새 문서는 무조건 TS</b>로 찍힌다.</p>
       </div>
 
@@ -291,7 +292,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>단계</th><th>일어나는 일</th></tr></thead>
           <tbody>
             <tr><td class="td-code">업로드</td><td>"A사 반도체 <b>세정 공정</b> 보고서" — 실제 등급은 <b>S2</b>(내부용)</td></tr>
-            <tr><td class="td-code">① ES 검색</td><td>"반도체·공정·세정" 단어가 겹치는 비슷한 문서 5건을 정확히 찾아옴 ✓ <span class="meta-soft">(검색 자체는 성공)</span></td></tr>
+            <tr><td class="td-code">① 검색</td><td>"반도체·공정·세정" 단어가 겹치는 비슷한 문서 5건을 정확히 찾아옴 ✓ <span class="meta-soft">(검색 자체는 성공)</span></td></tr>
             <tr><td class="td-code">② 찾아온 5건의 실제 등급</td><td>[ S3 공개카탈로그 · S3 매뉴얼 · S2 내부보고 · S3 스펙시트 · <span class="v-bad">TS 핵심레시피</span> ] — 주제는 같아도 등급은 뒤죽박죽</td></tr>
             <tr class="row-bad"><td class="td-code">③ "최고등급" 규칙</td><td>5건 중 <span class="v-bad">TS 한 건</span>이 제일 높음 → 이 문서도 <b class="v-bad">TS로 확정</b></td></tr>
             <tr><td class="td-code">결과</td><td>실제 S2인데 TS로 <b>과탐</b>. 이런 일이 문서 절반에서 일어나 → 전체의 <b>54%가 TS</b>로 찍힘(실제 TS는 7%뿐)</td></tr>
@@ -302,9 +303,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h3>비유 3 — "한 명도 안 놓치려고 전원을 용의자로" <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">(미탐 0%가 멋져 보이는 함정)</span></h3>
       <div class="band bad">
         <div class="bt">비밀을 안 놓친 게 아니라, 분류를 포기한 것</div>
-        <p>"ES 단독"의 자랑은 <b>"비밀을 놓치는 일(미탐)이 거의 0"</b>이라는 점이다. 멋져 보인다. 그런데 그 0이 만들어지는 방식이 함정이다.</p>
+        <p>"검색 단독"의 자랑은 <b>"비밀을 놓치는 일(미탐)이 거의 0"</b>이라는 점이다. 멋져 보인다. 그런데 그 0이 만들어지는 방식이 함정이다.</p>
         <p>공항 경비원이 <b>"테러범을 한 명도 안 놓치겠다"</b>며 <b>지나가는 사람 전원을 테러범으로 붙잡는다</b>고 하자. 놓친 테러범은 0명이 맞다 — 하지만 이건 보안이 아니라 <b>업무 마비</b>다. 진짜 위험인물이 수많은 일반인 사이에 묻혀버린다.</p>
-        <p>"ES 단독"이 딱 이 경비원이다. <b>실제 TS는 7%뿐인데 54%를 TS로 찍어서</b> 미탐 0을 만든다. 미탐을 안 해서 0이 아니라, <b>전부 최고등급으로 밀어버려서</b> 0이다. 결국 "TS" 도장이 흔해져 <b>아무도 그 도장을 믿지 않게 된다(양치기 소년).</b></p>
+        <p>"검색 단독"이 딱 이 경비원이다. <b>실제 TS는 7%뿐인데 54%를 TS로 찍어서</b> 미탐 0을 만든다. 미탐을 안 해서 0이 아니라, <b>전부 최고등급으로 밀어버려서</b> 0이다. 결국 "TS" 도장이 흔해져 <b>아무도 그 도장을 믿지 않게 된다(양치기 소년).</b></p>
       </div>
 
       <h3>비유 4 — 더 많이 참고할수록 더 틀린다 <span style="font-weight:400;color:var(--text-dim);font-size:0.82em;">(흔한 오해: "5개 말고 10개 보면 낫지 않나")</span></h3>
@@ -315,7 +316,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
       <div class="callout good">
         <span class="callout-icon">✓</span>
-        <div class="callout-body"><b>그래서 정답은.</b> ES의 진짜 강점인 <b>검색</b>은 그대로 살리되(유사 근거·후보 찾기), <b>등급 판단은 "등급의 특징"을 배운 분류기</b>에게 맡긴다. 분류기는 "공개됐나·관리되나"를 학습해, 주제만 보는 사서가 못 넘는 벽을 넘는다. 숫자로 보면 ES 단독 정확도 20% → 분류기 59~65%. 자세한 근거는 다음 장부터 이어진다.</div>
+        <div class="callout-body"><b>그래서 정답은.</b> 검색엔진의 진짜 강점인 <b>검색</b>은 그대로 살리되(유사 근거·후보 찾기), <b>등급 판단은 "등급의 특징"을 배운 분류기</b>에게 맡긴다. 분류기는 "공개됐나·관리되나"를 학습해, 주제만 보는 사서가 못 넘는 벽을 넘는다. 숫자로 보면 검색 단독 정확도 20% → 분류기 59~65%. 자세한 근거는 다음 장부터 이어진다.</div>
       </div>
     </section>
 
@@ -324,14 +325,14 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h2><span class="num">03</span> 두 방식 정의</h2>
       <div class="card-grid col2">
         <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
-          <div class="card-label">방식 A — ES 단독</div>
+          <div class="card-label">방식 A — 검색 단독</div>
           <p style="font-size:13.5px;margin:8px 0;">① 업로드 문서를 쿼리로 <b>BM25 검색</b><br>② 골든셋에서 <b>상위 5건</b> 추출<br>③ 5건의 등급 중 <b>가장 높은(심각한) 등급</b> 채택<br>④ 그 등급으로 확정</p>
           <p class="card-desc">학습·GPU 불필요. 골든셋만 있으면 동작. 단, 분류 성능은 검색 품질이 아니라 <b>"이웃 등급"</b>에 의존.</p>
         </div>
         <div class="card" style="border-left:4px solid var(--c-good);border-radius:0;">
-          <div class="card-label">방식 B — ES + 분류기</div>
-          <p style="font-size:13.5px;margin:8px 0;">① 학습된 <b>분류기(DeBERTa)</b>가 등급 산출<br>② ES <b>검색</b>으로 유사 근거·후보 제시<br>③ 룰·합의 게이트로 검수 라우팅<br>④ 등급 확정 + 근거 동봉</p>
-          <p class="card-desc">분류기 학습은 <b>중앙(지재원)에서 1회</b>, 고객사는 추론만(CPU 333ms/건이면 충분). ES는 검색·근거 담당.</p>
+          <div class="card-label">방식 B — 검색 + 분류기</div>
+          <p style="font-size:13.5px;margin:8px 0;">① 학습된 <b>분류기(DeBERTa)</b>가 등급 산출<br>② <b>검색</b>으로 유사 근거·후보 제시<br>③ 룰·합의 게이트로 검수 라우팅<br>④ 등급 확정 + 근거 동봉</p>
+          <p class="card-desc">분류기 학습은 <b>중앙(지재원)에서 1회</b>, 고객사는 추론만(CPU 333ms/건이면 충분). 검색엔진은 검색·근거 담당.</p>
         </div>
       </div>
     </section>
@@ -371,9 +372,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>방식</th><th class="td-center">정확도</th><th class="td-center">고등급 미탐(FNR)</th><th class="td-center">TS로 찍은 비율</th><th>판정</th></tr></thead>
           <tbody>
             <tr class="row-base"><td>무조건 TS (모델·검색 불필요)</td><td class="td-center">7%</td><td class="td-center">0%</td><td class="td-center">100%</td><td>degenerate 기준선</td></tr>
-            <tr class="row-bad"><td><b>A. ES 단독</b> · 상위5 최고등급</td><td class="td-center cell-bad">20%</td><td class="td-center">2%</td><td class="td-center cell-bad">54%</td><td>= "무조건 TS"와 동급</td></tr>
-            <tr><td>(참고) ES kNN 다수결 상위5</td><td class="td-center">38%</td><td class="td-center">22%</td><td class="td-center">30%</td><td>다른 투표도 부족</td></tr>
-            <tr class="row-good"><td><b>B. ES + 분류기</b></td><td class="td-center cell-good">59%</td><td class="td-center">5%</td><td class="td-center cell-good">~9% (정상)</td><td>두 축 모두 우위</td></tr>
+            <tr class="row-bad"><td><b>A. 검색 단독</b> · 상위5 최고등급</td><td class="td-center cell-bad">20%</td><td class="td-center">2%</td><td class="td-center cell-bad">54%</td><td>= "무조건 TS"와 동급</td></tr>
+            <tr><td>(참고) 검색 kNN 다수결 상위5</td><td class="td-center">38%</td><td class="td-center">22%</td><td class="td-center">30%</td><td>다른 투표도 부족</td></tr>
+            <tr class="row-good"><td><b>B. 검색 + 분류기</b></td><td class="td-center cell-good">59%</td><td class="td-center">5%</td><td class="td-center cell-good">~9% (정상)</td><td>두 축 모두 우위</td></tr>
           </tbody>
         </table>
       </div>
@@ -383,23 +384,23 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th>방식</th><th class="td-center">정확도</th><th class="td-center">고등급 미탐(FNR)</th><th class="td-center">TS로 찍은 비율</th></tr></thead>
           <tbody>
-            <tr class="row-bad"><td><b>A. ES 단독</b> · 상위5 최고등급</td><td class="td-center cell-bad">35%</td><td class="td-center">3%</td><td class="td-center cell-bad">51%</td></tr>
-            <tr class="row-good"><td><b>B. ES + 분류기</b></td><td class="td-center cell-good">65%</td><td class="td-center">14%</td><td class="td-center cell-good">정상</td></tr>
+            <tr class="row-bad"><td><b>A. 검색 단독</b> · 상위5 최고등급</td><td class="td-center cell-bad">35%</td><td class="td-center">3%</td><td class="td-center cell-bad">51%</td></tr>
+            <tr class="row-good"><td><b>B. 검색 + 분류기</b></td><td class="td-center cell-good">65%</td><td class="td-center">14%</td><td class="td-center cell-good">정상</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>③ 등급별 적중(recall) — 분류기는 S1까지 잡고, ES 단독은 못 잡는다</h3>
+      <h3>③ 등급별 적중(recall) — 분류기는 S1까지 잡고, 검색 단독은 못 잡는다</h3>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>방식 (777건)</th><th class="td-center">TS</th><th class="td-center">S1</th><th class="td-center">S2</th><th class="td-center">S3</th></tr></thead>
           <tbody>
-            <tr class="row-good"><td><b>ES + 분류기</b></td><td class="td-center">96%</td><td class="td-center cell-good">74%</td><td class="td-center">43%</td><td class="td-center">60%</td></tr>
-            <tr class="row-bad"><td>ES kNN (다수결, 참고)</td><td class="td-center">76%</td><td class="td-center cell-bad">9%</td><td class="td-center">31%</td><td class="td-center">41%</td></tr>
+            <tr class="row-good"><td><b>검색 + 분류기</b></td><td class="td-center">96%</td><td class="td-center cell-good">74%</td><td class="td-center">43%</td><td class="td-center">60%</td></tr>
+            <tr class="row-bad"><td>검색 kNN (다수결, 참고)</td><td class="td-center">76%</td><td class="td-center cell-bad">9%</td><td class="td-center">31%</td><td class="td-center">41%</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="card-desc">※ ES 단독 "최고등급" 방식은 문서 대부분을 TS로 밀어 등급별 적중 개념이 무의미해지므로, kNN 다수결을 참고로 병기. <b>S1(고가치 영업비밀) 적중이 9%로 사실상 무검출</b>인 점이 결정적이다.</p>
+      <p class="card-desc">※ 검색 단독 "최고등급" 방식은 문서 대부분을 TS로 밀어 등급별 적중 개념이 무의미해지므로, kNN 다수결을 참고로 병기. <b>S1(고가치 영업비밀) 적중이 9%로 사실상 무검출</b>인 점이 결정적이다.</p>
     </section>
 
     <!-- 06 (신규) -->
@@ -482,6 +483,15 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="callout-body"><b>비유.</b> 키워드 = <b>금칙어 목록 대조</b>(Ctrl+F). 분류기 = <b>경험 많은 보안담당자가 문서를 통째로 읽고</b> "이건 느낌이 1급이네" 판단. 담당자는 <b>목록에 없는 새 표현도 맥락으로 알아본다.</b></div>
       </div>
 
+      <h4>왜 분류기가 "필연적으로" 더 맞나 — 수치 이전의 인과</h4>
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>두 메커니즘을 나란히 두면 결론은 수치를 보기 전에 정해진다.</b><br>
+        · <b>룩업(검색 단독)</b>은 구조상 <b>새 문서의 등급을 스스로 읽지 않는다</b> — 표면이 닮은 이웃을 찾아 그 <b>이웃의 라벨을 빌려올</b> 뿐이다. 정확도의 천장이 "이웃 라벨이 맞을 확률"에 묶인다. 그런데 등급은 주제(표면)가 아니라 <b>비공지성·관리상태</b>에서 갈리므로, 표면이 닮아도 이웃 등급은 섞여 있다 — <b>검색이 100% 완벽해져도</b> 빌려온 라벨은 어긋나고, 집계를 최고로 돌리면 과탐·평균으로 돌리면 미탐, 그 사이에 좋은 점이 없다.<br>
+        · <b>분류기</b>는 이웃을 빌리지 않고 <b>그 문서 자체를 문맥째 인코딩해</b> 등급 특징을 직접 읽는다(self-attention). 같은 단어라도 맥락에 따라 내부 표현이 달라지고, 목록에 없던 표현도 일반화로 커버한다.<br>
+        <b>그래서 분류기의 우위는 데이터셋의 우연이 아니라 메커니즘의 귀결이다</b> — 빌려온 라벨 vs 직접 읽은 라벨. §05의 수치(검색 단독 20% → 분류기 59~65%)는 이 인과를 <b>확인</b>할 뿐 원인이 아니며, 검색엔진을 ES→PG로 바꾸거나 상위 k를 어떻게 잡아도 이 인과는 그대로다.</div>
+      </div>
+
       <h4>하이브리드 — 키워드를 버린 게 아니다 (분류기 결정 + 룰 교차검증)</h4>
       <p>중요한 점: 우리 설계는 "분류기 <b>vs</b> 키워드"가 아니라 <b>둘을 합친 하이브리드</b>다. 룰엔진(키워드)이 항상 같이 돌며 분류기와 교차검증한다. 각자의 강점만 취한다.</p>
       <div class="tbl-wrap">
@@ -506,7 +516,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
     <!-- 07 -->
     <section id="s06">
-      <h2><span class="num">07</span> ES 단독(가장 높은 등급)의 함정</h2>
+      <h2><span class="num">07</span> 검색 단독(가장 높은 등급)의 함정</h2>
       <p class="h2-sub">미탐 0%가 멋져 보이지만, 그것이 어떻게 만들어지는지가 함정이다.</p>
 
       <h4>예측 분포 — 실제 7%인 TS를 54~67%로 찍는다</h4>
@@ -517,7 +527,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <div class="barlbl">TS 7% · 나머지 93%</div>
         </div>
         <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
-          <div class="card-label">ES 단독 예측 (상위5 최고등급)</div>
+          <div class="card-label">검색 단독 예측 (상위5 최고등급)</div>
           <div class="bar"><i class="seg-ts" style="width:54%"></i><i class="seg-ok" style="width:46%"></i></div>
           <div class="barlbl"><span class="v-bad">TS 54%</span> · 나머지 46% — 9.7배 과탐</div>
         </div>
@@ -559,7 +569,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <section id="s07">
       <h2><span class="num">08</span> 장단점 종합 비교</h2>
 
-      <div class="appr-head bad">방식 A · ES 단독 (BM25 상위5 최고등급)</div>
+      <div class="appr-head bad">방식 A · 검색 단독 (BM25 상위5 최고등급)</div>
       <div class="card-grid col2">
         <div class="band good" style="margin-top:14px;">
           <div class="bt" style="color:var(--c-good);">장점</div>
@@ -582,7 +592,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </div>
       </div>
 
-      <div class="appr-head good">방식 B · ES + 분류기</div>
+      <div class="appr-head good">방식 B · 검색 + 분류기</div>
       <div class="card-grid col2">
         <div class="band good" style="margin-top:14px;">
           <div class="bt" style="color:var(--c-good);">장점</div>
@@ -591,7 +601,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <li>미탐 낮으면서 <b>정확도 유지</b>(5~14%)</li>
             <li><b>정상 분포</b> — 과탐 없음</li>
             <li>S1 등 고등급 판별(적중 58~74%)</li>
-            <li>ES 검색은 근거·후보로 보완, 선별 게이트로 미탐 추가 관리</li>
+            <li>검색은 근거·후보로 보완, 선별 게이트로 미탐 추가 관리</li>
           </ul>
         </div>
         <div class="band warn" style="margin-top:14px;">
@@ -609,8 +619,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <section id="s08">
       <h2><span class="num">09</span> 결론 · 권고</h2>
       <div class="band good">
-        <div class="bt">권고: 방식 B (ES + 분류기) 채택</div>
-        <p>① <b>분류기를 1차</b>로 등급을 매긴다(정확도 59~65%, 미탐 5~14%, S1 적중 58~74%).<br>② <b>ES 검색은 보완</b>으로 — "이 골든 예시와 유사" 근거 제시·후보 좁히기. ES의 강점인 검색(R@5 94%)을 제 자리에 쓴다.<br>③ <b>미탐은 선별 게이트</b>(합의·룰·메타데이터)로 추가로 낮춘다 — 전부가 아니라 불확실한 것만 검수로.</p>
+        <div class="bt">권고: 방식 B (검색 + 분류기) 채택</div>
+        <p>① <b>분류기를 1차</b>로 등급을 매긴다(정확도 59~65%, 미탐 5~14%, S1 적중 58~74%).<br>② <b>검색은 보완</b>으로 — "이 골든 예시와 유사" 근거 제시·후보 좁히기. 검색엔진의 강점인 검색(R@5 94%)을 제 자리에 쓴다.<br>③ <b>미탐은 선별 게이트</b>(합의·룰·메타데이터)로 추가로 낮춘다 — 전부가 아니라 불확실한 것만 검수로.</p>
       </div>
       <div class="callout bad">
         <span class="callout-icon">✕</span>
@@ -626,7 +636,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <ul>
           <li><b>레퍼런스(골든셋)</b>: oss_corpus 3,754건(등급 균형). <b>테스트</b>: classification_gold 777건 · holdout 109건(라벨 실문서).</li>
           <li><b>학습누출 0</b>: 레퍼런스↔테스트 텍스트해시·200자 prefix 중복 0건 확인(과거 train/gold 텍스트 중복 버그 제거).</li>
-          <li><b>분류기</b>: DeBERTa(v-137066a1), 청크·온도보정·most-severe 집계. <b>ES 단독</b>: BM25(한글 bigram 근사) 상위 k 최고등급/다수결.</li>
+          <li><b>분류기</b>: DeBERTa(v-137066a1), 청크·온도보정·most-severe 집계. <b>검색 단독</b>: BM25(한글 bigram 근사) 상위 k 최고등급/다수결.</li>
           <li>실행 환경 RTX 5070 Ti. 스크립트: <code>_bench_bm25_knn_classify.py</code>, <code>_bench_bm25_mostsevere.py</code>, <code>_bench_hybrid_recall.py</code>.</li>
         </ul>
       </div>
@@ -640,7 +650,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
-        <div class="callout-body"><b>요약.</b> "BM25 조회 후 상위 5 중 가장 높은 등급"은 검색을 분류로 오용한 방식이라 정확도 20%·과탐 54%로 "무조건 TS"와 동급으로 퇴행한다. ES의 강점은 검색이며, 분류는 분류기가, ES는 근거·후보 보완이 정답이다.</div>
+        <div class="callout-body"><b>요약.</b> "BM25 조회 후 상위 5 중 가장 높은 등급"은 검색을 분류로 오용한 방식이라 정확도 20%·과탐 54%로 "무조건 TS"와 동급으로 퇴행한다. 검색엔진의 강점은 검색이며, 분류는 분류기가, 검색엔진은 근거·후보 보완이 정답이다.</div>
       </div>
     </section>
 
@@ -648,7 +658,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 </div>
 
 <footer>
-  <span>ES 단독 vs ES + 분류기 — 등급분류 방식 비교 · 2026-06 · Lloydk AI Engine</span>
+  <span>검색 단독 vs 검색 + 분류기 — 등급분류 방식 비교 · 2026-06 · Lloydk AI Engine</span>
   <span>BM25 상위5 최고등급 방식 실측 · 누출 0 · 분류기 우위 확정</span>
 </footer>
 <script>
