@@ -78,6 +78,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
+      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-lloydk}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
@@ -112,6 +114,8 @@ services:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
+      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:

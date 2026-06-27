@@ -134,7 +134,10 @@ class Settings(BaseSettings):
     minio_bucket_mlflow: str = "mlflow"
 
     # P2-C2: 일반화 storage backend — minio | seaweedfs | local
-    storage_backend: str = "minio"
+    # 폐쇄망=로컬FS(file://) 결정(2026-06-24)에 맞춰 base 기본값도 local.
+    # 객체스토어(minio)가 필요한 dev compose는 STORAGE_BACKEND=minio를 명시 주입한다
+    # (docker-compose.yml api/worker · .env). 4개 프로파일은 모두 storage_backend를 명시.
+    storage_backend: str = "local"
     storage_endpoint: str = ""        # seaweedfs s3 게이트웨이 URL (예: http://seaweed:8333)
     storage_verify_tls: bool = True
 
@@ -694,7 +697,11 @@ def assert_production_credentials() -> None:
     missing: list[str] = []
     if not settings.api_key:
         missing.append("LLOYDK_API_KEY")
-    if not settings.minio_secret_key:
+    # 객체스토어 백엔드(minio/seaweedfs/s3)일 때만 시크릿 키 필수.
+    # 폐쇄망 local(file://) 배포는 minio를 쓰지 않으므로 키를 요구하지 않는다
+    # (이전엔 무조건 요구 → onprem-local[storage=local·poc_mode=full] 운영 startup이
+    #  쓰지도 않는 minio 키 부재로 차단되던 버그).
+    if settings.storage_backend in ("minio", "seaweedfs", "s3") and not settings.minio_secret_key:
         missing.append("LLOYDK_MINIO_SECRET_KEY")
     # NFR-SEC-01: 감사체인 HMAC 비밀키. 미설정 시 키 없는 sha256 폴백 → 과거 row 재작성 가능.
     # 실효 시크릿(필드 또는 LLOYDK_ env) 기준으로 판정 — 둘 다 비면 운영 startup 차단.

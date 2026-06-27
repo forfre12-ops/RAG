@@ -12,7 +12,7 @@
 - [ ] **2. 실데이터(회원사 실문서) 미확보** — 유일한 🔴 차단 자원(doc16 §1.3, 결정 A5). 인간 골든셋·실문서 FNR/Recall·베타 전부 종속. (외부 의존)
 - [~] **3. 온도 보정(T) 파이프라인** — 🟡 **코드 배선 완료(2026-06-24)**: trainer가 val per-row logits를 `val_logits.jsonl`로 덤프 → calibrate가 자동탐색해 `temperature.json` 산출 → 서빙 자동로드. **남음:** 실 학습 1회 실행으로 temperature.json 생성·배치(실데이터/GPU 후).
 - [ ] **4. FNR KPI 미달(≤5% 목표 vs 실측 17~22%)** — 후보 전모델 F1<0.75. 코드 아닌 실 S1/TS 데이터 양 문제.
-- [ ] **5. 안전 게이트 3종 + escalation τ 전부 기본 OFF** — 정밀도 63→81%·고등급 미탐 46→8 올리는 메커니즘이 배선만 되고 비활성.
+- [~] **5. 안전 게이트 + escalation τ** — 🟡 **부분 ON(2026-06-27 d1aac27)**: `agreement_gate_enabled`+`classifier_escalation_tau=0.30`을 onprem-local·full-train 프로파일 기본 ON으로 전환(정밀도 63→81%·미탐 메커니즘 활성). **남음:** lite 프로파일은 여전히 OFF; `metadata_floor`·`model_secondopinion_llm` 2종은 아직 기본 OFF(켤 근거 테스트는 배치 D1 확보, 임계 재보정은 human_review 후).
 - [ ] **6. 모델 버전 드리프트 — 사실은 문서(HTML)만 stale** — 🔎 재확인(2026-06-24): `.env`/`.env.example`/`.env.prod.example` **3종 모두 이미 v-dd3abab9(clean)** 을 가리키고, F1 0.686/FNR 0.018도 **그 clean 모델**의 서빙경로 실측. 코드는 정합. **남음:** 모델카드/테스트전략 HTML이 아직 v-f9b5cedb로 단정 → 정정 + **활성모델 A/B 결정**(A=v-dd3abab9 유지[증거부합] / B=step3 승격 시 .env 되돌림+0.686 재측정). `.env.prod.example` 주석 'v-437ec196 채택'은 아티팩트 부재 모순.
 - [~] **7. API 비동기 Celery 발사** — 🟡 **코드 배선 완료(2026-06-24)**: 브로커 가용 감지 시 `classify_async/train_classifier_task/synthesize_batch.delay()` 발사, 미가용/테스트는 in-process 보존, 거짓 'queued' 표기 정정. **남음:** 라이브 redis+worker로 async 경로 1회 검증, 운영 callback webhook은 tasks.py 후속.
 - [ ] **8. ES→PG 마이그레이션 §03 게이트 미실행** — PgVectorStore가 EXPERIMENTAL 미검증 스캐폴드. 실 PG·NL쿼리 게이트 전 ES 폐기 불가.
@@ -99,6 +99,30 @@ lite pytest **922 passed / 0 failed** (14 skip 환경성). 변경된 스트림 �
 - [x] C3 calib-NEW-1 — train→calibrate **자동연결**: trainer가 학습 직후 val logits로 temperature.json 자동 산출(서빙 자동 로드, MEMORY T≈3) + 온도 로직 `m6_evaluation/temperature.py`로 일원화(스크립트 중복 제거) + Makefile `calibrate` 타깃 + 테스트 5건
 
 > ✅ **코드-가능 배치 A/B/C/D 모두 완료.** 이후 잔여는 전부 외부 의존(human_review 실라벨·실문서 9월·라이브 PG/redis/GPU·DR 리허설·PII NER 가중치) 또는 발주처/VP 결정(A안 환산표·고객사 API ICD·airgap postgres 토폴로지)으로, 본 저장소 코드만으로는 더 진행 불가.
+
+---
+
+## 🔁 2026-06-27 재검증 (방향↔코드 6영역 직접 대조 + 코드 패치)
+
+> 최근 의사결정(FNR-safe 운영점·로컬FS·pgvector·테넌트 제거·무반출 교정·3-tier 골든)을 6영역 병렬 감사로 코드 직접 대조. 핵심 메커니즘은 전부 구현·배선 확인. 미완은 **기본값·비활성·실데이터** 3축에 집중. 아래는 직접 읽어 확정한 신규 건.
+
+### 🔨 코드 패치 (2026-06-27, 폐쇄망 storage 기본값 정합 — 관련 61 테스트 green)
+
+- [x] **NEW-H4 — 폐쇄망 local 배포가 운영 startup에서 차단되던 버그** — `assert_production_credentials()`가 `storage_backend`와 무관하게 `LLOYDK_MINIO_SECRET_KEY`를 무조건 요구([config.py](src/lloydk/config.py)) → onprem-local(storage=local·poc_mode=full)이 쓰지도 않는 minio 키 부재로 부팅 실패. **수정:** `storage_backend in (minio,seaweedfs,s3)`일 때만 요구.
+- [x] **base storage_backend 기본값 minio→local** — 폐쇄망 결정 정합([config.py](src/lloydk/config.py)). dev compose(api/worker)는 `STORAGE_BACKEND=minio` 명시 고정([docker-compose.yml](docker-compose.yml))로 dev minio 경로 보존. lite-cloud 프로파일은 의도상 minio 유지.
+
+### stale 정정 (재검증)
+
+| 항목 | 정정 |
+|------|------|
+| Top-8 #5 | d1aac27(2026-06-27)로 onprem-local·full-train은 `agreement_gate`+`τ=0.30` **기본 ON** → 본 절 위 갱신 반영. 목록 본문이 "전부 OFF"였던 것은 stale. |
+| 골든 승격/서명 REST 라우트 | **'미개발'이 아니라 의도된 설계** — `api/golden.py` docstring이 "human_review 승격은 별개 경로(import_review_corrections, 지재원 관리자)"로 명시. G4-html 검수 라우트(`/golden/jobs/{id}/review.html`)는 배선 완료. (감사 중 1차 오분류 정정) |
+
+### 재확인된 잔여 드리프트 (코드로 안 고침 — 이유 있음)
+
+- **라이브 `.env`가 `VECTOR_BACKEND=es`+`STORAGE_BACKEND=minio`** — dev 작업용 .env. 결정 방향은 프로파일(local+pg)이나, **ES→PG 재검증 게이트(Top-8 #8) 미실행** 상태라 .env를 pg로 돌리면 미검증 경로. 게이트 통과 후 전환(의도적 보류).
+- **활성모델 v-dd3abab9 무보정(T=1.0)** — 활성 dir에 temperature.json 부재(temperature.json은 무관한 bpilot 모델에만). 커밋 d1aac27 "bpilot 2.0 복사금지"와 정합. 실 GPU 학습 1회로 생성 필요(NEW-H3·Top-3, 외부 의존).
+- **es_store.py 잔존 `tenant_id` 매핑 필드** — 미사용·ES 폐기대상이라 저영향(정리 시 함께 제거).
 
 ---
 
