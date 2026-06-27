@@ -53,7 +53,7 @@ def _ocr_max_pages() -> int:
 @dataclass
 class ExtractResult:
     text: str
-    method: str           # parser/rhwp/ocr/ocr_llm/libreoffice/plain
+    method: str           # parser/rhwp/pyhwp/ocr/ocr_llm/libreoffice/plain
     quality: float        # 0.0~1.0 (추정)
     ocr_used: bool = False
     pages: int | None = None
@@ -96,6 +96,18 @@ def _extract_hwp(p: Path) -> ExtractResult:
     rhwp가 .hwp(바이너리)·.hwpx 둘 다 파싱한다. 미설치/파싱 실패는 graceful degrade.
     구 pyhwp/hwp5 폴백 제거(2026-06-05): 설치돼 있던 hwp5 0.1.0은 무관 패키지였고
     ``hwp5.extract_text`` API도 부재해 항상 실패하던 죽은 경로였다.
+
+    알려진 한계(실측 2026-06-27, 공개 보도자료·서식 .hwp 대상, rhwp 0.5.1·0.8.0 동일):
+      본문 단락은 정상 추출하나 **표·글상자 셀 텍스트를 거의 전부 흘린다**
+      (noori.hwp 표셀 29/31 누락, basicsReport.hwp 23/23 누락). 영업비밀 문서는
+      등급·원가·담당 정보가 표에 들어가는 일이 많아 '조용한 표 미추출'이 곧 미탐이다.
+
+    표 보강(opt-in): pyhwp([hwp-tables] extra)가 설치돼 있으면 표 셀까지 렌더하는
+      pyhwp 경로로 더 많은 텍스트를 뽑아 그쪽을 채택(_hwp_text_via_pyhwp). pyhwp는
+      AGPL이라 PyMuPDF([pdf-agpl])와 동일하게 기본 제외·옵트인. **AGPL 전염을 막기
+      위해 in-process import가 아니라 hwp5html 콘솔 스크립트를 별도 프로세스로 호출**
+      (데이터는 파일로만 주고받음 → arm's length). 미설치 시 rhwp 결과 유지하되,
+      rhwp가 빈 텍스트면 표 전용 문서 가능성을 경고로 surface한다.
     """
     try:
         import rhwp  # type: ignore
@@ -106,9 +118,90 @@ def _extract_hwp(p: Path) -> ExtractResult:
         )
     try:
         text = rhwp.parse(str(p)).extract_text()
-        return ExtractResult(text=text, method="rhwp", quality=0.95)
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="rhwp", quality=0.0, error=str(exc))
+
+    # 표·글상자 보강(opt-in pyhwp). rhwp보다 많이 뽑히면 = 표 셀을 회수했단 뜻이라 채택.
+    full = _hwp_text_via_pyhwp(p)
+    if full and len(full) > len(text or ""):
+        return ExtractResult(text=full, method="pyhwp", quality=0.9)
+
+    if not text or not text.strip():
+        # 빈 추출 = 성공 아님. 표/글상자 전용 HWP일 가능성을 경고로 surface.
+        # ([hwp-tables] 미설치 시 표 회수 불가 — 설치하면 위 pyhwp 경로로 복구.)
+        return ExtractResult(
+            text="", method="rhwp", quality=0.0,
+            error="rhwp가 본문 텍스트를 추출하지 못함 — 표·글상자 전용 문서일 수 있음. "
+                  "표 셀 회수에는 pyhwp 필요: pip install '.[hwp-tables]' (AGPL).",
+        )
+    return ExtractResult(text=text, method="rhwp", quality=0.95)
+
+
+def _hwp5html_cmd() -> str | None:
+    """pyhwp ``hwp5html`` 실행파일 경로 — 환경변수 > 현재 venv Scripts > PATH. 없으면 None.
+
+    AGPL 격리를 위해 pyhwp는 라이브러리로 import하지 않고 이 실행파일로만 쓴다.
+    """
+    import shutil
+    import sys
+
+    env = os.environ.get("HWP5HTML_CMD")
+    if env and Path(env).exists():
+        return env
+    exe = "hwp5html.exe" if os.name == "nt" else "hwp5html"
+    local = Path(sys.executable).parent / exe
+    if local.exists():
+        return str(local)
+    return shutil.which("hwp5html")
+
+
+def _hwp_text_via_pyhwp(p: Path) -> str | None:
+    """pyhwp(hwp5html CLI)로 .hwp의 표·글상자 포함 전체 텍스트 추출 (opt-in, AGPL).
+
+    rhwp.extract_text()가 표 셀을 흘리는 것을 보강한다. pyhwp의 HWP5→XHTML 변환은
+    표 셀까지 렌더하므로 결과 xhtml에서 태그를 제거해 평문을 얻는다.
+
+    **AGPL 격리**: pyhwp를 in-process import하지 않고 ``hwp5html`` 콘솔 스크립트를
+    별도 프로세스로 호출한다(임시 디렉터리로만 데이터 교환 → arm's length). AGPL
+    경계가 pyhwp 실행파일에 국한돼 본 코드로 전염되지 않는다. [hwp-tables] extra
+    (=pyhwp) 설치 시에만 동작.
+
+    HWP5(바이너리 .hwp) 전용 — .hwpx(OWPML/zip)는 pyhwp 미지원이라 None.
+    실행파일 부재·변환 실패는 None(graceful) → 호출부가 rhwp 결과를 사용.
+    """
+    if p.suffix.lower() != ".hwp":
+        return None
+    cmd = _hwp5html_cmd()
+    if not cmd:
+        return None
+
+    import html as _html
+    import re as _re
+    import shutil
+    import subprocess
+    import tempfile
+
+    tmpdir = tempfile.mkdtemp(prefix="hwp5html_")
+    try:
+        proc = subprocess.run(
+            [cmd, "--output", tmpdir, str(p)],
+            capture_output=True, timeout=120,
+        )
+        xhtml = Path(tmpdir) / "index.xhtml"
+        if proc.returncode != 0 or not xhtml.exists():
+            return None
+        raw = xhtml.read_text(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    raw = _re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=_re.S)
+    text = _re.sub(r"<[^>]+>", " ", raw)
+    text = _html.unescape(text)
+    text = _re.sub(r"[ \t ]+", " ", text)
+    text = _re.sub(r"\s*\n\s*", "\n", text).strip()
+    return text or None
 
 
 def _extract_docx(p: Path) -> ExtractResult:
@@ -138,6 +231,10 @@ def _extract_excel(p: Path) -> ExtractResult:
       - data_only=True는 '캐시된 수식 값'을 읽는다. 엑셀이 한 번도 계산·저장하지 않은
         수식 셀은 캐시가 없어 None으로 나와 누락될 수 있다. None인 수식 셀이 감지되면
         error에 경고를 남겨 후속 검수가 LibreOffice 재계산 등을 판단하게 한다.
+      - 병합 셀(merged): read_only는 병합정보를 노출하지 않아, 세로로 병합된 분류/카테고리
+        라벨이 첫 행에만 남고 나머지 행에서 끊긴다. _excel_merged_values로 별도 패스를 떠서
+        각 병합 범위의 앵커 값을 '걸친 모든 행의 맨 왼쪽 열'에 복제한다(가로 병합은 앵커 한
+        칸만 유지해 중복 노이즈 회피).
     """
     suffix = p.suffix.lower().lstrip(".")
     if suffix in ("xlsx", "xlsm"):
@@ -150,6 +247,7 @@ def _extract_excel(p: Path) -> ExtractResult:
             wb = load_workbook(str(p), read_only=True, data_only=True)
         except Exception as exc:  # noqa: BLE001
             return ExtractResult(text="", method="openpyxl", quality=0.0, error=str(exc))
+        merged = _excel_merged_values(str(p))
         parts: list[str] = []
         # read_only 워크북도 hidden/veryHidden 시트를 worksheets에 노출하므로
         # 추가 필터 없이 전부 순회 — sheet_state는 헤더 표기로만 사용.
@@ -157,8 +255,30 @@ def _extract_excel(p: Path) -> ExtractResult:
             state = getattr(ws, "sheet_state", "visible")
             header = f"[sheet: {ws.title}]" if state == "visible" else f"[sheet: {ws.title} ({state})]"
             parts.append(header)
-            for row in ws.iter_rows(values_only=True):
-                cells = [str(c) for c in row if c is not None and str(c).strip()]
+            mmap = merged.get(ws.title)
+            if not mmap:
+                # 병합 없는 시트는 기존 fast path(values_only) 유지.
+                for row in ws.iter_rows(values_only=True):
+                    cells = [str(c) for c in row if c is not None and str(c).strip()]
+                    if cells:
+                        parts.append(" | ".join(cells))
+                continue
+            # 병합 있는 시트만 좌표를 추적해 None 셀에 전파값을 채운다.
+            # read_only는 빈 칸을 EmptyCell(좌표 속성 없음)로 주므로, 행마다 첫
+            # 실셀의 (row, column)에서 행번호·열 오프셋을 잡아 위치를 보정한다.
+            for row in ws.iter_rows():
+                row_no = col_base = None
+                for idx, cell in enumerate(row):
+                    if hasattr(cell, "column"):
+                        row_no, col_base = cell.row, cell.column - idx
+                        break
+                cells = []
+                for idx, cell in enumerate(row):
+                    v = cell.value
+                    if v is None and row_no is not None:
+                        v = mmap.get((row_no, col_base + idx))
+                    if v is not None and str(v).strip():
+                        cells.append(str(v))
                 if cells:
                     parts.append(" | ".join(cells))
         wb.close()
@@ -190,6 +310,52 @@ def _extract_excel(p: Path) -> ExtractResult:
             if cells:
                 parts.append(" | ".join(cells))
     return ExtractResult(text="\n".join(parts), method="xlrd", quality=0.9)
+
+
+# 병합 셀 세로 전파 상한 — 병리적으로 큰 병합(예: A1:A1048576)이 맵을 폭발시키지
+# 않도록 범위당 전파 행 수에 상한. 초과 시 그 범위는 앵커(좌상단)만 자연 유지.
+_MERGED_MAX_ROWS = 10000
+
+
+def _excel_merged_values(path: str) -> dict[str, dict[tuple[int, int], object]]:
+    """시트별 병합 셀의 '세로 라벨 전파' 맵 (best-effort).
+
+    read_only 모드는 병합정보를 노출하지 않으므로 비-read_only로 한 번 더 열어
+    각 병합 범위의 앵커(좌상단) 값을 범위가 걸친 모든 행의 '맨 왼쪽 열'에 복제한다.
+    세로로 병합된 분류/카테고리 라벨이 각 행에 함께 남아 표 의미가 끊기지 않는다.
+    가로 병합은 앵커 한 칸만 남겨 중복 노이즈를 피한다(원동작 유지).
+
+    반환: {sheet_title: {(row, min_col): anchor_value}}. 라이브러리/파싱 실패는
+    조용히 빈 맵 — 전파 없이도 본문 추출은 정상 동작.
+    """
+    out: dict[str, dict[tuple[int, int], object]] = {}
+    try:
+        from openpyxl import load_workbook  # type: ignore
+
+        wb = load_workbook(path, data_only=True)  # 병합정보 필요 → read_only 불가
+    except Exception:  # noqa: BLE001
+        return out
+    try:
+        for ws in wb.worksheets:
+            ranges = getattr(ws, "merged_cells", None)
+            if not ranges:
+                continue
+            m: dict[tuple[int, int], object] = {}
+            for rng in list(getattr(ranges, "ranges", [])):
+                if rng.max_row - rng.min_row + 1 > _MERGED_MAX_ROWS:
+                    continue
+                anchor = ws.cell(row=rng.min_row, column=rng.min_col).value
+                if anchor is None or not str(anchor).strip():
+                    continue
+                for r in range(rng.min_row, rng.max_row + 1):
+                    m[(r, rng.min_col)] = anchor
+            if m:
+                out[ws.title] = m
+    except Exception:  # noqa: BLE001
+        return out
+    finally:
+        wb.close()
+    return out
 
 
 def _excel_formula_cache_warning(path: str) -> str | None:

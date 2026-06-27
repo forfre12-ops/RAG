@@ -169,6 +169,77 @@ class TestExcelExtraction:
         assert result.quality == 0.0
         assert result.error is not None
 
+    def test_xls_real_fixture(self):
+        """구형 .xls 실파일(BIFF) 추출 — 다중시트 + 표. xlrd/픽스처 없으면 skip."""
+        pytest.importorskip("xlrd", reason="구형 .xls 추출엔 xlrd 필요 (.[xls])")
+        fx = Path(__file__).parent / "fixtures" / "sample.xls"
+        if not fx.exists():
+            pytest.skip("sample.xls 픽스처 없음")
+        result = extract(fx)
+        assert result.method == "xlrd", f"got {result.method}: {result.error}"
+        assert result.quality > 0.5
+        assert "영업비밀목록" in result.text       # 첫 시트명
+        assert "ALD레시피" in result.text          # 셀 값
+        assert "협력사" in result.text             # 둘째 시트도
+        assert "로이드케이" in result.text
+        assert "|" in result.text                  # 표 셀 구분자
+
+    def test_xlsx_merged_cell_vertical_propagation(self, tmp_path: Path):
+        """세로 병합된 분류 라벨이 걸친 모든 행에 전파되는지 (표 의미 보존)."""
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "등급표"
+        ws.append(["분류", "문서", "등급"])         # row1
+        ws["A2"] = "기밀"
+        ws.merge_cells("A2:A4")                      # 세로 병합 A2:A4
+        ws["B2"], ws["C2"] = "ALD레시피", "S1"
+        ws["B3"], ws["C3"] = "원가구조", "S2"
+        ws["B4"], ws["C4"] = "고객명단", "S2"
+        p = tmp_path / "merged.xlsx"
+        wb.save(str(p))
+
+        text = extract(p).text
+        # 병합 앵커값 '기밀'이 3개 데이터 행 각각에 함께 남는다.
+        for doc in ("ALD레시피", "원가구조", "고객명단"):
+            line = next(ln for ln in text.splitlines() if doc in ln)
+            assert line.startswith("기밀 |"), f"세로병합 전파 실패: {line!r}"
+
+    def test_xlsx_merged_cell_horizontal_no_repeat(self, tmp_path: Path):
+        """가로 병합 헤더는 1회만 (중복 노이즈 회피)."""
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws["A1"] = "2026년 분류표"
+        ws.merge_cells("A1:C1")                      # 가로 병합
+        ws.append([])
+        ws.append(["분류", "문서", "등급"])
+        p = tmp_path / "hmerge.xlsx"
+        wb.save(str(p))
+
+        text = extract(p).text
+        assert text.count("2026년 분류표") == 1
+
+    def test_xlsx_hidden_sheet_included(self, tmp_path: Path):
+        """숨김 시트의 값도 추출하되 헤더에 상태 표기 (비밀 수치 누락 방지)."""
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "공개"
+        ws.append(["항목", "값"])
+        hidden = wb.create_sheet("내부전용")
+        hidden.sheet_state = "hidden"
+        hidden.append(["진짜원가", 999999])
+        p = tmp_path / "hidden.xlsx"
+        wb.save(str(p))
+
+        text = extract(p).text
+        assert "내부전용 (hidden)" in text          # 상태 표기
+        assert "999999" in text                     # 숨김 시트 값도 추출
+
 
 class TestPptxExtraction:
     """PowerPoint(.pptx) 추출 — 슬라이드·도형 텍스트 (FUN-022 갭 보강 2026-06-05)."""
