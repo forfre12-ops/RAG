@@ -294,6 +294,11 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
             </td>
           </tr>
           <tr>
+            <td>임베딩</td>
+            <td class="pick">KURE-v1</td>
+            <td>한국어 특화 임베더(1024차원). 우리 코퍼스 dense 실측 <b>KURE-v1 ≥ BGE-M3</b>(@1 +5~7pp 일관, KURE=BGE-M3 한국어 파인튜닝판). BGE-M3 폴백.</td>
+          </tr>
+          <tr>
             <td>분류 모델</td>
             <td class="pick">KF-DeBERTa</td>
             <td>한국어 특화 분류기. <b>정확도 65–78% · 고등급 미탐 14–21%</b>(룰 대비 미탐 반감). 미보정 과신 방지용 <b>온도 보정(temperature scaling) 적용</b>(학습 후 사후 캘리브레이션) — 보정계수는 골든셋 반입 후 확정.</td>

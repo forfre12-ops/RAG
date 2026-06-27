@@ -1431,14 +1431,19 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </style>
       <div class="gs-flow">
         <div class="gs-step"><div class="n">① 생성·수집</div><div class="t">후보 문서 확보</div><div class="d">합성(Qwen3) + 공개데이터(AI Hub·KIPRIS·판례)</div></div>
-        <div class="gs-step"><div class="n">② 자동 1차 라벨</div><div class="t">룰 + LLM 이중라벨</div><div class="d">S/V/M 등급·근거·신뢰계층(label_source)</div></div>
+        <div class="gs-step"><div class="n">② 자동 1차 라벨</div><div class="t">합의 게이트(ConsensusJudge)</div><div class="d">룰==LLM 합의 + 한국어 시드 근거 + self-consistency → gold_candidate</div></div>
         <div class="gs-step"><div class="n">③ 검수 큐</div><div class="t">우선순위 정렬</div><div class="d">룰≠모델·경계 S1↔S2·고등급 우선</div></div>
         <div class="gs-step hl"><div class="n">④ 사람 검수</div><div class="t">accept / correct</div><div class="d">검수 콘솔 — 최종 라벨·검수자·근거 기록</div></div>
-        <div class="gs-step"><div class="n">⑤ 골든셋 편입</div><div class="t">accepted만 편입</div><div class="d">버전·근거·검수자 감사 기록</div></div>
+        <div class="gs-step"><div class="n">⑤ 골든셋 편입</div><div class="t">tier 분리 · 사람 이중서명</div><div class="d">locked(평가정답)=TS/S1 ≥2 검수자 서명 · 버전·근거 감사</div></div>
         <div class="gs-step"><div class="n">⑥ 학습·배포</div><div class="t">모델 학습 → 번들</div><div class="d">오프라인 골든 번들로 고객사 배포</div></div>
         <div class="gs-step"><div class="n">⑦ 진단 환류</div><div class="t">집계 지표(A안)</div><div class="d">오분류율·혼동행렬 → 골든셋 보강 우선순위(문서 미반출)</div></div>
       </div>
       <div class="gs-loop"><b>환류 방식은 미확정 결정(A/B/C, §2.1.2).</b> 기본 A안은 ⑦ 집계 진단지표(오분류율·혼동행렬, 문서식별 불가)만 회수해 골든셋 보강 우선순위에 참고하고, 교정·문서는 고객사 망 내 잔류한다. 모델은 상시 재학습이 아니라 실데이터 1차학습 + 드리프트/이벤트 트리거 단발이다(§2.4.1). 단계별 구축 계획(검토본 100건 → 1,000건 확장)은 위 5.4 참조.</div>
+      <div class="gs-loop" style="margin-top:14px;border-left-color:var(--text);"><b style="display:block;margin-bottom:6px;font-size:13.5px;color:var(--text);">골든셋 생성·평가 재설계 (2026-06)</b>
+      <b>① 생성 게이트 = 합의 + 근거 + self-consistency.</b> 단일 confidence 임계(자동확정 신뢰 불가 — 실측 AUROC 0.535)를 게이트에서 <b>제거</b>하고, <b>룰등급 == LLM등급 합의 + 실제 한국어 시드 근거 span + 주 판정자 k-샘플 자기일관(self-consistency)</b>이 모두 충족될 때만 <code>gold_candidate</code>로 자동 인정한다. confidence는 사람 검토 큐 <b>정렬용</b>일 뿐 판정 권한이 없다.<br>
+      <b>② 판정자 = ConsensusJudge.</b> 주 판정자는 상용 LLM 택일(Claude·Gemini·GPT — 지재원 중앙 한정), 미연동·민감문서는 온프렘 Qwen(airgap)으로 라우팅. 배포급 Qwen <b>섀도</b>가 주 판정과 갈리면 '배포 모델이 틀릴 지점'(production_suspect)으로 사람 큐에 표시한다.<br>
+      <b>③ 3-tier 논리분할.</b> 정본 1파일에서 <code>tier_of</code>로 파생되는 네 tier — <b>silver_train</b>(학습 전용) / <b>gold_candidate</b>(자동 후보) / <b>locked_gold_eval</b>(평가 정답) / <b>legal_floor</b>(시나리오 차단 floor). <b>평가는 locked만, 학습은 locked 제외</b>(train-on-test 차단).<br>
+      <b>④ locked = 사람 이중서명.</b> 평가 정답 승격은 사람 서명이 유일 경로이며, 고등급(TS·S1)은 <b>독립 2인 검수자</b> 합의(이중서명)를 요구한다. LLM은 후보·triage 도구일 뿐 평가 권위는 사람이고, locked 고등급은 발주처 실문서(2026-09)로 채운다.</div>
 
       <h3>5.5 학습 데이터셋 구성 (프로토타입 기준)</h3>
       <div class="card-grid col4" style="margin:16px 0;">
