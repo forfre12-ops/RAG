@@ -77,6 +77,12 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "storage_backend": "local",
         "enable_training": False,
         "poc_mode": "full",
+        # FNR-safe 서빙 운영점 ON (2026-06-27 감사 + clean 홀드아웃 sweep 측정).
+        # τ=0.30: clean 77행에서 미탐 FNR 0.174→0.087(절반)·검토 +5pp·TS recall 0.91→1.0 (저regret 운영점).
+        #   더 낮추면(0.10~0.12) FNR≤0.05이나 검토부담 0.80+. 운영 검수역량에 맞춰 .env로 조정 가능.
+        # agreement_gate: 룰·모델 불일치만 needs_review 라우팅(등급 무변경·FNR-monotone·실패 시 silent 폴백).
+        "classifier_escalation_tau": 0.30,
+        "agreement_gate_enabled": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -87,6 +93,9 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "storage_backend": "local",
         "enable_training": True,
         "poc_mode": "full",
+        # FNR-safe 서빙 운영점 ON (onprem-local과 동일 — 위 주석 참조).
+        "classifier_escalation_tau": 0.30,
+        "agreement_gate_enabled": True,
     },
 }
 
