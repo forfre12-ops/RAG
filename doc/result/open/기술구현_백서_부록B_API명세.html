@@ -244,7 +244,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     </div>
     <h1 class="title">API 명세</h1>
     <p class="lede"><strong>Lloydk(수행사) AI 코어 API</strong> — 분류·설명·RAG·검수/능동학습·학습·합성·등급체계·문서 수집(M2)·운영. KL ↔ Lloydk 서버 간 통신 기준이며 Lloydk는 KL 단일 신뢰 클라이언트를 전제로 한다. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)이며 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다. 능동학습 폐곡선(relabel → tb_corrections → 재학습 → 모델 핫리로드)이 배선됨 — 단 이는 <b>단일 배포 내부 메커니즘</b>이며, 고객 교정·원문의 망 밖 반출·재학습 사용 여부는 <b>미확정</b>(기본 A안: 무반출·지재원 자기 골든셋 재학습·집계 진단지표만 환류, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>). 모델은 상시 재학습하지 않는다(실데이터 1차학습 후 드리프트/이벤트 단발).</p>
-    <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Lloydk(AI 에이전트)가 제공하는 API만</b> 다룬다. <b>가이드 관리·문서 메타데이터·회원사 자가진단·LLM 비용 등 KL 소유 대상 API는 KL이 직접 제공</b>하므로 제외한다. <span class="nego-chip">협의 필요</span>(주황색)는 KL과 인터페이스 합의가 남은 항목이다.</p>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Lloydk(AI 에이전트)가 제공하는 API만</b> 다룬다. <b>가이드 관리·문서 메타데이터·LLM 비용 등 KL 소유 대상 API는 KL이 직접 제공</b>하므로 제외한다. <b>회원사 자가진단(<code>tb_self_assessments</code>, A안 5요소)·고객사 연동 API는 신설 대상</b>으로 소유·인터페이스를 KL과 <span class="nego-chip">협의 필요</span>. <span class="nego-chip">협의 필요</span>(주황색)는 KL과 인터페이스 합의가 남은 항목이다.</p>
     <hr class="hero-sep">
 
     <!-- Global -->
@@ -313,8 +313,8 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">evaluation_factors</td><td class="f-type">object | null</td><td>3요건 점수 <code>{secrecy(S), value(V), management(M), scores}</code>, 각 0·1·2점. 등급 매핑은 <strong>적용서 §4.6 분기표</strong>(예: S=2·V=2면 M=0→S1·M≥1→TS, 그 외 곱≥1→S2·=0→S3, S=0은 S3).</td></tr>
             <tr><td class="f-name">evidence</td><td class="f-type">EvidenceSpan[]</td><td>[{start, end, text, weight, tag}] 근거 스팬 (<code>return_evidence=true</code> 시)</td></tr>
             <tr><td class="f-name">rag_context_used</td><td class="f-type">RagContextHit[]</td><td>[{source_doc, chunk_id, score, text}] 사용된 RAG 청크</td></tr>
-            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>사용된 모델 버전 (예: v-f9b5cedb)</td></tr>
-            <tr><td class="f-name">status</td><td class="f-type">string</td><td>staging / needs_review. needs_review 트리거: confidence&lt;0.7, <b>출처 cap이 고등급 상향 신호를 덮을 때(cap-conflict)</b>, 본문 없음 fail-secure(최고등급 격리). 추가로 <b>신규 opt-in 게이트(모두 기본 OFF)</b>: agreement 불일치(앙상블 신호 충돌), sparse-evidence(근거 스팬 부족), 메타데이터 <code>access_scope</code> 제한(<code>approved_only·designated·department</code>)인데 예측 등급이 낮을 때(메타floor 게이트, <code>metadata_floor_enabled</code>). FNR-safe override로 svm 등급과 콘텐츠 등급 불일치 시 더 높은(민감) 등급 채택.</td></tr>
+            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>사용된 모델 버전 (예: v-dd3abab9)</td></tr>
+            <tr><td class="f-name">status</td><td class="f-type">string</td><td>staging / needs_review. needs_review 트리거: confidence&lt;0.7, <b>출처 cap이 고등급 상향 신호를 덮을 때(cap-conflict)</b>, 본문 없음 fail-secure(최고등급 격리). <b>agreement 게이트(<code>agreement_gate_enabled</code>)와 escalation τ(<code>classifier_escalation_tau</code>=0.30)는 onprem-local/full-train 배포 프로파일 기본 ON</b>(룰·모델 불일치 또는 저마진 고등급을 검수 라우팅 — 미탐 FNR 0.174→0.087, TS recall→1.0). <code>sparse-evidence</code>(근거 스팬 부족)·메타floor 게이트(<code>metadata_floor_enabled</code>, <code>access_scope</code> 제한인데 예측 등급이 낮을 때)는 opt-in. FNR-safe override로 svm 등급과 콘텐츠 등급 불일치 시 더 높은(민감) 등급 채택.</td></tr>
             <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>저신뢰 검수 권고 등 경고 메시지 (예: low-confidence)</td></tr>
             <tr><td class="f-name">elapsed_ms</td><td class="f-type">integer</td><td>추론 소요 시간</td></tr>
           </tbody>
@@ -918,7 +918,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-f9b5cedb 형식 (현재 활성)</td></tr>
+            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-dd3abab9 형식 (현재 활성)</td></tr>
             <tr><td class="f-name">measured_at</td><td class="f-type">string | null</td><td>측정 시각 (ISO-8601)</td></tr>
             <tr><td class="f-name">accuracy</td><td class="f-type">float | null</td><td>전체 정확도</td></tr>
             <tr><td class="f-name">precision_macro</td><td class="f-type">float | null</td><td>4등급 정밀도 단순평균</td></tr>
@@ -962,12 +962,12 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">특정 모델 버전의 4×4 혼동 행렬(TS/S1/S2/S3)을 반환한다. M6 평가 완료 후 MLflow에서 로드.</p>
+        <p class="ep-desc">특정 모델 버전의 4×4 혼동 행렬(TS/S1/S2/S3)을 반환한다. M6 평가 완료 후 DB(<code>tb_model_versions</code> 평가 메트릭)·로컬 아티팩트에서 로드(폐쇄망 번들은 MLflow 미포함).</p>
         <h4>Path Parameter</h4>
         <table class="ftbl">
           <thead><tr><th>파라미터</th><th>타입</th><th>설명</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-f9b5cedb 형식</td></tr>
+            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-dd3abab9 형식</td></tr>
           </tbody>
         </table>
         <div class="status-chips"><span class="sc s2xx">200 OK — ConfusionMatrix</span><span class="sc s4xx">404 버전 없음</span></div>

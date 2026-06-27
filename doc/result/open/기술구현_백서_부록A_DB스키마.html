@@ -225,7 +225,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     </div>
     <h1 class="title">DB 스키마</h1>
     <p class="lede">15개 테이블, 7개 도메인 그룹. <code>tb_chunks</code>는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
-    <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Lloydk(수행사)가 생성·소유하는 테이블만</b> 다룬다 — AI 코어 6모듈(M1 합성·M2 청킹·M3 라벨링·M4 학습·M5 추론·M6 보정)과 등급체계. <b>문서(<code>tb_documents</code>)·감사·비용·가이드·회원사 자가진단은 KL이 직접 생성·소유</b>하므로 제외한다. Lloydk 테이블이 쓰는 <code>doc_id</code> 등은 KL이 제공하는 <b>외부 참조 키</b>다.</p>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Lloydk(수행사)가 생성·소유하는 테이블만</b> 다룬다 — AI 코어 6모듈(M1 합성·M2 청킹·M3 라벨링·M4 학습·M5 추론·M6 보정)과 등급체계. <b>문서(<code>tb_documents</code>)·감사·비용·가이드는 KL이 직접 생성·소유</b>하므로 제외한다. <b>회원사 자가진단(<code>tb_self_assessments</code>, A안 5요소)·고객사 연동 API는 신설 대상</b>으로 소유·책임을 KL과 <b>협의 중</b>이다. Lloydk 테이블이 쓰는 <code>doc_id</code> 등은 KL이 제공하는 <b>외부 참조 키</b>다.</p>
     <hr class="hero-sep">
 
     <!-- Overview -->
@@ -437,7 +437,7 @@ LIMIT  5;</pre>
         <tbody>
           <tr><td class="td-pk">classification_id</td><td class="td-type">UUID PK</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-fk">doc_id</td><td class="td-type">FK → tb_documents</td><td class="td-nn yes">●</td><td></td></tr>
-          <tr><td class="td-col">model_version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>v-f9b5cedb 형식</td></tr>
+          <tr><td class="td-col">model_version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>v-dd3abab9 형식</td></tr>
           <tr><td class="td-fk">predicted_level_id</td><td class="td-type">FK → tb_classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(5,4)</td><td class="td-nn yes">●</td><td>0.0000~1.0000</td></tr>
           <tr><td class="td-col">alternatives</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>[{level_code, score}] 전체 등급 softmax</td></tr>
@@ -492,7 +492,7 @@ LIMIT  5;</pre>
         <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
         <tbody>
           <tr><td class="td-pk">version_id</td><td class="td-type">UUID PK</td><td></td></tr>
-          <tr><td class="td-col">version_label</td><td class="td-type">VARCHAR(50) UNIQUE</td><td>v-f9b5cedb 형식 (해시 기반)</td></tr>
+          <tr><td class="td-col">version_label</td><td class="td-type">VARCHAR(50) UNIQUE</td><td>v-dd3abab9 형식 (해시 기반)</td></tr>
           <tr><td class="td-col">base_model</td><td class="td-type">VARCHAR(100)</td><td>kakaobank/kf-deberta-base</td></tr>
           <tr><td class="td-col">model_type</td><td class="td-type">VARCHAR(20)</td><td>classifier / reranker (기본 classifier)</td></tr>
           <tr><td class="td-col">trained_at</td><td class="td-type">TIMESTAMPTZ</td><td>학습 완료 시각</td></tr>
