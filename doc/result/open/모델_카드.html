@@ -124,6 +124,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>등급 산정</td><td>B안 <strong>S×V×M 곱셈</strong>(각 0/1/2점) + 모델 softmax 결합</td></tr>
     </tbody>
   </table></div>
+  <div class="callout"><div class="callout-label">↔ 키워드(룰)와 무엇이 다른가</div><p>분류기는 <strong>self-attention으로 문맥 속 의미</strong>를 읽어 "수율"이 유출·경쟁사 근처일 때와 공시·보도자료 근처일 때를 구분한다(키워드 카운트는 불가). 메커니즘 대비·"왜 분류기여야 정확한가"·하이브리드(룰 교차검증) 상세는 → <a href="ES단독_vs_ES분류기_등급분류_비교.html#s5b">ES 단독 vs ES+분류기 §06</a>.</p></div>
 
   <div class="section-sep" id="s2"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">의도된 용도 · 금지 용도</span></div>
   <h2>의도된 용도</h2>

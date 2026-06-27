@@ -203,10 +203,11 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <a class="toc-item" href="#s03">03 두 방식 정의</a>
       <a class="toc-item" href="#s04">04 검색은 잘 된다 — 분류는 다르다</a>
       <a class="toc-item" href="#s05">05 결과 수치 — 정확도·미탐·분포</a>
-      <a class="toc-item" href="#s06">06 ES 단독(가장 높은 등급)의 함정</a>
-      <a class="toc-item" href="#s07">07 장단점 종합 비교</a>
-      <a class="toc-item" href="#s08">08 결론 · 권고</a>
-      <a class="toc-item" href="#s09">09 측정 방법 · 한계</a>
+      <a class="toc-item" href="#s5b">06 키워드 룩업으로는 왜 등급을 못 매기나</a>
+      <a class="toc-item" href="#s06">07 ES 단독(가장 높은 등급)의 함정</a>
+      <a class="toc-item" href="#s07">08 장단점 종합 비교</a>
+      <a class="toc-item" href="#s08">09 결론 · 권고</a>
+      <a class="toc-item" href="#s09">10 측정 방법 · 한계</a>
     </div>
   </aside>
 
@@ -401,9 +402,111 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="card-desc">※ ES 단독 "최고등급" 방식은 문서 대부분을 TS로 밀어 등급별 적중 개념이 무의미해지므로, kNN 다수결을 참고로 병기. <b>S1(고가치 영업비밀) 적중이 9%로 사실상 무검출</b>인 점이 결정적이다.</p>
     </section>
 
-    <!-- 06 -->
+    <!-- 06 (신규) -->
+    <section id="s5b">
+      <h2><span class="num">06</span> 키워드 룩업으로는 왜 등급을 못 매기나 — 구조적 결함</h2>
+      <p class="h2-sub">위 수치가 "왜 그렇게 될 수밖에 없는가"의 원인. 룰/LLM 키워드로 라벨·검색하고 이웃의 등급을 집계(평균·최고)하는 <b>'검색 룩업 분류'</b>는 6가지 구조적 결함을 가진다. 검색엔진·키워드 추출기를 아무리 똑똑하게 만들어도 남는다.</p>
+
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>제안 구조 = "검색 기반(룩업/kNN) 분류".</b> ① 키워드(룰 또는 LLM)로 문서에 등급 라벨을 붙이고, ② 새 문서가 오면 키워드로 비슷한 검수문서를 찾아, ③ 그 이웃들의 등급을 <b>평균 또는 최고</b>로 집계해 등급을 정한다 — 합리적 직감이다. 그러나 아래 A–F가 구조적으로 막는다.</div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>결함</th><th>무엇이 문제인가</th><th class="td-center">본 문서 실측</th></tr></thead>
+          <tbody>
+            <tr><td><b>A. 의미 ≠ 키워드</b></td><td>같은 비밀이 다른 단어로 쓰이면 못 찾고, 같은 키워드라도 일반 설명까지 끌려온다(표현에 묶임)</td><td class="td-center cell-bad">S1 검색 9%</td></tr>
+            <tr><td><b>B. 집계 병리</b></td><td>최고등급=과탐 / 평균·다수결=미탐 — 어느 쪽도 좋은 동작점이 없다</td><td class="td-center cell-bad">TS 54% / FNR 22%</td></tr>
+            <tr><td><b>C. 비공지성</b></td><td>"이미 공개됐나"는 내용이 아니라 <b>출처</b> 문제 — 키워드로는 공개·비밀이 구분 안 됨</td><td class="td-center">공개문서 85% 과분류*</td></tr>
+            <tr><td><b>D. 일반화 0</b></td><td>룩업은 가진 것 사이 보간만 — 처음 보는 유형은 판정 근거가 없다</td><td class="td-center cell-good">분류기 74% vs 9%</td></tr>
+            <tr><td><b>E. 미보정 과신</b></td><td>약한 키워드 1개가 confidence=1.0 → 자신 있게 오확정(검수 게이트도 통과)</td><td class="td-center cell-bad">TS 5건 무인 미탐*</td></tr>
+            <tr><td><b>F. 순환·누출</b></td><td>틀린 라벨이 다음 이웃이 되어 오류를 전파 → 품질이 갈수록 퇴화</td><td class="td-center">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="card-desc">* C·E는 본 비교 외 골든셋 실증(출처 게이트 미적용 시 공개판례 85% 과분류 / 골든100 룰-폴백에서 TS 5건이 conf=1.0로 무인 미탐). A·B·D는 위 §05 표의 수치.</p>
+
+      <h4>B를 풀어보면 — 집계는 어느 쪽으로 돌려도 망한다</h4>
+      <div class="card-grid col2">
+        <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
+          <div class="card-label">최고등급(max)으로 집계</div>
+          <p class="card-desc" style="margin:6px 0 0;">이웃 하나만 TS여도 전부 TS로 끌어올림 → <span class="v-bad">문서 54%를 TS로 과탐</span>(실제 7%). 미탐 0%는 분류를 포기해 얻은 허수.</p>
+        </div>
+        <div class="card" style="border-left:4px solid var(--c-bad);border-radius:0;">
+          <div class="card-label">평균·다수결로 집계</div>
+          <p class="card-desc" style="margin:6px 0 0;">진짜 TS인데 이웃이 S2·S3 많으면 희석돼 내려감 → <span class="v-bad">FNR 22%</span>(진짜 비밀 놓침). 분포 상세는 다음 장(§07).</p>
+        </div>
+      </div>
+      <p class="card-desc">근본 원인: <b>한 문서의 등급은 그 문서 내용의 속성이지, 겉만 닮은 이웃들의 투표가 아니다.</b> 그래서 집계 규칙을 바꿔도 과탐↔미탐을 오갈 뿐이다.</p>
+
+      <h4>C를 풀어보면 — 같은 글자라도 정반대 등급</h4>
+      <div class="callout">
+        <span class="callout-icon">⚖️</span>
+        <div class="callout-body"><b>예: 영업비밀을 인용한 판례.</b> 그 텍스트는 비밀 본문과 <b>키워드가 완벽히 일치</b>하지만, <b>공개 문서라 S3</b>다. 키워드 룩업은 그 비밀의 등급(TS)을 베껴와 <b>공개 판례를 TS로 오분류</b>한다. 비공지성은 내용이 아니라 <b>출처 메타데이터</b>로만 풀린다(시스템의 source_prior 게이트가 이 축을 담당).</div>
+      </div>
+
+      <h4>"LLM·알고리즘으로 키워드를 똑똑하게 뽑으면 낫지 않나?"</h4>
+      <div class="callout bad">
+        <span class="callout-icon">✕</span>
+        <div class="callout-body"><b>검색은 좋아져도 분류 병목은 그대로다.</b> LLM 키워드 추출은 <b>더 나은 검색기</b>(동의어·개념 확장으로 recall↑)일 뿐, 여전히 문서를 <b>단어 가방으로 환원</b>해 <b>유한한 라벨 풀에 매칭하고 이웃을 집계</b>한다 — A(의미 손실)·B(집계 병리)는 남는다. <b>검색 ≠ 등급 결정.</b> LLM 키워드는 검색을 개선하지 분류를 대체하지 못한다.</div>
+      </div>
+
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>그래서 "틀린 도구"가 아니라 "역할을 잘못 맡은" 것이다.</b> 키워드/RAG 룩업은 <b>유사 검수문서를 찾아 근거로 보여주는 일(검색·근거 제시)</b>엔 최적이다. 다만 <b>등급의 최종 결정</b>을 맡기면 A–F로 붕괴한다. 결정은 "등급의 특징"을 배운 <b>분류기</b>가, 검색은 그 근거·후보 보완이 정답이다.</div>
+      </div>
+
+      <h4>분류기 메커니즘 — 키워드 카운트와 무엇이 다른가</h4>
+      <p>분류기는 키워드와 <b>완전히 다른 원리</b>로 작동한다. BERT 계열 <b>인코더 PLM</b>(한국어 <code>kf-deberta-base</code> 파인튜닝)으로, 문서를 토큰으로 쪼갠 뒤 각 단어의 의미를 <b>"주변 문맥 속에서" 계산</b>한다(self-attention).</p>
+      <ul>
+        <li>그래서 "수율"이 <b>유출·경쟁사</b> 근처에 있을 때와 <b>공시·보도자료</b> 근처에 있을 때 <b>모델 내부 표현이 달라진다</b> — 키워드 카운트는 절대 못 하는 일이다(§06-A·B 해소).</li>
+        <li>라벨된 예시(text→등급)로 학습하며, 우리가 명시적으로 안 알려준 <b>패러프레이즈·조합·맥락 패턴까지 통계적으로 학습</b>한다 → <b>처음 보는 표현에도 일반화</b>(§06-D 해소).</li>
+        <li>등급 산식의 <b>곱셈 상호작용</b>(비공지성 S × 자산가치 V × 관리상태 M)을, 단어 합산이 아니라 <b>분포로 학습</b>해 표현한다.</li>
+        <li>문서가 길면 청크별 softmax를 집계하고, 과신을 누르는 <b>temperature 보정</b>까지 거쳐 등급을 낸다.</li>
+      </ul>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>관점</th><th>키워드 (룰엔진)</th><th>분류기 (인코더 PLM)</th></tr></thead>
+          <tbody>
+            <tr><td>보는 것</td><td>글자 그대로 있나(부분문자열·정규식)</td><td><b>문맥 속 의미</b>(self-attention)</td></tr>
+            <tr><td>같은 단어, 다른 맥락</td><td class="cell-bad">구분 못 함</td><td class="cell-good">내부 표현이 달라짐</td></tr>
+            <tr><td>목록에 없는 표현</td><td class="cell-bad">통과 → 미탐</td><td class="cell-good">일반화로 커버</td></tr>
+            <tr><td>등급 결정</td><td>단어 합산 → argmax</td><td><b>S×V×M 상호작용을 분포로 학습</b></td></tr>
+            <tr><td>설명가능성(근거)</td><td class="cell-good">✓ 걸린 단어 스팬 제시</td><td>✕ 단독으론 "왜"를 못 보여줌</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <span class="callout-icon">🧑‍💼</span>
+        <div class="callout-body"><b>비유.</b> 키워드 = <b>금칙어 목록 대조</b>(Ctrl+F). 분류기 = <b>경험 많은 보안담당자가 문서를 통째로 읽고</b> "이건 느낌이 1급이네" 판단. 담당자는 <b>목록에 없는 새 표현도 맥락으로 알아본다.</b></div>
+      </div>
+
+      <h4>하이브리드 — 키워드를 버린 게 아니다 (분류기 결정 + 룰 교차검증)</h4>
+      <p>중요한 점: 우리 설계는 "분류기 <b>vs</b> 키워드"가 아니라 <b>둘을 합친 하이브리드</b>다. 룰엔진(키워드)이 항상 같이 돌며 분류기와 교차검증한다. 각자의 강점만 취한다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>장치</th><th>무엇을 하나</th><th class="td-center">효과</th></tr></thead>
+          <tbody>
+            <tr><td><b>룰 교차검증</b></td><td>알려진 고위험 패턴(M&amp;A·EUV·HBM)을 정밀 포착 + <b>근거 스팬</b> 제시</td><td class="td-center">설명가능성</td></tr>
+            <tr><td><b>분류기</b></td><td>목록에 없는 표현·맥락·조합을 일반화로 커버</td><td class="td-center">미탐↓</td></tr>
+            <tr class="row-good"><td><b>agreement_gate</b></td><td>비공개 등급(TS/S1/S2)은 <b>분류기·룰이 합의</b>해야 자동확정, 불일치면 사람검토</td><td class="td-center cell-good">정밀도 63→81%</td></tr>
+            <tr><td><b>FNR-safe override</b></td><td>룰이 TS/S1을 강하게 감지하면 분류기 예측을 끌어올림</td><td class="td-center">미탐 방지</td></tr>
+            <tr><td>semantic 시드</td><td>시드와 임베딩 <b>코사인 ≥0.75</b> 매칭 → 룰조차 순수 글자매칭 일부 초월</td><td class="td-center">보조(맥락 X)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="card-desc">※ semantic 시드는 "시드 단어와 <b>의미가 가까운가</b>"를 보는 보조일 뿐, 분류기처럼 <b>문서 전체 맥락</b>을 읽는 것은 아니다.</p>
+
+      <div class="callout good">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>한 줄 정리.</b> 키워드는 <b>"이 단어 있나"</b>(표면·고정 목록), 분류기는 <b>"이 문서가 의미상 몇 급인가"</b>(맥락·조합·일반화)다. 등급 판정은 후자의 문제라 분류기가 의무화됐고(FUN-004/005), 다만 <b>설명가능성과 정밀도</b>를 위해 키워드 룰을 버리지 않고 <b>교차검증 파트너</b>로 같이 쓴다.</div>
+      </div>
+    </section>
+
+    <!-- 07 -->
     <section id="s06">
-      <h2><span class="num">06</span> ES 단독(가장 높은 등급)의 함정</h2>
+      <h2><span class="num">07</span> ES 단독(가장 높은 등급)의 함정</h2>
       <p class="h2-sub">미탐 0%가 멋져 보이지만, 그것이 어떻게 만들어지는지가 함정이다.</p>
 
       <h4>예측 분포 — 실제 7%인 TS를 54~67%로 찍는다</h4>
@@ -454,7 +557,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
     <!-- 07 -->
     <section id="s07">
-      <h2><span class="num">07</span> 장단점 종합 비교</h2>
+      <h2><span class="num">08</span> 장단점 종합 비교</h2>
 
       <div class="appr-head bad">방식 A · ES 단독 (BM25 상위5 최고등급)</div>
       <div class="card-grid col2">
@@ -504,7 +607,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
     <!-- 08 -->
     <section id="s08">
-      <h2><span class="num">08</span> 결론 · 권고</h2>
+      <h2><span class="num">09</span> 결론 · 권고</h2>
       <div class="band good">
         <div class="bt">권고: 방식 B (ES + 분류기) 채택</div>
         <p>① <b>분류기를 1차</b>로 등급을 매긴다(정확도 59~65%, 미탐 5~14%, S1 적중 58~74%).<br>② <b>ES 검색은 보완</b>으로 — "이 골든 예시와 유사" 근거 제시·후보 좁히기. ES의 강점인 검색(R@5 94%)을 제 자리에 쓴다.<br>③ <b>미탐은 선별 게이트</b>(합의·룰·메타데이터)로 추가로 낮춘다 — 전부가 아니라 불확실한 것만 검수로.</p>
@@ -517,7 +620,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
     <!-- 09 -->
     <section id="s09">
-      <h2><span class="num">09</span> 측정 방법 · 한계</h2>
+      <h2><span class="num">10</span> 측정 방법 · 한계</h2>
       <div class="honesty">
         <div class="honesty-title">측정 조건 (재현 가능)</div>
         <ul>
