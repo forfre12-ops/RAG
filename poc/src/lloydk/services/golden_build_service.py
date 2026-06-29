@@ -87,6 +87,7 @@ class GoldenBuildService:
                 label_fn=lf,
                 holdout_texts=holdout,
                 min_self_consistency=req.min_self_consistency,
+                require_evidence=req.require_evidence,
             )
             gold_path, unc_path = self._write_outputs(req, job_id, result)
             self.jobs.update(

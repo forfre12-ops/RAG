@@ -23,6 +23,9 @@ class GoldenBuildRequest(BaseModel):
     min_rule_conf: float = Field(default=0.5, ge=0.0, le=1.0)        # 레거시(게이트 미사용)
     min_llm_conf: float = Field(default=0.7, ge=0.0, le=1.0)         # 레거시(게이트 미사용)
     min_self_consistency: float = Field(default=0.67, ge=0.0, le=1.0)
+    # False=합성 빌드 모드 — 룰 시드 근거(has_real_evidence) 미요구, rule==llm 합의+self-consistency만으로
+    # admission(leakage-free 합성이 no_evidence로 무더기 탈락하던 문제 완화·레버3). 운영 기본=True.
+    require_evidence: bool = Field(default=True)
     holdout_path: Optional[str] = None                       # 누출 차단용 홀드아웃 jsonl
     # run-스코프 후보 출력 위치. 정본(datasets/gold_real/classification_gold.jsonl)과 산출물이
     # 섞이지 않게 builds/ 하위로 분리(run-스코프 파일명이라 덮어쓰진 않으나 위생). 승격은

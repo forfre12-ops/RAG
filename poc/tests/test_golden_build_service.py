@@ -117,3 +117,22 @@ def test_holdout_leakage_excluded(tmp_path):
     st = svc.get_status(resp.golden_job_id)
     assert st.stats["dropped_leaked"] == 1
     assert st.gold_count == 1  # d1만 남음(d2는 누출 드롭)
+
+
+def _agree_no_evidence_label_fn(text: str) -> LabelPair:
+    # 합의(rule==llm=S2)지만 룰 시드 근거 없음 — require_evidence에 따라 admission 갈림.
+    return LabelPair("S2", 0.6, "S2", 0.9, has_real_evidence=False)
+
+
+def test_require_evidence_flag_flows_to_gate(tmp_path):
+    docs = [{"doc_id": "d1", "text": "근거없는 합의 문서"}]
+    svc = GoldenBuildService()
+    # 기본(require_evidence=True): 근거 없으면 needs_review(운영 게이트).
+    req_t = GoldenBuildRequest(source_type="inline", docs=docs, out_dir=str(tmp_path / "t"), actor=_ACTOR)
+    st_t = svc.get_status(svc.submit(req_t, label_fn=_agree_no_evidence_label_fn).golden_job_id)
+    assert st_t.gold_count == 0 and st_t.uncertain_count == 1
+    # 합성모드(require_evidence=False): 합의+self-consistency면 gold_candidate.
+    req_f = GoldenBuildRequest(source_type="inline", docs=docs, require_evidence=False,
+                               out_dir=str(tmp_path / "f"), actor=_ACTOR)
+    st_f = svc.get_status(svc.submit(req_f, label_fn=_agree_no_evidence_label_fn).golden_job_id)
+    assert st_f.gold_count == 1 and st_f.uncertain_count == 0
