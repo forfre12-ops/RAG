@@ -68,6 +68,8 @@ poc/datasets/corrections/
 # 대용량 실험 데이터(ab_s1 선례) — git 히스토리 부담 방지. 데이터는 별도 보관.
 poc/datasets/labeled_p1_bilingual_exp/
 poc/datasets/gold_real/_rejudge_claude/
+# 합성 골든 빌드 러너 run-스코프 출력(build_synthetic_golden.py) — 정본 아님, 재생성 가능.
+poc/datasets/golden_runs/
 
 # Test artifacts
 poc/.coverage
