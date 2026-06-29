@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lloydk.modules.m6_evaluation.serving_eval import evaluate_via_serving
+from lloydk.modules.m6_evaluation.serving_eval import (
+    evaluate_via_serving,
+    predict_via_serving,
+)
 from lloydk.schemas.common import Grade
 
 
@@ -81,3 +84,33 @@ def test_accepts_expected_grade_key():
     m = evaluate_via_serving(rows, pipeline=pipe)
     assert m.sample_count == 1
     assert m.accuracy == 1.0
+
+
+# ---- predict_via_serving (per-record API — 카드 평가와 경로 공유) ----
+
+def test_predict_returns_per_record_pred_and_preserves_source():
+    rows = [
+        {"text": "a", "label": "TS", "source": "anchor_nkt"},
+        {"text": "b", "label": "S1", "source": "holdout_gold"},
+    ]
+    pipe = _FakePipe({"a": Grade.S3, "b": Grade.S1})
+    out = predict_via_serving(rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"])
+    assert [r["pred"] for r in out] == ["S3", "S1"]
+    assert [r["label"] for r in out] == ["TS", "S1"]
+    assert [r["source"] for r in out] == ["anchor_nkt", "holdout_gold"]  # 원본 키 보존
+    assert all(r["serving_failed"] is False for r in out)
+
+
+def test_predict_failure_marks_serving_failed_and_least_severe():
+    rows = [{"text": "x", "label": "TS"}]
+    pipe = _FakePipe({}, raise_on="x")
+    out = predict_via_serving(rows, pipeline=pipe, labels=["TS", "S1", "S2", "S3"])
+    assert out[0]["serving_failed"] is True
+    assert out[0]["pred"] == "S3"  # 최저심각도 → 고등급 정답이면 미탐으로 잡힘
+
+
+def test_predict_skips_rows_without_label():
+    rows = [{"text": "a"}, {"text": "b", "label": "S2"}]
+    pipe = _FakePipe({"b": Grade.S2})
+    out = predict_via_serving(rows, pipeline=pipe)
+    assert len(out) == 1 and out[0]["label"] == "S2"
