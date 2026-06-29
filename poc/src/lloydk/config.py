@@ -384,6 +384,12 @@ class Settings(BaseSettings):
     # False로 끄면 옛 동작(합성 평가만으로 자동 활성). 수동 활성은 이 게이트와 무관.
     deploy_gate_require_locked_eval: bool = True
     deploy_gate_min_locked_per_grade: int = 5
+    # Kill-gate (죽음의 나선/품질붕괴 모니터, 비파괴=경보만). 발동 시 metric+log만, 자동 중단 없음.
+    # floor/capacity/max=0이면 해당 조건 비활성. capacity는 운영 검수 처리능력으로 설정 권장.
+    kill_gate_high_grade_miss_floor: int = 1     # 고등급(TS/S1) 미탐 교정 ≥ 이 값이면 발동(1=any)
+    kill_gate_daily_review_capacity: int = 0     # 일 검수 처리능력(0=fatigue 비활성)
+    kill_gate_fatigue_multiplier: float = 1.5    # 일 교정 ≥ capacity×배수면 과부하 발동
+    kill_gate_overturn_rate_max: float = 0.30    # 라벨변경 교정 비율 ≥ 이 값이면 발동(0=비활성)
     # 교정→라벨 재빌드/병합 학습셋 출력 디렉토리(A2-①).
     retrain_dataset_dir: str = "datasets/demo_retrain"
 

@@ -252,6 +252,14 @@ CORRECTION_TOTAL = Counter(
     registry=registry,
 )
 
+# Kill-gate 발동 여부 — 1이면 죽음의 나선/품질붕괴 조건(TS/S1 미탐 · 검수 과부하 · overturn율)
+# 중 하나 이상 충족(경보·비파괴, 자동 중단 없음). run_kill_gate_check()가 주기 갱신.
+KILL_GATE_TRIPPED = Gauge(
+    "lloydk_kill_gate_tripped",
+    "1 if kill-gate tripped (TS/S1 miss / review fatigue / overturn-rate); else 0 (alert-only)",
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",
@@ -374,6 +382,13 @@ def _refresh_business_gauges() -> None:
         ACTIVE_LEARNING_UNDERCLASS.set(status.pending_underclass)
     except Exception as exc:  # noqa: BLE001
         _logger.debug("business gauge refresh skipped: %s", exc)
+    # Kill-gate 모니터(경보만) 갱신 — 독립 try, best-effort.
+    try:
+        from lloydk.modules.m6_evaluation.kill_gate import run_kill_gate_check  # noqa: PLC0415
+
+        run_kill_gate_check()
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("kill-gate check skipped: %s", exc)
     # NEW-H2: Celery 큐 적체도 동반 갱신(best-effort, 독립 try).
     _refresh_celery_queue_gauges()
 
