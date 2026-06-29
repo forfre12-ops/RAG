@@ -41,33 +41,53 @@ def _provider(base_url: str, model: str, label: str):
                                enable_thinking=False, provider_label=label)
 
 
-def generate_docs(gen_model, base_url, grades, per_grade, len_min, len_max, log):
-    """등급별 per_grade건 생성(도메인 순환). (docs, intended_by_id, gen_fail, pii_hits) 반환."""
+def generate_docs(gen_model, base_url, grades, per_grade, len_min, len_max, log, run_dir):
+    """등급별 per_grade건 생성(도메인 순환). candidates.jsonl에 **증분 기록**(장시간 런 손실 방지).
+
+    (docs, intended_by_id, gen_fail, pii_hits) 반환. 생성 1건마다 candidates.jsonl에
+    append+flush 하므로 프로세스가 도중 죽어도 그때까지 생성분은 디스크에 남고, --build-from
+    으로 재개 가능.
+    """
     from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
     gen = SyntheticDocGenerator(llm=_provider(base_url, gen_model, "ollama-gen"))
     docs, intended_by_id, gen_fail, pii_hits = [], {}, 0, 0
-    for g in grades:
-        domains = GRADE_DOMAINS.get(g, ["mixed"])
-        for i in range(per_grade):
-            dom = domains[i % len(domains)]
-            try:
-                d = gen.generate_one(SynthRequest(target_grade=g, domain=dom, count=1,
-                                                  len_min=len_min, len_max=len_max))
-            except Exception as exc:  # noqa: BLE001 — 1건 실패가 장시간 런 전체를 죽이지 않게
-                gen_fail += 1
-                log(f"  생성 실패 {g}/{dom}: {type(exc).__name__}")
-                continue
-            if d.parse_error or not d.body or len(d.body.strip()) < 50:
-                gen_fail += 1
-                continue
-            if d.pii_violations:
-                pii_hits += 1  # 생성기가 PII 넣으면 카운트(드물지만 감사용)
-            doc_id = f"syn-{g}-{dom}-{uuid.uuid4().hex[:6]}"
-            docs.append({"doc_id": doc_id, "text": d.body, "domain": dom,
-                         "source": "synthetic", "intended": g, "title": d.title})
-            intended_by_id[doc_id] = g
-        log(f"  생성 {g}: 누적 {len([x for x in docs if x['intended']==g])}건")
+    cand_path = Path(run_dir) / "candidates.jsonl"
+    with io.open(cand_path, "w", encoding="utf-8") as cf:
+        for g in grades:
+            domains = GRADE_DOMAINS.get(g, ["mixed"])
+            for i in range(per_grade):
+                dom = domains[i % len(domains)]
+                try:
+                    d = gen.generate_one(SynthRequest(target_grade=g, domain=dom, count=1,
+                                                      len_min=len_min, len_max=len_max))
+                except Exception as exc:  # noqa: BLE001 — 1건 실패가 장시간 런 전체를 죽이지 않게
+                    gen_fail += 1
+                    log(f"  생성 실패 {g}/{dom}: {type(exc).__name__}")
+                    continue
+                if d.parse_error or not d.body or len(d.body.strip()) < 50:
+                    gen_fail += 1
+                    continue
+                if d.pii_violations:
+                    pii_hits += 1  # 생성기가 PII 넣으면 카운트(드물지만 감사용)
+                doc_id = f"syn-{g}-{dom}-{uuid.uuid4().hex[:6]}"
+                doc = {"doc_id": doc_id, "text": d.body, "domain": dom,
+                       "source": "synthetic", "intended": g, "title": d.title}
+                docs.append(doc)
+                intended_by_id[doc_id] = g
+                cf.write(json.dumps(doc, ensure_ascii=False) + "\n")
+                cf.flush()  # 증분 영속 — 도중 죽어도 보존
+            log(f"  생성 {g}: 누적 {len([x for x in docs if x['intended']==g])}건")
     return docs, intended_by_id, gen_fail, pii_hits
+
+
+def load_candidates(build_from):
+    """--build-from: run_dir(또는 candidates.jsonl 경로)에서 생성분 로드(생성 건너뜀·재개)."""
+    p = Path(build_from)
+    if p.is_dir():
+        p = p / "candidates.jsonl"
+    docs = [json.loads(l) for l in io.open(p, encoding="utf-8") if l.strip()]
+    intended_by_id = {d["doc_id"]: d.get("intended", "?") for d in docs}
+    return docs, intended_by_id
 
 
 def build(docs, judge_model, base_url, require_evidence, k_min, k_max, shadow_model, temperature, log):
@@ -96,8 +116,9 @@ def build(docs, judge_model, base_url, require_evidence, k_min, k_max, shadow_mo
     return result, fails["n"]
 
 
-def write_outputs(out_root, run_id, docs, result, meta):
-    run_dir = Path(out_root) / run_id
+def write_outputs(run_dir, run_id, result, meta):
+    """build/uncertain/stats 기록. candidates.jsonl은 generate_docs가 증분 기록(또는 build-from 입력)."""
+    run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     def _jsonl(name, rows):
@@ -105,7 +126,6 @@ def write_outputs(out_root, run_id, docs, result, meta):
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    _jsonl("candidates.jsonl", docs)                          # 생성 원본(감사·재사용)
     _jsonl(f"build_{run_id}.jsonl", [r.to_dict() for r in result.gold])      # gold_candidate
     _jsonl(f"uncertain_{run_id}.jsonl", [r.to_dict() for r in result.uncertain])  # 검수대상
     with (run_dir / "stats.json").open("w", encoding="utf-8") as f:
@@ -130,29 +150,43 @@ def main(argv=None):
     ap.add_argument("--len-max", type=int, default=1200)
     ap.add_argument("--temperature", type=float, default=0.6)
     ap.add_argument("--smoke", action="store_true", help="등급별 1건 빠른 검증")
+    ap.add_argument("--build-from", default=None,
+                    help="생성 건너뛰고 기존 run_dir(또는 candidates.jsonl)에서 빌드만(재개)")
     args = ap.parse_args(argv)
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     grades = [g.strip() for g in args.grades.split(",") if g.strip()]
     per_grade = 1 if args.smoke else args.per_grade
     require_evidence = bool(args.require_evidence)
-    run_id = uuid.uuid4().hex[:12]
 
     def log(msg):
         # ascii-safe 진행 로그(cp949 콘솔에서 한글 깨질 수 있어 stderr+flush; 핵심 수치는 stats.json)
         print(msg, file=sys.stderr, flush=True)
 
-    log(f"[run {run_id}] grades={grades} per_grade={per_grade} "
-        f"gen={args.gen_model} judge={args.judge_model} require_evidence={require_evidence}")
-
-    t0 = time.time()
-    docs, intended_by_id, gen_fail, pii_hits = generate_docs(
-        args.gen_model, args.base_url, grades, per_grade, args.len_min, args.len_max, log)
-    gen_s = round(time.time() - t0, 1)
-    log(f"[gen] {len(docs)}건 생성(실패 {gen_fail}, pii {pii_hits}) {gen_s}s")
+    # --build-from: 기존 run_dir 재사용(생성 건너뜀). 아니면 새 run_dir 생성 후 증분 생성.
+    if args.build_from:
+        run_dir = Path(args.build_from if Path(args.build_from).is_dir()
+                       else Path(args.build_from).parent)
+        run_id = run_dir.name
+        log(f"[run {run_id}] BUILD-FROM {run_dir} (생성 건너뜀)")
+        docs, intended_by_id = load_candidates(args.build_from)
+        gen_fail = pii_hits = 0
+        gen_s = 0.0
+        log(f"[gen] (재개) candidates {len(docs)}건 로드")
+    else:
+        run_id = uuid.uuid4().hex[:12]
+        run_dir = Path(args.out_dir) / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        log(f"[run {run_id}] grades={grades} per_grade={per_grade} "
+            f"gen={args.gen_model} judge={args.judge_model} require_evidence={require_evidence}")
+        t0 = time.time()
+        docs, intended_by_id, gen_fail, pii_hits = generate_docs(
+            args.gen_model, args.base_url, grades, per_grade, args.len_min, args.len_max, log, run_dir)
+        gen_s = round(time.time() - t0, 1)
+        log(f"[gen] {len(docs)}건 생성(실패 {gen_fail}, pii {pii_hits}) {gen_s}s")
 
     if not docs:
-        log("[abort] 생성 0건 — Ollama 가동/모델 확인")
+        log("[abort] 생성/로드 0건 — Ollama 가동·모델·candidates 확인")
         return 2
 
     t1 = time.time()
@@ -179,7 +213,7 @@ def main(argv=None):
         "high_grade_gold": gold_by_intended.get("TS", 0) + gold_by_intended.get("S1", 0),
         "stats": result.stats,
     }
-    run_dir = write_outputs(args.out_dir, run_id, docs, result, meta)
+    write_outputs(run_dir, run_id, result, meta)
     log(f"[build] gold={len(result.gold)} review={len(result.uncertain)} "
         f"pass={meta['pass_rate']} high_grade_gold={meta['high_grade_gold']} {build_s}s")
     log(f"[done] -> {run_dir} (stats.json)")
