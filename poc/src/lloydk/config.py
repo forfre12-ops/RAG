@@ -384,6 +384,12 @@ class Settings(BaseSettings):
     # False로 끄면 옛 동작(합성 평가만으로 자동 활성). 수동 활성은 이 게이트와 무관.
     deploy_gate_require_locked_eval: bool = True
     deploy_gate_min_locked_per_grade: int = 5
+    # [앵커 연결] 합성 test.jsonl만 보던 게이트에 **외부 사실 앵커 코퍼스**(NKT 공식분류·큐레이트
+    # 홀드아웃) 실측 미탐을 주입한다. True면 후보 모델을 앵커로 통과시켜 고등급(TS/S1) under-class
+    # 카드가 FAIL이면 게이트 hard block. 기본 False=동작 보존(앵커 측정은 CPU 추론 비용 발생).
+    # INCONCLUSIVE는 깨지 않음(측정 불가 — 자동활성 veto는 위 locked-eval 게이트 소관).
+    deploy_gate_anchor_eval_enabled: bool = False
+    deploy_gate_anchor_cap_per_cell: int = 200   # 앵커 (출처×등급) 칸당 표본 상한(0=전수)
     # Kill-gate (죽음의 나선/품질붕괴 모니터, 비파괴=경보만). 발동 시 metric+log만, 자동 중단 없음.
     # floor/capacity/max=0이면 해당 조건 비활성. capacity는 운영 검수 처리능력으로 설정 권장.
     kill_gate_high_grade_miss_floor: int = 1     # 고등급(TS/S1) 미탐 교정 ≥ 이 값이면 발동(1=any)

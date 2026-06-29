@@ -170,3 +170,64 @@ def test_decision_to_dict_serializable():
     assert d["passed"] is True
     assert isinstance(d["checks"], list) and d["checks"]
     assert all({"name", "passed", "detail"} <= set(c) for c in d["checks"])
+
+
+# ── 앵커 연결 (외부 사실 앵커 측정 미탐을 게이트에 주입) ─────────────────────────
+
+from lloydk.modules.m6_evaluation.deploy_gate import summarize_anchor_high_grade  # noqa: E402
+
+
+def _anchor_report(cards):
+    """build_eval_cards.to_dict() 형태의 최소 앵커 리포트."""
+    return {"cards": [{"slice": s, "grade": g, "underclass_fnr": f, "verdict": v}
+                      for (s, g, f, v) in cards]}
+
+
+def test_anchor_high_grade_fail_blocks_gate():
+    # 앵커가 고등급(TS) 미탐 FAIL을 보이면 합성 게이트가 통과해도 hard block.
+    anchor = _anchor_report([("anchor_nkt", "TS", 0.30, "FAIL"),
+                             ("anchor_nkt", "S1", 0.0, "PASS")])
+    dec = evaluate_deploy_gate(_report(fnr_high=0.0, f1_macro=0.9), _report(),
+                               anchor_report=anchor)
+    assert dec.passed is False
+    assert "anchor_high_grade_miss" in dec.reason
+
+
+def test_anchor_inconclusive_does_not_block_binary_gate():
+    # INCONCLUSIVE는 측정불가 — 이진 게이트를 깨지 않는다(자동활성 veto는 locked-eval 소관).
+    anchor = _anchor_report([("anchor_nkt", "TS", 0.03, "INCONCLUSIVE"),
+                             ("holdout_gold", "S1", 0.0, "INCONCLUSIVE")])
+    dec = evaluate_deploy_gate(_report(), _report(), anchor_report=anchor)
+    assert dec.passed is True
+    chk = [c for c in dec.checks if c.name == "anchor_high_grade_miss"][0]
+    assert chk.passed is True
+
+
+def test_anchor_pass_recorded_as_check():
+    anchor = _anchor_report([("anchor_nkt", "S1", 0.0, "PASS")])
+    dec = evaluate_deploy_gate(_report(), _report(), anchor_report=anchor)
+    assert dec.passed is True
+    assert any(c.name == "anchor_high_grade_miss" and c.passed for c in dec.checks)
+
+
+def test_anchor_no_high_grade_cards_skips():
+    # 고등급(TS/S1) 카드가 없으면(예: S2/S3만) 앵커 미탐 검사 생략.
+    anchor = _anchor_report([("holdout_gold", "S2", 0.0, "INCONCLUSIVE"),
+                             ("holdout_gold", "S3", 0.0, "N/A")])
+    dec = evaluate_deploy_gate(_report(), _report(), anchor_report=anchor)
+    chk = [c for c in dec.checks if c.name == "anchor_high_grade_miss"][0]
+    assert chk.passed is True and "검사 생략" in chk.detail
+
+
+def test_anchor_report_none_preserves_behavior():
+    # anchor_report 미제공(기본 None) → 앵커 체크 자체가 없음(동작 보존).
+    dec = evaluate_deploy_gate(_report(), _report())
+    assert not any(c.name == "anchor_high_grade_miss" for c in dec.checks)
+
+
+def test_summarize_anchor_high_grade_counts():
+    anchor = _anchor_report([("a", "TS", 0.3, "FAIL"), ("a", "S1", 0.0, "PASS"),
+                             ("a", "S2", 0.0, "FAIL")])  # S2는 고등급 아님 → 제외
+    s = summarize_anchor_high_grade(anchor)
+    assert s["high_grade_cards"] == 2 and s["fail"] == 1 and s["pass"] == 1
+    assert s["fail_cells"] == ["a/TS"]

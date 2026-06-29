@@ -64,6 +64,39 @@ def _report_metrics(report: Any) -> dict:
     return dict(d) if isinstance(d, dict) else {}
 
 
+def _maybe_anchor_report(settings: Any, *, candidate_model_dir: str | None) -> dict | None:
+    """opt-in 시 후보 모델을 외부 사실 앵커 코퍼스로 통과시켜 평가 카드 dict를 반환(게이트 주입용).
+
+    fail-OPEN: 비활성/후보경로 부재/측정 실패는 None(앵커 체크 생략) — 게이트 자체의 fail-secure
+    (degenerate·fnr 회귀·locked-eval)는 그대로 유지된다. 앵커 측정은 CPU 추론 비용이 있으므로
+    기본 비활성. candidate_model_dir = train_classifier_task가 넘긴 후보 산출 경로(output_dir/version).
+    """
+    if not bool(getattr(settings, "deploy_gate_anchor_eval_enabled", False)):
+        return None
+    if not candidate_model_dir:
+        logger.info("anchor gate: 후보 모델 경로 없음 — 앵커 측정 생략")
+        return None
+    from pathlib import Path  # noqa: PLC0415
+    if not Path(candidate_model_dir).exists():
+        logger.warning("anchor gate: 후보 경로 부재(%s) — 앵커 측정 생략", candidate_model_dir)
+        return None
+    try:
+        from lloydk.modules.m6_evaluation.anchor_eval import run_anchor_cards  # noqa: PLC0415
+        out = run_anchor_cards(
+            model_dir=str(candidate_model_dir),
+            cap_per_cell_n=int(getattr(settings, "deploy_gate_anchor_cap_per_cell", 200)),
+        )
+        rep = out.get("report")
+        logger.warning(
+            "anchor gate: 후보 앵커 측정 완료 — 평가 %s건, 카드 판정 %s",
+            out.get("evaluated"), (rep or {}).get("counts"),
+        )
+        return rep
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("anchor gate: 앵커 측정 실패(%s) → 앵커 체크 생략(fail-open)", type(exc).__name__)
+        return None
+
+
 def register_and_gate_model(
     report: Any,
     *,
@@ -102,12 +135,18 @@ def register_and_gate_model(
             baseline_metrics = dict(baseline.metrics) if baseline and baseline.metrics else None
             baseline_label = baseline.version_label if baseline else None
 
+            # [앵커 연결] 후보를 외부 사실 앵커로 측정해 게이트에 실측 미탐 신호를 주입(opt-in).
+            # 측정 실패는 fail-OPEN(앵커 체크 생략) — 게이트 자체는 fail-secure 유지되고 자동활성은
+            # eval_ready locked 게이트가 별도로 막으므로, 앵커 미측정이 자동배포를 열지 않는다.
+            anchor_report = _maybe_anchor_report(settings, candidate_model_dir=model_uri)
+
             decision = evaluate_deploy_gate(
                 metrics,
                 baseline_metrics,
                 fnr_high_tolerance=float(getattr(settings, "retrain_fnr_high_tolerance", 0.02)),
                 f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
                 first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
+                anchor_report=anchor_report,
                 candidate_version=version_label,
                 baseline_version=baseline_label,
             )

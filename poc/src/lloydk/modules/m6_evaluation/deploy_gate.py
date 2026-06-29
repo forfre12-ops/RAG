@@ -22,6 +22,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Sequence
 
+from lloydk.modules.m6_evaluation.eval_cards import (
+    VERDICT_FAIL,
+    VERDICT_INCONCLUSIVE,
+    VERDICT_PASS,
+)
+
 # 게이트 기본 허용오차 — config.py(Settings)에서 주입 가능. 안전 기본:
 #   fnr_high는 악화 0 허용(tolerance=0.0)이 가장 안전하나, 평가셋 표본분산(±1~2건)으로
 #   동급 모델이 반려되는 것을 막기 위해 소폭(0.02) 허용. f1은 5%p 하락까지만 용인.
@@ -97,6 +103,38 @@ def _get_float(d: Mapping, *keys: str) -> Optional[float]:
     return None
 
 
+DEFAULT_ANCHOR_HIGH_GRADES = ("TS", "S1")
+
+
+def summarize_anchor_high_grade(
+    anchor_report: Optional[Mapping],
+    *,
+    high_grades: Sequence[str] = DEFAULT_ANCHOR_HIGH_GRADES,
+) -> dict:
+    """앵커 평가 카드(build_eval_cards.to_dict)에서 **고등급(TS/S1) under-class 미탐** 신호 요약.
+
+    합성 test.jsonl만 보던 게이트(죽음의 나선 #4)에 **외부 사실 앵커**로 측정한 미탐을
+    주입하기 위한 순수 해석기. 카드 verdict 의미를 그대로 존중한다:
+      - FAIL = 미탐 하한 CI가 천장 초과(앵커가 실제로 고등급 미탐을 보임) → 게이트 hard block.
+      - INCONCLUSIVE = 표본부족/CI과대 → 측정 불가(PASS 아님). 이진 게이트를 깨진 않되 surfaced.
+        ('측정 못 함'으로 자동활성을 막는 일은 eval_ready locked 게이트 소관 — 역할 분리.)
+    """
+    cards = list(anchor_report.get("cards", [])) if anchor_report else []
+    hi = [c for c in cards if c.get("grade") in set(high_grades)]
+    fails = [c for c in hi if c.get("verdict") == VERDICT_FAIL]
+    passes = [c for c in hi if c.get("verdict") == VERDICT_PASS]
+    incon = [c for c in hi if c.get("verdict") == VERDICT_INCONCLUSIVE]
+    worst = max((float(c.get("underclass_fnr", 0.0)) for c in hi), default=None)
+    return {
+        "high_grade_cards": len(hi),
+        "fail": len(fails),
+        "pass": len(passes),
+        "inconclusive": len(incon),
+        "worst_underclass_fnr": worst,
+        "fail_cells": [f"{c.get('slice')}/{c.get('grade')}" for c in fails],
+    }
+
+
 def _is_degenerate(cm: Any, *, col_share: float = DEFAULT_DEGENERATE_COL_SHARE) -> Optional[bool]:
     """confusion matrix(행=정답, 열=예측)에서 한 예측 열이 전체의 col_share 이상이면 degenerate.
 
@@ -127,6 +165,8 @@ def evaluate_deploy_gate(
     f1_drop_tolerance: float = DEFAULT_F1_DROP_TOLERANCE,
     require_baseline: bool = False,
     first_deploy_fnr_high_max: Optional[float] = None,
+    anchor_report: Optional[Mapping] = None,
+    anchor_high_grades: Sequence[str] = DEFAULT_ANCHOR_HIGH_GRADES,
     candidate_version: Optional[str] = None,
     baseline_version: Optional[str] = None,
 ) -> DeployDecision:
@@ -141,6 +181,12 @@ def evaluate_deploy_gate(
         first_deploy_fnr_high_max: [NEW-M2] 최초 배포(baseline 없음) 절대 FNR floor.
             None(기본)이면 미적용(동작 보존). 설정 시 baseline 없는 첫 모델도
             fnr_high ≤ 이 값이어야 통과(미탐 하한 — fnr=10% 같은 미탐모델 무조건 통과 차단).
+        anchor_report: [앵커 연결] 후보를 **외부 사실 앵커 코퍼스**로 측정한 평가 카드
+            (build_eval_cards.to_dict). 합성 test.jsonl만 보던 게이트(죽음의 나선 #4)에 실측
+            미탐 신호를 주입한다. 고등급(TS/S1) 카드가 **FAIL**(미탐 하한 CI>천장)이면 hard block.
+            INCONCLUSIVE는 깨지 않음(측정 불가 — 자동활성 veto는 eval_ready locked 게이트 소관).
+            None(기본)이면 검사 생략(동작 보존).
+        anchor_high_grades: 앵커에서 미탐을 hard-block 기준으로 볼 고등급 집합(기본 TS·S1).
         *_version: 로깅/감사용 라벨.
 
     Returns:
@@ -217,6 +263,29 @@ def evaluate_deploy_gate(
                 f"최초배포 고등급 미탐율 후보={cand_fnr:.4f} ≤ floor={first_deploy_fnr_high_max:.4f} "
                 f"→ {'OK' if ok else 'floor 초과-거부'}",
                 cand_fnr, first_deploy_fnr_high_max,
+            ))
+
+    # ── 4. 앵커 고등급 미탐 (외부 사실 앵커 측정 — 합성 맹목 보완) ─────────────────
+    if anchor_report is not None:
+        a = summarize_anchor_high_grade(anchor_report, high_grades=anchor_high_grades)
+        if a["fail"] > 0:
+            checks.append(GateCheck(
+                "anchor_high_grade_miss", False,
+                f"앵커 고등급 미탐 측정됨(FAIL {a['fail']}칸: {a['fail_cells']}) — "
+                f"worst under-class FNR={a['worst_underclass_fnr']} → 거부",
+                a["worst_underclass_fnr"],
+            ))
+        elif a["high_grade_cards"] == 0:
+            checks.append(GateCheck(
+                "anchor_high_grade_miss", True,
+                "앵커 고등급(TS/S1) 카드 없음 — 앵커 미탐 검사 생략",
+            ))
+        else:
+            checks.append(GateCheck(
+                "anchor_high_grade_miss", True,
+                f"앵커 고등급 미탐 FAIL 없음(PASS {a['pass']}·INCONCLUSIVE {a['inconclusive']}칸; "
+                f"INCONCLUSIVE는 측정불가 — 자동활성 veto는 locked-eval 소관)",
+                a["worst_underclass_fnr"],
             ))
 
     passed = all(c.passed for c in checks)
