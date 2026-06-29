@@ -350,6 +350,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td><b>C 분리 리포트 카드</b></td><td class="td-pass">✅ 신규 구현</td><td>Wilson CI·출처×등급·INCONCLUSIVE·단일숫자 코드차단(combined_score raise) — <code>m6_evaluation/eval_cards.py</code> (테스트 10건)</td></tr>
             <tr><td><b>B 심판 신뢰도 폭로</b></td><td class="td-pass">✅ 신규 구현</td><td>591 rejudged.jsonl 출처별 층화·proxy 양가 플래그·라벨 미수정 — <code>m6_evaluation/judge_reliability.py</code> (테스트 7건, 실데이터 회귀 락 포함)</td></tr>
             <tr><td><b>D 메타모픽 회귀 코어</b></td><td class="td-pass">✅ 신규 구현</td><td>사실보존 게이트(토큰+부정가드, 룰/심판 아님)·순/역방향·과분류 대칭·quality_score 금지(통과=품질 아님) — <code>m6_evaluation/metamorphic.py</code> (테스트 10건). 패러프레이즈 *생성*은 별개(앵커 파이프라인·Qwen)</td></tr>
+            <tr><td><b>E 서빙 불변식 체커</b></td><td class="td-pass">✅ 신규 구현</td><td>공개출처 cap이 고등급 덮음+검수신호 없음=조용한 미탐(FN)·표기 상향 누락(floor) 탐지 — <code>m6_evaluation/serving_invariants.py</code> (테스트 10건). pipeline.py 미변경(순수 체커, 라이브 배선은 서빙 트랙 E1/E2와 함께)</td></tr>
           </tbody>
         </table>
       </div>
