@@ -56,6 +56,7 @@ def evaluate_consensus(
     airgap: bool = False,
     min_self_consistency: float = 0.67,
     sort_conf: float = 0.0,
+    require_evidence: bool = True,
     **_legacy,  # 구 keyword 인자(min_rule_conf 등) 흡수 — 1 릴리스 한시. (위치인자는 못 막음!)
 ) -> ConsensusResult:
     """룰·LLM 판정을 합의+근거 게이트로 평가해 gold_candidate 편입 여부 판정.
@@ -101,7 +102,10 @@ def evaluate_consensus(
     # 차단 사유(우선순위 순서로 첫 매치가 status). ts_downgrade가 generic disagree보다 우선.
     if ts_downgrade_suspect:
         reason = "ts_downgrade"
-    elif not has_real_evidence:
+    elif require_evidence and not has_real_evidence:
+        # require_evidence=False(합성 빌드 모드): 룰 시드 근거 없이도 rule==llm 합의 + self-consistency
+        # 만으로 admission 허용 — leakage-free 합성문서가 룰 키워드 부재로 무더기 no_evidence 탈락하던
+        # 문제 완화(파일럿 실측: no_evidence가 탈락 50%). 운영 게이트(기본 True)는 그대로 evidence 요구.
         reason = "no_evidence"
     elif not agree:
         reason = "disagree"

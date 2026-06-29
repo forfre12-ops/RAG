@@ -74,6 +74,21 @@ def test_airgap_allows_lower_grades():
     assert r.is_gold and r.status == "gold_candidate"
 
 
+def test_require_evidence_false_admits_agree_without_evidence():
+    # 합성 빌드 모드(require_evidence=False): 룰 시드 근거 없어도 rule==llm 합의면 gold.
+    # leakage-free 합성이 no_evidence로 무더기 탈락하던 문제 완화(파일럿 레버 3).
+    r = evaluate_consensus("S1", "S1", has_real_evidence=False, self_consistency=1.0,
+                           require_evidence=False)
+    assert r.is_gold and r.status == "gold_candidate"
+    # 완화는 evidence 요구뿐 — 불일치·ts_downgrade·low_agreement는 여전히 needs_review.
+    r2 = evaluate_consensus("S2", "S1", has_real_evidence=False, self_consistency=1.0,
+                            require_evidence=False)
+    assert not r2.is_gold and r2.status == "needs_review_disagree"
+    # 기본(require_evidence=True)은 운영 게이트 그대로 — 근거 없으면 no_evidence.
+    r3 = evaluate_consensus("S1", "S1", has_real_evidence=False, self_consistency=1.0)
+    assert not r3.is_gold and r3.status == "needs_review_no_evidence"
+
+
 def test_legacy_keyword_args_swallowed():
     # 구 keyword 인자(min_rule_conf/min_llm_conf)는 **_legacy로 흡수 — TypeError 안 남(1릴리스 한시).
     r = evaluate_consensus("S2", "S2", has_real_evidence=True, min_rule_conf=0.5, min_llm_conf=0.7)

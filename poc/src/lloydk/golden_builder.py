@@ -101,6 +101,7 @@ def build_golden_set(
     label_fn: Callable[[str], LabelPair],
     holdout_texts: Sequence[str] | None = None,
     min_self_consistency: float = 0.67,
+    require_evidence: bool = True,
     text_key: str = "text",
     id_key: str = "doc_id",
     **_legacy,  # 구 min_rule_conf/min_llm_conf 흡수(게이트 미사용; 서비스 호출 호환)
@@ -146,6 +147,7 @@ def build_golden_set(
             airgap=lp.airgap,
             sort_conf=lp.llm_conf,
             min_self_consistency=min_self_consistency,
+            require_evidence=require_evidence,
         )
         rec = GoldenRecord(
             doc_id=doc.get(id_key) or h[:16],
