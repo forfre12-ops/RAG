@@ -29,7 +29,7 @@
   --radius:       8px;
   --radius-lg:    12px;
   --radius-xl:    16px;
-  --radius-pill:  999px;
+  --radius-pill:  3px;   /* 직선형(사각)·타원/pill 금지 — 디자인 표준 */
   --shadow-sm:    0 1px 2px rgba(0,0,0,.05);
   --shadow:       0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.07);
   --font-sans:    "Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
@@ -56,7 +56,7 @@ li{margin-bottom:4px;font-size:14px;line-height:1.65;}
 .brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
 .brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:var(--radius-pill);white-space:nowrap;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:3px;white-space:nowrap;}
 /* Mobile TOC toggle */
 .toc-toggle{display:none;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg-surface);cursor:pointer;color:var(--text-dim);}
 .toc-toggle svg{width:16px;height:16px;}
@@ -79,7 +79,7 @@ article{min-width:0;max-width:var(--article-max);}
 
 /* ─── ARTICLE HEADER ─── */
 .meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
-.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:var(--radius-pill);background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:3px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
 .badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
 .meta-dot{color:var(--text-faint);}
 .meta-soft{color:var(--text-dim);}
@@ -133,7 +133,7 @@ pre code{background:none;border:none;padding:0;font-size:12.5px;line-height:1.65
 .steps{display:flex;flex-direction:column;margin:24px 0;}
 .step{display:grid;grid-template-columns:48px 1fr;}
 .step-num-col{display:flex;flex-direction:column;align-items:center;}
-.step-circle{width:34px;height:34px;border-radius:50%;background:var(--text);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px;flex-shrink:0;font-family:var(--font-mono);}
+.step-circle{width:34px;height:34px;border-radius:3px;background:var(--text);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px;flex-shrink:0;font-family:var(--font-mono);}
 .step-circle.outline{background:var(--bg);color:var(--text);border:2px solid var(--border-strong);}
 .step-line{flex:1;width:1px;background:var(--border-strong);margin:6px 0;}
 .step:last-child .step-line{display:none;}
@@ -146,7 +146,7 @@ pre code{background:none;border:none;padding:0;font-size:12.5px;line-height:1.65
 .grade-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0;}
 .grade-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:18px;transition:box-shadow .18s;}
 .grade-card:hover{box-shadow:var(--shadow);}
-.grade-badge{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:var(--radius-pill);margin-bottom:8px;letter-spacing:.04em;}
+.grade-badge{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:3px;margin-bottom:8px;letter-spacing:.04em;}
 /* TS — black fill */
 .grade-ts{border-color:var(--border-strong);}
 .grade-ts .grade-badge{background:var(--text);color:var(--bg);}
@@ -326,7 +326,7 @@ footer strong{color:var(--text-dim);}
 /* ─── P1 vs RAG ─── */
 .feature-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0;}
 .feature-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:20px;background:var(--bg-surface);}
-.feature-badge{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:3px 9px;border-radius:var(--radius-pill);background:var(--text);color:var(--bg);display:inline-block;margin-bottom:10px;letter-spacing:.05em;}
+.feature-badge{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:3px 9px;border-radius:3px;background:var(--text);color:var(--bg);display:inline-block;margin-bottom:10px;letter-spacing:.05em;}
 .feature-name{font-size:16px;font-weight:700;margin-bottom:6px;}
 .feature-io{margin:10px 0;font-size:13px;}
 .feature-io .io-row{display:flex;gap:8px;margin-bottom:4px;align-items:flex-start;}
@@ -349,7 +349,7 @@ footer strong{color:var(--text-dim);}
 .scenario-steps{display:flex;flex-direction:column;gap:0;}
 .sc-step{display:grid;grid-template-columns:32px 1fr;gap:0;}
 .sc-num{display:flex;flex-direction:column;align-items:center;}
-.sc-circle{width:28px;height:28px;border-radius:50%;background:var(--bg-strong);color:var(--text);display:grid;place-items:center;font-size:12px;font-weight:700;font-family:var(--font-mono);flex-shrink:0;}
+.sc-circle{width:28px;height:28px;border-radius:3px;background:var(--bg-strong);color:var(--text);display:grid;place-items:center;font-size:12px;font-weight:700;font-family:var(--font-mono);flex-shrink:0;}
 .sc-line{flex:1;width:1px;background:var(--border-strong);margin:4px 0;}
 .sc-step:last-child .sc-line{display:none;}
 .sc-body{padding:0 0 20px 12px;}
@@ -410,20 +410,18 @@ footer strong{color:var(--text-dim);}
   <a href="#api">04. API 엔드포인트</a>
   <a href="#workflow">05. 전체 워크플로우</a>
   <a href="#steps-detail" class="toc-sub">6단계 상세</a>
-  <a href="#p1-vs-rag">05-B. 분류 vs 답변 차이</a>
-  <a href="#rag">06. RAG — 질문 답변</a>
-  <a href="#models">07. AI 모델 설명</a>
-  <a href="#oss">08. 오픈소스 목록</a>
-  <a href="#criteria">09. 합격 기준</a>
+  <a href="#models">06. AI 모델 설명</a>
+  <a href="#oss">07. 오픈소스 목록</a>
+  <a href="#criteria">08. 합격 기준</a>
   <a href="#confidence" class="toc-sub">신뢰도 실무 가이드</a>
-  <a href="#cases">10. 상황별 로직</a>
-  <a href="#scenario">10-B. 실제 사용 시나리오</a>
-  <a href="#db">11. DB 구조</a>
+  <a href="#cases">09. 상황별 로직</a>
+  <a href="#scenario">09-B. 실제 사용 시나리오</a>
+  <a href="#db">10. DB 구조</a>
   <a href="#active-learning" class="toc-sub">능동학습 폐곡선</a>
-  <a href="#monitoring">12. 운영 모니터링</a>
-  <a href="#modules">13. 내부 모듈</a>
-  <a href="#cost">14. API·GPU 운용</a>
-  <a href="#roadmap">15. 남은 과제</a>
+  <a href="#monitoring">11. 운영 모니터링</a>
+  <a href="#modules">12. 내부 모듈</a>
+  <a href="#cost">13. API·GPU 운용</a>
+  <a href="#roadmap">14. 남은 과제</a>
   <a href="#glossary">부록. 용어집</a>
 </div>
 
@@ -457,7 +455,6 @@ footer strong{color:var(--text-dim);}
     <li>현행 모델 KF-DeBERTa <strong>F1 0.686 · 미탐율(FNR) 0.018</strong> (서빙경로, 홀드아웃 109건).</li>
     <li>AI가 틀리면 사람이 수정 — <strong>정정은 진단·교정 데이터로 축적</strong>되며, 재학습 반영 방식은 미확정(A 무반출 기본 / B 온사이트 / C 문서반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이고 모델은 상시 재학습하지 않습니다(지재원 자기 골든셋 1차학습 + 드리프트 트리거 단발).</li>
     <li>인터넷 없는 폐쇄망에서도 <strong>로컬 AI 모델로 완전 동작</strong>합니다.</li>
-    <li>질문을 입력하면 관련 문서를 찾아 <strong>AI가 답변을 생성</strong>합니다.</li>
     <li>모든 분류 요청이 <strong>감사 로그에 기록</strong>됩니다.</li>
     <li><strong>AI는 보조, 사람이 최종 판단</strong> — 이 원칙을 시스템이 강제합니다.</li>
   </ul>
@@ -572,7 +569,7 @@ footer strong{color:var(--text-dim);}
   <div class="reason-row">
     <div class="reason-q">💬 왜 Claude 기본?</div>
     <div class="reason-a">
-      RAG 답변 생성 품질, 한국어 이해도, 99.9% SLA 세 가지가 현재 최선입니다.
+      한국어 이해도와 99.9% SLA가 현재 최선이며, LLM은 선택적 보조 용도입니다.
       <strong>그러나 환경변수 하나로 GPT-4o, 로컬 Qwen3 등으로 교체 가능하게 설계했습니다.</strong>
       폐쇄망에서는 Qwen3-14B로 자동 전환됩니다. 벤더 종속 없음.
     </div>
@@ -960,7 +957,7 @@ footer strong{color:var(--text-dim);}
 <div class="case-grid">
   <div class="case-card">
     <div class="case-title"><span class="tag mid">일반망</span> 클라우드 API 사용</div>
-    <div class="case-body">LLM(Claude Sonnet 4.6)을 외부 API로 호출합니다. <code>LLM_PROVIDER=anthropic</code> 설정. <strong>일반망 개발·합성 데이터 생성 보조용</strong>이며, 폐쇄망 분류 본경로는 온프렘 GPU(Qwen3)를 씁니다(§14 참조).</div>
+    <div class="case-body">LLM(Claude Sonnet 4.6)을 외부 API로 호출합니다. <code>LLM_PROVIDER=anthropic</code> 설정. <strong>일반망 개발·합성 데이터 생성 보조용</strong>이며, 폐쇄망 비밀 분류 본경로는 <strong>분류기+룰(LLM-free·CPU)</strong>입니다(§14 참조).</div>
   </div>
   <div class="case-card">
     <div class="case-title"><span class="tag filled">폐쇄망</span> 로컬 모델 사용</div>
@@ -987,7 +984,6 @@ footer strong{color:var(--text-dim);}
 <tr><td><code>POST /api/v1/classify/stream</code></td><td>SSE 스트리밍</td><td>분류 진행 단계를 실시간으로 전송</td></tr>
 <tr><td><code>POST /api/v1/classify/async</code></td><td>비동기 202</td><td>백그라운드에서 분류. 대용량 배치 처리</td></tr>
 <tr><td><code>POST /api/v1/classify/batch</code></td><td>비동기 202</td><td>여러 문서를 한 번에 분류 요청 (최대 1,000건)</td></tr>
-<tr><td><code>POST /api/v1/answer</code></td><td>동기</td><td>질문 입력 → 관련 문서 검색 → AI 답변 생성</td></tr>
 <tr><td><code>POST /api/v1/documents</code></td><td>동기</td><td>HWP/PDF/DOCX 파일 업로드 및 등록 (최대 20MB)</td></tr>
 <tr><td><code>POST /api/v1/relabel</code></td><td>동기</td><td>분류 재라벨 — 사람 정정(correction)을 능동학습 입력으로 등록</td></tr>
 <tr><td><code>POST /api/v1/confirm</code></td><td>동기</td><td>분류 결과를 검증 라벨로 확정</td></tr>
@@ -1036,7 +1032,7 @@ footer strong{color:var(--text-dim);}
 <p>문서를 API로 전송하면 아래 6단계를 거쳐서 분류 결과가 나옵니다.</p>
 
 <!-- 한눈에 보기: 두 워크플로 (업로드 / 재학습) -->
-<div style="margin:18px 0;border:1px solid var(--border,#d8dee6);border-radius:10px;overflow:hidden;">
+<div style="margin:18px 0;border:1px solid var(--border,#d8dee6);border-radius:3px;overflow:hidden;">
   <div style="background:var(--accent,#3b6ea5);color:#fff;padding:10px 16px;font-weight:700;font-size:15px;">한눈에 보기 — 6개 모듈이 두 흐름에 나뉘어 동작</div>
   <div style="padding:12px 16px 14px;font-size:13.5px;line-height:1.6;">
     <p style="margin:4px 0 12px;color:var(--text-dim);">M1~M6 모듈은 ① 문서를 분류할 때와 ② 모델을 재학습할 때 서로 다르게 등장합니다.</p>
@@ -1269,74 +1265,9 @@ footer strong{color:var(--text-dim);}
 
 </div><!-- /steps -->
 
-<!-- ═══ 05-B ═══ -->
-<div class="section-sep">
-  <span class="section-sep-num">05-B</span>
-  <span class="section-sep-line"></span>
-  <span class="section-sep-title">분류 vs 검색 답변 — 두 기능의 차이</span>
-  <span class="section-sep-line"></span>
-</div>
-
-<h2 id="p1-vs-rag">P1 분류와 RAG, 같은 건가요?</h2>
-<p>
-  이 시스템에는 <strong>서로 다른 두 가지 AI 기능</strong>이 있습니다. 많이 혼동하는 부분입니다.
-  단, 둘의 <strong>위상은 다릅니다</strong> — <strong>P1 분류는 본 사업 핵심 요건</strong>(FUN-005)이고,
-  <strong>RAG 답변은 요건 외 부가 기능</strong>(검수자 지원용)입니다. 비중이 아니라 역할이 다릅니다.
-</p>
-
-<div class="feature-compare">
-  <div class="feature-card">
-    <div class="feature-badge">P1 — 분류</div>
-    <div class="feature-name">문서에 등급을 붙이는 기능</div>
-    <p style="font-size:13.5px;margin:8px 0 12px;">문서를 넣으면 TS/S1/S2/S3 중 하나를 판정합니다. "이 문서가 얼마나 민감한가?"에 답합니다.</p>
-    <div class="feature-io">
-      <div class="io-row"><span class="io-label">입력</span><span style="font-size:13px;color:var(--text-soft);">문서 텍스트 (HWP/PDF/TXT 등)</span></div>
-      <div class="io-row"><span class="io-label">출력</span><span style="font-size:13px;color:var(--text-soft);">등급 (TS) + 신뢰도 (0.93) + 근거 구간</span></div>
-      <div class="io-row"><span class="io-label">사용</span><span style="font-size:13px;color:var(--text-soft);">문서 관리 시스템에 업로드할 때 자동 분류</span></div>
-    </div>
-  </div>
-  <div class="feature-card">
-    <div class="feature-badge">RAG — 답변 <span style="font-size:.8em;opacity:.75;">(요건 외 부가)</span></div>
-    <div class="feature-name">질문에 답해주는 기능</div>
-    <p style="font-size:13.5px;margin:8px 0 12px;">질문을 넣으면 관련 문서를 찾아 AI가 답변을 만듭니다. "이 내용을 어디서 찾을 수 있나?"에 답합니다.</p>
-    <div class="feature-io">
-      <div class="io-row"><span class="io-label">입력</span><span style="font-size:13px;color:var(--text-soft);">자연어 질문 ("M&A 실사 접근 권한은?")</span></div>
-      <div class="io-row"><span class="io-label">출력</span><span style="font-size:13px;color:var(--text-soft);">답변 텍스트 + 인용한 문서 목록</span></div>
-      <div class="io-row"><span class="io-label">사용</span><span style="font-size:13px;color:var(--text-soft);">내부 직원 질의응답, 정책 확인</span></div>
-    </div>
-  </div>
-</div>
-
-<div class="callout">
-  <div class="callout-label">💡 두 기능은 독립적입니다</div>
-  <p>분류(P1)를 하지 않고 검색 답변(RAG)만 쓸 수 있고, 반대도 가능합니다.
-  함께 쓰면 "문서를 분류하면서 동시에 관련 내용을 검색"하는 combined 모드도 됩니다 (<code>use_rag=True</code> 옵션).</p>
-</div>
-
-<!-- ═══ 06 ═══ -->
-<div class="section-sep">
-  <span class="section-sep-num">06</span>
-  <span class="section-sep-line"></span>
-  <span class="section-sep-title">RAG — 질문에 답하기</span>
-  <span class="section-sep-line"></span>
-</div>
-
-<h2 id="rag">질문하면 어떻게 답변을 만드나요? <span style="font-size:.5em;color:var(--text-dim);font-weight:400;vertical-align:middle;">— 요건 외 부가 기능</span></h2>
-<p class="note-soft" style="font-size:13px;color:var(--text-dim);background:rgba(0,0,0,.03);border-left:3px solid var(--border,#d8dee6);padding:8px 12px;margin-bottom:12px;">
-  ※ RAG 질의응답은 계약 요건(영업비밀 <strong>분류</strong>)에 포함되지 않은 <strong>부가 기능</strong>입니다. 청킹 인프라(FUN-022)를 재활용해
-  <strong>검수자 지원용</strong>으로 제공하며, <strong>분류 등급에는 영향을 주지 않습니다.</strong> 아래는 동작 요약입니다(상세 생략).
-</p>
-
-<p><code>POST /api/v1/answer</code>에 자연어 질문을 보내면 두 단계로 답변을 만듭니다:</p>
-<ul style="line-height:1.7;">
-  <li><strong>① 검색</strong> — 질문을 <strong>KURE-v1</strong>로 벡터화 → PostgreSQL <strong>하이브리드</strong>(pgvector 의미 + ts_rank 어휘 + RRF)로 관련 문서 5개 검색. <span style="color:var(--text-dim);">(실 PG NL 측정 하이브리드 Recall@5 ≈ 0.85 &gt; dense 단독 0.76, 의사결정_대장 §03)</span></li>
-  <li><strong>② 생성</strong> — 검색된 문서를 근거로 LLM이 답변 + 인용 목록 생성. 일반망 <strong>Claude Sonnet 4.6</strong> · 폐쇄망 <strong>Qwen3-14B</strong>(Ollama) · CI <strong>Noop</strong>.</li>
-</ul>
-<p style="font-size:13px;color:var(--text-soft);">답변의 인용 번호(<code>[1]</code>,<code>[2]</code>)를 실제 검색 결과와 대조해 <strong>환각·무인용을 자동 경고</strong>합니다(<code>modules/m6_evaluation/answer_metrics.py</code>).</p>
-
 <!-- ═══ 07 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">07</span>
+  <span class="section-sep-num">06</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">사용하는 AI 모델</span>
   <span class="section-sep-line"></span>
@@ -1414,7 +1345,7 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 08 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">08</span>
+  <span class="section-sep-num">07</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">사용 오픈소스</span>
   <span class="section-sep-line"></span>
@@ -1444,7 +1375,7 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 09 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">09</span>
+  <span class="section-sep-num">08</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">합격 기준</span>
   <span class="section-sep-line"></span>
@@ -1458,8 +1389,6 @@ footer strong{color:var(--text-dim);}
   <tr><td><strong>분류 — 홀드아웃 F1 (서빙경로)</strong></td><td>F1-macro 측정</td><td>0.686 <span style="color:var(--text-dim);font-size:.85em;">· 원시 argmax 0.632</span></td><td><span class="tag mid">측정</span></td></tr>
   <tr><td><strong>분류 — 방향성 FNR (서빙경로)</strong></td><td>고등급 미탐 최소화</td><td>0.018 <span style="color:var(--text-dim);font-size:.85em;">· FNR_TS 0.000 · 원시 0.167</span></td><td><span class="tag mid">PASS</span></td></tr>
   <tr><td><strong>법률 정제 효과 (test 정확도)</strong></td><td>오염 제거 후 향상</td><td>93% <span style="color:var(--text-dim);font-size:.85em;">· 정제 전 78%</span></td><td><span class="tag mid">개선</span></td></tr>
-  <tr><td><strong>P2 RAG — Recall@5</strong> <span style="font-size:.85em;color:var(--text-dim);">(요건 외 부가)</span></td><td>Recall@5 ≥ 0.80</td><td>0.808 <span style="color:var(--text-dim);font-size:.85em;">(평가셋)</span></td><td><span class="tag mid">측정 · 실데이터 재확정</span></td></tr>
-  <tr><td><strong>P2 RAG — 검색 지연</strong></td><td>p50 ≤ 200ms</td><td>167ms</td><td><span class="tag mid">PASS</span></td></tr>
   <tr><td><strong>단위 테스트 (pytest)</strong></td><td>전통과 · 회귀 0</td><td>약 1,200건</td><td><span class="tag mid">PASS</span></td></tr>
   <tr><td><strong>실 GPU E2E (능동학습 폐곡선)</strong></td><td>7/7 (정정→학습→배포→리로드; 메커니즘 실증, 환류 정책 미확정)</td><td>7/7</td><td><span class="tag mid">PASS</span></td></tr>
   <tr><td><strong>운영 성능 F1 (실문서)</strong></td><td>발주처 실데이터 기준 측정 필요</td><td>N/A</td><td><span class="tag light">보류</span></td></tr>
@@ -1558,7 +1487,7 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 10 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">10</span>
+  <span class="section-sep-num">09</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">상황별 로직</span>
   <span class="section-sep-line"></span>
@@ -1607,7 +1536,7 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 10-B ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">10-B</span>
+  <span class="section-sep-num">09-B</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">실제 사용 시나리오</span>
   <span class="section-sep-line"></span>
@@ -1680,7 +1609,7 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 11 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">11</span>
+  <span class="section-sep-num">10</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">데이터베이스 구조</span>
   <span class="section-sep-line"></span>
@@ -1748,7 +1677,7 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 11-B ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">11-B</span>
+  <span class="section-sep-num">10-B</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">능동학습 폐곡선</span>
   <span class="section-sep-line"></span>
@@ -1795,13 +1724,13 @@ footer strong{color:var(--text-dim);}
   <p>
     백그라운드 작업이 정기적으로 점검합니다: 고등급 <strong>미탐이 10건 넘게 쌓이면 즉시 재학습(URGENT)</strong>,
     <strong>정정이 50건 넘게 쌓이면 정기 재학습(권장)</strong>으로 큐에 올립니다(상시 아님 — 실데이터 1차학습 후 드리프트/이벤트 단발 트리거).
-    검수자별 신뢰도(과거 합의 일치율)도 추적해서, 고등급 문서는 신뢰도 높은 2인 검토 게이트에 활용할 수 있습니다.
+    검수자별 신뢰도(과거 합의 일치율)도 추적해서, 고등급 문서는 신뢰도 높은 검수자의 단일 서명 게이트에 활용할 수 있습니다.
   </p>
 </div>
 
 <!-- ═══ 12 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">12</span>
+  <span class="section-sep-num">11</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">운영 모니터링</span>
   <span class="section-sep-line"></span>
@@ -1849,7 +1778,7 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 13 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">13</span>
+  <span class="section-sep-num">12</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">내부 모듈 구조</span>
   <span class="section-sep-line"></span>
@@ -1886,34 +1815,34 @@ footer strong{color:var(--text-dim);}
 
 <!-- ═══ 14 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">14</span>
+  <span class="section-sep-num">13</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">비용 시나리오</span>
   <span class="section-sep-line"></span>
 </div>
 
 <h2 id="cost">API와 GPU는 각각 어디에 쓰나요?</h2>
-<p><strong>온프렘 GPU 도입이 확정</strong>되어, 민감 데이터를 다루는 추론은 모두 <strong>폐쇄망 내부 GPU</strong>에서 상시 처리합니다. 클라우드 API는 데이터 반출이 허용되는 <strong>일반망 보조 용도로만</strong> 쓰입니다.</p>
+<p><strong>기본은 무GPU(CPU)</strong>입니다. 민감 데이터를 다루는 추론(분류·임베딩)은 폐쇄망 <strong>CPU</strong>에서 처리하고(LLM-free 핫패스), 상용 LLM(Claude 등)은 데이터 반출이 허용되는 <strong>공개·개발용으로만</strong> 씁니다. GPU는 <strong>학습 가속 옵션</strong>(요건상 발주처 제공·CSAP 샌드박스)으로 필수가 아닙니다.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>기능</th><th>실행 위치</th><th>비고</th></tr></thead>
   <tbody>
-  <tr><td>문서 분류 (KF-DeBERTa)</td><td><span class="tag filled">온프렘 GPU</span></td><td>핵심 요건 · 상시 추론</td></tr>
-  <tr><td>임베딩·검색 (KURE-v1)</td><td><span class="tag filled">온프렘 GPU</span></td><td>온프렘 인덱싱·검색</td></tr>
-  <tr><td>폐쇄망 LLM (Qwen3-14B)</td><td><span class="tag filled">온프렘 GPU</span></td><td>인터넷 불필요 · 데이터 외부 반출 없음</td></tr>
-  <tr><td>클라우드 LLM (Claude)</td><td><span class="tag mid">일반망 API</span></td><td>개발·합성 데이터 생성 보조 한정 · <strong>폐쇄망 운영 미사용</strong></td></tr>
+  <tr><td>문서 분류 (KF-DeBERTa)</td><td><span class="tag mid">CPU</span></td><td>핵심 요건 · LLM-free 핫패스 · 무GPU(≈333ms/건)</td></tr>
+  <tr><td>임베딩·검색 (KURE-v1)</td><td><span class="tag mid">CPU</span></td><td>온프렘 인덱싱·검색(CPU로 충분)</td></tr>
+  <tr><td>분류기 학습 (재학습 시)</td><td><span class="tag filled">GPU 선택</span></td><td>발주처 GPU 제공 시 가속 · 미제공 시 CPU(느림)</td></tr>
+  <tr><td>상용 LLM (Claude)</td><td><span class="tag mid">공개데이터만</span></td><td>골든·합성 생성 보조 · <strong>비밀 본문 미투입</strong></td></tr>
   </tbody>
 </table>
 </div>
 
 <div class="callout inset">
-  <div class="callout-label">🔒 왜 온프렘 GPU인가</div>
-  <p>영업비밀은 <strong>데이터 외부 반출이 금지</strong>되어, 폐쇄망 운영에서는 클라우드 API를 분류·검색 본 경로에 쓸 수 없습니다. 따라서 추론은 온프렘 GPU가 전제이며, GPU 도입으로 <strong>보안(망 분리)과 상시 대량 처리</strong>를 동시에 충족합니다. 클라우드 API는 인터넷이 허용되는 개발·합성 단계의 보조 수단으로만 활용합니다. (상세 용량·비용 산정은 본개발 단계에서 별도 제시)</p>
+  <div class="callout-label">🔒 왜 무GPU(CPU)인가</div>
+  <p>영업비밀은 <strong>데이터 외부 반출이 금지</strong>되어, 폐쇄망 운영에서는 상용 LLM·클라우드를 <strong>비밀 분류 본경로에 쓸 수 없습니다</strong>. 그래서 비밀 분류는 학습된 <strong>분류기+룰로 CPU에서 처리</strong>(LLM-free)하고, 임베딩·검색도 CPU로 충분합니다 — <strong>무GPU로도 동작</strong>. GPU는 (요건상 발주처 제공 시) <strong>학습 가속에만</strong> 쓰고 추론엔 불필요합니다. 상용 LLM은 공개·합성 데이터 가공에만 활용합니다. (상세 용량·비용은 본개발에서 별도 제시)</p>
 </div>
 
 <!-- ═══ 15 ═══ -->
 <div class="section-sep">
-  <span class="section-sep-num">15</span>
+  <span class="section-sep-num">14</span>
   <span class="section-sep-line"></span>
   <span class="section-sep-title">남은 과제 &amp; 로드맵</span>
   <span class="section-sep-line"></span>
@@ -1990,8 +1919,8 @@ footer strong{color:var(--text-dim);}
   <div class="gloss-card">
     <div class="gloss-term">RAG</div>
     <div class="gloss-eng">Retrieval-Augmented Generation</div>
-    <div class="gloss-def">질문에 답할 때 관련 문서를 먼저 검색(Retrieval)한 뒤 그 내용을 기반으로 답변을 생성(Generation)하는 방식. AI가 "기억"이 아닌 "실제 문서"를 참조.</div>
-    <div class="gloss-ex">예: "M&A 접근 권한?" → 규정 문서 검색 → Claude가 답변 생성</div>
+    <div class="gloss-def">관련 문서를 검색(Retrieval)해 근거 후보로 활용하는 방식. 본 시스템에서는 검수 보조용 검색 인덱스(청킹)로만 활용하며, 분류 등급 판정에는 사용하지 않습니다.</div>
+    <div class="gloss-ex">예: 질의 → 관련 규정 문서 상위 5개 검색(하이브리드)</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">F1 점수</div>
@@ -2051,7 +1980,7 @@ footer strong{color:var(--text-dim);}
     <div class="gloss-term">LLM</div>
     <div class="gloss-eng">Large Language Model</div>
     <div class="gloss-def">수천억 개의 파라미터로 이루어진 대형 AI 언어 모델. 문장을 이해하고 생성하는 능력이 탁월합니다. Claude, GPT-4, Qwen3 등이 여기 속합니다.</div>
-    <div class="gloss-ex">예: Claude Sonnet 4.6 = RAG 답변 생성에 사용되는 LLM</div>
+    <div class="gloss-ex">예: Claude Sonnet 4.6 · Qwen3-14B · GPT-4o</div>
   </div>
 </div>
 
@@ -2076,17 +2005,16 @@ footer strong{color:var(--text-dim);}
     <a href="#api">04. API 엔드포인트</a>
     <a href="#workflow">05. 전체 워크플로우</a>
     <a href="#steps-detail" class="toc-sub">6단계 상세</a>
-    <a href="#rag">06. RAG — 질문 답변</a>
-    <a href="#models">07. AI 모델 설명</a>
-    <a href="#oss">08. 사용 오픈소스</a>
-    <a href="#criteria">09. 합격 기준</a>
-    <a href="#cases">10. 상황별 로직</a>
-    <a href="#db">11. DB 구조</a>
+    <a href="#models">06. AI 모델 설명</a>
+    <a href="#oss">07. 사용 오픈소스</a>
+    <a href="#criteria">08. 합격 기준</a>
+    <a href="#cases">09. 상황별 로직</a>
+    <a href="#db">10. DB 구조</a>
     <a href="#active-learning" class="toc-sub">능동학습 폐곡선</a>
-    <a href="#monitoring">12. 운영 모니터링</a>
-    <a href="#modules">13. 내부 모듈</a>
-    <a href="#cost">14. API·GPU 운용</a>
-    <a href="#roadmap">15. 남은 과제</a>
+    <a href="#monitoring">11. 운영 모니터링</a>
+    <a href="#modules">12. 내부 모듈</a>
+    <a href="#cost">13. API·GPU 운용</a>
+    <a href="#roadmap">14. 남은 과제</a>
   </nav>
 </aside>
 

@@ -1,10 +1,10 @@
-"""골든 후보 → locked_gold_eval 사람 이중서명 승격 (P3 골격).
+"""골든 후보 → locked_gold_eval 사람 서명 승격 (P3 골격).
 
 gold_candidate(자동 합의+근거 통과)를 **평가 정답**(locked_gold_eval)으로 올리는 유일한 경로 = 사람 서명.
-규칙:
-  - 고등급(TS/S1): ≥2 독립 지재원 reviewer가 같은 등급에 서명(이중서명) — 운영 경로
+규칙(2026-06-29 결정: 골든 평가정답도 단일 서명):
+  - 기본 단일 서명: 모든 등급(TS/S1 포함) 독립 지재원 reviewer 1인 서명이면 승격.
+  - 옵션(dual_for_upper=True): 고등급(TS/S1)만 ≥2 독립 reviewer 합의 요구 — 운영
     (confirm_service._apply_dual_review_gate / distinct_reviewers_for_level)와 동일 강도.
-  - S2/S3: 단일 서명 허용(불일치 비용 제한적).
   - 머신/플레이스홀더 reviewer 거부(golden_tiers.is_human_reviewer 재사용).
   - 서명자 등급 불일치 → 거부(조정 필요).
 
@@ -69,12 +69,12 @@ def promote_to_locked(
     candidates: list[dict],
     signoffs: list[Signoff],
     *,
-    dual_for_upper: bool = True,
+    dual_for_upper: bool = False,
 ) -> SignoffResult:
     """gold_candidate를 사람 서명으로 locked_gold_eval로 승격(순수 함수, 정본 미변경).
 
-    고등급(TS/S1)=≥2 독립 reviewer 합의, S2/S3=≥1. 머신/불일치/미서명/등급외는 거부.
-    승격 레코드는 label_source=human_review·tier=locked_gold_eval가 되어 평가 정답으로 인정된다.
+    기본 단일 서명: 모든 등급이 독립 reviewer 1인이면 승격(dual_for_upper=True면 TS/S1만 ≥2).
+    머신/불일치/미서명/등급외는 거부. 승격 레코드는 label_source=human_review·tier=locked_gold_eval.
     """
     by_doc: dict[str, list[Signoff]] = defaultdict(list)
     for s in signoffs:

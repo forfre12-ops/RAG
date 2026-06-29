@@ -212,7 +212,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-classify"><span class="toc-method post">POST</span> /classify</a>
     <a class="toc-item" href="#ep-classify-batch"><span class="toc-method post">POST</span> /classify/batch</a>
     <a class="toc-item" href="#ep-classify-job"><span class="toc-method get">GET</span> /classify/jobs/{id}</a>
-    <a class="toc-item" href="#ep-answer"><span class="toc-method post">POST</span> /answer</a>
     <a class="toc-item" href="#ep-explain"><span class="toc-method post">POST</span> /classify/explain</a>
     <a class="toc-item" href="#ep-confirm"><span class="toc-method post">POST</span> /confirm</a>
     <a class="toc-item" href="#ep-relabel"><span class="toc-method post">POST</span> /relabel</a>
@@ -265,7 +264,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <h3 style="margin-top:16px;">신뢰 경계 — KL 단일 연동 (고객사 격리는 KL 포털)</h3>
         <p style="font-size:13px;"><strong>KL이 고객사(회원사) 페이지를 일원 구축</strong>하므로, 고객사 간 데이터 격리(어느 회원사가 어느 문서를 보는지)는 <strong>KL 포털 계층</strong>에서 처리한다. Lloydk는 KL 백엔드를 단일 신뢰 클라이언트로 받는 분류·RAG 엔진이다. 인증 신원(actor_id·role)은 <code>request.state</code>에 저장되어 <strong>역할 기반 권한(RBAC)</strong>과 감사 로그 actor 식별에만 쓰인다. 감사 로그의 actor_id는 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다. <span class="nego-chip">협의 필요</span> 고객사 식별자(예: <code>external_ref</code> 규약)를 Lloydk 응답·감사에 어느 수준까지 남길지는 KL과 합의.</p>
         <h3 style="margin-top:16px;">Rate Limit</h3>
-        <p style="font-size:13px;">SlowAPI 기반. 기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/explain 30/분 · /answer 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 키는 <strong>검증된 신원</strong>(인증 actor) 우선, 미인증 시 IP 폴백 — 위조 가능한 원시 헤더는 키로 쓰지 않는다(한도 우회·버킷 고갈 차단). 초과 시 <code>429</code> + <code>Retry-After</code> 헤더. <code>RATE_LIMIT_DISABLED=1</code>로 비활성(테스트·dryrun).</p>
+        <p style="font-size:13px;">SlowAPI 기반. 기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/explain 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 키는 <strong>검증된 신원</strong>(인증 actor) 우선, 미인증 시 IP 폴백 — 위조 가능한 원시 헤더는 키로 쓰지 않는다(한도 우회·버킷 고갈 차단). 초과 시 <code>429</code> + <code>Retry-After</code> 헤더. <code>RATE_LIMIT_DISABLED=1</code>로 비활성(테스트·dryrun).</p>
         <h3 style="margin-top:16px;">미들웨어</h3>
         <p style="font-size:13px;">모든 요청은 <code>api/middleware.py</code>를 통해 감사 로그(KL 소유 <code>tb_audit_log</code>)에 기록되고, OTel span이 생성된다.</p>
         <h3 style="margin-top:16px;">요청 본문 크기 한도 (DoS 가드)</h3>
@@ -380,45 +379,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     </div>
 
     <!-- ===== RAG ===== -->
-    <div class="cat-divider"><div class="cat-line"></div><span class="cat-label">RAG · 설명</span><div class="cat-line"></div></div>
-
-    <div class="ep" id="ep-answer">
-      <div class="ep-header">
-        <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/answer</span>
-        <span class="ep-summary">RAG 질의 응답</span>
-        <span class="ep-auth">API Key</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">RAG 질의응답. 검색 facade(<code>expand_then_search</code>: 쿼리 확장 → RRF 융합 → reranker)로 관련 청크를 수집하고 LLM(Qwen3/Claude)으로 한국어 답변을 합성한다. 검색·LLM 어느 쪽이 실패해도 <code>200</code> + <code>warnings</code>에 사유, <code>deterministic_fallback=true</code>로 처리(5xx는 진짜 예외만). 분당 30 한도. 본 엔드포인트는 등급 분류를 하지 않으며, <code>grade</code>는 호출자가 별도 단계에서 전달할 수 있다.</p>
-        <p style="font-size:13px;"><strong>인용 정합성 관측·집행</strong>: LLM 답변의 인용 번호를 검색된 근거(hits) 범위와 대조해, 존재하지 않는 근거 번호(out-of-range = 환각 인용)나 무인용 경고를 <code>warnings</code>에 남기고, 환각 인용 개수를 기계 판독용 마커 <code>hallucination_risk:&lt;n&gt;</code>로 노출한다. 설정 <code>answer_enforce_citations=true</code>(opt-in, <strong>기본 off=기존 동작</strong>)이면 out-of-range 인용이 1건 이상일 때 답변을 <strong>deterministic 답변으로 강등</strong>(<code>deterministic_fallback=true</code>)하고 강등 사유를 <code>warnings</code>에 기록한다.</p>
-        <h4>Request Body — RagAnswerRequest</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">query</td><td class="f-type">string</td><td class="f-req yes">●</td><td>한국어 질문 (1~4000자)</td></tr>
-            <tr><td class="f-name">namespace</td><td class="f-type">string</td><td></td><td>RAG collection (기본 settings.rag_default_collection="docs")</td></tr>
-            <tr><td class="f-name">top_k</td><td class="f-type">integer</td><td></td><td>검색 청크 수 (1~20, 기본 5)</td></tr>
-            <tr><td class="f-name">grade</td><td class="f-type">string</td><td></td><td>분류 결과 등급(TS/S1/S2/S3) — 합성 프롬프트에 전달</td></tr>
-            <tr><td class="f-name">use_reranker</td><td class="f-type">boolean</td><td></td><td>reranker 사용 (기본 true)</td></tr>
-            <tr><td class="f-name">metadata</td><td class="f-type">object</td><td></td><td>추가 검색 filter (선택)</td></tr>
-          </tbody>
-        </table>
-        <h4>Response 200 — RagAnswerResult</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">answer</td><td class="f-type">string</td><td>LLM 생성 한국어 답변</td></tr>
-            <tr><td class="f-name">citations</td><td class="f-type">RagCitation[]</td><td>[{source_doc, chunk_id, score, rank}] (rank 1-based)</td></tr>
-            <tr><td class="f-name">grade</td><td class="f-type">string | null</td><td>요청에 전달된 등급 에코</td></tr>
-            <tr><td class="f-name">usage</td><td class="f-type">object | null</td><td>{provider, model, input_tokens, output_tokens, cost_usd, latency_ms, success} (tb_llm_usage 기록)</td></tr>
-            <tr><td class="f-name">deterministic_fallback</td><td class="f-type">boolean</td><td>true이면 LLM 미사용/실패</td></tr>
-            <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>인용 정합성 경고 (범위초과/무인용 등) + <code>hallucination_risk:&lt;n&gt;</code> 관측 신호(n=환각 인용 개수). 집행 활성 시 강등 사유 포함</td></tr>
-          </tbody>
-        </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">400 query 누락</span><span class="sc s4xx">429 Rate Limit</span></div>
-      </div>
-    </div>
+    <div class="cat-divider"><div class="cat-line"></div><span class="cat-label">분류 설명</span><div class="cat-line"></div></div>
 
     <div class="ep" id="ep-explain">
       <div class="ep-header">
@@ -995,7 +956,6 @@ lloydk_rag_context_failure_total{stage}  # RAG context 빌드 실패 (build_rag_
 lloydk_embedding_fallback_total{original_provider}  # 임베딩 fallback → HashEmbedding
 
 # 성능 히스토그램
-lloydk_answer_phase_duration_seconds{phase}   # retrieve vs synthesize 단계별 latency
 lloydk_request_duration_seconds{method,route} # 전체 HTTP 요청 latency
 
 # 캐시
@@ -1025,7 +985,7 @@ lloydk_embedding_cache_miss_total</pre>
           <tr><td>422</td><td><code>VALIDATION_ERROR</code></td><td>Pydantic 검증 실패</td><td>detail 배열에서 필드별 오류 확인</td></tr>
           <tr><td>429</td><td><code>LLOYDK_RATE_LIMIT</code></td><td>요청 한도 초과</td><td>라우터별 한도(기본 120/분, /train 10/시간 등). Retry-After 헤더 이후 재시도</td></tr>
           <tr><td>503</td><td><code>MODEL_WARMING_UP</code></td><td>모델 로딩 중</td><td>warmup_done=true 확인 후 재시도 (최대 82초)</td></tr>
-          <tr><td>503</td><td><code>LLM_UNAVAILABLE</code></td><td>LLM 비응답</td><td>온프렘 LLM 서버(vLLM) 상태·API 확인</td></tr>
+          <tr><td>503</td><td><code>LLM_UNAVAILABLE</code></td><td>LLM 비응답</td><td>LLM 서버(설정 시·상용/로컬) 상태·API 확인</td></tr>
         </tbody>
       </table>
     </div>

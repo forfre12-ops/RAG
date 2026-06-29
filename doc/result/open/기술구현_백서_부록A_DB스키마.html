@@ -404,9 +404,9 @@ LIMIT  5;</pre>
           <tr><td class="td-col">labeler_id</td><td class="td-type">VARCHAR(50)</td><td></td><td>사람 라벨러 ID</td></tr>
           <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(3,2)</td><td></td><td>룰/LLM 신뢰도 — 검토 큐 정렬용(판정 권한 없음). 골든 생성 게이트는 합의(룰==LLM)+시드 근거+self-consistency로 판정</td></tr>
           <tr><td class="td-col">total_score</td><td class="td-type">NUMERIC(4,2)</td><td></td><td>평가 인자 합산 점수</td></tr>
-          <tr><td class="td-col">is_verified</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>검수 완료 여부 — 고등급(TS/S1) locked 승격은 독립 2인 이중서명 충족 시 true</td></tr>
+          <tr><td class="td-col">is_verified</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>검수 완료 여부 — 검수자 1인 서명 시 true(단일 서명). 고등급은 선택적 추가 검토 가능</td></tr>
           <tr><td class="td-col">verified_by</td><td class="td-type">VARCHAR(50)</td><td></td><td>1차 검수자(실계정)</td></tr>
-          <tr><td class="td-col">verified_by2</td><td class="td-type">VARCHAR(50)</td><td></td><td><b>2차 검수자</b> — locked(평가정답) 고등급 이중서명용(TS/S1 ≥2 독립 reviewer)</td></tr>
+          <tr><td class="td-col">verified_by2</td><td class="td-type">VARCHAR(50)</td><td></td><td><b>2차 검수자(선택)</b> — 고등급 추가 검토 시. 기본은 단일 서명</td></tr>
           <tr><td class="td-col">tier</td><td class="td-type">VARCHAR(20)</td><td></td><td>골든 논리 tier(label_source 파생): <code>silver_train</code>·<code>gold_candidate</code>·<code>locked_gold_eval</code>·<code>legal_floor</code>. 평가=locked만·학습=locked 제외</td></tr>
           <tr><td class="td-col">labeled_at / verified_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●/</td><td></td></tr>
         </tbody>

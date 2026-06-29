@@ -589,19 +589,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <td class="td-pass">PASS</td>
             </tr>
             <tr>
-              <td rowspan="2"><b>RAG 답변 품질</b></td>
-              <td>Citation-F1 · grounding 신호</td>
-              <td><span class="tag pass">✓ 검증</span></td>
-              <td><span class="tag neutral">동일</span></td>
-              <td class="td-pass">PASS</td>
-            </tr>
-            <tr>
-              <td>인용 범위 초과(환각) · 무인용 warning</td>
-              <td><span class="tag pass">✓ 검증</span></td>
-              <td><span class="tag neutral">동일</span></td>
-              <td class="td-pass">PASS</td>
-            </tr>
-            <tr>
               <td rowspan="3"><b>운영 무결성</b></td>
               <td>reviewer_id 빈/placeholder 거부 · AUDIT fail-fast</td>
               <td><span class="tag pass">✓ 검증</span></td>
@@ -1039,7 +1026,6 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
                   P1: F1=<b>0.855</b> · FNR=<b>14.6%</b> (5 epoch)<br>
                   RAG-ON: <b>16s → 2s</b> (싱글톤 버그 수정)<br>
                   PSH: <b>44/67 KPI</b> (65.7%)<br>
-                  /answer warm: <b>55s</b><br>
                   PDF E2E: <b>완전 영속화</b> (poc 계정 등록)
                 </div>
               </td>
@@ -1077,14 +1063,12 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               </td>
               <td><span class="env-badge env-dry">lite-noapi</span></td>
               <td style="font-size:12.5px;">
-                <b>보안(IDOR) · RAG 품질 · 운영 무결성</b><br>
+                <b>보안(IDOR) · 운영 무결성</b><br>
                 객체 수준 권한(IDOR/BOLA) 차단 — doc_id RBAC·등급 스코핑<br>
                 저신뢰 검수 게이트 (confidence&lt;0.7 → needs_review, 거부 아님)<br>
-                RAG 답변 품질 하니스 (Citation-F1·grounding·인용범위 검증)<br>
                 reviewer_id 빈/placeholder 거부 · AUDIT_DISABLED 운영 fail-fast<br>
                 alembic drift 점검 스크립트 · KPI→모듈 맵 CI 검증<br>
                 SBOM 의존성 폐포 스코프 (오염 173 → 프로젝트 178패키지)<br>
-                신규: test_answer_quality_metrics<br>
                 test_migration_drift · test_kpi_module_map · test_sbom_closure<br>
                 정적분석(ruff) 통과
               </td>
@@ -1195,7 +1179,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
                 v-dd3abab9 활성(.env) · 운영점 확정(C-esc 기본 None·B1 1.0 유지·C-eval 서빙평가)<br>
                 능동학습 폐곡선 배선(tb_corrections→train→deploy→reload) · 핫리로드 · 자동롤백<br>
                 alembic: evaluation_factors 3요건화 · score 0~2 · tb_model_versions 롤백 FK<br>
-                신규 API: /admin/model/reload · /train · /classify/stream · /answer · /relabel<br>
+                신규 API: /admin/model/reload · /train · /classify/stream · /relabel<br>
                 pytest 385/385 PASS · 회귀 0 · API 라우트 31개(스키마 노출 27)
               </td>
             </tr>

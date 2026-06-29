@@ -201,6 +201,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#basics">공통 원리 · 기호</a>
     <a class="toc-item" href="#terms">핵심 지표 용어</a>
     <a class="toc-item" href="#tools">도구 · 플랫폼 용어</a>
+    <a class="toc-item" href="#search">검색 용어 (BM25·dense·하이브리드)</a>
     <a class="toc-item" href="#gov">거버넌스 · 운영점 약어</a>
     <a class="toc-item" href="#m-p1">측정 P1 — 분류(F1·미탐률)</a>
     <a class="toc-item" href="#m-p2">측정 P2 — 검색(Recall@5)</a>
@@ -274,6 +275,23 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td><b>드리프트 (Drift)</b></td><td>운영 분포 변화 감지</td><td>운영 입력의 임베딩 분포(centroid)·분류 신뢰도·정정율을 학습 시점과 비교해 성능 저하를 조기 감지·경보한다. 학습 시 임베딩 centroid를 저장해 운영 분포와의 거리로 판정한다(거버넌스 <b>C-drift</b>). 이 분포·정정율 신호는 문서 식별 불가한 <b>집계 진단지표</b>로, 환류 결정상 A안에서도 <b>필수 환류 대상</b>이다(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>).</td></tr>
           <tr><td><b>FNR-safe 오버라이드</b></td><td>불일치 시 더 높은 등급 채택</td><td>S×V×M 등급과 콘텐츠(룰·모델) 등급이 어긋날 때 <b>더 민감한(높은) 등급</b>을 채택해 미탐을 막는 안전장치. 서빙 경로에 항상 적용되어 원시 argmax보다 미탐률이 크게 낮아진다.</td></tr>
           <tr><td><b>needs_review</b></td><td>거부 아닌 사람 검수 라우팅</td><td>저신뢰·충돌 등으로 자동 확정이 부적절할 때의 응답 상태. 분류를 막지 않고 검수자 큐로 보내 사람이 최종 확정한다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cat-divider" id="search"><div class="cat-line"></div><span class="cat-label">검색 용어 (BM25·dense·하이브리드)</span><div class="cat-line"></div></div>
+    <div class="tbl-wrap">
+      <table class="full">
+        <thead><tr><th style="width:20%;">이름</th><th style="width:24%;">한 줄</th><th>풀이</th></tr></thead>
+        <tbody>
+          <tr><td><b>희소검색 (sparse)</b></td><td>단어 표면형 일치로 찾기</td><td>문서를 단어 빈도 벡터로 보고 <b>표면형 단어 일치</b>로 점수를 낸다. 벡터 성분 대부분이 0이라 "희소(sparse)". 정확한 용어·고유명사엔 강하지만 동의어·문맥엔 약하다. 대표 랭킹 함수가 BM25이며, <b>우리는 그 자리에 <code>ts_rank</code>를 쓴다</b>(아래).</td></tr>
+          <tr><td><b>BM25</b></td><td>희소검색 대표 랭킹 함수</td><td>용어빈도(TF)에 문서길이·희귀도 보정을 더한 고전 검색 점수식(TF-IDF 개선판). <b>⚠ 우리 PostgreSQL 경로는 BM25를 쓰지 않는다</b> — BM25는 레거시 Elasticsearch 경로 용어이고, PG 경로의 어휘 랭커는 <code>ts_rank</code>다. 대외적으로 "BM25류 희소검색"이라 묶어 불러도 개념상 무방하나, <b>정밀하게는 ts_rank로 표기</b>해야 코드와 정합한다.</td></tr>
+          <tr><td><b>ts_rank (bigram tsvector)</b></td><td>우리의 한국어 어휘 랭커</td><td>PostgreSQL 전문검색(full-text search) 랭킹 함수. 한국어는 형태소 경계가 모호해 <b>bigram(2글자 단위) tsvector</b>로 색인한다. 우리 하이브리드의 <b>어휘(키워드) 축 실제 구현</b>이다. (<code>pg_bigm</code>은 랭커가 아니라 선택적 가속 후보 — <code>pg_store.py</code> 주석상 랭커 금지.)</td></tr>
+          <tr><td><b>밀집검색 (dense) · 시맨틱 검색</b></td><td>의미(벡터)로 찾기</td><td>문장을 임베딩 벡터로 바꿔 <b>의미 유사도</b>(코사인 등)로 점수를 낸다. 벡터 값이 꽉 차서 "밀집(dense)". <b>"시맨틱(의미) 검색"과 같은 말</b>이다. 우리 구현 = <code>pgvector</code> + KURE-v1 임베딩. 동의어·문맥·의역엔 강하나 정확한 고유명사엔 약할 수 있다. (RAG의 검색 *기법*이지 RAG 자체가 아님.)</td></tr>
+          <tr><td><b>하이브리드 검색 (BM25+dense)</b></td><td>어휘+의미 결합</td><td>희소(어휘)와 밀집(의미)을 합쳐 서로의 약점을 보완한다. 우리 = <code>dense(pgvector) + ts_rank</code>를 RRF로 융합. 실측 <b>하이브리드 ≈85% &gt; dense 단독 ≈76%</b>(의사결정_대장 §03).</td></tr>
+          <tr><td><b>RRF (상호순위융합)</b></td><td>순위 역수로 결과 합치기</td><td>Reciprocal Rank Fusion. 여러 검색결과를 <b>순위의 역수</b>(<code>1/(k+순위)</code>)로 합산해 하나로 융합한다. 점수 스케일이 달라도 순위로 정규화해 섞을 수 있다. 우리 상수 <b>k=60</b>(Cormack 2009 표준 · <code>_RRF_K</code>).</td></tr>
+          <tr><td><b>reranker (재정렬)</b></td><td>상위 후보를 정밀 재채점</td><td>1차 검색 상위 N건을 더 무거운 <b>cross-encoder</b> 모델로 다시 채점해 재정렬한다. 모델 = <code>BAAI/bge-reranker-v2-m3</code>. <b>⚠ 우리 코퍼스 실측 효과는 약 +1%p로 사실상 무용</b>이라 기본값은 비활성(<code>noop</code>)이다.</td></tr>
+          <tr><td><b>OCR (광학 문자 인식)</b></td><td>스캔본에서 글자 추출</td><td>Optical Character Recognition. 스캔 이미지·PDF에서 텍스트를 추출한다. <code>Tesseract</code>(한국어 데이터)+<code>poppler</code>를 쓰며 폐쇄망 번들에 동봉한다. 문서 추출 파이프라인의 한 단계(검색·분류 입력 전처리).</td></tr>
         </tbody>
       </table>
     </div>
