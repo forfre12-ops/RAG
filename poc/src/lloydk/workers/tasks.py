@@ -238,9 +238,20 @@ def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
     if getattr(rebuild, "rows", None):
         try:
             import uuid as _uuid  # noqa: PLC0415
-            base_train = spec_kwargs.get("train_path") or TrainSpec().train_path
+            _spec = TrainSpec()
+            base_train = spec_kwargs.get("train_path") or _spec.train_path
+            # [누수가드 강제] val/test(홀드아웃)와 doc_id·본문이 겹치는 교정 행을 train append에서
+            # 제외 — train↔eval 평가 누수 차단(fail-open→fail-closed). deploy gate가 깨끗한
+            # 홀드아웃에서 fnr_high를 재도록 보장(C-eval 정합). 옛 호출은 holdout_paths 미전달로
+            # 누수 차단이 fail-open(경고만)이었다.
+            holdout_paths = [
+                spec_kwargs.get("val_path") or _spec.val_path,
+                spec_kwargs.get("test_path") or _spec.test_path,
+            ]
             out_path = f"{settings.retrain_dataset_dir}/train_corr_{_uuid.uuid4().hex[:8]}.jsonl"
-            merged = merge_into_train_jsonl(base_train, rebuild, out_path)
+            merged = merge_into_train_jsonl(
+                base_train, rebuild, out_path, holdout_paths=holdout_paths
+            )
             if merged:
                 spec_kwargs["train_path"] = merged
                 incorporated_ids = list(rebuild.correction_ids)
