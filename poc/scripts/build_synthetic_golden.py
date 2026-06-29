@@ -50,8 +50,13 @@ def generate_docs(gen_model, base_url, grades, per_grade, len_min, len_max, log)
         domains = GRADE_DOMAINS.get(g, ["mixed"])
         for i in range(per_grade):
             dom = domains[i % len(domains)]
-            d = gen.generate_one(SynthRequest(target_grade=g, domain=dom, count=1,
-                                              len_min=len_min, len_max=len_max))
+            try:
+                d = gen.generate_one(SynthRequest(target_grade=g, domain=dom, count=1,
+                                                  len_min=len_min, len_max=len_max))
+            except Exception as exc:  # noqa: BLE001 — 1건 실패가 장시간 런 전체를 죽이지 않게
+                gen_fail += 1
+                log(f"  생성 실패 {g}/{dom}: {type(exc).__name__}")
+                continue
             if d.parse_error or not d.body or len(d.body.strip()) < 50:
                 gen_fail += 1
                 continue
@@ -65,8 +70,8 @@ def generate_docs(gen_model, base_url, grades, per_grade, len_min, len_max, log)
     return docs, intended_by_id, gen_fail, pii_hits
 
 
-def build(docs, judge_model, base_url, require_evidence, k_min, k_max, shadow_model, temperature):
-    from lloydk.golden_builder import build_golden_set, make_label_fn
+def build(docs, judge_model, base_url, require_evidence, k_min, k_max, shadow_model, temperature, log):
+    from lloydk.golden_builder import LabelPair, build_golden_set, make_label_fn
     from lloydk.modules.m3_labeling.judge import ConsensusJudge
     from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
     primary = LLMLabeler(provider=_provider(base_url, judge_model, "ollama-judge"))
@@ -75,7 +80,20 @@ def build(docs, judge_model, base_url, require_evidence, k_min, k_max, shadow_mo
     judge = ConsensusJudge(primary=primary, shadow=shadow, airgap=False,
                            k_min=k_min, k_max=k_max, temperature=temperature)
     label_fn = make_label_fn(judge=judge)
-    return build_golden_set(docs, label_fn=label_fn, require_evidence=require_evidence)
+    fails = {"n": 0}
+
+    def safe_label_fn(text):
+        try:
+            return label_fn(text)
+        except Exception as exc:  # noqa: BLE001 — 판정 실패는 review로(gold 금지)·런 보존
+            fails["n"] += 1
+            log(f"  판정 실패(→review): {type(exc).__name__}")
+            # rule=TS vs llm=S3 → ts_downgrade_suspect → needs_review (절대 gold 안 됨)
+            return LabelPair(rule_grade="TS", rule_conf=0.0, llm_grade="S3",
+                             llm_conf=0.0, has_real_evidence=False)
+
+    result = build_golden_set(docs, label_fn=safe_label_fn, require_evidence=require_evidence)
+    return result, fails["n"]
 
 
 def write_outputs(out_root, run_id, docs, result, meta):
@@ -138,8 +156,8 @@ def main(argv=None):
         return 2
 
     t1 = time.time()
-    result = build(docs, args.judge_model, args.base_url, require_evidence,
-                   args.k_min, args.k_max, args.shadow_model, args.temperature)
+    result, judge_fail = build(docs, args.judge_model, args.base_url, require_evidence,
+                               args.k_min, args.k_max, args.shadow_model, args.temperature, log)
     build_s = round(time.time() - t1, 1)
 
     # 등급별 gold 수율(intended 기준).
@@ -153,7 +171,7 @@ def main(argv=None):
         "gen_model": args.gen_model, "judge_model": args.judge_model,
         "shadow_model": args.shadow_model, "require_evidence": require_evidence,
         "k_min": args.k_min, "k_max": args.k_max, "temperature": args.temperature,
-        "generated": len(docs), "gen_fail": gen_fail, "pii_hits": pii_hits,
+        "generated": len(docs), "gen_fail": gen_fail, "judge_fail": judge_fail, "pii_hits": pii_hits,
         "gen_seconds": gen_s, "build_seconds": build_s,
         "gold_candidate": len(result.gold), "needs_review": len(result.uncertain),
         "pass_rate": round(len(result.gold) / len(docs), 3) if docs else 0,
