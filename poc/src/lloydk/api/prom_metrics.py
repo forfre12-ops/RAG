@@ -260,6 +260,22 @@ KILL_GATE_TRIPPED = Gauge(
     registry=registry,
 )
 
+# 관리자 검수 소요시간 — classification.classified_at → correction.corrected_at (초).
+# 처리시간 단축(자동확정·선례 효과) / 검수 병목 모니터. add_correction에서 best-effort 관측.
+ADMIN_REVIEW_SECONDS = Histogram(
+    "lloydk_admin_review_seconds",
+    "Seconds from classification to human correction (admin review handling time)",
+    buckets=(60, 300, 900, 1800, 3600, 21600, 86400, 259200, 604800),
+    registry=registry,
+)
+# 동일 문서 재등장 재검수 — 같은 doc에 이전 교정이 있던 재교정(문서 churn). 선례·exact-match
+# 재사용이 효과적이면 시간이 갈수록 감소해야 하는 지표(재검수 부담 절감 측정).
+SAME_DOC_RESURFACE_TOTAL = Counter(
+    "lloydk_same_doc_resurface_total",
+    "Corrections on a document that was already corrected before (recurring re-review)",
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",

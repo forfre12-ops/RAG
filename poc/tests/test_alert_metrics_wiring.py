@@ -61,6 +61,17 @@ def test_correction_total_defined_and_increments():
     assert after >= before + 1
 
 
+def test_admin_review_and_resurface_metrics_defined():
+    """[KPI] 처리시간 히스토그램 + 동일문서 재등장 카운터 — 시계열 노출(DB 불요)."""
+    from lloydk.api.prom_metrics import ADMIN_REVIEW_SECONDS, SAME_DOC_RESURFACE_TOTAL
+
+    ADMIN_REVIEW_SECONDS.observe(120)
+    SAME_DOC_RESURFACE_TOTAL.inc(0)
+    expo = generate_latest(registry).decode()
+    assert "lloydk_admin_review_seconds" in expo
+    assert "lloydk_same_doc_resurface_total" in expo
+
+
 def test_mask_pii_increments_pii_masked_metric():
     # 실제 계측 경로 — rrn 마스킹 시 타입별 카운터 증가.
     labels = {"pii_type": "rrn"}

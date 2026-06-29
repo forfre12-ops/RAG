@@ -327,12 +327,47 @@ class ClassifyRepo:
         )
         self.db.add(corr)
         self.db.flush()
-        # [KPI] 교정 발생률(direction별) 실시간 카운터 — best-effort(메트릭 실패가 교정 쓰기를
-        # 막지 않음). underclass 율 = 보안 미탐/자동확정 품질·죽음의 나선 모니터링 신호.
+        # [KPI] 교정 관련 실시간 지표 — best-effort(메트릭 실패가 교정 쓰기를 막지 않음).
+        #  · 발생률(direction별): underclass = 보안 미탐/자동확정 품질·죽음의 나선 신호
+        #  · 처리시간: classified_at→corrected_at (관리자 검수 소요)
+        #  · 동일문서 재등장: 같은 doc에 이전 교정이 있던 재교정(문서 churn·재검수 부담)
         try:
-            from lloydk.api.prom_metrics import CORRECTION_TOTAL  # noqa: PLC0415
+            from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                ADMIN_REVIEW_SECONDS,
+                CORRECTION_TOTAL,
+                SAME_DOC_RESURFACE_TOTAL,
+            )
 
             CORRECTION_TOTAL.labels(direction=direction).inc()
+            cls = self.db.get(Classification, classification_id)
+            if cls is not None:
+                if cls.classified_at is not None:
+                    import datetime as _dt  # noqa: PLC0415
+
+                    ca = cls.classified_at
+                    if ca.tzinfo is None:
+                        ca = ca.replace(tzinfo=_dt.timezone.utc)
+                    secs = (_dt.datetime.now(_dt.timezone.utc) - ca).total_seconds()
+                    if secs >= 0:
+                        ADMIN_REVIEW_SECONDS.observe(secs)
+                # 같은 doc에 이번 것 외 다른 교정이 있으면 재등장(recurring re-review).
+                prior = (
+                    self.db.execute(
+                        select(func.count())
+                        .select_from(Correction)
+                        .join(
+                            Classification,
+                            Correction.classification_id == Classification.classification_id,
+                        )
+                        .where(
+                            Classification.doc_id == cls.doc_id,
+                            Correction.correction_id != corr.correction_id,
+                        )
+                    ).scalar()
+                    or 0
+                )
+                if prior > 0:
+                    SAME_DOC_RESURFACE_TOTAL.inc()
         except Exception:  # noqa: BLE001
             pass
         return corr
