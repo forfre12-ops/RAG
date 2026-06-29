@@ -31,10 +31,11 @@ GenerateFn = Callable[[str, Optional[str]], str]
 # — 특히 reverse에서 '빈 텍스트=토큰 없음=제거 성공'으로 오채택되는 것을 막는다.
 MIN_GEN_LEN = 10
 
-# 역방향(사실 제거) 테스트에 쓸 수 있는 '강한' 토큰 출처 — 본문 중간 근거구간만.
+# 역방향(사실 제거) 테스트에 쓸 수 있는 '강한' 토큰 출처 — 본문 중간 근거 + 본문 구체값.
 # (제목 evidence@0·단일키워드 ts_kw·도메인폴백 domain은 제외: 그 토큰을 빼도 등급결정 '사실'이
 #  본문에 남아 reverse 전제가 성립 안 함 → 거짓 100% 위반을 만든다. 적대검증 2026-06-29.)
-REVERSE_ELIGIBLE_SOURCES = ("evidence@N",)
+# body_fact(수치/인용 구체값)는 빼면 등급결정 사실이 실제 사라질 수 있어 적격.
+REVERSE_ELIGIBLE_SOURCES = ("evidence@N", "body_fact")
 
 
 def is_reverse_eligible(token_sources: Sequence[str]) -> bool:

@@ -118,6 +118,7 @@ def test_generate_forward_only_when_reverse_disabled():
 
 def test_is_reverse_eligible_only_for_midbody_evidence():
     assert is_reverse_eligible(["evidence@N"]) is True
+    assert is_reverse_eligible(["body_fact"]) is True      # 본문 구체값(수치)도 적격
     assert is_reverse_eligible(["evidence@0"]) is False   # 제목
     assert is_reverse_eligible(["ts_kw"]) is False         # 단일 키워드
     assert is_reverse_eligible(["domain"]) is False        # 도메인 폴백

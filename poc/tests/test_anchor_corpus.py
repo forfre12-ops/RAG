@@ -5,6 +5,7 @@ import json
 
 from lloydk.modules.m6_evaluation.anchor_corpus import (
     AnchorSource,
+    extract_body_fact_tokens,
     extract_required_tokens,
     extract_required_tokens_detailed,
     load_anchor_corpus,
@@ -97,6 +98,37 @@ def test_record_carries_token_sources():
     rec = normalize_nkt({"text": "x", "label": "TS", "grade_basis": "nkt:AB:TS-kw:우주", "app_no": "P1"})
     assert rec.token_sources == ["ts_kw"]
     assert len(rec.token_sources) == len(rec.required_tokens)
+
+
+# ---- 본문 구체값(body_fact) — 역방향 적격 강토큰(gold 구조화문서 한정) ----
+
+def test_body_fact_extracts_numeric_specifics():
+    text = "수율 개선 메모\n\n불량률 2.3%, 수율 목표 97% 달성, 라인 3개 증설."
+    toks = extract_body_fact_tokens(text)
+    assert any("2.3%" in t for t in toks)
+    assert any("97%" in t for t in toks)
+
+
+def test_body_fact_skips_title_line():
+    # 제목(첫 줄)의 수치는 제외 — 본문만 본다.
+    text = "2024 3분기 보고서\n\n영업이익 12% 증가."
+    toks = extract_body_fact_tokens(text)
+    assert any("12%" in t for t in toks)
+
+
+def test_nkt_excludes_body_facts_gold_includes():
+    body = "수율 메모\n\n불량률 2.3%, 수율 97% 달성."
+    nkt = normalize_nkt({"text": body, "label": "S1", "app_no": "P1"})
+    gold = normalize_gold_real({"text": body, "label": "S1", "doc_id": "D1"})
+    assert "body_fact" not in nkt.token_sources           # NKT는 부수숫자라 끔
+    assert "body_fact" in gold.token_sources              # gold 구조화문서는 포함
+
+
+def test_include_body_facts_flag():
+    d_on = extract_required_tokens_detailed({"text": "t\n\n수율 97% 달성"}, include_body_facts=True)
+    d_off = extract_required_tokens_detailed({"text": "t\n\n수율 97% 달성"}, include_body_facts=False)
+    assert any(s == "body_fact" for _, s in d_on)
+    assert all(s != "body_fact" for _, s in d_off)
 
 
 # ---- 로더 + dedup + 제외정책 ----

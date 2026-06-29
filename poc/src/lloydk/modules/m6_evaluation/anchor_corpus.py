@@ -32,6 +32,40 @@ VALID_GRADES = ("TS", "S1", "S2", "S3")
 # grade_basis가 'TS-kw:<kw>' 꼴이면 그 kw가 등급 결정 사실. (S1-default는 일반 NKT.)
 _TS_KW_RE = re.compile(r"TS-kw:([^:|\s]+)")
 
+# 본문 구체값(수치+단위) — 등급을 가르는 '특정 사실'의 결정적 후보. 단어 접두 포함 캡처.
+# (역방향 적격 evidence@N 보강용. NKT 특허 추상은 수치가 드물어 주로 gold 구조화문서에서 잡힌다.)
+_BODY_NUM_RE = re.compile(
+    r"[가-힣A-Za-z][가-힣A-Za-z·\s]{0,12}?\s?"
+    r"\d{1,4}(?:[.,]\d+)?\s?"
+    r"(?:%|nm|fps|ms|μm|GHz|MHz|kW|W|V|℃|배|억원|억|만원|만|건|개월|분기|차)"
+)
+# 인용·강조로 묶인 특정 표현(고유 사실 신호): 「…」 『…』 '…' "…"
+_BODY_QUOTE_RE = re.compile(r"[「『\"']([가-힣A-Za-z0-9][^「『\"'」』]{1,28})[」』\"']")
+
+
+def extract_body_fact_tokens(text: str, *, max_tokens: int = 3, min_len: int = 3) -> list[str]:
+    """본문(제목=첫 줄 제외)에서 **등급결정 구체값**(수치+단위·인용 특정표현)을 결정적 추출.
+
+    역방향(사실 제거) 테스트의 적격 토큰(evidence@N급)을 보강한다 — 제목/도메인어와 달리
+    이 구체값은 빼면 등급결정 사실이 실제로 사라질 수 있다. **구조적 한계**: NKT 특허 추상은
+    수치 구체값이 드물어 거의 안 잡힌다(특허의 비밀=기술개시 전체, 분리 불가) → 주로 gold
+    구조화문서에서 잡힘. 안 잡히면 빈 리스트(해당 앵커는 reverse 부적격 유지).
+    """
+    lines = text.split("\n", 1)
+    body = lines[1] if len(lines) > 1 else text
+    toks: list[str] = []
+    for m in _BODY_NUM_RE.finditer(body):
+        frag = m.group(0).strip()
+        if len(frag) >= min_len:
+            toks.append(frag)
+    for m in _BODY_QUOTE_RE.finditer(body):
+        frag = m.group(1).strip()
+        if len(frag) >= min_len:
+            toks.append(frag)
+    seen: set[str] = set()
+    uniq = [t for t in toks if not (t in seen or seen.add(t))]
+    return uniq[:max_tokens]
+
 
 @dataclass
 class AnchorRecord:
@@ -63,16 +97,19 @@ def _stable_id(*parts: str) -> str:
 
 
 def extract_required_tokens_detailed(
-    raw: dict, *, max_tokens: int = 4, min_len: int = 2
+    raw: dict, *, max_tokens: int = 4, min_len: int = 2, include_body_facts: bool = True
 ) -> list[tuple[str, str]]:
     """required 토큰을 **출처(provenance)와 함께** 추출. 반환 [(token, source), ...].
 
     source 값(역방향 적격성 판정에 쓰임 — paraphrase_gen.is_reverse_eligible):
       - "evidence@0"  : evidence_span이 본문 맨 앞(start=0) = 사실상 **제목**. 약함(빼도 본문 사실 잔존).
-      - "evidence@N"  : 본문 중간 근거 구간(start>0) — 상대적으로 사실에 가까움.
+      - "evidence@N"  : 본문 중간 근거 구간(start>0) — 상대적으로 사실에 가까움(reverse 적격).
+      - "body_fact"   : 본문 수치/인용 구체값 — 빼면 등급결정 사실이 사라질 수 있음(reverse 적격).
       - "ts_kw"       : NKT grade_basis의 단일 키워드(국핵기 신호) — 단어수준이라 약함.
       - "domain"      : 도메인 폴백(단일 도메인어) — 가장 약함.
-    우선순위는 evidence > ts_kw > domain. 빈 리스트면 D는 '검사 불가'로 처리(순환 안 들임).
+    include_body_facts=False면 body_fact 미추출 — NKT 특허처럼 본문 수치가 부수적('3개'·'6개월'
+    같은 비-등급결정 숫자)인 출처는 끈다(약토큰 노이즈가 reverse를 오염시키지 않도록).
+    우선순위는 evidence > body_fact > ts_kw > domain. 빈 리스트면 D는 '검사 불가'로 처리.
     """
     out: list[tuple[str, str]] = []
     text = raw.get("text", "") or ""
@@ -89,6 +126,11 @@ def extract_required_tokens_detailed(
                 frag = frag[:40].rsplit(" ", 1)[0].strip()
             if len(frag) >= min_len:
                 out.append((frag, "evidence@0" if s == 0 else "evidence@N"))
+
+    # 본문 구체값(수치/인용) — 역방향 적격 강토큰. NKT 추상은 부수숫자뿐이라 끔(include_body_facts).
+    if include_body_facts:
+        for frag in extract_body_fact_tokens(text):
+            out.append((frag, "body_fact"))
 
     m = _TS_KW_RE.search(str(raw.get("grade_basis", "")))
     if m:
@@ -122,7 +164,8 @@ def normalize_nkt(raw: dict, *, source: str = "anchor_nkt", origin: str = "") ->
     if grade not in VALID_GRADES or not text:
         return None
     app = str(raw.get("app_no") or "")
-    detailed = extract_required_tokens_detailed(raw)
+    # NKT 특허 본문 수치는 부수적('3개'·'6개월')이라 body_fact 끔 — 등급결정 사실이 아님.
+    detailed = extract_required_tokens_detailed(raw, include_body_facts=False)
     return AnchorRecord(
         anchor_id="nkt:" + (app or _stable_id(text[:120])),
         text=text,
