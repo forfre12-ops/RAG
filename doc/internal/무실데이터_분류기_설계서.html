@@ -109,6 +109,7 @@ pre code{background:none;border:none;padding:0;}
 .callout.info{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.1);}
 .callout.pass{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.12);}
 .callout.danger{background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.2);border-left:3px solid #7a1f1f;border-radius:0;}
+.callout.ok{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.16);border-left:3px solid #1f5f3a;border-radius:0;}
 .callout-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
 .callout-body{font-size:13.5px;line-height:1.6;}
 
@@ -302,7 +303,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>S3부터 좁게(등급차등)</td><td class="td-pass">✅ 이미 있음</td><td>agreement_gate가 S3만 conf단독 허용 — <code>config.py:84-85,97-98</code></td></tr>
             <tr><td>안전 KPI</td><td class="td-pass">✅ 이미 있음</td><td>fnr_underclass · reviewer_trust · drift — <code>metrics.py</code>, <code>reviewer_trust.py</code></td></tr>
             <tr><td>FNR-safe 운영점(τ=0.30·agreement)</td><td class="td-pass">✅ ON</td><td>onprem/full-train 프로파일 기본 — <code>config.py:84-98</code></td></tr>
-            <tr><td>효율 KPI(취소율·처리시간·재등장)</td><td>△ 부분</td><td>교정 발생률 KPI(direction별) 구현(ae9836d, underclass=죽음나선 신호); 처리시간·라우팅적중·재등장 3종 후속</td></tr>
+            <tr><td>효율 KPI(취소율·처리시간·재등장)</td><td class="td-pass">✅ 대부분</td><td>교정 발생률(direction별)·관리자 처리시간·동일문서 재등장 구현(ae9836d·717c584·27b1686); 검수 라우팅 적중률만 후속(사후 outcome 추적)</td></tr>
+            <tr><td>kill-gate 모니터(미탐∧fatigue∧번복)</td><td class="td-pass">✅ 구현(경보)</td><td>run_kill_gate_check — 3축 평가 + KILL_GATE_TRIPPED 게이지, <b>비파괴(경보만)</b>. 자동 halt는 정책결정 후 — <code>kill_gate.py</code> (717c584)</td></tr>
+            <tr><td>합성 빌드 게이트(require_evidence)</td><td class="td-pass">✅ 구현</td><td>합성모드 <code>require_evidence=False</code>로 룰시드 부재 no_evidence 탈락 완화(운영 게이트 기본 True 불변) — <code>consensus.py</code> (44f8154)</td></tr>
             <tr><td>locked_gold_eval readiness gate</td><td class="td-pass">✅ 구현</td><td>eval_readiness(등급별 min N) + 자동활성 가드 — 합성-맹목 자동승격 차단 (04c77de); train 경로 eval_ready 산출은 후속</td></tr>
             <tr><td>serving shadow mode</td><td class="td-fail">⬜ 없음 (net-new)</td><td>빌드시 Qwen 섀도뿐. 모델버전+deploy gate 토대는 있음</td></tr>
             <tr><td>교정→학습 품질 게이트</td><td class="td-pass">✅ 구현</td><td>사람검수+finalized(confirmed/corrected)만 학습 편입 — 최약 고리 차단 (2f2c04e)</td></tr>
@@ -375,6 +378,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
       <p style="font-size:13px;color:var(--text-dim);">※ error-rate만으론 저volume 침묵을, fatigue만으론 정확도 붕괴를 놓친다 → 세 축 모두.</p>
+      <div class="callout ok"><span class="callout-icon">✅</span><div class="callout-body"><b>구현됨(경보만, 717c584):</b> <code>run_kill_gate_check</code>가 세 축(고등급 미탐 floor·일 처리부담 fatigue·자동확정 번복율)을 한 번의 DB 질의(admissible 교정만)로 모아 <code>evaluate_kill_gate</code>로 판정하고 <code>KILL_GATE_TRIPPED</code> 게이지를 set한다. 현재는 <b>비파괴(자동 중단 없이 경보)</b> — 자동 halt 전환과 일 처리능력(capacity)·임계 운영값은 정책 결정 후. fatigue capacity 기본값 0이면 부담 축은 비활성.</div></div>
 
       <h3>8.3 보류·정정</h3>
       <ul>
@@ -394,10 +398,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>검수자 신뢰도(reviewer_trust)</td><td class="td-pass">✅ 있음</td><td>오염 가중 방어</td></tr>
             <tr><td>드리프트(KL·cosine)</td><td class="td-pass">✅ 있음</td><td>분포 변화 경보</td></tr>
             <tr><td>자동확정률</td><td class="td-pass">✅ 있음</td><td>단독 KPI로 쓰면 위험(열고 싶어짐)</td></tr>
-            <tr><td><b>자동확정 취소/번복율</b></td><td class="td-fail">⬜ 추가</td><td>러버스탬프·오염 탐지기 — 카운터 신규</td></tr>
-            <tr><td><b>관리자 처리시간 감소</b></td><td class="td-fail">⬜ 추가</td><td>classified_at→corrected_at 히스토그램</td></tr>
-            <tr><td><b>검수 라우팅 적중률</b></td><td class="td-fail">⬜ 추가</td><td>라우팅 결정 정확도</td></tr>
-            <tr><td><b>동일문서 재검수 감소율</b></td><td class="td-fail">⬜ 추가</td><td>선례·exact-match 효과 측정</td></tr>
+            <tr><td><b>자동확정 취소/번복율</b></td><td class="td-pass">✅ 있음</td><td>CORRECTION_TOTAL(direction별, underclass=죽음나선 신호) — ae9836d</td></tr>
+            <tr><td><b>관리자 처리시간 감소</b></td><td class="td-pass">✅ 있음</td><td>ADMIN_REVIEW_SECONDS 히스토그램(classified_at→교정시각) — 717c584</td></tr>
+            <tr><td><b>검수 라우팅 적중률</b></td><td class="td-fail">⬜ 추가</td><td>라우팅 결정 정확도 — 사후 outcome 추적 필요(실시간 카운터 부적합)</td></tr>
+            <tr><td><b>동일문서 재검수 감소율</b></td><td class="td-pass">✅ 있음</td><td>SAME_DOC_RESURFACE_TOTAL(동일 doc 재교정 횟수) — 27b1686</td></tr>
           </tbody>
         </table>
       </div>
@@ -413,12 +417,18 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 1.   [계측]    교정 발생률 KPI(direction별, underclass=죽음나선 신호)     ✅ 완료 (ae9836d)
 4.   [게이트]  자동활성에 실(locked) 평가 readiness 요구                  ✅ 완료 (04c77de)
                 (train 경로 eval_ready 산출·전달은 locked 충분 시 후속)
+7.   [계측]    kill-gate 모니터(3축 평가 + 게이지, 경보만·비파괴)          ✅ 완료 (717c584)
+1b.  [계측]    처리시간·동일문서 재등장 KPI                              ✅ 완료 (717c584·27b1686)
+8.   [게이트]  합성 빌드 require_evidence(no_evidence 탈락 완화·레버3)     ✅ 완료 (44f8154)
 ── 후속 ──────────────────────────────────────────────────────────────
-1b.  나머지 KPI(처리시간·라우팅적중·재등장)                              ⬜
+1c.  검수 라우팅 적중률(사후 outcome 추적)                               ⬜
 3b.  τ sweep on 합성(eval_fnr_threshold_sweep) → 운영점·검수부담         ⬜
+A4.  [러너]    파일럿→정식 합성 빌드 러너(층화·과생성·run-스코프 출력)    ⬜
+A1.  [데이터]  고등급(TS/S1)은 앵커로(합성 수율 구조적 0~1) — eval_cards 통합  ⬜
 5.   [정리]    라우팅 형식화(RoutingPolicy enum) + hard "block" tier      ⬜
 6.   [빌드]    serving shadow mode (후보/kNN/CP record-only 검증)         ⬜</code></pre>
-      <p><b>상태:</b> 죽음의 나선은 이제 <b>2·3·4·0.5 네 군데 독립 방어</b>로 다층 차단(이전엔 단일 플래그뿐). <code>retrain_auto_activate</code>는 locked 평가 readiness 배선(1b 이후) 전까지 유지 — 켜도 합성 평가만으론 자동승격 안 됨(#4).</p>
+      <p><b>상태:</b> 죽음의 나선은 이제 <b>2·3·4·0.5 네 군데 독립 방어</b> + kill-gate 경보로 다층 차단(이전엔 단일 플래그뿐). <code>retrain_auto_activate</code>는 locked 평가 readiness 배선(train 경로) 전까지 유지 — 켜도 합성 평가만으론 자동승격 안 됨(#4).</p>
+      <div class="callout warn"><span class="callout-icon">🔬</span><div class="callout-body"><b>파일럿 실측(로컬 Ollama, 생성 qwen3:14b·심판 gemma3:12b, 8건):</b> 파이프라인 end-to-end 실동작 확인(Claude 불요·비용 0). 합의게이트 통과율 <b>운영모드 25% → 합성모드(레버3) 37.5%</b>, 고등급 gold 수율 <b>0→1(TS)</b>. <code>no_evidence</code>(룰시드 부재) 탈락이 레버3로 풀리자 병목은 <b>rule↔LLM 불일치</b>로 이동(생성품질·등급경계 문제, 게이트 아님). → 본 생성은 ~3배 과생성 필요, <b>고등급(TS/S1)은 합성 한계로 앵커가 정답</b>(A1).</div></div>
     </section>
 
     <section id="s11">
