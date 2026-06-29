@@ -17,7 +17,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from lloydk.db import session_scope
@@ -62,32 +62,49 @@ def evaluate_retraining_need(
     *,
     urgent_underclass_threshold: int = DEFAULT_URGENT_UNDERCLASS,
     recommended_threshold: int = DEFAULT_RECOMMENDED,
+    require_human_confirmed: bool = True,
 ) -> ActiveLearningStatus:
     """현재 unconsumed corrections 상태로 재학습 권장 여부 판단.
 
-    DB 미가용 시 status='OK', reason='db_unavailable'.
+    [admission 정합] 재학습 트리거 카운트도 **학습 편입 기준과 동일하게** 필터한다 —
+    사람 검수자 + finalized(confirmed/corrected) 교정만 센다(corrections_rebuild의
+    _correction_admissible 재사용). 머신/미확정 교정이 트리거 카운트를 부풀려 학습엔 안
+    들어갈 헛 재학습을 유발하던 불일치를 제거(카운트=실제 학습 편입분). require_human_confirmed
+    =False면 옛 동작(전부 카운트). DB 미가용 시 status='OK', reason='db_unavailable'.
     """
     try:
+        from lloydk.db.models import Classification  # noqa: PLC0415
+        from lloydk.modules.m6_evaluation.corrections_rebuild import (  # noqa: PLC0415
+            _correction_admissible,
+        )
+
         with session_scope() as db:
-            # direction별 counts (consumed_in_run is NULL만)
-            rows = db.execute(
-                select(Correction.direction, func.count())
-                .where(Correction.consumed_in_run.is_(None))
-                .group_by(Correction.direction)
-            ).all()
-            counts = {direction: count for direction, count in rows}
-            last_at = db.execute(
-                select(func.max(Correction.corrected_at)).where(
-                    Correction.consumed_in_run.is_(None)
+            # unconsumed corrections + 분류 status 조인 — admission 필터를 row별 적용.
+            q = (
+                select(
+                    Correction.correction_id,
+                    Correction.direction,
+                    Correction.corrected_by,
+                    Correction.corrected_at,
+                    Classification.status,
                 )
-            ).scalar_one_or_none()
-            unconsumed_ids = list(
-                db.execute(
-                    select(Correction.correction_id)
-                    .where(Correction.consumed_in_run.is_(None))
-                    .order_by(Correction.corrected_at)
-                ).scalars()
+                .join(
+                    Classification,
+                    Correction.classification_id == Classification.classification_id,
+                )
+                .where(Correction.consumed_in_run.is_(None))
+                .order_by(Correction.corrected_at)
             )
+            counts: dict[str, int] = {}
+            unconsumed_ids: list[int] = []
+            last_at = None
+            for cid, direction, corrected_by, corrected_at, status in db.execute(q).all():
+                if require_human_confirmed and not _correction_admissible(corrected_by, status):
+                    continue
+                counts[direction] = counts.get(direction, 0) + 1
+                unconsumed_ids.append(int(cid))
+                if corrected_at is not None and (last_at is None or corrected_at > last_at):
+                    last_at = corrected_at
     except SQLAlchemyError as exc:
         logger.debug("active learning eval skipped: %s", exc)
         return ActiveLearningStatus(reason=f"db_unavailable:{type(exc).__name__}")

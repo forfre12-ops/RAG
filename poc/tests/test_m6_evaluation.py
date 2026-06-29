@@ -198,6 +198,7 @@ def _seed_classification(db, levels: dict, model_version: str, code: str) -> Cla
         predicted_level_id=levels[code],
         confidence=0.9,
         alternatives=[],
+        status="confirmed",  # admission 게이트(finalized만 학습/트리거 카운트) 통과용
     )
     db.add(cls)
     db.flush()
