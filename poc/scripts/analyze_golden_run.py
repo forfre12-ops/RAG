@@ -17,7 +17,7 @@ import io
 import json
 import os
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -30,6 +30,38 @@ def _load(path: str) -> list[dict]:
         return []
     with io.open(path, encoding="utf-8") as f:
         return [json.loads(l) for l in f if l.strip()]
+
+
+def domain_leakage(gold: list[dict]) -> dict:
+    """도메인→등급 shortcut 누출 지표(silver 학습 적합성). 도메인이 등급을 얼마나 결정하나.
+
+    trivial_domain_baseline: 도메인-다수결 분류기 정확도(높을수록 누출 심함, 1.0=완전종속).
+    theil_u: 도메인이 등급 불확실성을 해소하는 비율(0=독립, 1=완전결정). H는 bits.
+    """
+    import math as _m
+    rows = [(r.get("domain") or "?", r.get("label") or r.get("llm_grade")) for r in gold
+            if (r.get("label") or r.get("llm_grade"))]
+    n = len(rows)
+    if not n:
+        return {}
+    grades = Counter(g for _, g in rows)
+
+    def H(counter, tot):
+        return -sum((c / tot) * _m.log2(c / tot) for c in counter.values() if c)
+
+    Hg = H(grades, n)
+    by_dom = defaultdict(Counter)
+    for d, g in rows:
+        by_dom[d][g] += 1
+    Hgd = sum((sum(gc.values()) / n) * H(gc, sum(gc.values())) for gc in by_dom.values())
+    correct = sum(max(gc.values()) for gc in by_dom.values())
+    return {
+        "n": n, "n_domains": len(by_dom),
+        "H_grade": round(Hg, 3), "H_grade_given_domain": round(Hgd, 3),
+        "trivial_domain_baseline": round(correct / n, 3),
+        "theil_u": round((Hg - Hgd) / Hg, 3) if Hg else 0.0,
+        "pure_domain_rows": sum(sum(gc.values()) for gc in by_dom.values() if len(gc) == 1),
+    }
 
 
 def analyze(run_dir: str) -> dict:
@@ -73,6 +105,7 @@ def analyze(run_dir: str) -> dict:
     )
 
     return {"run_dir": run_dir, "summary": summary,
+            "domain_leakage": domain_leakage(gold),
             "eval_cards": cards.to_dict(), "judge_reliability": jr.to_dict()}
 
 
@@ -102,6 +135,11 @@ def main(argv=None):
     print(f"N={s['n_records']} gold={s['gold_candidate']} pass={s['pass_rate']} "
           f"gold_by_intended={s['gold_by_intended']}")
     print(f"review_by_status={s['review_by_status']}")
+    dl = out.get("domain_leakage", {})
+    if dl:
+        print(f"[누출] 도메인→등급 trivial baseline={dl['trivial_domain_baseline']} "
+              f"(낮을수록 좋음; 0.856=본생성714 블로커) Theil_U={dl['theil_u']} "
+              f"H(grade|domain)={dl['H_grade_given_domain']}/{dl['H_grade']} 도메인수={dl['n_domains']}")
     o = out["judge_reliability"]["overall"]
     print(f"[judge] rule vs llm: agree={o['agreement_rate']} "
           f"up(llm>rule)={o['upgrade_rate']} down(llm<rule)={o['downgrade_rate']}")

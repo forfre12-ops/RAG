@@ -26,13 +26,14 @@ import time
 import uuid
 from pathlib import Path
 
-# 등급별 도메인 — 다양성 위해 등급 내에서 순환(고등급은 전용 특화 도메인).
-GRADE_DOMAINS = {
-    "TS": ["ma", "security", "defense", "semiconductor", "bio", "ai"],
-    "S1": ["finance", "tech", "business", "hr"],
-    "S2": ["business", "finance", "legal", "mixed"],
-    "S3": ["public"],  # 명확한 공개 도메인 — gemma 과분류 완화(A2). 내부문서형 mixed/business 제거
-}
+# 도메인×등급 교차 — 각 도메인이 모든 등급에 걸쳐 생성되게 공유 풀(도메인→등급 shortcut 차단).
+# 본 생성 714 다각감사에서 등급-잠금 도메인풀(TS=기술도메인·S3=public 단독)이 도메인→등급 누출
+# (trivial baseline 85.6%·Theil U 0.808)을 만들어 KF-DeBERTa가 민감도 대신 도메인토픽을 학습할
+# 위험으로 단독학습 보류 판정 → 교차 재설계. spannable(한 도메인이 등급별 다른 문서를 낼 수 있는)
+# 일반 도메인만 사용: finance는 S3 실적공시~TS M&A, tech는 S3 제품발표~TS 핵심알고리즘까지.
+# 등급은 생성기 situation 프롬프트가 통제(도메인 무관). 등급-잠금 특화/public 도메인은 배제.
+SPAN_DOMAINS = ["finance", "tech", "business", "legal", "hr", "mixed"]
+GRADE_DOMAINS = {g: SPAN_DOMAINS for g in ("TS", "S1", "S2", "S3")}
 
 
 def _provider(base_url: str, model: str, label: str):
