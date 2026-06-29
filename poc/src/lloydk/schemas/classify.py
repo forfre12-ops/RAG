@@ -89,6 +89,12 @@ class ClassifyResponse(BaseModel):
     confidence: float
     scores: dict[str, float]
     evaluation_factors: Optional[EvaluationFactors] = None
+    # [번들 C] evaluation_factors(S/V/M)의 출처 — 법리 근거 오인 방지(컴플라이언스).
+    #   "rule_evidenced": 룰엔진이 실제 본문 증거로 산출한 factor(법리 근거로 표시 가능).
+    #   "model_estimated": 모델/청크집계 등급에 맞춰 역산(svm_levels_for_grade)한 추정치 —
+    #     룰이 미탐했을 때 '등급↔factor 모순 표기'를 막으려 정합화한 값이라 법리 근거 아님.
+    # UI/리포트는 model_estimated를 '모델 추정'으로 구분 표시할 것.
+    factors_source: str = "rule_evidenced"
     evidence: list[EvidenceSpan] = []
     rag_context_used: list[RagContextHit] = []
     model_version: str

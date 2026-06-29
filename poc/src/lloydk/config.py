@@ -83,6 +83,15 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # agreement_gate: 룰·모델 불일치만 needs_review 라우팅(등급 무변경·FNR-monotone·실패 시 silent 폴백).
         "classifier_escalation_tau": 0.30,
         "agreement_gate_enabled": True,
+        # metadata_floor: KL ICD 보안표시·접근범위 상향 게이트 ON. 실데이터 0 환경에선 모델보다
+        # 메타데이터가 더 믿을 만하다 — security_marking이 예측보다 높으면 상향(FNR-safe·하향 안 함),
+        # access_scope 제한인데 예측 낮으면 검수 라우팅. 입력 메타 부재 시 silent no-op(안전).
+        # 발동·메타존재율은 lloydk_metadata_floor_applied_total / _classify_metadata_present_total로 가시화.
+        "metadata_floor_enabled": True,
+        # [번들 F] 원본 at-rest 암호화 ON — 영업비밀 폐쇄망에서 원본 평문 저장 금지(결정 정합:
+        # 원본 EncryptingStorage AES-256-GCM). 운영(full)에선 STORAGE_ENCRYPTION_KEY 필수 —
+        # 미설정 시 startup fail-fast(평문 저장 차단 = fail-secure). 다른 운영 시크릿과 동일 취급.
+        "storage_encryption_enabled": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -96,6 +105,10 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # FNR-safe 서빙 운영점 ON (onprem-local과 동일 — 위 주석 참조).
         "classifier_escalation_tau": 0.30,
         "agreement_gate_enabled": True,
+        # metadata_floor ON (onprem-local과 동일 — 위 주석 참조).
+        "metadata_floor_enabled": True,
+        # [번들 F] 원본 at-rest 암호화 ON (onprem-local과 동일 — 위 주석 참조).
+        "storage_encryption_enabled": True,
     },
 }
 
@@ -149,6 +162,11 @@ class Settings(BaseSettings):
     storage_encryption_enabled: bool = False
     storage_encryption_key: str = ""          # 고엔트로피 시크릿(SHA-256으로 32B 키 유도)
     storage_encrypted_buckets: list[str] = ["documents-raw"]  # 암호화 대상 버킷
+
+    # [QW SSRF] webhook outbox 대상 URL 가드. 스킴(http/https 외)·loopback은 항상 거부(SSRF
+    # 차단: file://·gopher://·127.0.0.1로 내부 서비스 타격). 사설IP(RFC1918/4193)는 폐쇄망에선
+    # 정상 콜백 대상이라 기본 허용 — 외부망 배포에서만 True로 막는다(과차단 방지).
+    outbox_block_private_ips: bool = False
 
     mlflow_tracking_uri: str = "http://localhost:5000"
 
@@ -357,6 +375,11 @@ class Settings(BaseSettings):
     # 자주 번복되는 저신뢰 검수자만으론 고등급 변경이 확정되지 않게 — 시니어 사인오프 정책의 근거.
     high_grade_review_min_reliability: float = 0.0
 
+    # [P1a] semantic 매칭 코사인 임계값 — 중앙 설정. 생성자 주입 > EMB_SEMANTIC_THRESHOLD env >
+    # 이 값 > 0.75(하드 폴백) 순. 0.75가 env에만 흩어져 있던 것을 다른 룰 노브(아래
+    # rule_high_risk_weight_multiplier)와 동일하게 settings로 끌어와 가시화·일관화한다(등급별 임계
+    # 차등은 후속 — 실데이터 보정 필요). 0~1 범위.
+    rule_semantic_threshold: float = 0.75
     # 룰 엔진 고위험 패턴(_HIGH_RISK_PATTERNS, 범용 영문약어 EUV·API·M&A 등) 가중치 배수 (B1).
     # 1.0=기본(동작 보존). 범용 약어의 단독 과분류가 골든셋 PR곡선에서 확인되면 이 값을 낮춰
     # (예 0.6) 코드 변경 없이 영향력을 하향한다. 과분류는 FNR-safe 방향이라 0 결함은 아니나
@@ -384,6 +407,10 @@ class Settings(BaseSettings):
     # False로 끄면 옛 동작(합성 평가만으로 자동 활성). 수동 활성은 이 게이트와 무관.
     deploy_gate_require_locked_eval: bool = True
     deploy_gate_min_locked_per_grade: int = 5
+    # [번들 D] locked_gold_eval(사람서명 평가정답) 레코드 jsonl 경로 — 운영 검수 readiness 가시화용
+    # (등급별 locked 보유/부족·배포가능 여부). 빈 값(기본)이면 readiness=no_locked_records(무실데이터
+    # 단계의 진실). 파일이 쌓이면 GET /admin/locked-readiness·게이지가 자동으로 켜진다. 읽기 전용.
+    locked_eval_jsonl: str = ""
     # [앵커 연결] 합성 test.jsonl만 보던 게이트에 **외부 사실 앵커 코퍼스**(NKT 공식분류·큐레이트
     # 홀드아웃) 실측 미탐을 주입한다. True면 후보 모델을 앵커로 통과시켜 고등급(TS/S1) under-class
     # 카드가 FAIL이면 게이트 hard block. 기본 False=동작 보존(앵커 측정은 CPU 추론 비용 발생).
@@ -396,6 +423,13 @@ class Settings(BaseSettings):
     kill_gate_daily_review_capacity: int = 0     # 일 검수 처리능력(0=fatigue 비활성)
     kill_gate_fatigue_multiplier: float = 1.5    # 일 교정 ≥ capacity×배수면 과부하 발동
     kill_gate_overturn_rate_max: float = 0.30    # 라벨변경 교정 비율 ≥ 이 값이면 발동(0=비활성)
+    # [번들 E] kill-gate를 '경보'에서 'admin-actuated 안전브레이크'로. 기본 False=동작 보존(경보만).
+    # True면 kill-gate tripped 동안 **고등급(TS/S1) 자동확정을 needs_review로 억제**한다(등급 무변경,
+    # FNR-safe). 합성 평가신호로 운영을 자동정지(쿼리 차단)하는 게 아니라, '확신 있는 고등급도 사람이
+    # 한 번 더 본다'로 보수화 — 조건이 풀리면(gauge→0) 자동 해제. 자동 롤백/재학습 정지와 별개.
+    # 억제 발동은 lloydk_kill_gate_autoconfirm_suppressed_total로 가시화. 캐시된 tripped 상태만 읽어
+    # 핫패스에 DB 부하 없음(주기 refresh가 run_kill_gate_check로 갱신).
+    kill_gate_suppress_autoconfirm: bool = False
     # 교정→라벨 재빌드/병합 학습셋 출력 디렉토리(A2-①).
     retrain_dataset_dir: str = "datasets/demo_retrain"
 

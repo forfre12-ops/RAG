@@ -28,6 +28,39 @@ from lloydk.schemas.confirm import (
 
 logger = logging.getLogger(__name__)
 
+
+def count_needs_second_review_by_grade() -> dict[str, int]:
+    """[번들 B] 이중검토 보류(status='needs_second_review') 건수를 등급코드별로 집계.
+
+    high_grade_dual_review ON 시 1인 동의 고등급 교정이 무음 hold 되는데, 운영자가 능동
+    쿼리해야만 보였다. 이 함수가 게이지 refresh와 admin 엔드포인트의 단일 소스 — 등급별 보류
+    건수를 노출해 '안 보이는 보류큐'를 가시화한다. DB 미가용/오류 → {}(best-effort, 안전).
+    """
+    from sqlalchemy import func as _f, select  # noqa: PLC0415
+
+    from lloydk.db.models import (  # noqa: PLC0415
+        Classification,
+        ClassificationLevel,
+    )
+
+    out: dict[str, int] = {}
+    try:
+        with session_scope() as db:
+            code_by_id = {
+                lv.level_id: lv.level_code
+                for lv in db.execute(select(ClassificationLevel)).scalars()
+            }
+            rows = db.execute(
+                select(Classification.predicted_level_id, _f.count())
+                .where(Classification.status == "needs_second_review")
+                .group_by(Classification.predicted_level_id)
+            ).all()
+            for level_id, n in rows:
+                out[code_by_id.get(level_id, str(level_id))] = int(n)
+    except SQLAlchemyError as exc:
+        logger.debug("count_needs_second_review_by_grade skipped: %s", exc)
+    return out
+
 RETRAIN_THRESHOLD_DEFAULT = 10  # underclass 누적 >= 이면 URGENT_RETRAIN (active_learning.py 단일 진실원)
 
 

@@ -33,6 +33,15 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SEMANTIC_THRESHOLD = 0.75
 
 
+def _settings_semantic_threshold() -> float:
+    """[P1a] settings.rule_semantic_threshold (중앙 설정) → 없거나 오류면 하드 폴백 0.75."""
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+        return float(getattr(settings, "rule_semantic_threshold", _DEFAULT_SEMANTIC_THRESHOLD))
+    except Exception:  # noqa: BLE001
+        return _DEFAULT_SEMANTIC_THRESHOLD
+
+
 # ── 정본 가이드 B안 v2.2: 등급 = 비공지성(S) × 경제적유용성(V) × 비밀관리성(M) ──
 # s==2·v==2 분기 선행: m=0이어도 s==2·v==2이면 S1(관리 미공식화 고가치 영업비밀).
 # 이 분기가 없으면 s=2,v=2,m=0 → 곱=0 → S3 미탐 — v2.2 골든셋 FNR 분석에서 명문화.
@@ -201,6 +210,7 @@ class LabelRuleEngine:
         self._factor_weights = {f["code"]: f["weight"] for f in FACTOR_SEEDS}
         # semantic 매칭 전용 자원 (lazy)
         self._embedder = embedder
+        # [P1a] 우선순위: 생성자 주입 > EMB_SEMANTIC_THRESHOLD env > settings > 0.75(하드 폴백).
         env_thr = os.environ.get("EMB_SEMANTIC_THRESHOLD")
         if semantic_threshold is not None:
             self.semantic_threshold = float(semantic_threshold)
@@ -208,9 +218,9 @@ class LabelRuleEngine:
             try:
                 self.semantic_threshold = float(env_thr)
             except ValueError:
-                self.semantic_threshold = _DEFAULT_SEMANTIC_THRESHOLD
+                self.semantic_threshold = _settings_semantic_threshold()
         else:
-            self.semantic_threshold = _DEFAULT_SEMANTIC_THRESHOLD
+            self.semantic_threshold = _settings_semantic_threshold()
         # seed.value 임베딩 캐시 — 동일 seed 반복 평가 시 재계산 방지
         self._seed_vec_cache: dict[str, list[float]] = {}
 

@@ -127,7 +127,10 @@ def main() -> int:
     regressions: list[dict] = []
     if args.regression_threshold > 0:
         from lloydk.perf.recorder import load_history  # noqa: PLC0415
-        from lloydk.perf.regression import detect_regressions  # noqa: PLC0415
+        from lloydk.perf.regression import (  # noqa: PLC0415
+            detect_regression_trend,
+            detect_regressions,
+        )
 
         prev_history = load_history(args.out_dir, mode=args.mode, limit=1)
         prev = prev_history[0] if prev_history else None
@@ -135,6 +138,14 @@ def main() -> int:
             report, prev, threshold_pct=args.regression_threshold
         )
         report["regressions"] = regressions
+
+        # [QW] 단발(prev 1건) 회귀만 보면 일시 스파이크와 지속 저하를 구별 못 한다.
+        # 최근 회차로 추세분석을 run-summary에 동반 기록(이전엔 HTML 리포트에서만 호출).
+        trend_history = load_history(args.out_dir, mode=args.mode, limit=5)
+        if len(trend_history) >= 3:
+            report["regression_trends"] = detect_regression_trend(
+                trend_history, threshold_pct=args.regression_threshold
+            )
         if regressions:
             print(f"[PSH] REGRESSIONS ({len(regressions)} ≥ {args.regression_threshold}%):")
             for r in regressions:

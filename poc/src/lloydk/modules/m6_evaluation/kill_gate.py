@@ -28,6 +28,25 @@ logger = logging.getLogger(__name__)
 _HIGH_GRADES = ("TS", "S1")
 _OVERTURN_MIN_SAMPLES = 5  # overturn율은 표본이 이 미만이면 신뢰불가 → 0(미발동)
 
+# [번들 E] 마지막 kill-gate 점검 결과 캐시 — 안전브레이크가 핫패스(classify)에서 DB 없이
+# tripped 여부를 읽게 한다. run_kill_gate_check()가 주기 refresh에서 갱신. None=아직 미점검.
+_LAST_RESULT: "KillGateResult | None" = None
+
+
+def should_suppress_autoconfirm(grade: str | None) -> bool:
+    """[번들 E] kill-gate 안전브레이크 — 이 등급의 자동확정을 억제해야 하는가.
+
+    settings.kill_gate_suppress_autoconfirm=True 이고 마지막 점검이 tripped 이며 등급이
+    고등급(TS/S1)일 때만 True. 캐시된 상태만 읽어 핫패스 DB 부하 없음. 미점검(None)·미발동·
+    플래그 OFF 면 False(동작 보존). 조건이 풀리면(다음 refresh에서 tripped=False) 자동 해제.
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    if not getattr(settings, "kill_gate_suppress_autoconfirm", False):
+        return False
+    if _LAST_RESULT is None or not _LAST_RESULT.tripped:
+        return False
+    return str(grade) in _HIGH_GRADES
+
 
 @dataclass
 class KillGateResult:
@@ -143,6 +162,9 @@ def run_kill_gate_check() -> dict:
         high_grade_miss_floor=int(getattr(settings, "kill_gate_high_grade_miss_floor", 1)),
         overturn_rate_max=float(getattr(settings, "kill_gate_overturn_rate_max", 0.30)),
     )
+    # [번들 E] 캐시 갱신 — 안전브레이크(should_suppress_autoconfirm)가 읽는 tripped 상태.
+    global _LAST_RESULT
+    _LAST_RESULT = res
     try:
         from lloydk.api.prom_metrics import KILL_GATE_TRIPPED  # noqa: PLC0415
 

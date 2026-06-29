@@ -44,3 +44,66 @@ def reload_model() -> ReloadModelResponse:
         model_version=str(info.get("model_version")),
         model_loaded=bool(info.get("model_loaded")),
     )
+
+
+# ── [번들 B] 고등급 이중검토 보류 가시화 ──────────────────────────────────────
+class EscalationHeldResponse(BaseModel):
+    by_grade: dict[str, int]
+    total: int
+
+
+@router.get(
+    "/escalation-held",
+    response_model=EscalationHeldResponse,
+    dependencies=_ADMIN_ONLY,
+    summary="이중검토 보류(needs_second_review) 등급별 건수",
+    description=(
+        "high_grade_dual_review ON 시 1인 동의 고등급 교정은 needs_second_review로 보류된다. "
+        "운영자가 능동 쿼리해야만 보이던 '안 보이는 보류큐'를 등급별 건수로 노출(가시화). "
+        "DB 미가용 시 빈 집계."
+    ),
+)
+def escalation_held() -> EscalationHeldResponse:
+    from lloydk.services.confirm_service import (  # noqa: PLC0415
+        count_needs_second_review_by_grade,
+    )
+    counts = count_needs_second_review_by_grade()
+    return EscalationHeldResponse(by_grade=counts, total=sum(counts.values()))
+
+
+# ── [번들 D] locked_gold_eval readiness 가시화 ───────────────────────────────
+class LockedReadinessResponse(BaseModel):
+    ready: bool
+    per_grade: dict[str, int]
+    missing: list[str]
+    min_per_grade: int
+    require_locked_eval: bool
+    deploy_locked_gate_passed: bool
+    reason: str
+
+
+@router.get(
+    "/locked-readiness",
+    response_model=LockedReadinessResponse,
+    dependencies=_ADMIN_ONLY,
+    summary="locked_gold_eval(사람서명 평가정답) 배포 readiness",
+    description=(
+        "deploy gate가 자동활성 시 요구하는 등급별 min_locked_per_grade 충족 여부를 노출 — "
+        "등급별 locked 보유/부족·배포 가능 여부. 무실데이터 단계엔 비어 ready=false(진실), "
+        "사람서명으로 채워지면 자동으로 켜진다. settings.locked_eval_jsonl 경로 기준(읽기 전용)."
+    ),
+)
+def locked_readiness() -> LockedReadinessResponse:
+    from lloydk.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
+        locked_eval_readiness,
+    )
+    s = locked_eval_readiness()
+    return LockedReadinessResponse(
+        ready=bool(s["ready"]),
+        per_grade=s["per_grade"],
+        missing=list(s["missing"]),
+        min_per_grade=int(s["min_per_grade"]),
+        require_locked_eval=bool(s["require_locked_eval"]),
+        deploy_locked_gate_passed=bool(s["deploy_locked_gate_passed"]),
+        reason=str(s["reason"]),
+    )

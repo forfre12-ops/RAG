@@ -234,16 +234,20 @@ class ClassifyService:
             # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
             notify("embed")
             notify("retrieve" if req.use_rag else "llm")
+            eff_meta = self._effective_metadata(req)
             pred = self.inference.run(
                 text=cleaned,
                 use_rag=req.use_rag,
                 rag_namespace=req.rag_namespace,
-                metadata=self._effective_metadata(req),
+                metadata=eff_meta,
                 return_evidence=req.return_evidence,
             )
             notify("llm")
 
             warnings_acc = list(pred.warnings)
+            # [번들 A] 메타데이터/출처 게이트 가시성 — 게이트 발동·ICD 메타 존재율을 best-effort
+            # 노출. pred.warnings(pipeline 산출)만 본 시점에 측정해 서비스 재라우팅과 중복 없음.
+            self._emit_gate_visibility_metrics(eff_meta, warnings_acc)
             notify("persist")
             inference_id, persist_warnings = self._try_persist(req, pred, chunks=chunks)
             warnings_acc.extend(persist_warnings)
@@ -312,6 +316,15 @@ class ClassifyService:
                     status = "needs_review"
                     warnings_acc.append(so)
 
+            # [번들 E] kill-gate 안전브레이크 — kill-gate tripped 동안 고등급(TS/S1) 자동확정을
+            # needs_review로 억제(등급 무변경·FNR-safe). 합성 평가신호로 운영을 자동정지하지 않고
+            # '확신 있는 고등급도 사람이 한 번 더' 로만 보수화 — 조건 풀리면 자동 해제(opt-in 기본 OFF).
+            if status != "needs_review":
+                brake = self._kill_gate_brake(pred.label)
+                if brake is not None:
+                    status = "needs_review"
+                    warnings_acc.append(brake)
+
             logger.info(
                 "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f status=%s",
                 req.doc_id, inference_id, pred.label, float(pred.confidence), status,
@@ -324,6 +337,7 @@ class ClassifyService:
                 confidence=pred.confidence,
                 scores=pred.scores,
                 evaluation_factors=pred.factors,
+                factors_source=self._factors_source(warnings_acc),
                 evidence=pred.evidence,
                 rag_context_used=pred.rag_context,
                 model_version=pred.model_version,
@@ -404,7 +418,7 @@ class ClassifyService:
             from lloydk.config import settings  # noqa: PLC0415
             if not getattr(settings, "model_secondopinion_llm_enabled", False):
                 return None
-            from lloydk.schemas.common import Grade, GradeRegistry  # noqa: PLC0415
+            from lloydk.schemas.common import GradeRegistry  # noqa: PLC0415
             order = GradeRegistry.get_order()
             top_code = next(iter(order), "TS")  # 가장 높은(비밀) 등급 코드
             model_code = model_label.value if hasattr(model_label, "value") else str(model_label)
@@ -469,10 +483,24 @@ class ClassifyService:
             except Exception as exc:  # noqa: BLE001
                 db.rollback()
                 logger.debug("audit write failed (non-critical): %s", exc)
+                self._inc_verified_label_audit_skip()
             finally:
                 db.close()
         except Exception as exc:  # noqa: BLE001
             logger.debug("_audit_verified_label skipped: %s", exc)
+            self._inc_verified_label_audit_skip()
+
+    @staticmethod
+    def _inc_verified_label_audit_skip() -> None:
+        """[QW] verified_label 감사 누락을 메트릭으로 가시화(best-effort). 결정론 경로의
+        컴플라이언스 감사가 무음 누락되지 않게 — 값 상승 시 DB/감사 미들웨어 문제 신호."""
+        try:
+            from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL,
+            )
+            CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL.inc()
+        except Exception:  # noqa: BLE001
+            pass
 
     # ------------------------------------------------------------
     # Verified Label Lookup (Corrections 반영)
@@ -764,6 +792,96 @@ class ClassifyService:
         try:
             return uuid.UUID(value)
         except (ValueError, TypeError, AttributeError):
+            return None
+
+    @staticmethod
+    def _emit_gate_visibility_metrics(eff_meta: dict, warnings_acc: list[str]) -> None:
+        """[번들 A] 메타데이터/출처 게이트 가시성 메트릭 — 전부 best-effort(실패해도 분류 무영향).
+
+        두 축을 노출한다:
+          (1) 게이트 실제 발동(METADATA_FLOOR_APPLIED / SOURCE_PRIOR_APPLIED) — pipeline이 남긴
+              경고 문자열로 판정(classify 라우팅 검사와 동일 신호 소스).
+          (2) 분류 입력의 ICD 메타데이터 존재율(CLASSIFY_METADATA_PRESENT) — 게이트를 켜도 입력
+              메타가 없으면 silent no-op임을 켜기 *전에* 보이게 한다. field='none'=게이트 입력 메타 전무.
+
+        서빙 경로(ClassifyService.classify)에서만 호출 — 평가(serving_eval은 pipeline.run 직접
+        호출)는 제외되어 운영 신호가 오염되지 않는다.
+        """
+        try:
+            from lloydk.api import prom_metrics as _pm  # noqa: PLC0415
+        except Exception:  # noqa: BLE001 — 메트릭 레지스트리 미가용 환경(테스트 일부)은 무해 skip
+            return
+        # (1) 게이트 발동 — pred.warnings 문자열 매칭(pipeline 산출).
+        try:
+            joined = " ".join(warnings_acc)
+            if "metadata-floor:" in joined:
+                _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="raised").inc()
+            if "metadata-access-conflict" in joined:
+                _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="access_conflict").inc()
+            if "source-prior:" in joined:
+                _pm.SOURCE_PRIOR_APPLIED_TOTAL.labels(action="capped").inc()
+            if "cap-conflict" in joined:
+                _pm.SOURCE_PRIOR_APPLIED_TOTAL.labels(action="cap_conflict").inc()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("gate-firing metric emit skipped: %s", exc)
+        # (2) ICD 메타데이터 존재율 — 게이트 활성 여부와 무관, 분류 1건당 1회.
+        try:
+            md = eff_meta or {}
+            present: list[str] = []
+            if str(md.get("security_marking", "") or "").strip():
+                present.append("security_marking")
+            if str(md.get("access_scope", "") or "").strip():
+                present.append("access_scope")
+            if str(md.get("source_type", "") or md.get("source", "") or "").strip():
+                present.append("source")
+            if present:
+                for field in present:
+                    _pm.CLASSIFY_METADATA_PRESENT_TOTAL.labels(field=field).inc()
+            else:
+                _pm.CLASSIFY_METADATA_PRESENT_TOTAL.labels(field="none").inc()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("metadata-presence metric emit skipped: %s", exc)
+
+    @staticmethod
+    def _factors_source(warnings_acc: list[str]) -> str:
+        """[번들 C] evaluation_factors 출처 판정 — 'model_estimated' | 'rule_evidenced'.
+
+        룰 미탐으로 등급에 맞춰 factor를 역산(svm_levels_for_grade)한 경우(정합화 경고
+        'factors aligned to model grade' / 'chunk severe-agg' 존재) 표시 S/V/M은 법리 근거가
+        아니라 모델/집계 추정치다 → 컴플라이언스상 구분 표시. 경고가 진실의 단일 소스.
+        """
+        for w in warnings_acc:
+            if "factors aligned to model grade" in w or "chunk severe-agg" in w:
+                return "model_estimated"
+        return "rule_evidenced"
+
+    @staticmethod
+    def _kill_gate_brake(label) -> "str | None":
+        """[번들 E] kill-gate 안전브레이크 — 억제 대상이면 검수 사유 문자열, 아니면 None.
+
+        should_suppress_autoconfirm(고등급 + tripped + flag ON) 충족 시 needs_review 라우팅
+        사유를 반환하고 메트릭 증가. 미충족·예외는 None(동작 보존 — 게이트가 죽어도 분류는 진행).
+        """
+        try:
+            from lloydk.modules.m6_evaluation.kill_gate import (  # noqa: PLC0415
+                should_suppress_autoconfirm,
+            )
+            grade = label.value if hasattr(label, "value") else str(label)
+            if not should_suppress_autoconfirm(grade):
+                return None
+            try:
+                from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                    KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL,
+                )
+                KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL.labels(grade=grade).inc()
+            except Exception:  # noqa: BLE001
+                pass
+            return (
+                "kill-gate-brake: high-grade auto-confirm suppressed while kill-gate tripped "
+                "— routed to human review"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("kill-gate brake skipped: %s", exc)
             return None
 
     def _effective_metadata(self, req: ClassifyRequest) -> dict:

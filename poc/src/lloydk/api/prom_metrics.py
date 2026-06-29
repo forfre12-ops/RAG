@@ -276,6 +276,81 @@ SAME_DOC_RESURFACE_TOTAL = Counter(
     registry=registry,
 )
 
+# ── 번들 A: 메타데이터 게이트 가시성 ──────────────────────────────────────────
+# metadata_floor_enabled / source_prior_enabled 를 켜도 입력 메타데이터(보안표시·접근범위·
+# 출처)가 실제로 들어오지 않으면 게이트는 **silent no-op** 이다(게이트를 켰는데 아무 일도
+# 안 일어나는 무음 실패). 아래 3종으로 (1) 게이트 실제 발동 횟수와 (2) 분류 입력의 메타데이터
+# 존재율을 함께 노출해, 켜기 *전에* '켜면 효과가 있을지'를 먼저 보이게 한다.
+# 모두 서빙 choke point(ClassifyService.classify)에서만 증가 — 평가(serving_eval)는 제외.
+
+# 메타데이터 floor 게이트 발동(ICD §4.2/§4.4): security_marking 상향 floor / access_scope 충돌.
+METADATA_FLOOR_APPLIED_TOTAL = Counter(
+    "lloydk_metadata_floor_applied_total",
+    "ICD metadata-floor gate firings (security_marking raised grade / access_scope conflict routed to review)",
+    ["action"],  # raised | access_conflict
+    registry=registry,
+)
+# source-prior(비공지성) 게이트 발동: 공개출처 등급 cap / cap-conflict 검수 라우팅.
+SOURCE_PRIOR_APPLIED_TOTAL = Counter(
+    "lloydk_source_prior_applied_total",
+    "Source-prior gate firings (public-source grade cap / cap-conflict routed to review)",
+    ["action"],  # capped | cap_conflict
+    registry=registry,
+)
+# 분류 입력에 ICD 게이트용 메타데이터 필드가 실제로 존재했는지 — 게이트 활성 여부와 무관하게
+# 분류 1건당 증가. field='none' = 게이트 입력 메타데이터가 하나도 없었음(coverage 분모).
+# coverage = 1 - (rate(field="none") / sum(rate(*)))  →  ICD 메타가 실제로 들어오는지 가시화.
+CLASSIFY_METADATA_PRESENT_TOTAL = Counter(
+    "lloydk_classify_metadata_present_total",
+    "Per-classification presence of ICD gate-input metadata fields ('none' = no gate-input metadata present)",
+    ["field"],  # security_marking | access_scope | source | none
+    registry=registry,
+)
+
+# ── 번들 B: 고등급 이중검토 보류 가시화 ───────────────────────────────────────
+# high_grade_dual_review ON 시 1인 동의 고등급 교정은 status='needs_second_review'로 DB에
+# 무음 hold 된다(운영자가 능동 쿼리해야만 발견). 등급별 보류 건수를 게이지로 노출해
+# '안 보이는 검수 보류큐'를 가시화한다(주기 refresh가 best-effort 갱신, DB 미가용 시 미설정).
+ESCALATION_HELD = Gauge(
+    "lloydk_escalation_held",
+    "Classifications held in needs_second_review (high-grade dual-review pending), by grade",
+    ["grade"],
+    registry=registry,
+)
+
+# ── 번들 D: locked_gold_eval readiness 가시화 ─────────────────────────────────
+# deploy gate는 자동활성 시 등급별 min_locked_per_grade 충족을 요구한다(죽음의 나선 #4).
+# '얼마나 쌓였고 배포 가능한지'를 운영자에게 직접 노출 — ready(0/1) + 등급별 보유 수.
+LOCKED_EVAL_READY = Gauge(
+    "lloydk_locked_eval_ready",
+    "1 if locked_gold_eval has >= min_per_grade for every grade (deploy-ready), else 0",
+    registry=registry,
+)
+LOCKED_EVAL_PER_GRADE = Gauge(
+    "lloydk_locked_eval_per_grade",
+    "Count of locked_gold_eval (human-signed) records per grade",
+    ["grade"],
+    registry=registry,
+)
+
+# ── 번들 E: kill-gate 안전브레이크 발동 ───────────────────────────────────────
+# kill_gate_suppress_autoconfirm ON + kill-gate tripped 동안 고등급 자동확정이 needs_review로
+# 억제된 횟수. 0 이상이면 '브레이크가 실제로 걸리고 있다'는 운영 신호(조건 해소 시 멈춤).
+KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL = Counter(
+    "lloydk_kill_gate_autoconfirm_suppressed_total",
+    "High-grade auto-confirms downgraded to needs_review because kill-gate brake was active",
+    ["grade"],
+    registry=registry,
+)
+
+# [QW] verified_label(사람검수 완료) 감사 기록 실패 — 결정론 경로의 컴플라이언스 감사가 best-effort라
+# DB 실패 시 무음 누락된다. 이 값이 0보다 크면 감사 누락 발생 신호(NFR-SEC-01 추적).
+CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
+    "lloydk_classify_verified_label_audit_skip_total",
+    "verified_label audit-trail writes skipped (best-effort failure) — compliance audit gap signal",
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",
@@ -405,8 +480,44 @@ def _refresh_business_gauges() -> None:
         run_kill_gate_check()
     except Exception as exc:  # noqa: BLE001
         _logger.debug("kill-gate check skipped: %s", exc)
+    # [번들 B] 이중검토 보류(needs_second_review) 등급별 게이지 — 독립 try, best-effort.
+    _refresh_escalation_held()
+    # [번들 D] locked_gold_eval readiness 게이지 — 독립 try, best-effort.
+    _refresh_locked_readiness()
     # NEW-H2: Celery 큐 적체도 동반 갱신(best-effort, 독립 try).
     _refresh_celery_queue_gauges()
+
+
+def _refresh_escalation_held() -> None:
+    """[번들 B] needs_second_review 보류 건수를 등급별 게이지에 노출(best-effort).
+
+    사라진 보류가 stale로 남지 않게, 알려진 등급은 0으로 초기화 후 현재 카운트를 set.
+    """
+    try:
+        from lloydk.services.confirm_service import (  # noqa: PLC0415
+            count_needs_second_review_by_grade,
+        )
+
+        counts = count_needs_second_review_by_grade()
+        for grade, n in counts.items():
+            ESCALATION_HELD.labels(grade=grade).set(float(n))
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("escalation-held gauge refresh skipped: %s", exc)
+
+
+def _refresh_locked_readiness() -> None:
+    """[번들 D] locked_gold_eval readiness(ready·등급별 보유)를 게이지에 노출(best-effort)."""
+    try:
+        from lloydk.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
+            locked_eval_readiness,
+        )
+
+        summary = locked_eval_readiness()
+        LOCKED_EVAL_READY.set(1.0 if summary.get("ready") else 0.0)
+        for grade, n in (summary.get("per_grade") or {}).items():
+            LOCKED_EVAL_PER_GRADE.labels(grade=grade).set(float(n))
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("locked-readiness gauge refresh skipped: %s", exc)
 
 
 @router.get("/metrics-prom", include_in_schema=False)

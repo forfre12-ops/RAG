@@ -29,6 +29,44 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 
+def _validate_target_url(target_url: str) -> None:
+    """[QW SSRF] webhook 대상 URL 가드 — 부적합 시 ValueError(enqueue 차단).
+
+    항상 거부: http/https 외 스킴(file://·gopher://·data: 등 내부 파일·프로토콜 악용),
+    호스트 없음, loopback(127.0.0.0/8·::1·localhost — 서비스 자기자신 타격). 사설IP(RFC1918/
+    4193)는 폐쇄망 정상 콜백이라 기본 허용하되 settings.outbox_block_private_ips=True면 거부
+    (외부망 배포용). DNS 리바인딩까지는 막지 않음(전송 시점 워커 책임) — enqueue 표면만 좁힌다.
+    """
+    import ipaddress  # noqa: PLC0415
+    from urllib.parse import urlparse  # noqa: PLC0415
+
+    if not target_url or not isinstance(target_url, str):
+        raise ValueError("outbox target_url required")
+    parsed = urlparse(target_url.strip())
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"outbox target_url scheme not allowed: {parsed.scheme!r} (http/https only)")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("outbox target_url has no host")
+    if host.lower() in ("localhost", "ip6-localhost"):
+        raise ValueError("outbox target_url loopback host not allowed")
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        ip = None  # 호스트명(IP 아님) — 전송 시점 해석
+    if ip is not None:
+        if ip.is_loopback:
+            raise ValueError("outbox target_url loopback address not allowed")
+        block_private = False
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            block_private = bool(getattr(settings, "outbox_block_private_ips", False))
+        except Exception:  # noqa: BLE001
+            block_private = False
+        if block_private and (ip.is_private or ip.is_link_local):
+            raise ValueError("outbox target_url private/link-local address blocked (outbox_block_private_ips)")
+
+
 @dataclass
 class OutboxMessage:
     id: str
@@ -288,6 +326,7 @@ def publish(
     headers: Optional[dict] = None,
     max_attempts: int = 5,
 ) -> OutboxMessage:
+    _validate_target_url(target_url)  # [QW SSRF] 부적합 대상은 enqueue 전 차단
     msg = OutboxMessage(
         id=str(uuid.uuid4()),
         target_url=target_url,
