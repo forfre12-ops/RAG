@@ -304,6 +304,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
       <p style="color:var(--text-dim);font-size:13.5px;">D는 합성·순환 holdout과 <b>같은 평가 숫자로 섞지 않는다</b>. 회귀 테스트 PASS/FAIL은 별도 산출이며, 위 §"한 숫자로 안 합침" 원칙의 가장 엄격한 적용이다.</p>
+      <div class="callout pass">
+        <span class="callout-icon">✓</span>
+        <div class="callout-body"><b>채점 코어 구현 완료.</b> <code>m6_evaluation/metamorphic.py</code> — 사실보존 게이트(<code>check_fact_preservation</code>: 토큰 보존 + 부정 가드, 룰/심판 아님)와 대칭 채점(<code>build_metamorphic_report</code>: 순방향/역방향/과분류 + Wilson CI, <code>quality_score</code>는 NotImplementedError로 "통과=품질 아님" 강제). 테스트 10건. <b>패러프레이즈 생성</b>(앵커→사내문서체, Qwen)은 앵커 파이프라인 소관으로 분리 — 이 코어는 생성 결과를 받아 채점/검사만 한다.</div>
+      </div>
 
       <h3>D 강화 사양 — 라벨 상속 조건 (느슨하면 위험 데이터)</h3>
       <p>D의 가치는 <b>"앵커의 권위 + 합성의 유연함"</b>을 동시에 얻는 데 있다. 그런데 재작성이 사실을 희석하는 순간, <b>앵커의 권위(외부 사실로 등급이 박혔다는 신뢰)는 가져오면서 그 근거는 합성으로 깨진</b> — "합성인데 앵커인 척하는" 데이터가 된다. 이건 품질 저하가 아니라 <b>틀린 라벨에 고신뢰 도장이 찍혀 평가를 반대 방향으로 오염</b>시킨다. 따라서 D는 아래 조건을 <b>모두</b> 통과한 쌍만 채택한다.</p>
@@ -345,6 +349,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td><b>FNR-safe 룰</b></td><td class="td-pass">✅ 구현</td><td>최종 등급 = 더 위험한 쪽(min) — <code>rule_engine.py:399-403</code> (E·하드네거티브 평가의 토대)</td></tr>
             <tr><td><b>C 분리 리포트 카드</b></td><td class="td-pass">✅ 신규 구현</td><td>Wilson CI·출처×등급·INCONCLUSIVE·단일숫자 코드차단(combined_score raise) — <code>m6_evaluation/eval_cards.py</code> (테스트 10건)</td></tr>
             <tr><td><b>B 심판 신뢰도 폭로</b></td><td class="td-pass">✅ 신규 구현</td><td>591 rejudged.jsonl 출처별 층화·proxy 양가 플래그·라벨 미수정 — <code>m6_evaluation/judge_reliability.py</code> (테스트 7건, 실데이터 회귀 락 포함)</td></tr>
+            <tr><td><b>D 메타모픽 회귀 코어</b></td><td class="td-pass">✅ 신규 구현</td><td>사실보존 게이트(토큰+부정가드, 룰/심판 아님)·순/역방향·과분류 대칭·quality_score 금지(통과=품질 아님) — <code>m6_evaluation/metamorphic.py</code> (테스트 10건). 패러프레이즈 *생성*은 별개(앵커 파이프라인·Qwen)</td></tr>
           </tbody>
         </table>
       </div>
