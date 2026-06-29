@@ -351,6 +351,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td><b>B 심판 신뢰도 폭로</b></td><td class="td-pass">✅ 신규 구현</td><td>591 rejudged.jsonl 출처별 층화·proxy 양가 플래그·라벨 미수정 — <code>m6_evaluation/judge_reliability.py</code> (테스트 7건, 실데이터 회귀 락 포함)</td></tr>
             <tr><td><b>D 메타모픽 회귀 코어</b></td><td class="td-pass">✅ 신규 구현</td><td>사실보존 게이트(토큰+부정가드, 룰/심판 아님)·순/역방향·과분류 대칭·quality_score 금지(통과=품질 아님) — <code>m6_evaluation/metamorphic.py</code> (테스트 10건). 패러프레이즈 *생성*은 별개(앵커 파이프라인·Qwen)</td></tr>
             <tr><td><b>E 서빙 불변식 체커</b></td><td class="td-pass">✅ 신규 구현</td><td>공개출처 cap이 고등급 덮음+검수신호 없음=조용한 미탐(FN)·표기 상향 누락(floor) 탐지 — <code>m6_evaluation/serving_invariants.py</code> (테스트 10건). pipeline.py 미변경(순수 체커, 라이브 배선은 서빙 트랙 E1/E2와 함께)</td></tr>
+            <tr><td><b>holdout 분할 + 누출 가드</b></td><td class="td-pass">✅ 신규 구현</td><td>gold_candidate → silver_train/synthetic_holdout 등급층화 75/25 <b>결정적</b> 분할 + 기존 코퍼스 누출 드롭(빌드 러너가 holdout_texts 미전달하던 구멍 폐쇄) + split_role 스탬프(golden_tiers와 직교) — <code>golden_split.py</code> (테스트 9건)</td></tr>
           </tbody>
         </table>
       </div>
@@ -364,7 +365,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th style="width:6%;">#</th><th style="width:26%;">빠진 것</th><th>설명 · 위치</th></tr></thead>
           <tbody>
             <tr><td>1</td><td><b>엔드투엔드 오케스트레이션</b></td><td>쿼터대로 ~1,600 생성 → <code>build_golden_set</code> → 25% holdout 분할 → 티어 출력을 묶는 스크립트 부재(<code>golden_pilot.py</code>는 소량·구 경로)</td></tr>
-            <tr><td>2</td><td><b>25% holdout 분할 미구현</b></td><td><code>build_golden_set</code>은 holdout을 <b>제외만</b> 하지 생성/분할 안 함 — <code>golden_builder.py:119-137</code></td></tr>
+            <tr><td>2</td><td><b>25% holdout 분할</b> <span class="td-pass">✅ 해소</span></td><td><code>golden_split.split_for_training</code>: 등급층화 75/25 결정적 분할 + 누출 가드 + split_role. 빌드 러너 산출(gold_candidate)을 받아 silver/holdout으로 가름(테스트 9건)</td></tr>
             <tr><td>3</td><td><b>파일럿 통과율 미측정</b></td><td>ConsensusJudge 경로로 통과율 미측정 → 과생성 배수(1,600) 추측</td></tr>
             <tr><td>4</td><td><b>readiness 게이트 = locked 전용만</b></td><td><code>eval_readiness</code>(<code>golden_tiers.py:89</code>, min_per_grade=5)는 <b>locked tier만</b> 보고 locked 비면 ready=False. 합성 holdout·앵커엔 출처별 CI/판단보류 기준 없음 → <b>C(eval_cards)가 모든 출처×등급으로 확장</b>(구현됨)</td></tr>
             <tr><td>5</td><td><b>deploy gate 미연결</b></td><td>여전히 합성 <code>test.jsonl</code>을 봄 → 앵커/holdout 미연결(설계 §07 하드닝 #2)</td></tr>
