@@ -377,6 +377,13 @@ class Settings(BaseSettings):
     # fnr_high 가 이 값을 초과하면 거부(미탐 하한). None(기본)=floor 미적용(동작 보존, 첫
     # 모델은 degenerate 아니면 통과). 실데이터 human_review PR곡선으로 값 확정 후 설정 권장.
     deploy_gate_first_deploy_fnr_high_max: float | None = None
+    # [죽음의 나선 #4] deploy gate는 합성 test.jsonl에서 fnr_high를 재 실분포 오염에 맹목이다.
+    # True(기본)면 **자동 활성(retrain_auto_activate)** 시 '실(locked_gold_eval) 평가' readiness
+    # (등급별 min_locked_per_grade 충족)까지 추가로 요구한다 — 합성/legal_floor 평가만으로는
+    # 오염 모델을 자동 승격하지 못한다. 무실데이터 단계엔 locked가 비어 자동활성 fail-closed.
+    # False로 끄면 옛 동작(합성 평가만으로 자동 활성). 수동 활성은 이 게이트와 무관.
+    deploy_gate_require_locked_eval: bool = True
+    deploy_gate_min_locked_per_grade: int = 5
     # 교정→라벨 재빌드/병합 학습셋 출력 디렉토리(A2-①).
     retrain_dataset_dir: str = "datasets/demo_retrain"
 

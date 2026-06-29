@@ -4,6 +4,7 @@ from lloydk.golden_tiers import (
     TIER_LEGAL_FLOOR,
     TIER_LOCKED,
     TIER_SILVER,
+    eval_readiness,
     eval_records,
     partition_by_tier,
     tier_of,
@@ -65,3 +66,33 @@ def test_eval_no_fallback_returns_empty():
     recs = [{"label_source": "nkt_designated"}]
     ev, used = eval_records(recs, allow_floor_fallback=False)
     assert used == TIER_LOCKED and ev == []
+
+
+# ── eval_readiness (죽음의 나선 #4 — 자동활성 가드 근거) ──────────────────────
+
+
+def _locked(label):
+    return {"label_source": "human_review", "reviewer_id": "admin_kim", "label": label}
+
+
+def test_eval_readiness_empty_locked_not_ready():
+    # locked 없음(무실데이터: legal_floor만 존재) → ready=False → 자동활성 차단 근거
+    recs = [{"label_source": "nkt_designated", "label": "TS"}]
+    r = eval_readiness(recs, min_per_grade=2)
+    assert r["ready"] is False
+    assert r["reason"] == "no_locked_records"
+
+
+def test_eval_readiness_insufficient_per_grade():
+    recs = [_locked("TS"), _locked("S1"), _locked("S2"), _locked("S3")]  # 등급별 1건
+    r = eval_readiness(recs, min_per_grade=2)
+    assert r["ready"] is False
+    assert set(r["missing"]) == {"TS", "S1", "S2", "S3"}
+
+
+def test_eval_readiness_ready_when_min_met():
+    recs = [_locked(g) for g in ("TS", "S1", "S2", "S3") for _ in range(2)]  # 등급별 2건
+    r = eval_readiness(recs, min_per_grade=2)
+    assert r["ready"] is True
+    assert r["missing"] == []
+    assert r["per_grade"] == {"TS": 2, "S1": 2, "S2": 2, "S3": 2}

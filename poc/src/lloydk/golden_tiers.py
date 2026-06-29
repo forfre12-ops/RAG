@@ -79,3 +79,42 @@ def eval_records(
 def train_records(records: Sequence[dict]) -> list[dict]:
     """학습 = silver + candidate + legal_floor. locked(평가 정답)는 절대 제외(train-on-test 차단)."""
     return [r for r in records if tier_of(r) != TIER_LOCKED]
+
+
+# locked_gold_eval이 '실(real) 평가'로 인정되는 등급별 최소 표본 (readiness 기준).
+DEFAULT_MIN_LOCKED_PER_GRADE = 5
+_DEFAULT_GRADES = ("TS", "S1", "S2", "S3")
+
+
+def eval_readiness(
+    records: Sequence[dict],
+    *,
+    min_per_grade: int = DEFAULT_MIN_LOCKED_PER_GRADE,
+    grades: Sequence[str] = _DEFAULT_GRADES,
+) -> dict:
+    """locked_gold_eval이 '실(real) 평가'로 쓸 만큼 충분한가 — readiness 게이트(죽음의 나선 #4).
+
+    locked tier만 인정한다(legal_floor·합성 holdout은 실평가 아님). 각 등급이 min_per_grade
+    이상이어야 ready. 무실데이터 단계에선 locked가 비어 ready=False → deploy gate가 합성
+    test.jsonl만 보는(실분포 오염 맹목) 상태에서 **자동 활성(오염 자동승격)을 막는 근거**가 된다.
+    locked가 운영 사람서명으로 충분히 쌓이면 ready=True → 그때 자동 활성을 허용한다.
+
+    반환: {ready, per_grade, missing, reason}. (순수 함수 — DB/파일 불요, 단위테스트 가능.)
+    """
+    locked, _ = eval_records(records, allow_floor_fallback=False)  # locked tier만
+    per_grade = {g: 0 for g in grades}
+    for r in locked:
+        code = r.get("label") or r.get("expected_grade")
+        if code in per_grade:
+            per_grade[code] += 1
+    missing = [g for g in grades if per_grade[g] < min_per_grade]
+    ready = bool(locked) and not missing
+    return {
+        "ready": ready,
+        "per_grade": per_grade,
+        "missing": missing,
+        "reason": (
+            "ok" if ready
+            else ("no_locked_records" if not locked else f"insufficient_per_grade:{missing}")
+        ),
+    }

@@ -71,6 +71,7 @@ def register_and_gate_model(
     training_data_count: int | None = None,
     model_uri: str | None = None,
     mlflow_run_id: str | None = None,
+    eval_ready: bool | None = None,
 ) -> dict:
     """재학습 모델을 ModelVersion으로 **등록(C-ver)** 하고 배포 합격선 **게이트** 평가 (A2-②).
 
@@ -128,18 +129,24 @@ def register_and_gate_model(
                     mv.training_data_count = int(training_data_count)
 
             auto = bool(getattr(settings, "retrain_auto_activate", False))
+            # [죽음의 나선 #4] deploy gate는 합성 test.jsonl에서 fnr를 재 실분포 오염에 맹목이다.
+            # 그래서 자동 활성은 '실(locked) 평가' readiness까지 요구한다 — eval_ready가 명시적
+            # True가 아니면(무실데이터·미확인) 자동 활성을 막는다(등록은 함; 수동 활성은 별도 경로).
+            # deploy_gate_require_locked_eval=False로 끄면 옛 동작(합성 평가만으로 자동 활성).
+            require_locked = bool(getattr(settings, "deploy_gate_require_locked_eval", True))
+            eval_block = require_locked and (eval_ready is not True)
             activated = False
-            if decision.passed and auto:
+            if decision.passed and auto and not eval_block:
                 repo.activate_model_version(mv.version_id)
                 activated = True
                 logger.warning(
-                    "retrain auto-activated: %s (gate passed, baseline=%s)",
+                    "retrain auto-activated: %s (gate passed, locked-eval ready, baseline=%s)",
                     version_label, baseline_label,
                 )
             else:
                 logger.info(
-                    "retrain registered (not activated): %s gate_passed=%s auto_activate=%s",
-                    version_label, decision.passed, auto,
+                    "retrain registered (not activated): %s gate_passed=%s auto=%s eval_block=%s",
+                    version_label, decision.passed, auto, eval_block,
                 )
 
             return {
@@ -148,6 +155,7 @@ def register_and_gate_model(
                 "version_label": version_label,
                 "activated": activated,
                 "auto_activate": auto,
+                "eval_block": eval_block,
                 "gate": decision.to_dict(),
             }
     except SQLAlchemyError as exc:
