@@ -44,6 +44,23 @@ def test_alert_referenced_series_present_in_exposition():
     assert 'lloydk_celery_queue_length{queue="classify"}' in expo  # CeleryQueueBacklog
 
 
+def test_correction_total_defined_and_increments():
+    """[KPI] 교정 발생률 카운터 — direction별 시계열 노출 + 증가 동작(DB 불요)."""
+    from lloydk.api.prom_metrics import CORRECTION_TOTAL
+
+    # direction child materialize → 시계열 노출.
+    CORRECTION_TOTAL.labels(direction="underclass").inc(0)
+    CORRECTION_TOTAL.labels(direction="confirm").inc(0)
+    expo = generate_latest(registry).decode()
+    assert 'lloydk_corrections_total{direction="underclass"}' in expo
+
+    labels = {"direction": "underclass"}
+    before = registry.get_sample_value("lloydk_corrections_total", labels) or 0.0
+    CORRECTION_TOTAL.labels(direction="underclass").inc()
+    after = registry.get_sample_value("lloydk_corrections_total", labels) or 0.0
+    assert after >= before + 1
+
+
 def test_mask_pii_increments_pii_masked_metric():
     # 실제 계측 경로 — rrn 마스킹 시 타입별 카운터 증가.
     labels = {"pii_type": "rrn"}

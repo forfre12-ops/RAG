@@ -327,6 +327,14 @@ class ClassifyRepo:
         )
         self.db.add(corr)
         self.db.flush()
+        # [KPI] 교정 발생률(direction별) 실시간 카운터 — best-effort(메트릭 실패가 교정 쓰기를
+        # 막지 않음). underclass 율 = 보안 미탐/자동확정 품질·죽음의 나선 모니터링 신호.
+        try:
+            from lloydk.api.prom_metrics import CORRECTION_TOTAL  # noqa: PLC0415
+
+            CORRECTION_TOTAL.labels(direction=direction).inc()
+        except Exception:  # noqa: BLE001
+            pass
         return corr
 
     def correction_exists(

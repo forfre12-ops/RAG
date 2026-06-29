@@ -241,6 +241,17 @@ CLASSIFY_CORRECT_TOTAL = Counter(
     registry=registry,
 )
 
+# 교정(correction) 발생률 — direction별(confirm/underclass/overclass/lateral) 실시간 카운터.
+# underclass = 모델이 비밀을 낮게 본 것을 사람이 올린 것(보안 미탐 신호) → 자동확정 품질·
+# 죽음의 나선(러버스탬프·운영 정확도 저하) 모니터링의 핵심 지표. add_correction(모든 교정의
+# 단일 choke point)에서 best-effort 증가. underclass 율 급증 = 모델 품질 저하/오염 경보 근거.
+CORRECTION_TOTAL = Counter(
+    "lloydk_corrections_total",
+    "Corrections recorded by human review, by direction (overturning/confirming a classification)",
+    ["direction"],  # confirm | underclass | overclass | lateral
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",
