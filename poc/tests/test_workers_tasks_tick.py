@@ -130,6 +130,21 @@ def test_tick_auto_ok_does_nothing():
     assert enq.call_count == 0
 
 
+def test_tick_auto_training_disabled_skips_enqueue():
+    """[재학습 토폴로지 가드] enable_training=False(고객사) → URGENT여도 train enqueue 안 함.
+
+    고객사(onprem-local)는 설계상 추론+비모수 전용 — 자동 재학습 루프가 돌면 안 된다(죽음의 나선
+    고객사 차단). status 평가는 유지하되 triggered=SKIP_TRAINING_DISABLED로 조기 반환.
+    """
+    with patch("lloydk.config.settings.enable_training", False, create=True):
+        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                   return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
+            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+                out = active_learning_tick(mode="auto")
+    assert out["triggered"] == "SKIP_TRAINING_DISABLED"
+    assert enq.call_count == 0
+
+
 # ---------------------------------------------------------------------------
 # drift_tick — run_drift_check 결과 그대로 dict로 반환
 # ---------------------------------------------------------------------------
@@ -377,3 +392,13 @@ def test_train_classifier_task_register_exception_falls_back():
 
     assert out["deploy"] == {"registered": False, "reason": "exception"}
     assert out["corrections_consumed"] == 0
+
+
+def test_train_classifier_task_training_disabled_skips():
+    """[재학습 토폴로지 가드 · 심층방어] enable_training=False(고객사) → 학습 미수행 조기 skip.
+
+    가드가 무거운 trainer import 이전에 반환하므로 별도 mock 불필요 — 반환 dict만 검증한다.
+    """
+    with patch("lloydk.config.settings.enable_training", False, create=True):
+        out = train_classifier_task(spec_kwargs={})
+    assert out == {"skipped": "training_disabled"}

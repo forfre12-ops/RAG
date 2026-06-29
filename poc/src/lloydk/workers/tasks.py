@@ -212,6 +212,16 @@ def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
              둘 다일 때만 — 미검증 모델 자동배포 차단.
     """
     from lloydk.config import settings  # noqa: PLC0415
+
+    # [재학습 토폴로지 가드 · 심층방어] 분류기 학습은 enable_training=True 노드(지재원)에서만.
+    # 고객사(onprem-local, enable_training=False)는 추론+비모수 전용 — 어떤 경로로 enqueue되든
+    # 학습을 수행하지 않는다(무거운 trainer import도 생략). active_learning_tick 가드와 belt+suspenders.
+    if not settings.enable_training:
+        logger.warning(
+            "train_classifier_task skipped — enable_training=False (inference-only node)"
+        )
+        return {"skipped": "training_disabled"}
+
     from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier  # noqa: PLC0415
     from lloydk.modules.m6_evaluation.active_learning import consume_corrections_for_run  # noqa: PLC0415
     from lloydk.modules.m6_evaluation.corrections_rebuild import (  # noqa: PLC0415
@@ -420,7 +430,17 @@ def active_learning_tick(mode: str = "auto") -> dict:
     if mode == "dry":
         return payload
 
-    # auto mode
+    # auto mode — [재학습 토폴로지 가드] 분류기 자동 재학습은 enable_training=True 노드(지재원
+    # full-train)에서만 발화한다. 고객사(onprem-local, enable_training=False)는 설계상 추론+비모수
+    # 전용이므로 자동 재학습을 금지한다. status 평가·기록은 위에서 끝났으므로(진단·집계 리포트용
+    # 으로 유지) 여기서는 train_classifier_task enqueue만 차단한다 — 옛 'beat 미게이트로 고객사에서도
+    # 재학습' 동작을 task 레벨에서 막아 코드를 설계에 정합시킨다(죽음의 나선 고객사 차단).
+    from lloydk.config import settings as _settings  # noqa: PLC0415
+
+    if not _settings.enable_training:
+        payload["triggered"] = "SKIP_TRAINING_DISABLED"
+        return payload
+
     if status.retrain_status == "URGENT_RETRAIN":
         logger.warning("URGENT_RETRAIN triggered: %s", status.reason)
         try:

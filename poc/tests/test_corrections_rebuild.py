@@ -27,6 +27,7 @@ from lloydk.db.models import (
 )
 from lloydk.modules.m6_evaluation.corrections_rebuild import (
     RebuildResult,
+    _correction_admissible,
     build_labeled_rows_from_corrections,
     merge_into_train_jsonl,
     write_labeled_jsonl,
@@ -95,6 +96,36 @@ def test_rebuild_db_unavailable_graceful(monkeypatch):
     assert res.reason.startswith("db_unavailable")
 
 
+# ── admission 게이트 (순수, DB 불요) ─────────────────────────────────────────
+# 죽음의 나선 최약 고리 차단: 사람 검수자 + finalized(confirmed/corrected) 교정만 학습 편입.
+
+
+def test_admission_human_confirmed_admitted():
+    assert _correction_admissible("qa1", "confirmed") is True
+    assert _correction_admissible("reviewer_kim", "corrected") is True
+
+
+def test_admission_unconfirmed_status_rejected():
+    # 사람 검수자라도 미확정/이중검수 대기는 학습 제외(러버스탬프 직전 상태)
+    assert _correction_admissible("qa1", "needs_second_review") is False
+    assert _correction_admissible("qa1", "staging") is False
+    assert _correction_admissible("qa1", "needs_review") is False
+    assert _correction_admissible("qa1", None) is False
+
+
+def test_admission_machine_reviewer_rejected():
+    # confirmed여도 머신/플레이스홀더 검수자는 제외
+    assert _correction_admissible("ai_assist", "confirmed") is False
+    assert _correction_admissible("llm_judge_v2", "corrected") is False
+    assert _correction_admissible("auto", "confirmed") is False
+    assert _correction_admissible("machine_x", "confirmed") is False
+
+
+def test_admission_bypass_when_disabled():
+    # require_human_confirmed=False → 옛 동작(전부 허용)
+    assert _correction_admissible("ai_assist", "staging", require_human_confirmed=False) is True
+
+
 # ── DB-backed ────────────────────────────────────────────────────────────────
 
 
@@ -149,10 +180,12 @@ def _seed_doc_with_chunks(db, *, chunks=None, preview=None) -> Document:
     return doc
 
 
-def _seed_cls(db, levels, doc, code, version) -> Classification:
+def _seed_cls(db, levels, doc, code, version, status="confirmed") -> Classification:
+    # status 기본 confirmed — admission 게이트(finalized만 학습 편입)를 통과하는 정상 케이스.
     cls = Classification(
         doc_id=doc.doc_id, model_version=version,
         predicted_level_id=levels[code], confidence=0.9, alternatives=[],
+        status=status,
     )
     db.add(cls)
     db.flush()
@@ -222,5 +255,70 @@ class TestRebuildLive:
             with session_scope() as s:
                 s.query(Correction).filter(
                     Correction.correction_id.in_([ca.correction_id, cb.correction_id])
+                ).delete(synchronize_session=False)
+                s.query(Classification).filter_by(model_version=version).delete()
+
+    def test_admission_gate_excludes_machine_and_unconfirmed(self, db, levels):
+        """[admission 게이트] 머신 검수자·미확정(이중검수 대기) 교정은 학습 제외·미소비."""
+        version = f"v-adm-{uuid.uuid4().hex[:6]}"
+        # A: 사람 + confirmed → 편입
+        doc_a = _seed_doc_with_chunks(db, chunks=["사람 확정 교정 본문 영업비밀 충분히 김"])
+        cls_a = _seed_cls(db, levels, doc_a, "S3", version, status="confirmed")
+        ca = Correction(classification_id=cls_a.classification_id,
+                        original_level_id=levels["S3"], corrected_level_id=levels["S1"],
+                        direction="underclass", corrected_by="qa_human")
+        db.add(ca)
+        # B: 머신 검수자(ai_assist) → 제외
+        doc_b = _seed_doc_with_chunks(db, chunks=["머신 교정 본문 충분히 길게 작성됨"])
+        cls_b = _seed_cls(db, levels, doc_b, "S3", version, status="confirmed")
+        cb = Correction(classification_id=cls_b.classification_id,
+                        original_level_id=levels["S3"], corrected_level_id=levels["TS"],
+                        direction="underclass", corrected_by="ai_assist")
+        db.add(cb)
+        # C: 사람이지만 needs_second_review(이중검수 대기) → 제외
+        doc_c = _seed_doc_with_chunks(db, chunks=["이중검수 대기 본문 충분히 길게 작성됨"])
+        cls_c = _seed_cls(db, levels, doc_c, "S3", version, status="needs_second_review")
+        cc = Correction(classification_id=cls_c.classification_id,
+                        original_level_id=levels["S3"], corrected_level_id=levels["TS"],
+                        direction="underclass", corrected_by="qa_human")
+        db.add(cc)
+        db.flush()
+        db.commit()
+        try:
+            res = build_labeled_rows_from_corrections()
+            ids = set(res.correction_ids)
+            assert ca.correction_id in ids               # 사람+confirmed 편입
+            assert cb.correction_id not in ids           # 머신 검수자 제외·미소비
+            assert cc.correction_id not in ids           # 이중검수 대기 제외·미소비
+            assert res.skipped_unadmitted >= 2
+            assert doc_a.doc_id in res.doc_ids
+            assert res.rows[res.doc_ids.index(doc_a.doc_id)]["label"] == "S1"
+        finally:
+            with session_scope() as s:
+                s.query(Correction).filter(
+                    Correction.correction_id.in_(
+                        [ca.correction_id, cb.correction_id, cc.correction_id]
+                    )
+                ).delete(synchronize_session=False)
+                s.query(Classification).filter_by(model_version=version).delete()
+
+    def test_admission_gate_bypass_includes_machine(self, db, levels):
+        """require_human_confirmed=False → 옛 동작(머신·미확정도 편입)."""
+        version = f"v-byp-{uuid.uuid4().hex[:6]}"
+        doc = _seed_doc_with_chunks(db, chunks=["바이패스 본문 충분히 길게 작성됨 영업비밀"])
+        cls = _seed_cls(db, levels, doc, "S3", version, status="staging")
+        cm = Correction(classification_id=cls.classification_id,
+                        original_level_id=levels["S3"], corrected_level_id=levels["TS"],
+                        direction="underclass", corrected_by="ai_assist")
+        db.add(cm)
+        db.flush()
+        db.commit()
+        try:
+            res = build_labeled_rows_from_corrections(require_human_confirmed=False)
+            assert cm.correction_id in set(res.correction_ids)
+        finally:
+            with session_scope() as s:
+                s.query(Correction).filter(
+                    Correction.correction_id == cm.correction_id
                 ).delete(synchronize_session=False)
                 s.query(Classification).filter_by(model_version=version).delete()

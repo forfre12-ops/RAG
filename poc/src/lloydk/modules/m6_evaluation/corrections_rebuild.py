@@ -38,6 +38,7 @@ from lloydk.db.models import (
     Correction,
     Document,
 )
+from lloydk.golden_tiers import is_human_reviewer
 from lloydk.hygiene import normalize_text
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,31 @@ logger = logging.getLogger(__name__)
 # trainer._LABEL_LIST와 일치 — 4등급 스킴만 재학습 입력으로 허용.
 _TRAINABLE_LABELS = ("TS", "S1", "S2", "S3")
 _DEFAULT_MIN_CHARS = 10
+
+# [admission 게이트] 교정이 학습 라벨로 편입되려면 분류 status가 '확정(finalized)'이어야 한다.
+# confirmed(확정)·corrected(재라벨 확정)만 허용 — needs_second_review(이중검수 대기)·staging·
+# needs_review는 사람의 최종 동의가 아직 없으므로 제외(미탐 라벨이 가중치에 박히는 것 차단).
+_ADMISSIBLE_STATUSES = ("confirmed", "corrected")
+
+
+def _correction_admissible(
+    corrected_by: object, cls_status: object, *, require_human_confirmed: bool = True
+) -> bool:
+    """교정이 학습 라벨로 편입될 자격이 있는가 — admission 게이트(죽음의 나선 최약 고리 차단).
+
+    require_human_confirmed=True(기본):
+      ① 사람 검수자(머신/플레이스홀더 id 제외, golden_tiers.is_human_reviewer) AND
+      ② 분류 status가 finalized(confirmed/corrected) — 이중검수 완료 또는 불요.
+      → 러버스탬프 직전(needs_second_review)·미확정(staging)·머신(ai_assist/llm_judge 등) 교정은
+        학습에서 제외. 제외분은 소비하지 않아 추후 확정되면 다음 tick에 재유입된다.
+    False: 옛 동작(전부 허용) — 테스트/특수경로 전용.
+    (순수 함수 — DB 불요, 단위테스트 가능.)
+    """
+    if not require_human_confirmed:
+        return True
+    if not is_human_reviewer(corrected_by):
+        return False
+    return str(cls_status or "") in _ADMISSIBLE_STATUSES
 
 
 @dataclass
@@ -58,6 +84,8 @@ class RebuildResult:
     doc_count: int = 0
     skipped_no_text: int = 0
     skipped_bad_label: int = 0
+    # [admission 게이트] 사람검수+finalized 조건 미통과로 학습 제외된 교정 수(머신/미확정).
+    skipped_unadmitted: int = 0
     # [#25] merge_into_train_jsonl이 holdout 중복으로 train에서 제외한 교정 행 수
     # (병합 시점에 갱신). 0 = 제외 없음/미수행. 호출부가 제외 건수를 조회할 수 있게 노출.
     excluded_holdout: int = 0
@@ -98,6 +126,7 @@ def build_labeled_rows_from_corrections(
     only_unconsumed: bool = True,
     min_chars: int = _DEFAULT_MIN_CHARS,
     trainable_labels: Sequence[str] = _TRAINABLE_LABELS,
+    require_human_confirmed: bool = True,
 ) -> RebuildResult:
     """unconsumed corrections를 {text,label} 행으로 복원.
 
@@ -134,19 +163,31 @@ def build_labeled_rows_from_corrections(
             cls_stmt = select(Classification).where(
                 Classification.classification_id.in_(cls_ids)
             )
-            doc_by_cls = {
-                c.classification_id: c.doc_id
-                for c in db.execute(cls_stmt).scalars()
-            }
+            doc_by_cls: dict = {}
+            status_by_cls: dict = {}  # [admission 게이트] 분류 status로 finalized 여부 판정
+            for c in db.execute(cls_stmt).scalars():
+                doc_by_cls[c.classification_id] = c.doc_id
+                status_by_cls[c.classification_id] = c.status
 
             # 문서별: 최신 라벨(첫 등장 = corrected_at desc 정렬이라 최신) + 묶인 correction_id 전부
             doc_label: dict = {}
             doc_corr_ids: dict = {}
             skipped_bad_label = 0
+            skipped_unadmitted = 0
             for corr in corrections:  # 이미 corrected_at desc
                 doc_id = doc_by_cls.get(corr.classification_id)
                 if doc_id is None:
                     continue  # 분류 없음
+                # [admission 게이트] 무검수/머신 교정이 학습 라벨이 되는 것을 차단(죽음의 나선
+                # 최약 고리). 사람 검수자 + finalized(confirmed/corrected)만 통과. 제외분은
+                # 소비하지 않아(continue) 추후 확정되면 다음 tick에 재유입된다.
+                if not _correction_admissible(
+                    corr.corrected_by,
+                    status_by_cls.get(corr.classification_id),
+                    require_human_confirmed=require_human_confirmed,
+                ):
+                    skipped_unadmitted += 1
+                    continue
                 code = code_by_id.get(corr.corrected_level_id)
                 if code not in label_set:
                     skipped_bad_label += 1
@@ -175,6 +216,7 @@ def build_labeled_rows_from_corrections(
                 doc_count=len(rows),
                 skipped_no_text=skipped_no_text,
                 skipped_bad_label=skipped_bad_label,
+                skipped_unadmitted=skipped_unadmitted,
                 reason="ok" if rows else "no_rows_after_filter",
             )
     except SQLAlchemyError as exc:
