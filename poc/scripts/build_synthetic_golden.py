@@ -31,7 +31,7 @@ GRADE_DOMAINS = {
     "TS": ["ma", "security", "defense", "semiconductor", "bio", "ai"],
     "S1": ["finance", "tech", "business", "hr"],
     "S2": ["business", "finance", "legal", "mixed"],
-    "S3": ["mixed", "business"],
+    "S3": ["public"],  # 명확한 공개 도메인 — gemma 과분류 완화(A2). 내부문서형 mixed/business 제거
 }
 
 
