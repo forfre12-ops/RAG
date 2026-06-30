@@ -425,7 +425,7 @@ class ClassifyService:
             if model_code == top_code:
                 return None  # 이미 최고등급 자동확정 — 과소분류 위험 없음
             from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: PLC0415
-            llm = LLMLabeler().label(text)
+            llm = LLMLabeler().label(text, purpose="second_opinion")
             if llm.grade not in order:
                 return None
             if order.get(llm.grade, 99) < order.get(model_code, 99):

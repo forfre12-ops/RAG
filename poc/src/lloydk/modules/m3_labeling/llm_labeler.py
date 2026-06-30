@@ -52,12 +52,26 @@ class LLMLabeler:
     def __init__(self, provider: LLMProvider | None = None) -> None:
         self.provider = provider or build_provider()
 
-    def label(self, text: str, *, max_tokens: int = 1500, temperature: float = 0.1) -> LLMLabelResult:
+    def label(
+        self,
+        text: str,
+        *,
+        max_tokens: int = 1500,
+        temperature: float = 0.1,
+        purpose: str = "llm_labeling",
+    ) -> LLMLabelResult:
         # /no_think: Qwen3 등 thinking 모델의 추론을 꺼 JSON 토큰 잘림(→ S3 default) 방지. 타 provider엔 무해.
         # temperature: 기본 0.1(결정론적 단일 라벨). ConsensusJudge가 self-consistency 표 분산을 위해
         # 0.3~0.7로 올려 호출한다(같은 라벨러를 k회 샘플).
+        # purpose: 비용 집계 라벨(second_opinion=서빙 핫패스, llm_labeling=judge/consensus 등).
         prompt = f"/no_think\n분류 대상 문서:\n```\n{text[:4000]}\n```\n\nJSON 응답:"
         resp = self.provider.generate(prompt, system=SYSTEM_PROMPT, max_tokens=max_tokens, temperature=temperature)
+        # [QW] LLM 라벨링 비용 best-effort 기록 — judge·consensus·second_opinion 공통 진입점.
+        try:
+            from lloydk.services.llm_usage_service import record_llm_usage  # noqa: PLC0415
+            record_llm_usage(resp, purpose=purpose)
+        except Exception:  # noqa: BLE001
+            pass
         parsed = _safe_parse_json(resp.text)
         svm_scores = {k: float(parsed[k]) for k in ("secrecy", "value", "management") if k in parsed}
         return LLMLabelResult(

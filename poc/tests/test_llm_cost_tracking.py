@@ -73,3 +73,33 @@ def test_expand_llm_records_query_expansion_usage(tmp_path, monkeypatch):
     out = qe.expand_llm("테스트 쿼리", provider=_Stub())
     assert out.method == "llm"
     assert _calls("anthropic", "claude-opus-4-8", "query_expansion") == c0 + 1
+
+
+def _labeler_stub(cost=0.003):
+    class _Stub:
+        name = "anthropic"
+
+        def generate(self, prompt, **k):
+            return LLMResponse(
+                text='{"grade":"S2","secrecy":1,"value":1,"management":1,"confidence":0.8}',
+                usage=_usage(provider="anthropic", model="claude-opus-4-8", cost=cost),
+            )
+    return _Stub()
+
+
+def test_llm_labeler_records_default_purpose(tmp_path, monkeypatch):
+    import lloydk.services.llm_usage_service as us
+    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+    monkeypatch.setattr(us, "_default_service", us.LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl")))
+    c0 = _calls("anthropic", "claude-opus-4-8", "llm_labeling")
+    LLMLabeler(provider=_labeler_stub()).label("문서 내용")
+    assert _calls("anthropic", "claude-opus-4-8", "llm_labeling") == c0 + 1
+
+
+def test_llm_labeler_records_custom_purpose(tmp_path, monkeypatch):
+    import lloydk.services.llm_usage_service as us
+    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+    monkeypatch.setattr(us, "_default_service", us.LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl")))
+    c0 = _calls("anthropic", "claude-opus-4-8", "second_opinion")
+    LLMLabeler(provider=_labeler_stub()).label("문서 내용", purpose="second_opinion")
+    assert _calls("anthropic", "claude-opus-4-8", "second_opinion") == c0 + 1
