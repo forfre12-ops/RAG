@@ -16,6 +16,17 @@ from dataclasses import dataclass, field
 logger = logging.getLogger(__name__)
 
 
+def _record_qe_fallback() -> None:
+    """LLM 쿼리확장 실패→룰 폴백을 가시화(best-effort). 무음으로 떨어지면 확장 품질이
+    조용히 룰 수준으로 회귀 — RAG_CONTEXT_FAILURE_TOTAL{stage=query_expansion_fallback}로 노출."""
+    try:
+        from lloydk.api.prom_metrics import RAG_CONTEXT_FAILURE_TOTAL  # noqa: PLC0415
+
+        RAG_CONTEXT_FAILURE_TOTAL.labels(stage="query_expansion_fallback").inc()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # 한국어 영업비밀 도메인 동의어/약어 기본 사전 (공개 출처 기반).
 # 다른 프로젝트에서 expand_rule(synonyms=...) 로 교체 가능.
 _DEFAULT_SYNONYMS: dict[str, list[str]] = {
@@ -98,6 +109,7 @@ def expand_llm(query: str, *, n: int = 3, provider=None) -> QueryExpansion:
             provider = build_provider()
     except Exception as e:  # noqa: BLE001
         logger.debug("LLM provider load failed (%s) — falling back to rule", e)
+        _record_qe_fallback()
         return expand_rule(query)
 
     prompt = (
@@ -109,6 +121,7 @@ def expand_llm(query: str, *, n: int = 3, provider=None) -> QueryExpansion:
         raw = provider.generate(prompt)
     except Exception as e:  # noqa: BLE001
         logger.debug("LLM generate failed (%s) — falling back to rule", e)
+        _record_qe_fallback()
         return expand_rule(query)
 
     # [QW] 쿼리확장 LLM 비용 best-effort 기록 (retrieval 경로의 LLM 비용 = 쿼리확장).

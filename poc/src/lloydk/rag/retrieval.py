@@ -40,6 +40,20 @@ def _record_hybrid_degrade() -> None:
         pass
 
 
+def _record_fallback(stage: str) -> None:
+    """검색 품질 저하 폴백(reranker→RRF, encode_batch→single, encode→skip)을 가시화.
+
+    무음으로 떨어지면 검색 품질이 조용히 나빠진다 — 호출부 WARNING 로그 + 이 best-effort
+    counter(stage 라벨)로 운영 대시보드에 노출. retrieval은 도메인 독립 코어라 lazy import.
+    """
+    try:
+        from lloydk.api.prom_metrics import RAG_CONTEXT_FAILURE_TOTAL  # noqa: PLC0415
+
+        RAG_CONTEXT_FAILURE_TOTAL.labels(stage=stage).inc()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 _RRF_K = 60.0  # 표준 RRF 상수 (Cormack et al. 2009)
 
 
@@ -97,6 +111,7 @@ def _rerank_hits(
             ranked = reranker.rerank(query_text, candidates, top_k=top_k)
     except Exception as exc:  # noqa: BLE001
         logger.warning("reranker failed (%s) — falling back to RRF order", exc)
+        _record_fallback("reranker_fallback")
         return hits[:top_k]
 
     fused: list[SearchHit] = []
@@ -178,8 +193,10 @@ def expand_then_search(
                     "encode_batch length mismatch (got %d, expected %d) — single fallback",
                     len(batch_result), len(queries),
                 )
+                _record_fallback("encode_batch_fallback")
         except Exception as exc:  # noqa: BLE001
             logger.warning("encode_batch failed (%s) — single fallback", exc)
+            _record_fallback("encode_batch_fallback")
 
     result_sets: list[list[SearchHit]] = []
     for i, q in enumerate(queries):
@@ -190,6 +207,7 @@ def expand_then_search(
                     vec = list(encode(q))
             except Exception as exc:  # noqa: BLE001
                 logger.warning("encode failed for q=%r: %s", q, exc)
+                _record_fallback("encode_fallback")
                 continue
         try:
             hits = store.search_hybrid(
