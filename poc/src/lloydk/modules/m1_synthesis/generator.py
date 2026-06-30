@@ -270,16 +270,21 @@ def _fallback_body(grade_code: str, domain: str) -> str:
     """Noop provider / CI 파이프라인 연결 테스트용 fallback.
 
     실제 품질 평가에 사용하지 않는다 (label_source: noop_fallback 으로 구분).
-    등급명·키워드를 본문에 직접 삽입하지 않는다.
+
+    [등급 누출 차단] 과거엔 GRADE_SITUATION_PROMPTS의 situation/disclosure_scope를 본문에
+    직접 넣어, 그 텍스트("외부 공유 절대 불가"·"유출 시 회사 존립…" 등 강한 등급 마커)가 합성
+    코퍼스에 누출됐다 — noop_fallback 문서가 학습에 새면 룰·모델이 실데이터에 없는 합성 단서에
+    과적합한다. 본문은 **grade-중립 placeholder**로만 둔다(모든 등급에서 동일). 등급은 본문이
+    아니라 메타(target_grade)로만 보존되며, grade_code는 호환을 위해 시그니처에만 유지한다.
     """
-    situation = GRADE_SITUATION_PROMPTS.get(grade_code, GRADE_SITUATION_PROMPTS["S3"])
+    del grade_code  # 본문에 등급 신호를 넣지 않는다(누출 차단) — 시그니처는 호출부 호환용.
     return (
-        f"[Noop fallback — {domain} 도메인 합성 문서]\n\n"
+        f"[Noop fallback — {domain} 도메인 합성 문서 (파이프라인 연결 테스트)]\n\n"
         "1. 문서 개요\n"
-        f"본 자료는 {situation['disclosure_scope']} 조건에 해당하는 내부 문서이다.\n\n"
+        f"본 자료는 {domain} 도메인의 내부 문서 형식 placeholder이다.\n\n"
         "2. 주요 내용\n"
-        f"{situation['situation']}\n\n"
+        "합성 파이프라인 연결 테스트 목적으로 생성된 자리표시 문서로, 등급 판단에 쓰일 "
+        "구체 내용(공개 범위·피해 가능성 등)을 담지 않는다.\n\n"
         "3. 결론\n"
-        "합성 파이프라인 연결 테스트 목적으로 생성되었으며, "
         "실제 LLM 호출 시 이 내용은 해당 맥락에 맞는 자연스러운 문서로 대체된다."
     )
