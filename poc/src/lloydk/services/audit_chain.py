@@ -145,9 +145,17 @@ class ChainVerificationResult:
     broken: int
     first_break_audit_id: int | None = None
     last_hash: str = ""
+    # payload_hash가 NULL/빈값인 행 수 — 체인 break와 별개의 무결성 신호(미들웨어 우회/데이터손실).
+    nil_hash_rows: int = 0
+    first_nil_audit_id: int | None = None
 
     def ok(self) -> bool:
+        # break만 본다(동작 보존). nil 행은 별개 신호로 노출 — integrity_ok로 종합 판정.
         return self.broken == 0
+
+    def integrity_ok(self) -> bool:
+        """체인 무결성 종합 — break도 nil 행도 없어야 True."""
+        return self.broken == 0 and self.nil_hash_rows == 0
 
 
 def verify_chain(
@@ -180,8 +188,17 @@ def verify_chain(
     broken = 0
     first_break: int | None = None
     last_hash = ZERO16
+    nil_hash_rows = 0
+    first_nil: int | None = None
 
     for row in rows:
+        # [무결성] payload_hash가 NULL/빈값 = 감사 미들웨어 미경유(직접 DB 삽입) 또는 데이터 손실.
+        # break 판정과 별개로 사전 카운트 — nil이 후속 prev16=ZERO16을 만들어 break를 무음
+        # anchor화하는 것을 따로 노출한다.
+        if not (row.payload_hash or "").strip():
+            nil_hash_rows += 1
+            if first_nil is None:
+                first_nil = row.audit_id
         prev16, stored_full32 = parse_chained_hash(row.payload_hash or "")
         # 본 row의 prev가 직전 last_hash와 일치하는지(전형적 chain)
         if prev16 != (last_hash or ZERO16)[:16] and last_hash != ZERO16:
@@ -191,6 +208,20 @@ def verify_chain(
         # 재계산은 원본 payload 미보유라 검증 한계 — stored를 last_hash로 인수
         last_hash = stored_full32 or last_hash
         verified += 1
+
+    if nil_hash_rows:
+        # P0 무결성 신호 — nil payload_hash는 우회/손실. break와 별개 메트릭·경보.
+        try:
+            from lloydk.api.prom_metrics import AUDIT_CHAIN_NIL_HASH_TOTAL  # noqa: PLC0415
+
+            AUDIT_CHAIN_NIL_HASH_TOTAL.inc(nil_hash_rows)
+        except Exception:  # noqa: BLE001
+            pass
+        logger.warning(
+            "audit chain verify: %d/%d rows have NULL payload_hash "
+            "(first_nil_audit_id=%s) — 미들웨어 우회/데이터손실 의심",
+            nil_hash_rows, len(rows), first_nil,
+        )
 
     if broken:
         # NEW-H2: P0 AuditChainBroken 알람용 메트릭. best-effort(프로메테우스 미가용 무시).
@@ -211,6 +242,8 @@ def verify_chain(
         broken=broken,
         first_break_audit_id=first_break,
         last_hash=last_hash,
+        nil_hash_rows=nil_hash_rows,
+        first_nil_audit_id=first_nil,
     )
 
 

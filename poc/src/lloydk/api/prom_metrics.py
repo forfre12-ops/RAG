@@ -194,6 +194,15 @@ AUDIT_CHAIN_BROKEN_TOTAL = Counter(
     registry=registry,
 )
 
+# 감사 행에 payload_hash가 NULL/빈값 — 체인 break와 별개의 무결성 신호(P0). nil hash는
+# 감사 미들웨어를 거치지 않은 직접 DB 삽입(우회) 또는 데이터 손실을 뜻한다. verify_chain의
+# break 카운트는 nil 근원 행을 무음 anchor화할 수 있어, nil 행을 따로 스캔해 노출한다.
+AUDIT_CHAIN_NIL_HASH_TOTAL = Counter(
+    "lloydk_audit_chain_nil_hash_total",
+    "Audit log rows with NULL/empty payload_hash (middleware bypass or data loss; integrity signal)",
+    registry=registry,
+)
+
 # 문서 적재 건수 — PiiMaskingMissRate 의 분모(유입은 있는데 PII 마스킹 0이면 masker 누락 의심).
 DOCUMENTS_INGESTED_TOTAL = Counter(
     "lloydk_documents_ingested_total",
