@@ -107,13 +107,11 @@ class SynthesisService:
         try:
             with session_scope() as db:
                 repo = SynthRepo(db)
-                if db_status == "pending_review":
-                    samples = repo.list_pending_review(limit=limit, offset=offset)
-                    # total = limit/offset 무관 전체 건수 (페이지네이션 메타)
-                    total = repo.count_pending_review()
-                else:
-                    # 승인/반려 조회는 PoC 미구현 — pending만 페이지네이션 지원
-                    samples, total = [], 0
+                # [C1] pending/approved/rejected 모두 조회 지원. 종전엔 승인/반려가 silent
+                # empty([],0)로 떨어져 운영자 검수 이력 조회가 무음 함정이었다.
+                samples = repo.list_by_status(db_status, limit=limit, offset=offset)
+                # total = limit/offset 무관 전체 건수 (페이지네이션 메타)
+                total = repo.count_by_status(db_status)
                 items = [
                     SyntheticDocItem(
                         synth_id=s.sample_id,
