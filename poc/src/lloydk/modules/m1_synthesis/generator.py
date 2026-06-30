@@ -166,6 +166,10 @@ class SynthDoc:
     usage: Optional[UsageRecord] = None
     pii_violations: list[str] = field(default_factory=list)
     parse_error: Optional[str] = None
+    # [C16] 본문 출처 식별 — None=정상 생성(JSON 파싱 OK). "noop_fallback"=resp.text가 비어
+    # placeholder 본문 사용(CI 연결 테스트, 학습 편입 금지 마커). "llm_nonjson"=실 LLM이 비-JSON
+    # 텍스트를 줘서 raw를 body로 사용. parse_error만으론 뒤 둘이 뭉뚱그려져 grep 식별 불가였다.
+    label_source: Optional[str] = None
 
 
 class SyntheticDocGenerator:
@@ -230,8 +234,12 @@ class SyntheticDocGenerator:
             parsed = self._parse(resp.text)
 
         if parsed is None:
-            # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용
-            body = resp.text or _fallback_body(grade_code, req.domain)
+            # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용.
+            # [C16] resp.text가 비면 placeholder(_fallback_body)=noop_fallback(학습 금지 마커),
+            # 실 LLM이 비-JSON 텍스트를 주면 llm_nonjson — 둘을 label_source로 구분(grep 식별).
+            raw_text = resp.text or ""
+            body = raw_text or _fallback_body(grade_code, req.domain)
+            label_source = "llm_nonjson" if raw_text else "noop_fallback"
             title = f"{DOMAIN_DOC_TYPES.get(req.domain, '내부 자료').split(',')[0].strip()} 합성 v{abs(hash(user)) % 10000:04d}"
             doc_type = DOMAIN_DOC_TYPES.get(req.domain, "내부 자료").split(",")[0].strip()
             return SynthDoc(
@@ -246,6 +254,7 @@ class SyntheticDocGenerator:
                 usage=resp.usage,
                 pii_violations=self._pii_violations(body),
                 parse_error="non-json response",
+                label_source=label_source,
             )
 
         body = parsed.get("body", "") or ""
@@ -269,7 +278,8 @@ class SyntheticDocGenerator:
 def _fallback_body(grade_code: str, domain: str) -> str:
     """Noop provider / CI 파이프라인 연결 테스트용 fallback.
 
-    실제 품질 평가에 사용하지 않는다 (label_source: noop_fallback 으로 구분).
+    실제 품질 평가에 사용하지 않는다 — 이 본문을 쓴 SynthDoc은 label_source="noop_fallback"
+    으로 식별된다(학습 편입 금지 마커. build_synthetic_golden은 parse_error로 이미 필터링).
 
     [등급 누출 차단] 과거엔 GRADE_SITUATION_PROMPTS의 situation/disclosure_scope를 본문에
     직접 넣어, 그 텍스트("외부 공유 절대 불가"·"유출 시 회사 존립…" 등 강한 등급 마커)가 합성
