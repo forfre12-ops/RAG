@@ -119,3 +119,77 @@ def test_calibrate_fails_loud_without_logits(tmp_path, monkeypatch):
     )
     assert mod.main() == 1
     assert not (model_dir / "temperature.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# C17 — 무보정(T=1.0) 서빙 가시화. 실모델 로드 시 동봉 temperature.json이 없고
+# classifier_temperature=1.0이면 종전엔 *완전 무음*으로 무보정 서빙됐다(OOD 과신
+# → 고등급 무음미탐). _apply_bundle_calibration이 보정 출처를 판정·loud-warn.
+# ---------------------------------------------------------------------------
+
+
+def test_bundle_calibration_loads_temperature_json(tmp_path, monkeypatch):
+    from lloydk import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.0, raising=False)
+    model_dir = tmp_path / "v-cal"
+    model_dir.mkdir()
+    (model_dir / "temperature.json").write_text(
+        json.dumps({"temperature": 2.0}), encoding="utf-8"
+    )
+    pipe = InferencePipeline()
+    pipe.model_dir = model_dir
+    src = pipe._apply_bundle_calibration()
+    assert src == "bundle"
+    assert pipe._model_temperature == pytest.approx(2.0)
+    assert pipe.calibrated is True
+
+
+def test_uncalibrated_serving_warns_loud(tmp_path, monkeypatch, caplog):
+    """동봉 temperature.json 부재 + classifier_temperature=1.0 → 무보정 + loud-warn."""
+    import logging
+
+    from lloydk import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.0, raising=False)
+    model_dir = tmp_path / "v-nocal"
+    model_dir.mkdir()  # temperature.json 없음
+    pipe = InferencePipeline()
+    pipe.model_dir = model_dir
+    with caplog.at_level(logging.WARNING, logger="lloydk.modules.m5_inference.pipeline"):
+        src = pipe._apply_bundle_calibration()
+    assert src == "uncalibrated"
+    assert pipe.calibrated is False
+    assert pipe._model_temperature is None
+    assert any("calibration" in r.message and "무보정" in r.message for r in caplog.records)
+
+
+def test_env_temperature_counts_as_calibrated(tmp_path, monkeypatch):
+    """동봉이 없어도 classifier_temperature(≠1.0) 주입이 있으면 보정으로 간주(경고 없음)."""
+    from lloydk import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.5, raising=False)
+    model_dir = tmp_path / "v-envcal"
+    model_dir.mkdir()
+    pipe = InferencePipeline()
+    pipe.model_dir = model_dir
+    src = pipe._apply_bundle_calibration()
+    assert src == "env"
+    assert pipe.calibrated is True
+
+
+def test_nonpositive_bundle_temperature_falls_back_uncalibrated(tmp_path, monkeypatch):
+    """temperature<=0 동봉은 무시하고 무보정 폴백(주입도 없으면 uncalibrated)."""
+    from lloydk import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "classifier_temperature", 1.0, raising=False)
+    model_dir = tmp_path / "v-zero"
+    model_dir.mkdir()
+    (model_dir / "temperature.json").write_text(
+        json.dumps({"temperature": 0}), encoding="utf-8"
+    )
+    pipe = InferencePipeline()
+    pipe.model_dir = model_dir
+    src = pipe._apply_bundle_calibration()
+    assert src == "uncalibrated"
+    assert pipe.calibrated is False

@@ -43,7 +43,15 @@ def _check_model() -> dict:
     except Exception:
         return {"status": "unknown", "ok": not model_expected, "model_dir": model_dir}
     if model_loaded:
-        return {"status": "loaded", "ok": True, "model_dir": model_dir}
+        # [calibration-visibility] 무보정(T=1.0) 서빙은 OOD 과신→고등급 무음미탐 위험이라
+        # 운영 점검 대상. ok는 유지(서빙 가능)하되 calibrated/calibration_source를 노출한다.
+        return {
+            "status": "loaded",
+            "ok": True,
+            "model_dir": model_dir,
+            "calibrated": getattr(svc.inference, "calibrated", None),
+            "calibration_source": getattr(svc.inference, "_calibration_source", "unknown"),
+        }
     if model_expected:
         return {"status": "degraded", "ok": False, "model_dir": model_dir}
     return {"status": "rule_fallback", "ok": True, "model_dir": model_dir}

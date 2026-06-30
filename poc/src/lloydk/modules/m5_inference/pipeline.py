@@ -68,6 +68,10 @@ class InferencePipeline:
         self._model = None
         self._tokenizer = None
         self._model_temperature: float | None = None  # [A1] 모델 동봉 temperature.json 자동로드값
+        # [calibration-visibility] 서빙 보정 상태 — None=rule-fallback(보정 N/A), True=동봉/주입
+        # 보정 적용, False=무보정(T=1.0) 서빙(무음실패 위험). _apply_bundle_calibration에서 셋.
+        self.calibrated: bool | None = None
+        self._calibration_source: str = "rule-fallback"
         # GradeRegistry 순서는 **rule-fallback 경로 전용** id→등급 매핑.
         # 학습 모델이 로드되면 _load_model에서 모델 config.id2label로 덮어쓴다
         # (softmax 인덱스는 학습 시점 순서에 고정되어 있고 DB level_order와 무관).
@@ -102,18 +106,62 @@ class InferencePipeline:
         self._model.eval()
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._model.to(self._device)
-        # [A1] 모델 아티팩트 동봉 temperature.json 자동 로드(보정 자동연결).
+        # [A1] 모델 아티팩트 동봉 temperature.json 자동 로드(보정 자동연결) + 무보정 가시화.
         # 보정 스크립트(calibrate_classifier.py)가 모델 폴더에 {"temperature": T}를 남기면
         # 서빙이 자동으로 logit/T 적용. settings.classifier_temperature가 명시(≠1.0)면 그게 우선.
+        self._calibration_source = self._apply_bundle_calibration()
+
+    def _apply_bundle_calibration(self) -> str:
+        """모델 dir 동봉 temperature.json을 로드하고 무보정 서빙을 가시화.
+
+        반환(보정 출처): "bundle"=동봉 T 적용 · "env"=classifier_temperature 주입 ·
+        "uncalibrated"=둘 다 없어 T=1.0 무보정 서빙(loud-warn).
+
+        실모델이 로드됐는데 보정이 없으면 OOD 과신으로 softmax conf가 부풀어 conf 게이트(0.7)가
+        보정 안 된 값 위에 서고, 고등급(TS/S1)이 과신 자동확정으로 무음미탐될 수 있다. 종전엔
+        temperature.json 부재가 *완전 무음*이라, 로드 시 1회 loud-warn으로 드러낸다(서빙 T 계산
+        자체는 불변 — _temperature()가 진실 소스, 본 메서드는 가시성·상태표시만 추가).
+        """
+        import json as _json  # noqa: PLC0415
+
+        self._model_temperature = None
+        if self.model_dir is not None:
+            try:
+                _tpath = self.model_dir / "temperature.json"
+                if _tpath.exists():
+                    _t = float(_json.loads(_tpath.read_text(encoding="utf-8")).get("temperature", 0))
+                    if _t > 0:
+                        self._model_temperature = _t
+                        self.calibrated = True
+                        return "bundle"
+                    logger.warning(
+                        "[calibration] %s/temperature.json 의 temperature=%r (<=0) — 무시(무보정 폴백).",
+                        self.model_dir, _t,
+                    )
+            except Exception as _exc:  # noqa: BLE001
+                logger.warning(
+                    "[calibration] %s/temperature.json 읽기 실패: %s — 무보정 폴백.",
+                    self.model_dir, _exc,
+                )
+        # 동봉 보정 없음 — settings.classifier_temperature(≠1.0) 주입이 있으면 그것으로 보정.
         try:
-            import json as _json  # noqa: PLC0415
-            _tpath = self.model_dir / "temperature.json"
-            if _tpath.exists():
-                _t = float(_json.loads(_tpath.read_text(encoding="utf-8")).get("temperature", 0))
-                if _t > 0:
-                    self._model_temperature = _t
+            from lloydk.config import settings as _settings  # noqa: PLC0415
+            _env_t = float(getattr(_settings, "classifier_temperature", 1.0))
         except Exception:  # noqa: BLE001
-            self._model_temperature = None
+            _env_t = 1.0
+        if _env_t > 0 and abs(_env_t - 1.0) > 1e-9:
+            self.calibrated = True
+            return "env"
+        # 무보정(T=1.0) 서빙 — 무음실패 위험. loud-warn.
+        self.calibrated = False
+        logger.warning(
+            "[calibration] 활성 모델(%s)에 사용 가능한 temperature.json이 없고 "
+            "classifier_temperature=1.0 — 무보정(T=1.0) 서빙. OOD 과신으로 고등급(TS/S1) "
+            "무음미탐 위험. 학습 후 calibrate_classifier.py로 temperature.json을 동봉하거나 "
+            "CLASSIFIER_TEMPERATURE를 주입하세요.",
+            self.model_dir,
+        )
+        return "uncalibrated"
 
     def _id2label_from_config(self) -> dict[int, object] | None:
         """학습 체크포인트 config.id2label → {int index: Grade|str} 매핑.
