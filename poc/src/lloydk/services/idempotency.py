@@ -140,8 +140,40 @@ def get_idempotency_store():
             logger.warning(
                 "idempotency store: in-memory fallback (redis unavailable: %s)", exc
             )
+            # [정합성] 폴백을 메트릭으로 노출 — 멀티워커에선 워커 간 멱등성이 깨진다(best-effort).
+            try:
+                from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                    IDEMPOTENCY_BACKEND_FALLBACK_TOTAL,
+                )
+                IDEMPOTENCY_BACKEND_FALLBACK_TOTAL.inc()
+            except Exception:  # noqa: BLE001
+                pass
             _store = _MemoryStore()
     return _store
+
+
+def assert_multiworker_idempotency_safe() -> None:
+    """[정합성] 멀티워커(WEB_CONCURRENCY>1) 운영에서 idempotency 저장소가 프로세스-로컬 메모리로
+    폴백되면 워커 간 멱등성이 깨진다(중복 처리) — 그 조합이면 fail-fast.
+
+    단일 워커는 no-op(메모리 폴백이라도 1워커면 정확). poc_mode=full·non-TESTING 게이트는
+    호출부(assert_production_credentials)가 이미 적용하므로 여기선 워커 수만 본다.
+    JWT 모드는 sub claim별 키 네임스페이스로 자연 격리되나, 저장소 자체가 프로세스-로컬이면
+    여전히 워커 간 가시성이 없으므로 redis가 필요하다(인증모드 무관).
+    """
+    import os  # noqa: PLC0415
+    try:
+        workers = int(os.environ.get("WEB_CONCURRENCY", "1"))
+    except ValueError:
+        workers = 1
+    if workers <= 1:
+        return
+    if isinstance(get_idempotency_store(), _MemoryStore):
+        raise RuntimeError(
+            "정합성: WEB_CONCURRENCY>1(멀티워커) 운영인데 idempotency 저장소가 in-memory "
+            "폴백입니다 — 워커 간 멱등성이 깨져 confirm/relabel 등 변경성 POST 재시도가 "
+            "중복 처리될 수 있습니다. REDIS_URL을 가용 redis로 설정하세요(또는 WEB_CONCURRENCY=1)."
+        )
 
 
 def reset_idempotency_store_for_test() -> None:

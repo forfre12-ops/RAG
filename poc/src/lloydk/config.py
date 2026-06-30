@@ -783,6 +783,12 @@ def assert_production_credentials() -> None:
             "키를 설정하거나(권장) 암호화를 끄세요."
         )
 
+    # [정합성] 멀티워커 운영에서 idempotency가 in-memory 폴백이면 워커 간 멱등성 붕괴 — fail-fast.
+    from lloydk.services.idempotency import (  # noqa: PLC0415
+        assert_multiworker_idempotency_safe,
+    )
+    assert_multiworker_idempotency_safe()
+
     # RATE_LIMIT_DISABLED 운영에서 오류
     if os.environ.get("RATE_LIMIT_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
         raise RuntimeError(

@@ -203,6 +203,14 @@ AUDIT_CHAIN_NIL_HASH_TOTAL = Counter(
     registry=registry,
 )
 
+# idempotency 저장소가 redis 미가용으로 in-memory(프로세스-로컬)로 폴백한 횟수. 멀티워커에선
+# 워커 간 멱등성이 깨져 중복 처리 위험 — 0보다 크면 운영(멀티워커)에서 redis 미배선 신호.
+IDEMPOTENCY_BACKEND_FALLBACK_TOTAL = Counter(
+    "lloydk_idempotency_backend_fallback_total",
+    "Idempotency store fell back to process-local in-memory (redis unavailable) — multi-worker risk",
+    registry=registry,
+)
+
 # 문서 적재 건수 — PiiMaskingMissRate 의 분모(유입은 있는데 PII 마스킹 0이면 masker 누락 의심).
 DOCUMENTS_INGESTED_TOTAL = Counter(
     "lloydk_documents_ingested_total",
