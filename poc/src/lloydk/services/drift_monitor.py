@@ -16,6 +16,7 @@ dryrun에서도 동작 — InMemory + Hash 임베딩 사용 가능.
 
 from __future__ import annotations
 
+import hashlib as _hashlib
 import json as _json
 import logging as _logging
 import math
@@ -161,27 +162,59 @@ def _default_state_path() -> str:
     return str(_Path(_DEFAULT_CENTROID_PATH).resolve().parent / "drift_state.json")
 
 
-def _load_violation_state(path: str | None = None) -> int:
-    """직전까지 누적된 연속 위반 횟수를 로드. 없거나 읽기 실패 시 0."""
+def _centroid_fingerprint(train: dict | None) -> str:
+    """드리프트 baseline(train centroid) 식별 지문 — baseline이 바뀌면 값이 바뀐다.
+
+    히스테리시스 연속위반 카운트는 '이 baseline 대비' 누적이라, 재학습으로 centroid가
+    덮어써지면(save_train_centroid는 고정 경로 overwrite) 옛 카운트는 무효 → 지문 불일치로
+    리셋한다. 부동소수 직렬화 민감도를 피해 메타(sample_size·dim·len) + 앞 16성분 라운딩만 해시.
+    """
+    if not train:
+        return ""
+    c = train.get("centroid") or []
+    basis = f"{train.get('sample_size')}:{train.get('dim')}:{len(c)}:"
+    basis += ",".join(f"{float(x):.6f}" for x in c[:16])
+    return _hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_violation_state(path: str | None = None, *, version: str | None = None) -> int:
+    """직전까지 누적된 연속 위반 횟수를 로드. 없거나 읽기 실패 시 0.
+
+    version(centroid 지문)이 주어지고 저장된 version과 다르면 baseline이 바뀐 것 → 0으로
+    리셋(옛 baseline 대비 위반은 무효). 저장된 version이 없으면(구 상태파일) 그대로 사용(하위호환).
+    """
     path = path or _default_state_path()
     p = _Path(path)
     if not p.exists():
         return 0
     try:
         data = _json.loads(p.read_text(encoding="utf-8"))
+        stored_version = data.get("version")
+        if version is not None and stored_version is not None and stored_version != version:
+            _logger.info(
+                "drift state reset: centroid baseline changed (was=%s now=%s) — 연속위반 0",
+                stored_version, version,
+            )
+            return 0
         return int(data.get("consecutive_violations", 0))
     except Exception as exc:  # noqa: BLE001
         _logger.warning("drift state load failed: path=%s err=%s", path, exc)
         return 0
 
 
-def _save_violation_state(count: int, path: str | None = None) -> None:
-    """연속 위반 횟수를 영속. 위반 아니면 0으로 리셋해 단발 스파이크가 누적 안 되게."""
+def _save_violation_state(count: int, path: str | None = None, *, version: str | None = None) -> None:
+    """연속 위반 횟수를 영속. 위반 아니면 0으로 리셋해 단발 스파이크가 누적 안 되게.
+
+    version(centroid 지문)을 함께 저장해, 다음 로드에서 baseline 변경을 감지·리셋한다.
+    """
     path = path or _default_state_path()
     p = _Path(path)
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(_json.dumps({"consecutive_violations": int(count)}), encoding="utf-8")
+        payload: dict = {"consecutive_violations": int(count)}
+        if version is not None:
+            payload["version"] = version
+        p.write_text(_json.dumps(payload), encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
         _logger.warning("drift state save failed: path=%s err=%s", path, exc)
 
@@ -553,12 +586,14 @@ def run_drift_check(
         )
 
     # #39 히스테리시스 적용 — 영속 카운트 갱신 후 N회 연속 위반일 때만 alert.
-    prev = _load_violation_state()
+    # 상태를 centroid 지문으로 스코핑 — 재학습으로 baseline이 바뀌면 옛 위반 누적은 무효 리셋.
+    fp = _centroid_fingerprint(train)
+    prev = _load_violation_state(version=fp)
     if report.raw_violation:
         new_count = prev + 1
     else:
         new_count = 0
-    _save_violation_state(new_count)
+    _save_violation_state(new_count, version=fp)
     report.consecutive_violations = new_count
     report.consecutive_required = consecutive_required
     report.alert = new_count >= consecutive_required
