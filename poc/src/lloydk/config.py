@@ -228,6 +228,9 @@ class Settings(BaseSettings):
     #   ollama        : (alias) local_openai와 동일 — Ollama 기본 11434 endpoint
     llm_provider: str = "noop"
     llm_model: str = "claude-sonnet-4-6"
+    # [QW] LLM 사용/비용 기록의 billing_phase 라벨. 기본 'development'(개발·검증 비용).
+    # 운영 청구 분리가 필요하면 'production'으로 설정 — LLMUsageService.record가 모든 경로에서 사용.
+    llm_billing_phase: str = "development"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     google_api_key: str = ""

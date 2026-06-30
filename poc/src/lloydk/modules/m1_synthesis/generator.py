@@ -172,6 +172,15 @@ class SyntheticDocGenerator:
     def __init__(self, llm: Optional[LLMProvider] = None) -> None:
         self.llm = llm or build_provider()
 
+    @staticmethod
+    def _record_usage(resp: object) -> None:
+        """[QW] 합성 LLM 호출 비용 best-effort 기록 (purpose='synthesis')."""
+        try:
+            from lloydk.services.llm_usage_service import record_llm_usage  # noqa: PLC0415
+            record_llm_usage(resp, purpose="synthesis")
+        except Exception:  # noqa: BLE001
+            pass
+
     def _pii_violations(self, text: str) -> list[str]:
         return [p.pattern for p in _PII_PATTERNS if p.search(text)]
 
@@ -210,12 +219,14 @@ class SyntheticDocGenerator:
         max_retries = 2
         attempt = 0
         resp = self.llm.generate(user, system=SYSTEM_PROMPT, temperature=0.7, max_tokens=3500)
+        self._record_usage(resp)
         parsed = self._parse(resp.text)
         while parsed is None and attempt < max_retries:
             attempt += 1
             # 재시도: temperature 0.3, system prompt 에 "반드시 유효한 JSON 만 출력" 추가
             retry_system = SYSTEM_PROMPT + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
             resp = self.llm.generate(user, system=retry_system, temperature=0.3, max_tokens=3500)
+            self._record_usage(resp)  # 재시도도 실제 LLM 비용 — 누락 없이 기록
             parsed = self._parse(resp.text)
 
         if parsed is None:

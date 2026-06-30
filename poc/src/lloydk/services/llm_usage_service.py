@@ -132,3 +132,55 @@ class LLMUsageService:
         except Exception as exc:  # noqa: BLE001
             # DB 실패해도 JSONL은 남음 (best-effort).
             logger.warning("llm_usage DB insert failed (JSONL preserved): %s", exc)
+
+
+# ── [QW] 호출지점용 best-effort 비용 기록 헬퍼 ────────────────────────────────
+# LLMUsageService.record가 src 어디서도 호출되지 않아 synthesis/query_expansion/answer 등
+# 모든 LLM 비용이 미기록(llm_cost_usd_total 0)이었다. 각 호출지점에서 이 헬퍼를 부르면
+# LLMResponse(.usage) 또는 UsageRecord를 받아 best-effort로 기록한다 — 실패는 흡수해 LLM
+# 호출 경로(특히 폴백 로직)를 절대 막지 않는다. purpose 라벨로 경로별 비용을 분리 집계.
+_default_service: "LLMUsageService | None" = None
+
+
+def _get_default_service() -> "LLMUsageService":
+    global _default_service
+    if _default_service is None:
+        _default_service = LLMUsageService()
+    return _default_service
+
+
+def record_llm_usage(
+    resp_or_usage: object,
+    *,
+    purpose: str,
+    reference_type: Optional[str] = None,
+    reference_id: Optional[str] = None,
+    billing_phase: Optional[str] = None,
+    service: "LLMUsageService | None" = None,
+) -> None:
+    """LLMResponse(.usage) 또는 UsageRecord를 받아 best-effort로 LLM 사용/비용 기록.
+
+    실패는 전부 흡수(LLM 호출 경로 무영향). billing_phase 미지정 시 settings.llm_billing_phase.
+    """
+    try:
+        usage = getattr(resp_or_usage, "usage", None)
+        if usage is None:
+            usage = resp_or_usage  # 이미 UsageRecord일 수 있음
+        if usage is None or not hasattr(usage, "provider"):
+            return  # 텍스트만 반환하는 provider(usage 없음) — 기록 불가, 무해 skip
+        if billing_phase is None:
+            try:
+                from lloydk.config import settings  # noqa: PLC0415
+                billing_phase = getattr(settings, "llm_billing_phase", "development")
+            except Exception:  # noqa: BLE001
+                billing_phase = "development"
+        svc = service or _get_default_service()
+        svc.record(
+            usage,
+            purpose=purpose,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            billing_phase=billing_phase,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("record_llm_usage skipped: %s", exc)

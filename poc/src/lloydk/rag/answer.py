@@ -210,6 +210,13 @@ def synthesize_answer(
             deterministic_fallback=True,
         )
 
+    # [QW] 답안 합성 LLM 비용 best-effort 기록 (purpose='answer').
+    try:
+        from lloydk.services.llm_usage_service import record_llm_usage  # noqa: PLC0415
+        record_llm_usage(raw, purpose="answer")
+    except Exception:  # noqa: BLE001
+        pass
+
     text, usage = _coerce_provider_text(raw)
     if not text or not text.strip():
         warnings_acc.append("llm returned empty text — deterministic fallback")

@@ -111,6 +111,13 @@ def expand_llm(query: str, *, n: int = 3, provider=None) -> QueryExpansion:
         logger.debug("LLM generate failed (%s) — falling back to rule", e)
         return expand_rule(query)
 
+    # [QW] 쿼리확장 LLM 비용 best-effort 기록 (retrieval 경로의 LLM 비용 = 쿼리확장).
+    try:
+        from lloydk.services.llm_usage_service import record_llm_usage  # noqa: PLC0415
+        record_llm_usage(raw, purpose="query_expansion")
+    except Exception:  # noqa: BLE001
+        pass
+
     text = raw.text if hasattr(raw, "text") else str(raw)
 
     import json
