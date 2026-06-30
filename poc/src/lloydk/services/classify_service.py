@@ -402,9 +402,26 @@ class ClassifyService:
                     f"agreement-gate: model={model_code} vs rule={rule_code} disagree on "
                     "non-public grade — routed to human review (conf alone insufficient)"
                 )
-        except Exception:  # noqa: BLE001 — 룰엔진 미가용·오류는 기존 자동확정 유지(fail-safe)
+        except Exception as exc:  # noqa: BLE001 — 룰엔진 미가용·오류는 기존 자동확정 유지(fail-safe)
+            logger.debug("agreement-gate fail-open (rule unavailable): %s", exc)
+            self._record_gate_fail_open("agreement")
             return None
         return None
+
+    @staticmethod
+    def _record_gate_fail_open(gate: str) -> None:
+        """[obs] 검수 게이트가 예외로 fail-open(자동확정 통과)했음을 가시화 — best-effort.
+
+        무음이면 고등급 자동확정이 게이트 없이 진행됐는지 안 보인다. 1차 가시성은 호출부 debug
+        로그, 운영 신호는 이 카운터(gate 라벨). 메트릭 실패는 분류 경로 무영향.
+        """
+        try:
+            from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                SERVING_GATE_FAIL_OPEN_TOTAL,
+            )
+            SERVING_GATE_FAIL_OPEN_TOTAL.labels(gate=gate).inc()
+        except Exception:  # noqa: BLE001
+            pass
 
     @staticmethod
     def _llm_second_opinion(text: str, model_label) -> str | None:
@@ -433,7 +450,9 @@ class ClassifyService:
                     f"llm-secondopinion: model auto-confirmed {model_code} but LLM proposes higher "
                     f"{llm.grade} (conf={llm.confidence:.2f}) — routed to human review (FNR-safe)"
                 )
-        except Exception:  # noqa: BLE001 — LLM 미가용·오류는 기존 자동확정 유지(fail-safe)
+        except Exception as exc:  # noqa: BLE001 — LLM 미가용·오류는 기존 자동확정 유지(fail-safe)
+            logger.debug("llm-secondopinion fail-open (LLM unavailable): %s", exc)
+            ClassifyService._record_gate_fail_open("llm_second_opinion")
             return None
         return None
 

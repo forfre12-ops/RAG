@@ -351,6 +351,16 @@ CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
     registry=registry,
 )
 
+# [obs] 서빙 검수 게이트가 예외로 fail-open한 횟수(gate별). agreement/llm_second_opinion 게이트는
+# 룰엔진·LLM 오류 시 None을 반환해 자동확정을 그대로 통과시킨다(fail-safe). 무음이면 고등급
+# 자동확정이 게이트 없이 진행됐는지 안 보인다 — 이 카운터로 'fail-open 발생'을 가시화한다.
+SERVING_GATE_FAIL_OPEN_TOTAL = Counter(
+    "lloydk_serving_gate_fail_open_total",
+    "Serving review gates that failed open (exception) and let auto-confirm proceed ungated, by gate",
+    ["gate"],  # agreement | llm_second_opinion
+    registry=registry,
+)
+
 # ── 작업(async job) 상태 진입 모니터 ──────────────────────────────────────────
 # 비동기 분류·합성·학습·골든빌드 작업의 각 상태 도달 횟수. job_store의 create/update 단일
 # choke point에서 best-effort 증가(상태 전이 1회=1 inc, double-count 없음 — Lock/WATCH로 직렬화).
