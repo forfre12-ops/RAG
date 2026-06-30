@@ -127,17 +127,37 @@ def main(argv=None):
         "--gold", args.gold, "--mode", "direct",
         "--report", str(work_dir / "gold_eval.md"),
     ]
-    print(f"[3/3 eval] {' '.join(eval_cmd)}", file=sys.stderr, flush=True)
+    print(f"[3/4 eval] {' '.join(eval_cmd)}", file=sys.stderr, flush=True)
     rc, tail = run_step("eval", eval_cmd, work_dir / "eval.log")
     summary["steps"]["eval"] = {"rc": rc, "tail": tail}
 
-    # 결과 취합
+    # 결과 취합(raw 모델)
     ej = work_dir / "gold_eval.json"
     if ej.exists():
         try:
             summary["gold_eval_metrics"] = json.load(io.open(ej, encoding="utf-8")).get("metrics")
         except Exception:  # noqa: BLE001
             pass
+
+    # 4) 서빙경로 평가 — escalation τ 스윕이 raw FNR을 얼마나 회복하나(배포 실제 성능).
+    #    raw 모델이 합성 천장으로 고등급 FNR 높아도, 서빙 게이트(τ→검수 에스컬레이션)가
+    #    회복하면 '배포 가능'. 이게 "쓸 만한가"의 진짜 답.
+    serve_report = work_dir / "serving_eval.md"
+    serve_cmd = [
+        PY, "scripts/eval_serving_path.py", "--model-dir", str(model_dir),
+        "--gold", args.gold, "--taus", "0,0.35,0.25,0.15",
+        "--report", str(serve_report),
+    ]
+    print(f"[4/4 serving] {' '.join(serve_cmd)}", file=sys.stderr, flush=True)
+    rc, tail = run_step("serving", serve_cmd, work_dir / "serving.log")
+    summary["steps"]["serving"] = {"rc": rc, "tail": tail}
+    sj = serve_report.with_suffix(".json")
+    if sj.exists():
+        try:
+            summary["serving_eval"] = json.load(io.open(sj, encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            pass
+
     _save(summary, work_dir)
     print(f"[done] -> {work_dir}/summary.json", file=sys.stderr)
     print(str(work_dir / "summary.json"))
