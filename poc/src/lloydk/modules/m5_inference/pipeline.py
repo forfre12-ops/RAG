@@ -10,6 +10,7 @@ from lloydk.schemas.common import Grade, GradeRegistry
 from lloydk.schemas.classify import EvidenceSpan, EvaluationFactors, RagContextHit
 from lloydk.modules.m2_preprocess import split as _chunk_split
 from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
+from lloydk.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 완전 no-op
 
 logger = logging.getLogger(__name__)
 
@@ -661,19 +662,27 @@ class InferencePipeline:
         chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
 
         probs = []
+        # span은 torch.no_grad() **안쪽**에 둔다 — 전체 forward가 grad 비활성 유지(필수).
+        # 속성은 스칼라·비민감(model_version·청크수·device)만. OTel 미활성 시 no-op.
         with torch.no_grad():
-            for batch_start in range(0, len(chunk_texts), 8):
-                batch = chunk_texts[batch_start:batch_start + 8]
-                enc = self._tokenizer(
-                    batch, truncation=True, max_length=settings.max_seq_len,
-                    padding=True, return_tensors="pt",
-                ).to(self._device)
-                logits = self._model(**enc).logits
-                # 서빙 캘리브레이션: T>1이면 분포를 부드럽게 해 OOD 과신 완화. T=1.0=무보정.
-                temp = self._temperature
-                if temp != 1.0:
-                    logits = logits / temp
-                probs.append(F.softmax(logits, dim=-1).cpu())
+            with span(
+                "ml.classifier.forward",
+                model_version=str(self.model_dir.name) if self.model_dir else "model",
+                n_chunks=len(chunk_texts),
+                device=str(self._device),
+            ):
+                for batch_start in range(0, len(chunk_texts), 8):
+                    batch = chunk_texts[batch_start:batch_start + 8]
+                    enc = self._tokenizer(
+                        batch, truncation=True, max_length=settings.max_seq_len,
+                        padding=True, return_tensors="pt",
+                    ).to(self._device)
+                    logits = self._model(**enc).logits
+                    # 서빙 캘리브레이션: T>1이면 분포를 부드럽게 해 OOD 과신 완화. T=1.0=무보정.
+                    temp = self._temperature
+                    if temp != 1.0:
+                        logits = logits / temp
+                    probs.append(F.softmax(logits, dim=-1).cpu())
         chunk_probs = torch.cat(probs)  # [n_chunks, n_labels]
         doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
         # 표시용 scores는 합=1로 재정규화 (모든 인덱스를 같은 상수로 나눠 순서 보존).

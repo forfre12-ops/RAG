@@ -85,8 +85,16 @@ def _rerank_hits(
         return hits[:top_k]
 
     candidates = [h.payload["text"] for _, h in text_hits]
+    # 지연 import — 도메인 독립 코어(rag/)가 obs에 top-level로 결합되지 않게. span은 no-op 안전.
+    from lloydk.obs.otel import span  # noqa: PLC0415
     try:
-        ranked = reranker.rerank(query_text, candidates, top_k=top_k)
+        with span(
+            "ml.reranker.rank",
+            n_candidates=len(candidates),
+            top_k=top_k,
+            reranker_name=getattr(reranker, "name", "unknown"),
+        ):
+            ranked = reranker.rerank(query_text, candidates, top_k=top_k)
     except Exception as exc:  # noqa: BLE001
         logger.warning("reranker failed (%s) — falling back to RRF order", exc)
         return hits[:top_k]
@@ -157,9 +165,12 @@ def expand_then_search(
     first_k = top_k * max(1, oversample_factor) if use_reranker else top_k
 
     vecs: list[Sequence[float] | None] = [None] * len(queries)
+    # 지연 import — 도메인 독립 코어 디커플 유지. span은 OTel 미활성 시 no-op.
+    from lloydk.obs.otel import span  # noqa: PLC0415
     if encode_batch is not None:
         try:
-            batch_result = encode_batch(queries)
+            with span("ml.embedding.encode_batch", n_queries=len(queries), method=expansion.method):
+                batch_result = encode_batch(queries)
             if len(batch_result) == len(queries):
                 vecs = [list(v) for v in batch_result]
             else:
@@ -175,7 +186,8 @@ def expand_then_search(
         vec = vecs[i]
         if vec is None:
             try:
-                vec = list(encode(q))
+                with span("ml.embedding.encode", method=expansion.method):
+                    vec = list(encode(q))
             except Exception as exc:  # noqa: BLE001
                 logger.warning("encode failed for q=%r: %s", q, exc)
                 continue
