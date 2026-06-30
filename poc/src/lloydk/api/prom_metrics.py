@@ -351,6 +351,26 @@ CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
     registry=registry,
 )
 
+# ── 작업(async job) 상태 진입 모니터 ──────────────────────────────────────────
+# 비동기 분류·합성·학습·골든빌드 작업의 각 상태 도달 횟수. job_store의 create/update 단일
+# choke point에서 best-effort 증가(상태 전이 1회=1 inc, double-count 없음 — Lock/WATCH로 직렬화).
+# 기존 CELERY_QUEUE_LENGTH(큐 길이)만으로는 진행/완료/실패율·처리시간을 알 수 없던 사각지대 해소.
+# state 값은 코드 실측: queued·running(golden_build)·done·failed·partial.
+JOB_STATE_ENTERED_TOTAL = Counter(
+    "lloydk_job_state_entered_total",
+    "Async job state entries at create/update choke points (queued->running->done/failed/partial)",
+    ["state"],
+    registry=registry,
+)
+# 완료 소요시간 — create(_created_at 주입) → 터미널 상태(done/failed/partial) 도달까지 초.
+JOB_COMPLETION_DURATION_SECONDS = Histogram(
+    "lloydk_job_completion_duration_seconds",
+    "Async job latency from queued (create) to terminal state, by terminal state",
+    ["state"],
+    buckets=(0.1, 0.5, 1, 5, 10, 30, 60, 300, 600, 1800, 3600),
+    registry=registry,
+)
+
 # 스크랩 제외 경로 — 셀프 카운트 회피 + 노이즈 차단
 _EXCLUDED = {
     "/api/v1/metrics-prom",
