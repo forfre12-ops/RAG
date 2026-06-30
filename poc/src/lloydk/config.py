@@ -92,6 +92,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # 원본 EncryptingStorage AES-256-GCM). 운영(full)에선 STORAGE_ENCRYPTION_KEY 필수 —
         # 미설정 시 startup fail-fast(평문 저장 차단 = fail-secure). 다른 운영 시크릿과 동일 취급.
         "storage_encryption_enabled": True,
+        # 하드닝 운영 — 위 3개 안전 게이트가 꺼지면 startup 차단(게이트ON=가시성ON).
+        "require_safety_gates": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -109,6 +111,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "metadata_floor_enabled": True,
         # [번들 F] 원본 at-rest 암호화 ON (onprem-local과 동일 — 위 주석 참조).
         "storage_encryption_enabled": True,
+        # 하드닝 운영 — 위 3개 안전 게이트가 꺼지면 startup 차단(onprem-local과 동일).
+        "require_safety_gates": True,
     },
 }
 
@@ -343,6 +347,13 @@ class Settings(BaseSettings):
     # 'metadata-access-conflict'로 needs_review 라우팅(ICD §4.4 — 관리수준 높은 문서를 낮게 자동확정
     # 안 함). 메타데이터 신뢰도에 의존하며 오류/부재는 silent 폴백(기존 동작 보존).
     metadata_floor_enabled: bool = False
+
+    # [번들-안전게이트] 하드닝 운영(폐쇄망)에서 안전 게이트(agreement_gate·metadata_floor·
+    # storage_encryption) 강제 여부. 기본 False(동작 보존·lite-cloud/dev tier). onprem-local·
+    # full-train 프로파일이 True로 켠다. True인데 게이트가 하나라도 꺼져 있으면
+    # assert_production_credentials가 startup을 차단(fail-clear) — 프로파일이 켜둔 안전장치를
+    # .env override(=0)나 개별키 운영 누락으로 '게이트 OFF=무음' 상태로 띄우는 것을 막는다.
+    require_safety_gates: bool = False
 
     # 검증 라벨 내용해시(file_hash) 재사용 (기본 True). doc_id는 업로드마다 gen_random_uuid라
     # 유니크 → 같은 문서를 *재업로드*하면 새 doc_id가 되어, 기존 doc_id 기반 검증라벨 재사용
@@ -734,6 +745,29 @@ settings = Settings()
 apply_profile_defaults(settings)
 
 
+# 안전 게이트(룰·모델 합의·메타데이터 floor·원본 at-rest 암호화) — 하드닝 운영(폐쇄망)에서 필수.
+_SAFETY_GATES: tuple[tuple[str, str], ...] = (
+    ("agreement_gate_enabled", "AGREEMENT_GATE_ENABLED"),
+    ("metadata_floor_enabled", "METADATA_FLOOR_ENABLED"),
+    ("storage_encryption_enabled", "STORAGE_ENCRYPTION_ENABLED"),
+)
+
+
+def evaluate_safety_gates(s: "Settings") -> dict:
+    """안전 게이트 상태 평가 — 순수 함수(assert_production_credentials에서 호출, 테스트 용이).
+
+    require_safety_gates=True(onprem-local·full-train)인데 게이트가 하나라도 꺼져 있으면
+    must_raise=True. False(lite-cloud·dev·개별키)면 off만 보고 — 호출부가 가시화(warn)만 한다.
+    게이트ON=가시성ON 원칙: 프로파일이 켜둔 안전장치가 .env override(=0)나 개별키 운영 누락으로
+    조용히 꺼진 채 startup 성공하는 것을 막는다.
+
+    Returns: {"off": [env명...], "required": bool, "must_raise": bool}
+    """
+    off = [env for attr, env in _SAFETY_GATES if not getattr(s, attr, False)]
+    required = bool(getattr(s, "require_safety_gates", False))
+    return {"off": off, "required": required, "must_raise": required and bool(off)}
+
+
 def assert_production_credentials() -> None:
     """운영 모드에서 빈 자격증명 차단. dryrun/테스트는 우회.
 
@@ -768,6 +802,27 @@ def assert_production_credentials() -> None:
             f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
             ".env / 환경변수 / secrets_manager(Vault·AWS SM)로 설정 필요."
         )
+
+    # [번들-안전게이트] 하드닝 운영(require_safety_gates=True)은 룰·모델 합의 게이트·메타데이터
+    # 상향 floor·원본 at-rest 암호화가 모두 켜져 있어야 한다. 프로파일이 켜둔 값을 .env
+    # override(=0)로 끄거나 개별키 운영에서 빠뜨리면 '게이트 OFF=무음'으로 startup이 성공한다
+    # → 차단(fail-clear). require_safety_gates=False(lite-cloud·dev)면 무음 방지 가시화(warn)만.
+    _sg = evaluate_safety_gates(settings)
+    if _sg["must_raise"]:
+        raise RuntimeError(
+            "production 하드닝 모드(require_safety_gates=True)인데 안전 게이트가 꺼져 있습니다: "
+            f"{', '.join(_sg['off'])}. 폐쇄망 운영(onprem-local/full-train)은 룰·모델 합의 게이트·"
+            "메타데이터 상향 floor·원본 at-rest 암호화가 필수입니다. 해당 env를 1로 켜거나, "
+            "의도된 비보안 배포면 REQUIRE_SAFETY_GATES=0 으로 명시하세요(권장하지 않음)."
+        )
+    if _sg["off"]:
+        logger.warning(
+            "production(full) 모드인데 안전 게이트 OFF: %s. 영업비밀 보안 운영이면 하드닝 "
+            "프로파일(LLOYDK_DEPLOY_PROFILE=onprem-local|full-train) 또는 REQUIRE_SAFETY_GATES=1 "
+            "로 강제하세요(클라우드 개발/데모 tier면 의도된 상태).",
+            ", ".join(_sg["off"]),
+        )
+
     # CORS=["*"] 운영에서 오류
     if settings.cors_allow_origins == ["*"]:
         raise RuntimeError(
