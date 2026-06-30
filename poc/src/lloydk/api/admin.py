@@ -7,10 +7,15 @@ tenant 제거: 테넌트 API 키 발급·교체(rotate-api-key) 엔드포인트�
 """
 from __future__ import annotations
 
+import datetime as _dt
+import logging
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from lloydk.api._rbac import require_role
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -106,4 +111,88 @@ def locked_readiness() -> LockedReadinessResponse:
         require_locked_eval=bool(s["require_locked_eval"]),
         deploy_locked_gate_passed=bool(s["deploy_locked_gate_passed"]),
         reason=str(s["reason"]),
+    )
+
+
+# ── 운영 검수 대시보드 — 분산된 운영 신호를 한 화면용 JSON으로 종합 ──────────────
+# 그동안 추가한 가시성 신호(보류큐·locked readiness·교정 backlog·kill-gate·드리프트)가
+# 엔드포인트별로 흩어져 있어 운영자가 여러 곳을 봐야 했다. 이 엔드포인트가 한 번에 모은다.
+# 각 섹션은 독립 best-effort — 한 소스가 죽어도 500이 아니라 그 섹션만 비고 degraded에 표기.
+# 모두 가벼운 신호(드리프트는 마지막 게이지 값 read, 재계산 안 함)라 대시보드 폴링에 안전.
+class DashboardResponse(BaseModel):
+    generated_at: str
+    escalation_held: dict
+    locked_readiness: dict
+    active_learning: dict
+    kill_gate: dict
+    drift: dict
+    degraded: list[str]  # 로드 실패한 섹션명 — 부분 가용 가시화
+
+
+def _section(name: str, fn, degraded: list[str]) -> dict:
+    """섹션 best-effort 로더 — 실패 시 {} + degraded에 이름 기록(500 방지)."""
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("dashboard section %s failed: %s", name, exc)
+        degraded.append(name)
+        return {}
+
+
+def _drift_snapshot() -> dict:
+    """드리프트 — 재계산 없이 마지막 게이지 값만 read(주기 refresh가 갱신)."""
+    from lloydk.api import prom_metrics as _pm  # noqa: PLC0415
+
+    def _g(gauge) -> float:
+        try:
+            return float(gauge._value.get())
+        except Exception:  # noqa: BLE001
+            return 0.0
+    return {
+        "kl_divergence": _g(_pm.DRIFT_KL_DIVERGENCE),
+        "cosine_mean": _g(_pm.DRIFT_COSINE_MEAN),
+        "alert": _g(_pm.DRIFT_ALERT),
+        "sample_size": _g(_pm.DRIFT_SAMPLE_SIZE),
+    }
+
+
+@router.get(
+    "/dashboard",
+    response_model=DashboardResponse,
+    dependencies=_ADMIN_ONLY,
+    summary="운영 검수 대시보드 — 보류큐·readiness·교정 backlog·kill-gate·드리프트 종합",
+    description=(
+        "운영자가 한 화면에서 보는 종합 상태: 이중검토 보류(등급별), locked_gold_eval 배포 "
+        "readiness, active-learning 교정 backlog/재학습 권고, kill-gate 발동 여부, 임베딩 드리프트. "
+        "각 섹션은 독립 best-effort — 일부 소스 미가용 시 그 섹션만 비고 degraded에 표기(500 없음)."
+    ),
+)
+def dashboard() -> DashboardResponse:
+    from lloydk.modules.m6_evaluation.active_learning import (  # noqa: PLC0415
+        evaluate_retraining_need,
+    )
+    from lloydk.modules.m6_evaluation.kill_gate import run_kill_gate_check  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
+        locked_eval_readiness,
+    )
+    from lloydk.services.confirm_service import (  # noqa: PLC0415
+        count_needs_second_review_by_grade,
+    )
+
+    degraded: list[str] = []
+
+    def _held() -> dict:
+        c = count_needs_second_review_by_grade()
+        return {"by_grade": c, "total": sum(c.values())}
+
+    return DashboardResponse(
+        generated_at=_dt.datetime.now(_dt.timezone.utc).isoformat(),
+        escalation_held=_section("escalation_held", _held, degraded),
+        locked_readiness=_section("locked_readiness", locked_eval_readiness, degraded),
+        active_learning=_section(
+            "active_learning", lambda: evaluate_retraining_need().to_dict(), degraded
+        ),
+        kill_gate=_section("kill_gate", run_kill_gate_check, degraded),
+        drift=_section("drift", _drift_snapshot, degraded),
+        degraded=degraded,
     )
