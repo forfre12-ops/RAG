@@ -2,13 +2,14 @@ name: lloydk-poc
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # ES 제거(의사결정_대장 §03 ⓑ) — pgvector dense + ts_rank 하이브리드. (stock pgvector 이미지, pg_bigm 불요)
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: lloydk
       POSTGRES_USER: lloydk
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dev}
     volumes:
-      - D:/antigravity/rag/docker-data/postgres:/var/lib/postgresql/data
+      - ../docker-data/postgres:/var/lib/postgresql/data
       # 2026-05-28: init.sql 자동 부트스트랩 제거 — alembic baseline 단일 경로로 일원화.
       # 빈 DB 부트스트랩: `docker compose up -d postgres && cd poc && alembic upgrade head`
     ports:
@@ -18,37 +19,6 @@ services:
       interval: 5s
       retries: 10
 
-  elasticsearch:
-    # Phase 0.2 (5070 Ti 풀가동): vanilla 이미지 → analysis-nori 동봉 빌드.
-    # Dockerfile.es 가 8.15.3 베이스에 elasticsearch-plugin install analysis-nori 적용.
-    build:
-      context: ./infra/es
-      dockerfile: Dockerfile.es
-    image: lloydk/elasticsearch:8.15.3-nori
-    environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      xpack.monitoring.collection.enabled: "false"
-      ES_JAVA_OPTS: "-Xms2g -Xmx2g"
-      ELASTIC_PASSWORD: ${ES_PASSWORD:-lloydk_dev_es}
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - esdata:/usr/share/elasticsearch/data
-      - ./infra/es/userdict_ko.txt:/usr/share/elasticsearch/config/userdict_ko.txt:ro
-    ports:
-      - "9200:9200"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
-      interval: 10s
-      retries: 20
-      start_period: 60s
-
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -56,7 +26,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lloydk}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
     volumes:
-      - D:/antigravity/rag/docker-data/minio:/data
+      - ../docker-data/minio:/data
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -67,7 +37,7 @@ services:
     image: redis:7.2-alpine
     command: redis-server --appendonly yes
     volumes:
-      - D:/antigravity/rag/docker-data/redis:/data
+      - ../docker-data/redis:/data
     ports:
       - "6379:6379"
 
@@ -107,10 +77,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-es}
-      ES_URL: http://elasticsearch:9200
-      ES_USERNAME: ${ES_USERNAME:-}
-      ES_PASSWORD: ${ES_PASSWORD:-}
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
+      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-lloydk}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
@@ -122,8 +91,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
       minio:
         condition: service_started
       redis:
@@ -131,7 +98,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./scripts:/app/scripts
-      - D:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
+      - ../docker-data/modelcache:/root/.cache/huggingface
     ports:
       - "8000:8000"
 
@@ -139,15 +106,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    command: celery -A lloydk.workers.celery_app worker -l info
+    # -Q 없이 기동하면 default(celery) 큐만 소비 → task_routes로 classify/index/
+    # synthesis/learning 큐에 보낸 작업이 영영 소비되지 않는다. 모든 큐를 구독한다.
+    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
       REDIS_URL: redis://redis:6379/0
-      VECTOR_BACKEND: ${VECTOR_BACKEND:-es}
-      ES_URL: http://elasticsearch:9200
-      ES_USERNAME: ${ES_USERNAME:-}
-      ES_PASSWORD: ${ES_PASSWORD:-}
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
+      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
@@ -155,7 +123,25 @@ services:
       - postgres
     volumes:
       - ./src:/app/src
-      - D:/antigravity/rag/docker-data/modelcache:/root/.cache/huggingface
+      - ../docker-data/modelcache:/root/.cache/huggingface
+
+  # Celery beat — beat_schedule(drift 15분·auto-rollback 60분·outbox 60초·active-learning
+  # 30분)의 주기 트리거를 발행한다. 이 서비스가 없으면 폐곡선 자동화가 전혀 동작하지 않는다.
+  # 단일 인스턴스만 띄울 것(다중 beat = 중복 tick).
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: celery -A lloydk.workers.celery_app beat -l info
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      REDIS_URL: redis://redis:6379/0
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      - redis
+    volumes:
+      - ./src:/app/src
 
   # D3 (2026-05-29): P2-C7 mTLS 종료 nginx — opt-in profile.
   # 활성: docker compose --profile mtls up -d nginx-mtls
@@ -177,8 +163,4 @@ services:
       retries: 3
 
 volumes:
-  # esdata만 named volume 유지 — ES는 fsync 빈도가 높아 bind mount(WSL2↔Windows FS) IO 패널티가 큼.
-  # 나머지(postgres/minio/redis/modelcache)는 D:/antigravity/rag/docker-data/ bind mount.
-  # 2026-05-30: 윈도우 재설치로 드라이브 레터 E:→D: 변경되어 경로 수정.
-  esdata:
   mlflow_data:  # MLflow SQLite (Phase 4 야간 작업)

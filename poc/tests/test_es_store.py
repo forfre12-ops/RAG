@@ -38,8 +38,8 @@ def test_build_term_filters_empty():
 
 
 def test_build_term_filters_basic():
-    out = _build_term_filters({"tenant_id": "koipa", "grade": "TS"})
-    assert {"term": {"tenant_id": "koipa"}} in out
+    out = _build_term_filters({"doc_type": "guideline", "grade": "TS"})
+    assert {"term": {"doc_type": "guideline"}} in out
     assert {"term": {"grade": "TS"}} in out
     assert len(out) == 2
 
@@ -200,7 +200,7 @@ def test_search_uses_knn_with_num_candidates():
     store, client = _make_store_with_version("8.15.3")
     client.search.return_value = _search_response(["d1", "d2"])
 
-    hits = store.search("col", [0.1] * 8, top_k=5, filter={"tenant_id": "koipa"})
+    hits = store.search("col", [0.1] * 8, top_k=5, filter={"doc_type": "guideline"})
 
     assert [h.id for h in hits] == ["d1", "d2"]
     # ES가 한 번 호출, knn 객체에 filter 포함
@@ -213,7 +213,7 @@ def test_search_uses_knn_with_num_candidates():
     assert knn["k"] == 5
     # 필터 selectivity 강 → num_candidates 상향
     assert knn["num_candidates"] >= 250
-    assert {"term": {"tenant_id": "koipa"}} in knn["filter"]
+    assert {"term": {"doc_type": "guideline"}} in knn["filter"]
 
 
 def test_search_hybrid_dispatches_retriever_on_8_15():
@@ -292,7 +292,7 @@ def test_search_hybrid_filter_propagation_retriever():
         "텍스트",
         [0.1] * 8,
         top_k=5,
-        filter={"tenant_id": "koipa", "grade": "TS"},
+        filter={"doc_type": "guideline", "grade": "TS"},
     )
 
     body = client.search.call_args.kwargs["body"]
@@ -300,8 +300,8 @@ def test_search_hybrid_filter_propagation_retriever():
     standard = next(r["standard"] for r in retrievers if "standard" in r)
     knn = next(r["knn"] for r in retrievers if "knn" in r)
     # 양쪽에 filter 동시 적용
-    assert {"term": {"tenant_id": "koipa"}} in standard["query"]["bool"]["filter"]
-    assert {"term": {"tenant_id": "koipa"}} in knn["filter"]
+    assert {"term": {"doc_type": "guideline"}} in standard["query"]["bool"]["filter"]
+    assert {"term": {"doc_type": "guideline"}} in knn["filter"]
 
 
 # ─────────────────────────────────────────────────────────────

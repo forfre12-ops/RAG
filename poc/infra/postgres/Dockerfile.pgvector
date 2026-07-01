@@ -1,0 +1,36 @@
+# Postgres 16 + pgvector + pg_bigm — ES→PG 단일화 재검증용 이미지 (의사결정_대장 §03 경로 ⓑ).
+#
+# stock postgres:16-alpine 에는 vector/pg_bigm 미포함 → 이 커스텀 이미지가 둘 다 제공.
+#   - pgvector : 베이스 이미지(pgvector/pgvector:pg16)에 내장 (dense kNN).
+#   - pg_bigm  : 소스 빌드(후보생성 GIN, 한국어 bigram). 빌드 타임에 인터넷 필요.
+#
+# ⚠️ 빌드 미검증(로컬 Docker 데몬 미가동 상태에서 작성) — 최초 빌드 시 pg_bigm 릴리스
+#    태그/URL 가용성을 확인할 것. 폐쇄망 배포는 이 이미지를 오프라인 번들에 동봉하고
+#    런타임엔 인터넷 불요(빌드는 인터넷 있는 환경에서 1회).
+#
+# 빌드:  docker build -t lloydk/postgres:16-pgvector-pgbigm -f Dockerfile.pgvector .
+# 또는:  docker compose -f ../../docker-compose.pgvector.yml up -d --build
+
+FROM pgvector/pgvector:pg16
+
+# pg_bigm 1.2 (PG16 호환) 소스 빌드. 태그가 바뀌면 PG_BIGM_VERSION 조정.
+ARG PG_BIGM_VERSION=1.2-20240606
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        build-essential postgresql-server-dev-16 wget ca-certificates; \
+    cd /tmp; \
+    wget -O pg_bigm.tar.gz \
+        "https://github.com/pgbigm/pg_bigm/archive/refs/tags/v${PG_BIGM_VERSION}.tar.gz"; \
+    tar xzf pg_bigm.tar.gz; \
+    cd "pg_bigm-${PG_BIGM_VERSION}"; \
+    make USE_PGXS=1; \
+    make USE_PGXS=1 install; \
+    cd /; \
+    rm -rf /tmp/*; \
+    apt-get purge -y --auto-remove build-essential postgresql-server-dev-16 wget; \
+    rm -rf /var/lib/apt/lists/*
+
+# 확장 자동 생성은 alembic 마이그레이션(a1b2c3d4e5f6)이 담당:
+#   CREATE EXTENSION vector / pg_bigm. 여기선 바이너리만 설치.

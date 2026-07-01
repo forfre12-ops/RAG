@@ -79,11 +79,10 @@ def test_answer_rejects_top_k_out_of_range():
 
 
 def test_answer_accepts_grade_and_metadata():
-    """grade·metadata·tenant_id 필드가 검증 통과."""
+    """grade·metadata 필드가 검증 통과."""
     with TestClient(app) as cli:
         r = _post(cli, {
             "query": "보안 등급 안내",
-            "tenant_id": "koipa",
             "grade": "S1",
             "metadata": {"dept_id": "rnd"},
             "top_k": 3,

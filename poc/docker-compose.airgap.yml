@@ -1,0 +1,150 @@
+# docker-compose.airgap.yml — 폐쇄망(에어갭) 운영 배포 전용
+# ─────────────────────────────────────────────────────────────────────────────
+# dev용 docker-compose.yml과의 차이 (폐쇄망 배포 3대 결함 해소):
+#   1) build: 컨텍스트 제거 → docker load 한 image: 태그를 직접 참조 (소스/인터넷 불필요)
+#   2) Windows E:/ 바인드마운트 제거 → named volume (docker 데이터 루트에 저장)
+#   3) beat 서비스 추가 (dev compose엔 없음 — 없으면 drift·롤백·outbox·파티션 자동화 정지)
+#   + HF/Transformers offline 강제 (런타임 외부 다운로드 차단), worker 전큐 구독(-Q)
+#
+# 실행(번들 루트에서):
+#   docker compose --env-file .env -f infra-config/docker-compose.airgap.yml up -d
+#   → 상대경로(./userdict_ko.txt, ../models)는 compose 파일 위치(infra-config/) 기준 해석
+#
+# 이미지 태그는 .env의 IMAGE_TAG로 일괄 전환 (docker load 로 복원된 태그와 일치해야 함).
+
+name: lloydk-airgap
+
+services:
+  postgres:
+    image: ${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}   # ES 제거(§03 ⓑ) — pgvector dense. 폐쇄망: docker load 한 태그
+    environment:
+      POSTGRES_DB: lloydk
+      POSTGRES_USER: lloydk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lloydk"]
+      interval: 5s
+      retries: 10
+
+  # minio 제거 — 폐쇄망 저장소는 로컬FS(file://) 결정(2026-06-24, MinIO 미사용).
+  # 문서/원본은 api·worker 의 storagedata 볼륨(/app/.storage)에 보관. 원본 at-rest 암호화는
+  # STORAGE_ENCRYPTION_ENABLED/KEY 로 활성(.env.prod.example).
+
+  redis:
+    image: redis:7.2-alpine
+    # appendonly + bgsave 실패 시 쓰기차단 해제(브로커/캐시 용도라 비영속 허용 — 운영 노트 참조)
+    command: redis-server --appendonly yes --stop-writes-on-bgsave-error no
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  # mlflow 제거 — 폐쇄망(고객사) 배포는 추론 전용(enable_training=False)이라 모델 트래킹/레지스트리
+  # 불요. 학습·MLflow 는 지재원(Lloydk) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
+  # 의존했으므로 minio 제거와 함께 제거.)
+
+  api:
+    image: lloydk-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
+      POC_MODE: ${POC_MODE:-full}
+      LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-Qwen/Qwen3-14B}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}
+      CLASSIFIER_BASE_MODEL: ${CLASSIFIER_BASE_MODEL:-kakaobank/kf-deberta-base}
+      CLASSIFIER_MODEL_DIR: ${CLASSIFIER_MODEL_DIR:-/models/classifier-trained}
+      HF_HOME: /models/hf
+      HF_HUB_OFFLINE: "1"           # 폐쇄망 — 외부 다운로드 차단 (모델은 ../models 에서 로드)
+      TRANSFORMERS_OFFLINE: "1"
+    volumes:
+      - ../models:/models:ro        # 사전 동봉 모델 (분류기 학습본·임베딩·HF 캐시)
+      - storagedata:/app/.storage   # 로컬FS 문서·원본 보관(WORKDIR=/app, LocalStorage root=.storage)
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthz/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    # GPU (NVIDIA Container Toolkit 필요) — 미보유 환경은 아래 블록 주석 처리 + POC_MODE/임베딩 CPU
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  worker:
+    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
+    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      REDIS_URL: redis://redis:6379/0
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS. api 와 동일 storagedata 볼륨 공유.
+      POC_MODE: ${POC_MODE:-full}
+      LLM_PROVIDER: ${LLM_PROVIDER:-vllm}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://host.docker.internal:8001/v1}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-Qwen/Qwen3-14B}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}
+      CLASSIFIER_MODEL_DIR: ${CLASSIFIER_MODEL_DIR:-/models/classifier-trained}
+      HF_HOME: /models/hf
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+    volumes:
+      - ../models:/models:ro
+      - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본
+    depends_on:
+      - redis
+      - postgres
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # 주기작업 발행기 — 단일 인스턴스만 (다중 beat = 중복 tick). dev compose엔 누락돼 있었음.
+  beat:
+    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
+    command: celery -A lloydk.workers.celery_app beat -l info
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+      - postgres
+
+  # mTLS 종료 (옵션): docker compose ... --profile mtls up -d nginx-mtls
+  nginx-mtls:
+    profiles: ["mtls"]
+    image: nginx:1.27-alpine
+    depends_on:
+      - api
+    ports:
+      - "443:443"
+    volumes:
+      - ./mtls/nginx.mtls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./mtls/certs:/etc/nginx/mtls:ro
+
+volumes:
+  pgdata:
+  redisdata:
+  storagedata:     # 로컬FS 문서·원본 보관(api·worker 공유) — minio/mlflowdata 대체

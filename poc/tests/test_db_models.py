@@ -26,7 +26,6 @@ from lloydk.db.models import (
     Document,
     EvaluationFactor,
     LlmUsage,
-    Tenant,
 )
 
 
@@ -58,27 +57,26 @@ def _require_postgres() -> None:
 
 def test_orm_metadata_has_expected_tables():
     """Sanity: all ORM-mapped parent tables present in Base.metadata."""
-    expected = {
-        "tenants",
-        "classification_levels",
-        "evaluation_factors",
-        "level_keywords",
-        "documents",
-        "chunks",
-        "document_labels",
-        "document_factor_scores",
-        "classifications",
-        "classification_evidence",
-        "model_versions",
-        "training_runs",
-        "training_epochs",
-        "training_datasets",
-        "corrections",
-        "prompt_versions",
-        "sample_documents",
-        "llm_usage",
-        "audit_log",
-        "guides",          # N5: GuideService DB 이전
+    expected = {                          # ORM __tablename__ 은 tb_ 접두사 규약
+        "tb_classification_levels",
+        "tb_evaluation_factors",
+        "tb_level_keywords",
+        "tb_documents",
+        "tb_chunks",
+        "tb_document_labels",
+        "tb_document_factor_scores",
+        "tb_classifications",
+        "tb_classification_evidence",
+        "tb_model_versions",
+        "tb_training_runs",
+        "tb_training_epochs",
+        "tb_training_datasets",
+        "tb_corrections",
+        "tb_prompt_versions",
+        "tb_sample_documents",
+        "tb_llm_usage",
+        "tb_audit_log",
+        "tb_guides",          # N5: GuideService DB 이전
     }
     actual = set(Base.metadata.tables.keys())
     missing = expected - actual
@@ -102,16 +100,8 @@ def test_orm_tables_present_in_database():
 
 # ============================================================
 # Seed data sanity
+# tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진). tenants 시드/round-trip 삭제.
 # ============================================================
-
-def test_default_tenant_seeded():
-    _require_postgres()
-    with session_scope() as s:
-        t = s.get(Tenant, "default")
-        assert t is not None
-        assert t.is_active is True
-        assert t.rag_enabled is True
-
 
 def test_classification_levels_seeded():
     """alembic baseline seeds 4 levels with OpenAPI-aligned codes."""
@@ -127,19 +117,18 @@ def test_classification_levels_seeded():
 
 
 def test_evaluation_factors_seeded():
-    """alembic baseline seeds 4 factors with weights summing to 1.0."""
+    """alembic baseline seeds the 4 grade factors with weights summing to 1.0.
+
+    공유 DB라 타 테스트가 추가 factor를 남길 수 있으므로 baseline 4요소의
+    존재·가중합만 검증(exact-match 금지).
+    """
     _require_postgres()
     with session_scope() as s:
-        factors = s.query(EvaluationFactor).all()
-        codes = {f.factor_code for f in factors}
-        assert codes == {
-            "ECONOMIC_VALUE",
-            "NON_PUBLICITY",
-            "MANAGEMENT_LEVEL",
-            "LEAK_IMPACT",
-        }
-        total = sum(float(f.weight) for f in factors)
-        assert abs(total - 1.0) < 0.01, f"factor weights must sum to ~1.0 (got {total})"
+        factors = {f.factor_code: float(f.weight) for f in s.query(EvaluationFactor).all()}
+        baseline = {"ECONOMIC_VALUE", "NON_PUBLICITY", "MANAGEMENT_LEVEL", "LEAK_IMPACT"}
+        assert baseline.issubset(factors.keys()), f"baseline 4요소 누락: {baseline - factors.keys()}"
+        total = sum(factors[c] for c in baseline)
+        assert abs(total - 1.0) < 0.01, f"baseline factor weights must sum to ~1.0 (got {total})"
 
 
 # ============================================================
@@ -158,26 +147,8 @@ def db_session():
         session.close()
 
 
-def _new_tenant(s, tenant_id: str | None = None) -> Tenant:
-    tid = tenant_id or f"test-{uuid.uuid4().hex[:8]}"
-    t = Tenant(tenant_id=tid, name=f"Tenant {tid}", is_active=True)
-    s.add(t)
-    s.flush()
-    return t
-
-
-def test_tenant_round_trip(db_session):
-    t = _new_tenant(db_session, "rtrip-1")
-    fetched = db_session.get(Tenant, "rtrip-1")
-    assert fetched is not None
-    assert fetched.name == "Tenant rtrip-1"
-    assert fetched.tenant_id == t.tenant_id
-
-
 def test_document_round_trip(db_session):
-    t = _new_tenant(db_session)
     doc = Document(
-        tenant_id=t.tenant_id,
         filename="sample.pdf",
         source_format="pdf",
         file_size_bytes=12345,
@@ -191,15 +162,12 @@ def test_document_round_trip(db_session):
     assert isinstance(doc.doc_id, uuid.UUID)
     fetched = db_session.get(Document, doc.doc_id)
     assert fetched.filename == "sample.pdf"
-    assert fetched.tenant_id == t.tenant_id
     # metadata default = {}
     assert fetched.metadata_ == {}
 
 
 def test_classification_round_trip_with_evidence(db_session):
-    t = _new_tenant(db_session)
     doc = Document(
-        tenant_id=t.tenant_id,
         filename="x.pdf",
         source_format="pdf",
         processing_status="done",
@@ -216,7 +184,6 @@ def test_classification_round_trip_with_evidence(db_session):
 
     cls = Classification(
         doc_id=doc.doc_id,
-        tenant_id=t.tenant_id,
         model_version="v0-test",
         predicted_level_id=s1.level_id,
         confidence=0.8765,
@@ -252,8 +219,7 @@ def test_classification_round_trip_with_evidence(db_session):
 
 
 def test_correction_links_to_classification(db_session):
-    t = _new_tenant(db_session)
-    doc = Document(tenant_id=t.tenant_id, filename="y.pdf", source_format="pdf")
+    doc = Document(filename="y.pdf", source_format="pdf")
     db_session.add(doc)
     db_session.flush()
 
@@ -262,7 +228,6 @@ def test_correction_links_to_classification(db_session):
 
     cls = Classification(
         doc_id=doc.doc_id,
-        tenant_id=t.tenant_id,
         model_version="v0",
         predicted_level_id=s1.level_id,
         confidence=0.9,
@@ -324,27 +289,36 @@ def test_llm_usage_partition_insert(db_session):
 
 
 def test_session_scope_commits_and_rolls_back():
-    """session_scope: commits on success, rolls back on exception."""
+    """session_scope: commits on success, rolls back on exception.
+
+    tenant 제거: 격리는 KL 포털 전담. 과거 Tenant 모델 대신 Document로 검증.
+    """
+    _require_postgres()
     marker = f"scope-{uuid.uuid4().hex[:8]}"
 
     # Success path: commit
     with session_scope() as s:
-        s.add(Tenant(tenant_id=marker, name="scope test"))
+        doc = Document(filename=marker, source_format="txt")
+        s.add(doc)
+        s.flush()
+        committed_id = doc.doc_id
     with session_scope() as s:
-        assert s.get(Tenant, marker) is not None
+        assert s.get(Document, committed_id) is not None
 
     # Rollback path: exception → no insert
-    rollback_marker = f"rb-{uuid.uuid4().hex[:8]}"
     with pytest.raises(RuntimeError):
         with session_scope() as s:
-            s.add(Tenant(tenant_id=rollback_marker, name="should not persist"))
+            doc = Document(filename=f"rb-{marker}", source_format="txt")
+            s.add(doc)
             s.flush()
             raise RuntimeError("intentional")
+    # rollback이라 별도 세션에서 조회되지 않아야 함 — filename 기준으로 부재 확인
     with session_scope() as s:
-        assert s.get(Tenant, rollback_marker) is None
+        leaked = s.query(Document).filter_by(filename=f"rb-{marker}").first()
+        assert leaked is None
 
-    # Cleanup: delete the committed test tenant so re-runs stay clean
+    # Cleanup: delete the committed test document so re-runs stay clean
     with session_scope() as s:
-        t = s.get(Tenant, marker)
-        if t is not None:
-            s.delete(t)
+        d = s.get(Document, committed_id)
+        if d is not None:
+            s.delete(d)

@@ -6,7 +6,6 @@ from .common import FactorRegistry, Grade
 
 class DocumentInput(BaseModel):
     doc_id: str
-    tenant_id: Optional[str] = None
     title: Optional[str] = None
     content: Optional[str] = Field(default=None, max_length=1_048_576)
     metadata: Optional[dict] = None
@@ -35,11 +34,10 @@ class EvaluationFactors(BaseModel):
     named field와 scores는 from_factor_scores()로 동시에 채워짐.
     """
 
-    # 영업비밀 도메인 기본 4요소 (하위호환)
-    economic_value: float = 0.0
-    non_publicity: float = 0.0
-    management_level: float = 0.0
-    leak_impact: float = 0.0
+    # 정본 가이드 3요건 (B안 S×V×M)
+    secrecy: float = 0.0          # 비공지성(S)
+    value: float = 0.0            # 경제적 유용성(V)
+    management: float = 0.0       # 비밀관리성(M)
 
     # 도메인 독립 동적 점수 — 모든 factor_code를 담음.
     # 다른 프로젝트에서는 이 필드만 참조하면 충분.
@@ -56,9 +54,10 @@ class EvaluationFactors(BaseModel):
         field_map = FactorRegistry.get_field_map()
         named: dict[str, float] = {}
         for code, value in factor_scores.items():
-            field_name = field_map.get(code)
-            # named field로 매핑 가능한 기본 4요소만 named에 설정
-            if field_name in {"economic_value", "non_publicity", "management_level", "leak_impact"}:
+            # DB field_map이 구(舊) 4요소로 stale일 수 있어, 정본 코드는 code.lower()로 직접 매핑
+            field_name = field_map.get(code) or code.lower()
+            # named field로 매핑 가능한 정본 3요건만 named에 설정
+            if field_name in {"secrecy", "value", "management"}:
                 named[field_name] = value
         return cls(**named, scores=factor_scores)
 
@@ -70,7 +69,7 @@ class EvaluationFactors(BaseModel):
             inv = {v: k for k, v in field_map.items()}
             self.scores = {
                 inv.get(f, f.upper()): getattr(self, f)
-                for f in ("economic_value", "non_publicity", "management_level", "leak_impact")
+                for f in ("secrecy", "value", "management")
                 if getattr(self, f, 0.0) != 0.0
             }
         return self
@@ -90,6 +89,12 @@ class ClassifyResponse(BaseModel):
     confidence: float
     scores: dict[str, float]
     evaluation_factors: Optional[EvaluationFactors] = None
+    # [번들 C] evaluation_factors(S/V/M)의 출처 — 법리 근거 오인 방지(컴플라이언스).
+    #   "rule_evidenced": 룰엔진이 실제 본문 증거로 산출한 factor(법리 근거로 표시 가능).
+    #   "model_estimated": 모델/청크집계 등급에 맞춰 역산(svm_levels_for_grade)한 추정치 —
+    #     룰이 미탐했을 때 '등급↔factor 모순 표기'를 막으려 정합화한 값이라 법리 근거 아님.
+    # UI/리포트는 model_estimated를 '모델 추정'으로 구분 표시할 것.
+    factors_source: str = "rule_evidenced"
     evidence: list[EvidenceSpan] = []
     rag_context_used: list[RagContextHit] = []
     model_version: str

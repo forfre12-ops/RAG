@@ -147,6 +147,36 @@ def test_assert_production_credentials_raises_when_missing_everywhere():
         config_mod.settings.poc_mode = original_mode
 
 
+def test_assert_production_credentials_requires_audit_chain_secret():
+    """[NFR-SEC-01] 운영 모드 + api/minio 있어도 감사체인 HMAC 비밀키 없으면 RuntimeError."""
+    config_mod._SECRETS_FILLED = True  # SM 보충 skip
+    original_mode = config_mod.settings.poc_mode
+    original_api = config_mod.settings.api_key
+    original_minio = config_mod.settings.minio_secret_key
+    original_audit = config_mod.settings.audit_chain_secret
+    config_mod.settings.poc_mode = "full"
+    config_mod.settings.api_key = "x"
+    config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.audit_chain_secret = ""
+    try:
+        with patch.dict(
+            os.environ,
+            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "LLOYDK_AUDIT_CHAIN_SECRET": ""},
+        ):
+            try:
+                config_mod.assert_production_credentials()
+            except RuntimeError as exc:
+                assert "LLOYDK_AUDIT_CHAIN_SECRET" in str(exc)
+            else:
+                raise AssertionError("운영 모드 + 감사체인 비밀키 부재 → RuntimeError 기대")
+    finally:
+        config_mod.settings.poc_mode = original_mode
+        config_mod.settings.api_key = original_api
+        config_mod.settings.minio_secret_key = original_minio
+        config_mod.settings.audit_chain_secret = original_audit
+        config_mod._SECRETS_FILLED = False
+
+
 def test_assert_production_credentials_blocks_trust_actor_role_header():
     """운영 모드 + API_KEY_TRUST_ACTOR_ROLE_HEADER=True → RuntimeError (위조 차단)."""
     config_mod._SECRETS_FILLED = True  # SM 보충 skip
@@ -154,12 +184,21 @@ def test_assert_production_credentials_blocks_trust_actor_role_header():
     original_trust = config_mod.settings.api_key_trust_actor_role_header
     original_api = config_mod.settings.api_key
     original_minio = config_mod.settings.minio_secret_key
+    original_audit = config_mod.settings.audit_chain_secret
     original_cors = config_mod.settings.cors_allow_origins
+    # [hermetic] 워킹트리 .env(onprem-local)가 storage_encryption_enabled=True·require_safety_gates
+    # =True를 박으면 그 게이트들이 trust_header 검사 전에 먼저 raise한다 → 본 테스트 목적과 무관.
+    # 명시적으로 꺼서 trust_header 검사에만 도달하도록 격리(프로파일 비의존).
+    original_storage_enc = config_mod.settings.storage_encryption_enabled
+    original_require_sg = getattr(config_mod.settings, "require_safety_gates", False)
     # 자격증명·CORS는 통과시키고, trust_header 검사에만 도달하도록 구성.
     config_mod.settings.poc_mode = "full"
     config_mod.settings.api_key = "x"
     config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.audit_chain_secret = "z"   # NFR-SEC-01 missing 체크 통과
     config_mod.settings.cors_allow_origins = ["https://app.example.com"]
+    config_mod.settings.storage_encryption_enabled = False
+    config_mod.settings.require_safety_gates = False
     config_mod.settings.api_key_trust_actor_role_header = True
     try:
         with patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": ""}):
@@ -174,7 +213,10 @@ def test_assert_production_credentials_blocks_trust_actor_role_header():
         config_mod.settings.api_key_trust_actor_role_header = original_trust
         config_mod.settings.api_key = original_api
         config_mod.settings.minio_secret_key = original_minio
+        config_mod.settings.audit_chain_secret = original_audit
         config_mod.settings.cors_allow_origins = original_cors
+        config_mod.settings.storage_encryption_enabled = original_storage_enc
+        config_mod.settings.require_safety_gates = original_require_sg
 
 
 def test_assert_production_credentials_blocks_audit_disabled():
@@ -184,16 +226,25 @@ def test_assert_production_credentials_blocks_audit_disabled():
     original_trust = config_mod.settings.api_key_trust_actor_role_header
     original_api = config_mod.settings.api_key
     original_minio = config_mod.settings.minio_secret_key
+    original_audit = config_mod.settings.audit_chain_secret
     original_cors = config_mod.settings.cors_allow_origins
+    # [hermetic] storage_encryption/require_safety_gates를 명시적으로 꺼 AUDIT_DISABLED 검사에만
+    # 도달하게 격리(워킹트리 onprem-local 프로파일 비의존).
+    original_storage_enc = config_mod.settings.storage_encryption_enabled
+    original_require_sg = getattr(config_mod.settings, "require_safety_gates", False)
     config_mod.settings.poc_mode = "full"
     config_mod.settings.api_key = "x"
     config_mod.settings.minio_secret_key = "y"
+    config_mod.settings.audit_chain_secret = "z"   # NFR-SEC-01 missing 체크 통과
     config_mod.settings.cors_allow_origins = ["https://app.example.com"]
+    config_mod.settings.storage_encryption_enabled = False
+    config_mod.settings.require_safety_gates = False
     config_mod.settings.api_key_trust_actor_role_header = False
     try:
         with patch.dict(
             os.environ,
-            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": "", "AUDIT_DISABLED": "1"},
+            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": "", "AUDIT_DISABLED": "1",
+             "LLOYDK_AUDIT_CHAIN_SECRET": ""},
         ):
             try:
                 config_mod.assert_production_credentials()
@@ -206,7 +257,10 @@ def test_assert_production_credentials_blocks_audit_disabled():
         config_mod.settings.api_key_trust_actor_role_header = original_trust
         config_mod.settings.api_key = original_api
         config_mod.settings.minio_secret_key = original_minio
+        config_mod.settings.audit_chain_secret = original_audit
         config_mod.settings.cors_allow_origins = original_cors
+        config_mod.settings.storage_encryption_enabled = original_storage_enc
+        config_mod.settings.require_safety_gates = original_require_sg
 
 
 def test_secrets_manager_protocol():

@@ -28,7 +28,6 @@ class AuditRepo:
         action: str,
         actor_id: str | None = None,
         actor_role: str | None = None,
-        tenant_id: str | None = None,
         target_type: str | None = None,
         target_id: str | None = None,
         request_id: uuid.UUID | str | None = None,
@@ -55,7 +54,6 @@ class AuditRepo:
 
         entry = AuditLog(
             request_id=request_id,
-            tenant_id=tenant_id,
             actor_id=actor_id,
             actor_role=actor_role,
             action=action,

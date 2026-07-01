@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.fullstack
+# #33: 인프라 비의존 순수함수 테스트 — fullstack 오마킹 제거(기본 pytest에서 수집·실행).
 from lloydk.perf.harness import AvailableResources, _detect_trained_model
 from lloydk.perf.kpis import KPIS, aggregate, kpi_by_id, passes
 
@@ -82,9 +82,9 @@ class TestKPIRegistry:
         assert "trained_model" in s1_3.requires
         assert "trained_model" in s1_4.requires
 
-    def test_s5_4_requires_es_and_trained_model(self):
+    def test_s5_4_requires_pg_and_trained_model(self):
         s5_4 = kpi_by_id("S5.4")
-        assert "es" in s5_4.requires
+        assert "pg" in s5_4.requires            # 벡터 검색이 PG로 이전(ES 제거)
         assert "trained_model" in s5_4.requires
 
 
@@ -165,6 +165,6 @@ class TestRequiresSkipsKPI:
 
     def test_satisfied_requires_empty_missing(self):
         r = AvailableResources(pg=True, es=True, trained_model=True)
-        kpi = kpi_by_id("S5.4")  # requires=["es", "trained_model"]
+        kpi = kpi_by_id("S5.4")  # requires=["pg", "trained_model"]
         missing = [name for name in kpi.requires if not r.has(name)]
         assert missing == []

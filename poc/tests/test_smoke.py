@@ -22,7 +22,6 @@ def test_classify_rule_fallback():
     """모델 가중치 없을 때 M3 규칙 폴백으로 응답하는지."""
     payload = {
         "doc_id": "t-1",
-        "tenant_id": "test",
         "content": "본 문서는 미공개 사업계획이며, 핵심기술의 전략과 매출 전망을 포함한다. "
                    "유출 시 손해배상 가능성이 있다.",
     }

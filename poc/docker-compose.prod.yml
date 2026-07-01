@@ -65,15 +65,6 @@ services:
         limits:
           memory: "${POSTGRES_MEM_LIMIT:-2G}"
 
-  elasticsearch:
-    ports:
-      - "127.0.0.1:9200:9200"
-    # ES heap(ES_JAVA_OPTS)의 ~2배를 컨테이너 상한으로 — off-heap + Lucene mmap 여유.
-    deploy:
-      resources:
-        limits:
-          memory: "${ES_MEM_LIMIT:-4G}"
-
   minio:
     ports:
       - "127.0.0.1:9000:9000"

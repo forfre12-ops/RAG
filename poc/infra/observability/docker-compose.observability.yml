@@ -1,7 +1,8 @@
 name: lloydk-observability
 
 # 관측성 스택 — Prometheus + Grafana + Loki + Promtail.
-# 기본 lloydk-poc 스택과 동일 docker network에 합류해서 api·postgres·elasticsearch를 스크랩.
+# 기본 lloydk-poc 스택과 동일 docker network에 합류해서 api·postgres·redis를 스크랩.
+# (ES→PG 단일화로 elasticsearch-exporter 제거 — §03)
 # 사용: docker compose -f docker-compose.yml -f infra/observability/docker-compose.observability.yml up -d
 
 services:
@@ -61,16 +62,6 @@ services:
       DATA_SOURCE_NAME: "postgresql://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk?sslmode=disable"
     ports:
       - "9187:9187"
-    networks: [default]
-
-  elasticsearch-exporter:
-    image: quay.io/prometheuscommunity/elasticsearch-exporter:v1.9.0
-    command:
-      - --es.uri=http://elasticsearch:9200
-      - --es.all
-      - --es.indices
-    ports:
-      - "9114:9114"
     networks: [default]
 
   redis-exporter:

@@ -54,7 +54,8 @@ class ModelEntry:
     dim: int | None
     sha256: str | None
     license: str
-    role: str  # classifier | embedding | llm | embedding_fallback
+    role: str  # classifier | classifier_trained | embedding | llm | embedding_fallback
+    source_path: str | None = None  # 빌드 호스트의 원본 경로(학습 모델 디렉토리 등). 복사 대상.
 
 
 @dataclass
@@ -66,7 +67,7 @@ class PluginEntry:
 
 @dataclass
 class BundlePolicies:
-    vector_backend_default: str = "es"
+    vector_backend_default: str = "pg"   # §03 ES→Postgres 단일화(2026-06-24). ES 폐기.
     llm_provider_default: str = "vllm"
     qwen3_thinking_mode: bool = False
 
@@ -212,11 +213,20 @@ def extract_models_from_config(config_path: Path) -> list[ModelEntry]:
     return models
 
 
-def default_es_plugins(es_version: str) -> list[PluginEntry]:
-    return [
-        PluginEntry(name="analysis-nori", version=es_version),
-        PluginEntry(name="repository-s3", version=es_version),
-    ]
+def resolve_classifier_model_dir(explicit: str | None) -> Path | None:
+    """학습된 분류기 가중치 디렉토리 해석 — 폐쇄망 번들에 동봉할 대상.
+
+    우선순위: --classifier-model-dir 인자 → env CLASSIFIER_MODEL_DIR →
+    env LLOYDK_CLASSIFIER_MODEL_DIR. 미설정이면 None(베이스 모델만 번들 — 경고 대상).
+    서빙은 이 디렉토리에서 가중치 + temperature.json(보정)을 로드하므로, 빠지면
+    폐쇄망에서 미학습·무보정으로 동작한다(#40).
+    """
+    import os  # noqa: PLC0415
+    cand = explicit or os.environ.get("CLASSIFIER_MODEL_DIR") or os.environ.get("LLOYDK_CLASSIFIER_MODEL_DIR")
+    if not cand:
+        return None
+    p = Path(cand)
+    return p if p.exists() else None
 
 
 # 컴포넌트별 예상 크기 (GB, doc/12 §3.2 기반 추정)
@@ -224,7 +234,7 @@ _COMPONENT_SIZE_GB: dict[str, float] = {
     "api": 1.5,
     "worker": 1.5,
     "postgres": 0.4,
-    "elasticsearch": 1.0,
+    # elasticsearch 제거 — §03 ES→PG 단일화. (dev compose 잔존 minio/mlflow는 추정용으로만 유지)
     "minio": 0.2,
     "redis": 0.1,
     "mlflow": 0.6,
@@ -232,6 +242,7 @@ _COMPONENT_SIZE_GB: dict[str, float] = {
 
 _MODEL_SIZE_GB: dict[str, float] = {
     "classifier": 0.7,
+    "classifier_trained": 0.7,
     "classifier_lightweight": 0.5,
     "embedding": 2.0,
     "embedding_fallback": 2.0,
@@ -261,14 +272,10 @@ def expected_files(components: dict[str, ComponentEntry], models: list[ModelEntr
         files.append(f"models/{m.name.replace('/', '-')}/")
     files.extend([
         "python-deps/wheels/",
-        "python-deps/requirements.lock.txt",
-        "es-plugins/analysis-nori-{ver}.zip",
-        "es-plugins/repository-s3-{ver}.zip",
+        "python-deps/_requirements_no_torch.txt",
         "infra-config/docker-compose.yml",
+        "infra-config/docker-compose.airgap.yml",
         "infra-config/.env.template",
-        "infra-config/es-index-template.json",
-        "infra-config/userdict_ko.txt",
-        "infra-config/ilm-policy-secrets.json",
         "db-migrations/alembic/",  # baseline + 후속 revision 전체 (init.sql 폐기)
         "docs/INSTALL.md",
         "docs/OPERATION.md",
@@ -305,6 +312,7 @@ def build_manifest(
     dry_run: bool,
     compose_path: Path,
     config_path: Path,
+    classifier_model_dir: Path | None = None,
 ) -> BundleManifest:
     components = extract_components_from_compose(compose_path)
 
@@ -316,8 +324,25 @@ def build_manifest(
         )
 
     models = extract_models_from_config(config_path)
-    es_version = components.get("elasticsearch", ComponentEntry("", "8.15.3")).version
-    plugins = default_es_plugins(es_version)
+    # #40: 학습된 분류기 가중치 + temperature.json을 번들에 동봉. config.py가 가리키는
+    # HF 베이스 모델만으론 폐쇄망에서 미학습·무보정으로 동작한다.
+    if classifier_model_dir is not None:
+        has_temp = (classifier_model_dir / "temperature.json").exists()
+        models.append(ModelEntry(
+            name="classifier-trained",
+            dim=None,
+            sha256=None,
+            license="internal-trained",
+            role="classifier_trained",
+            source_path=str(classifier_model_dir),
+        ))
+        if not has_temp:
+            print(
+                f"  [WARN] {classifier_model_dir}/temperature.json 없음 — 보정(temperature) "
+                "미동봉. 서빙이 T=1.0(무보정)로 동작합니다. calibrate_classifier.py 실행 권장.",
+                file=sys.stderr,
+            )
+    plugins: list[PluginEntry] = []  # ES 제거(의사결정_대장 §03 ⓑ) — 번들에 검색엔진 플러그인 없음
     size = estimate_total_size(components, models, plugins)
     files = expected_files(components, models)
 
@@ -452,10 +477,6 @@ def print_checklist(manifest: BundleManifest, *, stream=sys.stdout) -> None:
     for m in manifest.models:
         dim = f"dim={m.dim}" if m.dim else "-"
         p(f"  - [{m.role:22s}] {m.name}  ({m.license}, {dim})")
-
-    p(f"\n[ES plugins: {len(manifest.es_plugins)}]")
-    for plg in manifest.es_plugins:
-        p(f"  - {plg.name}-{plg.version}.zip")
 
     p("\n[Files expected]")
     for f in manifest.files_expected:
@@ -594,7 +615,7 @@ def _copy_ocr_binaries(out_dir: Path) -> None:
 
 
 def _copy_infra(out_dir: Path) -> None:
-    """docker-compose, env template, ES 설정 파일 복사."""
+    """docker-compose(airgap 포함), env template, alembic, OCR 바이너리 복사. (ES 설정 폐기 — §03)"""
     import shutil
 
     infra = out_dir / "infra-config"
@@ -602,10 +623,18 @@ def _copy_infra(out_dir: Path) -> None:
 
     for src, dst in [
         (_REPO_ROOT / "docker-compose.yml",              infra / "docker-compose.yml"),
-        (_REPO_ROOT / "infra" / "es" / "userdict_ko.txt", infra / "userdict_ko.txt"),
+        # 폐쇄망 전용 compose (image 참조·beat 서비스·named 볼륨) — 운영 배포는 이걸 사용.
+        (_REPO_ROOT / "docker-compose.airgap.yml",       infra / "docker-compose.airgap.yml"),
     ]:
         if src.exists():
             shutil.copy2(src, dst)
+
+    # docs — INSTALL 절차서 등 (manifest files_expected의 docs/INSTALL.md 충족)
+    docs_dst = out_dir / "docs"
+    docs_dst.mkdir(parents=True, exist_ok=True)
+    install_md = _REPO_ROOT / "docs" / "INSTALL.md"
+    if install_md.exists():
+        shutil.copy2(install_md, docs_dst / "INSTALL.md")
 
     # .env template
     env_template = infra / ".env.template"
@@ -617,9 +646,9 @@ def _copy_infra(out_dir: Path) -> None:
         env_template.write_text(
             "# Copy this to .env and fill in values\n"
             "DATABASE_URL=postgresql://lloydk:lloydk_dev@postgres:5432/lloydk\n"
-            "ES_URL=http://elasticsearch:9200\n"
+            "VECTOR_BACKEND=pg\n"
             "REDIS_URL=redis://redis:6379/0\n"
-            "MINIO_ENDPOINT=minio:9000\n"
+            "STORAGE_BACKEND=local\n"   # 폐쇄망=로컬FS(file://). MinIO 미사용.
             "LLM_PROVIDER=vllm\n"
             "DEPLOY_PROFILE=onprem-local\n",
             encoding="utf-8",
@@ -651,7 +680,7 @@ def _copy_infra(out_dir: Path) -> None:
         "done\n\n"
         "# 2) pip install from wheels\n"
         "pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" \\\n"
-        "  -r \"$BUNDLE_DIR/python-deps/requirements.lock.txt\" || true\n\n"
+        "  -r \"$BUNDLE_DIR/python-deps/_requirements_no_torch.txt\" || true\n\n"
         "# 3) OCR 바이너리 설치 (Linux 온프레미스 기준)\n"
         "if [ -d \"$BUNDLE_DIR/ocr-binaries/tesseract\" ]; then\n"
         "  echo '[OCR] Tesseract 설치 중 ...'\n"
@@ -668,8 +697,9 @@ def _copy_infra(out_dir: Path) -> None:
         "  cp -r \"$BUNDLE_DIR/ocr-binaries/poppler/bin/\"* /usr/local/bin/ || true\n"
         "fi\n\n"
         "# 4) env 설정\n"
-        "cp \"$BUNDLE_DIR/infra-config/.env.template\" .env\n"
-        "echo 'Edit .env, then run: docker compose up -d'\n",
+        "[ -f .env ] || cp \"$BUNDLE_DIR/infra-config/.env.template\" .env\n"
+        "echo 'Next: edit .env, then follow docs/INSTALL.md:'\n"
+        "echo '  docker compose --env-file .env -f infra-config/docker-compose.airgap.yml up -d'\n",
         encoding="utf-8",
     )
     install_sh.chmod(0o755)
@@ -685,6 +715,39 @@ def _copy_infra(out_dir: Path) -> None:
         encoding="utf-8",
     )
     verify_sh.chmod(0o755)
+
+
+def _copy_trained_classifier(manifest: "BundleManifest", out_dir: Path) -> bool:
+    """학습된 분류기 디렉토리(가중치+config+temperature.json)를 models/classifier-trained로 복사.
+
+    manifest.models에 role=classifier_trained 항목이 없으면(=학습 모델 미지정) 경고 후
+    True 반환(베이스 모델만 번들 — 빌드 자체는 실패 아님). 지정됐는데 복사 실패 시 False.
+    """
+    import shutil  # noqa: PLC0415
+
+    trained = next((m for m in manifest.models if m.role == "classifier_trained"), None)
+    if trained is None or not trained.source_path:
+        print(
+            "  [WARN] 학습 분류기 미지정 — 베이스 모델만 번들됩니다(폐쇄망에서 rule-fallback). "
+            "--classifier-model-dir 또는 CLASSIFIER_MODEL_DIR로 학습 가중치를 지정하세요(#40).",
+            file=sys.stderr,
+        )
+        return True
+    src = Path(trained.source_path)
+    if not src.exists():
+        print(f"  [ERR] classifier model dir 없음: {src}", file=sys.stderr)
+        return False
+    dst = out_dir / "models" / "classifier-trained"
+    if dst.exists():
+        print(f"  [skip] already exists: {dst}", file=sys.stderr)
+        return True
+    shutil.copytree(src, dst)
+    has_temp = (dst / "temperature.json").exists()
+    print(
+        f"  [model] classifier-trained -> {dst}  (temperature.json: {'포함' if has_temp else '없음'})",
+        file=sys.stderr,
+    )
+    return True
 
 
 def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
@@ -710,6 +773,10 @@ def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
     # infra 파일
     _copy_infra(out_dir)
 
+    # #40: 학습된 분류기 모델(가중치 + temperature.json) 복사
+    if not _copy_trained_classifier(manifest, out_dir):
+        failed.append("classifier-trained")
+
     if failed:
         print(f"\n[bundle] partial build — failed: {failed}", file=sys.stderr)
         print("[bundle] run verify.sh after deploying to confirm checksums", file=sys.stderr)
@@ -731,14 +798,23 @@ def main() -> int:
     ap.add_argument("--target-env", default="KOIPA-prod")
     ap.add_argument("--dry-run", action="store_true", help="다운로드 없이 manifest만 생성")
     ap.add_argument(
-        "--compose", default=str(_REPO_ROOT / "docker-compose.yml"),
-        help="파싱할 docker-compose.yml 경로",
+        # 폐쇄망 번들은 airgap compose 를 파싱한다(image: 태그 보유 → api/worker 이미지 추출 가능).
+        # dev compose(docker-compose.yml)는 api/worker 가 build: 라 image 추출 불가 + minio/mlflow 잔존.
+        "--compose", default=str(_REPO_ROOT / "docker-compose.airgap.yml"),
+        help="파싱할 docker-compose 경로(기본: airgap)",
     )
     ap.add_argument(
         "--config", default=str(_REPO_ROOT / "src" / "lloydk" / "config.py"),
         help="파싱할 config.py 경로",
     )
+    ap.add_argument(
+        "--classifier-model-dir", default=None,
+        help="학습된 분류기 가중치 디렉토리(가중치+temperature.json). "
+             "미지정 시 env CLASSIFIER_MODEL_DIR/LLOYDK_CLASSIFIER_MODEL_DIR 사용(#40)",
+    )
     args = ap.parse_args()
+
+    classifier_model_dir = resolve_classifier_model_dir(args.classifier_model_dir)
 
     manifest = build_manifest(
         version=args.version,
@@ -746,6 +822,7 @@ def main() -> int:
         dry_run=args.dry_run,
         compose_path=Path(args.compose),
         config_path=Path(args.config),
+        classifier_model_dir=classifier_model_dir,
     )
 
     out_dir = Path(args.output)

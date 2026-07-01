@@ -1,6 +1,6 @@
 """A1: Reranker 어댑터 smoke 테스트.
 
-운영 환경에서 BGE/Qwen3 cross-encoder 로드는 lazy이며, 본 테스트는 noop만 강제 검증.
+운영 환경에서 BGE cross-encoder 로드는 lazy이며, 본 테스트는 noop만 강제 검증.
 bge backend는 import 가능 여부만 확인.
 """
 
@@ -56,3 +56,21 @@ def test_get_reranker_bge_lazy_does_not_load_model():
     except Exception:
         pytest.skip("BGE 의존성 미설치 환경")
     assert r.name == "bge"
+
+
+def test_get_reranker_bge_import_failure_falls_back_to_noop(monkeypatch):
+    # F: bge import/초기화 실패 시 raise 대신 noop 폴백(다른 팩토리와 동일 정책).
+    import lloydk.adapters.reranker as rr_mod
+
+    # 캐시 비워서 폴백 경로를 강제(이전 테스트가 'bge'를 캐시했을 수 있음).
+    monkeypatch.setattr(rr_mod, "_RERANKER_CACHE", {})
+
+    def _boom():
+        raise RuntimeError("FlagEmbedding not installed")
+
+    # BgeReranker 생성 자체가 터지는 상황을 모사.
+    monkeypatch.setattr(
+        "lloydk.adapters.reranker.bge_reranker.BgeReranker", _boom, raising=True
+    )
+    r = get_reranker("bge")
+    assert r.name == "noop"

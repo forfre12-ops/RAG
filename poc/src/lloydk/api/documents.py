@@ -11,10 +11,10 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from lloydk.api._jwt_auth import require_auth, resolve_effective_tenant
+from lloydk.api._jwt_auth import require_auth
 from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.services.document_ingestion_service import DocumentIngestionService
@@ -48,7 +48,6 @@ class DocumentUploadResponse(BaseModel):
 
 @router.post("/documents", response_model=DocumentUploadResponse, status_code=201)
 async def upload_document(
-    request: Request,
     actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
     doc_type: Optional[str] = Form(default=None),
     external_ref: Optional[str] = Form(default=None, description="외부 문서 ID (EDMS 등)"),
@@ -86,14 +85,10 @@ async def upload_document(
         raise HTTPException(status_code=422, detail="empty file")
 
     filename = file.filename or "unknown"
-    # 보안: 클라이언트가 보낸 actor.tenant_id를 인증 컨텍스트에 결속(위조 차단). 불일치 시 403.
-    # 이후 ingest·RAG 적재가 이 유효 tenant로 스코프돼 교차테넌트 문서 적재를 막는다.
-    tenant_id = resolve_effective_tenant(request, actor_obj.tenant_id) or "default"
-
+    # tenant 제거: 격리는 KL 포털 전담(상류 보장). 단일 고객사 엔진이라 ingest를 무스코프로 수행.
     result = svc.ingest(
         filename=filename,
         content_bytes=body,
-        tenant_id=tenant_id,
         doc_type=doc_type,
         external_ref=external_ref,
         created_by=actor_obj.user_id,
@@ -107,7 +102,7 @@ async def upload_document(
             settings, "rag_upload_collection", "uploads"
         )
         rag_indexed, rag_vector_count = _index_uploaded_doc(
-            result.doc_id, tenant_id, rag_collection, result.warnings
+            result.doc_id, rag_collection, result.warnings
         )
 
     return DocumentUploadResponse(
@@ -130,9 +125,12 @@ async def upload_document(
 
 
 def _index_uploaded_doc(
-    doc_id, tenant_id: str, collection: str, warnings: list[str]
+    doc_id, collection: str, warnings: list[str]
 ) -> tuple[bool, int]:
-    """업로드된 문서의 DB chunks를 RAG 검색 컬렉션에 적재. 실패는 warnings에 누적."""
+    """업로드된 문서의 DB chunks를 RAG 검색 컬렉션에 적재. 실패는 warnings에 누적.
+
+    tenant 제거: 격리는 KL 포털 전담 → 무스코프 조회·적재.
+    """
     try:
         from lloydk.db import SessionLocal  # noqa: PLC0415
         from lloydk.rag.document_indexer import index_document_for_rag  # noqa: PLC0415
@@ -140,13 +138,13 @@ def _index_uploaded_doc(
 
         db = SessionLocal()
         try:
-            rows = ChunkRepo(db).get_by_doc_id(doc_id, tenant_id)
+            rows = ChunkRepo(db).get_by_doc_id(doc_id)
             chunks = [(c.chunk_index, c.content) for c in rows]
         finally:
             db.close()
 
         res = index_document_for_rag(
-            doc_id=str(doc_id), tenant_id=tenant_id, collection=collection, chunks=chunks
+            doc_id=str(doc_id), collection=collection, chunks=chunks
         )
         warnings.extend(f"rag-index: {w}" for w in res.warnings)
         return res.indexed, res.vector_count

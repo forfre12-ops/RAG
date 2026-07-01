@@ -10,8 +10,7 @@
 설계 노트:
 - 모든 메서드는 외부 Session을 주입받고, commit/rollback은 호출자(Service)
   의 ``session_scope`` 에서 일괄 처리.
-- ``delete_by_doc_id``는 tenant_id를 강제로 받아 cross-tenant 삭제 사고를
-  원천 차단 (영업비밀 시스템 멀티 테넌트 격리 요구).
+- tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
 """
 
 from __future__ import annotations
@@ -41,27 +40,26 @@ class ChunkRepo:
     # Lookup
     # ------------------------------------------------------------
 
-    def count_by_doc_id(self, doc_id: uuid.UUID | str, tenant_id: str) -> int:
+    def count_by_doc_id(self, doc_id: uuid.UUID | str) -> int:
         """특정 문서의 chunk 수. cascade 검증·테스트용."""
         from sqlalchemy import func as _func
 
         stmt = (
             select(_func.count())
             .select_from(Chunk)
-            .where(Chunk.doc_id == doc_id, Chunk.tenant_id == tenant_id)
+            .where(Chunk.doc_id == doc_id)
         )
         return int(self.db.execute(stmt).scalar() or 0)
 
     def get_by_doc_id(
         self,
         doc_id: uuid.UUID | str,
-        tenant_id: str,
         *,
         limit: int | None = None,
     ) -> list[Chunk]:
         stmt = (
             select(Chunk)
-            .where(Chunk.doc_id == doc_id, Chunk.tenant_id == tenant_id)
+            .where(Chunk.doc_id == doc_id)
             .order_by(Chunk.chunk_index)
         )
         if limit is not None:
@@ -76,7 +74,6 @@ class ChunkRepo:
         self,
         *,
         doc_id: uuid.UUID,
-        tenant_id: str,
         chunks: Iterable,
         replace_existing: bool = True,
     ) -> list[uuid.UUID]:
@@ -84,7 +81,6 @@ class ChunkRepo:
 
         Args:
             doc_id: 소속 문서 UUID (FK는 파티션 제약으로 DB에 없음, app 레이어 책임)
-            tenant_id: 테넌트 격리 — 필수
             chunks: PreprocessPipeline.chunk() 또는 PreprocessResult.chunks (Chunk dataclass)
                     필수 속성: index, text, char_count, overlap_prev, overlap_next
             replace_existing: True면 같은 doc_id의 기존 chunks 먼저 삭제 (재처리 시 중복 방지)
@@ -92,11 +88,8 @@ class ChunkRepo:
         Returns:
             insert된 chunk_id 리스트 (PG가 server_default로 채움 → flush 후 확보).
         """
-        if not tenant_id:
-            raise ValueError("tenant_id is required for chunk insert")
-
         if replace_existing:
-            self.delete_by_doc_id(doc_id, tenant_id)
+            self.delete_by_doc_id(doc_id)
 
         rows: list[Chunk] = []
         for c in chunks:
@@ -105,7 +98,6 @@ class ChunkRepo:
                 continue
             row = Chunk(
                 doc_id=doc_id,
-                tenant_id=tenant_id,
                 chunk_index=int(getattr(c, "index", len(rows))),
                 content=text,
                 token_count=_estimate_token_count(text),
@@ -122,7 +114,6 @@ class ChunkRepo:
     def chunk_ids_by_index(
         self,
         doc_id: uuid.UUID | str,
-        tenant_id: str,
         indices: Sequence[int],
     ) -> dict[int, uuid.UUID]:
         """chunk_index → chunk_id 매핑. Evidence 영속화 시 진짜 chunk_id 조회용."""
@@ -133,7 +124,6 @@ class ChunkRepo:
                 select(Chunk.chunk_index, Chunk.chunk_id)
                 .where(
                     Chunk.doc_id == doc_id,
-                    Chunk.tenant_id == tenant_id,
                     Chunk.chunk_index.in_(list(indices)),
                 )
             )
@@ -147,20 +137,13 @@ class ChunkRepo:
     def delete_by_doc_id(
         self,
         doc_id: uuid.UUID | str,
-        tenant_id: str,
     ) -> int:
         """문서 단위 청크 삭제. 반환값은 삭제된 행 수.
 
-        tenant_id는 필수 인자 — 멀티 테넌트 격리 강제.
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진).
         파티션 테이블이라 PG가 자동으로 모든 자식 파티션을 순회한다.
         """
-        if not tenant_id:
-            raise ValueError("tenant_id is required for chunk cascade delete")
-
-        stmt = delete(Chunk).where(
-            Chunk.doc_id == doc_id,
-            Chunk.tenant_id == tenant_id,
-        )
+        stmt = delete(Chunk).where(Chunk.doc_id == doc_id)
         result = self.db.execute(stmt)
         # rowcount는 driver에 따라 -1일 수 있으나 psycopg2/asyncpg는 정확.
         return int(result.rowcount or 0)

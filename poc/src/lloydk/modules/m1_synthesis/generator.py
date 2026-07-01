@@ -71,11 +71,14 @@ GRADE_SITUATION_PROMPTS = {
     },
     "S3": {
         "situation": (
-            "대외 공개를 전제로 작성되었거나, 이미 공개된 정보에 준하는 일반 자료. "
-            "예: 보도자료 초안, 채용 공고, 공시 자료, 회사 소개, 이용약관."
+            "이미 외부에 공개되었거나 공개를 전제로 작성된 자료로, 누구나 열람해도 회사에 "
+            "불이익이 없다. 예: 배포된 보도자료, 채용 공고, 법정 공시, 회사 소개, 이용약관, "
+            "고객 안내 FAQ. **미공개 수치·내부 전략·협상 조건·원가·매출 추정·고객 명단·"
+            "기술 사양은 절대 포함하지 않는다** — 포함되면 더 이상 공개 자료가 아니다. "
+            "문체도 대외 홍보·안내문처럼 작성한다."
         ),
-        "disclosure_scope": "외부 공개 가능 또는 공개 예정.",
-        "harm_potential": "해당 없음 또는 경미.",
+        "disclosure_scope": "일반 대중에게 공개됨(또는 공개 예정). 접근 제한 없음.",
+        "harm_potential": "없음 — 이미 공개된 정보 수준이라 유출로 인한 피해가 성립하지 않는다.",
     },
 }
 
@@ -110,10 +113,11 @@ USER_TEMPLATE_V2 = """[문서 상황]
 {doc_types}
 
 [작성 길이]
-한국어 {len_min}~{len_max}자
+body는 한국어 {len_min}자 이상 {len_max}자 이내. 단답 금지 — 여러 단락으로, 구체적 항목·수치·일정·금액·기술 사양 등 세부를 실제 사내 문서처럼 충실히 작성.
 
 위 상황에 해당하는 가상의 사내 문서를 JSON 객체로 작성하시오.
-등급명(비밀, 기밀, TS, S1, S2, S3 등)은 문서 내용에 포함하지 마시오."""
+- body는 반드시 {len_min}자 이상의 상세 문서(여러 단락).
+- 등급명(비밀, 기밀, TS, S1, S2, S3, 대외비, 극비 등)은 문서 내용에 포함하지 마시오."""
 
 DOMAIN_DOC_TYPES = {
     "tech": "연구노트, 설계명세, 시험성적서, 알고리즘 설명서",
@@ -122,6 +126,8 @@ DOMAIN_DOC_TYPES = {
     "hr": "임원 평가, 보상 체계, 인사 이동안",
     "legal": "NDA 초안, MOU, 라이선스 계약 검토",
     "mixed": "내부 보고서, 회의록, 의사결정 문서",
+    # 공개 전용 도메인 (S3 — 이미 공개된 대외 자료. 내부 수치·전략 미포함)
+    "public": "보도자료, 채용 공고, 법정 공시 자료, 회사 소개 페이지, 이용약관, 고객 안내 FAQ, 외부 블로그 글",
     # TS 전용 특화 도메인 (FNR 개선 목적)
     "security": "암호 키 관리 보고서, 취약점 분석서, HSM 운영 지침, 보안 인증서 관리 대장",
     "ma": "인수합병 실사 보고서, 기업가치 평가서, 주식 매수 계획안, 비공개 합병 의향서",
@@ -160,11 +166,24 @@ class SynthDoc:
     usage: Optional[UsageRecord] = None
     pii_violations: list[str] = field(default_factory=list)
     parse_error: Optional[str] = None
+    # [C16] 본문 출처 식별 — None=정상 생성(JSON 파싱 OK). "noop_fallback"=resp.text가 비어
+    # placeholder 본문 사용(CI 연결 테스트, 학습 편입 금지 마커). "llm_nonjson"=실 LLM이 비-JSON
+    # 텍스트를 줘서 raw를 body로 사용. parse_error만으론 뒤 둘이 뭉뚱그려져 grep 식별 불가였다.
+    label_source: Optional[str] = None
 
 
 class SyntheticDocGenerator:
     def __init__(self, llm: Optional[LLMProvider] = None) -> None:
         self.llm = llm or build_provider()
+
+    @staticmethod
+    def _record_usage(resp: object) -> None:
+        """[QW] 합성 LLM 호출 비용 best-effort 기록 (purpose='synthesis')."""
+        try:
+            from lloydk.services.llm_usage_service import record_llm_usage  # noqa: PLC0415
+            record_llm_usage(resp, purpose="synthesis")
+        except Exception:  # noqa: BLE001
+            pass
 
     def _pii_violations(self, text: str) -> list[str]:
         return [p.pattern for p in _PII_PATTERNS if p.search(text)]
@@ -203,18 +222,24 @@ class SyntheticDocGenerator:
         # 재시도 시 temperature 낮춰 deterministic 시도 + system prompt 강화.
         max_retries = 2
         attempt = 0
-        resp = self.llm.generate(user, system=SYSTEM_PROMPT, temperature=0.7, max_tokens=2048)
+        resp = self.llm.generate(user, system=SYSTEM_PROMPT, temperature=0.7, max_tokens=3500)
+        self._record_usage(resp)
         parsed = self._parse(resp.text)
         while parsed is None and attempt < max_retries:
             attempt += 1
             # 재시도: temperature 0.3, system prompt 에 "반드시 유효한 JSON 만 출력" 추가
             retry_system = SYSTEM_PROMPT + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
-            resp = self.llm.generate(user, system=retry_system, temperature=0.3, max_tokens=2048)
+            resp = self.llm.generate(user, system=retry_system, temperature=0.3, max_tokens=3500)
+            self._record_usage(resp)  # 재시도도 실제 LLM 비용 — 누락 없이 기록
             parsed = self._parse(resp.text)
 
         if parsed is None:
-            # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용
-            body = resp.text or _fallback_body(grade_code, req.domain)
+            # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용.
+            # [C16] resp.text가 비면 placeholder(_fallback_body)=noop_fallback(학습 금지 마커),
+            # 실 LLM이 비-JSON 텍스트를 주면 llm_nonjson — 둘을 label_source로 구분(grep 식별).
+            raw_text = resp.text or ""
+            body = raw_text or _fallback_body(grade_code, req.domain)
+            label_source = "llm_nonjson" if raw_text else "noop_fallback"
             title = f"{DOMAIN_DOC_TYPES.get(req.domain, '내부 자료').split(',')[0].strip()} 합성 v{abs(hash(user)) % 10000:04d}"
             doc_type = DOMAIN_DOC_TYPES.get(req.domain, "내부 자료").split(",")[0].strip()
             return SynthDoc(
@@ -229,6 +254,7 @@ class SyntheticDocGenerator:
                 usage=resp.usage,
                 pii_violations=self._pii_violations(body),
                 parse_error="non-json response",
+                label_source=label_source,
             )
 
         body = parsed.get("body", "") or ""
@@ -252,17 +278,23 @@ class SyntheticDocGenerator:
 def _fallback_body(grade_code: str, domain: str) -> str:
     """Noop provider / CI 파이프라인 연결 테스트용 fallback.
 
-    실제 품질 평가에 사용하지 않는다 (label_source: noop_fallback 으로 구분).
-    등급명·키워드를 본문에 직접 삽입하지 않는다.
+    실제 품질 평가에 사용하지 않는다 — 이 본문을 쓴 SynthDoc은 label_source="noop_fallback"
+    으로 식별된다(학습 편입 금지 마커. build_synthetic_golden은 parse_error로 이미 필터링).
+
+    [등급 누출 차단] 과거엔 GRADE_SITUATION_PROMPTS의 situation/disclosure_scope를 본문에
+    직접 넣어, 그 텍스트("외부 공유 절대 불가"·"유출 시 회사 존립…" 등 강한 등급 마커)가 합성
+    코퍼스에 누출됐다 — noop_fallback 문서가 학습에 새면 룰·모델이 실데이터에 없는 합성 단서에
+    과적합한다. 본문은 **grade-중립 placeholder**로만 둔다(모든 등급에서 동일). 등급은 본문이
+    아니라 메타(target_grade)로만 보존되며, grade_code는 호환을 위해 시그니처에만 유지한다.
     """
-    situation = GRADE_SITUATION_PROMPTS.get(grade_code, GRADE_SITUATION_PROMPTS["S3"])
+    del grade_code  # 본문에 등급 신호를 넣지 않는다(누출 차단) — 시그니처는 호출부 호환용.
     return (
-        f"[Noop fallback — {domain} 도메인 합성 문서]\n\n"
+        f"[Noop fallback — {domain} 도메인 합성 문서 (파이프라인 연결 테스트)]\n\n"
         "1. 문서 개요\n"
-        f"본 자료는 {situation['disclosure_scope']} 조건에 해당하는 내부 문서이다.\n\n"
+        f"본 자료는 {domain} 도메인의 내부 문서 형식 placeholder이다.\n\n"
         "2. 주요 내용\n"
-        f"{situation['situation']}\n\n"
+        "합성 파이프라인 연결 테스트 목적으로 생성된 자리표시 문서로, 등급 판단에 쓰일 "
+        "구체 내용(공개 범위·피해 가능성 등)을 담지 않는다.\n\n"
         "3. 결론\n"
-        "합성 파이프라인 연결 테스트 목적으로 생성되었으며, "
         "실제 LLM 호출 시 이 내용은 해당 맥락에 맞는 자연스러운 문서로 대체된다."
     )

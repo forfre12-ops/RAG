@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -26,6 +27,44 @@ from dataclasses import asdict, dataclass, field
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_target_url(target_url: str) -> None:
+    """[QW SSRF] webhook 대상 URL 가드 — 부적합 시 ValueError(enqueue 차단).
+
+    항상 거부: http/https 외 스킴(file://·gopher://·data: 등 내부 파일·프로토콜 악용),
+    호스트 없음, loopback(127.0.0.0/8·::1·localhost — 서비스 자기자신 타격). 사설IP(RFC1918/
+    4193)는 폐쇄망 정상 콜백이라 기본 허용하되 settings.outbox_block_private_ips=True면 거부
+    (외부망 배포용). DNS 리바인딩까지는 막지 않음(전송 시점 워커 책임) — enqueue 표면만 좁힌다.
+    """
+    import ipaddress  # noqa: PLC0415
+    from urllib.parse import urlparse  # noqa: PLC0415
+
+    if not target_url or not isinstance(target_url, str):
+        raise ValueError("outbox target_url required")
+    parsed = urlparse(target_url.strip())
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"outbox target_url scheme not allowed: {parsed.scheme!r} (http/https only)")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("outbox target_url has no host")
+    if host.lower() in ("localhost", "ip6-localhost"):
+        raise ValueError("outbox target_url loopback host not allowed")
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        ip = None  # 호스트명(IP 아님) — 전송 시점 해석
+    if ip is not None:
+        if ip.is_loopback:
+            raise ValueError("outbox target_url loopback address not allowed")
+        block_private = False
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            block_private = bool(getattr(settings, "outbox_block_private_ips", False))
+        except Exception:  # noqa: BLE001
+            block_private = False
+        if block_private and (ip.is_private or ip.is_link_local):
+            raise ValueError("outbox target_url private/link-local address blocked (outbox_block_private_ips)")
 
 
 @dataclass
@@ -88,43 +127,69 @@ class InMemoryOutboxStore(OutboxStore):
             self._items[msg.id] = msg
 
     def dequeue_ready(self, *, limit: int = 10) -> list[OutboxMessage]:
-        """ready 메시지를 반환하면서 in-flight 표시(visibility timeout)한다.
+        """ready 메시지의 **스냅샷(deepcopy)** 을 반환하며 in-flight 표시한다.
 
         M-outbox-inflight: Redis 백엔드와 동일하게, 반환 직전 락 아래에서
         ``next_retry_at = now + VISIBILITY_TIMEOUT_SEC`` 로 bump 해 두 번째
         워커가 같은 메시지를 즉시 다시 집지 못하게 한다(중복 webhook 차단).
 
-        M-outbox-attempts: Redis 는 dequeue 시 score 를 bump 하지만 attempts
-        는 deliver_once 가 증가시킨다. InMemory 도 동일 계약을 유지하려고
-        dequeue 시점엔 attempts 를 건드리지 않되, in-flight bump 만 persist 한다.
-        반환 메시지는 store 가 보관한 동일 객체(참조)라 deliver_once 의
-        ``msg.attempts += 1`` 후 ``store.update(msg)`` 가 그대로 persist 된다.
+        #35 (attempts 락 밖 변형 + visibility timeout 중 중복전송 차단):
+        예전 구현은 store 가 보관한 *동일 객체 참조* 를 반환했다. 그러면
+        deliver_once 가 락 밖에서 ``msg.attempts += 1`` / ``msg.next_retry_at=...``
+        를 직접 변형할 때, visibility timeout 후 같은 객체를 다시 집은 다른
+        워커와 attempts 가 경쟁하고(데이터 레이스), 성공 제거 직전 두 번째
+        deliver 가 끼어들 수 있었다. 이를 막기 위해:
+          1) 보관 객체는 락 안에서만 변형하고(아래 in-flight bump),
+          2) 호출부에는 **deepcopy 스냅샷** 만 넘긴다. 호출부가 스냅샷을 락 밖에서
+             아무리 변형해도 store 내부 상태와 경쟁하지 않는다. 실제 상태 반영은
+             update()/move_to_dlq() 가 락 안에서 원자적으로 수행한다.
         """
         now = time.time()
         invisible_until = now + self.VISIBILITY_TIMEOUT_SEC
+        snapshots: list[OutboxMessage] = []
         with self._lock:
             ready = [m for m in self._items.values() if m.next_retry_at <= now]
             ready.sort(key=lambda m: m.next_retry_at)
             picked = ready[:limit]
-            # in-flight 표시 — 반환 후 두 번째 dequeue가 같은 메시지를 못 집게.
             for m in picked:
+                # in-flight 표시 — 보관 객체에만 적용(락 안). visibility window 동안
+                # 두 번째 dequeue 가 같은 메시지를 못 집는다.
                 m.next_retry_at = invisible_until
-                self._items[m.id] = m
-        return picked
+                # 호출부에는 분리된 deepcopy 스냅샷을 전달(#35: 락 밖 변형 격리).
+                snapshots.append(copy.deepcopy(m))
+        return snapshots
 
     def update(self, msg: OutboxMessage) -> None:
+        """deliver_once 가 만든 스냅샷의 새 상태를 락 안에서 원자적으로 반영.
+
+        #35: attempts 증가/next_retry_at 갱신/성공 제거를 store 가 락 안에서
+        한 번에 처리한다. 호출부(deliver_once)는 락 밖에서 스냅샷을 변형한 뒤
+        이 원자 메서드만 호출한다. 메시지가 이미 제거(성공/DLQ)됐으면 무시해
+        visibility window 내 중복 deliver 가 죽은 메시지를 되살리지 못하게 한다.
+        """
         with self._lock:
-            if msg.id in self._items:
-                if msg.next_retry_at == float("inf"):
-                    # 성공 처리 → 즉시 제거
-                    self._items.pop(msg.id, None)
-                else:
-                    self._items[msg.id] = msg
+            stored = self._items.get(msg.id)
+            if stored is None:
+                # 이미 성공 제거/ DLQ 이동된 메시지 — 스테일 업데이트 무시.
+                return
+            if msg.next_retry_at == float("inf"):
+                # 성공 처리 → 즉시 제거(락 안 원자).
+                self._items.pop(msg.id, None)
+            else:
+                merged = copy.deepcopy(msg)
+                # #35: attempts 는 store 가 권위(authoritative)·단조 증가. 스테일
+                # 스냅샷이 락 밖에서 들고 온 낮은 attempts 로 카운터를 되돌리지
+                # 못하게 한다(visibility window 중 재진입/스테일 update 방어).
+                merged.attempts = max(stored.attempts, msg.attempts)
+                self._items[msg.id] = merged
 
     def move_to_dlq(self, msg: OutboxMessage) -> None:
         with self._lock:
+            # #35: 이미 제거된 메시지면 중복 DLQ 적재 방지(원자 처리).
+            if msg.id not in self._items and msg.id in self._dlq:
+                return
             self._items.pop(msg.id, None)
-            self._dlq[msg.id] = msg
+            self._dlq[msg.id] = copy.deepcopy(msg)
 
     def stats(self) -> dict:
         with self._lock:
@@ -261,6 +326,7 @@ def publish(
     headers: Optional[dict] = None,
     max_attempts: int = 5,
 ) -> OutboxMessage:
+    _validate_target_url(target_url)  # [QW SSRF] 부적합 대상은 enqueue 전 차단
     msg = OutboxMessage(
         id=str(uuid.uuid4()),
         target_url=target_url,
@@ -321,6 +387,13 @@ def deliver_once(
             )
             store.move_to_dlq(msg)
             dlq += 1
+            # NEW-H2: OutboxDlqGrowing 알람용 메트릭. best-effort(프로메테우스 미가용 무시).
+            try:
+                from lloydk.api.prom_metrics import OUTBOX_DLQ_TOTAL  # noqa: PLC0415
+
+                OUTBOX_DLQ_TOTAL.inc()
+            except Exception:  # noqa: BLE001
+                pass
         else:
             msg.next_retry_at = time.time() + _backoff_seconds(msg.attempts)
             store.update(msg)

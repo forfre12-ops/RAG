@@ -51,5 +51,5 @@ def test_default_up_excludes_mtls():
                         if not cfg.get("profiles")]
     assert "nginx-mtls" not in default_services
     # 기존 핵심 서비스는 default에 있어야 함 (regression guard)
-    for must in ("postgres", "elasticsearch", "redis", "minio", "api", "worker"):
+    for must in ("postgres", "redis", "minio", "api", "worker"):
         assert must in default_services, f"{must}는 기본 up에서 빠지면 안 됨"

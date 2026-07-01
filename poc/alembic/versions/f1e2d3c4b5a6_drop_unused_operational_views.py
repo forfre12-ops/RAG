@@ -54,15 +54,15 @@ SELECT
   c.status,
   c.classified_at,
   latest_corr.corrected_at
-FROM classifications c
-JOIN classification_levels pl ON c.predicted_level_id = pl.level_id
+FROM tb_classifications c
+JOIN tb_classification_levels pl ON c.predicted_level_id = pl.level_id
 LEFT JOIN LATERAL (
   SELECT corrected_level_id, corrected_at
-  FROM corrections
+  FROM tb_corrections
   WHERE classification_id = c.classification_id AND direction != 'confirm'
   ORDER BY corrected_at DESC LIMIT 1
 ) latest_corr ON true
-LEFT JOIN classification_levels fl ON latest_corr.corrected_level_id = fl.level_id;
+LEFT JOIN tb_classification_levels fl ON latest_corr.corrected_level_id = fl.level_id;
 
 CREATE OR REPLACE VIEW v_model_performance AS
 SELECT c.model_version,
@@ -74,9 +74,9 @@ SELECT c.model_version,
        COUNT(*) FILTER (WHERE cr.direction = 'overclass') AS overclass_count,
        AVG(c.confidence)::DECIMAL(5,4) AS avg_confidence,
        AVG(c.inference_ms)::INT AS avg_inference_ms
-FROM classifications c
-JOIN classification_levels cl ON c.predicted_level_id = cl.level_id
-LEFT JOIN corrections cr ON c.classification_id = cr.classification_id
+FROM tb_classifications c
+JOIN tb_classification_levels cl ON c.predicted_level_id = cl.level_id
+LEFT JOIN tb_corrections cr ON c.classification_id = cr.classification_id
 GROUP BY c.model_version, cl.level_code, cl.level_name;
 
 CREATE OR REPLACE VIEW v_active_learning_status AS
@@ -90,7 +90,7 @@ SELECT
     WHEN COUNT(*) FILTER (WHERE consumed_in_run IS NULL) >= 50 THEN 'RETRAIN_RECOMMENDED'
     ELSE 'OK'
   END AS retrain_status
-FROM corrections;
+FROM tb_corrections;
 """
 
 

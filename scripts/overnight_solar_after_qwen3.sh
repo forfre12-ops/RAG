@@ -10,7 +10,8 @@
 
 set -e
 
-REPO_ROOT="/e/antigravity/rag"
+# 2026-06-18: 드라이브 레터(/e/) 하드코딩 제거 — 스크립트 위치 기준 자동 탐지.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QWEN_DIR="$REPO_ROOT/poc/datasets/synthetic_qwen3"
 SOLAR_DIR="$REPO_ROOT/poc/datasets/synthetic_solar"
 QWEN_TARGET=200

@@ -18,7 +18,7 @@ from lloydk.api.rate_limit import limiter
 from lloydk.config import settings
 
 
-HDR = {"X-API-Key": settings.api_key, "X-Tenant-Id": "rate-test-tenant"}
+HDR = {"X-API-Key": settings.api_key}
 
 
 @pytest.fixture
@@ -43,7 +43,6 @@ def enable_limiter():
 def _classify_payload(doc_id: str = "rl-test") -> dict:
     return {
         "doc_id": doc_id,
-        "tenant_id": "rate-test-tenant",
         "content": "특급기밀 차세대 제품 설계도",
         "use_rag": False,
     }
@@ -105,17 +104,11 @@ def test_rate_limit_disabled_env_bypasses(monkeypatch):
         limiter.reset()
 
 
-def test_rate_limit_unverified_tenant_header_shares_bucket(enable_limiter):
-    """[M-ratelimit-key, 2026-06-11] 계약 갱신(보안): *검증 안 된* X-Tenant-Id 헤더는
-    더 이상 독립 rate-limit 버킷을 만들지 않는다.
+def test_rate_limit_shares_ip_bucket_for_same_client(enable_limiter):
+    """[M-ratelimit-key] rate-limit 버킷 키는 KL cred(인증된 actor) 또는 IP 폴백.
 
-    과거 계약은 원시 X-Tenant-Id 헤더로 버킷을 분리했다 → 공격자가 헤더를 위조해 매
-    요청마다 새 버킷을 차지하면 한도를 우회할 수 있었다. 이제 key_func는 인증이 해소한
-    authoritative 신원(request.state.auth_tenant/auth_actor)만 쓰고, 미검증 헤더는
-    IP 폴백으로 합쳐진다. 따라서 같은 클라이언트(같은 IP)가 다른 X-Tenant-Id를 보내도
-    같은 버킷을 공유하므로, 한쪽이 한도를 채우면 다른 쪽도 막혀야 한다.
-
-    (검증된 신원이 독립 버킷을 받는 *양성* 경로는 tests/test_audit_w2_b.py 에서 단위로 고정.)
+    tenant 제거: 격리는 KL 포털 전담. 같은 클라이언트(같은 cred/IP)는 같은 버킷을
+    공유하므로, 한도를 채우면 후속 요청은 막혀야 한다.
     """
     payload = {
         "target_grade": "S2",
@@ -123,15 +116,13 @@ def test_rate_limit_unverified_tenant_header_shares_bucket(enable_limiter):
         "llm_provider": "noop",
         "actor": {"user_id": "rl-isolated", "role": "admin"},
     }
-    hdr_a = {"X-API-Key": settings.api_key, "X-Tenant-Id": "tenant-a"}
-    hdr_b = {"X-API-Key": settings.api_key, "X-Tenant-Id": "tenant-b"}
     with TestClient(app) as cli:
-        # tenant-a 헤더로 한도까지 채움
+        # 한도까지 채움
         for _ in range(10):
-            cli.post("/api/v1/synth/generate", headers=hdr_a, json=payload)
-        # tenant-a 11번째 → 429 (버킷 고갈)
-        r_a = cli.post("/api/v1/synth/generate", headers=hdr_a, json=payload)
-        # tenant-b 헤더지만 검증 안 됨 → 같은 IP 버킷 공유 → 역시 429
-        r_b = cli.post("/api/v1/synth/generate", headers=hdr_b, json=payload)
-        assert r_a.status_code == 429
-        assert r_b.status_code == 429
+            cli.post("/api/v1/synth/generate", headers=HDR, json=payload)
+        # 11번째 → 429 (버킷 고갈)
+        r_1 = cli.post("/api/v1/synth/generate", headers=HDR, json=payload)
+        # 같은 cred/IP → 같은 버킷 공유 → 역시 429
+        r_2 = cli.post("/api/v1/synth/generate", headers=HDR, json=payload)
+        assert r_1.status_code == 429
+        assert r_2.status_code == 429

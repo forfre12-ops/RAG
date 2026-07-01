@@ -187,6 +187,8 @@ def main() -> int:
     ap.add_argument("--model-dir", required=True)
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--label-source-filter", default="")
+    ap.add_argument("--tier", choices=["all", "eval", "locked"], default="all",
+                    help="평가 tier: all=전체(레거시) / eval=locked_gold_eval(없으면 legal_floor interim) / locked=locked만")
     ap.add_argument("--mode", choices=["direct", "api-like"], default="direct")
     ap.add_argument("--report", default="reports/p1_model_gold_eval.md")
     ap.add_argument("--examples", type=int, default=30)
@@ -194,6 +196,24 @@ def main() -> int:
 
     label_sources = {s.strip() for s in args.label_source_filter.split(",") if s.strip()}
     rows = load_jsonl(Path(args.gold), label_sources or None)
+    eval_tier = "all"
+    if args.tier in ("eval", "locked"):
+        from lloydk.golden_tiers import eval_records
+        rows, eval_tier = eval_records(rows, allow_floor_fallback=(args.tier == "eval"))
+        if not rows:
+            print(
+                f"[ERROR] --tier {args.tier}: 레코드 0건 "
+                f"(locked_gold_eval 비어있음 — 9월 실데이터+사람서명 전).",
+                file=sys.stderr,
+            )
+            return 2
+        if eval_tier == "legal_floor":
+            print(
+                "[WARN] locked_gold_eval 없음 → legal_floor(시나리오/법적) interim. '템플릿 recall'이지 "
+                "일반화 진실 아님 — 릴리스 차단 floor로만, 헤드라인 F1로 보고 금지.",
+                file=sys.stderr,
+            )
+        print(f"[tier] eval tier={eval_tier}, n={len(rows)}")
     preds = (
         predict_api_like(Path(args.model_dir), rows)
         if args.mode == "api-like"
@@ -218,6 +238,7 @@ def main() -> int:
         "gold": args.gold,
         "mode": args.mode,
         "label_sources": sorted(label_sources),
+        "eval_tier": eval_tier,
         "metrics": compute_metrics(y_true, y_pred),
         "prediction_distribution": dict(Counter(y_pred)),
         "error_count": len(errors),

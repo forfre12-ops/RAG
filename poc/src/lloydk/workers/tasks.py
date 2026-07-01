@@ -139,35 +139,175 @@ def synthesize_batch(
         raise
 
 
+@celery_app.task(
+    name="lloydk.golden_build",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=2,
+)
+def golden_build_task(self: Any, req_dict: dict, job_id: str | None = None) -> dict:
+    """통합 골든셋 빌드(위생→라벨→합의→조립)를 워커에서 실행 (G3b).
+
+    GoldenBuildService.run_build이 JobStore 상태(running→done/failed)와 run-스코프 후보
+    파일 출력을 소유한다. 일시 예외 → self.retry(2**attempts). 최종 실패 시 run_build이
+    이미 status=failed를 기록(부분결과 없음 → partial 보상 불필요)하므로 그대로 재발생.
+    """
+    import uuid as _uuid
+
+    from lloydk.schemas.golden import GoldenBuildRequest
+    from lloydk.services.golden_build_service import GoldenBuildService
+
+    try:
+        req = GoldenBuildRequest(**req_dict)
+        return GoldenBuildService().run_build(req, _uuid.UUID(job_id))
+    except Exception as exc:  # noqa: BLE001
+        attempts = self.request.retries
+        max_r = self.max_retries or 0
+        if attempts < max_r:
+            countdown = 2 ** attempts
+            logger.warning(
+                "golden_build retry: attempts=%d/%d countdown=%ds err=%s",
+                attempts + 1, max_r, countdown, type(exc).__name__,
+            )
+            raise self.retry(exc=exc, countdown=countdown) from exc
+        logger.warning("golden_build exhausted: job_id=%s err=%s", job_id, exc)
+        raise
+
+
+def _create_training_run_guarded(
+    spec_kwargs: dict, *, total_samples: int, trigger: str = "active_learning"
+):
+    """실제 TrainingRun 1건 생성 → run_id 반환(소비 FK·감사용). DB 미가용 시 None.
+
+    [A2-① 정합] 기존엔 report.run_id(부재) → 랜덤 UUID로 소비를 시도했으나, 그 UUID는
+    training_runs에 없어 consumed_in_run FK가 깨졌다(소비 실패 → 교정 무한누적). 실제
+    TrainingRun을 만들어 그 run_id로만 소비해 FK 무결성과 감사추적을 보장한다.
+    """
+    try:
+        import uuid as _uuid  # noqa: PLC0415
+        from lloydk.db import session_scope  # noqa: PLC0415
+        from lloydk.repositories import TrainingRepo  # noqa: PLC0415
+        with session_scope() as db:
+            run = TrainingRepo(db).create_run(
+                total_samples=total_samples,
+                hyperparameters=spec_kwargs,
+                trigger_type=trigger,
+            )
+            rid = run.run_id
+            return rid if hasattr(rid, "hex") else _uuid.UUID(str(rid))
+    except Exception:  # noqa: BLE001
+        logger.warning("training run create skipped (DB unavailable) — 소비/등록 best-effort 진행")
+        return None
+
+
 @celery_app.task(name="lloydk.train_classifier")
 def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
-    """학습 시작 — 표적 5 (2026-05-29): unconsumed corrections를 자동 소비.
+    """재학습 — 교정 반영 → 학습 → 등록 → 게이트 → (조건부)활성 → 반영분만 소비.
 
-    학습이 끝난 뒤 같은 corrections가 다음 train tick에서 또 끌려오지 않게,
-    train_run_id로 mark. report에 consumed_count도 함께 반환.
+    doc/36 본개발 #1 (A2-①②·C-ver):
+      A2-①: unconsumed corrections를 {text,label}로 재빌드해 학습셋에 병합(반영). 그리고
+             **실제 학습에 반영된 correction_id만** 소비한다(반영 없이 소비 = 유실, 차단).
+      A2-②/C-ver: 학습 모델을 ModelVersion으로 등록하고 배포 합격선 게이트(fnr_high·f1)를
+             평가. 활성(activate)은 게이트 통과 + settings.retrain_auto_activate(기본 False)
+             둘 다일 때만 — 미검증 모델 자동배포 차단.
     """
-    from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
-    from lloydk.modules.m6_evaluation.active_learning import consume_corrections_for_run
+    from lloydk.config import settings  # noqa: PLC0415
 
-    spec = TrainSpec(**(spec_kwargs or {}))
+    # [재학습 토폴로지 가드 · 심층방어] 분류기 학습은 enable_training=True 노드(지재원)에서만.
+    # 고객사(onprem-local, enable_training=False)는 추론+비모수 전용 — 어떤 경로로 enqueue되든
+    # 학습을 수행하지 않는다(무거운 trainer import도 생략). active_learning_tick 가드와 belt+suspenders.
+    if not settings.enable_training:
+        logger.warning(
+            "train_classifier_task skipped — enable_training=False (inference-only node)"
+        )
+        return {"skipped": "training_disabled"}
+
+    from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.active_learning import consume_corrections_for_run  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.corrections_rebuild import (  # noqa: PLC0415
+        build_labeled_rows_from_corrections,
+        merge_into_train_jsonl,
+    )
+    from lloydk.services.training_service import register_and_gate_model  # noqa: PLC0415
+
+    spec_kwargs = dict(spec_kwargs or {})
+
+    # ── [A2-①] 교정→라벨 재빌드 + 학습셋 병합(train만 증강, 홀드아웃 불변) ──────────
+    rebuild = build_labeled_rows_from_corrections()
+    incorporated_ids: list[int] = []
+    if getattr(rebuild, "rows", None):
+        try:
+            import uuid as _uuid  # noqa: PLC0415
+            _spec = TrainSpec()
+            base_train = spec_kwargs.get("train_path") or _spec.train_path
+            # [누수가드 강제] val/test(홀드아웃)와 doc_id·본문이 겹치는 교정 행을 train append에서
+            # 제외 — train↔eval 평가 누수 차단(fail-open→fail-closed). deploy gate가 깨끗한
+            # 홀드아웃에서 fnr_high를 재도록 보장(C-eval 정합). 옛 호출은 holdout_paths 미전달로
+            # 누수 차단이 fail-open(경고만)이었다.
+            holdout_paths = [
+                spec_kwargs.get("val_path") or _spec.val_path,
+                spec_kwargs.get("test_path") or _spec.test_path,
+            ]
+            out_path = f"{settings.retrain_dataset_dir}/train_corr_{_uuid.uuid4().hex[:8]}.jsonl"
+            merged = merge_into_train_jsonl(
+                base_train, rebuild, out_path, holdout_paths=holdout_paths
+            )
+            if merged:
+                spec_kwargs["train_path"] = merged
+                incorporated_ids = list(rebuild.correction_ids)
+                logger.info(
+                    "train_classifier: %d corrections(%d docs) merged into train set",
+                    len(incorporated_ids), rebuild.row_count,
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("corrections merge failed — 기본 학습셋으로 진행")
+            incorporated_ids = []
+
+    # 소비 FK·감사용 실제 TrainingRun (학습 전 생성).
+    run_uuid = _create_training_run_guarded(
+        spec_kwargs, total_samples=getattr(rebuild, "row_count", 0)
+    )
+
+    # ── 학습 ────────────────────────────────────────────────────────────────────
+    spec = TrainSpec(**spec_kwargs)
     report = train_classifier(spec)
     out = dict(report.__dict__)
+    out["corrections_incorporated"] = len(incorporated_ids)
 
-    # run_id 결정: report에 있으면 그것을, 없으면 신규 UUID.
-    run_id = getattr(report, "run_id", None) or getattr(report, "training_run_id", None)
-    if not run_id:
-        import uuid as _uuid
-        run_id = _uuid.uuid4()
+    # ── [C-ver/A2-②] 등록 + 배포 게이트(활성은 게이트 통과 + opt-in 시에만) ────────
+    model_uri = None
     try:
-        import uuid as _uuid
-        run_uuid = run_id if hasattr(run_id, "hex") else _uuid.UUID(str(run_id))
-        n = consume_corrections_for_run(run_uuid)
-        out["corrections_consumed"] = n
-        out["corrections_run_id"] = str(run_uuid)
-        if n > 0:
-            logger.info("train_classifier: consumed %d corrections under run_id=%s", n, run_uuid)
+        _mv = getattr(report, "model_version", None)
+        _od = getattr(spec, "output_dir", None)
+        if _mv and _od:
+            model_uri = f"{_od}/{_mv}"
     except Exception:  # noqa: BLE001
-        logger.exception("consume_corrections_for_run failed (run_id=%s) — corrections 누적 가능", run_id)
+        model_uri = None
+    try:
+        out["deploy"] = register_and_gate_model(
+            report,
+            training_run_id=run_uuid,
+            training_data_count=getattr(rebuild, "row_count", None) or None,
+            model_uri=model_uri,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("register_and_gate_model failed — 등록/게이트 생략")
+        out["deploy"] = {"registered": False, "reason": "exception"}
+
+    # ── [A2-①] 소비 — 실제 반영된 교정만, 실제 run_id로 (반영 없으면 소비 안 함=무손실) ──
+    out["corrections_run_id"] = str(run_uuid) if run_uuid else None
+    if not incorporated_ids or run_uuid is None:
+        out["corrections_consumed"] = 0
+        if rebuild.correction_ids and run_uuid is None:
+            logger.info("교정 반영했으나 TrainingRun 미생성(DB) — 소비 보류(다음 tick 재시도, 무손실)")
+        return out
+    try:
+        n = consume_corrections_for_run(run_uuid, correction_ids=incorporated_ids)
+        out["corrections_consumed"] = n
+        if n > 0:
+            logger.info("train_classifier: consumed %d incorporated corrections under run_id=%s", n, run_uuid)
+    except Exception:  # noqa: BLE001
+        logger.exception("consume_corrections_for_run failed (run_id=%s) — corrections 누적 가능", run_uuid)
         out["corrections_consumed"] = -1
     return out
 
@@ -189,6 +329,50 @@ def deliver_outbox_tick(limit: int = 50) -> dict:
     return out
 
 
+@celery_app.task(name="lloydk.ensure_partitions_tick")
+def ensure_partitions_tick(months_ahead: int = 3) -> dict:
+    """월별 RANGE 파티션 롤오버 (#5) — beat가 매일 호출.
+
+    향후 N개월 파티션을 미리 생성해 _default 비대화·프루닝 무력화를 막는다.
+    CREATE IF NOT EXISTS라 멱등. failed가 있으면 롤오버 지연(런북 필요)이라 경고.
+    """
+    from lloydk.services.partitions import ensure_partitions  # noqa: PLC0415
+
+    out = ensure_partitions(months_ahead=months_ahead)
+    if out.get("failed"):
+        logger.warning("ensure_partitions_tick: 일부 파티션 생성 실패 — %s", out["failed"])
+    return out
+
+
+@celery_app.task(name="lloydk.auto_rollback_tick")
+def auto_rollback_tick() -> dict:
+    """C-ver 자동 롤백 주기 점검 — 활성 모델 라이브 미탐 회귀 시 직전 활성으로 복귀.
+
+    evaluate_rollback_need로 baseline 대비 라이브 fnr_high 회귀를 판정하고,
+    settings.auto_rollback_enabled(기본 False)이고 회귀가 확인되면 rollback_active_model 실행.
+    기본은 판정만 하고 롤백은 안 함(동작 보존) — beat가 주기 호출.
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    from lloydk.services.training_service import (  # noqa: PLC0415
+        evaluate_rollback_need,
+        rollback_active_model,
+    )
+
+    decision = evaluate_rollback_need()
+    out = dict(decision)
+    out["auto_rollback_enabled"] = bool(getattr(settings, "auto_rollback_enabled", False))
+    if decision.get("should_rollback") and out["auto_rollback_enabled"]:
+        reason = (
+            f"auto-rollback: live fnr_high {decision.get('live_fnr_high')} > "
+            f"baseline {decision.get('baseline_fnr_high')} + tol {decision.get('tolerance')}"
+        )
+        out["rollback"] = rollback_active_model(reason)
+        logger.warning("auto-rollback executed: %s", out["rollback"])
+    else:
+        logger.info("auto_rollback_tick: %s (enabled=%s)", decision.get("reason"), out["auto_rollback_enabled"])
+    return out
+
+
 @celery_app.task(name="lloydk.drift_tick")
 def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
     """A4: 운영 임베딩 drift 주기 점검 — Celery beat가 호출.
@@ -204,6 +388,28 @@ def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
         report.sample_size, report.kl_divergence, report.cosine_mean, report.alert,
     )
     return out
+
+
+@celery_app.task(name="lloydk.verify_audit_chain_tick")
+def verify_audit_chain_tick(limit: int = 100000) -> dict:
+    """NFR-SEC-01: 감사 로그 hash chain 정기 무결성 검증 — Celery beat 일별 호출.
+
+    verify_chain이 broken>0 검출 시 lloydk_audit_chain_broken_total 증가(P0 AuditChainBroken
+    알람) + warning 로그. 변조(과거 row 삭제·삽입·재배열·payload 변조) 의심을 운영에 노출한다.
+    """
+    from lloydk.services.audit_chain import verify_chain
+    res = verify_chain(limit=limit)
+    logger.info(
+        "verify_audit_chain_tick: total=%d verified=%d broken=%d first_break=%s",
+        res.total_rows, res.verified, res.broken, res.first_break_audit_id,
+    )
+    return {
+        "total_rows": res.total_rows,
+        "verified": res.verified,
+        "broken": res.broken,
+        "first_break_audit_id": res.first_break_audit_id,
+        "ok": res.ok(),
+    }
 
 
 @celery_app.task(name="lloydk.active_learning_tick")
@@ -235,7 +441,17 @@ def active_learning_tick(mode: str = "auto") -> dict:
     if mode == "dry":
         return payload
 
-    # auto mode
+    # auto mode — [재학습 토폴로지 가드] 분류기 자동 재학습은 enable_training=True 노드(지재원
+    # full-train)에서만 발화한다. 고객사(onprem-local, enable_training=False)는 설계상 추론+비모수
+    # 전용이므로 자동 재학습을 금지한다. status 평가·기록은 위에서 끝났으므로(진단·집계 리포트용
+    # 으로 유지) 여기서는 train_classifier_task enqueue만 차단한다 — 옛 'beat 미게이트로 고객사에서도
+    # 재학습' 동작을 task 레벨에서 막아 코드를 설계에 정합시킨다(죽음의 나선 고객사 차단).
+    from lloydk.config import settings as _settings  # noqa: PLC0415
+
+    if not _settings.enable_training:
+        payload["triggered"] = "SKIP_TRAINING_DISABLED"
+        return payload
+
     if status.retrain_status == "URGENT_RETRAIN":
         logger.warning("URGENT_RETRAIN triggered: %s", status.reason)
         try:

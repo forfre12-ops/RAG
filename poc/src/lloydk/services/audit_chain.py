@@ -28,11 +28,15 @@ import logging
 import os
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from lloydk.db import session_scope
 from lloydk.db.models import AuditLog
+
+# 전역 audit 체인 advisory lock 키 — Postgres pg_advisory_xact_lock(bigint).
+# 동일 키를 모든 audit insert가 공유해 prev-read+insert를 단일 직렬 체인으로 만든다.
+_AUDIT_LOCK_SQL = text("SELECT pg_advisory_xact_lock(hashtext('lloydk_audit_chain'))")
 
 logger = logging.getLogger(__name__)
 
@@ -141,19 +145,28 @@ class ChainVerificationResult:
     broken: int
     first_break_audit_id: int | None = None
     last_hash: str = ""
+    # payload_hash가 NULL/빈값인 행 수 — 체인 break와 별개의 무결성 신호(미들웨어 우회/데이터손실).
+    nil_hash_rows: int = 0
+    first_nil_audit_id: int | None = None
 
     def ok(self) -> bool:
+        # break만 본다(동작 보존). nil 행은 별개 신호로 노출 — integrity_ok로 종합 판정.
         return self.broken == 0
+
+    def integrity_ok(self) -> bool:
+        """체인 무결성 종합 — break도 nil 행도 없어야 True."""
+        return self.broken == 0 and self.nil_hash_rows == 0
 
 
 def verify_chain(
     *,
     since: dt.datetime | None = None,
     until: dt.datetime | None = None,
-    tenant_id: str | None = None,
     limit: int = 10000,
 ) -> ChainVerificationResult:
     """audit_log 행을 occurred_at 순으로 읽으며 hash chain 검증.
+
+    tenant 제거: 격리는 KL 포털 전담 — 감사 체인은 항상 전역 단일 체인.
 
     Returns:
         ChainVerificationResult — broken>0이면 변조 의심.
@@ -165,8 +178,6 @@ def verify_chain(
                 q = q.where(AuditLog.occurred_at >= since)
             if until:
                 q = q.where(AuditLog.occurred_at <= until)
-            if tenant_id:
-                q = q.where(AuditLog.tenant_id == tenant_id)
             q = q.limit(limit)
             rows = list(db.execute(q).scalars())
     except SQLAlchemyError as e:
@@ -177,8 +188,17 @@ def verify_chain(
     broken = 0
     first_break: int | None = None
     last_hash = ZERO16
+    nil_hash_rows = 0
+    first_nil: int | None = None
 
     for row in rows:
+        # [무결성] payload_hash가 NULL/빈값 = 감사 미들웨어 미경유(직접 DB 삽입) 또는 데이터 손실.
+        # break 판정과 별개로 사전 카운트 — nil이 후속 prev16=ZERO16을 만들어 break를 무음
+        # anchor화하는 것을 따로 노출한다.
+        if not (row.payload_hash or "").strip():
+            nil_hash_rows += 1
+            if first_nil is None:
+                first_nil = row.audit_id
         prev16, stored_full32 = parse_chained_hash(row.payload_hash or "")
         # 본 row의 prev가 직전 last_hash와 일치하는지(전형적 chain)
         if prev16 != (last_hash or ZERO16)[:16] and last_hash != ZERO16:
@@ -189,22 +209,93 @@ def verify_chain(
         last_hash = stored_full32 or last_hash
         verified += 1
 
+    if nil_hash_rows:
+        # P0 무결성 신호 — nil payload_hash는 우회/손실. break와 별개 메트릭·경보.
+        try:
+            from lloydk.api.prom_metrics import AUDIT_CHAIN_NIL_HASH_TOTAL  # noqa: PLC0415
+
+            AUDIT_CHAIN_NIL_HASH_TOTAL.inc(nil_hash_rows)
+        except Exception:  # noqa: BLE001
+            pass
+        logger.warning(
+            "audit chain verify: %d/%d rows have NULL payload_hash "
+            "(first_nil_audit_id=%s) — 미들웨어 우회/데이터손실 의심",
+            nil_hash_rows, len(rows), first_nil,
+        )
+
+    if broken:
+        # NEW-H2: P0 AuditChainBroken 알람용 메트릭. best-effort(프로메테우스 미가용 무시).
+        try:
+            from lloydk.api.prom_metrics import AUDIT_CHAIN_BROKEN_TOTAL  # noqa: PLC0415
+
+            AUDIT_CHAIN_BROKEN_TOTAL.inc(broken)
+        except Exception:  # noqa: BLE001
+            pass
+        logger.warning(
+            "audit chain verify: %d/%d rows broken (first_break_audit_id=%s) — 변조 의심",
+            broken, len(rows), first_break,
+        )
+
     return ChainVerificationResult(
         total_rows=len(rows),
         verified=verified,
         broken=broken,
         first_break_audit_id=first_break,
         last_hash=last_hash,
+        nil_hash_rows=nil_hash_rows,
+        first_nil_audit_id=first_nil,
     )
 
 
-def get_last_hash(tenant_id: str | None = None) -> str:
-    """가장 최근 audit_log row의 chained full32 — 다음 row의 prev 입력용."""
+def _advisory_xact_lock(db) -> None:
+    """전역 audit 체인 직렬화 — Postgres에서만 트랜잭션 단위 advisory lock 획득.
+
+    pg_advisory_xact_lock은 트랜잭션 종료(commit/rollback) 시 자동 해제된다. 같은 lock
+    아래에서 prev-read+insert를 수행하면 동시 요청이 같은 prev를 읽어 체인이 분기(fork)
+    하는 race를 막는다. Postgres가 아니거나(SQLite 테스트) 실패해도 best-effort로 진행.
+    """
+    try:
+        if db.get_bind().dialect.name == "postgresql":
+            db.execute(_AUDIT_LOCK_SQL)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("audit advisory lock skipped: %s", exc)
+
+
+def last_hash_in_session(db) -> str:
+    """제공된 세션(=같은 트랜잭션)에서 직전 chained full32를 읽는다 — race-free 체인용.
+
+    tenant 제거: 격리는 KL 포털 전담 — 전역 단일 체인.
+    """
+    q = select(AuditLog.payload_hash).order_by(
+        AuditLog.occurred_at.desc(), AuditLog.audit_id.desc()
+    )
+    row = db.execute(q.limit(1)).first()
+    if not row or not row[0]:
+        return ZERO16
+    _, full32 = parse_chained_hash(row[0])
+    return full32 or ZERO16
+
+
+def build_chained_hash_locked(db, body_hash: str) -> str:
+    """advisory lock → 같은 트랜잭션에서 prev 읽기 → 체인 패킹 (#4 race 수정).
+
+    반환값을 **같은 트랜잭션에서** INSERT해야 race-free 단일 체인이 보장된다. lock은
+    트랜잭션 종료 시 자동 해제. 전역 단일 체인이 모든 audit insert를 직렬화한다(선형
+    해시 체인의 본질적 제약). tenant 제거: 격리는 KL 포털 전담.
+    """
+    _advisory_xact_lock(db)
+    prev = last_hash_in_session(db)
+    return build_chained_hash(body_hash, prev)
+
+
+def get_last_hash() -> str:
+    """가장 최근 audit_log row의 chained full32 — 다음 row의 prev 입력용.
+
+    tenant 제거: 격리는 KL 포털 전담 — 전역 단일 체인.
+    """
     try:
         with session_scope() as db:
             q = select(AuditLog.payload_hash).order_by(AuditLog.occurred_at.desc(), AuditLog.audit_id.desc())
-            if tenant_id:
-                q = q.where(AuditLog.tenant_id == tenant_id)
             row = db.execute(q.limit(1)).first()
     except SQLAlchemyError:
         return ZERO16

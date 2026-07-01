@@ -15,7 +15,6 @@ from lloydk.db.models import (
     Correction,
     Document,
     ModelVersion,
-    Tenant,
 )
 from lloydk.modules.m6_evaluation import (
     build_confusion_matrix,
@@ -185,29 +184,21 @@ def db():
 
 
 @pytest.fixture
-def tenant_id(db):
-    tid = f"m6-{uuid.uuid4().hex[:8]}"
-    db.add(Tenant(tenant_id=tid, name=f"Tenant {tid}"))
-    db.flush()
-    return tid
-
-
-@pytest.fixture
 def levels(db):
     return {lv.level_code: lv.level_id for lv in db.query(ClassificationLevel).all()}
 
 
-def _seed_classification(db, tenant_id: str, levels: dict, model_version: str, code: str) -> Classification:
-    doc = Document(tenant_id=tenant_id, filename="x.pdf", source_format="pdf")
+def _seed_classification(db, levels: dict, model_version: str, code: str) -> Classification:
+    doc = Document(filename="x.pdf", source_format="pdf")
     db.add(doc)
     db.flush()
     cls = Classification(
         doc_id=doc.doc_id,
-        tenant_id=tenant_id,
         model_version=model_version,
         predicted_level_id=levels[code],
         confidence=0.9,
         alternatives=[],
+        status="confirmed",  # admission 게이트(finalized만 학습/트리거 카운트) 통과용
     )
     db.add(cls)
     db.flush()
@@ -220,10 +211,10 @@ class TestMetricsFromDB:
         result = compute_metrics_from_db(f"v-unseen-{uuid.uuid4().hex[:6]}")
         assert result is None
 
-    def test_with_classifications_no_corrections(self, db, tenant_id, levels):
+    def test_with_classifications_no_corrections(self, db, levels):
         version = f"v-m6-{uuid.uuid4().hex[:6]}"
         for code in ["TS", "TS", "S1", "S2", "S3"]:
-            _seed_classification(db, tenant_id, levels, version, code)
+            _seed_classification(db, levels, version, code)
         db.commit()  # 다른 세션에서 보이게
 
         try:
@@ -238,10 +229,10 @@ class TestMetricsFromDB:
             with session_scope() as s:
                 s.query(Classification).filter_by(model_version=version).delete()
 
-    def test_with_correction_drops_accuracy(self, db, tenant_id, levels):
+    def test_with_correction_drops_accuracy(self, db, levels):
         version = f"v-m6c-{uuid.uuid4().hex[:6]}"
         # 정답 TS인데 모델은 S3으로 분류 → 보정으로 'TS'로 수정 → underclass
-        cls = _seed_classification(db, tenant_id, levels, version, "S3")
+        cls = _seed_classification(db, levels, version, "S3")
         db.add(
             Correction(
                 classification_id=cls.classification_id,
@@ -275,11 +266,11 @@ class TestActiveLearning:
         status = evaluate_retraining_need()
         assert status.retrain_status in {"OK", "RETRAIN_RECOMMENDED", "URGENT_RETRAIN"}
 
-    def test_urgent_when_underclass_exceeds_threshold(self, db, tenant_id, levels):
+    def test_urgent_when_underclass_exceeds_threshold(self, db, levels):
         version = f"v-al-{uuid.uuid4().hex[:6]}"
         ids = []
         for _ in range(12):
-            cls = _seed_classification(db, tenant_id, levels, version, "S3")
+            cls = _seed_classification(db, levels, version, "S3")
             db.add(
                 Correction(
                     classification_id=cls.classification_id,
@@ -301,11 +292,11 @@ class TestActiveLearning:
                 s.query(Correction).filter(Correction.classification_id.in_(ids)).delete(synchronize_session=False)
                 s.query(Classification).filter_by(model_version=version).delete()
 
-    def test_consume_marks_corrections(self, db, tenant_id, levels):
+    def test_consume_marks_corrections(self, db, levels):
         from lloydk.repositories import TrainingRepo
 
         version = f"v-cons-{uuid.uuid4().hex[:6]}"
-        cls = _seed_classification(db, tenant_id, levels, version, "S3")
+        cls = _seed_classification(db, levels, version, "S3")
         corr = Correction(
             classification_id=cls.classification_id,
             original_level_id=levels["S3"],
@@ -365,7 +356,7 @@ class TestMetricsServiceLive:
             with session_scope() as s:
                 s.query(ModelVersion).filter_by(version_id=mv.version_id).delete()
 
-    def test_confusion_matrix_live_from_classifications(self, db, tenant_id, levels):
+    def test_confusion_matrix_live_from_classifications(self, db, levels):
         from lloydk.services.metrics_service import MetricsService
 
         version = f"v-cm-{uuid.uuid4().hex[:6]}"
@@ -374,7 +365,7 @@ class TestMetricsServiceLive:
         db.flush()
         # 3건 분류 (보정 없음 → predicted=truth)
         for code in ["TS", "S1", "S2"]:
-            _seed_classification(db, tenant_id, levels, version, code)
+            _seed_classification(db, levels, version, code)
         db.commit()
         try:
             cm = MetricsService().confusion_matrix(version)

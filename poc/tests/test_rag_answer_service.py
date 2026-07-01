@@ -238,3 +238,20 @@ def test_to_dict_serializable():
     assert d["answer"] == "ANS"
     assert d["citations"][0]["rank"] == 1
     assert d["deterministic_fallback"] is False
+
+
+# ------------------------------------------------------------
+# config: answer_enforce_citations 정식 필드 (기본 OFF, 동작 보존)
+# ------------------------------------------------------------
+
+
+def test_answer_enforce_citations_field_defaults_off():
+    """answer_enforce_citations가 Settings 정식 필드이고 기본값 False인지 확인."""
+    from lloydk.config import Settings
+
+    s = Settings()
+    assert hasattr(s, "answer_enforce_citations")
+    assert s.answer_enforce_citations is False
+    # bool 필드여야 함 (미문서화 env 폴백이 아니라 정식 스키마).
+    # model_fields는 인스턴스가 아니라 클래스에서 접근(Pydantic v2.11 deprecation 회피).
+    assert Settings.model_fields["answer_enforce_citations"].annotation is bool

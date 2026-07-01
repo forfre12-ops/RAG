@@ -68,3 +68,93 @@ def test_unknown_doc_is_appended_as_human_review(tmp_path, monkeypatch):
     assert len(rows) == 2
     assert by_id["new1"]["label_source"] == "human_review"
     assert by_id["new1"]["label"] == "S1"
+
+
+def test_machine_reviewer_id_rejected():
+    # human_review는 사람 사인오프만 인정 — ai_assist 등 머신 식별자는 거부.
+    # (build_review_assist 사전작성본이 위장 서명으로 승격되는 구멍 차단)
+    for rid in ("ai_assist", "AI_ASSIST", "llm_judge_anthropic", "claude-review",
+                "auto", "bot_x", "", "human"):
+        assert iric._is_machine_reviewer(rid), f"머신 id 미차단: {rid!r}"
+    for rid in ("r1", "reviewer-1", "kim@corp.com", "aiden_kim", "홍길동"):
+        assert not iric._is_machine_reviewer(rid), f"사람 id 오차단: {rid!r}"
+
+
+def test_validate_record_rejects_ai_assist():
+    row = {"doc_id": "d1", "model_label": "S1", "human_label": "S3",
+           "reviewer_id": "ai_assist", "text": "t"}
+    rec, errs = iric.validate_record(row, 1)
+    assert rec is None
+    assert any("reviewer_id" in e for e in errs)
+
+
+def test_validate_record_accepts_real_reviewer():
+    row = {"doc_id": "d1", "model_label": "S1", "human_label": "S3",
+           "reviewer_id": "r1", "text": "t"}
+    rec, errs = iric.validate_record(row, 1)
+    assert rec is not None and not errs
+    assert rec["reviewer_id"] == "r1"
+
+
+# ── [NEW-M3] write_to_db tenant 잔재 제거 회귀 ────────────────────────────────
+
+
+class _FakeSession:
+    def __init__(self):
+        self.added = []
+        self.executed = []
+        self.committed = False
+
+    def add(self, o):
+        self.added.append(o)
+
+    def flush(self):
+        pass
+
+    def execute(self, stmt):
+        self.executed.append(stmt)
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class _FakeRepo:
+    def __init__(self, db):
+        pass
+
+    def level_id_by_code(self, code):
+        return 1
+
+    def document_exists(self, doc_uuid):
+        return False
+
+
+def test_write_to_db_dry_run_signature_has_no_tenant():
+    # 시그니처에서 tenant_id 제거 — 인자 없이 호출 가능(dry-run).
+    out = iric.write_to_db([], dry_run=True)
+    assert out.get("dry_run") is True
+
+
+def test_write_to_db_constructs_document_without_tenant(monkeypatch):
+    # 테넌트 제거 후 Document(tenant_id=...) 잔재로 write_to_db 가 런타임에 깨졌었다(TypeError).
+    # 페이크 세션으로 DB 없이 Document 생성 경로를 태워 더는 깨지지 않음을 확인.
+    import lloydk.db as db_mod
+    import lloydk.repositories.classify_repo as repo_mod
+
+    fake = _FakeSession()
+    monkeypatch.setattr(db_mod, "SessionLocal", lambda: fake)
+    monkeypatch.setattr(repo_mod, "ClassifyRepo", _FakeRepo)
+
+    rec = _correction("a1b2c3d4" * 5, "S3", "TS", text="영업비밀 본문")  # 40자 sha1 hex
+    out = iric.write_to_db([rec], dry_run=False)
+
+    assert out["written"] == 1
+    assert fake.committed is True
+    assert len(fake.added) == 1                       # Document 1건 생성됨
+    assert not hasattr(fake.added[0], "tenant_id")    # tenant 컬럼 부재(제거 정합)

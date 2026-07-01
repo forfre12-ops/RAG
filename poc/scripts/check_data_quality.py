@@ -25,7 +25,6 @@ Gold 강화 검사 (--gold):
 from __future__ import annotations
 
 import argparse
-import hashlib
 import io
 import json
 import re
@@ -38,6 +37,12 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-s
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+# lloydk.hygiene 정본 위생 유틸 (정규화 텍스트 해시 — 누출 게이트 강화)
+_SRC = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+from lloydk.hygiene import text_hash  # noqa: E402 (sys.path 설정 후)
 
 
 # bracket-style 키워드 삽입 패턴 (hard leakage)
@@ -61,7 +66,9 @@ FORBIDDEN_GOLD_SOURCES = {"test_set_v2", "synthetic", "rag_corpus_v2", "qa_augme
 
 
 def _sha1(text: str) -> str:
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+    # 정규화 텍스트 해시(공백차이 동일시) — build_p1 홀드아웃 분리와 동일 기준으로 누출
+    # 게이트 강화. (구: raw 해시 → 공백만 다른 중복 누출을 놓침; 현 데이터 영향 0, 미래 방어)
+    return text_hash(text)
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -228,6 +235,38 @@ def check_overlap(splits: dict[str, list[dict]]) -> list[str]:
     return issues
 
 
+def check_leakage(
+    train_records: list[dict],
+    eval_records: list[dict],
+    eval_name: str,
+    train_name: str = "train_pool",
+) -> tuple[dict, list[str]]:
+    """test/holdout이 train과 '텍스트'로 겹치는지(누출) 검사.
+
+    doc_id만 분리하고 텍스트해시를 점검 안 하면, 동일 문서가 다른 doc_id로 train·
+    holdout 양쪽에 들어가 평가가 오염된다. 2026-06-23 실측: holdout_eval 109건 중
+    67건(42%)이 train_subset에 텍스트 중복 → 분류기 점수 부풀음(head-to-head 무효화).
+    본 게이트로 재발을 차단한다.
+    """
+    train_hashes = {_sha1(_text(r)) for r in train_records}
+    leaked = [r for r in eval_records if _sha1(_text(r)) in train_hashes]
+    issues: list[str] = []
+    if leaked:
+        sample = [r.get("doc_id", "?") for r in leaked[:5]]
+        issues.append(
+            f"FAIL [{eval_name}↔{train_name}] 텍스트 누출 {len(leaked)}/{len(eval_records)}건 "
+            f"(doc_id 분리됐어도 본문 동일) sample={sample}"
+        )
+    stats = {
+        "name": f"leakage:{eval_name}",
+        "eval_n": len(eval_records),
+        "train_n": len(train_records),
+        "leaked_count": len(leaked),
+        "leaked_doc_ids": [r.get("doc_id") for r in leaked],
+    }
+    return stats, issues
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="데이터셋 품질 검사")
     ap.add_argument("--train", default="datasets/labeled_v2_balanced/train.jsonl")
@@ -236,6 +275,12 @@ def main() -> int:
                     help="synthetic masked eval (분포 검사만)")
     ap.add_argument("--gold", default=None,
                     help="gold_real JSONL — 강화 검사 (human_review 필수, 합성 마커 금지)")
+    ap.add_argument("--train-pool", default="datasets/gold_real/train_subset.jsonl",
+                    help="누출 게이트: holdout과 텍스트해시 교차검증할 학습 풀")
+    ap.add_argument("--holdout",
+                    default="datasets/gold_real/holdout_eval.clean.jsonl,datasets/gold_real/holdout_business.clean.jsonl",
+                    help="누출 게이트 대상 holdout/test (쉼표로 여러 개). 기본=정화 홀드아웃 → "
+                         "train-pool과 텍스트해시 누출 검사를 기본 수행(fail-closed). 빈 문자열('')로 비활성.")
     ap.add_argument("--report", default="reports/data_quality_report.json")
     args = ap.parse_args()
 
@@ -256,6 +301,7 @@ def main() -> int:
 
     all_issues: list[str] = []
     all_stats: list[dict] = []
+    leak_stats: list[dict] = []
 
     for name, records in splits.items():
         stats, issues = check_split(name, records)
@@ -278,6 +324,29 @@ def main() -> int:
             all_issues.extend(gissues)
         else:
             print(f"[SKIP] gold: {gold_path} 없음 (미구축)", file=sys.stderr)
+
+    # ── train ↔ holdout 텍스트 누출 게이트 (데이터 위생) ──────────────
+    if args.train_pool and args.holdout:
+        tp = Path(args.train_pool)
+        if not tp.exists():
+            print(f"[SKIP] leak-check: train-pool {tp} 없음", file=sys.stderr)
+        else:
+            train_pool = load_jsonl(tp)
+            for hpath in [h.strip() for h in args.holdout.split(",") if h.strip()]:
+                hp = Path(hpath)
+                if not hp.exists():
+                    print(f"[SKIP] leak-check: holdout {hp} 없음", file=sys.stderr)
+                    continue
+                lstats, lissues = check_leakage(train_pool, load_jsonl(hp), hp.name, tp.name)
+                leak_stats.append(lstats)
+                all_issues.extend(lissues)
+                if lstats["leaked_doc_ids"]:
+                    ids = [i for i in lstats["leaked_doc_ids"] if i]
+                    leak_out = Path("reports") / f"leaked_ids_{hp.stem}.txt"
+                    leak_out.parent.mkdir(parents=True, exist_ok=True)
+                    leak_out.write_text("\n".join(ids), encoding="utf-8")
+                    print(f"[leak] {hp.name}: 누출 {lstats['leaked_count']}/{lstats['eval_n']}건 "
+                          f"→ doc_id 목록 {leak_out}", file=sys.stderr)
 
     fails = [i for i in all_issues if i.startswith("FAIL")]
     warns = [i for i in all_issues if i.startswith("WARN")]
@@ -352,7 +421,7 @@ def main() -> int:
     out.write_text(
         json.dumps(
             {"verdict": verdict, "fail_count": len(fails), "warn_count": len(warns),
-             "issues": all_issues, "splits": all_stats},
+             "issues": all_issues, "splits": all_stats, "leakage": leak_stats},
             ensure_ascii=False, indent=2,
         ),
         encoding="utf-8",

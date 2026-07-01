@@ -11,6 +11,9 @@ __pycache__/
 # Env / secrets
 .env
 *.env.local
+.env.bak*
+*.env.bak*
+poc/*.log
 
 # Data / artifacts (PoC)
 poc/datasets/raw/
@@ -34,7 +37,7 @@ poc/dist/
 poc/migration/
 # dump_licenses.py 자동 산출 (doc/14)
 poc/licenses/
-# Docker bind mount 데이터 (E:/antigravity/rag/docker-data/로 매핑)
+# Docker bind mount 데이터 (repo 루트 ../docker-data/ 로 매핑 — compose 파일 기준 상대경로)
 docker-data/
 
 # Additional data dirs (PoC 5K 합성·라벨)
@@ -62,6 +65,11 @@ poc/logs/
 # 생성된 혼합 학습 subset
 poc/datasets/gold_real/train_subset.jsonl
 poc/datasets/corrections/
+# 대용량 실험 데이터(ab_s1 선례) — git 히스토리 부담 방지. 데이터는 별도 보관.
+poc/datasets/labeled_p1_bilingual_exp/
+poc/datasets/gold_real/_rejudge_claude/
+# 합성 골든 빌드 러너 run-스코프 출력(build_synthetic_golden.py) — 정본 아님, 재생성 가능.
+poc/datasets/golden_runs/
 
 # Test artifacts
 poc/.coverage
@@ -93,7 +101,11 @@ poc/certs/
 poc/models/
 
 # doc 검증 스크린샷·스크립트 (작업산출물, 트래킹 불필요)
-doc/result/
+# 단, doc/result/open/*.html 는 공유 정본이라 추적(아카이브 하위폴더는 제외)
+doc/result/*
+!doc/result/open/
+doc/result/open/*
+!doc/result/open/*.html
 doc/temp_pptx.zip
 doc/temp_pptx/
 doc/temp_xlsx.zip
@@ -110,3 +122,17 @@ poc/datasets/patent_proxy/
 poc/datasets/mundane_s3/
 poc/datasets/labeled_p1_retrain_v4_step2/
 poc/datasets/labeled_p1_retrain_v4_step3/
+
+# 대용량 학습데이터·생성물·런타임 산출물 (스크립트로 재생성, 트래킹 금지) — 2026-06-20
+poc/datasets/labeled_bpilot/
+poc/datasets/demo_retrain/
+# A/B S1 합성 실험 중간데이터 (16MB, ab_qwen_gemma_s1 산출물 — git 비대화 회피)
+poc/datasets/ab_s1/
+poc/datasets/drift_train_centroid.json
+poc/datasets/drift_state.json
+# 임시 작업 산출물 / 일회성 스크래치 (_ 접두사 = throwaway 컨벤션)
+poc/.tmp_guide/
+poc/scripts/_*.py
+poc/scripts/_*.json
+# 참고용 클라이언트 PDF (기밀 — 트래킹 금지)
+doc/*.pdf

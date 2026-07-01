@@ -10,6 +10,7 @@ from lloydk.schemas.common import Grade, GradeRegistry
 from lloydk.schemas.classify import EvidenceSpan, EvaluationFactors, RagContextHit
 from lloydk.modules.m2_preprocess import split as _chunk_split
 from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
+from lloydk.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 완전 no-op
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,10 @@ class InferenceResult:
     rag_context: list[RagContextHit] = field(default_factory=list)
     model_version: str = "poc"
     warnings: list[str] = field(default_factory=list)
+    # [agreement-gate 재사용] run()이 이미 산출한 **원시 룰등급**(rule_result.grade) — 합의
+    # 게이트가 룰엔진을 두 번 돌리지 않게 노출. label과 별개(label은 모델/청크집계/override
+    # 결과, rule_grade는 단일패스 raw 룰등급). None이면 호출부가 폴백 재계산.
+    rule_grade: Optional[str] = None
 
 
 _LABELS = [Grade.TS, Grade.S1, Grade.S2, Grade.S3]
@@ -62,6 +67,11 @@ class InferencePipeline:
         self.labeling = LabelingPipeline()
         self._model = None
         self._tokenizer = None
+        self._model_temperature: float | None = None  # [A1] 모델 동봉 temperature.json 자동로드값
+        # [calibration-visibility] 서빙 보정 상태 — None=rule-fallback(보정 N/A), True=동봉/주입
+        # 보정 적용, False=무보정(T=1.0) 서빙(무음실패 위험). _apply_bundle_calibration에서 셋.
+        self.calibrated: bool | None = None
+        self._calibration_source: str = "rule-fallback"
         # GradeRegistry 순서는 **rule-fallback 경로 전용** id→등급 매핑.
         # 학습 모델이 로드되면 _load_model에서 모델 config.id2label로 덮어쓴다
         # (softmax 인덱스는 학습 시점 순서에 고정되어 있고 DB level_order와 무관).
@@ -96,6 +106,62 @@ class InferencePipeline:
         self._model.eval()
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         self._model.to(self._device)
+        # [A1] 모델 아티팩트 동봉 temperature.json 자동 로드(보정 자동연결) + 무보정 가시화.
+        # 보정 스크립트(calibrate_classifier.py)가 모델 폴더에 {"temperature": T}를 남기면
+        # 서빙이 자동으로 logit/T 적용. settings.classifier_temperature가 명시(≠1.0)면 그게 우선.
+        self._calibration_source = self._apply_bundle_calibration()
+
+    def _apply_bundle_calibration(self) -> str:
+        """모델 dir 동봉 temperature.json을 로드하고 무보정 서빙을 가시화.
+
+        반환(보정 출처): "bundle"=동봉 T 적용 · "env"=classifier_temperature 주입 ·
+        "uncalibrated"=둘 다 없어 T=1.0 무보정 서빙(loud-warn).
+
+        실모델이 로드됐는데 보정이 없으면 OOD 과신으로 softmax conf가 부풀어 conf 게이트(0.7)가
+        보정 안 된 값 위에 서고, 고등급(TS/S1)이 과신 자동확정으로 무음미탐될 수 있다. 종전엔
+        temperature.json 부재가 *완전 무음*이라, 로드 시 1회 loud-warn으로 드러낸다(서빙 T 계산
+        자체는 불변 — _temperature()가 진실 소스, 본 메서드는 가시성·상태표시만 추가).
+        """
+        import json as _json  # noqa: PLC0415
+
+        self._model_temperature = None
+        if self.model_dir is not None:
+            try:
+                _tpath = self.model_dir / "temperature.json"
+                if _tpath.exists():
+                    _t = float(_json.loads(_tpath.read_text(encoding="utf-8")).get("temperature", 0))
+                    if _t > 0:
+                        self._model_temperature = _t
+                        self.calibrated = True
+                        return "bundle"
+                    logger.warning(
+                        "[calibration] %s/temperature.json 의 temperature=%r (<=0) — 무시(무보정 폴백).",
+                        self.model_dir, _t,
+                    )
+            except Exception as _exc:  # noqa: BLE001
+                logger.warning(
+                    "[calibration] %s/temperature.json 읽기 실패: %s — 무보정 폴백.",
+                    self.model_dir, _exc,
+                )
+        # 동봉 보정 없음 — settings.classifier_temperature(≠1.0) 주입이 있으면 그것으로 보정.
+        try:
+            from lloydk.config import settings as _settings  # noqa: PLC0415
+            _env_t = float(getattr(_settings, "classifier_temperature", 1.0))
+        except Exception:  # noqa: BLE001
+            _env_t = 1.0
+        if _env_t > 0 and abs(_env_t - 1.0) > 1e-9:
+            self.calibrated = True
+            return "env"
+        # 무보정(T=1.0) 서빙 — 무음실패 위험. loud-warn.
+        self.calibrated = False
+        logger.warning(
+            "[calibration] 활성 모델(%s)에 사용 가능한 temperature.json이 없고 "
+            "classifier_temperature=1.0 — 무보정(T=1.0) 서빙. OOD 과신으로 고등급(TS/S1) "
+            "무음미탐 위험. 학습 후 calibrate_classifier.py로 temperature.json을 동봉하거나 "
+            "CLASSIFIER_TEMPERATURE를 주입하세요.",
+            self.model_dir,
+        )
+        return "uncalibrated"
 
     def _id2label_from_config(self) -> dict[int, object] | None:
         """학습 체크포인트 config.id2label → {int index: Grade|str} 매핑.
@@ -165,6 +231,67 @@ class InferencePipeline:
         except Exception:
             return 1.6
 
+    @property
+    def _escalation_tau(self) -> float | None:
+        """서빙 escalation τ (C-esc). None=순수 argmax(동작 보존). 0<τ<1만 유효."""
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            t = settings.classifier_escalation_tau
+            if t is None:
+                return None
+            t = float(t)
+            if 0.0 < t < 1.0:
+                return t
+        except Exception:  # noqa: BLE001
+            pass
+        return None
+
+    def _code_at(self, idx: int) -> str:
+        g = self._id2label[idx]
+        return g.value if hasattr(g, "value") else str(g)
+
+    def _select_pred_idx(self, probs) -> int:
+        """[C-esc] 예측 인덱스 선택 — escalation τ 또는 argmax.
+
+        τ=None: 순수 argmax(기존 동작). τ 설정 시: 가장 심각한 등급(GRADE_ORDER 작은 값)부터
+        검사해 prob ≥ τ 인 첫 등급 채택, 없으면 argmax 폴백. eval_fnr_threshold_sweep와 동일 규칙.
+        probs는 list/torch.Tensor 모두 허용(float 인덱싱). most-severe-wins 집계가 반영된 벡터.
+        """
+        n = len(self._id2label)
+
+        def _argmax() -> int:
+            return max(range(n), key=lambda i: float(probs[i]))
+
+        tau = self._escalation_tau
+        if tau is None:
+            return _argmax()
+        from lloydk.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
+        for i in sorted(range(n), key=lambda j: GRADE_ORDER.get(self._code_at(j), 999)):
+            if float(probs[i]) >= tau:
+                return i
+        return _argmax()
+
+    @property
+    def _temperature(self) -> float:
+        """서빙 softmax temperature scaling 계수.
+
+        분류기 softmax는 학습에 없던 새 문체(OOD)에서 과신(overconfident)하는 경향이
+        있어, confidence 게이트(0.7)가 보정 안 된 값 위에 설 수 있다. T>1이면 logit을
+        나눠 분포를 부드럽게 해 과신을 완화(calibration)한다. 기본 1.0 = 무보정(기존
+        동작 보존). 평가에서 측정한 temperature를 settings.classifier_temperature로 주입.
+        """
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            t = float(settings.classifier_temperature)
+            if t > 0 and abs(t - 1.0) > 1e-9:
+                return t  # .env로 명시 주입된 값이 최우선
+        except Exception:  # noqa: BLE001
+            pass
+        # [A1] settings 미지정(=1.0)이면 모델 동봉 temperature.json 사용(보정 자동연결).
+        if self._model_temperature and self._model_temperature > 0:
+            return self._model_temperature
+        return 1.0
+
     def run(
         self,
         text: str,
@@ -211,6 +338,7 @@ class InferencePipeline:
                                 warnings=result.warnings + [
                                     f"fnr-safe override: rule {override_grade.value} score={override_score:.1f}"
                                 ],
+                                rule_grade=result.rule_grade,
                             )
                 except Exception:  # noqa: BLE001
                     pass
@@ -219,9 +347,11 @@ class InferencePipeline:
 
         # Source-type prior: 판례/공개 문서는 비공지성 실패로 정의상 하향 등급 —
         # 모델의 상위등급 과분류를 방어. metadata.source_type/source가 공개 소스일 때만 적용.
-        # settings.source_prior_enabled=True (기본 False) 시 활성화.
+        # settings.source_prior_enabled (config 기본 True=운영 활성) 시 발동.
+        # 아래 getattr 2번째 인자(False/"S2")는 속성 자체가 없을 때만 쓰는 방어용
+        # 폴백이지 운영 기본값이 아니다 — 운영 기본은 config.py 기준 활성·S3.
         #
-        # cap 레벨은 settings.source_prior_cap_grade로 선택 (기본 "S2"):
+        # cap 레벨은 settings.source_prior_cap_grade로 선택 (config 기본 "S3"):
         #   "S2": TS/S1 예측을 S2로 cap (부분 완화 — S3 과분류는 안 건드림, FNR 위험 작음).
         #   "S3": TS/S1/S2 예측을 S3로 cap (S3 과분류 완전 완화 — FNR 위험 큼,
         #         판례 기반 S1/S2 시나리오(koipa_case_based)나 국가핵심기술 고시는 손상).
@@ -247,9 +377,20 @@ class InferencePipeline:
                     cap_rank = _GRADE_ORDER_LOCAL[cap_code]
                     cur_rank = _GRADE_ORDER_LOCAL.get(result.label.value, 99)
                     if cur_rank < cap_rank:  # 예측이 cap보다 상위(숫자 작음)면 cap으로 하향
-                        result.warnings = list(result.warnings) + [
+                        pre_cap_code = result.label.value
+                        cap_warnings = [
                             f"source-prior: {src!r} is public → grade capped at {cap_code}"
                         ]
+                        # [②·③ 충돌] 출처 cap(하향)이 강한 상향 신호(TS/S1)를 덮으면 자동
+                        # 확정하지 않는다 — cap-conflict 경고를 남겨 classify_service가
+                        # needs_review로 라우팅(진짜 공개문서는 사람 확인, 내부 비밀의 '공개'
+                        # 오태깅은 silent miss로 새지 않게). 출처 cap은 상향 가드를 무인으로 안 덮음.
+                        if pre_cap_code in ("TS", "S1"):
+                            cap_warnings.append(
+                                f"cap-conflict: public-source cap overrode high content grade "
+                                f"{pre_cap_code} → routing to human review (verify provenance)"
+                            )
+                        result.warnings = list(result.warnings) + cap_warnings
                         # [M-renorm] cap 등급을 strict argmax로 만들고 재정규화. cap은 하향이라
                         # confidence는 그 의미(불확실성↑)를 보존해 0.7 상한을 추가로 적용.
                         new_scores, new_conf = self._enforce_label_consistency(
@@ -264,8 +405,49 @@ class InferencePipeline:
                             rag_context=result.rag_context,
                             model_version=result.model_version,
                             warnings=result.warnings,
+                            rule_grade=result.rule_grade,
                         )
         except Exception:  # noqa: BLE001
+            pass
+
+        # [metadata-floor] ICD R6 S/V/M 메타데이터 상향 게이트 (opt-in, 기본 OFF).
+        # 내용 분류기는 비밀관리성(M)·출처(S)를 못 본다 — 인사·재무 비밀이 일상 내부문서(S2)로
+        # 보이는 사각지대(golden500 S1→S2 미탐 7건, 룰·모델 공유)가 그 결과. KL ICD가 주는
+        # 보안표시·접근범위로 그 축을 보완한다(ICD §3·§4):
+        #  (1) security_marking 명시표기 우선(§4.2): 표기 등급이 예측보다 *높으면* 그 등급으로 상향
+        #      floor(안전하게 높은 쪽 — 하향은 안 함, 출처 cap은 위 source_prior가 담당).
+        #  (2) 표기 없고 access_scope가 제한적인데 예측이 낮으면 'metadata-access-conflict' →
+        #      needs_review(§4.4 — 관리수준 높은 문서를 낮게 자동확정하지 않음).
+        # 메타데이터 오류/부재는 silent 폴백(기존 동작 보존). source_prior(하향) 다음에 적용.
+        try:
+            from lloydk.config import settings as _ms  # noqa: PLC0415
+            if getattr(_ms, "metadata_floor_enabled", False) and metadata:
+                _ORD = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+                cur = result.label.value if hasattr(result.label, "value") else str(result.label)
+                mark = str(metadata.get("security_marking", "") or "").strip().lower()
+                scope = str(metadata.get("access_scope", "") or "").strip().lower()
+                _MARK = {"top_secret": "TS", "secret": "S1", "confidential": "S2"}
+                if mark in _MARK and _ORD[_MARK[mark]] < _ORD.get(cur, 99):
+                    floor_code = _MARK[mark]
+                    new_scores, new_conf = self._enforce_label_consistency(
+                        result.scores, floor_code, floor=0.7
+                    )
+                    result = InferenceResult(
+                        label=Grade[floor_code], confidence=new_conf, scores=new_scores,
+                        factors=result.factors, evidence=result.evidence,
+                        rag_context=result.rag_context, model_version=result.model_version,
+                        warnings=result.warnings + [
+                            f"metadata-floor: security_marking={mark} → grade raised {cur}→{floor_code} (ICD §4.2 명시표기 우선)"
+                        ],
+                        rule_grade=result.rule_grade,
+                    )
+                elif mark in ("", "none") and scope in ("approved_only", "designated", "department"):
+                    low_thr = "S1" if scope == "approved_only" else "S2"
+                    if _ORD.get(cur, 99) > _ORD[low_thr]:
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-access-conflict: access_scope={scope}(제한 접근)인데 예측 {cur} → 검수 라우팅 (ICD §4.4)"
+                        ]
+        except Exception:  # noqa: BLE001 — 메타데이터 처리 오류는 분류를 막지 않음(fail-safe)
             pass
 
         # 표적 1 (2026-05-29): use_rag=True면 retrieval facade 호출하여 rag_context 채움.
@@ -319,34 +501,158 @@ class InferencePipeline:
             s = {k: (1.0 if k == label else 0.0) for k in s}
         return s, float(s[label])
 
+    def _rule_grade_scores_to_prob(self, grade_scores: dict) -> list[float] | None:
+        """[#23] 룰 등급점수(grade_scores) → self._id2label 인덱스 정렬 확률벡터.
+
+        모델 경로의 청크 집계 헬퍼(_aggregate_chunk_probs/_select_pred_idx)는
+        '인덱스가 등급에 정렬된 prob 벡터'를 입력으로 받는다. 룰 엔진은 등급별
+        원시 점수(grade_scores)를 주므로, 합으로 나눠 [0,1] 확률분포로 변환하고
+        _id2label 인덱스 순서에 맞춰 벡터화한다(softmax 출력과 동일한 형태).
+        모든 점수 0이면 None(해당 청크는 신호 없음 → 집계에서 0벡터로 처리).
+        """
+        total = float(sum(v for v in grade_scores.values() if v and v > 0))
+        if total <= 0:
+            return None
+        vec: list[float] = []
+        for i in range(len(self._id2label)):
+            code = self._code_at(i)
+            vec.append(max(float(grade_scores.get(code, 0.0)), 0.0) / total)
+        return vec
+
     def _run_rule_fallback(self, text: str, return_evidence: bool) -> InferenceResult:
         try:
             from lloydk.api.prom_metrics import RULE_FALLBACK_TOTAL  # noqa: PLC0415
             RULE_FALLBACK_TOTAL.inc()
         except Exception:  # noqa: BLE001
             pass
+        # evidence/factors는 전체 문서 기준 룰 라벨링에서 가져온다(표시 정합 보존).
         lab = self.labeling.label(text)
-        # grade_scores를 합계로 나눠 [0,1] 확률로 변환 (rule engine은 원시 점수 반환)
-        raw = (lab.rule_result.grade_scores if lab.rule_result else {}) or {}
-        total_raw = sum(raw.values())
-        if total_raw > 0:
-            scores = {g.value: round(raw.get(g.value, 0.0) / total_raw, 4) for g in _LABELS}
-        else:
-            scores = {g.value: 0.0 for g in _LABELS}
+        warnings = ["model weights not loaded — using rule-based fallback"]
+
+        # [sparse-evidence gate] rule confidence(top/total)는 단일·저가중 키워드 1개만 매칭돼도
+        # 한 등급에 전 질량이 몰리면 1.0이 된다. 즉 '단 하나의 약한 매치'가 conf=1.0으로 자동확정돼
+        # 저신뢰 게이트(conf<0.7)를 통과하는 silent FNR이 생긴다(골든셋 TS 5건: TS신호 0인데
+        # S1/S2로 conf=1.0 확정). 절대 룰 점수(ev)가 settings.rule_fallback_min_evidence 미만이면
+        # 경고를 남겨 classify_service가 confidence와 무관하게 needs_review로 라우팅한다.
+        # ev==0(무신호)은 conf=0으로 이미 저신뢰 게이트가 잡으므로 0<ev<floor 구간만 표기한다.
+        try:
+            _min_ev = float(settings.rule_fallback_min_evidence)
+        except Exception:  # noqa: BLE001
+            _min_ev = 0.0
+        if _min_ev > 0:
+            _ev_total = sum((lab.rule_result.grade_scores if lab.rule_result else {}).values())
+            if 0.0 < _ev_total < _min_ev:
+                warnings.append(
+                    f"sparse-evidence: rule total score {_ev_total:.2f} < {_min_ev:.2f} "
+                    "— thin single-match basis, routed to human review (FNR-safe)"
+                )
+
+        # [#23] rule-fallback도 모델 경로와 동일하게 청크 most-severe-wins + escalation τ 적용.
+        # 기존엔 전체 문서를 1회 라벨링해 grade_scores를 단순 합 정규화 → lab.grade를 그대로
+        # 라벨로 써서 청크 most-severe(_aggregate_chunk_probs)·τ(_select_pred_idx)를 우회했다.
+        # 모델 미로드 환경(다수 PoC)에서 한 청크에 든 핵심 비밀이 다수의 평범한 청크에 희석돼
+        # 미탐(FNR) 위험이 모델 경로보다 컸다. → 문서를 청크 분할, 청크별 룰 점수를 등급
+        # 확률분포로 변환해 모델 경로의 동일 헬퍼에 태운다(FNR-safe: 미탐↓, 단조 비후퇴).
+        # 실패(예: torch 부재)는 silent 폴백 — 기존 단일패스 동작을 그대로 보존한다.
+        pred = None
+        scores: dict[str, float] | None = None
+        conf: float | None = None
+        try:
+            import torch  # noqa: PLC0415
+
+            chunks = chunk_text(text, settings.max_seq_len * 3, settings.chunk_overlap)
+            chunk_texts = [c.text for c in chunks] or [text]
+            chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
+
+            n_labels = len(self._id2label)
+            chunk_vecs: list[list[float]] = []
+            for ct in chunk_texts:
+                gs = self.labeling.engine.label(ct).grade_scores
+                vec = self._rule_grade_scores_to_prob(gs)
+                chunk_vecs.append(vec if vec is not None else [0.0] * n_labels)
+
+            chunk_probs = torch.tensor(chunk_vecs, dtype=torch.float32)
+            # 모델 경로와 동일 집계: 고등급(severe_agg_codes 기본 TS·S1) max-pooling.
+            doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
+            total = float(doc_prob.sum())
+            norm = (doc_prob / total) if total > 0 else doc_prob
+            # 모든 청크가 무신호(합=0)면 룰 신호가 없는 것 → 단일패스 폴백으로.
+            if float(norm.sum()) > 0:
+                # [C-esc] τ 설정 시 동일 severity-ordered 규칙으로 라벨 선택, τ=None이면 argmax.
+                pred_idx = self._select_pred_idx(norm)
+                pred = self._id2label[pred_idx]
+                scores = {self._code_at(i): round(float(norm[i]), 4) for i in range(n_labels)}
+                conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
+        except Exception:  # noqa: BLE001 — 청크 집계 실패는 단일패스 폴백으로(동작 보존)
+            pred = None
+            scores = None
+            conf = None
+
+        if pred is None or scores is None or conf is None:
+            # 단일패스 폴백 — grade_scores를 합계로 나눠 [0,1] 확률로 변환 (기존 동작 보존).
+            raw = (lab.rule_result.grade_scores if lab.rule_result else {}) or {}
+            total_raw = sum(raw.values())
+            if total_raw > 0:
+                scores = {g.value: round(raw.get(g.value, 0.0) / total_raw, 4) for g in _LABELS}
+            else:
+                scores = {g.value: 0.0 for g in _LABELS}
+            return InferenceResult(
+                label=lab.grade,
+                confidence=lab.confidence,
+                scores=scores,
+                factors=lab.factors,
+                evidence=lab.evidence if return_evidence else [],
+                model_version="rule-fallback-v0",
+                warnings=warnings,
+                rule_grade=getattr(lab.rule_result, "grade", None),
+            )
+
+        # [#23] 청크 집계로 선택한 등급이 단일패스(lab.grade)보다 높으면(승격) 경고를 남겨
+        # 청크 희석 미탐을 방어했음을 표기. 표시 S/V/M factors도 선택 등급에 정합화해
+        # 'S0·V0·M0인데 TS' 같은 모순 표기를 막는다(모델 경로 A3와 동일 의도).
+        lab_code = lab.grade.value if hasattr(lab.grade, "value") else str(lab.grade)
+        pred_code = pred.value if hasattr(pred, "value") else str(pred)
+        factors = lab.factors
+        if pred_code != lab_code:
+            warnings = warnings + [
+                f"chunk severe-agg/escalation: rule grade {lab_code} → {pred_code} "
+                "(most-severe-wins over chunks; FNR-safe)"
+            ]
+            if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
+                try:
+                    from lloydk.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+                        svm_levels_for_grade,
+                    )
+                    s2, v2, m2 = svm_levels_for_grade(pred_code)
+                    factors = EvaluationFactors.from_factor_scores(
+                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
+                    )
+                except Exception:  # noqa: BLE001
+                    factors = lab.factors
+
         return InferenceResult(
-            label=lab.grade,
-            confidence=lab.confidence,
+            label=pred,
+            confidence=conf,
             scores=scores,
-            factors=lab.factors,
+            factors=factors,
             evidence=lab.evidence if return_evidence else [],
             model_version="rule-fallback-v0",
-            warnings=["model weights not loaded — using rule-based fallback"],
+            warnings=warnings,
+            rule_grade=getattr(lab.rule_result, "grade", None),
         )
 
     # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.
     # 이 등급들의 문서확률은 청크 평균이 아니라 max(가장 강한 청크)로 잡아,
     # 수식 한 문단 같은 핵심 비밀이 다수의 평범한 청크에 희석되어 미탐되는 것을 막는다.
-    _SEVERE_AGG_CODES = ("TS", "S1")
+    # settings.severe_agg_codes로 조정 가능(기본 TS·S1 — S2·S3는 표준 집계).
+    @property
+    def _SEVERE_AGG_CODES(self) -> tuple:
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            codes = getattr(settings, "severe_agg_codes", None)
+            return tuple(codes) if codes else ("TS", "S1")
+        except Exception:  # noqa: BLE001
+            return ("TS", "S1")
 
     def _aggregate_chunk_probs(self, chunk_probs, chunk_weights):
         """청크별 softmax → 문서 확률 벡터 (most-severe-wins, fail-SECURE).
@@ -381,6 +687,9 @@ class InferencePipeline:
         doc_prob = weighted.clone()
         # 고등급: max 청크 확률로 보강 (most-severe-wins). 단조 비감소 — 평균보다
         # 낮아지지 않으므로 미탐 방향으로 후퇴할 수 없다.
+        # [B3 검토 후 보류] 짧은 노이즈 청크 과분류를 막으려 최소길이 필터를 시도했으나,
+        # 짧은 *비밀* 청크(예: "마스터 키: …")도 함께 배제돼 미탐(FNR)을 유발 → 영업비밀
+        # 시스템은 과분류가 안전 방향이므로 필터 미적용. 전체 청크 severe-max 유지(FNR 우선).
         chunk_max = chunk_probs.max(dim=0).values
         severe_idx = {
             i for i, g in self._id2label.items()
@@ -401,37 +710,70 @@ class InferencePipeline:
         chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
 
         probs = []
+        # span은 torch.no_grad() **안쪽**에 둔다 — 전체 forward가 grad 비활성 유지(필수).
+        # 속성은 스칼라·비민감(model_version·청크수·device)만. OTel 미활성 시 no-op.
         with torch.no_grad():
-            for batch_start in range(0, len(chunk_texts), 8):
-                batch = chunk_texts[batch_start:batch_start + 8]
-                enc = self._tokenizer(
-                    batch, truncation=True, max_length=settings.max_seq_len,
-                    padding=True, return_tensors="pt",
-                ).to(self._device)
-                logits = self._model(**enc).logits
-                probs.append(F.softmax(logits, dim=-1).cpu())
+            with span(
+                "ml.classifier.forward",
+                model_version=str(self.model_dir.name) if self.model_dir else "model",
+                n_chunks=len(chunk_texts),
+                device=str(self._device),
+            ):
+                for batch_start in range(0, len(chunk_texts), 8):
+                    batch = chunk_texts[batch_start:batch_start + 8]
+                    enc = self._tokenizer(
+                        batch, truncation=True, max_length=settings.max_seq_len,
+                        padding=True, return_tensors="pt",
+                    ).to(self._device)
+                    logits = self._model(**enc).logits
+                    # 서빙 캘리브레이션: T>1이면 분포를 부드럽게 해 OOD 과신 완화. T=1.0=무보정.
+                    temp = self._temperature
+                    if temp != 1.0:
+                        logits = logits / temp
+                    probs.append(F.softmax(logits, dim=-1).cpu())
         chunk_probs = torch.cat(probs)  # [n_chunks, n_labels]
         doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
-        # argmax는 보강된 doc_prob에서 확정 (most-severe-wins 반영). 표시용 scores는
-        # 합=1로 재정규화한다 — 정규화는 모든 인덱스를 같은 상수로 나누므로 argmax 순서를
-        # 보존(label 안정)하고, scores·label·confidence 정합을 유지한다.
-        pred_idx = int(doc_prob.argmax().item())
-        pred = self._id2label[pred_idx]
+        # 표시용 scores는 합=1로 재정규화 (모든 인덱스를 같은 상수로 나눠 순서 보존).
         total = float(doc_prob.sum())
         norm = (doc_prob / total) if total > 0 else doc_prob
+        # [C-esc] 예측 인덱스: escalation τ(가장 심각한 등급 중 prob≥τ) 또는 argmax(τ=None=동작보존).
+        # most-severe-wins 집계가 반영된 norm에서 확정. τ는 평가 스윕과 동일 규칙(서빙↔평가 정합).
+        pred_idx = self._select_pred_idx(norm)
+        pred = self._id2label[pred_idx]
         scores = {g.value: float(norm[i]) for i, g in self._id2label.items()}
         conf = min(max(float(norm[pred_idx]), 0.0), 1.0)
 
         lab = self.labeling.label(text)  # 보조 evidence/factors
         # use_rag은 run() 레벨에서 통합 처리 — 본 함수 시그니처는 호환 위해 유지.
         del use_rag
+        # [A3] 모델 등급 ↔ 룰 factors 정합. 룰이 미탐(곱=0/낮음)인데 모델이 고등급이면
+        # 표시 S/V/M을 모델 등급에 정합화(+경고) — 'S0·V0·M0인데 TS' 모순 표기 방지.
+        factors = lab.factors
+        a3_warn: list[str] = []
+        pred_code = pred.value if hasattr(pred, "value") else str(pred)
+        if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
+            try:
+                from lloydk.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade  # noqa: PLC0415
+                fsv = int(float(getattr(factors, "secrecy", 0)))
+                fvv = int(float(getattr(factors, "value", 0)))
+                fmv = int(float(getattr(factors, "management", 0)))
+                if grade_from_svm(fsv, fvv, fmv) != pred_code:
+                    s2, v2, m2 = svm_levels_for_grade(pred_code)
+                    factors = EvaluationFactors.from_factor_scores(
+                        {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
+                    )
+                    a3_warn = [f"factors aligned to model grade {pred_code} (rule under-detected S/V/M)"]
+            except Exception:  # noqa: BLE001
+                factors = lab.factors
         return InferenceResult(
             label=pred,
             confidence=conf,
             scores=scores,
-            factors=lab.factors,
+            factors=factors,
             evidence=lab.evidence if return_evidence else [],
             model_version=str(self.model_dir.name) if self.model_dir else "model",
+            warnings=a3_warn,
+            rule_grade=getattr(lab.rule_result, "grade", None),
         )
 
     # ------------------------------------------------------------
@@ -504,26 +846,9 @@ class InferencePipeline:
                 logger.debug("encode_batch failed: %s", exc)
                 return []
 
-        # 테넌트 격리는 fail-CLOSED. 호출자가 멀티테넌트 컨텍스트를 신호(metadata dict
-        # 전달)했는데 tenant_id가 비어 있으면 — 테넌트가 '미확정'이므로 무격리 검색으로
-        # 떨어뜨리지 않고 빈 컨텍스트를 반환한다(교차테넌트 유출 차단). 분류 본문은
-        # run()에서 graceful degradation으로 그대로 진행되고 RAG context만 비게 된다.
-        #
-        # 구분:
-        #   metadata is None  → 멀티테넌트 미관여(단일테넌트/레거시 호출). 필터 없이 검색.
-        #   metadata == {}    → 동일하게 미관여로 본다(빈 컨텍스트 시그널 없음).
-        #   metadata = {...} (tenant_id 없음/빈값) → 멀티테넌트 요청인데 테넌트 분실 →
-        #                       fail-CLOSED(빈 컨텍스트). 이게 H8이 막으려는 fail-open 경로.
+        # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진이라 per-customer 경계 없음).
+        # 무스코핑 전역 검색 — filter 없음.
         filter_ = None
-        if isinstance(metadata, dict) and metadata:
-            tenant = metadata.get("tenant_id")
-            if not tenant or not str(tenant).strip():
-                logger.warning(
-                    "rag_context: tenant_id undetermined in a populated metadata context — "
-                    "returning empty context (fail-closed) to prevent cross-tenant leakage"
-                )
-                return []
-            filter_ = {"tenant_id": tenant}
 
         try:
             hits = expand_then_search(

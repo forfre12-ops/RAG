@@ -9,7 +9,8 @@ PY ?= python
 VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 
-.PHONY: help venv install env infra-up infra-down infra-verify api worker \
+.PHONY: help venv install env infra-up infra-down infra-verify api worker beat \
+        revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
@@ -22,7 +23,7 @@ help:
 	@echo "Targets:"
 	@echo "  venv         create venv ($(VENV_DIR)) and install -e .[dev]"
 	@echo "  env          copy .env.example -> .env if missing"
-	@echo "  infra-up     docker compose up -d (postgres/elasticsearch/minio/redis/mlflow)"
+	@echo "  infra-up     docker compose up -d (postgres/minio/redis/mlflow)"
 	@echo "  infra-down   docker compose down"
 	@echo "  infra-verify python scripts/verify_infra.py"
 	@echo "  api          run FastAPI locally (uvicorn)"
@@ -72,7 +73,7 @@ env:
 	@[ -f .env ] || cp .env.example .env
 
 infra-up:
-	docker compose up -d postgres elasticsearch minio redis mlflow
+	docker compose up -d postgres minio redis mlflow
 
 infra-down:
 	docker compose down
@@ -80,11 +81,36 @@ infra-down:
 infra-verify:
 	$(PY) scripts/verify_infra.py
 
+# ── ES→PG 단일화 재검증 (의사결정_대장 §03 게이트; infra/postgres/README.md) ──
+# 기본 dev 스택과 격리된 pgvector+pg_bigm PG(:5433). ES 스택 비건드림.
+REVALID_DB ?= postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk
+
+revalidate-pg-up:
+	docker compose -f docker-compose.pgvector.yml up -d --build
+
+revalidate-pg-migrate:
+	DATABASE_URL=$(REVALID_DB) $(PY) -m alembic upgrade head
+
+revalidate-pg-bench:
+	VECTOR_BACKEND=pg DATABASE_URL=$(REVALID_DB) $(PY) scripts/revalidate_pg_lexical.py
+
+revalidate-pg-down:
+	docker compose -f docker-compose.pgvector.yml down
+
+# 크럭스: stock dev postgres(:5432)만으로 실 ts_rank 검증 — 커스텀 이미지(pgvector/pg_bigm) 불요.
+# 게이트의 단일 핵심 불확실성(실 ts_rank ≈ 프록시 87%?)을 최소 비용으로 푼다.
+revalidate-tsrank-crux:
+	docker compose up -d postgres
+	$(PY) scripts/revalidate_pg_tsrank_crux.py
+
 api:
 	uvicorn lloydk.api.app:app --reload --host 0.0.0.0 --port 8000
 
 worker:
-	celery -A lloydk.workers.celery_app worker -l info
+	celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+
+beat:
+	celery -A lloydk.workers.celery_app beat -l info
 
 p4:
 	$(PY) scripts/build_p4_corpus.py
@@ -156,6 +182,12 @@ retrieval-gold: ## doc_id retrieval gold set 생성
 p1-retrain-dataset: ## P1 retraining JSONL build only
 	$(PY) scripts/build_p1_retrain_dataset.py
 
+# 온도 보정 — trainer 가 학습 직후 temperature.json 을 자동 산출(서빙 자동 로드)하지만,
+# 재보정이 필요할 때 수동 실행. <CAL_MODEL_DIR>/val_logits.jsonl(학습 시 동봉)을 자동 사용.
+CAL_MODEL_DIR ?= artifacts/classifier
+calibrate: ## 학습된 모델의 val_logits 로 temperature.json 재산출 (CAL_MODEL_DIR=...)
+	$(PY) scripts/calibrate_classifier.py --model-dir $(CAL_MODEL_DIR)
+
 p1-boundary: ## Build focused P1 boundary report from the latest llm gold eval
 	$(PY) scripts/build_p1_boundary_report.py \
 	    --report reports/p1_v3_llm_gold_direct.json \
@@ -188,6 +220,12 @@ check-data: ## 데이터 품질 검사 — synthetic split + synthetic masked ev
 	$(PY) scripts/check_data_quality.py \
 	    --train datasets/labeled_v2_balanced/train.jsonl \
 	    --test  datasets/gold/classification_gold.jsonl
+
+check-leakage: ## holdout↔train 텍스트해시 누출 게이트 (exit 1 on FAIL; 데이터 위생)
+	$(PY) scripts/check_data_quality.py \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --holdout datasets/gold_real/holdout_eval.jsonl,datasets/gold_real/holdout_business.jsonl \
+	    --report reports/leakage_report.json
 
 llm-judge-dry: ## LLM judge 비용 추정 (실제 호출 없음)
 	$(PY) scripts/make_llm_judge_gold.py --dry-run --n 200
@@ -364,7 +402,7 @@ clean-data:
 	rm -rf datasets/synthetic datasets/p4_corpus reports
 
 # P1-F3: incident runbook 자동화 타깃 — 야간/주말 1차 대응 단축
-.PHONY: incident-api-down incident-es-yellow incident-queue-backlog incident-drift incident-audit-verify
+.PHONY: incident-api-down incident-queue-backlog incident-drift incident-audit-verify
 
 incident-api-down:
 	@echo "[incident] API 다운 1차 대응"
@@ -372,11 +410,6 @@ incident-api-down:
 	@docker compose restart api || true
 	@sleep 10
 	@curl -fsS http://localhost:8000/api/v1/health || echo "[FAIL] /health still down — escalate to AI팀"
-
-incident-es-yellow:
-	@echo "[incident] ES yellow/red 1차 대응"
-	@curl -s http://localhost:9200/_cluster/health?pretty || true
-	@curl -s http://localhost:9200/_cat/shards | grep -E "UNASSIGNED|INITIALIZING" || echo "no problematic shards"
 
 incident-queue-backlog:
 	@echo "[incident] Celery 큐 적체 1차 대응"

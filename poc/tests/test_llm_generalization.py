@@ -117,26 +117,5 @@ class TestSeedsV2:
             assert 0.0 < s["weight"] <= 1.0, f"weight out of range in {s}"
 
 
-class TestUserdictV2:
-    """Nori 사용자 사전 v2 — 200+ 항목, 일반화 도메인 포함."""
-
-    def test_dictionary_has_enough_entries(self):
-        from pathlib import Path
-        userdict = Path(__file__).resolve().parents[1] / "infra" / "es" / "userdict_ko.txt"
-        lines = [
-            ln.strip()
-            for ln in userdict.read_text(encoding="utf-8").splitlines()
-            if ln.strip() and not ln.startswith("#")
-        ]
-        assert len(lines) >= 200, f"userdict has only {len(lines)} entries"
-
-    def test_dictionary_includes_general_domains(self):
-        from pathlib import Path
-        userdict = (
-            Path(__file__).resolve().parents[1] / "infra" / "es" / "userdict_ko.txt"
-        ).read_text(encoding="utf-8")
-        # 일반화 — 반도체·바이오·SW·금융 각 도메인 키워드 1개씩 존재
-        assert "반도체공정" in userdict or "EUV공정" in userdict
-        assert "신약개발" in userdict or "임상시험" in userdict
-        assert "알고리즘소스코드" in userdict or "API키" in userdict
-        assert "신용평가모델" in userdict or "거래알고리즘" in userdict
+# (TestUserdictV2 제거 — ES nori 사용자사전 infra/es/userdict_ko.txt 은 ES 제거(의사결정_대장 §03 ⓑ)로
+#  폐기됨. PG bigram-tsvector 경로는 사용자사전 불요. 도메인 용어가 필요하면 git 이력에서 복원.)

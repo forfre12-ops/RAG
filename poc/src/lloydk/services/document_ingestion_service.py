@@ -39,7 +39,6 @@ logger = logging.getLogger(__name__)
 @dataclass
 class IngestResult:
     doc_id: Optional[object]            # uuid.UUID | None (DB 미가용 시 None)
-    tenant_id: str
     filename: str
     source_format: str
     file_hash: str
@@ -83,19 +82,25 @@ class DocumentIngestionService:
         *,
         filename: str,
         content_bytes: bytes,
-        tenant_id: str,
         doc_type: Optional[str] = None,
+        source_type: Optional[str] = None,
         external_ref: Optional[str] = None,
         created_by: Optional[str] = None,
         db=None,
         persist: bool = True,
     ) -> IngestResult:
-        """파일 1건 적재. 실패(추출 0, DB·storage 미가용)는 warnings로 안전 반환."""
+        """파일 1건 적재. 실패(추출 0, DB·storage 미가용)는 warnings로 안전 반환.
+
+        source_type: 문서 출처(provenance). 공개 출처(court_decision·공시·published_patent
+            등)면 분류 시 Gate-1(비공지성 게이트)이 발동해 S3로 cap한다. documents.metadata_
+            에 적재되어 doc_id 분류 경로에서 hydrate된다(ClassifyService._effective_metadata).
+        """
         warns: list[str] = []
         source_format = (Path(filename).suffix.lstrip(".").lower() or "bin")[:10]
         file_hash = hashlib.sha256(content_bytes).hexdigest()
         size = len(content_bytes)
-        base_key = f"{tenant_id}/{file_hash}"
+        # tenant 제거: 격리는 KL 포털 전담 — storage 키는 file_hash 단독(전역 네임스페이스).
+        base_key = file_hash
         # 경로 탈출 방어 — 사용자 filename 을 그대로 스토리지 키에 합성하면
         # ..\..\ 형태로 .storage 루트 밖에 쓸 수 있다(MinIO 폴백 LocalStorage = 폐쇄망 기본).
         # 키에는 디렉터리 성분을 제거한 basename 만 사용하고, .,.. ,빈값은 해시로 대체.
@@ -128,7 +133,6 @@ class DocumentIngestionService:
         if persist:
             doc_id, persisted, pwarns = self._persist(
                 db=db,
-                tenant_id=tenant_id,
                 filename=filename,
                 source_format=source_format,
                 file_hash=file_hash,
@@ -137,14 +141,22 @@ class DocumentIngestionService:
                 norm_uri=norm_uri,
                 pre=pre,
                 doc_type=doc_type,
+                source_type=source_type,
                 external_ref=external_ref,
                 created_by=created_by,
             )
             warns.extend(pwarns)
 
+        # NEW-H2: 적재 카운트 — PiiMaskingMissRate 알람 분모. best-effort.
+        try:
+            from lloydk.api.prom_metrics import DOCUMENTS_INGESTED_TOTAL  # noqa: PLC0415
+
+            DOCUMENTS_INGESTED_TOTAL.inc()
+        except Exception:  # noqa: BLE001
+            pass
+
         return IngestResult(
             doc_id=doc_id,
-            tenant_id=tenant_id,
             filename=filename,
             source_format=source_format,
             file_hash=file_hash,
@@ -205,7 +217,6 @@ class DocumentIngestionService:
         self,
         *,
         db,
-        tenant_id: str,
         filename: str,
         source_format: str,
         file_hash: str,
@@ -214,6 +225,7 @@ class DocumentIngestionService:
         norm_uri: Optional[str],
         pre: Optional[PreprocessResult],
         doc_type: Optional[str],
+        source_type: Optional[str],
         external_ref: Optional[str],
         created_by: Optional[str],
     ) -> tuple[object, bool, list[str]]:
@@ -223,7 +235,6 @@ class DocumentIngestionService:
 
         def _do(session) -> object:
             doc = DocumentRepo(session).create(
-                tenant_id=tenant_id,
                 filename=filename,
                 source_format=source_format,
                 file_hash=file_hash,
@@ -237,13 +248,19 @@ class DocumentIngestionService:
                 ocr_used=(bool(ext.ocr_used) if ext else False),
                 processing_status=("ready" if text else "failed"),
                 external_ref=external_ref,
-                metadata=({"doc_type": doc_type} if doc_type else None),
+                metadata=(
+                    {
+                        k: v
+                        for k, v in {"doc_type": doc_type, "source_type": source_type}.items()
+                        if v
+                    }
+                    or None
+                ),
                 created_by=created_by,
             )
             if pre and pre.chunks:
                 ChunkRepo(session).upsert_chunks(
                     doc_id=doc.doc_id,
-                    tenant_id=tenant_id,
                     chunks=pre.chunks,
                     replace_existing=True,
                 )

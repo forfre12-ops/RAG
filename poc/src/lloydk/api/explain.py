@@ -60,28 +60,22 @@ def _aggregate_evidence(result: ClassifyResponse) -> dict:
 
 
 def _factor_decomposition(result: ClassifyResponse) -> dict:
-    """factors 점수의 가중 합산 분해 (검수자 가독성)."""
+    """3요건(S·V·M) 점수 분해 — B안 곱셈식이라 최저 요소가 등급을 제약 (검수자 가독성)."""
     if not result.factors:
         return {}
     f = result.factors
-    weights = {
-        "economic_value": 0.30,
-        "non_publicity": 0.25,
-        "management_level": 0.15,
-        "leak_impact": 0.30,
+    rows = [
+        {"factor": "secrecy", "name": "비공지성(S)", "score": round(float(getattr(f, "secrecy", 0.0) or 0.0), 4)},
+        {"factor": "value", "name": "경제적 유용성(V)", "score": round(float(getattr(f, "value", 0.0) or 0.0), 4)},
+        {"factor": "management", "name": "비밀관리성(M)", "score": round(float(getattr(f, "management", 0.0) or 0.0), 4)},
+    ]
+    # 곱셈식에서는 가장 낮은 요소가 등급을 제약(0이면 곱=0=공개). 그 요소를 함께 노출.
+    limiting = min(rows, key=lambda r: r["score"]) if rows else None
+    return {
+        "rows": rows,
+        "method": "multiplicative(S×V×M)",
+        "limiting_factor": limiting["factor"] if limiting else None,
     }
-    rows = []
-    for name, w in weights.items():
-        s = float(getattr(f, name, 0.0) or 0.0)
-        rows.append({
-            "factor": name,
-            "weight": w,
-            "score": round(s, 4),
-            "contribution": round(s * w, 4),
-        })
-    rows.sort(key=lambda r: -r["contribution"])
-    total = round(sum(r["contribution"] for r in rows), 4)
-    return {"rows": rows, "total": total}
 
 
 @router.post("/classify/explain", dependencies=[Depends(require_auth)])
@@ -95,6 +89,7 @@ def classify_explain(
 
     응답: ClassifyResponse + {explain: {evidence_aggregated, factor_decomposition}}
     """
+    # tenant 제거: 격리는 KL 포털 전담 → 무스코프 분류.
     result = svc.classify(req)
     body = result.model_dump(mode="json")
     body["explain"] = {

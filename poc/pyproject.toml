@@ -30,8 +30,8 @@ dependencies = [
   "redis>=5.0",
   "minio>=7.2",
 
-  # 벡터 DB (doc/13)
-  "elasticsearch>=8.15,<9.0",     # 9.x 클라이언트는 ES 8.x 서버 호환 거부 (Accept v9 header)
+  # 벡터 DB: pgvector(psycopg 경유, 별도 패키지 불요) — ES 제거(의사결정_대장 §03 ⓑ).
+  # 레거시 es 백엔드(es_store.py)가 필요하면 `elasticsearch>=8.15,<9.0`를 별도 설치.
 
   # ML 코어 (학습·추론 필수)
   "transformers>=4.44",
@@ -63,6 +63,24 @@ dependencies = [
 # 활성: pip install -e ".[hwp]"
 hwp = [
   "rhwp-python>=0.5.1",            # 최신 PyPI 0.5.1, 모든 플랫폼 wheel
+]
+
+# 구형 .xls(Excel 97-2003 BIFF) 추출. .xlsx/.xlsm은 base openpyxl로 충분하나
+# 바이너리 .xls는 openpyxl 미지원이라 xlrd 필요. extractor.py가 graceful 처리.
+# 활성: pip install -e ".[xls]"
+xls = [
+  "xlrd>=2.0",                     # BIFF .xls 리더 (BSD). 2.0+는 .xls 전용(.xlsx 미지원)
+]
+
+# HWP 표·글상자 셀 텍스트 회수 (AGPL 옵트인). 기본 rhwp([hwp])는 본문만 뽑고 표 셀을
+# 흘린다(실측: 보도자료 표셀 29/31 누락). pyhwp의 HWP5→XHTML 변환이 표 셀까지 렌더해
+# extractor.py가 rhwp보다 많이 뽑히면 채택. pyhwp는 AGPLv3+ — PyMuPDF([pdf-agpl])와
+# 동일하게 기본 제외, 라이선스 수용 환경에서만 옵트인. HWP5(.hwp) 전용(.hwpx 미지원).
+# AGPL 격리: extractor.py는 pyhwp를 import하지 않고 hwp5html 콘솔 스크립트를 별도
+# 프로세스로 호출(arm's length) → AGPL 경계가 pyhwp 실행파일에 국한.
+# 활성: pip install -e ".[hwp-tables]"
+hwp-tables = [
+  "pyhwp>=0.1b15",                 # HWP5 파서 (AGPLv3+). hwp5html CLI로 표 셀 추출
 ]
 
 # OCR — Tesseract 5.x + 한국어팩 (Apache 2.0, 무료).
@@ -131,6 +149,7 @@ lint = [
 # 활성: pip install -e ".[full]"
 full = [
   "rhwp-python>=0.5.1",
+  "xlrd>=2.0",
   "soynlp>=0.0.493",
   "konlpy>=0.6",
   "FlagEmbedding>=1.2",

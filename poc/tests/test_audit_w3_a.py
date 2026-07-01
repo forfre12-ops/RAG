@@ -58,15 +58,22 @@ def test_inmemory_inflight_visibility_window_is_future():
     assert stored.next_retry_at > before + store.VISIBILITY_TIMEOUT_SEC - 5
 
 
-def test_inmemory_dequeue_returns_stored_reference_for_attempts_persist():
-    """dequeue 가 store 보관 객체(참조)를 반환 → deliver_once 의 attempts 증가가
-    update 로 persist 됨 (M-outbox-attempts).
+def test_inmemory_dequeue_returns_snapshot_not_stored_reference():
+    """#35: dequeue 는 store 보관 객체의 deepcopy 스냅샷을 반환한다(동일 참조 아님).
+
+    과거엔 동일 참조를 반환해 deliver_once 가 락 밖에서 attempts 를 직접 변형 →
+    visibility window 중 다른 워커가 같은 객체를 집으면 경쟁했다. 이제 스냅샷을
+    반환하고 attempts persist 는 store.update 의 원자적 단조 머지로 보장한다
+    (행위 계약은 test_attempts_persist_across_deliver_failures 가 검증).
     """
     store = InMemoryOutboxStore()
     msg = publish(store, target_url="http://kl/cb", payload={"x": 1})
 
     out = store.dequeue_ready(limit=10)
-    assert out[0] is store._items[msg.id]  # noqa: SLF001
+    stored = store._items[msg.id]  # noqa: SLF001
+    assert out[0] is not stored          # 스냅샷(deepcopy) — 동일 참조 아님
+    assert out[0].id == stored.id        # 동일 메시지(값 일치)
+    assert out[0].payload == stored.payload
 
 
 def test_attempts_persist_across_deliver_failures():
@@ -239,10 +246,7 @@ class _RecordingClassifyRepo:
     def __init__(self, db):
         self.db = db
 
-    def tenant_exists(self, tenant_id):
-        return True
-
-    def document_exists(self, doc_id, tenant_id=None):
+    def document_exists(self, doc_id):
         return True
 
     def level_id_by_code(self, code):
@@ -293,7 +297,6 @@ def test_evidence_failure_does_not_discard_classification(monkeypatch):
 
     class _Req:
         doc_id = "12345678-1234-5678-1234-567812345678"
-        tenant_id = "t-1"
 
     cid, warns = svc._try_persist(_Req(), _Pred(), chunks=[])  # noqa: SLF001
 
@@ -332,7 +335,6 @@ def test_classification_returned_when_no_evidence(monkeypatch):
 
     class _Req:
         doc_id = "12345678-1234-5678-1234-567812345678"
-        tenant_id = "t-1"
 
     cid, warns = svc._try_persist(_Req(), _Pred(), chunks=[])  # noqa: SLF001
     assert cid == _RecordingClassifyRepo.created_classification_id

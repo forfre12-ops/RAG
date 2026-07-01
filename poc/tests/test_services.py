@@ -23,7 +23,6 @@ def test_classify_service_end_to_end():
     svc = ClassifyService.get_instance()
     req = ClassifyRequest(
         doc_id="t-1",
-        tenant_id="test",
         content="특급기밀 핵심 원천기술 M&A 계획 차세대 제품 설계도",
         use_rag=False,
         return_evidence=True,

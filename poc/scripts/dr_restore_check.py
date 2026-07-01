@@ -66,31 +66,6 @@ def check_pg_backup_recency(pg_dir: Path, *, hours: int = 24) -> CheckResult:
     )
 
 
-def check_es_snapshot_recency(*, hours: int = 24, repo: str = "lloydk_repo") -> CheckResult:
-    name = "es_snapshot_recency"
-    try:
-        from elasticsearch import Elasticsearch  # noqa: PLC0415
-        es = Elasticsearch(os.environ.get("ES_URL", "http://localhost:9200"))
-        if not es.ping():
-            return CheckResult(name, False, "ES unreachable", _now())
-        resp = es.snapshot.get(repository=repo, snapshot="_all")
-        snapshots = resp.get("snapshots", [])
-    except Exception as exc:  # noqa: BLE001
-        return CheckResult(name, False, f"error: {type(exc).__name__}: {exc}", _now())
-
-    if not snapshots:
-        return CheckResult(name, False, f"no snapshots in {repo}", _now())
-    latest = max(snapshots, key=lambda s: s.get("start_time_in_millis", 0))
-    start_ms = latest.get("start_time_in_millis", 0)
-    age_h = (dt.datetime.now(dt.timezone.utc).timestamp() - start_ms / 1000) / 3600
-    ok = age_h <= hours
-    return CheckResult(
-        name, ok,
-        f"latest={latest['snapshot']} age={age_h:.1f}h limit={hours}h",
-        _now(),
-    )
-
-
 def check_minio_mirror_recency(mirror_dir: Path, *, hours: int = 168) -> CheckResult:
     name = "minio_mirror_recency"
     if not mirror_dir.exists():
@@ -121,7 +96,6 @@ def check_infra_health() -> CheckResult:
         spec.loader.exec_module(mod)
         checks = [
             mod.check_postgres(),
-            mod.check_elasticsearch(),
             mod.check_minio(),
             mod.check_redis(),
         ]
@@ -152,7 +126,6 @@ def run_checks(
         rpo_target_hours=pg_recency_hours,
     )
     report.checks.append(check_pg_backup_recency(pg_dir, hours=pg_recency_hours))
-    report.checks.append(check_es_snapshot_recency(hours=es_recency_hours))
     report.checks.append(check_minio_mirror_recency(mirror_dir, hours=mirror_recency_hours))
     if not skip_infra:
         report.checks.append(check_infra_health())

@@ -20,3 +20,4 @@ dist/
 migration/
 licenses/
 .ipynb_checkpoints/
+datasets/gold/formats/

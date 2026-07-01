@@ -1,7 +1,6 @@
-"""17테이블 ORM 매핑 (init.sql v2 1:1).
+"""ORM 매핑 (init.sql v2 기반).
 
 도메인 그룹:
-  A 테넌트:       Tenant
   B 등급체계:     ClassificationLevel, EvaluationFactor, LevelKeyword
   C 문서:         Document, Chunk
   D 라벨링:       DocumentLabel, DocumentFactorScore
@@ -49,22 +48,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from lloydk.db.session import Base
 
-
-# ============================================================
-# [A] 테넌트
-# ============================================================
-
-class Tenant(Base):
-    __tablename__ = "tenants"
-
-    tenant_id: Mapped[str] = mapped_column(String(50), primary_key=True)
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    rag_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    active_model_version: Mapped[str | None] = mapped_column(String(50))
-    api_key_hash: Mapped[str | None] = mapped_column(String(128))
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+# tenant 제거: 격리는 KL 포털 전담 (2026-06-24 멀티테넌트 전면 제거 결정).
+# Lloydk는 단일 고객사 엔진 — per-customer 경계는 상류(KL 포털 라우팅)가 보장.
 
 
 # ============================================================
@@ -72,7 +57,7 @@ class Tenant(Base):
 # ============================================================
 
 class ClassificationLevel(Base):
-    __tablename__ = "classification_levels"
+    __tablename__ = "tb_classification_levels"
 
     level_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     level_code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
@@ -92,7 +77,7 @@ class ClassificationLevel(Base):
 
 
 class EvaluationFactor(Base):
-    __tablename__ = "evaluation_factors"
+    __tablename__ = "tb_evaluation_factors"
 
     factor_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     factor_code: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
@@ -105,13 +90,13 @@ class EvaluationFactor(Base):
 
 
 class LevelKeyword(Base):
-    __tablename__ = "level_keywords"
+    __tablename__ = "tb_level_keywords"
 
     keyword_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     keyword: Mapped[str] = mapped_column(String(200), nullable=False)
     pattern_type: Mapped[str] = mapped_column(String(20), nullable=False, default="exact")
-    factor_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_factors.factor_id", ondelete="RESTRICT"))
+    factor_id: Mapped[int | None] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"))
     weight: Mapped[float | None] = mapped_column(Numeric(3, 2), default=1.0)
     source: Mapped[str | None] = mapped_column(String(30), default="manual")
     example_context: Mapped[str | None] = mapped_column(Text)
@@ -135,10 +120,9 @@ class LevelKeyword(Base):
 # ============================================================
 
 class Document(Base):
-    __tablename__ = "documents"
+    __tablename__ = "tb_documents"
 
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.tenant_id"), nullable=False)
     external_ref: Mapped[str | None] = mapped_column(String(100))
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
     source_format: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -163,14 +147,21 @@ class Document(Base):
     processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[str | None] = mapped_column(String(50))
 
+    # #38 soft-delete/보존정책 — 논리 삭제 시각. NULL이면 활성(미삭제) 행.
+    # 기본 None이라 기존 행/테스트 비파괴. 물리 delete/cascade는 그대로 두고
+    # soft_delete()가 이 값을 NOW()로 세팅, 조회 메서드는 NULL만 노출한다.
+    # 실제 보존기간 만료 후 purge(물리삭제) 잡은 본 작업 범위 밖(운영 정책).
+    deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+
     __table_args__ = (
-        Index("idx_doc_tenant_status", "tenant_id", "processing_status"),
+        # idx_doc_status — tenant 제거로 idx_doc_tenant_status 의 prefix 컬럼만 잔존.
+        Index("idx_doc_status", "processing_status"),
         Index("idx_doc_format", "source_format"),
         Index("idx_doc_uploaded", "uploaded_at"),
-        # init.sql 보유 — ORM 동기화 (drift 방지)
+        # init.sql 보유 — ORM 동기화 (drift 방지).
+        # tenant 제거: file_hash 단독 UNIQUE(중복 업로드 dedup). 격리는 KL 포털 전담.
         Index(
             "idx_doc_hash",
-            "tenant_id",
             "file_hash",
             unique=True,
             postgresql_where=text("file_hash IS NOT NULL"),
@@ -186,18 +177,15 @@ class Document(Base):
             "uploaded_at",
             postgresql_where=text("processing_status = 'pending'"),
         ),
-        # N4 신규 — 테넌트 스코프 최신 문서 조회 hot path
-        Index("idx_doc_tenant_uploaded", "tenant_id", "uploaded_at"),
     )
 
 
 class Chunk(Base):
     """청크 파티션 부모. 실제 INSERT는 월별 子 파티션으로 자동 라우팅."""
-    __tablename__ = "chunks"
+    __tablename__ = "tb_chunks"
 
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), server_default=func.gen_random_uuid())
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(String(50), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -212,7 +200,6 @@ class Chunk(Base):
     __table_args__ = (
         PrimaryKeyConstraint("chunk_id", "created_at"),
         Index("idx_chunk_doc", "doc_id", "chunk_index"),
-        Index("idx_chunk_tenant", "tenant_id"),
         # init.sql의 PARTITION BY RANGE (created_at)는 ORM이 관리하지 않음.
         # SQLAlchemy의 declarative로는 표현이 부정확해 DB측에만 둠.
     )
@@ -223,10 +210,10 @@ class Chunk(Base):
 # ============================================================
 
 class DocumentLabel(Base):
-    __tablename__ = "document_labels"
+    __tablename__ = "tb_document_labels"
 
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="CASCADE"), primary_key=True)
-    level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
+    level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     labeled_by: Mapped[str] = mapped_column(String(30), nullable=False)
     labeler_id: Mapped[str | None] = mapped_column(String(50))
     confidence: Mapped[float | None] = mapped_column(Numeric(3, 2))
@@ -244,14 +231,16 @@ class DocumentLabel(Base):
 
 
 class DocumentFactorScore(Base):
-    __tablename__ = "document_factor_scores"
+    __tablename__ = "tb_document_factor_scores"
 
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="CASCADE"), primary_key=True)
-    factor_id: Mapped[int] = mapped_column(ForeignKey("evaluation_factors.factor_id", ondelete="RESTRICT"), primary_key=True)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
+    factor_id: Mapped[int] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"), primary_key=True)
     score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
 
     __table_args__ = (
-        CheckConstraint("score >= 0 AND score <= 5", name="ck_dfs_score_range"),
+        # 정본 B안 3요건(S·V·M)은 0·1·2점 — migration c7d8e9f0a1b2가 DB CHECK를
+        # 0~5에서 0~2로 교체. ORM도 동기화(이전엔 0~5로 drift). 제약명도 DB와 일치.
+        CheckConstraint("score >= 0 AND score <= 2", name="ck_dfs_score_0_2"),
     )
 
 
@@ -260,13 +249,12 @@ class DocumentFactorScore(Base):
 # ============================================================
 
 class Classification(Base):
-    __tablename__ = "classifications"
+    __tablename__ = "tb_classifications"
 
     classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="RESTRICT"), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.tenant_id"), nullable=False)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
-    predicted_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    predicted_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
     alternatives: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid")
@@ -280,7 +268,8 @@ class Classification(Base):
 
     __table_args__ = (
         Index("idx_cls_doc", "doc_id", "classified_at"),
-        Index("idx_cls_tenant_status", "tenant_id", "status"),
+        # idx_cls_status — tenant 제거로 idx_cls_tenant_status 의 status 컬럼만 잔존.
+        Index("idx_cls_status", "status"),
         Index("idx_cls_model_level", "model_version", "predicted_level_id", "status"),
         # init.sql 보유 — ORM 동기화 (drift 방지)
         Index(
@@ -288,19 +277,19 @@ class Classification(Base):
             "classified_at",
             postgresql_where=text("status = 'staging'"),
         ),
-        # N4 신규 — 테넌트 스코프 최근 분류 시계열 조회 hot path
-        Index("idx_cls_tenant_classified", "tenant_id", "classified_at"),
+        # 최근 분류 시계열 조회 hot path (tenant 제거 — 전역 스코프).
+        Index("idx_cls_classified", "classified_at"),
     )
 
 
 class ClassificationEvidence(Base):
-    __tablename__ = "classification_evidence"
+    __tablename__ = "tb_classification_evidence"
 
     evidence_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classifications.classification_id", ondelete="CASCADE"), nullable=False)
+    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     evidence_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    factor_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_factors.factor_id", ondelete="RESTRICT"))
+    factor_id: Mapped[int | None] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"))
     excerpt: Mapped[str] = mapped_column(Text, nullable=False)
     excerpt_start: Mapped[int | None] = mapped_column(Integer)
     excerpt_end: Mapped[int | None] = mapped_column(Integer)
@@ -321,7 +310,7 @@ class ClassificationEvidence(Base):
 # ============================================================
 
 class ModelVersion(Base):
-    __tablename__ = "model_versions"
+    __tablename__ = "tb_model_versions"
 
     version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     version_label: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
@@ -337,7 +326,7 @@ class ModelVersion(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     activated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     deactivated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
-    rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("model_versions.version_id"))
+    rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     rollback_reason: Mapped[str | None] = mapped_column(Text)
     level_snapshot: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -355,10 +344,10 @@ class ModelVersion(Base):
 
 
 class TrainingRun(Base):
-    __tablename__ = "training_runs"
+    __tablename__ = "tb_training_runs"
 
     run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    model_version: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("model_versions.version_id"))
+    model_version: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     mlflow_run_id: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), default="queued")
     started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
@@ -389,9 +378,9 @@ class TrainingRun(Base):
 
 
 class TrainingEpoch(Base):
-    __tablename__ = "training_epochs"
+    __tablename__ = "tb_training_epochs"
 
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("training_runs.run_id", ondelete="CASCADE"), primary_key=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), primary_key=True)
     epoch: Mapped[int] = mapped_column(Integer, primary_key=True)
     train_loss: Mapped[float | None] = mapped_column(Numeric)
     val_loss: Mapped[float | None] = mapped_column(Numeric)
@@ -401,13 +390,13 @@ class TrainingEpoch(Base):
 
 
 class TrainingDataset(Base):
-    __tablename__ = "training_datasets"
+    __tablename__ = "tb_training_datasets"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("training_runs.run_id", ondelete="CASCADE"), nullable=False)
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id", ondelete="RESTRICT"), nullable=False)
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), nullable=False)
+    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
     split_type: Mapped[str] = mapped_column(String(10), nullable=False)
-    level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("run_id", "doc_id", name="uq_td_run_doc"),
@@ -421,20 +410,29 @@ class TrainingDataset(Base):
 # ============================================================
 
 class Correction(Base):
-    __tablename__ = "corrections"
+    __tablename__ = "tb_corrections"
 
     correction_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("classifications.classification_id", ondelete="CASCADE"), nullable=False)
-    original_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
-    corrected_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
+    original_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    corrected_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)
     corrected_by: Mapped[str] = mapped_column(String(50), nullable=False)
     corrected_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    consumed_in_run: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("training_runs.run_id"))
+    consumed_in_run: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id"))
     consumed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
+        # #26b 최종 방어선 — 같은 (분류·보정등급·보정자) 조합 중복 보정 행 방지.
+        # confirm/보정 경로가 select-then-insert일 때 race로 중복이 생기면
+        # active learning 라벨이 중복 가중되므로 DB UNIQUE로 막는다.
+        UniqueConstraint(
+            "classification_id",
+            "corrected_level_id",
+            "corrected_by",
+            name="uq_corr_cls_level_by",
+        ),
         Index("idx_corr_cls", "classification_id"),
         Index("idx_corr_direction", "direction"),
         Index("idx_corr_at", "corrected_at"),
@@ -453,7 +451,7 @@ class Correction(Base):
 # ============================================================
 
 class PromptVersion(Base):
-    __tablename__ = "prompt_versions"
+    __tablename__ = "tb_prompt_versions"
 
     prompt_version: Mapped[str] = mapped_column(String(30), primary_key=True)
     chain_stage: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -467,16 +465,15 @@ class PromptVersion(Base):
 
 
 class SampleDocument(Base):
-    __tablename__ = "sample_documents"
+    __tablename__ = "tb_sample_documents"
 
     sample_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.doc_id"))
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.tenant_id"), nullable=False)
-    target_level_id: Mapped[int] = mapped_column(ForeignKey("classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id"))
+    target_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     doc_type: Mapped[str | None] = mapped_column(String(50))
-    outline_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("prompt_versions.prompt_version"))
-    body_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("prompt_versions.prompt_version"))
-    qc_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("prompt_versions.prompt_version"))
+    outline_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
+    body_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
+    qc_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
     llm_provider: Mapped[str] = mapped_column(String(30), nullable=False)
     llm_model: Mapped[str] = mapped_column(String(50), nullable=False)
     generated_outline: Mapped[str | None] = mapped_column(Text)
@@ -492,7 +489,6 @@ class SampleDocument(Base):
     __table_args__ = (
         Index("idx_sd_status", "review_status"),
         Index("idx_sd_level", "target_level_id"),
-        Index("idx_sd_tenant", "tenant_id"),
         # N4 신규 — list_pending_review() WHERE review_status=? ORDER BY created_at hot path
         Index("idx_sd_status_created", "review_status", "created_at"),
     )
@@ -504,7 +500,7 @@ class SampleDocument(Base):
 
 class LlmUsage(Base):
     """월별 파티션 부모. INSERT는 called_at 기준 자동 라우팅."""
-    __tablename__ = "llm_usage"
+    __tablename__ = "tb_llm_usage"
 
     usage_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
     provider: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -512,7 +508,6 @@ class LlmUsage(Base):
     purpose: Mapped[str] = mapped_column(String(30), nullable=False)
     reference_type: Mapped[str | None] = mapped_column(String(20))
     reference_id: Mapped[str | None] = mapped_column(String(100))
-    tenant_id: Mapped[str | None] = mapped_column(ForeignKey("tenants.tenant_id"))
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     # total_tokens는 DB측 generated column. ORM은 server_default 미설정으로 read-only처럼 처리.
@@ -538,11 +533,10 @@ class LlmUsage(Base):
 
 class AuditLog(Base):
     """월별 파티션 부모. 모든 API 호출 기록 (영업비밀 시스템 필수, doc/04 §9.5)."""
-    __tablename__ = "audit_log"
+    __tablename__ = "tb_audit_log"
 
     audit_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
     request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    tenant_id: Mapped[str | None] = mapped_column(String(50))
     actor_id: Mapped[str | None] = mapped_column(String(50))
     actor_role: Mapped[str | None] = mapped_column(String(30))
     action: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -560,11 +554,6 @@ class AuditLog(Base):
         Index("idx_audit_actor", "actor_id", "occurred_at"),
         Index("idx_audit_target", "target_type", "target_id"),
         Index("idx_audit_action", "action", "occurred_at"),
-        # N4 신규 — 테넌트별 감사 로그 시계열 조회 hot path
-        # (audit_log는 RANGE PARTITION이라 자식 파티션마다 자동 전파)
-        Index("idx_audit_tenant_occurred", "tenant_id", "occurred_at"),
-        # N4 신규 — 테넌트 + 액션 복합 감사 추적 hot path
-        Index("idx_audit_tenant_action", "tenant_id", "action", "occurred_at"),
     )
 
 
@@ -574,11 +563,10 @@ class AuditLog(Base):
 
 class Guide(Base):
     """가이드 문서 업로드 이력 — GuideService in-memory 대체."""
-    __tablename__ = "guides"
+    __tablename__ = "tb_guides"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     guide_id: Mapped[str] = mapped_column(String(200), nullable=False)
-    tenant_id: Mapped[str] = mapped_column(String(50), nullable=False, default="default")
     version: Mapped[str] = mapped_column(String(50), nullable=False)
     effective_date: Mapped[str | None] = mapped_column(String(30))
     change_summary: Mapped[str | None] = mapped_column(Text)
@@ -592,14 +580,16 @@ class Guide(Base):
     registered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
+        # 동시 업로드 시 중복 버전 행 방지(최종 방어선) — GuideRepo.upsert의
+        # select-then-insert는 락이 없어 race에서 중복을 만들 수 있다.
+        # tenant 제거: (guide_id, version) 전역 UNIQUE. 격리는 KL 포털 전담.
+        UniqueConstraint("guide_id", "version", name="uq_guides_id_version"),
         Index("idx_guides_guide_id", "guide_id"),
-        Index("idx_guides_tenant_guide", "tenant_id", "guide_id"),
         Index("idx_guides_registered", "registered_at"),
     )
 
 
 __all__ = [
-    "Tenant",
     "ClassificationLevel",
     "EvaluationFactor",
     "LevelKeyword",

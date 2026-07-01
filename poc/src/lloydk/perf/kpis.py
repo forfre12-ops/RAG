@@ -113,8 +113,8 @@ KPIS: list[KPI] = [
     KPI("S5.2", "S5", "embedding_vector_count > 0", "count", "gt", 0, "min"),
     # dryrun: hash 임베딩 + InMemory 백엔드. full: KURE-v1 + ES. 합격선은 보수적 0.3 (도달 검증 + full 시 회귀 추적)
     KPI("S5.3", "S5", "인덱싱 throughput", "chunks/s", "ge", 0.3, "last"),
-    # Recall@5는 실 ES + 학습된 모델(또는 풀 임베딩) 전제. dryrun(hash 임베딩)에선 SKIP.
-    KPI("S5.4", "S5", "Recall@5", "ratio", "ge", 0.80, "last", requires=["es", "trained_model"], core=True),
+    # Recall@5는 실 PG 벡터스토어(pgvector) + 학습된 모델(또는 풀 임베딩) 전제. dryrun(hash 임베딩)에선 SKIP.
+    KPI("S5.4", "S5", "Recall@5", "ratio", "ge", 0.80, "last", requires=["pg", "trained_model"], core=True),
     KPI("S5.5", "S5", "후속 GET 200", "bool", "ge", True, "bool_all"),
 
     # S6
@@ -155,11 +155,7 @@ KPIS: list[KPI] = [
     # full(uvicorn workers)에서는 ≥ 0.5 도달 가능, 합격선 별도 상향 검토 필요
     KPI("S11.5", "S11", "단계 확장성 (scaling efficiency)", "ratio", "ge", 0.15, "last"),
 
-    # S13 멀티 테넌트 격리 (W10 확장)
-    # bool/count 핵심 격리 검증. 데이터 누출 사고 방지 KPI
-    KPI("S13.1", "S13", "교차 노출 횟수", "count", "le", 0, "max", core=True),
-    KPI("S13.2", "S13", "audit tenant_id 정합", "ratio", "ge", 0.99, "ratio_true", requires=["pg"]),
-    KPI("S13.3", "S13", "가이드 인덱스 분리", "bool", "ge", True, "bool_all"),
+    # S13(멀티 테넌트 격리) 제거: 격리는 KL 포털 전담 — 단일 고객사 엔진이라 시나리오·KPI 불요.
 
     # S10 RAG 인용 충실도 (W11 확장)
     KPI("S10.1", "S10", "grounded_ratio", "ratio", "ge", 0.70, "mean"),
@@ -226,7 +222,6 @@ _SCENARIO_MODULES: dict[str, tuple[str, ...]] = {
     "S10": ("src/lloydk/rag", "src/lloydk/perf/scenarios.py"),
     "S11": ("src/lloydk/perf",),
     "S12": ("src/lloydk/services/async_classify_service.py", "src/lloydk/api/async_classify.py"),
-    "S13": ("src/lloydk/repositories", "src/lloydk/api/_jwt_auth.py", "src/lloydk/api/_rbac.py"),
     "S14": ("src/lloydk/adapters/vectorstore", "src/lloydk/adapters/storage"),
     "S15": ("scripts/dr_restore_check.py", "scripts/backup_postgres.py"),
     "S16": ("src/lloydk/api/_jwt_auth.py", "src/lloydk/api/_rbac.py"),

@@ -17,7 +17,6 @@ import {
 const state = {
   endpoint: window.location.origin,
   apiKey: "devkey",
-  tenant: "",
   currentSampleId: null,
   currentSample: null,
   toggledOff: new Set(), // 와우 A — off 된 키워드들
@@ -282,7 +281,6 @@ async function runClassify() {
         doc_id: state.currentSampleId || "demo-input",
         title: title || "demo",
         content: body,
-        tenant_id: state.tenant || null,
         use_rag: false,
         return_evidence: true,
       },
@@ -325,7 +323,6 @@ async function runClassify() {
       doc_id: state.currentSampleId || "demo-input",
       title: title || "demo",
       content: body,
-      tenant_id: state.tenant || null,
       use_rag: false,
       return_evidence: true,
     });
@@ -452,10 +449,9 @@ function renderSummary(data) {
     .slice(0, 2);
 
   const factorLabels = {
-    economic_value: "경제적 가치",
-    non_publicity: "비공지성",
-    management_level: "관리 수준",
-    leak_impact: "유출 시 영향도",
+    secrecy: "비공지성(S)",
+    value: "경제적 유용성(V)",
+    management: "비밀관리성(M)",
   };
 
   // 음성 근거 — 더 상위 등급의 키워드가 안 들어왔다
@@ -473,7 +469,7 @@ function renderSummary(data) {
     ? `「${matched.join("」 「")}」 키워드가 감지되었습니다.`
     : "본문에서 시드 키워드 매칭이 없어 기본 등급으로 판정되었습니다.";
   const factorTxt = topFactors.length > 0
-    ? `4 평가요소 중 ${topFactors
+    ? `3요건(S·V·M) 중 ${topFactors
         .map(([k, v]) => `<b>${factorLabels[k] || k}(${v.toFixed(2)})</b>`)
         .join("·")}가 가장 높게 측정되었습니다.`
     : "";
@@ -493,10 +489,9 @@ function gradeLabel(g) {
 function renderFactors(f) {
   const wrap = $("#result-factors");
   const labels = {
-    economic_value: "경제적 가치",
-    non_publicity: "비공지성",
-    management_level: "관리 수준",
-    leak_impact: "유출 시 영향도",
+    secrecy: "비공지성(S)",
+    value: "경제적 유용성(V)",
+    management: "비밀관리성(M)",
   };
   // 서버 응답은 키워드 가중치 누적값이라 등급에 따라 0~5+ 범위.
   // 화면 표시는 4 요소 중 상대값을 0~1로 정규화해서 비교 가능하게 한다.
@@ -532,7 +527,7 @@ function renderKeywordChips(evidence) {
     const w = typeof e.weight === "number" ? e.weight : 0;
     const intensity = Math.min(1, Math.max(0.15, w));
     chip.style.background = `rgba(0,0,0,${intensity * 0.12 + 0.04})`;
-    chip.innerHTML = `${e.text} <span class="w">${w.toFixed(2)}</span>`;
+    chip.innerHTML = `${escapeHtml(e.text)} <span class="w">${w.toFixed(2)}</span>`;
     chip.addEventListener("click", () => {
       flashKeywordInBody($("#body-preview"), e.text);
     });
@@ -898,12 +893,11 @@ function renderProfiles() {
 function bindConfig() {
   // config row 는 발주처 시연에서 노출되지 않도록 HTML 에서 생략됨.
   // 개발자가 직접 추가했을 때만 바인딩 (null-safe).
+  // tenant 제거: 격리는 KL 포털 전담. cfg-tenant 바인딩 없음.
   const ep = $("#cfg-endpoint");
   const ak = $("#cfg-apikey");
-  const tn = $("#cfg-tenant");
   if (ep) { ep.value = state.endpoint; ep.addEventListener("change", (e) => { state.endpoint = e.target.value || window.location.origin; }); }
   if (ak) { ak.value = state.apiKey; ak.addEventListener("change", (e) => { state.apiKey = e.target.value; }); }
-  if (tn) { tn.value = state.tenant; tn.addEventListener("change", (e) => { state.tenant = e.target.value; }); }
 }
 
 // ──────────────────────────────────────────────────────────────────────

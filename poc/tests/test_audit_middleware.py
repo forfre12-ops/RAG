@@ -87,7 +87,6 @@ def test_audit_log_recorded_for_classify():
                 "X-API-Key": settings.api_key,
                 "X-Actor-Id": actor,
                 "X-Actor-Role": "admin",
-                "X-Tenant-Id": "default",
             },
             json={"doc_id": "non-uuid", "content": "내용"},
         )
@@ -101,7 +100,6 @@ def test_audit_log_recorded_for_classify():
     a = rows[0]
     assert a.action == "classify"
     assert a.actor_role == "admin"
-    assert a.tenant_id == "default"
     assert a.payload_hash is not None
     assert a.success is True
 

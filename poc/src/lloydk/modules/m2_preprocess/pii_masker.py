@@ -139,6 +139,17 @@ def mask_pii(
         for k, v in ner_counts.items():
             counts[k] = counts.get(k, 0) + v
 
+    # NEW-H2: 타입별 PII 마스킹 카운트 — PiiMaskingMissRate 알람용. best-effort(프로메테우스 미가용 무시).
+    if counts:
+        try:
+            from lloydk.api.prom_metrics import PII_MASKED_TOTAL  # noqa: PLC0415
+
+            for _name, _n in counts.items():
+                if _n:
+                    PII_MASKED_TOTAL.labels(pii_type=_name).inc(_n)
+        except Exception:  # noqa: BLE001
+            pass
+
     return MaskResult(text=out, counts=counts)
 
 

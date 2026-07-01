@@ -22,7 +22,6 @@ from build_offline_bundle import (  # noqa: E402
     _MODEL_META,
     _simple_yaml_dump,
     build_manifest,
-    default_es_plugins,
     estimate_total_size,
     expected_files,
     extract_components_from_compose,
@@ -104,13 +103,15 @@ def test_extract_components_handles_missing_file(tmp_path: Path):
 
 
 def test_extract_components_real_project_compose():
-    """실제 프로젝트 docker-compose.yml에서 ES·postgres·minio·redis·mlflow가 추출되어야 함."""
+    """실제 프로젝트 docker-compose.yml에서 postgres·minio·redis·mlflow가 추출되어야 함."""
     real = Path(__file__).resolve().parents[1] / "docker-compose.yml"
     components = extract_components_from_compose(real)
-    for expected in ("postgres", "elasticsearch", "minio", "redis", "mlflow"):
+    for expected in ("postgres", "minio", "redis", "mlflow"):
         assert expected in components, f"missing: {expected}"
-    # ES 이미지가 8.15+ 라인이어야 retriever API 분기와 정합 (nori 빌드 태그 포함 허용)
-    assert "8.15.3" in components["elasticsearch"].image
+    # ES 제거(의사결정_대장 §03 ⓑ) — elasticsearch 서비스는 더 이상 없어야 한다.
+    assert "elasticsearch" not in components
+    # postgres는 pgvector 이미지(dense 백엔드)
+    assert "pgvector" in components["postgres"].image
 
 
 # ─────────────────────────────────────────────────────────────
@@ -176,11 +177,11 @@ def test_estimate_size_scales_with_components():
 def test_estimate_size_llm_dominates():
     """LLM 14B 모델이 단독으로 약 10GB 차지 → 전체 추정에 큰 비중."""
     components: dict[str, ComponentEntry] = {}
-    no_llm = estimate_total_size(components, [], default_es_plugins("8.15.3"))
+    no_llm = estimate_total_size(components, [], [])
     with_llm = estimate_total_size(
         components,
         [ModelEntry(name="Qwen/Qwen3-14B", dim=None, sha256=None, license="Apache-2.0", role="llm")],
-        default_es_plugins("8.15.3"),
+        [],
     )
     assert with_llm - no_llm >= 9.0
 
@@ -195,14 +196,6 @@ def test_expected_files_lists_required_artifacts():
     assert "CHECKSUMS.sha256" in files
     assert any(f.startswith("docker-images/postgres") for f in files)
     assert any(f.startswith("models/foo-bar/") for f in files)
-
-
-def test_default_es_plugins_includes_nori_and_s3():
-    plugins = default_es_plugins("8.15.3")
-    names = [p.name for p in plugins]
-    assert "analysis-nori" in names
-    assert "repository-s3" in names
-    assert all(p.version == "8.15.3" for p in plugins)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -248,7 +241,7 @@ def test_build_manifest_policies_force_vllm(sample_compose: Path, sample_config:
         compose_path=sample_compose,
         config_path=sample_config,
     )
-    assert m.policies.vector_backend_default == "es"
+    assert m.policies.vector_backend_default == "pg"   # §03 ES→PG 단일화
     assert m.policies.llm_provider_default == "vllm"
     assert m.policies.qwen3_thinking_mode is False
 

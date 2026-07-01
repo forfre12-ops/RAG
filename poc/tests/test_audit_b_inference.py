@@ -1,12 +1,11 @@
-"""Track B 회귀 테스트 — 추론·학습 코어 / 미탐(fail-SECURE) · 테넌트 격리(fail-CLOSED).
+"""Track B 회귀 테스트 — 추론·학습 코어 / 미탐(fail-SECURE).
 
 대상 수정:
   [H2] services/classify_service.py  — 빈 텍스트/본문 읽기 실패 시 S3(공개) 폴백 제거.
        보수적으로 최고등급 격리 + status=needs_review (절대 공개로 안 떨어뜨림).
   [H6] modules/m5_inference/pipeline.py — softmax id→등급 매핑을 모델 config.id2label에서
        구성. 길이·코드집합 불일치면 load 거부(fail-closed). GradeRegistry는 rule-fallback 전용.
-  [H8] modules/m5_inference/pipeline.py _build_rag_context — populated metadata인데 tenant 미확정이면
-       무격리 검색 대신 빈 컨텍스트(fail-closed).
+  [H8] modules/m5_inference/pipeline.py _build_rag_context — 무스코핑 검색(단일 고객사 엔진).
   [H4] modules/m4_training/trainer.py — 전부-TS degenerate 예측기가 fnr_high=0으로
        best 모델 선정을 게이밍하지 못하도록 합성 지표 + degenerate 가드.
 
@@ -35,7 +34,7 @@ def _empty_req(monkeypatch):
     svc = ClassifyService()
     # 본문 조회는 storage/DB 없이도 빈 문자열 반환하도록 강제 (조회 실패 시뮬레이션)
     monkeypatch.setattr(svc, "_fetch_content_by_doc_id", lambda *a, **k: "")
-    req = ClassifyRequest(doc_id="not-a-real-doc", tenant_id="t1", content=None)
+    req = ClassifyRequest(doc_id="not-a-real-doc", content=None)
     return svc, req
 
 
@@ -193,40 +192,12 @@ def test_h6_load_model_refuses_on_mismatch(monkeypatch, tmp_path):
 
 
 # ===========================================================================
-# [H8] _build_rag_context: 테넌트 미확정이면 빈 컨텍스트 (fail-closed)
+# [H8] _build_rag_context: 무스코핑 검색 (tenant 제거: 격리는 KL 포털 전담)
 # ===========================================================================
 
 
-def test_h8_populated_metadata_without_tenant_returns_empty(monkeypatch):
-    """멀티테넌트 컨텍스트(metadata dict)인데 tenant_id 없음 → 빈 컨텍스트(무격리 검색 금지)."""
-    pipe = _fresh_pipeline()
-
-    # store/embedder가 호출되면 안 됨 — 호출 전에 fail-closed로 빠져야 함
-    called = {"search": False}
-
-    def _boom(*a, **k):
-        called["search"] = True
-        raise AssertionError("tenant 미확정인데 검색이 호출됨 — fail-open 누수")
-
-    monkeypatch.setattr("lloydk.services.retrieval.expand_then_search", _boom)
-
-    hits = pipe._build_rag_context(query="M&A 인수", namespace="docs",
-                                   metadata={"source": "x"})  # tenant_id 없음
-    assert hits == []
-    assert called["search"] is False
-
-
-def test_h8_blank_tenant_returns_empty(monkeypatch):
-    pipe = _fresh_pipeline()
-    monkeypatch.setattr("lloydk.services.retrieval.expand_then_search",
-                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("호출 금지")))
-    hits = pipe._build_rag_context(query="q", namespace="docs",
-                                   metadata={"tenant_id": "   "})  # 공백 = 미확정
-    assert hits == []
-
-
-def test_h8_none_metadata_preserves_legacy_search(monkeypatch):
-    """metadata is None(단일테넌트/레거시)은 격리 미관여 — 검색은 진행(필터 None)."""
+def test_h8_none_metadata_preserves_search(monkeypatch):
+    """metadata is None → 검색은 진행(필터 None). 단일 고객사 엔진, tenant 격리 없음."""
     pipe = _fresh_pipeline()
 
     captured = {}
@@ -242,26 +213,8 @@ def test_h8_none_metadata_preserves_legacy_search(monkeypatch):
                         lambda *a, **k: type("E", (), {"embed": lambda self, t: [[0.0]]})())
 
     pipe._build_rag_context(query="q", namespace="docs", metadata=None)
-    assert "filter" in captured, "metadata None인데 검색이 호출되지 않음 — 레거시 경로 손상"
+    assert "filter" in captured, "metadata None인데 검색이 호출되지 않음 — 검색 경로 손상"
     assert captured["filter"] is None
-
-
-def test_h8_valid_tenant_builds_filter(monkeypatch):
-    pipe = _fresh_pipeline()
-
-    captured = {}
-
-    def _spy(*, filter=None, **kwargs):
-        captured["filter"] = filter
-        return []
-
-    monkeypatch.setattr("lloydk.services.retrieval.expand_then_search", _spy)
-    monkeypatch.setattr("lloydk.adapters.vectorstore.build_store", lambda *a, **k: object())
-    monkeypatch.setattr("lloydk.adapters.embedding.build_embedder",
-                        lambda *a, **k: type("E", (), {"embed": lambda self, t: [[0.0]]})())
-
-    pipe._build_rag_context(query="q", namespace="docs", metadata={"tenant_id": "tenantX"})
-    assert captured["filter"] == {"tenant_id": "tenantX"}
 
 
 # ===========================================================================

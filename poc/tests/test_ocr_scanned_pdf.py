@@ -96,9 +96,9 @@ class TestScannedPdfOcr:
         body = _scanned_pdf_from_image()
         storage = LocalStorage(root=str(tmp_path / "store"))
         svc = DocumentIngestionService(storage=storage)
-        res = svc.ingest(filename="scanned.pdf", content_bytes=body, tenant_id="t1", persist=False)
+        res = svc.ingest(filename="scanned.pdf", content_bytes=body, persist=False)
 
         assert res.ocr_used is True
         assert res.source_format == "pdf"
         # 원본 보관
-        assert storage.get(svc.RAW_BUCKET, f"t1/{res.file_hash}/scanned.pdf") == body
+        assert storage.get(svc.RAW_BUCKET, f"{res.file_hash}/scanned.pdf") == body

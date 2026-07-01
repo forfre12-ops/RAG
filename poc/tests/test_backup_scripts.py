@@ -157,19 +157,3 @@ class TestDrRestoreCheck:
         payload = json.loads(reports[0].read_text(encoding="utf-8"))
         assert "checks" in payload
         assert "all_ok" in payload
-
-
-# ============================================================
-# backup_es_snapshot (스크립트 import만 검증 — ES 실 호출은 mock 필요)
-# ============================================================
-
-class TestBackupEsSnapshot:
-    def test_import_and_dry_run_without_es(self, monkeypatch):
-        import backup_es_snapshot as bes
-        # ES 없는 환경에서 ping False → exit 2, --dry-run이면 exit 0
-        # 진짜 ES 클라이언트를 fake로 교체
-        class FakeClient:
-            def ping(self): return False
-        monkeypatch.setattr(bes, "_get_client", lambda *a, **kw: FakeClient())
-        rc = bes.main(["--dry-run"])
-        assert rc == 0

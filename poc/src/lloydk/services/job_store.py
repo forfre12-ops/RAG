@@ -39,6 +39,25 @@ from typing import Any, Optional, Protocol
 logger = logging.getLogger(__name__)
 
 
+def _emit_job_state_metric(status: object, created_at: object = None) -> None:
+    """[obs] 작업 상태 진입 메트릭 — best-effort(실패는 분류·작업 경로 무영향).
+
+    create/update의 단일 choke point에서 호출되어 상태 전이 1회당 1 inc(double-count 없음).
+    터미널 상태(done/failed/partial)면 _created_at 기준 완료 소요시간도 관측. 메트릭
+    레지스트리 미가용(일부 테스트)이면 조용히 skip.
+    """
+    try:
+        from lloydk.api import prom_metrics as _pm  # noqa: PLC0415
+        st = str(status)
+        _pm.JOB_STATE_ENTERED_TOTAL.labels(state=st).inc()
+        if st in ("done", "failed", "partial") and created_at is not None:
+            dur = time.time() - float(created_at)
+            if dur >= 0:
+                _pm.JOB_COMPLETION_DURATION_SECONDS.labels(state=st).observe(dur)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Protocol — 두 백엔드가 동일 인터페이스 제공함을 정적으로 명시
 # ---------------------------------------------------------------------------
@@ -69,9 +88,11 @@ class InMemoryJobStore:
         self._jobs: dict[str, dict[str, Any]] = {}
 
     def create(self, job_id: uuid.UUID, payload: dict[str, Any]) -> None:
+        # _created_at: 완료 소요시간(JOB_COMPLETION_DURATION) 산정용 — 터미널 상태에서 차감.
         with self._lock:
-            self._jobs[str(job_id)] = {"status": "queued", **payload}
+            self._jobs[str(job_id)] = {"status": "queued", "_created_at": time.time(), **payload}
         logger.debug("job_store create: job_id=%s keys=%s", job_id, list(payload.keys()))
+        _emit_job_state_metric("queued")
 
     def update(self, job_id: uuid.UUID, **fields: Any) -> None:
         with self._lock:
@@ -85,6 +106,7 @@ class InMemoryJobStore:
             logger.info(
                 "job_store status: job_id=%s status=%s", job_id, fields.get("status"),
             )
+            _emit_job_state_metric(fields.get("status"), job.get("_created_at"))
         else:
             logger.debug("job_store update: job_id=%s fields=%s", job_id, list(fields.keys()))
 
@@ -140,11 +162,13 @@ class RedisJobStore:
 
     def create(self, job_id: uuid.UUID, payload: dict[str, Any]) -> None:
         key = self._key(job_id)
-        doc = {"status": "queued", **payload}
+        # _created_at: 완료 소요시간 산정용(float, json default=str로 직렬화·TTL 내 보존).
+        doc = {"status": "queued", "_created_at": time.time(), **payload}
         self._client.set(key, json.dumps(doc, default=str), ex=self._ttl)
         logger.debug(
             "redis_job_store create: job_id=%s keys=%s", job_id, list(payload.keys()),
         )
+        _emit_job_state_metric("queued")
 
     def update(self, job_id: uuid.UUID, **fields: Any) -> None:
         """WATCH/MULTI/EXEC 루프로 race-free merge.
@@ -187,6 +211,8 @@ class RedisJobStore:
                 "redis_job_store status: job_id=%s status=%s",
                 job_id, fields.get("status"),
             )
+            # doc은 WATCH 루프(merge)에서 갱신된 최신 문서 — _created_at 보유.
+            _emit_job_state_metric(fields.get("status"), doc.get("_created_at"))
         else:
             logger.debug(
                 "redis_job_store update: job_id=%s fields=%s",

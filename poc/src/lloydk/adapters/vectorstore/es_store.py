@@ -13,10 +13,13 @@ PoC 단계에선 실제 ES 클러스터 없이도 import만 안전하도록 elas
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Sequence
 
 from lloydk.adapters.vectorstore.base import SearchHit
+
+logger = logging.getLogger(__name__)
 
 
 class EsStore:
@@ -49,6 +52,9 @@ class EsStore:
             "hosts": [url],
             "verify_certs": verify_certs,
             "request_timeout": request_timeout,
+            # #19: 일시적 타임아웃/네트워크 흔들림에 대한 자동 재시도 — 부분실패 침묵 완화.
+            "retry_on_timeout": True,
+            "max_retries": 3,
         }
         if ca_certs:
             kwargs["ca_certs"] = ca_certs
@@ -60,6 +66,8 @@ class EsStore:
         self._client = Elasticsearch(**kwargs)
         self._server_version: tuple[int, int, int] | None = None
         self._license_type: str | None = None
+        # #19: 직전 bulk upsert의 실패 건수 — 호출부가 부분실패 여부를 확인 가능.
+        self._last_bulk_errors: int = 0
 
     # ─────────────────────────────────────────────────────────────
     # 서버 버전 감지 (retriever API vs legacy 분기)
@@ -214,8 +222,57 @@ class EsStore:
                     "_source": doc,
                 }
             )
-        success, _errors = bulk(self._client, actions, refresh="wait_for", raise_on_error=False)
+        # #19: raise_on_error=False라 부분실패가 조용히 묻힌다. errors(실패 항목)를
+        # 받아 실패 건수·사유를 logger.warning으로 남겨 무관측을 해소한다.
+        success, errors = bulk(self._client, actions, refresh="wait_for", raise_on_error=False)
+        # errors는 raise_on_error=False일 때 실패 액션의 리스트(또는 int). 방어적으로 처리.
+        failed = errors if isinstance(errors, int) else len(errors)
+        if failed:
+            sample = errors[:5] if isinstance(errors, list) else None
+            logger.warning(
+                "ES bulk 색인 부분실패: index=%s total=%d success=%d failed=%d sample=%r",
+                collection,
+                len(actions),
+                int(success),
+                failed,
+                sample,
+            )
+        # 정상 경로 동작 보존: 기존처럼 success_count를 반환.
+        # (호출부가 부분실패를 알 수 있도록 self._last_bulk_errors에도 실패 수를 노출)
+        self._last_bulk_errors = failed
         return int(success)
+
+    def delete(
+        self,
+        collection: str,
+        *,
+        ids: Sequence[str] | None = None,
+        filter: dict | None = None,
+    ) -> int:
+        """#17: 재인덱싱 고아 청크 제거. ids 또는 filter(예: {"doc_id": ...})로 삭제.
+
+        - filter: metadata 필드 term 일치로 delete_by_query (예: doc_id 기준).
+        - ids: 정확 _id 목록을 delete_by_query(terms _id)로 삭제.
+        - 인덱스가 없으면 no-op(0 반환) — 멱등 재인덱싱 보장.
+        - 삭제된 문서 수를 반환.
+        """
+        if not ids and not filter:
+            return 0
+        if not self._client.indices.exists(index=collection):
+            return 0
+
+        bool_filter: list[dict] = _build_term_filters(filter)
+        if ids:
+            bool_filter.append({"terms": {"_id": list(ids)}})
+
+        query = {"bool": {"filter": bool_filter}} if bool_filter else {"match_all": {}}
+        resp = self._client.delete_by_query(
+            index=collection,
+            query=query,
+            refresh=True,
+            conflicts="proceed",
+        )
+        return int(resp.get("deleted", 0))
 
     def search(
         self,

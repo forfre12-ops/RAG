@@ -5,8 +5,9 @@
 - DB 미가용·테이블 부재 시 silent skip (테스트·dryrun 환경 보호)
 - payload는 SHA-256 해시만. 본문은 PG에 저장하지 않음.
 - /healthz·/docs·/openapi.json은 audit 제외 (노이즈 차단)
-- actor_id·tenant_id·role은 인증이 해소한 request.state.auth_*를 우선 사용.
-  인증이 신원을 못 채운 요청(인증 실패 등)에만 X-Actor-Id/X-Tenant-Id 헤더로 폴백.
+- actor_id·role은 인증이 해소한 request.state.auth_*를 우선 사용.
+  인증이 신원을 못 채운 요청(인증 실패 등)에만 X-Actor-Id 헤더로 폴백.
+- tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), audit에 tenant 기록 없음.
 """
 
 from __future__ import annotations
@@ -117,6 +118,16 @@ def _try_build_chained_hash(body: bytes) -> str | None:
         return _hash_bytes(body) if body else None
 
 
+def _raw_body_hash(body: bytes) -> str:
+    """체인 패킹 전 raw body sha256(hex). 빈 body는 ""(체인은 빈 payload로 계속).
+
+    #4: 과거엔 dispatch에서 prev를 락 없이 미리 읽어 체인을 만들었다(payload_hash). 동시
+    요청이 같은 prev를 읽어 체인이 분기됐다. 이제 dispatch는 raw 해시만 만들고, prev-read+
+    패킹은 _record의 advisory-locked insert 트랜잭션 안에서 수행한다(build_chained_hash_locked).
+    """
+    return _hash_bytes(body) if body else ""
+
+
 async def _read_body(request: Request) -> bytes:
     """body를 한 번만 읽고, 다운스트림 핸들러가 재사용할 수 있게 cache."""
     body = await request.body()
@@ -144,10 +155,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
             logger.debug("audit payload_hash skipped: %s", exc)
             body = b""
 
-        # A2 (2026-05-29): 단순 sha256 대신 chained hash로 저장.
-        # 형식 prev16:full32 — verify_chain이 진짜 재계산 가능. DB·chain 모듈 부재 시
-        # 기존 sha256 폴백(하위호환). _try_build_chained_hash는 모든 예외를 silent 처리.
-        payload_hash = _try_build_chained_hash(body)
+        # #4: dispatch는 raw body sha256만 계산. 체이닝(prev 읽기 + prev16:full32 패킹)은
+        # _record의 advisory-locked insert 트랜잭션에서 수행해 동시요청 체인 분기를 막는다.
+        payload_hash = _raw_body_hash(body)
 
         response: Response | None = None
         error_code: str | None = None
@@ -218,27 +228,36 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         action = _derive_action(request)
         # 보안: 인증이 해소한 신원(request.state.auth_*)을 우선 사용 — 위조 가능한
-        # X-Actor-Id/X-Tenant-Id 헤더로 감사 기록이 날조되는 것을 차단. 인증이
-        # 신원을 못 채운 경우(인증 실패/미인증 요청)에만 헤더로 폴백(success=False로 이미 구분됨).
+        # X-Actor-Id 헤더로 감사 기록이 날조되는 것을 차단. 인증이 신원을 못 채운
+        # 경우(인증 실패/미인증 요청)에만 헤더로 폴백(success=False로 이미 구분됨).
+        # tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), audit에 tenant 기록 없음.
         auth_actor = getattr(request.state, "auth_actor", None)
-        auth_tenant = getattr(request.state, "auth_tenant", None)
         auth_role = getattr(request.state, "auth_role", None)
         actor_id = auth_actor if auth_actor is not None else request.headers.get("x-actor-id")
         actor_role = auth_role if auth_role is not None else request.headers.get("x-actor-role")
-        tenant_id = auth_tenant if auth_tenant is not None else request.headers.get("x-tenant-id")
         request_id = getattr(request.state, "request_id", None)
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent")
 
+        # #4: prev-read + insert를 같은 advisory-locked 트랜잭션에 묶어 체인 분기 차단.
+        try:
+            from lloydk.services.audit_chain import build_chained_hash_locked  # noqa: PLC0415
+        except ImportError:
+            build_chained_hash_locked = None  # type: ignore[assignment]
+
         try:
             with session_scope() as db:
+                ph = payload_hash
+                if build_chained_hash_locked is not None:
+                    # payload_hash는 raw body 해시(또는 ""). 같은 tx에서 lock→prev→패킹.
+                    # tenant 제거: 전역 단일 체인(per-tenant 체인 없음).
+                    ph = build_chained_hash_locked(db, payload_hash or "")
                 AuditRepo(db).record(
                     action=action,
                     actor_id=actor_id,
                     actor_role=actor_role,
-                    tenant_id=tenant_id,
                     request_id=request_id,
-                    payload_hash=payload_hash,
+                    payload_hash=ph,
                     ip_address=ip,
                     user_agent=ua,
                     success=success,

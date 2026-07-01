@@ -19,7 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.create_table(
-        "guides",
+        "tb_guides",
         sa.Column("id", sa.BigInteger, primary_key=True, autoincrement=True),
         sa.Column("guide_id", sa.String(200), nullable=False),
         sa.Column("tenant_id", sa.String(50), nullable=False, server_default="default"),
@@ -36,13 +36,13 @@ def upgrade() -> None:
         sa.Column("registered_at", sa.DateTime(timezone=True), nullable=False,
                   server_default=sa.text("now()")),
     )
-    op.create_index("idx_guides_guide_id", "guides", ["guide_id"])
-    op.create_index("idx_guides_tenant_guide", "guides", ["tenant_id", "guide_id"])
-    op.create_index("idx_guides_registered", "guides", ["registered_at"])
+    op.create_index("idx_guides_guide_id", "tb_guides", ["guide_id"])
+    op.create_index("idx_guides_tenant_guide", "tb_guides", ["tenant_id", "guide_id"])
+    op.create_index("idx_guides_registered", "tb_guides", ["registered_at"])
 
 
 def downgrade() -> None:
-    op.drop_index("idx_guides_registered", table_name="guides")
-    op.drop_index("idx_guides_tenant_guide", table_name="guides")
-    op.drop_index("idx_guides_guide_id", table_name="guides")
-    op.drop_table("guides")
+    op.drop_index("idx_guides_registered", table_name="tb_guides")
+    op.drop_index("idx_guides_tenant_guide", table_name="tb_guides")
+    op.drop_index("idx_guides_guide_id", table_name="tb_guides")
+    op.drop_table("tb_guides")

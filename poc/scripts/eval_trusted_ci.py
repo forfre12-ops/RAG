@@ -118,7 +118,7 @@ def _fmt(ci: dict) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", default=_DEPLOYED_MODEL)
-    ap.add_argument("--holdout", default="datasets/gold_real/holdout_eval.jsonl")
+    ap.add_argument("--holdout", default="datasets/gold_real/holdout_eval.clean.jsonl")  # clean=train 누출 제거(dirty 109건 중 67건=61%가 train_subset 중복 → 암기 부풀림)
     ap.add_argument("--report", default="reports/p1_trusted_ci")
     ap.add_argument("--n-boot", type=int, default=5000)
     ap.add_argument("--seed", type=int, default=20260603)

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 (핵심 구조) | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{
+  --bg:#ffffff; --surface:#fafafa; --surface2:#f2f2f2; --code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.82);
+  --text:#0a0a0a; --soft:#525252; --dim:#737373; --faint:#a3a3a3;
+  --border:rgba(0,0,0,0.10); --border-strong:rgba(0,0,0,0.18);
+  --radius-sm:6px; --radius:8px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);
+  --sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14.5px;line-height:1.65;letter-spacing:-0.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+
+/* ===== Nav ===== */
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1180px;margin:0 auto;padding:13px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;white-space:nowrap;line-height:1;}
+.brand-mark{width:40px;height:40px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,0.12);box-shadow:var(--shadow-sm);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;}
+.brand-sep{color:var(--dim);font-size:14px;margin:0 5px;}
+.brand-url{font-family:var(--mono);font-size:13px;color:var(--dim);}
+.nav-tag{font-family:var(--mono);font-size:11.5px;color:var(--dim);border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:6px;}
+
+/* ===== Layout ===== */
+.page{max-width:1180px;margin:0 auto;padding:38px 28px 100px;}
+.eyebrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;margin-bottom:16px;}
+.badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:3px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--mono);}
+.badge.ghost{background:#404040;}
+.dotc{color:var(--faint);}
+.muted{color:var(--dim);}
+h1.title{font-size:40px;font-weight:800;letter-spacing:-0.035em;line-height:1.08;margin:0 0 14px;}
+.lede{font-size:16px;font-weight:300;color:var(--soft);max-width:780px;margin:0 0 26px;line-height:1.55;}
+
+/* ===== Section ===== */
+section{margin:0 0 14px;scroll-margin-top:70px;}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:34px 0 4px;}
+.sec-head .n{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--dim);border:1px solid var(--border);background:var(--surface);padding:3px 8px;border-radius:5px;line-height:1;}
+.sec-head h2{font-size:21px;font-weight:700;letter-spacing:-0.022em;margin:0;}
+.sec-sub{color:var(--dim);font-size:13px;margin:2px 0 14px;}
+
+/* ===== KPI strip (B) ===== */
+.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--border-strong);border-radius:0;overflow:hidden;margin:0 0 8px;}
+.kpi .cell{padding:16px 18px;border-right:1px solid var(--border);}
+.kpi .cell:last-child{border-right:none;}
+.kpi .v{font-size:26px;font-weight:800;letter-spacing:-0.03em;line-height:1;}
+.kpi .l{font-size:11.5px;color:var(--dim);margin-top:6px;font-family:var(--mono);}
+.kpi .s{font-size:11px;color:var(--faint);margin-top:2px;}
+
+/* ===== Diagram primitives (직선형·사각) ===== */
+.diag{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:8px 0;}
+.node{flex:1 1 140px;min-width:140px;border:1px solid var(--border-strong);border-radius:0;background:var(--surface);padding:12px 14px;}
+.node .nt{font-size:13.5px;font-weight:700;letter-spacing:-0.01em;}
+.node .nd{font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.45;}
+.node.dark{background:var(--text);color:var(--bg);border-color:var(--text);}
+.node.dark .nd{color:#cfcfcf;}
+.node.soft{background:var(--bg);}
+.arr{display:flex;align-items:center;justify-content:center;color:var(--dim);font-family:var(--mono);font-size:17px;flex:0 0 auto;padding:0 2px;}
+.grp{border:1px dashed var(--border-strong);border-radius:0;padding:10px;}
+.grp-l{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--dim);letter-spacing:0.05em;margin-bottom:8px;text-transform:uppercase;}
+
+/* ===== straight band callout (직선형 띠) ===== */
+.band{border-left:4px solid var(--text);border-radius:0;background:var(--surface);padding:13px 16px;margin:10px 0;}
+.band.gray{border-left-color:var(--dim);background:var(--surface);}
+.band .bt{font-size:12.5px;font-weight:700;font-family:var(--mono);letter-spacing:0.02em;margin-bottom:6px;}
+.band p{margin:5px 0;font-size:13px;line-height:1.6;}
+.band ul{margin:5px 0;padding-left:18px;} .band li{font-size:12.5px;margin:3px 0;}
+
+/* ===== deployment zones (②) ===== */
+.deploy{display:grid;grid-template-columns:1fr 56px 1fr;align-items:center;gap:0;margin:8px 0;}
+.zone{border:1px solid var(--border-strong);border-radius:0;padding:14px 16px;background:var(--bg);}
+.zone .zl{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.zone .zt{font-size:14px;font-weight:700;}
+.zone .zb{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--bg);background:var(--text);padding:3px 7px;border-radius:3px;letter-spacing:0.04em;}
+.subnode{border:1px solid var(--border);border-radius:0;background:var(--surface);padding:8px 11px;margin:6px 0;font-size:12.5px;}
+.subnode b{font-weight:600;}
+.subnode.hl{border-color:var(--text);}
+.conn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--dim);font-family:var(--mono);font-size:11px;}
+.conn .a{font-size:18px;line-height:1;}
+
+/* ===== grade box (A) ===== */
+.grade{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;border:1px solid var(--border-strong);border-radius:0;padding:14px 16px;background:var(--surface);margin:8px 0;}
+.grade .formula{font-family:var(--mono);font-size:13px;font-weight:600;white-space:nowrap;}
+.grade .chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{font-family:var(--mono);font-size:12px;font-weight:700;border:1px solid var(--border-strong);border-radius:0;padding:5px 11px;background:var(--bg);}
+.chip.top{background:var(--text);color:var(--bg);border-color:var(--text);}
+
+/* ===== model table (④) ===== */
+.tbl-wrap{border:1px solid var(--border);border-radius:0;overflow:hidden;margin:8px 0;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead{background:var(--surface);}
+th{padding:9px 13px;text-align:left;font-weight:600;font-size:11.5px;color:var(--soft);border-bottom:1px solid var(--border);}
+td{padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td .pick{font-weight:700;}
+td code,.mono{font-family:var(--mono);font-size:12px;}
+.reasons{list-style:none;padding:0;margin:4px 0 0;display:flex;flex-wrap:wrap;gap:5px;}
+.reasons li{font-family:var(--mono);font-size:11px;border:1px solid var(--border);background:var(--bg);padding:3px 7px;border-radius:0;color:var(--soft);}
+
+/* ===== golden set flow (⑤) ===== */
+.gs{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0;}
+.gs-step{flex:1 1 122px;min-width:122px;border:1px solid var(--border);border-radius:0;background:var(--surface);padding:10px 12px;}
+.gs-step.hl{border-color:var(--text);}
+.gs-step .n{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--dim);letter-spacing:0.03em;}
+.gs-step .t{font-size:12.5px;font-weight:600;margin-top:3px;}
+.gs-step .d{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.4;}
+.console{border:1px solid var(--text);border-radius:0;background:var(--bg);padding:12px 15px;margin:8px 0;}
+.console .ct{font-size:13px;font-weight:700;margin-bottom:7px;}
+.console .row{display:flex;flex-wrap:wrap;gap:6px;}
+.console .it{font-family:var(--mono);font-size:11.5px;border:1px solid var(--border);background:var(--surface);padding:4px 9px;border-radius:0;}
+.console .it.act{background:var(--text);color:var(--bg);border-color:var(--text);}
+
+footer{border-top:1px solid var(--border);max-width:1180px;margin:30px auto 0;padding:24px 28px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
+
+/* ===== 반응형 ===== */
+@media(max-width:860px){
+  .kpi{grid-template-columns:repeat(2,1fr);} .kpi .cell:nth-child(2){border-right:none;}
+  .deploy{grid-template-columns:1fr;} .conn{flex-direction:row;padding:10px 0;} .conn .a{transform:rotate(90deg);}
+  .grade{grid-template-columns:1fr;}
+}
+@media(max-width:560px){
+  .page{padding:28px 16px 70px;} h1.title{font-size:30px;}
+  .diag{flex-direction:column;} .arr{transform:rotate(90deg);padding:3px 0;}
+  .kpi{grid-template-columns:1fr;} .kpi .cell{border-right:none;}
+}
+@media print{.nav{position:static;}}
+</style>
+</head>
+
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="로이드케이 Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">lloydk.co.kr</span>
+    </a>
+    <span class="nav-tag">시스템 설계도 · 핵심 구조</span>
+  </div>
+</header>
+
+<div class="page" id="top">
+  <div class="eyebrow">
+    <span class="badge">시스템 설계도</span>
+    <span class="badge ghost">2026-06 · 제출용</span>
+    <span class="dotc">·</span>
+    <span class="muted">KOIPA AI 영업비밀관리시스템 — 핵심 구조 한눈에</span>
+  </div>
+  <h1 class="title">시스템 설계도</h1>
+  <p class="lede">인프라 · 배포 구조 · 분류 동작 · 모델 선정 · 골든셋 구축을 <b>한 화면</b>에 정리한 핵심 설계도다. 상세 근거·실증은 <b>기술구현 백서 v7</b>을 참조한다.</p>
+
+  <!-- B. KPI strip -->
+  <div class="kpi">
+    <div class="cell"><div class="v">65–78%</div><div class="l">분류 정확도</div><div class="s">실문서·합성 실측</div></div>
+    <div class="cell"><div class="v">14–21%</div><div class="l">고등급 미탐(FNR)</div><div class="s">룰 대비 미탐 반감</div></div>
+    <div class="cell"><div class="v">87%</div><div class="l">검색 Recall@5</div><div class="s">pgvector lexical(배포구성)</div></div>
+    <div class="cell"><div class="v">333ms</div><div class="l">건당 처리(CPU)</div><div class="s">GPU 시 21ms</div></div>
+  </div>
+  <p class="sec-sub" style="margin-top:6px;">※ 수치는 본 골든셋·테스트셋 실측. 고객사 실데이터 분포에서 재검증한다. 현 골든 후보 500건·희소 TS 기준이라 FNR 게이트는 점추정이 아니라 신뢰구간 하한으로 운영한다.</p>
+
+  <!-- ① 인프라 -->
+  <section id="s1">
+    <div class="sec-head"><span class="n">01</span><h2>인프라 컨테이너 구성</h2></div>
+    <div class="sec-sub">고객사 폐쇄망 호스트(배포 번들)와 지재원 중앙(학습·합성)은 <b>네트워크 분리</b> · docker-compose. <b>PostgreSQL이 관계형 + 벡터(pgvector)를 모두 담당 → 별도 검색엔진 컨테이너 불필요(컴포넌트 1개↓).</b></div>
+    <div class="diag">
+      <div class="grp" style="flex:1 1 100%;">
+        <div class="grp-l">고객사 폐쇄망 호스트 · 배포 번들 (추론 전용 · 온프렘 GPU)</div>
+        <div class="diag" style="margin:0;">
+          <div class="node"><div class="nt">API</div><div class="nd">FastAPI · 분류/검색/관리 엔드포인트</div></div>
+          <div class="node"><div class="nt">Worker · Beat</div><div class="nd">Celery · 비동기 분류·색인 (모델 핫리로드, 재학습 아님 — 재학습은 지재원·환류 미확정 §05)</div></div>
+          <div class="node"><div class="nt">Redis</div><div class="nd">Celery 브로커·백엔드 · 잡상태·아웃박스/DLQ (인메모리 LRU가 캐시)</div></div>
+        </div>
+        <div class="diag" style="margin:6px 0 0;">
+          <div class="node dark"><div class="nt">PostgreSQL + pgvector</div><div class="nd">문서·분류·라벨·감사 + 임베딩(벡터) — 단일 트랜잭션 정본 · <b>KL 제공·운영</b></div></div>
+          <div class="node"><div class="nt">로컬 스토리지</div><div class="nd">파일시스템 · 추출 텍스트·산출물 (원본 최소보관)</div></div>
+          <div class="node"><div class="nt">vLLM (Qwen3-14B)</div><div class="nd">온프렘 GPU · <b>RAG /answer 답변합성 · 선택적 2차판정 전용</b> — 분류 핫패스(333ms)엔 미사용</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="diag">
+      <div class="grp" style="flex:1 1 100%;">
+        <div class="grp-l">지재원 중앙 · 학습·합성 (오프라인 분리 · GPU) — MLflow는 고객사 번들에 미포함</div>
+        <div class="diag" style="margin:0;">
+          <div class="node soft"><div class="nt">vLLM (Qwen3)</div><div class="nd">합성·골든 자동라벨(LLM) 전용</div></div>
+          <div class="node soft"><div class="nt">MLflow</div><div class="nd">모델 버전·실험 추적 (지재원 전용)</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 배포 구조 -->
+  <section id="s2">
+    <div class="sec-head"><span class="n">02</span><h2>배포 구조 — 지재원(학습) / 고객사(추론)</h2></div>
+    <div class="sec-sub">지재원은 골든셋·학습을 담당하고, 학습된 모델을 <b>오프라인 골든 번들</b>로 고객사에 배포. 고객사는 추론만 수행한다. 운영 환류 방식은 <b>미확정 결정</b>(무반출·온사이트·반출 3안 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이며 기본 권고=<b>무반출</b>: 교정·원문은 망 내 잔류(반출 금지), 망 밖으로는 <b>집계 진단지표</b>(오분류율·혼동행렬, 문서식별 불가)만 환류.</div>
+    <div class="deploy">
+      <div class="zone">
+        <div class="zl"><span class="zt">지재원 (중앙)</span><span class="zb">GPU · 학습</span></div>
+        <div class="subnode"><b>골든셋 구축</b> — 생성·수집·라벨·편입</div>
+        <div class="subnode hl"><b>검수 콘솔(관리자)</b> — 골든셋 ④ 사람 검수·라벨링</div>
+        <div class="subnode"><b>모델 학습</b> — KF-DeBERTa 학습 → 번들 패키징</div>
+      </div>
+      <div class="conn">
+        <div><div class="a">→</div>골든 번들</div>
+        <div><div class="a">←</div>집계 진단 환류(문서 미반출)</div>
+      </div>
+      <div class="zone">
+        <div class="zl"><span class="zt">고객사 (폐쇄망)</span><span class="zb">추론 · 온프렘 GPU</span></div>
+        <div class="subnode"><b>AI Agent</b> — 문서 업로드 → 분류 → 저장</div>
+        <div class="subnode hl"><b>운영 검수 API</b> — confirm/relabel (분류 교정) · UI는 KL 구축</div>
+        <div class="subnode"><b>로컬 정본 DB</b> — 폐쇄망 격리 · 외부 미반출 (접근제어=KL)</div>
+      </div>
+    </div>
+    <div class="band gray">
+      <div class="bt">검수 인터페이스 = 같은 원리, 다른 책임</div>
+      <p>지재원은 <b>골든셋 검수 콘솔(우리 UI)</b>로 라벨을 생산하고, 고객사는 <b>검수 API(confirm/relabel)</b>만 제공받아 <b>KL이 자기 웹에 붙인다</b>. 둘 다 같은 accept/correct 원리, 책임만 분리(지재원=UI / 고객사=API).</p>
+    </div>
+  </section>
+
+  <!-- A. 등급 체계 + ③ E2E 분류 흐름 -->
+  <section id="s3">
+    <div class="sec-head"><span class="n">03</span><h2>분류 동작 — E2E 처리 흐름</h2></div>
+    <div class="sec-sub">업로드부터 등급 확정·검수 분기까지. 분류기·룰·RAG·메타데이터가 <b>합의 게이트로 모여</b> 등급이 된다.</div>
+
+    <!-- A. 등급 체계 -->
+    <div class="grade">
+      <div class="formula">등급 = 비공지성(S) × 경제적유용성(V) × 비밀관리성(M)</div>
+      <div class="chips">
+        <span class="chip top">TS</span><span class="chip">S1</span><span class="chip">S2</span><span class="chip">S3</span>
+        <span class="muted" style="font-size:11.5px;align-self:center;margin-left:4px;">부정경쟁방지법 영업비밀 3요건</span>
+      </div>
+    </div>
+
+    <!-- E2E flow -->
+    <div class="diag">
+      <div class="node soft"><div class="nt">문서 업로드</div></div>
+      <div class="arr">→</div>
+      <div class="node soft"><div class="nt">추출·전처리</div><div class="nd">OCR · 정규화 · 청킹</div></div>
+      <div class="arr">→</div>
+      <div class="grp" style="flex:2 1 320px;">
+        <div class="grp-l">분류 연산</div>
+        <div class="diag" style="margin:0;gap:6px;">
+          <div class="node" style="min-width:120px;"><div class="nt">분류기</div><div class="nd">KF-DeBERTa · 등급+신뢰도</div></div>
+          <div class="node" style="min-width:110px;"><div class="nt">룰 모델</div><div class="nd">S/V/M 키워드</div></div>
+          <div class="node" style="min-width:110px;"><div class="nt">RAG 근거</div><div class="nd">유사 선례 검색</div></div>
+          <div class="node" style="min-width:120px;"><div class="nt">메타데이터</div><div class="nd">보안표시·접근범위·출처</div></div>
+        </div>
+      </div>
+      <div class="arr">→</div>
+      <div class="node dark"><div class="nt">합의·보정 게이트</div><div class="nd">룰·모델 합의 + 메타 floor</div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="nt">등급 + 신뢰도</div><div class="nd">자동확정 / 검수 라우팅</div></div>
+    </div>
+    <div class="diag" style="gap:8px;">
+      <div class="node soft" style="flex:1 1 46%;"><div class="nt">자동확정</div><div class="nd">고신뢰 + 룰·모델 합의 시</div></div>
+      <div class="node soft" style="flex:1 1 46%;"><div class="nt">검수 라우팅 (사람 확인)</div><div class="nd">저신뢰 · 불일치 · 고등급</div></div>
+    </div>
+
+    <!-- C. fail-closed -->
+    <div class="band">
+      <div class="bt">안전 모드 — fail-closed (상향 격리)</div>
+      <p>장애·본문 판독 불가·판단 모호 시 문서를 <b>낮은 등급으로 떨어뜨리지 않고 최고등급으로 격리</b>한 뒤 사람 검수 큐로 보낸다. <b>미탐(비밀→공개) 0을 최우선</b>으로 하는 보수적 기본 동작이다.</p>
+    </div>
+  </section>
+
+  <!-- ④ 모델 선정 -->
+  <section id="s4">
+    <div class="sec-head"><span class="n">04</span><h2>모델 선정 — 근거</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:18%;">영역</th><th style="width:24%;">선정</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>벡터검색</td>
+            <td class="pick">PostgreSQL<br>+ pgvector</td>
+            <td>
+              <ul class="reasons">
+                <li>트랜잭션 정합성(ACID)</li><li>이중쓰기 제거</li><li>운영 단순(컴포넌트↓)</li><li>즉시 일관성</li><li>백업·DR 단순</li>
+              </ul>
+              <p style="margin:7px 0 0;font-size:12px;" class="muted">분류 등급은 <b>모델</b>이 산출(검색은 근거·답변 보조) → 검색 품질이 등급 정확도를 좌우하지 않으므로 <b>정합성·운영 단순성을 우선</b>해도 안전.</p>
+            </td>
+          </tr>
+          <tr>
+            <td>임베딩</td>
+            <td class="pick">KURE-v1</td>
+            <td>한국어 특화 임베더(1024차원). 우리 코퍼스 dense 실측 <b>KURE-v1 ≥ BGE-M3</b>(@1 +5~7pp 일관, KURE=BGE-M3 한국어 파인튜닝판). BGE-M3 폴백.</td>
+          </tr>
+          <tr>
+            <td>분류 모델</td>
+            <td class="pick">KF-DeBERTa</td>
+            <td>한국어 특화 분류기. <b>정확도 65–78% · 고등급 미탐 14–21%</b>(룰 대비 미탐 반감). 미보정 과신 방지용 <b>온도 보정(temperature scaling) 적용</b>(학습 후 사후 캘리브레이션) — 보정계수는 골든셋 반입 후 확정.</td>
+          </tr>
+          <tr>
+            <td>LLM<br><span class="muted" style="font-size:11px;">Qwen3-14B</span></td>
+            <td class="pick">Qwen3</td>
+            <td><b>vs Gemma 실측 비교</b>로 선정(품질·라이선스·폐쇄망 적합). <b>지재원</b>=합성 학습데이터·골든 자동라벨 / <b>고객사</b>=RAG /answer 답변합성·선택적 2차판정. <b>분류 등급결정 핫패스는 LLM-free</b>(분류기+룰+RAG검색+메타, 333ms CPU). 2차판정 게이트는 기본 OFF이며, 켜도 등급을 바꾸지 않고 상향 시 검수로만 라우팅.<br><span class="muted" style="font-size:12px;">말뭉치: 학습·평가 <b>4,554건</b> · 골든셋 <b>1,000건 이상</b> 목표(현재 후보 500건, TS·S1·S2·S3 균형)</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="band gray" style="margin-top:14px;">
+      <div class="bt">왜 pgvector인가 — Elasticsearch 대비 (실측 기반)</div>
+      <p style="margin:4px 0 0;font-size:12.5px;">ES는 검색은 강하나 <b>별도 시스템</b>이라 이중쓰기·동기화가 필요하다. 분류는 모델이 하므로(검색=보조) <b>정합성·운영</b>을 우선한다.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:26%;">항목</th><th>Elasticsearch</th><th>PostgreSQL + pgvector</th></tr></thead>
+        <tbody>
+          <tr><td>한국어 lexical 검색</td><td>BM25+nori 실측 R@5 94%(발췌쿼리·ES, 미채택)</td><td><b>bigram tsvector + ts_rank R@5 87%(≈nori) — 실 PG 풀스택 측정 완료(2026-06-24)</b></td></tr>
+          <tr><td>dense 벡터검색</td><td>실측 R@5 55% (동일 임베딩)</td><td><b>55% (HNSW · 동일)</b></td></tr>
+          <tr><td>트랜잭션 정합성</td><td>✗ 별도 시스템 · 이중쓰기</td><td><b>✓ ACID 단일 트랜잭션</b></td></tr>
+          <tr><td>쓰기→검색 일관성</td><td>최종 (refresh ~5s)</td><td><b>즉시 (read-after-write)</b></td></tr>
+          <tr><td>운영 복잡도</td><td>컨테이너 +1 · 동기화</td><td><b>단일 DB</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="band">
+      <div class="bt">실측 근거 · 정직성</div>
+      <p>검색 차이로 우려됐던 한국어 lexical은 <b>실 PG 풀스택으로 측정</b>(2026-06-24: PG ts_rank-bigram 87% ≈ nori 89%, 하이브리드 85% &gt; dense 76%)했고 dense 벡터검색은 동일하다(쿼리가 합성·LLM 생성이라 실 운영쿼리 모니터는 본개발). 그러나 <b>분류 정확도는 동일 비교조건에서 분류기 59–77% vs 검색기반 kNN 38–49%</b>(헤드라인 65–78%는 배포 실측 기준) — 분류는 검색이 아니라 모델이 한다. 따라서 검색엔진은 <b>정합성·운영(pgvector)</b>을 택해도 등급 정확도에 영향이 없다. <span class="muted">(수치 전부 실측 · 본 코퍼스 기준, pgvector 한국어 lexical 실 PG 측정 2026-06-24 — ts_rank-bigram 87%≈nori, 하이브리드 85%&gt;dense 76%)</span></p>
+    </div>
+  </section>
+
+  <!-- ⑤ 운영 라이프사이클 (골든셋·학습·배포 통합) -->
+  <section id="s5">
+    <div class="sec-head"><span class="n">05</span><h2>운영 라이프사이클 — 골든셋 → 학습 → 배포 (라이프사이클 · 환류 미확정)</h2></div>
+    <div class="sec-sub">데이터(골든셋) → 모델(학습) → 배포 → 운영의 사이클. 지재원이 <b>A·B</b>(골든셋·학습)를, 고객사가 <b>C</b>(배포·운영)를 맡는다. 운영 환류는 <b>미확정 결정</b>(무반출·온사이트·반출 3안 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>): 기본(무반출)에선 <b>집계 진단지표만</b> 지재원으로 가고(문서·교정은 망 내 잔류), 재학습은 지재원이 자기 골든셋으로 실데이터 1차학습 후 드리프트/이벤트 단발로 수행한다.</div>
+
+    <div class="grp" style="flex:1 1 100%;">
+      <div class="grp-l">지재원 · A. 골든셋 구축</div>
+      <div class="gs" style="margin:0;">
+        <div class="gs-step"><div class="n">① 생성·수집</div><div class="t">후보 확보</div><div class="d">합성(Qwen3)+공개데이터</div></div>
+        <div class="gs-step"><div class="n">② 자동 라벨</div><div class="t">룰+LLM 이중</div><div class="d">S/V/M·근거·신뢰계층</div></div>
+        <div class="gs-step"><div class="n">③ 검수 큐</div><div class="t">우선순위</div><div class="d">룰≠모델·고등급 우선</div></div>
+        <div class="gs-step hl"><div class="n">④ 사람 검수</div><div class="t">accept/correct</div><div class="d">검수 콘솔(관리자)</div></div>
+        <div class="gs-step"><div class="n">⑤ 편입</div><div class="t">accepted만</div><div class="d">버전·검수자 감사</div></div>
+      </div>
+    </div>
+    <div class="console">
+      <div class="ct">검수 콘솔 구성 (한 화면 · 관리자)</div>
+      <div class="row">
+        <span class="it">문서 본문</span>
+        <span class="it">자동 등급 + 신뢰도</span>
+        <span class="it">S/V/M 판단 근거</span>
+        <span class="it">유사 선례</span>
+        <span class="it act">[accept]</span>
+        <span class="it act">[correct]</span>
+        <span class="it">→ 최종 라벨·검수자·근거 기록</span>
+      </div>
+    </div>
+
+    <div class="grp" style="flex:1 1 100%;margin-top:12px;">
+      <div class="grp-l">지재원 · B. 학습 (GPU 1회 · 미탐 게이트 통과 시만 승인)</div>
+      <div class="diag" style="margin:0;">
+        <div class="node soft"><div class="nt">데이터 분할</div><div class="nd">train/val/test · 누출 차단</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">KF-DeBERTa 학습</div><div class="nd">한국어 분류기 fine-tune</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">온도 보정</div><div class="nd">사후 캘리브레이션 · 계수는 골든셋 후 확정</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">평가</div><div class="nd">정확도 · 미탐(FNR)</div></div>
+        <div class="arr">→</div>
+        <div class="node dark"><div class="nt">평가 게이트</div><div class="nd">미탐 비회귀 통과 시만</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">모델 등록</div><div class="nd">MLflow · 롤백 지점</div></div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--soft);margin:7px 2px 0;border-left:3px solid var(--text);padding:7px 12px;background:var(--surface);">⚠ <b>게이트 탈락(미탐 회귀) 시</b> → 배포 보류 · 이전 모델 유지 · 원인 수정 후 재학습 <span style="color:var(--dim);">(운영엔 검증 통과 모델만 도달)</span></div>
+
+    <div class="diag" style="justify-content:center;color:var(--dim);font-family:var(--mono);font-size:12px;margin:8px 0;">↓ 오프라인 골든 번들 (모델 + 보정값 + 골든셋 + 마이그레이션 · 서명·체크섬 · 보안 매체로 폐쇄망 반입)</div>
+
+    <div class="grp" style="flex:1 1 100%;">
+      <div class="grp-l">고객사 · C. 배포·적용 (추론 · CPU)</div>
+      <div class="diag" style="margin:0;">
+        <div class="node soft"><div class="nt">설치</div><div class="nd">docker load · 체크섬 검증</div></div>
+        <div class="arr">→</div>
+        <div class="node dark"><div class="nt">핫리로드</div><div class="nd">고객사 현장 로컬 (update 스크립트/재시작) · 비동기 배치라 교체 중 신규 업로드 처리만 수초 지연</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="nt">운영·모니터</div><div class="nd">미탐율 감시 → 악화 시 롤백</div></div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--dim);margin:7px 2px 0;">배포 후 운영 점검(버전·평가 재확인·미탐 모니터)과 롤백 절차는 <b>운영 런북(본개발)</b>에서 정의한다.</div>
+    <div class="band gray">
+      <div class="bt">↺ 환류 — 방식 미확정(무반출·온사이트·반출 3안)</div>
+      <p><b>기본 권고(무반출)</b>: 고객사에서 나가는 건 <b>집계 진단지표</b>(오분류율·혼동행렬, 문서식별 불가)뿐 → <b>A. 골든셋</b> 보강 우선순위 참고. 재학습(B)은 지재원이 자기 골든셋으로 <b>실데이터 1차학습 + 드리프트/이벤트 단발</b> 수행 → 재배포(C). 교정·문서는 고객사 망 내 잔류(반출 금지); 문서단위 반출 후 중앙 재학습은 비권장 옵션이다.</p>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 · 2026-06 · Lloydk AI Engine · 상세 근거는 기술구현 백서 v7</span>
+  <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa · Qwen3 · Docker(폐쇄망)</span>
+</footer>
+</body>
+</html>

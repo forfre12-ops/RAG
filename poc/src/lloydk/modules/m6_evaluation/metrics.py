@@ -41,6 +41,9 @@ class MetricsResult:
     f1_macro: float
     fnr_overall: float
     fnr_by_grade: dict[str, float] = field(default_factory=dict)
+    # [A4] 방향성 미탐(고등급→저등급)만 측정 — RFP FUN-024 핵심 KPI. 과분류(저→고) 제외.
+    fnr_underclass_overall: float = 0.0
+    fnr_underclass_by_grade: dict[str, float] = field(default_factory=dict)
     per_class: dict[str, dict[str, float]] = field(default_factory=dict)
     confusion_matrix: list[list[int]] = field(default_factory=list)
 
@@ -55,6 +58,8 @@ class MetricsResult:
             "f1_macro": self.f1_macro,
             "fnr_overall": self.fnr_overall,
             "fnr_by_grade": self.fnr_by_grade,
+            "fnr_underclass_overall": self.fnr_underclass_overall,
+            "fnr_underclass_by_grade": self.fnr_underclass_by_grade,
             "per_class": self.per_class,
             "confusion_matrix": self.confusion_matrix,
         }
@@ -94,6 +99,8 @@ def compute_metrics_from_arrays(
     )
 
     fnr_overall, fnr_by = _fnr_from_cm(cm, label_list)
+    # [A4] 방향성 미탐(고등급→저등급) — RFP FUN-024 핵심 KPI. 과분류(저→고)는 제외.
+    fnr_uc_overall, fnr_uc_by = _fnr_underclass_from_cm(cm, label_list)
     per_class = {
         lbl: {
             "precision": float(p_per[i]),
@@ -115,6 +122,8 @@ def compute_metrics_from_arrays(
         f1_macro=float(f),
         fnr_overall=fnr_overall,
         fnr_by_grade=fnr_by,
+        fnr_underclass_overall=fnr_uc_overall,
+        fnr_underclass_by_grade=fnr_uc_by,
         per_class=per_class,
         confusion_matrix=cm.tolist(),
     )
@@ -123,7 +132,6 @@ def compute_metrics_from_arrays(
 def compute_metrics_from_db(
     model_version: str,
     *,
-    tenant_id: str | None = None,
     labels: Sequence[str] | None = None,
 ) -> MetricsResult | None:
     """DB의 classifications + corrections로 진실 라벨 vs 예측 라벨 페어 추출.
@@ -137,7 +145,7 @@ def compute_metrics_from_db(
     """
     try:
         with session_scope() as db:
-            pairs = _fetch_truth_pred_pairs(db, model_version, tenant_id=tenant_id)
+            pairs = _fetch_truth_pred_pairs(db, model_version)
     except SQLAlchemyError:
         return None
 
@@ -171,11 +179,39 @@ def _fnr_from_cm(cm: np.ndarray, labels: Sequence[str]) -> tuple[float, dict[str
     return overall, fnr_by
 
 
+# 영업비밀 등급 심각도 순서 (낮은 값=고등급). under-class = 예측이 정답보다 *낮은 등급*.
+_GRADE_SEVERITY = {"TS": 0, "S1": 1, "S2": 2, "S3": 3}
+
+
+def _fnr_underclass_from_cm(cm: np.ndarray, labels: Sequence[str]) -> tuple[float, dict[str, float]]:
+    """방향성 미탐(under-classification)만 측정 — RFP FUN-024 핵심 KPI.
+
+    행=정답, 열=예측. 정답보다 *낮은 등급(심각도↓)*으로 예측된 것만 FN으로 센다.
+    과분류(저등급→고등급)는 보안상 안전한 오류이므로 제외 — 일반 FNR(1-recall)과 구별.
+    심각도 순서에 없는 커스텀 등급은 under-class 계산에서 안전하게 제외.
+    """
+    fnr_by: dict[str, float] = {}
+    fn_total = 0
+    pos_total = 0
+    for i, name in enumerate(labels):
+        row_sum = int(cm[i].sum())
+        true_sev = _GRADE_SEVERITY.get(name)
+        under = 0
+        if true_sev is not None:
+            for j, pname in enumerate(labels):
+                pred_sev = _GRADE_SEVERITY.get(pname)
+                if pred_sev is not None and pred_sev > true_sev:  # 더 낮은 등급으로 예측 = 미탐
+                    under += int(cm[i, j])
+        fnr_by[name] = float(under / row_sum) if row_sum else 0.0
+        fn_total += under
+        pos_total += row_sum
+    overall = float(fn_total / pos_total) if pos_total else 0.0
+    return overall, fnr_by
+
+
 def _fetch_truth_pred_pairs(
     db: Session,
     model_version: str,
-    *,
-    tenant_id: str | None = None,
 ) -> list[tuple[str, str]]:
     # level_id → code 매핑
     code_by_id = {
@@ -185,8 +221,6 @@ def _fetch_truth_pred_pairs(
 
     # classifications 조회
     stmt = select(Classification).where(Classification.model_version == model_version)
-    if tenant_id:
-        stmt = stmt.where(Classification.tenant_id == tenant_id)
     cls_list = list(db.execute(stmt).scalars())
     if not cls_list:
         return []

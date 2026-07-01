@@ -17,69 +17,47 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 
+_SRC = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
-def softmax(logits: list[float], temperature: float = 1.0) -> list[float]:
-    if temperature <= 0:
-        temperature = 1e-3
-    scaled = [v / temperature for v in logits]
-    m = max(scaled)
-    exps = [math.exp(s - m) for s in scaled]
-    z = sum(exps)
-    return [e / z for e in exps]
-
-
-def neg_log_likelihood(logits_list: list[list[float]], labels: list[int], T: float) -> float:
-    nll = 0.0
-    for logits, y in zip(logits_list, labels):
-        probs = softmax(logits, temperature=T)
-        p = max(probs[y], 1e-9)
-        nll -= math.log(p)
-    return nll / max(len(labels), 1)
-
-
-def expected_calibration_error(logits_list: list[list[float]], labels: list[int], T: float, n_bins: int = 10) -> float:
-    bins: list[list[tuple[float, int]]] = [[] for _ in range(n_bins)]
-    for logits, y in zip(logits_list, labels):
-        probs = softmax(logits, temperature=T)
-        pred = max(range(len(probs)), key=lambda i: probs[i])
-        conf = probs[pred]
-        bin_idx = min(int(conf * n_bins), n_bins - 1)
-        bins[bin_idx].append((conf, 1 if pred == y else 0))
-
-    ece = 0.0
-    n = max(len(labels), 1)
-    for bucket in bins:
-        if not bucket:
-            continue
-        acc = sum(b[1] for b in bucket) / len(bucket)
-        conf = sum(b[0] for b in bucket) / len(bucket)
-        ece += (len(bucket) / n) * abs(conf - acc)
-    return ece
-
-
-def find_best_temperature(logits_list: list[list[float]], labels: list[int], lo: float = 0.05, hi: float = 5.0, steps: int = 200) -> float:
-    best_T = 1.0
-    best_nll = neg_log_likelihood(logits_list, labels, 1.0)
-    for i in range(steps + 1):
-        T = lo + (hi - lo) * (i / steps)
-        nll = neg_log_likelihood(logits_list, labels, T)
-        if nll < best_nll:
-            best_nll = nll
-            best_T = T
-    return best_T
+# [중복 제거] 온도 스케일링 핵심은 m6_evaluation.temperature 로 일원화 — trainer 자동연결과 공유.
+from lloydk.modules.m6_evaluation.temperature import (  # noqa: E402
+    expected_calibration_error,
+    find_best_temperature,
+    neg_log_likelihood,
+)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="A6: temperature scaling calibration")
     parser.add_argument("--val", type=Path, required=False, help="val.jsonl (없으면 dummy)")
     parser.add_argument("--model-dir", type=Path, default=Path("artifacts/classifier"))
-    parser.add_argument("--output", type=Path, default=Path("artifacts/classifier/temperature.json"))
+    # 기본 출력은 model-dir/temperature.json — 서빙(m5 pipeline)이 model_dir에서만 T를
+    # 읽으므로, --output을 생략하면 보정 결과가 서빙이 읽는 곳에 정확히 떨어진다.
+    # (과거 고정 default 'artifacts/classifier/temperature.json'은 --model-dir을 다르게
+    #  주면 죽은 경로에 기록돼 보정이 서빙에 반영되지 않는 사고가 있었다.)
+    parser.add_argument("--output", type=Path, default=None,
+                        help="기본: <model-dir>/temperature.json")
     parser.add_argument("--n-bins", type=int, default=10)
+    parser.add_argument("--allow-dummy", action="store_true",
+                        help="실제 val logits가 없을 때 더미로 진행(검증 전용). 미지정 시 fail-loud.")
     args = parser.parse_args()
+    if args.output is None:
+        args.output = args.model_dir / "temperature.json"
+
+    # [보정 배선] --val 미지정 시 모델 dir에 동봉된 val_logits.jsonl 자동 탐색.
+    # trainer.py가 학습 종료 시 검증셋 per-row logits를 <model-dir>/val_logits.jsonl로
+    # 남긴다 → --val 없이도 *실제* logits로 보정해 더미/배포금지 분기를 우회한다.
+    # 사용자가 --val을 명시하면 그게 최우선(기존 동작 보존).
+    if not args.val:
+        _auto = args.model_dir / "val_logits.jsonl"
+        if _auto.exists():
+            args.val = _auto
+            print(f"[INFO] val 미지정 — 모델 동봉 {_auto} 사용(실 logits 보정).", file=sys.stderr)
 
     # 실제 학습된 모델이 없으면 dummy logits로 dry 실행
     if args.val and args.val.exists():
@@ -102,6 +80,17 @@ def main() -> int:
             args.val = None
 
     if not args.val or not args.val.exists():
+        # #10: 더미 logits로 적합한 T는 의미 없다 — 실수로 배포되지 않게 fail-loud.
+        # 검증·CI 목적이면 --allow-dummy를 명시해야 진행한다.
+        if not args.allow_dummy:
+            print(
+                "[ERR] 실제 val logits 없음 — 더미 logits로 만든 temperature는 배포 금지.\n"
+                "      --val <logits·label_idx 포함 jsonl>를 제공하거나, 검증 목적이면 "
+                "--allow-dummy를 명시하세요.",
+                file=sys.stderr,
+            )
+            return 1
+        print("[WARN] --allow-dummy: 더미 logits로 진행 — 산출 T는 배포 금지(검증 전용).", file=sys.stderr)
         # dummy: over-confident logits
         logits_list = [
             [3.0, 1.0, 0.5, 0.2], [2.5, 1.2, 0.7, 0.1], [3.5, 0.8, 0.3, 0.1],

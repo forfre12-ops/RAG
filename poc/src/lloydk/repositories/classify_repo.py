@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from typing import Iterable
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from lloydk.db.models import (
@@ -19,7 +19,6 @@ from lloydk.db.models import (
     Correction,
     Document,
     DocumentLabel,
-    Tenant,
 )
 from lloydk.schemas.classify import EvidenceSpan, RagContextHit
 from lloydk.schemas.common import Grade
@@ -43,22 +42,12 @@ class ClassifyRepo:
     # Lookup helpers
     # ------------------------------------------------------------
 
-    def tenant_exists(self, tenant_id: str) -> bool:
-        return self.db.get(Tenant, tenant_id) is not None
-
-    def document_exists(self, doc_id: uuid.UUID, tenant_id: str | None = None) -> bool:
+    def document_exists(self, doc_id: uuid.UUID) -> bool:
         """문서 존재 확인.
 
-        보안: tenant_id가 주어지면 그 tenant 소유일 때만 True(객체 수준 권한).
-        교차테넌트 doc_id로 분류가 엉뚱한 tenant 밑에 영속화(orphan)되는 것을 차단.
-        tenant_id=None은 하위호환(스코프 미적용).
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
         """
-        doc = self.db.get(Document, doc_id)
-        if doc is None:
-            return False
-        if tenant_id is not None and doc.tenant_id != tenant_id:
-            return False
-        return True
+        return self.db.get(Document, doc_id) is not None
 
     def level_id_by_code(self, code: Grade | str) -> int | None:
         """Grade 열거형 또는 코드 문자열을 level_id로 변환."""
@@ -78,7 +67,6 @@ class ClassifyRepo:
         self,
         *,
         doc_id: uuid.UUID,
-        tenant_id: str,
         model_version: str,
         predicted_level_id: int,
         confidence: float,
@@ -92,7 +80,6 @@ class ClassifyRepo:
     ) -> Classification:
         cls = Classification(
             doc_id=doc_id,
-            tenant_id=tenant_id,
             model_version=model_version,
             predicted_level_id=predicted_level_id,
             confidence=confidence,
@@ -218,20 +205,42 @@ class ClassifyRepo:
             self.db.add(o)
 
     def list_recent_for_doc(
-        self, doc_id: uuid.UUID, *, tenant_id: str | None = None, limit: int = 10
+        self,
+        doc_id: uuid.UUID,
+        *,
+        limit: int = 10,
+        for_update: bool = False,
     ) -> list[Classification]:
         """doc_id의 최근 분류 결과.
 
-        보안: tenant_id가 주어지면 그 tenant의 분류만 반환(교차테넌트 결과 열람 차단).
-        tenant_id=None은 하위호환(스코프 미적용).
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
+
+        for_update=True면 반환 행을 잠근다(동시 검수 확정 직렬화). doc_id 경로의
+        confirm/relabel이 최신 분류 1건을 안전하게 갱신하도록 쓴다.
         """
         stmt = select(Classification).where(Classification.doc_id == doc_id)
-        if tenant_id is not None:
-            stmt = stmt.where(Classification.tenant_id == tenant_id)
         stmt = stmt.order_by(Classification.classified_at.desc()).limit(limit)
+        if for_update:
+            stmt = stmt.with_for_update()
         return list(self.db.execute(stmt).scalars())
 
-    def get(self, classification_id: uuid.UUID) -> Classification | None:
+    def get(
+        self, classification_id: uuid.UUID, *, for_update: bool = False
+    ) -> Classification | None:
+        """classification 단건 조회.
+
+        for_update=True면 행 잠금(SELECT ... FOR UPDATE)으로 조회한다 — 동시 검수
+        확정(confirm/relabel)이 같은 분류를 건드릴 때 트랜잭션을 직렬화해 status
+        race·중복 correction을 막는다. SELECT FOR UPDATE를 지원하지 않는 백엔드
+        (SQLite 테스트)에서는 SQLAlchemy가 잠금 절을 안전하게 생략한다.
+        """
+        if for_update:
+            stmt = (
+                select(Classification)
+                .where(Classification.classification_id == classification_id)
+                .with_for_update()
+            )
+            return self.db.execute(stmt).scalar_one_or_none()
         return self.db.get(Classification, classification_id)
 
     def update_status(self, classification_id: uuid.UUID, status: str) -> None:
@@ -244,16 +253,14 @@ class ClassifyRepo:
     # ------------------------------------------------------------
 
     def get_verified_document_label(
-        self, doc_id: uuid.UUID, *, tenant_id: str | None = None
+        self, doc_id: uuid.UUID
     ) -> DocumentLabel | None:
         """doc_id에 대한 검증된 라벨 조회 (is_verified=True 우선).
 
         human_review → llm_judge_consensus → llm_judge_primary 우선순위로 반환.
         없으면 None → 모델 추론으로 계속 진행.
 
-        보안: tenant_id가 주어지면 그 tenant 소유 문서의 라벨만 반환(Document 조인).
-        DocumentLabel은 자체 tenant_id가 없으므로 documents.tenant_id로 스코프한다.
-        교차테넌트 검증 등급(human_review 결과) 유출 차단. tenant_id=None은 하위호환.
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
         """
         _LABEL_SOURCE_PRIORITY = {
             "human_review": 1,
@@ -261,6 +268,7 @@ class ClassifyRepo:
             "nkt_designated": 2,
             "codex_review": 3,
             "public_definitive": 4,
+            "rule_llm_agreement": 5,   # P1 신규 게이트(룰·LLM 합의+근거) — 구 llm_judge_consensus 동급
             "llm_judge_consensus": 5,
             "llm_judge_primary": 6,
         }
@@ -271,10 +279,6 @@ class ClassifyRepo:
             else DocumentLabel.is_verified.is_(True)
         )
         stmt = select(DocumentLabel).where(DocumentLabel.doc_id == doc_id).where(verified_cond)
-        if tenant_id is not None:
-            stmt = stmt.join(Document, DocumentLabel.doc_id == Document.doc_id).where(
-                Document.tenant_id == tenant_id
-            )
         rows = list(self.db.execute(stmt).scalars())
         if not rows:
             return None
@@ -296,9 +300,18 @@ class ClassifyRepo:
         reason: str | None = None,
     ) -> Correction:
         """direction은 등급 order 비교로 자동 결정."""
+        # #27(풀스캔 제거): ClassificationLevel 전체를 dict로 적재하지 않고
+        # direction 산출에 필요한 두 level_id(원본·교정)만 WHERE level_id IN (...)으로
+        # 조회한다. 등급 수가 늘어도(다중 등급체계) 조회 비용이 일정하게 유지된다.
+        # original==corrected(confirm) 같은 경우 IN 집합이 1건으로 줄어드는 것도 OK.
+        wanted = {original_level_id, corrected_level_id}
         levels = {
-            lv.level_id: lv.level_order
-            for lv in self.db.execute(select(ClassificationLevel)).scalars()
+            level_id: level_order
+            for level_id, level_order in self.db.execute(
+                select(
+                    ClassificationLevel.level_id, ClassificationLevel.level_order
+                ).where(ClassificationLevel.level_id.in_(wanted))
+            ).all()
         }
         orig_order = levels.get(original_level_id)
         new_order = levels.get(corrected_level_id)
@@ -314,7 +327,90 @@ class ClassifyRepo:
         )
         self.db.add(corr)
         self.db.flush()
+        # [KPI] 교정 관련 실시간 지표 — best-effort(메트릭 실패가 교정 쓰기를 막지 않음).
+        #  · 발생률(direction별): underclass = 보안 미탐/자동확정 품질·죽음의 나선 신호
+        #  · 처리시간: classified_at→corrected_at (관리자 검수 소요)
+        #  · 동일문서 재등장: 같은 doc에 이전 교정이 있던 재교정(문서 churn·재검수 부담)
+        try:
+            from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                ADMIN_REVIEW_SECONDS,
+                CORRECTION_TOTAL,
+                SAME_DOC_RESURFACE_TOTAL,
+            )
+
+            CORRECTION_TOTAL.labels(direction=direction).inc()
+            cls = self.db.get(Classification, classification_id)
+            if cls is not None:
+                if cls.classified_at is not None:
+                    import datetime as _dt  # noqa: PLC0415
+
+                    ca = cls.classified_at
+                    if ca.tzinfo is None:
+                        ca = ca.replace(tzinfo=_dt.timezone.utc)
+                    secs = (_dt.datetime.now(_dt.timezone.utc) - ca).total_seconds()
+                    if secs >= 0:
+                        ADMIN_REVIEW_SECONDS.observe(secs)
+                # 같은 doc에 이번 것 외 다른 교정이 있으면 재등장(recurring re-review).
+                prior = (
+                    self.db.execute(
+                        select(func.count())
+                        .select_from(Correction)
+                        .join(
+                            Classification,
+                            Correction.classification_id == Classification.classification_id,
+                        )
+                        .where(
+                            Classification.doc_id == cls.doc_id,
+                            Correction.correction_id != corr.correction_id,
+                        )
+                    ).scalar()
+                    or 0
+                )
+                if prior > 0:
+                    SAME_DOC_RESURFACE_TOTAL.inc()
+        except Exception:  # noqa: BLE001
+            pass
         return corr
+
+    def correction_exists(
+        self,
+        classification_id: uuid.UUID,
+        corrected_level_id: int,
+        corrected_by: str,
+    ) -> bool:
+        """동일 (classification, 교정등급, 교정자) correction 존재 여부 — 멱등성 가드.
+
+        같은 검수자가 같은 분류를 같은 등급으로 두 번 확정/정정해도(중복 클릭·재시도)
+        correction이 2건 쌓이지 않게 한다. 행 잠금(get for_update)과 함께 쓰면 동시
+        확정에서도 단일 correction만 남는다.
+        """
+        row = self.db.execute(
+            select(Correction.correction_id)
+            .where(
+                Correction.classification_id == classification_id,
+                Correction.corrected_level_id == corrected_level_id,
+                Correction.corrected_by == corrected_by,
+            )
+            .limit(1)
+        ).first()
+        return row is not None
+
+    def distinct_reviewers_for_level(
+        self, classification_id: uuid.UUID, corrected_level_id: int
+    ) -> set[str]:
+        """이 분류를 해당 등급으로 교정한 **서로 다른 검수자** 집합 (C-cons 2인검토용).
+
+        고등급 변경의 합의(2인 이상)를 판정하는 근거. 같은 검수자가 여러 번 교정해도 1명으로 센다.
+        """
+        rows = self.db.execute(
+            select(Correction.corrected_by)
+            .where(
+                Correction.classification_id == classification_id,
+                Correction.corrected_level_id == corrected_level_id,
+            )
+            .distinct()
+        ).scalars()
+        return {r for r in rows if r}
 
     @staticmethod
     def _direction(orig_order: int | None, new_order: int | None) -> str:
@@ -354,12 +450,25 @@ class ClassifyRepo:
     ) -> int:
         import datetime as _dt
         now = _dt.datetime.now(_dt.timezone.utc)
-        count = 0
-        for cid in correction_ids:
-            corr = self.db.get(Correction, cid)
-            if corr is None:
-                continue
-            corr.consumed_in_run = run_id
-            corr.consumed_at = now
-            count += 1
-        return count
+        # #27(N+1 제거): id별 db.get→객체 갱신 루프를 단일 bulk UPDATE 1쿼리로 대체.
+        # 반환값 의미(실제 갱신된 correction 건수)는 result.rowcount로 보존한다.
+        # 빈 id 집합이면 IN () 빈 UPDATE를 피하고 0 반환.
+        ids = list(correction_ids)
+        if not ids:
+            return 0
+        # synchronize_session="fetch"로 세션 동기화를 요청하되, 일부 백엔드/버전
+        # (예: SQLite + SA 2.0.x)에서 identity map에 이미 로드된 인스턴스가
+        # 즉시 만료되지 않는 경우가 있어, 갱신 대상 중 세션에 로드된 객체는
+        # 명시적으로 expire하여 후속 db.get이 신선한 consumed_* 값을 보게 한다.
+        # (SQLite/PG 양쪽에서 동작 — 기존 루프 방식의 "갱신 반영" 의미 보존.)
+        result = self.db.execute(
+            update(Correction)
+            .where(Correction.correction_id.in_(ids))
+            .values(consumed_in_run=run_id, consumed_at=now)
+            .execution_options(synchronize_session="fetch")
+        )
+        id_set = set(ids)
+        for corr in list(self.db.identity_map.values()):
+            if isinstance(corr, Correction) and corr.correction_id in id_set:
+                self.db.expire(corr)
+        return result.rowcount or 0

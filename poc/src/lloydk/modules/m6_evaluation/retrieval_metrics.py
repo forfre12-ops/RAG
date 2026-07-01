@@ -160,7 +160,6 @@ def compute_retrieval_metrics_from_arrays(
 def compute_retrieval_metrics_from_db(
     *,
     model_version: str | None = None,
-    tenant_id: str | None = None,
     top_k: int = 5,
     relevants_by_classification: dict[uuid.UUID, Iterable[str]] | None = None,
 ) -> RetrievalMetricsResult | None:
@@ -171,7 +170,6 @@ def compute_retrieval_metrics_from_db(
 
     Args:
         model_version: classifications 필터. None이면 모든 버전.
-        tenant_id:     tenant 필터.
         top_k:         평가 cutoff. evidence는 contribution(rag_similarity) 내림차순.
         relevants_by_classification:
                        classification_id → relevant doc_id 집합.
@@ -188,7 +186,6 @@ def compute_retrieval_metrics_from_db(
             pairs = _fetch_rag_evidence(
                 db,
                 model_version=model_version,
-                tenant_id=tenant_id,
                 top_k=top_k,
             )
     except SQLAlchemyError:
@@ -225,7 +222,6 @@ def _fetch_rag_evidence(
     db: Session,
     *,
     model_version: str | None,
-    tenant_id: str | None,
     top_k: int,
 ) -> list[tuple[uuid.UUID, list[str]]]:
     """분류별 RAG retrieved 문서 id 리스트 (rag_similarity 내림차순, top_k 컷).
@@ -235,8 +231,6 @@ def _fetch_rag_evidence(
     stmt = select(Classification.classification_id)
     if model_version is not None:
         stmt = stmt.where(Classification.model_version == model_version)
-    if tenant_id is not None:
-        stmt = stmt.where(Classification.tenant_id == tenant_id)
     cls_ids = [row for row in db.execute(stmt).scalars()]
     if not cls_ids:
         return []

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>소스코드 고도화 백로그 (검증본)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Noto Sans KR", sans-serif;
+         max-width: 1000px; margin: 32px auto; padding: 0 24px; color: #0a0a0a; line-height: 1.6; }
+  h1 { font-size: 28px; letter-spacing: -0.02em; margin-bottom: 4px; }
+  h2 { font-size: 19px; margin-top: 34px; border-bottom: 2px solid #0a0a0a; padding-bottom: 6px; }
+  h3 { font-size: 15px; margin-top: 22px; color: #b91c1c; }
+  .meta { color: #525252; font-size: 13.5px; margin-bottom: 8px; }
+  .warn-note { background: rgba(217,119,6,0.08); border-left: 3px solid #d97706; padding: 8px 12px;
+               font-size: 13px; border-radius: 4px; margin: 10px 0 24px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid rgba(0,0,0,0.1); text-align: left; vertical-align: top; }
+  th { background: #fafafa; color: #525252; font-weight: 600; font-size: 11px;
+       text-transform: uppercase; letter-spacing: 0.04em; }
+  td.n { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  code { background: #f4f4f4; padding: 1px 5px; border-radius: 4px;
+         font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 0.88em; }
+  .done { color: #15803d; font-weight: 600; }
+  .todo { color: #b45309; font-weight: 600; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+  .t0 { background: rgba(220,38,38,0.12); color: #b91c1c; }
+  .t1 { background: rgba(217,119,6,0.12); color: #b45309; }
+  .t2 { background: rgba(202,138,4,0.12); color: #a16207; }
+  .t3 { background: rgba(22,163,74,0.12); color: #15803d; }
+  .verdict-confirmed { color: #b91c1c; font-weight: 600; }
+  .verdict-nuanced { color: #a16207; font-weight: 600; }
+  ol, ul { font-size: 13.5px; }
+  .legend span { margin-right: 16px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>소스코드 고도화 백로그 <span style="font-weight:400;color:#525252">(검증본)</span></h1>
+<div class="meta">작성일 2026-06-20 · 대상 <code>poc/src/lloydk</code> (146 파일, ~23k LOC) + 인프라(docker-compose·Makefile·alembic·scripts·static)</div>
+<div class="meta">방법: 서브시스템 6분할 병렬 감사 → 상위 항목 적대적(refute-first) 재검증 → 직접 코드/레퍼런스 대조</div>
+<div class="warn-note"><b>범위 주의:</b> 내부 엔지니어링 백로그. <code>open/</code> 공유본 트리밍 정책(원가·협상·내부정보 제거) 대상 아님 — KL/고객 공유 금지.</div>
+
+<div class="legend">
+  <span class="done">✅ 이번 브랜치(fix/design-review-hardening)에서 수정 완료</span>
+  <span class="todo">🔧 미착수(권고)</span>
+  <span>판정: <span class="verdict-confirmed">CONFIRMED</span> / <span class="verdict-nuanced">NUANCED</span></span>
+</div>
+
+<h2><span class="badge t0">Tier 0</span> 배포 전 필수 (운영 차단급)</h2>
+<table>
+<thead><tr><th>#</th><th>항목</th><th>판정</th><th>상태</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td>Celery 워커가 <code>-Q</code> 없이 기동 → 라우팅된 작업 미소비 (docker-compose.yml:142)</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ worker <code>-Q classify,index,synthesis,learning,celery</code></td></tr>
+<tr><td class="n">2</td><td><code>celery beat</code> 서비스 부재 → drift·auto-rollback·outbox·active-learning tick 미발화</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ compose <code>beat</code> 서비스 + <code>make beat</code></td></tr>
+<tr><td class="n">3</td><td>데드 라우트 <code>lloydk.index_documents</code> (태스크 미정의)</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ task_routes에서 제거</td></tr>
+<tr><td class="n">4</td><td>audit hash chain read-then-write race — 동시요청이 같은 prev를 읽어 체인 분기, verify_chain 통과</td><td class="verdict-confirmed">CONFIRMED (완화책 없음)</td><td class="done">✅ <code>build_chained_hash_locked</code>로 prev-read+insert를 advisory-lock 단일 tx에 결속</td></tr>
+<tr><td class="n">5</td><td>파티션 자동 생성 부재 — audit_log는 2026-07부터 default 파티션行 (baseline_init.py:178)</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ 백필 마이그레이션 <code>e5f6a7b8c9d0</code> + <code>ensure_partitions_tick</code>(beat 매일)</td></tr>
+<tr><td class="n">40</td><td>폐쇄망 번들이 학습 가중치·<code>temperature.json</code> 누락 → 미학습 베이스+무보정 서빙</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ <code>--classifier-model-dir</code>로 학습 가중치+temperature.json 동봉</td></tr>
+</tbody>
+</table>
+
+<h2><span class="badge t1">Tier 1</span> 보안·분류 신뢰성</h2>
+<table>
+<thead><tr><th>#</th><th>항목</th><th>판정</th><th>상태</th></tr></thead>
+<tbody>
+<tr><td class="n">6</td><td>explain/stream tenant 결속 누락 (IDOR) — explain.py:92·classify_stream.py</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ <code>resolve_effective_tenant</code> 결속</td></tr>
+<tr><td class="n">7</td><td>Idempotency-Key 전역 네임스페이스 → 교차테넌트 응답 replay</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ 자격증명+테넌트 헤더 해시로 키 prefix</td></tr>
+<tr><td class="n">12</td><td>API 키 비-상수시간 비교 (_jwt_auth.py:418)</td><td class="verdict-confirmed">CONFIRMED (low)</td><td class="done">✅ <code>hmac.compare_digest</code></td></tr>
+<tr><td class="n">13</td><td>JSON batch body 크기 파싱 후 검사 (async_classify.py:39)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 ASGI max-body 미들웨어</td></tr>
+<tr><td class="n">8</td><td>LLM 라벨러 confidence 영구 0.0 (프롬프트 스키마 누락)</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ 프롬프트 confidence + SVM 결정성 폴백(<code>_coerce_confidence</code>)</td></tr>
+<tr><td class="n">10</td><td>캘리브레이션 런타임 측정 부재 (ECE/Brier) — pipeline.py 적용만</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ <code>m6/calibration.py</code> + report 섹션 + calibrate 더미 가드</td></tr>
+<tr><td class="n">11</td><td>reviewer_trust recency 편향 — latest correction=합의+self-agreement</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 동료 합의 기반 + min_corrections 상향</td></tr>
+<tr><td class="n">41</td><td>calibrate 출력이 서빙 미참조 경로에 기록</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ <code>--output</code> 기본값을 <code>&lt;model-dir&gt;/temperature.json</code>로</td></tr>
+</tbody>
+</table>
+<h3>1차 분석 정정 (재검증으로 하향)</h3>
+<p style="font-size:13.5px"><b>#9 serving_eval FNR 편향 — "deploy_gate 오염"은 틀림.</b> fail-secure(<code>pred="TS"</code>)는 serving_eval.py:61에 실재하나 <b>deploy_gate는 이 함수를 안 씀</b>(trainer의 <code>TrainReport.test_fnr_high</code> 사용). 호출처는 진단 스크립트·테스트뿐 → 진단 리포트 정확도(Med)로 강등.</p>
+
+<h2><span class="badge t2">Tier 2</span> 검색·성능 품질</h2>
+<table>
+<thead><tr><th>#</th><th>항목</th><th>판정</th><th>상태</th></tr></thead>
+<tbody>
+<tr><td class="n">14</td><td>이중 RRF (search_hybrid RRF → retrieval.py:206 재RRF)</td><td class="verdict-nuanced">NUANCED (기본 reranker 재정렬·단일쿼리 순위보존)</td><td class="todo">🔧 단일 result_set 시 원점수 보존</td></tr>
+<tr><td class="n">15</td><td>운영 권장 <code>split_v2</code> 미사용 (indexer.py:97) → 조항/문장 절단, heading_path 유실</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 split_v2 전환</td></tr>
+<tr><td class="n">16</td><td>LLM 답변 인용 검증 경고만 (answer.py:225) → 환각 인용 반환, grounding 런타임 미호출</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 심각 시 deterministic 강등</td></tr>
+<tr><td class="n">17</td><td>재인덱싱 고아 청크 (document_indexer.py:79 단일 collection upsert)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 선삭제 또는 content_hash 멱등</td></tr>
+<tr><td class="n">18</td><td>LLM provider 재시도 비대칭 (Anthropic만 백오프)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 base로 재시도 추출</td></tr>
+<tr><td class="n">19</td><td>ES bulk 부분실패 침묵 (<code>_errors</code> 폐기)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 retry_on_timeout + 실패건 로깅</td></tr>
+<tr><td class="n">20</td><td>임베딩 dim 하드코딩(1024) — KURE-v1 차원 불일치 위험</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 실측 dim</td></tr>
+<tr><td class="n">21</td><td>PRICE_TABLE: opus-4-7 $15/$75(실제 $5/$25), opus-4-8 누락→cost=0</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ 단가 정정 + opus-4-8/4-6 추가</td></tr>
+<tr><td class="n">22</td><td>룰엔진 semantic 매칭 N회 재임베딩 (rule_engine.py:251)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 문서 임베딩 1회 재사용</td></tr>
+<tr><td class="n">23</td><td>rule-fallback이 severe-agg/τ 우회 (m5 pipeline.py:407)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 폴백도 max-pooling+τ 공유</td></tr>
+<tr><td class="n">24</td><td>임베딩 캐시 디스크 플러시 O(N) + 락 없는 순회</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 주기/종료 플러시</td></tr>
+<tr><td class="n">25</td><td>corrections 재구축 train↔holdout 누수 미차단</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 holdout 교집합 제외</td></tr>
+<tr><td class="n">42</td><td>프론트엔드 stored-XSS — admin.html이 title·근거 text를 escape 없이 innerHTML 주입</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ admin.html <code>esc</code> 헬퍼 + app.js <code>escapeHtml</code></td></tr>
+</tbody>
+</table>
+
+<h2><span class="badge t3">Tier 3</span> 견고성·운영성</h2>
+<table>
+<thead><tr><th>#</th><th>항목</th><th>판정</th><th>상태</th></tr></thead>
+<tbody>
+<tr><td class="n">26</td><td>guide UNIQUE 제약 부재 (guide_repo.py:34 select-then-insert)</td><td class="verdict-confirmed">CONFIRMED</td><td class="done">✅ <code>(guide_id,version,tenant_id)</code> UNIQUE 마이그레이션</td></tr>
+<tr><td class="n">26b</td><td>corrections UNIQUE 부재</td><td class="verdict-nuanced">NUANCED (with_for_update 행 잠금으로 직렬화)</td><td class="todo">🔧 Low — 최종 방어선용 부분 UNIQUE</td></tr>
+<tr><td class="n">27</td><td>N+1/풀스캔 (mark_corrections_consumed, add_correction)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 bulk UPDATE</td></tr>
+<tr><td class="n">28</td><td>LLMUsageService가 공유 풀 우회 (별도 engine, llm_usage_repo 데드코드)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 공유 SessionLocal 통합</td></tr>
+<tr><td class="n">29</td><td>비즈니스 OTel span 0개 (otel.py:55 자동계측만)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 핵심 경로 수동 span</td></tr>
+<tr><td class="n">30</td><td>구조화 로깅 부재 + Celery trace 전파 누락</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 JSON 포매터 + CeleryInstrumentor</td></tr>
+<tr><td class="n">31</td><td>config 검증 로직 전무 (field_validator 0개)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 soft&lt;hard, ratio 0~1, Literal</td></tr>
+<tr><td class="n">32</td><td>SSE 스트림 disconnect 미감지 + rate-limit 미적용</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 협조적 취소 + @limiter.limit</td></tr>
+<tr><td class="n">33</td><td>순수 단위테스트가 fullstack 오마킹 (test_perf_regression.py:17)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 마커 제거</td></tr>
+<tr><td class="n">34</td><td>워커 tick 단위테스트 빈 구역 (auto_rollback/deliver_outbox/train)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 tick 단위테스트</td></tr>
+<tr><td class="n">35</td><td>outbox InMemory attempts 락 밖 변형 (outbox.py:90)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 dequeue 시 deepcopy</td></tr>
+<tr><td class="n">36</td><td>storage Protocol에 list/delete 부재 (storage/base.py:6)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 인터페이스 보강</td></tr>
+<tr><td class="n">37</td><td>멀티테넌트 인덱스명 충돌 (_safe_token 50자 절단, indexer.py:218)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 절단 시 해시 suffix</td></tr>
+<tr><td class="n">38</td><td>soft-delete/보존정책 부재 (document_service.py:111 hard delete)</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 deleted_at + 보존기간</td></tr>
+<tr><td class="n">39</td><td>drift 임계 단일 고정값(KL≥0.5), 연속위반·검색 연계 없음</td><td class="verdict-confirmed">CONFIRMED</td><td class="todo">🔧 히스테리시스 + recall 트리거</td></tr>
+</tbody>
+</table>
+<p style="font-size:13px;color:#525252">alembic↔models 정합은 재검증 결과 <b>깨끗함</b>(이슈 없음).</p>
+
+<h2>수정 완료 요약 (이 브랜치)</h2>
+<p style="font-size:13.5px"><b>1차(즉시·배선) 9건:</b> #6 tenant 결속 · #7 idempotency 네임스페이스 · #12 compare_digest · #21 PRICE_TABLE · #26 guide UNIQUE(+마이그레이션 <code>d4e5f6a7b8c9</code>) · #1 worker -Q · #2 beat 서비스 · #3 데드라우트 제거 · 백로그 문서</p>
+<p style="font-size:13.5px"><b>2차(Tier 0/1 잔여) 7건:</b></p>
+<ol>
+<li>#4 audit chain advisory lock — <code>audit_chain.build_chained_hash_locked</code> + <code>middleware._raw_body_hash</code>/<code>_record</code></li>
+<li>#5 파티션 롤오버 — <code>services/partitions.py</code> + <code>tasks.ensure_partitions_tick</code> + beat + 마이그레이션 <code>e5f6a7b8c9d0</code></li>
+<li>#40 폐쇄망 번들 학습모델 동봉 — <code>scripts/build_offline_bundle.py</code> (<code>--classifier-model-dir</code>)</li>
+<li>#8 LLM 라벨러 confidence — <code>m3_labeling/llm_labeler.py</code></li>
+<li>#10 ECE 런타임 측정 — <code>m6_evaluation/calibration.py</code> + <code>report.py</code> + calibrate 더미 가드</li>
+<li>#41 calibrate 출력경로 — <code>scripts/calibrate_classifier.py</code></li>
+<li>#42 프론트엔드 XSS — <code>api/static/admin.html</code>, <code>api/static/app.js</code></li>
+</ol>
+
+<h2>3차(Tier 2/3 잔여 전부) — 배치 병렬 구현 완료</h2>
+<p style="font-size:13px;color:#525252">파일분할 병렬구현 → 배치별 통합테스트 → 커밋. 모든 동작변경은 보수적(opt-in/no-op/FNR-safe).</p>
+<ul>
+<li><b>Batch1 견고성</b> <code>422d730</code>: #13 body가드 · #17 고아청크 · #18 provider 재시도 · #19 ES bulk · #20 임베딩 dim · #22 룰 재임베딩 · #24 캐시 플러시 · #33 fullstack 오마킹</li>
+<li><b>Batch2 검색품질</b> <code>1e2491a</code>: #15 split_v2 · #16 인용 집행 · #23 rule-fallback τ · #25 holdout 누수 · #14 이중 RRF</li>
+<li><b>Batch3 운영성</b> <code>81f94a6</code>: #29 OTel span · #30 구조화로깅+Celery trace · #31 config 검증 · #39 drift 히스테리시스</li>
+<li><b>Batch4 데이터/DB/API</b> <code>606036f</code>: #27 N+1 · #28 공유풀 · #32 SSE · #36 storage list/delete · #37 인덱스명 · #38 soft-delete · #26b corrections UNIQUE (마이그레이션 <code>f6a7b8c9d0e1</code>)</li>
+<li><b>Batch5</b> <code>7425ed7</code>: #35 outbox 원자성 · #34 워커 tick 단위테스트</li>
+<li><b>#11 reviewer_trust</b> <code>47da347</code>: self-reference 편향 제거(동료 합의). 임계 정책은 발주처 협의·기본값 보존.</li>
+</ul>
+
+<h2>남은 것 (코드 아님)</h2>
+<ul>
+<li><b>#4/#5 Postgres 실경로 검증</b>: advisory-lock·파티션 DDL은 dialect 가드로 비-PG 우회 → 로컬 lite 미실행. 배포 전 <code>make infra-up &amp;&amp; alembic upgrade head</code> 후 PG로 1회 검증 권장.</li>
+<li><b>#11 신뢰도 임계 정책</b>: <code>high_grade_review_min_reliability</code> 운영값·검토자 자격 — 발주처 협의로 확정.</li>
+</ul>
+
+</body>
+</html>

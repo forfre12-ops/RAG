@@ -14,11 +14,40 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Optional
 
-from lloydk.adapters.llm.base import LLMResponse, UsageRecord, estimate_cost_usd
+from lloydk.adapters.llm.base import (
+    LLMResponse,
+    UsageRecord,
+    estimate_cost_usd,
+    retry_with_backoff,
+)
 from lloydk.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+# 작업 #18: 로컬/원격 OpenAI 호환 endpoint도 OpenAI SDK 사용 — 동일 재시도 분류.
+# RateLimitError(429)/APITimeoutError/APIConnectionError + status>=500.
+_RETRYABLE_EXC_NAMES = frozenset(
+    {
+        "RateLimitError",        # 429
+        "APITimeoutError",       # 요청 타임아웃
+        "APIConnectionError",    # 일시 네트워크
+        "InternalServerError",   # 5xx
+        "APIConnectionTimeoutError",
+    }
+)
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """429/5xx/타임아웃/연결 오류면 True. 그 외 4xx 등 항구적 오류는 False."""
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status == 429 or status >= 500
+    return type(exc).__name__ in _RETRYABLE_EXC_NAMES
 
 
 class LocalOpenAIProvider:
@@ -55,6 +84,10 @@ class LocalOpenAIProvider:
         )
         if provider_label:
             self.name = provider_label
+        # 작업 #18: 지수 백오프 기본값 — settings에 값 있으면 우선.
+        self._max_retries = int(getattr(settings, "llm_max_retries", 3))
+        self._base_delay = float(getattr(settings, "llm_retry_base_delay", 0.5))
+        self._max_delay = float(getattr(settings, "llm_retry_max_delay", 8.0))
 
     def generate(
         self,
@@ -87,12 +120,20 @@ class LocalOpenAIProvider:
             if "qwen" in self.model.lower():
                 extra["think"] = bool(self.enable_thinking)
 
-            resp = self._client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                extra_body=extra or None,
+            # 작업 #18: 429/5xx/타임아웃/연결 오류에 full-jitter 지수 백오프 재시도.
+            resp = retry_with_backoff(
+                lambda: self._client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    extra_body=extra or None,
+                ),
+                is_retryable=_is_retryable,
+                max_retries=self._max_retries,
+                base_delay=self._base_delay,
+                max_delay=self._max_delay,
+                label=self.name,
             )
             text = resp.choices[0].message.content or ""
             in_tok = getattr(resp.usage, "prompt_tokens", 0) if resp.usage else 0

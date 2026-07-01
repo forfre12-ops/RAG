@@ -61,7 +61,7 @@ class TestPathTraversal:
         st = _storage(tmp_path)
         svc = DocumentIngestionService(storage=st)
         res = svc.ingest(
-            filename=evil, content_bytes=b"secret-bytes", tenant_id="t1", persist=False
+            filename=evil, content_bytes=b"secret-bytes", persist=False
         )
         root = (tmp_path / "store").resolve()
         # 1) raw_uri 의 실제 경로가 루트 하위
@@ -81,7 +81,7 @@ class TestPathTraversal:
         st = _storage(tmp_path)
         svc = DocumentIngestionService(storage=st)
         res = svc.ingest(
-            filename="..", content_bytes=b"d", tenant_id="t1", persist=False
+            filename="..", content_bytes=b"d", persist=False
         )
         # 키 마지막 성분이 file_hash 여야 함
         assert res.raw_text_uri.rstrip("/").endswith(res.file_hash)
@@ -93,7 +93,6 @@ class TestPathTraversal:
         res = svc.ingest(
             filename="..\\..\\evil.txt",
             content_bytes=b"x",
-            tenant_id="t1",
             persist=False,
         )
         assert res.filename == "..\\..\\evil.txt"
@@ -102,7 +101,7 @@ class TestPathTraversal:
 def _key_of(res) -> str:
     """raw_text_uri 에서 (bucket 이후) 스토리지 key 복원."""
     p = res.raw_text_uri.replace("file://", "")
-    # .../store/documents-raw/<tenant>/<hash>/<name>
+    # .../store/documents-raw/<hash>/<name>
     parts = p.split("/documents-raw/")
     return parts[1]
 

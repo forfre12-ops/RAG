@@ -300,6 +300,59 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         trainer.save_model(str(out_dir))
         tok.save_pretrained(str(out_dir))
 
+        # [보정 배선] 검증셋(val split) per-row raw logits + 정답 label_idx를 모델
+        # 아티팩트 dir에 ADDITIVELY 저장 → calibrate_classifier.py가 더미가 아닌
+        # *실제* logits로 temperature를 적합해 temperature.json을 같은 dir에 남길 수
+        # 있게 한다(서빙 m5 pipeline이 자동 로드). 기존엔 logits dump가 없어 보정이
+        # 더미만 산출(배포금지)됐다. 포맷: 한 줄당 {"logits":[...], "label_idx":int}
+        # — calibrate_classifier.py가 읽는 logits·label_idx 키와 동일.
+        # 무거운 재학습 없이 이미 로드된 best 모델로 val을 1회 predict만 한다.
+        # 베스트에포트(비치명적): 실패해도 학습 산출물·리포트는 그대로 보존.
+        try:
+            val_pred = trainer.predict(ds_val)
+            val_logits = val_pred.predictions
+            val_labels = val_pred.label_ids
+            _cal_logits: list[list[float]] = []
+            _cal_labels: list[int] = []
+            with (out_dir / "val_logits.jsonl").open("w", encoding="utf-8") as _vf:
+                for _lg, _yl in zip(val_logits, val_labels):
+                    _row = [float(x) for x in np.asarray(_lg).ravel()]
+                    _cal_logits.append(_row)
+                    _cal_labels.append(int(_yl))
+                    _vf.write(json.dumps({
+                        "logits": _row,
+                        "label_idx": int(_yl),
+                    }, ensure_ascii=False) + "\n")
+            # [train→calibrate 자동연결] 학습 직후 같은 val logits 로 temperature.json 을
+            # out_dir 에 산출 → 서빙(m5 pipeline)이 자동 로드(MEMORY: 미보정 서빙 시 OOD 과신).
+            # 수동 2-step(calibrate_classifier.py)을 운영자가 잊어도 보정이 적용된다. 자동 '활성'
+            # 과는 분리(등록만) — 베스트에포트(실패해도 학습 산출물 보존).
+            try:
+                from lloydk.modules.m6_evaluation.temperature import (  # noqa: PLC0415
+                    fit_temperature_report,
+                )
+                if _cal_logits and _cal_labels:
+                    _rep = fit_temperature_report(_cal_logits, _cal_labels)
+                    _rep["source"] = "trainer-auto"
+                    (out_dir / "temperature.json").write_text(
+                        json.dumps(_rep, ensure_ascii=False, indent=2), encoding="utf-8"
+                    )
+            except Exception:  # noqa: BLE001 — 자동 보정 실패는 학습/dump 를 막지 않음
+                pass
+        except Exception:  # noqa: BLE001 — 보정 dump 실패는 학습을 막지 않음
+            pass
+
+        # [드리프트 배선] 학습 표본 임베딩으로 train centroid 저장 → run_drift_check 활성화.
+        # 기존: centroid 미저장이라 drift_tick이 영원히 skip(드리프트 감지 무력). 베스트에포트(비치명적).
+        try:
+            from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
+            from lloydk.services.drift_monitor import save_train_centroid  # noqa: PLC0415
+            _vecs = build_embedder().embed(train_x[:200]).vectors
+            if _vecs:
+                save_train_centroid(_vecs)
+        except Exception:  # noqa: BLE001
+            pass
+
         result = TrainReport(
             model_version=f"v-{run.info.run_id[:8]}",
             accuracy=float(acc),

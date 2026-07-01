@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from lloydk.db.models import PromptVersion, SampleDocument
@@ -22,7 +22,6 @@ class SynthRepo:
     def create_sample(
         self,
         *,
-        tenant_id: str,
         target_level_id: int,
         llm_provider: str,
         llm_model: str,
@@ -36,7 +35,6 @@ class SynthRepo:
         qc_prompt_version: str | None = None,
     ) -> SampleDocument:
         sd = SampleDocument(
-            tenant_id=tenant_id,
             target_level_id=target_level_id,
             llm_provider=llm_provider,
             llm_model=llm_model,
@@ -54,13 +52,38 @@ class SynthRepo:
         self.db.flush()
         return sd
 
-    def list_pending_review(self, *, tenant_id: str | None = None, limit: int = 50) -> list[SampleDocument]:
-        stmt = select(SampleDocument).where(SampleDocument.review_status == "pending_review")
-        if tenant_id:
-            stmt = stmt.where(SampleDocument.tenant_id == tenant_id)
+    # 검수 큐 상태 — DB review_status 값. (API 'pending'은 'pending_review'로 매핑된다.)
+    VALID_REVIEW_STATUSES = ("pending_review", "approved", "rejected")
+
+    def list_by_status(
+        self, status: str, *, limit: int = 50, offset: int = 0
+    ) -> list[SampleDocument]:
+        """review_status별 합성 샘플 조회. pending/approved/rejected 모두 지원.
+
+        tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진, 전역 조회).
+        """
+        stmt = select(SampleDocument).where(SampleDocument.review_status == status)
         return list(
-            self.db.execute(stmt.order_by(SampleDocument.created_at).limit(limit)).scalars()
+            self.db.execute(
+                stmt.order_by(SampleDocument.created_at).limit(limit).offset(offset)
+            ).scalars()
         )
+
+    def count_by_status(self, status: str) -> int:
+        """페이지네이션 total — limit/offset과 무관한 상태별 전체 건수."""
+        stmt = select(func.count()).select_from(SampleDocument).where(
+            SampleDocument.review_status == status
+        )
+        return int(self.db.execute(stmt).scalar_one())
+
+    # 하위호환 — 기존 호출부/테스트 보존. 내부적으로 status 일반화 메서드에 위임.
+    def list_pending_review(
+        self, *, limit: int = 50, offset: int = 0
+    ) -> list[SampleDocument]:
+        return self.list_by_status("pending_review", limit=limit, offset=offset)
+
+    def count_pending_review(self) -> int:
+        return self.count_by_status("pending_review")
 
     def review(
         self,

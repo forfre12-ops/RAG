@@ -87,7 +87,8 @@ RULE_FALLBACK_TOTAL = Counter(
 CLASSIFY_PERSIST_FAILURE_TOTAL = Counter(
     "lloydk_classify_persist_failure_total",
     "Classify persistence failures (DB unavailable or error, inference_id is ephemeral UUID)",
-    ["reason"],  # db_error | unexpected | no_tenant | no_doc | no_level | import_error
+    # tenant 제거: 'no_tenant' reason 라벨 폐기(단일 고객사 엔진, tenant 스코프 없음).
+    ["reason"],  # db_error | unexpected | no_doc | no_level | import_error
     registry=registry,
 )
 
@@ -133,7 +134,8 @@ EMBEDDING_CACHE_MISS_TOTAL = Counter(
 )
 
 # LLM 토큰·비용 관측성 — LLMUsageService.record()가 모든 호출에서 갱신.
-# 라벨 카디널리티: provider/model/purpose는 유한 집합. tenant_id는 폭증 위험이라 제외.
+# 라벨 카디널리티: provider/model/purpose는 유한 집합.
+# tenant 제거: LLM 비용은 전역 집계(단일 고객사 엔진, tenant 태그 없음).
 LLM_TOKENS_TOTAL = Counter(
     "lloydk_llm_tokens_total",
     "LLM tokens consumed",
@@ -178,6 +180,221 @@ DRIFT_ALERT = Gauge(
 DRIFT_SAMPLE_SIZE = Gauge(
     "lloydk_drift_sample_size",
     "Number of prod embedding samples included in the latest drift report",
+    registry=registry,
+)
+
+# ── NEW-H2: alert_rules.yml 이 참조하나 정의가 없던 메트릭 (alert 영구 no-data 해소) ──
+# 이 7종은 infra/observability/alert_rules.yml 의 P0~P3 룰이 참조하는데 prom_metrics 에
+# 정의가 없어 시계열 자체가 생성되지 않았다 → 알람이 영원히 평가 불가(특히 P0 AuditChainBroken).
+
+# C4 감사 hash-chain 검증 실패 — verify_chain()이 broken>0 검출 시 증가(P0 AuditChainBroken).
+AUDIT_CHAIN_BROKEN_TOTAL = Counter(
+    "lloydk_audit_chain_broken_total",
+    "Audit log hash-chain breaks detected by verify_chain (tamper suspected)",
+    registry=registry,
+)
+
+# 감사 행에 payload_hash가 NULL/빈값 — 체인 break와 별개의 무결성 신호(P0). nil hash는
+# 감사 미들웨어를 거치지 않은 직접 DB 삽입(우회) 또는 데이터 손실을 뜻한다. verify_chain의
+# break 카운트는 nil 근원 행을 무음 anchor화할 수 있어, nil 행을 따로 스캔해 노출한다.
+AUDIT_CHAIN_NIL_HASH_TOTAL = Counter(
+    "lloydk_audit_chain_nil_hash_total",
+    "Audit log rows with NULL/empty payload_hash (middleware bypass or data loss; integrity signal)",
+    registry=registry,
+)
+
+# idempotency 저장소가 redis 미가용으로 in-memory(프로세스-로컬)로 폴백한 횟수. 멀티워커에선
+# 워커 간 멱등성이 깨져 중복 처리 위험 — 0보다 크면 운영(멀티워커)에서 redis 미배선 신호.
+IDEMPOTENCY_BACKEND_FALLBACK_TOTAL = Counter(
+    "lloydk_idempotency_backend_fallback_total",
+    "Idempotency store fell back to process-local in-memory (redis unavailable) — multi-worker risk",
+    registry=registry,
+)
+
+# 문서 적재 건수 — PiiMaskingMissRate 의 분모(유입은 있는데 PII 마스킹 0이면 masker 누락 의심).
+DOCUMENTS_INGESTED_TOTAL = Counter(
+    "lloydk_documents_ingested_total",
+    "Documents ingested via DocumentIngestionService.ingest()",
+    registry=registry,
+)
+
+# PII 마스킹 건수(타입별) — mask_pii()가 타입별로 증가. rrn 등 핵심 타입 알람.
+PII_MASKED_TOTAL = Counter(
+    "lloydk_pii_masked_total",
+    "PII tokens masked, by type (rrn, email, phone_mobile, ...)",
+    ["pii_type"],
+    registry=registry,
+)
+
+# Webhook outbox DLQ 진입 — deliver_once()가 max_attempts 소진 시 증가(OutboxDlqGrowing).
+OUTBOX_DLQ_TOTAL = Counter(
+    "lloydk_outbox_dlq_total",
+    "Webhook outbox messages moved to DLQ (max attempts exhausted)",
+    registry=registry,
+)
+
+# Celery 큐 적체(큐별) — /metrics-prom 스크랩 시 redis LLEN 으로 best-effort 갱신(CeleryQueueBacklog).
+CELERY_QUEUE_LENGTH = Gauge(
+    "lloydk_celery_queue_length",
+    "Pending tasks per Celery queue (redis LLEN, best-effort at scrape time)",
+    ["queue"],
+    registry=registry,
+)
+
+# 실시간 분류 정확도 신호용 — FnrSpikeOverall = 100*(1 - correct/total).
+# ⚠️ '정탐' 판정에는 정답(ground truth)이 필요하나 서빙 시점엔 알 수 없다. 두 카운터를
+# 함께 증가시키지 않으면(예: total만) expr 가 100%로 거짓 발화하므로, 정답이 확정되는
+# 경로(corrections/confirm)에서만 동반 증가시켜야 한다. 현재는 **정의만**(둘 다 0 → expr
+# 가 0/0=NaN → 무발화, 안전). 운영 실시간 미탐 신호는 이미 배선된
+# lloydk_active_learning_pending_underclass(ActiveLearningUrgent)를 1차로 사용한다.
+CLASSIFY_TOTAL = Counter(
+    "lloydk_classify_total",
+    "Classifications with a later-known ground truth (denominator for live FNR; not yet wired)",
+    registry=registry,
+)
+CLASSIFY_CORRECT_TOTAL = Counter(
+    "lloydk_classify_correct_total",
+    "Ground-truth-correct classifications (numerator for live FNR; not yet wired)",
+    registry=registry,
+)
+
+# 교정(correction) 발생률 — direction별(confirm/underclass/overclass/lateral) 실시간 카운터.
+# underclass = 모델이 비밀을 낮게 본 것을 사람이 올린 것(보안 미탐 신호) → 자동확정 품질·
+# 죽음의 나선(러버스탬프·운영 정확도 저하) 모니터링의 핵심 지표. add_correction(모든 교정의
+# 단일 choke point)에서 best-effort 증가. underclass 율 급증 = 모델 품질 저하/오염 경보 근거.
+CORRECTION_TOTAL = Counter(
+    "lloydk_corrections_total",
+    "Corrections recorded by human review, by direction (overturning/confirming a classification)",
+    ["direction"],  # confirm | underclass | overclass | lateral
+    registry=registry,
+)
+
+# Kill-gate 발동 여부 — 1이면 죽음의 나선/품질붕괴 조건(TS/S1 미탐 · 검수 과부하 · overturn율)
+# 중 하나 이상 충족(경보·비파괴, 자동 중단 없음). run_kill_gate_check()가 주기 갱신.
+KILL_GATE_TRIPPED = Gauge(
+    "lloydk_kill_gate_tripped",
+    "1 if kill-gate tripped (TS/S1 miss / review fatigue / overturn-rate); else 0 (alert-only)",
+    registry=registry,
+)
+
+# 관리자 검수 소요시간 — classification.classified_at → correction.corrected_at (초).
+# 처리시간 단축(자동확정·선례 효과) / 검수 병목 모니터. add_correction에서 best-effort 관측.
+ADMIN_REVIEW_SECONDS = Histogram(
+    "lloydk_admin_review_seconds",
+    "Seconds from classification to human correction (admin review handling time)",
+    buckets=(60, 300, 900, 1800, 3600, 21600, 86400, 259200, 604800),
+    registry=registry,
+)
+# 동일 문서 재등장 재검수 — 같은 doc에 이전 교정이 있던 재교정(문서 churn). 선례·exact-match
+# 재사용이 효과적이면 시간이 갈수록 감소해야 하는 지표(재검수 부담 절감 측정).
+SAME_DOC_RESURFACE_TOTAL = Counter(
+    "lloydk_same_doc_resurface_total",
+    "Corrections on a document that was already corrected before (recurring re-review)",
+    registry=registry,
+)
+
+# ── 번들 A: 메타데이터 게이트 가시성 ──────────────────────────────────────────
+# metadata_floor_enabled / source_prior_enabled 를 켜도 입력 메타데이터(보안표시·접근범위·
+# 출처)가 실제로 들어오지 않으면 게이트는 **silent no-op** 이다(게이트를 켰는데 아무 일도
+# 안 일어나는 무음 실패). 아래 3종으로 (1) 게이트 실제 발동 횟수와 (2) 분류 입력의 메타데이터
+# 존재율을 함께 노출해, 켜기 *전에* '켜면 효과가 있을지'를 먼저 보이게 한다.
+# 모두 서빙 choke point(ClassifyService.classify)에서만 증가 — 평가(serving_eval)는 제외.
+
+# 메타데이터 floor 게이트 발동(ICD §4.2/§4.4): security_marking 상향 floor / access_scope 충돌.
+METADATA_FLOOR_APPLIED_TOTAL = Counter(
+    "lloydk_metadata_floor_applied_total",
+    "ICD metadata-floor gate firings (security_marking raised grade / access_scope conflict routed to review)",
+    ["action"],  # raised | access_conflict
+    registry=registry,
+)
+# source-prior(비공지성) 게이트 발동: 공개출처 등급 cap / cap-conflict 검수 라우팅.
+SOURCE_PRIOR_APPLIED_TOTAL = Counter(
+    "lloydk_source_prior_applied_total",
+    "Source-prior gate firings (public-source grade cap / cap-conflict routed to review)",
+    ["action"],  # capped | cap_conflict
+    registry=registry,
+)
+# 분류 입력에 ICD 게이트용 메타데이터 필드가 실제로 존재했는지 — 게이트 활성 여부와 무관하게
+# 분류 1건당 증가. field='none' = 게이트 입력 메타데이터가 하나도 없었음(coverage 분모).
+# coverage = 1 - (rate(field="none") / sum(rate(*)))  →  ICD 메타가 실제로 들어오는지 가시화.
+CLASSIFY_METADATA_PRESENT_TOTAL = Counter(
+    "lloydk_classify_metadata_present_total",
+    "Per-classification presence of ICD gate-input metadata fields ('none' = no gate-input metadata present)",
+    ["field"],  # security_marking | access_scope | source | none
+    registry=registry,
+)
+
+# ── 번들 B: 고등급 이중검토 보류 가시화 ───────────────────────────────────────
+# high_grade_dual_review ON 시 1인 동의 고등급 교정은 status='needs_second_review'로 DB에
+# 무음 hold 된다(운영자가 능동 쿼리해야만 발견). 등급별 보류 건수를 게이지로 노출해
+# '안 보이는 검수 보류큐'를 가시화한다(주기 refresh가 best-effort 갱신, DB 미가용 시 미설정).
+ESCALATION_HELD = Gauge(
+    "lloydk_escalation_held",
+    "Classifications held in needs_second_review (high-grade dual-review pending), by grade",
+    ["grade"],
+    registry=registry,
+)
+
+# ── 번들 D: locked_gold_eval readiness 가시화 ─────────────────────────────────
+# deploy gate는 자동활성 시 등급별 min_locked_per_grade 충족을 요구한다(죽음의 나선 #4).
+# '얼마나 쌓였고 배포 가능한지'를 운영자에게 직접 노출 — ready(0/1) + 등급별 보유 수.
+LOCKED_EVAL_READY = Gauge(
+    "lloydk_locked_eval_ready",
+    "1 if locked_gold_eval has >= min_per_grade for every grade (deploy-ready), else 0",
+    registry=registry,
+)
+LOCKED_EVAL_PER_GRADE = Gauge(
+    "lloydk_locked_eval_per_grade",
+    "Count of locked_gold_eval (human-signed) records per grade",
+    ["grade"],
+    registry=registry,
+)
+
+# ── 번들 E: kill-gate 안전브레이크 발동 ───────────────────────────────────────
+# kill_gate_suppress_autoconfirm ON + kill-gate tripped 동안 고등급 자동확정이 needs_review로
+# 억제된 횟수. 0 이상이면 '브레이크가 실제로 걸리고 있다'는 운영 신호(조건 해소 시 멈춤).
+KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL = Counter(
+    "lloydk_kill_gate_autoconfirm_suppressed_total",
+    "High-grade auto-confirms downgraded to needs_review because kill-gate brake was active",
+    ["grade"],
+    registry=registry,
+)
+
+# [QW] verified_label(사람검수 완료) 감사 기록 실패 — 결정론 경로의 컴플라이언스 감사가 best-effort라
+# DB 실패 시 무음 누락된다. 이 값이 0보다 크면 감사 누락 발생 신호(NFR-SEC-01 추적).
+CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
+    "lloydk_classify_verified_label_audit_skip_total",
+    "verified_label audit-trail writes skipped (best-effort failure) — compliance audit gap signal",
+    registry=registry,
+)
+
+# [obs] 서빙 검수 게이트가 예외로 fail-open한 횟수(gate별). agreement/llm_second_opinion 게이트는
+# 룰엔진·LLM 오류 시 None을 반환해 자동확정을 그대로 통과시킨다(fail-safe). 무음이면 고등급
+# 자동확정이 게이트 없이 진행됐는지 안 보인다 — 이 카운터로 'fail-open 발생'을 가시화한다.
+SERVING_GATE_FAIL_OPEN_TOTAL = Counter(
+    "lloydk_serving_gate_fail_open_total",
+    "Serving review gates that failed open (exception) and let auto-confirm proceed ungated, by gate",
+    ["gate"],  # agreement | llm_second_opinion
+    registry=registry,
+)
+
+# ── 작업(async job) 상태 진입 모니터 ──────────────────────────────────────────
+# 비동기 분류·합성·학습·골든빌드 작업의 각 상태 도달 횟수. job_store의 create/update 단일
+# choke point에서 best-effort 증가(상태 전이 1회=1 inc, double-count 없음 — Lock/WATCH로 직렬화).
+# 기존 CELERY_QUEUE_LENGTH(큐 길이)만으로는 진행/완료/실패율·처리시간을 알 수 없던 사각지대 해소.
+# state 값은 코드 실측: queued·running(golden_build)·done·failed·partial.
+JOB_STATE_ENTERED_TOTAL = Counter(
+    "lloydk_job_state_entered_total",
+    "Async job state entries at create/update choke points (queued->running->done/failed/partial)",
+    ["state"],
+    registry=registry,
+)
+# 완료 소요시간 — create(_created_at 주입) → 터미널 상태(done/failed/partial) 도달까지 초.
+JOB_COMPLETION_DURATION_SECONDS = Histogram(
+    "lloydk_job_completion_duration_seconds",
+    "Async job latency from queued (create) to terminal state, by terminal state",
+    ["state"],
+    buckets=(0.1, 0.5, 1, 5, 10, 30, 60, 300, 600, 1800, 3600),
     registry=registry,
 )
 
@@ -253,6 +470,40 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 router = APIRouter()
 
 
+# Celery 큐명 — celery_app.task_routes 와 정합(미구독/미정의 큐는 LLEN 0으로 무해).
+_CELERY_QUEUES = ("classify", "synthesis", "learning", "index", "celery")
+
+
+def _refresh_celery_queue_gauges() -> None:
+    """Celery 큐 길이를 redis LLEN 으로 best-effort 갱신(NEW-H2 CeleryQueueBacklog).
+
+    celery(redis 브로커)는 큐를 큐명 list 키로 보관하므로 LLEN 으로 적체를 읽는다.
+    redis 미가용/미설치면 skip(게이지 미설정 → alert no-data → 거짓 발화 없음). API
+    프로세스에서 브로커를 직접 조회하므로 워커-프로세스 메트릭 분산 문제와 무관.
+    테스트(TESTING) 환경에서는 redis 연결 시도 자체를 건너뛴다(CI 지연·플래키 방지).
+    """
+    if _is_testing():
+        return
+    try:
+        import redis  # noqa: PLC0415
+
+        from lloydk.config import settings  # noqa: PLC0415
+
+        client = redis.Redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=0.5,
+            socket_timeout=0.5,
+        )
+        for q in _CELERY_QUEUES:
+            try:
+                CELERY_QUEUE_LENGTH.labels(queue=q).set(float(client.llen(q)))
+            except Exception:  # noqa: BLE001
+                continue
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("celery queue gauge refresh skipped: %s", exc)
+
+
 def _refresh_business_gauges() -> None:
     """active_learning gauge를 호출 시점에 lazy 갱신.
 
@@ -269,6 +520,51 @@ def _refresh_business_gauges() -> None:
         ACTIVE_LEARNING_UNDERCLASS.set(status.pending_underclass)
     except Exception as exc:  # noqa: BLE001
         _logger.debug("business gauge refresh skipped: %s", exc)
+    # Kill-gate 모니터(경보만) 갱신 — 독립 try, best-effort.
+    try:
+        from lloydk.modules.m6_evaluation.kill_gate import run_kill_gate_check  # noqa: PLC0415
+
+        run_kill_gate_check()
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("kill-gate check skipped: %s", exc)
+    # [번들 B] 이중검토 보류(needs_second_review) 등급별 게이지 — 독립 try, best-effort.
+    _refresh_escalation_held()
+    # [번들 D] locked_gold_eval readiness 게이지 — 독립 try, best-effort.
+    _refresh_locked_readiness()
+    # NEW-H2: Celery 큐 적체도 동반 갱신(best-effort, 독립 try).
+    _refresh_celery_queue_gauges()
+
+
+def _refresh_escalation_held() -> None:
+    """[번들 B] needs_second_review 보류 건수를 등급별 게이지에 노출(best-effort).
+
+    사라진 보류가 stale로 남지 않게, 알려진 등급은 0으로 초기화 후 현재 카운트를 set.
+    """
+    try:
+        from lloydk.services.confirm_service import (  # noqa: PLC0415
+            count_needs_second_review_by_grade,
+        )
+
+        counts = count_needs_second_review_by_grade()
+        for grade, n in counts.items():
+            ESCALATION_HELD.labels(grade=grade).set(float(n))
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("escalation-held gauge refresh skipped: %s", exc)
+
+
+def _refresh_locked_readiness() -> None:
+    """[번들 D] locked_gold_eval readiness(ready·등급별 보유)를 게이지에 노출(best-effort)."""
+    try:
+        from lloydk.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
+            locked_eval_readiness,
+        )
+
+        summary = locked_eval_readiness()
+        LOCKED_EVAL_READY.set(1.0 if summary.get("ready") else 0.0)
+        for grade, n in (summary.get("per_grade") or {}).items():
+            LOCKED_EVAL_PER_GRADE.labels(grade=grade).set(float(n))
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("locked-readiness gauge refresh skipped: %s", exc)
 
 
 @router.get("/metrics-prom", include_in_schema=False)

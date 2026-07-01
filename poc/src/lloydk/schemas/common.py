@@ -128,12 +128,11 @@ class FactorRegistry:
     - 다중 워커: 짧은 TTL(_registry_ttl_sec)이 지나면 다른 워커도 DB에서 재로드
     """
 
-    # 기본 4요소 — 영업비밀 도메인 폴백
+    # 정본 3요건(S·V·M) — 영업비밀 도메인 폴백 (B안, doc/22 v2)
     _DEFAULT_MAP: dict[str, str] = {
-        "ECONOMIC_VALUE": "economic_value",
-        "NON_PUBLICITY": "non_publicity",
-        "MANAGEMENT_LEVEL": "management_level",
-        "LEAK_IMPACT": "leak_impact",
+        "SECRECY": "secrecy",
+        "VALUE": "value",
+        "MANAGEMENT": "management",
     }
 
     _cache: dict[str, str] | None = None  # {factor_code: snake_case_name}
@@ -195,7 +194,7 @@ class FactorRegistry:
 class Actor(BaseModel):
     user_id: str
     role: str = Field(pattern=r"^(admin|reviewer|system|kl_backend)$")
-    tenant_id: Optional[str] = None
+    # tenant 제거: 격리는 KL 포털 전담 (단일 KL 인증). actor=KL cred 기준.
     ip: Optional[str] = None
 
 

@@ -47,7 +47,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================
 -- [A] 테넌트
 -- ============================================================
-CREATE TABLE IF NOT EXISTS tenants (
+CREATE TABLE IF NOT EXISTS tb_tenants (
     tenant_id           VARCHAR(50)     PRIMARY KEY,
     name                VARCHAR(200)    NOT NULL,
     rag_enabled         BOOLEAN         DEFAULT TRUE,
@@ -58,13 +58,13 @@ CREATE TABLE IF NOT EXISTS tenants (
     created_at          TIMESTAMPTZ     DEFAULT NOW()
 );
 
-INSERT INTO tenants (tenant_id, name) VALUES ('default', '기본 테넌트')
+INSERT INTO tb_tenants (tenant_id, name) VALUES ('default', '기본 테넌트')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================
 -- [B] 등급체계
 -- ============================================================
-CREATE TABLE IF NOT EXISTS classification_levels (
+CREATE TABLE IF NOT EXISTS tb_classification_levels (
     level_id        SERIAL          PRIMARY KEY,
     level_code      VARCHAR(20)     NOT NULL UNIQUE,
     level_name      VARCHAR(50)     NOT NULL,
@@ -79,16 +79,16 @@ CREATE TABLE IF NOT EXISTS classification_levels (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cl_active_order
-  ON classification_levels(is_active, level_order);
+  ON tb_classification_levels(is_active, level_order);
 
-INSERT INTO classification_levels (level_code, level_name, level_order, color_hex, loss_weight) VALUES
+INSERT INTO tb_classification_levels (level_code, level_name, level_order, color_hex, loss_weight) VALUES
   ('TS', '특급기밀',   1, '#7B1FA2', 3.0),
   ('S1', '1급 비밀',   2, '#D32F2F', 2.0),
   ('S2', '2급 대외비', 3, '#F57C00', 1.0),
   ('S3', '3급 공개',   4, '#388E3C', 1.0)
 ON CONFLICT DO NOTHING;
 
-CREATE TABLE IF NOT EXISTS evaluation_factors (
+CREATE TABLE IF NOT EXISTS tb_evaluation_factors (
     factor_id       SERIAL          PRIMARY KEY,
     factor_code     VARCHAR(30)     NOT NULL UNIQUE,
     factor_name     VARCHAR(100)    NOT NULL,
@@ -99,19 +99,19 @@ CREATE TABLE IF NOT EXISTS evaluation_factors (
     updated_at      TIMESTAMPTZ     DEFAULT NOW()
 );
 
-INSERT INTO evaluation_factors (factor_code, factor_name, weight) VALUES
+INSERT INTO tb_evaluation_factors (factor_code, factor_name, weight) VALUES
   ('ECONOMIC_VALUE',   '경제적 가치',       0.30),
   ('NON_PUBLICITY',    '비공지성',          0.25),
   ('MANAGEMENT_LEVEL', '관리수준',          0.15),
   ('LEAK_IMPACT',      '유출 시 영향도',    0.30)
 ON CONFLICT DO NOTHING;
 
-CREATE TABLE IF NOT EXISTS level_keywords (
+CREATE TABLE IF NOT EXISTS tb_level_keywords (
     keyword_id      SERIAL          PRIMARY KEY,
-    level_id        INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
+    level_id        INT             NOT NULL REFERENCES tb_classification_levels(level_id) ON DELETE RESTRICT,
     keyword         VARCHAR(200)    NOT NULL,
     pattern_type    VARCHAR(20)     NOT NULL DEFAULT 'exact',
-    factor_id       INT             REFERENCES evaluation_factors(factor_id) ON DELETE RESTRICT,
+    factor_id       INT             REFERENCES tb_evaluation_factors(factor_id) ON DELETE RESTRICT,
     weight          DECIMAL(3,2)    DEFAULT 1.0,
     source          VARCHAR(30)     DEFAULT 'manual',
     example_context TEXT,
@@ -119,15 +119,15 @@ CREATE TABLE IF NOT EXISTS level_keywords (
     created_at      TIMESTAMPTZ     DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_lk_level_active ON level_keywords(level_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_lk_keyword_trgm ON level_keywords USING gin (keyword gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_lk_level_active ON tb_level_keywords(level_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_lk_keyword_trgm ON tb_level_keywords USING gin (keyword gin_trgm_ops);
 
 -- ============================================================
 -- [C] 문서
 -- ============================================================
-CREATE TABLE IF NOT EXISTS documents (
+CREATE TABLE IF NOT EXISTS tb_documents (
     doc_id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tenants(tenant_id),
+    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tb_tenants(tenant_id),
     external_ref        VARCHAR(100),
     filename            VARCHAR(500)    NOT NULL,
     source_format       VARCHAR(10)     NOT NULL,
@@ -149,16 +149,16 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_doc_hash
-  ON documents(tenant_id, file_hash) WHERE file_hash IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_doc_tenant_status ON documents(tenant_id, processing_status);
-CREATE INDEX IF NOT EXISTS idx_doc_format ON documents(source_format);
-CREATE INDEX IF NOT EXISTS idx_doc_metadata ON documents USING gin (metadata jsonb_path_ops);
-CREATE INDEX IF NOT EXISTS idx_doc_uploaded ON documents(uploaded_at DESC);
+  ON tb_documents(tenant_id, file_hash) WHERE file_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_doc_tenant_status ON tb_documents(tenant_id, processing_status);
+CREATE INDEX IF NOT EXISTS idx_doc_format ON tb_documents(source_format);
+CREATE INDEX IF NOT EXISTS idx_doc_metadata ON tb_documents USING gin (metadata jsonb_path_ops);
+CREATE INDEX IF NOT EXISTS idx_doc_uploaded ON tb_documents(uploaded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_doc_pending
-  ON documents(uploaded_at) WHERE processing_status = 'pending';
+  ON tb_documents(uploaded_at) WHERE processing_status = 'pending';
 
 -- 청크: 멀티 테넌트 + 월별 파티셔닝
-CREATE TABLE IF NOT EXISTS chunks (
+CREATE TABLE IF NOT EXISTS tb_chunks (
     chunk_id        UUID            DEFAULT gen_random_uuid(),
     doc_id          UUID            NOT NULL,
     tenant_id       VARCHAR(50)     NOT NULL,
@@ -175,20 +175,20 @@ CREATE TABLE IF NOT EXISTS chunks (
     PRIMARY KEY (chunk_id, created_at)
 ) PARTITION BY RANGE (created_at);
 
-CREATE TABLE IF NOT EXISTS chunks_2026_05 PARTITION OF chunks FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
-CREATE TABLE IF NOT EXISTS chunks_2026_06 PARTITION OF chunks FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
-CREATE TABLE IF NOT EXISTS chunks_2026_07 PARTITION OF chunks FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
-CREATE TABLE IF NOT EXISTS chunks_default PARTITION OF chunks DEFAULT;
+CREATE TABLE IF NOT EXISTS tb_chunks_2026_05 PARTITION OF tb_chunks FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+CREATE TABLE IF NOT EXISTS tb_chunks_2026_06 PARTITION OF tb_chunks FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
+CREATE TABLE IF NOT EXISTS tb_chunks_2026_07 PARTITION OF tb_chunks FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
+CREATE TABLE IF NOT EXISTS tb_chunks_default PARTITION OF tb_chunks DEFAULT;
 
-CREATE INDEX IF NOT EXISTS idx_chunk_doc ON chunks(doc_id, chunk_index);
-CREATE INDEX IF NOT EXISTS idx_chunk_tenant ON chunks(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_chunk_doc ON tb_chunks(doc_id, chunk_index);
+CREATE INDEX IF NOT EXISTS idx_chunk_tenant ON tb_chunks(tenant_id);
 
 -- ============================================================
 -- [D] 라벨링
 -- ============================================================
-CREATE TABLE IF NOT EXISTS document_labels (
-    doc_id          UUID            PRIMARY KEY REFERENCES documents(doc_id) ON DELETE CASCADE,
-    level_id        INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
+CREATE TABLE IF NOT EXISTS tb_document_labels (
+    doc_id          UUID            PRIMARY KEY REFERENCES tb_documents(doc_id) ON DELETE CASCADE,
+    level_id        INT             NOT NULL REFERENCES tb_classification_levels(level_id) ON DELETE RESTRICT,
     labeled_by      VARCHAR(30)     NOT NULL,
     labeler_id      VARCHAR(50),
     confidence      DECIMAL(3,2),
@@ -200,12 +200,12 @@ CREATE TABLE IF NOT EXISTS document_labels (
     verified_at     TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_dl_level ON document_labels(level_id);
-CREATE INDEX IF NOT EXISTS idx_dl_labeled_by ON document_labels(labeled_by);
+CREATE INDEX IF NOT EXISTS idx_dl_level ON tb_document_labels(level_id);
+CREATE INDEX IF NOT EXISTS idx_dl_labeled_by ON tb_document_labels(labeled_by);
 
-CREATE TABLE IF NOT EXISTS document_factor_scores (
-    doc_id          UUID            NOT NULL REFERENCES documents(doc_id) ON DELETE CASCADE,
-    factor_id       INT             NOT NULL REFERENCES evaluation_factors(factor_id) ON DELETE RESTRICT,
+CREATE TABLE IF NOT EXISTS tb_document_factor_scores (
+    doc_id          UUID            NOT NULL REFERENCES tb_documents(doc_id) ON DELETE CASCADE,
+    factor_id       INT             NOT NULL REFERENCES tb_evaluation_factors(factor_id) ON DELETE RESTRICT,
     score           DECIMAL(4,2)    NOT NULL CHECK (score >= 0 AND score <= 5),
     PRIMARY KEY (doc_id, factor_id)
 );
@@ -213,12 +213,12 @@ CREATE TABLE IF NOT EXISTS document_factor_scores (
 -- ============================================================
 -- [E] 추론
 -- ============================================================
-CREATE TABLE IF NOT EXISTS classifications (
+CREATE TABLE IF NOT EXISTS tb_classifications (
     classification_id   UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    doc_id              UUID            NOT NULL REFERENCES documents(doc_id) ON DELETE RESTRICT,
-    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tenants(tenant_id),
+    doc_id              UUID            NOT NULL REFERENCES tb_documents(doc_id) ON DELETE RESTRICT,
+    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tb_tenants(tenant_id),
     model_version       VARCHAR(50)     NOT NULL,
-    predicted_level_id  INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
+    predicted_level_id  INT             NOT NULL REFERENCES tb_classification_levels(level_id) ON DELETE RESTRICT,
     confidence          DECIMAL(5,4)    NOT NULL,
     alternatives        JSONB           NOT NULL DEFAULT '[]',
     aggregation_method  VARCHAR(20)     DEFAULT 'hybrid',
@@ -231,18 +231,18 @@ CREATE TABLE IF NOT EXISTS classifications (
     classified_at       TIMESTAMPTZ     DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_cls_doc ON classifications(doc_id, classified_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cls_tenant_status ON classifications(tenant_id, status);
-CREATE INDEX IF NOT EXISTS idx_cls_model_level ON classifications(model_version, predicted_level_id, status);
+CREATE INDEX IF NOT EXISTS idx_cls_doc ON tb_classifications(doc_id, classified_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cls_tenant_status ON tb_classifications(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_cls_model_level ON tb_classifications(model_version, predicted_level_id, status);
 CREATE INDEX IF NOT EXISTS idx_cls_staging
-  ON classifications(classified_at DESC) WHERE status = 'staging';
+  ON tb_classifications(classified_at DESC) WHERE status = 'staging';
 
-CREATE TABLE IF NOT EXISTS classification_evidence (
+CREATE TABLE IF NOT EXISTS tb_classification_evidence (
     evidence_id         BIGSERIAL       PRIMARY KEY,
-    classification_id   UUID            NOT NULL REFERENCES classifications(classification_id) ON DELETE CASCADE,
+    classification_id   UUID            NOT NULL REFERENCES tb_classifications(classification_id) ON DELETE CASCADE,
     chunk_id            UUID            NOT NULL,
     evidence_type       VARCHAR(20)     NOT NULL,
-    factor_id           INT             REFERENCES evaluation_factors(factor_id) ON DELETE RESTRICT,
+    factor_id           INT             REFERENCES tb_evaluation_factors(factor_id) ON DELETE RESTRICT,
     excerpt             TEXT            NOT NULL,
     excerpt_start       INT,
     excerpt_end         INT,
@@ -253,13 +253,13 @@ CREATE TABLE IF NOT EXISTS classification_evidence (
     created_at          TIMESTAMPTZ     DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_ce_classification ON classification_evidence(classification_id);
-CREATE INDEX IF NOT EXISTS idx_ce_chunk_contrib ON classification_evidence(chunk_id, contribution DESC);
+CREATE INDEX IF NOT EXISTS idx_ce_classification ON tb_classification_evidence(classification_id);
+CREATE INDEX IF NOT EXISTS idx_ce_chunk_contrib ON tb_classification_evidence(chunk_id, contribution DESC);
 
 -- ============================================================
 -- [F] 학습
 -- ============================================================
-CREATE TABLE IF NOT EXISTS model_versions (
+CREATE TABLE IF NOT EXISTS tb_model_versions (
     version_id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     version_label       VARCHAR(50)     NOT NULL UNIQUE,
     base_model          VARCHAR(100)    NOT NULL,
@@ -274,19 +274,19 @@ CREATE TABLE IF NOT EXISTS model_versions (
     is_active           BOOLEAN         DEFAULT FALSE,
     activated_at        TIMESTAMPTZ,
     deactivated_at      TIMESTAMPTZ,
-    rolled_back_from    UUID            REFERENCES model_versions(version_id),
+    rolled_back_from    UUID            REFERENCES tb_model_versions(version_id),
     rollback_reason     TEXT,
     level_snapshot      JSONB,
     created_at          TIMESTAMPTZ     DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_active
-  ON model_versions(is_active) WHERE is_active = TRUE;
-CREATE INDEX IF NOT EXISTS idx_mv_mlflow ON model_versions(mlflow_run_id);
+  ON tb_model_versions(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_mv_mlflow ON tb_model_versions(mlflow_run_id);
 
-CREATE TABLE IF NOT EXISTS training_runs (
+CREATE TABLE IF NOT EXISTS tb_training_runs (
     run_id              UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    model_version       UUID            REFERENCES model_versions(version_id),
+    model_version       UUID            REFERENCES tb_model_versions(version_id),
     mlflow_run_id       VARCHAR(64),
     status              VARCHAR(20)     DEFAULT 'queued',
     started_at          TIMESTAMPTZ,
@@ -308,12 +308,12 @@ CREATE TABLE IF NOT EXISTS training_runs (
     created_by          VARCHAR(50)
 );
 
-CREATE INDEX IF NOT EXISTS idx_tr_model ON training_runs(model_version);
-CREATE INDEX IF NOT EXISTS idx_tr_status ON training_runs(status);
-CREATE INDEX IF NOT EXISTS idx_tr_date ON training_runs(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tr_model ON tb_training_runs(model_version);
+CREATE INDEX IF NOT EXISTS idx_tr_status ON tb_training_runs(status);
+CREATE INDEX IF NOT EXISTS idx_tr_date ON tb_training_runs(started_at DESC);
 
-CREATE TABLE IF NOT EXISTS training_epochs (
-    run_id          UUID            NOT NULL REFERENCES training_runs(run_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS tb_training_epochs (
+    run_id          UUID            NOT NULL REFERENCES tb_training_runs(run_id) ON DELETE CASCADE,
     epoch           INT             NOT NULL,
     train_loss      REAL,
     val_loss        REAL,
@@ -323,44 +323,44 @@ CREATE TABLE IF NOT EXISTS training_epochs (
     PRIMARY KEY (run_id, epoch)
 );
 
-CREATE TABLE IF NOT EXISTS training_datasets (
+CREATE TABLE IF NOT EXISTS tb_training_datasets (
     id              BIGSERIAL       PRIMARY KEY,
-    run_id          UUID            NOT NULL REFERENCES training_runs(run_id) ON DELETE CASCADE,
-    doc_id          UUID            NOT NULL REFERENCES documents(doc_id) ON DELETE RESTRICT,
+    run_id          UUID            NOT NULL REFERENCES tb_training_runs(run_id) ON DELETE CASCADE,
+    doc_id          UUID            NOT NULL REFERENCES tb_documents(doc_id) ON DELETE RESTRICT,
     split_type      VARCHAR(10)     NOT NULL,
-    level_id        INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
+    level_id        INT             NOT NULL REFERENCES tb_classification_levels(level_id) ON DELETE RESTRICT,
     UNIQUE(run_id, doc_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_td_run_split ON training_datasets(run_id, split_type);
-CREATE INDEX IF NOT EXISTS idx_td_doc ON training_datasets(doc_id);
+CREATE INDEX IF NOT EXISTS idx_td_run_split ON tb_training_datasets(run_id, split_type);
+CREATE INDEX IF NOT EXISTS idx_td_doc ON tb_training_datasets(doc_id);
 
 -- ============================================================
 -- [G] 보정
 -- ============================================================
-CREATE TABLE IF NOT EXISTS corrections (
+CREATE TABLE IF NOT EXISTS tb_corrections (
     correction_id       BIGSERIAL       PRIMARY KEY,
-    classification_id   UUID            NOT NULL REFERENCES classifications(classification_id) ON DELETE CASCADE,
-    original_level_id   INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
-    corrected_level_id  INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
+    classification_id   UUID            NOT NULL REFERENCES tb_classifications(classification_id) ON DELETE CASCADE,
+    original_level_id   INT             NOT NULL REFERENCES tb_classification_levels(level_id) ON DELETE RESTRICT,
+    corrected_level_id  INT             NOT NULL REFERENCES tb_classification_levels(level_id) ON DELETE RESTRICT,
     direction           VARCHAR(10)     NOT NULL,
     reason              TEXT,
     corrected_by        VARCHAR(50)     NOT NULL,
     corrected_at        TIMESTAMPTZ     DEFAULT NOW(),
-    consumed_in_run     UUID            REFERENCES training_runs(run_id),
+    consumed_in_run     UUID            REFERENCES tb_training_runs(run_id),
     consumed_at         TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_corr_cls ON corrections(classification_id);
-CREATE INDEX IF NOT EXISTS idx_corr_direction ON corrections(direction);
+CREATE INDEX IF NOT EXISTS idx_corr_cls ON tb_corrections(classification_id);
+CREATE INDEX IF NOT EXISTS idx_corr_direction ON tb_corrections(direction);
 CREATE INDEX IF NOT EXISTS idx_corr_unconsumed
-  ON corrections(consumed_in_run) WHERE consumed_in_run IS NULL;
-CREATE INDEX IF NOT EXISTS idx_corr_at ON corrections(corrected_at DESC);
+  ON tb_corrections(consumed_in_run) WHERE consumed_in_run IS NULL;
+CREATE INDEX IF NOT EXISTS idx_corr_at ON tb_corrections(corrected_at DESC);
 
 -- ============================================================
 -- [H] 샘플 생성
 -- ============================================================
-CREATE TABLE IF NOT EXISTS prompt_versions (
+CREATE TABLE IF NOT EXISTS tb_prompt_versions (
     prompt_version      VARCHAR(30)     PRIMARY KEY,
     chain_stage         VARCHAR(20)     NOT NULL,
     template            TEXT            NOT NULL,
@@ -372,15 +372,15 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
     notes               TEXT
 );
 
-CREATE TABLE IF NOT EXISTS sample_documents (
+CREATE TABLE IF NOT EXISTS tb_sample_documents (
     sample_id           UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    doc_id              UUID            REFERENCES documents(doc_id),
-    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tenants(tenant_id),
-    target_level_id     INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
+    doc_id              UUID            REFERENCES tb_documents(doc_id),
+    tenant_id           VARCHAR(50)     NOT NULL REFERENCES tb_tenants(tenant_id),
+    target_level_id     INT             NOT NULL REFERENCES tb_classification_levels(level_id) ON DELETE RESTRICT,
     doc_type            VARCHAR(50),
-    outline_prompt_version  VARCHAR(30) REFERENCES prompt_versions(prompt_version),
-    body_prompt_version     VARCHAR(30) REFERENCES prompt_versions(prompt_version),
-    qc_prompt_version       VARCHAR(30) REFERENCES prompt_versions(prompt_version),
+    outline_prompt_version  VARCHAR(30) REFERENCES tb_prompt_versions(prompt_version),
+    body_prompt_version     VARCHAR(30) REFERENCES tb_prompt_versions(prompt_version),
+    qc_prompt_version       VARCHAR(30) REFERENCES tb_prompt_versions(prompt_version),
     llm_provider        VARCHAR(30)     NOT NULL,
     llm_model           VARCHAR(50)     NOT NULL,
     generated_outline   TEXT,
@@ -394,21 +394,21 @@ CREATE TABLE IF NOT EXISTS sample_documents (
     created_at          TIMESTAMPTZ     DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_sd_status ON sample_documents(review_status);
-CREATE INDEX IF NOT EXISTS idx_sd_level ON sample_documents(target_level_id);
-CREATE INDEX IF NOT EXISTS idx_sd_tenant ON sample_documents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_sd_status ON tb_sample_documents(review_status);
+CREATE INDEX IF NOT EXISTS idx_sd_level ON tb_sample_documents(target_level_id);
+CREATE INDEX IF NOT EXISTS idx_sd_tenant ON tb_sample_documents(tenant_id);
 
 -- ============================================================
 -- [I] 비용 (월별 파티션)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS llm_usage (
+CREATE TABLE IF NOT EXISTS tb_llm_usage (
     usage_id            BIGSERIAL,
     provider            VARCHAR(30)     NOT NULL,
     model               VARCHAR(50)     NOT NULL,
     purpose             VARCHAR(30)     NOT NULL,
     reference_type      VARCHAR(20),
     reference_id        VARCHAR(100),
-    tenant_id           VARCHAR(50)     REFERENCES tenants(tenant_id),
+    tenant_id           VARCHAR(50)     REFERENCES tb_tenants(tenant_id),
     input_tokens        INT             NOT NULL,
     output_tokens       INT             NOT NULL,
     total_tokens        INT             GENERATED ALWAYS AS (input_tokens + output_tokens) STORED,
@@ -422,19 +422,19 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     PRIMARY KEY (usage_id, called_at)
 ) PARTITION BY RANGE (called_at);
 
-CREATE TABLE IF NOT EXISTS llm_usage_2026_05 PARTITION OF llm_usage FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
-CREATE TABLE IF NOT EXISTS llm_usage_2026_06 PARTITION OF llm_usage FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
-CREATE TABLE IF NOT EXISTS llm_usage_2026_07 PARTITION OF llm_usage FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
-CREATE TABLE IF NOT EXISTS llm_usage_default PARTITION OF llm_usage DEFAULT;
+CREATE TABLE IF NOT EXISTS tb_llm_usage_2026_05 PARTITION OF tb_llm_usage FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+CREATE TABLE IF NOT EXISTS tb_llm_usage_2026_06 PARTITION OF tb_llm_usage FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
+CREATE TABLE IF NOT EXISTS tb_llm_usage_2026_07 PARTITION OF tb_llm_usage FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
+CREATE TABLE IF NOT EXISTS tb_llm_usage_default PARTITION OF tb_llm_usage DEFAULT;
 
-CREATE INDEX IF NOT EXISTS idx_lu_phase ON llm_usage(billing_phase, called_at DESC);
-CREATE INDEX IF NOT EXISTS idx_lu_purpose ON llm_usage(purpose);
-CREATE INDEX IF NOT EXISTS idx_lu_ref ON llm_usage(reference_type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_lu_phase ON tb_llm_usage(billing_phase, called_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lu_purpose ON tb_llm_usage(purpose);
+CREATE INDEX IF NOT EXISTS idx_lu_ref ON tb_llm_usage(reference_type, reference_id);
 
 -- ============================================================
 -- [J] 감사 로그 (월별 파티션)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS audit_log (
+CREATE TABLE IF NOT EXISTS tb_audit_log (
     audit_id        BIGSERIAL,
     request_id      UUID,
     tenant_id       VARCHAR(50),
@@ -452,13 +452,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
     PRIMARY KEY (audit_id, occurred_at)
 ) PARTITION BY RANGE (occurred_at);
 
-CREATE TABLE IF NOT EXISTS audit_log_2026_05 PARTITION OF audit_log FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
-CREATE TABLE IF NOT EXISTS audit_log_2026_06 PARTITION OF audit_log FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
-CREATE TABLE IF NOT EXISTS audit_log_default PARTITION OF audit_log DEFAULT;
+CREATE TABLE IF NOT EXISTS tb_audit_log_2026_05 PARTITION OF tb_audit_log FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+CREATE TABLE IF NOT EXISTS tb_audit_log_2026_06 PARTITION OF tb_audit_log FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
+CREATE TABLE IF NOT EXISTS tb_audit_log_default PARTITION OF tb_audit_log DEFAULT;
 
-CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_id, occurred_at DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_log(target_type, target_id);
-CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON tb_audit_log(actor_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_target ON tb_audit_log(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON tb_audit_log(action, occurred_at DESC);
 
 -- ============================================================
 -- 무결성 트리거
@@ -467,12 +467,12 @@ CREATE OR REPLACE FUNCTION update_timestamp() RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_cl_updated ON classification_levels;
-CREATE TRIGGER trg_cl_updated BEFORE UPDATE ON classification_levels
+DROP TRIGGER IF EXISTS trg_cl_updated ON tb_classification_levels;
+CREATE TRIGGER trg_cl_updated BEFORE UPDATE ON tb_classification_levels
   FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
-DROP TRIGGER IF EXISTS trg_ef_updated ON evaluation_factors;
-CREATE TRIGGER trg_ef_updated BEFORE UPDATE ON evaluation_factors
+DROP TRIGGER IF EXISTS trg_ef_updated ON tb_evaluation_factors;
+CREATE TRIGGER trg_ef_updated BEFORE UPDATE ON tb_evaluation_factors
   FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
 CREATE OR REPLACE FUNCTION check_factor_weights_sum() RETURNS TRIGGER AS $$
@@ -480,7 +480,7 @@ DECLARE
   total DECIMAL(4,3);
 BEGIN
   SELECT COALESCE(SUM(weight), 0) INTO total
-  FROM evaluation_factors WHERE is_active = TRUE;
+  FROM tb_evaluation_factors WHERE is_active = TRUE;
   IF ABS(total - 1.0) > 0.01 THEN
     RAISE EXCEPTION 'evaluation_factors active weight sum must be 1.0 (current: %)', total;
   END IF;
@@ -488,9 +488,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_factor_weights_sum ON evaluation_factors;
+DROP TRIGGER IF EXISTS trg_factor_weights_sum ON tb_evaluation_factors;
 CREATE CONSTRAINT TRIGGER trg_factor_weights_sum
-  AFTER INSERT OR UPDATE OR DELETE ON evaluation_factors
+  AFTER INSERT OR UPDATE OR DELETE ON tb_evaluation_factors
   DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW EXECUTE FUNCTION check_factor_weights_sum();
 
@@ -511,15 +511,15 @@ SELECT
   c.status,
   c.classified_at,
   latest_corr.corrected_at
-FROM classifications c
-JOIN classification_levels pl ON c.predicted_level_id = pl.level_id
+FROM tb_classifications c
+JOIN tb_classification_levels pl ON c.predicted_level_id = pl.level_id
 LEFT JOIN LATERAL (
   SELECT corrected_level_id, corrected_at
-  FROM corrections
+  FROM tb_corrections
   WHERE classification_id = c.classification_id AND direction != 'confirm'
   ORDER BY corrected_at DESC LIMIT 1
 ) latest_corr ON true
-LEFT JOIN classification_levels fl ON latest_corr.corrected_level_id = fl.level_id;
+LEFT JOIN tb_classification_levels fl ON latest_corr.corrected_level_id = fl.level_id;
 
 CREATE OR REPLACE VIEW v_monthly_llm_cost AS
 SELECT date_trunc('month', called_at) AS month,
@@ -531,7 +531,7 @@ SELECT date_trunc('month', called_at) AS month,
        SUM(cost_krw) AS total_cost_krw,
        AVG(latency_ms)::INT AS avg_latency_ms,
        COUNT(*) FILTER (WHERE NOT success) AS error_count
-FROM llm_usage
+FROM tb_llm_usage
 GROUP BY 1, 2, 3, 4, 5;
 
 CREATE OR REPLACE VIEW v_model_performance AS
@@ -544,9 +544,9 @@ SELECT c.model_version,
        COUNT(*) FILTER (WHERE cr.direction = 'overclass') AS overclass_count,
        AVG(c.confidence)::DECIMAL(5,4) AS avg_confidence,
        AVG(c.inference_ms)::INT AS avg_inference_ms
-FROM classifications c
-JOIN classification_levels cl ON c.predicted_level_id = cl.level_id
-LEFT JOIN corrections cr ON c.classification_id = cr.classification_id
+FROM tb_classifications c
+JOIN tb_classification_levels cl ON c.predicted_level_id = cl.level_id
+LEFT JOIN tb_corrections cr ON c.classification_id = cr.classification_id
 GROUP BY c.model_version, cl.level_code, cl.level_name;
 
 CREATE OR REPLACE VIEW v_active_learning_status AS
@@ -560,7 +560,7 @@ SELECT
     WHEN COUNT(*) FILTER (WHERE consumed_in_run IS NULL) >= 50 THEN 'RETRAIN_RECOMMENDED'
     ELSE 'OK'
   END AS retrain_status
-FROM corrections;
+FROM tb_corrections;
 """
 
 

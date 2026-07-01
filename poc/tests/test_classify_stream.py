@@ -29,7 +29,6 @@ def client():
 def _make_req() -> dict:
     return ClassifyRequest(
         doc_id="not-a-uuid",
-        tenant_id="default",
         content="이 문서는 영업비밀 등급 분류 대상입니다.",
         use_rag=False,
         return_evidence=False,
@@ -42,7 +41,6 @@ def test_classify_unit_invokes_on_stage_callback():
     seen: list[str] = []
     req = ClassifyRequest(
         doc_id="not-a-uuid",
-        tenant_id="default",
         content="테스트 문서",
         use_rag=False,
         return_evidence=False,

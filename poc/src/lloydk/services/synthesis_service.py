@@ -23,6 +23,7 @@ from lloydk.schemas.synthesis import (
     SynthReviewRequest,
     SynthReviewResponse,
 )
+from lloydk.services.async_classify_service import _celery_dispatch_available
 from lloydk.services.job_store import get_default_store
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,24 @@ class SynthesisService:
                 "actor": req.actor.user_id,
             },
         )
-        # 운영: Celery synthesize_batch.delay(grade=..., count=...) 발사
+        # 운영(브로커 가용): 실제 Celery synthesize_batch.delay() 발사 → worker가 생성·검수큐 적재.
+        # 테스트/브로커 미가용/eager는 발사하지 않고 작업 등록만(동작·테스트 보존, dryrun 의미).
+        if _celery_dispatch_available():
+            try:
+                from lloydk.workers.tasks import synthesize_batch  # noqa: PLC0415
+
+                synthesize_batch.delay(
+                    req.target_grade.value,
+                    req.count,
+                    domain=req.domain,
+                    job_id=str(job_id),
+                )
+                logger.info("synth enqueued to celery: job_id=%s count=%d", job_id, req.count)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "celery enqueue failed for synth — left as registered: job_id=%s",
+                    job_id, exc_info=True,
+                )
         logger.info(
             "synth submit done: job_id=%s count=%d est_cost_usd=%.4f",
             job_id, req.count, round(unit * req.count, 4),
@@ -75,22 +93,25 @@ class SynthesisService:
         self,
         *,
         status: str = "pending",
-        tenant_id: Optional[str] = None,
         limit: int = 50,
+        offset: int = 0,
     ) -> SynthQueueResponse:
-        logger.debug("synth queue enter: status=%s tenant=%s limit=%d", status, tenant_id, limit)
+        # tenant 제거: 격리는 KL 포털 전담 — 합성 큐는 전역 네임스페이스.
+        logger.debug(
+            "synth queue enter: status=%s limit=%d offset=%d",
+            status, limit, offset,
+        )
         # status 매핑: API 'pending' → DB 'pending_review'
         db_status = {"pending": "pending_review", "approved": "approved", "rejected": "rejected"}.get(status, "pending_review")
 
         try:
             with session_scope() as db:
                 repo = SynthRepo(db)
-                samples = (
-                    repo.list_pending_review(tenant_id=tenant_id, limit=limit)
-                    if db_status == "pending_review"
-                    else []
-                )
-                # 승인/반려 조회는 별도 — repo에 메서드 추가 대신 raw query 회피, PoC는 pending만
+                # [C1] pending/approved/rejected 모두 조회 지원. 종전엔 승인/반려가 silent
+                # empty([],0)로 떨어져 운영자 검수 이력 조회가 무음 함정이었다.
+                samples = repo.list_by_status(db_status, limit=limit, offset=offset)
+                # total = limit/offset 무관 전체 건수 (페이지네이션 메타)
+                total = repo.count_by_status(db_status)
                 items = [
                     SyntheticDocItem(
                         synth_id=s.sample_id,
@@ -105,7 +126,7 @@ class SynthesisService:
                     )
                     for s in samples
                 ]
-                return SynthQueueResponse(total=len(items), items=items)
+                return SynthQueueResponse(total=total, items=items)
         except SQLAlchemyError as exc:
             logger.warning("synth queue skipped: %s", exc)
             return SynthQueueResponse(total=0, items=[])

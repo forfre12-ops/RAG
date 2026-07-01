@@ -94,7 +94,7 @@ class TestTxtIngestion:
         ).encode("utf-8")
 
         res = svc.ingest(
-            filename="guide.txt", content_bytes=body, tenant_id="t1", persist=False
+            filename="guide.txt", content_bytes=body, persist=False
         )
 
         assert res.source_format == "txt"
@@ -111,10 +111,10 @@ class TestTxtIngestion:
         body = "원본 보관 검증용 본문".encode("utf-8")
 
         res = svc.ingest(
-            filename="orig.txt", content_bytes=body, tenant_id="t1", persist=False
+            filename="orig.txt", content_bytes=body, persist=False
         )
 
-        key = f"t1/{res.file_hash}/orig.txt"
+        key = f"{res.file_hash}/orig.txt"
         assert res.raw_text_uri.startswith("file://")
         assert storage.exists(svc.RAW_BUCKET, key)
         assert storage.get(svc.RAW_BUCKET, key) == body  # 무손실 원본
@@ -138,14 +138,14 @@ class TestDocxIngestion:
         storage = _storage(tmp_path)
         svc = DocumentIngestionService(storage=storage)
         res = svc.ingest(
-            filename="sample.docx", content_bytes=body, tenant_id="t1", persist=False
+            filename="sample.docx", content_bytes=body, persist=False
         )
 
         assert res.source_format == "docx"
         assert res.extraction_method == "parser"
         assert res.char_count > 0
         # 정규화 텍스트에 실제 본문이 깨지지 않고 들어갔는지
-        norm = storage.get(svc.NORM_BUCKET, f"t1/{res.file_hash}/normalized.txt").decode("utf-8")
+        norm = storage.get(svc.NORM_BUCKET, f"{res.file_hash}/normalized.txt").decode("utf-8")
         assert "영업비밀" in norm
         assert "제조 공정" in norm
 
@@ -159,12 +159,12 @@ class TestPdfIngestion:
         storage = _storage(tmp_path)
         svc = DocumentIngestionService(storage=storage)
         res = svc.ingest(
-            filename="report.pdf", content_bytes=body, tenant_id="t1", persist=False
+            filename="report.pdf", content_bytes=body, persist=False
         )
         assert res.source_format == "pdf"
         assert res.extraction_method == "parser"
         assert res.ocr_used is False
-        norm = storage.get(svc.NORM_BUCKET, f"t1/{res.file_hash}/normalized.txt").decode("utf-8")
+        norm = storage.get(svc.NORM_BUCKET, f"{res.file_hash}/normalized.txt").decode("utf-8")
         assert "Trade Secret" in norm
 
 
@@ -190,14 +190,14 @@ class TestImageOcr:
         storage = _storage(tmp_path)
         svc = DocumentIngestionService(storage=storage)
         res = svc.ingest(
-            filename="scan.png", content_bytes=body, tenant_id="t1", persist=False
+            filename="scan.png", content_bytes=body, persist=False
         )
 
         assert res.source_format == "png"
         assert res.ocr_used is True
         assert res.extraction_method == "ocr"
         assert "Trade Secret" in storage.get(
-            svc.NORM_BUCKET, f"t1/{res.file_hash}/normalized.txt"
+            svc.NORM_BUCKET, f"{res.file_hash}/normalized.txt"
         ).decode("utf-8")
 
 
@@ -213,7 +213,7 @@ class TestRealFixtures:
         storage = _storage(tmp_path)
         svc = DocumentIngestionService(storage=storage)
         res = svc.ingest(
-            filename=name, content_bytes=body, tenant_id="t1", persist=False
+            filename=name, content_bytes=body, persist=False
         )
         assert res.source_format == name.rsplit(".", 1)[-1]
         # 실제 본문이 추출됐는지 — HWP 파서/ PDF 텍스트레이어 실증
@@ -223,7 +223,7 @@ class TestRealFixtures:
         assert res.char_count > 0, f"본문 추출 실패: warnings={res.warnings}"
         assert res.chunk_count >= 1
         # 원본 무손실 보관 확인
-        assert storage.get(svc.RAW_BUCKET, f"t1/{res.file_hash}/{name}") == body
+        assert storage.get(svc.RAW_BUCKET, f"{res.file_hash}/{name}") == body
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +239,6 @@ class TestPersistence:
         res = svc.ingest(
             filename="a.txt",
             content_bytes=body,
-            tenant_id="t1",
             doc_type="가이드",
             created_by="u1",
             db=sess,
@@ -254,7 +253,6 @@ class TestPersistence:
         assert len(docs) == 1
         doc = docs[0]
         # provenance 1:1 기록 확인
-        assert doc.tenant_id == "t1"
         assert doc.source_format == "txt"
         assert doc.file_hash == res.file_hash
         assert doc.raw_text_uri == res.raw_text_uri
@@ -266,7 +264,6 @@ class TestPersistence:
         # chunks 적재
         assert len(chunks) >= 1
         assert all(c.doc_id == doc.doc_id for c in chunks)
-        assert all(c.tenant_id == "t1" for c in chunks)
 
     def test_unsupported_format_degrades_gracefully(self, tmp_path):
         storage = _storage(tmp_path)
@@ -275,11 +272,10 @@ class TestPersistence:
         res = svc.ingest(
             filename="weird.xyz",
             content_bytes=b"\x00\x01\x02binarymisc",
-            tenant_id="t1",
             persist=False,
         )
         assert res.source_format == "xyz"
         assert res.char_count == 0
         # 원본은 그래도 보관 (감사 요건)
-        assert storage.exists(svc.RAW_BUCKET, f"t1/{res.file_hash}/weird.xyz")
+        assert storage.exists(svc.RAW_BUCKET, f"{res.file_hash}/weird.xyz")
         assert any("no text extracted" in w for w in res.warnings)

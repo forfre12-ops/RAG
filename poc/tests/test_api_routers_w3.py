@@ -284,6 +284,13 @@ class TestSchemaAdminRouter:
 class TestMetricsRouter:
     def test_latest_no_active_model_404(self):
         """현재 활성 모델 없음 → 404 (DB 미가용 시에도 동일)."""
+        # 공유 DB 오염(타 테스트가 활성화한 모델 잔존) 방지 — 활성 모델 비활성화 후 검증
+        from lloydk.db import session_scope
+        from lloydk.db.models import ModelVersion
+        with session_scope() as s:
+            s.query(ModelVersion).filter_by(is_active=True).update(
+                {"is_active": False}, synchronize_session=False
+            )
         with TestClient(app) as cli:
             r = cli.get("/api/v1/metrics/latest", headers=HDR)
             assert r.status_code == 404

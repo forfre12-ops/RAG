@@ -38,6 +38,6 @@ def train_status(train_job_id: UUID):
 def train_list(
     status: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),  # noqa: ARG001 — PoC, 페이지네이션 W4에서 보강
+    offset: int = Query(default=0, ge=0),
 ):
-    return TrainingService().list_recent(limit=limit, status_filter=status)
+    return TrainingService().list_recent(limit=limit, status_filter=status, offset=offset)

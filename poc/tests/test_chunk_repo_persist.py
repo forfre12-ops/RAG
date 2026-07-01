@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from lloydk.db.models import Chunk
 from lloydk.modules.m2_preprocess.chunker import Chunk as PreChunk
 from lloydk.repositories.chunk_repo import ChunkRepo, _estimate_token_count
@@ -70,14 +68,13 @@ def test_upsert_chunks_inserts_one_row_per_chunk():
     chunks = _make_chunks(3)
     doc_id = uuid.uuid4()
 
-    ids = repo.upsert_chunks(doc_id=doc_id, tenant_id="t1", chunks=chunks)
+    ids = repo.upsert_chunks(doc_id=doc_id, chunks=chunks)
     assert len(ids) == 3
     # 모두 Chunk 모델 객체
     assert all(isinstance(o, Chunk) for o in sess.added)
-    # doc_id/tenant_id가 모두 일관
+    # doc_id가 모두 일관 (tenant 제거: 격리는 KL 포털 전담)
     for row in sess.added:
         assert row.doc_id == doc_id
-        assert row.tenant_id == "t1"
     # chunk_index 보존
     assert [r.chunk_index for r in sess.added] == [0, 1, 2]
     # text 비어있지 않음, char_count 보존
@@ -89,7 +86,7 @@ def test_upsert_chunks_token_count_estimated_when_missing():
     sess = _StubSession()
     repo = ChunkRepo(sess)
     chunks = _make_chunks(1)
-    repo.upsert_chunks(doc_id=uuid.uuid4(), tenant_id="t1", chunks=chunks)
+    repo.upsert_chunks(doc_id=uuid.uuid4(), chunks=chunks)
     row = sess.added[0]
     assert row.token_count >= 1
 
@@ -101,15 +98,9 @@ def test_upsert_chunks_skips_empty_text():
         PreChunk(index=0, text="", char_count=0),
         PreChunk(index=1, text="유효 텍스트", char_count=6),
     ]
-    ids = repo.upsert_chunks(doc_id=uuid.uuid4(), tenant_id="t1", chunks=chunks)
+    ids = repo.upsert_chunks(doc_id=uuid.uuid4(), chunks=chunks)
     assert len(ids) == 1
     assert sess.added[0].content == "유효 텍스트"
-
-
-def test_upsert_chunks_requires_tenant_id():
-    repo = ChunkRepo(_StubSession())
-    with pytest.raises(ValueError):
-        repo.upsert_chunks(doc_id=uuid.uuid4(), tenant_id="", chunks=_make_chunks(1))
 
 
 def test_upsert_chunks_replace_existing_invokes_delete():
@@ -124,7 +115,7 @@ def test_upsert_chunks_replace_existing_invokes_delete():
 
     sess.execute = spy_execute  # type: ignore[method-assign]
     repo = ChunkRepo(sess)
-    repo.upsert_chunks(doc_id=uuid.uuid4(), tenant_id="t1", chunks=_make_chunks(1),
+    repo.upsert_chunks(doc_id=uuid.uuid4(), chunks=_make_chunks(1),
                        replace_existing=True)
     # delete + insert 흐름 — execute 1회 (delete), add 1회
     assert len(calls) >= 1
@@ -142,12 +133,6 @@ def test_upsert_chunks_no_replace_skips_delete():
 
     sess.execute = spy_execute  # type: ignore[method-assign]
     repo = ChunkRepo(sess)
-    repo.upsert_chunks(doc_id=uuid.uuid4(), tenant_id="t1", chunks=_make_chunks(1),
+    repo.upsert_chunks(doc_id=uuid.uuid4(), chunks=_make_chunks(1),
                        replace_existing=False)
     assert len(calls) == 0
-
-
-def test_delete_by_doc_id_requires_tenant_id():
-    repo = ChunkRepo(_StubSession())
-    with pytest.raises(ValueError):
-        repo.delete_by_doc_id(uuid.uuid4(), tenant_id="")

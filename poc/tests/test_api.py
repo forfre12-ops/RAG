@@ -47,7 +47,6 @@ def test_classify_full_response_shape():
             headers={"X-API-Key": settings.api_key},
             json={
                 "doc_id": "smoke-ts",
-                "tenant_id": "test",
                 "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 M&A 계획",
                 "use_rag": False,
                 "return_evidence": True,

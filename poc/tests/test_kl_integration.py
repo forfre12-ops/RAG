@@ -41,12 +41,11 @@ def _pg_ok() -> bool:
 _PG = _pg_ok()
 
 
-def _hdr(actor_id: str = "kl-user-1", role: str = "kl_backend", tenant: str = "default") -> dict:
+def _hdr(actor_id: str = "kl-user-1", role: str = "kl_backend") -> dict:
     return {
         "X-API-Key": settings.api_key,
         "X-Actor-Id": actor_id,
         "X-Actor-Role": role,
-        "X-Tenant-Id": tenant,
     }
 
 
@@ -66,7 +65,6 @@ class TestS1SyncClassify:
                 headers=_hdr(),
                 json={
                     "doc_id": str(uuid.uuid4()),
-                    "tenant_id": "default",
                     "content": "특급기밀 차세대 제품 설계도 핵심 원천기술 — KL 통합 시나리오 S1",
                     "use_rag": False,
                     "return_evidence": True,

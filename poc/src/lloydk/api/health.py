@@ -43,7 +43,15 @@ def _check_model() -> dict:
     except Exception:
         return {"status": "unknown", "ok": not model_expected, "model_dir": model_dir}
     if model_loaded:
-        return {"status": "loaded", "ok": True, "model_dir": model_dir}
+        # [calibration-visibility] 무보정(T=1.0) 서빙은 OOD 과신→고등급 무음미탐 위험이라
+        # 운영 점검 대상. ok는 유지(서빙 가능)하되 calibrated/calibration_source를 노출한다.
+        return {
+            "status": "loaded",
+            "ok": True,
+            "model_dir": model_dir,
+            "calibrated": getattr(svc.inference, "calibrated", None),
+            "calibration_source": getattr(svc.inference, "_calibration_source", "unknown"),
+        }
     if model_expected:
         return {"status": "degraded", "ok": False, "model_dir": model_dir}
     return {"status": "rule_fallback", "ok": True, "model_dir": model_dir}
@@ -60,15 +68,27 @@ def _check_db() -> dict:
 
 
 def _check_es() -> dict:
+    """벡터스토어 헬스 — 백엔드 무관. ES는 _client.ping, PG(pgvector)는 engine SELECT 1.
+
+    이전엔 ES `_client` 만 봐서 PG 백엔드는 _client 부재로 점검 없이 ok(false-ok)였다.
+    PgVectorStore 는 _engine(SQLAlchemy)으로 실연결을 확인한다.
+    """
     if getattr(settings, "vector_backend", "inmemory") == "inmemory":
         return {"status": "skipped", "ok": True}
     try:
         from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
         store = build_store()
         client = getattr(store, "_client", None)
-        if client is not None:
+        if client is not None:          # ES
             client.ping()
-        return {"status": "ok", "ok": True}
+            return {"status": "ok", "ok": True}
+        engine = getattr(store, "_engine", None)
+        if engine is not None:          # PG (pgvector)
+            from sqlalchemy import text  # noqa: PLC0415
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return {"status": "ok", "ok": True}
+        return {"status": "ok", "ok": True}  # inmemory 폴백 등 — 점검 대상 없음
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "ok": False, "detail": type(exc).__name__}
 
@@ -119,6 +139,83 @@ def _check_embedder() -> dict:
         return {"status": "ok", "ok": True}
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "ok": False, "detail": type(exc).__name__}
+
+
+def _check_reranker() -> dict:
+    """[C20] reranker effective 백엔드 가시화 — bge→noop graceful 폴백 노출.
+
+    종전 /healthz는 settings.reranker_provider(설정값)만 보고해, bge 초기화 실패로 noop으로
+    조용히 내려간 상태를 가렸다. 본 probe는 *이미 초기화된 캐시*만 읽어 effective 타입을
+    노출한다(강제 get_reranker() 호출로 모델 로드를 유발하지 않는다 — health가 느려지지 않게).
+    reranker는 품질 보강(+소폭)이라 폴백이 서비스-다운은 아니므로 ok=True 고정·가시화 전용.
+    """
+    configured = getattr(settings, "reranker_provider", "noop")
+    try:
+        from lloydk.adapters.reranker import _RERANKER_CACHE  # noqa: PLC0415
+        inst = _RERANKER_CACHE.get(str(configured).lower())
+        if inst is None:
+            return {"status": "not_initialized", "ok": True,
+                    "configured": configured, "effective": None}
+        effective = type(inst).__name__
+        fell_back = str(configured).lower() == "bge" and effective == "NoopReranker"
+        return {
+            "status": "fallback" if fell_back else "ok",
+            "ok": True,
+            "configured": configured,
+            "effective": effective,
+            "fell_back_to_noop": fell_back,
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "ok": True, "configured": configured,
+                "detail": type(exc).__name__}
+
+
+def _check_extractors() -> dict:
+    """[C22] 포맷별 추출기/OCR 외부 의존성 가용성 진단 (best-effort, 실행 없이 탐지).
+
+    추출기는 도구 부재 시 graceful degrade(quality=0.0 + error)라 서비스는 죽지 않지만,
+    그 degrade가 startup/health에 안 떠서 'HWP 표 누락·PDF 스캔 OCR 불가'가 문서 단위
+    무음 실패였다. import-가능성(find_spec)·바이너리 경로만 확인해 가시화한다(.txt/.md는
+    의존 없이 항상 가능). optional이므로 ok=True 고정 — unavailable 목록만 노출.
+    """
+    import importlib.util  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+
+    def _mod(name: str) -> bool:
+        try:
+            return importlib.util.find_spec(name) is not None
+        except Exception:  # noqa: BLE001
+            return False
+
+    try:
+        from lloydk.modules.m2_preprocess.extractor import (  # noqa: PLC0415
+            POPPLER_PATH,
+            TESSERACT_CMD,
+        )
+    except Exception:  # noqa: BLE001
+        POPPLER_PATH, TESSERACT_CMD = None, "tesseract"
+
+    _tess_ok = (shutil.which(TESSERACT_CMD) is not None or Path(TESSERACT_CMD).exists()) and _mod("pytesseract")
+    probes: dict[str, dict] = {
+        "hwp_body(rhwp)": {"available": _mod("rhwp")},
+        "hwp_table(pyhwp/hwp5html)": {"available": shutil.which("hwp5html") is not None},
+        "xls(xlrd)": {"available": _mod("xlrd")},
+        "xlsx(openpyxl)": {"available": _mod("openpyxl")},
+        "docx(python-docx)": {"available": _mod("docx")},
+        "pptx(python-pptx)": {"available": _mod("pptx")},
+        "pdf_text(pdfminer)": {"available": _mod("pdfminer")},
+        "pdf_render(fitz/pdf2image)": {"available": _mod("fitz") or _mod("pdf2image")},
+        "pdf_scan(poppler)": {"available": POPPLER_PATH is not None, "path": POPPLER_PATH},
+        "ocr(tesseract)": {"available": bool(_tess_ok), "cmd": TESSERACT_CMD},
+        "doc(antiword)": {"available": shutil.which("antiword") is not None},
+    }
+    unavailable = [k for k, v in probes.items() if not v["available"]]
+    return {
+        "status": "ok" if not unavailable else "degraded",
+        "ok": True,  # optional 의존 — 서비스 가용성 판단엔 미반영(가시화 전용)
+        "unavailable": unavailable,
+        "probes": probes,
+    }
 
 
 def _operational_config() -> dict:
@@ -195,6 +292,8 @@ def healthz_deep():
         "vectorstore": _check_es(),
         "storage": _check_storage(),
         "embedder": _check_embedder(),
+        "reranker": _check_reranker(),
+        "extractors": _check_extractors(),
         "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
                    "ok": STARTUP_COMPLETE},
     }

@@ -39,7 +39,9 @@ def _batch_req(n: int) -> ClassifyBatchRequest:
 def test_submit_async_happy_path():
     svc = AsyncClassifyService(sleep_fn=lambda _s: None)
     res = svc.submit_async(_async_req("a-1"))
-    assert res.status == "queued"
+    # Top-7 배선: 테스트/브로커 미가용은 in-process 즉시 처리이므로 응답 status가
+    # 'queued' 거짓표기가 아니라 실제 최종 상태('done')를 반영한다.
+    assert res.status == "done"
     assert str(res.job_id) in res.status_url
 
     status = svc.get_status(res.job_id)
@@ -59,6 +61,8 @@ def test_submit_async_records_failure():
     svc.classify.classify = _boom  # type: ignore[attr-defined]
 
     res = svc.submit_async(_async_req("a-err"))
+    # in-process 실패도 응답 status에 실제 상태(failed)가 반영된다('queued' 거짓표기 제거).
+    assert res.status == "failed"
     status = svc.get_status(res.job_id)
     assert status is not None
     assert status.status == "failed"
@@ -66,10 +70,22 @@ def test_submit_async_records_failure():
     assert "inference broke" in status.error
 
 
+def test_celery_dispatch_disabled_under_testing_env():
+    """Top-7 안전판: TESTING/PYTEST 환경에서는 실 브로커 발사를 절대 시도하지 않는다.
+
+    conftest가 TESTING=1을 세팅하므로 in-process 경로만 타고, 라이브 redis 없이 통과.
+    """
+    from lloydk.services.async_classify_service import _celery_dispatch_available
+
+    assert _celery_dispatch_available() is False
+
+
 def test_submit_batch_happy_path_3_docs():
     svc = AsyncClassifyService(sleep_fn=lambda _s: None)
     res = svc.submit_batch(_batch_req(3))
     assert res.total == 3
+    # 배치도 in-process 전건 처리 후 실제 최종 상태(done)를 반영.
+    assert res.status == "done"
     assert res.completed == 3
     assert res.failed == 0
     assert res.failed_doc_ids == []

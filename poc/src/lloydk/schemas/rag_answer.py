@@ -14,12 +14,11 @@ class RagAnswerRequest(BaseModel):
     """POST /answer 요청 — 질의 + 선택적 RAG context 옵션."""
 
     query: str = Field(min_length=1, max_length=4000)
-    tenant_id: Optional[str] = None
     namespace: Optional[str] = None  # RAG collection
     top_k: int = Field(default=5, ge=1, le=20)
     grade: Optional[Grade] = None  # 분류 결과를 별도 단계에서 받아 본 호출에 전달 가능
     use_reranker: bool = True
-    metadata: Optional[dict] = None  # tenant_id 외 추가 filter용
+    metadata: Optional[dict] = None  # 추가 filter용 (tenant 제거 — 격리는 KL 포털 전담)
 
 
 class RagCitation(BaseModel):

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>운영 런북 — 점검·모니터링·배포·장애·DR | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --bg-nav:rgba(255,255,255,.88);
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:220px; --article-max:920px; --container:1360px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:4px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 36px;max-width:680px;}
+h2{font-size:clamp(19px,2.6vw,24px);font-weight:700;letter-spacing:-.03em;margin:46px 0 12px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:46px 0 22px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{border-radius:0;padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:0;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.done{background:var(--text);color:var(--bg);}
+.tag.wip{background:#3f3f46;color:#fff;}
+.tag.plan{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.dep{background:#fefce8;color:#92400e;border:1px solid #fbbf24;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+
+</head>
+<body>
+
+<nav class="nav"><div class="nav-inner"><a class="brand" href="#"><span class="brand-mark"><img src="data:image/png;base64,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" alt="Lloydk" /></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">운영 런북</span></a><div class="nav-right"><span class="nav-badge">RUNBOOK</span></div></div></nav>
+
+<div class="article-layout">
+<article>
+
+  <div class="meta-row">
+    <span class="badge">DOC-OPS-01</span>
+    <span class="badge outline">본개발 설계</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">2026-06-20</span>
+  </div>
+  <h1 class="title">운영 런북</h1>
+  <p class="lede">KOIPA 영업비밀관리시스템의 운영 절차서 — 일상 점검, 모니터링, 모델 배포·롤백, 장애 대응, 큐·비동기 관리, 재해 복구. 운영자가 정상·비상 상황에서 <strong>무엇을 어떤 순서로</strong> 수행할지 규정한다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">상태 범례</div>
+    <p><span class="tag done">운영중</span> 현재 동작 · <span class="tag wip">보강</span> 본개발 정밀화 · <span class="tag plan">예정</span> 본개발 신규</p>
+  </div>
+  <hr/>
+
+  <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">일상 운영</span></div>
+  <h2>일일 점검 체크리스트</h2>
+  <ul>
+    <li><strong>헬스체크</strong> — <code>/api/v1/healthz/{live,ready,deep}</code>. <code>live</code>는 프로세스 생존, <code>ready</code>는 의존성(DB·벡터·LLM) 실측(실패 시 503), <code>deep</code>은 전체 점검.</li>
+    <li><strong>서비스 기동 확인</strong> — <code>api</code>·<code>worker</code>·<strong><code>beat</code></strong> 컨테이너가 모두 올라와 있는지 점검. <code>worker</code>는 모든 큐를 구독하고, <code>beat</code>는 단일 인스턴스만 동작해야 한다(아래 §05).</li>
+    <li><strong>핵심 지표</strong> — 분류 처리량, 오류율, 지연(p95), 방향성 FNR/FNR_TS, 검수 대기 건수.</li>
+    <li><strong>큐 상태</strong> — Celery 큐 깊이(<code>classify·index·synthesis·learning·celery</code>), outbox 미처리, DLQ 크기.</li>
+    <li><strong>주기작업(beat)</strong> — drift·auto-rollback·outbox·active-learning·파티션 롤오버 tick이 정상 발행·소비되는지 확인(미발행 시 폐곡선 자동화 정지).</li>
+    <li><strong>드리프트</strong> — 검색·분류 품질 드리프트 자가측정값.</li>
+  </ul>
+
+  <div class="section-sep" id="s2"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">모니터링 · 관제</span></div>
+  <h2>관측 지표</h2>
+  <p>Prometheus로 <strong>RED 지표</strong>(Rate·Error·Duration)와 <strong>업무 지표</strong>(분류량·FNR·검수 대기)를 수집한다. 3-tier 헬스체크는 의존성을 실측하며, 스토리지 무음 폴백 같은 숨은 열화도 탐지한다.</p>
+  <h2>관측 옵션 (환경변수)</h2>
+  <p>운영 환경에 맞춰 다음 관측 기능을 켤 수 있다. 모두 <strong>미설정 시 기존 동작 보존</strong>(no-op)이며, 로그 수집기·트레이싱 백엔드 구성에 따라 선택 적용한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>옵션</th><th>설정</th><th>동작</th></tr></thead>
+    <tbody>
+      <tr><td>구조화(JSON) 로깅</td><td><code>LLOYDK_LOG_JSON=1</code></td><td>API·워커 로그를 JSON 라인으로 출력(request_id 상관관계). 로그 수집기(예: Loki/ELK) 연동 시 권장.</td></tr>
+      <tr><td>드리프트 연속위반 임계</td><td><code>LLOYDK_DRIFT_CONSECUTIVE_REQUIRED</code> (기본 1)</td><td>단발 스파이크 오탐 억제 — drift 알람을 N회 연속 위반 시에만 발생. 2~3 권장.</td></tr>
+      <tr><td>OTel 비즈니스 span</td><td>OTel provider 설정 시 활성</td><td>추론·검색 핵심 경로를 수동 span으로 노출(미설정이면 no-op). 식별자·등급·신뢰도만 부착, 문서 본문 비포함.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><div class="callout-label">본개발 보강</div><p><strong>알람 룰·Grafana 대시보드</strong>를 리포지터리에 포함, Celery 큐 깊이·DLQ 크기를 지표로 노출. OpenTelemetry 트레이스 연동.</p></div>
+
+  <div class="section-sep" id="s3"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">모델 거버넌스 (배포 · 롤백)</span></div>
+  <h2>모델 배포 절차</h2>
+  <p>표준 순서: <strong>학습 → 서빙경로 평가 → 게이트 판정 → 활성화 → reload → 검증</strong>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th class="center">#</th><th>단계</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="center">1</td><td>평가</td><td>실배포(서빙) 경로 전체를 통과해 측정 — 캘리브레이션·FNR-safe 오버라이드 포함. 원시 argmax 측정 금지(미탐 9배 과소평가).</td></tr>
+      <tr><td class="center">2</td><td>게이트</td><td>FNR-safe 게이트 통과 시에만 배포 승인(예: fnr_high 지표 부재 시 배포 거부 = fail-secure).</td></tr>
+      <tr><td class="center">3</td><td>활성화</td><td><code>tb_model_versions.is_active</code> 전환 (activate). 롤백 시 직전 버전으로 되돌림.</td></tr>
+      <tr><td class="center">4</td><td>reload</td><td><code>POST /admin/model/reload</code> — 각 서빙 프로세스가 활성 모델을 메모리에 재적재(무중단).</td></tr>
+      <tr><td class="center">5</td><td>검증</td><td>reload 후 헬스·샘플 추론으로 새 모델 반영 확인.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><div class="callout-label">⚠ 현재 빈틈 (P0)</div><p>활성화는 DB <code>is_active</code>만 바꾸고, 각 서빙 프로세스가 <code>reload</code>를 개별 수신해야 반영된다. <strong>여러 레플리카(파드)에 reload를 브로드캐스트하는 메커니즘이 없어</strong>, 안전 롤백이 일부 레플리카에만 적용될 위험이 있다. 본개발에서 <strong>Redis pub/sub 또는 버전 폴링</strong>으로 전체 레플리카 팬아웃을 배선한다. 또한 <code>auto_rollback</code>·<code>auto_activate</code>는 기본 OFF이므로, 모니터링을 동반해 <strong>활성 결정</strong>을 내린다.</p></div>
+
+  <h2>캘리브레이션 운영</h2>
+  <p>서빙은 모델 디렉토리의 <code>temperature.json</code>(온도 스케일링 보정값)을 읽어 confidence를 재산정한다. 보정 산출 절차:</p>
+  <ul>
+    <li><strong>출력 위치</strong> — <code>calibrate_classifier.py</code>의 <code>--output</code> 기본값은 <code>&lt;model-dir&gt;/temperature.json</code>이다(서빙이 읽는 위치). <code>--output</code>을 생략하면 보정 결과가 서빙 경로에 정확히 떨어진다.</li>
+    <li><strong>실 데이터 필수</strong> — 실제 val logits 없이 더미로 만든 온도는 <strong>배포 금지</strong>. 도구는 fail-loud로 종료(exit 1)하며, 검증·CI 목적이면 <code>--allow-dummy</code>를 명시해야 한다.</li>
+    <li><strong>미보정 시 거동</strong> — <code>temperature.json</code> 부재 시 서빙은 T=1.0(무보정)으로 동작한다(over-confident 위험).</li>
+  </ul>
+
+  <h2>폐쇄망 번들 — 학습모델 동봉</h2>
+  <p>폐쇄망(에어갭) 배포 번들에는 <strong>학습된 분류기 가중치와 보정값을 반드시 동봉</strong>해야 한다. 베이스(HF) 모델만 포함하면 폐쇄망에서 미학습·무보정으로 동작한다.</p>
+  <ul>
+    <li><strong>학습 가중치 포함</strong> — <code>build_offline_bundle.py</code>에 <code>--classifier-model-dir</code>(또는 env <code>CLASSIFIER_MODEL_DIR</code>)로 학습 디렉토리를 지정하면 가중치+config와 <code>temperature.json</code>이 번들의 <code>models/classifier-trained</code>로 복사된다.</li>
+    <li><strong>누락 시 경고</strong> — 미지정 시 베이스 모델만 번들되며 경고가 출력된다(폐쇄망에서 rule-fallback). <code>temperature.json</code>이 빠지면 무보정 경고가 추가된다.</li>
+    <li><strong>마이그레이션 포함</strong> — 번들에는 alembic 마이그레이션 전체가 포함되며, 배포처에서 <code>alembic upgrade head</code>로 baseline+후속 revision(파티션 백필 포함)을 적용한다.</li>
+  </ul>
+
+  <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">장애 대응</span></div>
+  <h2>의존성 장애 런북</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>증상</th><th>현재 거동</th><th>조치</th></tr></thead>
+    <tbody>
+      <tr><td>PostgreSQL 다운</td><td>InferencePipeline 생성이 유한 폴백(약 21s)으로 종료</td><td>DB 복구 우선, 폴백 동안 신규 분류 보류, 복구 후 outbox 재처리</td></tr>
+      <tr><td>벡터검색(pgvector) 이슈</td><td>RAG 보조검색 품질 저하 — 분류·확정은 PG 트랜잭션으로 정상(RAG는 보조)</td><td>pgvector 확장·<code>tb_rag_vectors</code>(HNSW/tsv) 점검, 필요 시 재색인. PG 인스턴스 자체 다운은 위 행 참조</td></tr>
+      <tr><td>LLM API 장애</td><td>재시도+백오프</td><td><strong>서킷브레이커</strong>(본개발)로 지연 증폭 차단, 합성·검수 일시 보류</td></tr>
+      <tr><td>스토리지(로컬FS) 장애</td><td>무음 폴백 탐지(헬스)</td><td>원문 저장 경로 점검, 복구 후 재업로드</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><div class="callout-label">본개발 보강</div><p>LLM·스토리지에 <strong>서킷브레이커</strong> 도입(장기 장애 시 빠른 실패), 무음 폴백을 <strong>경보 동반</strong>으로 전환.</p></div>
+
+  <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">큐 · 비동기</span></div>
+  <h2>Celery 워커 · beat 운영</h2>
+  <p>비동기 작업은 작업 종류별 큐로 라우팅되며(<code>classify·index·synthesis·learning·celery</code>), 주기작업은 별도 <strong>beat</strong> 컨테이너가 발행한다. 두 컨테이너 모두 정상 기동·구성돼야 폐곡선 자동화가 동작한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>구성요소</th><th>역할</th><th>운영 주의</th></tr></thead>
+    <tbody>
+      <tr><td><strong>worker</strong></td><td>라우팅된 비동기 작업 소비</td><td><code>-Q classify,index,synthesis,learning,celery</code>로 <strong>모든 큐를 구독</strong>해야 한다. <code>-Q</code> 없이 기동하면 default(<code>celery</code>) 큐만 소비 → 다른 큐로 라우팅된 작업이 영영 소비되지 않는다.</td></tr>
+      <tr><td><strong>beat</strong></td><td>주기작업 트리거 발행</td><td><strong>전용 컨테이너 필수</strong>. 없으면 drift·롤백·outbox·파티션 롤오버 등 자동화가 전혀 동작하지 않는다. <strong>단일 인스턴스</strong>만 띄울 것(다중 beat = 중복 tick).</td></tr>
+    </tbody>
+  </table></div>
+  <h2>주기작업 (beat schedule)</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>작업</th><th>주기</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td>drift 점검</td><td>15분</td><td>운영 임베딩 드리프트 자가측정 → 임계 초과 시 알람 게이지.</td></tr>
+      <tr><td>active-learning</td><td>30분</td><td>검수 누적 임계 도달 시 재학습 권고/큐잉(+일별 03:00 스냅샷). <strong>학습 사이트(지재원)에서만 실효</strong> — 추론 전용 고객사에선 트레이너가 없어 큐잉이 무동작이고, 보정은 로컬 룰·진단용으로만 누적된다.</td></tr>
+      <tr><td>auto-rollback 점검</td><td>60분</td><td>활성 모델 라이브 미탐 회귀 점검(기본은 판정·로깅만, opt-in 시 실제 롤백).</td></tr>
+      <tr><td>outbox 배송</td><td>60초</td><td>enqueue된 콜백 실송신. 실패는 지수 백오프, max_attempts 후 DLQ.</td></tr>
+      <tr><td><strong>파티션 롤오버</strong></td><td>매일 02:10</td><td>향후 N개월 월 파티션 자동 생성(<code>_default</code> 비대화 방지). 아래 참조.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><div class="callout-label">폐곡선 범위 · 재학습 주기</div><p>위 beat 자동화 중 <strong>active-learning→재학습</strong> 구간은 <strong>학습 사이트(지재원)</strong> 한정이다. 고객사는 추론 전용이라 그 tick은 무동작이며, 검수 보정은 로컬에 누적돼 <strong>룰·키워드·임계 보정과 진단(Confusion Matrix)</strong>에만 쓰인다. 고객사 보정을 지재원으로 반출할지는 미확정이다(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인 5</a>, 기본 권고: 문서 무반출·집계 진단만). 모델은 상시 재학습되지 않으며, <strong>실데이터 1차 학습(2026-09) 후 드리프트·이벤트 트리거 시 단발</strong> 재학습한다.</p></div>
+  <h2>파티션 롤오버</h2>
+  <ul>
+    <li><strong>자동 연장</strong> — beat가 매일 02:10 <code>ensure_partitions_tick</code>을 호출해 향후 N개월 월 파티션을 미리 생성한다(<code>CREATE TABLE IF NOT EXISTS</code> 멱등). 대상: <code>tb_chunks</code>·<code>tb_llm_usage</code>·<code>tb_audit_log</code>.</li>
+    <li><strong>배포 시 백필</strong> — 신규 배포 시 마이그레이션 <code>e5f6a7b8c9d0</code>을 적용해 13개월치 월 파티션을 선생성한다(<code>alembic upgrade head</code>). 이후는 beat가 매일 연장.</li>
+    <li><strong>미동작 시 영향</strong> — beat·롤오버가 정지하면 신규 행이 <code>*_default</code> 파티션에 누적돼 프루닝이 무력화되고, 나중에 정상 파티션 attach 시 default 검증 락이 운영을 막는다.</li>
+    <li><strong>지연 복구</strong> — 이미 <code>_default</code>에 해당 월 행이 쌓인 뒤에는 자동 생성이 충돌·실패할 수 있다(경고만 남기고 beat는 계속 동작). 이 경우 수동 detach/move 절차가 필요하다.</li>
+  </ul>
+  <h2>비동기 처리 · DLQ</h2>
+  <p>비동기 작업은 Celery + outbox(Redis ZSET) 패턴으로 처리하며, 실패 작업은 <strong>DLQ</strong>(Dead Letter Queue)로 격리된다. 가시성 타임아웃으로 중복 처리를 방지하고, 멱등성 미들웨어(<code>Idempotency-Key</code>)가 재시도 중복을 막는다.</p>
+  <p><strong>DLQ 드레인 절차:</strong> ① DLQ 항목 원인 분류 → ② 일시 오류는 재투입, 영구 오류는 보류·기록 → ③ 재처리 후 잔량 0 확인.</p>
+  <div class="callout"><div class="callout-label">⚠ 현재 빈틈 (P0)</div><p><code>/classify/async</code>·<code>/batch</code>가 Celery <code>delay()</code> 대신 <strong>요청 스레드에서 인라인 실행</strong>하고 202를 반환한다(대량 배치 시 타임아웃). rate limiter·idempotency·job_store는 Redis 우선이나 <strong>무음 메모리 폴백</strong>이라 멀티워커에서 중복 실행 위험. 본개발에서 <strong>실제 <code>classify_async.delay()</code> 배선 + Redis 강제(폴백 fail-closed)</strong>로 전환한다.</p></div>
+
+  <div class="section-sep" id="s6"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">롤백 · 재해 복구</span></div>
+  <h2>롤백 · DR</h2>
+  <ul>
+    <li><strong>모델 롤백</strong> — 성능 열화 임계 초과 시 직전 버전으로 activate. 자동 롤백은 모니터링 동반 활성.</li>
+    <li><strong>백업</strong> — DB·원문 스토리지 정기 백업, 복구 시점 목표(RPO)·복구 시간 목표(RTO) 정의(본개발).</li>
+    <li><strong>DR 드릴</strong> — <code>dr_drill</code>로 감사 체인 무결성·복구 절차를 주기 점검.</li>
+    <li><strong>감사 체인 동시성</strong> — 감사 로그 해시 체인은 PostgreSQL advisory lock으로 직렬화돼, 동시 기록 시에도 체인 무결성이 보장된다(트랜잭션 종료 시 자동 해제). 모델 활성 전환도 동일 방식으로 직렬화된다.</li>
+  </ul>
+
+  <div class="section-sep" id="s7"><span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">알람 · SLO</span></div>
+  <h2>서비스 수준 목표</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>SLO</th><th>목표(예시)</th><th>알람 조건</th></tr></thead>
+    <tbody>
+      <tr><td>가용성</td><td>분류 API 99.5%</td><td>ready 503 지속 / 오류율 급증</td></tr>
+      <tr><td>지연</td><td>단건 분류 p95 ≤ 30초</td><td>p95 임계 초과</td></tr>
+      <tr><td>품질</td><td>서빙 FNR_TS = 0 유지</td><td>FNR_TS &gt; 0 / 드리프트 임계</td></tr>
+      <tr><td>큐</td><td>DLQ ≈ 0</td><td>DLQ 누적 / 큐 깊이 급증</td></tr>
+    </tbody>
+  </table></div>
+  <p class="footnote">SLO 목표값은 발주처 실데이터 검증(본개발) 후 확정한다.</p>
+  <div class="footnote">관련: <a href="보안_설계서.html">보안 설계서</a> · <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="기술구현_백서_부록C_지표용어해설.html">부록C 지표·용어</a> · <a href="데이터_거버넌스_계획.html">데이터 거버넌스</a></div>
+
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#s1">01 · 일상 운영</a><a href="#s2">02 · 모니터링·관제</a><a href="#s3">03 · 모델 거버넌스</a><a href="#s4">04 · 장애 대응</a><a href="#s5">05 · 큐·비동기</a><a href="#s6">06 · 롤백·DR</a><a href="#s7">07 · 알람·SLO</a>
+</nav></aside>
+</div>
+
+<footer><strong>로이드케이(Lloydk)</strong> · KOIPA 영업비밀관리시스템 · 본개발 설계 문서 · 2026-06-20</footer>
+</body>
+</html>

@@ -59,6 +59,8 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-s
 if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
+from lloydk.modules.m3_labeling.consensus import evaluate_consensus  # noqa: E402 (sys.path 설정 후)
+
 LABELS = ["TS", "S1", "S2", "S3"]
 
 
@@ -115,12 +117,14 @@ def load_oss_corpus(
     return docs
 
 
-def run_rule_labeler(text: str) -> tuple[str, float]:
+def run_rule_labeler(text: str) -> tuple[str, float, bool]:
     from lloydk.modules.m3_labeling import LabelingPipeline
+    from lloydk.modules.m3_labeling.rule_engine import has_real_evidence
     pipe = LabelingPipeline()
     result = pipe.label(text)
     grade = result.grade.value if hasattr(result.grade, "value") else str(result.grade)
-    return grade, float(result.confidence)
+    evidence = bool(result.rule_result) and has_real_evidence(result.rule_result)
+    return grade, float(result.confidence), evidence
 
 
 _JUDGE_SYSTEM = """당신은 한국 영업비밀 보호 가이드라인에 정통한 문서 분류 전문가다.
@@ -315,7 +319,7 @@ def main() -> int:
 
         # 1. 룰 라벨러
         try:
-            rule_grade, rule_conf = run_rule_labeler(text)
+            rule_grade, rule_conf, rule_evidence = run_rule_labeler(text)
         except Exception as e:
             print(f"rule_err={e}")
             continue
@@ -333,48 +337,23 @@ def main() -> int:
         in_tok = _estimate_tokens(text[:4000])
         total_cost += (in_tok * 3.0 + 150 * 15.0) / 1_000_000
 
-        agree = (rule_grade == llm_grade)
-        rule_no_opinion = rule_conf < 0.05   # 룰 라벨러가 키워드 못 찾음 → 의견 없음
-        conf_ok = (rule_conf >= args.min_rule_conf and llm_conf >= args.min_llm_conf)
-
-        # Gold 판정:
-        #  A) 두 판정자 동의 + 둘 다 신뢰도 충족
-        #  B) 룰 라벨러 의견 없음(conf≈0) + 두 판정자 동의 + LLM 신뢰도 높음
-        #  C) 룰 라벨러 의견 없음(conf≈0) + LLM이 S1/S2/TS + LLM 신뢰도 높음
-        #     → 룰 무의견=사실상 "모르겠다"이므로 LLM 단독 판단 허용
-        #     → S3는 이미 90건 있어 편향 심화 방지를 위해 제외
-        llm_upper = llm_grade in ("TS", "S1", "S2")
-        is_gold = (
-            (agree and conf_ok)                                          # A
-            or (agree and rule_no_opinion and llm_conf >= args.min_llm_conf)  # B
-            or (rule_no_opinion and llm_upper and llm_conf >= args.min_llm_conf)  # C
+        # 합의 게이트 (P1: conf 비사용 — 합의+근거+self-consistency). 이 레거시 스크립트는 단일 LLM
+        # 호출이라 self_consistency 미측정(=1.0); 정식 경로는 /golden/build·ConsensusJudge다.
+        verdict = evaluate_consensus(
+            rule_grade, llm_grade,
+            has_real_evidence=rule_evidence,
+            self_consistency=1.0,
+            sort_conf=llm_conf,
         )
-
-        if is_gold:
-            if conf_ok:
-                status = "gold_consensus"
-            elif agree:
-                status = "gold_llm_primary"
-            else:
-                status = "gold_llm_upper"   # C: 룰 무의견 + LLM S1/S2/TS
-        elif agree:
-            status = "low_conf"
-        else:
-            status = "disagree"
+        agree = verdict.agree
+        is_gold = verdict.is_gold
+        status = verdict.status
+        label_src = verdict.label_source
+        review_st = verdict.review_status
         print(
             f"rule={rule_grade}({rule_conf:.2f}) llm={llm_grade}({llm_conf:.2f}) "
             f"→ {status} ({elapsed_ms}ms)"
         )
-
-        if is_gold:
-            if conf_ok:
-                label_src = "llm_judge_consensus"   # 룰+LLM 둘 다 의견 있고 동의
-            else:
-                label_src = "llm_judge_primary"      # 룰 무의견, LLM 단독 고신뢰
-            review_st = "accepted"
-        else:
-            label_src = "llm_judge_uncertain"
-            review_st = "needs_review"
 
         rec = {
             "doc_id": doc_id,

@@ -40,6 +40,20 @@ def _record_hybrid_degrade() -> None:
         pass
 
 
+def _record_fallback(stage: str) -> None:
+    """검색 품질 저하 폴백(reranker→RRF, encode_batch→single, encode→skip)을 가시화.
+
+    무음으로 떨어지면 검색 품질이 조용히 나빠진다 — 호출부 WARNING 로그 + 이 best-effort
+    counter(stage 라벨)로 운영 대시보드에 노출. retrieval은 도메인 독립 코어라 lazy import.
+    """
+    try:
+        from lloydk.api.prom_metrics import RAG_CONTEXT_FAILURE_TOTAL  # noqa: PLC0415
+
+        RAG_CONTEXT_FAILURE_TOTAL.labels(stage=stage).inc()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 _RRF_K = 60.0  # 표준 RRF 상수 (Cormack et al. 2009)
 
 
@@ -85,10 +99,19 @@ def _rerank_hits(
         return hits[:top_k]
 
     candidates = [h.payload["text"] for _, h in text_hits]
+    # 지연 import — 도메인 독립 코어(rag/)가 obs에 top-level로 결합되지 않게. span은 no-op 안전.
+    from lloydk.obs.otel import span  # noqa: PLC0415
     try:
-        ranked = reranker.rerank(query_text, candidates, top_k=top_k)
+        with span(
+            "ml.reranker.rank",
+            n_candidates=len(candidates),
+            top_k=top_k,
+            reranker_name=getattr(reranker, "name", "unknown"),
+        ):
+            ranked = reranker.rerank(query_text, candidates, top_k=top_k)
     except Exception as exc:  # noqa: BLE001
         logger.warning("reranker failed (%s) — falling back to RRF order", exc)
+        _record_fallback("reranker_fallback")
         return hits[:top_k]
 
     fused: list[SearchHit] = []
@@ -157,9 +180,12 @@ def expand_then_search(
     first_k = top_k * max(1, oversample_factor) if use_reranker else top_k
 
     vecs: list[Sequence[float] | None] = [None] * len(queries)
+    # 지연 import — 도메인 독립 코어 디커플 유지. span은 OTel 미활성 시 no-op.
+    from lloydk.obs.otel import span  # noqa: PLC0415
     if encode_batch is not None:
         try:
-            batch_result = encode_batch(queries)
+            with span("ml.embedding.encode_batch", n_queries=len(queries), method=expansion.method):
+                batch_result = encode_batch(queries)
             if len(batch_result) == len(queries):
                 vecs = [list(v) for v in batch_result]
             else:
@@ -167,17 +193,21 @@ def expand_then_search(
                     "encode_batch length mismatch (got %d, expected %d) — single fallback",
                     len(batch_result), len(queries),
                 )
+                _record_fallback("encode_batch_fallback")
         except Exception as exc:  # noqa: BLE001
             logger.warning("encode_batch failed (%s) — single fallback", exc)
+            _record_fallback("encode_batch_fallback")
 
     result_sets: list[list[SearchHit]] = []
     for i, q in enumerate(queries):
         vec = vecs[i]
         if vec is None:
             try:
-                vec = list(encode(q))
+                with span("ml.embedding.encode", method=expansion.method):
+                    vec = list(encode(q))
             except Exception as exc:  # noqa: BLE001
                 logger.warning("encode failed for q=%r: %s", q, exc)
+                _record_fallback("encode_fallback")
                 continue
         try:
             hits = store.search_hybrid(
@@ -203,7 +233,14 @@ def expand_then_search(
 
     if not result_sets:
         return []
-    fused = _rrf_combine(result_sets)
+    # #14(이중 RRF 방지): store.search_hybrid가 이미 BM25+dense를 RRF 융합한 점수를
+    # 반환한다. 단일 result_set(확장쿼리 1개)일 때 outer RRF를 또 적용하면 store의
+    # 원점수가 무의미한 1/(60+rank)로 평탄화되므로, 그대로 원점수·순서를 보존한다.
+    # 멀티쿼리(확장 2개+)일 때만 outer RRF로 rank 기반 멀티쿼리 융합을 수행한다.
+    if len(result_sets) == 1:
+        fused = result_sets[0]
+    else:
+        fused = _rrf_combine(result_sets)
 
     if not use_reranker:
         return fused[:top_k]
