@@ -64,3 +64,39 @@ def test_custom_thresholds_respected() -> None:
     v = domain_leakage_verdict(_leak(0.411, 0.072), max_baseline=0.30, max_theil_u=0.35)
     assert v["blocked"] is True
     assert v["max_baseline"] == 0.30
+
+
+# ── 인라인 빌드타임 게이트(build_synthetic_golden.compute_leakage_verdict) ──────────
+# 독립 스크립트(post-build)를 넘어, 빌드가 산출 즉시 gold(=학습 silver)의 누출을 판정해
+# stats.json에 남기고 임계 초과 시 exit 2로 차단하도록 배선한 것을 검증(raw 레코드→verdict).
+from build_synthetic_golden import compute_leakage_verdict  # noqa: E402
+
+
+def test_inline_gate_blocks_domain_locked_gold() -> None:
+    # 도메인이 등급을 결정(도메인-잠금) → trivial baseline·theil_u 1.0 → 차단.
+    leaked = [{"domain": "tech", "label": "TS"}] * 4 + [{"domain": "public", "label": "S3"}] * 4
+    v = compute_leakage_verdict(leaked)
+    assert v["blocked"] is True and v["leakage"]["n"] == 8
+
+
+def test_inline_gate_passes_cross_domain_gold() -> None:
+    # 각 도메인이 모든 등급에 고르게 → 도메인이 등급을 못 결정 → 통과.
+    healthy = [{"domain": d, "label": g}
+               for d in ("finance", "tech", "business")
+               for g in ("TS", "S1", "S2", "S3")]
+    v = compute_leakage_verdict(healthy)
+    assert v["blocked"] is False and v["reason"] == "ok"
+
+
+def test_inline_gate_empty_is_fail_open() -> None:
+    # 산출 0건(생성 실패 등)은 no_data(fail-open) — 데이터 부재를 차단으로 오인하지 않는다.
+    v = compute_leakage_verdict([])
+    assert v["blocked"] is False and v["reason"] == "no_data"
+
+
+def test_inline_gate_custom_thresholds() -> None:
+    # 엄격 임계면 경계 누출도 차단(운영 튜닝 가능).
+    rows = [{"domain": "a", "label": "TS"}, {"domain": "a", "label": "S1"},
+            {"domain": "b", "label": "TS"}, {"domain": "b", "label": "S1"}]
+    strict = compute_leakage_verdict(rows, max_baseline=0.1, max_theil_u=0.01)
+    assert strict["blocked"] is True

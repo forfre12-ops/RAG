@@ -156,6 +156,26 @@ def write_outputs(run_dir, run_id, result, meta):
     return run_dir
 
 
+def compute_leakage_verdict(gold_rows, *, max_baseline=None, max_theil_u=None) -> dict:
+    """[P0#2 인라인] 산출 gold(=학습 silver)의 도메인→등급 누출 판정(순수 래퍼).
+
+    독립 게이트(check_domain_leakage_gate)의 순수 판정을 빌드타임에 재사용 — 산출 즉시 verdict를
+    stats.json에 남기고 임계 초과면 빌드가 exit 2로 차단한다(shortcut silver 학습 편입 방지).
+    런타임 import(동시 편집 가능한 analyze_golden_run에 collect-time 의존 안 하게). 빈/무표본은
+    no_data(fail-open — 게이트는 실제 누출을 잡는 것이지 데이터 부재를 벌하지 않는다).
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling scripts
+    from analyze_golden_run import domain_leakage  # noqa: PLC0415
+    from check_domain_leakage_gate import (  # noqa: PLC0415
+        DEFAULT_MAX_BASELINE,
+        DEFAULT_MAX_THEIL_U,
+        domain_leakage_verdict,
+    )
+    mb = DEFAULT_MAX_BASELINE if max_baseline is None else max_baseline
+    mt = DEFAULT_MAX_THEIL_U if max_theil_u is None else max_theil_u
+    return domain_leakage_verdict(domain_leakage(list(gold_rows)), max_baseline=mb, max_theil_u=mt)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="합성 골든셋 빌드 러너(생성→합의게이트, run-스코프)")
     ap.add_argument("--per-grade", type=int, default=5, help="등급당 생성 건수(도메인 순환)")
@@ -178,6 +198,13 @@ def main(argv=None):
     ap.add_argument("--smoke", action="store_true", help="등급별 1건 빠른 검증")
     ap.add_argument("--build-from", default=None,
                     help="생성 건너뛰고 기존 run_dir(또는 candidates.jsonl)에서 빌드만(재개)")
+    # [P0#2 인라인] 도메인→등급 누출 산출 게이트 — 기본 ON(누출 초과 시 exit 2로 산출 차단).
+    ap.add_argument("--no-leakage-gate", action="store_true",
+                    help="도메인→등급 누출 게이트 비활성(경고만·차단 안 함). 기본=누출 시 exit 2")
+    ap.add_argument("--max-baseline", type=float, default=None,
+                    help="도메인-다수결 정확도 상한(초과=누출). 기본=게이트 기본값(0.55)")
+    ap.add_argument("--max-theil-u", type=float, default=None,
+                    help="도메인→등급 Theil's U 상한. 기본=게이트 기본값(0.35)")
     args = ap.parse_args(argv)
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -238,6 +265,13 @@ def main(argv=None):
         [r.to_dict() for r in result.gold] + [r.to_dict() for r in result.uncertain]
     )
 
+    # [P0#2 인라인] 산출 gold(=학습 silver)의 도메인→등급 누출 판정 — stats.json에 기록 + 아래서 enforce.
+    leak_verdict = compute_leakage_verdict(
+        [r.to_dict() for r in result.gold],
+        max_baseline=args.max_baseline,
+        max_theil_u=args.max_theil_u,
+    )
+
     meta = {
         "run_id": run_id, "grades": grades, "per_grade": per_grade,
         "gen_model": args.gen_model, "judge_model": args.judge_model,
@@ -250,6 +284,7 @@ def main(argv=None):
         "gold_by_intended_grade": gold_by_intended,
         "high_grade_gold": gold_by_intended.get("TS", 0) + gold_by_intended.get("S1", 0),
         "defense_liveness": defense,
+        "domain_leakage_gate": leak_verdict,
         "stats": result.stats,
     }
     write_outputs(run_dir, run_id, result, meta)
@@ -261,6 +296,18 @@ def main(argv=None):
     if defense["verdict"] != "full_multi_axis":
         log(f"[방어경고] {defense['recommendation']}")
     log(f"[done] -> {run_dir} (stats.json)")
+    # [P0#2 인라인] 도메인→등급 누출 게이트 enforce — 누출 초과 산출은 학습 silver로 못 나가게 차단.
+    log(f"[누출게이트] blocked={leak_verdict['blocked']} reason={leak_verdict['reason']}")
+    if leak_verdict["blocked"] and not args.no_leakage_gate:
+        # ascii-safe(CI 로그·cp949 콘솔). exit 2 = 산출 거부(파이프라인 차단). run_dir은 진단용으로만.
+        print(
+            f"[BLOCK] domain->grade leakage gate FAILED: {leak_verdict['reason']}. "
+            f"run_dir={run_dir} (diagnostic). bypass=--no-leakage-gate (not recommended).",
+            file=sys.stderr,
+        )
+        return 2
+    if leak_verdict["blocked"]:
+        log("[누출경고] --no-leakage-gate 로 통과 — 누출 silver 학습 편입 주의(권장 안 함)")
     # stdout엔 run_dir만(파이프라인 친화). 상세는 stats.json.
     print(str(run_dir))
     return 0
