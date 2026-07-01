@@ -14,6 +14,30 @@ from lloydk.modules.m3_labeling import (
 )
 
 
+def test_reconcile_grade_fnr_safe_fixes_prompt_drift():
+    """LLM 자가등급을 정본 grade_from_svm(v2.2)과 FNR-safe 정합 (프롬프트 산술 드리프트 교정).
+
+    - (2,2,1) 곱4를 LLM이 S1로 깎아도 → TS 로 상향(정본 grade_from_svm).
+    - (2,2,0) 고가치·미관리를 LLM이 S3로 떨궈도 → S1 로 상향.
+    - LLM이 더 높게(severe) 보고하면 그대로 둠(절대 낮추지 않음 = 과대분류는 게이트가 처리).
+    - S/V/M 불완전·무효 등급이면 LLM 자가등급 보존.
+    """
+    from lloydk.modules.m3_labeling.llm_labeler import _reconcile_grade
+
+    assert _reconcile_grade("S1", {"secrecy": 2, "value": 2, "management": 1}) == "TS"
+    assert _reconcile_grade("S3", {"secrecy": 2, "value": 2, "management": 0}) == "S1"
+    # LLM이 더 위험하게 봤으면 보존(상향만 — svm이 더 낮아도 안 낮춤)
+    assert _reconcile_grade("TS", {"secrecy": 1, "value": 1, "management": 1}) == "TS"
+    # svm 일치 시 동일
+    assert _reconcile_grade("S2", {"secrecy": 1, "value": 1, "management": 1}) == "S2"
+    # S/V/M 불완전 → 자가등급 보존
+    assert _reconcile_grade("S2", {"secrecy": 2, "value": 2}) == "S2"
+    # 무효 등급 → 그대로
+    assert _reconcile_grade("PARSE_FAIL", {"secrecy": 2, "value": 2, "management": 2}) == "PARSE_FAIL"
+    # float·범위초과 입력도 안전(반올림·클램프)
+    assert _reconcile_grade("S2", {"secrecy": 2.0, "value": 2.4, "management": 0.0}) == "S1"
+
+
 def test_canonical_factors_are_three_requisites():
     """정본 B안 — 평가요소는 3요건(S·V·M). 곱셈식이라 가산 가중치 합 제약 없음."""
     codes = {f["code"] for f in FACTOR_SEEDS}

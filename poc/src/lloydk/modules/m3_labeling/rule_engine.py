@@ -69,6 +69,35 @@ def grade_from_svm(s: int, v: int, m: int) -> str:
     return "S3"
 
 
+def grade_from_svm_floored(
+    s: int,
+    v: int,
+    m: int,
+    *,
+    secrecy_proven_absent: bool = False,
+    value_proven_absent: bool = False,
+    mgmt_proven_absent: bool = False,
+) -> str:
+    """floor 원칙(doc/22 v2 §3.6)을 적용한 grade_from_svm 래퍼.
+
+    §3.6 원칙: "요소값 0은 '근거 없음'이 아니라 공개/무가치/무관리가 *입증*된 경우에만".
+    따라서 어떤 요소가 단지 '본문에 미언급'일 뿐이면 0이 아니라 1로 floor 해야
+    곱셈 붕괴(S2→S3 과소분류, 이른바 'S2 dead-zone')를 막는다. grade_from_svm
+    자체는 공식 가이드 워크드 예시(사무실배치도 1·1·0→S3)에 묶인 순수 함수라
+    바꾸지 않고, '미입증 vs 입증' 구분을 이 래퍼에서 처리한다.
+
+    rule_engine.label()은 S2-콘텐츠에 m_lv=1을 이미 floor하므로 배포 분류기는
+    이 dead-zone에 빠지지 않는다. 이 래퍼는 *외부 라벨러/심판/평가 조립*이
+    직접 S/V/M을 매길 때 같은 보호를 받도록 제공한다(예: 평가 라벨 경화).
+
+    proven_absent=True인 요소만 0을 허용하고, 그 외에는 max(level, 1)로 floor.
+    """
+    se = 0 if (secrecy_proven_absent and int(s) == 0) else max(int(s), 1)
+    ve = 0 if (value_proven_absent and int(v) == 0) else max(int(v), 1)
+    me = 0 if (mgmt_proven_absent and int(m) == 0) else max(int(m), 1)
+    return grade_from_svm(se, ve, me)
+
+
 def svm_levels_for_grade(grade: str) -> tuple[int, int, int]:
     """등급을 재구성하는 표준 S/V/M 레벨 (표시 정합용).
 

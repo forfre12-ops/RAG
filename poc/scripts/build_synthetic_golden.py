@@ -231,6 +231,13 @@ def main(argv=None):
         g = intended_by_id.get(r.doc_id, "?")
         gold_by_intended[g] = gold_by_intended.get(g, 0) + 1
 
+    # [B-2] 다층방어 liveness — 어느 방어 축이 실제 발화했나(무음으로 꺼진 방어 폭로).
+    # gold+review 전체 레코드로 shadow 커버리지·self-consistency 정보성·발화수를 집계.
+    from lloydk.golden_defense import assess_defense_liveness  # noqa: PLC0415
+    defense = assess_defense_liveness(
+        [r.to_dict() for r in result.gold] + [r.to_dict() for r in result.uncertain]
+    )
+
     meta = {
         "run_id": run_id, "grades": grades, "per_grade": per_grade,
         "gen_model": args.gen_model, "judge_model": args.judge_model,
@@ -242,11 +249,17 @@ def main(argv=None):
         "pass_rate": round(len(result.gold) / len(docs), 3) if docs else 0,
         "gold_by_intended_grade": gold_by_intended,
         "high_grade_gold": gold_by_intended.get("TS", 0) + gold_by_intended.get("S1", 0),
+        "defense_liveness": defense,
         "stats": result.stats,
     }
     write_outputs(run_dir, run_id, result, meta)
     log(f"[build] gold={len(result.gold)} review={len(result.uncertain)} "
         f"pass={meta['pass_rate']} high_grade_gold={meta['high_grade_gold']} {build_s}s")
+    # 다층방어 가시성 — 축이 무음으로 꺼졌으면 크게 경고(게이트 ON=가시성 ON).
+    log(f"[방어] verdict={defense['verdict']} shadow_active={defense['shadow_active']} "
+        f"차단축발화={defense['blocking_axes_active']}/3")
+    if defense["verdict"] != "full_multi_axis":
+        log(f"[방어경고] {defense['recommendation']}")
     log(f"[done] -> {run_dir} (stats.json)")
     # stdout엔 run_dir만(파이프라인 친화). 상세는 stats.json.
     print(str(run_dir))

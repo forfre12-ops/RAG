@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from lloydk.adapters.llm import build_provider
 from lloydk.adapters.llm.base import LLMProvider
+from lloydk.modules.m3_labeling.consensus import GRADE_RANK
 
 SYSTEM_PROMPT = """당신은 한국 영업비밀 등급분류 가이드(정본)에 정통한 분류 전문가다.
 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M). 각 요소를 0·1·2점으로 매긴 뒤 곱한다.
@@ -21,17 +22,22 @@ SYSTEM_PROMPT = """당신은 한국 영업비밀 등급분류 가이드(정본)�
 - 경제적 유용성(V): 0=경제적 가치 없음 / 1=취득·개발에 비용·노력 투입 / 2=상당한 비용·노력 투입
 - 비밀관리성(M): 0=공개·관리 안 됨 / 1=임직원 일부만 공유 / 2=승인된 자에 한해 공개
 
-[등급 = S×V×M]
-- 8 → TS(특급기밀) · 4 → S1(1급 비밀) · 1 또는 2 → S2(2급 대외비) · 0 → S3(3급 공개)
+[등급 결정 (정본 v2.2 — 단순 곱 크기 매핑 아님)]
+- 비공지성 S=2 그리고 경제적유용성 V=2 인 경우:
+    · 비밀관리성 M≥1 → TS(특급기밀)
+    · M=0          → S1(1급 비밀)   ← 고가치 비밀이나 관리만 미공식화 (곱=0이어도 S3 아님)
+- 그 외(S 또는 V 가 2 미만):
+    · 곱(S×V×M) ≥ 1 → S2(2급 대외비)
+    · 곱 = 0        → S3(3급 공개)
 
 [중요]
 - "외부 공개 시 유출 위험"처럼 *공개를 경고*하는 문장은 그 문서가 **비밀**이라는 뜻(공개 아님). 공개(S=0)는 보도자료·공시·공개특허처럼 *실제로 공표된* 경우만.
 - 미탐(고등급을 저등급으로) 금지. 모호하면 한 단계 위.
 
-[예시]
-- 중장기 경영계획(S2·V2·M2=8) → TS / 연구개발 보고서·핵심 공정 레시피 → TS~S1
-- 인사평가보고서(S1·V2·M2=4) → S1 / 원가구조·자금계획·고객DB → S1
-- 조직도(1·1·1=1)·내부 검토안·파트너십 협상안 → S2
+[예시] (괄호=비공지·가치·관리 레벨)
+- 중장기 경영계획(S2·V2·M2) → TS / 연구개발 보고서·핵심 공정 레시피 → TS~S1
+- 고가치 비밀이나 관리 미공식화(S2·V2·M0) → S1 / 원가구조·자금계획·고객DB → S1
+- 조직도(S1·V1·M1)·내부 검토안·파트너십 협상안 → S2
 - 보도자료·채용공고·공시(S=0) → S3
 
 출력(JSON only, 다른 텍스트 금지):
@@ -75,7 +81,7 @@ class LLMLabeler:
         parsed = _safe_parse_json(resp.text)
         svm_scores = {k: float(parsed[k]) for k in ("secrecy", "value", "management") if k in parsed}
         return LLMLabelResult(
-            grade=parsed.get("grade", "S3"),
+            grade=_reconcile_grade(parsed.get("grade", "S3"), svm_scores),
             # LLM이 보고한 confidence를 [0,1]로 클램프해 사용. 누락·무효(과거엔 스키마에
             # 없어 항상 0.0이 돼 m3 병합 max(llm_conf, score_ratio)에서 LLM 기여가 소거됐다)
             # 시 SVM 요소 점수의 '결정성'에서 폴백 신뢰도를 유도한다.
@@ -84,6 +90,29 @@ class LLMLabeler:
             rationale=str(parsed.get("rationale", "")),
             raw_text=resp.text,
         )
+
+
+def _reconcile_grade(parsed_grade: str, svm: dict[str, float]) -> str:
+    """LLM 자가등급을 정본 grade_from_svm(v2.2)과 FNR-safe 정합.
+
+    LLM이 보고한 S/V/M에서 정본 등급을 재도출해, 프롬프트의 등급 산술 드리프트로 인한
+    *과소분류*를 구조적으로 막는다(프롬프트 문구와 무관하게 보장):
+      - (2,2,1)을 곱4→S1로 깎던 오류 → grade_from_svm=TS 로 교정
+      - (2,2,0) 고가치·미관리 비밀을 곱0→S3로 떨구던 누락 → grade_from_svm=S1 로 교정
+    두 등급 중 더 위험한(상위, GRADE_RANK 작은) 쪽을 택한다 — LLM 등급을 절대 낮추지 않음
+    (FNR-safe). 과대분류는 합의 게이트(rule==llm)가 거르므로 여기선 상향만 한다.
+    S/V/M 셋이 다 있지 않거나 등급이 무효면 LLM 자가등급을 그대로 둔다.
+    grade_from_svm은 lazy import(rule_engine→seeds 로드를 모듈 임포트 시점에서 분리).
+    """
+    if parsed_grade not in GRADE_RANK or len(svm) < 3:
+        return parsed_grade
+    from lloydk.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: PLC0415
+
+    def _lv(x: float) -> int:
+        return max(0, min(2, round(float(x))))
+
+    svm_grade = grade_from_svm(_lv(svm["secrecy"]), _lv(svm["value"]), _lv(svm["management"]))
+    return min(parsed_grade, svm_grade, key=lambda g: GRADE_RANK[g])
 
 
 def _coerce_confidence(raw: object, svm: dict[str, float]) -> float:

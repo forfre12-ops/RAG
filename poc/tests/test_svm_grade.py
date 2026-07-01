@@ -9,7 +9,11 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade
+from lloydk.modules.m3_labeling.rule_engine import (
+    grade_from_svm,
+    grade_from_svm_floored,
+    svm_levels_for_grade,
+)
 from lloydk.modules.m3_labeling.seeds import to_canonical_factor
 
 
@@ -60,6 +64,28 @@ def test_all_reachable_svm_combinations():
     assert grade_from_svm(2, 2, 0) == "S1"   # s==2 AND v==2, 곱<4 → S1 (v2.2 신규)
     assert grade_from_svm(2, 2, 1) == "TS"   # s==2 AND v==2, 곱=4≥4 → TS
     assert grade_from_svm(2, 2, 2) == "TS"   # s==2 AND v==2, 곱=8≥4 → TS
+
+
+def test_svm_floor_principle_blocks_s2_deadzone():
+    """floor 원칙(§3.6): '미입증' 관리는 0이 아니라 1로 floor → S2 dead-zone 방지.
+
+    grade_from_svm(1,1,0)==S3(공식 가이드 사무실배치도)는 '관리 부재가 *입증*된'
+    경우. 그러나 단지 본문에 관리가 미언급일 뿐이면 floor=1 → (1,1,1) → S2 여야
+    한다(곱셈 붕괴로 내부 기밀을 공개(S3)로 과소분류 금지).
+    """
+    # 미입증(기본): 비밀+가치가 부분 존재하고 관리 미언급 → S2 (S3 아님)
+    assert grade_from_svm_floored(1, 1, 0) == "S2"
+    assert grade_from_svm_floored(2, 1, 0) == "S2"
+    assert grade_from_svm_floored(1, 2, 0) == "S2"
+    # 관리 부재가 *입증*되면 순수 함수와 동일하게 S3로 떨어질 수 있음
+    assert grade_from_svm_floored(1, 1, 0, mgmt_proven_absent=True) == "S3"
+    # 비공지성 0이 *입증*되면 공개 → S3 (게이트 유지)
+    assert grade_from_svm_floored(0, 2, 2, secrecy_proven_absent=True) == "S3"
+    # 미입증 비공지성(0이지만 입증 아님)은 floor → s=1,v=2,m=2 → 곱4·s≠2 → S2 (S3 강등 방지)
+    assert grade_from_svm_floored(0, 2, 2) == "S2"
+    # s=2,v=2 최상위 분기는 floor 후에도 유지
+    assert grade_from_svm_floored(2, 2, 1) == "TS"
+    assert grade_from_svm_floored(2, 2, 0, mgmt_proven_absent=True) == "S1"
 
 
 def test_legacy_factor_alias_maps_to_three_requisites():
