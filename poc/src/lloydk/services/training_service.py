@@ -205,6 +205,93 @@ def register_and_gate_model(
         return {"registered": False, "reason": f"error:{type(exc).__name__}:{exc}"}
 
 
+def activate_model_manually(
+    version_label: str,
+    *,
+    force: bool = False,
+    actor_id: str | None = None,
+    actor_role: str | None = None,
+) -> dict:
+    """[G1] 등록된 ModelVersion을 사람(admin)이 명시적으로 활성화 — 자동 경로와 별개.
+
+    자동 활성(register_and_gate_model)은 retrain_auto_activate·locked-eval 게이트로 막히지만,
+    수동 활성은 지재원 릴리스의 정상 배포 경로다. 다만 **현재 활성본 대비 deploy gate(고등급
+    미탐 fnr·f1 회귀)** 는 그대로 적용해 회귀 모델을 무심코 활성하는 것을 막고, 게이트 실패 시
+    **force=True(감사됨)** 로만 우회한다. 활성 전환은 advisory lock으로 직렬화(레이스 차단).
+    HTTP 요청 자체는 감사 미들웨어가 기록하므로 여기선 별도 audit write 없이 logger.warning만.
+
+    반환: {activated, blocked, forced, version_label, version_id, reason, gate, already_active}.
+    DB 미가용/미존재/오류는 예외 대신 activated=False + 명시 reason.
+    """
+    from lloydk.config import settings  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate  # noqa: PLC0415
+
+    try:
+        with session_scope() as db:
+            _advisory_xact_lock(db, _MODEL_ACTIVATION_LOCK_KEY)
+            repo = TrainingRepo(db)
+            target = repo.get_by_label(version_label)
+            if target is None:
+                return {
+                    "activated": False, "blocked": False, "forced": False,
+                    "version_label": version_label, "version_id": None,
+                    "reason": "version_not_found", "gate": None,
+                }
+            baseline = repo.get_active()
+            baseline_metrics = dict(baseline.metrics) if baseline and baseline.metrics else None
+            baseline_label = baseline.version_label if baseline else None
+            already_active = bool(getattr(target, "is_active", False))
+
+            decision = evaluate_deploy_gate(
+                dict(target.metrics or {}),
+                baseline_metrics,
+                fnr_high_tolerance=float(getattr(settings, "retrain_fnr_high_tolerance", 0.02)),
+                f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
+                first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
+                candidate_version=version_label,
+                baseline_version=baseline_label,
+            )
+
+            if not decision.passed and not force:
+                logger.warning(
+                    "manual activate BLOCKED (deploy gate failed, force=False): %s vs baseline=%s "
+                    "reason=%s actor=%s", version_label, baseline_label, decision.reason, actor_id,
+                )
+                return {
+                    "activated": False, "blocked": True, "forced": False,
+                    "version_label": version_label, "version_id": str(target.version_id),
+                    "reason": f"deploy_gate_failed: {decision.reason} — force=true 로만 우회(감사됨)",
+                    "gate": decision.to_dict(), "already_active": already_active,
+                }
+
+            forced = bool(force and not decision.passed)
+            repo.activate_model_version(target.version_id)
+            logger.warning(
+                "manual activate: version=%s baseline=%s gate_passed=%s forced=%s actor=%s role=%s",
+                version_label, baseline_label, decision.passed, forced, actor_id, actor_role,
+            )
+            return {
+                "activated": True, "blocked": False, "forced": forced,
+                "version_label": version_label, "version_id": str(target.version_id),
+                "reason": ("activated (FORCED override — deploy gate 실패)" if forced else "activated"),
+                "gate": decision.to_dict(), "already_active": already_active,
+            }
+    except SQLAlchemyError as exc:
+        logger.warning("activate_model_manually skipped (DB unavailable): %s", exc)
+        return {
+            "activated": False, "blocked": False, "forced": False,
+            "version_label": version_label, "version_id": None,
+            "reason": f"db_unavailable:{type(exc).__name__}", "gate": None,
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("activate_model_manually failed")
+        return {
+            "activated": False, "blocked": False, "forced": False,
+            "version_label": version_label, "version_id": None,
+            "reason": f"error:{type(exc).__name__}", "gate": None,
+        }
+
+
 def evaluate_rollback_need(
     *, min_samples: int | None = None, fnr_high_tolerance: float | None = None
 ) -> dict:

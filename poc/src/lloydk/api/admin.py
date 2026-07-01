@@ -51,6 +51,70 @@ def reload_model() -> ReloadModelResponse:
     )
 
 
+# ── [G1] 특정 ModelVersion 수동 활성화 (deploy gate 적용·force 우회 감사) ──────────
+class ActivateModelRequest(BaseModel):
+    version_label: str
+    force: bool = False
+
+
+class ActivateModelResponse(BaseModel):
+    activated: bool
+    blocked: bool
+    forced: bool
+    version_label: str
+    version_id: str | None = None
+    reason: str
+    gate: dict | None = None
+    reloaded: bool = False
+    model_version: str | None = None
+    model_loaded: bool | None = None
+
+
+@router.post(
+    "/model/activate",
+    response_model=ActivateModelResponse,
+    summary="특정 ModelVersion 활성화 (deploy gate 적용·force 우회 감사)",
+    description=(
+        "등록된 ModelVersion을 admin이 명시적으로 활성화한다(G1 — 수동 배포 경로). 현재 활성본 "
+        "대비 deploy gate(고등급 미탐 fnr·f1 회귀)를 적용해 회귀 모델의 무심한 활성을 막고, "
+        "게이트 실패 시 force=true로만 우회한다(HTTP 요청은 감사 미들웨어가 기록). 활성 후 "
+        "무중단 리로드까지 수행한다. 게이트 미통과+force=false면 activated=false·blocked=true로 응답."
+    ),
+)
+def activate_model(
+    req: ActivateModelRequest,
+    auth: dict = Depends(require_role("admin")),
+) -> ActivateModelResponse:
+    from lloydk.services.training_service import activate_model_manually  # noqa: PLC0415
+
+    res = activate_model_manually(
+        req.version_label,
+        force=req.force,
+        actor_id=auth.get("actor_id"),
+        actor_role=auth.get("actor_role"),
+    )
+    reloaded = False
+    model_version = model_loaded = None
+    if res.get("activated"):
+        from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
+        info = ClassifyService.get_instance().reload_model()
+        reloaded = bool(info["reloaded"])
+        model_version = str(info.get("model_version"))
+        model_loaded = bool(info.get("model_loaded"))
+    return ActivateModelResponse(
+        activated=bool(res.get("activated")),
+        blocked=bool(res.get("blocked")),
+        forced=bool(res.get("forced")),
+        version_label=str(res.get("version_label", req.version_label)),
+        version_id=res.get("version_id"),
+        reason=str(res.get("reason", "")),
+        gate=res.get("gate"),
+        reloaded=reloaded,
+        model_version=model_version,
+        model_loaded=model_loaded,
+    )
+
+
 # ── [번들 B] 고등급 이중검토 보류 가시화 ──────────────────────────────────────
 class EscalationHeldResponse(BaseModel):
     by_grade: dict[str, int]

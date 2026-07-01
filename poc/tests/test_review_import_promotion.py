@@ -158,3 +158,57 @@ def test_write_to_db_constructs_document_without_tenant(monkeypatch):
     assert fake.committed is True
     assert len(fake.added) == 1                       # Document 1건 생성됨
     assert not hasattr(fake.added[0], "tenant_id")    # tenant 컬럼 부재(제거 정합)
+
+
+# ── [G2] --as-candidate: 고객사 반입이 locked_gold_eval(평가정답)을 오염하지 않음 ──
+
+from lloydk import golden_tiers  # noqa: E402
+
+
+def test_merge_gold_default_is_locked_human_review(tmp_path, monkeypatch):
+    # 기본(지재원 골든셋 검수) = human_review → TIER_LOCKED(평가 정답). 기존 동작 보존.
+    gold = tmp_path / "classification_gold.jsonl"
+    _seed_gold(gold, [])
+    monkeypatch.setattr(iric, "GOLD_REAL_PATH", gold)
+    iric.merge_into_gold([_correction("c1", "S3", "TS")], dry_run=False)
+    rec = [json.loads(l) for l in gold.read_text(encoding="utf-8").splitlines() if l.strip()][0]
+    assert rec["label_source"] == "human_review"
+    assert golden_tiers.tier_of(rec) == golden_tiers.TIER_LOCKED
+
+
+def test_merge_gold_as_candidate_is_not_locked(tmp_path, monkeypatch):
+    # 고객사 반입(as_candidate) = customer_review/gold_candidate → TIER_CANDIDATE(학습용, 평가정답 아님).
+    gold = tmp_path / "classification_gold.jsonl"
+    _seed_gold(gold, [])
+    monkeypatch.setattr(iric, "GOLD_REAL_PATH", gold)
+    iric.merge_into_gold([_correction("c1", "S3", "TS")], dry_run=False, as_candidate=True)
+    rec = [json.loads(l) for l in gold.read_text(encoding="utf-8").splitlines() if l.strip()][0]
+    assert rec["label_source"] != "human_review"          # 고객 라벨을 human_review로 굳히지 않음
+    assert rec["review_status"] == "gold_candidate"
+    assert golden_tiers.tier_of(rec) == golden_tiers.TIER_CANDIDATE
+    assert golden_tiers.tier_of(rec) != golden_tiers.TIER_LOCKED
+
+
+def test_to_gold_record_candidate_excluded_from_eval_answers():
+    r = _correction("c1", "S3", "TS")
+    locked = iric._to_gold_record(r)
+    cand = iric._to_gold_record(r, as_candidate=True)
+    assert golden_tiers.tier_of(locked) == golden_tiers.TIER_LOCKED
+    assert golden_tiers.tier_of(cand) == golden_tiers.TIER_CANDIDATE
+    # eval 정답 집합엔 locked만 — candidate(고객 반입)는 평가 정답이 되지 않는다.
+    locked_eval, _ = golden_tiers.eval_records([locked, cand], allow_floor_fallback=False)
+    assert locked in locked_eval and cand not in locked_eval
+
+
+def test_write_to_db_as_candidate_runs(monkeypatch):
+    import lloydk.db as db_mod
+    import lloydk.repositories.classify_repo as repo_mod
+
+    fake = _FakeSession()
+    monkeypatch.setattr(db_mod, "SessionLocal", lambda: fake)
+    monkeypatch.setattr(repo_mod, "ClassifyRepo", _FakeRepo)
+
+    rec = _correction("b1c2d3e4" * 5, "S3", "S1", text="영업비밀 본문")
+    out = iric.write_to_db([rec], dry_run=False, as_candidate=True)
+    assert out["written"] == 1
+    assert fake.committed is True

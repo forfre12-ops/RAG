@@ -113,10 +113,12 @@ cat manifest.json | jq '{version: .bundle.version, target_env: .bundle.target_en
 curl -s http://localhost:8000/api/v1/admin/locked-readiness $ADMIN | jq
 # {ready, per_grade, missing, min_per_grade, require_locked_eval, deploy_locked_gate_passed, reason}
 ```
-- 활성화: 지정 `version_id`를 `TrainingRepo.activate_model_version(version_id)`로 활성(이전 활성은 자동 비활성). 활성 후 **무중단 리로드**:
+- 활성화(**G1 구현 엔드포인트**): 등록된 버전을 명시 활성 — 현재 활성본 대비 deploy gate(고등급 미탐 fnr·f1 회귀)를 적용하고, 회귀 시 `force=true`(감사됨)로만 우회. 활성+무중단 리로드까지 한 번에 수행:
 ```bash
-curl -s -X POST http://localhost:8000/api/v1/admin/model/reload $ADMIN | jq
-# {reloaded, model_dir, model_version, model_loaded}
+curl -s -X POST http://localhost:8000/api/v1/admin/model/activate $ADMIN \
+  -H 'Content-Type: application/json' -d '{"version_label":"<VERSION>"}' | jq
+# {activated, blocked, forced, version_label, reason, gate, reloaded, model_version, model_loaded}
+# 게이트 미통과로 blocked=true면: 회귀 확인 후 의도적일 때만 {"version_label":"<VERSION>","force":true}
 ```
 > **[검증 게이트 — 통과 못하면 STOP]** reload 응답이 **`model_loaded: true`** 이고 **`model_version`이 방금
 > 활성한 버전과 정확히 일치**해야 한다. `model_version == "rule-fallback"`(스모크에선 `rule-fallback-v0`)
@@ -125,12 +127,10 @@ curl -s -X POST http://localhost:8000/api/v1/admin/model/reload $ADMIN | jq
 > 실제 마운트됐는지 확인 후 재시도. (reload는 dir 미해석 시에도 `reloaded:true`를 반환하며 조용히
 > rule-fallback으로 떨어질 수 있어 이 확인이 필수다.)
 
-> **[갭 G1] 1급 수동-활성 도구 부재.** 특정 버전을 활성하는 깔끔한 admin 엔드포인트/CLI가 없다. 활성 자체는
-> 콘솔에서 `TrainingRepo.activate_model_version(version_id)`를 호출해야 하고, `scripts/seed_active_model_version.py`는
-> **데모 전용**·값 하드코딩이다. (`/admin/model/reload`는 별개다 — **호출 시점의 현재 활성 ModelVersion을 매번
-> 새로 재해석**해 서빙에 반영하므로, `activate_model_version` **직후 실행하면 새 버전이 무중단 적용**된다. 즉
-> reload는 활성을 바꾸는 도구가 아니라 활성 결과를 라이브에 적용하는 도구다.) **본개발에서 `POST
-> /admin/model/activate?version=…`(admin RBAC) 추가**를 권고한다(하드닝 항목).
+> **[G1 구현됨] `POST /api/v1/admin/model/activate`** (admin RBAC). 특정 등록 버전을 수동 활성한다. 현재
+> 활성본 대비 deploy gate(고등급 미탐 fnr·f1 회귀)를 적용해 회귀 모델의 무심한 활성을 막고, 게이트 실패 시
+> `force=true`(감사 미들웨어 기록)로만 우회한다. 활성+무중단 리로드를 한 번에 수행. (`/admin/model/reload`는
+> 별개로 — 이미 활성인 버전을 라이브에 재적용하는 도구. `scripts/seed_active_model_version.py`는 데모 전용·하드코딩.)
 
 ### B3. 활성 검증
 ```bash
@@ -164,14 +164,14 @@ cd poc
 # 1) 검증(적재/기록 없이 포맷·서명만 점검)
 .venv/Scripts/python.exe scripts/import_review_corrections.py customer_review.csv --dry-run
 
-# 2) 적용 — gold_real 편입 + document_labels upsert
+# 2) 적용 — 고객사 검수 반입은 반드시 --as-candidate (gold_candidate=학습용, 평가정답 오염 방지)
 .venv/Scripts/python.exe scripts/import_review_corrections.py customer_review.csv \
-    --merge-gold --write-db
+    --merge-gold --write-db --as-candidate
 ```
 - `--merge-gold`: text 있는 검수를 gold_real에 편입, 기존 doc_id는 `llm_judge → human_review`로 **승격**(label_source 갱신).
 - `--write-db`: `tb_document_labels` upsert (`labeled_by=human_review`, `is_verified=True`).
 - (기본 out-dir `datasets/corrections/`.)
-- ⚠️ **`--merge-gold`은 편입 검수를 `label_source=human_review`로 쓴다 → `golden_tiers`가 이를 `locked_gold_eval`(평가 정답)로 분류**한다. 그 파일(`datasets/gold_real/classification_gold.jsonl`)은 eval 홀드아웃을 깎는 원천이라, 고객사 라벨이 **말없이 평가 정답이 된다**(§C.5 #7 필독·§C.6과 상충). 학습 시드 목적만이면 `--merge-gold` 없이 쓰고, locked 승격은 별도 검토 후에만.
+- ⚠️ **`--merge-gold`은 기본으로 `label_source=human_review`(=`golden_tiers`가 `locked_gold_eval` 평가정답으로 분류)로 쓴다.** 그 파일(`datasets/gold_real/classification_gold.jsonl`)은 eval 홀드아웃을 깎는 원천이라, 고객사 검수엔 **반드시 `--as-candidate`**를 붙여 `gold_candidate`(학습용)로 기록한다 — 안 붙이면 고객 라벨이 **말없이 평가 정답이 된다**(train-on-test, §C.5 #7). 플래그 없는 기본형은 **지재원 골든셋 검수 전용**.
 
 ### C5. 절대 금지 (MUST NOT) — 죽음의 나선 재개 차단
 1. 고객사 corrections를 **locked_gold_eval(평가 정답)로 직접 학습** 금지 — train-on-test. locked는 학습에서 영구 제외([[golden-set-3split-decision]], `golden_tiers.train_records`).
@@ -180,11 +180,11 @@ cd poc
 4. **머신/빈 reviewer_id**로 human_review 승격 금지(§C.3).
 5. 고객사 문서 **원문을 무단 반출** 금지(§C.1, KL 승인·최소반출).
 6. 고객사와 지재원 홀드아웃(val/test)에 **겹치는 문서**를 train에 편입 금지(누출; `corrections_rebuild`가 holdout_paths로 차단하나 절차로도 확인).
-7. **`--merge-gold`가 만든 `human_review` 레코드를 평가 정답으로 굳히지 말 것.** `--merge-gold`는 편입 검수를 `label_source=human_review`로 기록하고 `golden_tiers.tier_of`는 이를 실계정 reviewer와 함께 **`locked_gold_eval`(유일한 평가 정답)**으로 분류한다. 그런데 `datasets/gold_real/classification_gold.jsonl`은 eval 홀드아웃(`build_p1_holdout_split`)과 `build_operational_readiness`의 human_review 릴리스-블로커 카운트의 **원천**이다. 따라서 (a) 고객사 보정을 `--merge-gold`로 편입한 뒤 eval 홀드아웃/`locked_eval_jsonl`을 gold_real에서 재생성해 고객사 라벨을 평가 정답으로 굳히지 말 것; (b) `build_operational_readiness`의 human_review 게이트를 고객사 import로 채우지 말 것; (c) 재학습 학습셋을 gold_real에서 파생할 땐 **반드시 `build_p1_holdout_split`를 재실행**해 holdout(및 locked)을 재분리할 것. (§C.6이 '반입은 silver/candidate로만'을 지시하는데 `--merge-gold`는 이를 위반 — 하드닝 G2로 스크립트 정합화 권고.)
+7. **`--merge-gold`가 만든 `human_review` 레코드를 평가 정답으로 굳히지 말 것.** `--merge-gold`는 편입 검수를 `label_source=human_review`로 기록하고 `golden_tiers.tier_of`는 이를 실계정 reviewer와 함께 **`locked_gold_eval`(유일한 평가 정답)**으로 분류한다. 그런데 `datasets/gold_real/classification_gold.jsonl`은 eval 홀드아웃(`build_p1_holdout_split`)과 `build_operational_readiness`의 human_review 릴리스-블로커 카운트의 **원천**이다. 따라서 (a) 고객사 보정을 `--merge-gold`로 편입한 뒤 eval 홀드아웃/`locked_eval_jsonl`을 gold_real에서 재생성해 고객사 라벨을 평가 정답으로 굳히지 말 것; (b) `build_operational_readiness`의 human_review 게이트를 고객사 import로 채우지 말 것; (c) 재학습 학습셋을 gold_real에서 파생할 땐 **반드시 `build_p1_holdout_split`를 재실행**해 holdout(및 locked)을 재분리할 것. → **G2 해소(구현됨)**: 고객사 반입 시 `--as-candidate`를 붙이면 `label_source=customer_review`·`review_status=gold_candidate`로 기록돼 `golden_tiers.tier_of`가 TIER_CANDIDATE(학습용)로 분류, 평가 정답이 되지 않는다(§C.4). 플래그 없는 기본형은 지재원 골든셋 검수(human_review 승격)이므로 **고객사 반입엔 `--as-candidate` 필수**.
 
 ### C6. (선택) 지재원 재학습 반영 — 결정 시에만
 > **[결정 D4] 고객사 보정의 재학습 사용 여부는 현재 미결**(기본 권고: 무반출·집계만).
-반영을 결정하면: 반입 라벨을 **silver_train/gold_candidate로만** 편입(locked 아님) → 재학습 →
+반영을 결정하면: 반입 라벨을 **silver_train/gold_candidate로만** 편입(locked 아님 — `import_review_corrections … --as-candidate`) → 재학습 →
 **locked eval에서 검증** → §A.2 배포 게이트 통과 → §A 번들 버전업 → §B **수동 활성**. 순서·게이트를 건너뛰지 않는다.
 
 ---
@@ -219,8 +219,8 @@ cd poc
 | D2 | 반출 매체·승인·해시대조 절차 | KL R&R 협의 | KL↔지재원 |
 | D3 | 고객사 검수 결과 반출 범위(집계-only vs 라벨+원문) | 기본 무반출·집계 | KL 승인 |
 | D4 | 고객사 보정의 지재원 재학습 사용 여부 | 미결(기본 미사용) | 지재원 |
-| G1 | 1급 수동-활성 admin 엔드포인트/CLI 부재(하드닝) | 갭(§B.2) | 지재원 개발 |
-| G2 | `--merge-gold`이 human_review(=locked_gold_eval) 즉시 생성 — 기본 gold_candidate로 낮추고 locked 승격은 별도 플래그+홀드아웃 재분리 | 갭(§C.5 #7) | 지재원 개발 |
+| G1 | 수동-활성 엔드포인트 `POST /admin/model/activate`(deploy gate 적용·force 우회 감사) | ✅ 구현(§B.2) | 지재원 개발 |
+| G2 | `--merge-gold`이 human_review(=locked_gold_eval) 생성 → 고객사 반입용 `--as-candidate`(gold_candidate·is_verified=False)로 eval 오염 차단 | ✅ 구현(§C.4) | 지재원 개발 |
 
 ---
 
@@ -239,5 +239,5 @@ curl -X POST .../api/v1/admin/model/reload $ADMIN
 
 # 되받기(검수 반입): 검증 → 적용   (⚠️ --merge-gold = locked_gold_eval 생성, §C.5 #7)
 python scripts/import_review_corrections.py customer_review.csv --dry-run
-python scripts/import_review_corrections.py customer_review.csv --merge-gold --write-db
+python scripts/import_review_corrections.py customer_review.csv --merge-gold --write-db --as-candidate
 ```
