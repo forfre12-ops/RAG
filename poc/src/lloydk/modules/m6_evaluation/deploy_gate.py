@@ -206,9 +206,11 @@ def evaluate_deploy_gate(
     first_deploy_fnr_high_max: Optional[float] = None,
     anchor_report: Optional[Mapping] = None,
     anchor_high_grades: Sequence[str] = DEFAULT_ANCHOR_HIGH_GRADES,
+    require_anchor: bool = False,
     metamorphic_report: Optional[Mapping] = None,
     metamorphic_forward_ceiling: float = DEFAULT_METAMORPHIC_FORWARD_CEILING,
     metamorphic_min_n: int = DEFAULT_METAMORPHIC_MIN_N,
+    require_metamorphic: bool = False,
     candidate_version: Optional[str] = None,
     baseline_version: Optional[str] = None,
 ) -> DeployDecision:
@@ -235,6 +237,11 @@ def evaluate_deploy_gate(
             회귀테스트(실패만 정보)라 합성 천장과 무관. None(기본)이면 검사 생략(동작 보존).
         metamorphic_forward_ceiling: 순방향 위반율 CI 하한이 이 값을 초과하면 회귀 확정(기본 0.0).
         metamorphic_min_n: 순방향 쌍 표본이 이 미만이면 측정 불가(게이트 안 깸, 기본 5).
+        require_anchor / require_metamorphic: [강제 옵트인] True 면 해당 리포트 '미제공=생략'을
+            통과(passed=True)가 아니라 hard block(passed=False)으로 승격한다 — 앵커/메타모픽을 켜둔
+            운영에서 리포트 생성이 조용히 깨져 게이트가 통과하는 fail-open 을 막는다(fail-closed).
+            기본 False=동작 보존(리포트 없으면 '검사 생략'으로 가시화만 하고 통과). 리포트가 있으나
+            표본 부족(측정 불가)인 경우는 강제하지 않는다 — 그건 데이터 천장이지 생성 실패가 아니다.
         *_version: 로깅/감사용 라벨.
 
     Returns:
@@ -335,6 +342,14 @@ def evaluate_deploy_gate(
                 f"INCONCLUSIVE는 측정불가 — 자동활성 veto는 locked-eval 소관)",
                 a["worst_underclass_fnr"],
             ))
+    elif require_anchor:
+        # [강제 옵트인 fail-closed] 앵커를 켜둔(require_anchor) 운영에서 리포트가 없다 = 앵커 생성이
+        # 조용히 깨졌는데 게이트가 통과하는 fail-open 을 차단. '미측정'을 통과로 숨기지 않고 hard block.
+        checks.append(GateCheck(
+            "anchor_eval_skipped", False,
+            "앵커(외부 사실) 리포트 미제공인데 require_external_fact_eval=ON — 외부 사실 미탐 검사가 "
+            "강제인데 앵커 리포트가 없어 거부(생성 실패 가능성; fail-closed).",
+        ))
     else:
         # [게이트=가시성] 앵커 미제공(deploy_gate_anchor_eval_enabled=False 기본 또는 리포트 부재)
         # 이면 외부 사실 미탐 검사를 **하지 않았음**을 명시 기록 — 통과 결정이 '외부 사실을 본 적
@@ -371,6 +386,14 @@ def evaluate_deploy_gate(
                 "metamorphic_forward_regression", True,
                 f"메타모픽 순방향 미탐 회귀 없음(위반 {m['violations']}/{m['n']}, CI하한={m['ci_low']:.4f})",
             ))
+    elif require_metamorphic:
+        # [강제 옵트인 fail-closed] 리포트 경로를 설정한(require_metamorphic) 운영에서 리포트가 없다 =
+        # 메타모픽 생성이 조용히 깨졌는데 게이트가 통과하는 fail-open 을 차단. hard block(fail-closed).
+        checks.append(GateCheck(
+            "metamorphic_eval_skipped", False,
+            "메타모픽 리포트 미제공인데 require_external_fact_eval=ON — 문체변경 순방향 미탐 회귀 "
+            "검사가 강제인데 리포트가 없어 거부(생성 실패 가능성; fail-closed).",
+        ))
     else:
         # [게이트=가시성] 메타모픽 미제공(deploy_gate_metamorphic_report_path 미설정 기본)이면
         # 문체변경 순방향 미탐 회귀 검사를 미수행 — 통과가 이 신호 부재 하 판정임을 명시.

@@ -465,6 +465,13 @@ class Settings(BaseSettings):
     deploy_gate_metamorphic_report_path: str = ""
     deploy_gate_metamorphic_forward_ceiling: float = 0.0  # 순방향 위반율 CI하한 초과 시 hard block
     deploy_gate_metamorphic_min_n: int = 5                # 순방향 쌍 표본 하한(미만=측정 불가)
+    # [P0#6 강제 옵트인] 외부-사실 검사(앵커/메타모픽)가 '미제공=생략(fail-open)'이면 리포트 생성이
+    # 조용히 깨져도 게이트가 통과한다. True면 *설정된* 검사의 리포트 부재를 hard block으로 승격
+    # (fail-closed) — 앵커/메타모픽 코퍼스가 준비된 운영단계에서 켜면 외부-사실 신호의 무음 소실이
+    # 배포를 막는다. 기본 False=동작 보존(합성-only 무앵커 단계엔 리포트가 없으므로 강제하면 정당한
+    # 배포를 깨뜨림 — 순수 운영 opt-in). 검사를 켜지 않은(anchor_enabled=False·report_path 미설정)
+    # 항목은 이 플래그로도 강제되지 않는다(한쪽만 쓰는 운영을 과차단하지 않음).
+    deploy_gate_require_external_fact_eval: bool = False
     # Kill-gate (죽음의 나선/품질붕괴 모니터, 비파괴=경보만). 발동 시 metric+log만, 자동 중단 없음.
     # floor/capacity/max=0이면 해당 조건 비활성. capacity는 운영 검수 처리능력으로 설정 권장.
     kill_gate_high_grade_miss_floor: int = 1     # 고등급(TS/S1) 미탐 교정 ≥ 이 값이면 발동(1=any)
@@ -798,11 +805,16 @@ apply_profile_defaults(settings)
 # source_prior: 공개출처(판례·공시 등) 문서를 S3로 cap하는 비공지성 게이트. corpus 비의존이라
 # 강제해도 무음 no-op 위험이 없고(기본 True), 하드닝 배포가 이 게이트를 조용히 끄면 공개출처가
 # 비밀로 과분류(실측 85% FPR)되므로 강제집합에 포함. (similarity_escalation은 corpus 의존이라 제외.)
+# require_real_embedder: HF 임베더 로드 실패 시 HashEmbedding 무음 폴백(검색품질 급락) 거부.
+# deploy_gate_require_locked_eval: 자동활성 시 실(locked_gold_eval) 평가 readiness 요구(죽음의 나선 #4).
+# 둘 다 하드닝 프로파일 기본 True — .env override(=0)로 조용히 되살리면 CI/startup 이 잡는다.
 _SAFETY_GATES: tuple[tuple[str, str], ...] = (
     ("agreement_gate_enabled", "AGREEMENT_GATE_ENABLED"),
     ("metadata_floor_enabled", "METADATA_FLOOR_ENABLED"),
     ("storage_encryption_enabled", "STORAGE_ENCRYPTION_ENABLED"),
     ("source_prior_enabled", "SOURCE_PRIOR_ENABLED"),
+    ("require_real_embedder", "REQUIRE_REAL_EMBEDDER"),
+    ("deploy_gate_require_locked_eval", "DEPLOY_GATE_REQUIRE_LOCKED_EVAL"),
 )
 
 
@@ -821,6 +833,18 @@ def evaluate_safety_gates(s: "Settings") -> dict:
     return {"off": off, "required": required, "must_raise": required and bool(off)}
 
 
+def hardened_poc_mode_bypass(s: "Settings") -> bool:
+    """하드닝(require_safety_gates=True)인데 poc_mode!=full 인 '무음 우회' 구성인지 — 순수 함수.
+
+    하드닝 프로파일(onprem-local·full-train)은 기본 poc_mode=full 이지만, .env 에 POC_MODE=dryrun
+    한 줄을 주면 apply_profile_defaults 가 이를 explicit override 로 보고 프로파일 기본값을 덮지 않아
+    poc_mode 가 dryrun 으로 남는다. 그러면 assert_production_credentials 의 `poc_mode!=full` 조기
+    return 으로 startup 시행부 전체(자격증명·안전게이트·CORS·감사·actor-role·암호화키)가 스킵된다
+    = 하드닝을 켠 줄 알지만 실제로는 전부 꺼진 상태. True 면 assert 가 fail-clear 로 차단한다.
+    """
+    return bool(getattr(s, "require_safety_gates", False)) and getattr(s, "poc_mode", None) != "full"
+
+
 def assert_production_credentials() -> None:
     """운영 모드에서 빈 자격증명 차단. dryrun/테스트는 우회.
 
@@ -830,11 +854,21 @@ def assert_production_credentials() -> None:
     수 있도록 한 번 fill_from_secrets_manager()를 시도한 뒤 missing 판정.
     LLOYDK_SECRETS_BACKEND=env(기본)는 사실상 no-op이라 dev 동작에 영향 없음.
     """
-    if settings.poc_mode != "full":
-        return
-    # pytest/TestClient 환경에서는 운영 자격증명 검사 skip.
-    # conftest.py가 TESTING=1 을 설정하거나 pytest가 PYTEST_CURRENT_TEST를 주입.
+    # pytest/TestClient 환경에서는 운영 자격증명 검사 skip (하드닝 프로파일을 구성한 단위테스트도
+    # 통과하도록 poc_mode/우회 판정보다 먼저). conftest.py가 TESTING=1, pytest가 PYTEST_CURRENT_TEST 주입.
     if os.environ.get("TESTING", "").strip().lower() in {"1", "true"} or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    # [게이트ON=가시성ON / 무음 우회 차단] 하드닝 프로파일(require_safety_gates=True)인데 poc_mode!=full
+    # 이면 아래 startup 시행부 전체가 조기 return 으로 스킵된다 — .env POC_MODE=dryrun 한 줄로 하드닝을
+    # 무음 우회하는 구멍. 이건 poc_mode!=full 조기 return 보다 먼저 fail-clear 로 차단해야 한다.
+    if hardened_poc_mode_bypass(settings):
+        raise RuntimeError(
+            f"하드닝 프로파일(require_safety_gates=True)인데 poc_mode={settings.poc_mode!r} 입니다. "
+            "poc_mode≠full 이면 startup 안전검사(자격증명·안전게이트·CORS·감사·암호화키)가 전부 스킵되어 "
+            "하드닝이 무음 우회됩니다. POC_MODE=full 로 두거나(권장), 하드닝이 불필요하면 비하드닝 "
+            "프로파일(lite-cloud/dev) 또는 REQUIRE_SAFETY_GATES=0 을 명시하세요."
+        )
+    if settings.poc_mode != "full":
         return
     fill_from_secrets_manager()
     missing: list[str] = []

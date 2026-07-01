@@ -29,6 +29,10 @@ def _settings(**over) -> Settings:
         metadata_floor_enabled=False,
         storage_encryption_enabled=False,
         require_safety_gates=False,
+        # require_real_embedder·deploy_gate_require_locked_eval 도 강제집합이지만 이 테스트들은
+        # 앞의 4개 게이트 폴러리티를 검증하므로, 명시적으로 ON 두어 off 집합 오염을 막는다
+        # (deploy_gate_require_locked_eval 은 전역 기본 True 라 별도 지정 불필요).
+        require_real_embedder=True,
     )
     base.update(over)
     return Settings(_env_file=None, **base)
@@ -90,10 +94,20 @@ def test_source_prior_in_enforced_safety_gates() -> None:
     assert sg["must_raise"] is True
 
 
-def test_hardened_profiles_source_prior_on_by_default() -> None:
+def _hermetic_gate_env(monkeypatch) -> None:
+    """conftest(REQUIRE_REAL_EMBEDDER=false) 등 호출자 env override 가 프로파일 기본값 해석을
+    오염시키지 않게 강제집합 env 를 걷어낸다 — '순수 프로파일 기본값'만 평가."""
+    from lloydk.config import _SAFETY_GATES
+
+    for _, env in _SAFETY_GATES:
+        monkeypatch.delenv(env, raising=False)
+
+
+def test_hardened_profiles_source_prior_on_by_default(monkeypatch) -> None:
     """하드닝 프로파일 기본값에 source_prior가 켜져 있어 강제집합 추가가 오탐 안 냄."""
     from lloydk.config import Settings, apply_profile_defaults
 
+    _hermetic_gate_env(monkeypatch)
     for profile in ("onprem-local", "full-train"):
         s = Settings(deploy_profile=profile, _env_file=None)
         apply_profile_defaults(s)
@@ -107,6 +121,74 @@ def test_hardened_profiles_require_safety_gates() -> None:
     # lite-* 는 require_safety_gates를 켜지 않는다(클라우드 개발/데모 tier).
     for profile in ("lite-noapi", "lite-cloud"):
         assert "require_safety_gates" not in _PROFILE_DEFAULTS[profile], profile
+
+
+def test_new_gates_in_enforced_set() -> None:
+    """[하드닝] require_real_embedder·deploy_gate_require_locked_eval 가 강제집합에 포함."""
+    from lloydk.config import _SAFETY_GATES
+
+    envs = {env for _, env in _SAFETY_GATES}
+    assert "REQUIRE_REAL_EMBEDDER" in envs
+    assert "DEPLOY_GATE_REQUIRE_LOCKED_EVAL" in envs
+
+
+def test_hardened_profiles_new_gates_on_by_default(monkeypatch) -> None:
+    """하드닝 프로파일 기본값이 신규 강제 게이트를 켜 둬야 강제집합 추가가 오탐 안 냄(off=[])."""
+    from lloydk.config import Settings, apply_profile_defaults
+
+    _hermetic_gate_env(monkeypatch)
+    for profile in ("onprem-local", "full-train"):
+        s = Settings(deploy_profile=profile, _env_file=None)
+        apply_profile_defaults(s)
+        assert s.require_real_embedder is True, profile
+        assert s.deploy_gate_require_locked_eval is True, profile
+        assert evaluate_safety_gates(s)["off"] == [], profile
+
+
+def test_require_real_embedder_off_blocks_when_hardened() -> None:
+    """하드닝에서 REQUIRE_REAL_EMBEDDER 만 끄면 startup 차단(무음 hash 폴백 되살리기 방지)."""
+    sg = evaluate_safety_gates(_settings(
+        agreement_gate_enabled=True,
+        metadata_floor_enabled=True,
+        storage_encryption_enabled=True,
+        require_real_embedder=False,  # 신규 게이트만 off
+        require_safety_gates=True,
+    ))
+    assert sg["off"] == ["REQUIRE_REAL_EMBEDDER"]
+    assert sg["must_raise"] is True
+
+
+def test_hardened_poc_mode_bypass_predicate() -> None:
+    """[무음 우회] require_safety_gates=True + poc_mode!=full 을 순수 함수가 True 로 잡는다."""
+    from lloydk.config import hardened_poc_mode_bypass
+
+    assert hardened_poc_mode_bypass(_settings(require_safety_gates=True, poc_mode="dryrun")) is True
+    # 정상: 하드닝 + full → 우회 아님.
+    assert hardened_poc_mode_bypass(_settings(require_safety_gates=True, poc_mode="full")) is False
+    # 비하드닝 + dryrun → 우회 아님(의도된 개발 tier).
+    assert hardened_poc_mode_bypass(_settings(require_safety_gates=False, poc_mode="dryrun")) is False
+
+
+def test_assert_blocks_hardened_with_poc_mode_dryrun() -> None:
+    """[무음 우회 차단] 하드닝 프로파일인데 POC_MODE=dryrun 으로 startup 시행부 전체를 스킵하는
+    구성이면 assert_production_credentials 가 fail-clear 로 차단한다."""
+    config_mod._SECRETS_FILLED = True
+    snap = {k: getattr(config_mod.settings, k) for k in ("poc_mode", "require_safety_gates")}
+    config_mod.settings.poc_mode = "dryrun"          # 하드닝인데 dryrun 으로 내려앉음
+    config_mod.settings.require_safety_gates = True
+    try:
+        with patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": ""}):
+            try:
+                config_mod.assert_production_credentials()
+            except RuntimeError as exc:
+                assert "poc_mode" in str(exc)
+                assert "무음 우회" in str(exc)
+            else:
+                raise AssertionError("하드닝 + poc_mode=dryrun → RuntimeError 기대")
+    finally:
+        for k, v in snap.items():
+            setattr(config_mod.settings, k, v)
+        config_mod._SECRETS_FILLED = False
 
 
 def test_assert_blocks_hardened_with_gate_off() -> None:

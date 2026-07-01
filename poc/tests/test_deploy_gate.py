@@ -87,6 +87,49 @@ def test_external_fact_signals_visible_when_absent():
     assert not any(c.name == "metamorphic_forward_regression" for c in dec.checks)
 
 
+# ── [강제 옵트인 fail-closed] 외부팩트 리포트 무음 누락 → hard block ──────────────
+
+
+def test_require_metamorphic_blocks_when_report_absent():
+    # require_metamorphic=True 인데 리포트 미제공 = 생성이 조용히 깨진 상태 → 통과 대신 hard block.
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.03, f1_macro=0.85), None, require_metamorphic=True,
+    )
+    assert dec.passed is False
+    assert "metamorphic_eval_skipped" in dec.reason
+    assert not any(
+        c.passed for c in dec.checks if c.name == "metamorphic_eval_skipped"
+    )
+
+
+def test_require_anchor_blocks_when_report_absent():
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.03, f1_macro=0.85), None, require_anchor=True,
+    )
+    assert dec.passed is False
+    assert "anchor_eval_skipped" in dec.reason
+
+
+def test_require_flags_default_false_preserve_passthrough():
+    # 기본 False → 스킵은 여전히 통과(동작 보존). Fix 3 회귀 가드.
+    dec = evaluate_deploy_gate(_report(fnr_high=0.03, f1_macro=0.85), None)
+    assert dec.passed is True
+    assert all(c.passed for c in dec.checks if c.name.endswith("_eval_skipped"))
+
+
+def test_require_metamorphic_does_not_block_when_report_present():
+    # 리포트가 있으면(측정됨) 강제해도 skip 분기로 안 감 — 실제 회귀검사가 판정한다.
+    report = {"forward": {"n": 10, "violations": 0}, "forward_failures": []}
+    dec = evaluate_deploy_gate(
+        _report(fnr_high=0.03, f1_macro=0.85), None,
+        metamorphic_report=report, require_metamorphic=True,
+    )
+    assert dec.passed is True
+    # skip check 는 아예 없고(리포트 있음), 실제 회귀검사가 존재.
+    assert not any(c.name == "metamorphic_eval_skipped" for c in dec.checks)
+    assert any(c.name == "metamorphic_forward_regression" for c in dec.checks)
+
+
 # ── fnr_high 회귀 차단 (미탐 악화) ───────────────────────────────────────────
 
 

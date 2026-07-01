@@ -48,6 +48,12 @@ def _settings_for(profile: str) -> Settings:
 def main() -> int:
     failures: list[str] = []
 
+    # [hermetic] 강제집합 env 는 아래 (음성) 루프가 명시적으로 토글하는 대상이다. 호출자(pytest
+    # conftest 가 REQUIRE_REAL_EMBEDDER=false 주입, 또는 개발 셸이 이 값들을 켜/꺼 둠)가 미리
+    # 설정해 두면 (양성) 프로파일 '순수 기본값' 검증이 오염된다 — 시작 시 걷어내 프로파일 기본값만 본다.
+    for _, _env in _SAFETY_GATES:
+        os.environ.pop(_env, None)
+
     hardened = [
         name for name, d in _PROFILE_DEFAULTS.items() if d.get("require_safety_gates") is True
     ]

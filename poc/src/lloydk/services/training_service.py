@@ -173,6 +173,11 @@ def register_and_gate_model(
             # eval_ready locked 게이트가 별도로 막으므로, 앵커 미측정이 자동배포를 열지 않는다.
             anchor_report = _maybe_anchor_report(settings, candidate_model_dir=model_uri)
             metamorphic_report = _maybe_metamorphic_report(settings)
+            # [강제 옵트인] 외부-사실 검사를 *켜둔* 경우에만 리포트 무음 누락을 hard block 으로 승격한다.
+            # 한쪽만 쓰는 운영을 과차단하지 않도록 각 검사의 활성 여부(anchor_enabled·report_path)와 AND.
+            _require_ext = bool(getattr(settings, "deploy_gate_require_external_fact_eval", False))
+            _anchor_on = bool(getattr(settings, "deploy_gate_anchor_eval_enabled", False))
+            _meta_on = bool(str(getattr(settings, "deploy_gate_metamorphic_report_path", "") or "").strip())
 
             decision = evaluate_deploy_gate(
                 metrics,
@@ -181,9 +186,11 @@ def register_and_gate_model(
                 f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
                 first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
                 anchor_report=anchor_report,
+                require_anchor=_require_ext and _anchor_on,
                 metamorphic_report=metamorphic_report,
                 metamorphic_forward_ceiling=float(getattr(settings, "deploy_gate_metamorphic_forward_ceiling", 0.0)),
                 metamorphic_min_n=int(getattr(settings, "deploy_gate_metamorphic_min_n", 5)),
+                require_metamorphic=_require_ext and _meta_on,
                 candidate_version=version_label,
                 baseline_version=baseline_label,
             )
@@ -281,6 +288,10 @@ def activate_model_manually(
 
             # 메타모픽은 파일 로드(저비용)라 수동 활성 경로에도 회귀 hard-signal 적용(앵커는
             # CPU 추론 비용으로 수동 경로에선 생략 — 설계 유지). force=True면 아래에서 우회(감사됨).
+            # 수동 경로는 앵커(CPU 추론비용) 생략·메타모픽(파일 로드)만 적용 — 설계 유지. 강제 옵트인도
+            # 메타모픽에만 건다(앵커는 이 경로에서 측정 자체를 안 하므로 강제 대상 아님).
+            _require_ext = bool(getattr(settings, "deploy_gate_require_external_fact_eval", False))
+            _meta_on = bool(str(getattr(settings, "deploy_gate_metamorphic_report_path", "") or "").strip())
             decision = evaluate_deploy_gate(
                 dict(target.metrics or {}),
                 baseline_metrics,
@@ -290,6 +301,7 @@ def activate_model_manually(
                 metamorphic_report=_maybe_metamorphic_report(settings),
                 metamorphic_forward_ceiling=float(getattr(settings, "deploy_gate_metamorphic_forward_ceiling", 0.0)),
                 metamorphic_min_n=int(getattr(settings, "deploy_gate_metamorphic_min_n", 5)),
+                require_metamorphic=_require_ext and _meta_on,
                 candidate_version=version_label,
                 baseline_version=baseline_label,
             )
