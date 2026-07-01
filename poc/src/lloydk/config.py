@@ -778,11 +778,16 @@ settings = Settings()
 apply_profile_defaults(settings)
 
 
-# 안전 게이트(룰·모델 합의·메타데이터 floor·원본 at-rest 암호화) — 하드닝 운영(폐쇄망)에서 필수.
+# 안전 게이트(룰·모델 합의·메타데이터 floor·원본 at-rest 암호화·비공지성 source-prior) —
+# 하드닝 운영(폐쇄망)에서 필수. .env override(=0)로 조용히 꺼진 채 startup 성공하는 것을 막는다.
+# source_prior: 공개출처(판례·공시 등) 문서를 S3로 cap하는 비공지성 게이트. corpus 비의존이라
+# 강제해도 무음 no-op 위험이 없고(기본 True), 하드닝 배포가 이 게이트를 조용히 끄면 공개출처가
+# 비밀로 과분류(실측 85% FPR)되므로 강제집합에 포함. (similarity_escalation은 corpus 의존이라 제외.)
 _SAFETY_GATES: tuple[tuple[str, str], ...] = (
     ("agreement_gate_enabled", "AGREEMENT_GATE_ENABLED"),
     ("metadata_floor_enabled", "METADATA_FLOOR_ENABLED"),
     ("storage_encryption_enabled", "STORAGE_ENCRYPTION_ENABLED"),
+    ("source_prior_enabled", "SOURCE_PRIOR_ENABLED"),
 )
 
 

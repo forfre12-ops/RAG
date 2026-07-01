@@ -72,6 +72,35 @@ def test_evaluate_not_required_off_is_report_only() -> None:
     assert sg["must_raise"] is False  # require 아니면 raise 안 함(가시화만)
 
 
+def test_source_prior_in_enforced_safety_gates() -> None:
+    """[P1] 비공지성 source-prior 게이트가 강제집합에 포함되어 하드닝서 .env로 못 끄게."""
+    from lloydk.config import _SAFETY_GATES
+
+    envs = {env for _, env in _SAFETY_GATES}
+    assert "SOURCE_PRIOR_ENABLED" in envs
+    # 하드닝(require=True)에서 source_prior만 끄면 startup 차단(다른 게이트는 켬).
+    sg = evaluate_safety_gates(_settings(
+        agreement_gate_enabled=True,
+        metadata_floor_enabled=True,
+        storage_encryption_enabled=True,
+        source_prior_enabled=False,   # 비공지성 게이트만 off
+        require_safety_gates=True,
+    ))
+    assert sg["off"] == ["SOURCE_PRIOR_ENABLED"]
+    assert sg["must_raise"] is True
+
+
+def test_hardened_profiles_source_prior_on_by_default() -> None:
+    """하드닝 프로파일 기본값에 source_prior가 켜져 있어 강제집합 추가가 오탐 안 냄."""
+    from lloydk.config import Settings, apply_profile_defaults
+
+    for profile in ("onprem-local", "full-train"):
+        s = Settings(deploy_profile=profile, _env_file=None)
+        apply_profile_defaults(s)
+        assert s.source_prior_enabled is True, profile
+        assert evaluate_safety_gates(s)["off"] == []  # 게이트 누락 0
+
+
 def test_hardened_profiles_require_safety_gates() -> None:
     for profile in ("onprem-local", "full-train"):
         assert _PROFILE_DEFAULTS[profile].get("require_safety_gates") is True, profile
