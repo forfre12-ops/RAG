@@ -217,15 +217,18 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-relabel"><span class="toc-method post">POST</span> /relabel</a>
     <a class="toc-item" href="#ep-training"><span class="toc-method post">POST</span> /train</a>
     <a class="toc-item" href="#ep-train-jobs"><span class="toc-method get">GET</span> /train/jobs</a>
+    <a class="toc-item" href="#ep-answer"><span class="toc-method post">POST</span> /answer</a>
     <a class="toc-item" href="#ep-synthesis"><span class="toc-method post">POST</span> /synth/generate</a>
     <a class="toc-item" href="#ep-documents"><span class="toc-method post">POST</span> /documents</a>
+    <a class="toc-item" href="#ep-golden-build"><span class="toc-method post">POST</span> /golden/build</a>
+    <a class="toc-item" href="#ep-guide-documents"><span class="toc-method post">POST</span> /guide/documents</a>
+    <a class="toc-item" href="#ep-promotions"><span class="toc-method get">GET</span> /promotions/pending</a>
     <a class="toc-item" href="#ep-schema-get"><span class="toc-method get">GET</span> /schema/grades</a>
     <a class="toc-item" href="#ep-schema-put"><span class="toc-method put" style="background:var(--put)">PUT</span> /schema/grades</a>
-    <a class="toc-item" href="#ep-keywords-get"><span class="toc-method get">GET</span> /admin/keywords</a>
-    <a class="toc-item" href="#ep-keywords-write"><span class="toc-method post">POST</span> /admin/keywords</a>
+    <a class="toc-item" href="#ep-keywords-get"><span class="toc-method" style="background:var(--text-faint)">NOTE</span> /admin/keywords (미구현)</a>
     <a class="toc-item" href="#ep-model-reload"><span class="toc-method post">POST</span> /admin/model/reload</a>
-    <a class="toc-item" href="#ep-rotate-key"><span class="toc-method post">POST</span> /admin/rotate-api-key</a>
-    <a class="toc-item" href="#ep-admin-models"><span class="toc-method get">GET</span> /admin/models</a>
+    <a class="toc-item" href="#ep-model-activate"><span class="toc-method post">POST</span> /admin/model/activate</a>
+    <a class="toc-item" href="#ep-admin-status"><span class="toc-method get">GET</span> /admin/dashboard</a>
     <a class="toc-item" href="#ep-metrics-latest"><span class="toc-method get">GET</span> /metrics/latest</a>
     <a class="toc-item" href="#ep-metrics-history"><span class="toc-method get">GET</span> /metrics/history</a>
     <a class="toc-item" href="#ep-metrics-cm"><span class="toc-method get">GET</span> /metrics/confusion-matrix/{ver}</a>
@@ -239,11 +242,11 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <span class="badge">부록 B</span>
       <span class="badge outline">API Spec</span>
       <span class="badge outline">2026-06-24 갱신</span>
-      <span style="color:var(--text-dim);font-size:12px;">· FastAPI · OpenAPI 3.0 · Base URL: /api/v1</span>
+      <span style="color:var(--text-dim);font-size:12px;">· OpenAPI 3.0 · Base URL: /api/v1</span>
     </div>
     <h1 class="title">API 명세</h1>
-    <p class="lede"><strong>Lloydk(수행사) AI 코어 API</strong> — 분류·설명·RAG·검수/능동학습·학습·합성·등급체계·문서 수집(M2)·운영. KL ↔ Lloydk 서버 간 통신 기준이며 Lloydk는 KL 단일 신뢰 클라이언트를 전제로 한다. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)이며 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다. 능동학습 폐곡선(relabel → tb_corrections → 재학습 → 모델 핫리로드)이 배선됨 — 단 이는 <b>단일 배포 내부 메커니즘</b>이며, 고객 교정·원문의 망 밖 반출·재학습 사용 여부는 <b>미확정</b>(기본 A안: 무반출·지재원 자기 골든셋 재학습·집계 진단지표만 환류, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>). 모델은 상시 재학습하지 않는다(실데이터 1차학습 후 드리프트/이벤트 단발).</p>
-    <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Lloydk(AI 에이전트)가 제공하는 API만</b> 다룬다. <b>가이드 관리·문서 메타데이터·LLM 비용 등 KL 소유 대상 API는 KL이 직접 제공</b>하므로 제외한다. <b>회원사 자가진단(<code>tb_self_assessments</code>, A안 5요소)·고객사 연동 API는 신설 대상</b>으로 소유·인터페이스를 KL과 <span class="nego-chip">협의 필요</span>. <span class="nego-chip">협의 필요</span>(주황색)는 KL과 인터페이스 합의가 남은 항목이다.</p>
+    <p class="lede"><strong>Lloydk(수행사) AI 코어 API</strong> — 분류·설명·RAG·검수·학습·합성·등급체계·문서 수집(M2)·운영. KL ↔ Lloydk 서버 간 통신 기준이며 Lloydk는 KL 단일 신뢰 클라이언트를 전제로 한다. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)이며 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다.</p>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>Lloydk(AI 에이전트)가 제공하는 API만</b> 다룬다. <b>가이드 관리·문서 메타데이터·LLM 비용 등 KL 소유 대상 API는 KL이 직접 제공</b>하므로 제외한다. <b>회원사 자가진단(<code>tb_self_assessments</code> 등 자가진단 요소)·고객사 연동 API는 신설 대상</b>으로 소유·인터페이스를 KL과 <span class="nego-chip">협의 필요</span>. <span class="nego-chip">협의 필요</span>(주황색)는 KL과 인터페이스 합의가 남은 항목이다.</p>
     <hr class="hero-sep">
 
     <!-- Global -->
@@ -253,22 +256,22 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <table class="full">
           <thead><tr><th>헤더</th><th>값</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">X-API-Key</td><td><code>&lt;키&gt;</code></td><td class="f-req">apikey 모드(기본)</td><td><strong>기본 인증 모드</strong>(AUTH_MODE=apikey). 역할은 서버 설정 <code>API_KEY_ROLE</code>로 결정(개발 환경은 <code>X-Actor-Role</code> 헤더 허용)</td></tr>
+            <tr><td class="f-name">X-API-Key</td><td><code>&lt;키&gt;</code></td><td class="f-req">apikey 모드(기본)</td><td><strong>기본 인증 모드</strong>(AUTH_MODE=apikey). 키에 매핑된 역할이 서버 측에서 결정된다(개발 환경은 <code>X-Actor-Role</code> 헤더 허용)</td></tr>
             <tr><td class="f-name">Authorization</td><td><code>Bearer &lt;JWT&gt;</code></td><td class="f-req">jwt 모드</td><td>RS256 서명 JWT(AUTH_MODE=jwt|both). <code>sub</code>=actor_id, <code>roles</code> claim 포함</td></tr>
             <tr><td class="f-name">X-Request-ID</td><td>UUID v4</td><td></td><td>요청 추적 ID. 없으면 서버가 생성. 감사 로그에 기록</td></tr>
             <tr><td class="f-name">Content-Type</td><td><code>application/json</code></td><td class="f-req yes">●</td><td>파일 업로드는 <code>multipart/form-data</code></td></tr>
           </tbody>
         </table>
         <h3 style="margin-top:16px;">인증 모드</h3>
-        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>apikey</code>(API 키 전용) · <code>both</code>(둘 다 허용). 모든 라우터가 <code>require_auth</code>로 통일되어 설정이 실제 적용된다. API 키 검증은 <strong>상수시간 비교</strong>(<code>hmac.compare_digest</code>)로 수행되어 바이트 단위 early-exit 타이밍 사이드채널을 차단한다(동작 동일, 보안 강화).</p>
+        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>apikey</code>(API 키 전용) · <code>both</code>(둘 다 허용). 설정한 모드가 모든 라우터에 일괄 적용된다. API 키 검증은 타이밍 사이드채널을 차단하도록 수행된다.</p>
         <h3 style="margin-top:16px;">신뢰 경계 — KL 단일 연동 (고객사 격리는 KL 포털)</h3>
         <p style="font-size:13px;"><strong>KL이 고객사(회원사) 페이지를 일원 구축</strong>하므로, 고객사 간 데이터 격리(어느 회원사가 어느 문서를 보는지)는 <strong>KL 포털 계층</strong>에서 처리한다. Lloydk는 KL 백엔드를 단일 신뢰 클라이언트로 받는 분류·RAG 엔진이다. 인증 신원(actor_id·role)은 <code>request.state</code>에 저장되어 <strong>역할 기반 권한(RBAC)</strong>과 감사 로그 actor 식별에만 쓰인다. 감사 로그의 actor_id는 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다. <span class="nego-chip">협의 필요</span> 고객사 식별자(예: <code>external_ref</code> 규약)를 Lloydk 응답·감사에 어느 수준까지 남길지는 KL과 합의.</p>
         <h3 style="margin-top:16px;">Rate Limit</h3>
-        <p style="font-size:13px;">SlowAPI 기반. 기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/explain 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 키는 <strong>검증된 신원</strong>(인증 actor) 우선, 미인증 시 IP 폴백 — 위조 가능한 원시 헤더는 키로 쓰지 않는다(한도 우회·버킷 고갈 차단). 초과 시 <code>429</code> + <code>Retry-After</code> 헤더. <code>RATE_LIMIT_DISABLED=1</code>로 비활성(테스트·dryrun).</p>
-        <h3 style="margin-top:16px;">미들웨어</h3>
-        <p style="font-size:13px;">모든 요청은 <code>api/middleware.py</code>를 통해 감사 로그(KL 소유 <code>tb_audit_log</code>)에 기록되고, OTel span이 생성된다.</p>
-        <h3 style="margin-top:16px;">요청 본문 크기 한도 (DoS 가드)</h3>
-        <p style="font-size:13px;">전역 ASGI 가드(<code>BodySizeLimitMiddleware</code>)가 본문 파싱 전에 크기를 검사해 한도 초과 시 즉시 <code>413</code>(대용량 JSON body OOM 차단). 한도 <code>max_request_body_mb</code> 기본 <strong>25MB</strong>. 멀티파트 업로드(<code>/documents</code>)는 라우터의 <code>max_upload_mb</code>(20MB)로 별도 적용.</p>
+        <p style="font-size:13px;">기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/explain 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 한도 키는 <strong>인증된 신원</strong>(actor) 우선, 미인증 시 IP 폴백이다. 초과 시 <code>429</code> + <code>Retry-After</code> 헤더로 응답한다.</p>
+        <h3 style="margin-top:16px;">감사 · 추적</h3>
+        <p style="font-size:13px;">모든 요청은 감사 로그(KL 소유 <code>tb_audit_log</code>)에 기록되고, <code>X-Request-ID</code>로 요청이 추적된다.</p>
+        <h3 style="margin-top:16px;">요청 본문 크기 한도</h3>
+        <p style="font-size:13px;">본문 파싱 전에 크기를 검사해 한도 초과 시 즉시 <code>413</code>으로 응답한다. 기본 한도 <strong>25MB</strong>. 멀티파트 업로드(<code>/documents</code>)는 별도로 <strong>20MB</strong>가 적용된다.</p>
       </div>
     </section>
 
@@ -283,7 +286,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">문서 텍스트를 4등급(TS/S1/S2/S3)으로 분류한다. M2 전처리 → M5 추론 순서로 실행. confidence가 임계값(<code>review_confidence_threshold</code>=0.7) 미만이면 응답 <code>status="needs_review"</code>로 표시하고 warning에 검수 권고를 남긴다(<strong>거부 아님</strong> — 고위험 FNR 보호). 검수자 큐는 동률 시 저신뢰를 우선 정렬한다.</p>
+        <p class="ep-desc">문서 텍스트를 4등급(TS/S1/S2/S3)으로 분류한다. M2 전처리 → M5 추론 순서로 실행. confidence가 임계값(기본 0.7) 미만이면 응답 <code>status="needs_review"</code>로 표시하고 warning에 검수 권고를 남긴다(<strong>거부 아님</strong> — 200으로 반환). 검수자 큐는 동률 시 저신뢰를 우선 정렬한다.</p>
         <h4>Request Body</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
@@ -295,8 +298,8 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">return_evidence</td><td class="f-type">boolean</td><td></td><td>근거 스팬(evidence) 반환 여부 (기본 <code>true</code>)</td></tr>
             <tr><td class="f-name">text_already_preprocessed</td><td class="f-type">boolean</td><td></td><td>본문이 이미 전처리됨 — 전처리 단계 skip (기본 <code>false</code>)</td></tr>
             <tr><td class="f-name">title</td><td class="f-type">string</td><td></td><td>문서 제목 (선택)</td></tr>
-            <tr><td class="f-name">metadata</td><td class="f-type">object</td><td></td><td>확장 메타데이터. <code>metadata.source_type</code>: 출처 provenance(선택; 허용값 <code>public·registered_patent·academic·internal·external_confidential·null</code> — ICD §3.1). 미전달 시 doc_id 저장 출처로 보완. 공개 출처면 Gate-1이 내용 무관 S3로 cap(운영 기본 활성·cap=S3·하향 전용, TS/S1 충돌 시 검수). 아래 <code>security_marking</code>·<code>access_scope</code>는 KL ICD R6 보안표시·접근범위 필드로, opt-in 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, <strong>기본 OFF</strong>)에서만 사용된다.</td></tr>
-            <tr><td class="f-name">metadata.security_marking</td><td class="f-type">string | null</td><td></td><td>KL 보안표시(ICD §3.2). <code>top_secret·secret·confidential·none·null</code>. 메타floor 게이트(opt-in·기본 OFF)에서 표시 등급이 내용 예측보다 높으면 <strong>상향 floor</strong>(top_secret→TS·secret→S1·confidential→S2) — 인사·재무 S1 사각지대 보완.</td></tr>
+            <tr><td class="f-name">metadata</td><td class="f-type">object</td><td></td><td>확장 메타데이터. <code>metadata.source_type</code>: 출처 provenance(선택; 허용값 <code>public·registered_patent·academic·internal·external_confidential·null</code> — ICD §3.1). 미전달 시 doc_id 저장 출처로 보완. 공개 출처면 내용과 무관하게 S3로 cap된다(하향 전용, TS/S1 충돌 시 검수 라우팅). 아래 <code>security_marking</code>·<code>access_scope</code>는 KL ICD R6 보안표시·접근범위 필드로, opt-in 메타데이터 floor 게이트(<strong>기본 OFF</strong>)에서만 사용된다.</td></tr>
+            <tr><td class="f-name">metadata.security_marking</td><td class="f-type">string | null</td><td></td><td>KL 보안표시(ICD §3.2). <code>top_secret·secret·confidential·none·null</code>. 메타 floor 게이트(opt-in·기본 OFF)에서 표시 등급이 내용 예측보다 높으면 <strong>상향 floor</strong>가 적용된다(top_secret→TS·secret→S1·confidential→S2).</td></tr>
             <tr><td class="f-name">metadata.access_scope</td><td class="f-type">string | null</td><td></td><td>KL 접근범위(ICD §3.3). 허용값 <code>approved_only·designated·department·all_employees·null</code>. <strong>메타floor 게이트(opt-in·기본 OFF)</strong>: 제한적 범위(<code>approved_only·designated·department</code>)인데 내용 분류 예측이 낮으면 검수 라우팅(<code>status="needs_review"</code>)으로 보낸다.</td></tr>
           </tbody>
         </table>
@@ -312,14 +315,14 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
             <tr><td class="f-name">evaluation_factors</td><td class="f-type">object | null</td><td>3요건 점수 <code>{secrecy(S), value(V), management(M), scores}</code>, 각 0·1·2점. 등급 매핑은 <strong>적용서 §4.6 분기표</strong>(예: S=2·V=2면 M=0→S1·M≥1→TS, 그 외 곱≥1→S2·=0→S3, S=0은 S3).</td></tr>
             <tr><td class="f-name">evidence</td><td class="f-type">EvidenceSpan[]</td><td>[{start, end, text, weight, tag}] 근거 스팬 (<code>return_evidence=true</code> 시)</td></tr>
             <tr><td class="f-name">rag_context_used</td><td class="f-type">RagContextHit[]</td><td>[{source_doc, chunk_id, score, text}] 사용된 RAG 청크</td></tr>
-            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>사용된 모델 버전 (예: v-dd3abab9)</td></tr>
-            <tr><td class="f-name">status</td><td class="f-type">string</td><td>staging / needs_review. needs_review 트리거: confidence&lt;0.7, <b>출처 cap이 고등급 상향 신호를 덮을 때(cap-conflict)</b>, 본문 없음 fail-secure(최고등급 격리). <b>agreement 게이트(<code>agreement_gate_enabled</code>)와 escalation τ(<code>classifier_escalation_tau</code>=0.30)는 onprem-local/full-train 배포 프로파일 기본 ON</b>(룰·모델 불일치 또는 저마진 고등급을 검수 라우팅 — 미탐 FNR 0.174→0.087, TS recall→1.0). <code>sparse-evidence</code>(근거 스팬 부족)·메타floor 게이트(<code>metadata_floor_enabled</code>, <code>access_scope</code> 제한인데 예측 등급이 낮을 때)는 opt-in. FNR-safe override로 svm 등급과 콘텐츠 등급 불일치 시 더 높은(민감) 등급 채택.</td></tr>
+            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>사용된 모델 버전 (예: v-XXXXXXXX)</td></tr>
+            <tr><td class="f-name">status</td><td class="f-type">string</td><td>staging / needs_review. needs_review 트리거(동작): (1) confidence&lt;0.7, (2) 출처 cap이 고등급 상향 신호를 덮을 때(cap-conflict), (3) 본문 없음 시 fail-secure로 최고등급 격리, (4) 룰 등급과 모델 등급이 불일치하거나 저마진 고등급일 때 검수 라우팅(운영 배포 기본 활성), (5) 근거 스팬이 부족한 룰-폴백 경로(sparse-evidence), (6) opt-in 메타 floor 게이트(기본 OFF)에서 <code>access_scope</code>가 제한 범위인데 예측 등급이 낮을 때. FNR-safe override로 모델 등급과 콘텐츠 등급이 불일치하면 더 높은(민감) 등급을 채택한다.</td></tr>
             <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>저신뢰 검수 권고 등 경고 메시지 (예: low-confidence)</td></tr>
             <tr><td class="f-name">elapsed_ms</td><td class="f-type">integer</td><td>추론 소요 시간</td></tr>
           </tbody>
         </table>
         <div class="status-chips">
-          <span class="sc s2xx">200 분류 완료</span>
+          <span class="sc s2xx">200 분류 완료 (needs_review 포함)</span>
           <span class="sc s4xx">400 텍스트/doc_id 누락</span>
           <span class="sc s4xx">404 문서 없음</span>
           <span class="sc s4xx">429 Rate Limit</span>
@@ -336,7 +339,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">여러 문서를 한 번에 제출한다. 빈 배열은 <code>400</code>, 1000건 초과는 <code>413</code>으로 거부한다(M1 경계값 가드). 분당 60 한도.</p>
+        <p class="ep-desc">여러 문서를 한 번에 제출한다. 빈 배열은 <code>400</code>, 1000건 초과는 <code>413</code>으로 거부한다. 분당 60 한도.</p>
         <h4>Request / Response</h4>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>타입</th><th>설명</th></tr></thead>
@@ -389,7 +392,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">특정 분류 결과의 근거를 자연어로 설명한다. tb_classification_evidence 테이블의 excerpt와 contribution을 LLM으로 요약. factor는 정본 3요건(SECRECY·VALUE·MANAGEMENT)으로 귀속된다(레거시 4요소는 LEGACY_FACTOR_ALIAS로 3요건에 자동 폴딩).</p>
+        <p class="ep-desc">특정 분류 결과의 근거를 자연어로 설명한다. tb_classification_evidence 테이블의 excerpt와 contribution을 LLM으로 요약. factor는 정본 3요건(SECRECY·VALUE·MANAGEMENT)으로 귀속된다.</p>
         <h4>Request / Response 핵심 필드</h4>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>설명</th></tr></thead>
@@ -415,7 +418,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT (admin · reviewer · kl_backend)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">AI 예측 등급을 검수자가 확정한다. confirmed_label이 예측과 다르면 사실상 relabel로 간주되어 tb_corrections로 기록되고 Active Learning 재학습에 사용된다.</p>
+        <p class="ep-desc">AI 예측 등급을 검수자가 확정한다. confirmed_label이 예측과 다르면 tb_corrections에 기록하되, 자동 재학습에는 사용하지 않는다.</p>
         <h4>Request Body — ConfirmRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
@@ -444,11 +447,11 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <div class="ep-header">
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/relabel</span>
-        <span class="ep-summary">분류 재라벨 → tb_corrections (능동학습 입력)</span>
+        <span class="ep-summary">분류 재라벨 → tb_corrections (교정 기록)</span>
         <span class="ep-auth">JWT (admin · reviewer)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">검수자가 분류 등급을 교정한다. 결과는 tb_corrections 테이블에 1건으로 적재되어 <strong>능동학습 폐곡선</strong>(tb_corrections 재빌드 → 학습셋 병합 → 재학습 → 모델 등록 → 배포게이트 → 핫리로드)의 입력이 된다. direction(underclass/overclass/lateral)은 등급 order로 자동 산출. 동일 분류·라벨·actor의 중복 relabel은 idempotent 처리.</p>
+        <p class="ep-desc">검수자가 분류 등급을 교정한다. 결과는 tb_corrections 테이블에 1건으로 적재된다. 이 레코드는 자동으로 재학습에 소비되지 않으며, 재학습 입력으로 사용하려면 별도 승인 절차를 통과해야 한다. direction(underclass/overclass/lateral)은 등급 order로 자동 산출. 동일 분류·라벨·actor의 중복 relabel은 idempotent 처리.</p>
         <h4>Request Body — RelabelRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
@@ -467,7 +470,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tbody>
             <tr><td class="f-name">relabel_id</td><td>tb_corrections 레코드 PK (UUID)</td></tr>
             <tr><td class="f-name">queue_size</td><td>대기 중인 미소비(unconsumed) tb_corrections 수</td></tr>
-            <tr><td class="f-name">retrain_threshold</td><td>재학습 자동 트리거 임계 (교정 누적 기준)</td></tr>
+            <tr><td class="f-name">retrain_threshold</td><td>재학습 후보 임계(교정 누적 기준, 자동 활성 아님)</td></tr>
           </tbody>
         </table>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 권한 부족</span></div>
@@ -482,7 +485,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT (admin · kl_backend · system)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">KF-DeBERTa(kakaobank/kf-deberta-base) 학습 작업을 Celery 워커에 제출한다. tb_corrections 재빌드 → 학습셋 병합(train만, val/test 홀드아웃은 증강 안함) → 학습 → 버전 등록(항상) → 배포게이트(fail-closed) 순. <strong>시간당 10회 한도</strong>. 능동학습 폐곡선의 재학습 단계.</p>
+        <p class="ep-desc">KF-DeBERTa 학습 작업을 제출하는 관리자 전용 API다. 학습이 완료되어 새 모델이 등록되어도 자동으로 서빙에 활성화되지 않는다(활성화는 별도 관리자 조치 필요).</p>
         <h4>Request Body — TrainRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
@@ -539,9 +542,35 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           </tbody>
         </table>
         <p style="font-size:12.5px;color:var(--text-dim);">목록 응답 TrainJobList = <code>{total, items:[{train_job_id, status, started_at, completed_at, duration_sec, model_version, trigger_type}]}</code></p>
-        <h4>관련: GET /train/jobs/{train_job_id}/epochs · /dataset</h4>
-        <p style="font-size:13px;"><code>GET /api/v1/train/jobs/{id}/epochs</code>는 <code>tb_training_epochs</code>의 에폭별 곡선(<code>[{epoch, train_loss, val_loss, val_metrics:{f1,fnr}, learning_rate}]</code>)을 반환해 손실·지표 추이를 그린다(조기종료·과적합 진단). <code>GET /api/v1/train/jobs/{id}/dataset</code>는 <code>tb_training_datasets</code>의 학습셋 구성(<code>{train, val, test}</code> 카운트 + 등급 분포, 재현·홀드아웃 누수 감사용)을 반환한다.</p>
+        <h4>구현 범위</h4>
+        <p style="font-size:13px;">현재 소스 기준 HTTP로 노출된 학습 조회 API는 <code>GET /api/v1/train/jobs</code>와 <code>GET /api/v1/train/jobs/{train_job_id}</code>뿐이다. <code>/epochs</code>, <code>/dataset</code> 상세 조회는 현재 별도 엔드포인트로 노출되지 않는다.</p>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">404 train job 없음</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-answer">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/answer</span>
+        <span class="ep-summary">RAG 답변 합성</span>
+        <span class="ep-auth">API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">온프렘/로컬 RAG 검색 컨텍스트를 바탕으로 답변과 citation을 생성한다. 분류 핫패스와 별개이며, LLM 미사용 또는 실패 시 deterministic fallback을 반환할 수 있다.</p>
+        <h4>Request Body — RagAnswerRequest</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">query</td><td class="f-type">string</td><td class="f-req yes">●</td><td>질의 본문(1~4000자)</td></tr>
+            <tr><td class="f-name">namespace</td><td class="f-type">string | null</td><td></td><td>RAG collection</td></tr>
+            <tr><td class="f-name">top_k</td><td class="f-type">integer</td><td></td><td>1~20, 기본 5</td></tr>
+            <tr><td class="f-name">grade</td><td class="f-type">Grade | null</td><td></td><td>분류 결과를 별도 단계에서 받은 경우 전달</td></tr>
+            <tr><td class="f-name">use_reranker</td><td class="f-type">boolean</td><td></td><td>기본 true</td></tr>
+            <tr><td class="f-name">metadata</td><td class="f-type">object | null</td><td></td><td>추가 필터</td></tr>
+          </tbody>
+        </table>
+        <h4>Response 200 — RagAnswerResult</h4>
+        <p style="font-size:13px;"><code>{answer, citations:[{source_doc, chunk_id, score, rank}], grade, usage, warnings, deterministic_fallback}</code></p>
       </div>
     </div>
 
@@ -557,21 +586,21 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
       <div class="ep-body">
         <p class="ep-desc"><strong>KL 자료등록(FUN-001)이 받은 원본 파일</strong>(HWP/PDF/DOCX/TXT)을 이 엔드포인트로 전달하면, Lloydk가 <strong>추출·정규화·PII 마스킹·청킹(FUN-022)</strong>을 수행해 <code>tb_chunks</code>를 생성한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 정규화·마스킹 → 청킹. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정.</p>
-        <p style="font-size:12.5px;color:var(--text-dim);">※ <strong>추출(HWP/PDF→텍스트)은 KL이 할 수 없는 FUN-022 전담 작업이라 반드시 Lloydk가 수행</strong>한다. 반대로 <strong>문서 레코드·저장·권한·이력(<code>tb_documents</code>)은 KL 소유</strong>(FUN-001 자료등록)이며, Lloydk는 추출 산출물(청크 <code>tb_chunks</code>)만 보유한다.</p>
-        <p style="font-size:12.5px;color:var(--text-dim);">KL 자료등록이 고객사 입력 <strong>메타데이터(보안표시·접근범위·출처, 아래 굵게)</strong>를 함께 전달하면, Lloydk의 메타floor 게이트(FUN-024) 입력이 된다. 메타데이터 자체의 저장·관리는 KL.</p>
+        <p style="font-size:12.5px;color:var(--text-dim);">※ 현재 소스 기준 Lloydk가 업로드 파일을 추출·정규화하고 <code>tb_documents</code>와 <code>tb_chunks</code>에 저장한다. KL 원천 문서/EDMS 키는 <code>external_ref</code>와 메타데이터로 연결하는 외부 참조다.</p>
+        <p style="font-size:12.5px;color:var(--text-dim);">KL 자료등록이 고객사 입력 <strong>메타데이터(보안표시·접근범위·출처, 아래 굵게)</strong>를 함께 전달하면, 등급 판정(FUN-024)의 메타데이터 기반 격리 판단에 사용된다. 이 메타데이터와 원본/정규화 URI는 문서 레코드에 함께 보존된다.</p>
         <h4>Request (multipart/form-data)</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">file</td><td class="f-type">binary</td><td class="f-req yes">●</td><td>HWP · DOCX · PDF · TXT (최대 <strong>20MB</strong>, <code>max_upload_mb</code>)</td></tr>
+            <tr><td class="f-name">file</td><td class="f-type">binary</td><td class="f-req yes">●</td><td>HWP · DOCX · PDF · TXT (최대 <strong>20MB</strong>)</td></tr>
             <tr><td class="f-name">actor</td><td class="f-type">string (JSON)</td><td class="f-req yes">●</td><td>Actor JSON 문자열 (multipart 제약)</td></tr>
             <tr><td class="f-name">doc_type</td><td class="f-type">string</td><td></td><td>문서 유형 태그 (자유 형식)</td></tr>
             <tr><td class="f-name">external_ref</td><td class="f-type">string</td><td></td><td>외부 EDMS 연계 ID · KL 고객사 원천 문서 키 (고객사 식별/연계는 KL 측 관리)</td></tr>
-            <tr><td class="f-name"><b>security_marking</b></td><td class="f-type">string</td><td></td><td><b>KL 보안표시</b>(ICD §3.2) — <code>top_secret·secret·confidential·none</code>. 메타floor 상향 floor 입력 <span class="nego-chip">협의 필요</span></td></tr>
+            <tr><td class="f-name"><b>security_marking</b></td><td class="f-type">string</td><td></td><td><b>KL 보안표시</b>(ICD §3.2) — <code>top_secret·secret·confidential·none</code>. 표시 등급이 내용 예측보다 높으면 격리 등급 상향(floor) 입력이 된다 <span class="nego-chip">협의 필요</span></td></tr>
             <tr><td class="f-name"><b>access_scope</b></td><td class="f-type">string</td><td></td><td><b>KL 접근범위</b>(ICD §3.3) — <code>approved_only·designated·department·all_employees</code>. 제한적이면 검수 라우팅 <span class="nego-chip">협의 필요</span></td></tr>
-            <tr><td class="f-name"><b>source_type</b></td><td class="f-type">string</td><td></td><td>출처 provenance — <code>public·registered_patent·academic·internal·external_confidential</code>. 공개 출처면 Gate-1이 S3로 cap</td></tr>
+            <tr><td class="f-name"><b>source_type</b></td><td class="f-type">string</td><td></td><td>출처 provenance — <code>public·registered_patent·academic·internal·external_confidential</code>. 공개 출처면 S3로 cap된다</td></tr>
             <tr><td class="f-name">index_for_rag</td><td class="f-type">boolean</td><td></td><td>true면 업로드 문서를 RAG 검색 컬렉션에도 적재 (기본 false)</td></tr>
-            <tr><td class="f-name">rag_namespace</td><td class="f-type">string</td><td></td><td>RAG 적재 컬렉션 (미지정 시 settings.rag_upload_collection="uploads")</td></tr>
+            <tr><td class="f-name">rag_namespace</td><td class="f-type">string</td><td></td><td>RAG 적재 컬렉션 (미지정 시 기본 <code>"uploads"</code>)</td></tr>
           </tbody>
         </table>
         <h4>Response 201 — DocumentUploadResponse</h4>
@@ -599,6 +628,50 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <span class="sc s4xx">413 파일 크기 초과 (20MB)</span>
           <span class="sc s4xx">422 actor JSON 오류 / 빈 파일</span>
         </div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-golden-build">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/golden/build</span>
+        <span class="ep-summary">골든 후보 빌드 작업 생성</span>
+        <span class="ep-auth">API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">inline 문서 또는 corpus 디렉터리에서 골든 후보 빌드 작업을 생성한다. 상태 조회는 <code>GET /api/v1/golden/jobs/{job_id}</code>, 사람이 검토하는 HTML 화면은 <code>GET /api/v1/golden/jobs/{job_id}/review.html</code>이다.</p>
+        <h4>Request Body — GoldenBuildRequest</h4>
+        <p style="font-size:13px;"><code>{source_type, docs, corpus_dir, n, llm_provider, sensitive, min_rule_conf, min_llm_conf, min_self_consistency, require_evidence, holdout_path, out_dir, actor}</code></p>
+        <h4>Response</h4>
+        <p style="font-size:13px;"><code>POST /golden/build</code> → <code>{golden_job_id, status_url}</code> · <code>GET /golden/jobs/{job_id}</code> → <code>{status, stats, gold_count, uncertain_count, gold_path, uncertain_path, error}</code></p>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-guide-documents">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/guide/documents · GET /api/v1/guide/documents/{guide_id}</span>
+        <span class="ep-summary">가이드 문서 등록·버전 조회</span>
+        <span class="ep-auth">API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">가이드 문서를 등록하고 RAG 인덱싱 결과를 반환한다. 버전 조회는 특정 <code>guide_id</code>의 현재 학습 버전과 등록 버전 목록을 반환한다.</p>
+        <p style="font-size:13px;"><code>GuideUploadResponse = {guide_id, version, indexed, embedding_vector_count, triggers_retraining}</code></p>
+        <p style="font-size:13px;"><code>GuideVersionList = {guide_id, current_training_version, versions:[{version, effective_date, change_summary, registered_at}]}</code></p>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-promotions">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/v1/promotions/pending · POST /api/v1/promotions/promote</span>
+        <span class="ep-summary">검증 라벨 승격 후보 조회·승격</span>
+        <span class="ep-auth">API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">사람 검수로 확정된 교정을 검증 라벨로 승격할 후보 목록을 조회하고, 선택한 문서를 승격한다. 자동 학습 데이터 편입이 아니라 검토자가 명시적으로 확정하는 경로다.</p>
+        <p style="font-size:13px;"><code>GET /promotions/pending</code> → <code>{count, items:[{doc_id, proposed_label, corrected_by, corrected_at, reason, current_verified_label, classification_id}]}</code></p>
+        <p style="font-size:13px;"><code>POST /promotions/promote</code> body <code>{doc_id, actor, expected_label, note}</code> → <code>{doc_id, status, promoted_label, labeler_id, warnings}</code></p>
       </div>
     </div>
 
@@ -658,56 +731,13 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 
     <div class="ep" id="ep-keywords-get">
       <div class="ep-header">
-        <span class="method get">GET</span>
+        <span class="method" style="background:var(--text-faint)">NOTE</span>
         <span class="ep-path">/api/v1/admin/keywords</span>
-        <span class="ep-summary">등급 키워드·태깅 규칙 조회 (FUN-023)</span>
-        <span class="ep-auth">API Key</span>
+        <span class="ep-summary">현재 미구현: 키워드·태깅 규칙 HTTP 관리</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc"><code>tb_level_keywords</code>의 등급·요건별 키워드/패턴을 조회한다. 룰엔진 1차 라벨링·태깅의 기준이며, FUN-023 "라벨링 기준·태깅 규칙 관리"의 조회 화면 백엔드다.</p>
-        <h4>Query Parameters</h4>
-        <table class="ftbl">
-          <thead><tr><th>파라미터</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">level_code</td><td class="f-type">string</td><td>등급 필터(TS/S1/S2/S3, 선택)</td></tr>
-            <tr><td class="f-name">factor_code</td><td class="f-type">string</td><td>요건 필터(SECRECY/VALUE/MANAGEMENT, 선택)</td></tr>
-            <tr><td class="f-name">is_active</td><td class="f-type">boolean</td><td>활성만 / 전체</td></tr>
-            <tr><td class="f-name">limit / offset</td><td class="f-type">integer</td><td>페이지네이션</td></tr>
-          </tbody>
-        </table>
-        <h4>Response 200 — KeywordList</h4>
-        <p style="font-size:13px;"><code>{total, items:[{keyword_id, keyword, level_code, pattern_type(exact·regex·semantic), factor_code, weight, source, is_active}]}</code></p>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span></div>
-      </div>
-    </div>
-
-    <div class="ep" id="ep-keywords-write">
-      <div class="ep-header">
-        <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/admin/keywords</span>
-        <span class="ep-summary">키워드·태깅 규칙 추가·수정·삭제 (FUN-023)</span>
-        <span class="ep-auth">JWT (admin role)</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">FUN-023 "라벨링 기준 및 태깅 규칙을 유연하게 수정·확장하는 관리 기능". 새 키워드/패턴을 추가한다. <strong>변경은 룰엔진·자동 라벨링에 즉시 반영되나, 배포 모델의 등급에는 재라벨링·재학습을 거쳐야 반영</strong>된다(<code>requires_retraining=true</code> 안내).</p>
-        <h4>Request Body</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">keyword</td><td class="f-type">string</td><td class="f-req yes">●</td><td>키워드/표현 패턴 (예: "영업비밀"·"M&A")</td></tr>
-            <tr><td class="f-name">level_code</td><td class="f-type">string</td><td class="f-req yes">●</td><td>연결 등급 TS/S1/S2/S3</td></tr>
-            <tr><td class="f-name">pattern_type</td><td class="f-type">string</td><td></td><td>exact(기본) · regex · semantic</td></tr>
-            <tr><td class="f-name">factor_code</td><td class="f-type">string</td><td></td><td>연계 요건 SECRECY/VALUE/MANAGEMENT(선택)</td></tr>
-            <tr><td class="f-name">weight</td><td class="f-type">number</td><td></td><td>등급 기여 가중치(기본 1.0)</td></tr>
-            <tr><td class="f-name">example_context</td><td class="f-type">string</td><td></td><td>예시 문맥(선택)</td></tr>
-            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
-          </tbody>
-        </table>
-        <h4>Response 201</h4>
-        <p style="font-size:13px;"><code>{keyword_id, requires_retraining: true}</code></p>
-        <h4>관련: 수정·삭제</h4>
-        <p style="font-size:13px;"><code>PUT /api/v1/admin/keywords/{keyword_id}</code>(키워드·가중치·패턴 수정) · <code>DELETE /api/v1/admin/keywords/{keyword_id}</code>(<code>is_active=false</code> 소프트 비활성 — 학습 이력 보존). 둘 다 admin 권한, 변경 시 <code>requires_retraining</code> 반환.</p>
-        <div class="status-chips"><span class="sc s2xx">201 Created</span><span class="sc s4xx">400 허용값 오류</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s4xx">404 키워드/등급 없음</span></div>
+        <p class="ep-desc">현재 라우터에는 <code>/api/v1/admin/keywords</code> 조회·등록·수정·삭제 API가 없다(호출하지 말 것). 외부로 노출된 등급체계 계약은 <code>GET/PUT /api/v1/schema/grades</code>다.</p>
+        <div class="status-chips"><span class="sc s4xx">현재 OpenAPI에 없음</span><span class="sc s4xx">라우터 미구현</span></div>
       </div>
     </div>
 
@@ -722,7 +752,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT (admin role)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">활성 ModelVersion(<code>model_uri</code>)을 재해석해 추론 파이프라인을 재구성한다. <code>activate_model_version</code>/rollback 후 <strong>프로세스 재기동 없이</strong> 새 모델을 서빙에 반영한다(능동학습 폐곡선 C-ver). 활성 버전이 없거나 로컬 디렉토리가 아니면 env <code>CLASSIFIER_MODEL_DIR</code>로 폴백.</p>
+        <p class="ep-desc">활성 ModelVersion(<code>model_uri</code>)을 재해석해 추론 파이프라인을 재구성한다. 모델 활성화/롤백 후 <strong>프로세스 재기동 없이</strong> 새 모델을 서빙에 반영한다. 활성 버전이 없거나 로컬 디렉토리가 아니면 기본 모델 디렉토리로 폴백한다.</p>
         <h4>Response 200 — ReloadModelResponse</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
@@ -737,55 +767,43 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
     </div>
 
-    <div class="ep nego-ep" id="ep-rotate-key">
+    <div class="ep" id="ep-model-activate">
       <div class="ep-header">
         <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/admin/rotate-api-key</span>
-        <span class="ep-summary">KL 클라이언트 API 키 발급·교체</span>
+        <span class="ep-path">/api/v1/admin/model/activate</span>
+        <span class="ep-summary">특정 ModelVersion 수동 활성화</span>
         <span class="ep-auth">JWT (admin role)</span>
       </div>
       <div class="ep-body">
-        <div class="nego"><span class="nego-label">협의 필요</span>KL 단일 클라이언트 키 1종을 발급한다. 키 해시 저장 위치(클라이언트 자격증명 저장소/시크릿 매니저)와 키 다중화(KL 환경별 복수 키) 필요 여부는 KL과 합의.</div>
-        <p class="ep-desc">새 API 키(<code>lk_</code> + 48자, 288비트)를 생성하고 bcrypt hash를 자격증명 저장소에 저장한다. raw key는 <strong>이 응답에서 한 번만 노출</strong>되며 재조회 불가.</p>
-        <h4>Response 200 — RotateApiKeyResponse</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">api_key</td><td class="f-type">string</td><td>raw key — 이 응답에서만 노출, 재조회 불가</td></tr>
-            <tr><td class="f-name">message</td><td class="f-type">string</td><td>안전 보관 안내 메시지</td></tr>
-          </tbody>
-        </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s5xx">503 DB 미가용</span></div>
+        <p class="ep-desc">등록된 ModelVersion을 admin이 명시적으로 활성화한다. deploy gate를 적용해 회귀 모델 활성화를 막고, <code>force=true</code>일 때만 게이트 실패를 우회한다. 활성 성공 시 서빙 모델 리로드까지 수행한다.</p>
+        <h4>Request Body — ActivateModelRequest</h4>
+        <p style="font-size:13px;"><code>{version_label, force=false}</code></p>
+        <h4>Response 200 — ActivateModelResponse</h4>
+        <p style="font-size:13px;"><code>{activated, blocked, forced, version_label, version_id, reason, gate, reloaded, model_version, model_loaded}</code></p>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s5xx">503 DB/모델 미가용</span></div>
       </div>
     </div>
 
-    <div class="ep" id="ep-admin-models">
+    <div class="ep" id="ep-admin-status">
       <div class="ep-header">
         <span class="method get">GET</span>
-        <span class="ep-path">/api/v1/admin/models</span>
-        <span class="ep-summary">모델 버전 레지스트리 조회</span>
+        <span class="ep-path">/api/v1/admin/escalation-held · /admin/locked-readiness · /admin/dashboard</span>
+        <span class="ep-summary">운영 상태·락드 평가 준비도·대시보드</span>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc"><code>tb_model_versions</code>에 등록된 <strong>모든 모델 버전 목록·현재 활성 버전·롤백 이력</strong>을 반환한다. 모델 버전은 학습 때마다 누적되며(version_label UNIQUE), <strong>활성은 항상 1개</strong>(partial UNIQUE). 운영 대시보드의 모델 이력·롤백 화면 데이터 소스. 버전별 상세 메트릭은 <code>GET /metrics/history</code>·<code>/metrics/confusion-matrix/{ver}</code>와 연계.</p>
-        <h4>Query Parameters</h4>
+        <p class="ep-desc">현재 구현된 admin 조회 API는 키 발급/모델 목록이 아니라 운영 상태 진단이다. <code>/admin/escalation-held</code>는 게이트 보류 건수, <code>/admin/locked-readiness</code>는 등급별 locked eval 준비도, <code>/admin/dashboard</code>는 운영 대시보드 요약을 반환한다.</p>
+        <h4>Response 요약</h4>
         <table class="ftbl">
-          <thead><tr><th>파라미터</th><th>타입</th><th>설명</th></tr></thead>
+          <thead><tr><th>엔드포인트</th><th>주요 필드</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">limit / offset</td><td class="f-type">integer</td><td>1~100 / 기본 20·0 (created_at DESC)</td></tr>
-            <tr><td class="f-name">active_only</td><td class="f-type">boolean</td><td>true면 활성 버전만</td></tr>
+            <tr><td class="f-name">/admin/escalation-held</td><td><code>{by_grade,total}</code></td></tr>
+            <tr><td class="f-name">/admin/locked-readiness</td><td><code>{ready, per_grade, missing, min_per_grade, require_locked_eval, deploy_locked_gate_passed, reason}</code></td></tr>
+            <tr><td class="f-name">/admin/dashboard</td><td><code>{generated_at, escalation_held, locked_readiness, active_learning, kill_gate, drift, degraded}</code></td></tr>
           </tbody>
         </table>
-        <h4>Response 200 — ModelVersionList</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">active_version</td><td class="f-type">string | null</td><td>현재 활성 version_label</td></tr>
-            <tr><td class="f-name">total</td><td class="f-type">integer</td><td>등록된 전체 버전 수</td></tr>
-            <tr><td class="f-name">items</td><td class="f-type">ModelVersionItem[]</td><td>[{version_label, base_model, model_type, trained_at, is_active, training_data_count, metrics:{f1_macro, fnr_overall}, rolled_back_from, rollback_reason}]</td></tr>
-          </tbody>
-        </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span></div>
+        <p style="font-size:12.5px;color:var(--text-dim);"><code>/api/v1/admin/rotate-api-key</code>와 <code>/api/v1/admin/models</code>는 현재 라우터에 없다. 모델 버전 이력은 메트릭/DB 내부 조회로 다루며, API 키 회전은 별도 운영 절차 또는 추후 구현 항목이다.</p>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">503 DB 미가용</span></div>
       </div>
     </div>
 
@@ -800,7 +818,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT (admin · kl_backend · system)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">M1 합성 파이프라인으로 학습용 합성 문서를 생성한다. Celery 비동기 실행. 분당 10 한도. 검수 큐(<code>GET /synth/queue</code>)와 검수(<code>POST /synth/{synth_id}/review</code>)가 후속 단계다.</p>
+        <p class="ep-desc">M1 합성 파이프라인으로 학습용 합성 문서를 생성한다. 비동기 실행. 분당 10 한도. 검수 큐(<code>GET /synth/queue</code>)와 검수(<code>POST /synth/{synth_id}/review</code>)가 후속 단계다.</p>
         <h4>Request Body — SynthGenerateRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
@@ -835,12 +853,12 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-summary">헬스체크 — 3계층</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">Kubernetes probe 및 운영 대시보드용 3계층 헬스체크. <code>/api/v1/healthz</code>는 기존 하위호환 엔드포인트.</p>
+        <p class="ep-desc">오케스트레이터 헬스 프로브 및 운영 대시보드용 3계층 헬스체크. <code>/api/v1/healthz</code>는 기존 하위호환 엔드포인트.</p>
         <table class="ftbl">
           <thead><tr><th>경로</th><th>용도</th><th>실패 시</th><th>포함 체크</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">/api/v1/healthz/live</td><td>k8s Liveness Probe</td><td class="f-type">항상 200</td><td>uptime_sec</td></tr>
-            <tr><td class="f-name">/api/v1/healthz/ready</td><td>k8s Readiness Probe</td><td class="f-type">503</td><td>model · db · vectorstore · storage · warmup</td></tr>
+            <tr><td class="f-name">/api/v1/healthz/live</td><td>Liveness Probe</td><td class="f-type">항상 200</td><td>uptime_sec</td></tr>
+            <tr><td class="f-name">/api/v1/healthz/ready</td><td>Readiness Probe</td><td class="f-type">503</td><td>model · db · vectorstore · storage · warmup</td></tr>
             <tr><td class="f-name">/api/v1/healthz/deep</td><td>운영 대시보드 상세 진단</td><td class="f-type">status=degraded|down</td><td>ready 항목 + embedder</td></tr>
             <tr><td class="f-name">/api/v1/healthz</td><td>하위호환 단일 엔드포인트</td><td class="f-type">status=degraded</td><td>model_check + deploy_profile</td></tr>
           </tbody>
@@ -879,7 +897,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-dd3abab9 형식 (현재 활성)</td></tr>
+            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-XXXXXXXX 형식 (현재 활성)</td></tr>
             <tr><td class="f-name">measured_at</td><td class="f-type">string | null</td><td>측정 시각 (ISO-8601)</td></tr>
             <tr><td class="f-name">accuracy</td><td class="f-type">float | null</td><td>전체 정확도</td></tr>
             <tr><td class="f-name">precision_macro</td><td class="f-type">float | null</td><td>4등급 정밀도 단순평균</td></tr>
@@ -923,12 +941,12 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">특정 모델 버전의 4×4 혼동 행렬(TS/S1/S2/S3)을 반환한다. M6 평가 완료 후 DB(<code>tb_model_versions</code> 평가 메트릭)·로컬 아티팩트에서 로드(폐쇄망 번들은 MLflow 미포함).</p>
+        <p class="ep-desc">특정 모델 버전의 4×4 혼동 행렬(TS/S1/S2/S3)을 반환한다. M6 평가 완료 후 DB(<code>tb_model_versions</code> 평가 메트릭)에서 로드한다.</p>
         <h4>Path Parameter</h4>
         <table class="ftbl">
           <thead><tr><th>파라미터</th><th>타입</th><th>설명</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-dd3abab9 형식</td></tr>
+            <tr><td class="f-name">model_version</td><td class="f-type">string</td><td>v-XXXXXXXX 형식</td></tr>
           </tbody>
         </table>
         <div class="status-chips"><span class="sc s2xx">200 OK — ConfusionMatrix</span><span class="sc s4xx">404 버전 없음</span></div>
@@ -942,7 +960,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-summary">Prometheus 메트릭 노출</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">Prometheus text format으로 게이지·카운터·히스토그램을 노출한다. 자체 <code>CollectorRegistry</code> 사용 (테스트 격리). Scrape interval은 Prometheus 설정에 따름.</p>
+        <p class="ep-desc">Prometheus text format으로 게이지·카운터·히스토그램을 노출한다. OpenAPI 외부 계약에는 포함되지 않는 내부 scrape 전용 엔드포인트다. Scrape interval은 Prometheus 설정에 따름.</p>
         <pre># 비즈니스 게이지
 lloydk_drift_kl_divergence               # 학습 centroid vs 최근 prod KL divergence
 lloydk_fnr{model="..."}                  # False Negative Rate
@@ -953,7 +971,7 @@ lloydk_active_learning_pending_total     # 미소비 tb_corrections 수
 lloydk_rule_fallback_total               # 모델 미로드 → rule-fallback 처리 횟수
 lloydk_classify_persist_failure_total{reason}  # DB 영속화 실패 (db_error 등)
 lloydk_rag_context_failure_total{stage}  # RAG context 빌드 실패 (build_rag_context|fetch_hits)
-lloydk_embedding_fallback_total{original_provider}  # 임베딩 fallback → HashEmbedding
+lloydk_embedding_fallback_total{original_provider}  # 임베딩 provider 폴백 발생 횟수
 
 # 성능 히스토그램
 lloydk_request_duration_seconds{method,route} # 전체 HTTP 요청 latency
@@ -980,9 +998,9 @@ lloydk_embedding_cache_miss_total</pre>
           <tr><td>404</td><td><code>DOC_NOT_FOUND</code></td><td>문서 없음</td><td>doc_id 확인</td></tr>
           <tr><td>404</td><td><code>CLASSIFICATION_NOT_FOUND</code></td><td>분류 결과 없음</td><td>classification_id 확인</td></tr>
           <tr><td>409</td><td><code>DUPLICATE_DOC</code></td><td>동일 해시 문서 존재</td><td>file_hash 중복 (전역)</td></tr>
-          <tr><td>413</td><td><code>FILE_TOO_LARGE</code></td><td>파일 크기 초과 (멀티파트 업로드)</td><td>20MB 이하 업로드 (max_upload_mb)</td></tr>
-          <tr><td>413</td><td><code>LLOYDK_BODY_TOO_LARGE</code></td><td>요청 본문 크기 초과 (일반 JSON, 전역 ASGI 가드)</td><td>본문 25MB 이하로 (max_request_body_mb)</td></tr>
-          <tr><td>422</td><td><code>VALIDATION_ERROR</code></td><td>Pydantic 검증 실패</td><td>detail 배열에서 필드별 오류 확인</td></tr>
+          <tr><td>413</td><td><code>FILE_TOO_LARGE</code></td><td>파일 크기 초과 (멀티파트 업로드)</td><td>20MB 이하 업로드</td></tr>
+          <tr><td>413</td><td><code>LLOYDK_BODY_TOO_LARGE</code></td><td>요청 본문 크기 초과 (일반 JSON)</td><td>본문 25MB 이하로</td></tr>
+          <tr><td>422</td><td><code>VALIDATION_ERROR</code></td><td>요청 스키마 검증 실패</td><td>detail 배열에서 필드별 오류 확인</td></tr>
           <tr><td>429</td><td><code>LLOYDK_RATE_LIMIT</code></td><td>요청 한도 초과</td><td>라우터별 한도(기본 120/분, /train 10/시간 등). Retry-After 헤더 이후 재시도</td></tr>
           <tr><td>503</td><td><code>MODEL_WARMING_UP</code></td><td>모델 로딩 중</td><td>warmup_done=true 확인 후 재시도 (최대 82초)</td></tr>
           <tr><td>503</td><td><code>LLM_UNAVAILABLE</code></td><td>LLM 비응답</td><td>LLM 서버(설정 시·상용/로컬) 상태·API 확인</td></tr>
@@ -997,7 +1015,7 @@ lloydk_embedding_cache_miss_total</pre>
 
 <footer>
   <span>부록 B — API 명세 · KOIPA AI 기술 구현 백서 v7 · 2026-06-24 갱신</span>
-  <span>FastAPI · Lloydk AI 코어 API (KL 소유 대상 API 제외) · 등급 = S×V×M 곱셈 · 능동학습 폐곡선</span>
+  <span>Lloydk AI 코어 API (KL 소유 대상 API 제외) · 등급 = S×V×M 곱셈 · 검수·교정 API 포함</span>
 </footer>
 
 <script>
@@ -1008,3 +1026,4 @@ secs.forEach(s=>obs.observe(s));
 </script>
 </body>
 </html>
+
