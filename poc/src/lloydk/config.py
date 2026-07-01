@@ -444,6 +444,12 @@ class Settings(BaseSettings):
     # INCONCLUSIVE는 깨지 않음(측정 불가 — 자동활성 veto는 위 locked-eval 게이트 소관).
     deploy_gate_anchor_eval_enabled: bool = False
     deploy_gate_anchor_cap_per_cell: int = 200   # 앵커 (출처×등급) 칸당 표본 상한(0=전수)
+    # [P0#6] 메타모픽 순방향 회귀를 deploy gate hard-signal로 연결(앵커와 상보 — 문체만 바꿔도
+    # 등급↓=미탐). 경로에 build_metamorphic_report.to_dict JSON을 두면 게이트가 소비(후보 대상으로
+    # 재생성 권장 — gen_metamorphic_pairs 파이프라인). 미설정(빈값)=검사 생략(fail-open, 동작 보존).
+    deploy_gate_metamorphic_report_path: str = ""
+    deploy_gate_metamorphic_forward_ceiling: float = 0.0  # 순방향 위반율 CI하한 초과 시 hard block
+    deploy_gate_metamorphic_min_n: int = 5                # 순방향 쌍 표본 하한(미만=측정 불가)
     # Kill-gate (죽음의 나선/품질붕괴 모니터, 비파괴=경보만). 발동 시 metric+log만, 자동 중단 없음.
     # floor/capacity/max=0이면 해당 조건 비활성. capacity는 운영 검수 처리능력으로 설정 권장.
     kill_gate_high_grade_miss_floor: int = 1     # 고등급(TS/S1) 미탐 교정 ≥ 이 값이면 발동(1=any)

@@ -231,3 +231,62 @@ def test_summarize_anchor_high_grade_counts():
     s = summarize_anchor_high_grade(anchor)
     assert s["high_grade_cards"] == 2 and s["fail"] == 1 and s["pass"] == 1
     assert s["fail_cells"] == ["a/TS"]
+
+
+# ── [P0#6] 메타모픽 순방향 회귀 hard-signal ─────────────────────────────────────
+from lloydk.modules.m6_evaluation.deploy_gate import summarize_metamorphic  # noqa: E402
+from lloydk.modules.m6_evaluation.metamorphic import build_metamorphic_report  # noqa: E402
+
+
+def _metamorphic(n, violations):
+    """순방향 쌍 n개 중 violations개가 앵커(TS)보다 낮은 등급(S3)으로 예측=미탐 회귀."""
+    pairs = [
+        {"anchor_id": f"a{i}", "anchor_grade": "TS",
+         "paraphrase_pred": "S3" if i < violations else "TS"}
+        for i in range(n)
+    ]
+    return build_metamorphic_report(pairs).to_dict()
+
+
+def test_metamorphic_forward_regression_blocks_even_if_synthetic_gate_passes():
+    # 합성 fnr/f1 게이트는 통과(깨끗)하지만 메타모픽 순방향 미탐 회귀가 hard block.
+    rep = _metamorphic(n=6, violations=2)
+    dec = evaluate_deploy_gate(_report(fnr_high=0.0, f1_macro=0.9), _report(),
+                               metamorphic_report=rep)
+    assert dec.passed is False
+    assert "metamorphic_forward_regression" in dec.reason
+
+
+def test_metamorphic_clean_passes_and_records_check():
+    rep = _metamorphic(n=6, violations=0)
+    dec = evaluate_deploy_gate(_report(), _report(), metamorphic_report=rep)
+    assert dec.passed is True
+    assert any(c.name == "metamorphic_forward_regression" and c.passed for c in dec.checks)
+
+
+def test_metamorphic_small_sample_not_measurable_does_not_block():
+    # n < min_n(기본 5) → 측정 불가(게이트 안 깸) — 표본부족으로 자동활성 막지 않음.
+    rep = _metamorphic(n=3, violations=1)
+    dec = evaluate_deploy_gate(_report(), _report(), metamorphic_report=rep)
+    assert dec.passed is True
+    chk = [c for c in dec.checks if c.name == "metamorphic_forward_regression"][0]
+    assert chk.passed is True and "측정 불가" in chk.detail
+
+
+def test_metamorphic_ceiling_can_tolerate_low_rate():
+    # ceiling을 올리면 낮은 위반율은 통과(운영 튜닝). 6쌍 중 1위반(CI하한 낮음).
+    rep = _metamorphic(n=6, violations=1)
+    dec = evaluate_deploy_gate(_report(), _report(), metamorphic_report=rep,
+                               metamorphic_forward_ceiling=0.5)
+    assert dec.passed is True
+
+
+def test_metamorphic_report_none_preserves_behavior():
+    dec = evaluate_deploy_gate(_report(), _report())
+    assert not any(c.name == "metamorphic_forward_regression" for c in dec.checks)
+
+
+def test_summarize_metamorphic_forward_signal():
+    s = summarize_metamorphic(_metamorphic(n=5, violations=2), min_n=5)
+    assert s["n"] == 5 and s["violations"] == 2
+    assert s["measurable"] is True and s["regression"] is True and s["ci_low"] > 0.0

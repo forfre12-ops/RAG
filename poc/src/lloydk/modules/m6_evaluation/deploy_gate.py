@@ -34,6 +34,10 @@ from lloydk.modules.m6_evaluation.eval_cards import (
 DEFAULT_FNR_HIGH_TOLERANCE = 0.02
 DEFAULT_F1_DROP_TOLERANCE = 0.05
 DEFAULT_DEGENERATE_COL_SHARE = 0.99
+# 메타모픽 순방향(미탐 FN) 회귀 hard-block 기준. 위반율 Wilson CI 하한이 ceiling 초과면 거부.
+# ceiling=0.0(기본) = CI로 뒷받침되는 순방향 회귀가 하나라도 있으면 거부(FN-first, 최고 보수).
+DEFAULT_METAMORPHIC_FORWARD_CEILING = 0.0
+DEFAULT_METAMORPHIC_MIN_N = 5  # 순방향 쌍 표본이 이 미만이면 측정 불가(게이트 안 깸)
 
 
 @dataclass
@@ -135,6 +139,41 @@ def summarize_anchor_high_grade(
     }
 
 
+def summarize_metamorphic(
+    metamorphic_report: Optional[Mapping],
+    *,
+    forward_ceiling: float = DEFAULT_METAMORPHIC_FORWARD_CEILING,
+    min_n: int = DEFAULT_METAMORPHIC_MIN_N,
+) -> dict:
+    """메타모픽 리포트(build_metamorphic_report.to_dict)에서 **순방향(미탐 FN) 회귀** 신호 요약.
+
+    순방향 위반 = 사실을 유지한 채 문체만 바꿨는데 등급이 내려감(고등급 미탐 — 위험). 메타모픽은
+    '실패만 정보' 원칙이라 통과(violations=0)는 신호가 아니다. 위반율 Wilson CI 하한이 ceiling을
+    초과하면 회귀 확정(hard block). 표본이 min_n 미만이면 measurable=False(측정 불가 — 게이트를
+    깨지 않되 surfaced; 자동활성 veto는 locked-eval 소관, 역할 분리). 역방향/과분류는 미탐이 아니라
+    (과분류=FP) deploy hard-block에는 쓰지 않는다(미탐-우선 원칙 유지) — 필요 시 별도 신호로 확장.
+    """
+    fwd = dict((metamorphic_report or {}).get("forward") or {})
+    n = int(fwd.get("n", 0) or 0)
+    v = int(fwd.get("violations", 0) or 0)
+    ci = fwd.get("ci") or [0.0, 0.0]
+    try:
+        ci_low = float(ci[0])
+    except (TypeError, ValueError, IndexError):
+        ci_low = 0.0
+    measurable = n >= max(1, min_n)
+    regression = bool(measurable and v > 0 and ci_low > forward_ceiling)
+    failures = list((metamorphic_report or {}).get("forward_failures", []) or [])[:5]
+    return {
+        "n": n,
+        "violations": v,
+        "ci_low": ci_low,
+        "measurable": measurable,
+        "regression": regression,
+        "failures": failures,
+    }
+
+
 def _is_degenerate(cm: Any, *, col_share: float = DEFAULT_DEGENERATE_COL_SHARE) -> Optional[bool]:
     """confusion matrix(행=정답, 열=예측)에서 한 예측 열이 전체의 col_share 이상이면 degenerate.
 
@@ -167,6 +206,9 @@ def evaluate_deploy_gate(
     first_deploy_fnr_high_max: Optional[float] = None,
     anchor_report: Optional[Mapping] = None,
     anchor_high_grades: Sequence[str] = DEFAULT_ANCHOR_HIGH_GRADES,
+    metamorphic_report: Optional[Mapping] = None,
+    metamorphic_forward_ceiling: float = DEFAULT_METAMORPHIC_FORWARD_CEILING,
+    metamorphic_min_n: int = DEFAULT_METAMORPHIC_MIN_N,
     candidate_version: Optional[str] = None,
     baseline_version: Optional[str] = None,
 ) -> DeployDecision:
@@ -187,6 +229,12 @@ def evaluate_deploy_gate(
             INCONCLUSIVE는 깨지 않음(측정 불가 — 자동활성 veto는 eval_ready locked 게이트 소관).
             None(기본)이면 검사 생략(동작 보존).
         anchor_high_grades: 앵커에서 미탐을 hard-block 기준으로 볼 고등급 집합(기본 TS·S1).
+        metamorphic_report: [메타모픽 연결] 후보를 **최소쌍 메타모픽 회귀**로 측정한 리포트
+            (build_metamorphic_report.to_dict). 사실 유지·문체 변경에 등급이 내려가는 **순방향 미탐(FN)**
+            회귀가 CI로 뒷받침되면 hard block. anchor_report(외부 사실 미탐)와 상보 — 정답셋 아닌
+            회귀테스트(실패만 정보)라 합성 천장과 무관. None(기본)이면 검사 생략(동작 보존).
+        metamorphic_forward_ceiling: 순방향 위반율 CI 하한이 이 값을 초과하면 회귀 확정(기본 0.0).
+        metamorphic_min_n: 순방향 쌍 표본이 이 미만이면 측정 불가(게이트 안 깸, 기본 5).
         *_version: 로깅/감사용 라벨.
 
     Returns:
@@ -286,6 +334,33 @@ def evaluate_deploy_gate(
                 f"앵커 고등급 미탐 FAIL 없음(PASS {a['pass']}·INCONCLUSIVE {a['inconclusive']}칸; "
                 f"INCONCLUSIVE는 측정불가 — 자동활성 veto는 locked-eval 소관)",
                 a["worst_underclass_fnr"],
+            ))
+
+    # ── 5. 메타모픽 순방향 회귀 (문체만 바꿔도 등급↓ = 미탐 — 실패만 정보) ─────────────
+    if metamorphic_report is not None:
+        m = summarize_metamorphic(
+            metamorphic_report,
+            forward_ceiling=metamorphic_forward_ceiling,
+            min_n=metamorphic_min_n,
+        )
+        if m["regression"]:
+            ids = [f.get("anchor_id") for f in m["failures"][:3]]
+            checks.append(GateCheck(
+                "metamorphic_forward_regression", False,
+                f"메타모픽 순방향 미탐 회귀(사실 유지·문체 변경에 등급↓): 위반 {m['violations']}/{m['n']} "
+                f"· 위반율 CI하한={m['ci_low']:.4f} > ceiling {metamorphic_forward_ceiling:.3f} → 거부 "
+                f"(예: {ids})",
+                m["ci_low"],
+            ))
+        elif not m["measurable"]:
+            checks.append(GateCheck(
+                "metamorphic_forward_regression", True,
+                f"메타모픽 순방향 쌍 부족(n={m['n']} < {metamorphic_min_n}) — 측정 불가(검사 생략)",
+            ))
+        else:
+            checks.append(GateCheck(
+                "metamorphic_forward_regression", True,
+                f"메타모픽 순방향 미탐 회귀 없음(위반 {m['violations']}/{m['n']}, CI하한={m['ci_low']:.4f})",
             ))
 
     passed = all(c.passed for c in checks)

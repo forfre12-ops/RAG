@@ -97,6 +97,39 @@ def _maybe_anchor_report(settings: Any, *, candidate_model_dir: str | None) -> d
         return None
 
 
+def _maybe_metamorphic_report(settings: Any) -> dict | None:
+    """opt-in 시 사전 산출된 메타모픽 회귀 리포트(build_metamorphic_report.to_dict JSON)를 로드.
+
+    fail-OPEN: 경로 미설정/파일 부재/파싱 실패는 None(메타모픽 체크 생략) — 게이트의 fail-secure는
+    유지된다. anchor(후보 라이브 측정)와 달리 메타모픽은 쌍 생성(gen_metamorphic_pairs)이 별도
+    파이프라인이라, 그 산출 JSON을 경로로 받아 소비한다. **후보 모델 대상으로 재생성해야 유효**
+    (stale 리포트는 오판 위험 — 파이프라인이 재학습 eval 단계에서 갱신하는 것을 전제).
+    """
+    path = str(getattr(settings, "deploy_gate_metamorphic_report_path", "") or "").strip()
+    if not path:
+        return None
+    from pathlib import Path  # noqa: PLC0415
+    p = Path(path)
+    if not p.exists():
+        logger.warning("metamorphic gate: 리포트 경로 부재(%s) — 메타모픽 체크 생략(fail-open)", path)
+        return None
+    try:
+        import json  # noqa: PLC0415
+        rep = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(rep, dict):
+            logger.warning("metamorphic gate: 리포트가 dict 아님 — 생략")
+            return None
+        fwd = (rep.get("forward") or {})
+        logger.warning(
+            "metamorphic gate: 리포트 로드 — 순방향 위반 %s/%s",
+            fwd.get("violations"), fwd.get("n"),
+        )
+        return rep
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("metamorphic gate: 리포트 로드 실패(%s) → 생략(fail-open)", type(exc).__name__)
+        return None
+
+
 def register_and_gate_model(
     report: Any,
     *,
@@ -139,6 +172,7 @@ def register_and_gate_model(
             # 측정 실패는 fail-OPEN(앵커 체크 생략) — 게이트 자체는 fail-secure 유지되고 자동활성은
             # eval_ready locked 게이트가 별도로 막으므로, 앵커 미측정이 자동배포를 열지 않는다.
             anchor_report = _maybe_anchor_report(settings, candidate_model_dir=model_uri)
+            metamorphic_report = _maybe_metamorphic_report(settings)
 
             decision = evaluate_deploy_gate(
                 metrics,
@@ -147,6 +181,9 @@ def register_and_gate_model(
                 f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
                 first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
                 anchor_report=anchor_report,
+                metamorphic_report=metamorphic_report,
+                metamorphic_forward_ceiling=float(getattr(settings, "deploy_gate_metamorphic_forward_ceiling", 0.0)),
+                metamorphic_min_n=int(getattr(settings, "deploy_gate_metamorphic_min_n", 5)),
                 candidate_version=version_label,
                 baseline_version=baseline_label,
             )
@@ -242,12 +279,17 @@ def activate_model_manually(
             baseline_label = baseline.version_label if baseline else None
             already_active = bool(getattr(target, "is_active", False))
 
+            # 메타모픽은 파일 로드(저비용)라 수동 활성 경로에도 회귀 hard-signal 적용(앵커는
+            # CPU 추론 비용으로 수동 경로에선 생략 — 설계 유지). force=True면 아래에서 우회(감사됨).
             decision = evaluate_deploy_gate(
                 dict(target.metrics or {}),
                 baseline_metrics,
                 fnr_high_tolerance=float(getattr(settings, "retrain_fnr_high_tolerance", 0.02)),
                 f1_drop_tolerance=float(getattr(settings, "retrain_f1_drop_tolerance", 0.05)),
                 first_deploy_fnr_high_max=getattr(settings, "deploy_gate_first_deploy_fnr_high_max", None),
+                metamorphic_report=_maybe_metamorphic_report(settings),
+                metamorphic_forward_ceiling=float(getattr(settings, "deploy_gate_metamorphic_forward_ceiling", 0.0)),
+                metamorphic_min_n=int(getattr(settings, "deploy_gate_metamorphic_min_n", 5)),
                 candidate_version=version_label,
                 baseline_version=baseline_label,
             )
