@@ -153,8 +153,12 @@ class ClassifyService:
             notify("extract")
             # content가 없으면 normalized_text_uri에서 읽어오기 (doc_id 전용 분류 경로)
             content = req.content
+            review_flagged = False
             if not content:
-                content = self._fetch_content_by_doc_id(req.doc_id)
+                content, _doc_status = self._fetch_content_by_doc_id(req.doc_id)
+                # [P0#3 후속] ingestion 열화추출(OCR/저품질)로 격리된 문서(processing_status)를
+                # 서빙 진입에서 존중 — 자동확정 금지(무음 자동분류 방지).
+                review_flagged = self._ingestion_review_flagged(_doc_status)
             if not content:
                 # fail-SECURE (미탐 절대 금지): 본문을 못 읽으면 등급을 판단할 수 없다.
                 # 과거엔 label="S3"(공개)로 폴백했는데, 이는 '읽지 못한 비밀문서를 공개로
@@ -264,6 +268,16 @@ class ClassifyService:
                 warnings_acc.append(
                     f"low-confidence: confidence={float(pred.confidence):.2f} < {threshold:.2f}"
                     " — review recommended"
+                )
+
+            # [P0#3 후속] ingestion 단계서 열화추출로 needs_review/failed 격리된 문서는 자동확정 금지.
+            # ingestion 게이트가 쓴 processing_status 를 서빙이 읽지 않아 격리문서가 그대로 자동분류되던
+            # 하프와이어링 마감. 등급은 검수자 참고로 산출하되 status만 격리(등급 무변경·FNR-safe).
+            if status != "needs_review" and review_flagged:
+                status = "needs_review"
+                warnings_acc.append(
+                    "document flagged at ingestion (degraded extraction: OCR/low-quality) —"
+                    " routed to human review, not auto-confirmed"
                 )
 
             # [②·③ 충돌] 출처 cap(하향)이 강한 상향 신호(TS/S1)를 덮은 경우 — pipeline이 남긴
@@ -790,41 +804,53 @@ class ClassifyService:
 
         return classification_id, warns
 
-    def _fetch_content_by_doc_id(self, doc_id: str) -> str:
+    @staticmethod
+    def _ingestion_review_flagged(processing_status: str | None) -> bool:
+        """저장된 문서 상태가 ingestion 단계 검수 격리(OCR/저품질 열화추출)인지 — 순수 판정.
+
+        needs_review/failed = 열화추출로 격리된 문서 → 서빙 진입에서 자동확정 금지(무음 자동분류
+        방지). 그 외(processed 등)·None(상태 미상)은 격리 아님(과차단 방지).
+        """
+        return processing_status in ("needs_review", "failed")
+
+    def _fetch_content_by_doc_id(self, doc_id: str) -> tuple[str, str | None]:
         """doc_id로 documents.normalized_text_uri → storage에서 텍스트 읽기.
 
-        ingestion 완료 문서는 normalized_text_uri를 갖고 있다.
-        storage·DB 미가용 시 빈 문자열 반환 — 호출자가 처리.
+        Returns (content, processing_status). processing_status 는 저장된 문서 상태로,
+        needs_review/failed(ingestion 열화추출 격리)면 호출자가 자동확정을 막고 검수 라우팅한다.
+        storage·DB·문서 미가용 시 ("", None) — 호출자가 처리.
         """
         doc_uuid = self._parse_doc_uuid(doc_id)
         if doc_uuid is None:
-            return ""
+            return "", None
         try:
             from lloydk.adapters.storage import build_storage  # noqa: PLC0415
             from lloydk.db import session_scope  # noqa: PLC0415
             from lloydk.repositories.document_repo import DocumentRepo  # noqa: PLC0415
         except ImportError:
-            return ""
+            return "", None
         try:
             with session_scope() as db:
                 doc = DocumentRepo(db).get(doc_uuid)
-                if doc is None or not doc.normalized_text_uri:
-                    return ""
+                if doc is None:
+                    return "", None
+                status = getattr(doc, "processing_status", None)
+                if not doc.normalized_text_uri:
+                    return "", status
                 uri = doc.normalized_text_uri
             # file:// URI → LocalStorage, s3:// or minio:// → MinioStorage
             storage = build_storage()
-            # URI → bucket/key 분해
             # 형식: s3://<bucket>/<key> 또는 minio://<host>/<bucket>/<key> 또는 file://<bucket>/<key>
             import re as _re  # noqa: PLC0415
             m = _re.match(r"(?:s3|minio|file)://([^/]+)/(.+)", uri)
             if not m:
-                return ""
+                return "", status
             bucket, key = m.group(1), m.group(2)
             data = storage.get(bucket, key)
-            return data.decode("utf-8", errors="replace")
+            return data.decode("utf-8", errors="replace"), status
         except Exception as exc:  # noqa: BLE001
             logger.debug("_fetch_content_by_doc_id failed: %s", exc)
-            return ""
+            return "", None
 
     @staticmethod
     def _inc_persist_failure(reason: str) -> None:

@@ -32,8 +32,8 @@ def _empty_req(monkeypatch):
     from lloydk.services.classify_service import ClassifyService
 
     svc = ClassifyService()
-    # 본문 조회는 storage/DB 없이도 빈 문자열 반환하도록 강제 (조회 실패 시뮬레이션)
-    monkeypatch.setattr(svc, "_fetch_content_by_doc_id", lambda *a, **k: "")
+    # 본문 조회는 storage/DB 없이도 (빈 문자열, 상태 None) 반환하도록 강제 (조회 실패 시뮬레이션)
+    monkeypatch.setattr(svc, "_fetch_content_by_doc_id", lambda *a, **k: ("", None))
     req = ClassifyRequest(doc_id="not-a-real-doc", content=None)
     return svc, req
 
