@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import copy
+import ipaddress
 import json
 import logging
 import os
@@ -29,15 +30,27 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 
+# 클라우드 메타데이터 SSRF — 어느 배포에서도 정상 webhook 대상이 아니다. 항상 거부.
+# 169.254.169.254 = AWS/Azure/GCP IMDS(v4, link-local이라 아래 범주 차단에도 걸림),
+# fd00:ec2::254 = AWS IMDS(IPv6 ULA — is_private라 범주만으론 opt-in에 걸려 명시 denylist 필요).
+# ipaddress 객체로 비교(문자열 표기 차이에 강건).
+_METADATA_IPS = frozenset(
+    {ipaddress.ip_address("169.254.169.254"), ipaddress.ip_address("fd00:ec2::254")}
+)
+# GCP는 IP 대신 호스트명으로도 IMDS 접근 가능 — 호스트명 리터럴도 차단.
+_METADATA_HOSTS = frozenset({"metadata.google.internal", "metadata"})
+
+
 def _validate_target_url(target_url: str) -> None:
     """[QW SSRF] webhook 대상 URL 가드 — 부적합 시 ValueError(enqueue 차단).
 
     항상 거부: http/https 외 스킴(file://·gopher://·data: 등 내부 파일·프로토콜 악용),
-    호스트 없음, loopback(127.0.0.0/8·::1·localhost — 서비스 자기자신 타격). 사설IP(RFC1918/
-    4193)는 폐쇄망 정상 콜백이라 기본 허용하되 settings.outbox_block_private_ips=True면 거부
-    (외부망 배포용). DNS 리바인딩까지는 막지 않음(전송 시점 워커 책임) — enqueue 표면만 좁힌다.
+    호스트 없음, loopback(127.0.0.0/8·::1·localhost — 서비스 자기자신 타격), **클라우드 메타데이터/
+    예약대역**(link-local 169.254/16·fe80::/10=IMDS·reserved·unspecified 0.0.0.0·multicast — 어느
+    배포에서도 정상 콜백 아님, 자격증명 탈취 SSRF 표면). 사설IP(RFC1918/4193)만 폐쇄망 정상 콜백이라
+    기본 허용하되 settings.outbox_block_private_ips=True면 거부(외부망 배포용). IPv4-mapped IPv6
+    (::ffff:a.b.c.d)는 내장 v4로 정규화해 우회 차단. DNS 리바인딩은 전송 시점 워커 책임(enqueue 표면만).
     """
-    import ipaddress  # noqa: PLC0415
     from urllib.parse import urlparse  # noqa: PLC0415
 
     if not target_url or not isinstance(target_url, str):
@@ -48,23 +61,37 @@ def _validate_target_url(target_url: str) -> None:
     host = parsed.hostname
     if not host:
         raise ValueError("outbox target_url has no host")
-    if host.lower() in ("localhost", "ip6-localhost"):
+    host_l = host.lower()
+    if host_l in ("localhost", "ip6-localhost"):
         raise ValueError("outbox target_url loopback host not allowed")
+    if host_l in _METADATA_HOSTS:
+        raise ValueError("outbox target_url cloud-metadata host not allowed")
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
         ip = None  # 호스트명(IP 아님) — 전송 시점 해석
     if ip is not None:
+        # IPv4-mapped IPv6(::ffff:169.254.169.254 등)는 내장 v4로 정규화 — 범주 판정 우회 차단.
+        mapped = getattr(ip, "ipv4_mapped", None)
+        if mapped is not None:
+            ip = mapped
         if ip.is_loopback:
             raise ValueError("outbox target_url loopback address not allowed")
+        # 항상 거부(opt-in 무관): 메타데이터·link-local·예약·미지정·멀티캐스트.
+        if ip in _METADATA_IPS:
+            raise ValueError("outbox target_url cloud-metadata address not allowed")
+        if ip.is_link_local or ip.is_reserved or ip.is_unspecified or ip.is_multicast:
+            raise ValueError(
+                "outbox target_url link-local/reserved/unspecified/multicast address not allowed (SSRF)"
+            )
         block_private = False
         try:
             from lloydk.config import settings  # noqa: PLC0415
             block_private = bool(getattr(settings, "outbox_block_private_ips", False))
         except Exception:  # noqa: BLE001
             block_private = False
-        if block_private and (ip.is_private or ip.is_link_local):
-            raise ValueError("outbox target_url private/link-local address blocked (outbox_block_private_ips)")
+        if block_private and ip.is_private:
+            raise ValueError("outbox target_url private address blocked (outbox_block_private_ips)")
 
 
 @dataclass

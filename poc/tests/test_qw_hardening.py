@@ -54,6 +54,37 @@ def test_ssrf_blocks_private_ip_when_enabled(monkeypatch):
         _validate_target_url("http://10.0.0.5/cb")
 
 
+# [P0#7] 클라우드 메타데이터/예약대역은 outbox_block_private_ips=False(기본)여도 항상 차단.
+# CSAP 공공클라우드 dev/train tier에서 webhook→IMDS(169.254.169.254) 자격증명 탈취 SSRF 방지.
+@pytest.mark.parametrize("url", [
+    "http://169.254.169.254/latest/meta-data/",             # AWS/Azure/GCP IMDS (link-local)
+    "http://[fd00:ec2::254]/latest/meta-data/",             # AWS IMDS IPv6 (ULA — 명시 denylist)
+    "http://metadata.google.internal/computeMetadata/v1/",  # GCP 메타데이터 호스트명
+    "http://[::ffff:169.254.169.254]/x",                    # IPv4-mapped IPv6 우회 시도
+    "http://169.254.1.1/x",                                 # link-local 일반
+    "https://[fe80::1]/x",                                  # link-local IPv6
+    "http://0.0.0.0/x",                                     # unspecified
+    "https://[::]/x",                                       # unspecified IPv6
+    "http://224.0.0.1/x",                                   # multicast
+    "http://240.0.0.1/x",                                   # reserved (240/4)
+    "http://metadata/x",                                    # GCP 축약 메타데이터 호스트명
+])
+def test_ssrf_blocks_metadata_and_reserved_even_when_private_allowed(monkeypatch, url):
+    from lloydk import config as cfg
+    monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", False, raising=False)
+    with pytest.raises(ValueError):
+        _validate_target_url(url)
+
+
+def test_ssrf_still_allows_normal_public_and_private(monkeypatch):
+    # 회귀 방지: 정상 공인/사설(기본 허용) 대상은 여전히 통과(과차단 아님).
+    from lloydk import config as cfg
+    monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", False, raising=False)
+    _validate_target_url("https://kl.example.com/webhook")
+    _validate_target_url("http://10.0.0.5/cb")
+    _validate_target_url("http://172.16.3.4/cb")
+
+
 def test_publish_rejects_bad_url_before_enqueue():
     store = InMemoryOutboxStore()
     with pytest.raises(ValueError):
