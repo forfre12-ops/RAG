@@ -28,7 +28,13 @@ dependencies = [
   "alembic>=1.13",
   "celery[redis]>=5.4",
   "redis>=5.0",
-  "minio>=7.2",
+
+  # 스토리지: 폐쇄망 운영 기본은 로컬FS(file://, LocalStorage) — 별도 패키지 불요.
+  # S3 호환 객체 스토리지(minio/seaweedfs/AWS S3·NCP 등) 백엔드는 optional extra `[minio]`로
+  # 옵트인한다. 어댑터(minio_store.py)·팩토리·docker-compose·config는 이미 완비돼 있어,
+  # `pip install -e ".[minio]"` + storage_backend=minio(또는 lite-cloud 프로파일)면 즉시 사용.
+  # (ES 백엔드가 `elasticsearch`를 별도 설치하는 것과 동일 패턴 — 미사용 백엔드 패키지를
+  # 폐쇄망 base 설치·감사 대상에서 제외해 슬림/공격표면 축소.)
 
   # 벡터 DB: pgvector(psycopg 경유, 별도 패키지 불요) — ES 제거(의사결정_대장 §03 ⓑ).
   # 레거시 es 백엔드(es_store.py)가 필요하면 `elasticsearch>=8.15,<9.0`를 별도 설치.
@@ -121,6 +127,15 @@ reranker = [
   "sentence-transformers>=3.0",
 ]
 
+# S3 호환 객체 스토리지 백엔드 (minio/seaweedfs/AWS S3·NCP Object Storage 등).
+# 폐쇄망 운영 기본은 로컬FS(file://)라 미사용 — 클라우드 티어(CSAP)·객체 스토리지 배포에서만
+# 옵트인. 어댑터(minio_store.py)·팩토리·docker-compose 완비 → storage_backend=minio + 이 extra
+# 설치면 즉시 사용(코드 변경 0). 미설치 상태로 minio backend 선택 시 RuntimeWarning 후 LocalStorage
+# 폴백. 활성: pip install -e ".[minio]"
+minio = [
+  "minio>=7.2",
+]
+
 # 상용 LLM API (P3 합성 실측, 운영 옵션)
 # 활성: pip install -e ".[llm]"
 llm = [
@@ -160,6 +175,7 @@ full = [
   "langchain-anthropic>=0.2",
   "langchain-openai>=0.2",
   "langgraph>=0.2",
+  "minio>=7.2",                    # S3 호환 객체 스토리지 백엔드(옵션 [minio])
 ]
 
 # PSH (Performance Scenario Harness) 보조 — Prometheus push, 그래프 렌더
@@ -202,6 +218,7 @@ dev = [
   "ruff>=0.6",
   "ipykernel>=6.29",
   "fakeredis>=2.20",                # B3 — redis 미가용 환경에서 R1·outbox 테스트 통과
+  "minio>=7.2",                    # base에서 optional [minio]로 분리 — 테스트/CI는 minio 백엔드 검증 위해 유지
 ]
 
 [build-system]

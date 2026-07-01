@@ -19,7 +19,16 @@ logger = logging.getLogger(__name__)
 def _build_minio() -> ObjectStorage:
     from lloydk.adapters.storage.minio_store import MinioStorage  # noqa: PLC0415
 
-    return MinioStorage()
+    try:
+        return MinioStorage()
+    except ModuleNotFoundError as exc:
+        # minio 패키지는 optional extra [minio](폐쇄망 운영 기본은 local FS라 base 제외).
+        # 미설치 상태로 minio backend 선택 시 원인을 명확히 — 호출부(_build_inner)가 이 메시지로
+        # RuntimeWarning 후 LocalStorage 폴백한다(무음 아님).
+        raise ModuleNotFoundError(
+            "minio backend requires the 'minio' package — install with: "
+            'pip install -e ".[minio]"  (폐쇄망 base는 local FS만; minio는 옵션)'
+        ) from exc
 
 
 def _build_seaweedfs() -> ObjectStorage:
