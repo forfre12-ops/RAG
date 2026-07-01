@@ -44,6 +44,14 @@ class ExtractionReviewDecision:
     reasons: list[str]  # extract_error | ocr | low_quality
 
 
+# 콘텐츠 파생 품질(normalizer.quality_score)이 이 값 미만이면 '얇은/깨진 본문'으로 보고
+# 검수 라우팅한다. quality_score 는 <50자·과다 스트립 본문을 0.2 로, 정상 한국어를 ~1.0 로
+# 준다 — 그러나 영어-only 클린 문서는 한글가중 부재로 ~0.5 라, 0.3 임계는 얇은/깨진(≤0.2)만
+# 잡고 정상 영어(0.5)는 과라우팅하지 않는다(검수큐 폭주 방지). 메서드 고정 품질(docx 0.97 등)이
+# 얇은 본문에도 높게 나오는 사각을 콘텐츠 품질로 보완한다.
+_THIN_CONTENT_QUALITY = 0.3
+
+
 def extraction_review_decision(
     *,
     quality: float | None,
@@ -51,12 +59,17 @@ def extraction_review_decision(
     error: str | None,
     min_quality: float,
     ocr_requires_review: bool,
+    content_quality: float | None = None,
 ) -> ExtractionReviewDecision:
     """본문이 존재하는(비어있지 않은) 추출이 검수 라우팅 대상인지 순수 판정.
 
     깨끗한 파서 추출과 OCR/저품질 추출이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자로
     조용히 오분류되는 것을 막기 위한 게이트. FNR-safe 지향(의심스러우면 검수). 빈 본문(no_text)은
     호출부에서 processing_status='failed'로 별도 처리하므로 여기서는 다루지 않는다.
+
+    quality 는 추출 *메서드* 기반 고정 품질(docx 0.97 등)이라 본문이 얇거나 깨져도 높게 나온다.
+    content_quality(normalizer.quality_score, 콘텐츠 기반)를 함께 받아 <50자·깨진 본문(≤0.2)을
+    보완 포착한다(영어 과라우팅 회피 위해 별도 저임계 _THIN_CONTENT_QUALITY 적용).
 
     reasons(우선순위 무관, 복수 가능): extract_error(추출 경고), ocr(OCR 사용), low_quality(품질 미만).
     """
@@ -65,8 +78,10 @@ def extraction_review_decision(
         reasons.append("extract_error")
     if ocr_used and ocr_requires_review:
         reasons.append("ocr")
-    if quality is not None and quality < min_quality:
-        reasons.append("low_quality")
+    method_low = quality is not None and quality < min_quality
+    content_thin = content_quality is not None and content_quality < _THIN_CONTENT_QUALITY
+    if method_low or content_thin:
+        reasons.append("low_quality")  # 메서드 저품질 또는 얇은/깨진 콘텐츠 — 사유 단일화
     return ExtractionReviewDecision(requires_review=bool(reasons), reasons=reasons)
 
 
@@ -159,7 +174,9 @@ class DocumentIngestionService:
             warns.append("no text extracted (parser/OCR needed)")
 
         # [P0#3] 저품질/OCR 추출 → 검수 라우팅 판정 + 열화 메트릭(무음 오분류 방지).
-        review_decision, degrade_reasons = self._extraction_review(ext, has_text=bool(text))
+        review_decision, degrade_reasons = self._extraction_review(
+            ext, content_quality=(pre.quality if pre else None), has_text=bool(text)
+        )
         if review_decision.requires_review:
             warns.append(
                 "extraction degraded — routed to human review before classification: "
@@ -242,11 +259,13 @@ class DocumentIngestionService:
             return fallback
         return base
 
-    def _extraction_review(self, ext, *, has_text: bool):
+    def _extraction_review(self, ext, *, content_quality: float | None = None, has_text: bool):
         """추출 결과 → (ExtractionReviewDecision, degrade_reasons[메트릭용]).
 
         빈 본문(no_text)은 requires_review 판정 대신 processing_status='failed'로 격리되므로
         여기서는 메트릭 reason 'empty'만 집계한다. 설정 미가용 시 합리적 기본(0.6 / OCR 검수).
+        content_quality=전처리 콘텐츠 기반 품질(pre.quality) — 메서드 고정 품질이 못 잡는 얇은/깨진
+        본문을 보완 포착한다.
         """
         try:
             from lloydk.config import settings  # noqa: PLC0415
@@ -262,6 +281,7 @@ class DocumentIngestionService:
             error=(ext.error if ext else None),
             min_quality=min_q,
             ocr_requires_review=ocr_req,
+            content_quality=content_quality,
         )
         return decision, list(decision.reasons)
 

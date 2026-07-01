@@ -8,9 +8,6 @@
 
 from __future__ import annotations
 
-import pytest
-from prometheus_client import generate_latest
-
 from lloydk.api.prom_metrics import registry
 from lloydk.modules.m2_preprocess.extractor import ExtractResult
 from lloydk.modules.m2_preprocess.pipeline import PreprocessResult
@@ -63,6 +60,43 @@ def test_boundary_quality_at_threshold_passes():
     # quality == min_quality 는 통과(미만일 때만 라우팅).
     d = extraction_review_decision(
         quality=0.6, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True
+    )
+    assert d.requires_review is False
+
+
+# ── 콘텐츠 기반 품질 보완(메서드 고정 품질이 못 잡는 얇은/깨진 본문) ─────────────
+
+def test_thin_content_routes_despite_high_method_quality():
+    # docx 메서드 품질 0.97(고정)이지만 콘텐츠가 얇음(0.2, <50자/깨짐) → 검수 라우팅.
+    d = extraction_review_decision(
+        quality=0.97, ocr_used=False, error=None, min_quality=0.6,
+        ocr_requires_review=True, content_quality=0.2,
+    )
+    assert d.requires_review is True and d.reasons == ["low_quality"]
+
+
+def test_english_clean_content_not_over_routed():
+    # 영어 클린 문서는 한글가중 부재로 콘텐츠 품질 ~0.5 → 얇음(0.3) 임계 미달 = 과라우팅 안 함.
+    d = extraction_review_decision(
+        quality=0.95, ocr_used=False, error=None, min_quality=0.6,
+        ocr_requires_review=True, content_quality=0.5,
+    )
+    assert d.requires_review is False and d.reasons == []
+
+
+def test_low_quality_reason_not_duplicated():
+    # 메서드 저품질 + 얇은 콘텐츠가 동시에 성립해도 low_quality 사유는 1개만.
+    d = extraction_review_decision(
+        quality=0.4, ocr_used=False, error=None, min_quality=0.6,
+        ocr_requires_review=True, content_quality=0.1,
+    )
+    assert d.reasons == ["low_quality"]
+
+
+def test_content_quality_default_none_preserves_behavior():
+    # content_quality 미지정(기본 None) = 기존 동작 보존.
+    d = extraction_review_decision(
+        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True
     )
     assert d.requires_review is False
 
