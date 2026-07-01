@@ -314,11 +314,11 @@ CLASSIFY_CORRECT_TOTAL = Counter(
     registry=registry,
 )
 # [P1-obs] 서빙 등급 분포 — 분류 결과 등급별 카운터(kpi-v2 '분류 등급 분포' 패널 백킹).
-# CLASSIFY_TOTAL 과 동일하게 정의만: 증가 배선은 서빙 outcome 카운터(핫패스) P1에서 함께 붙인다
-# (registry에 정의돼 있어야 대시보드 쿼리가 유효 — 미정의 참조 no-data 를 먼저 없앤다).
+# ClassifyService._record_grade가 classify 반환 등급마다 1회 증가(배선 완료). 라이브 FNR
+# (CLASSIFY_TOTAL/CORRECT)과 달리 정답 불요한 단순 예측 분포라 서빙 시점에 정직하게 채워진다.
 CLASSIFY_GRADE_TOTAL = Counter(
     "lloydk_classify_grade_total",
-    "Classifications by resulting grade (serving grade distribution; wiring pending — serving outcome counter)",
+    "Classifications by resulting grade (serving grade distribution; wired in ClassifyService._record_grade)",
     ["grade"],  # TS | S1 | S2 | S3
     registry=registry,
 )

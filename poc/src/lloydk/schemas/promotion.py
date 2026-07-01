@@ -50,6 +50,11 @@ class PromoteResponse(BaseModel):
     status: str = Field(
         description="promoted | already_promoted | not_promotable | mismatch"
     )
+    # [confirm/relabel 계약 정합] 검증라벨이 실제 DB에 영속됐는지 — 무음 성공 제거.
+    # True = promoted(신규 upsert) 또는 already_promoted(기존 검증라벨 유지). False =
+    # not_promotable(admissible 교정 없음 or DB 미가용 "persistence skipped" 경고)·mismatch.
+    # DB 미가용과 정상 not_promotable은 status가 같으므로 warnings로 구분(persistence skipped 접두).
+    persisted: bool = False
     promoted_label: Optional[Grade] = None
     labeler_id: Optional[str] = Field(
         default=None, description="검증라벨에 기록된 등급 결정 검수자(corrected_by)"

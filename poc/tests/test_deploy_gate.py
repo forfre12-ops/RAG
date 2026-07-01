@@ -70,6 +70,23 @@ def test_floor_ignored_when_baseline_present():
     assert not any(c.name == "first_deploy_fnr_floor" for c in dec.checks)
 
 
+# ── [게이트=가시성] 외부팩트 신호(앵커·메타모픽) OFF 상태 명시 ────────────────────
+
+
+def test_external_fact_signals_visible_when_absent():
+    # 앵커·메타모픽 리포트 미제공(기본 OFF) → 통과하되 '미수행'을 checks에 명시(무음 통과 방지).
+    dec = evaluate_deploy_gate(_report(fnr_high=0.03, f1_macro=0.85), None)
+    assert dec.passed is True
+    names = {c.name for c in dec.checks}
+    assert "anchor_eval_skipped" in names
+    assert "metamorphic_eval_skipped" in names
+    # 스킵 정보성 check는 통과를 막지 않는다(강제 ON 아님 — 비용/경로 opt-in).
+    assert all(c.passed for c in dec.checks if c.name.endswith("_eval_skipped"))
+    # 리포트 없으니 실제 검사 이름은 부재(이중 계상 없음).
+    assert not any(c.name == "anchor_high_grade_miss" for c in dec.checks)
+    assert not any(c.name == "metamorphic_forward_regression" for c in dec.checks)
+
+
 # ── fnr_high 회귀 차단 (미탐 악화) ───────────────────────────────────────────
 
 

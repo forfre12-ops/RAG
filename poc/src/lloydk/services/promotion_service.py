@@ -309,6 +309,8 @@ def to_promote_response(result: PromoteResult) -> PromoteResponse:
     return PromoteResponse(
         doc_id=result.doc_id,
         status=result.status,
+        # 검증라벨이 실제 DB에 존재하는 종단상태만 persisted=True(무음 성공 제거).
+        persisted=result.status in ("promoted", "already_promoted"),
         promoted_label=result.promoted_label,
         labeler_id=result.labeler_id,
         warnings=list(result.warnings),

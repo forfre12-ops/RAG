@@ -169,6 +169,7 @@ class ClassifyService:
                     f" cannot classify; fail-SECURE isolating at highest grade"
                     f" ({top_grade}) and routing to human_review (never defaults to public/S3)"
                 ]
+                self._record_grade(top_grade)
                 return ClassifyResponse(
                     inference_id=uuid.uuid4(),
                     doc_id=req.doc_id,
@@ -214,6 +215,7 @@ class ClassifyService:
                     inference_id=inference_id,
                 )
                 notify("finalize")
+                self._record_grade(verified_label.level_code)
                 return ClassifyResponse(
                     inference_id=inference_id,
                     doc_id=req.doc_id,
@@ -339,6 +341,7 @@ class ClassifyService:
                 req.doc_id, inference_id, pred.label, float(pred.confidence), status,
             )
 
+            self._record_grade(pred.label)
             return ClassifyResponse(
                 inference_id=inference_id,
                 doc_id=req.doc_id,
@@ -429,6 +432,22 @@ class ClassifyService:
                 SERVING_GATE_FAIL_OPEN_TOTAL,
             )
             SERVING_GATE_FAIL_OPEN_TOTAL.labels(gate=gate).inc()
+        except Exception:  # noqa: BLE001
+            pass
+
+    @staticmethod
+    def _record_grade(label) -> None:
+        """[obs] 서빙 등급 분포 카운터 — classify가 반환하는 최종 등급을 1건당 1회 증가.
+
+        kpi-v2 '분류 등급 분포' 패널 백킹. 라이브 FNR(정답 필요·미배선)과 달리 정답이 불요한
+        단순 예측 분포라 정직하게 배선 가능하다. fail-SECURE 격리(본문 미판독→최고등급)·검증라벨
+        경로도 '반환된 등급'이라 포함 — 저장장애發 고등급 격리 급증도 이 분포에 보인다.
+        best-effort: 메트릭 실패는 분류 경로 무영향.
+        """
+        try:
+            from lloydk.api.prom_metrics import CLASSIFY_GRADE_TOTAL  # noqa: PLC0415
+            grade = label.value if hasattr(label, "value") else str(label)
+            CLASSIFY_GRADE_TOTAL.labels(grade=grade).inc()
         except Exception:  # noqa: BLE001
             pass
 

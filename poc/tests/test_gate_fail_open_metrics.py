@@ -25,6 +25,32 @@ def test_record_gate_fail_open_increments():
         assert _gate_val(g) == before + 1
 
 
+def test_record_grade_increments_distribution():
+    # [P1-obs] 서빙 등급 분포 카운터 배선 — enum·str 양쪽 등급을 1회 증가(kpi-v2 등급분포 패널).
+    def _gv(g):
+        return pm.CLASSIFY_GRADE_TOTAL.labels(grade=g)._value.get()
+
+    before_ts = _gv("TS")
+    ClassifyService._record_grade(Grade.TS)   # enum 입력
+    ClassifyService._record_grade("S1")        # str 입력(fail-secure top_grade 경로)
+    assert _gv("TS") == before_ts + 1
+    assert _gv("S1") >= 1
+
+
+def test_record_grade_best_effort(monkeypatch):
+    # 메트릭 import 실패해도 예외 전파 없음(분류 경로 무영향).
+    import builtins
+    real = builtins.__import__
+
+    def _boom(name, *a, **k):
+        if name == "lloydk.api.prom_metrics":
+            raise ImportError("x")
+        return real(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", _boom)
+    ClassifyService._record_grade(Grade.S2)  # 예외 없으면 통과
+
+
 def test_record_gate_fail_open_best_effort(monkeypatch):
     # 메트릭 레지스트리 import 실패해도 예외 전파 없음(분류 경로 무영향).
     import builtins

@@ -335,6 +335,15 @@ def evaluate_deploy_gate(
                 f"INCONCLUSIVE는 측정불가 — 자동활성 veto는 locked-eval 소관)",
                 a["worst_underclass_fnr"],
             ))
+    else:
+        # [게이트=가시성] 앵커 미제공(deploy_gate_anchor_eval_enabled=False 기본 또는 리포트 부재)
+        # 이면 외부 사실 미탐 검사를 **하지 않았음**을 명시 기록 — 통과 결정이 '외부 사실을 본 적
+        # 없음'을 무음으로 숨기지 않게 한다. passed=True(강제 ON 아님 — 앵커는 CPU 추론비용 opt-in).
+        checks.append(GateCheck(
+            "anchor_eval_skipped", True,
+            "앵커(외부 사실) 리포트 미제공 — 고등급 미탐 앵커 검사 미수행. 게이트는 합성/기준 "
+            "지표만으로 판정(외부 사실 신호 부재 가시화; 운영 자동활성 veto는 locked-eval 소관).",
+        ))
 
     # ── 5. 메타모픽 순방향 회귀 (문체만 바꿔도 등급↓ = 미탐 — 실패만 정보) ─────────────
     if metamorphic_report is not None:
@@ -362,6 +371,14 @@ def evaluate_deploy_gate(
                 "metamorphic_forward_regression", True,
                 f"메타모픽 순방향 미탐 회귀 없음(위반 {m['violations']}/{m['n']}, CI하한={m['ci_low']:.4f})",
             ))
+    else:
+        # [게이트=가시성] 메타모픽 미제공(deploy_gate_metamorphic_report_path 미설정 기본)이면
+        # 문체변경 순방향 미탐 회귀 검사를 미수행 — 통과가 이 신호 부재 하 판정임을 명시.
+        checks.append(GateCheck(
+            "metamorphic_eval_skipped", True,
+            "메타모픽 리포트 미제공 — 문체변경 순방향 미탐 회귀 검사 미수행. 게이트 통과는 이 "
+            "외부 회귀신호 부재 하에서의 판정임을 가시화(강제 아님 — 리포트 경로 opt-in).",
+        ))
 
     passed = all(c.passed for c in checks)
     failed = [c.name for c in checks if not c.passed]

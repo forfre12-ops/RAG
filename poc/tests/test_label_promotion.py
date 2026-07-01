@@ -64,6 +64,18 @@ def test_to_promote_response_roundtrip():
     assert resp.promoted_label == Grade.S1
     assert resp.labeler_id == "qa_human"
     assert resp.warnings == ["w1"]
+    assert resp.persisted is True  # promoted = DB 영속 종단상태
+
+
+def test_promote_response_surfaces_persisted():
+    # [confirm/relabel 계약 정합] 검증라벨 실제 영속 여부 표면화(무음 성공 제거).
+    def _p(status, label=None):
+        return to_promote_response(PromoteResult("d", status, label, None, [])).persisted
+
+    assert _p("promoted", Grade.S2) is True          # 신규 upsert
+    assert _p("already_promoted", Grade.S2) is True   # 기존 검증라벨 유지(영속됨)
+    assert _p("not_promotable") is False              # admissible 교정 없음 or DB미가용
+    assert _p("mismatch", Grade.S2) is False          # race 가드(미영속)
 
 
 def test_try_uuid():

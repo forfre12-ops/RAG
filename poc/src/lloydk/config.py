@@ -200,6 +200,11 @@ class Settings(BaseSettings):
     # env: AUDIT_CHAIN_SECRET(필드명) 또는 LLOYDK_AUDIT_CHAIN_SECRET(audit_chain._chain_secret
     # os.getenv 폴백 + secrets_manager 후보) — 둘 중 하나면 충분.
     audit_chain_secret: str = ""
+    # [L-audit-noalarm] 고위험 변경성 액션(confirm/relabel/train/ingest/guide/upload/delete)의
+    # audit 기록 실패 시 fail-closed(503으로 차단) 여부. 기본 False=비파괴(요청 진행+메트릭·경고만).
+    # middleware._fail_closed_enabled가 이 필드 우선, 없으면 env LLOYDK_AUDIT_FAIL_CLOSED_HIGH_RISK
+    # 폴백. (과거 이 필드가 Settings에 없어 문서화된 설정 토글이 no-op였고 env만 동작했다 — 실 필드화.)
+    audit_fail_closed_high_risk: bool = False
 
     # --- DB 커넥션 풀 (운영 동시성) ---
     # 기본 5+10=15는 dev용. 운영은 동시 요청 수에 맞춰 DB_POOL_SIZE/DB_MAX_OVERFLOW 조정.

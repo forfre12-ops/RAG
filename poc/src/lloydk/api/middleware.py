@@ -67,8 +67,8 @@ _HIGH_RISK_ACTIONS: frozenset[str] = frozenset(
 def _fail_closed_enabled() -> bool:
     """고위험 액션 audit 실패 시 fail-closed 여부. 기본 off(비파괴).
 
-    settings.audit_fail_closed_high_risk 우선, 없으면 env
-    LLOYDK_AUDIT_FAIL_CLOSED_HIGH_RISK 폴백(설정 필드 추가 전에도 운영 토글 가능).
+    settings.audit_fail_closed_high_risk(실 필드) 우선, 없으면 env
+    LLOYDK_AUDIT_FAIL_CLOSED_HIGH_RISK 폴백(컨테이너 재빌드 없이 운영 토글).
     """
     import os  # noqa: PLC0415
     try:
