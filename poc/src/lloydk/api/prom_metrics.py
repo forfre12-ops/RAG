@@ -313,6 +313,15 @@ CLASSIFY_CORRECT_TOTAL = Counter(
     "Ground-truth-correct classifications (numerator for live FNR; not yet wired)",
     registry=registry,
 )
+# [P1-obs] 서빙 등급 분포 — 분류 결과 등급별 카운터(kpi-v2 '분류 등급 분포' 패널 백킹).
+# CLASSIFY_TOTAL 과 동일하게 정의만: 증가 배선은 서빙 outcome 카운터(핫패스) P1에서 함께 붙인다
+# (registry에 정의돼 있어야 대시보드 쿼리가 유효 — 미정의 참조 no-data 를 먼저 없앤다).
+CLASSIFY_GRADE_TOTAL = Counter(
+    "lloydk_classify_grade_total",
+    "Classifications by resulting grade (serving grade distribution; wiring pending — serving outcome counter)",
+    ["grade"],  # TS | S1 | S2 | S3
+    registry=registry,
+)
 
 # 교정(correction) 발생률 — direction별(confirm/underclass/overclass/lateral) 실시간 카운터.
 # underclass = 모델이 비밀을 낮게 본 것을 사람이 올린 것(보안 미탐 신호) → 자동확정 품질·

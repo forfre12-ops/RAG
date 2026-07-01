@@ -8,6 +8,7 @@ outbox_dlq_total·pii_masked_total·documents_ingested_total)이 정의 0건이�
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -165,3 +166,35 @@ def test_no_alert_references_undefined_metric():
         m for m in refs if f'"{m}"' not in src and m not in middleware_defined
     )
     assert not missing, f"alert 가 정의되지 않은 메트릭 참조(no-data 위험): {missing}"
+
+
+# ── [P1] Grafana 대시보드 ↔ registry 정합(3자 정합의 대시보드 축) ─────────────────
+# kpi-v2.json 이 registry에 없는 메트릭 5종(active_learning 오타·classify_grade·outbox_pending_total·
+# review_action)을 참조해 5패널 영구 no-data 였다. alert 축(위)과 동일 실패모드를 대시보드 축에서도
+# 사전 차단한다 — 대시보드가 정의되지 않은 메트릭을 참조하면 CI에서 fail.
+_DASHBOARDS = Path(__file__).resolve().parents[1] / "infra/observability/grafana/dashboards"
+
+
+def test_grafana_dashboards_reference_only_defined_metrics():
+    src = (Path(__file__).resolve().parents[1] / "src/lloydk/api/prom_metrics.py").read_text(
+        encoding="utf-8"
+    )
+    middleware_defined = {
+        "lloydk_requests_total",
+        "lloydk_request_duration_seconds_bucket",
+        "lloydk_request_duration_seconds",
+        "lloydk_requests_in_progress",
+    }
+    files = sorted(_DASHBOARDS.glob("*.json"))
+    assert files, "Grafana 대시보드 JSON 없음"
+    problems: dict[str, list[str]] = {}
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        json.loads(text)  # 유효 JSON 보장
+        refs = set(re.findall(r"lloydk_[a-z_]+", text))
+        missing = sorted(
+            m for m in refs if f'"{m}"' not in src and m not in middleware_defined
+        )
+        if missing:
+            problems[f.name] = missing
+    assert not problems, f"대시보드가 미정의 메트릭 참조(no-data 위험): {problems}"
