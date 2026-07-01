@@ -5,6 +5,8 @@
 (정본 classification_gold.jsonl 직접변경 금지 — golden_runs/<run_id>/ 에만 기록).
 
 기본은 로컬 Ollama(생성=qwen3:14b / 심판=gemma3:12b, 생성기와 독립 모델).
+[B-1] 섀도 심판(production_suspect 교차검증)도 기본 ON=Qwen(qwen3:14b, 심판 gemma와 독립).
+심판이 놓칠 배포 실패 위험을 섀도 불일치로 review에 라우팅한다(옛 기본 None=안전장치 no-op). --no-shadow로 off.
 합성 빌드라 require_evidence=False가 기본(룰 시드 부재 no_evidence 탈락 완화·레버3).
 운영 게이트(require_evidence=True)와 구분 — 본 러너 산출은 silver(학습 후보)일 뿐
 평가정답(locked_gold_eval)이 아니다(사람 서명이 진실).
@@ -40,6 +42,24 @@ def _provider(base_url: str, model: str, label: str):
     from lloydk.adapters.llm.local_openai_provider import LocalOpenAIProvider
     return LocalOpenAIProvider(base_url=base_url, api_key="ollama", model=model,
                                enable_thinking=False, provider_label=label)
+
+
+def _resolve_shadow_model(shadow_model, judge_model, log):
+    """[B-1] 섀도 심판 모델 확정 — production_suspect(배포 실패 예측) 교차검증용.
+
+    섀도는 주 심판과 **독립**이어야 신호가 있다. 심판과 동일하면 자기합의라
+    shadow_grade==llm_grade가 강제돼 production_suspect가 절대 발화하지 못한다(무의미) →
+    비활성(경고). 빈 값이면 섀도 없음. 기본은 온프렘 Qwen으로 켜 둔다(제품
+    judge_shadow_provider='vllm' 규약과 정합) — 옛 스크립트 기본 None은 안전장치가
+    no-op이었다(섀도 없으면 production_suspect 상시 False).
+    """
+    if not shadow_model:
+        return None
+    if shadow_model == judge_model:
+        log(f"  [shadow] 섀도({shadow_model})가 심판과 동일 — 자기합의라 "
+            f"production_suspect 신호 0 → 비활성")
+        return None
+    return shadow_model
 
 
 def generate_docs(gen_model, base_url, grades, per_grade, len_min, len_max, log, run_dir):
@@ -142,7 +162,10 @@ def main(argv=None):
     ap.add_argument("--grades", default="TS,S1,S2,S3")
     ap.add_argument("--gen-model", default="qwen3:14b", help="생성 모델(Ollama)")
     ap.add_argument("--judge-model", default="gemma3:12b", help="심판 모델(생성기와 독립)")
-    ap.add_argument("--shadow-model", default=None, help="섀도 모델(production_suspect 교차검증; 없으면 생략)")
+    ap.add_argument("--shadow-model", default="qwen3:14b",
+                    help="섀도 심판 모델(production_suspect 교차검증; 기본 ON=Qwen). 심판과 동일하면 자동 비활성")
+    ap.add_argument("--no-shadow", action="store_true",
+                    help="섀도 심판 비활성(비용 절감·교차검증 포기). 기본은 ON")
     ap.add_argument("--base-url", default="http://localhost:11434/v1")
     ap.add_argument("--out-dir", default="poc/datasets/golden_runs")
     ap.add_argument("--require-evidence", action="store_true",
@@ -165,6 +188,11 @@ def main(argv=None):
     def log(msg):
         # ascii-safe 진행 로그(cp949 콘솔에서 한글 깨질 수 있어 stderr+flush; 핵심 수치는 stats.json)
         print(msg, file=sys.stderr, flush=True)
+
+    # [B-1] 섀도 심판 기본 ON — production_suspect 교차검증 활성화(옛 기본 None=안전장치 no-op였음).
+    # --no-shadow로 끄거나, 섀도==심판이면 자기합의라 자동 비활성.
+    shadow_model = None if args.no_shadow else _resolve_shadow_model(
+        args.shadow_model, args.judge_model, log)
 
     # --build-from: 기존 run_dir 재사용(생성 건너뜀). 아니면 새 run_dir 생성 후 증분 생성.
     if args.build_from:
@@ -194,7 +222,7 @@ def main(argv=None):
 
     t1 = time.time()
     result, judge_fail = build(docs, args.judge_model, args.base_url, require_evidence,
-                               args.k_min, args.k_max, args.shadow_model, args.temperature, log)
+                               args.k_min, args.k_max, shadow_model, args.temperature, log)
     build_s = round(time.time() - t1, 1)
 
     # 등급별 gold 수율(intended 기준).
@@ -206,7 +234,7 @@ def main(argv=None):
     meta = {
         "run_id": run_id, "grades": grades, "per_grade": per_grade,
         "gen_model": args.gen_model, "judge_model": args.judge_model,
-        "shadow_model": args.shadow_model, "require_evidence": require_evidence,
+        "shadow_model": shadow_model, "require_evidence": require_evidence,
         "k_min": args.k_min, "k_max": args.k_max, "temperature": args.temperature,
         "generated": len(docs), "gen_fail": gen_fail, "judge_fail": judge_fail, "pii_hits": pii_hits,
         "gen_seconds": gen_s, "build_seconds": build_s,
