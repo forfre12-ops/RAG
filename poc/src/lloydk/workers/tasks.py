@@ -449,13 +449,17 @@ def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
     drift_monitor.run_drift_check가 train centroid + 최근 운영 표본을 비교하고
     Prometheus gauge에 직접 set. alert=True면 알람 룰이 페이지.
     """
-    from lloydk.services.drift_monitor import run_drift_check
+    from lloydk.services.drift_monitor import export_to_prometheus, run_drift_check
     report = run_drift_check(limit=limit, threshold=threshold)
     out = report.to_dict()
     logger.info(
         "drift_tick: sample=%d kl=%.4f cosine_mean=%.4f alert=%s",
         report.sample_size, report.kl_divergence, report.cosine_mean, report.alert,
     )
+    # [P0 관측성] 워커→API 브리지: DRIFT_* 게이지는 워커 레지스트리(비스크랩)에만 set 되므로
+    # exposition 을 Redis 에 게시 → API _refresh_drift_gauges 가 읽어 재노출(best-effort).
+    from lloydk.services.worker_metrics_bridge import DRIFT_REPORT, publish_signal
+    publish_signal(DRIFT_REPORT, export_to_prometheus(report))
     return out
 
 
@@ -472,6 +476,16 @@ def verify_audit_chain_tick(limit: int = 100000) -> dict:
         "verify_audit_chain_tick: total=%d verified=%d broken=%d first_break=%s",
         res.total_rows, res.verified, res.broken, res.first_break_audit_id,
     )
+    # [P0 관측성] 워커→API 브리지: AUDIT_CHAIN_BROKEN_TOTAL 은 워커 레지스트리(비스크랩)에만
+    # inc 되므로 authoritative full-scan 결과를 Redis 에 게시 → API _refresh_audit_integrity_gauges
+    # 가 읽어 현재-상태 게이지로 재노출(P0 AuditChainBroken 알람이 실제로 발화하게 함).
+    from lloydk.services.worker_metrics_bridge import AUDIT_INTEGRITY, publish_signal
+    publish_signal(AUDIT_INTEGRITY, {
+        "broken": res.broken,
+        "nil_hash_rows": res.nil_hash_rows,
+        "integrity_ok": res.integrity_ok(),
+        "total_rows": res.total_rows,
+    })
     return {
         "total_rows": res.total_rows,
         "verified": res.verified,

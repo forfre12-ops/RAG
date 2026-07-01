@@ -98,8 +98,10 @@ groups:
           runbook: "doc/23 §6.5 worker scaling"
 
       - alert: OutboxDlqGrowing
-        # outbox DLQ 누적 변화율 양수 (실패 누적)
-        expr: increase(lloydk_outbox_dlq_total[15m]) > 0
+        # outbox DLQ 백로그 > 0 (배송 실패로 죽은 메시지 잔존).
+        # 워커-프로세스 카운터(lloydk_outbox_dlq_total)는 API 스크랩에 안 보여 영구 no-data 였다
+        # → API 가 공유 Redis stats 로 재노출하는 현재-상태 게이지로 전환(_refresh_outbox_gauges).
+        expr: lloydk_outbox_dlq_pending > 0
         for: 0m
         labels:
           severity: P2
@@ -128,8 +130,10 @@ groups:
           runbook: "doc/25 §5.3 PII 마스킹"
 
       - alert: AuditChainBroken
-        # C4 hash chain verification 실패
-        expr: lloydk_audit_chain_broken_total > 0
+        # C4 hash chain verification 실패 (변조 의심). 워커 tick(verify_audit_chain_tick)이
+        # authoritative full-scan → Redis 게시 → API 가 현재-상태 게이지로 재노출한다.
+        # (이전 lloydk_audit_chain_broken_total 카운터는 워커 레지스트리라 API 스크랩에서 영구 0.)
+        expr: lloydk_audit_chain_broken_rows > 0
         for: 0m
         labels:
           severity: P0
@@ -159,7 +163,8 @@ groups:
       - alert: AuditChainNilHash
         # payload_hash NULL/빈값 — 감사 미들웨어 우회(직접 DB 삽입) 또는 데이터 손실.
         # AuditChainBroken(체인 단절)과 별개의 무결성 신호. nil 근원 행은 break로 무음화될 수 있음.
-        expr: increase(lloydk_audit_chain_nil_hash_total[15m]) > 0
+        # 워커 tick 이 Redis 게시 → API 현재-상태 게이지로 재노출(워커 카운터는 API 무가시였음).
+        expr: lloydk_audit_chain_nil_hash_rows > 0
         for: 0m
         labels:
           severity: P1

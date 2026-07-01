@@ -243,6 +243,43 @@ OUTBOX_DLQ_TOTAL = Counter(
     registry=registry,
 )
 
+# ── [P0 관측성] 워커-프로세스 신호를 API 레지스트리에서 재파생하는 현재-상태 게이지 ──
+# 배경: 아래 신호들은 워커(Celery beat)에서만 계산·기록되는데 Prometheus 는 API(job=
+# lloydk-api) 프로세스만 스크랩한다 → 워커 레지스트리의 카운터/게이지는 API /metrics-prom 에
+# 영원히 0/미변경으로 노출(거짓 all-clear). 해결(_refresh_celery_queue_gauges 선례와 동일
+# 원칙): API 프로세스가 **공유 진실원천**(감사=Postgres 검증결과를 워커가 Redis 게시, outbox=
+# Redis stats, drift=워커가 Redis 게시)을 조회해 현재 상태를 게이지로 재노출한다. 카운터가
+# 아니라 게이지인 이유: 크로스-프로세스에서 단조 카운터를 재구성할 수 없고, 알람이 필요로 하는
+# 것은 '지금 깨졌는가'(현재 상태)이기 때문. broken/nil/dlq 는 기본 0(=안전) → 첫 신호 전까지
+# 거짓 경보 없음. integrity_ok 는 정보용(알람 미사용)이라 첫 tick 전 0(=unknown)이어도 무해.
+# 이름 주의: 게이지에 _rows 접미 — Counter "lloydk_audit_chain_broken_total"/"..._nil_hash_total"
+# 이 prometheus_client 에서 base name("...broken"/"...nil_hash")으로 등록돼 게이지와 충돌하기 때문.
+AUDIT_CHAIN_BROKEN = Gauge(
+    "lloydk_audit_chain_broken_rows",
+    "Current audit hash-chain breaks (re-derived by API from worker tick via Redis; 0=intact)",
+    registry=registry,
+)
+AUDIT_CHAIN_NIL_HASH = Gauge(
+    "lloydk_audit_chain_nil_hash_rows",
+    "Current audit rows with NULL/empty payload_hash (re-derived by API from worker tick)",
+    registry=registry,
+)
+AUDIT_CHAIN_INTEGRITY_OK = Gauge(
+    "lloydk_audit_chain_integrity_ok",
+    "1 if audit chain has no breaks and no nil-hash rows (info gauge; 0 before first tick)",
+    registry=registry,
+)
+OUTBOX_DLQ_PENDING = Gauge(
+    "lloydk_outbox_dlq_pending",
+    "Current webhook outbox DLQ backlog (re-derived by API from shared Redis; 0=empty)",
+    registry=registry,
+)
+OUTBOX_PENDING = Gauge(
+    "lloydk_outbox_pending",
+    "Current webhook outbox pending backlog (re-derived by API from shared Redis)",
+    registry=registry,
+)
+
 # Celery 큐 적체(큐별) — /metrics-prom 스크랩 시 redis LLEN 으로 best-effort 갱신(CeleryQueueBacklog).
 CELERY_QUEUE_LENGTH = Gauge(
     "lloydk_celery_queue_length",
@@ -537,6 +574,97 @@ def _refresh_celery_queue_gauges() -> None:
         _logger.debug("celery queue gauge refresh skipped: %s", exc)
 
 
+# ── [P0 관측성] 워커→API 신호 재노출 (순수 applier + best-effort refresher 분리) ──
+# applier 는 데이터→게이지 매핑만 하는 순수 함수(테스트 용이, guard/네트워크 무관).
+# refresher 는 공유 매체에서 데이터를 읽어 applier 를 호출(best-effort, 미가용 시 skip).
+
+_DRIFT_GAUGE_BY_NAME = {
+    "lloydk_drift_cosine_mean": DRIFT_COSINE_MEAN,
+    "lloydk_drift_cosine_std": DRIFT_COSINE_STD,
+    "lloydk_drift_kl_divergence": DRIFT_KL_DIVERGENCE,
+    "lloydk_drift_alert": DRIFT_ALERT,
+    "lloydk_drift_sample_size": DRIFT_SAMPLE_SIZE,
+}
+
+
+def _apply_audit_integrity(sig: dict) -> None:
+    """워커 감사체인 검증 신호(dict)를 현재-상태 게이지에 반영(순수)."""
+    AUDIT_CHAIN_BROKEN.set(float(sig.get("broken", 0) or 0))
+    AUDIT_CHAIN_NIL_HASH.set(float(sig.get("nil_hash_rows", 0) or 0))
+    AUDIT_CHAIN_INTEGRITY_OK.set(1.0 if sig.get("integrity_ok") else 0.0)
+
+
+def _apply_outbox_stats(stats: dict) -> None:
+    """outbox stats(dict)를 게이지에 반영(순수)."""
+    OUTBOX_DLQ_PENDING.set(float(stats.get("dlq", 0) or 0))
+    OUTBOX_PENDING.set(float(stats.get("pending", 0) or 0))
+
+
+def _apply_drift_report(sig: dict) -> None:
+    """워커 drift exposition(dict: 메트릭명→값)을 DRIFT_* 게이지에 반영(순수)."""
+    for name, gauge in _DRIFT_GAUGE_BY_NAME.items():
+        if name in sig:
+            try:
+                gauge.set(float(sig[name]))
+            except (TypeError, ValueError):
+                continue
+
+
+def _refresh_audit_integrity_gauges() -> None:
+    """감사체인 무결성 — 워커 tick 이 Redis 에 게시한 결과를 게이지로 재노출(P0).
+
+    verify_audit_chain_tick(워커)이 authoritative full-scan 결과를 게시 → 여기서 읽어
+    현재-상태 게이지 set. 신호 부재면 미변경(첫 tick 전에는 broken=0 안전 기본값 유지).
+    """
+    try:
+        from lloydk.services.worker_metrics_bridge import (  # noqa: PLC0415
+            AUDIT_INTEGRITY,
+            load_signal,
+        )
+
+        sig = load_signal(AUDIT_INTEGRITY)
+        if sig:
+            _apply_audit_integrity(sig)
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("audit integrity gauge refresh skipped: %s", exc)
+
+
+def _refresh_outbox_gauges() -> None:
+    """Webhook outbox DLQ/pending — API 에서 Redis(공유) stats() 직접 조회로 재노출.
+
+    outbox 카운터는 워커(deliver tick)에서만 inc → API 무가시. Redis STREAM/ZSET 은 워커와
+    공유되므로 stats() 가 크로스-프로세스 정확값(_refresh_celery_queue_gauges 동원리).
+    테스트에선 redis 연결 플래키 회피 위해 skip(applier 는 직접 단위테스트).
+    """
+    if _is_testing():
+        return
+    try:
+        from lloydk.services.outbox import get_outbox_store  # noqa: PLC0415
+
+        _apply_outbox_stats(get_outbox_store().stats())
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("outbox gauge refresh skipped: %s", exc)
+
+
+def _refresh_drift_gauges() -> None:
+    """임베딩 드리프트 — 워커 drift_tick 이 Redis 에 게시한 exposition 을 게이지로 재노출.
+
+    DRIFT_* 게이지는 워커에서 set → API 무가시. drift_tick 이 export_to_prometheus(report)
+    를 게시 → 여기서 메트릭명→값 dict 을 읽어 해당 게이지에 set. 부재면 미변경.
+    """
+    try:
+        from lloydk.services.worker_metrics_bridge import (  # noqa: PLC0415
+            DRIFT_REPORT,
+            load_signal,
+        )
+
+        sig = load_signal(DRIFT_REPORT)
+        if sig:
+            _apply_drift_report(sig)
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("drift gauge refresh skipped: %s", exc)
+
+
 def _refresh_business_gauges() -> None:
     """active_learning gauge를 호출 시점에 lazy 갱신.
 
@@ -566,6 +694,11 @@ def _refresh_business_gauges() -> None:
     _refresh_locked_readiness()
     # NEW-H2: Celery 큐 적체도 동반 갱신(best-effort, 독립 try).
     _refresh_celery_queue_gauges()
+    # [P0 관측성] 워커-프로세스 신호(감사체인·outbox DLQ·drift)를 공유 매체(Postgres/Redis)
+    # 에서 API 게이지로 재노출 — 워커 레지스트리 비스크랩으로 인한 '거짓 all-clear' no-data 해소.
+    _refresh_audit_integrity_gauges()
+    _refresh_outbox_gauges()
+    _refresh_drift_gauges()
 
 
 def _refresh_escalation_held() -> None:
