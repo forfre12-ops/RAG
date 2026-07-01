@@ -41,6 +41,33 @@ _METADATA_IPS = frozenset(
 _METADATA_HOSTS = frozenset({"metadata.google.internal", "metadata"})
 
 
+def _ip_block_reason(ip) -> Optional[str]:
+    """해석된 IP가 webhook 대상으로 부적합하면 사유 문자열, 아니면 None (SSRF 판정 단일 소스).
+
+    enqueue(리터럴 IP)·전송 시점(호스트명 해석 IP) 양쪽이 같은 규칙을 쓰게 한다. IPv4-mapped
+    IPv6는 내장 v4로 정규화. 항상 거부: loopback·메타데이터·link-local·reserved·unspecified·
+    multicast. 사설IP(RFC1918/4193)는 폐쇄망 정상 콜백이라 opt-in(outbox_block_private_ips)일 때만.
+    """
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        ip = mapped
+    if ip.is_loopback:
+        return "loopback"
+    if ip in _METADATA_IPS:
+        return "cloud-metadata"
+    if ip.is_link_local or ip.is_reserved or ip.is_unspecified or ip.is_multicast:
+        return "link-local/reserved/unspecified/multicast"
+    block_private = False
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+        block_private = bool(getattr(settings, "outbox_block_private_ips", False))
+    except Exception:  # noqa: BLE001
+        block_private = False
+    if block_private and ip.is_private:
+        return "private (outbox_block_private_ips)"
+    return None
+
+
 def _validate_target_url(target_url: str) -> None:
     """[QW SSRF] webhook 대상 URL 가드 — 부적합 시 ValueError(enqueue 차단).
 
@@ -69,29 +96,11 @@ def _validate_target_url(target_url: str) -> None:
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
-        ip = None  # 호스트명(IP 아님) — 전송 시점 해석
+        ip = None  # 호스트명(IP 아님) — 전송 시점에 _assert_send_target_safe가 해석 IP 재검사
     if ip is not None:
-        # IPv4-mapped IPv6(::ffff:169.254.169.254 등)는 내장 v4로 정규화 — 범주 판정 우회 차단.
-        mapped = getattr(ip, "ipv4_mapped", None)
-        if mapped is not None:
-            ip = mapped
-        if ip.is_loopback:
-            raise ValueError("outbox target_url loopback address not allowed")
-        # 항상 거부(opt-in 무관): 메타데이터·link-local·예약·미지정·멀티캐스트.
-        if ip in _METADATA_IPS:
-            raise ValueError("outbox target_url cloud-metadata address not allowed")
-        if ip.is_link_local or ip.is_reserved or ip.is_unspecified or ip.is_multicast:
-            raise ValueError(
-                "outbox target_url link-local/reserved/unspecified/multicast address not allowed (SSRF)"
-            )
-        block_private = False
-        try:
-            from lloydk.config import settings  # noqa: PLC0415
-            block_private = bool(getattr(settings, "outbox_block_private_ips", False))
-        except Exception:  # noqa: BLE001
-            block_private = False
-        if block_private and ip.is_private:
-            raise ValueError("outbox target_url private address blocked (outbox_block_private_ips)")
+        reason = _ip_block_reason(ip)
+        if reason:
+            raise ValueError(f"outbox target_url {reason} address not allowed (SSRF)")
 
 
 @dataclass
@@ -428,11 +437,53 @@ def deliver_once(
     return {"sent": sent, "failed": failed, "dlq": dlq, "ready": len(ready)}
 
 
+def _assert_send_target_safe(url: str) -> None:
+    """[SSRF/DNS-rebinding] 전송 직전 대상 URL을 재검증 — enqueue↔전송 시간차 우회 차단.
+
+    enqueue 가드(_validate_target_url)는 최초 문자열만 봤다: 호스트명이면 IP를 몰라 통과했고,
+    그 사이 DNS가 내부/메타데이터 IP로 리바인딩되면 우회됐다. 전송 직전 호스트명을 실제 해석해
+    **모든 결과 IP**를 _ip_block_reason으로 검사한다(하나라도 차단대역이면 거부). 리터럴 IP·스킴은
+    _validate_target_url이 재확인. 해석 실패는 거부(안전). 해석↔httpx 연결 사이 잔여 TOCTOU는
+    폐쇄망 위협모델상 수용(진짜 IP-pinning은 커스텀 transport 필요 — 별도).
+    """
+    import socket  # noqa: PLC0415
+    from urllib.parse import urlparse  # noqa: PLC0415
+
+    _validate_target_url(url)  # 스킴/호스트/리터럴IP·메타호스트 재확인
+    host = urlparse(url.strip()).hostname
+    if not host:
+        raise ValueError("outbox send target has no host")
+    try:
+        ipaddress.ip_address(host)
+        return  # 리터럴 IP — _validate_target_url이 이미 대역 검사함
+    except ValueError:
+        pass  # 호스트명 — 아래에서 해석해 IP 검사
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError as exc:
+        raise ValueError(f"outbox send target DNS resolve failed: {host} ({exc})") from exc
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            continue
+        reason = _ip_block_reason(ip)
+        if reason:
+            raise ValueError(
+                f"outbox send target {host} resolves to blocked {reason} address {addr} "
+                f"(DNS-rebinding SSRF)"
+            )
+
+
 def http_send_via_httpx(url: str, method: str, headers: dict, payload: dict) -> int:
-    """기본 송신자 — httpx 사용. 운영시 timeout/retry 정책 적용."""
+    """기본 송신자 — httpx. 전송 시점 SSRF 재검증(DNS 리바인딩)+리다이렉트/프록시 우회 차단."""
     import httpx  # type: ignore
 
-    with httpx.Client(timeout=10.0) as client:
+    _assert_send_target_safe(url)  # DNS 리바인딩 가드 — 해석 IP 재검사(enqueue 이후 변조 차단)
+    # follow_redirects=False: 30x로 내부/메타데이터로 재유도되는 우회 차단(명시 고정, 기본에 의존 안 함).
+    # trust_env=False: HTTP(S)_PROXY 등 환경 프록시를 통한 SSRF 우회 차단(웹훅은 대상에 직접 송신).
+    with httpx.Client(timeout=10.0, follow_redirects=False, trust_env=False) as client:
         resp = client.request(method, url, headers=headers, json=payload)
         return resp.status_code
 

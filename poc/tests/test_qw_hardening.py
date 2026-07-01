@@ -85,6 +85,66 @@ def test_ssrf_still_allows_normal_public_and_private(monkeypatch):
     _validate_target_url("http://172.16.3.4/cb")
 
 
+# [P1] 전송 시점 DNS 리바인딩 재검증 — enqueue↔전송 시간차에 호스트명이 내부/메타데이터 IP로
+# 리바인딩되는 우회를 _assert_send_target_safe가 해석 IP 재검사로 차단한다.
+import ipaddress  # noqa: E402
+import socket  # noqa: E402
+
+from lloydk.services.outbox import _assert_send_target_safe, _ip_block_reason  # noqa: E402
+
+
+def _fake_getaddrinfo(ip: str):
+    fam = socket.AF_INET6 if ":" in ip else socket.AF_INET
+    sockaddr = (ip, 0, 0, 0) if ":" in ip else (ip, 0)
+    return lambda host, port, *a, **k: [(fam, socket.SOCK_STREAM, 6, "", sockaddr)]
+
+
+def test_ip_block_reason_categories(monkeypatch):
+    from lloydk import config as cfg
+    monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", False, raising=False)
+    ipa = ipaddress.ip_address
+    assert _ip_block_reason(ipa("169.254.169.254")) is not None   # 메타데이터
+    assert _ip_block_reason(ipa("169.254.1.1")) is not None       # link-local
+    assert _ip_block_reason(ipa("127.0.0.1")) is not None         # loopback
+    assert _ip_block_reason(ipa("::ffff:169.254.169.254")) is not None  # v4-mapped 정규화
+    assert _ip_block_reason(ipa("93.184.216.34")) is None         # 공인 → 허용
+    assert _ip_block_reason(ipa("10.0.0.5")) is None              # 사설 기본 허용
+
+
+def test_send_target_blocks_rebinding_to_metadata(monkeypatch):
+    # enqueue는 공개 도메인으로 통과했지만 전송 시점 해석이 IMDS로 리바인딩 → 차단.
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("169.254.169.254"))
+    with pytest.raises(ValueError, match="rebinding|blocked|metadata|link-local"):
+        _assert_send_target_safe("https://webhook.attacker.example/cb")
+
+
+def test_send_target_blocks_rebinding_to_ipv6_metadata(monkeypatch):
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("fd00:ec2::254"))
+    with pytest.raises(ValueError):
+        _assert_send_target_safe("https://webhook.attacker.example/cb")
+
+
+def test_send_target_allows_public_resolution(monkeypatch):
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("93.184.216.34"))
+    _assert_send_target_safe("https://kl.example.com/webhook")  # 예외 없으면 통과
+
+
+def test_send_target_literal_metadata_blocked_without_dns(monkeypatch):
+    # 리터럴 메타데이터 IP는 getaddrinfo 없이 _validate_target_url이 차단(호출조차 안 감).
+    monkeypatch.setattr(socket, "getaddrinfo",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("resolve 불필요")))
+    with pytest.raises(ValueError):
+        _assert_send_target_safe("http://169.254.169.254/latest/meta-data/")
+
+
+def test_send_target_dns_failure_is_blocked(monkeypatch):
+    def _boom(*a, **k):
+        raise OSError("NXDOMAIN")
+    monkeypatch.setattr(socket, "getaddrinfo", _boom)
+    with pytest.raises(ValueError, match="resolve failed"):
+        _assert_send_target_safe("https://nonexistent.invalid/cb")
+
+
 def test_publish_rejects_bad_url_before_enqueue():
     store = InMemoryOutboxStore()
     with pytest.raises(ValueError):
