@@ -94,6 +94,9 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "storage_encryption_enabled": True,
         # 하드닝 운영 — 위 3개 안전 게이트가 꺼지면 startup 차단(게이트ON=가시성ON).
         "require_safety_gates": True,
+        # [obs] 실 임베더 필수 — HF 로드 실패 시 HashEmbedding 무음 폴백은 검색품질 급락(정확도
+        # 저하)이라 폐쇄망 실서빙에선 거부. 명시적 hash 요청(dryrun)은 영향 없음(폴백만 차단).
+        "require_real_embedder": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -113,6 +116,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "storage_encryption_enabled": True,
         # 하드닝 운영 — 위 3개 안전 게이트가 꺼지면 startup 차단(onprem-local과 동일).
         "require_safety_gates": True,
+        # [obs] 실 임베더 필수(onprem-local과 동일) — hash 무음 폴백 거부.
+        "require_real_embedder": True,
     },
 }
 
@@ -359,6 +364,11 @@ class Settings(BaseSettings):
     # assert_production_credentials가 startup을 차단(fail-clear) — 프로파일이 켜둔 안전장치를
     # .env override(=0)나 개별키 운영 누락으로 '게이트 OFF=무음' 상태로 띄우는 것을 막는다.
     require_safety_gates: bool = False
+    # [obs] 실 임베더 필수 — HF 임베딩 로드 실패 시 HashEmbedding 무음 폴백(검색품질 급락=정확도
+    # 저하)을 거부하고 명시적 실패(RuntimeError)한다. 기본 False(dryrun/오프라인·lite tier 동작 보존).
+    # onprem-local·full-train 프로파일이 True로 켠다. 명시적 hash 요청(force_hash/embedding_model=
+    # "hash")은 폴백이 아니므로 영향 없음 — build_embedder의 로드-실패 폴백 경로에서만 작동.
+    require_real_embedder: bool = False
 
     # 검증 라벨 내용해시(file_hash) 재사용 (기본 True). doc_id는 업로드마다 gen_random_uuid라
     # 유니크 → 같은 문서를 *재업로드*하면 새 doc_id가 되어, 기존 doc_id 기반 검증라벨 재사용

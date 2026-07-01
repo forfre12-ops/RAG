@@ -113,4 +113,13 @@ def build_embedder(model_name: str | None = None, *, force_hash: bool = False) -
             _logging.getLogger(__name__).debug(
                 "fallback metric increment skipped: %s", metric_exc
             )
+        # [require_real_embedder] 폐쇄망 실서빙(onprem/full)은 hash 무음 폴백(검색품질 급락)을
+        # 거부 — 무음 정확도 저하 대신 명시적 실패(fail-secure). 명시적 hash 요청(force_hash/
+        # name=="hash")은 위에서 이미 반환됐으므로 여기 도달=진짜 임베더를 원했는데 로드 실패뿐.
+        if getattr(settings, "require_real_embedder", False):
+            raise RuntimeError(
+                f"real embedder required but HF load failed for {name!r}: {exc}. "
+                "Refusing HashEmbedding fallback (require_real_embedder=True) — "
+                "fix the model/cache or explicitly request embedding_model='hash'."
+            ) from exc
         return HashEmbedding(dim=1024)

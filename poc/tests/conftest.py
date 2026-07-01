@@ -41,6 +41,12 @@ os.environ.setdefault("ENABLE_TRAINING", "true")
 # 실 백엔드 테스트(test_default_backend_is_pg 등)는 자체 delenv/setenv로 override.
 os.environ.setdefault("VECTOR_BACKEND", "inmemory")
 
+# 실 임베더 필수(require_real_embedder)는 운영 프로파일(onprem-local·full-train, 커밋된 .env)에서
+# True다. 테스트/CI는 실 HF 모델을 항상 받지 못하므로(model_download 미표시 테스트) hash 폴백이
+# 필요 — 이 프로덕션 하드닝을 중화(poc_mode fail-fast·VECTOR_BACKEND와 동일 패턴). 게이트 자체
+# 검증(test_embedding_fallback_gate)은 monkeypatch로 명시 활성해 독립 검사한다.
+os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
+
 _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
