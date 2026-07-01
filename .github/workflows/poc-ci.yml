@@ -240,6 +240,43 @@ jobs:
             doc/21_OSS_SBOM_보고서.html
           retention-days: 90  # doc/14 운영 전환 시 발주처 검수 첨부용
 
+  safety-gates:
+    # P0#5: 하드닝 운영 안전 게이트 강제(require_safety_gates)와 airgap 번들이 회귀하지 않는지
+    # CI 로 영속화. 이전엔 evaluate_safety_gates/assert_production_credentials 가 배선만 되고
+    # CI 검증 0건 → 하드닝 스프린트(338e3b6 등)가 조용히 되돌려져도 무방비였다.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'poc/pyproject.toml'
+
+      - name: Install base package (no heavy extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Safety-gate enforcement check (하드닝 프로파일 게이트ON + 강제로직 양/음성)
+        # 양성: onprem-local·full-train 기본값에 안전 게이트 OFF 0건.
+        # 음성: 게이트 하나를 env override(=0)로 끄면 반드시 startup 차단(must_raise=True).
+        run: python scripts/ci_check_safety_gates.py
+
+      - name: Airgap compose config validation (폐쇄망 번들 정합성)
+        # docker-compose.airgap.yml 이 문법·참조 정합한지(변수/서비스 해석). 드리프트 사전 차단.
+        # config 는 구조/참조만 검사(실 비밀 아님) — env_file: .env 참조 + ${POSTGRES_PASSWORD:?}
+        # 필수변수를 충족시키는 던져쓰기 .env 를 생성. CI 체크아웃엔 .env 부재가 정상(있으면 loud fail).
+        run: |
+          if [ -f .env ]; then echo "::error::unexpected .env present in CI checkout"; exit 1; fi
+          printf 'POSTGRES_PASSWORD=ci_placeholder_not_a_secret\nIMAGE_TAG=ci\n' > .env
+          docker compose -f docker-compose.airgap.yml config --quiet
+          rm -f .env
+
   test-lite:
     runs-on: ubuntu-latest
     defaults:

@@ -10,6 +10,9 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import lloydk.config as config_mod
@@ -117,6 +120,24 @@ def test_assert_blocks_hardened_with_gate_off() -> None:
         for k, v in snap.items():
             setattr(config_mod.settings, k, v)
         config_mod._SECRETS_FILLED = False
+
+
+def test_ci_safety_gate_script_passes() -> None:
+    """P0#5: CI 안전게이트 스크립트가 green 인지 — CI job 이 실행하는 그 스크립트를 그대로 구동.
+
+    스크립트가 rot(하드닝 프로파일 게이트 누락/강제 무력화)하면 여기서도 exit!=0 으로 잡힌다.
+    _env_file=None 으로 hermetic 하므로 로컬 .env 유무와 무관.
+    """
+    script = Path(__file__).resolve().parents[1] / "scripts" / "ci_check_safety_gates.py"
+    assert script.exists(), script
+    proc = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+    )
+    assert proc.returncode == 0, f"CI 안전게이트 스크립트 실패:\n{proc.stdout}\n{proc.stderr}"
 
 
 def test_assert_allows_non_hardened_with_gate_off() -> None:
