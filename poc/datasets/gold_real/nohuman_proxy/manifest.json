@@ -1,0 +1,94 @@
+{
+  "input_total": 777,
+  "proxy_eval": {
+    "count": 229,
+    "labels": {
+      "TS": 55,
+      "S1": 54,
+      "S2": 52,
+      "S3": 68
+    },
+    "label_source": {
+      "rule_llm_agreement": 43,
+      "codex_review": 19,
+      "public_definitive": 50,
+      "koipa_case_based": 81,
+      "nkt_designated": 36
+    },
+    "source_label": {
+      "codex_review": {
+        "TS": 19
+      },
+      "koipa_case_based": {
+        "S2": 41,
+        "S1": 40
+      },
+      "nkt_designated": {
+        "TS": 36
+      },
+      "public_definitive": {
+        "S3": 50
+      },
+      "rule_llm_agreement": {
+        "S3": 18,
+        "S2": 11,
+        "S1": 14
+      }
+    }
+  },
+  "silver_train_only": {
+    "count": 356,
+    "labels": {
+      "TS": 0,
+      "S1": 3,
+      "S2": 28,
+      "S3": 325
+    },
+    "label_source": {
+      "llm_judge_primary": 334,
+      "llm_judge_consensus": 22
+    },
+    "reasons": {
+      "regate_demoted:needs_review_no_evidence": 355,
+      "regate_demoted:needs_review_disagree": 1
+    }
+  },
+  "quarantine": {
+    "count": 192,
+    "labels": {
+      "TS": 0,
+      "S1": 13,
+      "S2": 152,
+      "S3": 27
+    },
+    "label_source": {
+      "llm_judge_primary": 186,
+      "llm_judge_consensus": 6
+    },
+    "reasons": {
+      "ts_downgrade_suspect": 37,
+      "public_or_ruling_labeled_high_risk_by_llm": 150,
+      "public_or_ruling_labeled_high_risk_by_llm+ts_downgrade_suspect": 5
+    }
+  },
+  "locked_gold_eval_count": 0,
+  "warning": "No human-review locked gold is created here. proxy_eval is only an automatic, no-human evaluation proxy.",
+  "train_text_overlap": {
+    "train": "datasets\\gold_real\\train_subset.jsonl",
+    "proxy_eval": {
+      "count": 63,
+      "total": 229,
+      "rate": 0.2751
+    },
+    "silver_train_only": {
+      "count": 356,
+      "total": 356,
+      "rate": 1.0
+    },
+    "quarantine": {
+      "count": 192,
+      "total": 192,
+      "rate": 1.0
+    }
+  }
+}
