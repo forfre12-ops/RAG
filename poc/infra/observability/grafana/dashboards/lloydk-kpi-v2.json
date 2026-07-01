@@ -114,6 +114,46 @@
         {"expr": "lloydk_outbox_pending", "refId": "A"},
         {"expr": "lloydk_outbox_dlq_pending", "refId": "B"}
       ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "서빙 열화 (rule-fallback / 영속화 실패)",
+      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum(rate(lloydk_rule_fallback_total[5m]))", "refId": "A"},
+        {"expr": "sum by (reason) (rate(lloydk_classify_persist_failure_total[5m]))", "refId": "B"}
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "서빙 게이트 발동 (metadata-floor / source-prior / similarity, action별)",
+      "gridPos": {"x": 12, "y": 24, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum by (action) (rate(lloydk_metadata_floor_applied_total[5m]))", "refId": "A"},
+        {"expr": "sum by (action) (rate(lloydk_source_prior_applied_total[5m]))", "refId": "B"},
+        {"expr": "sum by (action) (rate(lloydk_similarity_escalation_total[5m]))", "refId": "C"}
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "locked_gold_eval readiness (배포 준비 0/1 · 등급별 보유)",
+      "gridPos": {"x": 0, "y": 30, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "lloydk_locked_eval_ready", "refId": "A"},
+        {"expr": "sum by (grade) (lloydk_locked_eval_per_grade)", "refId": "B"}
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "고등급 이중검토 보류 (escalation held, 등급별)",
+      "gridPos": {"x": 12, "y": 30, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum by (grade) (lloydk_escalation_held)", "refId": "A"}
+      ]
     }
   ]
 }

@@ -115,6 +115,40 @@ def test_safety_gate_alert_group_present():
     } <= names
 
 
+def test_degrade_visibility_alert_group_present():
+    """서빙 열화·게이트 발동 신호 경보 그룹 — 정의된 메트릭을 능동 경보로 승격했는지 잠금."""
+    groups = _load_alert_groups()
+    assert "lloydk-degrade-visibility" in groups, "열화 가시화 경보 그룹 누락"
+    names = {r["alert"] for r in groups["lloydk-degrade-visibility"]["rules"]}
+    assert {
+        "ServingRuleFallbackActive",
+        "ClassifyPersistFailure",
+        "SourcePriorCapConflict",
+        "MetadataFloorAccessConflict",
+    } <= names
+
+
+def test_degrade_visibility_alert_series_present_in_exposition():
+    """열화 경보가 참조하는 정확한 시계열 이름이 실제로 노출되는지 — 라벨 child materialize."""
+    from lloydk.api.prom_metrics import (
+        CLASSIFY_PERSIST_FAILURE_TOTAL,
+        METADATA_FLOOR_APPLIED_TOTAL,
+        RULE_FALLBACK_TOTAL,
+        SOURCE_PRIOR_APPLIED_TOTAL,
+    )
+
+    RULE_FALLBACK_TOTAL.inc(0)
+    CLASSIFY_PERSIST_FAILURE_TOTAL.labels(reason="db_error").inc(0)
+    SOURCE_PRIOR_APPLIED_TOTAL.labels(action="cap_conflict").inc(0)
+    METADATA_FLOOR_APPLIED_TOTAL.labels(action="access_conflict").inc(0)
+
+    expo = generate_latest(registry).decode()
+    assert "lloydk_rule_fallback_total" in expo
+    assert 'lloydk_classify_persist_failure_total{reason="db_error"}' in expo
+    assert 'lloydk_source_prior_applied_total{action="cap_conflict"}' in expo
+    assert 'lloydk_metadata_floor_applied_total{action="access_conflict"}' in expo
+
+
 def test_safety_gate_alert_series_present_in_exposition():
     """경보가 참조하는 정확한 시계열 이름이 실제로 노출되는지 — 라벨 child materialize."""
     from lloydk.api.prom_metrics import (

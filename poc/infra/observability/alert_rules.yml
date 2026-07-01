@@ -235,3 +235,54 @@ groups:
         annotations:
           summary: "고등급 이중검토 보류 > 20 (30m 지속) — 검수 병목/인원 확인"
           runbook: "doc/11 §2.4 — 보류큐 소진/검수자 배치"
+
+  # ── 서빙 열화·게이트 발동 신호 (게이트=가시성) ──────────────────────────────────
+  # 아래 메트릭들은 prom_metrics 에 정의·계측돼 있으나 alert 도 대시보드도 없어, 운영자가
+  # 존재를 알고 직접 쿼리해야만 보이는 '수동 상태'였다(감사 지적: ~30종 미노출). 고신호·저오탐
+  # 항목만 능동 경보로 승격한다(예상되는 정상 발동 — OCR 검수·locked 미충족·escalation 라우팅 —
+  # 은 대시보드 소관이라 여기서 제외해 알람 노이즈를 만들지 않는다).
+  - name: lloydk-degrade-visibility
+    interval: 1m
+    rules:
+      - alert: ServingRuleFallbackActive
+        # 학습 가중치 미로드 → rule-fallback-v0 로 서빙 = ML 분류가 실질 비활성(전부 룰 판정).
+        # 모델 로딩 실패/경로 미설정의 강한 신호(운영 full 모드에선 정상 발생 없음).
+        expr: increase(lloydk_rule_fallback_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "서빙이 rule-fallback-v0 로 열화 — 모델 가중치 미로드 의심 (분류 품질 급락)"
+          runbook: "doc/23 §6.6 — 모델 로딩/경로(classifier_model_dir) 확인"
+
+      - alert: ClassifyPersistFailure
+        # classify 결과 DB 영속화 실패 → inference_id 가 임시 UUID 로 대체(감사/교정 추적 단절).
+        expr: sum by (reason) (increase(lloydk_classify_persist_failure_total[15m])) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "분류 결과 영속화 실패 ({{ $labels.reason }}) — DB 연결/정합성 확인"
+          runbook: "doc/25 §9 — DB 가용성 점검"
+
+      - alert: SourcePriorCapConflict
+        # 공개출처인데 예측 등급이 S3 cap 과 충돌 = 비공지성 위반 의심(검수 라우팅).
+        # capped(정상 cap)는 제외하고 cap_conflict(충돌)만 경보 — 오탐 최소.
+        expr: increase(lloydk_source_prior_applied_total{action="cap_conflict"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "비공지성(source-prior) cap 충돌 — 공개출처가 고등급 예측됨, 라벨/출처 확인"
+          runbook: "doc/11 §2 안전 게이트 — 출처·등급 재확인"
+
+      - alert: MetadataFloorAccessConflict
+        # ICD access_scope 와 예측 등급이 충돌해 검수 라우팅됨(메타데이터 floor 게이트).
+        # raised(정상 floor 상향)는 제외, access_conflict(충돌)만 경보.
+        expr: increase(lloydk_metadata_floor_applied_total{action="access_conflict"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "ICD access_scope 충돌 — 접근범위와 예측 등급 불일치 검수 라우팅"
+          runbook: "doc/11 §2 안전 게이트 — ICD 메타데이터 확인"
