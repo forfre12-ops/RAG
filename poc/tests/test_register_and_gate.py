@@ -99,10 +99,54 @@ class TestRegisterAndGateLive:
     def test_auto_activate_when_gate_passes(self, monkeypatch):
         from lloydk.config import settings
         monkeypatch.setattr(settings, "retrain_auto_activate", True)
+        # locked-eval 게이트(죽음의 나선 #4)는 auto-activate 의 *추가* 조건이다. 순수 'gate+auto
+        # → activate' 경로를 검증하려 여기선 끈다(locked-eval 축은 별도 테스트로 양/음성 커버).
+        monkeypatch.setattr(settings, "deploy_gate_require_locked_eval", False)
         label = f"v-rg-{uuid.uuid4().hex[:6]}"
         out = register_and_gate_model(_report(label, fnr_high=0.01))
         try:
             assert out["registered"] is True
+            assert out["activated"] is True
+            with session_scope() as s:
+                active = TrainingRepo(s).get_active()
+                assert active is not None and active.version_label == label
+        finally:
+            with session_scope() as s:
+                s.query(ModelVersion).filter_by(version_label=label).delete()
+
+    def test_auto_activate_blocked_without_locked_eval(self, monkeypatch):
+        """[죽음의 나선 #4] locked-eval 게이트 ON(기본) + eval_ready 미전달 → 자동활성 차단(fail-secure).
+
+        합성-only 운영의 기본값. register_and_gate_model 이 eval_ready 를 받지 못하면(워커가 산출
+        전달 안 하면) 게이트가 통과해도 auto-activate 가 열리지 않음을 잠근다.
+        """
+        from lloydk.config import settings
+        monkeypatch.setattr(settings, "retrain_auto_activate", True)
+        monkeypatch.setattr(settings, "deploy_gate_require_locked_eval", True)
+        label = f"v-rg-{uuid.uuid4().hex[:6]}"
+        out = register_and_gate_model(_report(label, fnr_high=0.01))  # eval_ready 미전달(None)
+        try:
+            assert out["registered"] is True
+            assert out["gate"]["passed"] is True     # 게이트 자체는 통과
+            assert out["eval_block"] is True          # 그러나 locked-eval 미충족으로 차단
+            assert out["activated"] is False
+        finally:
+            with session_scope() as s:
+                s.query(ModelVersion).filter_by(version_label=label).delete()
+
+    def test_auto_activate_when_eval_ready_passed(self, monkeypatch):
+        """locked-eval 게이트 ON + eval_ready=True(워커 산출 전달) → auto-activate 도달 가능.
+
+        워커가 locked_eval_readiness().ready 를 넘기는 배선(tasks.train_classifier_task)의 계약.
+        """
+        from lloydk.config import settings
+        monkeypatch.setattr(settings, "retrain_auto_activate", True)
+        monkeypatch.setattr(settings, "deploy_gate_require_locked_eval", True)
+        label = f"v-rg-{uuid.uuid4().hex[:6]}"
+        out = register_and_gate_model(_report(label, fnr_high=0.01), eval_ready=True)
+        try:
+            assert out["registered"] is True
+            assert out["eval_block"] is False
             assert out["activated"] is True
             with session_scope() as s:
                 active = TrainingRepo(s).get_active()
@@ -141,6 +185,8 @@ class TestRegisterAndGateLive:
     def test_rollback_restores_previous_active(self, monkeypatch):
         from lloydk.config import settings
         monkeypatch.setattr(settings, "retrain_auto_activate", True)
+        # 자동활성 경로 검증이 목적이므로 locked-eval 추가 게이트는 끈다(#4는 별도 테스트).
+        monkeypatch.setattr(settings, "deploy_gate_require_locked_eval", False)
         v1 = f"v-rb1-{uuid.uuid4().hex[:6]}"
         v2 = f"v-rb2-{uuid.uuid4().hex[:6]}"
         # v1 활성 → v2 활성(게이트 통과) → 롤백하면 v1로 복귀

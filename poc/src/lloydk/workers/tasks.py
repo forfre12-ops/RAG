@@ -352,12 +352,22 @@ def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
             model_uri = f"{_od}/{_mv}"
     except Exception:  # noqa: BLE001
         model_uri = None
+    # [죽음의 나선 #4] 자동활성(register_and_gate_model)은 실(locked_gold_eval) readiness 를 요구한다
+    # (eval_block). 워커가 locked jsonl readiness 를 산출해 넘겨야 auto-activate 분기가 도달 가능하다 —
+    # 미전달(None)이면 eval_block 이 상시 True 로 자동활성이 영구 차단된다(dead wiring). best-effort:
+    # 산출 실패는 None(=차단 유지=fail-secure). 합성-only 단계엔 locked 가 비어 ready=False=차단(정직).
+    try:
+        from lloydk.modules.m6_evaluation.locked_readiness import locked_eval_readiness
+        _eval_ready = bool(locked_eval_readiness().get("ready"))
+    except Exception:  # noqa: BLE001
+        _eval_ready = None
     try:
         out["deploy"] = register_and_gate_model(
             report,
             training_run_id=run_uuid,
             training_data_count=getattr(rebuild, "row_count", None) or None,
             model_uri=model_uri,
+            eval_ready=_eval_ready,
         )
     except Exception:  # noqa: BLE001
         logger.exception("register_and_gate_model failed — 등록/게이트 생략")
