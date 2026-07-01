@@ -36,6 +36,40 @@ from lloydk.repositories.document_repo import DocumentRepo
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class ExtractionReviewDecision:
+    """[P0#3] 저품질/OCR 추출을 분류 전 검수로 라우팅할지 판정 결과."""
+
+    requires_review: bool
+    reasons: list[str]  # extract_error | ocr | low_quality
+
+
+def extraction_review_decision(
+    *,
+    quality: float | None,
+    ocr_used: bool,
+    error: str | None,
+    min_quality: float,
+    ocr_requires_review: bool,
+) -> ExtractionReviewDecision:
+    """본문이 존재하는(비어있지 않은) 추출이 검수 라우팅 대상인지 순수 판정.
+
+    깨끗한 파서 추출과 OCR/저품질 추출이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자로
+    조용히 오분류되는 것을 막기 위한 게이트. FNR-safe 지향(의심스러우면 검수). 빈 본문(no_text)은
+    호출부에서 processing_status='failed'로 별도 처리하므로 여기서는 다루지 않는다.
+
+    reasons(우선순위 무관, 복수 가능): extract_error(추출 경고), ocr(OCR 사용), low_quality(품질 미만).
+    """
+    reasons: list[str] = []
+    if error:
+        reasons.append("extract_error")
+    if ocr_used and ocr_requires_review:
+        reasons.append("ocr")
+    if quality is not None and quality < min_quality:
+        reasons.append("low_quality")
+    return ExtractionReviewDecision(requires_review=bool(reasons), reasons=reasons)
+
+
 @dataclass
 class IngestResult:
     doc_id: Optional[object]            # uuid.UUID | None (DB 미가용 시 None)
@@ -52,6 +86,10 @@ class IngestResult:
     normalized_text_uri: Optional[str]
     persisted: bool
     warnings: list[str] = field(default_factory=list)
+    # [P0#3] 저품질/OCR 추출 → 분류 전 검수 라우팅 신호. requires_review=True면 문서가
+    # processing_status='needs_review'로 격리돼 자동분류 그대로 통과하지 않는다.
+    requires_review: bool = False
+    review_reasons: list[str] = field(default_factory=list)
 
 
 class DocumentIngestionService:
@@ -120,6 +158,15 @@ class DocumentIngestionService:
         if not text:
             warns.append("no text extracted (parser/OCR needed)")
 
+        # [P0#3] 저품질/OCR 추출 → 검수 라우팅 판정 + 열화 메트릭(무음 오분류 방지).
+        review_decision, degrade_reasons = self._extraction_review(ext, has_text=bool(text))
+        if review_decision.requires_review:
+            warns.append(
+                "extraction degraded — routed to human review before classification: "
+                + ", ".join(review_decision.reasons)
+            )
+        self._emit_extraction_degraded(degrade_reasons)
+
         # 3) 정규화 텍스트 보관
         norm_uri: Optional[str] = None
         if text:
@@ -144,6 +191,7 @@ class DocumentIngestionService:
                 source_type=source_type,
                 external_ref=external_ref,
                 created_by=created_by,
+                requires_review=review_decision.requires_review,
             )
             warns.extend(pwarns)
 
@@ -170,6 +218,8 @@ class DocumentIngestionService:
             normalized_text_uri=norm_uri,
             persisted=persisted,
             warnings=warns,
+            requires_review=review_decision.requires_review,
+            review_reasons=review_decision.reasons,
         )
 
     # ------------------------------------------------------------
@@ -191,6 +241,40 @@ class DocumentIngestionService:
         if not base or base in {".", ".."}:
             return fallback
         return base
+
+    def _extraction_review(self, ext, *, has_text: bool):
+        """추출 결과 → (ExtractionReviewDecision, degrade_reasons[메트릭용]).
+
+        빈 본문(no_text)은 requires_review 판정 대신 processing_status='failed'로 격리되므로
+        여기서는 메트릭 reason 'empty'만 집계한다. 설정 미가용 시 합리적 기본(0.6 / OCR 검수).
+        """
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            min_q = float(getattr(settings, "extraction_review_min_quality", 0.6))
+            ocr_req = bool(getattr(settings, "extraction_ocr_requires_review", True))
+        except Exception:  # noqa: BLE001
+            min_q, ocr_req = 0.6, True
+        if not has_text:
+            return ExtractionReviewDecision(requires_review=False, reasons=[]), ["empty"]
+        decision = extraction_review_decision(
+            quality=(float(ext.quality) if ext else None),
+            ocr_used=(bool(ext.ocr_used) if ext else False),
+            error=(ext.error if ext else None),
+            min_quality=min_q,
+            ocr_requires_review=ocr_req,
+        )
+        return decision, list(decision.reasons)
+
+    @staticmethod
+    def _emit_extraction_degraded(reasons: list[str]) -> None:
+        if not reasons:
+            return
+        try:
+            from lloydk.api.prom_metrics import EXTRACTION_DEGRADED_TOTAL  # noqa: PLC0415
+            for r in reasons:
+                EXTRACTION_DEGRADED_TOTAL.labels(reason=r).inc()
+        except Exception:  # noqa: BLE001
+            pass
 
     def _preprocess(
         self, filename: str, content_bytes: bytes, warns: list[str]
@@ -228,10 +312,13 @@ class DocumentIngestionService:
         source_type: Optional[str],
         external_ref: Optional[str],
         created_by: Optional[str],
+        requires_review: bool = False,
     ) -> tuple[object, bool, list[str]]:
         warns: list[str] = []
         ext = pre.extraction if pre else None
         text = pre.text if pre else ""
+        # [P0#3] 저품질/OCR 추출은 'ready'로 바로 열지 않고 needs_review로 격리(자동분류 전 검수).
+        status = "needs_review" if (text and requires_review) else ("ready" if text else "failed")
 
         def _do(session) -> object:
             doc = DocumentRepo(session).create(
@@ -246,7 +333,7 @@ class DocumentIngestionService:
                 extraction_method=(ext.method if ext else None),
                 extraction_quality=(float(ext.quality) if ext else None),
                 ocr_used=(bool(ext.ocr_used) if ext else False),
-                processing_status=("ready" if text else "failed"),
+                processing_status=status,
                 external_ref=external_ref,
                 metadata=(
                     {

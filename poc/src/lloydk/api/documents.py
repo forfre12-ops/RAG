@@ -40,6 +40,10 @@ class DocumentUploadResponse(BaseModel):
     chunk_count: int
     persisted: bool
     warnings: list[str]
+    # [P0#3] 저품질/OCR 추출 → 분류 전 검수 라우팅 신호. True면 processing_status='needs_review'로
+    # 격리돼 자동분류를 그대로 통과하지 않는다(호출측이 검수 유도).
+    requires_review: bool = False
+    review_reasons: list[str] = []
     # index_for_rag=true 일 때만 채워짐 — 업로드 문서를 RAG 검색 대상으로 적재한 결과
     rag_indexed: bool = False
     rag_collection: Optional[str] = None
@@ -118,6 +122,8 @@ async def upload_document(
         chunk_count=result.chunk_count,
         persisted=result.persisted,
         warnings=result.warnings,
+        requires_review=result.requires_review,
+        review_reasons=result.review_reasons,
         rag_indexed=rag_indexed,
         rag_collection=rag_collection if rag_indexed else None,
         rag_vector_count=rag_vector_count,

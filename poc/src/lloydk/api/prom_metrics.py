@@ -218,6 +218,16 @@ DOCUMENTS_INGESTED_TOTAL = Counter(
     registry=registry,
 )
 
+# [P0#3] 추출 열화(degrade) — 저품질/OCR/추출오류/빈본문으로 검수 라우팅된 적재 건수(reason별).
+# 깨끗한 텍스트와 OCR/스캔본이 동일 입력으로 분류기에 진입하던 무음 오분류를 가시화한다. reason=
+# empty(본문0)·extract_error·ocr·low_quality. rate(*{reason!=empty})/documents_ingested = 검수 라우팅율.
+EXTRACTION_DEGRADED_TOTAL = Counter(
+    "lloydk_extraction_degraded_total",
+    "Ingested documents flagged degraded (routed to review): low quality / OCR / extract error / empty, by reason",
+    ["reason"],  # empty | extract_error | ocr | low_quality
+    registry=registry,
+)
+
 # PII 마스킹 건수(타입별) — mask_pii()가 타입별로 증가. rrn 등 핵심 타입 알람.
 PII_MASKED_TOTAL = Counter(
     "lloydk_pii_masked_total",

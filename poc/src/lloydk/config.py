@@ -490,6 +490,12 @@ class Settings(BaseSettings):
     # 보안 민감 도메인이라 기본 True. dryrun/테스트에서 비활성하려면 LLOYDK_PII_MASKING_ENABLED=0.
     pii_masking_enabled: bool = True
 
+    # [P0#3] 저품질/OCR 추출 검수 라우팅 — 추출 품질이 낮거나 OCR/추출오류인 문서를 자동분류
+    # 그대로 통과시키지 않고 processing_status='needs_review'로 격리(무음 오분류 방지). 깨끗한
+    # 텍스트와 OCR/스캔본이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자가 조용히 오분류되던 것을 차단.
+    extraction_review_min_quality: float = 0.6  # 정규화 품질(0~1) 이 미만이면 검수 라우팅
+    extraction_ocr_requires_review: bool = True  # OCR 사용 추출은 검수 라우팅(스캔본 신뢰 낮음)
+
     # 표적 1 (2026-05-29): InferencePipeline use_rag 활성 시 retrieval facade 호출 기본값.
     rag_default_collection: str = "docs"
     rag_default_top_k: int = 5
