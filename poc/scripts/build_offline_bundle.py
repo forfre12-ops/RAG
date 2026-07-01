@@ -74,7 +74,12 @@ class BundlePolicies:
 
 @dataclass
 class SecurityScan:
-    scanned_with: str = "trivy (dry-run skipped)"
+    # [정직화] 빌드 시 실제 취약점 스캔을 수행하지 않는다. 과거 default 'trivy (dry-run skipped)'는
+    # trivy 가 개입한 것처럼 암시해, 안 한 스캔을 매니페스트가 한 것처럼 실었다. scanned=False 로
+    # 스캔 미수행을 명시한다(감사·컴플라이언스 오독 차단). 실제 trivy/grype 실행·SARIF 파싱 배선은
+    # CI 후속 과제(도구 설치 필요) — 스캔이 실제로 돌면 populate 로 scanned/scanned_with/CVE 채운다.
+    scanned: bool = False
+    scanned_with: str = "none (no vulnerability scan performed at build time)"
     scan_date: str = ""
     critical_cves: int = 0
     high_cves: int = 0

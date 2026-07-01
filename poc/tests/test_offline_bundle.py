@@ -232,6 +232,23 @@ def test_build_manifest_dry_run_no_sha256(sample_compose: Path, sample_config: P
         assert plg.sha256 is None
 
 
+def test_manifest_security_scan_is_honest_by_default(sample_compose: Path, sample_config: Path):
+    """[정직화] 빌드가 실제 스캔을 안 하면 매니페스트가 trivy 수행을 암시하지 않아야 한다."""
+    m = build_manifest(
+        version="1.0.0",
+        target_env="test",
+        dry_run=True,
+        compose_path=sample_compose,
+        config_path=sample_config,
+    )
+    sec = m.to_dict()["security"]
+    assert sec["scanned"] is False
+    label = sec["scanned_with"].lower()
+    assert "trivy" not in label            # 안 한 스캔을 도구가 수행한 것처럼 암시 금지
+    assert "dry-run skipped" not in label
+    assert sec["critical_cves"] == 0 and sec["high_cves"] == 0
+
+
 def test_build_manifest_policies_force_vllm(sample_compose: Path, sample_config: Path):
     """폐쇄망 기본 정책: vllm + thinking 비활성."""
     m = build_manifest(
