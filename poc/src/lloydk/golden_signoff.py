@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from lloydk.golden_tiers import TIER_LOCKED, is_human_reviewer
+from lloydk.golden_tiers import TIER_LOCKED, is_human_reviewer, tier_of
 
 UPPER_GRADES = ("TS", "S1")
 _LABELS = ("TS", "S1", "S2", "S3")
@@ -113,3 +113,28 @@ def promote_to_locked(
         "rejected_reasons": dict(reason_counts),
     }
     return SignoffResult(locked=locked, rejected=rejected, stats=stats)
+
+
+def merge_locked_records(
+    existing: list[dict], new_locked: list[dict]
+) -> list[dict]:
+    """published locked_gold_eval 셋에 새 서명 승격분을 doc_id 기준 dedup 병합(순수 함수).
+
+    사람 서명 승격은 여러 검수 세션에 걸쳐 **누적**된다(config locked_eval_jsonl 주석:
+    "파일이 쌓이면 readiness가 자동으로 켜진다"). 같은 doc_id 재승격은 최신(new)으로 대체하고,
+    삽입 위치는 안정적으로 유지(결정적). locked tier(label_source=human_review·실계정 reviewer)가
+    아닌 레코드는 방어적으로 배제 — 읽기 경로(eval_readiness)가 locked만 인정하므로, 병합 단계에서
+    비-locked 오염이 파일에 섞여 들어가는 것을 원천 차단한다.
+
+    이 함수가 last-mile의 핵심: promote_to_locked가 산출한 locked 레코드를 실제 읽기 경로
+    파일에 누적시켜, locked_eval_readiness / deploy gate가 사람 서명을 실제로 '보게' 만든다.
+    """
+    merged: dict[str, dict] = {}
+    for r in list(existing) + list(new_locked):
+        if tier_of(r) != TIER_LOCKED:
+            continue
+        doc_id = r.get("doc_id")
+        if doc_id is None:
+            continue
+        merged[doc_id] = r
+    return list(merged.values())
