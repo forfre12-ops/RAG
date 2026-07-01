@@ -1,12 +1,14 @@
-"""P1-A7: /classify/explain — 분류 근거(토큰 기여도 + 4 요인 + RAG context) 상세 반환.
+"""P1-A7: /classify/explain — 분류 근거(증거 토큰 재집계 + S/V/M 요인 분해 + RAG context) 반환.
 
-기본 동작:
-1) `/classify`를 거쳐 결과 획득 (evidence·factors·rag_context 포함)
-2) evidence를 등급별 기여도로 재집계
-3) 4 평가요소 가중 합산 분해
-4) 운영시 학습된 분류기가 있으면 attention/IG 점수도 첨부 (옵션)
+동작:
+1) `/classify`를 거쳐 결과 획득 (evidence·factors·rag_context·warnings 포함)
+2) evidence 토큰을 등급별·요인별로 재집계 (_aggregate_evidence)
+3) 정본 3요건(S·V·M) 곱셈식 점수 분해 + 등급을 제약하는 최저 요소 노출 (_factor_decomposition)
+4) RAG context 건수·경고·판정 경로(rule vs model) 메타 첨부
 
 본 라우터는 검수자 UI(FUN-024)가 "왜 이 등급?"을 사용자에게 표시하기 위해 사용.
+근거는 **룰 시드 증거 span 기반**이다. 학습 분류기의 attention/IG 등 토큰 어트리뷰션은
+현재 미구현(FUN-024 요구 사항 아님) — 향후 확장 시 이 라우터에 첨부한다.
 """
 
 from collections import defaultdict
@@ -59,6 +61,19 @@ def _aggregate_evidence(result: ClassifyResponse) -> dict:
     return {"by_grade": grade_summary, "by_factor": factor_summary}
 
 
+def _method_label(model_version: str | None) -> str:
+    """판정 경로 표기 — 학습 분류기 사용('model+rule+rag') vs 룰 폴백('rule+rag').
+
+    rule-fallback(모델 미로드) 경로의 model_version 은 'rule-fallback-v0'/'rule-fallback'
+    (m5_inference/pipeline.py·classify_service.py) 또는 'poc'(기본값)/'none'/빈값이다.
+    과거엔 == 'poc' 만 검사해 실제 폴백 문자열 'rule-fallback-v0'를 'model'로 오표기했다
+    (rule 판정을 model 사용으로 둔갑). 폴백 마커를 정확히 룰 경로로 판정한다.
+    """
+    mv = (model_version or "").strip().lower()
+    is_model = bool(mv) and mv not in ("poc", "none") and not mv.startswith("rule-fallback")
+    return "model+rule+rag" if is_model else "rule+rag"
+
+
 def _factor_decomposition(result: ClassifyResponse) -> dict:
     """3요건(S·V·M) 점수 분해 — B안 곱셈식이라 최저 요소가 등급을 제약 (검수자 가독성)."""
     if not result.factors:
@@ -97,6 +112,6 @@ def classify_explain(
         "factor_decomposition": _factor_decomposition(result),
         "rag_context_count": len(result.rag_context or []),
         "warnings": list(result.warnings or []),
-        "method": "rule+rag" if not result.model_version or result.model_version == "poc" else "model+rule+rag",
+        "method": _method_label(result.model_version),
     }
     return body
