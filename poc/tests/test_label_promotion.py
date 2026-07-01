@@ -422,3 +422,42 @@ class TestPromotionAPI:
             )
             assert r.status_code == 200, r.text
             assert r.json()["status"] == "not_promotable"
+
+
+# ── [P1] 승급 감사 fail-open 가시화 ────────────────────────────────────────────
+# 검증라벨 승급은 서빙 등급을 override하는 보안 민감 행위인데, 감사 기록이 best-effort로 무음
+# 실패(DEBUG 로그+swallow)하면 컴플라이언스 갭이 안 보였다. 실패 시 CLASSIFY_VERIFIED_LABEL_
+# AUDIT_SKIP_TOTAL(#4 VerifiedLabelAuditSkip 알람 감시)을 증가시켜 alert로 승격한다.
+
+def test_emit_promote_audit_skip_increments_metric():
+    from lloydk.api.prom_metrics import (
+        CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL,  # noqa: F401
+        registry,
+    )
+    from lloydk.services.promotion_service import _emit_promote_audit_skip
+
+    name = "lloydk_classify_verified_label_audit_skip_total"
+    before = registry.get_sample_value(name) or 0.0
+    _emit_promote_audit_skip()
+    after = registry.get_sample_value(name) or 0.0
+    assert after >= before + 1
+
+
+def test_audit_promote_failure_is_visible_not_silent(monkeypatch):
+    # 감사 세션이 터져도(승급 자체는 fail-open 진행) 예외 미전파 + 메트릭↑(무음 아님).
+    import lloydk.db as db_mod
+    from lloydk.api.prom_metrics import registry
+    from lloydk.services.promotion_service import PromotionService
+
+    def _boom(*a, **k):
+        raise RuntimeError("audit db down")
+
+    monkeypatch.setattr(db_mod, "SessionLocal", _boom, raising=False)
+    name = "lloydk_classify_verified_label_audit_skip_total"
+    before = registry.get_sample_value(name) or 0.0
+    # 예외가 전파되면 실패(fail-open 계약 위반). None 반환·메트릭 증가만 기대.
+    PromotionService._audit_promote(
+        doc_id="d1", level_code="TS", verified_by="admin", actor_role="admin"
+    )
+    after = registry.get_sample_value(name) or 0.0
+    assert after >= before + 1

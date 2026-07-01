@@ -37,6 +37,25 @@ from lloydk.schemas.promotion import (
 
 logger = logging.getLogger(__name__)
 
+
+def _emit_promote_audit_skip() -> None:
+    """[P1] 검증라벨 승급 감사 기록 실패를 가시화 — 무음 fail-open → 메트릭.
+
+    승급은 서빙 등급을 override하는 보안 민감 행위인데, 감사 기록이 best-effort로 무음 실패하면
+    컴플라이언스 감사 갭이 안 보였다. 기존 CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL(#4
+    VerifiedLabelAuditSkip 알람이 감시)를 증가시켜 skip을 알람으로 승격한다. best-effort(프로메테우스
+    미가용 무시).
+    """
+    try:
+        from lloydk.api.prom_metrics import (  # noqa: PLC0415
+            CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL,
+        )
+
+        CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL.inc()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # get_verified_document_label 최우선 출처(=서빙 override 1순위). 승급은 사람 검수 결정이므로
 # 항상 'human_review'로 기록 — 기존 llm_judge_* 검증라벨이 있어도 사람 결정이 우선한다.
 _LABEL_SOURCE = "human_review"
@@ -272,11 +291,18 @@ class PromotionService:
                 db.commit()
             except Exception as exc:  # noqa: BLE001
                 db.rollback()
-                logger.debug("promote audit write failed (non-critical): %s", exc)
+                logger.warning(
+                    "promote audit write FAILED — 검증라벨 승급 감사 갭(NFR-SEC-01·컴플라이언스): "
+                    "doc_id=%s level=%s by=%s err=%s",
+                    doc_id, level_code, verified_by, exc,
+                )
+                _emit_promote_audit_skip()
             finally:
                 db.close()
         except Exception as exc:  # noqa: BLE001
-            logger.debug("_audit_promote skipped: %s", exc)
+            # fail-open(승급 자체는 진행)이되 무음 금지 — 메트릭+WARNING으로 VerifiedLabelAuditSkip 알람 발화.
+            logger.warning("_audit_promote skipped — 승급 감사 미기록(감사 갭): %s", exc)
+            _emit_promote_audit_skip()
 
 
 def to_promote_response(result: PromoteResult) -> PromoteResponse:
