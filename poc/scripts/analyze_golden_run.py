@@ -21,7 +21,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from lloydk.modules.m6_evaluation.eval_cards import build_eval_cards  # noqa: E402
+from lloydk.modules.m6_evaluation.eval_cards import GRADE_ORDER, build_eval_cards  # noqa: E402
 from lloydk.modules.m6_evaluation.judge_reliability import build_judge_reliability  # noqa: E402
 
 
@@ -39,8 +39,9 @@ def domain_leakage(gold: list[dict]) -> dict:
     theil_u: 도메인이 등급 불확실성을 해소하는 비율(0=독립, 1=완전결정). H는 bits.
     """
     import math as _m
+    # 라벨을 GRADE_ORDER로 검증(eval_cards·judge_reliability와 동일) — 잡값이 엔트로피/baseline 오염 방지.
     rows = [(r.get("domain") or "?", r.get("label") or r.get("llm_grade")) for r in gold
-            if (r.get("label") or r.get("llm_grade"))]
+            if (r.get("label") or r.get("llm_grade")) in GRADE_ORDER]
     n = len(rows)
     if not n:
         return {}
@@ -57,9 +58,11 @@ def domain_leakage(gold: list[dict]) -> dict:
     correct = sum(max(gc.values()) for gc in by_dom.values())
     return {
         "n": n, "n_domains": len(by_dom),
-        "H_grade": round(Hg, 3), "H_grade_given_domain": round(Hgd, 3),
+        "H_grade": round(Hg, 3) + 0.0, "H_grade_given_domain": round(Hgd, 3) + 0.0,  # -0.0 정규화
         "trivial_domain_baseline": round(correct / n, 3),
-        "theil_u": round((Hg - Hgd) / Hg, 3) if Hg else 0.0,
+        # 단일 등급(Hg=0)은 도메인이 그 등급을 자명하게 결정 → theil_u=1.0(baseline=1.0과 정합).
+        # 0.0로 두면 '누출 없음'으로 오독됨(baseline은 1.0인데).
+        "theil_u": round((Hg - Hgd) / Hg, 3) if Hg else 1.0,
         "pure_domain_rows": sum(sum(gc.values()) for gc in by_dom.values() if len(gc) == 1),
     }
 

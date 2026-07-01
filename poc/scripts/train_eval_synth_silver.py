@@ -34,7 +34,7 @@ def load(p):
 def convert_and_split(silver_run, work_dir, val_frac=0.15):
     """silver build_*.jsonl → (text,label) train/val. 결정론적 층화(random 없음)."""
     gold = []
-    for f in glob.glob(str(Path(silver_run) / "build_*.jsonl")):
+    for f in glob.glob(os.path.join(glob.escape(str(Path(silver_run))), "build_*.jsonl")):
         gold += load(f)
     rows = [{"text": r["text"], "label": r.get("label") or r.get("llm_grade")}
             for r in gold if (r.get("label") or r.get("llm_grade")) and r.get("text")]
@@ -44,7 +44,8 @@ def convert_and_split(silver_run, work_dir, val_frac=0.15):
     train, val = [], []
     for lbl, items in sorted(by.items()):
         items = sorted(items, key=lambda r: r["text"])  # 결정론적 순서
-        k = max(1, int(round(len(items) * val_frac)))
+        # 클래스가 학습행 0이 되지 않게: 1건이면 전부 train, ≥2면 val은 최대 len-1까지만.
+        k = 0 if len(items) < 2 else min(len(items) - 1, max(1, int(round(len(items) * val_frac))))
         val += items[:k]
         train += items[k:]
     Path(work_dir).mkdir(parents=True, exist_ok=True)
@@ -86,7 +87,8 @@ def main(argv=None):
 
     silver_run = args.silver_run
     run_id = Path(silver_run).name
-    work_dir = Path(args.work_dir or (POC / "artifacts" / f"synth_train_{run_id}"))
+    work_dir = (Path(args.work_dir).resolve() if args.work_dir
+                else (POC / "artifacts" / f"synth_train_{run_id}"))
     work_dir.mkdir(parents=True, exist_ok=True)
     model_dir = work_dir / "model"
     summary = {"silver_run": silver_run, "work_dir": str(work_dir), "steps": {}}

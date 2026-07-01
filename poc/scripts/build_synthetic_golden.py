@@ -86,6 +86,8 @@ def load_candidates(build_from):
     p = Path(build_from)
     if p.is_dir():
         p = p / "candidates.jsonl"
+    if not p.exists():
+        return [], {}  # 누락 시 main의 [abort] 가드가 처리(uncaught FileNotFoundError 대신)
     docs = [json.loads(l) for l in io.open(p, encoding="utf-8") if l.strip()]
     intended_by_id = {d["doc_id"]: d.get("intended", "?") for d in docs}
     return docs, intended_by_id
