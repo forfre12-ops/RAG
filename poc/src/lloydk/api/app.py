@@ -18,6 +18,7 @@ from lloydk.api import classify_stream as classify_stream_api
 from lloydk.api import explain as explain_api
 from lloydk.api import health as health_api
 from lloydk.api import confirm as confirm_api
+from lloydk.api import promotion as promotion_api
 from lloydk.api import training as training_api
 from lloydk.api import synthesis as synthesis_api
 from lloydk.api import golden as golden_api
@@ -313,6 +314,8 @@ app.include_router(explain_api.router, prefix="/api/v1")
 app.include_router(async_classify_api.router, prefix="/api/v1")
 app.include_router(answer_api.router, prefix="/api/v1")
 app.include_router(confirm_api.router, prefix="/api/v1")
+# 검수 액션(승급)은 재학습 무관 — enable_training과 무관하게 항상 등록(폐쇄망 운영 경로).
+app.include_router(promotion_api.router, prefix="/api/v1")
 # 학습 라우터는 settings.enable_training=True (full-train 프로파일)에서만 등록.
 # lite-*·onprem에서는 OpenAPI에도 노출되지 않아 고객사가 "있는데 안 쓴다"는 인식 자체가 없음.
 if settings.enable_training:

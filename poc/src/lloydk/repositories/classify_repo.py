@@ -287,6 +287,61 @@ class ClassifyRepo:
         rows.sort(key=lambda r: _LABEL_SOURCE_PRIORITY.get(r.labeled_by, 99))
         return rows[0]
 
+    def get_document_label(self, doc_id: uuid.UUID) -> DocumentLabel | None:
+        """doc_id의 DocumentLabel(검증 여부 무관) — PK 단건 조회. 승급 멱등성·충돌 판정용."""
+        return self.db.get(DocumentLabel, doc_id)
+
+    def upsert_verified_label(
+        self,
+        *,
+        doc_id: uuid.UUID,
+        level_id: int,
+        labeled_by: str,
+        labeler_id: str | None,
+        verified_by: str | None,
+        confidence: float | None = None,
+        notes: str | None = None,
+    ) -> DocumentLabel:
+        """검증 DocumentLabel upsert (PK=doc_id → 문서당 1건).
+
+        교정→검증라벨 '승급'의 쓰기 경로. is_verified=True + labeled_by='human_review'로
+        기록하면 서빙(ClassifyService._get_verified_label → get_verified_document_label)이
+        다음 분류에서 모델을 스킵하고 이 등급을 반환한다(동일 doc_id 및 동일 file_hash
+        재업로드 한정). 가중치·재학습 무관 — 죽음의 나선과 무관하다(전파 없음, 폭발반경=문서 1건).
+
+        커밋은 호출자 책임(session_scope). 기존 라벨이 있으면 등급/출처/검증메타를 갱신한다.
+        """
+        import datetime as _dt  # noqa: PLC0415
+
+        now = _dt.datetime.now(_dt.timezone.utc)
+        dl = self.db.get(DocumentLabel, doc_id)
+        if dl is None:
+            dl = DocumentLabel(
+                doc_id=doc_id,
+                level_id=level_id,
+                labeled_by=labeled_by,
+                labeler_id=labeler_id,
+                confidence=confidence,
+                notes=notes,
+                is_verified=True,
+                verified_by=verified_by,
+                verified_at=now,
+            )
+            self.db.add(dl)
+        else:
+            dl.level_id = level_id
+            dl.labeled_by = labeled_by
+            dl.labeler_id = labeler_id
+            if confidence is not None:
+                dl.confidence = confidence
+            if notes is not None:
+                dl.notes = notes
+            dl.is_verified = True
+            dl.verified_by = verified_by
+            dl.verified_at = now
+        self.db.flush()
+        return dl
+
     # Correction (Active Learning truth source)
     # ------------------------------------------------------------
 
