@@ -279,6 +279,15 @@ OUTBOX_PENDING = Gauge(
     "Current webhook outbox pending backlog (re-derived by API from shared Redis)",
     registry=registry,
 )
+# 월별 파티션 롤오버(ensure_partitions_tick, 워커 beat) 실패 건수 — 롤오버 지연 시 _default
+# 비대화·프루닝 무력화 무음열화. outbox/audit 은 신호가 있는데 파티션만 없던 갭. 카운터가
+# 아니라 게이지인 이유: 워커 카운터는 API 무가시(브리지로 재파생), 알람이 필요한 건 '지금
+# 롤오버가 막혀 있나'(현재 실패 건수). 0=정상 → 첫 tick 전 거짓경보 없음.
+PARTITION_ENSURE_FAILED = Gauge(
+    "lloydk_partition_ensure_failed",
+    "Current monthly partitions failing to ensure (rollover delayed; re-derived by API)",
+    registry=registry,
+)
 
 # Celery 큐 적체(큐별) — /metrics-prom 스크랩 시 redis LLEN 으로 best-effort 갱신(CeleryQueueBacklog).
 CELERY_QUEUE_LENGTH = Gauge(
@@ -610,6 +619,11 @@ def _apply_drift_report(sig: dict) -> None:
                 continue
 
 
+def _apply_partition_ensure(sig: dict) -> None:
+    """워커 파티션 롤오버 신호(dict)를 실패-건수 게이지에 반영(순수)."""
+    PARTITION_ENSURE_FAILED.set(float(sig.get("failed", 0) or 0))
+
+
 def _refresh_audit_integrity_gauges() -> None:
     """감사체인 무결성 — 워커 tick 이 Redis 에 게시한 결과를 게이지로 재노출(P0).
 
@@ -665,6 +679,24 @@ def _refresh_drift_gauges() -> None:
         _logger.debug("drift gauge refresh skipped: %s", exc)
 
 
+def _refresh_partition_gauges() -> None:
+    """월별 파티션 롤오버 실패 — 워커 ensure_partitions_tick 이 Redis 게시 → 게이지 재노출.
+
+    파티션 롤오버는 워커 beat 에서만 도므로 실패가 API 무가시였다(로그뿐). 부재면 미변경.
+    """
+    try:
+        from lloydk.services.worker_metrics_bridge import (  # noqa: PLC0415
+            PARTITION_ENSURE,
+            load_signal,
+        )
+
+        sig = load_signal(PARTITION_ENSURE)
+        if sig:
+            _apply_partition_ensure(sig)
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("partition gauge refresh skipped: %s", exc)
+
+
 def _refresh_business_gauges() -> None:
     """active_learning gauge를 호출 시점에 lazy 갱신.
 
@@ -699,6 +731,7 @@ def _refresh_business_gauges() -> None:
     _refresh_audit_integrity_gauges()
     _refresh_outbox_gauges()
     _refresh_drift_gauges()
+    _refresh_partition_gauges()
 
 
 def _refresh_escalation_held() -> None:

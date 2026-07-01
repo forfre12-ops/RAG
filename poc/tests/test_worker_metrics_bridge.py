@@ -101,6 +101,13 @@ def test_apply_drift_report_ignores_bad_values():
     # 예외 없이 통과하면 성공(값은 이전 상태 유지).
 
 
+def test_apply_partition_ensure_sets_gauge():
+    pm._apply_partition_ensure({"failed": 2, "ensured": 7})
+    assert registry.get_sample_value("lloydk_partition_ensure_failed") == 2.0
+    pm._apply_partition_ensure({"failed": 0, "ensured": 9})
+    assert registry.get_sample_value("lloydk_partition_ensure_failed") == 0.0
+
+
 # --------------------------------------------------------------------------- #
 # 3) refresher — 신호 로드 → applier 흐름
 # --------------------------------------------------------------------------- #
@@ -132,6 +139,16 @@ def test_refresh_drift_from_signal(monkeypatch):
     assert registry.get_sample_value("lloydk_drift_kl_divergence") == 0.55
 
 
+def test_refresh_partition_from_signal(monkeypatch):
+    monkeypatch.setattr(
+        bridge, "load_signal",
+        lambda name: {"failed": 3, "ensured": 6}
+        if name == bridge.PARTITION_ENSURE else None,
+    )
+    pm._refresh_partition_gauges()
+    assert registry.get_sample_value("lloydk_partition_ensure_failed") == 3.0
+
+
 # --------------------------------------------------------------------------- #
 # 4) 노출 + alert 정합 (no-data 회귀 잠금)
 # --------------------------------------------------------------------------- #
@@ -141,6 +158,7 @@ def test_worker_signal_gauges_exposed():
     pm.AUDIT_CHAIN_INTEGRITY_OK.set(1)
     pm.OUTBOX_DLQ_PENDING.set(0)
     pm.OUTBOX_PENDING.set(0)
+    pm.PARTITION_ENSURE_FAILED.set(0)
     expo = generate_latest(registry).decode()
     for name in (
         "lloydk_audit_chain_broken_rows",
@@ -148,6 +166,7 @@ def test_worker_signal_gauges_exposed():
         "lloydk_audit_chain_integrity_ok",
         "lloydk_outbox_dlq_pending",
         "lloydk_outbox_pending",
+        "lloydk_partition_ensure_failed",
     ):
         assert name in expo, f"{name} 미노출"
 
@@ -181,6 +200,9 @@ def test_alerts_reference_api_visible_gauges():
     assert "lloydk_outbox_dlq_pending" in dlq
     assert "lloydk_outbox_dlq_total" not in dlq
 
+    part = _alert_expr("PartitionEnsureFailed")
+    assert "lloydk_partition_ensure_failed" in part
+
 
 def test_no_alert_references_undefined_metric_still_holds():
     """기존 드리프트 가드와 동일 원리 — 새 게이지 3종이 prom_metrics 에 정의됐는지 재확인."""
@@ -191,6 +213,7 @@ def test_no_alert_references_undefined_metric_still_holds():
         "lloydk_audit_chain_broken_rows",
         "lloydk_audit_chain_nil_hash_rows",
         "lloydk_outbox_dlq_pending",
+        "lloydk_partition_ensure_failed",
     ):
         assert f'"{name}"' in src, f"{name} 정의 누락(alert no-data 위험)"
 

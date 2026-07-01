@@ -408,8 +408,15 @@ def ensure_partitions_tick(months_ahead: int = 3) -> dict:
     from lloydk.services.partitions import ensure_partitions  # noqa: PLC0415
 
     out = ensure_partitions(months_ahead=months_ahead)
-    if out.get("failed"):
-        logger.warning("ensure_partitions_tick: 일부 파티션 생성 실패 — %s", out["failed"])
+    failed = out.get("failed") or []
+    if failed:
+        logger.warning("ensure_partitions_tick: 일부 파티션 생성 실패 — %s", failed)
+    # [P0 관측성] 워커→API 브리지: 롤오버 실패는 워커 beat 에서만 계산돼 API 무가시(로그뿐)
+    # 였다 → 실패 건수를 Redis 게시 → API _refresh_partition_gauges 재노출(PartitionEnsureFailed).
+    # db_unavailable(status)면 게시 skip(측정 불가 ≠ 실패 0, 거짓 all-clear 방지).
+    if out.get("status") == "ok":
+        from lloydk.services.worker_metrics_bridge import PARTITION_ENSURE, publish_signal
+        publish_signal(PARTITION_ENSURE, {"failed": len(failed), "ensured": len(out.get("ensured") or [])})
     return out
 
 

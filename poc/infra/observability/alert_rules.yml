@@ -109,6 +109,18 @@ groups:
           summary: "Webhook outbox DLQ 신규 진입 발생"
           runbook: "doc/25 §9 사고 대응"
 
+      - alert: PartitionEnsureFailed
+        # 월별 파티션 롤오버 실패 > 0 → _default 비대화·프루닝 무력화 무음열화.
+        # 워커 ensure_partitions_tick 이 Redis 게시 → API 가 현재-실패건수 게이지로 재노출.
+        # 롤오버 지연은 수동 detach/move 런북 필요(default 에 해당 월 행이 이미 쌓임).
+        expr: lloydk_partition_ensure_failed > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "월별 파티션 롤오버 실패 {{ $value }}건 — 프루닝 무력화 위험"
+          runbook: "doc/25 §9 파티션 detach/move"
+
       - alert: DriftKlDivergenceHigh
         # B4 drift KL 임계 초과
         expr: lloydk_drift_kl_divergence >= 0.5
