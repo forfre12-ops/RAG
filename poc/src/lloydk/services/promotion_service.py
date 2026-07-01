@@ -56,6 +56,20 @@ def _emit_promote_audit_skip() -> None:
         pass
 
 
+def _emit_promote_success(grade: str) -> None:
+    """[P1] 검증라벨 승급 성공을 가시화 — 서빙 override 발동률의 성공측(실패측 AUDIT_SKIP과 대칭).
+
+    promote()가 사람 승인으로 서빙 등급을 override할 때 등급별로 증가. 기존엔 실패측만 카운터가
+    있어 발동률이 실패면에서만 그래프화됐다(가시성 비대칭). best-effort(프로메테우스 미가용 무시).
+    """
+    try:
+        from lloydk.api.prom_metrics import VERIFIED_LABEL_PROMOTED_TOTAL  # noqa: PLC0415
+
+        VERIFIED_LABEL_PROMOTED_TOTAL.labels(grade=grade or "unknown").inc()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # get_verified_document_label 최우선 출처(=서빙 override 1순위). 승급은 사람 검수 결정이므로
 # 항상 'human_review'로 기록 — 기존 llm_judge_* 검증라벨이 있어도 사람 결정이 우선한다.
 _LABEL_SOURCE = "human_review"
@@ -244,6 +258,10 @@ class PromotionService:
             verified_by=req.actor.user_id,
             actor_role=req.actor.role,
         )
+        # [P1 가시성] 승급 성공 발동률 노출(실패측 AUDIT_SKIP과 대칭). 신규 upsert(promoted)만 계상 —
+        # already_promoted(무변경)/not_promotable(미승급)은 서빙 override 신규 발동이 아니다.
+        if result.status == "promoted":
+            _emit_promote_success(result.promoted_label.value if result.promoted_label else "unknown")
         return result
 
     @staticmethod

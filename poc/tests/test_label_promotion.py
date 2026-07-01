@@ -78,6 +78,21 @@ def test_promote_response_surfaces_persisted():
     assert _p("mismatch", Grade.S2) is False          # race 가드(미영속)
 
 
+def test_emit_promote_success_increments_counter():
+    # 순수(DB 불요): 성공 발동 카운터가 등급별로 증가하는지.
+    from lloydk.api.prom_metrics import VERIFIED_LABEL_PROMOTED_TOTAL, registry
+
+    VERIFIED_LABEL_PROMOTED_TOTAL.labels(grade="TS").inc(0)  # child materialize
+    before = registry.get_sample_value(
+        "lloydk_verified_label_promoted_total", {"grade": "TS"}
+    ) or 0.0
+    ps._emit_promote_success("TS")
+    after = registry.get_sample_value(
+        "lloydk_verified_label_promoted_total", {"grade": "TS"}
+    ) or 0.0
+    assert after >= before + 1
+
+
 def test_try_uuid():
     u = uuid.uuid4()
     assert _try_uuid(str(u)) == u
@@ -208,11 +223,17 @@ def _level_code(level_id):
 @db_backed
 class TestPromotionLive:
     def test_promote_creates_verified_human_label(self, db, levels):
+        from lloydk.api.prom_metrics import VERIFIED_LABEL_PROMOTED_TOTAL, registry
+
         version = f"v-prom-{uuid.uuid4().hex[:6]}"
         doc = _seed_doc(db)
         cls = _seed_cls(db, levels, doc, "S3", version, status="confirmed")
         c = _add_corr(db, cls, levels, "S3", "S1", "qa_human")
         db.commit()
+        VERIFIED_LABEL_PROMOTED_TOTAL.labels(grade="S1").inc(0)  # child materialize
+        before = registry.get_sample_value(
+            "lloydk_verified_label_promoted_total", {"grade": "S1"}
+        ) or 0.0
         try:
             res = PromotionService().promote(
                 PromoteRequest(doc_id=str(doc.doc_id), actor=_actor("reviewer_kim"))
@@ -220,6 +241,11 @@ class TestPromotionLive:
             assert res.status == "promoted"
             assert res.promoted_label == Grade.S1
             assert res.labeler_id == "qa_human"
+            # [P1 가시성] 승급 성공 발동률 카운터가 등급별로 증가(가시성 비대칭 해소).
+            after = registry.get_sample_value(
+                "lloydk_verified_label_promoted_total", {"grade": "S1"}
+            ) or 0.0
+            assert after >= before + 1
             # 서빙 hook(get_verified_document_label)이 보는 라벨이 정확히 박혔는가.
             with session_scope() as s:
                 dl = ClassifyRepo(s).get_verified_document_label(doc.doc_id)

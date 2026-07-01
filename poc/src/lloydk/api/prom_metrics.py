@@ -445,6 +445,17 @@ CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
     registry=registry,
 )
 
+# [P1 가시성] 검증라벨 승급 성공 — promote()가 사람 승인으로 서빙 등급을 override한 건수(등급별).
+# 기존엔 실패측(위 AUDIT_SKIP)만 카운터가 있어 '서빙 override 발동률'이 실패면에서만 보였다(가시성
+# 비대칭). 성공 발동을 등급별로 노출해 승급 활동을 그래프·경보 가능하게 한다(promote는 API 프로세스라
+# 스크랩 가시).
+VERIFIED_LABEL_PROMOTED_TOTAL = Counter(
+    "lloydk_verified_label_promoted_total",
+    "Verified-label promotions that overrode the serving grade (human-approved), by grade",
+    ["grade"],
+    registry=registry,
+)
+
 # [obs] 서빙 검수 게이트가 예외로 fail-open한 횟수(gate별). agreement/llm_second_opinion 게이트는
 # 룰엔진·LLM 오류 시 None을 반환해 자동확정을 그대로 통과시킨다(fail-safe). 무음이면 고등급
 # 자동확정이 게이트 없이 진행됐는지 안 보인다 — 이 카운터로 'fail-open 발생'을 가시화한다.
