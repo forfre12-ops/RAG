@@ -296,7 +296,13 @@ class RelabelService:
 
 
 def to_confirm_response(result: ConfirmResult) -> ConfirmResponse:
-    return ConfirmResponse(confirmation_id=result.confirmation_id, confirmed_at=result.confirmed_at)
+    return ConfirmResponse(
+        confirmation_id=result.confirmation_id,
+        confirmed_at=result.confirmed_at,
+        persisted=result.persisted,
+        warnings=result.warnings,
+        second_review_required=result.second_review_required,
+    )
 
 
 def to_relabel_response(result: RelabelResult) -> RelabelResponse:
@@ -304,4 +310,7 @@ def to_relabel_response(result: RelabelResult) -> RelabelResponse:
         relabel_id=result.relabel_id,
         queue_size=result.queue_size,
         retrain_threshold=result.retrain_threshold,
+        persisted=result.persisted,
+        warnings=result.warnings,
+        second_review_required=result.second_review_required,
     )
