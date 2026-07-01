@@ -198,3 +198,49 @@ def test_grafana_dashboards_reference_only_defined_metrics():
         if missing:
             problems[f.name] = missing
     assert not problems, f"대시보드가 미정의 메트릭 참조(no-data 위험): {problems}"
+
+
+# 미들웨어 메트릭의 실제 라벨키(PrometheusMiddleware). 이름은 맞는데 라벨키가 틀리면
+# (예: {path=~...} — emitter는 route) 패널이 영구 no-data가 된다. 이름-only 검사는 이를
+# 못 잡으므로 라벨키 화이트리스트로 별도 차단한다(kpi-v2 panel1·2 path→route 회귀 봉인).
+_MIDDLEWARE_METRIC_LABELS = {
+    "lloydk_requests_total": {"method", "route", "status"},
+    "lloydk_request_duration_seconds_bucket": {"method", "route", "le"},
+    "lloydk_request_duration_seconds": {"method", "route"},
+}
+
+# 워커 프로세스에서만 증가하는 _total 카운터는 API scrape에서 항상 0 → 대시보드/알람은
+# worker_metrics_bridge가 재노출하는 API-가시 게이지(_pending/_rows)를 써야 한다
+# (P0 no-data 함정: outbox_dlq_total→_pending, audit_chain_broken_total→_broken_rows 등).
+_WORKER_ONLY_USE_INSTEAD = {
+    "lloydk_outbox_dlq_total": "lloydk_outbox_dlq_pending",
+    "lloydk_audit_chain_broken_total": "lloydk_audit_chain_broken_rows",
+    "lloydk_audit_chain_nil_hash_total": "lloydk_audit_chain_nil_hash_rows",
+}
+
+
+def test_grafana_dashboards_use_valid_middleware_label_keys():
+    """[정합 강화] 대시보드 라벨키 검증 — 이름만 맞고 라벨키가 틀린 no-data 패널 차단."""
+    files = sorted(_DASHBOARDS.glob("*.json"))
+    problems: dict[str, list[str]] = {}
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        for metric, allowed_keys in _MIDDLEWARE_METRIC_LABELS.items():
+            for sel in re.findall(re.escape(metric) + r"\{([^}]*)\}", text):
+                keys = set(re.findall(r"(\w+)\s*=~?", sel))
+                bad = sorted(keys - allowed_keys)
+                if bad:
+                    problems.setdefault(f.name, []).append(f"{metric}: {bad}")
+    assert not problems, f"대시보드가 미정의 라벨키 참조(no-data 위험): {problems}"
+
+
+def test_grafana_dashboards_avoid_worker_only_counters():
+    """[정합 강화] 대시보드가 워커-only _total 카운터(API scrape서 항상 0)를 쓰지 않는지."""
+    files = sorted(_DASHBOARDS.glob("*.json"))
+    problems: dict[str, list[str]] = {}
+    for f in files:
+        refs = set(re.findall(r"lloydk_[a-z_]+", f.read_text(encoding="utf-8")))
+        for bad, good in _WORKER_ONLY_USE_INSTEAD.items():
+            if bad in refs:
+                problems.setdefault(f.name, []).append(f"{bad} → {good} 사용")
+    assert not problems, f"대시보드가 워커-only 카운터 참조(API scrape서 0=no-data): {problems}"

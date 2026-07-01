@@ -908,8 +908,11 @@ class ClassifyService:
                 "kill-gate-brake: high-grade auto-confirm suppressed while kill-gate tripped "
                 "— routed to human review"
             )
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("kill-gate brake skipped: %s", exc)
+        except Exception as exc:  # noqa: BLE001 — kill-gate 미가용·오류는 자동확정 유지(fail-open)
+            # 다른 서빙 게이트(agreement/llm_second_opinion/similarity_escalation)와 동일하게
+            # 게이트 계통장애가 무음 no-op으로 숨지 않게 가시화(게이트=가시성 계약).
+            logger.debug("kill-gate brake fail-open (kill-gate unavailable): %s", exc)
+            ClassifyService._record_gate_fail_open("kill_gate")
             return None
 
     # ------------------------------------------------------------

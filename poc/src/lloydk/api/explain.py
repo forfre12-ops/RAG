@@ -27,38 +27,37 @@ def get_service() -> ClassifyService:
 
 
 def _aggregate_evidence(result: ClassifyResponse) -> dict:
-    """evidence 토큰을 등급별·요인별로 재집계."""
-    by_grade: dict[str, list[dict]] = defaultdict(list)
+    """evidence span을 요인(factor)별로 재집계.
+
+    EvidenceSpan 스키마는 {start,end,text,weight,tag}이고 tag=요인 코드(S/V/M)다
+    (m3_labeling/pipeline.py에서 `tag=m.factor`). span 단위 등급은 존재하지 않으므로
+    (문서 등급은 result.label 하나뿐) 요인별 집계만 제공한다.
+
+    과거엔 스키마에 없는 필드(token/factor/grade/positions)를 getattr 기본값으로 읽어
+    by_grade·by_factor가 **항상 빈값**이었다(死집계). 실 필드(text/tag/start·end)로 정합화.
+    """
     by_factor: dict[str, list[dict]] = defaultdict(list)
     for e in result.evidence or []:
-        item = {
-            "token": getattr(e, "token", ""),
-            "weight": float(getattr(e, "weight", 0.0)),
-            "factor": getattr(e, "factor", ""),
-            "grade": getattr(e, "grade", ""),
-            "positions": list(getattr(e, "positions", []) or []),
-        }
-        if item["grade"]:
-            by_grade[item["grade"]].append(item)
-        if item["factor"]:
-            by_factor[item["factor"]].append(item)
+        factor = e.tag or ""
+        if not factor:
+            continue
+        by_factor[factor].append(
+            {
+                "token": e.text,
+                "weight": float(e.weight or 0.0),
+                "span": [e.start, e.end],
+            }
+        )
 
-    grade_summary = {
-        g: {
-            "count": len(items),
-            "total_weight": round(sum(i["weight"] for i in items), 4),
-            "top_tokens": sorted(items, key=lambda i: -i["weight"])[:5],
-        }
-        for g, items in by_grade.items()
-    }
     factor_summary = {
         f: {
             "count": len(items),
             "total_weight": round(sum(i["weight"] for i in items), 4),
+            "top_tokens": sorted(items, key=lambda i: -i["weight"])[:5],
         }
         for f, items in by_factor.items()
     }
-    return {"by_grade": grade_summary, "by_factor": factor_summary}
+    return {"by_factor": factor_summary}
 
 
 def _method_label(model_version: str | None) -> str:

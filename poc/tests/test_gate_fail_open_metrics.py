@@ -58,6 +58,21 @@ def test_agreement_gate_fail_open_records(monkeypatch):
     assert _gate_val("agreement") == before + 1
 
 
+def test_kill_gate_brake_fail_open_records(monkeypatch):
+    # kill-gate 계통장애(should_suppress_autoconfirm 예외)도 다른 게이트와 동일하게
+    # fail-open(동작 보존)하되 SERVING_GATE_FAIL_OPEN_TOTAL{gate="kill_gate"}로 가시화.
+    import lloydk.modules.m6_evaluation.kill_gate as kg
+
+    def _boom(*a, **k):
+        raise RuntimeError("kill-gate read failed")
+
+    monkeypatch.setattr(kg, "should_suppress_autoconfirm", _boom)
+    before = _gate_val("kill_gate")
+    out = ClassifyService._kill_gate_brake(Grade.TS)
+    assert out is None  # fail-open 유지
+    assert _gate_val("kill_gate") == before + 1
+
+
 def test_llm_second_opinion_fail_open_records(monkeypatch):
     from lloydk import config as cfg
     from lloydk.schemas import common as _common

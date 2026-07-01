@@ -87,10 +87,15 @@ def activate_model(
 ) -> ActivateModelResponse:
     from lloydk.services.training_service import activate_model_manually  # noqa: PLC0415
 
+    # require_auth 반환 dict은 actor_id 키가 없다(jwt=claims.sub, api_key=공유키·actor 없음).
+    # 과거 auth.get("actor_id")는 항상 None이라 강제활성 감사가 익명으로 기록됐다.
+    # jwt subject를 실제 actor로 기록하고, api-key 모드는 사용자 신원이 없어 None(정직).
+    _claims = auth.get("claims")
+    actor_id = _claims.sub if _claims is not None else None
     res = activate_model_manually(
         req.version_label,
         force=req.force,
-        actor_id=auth.get("actor_id"),
+        actor_id=actor_id,
         actor_role=auth.get("actor_role"),
     )
     reloaded = False

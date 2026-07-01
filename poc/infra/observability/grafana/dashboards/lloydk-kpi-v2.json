@@ -14,7 +14,7 @@
       "title": "분류 처리량 (5m)",
       "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
       "targets": [
-        {"expr": "sum(rate(lloydk_requests_total{path=~\"/api/v1/classify.*\"}[5m]))",
+        {"expr": "sum(rate(lloydk_requests_total{route=~\"/api/v1/classify.*\"}[5m]))",
          "refId": "A"}
       ]
     },
@@ -24,7 +24,7 @@
       "title": "p95 latency (분류, ms)",
       "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
       "targets": [
-        {"expr": "histogram_quantile(0.95, sum(rate(lloydk_request_duration_seconds_bucket{path=~\"/api/v1/classify.*\"}[5m])) by (le)) * 1000",
+        {"expr": "histogram_quantile(0.95, sum(rate(lloydk_request_duration_seconds_bucket{route=~\"/api/v1/classify.*\"}[5m])) by (le)) * 1000",
          "refId": "A"}
       ]
     },
@@ -112,7 +112,7 @@
       "gridPos": {"x": 12, "y": 18, "w": 12, "h": 6},
       "targets": [
         {"expr": "lloydk_outbox_pending", "refId": "A"},
-        {"expr": "lloydk_outbox_dlq_total", "refId": "B"}
+        {"expr": "lloydk_outbox_dlq_pending", "refId": "B"}
       ]
     }
   ]
