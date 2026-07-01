@@ -28,7 +28,7 @@ import logging
 import os
 from dataclasses import dataclass
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from lloydk.db import session_scope
@@ -148,6 +148,9 @@ class ChainVerificationResult:
     # payload_hash가 NULL/빈값인 행 수 — 체인 break와 별개의 무결성 신호(미들웨어 우회/데이터손실).
     nil_hash_rows: int = 0
     first_nil_audit_id: int | None = None
+    # 스캔이 limit 캡에 걸려 스코프 전체를 못 봤는지 — True면 total_rows는 부분집합이라
+    # broken=0/integrity_ok가 '변조 없음'이 아니라 '스캔된 부분엔 없음'을 뜻한다(무음 부분검증).
+    scan_truncated: bool = False
 
     def ok(self) -> bool:
         # break만 본다(동작 보존). nil 행은 별개 신호로 노출 — integrity_ok로 종합 판정.
@@ -156,6 +159,15 @@ class ChainVerificationResult:
     def integrity_ok(self) -> bool:
         """체인 무결성 종합 — break도 nil 행도 없어야 True."""
         return self.broken == 0 and self.nil_hash_rows == 0
+
+
+def scan_was_truncated(scanned: int, total_in_scope: int | None) -> bool:
+    """스캔이 스코프 전체를 덮지 못했는지 — 순수 판정(DB 불요, 테스트 가능).
+
+    total_in_scope 가 None(카운트 실패)이면 판정 불가로 False(가시화만, 과경보 금지).
+    total_in_scope > scanned 이면 limit 캡에 걸려 일부 행만 검증됨(무음 부분검증 신호).
+    """
+    return total_in_scope is not None and total_in_scope > scanned
 
 
 def verify_chain(
@@ -180,9 +192,30 @@ def verify_chain(
                 q = q.where(AuditLog.occurred_at <= until)
             q = q.limit(limit)
             rows = list(db.execute(q).scalars())
+            # [무음 부분검증 가드] limit 캡에 걸리면 total_rows 는 스코프의 부분집합이라
+            # broken=0 이 '변조 없음'이 아니라 '스캔된 일부엔 없음'이 된다. 스코프 전체 COUNT 와
+            # 비교해 절단 여부를 노출한다(일별 tick 1회 COUNT = 무시 가능 비용, best-effort).
+            total_in_scope: int | None = None
+            try:
+                cq = select(func.count()).select_from(AuditLog)
+                if since:
+                    cq = cq.where(AuditLog.occurred_at >= since)
+                if until:
+                    cq = cq.where(AuditLog.occurred_at <= until)
+                total_in_scope = int(db.execute(cq).scalar() or 0)
+            except Exception:  # noqa: BLE001 — 절단 탐지 COUNT 는 검증을 절대 깨선 안 됨(best-effort)
+                total_in_scope = None
     except SQLAlchemyError as e:
         logger.debug("audit chain verify skipped (db unavailable): %s", e)
         return ChainVerificationResult(total_rows=0, verified=0, broken=0)
+
+    scan_truncated = scan_was_truncated(len(rows), total_in_scope)
+    if scan_truncated:
+        logger.warning(
+            "audit chain verify: scan truncated — %d/%s rows scanned (limit=%d); "
+            "broken=0 은 스캔된 부분에 한정, 전체 무결성 미보장 — 증분 검증 필요",
+            len(rows), total_in_scope, limit,
+        )
 
     verified = 0
     broken = 0
@@ -244,6 +277,7 @@ def verify_chain(
         last_hash=last_hash,
         nil_hash_rows=nil_hash_rows,
         first_nil_audit_id=first_nil,
+        scan_truncated=scan_truncated,
     )
 
 

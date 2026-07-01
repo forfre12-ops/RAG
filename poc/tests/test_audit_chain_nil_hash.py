@@ -13,7 +13,11 @@ from types import SimpleNamespace
 
 from lloydk.api import prom_metrics as pm
 from lloydk.services import audit_chain as ac
-from lloydk.services.audit_chain import ChainVerificationResult, verify_chain
+from lloydk.services.audit_chain import (
+    ChainVerificationResult,
+    scan_was_truncated,
+    verify_chain,
+)
 
 
 def _rows(*hashes):
@@ -83,3 +87,31 @@ def test_all_valid_no_nil(monkeypatch):
     assert res.nil_hash_rows == 0
     assert res.integrity_ok()
     assert _nil_val() == before  # nil 없으면 메트릭 무변동
+
+
+# ── [무음 부분검증 가드] limit 캡 절단 신호 ────────────────────────────────────
+
+def test_scan_was_truncated_pure():
+    # 스코프 전체(total_in_scope)가 스캔량보다 크면 절단 = 부분검증.
+    assert scan_was_truncated(scanned=100, total_in_scope=250) is True
+    assert scan_was_truncated(scanned=100, total_in_scope=100) is False
+    assert scan_was_truncated(scanned=100, total_in_scope=50) is False
+    # 카운트 실패(None) = 판정 불가 → False(과경보 금지, 가시화만).
+    assert scan_was_truncated(scanned=100, total_in_scope=None) is False
+
+
+def test_verify_chain_count_failure_leaves_truncated_false(monkeypatch):
+    # nil-hash 테스트의 mock DB는 .scalar()를 지원하지 않아 COUNT가 실패한다 →
+    # best-effort 폴백으로 total_in_scope=None → scan_truncated=False (검증은 정상 진행).
+    _patch_db(monkeypatch, _rows(
+        "0000000000000000:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    ))
+    res = verify_chain()
+    assert res.scan_truncated is False
+    assert res.integrity_ok()  # COUNT 실패가 검증 결과를 오염시키지 않음
+
+
+def test_result_default_scan_truncated_false():
+    r = ChainVerificationResult(total_rows=3, verified=3, broken=0)
+    assert r.scan_truncated is False

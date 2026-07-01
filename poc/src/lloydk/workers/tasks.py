@@ -480,8 +480,8 @@ def verify_audit_chain_tick(limit: int = 100000) -> dict:
     from lloydk.services.audit_chain import verify_chain
     res = verify_chain(limit=limit)
     logger.info(
-        "verify_audit_chain_tick: total=%d verified=%d broken=%d first_break=%s",
-        res.total_rows, res.verified, res.broken, res.first_break_audit_id,
+        "verify_audit_chain_tick: total=%d verified=%d broken=%d first_break=%s truncated=%s",
+        res.total_rows, res.verified, res.broken, res.first_break_audit_id, res.scan_truncated,
     )
     # [P0 관측성] 워커→API 브리지: AUDIT_CHAIN_BROKEN_TOTAL 은 워커 레지스트리(비스크랩)에만
     # inc 되므로 authoritative full-scan 결과를 Redis 에 게시 → API _refresh_audit_integrity_gauges
@@ -492,6 +492,7 @@ def verify_audit_chain_tick(limit: int = 100000) -> dict:
         "nil_hash_rows": res.nil_hash_rows,
         "integrity_ok": res.integrity_ok(),
         "total_rows": res.total_rows,
+        "scan_truncated": res.scan_truncated,
     })
     return {
         "total_rows": res.total_rows,
@@ -499,6 +500,7 @@ def verify_audit_chain_tick(limit: int = 100000) -> dict:
         "broken": res.broken,
         "first_break_audit_id": res.first_break_audit_id,
         "ok": res.ok(),
+        "scan_truncated": res.scan_truncated,
     }
 
 
