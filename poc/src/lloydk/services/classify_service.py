@@ -325,6 +325,15 @@ class ClassifyService:
                     status = "needs_review"
                     warnings_acc.append(brake)
 
+            # [Phase 2] 유사도 escalation — 사람이 더 높은 등급으로 검증한 문서와 매우 유사하면
+            # needs_review 라우팅(등급 무변경·opt-in 기본 off·전 경로 fail-open). 가장 비싼 게이트
+            # (임베딩+벡터검색+DB)라 체인 마지막에 두고, 앞 게이트가 이미 올렸으면 스킵된다.
+            if status != "needs_review":
+                sim = self._similarity_escalation_gate(req.doc_id, cleaned, pred.label)
+                if sim is not None:
+                    status = "needs_review"
+                    warnings_acc.append(sim)
+
             logger.info(
                 "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f status=%s",
                 req.doc_id, inference_id, pred.label, float(pred.confidence), status,
@@ -902,6 +911,159 @@ class ClassifyService:
         except Exception as exc:  # noqa: BLE001
             logger.debug("kill-gate brake skipped: %s", exc)
             return None
+
+    # ------------------------------------------------------------
+    # [Phase 2] 유사도 escalation 게이트 (등급 무변경 — 검수 라우팅만)
+    # ------------------------------------------------------------
+
+    # 권위(사람/법적) 검증 출처 — get_verified_document_label 우선순위 1~2(human_review·koipa_case_based·
+    # nkt_designated)만 escalation 참조로 인정. codex_review/public_definitive/rule_llm_agreement/
+    # llm_judge_* 등 머신·룰 출처는 제외(‘사람이 검증한 더 높은 등급’ 신호만 채택).
+    _AUTHORITATIVE_LABEL_SOURCES = frozenset(
+        {"human_review", "koipa_case_based", "nkt_designated"}
+    )
+
+    def _similarity_escalation_gate(self, doc_id, text, model_label) -> "str | None":
+        """유사도 escalation — 자동확정 부적격이면 검수 사유 문자열, 적격/비활성이면 None.
+
+        들어온 문서가 *권위(사람 검수·법적 지정) 출처가 더 높은(더 비밀) 등급으로 검증한 다른
+        문서와 매우 유사*하면 (dense 코사인 ≥ τ) needs_review로 라우팅한다. 등급(pred.label/
+        scores)은 **절대 바꾸지 않는다** — exact-match override의 '유사' 아날로그를 *신호*로만
+        쓴다(전파 0·poisoning 0). FNR-safe: 이웃이 모델 예측보다 **엄격히 더 비밀**일 때만
+        올린다(동급/하급은 절대 발동 안 함).
+
+        반환 None = 라우팅 변경 없음(게이트 비활성·이미 최고등급·본문 없음·이웃 없음·임계 미만·
+        이웃이 동급/하급·사람검증 이웃 없음·임베딩/검색/DB 오류). 모든 예외는 fail-open(분류 진행)
+        하고 SERVING_GATE_FAIL_OPEN_TOTAL{gate='similarity_escalation'}로 가시화한다.
+
+        ⚠️ 반드시 store.search(dense 코사인 = 1-cosine_distance)만 쓴다 — expand_then_search/
+        search_hybrid 점수는 RRF/리랭커라 τ(코사인)와 비교 불가(잘못 쓰면 상시/전무 발동).
+        """
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+
+            if not getattr(settings, "similarity_escalation_enabled", False):
+                return None  # 기본 OFF — 임베딩/검색 비용 전에 즉시 종료
+            # 점수 의미 일치: store.search가 *raw 코사인*을 주는 백엔드에서만 동작(τ=코사인 기준).
+            # es는 _score=(1+cos)/2라 같은 τ가 더 낮은 실코사인에서 발동(의미 어긋남) → no-op
+            # (es는 레거시·기본 아님, opt-in 게이트라 안전). pg(1-거리)·inmemory(코사인)만 raw 코사인.
+            backend = str(getattr(settings, "vector_backend", "pg") or "pg").lower()
+            if backend not in ("pg", "inmemory"):
+                return None
+            from lloydk.schemas.common import GradeRegistry  # noqa: PLC0415
+
+            order = GradeRegistry.get_order()  # 낮을수록 더 비밀(TS=1)
+            model_code = model_label.value if hasattr(model_label, "value") else str(model_label)
+            top_code = next(iter(order), "TS")
+            if model_code == top_code:
+                return None  # 이미 최고등급 — 과소분류 불가, 검색 불요
+            if not text:
+                return None
+
+            # dense 임베딩 + dense 검색(코사인). hybrid/reranker 금지(점수 의미 불일치).
+            from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
+            from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
+
+            result = build_embedder().embed([text])
+            vectors = getattr(result, "vectors", None) or result
+            vec = vectors[0] if vectors else None
+            if not vec:
+                return None
+            collection = getattr(settings, "rag_default_collection", "docs")
+            top_k = int(getattr(settings, "rag_default_top_k", 5) or 5)
+            tau = float(getattr(settings, "similarity_escalation_tau", 0.92))
+            hits = build_store().search(collection, vec, top_k=top_k, filter=None)
+            # [obs] 게이트가 실제 검색을 수행함(routed와 분리) — enabled인데 참조 없어 inert인
+            # 상태를 'ran'>0·'routed'=0으로 구분(무실데이터 단계 가시화).
+            self._inc_similarity_escalation("ran")
+
+            self_id = str(doc_id or "")
+            seen: set[str] = set()
+            for hit in hits or []:
+                score = float(getattr(hit, "score", 0.0) or 0.0)
+                if score < tau:
+                    continue  # 고정밀 임계 미만 — 참조로 안 씀
+                payload = getattr(hit, "payload", None) or {}
+                nid = str(
+                    payload.get("doc_id")
+                    or payload.get("source_doc")
+                    or getattr(hit, "id", "")
+                    or ""
+                )
+                if not nid or nid == self_id or nid in seen:
+                    continue  # 자기 자신(또는 동일 doc의 다른 청크)·중복 제외
+                seen.add(nid)
+                neighbor_code = self._verified_human_grade(nid)
+                if neighbor_code is None:
+                    continue  # 사람검증 등급 없음(머신라벨/미검증) → 참조 불가
+                if order.get(neighbor_code, 99) < order.get(model_code, 99):
+                    # 이웃이 모델 예측보다 엄격히 더 비밀 → 사람 확인(등급은 무변경).
+                    self._inc_similarity_escalation("routed")
+                    return (
+                        f"similarity-escalation: model auto-confirmed {model_code} but an authoritatively-"
+                        f"verified (human/legal) similar doc {nid} is graded higher {neighbor_code} "
+                        f"(cos={score:.2f} >= {tau:.2f}) — routed to human review (FNR-safe, grade unchanged)"
+                    )
+            return None
+        except Exception as exc:  # noqa: BLE001 — 임베딩/검색/DB 오류는 fail-open(분류 진행)
+            logger.debug("similarity-escalation fail-open: %s", exc)
+            self._record_gate_fail_open("similarity_escalation")
+            return None
+
+    @staticmethod
+    def _verified_human_grade(neighbor_doc_id: str) -> "str | None":
+        """이웃 doc의 *사람/권위* 검증 등급 코드 — 없거나 머신라벨이면 None.
+
+        exact-match override가 쓰는 동일 primitive(get_verified_document_label)로 검증라벨을
+        가져와, labeled_by가 권위 출처(_AUTHORITATIVE_LABEL_SOURCES)일 때만 등급코드를 반환한다.
+        file_hash 폴백(_verified_label_by_content)은 쓰지 않는다(그건 exact-match의 몫).
+        예외는 None(이웃 1건 스킵 — 게이트 전체를 죽이지 않음) + fail-open 카운터로 가시화한다
+        (systemic 라벨-DB 장애를 무음 no-op으로 숨기지 않음 — 게이트 contract 준수).
+        """
+        try:
+            from sqlalchemy import select  # noqa: PLC0415
+
+            from lloydk.db import SessionLocal  # noqa: PLC0415
+            from lloydk.db.models import ClassificationLevel  # noqa: PLC0415
+            from lloydk.repositories.classify_repo import ClassifyRepo  # noqa: PLC0415
+
+            nid = _try_uuid_str(neighbor_doc_id)
+            if nid is None:
+                return None
+            db = SessionLocal()
+            try:
+                dl = ClassifyRepo(db).get_verified_document_label(nid)
+                if dl is None or dl.labeled_by not in ClassifyService._AUTHORITATIVE_LABEL_SOURCES:
+                    return None
+                level = db.execute(
+                    select(ClassificationLevel).where(
+                        ClassificationLevel.level_id == dl.level_id
+                    )
+                ).scalar_one_or_none()
+                return level.level_code if level is not None else None
+            finally:
+                db.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_verified_human_grade skipped: %s", exc)
+            # systemic 라벨-DB 장애가 무음 no-op으로 숨지 않게 가시화(게이트 fail-open contract).
+            ClassifyService._record_gate_fail_open("similarity_escalation")
+            return None
+
+    @staticmethod
+    def _inc_similarity_escalation(action: str = "routed") -> None:
+        """[obs] 유사도 escalation 가시화 — best-effort(메트릭 실패가 게이트를 막지 않음).
+
+        action='ran'(게이트가 실제 검색 수행)·'routed'(검수 라우팅 발동). ran>0·routed=0이면
+        '활성인데 참조(권위 고등급 유사문서)가 없어 inert'를 의미 — disabled/empty와 구분된다.
+        """
+        try:
+            from lloydk.api.prom_metrics import (  # noqa: PLC0415
+                SIMILARITY_ESCALATION_TOTAL,
+            )
+
+            SIMILARITY_ESCALATION_TOTAL.labels(action=action).inc()
+        except Exception:  # noqa: BLE001
+            pass
 
     def _effective_metadata(self, req: ClassifyRequest) -> dict:
         """분류 metadata 구성 — 요청 metadata에 저장된 문서 출처(provenance)를 보강.

@@ -360,6 +360,18 @@ KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL = Counter(
     registry=registry,
 )
 
+# [Phase 2] 유사도 escalation — 권위(사람/법적) 출처가 더 높은 등급으로 검증한 *유사* 문서(dense
+# 코사인 ≥ τ)에 대한 게이트 동작. 등급은 바뀌지 않는다(검수 라우팅만). label action:
+#   · action='ran'    : 게이트가 실제 검색을 수행한 횟수(활성 상태에서 1분류당 1회).
+#   · action='routed' : 그중 실제로 needs_review로 라우팅한 횟수.
+# ran>0·routed=0 = 활성인데 참조(권위 고등급 유사문서)가 없어 inert(disabled/empty와 구분, 무실데이터 가시화).
+SIMILARITY_ESCALATION_TOTAL = Counter(
+    "lloydk_similarity_escalation_total",
+    "Auto-confirms routed to needs_review because a highly-similar (dense cosine >= tau) doc was human-verified to a higher/more-secret grade than predicted",
+    ["action"],
+    registry=registry,
+)
+
 # [QW] verified_label(사람검수 완료) 감사 기록 실패 — 결정론 경로의 컴플라이언스 감사가 best-effort라
 # DB 실패 시 무음 누락된다. 이 값이 0보다 크면 감사 누락 발생 신호(NFR-SEC-01 추적).
 CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
@@ -374,7 +386,18 @@ CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL = Counter(
 SERVING_GATE_FAIL_OPEN_TOTAL = Counter(
     "lloydk_serving_gate_fail_open_total",
     "Serving review gates that failed open (exception) and let auto-confirm proceed ungated, by gate",
-    ["gate"],  # agreement | llm_second_opinion
+    ["gate"],  # agreement | llm_second_opinion | similarity_escalation
+    registry=registry,
+)
+
+# [P0#1] 합성 검수큐 적재 — synthesize_batch 워커가 생성 문서를 tb_sample_documents 에 적재한 건수.
+# label_source 별 노출로 (1) generate→queue→review 운영 루프가 실제로 도는지 (2) noop_fallback/
+# llm_nonjson(학습 편입 금지 마커) 비율을 함께 가시화한다. 이전엔 워커가 list[dict]만 반환해
+# 검수큐 적재 자체가 0 = 유일 자동화 레버(운영학습)의 입력원이 단절돼 있었다.
+SYNTH_SAMPLE_PERSISTED_TOTAL = Counter(
+    "lloydk_synth_sample_persisted_total",
+    "Synthetic docs persisted to review queue (tb_sample_documents) by synthesize_batch, by body-source marker",
+    ["label_source"],  # clean | noop_fallback | llm_nonjson
     registry=registry,
 )
 

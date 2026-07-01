@@ -364,6 +364,19 @@ class Settings(BaseSettings):
     # tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진) — 전역 file_hash 스코프.
     verified_label_content_reuse: bool = True
 
+    # [Phase 2] 유사도 escalation 게이트 (등급 무변경·검수 라우팅만). 기본 False = 동작 보존(opt-in).
+    # 들어온 문서가 *사람이 더 높은(더 비밀) 등급으로 검증한 문서와 매우 유사*(dense 코사인 ≥ τ)하면
+    # needs_review로 라우팅한다 — exact-match override(_verified_label_by_content)의 '유사' 아날로그를
+    # 등급 *override가 아니라 신호*로만 쓴다. 전파 0·poisoning 0·FNR-safe(이웃이 모델 예측보다 엄격히
+    # 더 비밀일 때만 발동). corpus 의존: 사람검증 고등급 문서가 벡터스토어에 없으면 no-op(무실데이터
+    # 단계엔 발동 0 → SIMILARITY_ESCALATION_TOTAL 카운터로 가시화). 임베딩/검색/DB 오류는 전부 silent
+    # fail-open(분류 진행). _SAFETY_GATES·_PROFILE_DEFAULTS에 넣지 않음 — 강제 ON은 corpus 없으면
+    # 무음 no-op이거나 startup 차단(require_safety_gates)이 되어 비파괴 원칙에 어긋남(검증 corpus 생긴 뒤 승격).
+    similarity_escalation_enabled: bool = False
+    # 유사도 escalation 임계 (dense 코사인 유사도 = 1-cosine_distance). 기본 0.92 = 고정밀(검수 폭증 방지).
+    # 0<τ<1. 기존 classifier_escalation_tau(등급별 softmax argmax 보정)와 무관한 별개 노브(이름 구분).
+    similarity_escalation_tau: float = 0.92
+
     # Source-type prior = 비공지성 게이트 (Gate 1). doc/22 §4.0 · doc/32 §2.
     # 이미 공개된 출처(판례·공시·보도자료 등)의 문서는 내용과 무관하게 S3 — 부정경쟁방지법
     # §2.2 비공지성 미충족 → 영업비밀 불성립. 가중합(내용) 결과를 게이트가 덮어쓴다.
@@ -554,6 +567,14 @@ class Settings(BaseSettings):
             return v
         if not (0.0 < v < 1.0):
             raise ValueError(f"classifier_escalation_tau는 None이거나 0<τ<1 이어야 합니다 (got {v}).")
+        return v
+
+    # 유사도 escalation τ: 0<τ<1 (양 끝 배제 — 1.0=exact·0.0=무의미은 degenerate).
+    @field_validator("similarity_escalation_tau")
+    @classmethod
+    def _check_similarity_escalation_tau(cls, v: float) -> float:
+        if not (0.0 < v < 1.0):
+            raise ValueError(f"similarity_escalation_tau는 0<τ<1 이어야 합니다 (got {v}).")
         return v
 
     # 2) 양수/음수 제약 — 풀·업로드·청크·시퀀스·타임리밋 등.
