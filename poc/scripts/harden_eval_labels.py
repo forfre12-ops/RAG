@@ -56,7 +56,31 @@ HARDEN_DIR = GOLD_REAL / "_eval_harden"
 
 
 def _load_jsonl(p: Path) -> list[dict]:
-    return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def adjudicate_disposition(gold: str, cons: str, svm: dict) -> tuple[str, str, str]:
+    """분쟁 레코드(3심판 재판정 대상)의 **결정적** tier/경화라벨/사유 판정 — 순수(파일 I/O 없음).
+
+    반환: (trust_tier, hardened_label, disposition).
+    핵심 안전 변환(eval 라벨을 바꾸는 유일 결정론 transform):
+      - cons==gold                         → anchor, 라벨 불변(3출처 합의로 의도 재확인).
+      - 근거 상향(S2→S1·S1→TS)             → adjudicated, 라벨=cons.
+      - cons==S3 & gold==S2 (dead-zone)    → **floor 복원**: grade_from_svm_floored(s,v,0)로
+        재도출(§3.6 미입증 M은 0 아닌 floor=1) → 거의 전건 S2 로 복원(격리 아님·anchor).
+      - 그 외                               → quarantine(사람 앵커 전까지 strict 제외).
+    svm = {"s","v",...} 평균 레벨(round 하여 사용).
+    """
+    if cons == gold:
+        return "anchor", gold, "confirm_intent"
+    if cons in ("TS", "S1") and gold in ("S1", "S2") and _rank(cons) < _rank(gold):
+        return "adjudicated", cons, f"upgrade_{gold}_to_{cons}"
+    if cons == "S3" and gold == "S2":
+        s_lv = round(svm["s"])
+        v_lv = round(svm["v"])
+        refloored = grade_from_svm_floored(s_lv, v_lv, 0)  # m 미입증 → floor=1
+        return "anchor", refloored, f"floor_restored_S2(judge_m0_artifact; refloored={refloored})"
+    return "quarantine", gold, f"other_{gold}_to_{cons}"
 
 
 def main() -> None:
@@ -86,32 +110,10 @@ def main() -> None:
             cons = j["consensus"]            # 3심판 다수결 등급
             agree = j["agreement"]
             svm = j["avg_svm"]
-            if cons == gold:
-                # 의도 재확인 → anchor (이제 3출처 합의)
-                tier = "anchor"
-                hard = gold
-                disp = "confirm_intent"
-            elif cons in ("TS", "S1") and gold in ("S1", "S2") and _rank(cons) < _rank(gold):
-                # 근거 있는 상향(S2→S1, S1→TS) → adjudicated, 라벨 변경
-                tier = "adjudicated"
-                hard = cons
-                disp = f"upgrade_{gold}_to_{cons}"
-            elif cons == "S3" and gold == "S2":
-                # [floor 원칙 §3.6] 심판이 S3로 본 것은 관리(M)를 0으로 강제한 결과인데,
-                # 그 0은 '관리 부재 입증'이 아니라 '본문 미언급'이다(보일러플레이트 한정).
-                # 미입증 요소는 floor=1 이어야 하므로(rule_engine.grade_from_svm_floored)
-                # 재도출하면 S2가 된다. 배포 분류기(label() m_floor)·설계자 의도도 S2로
-                # 일치하므로 격리가 아니라 S2 anchor로 복원한다. (S2 dead-zone 해소)
-                s_lv = round(svm["s"])
-                v_lv = round(svm["v"])
-                refloored = grade_from_svm_floored(s_lv, v_lv, 0)  # m 미입증 → floor=1
-                tier = "anchor"
-                hard = refloored  # 거의 전건 S2
-                disp = f"floor_restored_S2(judge_m0_artifact; refloored={refloored})"
-            else:
-                tier = "quarantine"
-                hard = gold
-                disp = f"other_{gold}_to_{cons}"
+            # 결정적 tier/라벨/사유 판정 — 순수함수(위 adjudicate_disposition)로 추출해 단위테스트.
+            # [floor 원칙 §3.6] cons==S3 & gold==S2 는 심판이 관리(M)를 0으로 강제한 아티팩트라
+            # grade_from_svm_floored 로 재도출(미입증 M=floor 1)하면 S2 복원 → dead-zone 해소.
+            tier, hard, disp = adjudicate_disposition(gold, cons, svm)
             prov = {
                 "method": "rubric_3judge_blind",
                 "gold_intended": gold,

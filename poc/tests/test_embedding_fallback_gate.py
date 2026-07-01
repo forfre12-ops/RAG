@@ -50,3 +50,42 @@ def test_explicit_hash_allowed_even_when_required(monkeypatch):
     monkeypatch.setattr(settings, "require_real_embedder", True, raising=False)
     assert isinstance(emb.build_embedder(force_hash=True), HashEmbedding)
     assert isinstance(emb.build_embedder("hash"), HashEmbedding)
+
+
+# ── startup fail-clear: warmup 이 require_real_embedder 실패를 삼키지 않음 ──────────
+
+
+def _warmup_settings(**over):
+    from types import SimpleNamespace
+
+    base = dict(poc_mode="full", require_real_embedder=False,
+                embedding_provider="hf", reranker_provider="noop")
+    base.update(over)
+    return SimpleNamespace(**base)
+
+
+def test_warmup_reraises_when_real_embedder_required(monkeypatch):
+    """require_real_embedder=True 하드닝 서빙: 임베더 warmup 실패는 startup fail-clear(re-raise).
+
+    lazy(첫 요청)까지 지연하지 않고 startup 에서 걸린다 — 형제 게이트(require_safety_gates)와 대칭."""
+    from lloydk.api import app as app_mod
+    import lloydk.adapters.embedding as emb_mod
+
+    def _boom(*a, **k):
+        raise RuntimeError("real embedder required but HF load failed (simulated)")
+
+    monkeypatch.setattr(emb_mod, "build_embedder", _boom)
+    with pytest.raises(RuntimeError, match="require_real_embedder"):
+        app_mod._warmup_models(_warmup_settings(require_real_embedder=True))
+
+
+def test_warmup_swallows_when_not_required(monkeypatch):
+    """require_real_embedder=False(기본): warmup 실패는 best-effort 스킵(부팅 안 막음 — 동작 보존)."""
+    from lloydk.api import app as app_mod
+    import lloydk.adapters.embedding as emb_mod
+
+    def _boom(*a, **k):
+        raise RuntimeError("HF load failed (simulated)")
+
+    monkeypatch.setattr(emb_mod, "build_embedder", _boom)
+    app_mod._warmup_models(_warmup_settings(require_real_embedder=False))  # no raise

@@ -124,7 +124,7 @@ ANSWER_PHASE_DURATION = Histogram(
 EMBEDDING_CACHE_HIT_TOTAL = Counter(
     "lloydk_embedding_cache_hit_total",
     "Embedding cache hits (LRU or redis)",
-    ["layer"],  # lru | redis | disk
+    ["layer"],  # lru | redis (cache_layer.py가 방출하는 실 계층 — 'disk'층은 미구현이라 제거)
     registry=registry,
 )
 EMBEDDING_CACHE_MISS_TOTAL = Counter(

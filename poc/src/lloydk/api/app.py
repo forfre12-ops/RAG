@@ -222,6 +222,15 @@ def _warmup_models(settings_obj) -> None:
         emb.embed(["warmup"])
         logger.info("embedder warmup ok — provider=%s", settings_obj.embedding_provider)
     except Exception as exc:  # noqa: BLE001
+        # [require_real_embedder] 하드닝 실서빙에서 실 임베더 로드 실패(HashEmbedding 무음 폴백 거부)는
+        # startup fail-clear 여야 한다 — best-effort warmup 이 이 fail-secure 신호를 삼키면 형제 게이트
+        # (require_safety_gates)와 달리 첫 요청(lazy)까지 지연돼 검색품질 급락이 무음으로 흐른다.
+        # require_real_embedder=True 면 re-raise(그 외 다운로드/rate-limit 등은 기존대로 best-effort 스킵).
+        if getattr(settings_obj, "require_real_embedder", False):
+            raise RuntimeError(
+                f"require_real_embedder=True 인데 임베더 warmup 실패: {exc}. 실 임베더 없이 폐쇄망 "
+                "실서빙 진입 불가(HashEmbedding 폴백=검색품질 급락 — fail-clear)."
+            ) from exc
         logger.warning("embedder warmup skipped: %s", exc)
     if settings_obj.reranker_provider not in ("", "noop"):
         try:
