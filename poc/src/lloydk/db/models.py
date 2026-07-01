@@ -480,6 +480,11 @@ class SampleDocument(Base):
     generated_content: Mapped[str] = mapped_column(Text, nullable=False)
     quality_score: Mapped[float | None] = mapped_column(Numeric(3, 2))
     quality_report: Mapped[dict | None] = mapped_column(JSONB)
+    # [P0#1] 본문 출처 마커 — 생성기(SynthDoc.label_source)에서 보존. None=정상 JSON 생성,
+    # "noop_fallback"=placeholder 본문(학습 편입 금지), "llm_nonjson"=실 LLM 비-JSON 응답.
+    # 워커가 이 마커 없이 list[dict]만 반환하던 시절엔 검수큐 적재 자체가 없어 마커도 소실됐다.
+    label_source: Mapped[str | None] = mapped_column(String(30))
+    parse_error: Mapped[str | None] = mapped_column(Text)
     review_status: Mapped[str | None] = mapped_column(String(20), default="pending_review")
     reviewed_by: Mapped[str | None] = mapped_column(String(50))
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))

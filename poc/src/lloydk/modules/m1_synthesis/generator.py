@@ -163,6 +163,7 @@ class SynthDoc:
     dept_hint: str
     rationale_tags: list[str]
     llm_provider: str
+    llm_model: str = ""
     usage: Optional[UsageRecord] = None
     pii_violations: list[str] = field(default_factory=list)
     parse_error: Optional[str] = None
@@ -251,6 +252,7 @@ class SyntheticDocGenerator:
                 dept_hint="",
                 rationale_tags=[grade_code],
                 llm_provider=self.llm.name,
+                llm_model=getattr(self.llm, "model", "") or "",
                 usage=resp.usage,
                 pii_violations=self._pii_violations(body),
                 parse_error="non-json response",
@@ -267,6 +269,7 @@ class SyntheticDocGenerator:
             dept_hint=parsed.get("dept_hint", "") or "",
             rationale_tags=list(parsed.get("rationale_tags", []) or []),
             llm_provider=self.llm.name,
+            llm_model=getattr(self.llm, "model", "") or "",
             usage=resp.usage,
             pii_violations=self._pii_violations(body),
         )

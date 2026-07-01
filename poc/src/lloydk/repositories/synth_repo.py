@@ -33,6 +33,8 @@ class SynthRepo:
         outline_prompt_version: str | None = None,
         body_prompt_version: str | None = None,
         qc_prompt_version: str | None = None,
+        label_source: str | None = None,
+        parse_error: str | None = None,
     ) -> SampleDocument:
         sd = SampleDocument(
             target_level_id=target_level_id,
@@ -46,6 +48,9 @@ class SynthRepo:
             outline_prompt_version=outline_prompt_version,
             body_prompt_version=body_prompt_version,
             qc_prompt_version=qc_prompt_version,
+            # [P0#1] 생성기 본문 출처 마커 보존 — 학습 데이터 위생 필터(noop_fallback/llm_nonjson) 근거.
+            label_source=label_source,
+            parse_error=parse_error,
             review_status="pending_review",
         )
         self.db.add(sd)

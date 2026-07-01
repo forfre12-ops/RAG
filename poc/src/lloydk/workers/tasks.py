@@ -84,6 +84,72 @@ def classify_async(self: Any, payload: dict, job_id: str | None = None) -> dict:
         raise
 
 
+def _persist_synth_samples(docs: list, *, job_id: str | None) -> int:
+    """[P0#1] 생성 문서를 검수큐(tb_sample_documents)에 적재 — generate→queue→review 루프 마감.
+
+    이전 워커는 list[dict]만 반환하고 SynthRepo.create_sample 을 호출하지 않아, 검수큐가 비어
+    운영학습(유일 자동화 레버)의 입력원이 단절돼 있었다. 여기서 각 SynthDoc 을 검수 대기(pending_review)
+    상태로 적재하며, 본문 출처 마커(label_source/parse_error)를 보존한다.
+
+    best-effort: DB 미가용/오류는 로깅만(워커를 죽이거나 retry→재생성 유발하지 않음). 생성은 이미
+    성공했으므로 적재 실패는 loud ERROR 로 가시화하되 예외를 전파하지 않는다.
+
+    Returns: 적재 성공 건수.
+    """
+    if not docs:
+        return 0
+    try:
+        from lloydk.db import session_scope  # noqa: PLC0415
+        from lloydk.repositories import ClassifyRepo, SynthRepo  # noqa: PLC0415
+
+        persisted = 0
+        with session_scope() as db:
+            cls_repo = ClassifyRepo(db)
+            synth_repo = SynthRepo(db)
+            level_cache: dict[str, int | None] = {}
+            for d in docs:
+                grade_code = str(getattr(d, "target_grade", "") or "")
+                if grade_code not in level_cache:
+                    level_cache[grade_code] = cls_repo.level_id_by_code(grade_code)
+                level_id = level_cache[grade_code]
+                if level_id is None:
+                    logger.warning(
+                        "synth persist skip: 알 수 없는 등급 code=%r (레벨 미시드) — 적재 생략",
+                        grade_code,
+                    )
+                    continue
+                synth_repo.create_sample(
+                    target_level_id=level_id,
+                    llm_provider=str(getattr(d, "llm_provider", "") or "unknown"),
+                    llm_model=str(getattr(d, "llm_model", "") or "unknown"),
+                    generated_content=str(getattr(d, "body", "") or ""),
+                    doc_type=(getattr(d, "domain", None) or None),
+                    label_source=getattr(d, "label_source", None),
+                    parse_error=getattr(d, "parse_error", None),
+                )
+                persisted += 1
+                try:
+                    from lloydk.api.prom_metrics import SYNTH_SAMPLE_PERSISTED_TOTAL  # noqa: PLC0415
+
+                    SYNTH_SAMPLE_PERSISTED_TOTAL.labels(
+                        label_source=(getattr(d, "label_source", None) or "clean")
+                    ).inc()
+                except Exception:  # noqa: BLE001
+                    pass
+        logger.info(
+            "synth persisted to review queue: job_id=%s persisted=%d/%d",
+            job_id, persisted, len(docs),
+        )
+        return persisted
+    except Exception:  # noqa: BLE001
+        # 검수큐 적재 실패 = 운영학습 입력원 단절 신호 — loud ERROR(무음 금지). 재생성은 유발 안 함.
+        logger.error(
+            "synth persist FAILED (검수큐 적재 실패, generate→review 루프 단절): job_id=%s count=%d",
+            job_id, len(docs), exc_info=True,
+        )
+        return 0
+
+
 @celery_app.task(
     name="lloydk.synthesize_batch",
     bind=True,
@@ -97,9 +163,10 @@ def synthesize_batch(
     domain: str = "mixed",
     job_id: str | None = None,
 ) -> list[dict]:
-    """합성 문서 N건 생성.
+    """합성 문서 N건 생성 + 검수큐 적재.
 
     SyntheticDocGenerator 내부도 best-effort지만, 전체 호출 실패 시 retry.
+    생성 성공 시 tb_sample_documents(검수 대기)에 적재해 generate→queue→review 루프를 잇는다(P0#1).
     부분 결과가 있으면 보상 트랜잭션으로 partial 기록.
     """
     from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
@@ -119,6 +186,8 @@ def synthesize_batch(
             }
             for d in docs
         ]
+        # [P0#1] 검수큐 적재 — best-effort(예외 미전파: retry→재생성 방지). 루프 마감.
+        _persist_synth_samples(docs, job_id=job_id)
         return partial
     except Exception as exc:  # noqa: BLE001
         attempts = self.request.retries
