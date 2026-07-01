@@ -134,6 +134,10 @@ class RuleLabelResult:
     method: str = "rule_keyword"
     svm: int = 0                         # 정본 B안: S×V×M 곱 (0/1/2/4/8). multiplicative 모드 산출.
     warnings: list[str] = field(default_factory=list)
+    # [M축 가시화] 비밀관리성(M)이 독립 근거로 뒷받침되는가 — 형식적 관리표시(기밀/대외비/사외비
+    # 등) 또는 MANAGEMENT 요소 시드가 실제 매치됐으면 True. False면 m_lv 가 콘텐츠등급에서 추정된
+    # 것(독립 근거 없음)이라 검수 시 M 확인이 필요하다는 신호. **등급에는 영향 없음**(순수 메타데이터).
+    management_evidenced: bool = False
 
 
 def has_real_evidence(result: "RuleLabelResult") -> bool:
@@ -208,6 +212,31 @@ def _apply_high_risk_overrides(
                     end=mo.end(),
                 )
             )
+
+
+# [M축 가시화] 형식적 비밀관리 표시(분류 마킹) — 조직이 정보를 비밀로 '관리'한다는 직접 증거.
+# 이 목록은 **탐지 전용**이다: 등급 산정(seed/argmax/m_lv)에 일절 개입하지 않고, 관리표시
+# 존재 여부만 읽어 management_evidenced 플래그·검수 경고에 쓴다(등급 변경 없음·FNR/정밀도
+# 무영향). ⚠️ 이 목록을 KEYWORD_SEEDS(MANAGEMENT_LEVEL)로 승격하면 안 된다 — S1 콘텐츠+관리
+# 표시가 svm(2,2,2)=TS 로 과분류되는 피드백이 발생(2026-07-01 eval 실증, S3+사외비→TS).
+_MANAGEMENT_MARKING_TERMS: tuple[str, ...] = (
+    "특급기밀", "극비", "대외비", "사외비", "기밀", "1급 비밀", "1급비밀", "2급 비밀",
+    "3급 비밀", "취급주의", "열람제한", "열람 제한", "접근제한", "접근 제한", "접근통제",
+    "대외주의", "내부한정", "사내한정", "내부 전용", "사내 전용",
+    "Confidential", "Restricted", "Top Secret", "Classified", "Internal Only",
+    "Need-to-Know", "Eyes-Only",
+)
+
+
+def detect_management_marking(text: str) -> bool:
+    """본문에 형식적 비밀관리 표시가 있는지 — 탐지 전용(등급 무영향).
+
+    비밀관리성(M)의 독립 근거 유무를 판정하는 데만 쓴다. 대소문자 무시(영문 표시).
+    """
+    if not text:
+        return False
+    low = text.lower()
+    return any(term.lower() in low for term in _MANAGEMENT_MARKING_TERMS)
 
 
 class LabelRuleEngine:
@@ -454,6 +483,19 @@ class LabelRuleEngine:
             # 정본 3요건은 레벨(0/1/2)로 덮되, 커스텀 factor 키는 보존(merge — genericity 계약).
             factor_scores = {**factor_scores, "SECRECY": float(s_lv), "VALUE": float(v_lv), "MANAGEMENT": float(m_lv)}
 
+        # [M축 가시화] 비밀관리성(M) 독립 근거 유무 — 등급 결정 후 순수 메타데이터로만 산출
+        # (grade/factor/svm 에 일절 개입 안 함). 관리표시(기밀/대외비 등) 또는 MANAGEMENT 요소
+        # 시드가 실제 매치됐으면 evidenced. 아니면 m_lv 가 콘텐츠등급에서 추정된 것 → 검수 경고.
+        mgmt_factor_matched = any(
+            to_canonical_factor(mm.factor) == "MANAGEMENT" for mm in matches
+        )
+        management_evidenced = mgmt_factor_matched or detect_management_marking(text)
+        if chosen != "S3" and not management_evidenced:
+            warnings = warnings + [
+                "비밀관리성(M) 독립 근거 없음 — 관리표시/관리요소 미검출, 콘텐츠등급 기반 추정"
+                " (검수 시 M 확인 권장)"
+            ]
+
         return RuleLabelResult(
             grade=chosen,
             confidence=round(conf, 4),
@@ -463,6 +505,7 @@ class LabelRuleEngine:
             total_score=round(total, 4),
             svm=svm_val,
             warnings=warnings,
+            management_evidenced=management_evidenced,
         )
 
     def _count(
