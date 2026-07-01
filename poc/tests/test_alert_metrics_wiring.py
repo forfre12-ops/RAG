@@ -8,6 +8,10 @@ outbox_dlq_total·pii_masked_total·documents_ingested_total)이 정의 0건이�
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
+import yaml
 from prometheus_client import generate_latest
 
 from lloydk.api.prom_metrics import (
@@ -80,3 +84,84 @@ def test_mask_pii_increments_pii_masked_metric():
     assert res.counts.get("rrn", 0) >= 1                      # 마스킹 자체 동작 확인
     after = registry.get_sample_value("lloydk_pii_masked_total", labels) or 0.0
     assert after >= before + 1                                # 메트릭 동반 증가
+
+
+# ── P0#4: 번들 A–F 안전 게이트 메트릭 → 능동 경보(alert) 배선 ──────────────────
+# 배경: serving_gate_fail_open·audit_chain_nil_hash·kill_gate·idempotency_fallback 등
+# 안전실패 메트릭이 노출만 되고 alert expr 0건이었다(무인 미탐). lloydk-safety-gates 그룹
+# 추가로 알람 승격. 아래 테스트는 (1) 그룹의 alert 존재 (2) 참조 시계열 실 노출을 잠근다.
+
+_ALERT_RULES = Path(__file__).resolve().parents[1] / "infra/observability/alert_rules.yml"
+
+
+def _load_alert_groups() -> dict:
+    doc = yaml.safe_load(_ALERT_RULES.read_text(encoding="utf-8"))
+    return {g["name"]: g for g in doc["groups"]}
+
+
+def test_safety_gate_alert_group_present():
+    groups = _load_alert_groups()
+    assert "lloydk-safety-gates" in groups, "안전게이트 경보 그룹 누락"
+    names = {r["alert"] for r in groups["lloydk-safety-gates"]["rules"]}
+    # 안전실패·무결성 핵심 경보가 모두 존재해야 한다(무인 미탐 방지).
+    assert {
+        "ServingGateFailOpen",
+        "AuditChainNilHash",
+        "VerifiedLabelAuditSkip",
+        "KillGateTripped",
+        "KillGateAutoconfirmSuppressed",
+        "IdempotencyBackendFallback",
+    } <= names
+
+
+def test_safety_gate_alert_series_present_in_exposition():
+    """경보가 참조하는 정확한 시계열 이름이 실제로 노출되는지 — 라벨 child materialize."""
+    from lloydk.api.prom_metrics import (
+        AUDIT_CHAIN_NIL_HASH_TOTAL,
+        CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL,
+        ESCALATION_HELD,
+        IDEMPOTENCY_BACKEND_FALLBACK_TOTAL,
+        KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL,
+        KILL_GATE_TRIPPED,
+        SERVING_GATE_FAIL_OPEN_TOTAL,
+    )
+
+    SERVING_GATE_FAIL_OPEN_TOTAL.labels(gate="agreement").inc(0)
+    AUDIT_CHAIN_NIL_HASH_TOTAL.inc(0)
+    CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL.inc(0)
+    KILL_GATE_TRIPPED.set(0)
+    KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL.labels(grade="TS").inc(0)
+    IDEMPOTENCY_BACKEND_FALLBACK_TOTAL.inc(0)
+    ESCALATION_HELD.labels(grade="TS").set(0)
+
+    expo = generate_latest(registry).decode()
+    assert 'lloydk_serving_gate_fail_open_total{gate="agreement"}' in expo
+    assert "lloydk_audit_chain_nil_hash_total" in expo
+    assert "lloydk_classify_verified_label_audit_skip_total" in expo
+    assert "lloydk_kill_gate_tripped" in expo
+    assert 'lloydk_kill_gate_autoconfirm_suppressed_total{grade="TS"}' in expo
+    assert "lloydk_idempotency_backend_fallback_total" in expo
+    assert 'lloydk_escalation_held{grade="TS"}' in expo
+
+
+def test_no_alert_references_undefined_metric():
+    """드리프트 가드: alert_rules.yml 의 모든 lloydk_* 메트릭이 prom_metrics 에 정의됐는지.
+
+    Grafana kpi-v2.json 이 없는 메트릭 5종을 참조해 영구 no-data 였던 실패모드를 alert 쪽에서
+    사전 차단한다. 미들웨어(요청 카운터/지연)는 PrometheusMiddleware 정의라 allowlist.
+    """
+    src = (Path(__file__).resolve().parents[1] / "src/lloydk/api/prom_metrics.py").read_text(
+        encoding="utf-8"
+    )
+    middleware_defined = {
+        "lloydk_requests_total",
+        "lloydk_request_duration_seconds_bucket",
+    }
+    refs: set[str] = set()
+    for g in _load_alert_groups().values():
+        for r in g["rules"]:
+            refs |= set(re.findall(r"lloydk_[a-z_]+", r["expr"]))
+    missing = sorted(
+        m for m in refs if f'"{m}"' not in src and m not in middleware_defined
+    )
+    assert not missing, f"alert 가 정의되지 않은 메트릭 참조(no-data 위험): {missing}"

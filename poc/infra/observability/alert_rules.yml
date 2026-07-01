@@ -136,3 +136,85 @@ groups:
         annotations:
           summary: "감사 로그 hash chain 변조 의심 — 즉시 보안팀 통지"
           runbook: "doc/25 §9 사고 대응 (Critical)"
+
+  # ── 안전 게이트 실패·무결성 신호 (번들 A–F) ──────────────────────────────────
+  # 원칙: "게이트=가시성 한 몸". 안전 액추에이터(serving gate fail-open · kill-gate ·
+  # 감사체인 nil-hash · 멱등 폴백 · 검수 감사누락)는 메트릭으로 노출돼 있었으나 능동 경보 룰이
+  # 없어 '수동 대시보드에만 머무는 무인 미탐'이었다. 아래 룰이 안전실패를 알람으로 승격한다.
+  # 대응 매핑: doc/11 §2 안전 사고. 발동률/발동 자체가 저강도라도 신호 → 검토 라우팅.
+  - name: lloydk-safety-gates
+    interval: 1m
+    rules:
+      - alert: ServingGateFailOpen
+        # 서빙 검수 게이트(agreement/llm_second_opinion/similarity)가 예외로 fail-open →
+        # 고등급 자동확정이 게이트 없이 통과. fail-safe 설계지만 발생 자체가 검토 신호.
+        expr: sum by (gate) (increase(lloydk_serving_gate_fail_open_total[15m])) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "서빙 검수 게이트 fail-open 발생 ({{ $labels.gate }}) — 자동확정 무게이트 통과"
+          runbook: "doc/11 §2 안전 게이트 — 룰/LLM 오류 원인 확인 후 재기동"
+
+      - alert: AuditChainNilHash
+        # payload_hash NULL/빈값 — 감사 미들웨어 우회(직접 DB 삽입) 또는 데이터 손실.
+        # AuditChainBroken(체인 단절)과 별개의 무결성 신호. nil 근원 행은 break로 무음화될 수 있음.
+        expr: increase(lloydk_audit_chain_nil_hash_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "감사 nil payload_hash 발생 — 미들웨어 우회/데이터 손실 의심"
+          runbook: "doc/25 §9 사고 대응 — 무결성 조회로 근원 행 스캔"
+
+      - alert: VerifiedLabelAuditSkip
+        # 사람검수 완료 라벨(결정론 경로)의 컴플라이언스 감사 기록이 best-effort로 무음 누락됨.
+        expr: increase(lloydk_classify_verified_label_audit_skip_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "verified_label 감사기록 누락 — 컴플라이언스 감사 갭 (NFR-SEC-01)"
+          runbook: "doc/25 §5 감사 추적 — DB 쓰기 실패 원인 확인"
+
+      - alert: KillGateTripped
+        # 죽음의 나선/품질붕괴 조건(TS·S1 미탐 / 검수 과부하 / overturn율) 중 하나 이상 충족.
+        # 경보-only(자동 중단 없음). 지속되면 관리자 안전브레이크(억제) 판단 근거.
+        expr: lloydk_kill_gate_tripped == 1
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Kill-gate 발동(5m 지속) — 모델 품질붕괴/미탐 조건, 관리자 검토 필요"
+          runbook: "doc/11 §3 모델 재학습 / kill-gate 조건 진단"
+
+      - alert: KillGateAutoconfirmSuppressed
+        # 안전브레이크가 실제로 고등급 자동확정을 needs_review로 억제 중 = 열화 조건 지속 신호.
+        expr: sum by (grade) (increase(lloydk_kill_gate_autoconfirm_suppressed_total[15m])) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Kill-gate 안전브레이크 작동 중 ({{ $labels.grade }} 자동확정 억제)"
+          runbook: "doc/11 §3 — 억제 조건 해소까지 검수 인원 확인"
+
+      - alert: IdempotencyBackendFallback
+        # idempotency 저장소가 redis 미가용으로 in-memory(프로세스-로컬) 폴백 → 멀티워커 멱등성 붕괴.
+        # (운영 startup은 assert_multiworker_idempotency_safe로 차단하나, 런타임 열화 신호를 별도 노출.)
+        expr: increase(lloydk_idempotency_backend_fallback_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "멱등 저장소 in-memory 폴백 — 멀티워커 중복처리 위험 (redis 확인)"
+          runbook: "doc/23 §6.5 — redis 가용성/URL 배선 확인"
+
+      - alert: HighGradeReviewBacklog
+        # 고등급(TS·S1) needs_second_review 보류가 누적. 1인 운영 데드락/검수 병목 신호.
+        expr: sum(lloydk_escalation_held{grade=~"TS|S1"}) > 20
+        for: 30m
+        labels:
+          severity: P2
+        annotations:
+          summary: "고등급 이중검토 보류 > 20 (30m 지속) — 검수 병목/인원 확인"
+          runbook: "doc/11 §2.4 — 보류큐 소진/검수자 배치"
