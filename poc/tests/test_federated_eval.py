@@ -165,3 +165,31 @@ def test_cli_rows_to_pairs_admission_and_context_proxy():
     # τ 미지정이면 전부 unknown
     pairs2 = rows_to_pairs(rows[:1], escalation_tau=None)
     assert pairs2[0].review_context == CTX_UNKNOWN
+
+
+def test_cli_audit_manifest_overrides_to_unbiased():
+    # 감사 매니페스트 doc_id는 신뢰도 프록시를 이기고 random_audit(무편향)으로 라벨된다.
+    from scripts.federated_eval_report import rows_to_pairs
+
+    rows = [
+        {"model_pred": "S3", "human_truth": "S1", "confidence": 0.6,
+         "corrected_by": "admin_kim", "doc_id": "doc-audit-1"},   # 감사 대상(conf 낮아도 audit 우선)
+        {"model_pred": "S1", "human_truth": "S1", "confidence": 0.95,
+         "corrected_by": "admin_kim", "doc_id": "doc-normal-2"},  # 감사 아님 → 고신뢰 프록시
+    ]
+    pairs = rows_to_pairs(rows, escalation_tau=0.8, audit_doc_ids=frozenset({"doc-audit-1"}))
+    ctx = {(p.model_pred, p.human_truth): p.review_context for p in pairs}
+    assert ctx[("S3", "S1")] == CTX_RANDOM_AUDIT          # 매니페스트 우선(무편향)
+    assert ctx[("S1", "S1")] == CTX_HIGH_CONF_PROXY        # 비-감사 → 프록시(편향)
+    # doc_id는 EvalPair에 실리지 않는다(구조적 무유출)
+    assert not any(hasattr(p, "doc_id") for p in pairs)
+
+
+def test_load_audit_manifest_formats(tmp_path):
+    from scripts.federated_eval_report import load_audit_manifest
+
+    f = tmp_path / "audit.jsonl"
+    f.write_text('{"doc_id": "d1"}\n# comment\nd2\n{"doc_id": "d3", "extra": 1}\n\n',
+                 encoding="utf-8")
+    ids = load_audit_manifest(str(f))
+    assert ids == frozenset({"d1", "d2", "d3"})
