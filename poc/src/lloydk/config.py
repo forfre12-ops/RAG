@@ -523,6 +523,10 @@ class Settings(BaseSettings):
     # 텍스트와 OCR/스캔본이 동일 입력으로 분류기에 진입해 표 누락·깨진 문자가 조용히 오분류되던 것을 차단.
     extraction_review_min_quality: float = 0.6  # 정규화 품질(0~1) 이 미만이면 검수 라우팅
     extraction_ocr_requires_review: bool = True  # OCR 사용 추출은 검수 라우팅(스캔본 신뢰 낮음)
+    # HWP/HWPX 표 셀 미추출(rhwp의 조용한 표 흘림) 의심 문서를 검수 라우팅. 본문만 분류기에
+    # 들어가 표 속 등급·원가·임원보상 같은 영업비밀이 미탐되는 것을 차단(등급 불변·FNR-safe).
+    # 기본 ON. 표 다수 HWP 고객사에서 과라우팅 시 0으로 끄거나 [hwp-tables]로 표를 회수.
+    extraction_table_coverage_review: bool = True
 
     # 표적 1 (2026-05-29): InferencePipeline use_rag 활성 시 retrieval facade 호출 기본값.
     rag_default_collection: str = "docs"

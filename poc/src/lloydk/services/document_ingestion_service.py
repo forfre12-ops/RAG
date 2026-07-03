@@ -60,6 +60,7 @@ def extraction_review_decision(
     min_quality: float,
     ocr_requires_review: bool,
     content_quality: float | None = None,
+    table_coverage: str | None = None,
 ) -> ExtractionReviewDecision:
     """본문이 존재하는(비어있지 않은) 추출이 검수 라우팅 대상인지 순수 판정.
 
@@ -71,7 +72,12 @@ def extraction_review_decision(
     content_quality(normalizer.quality_score, 콘텐츠 기반)를 함께 받아 <50자·깨진 본문(≤0.2)을
     보완 포착한다(영어 과라우팅 회피 위해 별도 저임계 _THIN_CONTENT_QUALITY 적용).
 
-    reasons(우선순위 무관, 복수 가능): extract_error(추출 경고), ocr(OCR 사용), low_quality(품질 미만).
+    table_coverage="incomplete" 는 원문에 표가 있는데 셀 텍스트가 추출본에 빠진 경우(HWP/HWPX의
+    조용한 표 미추출) — 본문만 보면 표 속 영업비밀이 미탐되므로 검수 라우팅한다. 메서드 고정
+    quality 로는 안 잡히는 사각(0.95로 통과)이라 별도 신호로 받는다.
+
+    reasons(우선순위 무관, 복수 가능): extract_error(추출 경고), ocr(OCR 사용),
+    low_quality(품질 미만), table_incomplete(표 셀 미추출 의심).
     """
     reasons: list[str] = []
     if error:
@@ -82,6 +88,8 @@ def extraction_review_decision(
     content_thin = content_quality is not None and content_quality < _THIN_CONTENT_QUALITY
     if method_low or content_thin:
         reasons.append("low_quality")  # 메서드 저품질 또는 얇은/깨진 콘텐츠 — 사유 단일화
+    if table_coverage == "incomplete":
+        reasons.append("table_incomplete")  # 표 셀 미추출 의심 → 표 속 비밀 미탐 방지
     return ExtractionReviewDecision(requires_review=bool(reasons), reasons=reasons)
 
 
@@ -271,10 +279,13 @@ class DocumentIngestionService:
             from lloydk.config import settings  # noqa: PLC0415
             min_q = float(getattr(settings, "extraction_review_min_quality", 0.6))
             ocr_req = bool(getattr(settings, "extraction_ocr_requires_review", True))
+            table_review = bool(getattr(settings, "extraction_table_coverage_review", True))
         except Exception:  # noqa: BLE001
-            min_q, ocr_req = 0.6, True
+            min_q, ocr_req, table_review = 0.6, True, True
         if not has_text:
             return ExtractionReviewDecision(requires_review=False, reasons=[]), ["empty"]
+        # 표 커버리지 라우팅은 기본 ON이나, HWP 표 다수 고객사에서 과라우팅 시 끌 수 있게 토글.
+        coverage = (ext.table_coverage if ext else None) if table_review else None
         decision = extraction_review_decision(
             quality=(float(ext.quality) if ext else None),
             ocr_used=(bool(ext.ocr_used) if ext else False),
@@ -282,6 +293,7 @@ class DocumentIngestionService:
             min_quality=min_q,
             ocr_requires_review=ocr_req,
             content_quality=content_quality,
+            table_coverage=coverage,
         )
         return decision, list(decision.reasons)
 

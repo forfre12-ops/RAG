@@ -58,6 +58,12 @@ class ExtractResult:
     ocr_used: bool = False
     pages: int | None = None
     error: str | None = None
+    # 표 커버리지 신호 — 원문에 표가 있는데 셀 텍스트가 추출본에 빠졌을 때 "incomplete".
+    # HWP/HWPX에서 rhwp가 표·글상자 셀을 흘리면 본문만 분류기에 들어가 표 속 영업비밀이
+    # '조용히' 미탐(FNR)되는 것을 가시화한다. None=해당없음/회수됨/판정불가. 메서드 고정
+    # quality(0.95 등)는 '무엇을 놓쳤나'가 아니라 '어떤 파서를 썼나'만 반영해 부분손실을
+    # 가리므로, 이 신호로 검수 라우팅을 발동한다(등급 불변 — FNR-safe).
+    table_coverage: str | None = None
 
 
 def extract(path: str | Path) -> ExtractResult:
@@ -117,7 +123,8 @@ def _extract_hwp(p: Path) -> ExtractResult:
             error=f"HWP 추출에는 rhwp-python 필요 (pip install '.[hwp]'): {exc}",
         )
     try:
-        text = rhwp.parse(str(p)).extract_text()
+        doc = rhwp.parse(str(p))
+        text = doc.extract_text()
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="rhwp", quality=0.0, error=str(exc))
 
@@ -134,7 +141,93 @@ def _extract_hwp(p: Path) -> ExtractResult:
             error="rhwp가 본문 텍스트를 추출하지 못함 — 표·글상자 전용 문서일 수 있음. "
                   "표 셀 회수에는 pyhwp 필요: pip install '.[hwp-tables]' (AGPL).",
         )
-    return ExtractResult(text=text, method="rhwp", quality=0.95)
+    # 본문은 뽑혔지만 표 셀이 빠졌을 수 있다(rhwp의 조용한 표 미추출) — 커버리지 판정.
+    coverage = _hwp_table_coverage(p, doc, text)
+    return ExtractResult(text=text, method="rhwp", quality=0.95, table_coverage=coverage)
+
+
+def _hwp_table_coverage(p: Path, doc, text: str) -> str | None:
+    """rhwp가 본문은 뽑았으나 표 셀을 흘렸는지 판정 → "incomplete" | None.
+
+    표 속 등급·원가·담당·임원보상 같은 영업비밀이 본문에 없으면 분류기가 못 보고
+    저등급으로 '조용히' 미탐한다. 메서드 고정 quality(0.95)로는 안 잡히는 사각.
+
+    - **.hwpx**: 원본 zip의 section XML에서 표 셀 텍스트(<...:t>)를 뽑아 추출본과 대조.
+      셀 텍스트가 추출본에 없으면 "incomplete"(정밀 — rhwp가 회수했으면 flag 안 함).
+    - **.hwp(바이너리)**: 셀 텍스트는 rhwp HWPX 변환에도 빠지므로 대조 불가. 표 *구조*
+      존재만 보고 "incomplete"(pyhwp로 회수했으면 이 경로에 안 옴). 보수적(FNR-safe).
+
+    판정 실패·예외·표 없음은 None(graceful) — 과라우팅을 피한다.
+    """
+    try:
+        suffix = p.suffix.lower()
+        if suffix == ".hwpx":
+            if _hwpx_uncaptured_table_cells(p.read_bytes(), text or ""):
+                return "incomplete"
+            return None
+        if suffix == ".hwp":
+            hwpx_bytes = doc.to_hwpx_bytes()
+            if _hwpx_bytes_has_table(hwpx_bytes):
+                return "incomplete"
+            return None
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+def _hwpx_uncaptured_table_cells(hwpx_bytes: bytes, extracted_text: str) -> bool:
+    """HWPX(zip)의 표 셀 텍스트 중 추출본에 없는 게 하나라도 있으면 True.
+
+    section XML의 <...:tbl> 블록 안 <...:t> 텍스트를 모아, 공백 제거 후 추출본(공백 제거)에
+    부분문자열로 존재하는지 본다. 접두 네임스페이스 무관(hp:/hhs:/무접두 모두 매칭).
+    셀 텍스트가 이미 본문에 있으면(회수됨/반복) flag 안 함 — 오탐 최소화.
+    """
+    import html as _html
+    import io
+    import re as _re
+    import zipfile
+
+    norm = _re.sub(r"\s+", "", extracted_text or "")
+    try:
+        z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
+    except Exception:  # noqa: BLE001
+        return False
+    names = [n for n in z.namelist() if n.lower().endswith(".xml") and "section" in n.lower()]
+    if not names:
+        names = [n for n in z.namelist() if n.lower().endswith(".xml")]
+    for n in names:
+        try:
+            xml = z.read(n).decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            continue
+        for tbl in _re.findall(r"<(?:\w+:)?tbl\b[^>]*>(.*?)</(?:\w+:)?tbl>", xml, _re.S):
+            for cell in _re.findall(r"<(?:\w+:)?t\b[^>]*>(.*?)</(?:\w+:)?t>", tbl, _re.S):
+                c = _html.unescape(_re.sub(r"<[^>]+>", "", cell)).strip()
+                if len(c) >= 2 and _re.sub(r"\s+", "", c) not in norm:
+                    return True
+    return False
+
+
+def _hwpx_bytes_has_table(hwpx_bytes: bytes) -> bool:
+    """HWPX(zip) 어느 XML에든 표 구조(<...:tbl>)가 있으면 True (존재만 판정)."""
+    import io
+    import re as _re
+    import zipfile
+
+    try:
+        z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
+    except Exception:  # noqa: BLE001
+        return False
+    for n in z.namelist():
+        if not n.lower().endswith(".xml"):
+            continue
+        try:
+            xml = z.read(n).decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            continue
+        if _re.search(r"<(?:\w+:)?tbl\b", xml):
+            return True
+    return False
 
 
 def _hwp5html_cmd() -> str | None:
