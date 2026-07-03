@@ -37,14 +37,29 @@ def main() -> int:
     ap.add_argument("--min-n", type=int, default=30, help="칸당 최소 표본(미달=INCONCLUSIVE)")
     ap.add_argument("--report", default="reports/anchor_eval_cards.md")
     ap.add_argument("--tau", default="", help="escalation τ override(빈칸=settings 기본). 0=argmax")
+    ap.add_argument("--constructed-floor", action="append", default=[], metavar="RUN_DIR",
+                    help="constructed_floor run 디렉터리(또는 admitted.jsonl)를 자체 slice로 편입"
+                         "(opt-in·반복 가능). 라벨=floor(≥등급): FNR verdict만 의미, recall은 참고용.")
     args = ap.parse_args()
 
     from lloydk.config import settings
+    from lloydk.modules.m6_evaluation.anchor_corpus import (
+        DEFAULT_ANCHOR_SOURCES,
+        constructed_floor_source,
+    )
     from lloydk.modules.m6_evaluation.anchor_eval import run_anchor_cards
 
     model_dir = Path(args.model_dir)
     if not model_dir.is_absolute():
         model_dir = _HERE.parent / model_dir
+
+    # constructed_floor는 opt-in — 지정 시에만 기본 앵커에 자체 slice로 덧붙인다(기본 경로 무변경).
+    sources = None
+    if args.constructed_floor:
+        extra = [constructed_floor_source(p) for p in args.constructed_floor]
+        sources = list(DEFAULT_ANCHOR_SOURCES) + extra
+        print(f"[constructed-floor] {len(extra)}개 run 편입(자체 slice, floor 라벨) — "
+              f"FNR verdict만 의미·recall 참고용", file=sys.stderr)
 
     saved_tau = settings.classifier_escalation_tau
     if args.tau.strip():
@@ -53,6 +68,7 @@ def main() -> int:
     try:
         out_json = run_anchor_cards(
             model_dir=str(model_dir),
+            sources=sources,
             cap_per_cell_n=args.cap_per_cell,
             min_n=args.min_n,
         )

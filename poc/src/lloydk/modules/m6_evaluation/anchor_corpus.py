@@ -178,6 +178,46 @@ def normalize_nkt(raw: dict, *, source: str = "anchor_nkt", origin: str = "") ->
     )
 
 
+def normalize_constructed_floor(
+    raw: dict, *, source: str = "constructed_floor", origin: str = ""
+) -> AnchorRecord | None:
+    """constructed_floor admitted.jsonl 한 줄 → AnchorRecord (자체 slice로 격리).
+
+    ⚠️ 라벨 의미론은 **floor(≥등급)**다. under-class FNR 카드에는 정확히 맞물린다:
+    floor=S2 문서를 S3(더 공개)로 예측 = 위반(미탐), TS/S1(더 비밀)로 예측 = 위반 아님
+    (floor 이상이므로). 즉 이 셀의 FAIL은 '명백 케이스에서조차 미탐' 신호(정당한 veto)다.
+    단 카드의 recall(=정확일치) 컬럼은 floor 셀에서 과소평가된다(floor 초과 예측이 '정답'으로
+    안 세짐) — verdict(FNR)만 의미 있고 recall은 참고용. eval_cards는 공유 순수모듈이라
+    특례를 넣지 않고 여기 문서로 명시한다.
+
+    admitted.jsonl 계약(build_constructed_floor_set): {doc_id, text, label(=floor grade),
+    witnesses:[{token,basis}], tier, label_source}. witness 토큰은 등급결정 구체값이라
+    required_tokens(D 역방향 적격 body_fact급)로 그대로 싣는다.
+    """
+    grade = str(raw.get("label") or raw.get("intended_grade") or "").strip()
+    text = (raw.get("text") or "").strip()
+    if grade not in VALID_GRADES or not text:
+        return None
+    did = str(raw.get("doc_id") or "")
+    witnesses = raw.get("witnesses") or []
+    tokens = [str(w.get("token") or "").strip() for w in witnesses if w.get("token")]
+    bases = [str(w.get("basis") or "").strip() for w in witnesses if w.get("basis")]
+    # 무근거 floor 주장 금지(constructed_floor 원칙) — witness 없는 레코드는 등급 앵커 불가.
+    # 빌더는 항상 witness를 넣지만, 손상/외부 파일이 그 보장 없이 흘러들어도 안전-skip.
+    if not tokens:
+        return None
+    return AnchorRecord(
+        anchor_id="cf:" + (did or _stable_id(text[:120])),
+        text=text,
+        anchor_grade=grade,
+        source=source,
+        grade_basis=(bases[0][:160] if bases else str(raw.get("witness_id") or "")),
+        required_tokens=[t for t in tokens if len(t) >= 2],
+        token_sources=["body_fact"] * len([t for t in tokens if len(t) >= 2]),
+        origin=origin,
+    )
+
+
 def normalize_gold_real(raw: dict, *, source: str = "holdout_gold", origin: str = "") -> AnchorRecord | None:
     """gold_real 홀드아웃 한 줄 → AnchorRecord. 전 등급 인정, doc_id를 앵커 id로."""
     grade = str(raw.get("label") or raw.get("expected_grade") or "").strip()
@@ -207,13 +247,29 @@ class AnchorSource:
     kind: str            # "nkt" | "gold_real"
     source: str          # C 카드 slice 라벨
 
-    _NORMALIZERS = {"nkt": normalize_nkt, "gold_real": normalize_gold_real}
+    _NORMALIZERS = {
+        "nkt": normalize_nkt,
+        "gold_real": normalize_gold_real,
+        "constructed_floor": normalize_constructed_floor,
+    }
 
     def normalizer(self):
         fn = self._NORMALIZERS.get(self.kind)
         if fn is None:
             raise ValueError(f"unknown anchor source kind: {self.kind!r}")
         return fn
+
+
+def constructed_floor_source(path: str | Path, *, slice_name: str = "constructed_floor") -> AnchorSource:
+    """constructed_floor run 디렉터리(또는 admitted.jsonl 직접 경로) → AnchorSource.
+
+    **기본 앵커에 미포함(opt-in)**: run 산출물은 run-스코프·gitignore라 DEFAULT_ANCHOR_SOURCES에
+    넣지 않는다. eval_anchor_cards --constructed-floor 로 명시 편입할 때만 자체 slice로 붙는다
+    (deploy gate 앵커 경로는 sources 미지정=기본만 쓰므로 자동 유입 없음).
+    """
+    p = Path(path)
+    admitted = p / "admitted.jsonl" if p.is_dir() else p
+    return AnchorSource(str(admitted), "constructed_floor", slice_name)
 
 
 # 기본 앵커 소스 — 저장소 로컬 데이터(외부 의존 0). 누출 제거(.clean) 우선.
