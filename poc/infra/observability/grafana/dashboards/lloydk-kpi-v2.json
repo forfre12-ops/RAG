@@ -31,7 +31,7 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "FNR overall (%, 24h) — 사람라벨 필요·미배선(0/0=NaN); 실시간 미탐은 패널8 참조",
+      "title": "FNR overall (%, 24h) — 검수확정 모집단 정탐율(배선됨·선택편향); 실분포는 연합평가·실시간 미탐은 패널8",
       "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
       "targets": [
         {"expr": "100 * (1 - sum(rate(lloydk_classify_correct_total[24h])) / sum(rate(lloydk_classify_total[24h])))",

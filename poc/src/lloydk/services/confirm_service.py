@@ -29,6 +29,26 @@ from lloydk.schemas.confirm import (
 logger = logging.getLogger(__name__)
 
 
+def _record_live_fnr(predicted_level_id, final_level_id) -> None:
+    """정답 확정 시점(confirm/relabel)에 라이브 FNR 카운터를 동반 증가.
+
+    lloydk_classify_total(분모)은 정답이 확정된 분류마다 1, lloydk_classify_correct_total
+    (분자)은 확정 등급이 모델 예측과 일치할 때만 1 증가한다. FnrSpikeOverall =
+    100*(1 - correct/total). 서빙 시점엔 정답이 없어 여기(사람 검수 확정)에서만 채운다
+    — prom_metrics.py의 계약(둘을 동반 증가). best-effort — 실패해도 검수 흐름 불변.
+    """
+    try:
+        from lloydk.api.prom_metrics import (  # noqa: PLC0415
+            CLASSIFY_CORRECT_TOTAL,
+            CLASSIFY_TOTAL,
+        )
+        CLASSIFY_TOTAL.inc()
+        if predicted_level_id is not None and final_level_id == predicted_level_id:
+            CLASSIFY_CORRECT_TOTAL.inc()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def count_needs_second_review_by_grade() -> dict[str, int]:
     """[번들 B] 이중검토 보류(status='needs_second_review') 건수를 등급코드별로 집계.
 
@@ -202,6 +222,8 @@ class ConfirmService:
                         corrected_by=req.actor.user_id,
                         reason=reason,
                     )
+                    # 정답 확정(신규 교정 1건) — 라이브 FNR 분모/분자 동반 증가(멱등 재클릭 제외).
+                    _record_live_fnr(cls.predicted_level_id, target_level_id)
                 # [C-cons] 고등급 확정도 2인검토 통과 전까지 보류(기본 off → 'confirmed' 그대로).
                 status, second_required = _apply_dual_review_gate(
                     repo, cls, target_level_id, req.confirmed_label, base_status="confirmed", warns=warns
@@ -266,6 +288,8 @@ class RelabelService:
                         corrected_by=req.actor.user_id,
                         reason=req.reason,
                     )
+                    # 정답 확정(신규 교정 1건) — 예측(predicted_level_id) 대비 확정등급으로 FNR 배선.
+                    _record_live_fnr(cls.predicted_level_id, corr_id)
                 # [C-cons] 고등급 변경은 2인검토 통과 전까지 needs_second_review로 보류(기본 off).
                 status, second_required = _apply_dual_review_gate(
                     repo, cls, corr_id, req.corrected_label, base_status="corrected", warns=warns

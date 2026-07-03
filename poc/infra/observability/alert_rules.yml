@@ -75,9 +75,10 @@ groups:
     rules:
       - alert: FnrSpikeOverall
         # P1-F2: 일별 FNR이 5%를 5분 평균으로 초과하면 알람
-        # NEW-H2 주의: lloydk_classify_correct_total/total 은 prom_metrics 에 정의됐으나
-        # 아직 증가 배선 전(정탐 판정에 정답 필요 — corrections/confirm 경로에서 동반 증가 예정).
-        # 둘 다 0이면 expr=0/0=NaN 으로 무발화(안전). 운영 1차 미탐 신호는 ActiveLearningUrgent 사용.
+        # lloydk_classify_correct_total/total 은 confirm_service._record_live_fnr 가 사람 검수
+        # 확정(신규 교정, 멱등 재클릭 제외)마다 동반 증가한다(배선됨). 확정 신호 없으면 둘 다 0 →
+        # expr=0/0=NaN 으로 무발화(안전). ⚠️ 검수 선택편향 모집단의 정탐율이므로 실분포 미탐이 아님
+        # (실분포는 연합평가). 운영 1차 미탐 신호는 ActiveLearningUrgent 를 계속 사용.
         expr: |
           100 * (1 - sum(rate(lloydk_classify_correct_total[5m])) / sum(rate(lloydk_classify_total[5m]))) > 5
         for: 10m

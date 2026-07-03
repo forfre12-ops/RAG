@@ -301,17 +301,20 @@ CELERY_QUEUE_LENGTH = Gauge(
 # 실시간 분류 정확도 신호용 — FnrSpikeOverall = 100*(1 - correct/total).
 # ⚠️ '정탐' 판정에는 정답(ground truth)이 필요하나 서빙 시점엔 알 수 없다. 두 카운터를
 # 함께 증가시키지 않으면(예: total만) expr 가 100%로 거짓 발화하므로, 정답이 확정되는
-# 경로(corrections/confirm)에서만 동반 증가시켜야 한다. 현재는 **정의만**(둘 다 0 → expr
-# 가 0/0=NaN → 무발화, 안전). 운영 실시간 미탐 신호는 이미 배선된
-# lloydk_active_learning_pending_underclass(ActiveLearningUrgent)를 1차로 사용한다.
+# 경로에서만 동반 증가시킨다. **배선됨**: confirm_service._record_live_fnr 가 사람 검수
+# 확정(신규 교정 1건, 멱등 재클릭 제외)마다 total+1, 확정등급==예측이면 correct+1. 확정
+# 신호 없기 전엔 둘 다 0 → expr 0/0=NaN → 무발화(안전). ⚠️ 검수는 선택편향(플래그된 것
+# 위주)이라 이 비율은 실분포 정확도가 아니라 '검수 확정 모집단'의 정탐율이다 — 실분포 미탐은
+# 연합평가(federated_eval)로 본다. 운영 실시간 신호 1차는
+# lloydk_active_learning_pending_underclass(ActiveLearningUrgent).
 CLASSIFY_TOTAL = Counter(
     "lloydk_classify_total",
-    "Classifications with a later-known ground truth (denominator for live FNR; not yet wired)",
+    "Classifications with a human-confirmed ground truth (denominator for live FNR; wired at confirm/relabel)",
     registry=registry,
 )
 CLASSIFY_CORRECT_TOTAL = Counter(
     "lloydk_classify_correct_total",
-    "Ground-truth-correct classifications (numerator for live FNR; not yet wired)",
+    "Human-confirmed grade matched the model prediction (numerator for live FNR; wired at confirm/relabel)",
     registry=registry,
 )
 # [P1-obs] 서빙 등급 분포 — 분류 결과 등급별 카운터(kpi-v2 '분류 등급 분포' 패널 백킹).
