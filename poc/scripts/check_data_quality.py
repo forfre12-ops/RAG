@@ -299,7 +299,14 @@ def main() -> int:
                     help="누출 게이트 대상 holdout/test (쉼표로 여러 개). 기본=정화 홀드아웃 → "
                          "train-pool과 텍스트해시 누출 검사를 기본 수행(fail-closed). 빈 문자열('')로 비활성.")
     ap.add_argument("--report", default="reports/data_quality_report.json")
+    ap.add_argument("--strict-coverage", action="store_true",
+                    help="누출/overlap 검사가 입력 부재로 **수행되지 못하면** FAIL(exit 1). 기본 off — "
+                         "CI에서 학습풀을 추적/공급하면 이 플래그로 '무음 skip=green'(fake-green)을 차단한다.")
     args = ap.parse_args()
+
+    # 검사가 '통과'가 아니라 '수행 못 됨'인 경우를 명시 기록 — train_overlap=0 이 '검증됨'으로
+    # 오독되는 fake-green 을 차단한다(무음 skip 대신 가시적 COVERAGE-GAP + 옵션 강제).
+    coverage_gaps: list[str] = []
 
     # 일반 split 로드
     splits: dict[str, list[dict]] = {}
@@ -336,7 +343,15 @@ def main() -> int:
             train_hashes: set[str] = set()
             if "train" in splits:
                 train_hashes = {_sha1(_text(r)) for r in splits["train"]}
+            else:
+                # train split 부재 → gold↔train overlap 을 계산할 수 없다. train_overlap=0 이
+                # '오염 없음 검증됨'으로 오독되지 않도록 명시적 coverage-gap 으로 남긴다.
+                coverage_gaps.append(
+                    f"gold train-overlap 미검사 — train split 부재({args.train or '미지정'})")
+                print("[COVERAGE-GAP] gold↔train overlap NOT checked — train split 부재 "
+                      "(train_overlap=0 은 '검증됨'이 아니라 '미검사')", file=sys.stderr)
             gstats, gissues = check_gold_real("gold_real", gold_records, train_hashes)
+            gstats["train_overlap_checked"] = bool(train_hashes)
             all_stats.append(gstats)
             all_issues.extend(gissues)
         else:
@@ -346,13 +361,16 @@ def main() -> int:
     if args.train_pool and args.holdout:
         tp = Path(args.train_pool)
         if not tp.exists():
-            print(f"[SKIP] leak-check: train-pool {tp} 없음", file=sys.stderr)
+            coverage_gaps.append(f"leak-check 미수행 — train-pool 부재({tp})")
+            print(f"[COVERAGE-GAP] leak-check NOT run — train-pool {tp} 없음 "
+                  "(누출 검사가 통과가 아니라 미수행)", file=sys.stderr)
         else:
             train_pool = load_jsonl(tp)
             for hpath in [h.strip() for h in args.holdout.split(",") if h.strip()]:
                 hp = Path(hpath)
                 if not hp.exists():
-                    print(f"[SKIP] leak-check: holdout {hp} 없음", file=sys.stderr)
+                    coverage_gaps.append(f"leak-check 미수행 — holdout 부재({hp})")
+                    print(f"[COVERAGE-GAP] leak-check NOT run — holdout {hp} 없음", file=sys.stderr)
                     continue
                 lstats, lissues = check_leakage(train_pool, load_jsonl(hp), hp.name, tp.name)
                 leak_stats.append(lstats)
@@ -430,15 +448,23 @@ def main() -> int:
         for issue in all_issues:
             print(f"  {issue}")
 
-    verdict = "PASS" if not fails else "FAIL"
-    print(f"\n결과: {verdict}  (FAIL={len(fails)}, WARN={len(warns)})")
+    # coverage-gap: 기본은 verdict 불변(가시 기록만), --strict-coverage 면 미수행 검사를 FAIL 처리.
+    strict_fail = bool(args.strict_coverage and coverage_gaps)
+    verdict = "FAIL" if (fails or strict_fail) else "PASS"
+    if coverage_gaps:
+        print(f"\n[COVERAGE-GAP] 수행되지 못한 검사 {len(coverage_gaps)}건"
+              f"{' → --strict-coverage 로 FAIL 처리' if strict_fail else ' (가시 기록; strict 아님)'}:")
+        for g in coverage_gaps:
+            print(f"  - {g}")
+    print(f"\n결과: {verdict}  (FAIL={len(fails)}, WARN={len(warns)}, COVERAGE-GAP={len(coverage_gaps)})")
 
     out = Path(args.report)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(
             {"verdict": verdict, "fail_count": len(fails), "warn_count": len(warns),
-             "issues": all_issues, "splits": all_stats, "leakage": leak_stats},
+             "issues": all_issues, "splits": all_stats, "leakage": leak_stats,
+             "coverage_gaps": coverage_gaps, "strict_coverage": bool(args.strict_coverage)},
             ensure_ascii=False, indent=2,
         ),
         encoding="utf-8",
