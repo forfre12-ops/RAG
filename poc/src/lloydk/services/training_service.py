@@ -119,6 +119,13 @@ def _maybe_metamorphic_report(settings: Any) -> dict | None:
         if not isinstance(rep, dict):
             logger.warning("metamorphic gate: 리포트가 dict 아님 — 생략")
             return None
+        # [계약 정합] gen_metamorphic_pairs.py 는 감사 메타(model_dir·admitted…)와 함께 실 리포트를
+        # "report" 키 아래 중첩해 쓴다. 그러나 summarize_metamorphic 은 **최상위** forward 를
+        # 읽으므로, 중첩형을 그대로 넘기면 forward=None → n=0 → measurable=False 로 **조용히 통과**
+        # 하는 fake-pass가 된다. 중첩형이면 내부 report 로 언랩해 게이트가 실제 위반을 보게 한다.
+        inner = rep.get("report")
+        if isinstance(inner, dict) and "forward" in inner:
+            rep = inner
         fwd = (rep.get("forward") or {})
         logger.warning(
             "metamorphic gate: 리포트 로드 — 순방향 위반 %s/%s",
