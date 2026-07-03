@@ -21,3 +21,7 @@ migration/
 licenses/
 .ipynb_checkpoints/
 datasets/gold/formats/
+# run-스코프 생성 산출물(스크립트로 재현 — 비결정적 LLM 출력 포함, 정본 아님)
+datasets/constructed_floor_runs/
+datasets/patent_timeaxis/
+datasets/gold_real/*.bak-forged-nkt
