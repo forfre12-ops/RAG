@@ -4,8 +4,8 @@
 
 - locked_gold_eval: 0 (사람서명 없음 — 이건 true gold 아님)
 - proxy_eval (leakage-free): 166 / 777
-  - external_authority (nkt+public, 실측 인용 가능): 85
-  - synthetic_proxy (koipa/rule_llm/codex, 스모크 전용): 81
+  - external_authority (nkt+public, 실측 인용 가능): 79
+  - synthetic_proxy (koipa/rule_llm/codex, 스모크 전용): 87
 - train_leak (학습중복 → eval서 배제): 48
 - silver_train_only: 356
 - quarantine: 207
@@ -38,31 +38,44 @@
 
 {
   "external_authority": {
-    "count": 85,
+    "count": 79,
     "labels": {
-      "TS": 36,
+      "TS": 30,
       "S1": 0,
       "S2": 0,
       "S3": 49
     },
     "label_source": {
       "public_definitive": 49,
-      "nkt_designated": 36
+      "nkt_designated": 30
     },
     "note": "정부지정·공개 확정 = 사람서명 없이도 진짜 정답. 실측 인용 가능."
   },
   "synthetic_proxy": {
-    "count": 81,
+    "count": 87,
     "labels": {
-      "TS": 0,
+      "TS": 6,
       "S1": 40,
       "S2": 41,
       "S3": 0
     },
     "label_source": {
-      "koipa_case_based": 81
+      "koipa_case_based": 81,
+      "nkt_designated": 6
     },
-    "note": "손작성/LLM 프록시 = 분류기와 편향 공유 가능(상관오류). 스모크용, 실정확도 근거로 인용 금지."
+    "note": "손작성/LLM 프록시 = 분류기와 편향 공유 가능(상관오류). 스모크용, 실정확도 근거로 인용 금지.",
+    "forged_authority_claims": {
+      "count": 6,
+      "doc_ids": [
+        "ab71b54ebe76b4e4",
+        "b0c94e7f392f92f3",
+        "b391d2be6b03368a",
+        "caca4c19ecad4225",
+        "caea175d89e8cc09",
+        "e28b7763a5e000ec"
+      ],
+      "note": "label_source는 외부권위를 주장하나 record에 legal_reference 없음 — provenance 위조 의심, curated_scenario로 교정 필요."
+    }
   }
 }
 

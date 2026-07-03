@@ -59,14 +59,29 @@ def test_quarantine_applied_to_proxy_branch():
 
 def test_authority_breakdown_splits_external_vs_synthetic():
     original = [
-        _row("A", "aa", "TS", "nkt_designated"),
+        _row("A", "aa", "TS", "nkt_designated", legal_reference="산업기술보호법 §9 고시"),
         _row("B", "bb", "S3", "public_definitive"),
         _row("K", "kk", "S2", "koipa_case_based"),
     ]
     out = M.build(original, list(original), [], set())
     ab = out["manifest"]["proxy_eval"]["authority_breakdown"]
-    assert ab["external_authority"]["count"] == 2   # nkt + public = 진짜 정답
+    assert ab["external_authority"]["count"] == 2   # nkt(근거 있음) + public = 진짜 정답
     assert ab["synthetic_proxy"]["count"] == 1      # koipa = 합성 프록시
+
+
+def test_forged_nkt_without_legal_reference_is_synthetic():
+    # 2026-07-03 감사: legal_reference 없는 nkt_designated = 위조 provenance → external 불가,
+    # synthetic으로 강등 + forged_authority_claims로 폭로(무음 편입 차단).
+    original = [
+        _row("F", "forged scenario", "TS", "nkt_designated"),  # 근거 없음
+        _row("B", "bb", "S3", "public_definitive"),
+    ]
+    out = M.build(original, list(original), [], set())
+    ab = out["manifest"]["proxy_eval"]["authority_breakdown"]
+    assert ab["external_authority"]["count"] == 1  # public만
+    assert ab["synthetic_proxy"]["count"] == 1
+    forged = ab["synthetic_proxy"]["forged_authority_claims"]
+    assert forged["count"] == 1 and forged["doc_ids"] == ["F"]
 
 
 def test_main_requires_train(tmp_path, monkeypatch):

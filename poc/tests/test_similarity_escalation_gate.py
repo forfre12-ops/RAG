@@ -474,10 +474,20 @@ class TestVerifiedHumanGradeLive:
 
     def test_legal_designated_label_returns_grade(self, db, levels):
         doc = _seed_doc(db)
+        _upsert_label(db, doc, levels["TS"], "nkt_designated")  # 정부지정 = 권위 출처
+        db.commit()
+        try:
+            assert ClassifyService._verified_human_grade(str(doc.doc_id)) == "TS"
+        finally:
+            _cleanup_docs([doc.doc_id])
+
+    def test_koipa_label_demoted_returns_none(self, db, levels):
+        # 2026-07-03 감사 강등: koipa=손작성 시나리오+판례 인용 조작 확인 → 권위 출처 아님.
+        doc = _seed_doc(db)
         _upsert_label(db, doc, levels["S1"], "koipa_case_based")
         db.commit()
         try:
-            assert ClassifyService._verified_human_grade(str(doc.doc_id)) == "S1"
+            assert ClassifyService._verified_human_grade(str(doc.doc_id)) is None
         finally:
             _cleanup_docs([doc.doc_id])
 

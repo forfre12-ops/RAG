@@ -1,11 +1,14 @@
 """golden_tiers.tier_of 파생 + consumer 필터(eval=locked/floor, train≠locked) 계약 테스트."""
 from lloydk.golden_tiers import (
+    EXTERNAL_AUTHORITY_SOURCES,
+    SYNTHETIC_PROXY_SOURCES,
     TIER_CANDIDATE,
     TIER_LEGAL_FLOOR,
     TIER_LOCKED,
     TIER_SILVER,
     eval_readiness,
     eval_records,
+    is_external_authority,
     partition_by_tier,
     tier_of,
     train_records,
@@ -23,8 +26,34 @@ def test_human_review_with_machine_reviewer_not_locked():
 
 
 def test_legal_floor_sources():
-    for s in ("public_definitive", "koipa_case_based", "nkt_designated", "codex_review"):
+    for s in ("public_definitive", "koipa_case_based", "nkt_designated", "codex_review",
+              "curated_scenario"):
         assert tier_of({"label_source": s}) == TIER_LEGAL_FLOOR
+
+
+# ── 권위 분류(2026-07-03 감사) — 외부권위 vs 큐레이트 프록시 ─────────────────────
+
+
+def test_authority_sets_disjoint_and_koipa_demoted():
+    # koipa 판례 인용 조작 확인 → 어떤 경로에서도 외부권위 아님
+    assert "koipa_case_based" in SYNTHETIC_PROXY_SOURCES
+    assert "koipa_case_based" not in EXTERNAL_AUTHORITY_SOURCES
+    assert not (EXTERNAL_AUTHORITY_SOURCES & SYNTHETIC_PROXY_SOURCES)
+
+
+def test_is_external_authority_record_level():
+    # public 판례 = 외부권위 (record 조건 없음)
+    assert is_external_authority({"label_source": "public_definitive"})
+    # nkt는 지정근거(legal_reference)가 있어야 성립 — 위조 provenance 차단
+    assert is_external_authority(
+        {"label_source": "nkt_designated", "legal_reference": "산업기술보호법 §9 고시 제2023-209호"}
+    )
+    assert not is_external_authority({"label_source": "nkt_designated"})
+    assert not is_external_authority({"label_source": "nkt_designated", "legal_reference": "  "})
+    # 큐레이트 프록시는 항상 아님
+    assert not is_external_authority({"label_source": "koipa_case_based"})
+    assert not is_external_authority({"label_source": "curated_scenario"})
+    assert not is_external_authority({"label_source": "codex_review"})
 
 
 def test_gold_candidate_from_new_gate():

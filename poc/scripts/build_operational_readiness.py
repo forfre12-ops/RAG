@@ -292,7 +292,8 @@ def _write_md(payload: dict, out: Path) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     # 2026-06-05: 티어 분리. p1-public = *법적근거 티어*(real-ish 라벨: public_definitive/
-    # koipa_case_based/nkt_designated)를 신뢰 신호로(게이트 판정 기준). p1-llm = 전체 홀드아웃
+    # nkt_designated — koipa는 2026-07-03 인용조작 확인으로 강등, curated_scenario로 분리 보고)
+    # 를 신뢰 신호로(게이트 판정 기준). p1-llm = 전체 홀드아웃
     # (llm_judge ~47% 노이즈 포함)을 보수적 하한으로. 'FAIL on 노이즈'를 'FAIL on 진짜 약점'과
     # 구분한다. 두 리포트는 `make p1-eval`이 배포 모델로 생성(단일 진실원).
     ap.add_argument("--p1-public", default="reports/p1_step3_legal_direct.json")

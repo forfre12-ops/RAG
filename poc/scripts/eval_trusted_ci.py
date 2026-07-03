@@ -6,8 +6,14 @@ The deployed headline (FNR 0.056, F1 0.634) is measured on the FULL clean
 holdout (109), but 61/109 of those labels were produced by an LLM judge
 (reviewer_id=llm_judge_local_openai). On that majority we are not measuring
 accuracy-vs-truth, we are measuring agreement-vs-another-model. Only the
-legally_grounded tier (nkt_designated=TS / public_definitive=S3 /
-koipa_case_based=S1,S2) carries real-world ground truth.
+legally_grounded tier (nkt_designated=TS / public_definitive=S3) carries
+real-world ground truth.
+
+[2026-07-03 강등] koipa_case_based는 legally_grounded에서 제외 — 감사에서 판례
+인용이 실사건과 무대응(사건번호 무관 재사용·자리표시자·시대착오)인 손작성 시나리오로
+확인됐다(golden_tiers.SYNTHETIC_PROXY_SOURCES). curated_scenario 티어로 분리 보고하며,
+그 수치는 시나리오 회귀(floor)이지 real-world accuracy가 아니다. 결과적으로 사람서명
+없는 현 단계에서 S1/S2의 real-world ground truth는 0건이다 — 이것이 정직한 상태다.
 
 This script reports the SAME metrics as eval_p1_model_gold, split by tier,
 with percentile bootstrap confidence intervals so the small-sample tiers
@@ -40,7 +46,10 @@ from lloydk.config import settings as _settings  # noqa: E402
 # 배포 모델 단일 진실원 = .env CLASSIFIER_MODEL_DIR (버전 하드코딩 드리프트 방지).
 _DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb"
 
-LEGAL = {"public_definitive", "koipa_case_based", "nkt_designated"}
+# 외부권위만 legally_grounded — 단일 진실원은 lloydk.golden_tiers(EXTERNAL_AUTHORITY_SOURCES).
+from lloydk.golden_tiers import EXTERNAL_AUTHORITY_SOURCES as LEGAL  # noqa: E402
+
+CURATED = {"koipa_case_based", "curated_scenario"}  # 손작성 시나리오 — floor 회귀용, 정답 아님
 LLMJ = {"llm_judge_primary", "llm_judge_consensus", "codex_review"}
 LABELS = ("TS", "S1", "S2", "S3")
 
@@ -48,6 +57,8 @@ LABELS = ("TS", "S1", "S2", "S3")
 def tier(ls: str) -> str:
     if ls in LEGAL:
         return "legally_grounded"
+    if ls in CURATED:
+        return "curated_scenario"
     if ls in LLMJ:
         return "llm_judge"
     return "other"
@@ -138,6 +149,7 @@ def main() -> int:
     tiers = {
         "ALL": rows,
         "legally_grounded": [r for r in rows if tier(r.get("label_source", "")) == "legally_grounded"],
+        "curated_scenario": [r for r in rows if tier(r.get("label_source", "")) == "curated_scenario"],
         "llm_judge": [r for r in rows if tier(r.get("label_source", "")) == "llm_judge"],
     }
     payload = {
@@ -154,13 +166,15 @@ def main() -> int:
         f"- model: `{args.model_dir}`",
         f"- holdout: `{args.holdout}`  | bootstrap: {args.n_boot} resamples (seed {args.seed})",
         "",
-        "`legally_grounded` = real-world labels (nkt=TS / public=S3 / koipa=S1,S2).",
+        "`legally_grounded` = real-world labels (nkt=TS / public=S3). koipa는 2026-07-03 강등"
+        "(판례 인용 조작 확인) — S1/S2 real-world truth는 현재 0건.",
+        "`curated_scenario` = 손작성 시나리오(구 koipa) — floor 회귀용, real-world accuracy 아님.",
         "`llm_judge` = labels produced by an LLM judge (agreement-vs-model, not truth).",
         "",
         "| Tier | n | high-risk n | F1 macro [95% CI] | FNR underclass [95% CI] | Recall S1 [95% CI] | Recall TS [95% CI] |",
         "|---|---:|---:|---|---|---|---|",
     ]
-    for name in ("ALL", "legally_grounded", "llm_judge"):
+    for name in ("ALL", "legally_grounded", "curated_scenario", "llm_judge"):
         b = payload["tiers"][name]
         md.append(
             f"| {name} | {b['n']} | {b['high_risk_n']} | {_fmt(b['f1_macro'])} | "

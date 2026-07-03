@@ -130,8 +130,11 @@ def main() -> int:
 
     def tier(r: dict) -> str:
         ls = r.get("label_source", "?")
-        if ls in {"public_definitive", "koipa_case_based", "nkt_designated"}:
+        # koipa는 2026-07-03 강등(판례 인용 조작 확인) — legally_grounded 아님(golden_tiers 참조).
+        if ls in {"public_definitive", "nkt_designated"}:
             return "legally_grounded"
+        if ls in {"koipa_case_based", "curated_scenario"}:
+            return "curated_scenario"
         if ls in {"llm_judge_primary", "llm_judge_consensus", "codex_review"}:
             return "llm_judge"
         return ls

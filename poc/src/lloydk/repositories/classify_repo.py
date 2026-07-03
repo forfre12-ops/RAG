@@ -264,12 +264,14 @@ class ClassifyRepo:
         """
         _LABEL_SOURCE_PRIORITY = {
             "human_review": 1,
-            "koipa_case_based": 2,
             "nkt_designated": 2,
-            "codex_review": 3,
             "public_definitive": 4,
             "rule_llm_agreement": 5,   # P1 신규 게이트(룰·LLM 합의+근거) — 구 llm_judge_consensus 동급
             "llm_judge_consensus": 5,
+            # 2026-07-03 감사 강등: koipa=손작성 시나리오+판례 인용 조작 확인, codex=LLM 리뷰 —
+            # 외부권위 아님(golden_tiers.SYNTHETIC_PROXY_SOURCES). LLM 심판 동급으로만 취급.
+            "koipa_case_based": 5,
+            "codex_review": 5,
             "llm_judge_primary": 6,
         }
 

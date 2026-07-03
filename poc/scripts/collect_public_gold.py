@@ -3,14 +3,19 @@
 
 등급별 라벨 근거 전략:
   S3: oss_corpus 판례 문서 (공개 법원 기록 → 정의상 S3)
-  S2: KOIPA 영업비밀보호 가이드라인 사례 기반 시나리오
-  S1: 대법원·특허법원 영업비밀 인정 판결 사례 기반
+  S2: 손작성 경계 시나리오 (KOIPA 가이드라인 모티프)
+  S1: 손작성 경계 시나리오 (영업비밀 판결 모티프)
   TS: 산업부 국가핵심기술 지정 고시 기반 기술 문서
 
 label_source:
-  public_definitive  — 이미 공개된 문서 (S3 자동)
-  koipa_case_based   — KOIPA 판례/가이드라인 근거 (S1/S2)
-  nkt_designated     — 국가핵심기술 지정 근거 (TS)
+  public_definitive  — 이미 공개된 문서 (S3 자동) — 외부권위
+  curated_scenario   — 손작성 시나리오 (S1/S2) — 외부권위 아님, floor 회귀/학습용
+  nkt_designated     — 국가핵심기술 지정 근거 (TS) — legal_reference 필수(외부권위)
+
+⚠️ 2026-07-03 감사: 구 'koipa_case_based'의 판례 인용은 실사건과 무대응(사건번호 무관
+재사용·자리표시자·시대착오)으로 확인 → S1/S2 시나리오는 curated_scenario로 정직화하고
+legal_reference에 예시 마커를 강제한다. 기존 koipa_case_based 레코드는
+golden_tiers.SYNTHETIC_PROXY_SOURCES로 강등 처리(실세계 정답·서빙 권위 취급 금지).
 
 사용:
   python scripts/collect_public_gold.py --dry-run
@@ -956,9 +961,16 @@ _TS_ADD2 = [
 
 
 def build_scenario_records(scenarios: list[dict], label: str, label_source: str) -> list[dict]:
+    # 2026-07-03 감사: 시나리오의 판례/판정례 인용은 실사건과 대응하지 않는 예시 인용이었다
+    # (사건번호 무관 재사용·자리표시자·시대착오). 외부권위가 아닌 출처(curated_scenario 등)의
+    # legal_reference에는 예시 마커를 강제해 provenance 위장을 원천 차단한다.
+    external = label_source in {"nkt_designated", "public_definitive"}
     records = []
     for s in scenarios:
         text = f"{s['title']}\n\n{s['body']}"
+        ref = s.get("legal_reference", "")
+        if ref and not external:
+            ref = f"[예시 인용 — 실제 사건과 무관, 정확도 근거로 인용 금지] {ref}"
         records.append({
             "doc_id": _sha1(text),
             "text": text,
@@ -968,12 +980,18 @@ def build_scenario_records(scenarios: list[dict], label: str, label_source: str)
             "reviewer_id": "public_gold_collector",
             "source": "public_scenario",
             "domain": "mixed",
-            "legal_reference": s.get("legal_reference", ""),
+            "legal_reference": ref,
             "evidence_spans": [
                 {"start": 0, "end": min(100, len(text)), "factor": "NON_PUBLICITY",
-                 "reason": f"{label} — 공개 법령/판례 기반 분류 근거 있음"}
+                 "reason": (
+                     f"{label} — 공개 법령/판례 기반 분류 근거 있음" if external
+                     else f"{label} — 손작성 경계 시나리오(구성 의도 라벨, 외부권위 아님)"
+                 )}
             ],
-            "notes": "공개 출처 기반 시나리오 — 법적 근거 명시",
+            "notes": (
+                "공개 출처 기반 시나리오 — 법적 근거 명시" if external
+                else "손작성 시나리오 — floor 회귀/학습용, real-world 정답 아님(2026-07-03 감사)"
+            ),
         })
     return records
 
@@ -999,17 +1017,18 @@ def main():
     else:
         print("[SKIP] oss_corpus 없음")
 
-    # S2 — KOIPA 가이드라인 기반
+    # S2 — 손작성 경계 시나리오 (구 'koipa_case_based' — 2026-07-03 감사로 curated_scenario로
+    # 정직화: 인용이 실사건과 무대응이라 외부권위 주장 금지)
     s2_pool = _S2_SCENARIOS + _S2_EXTRA + _S2_ADD + _S2_ADD2
-    s2_recs = build_scenario_records(s2_pool[:args.n_s2], "S2", "koipa_case_based")
+    s2_recs = build_scenario_records(s2_pool[:args.n_s2], "S2", "curated_scenario")
     records.extend(s2_recs)
-    print(f"S2 (KOIPA 사례): {len(s2_recs)}건")
+    print(f"S2 (손작성 시나리오): {len(s2_recs)}건")
 
-    # S1 — 대법원 판결 기반
+    # S1 — 손작성 경계 시나리오 (동일 정직화)
     s1_pool = _S1_SCENARIOS + _S1_EXTRA + _S1_ADD + _S1_ADD2
-    s1_recs = build_scenario_records(s1_pool[:args.n_s1], "S1", "koipa_case_based")
+    s1_recs = build_scenario_records(s1_pool[:args.n_s1], "S1", "curated_scenario")
     records.extend(s1_recs)
-    print(f"S1 (영업비밀 판결): {len(s1_recs)}건")
+    print(f"S1 (손작성 시나리오): {len(s1_recs)}건")
 
     # TS — 국가핵심기술 지정 근거
     ts_pool = _TS_SCENARIOS + _TS_ADD + _TS_ADD2

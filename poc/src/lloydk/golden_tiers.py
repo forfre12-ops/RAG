@@ -6,9 +6,13 @@
 
 tier 결정:
   - locked_gold_eval : 사람 서명(label_source=human_review, 실계정 reviewer) — **유일한 평가 정답**(P3)
-  - legal_floor      : 법적근거/시나리오(public_definitive·koipa_case_based·nkt_designated·codex_review)
-                       — 릴리스 차단 floor(고→S3 회귀 차단). 평가 정답 승격은 사람 서명 후. 합성/템플릿이라
-                       그 자체로 일반화-진실 아님.
+  - legal_floor      : 법적근거/시나리오(public_definitive·nkt_designated + koipa_case_based·
+                       codex_review·curated_scenario) — 릴리스 차단 floor(고→S3 회귀 차단). 평가 정답
+                       승격은 사람 서명 후. 합성/템플릿이라 그 자체로 일반화-진실 아님.
+                       ⚠️ floor 안에서도 권위가 갈린다: 외부권위(EXTERNAL_AUTHORITY_SOURCES,
+                       record 검증은 is_external_authority)만 실측 인용 가능하고, 큐레이트 프록시
+                       (SYNTHETIC_PROXY_SOURCES — koipa 판례 인용 조작 확인, 2026-07-03 감사)는
+                       실세계 정답·서빙 권위로 취급 금지.
   - gold_candidate   : 새 게이트 자동 통과(label_source=rule_llm_agreement / review_status=gold_candidate)
                        — 사람 서명 대기. 학습엔 써도 됨.
   - silver_train     : 그 외(구 llm_judge_*, needs_review_*) — **학습 시드 전용, 평가 금지**.
@@ -26,8 +30,18 @@ TIER_LEGAL_FLOOR = "legal_floor"
 TIER_CANDIDATE = "gold_candidate"
 TIER_SILVER = "silver_train"
 
-# 법적근거/시나리오 출처(고등급 backbone) — 릴리스 차단 floor.
-_LEGAL_SOURCES = {"public_definitive", "koipa_case_based", "nkt_designated", "codex_review"}
+# ── 권위 분류(2026-07-03 감사) — floor tier 안에서도 '실세계 정답'과 '큐레이트 프록시'를 구분한다 ──
+# 외부권위: 라벨 근거가 텍스트 밖 실세계 사실(공개 판결/공시=public_definitive, §9 고시 지정=
+# nkt_designated). 사람서명 없이 실측 인용 가능한 유일한 축. 단 nkt는 record가 지정근거
+# (legal_reference)를 가질 때만 성립 — 근거 없는 손작성 시나리오가 이 출처를 위조 사용한 사례
+# 6건 발견(augment_high_risk_gold, → curated_scenario로 교정). record 수준은 is_external_authority().
+EXTERNAL_AUTHORITY_SOURCES = frozenset({"public_definitive", "nkt_designated"})
+# 큐레이트/합성 프록시: 손작성 시나리오·LLM 리뷰. 감사에서 koipa_case_based의 판례 인용이 실사건과
+# 무대응(사건번호 무관 재사용·자리표시자·시대착오)으로 확인 → 실세계 정답(legally grounded)·서빙
+# 권위 출처로 취급 금지. 릴리스 차단 floor 회귀·학습 시드로만 쓴다.
+SYNTHETIC_PROXY_SOURCES = frozenset({"koipa_case_based", "codex_review", "curated_scenario"})
+# 법적근거/시나리오 출처(고등급 backbone) — 릴리스 차단 floor(tier 파생용 합집합).
+_LEGAL_SOURCES = EXTERNAL_AUTHORITY_SOURCES | SYNTHETIC_PROXY_SOURCES
 # 새 게이트(P1) 자동 통과 출처.
 _CANDIDATE_SOURCES = {"rule_llm_agreement"}
 # 사람 아님(머신/플레이스홀더 reviewer) — import_review_corrections._is_machine_reviewer와 정합 유지.
@@ -39,6 +53,22 @@ def is_human_reviewer(reviewer_id: object) -> bool:
     if not rid:
         return False
     return not any(rid.startswith(p) for p in _MACHINE_PREFIXES)
+
+
+def is_external_authority(record: dict) -> bool:
+    """record가 '외부권위 정답'(사람서명 없이 실측 인용 가능)인가.
+
+    source 수준(EXTERNAL_AUTHORITY_SOURCES)에 더해 record 수준을 검증한다:
+    nkt_designated는 지정근거(legal_reference)가 있어야 한다 — 근거 없는 손작성 시나리오가
+    nkt_designated를 위조 사용해 external_authority 버킷을 오염시킨 사례(2026-07-03 감사)의
+    재발 차단. koipa_case_based 등 SYNTHETIC_PROXY_SOURCES는 항상 False.
+    """
+    src = record.get("label_source")
+    if src not in EXTERNAL_AUTHORITY_SOURCES:
+        return False
+    if src == "nkt_designated" and not str(record.get("legal_reference") or "").strip():
+        return False
+    return True
 
 
 def tier_of(record: dict) -> str:

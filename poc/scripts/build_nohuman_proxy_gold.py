@@ -13,14 +13,20 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from analyze_label_noise import _is_ruling  # noqa: E402
-from lloydk.golden_tiers import tier_of  # noqa: E402
+from lloydk.golden_tiers import (  # noqa: E402
+    EXTERNAL_AUTHORITY_SOURCES,
+    is_external_authority,
+    tier_of,
+)
 
 LABELS = ("TS", "S1", "S2", "S3")
 LLM_SOURCES = {"llm_judge_primary", "llm_judge_consensus"}
-# 외부 권위 정답(사람서명 대체 가능한 유일한 진짜 정답원): 정부지정 NKT·공개판례/공시.
-# 나머지(koipa 손작성 시나리오·rule_llm 합의·codex 리뷰)는 합성/LLM 프록시 — 분류기와 편향을
-# 공유할 수 있어(상관오류) '통과'가 실문서 정확도를 보증하지 않는다. 단일 F1로 뭉개지 않도록 분리.
-EXTERNAL_AUTHORITY_SOURCES = {"nkt_designated", "public_definitive"}
+# 외부 권위 정답(사람서명 대체 가능한 유일한 진짜 정답원): 정부지정 NKT·공개판례/공시 —
+# 단일 진실원은 lloydk.golden_tiers. 나머지(koipa 손작성 시나리오·rule_llm 합의·codex 리뷰)는
+# 합성/LLM 프록시 — 분류기와 편향을 공유할 수 있어(상관오류) '통과'가 실문서 정확도를 보증하지
+# 않는다. 단일 F1로 뭉개지 않도록 분리. record 수준 검증(is_external_authority)까지 통과해야
+# external — nkt_designated는 legal_reference(지정근거) 없으면 위조로 보고 synthetic 처리
+# (2026-07-03 감사: augment 시나리오 6건이 근거 없이 nkt를 사용).
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -91,10 +97,17 @@ def annotate(row: dict, nohuman_tier: str, reason: str) -> dict:
 
 def _breakdown_by_authority(rows: list[dict]) -> dict:
     """proxy_eval을 외부권위 정답(nkt+public) vs 합성/LLM 프록시로 분리 — 단일 F1이 둘을 뭉개
-    '통과=실문서 안전'으로 오독되는 것을 막는다(합성 프록시는 상관오류로 정확도 미보증)."""
-    ext = [r for r in rows if r.get("label_source") in EXTERNAL_AUTHORITY_SOURCES]
-    syn = [r for r in rows if r.get("label_source") not in EXTERNAL_AUTHORITY_SOURCES]
-    return {
+    '통과=실문서 안전'으로 오독되는 것을 막는다(합성 프록시는 상관오류로 정확도 미보증).
+
+    record 수준 검증(is_external_authority): nkt_designated여도 legal_reference(지정근거)가
+    없으면 위조 provenance로 보고 synthetic_proxy에 넣는다(2026-07-03 감사)."""
+    ext = [r for r in rows if is_external_authority(r)]
+    syn = [r for r in rows if not is_external_authority(r)]
+    forged = [
+        r for r in syn
+        if r.get("label_source") in EXTERNAL_AUTHORITY_SOURCES  # source는 권위 주장, record 근거 없음
+    ]
+    out = {
         "external_authority": {
             "count": len(ext), "labels": label_counts(ext),
             "label_source": counts(ext, "label_source"),
@@ -106,6 +119,14 @@ def _breakdown_by_authority(rows: list[dict]) -> dict:
             "note": "손작성/LLM 프록시 = 분류기와 편향 공유 가능(상관오류). 스모크용, 실정확도 근거로 인용 금지.",
         },
     }
+    if forged:
+        out["synthetic_proxy"]["forged_authority_claims"] = {
+            "count": len(forged),
+            "doc_ids": sorted(str(r.get("doc_id", "?"))[:16] for r in forged),
+            "note": "label_source는 외부권위를 주장하나 record에 legal_reference 없음 — "
+                    "provenance 위조 의심, curated_scenario로 교정 필요.",
+        }
+    return out
 
 
 def build(

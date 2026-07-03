@@ -145,8 +145,10 @@ ACCEPTED_GOLD_LABEL_SOURCES = {
     "llm_judge_primary",    # 룰 라벨러 무의견 + LLM 고신뢰 단독
     "codex_review",         # AI adjudicate, requires_human_signoff=True
     "public_definitive",    # 이미 공개된 문서 (판례, DART 공시 등) → 정의상 S3
-    "koipa_case_based",     # KOIPA 판례·가이드라인 근거 시나리오 (S1/S2)
-    "nkt_designated",       # 산업부 국가핵심기술 지정 근거 시나리오 (TS)
+    "koipa_case_based",     # 손작성 시나리오 (S1/S2) — 2026-07-03 감사: 판례 인용 조작 확인,
+                            # 외부권위 아님(synthetic proxy). 신규 생성은 curated_scenario 사용.
+    "curated_scenario",     # 손작성 경계 시나리오 — 외부권위 주장 없음(floor 회귀·학습용)
+    "nkt_designated",       # 산업부 국가핵심기술 지정 근거 시나리오 (TS) — legal_reference 필수
 }
 
 def check_gold_real(name: str, records: list[dict], train_hashes: set[str]) -> tuple[dict, list[str]]:
@@ -172,6 +174,21 @@ def check_gold_real(name: str, records: list[dict], train_hashes: set[str]) -> t
     if not_accepted:
         issues.append(
             f"FAIL [{name}] review_status != accepted: {len(not_accepted)}건"
+        )
+
+    # 외부권위 위조 가드(2026-07-03 감사): nkt_designated는 지정근거(legal_reference)가 있어야
+    # 한다. 근거 없는 손작성 시나리오가 nkt를 위조 사용해 external_authority 버킷을 오염시킨
+    # 사례 6건(augment_high_risk_gold)의 재발 차단 — 위조분은 curated_scenario로 교정할 것.
+    forged_nkt = [
+        r for r in records
+        if r.get("label_source") == "nkt_designated"
+        and not str(r.get("legal_reference") or "").strip()
+    ]
+    if forged_nkt:
+        ids = [str(r.get("doc_id", "?"))[:12] for r in forged_nkt[:8]]
+        issues.append(
+            f"FAIL [{name}] nkt_designated인데 legal_reference 없음 {len(forged_nkt)}건 "
+            f"(외부권위 위조 의심, 예: {ids}) — label_source를 curated_scenario로 교정 필요"
         )
     if forbidden_src:
         srcs = Counter(r.get("source") for r in forbidden_src)

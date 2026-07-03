@@ -200,8 +200,9 @@ class ClassifyService:
                 chunks = []
 
             # ── Corrections 반영: DB에 검증된 라벨이 있으면 모델 추론 스킵 ───────────
-            # human_review / koipa_case_based / nkt_designated 등 is_verified=True 라벨
-            # 우선순위: human_review > koipa_case_based > llm_judge_consensus > ...
+            # human_review / nkt_designated 등 is_verified=True 라벨
+            # 우선순위: human_review > nkt_designated > … (koipa/codex는 2026-07-03 감사로
+            # LLM 심판 동급 강등 — classify_repo._LABEL_SOURCE_PRIORITY 참조)
             verified_label = self._get_verified_label(req.doc_id)
             if verified_label is not None:
                 from lloydk.schemas.common import Grade  # noqa: PLC0415
@@ -964,11 +965,13 @@ class ClassifyService:
     # [Phase 2] 유사도 escalation 게이트 (등급 무변경 — 검수 라우팅만)
     # ------------------------------------------------------------
 
-    # 권위(사람/법적) 검증 출처 — get_verified_document_label 우선순위 1~2(human_review·koipa_case_based·
-    # nkt_designated)만 escalation 참조로 인정. codex_review/public_definitive/rule_llm_agreement/
-    # llm_judge_* 등 머신·룰 출처는 제외(‘사람이 검증한 더 높은 등급’ 신호만 채택).
+    # 권위(사람/법적) 검증 출처 — get_verified_document_label 우선순위 1~2(human_review·
+    # nkt_designated)만 escalation 참조로 인정. koipa_case_based는 2026-07-03 감사에서 판례 인용
+    # 조작(손작성 시나리오)이 확인돼 강등(golden_tiers.SYNTHETIC_PROXY_SOURCES) — codex_review/
+    # public_definitive/rule_llm_agreement/llm_judge_* 와 함께 제외(‘사람·정부지정이 검증한 더
+    # 높은 등급’ 신호만 채택). S1/S2 escalation 커버리지는 고객사 human_review 누적이 정당한 경로.
     _AUTHORITATIVE_LABEL_SOURCES = frozenset(
-        {"human_review", "koipa_case_based", "nkt_designated"}
+        {"human_review", "nkt_designated"}
     )
 
     def _similarity_escalation_gate(self, doc_id, text, model_label) -> "str | None":
