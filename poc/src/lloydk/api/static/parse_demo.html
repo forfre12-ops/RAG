@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>문서 파싱·분류 시연 콘솔 — 업로드→파싱→검수→등급 | Lloydk</title>
+<meta name="description" content="실제 문서를 업로드하면 파싱(추출)→정규화·PII마스킹→청킹→검수 게이트→등급 분류까지 전 구간을 단계별로 보여주는 시연·검증 콘솔. POST /documents/analyze 를 호출합니다." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --red:#e11d2e; --red-soft:#fef2f2; --red-border:#fecaca;
+  --green:#16a34a; --green-soft:#f0fdf4; --green-border:#bbf7d0;
+  --amber:#d97706; --amber-soft:#fffbeb; --amber-border:#fde68a;
+  --blue:#2563eb; --blue-soft:#eff6ff; --blue-border:#bfdbfe;
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*,*::before,*::after{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.6;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;}
+a{color:var(--text);}
+h2,h3{letter-spacing:-.02em;margin:0;}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1180px;margin:0 auto;padding:11px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:9px;text-decoration:none;color:var(--text);}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:3px;}
+.brand-name{font-weight:700;font-size:14px;letter-spacing:-.02em;}
+.brand-sep{color:var(--text-faint);margin:0 3px;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.nav-link{font-size:12.5px;color:var(--text-dim);text-decoration:none;padding:4px 8px;border-radius:6px;}
+.nav-link:hover{background:var(--bg-mid);}
+.nav-badge{background:var(--bg-inverse);color:#fff;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:4px;}
+.health-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px;border:1px solid var(--border-mid);color:var(--text-dim);background:var(--bg-surface);cursor:pointer;}
+.health-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.health-pill.ok .dot{background:var(--green);} .health-pill.ok{color:var(--green);border-color:var(--green);}
+.health-pill.bad .dot{background:var(--red);} .health-pill.bad{color:var(--red);border-color:var(--red-border);}
+
+.wrap{max-width:1180px;margin:0 auto;padding:24px 22px 100px;}
+.h1{font-size:clamp(21px,3vw,28px);font-weight:800;letter-spacing:-.035em;margin:2px 0 8px;}
+.lede{color:var(--text-soft);font-size:14px;max-width:800px;margin:0 0 22px;}
+
+.card{border:1px solid var(--border-mid);border-radius:11px;background:#fff;padding:18px 18px;margin-bottom:16px;}
+.card-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:12px;font-family:var(--font-mono);}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+label.fld{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--text-dim);font-weight:600;}
+input[type=text],input[type=password],select{font-family:var(--font-mono);font-size:12.5px;padding:7px 10px;border:1px solid var(--border-mid);border-radius:7px;background:#fff;color:var(--text);min-width:120px;}
+input:focus,select:focus{outline:none;border-color:var(--text);}
+.btn{font-family:var(--font-sans);font-weight:600;font-size:13px;padding:9px 18px;border-radius:8px;border:1px solid var(--bg-inverse);background:var(--bg-inverse);color:#fff;cursor:pointer;transition:opacity .12s;}
+.btn:hover{opacity:.85;} .btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn.ghost{background:#fff;color:var(--text);border-color:var(--border-strong);}
+
+/* DROPZONE */
+.drop{border:2px dashed var(--border-strong);border-radius:12px;padding:34px 20px;text-align:center;background:var(--bg-surface);cursor:pointer;transition:.15s;}
+.drop:hover,.drop.over{border-color:var(--text);background:var(--bg-mid);}
+.drop .big{font-size:15px;font-weight:700;margin-bottom:5px;}
+.drop .sub{font-size:12.5px;color:var(--text-dim);}
+.drop .fname{font-family:var(--font-mono);font-size:13px;color:var(--blue);margin-top:8px;font-weight:600;}
+
+/* STAGE TIMELINE */
+.timeline{display:flex;flex-wrap:wrap;gap:0;align-items:stretch;margin:2px 0;}
+.tl-step{flex:1 1 120px;min-width:120px;border:1px solid var(--border-mid);border-right:none;padding:11px 12px;background:var(--bg-surface);position:relative;}
+.tl-step:last-child{border-right:1px solid var(--border-mid);border-radius:0 9px 9px 0;}
+.tl-step:first-child{border-radius:9px 0 0 9px;}
+.tl-step .tl-name{font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;}
+.tl-step .tl-detail{font-size:11px;color:var(--text-dim);margin-top:3px;font-family:var(--font-mono);line-height:1.45;word-break:break-word;}
+.tl-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--text-faint);}
+.tl-step.done{background:var(--green-soft);border-color:var(--green-border);} .tl-step.done .tl-dot{background:var(--green);}
+.tl-step.review{background:var(--amber-soft);border-color:var(--amber-border);} .tl-step.review .tl-dot{background:var(--amber);}
+.tl-step.fail{background:var(--red-soft);border-color:var(--red-border);} .tl-step.fail .tl-dot{background:var(--red);}
+.tl-step.skipped{opacity:.6;} .tl-step.skipped .tl-dot{background:var(--text-faint);}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:820px){.grid2{grid-template-columns:1fr;}}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px;}
+.kv dt{color:var(--text-dim);font-weight:600;}
+.kv dd{margin:0;font-family:var(--font-mono);font-size:12.5px;word-break:break-word;}
+
+.gate-ok{border-left:3px solid var(--green);padding:10px 14px;background:var(--green-soft);border-radius:7px;font-size:13px;}
+.gate-review{border-left:3px solid var(--amber);padding:10px 14px;background:var(--amber-soft);border-radius:7px;font-size:13px;}
+.reason-chip{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:2px 8px;margin:3px 4px 0 0;border-radius:5px;background:#fff;border:1px solid var(--amber-border);color:var(--amber);}
+
+/* GRADE */
+.grade-badge{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:22px;letter-spacing:-.02em;padding:8px 16px;border-radius:9px;border:2px solid;}
+.g-TS{color:var(--red);border-color:var(--red);background:var(--red-soft);}
+.g-S1{color:var(--amber);border-color:var(--amber);background:var(--amber-soft);}
+.g-S2{color:var(--blue);border-color:var(--blue);background:var(--blue-soft);}
+.g-S3{color:var(--green);border-color:var(--green);background:var(--green-soft);}
+.conf-bar{height:8px;border-radius:5px;background:var(--bg-strong);overflow:hidden;margin-top:8px;}
+.conf-fill{height:100%;background:var(--bg-inverse);border-radius:5px;}
+.status-pill{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;}
+.status-staging{background:var(--green-soft);color:var(--green);border:1px solid var(--green-border);}
+.status-needs_review{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-border);}
+.factor{margin:8px 0;}
+.factor .flabel{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
+.factor .fbar{height:6px;border-radius:4px;background:var(--bg-strong);overflow:hidden;}
+.factor .ffill{height:100%;background:var(--blue);border-radius:4px;}
+.chip{display:inline-block;font-family:var(--font-mono);font-size:11.5px;padding:3px 9px;margin:3px 4px 0 0;border-radius:5px;background:var(--bg-mid);border:1px solid var(--border-mid);}
+.warn{font-size:12px;color:var(--amber);font-family:var(--font-mono);margin-top:4px;}
+.preview{font-family:var(--font-mono);font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border-mid);border-radius:8px;padding:12px;max-height:180px;overflow:auto;white-space:pre-wrap;}
+.log{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);background:var(--bg-inverse);color:#d4d4d8;border-radius:8px;padding:12px;max-height:150px;overflow:auto;white-space:pre-wrap;}
+.hint{font-size:12px;color:var(--text-faint);margin-top:6px;}
+.hidden{display:none;}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="./index.html">
+    <span class="brand-mark"><img src="./lloydk_logo_mark.png" alt="Lloydk" onerror="this.style.display='none'" /></span>
+    <span><span class="brand-name">Lloydk</span><span class="brand-sep">·</span><span class="brand-sub">문서 파싱·분류 시연</span></span>
+  </a>
+  <div class="nav-right">
+    <a class="nav-link" href="./index.html">분류 콘솔</a>
+    <a class="nav-link" href="./admin.html">거버넌스 콘솔 ↗</a>
+    <span class="nav-badge">Analyze</span>
+    <span id="health" class="health-pill" onclick="checkHealth()"><span class="dot"></span><span id="health-txt">health</span></span>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <h1 class="h1">문서 업로드 → 파싱 → 검수 → 등급 시연</h1>
+  <p class="lede">실제 업무 문서(HWP·PDF·DOCX·XLSX 등)를 올리면 <b>추출 → 정규화·PII마스킹 → 청킹 → 검수 게이트 → 등급 분류</b>까지
+    전 구간이 어떻게 처리됐는지 단계별로 보여줍니다. 실제 서빙 파이프라인(<code>POST /documents/analyze</code>)을 그대로 호출합니다.</p>
+
+  <!-- 연결 -->
+  <div class="card">
+    <div class="card-title">연결</div>
+    <div class="row">
+      <label class="fld">API Base<input type="text" id="base" value="/api/v1" /></label>
+      <label class="fld">X-API-Key<input type="password" id="apikey" value="devkey" /></label>
+      <label class="fld">Actor-Role<select id="role"><option>admin</option><option>reviewer</option><option>viewer</option></select></label>
+      <label class="fld">근거 표시<select id="ev"><option value="true">on</option><option value="false">off</option></select></label>
+    </div>
+    <div class="hint">폐쇄망 데모는 API Base를 <code>/api/v1</code>(같은 호스트) 그대로 두면 됩니다. 헬스 배지를 눌러 연결을 확인하세요.</div>
+  </div>
+
+  <!-- 업로드 -->
+  <div class="card">
+    <div class="card-title">1 · 문서 업로드</div>
+    <div class="drop" id="drop">
+      <div class="big">파일을 끌어다 놓거나 클릭해 선택</div>
+      <div class="sub">HWP · HWPX · PDF · DOCX · XLSX · XLS · PPTX · TXT · 이미지(OCR)</div>
+      <div class="fname" id="fname"></div>
+      <input type="file" id="file" class="hidden" />
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <button class="btn" id="go" onclick="analyze()" disabled>분석 실행</button>
+      <button class="btn ghost" onclick="reset()">초기화</button>
+      <span class="hint" id="busy"></span>
+    </div>
+  </div>
+
+  <!-- 결과 -->
+  <div id="result" class="hidden">
+    <div class="card">
+      <div class="card-title">2 · 처리 단계 (파싱 → 검수 → 분류)</div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">3 · 파싱 결과</div>
+        <dl class="kv" id="parse-kv"></dl>
+      </div>
+      <div class="card">
+        <div class="card-title">4 · 검수 게이트</div>
+        <div id="gate-box"></div>
+        <div class="hint">FNR-안전 설계: 표 미추출·OCR·저품질·손상은 등급을 바꾸지 않고 <b>검수로 라우팅</b>합니다.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">5 · 최종 분류</div>
+      <div id="cls-box"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">근거 키워드</div>
+        <div id="evidence-box"><span class="hint">없음</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">추출 본문 미리보기 (정규화·PII 마스킹 후)</div>
+        <div class="preview" id="preview"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">요청 로그</div>
+    <div class="log" id="log">준비됨.</div>
+  </div>
+</div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+let picked = null;
+function base(){ return $('base').value.replace(/\/$/,''); }
+function hdr(){ return { 'X-API-Key': $('apikey').value, 'X-Actor-Role': $('role').value }; }
+function log(m){ const el=$('log'); el.textContent = '['+new Date().toLocaleTimeString()+'] '+m+'\n'+el.textContent; }
+
+async function checkHealth(){
+  const pill=$('health');
+  try{
+    const r = await fetch(base()+'/healthz', {headers:hdr()});
+    const j = await r.json().catch(()=>({}));
+    if(r.ok){ pill.className='health-pill ok'; $('health-txt').textContent = (j.profile||'ok'); }
+    else { pill.className='health-pill bad'; $('health-txt').textContent='HTTP '+r.status; }
+  }catch(e){ pill.className='health-pill bad'; $('health-txt').textContent='offline'; }
+}
+
+// dropzone
+const drop=$('drop'), fileInput=$('file');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=(e)=>setFile(e.target.files[0]);
+;['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.add('over');}));
+;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',(e)=>{ if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+function setFile(f){ if(!f) return; picked=f; $('fname').textContent = f.name+'  ('+f.size.toLocaleString()+' bytes)'; $('go').disabled=false; }
+function reset(){ picked=null; fileInput.value=''; $('fname').textContent=''; $('go').disabled=true; $('result').classList.add('hidden'); }
+
+async function analyze(){
+  if(!picked) return;
+  $('go').disabled=true; $('busy').textContent='분석 중… (첫 요청은 모델 로드로 지연될 수 있습니다)';
+  const fd = new FormData();
+  fd.append('file', picked);
+  fd.append('return_evidence', $('ev').value);
+  const t0=performance.now();
+  try{
+    const r = await fetch(base()+'/documents/analyze', { method:'POST', headers:hdr(), body:fd });
+    const ms=Math.round(performance.now()-t0);
+    const j = await r.json();
+    if(!r.ok){ log('HTTP '+r.status+'  '+JSON.stringify(j).slice(0,240)); $('busy').textContent='실패: HTTP '+r.status; $('go').disabled=false; return; }
+    log('analyze OK '+ms+'ms  '+picked.name+' → '+(j.classification? j.classification.label : '(빈본문)'));
+    render(j);
+    $('busy').textContent='완료 ('+ms+'ms)';
+  }catch(e){ log('오류: '+e.message); $('busy').textContent='오류: '+e.message; }
+  $('go').disabled=false;
+}
+
+function render(j){
+  $('result').classList.remove('hidden');
+  // 타임라인
+  $('timeline').innerHTML = (j.stages||[]).map(s=>`
+    <div class="tl-step ${s.status}">
+      <div class="tl-name"><span class="tl-dot"></span>${esc(s.name)}</div>
+      <div class="tl-detail">${esc(s.detail)}</div>
+    </div>`).join('');
+  // 파싱
+  const p=j.parse||{};
+  $('parse-kv').innerHTML = kv([
+    ['파일', j.filename+' ('+(j.file_size_bytes||0).toLocaleString()+'B)'],
+    ['포맷', p.source_format],
+    ['추출기', p.extraction_method + (p.ocr_used?' (OCR)':'')],
+    ['추출 품질', fmt(p.extraction_quality)+' / 콘텐츠 '+fmt(p.content_quality)],
+    ['추출 글자수', (p.char_count||0).toLocaleString()],
+    ['청크', p.chunk_count],
+    ['표 커버리지', p.table_coverage || '—'],
+    ['PII 마스킹', (p.pii_masked_count||0)+'건'],
+    ['추출 오류', p.extract_error || '없음'],
+  ]);
+  // 게이트
+  const g=j.gate||{};
+  $('gate-box').innerHTML = g.requires_review
+    ? `<div class="gate-review"><b>검수 필요</b> — 자동 확정하지 않고 사람 검수로 라우팅됩니다.<div>${(g.reasons||[]).map(r=>`<span class="reason-chip">${esc(r)}</span>`).join('')}</div></div>`
+    : `<div class="gate-ok"><b>자동 경로 통과</b> — 추출 품질·표·OCR 이상 없음(무오탐).</div>`;
+  // 분류
+  const c=j.classification;
+  if(!c){ $('cls-box').innerHTML='<span class="hint">본문 추출 0자 — 분류 불가(검수 필요).</span>'; }
+  else{
+    const f=c.factors||{};
+    const fbars = ['secrecy','value','management'].map(k=>{
+      const v=Number(f[k]||0); const pct=Math.max(0,Math.min(100,v<=1?v*100:v));
+      const ko={secrecy:'비공지성(S)',value:'경제적 유용성(V)',management:'비밀관리성(M)'}[k];
+      return `<div class="factor"><div class="flabel"><span>${ko}</span><span>${v.toFixed(2)}</span></div><div class="fbar"><div class="ffill" style="width:${pct}%"></div></div></div>`;
+    }).join('');
+    $('cls-box').innerHTML = `
+      <div class="row" style="align-items:flex-start;gap:24px;">
+        <div>
+          <span class="grade-badge g-${esc(c.label)}">${esc(c.label)}</span>
+          <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">신뢰도 ${fmt(c.confidence)}</div>
+          <div class="conf-bar" style="width:160px"><div class="conf-fill" style="width:${(c.confidence*100).toFixed(0)}%"></div></div>
+          <div style="margin-top:12px"><span class="status-pill status-${esc(c.status)}">${c.status==='staging'?'자동 확정':'검수 필요'}</span></div>
+          <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')}</div>
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:4px">평가요소 (가이드 3요건 S×V×M)</div>
+          ${fbars}
+        </div>
+      </div>
+      ${(c.warnings&&c.warnings.length)?`<div style="margin-top:12px">${c.warnings.map(w=>`<div class="warn">⚠ ${esc(w)}</div>`).join('')}</div>`:''}`;
+  }
+  // 근거
+  const ev=j.evidence||[];
+  $('evidence-box').innerHTML = ev.length
+    ? ev.map(e=>`<span class="chip">${esc(e.text||'')} ${e.weight?('· '+Number(e.weight).toFixed(2)):''}</span>`).join('')
+    : '<span class="hint">없음</span>';
+  // 미리보기
+  $('preview').textContent = j.text_preview || '(없음)';
+}
+
+function kv(pairs){ return pairs.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(String(v==null?'—':v))}</dd>`).join(''); }
+function fmt(x){ return (x==null)?'—':Number(x).toFixed(3); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+checkHealth();
+</script>
+</body>
+</html>

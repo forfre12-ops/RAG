@@ -368,6 +368,12 @@ test-lite: ## 빠른 테스트 suite (2분 이내 목표, CI 기본 — slow/ful
 test-slow: ## slow marker tests only
 	$(PY) -m pytest -q -m slow
 
+test-e2e-parse: ## 실문서 파싱→검수게이트→분류 E2E 회귀 (slow)
+	$(PY) -m pytest -q tests/test_e2e_parse_classify.py
+
+parse-probe: ## 실문서 파싱→게이트→분류 프로브 (예: make parse-probe ARGS="--gold")
+	PYTHONPATH=src $(PY) scripts/parse_probe.py $(ARGS)
+
 test-fullstack: ## fullstack marker tests only
 	$(PY) -m pytest -q -m fullstack
 
