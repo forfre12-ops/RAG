@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -84,7 +85,15 @@ def _patch_retrain_closure(*, rebuild, run_uuid, consume):
     from lloydk.modules.m6_evaluation.corrections_rebuild import RebuildResult  # noqa: F401
     return [
         patch("lloydk.modules.m4_training.trainer.train_classifier", return_value=_FakeReport()),
-        patch("lloydk.modules.m4_training.trainer.TrainSpec", lambda **kw: object()),
+        # TrainSpec 목: holdout 하드닝(merge 블록)이 _spec.val_path/test_path 를 읽으므로 그 속성을
+        # 가진 네임스페이스로 준다(과거 object() 목은 rows 비어있지 않은 케이스에서 AttributeError
+        # →merge 무음실패로 소비 검증을 깨뜨렸다 — pre-existing red).
+        patch("lloydk.modules.m4_training.trainer.TrainSpec",
+              lambda **kw: SimpleNamespace(
+                  train_path=kw.get("train_path", "base.jsonl"),
+                  val_path="datasets/holdout_val.jsonl",
+                  test_path="datasets/holdout_test.jsonl",
+                  output_dir="artifacts/test_out")),
         patch("lloydk.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
               return_value=rebuild),
         patch("lloydk.modules.m6_evaluation.corrections_rebuild.merge_into_train_jsonl",
@@ -155,6 +164,43 @@ def test_train_classifier_task_handles_consume_failure():
             stack.enter_context(cm)
         out = train_classifier_task(spec_kwargs={"train_path": "base.jsonl"})
     assert out.get("corrections_consumed") == -1
+
+
+def test_train_classifier_task_adopts_submitted_run_id():
+    """[A4] API /train submit 이 넘긴 run_id 를 채택 — 별도 run 생성 없이 그 행 상태 갱신.
+
+    미전달 시 워커가 독립 TrainingRun 을 만들어 API 행이 영구 'queued' 고아가 되던 것 차단.
+    running→completed 마킹으로 /train 상태가 실제 진행을 반영.
+    """
+    import contextlib
+    from unittest.mock import MagicMock
+    from lloydk.modules.m6_evaluation.corrections_rebuild import RebuildResult
+    import lloydk.workers.tasks as tasks_mod
+
+    rebuild = RebuildResult(rows=[], correction_ids=[], reason="none")  # rows=[] → merge 스킵
+    submitted = uuid.uuid4()
+    marks: list[tuple[str, str]] = []
+    create_guard = MagicMock()  # run_id 제공 시 호출되면 안 됨
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("lloydk.modules.m4_training.trainer.train_classifier",
+                                  return_value=_FakeReport()))
+        stack.enter_context(patch("lloydk.modules.m4_training.trainer.TrainSpec",
+                                  lambda **kw: SimpleNamespace(output_dir="out")))
+        stack.enter_context(patch(
+            "lloydk.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
+            return_value=rebuild))
+        stack.enter_context(patch("lloydk.services.training_service.register_and_gate_model",
+                                  return_value={"registered": True}))
+        stack.enter_context(patch("lloydk.workers.tasks._create_training_run_guarded", create_guard))
+        stack.enter_context(patch("lloydk.workers.tasks._mark_training_run",
+                                  lambda rid, *, status, **kw: marks.append((str(rid), status))))
+        out = tasks_mod.train_classifier_task(spec_kwargs={"train_path": "base.jsonl"},
+                                              run_id=str(submitted))
+
+    create_guard.assert_not_called()                          # 제공 run_id 채택 → 새 run 생성 안 함
+    assert out.get("corrections_run_id") == str(submitted)     # 그 run_id 로 소비/감사
+    assert (str(submitted), "running") in marks                # 학습 전 running
+    assert (str(submitted), "completed") in marks              # 게이트 후 completed
 
 
 # ---------------------------------------------------------------------------

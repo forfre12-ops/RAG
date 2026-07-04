@@ -269,8 +269,41 @@ def _create_training_run_guarded(
         return None
 
 
+def _mark_training_run(run_id, *, status: str, **fields) -> None:
+    """best-effort TrainingRun 상태 갱신 — 실패해도 학습 흐름 불변(관리 상태 표면만).
+
+    mark_started/completed/failed 는 정의만 있고 prod 호출자가 없어 /train 상태가 영구
+    'queued' 로 남던 것(고아 행)을 이 헬퍼가 닫는다. DB 미가용/오류는 삼켜 학습을 막지 않는다.
+    """
+    if run_id is None:
+        return
+    try:
+        import uuid as _uuid  # noqa: PLC0415
+
+        from lloydk.db import session_scope  # noqa: PLC0415
+        from lloydk.repositories import TrainingRepo  # noqa: PLC0415
+        rid = run_id if hasattr(run_id, "hex") else _uuid.UUID(str(run_id))
+        with session_scope() as db:
+            repo = TrainingRepo(db)
+            if status == "running":
+                repo.mark_started(rid)
+            elif status == "completed":
+                repo.mark_completed(
+                    rid,
+                    final_metrics=fields.get("final_metrics") or {},
+                    duration_sec=fields.get("duration_sec"),
+                )
+            elif status == "failed":
+                repo.mark_failed(rid, fields.get("error", ""))
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "training run status update skipped (best-effort): run_id=%s status=%s",
+            run_id, status,
+        )
+
+
 @celery_app.task(name="lloydk.train_classifier")
-def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
+def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = None) -> dict:
     """재학습 — 교정 반영 → 학습 → 등록 → 게이트 → (조건부)활성 → 반영분만 소비.
 
     doc/36 본개발 #1 (A2-①②·C-ver):
@@ -332,14 +365,29 @@ def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
             logger.exception("corrections merge failed — 기본 학습셋으로 진행")
             incorporated_ids = []
 
-    # 소비 FK·감사용 실제 TrainingRun (학습 전 생성).
-    run_uuid = _create_training_run_guarded(
-        spec_kwargs, total_samples=getattr(rebuild, "row_count", 0)
-    )
+    # 소비 FK·감사용 실제 TrainingRun (학습 전 생성). API /train submit 이 넘긴 run_id 가 있으면
+    # 그 행을 채택해 상태를 갱신한다(별도 run 생성 시 API 행이 영구 'queued' 고아가 되던 것 차단).
+    if run_id is not None:
+        try:
+            import uuid as _uuid  # noqa: PLC0415
+            run_uuid = run_id if hasattr(run_id, "hex") else _uuid.UUID(str(run_id))
+        except Exception:  # noqa: BLE001
+            run_uuid = _create_training_run_guarded(
+                spec_kwargs, total_samples=getattr(rebuild, "row_count", 0)
+            )
+    else:
+        run_uuid = _create_training_run_guarded(
+            spec_kwargs, total_samples=getattr(rebuild, "row_count", 0)
+        )
+    _mark_training_run(run_uuid, status="running")
 
     # ── 학습 ────────────────────────────────────────────────────────────────────
     spec = TrainSpec(**spec_kwargs)
-    report = train_classifier(spec)
+    try:
+        report = train_classifier(spec)
+    except Exception as exc:  # noqa: BLE001
+        _mark_training_run(run_uuid, status="failed", error=f"{type(exc).__name__}: {exc}")
+        raise
     out = dict(report.__dict__)
     out["corrections_incorporated"] = len(incorporated_ids)
 
@@ -372,6 +420,16 @@ def train_classifier_task(spec_kwargs: dict | None = None) -> dict:
     except Exception:  # noqa: BLE001
         logger.exception("register_and_gate_model failed — 등록/게이트 생략")
         out["deploy"] = {"registered": False, "reason": "exception"}
+
+    # 학습·게이트 성공 → 상태 completed (소비 성패와 무관 — 소비는 아래 별도 처리).
+    _mark_training_run(
+        run_uuid,
+        status="completed",
+        final_metrics={
+            "corrections_incorporated": len(incorporated_ids),
+            "deploy": out.get("deploy"),
+        },
+    )
 
     # ── [A2-①] 소비 — 실제 반영된 교정만, 실제 run_id로 (반영 없으면 소비 안 함=무손실) ──
     out["corrections_run_id"] = str(run_uuid) if run_uuid else None

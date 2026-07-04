@@ -469,7 +469,9 @@ class TrainingService:
                 from lloydk.workers.tasks import train_classifier_task  # noqa: PLC0415
 
                 spec_kwargs = dict(req.hyperparams) if req.hyperparams else None
-                train_classifier_task.delay(spec_kwargs)
+                # run_id 전달 — 워커가 이 행의 상태를 running→completed/failed 로 갱신하도록
+                # (미전달 시 워커가 별도 run 을 만들어 API 행이 영구 'queued' 고아가 됐다).
+                train_classifier_task.delay(spec_kwargs, run_id=str(run_id))
                 logger.info("training enqueued to celery: train_job_id=%s status=queued", run_id)
             except Exception:  # noqa: BLE001
                 logger.warning(
