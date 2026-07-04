@@ -63,6 +63,12 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
 .drop .big{font-size:15px;font-weight:700;margin-bottom:5px;}
 .drop .sub{font-size:12.5px;color:var(--text-dim);}
 .drop .fname{font-family:var(--font-mono);font-size:13px;color:var(--blue);margin-top:8px;font-weight:600;}
+.samples-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border-mid);}
+.samples-label{font-size:12px;font-weight:700;color:var(--text-dim);margin-right:2px;}
+.sample-btn{font-size:12px;padding:6px 12px;}
+.sample-btn.ok{border-color:var(--green);color:var(--green);}
+.sample-btn.bad{border-color:var(--amber);color:var(--amber);}
+.sample-btn:disabled{opacity:.5;cursor:not-allowed;}
 
 /* STAGE TIMELINE */
 .timeline{display:flex;flex-wrap:wrap;gap:0;align-items:stretch;margin:2px 0;}
@@ -150,6 +156,14 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
       <div class="fname" id="fname"></div>
       <input type="file" id="file" class="hidden" />
     </div>
+    <div class="samples-row">
+      <span class="samples-label">시연 샘플 원클릭</span>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./samples/success_semiconductor.docx','success_semiconductor.docx')">✓ 성공 · 반도체 영업비밀 (DOCX)</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./samples/fail_corrupt_scan.pdf','fail_corrupt_scan.pdf')">✕ 실패 · 손상/스캔 PDF</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./samples/fail_thin_text.txt','fail_thin_text.txt')">✕ 실패 · 얇은 본문 (TXT)</button>
+      <button class="btn ghost sample-btn bad" disabled title="실파일(noori/koipa류) 제공 대기 — tests/fixtures/adversarial/ 반입 시 활성화">✕ 실패 · 표 포함 HWP (실파일 대기)</button>
+    </div>
+    <div class="hint">성공=깨끗한 문서가 자동 확정되는 경로. 실패=파싱 이상(손상·얇은본문·표누락)을 <b>조용히 오분류하지 않고 검수로 라우팅</b>하는 안전장치 시연.</div>
     <div class="row" style="margin-top:14px;">
       <button class="btn" id="go" onclick="analyze()" disabled>분석 실행</button>
       <button class="btn ghost" onclick="reset()">초기화</button>
@@ -225,6 +239,20 @@ fileInput.onchange=(e)=>setFile(e.target.files[0]);
 drop.addEventListener('drop',(e)=>{ if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
 function setFile(f){ if(!f) return; picked=f; $('fname').textContent = f.name+'  ('+f.size.toLocaleString()+' bytes)'; $('go').disabled=false; }
 function reset(){ picked=null; fileInput.value=''; $('fname').textContent=''; $('go').disabled=true; $('result').classList.add('hidden'); }
+
+// 원클릭 시연 샘플 — 정적 자산을 가져와 업로드처럼 분석
+async function loadSample(url, name){
+  $('busy').textContent='샘플 불러오는 중…';
+  try{
+    const r = await fetch(url);
+    if(!r.ok){ $('busy').textContent='샘플 로드 실패: HTTP '+r.status; log('샘플 로드 실패 '+name+' HTTP '+r.status); return; }
+    const blob = await r.blob();
+    const f = new File([blob], name, { type: blob.type || 'application/octet-stream' });
+    setFile(f);
+    log('시연 샘플 로드: '+name+' ('+f.size.toLocaleString()+'B) → 분석 실행');
+    analyze();
+  }catch(e){ $('busy').textContent='샘플 로드 오류: '+e.message; }
+}
 
 async function analyze(){
   if(!picked) return;
