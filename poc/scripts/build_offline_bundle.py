@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -100,6 +101,8 @@ class BundleManifest:
     security: SecurityScan = field(default_factory=SecurityScan)
     estimated_size_gb: float = 0.0
     files_expected: list[str] = field(default_factory=list)
+    # 관측성 스택 이미지(best-effort 동봉) — 안전 알림 소비자. 빈 리스트면 미포함.
+    observability_images: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -118,6 +121,7 @@ class BundleManifest:
             "security": asdict(self.security),
             "estimated_size_gb": self.estimated_size_gb,
             "files_expected": self.files_expected,
+            "observability_images": self.observability_images,
         }
 
 
@@ -125,7 +129,10 @@ class BundleManifest:
 # 추출 로직 (외부 네트워크 0)
 # ─────────────────────────────────────────────────────────────
 
-_IMAGE_LINE = re.compile(r"^\s*image:\s*(\S+)\s*$")
+# image: 값만 포착(뒤따르는 인라인 주석 허용). 끝 앵커 `$` 를 쓰면 `image: x  # 주석` 라인이
+# 통째로 매칭 실패해 그 서비스가 번들에서 통으로 누락된다 — postgres/api 가 폐쇄망 번들에서
+# 빠지던 실제 회귀 원인이었다. `(\S+)` 가 공백 앞에서 멈추므로 인라인 주석은 자연히 배제된다.
+_IMAGE_LINE = re.compile(r"^\s*image:\s*(\S+)")
 _MODEL_RE = re.compile(r"^\s*(\w+_model)\s*:\s*str\s*=\s*\"([^\"]+)\"", re.MULTILINE)
 # `vllm_model: str = "..."`, `classifier_base_model: str = "..."` 둘 다 잡음
 _ANY_MODEL_RE = re.compile(
@@ -133,11 +140,57 @@ _ANY_MODEL_RE = re.compile(
     re.MULTILINE,
 )
 
+# 폐쇄망 기동에 필수인 코어 서비스 — 번들에 이미지 tar 가 반드시 있어야 한다.
+# nginx-mtls 는 `--profile mtls` 옵션이라 필수에서 제외. main() 이 이 목록으로 dry-run/실빌드
+# 양쪽에서 누락을 fail-closed 검사한다(CI dry-run 이 postgres 누락을 잡도록).
+_REQUIRED_CORE_SERVICES = ("postgres", "redis", "api", "worker", "beat")
 
-def extract_components_from_compose(compose_path: Path) -> dict[str, ComponentEntry]:
+# 관측성 스택 이미지 — infra/observability/docker-compose.observability.airgap.yml 과 태그 동기.
+# best-effort 동봉(핵심 아님): 저장 실패 시 경고만(빌드 실패 아님). 안전 알림(FnrSpike·
+# AuditChainBroken·KillGateTripped 등)의 폐쇄망 소비자. --skip-observability 로 제외 가능.
+_OBSERVABILITY_IMAGES = (
+    "prom/prometheus:v2.55.1",
+    "grafana/grafana:11.3.0",
+    "grafana/loki:3.2.1",
+    "grafana/promtail:3.2.1",
+    "prometheuscommunity/postgres-exporter:v0.16.0",
+    "oliver006/redis_exporter:v1.66.0",
+)
+
+# docker-compose 스타일 `${NAME}` / `${NAME:-default}` 치환용.
+_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+
+
+def _expand_env_vars(value: str, overrides: dict[str, str] | None = None) -> str:
+    """compose 의 `${NAME}` / `${NAME:-default}` 치환.
+
+    우선순위: overrides > 환경변수(비어있지 않을 때) > default > 빈 문자열.
+    번들러는 실제 태그를 알아야 docker save/load 가 일치한다 — `${IMAGE_TAG:-1.0.0-rc1}` 을
+    리터럴로 캡처하면 `docker save lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}` 가 존재불가 태그로
+    실패한다. overrides 로 번들 --version 을 IMAGE_TAG 에 주입해 save/load 태그를 맞춘다.
+    """
+    overrides = overrides or {}
+
+    def _repl(m: "re.Match") -> str:
+        name, default = m.group(1), m.group(2)
+        if name in overrides:
+            return overrides[name]
+        env_val = os.environ.get(name)
+        if env_val:
+            return env_val
+        return default if default is not None else ""
+
+    return _VAR_RE.sub(_repl, value)
+
+
+def extract_components_from_compose(
+    compose_path: Path, var_overrides: dict[str, str] | None = None,
+) -> dict[str, ComponentEntry]:
     """docker-compose.yml에서 image: 라인 파싱.
 
     YAML 파서를 쓰지 않는 이유: PoC 환경에 pyyaml이 없어도 동작해야 함.
+    `${VAR:-default}` 는 _expand_env_vars 로 확장(var_overrides 우선) — 미확장 리터럴
+    태그로 docker save 가 실패하던 회귀 차단.
     """
     if not compose_path.exists():
         return {}
@@ -166,7 +219,7 @@ def extract_components_from_compose(compose_path: Path) -> dict[str, ComponentEn
         if current_service and indent >= 4:
             m = _IMAGE_LINE.match(raw)
             if m:
-                full = m.group(1)
+                full = _expand_env_vars(m.group(1), var_overrides)
                 image, _, version = full.partition(":")
                 if not version:
                     version = "latest"
@@ -269,7 +322,11 @@ def estimate_total_size(
     return round(total, 1)
 
 
-def expected_files(components: dict[str, ComponentEntry], models: list[ModelEntry]) -> list[str]:
+def expected_files(
+    components: dict[str, ComponentEntry],
+    models: list[ModelEntry],
+    observability_images: list[str] | None = None,
+) -> list[str]:
     files: list[str] = ["README.md", "install.sh", "verify.sh", "manifest.yaml", "CHECKSUMS.sha256"]
     for svc in components:
         files.append(f"docker-images/{svc}.tar")
@@ -287,7 +344,23 @@ def expected_files(components: dict[str, ComponentEntry], models: list[ModelEntr
         "docs/TROUBLESHOOTING.md",
         "licenses/third-party-licenses.txt",
     ])
+    # 관측성 스택(동봉 시) — 설정은 항상, 이미지는 best-effort.
+    if observability_images:
+        files.extend([
+            "observability/docker-compose.observability.airgap.yml",
+            "observability/prometheus.yml",
+            "observability/alert_rules.yml",
+            "observability/grafana/",
+        ])
+        for img in observability_images:
+            files.append(f"docker-images/obs-{_obs_tar_name(img)}.tar")
     return files
+
+
+def _obs_tar_name(image: str) -> str:
+    """관측성 이미지 ref 를 tar 파일명 조각으로 정규화(prom/prometheus:v2.55.1 → prometheus-v2.55.1)."""
+    ref = image.split("/")[-1]
+    return ref.replace(":", "-")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -318,10 +391,16 @@ def build_manifest(
     compose_path: Path,
     config_path: Path,
     classifier_model_dir: Path | None = None,
+    include_observability: bool = True,
 ) -> BundleManifest:
-    components = extract_components_from_compose(compose_path)
+    # IMAGE_TAG 를 --version 으로 주입 → api/worker/beat 태그가 docker save/load 와 일치.
+    components = extract_components_from_compose(
+        compose_path, var_overrides={"IMAGE_TAG": version},
+    )
 
-    # 로컬 빌드 이미지 (docker-compose의 `build:` 블록) — image 라인이 없어 자동 추출 불가
+    # 안전망: 정상 파싱되면 api/worker 는 이미 존재하므로 no-op. 파싱이 놓친 경우에만
+    # --version 태그로 폴백한다(과거엔 인라인 주석 파싱실패를 이 setdefault 가 우연히 덮어
+    # 누락을 감췄다 — 이제 파싱이 정상이라 실제 폴백은 거의 발생하지 않는다).
     for svc in ("api", "worker"):
         components.setdefault(
             svc,
@@ -348,8 +427,9 @@ def build_manifest(
                 file=sys.stderr,
             )
     plugins: list[PluginEntry] = []  # ES 제거(의사결정_대장 §03 ⓑ) — 번들에 검색엔진 플러그인 없음
+    obs_images = list(_OBSERVABILITY_IMAGES) if include_observability else []
     size = estimate_total_size(components, models, plugins)
-    files = expected_files(components, models)
+    files = expected_files(components, models, obs_images)
 
     return BundleManifest(
         bundle_name="lloydk-airgap-bundle",
@@ -363,6 +443,7 @@ def build_manifest(
         es_plugins=plugins,
         estimated_size_gb=size,
         files_expected=files,
+        observability_images=obs_images,
     )
 
 
@@ -483,6 +564,11 @@ def print_checklist(manifest: BundleManifest, *, stream=sys.stdout) -> None:
         dim = f"dim={m.dim}" if m.dim else "-"
         p(f"  - [{m.role:22s}] {m.name}  ({m.license}, {dim})")
 
+    obs = manifest.observability_images
+    p(f"\n[Observability: {len(obs)} images {'(bundled)' if obs else '(SKIPPED - no safety-alert consumer)'}]")
+    for img in obs:
+        p(f"  - {img}")
+
     p("\n[Files expected]")
     for f in manifest.files_expected:
         p(f"  - {f}")
@@ -527,8 +613,19 @@ def _docker_save(image: str, dest: Path) -> bool:
     return True
 
 
+# 호스트 오프라인 설치 대상에서 제외할 패키지 접두어. torch/nvidia/triton 은 CUDA·플랫폼
+# 특정이고 이미지에 구워지므로 호스트 pip 설치 목록(_requirements_no_torch.txt)에서 뺀다.
+_HOST_EXCLUDE_PREFIXES = ("torch", "nvidia", "triton")
+
+
 def _pip_download(out_dir: Path) -> bool:
-    """pip download -r requirements → wheels/."""
+    """pip download -r requirements → wheels/.
+
+    fail-closed: pip download 가 일부라도 실패하면(rc!=0) False 를 반환해 빌드를 중단한다.
+    누락 wheel 을 성공으로 넘기면 고객사 폐쇄망 오프라인 설치가 런타임 ImportError 로 죽는다.
+    또한 install.sh·expected_files 가 참조하는 `_requirements_no_torch.txt` 를 반드시 생성한다
+    (과거 writer=_requirements_freeze.txt vs consumer=_requirements_no_torch.txt 파일명 불일치 버그).
+    """
     wheels_dir = out_dir / "wheels"
     wheels_dir.mkdir(parents=True, exist_ok=True)
     req = _REPO_ROOT / "requirements.txt"
@@ -540,23 +637,51 @@ def _pip_download(out_dir: Path) -> bool:
             capture_output=True, text=True,
         )
         if r.returncode != 0:
+            print(f"  [ERR] pip freeze 실패: {r.stderr[-300:]}", file=sys.stderr)
             return False
         # git+ / file: / @ file: 라인 제거 (폐쇄망 번들에 포함 불가)
         lines = [
             line for line in r.stdout.splitlines()
-            if not line.startswith("git+") and not line.startswith("-e ") and "@ file:" not in line
+            if line.strip()
+            and not line.startswith("git+") and not line.startswith("-e ") and "@ file:" not in line
         ]
         req = out_dir / "_requirements_freeze.txt"
         req.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # 최종 요구 목록(주석·빈 줄 제외).
+    requested = [
+        ln for ln in req.read_text(encoding="utf-8").splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    ]
+    # 호스트 설치용(torch류 제외) 목록 — install.sh 가 이 파일명을 참조하므로 항상 생성.
+    no_torch = [
+        ln for ln in requested
+        if not ln.split("==")[0].split(">")[0].split("<")[0].strip().lower().startswith(_HOST_EXCLUDE_PREFIXES)
+    ]
+    (out_dir / "_requirements_no_torch.txt").write_text("\n".join(no_torch) + "\n", encoding="utf-8")
+
     r = subprocess.run(
         [sys.executable, "-m", "pip", "download", "-r", str(req),
          "-d", str(wheels_dir), "--no-deps", "-q"],
         capture_output=True, text=True,
     )
     if r.returncode != 0:
-        print(f"  [WARN] pip download partial: {r.stderr[-300:]}", file=sys.stderr)
-    count = sum(1 for _ in wheels_dir.glob("*.whl"))
-    print(f"  [pip]  {count} wheels -> {wheels_dir}", file=sys.stderr)
+        print(f"  [ERR] pip download 실패(rc={r.returncode}): {r.stderr[-300:]}", file=sys.stderr)
+        return False
+    # --no-deps 는 요구 1건당 산출 1건(.whl 또는 sdist .tar.gz/.zip). 산출이 요구보다 적으면
+    # 불완전 번들 — 자기검사로 표면화한다.
+    downloaded = sum(
+        1 for f in wheels_dir.iterdir()
+        if f.suffix in (".whl", ".zip") or f.name.endswith(".tar.gz")
+    )
+    print(f"  [pip]  {downloaded} dists -> {wheels_dir} (requested {len(requested)})", file=sys.stderr)
+    if downloaded < len(requested):
+        print(
+            f"  [ERR] wheel 자기검사 실패: 요구 {len(requested)} > 산출 {downloaded}. "
+            "불완전 번들 — 빌드 중단(fail-closed).",
+            file=sys.stderr,
+        )
+        return False
     return True
 
 
@@ -683,9 +808,16 @@ def _copy_infra(out_dir: Path) -> None:
         "  echo \"Loading $tar ...\"\n"
         "  docker load -i \"$tar\"\n"
         "done\n\n"
-        "# 2) pip install from wheels\n"
-        "pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" \\\n"
-        "  -r \"$BUNDLE_DIR/python-deps/_requirements_no_torch.txt\" || true\n\n"
+        "# 2) (옵션) 호스트 파이썬 deps — 컨테이너 배포는 deps 가 이미지에 포함(INSTALL.md).\n"
+        "#    pip 이 있으면 fail-closed 로 설치(오류 시 set -e 로 스크립트 중단), 없으면 명시적 skip.\n"
+        "#    과거의 `|| true` 는 누락 wheel 을 조용히 성공 처리해 런타임 ImportError 로 이어졌다.\n"
+        "REQ=\"$BUNDLE_DIR/python-deps/_requirements_no_torch.txt\"\n"
+        "if command -v pip >/dev/null 2>&1 && [ -f \"$REQ\" ]; then\n"
+        "  echo '[deps] host python deps 설치 ...'\n"
+        "  pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" -r \"$REQ\"\n"
+        "else\n"
+        "  echo '[deps] host python deps skip (pip 미탑재 또는 컨테이너 전용 배포 — deps 는 이미지에 포함)'\n"
+        "fi\n\n"
         "# 3) OCR 바이너리 설치 (Linux 온프레미스 기준)\n"
         "if [ -d \"$BUNDLE_DIR/ocr-binaries/tesseract\" ]; then\n"
         "  echo '[OCR] Tesseract 설치 중 ...'\n"
@@ -720,6 +852,30 @@ def _copy_infra(out_dir: Path) -> None:
         encoding="utf-8",
     )
     verify_sh.chmod(0o755)
+
+
+def _copy_observability(out_dir: Path) -> None:
+    """관측성 스택 설정(prometheus·alert_rules·grafana·loki·airgap overlay compose)을 번들에 복사.
+
+    이미지 tar 는 build_bundle 이 best-effort 로 별도 저장. 설정은 항상 복사 — 이 파일들의
+    부재가 '관측성 미배선' 갭의 절반(고객사가 무엇을 어떻게 띄우는지 모름)이었다.
+    """
+    import shutil  # noqa: PLC0415
+
+    src = _REPO_ROOT / "infra" / "observability"
+    if not src.exists():
+        print("  [WARN] infra/observability 없음 — 관측성 설정 미동봉", file=sys.stderr)
+        return
+    dst = out_dir / "observability"
+    if dst.exists():
+        print(f"  [skip] already exists: {dst}", file=sys.stderr)
+        return
+    # dev overlay(lloydk-poc 네트워크)는 폐쇄망에서 무용이므로 제외하고 나머지 전부 복사.
+    shutil.copytree(
+        src, dst,
+        ignore=shutil.ignore_patterns("docker-compose.observability.yml"),
+    )
+    print(f"  [obs]  관측성 설정 → {dst}", file=sys.stderr)
 
 
 def _copy_trained_classifier(manifest: "BundleManifest", out_dir: Path) -> bool:
@@ -778,6 +934,23 @@ def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
     # infra 파일
     _copy_infra(out_dir)
 
+    # 관측성 스택 — 설정은 항상 복사, 이미지는 best-effort(실패해도 빌드 중단 아님).
+    # 관측성은 핵심 기동 요소가 아니므로 fail-visible(경고)로 두되, 무엇이 빠졌는지 반드시 알린다.
+    if manifest.observability_images:
+        _copy_observability(out_dir)
+        obs_failed: list[str] = []
+        for img in manifest.observability_images:
+            tar = images_dir / f"obs-{_obs_tar_name(img)}.tar"
+            if not _docker_save(img, tar):
+                obs_failed.append(img)
+        if obs_failed:
+            print(
+                f"\n[bundle][WARN] 관측성 이미지 미저장: {obs_failed}. 번들은 완성되나 이 이미지가 없으면 "
+                "고객사 폐쇄망에서 Prometheus/Grafana 로 안전 알림을 소비할 수 없습니다. "
+                "외부망 빌드호스트에서 해당 이미지를 pull 후 재빌드하거나 수동 동봉하세요.",
+                file=sys.stderr,
+            )
+
     # #40: 학습된 분류기 모델(가중치 + temperature.json) 복사
     if not _copy_trained_classifier(manifest, out_dir):
         failed.append("classifier-trained")
@@ -817,6 +990,11 @@ def main() -> int:
         help="학습된 분류기 가중치 디렉토리(가중치+temperature.json). "
              "미지정 시 env CLASSIFIER_MODEL_DIR/LLOYDK_CLASSIFIER_MODEL_DIR 사용(#40)",
     )
+    ap.add_argument(
+        "--skip-observability", action="store_true",
+        help="관측성 스택(Prometheus/Grafana/Loki + 안전 알림)을 번들에서 제외. "
+             "기본은 포함 — 안전 알림 소비자는 폐쇄망 운영 필수.",
+    )
     args = ap.parse_args()
 
     classifier_model_dir = resolve_classifier_model_dir(args.classifier_model_dir)
@@ -828,7 +1006,20 @@ def main() -> int:
         compose_path=Path(args.compose),
         config_path=Path(args.config),
         classifier_model_dir=classifier_model_dir,
+        include_observability=not args.skip_observability,
     )
+
+    # 코어 서비스 이미지 누락 fail-closed — dry-run 에서도 검사해 CI 가 회귀를 잡는다.
+    # (인라인 주석/미확장 ${VAR} 로 postgres 등이 통째 빠지면 폐쇄망 기동 불가.)
+    missing_core = [s for s in _REQUIRED_CORE_SERVICES if s not in manifest.components]
+    if missing_core:
+        print(
+            f"\n[bundle][FATAL] 폐쇄망 코어 서비스 이미지 누락: {missing_core}. "
+            "docker-compose.airgap.yml 의 image: 파싱을 확인하세요(인라인 주석·${VAR} 미확장 등). "
+            "이 번들은 고객사 폐쇄망에서 기동 불가합니다.",
+            file=sys.stderr,
+        )
+        return 2
 
     out_dir = Path(args.output)
     paths = write_manifest(manifest, out_dir)

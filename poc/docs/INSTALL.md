@@ -15,8 +15,8 @@
 | Docker | `docker version` (Engine 24+), `docker compose version` (v2) |
 | GPU | `nvidia-smi` 인식 + `docker run --rm --gpus all nvidia/cuda:12.4.0-base nvidia-smi` 동작 |
 | 커널 | `sysctl vm.max_map_count` ≥ 262144 (미만 시 `sudo sysctl -w vm.max_map_count=262144`) |
-| 디스크 | Data SSD 여유 ≥ 60GB (번들 ~23GB + 이미지 적재 + 데이터 볼륨) |
-| 포트 | 5432·9000·9001·6379·5000·8000 (+ mTLS 443) 내부 가용 |
+| 디스크 | Data SSD 여유 ≥ 70GB (번들 ~23GB + 관측성 이미지 ~2GB + 적재 + 데이터/메트릭 볼륨) |
+| 포트 | 5432·6379·8000 (+ mTLS 443, + 관측성 9090·3000·3100) 내부 가용 |
 
 GPU가 없으면: `.env`에서 `POC_MODE`를 유지하되 임베딩 CPU 모드로 두고, compose의 `deploy.resources...devices`(nvidia) 블록을 주석 처리한다. 추론 성능이 40~60% 하락한다.
 
@@ -34,13 +34,16 @@ bash verify.sh                 # CHECKSUMS.sha256 대조 → "Checksums OK"
 ## 2. 이미지 적재 + (호스트) 의존성
 
 ```bash
-bash install.sh                # docker images 8종 docker load + (호스트 실행용) wheel·OCR 설치
-docker images | grep -E 'lloydk|postgres|minio|redis|nginx'   # 적재 확인
+bash install.sh                # docker images 적재 + (호스트 실행용) wheel·OCR 설치
+docker images | grep -E 'lloydk|postgres|redis|nginx'   # 적재 확인
 ```
 
 - 컨테이너 배포(본 절차)에서는 의존성·OCR이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`의 wheel/OCR 단계는 호스트에서 스크립트를 직접 구동할 때만 의미가 있다.
 - **torch**: GPU 환경에 맞는 휠은 이미지에 포함된다. 호스트 직접 실행 시에만 별도 설치:
   `pip install --no-index --find-links=python-deps/wheels torch-*.whl`
+- **문서 파싱 선택 의존성**: HWP 표 셀은 `.[hwp-tables]`/`hwp5html`, PDF 표 행열은
+  `.[pdf-tables]`/`pdfplumber`, Office 내부 이미지 OCR은 `.[ocr]`/Tesseract가 있어야 구조화된다.
+  미설치 시 API는 추출을 계속하되 `parse.warnings`와 `/healthz/deep` extractor probe에 누락 사유를 표시한다.
 
 ---
 
@@ -72,7 +75,6 @@ cp infra-config/.env.template .env
 |---|---|---|
 | `IMAGE_TAG` | `1.0.0-rc1` | docker load 로 복원된 이미지 태그와 일치 |
 | `POSTGRES_PASSWORD` | `<강한 값>` | **기본값 교체 필수** |
-| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | `<강한 값>` | **기본값 교체 필수** |
 | `API_KEY` | `<강한 값>` | X-API-Key 인증 |
 | `VECTOR_BACKEND` | `pg` | pgvector dense + bigram-tsvector ts_rank 하이브리드 |
 | `POC_MODE` | `full` | 실모델 로드 (dryrun=mock) |
@@ -82,7 +84,7 @@ cp infra-config/.env.template .env
 | `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1` | |
 | `CLASSIFIER_MODEL_DIR` | `/models/classifier-trained` | 컨테이너 내 경로(모델 마운트) |
 
-DB·Redis·MinIO·MLflow 엔드포인트는 compose가 컨테이너 네트워크 기준으로 자동 주입하므로 `.env`에 둘 필요 없다.
+DB·Redis 엔드포인트는 compose가 컨테이너 네트워크 기준으로 자동 주입하므로 `.env`에 둘 필요 없다. 폐쇄망 번들은 원문·산출물을 로컬 파일시스템 볼륨에 저장하므로 MinIO·MLflow 엔드포인트를 설정하지 않는다.
 
 ---
 
@@ -90,7 +92,7 @@ DB·Redis·MinIO·MLflow 엔드포인트는 compose가 컨테이너 네트워크
 
 ```bash
 export COMPOSE="docker compose --env-file .env -f infra-config/docker-compose.airgap.yml"
-$COMPOSE up -d postgres minio redis mlflow
+$COMPOSE up -d postgres redis
 $COMPOSE ps        # postgres healthy 까지 대기 (~30s)
 ```
 
@@ -109,17 +111,9 @@ $COMPOSE run --rm api alembic upgrade head
 
 ## 7. 스토리지 · 검색 인덱스 초기화
 
-```bash
-# (a) MinIO — mlflow 버킷만 수동 생성 (lloydk-docs/lloydk-models 는 앱이 자동생성)
-docker run --rm --network lloydk-airgap_default minio/mc:latest sh -c "\
-  mc alias set m http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD && \
-  mc mb -p m/mlflow"
-
-# (b) 벡터검색 — 별도 초기화 불요: tb_rag_vectors(pgvector dense + bigram tsvector ts_rank)는
-#     §6 alembic upgrade 가 생성한다(vector 확장 포함). 가이드/문서 색인은 앱이 적재 시 자동 채움.
-```
-
-- 검색엔진(ES)·Nori 분석기·인덱스 템플릿 제거(의사결정_대장 §03 ⓑ) — pgvector + bigram-tsvector ts_rank 하이브리드로 통합. postgres 이미지(`pgvector/pgvector:pg16`)에 vector 확장 포함.
+- 스토리지: 별도 초기화 불요. `docker-compose.airgap.yml`의 `storagedata` named volume이 `/app/.storage`에 마운트되며, 원본은 설정에 따라 AES-256-GCM으로 암호화 저장된다.
+- 벡터검색: 별도 초기화 불요. `tb_rag_vectors`(pgvector dense + bigram tsvector `ts_rank`)는 §6 `alembic upgrade`가 생성한다(vector 확장 포함). 가이드/문서 색인은 앱이 적재 시 자동 채움.
+- 검색엔진(ES)·Nori 분석기·인덱스 템플릿 제거(의사결정_대장 §03 ⓑ) — pgvector + bigram-tsvector `ts_rank` 하이브리드로 통합. postgres 이미지(`pgvector/pgvector:pg16`)에 vector 확장 포함.
 
 ---
 
@@ -158,10 +152,30 @@ $COMPOSE exec api python scripts/verify_infra.py        # 인프라 일괄 점�
 # 스모크 분류 (X-API-Key 필요)
 curl -s -X POST http://localhost:8000/api/v1/classify \
      -H "X-API-Key: $API_KEY" -H 'Content-Type: application/json' \
-     -d '{"text":"본 문서는 당사의 반도체 공정 영업비밀을 포함한다","tenant_id":"default"}'
+     -d '{"doc_id":"smoke-1","content":"본 문서는 당사의 반도체 공정 영업비밀을 포함한다"}'
 ```
 
 기대: 등급(TS/S1/S2/S3) + confidence 반환, `/ready` 200.
+
+---
+
+## 10.5 관측성 스택 기동 (권장 — 안전 알림 소비자)
+
+분류기·감사체인·서빙 게이트의 안전 신호(FNR 급증·감사체인 파손·킬게이트 발동·rule-fallback 서빙 등 알림 29종)는 **Prometheus/Grafana가 떠 있어야 소비**된다. 이 스택이 없으면 API의 `/api/v1/metrics-prom`은 노출되지만 아무도 스크랩·경보하지 않는다("안전하게 틀리고 빨리 배운다"의 관측 절반이 빈다).
+
+번들에는 관측성 설정과 이미지가 `observability/`·`docker-images/obs-*.tar`로 동봉된다(빌드 시 `--skip-observability`로 제외 가능 — 그 경우 이 절 생략).
+
+```bash
+# 메인 스택(§9)이 먼저 떠서 lloydk-airgap_default 네트워크가 존재해야 한다.
+export OBS="docker compose --env-file .env -f observability/docker-compose.observability.airgap.yml"
+$OBS up -d
+$OBS ps                                        # prometheus·grafana·loki·exporters healthy
+curl -s http://localhost:9090/-/ready          # Prometheus ready
+```
+
+- **발화 알림 확인**: `http://<host>:9090/alerts` — `alert_rules.yml`의 규칙이 로드·평가된다(airgap overlay가 `alert_rules.yml`을 마운트하도록 교정됨. dev overlay는 이 마운트가 없어 규칙이 로드되지 않았다).
+- **대시보드**: `http://<host>:3000` (Grafana, `.env`의 `GRAFANA_PASSWORD` 필수) — KPI·overview 대시보드 자동 프로비저닝.
+- **통지 라우팅**(email/webhook)은 Alertmanager를 추가해야 완성된다. 현 단계는 Prometheus UI 발화 가시화까지 — 고객사 폐쇄망 통지 채널(사내 메일/메신저 webhook)이 결정되면 `alertmanager` 서비스를 이 overlay에 추가한다.
 
 ---
 
@@ -174,6 +188,9 @@ curl -s -X POST http://localhost:8000/api/v1/classify \
 | 분류 confidence 비정상 | `temperature.json` 부재 | 보정값 동봉 후 모델 재배치 |
 | 큐 작업 미소비 | worker `-Q` 누락 / beat 미기동 | §9대로 worker 전큐 구독 + beat 단일 기동 |
 | 마이그레이션 `alembic: not found` | 구버전 이미지(alembic 미동봉) | 최신 api 이미지 사용(Dockerfile에 alembic 포함) |
+| 관측성 `network lloydk-airgap_default not found` | 메인 스택 미기동 | §9 먼저 실행 후 §10.5 관측성 up |
+| Prometheus `/alerts` 비어있음 | 규칙 미로드 | airgap overlay 사용 확인(`alert_rules.yml` 마운트) — dev overlay는 마운트 없음 |
+| 관측성 이미지 `no such image` | 빌드 시 obs 이미지 미저장(WARN) | 외부망서 pull 후 재빌드 또는 `docker-images/obs-*.tar` 수동 동봉 |
 
 > 참고: Docker Desktop(WSL2)의 단일파일 마운트·136MB 바인드 디바이스 트랩은 **개발 PC 한정** 이슈이며, Linux 운영 서버(named volume)에는 해당하지 않는다.
 
