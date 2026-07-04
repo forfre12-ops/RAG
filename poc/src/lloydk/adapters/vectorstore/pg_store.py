@@ -5,9 +5,21 @@ alembic a1b2c3d4e5f6 (tb_rag_vectors / tb_rag_aliases).
 
 상태(2026-06-24): §03 결정으로 **기본 백엔드는 pg** 이며 ES 서비스는 core/prod/airgap
    compose 에서 제거됐다(build_store 기본값도 'pg'). 단위·정적 검증(test_pg_store)은 통과.
-⚠️ 단, **라이브 PG(pgvector 포함 이미지) × 실코퍼스 × 자연어(비발췌) 쿼리 재검증 게이트는
-   미실행**(실 PG 부재). dense 채널은 저장소 무관(ES 동급)이나 어휘(ts_rank/bigram) 채널의
-   실 R@5 는 scripts/revalidate_pg_lexical.py 로 확정 후 본 caveat 제거. >10pp 퇴행 시 경로 ⓒ.
+✅ 라이브 PG 정식 게이트 통과(2026-07-04, 적대검증 반영): docker-compose.pgvector.yml
+   (pg_bigm+pgvector :5433)에 oss_corpus 3754건 KURE-v1 적재 후 revalidate_pg_lexical.py
+   를 **자연어(비발췌) 190쿼리**(retrieval_gold_nl.jsonl)로 실행. 라이브 hybrid R@5=**85.3%**
+   (162/190; TS94·S1 69·S2 86·S3 95) > dense(pgvector) 78%. **판정: 경로 ⓑ 확정** —
+   근거는 -9pp가 아니다: 동일 NL 세트의 nori-프록시 hybrid ~86%(pg_lexical_revalidation_nl.json,
+   dense+bigram 0.863·dense+morph 0.863)와 비교해 **≈-1pp(±5pp 내)**. (스크립트가 찍는
+   "vs nori~94%"는 **발췌셋 lexical-only 프록시**라 비교불가 — ES/nori 제거로 스택 내 실측 불가.)
+   ⚠️ 귀속 정정: 이 hybrid 는 **dense + bigram ts_rank(RRF k=60)** — search_hybrid 후보필터는
+   tsv @@ to_tsquery(idx_ragvec_tsv)이고 **pg_bigm GIN/bigm_similarity 는 랭킹에 안 쓰인다**.
+   +7pp(85 vs 78)는 bigram ts_rank 몫이지 pg_bigm 아님. 별도 raw pg_bigm arm(NL 26%·발췌 0%)은
+   hybrid 가 안 쓰는 신호로, "랭커 금지·후보가속 전용" 설계 실증.
+   ⚠️ 85.3%는 **낙관적 상한**: NL 쿼리가 verbatim 은 아니나(최장연속<10자) 키워드-free 아님
+   (156/190이 타깃 고유명사 토큰 공유)·질의가 in-corpus 타깃 보장으로 작성 → 콜드스타트 개념검색은
+   더 낮음. 비교 유효성 확인: collection='revalid' NULL 임베딩 0/3754(count(*) 가드가 못 잡는
+   부분로드 없음). 리포트 reports/revalidate_pg_lexical.json.
 
 설계 노트 (실측·적대검증 반영, scripts/_bench_pg_lexical_revalidation.py):
   - dense 는 pgvector 코사인(embedding <=> q). 저장소 무관(ES 와 동일 품질).
