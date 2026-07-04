@@ -5,7 +5,7 @@ doc/13_벡터DB_ES_전환_계획서.md v0.9-final 구현.
 - dense_vector + int8_hnsw (8.13+) — 메모리 75% 절감
 - 한국어: analysis-nori + userdict_ko.txt
 - 하이브리드: retriever API(8.14+) 우선 / legacy rank.rrf 폴백
-- 멀티테넌트: 인덱스 분리 (`secrets-{role}-{tenant}-{model}-{version}`)
+- 인덱스: `secrets-{role}-{model}-{version}` (테넌트 제거 — 단일 고객사·폐쇄망, 격리는 KL 포털)
 - 무중단 재인덱싱: alias 스위칭
 
 PoC 단계에선 실제 ES 클러스터 없이도 import만 안전하도록 elasticsearch 패키지 lazy import.
@@ -159,7 +159,6 @@ class EsStore:
                     "id": {"type": "keyword"},
                     "doc_id": {"type": "keyword"},
                     "chunk_idx": {"type": "integer"},
-                    "tenant_id": {"type": "keyword"},
                     "grade": {"type": "keyword"},
                     "department": {"type": "keyword"},
                     "doc_type": {"type": "keyword"},

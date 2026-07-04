@@ -236,7 +236,7 @@ class Settings(BaseSettings):
     #   noop          : 결정론적 mock (CI·dryrun)
     #   anthropic     : Claude Sonnet/Opus/Haiku 원격
     #   openai        : GPT-4o 등 원격
-    #   google        : Gemini 원격 (어댑터 준비 중)
+    #   google        : Gemini 원격 (OpenAI 호환 endpoint 어댑터 구현됨 — adapters/llm/__init__.py)
     #   local_openai  : OpenAI 호환 endpoint (vLLM·Ollama·LM Studio·llama.cpp)
     #   vllm          : (alias) local_openai와 동일 — 하위호환
     #   ollama        : (alias) local_openai와 동일 — Ollama 기본 11434 endpoint

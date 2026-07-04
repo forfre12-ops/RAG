@@ -5,8 +5,10 @@
 - DB 미가용·테이블 부재 시 silent skip (테스트·dryrun 환경 보호)
 - payload는 SHA-256 해시만. 본문은 PG에 저장하지 않음.
 - /healthz·/docs·/openapi.json은 audit 제외 (노이즈 차단)
-- actor_id·role은 인증이 해소한 request.state.auth_*를 우선 사용.
-  인증이 신원을 못 채운 요청(인증 실패 등)에만 X-Actor-Id 헤더로 폴백.
+- actor_id·role은 인증이 해소한 request.state.auth_*를 우선 사용(JWT는 sub=개별 신원).
+  auth_*가 비면 X-Actor-Id 헤더로 폴백 — 인증 실패뿐 아니라 **공유 api_key 모드**(개별
+  신원 미해석)의 성공 요청도 포함된다. 즉 shared-key 배포에서 X-Actor-Id는 KL 포털이
+  주입하는 신뢰 신원 채널이다(단일 고객사·폐쇄망 전제; JWT 모드에선 위조 불가한 sub 우선).
 - tenant 제거: 단일 고객사 엔진(격리는 KL 포털 전담), audit에 tenant 기록 없음.
 """
 
