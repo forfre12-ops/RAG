@@ -40,12 +40,16 @@ def main() -> int:
     ap.add_argument("--constructed-floor", action="append", default=[], metavar="RUN_DIR",
                     help="constructed_floor run 디렉터리(또는 admitted.jsonl)를 자체 slice로 편입"
                          "(opt-in·반복 가능). 라벨=floor(≥등급): FNR verdict만 의미, recall은 참고용.")
+    ap.add_argument("--patent-timeaxis-prepub", action="append", default=[], metavar="DIR_OR_JSONL",
+                    help="특허 시간축 prepub_floor_eval.jsonl(또는 그 run 디렉터리)를 자체 slice로 편입"
+                         "(opt-in·반복 가능). 라벨=S2 floor(≥등급): FNR verdict만 의미, recall은 참고용.")
     args = ap.parse_args()
 
     from lloydk.config import settings
     from lloydk.modules.m6_evaluation.anchor_corpus import (
         DEFAULT_ANCHOR_SOURCES,
         constructed_floor_source,
+        patent_timeaxis_prepub_source,
     )
     from lloydk.modules.m6_evaluation.anchor_eval import run_anchor_cards
 
@@ -53,13 +57,20 @@ def main() -> int:
     if not model_dir.is_absolute():
         model_dir = _HERE.parent / model_dir
 
-    # constructed_floor는 opt-in — 지정 시에만 기본 앵커에 자체 slice로 덧붙인다(기본 경로 무변경).
-    sources = None
+    # constructed_floor·patent_timeaxis는 opt-in — 지정 시에만 기본 앵커에 자체 slice로 덧붙인다
+    # (기본 경로 무변경). 둘 다 floor 라벨 = FNR verdict만 의미·recall 참고용.
+    extra = []
     if args.constructed_floor:
-        extra = [constructed_floor_source(p) for p in args.constructed_floor]
-        sources = list(DEFAULT_ANCHOR_SOURCES) + extra
-        print(f"[constructed-floor] {len(extra)}개 run 편입(자체 slice, floor 라벨) — "
+        cf = [constructed_floor_source(p) for p in args.constructed_floor]
+        extra += cf
+        print(f"[constructed-floor] {len(cf)}개 run 편입(자체 slice, floor 라벨) — "
               f"FNR verdict만 의미·recall 참고용", file=sys.stderr)
+    if args.patent_timeaxis_prepub:
+        px = [patent_timeaxis_prepub_source(p) for p in args.patent_timeaxis_prepub]
+        extra += px
+        print(f"[patent-timeaxis] {len(px)}개 prepub 편입(자체 slice, S2 floor) — "
+              f"FNR verdict만 의미·recall 참고용", file=sys.stderr)
+    sources = (list(DEFAULT_ANCHOR_SOURCES) + extra) if extra else None
 
     saved_tau = settings.classifier_escalation_tau
     if args.tau.strip():

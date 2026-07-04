@@ -218,6 +218,44 @@ def normalize_constructed_floor(
     )
 
 
+def normalize_patent_timeaxis_prepub(
+    raw: dict, *, source: str = "patent_timeaxis_prepub", origin: str = ""
+) -> AnchorRecord | None:
+    """특허 시간축 prepub_floor_eval.jsonl 한 줄 → AnchorRecord (자체 slice로 격리).
+
+    ⚠️ 라벨 의미론은 **floor(≥등급)**다 — constructed_floor와 동일하게 under-class FNR 카드에만
+    맞물린다: floor=S2 문서를 S3(더 공개)로 예측 = 위반(미탐), TS/S1(더 비밀)로 예측 = 위반 아님.
+    FNR verdict만 의미 있고 recall은 floor 셀에서 과소평가(참고용). 단일 F1 병합 금지(builder
+    eval_contract) — 자체 slice(source)로만 소비한다.
+
+    constructed_floor와 달리 witness(in-text 토큰)를 **요구하지 않는다** — floor 근거가 본문
+    토큰이 아니라 **특허법 §64 공개일이라는 비인적 법적 사실**이기 때문이다
+    (build_patent_timeaxis_pairs.MAPPING_RULE: 공개 전 = 비공지+법정 비밀유지 → 최소 S2).
+    required_tokens는 D 메타모픽 best-effort(특허 초록엔 구체 수치가 드묾).
+
+    prepub 계약(materialize_views): {doc_id, app_no, text, label(=floor grade S2),
+    floor_label:true, label_source:'patent_timeaxis_prepub', open_date, ...}.
+    """
+    grade = str(raw.get("label") or "").strip()
+    text = (raw.get("text") or "").strip()
+    if grade not in VALID_GRADES or not text:
+        return None
+    app = str(raw.get("app_no") or "")
+    did = str(raw.get("doc_id") or "")
+    open_date = str(raw.get("open_date") or "")
+    detailed = extract_required_tokens_detailed(raw)
+    return AnchorRecord(
+        anchor_id="ptx:" + (app or did or _stable_id(text[:120])),
+        text=text,
+        anchor_grade=grade,
+        source=source,
+        grade_basis="patent_timeaxis §64 prepub floor" + (f" (open_date={open_date})" if open_date else ""),
+        required_tokens=[t for t, _ in detailed],
+        token_sources=[s for _, s in detailed],
+        origin=origin,
+    )
+
+
 def normalize_gold_real(raw: dict, *, source: str = "holdout_gold", origin: str = "") -> AnchorRecord | None:
     """gold_real 홀드아웃 한 줄 → AnchorRecord. 전 등급 인정, doc_id를 앵커 id로."""
     grade = str(raw.get("label") or raw.get("expected_grade") or "").strip()
@@ -251,6 +289,7 @@ class AnchorSource:
         "nkt": normalize_nkt,
         "gold_real": normalize_gold_real,
         "constructed_floor": normalize_constructed_floor,
+        "patent_timeaxis_prepub": normalize_patent_timeaxis_prepub,
     }
 
     def normalizer(self):
@@ -270,6 +309,21 @@ def constructed_floor_source(path: str | Path, *, slice_name: str = "constructed
     p = Path(path)
     admitted = p / "admitted.jsonl" if p.is_dir() else p
     return AnchorSource(str(admitted), "constructed_floor", slice_name)
+
+
+def patent_timeaxis_prepub_source(
+    path: str | Path, *, slice_name: str = "patent_timeaxis_prepub"
+) -> AnchorSource:
+    """특허 시간축 prepub_floor_eval.jsonl(또는 그 run 디렉터리) → AnchorSource.
+
+    **기본 앵커에 미포함(opt-in)**: 시간축 산출물은 datasets/patent_timeaxis/(빌드 산출물)이라
+    DEFAULT_ANCHOR_SOURCES에 넣지 않는다 — eval_anchor_cards --patent-timeaxis-prepub 로 명시
+    편입할 때만 자체 slice(floor 라벨)로 붙는다. 라벨=S2 floor: FNR verdict만 의미, recall 참고용.
+    (published_public.jsonl(S3)은 publicness 인지 경로 전용이라 이 카드에 싣지 않는다.)
+    """
+    p = Path(path)
+    prepub = p / "prepub_floor_eval.jsonl" if p.is_dir() else p
+    return AnchorSource(str(prepub), "patent_timeaxis_prepub", slice_name)
 
 
 # 기본 앵커 소스 — 저장소 로컬 데이터(외부 의존 0). 누출 제거(.clean) 우선.
