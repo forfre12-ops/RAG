@@ -155,7 +155,22 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--output-json", type=Path, default=None)
     parser.add_argument("--output-md", type=Path, default=None)
+    parser.add_argument("--allow-stub", action="store_true",
+                        help="이 스크립트는 실 retriever 미배선 — evaluate()가 _run_search_stub "
+                             "(플레이스홀더)로만 채점한다. best_alpha 는 실 검색 결과가 아니다. "
+                             "실 하이브리드 가중은 라이브 PG 재검증(커밋 7d222b5, NL R@5 85.3%)에서 "
+                             "확정됨. 데모/골격 용도로만 강제 실행하려면 이 플래그를 준다.")
     args = parser.parse_args()
+
+    # [정직성 가드] main()은 evaluate()에 실 runner 를 넘기지 않아 항상 _run_search_stub 로
+    # 계산한다 → 출력 best_alpha 가 실 검색을 반영하지 않는다. 무음 오해를 막기 위해 명시
+    # opt-in(--allow-stub) 없이는 실행을 거부한다(실 튜닝은 라이브 PG 경로에서 별도 수행).
+    if not args.allow_stub:
+        print("[STUB-ONLY] tune_hybrid_weights 는 실 retriever 가 미배선이라 _run_search_stub "
+              "로만 채점합니다 — best_alpha 는 실 검색 결과가 아닙니다. 실 하이브리드 가중은 "
+              "라이브 PG 재검증(7d222b5, NL R@5 85.3%)에서 확정됨. 골격/데모로 강제하려면 "
+              "--allow-stub 을 주세요.", file=sys.stderr)
+        return 2
 
     if args.eval_set and args.eval_set.exists():
         eval_set = _load_eval_set(args.eval_set)
