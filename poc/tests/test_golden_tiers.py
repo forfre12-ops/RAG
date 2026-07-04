@@ -50,6 +50,19 @@ def test_is_external_authority_record_level():
     )
     assert not is_external_authority({"label_source": "nkt_designated"})
     assert not is_external_authority({"label_source": "nkt_designated", "legal_reference": "  "})
+    # 라벨 권위(고시 지정근거)가 정당해도 본문이 손작성 합성(source=public_scenario)이면 아님 —
+    # real-text 실측 인용 불가(2026-07-04 텍스처 갭 감사). label floor 역할은 tier_of가 유지.
+    assert not is_external_authority(
+        {"label_source": "nkt_designated",
+         "legal_reference": "산업기술보호법 §9 고시 제2023-209호",
+         "source": "public_scenario"}
+    )
+    # 반대로 실텍스트(공개 판례/공보 등 non-scenario source)는 그대로 external
+    assert is_external_authority(
+        {"label_source": "nkt_designated",
+         "legal_reference": "산업기술보호법 §9 고시 제2023-209호",
+         "source": "patent_publication"}
+    )
     # 큐레이트 프록시는 항상 아님
     assert not is_external_authority({"label_source": "koipa_case_based"})
     assert not is_external_authority({"label_source": "curated_scenario"})

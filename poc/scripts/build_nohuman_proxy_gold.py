@@ -103,10 +103,13 @@ def _breakdown_by_authority(rows: list[dict]) -> dict:
     없으면 위조 provenance로 보고 synthetic_proxy에 넣는다(2026-07-03 감사)."""
     ext = [r for r in rows if is_external_authority(r)]
     syn = [r for r in rows if not is_external_authority(r)]
-    forged = [
-        r for r in syn
-        if r.get("label_source") in EXTERNAL_AUTHORITY_SOURCES  # source는 권위 주장, record 근거 없음
-    ]
+    # label_source가 외부권위를 주장하나 is_external_authority에서 탈락한 레코드 — 두 부류로 정직 분리:
+    #  (a) forged: 지정근거(legal_reference) 자체가 없음(위조 provenance) — koipa/augment 유래.
+    #  (b) synthetic_text: 지정근거는 정당하나 본문이 손작성 시나리오(source=public_scenario) —
+    #      라벨 권위는 실재, 그러나 real-text 실측 인용 불가(텍스처 갭). release floor로만.
+    claims_external = [r for r in syn if r.get("label_source") in EXTERNAL_AUTHORITY_SOURCES]
+    forged = [r for r in claims_external if not str(r.get("legal_reference") or "").strip()]
+    synthetic_text = [r for r in claims_external if str(r.get("legal_reference") or "").strip()]
     out = {
         "external_authority": {
             "count": len(ext), "labels": label_counts(ext),
@@ -125,6 +128,14 @@ def _breakdown_by_authority(rows: list[dict]) -> dict:
             "doc_ids": sorted(str(r.get("doc_id", "?"))[:16] for r in forged),
             "note": "label_source는 외부권위를 주장하나 record에 legal_reference 없음 — "
                     "provenance 위조 의심, curated_scenario로 교정 필요.",
+        }
+    if synthetic_text:
+        out["synthetic_proxy"]["synthetic_text_external_label"] = {
+            "count": len(synthetic_text),
+            "labels": label_counts(synthetic_text),
+            "doc_ids": sorted(str(r.get("doc_id", "?"))[:16] for r in synthetic_text),
+            "note": "라벨 권위(고시 지정근거)는 정당하나 본문이 손작성 합성(source=public_scenario) — "
+                    "release floor로만, real-text 실측 정확도 인용 금지(2026-07-04 텍스처 갭 감사).",
         }
     return out
 

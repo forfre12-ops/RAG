@@ -40,6 +40,10 @@ EXTERNAL_AUTHORITY_SOURCES = frozenset({"public_definitive", "nkt_designated"})
 # 무대응(사건번호 무관 재사용·자리표시자·시대착오)으로 확인 → 실세계 정답(legally grounded)·서빙
 # 권위 출처로 취급 금지. 릴리스 차단 floor 회귀·학습 시드로만 쓴다.
 SYNTHETIC_PROXY_SOURCES = frozenset({"koipa_case_based", "codex_review", "curated_scenario"})
+# 손작성 합성 시나리오 텍스트의 self-tag(collect_public_gold.build_scenario_records가 record.source에
+# 부여). 라벨 권위(고시 지정 등)가 정당해도 '본문'이 합성이면 real-text 실측 인용 불가 —
+# is_external_authority의 2번째 축(2026-07-04 텍스처 갭 감사). label floor 역할은 tier_of가 유지.
+SYNTHETIC_TEXT_SOURCE = "public_scenario"
 # 법적근거/시나리오 출처(고등급 backbone) — 릴리스 차단 floor(tier 파생용 합집합).
 _LEGAL_SOURCES = EXTERNAL_AUTHORITY_SOURCES | SYNTHETIC_PROXY_SOURCES
 # 새 게이트(P1) 자동 통과 출처.
@@ -58,15 +62,21 @@ def is_human_reviewer(reviewer_id: object) -> bool:
 def is_external_authority(record: dict) -> bool:
     """record가 '외부권위 정답'(사람서명 없이 실측 인용 가능)인가.
 
-    source 수준(EXTERNAL_AUTHORITY_SOURCES)에 더해 record 수준을 검증한다:
-    nkt_designated는 지정근거(legal_reference)가 있어야 한다 — 근거 없는 손작성 시나리오가
-    nkt_designated를 위조 사용해 external_authority 버킷을 오염시킨 사례(2026-07-03 감사)의
-    재발 차단. koipa_case_based 등 SYNTHETIC_PROXY_SOURCES는 항상 False.
+    두 축을 모두 요구한다 — 라벨 권위(external label)와 텍스트 실재(real text):
+      1) source 수준(EXTERNAL_AUTHORITY_SOURCES) + nkt_designated는 지정근거(legal_reference)
+         필수 — 근거 없는 손작성 시나리오가 nkt를 위조 사용해 버킷을 오염시킨 사례(2026-07-03
+         감사) 재발 차단. koipa_case_based 등 SYNTHETIC_PROXY_SOURCES는 항상 False.
+      2) 텍스트가 손작성 합성 시나리오(source=SYNTHETIC_TEXT_SOURCE)면 라벨 권위가 정당해도
+         False — 지정고시가 TS '라벨'을 정당화해도 '본문'이 합성이면 real-text 실측 정확도로
+         인용할 수 없다(텍스처 갭, capstone F1 0.26). 라벨 floor 역할은 tier_of가 legal_floor로
+         별도 유지하되 '실측 인용 가능' 버킷에서는 제외(2026-07-04 감사).
     """
     src = record.get("label_source")
     if src not in EXTERNAL_AUTHORITY_SOURCES:
         return False
     if src == "nkt_designated" and not str(record.get("legal_reference") or "").strip():
+        return False
+    if str(record.get("source") or "") == SYNTHETIC_TEXT_SOURCE:
         return False
     return True
 
