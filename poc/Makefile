@@ -8,15 +8,17 @@
 PY ?= python
 VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
+# uv — 의존성 락(uv.lock, 해시핀·유니버설) 생성/검사. 미설치 시 `pip install uv`.
+UV ?= $(PY) -m uv
 
-.PHONY: help venv install env infra-up infra-down infra-verify api worker beat \
+.PHONY: help venv install env lock lock-check infra-up infra-down infra-verify api worker beat \
         revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
         perf-scenarios perf-scenarios-full perf-clean-run \
         gold-set retrieval-gold check-data check-gold check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-manifest \
         recover-llm-judge \
-        eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
+        eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
         test-lite test-slow test-fullstack test-model-download test-full
 
 help:
@@ -68,6 +70,15 @@ venv:
 
 install:
 	pip install -e .[dev]
+
+# ── 의존성 락 (P1: 폐쇄망 번들 재현성·공급망 감사) ──────────────────────────
+# uv.lock = 해시핀·유니버설(py3.11+ 전 플랫폼) 락. pyproject 를 바꾸면 `make lock` 재생성.
+# CI 는 `make lock-check` 로 락이 pyproject 와 어긋나지 않았는지 강제(drift 시 fail).
+lock: ## uv.lock 재생성 (pyproject 변경 후 실행)
+	$(UV) lock
+
+lock-check: ## uv.lock 이 pyproject 와 일치하는지 검사 (CI용, drift 시 exit 1)
+	$(UV) lock --locked
 
 env:
 	@[ -f .env ] || cp .env.example .env
@@ -303,6 +314,10 @@ tiers = [ \
  if (p := pathlib.Path(f)) and p.exists() and (d := json.loads(p.read_text(encoding=\"utf-8\"))) else print(f'  {label}: N/A (미실행)') \
  for label, f in tiers]"
 
+eval-trusted-ci: ## 정직 홀드아웃 평가 — legally_grounded tier + bootstrap CI (소표본 과대해석 차단)
+	## 배포 headline(FNR/F1)이 LLM심판 라벨 다수 위에 측정된 것을 티어별로 분리·CI로 노출.
+	$(PY) scripts/eval_trusted_ci.py
+
 active-learning: ## active learning 트리거 — corrections 현황 + 재학습 권고
 	$(PY) scripts/check_active_learning.py --threshold 30
 
@@ -423,7 +438,9 @@ incident-api-down:
 	@docker compose logs api --tail 200 || true
 	@docker compose restart api || true
 	@sleep 10
-	@curl -fsS http://localhost:8000/api/v1/health || echo "[FAIL] /health still down — escalate to AI팀"
+	@# 실제 엔드포인트는 /api/v1/healthz/live (프로세스 생존). 과거 /api/v1/health 는 존재하지
+	@# 않아 재기동 성공 시에도 항상 curl 실패→오탐 에스컬레이션이었다.
+	@curl -fsS http://localhost:8000/api/v1/healthz/live || echo "[FAIL] /healthz/live still down — escalate to AI팀"
 
 incident-queue-backlog:
 	@echo "[incident] Celery 큐 적체 1차 대응"

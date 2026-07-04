@@ -106,6 +106,13 @@ pdf-agpl = [
   "pymupdf>=1.24",
 ]
 
+# PDF 표 행/열 구조화. 미설치 시 extractor.py는 텍스트 추출은 계속하고
+# pdf_table_extractor_unavailable 경고를 남긴다.
+# 활성: pip install -e ".[pdf-tables]"
+pdf-tables = [
+  "pdfplumber>=0.11",
+]
+
 # 한국어 형태소 분석·정규화 (Mecab 의존, Java JDK 필요할 수 있음)
 # 활성: pip install -e ".[nlp]"
 nlp = [
@@ -165,6 +172,7 @@ lint = [
 full = [
   "rhwp-python>=0.5.1",
   "xlrd>=2.0",
+  "pdfplumber>=0.11",
   "soynlp>=0.0.493",
   "konlpy>=0.6",
   "FlagEmbedding>=1.2",

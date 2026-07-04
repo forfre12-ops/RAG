@@ -59,6 +59,28 @@ jobs:
       - name: Lint src + scripts
         run: ruff check src/ scripts/
 
+  deps-lock-check:
+    # P1: 의존성 락(uv.lock, 해시핀·유니버설) 신선도 강제.
+    # pyproject.toml 을 바꾸고 `make lock`(uv lock)을 안 돌리면 여기서 fail →
+    # 폐쇄망 번들이 "부동 >=" 로 재현·감사 불가해지는 회귀를 사전 차단.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Verify uv.lock is in sync with pyproject.toml
+        # --locked: 락을 재생성하지 않고 pyproject 와 일치하는지만 검사(불일치 시 exit 1).
+        run: uv lock --locked
+
   security-scan:
     # C8: OWASP ASVS L2 셀프스캔 — bandit(SAST) + semgrep(rule-based)
     # 결과는 SARIF로 업로드. 신규 HIGH/CRITICAL 발견 시 fail.
