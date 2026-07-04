@@ -3,9 +3,9 @@
 실측 가이드. 분기 1회 staging 환경에서 실행 권장.
 
 단계:
-1. 최신 pg/es/minio dump 위치 확인
+1. 최신 pg/storage 백업 위치 확인 (폐쇄망 저장소=로컬FS, MinIO 미사용)
 2. staging 컨테이너 기동 (별도 compose project)
-3. dump 복원
+3. dr_restore.py 로 실복구 (pg_restore + 로컬FS 미러) — fail-closed
 4. 핵심 read·write 시나리오 5개 검증
 5. 시간 측정 + 리포트 산출
 """
@@ -25,7 +25,7 @@ STAGES = [
     "find_latest_backups",
     "spin_up_staging",
     "restore_postgres",
-    "restore_minio",
+    "restore_storage",   # 폐쇄망 원문 저장소=로컬FS(file://). MinIO 미사용이라 storage 복원.
     "smoke_classify",
     "smoke_guide",
     "smoke_async_batch",
@@ -65,8 +65,11 @@ def stage_commands(staging_compose: str) -> dict[str, list[str]]:
     return {
         "find_latest_backups": ["ls", "-la", "backups/"],
         "spin_up_staging": ["docker", "compose", "-p", "lloydk-dr", "-f", staging_compose, "up", "-d"],
-        "restore_postgres": ["python", "scripts/dr_restore_check.py", "--target", "postgres", "--staging"],
-        "restore_minio": ["python", "scripts/dr_restore_check.py", "--target", "minio", "--staging"],
+        # 실복구는 dr_restore.py(실 pg_restore, fail-closed) — dr_restore_check.py 는 recency
+        # 점검일 뿐 복원을 하지 않는다. 과거엔 존재하지 않는 --target/--staging 플래그로 호출해
+        # argparse 오류(exit 2)로 항상 죽었다.
+        "restore_postgres": ["python", "scripts/dr_restore.py", "--target", "postgres", "--staging"],
+        "restore_storage": ["python", "scripts/dr_restore.py", "--target", "storage", "--staging"],
         "smoke_classify": ["python", "scripts/p5_e2e_smoke.py", "--mode", "staging"],
         "smoke_guide": ["python", "-c", "print('staging /guide/* smoke — manual or scripted')"],
         "smoke_async_batch": ["python", "-c", "print('staging async batch smoke')"],

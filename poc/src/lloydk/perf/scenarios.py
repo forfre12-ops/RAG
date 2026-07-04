@@ -1234,7 +1234,11 @@ def s15_backup_restore(ctx: ScenarioContext) -> None:
 
     try:
         proc = _sp.run(
-            [_sys.executable, str(script), "--dry-run"],
+            # dr_restore_check.py 는 --dry-run 플래그가 없다. 과거 이 잘못된 플래그가
+            # argparse 오류(exit 2)를 냈고, 아래 rc 허용에 2 가 포함돼 "배선 파손을 초록으로
+            # 삼키는" fake-green 이었다. 실 인프라가 없는 perf/dryrun 맥락이므로 유효 플래그
+            # --skip-infra 로 호출한다(백업 recency 만 검사).
+            [_sys.executable, str(script), "--skip-infra"],
             cwd=str(poc_root),
             check=False,
             timeout=30,
@@ -1244,9 +1248,10 @@ def s15_backup_restore(ctx: ScenarioContext) -> None:
     except Exception:  # noqa: BLE001
         rc = -1
 
-    # dr_restore_check는 백업 디렉토리 부재 시 비정상 exit 가능 — 그래도 스크립트 자체가 실행되면 True
-    # (dryrun에서는 실제 백업 검증이 의미 없음 → 스크립트 실행 가능성만 검증)
-    ctx.record("s15_1", rc in (0, 1, 2))  # 정상/경고/일부 누락 모두 "실행 자체는 OK"
+    # rc 0 = 백업 최신·정상, rc 1 = 스크립트는 정상 실행했으나 백업 부재/노후(clean 체크아웃의
+    # 정상 상태). 그 외(2=argparse 오류, -1=예외, 3+)는 검사기 자체가 깨진 것 → FAIL.
+    # 과거 `rc in (0,1,2)` 는 argparse 오류(2)를 PASS 로 삼켜 배선 파손을 은폐했다(fake-green).
+    ctx.record("s15_1", rc in (0, 1))
 
     # S15.2는 require=pg+es+minio. 미가용 시 자동 SKIP.
 
