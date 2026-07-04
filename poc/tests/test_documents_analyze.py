@@ -96,6 +96,19 @@ class TestAnalyzeContract:
         )
         assert r.status_code in (401, 403)
 
+    def test_oversized_file_rejected(self, client, monkeypatch):
+        """max_upload_mb 초과 업로드 → 413 (DoS/자원 보호). 파싱·분류 진입 전 차단."""
+        from lloydk import config as cfg
+
+        monkeypatch.setattr(cfg.settings, "max_upload_mb", 1, raising=False)
+        big = b"x" * (2 * 1024 * 1024)  # 2MB > 1MB 한도
+        r = client.post(
+            "/api/v1/documents/analyze",
+            headers=_HDR,
+            files={"file": ("big.txt", big, "text/plain")},
+        )
+        assert r.status_code == 413, r.text
+
     def test_corrupt_file_gate_fires(self, client):
         """손상 PDF → 게이트 발동(extract_error/low_quality) 또는 빈 본문 격리."""
         r = client.post(
