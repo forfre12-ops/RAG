@@ -82,6 +82,11 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         #   더 낮추면(0.10~0.12) FNR≤0.05이나 검토부담 0.80+. 운영 검수역량에 맞춰 .env로 조정 가능.
         # agreement_gate: 룰·모델 불일치만 needs_review 라우팅(등급 무변경·FNR-monotone·실패 시 silent 폴백).
         "classifier_escalation_tau": 0.30,
+        # [배포전 P0#④] 서빙 temperature 보정 — 미보정(T=1.0) 서빙은 OOD 과신으로 고등급(TS) 무음
+        # 미탐 위험(model serving needs calibration, T≈3). lite-cloud(데모)는 이미 3.0인데 정작
+        # 안전이 중요한 하드닝(GA) 프로파일이 누락돼 있던 드리프트를 정합. 모델 동봉 temperature.json
+        # 이 있거나 재보정하면 .env(CLASSIFIER_TEMPERATURE)로 override.
+        "classifier_temperature": 3.0,
         "agreement_gate_enabled": True,
         # metadata_floor: KL ICD 보안표시·접근범위 상향 게이트 ON. 실데이터 0 환경에선 모델보다
         # 메타데이터가 더 믿을 만하다 — security_marking이 예측보다 높으면 상향(FNR-safe·하향 안 함),
@@ -112,6 +117,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "poc_mode": "full",
         # FNR-safe 서빙 운영점 ON (onprem-local과 동일 — 위 주석 참조).
         "classifier_escalation_tau": 0.30,
+        # [배포전 P0#④] 서빙 temperature 보정 T≈3 (onprem-local과 동일 — 미보정 T=1.0 OOD 과신 방지).
+        "classifier_temperature": 3.0,
         "agreement_gate_enabled": True,
         # metadata_floor ON (onprem-local과 동일 — 위 주석 참조).
         "metadata_floor_enabled": True,
