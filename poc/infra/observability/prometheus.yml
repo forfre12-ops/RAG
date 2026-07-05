@@ -10,6 +10,13 @@ global:
 rule_files:
   - alert_rules.yml
 
+# 발화 알림을 Alertmanager 로 라우팅(그룹·중복제거·통지). Alertmanager 미기동 환경에서는
+# Prometheus 가 전송 실패를 로그로만 남기고 계속 동작하므로 dev overlay 에도 무해하다.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
 scrape_configs:
   - job_name: prometheus
     static_configs:

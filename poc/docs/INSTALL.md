@@ -16,7 +16,7 @@
 | GPU | `nvidia-smi` 인식 + `docker run --rm --gpus all nvidia/cuda:12.4.0-base nvidia-smi` 동작 |
 | 커널 | `sysctl vm.max_map_count` ≥ 262144 (미만 시 `sudo sysctl -w vm.max_map_count=262144`) |
 | 디스크 | Data SSD 여유 ≥ 70GB (번들 ~23GB + 관측성 이미지 ~2GB + 적재 + 데이터/메트릭 볼륨) |
-| 포트 | 5432·6379·8000 (+ mTLS 443, + 관측성 9090·3000·3100) 내부 가용 |
+| 포트 | 5432·6379·8000 (+ mTLS 443, + 관측성 9090·9093·3000·3100) 내부 가용 |
 
 GPU가 없으면: `.env`에서 `POC_MODE`를 유지하되 임베딩 CPU 모드로 두고, compose의 `deploy.resources...devices`(nvidia) 블록을 주석 처리한다. 추론 성능이 40~60% 하락한다.
 
@@ -175,7 +175,7 @@ curl -s http://localhost:9090/-/ready          # Prometheus ready
 
 - **발화 알림 확인**: `http://<host>:9090/alerts` — `alert_rules.yml`의 규칙이 로드·평가된다(airgap overlay가 `alert_rules.yml`을 마운트하도록 교정됨. dev overlay는 이 마운트가 없어 규칙이 로드되지 않았다).
 - **대시보드**: `http://<host>:3000` (Grafana, `.env`의 `GRAFANA_PASSWORD` 필수) — KPI·overview 대시보드 자동 프로비저닝.
-- **통지 라우팅**(email/webhook)은 Alertmanager를 추가해야 완성된다. 현 단계는 Prometheus UI 발화 가시화까지 — 고객사 폐쇄망 통지 채널(사내 메일/메신저 webhook)이 결정되면 `alertmanager` 서비스를 이 overlay에 추가한다.
+- **통지 라우팅**: `alertmanager` 서비스가 overlay에 포함되어 Prometheus 발화 알림을 그룹·중복제거해 라우팅한다(`http://<host>:9093` Alertmanager UI). 폐쇄망 통지 채널은 환경마다 달라 기본은 미설정 상태 — 알림은 Alertmanager UI에 그룹핑되어 보이되 외부로 push되지 않는다. 사내 채널이 결정되면 `observability/alertmanager.yml`의 `receivers`에 `email_configs`(사내 SMTP) 또는 `webhook_configs`(메신저)를 추가하면 즉시 능동 통지된다.
 
 ---
 

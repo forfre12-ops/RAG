@@ -150,6 +150,7 @@ _REQUIRED_CORE_SERVICES = ("postgres", "redis", "api", "worker", "beat")
 # AuditChainBroken·KillGateTripped 등)의 폐쇄망 소비자. --skip-observability 로 제외 가능.
 _OBSERVABILITY_IMAGES = (
     "prom/prometheus:v2.55.1",
+    "prom/alertmanager:v0.27.0",
     "grafana/grafana:11.3.0",
     "grafana/loki:3.2.1",
     "grafana/promtail:3.2.1",
@@ -351,6 +352,7 @@ def expected_files(
             "observability/docker-compose.observability.airgap.yml",
             "observability/prometheus.yml",
             "observability/alert_rules.yml",
+            "observability/alertmanager.yml",
             "observability/grafana/",
         ])
         for img in observability_images:

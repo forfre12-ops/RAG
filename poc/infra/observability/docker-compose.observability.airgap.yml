@@ -31,6 +31,21 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     networks: [default]
+    depends_on: [alertmanager]
+
+  alertmanager:
+    # 발화 알림 그룹·중복제거·통지 라우팅. 통지 채널(SMTP/webhook)은 alertmanager.yml 에서
+    # 고객사 환경에 맞춰 설정. 미설정 시 알림은 Alertmanager UI(:9093)에서 확인.
+    image: prom/alertmanager:v0.27.0
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanagerdata:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks: [default]
 
   grafana:
     image: grafana/grafana:11.3.0
@@ -87,6 +102,7 @@ volumes:
   promdata:
   grafanadata:
   lokidata:
+  alertmanagerdata:
 
 networks:
   default:
