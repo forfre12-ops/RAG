@@ -4,7 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       run_release_gate:
-        description: 'Run strict release gate (requires local evaluation reports/artifacts)'
+        description: 'Run the release gate job (requires local evaluation reports/artifacts)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      release_gate_strict:
+        description: 'STRICT (GA): every gate must PASS. Default = PILOT: blocks on regression FAIL, waives human_review/parity data ceiling with an audited waiver.'
         required: false
         default: 'false'
         type: choice
@@ -756,9 +764,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Validate manifest and strict release gate
+      - name: Validate manifest and release gate
         run: |
           make check-manifest
           make check-release-evidence
           make check-parser-support
-          make release-gate
+          if [ "${{ github.event.inputs.release_gate_strict }}" = "true" ]; then
+            echo "::notice::release-gate STRICT (GA) — every readiness gate must PASS"
+            make release-gate
+          else
+            echo "::notice::release-gate PILOT — blocks on regression FAIL; human_review/parity data ceiling waived with audit"
+            make release-gate-pilot
+          fi

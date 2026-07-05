@@ -187,6 +187,73 @@ def test_release_gate_requires_every_gate_to_pass(tmp_path, monkeypatch):
     assert check_release_gate.main() == 1
 
 
+def _write_readiness(tmp_path, verdict, gates):
+    readiness = tmp_path / "readiness.json"
+    readiness.write_text(json.dumps({"verdict": verdict, "gates": gates}), encoding="utf-8")
+    return readiness
+
+
+def test_release_gate_pilot_waives_blocked_data_ceiling(tmp_path, monkeypatch):
+    # CONDITIONALLY_READY: only BLOCKED gates (human_review ceiling + parity pending).
+    readiness = _write_readiness(
+        tmp_path,
+        "CONDITIONALLY_READY",
+        [
+            {"name": "human review gold", "status": "BLOCKED", "detail": "human_review=1/40"},
+            {"name": "model parity", "status": "BLOCKED", "detail": "deployed unknown"},
+            {"name": "P1 classifier", "status": "PASS", "detail": "ok"},
+        ],
+    )
+    # strict (default): a BLOCKED gate still blocks -> exit 1
+    monkeypatch.setattr("sys.argv", ["check_release_gate.py", "--readiness", str(readiness)])
+    assert check_release_gate.main() == 1
+    # pilot: data-ceiling BLOCKED gates waived with audit -> exit 0
+    monkeypatch.setattr(
+        "sys.argv",
+        ["check_release_gate.py", "--readiness", str(readiness), "--allow-conditional"],
+    )
+    assert check_release_gate.main() == 0
+
+
+def test_release_gate_pilot_never_waives_fail(tmp_path, monkeypatch):
+    # A genuine regression (FAIL gate) must block even in pilot mode.
+    readiness = _write_readiness(
+        tmp_path,
+        "FAIL",
+        [
+            {"name": "P1 classifier", "status": "FAIL", "detail": "f1 regressed"},
+            {"name": "human review gold", "status": "BLOCKED", "detail": "human_review=1/40"},
+        ],
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["check_release_gate.py", "--readiness", str(readiness), "--allow-conditional"],
+    )
+    assert check_release_gate.main() == 1
+
+
+def test_release_gate_pilot_env_flag_enables_waiver(tmp_path, monkeypatch):
+    # RELEASE_GATE_ALLOW_CONDITIONAL=1 enables pilot mode without the CLI flag.
+    readiness = _write_readiness(
+        tmp_path,
+        "CONDITIONALLY_READY",
+        [{"name": "human review gold", "status": "BLOCKED", "detail": "human_review=1/40"}],
+    )
+    monkeypatch.setenv("RELEASE_GATE_ALLOW_CONDITIONAL", "1")
+    monkeypatch.setattr("sys.argv", ["check_release_gate.py", "--readiness", str(readiness)])
+    assert check_release_gate.main() == 0
+
+
+def test_release_gate_missing_report_never_waived(tmp_path, monkeypatch):
+    # A missing report is an evidence gap, not a data ceiling -> never waivable.
+    missing = tmp_path / "nope.json"
+    monkeypatch.setattr(
+        "sys.argv",
+        ["check_release_gate.py", "--readiness", str(missing), "--allow-conditional"],
+    )
+    assert check_release_gate.main() == 1
+
+
 def test_human_review_queue_prioritizes_high_risk_underclassification(tmp_path, monkeypatch):
     report = tmp_path / "p1_report.json"
     _write_json(

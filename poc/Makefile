@@ -405,13 +405,20 @@ readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 
 adversarial-gate: ## 적대 회귀 게이트 — golden_100 위험 미탐(고비밀→S3) baseline 초과 시 FAIL
 	$(PY) scripts/eval_adversarial.py
 
-release-gate: operational-readiness adversarial-gate ## Strict release gate; requires every readiness gate to PASS
+release-gate: operational-readiness adversarial-gate ## Strict release gate (GA); requires every readiness gate to PASS
 	$(PY) scripts/check_release_gate.py
+
+release-gate-pilot: operational-readiness adversarial-gate ## Pilot release gate; blocks on FAIL (regression) but waives data-ceiling BLOCKED gates (human_review/parity) with an audited waiver
+	$(PY) scripts/check_release_gate.py --allow-conditional
 
 release-gate-recalculate: p1-eval p2-full-gold operational-readiness adversarial-gate ## Nightly/local strict gate with model + ES eval recomputed
 	$(PY) scripts/check_release_gate.py
 
-release-manifest: operational-readiness p1-boundary ## Hash release evidence artifacts
+# 배포 경로 배선: 릴리스 산출물(매니페스트) 생성 전에 게이트를 강제한다. 하드 FAIL(진짜 회귀)은
+# 차단하고, CONDITIONALLY_READY(human_review 데이터천장·model parity 대기)는 감사된 파일럿 waiver로
+# 통과시킨다. GA용 strict 차단은 별도 `make release-gate`(--allow-conditional 없음).
+release-manifest: operational-readiness p1-boundary ## Hash release evidence artifacts (blocked by the pilot release gate on a hard FAIL)
+	$(PY) scripts/check_release_gate.py --allow-conditional
 	$(PY) scripts/build_release_manifest.py \
 	    --out reports/release_artifact_manifest.json
 
