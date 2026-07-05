@@ -102,6 +102,7 @@ def test_training_router_visibility(
     monkeypatch.setenv("ENABLE_TRAINING", "true" if training_expected else "false")
 
     import lloydk.config as cfg_mod
+    _orig_settings = cfg_mod.settings  # 원본 settings 객체 — import-bound 모듈(_jwt_auth 등 44개)이 참조
     importlib.reload(cfg_mod)
     import lloydk.api.app as app_mod
     importlib.reload(app_mod)
@@ -116,7 +117,10 @@ def test_training_router_visibility(
         else:
             assert not training_paths, f"{profile}: 학습 라우터가 노출되면 안됨 — {training_paths}"
     finally:
-        # env 원상복구 후 모듈 재reload — 후속 테스트의 settings 오염 차단
+        # env 원상복구 후 원본 settings 객체를 '복원'한다. reload는 새 settings 객체를 만들어
+        # 정체성이 달라지고, import-bound 모듈(_jwt_auth 등 44개)이 stale settings를 참조하게 돼
+        # 후속 테스트(JWT 검증·reranker probe 등)를 결정론적으로 오염시킨다(테스트 순서 의존 red).
+        # 원본 객체를 되돌린 뒤 app만 재빌드해 import-bound 참조와 정합시킨다.
         monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
-        importlib.reload(cfg_mod)
+        cfg_mod.settings = _orig_settings
         importlib.reload(app_mod)
