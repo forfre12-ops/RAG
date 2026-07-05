@@ -34,21 +34,26 @@ cp .env.lite-cloud .env.cloud
 > 저장 암호화는 lite-cloud 에서 OFF 라 `STORAGE_ENCRYPTION_KEY` 불필요.
 > onprem-local(하드닝)로 배포한다면 `STORAGE_ENCRYPTION_KEY` 도 필수(없으면 부팅 거부·ingestion 500).
 
-## 2. 기동 — **명시적 compose 경로** (BLOCKER A4)
+## 2. 기동 — **명시적 compose 경로 + --env-file** (BLOCKER A4)
 
 `docker-compose.override.yml` 은 로컬 dev 전용(GPU·Ollama 강제)이라 자동 머지되면 GPU 없는 VM 에서
-실패한다. 반드시 override 를 제외한 명시 경로로 올린다:
+실패한다. 반드시 override 제외 + `--env-file` 로 올린다. **`ENV_FILE=` 와 `--env-file` 을 같은 파일로**
+줘야 dev `.env` 누수(admin/training/실키·잘못된 provider)가 완전히 차단된다(prod overlay 가
+env_file 을 !override 로 끊고 서비스 env_file 을 `${ENV_FILE:-.env.prod}` 로 받음):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.cloud up -d postgres redis minio
+CF=".env.cloud"   # 채운 env 파일
+BASE="-f docker-compose.yml -f docker-compose.prod.yml"
+ENV_FILE=$CF docker compose --env-file $CF $BASE up -d postgres redis minio
 # postgres 헬시 대기 후 ↓
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.cloud \
-  run --rm api alembic upgrade head          # 마이그레이션 수동 실행 (BLOCKER A5 — startup 자동 아님)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.cloud up -d
+ENV_FILE=$CF docker compose --env-file $CF $BASE run --rm api alembic upgrade head   # 마이그레이션 수동(A5)
+ENV_FILE=$CF docker compose --env-file $CF $BASE up -d
 ```
 
-- prod overlay 는 **하드닝 이미지**(`Dockerfile.api.prod`, non-root·gunicorn)를 쓴다. 초기 테스트는
-  `WEB_CONCURRENCY=1`(기본) 권장 — 멀티워커는 프로모션 후 모델 reload 팬아웃 미구현이라 재기동 필요.
+- prod overlay(하드닝): **Dockerfile.api.prod**(non-root·gunicorn) · **불변**(./src·./scripts bind 없음,
+  모델은 ro external volume) · **포트 최소노출**(api 만 127.0.0.1:8000, pg/redis/minio/mlflow 미노출 —
+  리버스 프록시/내부망 전제) · HF 캐시는 non-root named volume(재다운로드 방지).
+- `WEB_CONCURRENCY=1`(기본) 권장 — 멀티워커는 모델 reload 팬아웃 미구현이라 재기동으로 갱신.
 - alembic 단일 head `c3d4e5f6a7b8`. 확장(vector/pg_trgm)은 마이그레이션이 생성(pgvector 이미지).
 
 ## 3. 분류 모델 공급 (BLOCKER A3)

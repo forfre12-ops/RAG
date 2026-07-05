@@ -1,40 +1,46 @@
-# docker-compose.prod.yml — 운영 환경 오버라이드
-# 사용: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+# docker-compose.prod.yml — 운영(immutable) 오버라이드
+# 사용(canonical): docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   - --env-file 은 ${} 치환용(이게 없으면 프로젝트 .env=dev 값이 치환에 새어듦).
+#   - 서비스 env_file 은 ${ENV_FILE:-.env.prod} → --env-file 과 같은 파일을 가리키게 할 것.
+#     (lite-cloud 테스트: ENV_FILE=.env.cloud docker compose --env-file .env.cloud -f ... up -d)
+#   - override.yml 은 -f 명시라 자동 제외 → GPU/Ollama 강제 회피.
 #
-# 차이점(dev vs prod):
-#   - GPU passthrough 없음 (임베딩 CPU 모드 또는 외부 서비스)
-#   - LLM: Ollama 로컬 대신 Anthropic/OpenAI 원격 API
-#   - 볼륨: src/ hot-reload 마운트 없음 (불변 이미지)
-#   - CORS: 명시적 origin만 허용
-#   - 헬스체크: 더 엄격한 interval/threshold
+# dev 대비 하드닝(상용 릴리스 기준):
+#   - env_file: base 의 .env(개발용) 상속을 !override 로 끊고 ${ENV_FILE:-.env.prod} 만 로드
+#     (dev .env 의 API_KEY_ROLE=admin·ENABLE_TRAINING=true·실키 주입 차단)
+#   - volumes: ./src·./scripts hot-reload bind 제거(불변 이미지). 모델은 external volume(ro)로만
+#   - ports: api 만 127.0.0.1:8000(리버스 프록시 뒤). pg/redis/minio/mlflow 는 미노출(내부 네트워크)
+#   - 이미지: Dockerfile.api.prod(non-root uid1000·gunicorn), CPU 임베딩, 원격 LLM
+#   - HF 캐시: non-root 경로(/home/lloydk)에 named volume — 매 기동 재다운로드 방지
 services:
   api:
-    # 하드닝 이미지 — non-root(uid 1000) + gunicorn/uvicorn workers + graceful shutdown.
-    # 베이스(Dockerfile.api=root·단일 uvicorn)를 덮어쓴다. context 는 base 에서 상속.
-    # 초기 클라우드 테스트는 WEB_CONCURRENCY=1 권장(멀티워커는 프로모션 후 /admin/model/reload
-    # 팬아웃 미구현[NFR-OPS-01]이라 워커별 stale 가능 — 재기동으로 갱신).
     build:
       dockerfile: Dockerfile.api.prod
+    # dev .env 상속 차단 — 운영 자격/설정은 ENV_FILE 로만. 초기 클라우드 테스트는 ENV_FILE=.env.cloud.
+    env_file: !override
+      - "${ENV_FILE:-.env.prod}"
     environment:
+      # WEB_CONCURRENCY 멀티워커는 프로모션 후 /admin/model/reload 팬아웃 미구현[NFR-OPS-01]이라
+      # 워커별 stale 가능 — 초기엔 1 권장(재기동으로 갱신).
       WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
-      # 원격 LLM (API 키는 .env.prod.secrets 또는 secrets manager에서 주입)
       LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
       LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
-      # 임베딩: CPU 모드 (GPU 없음)
       EMBEDDING_PROVIDER: hf
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-BAAI/bge-m3}"
-      # 운영 CORS — 명시적 origin
       CORS_ALLOW_ORIGINS: '["${ALLOWED_ORIGIN:-https://app.example.com}"]'
-    volumes:
-      # 불변 이미지 — src hot-reload 마운트 없음
-      # artifacts는 external volume 또는 공유 스토리지로 대체
+      HF_HOME: /home/lloydk/.cache/huggingface
+    # 불변 — dev 코드 bind 제거. 모델은 ro external volume, HF 캐시는 non-root named volume.
+    volumes: !override
       - prod_artifacts:/app/artifacts:ro
+      - hf_cache_api:/home/lloydk/.cache/huggingface
+    # 리버스 프록시(nginx-mtls 등) 뒤 — 외부 직노출 금지.
+    ports: !override
+      - "127.0.0.1:8000:8000"
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
         max_attempts: 3
-      # OOM 방어 — 컨테이너별 상한. 값은 운영 인스턴스 사양에 맞춰 .env로 조정.
       resources:
         limits:
           cpus: "${API_CPU_LIMIT:-2}"
@@ -49,9 +55,15 @@ services:
       start_period: 90s
 
   worker:
+    env_file: !override
+      - "${ENV_FILE:-.env.prod}"
     environment:
       LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
       LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
+    # dev 코드 bind 제거. 워커도 모델 접근 필요(classify/index 태스크) → ro external volume.
+    volumes: !override
+      - prod_artifacts:/app/artifacts:ro
+      - hf_cache_worker:/root/.cache/huggingface
     deploy:
       restart_policy:
         condition: on-failure
@@ -63,25 +75,36 @@ services:
         reservations:
           memory: "${WORKER_MEM_RESERVATION:-1G}"
 
+  beat:
+    env_file: !override
+      - "${ENV_FILE:-.env.prod}"
+    # beat 는 스케줄만 발행 — 코드/모델 bind 불요.
+    volumes: !override []
+
   postgres:
-    ports:
-      # 운영: localhost에서만 접근 (외부 노출 차단)
-      - "127.0.0.1:5432:5432"
+    # 내부 네트워크만 — 호스트 노출 없음(dev 의 0.0.0.0:5432 상속 차단).
+    ports: !override []
     deploy:
       resources:
         limits:
           memory: "${POSTGRES_MEM_LIMIT:-2G}"
 
+  redis:
+    ports: !override []
+
   minio:
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+    ports: !override []
     deploy:
       resources:
         limits:
           memory: "${MINIO_MEM_LIMIT:-2G}"
 
+  mlflow:
+    ports: !override []
+
 volumes:
   prod_artifacts:
     external: true
     name: "${PROD_ARTIFACTS_VOLUME:-lloydk_prod_artifacts}"
+  hf_cache_api:
+  hf_cache_worker:
