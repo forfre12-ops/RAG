@@ -182,7 +182,7 @@ tr.st-fixed{background:#fafffb;}
   </table>
 
   <h2 class="sec">4 · 배포 전 코드구멍 5건 — W1 티켓 (실소스 검증)</h2>
-  <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:6px;">아래는 릴리스 준비 감사에서 나온 🔴 배포 전 코드구멍 5건을, 이번에 <b>실제 소스에서 재검증</b>(각 5개 병렬 적대검증 에이전트)하고 일부를 실제로 마감한 결과다. <b>현재 마감</b>: ②보정온도 · ④-leakage · ①수동활성(병렬 <code>e88c087</code>) · <b>③release-gate(이번 세션 배선)</b> · <b>⑤ airgap 부분마감</b>(이번 세션: parity 게이트·위생 가드·wheel Linux 타깃). <b>남은 W1</b>: ④-metamorphic CI 실측화 + ⑤ 잔여(이미지 digest·<code>uv.lock</code> 해시핀·CI 실빌드 — 라이브 환경 필요).</p>
+  <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:6px;">아래는 릴리스 준비 감사에서 나온 🔴 배포 전 코드구멍 5건을, 이번에 <b>실제 소스에서 재검증</b>(각 5개 병렬 적대검증 에이전트)하고 일부를 실제로 마감한 결과다. <b>현재 마감</b>: ②보정온도 · ①수동활성(병렬 <code>e88c087</code>) · <b>③release-gate 배선</b> · <b>④ leakage+metamorphic</b>(이번 세션 마감) · <b>⑤ airgap 부분마감</b>(parity 게이트·위생 가드·wheel Linux). <b>남은 W1 = ⑤ 잔여뿐</b>(이미지 digest 핀·<code>uv.lock</code> 해시핀·CI 실빌드 — 전부 <b>라이브 빌드 환경</b> 필요, 순수-로직 W1은 완료).</p>
   <table class="f">
     <thead><tr><th class="c-sev">P</th><th style="width:150px">구멍</th><th>현재 상태 → 조치 (W1 티켓)</th></tr></thead>
     <tbody>
@@ -202,9 +202,9 @@ tr.st-fixed{background:#fafffb;}
         <td><b>배선 완료(이번 세션)</b>: <code>check_release_gate.py</code>에 파일럿 override(<code>--allow-conditional</code> / <code>RELEASE_GATE_ALLOW_CONDITIONAL=1</code>) — <b>BLOCKED(human_review 데이터천장·model parity)만 waive, FAIL·누락 리포트는 절대 불가</b>. <code>Makefile</code> <code>release-manifest</code>에 게이트 강제 → <b>하드 FAIL이면 릴리스 산출물 생성 차단</b>(=배포 경로 배선). CI dispatch는 파일럿 모드 기본(+strict 토글). 로컬 검증: 게이트 test 13 + CLI 4케이스(strict 차단 / pilot waive / FAIL 불가 / env flag). <b>발견·수정</b>: cp949 콘솔 <code>UnicodeEncodeError</code> 크래시 → ASCII 출력. <span style="color:var(--text-faint);">데이터천장으로 CI red 위험을 파일럿 override로 회피(설계 의도대로).</span></td>
       </tr>
       <tr>
-        <td><span class="sev sev-P2">P2</span></td>
+        <td><span class="sev" style="color:#15803d;border-color:#15803d;">CLOSED</span></td>
         <td><b>④ leakage / metamorphic fake-green</b></td>
-        <td><b>leakage=실측화 닫힘</b>(manifest-hash 610건+committed clean holdout+<code>--strict-coverage</code>, 매 push 실행; memory의 'SKIP' 서술은 구버전). <b>metamorphic=여전히 CI fake-green</b>(모델 대상 미실행·report 미생성·opt-in OFF 기본, 로직 유닛테스트만 실행). <b>W1</b>: committed anchor 픽스처로 metamorphic report 생성 CI 스텝 → <code>require_metamorphic=True</code>로 deploy gate 호출(리포트 없으면 green 대신 FAIL) · leakage manifest freshness 가드(현 train pool 정합 assert).</td>
+        <td><b>leakage=닫힘</b>(전 세션: manifest-hash 610건+committed clean holdout+<code>--strict-coverage</code>). <b>metamorphic=이번 세션 닫힘</b>: 원인=deploy gate가 리포트 미제공 시 가시적-skip(passed=True)이라 조용히 never-run. → <code>check_metamorphic_gate.py</code>(리포트 미생성·측정불가(표본&lt;min_n)·forward 회귀 모두 <b>fail-closed</b>) + <code>gen_metamorphic_pairs.py --from-samples</code>(커밋 픽스처를 배포 모델로 재분류, <b>live LLM 불요·결정적</b>) + <code>make metamorphic-gate</code>. <b>실측</b>: gemma3 생성 픽스처 18쌍, 배포 서빙(T=3.0·escalation τ=0.30)에서 <b>forward n=11 violations=0 → 게이트 PASS</b>(escalation이 패러프레이즈 하향[미탐] 차단; T=1.0·escalation 없으면 violation 1.0). 2회 실행 동일·신규 test 6.</td>
       </tr>
       <tr>
         <td><span class="sev" style="color:#b45309;border-color:#b45309;">PARTIAL</span></td>
