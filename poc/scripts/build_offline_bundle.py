@@ -924,12 +924,13 @@ def _copy_infra(out_dir: Path) -> None:
         if src.exists():
             shutil.copy2(src, dst)
 
-    # docs — INSTALL 절차서 등 (manifest files_expected의 docs/INSTALL.md 충족)
+    # docs — 절차서 (manifest files_expected 의 docs/{INSTALL,OPERATION,TROUBLESHOOTING}.md 충족)
     docs_dst = out_dir / "docs"
     docs_dst.mkdir(parents=True, exist_ok=True)
-    install_md = _REPO_ROOT / "docs" / "INSTALL.md"
-    if install_md.exists():
-        shutil.copy2(install_md, docs_dst / "INSTALL.md")
+    for _doc in ("INSTALL.md", "OPERATION.md", "TROUBLESHOOTING.md"):
+        _src = _REPO_ROOT / "docs" / _doc
+        if _src.exists():
+            shutil.copy2(_src, docs_dst / _doc)
 
     # .env template
     env_template = infra / ".env.template"
