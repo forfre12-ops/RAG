@@ -15,6 +15,22 @@ from lloydk.obs.otel import span  # 수동 span — OTel 미설치/미활성 시
 logger = logging.getLogger(__name__)
 
 
+def _record_gate_fail_open(gate: str) -> None:
+    """[obs] 서빙 파이프라인 게이트가 예외로 fail-open(미적용)했음을 가시화 — best-effort.
+
+    metadata-floor·FNR-safe override 같은 상향/라우팅 게이트가 조용히 실패하면 비밀이 낮은
+    등급을 무음 유지할 수 있다("게이트ON=가시성ON" 위반). classify_service 와 동일한
+    SERVING_GATE_FAIL_OPEN_TOTAL 카운터에 gate 라벨로 기록한다 — 분류 제어흐름은 그대로
+    (예외는 계속 삼켜 fail-safe 유지), 가시성만 추가. 메트릭/로그 실패는 무시.
+    """
+    try:
+        from lloydk.api.prom_metrics import SERVING_GATE_FAIL_OPEN_TOTAL  # noqa: PLC0415
+        SERVING_GATE_FAIL_OPEN_TOTAL.labels(gate=gate).inc()
+    except Exception:  # noqa: BLE001
+        pass
+    logger.debug("serving gate fail-open (예외로 미적용): %s", gate)
+
+
 def chunk_text(text: str, size: int = 512, overlap: int = 64):
     """하위호환 wrapper — 새 split()로 위임."""
     return _chunk_split(text, size=size, overlap=overlap)
@@ -341,7 +357,8 @@ class InferencePipeline:
                                 rule_grade=result.rule_grade,
                             )
                 except Exception:  # noqa: BLE001
-                    pass
+                    # FNR-safe 상향이 예외로 미적용 → 모델의 낮은 등급 유지(무음 미탐 위험). 가시화.
+                    _record_gate_fail_open("fnr_safe_override")
         else:
             result = self._run_rule_fallback(text, return_evidence)
 
@@ -408,7 +425,8 @@ class InferencePipeline:
                             rule_grade=result.rule_grade,
                         )
         except Exception:  # noqa: BLE001
-            pass
+            # source-prior cap(하향)이 예외로 미적용 → 공개출처 문서가 상위등급 유지. 가시화.
+            _record_gate_fail_open("source_prior_cap")
 
         # [metadata-floor] ICD R6 S/V/M 메타데이터 상향 게이트 (opt-in, 기본 OFF).
         # 내용 분류기는 비밀관리성(M)·출처(S)를 못 본다 — 인사·재무 비밀이 일상 내부문서(S2)로
@@ -448,7 +466,9 @@ class InferencePipeline:
                             f"metadata-access-conflict: access_scope={scope}(제한 접근)인데 예측 {cur} → 검수 라우팅 (ICD §4.4)"
                         ]
         except Exception:  # noqa: BLE001 — 메타데이터 처리 오류는 분류를 막지 않음(fail-safe)
-            pass
+            # metadata-floor 상향/access-conflict 라우팅이 예외로 미적용 → 비밀이 낮은 등급을
+            # 무음 유지할 수 있다(shipping-ON 게이트). 분류는 계속하되 가시화(운영자 신호).
+            _record_gate_fail_open("metadata_floor")
 
         # 표적 1 (2026-05-29): use_rag=True면 retrieval facade 호출하여 rag_context 채움.
         # rule-fallback / _run_model 어느 경로든 동일하게 RAG context 보강 — 분류 본문은 안 건드림.
