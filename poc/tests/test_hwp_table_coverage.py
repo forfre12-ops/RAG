@@ -16,8 +16,10 @@ from pathlib import Path
 
 from lloydk.modules.m2_preprocess.extractor import (
     ExtractResult,
+    _hwp_via_pyhwp,
     _hwp_table_coverage,
     _hwpx_bytes_has_table,
+    _hwpx_tables,
     _hwpx_uncaptured_table_cells,
 )
 from lloydk.services.document_ingestion_service import extraction_review_decision
@@ -57,6 +59,22 @@ class TestUncapturedTableCells:
         data = _make_hwpx(_SECTION_WITH_TABLE)
         # 추출본은 본문만(표 셀 SECRET_CELL_원가구조_99 빠짐) — 조용한 표 미추출 상황
         assert _hwpx_uncaptured_table_cells(data, "BODY_VISIBLE_본문단락") is True
+
+    def test_hwpx_table_rows_are_structured(self):
+        data = _make_hwpx(
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<hs:sec xmlns:hs="urn:sec" xmlns:hp="urn:para">'
+            "<hp:tbl><hp:tr>"
+            "<hp:tc><hp:p><hp:run><hp:t>item</hp:t></hp:run></hp:p></hp:tc>"
+            "<hp:tc><hp:p><hp:run><hp:t>amount</hp:t></hp:run></hp:p></hp:tc>"
+            "</hp:tr><hp:tr>"
+            "<hp:tc><hp:p><hp:run><hp:t>secret</hp:t></hp:run></hp:p></hp:tc>"
+            "<hp:tc><hp:p><hp:run><hp:t>12000</hp:t></hp:run></hp:p></hp:tc>"
+            "</hp:tr></hp:tbl></hs:sec>"
+        )
+        tables = _hwpx_tables(data)
+        assert tables
+        assert tables[0].rows == [["item", "amount"], ["secret", "12000"]]
 
     def test_cell_present_in_text_no_flag(self):
         data = _make_hwpx(_SECTION_WITH_TABLE)
@@ -184,3 +202,34 @@ class TestExtractResultField:
     def test_default_table_coverage_none(self):
         r = ExtractResult(text="x", method="plain", quality=1.0)
         assert r.table_coverage is None
+
+
+class TestPyhwpTableParsing:
+    def test_hwp5html_xhtml_tables_are_structured(self, tmp_path: Path, monkeypatch):
+        import subprocess
+        from types import SimpleNamespace
+
+        import lloydk.modules.m2_preprocess.extractor as ex
+
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        def fake_run(args, **kwargs):
+            out_dir = Path(args[args.index("--output") + 1])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "index.xhtml").write_text(
+                "<html><body><p>body</p><table>"
+                "<tr><td>item</td><td>amount</td></tr>"
+                "<tr><td>secret</td><td>12000</td></tr>"
+                "</table></body></html>",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(ex, "_hwp5html_cmd", lambda: "hwp5html")
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        text, tables = _hwp_via_pyhwp(p)
+        assert "secret | 12000" in text
+        assert tables
+        assert tables[0].rows == [["item", "amount"], ["secret", "12000"]]

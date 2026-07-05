@@ -178,6 +178,9 @@ class DocumentIngestionService:
 
         if ext and ext.error:
             warns.append(f"extract: {ext.error}")
+        if ext:
+            for warning in getattr(ext, "warnings", []) or []:
+                warns.append(f"extract-warning: {warning}")
         if not text:
             warns.append("no text extracted (parser/OCR needed)")
 

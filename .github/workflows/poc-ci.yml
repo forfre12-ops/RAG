@@ -298,8 +298,11 @@ jobs:
           printf 'POSTGRES_PASSWORD=ci_placeholder_not_a_secret\nIMAGE_TAG=ci\nGRAFANA_PASSWORD=ci_placeholder\n' > .env
           docker compose --env-file .env -f docker-compose.airgap.yml config --quiet
           docker compose --env-file .env -f infra/observability/docker-compose.observability.airgap.yml config --quiet
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+          ENV_FILE=.env docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
           rm -f .env
+
+      - name: Build production API image
+        run: docker build -f Dockerfile.api.prod -t lloydk-api:ci .
 
   test-lite:
     runs-on: ubuntu-latest
@@ -310,7 +313,7 @@ jobs:
     # B1·B2 (2026-05-29): Redis(R1·outbox) + Elasticsearch(RAG indexer·DR) 추가.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: lloydk
           POSTGRES_PASSWORD: lloydk_dev_pg
@@ -405,6 +408,15 @@ jobs:
 
       - name: Data quality — gold_real 강화 검사 (누수·합성마커·금지source, exit 1 on FAIL)
         run: make check-gold
+
+      - name: Release eval evidence gate
+        run: make check-release-evidence
+
+      - name: Parser support matrix gate
+        run: make check-parser-support
+
+      - name: Leakage gate - train/holdout text hash
+        run: make check-leakage
 
       - name: Run PoC dryrun suite (P4 -> P3 -> P2 -> P1 -> P5)
         run: python scripts/run_all_pocs.py
@@ -665,7 +677,7 @@ jobs:
         working-directory: ./poc
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: lloydk
           POSTGRES_PASSWORD: lloydk_dev_pg
@@ -747,5 +759,6 @@ jobs:
       - name: Validate manifest and strict release gate
         run: |
           make check-manifest
-          make operational-readiness
+          make check-release-evidence
+          make check-parser-support
           make release-gate

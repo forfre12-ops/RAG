@@ -15,7 +15,7 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from lloydk.api._jwt_auth import require_auth
 from lloydk.config import settings
@@ -186,6 +186,9 @@ class AnalyzeParseInfo(BaseModel):
     char_count: int
     chunk_count: int
     table_coverage: Optional[str] = None
+    table_count: int = 0
+    table_cell_count: int = 0
+    warnings: list[str] = Field(default_factory=list)
     pii_masked_count: int = 0
     extract_error: Optional[str] = None
 
@@ -266,6 +269,13 @@ async def analyze_document(
 
     ex = pre.extraction
     pii_count = sum(pre.pii_counts.values()) if pre.pii_counts else 0
+    extracted_tables = list(getattr(ex, "tables", []) or [])
+    extraction_warnings = list(getattr(ex, "warnings", []) or [])
+    table_cell_count = sum(
+        len(row)
+        for table in extracted_tables
+        for row in getattr(table, "rows", []) or []
+    )
     parse = AnalyzeParseInfo(
         source_format=source_format or ex.method,
         extraction_method=ex.method,
@@ -275,6 +285,9 @@ async def analyze_document(
         char_count=len(pre.text),
         chunk_count=len(pre.chunks),
         table_coverage=getattr(ex, "table_coverage", None),
+        table_count=len(extracted_tables),
+        table_cell_count=table_cell_count,
+        warnings=extraction_warnings,
         pii_masked_count=pii_count,
         extract_error=ex.error or None,
     )

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m2_preprocess.extractor import ExtractResult, extract
+from lloydk.modules.m2_preprocess.extractor import ExtractResult, _pdf_tables_via_pdfplumber, extract
 
 
 @pytest.fixture
@@ -99,6 +99,47 @@ class TestPdfFallback:
         # quality가 0 (에러) 또는 매우 낮음
         assert result.quality <= 0.5
 
+    def test_pdfplumber_tables_are_structured(self, tmp_path: Path, monkeypatch):
+        import sys
+        from types import SimpleNamespace
+
+        class FakePage:
+            def extract_tables(self):
+                return [[["item", "amount"], ["secret", "12000"]]]
+
+        class FakePdf:
+            pages = [FakePage()]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        monkeypatch.setitem(sys.modules, "pdfplumber", SimpleNamespace(open=lambda path: FakePdf()))
+
+        p = tmp_path / "table.pdf"
+        p.write_bytes(b"%PDF fake")
+        tables, warnings = _pdf_tables_via_pdfplumber(p)
+        assert warnings == ["pdf_tables_structured"]
+        assert tables[0].rows == [["item", "amount"], ["secret", "12000"]]
+
+    def test_pdf_table_extractor_unavailable_routes_review_signal(self, tmp_path: Path, monkeypatch):
+        import sys
+
+        from tests.test_document_ingestion import _minimal_pdf
+
+        monkeypatch.setitem(sys.modules, "pdfplumber", None)
+
+        p = tmp_path / "text_table_unknown.pdf"
+        p.write_bytes(_minimal_pdf("Trade Secret ALD deposition table"))
+        result = extract(p)
+
+        assert result.method == "parser"
+        assert result.text
+        assert "pdf_table_extractor_unavailable" in result.warnings
+        assert result.table_coverage == "incomplete"
+
 
 class TestDocxFallback:
     def test_docx_nonexistent(self, tmp_path: Path):
@@ -108,6 +149,56 @@ class TestDocxFallback:
         assert isinstance(result, ExtractResult)
         assert result.quality == 0.0
         assert result.error is not None
+
+    def test_docx_table_is_structured(self, tmp_path: Path):
+        docx = pytest.importorskip("docx")
+
+        doc = docx.Document()
+        table = doc.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "item"
+        table.cell(0, 1).text = "amount"
+        table.cell(1, 0).text = "secret cost"
+        table.cell(1, 1).text = "12000"
+        p = tmp_path / "table.docx"
+        doc.save(str(p))
+
+        result = extract(p)
+        assert result.tables
+        assert result.tables[0].rows == [["item", "amount"], ["secret cost", "12000"]]
+        assert "secret cost | 12000" in result.text
+
+    def test_docx_ooxml_content_control_table_fallback(self, tmp_path: Path, monkeypatch):
+        import zipfile
+
+        import docx
+
+        class FakeDoc:
+            paragraphs = []
+            tables = []
+            sections = []
+
+        monkeypatch.setattr(docx, "Document", lambda path: FakeDoc())
+
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:tbl><w:tr>"
+            "<w:tc><w:sdt><w:sdtContent><w:r><w:t>item</w:t></w:r></w:sdtContent></w:sdt></w:tc>"
+            "<w:tc><w:sdt><w:sdtContent><w:r><w:t>amount</w:t></w:r></w:sdtContent></w:sdt></w:tc>"
+            "</w:tr><w:tr>"
+            "<w:tc><w:sdt><w:sdtContent><w:r><w:t>hidden weekly report</w:t></w:r></w:sdtContent></w:sdt></w:tc>"
+            "<w:tc><w:r><w:t>260703</w:t></w:r></w:tc>"
+            "</w:tr></w:tbl></w:body></w:document>"
+        )
+        p = tmp_path / "content_control_table.docx"
+        with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("word/document.xml", xml)
+
+        result = extract(p)
+        assert "hidden weekly report | 260703" in result.text
+        assert result.tables
+        assert result.tables[0].rows == [["item", "amount"], ["hidden weekly report", "260703"]]
+        assert "docx_ooxml_tables_extracted" in result.warnings
 
 
 class TestHwpFallback:
@@ -151,6 +242,29 @@ class TestExcelExtraction:
         assert "12000" in result.text
         assert "대외비" in result.text           # 2번째 시트도
         assert "|" in result.text                # 표 셀 구분자
+
+    def test_xlsx_table_comments_and_formula_are_preserved(self, tmp_path: Path):
+        from openpyxl import Workbook
+        from openpyxl.comments import Comment
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+        ws.append(["item", "amount"])
+        ws.append(["secret cost", 12000])
+        ws["A2"].comment = Comment("review this hidden note", "tester")
+        ws["C2"] = "=B2*2"
+        p = tmp_path / "structured.xlsx"
+        wb.save(str(p))
+
+        result = extract(p)
+        assert result.tables
+        assert result.tables[0].sheet == "Data"
+        assert result.tables[0].rows[1][:2] == ["secret cost", "12000"]
+        assert "[excel comment Data!A2] review this hidden note" in result.text
+        assert "[excel formula Data!C2] =B2*2" in result.text
+        assert "excel_comments_extracted" in result.warnings
+        assert "excel_formulas_extracted" in result.warnings
 
     def test_xlsx_corrupt_graceful(self, tmp_path: Path):
         p = tmp_path / "fake.xlsx"
@@ -262,6 +376,26 @@ class TestPptxExtraction:
         assert "[slide 1]" in result.text
         assert "영업비밀 사업계획" in result.text     # 제목 도형
         assert "대외비" in result.text                # 텍스트박스
+
+    def test_pptx_table_is_structured(self, tmp_path: Path):
+        from pptx import Presentation
+        from pptx.util import Inches
+
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        shape = slide.shapes.add_table(2, 2, Inches(1), Inches(1), Inches(5), Inches(1))
+        table = shape.table
+        table.cell(0, 0).text = "item"
+        table.cell(0, 1).text = "amount"
+        table.cell(1, 0).text = "prototype"
+        table.cell(1, 1).text = "9000"
+        p = tmp_path / "table.pptx"
+        prs.save(str(p))
+
+        result = extract(p)
+        assert result.tables
+        assert result.tables[0].rows == [["item", "amount"], ["prototype", "9000"]]
+        assert "prototype | 9000" in result.text
 
     def test_pptx_corrupt_graceful(self, tmp_path: Path):
         p = tmp_path / "fake.pptx"

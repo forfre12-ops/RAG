@@ -204,6 +204,7 @@ def _check_extractors() -> dict:
         "docx(python-docx)": {"available": _mod("docx")},
         "pptx(python-pptx)": {"available": _mod("pptx")},
         "pdf_text(pdfminer)": {"available": _mod("pdfminer")},
+        "pdf_table(pdfplumber)": {"available": _mod("pdfplumber")},
         "pdf_render(fitz/pdf2image)": {"available": _mod("fitz") or _mod("pdf2image")},
         "pdf_scan(poppler)": {"available": POPPLER_PATH is not None, "path": POPPLER_PATH},
         "ocr(tesseract)": {"available": bool(_tess_ok), "cmd": TESSERACT_CMD},

@@ -291,6 +291,8 @@ function render(j){
     ['추출 글자수', (p.char_count||0).toLocaleString()],
     ['청크', p.chunk_count],
     ['표 커버리지', p.table_coverage || '—'],
+    ['구조화 표', (p.table_count||0).toLocaleString()+'개 / 셀 '+(p.table_cell_count||0).toLocaleString()+'개'],
+    ['파싱 경고', (p.warnings||[]).length ? (p.warnings||[]).join(', ') : '없음'],
     ['PII 마스킹', (p.pii_masked_count||0)+'건'],
     ['추출 오류', p.extract_error || '없음'],
   ]);

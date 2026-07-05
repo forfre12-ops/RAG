@@ -12,7 +12,7 @@ OCR 엔진: Tesseract 5.x + 한국어팩 (kor.traineddata) — Apache 2.0.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # Tesseract 실행파일 경로 — 환경변수 > Windows 기본 경로 > PATH
@@ -38,6 +38,20 @@ POPPLER_PATH: str | None = next(
 _OCR_MAX_PAGES_DEFAULT = 50
 
 
+SUPPORTED_FORMAT_GROUPS: dict[str, tuple[str, ...]] = {
+    "plain": ("txt", "md", "log", "csv"),
+    "hwp": ("hwp", "hwpx"),
+    "word": ("docx", "doc"),
+    "excel": ("xlsx", "xlsm", "xls"),
+    "powerpoint": ("pptx", "pptm"),
+    "pdf": ("pdf",),
+    "image_ocr": ("jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"),
+}
+SUPPORTED_PARSE_EXTENSIONS: tuple[str, ...] = tuple(
+    ext for group in SUPPORTED_FORMAT_GROUPS.values() for ext in group
+)
+
+
 def _ocr_max_pages() -> int:
     try:
         from lloydk.config import settings  # noqa: PLC0415
@@ -48,6 +62,16 @@ def _ocr_max_pages() -> int:
     except Exception:  # noqa: BLE001
         pass
     return _OCR_MAX_PAGES_DEFAULT
+
+
+@dataclass
+class ExtractedTable:
+    source: str
+    name: str
+    rows: list[list[str]]
+    sheet: str | None = None
+    page: int | None = None
+    table_index: int | None = None
 
 
 @dataclass
@@ -64,26 +88,28 @@ class ExtractResult:
     # quality(0.95 등)는 '무엇을 놓쳤나'가 아니라 '어떤 파서를 썼나'만 반영해 부분손실을
     # 가리므로, 이 신호로 검수 라우팅을 발동한다(등급 불변 — FNR-safe).
     table_coverage: str | None = None
+    tables: list[ExtractedTable] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 def extract(path: str | Path) -> ExtractResult:
     p = Path(path)
     suffix = p.suffix.lower().lstrip(".")
-    if suffix in ("txt", "md", "log", "csv"):
+    if suffix in SUPPORTED_FORMAT_GROUPS["plain"]:
         return _extract_plain(p)
-    if suffix in ("hwp", "hwpx"):
+    if suffix in SUPPORTED_FORMAT_GROUPS["hwp"]:
         return _extract_hwp(p)
-    if suffix in ("docx",):
+    if suffix == "docx":
         return _extract_docx(p)
-    if suffix in ("doc",):
+    if suffix == "doc":
         return _extract_doc(p)
-    if suffix in ("xlsx", "xlsm", "xls"):
+    if suffix in SUPPORTED_FORMAT_GROUPS["excel"]:
         return _extract_excel(p)
-    if suffix in ("pptx", "pptm"):
+    if suffix in SUPPORTED_FORMAT_GROUPS["powerpoint"]:
         return _extract_pptx(p)
-    if suffix in ("pdf",):
+    if suffix == "pdf":
         return _extract_pdf(p)
-    if suffix in ("jpg", "jpeg", "png", "tiff", "tif", "bmp", "webp"):
+    if suffix in SUPPORTED_FORMAT_GROUPS["image_ocr"]:
         return _extract_image_ocr(p)
     return ExtractResult(text="", method="plain", quality=0.0, error=f"unsupported: {suffix}")
 
@@ -94,6 +120,169 @@ def _extract_plain(p: Path) -> ExtractResult:
     except UnicodeDecodeError:
         text = p.read_text(encoding="cp949", errors="ignore")
     return ExtractResult(text=text, method="plain", quality=1.0)
+
+
+def _cell_text(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _trim_trailing_empty(row: list[str]) -> list[str]:
+    while row and not row[-1]:
+        row.pop()
+    return row
+
+
+def _row_has_text(row: list[str]) -> bool:
+    return any(c.strip() for c in row)
+
+
+def _table_text_line(row: list[str]) -> str:
+    return " | ".join(c for c in row if c.strip())
+
+
+def _tables_to_text(tables: list[ExtractedTable]) -> str:
+    lines: list[str] = []
+    for table in tables:
+        for row in table.rows:
+            line = _table_text_line(row)
+            if line:
+                lines.append(line)
+    return "\n".join(lines)
+
+
+def _append_if_missing(text: str, addition: str) -> str:
+    if not addition.strip():
+        return text or ""
+    norm = "".join((text or "").split())
+    missing = []
+    for line in addition.splitlines():
+        if line.strip() and "".join(line.split()) not in norm:
+            missing.append(line)
+    if not missing:
+        return text or ""
+    return ((text or "").rstrip() + "\n" + "\n".join(missing)).strip()
+
+
+def _warn_once(warnings: list[str], warning: str) -> None:
+    if warning not in warnings:
+        warnings.append(warning)
+
+
+def _zip_names(path: Path) -> list[str]:
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(path) as zf:
+            return zf.namelist()
+    except Exception:  # noqa: BLE001
+        return []
+
+
+_PACKAGE_IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp")
+_PACKAGE_OCR_LIMIT = 30
+
+
+def _ocr_package_images(
+    p: Path,
+    *,
+    prefix: str,
+    label: str,
+    warnings: list[str],
+) -> list[str]:
+    import io
+    import zipfile
+
+    names = [
+        n for n in _zip_names(p)
+        if n.startswith(prefix) and n.lower().endswith(_PACKAGE_IMAGE_SUFFIXES)
+    ]
+    if not names:
+        return []
+    try:
+        from PIL import Image  # type: ignore
+        import pytesseract  # type: ignore  # noqa: F401
+    except ImportError:
+        _warn_once(warnings, f"{label}_media_ocr_unavailable")
+        return []
+
+    parts: list[str] = []
+    try:
+        with zipfile.ZipFile(p) as zf:
+            for name in names[:_PACKAGE_OCR_LIMIT]:
+                try:
+                    with Image.open(io.BytesIO(zf.read(name))) as img:
+                        text = _tess_image(img)
+                except Exception:  # noqa: BLE001
+                    continue
+                if text and text.strip():
+                    parts.append(f"[{label} image OCR {name}]\n{text.strip()}")
+                    try:
+                        warnings.remove(f"{label}_media_not_ocrd")
+                    except ValueError:
+                        pass
+                    _warn_once(warnings, f"{label}_media_ocr_extracted")
+    except Exception as exc:  # noqa: BLE001
+        _warn_once(warnings, f"{label}_media_ocr_error:{type(exc).__name__}")
+        return parts
+
+    if len(names) > _PACKAGE_OCR_LIMIT:
+        _warn_once(warnings, f"{label}_media_ocr_truncated")
+    if not parts:
+        _warn_once(warnings, f"{label}_media_ocr_empty")
+    return parts
+
+
+def _xml_text(xml: str) -> str:
+    import html as _html
+    import re as _re
+
+    chunks = _re.findall(r"<(?:\w+:)?t\b[^>]*>(.*?)</(?:\w+:)?t>", xml, _re.S)
+    text = "\n".join(_html.unescape(_re.sub(r"<[^>]+>", "", c)).strip() for c in chunks)
+    return "\n".join(line for line in text.splitlines() if line.strip())
+
+
+def _html_to_text(raw: str) -> str:
+    import html as _html
+    import re as _re
+
+    raw = _re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=_re.S | _re.I)
+    text = _re.sub(r"<[^>]+>", " ", raw)
+    text = _html.unescape(text)
+    text = _re.sub(r"[ \t\u00a0]+", " ", text)
+    text = _re.sub(r"\s*\n\s*", "\n", text).strip()
+    return text
+
+
+def _html_tables(raw: str, *, source: str, name_prefix: str) -> list[ExtractedTable]:
+    import html as _html
+    import re as _re
+
+    tables: list[ExtractedTable] = []
+    for tidx, table in enumerate(
+        _re.findall(r"<table\b[^>]*>(.*?)</table>", raw, _re.S | _re.I),
+        start=1,
+    ):
+        rows: list[list[str]] = []
+        for tr in _re.findall(r"<tr\b[^>]*>(.*?)</tr>", table, _re.S | _re.I):
+            cells: list[str] = []
+            for cell in _re.findall(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", tr, _re.S | _re.I):
+                text = _html_to_text(_html.unescape(cell))
+                cells.append(text)
+            cells = _trim_trailing_empty(cells)
+            if _row_has_text(cells):
+                rows.append(cells)
+        if rows:
+            tables.append(
+                ExtractedTable(
+                    source=source,
+                    name=f"{name_prefix} table {tidx}",
+                    rows=rows,
+                    table_index=tidx,
+                )
+            )
+    return tables
 
 
 def _extract_hwp(p: Path) -> ExtractResult:
@@ -129,9 +318,26 @@ def _extract_hwp(p: Path) -> ExtractResult:
         return ExtractResult(text="", method="rhwp", quality=0.0, error=str(exc))
 
     # 표·글상자 보강(opt-in pyhwp). rhwp보다 많이 뽑히면 = 표 셀을 회수했단 뜻이라 채택.
-    full = _hwp_text_via_pyhwp(p)
+    warnings: list[str] = []
+    tables: list[ExtractedTable] = []
+    if p.suffix.lower() == ".hwpx":
+        tables = _hwpx_tables(p.read_bytes(), source="hwpx")
+        if tables:
+            text = _append_if_missing(text or "", _tables_to_text(tables))
+            _warn_once(warnings, "hwpx_tables_structured")
+
+    full, pyhwp_tables = _hwp_via_pyhwp(p)
     if full and len(full) > len(text or ""):
-        return ExtractResult(text=full, method="pyhwp", quality=0.9)
+        pyhwp_warnings = ["hwp_tables_extracted_by_hwp5html"] if pyhwp_tables else [
+            "hwp_tables_flattened_by_hwp5html"
+        ]
+        return ExtractResult(
+            text=full,
+            method="pyhwp",
+            quality=0.9,
+            tables=pyhwp_tables,
+            warnings=pyhwp_warnings,
+        )
 
     if not text or not text.strip():
         # 빈 추출 = 성공 아님. 표/글상자 전용 HWP일 가능성을 경고로 surface.
@@ -143,7 +349,16 @@ def _extract_hwp(p: Path) -> ExtractResult:
         )
     # 본문은 뽑혔지만 표 셀이 빠졌을 수 있다(rhwp의 조용한 표 미추출) — 커버리지 판정.
     coverage = _hwp_table_coverage(p, doc, text)
-    return ExtractResult(text=text, method="rhwp", quality=0.95, table_coverage=coverage)
+    if coverage == "incomplete":
+        _warn_once(warnings, "hwp_table_cells_may_be_missing")
+    return ExtractResult(
+        text=text,
+        method="rhwp",
+        quality=0.95,
+        table_coverage=coverage,
+        tables=tables,
+        warnings=warnings,
+    )
 
 
 def _hwp_table_coverage(p: Path, doc, text: str) -> str | None:
@@ -208,6 +423,55 @@ def _hwpx_uncaptured_table_cells(hwpx_bytes: bytes, extracted_text: str) -> bool
     return False
 
 
+def _hwpx_tables(hwpx_bytes: bytes, *, source: str = "hwpx") -> list[ExtractedTable]:
+    import html as _html
+    import io
+    import re as _re
+    import zipfile
+
+    try:
+        z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
+    except Exception:  # noqa: BLE001
+        return []
+    names = [n for n in z.namelist() if n.lower().endswith(".xml") and "section" in n.lower()]
+    if not names:
+        names = [n for n in z.namelist() if n.lower().endswith(".xml")]
+
+    out: list[ExtractedTable] = []
+    for name in names:
+        try:
+            xml = z.read(name).decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            continue
+        for tbl in _re.findall(r"<(?:\w+:)?tbl\b[^>]*>(.*?)</(?:\w+:)?tbl>", xml, _re.S):
+            rows: list[list[str]] = []
+            tr_blocks = _re.findall(r"<(?:\w+:)?tr\b[^>]*>(.*?)</(?:\w+:)?tr>", tbl, _re.S)
+            if not tr_blocks:
+                tr_blocks = [tbl]
+            for tr in tr_blocks:
+                row: list[str] = []
+                for tc in _re.findall(r"<(?:\w+:)?tc\b[^>]*>(.*?)</(?:\w+:)?tc>", tr, _re.S):
+                    texts = []
+                    for t in _re.findall(r"<(?:\w+:)?t\b[^>]*>(.*?)</(?:\w+:)?t>", tc, _re.S):
+                        cell = _html.unescape(_re.sub(r"<[^>]+>", "", t)).strip()
+                        if cell:
+                            texts.append(cell)
+                    row.append("\n".join(texts).strip())
+                row = _trim_trailing_empty(row)
+                if _row_has_text(row):
+                    rows.append(row)
+            if rows:
+                out.append(
+                    ExtractedTable(
+                        source=source,
+                        name=f"{Path(name).name} table {len(out) + 1}",
+                        rows=rows,
+                        table_index=len(out) + 1,
+                    )
+                )
+    return out
+
+
 def _hwpx_bytes_has_table(hwpx_bytes: bytes) -> bool:
     """HWPX(zip) 어느 XML에든 표 구조(<...:tbl>)가 있으면 True (존재만 판정)."""
     import io
@@ -248,7 +512,7 @@ def _hwp5html_cmd() -> str | None:
     return shutil.which("hwp5html")
 
 
-def _hwp_text_via_pyhwp(p: Path) -> str | None:
+def _hwp_via_pyhwp(p: Path) -> tuple[str | None, list[ExtractedTable]]:
     """pyhwp(hwp5html CLI)로 .hwp의 표·글상자 포함 전체 텍스트 추출 (opt-in, AGPL).
 
     rhwp.extract_text()가 표 셀을 흘리는 것을 보강한다. pyhwp의 HWP5→XHTML 변환은
@@ -263,10 +527,10 @@ def _hwp_text_via_pyhwp(p: Path) -> str | None:
     실행파일 부재·변환 실패는 None(graceful) → 호출부가 rhwp 결과를 사용.
     """
     if p.suffix.lower() != ".hwp":
-        return None
+        return None, []
     cmd = _hwp5html_cmd()
     if not cmd:
-        return None
+        return None, []
 
     import html as _html
     import re as _re
@@ -282,10 +546,10 @@ def _hwp_text_via_pyhwp(p: Path) -> str | None:
         )
         xhtml = Path(tmpdir) / "index.xhtml"
         if proc.returncode != 0 or not xhtml.exists():
-            return None
+            return None, []
         raw = xhtml.read_text(encoding="utf-8", errors="replace")
     except Exception:  # noqa: BLE001
-        return None
+        return None, []
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -294,7 +558,158 @@ def _hwp_text_via_pyhwp(p: Path) -> str | None:
     text = _html.unescape(text)
     text = _re.sub(r"[ \t ]+", " ", text)
     text = _re.sub(r"\s*\n\s*", "\n", text).strip()
-    return text or None
+    tables = _html_tables(raw, source="hwp", name_prefix=p.name)
+    text = _append_if_missing(_html_to_text(raw), _tables_to_text(tables))
+    return (text or None), tables
+
+
+def _hwp_text_via_pyhwp(p: Path) -> str | None:
+    text, _tables = _hwp_via_pyhwp(p)
+    return text
+
+
+def _docx_collect_tables(container, *, source: str, tables: list[ExtractedTable],
+                         parts: list[str]) -> None:
+    for idx, tbl in enumerate(getattr(container, "tables", []), start=1):
+        rows: list[list[str]] = []
+        for row in tbl.rows:
+            cells = _trim_trailing_empty([_cell_text(cell.text) for cell in row.cells])
+            if _row_has_text(cells):
+                rows.append(cells)
+                parts.append(_table_text_line(cells))
+        if rows:
+            tables.append(
+                ExtractedTable(
+                    source=source,
+                    name=f"{source} table {idx}",
+                    rows=rows,
+                    table_index=idx,
+                )
+            )
+
+
+def _docx_ooxml_extras(p: Path, warnings: list[str]) -> list[str]:
+    import re as _re
+    import zipfile
+
+    extras: list[str] = []
+    names = _zip_names(p)
+    if any(n.startswith("word/media/") for n in names):
+        _warn_once(warnings, "docx_media_not_ocrd")
+        extras.extend(_ocr_package_images(p, prefix="word/media/", label="docx", warnings=warnings))
+    if any(n.startswith("word/charts/") for n in names):
+        _warn_once(warnings, "docx_charts_not_extracted")
+    if any(n.startswith("word/embeddings/") for n in names):
+        _warn_once(warnings, "docx_embedded_objects_not_extracted")
+
+    try:
+        with zipfile.ZipFile(p) as zf:
+            named_parts = {
+                "word/comments.xml": "docx_comments_extracted",
+                "word/footnotes.xml": "docx_footnotes_extracted",
+                "word/endnotes.xml": "docx_endnotes_extracted",
+            }
+            for name, warning in named_parts.items():
+                if name not in names:
+                    continue
+                text = _xml_text(zf.read(name).decode("utf-8", errors="replace"))
+                if text:
+                    extras.append(f"[{name}]\n{text}")
+                    _warn_once(warnings, warning)
+
+            xml_parts = [
+                n for n in names
+                if n.startswith("word/") and n.endswith(".xml")
+                and (n == "word/document.xml" or n.startswith("word/header") or n.startswith("word/footer"))
+            ]
+            for name in xml_parts:
+                xml = zf.read(name).decode("utf-8", errors="replace")
+                for box in _re.findall(
+                    r"<(?:\w+:)?txbxContent\b[^>]*>(.*?)</(?:\w+:)?txbxContent>",
+                    xml,
+                    _re.S,
+                ):
+                    text = _xml_text(box)
+                    if text:
+                        extras.append(f"[{name}:textbox]\n{text}")
+                        _warn_once(warnings, "docx_textboxes_extracted")
+    except Exception:  # noqa: BLE001
+        return extras
+    return extras
+
+
+def _docx_ooxml_tables(p: Path, warnings: list[str]) -> list[ExtractedTable]:
+    import re as _re
+    import zipfile
+
+    tables: list[ExtractedTable] = []
+    names = _zip_names(p)
+    xml_parts = [
+        n for n in names
+        if n.startswith("word/") and n.endswith(".xml")
+        and (n == "word/document.xml" or n.startswith("word/header") or n.startswith("word/footer"))
+    ]
+    try:
+        with zipfile.ZipFile(p) as zf:
+            for name in xml_parts:
+                xml = zf.read(name).decode("utf-8", errors="replace")
+                for raw_tbl in _re.findall(
+                    r"<(?:\w+:)?tbl\b[^>]*>(.*?)</(?:\w+:)?tbl>",
+                    xml,
+                    _re.S,
+                ):
+                    rows: list[list[str]] = []
+                    for raw_tr in _re.findall(
+                        r"<(?:\w+:)?tr\b[^>]*>(.*?)</(?:\w+:)?tr>",
+                        raw_tbl,
+                        _re.S,
+                    ):
+                        row: list[str] = []
+                        for raw_tc in _re.findall(
+                            r"<(?:\w+:)?tc\b[^>]*>(.*?)</(?:\w+:)?tc>",
+                            raw_tr,
+                            _re.S,
+                        ):
+                            row.append(_xml_text(raw_tc))
+                        row = _trim_trailing_empty(row)
+                        if _row_has_text(row):
+                            rows.append(row)
+                    if rows:
+                        tables.append(
+                            ExtractedTable(
+                                source="docx_ooxml",
+                                name=f"{Path(name).name} table {len(tables) + 1}",
+                                rows=rows,
+                                table_index=len(tables) + 1,
+                            )
+                        )
+    except Exception:  # noqa: BLE001
+        return tables
+    if tables:
+        _warn_once(warnings, "docx_ooxml_tables_extracted")
+    return tables
+
+
+def _docx_ooxml_text(p: Path, warnings: list[str]) -> str:
+    import zipfile
+
+    names = _zip_names(p)
+    xml_parts = [
+        n for n in names
+        if n.startswith("word/") and n.endswith(".xml")
+        and (n == "word/document.xml" or n.startswith("word/header") or n.startswith("word/footer"))
+    ]
+    lines: list[str] = []
+    try:
+        with zipfile.ZipFile(p) as zf:
+            for name in xml_parts:
+                text = _xml_text(zf.read(name).decode("utf-8", errors="replace"))
+                if text:
+                    lines.extend(text.splitlines())
+    except Exception:  # noqa: BLE001
+        return ""
+    text = "\n".join(line for line in lines if line.strip())
+    return text
 
 
 def _extract_docx(p: Path) -> ExtractResult:
@@ -303,12 +718,99 @@ def _extract_docx(p: Path) -> ExtractResult:
 
         doc = Document(str(p))
         parts = [para.text for para in doc.paragraphs if para.text]
-        for tbl in doc.tables:
-            for row in tbl.rows:
-                parts.append(" | ".join(cell.text for cell in row.cells))
-        return ExtractResult(text="\n".join(parts), method="parser", quality=0.97)
+        tables: list[ExtractedTable] = []
+        warnings: list[str] = []
+
+        _docx_collect_tables(doc, source="docx", tables=tables, parts=parts)
+        for sidx, section in enumerate(doc.sections, start=1):
+            for label in (
+                "header",
+                "footer",
+                "first_page_header",
+                "first_page_footer",
+                "even_page_header",
+                "even_page_footer",
+            ):
+                block = getattr(section, label, None)
+                if block is None:
+                    continue
+                block_parts = [p.text for p in block.paragraphs if p.text]
+                if block_parts:
+                    parts.append(f"[docx section {sidx} {label}]")
+                    parts.extend(block_parts)
+                _docx_collect_tables(
+                    block,
+                    source=f"docx_{label}",
+                    tables=tables,
+                    parts=parts,
+                )
+
+        if not tables:
+            ooxml_tables = _docx_ooxml_tables(p, warnings)
+            if ooxml_tables:
+                tables.extend(ooxml_tables)
+                table_text = _tables_to_text(ooxml_tables)
+                merged = _append_if_missing("\n".join(parts), table_text)
+                parts = merged.splitlines() if merged else []
+
+        parts.extend(_docx_ooxml_extras(p, warnings))
+        ooxml_text = _docx_ooxml_text(p, warnings)
+        if ooxml_text:
+            current = "\n".join(parts)
+            merged = _append_if_missing(current, ooxml_text)
+            if merged != current:
+                _warn_once(warnings, "docx_ooxml_text_extracted")
+            parts = merged.splitlines() if merged else []
+        return ExtractResult(
+            text="\n".join(parts),
+            method="parser",
+            quality=0.97,
+            tables=tables,
+            warnings=warnings,
+        )
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="parser", quality=0.0, error=str(exc))
+
+
+def _excel_package_warnings(p: Path, warnings: list[str]) -> None:
+    names = _zip_names(p)
+    if any(n.startswith("xl/media/") for n in names):
+        _warn_once(warnings, "excel_media_not_ocrd")
+    if any(n.startswith("xl/charts/") for n in names):
+        _warn_once(warnings, "excel_charts_not_extracted")
+    if any(n.startswith("xl/drawings/") for n in names):
+        _warn_once(warnings, "excel_drawings_text_may_be_missing")
+    if any(n.startswith("xl/embeddings/") for n in names):
+        _warn_once(warnings, "excel_embedded_objects_not_extracted")
+
+
+def _excel_auxiliary_texts(path: str, warnings: list[str]) -> list[str]:
+    parts: list[str] = []
+    try:
+        from openpyxl import load_workbook  # type: ignore
+
+        wb = load_workbook(path, read_only=False, data_only=False)
+    except Exception:  # noqa: BLE001
+        return parts
+    try:
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                for cell in row:
+                    coord = f"{ws.title}!{cell.coordinate}"
+                    if cell.comment and cell.comment.text:
+                        parts.append(f"[excel comment {coord}] {cell.comment.text.strip()}")
+                        _warn_once(warnings, "excel_comments_extracted")
+                    if cell.hyperlink and cell.hyperlink.target:
+                        parts.append(f"[excel hyperlink {coord}] {cell.hyperlink.target}")
+                        _warn_once(warnings, "excel_hyperlinks_extracted")
+                    if isinstance(cell.value, str) and cell.value.startswith("="):
+                        parts.append(f"[excel formula {coord}] {cell.value}")
+                        _warn_once(warnings, "excel_formulas_extracted")
+    except Exception:  # noqa: BLE001
+        return parts
+    finally:
+        wb.close()
+    return parts
 
 
 def _extract_excel(p: Path) -> ExtractResult:
@@ -330,7 +832,9 @@ def _extract_excel(p: Path) -> ExtractResult:
         칸만 유지해 중복 노이즈 회피).
     """
     suffix = p.suffix.lower().lstrip(".")
+    warnings: list[str] = []
     if suffix in ("xlsx", "xlsm"):
+        _excel_package_warnings(p, warnings)
         try:
             from openpyxl import load_workbook  # type: ignore
         except ImportError as exc:
@@ -342,19 +846,32 @@ def _extract_excel(p: Path) -> ExtractResult:
             return ExtractResult(text="", method="openpyxl", quality=0.0, error=str(exc))
         merged = _excel_merged_values(str(p))
         parts: list[str] = []
+        tables: list[ExtractedTable] = []
         # read_only 워크북도 hidden/veryHidden 시트를 worksheets에 노출하므로
         # 추가 필터 없이 전부 순회 — sheet_state는 헤더 표기로만 사용.
-        for ws in wb.worksheets:
+        for ws_idx, ws in enumerate(wb.worksheets, start=1):
             state = getattr(ws, "sheet_state", "visible")
             header = f"[sheet: {ws.title}]" if state == "visible" else f"[sheet: {ws.title} ({state})]"
             parts.append(header)
             mmap = merged.get(ws.title)
+            table_rows: list[list[str]] = []
             if not mmap:
                 # 병합 없는 시트는 기존 fast path(values_only) 유지.
                 for row in ws.iter_rows(values_only=True):
-                    cells = [str(c) for c in row if c is not None and str(c).strip()]
-                    if cells:
-                        parts.append(" | ".join(cells))
+                    cells = _trim_trailing_empty([_cell_text(c) for c in row])
+                    if _row_has_text(cells):
+                        table_rows.append(cells)
+                        parts.append(_table_text_line(cells))
+                if table_rows:
+                    tables.append(
+                        ExtractedTable(
+                            source="excel",
+                            name=ws.title,
+                            rows=table_rows,
+                            sheet=ws.title,
+                            table_index=ws_idx,
+                        )
+                    )
                 continue
             # 병합 있는 시트만 좌표를 추적해 None 셀에 전파값을 채운다.
             # read_only는 빈 칸을 EmptyCell(좌표 속성 없음)로 주므로, 행마다 첫
@@ -370,18 +887,38 @@ def _extract_excel(p: Path) -> ExtractResult:
                     v = cell.value
                     if v is None and row_no is not None:
                         v = mmap.get((row_no, col_base + idx))
-                    if v is not None and str(v).strip():
-                        cells.append(str(v))
-                if cells:
-                    parts.append(" | ".join(cells))
+                    cells.append(_cell_text(v))
+                cells = _trim_trailing_empty(cells)
+                if _row_has_text(cells):
+                    table_rows.append(cells)
+                    parts.append(_table_text_line(cells))
+            if table_rows:
+                tables.append(
+                    ExtractedTable(
+                        source="excel",
+                        name=ws.title,
+                        rows=table_rows,
+                        sheet=ws.title,
+                        table_index=ws_idx,
+                    )
+                )
         wb.close()
 
         # 수식 캐시 부재(None) 가능성 감지 — data_only 모드에서 수식 셀이 None이면
         # 값 누락. read_only 워크북은 셀 데이터타입을 못 보므로 별도 워크북을
         # data_only=False로 재오픈해 수식 존재 여부만 가볍게 점검한다(실패는 무시).
+        parts.extend(_excel_auxiliary_texts(str(p), warnings))
+        parts.extend(_ocr_package_images(p, prefix="xl/media/", label="excel", warnings=warnings))
         warn = _excel_formula_cache_warning(str(p))
+        if warn:
+            _warn_once(warnings, "excel_formula_cached_values_missing")
         return ExtractResult(
-            text="\n".join(parts), method="openpyxl", quality=0.95, error=warn,
+            text="\n".join(parts),
+            method="openpyxl",
+            quality=0.95,
+            error=warn,
+            tables=tables,
+            warnings=warnings,
         )
 
     # .xls (구형 바이너리) — openpyxl 미지원이라 xlrd 필요. 미설치 시 변환 안내.
@@ -395,14 +932,26 @@ def _extract_excel(p: Path) -> ExtractResult:
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="xlrd", quality=0.0, error=str(exc))
     parts = []
-    for sh in book.sheets():
+    tables: list[ExtractedTable] = []
+    for sidx, sh in enumerate(book.sheets(), start=1):
         parts.append(f"[sheet: {sh.name}]")
+        table_rows: list[list[str]] = []
         for r in range(sh.nrows):
-            cells = [str(sh.cell_value(r, c)).strip() for c in range(sh.ncols)]
-            cells = [c for c in cells if c]
-            if cells:
-                parts.append(" | ".join(cells))
-    return ExtractResult(text="\n".join(parts), method="xlrd", quality=0.9)
+            cells = _trim_trailing_empty([_cell_text(sh.cell_value(r, c)) for c in range(sh.ncols)])
+            if _row_has_text(cells):
+                table_rows.append(cells)
+                parts.append(_table_text_line(cells))
+        if table_rows:
+            tables.append(
+                ExtractedTable(
+                    source="excel",
+                    name=sh.name,
+                    rows=table_rows,
+                    sheet=sh.name,
+                    table_index=sidx,
+                )
+            )
+    return ExtractResult(text="\n".join(parts), method="xlrd", quality=0.9, tables=tables)
 
 
 # 병합 셀 세로 전파 상한 — 병리적으로 큰 병합(예: A1:A1048576)이 맵을 폭발시키지
@@ -534,20 +1083,99 @@ def _extract_pptx(p: Path) -> ExtractResult:
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="pptx", quality=0.0, error=str(exc))
     parts: list[str] = []
+    tables: list[ExtractedTable] = []
+    warnings: list[str] = []
     for i, slide in enumerate(prs.slides):
         parts.append(f"[slide {i + 1}]")
-        for shape in slide.shapes:
+        for shape_idx, shape in enumerate(slide.shapes, start=1):
             if getattr(shape, "has_text_frame", False):
                 for para in shape.text_frame.paragraphs:
                     t = "".join(r.text for r in para.runs) or para.text
                     if t.strip():
                         parts.append(t)
             if getattr(shape, "has_table", False):
+                table_rows: list[list[str]] = []
                 for row in shape.table.rows:
-                    cells = [c.text for c in row.cells if c.text.strip()]
-                    if cells:
-                        parts.append(" | ".join(cells))
-    return ExtractResult(text="\n".join(parts), method="pptx", quality=0.95)
+                    cells = _trim_trailing_empty([_cell_text(c.text) for c in row.cells])
+                    if _row_has_text(cells):
+                        table_rows.append(cells)
+                        parts.append(_table_text_line(cells))
+                if table_rows:
+                    tables.append(
+                        ExtractedTable(
+                            source="pptx",
+                            name=f"slide {i + 1} table {shape_idx}",
+                            rows=table_rows,
+                            page=i + 1,
+                            table_index=shape_idx,
+                        )
+                    )
+            if getattr(shape, "has_chart", False):
+                _warn_once(warnings, "pptx_charts_not_extracted")
+            shape_type = str(getattr(shape, "shape_type", "")).upper()
+            if "PICTURE" in shape_type:
+                _warn_once(warnings, "pptx_media_not_ocrd")
+            if "OLE" in shape_type or "EMBEDDED" in shape_type:
+                _warn_once(warnings, "pptx_embedded_objects_not_extracted")
+        if getattr(slide, "has_notes_slide", False):
+            try:
+                note_text = slide.notes_slide.notes_text_frame.text
+                if note_text and note_text.strip():
+                    parts.append(f"[slide {i + 1} notes]")
+                    parts.append(note_text.strip())
+                    _warn_once(warnings, "pptx_notes_extracted")
+            except Exception:  # noqa: BLE001
+                pass
+    parts.extend(_ocr_package_images(p, prefix="ppt/media/", label="pptx", warnings=warnings))
+    return ExtractResult(
+        text="\n".join(parts),
+        method="pptx",
+        quality=0.95,
+        tables=tables,
+        warnings=warnings,
+    )
+
+
+def _pdf_tables_via_pdfplumber(p: Path) -> tuple[list[ExtractedTable], list[str]]:
+    try:
+        import pdfplumber  # type: ignore
+    except ImportError:
+        return [], ["pdf_table_extractor_unavailable"]
+    except Exception as exc:  # noqa: BLE001
+        return [], [f"pdf_table_extractor_error:{type(exc).__name__}"]
+
+    tables: list[ExtractedTable] = []
+    try:
+        with pdfplumber.open(str(p)) as pdf:
+            for page_idx, page in enumerate(pdf.pages, start=1):
+                for raw in page.extract_tables() or []:
+                    rows: list[list[str]] = []
+                    for row in raw or []:
+                        cells = _trim_trailing_empty([_cell_text(c) for c in (row or [])])
+                        if _row_has_text(cells):
+                            rows.append(cells)
+                    if rows:
+                        tables.append(
+                            ExtractedTable(
+                                source="pdf",
+                                name=f"page {page_idx} table {len(tables) + 1}",
+                                rows=rows,
+                                page=page_idx,
+                                table_index=len(tables) + 1,
+                            )
+                        )
+    except Exception as exc:  # noqa: BLE001
+        return [], [f"pdf_table_extractor_error:{type(exc).__name__}"]
+
+    if tables:
+        return tables, ["pdf_tables_structured"]
+    return [], ["pdf_tables_not_detected"]
+
+
+def _pdf_table_coverage(table_warnings: list[str]) -> str | None:
+    if any(w.startswith("pdf_table_extractor_") for w in table_warnings):
+        return "incomplete"
+    return None
 
 
 def _extract_pdf(p: Path) -> ExtractResult:
@@ -564,7 +1192,17 @@ def _extract_pdf(p: Path) -> ExtractResult:
         text = extract_text(str(p)) or ""
         if text.strip():
             pages = max(1, text.count("\x0c") + 1)
-            return ExtractResult(text=text, method="parser", quality=0.92, pages=pages)
+            tables, table_warnings = _pdf_tables_via_pdfplumber(p)
+            text = _append_if_missing(text, _tables_to_text(tables))
+            return ExtractResult(
+                text=text,
+                method="parser",
+                quality=0.92,
+                pages=pages,
+                table_coverage=_pdf_table_coverage(table_warnings),
+                tables=tables,
+                warnings=table_warnings,
+            )
     except Exception:  # noqa: BLE001
         pass
 
@@ -580,7 +1218,17 @@ def _extract_pdf(p: Path) -> ExtractResult:
             doc.close()
         text = "\n".join(page_texts)
         if text.strip():
-            return ExtractResult(text=text, method="parser", quality=0.95, pages=n_pages)
+            tables, table_warnings = _pdf_tables_via_pdfplumber(p)
+            text = _append_if_missing(text, _tables_to_text(tables))
+            return ExtractResult(
+                text=text,
+                method="parser",
+                quality=0.95,
+                pages=n_pages,
+                table_coverage=_pdf_table_coverage(table_warnings),
+                tables=tables,
+                warnings=table_warnings,
+            )
         # 텍스트 레이어 없음 → OCR 시도
         return _ocr_pdf_pages(p, n_pages)
     except Exception:  # noqa: BLE001
@@ -626,15 +1274,20 @@ def _ocr_pdf_pages(p: Path, n_pages: int | None) -> ExtractResult:
                 f"OCR truncated to first {last_page} of {n_pages or '?'} pages (DoS guard)"
                 if truncated else None
             )
+            warnings = ["pdf_ocr_text_may_be_noisy"]
+            if truncated:
+                warnings.append("pdf_ocr_truncated")
             return ExtractResult(
                 text=text, method="ocr", quality=0.75,
-                ocr_used=True, pages=len(images), error=note,
+                ocr_used=True, pages=len(images), error=note, warnings=warnings,
             )
     except Exception:  # noqa: BLE001
         pass
     return ExtractResult(
         text="", method="ocr", quality=0.0, ocr_used=False,
-        pages=n_pages, error="OCR failed (no text layer, pdf2image/tesseract unavailable)",
+        pages=n_pages,
+        error="OCR failed (no text layer, pdf2image/tesseract unavailable)",
+        warnings=["pdf_ocr_unavailable"],
     )
 
 
@@ -646,7 +1299,13 @@ def _extract_image_ocr(p: Path) -> ExtractResult:
         img = Image.open(str(p))
         text = _tess_image(img)
         if text.strip():
-            return ExtractResult(text=text, method="ocr", quality=0.75, ocr_used=True)
+            return ExtractResult(
+                text=text,
+                method="ocr",
+                quality=0.75,
+                ocr_used=True,
+                warnings=["image_ocr_text_may_be_noisy"],
+            )
         return ExtractResult(text="", method="ocr", quality=0.0, ocr_used=True,
                              error="OCR produced empty text")
     except Exception as exc:  # noqa: BLE001

@@ -22,6 +22,7 @@ def test_check_extractors_contract() -> None:
         "docx(python-docx)",
         "pptx(python-pptx)",
         "pdf_text(pdfminer)",
+        "pdf_table(pdfplumber)",
         "pdf_render(fitz/pdf2image)",
         "pdf_scan(poppler)",
         "ocr(tesseract)",

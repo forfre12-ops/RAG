@@ -89,7 +89,7 @@ class TestHwpCodePath:
         pyhwp_text = "본문 단락만\n담당부서 | 거대공공연구정책과\n담당과장 | 장인숙"
 
         with patch.dict(sys.modules, {"rhwp": MagicMock(parse=MagicMock(return_value=mock_doc))}), \
-                patch.object(ex, "_hwp_text_via_pyhwp", return_value=pyhwp_text):
+                patch.object(ex, "_hwp_via_pyhwp", return_value=(pyhwp_text, [])):
             result = extract(p)
 
         assert result.method == "pyhwp"
@@ -107,7 +107,7 @@ class TestHwpCodePath:
         mock_doc.extract_text.return_value = "본문 영업비밀 내용"
 
         with patch.dict(sys.modules, {"rhwp": MagicMock(parse=MagicMock(return_value=mock_doc))}), \
-                patch.object(ex, "_hwp_text_via_pyhwp", return_value=None):
+                patch.object(ex, "_hwp_via_pyhwp", return_value=(None, [])):
             result = extract(p)
 
         assert result.method == "rhwp"
