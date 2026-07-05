@@ -14,8 +14,9 @@
 
 포맷: TXT · PDF · DOCX · XLSX · XLS · PPTX · HWPX (전부). HWP(바이너리)=파이썬 생성 불가 →
 실 .hwp 픽스처(datasets/acceptance_seed/*.hwp)가 있으면 동봉, 없으면 스킵(HWPX 가 한국어 네이티브 대체).
-reportlab(PDF)·xlwt(XLS)는 pyproject 미선언 → optional import, 없으면 해당 포맷 스킵(경고). 렌더된 팩은
-커밋(airgap 결정적 배송) — 재생성은 dev 에서 `make acceptance-pack`.
+reportlab(PDF)·xlwt(XLS)는 런타임/번들 불요 dev-only(scripts/requirements-docgen.txt; 팩이 미리 커밋되므로
+번들은 이들이 불필요) → optional import, 없으면 해당 포맷 스킵. 렌더 팩은 커밋(airgap 결정적 배송);
+전 포맷 재생성은 `make acceptance-pack-deps && make acceptance-pack`.
 
 실행:  cd poc && python scripts/build_acceptance_pack.py
 """
@@ -240,10 +241,13 @@ def render_xls(spec: dict, path: Path) -> bool:
     ws = wb.add_sheet("인수표본")
     r = 0
     for line in _body_lines(spec):
-        ws.write(r, 0, line); r += 1
+        ws.write(r, 0, line)
+        r += 1
     r += 1
     for row in spec["table"]:
-        ws.write(r, 0, row[0]); ws.write(r, 1, row[1]); r += 1
+        ws.write(r, 0, row[0])
+        ws.write(r, 1, row[1])
+        r += 1
     wb.save(str(path))
     return True
 
@@ -289,7 +293,7 @@ def render_hwpx(spec: dict, path: Path) -> bool:
     section = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<hhs:section xmlns:hhs="urn:schemas-hancom-com:hhs">'
-        + "".join(para(l) for l in _body_lines(spec))
+        + "".join(para(ln) for ln in _body_lines(spec))
         + f"<hhs:tbl>{rows_xml}</hhs:tbl>"
         + "</hhs:section>"
     )
