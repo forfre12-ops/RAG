@@ -80,6 +80,21 @@ def load_jsonl(path: Path) -> list[dict]:
     return records
 
 
+def load_hash_manifest(path: Path) -> set[str]:
+    """누출 게이트용 텍스트해시 매니페스트(한 줄 1해시, #주석 허용) 로드.
+
+    대용량/미추적 학습풀(train_subset.jsonl 등)을 CI에 커밋하지 않고도 holdout↔train 누출
+    검사를 실제로 수행하게 한다. 해시는 build_leakage_manifest.py 가 이 스크립트의 _text/_sha1
+    로 생성 → 검사 측과 100% 패리티.
+    """
+    hs: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            hs.add(line)
+    return hs
+
+
 def _text(r: dict) -> str:
     return r.get("text", "") or (r.get("title", "") + " " + r.get("body", ""))
 
@@ -257,6 +272,8 @@ def check_leakage(
     eval_records: list[dict],
     eval_name: str,
     train_name: str = "train_pool",
+    *,
+    train_hashes: set[str] | None = None,
 ) -> tuple[dict, list[str]]:
     """test/holdout이 train과 '텍스트'로 겹치는지(누출) 검사.
 
@@ -264,8 +281,12 @@ def check_leakage(
     holdout 양쪽에 들어가 평가가 오염된다. 2026-06-23 실측: holdout_eval 109건 중
     67건(42%)이 train_subset에 텍스트 중복 → 분류기 점수 부풀음(head-to-head 무효화).
     본 게이트로 재발을 차단한다.
+
+    train_hashes 를 주면 train_records 를 다시 해싱하지 않고 그 집합을 쓴다(커밋된 해시
+    매니페스트 경로 — 대용량 학습풀 없이 CI에서 실제 누출검사 수행).
     """
-    train_hashes = {_sha1(_text(r)) for r in train_records}
+    if train_hashes is None:
+        train_hashes = {_sha1(_text(r)) for r in train_records}
     leaked = [r for r in eval_records if _sha1(_text(r)) in train_hashes]
     issues: list[str] = []
     if leaked:
@@ -277,7 +298,7 @@ def check_leakage(
     stats = {
         "name": f"leakage:{eval_name}",
         "eval_n": len(eval_records),
-        "train_n": len(train_records),
+        "train_n": len(train_hashes),
         "leaked_count": len(leaked),
         "leaked_doc_ids": [r.get("doc_id") for r in leaked],
     }
@@ -294,11 +315,24 @@ def main() -> int:
                     help="gold_real JSONL — 강화 검사 (human_review 필수, 합성 마커 금지)")
     ap.add_argument("--train-pool", default="datasets/gold_real/train_subset.jsonl",
                     help="누출 게이트: holdout과 텍스트해시 교차검증할 학습 풀")
+    ap.add_argument("--train-hash-manifest", default=None,
+                    help="누출 게이트: 학습풀 대신 커밋된 텍스트해시 매니페스트(한 줄 1해시)를 사용 — "
+                         "대용량/미추적 학습풀(train_subset.jsonl 은 gitignore) 없이 CI에서 실제 "
+                         "누출검사 수행(fake-green 차단). 존재하면 --train-pool 보다 우선.")
     ap.add_argument("--holdout",
                     default="datasets/gold_real/holdout_eval.clean.jsonl,datasets/gold_real/holdout_business.clean.jsonl",
                     help="누출 게이트 대상 holdout/test (쉼표로 여러 개). 기본=정화 홀드아웃 → "
                          "train-pool과 텍스트해시 누출 검사를 기본 수행(fail-closed). 빈 문자열('')로 비활성.")
     ap.add_argument("--report", default="reports/data_quality_report.json")
+    ap.add_argument(
+        "--gold-train-overlap-policy",
+        choices=["fail", "warn", "ignore"],
+        default="fail",
+        help=(
+            "How to handle --gold records that overlap --train. Use fail for eval-only gold; "
+            "use warn only for mixed gold pools where release eval evidence is checked separately."
+        ),
+    )
     ap.add_argument("--strict-coverage", action="store_true",
                     help="누출/overlap 검사가 입력 부재로 **수행되지 못하면** FAIL(exit 1). 기본 off — "
                          "CI에서 학습풀을 추적/공급하면 이 플래그로 '무음 skip=green'(fake-green)을 차단한다.")
@@ -343,14 +377,29 @@ def main() -> int:
             train_hashes: set[str] = set()
             if "train" in splits:
                 train_hashes = {_sha1(_text(r)) for r in splits["train"]}
+            elif args.train_hash_manifest and Path(args.train_hash_manifest).exists():
+                # 원본 train split(gitignore/CI 부재)이 없어도 커밋된 해시 매니페스트로 overlap 수행.
+                train_hashes = load_hash_manifest(Path(args.train_hash_manifest))
             else:
-                # train split 부재 → gold↔train overlap 을 계산할 수 없다. train_overlap=0 이
+                # train 해시 소스 부재 → gold↔train overlap 을 계산할 수 없다. train_overlap=0 이
                 # '오염 없음 검증됨'으로 오독되지 않도록 명시적 coverage-gap 으로 남긴다.
                 coverage_gaps.append(
-                    f"gold train-overlap 미검사 — train split 부재({args.train or '미지정'})")
-                print("[COVERAGE-GAP] gold↔train overlap NOT checked — train split 부재 "
+                    f"gold train-overlap 미검사 — train 해시 소스 부재({args.train or '미지정'})")
+                print("[COVERAGE-GAP] gold↔train overlap NOT checked — train 해시 소스 부재 "
                       "(train_overlap=0 은 '검증됨'이 아니라 '미검사')", file=sys.stderr)
             gstats, gissues = check_gold_real("gold_real", gold_records, train_hashes)
+            if args.gold_train_overlap_policy != "fail" and gstats.get("train_overlap", 0) > 0:
+                overlap_issues = [
+                    issue for issue in gissues
+                    if issue.startswith("FAIL [gold_real] train")
+                ]
+                gissues = [
+                    issue for issue in gissues
+                    if not issue.startswith("FAIL [gold_real] train")
+                ]
+                if args.gold_train_overlap_policy == "warn":
+                    for issue in overlap_issues:
+                        gissues.append(issue.replace("FAIL [gold_real]", "WARN [gold_real]", 1))
             gstats["train_overlap_checked"] = bool(train_hashes)
             all_stats.append(gstats)
             all_issues.extend(gissues)
@@ -358,21 +407,33 @@ def main() -> int:
             print(f"[SKIP] gold: {gold_path} 없음 (미구축)", file=sys.stderr)
 
     # ── train ↔ holdout 텍스트 누출 게이트 (데이터 위생) ──────────────
-    if args.train_pool and args.holdout:
-        tp = Path(args.train_pool)
-        if not tp.exists():
-            coverage_gaps.append(f"leak-check 미수행 — train-pool 부재({tp})")
-            print(f"[COVERAGE-GAP] leak-check NOT run — train-pool {tp} 없음 "
-                  "(누출 검사가 통과가 아니라 미수행)", file=sys.stderr)
+    # train 해시 소스: 커밋된 매니페스트(우선) → 없으면 원본 학습풀(로컬). 둘 다 없으면 COVERAGE-GAP.
+    if (args.train_hash_manifest or args.train_pool) and args.holdout:
+        train_hashes: set[str] | None = None
+        train_label = ""
+        manifest = Path(args.train_hash_manifest) if args.train_hash_manifest else None
+        if manifest is not None and manifest.exists():
+            train_hashes = load_hash_manifest(manifest)
+            train_label = manifest.name
+        elif args.train_pool and Path(args.train_pool).exists():
+            tp = Path(args.train_pool)
+            train_hashes = {_sha1(_text(r)) for r in load_jsonl(tp)}
+            train_label = tp.name
+        if train_hashes is None:
+            src = args.train_hash_manifest or args.train_pool
+            coverage_gaps.append(f"leak-check 미수행 — train 해시 소스 부재({src})")
+            print(f"[COVERAGE-GAP] leak-check NOT run — train 해시 소스 {src} 없음 "
+                  "(매니페스트/학습풀 둘 다 부재; 통과가 아니라 미수행)", file=sys.stderr)
         else:
-            train_pool = load_jsonl(tp)
             for hpath in [h.strip() for h in args.holdout.split(",") if h.strip()]:
                 hp = Path(hpath)
                 if not hp.exists():
                     coverage_gaps.append(f"leak-check 미수행 — holdout 부재({hp})")
                     print(f"[COVERAGE-GAP] leak-check NOT run — holdout {hp} 없음", file=sys.stderr)
                     continue
-                lstats, lissues = check_leakage(train_pool, load_jsonl(hp), hp.name, tp.name)
+                lstats, lissues = check_leakage(
+                    [], load_jsonl(hp), hp.name, train_label, train_hashes=train_hashes
+                )
                 leak_stats.append(lstats)
                 all_issues.extend(lissues)
                 if lstats["leaked_doc_ids"]:

@@ -16,7 +16,7 @@ UV ?= $(PY) -m uv
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
         p3 p3-800 p4 p1 p5 poc-all clean clean-data reports test-lite-cov \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-manifest \
+        gold-set retrieval-gold check-data check-gold check-leakage check-release-evidence check-parser-support check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
         test-lite test-slow test-fullstack test-model-download test-full
@@ -201,19 +201,21 @@ calibrate: ## 학습된 모델의 val_logits 로 temperature.json 재산출 (CAL
 
 p1-boundary: ## Build focused P1 boundary report from the latest llm gold eval
 	$(PY) scripts/build_p1_boundary_report.py \
-	    --report reports/p1_v3_llm_gold_direct.json \
+	    --report reports/p1_release_holdout_direct.json \
 	    --out reports/p1_boundary_report.md
 
 # 운영 P1 평가 — 배포 모델(.env CLASSIFIER_MODEL_DIR과 일치해야 하며 readiness parity
 # 게이트가 검증)을 두 티어로 평가해 operational-readiness가 읽는 리포트를 생성(단일 진실원).
 # 법적근거 티어 = 신뢰 신호(게이트 판정), 전체 홀드아웃 = 노이즈 포함 보수적 하한.
-P1_MODEL ?= artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb
+P1_MODEL ?= artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9
+DEPLOYED_MODEL ?= $(or $(CLASSIFIER_MODEL_DIR),$(P1_MODEL))
 p1-eval: ## 배포 P1 모델을 gold 티어(법적근거+전체)로 평가 → readiness 입력 생성
 	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \
+	    --source-prior-cap S3 \
 	    --label-source-filter public_definitive,koipa_case_based,nkt_designated \
-	    --report reports/p1_step3_legal_direct.md
+	    --report reports/p1_release_legal_direct.md
 	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \
-	    --report reports/p1_step3_holdout_direct.md
+	    --report reports/p1_release_holdout_direct.md
 
 p1-eval-v3: ## [legacy] v3 모델 gold 티어 평가 — 운영 경로 아님(역사 비교용)
 	$(PY) scripts/eval_p1_model_gold.py \
@@ -233,10 +235,22 @@ check-data: ## 데이터 품질 검사 — synthetic split + synthetic masked ev
 	    --test  datasets/gold/classification_gold.jsonl
 
 check-leakage: ## holdout↔train 텍스트해시 누출 게이트 (exit 1 on FAIL; 데이터 위생)
+	# 커밋된 해시 매니페스트(train_subset.jsonl 은 gitignore=CI 부재)로 실제 누출검사 수행 +
+	# --strict-coverage 로 소스 부재 시 fake-green(무음 PASS) 대신 honest FAIL. 로컬은 원본 풀 fallback.
 	$(PY) scripts/check_data_quality.py \
+	    --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
 	    --train-pool datasets/gold_real/train_subset.jsonl \
-	    --holdout datasets/gold_real/holdout_eval.jsonl,datasets/gold_real/holdout_business.jsonl \
+	    --holdout datasets/gold_real/holdout_eval.clean.jsonl,datasets/gold_real/holdout_business.clean.jsonl \
+	    --strict-coverage \
 	    --report reports/leakage_report.json
+
+leakage-manifest: ## train 풀 → 누출 게이트용 텍스트해시 매니페스트(커밋 대상) 재생성
+	$(PY) scripts/build_leakage_manifest.py \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --out datasets/gold_real/train_subset.hashes.txt
+
+check-parser-support: ## Parser support matrix must match extractor routes and optional extras
+	$(PY) scripts/check_parser_support_matrix.py
 
 llm-judge-dry: ## LLM judge 비용 추정 (실제 호출 없음)
 	$(PY) scripts/make_llm_judge_gold.py --dry-run --n 200
@@ -259,7 +273,30 @@ check-gold: ## gold_real 강화 검사 — label_source 3층 분리 리포트 �
 	$(PY) scripts/check_data_quality.py \
 	    --train datasets/labeled_v2_balanced/train.jsonl \
 	    --gold  datasets/gold_real/classification_gold.jsonl \
+	    --gold-train-overlap-policy warn \
 	    --report reports/gold_real_quality_report.json
+
+check-release-evidence: ## Release eval evidence must be leakage-free and provenance-clean
+	# 누출/overlap 은 커밋된 해시 매니페스트로 CI에서 실제 수행(원본 train_subset 은 gitignore) +
+	# --strict-coverage 로 fake-green 차단. 원본 --train split 은 로컬에만 있으면 SKIP(비파괴).
+	$(PY) scripts/check_data_quality.py \
+	    --train datasets/gold_real/train_subset.jsonl \
+	    --test datasets/gold_real/nohuman_proxy/proxy_eval_nohuman.jsonl \
+	    --gold datasets/gold_real/nohuman_proxy/proxy_eval_nohuman.jsonl \
+	    --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --holdout datasets/gold_real/nohuman_proxy/proxy_eval_nohuman.jsonl \
+	    --strict-coverage \
+	    --report reports/nohuman_proxy_quality_report.json
+	$(PY) scripts/check_data_quality.py \
+	    --train datasets/gold_real/train_subset.jsonl \
+	    --test datasets/gold_real/holdout_eval.hardened.jsonl \
+	    --gold datasets/gold_real/holdout_eval.hardened.jsonl \
+	    --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --holdout datasets/gold_real/holdout_eval.hardened.jsonl \
+	    --strict-coverage \
+	    --report reports/hardened_holdout_quality_report.json
 
 check-manifest: ## dataset_v1.0.yaml count/lineage consistency
 	$(PY) scripts/check_dataset_manifest.py
@@ -329,11 +366,10 @@ recover-llm-judge: ## uncertain_cases → llm_judge_primary 회수 (S3→S2/S1 +
 	@$(MAKE) -s check-gold
 
 import-review: ## 검수 CSV/JSONL → corrections/ + gold_real + DB document_labels
-	@[ -n "$(INPUT)" ] || (echo "usage: make import-review INPUT=corrections.csv [TENANT=default]"; exit 1)
+	@[ -n "$(INPUT)" ] || (echo "usage: make import-review INPUT=corrections.csv"; exit 1)
 	$(PY) scripts/import_review_corrections.py $(INPUT) \
 	    --merge-gold \
-	    --write-db \
-	    --tenant-id $${TENANT:-default}
+	    --write-db
 	@$(MAKE) -s check-gold
 
 import-review-dry: ## 검수 import dry-run (파일/DB 수정 없음)
@@ -360,6 +396,8 @@ p2-full-gold: ## KURE-v1 + ES dense/hybrid full eval on retrieval_gold
 
 operational-readiness: ## Build combined P1/P2/data readiness report (reads existing eval JSONs)
 	$(PY) scripts/build_operational_readiness.py \
+	    --model-dir $(P1_MODEL) \
+	    --deployed-model $(DEPLOYED_MODEL) \
 	    --out reports/operational_readiness.md
 
 readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 빌드 (권장 진입점)
@@ -368,6 +406,9 @@ adversarial-gate: ## 적대 회귀 게이트 — golden_100 위험 미탐(고비
 	$(PY) scripts/eval_adversarial.py
 
 release-gate: operational-readiness adversarial-gate ## Strict release gate; requires every readiness gate to PASS
+	$(PY) scripts/check_release_gate.py
+
+release-gate-recalculate: p1-eval p2-full-gold operational-readiness adversarial-gate ## Nightly/local strict gate with model + ES eval recomputed
 	$(PY) scripts/check_release_gate.py
 
 release-manifest: operational-readiness p1-boundary ## Hash release evidence artifacts

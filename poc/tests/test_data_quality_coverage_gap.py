@@ -54,3 +54,41 @@ def test_default_is_non_disruptive_pass(tmp_path):
     assert cp.returncode == 0
     assert data["verdict"] == "PASS"
     assert data["coverage_gaps"]  # 그러나 gap 은 정직하게 기록됨
+
+
+def test_hash_manifest_runs_leakcheck_without_raw_pool(tmp_path):
+    """[fake-green 차단] 커밋된 해시 매니페스트가 있으면 원본 학습풀(gitignore=CI 부재)이 없어도
+    누출 검사가 '수행'된다 — COVERAGE-GAP 없이 실제 검사 + strict-coverage 에서도 green."""
+    manifest = tmp_path / "train.hashes.txt"
+    manifest.write_text("# test manifest\n" + "\n".join(f"{i:040x}" for i in range(5)) + "\n",
+                        encoding="utf-8")
+    # split 이 하나는 있어야 스크립트가 진행(빈 split→ERROR). 작은 train split 로 격리.
+    tiny_train = tmp_path / "tiny_train.jsonl"
+    tiny_train.write_text(
+        json.dumps({"doc_id": "t1", "text": "학습 본문 하나", "label_source": "llm_judge_primary"},
+                   ensure_ascii=False) + "\n"
+        + json.dumps({"doc_id": "t2", "text": "학습 본문 둘", "label_source": "llm_judge_primary"},
+                     ensure_ascii=False) + "\n",
+        encoding="utf-8")
+    holdout = tmp_path / "holdout.jsonl"
+    holdout.write_text(json.dumps({"doc_id": "h1", "text": "고유한 홀드아웃 본문 — 누출 없음"},
+                                  ensure_ascii=False) + "\n", encoding="utf-8")
+    report = tmp_path / "dq.json"
+    cp = subprocess.run(
+        [sys.executable, str(SCRIPT),
+         "--train", str(tiny_train),
+         "--test", "",
+         "--train-hash-manifest", str(manifest),
+         "--train-pool", str(tmp_path / "absent_pool.jsonl"),  # 원본 풀 부재(CI)
+         "--holdout", str(holdout),
+         "--strict-coverage",
+         "--report", str(report)],
+        capture_output=True, text=True, encoding="utf-8", cwd=str(ROOT),
+    )
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert cp.returncode == 0, cp.stdout + cp.stderr
+    assert data["verdict"] == "PASS"
+    assert data["coverage_gaps"] == []          # 매니페스트로 실제 수행 → gap 없음(과거 fake-green 아님)
+    assert len(data["leakage"]) == 1            # 누출 검사가 실제로 돌았다
+    assert data["leakage"][0]["leaked_count"] == 0
+    assert data["leakage"][0]["train_n"] == 5   # 매니페스트 해시 5개를 train 집합으로 사용
