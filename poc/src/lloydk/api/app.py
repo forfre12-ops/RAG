@@ -1,4 +1,5 @@
 import logging
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from uuid import uuid4
 from contextlib import asynccontextmanager
@@ -242,9 +243,16 @@ def _warmup_models(settings_obj) -> None:
             logger.warning("reranker warmup skipped: %s", exc)
 
 
+# 버전 단일 소스 = pyproject.toml([project].version). 과거엔 app.py("0.1.0-poc")·pyproject
+# ("0.1.0")가 각자 하드코딩돼 이미 불일치했다. dist 메타에서 읽어 단일화한다.
+try:
+    _APP_VERSION = _pkg_version("lloydk-ai")
+except PackageNotFoundError:  # 미설치(소스 직접 실행) 폴백
+    _APP_VERSION = "0.0.0+local"
+
 app = FastAPI(
     title="Lloydk AI Engine",
-    version="0.1.0-poc",
+    version=_APP_VERSION,
     description="KIPRA AI 영업비밀관리시스템 — Lloydk 파트 PoC API",
     lifespan=lifespan,
     openapi_url="/api/v1/openapi.json",
