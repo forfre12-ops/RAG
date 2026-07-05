@@ -218,7 +218,7 @@ def _deployed_model_default() -> str:
 
 def _model_parity_gate(evaluated: str, deployed: str) -> Gate:
     """The F1/FNR gates describe the *evaluated* model. If the *deployed* model
-    (CLASSIFIER_MODEL_DIR) differs, those numbers do not describe what is live —
+    (CLASSIFIER_MODEL_DIR) differs, those numbers do not describe what is live;
     so readiness cannot be claimed on them. BLOCKED until the deploy is promoted.
     """
     ev, dp = _norm_model(evaluated), _norm_model(deployed)
@@ -296,13 +296,13 @@ def main() -> int:
     # 를 신뢰 신호로(게이트 판정 기준). p1-llm = 전체 홀드아웃
     # (llm_judge ~47% 노이즈 포함)을 보수적 하한으로. 'FAIL on 노이즈'를 'FAIL on 진짜 약점'과
     # 구분한다. 두 리포트는 `make p1-eval`이 배포 모델로 생성(단일 진실원).
-    ap.add_argument("--p1-public", default="reports/p1_step3_legal_direct.json")
-    ap.add_argument("--p1-llm", default="reports/p1_step3_holdout_direct.json")
+    ap.add_argument("--p1-public", default="reports/p1_release_legal_direct.json")
+    ap.add_argument("--p1-llm", default="reports/p1_release_holdout_direct.json")
     ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb",
-                    help="evaluated model — the one the F1/FNR reports describe")
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9",
+                    help="evaluated model - the one the F1/FNR reports describe")
     ap.add_argument("--deployed-model", default=_deployed_model_default(),
                     help="live deployment model (defaults to settings.classifier_model_dir / .env)")
     ap.add_argument("--out", default="reports/operational_readiness.md")
@@ -333,6 +333,7 @@ def main() -> int:
     # 외부 의존(실제 검수 라벨)이라 진짜 블로커지만, model parity는 배포 시
     # CLASSIFIER_MODEL_DIR 설정으로 자가해소되는 내부 액션이므로 구분해 표기한다.
     parity_blocked = parity_gate.status == "BLOCKED"
+    p1_failed = p1_gate.status == "FAIL"
     hr_blocked = any(
         g.name == "human review gold" and g.status == "BLOCKED" for g in data_gates
     )
@@ -349,9 +350,15 @@ def main() -> int:
             "at deploy time by setting CLASSIFIER_MODEL_DIR to the evaluated model "
             "(internal deploy action, not an external dependency)."
         )
+    parity_note = (
+        f"Evaluated model ({_norm_model(evaluated_model)}) may differ from the live deployment "
+        f"({_norm_model(args.deployed_model) or 'unknown'}); the 'model parity' gate blocks release until they match."
+        if parity_blocked
+        else f"Evaluated model matches deployed model ({_norm_model(evaluated_model)})."
+    )
     known_limitations = [
         blocker_line + " Everything else below is by design, not an open defect.",
-        f"Classifier F1 is source-dependent: public/case/nkt direct = {public_f1:.3f} (upper bound), "
+        f"Classifier F1 is source-dependent: public/case/nkt release tier = {public_f1:.3f}, "
         f"llm_judge pseudo = {pseudo_f1:.3f} (lower bound). Never cite a single F1 without its source.",
         "Pseudo-label noise: ~47% of court-ruling records in the llm_judge tiers are over-graded S1/S2 "
         "(published rulings should be S3 — non-publicity fails). This deflates the pseudo-set F1 and inflates "
@@ -361,35 +368,35 @@ def main() -> int:
         "over-classifies toward higher grades: precision/F1 drop but high-risk under-classification (TS/S1/S2 -> S3) "
         "is driven to ~0. A low api-mode F1 is the safety trade-off working, not a regression.",
         "reports/eval_human_review_gold.* is produced by `p1_train_classifier.py --mode dryrun`, which scores the "
-        "m3 keyword rule-labeler, NOT the trained v3 model. Its FAIL verdict does not describe model performance; "
-        "use reports/p1_v3_*_gold_direct.* (eval_p1_model_gold.py) for the trained model.",
+        "m3 keyword rule-labeler, NOT the release candidate model. Its FAIL verdict does not describe model "
+        "performance; use reports/p1_release_*_direct.* (eval_p1_model_gold.py) for the trained release model.",
         "Operational cost of the over-classification (S3 docs flagged as S1/S2 -> reviewer false-positive load) "
         "is not yet quantified; defer until real human_review labels exist.",
-        f"Evaluated model ({_norm_model(evaluated_model)}) may differ from the live deployment "
-        f"({_norm_model(args.deployed_model) or 'unknown'}); the 'model parity' gate blocks release until they match.",
+        parity_note,
     ]
     next_actions = [
         f"Collect at least {args.min_human_review} human_review gold samples; "
-        "the only externally-dependent blocked gate (model parity self-resolves via CLASSIFIER_MODEL_DIR).",
+        "this remains the externally-dependent release blocker.",
         f"Human-review gate now also requires high-risk underclass rate <= {args.max_high_risk_underclass:.2f} "
         "(human=TS/S1/S2 but model=S3); a filled queue alone no longer passes it.",
         "Reporting is split by source: public/case/nkt (definitive) vs llm_judge pseudo. "
         "Treat the pseudo-set F1 as the conservative bound, not the public-set F1.",
         "Review LLM pseudo-gold S2->S3 cases and either relabel or add boundary examples.",
-        "DONE 2026-06-03: deployed model promoted v3 -> v4_cost2 (honest holdout). P1 gate now reads "
-        "the de-contaminated holdout (F1 0.634 < 0.75) instead of v3's contaminated 0.830 — readiness "
-        "honestly FAILs P1. Real fix is diverse S1 data, not a model swap (threshold/cost already tapped out).",
-        "DONE 2026-06-03 (step3): promoted v4_cost2 -> v4_step3. Added REAL patent content "
-        "(AIHub national-key-tech -> TS/S1) + a mundane admin-doc S3 corpus, fixing the dominant "
-        "failure: over-classification of routine internal docs. On a clean hand-written OOD set, "
-        "mundane over-classification dropped 93% -> 0% with secret-miss still 0; real-data signals "
-        "hold (patent high-grade recall 1.0, public-ruling over-class 0.002). P1 gate still FAILs on "
-        "the gold_real holdout (F1 0.635, FNR 0.361), but all 15 high->S3 'misses' are llm_judge-"
-        "mislabeled public court/market text that step3 correctly downgrades (legally_grounded "
-        "high->S3 = 0) -- FNR inflated by ~47% pseudo-label noise, not real regression. Remaining: "
-        "real S2 data (0 examples; DART path) and deployment recall (structurally unmeasurable).",
+        "Release candidate is the clean model; readiness reads reports/p1_release_* generated from that same model.",
         "Run p2-full-gold after every ES reindex or embedding-model change.",
     ]
+    if p1_failed:
+        next_actions.insert(
+            -1,
+            "P1 still fails the F1 target. Treat threshold/model swaps as secondary; the primary fix is more trusted "
+            "S1/S2 human-reviewed data and boundary examples.",
+        )
+    else:
+        next_actions.insert(
+            -1,
+            "P1 release-tier classifier gate now passes; keep it green by regenerating p1_release_* after model or "
+            "source-prior policy changes.",
+        )
     payload = {
         "generated_at": _dt.date.today().isoformat(),
         "verdict": _overall(gate_objects),
@@ -411,7 +418,7 @@ def main() -> int:
     out = Path(args.out)
     _write_md(payload, out)
     out.with_suffix(".json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"verdict": payload["verdict"], "gates": payload["gates"]}, ensure_ascii=False, indent=2))
+    print(json.dumps({"verdict": payload["verdict"], "gates": payload["gates"]}, ensure_ascii=True, indent=2))
     return 0 if payload["verdict"] in {"PASS", "CONDITIONALLY_READY"} else 1
 
 
