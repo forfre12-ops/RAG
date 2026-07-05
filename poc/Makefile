@@ -269,6 +269,16 @@ metamorphic-report: ## 후보 모델 대상 메타모픽 회귀 리포트 생성
 	    --model-dir $(or $(MODEL_DIR),artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9) \
 	    --report reports/metamorphic_pairs.md
 
+# Release 메타모픽 게이트: 커밋된 패러프레이즈 픽스처를 배포 모델로 재분류(live LLM 불요·결정적) →
+# forward 미탐 회귀 OR 측정불가(표본<min_n) 시 fail-closed. deploy_gate 의 opt-in 가시적-skip 과 달리
+# "리포트 미생성=조용한 green"을 막는다(배포전 ④). 배포 프로파일(onprem-local: T=3.0·escalation)에서 실행.
+metamorphic-gate: ## Release 메타모픽 게이트 — 커밋 픽스처 재분류 → forward 회귀/측정불가 fail-closed (live LLM 불요)
+	$(PY) scripts/gen_metamorphic_pairs.py \
+	    --from-samples datasets/metamorphic/anchor_pairs.fixture.jsonl \
+	    --model-dir $(or $(MODEL_DIR),artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9) \
+	    --report reports/metamorphic_pairs.md
+	$(PY) scripts/check_metamorphic_gate.py --report reports/metamorphic_pairs.json
+
 check-gold: ## gold_real 강화 검사 — label_source 3층 분리 리포트 포함 (exit 1 on FAIL)
 	$(PY) scripts/check_data_quality.py \
 	    --train datasets/labeled_v2_balanced/train.jsonl \
