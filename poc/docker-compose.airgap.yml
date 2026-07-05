@@ -112,6 +112,14 @@ services:
     depends_on:
       - redis
       - postgres
+    healthcheck:
+      # celery worker 응답성 — 브로커 연결 + 워커 프로세스 생존. 응답 없으면 non-zero.
+      # 과거엔 worker/beat 헬스체크가 전 compose에서 부재라 죽은 워커를 오케스트레이터가 몰랐다.
+      test: ["CMD-SHELL", "celery -A lloydk.workers.celery_app inspect ping -t 10 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         reservations:
@@ -123,7 +131,8 @@ services:
   # 주기작업 발행기 — 단일 인스턴스만 (다중 beat = 중복 tick). dev compose엔 누락돼 있었음.
   beat:
     image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
-    command: celery -A lloydk.workers.celery_app beat -l info
+    # --schedule 경로 고정 → 헬스체크가 이 파일의 신선도로 beat tick 생존을 판정.
+    command: celery -A lloydk.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
@@ -131,6 +140,14 @@ services:
     depends_on:
       - redis
       - postgres
+    healthcheck:
+      # beat 생존 — PersistentScheduler 가 tick 마다 갱신하는 schedule 파일의 신선도(10분 내).
+      # 최단 tick(outbox 60s)보다 넉넉한 창. beat 가 멈추면 파일이 낡아 unhealthy.
+      test: ["CMD-SHELL", "find /tmp/celerybeat-schedule -mmin -10 | grep -q . || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   # mTLS 종료 (옵션): docker compose ... --profile mtls up -d nginx-mtls
   nginx-mtls:

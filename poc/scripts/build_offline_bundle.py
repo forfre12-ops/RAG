@@ -343,6 +343,7 @@ def expected_files(
         "docs/OPERATION.md",
         "docs/TROUBLESHOOTING.md",
         "licenses/third-party-licenses.txt",
+        "licenses/sbom.cyclonedx.json",  # 공급망 SBOM (CycloneDX) — 번들 동봉
     ])
     # 관측성 스택(동봉 시) — 설정은 항상, 이미지는 best-effort.
     if observability_images:
@@ -790,6 +791,22 @@ def _copy_infra(out_dir: Path) -> None:
     if alembic_src.exists() and not alembic_dst.exists():
         import shutil as _sh
         _sh.copytree(alembic_src, alembic_dst)
+
+    # OSS 라이선스 + SBOM — expected_files 가 licenses/third-party-licenses.txt 를 기대하는데
+    # 과거엔 아무도 복사하지 않아 번들에 실제로는 없었다(공급망 감사 산출물 부재). licenses/
+    # 전체(third-party-licenses.*·sbom.cyclonedx.json·sbom.json)를 동봉한다. 없으면 경고 후 진행.
+    licenses_src = _REPO_ROOT / "licenses"
+    licenses_dst = out_dir / "licenses"
+    if licenses_src.exists() and not licenses_dst.exists():
+        import shutil as _sh
+        _sh.copytree(licenses_src, licenses_dst)
+        print(f"  [lic]  라이선스·SBOM → {licenses_dst}", file=sys.stderr)
+    elif not licenses_src.exists():
+        print(
+            "  [WARN] licenses/ 없음 — SBOM·서드파티 라이선스 미동봉. "
+            "`make licenses` 로 먼저 산출하세요(공급망 감사 산출물).",
+            file=sys.stderr,
+        )
 
     # ── OCR 시스템 바이너리 번들 ──────────────────────────────────
     # Tesseract 실행파일 + kor.traineddata, poppler 바이너리를 번들에 포함.

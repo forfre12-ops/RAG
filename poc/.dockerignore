@@ -1,0 +1,51 @@
+# 도커 빌드 컨텍스트 축소 — Dockerfile.api/worker 는 pyproject·src·scripts·alembic 만 COPY.
+# 이 목록이 없으면 `build: context: .`(poc/) 가 artifacts(373G)·dist(7.6G)·.venv(5.8G)·
+# datasets 를 통째로 데몬에 전송한다(빌드 급락 + .env·모델 등 민감물 유입 위험).
+# COPY 대상(pyproject.toml·src/·scripts/·alembic/·alembic.ini)은 제외하지 않는다.
+
+# ── 대용량 산출물·데이터 (이미지 미사용) ──
+artifacts/
+dist/
+datasets/
+reports/
+models/
+.venv/
+venv/
+docker-data/
+
+# ── 파이썬 캐시 ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# ── VCS·CI ──
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# ── 시크릿·환경 (런타임 env_file 로 주입 — 이미지에 굽지 않는다) ──
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+# ── 테스트·문서 (이미지 미사용) ──
+tests/
+docs/
+*.md
+
+# ── 로컬 개발 부산물 ──
+*.log
+.coverage
+htmlcov/
+node_modules/
+.vscode/
+.idea/
+*.bak
