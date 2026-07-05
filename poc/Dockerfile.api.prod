@@ -25,12 +25,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# editable 설치는 패키지 소스(src/)가 있어야 한다(pyproject egg_base=src). pyproject 만 복사한 뒤
+# pip install -e 하면 'src does not exist' 로 빌드 실패 → 소스를 먼저 복사한다. alembic/alembic.ini
+# 도 복사해야 이 이미지로 `alembic upgrade head`(마이그레이션)를 돌릴 수 있다.
 COPY pyproject.toml ./
-RUN pip install --upgrade pip && \
-    pip install -e ".[psh,otel,jwt]" gunicorn
-
 COPY src ./src
 COPY scripts ./scripts
+COPY alembic ./alembic
+COPY alembic.ini ./
+# extras: 운영(psh 성능·otel 관측·jwt) + 파싱 의존(hwp·ocr) — 파싱 요건(FUN) 유지.
+RUN pip install --upgrade pip && \
+    pip install -e ".[psh,otel,jwt,hwp,ocr]" gunicorn
 
 # 비-root 사용자 (보안)
 RUN useradd -m -u 1000 lloydk && chown -R lloydk:lloydk /app

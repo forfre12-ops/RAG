@@ -118,6 +118,24 @@ python scripts/p5_e2e_smoke.py --mode http --base-url http://<host>:8000 --api-k
 - **안전게이트 warn-only**: lite-cloud 는 agreement/metadata-floor 등이 OFF 여도 경고만(dev/staging
   의도). 하드닝 운영은 onprem-local tier 로 배포.
 
+## 로컬 리허설에서 확인된 것 (2026-07-05, prod 경로 그대로 로컬 재현)
+
+전체 경로 성공: non-root gunicorn 이미지 빌드 → fail-fast 통과 → 마이그레이션 → 볼륨 모델 로드
+(`/healthz/ready` = model:loaded·db:ok·vectorstore:ok) → 실분류(label=TS·model_version=v-dd3abab9·
+S/V/M 분해·evidence, 772ms). 리허설이 잡은 실 이슈:
+
+- **[해결] `Dockerfile.api.prod` 빌드 불가였음** — ① editable 설치를 src 복사 전에 실행(egg_base 'src'
+  없음) ② alembic/alembic.ini 미복사(마이그레이션 불가) ③ extras 에 hwp/ocr 없음(파싱 저하). 소스
+  선복사 + alembic 복사 + `.[psh,otel,jwt,hwp,ocr]` 로 교정함.
+- **[주의] non-root 이미지 + HF 캐시 경로 불일치** — prod 이미지는 uid1000(lloydk, home /home/lloydk)
+  로 도는데 base compose 는 HF 캐시를 `/root/.cache/huggingface` 에 마운트 → 비-root 는 못 읽어
+  임베더(bge-m3)를 매 기동 재다운로드(startup ~2.5분). 클라우드는 `HF_HOME` 을 쓰기가능한 마운트
+  경로로 지정하거나 임베딩 모델을 이미지/볼륨에 미리 넣을 것.
+- **[최적화] GPU torch 로 이미지 ~10GB** — CPU 배포인데 기본 torch 가 CUDA 휠(~4GB)을 끌어옴.
+  CPU 전용 torch 휠(`--index-url .../cpu`)로 바꾸면 이미지·다운로드가 크게 준다(테스트엔 무영향).
+- **[확인] 안전게이트 warn-only** — 기동 시 AGREEMENT/METADATA_FLOOR/… OFF 경고만(lite-cloud 의도),
+  부팅 차단 없음. storage 는 classify 경로서 미접촉(ready 'skipped').
+
 ## 배포 전 최종 체크리스트
 
 - [ ] `.env.cloud` — API_KEY·LLM 키·`LLOYDK_AUDIT_CHAIN_SECRET`·`CORS_ALLOW_ORIGINS`·MINIO_SECRET_KEY 실값
