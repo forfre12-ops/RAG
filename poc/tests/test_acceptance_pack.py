@@ -139,3 +139,19 @@ def test_committed_pack_manifest_consistent():
     # 전 포맷 대표성(적어도 txt/docx/xlsx 는 base-dep 라 항상 존재)
     fmts = {d["format"] for d in docs}
     assert {"txt", "docx", "xlsx"} <= fmts
+
+
+def test_real_fixtures_merged_into_manifest():
+    """발주처 제공 실문서 픽스처(real_fixtures.json)가 매니페스트에 병합되고 파일이 존재."""
+    import json
+    pack = _POC / "datasets" / "acceptance_pack"
+    rf = pack / "real_fixtures.json"
+    if not rf.exists():
+        pytest.skip("real_fixtures 없음")
+    real = json.loads(rf.read_text(encoding="utf-8"))["docs"]
+    mf = json.loads((pack / "expected_labels.json").read_text(encoding="utf-8"))
+    mdocs = {d["doc_id"] for d in mf["docs"]}
+    for d in real:
+        assert d["doc_id"] in mdocs, f"real fixture {d['doc_id']} 매니페스트 미병합"
+        assert (pack / d["file"]).exists(), f"real fixture 파일 누락: {d['file']}"
+    assert mf.get("real_fixtures", 0) >= len(real)

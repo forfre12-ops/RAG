@@ -324,8 +324,8 @@ _FORMAT_ORDER = ["docx", "xlsx", "hwpx", "pdf", "pptx", "xls", "txt"]
 def build_pack(out_dir: Path) -> dict:
     docs_dir = out_dir / "docs"
     if docs_dir.exists():
-        for f in docs_dir.iterdir():  # stale 파일 제거 — 커밋 팩이 매니페스트와 정확히 일치하게
-            if f.is_file():
+        for f in docs_dir.iterdir():  # 생성 파일(acc-*)만 제거; 수기 real-* 실문서 픽스처는 보존
+            if f.is_file() and f.name.startswith("acc-"):
                 f.unlink()
     docs_dir.mkdir(parents=True, exist_ok=True)
     seeds = load_seeds()
@@ -354,12 +354,26 @@ def build_pack(out_dir: Path) -> dict:
                 })
                 break
             skipped[fmt] = skipped.get(fmt, 0) + 1
+    # 수기 실문서 픽스처 병합 — 발주처 제공 실 .hwp/.hwpx(바이너리 파서 실검증)를 팩에 드롭인.
+    # real_fixtures.json(out_dir)에 {file, expected_grade, expected_numeric_tokens, ...} 선언, docs/real-* 배치.
+    real_fx = out_dir / "real_fixtures.json"
+    n_real = 0
+    if real_fx.exists():
+        for d in json.loads(real_fx.read_text(encoding="utf-8")).get("docs", []):
+            if (out_dir / d["file"]).exists():
+                manifest_docs.append(d)
+                n_real += 1
+            else:
+                print(f"  [WARN] real_fixtures 파일 없음(스킵): {d['file']}")
+
     manifest = {
         "pack": "lloydk-acceptance-pack",
         "note": ("고객 배포 인수검증용. 판정 규율: 정확 등급일치가 아니라 severity FLOOR(고등급 미탐=veto) "
                  "+ 숫자무손실 + 게이트 가시성. 소스=공개+합성 혼합, 실비밀 텍스트 0. HWP 바이너리는 생성불가."),
         "grades": GRADES,
         "docs": manifest_docs,
+        "generated": len(manifest_docs) - n_real,
+        "real_fixtures": n_real,
         "skipped_formats": skipped,
     }
     (out_dir / "expected_labels.json").write_text(
