@@ -1,0 +1,125 @@
+{
+  "pack": "lloydk-acceptance-pack",
+  "note": "고객 배포 인수검증용. 판정 규율: 정확 등급일치가 아니라 severity FLOOR(고등급 미탐=veto) + 숫자무손실 + 게이트 가시성. 소스=공개+합성 혼합, 실비밀 텍스트 0. HWP 바이너리는 생성불가.",
+  "grades": [
+    "TS",
+    "S1",
+    "S2",
+    "S3"
+  ],
+  "docs": [
+    {
+      "doc_id": "acc-TS-01",
+      "file": "docs/acc-TS-01.docx",
+      "format": "docx",
+      "expected_grade": "TS",
+      "source_kind": "public",
+      "legal_basis": "방위산업기술보호법 §3·§10: AI 군사 인식 기술의 방위산업기술 지정. 산업기술보호법 §9: AI·로봇 분야 국가핵심기술 해당.",
+      "expected_numeric_tokens": [
+        "420731",
+        "420868",
+        "1262204"
+      ],
+      "has_table": true
+    },
+    {
+      "doc_id": "acc-TS-02",
+      "file": "docs/acc-TS-02.xlsx",
+      "format": "xlsx",
+      "expected_grade": "TS",
+      "source_kind": "synthetic",
+      "legal_basis": "",
+      "expected_numeric_tokens": [
+        "441462",
+        "441599",
+        "1324397"
+      ],
+      "has_table": true
+    },
+    {
+      "doc_id": "acc-S1-03",
+      "file": "docs/acc-S1-03.hwpx",
+      "format": "hwpx",
+      "expected_grade": "S1",
+      "source_kind": "public",
+      "legal_basis": "대법원 2019다248919: 고객 데이터 분석 결과의 영업비밀 인정.",
+      "expected_numeric_tokens": [
+        "462193",
+        "462330",
+        "1386590"
+      ],
+      "has_table": true
+    },
+    {
+      "doc_id": "acc-S1-04",
+      "file": "docs/acc-S1-04.pdf",
+      "format": "pdf",
+      "expected_grade": "S1",
+      "source_kind": "synthetic",
+      "legal_basis": "",
+      "expected_numeric_tokens": [
+        "482924",
+        "483061",
+        "1448783"
+      ],
+      "has_table": false
+    },
+    {
+      "doc_id": "acc-S2-05",
+      "file": "docs/acc-S2-05.pptx",
+      "format": "pptx",
+      "expected_grade": "S2",
+      "source_kind": "public",
+      "legal_basis": "",
+      "expected_numeric_tokens": [
+        "503655",
+        "503792",
+        "1510976"
+      ],
+      "has_table": true
+    },
+    {
+      "doc_id": "acc-S2-06",
+      "file": "docs/acc-S2-06.xls",
+      "format": "xls",
+      "expected_grade": "S2",
+      "source_kind": "synthetic",
+      "legal_basis": "",
+      "expected_numeric_tokens": [
+        "524386",
+        "524523",
+        "1573169"
+      ],
+      "has_table": true
+    },
+    {
+      "doc_id": "acc-S3-07",
+      "file": "docs/acc-S3-07.txt",
+      "format": "txt",
+      "expected_grade": "S3",
+      "source_kind": "public",
+      "legal_basis": "공개 법원 판결문 — 이미 공개된 문서는 정의상 S3 (비밀성 요건 미충족)",
+      "expected_numeric_tokens": [
+        "545117",
+        "545254",
+        "1635362"
+      ],
+      "has_table": false
+    },
+    {
+      "doc_id": "acc-S3-08",
+      "file": "docs/acc-S3-08.docx",
+      "format": "docx",
+      "expected_grade": "S3",
+      "source_kind": "synthetic",
+      "legal_basis": "",
+      "expected_numeric_tokens": [
+        "565848",
+        "565985",
+        "1697555"
+      ],
+      "has_table": true
+    }
+  ],
+  "skipped_formats": {}
+}

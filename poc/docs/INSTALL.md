@@ -157,6 +157,22 @@ curl -s -X POST http://localhost:8000/api/v1/classify \
 
 기대: 등급(TS/S1/S2/S3) + confidence 반환, `/ready` 200.
 
+### 10.1 인수(acceptance) 샘플팩 검증 — 권장
+
+번들에 동봉된 **인수 샘플팩**(전 포맷 TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX × 등급, 공개+합성 혼합)을
+배포 API 에 올려 **파서·분류·안전 게이트**를 한 번에 검증한다. 판정 규율: 정확 등급일치가 아니라
+**(1) 파싱 성공 + (2) 고등급 미탐 없음(severity floor)** — 서빙은 의도적으로 안전방향 과분류라 정확도로
+합격/불합격하지 않는다.
+
+```bash
+# 번들 루트에서 (호스트, python 불요 — bash+curl. python3 있으면 JSON 정밀 파싱)
+API_KEY="$API_KEY" BASE_URL=http://localhost:8000 bash acceptance/run_acceptance.sh
+```
+
+기대: `[acceptance] PASS: N docs, 0 veto`. `UNDER!`(고등급 미탐)·파싱실패가 1건이라도 있으면 **FAIL** —
+`/healthz/deep` 로 원인(모델 미공급·보정 T=1.0·파서 extra 누락) 확인. 개발/lite 환경(레포 보유)에서는
+`make acceptance-test`(in-proc, 숫자 무손실까지 전수 검증)로도 확인 가능.
+
 ---
 
 ## 10.5 관측성 스택 기동 (권장 — 안전 알림 소비자)

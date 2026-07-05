@@ -102,12 +102,16 @@ docker compose -f infra/observability/docker-compose.obs.yml up -d   # (있으�
 ```bash
 # 헬스
 curl -fsS http://<host>:8000/api/v1/healthz/ready   # 200 이어야(모델·DB·스토어 준비)
-# E2E 분류 스모크 (200 + label∈{TS,S1,S2,S3} + ≤30s)
-python scripts/p5_e2e_smoke.py --mode http --base-url http://<host>:8000 --api-key <API_KEY>
+# E2E 분류 스모크 (200 + label∈{TS,S1,S2,S3} + ≤30s)  — p5 는 --url (--base-url 아님)
+python scripts/p5_e2e_smoke.py --mode http --url http://<host>:8000 --api-key <API_KEY>
+# 인수(acceptance) 샘플팩 — 전 포맷 파싱 + severity floor(고등급 미탐 없음) 검증
+#   폐쇄망 번들: bash acceptance/run_acceptance.sh  /  레포 보유: make acceptance-test
+python scripts/run_acceptance.py --mode http --base-url http://<host>:8000 --api-key <API_KEY>
 ```
 
 - `/healthz/ready` 가 503 이면 원인 확인: 모델 미공급(rule_fallback)·DB·스토어(minio→local degrade).
 - `/healthz/deep` 로 구성요소별 상태 확인.
+- 인수 러너 판정: `PASS`/`FAIL`. `UNDER!`(고등급 미탐)·파싱실패는 veto — 배포 전 반드시 0 이어야 한다.
 
 ---
 
@@ -150,3 +154,4 @@ S/V/M 분해·evidence, 772ms). 리허설이 잡은 실 이슈:
 - [ ] `temperature.json` 또는 `CLASSIFIER_TEMPERATURE` (미보정 방지)
 - [ ] worker·beat·(관측 스택) 기동
 - [ ] `/healthz/ready` 200 + p5 스모크 통과
+- [ ] 인수(acceptance) 샘플팩 **PASS** (전 포맷 파싱 + 고등급 미탐 0 + 숫자 무손실) — `bash acceptance/run_acceptance.sh` / `make acceptance-test`

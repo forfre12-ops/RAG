@@ -432,6 +432,9 @@ def expected_files(
         "docs/TROUBLESHOOTING.md",
         "licenses/third-party-licenses.txt",
         "licenses/sbom.cyclonedx.json",  # 공급망 SBOM (CycloneDX) — 번들 동봉
+        "acceptance/expected_labels.json",  # 고객 인수 샘플팩 매니페스트(등급·기대숫자)
+        "acceptance/docs/",                 # 전 포맷 인수 표본(TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX)
+        "acceptance/run_acceptance.sh",     # 고객 인수 러너(bash+curl, severity floor)
     ])
     # 관측성 스택(동봉 시) — 설정은 항상, 이미지는 best-effort.
     if observability_images:
@@ -859,6 +862,53 @@ def _copy_ocr_binaries(out_dir: Path) -> None:
         print("  [WARN] poppler 미발견 — POPPLER_DIR 환경변수로 경로 지정 필요", file=sys.stderr)
 
 
+# 고객 인수(acceptance) 러너 — 호스트에서 bash+curl 로 실행(파이썬 불요). 배포 API 에 팩 문서를
+# 업로드(POST /documents/analyze)해 severity floor 를 검증한다. 판정 규율: 정확 등급일치가 아니라
+# (1) 파싱 성공 + (2) 고등급 미탐 없음(pred 가 기대보다 '덜 민감'하면 FAIL). over-분류(더 민감)는 안전방향=통과.
+_ACCEPTANCE_SH = r'''#!/usr/bin/env bash
+# Lloydk 고객 인수(acceptance) 러너 — 배포 후 파서·분류·안전 게이트를 실문서로 검증.
+# 판정: 정확 등급일치가 아니라 (1) 파싱 성공 + (2) 고등급 미탐 없음(severity floor). over-분류는 안전=통과.
+# 사용:  API_KEY=<배포키> BASE_URL=http://localhost:8000 bash acceptance/run_acceptance.sh
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+BASE_URL="${BASE_URL:-http://localhost:8000}"
+API_KEY="${API_KEY:-}"
+MANIFEST="$HERE/expected_labels.json"
+sev() { case "$1" in TS) echo 0;; S1) echo 1;; S2) echo 2;; S3) echo 3;; *) echo 9;; esac; }
+
+command -v curl >/dev/null 2>&1 || { echo "[acceptance] FAIL: curl 필요"; exit 2; }
+[ -f "$MANIFEST" ] || { echo "[acceptance] FAIL: expected_labels.json 없음"; exit 2; }
+curl -fsS "$BASE_URL/api/v1/healthz" >/dev/null 2>&1 || { echo "[acceptance] FAIL: API 무응답 ($BASE_URL/api/v1/healthz)"; exit 1; }
+
+if command -v python3 >/dev/null 2>&1; then
+  PAIRS="$(python3 -c 'import json,sys;[print(d["file"]+"|"+d["expected_grade"]) for d in json.load(open(sys.argv[1]))["docs"]]' "$MANIFEST")"
+else
+  PAIRS="$(grep -oE '"file": *"[^"]*"|"expected_grade": *"[^"]*"' "$MANIFEST" | sed -E 's/.*: *"([^"]*)"/\1/' | paste -d'|' - -)"
+fi
+
+n=0; fail=0
+while IFS='|' read -r file exp; do
+  [ -z "$file" ] && continue
+  n=$((n+1))
+  resp="$(curl -fsS -X POST "$BASE_URL/api/v1/documents/analyze" -H "X-API-Key: $API_KEY" -F "file=@$HERE/$file" 2>/dev/null)"
+  if [ -z "$resp" ]; then echo "  FAIL   $file  (분석 응답 없음 = 고등급이면 미탐)"; fail=$((fail+1)); continue; fi
+  if command -v python3 >/dev/null 2>&1; then
+    pred="$(printf '%s' "$resp" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("classification",{}).get("label",""))' 2>/dev/null)"
+  else
+    pred="$(printf '%s' "$resp" | grep -oE '"label": *"[A-Z0-9]+"' | tail -1 | sed -E 's/.*"([A-Z0-9]+)"/\1/')"
+  fi
+  if [ "$(sev "${pred:-X}")" -gt "$(sev "$exp")" ]; then
+    echo "  UNDER! $file  exp=$exp pred=${pred:-?}  (고등급 미탐 - veto)"; fail=$((fail+1))
+  else
+    echo "  ok     $file  exp=$exp pred=${pred:-?}"
+  fi
+done < <(printf '%s\n' "$PAIRS")
+
+echo "[acceptance] $([ "$fail" -eq 0 ] && echo PASS || echo FAIL): ${n} docs, ${fail} veto(고등급 미탐/파싱실패)"
+[ "$fail" -eq 0 ]
+'''
+
+
 def _copy_infra(out_dir: Path) -> None:
     """docker-compose(airgap 포함), env template, alembic, OCR 바이너리 복사. (ES 설정 폐기 — §03)"""
     import shutil
@@ -983,6 +1033,28 @@ def _copy_infra(out_dir: Path) -> None:
         encoding="utf-8",
     )
     verify_sh.chmod(0o755)
+
+    # 고객 인수(acceptance) 샘플팩 + 러너 — 상용 운영 포장. 전 포맷 표본을 배포 API 에 올려
+    # severity floor(고등급 미탐 없음) + 파싱성공을 검증. expected_files 가 acceptance/* 를 기대하므로
+    # 반드시 실제 복사(licenses 처럼 '선언-무복사' 함정 회피). 팩 없으면 경고(`make acceptance-pack` 선행).
+    pack_src = _REPO_ROOT / "datasets" / "acceptance_pack"
+    pack_dst = out_dir / "acceptance"
+    if pack_src.exists() and (pack_src / "expected_labels.json").exists():
+        import shutil as _sh
+        if pack_dst.exists():
+            _sh.rmtree(pack_dst)
+        _sh.copytree(pack_src, pack_dst)
+        run_sh = pack_dst / "run_acceptance.sh"
+        run_sh.write_text(_ACCEPTANCE_SH, encoding="utf-8")
+        run_sh.chmod(0o755)
+        n_docs = sum(1 for _ in (pack_src / "docs").iterdir()) if (pack_src / "docs").exists() else 0
+        print(f"  [accept] 인수 샘플팩({n_docs}문서) + run_acceptance.sh → {pack_dst}", file=sys.stderr)
+    else:
+        print(
+            "  [WARN] datasets/acceptance_pack 없음 — 고객 인수 샘플팩 미동봉. "
+            "`make acceptance-pack` 로 먼저 생성하세요(상용 운영 포장).",
+            file=sys.stderr,
+        )
 
 
 def _copy_observability(out_dir: Path) -> None:

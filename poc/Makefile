@@ -14,7 +14,7 @@ UV ?= $(PY) -m uv
 .PHONY: help venv install env lock lock-check infra-up infra-down infra-verify api worker beat \
         revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
-        p3 p3-800 p4 p1 p5 poc-all clean clean-data reports test-lite-cov \
+        p3 p3-800 p4 p1 p5 acceptance-pack acceptance-test poc-all clean clean-data reports test-lite-cov \
         perf-scenarios perf-scenarios-full perf-clean-run \
         gold-set retrieval-gold check-data check-gold check-leakage check-release-evidence check-parser-support check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
@@ -462,6 +462,14 @@ test-full: ## 전체 테스트 suite (인프라 + GPU 필요)
 
 p5:
 	$(PY) scripts/p5_e2e_smoke.py --mode inproc
+
+# 고객 인수(acceptance) 샘플팩 — 상용 운영 포장. 전 포맷(TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX) × 등급,
+# 공개+합성 혼합. acceptance-pack=생성(dev, 커밋 대상; PDF/XLS 는 reportlab/xlwt 설치 시), acceptance-test=
+# in-proc 채점(severity floor veto: 파싱실패/숫자유실/고등급 미탐이면 exit 1; 정확도는 보고만).
+acceptance-pack: ## 인수 샘플팩 생성 → datasets/acceptance_pack/ (전 포맷 × 등급, 공개+합성 혼합)
+	$(PY) scripts/build_acceptance_pack.py
+acceptance-test: ## 인수 샘플팩 채점 (in-proc parse→classify→gate; severity floor veto) — 고객은 bundle 의 run_acceptance.sh
+	$(PY) scripts/run_acceptance.py --mode inproc
 
 poc-all: p4 p3 p2 p1 p5
 	@echo "\nAll PoCs completed. See reports/"
