@@ -289,14 +289,16 @@ jobs:
         # 음성: 게이트 하나를 env override(=0)로 끄면 반드시 startup 차단(must_raise=True).
         run: python scripts/ci_check_safety_gates.py
 
-      - name: Airgap compose config validation (폐쇄망 번들 정합성)
-        # docker-compose.airgap.yml 이 문법·참조 정합한지(변수/서비스 해석). 드리프트 사전 차단.
-        # config 는 구조/참조만 검사(실 비밀 아님) — env_file: .env 참조 + ${POSTGRES_PASSWORD:?}
-        # 필수변수를 충족시키는 던져쓰기 .env 를 생성. CI 체크아웃엔 .env 부재가 정상(있으면 loud fail).
+      - name: Compose config validation (airgap · observability · prod)
+        # airgap 번들 + 관측성 overlay(alertmanager/healthcheck) + prod overlay 가 문법·참조
+        # 정합한지 검사(변수/서비스 해석). config 는 구조만 검사(external network/volume 존재는
+        # up-time 검사라 무관). 던져쓰기 .env 로 ${VAR:?} 필수변수 충족. .env 부재가 CI 정상.
         run: |
           if [ -f .env ]; then echo "::error::unexpected .env present in CI checkout"; exit 1; fi
-          printf 'POSTGRES_PASSWORD=ci_placeholder_not_a_secret\nIMAGE_TAG=ci\n' > .env
-          docker compose -f docker-compose.airgap.yml config --quiet
+          printf 'POSTGRES_PASSWORD=ci_placeholder_not_a_secret\nIMAGE_TAG=ci\nGRAFANA_PASSWORD=ci_placeholder\n' > .env
+          docker compose --env-file .env -f docker-compose.airgap.yml config --quiet
+          docker compose --env-file .env -f infra/observability/docker-compose.observability.airgap.yml config --quiet
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
           rm -f .env
 
   test-lite:
@@ -377,8 +379,19 @@ jobs:
         # alembic baseline + N4 인덱스까지 upgrade head 된 상태에서 ORM 메타데이터와 비교.
         run: bash scripts/ci_alembic_drift_check.sh
 
-      - name: Run pytest lite (slow/fullstack/model_download excluded)
-        run: make test-lite
+      - name: Run pytest lite + coverage (slow/fullstack/model_download excluded)
+        # P3: coverage 측정·리포트 배선(과거엔 pytest-cov 설치·'80% 목표' 주석만 있고 --cov 미실행).
+        # 소프트 — 하드 임계 게이트는 아직 없음(현 커버리지 확인 후 도입 예정). coverage.xml 업로드.
+        run: make test-lite-cov
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: poc/coverage.xml
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Run fullstack DB tests (PG-backed — repositories·db_models·cascade·idempotency)
         # test-lite 타깃은 로컬(PG 없는 dev) 친화를 위해 fullstack 제외가 의도적이다. 이 CI 잡엔

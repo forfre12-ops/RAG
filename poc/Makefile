@@ -14,7 +14,7 @@ UV ?= $(PY) -m uv
 .PHONY: help venv install env lock lock-check infra-up infra-down infra-verify api worker beat \
         revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
-        p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
+        p3 p3-800 p4 p1 p5 poc-all clean clean-data reports test-lite-cov \
         perf-scenarios perf-scenarios-full perf-clean-run \
         gold-set retrieval-gold check-data check-gold check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-manifest \
         recover-llm-judge \
@@ -379,6 +379,10 @@ p1:
 
 test-lite: ## 빠른 테스트 suite (2분 이내 목표, CI 기본 — slow/fullstack/model_download 제외)
 	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow"
+
+test-lite-cov: ## test-lite + coverage 측정·리포트 (CI용 — 소프트, 하드 게이트 없음)
+	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow" \
+	    --cov=lloydk --cov-report=term-missing:skip-covered --cov-report=xml
 
 test-slow: ## slow marker tests only
 	$(PY) -m pytest -q -m slow
