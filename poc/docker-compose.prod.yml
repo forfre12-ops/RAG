@@ -9,7 +9,14 @@
 #   - 헬스체크: 더 엄격한 interval/threshold
 services:
   api:
+    # 하드닝 이미지 — non-root(uid 1000) + gunicorn/uvicorn workers + graceful shutdown.
+    # 베이스(Dockerfile.api=root·단일 uvicorn)를 덮어쓴다. context 는 base 에서 상속.
+    # 초기 클라우드 테스트는 WEB_CONCURRENCY=1 권장(멀티워커는 프로모션 후 /admin/model/reload
+    # 팬아웃 미구현[NFR-OPS-01]이라 워커별 stale 가능 — 재기동으로 갱신).
+    build:
+      dockerfile: Dockerfile.api.prod
     environment:
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
       # 원격 LLM (API 키는 .env.prod.secrets 또는 secrets manager에서 주입)
       LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
       LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
