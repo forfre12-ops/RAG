@@ -273,9 +273,11 @@ metamorphic-report: ## 후보 모델 대상 메타모픽 회귀 리포트 생성
 # forward 미탐 회귀 OR 측정불가(표본<min_n) 시 fail-closed. deploy_gate 의 opt-in 가시적-skip 과 달리
 # "리포트 미생성=조용한 green"을 막는다(배포전 ④). 배포 프로파일(onprem-local: T=3.0·escalation)에서 실행.
 metamorphic-gate: ## Release 메타모픽 게이트 — 커밋 픽스처 재분류 → forward 회귀/측정불가 fail-closed (live LLM 불요)
+	# 배포 모델(DEPLOYED_MODEL = CLASSIFIER_MODEL_DIR→P1_MODEL)로 재분류해 adversarial-gate·
+	# readiness parity 와 동일 모델을 평가한다(다른 후보를 배포하며 v-dd3abab9 로 green 나는 구멍 차단).
 	$(PY) scripts/gen_metamorphic_pairs.py \
 	    --from-samples datasets/metamorphic/anchor_pairs.fixture.jsonl \
-	    --model-dir $(or $(MODEL_DIR),artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9) \
+	    --model-dir $(or $(MODEL_DIR),$(DEPLOYED_MODEL)) \
 	    --report reports/metamorphic_pairs.md
 	$(PY) scripts/check_metamorphic_gate.py --report reports/metamorphic_pairs.json
 
@@ -415,19 +417,21 @@ readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 
 adversarial-gate: ## 적대 회귀 게이트 — golden_100 위험 미탐(고비밀→S3) baseline 초과 시 FAIL
 	$(PY) scripts/eval_adversarial.py
 
-release-gate: operational-readiness adversarial-gate ## Strict release gate (GA); requires every readiness gate to PASS
+release-gate: operational-readiness adversarial-gate metamorphic-gate ## Strict release gate (GA); requires every readiness gate to PASS
 	$(PY) scripts/check_release_gate.py
 
-release-gate-pilot: operational-readiness adversarial-gate ## Pilot release gate; blocks on FAIL (regression) but waives data-ceiling BLOCKED gates (human_review/parity) with an audited waiver
+# metamorphic-gate 는 pilot 에서도 prereq: forward 미탐 회귀(스타일 패러프레이즈에 고등급 강등)는
+# 데이터천장(BLOCKED, waive 가능)이 아니라 안전 회귀(FAIL)이므로 pilot 도 통과 못한다.
+release-gate-pilot: operational-readiness adversarial-gate metamorphic-gate ## Pilot release gate; blocks on FAIL (regression) but waives data-ceiling BLOCKED gates (human_review/parity) with an audited waiver
 	$(PY) scripts/check_release_gate.py --allow-conditional
 
-release-gate-recalculate: p1-eval p2-full-gold operational-readiness adversarial-gate ## Nightly/local strict gate with model + ES eval recomputed
+release-gate-recalculate: p1-eval p2-full-gold operational-readiness adversarial-gate metamorphic-gate ## Nightly/local strict gate with model + ES eval recomputed
 	$(PY) scripts/check_release_gate.py
 
 # 배포 경로 배선: 릴리스 산출물(매니페스트) 생성 전에 게이트를 강제한다. 하드 FAIL(진짜 회귀)은
 # 차단하고, CONDITIONALLY_READY(human_review 데이터천장·model parity 대기)는 감사된 파일럿 waiver로
 # 통과시킨다. GA용 strict 차단은 별도 `make release-gate`(--allow-conditional 없음).
-release-manifest: operational-readiness p1-boundary ## Hash release evidence artifacts (blocked by the pilot release gate on a hard FAIL)
+release-manifest: operational-readiness p1-boundary metamorphic-gate ## Hash release evidence artifacts (blocked by the pilot release gate on a hard FAIL)
 	$(PY) scripts/check_release_gate.py --allow-conditional
 	$(PY) scripts/build_release_manifest.py \
 	    --out reports/release_artifact_manifest.json
