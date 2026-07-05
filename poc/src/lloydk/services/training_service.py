@@ -392,6 +392,29 @@ def activate_model_manually(
                     _waived.append("deploy gate")
                 if locked_block:
                     _waived.append("locked-eval")
+                # [P0#①-c] 강제(미검증) GA 활성은 탬퍼-증거 감사 체인에 전용 행으로 남긴다
+                # (누가·왜·무엇을 우회했나) — 활성과 같은 tx(원자적). best-effort: 미들웨어 요청 감사 +
+                # logger.warning 에 더한 명시 기록이라, 체인 write 실패해도 활성은 유지(프로젝트 감사
+                # 관례; hard fail-closed 는 audit_fail_closed_high_risk 소관).
+                try:
+                    from lloydk.repositories.audit_repo import AuditRepo  # noqa: PLC0415
+                    from lloydk.services.audit_chain import (  # noqa: PLC0415
+                        build_chained_hash_locked,
+                    )
+                    _payload = {
+                        "version_label": version_label, "version_id": str(target.version_id),
+                        "forced": True, "reason": _reason_text, "waived": _waived,
+                        "baseline": baseline_label, "gate_passed": decision.passed,
+                        "locked_ready": locked_ready,
+                    }
+                    _ph = build_chained_hash_locked(db, AuditRepo._hash_payload(_payload))
+                    AuditRepo(db).record(
+                        action="model.activate.forced", actor_id=actor_id,
+                        actor_role=actor_role, target_type="model_version",
+                        target_id=str(target.version_id), payload_hash=_ph, success=True,
+                    )
+                except Exception as _aexc:  # noqa: BLE001
+                    logger.warning("forced-activation audit row skipped: %s", _aexc)
                 _reason = f"activated (FORCED override — {'·'.join(_waived)} 미충족)"
                 if _reason_text:
                     _reason += f"; 사유={_reason_text}"

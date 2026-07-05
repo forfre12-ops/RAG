@@ -184,3 +184,34 @@ def test_force_requires_reason_and_actor_when_hardened(monkeypatch):
         assert _active_label() == good
     finally:
         _cleanup([base, good])
+
+
+def test_forced_activation_writes_audit_chain_row(monkeypatch):
+    """[P0#①-c] 강제(미검증) 활성은 model.activate.forced 감사 체인 행을 남긴다(누가·왜·우회대상)."""
+    from lloydk.db.models import AuditLog
+
+    monkeypatch.setattr(config_mod.settings, "deploy_gate_manual_require_locked_eval", True)
+    monkeypatch.setattr(config_mod.settings, "locked_eval_jsonl", "")
+    monkeypatch.setattr(config_mod.settings, "manual_activate_force_requires_reason", True)
+    actor = f"kl-admin-{uuid.uuid4().hex[:6]}"
+    base = f"v-base-{uuid.uuid4().hex[:6]}"
+    cand = f"v-cand-{uuid.uuid4().hex[:6]}"
+    _seed(base, {"fnr_high": 0.10, "f1_macro": 0.80}, active=True)
+    _seed(cand, {"fnr_high": 0.08, "f1_macro": 0.82})
+    try:
+        r = activate_model_manually(cand, force=True, reason="긴급 승인", actor_id=actor)
+        assert r["activated"] is True and r["forced"] is True
+        with session_scope() as db:
+            rows = db.query(AuditLog).filter(
+                AuditLog.action == "model.activate.forced",
+                AuditLog.actor_id == actor,
+            ).all()
+        assert len(rows) == 1, f"강제활성 감사행 1건 기대, got {len(rows)}"
+        assert rows[0].target_id is not None
+        assert ":" in (rows[0].payload_hash or "")  # 체인 패킹(prev16:payload32)
+    finally:
+        _cleanup([base, cand])
+        with session_scope() as db:
+            db.query(AuditLog).filter(AuditLog.actor_id == actor).delete(
+                synchronize_session=False
+            )
