@@ -131,7 +131,7 @@ lite pytest **922 passed / 0 failed** (14 skip 환경성). 변경된 스트림 �
 - [ ] **A-1. ES→PG(pgvector+pg_bigm) 단일화** — `pg_store.py` EXPERIMENTAL 미검증 스캐폴드, test_pg_store.py 0건. 완료: ①이미지 오프라인 빌드 ②NL 재검증 쿼리셋 ③`revalidate_pg_lexical.py` ④R@5 nori~94% ±5pp ⑤default 전환+문서 반영. 갭: ts_rank IDF 없음(~80-85%)+tsvector `simple`. >10pp 퇴행 시 경로 ⓒ(ParadeDB/VectorChord-bm25).
 - [ ] **A-2. API 비동기/배치 경로 Celery 미발사** — `training_service.py:266-273`, `synthesis_service.py:63`, `async_classify_service.py:58`. task는 `workers/tasks.py`에 이미 존재 → `.delay()` 배선만.
 - [ ] **A-3. 합성 리뷰 큐·데이터셋 연계** — `/synth/queue` 승인/반려 미구현, 승인건 학습셋 버전 미연결, 가이드 retraining 트리거 항상 False(`guide_service.py:199`).
-- [ ] **A-4. FUN-005 2단계 XAI(LLM 자연어 설명) 미구현** — stage-1(feature attribution)만 존재, `explain_llm` grep 0건.
+- [~] **A-4. FUN-005 "2단계 XAI" = 요건 오귀속(스킵)** — RTM 접지(2026-07-06): FUN-005는 "출처+콘텐츠 2단계 **분류**"(metadata_floor+분류기)로 **완료** 상태이며, "2단계 판정"을 "2단계 설명(XAI)"으로 혼동한 것. RTM/제안요청서(FUN-003·004·005·022·023·024)에 XAI·LLM 자연어 설명 요건 **없음**. stage-1 feature attribution(`api/explain.py`)로 족함. 요건-스코프 규율상 신규 LLM 설명기능 = 초과기능 → **스킵**.
 - [ ] **A-5. A안 5요소 100점 → 등급 환산표 미정의/미구현** — RTM "미구현(선택)", K8 환산 로직 미정.
 - [ ] **A-6. Secrets Manager GCP 백엔드 미구현** — env/vault/aws만.
 
@@ -192,7 +192,7 @@ lite pytest **922 passed / 0 failed** (14 skip 환경성). 변경된 스트림 �
 - [ ] **RTM "정밀화"(미완)** — FUN-004(실데이터 라벨·FNR 7~8월), FUN-024(검수자 큐·능동학습 폐곡선 실측).
 - [ ] **FUN-003 스펙 편차** — 설계는 LangChain+PydanticOutputParser, generator.py는 자체 어댑터+수동 JSON. 기능 동등, KL 합의 필요.
 - [ ] **FUN-022 검증 공백** — 5포맷 중 검증 증빙 3개만, XLSX/PPTX 커버리지 확인.
-- [ ] **FUN-024 PDF 리포트 미구현** — HTML만(브라우저 인쇄 우회).
+- [~] **FUN-024 "PDF 리포트" = 요건 오귀속(스킵)** — RTM 접지(2026-07-06): FUN-024는 "검수자 큐 배분·심층지표"(다단 게이트·메타floor·검수 라우팅·FNR 관리·운영 확정 환류 = 거버넌스 폐곡선, status=정밀화)이며 **PDF 출력 요건 없음**. RTM의 "PDF"는 입력 파싱포맷(FUN-022 HWP/DOCX/PDF/XLSX 추출)·요건출처 가이드 문서뿐. HTML+브라우저 인쇄로 족함 → PDF 출력 = **스킵**.
 - [ ] **한국어 정규화 스택 미구현** — normalizer는 NFKC+regex+8단어 불용어만. `[nlp]` extra dead(미import).
 - [ ] **Nori 사용자 사전 수치 불일치** — 본문 ~58항목 vs 노트 "1,002항목 동결".
 - [ ] **doc/15 정합성 불일치** — pytest 수(385/570/912)·라우트 수(23/31) 문서간 불일치, 단일 출처 정리.
