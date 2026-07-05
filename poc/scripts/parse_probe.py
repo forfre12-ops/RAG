@@ -76,7 +76,7 @@ def _review(pre):
         quality=ex.quality,
         ocr_used=ex.ocr_used,
         error=ex.error,
-        min_quality=float(getattr(settings, "extraction_min_quality", 0.6)),
+        min_quality=float(getattr(settings, "extraction_review_min_quality", 0.6)),
         ocr_requires_review=bool(getattr(settings, "extraction_ocr_requires_review", True)),
         content_quality=pre.quality,
         table_coverage=getattr(ex, "table_coverage", None),

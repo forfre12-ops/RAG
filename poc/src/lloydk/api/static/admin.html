@@ -152,6 +152,16 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 
 .sec-note{font-size:11.5px;color:var(--text-faint);line-height:1.5;border-left:2px solid var(--border-strong);padding-left:10px;}
 .warnbox{font-size:12px;color:var(--amber);background:var(--amber-soft);border:1px solid #fcd34d;border-radius:8px;padding:9px 12px;}
+
+/* DASHBOARD (관제 종합) */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;}
+.dash-panel{border:1px solid var(--border-mid);border-radius:10px;padding:12px 13px;background:var(--bg-surface);display:flex;flex-direction:column;gap:8px;}
+.dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dash-panel .dp-big{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1;}
+.dash-panel .dp-row{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-soft);}
+.dash-panel .dp-row b{color:var(--text);}
+.dash-panel .dp-note{font-size:11.5px;color:var(--text-faint);line-height:1.45;}
+.dp-degraded{font-size:10.5px;color:var(--amber);font-family:var(--font-mono);}
 </style>
 </head>
 <body>
@@ -337,16 +347,29 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
     <!-- ===== 4. 모델 서빙/리로드 ===== -->
     <section class="card">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">4</span> 모델 서빙 · 핫리로드</div>
-        <span class="ep">POST /admin/model/reload</span>
+        <div class="ttl"><span class="step-no">4</span> 모델 서빙 · 배포(G1) · 핫리로드</div>
+        <span class="ep">POST /admin/model/activate · /reload</span>
       </div>
       <div class="card-body">
-        <div class="btn-row">
+        <div class="row2">
+          <div class="field">
+            <label class="fld">활성화할 version_label (G1 수동 배포)</label>
+            <input id="act-ver" type="text" placeholder="예: v-dd3abab9" />
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;gap:10px;">
+            <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;white-space:nowrap;">
+              <input id="act-force" type="checkbox" style="width:auto" /> force (게이트 우회)
+            </label>
+            <button class="btn" onclick="activateModel()" style="flex:1">활성화 (배포)</button>
+          </div>
+        </div>
+        <div id="activate-result"></div>
+        <div class="btn-row" style="margin-top:2px">
           <button class="btn red" onclick="reloadModel()">활성 모델 핫리로드</button>
         </div>
         <div id="reload-result"></div>
         <div class="warnbox" style="display:none" id="rollback-note"></div>
-        <p class="sec-note">핫리로드는 활성 ModelVersion(activate/rollback 후)을 프로세스 재기동 없이 서빙에 반영합니다. <b>activate / rollback 자체는 REST가 없고</b> 거버넌스 스케줄러·CLI에서 수행됩니다(자동 롤백 포함) — 콘솔은 그 결과를 리로드로 서빙에 적용하고 메트릭으로 확인합니다.</p>
+        <p class="sec-note"><b>activate</b>(<code>POST /admin/model/activate</code>)는 현재 활성본 대비 deploy gate(고등급 미탐 FNR·F1 회귀)를 적용해 특정 ModelVersion을 배포하며, gate 미통과는 <code>force</code>로만 우회됩니다(감사 기록). <b>핫리로드</b>는 활성 ModelVersion을 프로세스 재기동 없이 서빙에 반영합니다. <b>rollback</b> 및 자동 배포는 거버넌스 스케줄러·CLI가 담당합니다.</p>
       </div>
     </section>
 
@@ -360,10 +383,27 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
         <div class="btn-row">
           <button class="btn" onclick="loadMetrics()">최신 메트릭</button>
           <button class="btn sec sm" onclick="loadHistory()">이력</button>
+          <button class="btn sec sm" onclick="loadConfusionMatrix()">혼동행렬</button>
           <button class="btn sec sm" onclick="loadSchema()">등급체계 조회</button>
         </div>
         <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(4,1fr)"></div>
         <div id="metrics-extra"></div>
+      </div>
+    </section>
+
+    <!-- ===== 6. 운영 관제 대시보드 ===== -->
+    <section class="card col-span">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no" style="background:var(--red)">◎</span> 운영 관제 대시보드</div>
+        <span class="ep">GET /admin/dashboard</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row" style="align-items:center">
+          <button class="btn" onclick="loadDashboard()">관제 종합 새로고침</button>
+          <span id="dash-meta" class="hint"></span>
+        </div>
+        <div id="dash-grid" class="dash-grid"><div class="q-empty">“관제 종합 새로고침”으로 보류큐·배포 readiness·재학습 backlog·kill-gate·드리프트를 한 번에 조회합니다 (admin 전용).</div></div>
+        <p class="sec-note">이중검토 보류·<code>locked_gold_eval</code> 배포 readiness·재학습 backlog·kill-gate·임베딩 드리프트를 한 화면에 종합합니다(admin 전용·읽기 전용). 각 섹션은 독립 best-effort — 일부 소스 미가용 시 그 섹션만 <span class="pill warn">degraded</span>로 표기됩니다(500 없음). 드리프트는 마지막 게이지 값(주기 refresh 갱신)이라 표본 0이면 “데이터 없음”으로 표시됩니다.</p>
       </div>
     </section>
 
@@ -390,6 +430,7 @@ const GRADES = ["TS","S1","S2","S3"];
 const GRADE_KR = {TS:"특급기밀", S1:"1등급 비밀", S2:"2등급 대외비", S3:"3급 공개"};
 let QUEUE = [];   // {inference_id, doc_id, title, label, confidence, model_version, flagged, resolved}
 let lastFlow = 0;
+let LAST_MODEL_VERSION = null;   // 최신 메트릭에서 세팅 — 혼동행렬 조회에 사용
 
 const $ = id => document.getElementById(id);
 const cfg = () => ({
@@ -612,10 +653,31 @@ async function reloadModel(){
 }
 // tenant 제거: 테넌트 API 키 교체(rotateKey)는 단일 KL 인증 모델에서 불필요 — KL이 cred 발급/회전 전담.
 
+// [G1] 특정 ModelVersion 수동 활성화(배포) — deploy gate 적용, force로만 우회(감사 기록).
+async function activateModel(){
+  const ver=$('act-ver').value.trim();
+  if(!ver){ alert('활성화할 version_label을 입력하세요.'); return; }
+  const force=$('act-force').checked;
+  if(force && !confirm('force=true는 deploy gate(고등급 미탐 FNR·F1 회귀)를 우회합니다.\n감사에 기록됩니다. 진행할까요?')) return;
+  try{
+    const d=await api('POST','/admin/model/activate',{version_label:ver, force});
+    const badge = d.activated ? '<span class="pill ok">활성화됨</span>'
+                : d.blocked  ? '<span class="pill err">게이트 차단</span>'
+                :              '<span class="pill warn">미활성</span>';
+    $('activate-result').innerHTML=`<div class="${d.activated?'kv':'warnbox'}" style="margin-top:8px">
+      ${badge} <span style="font-size:12px;color:var(--text-soft)">${esc(d.reason||'')}</span>
+      ${d.reloaded?` · <span class="pill ok">리로드됨</span> <b class="mono" style="font-family:var(--font-mono);font-size:11.5px">${esc(d.model_version||'')}</b>`:''}
+    </div>`;
+    if(d.activated){ markFlow(4); loadMetrics(); }
+    else if(d.blocked){ log(`활성 차단(deploy gate): ${d.reason} — 회귀 확인 후 force로만 우회`,'err'); }
+  }catch(e){ $('activate-result').innerHTML=`<div class="warnbox">활성화 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`; }
+}
+
 /* ---- 5. METRICS ---- */
 async function loadMetrics(){
   try{
     const d=await api('GET','/metrics/latest');
+    LAST_MODEL_VERSION = d.model_version || LAST_MODEL_VERSION;
     const cards=$('metrics-cards');
     const acc=d.accuracy!=null?(d.accuracy*100).toFixed(1)+'%':'—';
     const f1=d.f1_macro!=null?(d.f1_macro*100).toFixed(1)+'%':'—';
@@ -646,6 +708,19 @@ async function loadHistory(){
         <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="6" style="color:var(--text-faint)">이력 없음</td></tr>'}</tbody></table></div>`;
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${e.status||''}</div>`; }
 }
+async function loadConfusionMatrix(){
+  if(!LAST_MODEL_VERSION){ alert('먼저 "최신 메트릭"을 조회해 활성 모델 버전을 확인하세요.'); return; }
+  try{
+    const d=await api('GET',`/metrics/confusion-matrix/${encodeURIComponent(LAST_MODEL_VERSION)}`);
+    const labels=d.labels||[], m=d.matrix||[];
+    const head=`<tr><th class="mono">실제 \\ 예측</th>${labels.map(l=>`<th class="mono" style="text-align:center">${esc(l)}</th>`).join('')}</tr>`;
+    const rows=m.map((row,i)=>`<tr><td class="mono"><b>${esc(labels[i]??i)}</b></td>${row.map((v,j)=>`<td style="text-align:center;${i===j?'font-weight:700;background:var(--green-soft);color:var(--green)':''}">${v}</td>`).join('')}</tr>`).join('');
+    const fnr=d.fnr_by_grade||{};
+    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">혼동행렬 — 모델 ${esc(d.model_version||LAST_MODEL_VERSION)} <span style="color:var(--text-faint)">(대각선=정분류)</span></label>
+      <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${rows||'<tr><td style="color:var(--text-faint)">데이터 없음</td></tr>'}</tbody></table></div>
+      ${Object.keys(fnr).length?`<div class="kv" style="margin-top:8px">${Object.entries(fnr).map(([g,v])=>`<div><span>FNR ${esc(g)}</span> <b style="color:${v>0.05?'var(--red)':'var(--green)'}">${(v*100).toFixed(1)}%</b></div>`).join('')}</div>`:''}</div>`;
+  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">혼동행렬 조회 실패: ${e.status||''} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 혼동행렬 이력이 없을 수 있습니다.</div>`; }
+}
 async function loadSchema(){
   try{
     const d=await api('GET','/schema/grades');
@@ -653,6 +728,67 @@ async function loadSchema(){
     $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">활성 등급체계 — version ${d.version||'-'} (DB 주도)</label>
       <div class="kv" style="margin-top:4px">${list.length?list.map(g=>`<div>${gradeTag(g.code)} <span>${g.name||GRADE_KR[g.code]||''}${g.order!=null?' · #'+g.order:''}</span></div>`).join(''):'<span style="color:var(--text-faint)">응답 형태 확인 — raw JSON 참조</span>'}</div></div>`;
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">등급체계 조회 실패: ${e.status||''}</div>`; }
+}
+
+/* ---- 6. 운영 관제 대시보드 ---- */
+function dpDegraded(d, name){ return (d.degraded||[]).includes(name) ? '<span class="dp-degraded">degraded</span>' : ''; }
+function alStatusPill(s){
+  if(s==='URGENT_RETRAIN') return '<span class="pill err">긴급 재학습</span>';
+  if(s==='RETRAIN_RECOMMENDED') return '<span class="pill warn">재학습 권고</span>';
+  return '<span class="pill ok">정상</span>';
+}
+function renderDashboard(d){
+  $('dash-meta').textContent = `생성 ${d.generated_at||'-'}` + ((d.degraded&&d.degraded.length)?` · degraded: ${d.degraded.join(', ')}`:'');
+  const eh=d.escalation_held||{}, lr=d.locked_readiness||{}, al=d.active_learning||{}, kg=d.kill_gate||{}, dr=d.drift||{};
+  const byg=eh.by_grade||{};
+  // 1) 이중검토 보류
+  const p1=`<div class="dash-panel">
+    <div class="dp-h"><span>이중검토 보류</span>${(eh.total>0)?'<span class="pill warn">보류</span>':'<span class="pill ok">없음</span>'}${dpDegraded(d,'escalation_held')}</div>
+    <div class="dp-big">${eh.total??0}</div>
+    <div class="dp-row">${GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')}</div>
+  </div>`;
+  // 2) 배포 readiness (locked_gold_eval)
+  const pg=lr.per_grade||{};
+  const p2=`<div class="dash-panel">
+    <div class="dp-h"><span>배포 readiness</span>${lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>'}${dpDegraded(d,'locked_readiness')}</div>
+    <div class="dp-row">${GRADES.map(g=>pg[g]!=null?`<div><span>${g}</span> <b>${pg[g]}</b></div>`:'').join('')||'<span style="color:var(--text-faint)">등급별 데이터 없음</span>'}</div>
+    ${lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족: ${lr.missing.join(', ')}`:''}</div>`:''}
+    ${lr.reason?`<div class="dp-note">${esc(lr.reason)}</div>`:''}
+  </div>`;
+  // 3) 재학습 backlog (active-learning)
+  const p3=`<div class="dash-panel">
+    <div class="dp-h"><span>재학습 backlog</span>${alStatusPill(al.retrain_status)}${dpDegraded(d,'active_learning')}</div>
+    <div class="dp-big">${al.unconsumed_total??0}</div>
+    <div class="dp-row"><div><span>과소</span> <b style="color:${al.pending_underclass>0?'var(--red)':'inherit'}">${al.pending_underclass??0}</b></div><div><span>과대</span> <b>${al.pending_overclass??0}</b></div><div><span>측면</span> <b>${al.pending_lateral??0}</b></div></div>
+    ${al.reason?`<div class="dp-note">${esc(al.reason)}</div>`:''}
+  </div>`;
+  // 4) kill-gate
+  const kgReasons=(kg.reasons||[]);
+  const p4=`<div class="dash-panel">
+    <div class="dp-h"><span>kill-gate</span>${kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>'}${dpDegraded(d,'kill_gate')}</div>
+    <div class="dp-big" style="color:${kg.tripped?'var(--red)':'var(--green)'}">${kg.tripped?'STOP':'OK'}</div>
+    <div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'발동 사유 없음'}</div>
+  </div>`;
+  // 5) 임베딩 드리프트 (마지막 게이지 — 표본 0이면 데이터 없음)
+  const noSample=!(dr.sample_size>0);
+  const p5=`<div class="dash-panel">
+    <div class="dp-h"><span>임베딩 드리프트</span>${noSample?'<span class="pill">데이터 없음</span>':(dr.alert>0.5?'<span class="pill err">경보</span>':'<span class="pill ok">정상</span>')}${dpDegraded(d,'drift')}</div>
+    <div class="dp-row">
+      <div><span>KL</span> <b>${noSample?'—':(+dr.kl_divergence).toFixed(4)}</b></div>
+      <div><span>cos</span> <b>${noSample?'—':(+dr.cosine_mean).toFixed(4)}</b></div>
+      <div><span>표본</span> <b>${dr.sample_size??0}</b></div>
+    </div>
+    ${noSample?'<div class="dp-note">드리프트 refresh 표본이 없어 값은 미측정(0.0은 실측 아님).</div>':''}
+  </div>`;
+  $('dash-grid').innerHTML = p1+p2+p3+p4+p5;
+}
+async function loadDashboard(){
+  try{
+    const d=await api('GET','/admin/dashboard');
+    renderDashboard(d);
+  }catch(e){
+    $('dash-grid').innerHTML=`<div class="warnbox">관제 대시보드 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`;
+  }
 }
 
 /* init */
