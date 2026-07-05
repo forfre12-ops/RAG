@@ -19,12 +19,10 @@ services:
     # dev .env 상속 차단 — 운영 자격/설정은 ENV_FILE 로만. 초기 클라우드 테스트는 ENV_FILE=.env.cloud.
     env_file: !override
       - "${ENV_FILE:-.env.prod}"
-    environment:
+    environment: !override
       # WEB_CONCURRENCY 멀티워커는 프로모션 후 /admin/model/reload 팬아웃 미구현[NFR-OPS-01]이라
       # 워커별 stale 가능 — 초기엔 1 권장(재기동으로 갱신).
       WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
-      LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
-      LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
       EMBEDDING_PROVIDER: hf
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-BAAI/bge-m3}"
       CORS_ALLOW_ORIGINS: '["${ALLOWED_ORIGIN:-https://app.example.com}"]'
@@ -57,9 +55,7 @@ services:
   worker:
     env_file: !override
       - "${ENV_FILE:-.env.prod}"
-    environment:
-      LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
-      LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
+    environment: !override {}
     # dev 코드 bind 제거. 워커도 모델 접근 필요(classify/index 태스크) → ro external volume.
     volumes: !override
       - prod_artifacts:/app/artifacts:ro
@@ -78,6 +74,7 @@ services:
   beat:
     env_file: !override
       - "${ENV_FILE:-.env.prod}"
+    environment: !override {}
     # beat 는 스케줄만 발행 — 코드/모델 bind 불요.
     volumes: !override []
 
