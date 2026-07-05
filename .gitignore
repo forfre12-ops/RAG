@@ -98,6 +98,7 @@ poc/reports/p2_oss*.json
 
 # Generated certs / trained model weights
 poc/certs/
+poc/infra/mtls/certs/
 poc/models/
 
 # doc 검증 스크린샷·스크립트 (작업산출물, 트래킹 불필요)
