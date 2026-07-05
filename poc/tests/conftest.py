@@ -47,6 +47,12 @@ os.environ.setdefault("VECTOR_BACKEND", "inmemory")
 # 검증(test_embedding_fallback_gate)은 monkeypatch로 명시 활성해 독립 검사한다.
 os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
 
+# 수동 GA 활성 locked-eval 하드블록(deploy_gate_manual_require_locked_eval)은 하드닝 프로파일
+# (onprem-local·full-train) 기본 True. 테스트는 무실데이터(locked_gold_eval 비어있음)라 이게 켜지면
+# 모든 수동 활성이 막힌다 — REQUIRE_REAL_EMBEDDER와 동일하게 중화. 게이트 자체 검증은
+# test_manual_activate.py의 전용 테스트가 monkeypatch로 명시 활성해 독립 수행한다.
+os.environ.setdefault("DEPLOY_GATE_MANUAL_REQUIRE_LOCKED_EVAL", "false")
+
 _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))

@@ -65,6 +65,9 @@ class ActivateModelResponse(BaseModel):
     version_id: str | None = None
     reason: str
     gate: dict | None = None
+    # [배포전 하드닝 P0#①] locked_gold_eval readiness — 하드닝 프로파일에선 수동 활성도 이 축을
+    # 요구(force로만 우회). 요구 여부와 무관하게 항상 노출(운영자 가시화·미검증 활성 감사).
+    locked_readiness: dict | None = None
     reloaded: bool = False
     model_version: str | None = None
     model_loaded: bool | None = None
@@ -77,8 +80,10 @@ class ActivateModelResponse(BaseModel):
     description=(
         "등록된 ModelVersion을 admin이 명시적으로 활성화한다(G1 — 수동 배포 경로). 현재 활성본 "
         "대비 deploy gate(고등급 미탐 fnr·f1 회귀)를 적용해 회귀 모델의 무심한 활성을 막고, "
-        "게이트 실패 시 force=true로만 우회한다(HTTP 요청은 감사 미들웨어가 기록). 활성 후 "
-        "무중단 리로드까지 수행한다. 게이트 미통과+force=false면 activated=false·blocked=true로 응답."
+        "하드닝 프로파일(onprem-local·full-train)에선 사람서명 locked_gold_eval readiness까지 "
+        "요구한다(미검증 모델 GA 활성 차단). 게이트 미충족 시 force=true로만 우회한다(HTTP 요청은 "
+        "감사 미들웨어가, force 우회는 forced=true로 기록). 활성 후 무중단 리로드까지 수행한다. "
+        "게이트 미통과+force=false면 activated=false·blocked=true, locked_readiness에 배포 축 노출."
     ),
 )
 def activate_model(
@@ -114,6 +119,7 @@ def activate_model(
         version_id=res.get("version_id"),
         reason=str(res.get("reason", "")),
         gate=res.get("gate"),
+        locked_readiness=res.get("locked"),
         reloaded=reloaded,
         model_version=model_version,
         model_loaded=model_loaded,

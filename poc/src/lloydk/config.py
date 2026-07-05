@@ -97,6 +97,9 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # [obs] 실 임베더 필수 — HF 로드 실패 시 HashEmbedding 무음 폴백은 검색품질 급락(정확도
         # 저하)이라 폐쇄망 실서빙에선 거부. 명시적 hash 요청(dryrun)은 영향 없음(폴백만 차단).
         "require_real_embedder": True,
+        # [배포전 하드닝 P0#①] 수동 GA 활성도 사람서명 locked 평가 readiness 요구(미검증 모델
+        # 무심코 GA 활성 차단; force=True로만 우회·감사됨). 자동활성 게이트와 별개 축.
+        "deploy_gate_manual_require_locked_eval": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -118,6 +121,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "require_safety_gates": True,
         # [obs] 실 임베더 필수(onprem-local과 동일) — hash 무음 폴백 거부.
         "require_real_embedder": True,
+        # [배포전 하드닝 P0#①] 수동 GA 활성 locked-eval 요구(onprem-local과 동일).
+        "deploy_gate_manual_require_locked_eval": True,
     },
 }
 
@@ -449,6 +454,15 @@ class Settings(BaseSettings):
     # False로 끄면 옛 동작(합성 평가만으로 자동 활성). 수동 활성은 이 게이트와 무관.
     deploy_gate_require_locked_eval: bool = True
     deploy_gate_min_locked_per_grade: int = 5
+    # [배포전 하드닝 P0#①] 수동 활성(activate_model_manually / POST /admin/model/activate)에도
+    # locked_gold_eval readiness를 요구할지. 기본 False = 현행 보존 — 수동 활성은 원래 '지재원
+    # 릴리스의 정상 배포 경로'라 위 deploy_gate_require_locked_eval(자동활성 전용)와 무관했다.
+    # 하드닝 프로파일(onprem-local·full-train)은 True: 사람서명 locked 평가 없이 미검증 모델을
+    # GA로 무심코 활성하는 경로를 막는다(회귀 gate와 별개의 축). force=True로만 우회(감사됨) —
+    # 파일럿 부트스트랩(locked 비어있음)은 명시적 force로 활성하며 그 사실이 forced=True로 감사에
+    # 남는다. locked_gold_eval이 사람서명으로 채워지면 자동으로 통과(force 불요). readiness는 활성
+    # 성패와 무관하게 항상 응답/로그에 노출(가시화). lite-*/dev/pilot=False(현행) 유지.
+    deploy_gate_manual_require_locked_eval: bool = False
     # [번들 D] locked_gold_eval(사람서명 평가정답) 레코드 jsonl 경로 — 운영 검수 readiness 가시화용
     # (등급별 locked 보유/부족·배포가능 여부). 빈 값(기본)이면 readiness=no_locked_records(무실데이터
     # 단계의 진실). 파일이 쌓이면 GET /admin/locked-readiness·게이지가 자동으로 켜진다. 읽기 전용.

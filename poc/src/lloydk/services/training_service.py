@@ -271,7 +271,12 @@ def activate_model_manually(
     **force=True(감사됨)** 로만 우회한다. 활성 전환은 advisory lock으로 직렬화(레이스 차단).
     HTTP 요청 자체는 감사 미들웨어가 기록하므로 여기선 별도 audit write 없이 logger.warning만.
 
-    반환: {activated, blocked, forced, version_label, version_id, reason, gate, already_active}.
+    [배포전 하드닝 P0#①] 하드닝 프로파일(deploy_gate_manual_require_locked_eval=True)에선 회귀
+    gate에 더해 **locked_gold_eval readiness**(사람서명 평가정답)까지 요구한다 — 미검증 모델의
+    무심한 GA 활성을 막고 force=True로만 우회(감사됨). locked readiness는 요구 여부와 무관하게
+    항상 계산해 반환(locked 키)·로그에 노출(가시화).
+
+    반환: {activated, blocked, forced, version_label, version_id, reason, gate, locked, already_active}.
     DB 미가용/미존재/오류는 예외 대신 activated=False + 명시 reason.
     """
     from lloydk.config import settings  # noqa: PLC0415
@@ -286,7 +291,7 @@ def activate_model_manually(
                 return {
                     "activated": False, "blocked": False, "forced": False,
                     "version_label": version_label, "version_id": None,
-                    "reason": "version_not_found", "gate": None,
+                    "reason": "version_not_found", "gate": None, "locked": None,
                 }
             baseline = repo.get_active()
             baseline_metrics = dict(baseline.metrics) if baseline and baseline.metrics else None
@@ -313,43 +318,80 @@ def activate_model_manually(
                 baseline_version=baseline_label,
             )
 
-            if not decision.passed and not force:
+            # [배포전 하드닝 P0#①] locked_gold_eval readiness — 회귀 gate와 별개의 배포 축.
+            # 항상 계산해 응답/로그에 노출(가시화)하고, 하드닝 프로파일
+            # (deploy_gate_manual_require_locked_eval=True)에선 사람서명 locked 평가가 준비되지
+            # 않으면 hard-block 한다 — 미검증 모델의 무심한 GA 활성 차단. force=True로만 우회(감사됨).
+            # readiness 계산 오류는 fail-closed(막고 force 허용). 기본(lite/dev/pilot)은 요구 안 함.
+            from lloydk.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
+                locked_eval_readiness,
+            )
+            manual_require_locked = bool(
+                getattr(settings, "deploy_gate_manual_require_locked_eval", False)
+            )
+            try:
+                locked = locked_eval_readiness()
+                locked_ready = bool(locked.get("ready"))
+            except Exception as exc:  # noqa: BLE001
+                locked = {"ready": False, "reason": f"readiness_error:{type(exc).__name__}"}
+                locked_ready = False
+            locked_block = manual_require_locked and not locked_ready
+            gate_ok = decision.passed and not locked_block
+
+            if not gate_ok and not force:
+                reasons: list[str] = []
+                if not decision.passed:
+                    reasons.append(f"deploy_gate_failed: {decision.reason}")
+                if locked_block:
+                    reasons.append(f"locked_eval_not_ready: {locked.get('reason')}")
                 logger.warning(
-                    "manual activate BLOCKED (deploy gate failed, force=False): %s vs baseline=%s "
-                    "reason=%s actor=%s", version_label, baseline_label, decision.reason, actor_id,
+                    "manual activate BLOCKED (force=False): %s vs baseline=%s reasons=%s actor=%s",
+                    version_label, baseline_label, reasons, actor_id,
                 )
                 return {
                     "activated": False, "blocked": True, "forced": False,
                     "version_label": version_label, "version_id": str(target.version_id),
-                    "reason": f"deploy_gate_failed: {decision.reason} — force=true 로만 우회(감사됨)",
-                    "gate": decision.to_dict(), "already_active": already_active,
+                    "reason": " ; ".join(reasons) + " — force=true 로만 우회(감사됨)",
+                    "gate": decision.to_dict(), "locked": locked,
+                    "already_active": already_active,
                 }
 
-            forced = bool(force and not decision.passed)
+            forced = bool(force and not gate_ok)
             repo.activate_model_version(target.version_id)
             logger.warning(
-                "manual activate: version=%s baseline=%s gate_passed=%s forced=%s actor=%s role=%s",
-                version_label, baseline_label, decision.passed, forced, actor_id, actor_role,
+                "manual activate: version=%s baseline=%s gate_passed=%s locked_ready=%s "
+                "forced=%s actor=%s role=%s",
+                version_label, baseline_label, decision.passed, locked_ready, forced,
+                actor_id, actor_role,
             )
+            _reason = "activated"
+            if forced:
+                _waived = []
+                if not decision.passed:
+                    _waived.append("deploy gate")
+                if locked_block:
+                    _waived.append("locked-eval")
+                _reason = f"activated (FORCED override — {'·'.join(_waived)} 미충족)"
             return {
                 "activated": True, "blocked": False, "forced": forced,
                 "version_label": version_label, "version_id": str(target.version_id),
-                "reason": ("activated (FORCED override — deploy gate 실패)" if forced else "activated"),
-                "gate": decision.to_dict(), "already_active": already_active,
+                "reason": _reason,
+                "gate": decision.to_dict(), "locked": locked,
+                "already_active": already_active,
             }
     except SQLAlchemyError as exc:
         logger.warning("activate_model_manually skipped (DB unavailable): %s", exc)
         return {
             "activated": False, "blocked": False, "forced": False,
             "version_label": version_label, "version_id": None,
-            "reason": f"db_unavailable:{type(exc).__name__}", "gate": None,
+            "reason": f"db_unavailable:{type(exc).__name__}", "gate": None, "locked": None,
         }
     except Exception as exc:  # noqa: BLE001
         logger.exception("activate_model_manually failed")
         return {
             "activated": False, "blocked": False, "forced": False,
             "version_label": version_label, "version_id": None,
-            "reason": f"error:{type(exc).__name__}", "gate": None,
+            "reason": f"error:{type(exc).__name__}", "gate": None, "locked": None,
         }
 
 
