@@ -152,8 +152,8 @@ def test_manual_locked_gate_off_activates_without_locked(monkeypatch):
         _cleanup([base, good])
 
 
-def test_force_requires_reason_when_hardened(monkeypatch):
-    """[P0#①-b] 하드닝: force 우회에 사유 필수 — 사유 없으면 blocked, 있으면 forced 활성."""
+def test_force_requires_reason_and_actor_when_hardened(monkeypatch):
+    """[P0#①-b/c] 하드닝: force 우회에 사유+식별된 actor 필수 — 없으면 blocked, 둘 다 있으면 활성."""
     monkeypatch.setattr(config_mod.settings, "deploy_gate_manual_require_locked_eval", True)
     monkeypatch.setattr(config_mod.settings, "locked_eval_jsonl", "")  # locked 미준비 → 게이트 실패
     monkeypatch.setattr(config_mod.settings, "manual_activate_force_requires_reason", True)
@@ -162,18 +162,25 @@ def test_force_requires_reason_when_hardened(monkeypatch):
     _seed(base, {"fnr_high": 0.10, "f1_macro": 0.80}, active=True)
     _seed(good, {"fnr_high": 0.08, "f1_macro": 0.82})
     try:
-        # force=True 이지만 사유 없음 → 여전히 blocked.
+        # force=True 이지만 사유·actor 없음 → 둘 다 요구, blocked.
         r1 = activate_model_manually(good, force=True)
-        assert r1["activated"] is False
-        assert r1["blocked"] is True
+        assert r1["activated"] is False and r1["blocked"] is True
         assert "force_reason_required" in r1["reason"]
+        assert "force_actor_required" in r1["reason"]
         assert _active_label() == base
 
-        # force=True + 사유 → forced 활성, 사유가 결과 reason 에 남는다.
-        r2 = activate_model_manually(good, force=True, reason="긴급 파일럿 배포 승인 by VP")
-        assert r2["activated"] is True
-        assert r2["forced"] is True
-        assert "긴급 파일럿 배포" in r2["reason"]
+        # 사유는 있으나 actor 없음(api_key 공유키 모드) → 여전히 blocked(익명 강제활성 차단).
+        r2 = activate_model_manually(good, force=True, reason="긴급 배포")
+        assert r2["activated"] is False and r2["blocked"] is True
+        assert "force_actor_required" in r2["reason"]
+        assert _active_label() == base
+
+        # force + 사유 + 식별된 actor(jwt) → forced 활성, 사유가 결과 reason 에 남는다.
+        r3 = activate_model_manually(
+            good, force=True, reason="긴급 파일럿 배포 승인 by VP", actor_id="kl-admin-7"
+        )
+        assert r3["activated"] is True and r3["forced"] is True
+        assert "긴급 파일럿 배포" in r3["reason"]
         assert _active_label() == good
     finally:
         _cleanup([base, good])

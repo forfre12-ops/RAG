@@ -339,13 +339,16 @@ def activate_model_manually(
             locked_block = manual_require_locked and not locked_ready
             gate_ok = decision.passed and not locked_block
 
-            # [배포전 하드닝 P0#①-b] 하드닝 프로파일에선 force 우회 시 사유(reason) 필수 —
-            # 미검증 모델을 GA로 강제 활성하려면 '왜'를 남긴다(force 금지 아님, 감사 강화).
+            # [배포전 하드닝 P0#①-b/c] 하드닝 프로파일에선 force 우회 시 사유(reason)와 **식별된
+            # actor** 를 요구한다 — 미검증 모델을 GA로 강제 활성하려면 '왜'와 '누가'를 남긴다
+            # (force 금지 아님, 감사 강화). actor 없음(api_key 공유키 모드)으로는 강제활성 불가.
             _reason_text = (reason or "").strip()
+            _actor_text = (actor_id or "").strip()
             requires_reason = bool(getattr(settings, "manual_activate_force_requires_reason", False))
             reason_missing = (not gate_ok) and force and requires_reason and not _reason_text
+            actor_missing = (not gate_ok) and force and requires_reason and not _actor_text
 
-            if not gate_ok and (not force or reason_missing):
+            if not gate_ok and (not force or reason_missing or actor_missing):
                 reasons: list[str] = []
                 if not decision.passed:
                     reasons.append(f"deploy_gate_failed: {decision.reason}")
@@ -353,7 +356,13 @@ def activate_model_manually(
                     reasons.append(f"locked_eval_not_ready: {locked.get('reason')}")
                 if reason_missing:
                     reasons.append("force_reason_required: force 우회에는 사유(reason) 필수")
-                    tail = " — reason 을 채워 force=true 로 재시도(감사됨)"
+                if actor_missing:
+                    reasons.append(
+                        "force_actor_required: force 우회에는 식별된 actor 필수"
+                        "(api_key 공유키 모드 불가 — AUTH_MODE=jwt 사용)"
+                    )
+                if reason_missing or actor_missing:
+                    tail = " — 식별된 actor(jwt)와 reason 으로 force=true 재시도(감사됨)"
                 else:
                     tail = " — force=true 로만 우회(감사됨)"
                 logger.warning(

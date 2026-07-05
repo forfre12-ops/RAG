@@ -45,6 +45,20 @@ METRICS = {
 
 
 def main() -> int:
+    # [P0#①-a] 이 스크립트는 activate_model_version 을 직접 호출해 deploy gate·locked-eval·감사를
+    # 모두 우회한다(데모 metrics/latest 시딩 전용). 하드닝/운영 프로파일에서는 이 우회를 거부한다 —
+    # 운영 활성은 POST /admin/model/activate(게이트·감사)로만.
+    from lloydk.config import settings  # noqa: PLC0415
+    profile = (getattr(settings, "deploy_profile", "") or "").lower()
+    if getattr(settings, "require_safety_gates", False) or profile in ("onprem-local", "full-train"):
+        print(
+            f"[REFUSED] 하드닝/운영 프로파일(deploy_profile={profile!r}, "
+            f"require_safety_gates={getattr(settings, 'require_safety_gates', False)})에서는 "
+            "seed_active_model_version 로 모델을 활성화할 수 없습니다 — 이 스크립트는 deploy gate·"
+            "locked-eval·감사를 우회하는 데모 전용입니다. 운영 활성은 POST /admin/model/activate 사용.",
+            file=sys.stderr,
+        )
+        return 2
     with session_scope() as db:
         repo = TrainingRepo(db)
         mv = repo.get_by_label(LABEL)

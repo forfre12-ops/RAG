@@ -107,6 +107,10 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "deploy_gate_manual_require_locked_eval": True,
         # [P0#①-b] force 우회 시 사유 필수(미검증 GA 강제활성에 '왜'를 남김 — force 금지 아님).
         "manual_activate_force_requires_reason": True,
+        # [P0#①-c] 최초 배포(baseline 없음) 절대 미탐 floor — baseline 비교가 불가능한 첫 모델이
+        # 고등급 미탐율 >0.10 이면 deploy gate 거부(degenerate·fnr_high 존재만으로 통과하던 fail-open
+        # 차단). 하드닝 GA는 첫 모델도 미탐 하한을 강제. 실데이터 human_review PR곡선으로 값 재확정 권장.
+        "deploy_gate_first_deploy_fnr_high_max": 0.10,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -134,6 +138,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "deploy_gate_manual_require_locked_eval": True,
         # [P0#①-b] force 우회 시 사유 필수(onprem-local과 동일).
         "manual_activate_force_requires_reason": True,
+        # [P0#①-c] 최초 배포 절대 미탐 floor 0.10 (onprem-local과 동일 — 첫 모델 fail-open 차단).
+        "deploy_gate_first_deploy_fnr_high_max": 0.10,
     },
 }
 
