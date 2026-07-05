@@ -328,6 +328,31 @@ def get_job_store(
         return InMemoryJobStore()
 
 
+def assert_multiworker_jobstore_safe() -> None:
+    """[정합성] 멀티워커(WEB_CONCURRENCY>1) 운영에서 async job 저장소가 프로세스-로컬 메모리로
+    폴백되면 워커 간 job 가시성이 깨진다 — 워커 A에 제출한 job을 워커 B가 조회하면 404/유실.
+    그 조합이면 fail-fast(idempotency 저장소 가드와 동형).
+
+    단일 워커는 no-op(메모리라도 1워커면 조회 일관). poc_mode=full·non-TESTING 게이트는
+    호출부(assert_production_credentials)가 이미 적용하므로 여기선 워커 수만 본다.
+    RedisJobStore.__init__ 이 ping()으로 eager connect 하므로, redis 요청됐으나 미가용이면
+    get_job_store()가 InMemoryJobStore 로 폴백 → 여기서 잡힌다(연결성 검증 겸용).
+    """
+    import os  # noqa: PLC0415
+    try:
+        workers = int(os.environ.get("WEB_CONCURRENCY", "1"))
+    except ValueError:
+        workers = 1
+    if workers <= 1:
+        return
+    if isinstance(get_job_store(), InMemoryJobStore):
+        raise RuntimeError(
+            "정합성: WEB_CONCURRENCY>1(멀티워커) 운영인데 async job 저장소가 in-memory "
+            "폴백입니다 — 워커 간 job 가시성이 없어 제출/조회가 다른 워커면 유실됩니다. "
+            "REDIS_URL을 가용 redis로 설정하세요(또는 WEB_CONCURRENCY=1)."
+        )
+
+
 # ---------------------------------------------------------------------------
 # module-level singleton — 기존 호출처 호환
 # ---------------------------------------------------------------------------

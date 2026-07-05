@@ -971,6 +971,12 @@ def assert_production_credentials() -> None:
     )
     assert_multiworker_idempotency_safe()
 
+    # [정합성] 동일 사유 — 멀티워커에서 async job 저장소가 in-memory 폴백이면 워커 간 job 유실.
+    from lloydk.services.job_store import (  # noqa: PLC0415
+        assert_multiworker_jobstore_safe,
+    )
+    assert_multiworker_jobstore_safe()
+
     # RATE_LIMIT_DISABLED 운영에서 오류
     if os.environ.get("RATE_LIMIT_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
         raise RuntimeError(
