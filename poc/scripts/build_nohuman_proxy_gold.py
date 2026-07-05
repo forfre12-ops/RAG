@@ -73,6 +73,28 @@ def norm_text(text: str) -> str:
     return re.sub(r"\s+", "", text or "")
 
 
+PROVENANCE_CORRECTION_NOTE = (
+    "provenance corrected: nkt_designated without legal_reference is a curated_scenario, "
+    "not external authority; human signoff required"
+)
+
+
+def normalize_provenance(row: dict) -> dict:
+    out = dict(row)
+    if out.get("label_source") == "nkt_designated" and not str(out.get("legal_reference") or "").strip():
+        out["original_label_source"] = out.get("original_label_source") or "nkt_designated"
+        out["label_source"] = "curated_scenario"
+        out["requires_human_signoff"] = True
+        notes = str(out.get("notes") or "").strip()
+        if PROVENANCE_CORRECTION_NOTE not in notes:
+            out["notes"] = (
+                f"{notes} | {PROVENANCE_CORRECTION_NOTE}"
+                if notes
+                else PROVENANCE_CORRECTION_NOTE
+            )
+    return out
+
+
 def train_overlap(rows: list[dict], train_rows: list[dict]) -> dict[str, float | int]:
     train_texts = {norm_text(r.get("text", "")) for r in train_rows if r.get("text")}
     overlap = sum(1 for r in rows if norm_text(r.get("text", "")) in train_texts)
@@ -84,7 +106,7 @@ def train_overlap(rows: list[dict], train_rows: list[dict]) -> dict[str, float |
 
 
 def annotate(row: dict, nohuman_tier: str, reason: str) -> dict:
-    out = dict(row)
+    out = normalize_provenance(row)
     out["nohuman_tier"] = nohuman_tier
     out["nohuman_reason"] = reason
     out["truth_warning"] = (
@@ -108,7 +130,14 @@ def _breakdown_by_authority(rows: list[dict]) -> dict:
     #  (b) synthetic_text: 지정근거는 정당하나 본문이 손작성 시나리오(source=public_scenario) —
     #      라벨 권위는 실재, 그러나 real-text 실측 인용 불가(텍스처 갭). release floor로만.
     claims_external = [r for r in syn if r.get("label_source") in EXTERNAL_AUTHORITY_SOURCES]
-    forged = [r for r in claims_external if not str(r.get("legal_reference") or "").strip()]
+    forged = [
+        r for r in syn
+        if (
+            r.get("original_label_source") == "nkt_designated"
+            or r.get("label_source") in EXTERNAL_AUTHORITY_SOURCES
+        )
+        and not str(r.get("legal_reference") or "").strip()
+    ]
     synthetic_text = [r for r in claims_external if str(r.get("legal_reference") or "").strip()]
     out = {
         "external_authority": {
@@ -158,6 +187,7 @@ def build(
     quarantine_ids: set[str] = set()
     quarantine_reasons: dict[str, list[str]] = defaultdict(list)
     for row in original:
+        row = normalize_provenance(row)
         doc_id = str(row.get("doc_id"))
         src = row.get("label_source")
         label = str(row.get("label") or "").upper()
@@ -166,6 +196,7 @@ def build(
             quarantine_reasons[doc_id].append("public_or_ruling_labeled_high_risk_by_llm")
 
     for row in regate_review:
+        row = normalize_provenance(row)
         doc_id = str(row.get("doc_id"))
         status = str(row.get("status") or row.get("review_status") or "")
         if "ts_downgrade" in status:
@@ -173,6 +204,7 @@ def build(
             quarantine_reasons[doc_id].append("ts_downgrade_suspect")
 
     for row in regate_gold:
+        row = normalize_provenance(row)
         doc_id = str(row.get("doc_id"))
         # [수정1] quarantine 필터를 proxy 가지에도 적용 — 의심 라벨이 regate_gold에 있어도 eval서 배제.
         if doc_id in quarantine_ids:

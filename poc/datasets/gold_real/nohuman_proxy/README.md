@@ -4,8 +4,8 @@
 
 - locked_gold_eval: 0 (사람서명 없음 — 이건 true gold 아님)
 - proxy_eval (leakage-free): 166 / 777
-  - external_authority (nkt+public, 실측 인용 가능): 79
-  - synthetic_proxy (koipa/rule_llm/codex, 스모크 전용): 87
+  - external_authority (nkt+public, 실측 인용 가능): 49
+  - synthetic_proxy (koipa/rule_llm/codex, 스모크 전용): 117
 - train_leak (학습중복 → eval서 배제): 48
 - silver_train_only: 356
 - quarantine: 207
@@ -38,30 +38,30 @@
 
 {
   "external_authority": {
-    "count": 79,
+    "count": 49,
     "labels": {
-      "TS": 30,
+      "TS": 0,
       "S1": 0,
       "S2": 0,
       "S3": 49
     },
     "label_source": {
-      "public_definitive": 49,
-      "nkt_designated": 30
+      "public_definitive": 49
     },
     "note": "정부지정·공개 확정 = 사람서명 없이도 진짜 정답. 실측 인용 가능."
   },
   "synthetic_proxy": {
-    "count": 87,
+    "count": 117,
     "labels": {
-      "TS": 6,
+      "TS": 36,
       "S1": 40,
       "S2": 41,
       "S3": 0
     },
     "label_source": {
       "koipa_case_based": 81,
-      "nkt_designated": 6
+      "nkt_designated": 30,
+      "curated_scenario": 6
     },
     "note": "손작성/LLM 프록시 = 분류기와 편향 공유 가능(상관오류). 스모크용, 실정확도 근거로 인용 금지.",
     "forged_authority_claims": {
@@ -75,6 +75,48 @@
         "e28b7763a5e000ec"
       ],
       "note": "label_source는 외부권위를 주장하나 record에 legal_reference 없음 — provenance 위조 의심, curated_scenario로 교정 필요."
+    },
+    "synthetic_text_external_label": {
+      "count": 30,
+      "labels": {
+        "TS": 30,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0
+      },
+      "doc_ids": [
+        "0133457f8a15b71d",
+        "05275470efacff5d",
+        "0fcb2d38382eefee",
+        "326d0f16f4ac4510",
+        "347b56e14deb0eea",
+        "36e438b7faaf43fa",
+        "3deb5cc7b6b35edf",
+        "46051c71f5422ea4",
+        "4ef537e826c64ad6",
+        "4ff815f973704eec",
+        "558c0801c86bcbc2",
+        "59949790846b5d8c",
+        "5ddb377cb5287784",
+        "7633e7ec4a17f7ed",
+        "7aa8a7a5f9560573",
+        "7d3522209150a702",
+        "9354f07c44837915",
+        "a26b29517d47eb5e",
+        "a61ea12e678d86da",
+        "a98badc91a48b1be",
+        "abdb467e695d3e5e",
+        "acf152b46490a834",
+        "b21783067821a0fc",
+        "b893ef333329831b",
+        "bce8ec1812b08a45",
+        "c56c7b5fc04267d5",
+        "c7d14e749345fa90",
+        "dadbdc5e8ac6e764",
+        "daf70c80ffcc720d",
+        "ede37cfddfd37b2e"
+      ],
+      "note": "라벨 권위(고시 지정근거)는 정당하나 본문이 손작성 합성(source=public_scenario) — release floor로만, real-text 실측 정확도 인용 금지(2026-07-04 텍스처 갭 감사)."
     }
   }
 }

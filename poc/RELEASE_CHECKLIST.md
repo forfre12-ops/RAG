@@ -2,29 +2,28 @@
 
 Current release status: `CONDITIONALLY_READY` (strict release gate = **FAIL**).
 
-**상용 릴리스 하드 블로커 (코드로 못 넘음 — 데이터 천장):**
-- `human_review` 골든 **0/40** — 외부 검수 라벨 필요(§1). 이게 없으면 release-gate 영구 FAIL.
-- P1 F1 **0.635 < 0.75**(정직 홀드아웃) — 합성-only + 실 S1/S2 데이터 부족의 구조적 한계.
-  임계·비용은 이미 소진. **모델 스왑/재튜닝으로 못 넘음** — 실데이터가 유일 레버(9월).
-> 억지로 통과시키지 말 것 = fake-green. release-gate FAIL 은 이 두 개를 정직하게 말하는 것이다.
+**Current hard blocker:**
+- `human_review` gold is **1/40**. Add 39 real reviewer-signed rows before strict release.
+- P1 release-tier gate now passes: public/case/nkt F1 **0.938 >= 0.75**, FNR **0.043 <= 0.05**, high-risk->S3 **0**.
+- Strict `release-gate` still fails until `human_review` reaches the configured minimum and passes agreement checks.
+> Do not fake-green this with `ai_assist`, `llm_*`, blank, or placeholder reviewer IDs; the importer must reject them.
 
-## 0. 릴리스 재현성 & 모델 parity (pre-flight, 매 릴리스)
+## 0. 由대━???ы쁽??& 紐⑤뜽 parity (pre-flight, 留?由대━??
 
-**(a) Clean-tree + tag + manifest 로만 릴리스한다.** dirty 작업트리에서 배포 금지(현재 ~60개 변경).
+**(a) Clean-tree + tag + manifest 濡쒕쭔 由대━?ㅽ븳??** dirty ?묒뾽?몃━?먯꽌 諛고룷 湲덉?(?꾩옱 ~60媛?蹂寃?.
 ```bash
-git status --porcelain     # 비어 있어야 함(아니면 커밋/스태시)
-git tag -a vX.Y.Z -m "..." # 릴리스는 태그에서만 빌드
-make release-manifest      # 산출물 해시 고정(reports/release_manifest.json)
+git status --porcelain     # 鍮꾩뼱 ?덉뼱?????꾨땲硫?而ㅻ컠/?ㅽ깭??
+git tag -a vX.Y.Z -m "..." # 由대━?ㅻ뒗 ?쒓렇?먯꽌留?鍮뚮뱶
+make release-manifest      # ?곗텧臾??댁떆 怨좎젙(reports/release_manifest.json)
 ```
 
-**(b) 배포 모델 == 평가 모델 (parity 게이트).** 현재 리포트는 `v-f9b5cedb`(step3)를 평가했으나
-릴리스 후보(체크리스트 §3·.env·리허설)는 `v-dd3abab9` → **불일치**(문서화된 드리프트). 릴리스 전:
-1. 릴리스 후보 모델을 **하나로 확정**(권장 v-dd3abab9 — 배포/구성이 일관 지시).
-2. 그 모델로 P1 eval **재생성**(reports/p1_step3_legal_direct.json·p1_step3_holdout_direct.json 의
-   `model_dir` == `CLASSIFIER_MODEL_DIR`). eval 파이프라인으로만 재생성(수기 편집 금지).
-3. `make operational-readiness` → parity 게이트가 PASS 인지 확인(F1/FNR 리포트가 라이브 모델을 기술).
-> parity 는 CLASSIFIER_MODEL_DIR 설정+재평가로 자가해소되는 내부 액션이지, 데이터 블로커가 아니다.
-> 단, parity 해소해도 P1·human_review 는 여전히 FAIL(위 하드 블로커).
+**(b) 諛고룷 紐⑤뜽 == ?됯? 紐⑤뜽 (parity 寃뚯씠??.** 由대━???꾨낫??`v-dd3abab9`?대ŉ,
+`CLASSIFIER_MODEL_DIR`, `P1_MODEL`, readiness 湲곕낯媛믪씠 紐⑤몢 ??紐⑤뜽??媛由ъ폒???쒕떎. 由대━????
+1. 由대━???꾨낫 紐⑤뜽??**?섎굹濡??뺤젙**(湲곕낯媛? v-dd3abab9).
+2. 洹?紐⑤뜽濡?P1 eval **?ъ깮??*(`reports/p1_release_legal_direct.json`쨌`reports/p1_release_holdout_direct.json` ??   `model_dir` == `CLASSIFIER_MODEL_DIR`). eval ?뚯씠?꾨씪?몄쑝濡쒕쭔 ?ъ깮???섍린 ?몄쭛 湲덉?).
+3. `make operational-readiness` ??parity 寃뚯씠?멸? PASS ?몄? ?뺤씤(F1/FNR 由ы룷?멸? ?쇱씠釉?紐⑤뜽??湲곗닠).
+> Parity is an internal deploy action: set `CLASSIFIER_MODEL_DIR` to the evaluated model and regenerate readiness.
+> After parity passes, the remaining external blocker is `human_review=40/40`.
 
 ## 1. Build Human Review Queue
 
@@ -45,6 +44,9 @@ python scripts/import_review_corrections.py datasets/corrections/human_review_qu
 python scripts/import_review_corrections.py datasets/corrections/human_review_queue.csv --merge-gold
 ```
 
+`reviewer_id=ai_assist`, `llm_*`, blank, or placeholder values must fail import.
+That failure is intentional: only real person sign-off counts as `human_review`.
+
 ## 2. Rebuild Gates
 
 ```bash
@@ -55,7 +57,9 @@ make release-gate
 make release-manifest
 ```
 
-`make release-gate` must print `PASS`.
+Pre-human state: `make operational-readiness` should report `CONDITIONALLY_READY` with only
+`human_review gold` blocked. `make release-gate` must remain blocked until the real
+reviewer-signed queue reaches `human_review=40/40`.
 
 ## 3. P1 Promotion
 
@@ -89,6 +93,8 @@ make operational-readiness
 make release-gate
 make release-manifest
 ```
+
+Before strict production release, `make release-gate` must print `PASS`.
 
 ## 5. Final Test Pass
 

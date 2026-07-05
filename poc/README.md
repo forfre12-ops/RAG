@@ -2,7 +2,7 @@
 
 한국지식재산보호원(KOIPA) AI 영업비밀관리시스템 / 로이드케이 파트.
 
-설계 문서: [`../doc/`](../doc/) — 00~15.
+설계 문서: 최신 외부 공유본은 [`../doc/result/open/index.html`](../doc/result/open/index.html)에서 시작한다. 아래 00~15 Markdown 링크 일부는 초기 PoC 산출물 경로라 현재 HTML 산출물과 다를 수 있다.
 
 | 영역 | 문서 |
 |---|---|
@@ -46,13 +46,13 @@ cat reports/summary.md
 ## 풀 인프라 실행 (협의·GPU 확보 후)
 
 ```bash
-# Postgres / Elasticsearch / MinIO / Redis / MLflow 기동
+# Postgres(pgvector) / Redis 등 dev 인프라 기동
 make infra-up
-python scripts/verify_infra.py     # 헬스 체크 (ES + 다른 서비스)
+python scripts/verify_infra.py     # 헬스 체크
 python scripts/init_minio_buckets.py
 python scripts/seed_keywords.py --db    # 키워드 시드 DB 적재
 
-# API + Worker (env VECTOR_BACKEND=es 기본)
+# API + Worker (VECTOR_BACKEND=pg 기본, ES는 레거시)
 make api      # uvicorn lloydk.api.app:app --reload
 make worker   # celery -A lloydk.workers.celery_app worker -l info
 
@@ -66,7 +66,7 @@ docker compose up -d
 
 ```
 poc/
-├── docker-compose.yml          # Postgres/Elasticsearch/MinIO/Redis/MLflow/api/worker
+├── docker-compose.yml          # dev 스택(Postgres/Redis 등) + api/worker
 ├── Dockerfile.api              # FastAPI + PyTorch + Transformers
 ├── Makefile                    # poc-all, infra-up, p2-full, bundle-dry 등
 ├── alembic/versions/           # PostgreSQL 스키마 단일 진실 소스 (baseline + 변경분)
@@ -77,7 +77,7 @@ poc/
 │   ├── adapters/               # 외부 의존성 교체 가능 계층
 │   │   ├── llm/                #   noop/anthropic/openai/vllm
 │   │   ├── embedding/          #   hash(드라이런)/KURE-v1/BGE-M3
-│   │   ├── vectorstore/        #   es(기본)/inmemory(dryrun)
+│   │   ├── vectorstore/        #   pg(기본)/inmemory(dryrun)/es(레거시)
 │   │   │                       #   Protocol에 search_hybrid 포함, 폴리필 일관
 │   │   └── storage/            #   local(드라이런)/minio
 │   ├── modules/
@@ -104,7 +104,7 @@ poc/
 |---|---|---|
 | `make poc-all` | P4→P3→P2→P1→P5 dryrun 일괄 | ❌ |
 | `make p2` | P2 임베딩 dryrun (inmemory) | ❌ |
-| `make p2-full` | **P2 4-way (KURE/BGE × ES dense+hybrid)** | ✅ Q1+E1+E5 |
+| `make p2-full` | **P2 KURE/BGE hybrid 측정(레거시 ES 포함 가능)** | ✅ Q1+E1+E5 |
 | `make p1` / `p3` / `p4` / `p5` | 개별 PoC | 일부 ✅ |
 | `make infra-up` | postgres(pgvector)·minio·redis·mlflow 기동 | ✅ E5 |
 | `make infra-verify` | 헬스체크 (postgres/minio/redis/mlflow) | ✅ E1·E2 |
@@ -120,7 +120,7 @@ poc/
 | PoC | 검증 항목 | 합격선 (v0.9) | 진입점 |
 |---|---|---|---|
 | **P1** | KF-DeBERTa 분류 / 룰 surrogate | F1 ≥ 0.75, FNR ≤ 5% | `p1_train_classifier.py --mode dryrun\|full` |
-| **P2** | KURE/BGE-M3 × ES dense/hybrid | Recall@5 ≥ 0.80, Lat p50 ≤ 200ms | `p2_compare_embeddings.py --mode dryrun\|full --backends es,inmemory --hybrid` |
+| **P2** | KURE/BGE-M3 × PG pgvector+ts_rank hybrid | Recall@5 ≥ 0.80, Lat p50 ≤ 200ms | `revalidate_pg_lexical.py` / `p2_compare_embeddings.py --mode dryrun\|full --hybrid` |
 | **P3** | LLM 합성 + 라벨 일치 + 비용 | 라벨 일치 ≥ 90% | `p3_generate_synthetic.py --total 40 --provider noop\|anthropic` |
 | **P4** | HWP/DOCX/PDF/MD 추출 | 누락 ≤ 5%, 품질 ≥ 0.7 | `build_p4_corpus.py` + `p4_extract_eval.py` |
 | **P5** | API E2E 스모크 | 200 OK + 라벨 OK | `p5_e2e_smoke.py --mode inproc\|http` |
@@ -272,31 +272,32 @@ python scripts/cache_kure_v1.py --dry-run  # 캐시 존재 여부만 확인
 
 ---
 
-## Current Status (2026-06-02)
+## Current Status
 
-- P1 retrain v3 is trained at `artifacts/classifier_p1_retrain_v3/v-3443785f`. OSS holdout F1=0.794; public/case/nkt direct gold F1=0.830 with TS/S1/S2 -> S3 = 0.
-- LLM pseudo-gold remains weaker: direct F1=0.547 on n=610, with 17 S2 -> S3 cases. This is the remaining P1 boundary to improve.
-- P2 retrieval operational config is KURE-v1 + Elasticsearch hybrid + chunk_size=1200 / overlap=100. On `retrieval_gold.jsonl` 80 doc-id queries: Recall@5=0.925, MRR=0.842, nDCG@5=0.862, p50=174 ms.
-- Retrieval gold is `datasets/gold_real/retrieval_gold.jsonl`; `make eval-p2-gold` gives a dryrun snapshot, `make p2-full-gold` runs the KURE-v1 + ES full measurement.
+- P1 release candidate is the cleaned KF-DeBERTa model `artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9`.
+- P2 retrieval operational config is KURE-v1 + PostgreSQL `pgvector` dense + bigram `ts_rank` hybrid + chunk_size=1200 / overlap=100. ES remains a legacy adapter, not the default production path.
+- Retrieval gold is `datasets/gold_real/retrieval_gold.jsonl`; PG lexical revalidation is documented in `infra/postgres/README.md` and implemented by `scripts/revalidate_pg_lexical.py`.
 - `make operational-readiness` builds the combined P1/P2/data readiness report. Current verdict is `CONDITIONALLY_READY`.
 - `make release-gate` is stricter and currently blocks release until at least 40 `human_review` gold samples are added.
-- `test-lite` passes: `python -m pytest -q -m "not fullstack and not model_download and not slow"` -> 570 passed, 4 skipped, 203 deselected in about 95 seconds.
+- `test-lite` is the fast non-fullstack suite; exact pass counts move as audit/regression tests are added.
 - CI default pytest path now runs `make test-lite`; slow/fullstack/model_download suites are separated as explicit Make targets.
-- `gold_real` now has 777 records: S3 420, S2 232, S1 70, TS 55. `human_review` is still 0 and remains the main evidence gap.
+- `gold_real` now has 777 records: S3 420, S2 232, S1 70, TS 55. `human_review` is 1/40 and remains the main evidence gap.
 
-## Release Gates (2026-06-02)
+## Release Gates (2026-07-05)
 
 Before an operational release, run:
 
 ```bash
 make check-manifest
+make check-release-evidence
 make human-review-queue
 make p1-boundary
+make p1-eval
 make operational-readiness
 make release-gate
 make release-manifest
 make p2-full-gold
 ```
 
-Strict release requires all readiness gates to be `PASS`. The current non-code blocker is external human review gold: `human_review=0/40`.
+Strict release requires all readiness gates to be `PASS`. Current blocker is external human review gold: `human_review=1/40`. Pre-human readiness is `CONDITIONALLY_READY`; P1 release-tier F1 now passes with source-prior policy applied to public-source records.
 See [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) for the reviewer import, rollback, and final release sequence.
