@@ -288,6 +288,93 @@ def resolve_classifier_model_dir(explicit: str | None) -> Path | None:
     return p if p.exists() else None
 
 
+# ─────────────────────────────────────────────────────────────
+# 번들↔릴리스 parity + 위생 (배포 전 fail-closed 게이트)
+# ─────────────────────────────────────────────────────────────
+
+
+def hash_model_dir(model_dir: Path) -> str:
+    """모델 디렉토리의 결정적 지문(sha256). 파일 상대경로+내용을 정렬 순서로 해시.
+
+    번들에 실린 학습 분류기가 '릴리스 모델'과 동일본인지(번들↔prod parity)를 확인하는
+    fingerprint. 빌드 호스트/OS 무관하게 같은 가중치면 같은 값 → manifest 에 기록해
+    다운스트림 verify 가 대조할 수 있다.
+    """
+    h = hashlib.sha256()
+    files = sorted(
+        (p for p in model_dir.rglob("*") if p.is_file()),
+        key=lambda p: p.relative_to(model_dir).as_posix(),
+    )
+    for p in files:
+        h.update(p.relative_to(model_dir).as_posix().encode("utf-8"))
+        h.update(b"\0")
+        with p.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+    return h.hexdigest()
+
+
+def _model_version_id(path_or_name: str) -> str:
+    """모델 경로/이름에서 버전 식별자(basename) 추출(후행 슬래시·백슬래시 정규화)."""
+    return Path(str(path_or_name).replace("\\", "/").rstrip("/")).name
+
+
+def check_model_parity(bundled_dir: Path | None, release_model: str) -> str | None:
+    """번들에 실리는 학습 분류기가 '릴리스 모델' 버전을 담고 있는지 강제.
+
+    반환: 위반 메시지(불일치) 또는 None(일치/미동봉). 문자열 비교라 dry-run(CI)에서도
+    동작 — 잘못된/구버전 모델이 번들에 실리는 것을 배포 전에 차단한다. F1/FNR 게이트는
+    릴리스 모델을 기술하므로, 다른 모델을 실으면 번들이 미검증본이 된다.
+    """
+    if bundled_dir is None:
+        return None  # 미동봉(베이스 모델만) — 별도 경고가 이미 처리
+    want = _model_version_id(release_model)
+    bundled_norm = str(bundled_dir).replace("\\", "/").rstrip("/")
+    if want and want not in bundled_norm:
+        return (
+            f"bundled classifier '{bundled_dir}' 에 릴리스 모델 버전 '{want}' 가 없음 "
+            f"(release={release_model}). --classifier-model-dir 를 릴리스 모델로 맞추거나 "
+            "--release-model 을 이번 릴리스 버전으로 갱신하라."
+        )
+    return None
+
+
+# 폐쇄망 타깃이 아닌 wheel 플랫폼 태그 — 있으면 런타임 ImportError.
+_NON_LINUX_WHEEL_TAGS = ("win_amd64", "win32", "-macosx", "macosx_")
+
+
+def check_bundle_hygiene(out_dir: Path, manifest: "BundleManifest") -> list[str]:
+    """이미 존재하는 출력 디렉토리에서 stale/이질 산출물을 fail-closed 로 잡는다.
+
+    핵심 함정: 재빌드 시 _docker_save/copytree 가 'already exists' 로 SKIP → 예전(ES시대)
+    번들 위에 덮어쓰면 elasticsearch/minio/mlflow.tar 와 win_amd64 wheel 이 그대로 실려나간다.
+      - docker-images/ 의 tar 중 매니페스트 컴포넌트/관측성에 없는 것(=이질 이미지)
+      - wheel 중 비-Linux 플랫폼 태그(win_amd64/win32/macosx)
+    반환: 위반 목록(빈 리스트=청결). docker-images/·wheels 가 없으면 no-op(순수 dry-run 안전).
+    """
+    violations: list[str] = []
+    images_dir = out_dir / "docker-images"
+    if images_dir.is_dir():
+        allowed = {f"{svc}.tar" for svc in manifest.components}
+        allowed |= {f"obs-{_obs_tar_name(img)}.tar" for img in manifest.observability_images}
+        for tar in sorted(images_dir.glob("*.tar")):
+            if tar.name not in allowed:
+                violations.append(
+                    f"foreign image tar: docker-images/{tar.name} "
+                    "(매니페스트 컴포넌트/관측성 아님 - 예전 번들 잔존 의심)"
+                )
+    for wheels_dir in (out_dir / "wheels", out_dir / "python-deps" / "wheels"):
+        if wheels_dir.is_dir():
+            for whl in sorted(wheels_dir.glob("*.whl")):
+                low = whl.name.lower()
+                if any(tag in low for tag in _NON_LINUX_WHEEL_TAGS):
+                    violations.append(
+                        f"non-Linux wheel: {whl.relative_to(out_dir).as_posix()} "
+                        "(폐쇄망 타깃=Linux — win/mac wheel 은 런타임 ImportError)"
+                    )
+    return violations
+
+
 # 컴포넌트별 예상 크기 (GB, doc/12 §3.2 기반 추정)
 _COMPONENT_SIZE_GB: dict[str, float] = {
     "api": 1.5,
@@ -415,10 +502,16 @@ def build_manifest(
     # HF 베이스 모델만으론 폐쇄망에서 미학습·무보정으로 동작한다.
     if classifier_model_dir is not None:
         has_temp = (classifier_model_dir / "temperature.json").exists()
+        # 번들↔prod parity fingerprint. dry-run(CI, 모델 부재)에선 생략(속도·부재).
+        trained_sha = (
+            hash_model_dir(classifier_model_dir)
+            if (not dry_run and classifier_model_dir.exists())
+            else None
+        )
         models.append(ModelEntry(
             name="classifier-trained",
             dim=None,
-            sha256=None,
+            sha256=trained_sha,
             license="internal-trained",
             role="classifier_trained",
             source_path=str(classifier_model_dir),
@@ -620,8 +713,28 @@ def _docker_save(image: str, dest: Path) -> bool:
 # 특정이고 이미지에 구워지므로 호스트 pip 설치 목록(_requirements_no_torch.txt)에서 뺀다.
 _HOST_EXCLUDE_PREFIXES = ("torch", "nvidia", "triton")
 
+# 폐쇄망 타깃 플랫폼 — 빌드 호스트가 Windows/macOS여도 Linux wheel 을 받는다
+# (win_amd64 wheel 이 리눅스 airgap 에서 런타임 ImportError 로 깨지던 구멍).
+_DEFAULT_WHEEL_PLATFORM = "manylinux2014_x86_64"
 
-def _pip_download(out_dir: Path) -> bool:
+
+def _pip_download_cmd(req: Path, wheels_dir: Path, wheel_platform: str) -> list[str]:
+    """pip download 명령 구성(순수 함수 — 테스트 대상). wheel_platform 이 주어지면
+    타깃 플랫폼 고정(--platform 은 --only-binary 필수). 빈 문자열이면 빌드 호스트 플랫폼.
+    """
+    cmd = [
+        sys.executable, "-m", "pip", "download", "-r", str(req),
+        "-d", str(wheels_dir), "--no-deps", "-q",
+    ]
+    if wheel_platform:
+        cmd += [
+            "--only-binary=:all:", "--platform", wheel_platform,
+            "--python-version", "311", "--implementation", "cp", "--abi", "cp311",
+        ]
+    return cmd
+
+
+def _pip_download(out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) -> bool:
     """pip download -r requirements → wheels/.
 
     fail-closed: pip download 가 일부라도 실패하면(rc!=0) False 를 반환해 빌드를 중단한다.
@@ -664,12 +777,11 @@ def _pip_download(out_dir: Path) -> bool:
     (out_dir / "_requirements_no_torch.txt").write_text("\n".join(no_torch) + "\n", encoding="utf-8")
 
     r = subprocess.run(
-        [sys.executable, "-m", "pip", "download", "-r", str(req),
-         "-d", str(wheels_dir), "--no-deps", "-q"],
+        _pip_download_cmd(req, wheels_dir, wheel_platform),
         capture_output=True, text=True,
     )
     if r.returncode != 0:
-        print(f"  [ERR] pip download 실패(rc={r.returncode}): {r.stderr[-300:]}", file=sys.stderr)
+        print(f"  [ERR] pip download 실패(rc={r.returncode}, platform={wheel_platform or 'host'}): {r.stderr[-300:]}", file=sys.stderr)
         return False
     # --no-deps 는 요구 1건당 산출 1건(.whl 또는 sdist .tar.gz/.zip). 산출이 요구보다 적으면
     # 불완전 번들 — 자기검사로 표면화한다.
@@ -930,7 +1042,7 @@ def _copy_trained_classifier(manifest: "BundleManifest", out_dir: Path) -> bool:
     return True
 
 
-def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
+def build_bundle(manifest: "BundleManifest", out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) -> int:
     """실 빌드: docker save + pip download + infra 파일 복사."""
     print("\n=== Lloydk Airgap Bundle - BUILD ===", file=sys.stderr)
     images_dir = out_dir / "docker-images"
@@ -947,7 +1059,7 @@ def build_bundle(manifest: "BundleManifest", out_dir: Path) -> int:
     # pip download
     pip_dir = out_dir / "python-deps"
     pip_dir.mkdir(parents=True, exist_ok=True)
-    if not _pip_download(pip_dir):
+    if not _pip_download(pip_dir, wheel_platform):
         failed.append("pip-download")
 
     # infra 파일
@@ -1014,6 +1126,16 @@ def main() -> int:
         help="관측성 스택(Prometheus/Grafana/Loki + 안전 알림)을 번들에서 제외. "
              "기본은 포함 — 안전 알림 소비자는 폐쇄망 운영 필수.",
     )
+    ap.add_argument(
+        "--release-model", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9",
+        help="이번 릴리스의 검증된 분류기(단일 진실원). 번들에 실리는 분류기가 이 버전을 "
+             "담지 않으면 빌드 중단(번들↔prod parity). 릴리스마다 갱신.",
+    )
+    ap.add_argument(
+        "--wheel-platform", default=_DEFAULT_WHEEL_PLATFORM,
+        help=f"pip download 타깃 플랫폼(기본 {_DEFAULT_WHEEL_PLATFORM}=Linux). "
+             "빈 문자열이면 빌드 호스트 플랫폼(win/mac wheel 위험 — 비권장).",
+    )
     args = ap.parse_args()
 
     classifier_model_dir = resolve_classifier_model_dir(args.classifier_model_dir)
@@ -1040,7 +1162,23 @@ def main() -> int:
         )
         return 2
 
+    # 번들↔릴리스 모델 parity — 잘못된/구버전 분류기 동봉 fail-closed (dry-run 포함).
+    parity_violation = check_model_parity(classifier_model_dir, args.release_model)
+    if parity_violation:
+        print(f"\n[bundle][FATAL] 모델 parity 위반: {parity_violation}", file=sys.stderr)
+        return 2
+
     out_dir = Path(args.output)
+
+    # 위생 가드 — 예전(ES시대) 번들 위 재빌드 시 stale tar/win wheel 이 실려나가는 것 차단.
+    hygiene = check_bundle_hygiene(out_dir, manifest)
+    if hygiene:
+        print("\n[bundle][FATAL] 번들 위생 위반(예전 산출물 잔존 의심):", file=sys.stderr)
+        for v in hygiene:
+            print(f"  - {v}", file=sys.stderr)
+        print("  -> 출력 디렉토리를 비우고(또는 신규 경로로) 재빌드하라.", file=sys.stderr)
+        return 3
+
     paths = write_manifest(manifest, out_dir)
 
     if args.dry_run:
@@ -1051,7 +1189,7 @@ def main() -> int:
         return 0
 
     # ── 실 빌드 ──────────────────────────────────────────────
-    rc = build_bundle(manifest, out_dir)
+    rc = build_bundle(manifest, out_dir, wheel_platform=args.wheel_platform)
     if rc == 0:
         all_files = list(out_dir.rglob("*"))
         actual_files = [f for f in all_files if f.is_file()]

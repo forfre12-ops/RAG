@@ -19,13 +19,18 @@ from build_offline_bundle import (  # noqa: E402
     ComponentEntry,
     ModelEntry,
     PluginEntry,
+    _DEFAULT_WHEEL_PLATFORM,
     _MODEL_META,
+    _pip_download_cmd,
     _simple_yaml_dump,
     build_manifest,
+    check_bundle_hygiene,
+    check_model_parity,
     estimate_total_size,
     expected_files,
     extract_components_from_compose,
     extract_models_from_config,
+    hash_model_dir,
     write_checksums,
     write_manifest,
 )
@@ -328,3 +333,88 @@ def test_simple_yaml_dump_escapes_special_chars():
     """콜론·줄바꿈 포함 문자열은 quote."""
     out = _simple_yaml_dump({"k": "value: with colon"})
     assert "\"value: with colon\"" in out
+
+
+# ─────────────────────────────────────────────────────────────
+# 번들↔릴리스 parity + 위생 (배포 전 fail-closed 게이트)
+# ─────────────────────────────────────────────────────────────
+
+
+def test_hash_model_dir_is_deterministic_and_content_sensitive(tmp_path: Path):
+    d = tmp_path / "model"
+    (d / "sub").mkdir(parents=True)
+    (d / "config.json").write_text("{}", encoding="utf-8")
+    (d / "sub" / "weights.bin").write_bytes(b"\x01\x02\x03")
+    h1 = hash_model_dir(d)
+    assert len(h1) == 64 and h1 == hash_model_dir(d)  # 결정적
+    (d / "sub" / "weights.bin").write_bytes(b"\x01\x02\x04")  # 내용 변경
+    assert hash_model_dir(d) != h1
+
+
+def test_model_parity_passes_when_release_version_present():
+    assert check_model_parity(
+        Path("artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9"),
+        "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9",
+    ) is None
+    # 경로 하위에 버전이 있어도 통과(basename 아닌 경로 내 존재)
+    assert check_model_parity(
+        Path("/models/v-dd3abab9/weights"),
+        "artifacts/x/v-dd3abab9",
+    ) is None
+
+
+def test_model_parity_blocks_wrong_version():
+    msg = check_model_parity(
+        Path("artifacts/old/v-f9b5cedb"),
+        "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9",
+    )
+    assert msg is not None and "v-dd3abab9" in msg
+
+
+def test_model_parity_noop_when_not_bundled():
+    assert check_model_parity(None, "artifacts/x/v-dd3abab9") is None
+
+
+def _hygiene_manifest(components: list[str], obs: list[str] | None = None):
+    from types import SimpleNamespace
+    return SimpleNamespace(components={c: None for c in components}, observability_images=obs or [])
+
+
+def test_hygiene_flags_foreign_image_tar(tmp_path: Path):
+    imgs = tmp_path / "docker-images"
+    imgs.mkdir()
+    (imgs / "postgres.tar").write_bytes(b"x")       # 허용(컴포넌트)
+    (imgs / "elasticsearch.tar").write_bytes(b"x")  # 이질(ES시대 잔존)
+    (imgs / "minio.tar").write_bytes(b"x")          # 이질
+    manifest = _hygiene_manifest(["postgres", "redis", "api", "worker", "beat"])
+    violations = check_bundle_hygiene(tmp_path, manifest)
+    joined = "\n".join(violations)
+    assert "elasticsearch.tar" in joined and "minio.tar" in joined
+    assert "postgres.tar" not in joined
+
+
+def test_hygiene_flags_non_linux_wheel(tmp_path: Path):
+    wheels = tmp_path / "python-deps" / "wheels"
+    wheels.mkdir(parents=True)
+    (wheels / "numpy-1.26.0-cp311-cp311-win_amd64.whl").write_bytes(b"x")
+    (wheels / "numpy-1.26.0-cp311-cp311-manylinux2014_x86_64.whl").write_bytes(b"x")
+    violations = check_bundle_hygiene(tmp_path, _hygiene_manifest(["postgres"]))
+    joined = "\n".join(violations)
+    assert "win_amd64" in joined
+    assert "manylinux" not in joined  # 리눅스 wheel 은 위반 아님
+
+
+def test_hygiene_clean_and_noop_when_absent(tmp_path: Path):
+    # docker-images/·wheels 부재 → 순수 dry-run 안전(no-op)
+    assert check_bundle_hygiene(tmp_path, _hygiene_manifest(["postgres"])) == []
+
+
+def test_pip_download_cmd_pins_linux_platform():
+    cmd = _pip_download_cmd(Path("req.txt"), Path("wheels"), _DEFAULT_WHEEL_PLATFORM)
+    assert "--platform" in cmd and _DEFAULT_WHEEL_PLATFORM in cmd
+    assert "--only-binary=:all:" in cmd and "cp311" in cmd
+
+
+def test_pip_download_cmd_host_platform_when_empty():
+    cmd = _pip_download_cmd(Path("req.txt"), Path("wheels"), "")
+    assert "--platform" not in cmd and "--only-binary=:all:" not in cmd
