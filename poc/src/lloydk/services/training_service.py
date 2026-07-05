@@ -260,6 +260,7 @@ def activate_model_manually(
     version_label: str,
     *,
     force: bool = False,
+    reason: str = "",
     actor_id: str | None = None,
     actor_role: str | None = None,
 ) -> dict:
@@ -338,20 +339,31 @@ def activate_model_manually(
             locked_block = manual_require_locked and not locked_ready
             gate_ok = decision.passed and not locked_block
 
-            if not gate_ok and not force:
+            # [배포전 하드닝 P0#①-b] 하드닝 프로파일에선 force 우회 시 사유(reason) 필수 —
+            # 미검증 모델을 GA로 강제 활성하려면 '왜'를 남긴다(force 금지 아님, 감사 강화).
+            _reason_text = (reason or "").strip()
+            requires_reason = bool(getattr(settings, "manual_activate_force_requires_reason", False))
+            reason_missing = (not gate_ok) and force and requires_reason and not _reason_text
+
+            if not gate_ok and (not force or reason_missing):
                 reasons: list[str] = []
                 if not decision.passed:
                     reasons.append(f"deploy_gate_failed: {decision.reason}")
                 if locked_block:
                     reasons.append(f"locked_eval_not_ready: {locked.get('reason')}")
+                if reason_missing:
+                    reasons.append("force_reason_required: force 우회에는 사유(reason) 필수")
+                    tail = " — reason 을 채워 force=true 로 재시도(감사됨)"
+                else:
+                    tail = " — force=true 로만 우회(감사됨)"
                 logger.warning(
-                    "manual activate BLOCKED (force=False): %s vs baseline=%s reasons=%s actor=%s",
-                    version_label, baseline_label, reasons, actor_id,
+                    "manual activate BLOCKED: %s vs baseline=%s reasons=%s force=%s actor=%s",
+                    version_label, baseline_label, reasons, force, actor_id,
                 )
                 return {
                     "activated": False, "blocked": True, "forced": False,
                     "version_label": version_label, "version_id": str(target.version_id),
-                    "reason": " ; ".join(reasons) + " — force=true 로만 우회(감사됨)",
+                    "reason": " ; ".join(reasons) + tail,
                     "gate": decision.to_dict(), "locked": locked,
                     "already_active": already_active,
                 }
@@ -360,9 +372,9 @@ def activate_model_manually(
             repo.activate_model_version(target.version_id)
             logger.warning(
                 "manual activate: version=%s baseline=%s gate_passed=%s locked_ready=%s "
-                "forced=%s actor=%s role=%s",
+                "forced=%s reason=%r actor=%s role=%s",
                 version_label, baseline_label, decision.passed, locked_ready, forced,
-                actor_id, actor_role,
+                (_reason_text if forced else ""), actor_id, actor_role,
             )
             _reason = "activated"
             if forced:
@@ -372,6 +384,8 @@ def activate_model_manually(
                 if locked_block:
                     _waived.append("locked-eval")
                 _reason = f"activated (FORCED override — {'·'.join(_waived)} 미충족)"
+                if _reason_text:
+                    _reason += f"; 사유={_reason_text}"
             return {
                 "activated": True, "blocked": False, "forced": forced,
                 "version_label": version_label, "version_id": str(target.version_id),

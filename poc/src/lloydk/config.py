@@ -105,6 +105,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # [배포전 하드닝 P0#①] 수동 GA 활성도 사람서명 locked 평가 readiness 요구(미검증 모델
         # 무심코 GA 활성 차단; force=True로만 우회·감사됨). 자동활성 게이트와 별개 축.
         "deploy_gate_manual_require_locked_eval": True,
+        # [P0#①-b] force 우회 시 사유 필수(미검증 GA 강제활성에 '왜'를 남김 — force 금지 아님).
+        "manual_activate_force_requires_reason": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -130,6 +132,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "require_real_embedder": True,
         # [배포전 하드닝 P0#①] 수동 GA 활성 locked-eval 요구(onprem-local과 동일).
         "deploy_gate_manual_require_locked_eval": True,
+        # [P0#①-b] force 우회 시 사유 필수(onprem-local과 동일).
+        "manual_activate_force_requires_reason": True,
     },
 }
 
@@ -470,6 +474,11 @@ class Settings(BaseSettings):
     # 남는다. locked_gold_eval이 사람서명으로 채워지면 자동으로 통과(force 불요). readiness는 활성
     # 성패와 무관하게 항상 응답/로그에 노출(가시화). lite-*/dev/pilot=False(현행) 유지.
     deploy_gate_manual_require_locked_eval: bool = False
+    # [배포전 하드닝 P0#①-b] 수동 활성에서 force=True 로 게이트(회귀·locked-eval)를 우회할 때
+    # 사유(reason) 필수 여부. 기본 False = 현행 보존(force 만으로 우회). 하드닝 프로파일은 True:
+    # 미검증 모델을 GA로 강제 활성하려면 '왜'를 남겨야 한다(force 자체는 여전히 허용 — 금지 아님,
+    # 감사 강화). 게이트가 통과하면 force 는 no-op 이라 reason 도 불요(force+게이트실패 시에만 요구).
+    manual_activate_force_requires_reason: bool = False
     # [번들 D] locked_gold_eval(사람서명 평가정답) 레코드 jsonl 경로 — 운영 검수 readiness 가시화용
     # (등급별 locked 보유/부족·배포가능 여부). 빈 값(기본)이면 readiness=no_locked_records(무실데이터
     # 단계의 진실). 파일이 쌓이면 GET /admin/locked-readiness·게이지가 자동으로 켜진다. 읽기 전용.

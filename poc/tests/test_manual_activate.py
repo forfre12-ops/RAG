@@ -150,3 +150,30 @@ def test_manual_locked_gate_off_activates_without_locked(monkeypatch):
         assert _active_label() == good
     finally:
         _cleanup([base, good])
+
+
+def test_force_requires_reason_when_hardened(monkeypatch):
+    """[P0#①-b] 하드닝: force 우회에 사유 필수 — 사유 없으면 blocked, 있으면 forced 활성."""
+    monkeypatch.setattr(config_mod.settings, "deploy_gate_manual_require_locked_eval", True)
+    monkeypatch.setattr(config_mod.settings, "locked_eval_jsonl", "")  # locked 미준비 → 게이트 실패
+    monkeypatch.setattr(config_mod.settings, "manual_activate_force_requires_reason", True)
+    base = f"v-base-{uuid.uuid4().hex[:6]}"
+    good = f"v-good-{uuid.uuid4().hex[:6]}"
+    _seed(base, {"fnr_high": 0.10, "f1_macro": 0.80}, active=True)
+    _seed(good, {"fnr_high": 0.08, "f1_macro": 0.82})
+    try:
+        # force=True 이지만 사유 없음 → 여전히 blocked.
+        r1 = activate_model_manually(good, force=True)
+        assert r1["activated"] is False
+        assert r1["blocked"] is True
+        assert "force_reason_required" in r1["reason"]
+        assert _active_label() == base
+
+        # force=True + 사유 → forced 활성, 사유가 결과 reason 에 남는다.
+        r2 = activate_model_manually(good, force=True, reason="긴급 파일럿 배포 승인 by VP")
+        assert r2["activated"] is True
+        assert r2["forced"] is True
+        assert "긴급 파일럿 배포" in r2["reason"]
+        assert _active_label() == good
+    finally:
+        _cleanup([base, good])

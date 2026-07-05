@@ -53,6 +53,10 @@ os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
 # test_manual_activate.py의 전용 테스트가 monkeypatch로 명시 활성해 독립 수행한다.
 os.environ.setdefault("DEPLOY_GATE_MANUAL_REQUIRE_LOCKED_EVAL", "false")
 
+# force 우회 사유 필수(manual_activate_force_requires_reason)도 하드닝 프로파일 기본 True.
+# 테스트의 기존 force=True(사유 없음) 경로를 깨지 않도록 중화(전용 테스트가 monkeypatch로 검증).
+os.environ.setdefault("MANUAL_ACTIVATE_FORCE_REQUIRES_REASON", "false")
+
 _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))

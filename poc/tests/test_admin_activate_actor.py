@@ -17,10 +17,11 @@ from lloydk.api.admin import ActivateModelRequest, activate_model
 def _patch_capture(monkeypatch) -> dict:
     captured: dict = {}
 
-    def _fake(version_label, *, force, actor_id, actor_role):
+    def _fake(version_label, *, force, actor_id, actor_role, reason=""):
         captured.update(
             version_label=version_label,
             force=force,
+            reason=reason,
             actor_id=actor_id,
             actor_role=actor_role,
         )

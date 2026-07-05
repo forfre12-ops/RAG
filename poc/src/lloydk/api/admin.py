@@ -55,6 +55,9 @@ def reload_model() -> ReloadModelResponse:
 class ActivateModelRequest(BaseModel):
     version_label: str
     force: bool = False
+    # [P0#①-b] force 우회 사유. 하드닝 프로파일(manual_activate_force_requires_reason=True)에선
+    # force=true 로 게이트를 우회할 때 필수 — 미검증 GA 강제활성에 '왜'를 남긴다(감사).
+    reason: str = ""
 
 
 class ActivateModelResponse(BaseModel):
@@ -100,6 +103,7 @@ def activate_model(
     res = activate_model_manually(
         req.version_label,
         force=req.force,
+        reason=req.reason,
         actor_id=actor_id,
         actor_role=auth.get("actor_role"),
     )
