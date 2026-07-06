@@ -387,7 +387,7 @@ class InferencePipeline:
                     "공개특허", "등록특허", "공개공보", "특허공보", "published_patent",
                 }
                 if any(s in str(src) for s in _PUBLIC_SOURCES):
-                    _GRADE_ORDER_LOCAL = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+                    from lloydk.modules.m3_labeling.seeds import GRADE_ORDER as _GRADE_ORDER_LOCAL  # noqa: PLC0415
                     cap_code = (getattr(_s, "source_prior_cap_grade", "S2") or "S2").upper()
                     if cap_code not in _GRADE_ORDER_LOCAL:
                         cap_code = "S2"
@@ -440,7 +440,7 @@ class InferencePipeline:
         try:
             from lloydk.config import settings as _ms  # noqa: PLC0415
             if getattr(_ms, "metadata_floor_enabled", False) and metadata:
-                _ORD = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+                from lloydk.modules.m3_labeling.seeds import GRADE_ORDER as _ORD  # noqa: PLC0415
                 cur = result.label.value if hasattr(result.label, "value") else str(result.label)
                 mark = str(metadata.get("security_marking", "") or "").strip().lower()
                 scope = str(metadata.get("access_scope", "") or "").strip().lower()

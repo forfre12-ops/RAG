@@ -33,6 +33,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
+from lloydk.modules.m3_labeling.seeds import GRADE_ORDER
+
 TIER_CONSTRUCTED_FLOOR = "constructed_floor_eval"
 LABEL_SOURCE_CONSTRUCTED_FLOOR = "constructed_floor"
 TRUTH_WARNING = (
@@ -61,7 +63,7 @@ TS_EXTERNAL_BASIS_MARKERS = (
     "§9", "제9조", "고시", "국가핵심기술", "방위산업기술보호법", "산업기술보호법",
 )
 
-_GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}  # 낮을수록 더 비밀
+_GRADE_ORDER = GRADE_ORDER  # 낮을수록 더 비밀 (단일 소스: seeds.GRADE_ORDER)
 
 
 def find_occurrences(text: str, token: str) -> list[int]:

@@ -13,8 +13,9 @@ from typing import Sequence
 
 import numpy as np
 
-DEFAULT_LABELS = ["TS", "S1", "S2", "S3"]
-GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+from lloydk.modules.m3_labeling.seeds import GRADE_ORDER
+
+DEFAULT_LABELS = list(GRADE_ORDER)  # ["TS","S1","S2","S3"] — 단일 소스(seeds.GRADE_ORDER)에서 파생
 
 
 @dataclass

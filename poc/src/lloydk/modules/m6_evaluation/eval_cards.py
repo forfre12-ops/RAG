@@ -19,9 +19,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Callable, Sequence
 
-# 심각도 순서 (낮을수록 고등급). confusion_matrix.GRADE_ORDER와 동일.
-GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
-DEFAULT_GRADES = ("TS", "S1", "S2", "S3")
+# 심각도 순서 단일 소스: seeds.GRADE_ORDER (낮을수록 고등급).
+from lloydk.modules.m3_labeling.seeds import GRADE_ORDER
+
+DEFAULT_GRADES = tuple(GRADE_ORDER)
 
 VERDICT_PASS = "PASS"
 VERDICT_FAIL = "FAIL"
