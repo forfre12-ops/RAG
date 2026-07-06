@@ -41,7 +41,6 @@ _VALID_RERANKER_PROVIDER = {"noop", "bge"}
 _VALID_VECTOR_BACKEND = {"es", "pg", "pgvector", "postgres", "inmemory"}
 _VALID_STORAGE_BACKEND = {"minio", "seaweedfs", "s3", "local"}
 _VALID_POC_MODE = {"dryrun", "full"}
-_VALID_LABELING_METHOD = {"multiplicative", "additive"}
 _VALID_SOURCE_PRIOR_CAP_GRADE = {"S2", "S3"}
 
 DEPLOY_PROFILES = ("lite-noapi", "lite-cloud", "onprem-local", "full-train")
@@ -166,8 +165,6 @@ class Settings(BaseSettings):
     es_url: str = "http://localhost:9200"
     es_username: str = ""
     es_password: str = ""
-    es_api_key: str = ""
-    es_verify_certs: bool = True
 
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = ""
@@ -290,11 +287,9 @@ class Settings(BaseSettings):
     judge_k_min: int = 3                        # self-consistency 최소 샘플(만장일치면 여기서 멈춤)
     judge_k_max: int = 5                        # 의견 갈릴 때 최대(adaptive-k)
     judge_temperature: float = 0.7             # 표 분산용(>0 필요)
-    judge_min_self_consistency: float = 0.67   # 미만이면 low_agreement → needs_review
 
     # --- Models ---
     classifier_base_model: str = "kakaobank/kf-deberta-base"
-    classifier_lightweight_model: str = "monologg/koelectra-base-v3-discriminator"
     # Phase 3 (5070 Ti 풀가동): 학습 가중치 디렉토리. 비어있으면 rule-fallback 유지.
     # .env: CLASSIFIER_MODEL_DIR=artifacts/classifier-1ep/v-ae3f5371 형식.
     classifier_model_dir: str = ""
@@ -425,9 +420,6 @@ class Settings(BaseSettings):
     # cap 레벨: "S3"(공개=S3 강제, 법리 정합·권장) | "S2"(부분완화, TS/S1만 하향 — 레거시).
     source_prior_cap_grade: str = "S3"
 
-    # 등급 산정법(정본 가이드 B안): multiplicative(S×V×M 곱셈) | additive(레거시 4요소 가중합).
-    labeling_method: str = "multiplicative"
-
     # 고등급(TS/S1) 변경 2인검토 (C-cons, doc/36). 기본 False=단일검수자 즉시확정(동작 보존).
     # True면 고등급으로의 confirm/relabel은 **서로 다른 2인**이 같은 등급에 동의해야 확정되고,
     # 1인만 동의한 동안은 classification.status='needs_second_review'로 보류된다(편향·오염 방지).
@@ -542,8 +534,6 @@ class Settings(BaseSettings):
     # noop  : 입력 순서 유지 (기본, 운영 외)
     # bge   : BAAI/bge-reranker-v2-m3 (FlagEmbedding 또는 sentence_transformers)
     reranker_provider: str = "noop"
-    reranker_top_k: int = 50  # retriever 1차 후 reranker로 줄일 입력 크기
-    embedding_fallback_model: str = "BAAI/bge-m3"
 
     # --- 청크/처리 ---
     max_seq_len: int = 512
@@ -680,7 +670,7 @@ class Settings(BaseSettings):
             raise ValueError(f"{info.field_name}는 양수여야 합니다 (got {v}).")
         return v
 
-    @field_validator("reranker_top_k", "rag_default_top_k")
+    @field_validator("rag_default_top_k")
     @classmethod
     def _check_top_k(cls, v: int, info) -> int:  # noqa: ANN001
         if v < 1:
@@ -756,13 +746,6 @@ class Settings(BaseSettings):
     def _check_poc_mode(cls, v: str) -> str:
         if v.lower() not in _VALID_POC_MODE:
             raise ValueError(f"poc_mode는 {sorted(_VALID_POC_MODE)} 중 하나여야 합니다 (got {v!r}).")
-        return v
-
-    @field_validator("labeling_method")
-    @classmethod
-    def _check_labeling_method(cls, v: str) -> str:
-        if v.lower() not in _VALID_LABELING_METHOD:
-            raise ValueError(f"labeling_method는 {sorted(_VALID_LABELING_METHOD)} 중 하나여야 합니다 (got {v!r}).")
         return v
 
     @field_validator("source_prior_cap_grade")
