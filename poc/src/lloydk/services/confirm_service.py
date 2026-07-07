@@ -81,6 +81,95 @@ def count_needs_second_review_by_grade() -> dict[str, int]:
         logger.debug("count_needs_second_review_by_grade skipped: %s", exc)
     return out
 
+
+# 검수 대기 상태 — 자동확정되지 않아 사람 판정을 기다리는 분류(승인 대기).
+_REVIEW_STATUSES: tuple[str, ...] = ("needs_review", "needs_second_review")
+
+
+def resolve_review_statuses(status: str | None) -> tuple[str, ...]:
+    """status 쿼리값 → 조회할 classification.status 집합.
+
+    pending/all/빈값(기본) = needs_review + needs_second_review. 허용 집합 내 특정값이면
+    그것만. 그 외(임의 문자열)는 기본으로 폴백 — 임의 status 주입으로 confirmed 등을 노출하는
+    경로를 차단(검수 큐는 '대기'만 보인다).
+    """
+    s = (status or "").strip().lower()
+    if s in ("", "pending", "all"):
+        return _REVIEW_STATUSES
+    if s in _REVIEW_STATUSES:
+        return (s,)
+    return _REVIEW_STATUSES
+
+
+def list_review_queue(
+    limit: int = 50,
+    offset: int = 0,
+    statuses: tuple[str, ...] = _REVIEW_STATUSES,
+) -> tuple[list, int, list[str]]:
+    """검수 대기(needs_review/needs_second_review) 분류를 DB에서 조회 — 승인 대기 목록(FUN-024).
+
+    admin 콘솔의 세션-only 큐가 못 보던 'DB에 쌓인 needs_review'를 서버측에서 반환한다. FIFO
+    (오래된 것 먼저)로 정렬해 백로그가 고이지 않게 한다. 문서 soft-delete(deleted_at) 제외.
+    DB 미가용/오류 → ([], 0, [warning]) best-effort — 빈 큐(정상 0건)와 조회실패를 warning 으로 구분.
+
+    Returns (items, total, warnings). items = ReviewQueueItem 리스트, total = 페이지네이션 전 전체.
+    """
+    from sqlalchemy import func as _f, select  # noqa: PLC0415
+
+    from lloydk.db.models import (  # noqa: PLC0415
+        Classification,
+        ClassificationLevel,
+        Document,
+    )
+    from lloydk.schemas.confirm import ReviewQueueItem  # noqa: PLC0415
+
+    items: list[ReviewQueueItem] = []
+    try:
+        with session_scope() as db:
+            code_by_id = {
+                lv.level_id: lv.level_code
+                for lv in db.execute(select(ClassificationLevel)).scalars()
+            }
+            cond = (Classification.status.in_(statuses), Document.deleted_at.is_(None))
+            total = int(
+                db.execute(
+                    select(_f.count())
+                    .select_from(Classification)
+                    .join(Document, Classification.doc_id == Document.doc_id)
+                    .where(*cond)
+                ).scalar_one()
+            )
+            rows = db.execute(
+                select(Classification, Document.filename, Document.text_preview)
+                .join(Document, Classification.doc_id == Document.doc_id)
+                .where(*cond)
+                .order_by(Classification.classified_at.asc())  # FIFO
+                .limit(limit)
+                .offset(offset)
+            ).all()
+            for cls, filename, preview in rows:
+                items.append(
+                    ReviewQueueItem(
+                        classification_id=str(cls.classification_id),
+                        doc_id=str(cls.doc_id),
+                        filename=filename,
+                        grade=code_by_id.get(cls.predicted_level_id, str(cls.predicted_level_id)),
+                        confidence=float(cls.confidence),
+                        model_version=cls.model_version,
+                        status=cls.status,
+                        classified_at=cls.classified_at.isoformat() if cls.classified_at else None,
+                        text_preview=((preview or "")[:300] or None),
+                    )
+                )
+            return items, total, []
+    except SQLAlchemyError as exc:
+        logger.debug("list_review_queue skipped (db): %s", exc)
+        return [], 0, [f"db unavailable: {type(exc).__name__}"]
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("list_review_queue error: %s", exc)
+        return [], 0, [f"error: {type(exc).__name__}"]
+
+
 RETRAIN_THRESHOLD_DEFAULT = 10  # underclass 누적 >= 이면 URGENT_RETRAIN (active_learning.py 단일 진실원)
 
 

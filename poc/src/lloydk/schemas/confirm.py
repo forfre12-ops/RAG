@@ -39,6 +39,30 @@ class ConfirmResponse(BaseModel):
     )
 
 
+# ── 검수 큐 조회 (GET /review-queue) — FUN-024 승인 대기 목록 ──────────────────
+class ReviewQueueItem(BaseModel):
+    classification_id: str
+    doc_id: str
+    filename: Optional[str] = None
+    grade: str                       # level_code (TS/S1/S2/S3) — 모델 예측 등급
+    confidence: float
+    model_version: str
+    status: str                      # needs_review | needs_second_review
+    classified_at: Optional[str] = None  # ISO-8601
+    text_preview: Optional[str] = None
+
+
+class ReviewQueueResponse(BaseModel):
+    items: list[ReviewQueueItem] = Field(default_factory=list)
+    total: int = Field(default=0, description="필터에 해당하는 전체 대기 건수(페이지네이션 전).")
+    limit: int
+    offset: int
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="DB 미가용 등 비치명 경고. 있으면 빈 items 가 '대기 0'이 아니라 '조회 실패'임을 구분.",
+    )
+
+
 class RelabelRequest(BaseModel):
     doc_id: str
     inference_id: Optional[UUID] = None

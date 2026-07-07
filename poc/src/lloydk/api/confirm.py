@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from lloydk.api._rbac import require_role
 from lloydk.schemas.confirm import (
@@ -12,10 +12,13 @@ from lloydk.schemas.confirm import (
     ConfirmResponse,
     RelabelRequest,
     RelabelResponse,
+    ReviewQueueResponse,
 )
 from lloydk.services.confirm_service import (
     ConfirmService,
     RelabelService,
+    list_review_queue,
+    resolve_review_statuses,
     to_confirm_response,
     to_relabel_response,
 )
@@ -68,6 +71,27 @@ def confirm(
     _bind_authenticated_actor(req.actor, auth)
     result = ConfirmService().confirm(req)
     return to_confirm_response(result)
+
+
+@router.get("/review-queue", response_model=ReviewQueueResponse)
+def review_queue(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(
+        default="pending",
+        description="pending(기본=needs_review+needs_second_review) | needs_review | needs_second_review | all",
+    ),
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+):
+    """검수 대기(승인 대기) 분류 목록 — DB에 쌓인 needs_review 를 서버측에서 조회(FUN-024).
+
+    admin 콘솔의 세션-only 큐를 대체·보강한다: 브라우저 세션과 무관하게 실제 대기 건을 FIFO 로
+    반환해, 검수자가 페이지를 열면 '승인 대기 문서'를 바로 본다. DB 미가용 시 items=[] +
+    warnings(빈 큐와 조회실패 구분). 확정/재라벨은 기존 /confirm·/relabel 로.
+    """
+    statuses = resolve_review_statuses(status)
+    items, total, warnings = list_review_queue(limit=limit, offset=offset, statuses=statuses)
+    return ReviewQueueResponse(items=items, total=total, limit=limit, offset=offset, warnings=warnings)
 
 
 @router.post("/relabel", response_model=RelabelResponse)

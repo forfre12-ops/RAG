@@ -299,8 +299,12 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
             <p class="hint">confidence &lt; <b id="gate-v">0.70</b> 이거나 warnings 존재 시 <span class="pill warn">검수 필요</span> 플래그. 게이트 이상이면 자동 확정 후보.</p>
           </div>
         </div>
-        <div id="queue" class="queue"><div class="q-empty">분류를 실행하면 결과가 검수 큐에 적재됩니다.</div></div>
-        <p class="sec-note">검수 큐 GET API는 PoC에 없어, 이 큐는 <b>이 세션에서 분류한 건</b>만 클라이언트에 누적합니다(DB 영속 큐 아님). 확정/재라벨은 실제 <code>/confirm</code>·<code>/relabel</code>로 전송되어 corrections 테이블·재학습 큐에 반영됩니다.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin:2px 0 8px;">
+          <button class="btn sm" onclick="loadReviewQueue()">DB 검수 큐 불러오기</button>
+          <span id="rq-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div id="queue" class="queue"><div class="q-empty">「DB 검수 큐 불러오기」로 서버의 승인 대기 건을 조회하거나, 분류를 실행하면 결과가 적재됩니다.</div></div>
+        <p class="sec-note"><b>DB 검수 큐 불러오기</b>는 <code>GET /review-queue</code>(서버측 needs_review 대기 목록, FIFO)를 불러옵니다 — 브라우저 세션과 무관하게 실제 대기 건을 봅니다. 분류를 실행하면 이 세션 건도 누적됩니다. 확정/재라벨은 <code>/confirm</code>·<code>/relabel</code>로 전송되어 corrections·재학습 큐에 반영됩니다.</p>
       </div>
     </section>
 
@@ -565,6 +569,20 @@ function renderClassify(d){
 function factorCard(label,v){ v=v??0; const pct=Math.min(100,(v/2)*100); return `<div class="factor"><div class="fl">${label}</div><div class="fv">${(+v).toFixed(v%1?1:0)}</div><div class="meter"><i style="width:${pct}%"></i></div></div>`; }
 
 /* ---- 2. QUEUE / CONFIRM / RELABEL ---- */
+async function loadReviewQueue(){
+  try{
+    const d=await api('GET','/review-queue?limit=50');
+    QUEUE = (d.items||[]).map(it=>({
+      inference_id:it.classification_id, doc_id:it.doc_id,
+      title:it.filename||it.doc_id, label:it.grade, confidence:it.confidence,
+      model_version:it.model_version, flagged:true, resolved:false
+    }));
+    renderQueue(); markFlow(2);
+    const info=$('rq-info');
+    if(info) info.textContent = `대기 ${d.total||0}건 (표시 ${QUEUE.length})`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(', ')}`:'');
+    log(`검수 큐 로드: ${QUEUE.length}건 (전체 ${d.total||0})`, 'ok');
+  }catch(e){ log(`검수 큐 로드 실패: ${e.status||e.message}`,'err'); }
+}
 function enqueue(d, title){
   const gate=+$('gate').value; const flagged=d.confidence<gate || (d.warnings&&d.warnings.length);
   QUEUE.unshift({inference_id:d.inference_id, doc_id:d.doc_id, title:title||$('cl-title').value||d.doc_id, label:d.label, confidence:d.confidence, model_version:d.model_version, flagged, resolved:false});
