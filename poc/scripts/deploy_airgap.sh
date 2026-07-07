@@ -65,9 +65,10 @@ if [ ! -f "$ENV_FILE" ]; then
   [ -f "$tmpl" ] && cp "$tmpl" "$ENV_FILE" && die "$ENV_FILE 생성함 — IMAGE_TAG·POSTGRES_PASSWORD·API_KEY 채운 뒤 재실행."
   die "$ENV_FILE 없음. 'cp infra-config/.env.template $ENV_FILE' 후 실값 입력."
 fi
-if [ "$LAYOUT" = "bundle" ] && [ ! -e "$COMPOSE_DIR/.env" ]; then
-  cp "$ENV_FILE" "$COMPOSE_DIR/.env"   # 서비스 env_file: .env 도 확실히 로드되게 미러
-  info "infra-config/.env 미러 (서비스 env_file 로드 보장)"
+if [ "$LAYOUT" = "bundle" ]; then
+  # 서비스 env_file: .env 는 compose 파일 기준(infra-config/)으로 해석될 수 있어 항상 미러(최신화).
+  # cp 대상이 원본과 동일 파일이면 오류 → 무시.
+  cp -f "$ENV_FILE" "$COMPOSE_DIR/.env" 2>/dev/null && info "infra-config/.env 미러(서비스 env_file 로드 보장)" || true
 fi
 _env_val() { grep -E "^${1}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' '; }
 for k in POSTGRES_PASSWORD API_KEY; do

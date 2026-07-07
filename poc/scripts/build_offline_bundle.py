@@ -415,7 +415,7 @@ def expected_files(
     models: list[ModelEntry],
     observability_images: list[str] | None = None,
 ) -> list[str]:
-    files: list[str] = ["README.md", "install.sh", "verify.sh", "manifest.yaml", "CHECKSUMS.sha256"]
+    files: list[str] = ["README.md", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "manifest.yaml", "CHECKSUMS.sha256"]
     for svc in components:
         files.append(f"docker-images/{svc}.tar")
     for m in models:
@@ -1017,8 +1017,10 @@ def _copy_infra(out_dir: Path) -> None:
         "fi\n\n"
         "# 4) env 설정\n"
         "[ -f .env ] || cp \"$BUNDLE_DIR/infra-config/.env.template\" .env\n"
-        "echo 'Next: edit .env, then follow docs/INSTALL.md:'\n"
-        "echo '  docker compose --env-file .env -f infra-config/docker-compose.airgap.yml up -d'\n",
+        "echo 'Next: edit .env (IMAGE_TAG·POSTGRES_PASSWORD·API_KEY…), then run:'\n"
+        "echo '  bash deploy.sh          # 통합 진입점 — 폐쇄망 자동감지 후 전체 스택 원커맨드 기동(권장)'\n"
+        "echo '  (동일: bash deploy_airgap.sh   verify→infra→alembic→app→스모크)'\n"
+        "echo '  또는 수동: docker compose --env-file .env -f infra-config/docker-compose.airgap.yml up -d (docs/INSTALL.md)'\n",
         encoding="utf-8",
     )
     install_sh.chmod(0o755)
@@ -1034,6 +1036,18 @@ def _copy_infra(out_dir: Path) -> None:
         encoding="utf-8",
     )
     verify_sh.chmod(0o755)
+
+    # deploy.sh(통합 진입점) + deploy_airgap.sh(전체 스택 원커맨드 기동). 리포 scripts/ 의 정본을
+    # 번들 루트로 복사(단일 출처). install.sh(docker load) 이후 `bash deploy.sh` 로 기동.
+    import shutil as _sh
+    for _script in ("deploy.sh", "deploy_airgap.sh"):
+        _src = _REPO_ROOT / "scripts" / _script
+        if _src.exists():
+            _dst = out_dir / _script
+            _sh.copy2(_src, _dst)
+            _dst.chmod(0o755)
+        else:
+            print(f"  [WARN] scripts/{_script} 없음 — 번들에 배포 스크립트 미동봉.", file=sys.stderr)
 
     # 고객 인수(acceptance) 샘플팩 + 러너 — 상용 운영 포장. 전 포맷 표본을 배포 API 에 올려
     # severity floor(고등급 미탐 없음) + 파싱성공을 검증. expected_files 가 acceptance/* 를 기대하므로
