@@ -209,6 +209,7 @@ article .callout .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:7
     <a class="toc-item" href="#s06">06 리허설에서 잡힌 함정 3건</a>
     <a class="toc-item" href="#s07">07 오픈망이라 안 챙겨도 되는 것</a>
     <a class="toc-item" href="#s08">08 릴리스 게이트 오해 방지</a>
+    <a class="toc-item" href="#s09">09 최단 배포 & 설치 확인 (E2E)</a>
   </aside>
 
   <article id="top">
@@ -403,6 +404,53 @@ python scripts/run_acceptance.py --mode http --base-url http://&lt;host&gt;:8000
         <a class="appendix-link" href="../../poc/docs/CLOUD_DEPLOY_RUNBOOK.md"><span>CLOUD_DEPLOY_RUNBOOK.md</span><span class="al-arrow">→</span></a>
         <a class="appendix-link" href="테스트서버_파일럿_플랜.html"><span>테스트서버 1개월 파일럿 플랜</span><span class="al-arrow">→</span></a>
         <a class="appendix-link" href="../../poc/RELEASE_CHECKLIST.md"><span>RELEASE_CHECKLIST.md</span><span class="al-arrow">→</span></a>
+      </div>
+    </section>
+
+    <section id="s09">
+      <h2><span class="num">09</span> 최단 배포 &amp; 설치 확인 (E2E)</h2>
+      <p class="h2-sub">목표 = 테스트서버에 올려 <b>문서 업로드 → 파싱 → 분류</b>가 되는지 확인. 최대한 무설정으로.</p>
+
+      <div class="callout live">
+        <div>
+          <div class="cl">한 줄 배포 — 무설정</div>
+          <p><code>bash scripts/deploy.sh</code> 하나면 끝. <code>.env.cloud</code>가 없으면 <b>자동 생성</b>한다 —
+          API_KEY·감사키는 랜덤 생성, <code>STORAGE_BACKEND=local</code>로 <b>minio도 제거</b>(startup 필수값이 API_KEY·감사키 둘뿐이 됨),
+          LLM 키는 불필요(분류 핫패스는 LLM-free). 모델 아티팩트가 있으면 볼륨에 자동 적재, 없으면 룰 기반으로라도 등급이 나온다.
+          끝나면 화면에 <b>API_KEY와 E2E 확인 방법</b>이 출력된다.</p>
+        </div>
+      </div>
+
+      <h3>설치 확인 — 한 방 스크립트</h3>
+      <pre><code>bash scripts/verify_install.sh
+# 1) /healthz/ready 200   2) /healthz/deep 컴포넌트 상태   3) 문서 올려 파싱+분류
+# → "설치 확인 PASS ✓ — 파싱·분류 E2E 정상"</code></pre>
+
+      <h3>문서 E2E — 3가지 방법</h3>
+      <table class="f">
+        <thead><tr><th style="width:150px">방법</th><th>어떻게</th></tr></thead>
+        <tbody>
+          <tr><td><b>데모 콘솔(브라우저)</b></td><td><code>http://&lt;서버&gt;:8000/demo/parse_demo.html</code> — 문서를 드래그하면 추출 텍스트·표·PII·<b>등급</b>이 바로 보임(가장 직관적)</td></tr>
+          <tr><td><b>커맨드 1건</b></td><td>아래 <code>/documents/analyze</code> — 파일 하나 올려 파싱+분류 한 번에</td></tr>
+          <tr><td><b>인수 샘플팩</b></td><td>배포 스모크가 자동 실행(전 포맷 TXT/PDF/DOCX/XLSX/HWPX × 등급, severity floor)</td></tr>
+        </tbody>
+      </table>
+      <pre><code>curl -s -X POST http://&lt;서버&gt;:8000/api/v1/documents/analyze \
+     -H "X-API-Key: &lt;배포시 출력된 API_KEY&gt;" \
+     -F "file=@내문서.pdf" | jq .
+# 반환: parse(추출방식·품질·char_count·표·PII) + 분류 등급(TS/S1/S2/S3)</code></pre>
+
+      <div class="callout warn">
+        <span class="callout-icon">▲</span>
+        <div class="callout-body"><b>브라우저 접근</b> — api 는 하드닝상 <code>127.0.0.1:8000</code>에만 바인딩된다. 원격에서 데모 콘솔을 열려면
+        <b>SSH 터널</b>이 가장 간단·안전: <code>ssh -L 8000:127.0.0.1:8000 &lt;user&gt;@&lt;서버&gt;</code> 후 로컬에서 <code>http://localhost:8000/demo/parse_demo.html</code>.
+        서버에서 직접 <code>curl localhost:8000</code>은 터널 없이 바로 된다.</div>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">◆</span>
+        <div class="callout-body"><b>판정 기준</b>: 이 E2E의 확인 포인트는 두 가지 — (1) <b>파싱</b>(추출 텍스트·<code>char_count</code>가 나오는가), (2) <b>분류</b>(등급이 산출되는가).
+        모델 아티팩트가 없으면 룰 기반 등급이라 정확도는 낮지만 <b>파이프라인 동작 자체는 확인</b>된다. 실제 분류 품질을 보려면 분류기 아티팩트(<code>v-dd3abab9</code>)를 <code>artifacts/</code>에 두면 자동 적재된다.</div>
       </div>
     </section>
   </article>

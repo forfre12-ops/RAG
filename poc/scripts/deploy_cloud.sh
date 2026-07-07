@@ -53,7 +53,36 @@ _env_val() { grep -E "^${1}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'
 log "0/7  사전 요건 확인"
 command -v docker >/dev/null 2>&1 || die "docker 미탑재"
 docker compose version >/dev/null 2>&1 || die "docker compose v2 미탑재"
-[ -f "$ENV_FILE" ] || die "env 파일 없음: $ENV_FILE  (cp .env.lite-cloud $ENV_FILE 후 실값 입력)"
+# .env 없으면 테스트서버용으로 자동 생성(무설정 배포). NO_AUTO_ENV=1 로 끔.
+if [ ! -f "$ENV_FILE" ]; then
+  [ "${NO_AUTO_ENV:-0}" = "1" ] && die "env 없음: $ENV_FILE (NO_AUTO_ENV=1) — cp .env.lite-cloud $ENV_FILE 후 실값 입력"
+  log "env 자동 생성 (테스트서버용 · $ENV_FILE)"
+  _gen() { openssl rand -hex "$1" 2>/dev/null || { tr -dc 'a-f0-9' </dev/urandom | head -c "$(( $1 * 2 ))"; echo; }; }
+  _api="$(_gen 24)"; _audit="$(_gen 32)"
+  _model_line='# CLASSIFIER_MODEL_DIR 미설정 → 룰 기반 분류(모델 없이도 파싱·등급 E2E 동작)'
+  [ -d "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9" ] \
+    && _model_line='CLASSIFIER_MODEL_DIR=/app/artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9'
+  cat > "$ENV_FILE" <<ENVEOF
+# 테스트서버 자동생성(lite-cloud) — 실운영 아님. 재생성: 이 파일 삭제 후 재실행.
+DEPLOY_PROFILE=lite-cloud
+POC_MODE=full
+API_KEY=$_api
+LLOYDK_AUDIT_CHAIN_SECRET=$_audit
+# 저장소=로컬FS → minio 불요(무설정). 업로드 문서는 컨테이너 볼륨에 저장.
+STORAGE_BACKEND=local
+VECTOR_BACKEND=pg
+# CORS: 데모 콘솔은 same-origin이라 무관. 타 머신 브라우저 직접 접근 시 실 origin으로.
+ALLOWED_ORIGIN=http://localhost:$API_PORT
+EMBEDDING_MODEL=nlpai-lab/KURE-v1
+CLASSIFIER_TEMPERATURE=3.0
+$_model_line
+# LLM: 분류 핫패스는 LLM-free라 불요. /answer·2차판정 쓰려면 키 채우기.
+# ANTHROPIC_API_KEY=sk-ant-...
+ENVEOF
+  chmod 600 "$ENV_FILE" 2>/dev/null || true
+  info "생성됨 · API_KEY=$_api  (업로드·E2E 에 사용 — 보관)"
+fi
+[ -f "$ENV_FILE" ] || die "env 파일 없음: $ENV_FILE"
 
 # 앱도 startup 에서 재검증하나(fail-fast), 부팅 전에 친절히 잡는다.
 _ph_re='change[_-]?me|replace[_-]?me|placeholder|xxx|your[_-]'
@@ -62,11 +91,15 @@ for k in API_KEY LLOYDK_AUDIT_CHAIN_SECRET; do
   { [ -z "$v" ] || printf '%s' "$v" | grep -qiE "$_ph_re"; } \
     && die "필수값 미설정/placeholder: $k  ($ENV_FILE 실값 입력)"
 done
-# LLM 키·MINIO 시크릿은 경고(핫패스 classify 는 LLM-free · 프리픽스 변형 가능)
+# LLM 키는 경고(분류 핫패스는 LLM-free — 파싱·분류 E2E 는 무관)
 { [ -n "$(_env_val ANTHROPIC_API_KEY || true)" ] || [ -n "$(_env_val OPENAI_API_KEY || true)" ]; } \
-  || warn "ANTHROPIC_API_KEY/OPENAI_API_KEY 미설정 — /answer·2차판정 LLM 경로 비활성(분류 핫패스는 무관)"
-{ mk="$(_env_val MINIO_SECRET_KEY || true)"; [ -n "$mk" ] && ! printf '%s' "$mk" | grep -qiE "$_ph_re"; } \
-  || warn "MINIO_SECRET_KEY 미설정/placeholder — storage_backend=minio 면 startup 거부될 수 있음"
+  || warn "LLM 키 미설정 — /answer·2차판정 비활성(분류·파싱 E2E 는 정상)"
+# storage=minio 일 때만 minio 시크릿 필요(local 이면 minio 자체 불요)
+STORAGE="$(_env_val STORAGE_BACKEND || true)"; STORAGE="${STORAGE:-minio}"
+if [ "$STORAGE" = "minio" ]; then
+  { mk="$(_env_val MINIO_SECRET_KEY || true)"; [ -n "$mk" ] && ! printf '%s' "$mk" | grep -qiE "$_ph_re"; } \
+    || warn "MINIO_SECRET_KEY 미설정/placeholder — storage_backend=minio 는 startup 거부될 수 있음(테스트는 STORAGE_BACKEND=local 권장)"
+fi
 
 # CORS: prod overlay 는 CORS_ALLOW_ORIGINS 를 ["${ALLOWED_ORIGIN:-…}"] 로 강제(environment>env_file)
 # → 배포 경로의 실효 노브는 ALLOWED_ORIGIN. 사용자가 어느 쪽에 적었든 동작하도록 브리지+검증.
@@ -88,7 +121,9 @@ fi
 
 # ── 2. 인프라 기동 (postgres·redis·minio) ──────────────────
 log "2/7  인프라 기동 + postgres 헬시 대기"
-dc up -d postgres redis minio
+infra=(postgres redis); [ "$STORAGE" = "minio" ] && infra+=(minio)
+info "인프라: ${infra[*]}  (storage=$STORAGE)"
+dc up -d "${infra[@]}"
 for i in $(seq 1 60); do
   if dc exec -T postgres pg_isready -U "$PG_USER" -d "$PG_USER" >/dev/null 2>&1; then
     info "postgres ready (${i}s)"; break
@@ -130,7 +165,7 @@ dc run --rm api alembic upgrade head
 
 # ── 5. 애플리케이션 기동 (api·worker·beat) ─────────────────
 log "5/7  애플리케이션 기동 (api·worker·beat)"
-dc up -d
+dc up -d api worker beat
 
 # ── 6. /healthz/ready 대기 ─────────────────────────────────
 log "6/7  /healthz/ready 대기 (최대 ${READY_TIMEOUT}s)"
@@ -166,12 +201,24 @@ else
   fi
 fi
 
+APIKEY_OUT="$(_env_val API_KEY || true)"
 log "완료 ✓  오픈망 배포 성공 (lite-cloud)"
 cat <<EOF
-${c_dim}
-  ⚠ 외부 노출: prod overlay 는 api 를 127.0.0.1:${API_PORT} 에만 바인딩한다.
-    오픈망 외부 노출은 반드시 앞단 리버스 프록시(nginx)로 — 직노출 금지.
-  상태:   docker compose --env-file $ENV_FILE ${BASE[*]} ps
-  로그:   docker compose --env-file $ENV_FILE ${BASE[*]} logs -f api
-${c_off}
+${c_bold}━━ 설치 확인 & 문서 E2E (파싱→분류) ━━━━━━━━━━━━━━━━━━━━━${c_off}
+${c_dim}  API_KEY = ${APIKEY_OUT}${c_off}
+
+  [한 방] bash scripts/verify_install.sh     # 헬스 + 문서 업로드 파싱·분류 스모크
+
+  1) 헬스:   curl -fsS http://${API_HOST}:${API_PORT}/api/v1/healthz/ready   # 200
+             curl -s   http://${API_HOST}:${API_PORT}/api/v1/healthz/deep    # 컴포넌트 상태
+  2) 데모 콘솔(브라우저): http://<서버>:${API_PORT}/demo/parse_demo.html
+             → 문서 드래그하면 파싱 텍스트·표·등급이 바로 보임
+  3) 커맨드 E2E: 문서 하나 올려 파싱+분류 한 번에
+     curl -s -X POST http://${API_HOST}:${API_PORT}/api/v1/documents/analyze \\
+          -H "X-API-Key: ${APIKEY_OUT}" -F "file=@/경로/문서.pdf" | (jq . 2>/dev/null || cat)
+
+${c_dim}  ⚠ 외부/브라우저 접근: api 는 127.0.0.1:${API_PORT} 바인딩(하드닝). 원격 브라우저는
+    SSH 터널 권장:  ssh -L ${API_PORT}:127.0.0.1:${API_PORT} <user>@<서버>  → http://localhost:${API_PORT}/demo/parse_demo.html
+  상태:  docker compose --env-file $ENV_FILE ${BASE[*]} ps
+  로그:  docker compose --env-file $ENV_FILE ${BASE[*]} logs -f api${c_off}
 EOF
