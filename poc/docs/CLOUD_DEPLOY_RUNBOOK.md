@@ -54,7 +54,7 @@ ENV_FILE=$CF docker compose --env-file $CF $BASE up -d
   모델은 ro external volume) · **포트 최소노출**(api 만 127.0.0.1:8000, pg/redis/minio/mlflow 미노출 —
   리버스 프록시/내부망 전제) · HF 캐시는 non-root named volume(재다운로드 방지).
 - `WEB_CONCURRENCY=1`(기본) 권장 — 멀티워커는 모델 reload 팬아웃 미구현이라 재기동으로 갱신.
-- alembic 단일 head `c3d4e5f6a7b8`. 확장(vector/pg_trgm)은 마이그레이션이 생성(pgvector 이미지).
+- alembic 단일 head `a7b8c9d0e1f2`. 확장(vector/pg_trgm)은 마이그레이션이 생성(pgvector 이미지).
 
 ## 3. 분류 모델 공급 (BLOCKER A3)
 
@@ -117,9 +117,10 @@ python scripts/run_acceptance.py --mode http --base-url http://<host>:8000 --api
 
 ## 알아둘 한계 (테스트 해석용)
 
-- **검수 큐 서버측 조회 API 부재 (B2)**: needs_review 로 라우팅된 건(적재 열화·게이트·저신뢰)이 DB 에
-  쌓이나, 운영 콘솔은 **현 세션에서 분류한 건만** 보여준다(admin.html 자인). 검수중심 시나리오면 이
-  건들을 SQL(`documents.processing_status='needs_review'`)로 직접 확인해야 한다.
+- **검수 큐 서버측 조회 (B2 — 해소됨)**: `GET /api/v1/review-queue` 로 DB 에 쌓인 needs_review/
+  needs_second_review 대기 건을 서버측에서 FIFO 조회한다(reviewer 권한, 페이지네이션). admin 콘솔의
+  "DB 검수 큐 불러오기"가 이 API 를 호출 — 브라우저 세션과 무관하게 실제 대기 목록을 본다(구 '세션-only'
+  한계 해소). SQL 직접 확인(`documents.processing_status='needs_review'`)도 여전히 가능.
 - **모델 reload 멀티레플리카 팬아웃 미구현 (NFR-OPS-01)**: 프로모션 후 `/admin/model/reload` 는
   로컬 프로세스만 갱신. 멀티워커/멀티레플리카면 재기동으로 갱신.
 - **`.doc`(구 워드)·HWP 표 셀**: 이미지에 antiword·pyhwp[hwp-tables] 미포함 → 해당 입력은 검수 라우팅
