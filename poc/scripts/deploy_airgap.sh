@@ -78,6 +78,13 @@ for k in POSTGRES_PASSWORD API_KEY; do
 done
 info "env=$ENV_FILE · IMAGE_TAG=$(_env_val IMAGE_TAG || echo '기본(1.0.0-rc1)')"
 
+# compose 병합 검증(기동 전 조기 실패) — env 치환·상대경로·문법 오류를 up 전에 잡는다.
+if ! cfgerr="$(dc_air config -q 2>&1)"; then
+  printf '%s\n' "$cfgerr" >&2
+  die "compose 병합 검증 실패 — .env(IMAGE_TAG·POSTGRES_PASSWORD 등)·경로 확인 후 재실행"
+fi
+info "compose 병합 검증 OK"
+
 # ── 1. 무결성 검증 (체크섬) ────────────────────────────────
 if [ "$SKIP_VERIFY" != "1" ] && [ -f "$ROOT/verify.sh" ]; then
   log "1/7  번들 무결성 검증 (verify.sh)"

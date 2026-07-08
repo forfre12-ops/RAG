@@ -415,7 +415,7 @@ def expected_files(
     models: list[ModelEntry],
     observability_images: list[str] | None = None,
 ) -> list[str]:
-    files: list[str] = ["README.md", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "manifest.yaml", "CHECKSUMS.sha256"]
+    files: list[str] = ["README.md", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
     for svc in components:
         files.append(f"docker-images/{svc}.tar")
     for m in models:
@@ -1040,7 +1040,7 @@ def _copy_infra(out_dir: Path) -> None:
     # deploy.sh(통합 진입점) + deploy_airgap.sh(전체 스택 원커맨드 기동). 리포 scripts/ 의 정본을
     # 번들 루트로 복사(단일 출처). install.sh(docker load) 이후 `bash deploy.sh` 로 기동.
     import shutil as _sh
-    for _script in ("deploy.sh", "deploy_airgap.sh", "verify_install.sh"):
+    for _script in ("deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh"):
         _src = _REPO_ROOT / "scripts" / _script
         if _src.exists():
             _dst = out_dir / _script

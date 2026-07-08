@@ -111,6 +111,13 @@ printf '%s' "$ORIGIN" | grep -qiE '\*|replace_me|example\.com|your[_-]?host' \
 export ALLOWED_ORIGIN="$ORIGIN"
 info "env=$ENV_FILE · 자격증명 OK · CORS origin=$ORIGIN"
 
+# compose 병합 검증(up 전 조기 실패) — env 치환·경로·문법 오류를 빌드/기동 전에 잡는다.
+if ! cfgerr="$(dc config -q 2>&1)"; then
+  printf '%s\n' "$cfgerr" >&2
+  die "compose 병합 검증 실패 — 위 오류(env 치환·경로·override) 수정 후 재실행"
+fi
+info "compose 병합 검증 OK"
+
 # ── 1. 이미지 빌드 ─────────────────────────────────────────
 if [ "$SKIP_BUILD" = "1" ]; then
   log "1/7  이미지 빌드 (SKIP_BUILD=1 → 생략)"
