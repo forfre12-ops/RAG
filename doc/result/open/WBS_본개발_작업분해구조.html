@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -128,11 +128,14 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <h1 class="title">본개발 작업분해구조 (WBS)</h1>
-  <p class="lede">KOIPA AI 영업비밀관리시스템 본개발 — <strong>2026년 6월 ~ 12월</strong> 마스터 일정. 발주처 제시 마일스톤(설계감리 8월 초 · 1차 개발완료 9월 초 · 중간보고 9월 · 종료감리 11~12월 · 완료보고·오픈 12월)에 우리 개발 모듈(M1~M6 · KF-DeBERTa · 골든셋 · v2.2 곱셈 보정 · KL 연동 · 거버넌스 폐곡선)을 매핑한다. 담당: <span class="tag lk">LK</span> 로이드케이 · <span class="tag kl">KL</span> KL · <span class="tag koipa">KOIPA</span> 지재원.</p>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
+  <p class="lede">본개발/파일럿 진입 WBS는 소스코드 기준 1차 개발 완료 상태를 전제로 재정렬했습니다. 6월~7월 3주차 PoC 자산 실사·데이터셋·분류·서빙·릴리즈 게이트 구현을 1차 완료로 보고, 이후 일정은 개발이 아니라 7월 4~5주차 파일럿 배포 준비 및 안정화 보완, 8월 KL API 연동 협의 및 보완, 8월 4주차까지의 파일럿 전 최종 검증, 11월까지의 시스템 연계 및 통합 테스트, 11~12월 베타 테스트 및 결과 보완/종료감리, 12월 완료보고 및 운영 오픈으로 병합합니다.</p>
 
   <div class="callout warn">
     <div class="callout-label">선행 의존 — 6월 설계 미팅 결정에 묶임</div>
-    <p>7월 착수의 2개 전제(<strong>실데이터 제공 A5 · KL ICD 합의</strong>)가 6/23 설계 미팅 결정에 의존한다. 늦어지면 데이터셋 구축(7월)·통합(9월)이 직접 지연 — 미팅에서 시점 확정 필수. (GPU 사양 A6는 온프렘 도입으로 결정 완료.)</p>
+    <p>최근 전제는 <strong>실데이터·빌드 검수·반출 0</strong>이다. 따라서 주경로는 실데이터 수령이 아니라 <strong>합성 부트스트랩 → 룰/메타 게이트 강화 → 관리자 확정 포착 → 운영 kill-gate·표본감사</strong>로 바뀐다. KL ICD는 여전히 중요하지만, 이는 모델 검증용 데이터가 아니라 metadata-floor와 운영 라우팅의 안전 신호로 소비한다.</p>
   </div>
 
   <hr/>
@@ -146,32 +149,32 @@ footer strong{color:var(--text-dim);}
       <div>Phase</div><div>6월</div><div>7월</div><div>8월</div><div>9월</div><div>10월</div><div>11월</div><div>12월</div>
     </div>
     <div class="gantt-row">
-      <div class="gantt-label">P0 분석·설계</div>
+      <div class="gantt-label">P0 환경·설계</div>
       <div class="gantt-cell"><div class="gantt-bar"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
     </div>
     <div class="gantt-row">
-      <div class="gantt-label">P1 데이터셋 구축</div>
+      <div class="gantt-label">P1 데이터셋·인수팩 완료</div>
       <div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
     </div>
     <div class="gantt-row">
-      <div class="gantt-label">P2 AI 모델 개발·검증</div>
-      <div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
+      <div class="gantt-label">P2 분류·서빙 완료</div>
+      <div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
     </div>
     <div class="gantt-row">
-      <div class="gantt-label">P3 연계·통합 테스트</div>
-      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"></div>
+      <div class="gantt-label" style="color:#92400e;">◆ 1차 개발 완료</div>
+      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-ms" title="1차 개발 완료 / 파일럿 준비 기준선(7월 3주차)"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
     </div>
     <div class="gantt-row">
-      <div class="gantt-label">P4 베타·보완</div>
-      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar"></div></div><div class="gantt-cell"><div class="gantt-bar"></div></div>
+      <div class="gantt-label">P3 KL API 연동·최종 검증</div>
+      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar soft"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
     </div>
     <div class="gantt-row">
-      <div class="gantt-label">P5 완료보고·오픈</div>
-      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar light"></div></div>
+      <div class="gantt-label">P4 시스템 연계·통합 테스트</div>
+      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div>
     </div>
     <div class="gantt-row">
-      <div class="gantt-label" style="color:#92400e;">◆ 감리·보고</div>
-      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-ms" title="설계감리(8월 초)"></div></div><div class="gantt-cell"><div class="gantt-ms" title="1차완료·중간보고(9월)"></div></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-ms" title="종료감리·완료보고(12월)"></div></div>
+      <div class="gantt-label">P5 베타·종료감리·오픈</div>
+      <div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"></div><div class="gantt-cell"><div class="gantt-bar light"></div></div><div class="gantt-cell"><div class="gantt-bar light"></div></div>
     </div>
   </div>
   <p style="font-size:12px;color:var(--text-faint);">■ 검정=핵심 산출 · ■ 진회색=개발 · □ 연회색=배포 · <span style="color:#92400e;">◆</span> 감리/보고 마일스톤. 데이터셋(P1)·모델(P2)은 7~8월 병렬. ±1~2개월 가변.</p>
@@ -191,113 +194,114 @@ footer strong{color:var(--text-dim);}
         <tr><td><code>0.1</code></td><td>요구사항 분석 · 설계 미팅 (의사결정 A1~A6)</td><td>의사결정 안건서·결정기록</td><td class="center"><span class="tag lk">LK</span> <span class="tag koipa">KOIPA</span></td><td class="center">06/23</td></tr>
         <tr><td><code>0.2</code></td><td>KL 연동 인터페이스(ICD) v1.0 확정</td><td>ICD 확정본·부록B 반영</td><td class="center"><span class="tag kl">KL</span> <span class="tag lk">LK</span></td><td class="center">06/23~06/30</td></tr>
         <tr><td><code>0.3</code></td><td>등급기준 적용서 확정 (가이드 대조·v2.2 보정 토글 설계)</td><td>적용서 v2.3 확정본</td><td class="center"><span class="tag lk">LK</span></td><td class="center">~06/30</td></tr>
-        <tr><td><code>0.4</code></td><td>실데이터 수령 · 운영 서버 환경 확정 (GPU 온프렘 도입 확정)</td><td>실문서 코퍼스·환경 사양</td><td class="center"><span class="tag koipa">KOIPA</span></td><td class="center">06월 말</td></tr>
+        <tr><td><code>0.4</code></td><td>무실데이터 운영 전제 확정 · 안전 부트스트랩 기준 합의</td><td>운영 전제·kill-gate·검수 SLA</td><td class="center"><span class="tag koipa">KOIPA</span> <span class="tag lk">LK</span></td><td class="center">06월 말</td></tr>
       </tbody>
     </table>
   </div>
 
-  <h3 style="font-size:16px;font-weight:600;margin:26px 0 8px;">P1 · 데이터셋 구축 — 7~8월</h3>
-  <div class="table-wrap">
+  <h3 class="phase-title">P1 · 데이터셋·인수팩 구축 (1차 완료)</h3>
     <table>
-      <thead><tr><th>WBS</th><th>작업패키지</th><th>산출물 · 모듈</th><th class="center">담당</th><th class="center">일정</th></tr></thead>
+      <thead><tr><th style="width:18%">작업</th><th>주요 내용</th><th style="width:22%">산출물</th></tr></thead>
       <tbody>
-        <tr><td><code>1.1</code></td><td>실데이터 전처리·정규화·PII 마스킹 <code>(M2)</code></td><td>정규화 코퍼스</td><td class="center"><span class="tag lk">LK</span></td><td class="center">07월</td></tr>
-        <tr><td><code>1.2</code></td><td>실데이터 라벨링·검수 — 3요건 S/V/M <code>(M3)</code></td><td>검수 완료 학습셋</td><td class="center"><span class="tag lk">LK</span></td><td class="center">07~08월</td></tr>
-        <tr><td><code>1.3</code></td><td>골든셋 확장 — 특급(TS) 표본 보강</td><td>골든셋 v3 (200건+)</td><td class="center"><span class="tag lk">LK</span></td><td class="center">08월</td></tr>
-        <tr><td><code>1.4</code></td><td>인사·재무 S1 사각지대 라벨 보강 — 임원 보상·자금조달·고객별 매출·원가구조 (golden500 S1→S2 미탐 7건 전부 이 유형이고 룰·모델이 공유한 사각지대 → 재학습 최우선 타깃)</td><td>S1 경계 보강 학습셋</td><td class="center"><span class="tag lk">LK</span></td><td class="center">08월</td></tr>
+        <tr><td>silver/합성 코퍼스</td><td>silver_train·합성 holdout 생성, PII·누출 필터, leakage manifest·domain leakage gate 정리</td><td>silver_train / synthetic_holdout</td></tr>
+        <tr><td>라벨링·골든 후보</td><td>룰·LLM 합의 라벨링 자동화, gold_candidate와 needs_review 큐 분리, 앵커·메타모픽 회귀셋 보강</td><td>gold_candidate / regression fixtures</td></tr>
+        <tr><td>locked gold 계획</td><td>locked_gold_eval은 사람 검수 sign-off 이후 확정한다. 현재 human_review는 1/40이므로 strict GA 전제 조건으로 분리한다.</td><td>데이터셋 정의서 / sign-off plan</td></tr>
+        <tr><td>고객 인수 샘플팩</td><td>TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX 샘플팩 생성 및 acceptance-test 실행</td><td>acceptance_pack / acceptance_report</td></tr>
       </tbody>
     </table>
-  </div>
 
-  <h3 style="font-size:16px;font-weight:600;margin:26px 0 8px;">P2 · AI 모델 개발 · 성능 검증 — 7~8월 (P1과 병렬)</h3>
-  <div class="table-wrap">
+    <h3 class="phase-title">P2 · 파일럿 배포 준비 및 안정화 보완 (7월 4~5주차)</h3>
     <table>
-      <thead><tr><th>WBS</th><th>작업패키지</th><th>산출물 · 모듈</th><th class="center">담당</th><th class="center">일정</th></tr></thead>
+      <thead><tr><th style="width:18%">작업</th><th>주요 내용</th><th style="width:22%">산출물</th></tr></thead>
       <tbody>
-        <tr><td><code>2.1</code></td><td>재학습 파이프라인 정식화 — KF-DeBERTa <code>(M4)</code></td><td>학습 자동화·MLflow</td><td class="center"><span class="tag lk">LK</span></td><td class="center">07월</td></tr>
-        <tr><td><code>2.2</code></td><td>FNR 최적화 · v2.2 곱셈 보정 토글 <code>(M3·M5)</code></td><td>등급 산정 설정화·FNR-safe</td><td class="center"><span class="tag lk">LK</span></td><td class="center">07~08월</td></tr>
-        <tr><td><code>2.3</code></td><td>모델 튜닝 · 1차 성능 검증 (전체·등급별 FNR)</td><td>1차 성능 보고서·합격 모델</td><td class="center"><span class="tag lk">LK</span></td><td class="center">08월</td></tr>
+        <tr><td>분류 모델·게이트</td><td>KF-DeBERTa 재학습, source-prior policy, v2.2 곱셈 보정 토글, FNR-safe tuning</td><td>모델 성능 리포트</td></tr>
+        <tr><td>서빙 API·ICD</td><td>등급 산정, 검수 라우팅, 룰 폴백, needs_review fail-closed, KL 연동 request/response 정의</td><td>API·ICD 정의서</td></tr>
+        <tr><td>파서·보안 게이트</td><td>표 커버리지 신호, HWP/HWPX/PDF 표 회수, leakage·metamorphic·adversarial gate 연결</td><td>parser / gate report</td></tr>
+        <tr><td>파일럿 배포 준비 및 안정화 보완</td><td>7월 4~5주차에 운영 설정값, release-gate-pilot, airgap 번들, SBOM, acceptance pack 동봉 여부를 점검하고 보완한다.</td><td>배포 준비 점검표 / bundle report</td></tr>
       </tbody>
     </table>
-  </div>
 
-  <h3 style="font-size:16px;font-weight:600;margin:26px 0 8px;">P3 · 시스템 연계 및 통합 테스트 — 9~11월</h3>
-  <div class="table-wrap">
+    <h3 class="phase-title">M1 · 1차 개발 완료(소스코드 기준) / 파일럿 준비 기준선</h3>
     <table>
-      <thead><tr><th>WBS</th><th>작업패키지</th><th>산출물 · 모듈</th><th class="center">담당</th><th class="center">일정</th></tr></thead>
+      <thead><tr><th style="width:18%">판정</th><th>주요 기준</th><th style="width:22%">비고</th></tr></thead>
       <tbody>
-        <tr><td><code>3.1</code></td><td>KL 메타데이터 인터페이스 연계 <code>(R6)</code></td><td>출처·보안표시·접근범위 수신 가동 — 수신한 보안표시·접근범위를 metadata-floor 게이트로 소비해 재학습 전까지 S1 사각지대를 결정론적 차단</td><td class="center"><span class="tag kl">KL</span> <span class="tag lk">LK</span></td><td class="center">09월</td></tr>
-        <tr><td><code>3.2</code></td><td>검수 콘솔·거버넌스 폐곡선 <code>(M5·M6·FUN-024)</code></td><td>검수·재학습·롤백 운영 UI <span style="color:#888;">※ 재학습 환류 정책 미확정(A 무반출 권고 / B 온사이트 / C 반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>); 기본 A안에서 운영 UI는 검수·집계 진단 환류·롤백 중심, 재학습 주체=지재원 골든셋</span></td><td class="center"><span class="tag lk">LK</span></td><td class="center">09~10월</td></tr>
-        <tr><td><code>3.3</code></td><td>시스템 통합·E2E 통합 테스트</td><td>통합 테스트 결과서</td><td class="center"><span class="tag lk">LK</span></td><td class="center">10~11월</td></tr>
+        <tr><td>파일럿 진입</td><td>readiness, parser, leakage, metamorphic, adversarial, acceptance-test 기반 파일럿 진입 게이트를 구성·점검</td><td>파일럿 진입 체크리스트</td></tr>
+        <tr><td>strict GA 보류</td><td>human_review locked gold 40건 미달 시 상용 일반오픈은 보류</td><td>현재 1/40</td></tr>
       </tbody>
     </table>
-  </div>
 
-  <h3 style="font-size:16px;font-weight:600;margin:26px 0 8px;">P4 · 베타 테스트 및 결과 보완 — 11~12월</h3>
-  <div class="table-wrap">
+    <h3 class="phase-title">P3 · KL API 연동 협의·파일럿 전 최종 검증 (8월)</h3>
     <table>
-      <thead><tr><th>WBS</th><th>작업패키지</th><th>산출물</th><th class="center">담당</th><th class="center">일정</th></tr></thead>
+      <thead><tr><th style="width:18%">작업</th><th>주요 내용</th><th style="width:22%">산출물</th></tr></thead>
       <tbody>
-        <tr><td><code>4.1</code></td><td>베타 테스트 (실사용 환경·실문서)</td><td>베타 결과·이슈 목록</td><td class="center"><span class="tag lk">LK</span> <span class="tag koipa">KOIPA</span></td><td class="center">11월</td></tr>
-        <tr><td><code>4.2</code></td><td>결과 보완 · 성능 재측정 · 임계값 재보정</td><td>보완 패치·최종 성능 보고서</td><td class="center"><span class="tag lk">LK</span></td><td class="center">11~12월</td></tr>
+        <tr><td>KL API 연동 협의 및 보완</td><td>8월 KL API 연동 협의에서 ICD request/response, metadata_floor 입력, 오류/재시도 정책, mock/contract fixture를 협의하고 보완한다.</td><td>API 협의 기록 / ICD 보완안</td></tr><tr><td>파일럿 전 최종 검증</td><td>8월 4주차까지 API contract, parser, leakage, release-gate-pilot, acceptance_pack E2E, 응답시간, needs_review, kill-gate 테스트를 완료한다.</td><td>파일럿 진입 체크리스트 / 테스트 결과서</td></tr>
+        <tr><td>운영학습</td><td>교정 환류, 유사도 escalation, 확정 축적을 통해 자동확정률 상향</td><td>운영학습 로그</td></tr>
       </tbody>
     </table>
-  </div>
 
-  <h3 style="font-size:16px;font-weight:600;margin:26px 0 8px;">P5 · 완료보고 및 오픈 — 12월</h3>
-  <div class="table-wrap">
+    <h3 class="phase-title">P4 · 시스템 연계 및 통합 테스트 (9~11월)</h3>
     <table>
-      <thead><tr><th>WBS</th><th>작업패키지</th><th>산출물</th><th class="center">담당</th><th class="center">일정</th></tr></thead>
+      <thead><tr><th style="width:18%">작업</th><th>주요 내용</th><th style="width:22%">산출물</th></tr></thead>
       <tbody>
-        <tr><td><code>5.1</code></td><td>운영 환경 배포 · 모니터링 구성</td><td>배포·관제 구성</td><td class="center"><span class="tag lk">LK</span></td><td class="center">12월</td></tr>
-        <tr><td><code>5.2</code></td><td>완료보고 · 인수인계 · 교육 · 오픈</td><td>운영 매뉴얼·인수확인서</td><td class="center"><span class="tag lk">LK</span> <span class="tag koipa">KOIPA</span></td><td class="center">12월 말</td></tr>
+        <tr><td>시스템 연계</td><td>KL API 연계, 운영 시나리오, 고객 인수팩 기반 E2E 흐름을 통합한다.</td><td>연계 점검표</td></tr>
+        <tr><td>통합 테스트</td><td>분류 API, parser, leakage, release-gate-pilot, acceptance_pack, 응답시간, 운영 게이트를 11월까지 통합 검증한다.</td><td>통합 테스트 결과서</td></tr>
       </tbody>
     </table>
-  </div>
+
+    <h3 class="phase-title">P5 · 베타 테스트 및 결과 보완 / 종료감리 / 완료보고 및 운영 오픈 (11~12월)</h3>
+    <table>
+      <thead><tr><th style="width:18%">작업</th><th>주요 내용</th><th style="width:22%">산출물</th></tr></thead>
+      <tbody>
+        <tr><td>베타 테스트</td><td>11~12월 운영 베타 테스트, 고객 피드백 수집, 검수 라우팅과 운영 게이트를 점검한다.</td><td>베타 테스트 결과서</td></tr>
+        <tr><td>결과 보완·종료감리</td><td>베타 결과 보완, 성능 재측정, 종료감리 대응 자료를 정리한다.</td><td>종료감리 자료</td></tr>
+        <tr><td>완료보고 및 운영 오픈</td><td>12월 완료보고서, 운영 매뉴얼, 릴리즈 매니페스트, 관리자 교육, 운영 오픈을 마무리한다.</td><td>완료보고서 / 인수확인서</td></tr>
+      </tbody>
+    </table>
 
   <hr/>
 
   <div class="section-sep" id="s2">
     <span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">마일스톤 · 감리</span>
   </div>
-  <h2>주요 마일스톤 (발주처 일정 정합)</h2>
+  <h2>주요 마일스톤</h2>
   <div class="ms">
-    <div class="ms-item"><span class="ms-when">06/23 (화)</span><span class="ms-what"><b>설계 미팅</b> — 의사결정 안건, KL ICD 합의, 실데이터 확정 (GPU 온프렘 확정)</span></div>
-    <div class="ms-item"><span class="ms-when">06월 말</span><span class="ms-what"><b>분석·설계 완료</b> — 적용서 v2.3 확정, ICD v1.0, 착수 전제 충족</span></div>
-    <div class="ms-item audit"><span class="ms-when">08월 초</span><span class="ms-what"><b>◆ 설계감리</b> — 설계 산출물 감리 대응 (적용서·백서·RTM·DB스키마·API 명세)</span></div>
-    <div class="ms-item"><span class="ms-when">09월 초</span><span class="ms-what"><b>1차 개발 완료 목표</b> — 데이터셋 v3 + 운영 분류 모델 + 1차 성능 합격</span></div>
-    <div class="ms-item audit"><span class="ms-when">09월</span><span class="ms-what"><b>◆ 중간보고</b> — 진척·성능·연계 설계 보고</span></div>
-    <div class="ms-item"><span class="ms-when">11월 말</span><span class="ms-what"><b>통합 테스트 완료</b> — KL 연계·거버넌스 운영 흐름(검수·집계 진단 환류) 검증 완료</span></div>
-    <div class="ms-item audit"><span class="ms-when">11~12월</span><span class="ms-what"><b>◆ 종료감리</b> — 베타 결과·최종 성능·요구사항 추적(RTM) 증빙</span></div>
-    <div class="ms-item"><span class="ms-when">12월 말</span><span class="ms-what"><b>완료보고 · 오픈</b> — 운영 배포·인수인계 완료</span></div>
+    <div class="ms-item"><span class="ms-when">6월 말</span><span class="ms-what"><b>PoC 자산 실사·환경 반입 완료</b> — 모델·데이터·문서 자산 인수, 폐쇄망 개발환경, PostgreSQL·pgvector 기반 구성 재현</span></div>
+    <div class="ms-item"><span class="ms-when">7월 2주차</span><span class="ms-what"><b>데이터·게이트 1차 완료</b> — silver_train, gold_candidate, parser/leakage gate, 고객 인수 샘플팩 생성 도구 정리</span></div>
+    <div class="ms-item audit"><span class="ms-when">7월 3주차</span><span class="ms-what"><b>1차 개발 완료(소스코드 기준) / 파일럿 준비 기준선</b> — 기능 구현·release-gate-pilot·acceptance-test 경로 확보. strict GA는 human_review 40건 확보 후 별도 판단</span></div>
+    <div class="ms-item"><span class="ms-when">7월 4~5주차</span><span class="ms-what"><b>파일럿 배포 준비 및 안정화 보완 완료</b> — 운영 설정값, 릴리즈 게이트, 배포 번들, 고객 인수팩을 파일럿 투입 가능한 상태로 정리</span></div>
+    <div class="ms-item"><span class="ms-when">8월</span><span class="ms-what"><b>KL API 연동 협의 및 보완</b> — ICD request/response, metadata_floor 입력, 오류/재시도 정책, mock/contract fixture 협의 및 보완</span></div>
+    <div class="ms-item"><span class="ms-when">8월 4주차</span><span class="ms-what"><b>파일럿 전 최종 검증</b> — API contract, parser, leakage, release-gate-pilot, acceptance_pack E2E, 응답시간, needs_review, kill-gate 테스트 완료</span></div>
+    <div class="ms-item"><span class="ms-when">~11월</span><span class="ms-what"><b>시스템 연계 및 통합 테스트</b> — KL API 연계, 운영 시나리오, 고객 인수팩 기반 E2E, 성능·운영 게이트 통합 검증</span></div>
+    <div class="ms-item audit"><span class="ms-when">11~12월</span><span class="ms-what"><b>베타 테스트 및 결과 보완 / 종료감리</b> — 운영 베타, 고객 피드백 반영, 성능 재측정, 종료감리 대응 자료 정리</span></div>
+    <div class="ms-item audit"><span class="ms-when">12월</span><span class="ms-what"><b>완료보고 및 운영 오픈</b> — 완료보고서, 운영 매뉴얼, 인수인계, 관리자 교육, 운영 오픈</span></div>
   </div>
 
   <div class="callout inset">
     <div class="callout-label">크리티컬 패스</div>
-    <p><strong>실데이터 입수(0.4, 6월말) → 라벨링(1.2, 7~8월) → 모델 개발·검증(2.x, 7~8월) → 1차 완료(9월초)</strong> 가 전반 주경로다. 실데이터 제공(A5)이 늦으면 1차 완료·중간보고가 직접 밀린다. 후반은 <strong>KL 연계(3.1, 9월) → 통합 테스트(3.3, 11월) → 베타(4.1) → 종료감리</strong>. KL ICD(0.2)는 9월 연계의 선행이므로 6월 미팅에서 반드시 확정.</p>
+    <p><strong>PoC 자산 실사 → 1차 개발 완료 → 7월 4~5주차 파일럿 배포 준비 및 안정화 보완 → 8월 KL API 연동 협의·보완 → 8월 4주차 파일럿 전 최종 검증 → 11월까지 시스템 연계 및 통합 테스트 → 11~12월 베타/종료감리 → 12월 완료보고 및 운영 오픈</strong>이 새 주경로다. 실데이터 접근은 배포 전 품질 검증의 필수 전제가 아니라, 제약 완화 시 locked 평가와 strict GA를 여는 후속 조건이다.</p>
   </div>
 
   <div class="callout warn">
-    <div class="callout-label">PoC 자산 재사용 (개발 가속)</div>
-    <p>본개발은 <strong>백지 시작이 아니다.</strong> PoC에서 검증된 자산(M1~M6 파이프라인 · KF-DeBERTa 분류기 v-f9b5cedb · <code>grade_from_svm</code> v2.2 · 골든셋 100건 · 거버넌스 콘솔 · FNR-safe 보정)을 그대로 승계·확장한다. 7~8월 모델 개발은 <strong>실데이터 라벨 반영·FNR 최적화·보정 토글화</strong>가 핵심이며, 아키텍처 신규 구축이 아니다.</p>
+    <div class="callout-label">PoC 자산 실사 및 파일럿 자산화 (개발 가속)</div>
+    <p>본개발은 <strong>백지 시작이 아니다.</strong> PoC에서 검증된 자산(M1~M6 파이프라인 · KF-DeBERTa 분류기 · <code>grade_from_svm</code> v2.2 · 합성/프록시 리포트 · 거버넌스 콘솔 · FNR-safe 보정)을 실사해 파일럿 자산으로 반입한다. 현재 핵심은 <strong>7월 4~5주차에 고객 인수팩, 릴리즈 게이트, 파서/누출/메타모픽 회귀, 보수적 검수 라우팅</strong>을 파일럿 투입 가능한 상태로 보완하고, 8월 KL API 연동 협의와 최종 테스트를 거쳐 고객 검수 신호로 strict GA 조건을 채우는 것이다.</p>
   </div>
 
   <div class="section-sep" id="sp0"><span class="section-sep-num">★</span><span class="section-sep-line"></span><span class="section-sep-title">본개발 보강 과제 (P0)</span></div>
   <h2>품질·운영·보안 우선 과제</h2>
-  <p>프로토타입을 본개발로 전환할 때 우선 착수할 과제다. 코드 구조는 확장 가능하므로 재설계가 아니라 <strong>"합성→실데이터", "단일 노드→분산", "안전장치 활성화"</strong> 세 전환이 핵심이다.</p>
+  <p>프로토타입을 본개발로 전환할 때 우선 착수할 과제다. 코드 구조는 확장 가능하므로 재설계가 아니라 <strong>"합성 부트스트랩 고도화", "단일 노드→분산", "운영 안전장치 기본화"</strong> 세 전환이 핵심이다.</p>
   <div class="table-wrap"><table>
     <thead><tr><th class="center">순위</th><th>과제</th><th>영역</th><th>예상 기간</th></tr></thead>
     <tbody>
-      <tr><td class="center">P0</td><td>인간검증 골든셋 500건+ 구축 · 라벨 순환성 차단</td><td>데이터</td><td>2~4주 (크리티컬)</td></tr>
+      <tr><td class="center">P0</td><td>관리자 확정 포착·교정 admission gate·locked readiness fail-closed</td><td>운영 데이터</td><td>즉시 (크리티컬)</td></tr>
       <tr><td class="center">P0</td><td>분산 상태 외부화 — 비동기 실배선 · Redis 강제 · 모델 reload 팬아웃</td><td>성능·운영</td><td>1~2주</td></tr>
       <tr><td class="center">P0</td><td>감사 체인 비밀키 + fail-fast + 정기 무결성 검증</td><td>보안</td><td>3~5일</td></tr>
       <tr><td class="center">P1</td><td>안전망 활성화(자동롤백·서킷브레이커) · 접근 격리 deny-by-default</td><td>운영·보안</td><td>1~2주</td></tr>
-      <tr><td class="center">P1</td><td>자동확정 안전 게이트 — 희소근거 게이트 <code>(rule_fallback_min_evidence)</code> · 합의 게이트 <code>(agreement_gate_enabled)</code> · 메타데이터 floor 게이트 <code>(metadata_floor_enabled)</code>, <strong>opt-in·기본 OFF</strong></td><td>운영·보안</td><td>3~5일</td></tr>
+      <tr><td class="center">P1</td><td>자동확정 안전 게이트 — 희소근거 게이트 <code>(rule_fallback_min_evidence)</code>는 룰-폴백 경로 기본 ON(<code>0.9</code>), 합의 게이트 <code>(agreement_gate_enabled)</code> · 메타데이터 floor 게이트 <code>(metadata_floor_enabled)</code>는 base 기본 OFF(운영 프로파일 별도)</td><td>운영·보안</td><td>3~5일</td></tr>
     </tbody>
   </table></div>
-  <div class="callout inset"><div class="callout-label">병목 안내</div><p>2·3·4번은 개발자 작업이라 골든셋 라벨링 기간에 <strong>병렬 수행</strong> 가능. 전체 일정을 좌우하는 것은 ①번(도메인 전문가 라벨링 속도)으로, 약 <strong>3~4주</strong>가 본개발 품질 안정화의 핵심 구간이다. 상세 설계는 보안 설계서·운영 런북·데이터 거버넌스 계획에 정리되어 있다.</p></div>
+  <div class="callout inset"><div class="callout-label">병목 안내</div><p>이제 병목은 라벨링 속도가 아니라 <strong>운영에서 생기는 첫 확정 신호를 얼마나 깨끗하게 포착하고, 자동 반영을 얼마나 보수적으로 막느냐</strong>다. 검수 피로·자동확정 번복률·고등급 표본감사를 kill-gate로 운영하고, locked 평가가 비어 있으면 자동 활성은 fail-closed 한다.</p></div>
 
-  <div class="callout warn"><div class="callout-label">자동확정 안전 게이트 — opt-in · 기본 OFF</div><p>자동확정·검수 라우팅은 confidence 임계(기본 0.7) 단독이 아니라 <strong>다단 게이트</strong>로 결정한다. confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 따라서 본개발 안전망 활성화 범위에 두 게이트를 추가한다(<strong>둘 다 opt-in·기본 OFF — 켜기 전 기존 동작은 그대로</strong>). ① <strong>희소근거 게이트</strong> <code>rule_fallback_min_evidence</code> — 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단(golden100 무성 TS 미탐 5→0). ② <strong>합의 게이트</strong> <code>agreement_gate_enabled</code> — 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고, 그 외 불일치는 사람 검수로 보낸다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). ③ <strong>메타데이터 floor 게이트</strong> <code>metadata_floor_enabled</code> — KL ICD R6 보안표시·접근범위로 내용 분류기가 못 보는 비밀관리성(M)·출처(S)를 보완하며, <code>source_prior</code>(공개출처→S3 하향)의 <em>상향 대칭</em>이다. ⓐ 보안표시(top_secret→TS·secret→S1·confidential→S2)가 예측보다 높으면 그 등급으로 상향 floor(명시표기 우선·하향 안 함); ⓑ 접근범위(approved_only/designated/department 등 제한적)인데 예측이 낮으면 검수 라우팅. 인사·재무 S1 사각지대(룰·모델 공유)를 재학습 전 결정론적으로 차단한다(KL 마킹 신뢰 전제). TS/S1 자동확정분은 표본감사한다. ※ 모든 수치는 합성 골든셋(OOD) 기준 — 실데이터(human_review) 검증 전 정식 수치 아님.</p></div>
+  <div class="callout warn"><div class="callout-label">자동확정 안전 게이트 — 희소근거 룰-폴백 기본 ON · 합의/메타 base 기본 OFF</div><p>자동확정·검수 라우팅은 confidence 임계(기본 0.7) 단독이 아니라 <strong>다단 게이트</strong>로 결정한다. confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 현재 소스 기준 ① <strong>희소근거 게이트</strong> <code>rule_fallback_min_evidence=0.9</code>는 룰-폴백 경로에서 기본 적용되어 단일 약한 키워드만으로 conf=1.0이 되는 자동확정을 차단한다(golden100 무성 TS 미탐 5→0). ② <strong>합의 게이트</strong> <code>agreement_gate_enabled</code>는 base 기본 OFF이나 onprem-local/full-train 프로파일에서는 기본 ON으로 둘 수 있으며, 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 그 외 불일치는 사람 검수로 보낸다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). ③ <strong>메타데이터 floor 게이트</strong> <code>metadata_floor_enabled</code>는 base 기본 OFF이며, KL ICD R6 보안표시·접근범위로 내용 분류기가 못 보는 비밀관리성(M)·출처(S)를 보완한다. ⓐ 보안표시(top_secret→TS·secret→S1·confidential→S2)가 예측보다 높으면 그 등급으로 상향 floor(명시표기 우선·하향 안 함); ⓑ 접근범위(approved_only/designated/department 등 제한적)인데 예측이 낮으면 검수 라우팅. 인사·재무 S1 사각지대(룰·모델 공유)를 재학습 전 결정론적으로 차단한다(KL 마킹 신뢰 전제). TS/S1 자동확정분은 표본감사한다. ※ 모든 수치는 합성 골든셋(OOD) 기준 — 운영 human_review/locked 확정 전 운영 확정 수치 아님.</p></div>
 
   <div class="footnote">
     <p>일정은 발주처 제시 마스터(6~12월) 기준 가안 — ±1~2개월 가변. 단계 간 중첩(데이터↔모델 7~8월, 모델↔연계 8~9월) 반영.</p>

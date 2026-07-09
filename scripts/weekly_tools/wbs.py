@@ -4,7 +4,7 @@ wbs.py — [지재원] AI 영업비밀관리시스템 구축 WBS.xlsx 읽기/쓰
 
 간트 구조(고정):
   - 축: 열 G(=7)부터 하루 1열, 시작일 2026-06-02(화), ~2027-01-04.
-  - 행1=월 띠(병합), 행2=주차(병합, 월 내부 nest), 행3=일자, 행4=요일/라벨헤더.
+  - 행1=월 띠(병합), 행2=주차(병합, 월~일 실제 주·목요일 속한 달 귀속), 행3=일자, 행4=요일/라벨헤더.
   - 작업 행 = 5..(마지막 작업행). 틀고정 G5.
   - 라벨열: B=구분, C=작업, D=기능상세, E=산출물, F=상태.
   - 막대 색: 완료 FF3F7D58 · 마일스톤 FFFFC000 · 예정 FF9EADCC/FF6E8F72/FF8064A2.
@@ -195,7 +195,7 @@ class WBSGantt:
             cell.value = val
 
     def _paint_calendar_bands(self):
-        """행1 월띠(정확한 월경계) + 행2 주차(월 내부 nest, <3일 슬리버 흡수)."""
+        """행1 월띠(정확한 월경계) + 행2 주차(월~일 실제 주, 목요일 속한 달에 귀속)."""
         ws = self.ws
         lc = self.last_col
         # 간트 열(G+)에 걸치는 행1/2 병합은 모두 해제(경계를 넘어오는 병합 포함)
@@ -208,7 +208,7 @@ class WBSGantt:
                 if not isinstance(cell, MergedCell):   # 잔존 병합셀 .value 쓰기 방지
                     cell.value = None
         cols = list(range(self.start_col, lc + 1))
-        # 월 그룹
+        # 행1: 월 띠 (정확한 월경계)
         mgroups = []
         for c in cols:
             d = self.date_of(c)
@@ -224,34 +224,28 @@ class WBSGantt:
             if len(mcols) > 1:
                 ws.merge_cells(start_row=1, start_column=mcols[0],
                                end_row=1, end_column=mcols[-1])
-            # 주차: 글로벌 7일블록으로 나눈 뒤 <3일은 이웃에 흡수
-            subs = []
-            for c in mcols:
-                wid = (c - self.start_col) // 7
-                if subs and subs[-1][0] == wid:
-                    subs[-1][1].append(c)
-                else:
-                    subs.append([wid, [c]])
-            groups = [s[1] for s in subs]
-            changed = True
-            while changed and len(groups) > 1:
-                changed = False
-                for i, g in enumerate(groups):
-                    if len(g) < 3:
-                        if i > 0:
-                            groups[i - 1] = groups[i - 1] + g
-                        else:
-                            groups[i + 1] = g + groups[i + 1]
-                        groups.pop(i)
-                        changed = True
-                        break
-            for n, g in enumerate(groups, 1):
-                for c in g:
-                    self._hdr_style(2, c)
-                ws.cell(row=2, column=g[0]).value = f"{n} 주차"
-                if len(g) > 1:
-                    ws.merge_cells(start_row=2, start_column=g[0],
-                                   end_row=2, end_column=g[-1])
+        # 행2: 월~일 실제 주(월요일 기준). 한 주가 두 달에 걸치면 '그 주의 목요일(=4일
+        # 이상)이 속한 달'의 주로 번호를 매긴다 → 8월 4주차 등 기존 상태라벨과 일치.
+        # 주 밴드는 월 경계를 넘어 그대로 표시(달력과 동일: 예) 7월 1주차가 6/29(월) 시작).
+        # 항상 7일 주 → 8일 이상 주가 생기지 않는다(옛 슬리버 흡수 방식의 8~10일 주 제거).
+        wgroups = []
+        for c in cols:
+            mon = cal.monday_of(self.date_of(c))
+            if wgroups and wgroups[-1][0] == mon:
+                wgroups[-1][1].append(c)
+            else:
+                wgroups.append([mon, [c]])
+        owner_count = {}
+        for mon, g in wgroups:
+            thu = mon + datetime.timedelta(days=3)       # 그 주의 목요일이 속한 달
+            okey = (thu.year, thu.month)
+            owner_count[okey] = owner_count.get(okey, 0) + 1
+            for c in g:
+                self._hdr_style(2, c)
+            ws.cell(row=2, column=g[0]).value = f"{owner_count[okey]} 주차"
+            if len(g) > 1:
+                ws.merge_cells(start_row=2, start_column=g[0],
+                               end_row=2, end_column=g[-1])
 
     def _paint_offdays(self):
         """주말·공휴일: 본문(5..마지막행) 회색, 공휴일은 머리글(행3·4) 빨강.
