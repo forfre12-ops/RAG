@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>골든셋 종합 — 4종 시험지의 의미·채점·실측 | Lloydk</title>
+<title>합성 코퍼스·프록시 평가 종합 — locked 평가와의 구분 | Lloydk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
@@ -98,17 +98,20 @@ footer strong{color:var(--text-dim);}
 
   <div class="meta-row">
     <span class="badge">DOC-GOLD-01</span>
-    <span class="badge outline">골든셋 정본</span>
+    <span class="badge outline">프록시/합성 평가</span>
     <span class="meta-dot">·</span>
     <span class="meta-soft">2026-06-25</span>
   </div>
 
-  <h1 class="title">골든셋 종합 — 4종 시험지의 의미·채점·실측과 추가 방법</h1>
-  <p class="lede">골든셋은 <strong>시스템을 채점하는 시험지</strong>다. 분류·검색·적대적·답변 네 과목이 서로 다른 것을 재며, 합성·구버전은 시험이 아니라 연습·폐기다. 운영 본체는 실문서 기반 <strong>분류 골든셋(gold_real)</strong>이고, 남은 본질은 <strong>9월 실데이터 + 지재원 관리자 사람검증</strong>으로 정본을 확정하는 것이다.</p>
+  <h1 class="title">합성 코퍼스·프록시 평가 종합 — locked 평가와의 구분</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
+  <p class="lede">이 문서는 과거 "골든셋"으로 부르던 데이터들을 새 전제에 맞춰 재해석한다. 합성·LLM·공개 프록시 라벨은 <strong>학습 시드, 상대비교 holdout, 회귀 테스트</strong>로는 유용하지만 <strong>locked 평가 진실은 아니다</strong>. 평가 진실은 사람 서명 전용이며, 현재 제약에서는 0건/휴면 상태가 정상이다.</p>
 
   <div class="callout inset">
     <div class="callout-label">한눈에 보기 (비전문가용)</div>
-    <p>① <b>분류</b> = 문서 등급(TS~S3) 채점 답안지 · ② <b>검색</b> = 질문에 맞는 근거문서 찾기 시험 · ③ <b>적대적</b> = 함정에 안 낚이나(치명 미탐) 안전 게이트 · ④ <b>답변</b> = 서술형 모범답안(미구축). <br>핵심 한 줄: <b>"양은 찼는데(실문서 777건) 사람검증(★★★★★)은 0건"</b> — 그래서 9월 실데이터·지재원 관리자 검수가 마지막 퍼즐.</p>
+    <p>① <b>분류</b> = 합성/프록시 라벨 기반 상대비교 · ② <b>검색</b> = 근거문서 회수 품질 · ③ <b>적대적</b> = 치명 미탐 회귀 테스트 · ④ <b>답변</b> = 서술형 모범답안(미구축). <br>핵심 한 줄: <b>양은 있어도 locked 사람서명은 0건</b> — 그래서 배포 전 정확도 검증이 아니라 안전 부트스트랩과 운영 확정 루프가 본체다.</p>
   </div>
 
   <hr/>
@@ -118,7 +121,7 @@ footer strong{color:var(--text-dim);}
   <div class="table-wrap"><table>
     <thead><tr><th>종류</th><th>무엇을 재나</th><th>데이터(출처)</th><th>채점 지표</th><th>정직한 실측</th><th class="center">상태</th></tr></thead>
     <tbody>
-      <tr><td><b>분류</b> gold_real (777)</td><td>문서 등급 맞히기</td><td>실문서(판례·금융·특허·NKT·KOIPA)</td><td>F1-macro + <b>방향성 미탐</b></td><td>출처직결 0.83 / 실문서 0.63·S1 0.26~0.32</td><td class="center"><span class="tag done">정본</span></td></tr>
+      <tr><td><b>분류</b> proxy/holdout</td><td>문서 등급 상대비교</td><td>합성·공개·LLM 라벨 혼합</td><td>F1-macro + <b>방향성 미탐</b></td><td>분포 내 프록시 수치만</td><td class="center"><span class="tag dep">프록시</span></td></tr>
       <tr><td><b>검색</b> retrieval (80 + NL 190)</td><td>근거문서 회수</td><td>판례 실문서</td><td>Recall@5</td><td>base 0.89(천장) / 정직 ~0.55~0.70</td><td class="center"><span class="tag done">사용</span></td></tr>
       <tr><td><b>적대적</b> golden_100 (100)</td><td>함정 방어(치명 미탐)</td><td>한 문장 함정</td><td>고위험 미탐 &le; 임계</td><td>미탐 4건 PASS (정확도 41%)</td><td class="center"><span class="tag done">게이트</span></td></tr>
       <tr><td><b>답변</b> answer_gold (0)</td><td>생성 답 정확성</td><td>—</td><td>Citation-F1·충실도</td><td>—</td><td class="center"><span class="tag plan">미구축</span></td></tr>
@@ -129,8 +132,8 @@ footer strong{color:var(--text-dim);}
 
   <div class="section-sep" id="s2"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">각 골든셋 상세</span></div>
 
-  <h2>① 분류 골든셋 (gold_real, 777) — 운영 본체</h2>
-  <p><b>의미</b> : 각 실문서의 진짜 보안등급(TS/S1/S2/S3) 정답. 채점이 쓰는 건 <code>text</code>(모델 입력) + <code>label</code>(정답)뿐, 나머지는 맥락·품질 기록.</p>
+  <h2>① 분류 proxy/holdout — 운영 전 상대비교</h2>
+  <p><b>의미</b> : 합성·공개·LLM 라벨로 만든 상대비교용 데이터. 채점 형식은 <code>text</code> + <code>label</code>이지만, 이 label은 locked 평가 진실이 아니라 프록시다.</p>
   <p><b>채점</b> : 정답 vs 예측 혼동행렬 → F1-macro + <b>방향성 미탐(FNR_underclass)</b>. 심각도순 <code>TS &lt; S1 &lt; S2 &lt; S3</code>에서 <i>정답보다 낮은 등급으로 예측한 것만</i> 미탐으로 셈(과분류는 보안상 안전오류라 제외). TS&rarr;S3 같은 치명 미탐은 1건만 있어도 critical 알람.</p>
   <p><b>실측</b> : 출처직결 라벨(public·nkt)은 F1 0.83·TS/S1 recall&asymp;1.0이지만, 진짜 실문서(llm_judge holdout)는 F1 0.63·<b>S1 recall 0.26~0.32로 붕괴</b>. 운영 미탐 0.018은 모델이 아니라 <b>서빙 룰/게이트</b>(FNR-safe override·most-severe 집계)가 막아낸 값.</p>
   <div class="callout inset"><div class="callout-label">라벨 신뢰도(label_source) — ★★★★★는 0건</div>
@@ -168,7 +171,7 @@ footer strong{color:var(--text-dim);}
   <b>2. 고등급(특히 S1)이 약점</b> — S1 recall 0.26~0.32, 검색 S1 25% 붕괴. 원인 = 실데이터 부족(합성증강으로 못 메움, 실측 확정).<br>
   <b>3. "쉬운 숫자"의 함정</b> — 발췌질의 0.89·출처직결 0.83은 부풀림, 정직값은 0.55~0.70. 이 구분을 못 하면 성능 오해.<br>
   <b>4. 위생은 강화됨</b> — text-hash dedup·누출게이트(raw&rarr;정규화)·순환성 차단·AI 위장서명 가드.<br>
-  <b>5. 합성 &ne; 정본</b> — 합성은 방법론·균형·콜드스타트용 마중물. 운영 진실은 실문서 + 사람검증뿐.
+  <b>5. 합성 &ne; locked 평가</b> — 합성은 방법론·균형·콜드스타트용 마중물. 운영 진실은 관리자 확정과 사람서명 locked뿐.
   </p></div>
 
   <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">추가·반영 방법</span></div>
@@ -176,8 +179,8 @@ footer strong{color:var(--text-dim);}
   <p>나중에 골든셋을 늘리는 절차는 이제 <b>설계가 아니라 구현된 파이프라인</b>이다:</p>
   <div class="callout inset"><div class="callout-label">/golden/build 파이프라인</div>
   <p>① 위생(중복·누출 제거) &rarr; ② 라벨(룰 + LLM) &rarr; ③ 합의(gold 후보 / 검수대상) &rarr; ④ run-스코프 후보파일 <span class="meta-soft">(정본 직접변경 금지)</span> &rarr; ⑤ 검토본 HTML &rarr; ⑥ <b>지재원 관리자 검수·서명</b>(human_review 승급) &rarr; ⑦ promote 게이트(중복·누출·비gold 차단) &rarr; 정본 편입.</p></div>
-  <p><b>두 검수 루프 분리(혼동 금지)</b> : 골든셋 검수(지재원 관리자 + AI agent &rarr; human_review 평가 진실) ↔ 운영 업로드 검수(회원사 폐쇄망 &rarr; 자동확정 안 된 것 &rarr; 교정 &rarr; <code>tb_corrections</code> 적재). 이 교정의 재학습 반영 방식은 <b>미확정 결정</b>(A/B/C — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이며 기본 권고는 <b>무반출(A안)</b> — 교정·원문은 망 내 잔류(반출 금지), 재학습은 지재원이 자기 골든셋으로(고객문서 미사용)·집계 진단지표만 환류. 회원사 교정이 자동으로 ★★★★★ 골든이 되지는 않는다.</p>
-  <p><b>9월 실데이터</b> : 같은 빌더에 입력만 실데이터로. 불변 원칙 — 고등급(S1/TS)은 <b>실문서로만</b>, 순환성 차단, reviewer_id는 <b>지재원 관리자 실계정만</b>(머신/ai_assist 거부).</p>
+  <p><b>두 검수 루프 분리(혼동 금지)</b> : 합성/후보 검수는 학습 시드·프록시 품질관리이고, 운영 업로드 검수는 회원사 폐쇄망에서 관리자 확정으로 <code>tb_corrections</code>에 적재되는 유일한 진짜 데이터다. 교정·원문은 망 내 잔류하며, 기본 반영은 exact-match 선례·집계 진단이다. 회원사 교정은 admission gate와 사람서명 없이는 locked 평가가 되지 않는다.</p>
+  <p><b>제약 완화 또는 운영 확정</b> : 사람서명 locked로 승급하려면 관리자 실계정·서명·감사로그가 필요하다. 머신/ai_assist 라벨은 locked로 승급하지 않는다.</p>
 
   <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">최선 평가·남은 것</span></div>
   <h2>최선인가 / 남은 것</h2>
@@ -187,7 +190,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>채점 설계</td><td>미탐중심·게이트·서빙정합</td><td>—</td><td class="center"><span class="tag done">완료</span></td></tr>
       <tr><td>데이터 위생</td><td>누출게이트·순환성·무결성가드 강화</td><td>—</td><td class="center"><span class="tag done">완료</span></td></tr>
       <tr><td>추가 도구(빌더)</td><td>구현·푸시</td><td>(선택) 검토본 엔드포인트</td><td class="center"><span class="tag done">완료</span></td></tr>
-      <tr><td><b>사람검증</b></td><td><b>0건</b></td><td>9월 지재원 관리자</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+      <tr><td><b>사람검증 locked</b></td><td><b>0건</b></td><td>운영 관리자 확정 또는 별도 사람서명</td><td class="center"><span class="tag dep">운영 루프</span></td></tr>
       <tr><td><b>고등급 데이터</b></td><td>S1 70·TS 55 (16%)</td><td>실 S1/TS 확보(합성 불가)</td><td class="center"><span class="tag dep">발주처</span></td></tr>
       <tr><td>규모/균형</td><td>777</td><td>1,000+</td><td class="center"><span class="tag wip">정밀화</span></td></tr>
       <tr><td>답변셋</td><td>0</td><td>후순위 구축</td><td class="center"><span class="tag plan">예정</span></td></tr>
@@ -195,7 +198,7 @@ footer strong{color:var(--text-dim);}
   </table></div>
 
   <div class="callout inset"><div class="callout-label">한 줄 결론</div>
-  <p><b>채점·위생·추가도구는 최선으로 갖췄다.</b> 운영 본체(분류)는 방향성 미탐으로 채점하고 서빙 게이트가 고등급을 막아낸다. 남은 본질은 단 둘 — <b>① 9월 실데이터로 S1/TS를 채우고 ② 지재원 관리자 사람검증(★★★★★)으로 정본을 확정</b>하는 것. 그건 코드가 아니라 운영·협의 의존이며, 그때 빌더 파이프라인이 그대로 그 일을 처리한다.</p></div>
+  <p><b>채점·위생·추가도구는 부트스트랩 기준으로 갖췄다.</b> 그러나 locked가 0인 한 운영 정확도는 주장하지 않는다. 남은 본질은 <b>① 안전하게 배포하고 ② 관리자 확정을 깨끗하게 포착하며 ③ 자동학습 오염을 admission gate와 locked readiness로 막는 것</b>이다.</p></div>
 
 </article>
 

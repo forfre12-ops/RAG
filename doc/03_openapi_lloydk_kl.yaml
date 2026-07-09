@@ -13,9 +13,9 @@ info:
     모든 응답은 application/json. 파일 업로드는 multipart/form-data.
     날짜·시각은 ISO 8601 UTC. 모든 ID는 UUIDv4.
 
-    내부 RAG 백엔드: Elasticsearch 8.14+ (`secrets-{role}-{tenant}-{model}-{version}`
-    인덱스 + alias). 본 명세는 backend-agnostic 하므로 KL 측은 RAG 동작 세부를
-    몰라도 호출 가능. 상세 설계는 doc/13 (벡터DB ES 전환 계획서) 참고.
+    내부 RAG 백엔드: PostgreSQL pgvector dense + bigram tsvector `ts_rank`
+    하이브리드. 본 명세는 backend-agnostic 하므로 KL 측은 RAG 동작 세부를
+    몰라도 호출 가능. ES 경로는 레거시 어댑터로만 남아 있다.
   version: 1.0.0-draft
   contact:
     name: Lloydk AI Engineering
@@ -52,6 +52,12 @@ tags:
     description: RAG 기반 질의응답 합성
   - name: health
     description: 상태 확인
+  - name: admin
+    description: 운영 관리자 진단·모델 활성화
+  - name: golden
+    description: 골든셋 빌드·검수 산출물
+  - name: promotion
+    description: 교정 라벨 승급 승인
 
 paths:
   /healthz:
@@ -70,6 +76,44 @@ paths:
                   status: { type: string, example: ok }
                   model_version: { type: string, example: "kf-deberta-cls-v1.3.0" }
                   uptime_sec: { type: integer, example: 123456 }
+
+  /healthz/live:
+    get:
+      tags: [health]
+      summary: Liveness Probe
+      security: []
+      responses:
+        '200':
+          description: 프로세스 생존
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /healthz/ready:
+    get:
+      tags: [health]
+      summary: Readiness Probe
+      security: []
+      responses:
+        '200':
+          description: 의존성 준비 완료
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '503':
+          description: 모델·DB·벡터스토어·스토리지 등 준비 미완료
+
+  /healthz/deep:
+    get:
+      tags: [health]
+      summary: 상세 의존성 진단
+      security: []
+      responses:
+        '200':
+          description: 상세 진단 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
 
   /classify:
     post:
@@ -179,9 +223,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [tenant_id, documents]
+              required: [documents]
               properties:
-                tenant_id: { type: string }
                 use_rag: { type: boolean, default: false }
                 documents:
                   type: array
@@ -291,6 +334,49 @@ paths:
                 properties:
                   confirmation_id: { type: string, format: uuid }
                   confirmed_at: { type: string, format: date-time }
+
+  /review-queue:
+    get:
+      tags: [confirm]
+      summary: Review queue lookup
+      description: |
+        Returns server-side pending review items for classifications routed to
+        needs_review or needs_second_review. The default status `pending` includes
+        both review states. When the backing DB is unavailable, the API returns an
+        empty list with `warnings` so clients can distinguish lookup failure from
+        an actually empty queue.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          description: Maximum number of items to return.
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Pagination offset.
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, needs_review, needs_second_review, all]
+            default: pending
+          description: pending means needs_review plus needs_second_review.
+      responses:
+        '200':
+          description: Pending review queue.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewQueueResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /relabel:
     post:
@@ -531,7 +617,7 @@ paths:
       summary: 분류 대상 문서 업로드·ingestion
       description: |
         등급 판정을 받을 업무 문서(HWP/PDF/DOCX/TXT 등)를 업로드한다.
-        포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 원본 object storage 저장 →
+        포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 원본 스토리지 저장 →
         documents/chunks 테이블 적재. 이후 POST /classify?doc_id=<doc_id> 로 등급 요청.
         /guide/documents(지식베이스용 가이드 문서)와 완전 분리된 도메인.
       requestBody:
@@ -544,7 +630,7 @@ paths:
               properties:
                 actor:
                   type: string
-                  description: "Actor JSON 문자열 (user_id, role, tenant_id)"
+                  description: "Actor JSON 문자열 (user_id, role)"
                 doc_type:
                   type: string
                   nullable: true
@@ -568,15 +654,49 @@ paths:
         '422': { description: "빈 파일 또는 actor JSON 오류" }
         '500': { $ref: '#/components/responses/InternalError' }
 
+  /documents/analyze:
+    post:
+      tags: [documents]
+      summary: 업로드 문서 파싱·검수게이트·분류 단계별 진단
+      description: |
+        데모/관리자 콘솔용 read-only 분석 엔드포인트. 문서를 저장하지 않고
+        추출 → 정규화·PII 마스킹 → 청킹 → 검수게이트 → 분류 결과를 한 번에 반환한다.
+        parse에는 table_coverage, table_count, table_cell_count, warnings가 포함되어
+        표 구조화 여부와 잠재 누락 경고를 확인할 수 있다.
+        HWP/HWPX/Office/PDF 표 구조화와 Office 내부 이미지 OCR은 설치된 optional extractor에 따라
+        수행되며, 미설치 또는 미검출 항목은 warnings로 노출된다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                return_evidence:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: 단계별 진단 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { description: "파일 크기 초과 (MAX_UPLOAD_MB)" }
+        '422': { description: "빈 파일 또는 파싱 실패" }
+
   /guide/documents:
     post:
       tags: [guide]
       summary: 학습 가이드 문서 등록·갱신 (FUN-002 연계)
       description: |
         KL이 관리하는 영업비밀 가이드 문서를 Lloydk가 학습 기준으로 사용할 수 있도록
-        등록한다. 등록 시 자동으로 KURE-v1 임베딩되어 Elasticsearch
-        `secrets-guides-{tenant_id}` alias에 반영된다 (Blue/Green 무중단 스왑).
-        상세: doc/13 §4.1, doc/12 §7.3.
+        등록한다. 등록 시 자동으로 KURE-v1 임베딩되어 현재 RAG 백엔드
+        collection/alias에 반영된다. 현재 기본은 PostgreSQL pgvector이며 ES는 레거시 경로다.
       requestBody:
         required: true
         content:
@@ -749,6 +869,155 @@ paths:
                   fnr_by_grade:
                     type: object
                     additionalProperties: { type: number }
+
+  /golden/build:
+    post:
+      tags: [golden]
+      summary: 골든 후보 빌드 작업 생성
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '202':
+          description: 빌드 작업 생성
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /golden/jobs/{job_id}:
+    get:
+      tags: [golden]
+      summary: 골든 빌드 작업 상태 조회
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 작업 상태
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /golden/jobs/{job_id}/review.html:
+    get:
+      tags: [golden]
+      summary: 골든 빌드 검수 HTML
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: HTML 검수 화면
+          content:
+            text/html:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /promotions/pending:
+    get:
+      tags: [promotion]
+      summary: 검증 라벨 승급 대기 목록
+      responses:
+        '200':
+          description: 승급 대기 목록
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /promotions/promote:
+    post:
+      tags: [promotion]
+      summary: 교정 라벨을 검증 라벨로 승급
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: 승급 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /admin/model/reload:
+    post:
+      tags: [admin]
+      summary: 활성 모델 핫리로드
+      responses:
+        '200':
+          description: 리로드 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+
+  /admin/model/activate:
+    post:
+      tags: [admin]
+      summary: 특정 ModelVersion 수동 활성화
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version_label]
+              properties:
+                version_label: { type: string }
+                force: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 활성화 또는 게이트 차단 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+
+  /admin/escalation-held:
+    get:
+      tags: [admin]
+      summary: 이중검토 보류 건수
+      responses:
+        '200':
+          description: 등급별 보류 건수
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+
+  /admin/locked-readiness:
+    get:
+      tags: [admin]
+      summary: locked_gold_eval readiness
+      responses:
+        '200':
+          description: 등급별 locked 평가 준비도
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+
+  /admin/dashboard:
+    get:
+      tags: [admin]
+      summary: 운영 검수 대시보드 종합
+      responses:
+        '200':
+          description: 운영 상태 종합
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
 
   /answer:
     post:
@@ -951,6 +1220,60 @@ components:
         warnings:
           type: array
           items: { type: string }
+
+    ReviewQueueItem:
+      type: object
+      required: [classification_id, doc_id, grade, confidence, model_version, status]
+      properties:
+        classification_id: { type: string }
+        doc_id: { type: string }
+        filename:
+          type: string
+          nullable: true
+        grade:
+          type: string
+          enum: [TS, S1, S2, S3]
+          description: Model-predicted grade awaiting review.
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        model_version: { type: string }
+        status:
+          type: string
+          enum: [needs_review, needs_second_review]
+        classified_at:
+          type: string
+          format: date-time
+          nullable: true
+        text_preview:
+          type: string
+          nullable: true
+
+    ReviewQueueResponse:
+      type: object
+      required: [items, total, limit, offset, warnings]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewQueueItem'
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of queue items matching the requested status filter.
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+        offset:
+          type: integer
+          minimum: 0
+        warnings:
+          type: array
+          items: { type: string }
+          description: Non-empty when queue lookup degraded, for example because DB is unavailable.
 
     RagAnswerRequest:
       type: object

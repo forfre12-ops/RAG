@@ -124,6 +124,9 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <h1 class="title">발주처 의사결정 안건서</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
   <p class="lede">화요일 설계 미팅에서 <strong>지식재산보호원(지재원)</strong>이 확인·승인·합의해야 할 항목을 한 장으로 정리한 결정 요청서. 각 안건은 <em>배경 → 수행사 권고 → 근거 → 결정란</em> 순으로 구성된다. 수행사 설계 확정 사항(통보)은 §A·근거로만 적고, 발주처 판단이 필요한 것만 안건으로 올린다.</p>
 
   <div class="callout inset">
@@ -143,9 +146,9 @@ footer strong{color:var(--text-dim);}
       <tbody>
         <tr><td class="center">A1</td><td>공개·등록 특허 = 3급 공개(S3)</td><td class="center"><span class="tag confirm">확인</span></td><td>가이드 예시(2급) 정정 — 법리상 공개 IP는 영업비밀 불성립</td></tr>
         <tr><td class="center">A2</td><td>v2.2 곱셈 보정 2건 활성화</td><td class="center"><span class="tag approve">승인</span></td><td>기본=가이드 곱셈, 보정=토글. 골든셋 근거로 on 권고</td></tr>
-        <tr><td class="center">A3</td><td>90% 정확도 측정 기준</td><td class="center"><span class="tag agree">합의</span></td><td>전체 정확도 + 고등급(TS·S1) FNR 별도 게이트</td></tr>
+        <tr><td class="center">A3</td><td>운영 확정 기반 성능 기준</td><td class="center"><span class="tag agree">합의</span></td><td>합성/프록시 수치는 참고, 운영 locked 기준 전체 정확도 + 고등급(TS·S1) FNR kill-gate</td></tr>
         <tr><td class="center">A4</td><td>등급 한국어/영문 표시명 확정</td><td class="center"><span class="tag agree">합의</span></td><td>정본 한국어 + 가이드 영문(특급=Confidential)</td></tr>
-        <tr><td class="center">A5</td><td>실데이터(회원사 실문서) 제공</td><td class="center"><span class="tag assist">협조</span></td><td>FNR 실측·특급 표본 확보에 필수</td></tr>
+        <tr><td class="center">A5</td><td>운영 관리자 확정 라벨 포착</td><td class="center"><span class="tag assist">협조</span></td><td>tb_corrections/locked 후보 포착, admission gate, 표본감사에 필수</td></tr>
         <tr><td class="center">A6</td><td>GPU·서버 사양 확정</td><td class="center"><span class="tag assist">협조</span></td><td>본개발 학습·서빙 사양(PER-002)</td></tr>
       </tbody>
     </table>
@@ -212,14 +215,14 @@ footer strong{color:var(--text-dim);}
   <h2>값·기준 합의가 필요한 안건</h2>
 
   <div class="agenda">
-    <div class="agenda-head"><span class="agenda-id">A3</span><span class="agenda-title">90% 정확도 측정 기준</span><span class="tag agree">합의</span></div>
+    <div class="agenda-head"><span class="agenda-id">A3</span><span class="agenda-title">운영 확정 기반 성능 기준</span><span class="tag agree">합의</span></div>
     <div class="agenda-body">
       <h4>쟁점</h4>
-      <p>"정확도 90%"를 <strong>전체 평균</strong>으로 볼지, <strong>등급별</strong>로 볼지. 전체 평균은 다수 등급(S2/S3)에 유리해 고등급 미탐을 가릴 수 있다.</p>
-      <div class="agenda-rec"><b>수행사 권고:</b> 전체 정확도(참고지표) + <b>고등급(TS·S1) 미탐율(FNR)을 핵심 합격 게이트</b>로 분리 측정. 보안 사고 비용이 비대칭이므로 FNR 우선.</div>
+      <p>"정확도 90%"를 <strong>합성/프록시 성능과 운영 locked 성능을 구분하고, 자동확정 확대를 어떤 기준으로 허용할지 정해야 한다. 전체 평균은 다수 등급(S2/S3)에 유리해 고등급 미탐을 가릴 수 있다.</p>
+      <div class="agenda-rec"><b>수행사 권고:</b> 전체 정확도는 참고지표로 두고 <b>고등급(TS·S1) 미탐율(FNR)을 자동확정 확대 kill-gate</b>로 분리한다. locked가 충분히 쌓이기 전에는 수치를 보증하지 않고 검수 라우팅을 기본값으로 둔다.</div>
       <div class="decide-box">
         <span><i class="chk"></i> 전체 평균</span>
-        <span><i class="chk"></i> 등급별 + FNR 게이트(권고)</span>
+        <span><i class="chk"></i> locked 등급별 + FNR kill-gate(권고)</span>
         <span><i class="chk"></i> 기타:______________</span>
       </div>
     </div>
@@ -254,10 +257,10 @@ footer strong{color:var(--text-dim);}
   <h2>자료·자원 협조가 필요한 안건</h2>
 
   <div class="agenda">
-    <div class="agenda-head"><span class="agenda-id">A5</span><span class="agenda-title">실데이터(회원사 실문서) 제공</span><span class="tag assist">협조</span></div>
+    <div class="agenda-head"><span class="agenda-id">A5</span><span class="agenda-title">운영 관리자 확정 라벨 포착</span><span class="tag assist">협조</span></div>
     <div class="agenda-body">
-      <p>현재 평가는 합성 골든셋(100건) + 공개 코퍼스 기반이다. <strong>실문서가 있어야</strong> ① 실 FNR 측정, ② 특급 표본 확보, ③ 손해 시나리오 실측 갱신이 가능하다.</p>
-      <div class="agenda-rec"><b>요청:</b> 비식별·샘플 형태라도 회원사 실문서 제공 여부·시점·범위 협의. (PMR-002)</div>
+      <p>현재 평가는 합성/공개 프록시 기반이다. <strong>운영 관리자 확정 라벨이 쌓여야</strong> ① 실제 FNR 측정, ② 특급 표본 감사, ③ 손해 시나리오 실측 갱신이 가능하다.</p>
+      <div class="agenda-rec"><b>요청:</b> 비식별·샘플 형태라도 운영 회원사 문서 제공 여부·시점·범위 협의. (PMR-002)</div>
       <div class="decide-box"><span><i class="chk"></i> 제공 가능(시점:______)</span><span><i class="chk"></i> 비식별 후 제공</span><span><i class="chk"></i> 불가</span></div>
     </div>
   </div>
@@ -265,7 +268,7 @@ footer strong{color:var(--text-dim);}
   <div class="agenda">
     <div class="agenda-head"><span class="agenda-id">A6</span><span class="agenda-title">GPU·서버 사양 확정</span><span class="tag assist">협조</span></div>
     <div class="agenda-body">
-      <p>본개발 학습(1차학습(2026-09 실문서)+드리프트/이벤트 트리거 단발 재학습 파이프라인 — 상시 아님)·서빙(실시간 추론)의 GPU·서버 사양 확정 필요. (PER-002)</p>
+      <p>서빙(실시간 추론)·확정 포착(tb_corrections)·locked readiness/kill-gate 운영의 GPU·서버 사양 확정 필요. (PER-002)</p>
       <p style="font-size:13px;color:var(--text-dim);">※ 환류 방식 미확정 (기본 A안: 고객 교정·원문은 망 내 잔류, 집계 진단지표만 환류).</p>
       <div class="agenda-rec"><b>요청:</b> 운영 환경(온프레미스/클라우드)·GPU 등급·동시처리 목표 합의.</div>
       <div class="decide-box"><span><i class="chk"></i> 온프레미스</span><span><i class="chk"></i> 클라우드</span><span><i class="chk"></i> 추후 확정</span></div>

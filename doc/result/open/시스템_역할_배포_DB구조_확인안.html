@@ -219,13 +219,16 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <span style="color:var(--text-dim);font-size:12px;">2026-06-25 · 내부 검토용 (Draft)</span>
     </div>
     <h1 class="title">시스템 구조 · 역할 분담 · DB 설계</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
     <p class="lede">KOIPA AI 영업비밀 등급분류 시스템의 <b>역할 분담(KL↔로이드케이)·배포 토폴로지(지재원/고객사)·DB 구조</b>를 정리한 확인안입니다. 아래 구조가 맞는지 검토·확정 부탁드립니다. <b>§6에 확인·합의가 필요한 항목</b>을 모았습니다.</p>
 
     <section id="overview">
       <div class="partition-box" style="font-size:13.5px;line-height:1.7;">
         <b>한눈에 보기</b> &nbsp; <span class="tag-lk">로이드케이</span> = "AI 엔진(합성·학습·분류·검수)", &nbsp; <span class="tag-kl">KL</span> = "관리시스템·인프라·고객사 운영".<br>
         ① <b>지재원(중앙)</b>에서 로이드케이가 학습·골든셋을 만들어 → ② <b>오프라인 매체</b>로 → ③ <b>고객사(폐쇄망)</b>에 배포. 고객사 운영·DB는 KL.<br>
-        고객사 DB는 <b>KL의 PostgreSQL 한 대</b>에 <code>ai_agent</code>(로이드케이)·<code>admin</code>(KL) <b>두 schema로 나눠 공유</b>한다.
+        현 소스 기준 고객사 런타임은 <b>Lloydk 애플리케이션 DB 단일 테이블 세트</b>로 동작한다. KL 원천 문서/EDMS/권한 시스템은 <code>external_ref</code>·API 계약으로 연동하며, <code>ai_agent</code>/<code>admin</code> schema 분리는 아직 구현된 전제가 아니다.
       </div>
     </section>
 
@@ -254,45 +257,42 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         ▲ 네트워크 연결 없음 — 고객사→지재원 직결 불가 (폐쇄망) ▲</div>
     <div class="ok-box"><span class="ok-label">확정</span>고객사는 폐쇄망이라 지재원에 붙을 수 없음. 골든 번들(모델+골든셋+스키마)은 매체로 반입. <b>로이드케이는 고객사에 라이브 접속이 0</b> → 지재원 DB 권한만으로 충분. <span class="logical-name">단, 역방향(고객사→지재원) 검수교정 반출·재학습은 <b>미확정</b> — §6 확인 5의 결정 대상(기본 권고: 문서 무반출·집계 진단만 환류)</span></div>
 
-    <h2 id="db"><span class="num">3</span> DB 구조 — 고객사 KL PostgreSQL · schema 분리</h2>
-    <p class="h2-sub">KL이 어드민도 PostgreSQL로 개발 → 고객사 PostgreSQL은 <b>KL이 제공·운영</b>. 그 한 대를 schema로 나눠 공유.</p>
-    <div class="diagram">[ 고객사 폐쇄망 ]   PostgreSQL  &lt;- KL이 제공·운영 (admin과 공용)
+    <h2 id="db"><span class="num">3</span> DB 구조 — 현재 소스 기준 단일 애플리케이션 스키마</h2>
+    <p class="h2-sub">고객사 PostgreSQL 운영 주체는 KL일 수 있으나, 현재 DDL/ORM은 <b>schema 분리 없이 Lloydk 테이블을 같은 기본 스키마에 생성</b>한다.</p>
+    <div class="diagram">[ 고객사 폐쇄망 ]   PostgreSQL  &lt;- KL 운영 가능 / Lloydk 앱 접속
   |
-  +- schema  admin       &lt;- KL 소유 (이름은 KL이 정함)
-  |     조직·이용자·통계·이력·권한·자료등록 ...
-  |     tb_documents · tb_audit_log · tb_llm_usage · tb_guides
-  |
-  +- schema  ai_agent    &lt;- 로이드케이 소유 (AI 15테이블)
-        tb_chunks · tb_classifications · tb_classification_evidence
+  +- Lloydk application tables (현재 ORM/Alembic)
+        tb_documents · tb_chunks · tb_classifications · tb_classification_evidence
         tb_document_labels · tb_document_factor_scores · tb_corrections
         tb_model_versions · tb_training_(runs·epochs·datasets)
         tb_prompt_versions · tb_sample_documents
         tb_classification_levels · tb_evaluation_factors · tb_level_keywords
+        tb_audit_log · tb_llm_usage · tb_guides · tb_rag_vectors
 
-  연결: ai_agent.tb_chunks.doc_id  -&gt;  admin.tb_documents.doc_id   (schema 넘는 FK OK)</div>
-    <div class="ok-box"><span class="ok-label">권장</span><b>별도 DB(메타디비)가 아니라 같은 DB + schema 분리</b>. 이유: PostgreSQL은 <b>외래키가 DB 경계를 못 넘는다</b>. 자료등록-&gt;청킹-&gt;분류가 <code>doc_id</code> 하나로 꿰여 있어, 같은 DB라야 JOIN·트랜잭션이 살고 권한(GRANT)으로 격리도 충분하다. (벤더 경계 <code>doc_id</code>는 하드 FK 대신 <b>소프트 참조</b>도 선택지 — §6 매트릭스)</div>
+  KL EDMS/관리시스템: external_ref/API/메타데이터로 연동 (현재 cross-schema FK 없음)</div>
+    <div class="ok-box"><span class="ok-label">현재 구현</span>소스에는 <code>ai_agent</code>/<code>admin</code> schema 분리, cross-schema FK, tenant schema 분리가 없다. <code>b2c3d4e5f6a7_drop_tenant</code> 마이그레이션 이후 테넌트 분리도 제거되어, 문서 원천 키는 <code>external_ref</code> 기반 소프트 연동으로 보는 것이 코드와 맞다.</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>층</th><th>무엇</th><th style="width:150px;">누가</th></tr></thead>
       <tbody>
-        <tr><td>PostgreSQL 서버</td><td>설치·버전·백업·접근제어 (admin과 공용)</td><td><span class="tag-kl">KL</span></td></tr>
+        <tr><td>PostgreSQL 서버</td><td>설치·버전·백업·접근제어</td><td><span class="tag-kl">KL</span></td></tr>
         <tr><td>확장</td><td><b>pgvector(필수)</b> · pg_bigm(선택·후보가속) 설치</td><td><span class="tag-kl">KL</span> (명세는 LK)</td></tr>
-        <tr><td><code>admin</code> schema</td><td>어드민 + 문서·감사·비용·가이드</td><td><span class="tag-kl">KL</span></td></tr>
-        <tr><td><code>ai_agent</code> schema</td><td>AI 15테이블 DDL(마이그레이션)·골든셋·모델</td><td><span class="tag-lk">로이드케이</span> 납품 → KL 적용</td></tr>
+        <tr><td>Lloydk DDL</td><td>ORM 19개 테이블 + <code>tb_rag_vectors</code> Alembic SQL</td><td><span class="tag-lk">로이드케이</span> 납품 → KL 적용</td></tr>
+        <tr><td>KL 연동</td><td>원천 문서/EDMS/사용자 권한은 API·<code>external_ref</code>·메타데이터 계약으로 연결</td><td><span class="tag-kl">KL</span> + <span class="tag-lk">LK</span></td></tr>
         <tr><td>앱(api·worker·beat)</td><td>컨테이너 (전용 계정으로 KL DB 접속)</td><td><span class="tag-lk">로이드케이</span> 납품 → KL 기동</td></tr>
       </tbody>
     </table></div>
     <div class="nego" style="font-size:12.5px;"><span class="nego-chip">변경</span> 이 구조면 폐쇄망 번들에서 <b>postgres·minio·mlflow 컨테이너가 빠진다</b> — DB는 KL PG, 스토리지는 로컬 파일시스템, 학습(mlflow)은 지재원에서만. 번들 = <b>api·worker·beat(+redis)</b> 로 슬림.</div>
 
     <h2 id="ownership"><span class="num">4</span> 테이블 소유 경계</h2>
-    <p class="h2-sub">같은 PostgreSQL 안에서 schema로 소유를 나눈다.</p>
+    <p class="h2-sub">현재 소스 기준 테이블은 schema로 나뉘지 않는다. 소유 경계는 DB schema가 아니라 런타임 책임과 외부 연동 계약으로 구분한다.</p>
     <div class="tbl-wrap"><table>
-      <thead><tr><th style="width:130px;">schema</th><th>테이블</th><th style="width:90px;">소유</th></tr></thead>
+      <thead><tr><th style="width:130px;">구분</th><th>테이블/대상</th><th style="width:90px;">책임</th></tr></thead>
       <tbody>
-        <tr><td><code>ai_agent</code> (15)</td><td>tb_classification_levels · evaluation_factors · level_keywords · chunks · document_labels · document_factor_scores · classifications · classification_evidence · model_versions · training_runs · training_epochs · training_datasets · corrections · prompt_versions · sample_documents</td><td><span class="tag-lk">로이드케이</span></td></tr>
-        <tr><td><code>admin</code></td><td>tb_documents(자료등록) · tb_audit_log(이력) · tb_llm_usage(비용) · tb_guides(가이드) · tb_self_assessments(자가진단) + 어드민 테이블(조직·이용자·권한 …)</td><td><span class="tag-kl">KL</span></td></tr>
+        <tr><td>Lloydk DB</td><td>tb_classification_levels · evaluation_factors · level_keywords · documents · chunks · document_labels · document_factor_scores · classifications · classification_evidence · model_versions · training_runs · training_epochs · training_datasets · corrections · prompt_versions · sample_documents · audit_log · llm_usage · guides · rag_vectors</td><td><span class="tag-lk">로이드케이</span></td></tr>
+        <tr><td>KL 외부</td><td>EDMS 원천 문서 · 조직/이용자/권한 · 자가진단 · 고객사 관리시스템. Lloydk에는 <code>external_ref</code>/메타데이터/API 응답으로 전달</td><td><span class="tag-kl">KL</span></td></tr>
       </tbody>
     </table></div>
-    <p style="font-size:12.5px;color:var(--text-dim);">※ 로이드케이 테이블이 쓰는 <code>doc_id</code>는 KL의 <code>admin.tb_documents</code>를 참조하는 외부 키다(추출=FUN-022 로이드케이, 자료등록·저장=FUN-001 KL).</p>
+    <p style="font-size:12.5px;color:var(--text-dim);">※ 현재 구현에서 <code>doc_id</code>는 Lloydk <code>tb_documents</code>의 PK다. KL 원천 문서 키는 <code>external_ref</code> 등으로 연결한다.</p>
 
     <h2 id="flow"><span class="num">5</span> 데이터 흐름 (오프라인)</h2>
     <div class="diagram">IN  (지재원 -&gt; 고객사) :  골든 번들 = 모델 + 골든셋 + 스키마 DDL(마이그레이션) + 앱 이미지
@@ -305,10 +305,10 @@ OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 
     <h2 id="confirm"><span class="num">6</span> 확인 · 합의 필요</h2>
     <p class="h2-sub">아래 항목이 위 구조의 전제입니다. 맞는지 / KL과 합의가 됐는지 확인 바랍니다.</p>
 
-    <div class="nego"><span class="nego-label">확인 1</span><b>고객사 DB = KL의 PostgreSQL 운영</b> (로이드케이는 지재원 DB만). 폐쇄망이라 로이드케이가 고객사 DB를 운영하는 건 물리적으로 불가 → KL 운영이 맞나?</div>
-    <div class="nego"><span class="nego-label">확인 2</span><b>schema 분리</b> — 같은 KL DB에 <code>ai_agent</code>(LK)·<code>admin</code>(KL) 두 schema. 별도 DB(메타디비) 대신 schema 분리로 가는 것 동의하나? (doc_id FK 때문)</div>
+    <div class="nego"><span class="nego-label">확인 1</span><b>고객사 DB 운영 주체</b> — 폐쇄망 고객사 PostgreSQL을 KL이 운영하고 Lloydk 앱은 전용 계정으로 접속하는 전제가 맞나?</div>
+    <div class="nego"><span class="nego-label">확인 2</span><b>schema 분리 여부</b> — 현 소스는 단일 스키마/테이블 세트다. <code>ai_agent</code>/<code>admin</code> 분리가 필요하면 ORM/Alembic/권한 설계를 별도 변경해야 한다.</div>
     <div class="nego"><span class="nego-label">확인 3</span><b>확장 설치</b> — KL PG에 <b>pgvector(필수)</b> 설치 가능한가? (벡터검색 필수) pg_bigm은 선택 — 한국어 후보생성 가속용이고, 랭킹은 코어 <code>ts_rank</code>(별도 확장 불요)가 담당.</div>
-    <div class="nego"><span class="nego-label">확인 4</span><b>스키마 적용 주체·FK 권한</b> — 로이드케이 마이그레이션(ai_agent DDL)을 <b>KL이 적용</b>하나, 아니면 로이드케이 컨테이너에 일시 DDL 권한을 주나? cross-schema FK(<code>ai_agent</code>→<code>admin.tb_documents</code>)는 <b>admin.tb_documents 선생성 + 로이드케이 계정에 REFERENCES 권한</b>이 전제(SELECT만으론 FK 생성 불가).</div>
+    <div class="nego"><span class="nego-label">확인 4</span><b>DDL 적용 주체</b> — Lloydk 마이그레이션을 <b>KL이 적용</b>하나, 아니면 Lloydk 컨테이너에 일시 DDL 권한을 주나? 현재 구현에는 cross-schema FK가 없으므로 <code>admin.tb_documents</code> 선생성/REFERENCES 권한 전제는 적용되지 않는다.</div>
     <div class="nego"><span class="nego-label">확인 5</span><b>보정 환류 — "포맷"이 아니라 "반출 여부"가 먼저다.</b> 고객사 검수교정을 지재원으로 반출해 재학습하는 그림은 세 가지로 막힌다: ① <code>tb_corrections</code>를 DB→파일로 뽑는 <b>export 도구가 아직 없다</b>(현 <code>import_review_corrections.py</code>는 import 전용·트리거 미연결), ② 반출 포맷이 라벨(<code>doc_id·model_label·human_label·reason</code>)뿐이면 <b>원문 텍스트가 없어 분류기 재학습 자체가 불가</b>(학습은 <code>Chunk.content</code> 필요·원문은 고객사에만 존재), ③ <code>reason</code> 자유텍스트가 원문 발췌를 담을 수 있어 "메타데이터-only도 무해하지 않다". → <b>폐쇄망 고객이 문서단위 검수데이터 반출에 동의하겠는가</b>를 먼저 결정해야 한다(컬럼 규약은 그 다음 문제). <b>두 채널을 구분하라</b> — ① <b>문서 채널</b>(doc_id·원문·발췌)은 어느 안이든 <b>망 밖으로 내보내지 않는다</b>; ② <b>집계 진단 리포트</b>(등급별 오분류율·혼동행렬 카운트·문서식별 불가)는 지재원이 현장 성능을 보고 <b>고등급 사각지대의 우선순위를 잡는</b> 용도다 — 단 이건 <b>조준 신호일 뿐, 갭을 메우는 데이터가 아니다</b>(보강할 실데이터는 지재원이 자기 공개·프록시 코퍼스에서 따로 확보하며, 고등급일수록 A안만으론 못 메운다 → B안). 양이 작아(혼동행렬 한 장 분량) <b>자동 반출 채널이 아니라 고정 양식의 정기 리포트를 메일·유선·정기보고로 전달</b>하면 충분하고, 양식을 못박는 목적은 전송이 아니라 <b>'문서식별 필드 없음'을 고객 보안팀이 1회 승인</b>받기 위함이다. 아래 A/B/C 중 택1(②는 공통 필수).</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th style="width:120px;">안</th><th>무엇</th><th style="width:150px;">망 밖 반출</th><th style="width:120px;">권고</th></tr></thead>
@@ -326,14 +326,14 @@ OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 
     <div class="tbl-wrap"><table>
       <thead><tr><th style="width:200px;">경계</th><th>규약 (권고)</th><th style="width:120px;">근거</th></tr></thead>
       <tbody>
-        <tr><td><code>ai_agent</code> → <code>admin.tb_documents</code></td><td>FK 생성 시 로이드케이 계정에 <code>REFERENCES</code> + <code>SELECT</code> on <code>admin.tb_documents</code> 필요 · <code>admin.tb_documents</code> <b>선생성</b> 후 ai_agent 마이그레이션 적용</td><td>PG cross-schema FK 전제</td></tr>
-        <tr><td>벤더 경계 FK</td><td><b>소프트 참조 권고</b>(<code>doc_id</code> 컬럼 + 앱-레벨 정합성, 제약 없음) — 두 벤더 마이그레이션 생명주기 디커플 · <code>ai_agent</code> <b>내부</b> 테이블 간은 하드 FK CASCADE 유지</td><td>2-벤더 폐쇄망 디커플</td></tr>
-        <tr><td>학습 테이블 (ai_agent)</td><td><code>training_runs·epochs·datasets</code>·<code>prompt_versions</code>·<code>sample_documents</code>는 <b>고객사에서 공란</b>(단일 DDL을 양쪽 배포) · <code>model_versions</code>만 감사·롤백용 적재 · <code>tb_corrections</code>는 고객사 검수 교정으로 채워짐</td><td>고객사 = 추론 전용</td></tr>
-        <tr class="nego-row"><td><code>admin.tb_llm_usage</code></td><td>고객사 온프렘 LLM(/answer·선택 2차판정) 호출 시 기록 — 현 런타임 미호출이라 공란일 뿐, <b>구조적 공란 아님</b>. 로이드케이 컨테이너가 KL 소유 <code>admin</code> 스키마에 쓰려면 <b>INSERT grant 필요</b>(역방향 쓰기 결합) → GRANT 매트릭스에 명시</td><td>고객사 온프렘 LLM 실재</td></tr>
+        <tr><td>Lloydk ↔ KL 원천 문서</td><td><code>tb_documents.doc_id</code>는 Lloydk PK, KL EDMS 키는 <code>external_ref</code>로 보존한다. 하드 FK 대신 API/메타데이터 기반 소프트 연동.</td><td>현재 구현</td></tr>
+        <tr><td>벤더 경계 FK</td><td><b>소프트 참조</b>가 현 코드와 맞다. schema 분리와 cross-schema FK가 필요하면 별도 설계 변경 대상이다.</td><td>2-벤더 폐쇄망 디커플</td></tr>
+        <tr><td>학습 테이블</td><td><code>training_runs·epochs·datasets</code>·<code>prompt_versions</code>·<code>sample_documents</code>는 고객사 추론 전용 배포에서는 비어 있을 수 있다. <code>model_versions</code>는 감사·롤백용, <code>tb_corrections</code>는 고객사 검수 교정으로 채워진다.</td><td>고객사 = 추론 전용</td></tr>
+        <tr class="nego-row"><td><code>tb_llm_usage</code></td><td>고객사 온프렘 LLM(/answer·선택 2차판정) 호출 시 Lloydk DB에 기록한다. KL 비용 정산 시스템으로 넘길지는 별도 API/리포트 계약이다.</td><td>고객사 온프렘 LLM 실재</td></tr>
       </tbody>
     </table></div>
 
-    <div class="partition-box" style="margin-top:18px;font-size:12.5px;color:var(--text-dim);">정리: 위 7개가 확정되면 — ① 부록A(DB 스키마)에 'ai_agent schema·KL PG 적용' 전제 명시 ② 폐쇄망 배포 설계서에 'DB=KL 운영·번들 슬림' 반영 ③ 부록B(API) 키워드 관리 등 백엔드는 이미 준비됨. <b>막는 기술 이슈는 없고, 역할·인터페이스 합의만 남음.</b></div>
+    <div class="partition-box" style="margin-top:18px;font-size:12.5px;color:var(--text-dim);">정리: 현재 소스 기준으로는 ① 단일 Lloydk 애플리케이션 스키마 ② KL 원천 문서와는 <code>external_ref</code>/API 소프트 연동 ③ 키워드 관리·API 키 회전은 별도 HTTP 라우터 미구현이다. schema 분리나 cross-schema FK를 확정하려면 코드/마이그레이션 변경 항목으로 잡아야 한다.</div>
 
   </article>
 </div>

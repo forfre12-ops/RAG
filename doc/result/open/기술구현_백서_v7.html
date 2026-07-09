@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -318,6 +318,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     </div>
 
     <h1 class="title">기술 구현 백서</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
     <p class="lede">본 백서는 KOIPA 영업비밀관리시스템 AI 코어의 <b>프로토타입(PoC) 검증 결과</b>와 <b>핵심 모델 선정 근거</b>, 그리고 <b>본개발을 어떻게 진행할지</b>를 정리한다. 시스템 구조와 문서 분류 워크플로우를 중심으로, 무엇을 어떤 기술로 만들 것인지를 명확히 제시하는 것을 목적으로 한다.</p>
 
     <!-- Hero KPIs -->
@@ -382,7 +385,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 6개가 Lloydk(AI 코어) 담당 범위다. 나머지 18개(메뉴·로그인·조직/이용자·서약서·통계·이력·PC·워터마크·반출승인·자료등록 등)는 KL이 담당한다.</p>
 
       <h3>1.3 개발 진행 단계</h3>
-      <p>프로토타입(PoC)으로 핵심 기술의 타당성과 모델 선정을 먼저 검증하고, 그 결과를 바탕으로 발주처 실데이터를 적용한 본개발을 진행한다.</p>
+      <p>프로토타입(PoC)으로 핵심 기술의 타당성과 모델 선정을 먼저 검증하고, 그 결과를 바탕으로 제약 완화 시 발주처 실데이터를 적용한 본개발을 진행한다.</p>
       <ul class="timeline">
         <li>
           <div class="tl-date">1단계 · 완료</div>
@@ -407,12 +410,12 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <li>
           <div class="tl-date">5단계 · 예정</div>
           <div class="tl-title">본개발 — 실데이터 학습·정밀화</div>
-          <div class="tl-desc">발주처 실데이터로 분류 모델을 학습·정밀화하고, 운영 환경에 통합한다(§11).</div>
+          <div class="tl-desc">제약 완화 시 발주처 실데이터로 분류 모델을 학습·정밀화하고, 운영 환경에 통합한다(§11).</div>
         </li>
         <li>
           <div class="tl-date">6단계 · 예정</div>
-          <div class="tl-title">실데이터 시범 운영 → 정식 오픈</div>
-          <div class="tl-desc">운영 환경에서 사람 확정 모드로 시범 운영하며 실제 정확도(미탐률)를 측정하고, 기준 충족 시 정식 오픈한다(§11.1).</div>
+          <div class="tl-title">실데이터 시범 운영 → 자동확정 범위 확대</div>
+          <div class="tl-desc">운영 환경에서 사람 확정 모드로 시범 운영하며 실제 정확도(미탐률)를 측정하고, 기준 충족 시 자동확정 범위 확대한다(§11.1).</div>
         </li>
       </ul>
 
@@ -548,7 +551,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>2.1.2 배포 토폴로지 — 지재원(골든셋·학습) / 고객사 agent(추론)</h3>
-      <p>본 시스템은 <b>2-tier 배포</b>다. 중앙의 <b>지재원</b> 1곳은 골든셋 구성과 모델 학습만 담당하고, <b>고객사 AI agent</b> N곳은 추론(등급 분류)·RAG 보조·감사만 담당한다. 학습 결과(분류기·참조 임베딩)는 <b>오프라인 골든 번들</b>로 export해 고객사에 적재한다. 고객사 교정의 활용 방식은 <b>미확정 결정(A/B/C)</b>이며 <b>기본 권고는 A안</b> — 교정·원문은 고객사 망 내 잔류(반출 금지), 재학습은 지재원이 <b>자기 골든셋으로</b> 수행(고객문서 미사용)하고, 망 밖으로는 문서식별 불가한 <b>집계 진단지표(등급별 오분류율·혼동행렬)만</b> 환류한다. 모델은 상시 재학습이 아니라 실데이터 1차학습 + 드리프트/이벤트 트리거 단발이다. 고객사 웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위이며, 고객사 agent는 OpenAPI 계약만 노출한다.</p>
+      <p>본 시스템은 <b>2-tier 배포</b>다. 중앙의 <b>지재원</b> 1곳은 합성 코퍼스·룰/게이트 번들과 모델 패키징을 담당하고, <b>고객사 AI agent</b> N곳은 추론(등급 분류)·RAG 보조·감사·관리자 확정 포착을 담당한다. 고객사 교정·원문은 망 내 잔류(반출 금지)하며, 기본 반영은 exact-match 선례·상향 라우팅·집계 진단지표로 제한한다. 재학습/kNN 전파는 locked 충분량·shadow 검증·별도 승인 이후 단발로만 연다. 고객사 웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위이며, 고객사 agent는 OpenAPI 계약만 노출한다.</p>
 
       <div style="margin:16px 0;overflow-x:auto;">
         <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;min-width:600px;display:block;" aria-label="2-tier 배포 토폴로지">
@@ -794,7 +797,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
         <div class="callout-body"><b>워크플로우 3대 원칙 (오해 방지)</b><br>
-        ① <b>분류기는 항상 판단한다.</b> "판단 불가" 상태는 없으며, 항상 등급 + confidence를 산출한다. confidence가 낮다는 것은 <b>"판단했으나 사람 검증이 필요"</b>라는 플래그이지 "분류기가 못 했다"가 아니다. 다만 confidence는 분류기가 학습한 신뢰도가 아니라 <b>softmax 파생값</b>이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58) — 그래서 자동확정은 confidence 단독이 아니라 <b>다단 게이트</b>(합의·희소근거, opt-in·기본 OFF)로 판단한다(§2.4 ⑦).<br>
+        ① <b>분류기는 항상 판단한다.</b> "판단 불가" 상태는 없으며, 항상 등급 + confidence를 산출한다. confidence가 낮다는 것은 <b>"판단했으나 사람 검증이 필요"</b>라는 플래그이지 "분류기가 못 했다"가 아니다. 다만 confidence는 분류기가 학습한 신뢰도가 아니라 <b>softmax 파생값</b>이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58) — 그래서 자동확정은 confidence 단독이 아니라 <b>다단 게이트</b>(희소근거는 룰-폴백 기본 ON, 합의는 base 기본 OFF·운영 프로파일 별도)로 판단한다(§2.4 ⑦).<br>
         ② <b>RAG는 불확실 시 켜지는 폴백이 아니라 추론 단계에서 분류와 <u>병렬</u>로 도는 참고 보강</b>이다. 유사 기준문서 Top-K를 근거로 첨부할 뿐 <b>등급 결정을 바꾸지 않으며</b>, 검색이 실패해도 분류는 그대로 진행된다(graceful degradation).<br>
         ③ <b>"기준값 변경"은 임계값 자동조정이 아니라 모델 재학습(가중치)</b>이다. confidence 임계값(기본 0.7)은 고정 설정이며, 재학습은 자동이 아닌 관리자 수동 절차다(하단 모델 갱신 절차).</div>
       </div>
@@ -811,7 +814,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-code">④<br>PII 마스킹</td><td>worker</td><td>주민번호·전화·이메일·계좌·사업자번호 등 <b>구조적 식별자 11패턴</b>을 마스킹한다(고객사 특화 패턴·개체명(NER) 마스킹은 옵션). <b>추출 텍스트에 적용</b>되어 분류·색인·검수 화면 어디에도 원본 PII가 흐르지 않는다.</td><td>—</td></tr>
             <tr><td class="td-code">⑤<br>저장</td><td>worker</td><td><b>원본 바이너리</b>는 증빙용으로 <b>암호화 보관</b>하고, <b>마스킹된 정규화 텍스트·청크</b>만 분류·색인 경로로 보낸다. 원본·마스킹본·청크·임베딩·색인 각 단계의 PII 잔존·암호화·보관기간 정책은 데이터 흐름표(부록 A)로 관리한다.</td><td>원본(암호화) → <b>KL 원문저장(로컬FS · AES-256-GCM)</b> · <code>tb_chunks</code> → PG(월별 파티션)</td></tr>
             <tr><td class="td-code">⑥<br>등급 추론 (M5)</td><td>worker</td><td>해당 문서에 사람이 확정한 라벨이 이미 있으면 <b>즉시 그 라벨 사용</b>(<code>_get_verified_label</code>, 모델 추론 생략). 그 외에는 청크별 KF-DeBERTa softmax를 집계하되 <b>고등급(TS·S1)은 최고-위험 청크 우선(max-pooling)</b>으로 잡고, <b>3요건 곱셈 등급(S×V×M, 하단 '등급 산정 방식')과, 업로드 <u>메타정보(출처·문서유형)를 결합</u>한 출처·콘텐츠 2-게이트·미탐 판정 가드</b>(하단 '등급 하향 방어')를 적용해 <b>등급 + confidence</b>를 산출한다. "판단 불가"는 없다 — 항상 산출. 동시에 <b>RAG 근거 검색이 병렬</b>로 돈다(하단 RAG 참고 방식).</td><td>분류 결과 → PG</td></tr>
-            <tr><td class="td-code">⑦<br>confidence 게이트</td><td>worker/api</td><td>자동확정·검수 라우팅은 confidence 임계(기본 0.7) <b>단독이 아니라 다단 게이트</b>로 결정한다. 기본 경로는 confidence ≥ 0.7(<code>review_confidence_threshold</code>, 고정 설정) → <b>⑦a staging 임시저장</b>(관리자 검토 대기), 미만 → <b>⑦b</b> <code>status="needs_review"</code> + warning, <b>검수자 큐 자동 배분</b>(동률 시 저신뢰 우선 정렬)이다. confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하며 정답/오답 판별력이 낮으므로(골든500 AUROC 0.58), 다단 게이트를 둔다 — <b>① 합의 게이트</b>(<code>agreement_gate_enabled</code>)와 <b>escalation τ</b>(<code>classifier_escalation_tau</code>=0.30)는 <b>onprem-local/full-train 배포 프로파일 기본 ON</b>: 합의 게이트는 자동확정을 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 불일치는 사람 검수로(자동확정 정밀도 63→81%), escalation은 저마진 고등급을 적극 승격해 미탐을 줄인다(clean 홀드아웃 실측 FNR 0.174→0.087·TS recall→1.0). <b>② 희소근거 게이트</b>(<code>rule_fallback_min_evidence</code>): 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단(golden100 무성 TS 미탐 5→0)은 opt-in. 모든 게이트는 등급을 무인 변경하지 않고 검수 라우팅만 한다. TS/S1 자동확정분은 표본감사한다. TS/S1 자동확정분은 표본감사한다.</td><td>PG</td></tr>
+            <tr><td class="td-code">⑦<br>confidence 게이트</td><td>worker/api</td><td>자동확정·검수 라우팅은 confidence 임계(기본 0.7) <b>단독이 아니라 다단 게이트</b>로 결정한다. 기본 경로는 confidence ≥ 0.7(<code>review_confidence_threshold</code>, 고정 설정) → <b>⑦a staging 임시저장</b>(관리자 검토 대기), 미만 → <b>⑦b</b> <code>status="needs_review"</code> + warning, <b>검수자 큐 자동 배분</b>(동률 시 저신뢰 우선 정렬)이다. confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하며 정답/오답 판별력이 낮으므로(골든500 AUROC 0.58), 다단 게이트를 둔다 — <b>① 합의 게이트</b>(<code>agreement_gate_enabled</code>)와 <b>escalation τ</b>(<code>classifier_escalation_tau</code>=0.30)는 <b>onprem-local/full-train 배포 프로파일 기본 ON</b>: 합의 게이트는 자동확정을 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 불일치는 사람 검수로(자동확정 정밀도 63→81%), escalation은 저마진 고등급을 적극 승격해 미탐을 줄인다(clean 홀드아웃 실측 FNR 0.174→0.087·TS recall→1.0). <b>② 희소근거 게이트</b>(<code>rule_fallback_min_evidence</code>): 룰-폴백 경로에서 단일 약한 키워드만으로 conf=1.0이 되는 자동확정을 차단(golden100 무성 TS 미탐 5→0)하며 기본값은 <code>0.9</code>다. 모든 게이트는 등급을 무인 변경하지 않고 검수 라우팅만 한다. TS/S1 자동확정분은 표본감사한다.</td><td>PG</td></tr>
             <tr><td class="td-code">⑧<br>사람 최종 확정</td><td>관리자 / 검수자 (UI)</td><td>⑦a: 관리자가 staging 결과 검토 후 <b>최종 등급 확정</b>(FUN-005: 임시저장 → 관리자 최종확정). ⑦b: 검수자가 <b>라벨 + 사유</b> 부여 → 해당 문서에 즉시 정답 반영, 동시에 <code>tb_corrections</code>에 적재(모델 갱신 절차의 입력 — 갱신 자체는 자동 아님). <b>등급의 최종 결정권자는 항상 사람이다.</b></td><td>PG (verified label · <code>tb_corrections</code>)</td></tr>
             <tr><td class="td-code">공통<br>감사·관측</td><td>전 구간 상시</td><td>전 단계 API 호출 SHA-256 해시 체인 기록(사후 변조 탐지), Prometheus 지표 노출, Drift Monitor 15분 주기 분포 감시(§9).</td><td>PG <code>tb_audit_log</code>(월별 파티션)</td></tr>
           </tbody>
@@ -950,7 +953,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
-        <div class="callout-body"><b>설계 핵심 — confidence 게이트만으로는 미탐을 못 막는다.</b> 0.7 신뢰도 게이트는 <b>저신뢰</b> 오류만 검수로 보낸다. 게다가 confidence는 분류기가 학습한 신뢰도가 아니라 <b>softmax 파생값</b>이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 학습에 없던 새 문체(OOD)에서 모델이 <b>높은 confidence로 하향 오분류</b>하면 게이트를 그대로 통과하므로, 위 ①·②의 <b>판정 시점 상향 가드</b>로 별도 차단한다. 또한 자동확정·검수 라우팅 자체를 confidence 임계 단독이 아니라 <b>다단 게이트</b>로 강화한다(둘 다 <b>옵트인·기본 OFF</b>라 켜기 전 기본 동작은 변하지 않는다): <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence</code>)는 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단하고(golden100 무성 TS 미탐 5→0), <b>합의 게이트</b>(<code>agreement_gate_enabled</code>)는 자동확정을 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 그 외 불일치는 사람 검수로 보낸다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). 이 가드·게이트의 실제 미탐 차단율은 합성 데이터로는 측정할 수 없으며 <b>본개발 실데이터로 확정</b>한다(§10·§11). ③ 출처 게이트는 ingest가 문서 출처(provenance)를 정확히 태깅할 때 작동하므로, <b>출처 메타데이터 적재·전달</b>을 본개발에서 배선한다(§11.2). <b>②·③ 충돌 규칙:</b> 출처 게이트(③, 하향)가 강한 상향 신호(①·②)를 덮을 때는 <b>자동 확정하지 않고 검수자에게 보낸다(needs_review)</b> — 진짜 공개문서는 사람이 즉시 확인하고, 내부 비밀문서가 '공개'로 오태깅된 경우(silent miss)는 여기서 걸러진다. 즉 출처 cap은 콘텐츠 상향 가드를 <b>무인으로 덮지 않는다</b>.</div>
+        <div class="callout-body"><b>설계 핵심 — confidence 게이트만으로는 미탐을 못 막는다.</b> 0.7 신뢰도 게이트는 <b>저신뢰</b> 오류만 검수로 보낸다. 게다가 confidence는 분류기가 학습한 신뢰도가 아니라 <b>softmax 파생값</b>이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 학습에 없던 새 문체(OOD)에서 모델이 <b>높은 confidence로 하향 오분류</b>하면 게이트를 그대로 통과하므로, 위 ①·②의 <b>판정 시점 상향 가드</b>로 별도 차단한다. 또한 자동확정·검수 라우팅 자체를 confidence 임계 단독이 아니라 <b>다단 게이트</b>로 강화한다. <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence=0.9</code>)는 룰-폴백 경로 기본 ON으로 단일 약한 키워드만으로 conf=1.0이 되는 자동확정을 차단하고(golden100 무성 TS 미탐 5→0), <b>합의 게이트</b>(<code>agreement_gate_enabled</code>)는 base 기본 OFF(운영 프로파일 별도)이며 자동확정을 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 그 외 불일치는 사람 검수로 보낸다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). 이 가드·게이트의 실제 미탐 차단율은 합성 데이터로는 측정할 수 없으며 <b>운영 관리자 확정 locked가 쌓인 뒤에만 확정</b>한다(§10·§11). ③ 출처 게이트는 ingest가 문서 출처(provenance)를 정확히 태깅할 때 작동하므로, <b>출처 메타데이터 적재·전달</b>을 본개발에서 배선한다(§11.2). <b>②·③ 충돌 규칙:</b> 출처 게이트(③, 하향)가 강한 상향 신호(①·②)를 덮을 때는 <b>자동 확정하지 않고 검수자에게 보낸다(needs_review)</b> — 진짜 공개문서는 사람이 즉시 확인하고, 내부 비밀문서가 '공개'로 오태깅된 경우(silent miss)는 여기서 걸러진다. 즉 출처 cap은 콘텐츠 상향 가드를 <b>무인으로 덮지 않는다</b>.</div>
       </div>
 
       <h4>문서 처리 상태 전이</h4>
@@ -1192,7 +1195,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
-        <div class="callout-body"><b>벤치마크 수치 구분 — 운영 기준은 "누출 제거 clean 실측"이다.</b> 과거 OSS 학습본 F1 0.848은 <b>법률 코퍼스 오염 정제 전</b> 수치다(§7.7). 또한 비즈니스 홀드아웃 109건 기준 수치(F1_macro 0.686 · Accuracy 0.706 · 방향성 FNR 0.018)는 <b>학습셋과 본문 텍스트가 42% 중복(누출)</b>돼 안전성을 과대평가하므로 운영 기준에서 제외하고 참고로만 둔다. 정직한 운영 기준은 <b>누출을 제거한 clean 실측(정확도 77% · 고등급 FNR 6.6% · F1_macro ≈0.78)</b>이며, 최종값은 발주처 실데이터로 확정한다(§11).</div>
+        <div class="callout-body"><b>벤치마크 수치 구분 — 운영 기준은 "누출 제거 clean 실측"이다.</b> 과거 OSS 학습본 F1 0.848은 <b>법률 코퍼스 오염 정제 전</b> 수치다(§7.7). 또한 비즈니스 홀드아웃 109건 기준 수치(F1_macro 0.686 · Accuracy 0.706 · 방향성 FNR 0.018)는 <b>학습셋과 본문 텍스트가 42% 중복(누출)</b>돼 안전성을 과대평가하므로 운영 기준에서 제외하고 참고로만 둔다. 정직한 운영 기준은 <b>누출을 제거한 clean 실측(정확도 77% · 고등급 FNR 6.6% · F1_macro ≈0.78)</b>이며, 최종값은 제약 완화 시 발주처 실데이터로 확정한다(§11).</div>
       </div>
 
       <div class="callout">
@@ -1277,14 +1280,14 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <h4>분류 모델 학습</h4>
           <div class="mod-fun">KF-DeBERTa 학습 · 실험 추적 · 모델 버전 관리</div>
           <p>선정한 분류 모델(KF-DeBERTa)을 4등급 분류기로 학습한다. 학습 데이터는 등급별 층화 70/15/15로 학습/검증/평가셋에 자동 분리하며, 같은 내용이 학습·평가에 동시 포함되는 누수를 차단(정규화 텍스트 dedup)해 평가셋이 <b>모델이 한 번도 보지 않은 데이터</b>가 되도록 보장한다. 평가셋 기준으로 정확도·정밀도·재현율·F1 리포트를 산출하고, 본 사업 핵심 KPI인 <b>미탐율(FNR — 고등급을 낮은 등급으로 흘린 비율)</b>을 등급별로 분리 보고한다.</p>
-          <p>모델 선정은 단순 정확도가 아니라 <b>미탐 최소화</b>를 기준으로 한다. 고등급(TS·S1) 표본에 비대칭 손실 가중을 주고, '전부 고등급 찍기' 식 게이밍을 막는 합성 지표(미탐율 + 과분류율 + 단일클래스 패널티)로 best 모델을 선택한다. 평가는 신뢰수준을 구분한 다층 체계(합성 일관성 → LLM pseudo-gold → 디오염 홀드아웃 → 발주처 사람 라벨)로 운영하며, 보고 수치는 학습 누수가 없는 <b>디오염 홀드아웃·운영 파이프라인 기준</b>을 사용한다. 학습 과정·결과는 실험 추적 도구(MLflow)로 기록하고, 모델은 버전 단위로 저장·배포한다(온프렘 GPU). RAG 인덱싱은 선택 옵션이다.</p>
+          <p>모델 선정은 단순 정확도가 아니라 <b>미탐 최소화</b>를 기준으로 한다. 고등급(TS·S1) 표본에 비대칭 손실 가중을 주고, '전부 고등급 찍기' 식 게이밍을 막는 합성 지표(미탐율 + 과분류율 + 단일클래스 패널티)로 best 모델을 선택한다. 평가는 신뢰수준을 구분한 다층 체계(합성 일관성 → LLM pseudo-gold → 디오염 holdout → 운영 관리자 확정 locked)로 운영한다. 단 locked가 0인 동안 보고 수치는 <b>프록시·상대비교·메커니즘 검증</b>으로만 사용한다. 학습 과정·결과는 실험 추적 도구(MLflow)로 기록하고, 모델은 버전 단위로 저장·배포한다(온프렘 GPU). RAG 인덱싱은 선택 옵션이다.</p>
           <div style="margin:12px 0;padding:10px 12px;border-left:3px solid var(--accent,#3b6ea5);background:rgba(59,110,165,0.06);font-size:13px;line-height:1.6;">
             <b>데이터 단계 구분</b> — 위 학습/검증/평가셋은 <b>모델을 만드는 개발·검증 단계에서만</b> 쓰는 라벨링된 데이터다.
             <b>실운영 단계에서는 이 셋을 쓰지 않는다.</b> 운영 시에는 그날그날 새로 들어온 실문서를 학습된 모델이 분류하고,
-            검수자가 교정(correction)한 값을 정답 삼아 정확도·미탐율을 <b>실데이터 기준으로 재측정</b>한다.
+            검수자가 확정한 값만 <code>tb_corrections</code>/<code>locked_gold_eval</code> 후보가 되며, admission gate와 표본감사를 통과한 뒤에야 운영 정확도·미탐율 산정에 쓴다.
             <span style="color:var(--text-dim);">(요약: 학습셋 = 시험 준비용 / 실운영 = 실제 업무 — 둘은 별개 데이터다.)</span>
           </div>
-          <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 현재 디오염 홀드아웃·운영 파이프라인 기준 미탐율 2.8%(TS 전건 검출)는 <b>고무적이나, 모든 수치는 합성 골든셋(OOD) 기준이라 실데이터(human_review) 검증 전에는 보안 축 "통과"로 단정하지 않는다</b>(정식 FNR/정확도 수치가 아님). 최종 납품 게이트는 발주처 실문서 기반 사람 검수 라벨(human_review) 입수 후 확정된다.</p>
+          <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 현재 디오염 홀드아웃·운영 파이프라인 기준 미탐율 2.8%(TS 전건 검출)는 <b>고무적이나, 모든 수치는 합성 골든셋(OOD) 기준이라 운영 human_review/locked 확정 전에는 보안 축 "통과"로 단정하지 않는다</b>(운영 FNR/정확도 수치가 아님). 운영 자동확정 범위 확대는 관리자 확정 라벨, locked readiness gate, 표본감사, kill-gate를 통과한 뒤에만 검토한다.</p>
         </div>
       </div>
 
@@ -1322,38 +1325,38 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
       <!-- 한눈에 보기: 데이터·검증 전체 흐름 (초보자용 개요) -->
       <div style="margin:20px 0;border:1px solid var(--border,#d8dee6);border-radius:10px;overflow:hidden;">
-        <div style="background:var(--accent,#3b6ea5);color:#fff;padding:10px 16px;font-weight:700;font-size:15px;">한눈에 보기 — 정답지 만들기 → 출시 전 시험 → 현장 점검</div>
+        <div style="background:var(--accent,#3b6ea5);color:#fff;padding:10px 16px;font-weight:700;font-size:15px;">한눈에 보기 — 합성 시드 만들기 → 프록시 점검 → 운영 확정 루프</div>
         <div style="padding:6px 16px 14px;font-size:13.5px;line-height:1.65;">
           <p style="margin:12px 0 14px;color:var(--text-dim);">아래 3단계만 알면 이 장(데이터·검증) 전체가 한 줄로 꿰어진다. 각 단계의 상세는 표시된 절을 보면 된다.</p>
 
           <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">
             <div style="flex:0 0 32px;height:32px;border-radius:50%;background:var(--accent,#3b6ea5);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;">1</div>
             <div style="flex:1;">
-              <b>골든셋(정답지) 만들기</b> <span style="color:var(--text-dim);font-size:12px;">— 상세 §5.4</span><br>
-              합성·공개문서를 모아 → <b>룰+LLM이 1차 등급 자동부여</b> → <b>사람이 검토·확정</b> → 채점 기준이 될 "정답지" 완성.<br>
-              <span style="color:var(--text-dim);">※ 전부 손으로 안 만든다. 자동으로 초안을 만들고 사람은 확인·교정만. 최상위 신뢰도 정답지(<code>human_review</code>)만 전문가가 직접 라벨링한다.</span>
+              <b>합성 코퍼스·프록시 holdout 만들기</b> <span style="color:var(--text-dim);font-size:12px;">— 상세 §5.4</span><br>
+              합성·공개문서를 모아 → <b>룰+LLM이 1차 등급 후보를 생성</b> → 합의·근거·하드케이스를 강화해 학습 시드와 프록시 holdout을 만든다.<br>
+              <span style="color:var(--text-dim);">※ 합성/LLM 라벨은 locked 정답이 아니다. <code>human_review</code>/<code>locked_gold_eval</code>은 운영 관리자 확정 또는 별도 사람서명으로만 채운다.</span>
             </div>
           </div>
 
           <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">
             <div style="flex:0 0 32px;height:32px;border-radius:50%;background:var(--accent,#3b6ea5);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;">2</div>
             <div style="flex:1;">
-              <b>개발 단계 검증 (출시 전 시험)</b> <span style="color:var(--text-dim);font-size:12px;">— 상세 §5.3 · §7</span><br>
-              모델을 학습 → <b>한 번도 학습에 안 쓴 평가셋</b>으로 채점 → <b>정확도(F1)·미탐율</b> 확인 → 기준 통과해야 배포.<br>
-              <span style="color:var(--text-dim);">※ 미탐율 = 고등급 비밀을 낮은 등급으로 잘못 분류한 비율. 보안사고와 직결되므로 가장 중요한 합격 기준.</span>
+              <b>개발 단계 프록시 점검</b> <span style="color:var(--text-dim);font-size:12px;">— 상세 §5.3 · §7</span><br>
+              모델·룰·게이트를 합성 holdout과 하드케이스로 점검한다. 이 결과는 배포 전 안전장치 확인이지 운영 정확도 보증이 아니다.<br>
+              <span style="color:var(--text-dim);">※ 미탐율 = 고등급 비밀을 낮은 등급으로 잘못 분류한 비율. 보안사고와 직결되므로 가장 중요한 운영 기준.</span>
             </div>
           </div>
 
           <div style="display:flex;gap:10px;align-items:flex-start;">
             <div style="flex:0 0 32px;height:32px;border-radius:50%;background:var(--accent,#3b6ea5);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;">3</div>
             <div style="flex:1;">
-              <b>실운영 검증 (현장 점검)</b> <span style="color:var(--text-dim);font-size:12px;">— 상세 §2.4 · §9</span><br>
-              실문서가 들어옴 → 모델이 분류 → <b>검수자가 틀린 것 교정</b> → <b>교정값을 새 정답삼아 재채점</b> → 성능 떨어지면 재학습(재학습 위치·환류 범위는 미확정 — 기본 A안: 교정·문서는 고객 망 내 잔류·집계 진단만 환류, 상시 아님 · §2.1.2).<br>
-              <span style="color:var(--text-dim);">※ 운영에선 골든셋(시험지)을 쓰지 않는다. 실제 들어온 문서 + 사람 교정으로 계속 점검한다. 즉 학습셋과 실운영 데이터는 별개다.</span>
+              <b>운영 확정 루프</b> <span style="color:var(--text-dim);font-size:12px;">— 상세 §2.4 · §9</span><br>
+              운영 문서가 들어오면 AI는 제안·라우팅하고, 관리자가 확정한다. 확정값은 admission gate를 거쳐 exact-match 선례와 표본감사 지표로 먼저 쓰며, 재학습·kNN 전파는 shadow와 별도 승인 이후에만 연다.<br>
+              <span style="color:var(--text-dim);">※ 운영에서 처음 쌓이는 관리자 확정이 유일한 진짜 데이터다. 합성 holdout과 locked 평가는 끝까지 분리한다.</span>
             </div>
           </div>
 
-          <p style="margin:14px 0 4px;padding-top:10px;border-top:1px dashed var(--border,#d8dee6);color:var(--text-dim);"><b>한 줄 비유</b> — 1단계는 시험문제 정답지 만들기, 2단계는 출시 전 모의고사, 3단계는 졸업 후 실무에서 계속 점검. 정답지(골든셋)는 시험용이고, 실무(운영)에선 진짜 들어온 일감으로 평가한다.</p>
+          <p style="margin:14px 0 4px;padding-top:10px;border-top:1px dashed var(--border,#d8dee6);color:var(--text-dim);"><b>한 줄 비유</b> — 1단계는 연습문제와 함정문제를 넓게 만들기, 2단계는 안전장치 리허설, 3단계는 실제 업무에서 관리자가 확정한 답으로 배워가기다.</p>
         </div>
       </div>
 
@@ -1377,7 +1380,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p>실제 비밀문서는 외부 반출이 어려우므로, 선정한 LLM(Qwen3)으로 보안등급 정의에 맞춘 학습용 문서를 등급별로 균형 있게 생성한다. 짧은 문서부터 장문까지 길이를 다양화해 표현이 단조로워지지 않도록 한다. 생성된 데이터는 학습 데이터로 사용하기 전 검수를 거친다.</p>
 
       <h3>5.3 독립 평가 데이터 구성</h3>
-      <p>모델 성능을 객관적으로 측정하기 위해, <b>학습에 사용하지 않은 별도의 실제 문서</b>(공개 판례·기업 공시 등)로 평가셋을 따로 구성한다. 학습 데이터와 평가 데이터를 분리해야, 모델이 정답을 외운 것이 아니라 새로운 문서에도 일반화되는지를 정직하게 확인할 수 있다. 최종 정밀화는 발주처 실데이터를 확보한 본개발 단계에서 진행한다(§11).</p>
+      <p>모델 성능을 객관적으로 측정하기 위해, <b>학습에 사용하지 않은 별도의 실제 문서</b>(공개 판례·기업 공시 등)로 평가셋을 따로 구성한다. 학습 데이터와 평가 데이터를 분리해야, 모델이 정답을 외운 것이 아니라 새로운 문서에도 일반화되는지를 정직하게 확인할 수 있다. 최종 정밀화는 제약 완화 시 발주처 실데이터를 확보한 본개발 단계에서 진행한다(§11).</p>
 
       <h3>5.4 골든셋 — 1,000건 이상 목표 · 고객 검토형 단계 구축</h3>
       <p>모델·룰셋 평가의 정답 기준이 되는 골든셋은 발주처 합의대로 <b>1,000건 이상</b>을 목표로, <b>고객사 검토를 거쳐 단계적으로</b> 구축한다.</p>
@@ -1438,12 +1441,12 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="gs-step"><div class="n">⑥ 학습·배포</div><div class="t">모델 학습 → 번들</div><div class="d">오프라인 골든 번들로 고객사 배포</div></div>
         <div class="gs-step"><div class="n">⑦ 진단 환류</div><div class="t">집계 지표(A안)</div><div class="d">오분류율·혼동행렬 → 골든셋 보강 우선순위(문서 미반출)</div></div>
       </div>
-      <div class="gs-loop"><b>환류 방식은 미확정 결정(A/B/C, §2.1.2).</b> 기본 A안은 ⑦ 집계 진단지표(오분류율·혼동행렬, 문서식별 불가)만 회수해 골든셋 보강 우선순위에 참고하고, 교정·문서는 고객사 망 내 잔류한다. 모델은 상시 재학습이 아니라 실데이터 1차학습 + 드리프트/이벤트 트리거 단발이다(§2.4.1). 단계별 구축 계획(검토본 100건 → 1,000건 확장)은 위 5.4 참조.</div>
+      <div class="gs-loop"><b>환류 방식은 미확정 결정(A/B/C, §2.1.2).</b> 기본 A안은 ⑦ 집계 진단지표(오분류율·혼동행렬, 문서식별 불가)만 회수해 골든셋 보강 우선순위에 참고하고, 교정·문서는 고객사 망 내 잔류한다. 모델은 상시 재학습이 아니라 제약 완화 시 별도 학습 + 드리프트/이벤트 트리거 단발이다(§2.4.1). 단계별 구축 계획(검토본 100건 → 1,000건 확장)은 위 5.4 참조.</div>
       <div class="gs-loop" style="margin-top:14px;border-left-color:var(--text);"><b style="display:block;margin-bottom:6px;font-size:13.5px;color:var(--text);">골든셋 생성·평가 재설계 (2026-06)</b>
       <b>① 생성 게이트 = 합의 + 근거 + self-consistency.</b> 단일 confidence 임계(자동확정 신뢰 불가 — 실측 AUROC 0.535)를 게이트에서 <b>제거</b>하고, <b>룰등급 == LLM등급 합의 + 실제 한국어 시드 근거 span + 주 판정자 k-샘플 자기일관(self-consistency)</b>이 모두 충족될 때만 <code>gold_candidate</code>로 자동 인정한다. confidence는 사람 검토 큐 <b>정렬용</b>일 뿐 판정 권한이 없다.<br>
       <b>② 판정자 = ConsensusJudge.</b> 주 판정자는 상용 LLM 택일(Claude·Gemini·GPT — 지재원 중앙 한정), 미연동·민감문서는 온프렘 Qwen(airgap)으로 라우팅. 배포급 Qwen <b>섀도</b>가 주 판정과 갈리면 '배포 모델이 틀릴 지점'(production_suspect)으로 사람 큐에 표시한다.<br>
       <b>③ 3-tier 논리분할.</b> 정본 1파일에서 <code>tier_of</code>로 파생되는 네 tier — <b>silver_train</b>(학습 전용) / <b>gold_candidate</b>(자동 후보) / <b>locked_gold_eval</b>(평가 정답) / <b>legal_floor</b>(시나리오 차단 floor). <b>평가는 locked만, 학습은 locked 제외</b>(train-on-test 차단).<br>
-      <b>④ locked = 사람 이중서명.</b> 평가 정답 승격은 사람 서명이 유일 경로이며, 고등급(TS·S1)은 <b>독립 2인 검수자</b> 합의(이중서명)를 요구한다. LLM은 후보·triage 도구일 뿐 평가 권위는 사람이고, locked 고등급은 발주처 실문서(2026-09)로 채운다.</div>
+      <b>④ locked = 사람 이중서명.</b> 평가 정답 승격은 사람 서명이 유일 경로이며, 고등급(TS·S1)은 <b>독립 2인 검수자</b> 합의(이중서명)를 요구한다. LLM은 후보·triage 도구일 뿐 평가 권위는 사람이고, locked 고등급은 운영 관리자 확정 또는 별도 사람서명 검수로만 채운다. 현재 제약에서는 0건이 정상이며, 합성/LLM 라벨은 승격하지 않는다.</div>
 
       <h3>5.5 학습 데이터셋 구성 (프로토타입 기준)</h3>
       <div class="card-grid col4" style="margin:16px 0;">
@@ -1478,14 +1481,14 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 성능 시나리오(PSH) S1~S18(18종)×30+ KPI를 CI에서 자동 측정하고 회귀를 자동 탐지한다(pytest + dryrun + PSH + PR 코멘트 + GitHub Pages 리포트).</p>
 
       <h3>6.2 5단계 프로토타입(PoC) 검증</h3>
-      <p>핵심 기능을 5개 항목으로 나누어 합격 기준을 정의한다. 이 기준은 <b>본개발 정식 오픈을 판정하는 목표치(운영 게이트)</b>이며, 프로토타입에서의 <b>실측값과 그 한계</b>는 §7에 분리해 제시한다 — 합성·공개 데이터 기준이므로 "측정"이 아니라 "타당성 확인"으로 읽어야 한다.</p>
+      <p>핵심 기능을 5개 항목으로 나누어 운영 기준을 정의한다. 이 기준은 <b>본개발 자동확정 범위 확대을 판정하는 목표치(운영 게이트)</b>이며, 프로토타입에서의 <b>실측값과 그 한계</b>는 §7에 분리해 제시한다 — 합성·공개 데이터 기준이므로 "측정"이 아니라 "타당성 확인"으로 읽어야 한다.</p>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>PoC</th><th>검증 대상</th><th>합격 기준</th></tr></thead>
+          <thead><tr><th>PoC</th><th>검증 대상</th><th>운영 기준</th></tr></thead>
           <tbody>
-            <tr><td><b>P1</b></td><td>분류 모델 정확도·<b>등급별 미탐률</b></td><td>F1-macro ≥ 0.75 · 전체 FNR ≤ 5% · <b>고등급(TS·S1) FNR ≈ 0%</b>(구속 기준)</td></tr>
+            <tr><td><b>P1</b></td><td>분류 모델 정확도·<b>등급별 미탐률</b></td><td>locked 기반 측정 전까지 보증 불가 · 운영에서는 고등급 전수검수/상향가드/kill-gate 우선</td></tr>
             <tr><td><b>P2</b></td><td>검색(임베딩) 재현율·응답속도</td><td>Recall@5 ≥ 0.80 · 응답 ≤ 200ms</td></tr>
-            <tr><td><b>P3</b></td><td>합성 LLM 라벨 일치도·미탐률</td><td>라벨 일치 ≥ 90% · 미탐률 ≤ 5%</td></tr>
+            <tr><td><b>P3</b></td><td>합성 LLM 라벨 일치도·미탐률</td><td>합의·근거·self-consistency·하드케이스 커버리지 확인(평가 정답 아님)</td></tr>
             <tr><td><b>P4</b></td><td>문서 포맷 추출 품질</td><td>누락 ≤ 5% · 품질 ≥ 0.7</td></tr>
             <tr><td><b>P5</b></td><td>업로드→분류 전체 동작·응답속도</td><td>정상 응답 · 라벨 100% · ≤ 30s</td></tr>
           </tbody>
@@ -1498,18 +1501,18 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
          ============================ -->
     <section id="s07">
       <h2><span class="num">07</span> 프로토타입 검증 결과</h2>
-      <p class="h2-sub">프로토타입에서 확인한 타당성과 모델 선정 결과. 정밀 수치는 본개발에서 실데이터로 확정한다.</p>
+      <p class="h2-sub">프로토타입에서 확인한 타당성과 모델 선정 결과. 정밀 수치는 운영 관리자 확정 locked가 쌓인 뒤에만 확정한다.</p>
 
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
-        <div class="callout-body">아래 결과는 <b>프로토타입(합성·공개 데이터) 기준</b>으로 핵심 기능의 타당성과 모델 선정을 확인한 것이다. 최종 정확도는 발주처 실데이터로 학습·정밀화하는 본개발 단계에서 확정한다(§11).</div>
+        <div class="callout-body">아래 결과는 <b>프로토타입(합성·공개 데이터) 기준</b>으로 핵심 기능의 타당성과 모델 선정을 확인한 것이다. 최종 정확도는 운영 관리자 확정 라벨이 충분히 쌓인 뒤 locked readiness gate를 통과해야 확정할 수 있다(§11).</div>
       </div>
 
       <h3>7.1 분류 모델 — 타당성 확인 · 모델 선정 완료</h3>
-      <p>분류 모델로 <b>KF-DeBERTa</b>(법률 오염 정제 clean 버전 <code>v-dd3abab9</code>)를 선정하고, 4단계 보안등급 분류가 정상 동작함을 확인했다. <b>누출 제거 clean 실측은 정확도 77% · 고등급(TS·S1) FNR 6.6% · F1_macro ≈0.78</b>이다(§3.2). (109-홀드아웃 수치 0.686 등은 학습 텍스트 42% 중복이 포함돼 참고로만 본다.) 다만 학습에 포함되지 않은 새로운 문체에서는 일부 문서가 실제보다 낮은 등급으로 분류되는 경향이 관찰되었다. 이를 줄이기 위해 <b>발주처 실데이터로 보강·정밀화</b>하는 것이 본개발의 핵심 과제이며, 비밀문서 미탐(누락)을 가장 중요한 관리 지표로 두고, 저신뢰 오류는 검수 라우팅으로, <b>고신뢰 하향 오분류는 §2의 판정 시점 미탐 가드(최고-위험 청크 집계·콘텐츠 가드)</b>로 별도 차단한다.</p>
+      <p>분류 모델로 <b>KF-DeBERTa</b>(법률 오염 정제 clean 버전 <code>v-dd3abab9</code>)를 선정하고, 4단계 보안등급 분류가 정상 동작함을 확인했다. <b>누출 제거 clean 실측은 정확도 77% · 고등급(TS·S1) FNR 6.6% · F1_macro ≈0.78</b>이다(§3.2). (109-홀드아웃 수치 0.686 등은 학습 텍스트 42% 중복이 포함돼 참고로만 본다.) 다만 학습에 포함되지 않은 새로운 문체에서는 일부 문서가 실제보다 낮은 등급으로 분류되는 경향이 관찰되었다. 이를 줄이기 위해 <b>룰/메타데이터 게이트를 우선 강화하고 운영 관리자 확정에서 배우는 루프</b>가 본개발의 핵심이며, 비밀문서 미탐(누락)을 가장 중요한 관리 지표로 두고, 저신뢰 오류는 검수 라우팅으로, <b>고신뢰 하향 오분류는 §2의 판정 시점 미탐 가드(최고-위험 청크 집계·콘텐츠 가드)</b>로 별도 차단한다.</p>
 
       <h3>7.2 검색(임베딩) 모델 — 모델 선정 완료</h3>
-      <p>검색 모델로 <b>KURE-v1</b>(한국어 특화, BGE-M3 폴백)을 선정했다. 합성 코퍼스에서의 초기 검색 정확도는 <b>Recall@5 약 0.67~0.72로 목표(0.80)에 미달</b>했다. 원인은 검색 알고리즘이 아니라 <b>합성 데이터 본문이 비슷한 표현을 반복하는 다양성 부족</b>이다 — 쿼리와 정답 문서가 거의 같은 표현을 공유해 변별이 어려운 구조였다(데이터 한계). 실문서의 표현 다양성이 확보되면 향상되며, 목표 충족 여부는 본개발 실데이터로 재측정·확정한다.</p>
+      <p>검색 모델로 <b>KURE-v1</b>(한국어 특화, BGE-M3 폴백)을 선정했다. 합성 코퍼스에서의 초기 검색 정확도는 <b>Recall@5 약 0.67~0.72로 목표(0.80)에 미달</b>했다. 원인은 검색 알고리즘이 아니라 <b>합성 데이터 본문이 비슷한 표현을 반복하는 다양성 부족</b>이다 — 쿼리와 정답 문서가 거의 같은 표현을 공유해 변별이 어려운 구조였다(데이터 한계). 운영 문서의 표현 다양성은 관리자 확정·검색 로그를 통해 관찰하고, 목표 충족 여부는 locked 기반으로만 판단한다.</p>
 
       <h3>7.3 문서 추출 — 구현 완료 · 실문서 검증 예정</h3>
       <p>HWP·DOCX·PDF·Excel·PPTX 추출 파이프라인을 구현했다. HWP 실문서를 확보한 뒤 최종 추출 품질을 검증한다.</p>
@@ -1527,11 +1530,11 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="card card-pass"><div class="card-label">타당성</div><div class="card-value sm">확인</div><div class="card-desc">핵심 기능 정상 동작</div></div>
         <div class="card card-pass"><div class="card-label">모델 선정</div><div class="card-value sm">완료</div><div class="card-desc">분류·합성·검색 모델</div></div>
         <div class="card card-pass"><div class="card-label">전체 흐름</div><div class="card-value sm">검증</div><div class="card-desc">업로드→분류 E2E</div></div>
-        <div class="card"><div class="card-label">정밀화</div><div class="card-value sm">본개발</div><div class="card-desc">실데이터 학습 예정</div></div>
+        <div class="card"><div class="card-label">정밀화</div><div class="card-value sm">본개발</div><div class="card-desc">운영 확정 루프</div></div>
       </div>
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
-        <div class="callout-body"><b>오해 방지 — §6.2 합격 기준의 "통과"는 아직 주장하지 않는다.</b> 위 결과는 <b>타당성 확인과 모델 선정</b>이며, P1(분류 F1·등급별 FNR)·P2(Recall@5) 등 정량 게이트의 충족 판정은 <b>합성 데이터로는 불가</b>하다 — 본개발 실데이터 시범 운영에서 측정·확정한다(§11.1). 특히 비밀등급(TS·S1) 미탐률은 진짜 비밀문서 표본이 없으면 측정 자체가 불가능하므로, <b>발주처 실데이터 확보가 정식 오픈의 전제</b>다.</div>
+        <div class="callout-body"><b>오해 방지 — §6.2 운영 기준의 "통과"는 아직 주장하지 않는다.</b> 위 결과는 <b>타당성 확인과 모델 선정</b>이며, P1(분류 F1·등급별 FNR)·P2(Recall@5) 등 정량 게이트의 충족 판정은 <b>합성 데이터로는 불가</b>하다 — 운영 관리자 확정 locked가 충분히 쌓인 뒤 측정·확정한다(§11.1). 특히 비밀등급(TS·S1) 미탐률은 진짜 비밀문서 표본이 없으면 측정 자체가 불가능하므로, <b>제약 완화 시 발주처 실데이터 확보가 자동확정 범위 확대의 전제</b>다.</div>
       </div>
 
       <h3>7.6 운영점 실측 — 평가↔서빙 갭과 운영 임계값</h3>
@@ -1550,7 +1553,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th>운영점</th><th>기본값</th><th>근거 · 옵션</th></tr></thead>
           <tbody>
-            <tr><td><b>C-esc (escalation τ)</b></td><td class="td-code">0.30 (onprem 기본 ON)</td><td><b>onprem-local/full-train 배포 프로파일 기본 τ=0.30 ON</b> — clean 홀드아웃(누출0 n=77) 실측 미탐 FNR 0.174(argmax)→0.087, TS recall 0.91→1.0, 검수부하 +5pp(과분류 불변). 더 낮추면(τ 0.10~0.12) FNR≤0.05이나 검수부하 0.8+로 급증 — 운영 검수역량에 맞춰 <code>.env</code>로 조정. 발주처 실데이터로 운영점 재확정(§3.2·§11).</td></tr>
+            <tr><td><b>C-esc (escalation τ)</b></td><td class="td-code">0.30 (onprem 기본 ON)</td><td><b>onprem-local/full-train 배포 프로파일 기본 τ=0.30 ON</b> — clean 홀드아웃(누출0 n=77) 실측 미탐 FNR 0.174(argmax)→0.087, TS recall 0.91→1.0, 검수부하 +5pp(과분류 불변). 더 낮추면(τ 0.10~0.12) FNR≤0.05이나 검수부하 0.8+로 급증 — 운영 검수역량에 맞춰 <code>.env</code>로 조정. 운영 관리자 확정 라벨이 쌓이면 운영점 재확정(§3.2·§11).</td></tr>
             <tr><td><b>B1 (범용약어 weight 배수)</b></td><td class="td-code">1.0 유지</td><td>배수를 낮추면 FNR_S1이 0.053→0.21로 악화(S1 recall에 load-bearing)되고 F1도 하락 → 낮추면 순손해. <b>1.0 유지 확정</b>.</td></tr>
             <tr><td><b>C-eval (서빙경로 평가)</b></td><td class="td-code">활성</td><td>실배포 경로 전체를 통과해 측정 → eval이 배포 동작과 일치함을 보장.</td></tr>
           </tbody>
@@ -1662,16 +1665,16 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="honesty-title">프로토타입 단계의 전제</div>
 
         <h4>① 합성·공개 데이터 기반</h4>
-        <p>프로토타입의 학습·검증은 합성 데이터와 공개 문서를 기반으로 했다. 실제 업무 문서(특히 비밀 등급)는 외부 반출이 어렵기 때문이며, 따라서 현재 수치는 <b>타당성 확인과 모델 선정</b>을 위한 것이다. 실제 운영 정확도는 발주처 실데이터로 학습하는 본개발 단계에서 확정된다.</p>
+        <p>프로토타입의 학습·검증은 합성 데이터와 공개 문서를 기반으로 했다. 실제 업무 문서(특히 비밀 등급)는 외부 반출이 어렵기 때문이며, 따라서 현재 수치는 <b>타당성 확인과 모델 선정</b>을 위한 것이다. 실제 운영 정확도는 관리자 확정 locked가 충분히 쌓인 뒤에만 확정된다. 그 전에는 안전 부트스트랩으로 배포하고 검수 라우팅으로 운영한다.</p>
 
         <h4>② 새로운 문체에 대한 일반화</h4>
-        <p>학습에 포함되지 않은 새로운 문체의 문서에서는 일부 등급이 실제보다 낮게 분류되는 경향이 관찰되었다. 비밀문서 누락(미탐)을 최우선 관리 지표로 두고, <b>실데이터 보강 + 저신뢰 검수 라우팅</b>으로 보완하는 것이 본개발의 핵심 과제다.</p>
+        <p>학습에 포함되지 않은 새로운 문체의 문서에서는 일부 등급이 실제보다 낮게 분류되는 경향이 관찰되었다. 비밀문서 누락(미탐)을 최우선 관리 지표로 두고, <b>룰/메타 게이트 강화 + 저신뢰·불일치 검수 라우팅 + 운영 확정 포착</b>으로 보완하는 것이 본개발의 핵심 과제다.</p>
 
         <h4>③ 검색 정확도와 데이터 다양성</h4>
         <p>프로토타입의 검색 정확도가 목표(Recall@5 0.80)에 미달한 것은 합성 데이터 본문이 비슷한 표현을 반복하는 한계 때문으로, 검색 알고리즘이 아니라 <b>데이터 다양성</b>의 문제다. 실제 문서 본문의 다양성이 확보되면 향상된다.</p>
 
         <h4>④ 신뢰도 캘리브레이션 (서빙 반영됨 · 실데이터 재보정 예정)</h4>
-        <p>confidence는 분류기가 학습한 신뢰도가 아니라 <b>logits→온도→softmax→청크집계→정규화로 만든 softmax 파생 점수</b>이며 보정된 정답확률이 아니다. 학습에 없던 새 문체(OOD)에서 <b>과신(overconfident)</b>하고(골든500 ECE 0.18, 정답/오답 AUROC 0.58) 높은 confidence가 정확을 보장하지 않아, 0.7 신뢰도 게이트가 보정되지 않은 값 위에 설 수 있다. 이를 위해 <b>temperature scaling 보정을 서빙 경로에 반영</b>했다 — <code>temperature.json</code>을 자동 로드해(T&gt;1이면 과신 완화) 서빙 softmax에 적용한다(로직감사 A1 완료). 다만 temperature 보정은 val 분포 내 과신만 완화하며 OOD(골든/실데이터)로는 전이되지 않으므로(골든 ECE 0.18), <b>보정만으로 confidence가 자동확정의 신뢰 근거가 되지는 않는다</b> — 자동확정은 confidence 단독이 아니라 <b>합의 게이트 + escalation τ</b>로 판단한다(§2.4 ⑦, onprem-local/full-train 배포 프로파일 기본 ON). 보정 계수는 합성·공개 데이터로 산출한 값이므로, 본개발에서 <b>실데이터로 재보정</b>하고 캘리브레이션 모니터링(ECE)에 연결한다(§9.3).</p>
+        <p>confidence는 분류기가 학습한 신뢰도가 아니라 <b>logits→온도→softmax→청크집계→정규화로 만든 softmax 파생 점수</b>이며 보정된 정답확률이 아니다. 학습에 없던 새 문체(OOD)에서 <b>과신(overconfident)</b>하고(골든500 ECE 0.18, 정답/오답 AUROC 0.58) 높은 confidence가 정확을 보장하지 않아, 0.7 신뢰도 게이트가 보정되지 않은 값 위에 설 수 있다. 이를 위해 <b>temperature scaling 보정을 서빙 경로에 반영</b>했다 — <code>temperature.json</code>을 자동 로드해(T&gt;1이면 과신 완화) 서빙 softmax에 적용한다(로직감사 A1 완료). 다만 temperature 보정은 val 분포 내 과신만 완화하며 OOD(골든/실데이터)로는 전이되지 않으므로(골든 ECE 0.18), <b>보정만으로 confidence가 자동확정의 신뢰 근거가 되지는 않는다</b> — 자동확정은 confidence 단독이 아니라 <b>합의 게이트 + escalation τ</b>로 판단한다(§2.4 ⑦, onprem-local/full-train 배포 프로파일 기본 ON). 보정 계수는 합성·공개 데이터로 산출한 값이므로, 본개발에서 <b>운영 확정 라벨로 재보정</b>하고 캘리브레이션 모니터링(ECE)에 연결한다(§9.3).</p>
 
         <h4>⑤ 미탐 판정 가드의 효과는 실데이터로만 확정된다</h4>
         <p>§2의 판정 시점 상향 가드(최고-위험 청크 집계·콘텐츠 가드)는 <b>설계상 미탐을 줄이는 방향</b>이지만, 그 실제 차단율은 룰·모델의 재현율에 달려 있어 <b>합성·공개 데이터로는 측정할 수 없다</b>. 진짜 비밀문서 표본이 쌓이는 시범 운영에서만 등급별 미탐률로 확정된다.</p>
@@ -1692,24 +1695,24 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
          ============================ -->
     <section id="s11">
       <h2><span class="num">11</span> 본개발 진행 방안</h2>
-      <p class="h2-sub">프로토타입에서 확정한 것과, 본개발에서 진행할 것.</p>
+      <p class="h2-sub">프로토타입에서 확정한 것과, 운영 학습 루프로 진행할 것.</p>
 
       <div class="callout pass">
         <span class="callout-icon">✓</span>
-        <div class="callout-body">프로토타입 단계에서 <b>시스템 구조·워크플로우 설계, 핵심 모델 선정, 전체 흐름(E2E) 동작</b>을 확정했다. 본개발에서는 <b>발주처 실데이터를 적용해 분류 모델을 학습·정밀화</b>하고, 운영 환경에 통합·안정화한다.</div>
+        <div class="callout-body">프로토타입 단계에서 <b>시스템 구조·워크플로우 설계, 핵심 모델 선정, 전체 흐름(E2E) 동작</b>을 확정했다. 본개발에서는 <b>룰 우선 안전 부트스트랩, 관리자 확정 포착, admission gate, 표본감사, kill-gate</b>를 운영 환경에 통합·안정화한다.</div>
       </div>
 
-      <h3>11.1 단계별 본개발 · 오픈 — 실데이터 시범 운영</h3>
-      <p>합성·공개 데이터로 만든 초기 모델은 <b>시동용</b>이다. 실제 정확도(특히 비밀문서 미탐률)는 합성 데이터로 보장할 수 없으므로, <b>운영 환경에 올린 뒤 실데이터로 검증·정밀화한 다음 정식 오픈</b>한다.</p>
+      <h3>11.1 단계별 본개발 · 오픈 — 안전 부트스트랩과 운영 학습 루프</h3>
+      <p>합성·공개 데이터로 만든 초기 모델은 <b>시동용</b>이다. 실제 정확도(특히 비밀문서 미탐률)는 합성 데이터로 보장할 수 없으므로, <b>운영 환경에서는 AI 제안·보수적 검수 라우팅·관리자 확정 포착으로 시작하고 locked readiness gate 통과 후에만 자동확정 범위를 확대</b>한다.</p>
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
-        <div class="callout-body"><b>오픈 시점은 "기간"이 아니라 "기준"으로 판단한다.</b> 시범 운영 기간(약 1개월 이상)은 기본값이며, 정식 오픈은 <b>실데이터 충분량 확보 + 미탐률 임계 충족</b>을 만족할 때 한다. 비밀등급(특히 TS·S1) 문서가 충분히 쌓이지 않으면 기간을 연장한다.</div>
+        <div class="callout-body"><b>오픈 시점은 "기간"이 아니라 "기준"으로 판단한다.</b> 시범 운영 기간(약 1개월 이상)은 기본값이며, 자동확정 범위 확대은 <b>실데이터 충분량 확보 + 미탐률 임계 충족</b>을 만족할 때 한다. 비밀등급(특히 TS·S1) 문서가 충분히 쌓이지 않으면 기간을 연장한다.</div>
       </div>
       <ol>
-        <li><b>① 초기 학습(시동)</b> — 합성·공개 데이터로 부트스트랩 모델을 만든다.</li>
-        <li><b>② 실데이터 시범 운영(약 1개월+)</b> — 운영 환경에 올리되 <b>AI는 등급을 "제안"만 하고 사람이 전수 확정</b>하는 모드로 운영한다(워크플로우 ⑧). 오분류가 접근제어로 새지 않으므로 <b>안전하게 실데이터로 측정</b>할 수 있다. 이 기간에 실문서·실라벨을 쌓고 <b>실제 미탐률·정확도</b>를 측정한다.</li>
-        <li><b>③ 실데이터 재학습·정밀화</b> — 쌓인 실데이터로 모델을 재학습하고 평가 게이트로 검증한다(재학습·게이트 방식은 §2.4). 단 환류·재학습 위치는 미확정 결정(A 무반출 기본 / B 온사이트 / C 반출, §2.1.2) — 기본 A안에서 고객 실문서·교정은 망 내 잔류, 지재원은 자기 골든셋으로 재학습하며, 모델은 상시 재학습이 아니라 실데이터 1차학습 + 드리프트/이벤트 단발이다.</li>
-        <li><b>④ 정식 오픈</b> — <b>등급별 미탐률 기준 충족 시</b> 자동 분류의 신뢰 범위를 점진적으로 넓히되, <b>고등급(TS·S1)은 사람 전수 확정을 유지</b>한다. 신뢰 범위 확대는 등급별로 차등 적용하며, 사람 최종 확정 원칙과 판정 시점 미탐 가드(§2)는 그대로 둔다.</li>
+        <li><b>① 안전 부트스트랩</b> — 합성·공개 데이터로 시작하되, 룰·메타데이터 floor·FNR-safe override를 우선한다.</li>
+        <li><b>② 안전 운영 파일럿</b> — 운영 환경에 올리되 <b>AI는 등급을 제안하고 보수적으로 검수 라우팅</b>한다. 고등급·불일치·저신뢰는 사람 확정이 기본이며, 이 확정만 locked 후보가 된다.</li>
+        <li><b>③ 운영 확정 반영·학습 잠금 해제 후보</b> — 쌓인 확정은 먼저 exact-match 선례, 상향 override, 검수 우선순위에만 반영한다. kNN 전파·재학습은 shadow 평가, holdout guard, 2인 승인, 롤백 계획을 통과한 별도 모드에서만 연다.</li>
+        <li><b>④ 자동확정 범위 확대</b> — <b>locked 기반 kill-gate 충족 시</b> 자동확정의 신뢰 범위를 점진적으로 넓히되, <b>고등급(TS·S1)은 사람 전수 확정을 유지</b>한다. 신뢰 범위 확대는 등급별로 차등 적용하며, 사람 최종 확정 원칙과 판정 시점 미탐 가드(§2)는 그대로 둔다.</li>
       </ol>
 
       <h3>11.2 본개발 핵심 과제</h3>
@@ -1717,14 +1720,14 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th>과제</th><th>현재(프로토타입)</th><th>본개발에서 할 일</th><th>발주처 협조</th></tr></thead>
           <tbody>
-            <tr><td><b>분류 정확도 정밀화</b></td><td>모델·학습 파이프라인 준비 완료</td><td>실데이터로 재학습·정밀화, 미탐률 관리</td><td class="td-pend">실데이터</td></tr>
+            <tr><td><b>분류 정확도 정밀화</b></td><td>모델·학습 파이프라인 준비 완료</td><td>운영 확정 포착·admission gate·미탐 kill-gate 관리</td><td class="td-pend">실데이터</td></tr>
             <tr><td><b>문서 추출 최종 검증</b></td><td>추출 파이프라인 구현 완료</td><td>HWP 등 실문서로 추출 품질 검증</td><td class="td-pend">HWP 실문서</td></tr>
             <tr><td><b>도메인 기준 강화</b></td><td>기본 키워드·등급체계 구성</td><td>발주처 가이드로 분류 기준 보강</td><td class="td-pend">분류 가이드</td></tr>
-            <tr><td><b>검색 정확도 향상</b></td><td>검색 모델 선정 완료</td><td>실문서 다양성 확보로 정확도 향상</td><td class="td-pend">실데이터</td></tr>
+            <tr><td><b>검색 정확도 향상</b></td><td>검색 모델 선정 완료</td><td>운영 검색 로그·확정 선례로 다양성 관찰, exact-match부터 반영</td><td class="td-pend">실데이터</td></tr>
             <tr><td><b>운영 성능 기준 합의</b></td><td>프로토타입 기준치 확보</td><td>운영 목표 기준을 협의·확정</td><td class="td-warn">발주처 협의</td></tr>
             <tr><td><b>검수 확정 동시성·정합</b></td><td>확정·정정 경로 동작</td><td>다중 검수자 동시 확정 시 행 잠금·멱등키로 중복·경합(race) 차단</td><td class="td-pass">내부</td></tr>
             <tr><td><b>출처 게이트 안전화</b></td><td>출처 게이트(S3 cap) 구현</td><td>ingest 출처 적재 + 분류 경로 전달 + <b>신뢰 프로비넌스에만 cap·상향 충돌 시 검수 라우팅</b>(오태깅 silent miss 차단)</td><td class="td-pass">내부</td></tr>
-            <tr><td><b>신뢰도 캘리브레이션</b></td><td>temperature scaling 서빙 반영(temperature.json 자동 로드)</td><td>실데이터로 보정 계수 재산출 + 캘리브레이션 모니터링(ECE) 연결</td><td class="td-pend">실데이터</td></tr>
+            <tr><td><b>신뢰도 캘리브레이션</b></td><td>temperature scaling 서빙 반영(temperature.json 자동 로드)</td><td>운영 확정 라벨로 보정 계수 재산출 후보를 shadow 검증 + 캘리브레이션 모니터링(ECE) 연결</td><td class="td-pend">실데이터</td></tr>
             <tr><td><b>원문 암호화·데이터 흐름</b></td><td>마스킹·조직격리 구현</td><td>원본 at-rest 암호화 + 단계별 PII 잔존·보관기간 정책 확정(부록 A 데이터 흐름표)</td><td class="td-pend">보안 정책</td></tr>
             <tr><td><b>확정 라벨 신선도</b></td><td>doc_id 기준 즉시 적용</td><td>라벨 시점 내용 해시 저장 → 불일치 시 재분류(내용 교체 staleness 방지)</td><td class="td-pass">내부</td></tr>
             <tr><td><b>검수 큐 SLA·백로그</b></td><td>저신뢰·충돌 라우팅</td><td>백로그 정책 명시 — 무한 대기(안전) 기본 · 자동 릴리즈 없음 · 고등급 우선 처리</td><td class="td-pass">내부</td></tr>

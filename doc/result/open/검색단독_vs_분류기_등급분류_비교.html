@@ -222,6 +222,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     </div>
 
     <h1 class="title">검색 단독 vs 검색 + 분류기</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
     <p class="lede">"분류기를 빼고 <b>검색엔진에서 BM25로 조회한 상위 5건 중 가장 높은 등급</b>을 그대로 매기면 되지 않나"라는 안(案)을, 동일 테스트셋·누출 0 조건에서 분류기와 정면 실측해 비교한다. 핵심 결론: <b>검색은 우수(R@5 94%)하지만 그 방식의 등급분류 정확도는 20%로 붕괴</b>하며, 사실상 <span class="v-bad">"무조건 1급비밀(TS) 도장기"</span>가 된다.</p>
 
     <div class="callout" style="margin:10px 0;"><span class="callout-icon">⚠️</span>
@@ -364,7 +367,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <!-- 05 -->
     <section id="s05">
       <h2><span class="num">05</span> 결과 수치 — 정확도 · 미탐 · 예측분포</h2>
-      <p class="h2-sub">레퍼런스(골든셋)=실문서 3,754건, 테스트=라벨 실문서 777·109건. 학습누출 0(텍스트해시 검증).</p>
+      <p class="h2-sub">레퍼런스(골든셋)=공개·합성 프록시 3,754건, 테스트=프록시 라벨 777·109건. 학습누출 0(텍스트해시 검증).</p>
 
       <h3>① classification_gold (777건 · 실제 TS 비율 7%)</h3>
       <div class="tbl-wrap">

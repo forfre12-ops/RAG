@@ -1,0 +1,370 @@
+schema_version: 1
+updated_at: 2026-07-10
+
+policy:
+  active_public_root: doc/result/open
+  internal_root: doc/internal
+  archive_root: doc/archive
+  release_root: doc/releases
+  registry_owner: engineering
+
+documents:
+  - id: DOC-INDEX-001
+    title: 공개 산출물 인덱스
+    path: doc/result/open/index.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-WBS-001
+    title: WBS 본개발 작업분해구조
+    path: doc/result/open/WBS_본개발_작업분해구조.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-WBS-002
+    title: WBS 작업 기능해설서
+    path: doc/result/open/WBS_작업_기능해설서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-API-001
+    title: KL 연동 인터페이스 규약서 ICD
+    path: doc/result/open/KL연동_인터페이스_규약서_ICD.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 1.0-draft
+
+  - id: DOC-OPENAPI-001
+    title: KL OpenAPI YAML
+    path: doc/03_openapi_lloydk_kl.yaml
+    owner: engineering
+    audience: customer
+    status: current
+    version: 1.0-draft
+
+  - id: DOC-ARCH-001
+    title: 시스템 설계도
+    path: doc/result/open/시스템_설계도_v4.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: v4
+
+  - id: DOC-ARCH-002
+    title: 시스템 역할 배포 DB구조 확인안
+    path: doc/result/open/시스템_역할_배포_DB구조_확인안.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-ARCH-003
+    title: 폐쇄망 설치 배포 설계서
+    path: doc/result/open/폐쇄망_설치_배포_설계서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SEC-001
+    title: 보안 설계서
+    path: doc/result/open/보안_설계서.html
+    owner: security
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-RUN-001
+    title: 운영 런북
+    path: doc/result/open/운영_런북.html
+    owner: operations
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-001
+    title: 데이터 거버넌스 계획
+    path: doc/result/open/데이터_거버넌스_계획.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-002
+    title: 골든셋 종합
+    path: doc/result/open/골든셋_종합.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-003
+    title: 골든셋 쉬운설명
+    path: doc/result/open/골든셋_쉬운설명.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DATA-004
+    title: 골든셋 합성생성 설계검토
+    path: doc/result/open/골든셋_합성생성_설계검토.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-001
+    title: golden100 분류근거 보고서
+    path: doc/result/open/golden100_분류근거_보고서.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-002
+    title: golden500 분류근거 보고서
+    path: doc/result/open/golden500_분류근거_보고서.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-003
+    title: 테스트 전략 및 이력
+    path: doc/result/open/테스트_전략_및_이력.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-REQ-001
+    title: 요구사항 추적표 RTM
+    path: doc/result/open/요구사항_추적표_RTM.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MODEL-001
+    title: 모델 카드
+    path: doc/result/open/모델_카드.html
+    owner: ml
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DEMO-001
+    title: 시연 콘솔 소개
+    path: doc/result/open/시연_콘솔_소개.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-001
+    title: 테스트서버 파일럿 플랜
+    path: doc/internal/테스트서버_파일럿_플랜.html
+    owner: pm
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-002
+    title: 배포 관리 하드닝 감사
+    path: doc/internal/배포_관리_하드닝_감사.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TECH-001
+    title: 기술구현 백서
+    path: doc/result/open/기술구현_백서_v7.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: v7
+
+  - id: DOC-TECH-002
+    title: 기술구현 백서 부록A DB스키마
+    path: doc/result/open/기술구현_백서_부록A_DB스키마.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TECH-003
+    title: 기술구현 백서 부록B API명세
+    path: doc/result/open/기술구현_백서_부록B_API명세.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TECH-004
+    title: 기술구현 백서 부록C 지표용어해설
+    path: doc/result/open/기술구현_백서_부록C_지표용어해설.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-CLASSIFIER-001
+    title: 무실데이터 분류기 설계서
+    path: doc/result/open/무실데이터_분류기_설계서.html
+    owner: ml
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-GATE-001
+    title: 분류검수게이트 강화 보고서
+    path: doc/result/open/분류검수게이트_강화_보고서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SERVING-001
+    title: 서빙 운영점 파라미터 명세
+    path: doc/result/open/서빙_운영점_파라미터_명세.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-HARDENING-001
+    title: 설계검토 하드닝 반영 내역
+    path: doc/result/open/설계검토_하드닝_반영_내역.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DECISION-001
+    title: 발주처 의사결정 안건서
+    path: doc/result/open/발주처_의사결정_안건서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DECISION-002
+    title: 의사결정 대장
+    path: doc/result/open/의사결정_대장.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-GRADE-001
+    title: 영업비밀 등급분류 기준 적용서
+    path: doc/result/open/영업비밀_등급분류_기준_적용서_v2.2.html
+    owner: policy
+    audience: customer
+    status: current
+    version: v2.2
+
+  - id: DOC-SCORE-001
+    title: 점수 채점 방식 쉬운설명
+    path: doc/result/open/점수_채점_방식_쉬운설명.html
+    owner: policy
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-COMPARE-001
+    title: 검색단독 vs 분류기 등급분류 비교
+    path: doc/result/open/검색단독_vs_분류기_등급분류_비교.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-WEEKLY-001
+    title: 7월 1주 주간보고
+    path: doc/result/open/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 1주 - 260703.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week1
+
+  - id: DOC-WBS-XLSX-001
+    title: 지재원 AI 영업비밀관리시스템 구축 WBS 엑셀
+    path: doc/result/open/[지재원] AI 영업비밀관리시스템 구축 WBS.xlsx
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-ARCH-SUP-001
+    title: 시스템 설계도 v1
+    path: doc/result/open/시스템_설계도.html
+    owner: engineering
+    audience: internal
+    status: superseded
+    version: v1
+
+  - id: DOC-ARCH-SUP-002
+    title: 시스템 설계도 v2
+    path: doc/result/open/시스템_설계도_v2.html
+    owner: engineering
+    audience: internal
+    status: superseded
+    version: v2
+
+  - id: DOC-ARCH-SUP-003
+    title: 시스템 설계도 v3
+    path: doc/result/open/시스템_설계도_v3.html
+    owner: engineering
+    audience: internal
+    status: superseded
+    version: v3
+
+  - id: DOC-GUIDE-001
+    title: 시스템 완전이해 가이드
+    path: doc/result/open/시스템_완전이해_가이드_V3.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: v3
+
+  - id: DOC-INTERNAL-003
+    title: 골든셋 합성생성 설계검토 내부본
+    path: doc/internal/골든셋_합성생성_설계검토.html
+    owner: data
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-004
+    title: 무실데이터 분류기 설계서 내부본
+    path: doc/internal/무실데이터_분류기_설계서.html
+    owner: ml
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-005
+    title: 실제 사용 파일 아키텍처 맵
+    path: doc/internal/실제_사용_파일_아키텍처_맵.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-INTERNAL-006
+    title: 오픈망 테스트서버 배포 가이드
+    path: doc/internal/오픈망_테스트서버_배포_가이드.html
+    owner: operations
+    audience: internal
+    status: current
+    version: 2026-07-pilot

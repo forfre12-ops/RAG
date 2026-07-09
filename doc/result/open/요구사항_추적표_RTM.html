@@ -104,6 +104,9 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <h1 class="title">요구사항 추적표 (RTM)</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
   <p class="lede">제안요청서(RFP) 기능·성능 요건과 발주처 정본 가이드 등급기준이 <strong>어느 설계 문서 → 어느 구현(코드) → 어느 검증(테스트)</strong>으로 충족되는지 추적하는 표. 감리의 "요구사항 → 구현 증빙" 요청에 대응한다.</p>
 
   <div class="callout inset">
@@ -154,7 +157,7 @@ footer strong{color:var(--text-dim);}
           <td class="center">M4</td>
           <td>백서 §03 모델선정 · §06 검증</td>
           <td><code>m4_training/trainer</code> · <code>p1_train_classifier.py</code></td>
-          <td>재학습 파이프라인 · MLflow 기록</td>
+          <td>확정 포착·admission gate·MLflow/감사 기록(재학습은 잠금)</td>
           <td class="center"><span class="tag wip">정밀화</span></td>
         </tr>
         <tr>
@@ -168,11 +171,11 @@ footer strong{color:var(--text-dim);}
         </tr>
         <tr>
           <td><code>FUN-024</code></td>
-          <td>검수자 큐 배분 · 심층지표 — 자동확정·검수 라우팅은 confidence(softmax 파생, 단독 신뢰불가 · OOD AUROC 0.58) 임계 단독이 아닌 다단 게이트로 결정: 희소근거 게이트(<code>rule_fallback_min_evidence</code>) + 합의 게이트(<code>agreement_gate_enabled</code>) + 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, 입력=KL ICD <code>security_marking</code>/<code>access_scope</code> — 보안표시가 예측보다 높으면 상향 floor·접근범위 제한 시 검수 라우팅, <code>source_prior</code> 하향의 상향 대칭, 세 게이트 모두 opt-in·기본 OFF) → 검수자 큐, FNR 핵심관리, 능동학습 환류(정책 미확정 — 기본 A안: 지재원 골든셋 재학습·집계 진단 환류·고객문서 무반출)</td>
+          <td>검수자 큐 배분 · 심층지표 — 자동확정·검수 라우팅은 confidence(softmax 파생, 단독 신뢰불가 · OOD AUROC 0.58) 임계 단독이 아닌 다단 게이트로 결정: 희소근거 게이트(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON) + 합의 게이트(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도) + 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, base 기본 OFF, 입력=KL ICD <code>security_marking</code>/<code>access_scope</code> — 보안표시가 예측보다 높으면 상향 floor·접근범위 제한 시 검수 라우팅, <code>source_prior</code> 하향의 상향 대칭) → 검수자 큐, FNR 핵심관리, 운영 확정 환류(기본: 고객문서 무반출·exact-match 선례·집계 진단, 재학습 잠금)</td>
           <td class="center">M5·M6</td>
           <td>적용서 §3.4 · 테스트전략 §03</td>
           <td><code>confirm/relabel</code> · <code>m6_evaluation</code> · 거버넌스 콘솔</td>
-          <td>검수→집계 진단 환류 실측(재학습 환류 정책 A/B/C 미확정) · 검수자 신뢰도</td>
+          <td>검수→확정 admission gate→집계 진단 환류 · 검수자 신뢰도</td>
           <td class="center"><span class="tag wip">정밀화</span></td>
         </tr>
       </tbody>
@@ -192,7 +195,7 @@ footer strong{color:var(--text-dim);}
         <tr><td>3요건 S/V/M 0·1·2 배점</td><td>p11</td><td>적용서 §1.2</td><td><code>FACTOR_SEEDS</code> (S/V/M)</td><td>test_svm_grade · 골든셋</td><td class="center"><span class="tag done">완료</span></td></tr>
         <tr><td>S×V×M 곱셈 4단계 매핑</td><td>p12</td><td>적용서 §1.2·§3.7</td><td><code>grade_from_svm()</code></td><td>test_svm_grade (워크드 예시)</td><td class="center"><span class="tag done">완료</span></td></tr>
         <tr><td>직무별 등급 예시표</td><td>p6~9</td><td>적용서 §4.1~4.3</td><td>시드 키워드 · 골든셋 정답지</td><td>골든셋 분류근거 보고서</td><td class="center"><span class="tag done">완료</span></td></tr>
-        <tr><td>v2.2 곱셈 보정 (2·2·0→S1 등)</td><td>p12 정정</td><td>적용서 §3.7·§7.2</td><td><code>grade_from_svm</code> 분기 (토글화 예정)</td><td>골든셋 FNR 실증</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td>v2.2 곱셈 보정 (2·2·0→S1 등)</td><td>p12 정정</td><td>적용서 §3.7·§7.2</td><td><code>grade_from_svm</code> 분기 (토글화 예정)</td><td>프록시 FNR 회귀 + locked 확보 후 실증</td><td class="center"><span class="tag dep">발주처</span></td></tr>
         <tr><td>A안 5요소 100점 (사람 수기)</td><td>p4~5</td><td>적용서 §6</td><td>미구현 (자가진단 보조 — 선택)</td><td>—</td><td class="center"><span class="tag plan">예정</span></td></tr>
         <tr><td>공개특허 = S3 (예시 정정)</td><td>p6~9 정정</td><td>적용서 §3.6·§7.2</td><td>Gate-1 출처 게이트</td><td>실데이터 공개특허 코퍼스</td><td class="center"><span class="tag dep">발주처</span></td></tr>
       </tbody>
@@ -209,9 +212,9 @@ footer strong{color:var(--text-dim);}
     <table>
       <thead><tr><th>ID</th><th>요구사항</th><th>설계 문서</th><th>현황</th><th class="center">상태</th></tr></thead>
       <tbody>
-        <tr><td><code>PMR-002</code></td><td>90% 정확도 측정 기준 + 실데이터 제공</td><td>테스트전략 §02 · 안건서 A3·A5</td><td>측정 기준·실데이터 발주처 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td><code>PMR-002</code></td><td>운영 확정 기반 성능 기준 + 자동확정 확대 게이트</td><td>테스트전략 §02 · 안건서 A3·A5</td><td>측정 기준·실데이터 발주처 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
         <tr><td><code>R6</code></td><td>S/M 메타데이터 인터페이스 (KL 연동)</td><td><strong>KL ICD v0.9</strong> · 적용서 §3.5</td><td>출처 1필드만 명세 — 보안표시·접근범위 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
-        <tr><td><code>R6.1</code></td><td>KL 보안표시·접근범위 → metadata-floor 상향 게이트 (<code>security_marking</code> top_secret/secret/confidential → TS/S1/S2 상향 floor · <code>access_scope</code> 제한 시 검수 라우팅)</td><td>KL ICD §3.2·§3.3 · 적용서 §3.4·§3.5</td><td><code>metadata_floor_enabled</code> opt-in·기본 OFF — 인사·재무 S1 사각지대 재학습 전 결정론적 차단(KL 마킹 신뢰 전제)</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td><code>R6.1</code></td><td>KL 보안표시·접근범위 → metadata-floor 상향 게이트 (<code>security_marking</code> top_secret/secret/confidential → TS/S1/S2 상향 floor · <code>access_scope</code> 제한 시 검수 라우팅)</td><td>KL ICD §3.2·§3.3 · 적용서 §3.4·§3.5</td><td><code>metadata_floor_enabled</code> opt-in·기본 OFF — 인사·재무 S1 사각지대의 데이터 독립적 결정론 차단(KL 마킹 신뢰 전제)</td><td class="center"><span class="tag dep">발주처</span></td></tr>
         <tr><td><code>FUN-005a</code></td><td>등급체계 관리자 추가/변경/삭제 (설정화)</td><td>적용서 §3.5 R3 · 부록A</td><td><code>schema/grades</code> API · DB 주도</td><td class="center"><span class="tag done">완료</span></td></tr>
       </tbody>
     </table>
@@ -228,7 +231,7 @@ footer strong{color:var(--text-dim);}
   <div class="table-wrap"><table>
     <thead><tr><th>ID</th><th>요구사항</th><th class="center">영역</th><th>설계 문서</th><th class="center">상태</th></tr></thead>
     <tbody>
-      <tr><td><code>NFR-DAT-01</code></td><td>인간검증 골든셋 500건+ 구축 · 학습/평가 라벨 순환성 차단 · 게이트 임계 재보정</td><td class="center">데이터</td><td>데이터 거버넌스 계획 §04</td><td class="center"><span class="tag plan">예정</span></td></tr>
+      <tr><td><code>NFR-DAT-01</code></td><td>사람서명 locked 평가셋 500건+ 구축 · 학습/평가 라벨 순환성 차단 · 게이트 임계 재보정</td><td class="center">데이터</td><td>데이터 거버넌스 계획 §04</td><td class="center"><span class="tag plan">예정</span></td></tr>
       <tr><td><code>NFR-OPS-01</code></td><td>분산 상태 외부화 — 비동기 실배선 · Redis 강제(폴백 fail-closed) · 모델 reload 멀티레플리카 팬아웃</td><td class="center">운영</td><td>운영 런북 §03·§05</td><td class="center"><span class="tag plan">예정</span></td></tr>
       <tr><td><code>NFR-SEC-01</code></td><td>감사 체인 비밀키 + 빈 키 기동 거부(fail-fast) + 정기 무결성 검증·알람</td><td class="center">보안</td><td>보안 설계서 §05</td><td class="center"><span class="tag plan">예정</span></td></tr>
       <tr><td><code>NFR-SEC-02</code></td><td>접근 격리 deny-by-default + Postgres RLS · 저장 암호화 기본 활성</td><td class="center">보안</td><td>보안 설계서 §04·§06</td><td class="center"><span class="tag plan">예정</span></td></tr>

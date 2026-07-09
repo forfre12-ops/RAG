@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -94,6 +94,9 @@ footer strong{color:var(--text-dim);}
     <span class="meta-soft">2026-06-20</span>
   </div>
   <h1 class="title">보안 설계서</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
   <p class="lede">KOIPA 영업비밀관리시스템의 보안 설계 기준 — 위협 모델, 인증·인가, 접근 격리, 감사 무결성, 데이터 보호. 이미 구현된 통제(객체수준 인가·멱등성 격리·상수시간 비교·XSS 방어·본문 DoS 가드·감사 체인 직렬화 포함)와 본개발에서 보강할 <strong>P0 과제</strong>를 함께 명시한다. 영업비밀을 다루는 시스템이므로 기밀성·무결성·추적성을 동급으로 설계한다.</p>
 
   <div class="callout inset">

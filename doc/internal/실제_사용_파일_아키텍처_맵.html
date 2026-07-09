@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>테스트서버 1개월 파일럿 플랜 (내부) | Lloydk</title>
+<title>실제 사용 파일 아키텍처 맵 (내부) | Lloydk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
@@ -176,7 +176,9 @@ article .st-b-fixed{border-color:rgba(0,0,0,.42);background:rgba(0,0,0,.04);} ar
 article .callout.live{background:var(--text);border-color:var(--text);color:var(--bg);border-radius:var(--radius);}
 article .callout.live .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.62);margin-bottom:6px;}
 article .callout.live p{color:rgba(255,255,255,.88);margin:0;}
-article .callout .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
+article .callout.live code{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);color:#fff;}
+article .callout.live b{color:#fff;}
+article .callout.live .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;}
 @media(max-width:820px){article .c-evid{display:none;}}
 </style>
 </head>
@@ -193,7 +195,7 @@ article .callout .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:7
     <div class="nav-actions">
       <div class="nav-search" role="search" aria-label="Search">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        테스트서버 1개월 파일럿 플랜
+        실제 사용 파일 아키텍처 맵
       </div>
     </div>
   </div>
@@ -201,199 +203,280 @@ article .callout .cl{font-family:var(--font-mono);font-size:10.5px;font-weight:7
 <div class="page">
   <aside class="sidebar">
     <div class="toc-title">목차</div>
-    <a class="toc-item active" href="#s01">01 목적 재정의 — 왜 &quot;정확도&quot;가 기준이 아닌가</a>
-    <a class="toc-item" href="#s02">02 한 달 목표 3축</a>
-    <a class="toc-item" href="#s03">03 주차별 플랜 (오늘 2026-07-05 기준, 8월말 역산)</a>
-    <a class="toc-item" href="#s04">04 배포 전 코드구멍 5건 — W1 티켓 (실소스 검증)</a>
-    <a class="toc-item" href="#s05">05 측정·수용 스코어카드 (8월말 판정표)</a>
-    <a class="toc-item" href="#s06">06 비밀문서 문제 — 정직하게</a>
-    <a class="toc-item" href="#s07">07 8월말 납품 의사결정 프레임</a>
-    <a class="toc-item" href="#s08">08 부록 · W0 테스트서버 사양 산정</a>
+    <a class="toc-item active" href="#s00">00 한눈에 — 실행되는 건 3개 프로세스</a>
+    <a class="toc-item" href="#s01">01 실행 진입점 · 부트</a>
+    <a class="toc-item" href="#s02">02 앱 코드 지도 — poc/src/lloydk</a>
+    <a class="toc-item" href="#s03">03 분류기 파이프라인 M1~M6</a>
+    <a class="toc-item" href="#s04">04 어댑터 — 활성 vs 대기</a>
+    <a class="toc-item" href="#s05">05 데이터셋 경로</a>
+    <a class="toc-item" href="#s06">06 설치 대상 — 모델 · DB · 저장소</a>
+    <a class="toc-item" href="#s07">07 배포 프로파일</a>
+    <a class="toc-item" href="#s08">08 오프라인 도구 — scripts / make</a>
   </aside>
 
   <article id="top">
     <div class="meta-row">
-      <span class="badge">내부 계획</span>
+      <span class="badge">아키텍처 맵</span>
       <span class="badge warn">내부용 · 대외공유 금지</span>
       <span class="meta-dot">·</span>
-      <span class="meta-soft">테스트서버 1개월 파일럿 · 8월말 납품 판정 · 수행사 내부</span>
+      <span class="meta-soft">실제 사용 파일 지도 · poc/ 기준 · 4영역 실측(2026-07-06) · 재검증·정리커밋 반영(2026-07-07)</span>
     </div>
 
-    <h1 class="title">테스트서버 1개월 파일럿 플랜</h1>
-    <p class="lede">고객사 납품(8월말) 전, 테스트서버에서 한 달간 시스템을 돌려 <b>납품 가능/불가</b>를 판정하기 위한 실행 플랜. 핵심 전제 재정의: 이 시스템의 납품 합격선은 <b>"자동 분류 정확도 몇 %"가 아니라</b> <b>"고등급을 절대 흘리지 않고(안전) · 검수 부담이 감당 가능하며 · 운영학습으로 좋아진다"</b>이다. 합성-only 분류기의 실문서 자동정확도(F1 0.26)는 한 달로 못 올린다 — 이는 결함이 아니라 구조이며, 이 사실을 <b>테스트 결과로 미리 고객 기대치에 반영</b>하는 것이 이 파일럿의 절반짜리 목적이다.</p>
+    <h1 class="title">실제 사용 파일 아키텍처 맵</h1>
+    <p class="lede">이 프로젝트에서 <b>실제로 실행·사용되는 파일</b>이 무엇이고 어떤 역할을 하는지, 그리고 배포 시 <b>어떤 모델·DB를 어디에 설치</b>해야 하는지를 경로·모듈 단위로 정리한다. 앱 코드는 전부 단일 패키지 <code>poc/src/lloydk/</code> 안에 있고, 실제 기동되는 것은 <b>3개 프로세스</b>뿐이다. 나머지 파이썬 파일은 이 3개를 구성하는 라이브러리·오프라인 도구·테스트다.</p>
 
     <div class="hero-kpis">
-      <div class="hero-kpi">테스트 4주 + 판정·버퍼 2주</div>
-      <div class="hero-kpi">납품 판정: 8월말</div>
-      <div class="hero-kpi">3축: 안전봉투 · 운영안정 · 운영학습</div>
-      <div class="hero-kpi">검수: 무인 시뮬 (+실슬라이스 가능시)</div>
+      <div class="hero-kpi">추적 파일 <b>789</b></div>
+      <div class="hero-kpi">Python <b>558</b></div>
+      <div class="hero-kpi">앱 코드 <b>178</b> (src)</div>
+      <div class="hero-kpi">스크립트 <b>151</b> · 테스트 <b>207</b></div>
+      <div class="hero-kpi">실행 프로세스 <b>3</b></div>
     </div>
     <hr class="hero-sep">
 
     <div class="callout live">
-    <div class="cl">가장 중요한 한 가지 · 재프레임</div>
-    <p>이 시스템은 <b>"정확히 자동분류"</b> 하도록 만든 게 아니라 <b>"안전하게 틀리고 · 애매하면 사람에게 넘기고 · 운영 중 교정으로 좋아지도록"</b> 설계됐다. 따라서 8월말 납품의 진짜 합격 기준은 두 숫자다 — (1) <b>안전(veto)</b>: 고등급(TS/S1) 미탐 0건, (2) <b>그 안전에서의 자동화 커버리지</b>(=사람이 안 봐도 되는 비율, 곧 고객 검수 부담). 커버리지는 실문서에서 낮게 나오는 게 정상이며, 유일한 상향 레버는 <b>운영학습</b>(고객 현장 교정 → 재학습)뿐이다.</p>
-  </div>
+      <div class="cl">가장 중요한 한 가지</div>
+      <p>558개 파이썬 파일이 있지만 <b>실제로 돌아가는 것은 API 서버 · Celery 워커 · Celery beat 3개 프로세스</b>뿐이다. 이 3개가 로드하는 앱 코드는 <code>poc/src/lloydk/</code>(178개)이고, <code>poc/scripts/</code>(151)는 손으로 돌리는 빌드·평가·릴리스 도구, <code>poc/tests/</code>(207)는 테스트다. 아래 표에는 각 파일에 <b>🟢 LIVE</b>(런타임 서빙 경로) · <b>🔵 BATCH</b>(오프라인 빌드·평가 배선) · <b>⚪ DORMANT</b>(미배선) 태그를 붙였다.</p>
+    </div>
 
-  <div class="stat-row">
-    <div class="stat"><div class="k">합성→실문서 raw F1</div><div class="v">0.26</div></div>
-    <div class="stat g"><div class="k">서빙 TS FNR</div><div class="v">0</div></div>
-    <div class="stat a"><div class="k">서빙 S1 FNR</div><div class="v">8%</div></div>
-    <div class="stat dark"><div class="k">human_review (GA 블로커)</div><div class="v">1/40</div></div>
-  </div>
+    <div class="stat-row">
+      <div class="stat"><div class="k">전체 추적 파일</div><div class="v">789</div></div>
+      <div class="stat"><div class="k">앱 코드 (poc/src/lloydk)</div><div class="v">178</div></div>
+      <div class="stat g"><div class="k">실행 프로세스</div><div class="v">3</div></div>
+      <div class="stat dark"><div class="k">파이프라인 단계</div><div class="v">M1~M6</div></div>
+    </div>
 
-  <section id="s01">
-      <h2><span class="num">01</span> 목적 재정의 — 왜 "정확도"가 기준이 아닌가</h2>
-  <p>우리 실측 기록이 이미 답을 갖고 있다. 합성으로 학습한 분류기는 <b>실문서에서 raw F1 0.26</b>(KF-DeBERTa, 교차-silver 627 학습 → gold_real 777 평가)로, 이는 합성↔실 텍스처 갭에서 오는 <b>구조적 천장</b>이라 한 달로 못 올린다. 대신 서빙 경로(escalation τ=0.25)가 이를 <b>안전</b> 쪽으로 흡수해 고등급 미탐을 ~0으로 만든다 — 정확도가 아니라 <b>안전 봉투</b>가 이 시스템의 핵심 자산이다. 따라서 납품 합격선은 아래 두 축으로 판정한다:</p>
-  <table class="f">
-    <thead><tr><th style="width:180px">축</th><th>측정</th><th style="width:230px">합격 기준</th></tr></thead>
-    <tbody>
-      <tr><td><b>① 안전 (veto)</b></td><td>테스트 전 기간, 고등급(TS/S1) 문서가 자동으로 하향 확정되어 유출된 건수</td><td><b>0건</b> — 1건이라도 발생 시 즉시 NO-GO (root-cause 전까지)</td></tr>
-      <tr><td><b>② 자동화 커버리지</b></td><td>전체 중 사람 검수 없이 자동확정된 비율(=고객 검수 인력 부담의 역수)</td><td>측정·보고. 실문서에서 낮아도 정상. 운영학습 전 <b>baseline</b>으로 기록하고 계약에 반영</td></tr>
-    </tbody>
-  </table>
+    <section id="s00">
+      <h2><span class="num">00</span> 한눈에 — 실행되는 건 3개 프로세스</h2>
+      <p class="h2-sub">이 세 줄이 시스템 전체의 실행 표면이다. 나머지 파일은 이 셋을 구성하는 부품이다.</p>
+      <pre><code>① API 서버    uvicorn lloydk.api.app:app                          (포트 8000)
+② Celery 워커  celery -A lloydk.workers.celery_app worker
+                 -Q classify,index,synthesis,learning,celery
+③ Celery beat  celery -A lloydk.workers.celery_app beat            (주기 잡)</code></pre>
+      <div class="rootcauses">
+        <div class="rc"><div class="n">① API</div><div class="t">동기 요청 처리</div><div class="d">분류·확정·설명·관리 엔드포인트. 실서빙 추론(M5)과 전처리(M2)를 직접 호출하는 핫패스. 진입점 <code>api/app.py</code> 하나(별도 main.py 없음).</div></div>
+        <div class="rc"><div class="n">② 워커</div><div class="t">무거운 배치 잡</div><div class="d">비동기 분류·합성·재학습(M4)·골든빌드·드리프트. 큐 5종 구독. 진입점 <code>workers/celery_app.py</code>.</div></div>
+        <div class="rc"><div class="n">③ beat</div><div class="t">스케줄 트리거</div><div class="d">active-learning(30분/일1회)·드리프트·auto-rollback·outbox·partitions 주기 잡. 단일 인스턴스.</div></div>
+      </div>
     </section>
 
-  <section id="s02">
-      <h2><span class="num">02</span> 한 달 목표 3축</h2>
-  <div class="rootcauses">
-    <div class="rc"><div class="n">축 A · 핵심 veto</div><div class="t">안전 봉투</div><div class="d">다양한 입력을 한 달간 흘려도 고등급 미탐 0 유지. 서빙 게이트·escalation·보정온도가 실환경에서 실동작하는지 검증. <b>깨지면 NO-GO.</b></div></div>
-    <div class="rc"><div class="n">축 B · 배포 준비</div><div class="t">운영 안정성 + 코드구멍 마감</div><div class="d">30일 무중단 소크·DR 복구·관측성 배선 + 배포 전 알려진 코드구멍 5건을 실환경에서 마감. <b>미마감 시 NO-GO.</b></div></div>
-    <div class="rc"><div class="n">축 C · 자동화 레버</div><div class="t">운영학습 루프</div><div class="d">교정 주입 → 재학습 → escalation/F1 개선 방향 실증. 자동화를 올릴 <b>유일한 레버</b>. 파국 회귀 시 조건부(계약으로 커버).</div></div>
-  </div>
+    <section id="s01">
+      <h2><span class="num">01</span> 실행 진입점 · 부트</h2>
+      <p class="h2-sub">각 프로세스가 어떻게 뜨는지 (로컬 make 타겟 · 컨테이너 CMD).</p>
+      <table class="f">
+        <thead><tr><th style="width:130px">프로세스</th><th style="width:230px">진입 경로</th><th>기동 명령</th></tr></thead>
+        <tbody>
+          <tr><td><b>API (dev)</b></td><td class="td-code">lloydk.api.app:app</td><td><code>make api</code> → <code>uvicorn lloydk.api.app:app --reload --port 8000</code></td></tr>
+          <tr><td><b>API (prod)</b></td><td class="td-code">Dockerfile.api.prod</td><td><code>gunicorn ... -k uvicorn.workers.UvicornWorker</code> (non-root, graceful)</td></tr>
+          <tr><td><b>워커</b></td><td class="td-code">lloydk.workers.celery_app</td><td><code>make worker</code> → <code>celery -A ... worker -Q classify,index,synthesis,learning,celery</code></td></tr>
+          <tr><td><b>beat</b></td><td class="td-code">lloydk.workers.celery_app</td><td><code>make beat</code> → <code>celery -A ... beat</code></td></tr>
+          <tr><td><b>PoC 일괄</b></td><td class="td-code">Makefile</td><td><code>make poc-all</code> = p4 → p3 → p2 → p1 → p5</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px;color:var(--text-dim);margin:10px 0 0;">큐 라우팅: <code>classify_async→classify</code> · <code>synthesize_batch→synthesis</code> · <code>train_classifier·golden_build·active_learning_tick·drift_tick→learning</code> · <code>deliver_outbox_tick·ensure_partitions_tick→index</code>.</p>
     </section>
 
-  <section id="s03">
-      <h2><span class="num">03</span> 주차별 플랜 (오늘 2026-07-05 기준, 8월말 역산)</h2>
-  <table class="f">
-    <thead><tr><th style="width:110px">기간</th><th style="width:150px">주차</th><th>핵심 작업</th><th style="width:170px">산출</th></tr></thead>
-    <tbody>
-      <tr><td>7/7–7/13</td><td><b>W0 셋업</b></td><td>테스트서버 프로비저닝(고객 폐쇄망 미러 스펙: vCPU/Mem/Storage, GPU 없음 가정) · <b>airgap 번들 fresh 머신 클린 설치 1회</b>(설치 드레스리허설) · 관측성 대시보드/알림 배선 확인</td><td>설치 런북 검증본</td></tr>
-      <tr><td>7/14–7/20</td><td><b>W1 코드구멍 마감</b></td><td>배포 전 🔴 5건 실환경 마감 — §4 티켓 참조 (수동활성 게이트 우회 · onprem 보정온도 · release-gate 배선 · leakage/metamorphic 실측화 · airgap 번들 정합)</td><td>구멍 5/5 close 증적</td></tr>
-      <tr><td>7/21–7/27</td><td><b>W2 입력 다양성 소크</b></td><td>공개/유사문서 대량 투입(도메인 폭넓게) → 안전(고등급 미탐)·자동확정 정밀도·escalation율 실측 시작 · 부하/성능 프로파일</td><td>스코어카드 v1 (baseline)</td></tr>
-      <tr><td>7/28–8/3</td><td><b>W3 운영학습 루프</b></td><td>무인 시뮬 교정 N건 주입 → 재학습 → admission 게이트·자동활성 차단 실동작 확인 → holdout 리프트(+Δ) 측정</td><td>운영학습 실증 리포트</td></tr>
-      <tr><td>8/4–8/10</td><td><b>W4 실문서 슬라이스</b></td><td>비밀문서 확보 시 소량 <b>in-place</b> 측정(§6) · 30일 소크 마감 · 메모리/DB 성장·누수 확인 · DR 복구 훈련 1회(RPO/RTO)</td><td>실텍스처 감(感) + DR 리포트</td></tr>
-      <tr><td>8/11–8/20</td><td><b>판정 + 버퍼</b></td><td>스코어카드 확정 → GO/조건부/NO-GO 판정 → 잔여 결함 픽스 버퍼</td><td><b>납품 의사결정</b></td></tr>
-      <tr><td>8/21–8/31</td><td><b>납품 준비</b></td><td>계약(기대치 리셋)·SLA·런북·인수인계 문서 정리</td><td>8월말 납품</td></tr>
-    </tbody>
-  </table>
+    <section id="s02">
+      <h2><span class="num">02</span> 앱 코드 지도 — <code>poc/src/lloydk/</code></h2>
+      <p class="h2-sub">레이어별 파일 수와 역할. 태그: 🟢 LIVE(런타임) · 🔵 BATCH(오프라인 배선) · ⚪ DORMANT(미배선).</p>
+
+      <h3>진입 · 미들웨어 — <code>api/</code> (24) 🟢</h3>
+      <p><code>app.py</code>가 유일 진입점: 라우터 include + 미들웨어(Audit·Idempotency·Prometheus·RateLimit) 부착.</p>
+      <table class="f">
+        <thead><tr><th style="width:280px">경로</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td class="td-code">api/app.py</td><td>FastAPI 조립 · 라우터 include · 미들웨어 부착 <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">api/classify.py · classify_stream.py · async_classify.py</td><td>분류 동기/SSE/비동기잡 — <b>핵심 핫패스</b></td></tr>
+          <tr><td class="td-code">api/explain.py</td><td>등급 판정 근거 반환</td></tr>
+          <tr><td class="td-code">api/confirm.py · promotion.py</td><td>확정/보정 · 모델 승격</td></tr>
+          <tr><td class="td-code">api/admin.py</td><td>관제 대시보드 · 모델 activate · RBAC</td></tr>
+          <tr><td class="td-code">api/documents.py · answer.py</td><td>문서 적재 / RAG 질의응답(요건 외 보조)</td></tr>
+          <tr><td class="td-code">api/golden.py · synthesis.py · training.py · guide.py</td><td>골든빌드 · 합성 · 학습 · 가이드</td></tr>
+          <tr><td class="td-code">api/health.py · metrics.py · prom_metrics.py</td><td>헬스 · 메트릭 노출</td></tr>
+          <tr><td class="td-code">api/_jwt_auth.py · _rbac.py · _idempotency_mw.py · rate_limit.py</td><td>인증 · 권한 · 멱등 · 레이트리밋</td></tr>
+        </tbody>
+      </table>
+
+      <h3>비즈니스 로직 — <code>services/</code> (25) 🟢</h3>
+      <p>라우터와 저장소 사이 오케스트레이션.</p>
+      <div class="card-grid col3">
+        <div class="card"><div class="card-label">분류 코어</div><div class="card-desc"><code>classify_service</code> · <code>async_classify_service</code> — M5 추론 오케스트레이션</div></div>
+        <div class="card"><div class="card-label">운영 루프</div><div class="card-desc"><code>confirm_service</code> · <code>promotion_service</code> · <code>training_service</code></div></div>
+        <div class="card"><div class="card-label">무결성</div><div class="card-desc"><code>audit_chain</code>(감사체인) · <code>drift_monitor</code> · <code>outbox</code> · <code>idempotency</code></div></div>
+        <div class="card"><div class="card-label">검색·RAG</div><div class="card-desc"><code>retrieval</code> · <code>rag_answer_service</code></div></div>
+        <div class="card"><div class="card-label">잡·시크릿</div><div class="card-desc"><code>job_store</code>(Redis) · <code>secrets_manager</code></div></div>
+        <div class="card"><div class="card-label">관측</div><div class="card-desc"><code>metrics_service</code> · <code>worker_metrics_bridge</code></div></div>
+      </div>
+
+      <h3>나머지 레이어</h3>
+      <table class="f">
+        <thead><tr><th style="width:150px">디렉토리</th><th style="width:70px">수</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td class="td-code">repositories/</td><td>9</td><td>DB 접근 (document·chunk·classify·audit·training·synth·guide·llm_usage) <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">db/</td><td>4</td><td><code>models.py</code> · <code>session.py</code> · <code>listeners.py</code> <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">schemas/</td><td>13</td><td>Pydantic 요청/응답 계약 <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">workers/</td><td>3</td><td><code>celery_app.py</code> · <code>tasks.py</code> <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">obs/</td><td>2</td><td>OpenTelemetry <code>otel.py</code> (+<code>__init__</code>) <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+          <tr><td class="td-code">perf/</td><td>8</td><td>성능 KPI · 회귀 하니스 <span class="sev">BATCH</span></td></tr>
+          <tr><td class="td-code">rag/</td><td>6</td><td>인덱싱 · 검색 · 질의확장 (요건 외, 대체로 휴면) <span class="sev" style="border-color:rgba(0,0,0,.2);color:var(--text-dim);">일부 DORMANT</span></td></tr>
+          <tr><td class="td-code">golden_*.py · hygiene.py</td><td>8</td><td>골든셋 빌더/방어/서명/분할/등급/위생 (최상위) <span class="sev">BATCH</span></td></tr>
+          <tr><td class="td-code">config.py</td><td>1</td><td><b>전 설정 중앙</b> — 모델·DB·경로·배포 프로파일 <span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <div class="callout-icon">◆</div>
+        <div class="callout-body"><b>최상위 <code>golden_*.py</code> 6종</b>: <code>golden_builder</code>(후보 조립) · <code>golden_defense</code>(방어축 liveness 감사) · <code>golden_signoff</code>(사람서명 승격) · <code>golden_split</code>(75/25 홀드아웃) · <code>golden_tiers</code>(3-tier 파생) · <code>golden_review_html</code>(검토 HTML) + <code>hygiene</code>(정규화·text_hash·누출탐지 공유 유틸).</div>
+      </div>
     </section>
 
+    <section id="s03">
+      <h2><span class="num">03</span> 분류기 파이프라인 — <code>modules/</code> (47)</h2>
+      <p class="h2-sub">프로젝트의 심장. 흐름 = <b>합성 → 전처리 → 라벨링 → 학습 → 추론 → 평가</b>. M2·M5 및 M6 일부가 실서빙 핫패스(🟢), 나머지는 오프라인 배선(🔵).</p>
+      <table class="f">
+        <thead><tr><th style="width:120px">모듈</th><th style="width:230px">파일</th><th style="width:60px">태그</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="4">M1 — 합성 (학습·평가 코퍼스 씨앗)</td></tr>
+          <tr><td>m1_synthesis</td><td class="td-code">generator.py</td><td><span class="sev">BATCH</span></td><td>LLM로 등급별 합성 문서 생성 (무실데이터 부트스트랩)</td></tr>
+          <tr><td></td><td class="td-code">witness_taxonomy.py</td><td><span class="sev">BATCH</span></td><td>등급-결정 사실(witness) 카탈로그 (법령근거)</td></tr>
 
-  <section id="s04">
-      <h2><span class="num">04</span> 배포 전 코드구멍 5건 — W1 티켓 (실소스 검증)</h2>
-  <p style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:6px;">아래는 릴리스 준비 감사에서 나온 🔴 배포 전 코드구멍 5건을, 이번에 <b>실제 소스에서 재검증</b>(각 5개 병렬 적대검증 에이전트)하고 일부를 실제로 마감한 결과다. <b>현재 마감</b>: ②보정온도 · ①수동활성(병렬 <code>e88c087</code>) · <b>③release-gate 배선</b> · <b>④ leakage+metamorphic</b>(이번 세션 마감) · <b>⑤ airgap 부분마감</b>(parity 게이트·위생 가드·wheel Linux). <b>남은 W1 = ⑤ 잔여뿐</b>(이미지 digest 핀·<code>uv.lock</code> 해시핀·CI 실빌드 — 전부 <b>라이브 빌드 환경</b> 필요, 순수-로직 W1은 완료).</p>
-  <table class="f">
-    <thead><tr><th class="c-sev">P</th><th style="width:150px">구멍</th><th>현재 상태 → 조치 (W1 티켓)</th></tr></thead>
-    <tbody>
-      <tr>
-        <td><span class="sev" style="color:#15803d;border-color:#15803d;">CLOSED</span></td>
-        <td><b>① 수동활성 게이트 우회</b></td>
-        <td><b>닫힘</b>(병렬 하드닝 <code>e88c087</code>): seed CLI 하드닝 가드(onprem/full <code>REFUSED</code>) · <code>deploy_gate_first_deploy_fnr_high_max=0.10</code> baking(미탐 90% 첫 모델 거부) · 하드닝서 force 우회에 식별된 actor(jwt) 필수(api_key 익명 강제활성 거부). <span style="color:var(--text-faint);">이번 세션 재검증(agent) 시점엔 열려 있었으나 병렬 작업으로 마감.</span></td>
-      </tr>
-      <tr>
-        <td><span class="sev" style="color:#15803d;border-color:#15803d;">CLOSED</span></td>
-        <td><b>② onprem 보정온도 T=1.0</b></td>
-        <td><b>이미 닫힘</b> — 커밋 20937f3(현재 브랜치)이 onprem/full/airgap 프로파일에 <code>classifier_temperature=3.0</code> baking(<code>config.py:89,121</code>). 잔존(비블로커): 3.0은 미검증 상수(유사 분류기 실측 ECE-최적 T≈2.0), 서빙 모델 <code>v-dd3abab9</code>에 fitted <code>temperature.json</code> 없음, 프로파일 상수가 향후 fitted T를 가림(precedence). <b>W1</b>: 20937f3 유지 확인만(상수 T≈3=안전방향, 배포 무블로킹). 후속=v-dd3abab9 per-version 보정 fitting + precedence 정리.</td>
-      </tr>
-      <tr>
-        <td><span class="sev" style="color:#15803d;border-color:#15803d;">CLOSED</span></td>
-        <td><b>③ release-gate 배포 배선</b></td>
-        <td><b>배선 완료(이번 세션)</b>: <code>check_release_gate.py</code>에 파일럿 override(<code>--allow-conditional</code> / <code>RELEASE_GATE_ALLOW_CONDITIONAL=1</code>) — <b>BLOCKED(human_review 데이터천장·model parity)만 waive, FAIL·누락 리포트는 절대 불가</b>. <code>Makefile</code> <code>release-manifest</code>에 게이트 강제 → <b>하드 FAIL이면 릴리스 산출물 생성 차단</b>(=배포 경로 배선). CI dispatch는 파일럿 모드 기본(+strict 토글). 로컬 검증: 게이트 test 13 + CLI 4케이스(strict 차단 / pilot waive / FAIL 불가 / env flag). <b>발견·수정</b>: cp949 콘솔 <code>UnicodeEncodeError</code> 크래시 → ASCII 출력. <span style="color:var(--text-faint);">데이터천장으로 CI red 위험을 파일럿 override로 회피(설계 의도대로).</span></td>
-      </tr>
-      <tr>
-        <td><span class="sev" style="color:#15803d;border-color:#15803d;">CLOSED</span></td>
-        <td><b>④ leakage / metamorphic fake-green</b></td>
-        <td><b>leakage=닫힘</b>(전 세션: manifest-hash 610건+committed clean holdout+<code>--strict-coverage</code>). <b>metamorphic=이번 세션 닫힘</b>: 원인=deploy gate가 리포트 미제공 시 가시적-skip(passed=True)이라 조용히 never-run. → <code>check_metamorphic_gate.py</code>(리포트 미생성·측정불가(표본&lt;min_n)·forward 회귀 모두 <b>fail-closed</b>) + <code>gen_metamorphic_pairs.py --from-samples</code>(커밋 픽스처를 배포 모델로 재분류, <b>live LLM 불요·결정적</b>) + <code>make metamorphic-gate</code>. <b>실측</b>: gemma3 생성 픽스처 18쌍, 배포 서빙(T=3.0·escalation τ=0.30)에서 <b>forward n=11 violations=0 → 게이트 PASS</b>(escalation이 패러프레이즈 하향[미탐] 차단; T=1.0·escalation 없으면 violation 1.0). 2회 실행 동일·신규 test 6.</td>
-      </tr>
-      <tr>
-        <td><span class="sev" style="color:#b45309;border-color:#b45309;">PARTIAL</span></td>
-        <td><b>⑤ airgap 번들 정합 (stale)</b></td>
-        <td><b>이번 세션 마감(3건)</b>: ① <b>번들↔릴리스 모델 parity 게이트</b>(<code>check_model_parity</code>+<code>--release-model</code>: 번들 분류기가 <code>v-dd3abab9</code> 아니면 빌드 FATAL, dry-run/CI도 잡음) + 학습분류기 <code>sha256</code> 지문 기록 · ② <b>번들 위생 가드</b>(<code>check_bundle_hygiene</code>: 예전(ES시대) <code>elasticsearch/minio/mlflow.tar</code>·비-Linux wheel이 stale dir 재빌드로 실려나가는 것 fail-closed — 실제 디스크 stale dist에 대해 exit 3 실증) · ③ <b>wheel Linux 타깃</b>(<code>--platform manylinux2014_x86_64</code>, win_amd64 구멍). 검증 test+10·cp949 콘솔 시뮬. <b>남은 잔존(라이브 환경 필요)</b>: 이미지 레지스트리 digest 핀(<code>@sha256</code>)·<code>uv.lock</code>→<code>--require-hashes</code> wheel·CI 실빌드(non-dry-run)·디스크 stale dist 삭제(위생 가드가 차단은 함).</td>
-      </tr>
-    </tbody>
-  </table>
+          <tr class="grp"><td colspan="4">M2 — 전처리 (추출→정규화→PII→청크) · 서빙 핫패스</td></tr>
+          <tr><td>m2_preprocess</td><td class="td-code">extractor.py</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>HWP/PDF/Word/Excel/PPTX 추출 + Tesseract OCR</td></tr>
+          <tr><td></td><td class="td-code">normalizer · pii_masker · chunker · pipeline</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>한국어 정규화 · PII 마스킹 · 청킹 · 조립</td></tr>
+
+          <tr class="grp"><td colspan="4">M3 — 라벨링 (룰 + LLM 합의)</td></tr>
+          <tr><td>m3_labeling</td><td class="td-code">rule_engine · seeds · pipeline</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>룰 1차 라벨 (키워드 1000+ · FNR-safe 동점 상향)</td></tr>
+          <tr><td></td><td class="td-code">llm_labeler · judge · consensus</td><td><span class="sev">BATCH</span></td><td>LLM fallback · 합의판정 (골든빌드 경로)</td></tr>
+
+          <tr class="grp"><td colspan="4">M4 — 학습 (오프라인)</td></tr>
+          <tr><td>m4_training</td><td class="td-code">trainer.py</td><td><span class="sev">BATCH</span></td><td>KF-DeBERTa 학습 + 온도보정 (워커 잡)</td></tr>
+          <tr><td></td><td class="td-code">rag_indexer</td><td><span class="sev" style="border-color:rgba(0,0,0,.2);color:var(--text-dim);">shim</span></td><td><code>lloydk.rag</code>로 가는 하위호환 shim (실코드는 rag/; <code>query_expansion</code> shim은 정리 커밋 8a09199에서 제거)</td></tr>
+
+          <tr class="grp"><td colspan="4">M5 — 추론 (실서빙 핵심)</td></tr>
+          <tr><td>m5_inference</td><td class="td-code">pipeline.py</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td><b>실서빙 추론</b> + 게이트(escalation · FNR-safe · metadata-floor · source-cap)</td></tr>
+
+          <tr class="grp"><td colspan="4">M6 — 평가 · 게이트 · 거버넌스 (25)</td></tr>
+          <tr><td>m6_evaluation</td><td class="td-code">metrics · confusion_matrix · answer_metrics</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>FNR(등급별) · 혼동행렬 · 인용정합</td></tr>
+          <tr><td></td><td class="td-code">deploy_gate · kill_gate · locked_readiness · serving_eval · temperature</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE/</span><span class="sev">B</span></td><td>배포합격선 · 붕괴모니터 · readiness · eval↔serving 정합</td></tr>
+          <tr><td></td><td class="td-code">active_learning · corrections_rebuild · reviewer_trust</td><td><span class="sev" style="border-color:#15803d;color:#15803d;">LIVE</span></td><td>교정 환류 · 재학습 큐 · 검수 신뢰도</td></tr>
+          <tr><td></td><td class="td-code">eval_cards · anchor_corpus · anchor_eval</td><td><span class="sev">BATCH</span></td><td>앵커 다층평가 (Wilson CI · PASS/FAIL/INCONCLUSIVE)</td></tr>
+          <tr><td></td><td class="td-code">metamorphic · paraphrase_gen · serving_invariants · constructed_floor · federated_eval · judge_reliability · optuna_tuner</td><td><span class="sev">BATCH</span></td><td>메타모픽 회귀 · 연합평가 · witness floor · 튜닝 (스크립트/테스트 전용)</td></tr>
+          <tr><td></td><td class="td-code">calibration.py</td><td><span class="sev" style="border-color:rgba(0,0,0,.2);color:var(--text-dim);">DORMANT</span></td><td>ECE/Brier 런타임 측정 — 현재 임포터 없음</td></tr>
+        </tbody>
+      </table>
     </section>
 
-  <section id="s05">
-      <h2><span class="num">05</span> 측정·수용 스코어카드 (8월말 판정표)</h2>
-  <table class="f">
-    <thead><tr><th style="width:230px">지표</th><th style="width:230px">목표</th><th>판정</th></tr></thead>
-    <tbody>
-      <tr><td><b>고등급(TS/S1) 미탐</b></td><td>0건</td><td><span class="sev sev-P1">VETO</span> 1건↑ = NO-GO (root-cause 전까지)</td></tr>
-      <tr><td>자동확정 정밀도 (auto-confirmed subset)</td><td>≥ 0.95, 오류는 안전방향만</td><td>위험방향 오류 = 블로커</td></tr>
-      <tr><td><b>Escalation율</b> (=사람 검수 비율)</td><td>측정·예측가능성</td><td>고객이 감당 가능한 규모인지 = 계약 근거</td></tr>
-      <tr><td>자동화 커버리지</td><td>측정만 (낮아도 정상)</td><td>운영학습 전 baseline으로 기록</td></tr>
-      <tr><td>운영학습 리프트</td><td>+Δ 양수, 파국 회귀 0</td><td>음수/파국 = 조건부 → 계약 강화</td></tr>
-      <tr><td>30일 소크</td><td>무재시작 · 성장 선형</td><td>누수/재시작 = 블로커</td></tr>
-      <tr><td>DR 복구</td><td>1회 성공, RPO/RTO 측정</td><td>실패 = 블로커</td></tr>
-      <tr><td>관측성</td><td>게이트ON=가시성ON, 알림 3종 실발화</td><td>no-data = 블로커</td></tr>
-      <tr><td>airgap 클린 설치</td><td>fresh 머신 1회 성공</td><td>실패 = 블로커</td></tr>
-    </tbody>
-  </table>
+    <section id="s04">
+      <h2><span class="num">04</span> 어댑터 — 활성 vs 대기</h2>
+      <p class="h2-sub"><code>adapters/</code>(28)는 포트+구현체 구조로 교체 가능. <b>배포 프로파일(<code>LLOYDK_DEPLOY_PROFILE</code>)</b>이 무엇을 켤지 결정한다.</p>
+      <table class="f">
+        <thead><tr><th style="width:130px">종류</th><th>활성 (운영)</th><th>대기 / 옵션</th></tr></thead>
+        <tbody>
+          <tr><td><b>embedding</b></td><td class="td-pass"><code>hf_embedding</code> (KURE-v1)</td><td><code>hash</code>(드라이런) · <code>cache_layer</code></td></tr>
+          <tr><td><b>llm</b></td><td class="td-pass"><code>local_openai</code>/<code>vllm</code>(고객) · <code>anthropic</code>(개발)</td><td><code>openai</code> · <code>noop</code></td></tr>
+          <tr><td><b>vectorstore</b></td><td class="td-pass"><code>pg_store</code> (pgvector)</td><td><code>es_store</code> · <code>inmemory</code></td></tr>
+          <tr><td><b>storage</b></td><td class="td-pass"><code>local_store</code> · <code>encrypted_store</code></td><td><code>minio</code> · <code>seaweedfs</code> (옵션)</td></tr>
+          <tr><td><b>reranker</b></td><td class="td-pass"><code>bge_reranker</code></td><td><code>noop</code></td></tr>
+        </tbody>
+      </table>
     </section>
 
-  <section id="s06">
-      <h2><span class="num">06</span> 비밀문서 문제 — 정직하게</h2>
-  <p>냉정한 결론부터: <b>"예전 기밀 → 현재 공개" 문서는 원리상 실기밀 텍스처를 못 준다</b>(그래서 F1 0.26 갭이 안 닫힘). 그리고 실제 분류문서를 테스트서버로 반출하는 것은 반출0 방침·법적으로도 어렵다. 그래서 실텍스처 증거를 얻는 <b>유일하게 안전한 방법은 문서를 가져오는 게 아니라 반대로 하는 것</b>이다:</p>
-  <div class="callout">
-    <div class="cl">권장 · in-place 섀도우 런</div>
-    <p>시스템을 고객 실문서 위에서 <b>그 폐쇄망 환경 안에서</b> 돌리고, <b>문서는 안 나오고 집계 지표(escalation율·고등급 미탐·정밀도)만</b> 반출한다. 반출0을 안 깨면서 실텍스처 escalation율/안전을 실측할 수 있다. "일부만 검수"가 정확히 이 슬라이스이며, 소량이라도 스코어카드에서 가장 값진 한 칸이다. 테스트서버 쪽은 공개/유사문서로 <b>안정성·커버리지 baseline</b>만 잡고, 실텍스처 감은 in-place로 얻는 <b>이원 구조</b>를 권한다.</p>
-  </div>
+    <section id="s05">
+      <h2><span class="num">05</span> 데이터셋 경로 — <code>poc/datasets/</code></h2>
+      <p class="h2-sub">중요: 런타임 서빙은 데이터셋을 직접 읽지 <b>않고</b> 모델 디렉토리만 로드한다. 데이터셋을 읽는 건 거의 전부 <code>scripts/</code>(빌드·평가 게이트)이며, 런타임 예외는 딱 2개다.</p>
+      <table class="f">
+        <thead><tr><th style="width:320px">경로</th><th style="width:60px">건수</th><th>용도</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="3">평가 정본 (릴리스 게이트가 소비)</td></tr>
+          <tr><td class="td-code">gold_real/classification_gold.jsonl</td><td>777</td><td>분류 정본. ⚠train-on-test 오염 → F1 0.83은 암기치</td></tr>
+          <tr><td class="td-code">gold_real/holdout_eval.clean.jsonl</td><td>42</td><td><b>디오염 홀드아웃</b> — ★릴리스 판단 진짜 지표(운영 FNR 2.8%)</td></tr>
+          <tr><td class="td-code">gold_real/retrieval_gold.jsonl</td><td>80</td><td>검색 정본 — P2 게이트(KURE hybrid R@5 0.925)</td></tr>
+          <tr><td class="td-code">gold/classification_gold.jsonl</td><td>144</td><td>합성 마스킹 eval (내부일관성만)</td></tr>
+          <tr><td class="td-code">adversarial/golden_100.jsonl</td><td>100</td><td>적대 FNR 회귀 — S9 릴리스 게이트</td></tr>
+          <tr><td class="td-code">metamorphic/anchor_pairs.fixture.jsonl</td><td>18</td><td>최소쌍 픽스처 — 메타모픽 게이트</td></tr>
+          <tr><td class="td-code">acceptance_pack/</td><td>—</td><td>전 포맷 실문서 샘플 — 고객 인수검증(번들 동봉)</td></tr>
+
+          <tr class="grp"><td colspan="3">학습 데이터 (silver)</td></tr>
+          <tr><td class="td-code">labeled_p1_retrain_v4_clean/train.jsonl</td><td>5911</td><td><b>현재 배포모델(v-dd3abab9) 학습입력</b> — KF-DeBERTa clean 베이스 (FNR 0.167 / F1 0.632)</td></tr>
+          <tr><td class="td-code">labeled_oss_v1/{val,test}</td><td>680/687</td><td>in-dist 게이트 (F1 0.774 PASS)</td></tr>
+          <tr><td class="td-code">oss_corpus/</td><td>3754</td><td>P2 검색 대상 코퍼스 (Recall eval)</td></tr>
+
+          <tr class="grp"><td colspan="3">런타임이 읽는 유일한 예외 2건 🟢</td></tr>
+          <tr><td class="td-code">demo_retrain/</td><td>~400</td><td>재학습 데모 (<code>config.retrain_dataset_dir</code>)</td></tr>
+          <tr><td class="td-code">drift_train_centroid.json</td><td>1</td><td>드리프트 센트로이드 (<code>drift_monitor.py</code>)</td></tr>
+
+          <tr class="grp"><td colspan="3">참조 · 금지</td></tr>
+          <tr><td class="td-code">manifests/dataset_v1.0.yaml</td><td>—</td><td>정본 매니페스트 (모든 count/lineage 근거)</td></tr>
+          <tr><td class="td-code">legacy_synthetic/*</td><td>—</td><td>⚠순환오염 — <b>학습·평가 입력 금지(폐기)</b></td></tr>
+        </tbody>
+      </table>
     </section>
 
-  <section id="s07">
-      <h2><span class="num">07</span> 8월말 납품 의사결정 프레임</h2>
-  <div class="rootcauses">
-    <div class="rc" style="border-left-color:#15803d;"><div class="n">GO</div><div class="t">납품 진행</div><div class="d">안전 미탐 0 + 소크/DR/관측성/설치 통과 + 운영학습 리프트 확인 + <b>고객이 "안전+운영학습" 계약 수용</b>(day-1 자동정확도가 아니라 안전+운영개선).</div></div>
-    <div class="rc" style="border-left-color:#b45309;"><div class="n">조건부 GO</div><div class="t">계약 명문화 후 납품</div><div class="d">안전은 통과하나 커버리지 낮음/실텍스처 미검증 → 납품하되 <b>"초기 검수 부담 큼 + N개월 운영학습으로 개선"</b>을 계약·SLA에 명문화.</div></div>
-    <div class="rc" style="border-left-color:#b91c1c;"><div class="n">NO-GO</div><div class="t">픽스 후 재판정</div><div class="d">고등급 미탐 발생 / 설치·DR 실패 / 운영학습 파국 회귀 → 원인 규명·픽스 후 재판정.</div></div>
-  </div>
-  <div class="callout" style="margin-top:16px;">
-    <div class="cl">핵심 리스크</div>
-    <p>고객이 "day-1에 실비밀문서를 정확히 자동분류"를 기대하면 합성-only로는 못 맞춘다. 이 기대치를 <b>테스트 결과로 미리 리셋</b>하는 것이 이 한 달의 절반짜리 목적이다. 안전은 지금도 납품 가능 수준이지만, 자동화 커버리지는 운영학습이 쌓이는 N개월에 걸쳐 올라간다.</p>
-  </div>
+    <section id="s06">
+      <h2><span class="num">06</span> 설치 대상 — 모델 · DB · 저장소</h2>
+      <p class="h2-sub">폐쇄망 GA(<code>onprem-local</code>) 기준, <b>무엇을 어디에 깔아야 하는가</b>. 모든 식별자·경로·env 이름은 소스에서 확인한 실값이다.</p>
+      <table class="f">
+        <thead><tr><th style="width:40px">#</th><th style="width:130px">대상</th><th style="width:230px">이름 / 버전</th><th>경로 · env</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><b>Postgres+pgvector</b></td><td class="td-code">pgvector/pgvector:pg16</td><td>포트 5432 · <code>pgdata:/var/lib/postgresql/data</code> · <code>DATABASE_URL</code>. 부팅 후 <code>alembic upgrade head</code> (vector·pg_bigm 확장)</td></tr>
+          <tr><td>2</td><td><b>Redis</b></td><td class="td-code">redis:7.2-alpine</td><td>포트 6379 · <code>REDIS_URL</code>. Celery 브로커+잡+멱등</td></tr>
+          <tr><td>3</td><td><b>임베딩 모델</b></td><td class="td-code">nlpai-lab/KURE-v1 (폴백 BAAI/bge-m3)</td><td><code>/models</code>(→<code>HF_HOME=/models/hf</code>) 오프라인 동봉 · <code>HF_HUB_OFFLINE=1</code>. CPU/GPU</td></tr>
+          <tr><td>4</td><td><b>리랭커</b></td><td class="td-code">BAAI/bge-reranker-v2-m3</td><td>같은 HF 캐시 · <code>RERANKER_PROVIDER=bge</code></td></tr>
+          <tr><td>5</td><td><b>분류 모델</b></td><td class="td-code">kakaobank/kf-deberta-base + 학습가중치</td><td><code>CLASSIFIER_MODEL_DIR=/models/classifier-trained</code> (safetensors, <b>경로 없으면 startup 실패</b>)</td></tr>
+          <tr><td>6</td><td><b>로컬 LLM</b></td><td class="td-code">Qwen/Qwen3-14B (또는 qwen3:14b)</td><td>vLLM <code>:8001/v1</code> 또는 Ollama <code>:11434/v1</code>. GPU 필요 · <code>LLM_PROVIDER=local_openai|vllm|ollama</code></td></tr>
+          <tr><td>7</td><td><b>문서 저장소</b></td><td class="td-code">로컬 FS (MinIO 미사용)</td><td><code>/app/.storage</code> (api↔worker 공유) · <code>STORAGE_ENCRYPTION_KEY</code>(64-hex)로 AES-256-GCM</td></tr>
+          <tr><td>8</td><td><b>OS 바이너리</b></td><td class="td-code">tesseract(+kor) · poppler · libreoffice</td><td>Dockerfile.api 포함 · GPU 시 NVIDIA Container Toolkit</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <div class="callout-icon">◆</div>
+        <div class="callout-body"><b>배포 모델 = <code>v4_clean/v-dd3abab9</code> (clean)</b> — <code>.env.example</code>·<code>.env.prod.example</code>·오프라인 번들(<code>build_offline_bundle</code>)·readiness·adversarial 게이트까지 <b>코드·설정·스크립트 전부가 일관되게</b> 이 경로를 가리킨다 (FNR 0.167 / F1 0.632, cost 미적용 clean 베이스). 옛 <code>v4_step3/v-f9b5cedb</code>는 서빙 기본값으로 참조되는 곳이 없고, 그 학습셋(step3 train.jsonl)은 정리 커밋에서 추적 해제(<code>git rm --cached</code>)됐다.</div>
+      </div>
+      <p style="font-size:13px;color:var(--text-dim);margin:12px 0 0;"><b>개발/클라우드 티어</b>는 6·로컬LLM 대신 <code>ANTHROPIC_API_KEY</code> + <code>claude-sonnet-4-6</code>을 쓴다. <b>필수 시크릿</b>(<code>poc_mode=full</code>): <code>API_KEY</code> · <code>LLOYDK_AUDIT_CHAIN_SECRET</code> · <code>STORAGE_ENCRYPTION_KEY</code> + 안전게이트(agreement/metadata_floor/storage_encryption/source_prior/require_real_embedder/deploy_gate_require_locked_eval)가 모두 ON이어야 startup 통과.</p>
     </section>
 
-  <section id="s08">
-      <h2><span class="num">08</span> 부록 · W0 테스트서버 사양 산정</h2>
-  <p>아키텍처 결정(GPU=0 원칙, 분류기·임베딩 추론은 CPU 충분, GPU는 <b>LLM 서빙·학습에만</b> 필요)에 근거해, 테스트서버는 고객 운영 실서버(A100 80GB×2·32 vCore·192GB·4TB, 발주처 제공)보다 <b>훨씬 작게</b> 산정할 수 있다. 파일럿 <b>1차 목표(안전·escalation·소크·DR·설치)는 전부 CPU 경로</b>이므로 아래 <b>2-tier</b>를 권한다.</p>
-  <div class="callout live">
-    <div class="cl">권장 · 2-tier</div>
-    <p><b>① 베이스라인(상시, CPU-only)</b> — 파일럿 한 달의 primary 목표를 전부 커버(분류·검색·escalation·소크·DR·airgap 설치 리허설). <b>② GPU 스파이크(단기, 별도)</b> — W3 재학습 + LLM 경로(Qwen3-14B) 1회 충실검증에만 수일. 렌탈 GPU 또는 RFP상 개발/학습용 CSAP 클라우드 샌드박스로 조달해 <b>별도 GPU 상시 구매 회피</b>.</p>
-  </div>
-  <table class="f">
-    <thead><tr><th style="width:130px">구성요소</th><th style="width:170px">베이스라인 (CPU-only)</th><th>근거</th></tr></thead>
-    <tbody>
-      <tr><td><b>vCPU</b></td><td>16 core (최소 8)</td><td>api + worker(celery) + postgres + KURE·KF-DeBERTa·BGE reranker CPU 추론. 임베딩·리랭커가 CPU-heavy(파일럿 처리량엔 16 충분)</td></tr>
-      <tr><td><b>RAM</b></td><td>32GB (최소 24)</td><td>모델 상주 2벌(api+worker: KURE~2G · KF-DeBERTa~0.7G · BGE reranker~2.3G ≈ 5G×2) + postgres + redis + OS 여유</td></tr>
-      <tr><td><b>OS Disk</b></td><td>100GB</td><td>OS + Docker + 로드된 이미지</td></tr>
-      <tr><td><b>Data SSD</b></td><td>256GB</td><td>번들 ~23GB + 이미지 + 모델볼륨 ~10GB + pgdata(한 달 성장) + storagedata(암호화 원본) + 로그·메트릭</td></tr>
-      <tr><td><b>GPU</b></td><td>없음</td><td>분류·검색·escalation(핫패스)은 CPU. LLM/학습만 GPU → 스파이크 tier로 분리</td></tr>
-      <tr><td><b>OS / 런타임</b></td><td>Linux x86_64 + Docker + Compose</td><td>airgap 번들이 <b>Linux 타깃</b>(win_amd64 wheel 아님, 구멍 ⑤ 참조). <b>외부망 차단</b> 상태로 번들만 기동해야 설치 리허설 유효</td></tr>
-    </tbody>
-  </table>
-  <p style="font-size:13px;color:var(--text-dim);margin:14px 0 4px;"><b>스택(운영과 동일 미러):</b> postgres(pgvector:pg16) · redis(7.2) · api · worker(전 큐 구독) · beat(단일) <span style="color:var(--text-faint);">(+옵션 nginx-mtls)</span> · storage=로컬FS(AES-256-GCM) · VECTOR_BACKEND=pg · HF_HUB_OFFLINE=1.</p>
-  <table class="f">
-    <thead><tr><th style="width:130px">GPU 스파이크</th><th style="width:170px">산정</th><th>용도 · 대안</th></tr></thead>
-    <tbody>
-      <tr><td><b>GPU</b></td><td>1× 48GB (L40S/A6000) 권장</td><td>Qwen3-14B fp16(~28GB VRAM) LLM 서빙 + KF-DeBERTa 재학습 동시 수용. 24GB(4090/L4)는 int4 양자화 LLM이면 가능</td></tr>
-      <tr><td><b>기간</b></td><td>수일 (time-boxed)</td><td>W3 재학습 1~2회 + /answer·2차 LLM판정 경로 1회 검증. 상시 아님</td></tr>
-      <tr><td><b>대안</b></td><td>CSAP 클라우드 샌드박스</td><td>RFP상 개발/학습은 발주기관 제공 클라우드 → GPU 별도 구매 회피(<code>rfp-cloud-hosting</code>)</td></tr>
-    </tbody>
-  </table>
-  <div class="callout" style="margin-top:14px;">
-    <div class="cl">주의 · 폐쇄망 미러 조건</div>
-    <p>테스트서버도 <b>외부망 차단(HF_HUB_OFFLINE=1)</b> 상태에서 번들만으로 기동해야 airgap 설치 구멍(⑤)을 실제로 잡을 수 있다. 인터넷 되는 서버로 편하게 테스트하면 정작 고객 폐쇄망에서 터지는 문제를 못 본다. 규모·부하 시험이 목적이면 별도로 운영 실서버 스펙에 근접시켜 1회만 수행.</p>
-  </div>
-
+    <section id="s07">
+      <h2><span class="num">07</span> 배포 프로파일</h2>
+      <p class="h2-sub"><code>LLOYDK_DEPLOY_PROFILE</code> 한 줄이 위 모델·DB·게이트의 on/off를 결정한다 (<code>config.py</code> <code>_PROFILE_DEFAULTS</code>).</p>
+      <table class="f">
+        <thead><tr><th style="width:130px">프로파일</th><th style="width:90px">GPU</th><th>구성</th></tr></thead>
+        <tbody>
+          <tr><td class="td-code">lite-noapi</td><td>없음</td><td>전부 mock: llm=noop · embedding=hash · vector=inmemory · 학습 OFF · dryrun</td></tr>
+          <tr><td class="td-code">lite-cloud</td><td>없음</td><td>외부 LLM: llm=anthropic · embedding=hf · vector=pg · storage=minio · full</td></tr>
+          <tr><td class="td-code"><b>onprem-local</b></td><td>있음</td><td><b>폐쇄망 GA</b>: llm=ollama · embedding=hf · reranker=bge · vector=pg · storage=local · 안전게이트 강제 ON</td></tr>
+          <tr><td class="td-code">full-train</td><td>있음</td><td>풀스펙: llm=anthropic · reranker=bge · vector=pg · storage=local · 학습 ON</td></tr>
+        </tbody>
+      </table>
     </section>
+
+    <section id="s08">
+      <h2><span class="num">08</span> 오프라인 도구 — <code>scripts/</code> / make</h2>
+      <p class="h2-sub"><code>poc/scripts/</code>(151 = 직속 132 + <code>scripts/archive/</code> 격리 19)는 손으로 돌리는 도구. 일회성·실험 스크립트 19개는 정리 커밋 0b49f76에서 <code>archive/</code>로 격리됐고, 밑줄(<code>_</code>) 접두 파일도 대부분 임시 프로브다. 실제 배선된 make 타겟 체인만 정리한다.</p>
+      <table class="f">
+        <thead><tr><th style="width:150px">목적</th><th>핵심 스크립트 · make 타겟</th></tr></thead>
+        <tbody>
+          <tr><td><b>합성 골든빌드</b></td><td class="td-code">build_synthetic_golden · run_golden_split_signoff · promote_golden_candidates · make_gold_set(gold-set) · make_retrieval_gold(retrieval-gold)</td></tr>
+          <tr><td><b>평가</b></td><td class="td-code">eval_p1_model_gold(p1-eval) · eval_adversarial(adversarial-gate) · eval_trusted_ci(eval-trusted-ci) · build_p1_boundary_report(p1-boundary)</td></tr>
+          <tr><td><b>릴리스 게이트</b></td><td class="td-code">build_operational_readiness(operational-readiness) → adversarial-gate + metamorphic-gate → check_release_gate(release-gate) → build_release_manifest(release-manifest)</td></tr>
+          <tr><td><b>인수 팩</b></td><td class="td-code">build_acceptance_pack(acceptance-pack) · run_acceptance(acceptance-test)</td></tr>
+          <tr><td><b>데이터 위생</b></td><td class="td-code">check_data_quality(check-data/check-leakage) · build_leakage_manifest(leakage-manifest) · check_dataset_manifest(check-manifest)</td></tr>
+          <tr><td><b>검수 루프</b></td><td class="td-code">build_human_review_queue(human-review-queue) · import_review_corrections(import-review) · check_active_learning(active-learning)</td></tr>
+          <tr><td><b>DB · DR</b></td><td class="td-code">check_migration_drift · seed_active_model_version · backup_postgres · dr_drill · dr_restore</td></tr>
+          <tr><td><b>공급망 · 번들</b></td><td class="td-code">dump_licenses(licenses) · render_sbom_html(sbom-publish) · build_offline_bundle(bundle-dry)</td></tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        <div class="callout-icon">▸</div>
+        <div class="callout-body"><b>릴리스 흐름</b>(RELEASE_CHECKLIST): <code>human-review-queue</code> → <code>import-review</code> → <code>check-manifest</code> → <code>p1-boundary</code> → <code>operational-readiness</code> → <code>release-gate</code> → <code>release-manifest</code> → <code>test-lite / test-fullstack</code>.</div>
+      </div>
+    </section>
+
   </article>
 </div>
 
 <footer>
-  <strong>테스트서버 1개월 파일럿 플랜</strong> — 수행사 내부 · 로이드케이<br>
-  2026-07-05 · KL 공유 대상 아님(내부 계획) · 판정 기준: 안전(veto) + 커버리지 baseline + 운영학습 리프트
+  <strong>실제 사용 파일 아키텍처 맵</strong> — 수행사 내부 · 로이드케이<br>
+  2026-07-07 재검증 · KL 공유 대상 아님(내부 참조) · 실측 근거: 4영역 병렬 소스 감사 + 정리커밋 6건 반영 · 앱코드 poc/src/lloydk 178 · 실행 프로세스 3
 </footer>
 
 <script>

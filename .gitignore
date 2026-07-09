@@ -64,6 +64,7 @@ poc/logs/
 
 # 생성된 혼합 학습 subset
 poc/datasets/gold_real/train_subset.jsonl
+poc/datasets/gold_real/*.v1_bak_*
 poc/datasets/corrections/
 # 대용량 실험 데이터(ab_s1 선례) — git 히스토리 부담 방지. 데이터는 별도 보관.
 poc/datasets/labeled_p1_bilingual_exp/
@@ -76,6 +77,9 @@ poc/.coverage
 
 # Doc backups / 외부 회신용 통합본 (별도 트래킹 안 함)
 doc/bak/
+doc/archive/**
+!doc/archive/
+!doc/archive/ARCHIVE_INDEX.md
 
 # Notebooks
 .ipynb_checkpoints/
@@ -87,6 +91,7 @@ doc/bak/
 .DS_Store
 Thumbs.db
 ~$*
+doc/**/~$*
 poc/backups/
 poc/datasets/synthetic_qwen3_1200/
 

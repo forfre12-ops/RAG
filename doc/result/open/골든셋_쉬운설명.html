@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>골든셋 — 정답지는 어떻게 만들고 왜 둘로 나누나 (쉬운 설명) | Lloydk</title>
+<title>합성 코퍼스와 locked 평가 — 왜 나누나 (쉬운 설명) | Lloydk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
@@ -119,11 +119,14 @@ footer strong{color:var(--text-dim);}
     <span class="meta-soft">2026-06-27</span>
   </div>
 
-  <h1 class="title">정답지는 어떻게 만들고,<br/>왜 둘로 나누나</h1>
+  <h1 class="title">합성 코퍼스와 locked 평가는<br/>왜 나누나</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
   <p class="lede">
-    AI가 문서 등급을 배우려면 <strong>믿을 수 있는 정답지(골든셋)</strong>가 먼저 있어야 합니다.
+    AI가 문서 등급을 배우려면 라벨이 필요하지만, <strong>합성·LLM 라벨은 믿을 수 있는 평가 정답이 아닙니다.</strong>
     이 문서는 ① 골든셋이 무엇인지, ② 어디서 모으고 어떤 모델로 만드는지,
-    ③ 그 정답지를 왜 <strong>학습셋</strong>과 <strong>홀드아웃</strong> 둘로 쪼개는지를,
+    ③ 합성 산출물을 왜 <strong>학습셋</strong>과 <strong>상대비교 holdout</strong>으로만 쓰는지를,
     파일의 실제 구성항목과 예시로 비전문가도 한 번에 이해하도록 풀어 씁니다.
   </p>
 
@@ -135,14 +138,14 @@ footer strong{color:var(--text-dim);}
       <strong>홀드아웃</strong>(절대 안 보여주고 시험만 보는 모의고사).
     </p>
     <p>
-      비유하면 — 골든셋은 <strong>선생님이 만든 정답지</strong>입니다. 그 정답지의 일부를 <strong>연습문제</strong>로 학생(AI)에게
+      비유하면 — 합성 코퍼스는 <strong>연습문제</strong>입니다. 그 일부를 학생(AI)에게
       풀게 하고, 나머지는 숨겨뒀다가 <strong>시험문제</strong>로 냅니다. 연습한 문제로 시험 보면 다 맞히는 게 당연하니까(=암기),
       <strong>진짜 실력은 숨겨둔 문제로만</strong> 잴 수 있습니다.
     </p>
   </div>
 
   <div class="section-sep"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">골든셋이란</span></div>
-  <h2 id="s1">골든셋 = "믿을 수 있는 정답지"</h2>
+  <h2 id="s1">합성 코퍼스 ≠ locked 평가 정답</h2>
   <p>
     골든셋(gold set)의 "gold(금)"은 <strong>정답의 순도가 높다</strong>는 뜻입니다. 즉 골든셋은 <em>용도</em>(학습용·시험용)로
     정의되는 게 아니라 <strong>"정답이 얼마나 믿을 만한가"</strong>로 정의됩니다. 사람이 검수해 도장을 찍은, 신뢰할 수 있는 라벨 모음이죠.
@@ -158,15 +161,15 @@ footer strong{color:var(--text-dim);}
     <div class="step"><div class="n">자식 ②</div><div class="t">홀드아웃</div><div class="d">숨겨두고 채점만 (시험문제)</div></div>
   </div>
   <p class="meta-soft" style="font-size:12.5px;">
-    현재 정본 골든셋(<code>classification_gold.jsonl</code>)은 <strong>실문서 777건</strong>이며,
+    현재 <code>classification_gold.jsonl</code> 계열은 합성·공개·LLM 라벨이 섞인 <strong>프록시/후보 데이터</strong>이며,
     등급 분포는 <span class="g ts">TS 55</span> <span class="g s1">S1 70</span> <span class="g s2">S2 232</span> <span class="g s3">S3 420</span> 입니다.
   </p>
 
   <div class="section-sep"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">수집 출처</span></div>
   <h2 id="s2">골든셋은 어디서 모으나?</h2>
   <p>
-    정답지의 신뢰도는 <strong>출처</strong>에서 옵니다. 우리는 한 곳이 아니라 <strong>법적 근거가 분명한 공개 출처</strong>와
-    <strong>AI·룰의 판정</strong>, 그리고 (9월부터) <strong>실고객 문서</strong>를 층층이 쌓습니다. 출처마다 신뢰 등급(tier)이 다릅니다.
+    라벨의 신뢰도는 <strong>출처</strong>에서 옵니다. 우리는 한 곳이 아니라 <strong>법적 근거가 분명한 공개 출처</strong>와
+    <strong>AI·룰의 판정</strong>, 그리고 운영에서 쌓이는 <strong>관리자 확정 라벨</strong>를 층층이 쌓습니다. 출처마다 신뢰 등급(tier)이 다릅니다.
   </p>
   <div class="table-wrap">
   <table>
@@ -178,7 +181,7 @@ footer strong{color:var(--text-dim);}
       <tr><td><strong>codex_review</strong></td><td>AI 교차 리뷰로 보정한 시나리오</td><td class="center">19</td><td class="center"><span class="tag legal">법적근거</span></td></tr>
       <tr><td><strong>llm_judge_primary</strong></td><td>LLM 주 판정자의 1차 라벨</td><td class="center">524</td><td class="center"><span class="tag silver">학습시드</span></td></tr>
       <tr><td><strong>llm_judge_consensus</strong></td><td>LLM 여러 번 샘플의 <strong>합의</strong> 라벨</td><td class="center">67</td><td class="center"><span class="tag silver">학습시드</span></td></tr>
-      <tr><td><strong>human_review</strong></td><td><strong>사람이 서명 확정</strong> — 유일한 "평가 정답"</td><td class="center">0 <span class="meta-soft">(9월 후)</span></td><td class="center"><span class="tag lock">평가정답</span></td></tr>
+      <tr><td><strong>human_review / locked_gold_eval</strong></td><td><strong>사람이 서명 확정</strong> — 유일한 평가 진실</td><td class="center">0 <span class="meta-soft">(운영 확정 전)</span></td><td class="center"><span class="tag lock">locked</span></td></tr>
     </tbody>
   </table>
   </div>
@@ -353,7 +356,7 @@ footer strong{color:var(--text-dim);}
     <p>
       학습셋에 <strong>"○○ 원가표"</strong> 문서가 있고 AI가 이걸 보고 배웠습니다. 이제 <strong>같은 "○○ 원가표"로 시험</strong>을 보면?
       AI는 답을 외웠으니 <strong>S1 정답</strong>. "정확도 99%!"처럼 보입니다. 하지만 이건 <strong>실력이 아니라 암기</strong>입니다.
-      9월에 들어온 <strong>처음 보는 "△△ 원가표"</strong>(다르게 쓰인 문서)는 외운 게 없으니 틀립니다.
+      운영에서 들어온 <strong>처음 보는 "△△ 원가표"</strong>(다르게 쓰인 문서)는 외운 게 없으니 틀립니다.
       → <strong>숨겨둔 문제로 채점해야</strong> 진짜 실력이 보입니다.
     </p>
   </div>
@@ -362,7 +365,7 @@ footer strong{color:var(--text-dim);}
     <div class="callout-label">예시 2 — "학습셋과 비교해 분류"는 외운 걸 베끼는 것 (이미 실측 실패)</div>
     <p>
       새 문서를 학습셋에서 닮은 걸 찾아 그 등급을 베끼는 방식(검색·kNN)은, 새 문서가 <strong>글자가 닮았을 때만</strong> 맞습니다.
-      실측 결과 이 방식은 <strong>S1(영업비밀)을 9%만</strong> 잡았습니다(=사실상 무검출). 9월 실문서는 모두 "처음 보는 문제"라
+      실측 결과 이 방식은 <strong>S1(영업비밀)을 9%만</strong> 잡았습니다(=사실상 무검출). 제약 완화 시 실문서는 모두 "처음 보는 문제"라
       닮은 이웃이 없으면 무너지기 때문입니다. 반면 <strong>규칙을 배운 분류기</strong>는 처음 보는 표현도 추론합니다.
       → 자세한 수치는 <a href="검색단독_vs_분류기_등급분류_비교.html">검색 단독 vs 검색+분류기 비교</a> 참고.
     </p>
@@ -382,7 +385,7 @@ footer strong{color:var(--text-dim);}
   <div class="callout warn">
     <div class="callout-label">지금의 한계 (투명 공개)</div>
     <p>
-      ① <strong>사람 서명 평가정답(locked)은 아직 0건</strong>입니다 — <strong>2026년 9월 실문서 검수</strong> 후 채워집니다.
+      ① <strong>사람 서명 평가정답(locked)은 0건</strong>입니다 — 현 제약에서는 비어 있는 것이 정상이며, 운영 관리자 확정 또는 제약 완화가 있어야 채워집니다.
       그 전까지는 <span class="tag legal">법적근거</span> 라벨을 <strong>임시 평가 바닥</strong>으로만 씁니다(릴리스 차단용, 일반화 진실 아님).
     </p>
     <p>
@@ -395,7 +398,7 @@ footer strong{color:var(--text-dim);}
     <thead><tr><th>질문</th><th>한 줄 답</th></tr></thead>
     <tbody>
       <tr><td>골든셋이 학습셋이야 홀드아웃이야?</td><td><strong>둘 다 아님 — 둘의 부모</strong>(정답 신뢰 문서). 쪼개서 둘을 만듦.</td></tr>
-      <tr><td>어디서 모으나?</td><td>판례·공시·국가핵심기술 등 <strong>법적근거 공개 출처</strong> + LLM/룰 + (9월)실문서.</td></tr>
+      <tr><td>어디서 모으나?</td><td>판례·공시·국가핵심기술 등 <strong>법적근거 공개 출처</strong> + LLM/룰 + 운영 관리자 확정(가능 시).</td></tr>
       <tr><td>어떤 모델로 만드나?</td><td>룰 → LLM 판정(<strong>비밀=오픈소스 Qwen / 공개=상용 택일</strong>) → 사람 검수 3단.</td></tr>
       <tr><td>학습셋 파일 구성?</td><td><code>doc_id · text · label · source</code> — 최소(배움용).</td></tr>
       <tr><td>홀드아웃 파일 구성?</td><td>위 + <code>legal_reference · evidence_spans · notes · reviewer_id</code> — 풍부(채점용).</td></tr>
@@ -432,7 +435,7 @@ footer strong{color:var(--text-dim);}
 
 <footer>
   <strong>KOIPA AI 영업비밀관리시스템</strong> — 골든셋 쉬운 설명 · 2026-06-27<br>
-  골든셋 = 정답지 · 학습셋(연습) + 홀드아웃(시험)으로 분할 · 누출 0 검증
+  합성 코퍼스 = 학습시드 + 상대비교 holdout · locked 평가는 사람서명 전용 · 누출 0 검증
 </footer>
 
 <script>

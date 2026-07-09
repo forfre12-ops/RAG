@@ -210,6 +210,8 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <div class="toc-title">API 목록</div>
     <a class="toc-item" href="#global">인증 · 공통</a>
     <a class="toc-item" href="#ep-classify"><span class="toc-method post">POST</span> /classify</a>
+    <a class="toc-item" href="#ep-classify-async"><span class="toc-method post">POST</span> /classify/async</a>
+    <a class="toc-item" href="#ep-classify-stream"><span class="toc-method post">POST</span> /classify/stream</a>
     <a class="toc-item" href="#ep-classify-batch"><span class="toc-method post">POST</span> /classify/batch</a>
     <a class="toc-item" href="#ep-classify-job"><span class="toc-method get">GET</span> /classify/jobs/{id}</a>
     <a class="toc-item" href="#ep-explain"><span class="toc-method post">POST</span> /classify/explain</a>
@@ -220,6 +222,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-answer"><span class="toc-method post">POST</span> /answer</a>
     <a class="toc-item" href="#ep-synthesis"><span class="toc-method post">POST</span> /synth/generate</a>
     <a class="toc-item" href="#ep-documents"><span class="toc-method post">POST</span> /documents</a>
+    <a class="toc-item" href="#ep-documents-analyze"><span class="toc-method post">POST</span> /documents/analyze</a>
     <a class="toc-item" href="#ep-golden-build"><span class="toc-method post">POST</span> /golden/build</a>
     <a class="toc-item" href="#ep-guide-documents"><span class="toc-method post">POST</span> /guide/documents</a>
     <a class="toc-item" href="#ep-promotions"><span class="toc-method get">GET</span> /promotions/pending</a>
@@ -241,7 +244,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <div class="meta-row">
       <span class="badge">부록 B</span>
       <span class="badge outline">API Spec</span>
-      <span class="badge outline">2026-06-24 갱신</span>
+      <span class="badge outline">2026-07-04 갱신</span>
       <span style="color:var(--text-dim);font-size:12px;">· OpenAPI 3.0 · Base URL: /api/v1</span>
     </div>
     <h1 class="title">API 명세</h1>
@@ -328,6 +331,49 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <span class="sc s4xx">429 Rate Limit</span>
           <span class="sc s5xx">503 모델 워밍업 중</span>
         </div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-classify-async">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/classify/async</span>
+        <span class="ep-summary">단일 문서 비동기 분류 작업 제출</span>
+        <span class="ep-auth">API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">긴 문서·RAG ON 등 즉시 응답 시간이 길 수 있는 단일 문서를 큐에 등록한다. 브로커 가용 시 Celery로 발사하고, 테스트·브로커 미가용 환경에서는 in-process 폴백으로 기존 동작을 보존한다.</p>
+        <table class="ftbl">
+          <thead><tr><th>방향</th><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>REQ</td><td class="f-name">doc_id / content</td><td class="f-type">string</td><td><code>ClassifyRequest</code>와 동일. <code>doc_id</code>는 필수, 본문은 <code>content</code>.</td></tr>
+            <tr><td>RES 202</td><td class="f-name">job_id</td><td class="f-type">UUID</td><td>상태 조회 키</td></tr>
+            <tr><td>RES 202</td><td class="f-name">status_url</td><td class="f-type">string</td><td><code>/api/v1/classify/jobs/{job_id}</code></td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">202 Accepted</span><span class="sc s4xx">401 인증 실패</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-classify-stream">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/classify/stream</span>
+        <span class="ep-summary">SSE 스트리밍 분류</span>
+        <span class="ep-auth">API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc"><code>/classify</code>와 같은 분류를 수행하되 <code>text/event-stream</code>으로 단계별 진행 이벤트를 보낸다. 데모 콘솔과 긴 문서 UX에서 사용한다.</p>
+        <table class="ftbl">
+          <thead><tr><th>이벤트</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">progress</td><td>추출·청킹·모델 추론 등 단계 진행</td></tr>
+            <tr><td class="f-name">partial</td><td>중간 결과</td></tr>
+            <tr><td class="f-name">result</td><td>최종 <code>ClassifyResponse</code></td></tr>
+            <tr><td class="f-name">done / error</td><td>종료 또는 오류</td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">200 text/event-stream</span><span class="sc s4xx">401 인증 실패</span></div>
       </div>
     </div>
 
@@ -628,6 +674,30 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <span class="sc s4xx">413 파일 크기 초과 (20MB)</span>
           <span class="sc s4xx">422 actor JSON 오류 / 빈 파일</span>
         </div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-documents-analyze">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/documents/analyze</span>
+        <span class="ep-summary">업로드 문서 단계별 진단</span>
+        <span class="ep-auth">API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">시연·관리자 콘솔용 read-only 엔드포인트. 파일을 저장하지 않고 추출 → 정규화·PII 마스킹 → 청킹 → 검수게이트 → 분류까지 실행해 단계별 결과를 반환한다. HWP/HWPX·Office·PDF 표 구조화와 Office 내부 이미지 OCR 상태는 <code>parse.table_count</code>, <code>parse.table_cell_count</code>, <code>parse.warnings</code>로 확인한다. 운영 적재 경로(<code>POST /documents</code>)와 분리된 진단 API다.</p>
+        <table class="ftbl">
+          <thead><tr><th>방향</th><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td>REQ</td><td class="f-name">file</td><td class="f-type">binary</td><td>분석할 원본 파일</td></tr>
+            <tr><td>REQ</td><td class="f-name">return_evidence</td><td class="f-type">boolean</td><td>근거 스팬 반환 여부, 기본 true</td></tr>
+            <tr><td>RES 200</td><td class="f-name">parse</td><td class="f-type">object</td><td>source_format, extraction_method, extraction_quality, content_quality, ocr_used, table_coverage, table_count, table_cell_count, warnings 등</td></tr>
+            <tr><td>RES 200</td><td class="f-name">gate</td><td class="f-type">object</td><td>requires_review, reasons</td></tr>
+            <tr><td>RES 200</td><td class="f-name">classification</td><td class="f-type">object | null</td><td>label, confidence, scores, status, model_version</td></tr>
+            <tr><td>RES 200</td><td class="f-name">stages</td><td class="f-type">array</td><td>업로드·추출·정규화·청킹·검수게이트·분류 단계 로그</td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">200 분석 완료</span><span class="sc s4xx">413 파일 크기 초과</span><span class="sc s4xx">422 빈 파일/파싱 실패</span></div>
       </div>
     </div>
 

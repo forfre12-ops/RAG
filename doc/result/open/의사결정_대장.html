@@ -103,6 +103,9 @@ footer strong{color:var(--text-dim);}
     <span class="meta-soft">2026-06-22</span>
   </div>
   <h1 class="title">의사결정 대장</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
   <p class="lede">이 문서 <strong>하나로</strong> KOIPA 영업비밀관리시스템의 전체 의사결정 이슈를 파악·추적한다. 미팅 진행 흐름 + 발주처/KL 합의 + DB 거버넌스 + 본개발 + 사업 판단을 모았고, 각 항목에 <strong>배경 · 선택지 · 추천 · 주체 · 상태</strong>를 담았다. 상세 근거는 발주처 안건서·ICD·적용서 링크 참조.</p>
 
   <div class="callout inset">
@@ -131,9 +134,9 @@ footer strong{color:var(--text-dim);}
     <tbody>
       <tr><td><code>A1</code></td><td>공개·등록 특허 = S3(공개) 처리</td><td>공개특허를 비밀로 오분류 방지. 출원공개·등록 = 공지</td><td>S3 확정</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td><code>A2</code></td><td>v2.2 곱셈 보정 2건 활성화 여부</td><td>가이드 원본 곱셈 vs v2.2 보정(2·2·0→S1, 1·2·2→S2). 둘 다 골든셋 근거</td><td>설정 토글 제공 후 정책 승인</td><td class="center"><span class="tag plan">미결</span></td></tr>
-      <tr><td><code>A3</code></td><td>90% 정확도 측정 기준</td><td>어느 코퍼스·지표로 합격 판정. 운영 코퍼스 0.925 vs OSS 0.623</td><td>운영 코퍼스 기준 + FNR 동반</td><td class="center"><span class="tag plan">미결</span></td></tr>
+      <tr><td><code>A3</code></td><td>운영 확정 기반 성능 기준</td><td>합성/프록시 수치와 운영 locked 수치를 분리. 자동확정 확대는 locked 기준으로만 판단</td><td>locked 운영 확정 기준 + FNR kill-gate</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td><code>A4</code></td><td>등급 한국어/영문 표시명 확정</td><td>TS/S1/S2/S3 ↔ 한국어 명칭</td><td>§4.4 표대로</td><td class="center"><span class="tag plan">미결</span></td></tr>
-      <tr><td><code>A5</code></td><td>실데이터(회원사 실문서) 제공 시점·범위</td><td>본개발 검증·인간 골든셋의 토대. 현재 합성 위주. <strong>실문서 = 2026-09 1차학습 코퍼스(필수)</strong>; 1차학습 전 모델은 합성 기반, 상시 재학습 안 함(드리프트 단발)</td><td>조기 제공 요청(크리티컬)</td><td class="center"><span class="tag dep">발주처 의존</span></td></tr>
+      <tr><td><code>A5</code></td><td>운영 관리자 확정 라벨 확보·활용 범위</td><td>배포 전 검증 데이터가 아니라 운영에서 처음 생기는 진짜 신호. 확정 라벨은 고객 망에 잔류하고, 기본은 exact-match 선례·검수 라우팅에만 반영한다.</td><td>확정 포착·admission gate 합의(크리티컬)</td><td class="center"><span class="tag dep">발주처 의존</span></td></tr>
       <tr><td><code>A6</code></td><td>GPU·서버 사양 확정</td><td>운영 목표 A100 vs PoC 실측 RTX 5070 Ti. 폐쇄망 설치 포함</td><td>운영=A100급, 실측=5070Ti 명시</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td><code>A7</code></td><td><strong>골든셋 라벨링·검증 주체·절차</strong> <span class="tag wip">신규</span></td><td>AI사가 임의 라벨링 시 신뢰성 문제(라벨 순환성)</td><td><strong>2단계</strong> — 임시(Lloydk) → 정식(발주처 전문가 검증·승인)</td><td class="center"><span class="tag plan">미결</span></td></tr>
     </tbody>
@@ -170,12 +173,12 @@ footer strong{color:var(--text-dim);}
   <div class="table-wrap"><table>
     <thead><tr><th>항목</th><th>배경 · 선택지</th><th>추천</th><th class="center">상태</th></tr></thead>
     <tbody>
-      <tr><td>폐곡선·자동롤백 활성</td><td>기본 OFF. 언제·어떤 임계로 켤지. <strong>환류=재학습 방식은 미확정 3안</strong>(A 무반출·기본 / B 온사이트 학습 / C 문서단위 반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>); <strong>채널 분리</strong>(고객 문서=무반출, 집계 진단지표만 필수 환류). 모델은 상시 재학습하지 않음 — 폐곡선/자동롤백 임계는 1차학습 후 드리프트 트리거 단발</td><td>모니터링 동반 활성</td><td class="center"><span class="tag plan">미결</span></td></tr>
+      <tr><td>폐곡선·자동롤백 활성</td><td>기본 OFF. 고객사 기본값은 추론+비모수 메모리이며, 재학습은 locked 충분량·shadow 검증·2인 승인·롤백 계획 전까지 잠근다. 고객 문서=무반출, 집계 진단지표만 필수 환류</td><td>모니터링 동반 활성</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td>임베딩 모델 운영 선택</td><td>KURE-v1(BGE-M3 한국어 파인튜닝판) vs BGE-M3(일반 MTEB 높음)</td><td><strong>KURE-v1 확정</strong> — 우리 코퍼스 dense 실측: 발췌(80)·NL(190) 양쪽 모두 KURE ≥ BGE (@5 +1.6~3.8pp, @1 +5~7pp). 일반 벤치는 BGE 우위라도 우리 한국어 도메인은 특화판 KURE 우위. (dense·합성 한계 — 실데이터 재확인 P2)</td><td class="center"><span class="tag done">결정(실측)</span></td></tr>
       <tr><td><strong>A안 점수→등급 환산 규칙</strong> <span class="tag wip">신규</span></td><td>5요소 100점 → 등급 환산표 미정</td><td>가이드 기준 환산표 확정</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td>분산 상태 외부화</td><td>비동기 인라인·인프로세스 폴백</td><td>Celery 실배선·Redis 강제·reload 팬아웃</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td>감사키·접근 격리</td><td>감사키 부재·권한 결속 빈틈</td><td>비밀키 도입·deny-by-default·RLS</td><td class="center"><span class="tag plan">미결</span></td></tr>
-      <tr><td><strong>희소근거 게이트</strong> <code>rule_fallback_min_evidence</code> <span class="tag wip">신규</span></td><td>기본 OFF(opt-in). 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단(golden100 무성 TS 미탐 5→0). 언제 켤지·최소 근거 임계값</td><td>실데이터(human_review) 검증 후 활성</td><td class="center"><span class="tag plan">미결</span></td></tr>
+      <tr><td><strong>희소근거 게이트</strong> <code>rule_fallback_min_evidence</code> <span class="tag wip">신규</span></td><td>룰-폴백 경로 기본 ON(<code>0.9</code>). 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정을 차단(golden100 무성 TS 미탐 5→0). 임계값 조정 여부</td><td>실데이터(human_review) 검증 후 조정</td><td class="center"><span class="tag plan">미결</span></td></tr>
       <tr><td><strong>합의 게이트</strong> <code>agreement_gate_enabled</code> <span class="tag wip">신규</span></td><td>기본 OFF(opt-in). 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용, 그 외 불일치는 사람 검수로(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). confidence 단독(임계 0.7)은 OOD 과신(골든500 AUROC 0.58)이라 미사용. 언제 켤지</td><td>실데이터(human_review) 검증 후 활성</td><td class="center"><span class="tag plan">미결</span></td></tr>
     </tbody>
   </table></div>

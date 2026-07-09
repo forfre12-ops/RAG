@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -318,6 +318,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <span style="color:var(--text-dim);font-size:12.5px;">KOIPA AI 영업비밀관리시스템</span>
     </div>
     <h1 class="title">테스트 전략 · 환경 · 이력</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
     <p class="lede">실측 환경 구조·처리 흐름·테스트 범위, 사용 데이터(출처·품질·건수), 일자별 실행 이력과 현행 운영점(C-esc/C-eval/B1)·능동학습 폐곡선 내역. 로드맵은 맨 뒤.</p>
 
     <div class="card-grid col4" style="margin:0 0 32px;">
@@ -429,7 +432,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <div class="flow-card real-step">
                 <div class="flow-step-name">⑦ KF-DeBERTa 추론 <span class="tag real">진짜</span></div>
                 <div class="flow-step-lib">kakaobank/kf-deberta-base fine-tuned · 110M params · p50 ~10ms</div>
-                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값(기본 0.7) 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 단 confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮아(골든500 AUROC 0.58), <b>자동확정은 confidence 임계 단독이 아니라 다단 게이트로 결정</b>한다 — 추가로 <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence</code>, 단일 약한 키워드만으로 conf=1.0이 되는 룰-폴백 자동확정 차단)와 <b>합의 게이트</b>(<code>agreement_gate_enabled</code>, 자동확정은 예측이 공개등급 S3이거나 룰등급==모델등급일 때만 허용·그 외 불일치는 사람 검수)로 제한한다(<b>둘 다 opt-in·기본 OFF</b>이라 기본 동작은 변하지 않음). 현 배포 v-dd3abab9(v4_clean): 홀드아웃109 F1_macro=0.686 · 서빙 방향성 FNR=0.018 · FNR_TS=0.000.</div>
+                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값(기본 0.7) 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 단 confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮아(골든500 AUROC 0.58), <b>자동확정은 confidence 임계 단독이 아니라 다단 게이트로 결정</b>한다 — 추가로 <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON, 단일 약한 키워드만으로 conf=1.0이 되는 자동확정 차단)와 <b>합의 게이트</b>(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도, 자동확정은 예측이 공개등급 S3이거나 룰등급==모델등급일 때만 허용·그 외 불일치는 사람 검수)로 제한한다. 현 배포 v-dd3abab9(v4_clean): 홀드아웃109 F1_macro=0.686 · 서빙 방향성 FNR=0.018 · FNR_TS=0.000.</div>
               </div>
             </div>
 
@@ -525,9 +528,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <td class="td-pass">0.018 · FNR_TS 0.000</td>
             </tr>
             <tr>
-              <td>FNR (발주처 <b>실문서</b>, 제3 문체)</td>
+              <td>FNR (운영 locked, 제3 문체)</td>
               <td><span class="tag fail">불가</span></td>
-              <td><span class="tag warn">실문서 대기</span></td>
+              <td><span class="tag warn">locked 대기</span></td>
               <td class="td-pend">미측정 <b>(GPU 아님)</b></td>
             </tr>
             <tr>
@@ -535,7 +538,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <td>Recall@5 (운영 코퍼스 · KURE+pgvector)</td>
               <td><span class="tag warn">로직만</span></td>
               <td><span class="tag pass">✓ 측정</span></td>
-              <td class="td-pass">0.925 (목표 0.80) PASS</td>
+              <td class="td-pass">0.925 (프록시 목표 0.80 충족)</td>
             </tr>
             <tr>
               <td>Recall@5 (OSS 코퍼스)</td>
@@ -546,7 +549,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr>
               <td>Recall@5 (발주처 <b>실문서</b>)</td>
               <td><span class="tag fail">불가</span></td>
-              <td><span class="tag warn">실문서 대기</span></td>
+              <td><span class="tag warn">locked 대기</span></td>
               <td class="td-pend">미측정 <b>(GPU 아님)</b></td>
             </tr>
             <tr>
@@ -611,8 +614,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
       <p style="font-size:12.5px;color:var(--text-soft);">
-        <b>핵심:</b> "실측"의 GPU 의존 항목(분류 F1·FNR·Recall@5·E2E)은 <b>RTX 5070 Ti로 이미 측정 완료</b>입니다 — GPU는 블로커가 아닙니다. <b>유일하게 남은 미측정은 발주처 실문서(폐쇄망 반출 불가)</b> 의존 항목뿐.
-        <span style="color:var(--text-dim);">* 검증 피라미드: 단위 385/385 · DB-backed 20/20 · 풀스택(PG+pgvector) 95/95 · 실 GPU E2E 7/7(tb_corrections→train→deploy→reload 능동학습 폐곡선) · 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐). PSH S1~S13(11종)×30+ KPI 회귀 자동탐지.</span>
+        <b>핵심:</b> "실측"의 GPU 의존 항목(분류 F1·FNR·Recall@5·E2E)은 <b>RTX 5070 Ti로 이미 측정 완료</b>입니다 — GPU는 블로커가 아닙니다. <b>운영 성능은 관리자 확정 locked가 쌓여야만 측정 가능합니다.</b> 폐쇄망 원문은 반출하지 않습니다.
+        <span style="color:var(--text-dim);">* 검증 피라미드: 단위 385/385 · DB-backed 20/20 · 풀스택(PG+pgvector) 95/95 · 실 GPU E2E 7/7(tb_corrections→train→deploy→reload 메커니즘 검증, 자동 활성 아님) · 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐). PSH S1~S13(11종)×30+ KPI 회귀 자동탐지.</span>
       </p>
     </section>
 
@@ -731,7 +734,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="h2-sub">동일 모델·홀드아웃이라도 원시 argmax와 실배포 서빙경로의 안전성이 크게 다릅니다. 운영점(C-esc/C-eval/B1)을 실측해 확정했습니다.</p>
 
       <h3>10.0 모델 선정 — KF-DeBERTa (활성 v4_clean/v-dd3abab9 · .env 포인터 정합 완료)</h3>
-      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,589건(train 2,071 + val 259 + test 261). 홀드아웃 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b> · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
+      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,589건(train 2,071 + val 259 + test 261). 프록시 holdout 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b> · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
 
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
@@ -785,7 +788,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>10.3 능동학습 폐곡선 (A2/C-ver) — 실 GPU E2E 7/7</h3>
-      <p style="font-size:13px;">분류 → 검수자 교정(tb_corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다. <span style="color:var(--text-dim,#71717a);">단 이는 단일 배포 내부 메커니즘이며, 모델은 상시 재학습하지 않습니다 — 실데이터 1차학습(2026-09) 후 드리프트/이벤트 단발. 고객사는 추론 전용(B안 예외)이고, 고객 교정·원문 등 문서 채널은 망 밖 반출 금지·집계 진단지표만 환류한다(환류=재학습 미확정 A/B/C, <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>).</span></p>
+      <p style="font-size:13px;">분류 → 검수자 교정(tb_corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다. <span style="color:var(--text-dim,#71717a);">단 이는 단일 배포 내부 메커니즘 검증이며 자동 운영 활성화가 아닙니다. 고객사는 기본 추론 전용이고, 확정값은 admission gate 뒤 exact-match 선례·진단 지표에 먼저 쓰며, 재학습/kNN 전파는 shadow와 별도 승인 후에만 엽니다.</span></p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>단계</th><th>구현</th><th>동작</th></tr></thead>
@@ -796,13 +799,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>모델 핫리로드</td><td class="td-code">POST /admin/model/reload</td><td>활성 ModelVersion.model_uri로 InferencePipeline 재구성. <b>프로세스 재기동 불요</b></td></tr>
             <tr><td>자동 롤백</td><td class="td-code">auto_rollback_tick</td><td>Celery beat 매 60분. 라이브 운영데이터 fnr_high가 baseline+tol 초과 시 직전 활성으로 복귀. 기본 <code>auto_rollback_enabled=False</code>(판정·로깅만)</td></tr>
             <tr><td>검수자 신뢰도</td><td class="td-code">reviewer_trust.py</td><td>reviewer별 reliability=agreed/total, overturned 추적. 고등급 2인검토 게이트(C-cons)에 활용. 기본 min_reliability=0.0</td></tr>
-            <tr><td>재학습 트리거</td><td class="td-code">active_learning_tick</td><td>Celery 매 30분. URGENT_RETRAIN(미탐 10건↑ 즉시) / RETRAIN_RECOMMENDED(교정 50건↑ 월요일). 큐: classify/synthesis/learning/index</td></tr>
+            <tr><td>재학습 트리거</td><td class="td-code">active_learning_tick</td><td>Celery 매 30분. 미탐/교정 누적 시 검수 강화·shadow 학습 후보를 생성. 실제 활성은 retrain_auto_activate=False와 locked readiness gate로 fail-closed</td></tr>
           </tbody>
         </table>
       </div>
       <div class="callout pass">
         <span class="callout-icon">✓</span>
-        <div class="callout-body"><b>실 GPU E2E 7/7 PASS</b>: tb_corrections→train→deploy→reload 폐곡선 전체. 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐)로 검증.</div>
+        <div class="callout-body"><b>실 GPU E2E 7/7 PASS</b>: tb_corrections→train→deploy→reload 메커니즘 전체를 검증했다. 단 운영 기본값은 자동 활성 OFF이며, confirm/relabel은 먼저 확정 포착과 감사에 쓰인다.</div>
       </div>
 
       <!-- ============================================================
@@ -1506,7 +1509,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
         <div class="callout-body">
-          ✅ <b>능력 측정</b>: 모델이 진짜 deep-tech 내용을 민감하게 인식하는가 · ❌ <b>실배포 재현율 아님</b>: 특허는 "공개를 택한" 비밀이라 선택편향 — 특정 기업의 진짜 미공개 비밀 탐지는 <b>여전히 구조적 측정불가</b>(발주처 실데이터 몫) · ⚠ 위 좋은 수치는 전부 <b>본 적 있는 두 문체(판례·특허) 안에서의 성능</b> — 제3 문체(내부 메모·원가표) recall은 미측정 · 🔒 Gate 1(출처)이 주 레버이고 step3/Gate 2는 보조. <b>추가 특허 마이닝은 수확체감 → 중단.</b>
+          ✅ <b>능력 측정</b>: 모델이 진짜 deep-tech 내용을 민감하게 인식하는가 · ❌ <b>실배포 재현율 아님</b>: 특허는 "공개를 택한" 비밀이라 선택편향 — 특정 기업의 진짜 미공개 비밀 탐지는 <b>여전히 구조적 측정불가</b>(제약 완화 시 발주처 실데이터 몫) · ⚠ 위 좋은 수치는 전부 <b>본 적 있는 두 문체(판례·특허) 안에서의 성능</b> — 제3 문체(내부 메모·원가표) recall은 미측정 · 🔒 Gate 1(출처)이 주 레버이고 step3/Gate 2는 보조. <b>추가 특허 마이닝은 수확체감 → 중단.</b>
         </div>
       </div>
 

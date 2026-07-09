@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -94,11 +94,14 @@ footer strong{color:var(--text-dim);}
     <span class="meta-soft">2026-06-20</span>
   </div>
   <h1 class="title">데이터 거버넌스 계획</h1>
-  <p class="lede">KOIPA 영업비밀관리시스템의 데이터 자산·라벨 품질·재현성 관리 계획 — 골든셋 계층, 라벨 출처와 품질 현황, <strong>라벨 순환성 차단과 인간검증 골든셋 구축</strong>, 합성→실데이터 전환. AI 품질의 토대를 신뢰 가능하게 만드는 것이 목표다.</p>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
+  <p class="lede">KOIPA 영업비밀관리시스템의 데이터 자산·라벨 품질·재현성 관리 계획 — 합성 코퍼스 계층, 라벨 출처와 품질 현황, <strong>locked 평가 진실의 부재를 전제로 한 안전 부트스트랩</strong>, 운영 관리자 확정 루프를 다룬다. 목표는 배포 전 정확도 보증이 아니라 오염을 막고 운영에서 배울 수 있는 토대를 만드는 것이다.</p>
 
   <div class="callout inset">
     <div class="callout-label">핵심 메시지</div>
-    <p>현재 정확도 지표는 대부분 <strong>AI가 만든 정답지</strong>에 기반한다(라벨 순환성). 본개발의 1순위는 <strong>사람이 검증한 정답지(골든셋)</strong>를 구축하고 그 위에서 모든 품질 게이트를 재보정하는 것이다.</p>
+    <p>현재 정확도 지표는 대부분 <strong>합성·LLM·공개 프록시 라벨</strong>에 기반한다(라벨 순환성). 따라서 본개발의 1순위는 이를 평가 진실로 포장하지 않고, 운영 관리자 확정이 들어오는 경로와 품질 게이트를 깨끗하게 만드는 것이다.</p>
   </div>
   <hr/>
 
@@ -117,7 +120,7 @@ footer strong{color:var(--text-dim);}
     <tbody>
       <tr><td><strong>golden100</strong></td><td>100건</td><td>1차 실증 · 분류근거 보고 대상</td></tr>
       <tr><td><strong>golden500</strong></td><td>500건</td><td>확장 평가셋</td></tr>
-      <tr><td><strong>본개발 골든셋</strong></td><td>1,000건(목표)</td><td>발주처 실데이터 기반 · 인간검증</td></tr>
+      <tr><td><strong>locked_gold_eval</strong></td><td>0건(현재 정상)</td><td>사람서명 전용 · 운영 확정/제약 완화 시만 증가</td></tr>
       <tr><td>학습셋(labeled)</td><td>수천 건</td><td>분류기 파인튜닝 — 합성 + LLM판정 + 인간정정 혼합</td></tr>
     </tbody>
   </table></div>
@@ -135,13 +138,13 @@ footer strong{color:var(--text-dim);}
   </table></div>
 
   <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">라벨 순환성 · 골든셋 구축 (P0)</span></div>
-  <h2>왜 인간검증 골든셋이 1순위인가</h2>
+  <h2>왜 locked 부재를 정직하게 관리해야 하는가</h2>
   <p><strong>라벨 순환성</strong> — 학습 라벨과 평가 라벨이 모두 모델이 모방할 <strong>동일한 룰 + LLM</strong>에서 파생되면, 모델과 정답지가 같은 맹점을 공유해 "끼리끼리 채점"이 된다. 합성 F1=1.0과 실측 0.37의 격차가 이 순환성의 증거다. 게다가 모든 배포·롤백 임계값이 이 미검증 라벨 기준이므로, 토대가 흔들린다.</p>
   <div class="callout"><div class="callout-label">본개발 골든셋 구축 계획 (P0)</div><p>① 영업비밀 <strong>도메인 전문가가 직접 라벨링 500건 이상</strong>(희소한 TS·S1 경계 사례 가중) ② 학습에 쓰인 룰·LLM과 <strong>독립된 holdout</strong>으로 구성 ③ 이 골든셋 위에서 <strong>모든 품질 게이트(배포·롤백 임계) 재보정</strong> ④ 2인 검토·검수자 신뢰도 추적으로 라벨 품질 보증. <strong>이것이 없으면 다른 모든 품질 지표가 그림자 측정이다.</strong></p></div>
 
-  <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">합성 → 실데이터 전환</span></div>
-  <h2>실데이터 검증</h2>
-  <p>프로토타입 수치는 타당성 확인·모델 선정용이다. <strong>실제 운영 정확도는 발주처 실데이터로 검증하는 본개발 단계에서 확정</strong>한다. 합성 비율을 점진적으로 낮추고 실데이터·인간검증 비율을 높여, 채점기준 자체에서 생성된 비현실적 분리를 해소한다.</p>
+  <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">합성 부트스트랩 → 운영 확정 루프</span></div>
+  <h2>운영에서 배우는 검증 루프</h2>
+  <p>프로토타입 수치는 타당성 확인·모델 선정용이다. <strong>실제 운영 정확도는 운영 관리자 확정 라벨이 충분히 쌓인 뒤에야 확인</strong>한다. 현 제약에서는 분류기 가중치가 실데이터로 개선될 경로가 없으므로, 고객사에서는 exact-match 선례·상향 override·검수 라우팅 같은 비모수 메모리부터 안전하게 쌓는다.</p>
 
   <div class="section-sep" id="s6"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">재현성 · 버전 관리</span></div>
   <h2>버전 고정</h2>
@@ -179,21 +182,21 @@ footer strong{color:var(--text-dim);}
       </tr>
       <tr>
         <td><strong>자동확정 안전 게이트</strong><br/><span class="tag done">적용</span></td>
-        <td>자동확정·검수 라우팅을 <code>confidence</code> 임계(기본 0.7) 단독이 아니라 다단 게이트로 결정. <code>confidence</code>는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 두 게이트를 둔다(<strong>둘 다 opt-in·기본 OFF</strong> — 켜기 전 동작 불변): ① <strong>희소근거 게이트</strong>(<code>rule_fallback_min_evidence</code>) — 단일 약한 키워드만으로 <code>conf=1.0</code>이 되는 룰-폴백 자동확정을 차단; ② <strong>합의 게이트</strong>(<code>agreement_gate_enabled</code>) — 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고, 그 외 불일치는 사람 검수로 보낸다.</td>
-        <td>confidence 과신으로 약한 근거가 자동확정되던 경로를 막는다. 측정효과(합성 골든셋·OOD 기준): 희소근거 게이트로 golden100 무성 TS 미탐 5→0, 합의 게이트로 자동확정 정밀도 63→81%·고등급 TS/S1 미탐 46→8. TS/S1 자동확정분은 표본감사한다. 실데이터(human_review) 검증 전에는 정식 수치가 아니다.</td>
+        <td>자동확정·검수 라우팅을 <code>confidence</code> 임계(기본 0.7) 단독이 아니라 다단 게이트로 결정. <code>confidence</code>는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 현재 소스 기준 ① <strong>희소근거 게이트</strong>(<code>rule_fallback_min_evidence=0.9</code>)는 룰-폴백 경로 기본 ON으로 단일 약한 키워드만으로 <code>conf=1.0</code>이 되는 자동확정을 차단한다. ② <strong>합의 게이트</strong>(<code>agreement_gate_enabled</code>)는 base 기본 OFF(운영 프로파일 별도)이며, 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 그 외 불일치는 사람 검수로 보낸다.</td>
+        <td>confidence 과신으로 약한 근거가 자동확정되던 경로를 막는다. 측정효과(합성 골든셋·OOD 기준): 희소근거 게이트로 golden100 무성 TS 미탐 5→0, 합의 게이트로 자동확정 정밀도 63→81%·고등급 TS/S1 미탐 46→8. TS/S1 자동확정분은 표본감사한다. 운영 human_review/locked 확정 전에는 운영 확정 수치가 아니다.</td>
       </tr>
     </tbody>
   </table></div>
-  <div class="callout inset"><div class="callout-label">보정 환류 · 재학습 경계</div><p>위 보정(corrections) 기반 재학습은 <strong>학습 사이트(지재원)</strong>의 활동이다. <strong>고객사는 추론 전용</strong>이라 자체 학습하지 않으며, 고객사 검수교정을 지재원으로 반출할지는 <strong>미확정 결정</strong>이다(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인 5</a> A/B/C — <strong>기본 권고: 문서 무반출·집계 진단만</strong>). 또한 모델은 <strong>상시 재학습되지 않는다</strong> — 하드 요건은 <strong>실데이터 1차 학습</strong>(2026-09 실문서 반입)이며, 이후 일상 적응은 룰·키워드·임계·보정·LLM 2차·사람 게이트(비-모델 레버)가 담당하고, 모델 재학습은 <strong>드리프트·이벤트 트리거 시 단발</strong>로 수행한다.</p></div>
+  <div class="callout inset"><div class="callout-label">보정 환류 · 재학습 경계</div><p>위 보정(corrections) 기반 재학습은 <strong>학습 사이트(지재원)</strong>의 활동이다. <strong>고객사는 추론 전용</strong>이라 자체 학습하지 않으며, 고객사 검수교정을 지재원으로 반출할지는 <strong>미확정 결정</strong>이다(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인 5</a> A/B/C — <strong>기본 권고: 문서 무반출·집계 진단만</strong>). 또한 모델은 <strong>상시 재학습되지 않는다</strong> — 하드 요건은 <strong>제약 완화 시 별도 학습</strong>(제약 완화 시 실문서 반입)이며, 이후 일상 적응은 룰·키워드·임계·보정·LLM 2차·사람 게이트(비-모델 레버)가 담당하고, 모델 재학습은 <strong>드리프트·이벤트 트리거 시 단발</strong>로 수행한다.</p></div>
   <div class="callout inset"><div class="callout-label">정책 경계</div><p>위 통제는 <strong>메커니즘</strong>을 코드·스키마에 반영한 것이며, 기본값은 기존 동작을 보존한다. <strong>보존기간·신뢰도 임계·검토자 자격</strong> 등 운영 정책 수치는 발주처 협의로 확정한다.</p></div>
 
   <div class="section-sep" id="s8"><span class="section-sep-num">08</span><span class="section-sep-line"></span><span class="section-sep-title">본개발 데이터 과제 (P0)</span></div>
   <div class="table-wrap"><table>
     <thead><tr><th class="center">순위</th><th>과제</th><th>근거</th><th class="center">기간</th></tr></thead>
     <tbody>
-      <tr><td class="center">P0</td><td>인간검증 골든셋 500건+ 구축</td><td>human_review 0%, 실측 F1 0.37</td><td class="center">2~4주</td></tr>
+      <tr><td class="center">P0</td><td>관리자 확정 포착·교정 admission gate</td><td>human_review/locked 0, 자동학습 오염 위험</td><td class="center">즉시</td></tr>
       <tr><td class="center">P0</td><td>라벨 순환성 차단(독립 holdout)</td><td>학습·평가 라벨 동일 출처</td><td class="center">골든셋과 병행</td></tr>
-      <tr><td class="center">P1</td><td>게이트 임계 재보정</td><td>임계가 미검증 라벨 기준</td><td class="center">골든셋 후 3~5일</td></tr>
+      <tr><td class="center">P1</td><td>게이트 임계 보수화·운영 표본감사</td><td>임계가 합성/OOD 라벨 기준</td><td class="center">베타 즉시</td></tr>
       <tr><td class="center">P1</td><td>능동학습 표적 샘플링</td><td>현 트리거는 정정건수 기반(불확실성 샘플링 부재)</td><td class="center">1주</td></tr>
       <tr><td class="center">P1</td><td>인사·재무 S1 사각지대 라벨 보강 — 임원 보상·자금조달·고객별 매출·원가구조</td><td>golden500 S1→S2 미탐 7건이 전부 이 유형, 룰·모델 공유 사각지대(둘 다 S2로 합의→게이트 통과). LLM 2차의견도 4/7만 회복 → 재학습으로만 근본 교정</td><td class="center">골든셋과 병행</td></tr>
     </tbody>
