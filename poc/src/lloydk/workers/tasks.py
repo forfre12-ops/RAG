@@ -17,6 +17,33 @@ from lloydk.workers.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
+def _record_job_done(
+    job_id: str | None,
+    *,
+    results: list[dict],
+    completed: int | None = None,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    """Best-effort JobStore success transition for Celery worker paths."""
+    if not job_id:
+        return
+    try:
+        import uuid as _uuid
+
+        from lloydk.services.job_store import get_default_store
+
+        fields: dict[str, Any] = {
+            "status": "done",
+            "completed": len(results) if completed is None else completed,
+            "results": results,
+        }
+        if extra:
+            fields.update(extra)
+        get_default_store().update(_uuid.UUID(job_id), **fields)
+    except Exception:  # noqa: BLE001
+        logger.exception("job success update failed: job_id=%s", job_id)
+
+
 def _record_compensation(job_id: str | None, partial_results: list[dict], reason: str) -> None:
     """모든 retry 실패 시 보상 트랜잭션 — JobStore에 partial 기록.
 
@@ -64,7 +91,9 @@ def classify_async(self: Any, payload: dict, job_id: str | None = None) -> dict:
         req = ClassifyRequest(**payload)
         svc = ClassifyService.get_instance()
         result = svc.classify(req)
-        return result.model_dump(mode="json")
+        result_json = result.model_dump(mode="json")
+        _record_job_done(job_id, results=[result_json], completed=1)
+        return result_json
     except Exception as exc:  # noqa: BLE001
         attempts = self.request.retries
         max_r = self.max_retries or 0
@@ -187,7 +216,13 @@ def synthesize_batch(
             for d in docs
         ]
         # [P0#1] 검수큐 적재 — best-effort(예외 미전파: retry→재생성 방지). 루프 마감.
-        _persist_synth_samples(docs, job_id=job_id)
+        persisted = _persist_synth_samples(docs, job_id=job_id)
+        _record_job_done(
+            job_id,
+            results=partial,
+            completed=len(partial),
+            extra={"persisted": persisted},
+        )
         return partial
     except Exception as exc:  # noqa: BLE001
         attempts = self.request.retries

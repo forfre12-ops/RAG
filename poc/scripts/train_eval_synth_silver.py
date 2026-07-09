@@ -25,19 +25,54 @@ from pathlib import Path
 
 POC = Path(__file__).resolve().parents[1]  # poc/
 PY = sys.executable
+SRC = POC / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 
 def load(p):
     return [json.loads(l) for l in io.open(p, encoding="utf-8") if l.strip()]
 
 
-def convert_and_split(silver_run, work_dir, val_frac=0.15):
+def _record_key(r: dict) -> tuple[str, str]:
+    return (str(r.get("doc_id") or ""), str(r.get("text_hash") or ""))
+
+
+def _locked_eval_keys(gold_path: str | Path) -> set[tuple[str, str]]:
+    from lloydk.golden_tiers import TIER_LOCKED, tier_of
+
+    if not Path(gold_path).exists():
+        return set()
+    return {
+        _record_key(r)
+        for r in load(gold_path)
+        if tier_of(r) == TIER_LOCKED and any(_record_key(r))
+    }
+
+
+def convert_and_split(silver_run, work_dir, val_frac=0.15, *, gold_path=None, allow_build_fallback=False):
     """silver build_*.jsonl → (text,label) train/val. 결정론적 층화(random 없음)."""
-    gold = []
-    for f in glob.glob(os.path.join(glob.escape(str(Path(silver_run))), "build_*.jsonl")):
-        gold += load(f)
-    rows = [{"text": r["text"], "label": r.get("label") or r.get("llm_grade")}
-            for r in gold if (r.get("label") or r.get("llm_grade")) and r.get("text")]
+    run_dir = Path(silver_run)
+    split_path = run_dir / "silver_train.jsonl"
+    if split_path.exists():
+        source_rows = load(split_path)
+    elif allow_build_fallback:
+        source_rows = []
+        for f in glob.glob(os.path.join(glob.escape(str(run_dir)), "build_*.jsonl")):
+            source_rows += load(f)
+    else:
+        raise FileNotFoundError(
+            f"{split_path} not found. Run scripts/run_golden_split_signoff.py first "
+            "or pass --allow-build-fallback explicitly."
+        )
+    locked_keys = _locked_eval_keys(gold_path) if gold_path else set()
+    rows = [
+        {"text": r["text"], "label": r.get("label") or r.get("llm_grade")}
+        for r in source_rows
+        if (r.get("label") or r.get("llm_grade"))
+        and r.get("text")
+        and _record_key(r) not in locked_keys
+    ]
     by = {}
     for r in rows:
         by.setdefault(r["label"], []).append(r)
@@ -83,6 +118,11 @@ def main(argv=None):
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--fnr-cost", type=float, default=2.0)
     ap.add_argument("--max-seq-len", type=int, default=512)
+    ap.add_argument(
+        "--allow-build-fallback",
+        action="store_true",
+        help="Unsafe compatibility mode: read build_*.jsonl when silver_train.jsonl is missing.",
+    )
     args = ap.parse_args(argv)
 
     silver_run = args.silver_run
@@ -95,7 +135,12 @@ def main(argv=None):
 
     # 1) 변환·분할
     try:
-        conv = convert_and_split(silver_run, work_dir)
+        conv = convert_and_split(
+            silver_run,
+            work_dir,
+            gold_path=args.gold,
+            allow_build_fallback=args.allow_build_fallback,
+        )
         summary["convert"] = conv
         print(f"[1/3 convert] train={conv['train_n']} val={conv['val_n']} dist={conv['label_dist']}",
               file=sys.stderr, flush=True)

@@ -33,7 +33,6 @@ import io
 import json
 import os
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")

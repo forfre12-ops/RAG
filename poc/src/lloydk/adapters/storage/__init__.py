@@ -16,6 +16,15 @@ __all__ = ["ObjectStorage", "LocalStorage", "build_storage"]
 logger = logging.getLogger(__name__)
 
 
+def _strict_remote_storage_required() -> bool:
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+
+        return str(getattr(settings, "poc_mode", "")).lower() == "full"
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _build_minio() -> ObjectStorage:
     from lloydk.adapters.storage.minio_store import MinioStorage  # noqa: PLC0415
 
@@ -76,12 +85,16 @@ def _build_inner(
     elif name in ("seaweedfs", "s3"):
         builder = _build_seaweedfs
     else:
+        if _strict_remote_storage_required():
+            raise RuntimeError(f"[storage] unknown backend {name!r} in full mode")
         logger.warning("[storage] unknown backend %r — falling back to LocalStorage", name)
         return LocalStorage(root=local_root or ".storage")
 
     try:
         return builder()
     except Exception as exc:  # noqa: BLE001
+        if _strict_remote_storage_required():
+            raise RuntimeError(f"[storage] {name} unavailable in full mode: {exc}") from exc
         import warnings  # noqa: PLC0415
 
         warnings.warn(
@@ -113,6 +126,7 @@ def _maybe_encrypt(storage: ObjectStorage) -> ObjectStorage:
         storage,
         key_material=getattr(settings, "storage_encryption_key", ""),
         buckets=buckets,
+        strict_plaintext=_strict_remote_storage_required(),
     )
 
 

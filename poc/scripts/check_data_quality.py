@@ -473,7 +473,7 @@ def main() -> int:
             ls_dist = s.get("label_source_distribution", {})
             if ls_dist:
                 total = sum(ls_dist.values())
-                print(f"\n  ┌─ label_source 분리 (신뢰도 계층) ─────────────────────────")
+                print("\n  ┌─ label_source 분리 (신뢰도 계층) ─────────────────────────")
                 tiers = [
                     ("human_review",        "① human_review    (최고 신뢰)"),
                     ("llm_judge_consensus",  "② llm_judge_consensus (룰+LLM 동의)"),
@@ -493,7 +493,7 @@ def main() -> int:
                 # 등급 × label_source 크로스탭
                 grade_by_ls = s.get("grade_by_label_source", {})
                 if grade_by_ls:
-                    print(f"\n  ┌─ 등급 × label_source 크로스탭 ───────────────────────────")
+                    print("\n  ┌─ 등급 × label_source 크로스탭 ───────────────────────────")
                     grades = ["TS", "S1", "S2", "S3"]
                     ls_keys = [t[0] for t in tiers if ls_dist.get(t[0], 0) > 0]
                     header = "  │  {:4s} " + " {:>8s}" * len(ls_keys)
@@ -502,7 +502,7 @@ def main() -> int:
                         row_vals = [grade_by_ls.get(ls, {}).get(g, 0) for ls in ls_keys]
                         row = "  │  {:4s} " + " {:>8d}" * len(ls_keys)
                         print(row.format(g, *row_vals))
-                    print(f"  └──────────────────────────────────────────────────────────")
+                    print("  └──────────────────────────────────────────────────────────")
 
     if all_issues:
         print()

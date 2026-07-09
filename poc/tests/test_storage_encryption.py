@@ -69,6 +69,19 @@ def test_missing_key_fail_closed():
         EncryptingStorage(_FakeInner(), key_material="", buckets={"documents-raw"})
 
 
+def test_strict_plaintext_rejected_for_target_bucket():
+    inner = _FakeInner()
+    inner.store[("documents-raw", "old")] = b"legacy plaintext"
+    enc = EncryptingStorage(
+        inner,
+        key_material=KEY,
+        buckets={"documents-raw"},
+        strict_plaintext=True,
+    )
+    with pytest.raises(ValueError, match="plaintext object"):
+        enc.get("documents-raw", "old")
+
+
 def test_wrong_key_cannot_decrypt():
     inner = _FakeInner()
     EncryptingStorage(inner, key_material=KEY, buckets={"documents-raw"}).put(
@@ -77,6 +90,15 @@ def test_wrong_key_cannot_decrypt():
     other = EncryptingStorage(inner, key_material="different-key", buckets={"documents-raw"})
     with pytest.raises(Exception):  # noqa: B017 — InvalidTag 등 복호화 실패
         other.get("documents-raw", "k")
+
+
+def test_ciphertext_bound_to_bucket_and_key():
+    inner = _FakeInner()
+    enc = EncryptingStorage(inner, key_material=KEY, buckets={"documents-raw"})
+    enc.put("documents-raw", "original", b"secret")
+    inner.store[("documents-raw", "moved")] = inner.store[("documents-raw", "original")]
+    with pytest.raises(Exception):  # noqa: B017 - InvalidTag from AEAD binding
+        enc.get("documents-raw", "moved")
 
 
 def test_build_storage_wraps_when_enabled(monkeypatch):

@@ -14,9 +14,9 @@ UV ?= $(PY) -m uv
 .PHONY: help venv install env lock lock-check infra-up infra-down infra-verify api worker beat \
         revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
-        p3 p3-800 p4 p1 p5 acceptance-pack acceptance-pack-deps acceptance-test poc-all clean clean-data reports test-lite-cov \
+        p3 p3-800 p4 p1 p5 acceptance-pack acceptance-pack-deps acceptance-test pilot-scorecard pilot-verify poc-all clean clean-data reports test-lite-cov \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold check-leakage check-release-evidence check-parser-support check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
+        gold-set retrieval-gold check-data check-gold check-leakage check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
         test-lite test-slow test-fullstack test-model-download test-full
@@ -252,6 +252,9 @@ leakage-manifest: ## train 풀 → 누출 게이트용 텍스트해시 매니페
 check-parser-support: ## Parser support matrix must match extractor routes and optional extras
 	$(PY) scripts/check_parser_support_matrix.py
 
+openapi-consistency: ## OpenAPI yaml must match active FastAPI router paths
+	$(PY) scripts/openapi_consistency.py --strict
+
 llm-judge-dry: ## LLM judge 비용 추정 (실제 호출 없음)
 	$(PY) scripts/make_llm_judge_gold.py --dry-run --n 200
 
@@ -415,7 +418,7 @@ operational-readiness: ## Build combined P1/P2/data readiness report (reads exis
 readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 빌드 (권장 진입점)
 
 adversarial-gate: ## 적대 회귀 게이트 — golden_100 위험 미탐(고비밀→S3) baseline 초과 시 FAIL
-	$(PY) scripts/eval_adversarial.py
+	$(PY) scripts/eval_adversarial.py --model-dir $(or $(MODEL_DIR),$(DEPLOYED_MODEL))
 
 release-gate: operational-readiness adversarial-gate metamorphic-gate ## Strict release gate (GA); requires every readiness gate to PASS
 	$(PY) scripts/check_release_gate.py
@@ -476,6 +479,12 @@ acceptance-pack: ## 인수 샘플팩 생성 → datasets/acceptance_pack/ (PDF/X
 	$(PY) scripts/build_acceptance_pack.py
 acceptance-test: ## 인수 샘플팩 채점 (in-proc parse→classify→gate; severity floor veto) — 고객은 bundle 의 run_acceptance.sh
 	$(PY) scripts/run_acceptance.py --mode inproc
+pilot-scorecard: ## Render pilot scorecard HTML from acceptance/readiness JSON artifacts
+	$(PY) scripts/render_pilot_scorecard.py
+pilot-verify: ## Run pilot acceptance/readiness, always render scorecard, then return final verdict
+	-$(PY) scripts/run_acceptance.py --mode inproc
+	-$(PY) scripts/build_operational_readiness.py --model-dir $(P1_MODEL) --deployed-model $(DEPLOYED_MODEL) --out reports/operational_readiness.md
+	$(PY) scripts/render_pilot_scorecard.py --fail-on-bad
 
 poc-all: p4 p3 p2 p1 p5
 	@echo "\nAll PoCs completed. See reports/"

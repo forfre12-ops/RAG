@@ -50,6 +50,7 @@ logger = logging.getLogger(__name__)
 _RRF_K = 60          # Cormack et al. 2009 표준 (es_store 와 통일)
 _CAND_N = 50         # RRF 입력 후보 윈도우 (es_store _num_candidates_for 기본과 정합)
 _EMBED_DIM = 1024    # KURE-v1 / BGE-M3 (마이그레이션 vector(1024) 와 일치)
+_FILTER_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # payload 의 어느 키를 전용 컬럼으로 승격할지 (나머지는 payload JSONB).
 # tenant_id 는 2026-06-24 전면 제거 결정(KL 포털이 격리) — 본 PG 층은 tenant-free.
@@ -115,6 +116,8 @@ class PgVectorStore:
             return ""
         clauses = []
         for i, (k, v) in enumerate(filter.items()):
+            if not _FILTER_KEY_RE.fullmatch(str(k)):
+                raise ValueError(f"invalid pg vector filter key: {k!r}")
             pk = f"{prefix}{i}"
             if k in self._COLUMN_FILTERS:
                 clauses.append(f"{k} = :{pk}")
@@ -123,6 +126,21 @@ class PgVectorStore:
                 clauses.append(f"payload ->> '{k}' = :{pk}")
                 params[pk] = str(v)
         return " AND " + " AND ".join(clauses) if clauses else ""
+
+    def _resolve_collection(self, collection: str) -> str:
+        """Resolve blue/green alias names to physical PG collections."""
+        from sqlalchemy import text  # noqa: PLC0415
+
+        try:
+            with self._engine.connect() as conn:
+                target = conn.execute(
+                    text("SELECT collection FROM tb_rag_aliases WHERE alias = :a"),
+                    {"a": collection},
+                ).scalar()
+            return str(target or collection)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("pg alias resolution skipped for %s: %s", collection, exc)
+            return collection
 
     # ─────────────────────────────────────────────────────────────
     def ensure_collection(self, name: str, dim: int) -> None:
@@ -210,6 +228,7 @@ class PgVectorStore:
     ) -> list[SearchHit]:
         from sqlalchemy import text  # noqa: PLC0415
 
+        collection = self._resolve_collection(collection)
         params: dict[str, Any] = {"collection": collection, "q": self._vec_lit(query), "k": top_k}
         where = "collection = :collection" + self._filter_sql(filter, params)
         sql = text(
@@ -245,6 +264,7 @@ class PgVectorStore:
 
         # OR 의미(BM25 정합): plainto_tsquery 는 모든 토큰 AND라 패러프레이즈서 0매치(크럭스서 실측)
         # → bigram 을 ' | ' 로 묶어 to_tsquery. 토큰은 [가-힣]{2}/[a-z0-9]+ 라 tsquery 특수문자 없음.
+        collection = self._resolve_collection(collection)
         q_or = " | ".join(self._bigram(query_text).split()) or "__nomatch__"
         params: dict[str, Any] = {
             "collection": collection, "q": self._vec_lit(query_vec),
@@ -294,6 +314,7 @@ class PgVectorStore:
     def count(self, collection: str) -> int:
         from sqlalchemy import text  # noqa: PLC0415
 
+        collection = self._resolve_collection(collection)
         with self._engine.connect() as conn:
             r = conn.execute(
                 text("SELECT count(*) FROM tb_rag_vectors WHERE collection = :c"),

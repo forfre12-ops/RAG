@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>문서 파싱·분류 시연 콘솔 — 업로드→파싱→검수→등급 | Lloydk</title>
 <meta name="description" content="실제 문서를 업로드하면 파싱(추출)→정규화·PII마스킹→청킹→검수 게이트→등급 분류까지 전 구간을 단계별로 보여주는 시연·검증 콘솔. POST /documents/analyze 를 호출합니다." />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Geist:wght@300;400;500;600;700;800&display=swap" />
 <style>
 :root{
   --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
@@ -17,8 +14,8 @@
   --green:#16a34a; --green-soft:#f0fdf4; --green-border:#bbf7d0;
   --amber:#d97706; --amber-soft:#fffbeb; --amber-border:#fde68a;
   --blue:#2563eb; --blue-soft:#eff6ff; --blue-border:#bfdbfe;
-  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
-  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
 }
 *,*::before,*::after{box-sizing:border-box;}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.6;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;}
@@ -140,7 +137,7 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
     <div class="card-title">연결</div>
     <div class="row">
       <label class="fld">API Base<input type="text" id="base" value="/api/v1" /></label>
-      <label class="fld">X-API-Key<input type="password" id="apikey" value="devkey" /></label>
+      <label class="fld">X-API-Key<input type="password" id="apikey" placeholder="시연 서버 API 키 입력" /></label>
       <label class="fld">Actor-Role<select id="role"><option>admin</option><option>reviewer</option><option>viewer</option></select></label>
       <label class="fld">근거 표시<select id="ev"><option value="true">on</option><option value="false">off</option></select></label>
     </div>
@@ -159,6 +156,7 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
     <div class="samples-row">
       <span class="samples-label">시연 샘플 원클릭</span>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./samples/success_semiconductor.docx','success_semiconductor.docx')">✓ 성공 · 반도체 영업비밀 (DOCX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./samples/success_table_xlsx.xlsx','success_table_xlsx.xlsx')">✓ 성공 · 표 추출 (XLSX)</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./samples/fail_corrupt_scan.pdf','fail_corrupt_scan.pdf')">✕ 실패 · 손상/스캔 PDF</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./samples/fail_thin_text.txt','fail_thin_text.txt')">✕ 실패 · 얇은 본문 (TXT)</button>
       <button class="btn ghost sample-btn bad" disabled title="실파일(noori/koipa류) 제공 대기 — tests/fixtures/adversarial/ 반입 시 활성화">✕ 실패 · 표 포함 HWP (실파일 대기)</button>

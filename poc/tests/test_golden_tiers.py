@@ -25,6 +25,11 @@ def test_human_review_with_machine_reviewer_not_locked():
     assert tier_of({"label_source": "human_review", "reviewer_id": ""}) == TIER_SILVER
 
 
+def test_common_model_reviewer_ids_are_not_human():
+    for reviewer_id in ("claude-review", "gpt-4o", "qwen_judge", "gemini-pro", "bot1", "judge_local"):
+        assert tier_of({"label_source": "human_review", "reviewer_id": reviewer_id}) == TIER_SILVER
+
+
 def test_legal_floor_sources():
     for s in ("public_definitive", "koipa_case_based", "nkt_designated", "codex_review",
               "curated_scenario"):

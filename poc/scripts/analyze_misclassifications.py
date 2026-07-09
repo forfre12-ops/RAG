@@ -15,7 +15,7 @@ import argparse
 import io
 import json
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent

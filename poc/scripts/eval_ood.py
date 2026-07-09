@@ -4,7 +4,8 @@
 지표: 일상문서 과분류(S3여야 하는데 비밀로), 진짜비밀 미탐(비밀인데 S3로).
 사용: python scripts/eval_ood.py --model-dir <dir> [--model-dir2 <dir>] """
 from __future__ import annotations
-import argparse, sys
+import argparse
+import sys
 from pathlib import Path
 sys.path.insert(0, "scripts"); sys.stdout.reconfigure(encoding="utf-8")
 from eval_p1_model_gold import predict_direct

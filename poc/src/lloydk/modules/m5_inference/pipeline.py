@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -13,6 +14,49 @@ from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
 from lloydk.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 완전 no-op
 
 logger = logging.getLogger(__name__)
+
+_PUBLIC_SOURCE_TOKENS = {
+    "court_decision",
+    "public_disclosure",
+    "published_patent",
+    "\ud310\ub840",  # 판례
+    "\uacf5\uc2dc",  # 공시
+    "\ucc44\uc6a9\uacf5\uace0",  # 채용공고
+    "\ubcf4\ub3c4\uc790\ub8cc",  # 보도자료
+    "\uacf5\uac1c\ud2b9\ud5c8",  # 공개특허
+    "\ub4f1\ub85d\ud2b9\ud5c8",  # 등록특허
+    "\uacf5\uac1c\uacf5\ubcf4",  # 공개공보
+    "\ud2b9\ud5c8\uacf5\ubcf4",  # 특허공보
+}
+_PUBLIC_SOURCE_NEGATIVE_TOKENS = {
+    "draft",
+    "planned",
+    "internal",
+    "private",
+    "unpublished",
+    "nonpublic",
+    "non-public",
+    "\ubbf8\uacf5\uc2dc",  # 미공시
+    "\ubbf8\uacf5\uac1c",  # 미공개
+    "\ube44\uacf5\uac1c",  # 비공개
+    "\ucd08\uc548",  # 초안
+    "\uc608\uc815",  # 예정
+}
+
+
+def _source_prior_is_public(src: object) -> bool:
+    text = str(src or "").strip().lower()
+    if not text:
+        return False
+    tokens = {
+        t for t in re.split(r"[^0-9a-zA-Z_\uac00-\ud7a3-]+", text)
+        if t
+    }
+    if text in _PUBLIC_SOURCE_NEGATIVE_TOKENS or tokens & _PUBLIC_SOURCE_NEGATIVE_TOKENS:
+        return False
+    if any(t.startswith("\ubbf8") and t[1:] in _PUBLIC_SOURCE_TOKENS for t in tokens):
+        return False
+    return text in _PUBLIC_SOURCE_TOKENS or bool(tokens & _PUBLIC_SOURCE_TOKENS)
 
 
 def _record_gate_fail_open(gate: str) -> None:
@@ -382,11 +426,11 @@ class InferencePipeline:
                 # '공개를 택한' 문서라 doc/32 §3 설계대로 게이트가 S3로 cap해야 한다
                 # (콘텐츠 모델은 기술내용을 고등급으로 보지만 provenance가 공개라 영업비밀 불성립).
                 # 정밀 토큰만 등록 — bare "특허"는 내부 '특허전략' 문서를 오인 cap(FNR)할 수 있어 제외.
-                _PUBLIC_SOURCES = {
+                _PUBLIC_SOURCES = {  # noqa: F841 - legacy token list kept for local context
                     "court_decision", "판례", "public_disclosure", "공시", "채용공고", "보도자료",
                     "공개특허", "등록특허", "공개공보", "특허공보", "published_patent",
                 }
-                if any(s in str(src) for s in _PUBLIC_SOURCES):
+                if _source_prior_is_public(src):
                     from lloydk.modules.m3_labeling.seeds import GRADE_ORDER as _GRADE_ORDER_LOCAL  # noqa: PLC0415
                     cap_code = (getattr(_s, "source_prior_cap_grade", "S2") or "S2").upper()
                     if cap_code not in _GRADE_ORDER_LOCAL:

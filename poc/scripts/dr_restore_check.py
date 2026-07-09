@@ -17,7 +17,6 @@ import argparse
 import datetime as dt
 import json
 import logging
-import os
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path

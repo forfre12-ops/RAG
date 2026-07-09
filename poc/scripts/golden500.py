@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from lloydk.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest  # noqa: E402
 from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
 from lloydk.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm, svm_levels_for_grade  # noqa: E402
+from lloydk.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
 from lloydk.modules.m3_labeling.seeds import to_canonical_factor  # noqa: E402
 
 PER_GRADE = int(os.environ.get("PER_GRADE", "125"))

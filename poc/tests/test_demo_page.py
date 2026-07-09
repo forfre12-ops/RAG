@@ -60,7 +60,7 @@ def test_demo_styles_css(client):
     assert "--bg-surface" in r.text
     assert "--border-strong" in r.text
     assert "--font-mono" in r.text
-    assert "Geist" in r.text
+    assert "Malgun Gothic" in r.text
     # 데모 신규 컴포넌트
     assert ".kw-toggle" in r.text
     assert ".race-fill" in r.text

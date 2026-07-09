@@ -160,6 +160,16 @@ def _report(results: list[dict], mode: str, max_latency_ms: int) -> tuple[str, d
         "exact_match": exact, "over_classified_safe": len(over), "needs_review": len(review),
         "over_latency_budget": len(slow), "latency_budget_ms": max_latency_ms,
         "by_format": dict(Counter(r["format"] for r in results)),
+        "parser_by_format": {
+            fmt: {
+                "total": sum(1 for r in results if r["format"] == fmt),
+                "parse_fail": sum(1 for r in results if r["format"] == fmt and not r["parse_ok"]),
+                "needs_review": sum(1 for r in results if r["format"] == fmt and r["status"] == "needs_review"),
+                "veto": sum(1 for r in results if r["format"] == fmt and r["veto"]),
+            }
+            for fmt in sorted({r["format"] for r in results})
+        },
+        "results": results,
     }
     lines = [
         "# Acceptance Pack Result",

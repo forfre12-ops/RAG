@@ -69,7 +69,7 @@ def main() -> int:
         print(f"  • 추출 글자수      : {up['char_count']}자")
         print(f"  • 청크 개수        : {up['chunk_count']}")
         print(f"  • RAG 색인         : {up['rag_indexed']} (collection={up['rag_collection']}, vec={up['rag_vector_count']})")
-        print(f"  • 원문 저장(MinIO) : documents-raw / documents-normalized 버킷")
+        print("  • 원문 저장(MinIO) : documents-raw / documents-normalized 버킷")
 
         # ── ② 분류: 등급 · 신뢰도 · 4대 요소 · 근거토큰 ──
         print("\n[②] 분류기 추론 (KF-DeBERTa)")
@@ -82,7 +82,7 @@ def main() -> int:
         label = cl["label"]
         print(f"  • 예측 등급        : {label}  ({GRADE_DESC.get(label, '')})")
         print(f"  • 신뢰도           : {cl['confidence']:.4f}   model={cl['model_version']}  {cl['elapsed_ms']}ms")
-        print(f"  • 점수분포         : " + "  ".join(f"{k}={v:.3f}" for k, v in cl["scores"].items()))
+        print("  • 점수분포         : " + "  ".join(f"{k}={v:.3f}" for k, v in cl["scores"].items()))
         ef = (cl.get("evaluation_factors") or {})
         if ef:
             s, v, m = ef.get("secrecy"), ef.get("value"), ef.get("management")

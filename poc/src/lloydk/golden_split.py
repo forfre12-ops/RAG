@@ -16,7 +16,7 @@ truth-tier와 **직교** — label_source/review_status를 덮지 않아 tier_of
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Sequence

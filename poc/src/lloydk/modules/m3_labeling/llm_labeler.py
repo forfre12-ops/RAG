@@ -52,6 +52,8 @@ class LLMLabelResult:
     factor_scores: dict[str, float]
     rationale: str
     raw_text: str
+    parse_ok: bool = True
+    parse_error: str | None = None
 
 
 class LLMLabeler:
@@ -79,6 +81,16 @@ class LLMLabeler:
         except Exception:  # noqa: BLE001
             pass
         parsed = _safe_parse_json(resp.text)
+        if not parsed:
+            return LLMLabelResult(
+                grade="PARSE_FAIL",
+                confidence=0.0,
+                factor_scores={},
+                rationale="",
+                raw_text=resp.text,
+                parse_ok=False,
+                parse_error="llm_json_parse_failed",
+            )
         svm_scores = {k: float(parsed[k]) for k in ("secrecy", "value", "management") if k in parsed}
         return LLMLabelResult(
             grade=_reconcile_grade(parsed.get("grade", "S3"), svm_scores),

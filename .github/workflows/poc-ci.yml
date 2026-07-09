@@ -423,6 +423,9 @@ jobs:
       - name: Parser support matrix gate
         run: make check-parser-support
 
+      - name: OpenAPI router consistency gate
+        run: make openapi-consistency
+
       - name: Leakage gate - train/holdout text hash
         run: make check-leakage
 

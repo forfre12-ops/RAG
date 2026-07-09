@@ -81,7 +81,7 @@ for i, r in enumerate(rows):
 
     md.append(f"\n## {r['doc_id']} · {GRADE_NAME[target]}({target}) · {r['domain']}")
     md.append(f"**제목**: {r['title']}  (본문 {len(body)}자)")
-    md.append(f"\n**등급 근거 (독립 판독 S×V×M)**:")
+    md.append("\n**등급 근거 (독립 판독 S×V×M)**:")
     md.append(f"- 비공지성 S={s} · 경제유용성 V={v} · 비밀관리성 M={m}")
     md.append(f"- → {s}×{v}×{m} = **{prod} → {derived}({GRADE_NAME.get(derived,derived)})**"
               + ("  ✓ 곱↔등급 정합" if consistent else f"  (LLM최종={lr.grade})"))
@@ -90,7 +90,7 @@ for i, r in enumerate(rows):
     if anyk:
         md.append("**룰 매치 키워드(보조)**: " + " / ".join(
             f"{FACTOR_KO[f]}: {', '.join(ks)}" for f, ks in kws.items() if ks))
-    md.append(f"**가이드 조항**: 정본 가이드 §등급=S×V×M (p.11 요소기준 · p.12 산정표)")
+    md.append("**가이드 조항**: 정본 가이드 §등급=S×V×M (p.11 요소기준 · p.12 산정표)")
     md.append(f"**목표={target} / 룰={rule_g} / LLM판독={derived} → {status}**")
     out_rows.append({**r, "llm_s": s, "llm_v": v, "llm_m": m, "llm_prod": prod, "llm_derived": derived,
                      "review_status": "auto" if status.startswith("✅") else "review"})

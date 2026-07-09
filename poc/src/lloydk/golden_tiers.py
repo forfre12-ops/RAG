@@ -49,7 +49,23 @@ _LEGAL_SOURCES = EXTERNAL_AUTHORITY_SOURCES | SYNTHETIC_PROXY_SOURCES
 # 새 게이트(P1) 자동 통과 출처.
 _CANDIDATE_SOURCES = {"rule_llm_agreement"}
 # 사람 아님(머신/플레이스홀더 reviewer) — import_review_corrections._is_machine_reviewer와 정합 유지.
-_MACHINE_PREFIXES = ("llm_judge", "ai_assist", "codex", "model", "machine", "public_gold", "auto")
+_MACHINE_PREFIXES = (
+    "llm_judge",
+    "ai_assist",
+    "codex",
+    "model",
+    "machine",
+    "public_gold",
+    "auto",
+    "claude",
+    "gpt",
+    "qwen",
+    "gemini",
+    "anthropic",
+    "openai",
+    "bot",
+    "judge",
+)
 
 
 def is_human_reviewer(reviewer_id: object) -> bool:

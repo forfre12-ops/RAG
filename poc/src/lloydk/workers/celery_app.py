@@ -22,6 +22,27 @@ celery_app.conf.result_expires = settings.celery_result_expires
 celery_app.conf.task_soft_time_limit = settings.celery_task_soft_time_limit
 celery_app.conf.task_time_limit = settings.celery_task_time_limit
 celery_app.conf.worker_max_tasks_per_child = settings.celery_worker_max_tasks_per_child
+celery_app.conf.task_acks_late = True
+celery_app.conf.task_reject_on_worker_lost = True
+celery_app.conf.worker_prefetch_multiplier = 1
+celery_app.conf.task_annotations = {
+    "lloydk.classify_async": {
+        "soft_time_limit": min(settings.celery_task_soft_time_limit, 120),
+        "time_limit": min(settings.celery_task_time_limit, 180),
+    },
+    "lloydk.synthesize_batch": {
+        "soft_time_limit": min(settings.celery_task_soft_time_limit, 300),
+        "time_limit": min(settings.celery_task_time_limit, 420),
+    },
+    "lloydk.golden_build": {
+        "soft_time_limit": max(settings.celery_task_soft_time_limit, 900),
+        "time_limit": max(settings.celery_task_time_limit, 1200),
+    },
+    "lloydk.train_classifier": {
+        "soft_time_limit": max(settings.celery_task_soft_time_limit, 1800),
+        "time_limit": max(settings.celery_task_time_limit, 2400),
+    },
+}
 
 # P1-D3: 큐 분리 — classify/index/synthesis/learning.
 # 워커는 `-Q classify,index,synthesis,learning,celery`로 모든 큐를 구독해야 한다

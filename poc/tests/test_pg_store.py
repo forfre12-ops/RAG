@@ -39,6 +39,12 @@ def test_filter_sql_column_vs_payload():
     assert store._filter_sql(None, {}) == ""           # 빈 필터는 빈 절
 
 
+def test_filter_sql_rejects_unsafe_payload_key():
+    store = PgVectorStore(engine=object())
+    with pytest.raises(ValueError):
+        store._filter_sql({"x' OR '1'='1": "boom"}, {})
+
+
 def test_protocol_conformance():
     store = PgVectorStore(engine=object())
     assert isinstance(store, VectorStore)
@@ -97,6 +103,44 @@ class _FakeEngine:
     def connect(self):
         self.conn = _FakeConn(self._rows)
         return self.conn
+
+
+class _ScalarResult:
+    def __init__(self, value):
+        self.value = value
+
+    def scalar(self):
+        return self.value
+
+
+class _AliasConn:
+    def __init__(self, target):
+        self.target = target
+        self.captured = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def execute(self, sql, params=None):
+        self.captured = (str(sql), params)
+        return _ScalarResult(self.target)
+
+
+class _AliasEngine:
+    def __init__(self, target):
+        self.conn = _AliasConn(target)
+
+    def connect(self):
+        return self.conn
+
+
+def test_resolve_collection_uses_pg_alias_table():
+    store = PgVectorStore(engine=_AliasEngine("secrets-guides-kure-v2"))
+    assert store._resolve_collection("secrets-guides") == "secrets-guides-kure-v2"
+    assert store._engine.conn.captured[1] == {"a": "secrets-guides"}
 
 
 def test_sample_vectors_parses_rows():

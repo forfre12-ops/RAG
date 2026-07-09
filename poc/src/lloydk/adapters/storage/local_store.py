@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 
 
@@ -29,16 +31,39 @@ class LocalStorage:
         p.parent.mkdir(parents=True, exist_ok=True)
         return p
 
+    def _path_readonly(self, bucket: str, key: str) -> Path:
+        p = self.root / bucket / key
+        resolved = p.resolve()
+        try:
+            resolved.relative_to(self._root_resolved)
+        except ValueError as exc:
+            raise ValueError(
+                f"path traversal blocked: key escapes storage root "
+                f"(bucket={bucket!r}, key={key!r})"
+            ) from exc
+        return p
+
     def put(self, bucket: str, key: str, data: bytes, *, content_type: str = "application/octet-stream") -> str:
         p = self._path(bucket, key)
-        p.write_bytes(data)
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{p.name}.", suffix=".tmp", dir=str(p.parent))
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_name, p)
+        finally:
+            try:
+                os.unlink(tmp_name)
+            except FileNotFoundError:
+                pass
         return self.uri(bucket, key)
 
     def get(self, bucket: str, key: str) -> bytes:
-        return self._path(bucket, key).read_bytes()
+        return self._path_readonly(bucket, key).read_bytes()
 
     def exists(self, bucket: str, key: str) -> bool:
-        return self._path(bucket, key).exists()
+        return self._path_readonly(bucket, key).exists()
 
     def uri(self, bucket: str, key: str) -> str:
         return f"file://{(self.root / bucket / key).as_posix()}"

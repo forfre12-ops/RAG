@@ -174,7 +174,7 @@ def write_report(metrics: dict, mode: str, out: Path) -> str:
             f"# P1 — 분류 모델 평가 리포트 ({mode})",
             "",
             f"- **eval_type**: `{eval_type}`{filter_note} — {eval_note}",
-            f"- **판정**: N/A — 해당 label_source 데이터가 없습니다.",
+            "- **판정**: N/A — 해당 label_source 데이터가 없습니다.",
             "",
             "human_review 데이터를 gold_real/classification_gold.jsonl에 추가한 후 재실행하세요.",
         ]

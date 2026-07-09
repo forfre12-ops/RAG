@@ -161,6 +161,7 @@ _HIGH_RISK_PATTERNS: list[tuple[str, str, float, str]] = [
     ("TS", r"\b(?:DCF|NDA|PMI|Post[- ]Merger|IPO|M&A|CFO|valuation|merger|acquisition)\b", 1.4, "NON_PUBLICITY"),
     ("S1", r"\b(?:GMP|DMF|PLC|TFT[- ]LCD|QKD|source\s*code|API|patent|license|trade\s*secret)\b", 1.2, "ECONOMIC_VALUE"),
     ("S1", r"\b(?:EBITDA|BUY|target\s*price|cost\s*structure|customer\s*(?:list|database)|pricing\s*model)\b", 1.0, "ECONOMIC_VALUE"),
+    ("S1", "(?:\uAE30\uC5C5\\s*\uC2E4\uC0AC|\uC778\uC218\\s*\uBB34\uC0B0|\uD569\uBCD1\\s*\uAC00\uACA9|\uC778\uC218\\s*\uAC00\uACA9|\uBE44\uACF5\uAC1C\\s*\uC774\uC0AC\uD68C|\uBBF8\uACF5\uC2DC)", 1.2, "NON_PUBLICITY"),
     ("S2", r"\b(?:Weekly|Guide\s*Book|OEM|BEV|IRA|AMPC|CDMO|LNG|WTI|GHz|GWh|LTE|ETF|OECD)\b", 0.9, "NON_PUBLICITY"),
     ("S2", r"\b(?:internal\s*(?:review|plan|memo)|draft|negotiation|vendor|supplier|budget|forecast)\b", 1.0, "NON_PUBLICITY"),
 ]

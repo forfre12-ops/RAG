@@ -58,12 +58,14 @@ if "from pathlib import Path" not in new_src:
 P5_PATH.write_text(new_src, encoding="utf-8")
 
 # 문법 검증
-import py_compile, tempfile, os
+import py_compile
+import tempfile
+import os
 tmp = tempfile.mktemp(suffix=".py")
 Path(tmp).write_text(new_src, encoding="utf-8")
 try:
     py_compile.compile(tmp, doraise=True)
-    print(f"p5_e2e_smoke.py 교체 완료 — 문법 OK")
+    print("p5_e2e_smoke.py 교체 완료 — 문법 OK")
 except py_compile.PyCompileError as e:
     print(f"문법 오류: {e}")
 finally:

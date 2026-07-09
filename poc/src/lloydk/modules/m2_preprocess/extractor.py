@@ -117,9 +117,23 @@ def extract(path: str | Path) -> ExtractResult:
 def _extract_plain(p: Path) -> ExtractResult:
     try:
         text = p.read_text(encoding="utf-8")
+        return ExtractResult(text=text, method="plain", quality=1.0)
     except UnicodeDecodeError:
-        text = p.read_text(encoding="cp949", errors="ignore")
-    return ExtractResult(text=text, method="plain", quality=1.0)
+        pass
+    raw = p.read_bytes()
+    warnings: list[str] = []
+    for enc in ("utf-16", "utf-16-le", "utf-16-be", "cp949", "euc-kr"):
+        try:
+            text = raw.decode(enc)
+            warnings.append(f"plain_decoded_as_{enc}")
+            return ExtractResult(text=text, method="plain", quality=0.9, warnings=warnings)
+        except UnicodeDecodeError:
+            continue
+    text = raw.decode("utf-8", errors="replace")
+    replacement_count = text.count("\ufffd")
+    warnings.append(f"plain_decode_replaced_chars:{replacement_count}")
+    quality = max(0.3, 1.0 - min(0.7, replacement_count / max(1, len(text))))
+    return ExtractResult(text=text, method="plain", quality=round(quality, 4), warnings=warnings)
 
 
 def _cell_text(value) -> str:

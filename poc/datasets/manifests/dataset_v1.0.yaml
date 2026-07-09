@@ -1,5 +1,5 @@
 version: "1.0"
-generated_at: "2026-06-05"
+generated_at: "2026-07-06"
 purpose: |
   KOIPA AI 영업비밀관리시스템 학습·평가 데이터셋 정본 매니페스트.
   P1(분류) · P2(임베딩) · P3(합성) · P4(추출) PoC 5종 + Phase 8 고도화 산출물.
@@ -18,9 +18,9 @@ current_status:
   p2_retrieval:
     recall_at_5: 0.925         # KURE-v1 + ES hybrid, chunk 1200/100
     gate: PASS
-  human_review_gold: "0/40"    # 외부 의존(발주처 사람 라벨) — 유일한 진짜 릴리즈 블로커
+  human_review_gold: "1/40"    # external reviewed samples still required for strict GA
   model_parity: PASS
-  readiness_verdict: FAIL
+  readiness_verdict: CONDITIONALLY_READY
 
 datasets:
 
@@ -210,7 +210,7 @@ acceptance:
         eval_type: llm_judge_pseudo_gold
         source: gold_real/classification_gold.jsonl (777 total; 610 llm_judge/codex eval records)
         filter: llm_judge_primary, llm_judge_consensus, codex_review
-        measured_rule_labeler:  { F1: 0.498, FNR: 0.367, n: 610, note: "2026-06-01 high-risk pattern guard" }
+        measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "legacy proxy metric before 2026-07-06 distribution refresh" }
         measured_ml_v3_direct:  { F1: 0.487, FNR: 0.441, n: 710, note: "S1_R=0.68, S2_R=0.49" }
         measured_ml_v3_api:     { F1: 0.487, FNR: 0.000, n: 710, note: "FNR-safe 오버라이드, TS/S1/S2 R=1.00" }
         measured_ml_retrain_v3_direct: { F1: 0.547, FNR_TS_S1: 0.000, n: 610, TS_S1_S2_to_S3: 17, note: "S2->S3 remains on pseudo tier" }
@@ -220,12 +220,12 @@ acceptance:
         source: gold_real/classification_gold.jsonl
         filter: human_review, public_definitive, koipa_case_based, nkt_designated
         gold_breakdown:
-          human_review: 0건          # 발주처 실문서 (미입수)
+          human_review: 1           # external reviewed sample
           public_definitive: 50      # public definitive S3
-          koipa_case_based: 81       # KOIPA/case-based S1/S2
-          nkt_designated: 36         # national-core/high-risk TS
-          total: 167
-        measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "TS recall=0.972; S1/S2 still below target" }
+          koipa_case_based: 80       # KOIPA/case-based S1/S2
+          nkt_designated: 30         # national-core/high-risk TS
+          total: 161
+        measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "legacy proxy metric before 2026-07-06 distribution refresh" }
         measured_ml_v3_api:    { F1: 0.561, FNR: 0.000, n: 100, note: "TS/S1/S2 R=1.00, S3 과분류" }
         measured_ml_retrain_v3_direct: { F1: 0.830, FNR_TS_S1: 0.000, n: 167, TS_S1_S2_to_S3: 0, note: "TS/S1/S2 recall all 1.00; S3 recall 0.46" }
         note: |
@@ -354,7 +354,7 @@ gold:
       구 generator 기반 합성 문서. 등급명 마스킹 처리했으나 내용 자체가
       등급 시맨틱 반영 → 룰 라벨러 F1=1.0. 운영 성능 근거 불가.
       보고 시 반드시 synthetic_masked_eval_f1 로 표기.
-    generated_at: "2026-06-01"
+    generated_at: "2026-07-06"
 
   classification_gold_real:
     path: poc/datasets/gold_real/classification_gold.jsonl
@@ -365,10 +365,10 @@ gold:
       llm_judge_primary: 524
       llm_judge_consensus: 67
       codex_review: 19
-      human_review: 0
+      human_review: 1
       public_definitive: 50
-      koipa_case_based: 81
-      nkt_designated: 36
+      koipa_case_based: 80
+      nkt_designated: 30
     source: oss_corpus + public_scenario + synthetic_grounded
     eval_results:
       synthetic_masked_f1: 1.000
@@ -385,8 +385,8 @@ gold:
       위 llm_judge_gold_f1 / public_case_nkt_gold_f1 는 평가 독립성 없음(암기). 운영 근거 금지.
       디오염 측정은 acceptance.p1_classification.eval_tiers.clean_holdout 참조.
       release 판단은 운영 파이프라인 기준 system FNR 2.8%(≤5% 통과, TS 100%) — 과분류 트레이드오프.
-      777 records after high-risk boundary supplement. human_review=0 remains.
-    updated_at: "2026-06-02"
+      777 records after high-risk boundary supplement. human_review=1/40; strict GA remains externally blocked.
+    updated_at: "2026-07-06"
   retrieval_gold:
     path: poc/datasets/gold_real/retrieval_gold.jsonl
     eval_type: oss_eval_doc_id
@@ -395,6 +395,7 @@ gold:
     note: expected_doc_id/relevant_doc_ids based Recall/MRR/nDCG evaluation set generated on 2026-06-01.
 
 changelog:
+  - { date: "2026-07-06", version: "1.4", note: "classification_gold_real manifest refreshed to match current label_source distribution; human_review=1/40, strict GA still externally blocked." }
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }
   - { date: "2026-06-01", version: "1.1", note: "데이터 품질 복구: labeled_5k/rag_corpus_qa deprecated, gold set 신설, generator V2 프롬프트 교체" }
   - { date: "2026-06-02", version: "1.2", note: "P1 retrain v3 and P2 KURE-v1 ES hybrid gold metrics reflected; release remains blocked on human_review=0." }

@@ -46,6 +46,7 @@ import random
 import sys
 import time
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
@@ -62,6 +63,13 @@ if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf-8-s
 from lloydk.modules.m3_labeling.consensus import evaluate_consensus  # noqa: E402 (sys.path 설정 후)
 
 LABELS = ["TS", "S1", "S2", "S3"]
+DEFAULT_CANONICAL_GOLD = Path("datasets/gold_real/classification_gold.jsonl")
+
+
+def _default_run_outputs() -> tuple[Path, Path]:
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    base = Path("datasets/gold_real/llm_judge_runs") / run_id
+    return base / "classification_gold.jsonl", base / "uncertain_cases.jsonl"
 
 
 def _sha1(text: str) -> str:
@@ -224,8 +232,13 @@ def estimate_cost(docs: list[dict], provider: str) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description="LLM-as-judge gold set 생성")
     ap.add_argument("--corpus-dir", default="datasets/oss_corpus")
-    ap.add_argument("--out", default="datasets/gold_real/classification_gold.jsonl")
-    ap.add_argument("--uncertain-out", default="datasets/gold_real/uncertain_cases.jsonl")
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--uncertain-out", default=None)
+    ap.add_argument(
+        "--allow-canonical-out",
+        action="store_true",
+        help="Allow writing directly to datasets/gold_real/classification_gold.jsonl. Default is run-scoped output.",
+    )
     ap.add_argument("--provider", default="anthropic",
                     help="LLM provider: anthropic|openai|local_openai|noop")
     ap.add_argument("--n", type=int, default=200, help="처리할 문서 수")
@@ -247,6 +260,20 @@ def main() -> int:
     ap.add_argument("--exclude-processed", action="store_true",
                     help="기존 gold/uncertain에서 처리된 파일 제외")
     args = ap.parse_args()
+
+    if args.out is None or args.uncertain_out is None:
+        default_out, default_uncertain = _default_run_outputs()
+        if args.out is None:
+            args.out = str(default_out)
+        if args.uncertain_out is None:
+            args.uncertain_out = str(default_uncertain)
+    if Path(args.out) == DEFAULT_CANONICAL_GOLD and not args.allow_canonical_out:
+        print(
+            "[ERROR] canonical gold output is protected. Use a run-scoped --out or pass "
+            "--allow-canonical-out explicitly.",
+            file=sys.stderr,
+        )
+        return 2
 
     corpus_dir = Path(args.corpus_dir)
     if not corpus_dir.exists():
@@ -403,8 +430,8 @@ def main() -> int:
     print()
 
     if gold_records:
-        print(f"다음 단계: make check-gold  (gold_real 품질 검사)")
-        print(f"           make eval-gold   (P1 llm_judge_gold F1)")
+        print("다음 단계: make check-gold  (gold_real 품질 검사)")
+        print("           make eval-gold   (P1 llm_judge_gold F1)")
 
     return 0 if gold_records else 1
 

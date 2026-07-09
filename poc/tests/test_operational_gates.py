@@ -254,6 +254,24 @@ def test_release_gate_missing_report_never_waived(tmp_path, monkeypatch):
     assert check_release_gate.main() == 1
 
 
+def test_release_gate_empty_gates_fail_closed(tmp_path, monkeypatch):
+    readiness = _write_readiness(tmp_path, "PASS", [])
+    monkeypatch.setattr("sys.argv", ["check_release_gate.py", "--readiness", str(readiness)])
+    assert check_release_gate.main() == 1
+
+
+def test_release_gate_invalid_verdict_fail_closed(tmp_path, monkeypatch):
+    readiness = _write_readiness(tmp_path, "UNKNOWN", [{"name": "x", "status": "PASS"}])
+    monkeypatch.setattr("sys.argv", ["check_release_gate.py", "--readiness", str(readiness)])
+    assert check_release_gate.main() == 1
+
+
+def test_release_gate_malformed_gate_fail_closed(tmp_path, monkeypatch):
+    readiness = _write_readiness(tmp_path, "PASS", [{"name": "x"}])
+    monkeypatch.setattr("sys.argv", ["check_release_gate.py", "--readiness", str(readiness)])
+    assert check_release_gate.main() == 1
+
+
 def test_human_review_queue_prioritizes_high_risk_underclassification(tmp_path, monkeypatch):
     report = tmp_path / "p1_report.json"
     _write_json(

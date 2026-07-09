@@ -60,7 +60,7 @@ def main():
     report = train_classifier(spec)
     print(json.dumps(report.__dict__, ensure_ascii=False, indent=2, default=str))
 
-    print(f"\n=== P1 재학습 완료 ===")
+    print("\n=== P1 재학습 완료 ===")
     print(f"F1-macro: {report.f1_macro:.4f}")
     print(f"FNR-overall: {report.fnr_overall:.4f} ({report.fnr_overall*100:.1f}%)")
     print(f"FNR-TS: {report.fnr_by_grade.get('TS',0)*100:.1f}%")

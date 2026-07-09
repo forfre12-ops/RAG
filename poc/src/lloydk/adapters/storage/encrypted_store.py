@@ -34,7 +34,14 @@ class EncryptingStorage:
 
     name = "encrypted"
 
-    def __init__(self, inner: ObjectStorage, *, key_material: str, buckets: set[str]):
+    def __init__(
+        self,
+        inner: ObjectStorage,
+        *,
+        key_material: str,
+        buckets: set[str],
+        strict_plaintext: bool = False,
+    ):
         if not key_material:
             raise ValueError(
                 "storage encryption enabled but no key material provided "
@@ -42,6 +49,7 @@ class EncryptingStorage:
             )
         self._inner = inner
         self._buckets = set(buckets or ())
+        self._strict_plaintext = strict_plaintext
         # 32바이트 AES-256 키를 고엔트로피 시크릿에서 결정적으로 유도.
         self._key = hashlib.sha256(key_material.encode("utf-8")).digest()
         logger.info(
@@ -58,14 +66,16 @@ class EncryptingStorage:
         self, bucket: str, key: str, data: bytes, *, content_type: str = "application/octet-stream"
     ) -> str:
         if self._should_encrypt(bucket):
-            data = self._encrypt(data)
+            data = self._encrypt(data, bucket=bucket, key=key)
         return self._inner.put(bucket, key, data, content_type=content_type)
 
     def get(self, bucket: str, key: str) -> bytes:
         data = self._inner.get(bucket, key)
         # MAGIC 헤더가 있으면 암호문 — 복호화. 없으면 평문(기존 데이터·비대상 버킷) 그대로.
         if data[: len(_MAGIC)] == _MAGIC:
-            return self._decrypt(data)
+            return self._decrypt(data, bucket=bucket, key=key)
+        if self._should_encrypt(bucket) and self._strict_plaintext:
+            raise ValueError(f"encrypted bucket contains plaintext object: {bucket}/{key}")
         return data
 
     def exists(self, bucket: str, key: str) -> bool:
@@ -83,16 +93,20 @@ class EncryptingStorage:
 
     # --- crypto --------------------------------------------------------------
 
-    def _encrypt(self, data: bytes) -> bytes:
+    @staticmethod
+    def _aad(bucket: str, key: str) -> bytes:
+        return f"{bucket}/{key}".encode("utf-8")
+
+    def _encrypt(self, data: bytes, *, bucket: str, key: str) -> bytes:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # noqa: PLC0415
 
         nonce = os.urandom(_NONCE_LEN)
-        ct = AESGCM(self._key).encrypt(nonce, data, None)
+        ct = AESGCM(self._key).encrypt(nonce, data, self._aad(bucket, key))
         return _MAGIC + nonce + ct
 
-    def _decrypt(self, blob: bytes) -> bytes:
+    def _decrypt(self, blob: bytes, *, bucket: str, key: str) -> bytes:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # noqa: PLC0415
 
         nonce = blob[len(_MAGIC) : len(_MAGIC) + _NONCE_LEN]
         ct = blob[len(_MAGIC) + _NONCE_LEN :]
-        return AESGCM(self._key).decrypt(nonce, ct, None)
+        return AESGCM(self._key).decrypt(nonce, ct, self._aad(bucket, key))

@@ -16,7 +16,7 @@ import {
 // ──────────────────────────────────────────────────────────────────────
 const state = {
   endpoint: window.location.origin,
-  apiKey: "devkey",
+  apiKey: window.localStorage?.getItem("lloydk_api_key") || "",
   currentSampleId: null,
   currentSample: null,
   toggledOff: new Set(), // 와우 A — off 된 키워드들
@@ -34,7 +34,16 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 function apiUrl(path) {
   return state.endpoint.replace(/\/+$/, "") + path;
 }
+function ensureApiKey() {
+  if (state.apiKey) return;
+  const entered = window.prompt("시연 서버 API 키를 입력하세요. 입력값은 이 브라우저의 localStorage에만 저장됩니다.");
+  if (entered) {
+    state.apiKey = entered.trim();
+    window.localStorage?.setItem("lloydk_api_key", state.apiKey);
+  }
+}
 function authHeaders() {
+  ensureApiKey();
   return { "X-API-Key": state.apiKey };
 }
 async function apiGet(path) {
@@ -897,7 +906,7 @@ function bindConfig() {
   const ep = $("#cfg-endpoint");
   const ak = $("#cfg-apikey");
   if (ep) { ep.value = state.endpoint; ep.addEventListener("change", (e) => { state.endpoint = e.target.value || window.location.origin; }); }
-  if (ak) { ak.value = state.apiKey; ak.addEventListener("change", (e) => { state.apiKey = e.target.value; }); }
+  if (ak) { ak.value = state.apiKey; ak.addEventListener("change", (e) => { state.apiKey = e.target.value; window.localStorage?.setItem("lloydk_api_key", state.apiKey); }); }
 }
 
 // ──────────────────────────────────────────────────────────────────────

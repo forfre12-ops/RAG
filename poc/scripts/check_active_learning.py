@@ -82,9 +82,9 @@ def check_file_corrections(threshold: int) -> dict:
         "direction_dist": dict(directions),
         "recommend_retrain": len(corrected) >= threshold,
         "retrain_command": (
-            f"python scripts/p1_train_classifier.py --mode full "
-            f"--train-path datasets/labeled_v2_balanced/train.jsonl "
-            f"--no-mlflow --output-dir artifacts/classifier_active_v1"
+            "python scripts/p1_train_classifier.py --mode full "
+            "--train-path datasets/labeled_v2_balanced/train.jsonl "
+            "--no-mlflow --output-dir artifacts/classifier_active_v1"
         ) if len(corrected) >= threshold else None,
     }
 

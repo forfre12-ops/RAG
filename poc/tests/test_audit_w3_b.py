@@ -231,6 +231,16 @@ def test_build_storage_minio_failure_falls_back_local(tmp_path):
     assert any(issubclass(w.category, RuntimeWarning) for w in caught)
 
 
+def test_build_storage_minio_failure_raises_in_full_mode(monkeypatch, tmp_path):
+    from lloydk.adapters import storage as storage_mod
+    from lloydk.adapters.storage import build_storage
+
+    monkeypatch.setattr(storage_mod, "_strict_remote_storage_required", lambda: True)
+    with patch.object(storage_mod, "_build_minio", side_effect=RuntimeError("no minio")):
+        with pytest.raises(RuntimeError, match="full mode"):
+            build_storage(backend="minio", local_root=str(tmp_path))
+
+
 def test_build_storage_seaweedfs_backend_constructs_seaweed():
     """seaweedfs 백엔드는 SeaweedFSStore를 생성(boto3 lazy라 생성 자체는 성공)."""
     from lloydk.adapters.storage import build_storage

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from lloydk.adapters.embedding import HashEmbedding
@@ -12,6 +14,16 @@ from lloydk.modules.m3_labeling import (
     LabelingPipeline,
     LabelRuleEngine,
 )
+
+
+class _TextProvider:
+    name = "fake"
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def generate(self, *_args, **_kwargs):
+        return SimpleNamespace(text=self.text, usage=None)
 
 
 def test_reconcile_grade_fnr_safe_fixes_prompt_drift():
@@ -38,6 +50,16 @@ def test_reconcile_grade_fnr_safe_fixes_prompt_drift():
     assert _reconcile_grade("S2", {"secrecy": 2.0, "value": 2.4, "management": 0.0}) == "S1"
 
 
+def test_llm_labeler_parse_fail_is_not_s3():
+    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+
+    out = LLMLabeler(provider=_TextProvider("not json")).label("doc")
+    assert out.grade == "PARSE_FAIL"
+    assert out.confidence == 0.0
+    assert out.parse_ok is False
+    assert out.parse_error == "llm_json_parse_failed"
+
+
 def test_canonical_factors_are_three_requisites():
     """정본 B안 — 평가요소는 3요건(S·V·M). 곱셈식이라 가산 가중치 합 제약 없음."""
     codes = {f["code"] for f in FACTOR_SEEDS}
@@ -47,6 +69,16 @@ def test_canonical_factors_are_three_requisites():
 def test_grade_order_has_all_four_levels():
     assert set(GRADE_ORDER) == {"TS", "S1", "S2", "S3"}
     assert GRADE_ORDER["TS"] < GRADE_ORDER["S1"] < GRADE_ORDER["S2"] < GRADE_ORDER["S3"]
+
+
+def test_source_prior_public_detection_rejects_negated_public_terms():
+    from lloydk.modules.m5_inference.pipeline import _source_prior_is_public
+
+    assert _source_prior_is_public("public_disclosure") is True
+    assert _source_prior_is_public("공시") is True
+    assert _source_prior_is_public("미공시 내부자료") is False
+    assert _source_prior_is_public("보도자료 초안") is False
+    assert _source_prior_is_public("unpublished patent draft") is False
 
 
 def test_keyword_seeds_cover_all_grades():

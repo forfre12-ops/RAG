@@ -44,7 +44,7 @@ from eval_p1_model_gold import compute_metrics, predict_direct  # noqa: E402
 from lloydk.config import settings as _settings  # noqa: E402
 
 # 배포 모델 단일 진실원 = .env CLASSIFIER_MODEL_DIR (버전 하드코딩 드리프트 방지).
-_DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb"
+_DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9"
 
 # 외부권위만 legally_grounded — 단일 진실원은 lloydk.golden_tiers(EXTERNAL_AUTHORITY_SOURCES).
 from lloydk.golden_tiers import EXTERNAL_AUTHORITY_SOURCES as LEGAL  # noqa: E402

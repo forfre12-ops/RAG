@@ -563,7 +563,7 @@ def run_eval(records):
     agree   = sum(1 for r in records if r["agree"])
 
     print(f"\n{'='*55}")
-    print(f"  골든셋 100건 평가 요약")
+    print("  골든셋 100건 평가 요약")
     print(f"{'='*55}")
     print(f"  총 건수        : {total}")
     print(f"  자동 확정      : {auto} ({auto/total*100:.1f}%)")
@@ -572,7 +572,7 @@ def run_eval(records):
     print(f"  LLM 정확도     : {llm_ok}/{total} ({llm_ok/total*100:.1f}%)")
     print(f"  합의율(agree)  : {agree}/{total} ({agree/total*100:.1f}%)")
 
-    print(f"\n  ─── 등급별 분포 ─────────────────────────────")
+    print("\n  ─── 등급별 분포 ─────────────────────────────")
     for grade in ["TS", "S1", "S2", "S3"]:
         subset = [r for r in records if r["target"] == grade]
         n = len(subset)
@@ -583,7 +583,7 @@ def run_eval(records):
               f"LLM {l_ok}/{n} ({l_ok/n*100:.0f}%)  자동 {auto_n}/{n}")
 
     # FNR for high-value grades (TS, S1)
-    print(f"\n  ─── 고등급 FNR (False Negative Rate) ────────")
+    print("\n  ─── 고등급 FNR (False Negative Rate) ────────")
     for grade in ["TS", "S1"]:
         subset = [r for r in records if r["target"] == grade]
         n = len(subset)

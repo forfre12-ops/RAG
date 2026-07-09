@@ -29,6 +29,8 @@ from pathlib import Path
 # Gate statuses a PILOT (--allow-conditional) release is permitted to waive.
 # Everything else — notably FAIL, and any unrecognised status — is a hard blocker.
 _WAIVABLE = {"BLOCKED"}
+_VALID_VERDICTS = {"PASS", "CONDITIONALLY_READY", "FAIL"}
+_VALID_GATE_STATUSES = {"PASS", "BLOCKED", "FAIL"}
 
 
 def _env_flag(name: str) -> bool:
@@ -57,9 +59,31 @@ def main() -> int:
         print(f"[release-gate] FAIL: missing readiness report: {path}")
         return 1
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"[release-gate] FAIL: invalid readiness JSON: {path} ({exc})")
+        return 1
+    if not isinstance(payload, dict):
+        print(f"[release-gate] FAIL: readiness report must be a JSON object: {path}")
+        return 1
     verdict = payload.get("verdict", "UNKNOWN")
     gates = payload.get("gates", [])
+    if verdict not in _VALID_VERDICTS:
+        print(f"[release-gate] FAIL: invalid or missing verdict: {verdict!r}")
+        return 1
+    if not isinstance(gates, list) or not gates:
+        print("[release-gate] FAIL: readiness gates are missing or empty")
+        return 1
+    malformed = [
+        g for g in gates
+        if not isinstance(g, dict) or not g.get("name") or g.get("status") not in _VALID_GATE_STATUSES
+    ]
+    if malformed:
+        print("[release-gate] FAIL: malformed gate entries")
+        for gate in malformed[:10]:
+            print(f"- {gate!r}")
+        return 1
 
     non_pass = [g for g in gates if g.get("status") != "PASS"]
     hard_blockers = [g for g in non_pass if g.get("status") not in _WAIVABLE]

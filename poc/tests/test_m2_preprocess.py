@@ -22,6 +22,16 @@ def test_extract_txt(tmp_path: Path):
     assert r.error is None
 
 
+def test_extract_plain_utf16_warns_and_lowers_quality(tmp_path: Path):
+    p = tmp_path / "utf16.txt"
+    p.write_bytes("본문".encode("utf-16"))
+    r = extract(p)
+    assert r.method == "plain"
+    assert "본문" in r.text
+    assert r.quality < 1.0
+    assert any(w.startswith("plain_decoded_as_") for w in r.warnings)
+
+
 def test_extract_unsupported_returns_error(tmp_path: Path):
     p = tmp_path / "x.unknown"
     p.write_text("data", encoding="utf-8")

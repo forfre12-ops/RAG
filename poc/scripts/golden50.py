@@ -118,7 +118,7 @@ for x in rows:
     if not any_ev:
         md.append("- (룰 키워드 매치 없음 — 의미기반/LLM 판단 의존)")
     md.append(f"\n**LLM 판단근거**: {x['llm_rationale'] or '(없음)'}")
-    md.append(f"**가이드 조항**: 정본 가이드 §등급=S×V×M (p.12 산정표)")
+    md.append("**가이드 조항**: 정본 가이드 §등급=S×V×M (p.12 산정표)")
     chk = "✅ 일치" if x["rule_correct"] else f"⚠ 룰={x['rule']} (검수대상)"
     md.append(f"**검증**: 목표={x['target']} / 룰={x['rule']} / LLM={x['llm']} → {chk}")
 (gd / "golden50_evidence.md").write_text("\n".join(md), encoding="utf-8")

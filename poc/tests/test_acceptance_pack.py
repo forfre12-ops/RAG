@@ -76,6 +76,32 @@ def test_report_fail_on_any_veto():
     assert s["verdict"] == "FAIL" and s["under_classified"] == 1
 
 
+def test_report_includes_parser_format_rollup_and_details():
+    txt = _res(doc_id="txt-ok", format="txt")
+    pdf_fail = _res(
+        doc_id="pdf-fail",
+        format="pdf",
+        parse_ok=False,
+        status="needs_review",
+        veto=True,
+        veto_reasons=["parse_fail"],
+    )
+    _, s = ra._report([txt, pdf_fail], "inproc", 3000)
+    assert s["parser_by_format"]["txt"] == {
+        "total": 1,
+        "parse_fail": 0,
+        "needs_review": 0,
+        "veto": 0,
+    }
+    assert s["parser_by_format"]["pdf"] == {
+        "total": 1,
+        "parse_fail": 1,
+        "needs_review": 1,
+        "veto": 1,
+    }
+    assert [r["doc_id"] for r in s["results"]] == ["txt-ok", "pdf-fail"]
+
+
 # ── 생성기 렌더러 round-trip (base-dep 포맷; 숫자 무손실) ─────────────────────
 
 @pytest.fixture

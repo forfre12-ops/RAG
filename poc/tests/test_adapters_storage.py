@@ -31,6 +31,19 @@ def test_local_storage_creates_parent_dirs(tmp_path: Path):
     assert (tmp_path / "b" / "deep" / "nested" / "path" / "file.bin").exists()
 
 
+def test_local_storage_missing_read_does_not_create_dirs(tmp_path: Path):
+    st = LocalStorage(root=str(tmp_path))
+    assert not st.exists("b", "deep/missing.txt")
+    assert not (tmp_path / "b").exists()
+
+
+def test_local_storage_put_leaves_no_temp_file(tmp_path: Path):
+    st = LocalStorage(root=str(tmp_path))
+    st.put("b", "deep/file.bin", b"x")
+    parent = tmp_path / "b" / "deep"
+    assert not list(parent.glob("*.tmp"))
+
+
 # --- F: S3 호환 백엔드 키 정규화/traversal 가드 (인프라 불필요 — 순수 staticmethod) ---
 
 @pytest.mark.parametrize(
