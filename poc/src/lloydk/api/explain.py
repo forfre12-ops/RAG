@@ -75,9 +75,9 @@ def _method_label(model_version: str | None) -> str:
 
 def _factor_decomposition(result: ClassifyResponse) -> dict:
     """3요건(S·V·M) 점수 분해 — B안 곱셈식이라 최저 요소가 등급을 제약 (검수자 가독성)."""
-    if not result.factors:
+    if not result.evaluation_factors:
         return {}
-    f = result.factors
+    f = result.evaluation_factors
     rows = [
         {"factor": "secrecy", "name": "비공지성(S)", "score": round(float(getattr(f, "secrecy", 0.0) or 0.0), 4)},
         {"factor": "value", "name": "경제적 유용성(V)", "score": round(float(getattr(f, "value", 0.0) or 0.0), 4)},
@@ -109,7 +109,7 @@ def classify_explain(
     body["explain"] = {
         "evidence_aggregated": _aggregate_evidence(result),
         "factor_decomposition": _factor_decomposition(result),
-        "rag_context_count": len(result.rag_context or []),
+        "rag_context_count": len(result.rag_context_used or []),
         "warnings": list(result.warnings or []),
         "method": _method_label(result.model_version),
     }
