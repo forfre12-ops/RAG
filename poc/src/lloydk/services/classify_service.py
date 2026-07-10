@@ -632,6 +632,8 @@ class ClassifyService:
             doc_uuid = _try_uuid_str(doc_id_str)
             if doc_uuid is None:
                 return None
+            if _skip_optional_db_work():
+                return None
 
             db = SessionLocal()
             try:
