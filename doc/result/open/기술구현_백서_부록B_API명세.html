@@ -217,6 +217,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-explain"><span class="toc-method post">POST</span> /classify/explain</a>
     <a class="toc-item" href="#ep-confirm"><span class="toc-method post">POST</span> /confirm</a>
     <a class="toc-item" href="#ep-relabel"><span class="toc-method post">POST</span> /relabel</a>
+    <a class="toc-item" href="#ep-review-queue"><span class="toc-method get">GET</span> /review-queue</a>
     <a class="toc-item" href="#ep-training"><span class="toc-method post">POST</span> /train</a>
     <a class="toc-item" href="#ep-train-jobs"><span class="toc-method get">GET</span> /train/jobs</a>
     <a class="toc-item" href="#ep-answer"><span class="toc-method post">POST</span> /answer</a>
@@ -228,7 +229,9 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-promotions"><span class="toc-method get">GET</span> /promotions/pending</a>
     <a class="toc-item" href="#ep-schema-get"><span class="toc-method get">GET</span> /schema/grades</a>
     <a class="toc-item" href="#ep-schema-put"><span class="toc-method put" style="background:var(--put)">PUT</span> /schema/grades</a>
-    <a class="toc-item" href="#ep-keywords-get"><span class="toc-method" style="background:var(--text-faint)">NOTE</span> /admin/keywords (미구현)</a>
+    <a class="toc-item" href="#ep-keywords-get"><span class="toc-method get">GET</span> /admin/keywords</a>
+    <a class="toc-item" href="#ep-keywords-post"><span class="toc-method post">POST</span> /admin/keywords</a>
+    <a class="toc-item" href="#ep-keywords-patch"><span class="toc-method put" style="background:var(--put)">PATCH</span> /admin/keywords/{keyword_id}</a>
     <a class="toc-item" href="#ep-model-reload"><span class="toc-method post">POST</span> /admin/model/reload</a>
     <a class="toc-item" href="#ep-model-activate"><span class="toc-method post">POST</span> /admin/model/activate</a>
     <a class="toc-item" href="#ep-admin-status"><span class="toc-method get">GET</span> /admin/dashboard</a>
@@ -483,6 +486,9 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tbody>
             <tr><td class="f-name">confirmation_id</td><td>확정 레코드 PK (UUID)</td></tr>
             <tr><td class="f-name">confirmed_at</td><td>확정 시각 (ISO-8601)</td></tr>
+            <tr><td class="f-name">persisted</td><td>DB 영속 성공 여부 (false = DB 미가용·분류 미존재 → 감사-only, <strong>무음 성공 아님</strong>)</td></tr>
+            <tr><td class="f-name">warnings</td><td>경고 목록 (영속 실패·라우팅 사유 등)</td></tr>
+            <tr><td class="f-name">second_review_required</td><td>고등급 1인 동의 시 <strong>이중검토 보류</strong> 여부</td></tr>
           </tbody>
         </table>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 권한 부족</span><span class="sc s4xx">404 분류 없음</span></div>
@@ -520,6 +526,37 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           </tbody>
         </table>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 권한 부족</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-review-queue">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/v1/review-queue</span>
+        <span class="ep-summary">검수 승인 대기 목록 (서버측 FIFO) — FUN-024</span>
+        <span class="ep-auth">JWT (admin · reviewer · kl_backend)</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">자동 확정되지 않아 검수가 필요한(needs_review) 분류를 서버측에서 FIFO로 조회한다. admin 콘솔의 세션-only 큐가 못 보던 'DB에 쌓인 검수 대기'를 노출한다(FUN-024 검수자 큐 배분). DB 미가용 시 <code>items=[]</code>+<code>warnings</code>로 '빈 큐'와 '조회 실패'를 구분한다.</p>
+        <h4>Query Parameters</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">status</td><td class="f-type">string</td><td>pending(기본) · needs_review · needs_second_review · all</td></tr>
+            <tr><td class="f-name">limit / offset</td><td class="f-type">integer</td><td>페이지네이션</td></tr>
+          </tbody>
+        </table>
+        <h4>Response 200 — ReviewQueueResponse</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">items</td><td>ReviewQueueItem[] · [{classification_id, doc_id, filename, grade, confidence, model_version, status}]</td></tr>
+            <tr><td class="f-name">total</td><td>대기 총건수</td></tr>
+            <tr><td class="f-name">limit / offset</td><td>요청 페이지네이션 반영</td></tr>
+            <tr><td class="f-name">warnings</td><td>DB 미가용 등 (빈 큐와 구분)</td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin/reviewer/kl_backend 권한 필요</span></div>
       </div>
     </div>
 
@@ -801,13 +838,100 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 
     <div class="ep" id="ep-keywords-get">
       <div class="ep-header">
-        <span class="method" style="background:var(--text-faint)">NOTE</span>
+        <span class="method get">GET</span>
         <span class="ep-path">/api/v1/admin/keywords</span>
-        <span class="ep-summary">현재 미구현: 키워드·태깅 규칙 HTTP 관리</span>
+        <span class="ep-summary">태깅 키워드 목록 (등급·요소·활성 필터) — FUN-023</span>
+        <span class="ep-auth">JWT (admin·reviewer)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">현재 라우터에는 <code>/api/v1/admin/keywords</code> 조회·등록·수정·삭제 API가 없다(호출하지 말 것). 외부로 노출된 등급체계 계약은 <code>GET/PUT /api/v1/schema/grades</code>다.</p>
-        <div class="status-chips"><span class="sc s4xx">현재 OpenAPI에 없음</span><span class="sc s4xx">라우터 미구현</span></div>
+        <p class="ep-desc">DB <code>tb_level_keywords</code>의 태깅 키워드를 조회한다. 등급/평가요소/활성 필터 지원. 룰엔진이 런타임에 이 시드를 사용한다(FUN-023 태깅 규칙 관리).</p>
+        <h4>Query Parameters</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">grade</td><td class="f-type">string?</td><td>등급 코드 필터 (TS·S1·S2·S3)</td></tr>
+            <tr><td class="f-name">factor</td><td class="f-type">string?</td><td>평가요소 코드 필터 (SECRECY·VALUE·MANAGEMENT)</td></tr>
+            <tr><td class="f-name">active_only</td><td class="f-type">boolean</td><td>활성만 (기본 true)</td></tr>
+            <tr><td class="f-name">limit / offset</td><td class="f-type">integer</td><td>페이지네이션 (기본 500 / 0)</td></tr>
+          </tbody>
+        </table>
+        <h4>Response 200 — KeywordListResponse</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">keywords</td><td class="f-type">KeywordItem[]</td><td>[{keyword_id, grade, keyword, pattern_type, factor, weight, is_active}]</td></tr>
+            <tr><td class="f-name">count</td><td class="f-type">integer</td><td>반환 건수</td></tr>
+            <tr><td class="f-name">warnings</td><td class="f-type">string[]</td><td>DB 미가용 등 (빈 목록과 구분)</td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin/reviewer 권한 필요</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-keywords-post">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/admin/keywords</span>
+        <span class="ep-summary">태깅 키워드 추가 (룰엔진 핫리로드) — FUN-023</span>
+        <span class="ep-auth">JWT (admin role)</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">키워드를 추가하고 서빙 룰엔진을 <strong>재기동 없이 핫리로드</strong>한다. <strong>admin 역할만 허용</strong>. 등급·요소 코드는 활성 등급·요소로 해석(레거시 4요소는 정본 S·V·M으로 정규화). 삭제는 하드 삭제 대신 <code>PATCH is_active=false</code>(소프트 삭제).</p>
+        <h4>Request Body</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">grade</td><td class="f-type">string</td><td class="f-req yes">●</td><td>등급 코드 (활성 등급)</td></tr>
+            <tr><td class="f-name">keyword</td><td class="f-type">string</td><td class="f-req yes">●</td><td>키워드 (1~200자)</td></tr>
+            <tr><td class="f-name">pattern_type</td><td class="f-type">string</td><td class="f-req no">○</td><td>exact·regex·semantic (기본 exact)</td></tr>
+            <tr><td class="f-name">factor</td><td class="f-type">string?</td><td class="f-req no">○</td><td>평가요소 코드 (생략 시 NULL)</td></tr>
+            <tr><td class="f-name">weight</td><td class="f-type">number</td><td class="f-req no">○</td><td>가중치 (기본 1.0, 0~9.99)</td></tr>
+            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
+          </tbody>
+        </table>
+        <h4>Response 201 — KeywordMutationResponse</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">keyword_id</td><td class="f-type">integer</td><td>생성된 키워드 PK</td></tr>
+            <tr><td class="f-name">action</td><td class="f-type">string</td><td>created</td></tr>
+            <tr><td class="f-name">item</td><td class="f-type">KeywordItem</td><td>생성된 키워드</td></tr>
+            <tr><td class="f-name">serving_reloaded</td><td class="f-type">boolean</td><td>룰엔진 핫리로드 반영 여부</td></tr>
+            <tr><td class="f-name">seed_count</td><td class="f-type">integer | null</td><td>리로드 후 시드 수</td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">201 Created</span><span class="sc s4xx">400 등급 코드 미상·비활성</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s4xx">503 DB 미가용</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-keywords-patch">
+      <div class="ep-header">
+        <span class="method put" style="background:var(--put)">PATCH</span>
+        <span class="ep-path">/api/v1/admin/keywords/{keyword_id}</span>
+        <span class="ep-summary">태깅 키워드 수정·비활성 (룰엔진 핫리로드) — FUN-023</span>
+        <span class="ep-auth">JWT (admin role)</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">키워드를 부분 수정한다(제공된 필드만). <code>is_active=false</code>가 소프트 삭제(하드 삭제 없음 — FK RESTRICT·감사 보존). 변경 후 룰엔진 핫리로드. <strong>admin 역할만 허용</strong>.</p>
+        <h4>Request Body (부분 수정 — 제공 필드만)</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">keyword / pattern_type / factor / weight</td><td class="f-type">?</td><td class="f-req no">○</td><td>제공된 필드만 변경</td></tr>
+            <tr><td class="f-name">is_active</td><td class="f-type">boolean?</td><td class="f-req no">○</td><td>false = 비활성(소프트 삭제)</td></tr>
+            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
+          </tbody>
+        </table>
+        <h4>Response 200 — KeywordMutationResponse</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">action</td><td class="f-type">string</td><td>updated · deactivated</td></tr>
+            <tr><td class="f-name">item</td><td class="f-type">KeywordItem</td><td>변경 후 키워드</td></tr>
+            <tr><td class="f-name">serving_reloaded</td><td class="f-type">boolean</td><td>룰엔진 핫리로드 반영 여부</td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s4xx">404 keyword_id 없음</span><span class="sc s4xx">503 DB 미가용</span></div>
       </div>
     </div>
 
