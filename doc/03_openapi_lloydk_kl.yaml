@@ -1019,6 +1019,80 @@ paths:
               schema: { type: object, additionalProperties: true }
         '403': { description: "admin role required" }
 
+  /admin/keywords:
+    get:
+      tags: [admin]
+      summary: 태깅 키워드 목록 (등급·요소·활성 필터) — FUN-023
+      parameters:
+        - { name: grade, in: query, required: false, schema: { type: string } }
+        - { name: factor, in: query, required: false, schema: { type: string } }
+        - { name: active_only, in: query, required: false, schema: { type: boolean, default: true } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 500 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, default: 0 } }
+      responses:
+        '200':
+          description: 키워드 목록
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin/reviewer role required" }
+    post:
+      tags: [admin]
+      summary: 태깅 키워드 추가 (룰엔진 핫리로드) — FUN-023
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grade, keyword, actor]
+              properties:
+                grade: { type: string }
+                keyword: { type: string }
+                pattern_type: { type: string, enum: [exact, regex, semantic], default: exact }
+                factor: { type: string, nullable: true }
+                weight: { type: number, default: 1.0 }
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '201':
+          description: 추가 결과 (룰엔진 리로드 여부 포함)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { description: "unknown/inactive grade code" }
+        '403': { description: "admin role required" }
+        '503': { description: "db unavailable" }
+
+  /admin/keywords/{keyword_id}:
+    patch:
+      tags: [admin]
+      summary: 태깅 키워드 수정·비활성 (is_active=false=소프트 삭제, 룰엔진 핫리로드) — FUN-023
+      parameters:
+        - { name: keyword_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actor]
+              properties:
+                keyword: { type: string }
+                pattern_type: { type: string, enum: [exact, regex, semantic] }
+                factor: { type: string, nullable: true }
+                weight: { type: number }
+                is_active: { type: boolean }
+                actor: { $ref: '#/components/schemas/Actor' }
+      responses:
+        '200':
+          description: 수정·비활성 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+        '404': { description: "keyword_id not found" }
+        '503': { description: "db unavailable" }
+
   /answer:
     post:
       tags: [answer]

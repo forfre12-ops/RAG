@@ -113,6 +113,24 @@ class ClassifyService:
         logger.info("classify model reloaded: dir=%s version=%s loaded=%s", new_dir, version, loaded)
         return {"reloaded": True, "model_dir": new_dir, "model_version": version, "model_loaded": loaded}
 
+    def reload_rules(self) -> dict:
+        """서빙 룰 엔진을 DB(tb_level_keywords) 기준으로 재구성 — 키워드 CRUD 후 핫리로드 (FUN-023).
+
+        reload_model 과 달리 분류기 가중치는 건드리지 않고 룰 시드만 갱신(경량). 룰 엔진은
+        LabelingPipeline 생성 시 build_rule_engine_from_db() 로 한 번 만들어져 이 싱글턴에 캐시되므로,
+        태깅 변경을 재기동 없이 반영하려면 명시적 리로드가 필요하다. 다중 워커면 이 요청을 처리한
+        워커에만 즉시 반영된다(GradeRegistry.invalidate 와 동일 한계 — 나머지는 재기동/다음 리로드까지 stale).
+        반환: 재로드 여부·현재 시드 수.
+        """
+        from lloydk.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+            build_rule_engine_from_db,
+        )
+
+        self.inference.labeling.engine = build_rule_engine_from_db()
+        seed_count = len(getattr(self.inference.labeling.engine, "seeds", []) or [])
+        logger.info("classify rule engine reloaded from DB: seeds=%d", seed_count)
+        return {"reloaded": True, "seed_count": seed_count}
+
     # ------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------

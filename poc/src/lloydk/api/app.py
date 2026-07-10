@@ -31,6 +31,7 @@ from lloydk.api import async_classify as async_classify_api
 from lloydk.api import answer as answer_api
 from lloydk.api import prom_metrics as prom_metrics_api
 from lloydk.api import admin as admin_api
+from lloydk.api import keyword_admin as keyword_admin_api
 from lloydk.api.middleware import AuditMiddleware
 from lloydk.api._idempotency_mw import IdempotencyMiddleware
 from lloydk.api.prom_metrics import PrometheusMiddleware
@@ -378,6 +379,7 @@ app.include_router(
 app.include_router(metrics_api.router, prefix="/api/v1")
 app.include_router(prom_metrics_api.router, prefix="/api/v1")
 app.include_router(admin_api.router, prefix="/api/v1")
+app.include_router(keyword_admin_api.router, prefix="/api/v1")
 
 # 백그라운드 메트릭 refresh — TESTING=1 또는 pytest 환경이면 자동 skip.
 prom_metrics_api.register_background_refresh(app)
