@@ -148,7 +148,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>분류 모델</td><td>KF-DeBERTa (MIT) / KoELECTRA (Apache-2.0)</td><td>학습 가중치+보정값 동봉</td></tr>
       <tr><td>임베딩 모델</td><td>KURE-v1 (MIT) / BGE-M3 (MIT)</td><td>한국어 검색 — 가중치 사전 동봉</td></tr>
       <tr><td>로컬 LLM 모델</td><td>Qwen3-14B (Apache-2.0)</td><td>합성·요약 (onprem) — 가중치 사전 동봉</td></tr>
-      <tr><td>OCR (스캔 PDF)</td><td>Tesseract + 한국어 데이터(kor.traineddata) + poppler</td><td>시스템 바이너리 사전 반입 — 스캔 문서 텍스트 추출용</td></tr>
+      <tr><td>OCR (스캔 PDF)</td><td>Tesseract + 한국어 데이터(kor.traineddata) + poppler</td><td>시스템 바이너리 사전 반입 — 스캔 문서 텍스트 추출용(FUN-022 요건 외 부가 방어 · 미반입 시 스캔 PDF만 needs_review)</td></tr>
     </tbody>
   </table></div>
   <div class="callout"><div class="callout-label">모델·바이너리 사전 동봉 (중요)</div><p>폐쇄망에서는 런타임 다운로드가 불가하므로, <strong>분류기 학습 가중치+보정값(temperature), 임베딩(KURE-v1/BGE-M3), 로컬 LLM(Qwen3-14B), OCR 바이너리를 모두 반입 매체에 사전 동봉</strong>해야 한다. 베이스 모델만 넣으면 미학습·무보정으로 동작하고, 임베딩 모델이 빠지면 검색이 동작하지 않는다.</p></div>
