@@ -193,14 +193,19 @@ class RelabelResult:
 
 
 def _apply_dual_review_gate(
-    repo, cls, corrected_level_id: int, corrected_label: str, *, base_status: str, warns: list[str]
+    repo, cls, corrected_level_id: int, corrected_label: str, *,
+    base_status: str, warns: list[str], prior_status: str | None = None,
 ) -> tuple[str, bool]:
     """[C-cons] 고등급 변경 2인검토 게이트.
 
     settings.high_grade_dual_review=False(기본)면 base_status 그대로(동작 보존).
-    True이고 corrected_label이 고등급이면, 이 분류를 그 등급으로 교정한 **고유 검수자가 2인
-    이상**일 때만 확정(base_status), 아니면 'needs_second_review'로 보류. correction은 이미
-    기록된 뒤 호출되므로 현재 검수자가 집합에 포함된다.
+    True면 아래 두 경우에 **고유 검수자 2인 이상** 동의를 요구(아니면 'needs_second_review' 보류):
+      (1) corrected_label 이 고등급(TS/S1)인 상향, 그리고
+      (2) 대상 분류가 이미 needs_second_review 로 보류 중인 건의 '해제'(저등급 하향 포함).
+    (2)가 없으면 A가 S3→TS 로 보류시킨 건을 B 1인이 S3 confirm 으로 무게이트 해제하는 비대칭
+    우회가 생긴다(상향엔 2인·하향 해제엔 1인). prior_status 는 이 트랜잭션에서 status 를 덮어쓰기
+    **전**의 원래 값이어야 한다(confirm 은 게이트 전에 'confirmed'로 세팅하므로 반드시 전달).
+    correction 은 이미 기록된 뒤 호출되므로 현재 검수자가 집합에 포함된다.
 
     반환: (적용할 status, second_review_required).
     """
@@ -208,7 +213,8 @@ def _apply_dual_review_gate(
     if not getattr(settings, "high_grade_dual_review", False):
         return base_status, False
     high_codes = set(getattr(settings, "high_grade_review_codes", ["TS", "S1"]))
-    if corrected_label not in high_codes:
+    held = prior_status == "needs_second_review"
+    if corrected_label not in high_codes and not held:
         return base_status, False
     reviewers = repo.distinct_reviewers_for_level(cls.classification_id, corrected_level_id)
     # [C-cons 신뢰도 배선] min_reliability>0이면 저신뢰 검수자 동의는 정족수에서 제외.
@@ -233,8 +239,9 @@ def _apply_dual_review_gate(
             f"dual-review satisfied: {len(reviewers)} distinct reviewers agree on {corrected_label}"
         )
         return base_status, False
+    kind = "high-grade change" if corrected_label in high_codes else "resolving a held review"
     warns.append(
-        f"high-grade change to {corrected_label} needs a second distinct reviewer "
+        f"{kind} to {corrected_label} needs a second distinct reviewer "
         f"({len(reviewers)}/2) — held as needs_second_review"
     )
     return "needs_second_review", True
@@ -281,6 +288,8 @@ class ConfirmService:
                     warns.append("classification not found in DB — confirmation recorded in audit only")
                     return ConfirmResult(new_id, confirmed_at, persisted=False, warnings=warns)
 
+                # 게이트가 원래 status(needs_second_review 보류 여부)를 볼 수 있도록 덮어쓰기 전에 포착.
+                prior_status = cls.status
                 # status 갱신
                 cls.status = "confirmed"
 
@@ -315,7 +324,8 @@ class ConfirmService:
                     _record_live_fnr(cls.predicted_level_id, target_level_id)
                 # [C-cons] 고등급 확정도 2인검토 통과 전까지 보류(기본 off → 'confirmed' 그대로).
                 status, second_required = _apply_dual_review_gate(
-                    repo, cls, target_level_id, req.confirmed_label, base_status="confirmed", warns=warns
+                    repo, cls, target_level_id, req.confirmed_label,
+                    base_status="confirmed", warns=warns, prior_status=prior_status,
                 )
                 cls.status = status
                 logger.info(
@@ -380,8 +390,10 @@ class RelabelService:
                     # 정답 확정(신규 교정 1건) — 예측(predicted_level_id) 대비 확정등급으로 FNR 배선.
                     _record_live_fnr(cls.predicted_level_id, corr_id)
                 # [C-cons] 고등급 변경은 2인검토 통과 전까지 needs_second_review로 보류(기본 off).
+                # relabel 은 게이트 전에 status 를 바꾸지 않으므로 cls.status 가 곧 prior_status.
                 status, second_required = _apply_dual_review_gate(
-                    repo, cls, corr_id, req.corrected_label, base_status="corrected", warns=warns
+                    repo, cls, corr_id, req.corrected_label, base_status="corrected",
+                    warns=warns, prior_status=cls.status,
                 )
                 cls.status = status
 
