@@ -197,3 +197,50 @@ def test_signoff_html_renders(tmp_path):
     assert r.text.startswith("<!doctype html>")
     assert "서명 제출" in r.text and "ts문서 본문" in r.text
     assert f"/api/v1/golden/jobs/{job_id}/signoff" in r.text  # POST url 배선
+
+
+def test_signoff_html_escapes_script_breakout(tmp_path):
+    # 문서 본문의 리터럴 </script> 가 data 스크립트 블록을 조기 종료시키지 못해야 함(저장형 XSS 차단).
+    payload = "ts문서 </script><script>window.__pwned=1</script>"
+    job_id = _make_job(tmp_path, [{"doc_id": "a", "text": payload}])
+    r = client.get(f"{API}/golden/jobs/{job_id}/signoff.html", headers=_h(role="reviewer"))
+    assert r.status_code == 200, r.text
+    # 임베드된 JSON 안에 리터럴 </script> 가 있으면 안 됨(유니코드 이스케이프로 치환).
+    assert "</script><script>window.__pwned" not in r.text
+    assert "\\u003c/script\\u003e" in r.text  # breakout 페이로드가 이스케이프됨
+
+
+def test_change_without_grade_rejected_422(tmp_path):
+    # decision=change 인데 grade 미지정 → 스키마 validator 가 422 로 거부(조용한 no_signoff 방지).
+    job_id = _make_job(tmp_path, [{"doc_id": "a", "text": "ts문서"}])
+    r = client.post(
+        f"{API}/golden/jobs/{job_id}/signoff",
+        headers=_h(role="reviewer"),
+        json={
+            "decisions": [{"doc_id": "a", "decision": "change"}],  # grade 없음
+            "actor": {"user_id": "reviewer_kim", "role": "reviewer"},
+        },
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_run_scoped_audit_accumulates_across_sessions(tmp_path):
+    # 같은 잡을 여러 세션에 나눠 서명해도 run-스코프 감사 파일이 덮어써지지 않고 누적돼야 함.
+    import uuid as _uuid
+
+    job_id = _make_job(tmp_path, [
+        {"doc_id": "a", "text": "ts문서"}, {"doc_id": "b", "text": "s1문서"},
+    ])
+    svc = GoldenBuildService()
+    svc.apply_signoff(
+        _uuid.UUID(job_id), [GoldenSignoffDecision(doc_id="a", decision="approve")], reviewer_id="r1",
+    )
+    svc.apply_signoff(
+        _uuid.UUID(job_id), [GoldenSignoffDecision(doc_id="b", decision="approve")], reviewer_id="r1",
+    )
+    rows = [
+        json.loads(ln)
+        for ln in (tmp_path / f"locked_{job_id}.jsonl").read_text(encoding="utf-8").splitlines()
+        if ln.strip()
+    ]
+    assert {r["doc_id"] for r in rows} == {"a", "b"}  # 세션2가 세션1을 덮어쓰지 않음

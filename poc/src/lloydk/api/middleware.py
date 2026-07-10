@@ -62,7 +62,7 @@ def _skip_best_effort_audit_db(request: Request) -> bool:
         return False
     if not hasattr(request, "scope"):
         return False
-    if _is_high_risk(request):
+    if _is_high_risk(request) and _fail_closed_enabled():
         return False
     try:
         from lloydk.db import database_reachable_fast  # noqa: PLC0415

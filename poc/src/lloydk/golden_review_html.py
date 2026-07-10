@@ -67,6 +67,22 @@ def _display_records(records: Sequence[dict]) -> list[dict]:
     return out
 
 
+def _embed_json(data: object) -> str:
+    """<script> 블록 임베드용 JSON 직렬화 — </script> breakout·HTML 컨텍스트 탈출 차단.
+
+    json.dumps 는 <, >, & 를 이스케이프하지 않으므로, 후보 문서 본문(text)·doc_id 에 리터럴
+    </script> 가 있으면 <script id="data" type="application/json"> 블록이 그 지점에서 조기
+    종료돼 뒤 문자열이 실행 컨텍스트로 새는 저장형 XSS 가 된다(2026-07 적대 리뷰). <,>,& 를
+    유니코드 이스케이프로 치환 — JSON.parse 가 원문을 무손실 복원하므로 데이터는 그대로다.
+    """
+    return (
+        json.dumps(data, ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+
+
 def render_review_html(
     records: Sequence[dict],
     *,
@@ -88,7 +104,7 @@ def render_review_html(
         .replace("__TOTAL__", str(len(data)))
         .replace("__GOLD__", str(n_gold))
         .replace("__UNCERTAIN__", str(len(data) - n_gold))
-        .replace("__DATA__", json.dumps(data, ensure_ascii=False))
+        .replace("__DATA__", _embed_json(data))
     )
 
 
@@ -153,7 +169,7 @@ def render_signoff_html(
         .replace("__JOB__", _html.escape(job_id))
         .replace("__POST_URL__", _html.escape(post_url))
         .replace("__TOTAL__", str(len(data)))
-        .replace("__DATA__", json.dumps(data, ensure_ascii=False))
+        .replace("__DATA__", _embed_json(data))
     )
 
 
@@ -237,7 +253,8 @@ const DATA=JSON.parse(document.getElementById('data').textContent);
 const POST_URL="__POST_URL__";
 const DEC={};       // id -> {decision, grade, note}
 let g='all',q='';
-function esc(t){const d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;}
+// 텍스트+속성(name=/data-id=/value=) 양쪽에 쓰이므로 따옴표도 이스케이프(속성 컨텍스트 주입 차단).
+function esc(t){const d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function gopts(sel){return ['TS','S1','S2','S3'].map(x=>'<option value="'+x+'"'+(x===sel?' selected':'')+'>'+x+'</option>').join('');}
 function card(r){
   const d=DEC[r.id]||{};

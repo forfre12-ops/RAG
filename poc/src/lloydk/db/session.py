@@ -42,7 +42,7 @@ def _engine_connect_args() -> dict:
     return {}
 
 
-def database_reachable_fast(timeout: float = 0.2) -> bool:
+def database_reachable_fast(timeout: float = 0.05) -> bool:
     """Return whether the configured PostgreSQL endpoint accepts TCP quickly.
 
     This is intentionally a shallow preflight for optional/best-effort DB paths
