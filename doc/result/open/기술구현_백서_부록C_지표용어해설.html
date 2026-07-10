@@ -294,7 +294,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td><b>하이브리드 검색 (BM25+dense)</b></td><td>어휘+의미 결합</td><td>희소(어휘)와 밀집(의미)을 합쳐 서로의 약점을 보완한다. 우리 = <code>dense(pgvector) + ts_rank</code>를 RRF로 융합. 실측 <b>하이브리드 ≈85% &gt; dense 단독 ≈76%</b>(의사결정_대장 §03).</td></tr>
           <tr><td><b>RRF (상호순위융합)</b></td><td>순위 역수로 결과 합치기</td><td>Reciprocal Rank Fusion. 여러 검색결과를 <b>순위의 역수</b>(<code>1/(k+순위)</code>)로 합산해 하나로 융합한다. 점수 스케일이 달라도 순위로 정규화해 섞을 수 있다. 우리 상수 <b>k=60</b>(Cormack 2009 표준 · <code>_RRF_K</code>).</td></tr>
           <tr><td><b>reranker (재정렬)</b></td><td>상위 후보를 정밀 재채점</td><td>1차 검색 상위 N건을 더 무거운 <b>cross-encoder</b> 모델로 다시 채점해 재정렬한다. 모델 = <code>BAAI/bge-reranker-v2-m3</code>. <b>⚠ 우리 코퍼스 실측 효과는 약 +1%p로 사실상 무용</b>이라 기본값은 비활성(<code>noop</code>)이다.</td></tr>
-          <tr><td><b>OCR (광학 문자 인식)</b></td><td>스캔본에서 글자 추출</td><td>Optical Character Recognition. 스캔 이미지·PDF에서 텍스트를 추출한다. <code>Tesseract</code>(한국어 데이터)+<code>poppler</code>를 쓰며 폐쇄망 번들에 동봉한다. 문서 추출 파이프라인의 한 단계(검색·분류 입력 전처리).</td></tr>
+          <tr><td><b>OCR (광학 문자 인식)</b></td><td>스캔본에서 글자 추출</td><td>Optical Character Recognition. 스캔 이미지·PDF에서 텍스트를 추출한다. <code>Tesseract</code>(한국어 데이터)+<code>poppler</code>를 쓰며 폐쇄망 번들에 동봉한다. 스캔/이미지 PDF 대응 <b>부가 단계</b>(FUN-022 요건은 전자문서 추출 — OCR은 요건 외; 전자문서는 OCR 불요).</td></tr>
         </tbody>
       </table>
     </div>
