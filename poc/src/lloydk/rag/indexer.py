@@ -242,13 +242,13 @@ def _safe_token(value: str) -> str:
     safe = _TOKEN_RE.sub("-", lower)
     safe = safe.strip("-._")
     if not safe:
-        safe = hashlib.sha1(value.encode("utf-8")).hexdigest()[:8]
+        safe = hashlib.sha1(value.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
     # #37 (인덱스명 충돌): 50자 truncation이 실제로 일어나면 앞 50자가 같은
     #      서로 다른 model/version이 같은 인덱스/alias로 붕괴할 수 있다. truncation이
     #      발생한 경우에 한해 원본(value)의 짧은 해시 suffix를 부착해 항상 유일성을
     #      보장한다. (truncation이 없으면 suffix 미부착 — 기존 인덱스명 그대로 보존, 비파괴.)
     if len(safe) > _TOKEN_MAX_LEN:
-        suffix = hashlib.sha1(value.encode("utf-8")).hexdigest()[:_HASH_SUFFIX_LEN]
+        suffix = hashlib.sha1(value.encode("utf-8"), usedforsecurity=False).hexdigest()[:_HASH_SUFFIX_LEN]
         head_len = _TOKEN_MAX_LEN - _HASH_SUFFIX_LEN - 1  # "-" 1자 확보
         head = safe[:head_len].strip("-._")
         return f"{head}-{suffix}"

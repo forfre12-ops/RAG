@@ -35,7 +35,7 @@ def normalize_text(text: object, *, keep_spaces: bool = False, lower: bool = Fal
 def text_hash(text: object, *, keep_spaces: bool = False, lower: bool = False) -> str:
     """정규화 본문의 SHA1 hex. 누출/중복 탐지 키(raw 해시보다 강함 — 공백차이도 동일시)."""
     norm = normalize_text(text, keep_spaces=keep_spaces, lower=lower)
-    return hashlib.sha1(norm.encode("utf-8")).hexdigest()
+    return hashlib.sha1(norm.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def find_leaked(

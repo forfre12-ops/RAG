@@ -33,8 +33,8 @@ def _hash_key(text: str, model: str | None = None) -> str:
     돌려받던 사고)을 차단한다.
     """
     if model:
-        return hashlib.sha1(f"{model}\x1f{text}".encode("utf-8")).hexdigest()
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+        return hashlib.sha1(f"{model}\x1f{text}".encode("utf-8"), usedforsecurity=False).hexdigest()
+    return hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _resolve_cache_size(explicit: int | None) -> int:

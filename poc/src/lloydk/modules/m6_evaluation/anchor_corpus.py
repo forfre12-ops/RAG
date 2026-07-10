@@ -92,7 +92,7 @@ class AnchorRecord:
 
 
 def _stable_id(*parts: str) -> str:
-    h = hashlib.sha1("".join(parts).encode("utf-8")).hexdigest()
+    h = hashlib.sha1("".join(parts).encode("utf-8"), usedforsecurity=False).hexdigest()
     return h[:16]
 
 
