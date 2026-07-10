@@ -668,7 +668,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc"><strong>KL 자료등록(FUN-001)이 받은 원본 파일</strong>(HWP/PDF/DOCX/TXT)을 이 엔드포인트로 전달하면, Lloydk가 <strong>추출·정규화·PII 마스킹·청킹(FUN-022)</strong>을 수행해 <code>tb_chunks</code>를 생성한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출(필요 시 OCR) → 정규화·마스킹 → 청킹. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정.</p>
+        <p class="ep-desc"><strong>KL 자료등록(FUN-001)이 받은 원본 파일</strong>(HWP/PDF/DOCX/TXT)을 이 엔드포인트로 전달하면, Lloydk가 <strong>추출·정규화·PII 마스킹·청킹(FUN-022)</strong>을 수행해 <code>tb_chunks</code>를 생성한다. <code>multipart/form-data</code>. 포맷 자동 감지 → 텍스트 추출 → 정규화·마스킹 → 청킹. 이후 <code>POST /classify?doc_id=...</code>로 등급 판정. <em>(FUN-022 요건은 <b>전자문서</b>(HWP/DOCX/PDF) 텍스트 추출이며, 스캔/이미지 PDF의 OCR은 요건 외 부가 방어 — 열화 추출 시 needs_review 라우팅.)</em></p>
         <p style="font-size:12.5px;color:var(--text-dim);">※ 현재 소스 기준 Lloydk가 업로드 파일을 추출·정규화하고 <code>tb_documents</code>와 <code>tb_chunks</code>에 저장한다. KL 원천 문서/EDMS 키는 <code>external_ref</code>와 메타데이터로 연결하는 외부 참조다.</p>
         <p style="font-size:12.5px;color:var(--text-dim);">KL 자료등록이 고객사 입력 <strong>메타데이터(보안표시·접근범위·출처, 아래 굵게)</strong>를 함께 전달하면, 등급 판정(FUN-024)의 메타데이터 기반 격리 판단에 사용된다. 이 메타데이터와 원본/정규화 URI는 문서 레코드에 함께 보존된다.</p>
         <h4>Request (multipart/form-data)</h4>
