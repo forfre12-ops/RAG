@@ -97,8 +97,8 @@ def main() -> int:
         r = run_stage(stage, args.dry_run, cmd)
         results.append(r)
         print(f"[{r['status']}] {stage}  {r['elapsed_sec']}s")
-        if r["status"] == "FAIL" and stage not in ("teardown",):
-            print(f"[stop] {stage} failed — aborting drill (run teardown still)", file=sys.stderr)
+        if r["status"] in ("FAIL", "ERROR") and stage not in ("teardown",):
+            print(f"[stop] {stage} {r['status']} — aborting drill (run teardown still)", file=sys.stderr)
             # teardown은 강제 실행
             if stage != "teardown":
                 t_cmd = cmds.get("teardown")
@@ -106,19 +106,30 @@ def main() -> int:
             break
 
     total_elapsed = time.time() - overall_start
+    within_rto = total_elapsed <= args.rto_seconds
+    # DR 판정: 어떤 단계라도 FAIL/ERROR 면 실패. 과거엔 within_rto 만 봐서, 복원이 실패해도
+    # 조기 abort 로 경과시간이 짧으면 exit 0(fake-green)이었다. teardown 실패는 판정에서 제외.
+    stage_failures = [
+        r["stage"] for r in results
+        if r["status"] in ("FAIL", "ERROR") and r["stage"] != "teardown"
+    ]
+    passed = within_rto and not stage_failures
     report = {
         "ts": _now(),
         "dry_run": args.dry_run,
         "rto_target_sec": args.rto_seconds,
         "total_elapsed_sec": round(total_elapsed, 2),
-        "within_rto": total_elapsed <= args.rto_seconds,
+        "within_rto": within_rto,
+        "stage_failures": stage_failures,
+        "passed": passed,
         "stages": results,
     }
     args.report_out.parent.mkdir(parents=True, exist_ok=True)
     args.report_out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nReport: {args.report_out}")
-    print(f"Total: {total_elapsed:.1f}s  RTO {args.rto_seconds}s  within={report['within_rto']}")
-    return 0 if report["within_rto"] else 2
+    print(f"Total: {total_elapsed:.1f}s  RTO {args.rto_seconds}s  within={within_rto}  "
+          f"failures={stage_failures or 'none'}  -> {'PASS' if passed else 'FAIL'}")
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":
