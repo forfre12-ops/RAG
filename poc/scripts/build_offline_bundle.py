@@ -924,6 +924,16 @@ def _copy_infra(out_dir: Path) -> None:
         if src.exists():
             shutil.copy2(src, dst)
 
+    # mTLS 종료 nginx 설정(opt-in `--profile mtls`). airgap/base compose 의 nginx-mtls 가
+    # `./mtls/nginx.mtls.conf` 를 마운트하므로 번들 infra-config/mtls/ 에 실제 파일이 있어야
+    # 한다(과거 미동봉 → 마운트 소스 부재로 디렉토리 오생성·nginx 기동 실패). certs/ 는
+    # 환경별 PKI 라 번들 제외 — 운영자가 infra-config/mtls/certs/ 에 배치(conf 헤더 절차 참조).
+    mtls_conf_src = _REPO_ROOT / "infra" / "mtls" / "nginx.mtls.conf"
+    if mtls_conf_src.exists():
+        mtls_dst_dir = infra / "mtls"
+        mtls_dst_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(mtls_conf_src, mtls_dst_dir / "nginx.mtls.conf")
+
     # docs — 절차서 (manifest files_expected 의 docs/{INSTALL,OPERATION,TROUBLESHOOTING}.md 충족)
     docs_dst = out_dir / "docs"
     docs_dst.mkdir(parents=True, exist_ok=True)
@@ -1032,7 +1042,11 @@ def _copy_infra(out_dir: Path) -> None:
         "set -euo pipefail\n"
         "echo '=== Bundle Verify ==='\n"
         "cd \"$(dirname \"$0\")\"\n"
-        "sha256sum -c CHECKSUMS.sha256 && echo 'Checksums OK' || echo 'CHECKSUM MISMATCH'\n",
+        # 체크섬 불일치 = 반입 매체 손상/변조 → 반드시 비정상 종료(exit 1).
+        # 과거 `... || echo MISMATCH` 는 실패를 삼켜 항상 exit 0 이었고, deploy_airgap.sh 의
+        # `bash verify.sh || die` 가 죽은 코드가 되어 손상 매체로도 배포가 진행됐다(fake-green).
+        "sha256sum -c CHECKSUMS.sha256 || { echo 'CHECKSUM MISMATCH — 반입 매체 손상/변조. 배포 중단.' >&2; exit 1; }\n"
+        "echo 'Checksums OK'\n",
         encoding="utf-8",
     )
     verify_sh.chmod(0o755)

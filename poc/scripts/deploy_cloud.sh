@@ -58,7 +58,7 @@ if [ ! -f "$ENV_FILE" ]; then
   [ "${NO_AUTO_ENV:-0}" = "1" ] && die "env 없음: $ENV_FILE (NO_AUTO_ENV=1) — cp .env.lite-cloud $ENV_FILE 후 실값 입력"
   log "env 자동 생성 (테스트서버용 · $ENV_FILE)"
   _gen() { openssl rand -hex "$1" 2>/dev/null || { tr -dc 'a-f0-9' </dev/urandom | head -c "$(( $1 * 2 ))"; echo; }; }
-  _api="$(_gen 24)"; _audit="$(_gen 32)"
+  _api="$(_gen 24)"; _audit="$(_gen 32)"; _pgpw="$(_gen 16)"
   _model_line='# CLASSIFIER_MODEL_DIR 미설정 → 룰 기반 분류(모델 없이도 파싱·등급 E2E 동작)'
   [ -d "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9" ] \
     && _model_line='CLASSIFIER_MODEL_DIR=/app/artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9'
@@ -71,6 +71,13 @@ LLOYDK_AUDIT_CHAIN_SECRET=$_audit
 # 저장소=로컬FS → minio 불요(무설정). 업로드 문서는 컨테이너 볼륨에 저장.
 STORAGE_BACKEND=local
 VECTOR_BACKEND=pg
+# 인프라 연결 — 반드시 compose 서비스명(postgres/redis). 컨테이너 안에서 localhost 는
+# '자기 자신'이라 DB/Redis 에 못 붙는다. prod overlay 가 base 의 DATABASE_URL/REDIS_URL 을
+# !override 로 제거하므로(worker/beat 는 아예 빈 environment) 이 env 값이 유일한 연결 소스다.
+# POSTGRES_PASSWORD 는 postgres 컨테이너 초기화값이자 DATABASE_URL 의 비밀번호와 일치해야 한다.
+POSTGRES_PASSWORD=$_pgpw
+DATABASE_URL=postgresql+psycopg://lloydk:$_pgpw@postgres:5432/lloydk
+REDIS_URL=redis://redis:6379/0
 # CORS: 데모 콘솔은 same-origin이라 무관. 타 머신 브라우저 직접 접근 시 실 origin으로.
 ALLOWED_ORIGIN=http://localhost:$API_PORT
 EMBEDDING_MODEL=nlpai-lab/KURE-v1
