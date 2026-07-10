@@ -154,6 +154,12 @@ KPIS: list[KPI] = [
     # dryrun(TestClient + Python GIL)에서는 진정한 병렬이 불가능 → 0.15가 현실
     # full(uvicorn workers)에서는 ≥ 0.5 도달 가능, 합격선 별도 상향 검토 필요
     KPI("S11.5", "S11", "단계 확장성 (scaling efficiency)", "ratio", "ge", 0.15, "last"),
+    # PER-002 자원 사용률 상한 — 부하 중 시스템 사용률 피크(max)가 임계 미만이어야 한다.
+    # CPU<90%·MEM<70% (RFP 협의 조절 가능). psutil 부재/미측정이면 harness 가 SKIP 처리
+    # (무데이터 false-PASS 아님). dryrun(TestClient)에선 부하가 가벼워 낮게 측정 — 실 판정은
+    # full 모드(테스트서버 uvicorn workers) 실측치가 근거.
+    KPI("S11.6", "S11", "CPU 사용률 peak (PER-002)", "%", "le", 90, "max", core=True),
+    KPI("S11.7", "S11", "MEM 사용률 peak (PER-002)", "%", "le", 70, "max", core=True),
 
     # S13(멀티 테넌트 격리) 제거: 격리는 KL 포털 전담 — 단일 고객사 엔진이라 시나리오·KPI 불요.
 

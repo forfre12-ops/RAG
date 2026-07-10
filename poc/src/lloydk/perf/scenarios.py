@@ -712,6 +712,28 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
 
     rss_before = _rss_mb()
 
+    # PER-002: 부하 중 **시스템 전체** CPU%/MEM% 사용률 피크 샘플러(백그라운드).
+    # 시스템 전체 기준 = 발주처 제공 전용 서버의 자원 상한(CPU<90%·MEM<70%) 판정에 정합.
+    # 주의: 공유 개발머신 dryrun 에선 타 프로세스 부하가 섞여 CPU 가 높게 나올 수 있다 —
+    # 실 판정은 전용 테스트서버 full 모드 실측치가 근거. psutil 부재 시 무샘플 → harness SKIP.
+    _res_stop = threading.Event()
+    _cpu_samples: list[float] = []
+    _mem_samples: list[float] = []
+
+    def _res_sampler() -> None:
+        try:
+            import psutil  # noqa: PLC0415
+            psutil.cpu_percent(interval=None)  # prime — 첫 호출 0.0 은 버림
+            while not _res_stop.is_set():
+                _cpu_samples.append(float(psutil.cpu_percent(interval=None)))
+                _mem_samples.append(float(psutil.virtual_memory().percent))
+                _res_stop.wait(0.05)  # 50ms — 짧은 부하에서도 다표본 확보(peak 해상도)
+        except Exception:  # noqa: BLE001
+            return
+
+    _sampler = threading.Thread(target=_res_sampler, daemon=True)
+    _sampler.start()
+
     # 단계 — full은 더 큰 부하
     stages = [50, 100, 200] if ctx.mode == "full" else [20, 50, 100]
     per_worker = 5
@@ -772,6 +794,10 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
             total_errors += errors_state[0]
             total_requests += stage_total
 
+    # 부하 종료 — 사용률 샘플러 정지 후 피크 기록.
+    _res_stop.set()
+    _sampler.join(timeout=2)
+
     error_rate = total_errors / total_requests if total_requests else 1.0
     throughput_max = max(stage_throughputs) if stage_throughputs else 0.0
 
@@ -779,6 +805,12 @@ def s11_concurrent_stress(ctx: ScenarioContext) -> None:
     for lat in all_latencies:
         ctx.record("s11_2", lat)
     ctx.record("s11_3", throughput_max)
+
+    # S11.6/S11.7 PER-002 자원 사용률 peak (samples 있을 때만 — 없으면 harness SKIP)
+    if _cpu_samples:
+        ctx.record("s11_6", max(_cpu_samples))
+    if _mem_samples:
+        ctx.record("s11_7", max(_mem_samples))
 
     # S11.4 메모리 누수 — 전·후 RSS 차분
     rss_after = _rss_mb()
