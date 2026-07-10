@@ -1,4 +1,4 @@
-"""KEYWORD_SEEDS를 DB `level_keywords` 테이블에 시드.
+"""KEYWORD_SEEDS를 DB `tb_level_keywords` 테이블에 시드.
 
 DB 연결 안 되면 JSON 파일로 dump (수동 적재용).
 """
@@ -35,11 +35,13 @@ def to_db() -> int:
     try:
         engine = create_engine(settings.database_url, pool_pre_ping=True)
         with engine.begin() as conn:
+            # 실 스키마는 tb_ 접두(db/models.py·alembic baseline). 무접두는 존재하지 않아
+            # seed --db 가 UndefinedTable 로 조용히 exit 2 하던 잠복 버그 — ORM 테이블명과 정합.
             level_map = dict(
-                conn.execute(text("SELECT level_code, level_id FROM classification_levels")).all()
+                conn.execute(text("SELECT level_code, level_id FROM tb_classification_levels")).all()
             )
             factor_map = dict(
-                conn.execute(text("SELECT factor_code, factor_id FROM evaluation_factors")).all()
+                conn.execute(text("SELECT factor_code, factor_id FROM tb_evaluation_factors")).all()
             )
 
             inserted = 0
@@ -52,7 +54,7 @@ def to_db() -> int:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO level_keywords (level_id, keyword, pattern_type, factor_id, weight, source)
+                        INSERT INTO tb_level_keywords (level_id, keyword, pattern_type, factor_id, weight, source)
                         VALUES (:level_id, :keyword, :pattern_type, :factor_id, :weight, 'seed_v1')
                         """
                     ),
