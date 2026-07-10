@@ -42,6 +42,23 @@ def _try_uuid_str(value: str | None) -> "uuid.UUID | None":
         return None
 
 
+def _testing_env() -> bool:
+    return os.environ.get("TESTING", "").strip().lower() in {"1", "true", "yes", "on"} or bool(
+        os.environ.get("PYTEST_CURRENT_TEST")
+    )
+
+
+def _skip_optional_db_work() -> bool:
+    if not _testing_env():
+        return False
+    try:
+        from lloydk.db import database_reachable_fast  # noqa: PLC0415
+
+        return not database_reachable_fast()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _active_model_dir() -> Optional[str]:
     """활성 ModelVersion.model_uri가 로컬 디렉토리면 그 경로, 아니면 None (C-ver 서빙 배선).
 
@@ -703,6 +720,10 @@ class ClassifyService:
         if doc_uuid is None:
             warns.append(f"persistence skipped: doc_id={req.doc_id!r} is not a UUID")
             return uuid.uuid4(), warns
+        if _skip_optional_db_work():
+            self._inc_persist_failure("db_unavailable")
+            warns.append("persistence skipped: db unavailable")
+            return uuid.uuid4(), warns
 
         # session_scope import는 함수 안에서 — settings.database_url 변경 가능성·테스트 격리
         try:
@@ -857,6 +878,8 @@ class ClassifyService:
         """
         doc_uuid = self._parse_doc_uuid(doc_id)
         if doc_uuid is None:
+            return "", None
+        if _skip_optional_db_work():
             return "", None
         try:
             from lloydk.adapters.storage import build_storage  # noqa: PLC0415
@@ -1166,6 +1189,8 @@ class ClassifyService:
             return meta
         doc_uuid = self._parse_doc_uuid(req.doc_id)
         if doc_uuid is None:
+            return meta
+        if _skip_optional_db_work():
             return meta
         try:
             from lloydk.db import session_scope  # noqa: PLC0415

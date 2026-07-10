@@ -116,7 +116,7 @@ def run_http(base_url: str, api_key: str, pack_dir: Path, docs: list[dict]) -> l
                 elapsed = round((time.perf_counter() - t0) * 1000)
                 if r.status_code != 200:
                     # 고등급 문서의 비-200 = 운영 미탐과 동치(serving_eval 규율): pred=None → under.
-                    j = judge_doc(d["expected_grade"], d["expected_numeric_tokens"], False,
+                    j = judge_doc(d["expected_grade"], [], False,
                                   "", None, f"http_{r.status_code}")
                     results.append({**d, **j, "method": "HTTP_FAIL", "table_coverage": None,
                                     "warnings": [r.text[:120]], "elapsed_ms": elapsed})
@@ -129,13 +129,14 @@ def run_http(base_url: str, api_key: str, pack_dir: Path, docs: list[dict]) -> l
                 text = body.get("text_preview", "") or ""
                 parse_ok = (not parse.get("extract_error")) and float(parse.get("extraction_quality") or 0) > 0
                 pred = cls.get("label")
-                j = judge_doc(d["expected_grade"], d["expected_numeric_tokens"], parse_ok, text, pred, cls.get("status", "?"))
+                j = judge_doc(d["expected_grade"], [], parse_ok, text, pred, cls.get("status", "?"))
                 results.append({**d, **j, "method": parse.get("extraction_method", "?"),
                                 "table_coverage": parse.get("table_coverage"),
-                                "warnings": list(parse.get("warnings") or []) + list(cls.get("warnings") or []),
+                                "warnings": list(parse.get("warnings") or []) + list(cls.get("warnings") or [])
+                                + ["numeric_check_inproc_only:http_text_preview"],
                                 "elapsed_ms": cls.get("elapsed_ms") or elapsed})
             except Exception as e:  # noqa: BLE001
-                j = judge_doc(d["expected_grade"], d["expected_numeric_tokens"], False, "", None, "http_error")
+                j = judge_doc(d["expected_grade"], [], False, "", None, "http_error")
                 results.append({**d, **j, "method": "HTTP_ERR", "table_coverage": None,
                                 "warnings": [f"{type(e).__name__}: {e}"], "elapsed_ms": None})
     return results

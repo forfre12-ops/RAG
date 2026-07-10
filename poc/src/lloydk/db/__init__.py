@@ -8,7 +8,14 @@ import side-effects:
   PG 16 제약에 대한 application-level 안전망.
 """
 
-from lloydk.db.session import Base, engine, SessionLocal, get_session, session_scope
+from lloydk.db.session import (
+    Base,
+    engine,
+    SessionLocal,
+    database_reachable_fast,
+    get_session,
+    session_scope,
+)
 from lloydk.db.listeners import register_listeners
 
 # 임포트 시점에 Document→Chunk cascade 이벤트 등록 (멱등 — 데코레이터 1회).
@@ -18,6 +25,7 @@ __all__ = [
     "Base",
     "engine",
     "SessionLocal",
+    "database_reachable_fast",
     "get_session",
     "session_scope",
     "register_listeners",

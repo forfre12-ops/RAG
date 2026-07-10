@@ -10,10 +10,12 @@
 from __future__ import annotations
 
 import logging
+import socket
 from contextlib import contextmanager
 from typing import Iterator
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from lloydk.config import settings
@@ -38,6 +40,30 @@ def _engine_connect_args() -> dict:
     if url.startswith("postgresql") and timeout > 0:
         return {"connect_timeout": timeout}
     return {}
+
+
+def database_reachable_fast(timeout: float = 0.2) -> bool:
+    """Return whether the configured PostgreSQL endpoint accepts TCP quickly.
+
+    This is intentionally a shallow preflight for optional/best-effort DB paths
+    in local tests. It does not validate credentials or schema; real DB work is
+    still performed by SQLAlchemy when the endpoint is reachable.
+    """
+    url = settings.database_url or ""
+    if not url.startswith("postgresql"):
+        return True
+    try:
+        parsed = make_url(url)
+        host = parsed.host or "localhost"
+        port = int(parsed.port or 5432)
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+    except Exception:
+        # If parsing or an unusual driver URL surprises us, leave behavior to
+        # SQLAlchemy rather than accidentally disabling DB-backed operation.
+        return True
 
 
 engine = create_engine(

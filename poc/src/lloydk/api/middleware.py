@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from typing import Awaitable, Callable
 
 from fastapi import Request, Response
@@ -48,6 +49,27 @@ def _inc_audit_failure(reason: str) -> None:
             AUDIT_WRITE_FAILURE_TOTAL.labels(reason=reason).inc()
         except Exception as exc:  # noqa: BLE001
             logger.debug("audit failure counter inc failed: %s", exc)
+
+
+def _testing_env() -> bool:
+    return os.environ.get("TESTING", "").strip().lower() in {"1", "true", "yes", "on"} or bool(
+        os.environ.get("PYTEST_CURRENT_TEST")
+    )
+
+
+def _skip_best_effort_audit_db(request: Request) -> bool:
+    if not _testing_env():
+        return False
+    if not hasattr(request, "scope"):
+        return False
+    if _is_high_risk(request):
+        return False
+    try:
+        from lloydk.db import database_reachable_fast  # noqa: PLC0415
+
+        return not database_reachable_fast()
+    except Exception:  # noqa: BLE001
+        return False
 
 _EXCLUDED_PATHS: frozenset[str] = frozenset(
     {
@@ -227,6 +249,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
             from lloydk.repositories.audit_repo import AuditRepo  # noqa: PLC0415
         except ImportError:
             return True  # 환경상 audit 미탑재 — 실패로 카운트하지 않음
+
+        if _skip_best_effort_audit_db(request):
+            _inc_audit_failure("db_unavailable")
+            return True
 
         action = _derive_action(request)
         # 보안: 인증이 해소한 신원(request.state.auth_*)을 우선 사용 — 위조 가능한

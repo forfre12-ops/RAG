@@ -111,6 +111,214 @@ def render_review_html_from_jsonl(
     return render_review_html(recs, title=title, subtitle=subtitle, css=css)
 
 
+# ── 골든셋 검수 · 화면 서명(signoff) 인터랙티브 렌더 ──────────────────────────────
+# render_review(보기 전용)와 달리 각 후보에 승인/등급변경/거부 폼을 붙이고, 제출 시
+# POST /golden/jobs/{id}/signoff 로 결정을 보내 locked_gold_eval 로 승격한다. 검수자가
+# jsonl 을 손으로 편집하는 대신 화면에서 클릭 서명 — 서명 캡처 UI 갭(뷰어만 존재) 해소.
+def _signoff_records(records: Sequence[dict]) -> list[dict]:
+    out: list[dict] = []
+    for r in records:
+        grade = r.get("label") or r.get("llm_grade") or "S3"
+        if grade not in _GRADES:
+            grade = "S3"
+        out.append({
+            "id": str(r.get("doc_id", "")),
+            "grade": grade,
+            "rule": str(r.get("rule_grade", "")),
+            "llm": str(r.get("llm_grade", "")),
+            "conf": round(float(r.get("llm_confidence") or 0.0), 3),
+            "domain": str(r.get("domain", "") or r.get("source", "")),
+            "text": str(r.get("text") or ""),
+        })
+    return out
+
+
+def render_signoff_html(
+    records: Sequence[dict],
+    *,
+    job_id: str,
+    post_url: str,
+    title: str = "골든셋 검수 · 서명",
+    css: Optional[str] = None,
+) -> str:
+    """gold 후보를 화면 서명용 인터랙티브 HTML로 렌더(승인/등급변경/거부 → POST signoff)."""
+    data = _signoff_records(records)
+    head = (
+        "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
+        f"<title>{_html.escape(title)}</title>{css or _DEFAULT_CSS}{_SIGNOFF_CSS}</head>"
+    )
+    return head + (
+        _SIGNOFF_BODY
+        .replace("__TITLE__", _html.escape(title))
+        .replace("__JOB__", _html.escape(job_id))
+        .replace("__POST_URL__", _html.escape(post_url))
+        .replace("__TOTAL__", str(len(data)))
+        .replace("__DATA__", json.dumps(data, ensure_ascii=False))
+    )
+
+
+def render_signoff_html_from_jsonl(
+    paths: Sequence[str | Path],
+    *,
+    job_id: str,
+    post_url: str,
+    title: str = "골든셋 검수 · 서명",
+    css: Optional[str] = None,
+) -> str:
+    """build_<id>.jsonl(gold 후보)을 읽어 서명 HTML로 렌더."""
+    recs: list[dict] = []
+    for p in paths:
+        pp = Path(p)
+        if not pp.exists():
+            continue
+        for line in pp.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                recs.append(json.loads(line))
+    return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css)
+
+
+_SIGNOFF_CSS = """<style>
+.signbar{position:sticky;top:0;z-index:10;background:#0f172a;color:#e2e8f0;padding:12px 24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.signbar .fld{display:flex;flex-direction:column;font-size:11px;gap:3px}
+.signbar input,.signbar select{padding:5px 8px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px}
+.signbar .chk{flex-direction:row;align-items:center;gap:4px}
+.signbar button{padding:8px 18px;border:0;border-radius:6px;background:#16a34a;color:#fff;font-weight:700;font-size:13px;cursor:pointer}
+.signbar button:disabled{background:#475569;cursor:not-allowed}
+.rubric{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin:14px 0;font-size:12px;line-height:1.6}
+.rubric b{color:#92400e}
+.scard{background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:14px;margin-bottom:12px}
+.scard.decided{border-color:#16a34a;box-shadow:0 0 0 1px #16a34a inset}
+.scard.rejected{border-color:#dc2626;box-shadow:0 0 0 1px #dc2626 inset;opacity:.75}
+.stext{font-size:12.5px;color:#27272a;white-space:pre-wrap;max-height:220px;overflow:auto;background:#fafafa;border:1px solid #f0f0f0;border-radius:6px;padding:10px;margin:8px 0;line-height:1.55}
+.decrow{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:13px}
+.decrow label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.decrow select{padding:3px 6px;border:1px solid #d4d4d8;border-radius:4px}
+.note{width:100%;margin-top:8px;padding:6px 8px;border:1px solid #e4e4e7;border-radius:6px;font-size:12px}
+.result{margin:14px 0;padding:12px 16px;border-radius:8px;font-size:13px;display:none}
+.result.ok{background:#f0fdf4;border:1px solid #86efac;color:#166534;display:block}
+.result.err{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;display:block}
+</style>"""
+
+_SIGNOFF_BODY = r"""
+<body>
+<header class="app-header"><h1>__TITLE__</h1>
+<div class="sub">job __JOB__ · gold 후보 __TOTAL__건 · 지재원 관리자 골든셋 검수 — 승인/등급변경/거부 후 서명하면 locked_gold_eval(사람서명 평가정답)로 승격</div></header>
+<div class="signbar">
+  <div class="fld"><label>X-API-Key</label><input id="key" type="password" placeholder="settings.api_key"></div>
+  <div class="fld"><label>역할(X-Actor-Role)</label><select id="role"><option value="reviewer">reviewer</option><option value="admin">admin</option><option value="kl_backend">kl_backend</option></select></div>
+  <div class="fld"><label>검수자 계정(reviewer_id)</label><input id="reviewer" placeholder="실계정 예: hong.gd"></div>
+  <div class="fld chk"><input type="checkbox" id="publish"><label for="publish">라이브 반영(publish)</label></div>
+  <div class="fld chk"><input type="checkbox" id="dual"><label for="dual">TS/S1 이중서명</label></div>
+  <div class="fld"><label>&nbsp;</label><button id="submit">서명 제출</button></div>
+</div>
+<div class="container">
+  <div class="rubric">
+    <b>판정</b> S×V×M → <b>8=TS</b>·<b>4=S1</b>·<b>1·2=S2</b>·<b>0=S3</b> (S=0이면 무조건 S3).
+    핵심 분기 <b>S1 vs TS = M</b>: S2·V2에서 <b>M=0→S1</b>(관리 미공식화)·<b>M≥1→TS</b>. 확신 없으면 <b>거부</b>(미탐 안전).
+    승인=제안등급 유지 / 변경=다른 등급 / 거부=승격 제외. 미결정 후보는 제출에서 빠진다.
+  </div>
+  <div class="filters">
+    <span style="font-size:12px">등급</span>
+    <button class="filter-btn active" data-v="all">전체</button>
+    <button class="filter-btn" data-v="TS">TS</button>
+    <button class="filter-btn" data-v="S1">S1</button>
+    <button class="filter-btn" data-v="S2">S2</button>
+    <button class="filter-btn" data-v="S3">S3</button>
+    <span class="filter-sep"></span>
+    <input class="search-box" id="q" placeholder="id·본문 검색...">
+    <span id="deccount" style="font-size:12px;color:#71717a"></span>
+  </div>
+  <div class="result" id="result"></div>
+  <div id="grid"></div>
+</div>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const DATA=JSON.parse(document.getElementById('data').textContent);
+const POST_URL="__POST_URL__";
+const DEC={};       // id -> {decision, grade, note}
+let g='all',q='';
+function esc(t){const d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;}
+function gopts(sel){return ['TS','S1','S2','S3'].map(x=>'<option value="'+x+'"'+(x===sel?' selected':'')+'>'+x+'</option>').join('');}
+function card(r){
+  const d=DEC[r.id]||{};
+  const cls=d.decision==='reject'?'scard rejected':(d.decision?'scard decided':'scard');
+  return '<div class="'+cls+'" data-id="'+esc(r.id)+'">'
+    +'<div class="card-meta"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> <span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> <span style="color:#71717a">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)+' conf '+r.conf.toFixed(2)+'</span></div>'
+    +'<div class="stext">'+esc(r.text)+'</div>'
+    +'<div class="decrow">'
+      +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="approve"'+(d.decision==='approve'?' checked':'')+'> 승인 ('+r.grade+' 유지)</label>'
+      +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="change"'+(d.decision==='change'?' checked':'')+'> 등급변경 <select class="gsel" data-id="'+esc(r.id)+'">'+gopts(d.grade||r.grade)+'</select></label>'
+      +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="reject"'+(d.decision==='reject'?' checked':'')+'> 거부</label>'
+    +'</div>'
+    +'<input class="note" data-id="'+esc(r.id)+'" placeholder="메모(선택)" value="'+esc(d.note||'')+'">'
+    +'</div>';
+}
+function decCount(){const n=Object.keys(DEC).length;document.getElementById('deccount').textContent='결정 '+n+' / 후보 '+DATA.length+'건';}
+function render(){
+  const ql=q.toLowerCase();
+  const f=DATA.filter(r=>{
+    if(g!=='all'&&r.grade!==g)return false;
+    if(ql&&!((r.id+' '+r.text).toLowerCase().includes(ql)))return false;
+    return true;
+  });
+  document.getElementById('grid').innerHTML=f.length?f.map(card).join(''):'<div class="no-results">조건에 맞는 후보가 없습니다.</div>';
+  decCount();
+}
+document.getElementById('grid').addEventListener('change',function(e){
+  const t=e.target;
+  if(t.matches('input[type=radio]')){
+    const id=t.name.slice(4);
+    DEC[id]=DEC[id]||{};DEC[id].decision=t.value;
+    if(t.value==='change'){const s=document.querySelector('.gsel[data-id="'+CSS.escape(id)+'"]');DEC[id].grade=s?s.value:null;}
+    else delete DEC[id].grade;
+    const cd=t.closest('.scard');cd.className=t.value==='reject'?'scard rejected':'scard decided';
+    decCount();
+  } else if(t.matches('.gsel')){
+    const id=t.dataset.id;DEC[id]=DEC[id]||{decision:'change'};DEC[id].grade=t.value;
+    const rc=document.querySelector('input[name="dec-'+CSS.escape(id)+'"][value=change]');if(rc)rc.checked=true;DEC[id].decision='change';
+  }
+});
+document.getElementById('grid').addEventListener('input',function(e){
+  if(e.target.matches('.note')){const id=e.target.dataset.id;DEC[id]=DEC[id]||{};DEC[id].note=e.target.value;}
+});
+document.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',function(){
+  document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));this.classList.add('active');g=this.dataset.v;render();
+}));
+document.getElementById('q').addEventListener('input',function(){q=this.value;render();});
+document.getElementById('submit').addEventListener('click',async function(){
+  const key=document.getElementById('key').value.trim();
+  const role=document.getElementById('role').value;
+  const reviewer=document.getElementById('reviewer').value.trim();
+  const publish=document.getElementById('publish').checked;
+  const dual=document.getElementById('dual').checked;
+  const box=document.getElementById('result');
+  if(!reviewer){box.className='result err';box.textContent='검수자 계정(reviewer_id)을 입력하세요.';return;}
+  const decisions=Object.keys(DEC).filter(id=>DEC[id].decision).map(id=>{
+    const o={doc_id:id,decision:DEC[id].decision,note:DEC[id].note||''};
+    if(DEC[id].decision==='change')o.grade=DEC[id].grade;return o;
+  });
+  if(!decisions.length){box.className='result err';box.textContent='결정한 후보가 없습니다.';return;}
+  this.disabled=true;this.textContent='제출 중...';
+  try{
+    const res=await fetch(POST_URL,{method:'POST',headers:{'X-API-Key':key,'X-Actor-Role':role,'Content-Type':'application/json; charset=utf-8'},
+      body:JSON.stringify({decisions,actor:{user_id:reviewer,role:role},publish,dual_for_upper:dual})});
+    const j=await res.json();
+    if(!res.ok){box.className='result err';box.textContent='실패('+res.status+'): '+(j.detail||JSON.stringify(j));}
+    else{const rd=j.readiness||{};
+      box.className='result ok';
+      box.innerHTML='서명 완료 — locked <b>'+j.locked+'</b>건 승격 (거부/미서명 '+j.rejected+') · 등급별 '+JSON.stringify(j.locked_by_grade)
+        +'<br>readiness: ready=<b>'+rd.ready+'</b> per_grade='+JSON.stringify(rd.per_grade)+' '+(j.published?'· 라이브 반영됨':'· 미리보기(라이브 무변경)')
+        +'<br>서명자: '+esc(j.reviewer_id)+(j.overridden?' (클라 값이 인증 신원으로 교정됨)':'');
+    }
+  }catch(e){box.className='result err';box.textContent='요청 오류: '+e;}
+  this.disabled=false;this.textContent='서명 제출';
+});
+render();
+</script>
+</body></html>
+"""
+
+
 _BODY_TEMPLATE = r"""
 <body>
 <header class="app-header"><h1>__TITLE__</h1>

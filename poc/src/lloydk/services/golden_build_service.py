@@ -16,11 +16,17 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from lloydk.golden_builder import GoldenBuildResult, build_golden_set, make_label_fn
-from lloydk.golden_review_html import render_review_html_from_jsonl
+from lloydk.golden_review_html import (
+    render_review_html_from_jsonl,
+    render_signoff_html_from_jsonl,
+)
+from lloydk.golden_signoff import Signoff, merge_locked_records, promote_to_locked
+from lloydk.golden_tiers import eval_readiness
 from lloydk.schemas.golden import (
     GoldenBuildRequest,
     GoldenBuildResponse,
     GoldenBuildStatus,
+    GoldenSignoffDecision,
 )
 from lloydk.services.async_classify_service import _celery_dispatch_available
 from lloydk.services.job_store import get_default_store
@@ -163,6 +169,118 @@ class GoldenBuildService:
             return None
         return render_review_html_from_jsonl(paths, title=title, subtitle=f"job {job_id}")
 
+    def render_signoff(
+        self, job_id: uuid.UUID, *, title: str = "골든셋 검수 · 서명"
+    ) -> Optional[str]:
+        """빌드 잡의 gold 후보(gold_candidate)를 화면 서명용 인터랙티브 HTML로 렌더.
+
+        render_review(보기 전용)와 달리 각 후보에 승인/등급변경/거부 폼을 붙이고, 제출 시
+        POST /golden/jobs/{id}/signoff 로 결정을 보낸다. gold 후보만 대상(uncertain 은
+        아직 승격 후보가 아님). 잡/경로 없으면 None.
+        """
+        job = self.jobs.get(job_id)
+        if job is None:
+            return None
+        gold_path = job.get("gold_path")
+        if not gold_path:
+            return None
+        return render_signoff_html_from_jsonl(
+            [gold_path],
+            job_id=str(job_id),
+            post_url=f"/api/v1/golden/jobs/{job_id}/signoff",
+            title=title,
+        )
+
+    def apply_signoff(
+        self,
+        job_id: uuid.UUID,
+        decisions: "list[GoldenSignoffDecision]",
+        *,
+        reviewer_id: str,
+        publish: bool = False,
+        dual_for_upper: bool = False,
+    ) -> Optional[dict]:
+        """검수 결정(승인/변경/거부)을 골든 후보에 적용해 locked_gold_eval 로 승격.
+
+        골든셋 검수의 서명 캡처 단계 — golden_signoff.promote_to_locked 계약 그대로.
+        후보는 잡의 gold_path(build_<id>.jsonl)에서 로드한다. 정본(classification_gold.jsonl)은
+        건드리지 않는다. run-스코프 locked_<id>.jsonl 은 항상 기록(감사), 라이브 readiness
+        읽기경로(settings.locked_eval_jsonl)는 publish=True 일 때만 dedup 병합(배포 게이트 소비).
+
+        reviewer_id 는 호출부(엔드포인트)가 인증 신원으로 확정해 넘긴다(위조 차단). 머신
+        reviewer 는 promote_to_locked 내부 is_human_reviewer 가 거부(전건 machine_reviewer).
+
+        반환: {locked, rejected, locked_by_grade, rejected_reasons, readiness, published,
+        run_locked_path}. 잡/경로 없으면 None.
+        """
+        job = self.jobs.get(job_id)
+        if job is None:
+            return None
+        gold_path = job.get("gold_path")
+        if not gold_path or not Path(gold_path).exists():
+            return None
+
+        candidates = _read_jsonl(Path(gold_path))
+        by_doc = {c.get("doc_id"): c for c in candidates}
+
+        signed_at = dt.datetime.now(dt.timezone.utc).isoformat()
+        signoffs: list[Signoff] = []
+        decided_ids: set = set()
+        for d in decisions:
+            cand = by_doc.get(d.doc_id)
+            if cand is None:
+                continue  # 후보에 없는 doc_id 는 서명 불가(팬텀 방지) — 무시
+            decided_ids.add(d.doc_id)
+            if d.decision == "reject":
+                continue  # 거부 — 서명 없음(promote 에서 no_signoff 로 rejected 집계)
+            if d.decision == "change":
+                if not d.grade:
+                    continue  # 변경인데 등급 미지정 — 방어적 skip(스키마가 1차 방지)
+                grade = d.grade
+            else:  # approve — 제안등급(후보 label) 유지
+                grade = cand.get("label")
+            signoffs.append(
+                Signoff(
+                    doc_id=d.doc_id, reviewer_id=reviewer_id, grade=grade,
+                    signed_at=signed_at, note=d.note,
+                )
+            )
+
+        # 결정된 후보만 승격 대상으로(미결정 후보가 rejected 로 잡히는 노이즈 차단).
+        subset = [c for c in candidates if c.get("doc_id") in decided_ids]
+        res = promote_to_locked(subset, signoffs, dual_for_upper=dual_for_upper)
+
+        # run-스코프 감사 기록(정본·라이브 무변경) — 항상.
+        run_locked_path = Path(gold_path).parent / f"locked_{job_id}.jsonl"
+        _write_jsonl(run_locked_path, res.locked)
+
+        # 라이브 readiness 읽기경로 — publish 병합 대상 + readiness union 계산.
+        from lloydk.config import settings  # noqa: PLC0415
+
+        live_path = getattr(settings, "locked_eval_jsonl", "") or ""
+        existing_live = (
+            _read_jsonl(Path(live_path))
+            if live_path and Path(live_path).exists()
+            else []
+        )
+        merged = merge_locked_records(existing_live, res.locked)
+
+        published = False
+        if publish and res.locked and live_path:
+            _atomic_write_jsonl(Path(live_path), merged)
+            published = True
+
+        return {
+            "locked": len(res.locked),
+            "rejected": len(res.rejected),
+            "locked_by_grade": res.stats.get("locked_by_grade", {}),
+            "rejected_reasons": res.stats.get("rejected_reasons", {}),
+            # published=False 면 '라이브+이번 승격' 미리보기(라이브는 실제 무변경).
+            "readiness": eval_readiness(merged),
+            "published": published,
+            "run_locked_path": str(run_locked_path),
+        }
+
     # ------------------------------------------------------------------ helpers
     def _load_docs(self, req: GoldenBuildRequest) -> list[dict]:
         if req.source_type == "inline":
@@ -217,6 +335,31 @@ class GoldenBuildService:
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def _read_jsonl(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    return [
+        json.loads(ln)
+        for ln in path.read_text(encoding="utf-8").splitlines()
+        if ln.strip()
+    ]
+
+
+def _atomic_write_jsonl(path: Path, rows: list[dict]) -> None:
+    """원자적 jsonl 기록(tmp→replace) — 라이브 readiness 읽기경로가 부분기록으로 깨지지 않게.
+
+    배포 게이트/readiness 게이지가 이 파일을 읽으므로 (run_golden_split_signoff._write_jsonl
+    과 동일 규율) 원자적 교체로 반쪽 상태 노출을 막는다.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    tmp.replace(path)

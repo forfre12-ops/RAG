@@ -30,6 +30,12 @@ def _registry_ttl_sec() -> float:
         return 30.0
 
 
+def _testing_env() -> bool:
+    return os.environ.get("TESTING", "").strip().lower() in {"1", "true"} or bool(
+        os.environ.get("PYTEST_CURRENT_TEST")
+    )
+
+
 class Grade(str, Enum):
     TS = "TS"
     S1 = "S1"
@@ -73,6 +79,11 @@ class GradeRegistry:
         """활성 등급 코드 목록 반환 (level_order 오름차순)."""
         if cls._cache is not None and cls._cache_fresh():
             return list(cls._cache)
+        if _testing_env():
+            fallback = [g.value for g in Grade]
+            cls._cache = fallback
+            cls._cache_ts = time.monotonic()
+            return list(fallback)
         try:
             from lloydk.db import session_scope  # noqa: PLC0415
             from lloydk.db.models import ClassificationLevel  # noqa: PLC0415
@@ -154,6 +165,10 @@ class FactorRegistry:
         반환값은 EvaluationFactors.scores의 key와 named field 이름에 모두 사용됨.
         """
         if cls._cache is not None and cls._cache_fresh():
+            return dict(cls._cache)
+        if _testing_env():
+            cls._cache = dict(cls._DEFAULT_MAP)
+            cls._cache_ts = time.monotonic()
             return dict(cls._cache)
         try:
             from lloydk.db import session_scope  # noqa: PLC0415

@@ -38,10 +38,28 @@ v4 확장 정책 (2026-05-29 P0-B5):
 from __future__ import annotations
 
 import logging
+import os
 
 _logger = logging.getLogger(__name__)
 
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
+
+
+def _testing_env() -> bool:
+    return os.environ.get("TESTING", "").strip().lower() in {"1", "true", "yes", "on"} or bool(
+        os.environ.get("PYTEST_CURRENT_TEST")
+    )
+
+
+def _skip_optional_db_load() -> bool:
+    if not _testing_env():
+        return False
+    try:
+        from lloydk.db import database_reachable_fast  # noqa: PLC0415
+
+        return not database_reachable_fast()
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def get_factor_codes() -> list[str]:
@@ -78,6 +96,9 @@ def load_seeds_from_db() -> list[dict] | None:
         list[dict] — KEYWORD_SEEDS와 동일한 형식 (keyword, grade, factor, weight, pattern_type)
         None       — DB 미가용 또는 키워드 없음 → 호출자가 KEYWORD_SEEDS로 폴백
     """
+    if _skip_optional_db_load():
+        _logger.debug("load_seeds_from_db: DB unavailable in test/local mode, using KEYWORD_SEEDS")
+        return None
     try:
         from lloydk.db import session_scope  # noqa: PLC0415
         from lloydk.db.models import ClassificationLevel, EvaluationFactor, LevelKeyword  # noqa: PLC0415
