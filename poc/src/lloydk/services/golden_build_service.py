@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Callable, Optional
@@ -27,6 +28,30 @@ from lloydk.services.job_store import get_default_store
 logger = logging.getLogger(__name__)
 
 LabelFn = Callable[[str], "object"]
+
+# ── 경로 샌드박스 (path traversal 차단) ──────────────────────────────────────
+# corpus_dir/holdout_path/out_dir 은 요청 바디로 들어오는 파일시스템 경로다. 무검증이면
+# "/etc/passwd" 읽기·"../../" 임의 위치 쓰기가 가능하다(인증된 admin/kl_backend 경로라도
+# 최소권한 위반). 허용 루트(리포 datasets/ · 시스템 temp — pytest tmp_path 포함) 하위로만
+# 제한한다. golden_build_service.py = poc/src/lloydk/services/... → parents[3] = poc 루트.
+_POC_ROOT = Path(__file__).resolve().parents[3]
+_ALLOWED_PATH_ROOTS = (
+    (_POC_ROOT / "datasets").resolve(),
+    Path(tempfile.gettempdir()).resolve(),
+)
+
+
+def _safe_path(raw: str | None) -> Path:
+    """요청 경로를 허용 루트 하위로 제한. 벗어나면 ValueError(작업 자체를 거부)."""
+    if not raw:
+        raise ValueError("경로 미지정")
+    p = Path(raw)
+    resolved = (p if p.is_absolute() else _POC_ROOT / p).resolve()
+    if not any(resolved.is_relative_to(base) for base in _ALLOWED_PATH_ROOTS):
+        raise ValueError(
+            f"허용 루트(datasets/ · temp) 밖 경로 거부: {raw}"
+        )
+    return resolved
 
 
 class GoldenBuildService:
@@ -142,8 +167,8 @@ class GoldenBuildService:
     def _load_docs(self, req: GoldenBuildRequest) -> list[dict]:
         if req.source_type == "inline":
             return list(req.docs)
-        # corpus: jsonl 파일 또는 *.json 디렉토리
-        p = Path(req.corpus_dir or "")
+        # corpus: jsonl 파일 또는 *.json 디렉토리 (허용 루트 하위로 제한)
+        p = _safe_path(req.corpus_dir)
         if not p.exists():
             raise FileNotFoundError(f"corpus_dir 없음: {p}")
         rows: list[dict] = []
@@ -168,7 +193,7 @@ class GoldenBuildService:
     def _load_holdout(self, req: GoldenBuildRequest) -> Optional[list[str]]:
         if not req.holdout_path:
             return None
-        p = Path(req.holdout_path)
+        p = _safe_path(req.holdout_path)
         if not p.exists():
             return None
         texts: list[str] = []
@@ -182,7 +207,7 @@ class GoldenBuildService:
     def _write_outputs(
         self, req: GoldenBuildRequest, job_id: uuid.UUID, result: GoldenBuildResult,
     ) -> tuple[Path, Path]:
-        out = Path(req.out_dir)
+        out = _safe_path(req.out_dir)
         out.mkdir(parents=True, exist_ok=True)
         gold_path = out / f"build_{job_id}.jsonl"
         unc_path = out / f"uncertain_{job_id}.jsonl"
