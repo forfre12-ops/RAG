@@ -233,6 +233,31 @@ def _warmup_models(settings_obj) -> None:
                 "실서빙 진입 불가(HashEmbedding 폴백=검색품질 급락 — fail-clear)."
             ) from exc
         logger.warning("embedder warmup skipped: %s", exc)
+    # [require_real_classifier] 분류기 모델 dir 이 실재(env 또는 활성 ModelVersion)로 해석됐는데 가중치
+    # 로드에 실패하면 InferencePipeline 이 rule-fallback-v0 으로 *무음* 열화한다(미보정 과신·고등급
+    # 미탐 위험). config.assert_production_credentials 는 경로 '존재'만 보고 로드 성공(_model) 여부는
+    # 안 봐서 이 열화가 startup 을 통과했다 — 형제 게이트 require_real_embedder 와 동일하게 warmup 에서
+    # fail-clear 로 막는다. 부수효과로 분류기 cold-start(가중치 로드)를 startup 에서 1회 흡수한다.
+    # 모델 dir 미해석(rule-fallback 의도)은 대상 아님 — 로드-실패 폴백 경로에서만 작동.
+    if getattr(settings_obj, "require_real_classifier", False):
+        try:
+            from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
+            svc = ClassifyService.get_instance()
+            model_dir = getattr(svc.inference, "model_dir", None)
+            loaded = getattr(svc.inference, "_model", None) is not None
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                f"require_real_classifier=True 인데 분류기 warmup 중 오류: {exc}. 실 분류기 없이 "
+                "폐쇄망 실서빙 진입 불가(rule-fallback 무음 열화 — fail-clear)."
+            ) from exc
+        if model_dir is not None and not loaded:
+            raise RuntimeError(
+                f"require_real_classifier=True 인데 모델 dir={str(model_dir)!r} 이 해석됐으나 가중치 "
+                "로드 실패로 rule-fallback-v0 서빙 상태입니다(무음 미탐·미보정 위험). 모델 아티팩트/"
+                "config.id2label 를 확인하거나, rule-fallback 이 의도면 REQUIRE_REAL_CLASSIFIER=0 을 "
+                "명시하세요(하드닝 비권장)."
+            )
+        logger.info("classifier warmup ok — model_dir=%s loaded=%s", model_dir, loaded)
     if settings_obj.reranker_provider not in ("", "noop"):
         try:
             from lloydk.adapters.reranker import get_reranker  # noqa: PLC0415

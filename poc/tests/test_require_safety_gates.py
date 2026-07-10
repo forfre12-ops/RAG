@@ -29,10 +29,11 @@ def _settings(**over) -> Settings:
         metadata_floor_enabled=False,
         storage_encryption_enabled=False,
         require_safety_gates=False,
-        # require_real_embedder·deploy_gate_require_locked_eval 도 강제집합이지만 이 테스트들은
-        # 앞의 4개 게이트 폴러리티를 검증하므로, 명시적으로 ON 두어 off 집합 오염을 막는다
+        # require_real_embedder·require_real_classifier·deploy_gate_require_locked_eval 도 강제집합이지만
+        # 이 테스트들은 앞의 4개 게이트 폴러리티를 검증하므로, 명시적으로 ON 두어 off 집합 오염을 막는다
         # (deploy_gate_require_locked_eval 은 전역 기본 True 라 별도 지정 불필요).
         require_real_embedder=True,
+        require_real_classifier=True,
     )
     base.update(over)
     return Settings(_env_file=None, **base)
@@ -129,6 +130,7 @@ def test_new_gates_in_enforced_set() -> None:
 
     envs = {env for _, env in _SAFETY_GATES}
     assert "REQUIRE_REAL_EMBEDDER" in envs
+    assert "REQUIRE_REAL_CLASSIFIER" in envs
     assert "DEPLOY_GATE_REQUIRE_LOCKED_EVAL" in envs
 
 
@@ -141,8 +143,22 @@ def test_hardened_profiles_new_gates_on_by_default(monkeypatch) -> None:
         s = Settings(deploy_profile=profile, _env_file=None)
         apply_profile_defaults(s)
         assert s.require_real_embedder is True, profile
+        assert s.require_real_classifier is True, profile
         assert s.deploy_gate_require_locked_eval is True, profile
         assert evaluate_safety_gates(s)["off"] == [], profile
+
+
+def test_require_real_classifier_off_blocks_when_hardened() -> None:
+    """하드닝에서 REQUIRE_REAL_CLASSIFIER 만 끄면 startup 차단(rule-fallback 무음 열화 되살리기 방지)."""
+    sg = evaluate_safety_gates(_settings(
+        agreement_gate_enabled=True,
+        metadata_floor_enabled=True,
+        storage_encryption_enabled=True,
+        require_real_classifier=False,  # 신규 게이트만 off
+        require_safety_gates=True,
+    ))
+    assert sg["off"] == ["REQUIRE_REAL_CLASSIFIER"]
+    assert sg["must_raise"] is True
 
 
 def test_require_real_embedder_off_blocks_when_hardened() -> None:

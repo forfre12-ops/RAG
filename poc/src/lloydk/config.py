@@ -101,6 +101,9 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # [obs] 실 임베더 필수 — HF 로드 실패 시 HashEmbedding 무음 폴백은 검색품질 급락(정확도
         # 저하)이라 폐쇄망 실서빙에선 거부. 명시적 hash 요청(dryrun)은 영향 없음(폴백만 차단).
         "require_real_embedder": True,
+        # [obs] 실 분류기 필수 — 모델 dir 이 있는데 로드 실패로 rule-fallback-v0 무음 열화하면
+        # startup fail-clear(require_real_embedder 형제). 미보정·미탐 위험 서빙을 조용히 띄우지 않음.
+        "require_real_classifier": True,
         # [배포전 하드닝 P0#①] 수동 GA 활성도 사람서명 locked 평가 readiness 요구(미검증 모델
         # 무심코 GA 활성 차단; force=True로만 우회·감사됨). 자동활성 게이트와 별개 축.
         "deploy_gate_manual_require_locked_eval": True,
@@ -133,6 +136,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "require_safety_gates": True,
         # [obs] 실 임베더 필수(onprem-local과 동일) — hash 무음 폴백 거부.
         "require_real_embedder": True,
+        # [obs] 실 분류기 필수(onprem-local과 동일) — 모델 dir 로드 실패 시 rule-fallback 무음 열화 거부.
+        "require_real_classifier": True,
         # [배포전 하드닝 P0#①] 수동 GA 활성 locked-eval 요구(onprem-local과 동일).
         "deploy_gate_manual_require_locked_eval": True,
         # [P0#①-b] force 우회 시 사유 필수(onprem-local과 동일).
@@ -386,6 +391,13 @@ class Settings(BaseSettings):
     # onprem-local·full-train 프로파일이 True로 켠다. 명시적 hash 요청(force_hash/embedding_model=
     # "hash")은 폴백이 아니므로 영향 없음 — build_embedder의 로드-실패 폴백 경로에서만 작동.
     require_real_embedder: bool = False
+    # [obs] 실 분류기 필수 — CLASSIFIER_MODEL_DIR 이 실재 디렉토리로 해석됐는데 가중치 로드에
+    # 실패(config.id2label 불일치·torch 부재·손상 등)하면 InferencePipeline 이 rule-fallback-v0 으로
+    # *조용히* 넘어간다(pipeline.py `_run_rule_fallback`). config.assert_production_credentials 는 경로
+    # '존재'만 보고 로드 성공(_model) 여부는 안 봐서 이 무음 열화가 startup 을 통과했다. True 면
+    # warmup 에서 '모델 dir 해석됐는데 미로드' 를 fail-clear 로 차단(require_real_embedder 의 형제).
+    # 모델 dir 미설정(rule-fallback 의도)은 대상 아님 — 로드-실패 폴백 경로에서만 작동.
+    require_real_classifier: bool = False
 
     # 검증 라벨 내용해시(file_hash) 재사용 (기본 True). doc_id는 업로드마다 gen_random_uuid라
     # 유니크 → 같은 문서를 *재업로드*하면 새 doc_id가 되어, 기존 doc_id 기반 검증라벨 재사용
@@ -829,14 +841,16 @@ apply_profile_defaults(settings)
 # 강제해도 무음 no-op 위험이 없고(기본 True), 하드닝 배포가 이 게이트를 조용히 끄면 공개출처가
 # 비밀로 과분류(실측 85% FPR)되므로 강제집합에 포함. (similarity_escalation은 corpus 의존이라 제외.)
 # require_real_embedder: HF 임베더 로드 실패 시 HashEmbedding 무음 폴백(검색품질 급락) 거부.
+# require_real_classifier: 분류기 모델 dir 로드 실패 시 rule-fallback-v0 무음 열화 거부(형제 게이트).
 # deploy_gate_require_locked_eval: 자동활성 시 실(locked_gold_eval) 평가 readiness 요구(죽음의 나선 #4).
-# 둘 다 하드닝 프로파일 기본 True — .env override(=0)로 조용히 되살리면 CI/startup 이 잡는다.
+# 모두 하드닝 프로파일 기본 True — .env override(=0)로 조용히 되살리면 CI/startup 이 잡는다.
 _SAFETY_GATES: tuple[tuple[str, str], ...] = (
     ("agreement_gate_enabled", "AGREEMENT_GATE_ENABLED"),
     ("metadata_floor_enabled", "METADATA_FLOOR_ENABLED"),
     ("storage_encryption_enabled", "STORAGE_ENCRYPTION_ENABLED"),
     ("source_prior_enabled", "SOURCE_PRIOR_ENABLED"),
     ("require_real_embedder", "REQUIRE_REAL_EMBEDDER"),
+    ("require_real_classifier", "REQUIRE_REAL_CLASSIFIER"),
     ("deploy_gate_require_locked_eval", "DEPLOY_GATE_REQUIRE_LOCKED_EVAL"),
 )
 

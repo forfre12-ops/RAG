@@ -47,6 +47,12 @@ os.environ.setdefault("VECTOR_BACKEND", "inmemory")
 # 검증(test_embedding_fallback_gate)은 monkeypatch로 명시 활성해 독립 검사한다.
 os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
 
+# 실 분류기 필수(require_real_classifier)도 하드닝 프로파일(onprem-local·full-train) 기본 True.
+# 테스트/CI는 학습 가중치 없이 rule-fallback 으로 도는 경우가 많아(무실데이터) 이게 켜지면 warmup
+# 이 차단된다 — REQUIRE_REAL_EMBEDDER 와 동일 패턴으로 중화. 게이트 자체 검증은 전용 테스트가
+# monkeypatch 로 명시 활성해 독립 수행한다(test_classifier_fallback_gate).
+os.environ.setdefault("REQUIRE_REAL_CLASSIFIER", "false")
+
 # 수동 GA 활성 locked-eval 하드블록(deploy_gate_manual_require_locked_eval)은 하드닝 프로파일
 # (onprem-local·full-train) 기본 True. 테스트는 무실데이터(locked_gold_eval 비어있음)라 이게 켜지면
 # 모든 수동 활성이 막힌다 — REQUIRE_REAL_EMBEDDER와 동일하게 중화. 게이트 자체 검증은
