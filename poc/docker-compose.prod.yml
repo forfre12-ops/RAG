@@ -53,13 +53,19 @@ services:
       start_period: 90s
 
   worker:
+    # 하드닝: dev Dockerfile.api(root)가 아니라 non-root(uid1000) 이미지로 빌드 — api 와 동일.
+    # Dockerfile.api.prod 는 앱+전 extras(hwp/ocr/jwt/psh/otel) 포함이라 워커 파싱 태스크에도 충분.
+    # (compose command 오버라이드가 gunicorn CMD 를 celery worker 로 대체.)
+    build:
+      dockerfile: Dockerfile.api.prod
     env_file: !override
       - "${ENV_FILE:-.env.prod}"
     environment: !override {}
     # dev 코드 bind 제거. 워커도 모델 접근 필요(classify/index 태스크) → ro external volume.
+    # HF 캐시는 non-root 홈(/home/lloydk) — root 캐시(/root)는 uid1000 이 쓸 수 없어 재다운로드 유발.
     volumes: !override
       - prod_artifacts:/app/artifacts:ro
-      - hf_cache_worker:/root/.cache/huggingface
+      - hf_cache_worker:/home/lloydk/.cache/huggingface
     deploy:
       restart_policy:
         condition: on-failure
@@ -72,6 +78,9 @@ services:
           memory: "${WORKER_MEM_RESERVATION:-1G}"
 
   beat:
+    # 하드닝: worker 와 동일 non-root 이미지(uid1000)로 빌드(dev Dockerfile.api=root 상속 차단).
+    build:
+      dockerfile: Dockerfile.api.prod
     env_file: !override
       - "${ENV_FILE:-.env.prod}"
     environment: !override {}
