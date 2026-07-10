@@ -273,11 +273,15 @@ class ClassifyService:
             # [번들 A] 메타데이터/출처 게이트 가시성 — 게이트 발동·ICD 메타 존재율을 best-effort
             # 노출. pred.warnings(pipeline 산출)만 본 시점에 측정해 서비스 재라우팅과 중복 없음.
             self._emit_gate_visibility_metrics(eff_meta, warnings_acc)
-            notify("persist")
-            inference_id, persist_warnings = self._try_persist(req, pred, chunks=chunks)
-            warnings_acc.extend(persist_warnings)
-            notify("finalize")
-
+            # ── 검수 라우팅 게이트 → 최종 status를 persist 전에 확정 ─────────────────
+            # 게이트가 산출한 needs_review 를 DB 행에 실제로 반영하려면 status 를
+            # create_classification 에 원자적으로 넘겨야 한다. 과거엔 게이트가 persist
+            # 뒤에 돌아 status 가 응답에만 실리고 DB 행은 staging 으로 남았고,
+            # GET /review-queue(FUN-024)는 status IN (needs_review, …)만 조회하므로
+            # 서빙게이트 검수건을 영영 못 받는 하프와이어링(무음 미탐)이 있었다.
+            # 게이트는 pred/cleaned/review_flagged 만 참조(inference_id 불필요)하므로
+            # persist 앞으로 안전하게 이동한다.
+            #
             # 저신뢰 검수 라우팅: confidence가 임계 미만이면 needs_review로 표시(거부 아님).
             # 데모 콘솔이 광고하는 'low-confidence 게이트'의 서버측 구현 — 검수자 큐 노출 근거.
             status = "staging"
@@ -368,6 +372,15 @@ class ClassifyService:
                 if sim is not None:
                     status = "needs_review"
                     warnings_acc.append(sim)
+
+            # 게이트가 확정한 최종 status로 영속화(원자적). needs_review 는 여기서 DB 행에
+            # 실제 기록되어 GET /review-queue 검수 큐에 노출된다(예전엔 항상 staging 이었음).
+            notify("persist")
+            inference_id, persist_warnings = self._try_persist(
+                req, pred, chunks=chunks, status=status,
+            )
+            warnings_acc.extend(persist_warnings)
+            notify("finalize")
 
             logger.info(
                 "classify done: doc_id=%s inference_id=%s label=%s confidence=%.3f status=%s",
@@ -673,6 +686,7 @@ class ClassifyService:
         pred: InferenceResult,
         *,
         chunks: list[_PreprocessChunk] | None = None,
+        status: str = "staging",
     ) -> tuple[uuid.UUID, list[str]]:
         """Best-effort 영속화.
 
@@ -754,6 +768,7 @@ class ClassifyService:
                     chunk_count=chunk_count,
                     rag_used=bool(pred.rag_context),
                     rag_top_k=len(pred.rag_context) or None,
+                    status=status,
                 )
                 classification_id = cls.classification_id
                 # Evidence chunk_id 결정: chunks가 영속화됐으면 진짜 첫 chunk_id, 아니면 임시 UUID
