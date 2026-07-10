@@ -32,6 +32,14 @@ class TrainSpec:
     test_path: str = "datasets/labeled/test.jsonl"
     output_dir: str = "artifacts/classifier"
     max_seq_len: int = 512
+    # [FUN-004 Chunk 단위 학습] True 면 TRAIN 분할을 chunk 단위로 확장(각 chunk=문서 라벨 상속).
+    # 긴 문서의 max_seq_len truncation 으로 잘리던 뒷부분까지 학습 신호로 사용. val/test/holdout 은
+    # 문서 단위 유지(누수차단 — chunk_expand 모듈 주석 참조). 기본 False=기존 문서단위 학습 보존.
+    chunk_expand: bool = False
+    # chunk char 크기(0=auto=max_seq_len*3, 추론측 chunk_text 와 동일 휴리스틱)·overlap·최소 글자.
+    chunk_char_size: int = 0
+    chunk_overlap: int = 64
+    chunk_min_chars: int = 40
     batch_size: int = 8
     epochs: int = 5
     lr: float = 2e-5
@@ -168,6 +176,19 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     train_x, train_y = _load_jsonl(spec.train_path)
     val_x, val_y = _load_jsonl(spec.val_path)
     test_x, test_y = _load_jsonl(spec.test_path)
+
+    # [FUN-004] chunk 단위 학습: TRAIN 만 chunk 확장(val/test 는 문서 단위 유지 = 누수차단).
+    if spec.chunk_expand:
+        from lloydk.modules.m4_training.chunk_expand import expand_chunks  # noqa: PLC0415
+
+        _csz = spec.chunk_char_size or (spec.max_seq_len * 3)
+        _n_before = len(train_x)
+        train_x, train_y = expand_chunks(
+            train_x, train_y,
+            char_size=_csz, overlap=spec.chunk_overlap, min_chars=spec.chunk_min_chars,
+        )
+        print(f"  [chunk-expand] train {_n_before} docs → {len(train_x)} chunk rows "
+              f"(char_size={_csz}); val/test 문서단위 유지(누수차단)")
 
     tok = AutoTokenizer.from_pretrained(spec.base_model)
 
