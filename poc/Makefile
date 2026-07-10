@@ -479,6 +479,8 @@ acceptance-pack: ## 인수 샘플팩 생성 → datasets/acceptance_pack/ (PDF/X
 	$(PY) scripts/build_acceptance_pack.py
 acceptance-test: ## 인수 샘플팩 채점 (in-proc parse→classify→gate; severity floor veto) — 고객은 bundle 의 run_acceptance.sh
 	$(PY) scripts/run_acceptance.py --mode inproc
+soak: ## W2 소크: 코퍼스 반복 투입(영속 서빙)로 메모리 누수·고등급 veto·escalation 안정성 검증
+	$(PY) scripts/run_soak.py --cycles 50 --snapshot-every 10
 pilot-scorecard: ## Render pilot scorecard HTML from acceptance/readiness JSON artifacts
 	$(PY) scripts/render_pilot_scorecard.py
 pilot-verify: ## Run pilot acceptance/readiness, always render scorecard, then return final verdict
