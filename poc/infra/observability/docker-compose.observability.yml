@@ -10,6 +10,11 @@ services:
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # prometheus.yml 의 rule_files 가 찾는 경로(설정파일과 동일 디렉토리)에 alert_rules.yml 마운트.
+      # 이 줄이 없으면 안전 알림 29종(FnrSpike·KillGateTripped·HighGradeReviewBacklog 등)이
+      # 로드조차 안 돼 무음이었다 — airgap overlay 만 교정돼 있고 오픈망(dev) overlay 는 누락됐던
+      # 갭. Alertmanager 미기동이어도 Prometheus /alerts 에서 발화는 보인다(파일럿 GO 조건 충족).
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - promdata:/prometheus
     command:
       # P1-D6: 회귀 추세 분석을 위해 retention 30d → 90d, size 10GB → 30GB.
