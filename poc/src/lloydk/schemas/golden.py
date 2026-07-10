@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .common import Actor
 
@@ -59,6 +59,14 @@ class GoldenSignoffDecision(BaseModel):
     decision: str = Field(pattern=r"^(approve|change|reject)$")
     grade: Optional[str] = Field(default=None, pattern=r"^(TS|S1|S2|S3)$")  # change 시 필수
     note: str = ""
+
+    @model_validator(mode="after")
+    def _grade_required_for_change(self) -> "GoldenSignoffDecision":
+        # change 인데 grade 미지정이면 서비스가 조용히 no_signoff 로 흘리는 대신 여기서 422 로 거부
+        # (검수자 실수를 즉시 피드백 — golden_build_service 의 방어적 skip 은 벨트-서스펜더로 유지).
+        if self.decision == "change" and not self.grade:
+            raise ValueError("decision=change 인데 grade 미지정")
+        return self
 
 
 class GoldenSignoffRequest(BaseModel):

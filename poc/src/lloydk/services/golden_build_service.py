@@ -250,9 +250,13 @@ class GoldenBuildService:
         subset = [c for c in candidates if c.get("doc_id") in decided_ids]
         res = promote_to_locked(subset, signoffs, dual_for_upper=dual_for_upper)
 
-        # run-스코프 감사 기록(정본·라이브 무변경) — 항상.
+        # run-스코프 감사 기록(정본·라이브 무변경) — 항상. 같은 잡을 여러 세션에 나눠 서명하는 게
+        # 정상 흐름(대량 후보)이므로 덮어쓰기 대신 기존 승격분과 doc_id dedup 누적(라이브 경로와 동일
+        # 규율) — 세션1 서명이 세션2 제출로 유실되지 않게.
         run_locked_path = Path(gold_path).parent / f"locked_{job_id}.jsonl"
-        _write_jsonl(run_locked_path, res.locked)
+        _atomic_write_jsonl(
+            run_locked_path, merge_locked_records(_read_jsonl(run_locked_path), res.locked)
+        )
 
         # 라이브 readiness 읽기경로 — publish 병합 대상 + readiness union 계산.
         from lloydk.config import settings  # noqa: PLC0415
