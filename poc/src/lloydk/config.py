@@ -882,6 +882,48 @@ def hardened_poc_mode_bypass(s: "Settings") -> bool:
     return bool(getattr(s, "require_safety_gates", False)) and getattr(s, "poc_mode", None) != "full"
 
 
+def _assert_classifier_artifacts(model_dir: str) -> None:
+    """CLASSIFIER_MODEL_DIR 이 지정됐을 때 필수 모델 산출물 유효성을 startup 에서 검증.
+
+    존재 여부만이 아니라 내용물까지 본다: config.json(필수) + 가중치 1종(model.safetensors 또는
+    pytorch_model.bin, sharded index 포함) 이 없으면 RuntimeError — 어떤 파일이 없는지 명시한다.
+    손상/불완전 모델 dir 를 그대로 서빙 진입시키면 transformers from_pretrained 가 난해한 스택
+    트레이스로 실패하거나(→require_real_classifier 가 warmup 에서 잡지만) rule-fallback 무음 열화로
+    빠질 수 있어, 그 전에 명확히 차단한다(형제: require_real_classifier 는 '로드 성공'의 최종 백스톱).
+    temperature.json 부재는 무보정(T=1.0) 서빙 위험이지만 치명적이진 않아 경고만(pipeline 도 loud-warn).
+    """
+    from pathlib import Path  # noqa: PLC0415
+
+    p = Path(model_dir)
+    if not p.exists():
+        raise RuntimeError(
+            f"CLASSIFIER_MODEL_DIR={model_dir!r} 경로가 존재하지 않습니다. "
+            "운영 모드에서 모델 미로드 시 rule-fallback-v0으로 조용히 넘어가지 않습니다. "
+            "경로를 수정하거나 CLASSIFIER_MODEL_DIR을 비워 rule-fallback 의도를 명시하세요."
+        )
+    missing: list[str] = []
+    if not (p / "config.json").exists():
+        missing.append("config.json")
+    _weights = (
+        "model.safetensors", "pytorch_model.bin",
+        "model.safetensors.index.json", "pytorch_model.bin.index.json",
+    )
+    if not any((p / w).exists() for w in _weights):
+        missing.append("모델 가중치(model.safetensors 또는 pytorch_model.bin)")
+    if missing:
+        raise RuntimeError(
+            f"CLASSIFIER_MODEL_DIR={model_dir!r} 에 필수 모델 산출물 누락: {', '.join(missing)}. "
+            "손상·불완전 모델 dir 의 rule-fallback 무음 열화를 막기 위해 startup 을 차단합니다. "
+            "아티팩트를 확인하거나 CLASSIFIER_MODEL_DIR 을 비워 rule-fallback 의도를 명시하세요."
+        )
+    if not (p / "temperature.json").exists():
+        logger.warning(
+            "CLASSIFIER_MODEL_DIR=%s 에 temperature.json 없음 — 무보정(T=1.0) 서빙 위험(OOD 과신 → "
+            "고등급 무음 미탐). CLASSIFIER_TEMPERATURE env 로 주입하거나 보정을 재적용하세요.",
+            model_dir,
+        )
+
+
 def assert_production_credentials() -> None:
     """운영 모드에서 빈 자격증명 차단. dryrun/테스트는 우회.
 
@@ -998,16 +1040,9 @@ def assert_production_credentials() -> None:
             "역할 분리가 필요하면 AUTH_MODE=jwt 를 사용하세요."
         )
 
-    # rule-fallback-v0 운영 차단 — 모델 디렉토리가 명시됐는데 없으면 즉시 오류
+    # rule-fallback-v0 운영 차단 — 모델 디렉토리가 명시됐으면 존재+내용물(config.json·가중치) 검증.
     if settings.classifier_model_dir:
-        from pathlib import Path  # noqa: PLC0415
-        model_path = Path(settings.classifier_model_dir)
-        if not model_path.exists():
-            raise RuntimeError(
-                f"CLASSIFIER_MODEL_DIR={settings.classifier_model_dir!r} 경로가 존재하지 않습니다. "
-                "운영 모드에서 모델 미로드 시 rule-fallback-v0으로 조용히 넘어가지 않습니다. "
-                "경로를 수정하거나 CLASSIFIER_MODEL_DIR을 비워 rule-fallback 의도를 명시하세요."
-            )
+        _assert_classifier_artifacts(settings.classifier_model_dir)
     else:
         # 모델 디렉토리 미설정 = rule-fallback 의도. 운영에서 경고만.
         logger.warning(
