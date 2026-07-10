@@ -201,6 +201,27 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
     <span class="flow-step" data-step="5"><b>5</b> 메트릭</span>
   </div>
 
+  <!-- 실시간 관제 컨트롤 (읽기 전용 자동 폴링) -->
+  <div class="flow" style="justify-content:flex-start;gap:12px;">
+    <span style="display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;">
+      <span id="auto-dot" style="width:9px;height:9px;border-radius:50%;background:var(--text-faint);display:inline-block;"></span>
+      실시간 관제
+    </span>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-soft);margin:0;">
+      자동 갱신
+      <select id="auto-interval" onchange="onAutoChange()" style="width:auto;padding:5px 9px;font-size:12.5px;">
+        <option value="0">끄기</option>
+        <option value="3">3초</option>
+        <option value="5">5초</option>
+        <option value="10">10초</option>
+        <option value="30">30초</option>
+      </select>
+    </label>
+    <span id="auto-status" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);">정지</span>
+    <span id="auto-stamp" style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-left:auto;"></span>
+    <span class="hint" style="margin:0;flex-basis:100%;">켜두면 <b>관제 대시보드·검수 큐</b>를 주기적으로 <b>읽기 전용</b>으로 자동 조회합니다. 확정·재라벨·재학습·활성화 같은 쓰기 작업은 폴링하지 않습니다(Safe Mode 무관). 메트릭·혼동행렬은 재학습 때만 바뀌므로 수동 조회로 둡니다.</span>
+  </div>
+
   <div class="grid">
 
     <!-- ===== 연결/인증 ===== -->
@@ -481,6 +502,8 @@ let QUEUE = [];   // {inference_id, doc_id, title, label, confidence, model_vers
 let lastFlow = 0;
 let LAST_MODEL_VERSION = null;   // 최신 메트릭에서 세팅 — 혼동행렬 조회에 사용
 let LAST_GOLDEN_JOB_ID = null;
+// 실시간 관제(auto-refresh) 상태 — 아래 "실시간 관제" 섹션 참조.
+let AUTO_TIMER=null, AUTO_SILENT=false, AUTO_INFLIGHT=false, AUTO_TICK_OK=true;
 
 const $ = id => document.getElementById(id);
 const cfg = () => ({
@@ -509,6 +532,7 @@ function markFlow(n){
 }
 function ts(){ const d=new Date(); return d.toTimeString().slice(0,8); }
 function log(msg, kind='info'){
+  if(AUTO_SILENT) return;   // 실시간 관제 폴링 tick 은 로그를 남기지 않는다(스팸 방지).
   const b=$('logbody'); const line=document.createElement('div');
   line.className='logline '+kind;
   line.innerHTML=`<span class="t">${ts()}</span><span class="m"></span>`;
@@ -516,7 +540,7 @@ function log(msg, kind='info'){
   b.appendChild(line); b.scrollTop=b.scrollHeight;
 }
 function toggleLog(){ const b=$('logbody'); b.classList.toggle('collapsed'); $('log-toggle').textContent=b.classList.contains('collapsed')?'펼치기 ▴':'접기 ▾'; }
-function showRaw(obj){ $('raw-json').textContent = typeof obj==='string'?obj:JSON.stringify(obj,null,2); }
+function showRaw(obj){ if(AUTO_SILENT) return; $('raw-json').textContent = typeof obj==='string'?obj:JSON.stringify(obj,null,2); }
 function gradeTag(g){ return `<span class="tag g-${g}">${g}</span>`; }
 
 async function api(method, path, body){
@@ -530,10 +554,10 @@ async function api(method, path, body){
   try{
     res=await fetch(url,{method, headers, body: body?JSON.stringify(body):undefined});
     text=await res.text();
-  }catch(e){ log(`네트워크 오류: ${e.message}`,'err'); throw e; }
+  }catch(e){ AUTO_TICK_OK=false; log(`네트워크 오류: ${e.message}`,'err'); throw e; }
   let data; try{ data=text?JSON.parse(text):null; }catch{ data=text; }
   showRaw(data ?? text);
-  if(!res.ok){ log(`← ${res.status} ${path} :: ${typeof data==='object'?(data.detail||data.message||JSON.stringify(data)):text}`,'err'); const err=new Error(res.status); err.data=data; err.status=res.status; throw err; }
+  if(!res.ok){ AUTO_TICK_OK=false; log(`← ${res.status} ${path} :: ${typeof data==='object'?(data.detail||data.message||JSON.stringify(data)):text}`,'err'); const err=new Error(res.status); err.data=data; err.status=res.status; throw err; }
   log(`← ${res.status} ${path}`, 'ok');
   return data;
 }
@@ -917,9 +941,51 @@ function openGoldenReview(){
   window.open(`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/review.html`, '_blank', 'noopener');
 }
 
+/* ---- 실시간 관제 (auto-refresh · 읽기 전용 폴링) ----
+ * 이 콘솔은 원래 수동 새로고침만 있었다(웹소켓/폴링 0). 여기서 읽기 전용 조회
+ * (관제 대시보드 + 검수 큐)만 주기 폴링해 "켜두면 저절로 도는" 실시간 관제를 준다.
+ * 확정/재라벨/재학습/활성화 같은 쓰기는 절대 폴링하지 않는다(Safe Mode 와 무관).
+ * 메트릭/혼동행렬은 재학습 때만 바뀌고 수동으로 띄운 행렬을 덮어쓸 수 있어 제외한다. */
+function setAutoStatus(state){
+  const dot=$('auto-dot'), txt=$('auto-status'), stamp=$('auto-stamp');
+  if(!dot||!txt) return;
+  if(state==='live'){ dot.style.background='var(--green)'; txt.textContent='실시간 갱신 중'; txt.style.color='var(--green)'; if(stamp) stamp.textContent='마지막 갱신 '+ts(); }
+  else if(state==='error'){ dot.style.background='var(--red)'; txt.textContent='갱신 오류 · 재시도 중'; txt.style.color='var(--red)'; }
+  else { dot.style.background='var(--text-faint)'; txt.textContent='정지'; txt.style.color='var(--text-dim)'; }
+}
+// 검수 큐에서 사용자가 상호작용(등급 select/버튼 포커스) 중이면 재렌더가 그 조작을
+// 날려버리므로 그 tick 은 큐 갱신을 건너뛴다(대시보드는 계속 갱신).
+function queueBusy(){ const el=document.activeElement, q=$('queue'); return !!(el && q && el!==document.body && q.contains(el)); }
+async function autoTick(){
+  if(document.hidden) return;      // 백그라운드 탭이면 스킵(타이머는 유지)
+  if(AUTO_INFLIGHT) return;        // 이전 tick 진행 중이면 중첩 방지
+  AUTO_INFLIGHT=true; AUTO_SILENT=true; AUTO_TICK_OK=true;
+  try{
+    await loadDashboard();
+    if(!queueBusy()) await loadReviewQueue();
+  }catch(e){ AUTO_TICK_OK=false; }
+  AUTO_SILENT=false; AUTO_INFLIGHT=false;
+  setAutoStatus(AUTO_TICK_OK ? 'live' : 'error');
+}
+function stopAuto(){ if(AUTO_TIMER){ clearInterval(AUTO_TIMER); AUTO_TIMER=null; } }
+function onAutoChange(){
+  const secs=+($('auto-interval').value||0);
+  stopAuto();
+  if(secs>0){
+    setAutoStatus('live');
+    log(`실시간 관제 ON — ${secs}s 주기 (관제 대시보드·검수 큐 읽기 전용 조회)`, 'ok');
+    autoTick();                                // 즉시 1회
+    AUTO_TIMER=setInterval(autoTick, secs*1000);
+  } else {
+    setAutoStatus('paused');
+    log('실시간 관제 OFF (수동 새로고침만)', 'info');
+  }
+}
+
 /* init */
 populateSamples();
 checkHealth();
+setAutoStatus('paused');
 log('거버넌스 콘솔 준비 완료. Safe Mode가 켜져 있어 상태 변경 작업은 기본 차단됩니다.','info');
 </script>
 
