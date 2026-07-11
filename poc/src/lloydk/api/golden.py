@@ -19,6 +19,7 @@ from lloydk.schemas.golden import (
     GoldenBuildRequest,
     GoldenBuildResponse,
     GoldenBuildStatus,
+    GoldenRegisterRequest,
     GoldenSignoffRequest,
     GoldenSignoffResponse,
 )
@@ -34,6 +35,28 @@ router = APIRouter(tags=["golden"], dependencies=[Depends(require_auth)])
 )
 def golden_build(request: Request, req: GoldenBuildRequest) -> GoldenBuildResponse:
     return GoldenBuildService().submit(req)
+
+
+@router.post(
+    "/golden/jobs/register",
+    response_model=GoldenBuildResponse,
+    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
+)
+def golden_register_build(req: GoldenRegisterRequest) -> GoldenBuildResponse:
+    """기존 build_*.jsonl(큐레이트 슬레이트)을 재라벨링 없이 골든 잡으로 등록 → signoff.html 연결.
+
+    /golden/build 와 달리 LLM 재라벨링을 하지 않아 슬레이트 라벨을 보존한다(실서명 스프린트 34건
+    등). 경로는 datasets/ 하위 샌드박스. 반환 job_id 로 GET /golden/jobs/{id}/signoff.html 을 열어
+    검수자가 화면 서명한다.
+    """
+    job_id = GoldenBuildService().register_build(
+        req.build_path, actor_user_id=req.actor.user_id
+    )
+    if job_id is None:
+        raise HTTPException(
+            status_code=404, detail="build_path 없음 또는 datasets/ 밖(샌드박스 거부)"
+        )
+    return GoldenBuildResponse(golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}")
 
 
 @router.get(
@@ -120,4 +143,5 @@ def golden_job_signoff(
         published=result["published"],
         reviewer_id=reviewer_id,
         overridden=overridden,
+        publish_note=result.get("publish_note"),
     )

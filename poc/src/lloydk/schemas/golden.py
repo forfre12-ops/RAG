@@ -39,6 +39,17 @@ class GoldenBuildResponse(BaseModel):
     status_url: str
 
 
+class GoldenRegisterRequest(BaseModel):
+    """이미 만들어진 build_*.jsonl(gold 후보)을 재라벨링 없이 골든 잡으로 등록.
+
+    /golden/build 는 LLM 재라벨링을 하므로 큐레이트된 슬레이트(예: 실서명 스프린트 34건)의
+    라벨이 바뀐다. 이 경로는 기존 build 파일을 그대로 잡으로 올려 signoff.html 이 그 후보를
+    가리키게 한다(검수자 화면 서명 대상 연결). 경로는 datasets/ 하위로 샌드박스된다.
+    """
+    build_path: str
+    actor: Actor
+
+
 class GoldenBuildStatus(BaseModel):
     status: str                                  # queued | running | done | failed
     stats: Optional[dict] = None
@@ -89,3 +100,5 @@ class GoldenSignoffResponse(BaseModel):
     published: bool
     reviewer_id: str           # 실제 기록된 서명자(인증 신원)
     overridden: bool           # 클라 actor.user_id 가 인증 sub 로 덮어써졌나(위조 시도/클라 버그 신호)
+    # publish 요청이 라이브 경로에 반영되지 못한 이유(경로 미설정·승격 0건). 정상 반영/미요청이면 None.
+    publish_note: Optional[str] = None

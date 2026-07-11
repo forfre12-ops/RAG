@@ -100,6 +100,45 @@ class GoldenBuildService:
 
         return GoldenBuildResponse(golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}")
 
+    def register_build(
+        self, build_path: str, *, actor_user_id: str
+    ) -> "Optional[uuid.UUID]":
+        """기존 build_*.jsonl(gold 후보)을 재라벨링 없이 'done' 골든 잡으로 등록.
+
+        /golden/build 는 LLM 재라벨링을 하므로 큐레이트 슬레이트(실서명 스프린트 등)의 라벨이
+        바뀐다. 이 경로는 파일을 그대로 잡의 gold_path 로 올려 signoff.html/POST signoff 가 그
+        후보를 검수 화면에 연결하게 한다. 경로는 datasets/ 하위로 샌드박스(_safe_path). 파일
+        없음/샌드박스 밖이면 None(호출부 404). LLM·게이트 미실행 — 순수 등록.
+        """
+        try:
+            p = _safe_path(build_path)
+        except ValueError:
+            return None
+        if not p.exists() or not p.is_file():
+            return None
+        from collections import Counter  # noqa: PLC0415
+
+        rows = _read_jsonl(p)
+        by_grade = Counter(r.get("label") for r in rows if r.get("label"))
+        job_id = uuid.uuid4()
+        self.jobs.create(
+            job_id,
+            payload={
+                "kind": "golden_register",
+                "actor": actor_user_id,
+                "submitted_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            },
+        )
+        self.jobs.update(
+            job_id,
+            status="done",
+            gold_path=str(p),
+            gold_count=len(rows),
+            uncertain_count=0,
+            stats={"gold_by_grade": dict(by_grade), "source": "register"},
+        )
+        return job_id
+
     def run_build(
         self,
         req: GoldenBuildRequest,
@@ -270,9 +309,19 @@ class GoldenBuildService:
         merged = merge_locked_records(existing_live, res.locked)
 
         published = False
-        if publish and res.locked and live_path:
-            _atomic_write_jsonl(Path(live_path), merged)
-            published = True
+        publish_note = None
+        if publish:
+            # publish 요청이 라이브 경로에 반영되지 못하는 두 경우를 조용한 no-op 대신 명시(리뷰 ⑥).
+            if not res.locked:
+                publish_note = "publish 요청됐으나 승격 locked 0건 — 반영 대상 없음"
+            elif not live_path:
+                publish_note = (
+                    "publish 요청됐으나 LOCKED_EVAL_JSONL 미설정 — 배포 게이트 미반영. "
+                    "프로파일 env 에 locked_eval_jsonl 경로를 설정하세요"
+                )
+            else:
+                _atomic_write_jsonl(Path(live_path), merged)
+                published = True
 
         return {
             "locked": len(res.locked),
@@ -282,6 +331,7 @@ class GoldenBuildService:
             # published=False 면 '라이브+이번 승격' 미리보기(라이브는 실제 무변경).
             "readiness": eval_readiness(merged),
             "published": published,
+            "publish_note": publish_note,
             "run_locked_path": str(run_locked_path),
         }
 

@@ -25,3 +25,6 @@ datasets/gold/formats/
 datasets/constructed_floor_runs/
 datasets/patent_timeaxis/
 datasets/gold_real/*.bak-forged-nkt
+# signoff_slate/ 는 결정적 슬레이트(build_signoff_slate_v1.jsonl)만 tracked.
+# 서명 run 출력 locked_<job_id>.jsonl 은 per-run 산출물 → 무시(정본은 LOCKED_EVAL_JSONL).
+datasets/signoff_slate/locked_*.jsonl
