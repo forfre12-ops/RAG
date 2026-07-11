@@ -313,7 +313,7 @@ class ClassifyService:
             # [P0#3 후속] ingestion 단계서 열화추출로 needs_review/failed 격리된 문서는 자동확정 금지.
             # ingestion 게이트가 쓴 processing_status 를 서빙이 읽지 않아 격리문서가 그대로 자동분류되던
             # 하프와이어링 마감. 등급은 검수자 참고로 산출하되 status만 격리(등급 무변경·FNR-safe).
-            if status != "needs_review" and review_flagged:
+            if review_flagged:
                 status = "needs_review"
                 warnings_acc.append(
                     "document flagged at ingestion (degraded extraction: OCR/low-quality) —"
