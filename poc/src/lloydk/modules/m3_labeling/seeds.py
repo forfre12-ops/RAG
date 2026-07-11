@@ -184,6 +184,15 @@ def to_canonical_factor(factor_code: str) -> str:
 #   - semantic       : 임베딩 코사인 유사도 ≥ EMB_SEMANTIC_THRESHOLD(기본 0.75) 시 1회 매칭
 #                     provider는 EMB_PROVIDER=hash | lloydk.config.settings.embedding_model 사용
 KEYWORD_SEEDS: list[dict] = [
+    # Defense/electronic-warfare terms observed in golden TS samples.
+    {"grade": "TS", "keyword": "국방용", "weight": 0.9, "factor": "VALUE"},
+    {"grade": "TS", "keyword": "전자전투 시스템", "weight": 0.95, "factor": "VALUE"},
+    {"grade": "TS", "keyword": "전자전투", "weight": 0.85, "factor": "VALUE"},
+    {"grade": "TS", "keyword": "초고주파 레이더", "weight": 0.9, "factor": "VALUE"},
+    {"grade": "TS", "keyword": "AI 기반 신호 인식 알고리즘", "weight": 0.9, "factor": "VALUE"},
+    {"grade": "TS", "keyword": "양자 암호화", "weight": 0.9, "factor": "MANAGEMENT"},
+    {"grade": "TS", "keyword": "암호화 키 관리 시스템", "weight": 0.95, "factor": "MANAGEMENT"},
+    {"grade": "TS", "keyword": "외부 공유는 절대 금지", "weight": 0.9, "factor": "SECRECY"},
     # ============================================================
     # TS 특급기밀 — 유출 시 회사 존립 위협
     # ============================================================
