@@ -349,15 +349,25 @@ async def analyze_document(
     elapsed = int((time.perf_counter() - t0) * 1000)
     label = cls.label.value if hasattr(cls.label, "value") else str(cls.label)
     factors = cls.evaluation_factors.model_dump() if getattr(cls, "evaluation_factors", None) else {}
+    # 추출 검수게이트(표누락/OCR/저품질/추출오류)를 최종 status 로 조정 — content 경로 분류는
+    # review_flagged 를 안 태우므로, 게이트가 검수를 요구하면 여기서 needs_review 로 승격해
+    # box4('검수 필요')와 box5(최종 status)가 모순되지 않게 하고 실 doc_id 서빙과 일치시킨다.
+    cls_warnings = list(cls.warnings or [])
+    eff_status = cls.status
+    if dec.requires_review and cls.status != "needs_review":
+        eff_status = "needs_review"
+        cls_warnings.append(
+            "extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (" + ", ".join(dec.reasons) + ")"
+        )
     resp.classification = AnalyzeClassification(
         label=label,
         confidence=round(cls.confidence, 3),
         scores={k: round(float(v), 3) for k, v in (cls.scores or {}).items()},
-        status=cls.status,
+        status=eff_status,
         model_version=cls.model_version,
         factors=factors,
         factors_source=getattr(cls, "factors_source", None),
-        warnings=list(cls.warnings or []),
+        warnings=cls_warnings,
         elapsed_ms=cls.elapsed_ms or elapsed,
     )
     if return_evidence and getattr(cls, "evidence", None):
@@ -370,7 +380,7 @@ async def analyze_document(
     ))
     resp.stages.append(AnalyzeStage(
         name="결과",
-        status="review" if cls.status == "needs_review" else "done",
-        detail="검수 필요(needs_review)" if cls.status == "needs_review" else "자동 확정(staging)",
+        status="review" if eff_status == "needs_review" else "done",
+        detail="검수 필요(needs_review)" if eff_status == "needs_review" else "자동 확정(staging)",
     ))
     return resp

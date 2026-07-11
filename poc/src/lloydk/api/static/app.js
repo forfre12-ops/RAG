@@ -387,10 +387,10 @@ function renderResult(data, elapsedMs) {
     badge.addEventListener("click", () => focusLegalCard(grade));
   }
 
-  // 자연어 요약 3단 (양성·음성 근거)
+  // 자연어 요약 3단 (양성·음성 근거) + 서버 status/warnings 반영
   renderSummary(data);
-  // 4 평가요소 stats
-  renderFactors(data.evaluation_factors || {});
+  // 평가요소 stats (factors_source=model_estimated 는 '모델 추정'으로 구분)
+  renderFactors(data.evaluation_factors || {}, data.factors_source);
   // 키워드 칩 (weight 진하기)
   renderKeywordChips(data.evidence || []);
   // 본문 하이라이트
@@ -477,15 +477,29 @@ function renderSummary(data) {
   const matchedTxt = matched.length > 0
     ? `「${matched.join("」 「")}」 키워드가 감지되었습니다.`
     : "본문에서 시드 키워드 매칭이 없어 기본 등급으로 판정되었습니다.";
+  // factors_source=model_estimated 는 룰 미탐으로 등급에 맞춰 역산한 추정치(법리 근거 아님).
+  const estimated = data.factors_source === "model_estimated";
   const factorTxt = topFactors.length > 0
     ? `3요건(S·V·M) 중 ${topFactors
         .map(([k, v]) => `<b>${factorLabels[k] || k}(${v.toFixed(2)})</b>`)
-        .join("·")}가 가장 높게 측정되었습니다.`
+        .join("·")}가 ${estimated ? "가장 높게 <b>추정</b>되었습니다 (모델 역산 — 법리 근거 아님)" : "가장 높게 측정되었습니다"}.`
     : "";
+
+  // 서버가 계산한 라우팅 status·warnings 를 반드시 노출 — needs_review 를 확정처럼 보이지 않게.
+  const needsReview = data.status === "needs_review";
+  const warns = Array.isArray(data.warnings) ? data.warnings : [];
+  const warnTxt = warns.map((w) => escapeHtml(String(w))).join(" · ");
+  const banner = needsReview
+    ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:8px;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨${warnTxt ? `<br><span style="font-weight:500;font-size:12px;">사유: ${warnTxt}</span>` : ""}</p>`
+    : warnTxt ? `<p class="neg" style="font-size:12px;">⚠ ${warnTxt}</p>` : "";
+  const verdictTxt = needsReview
+    ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다. (신뢰도 ${(conf * 100).toFixed(0)}%)`
+    : `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 판정되었습니다. (신뢰도 ${(conf * 100).toFixed(0)}%)`;
 
   const wrap = $("#result-summary");
   wrap.innerHTML = `
-    <p class="pos">본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 판정되었습니다. (신뢰도 ${(conf * 100).toFixed(0)}%)</p>
+    ${banner}
+    <p class="pos">${verdictTxt}</p>
     <p class="pos">${matchedTxt} ${factorTxt}</p>
     <p class="neg">${negEvidence}</p>
   `;
@@ -495,7 +509,7 @@ function gradeLabel(g) {
   return ({ TS: "특급기밀", S1: "1급 비밀", S2: "2급 대외비", S3: "3급 공개" })[g] || g;
 }
 
-function renderFactors(f) {
+function renderFactors(f, factorsSource) {
   const wrap = $("#result-factors");
   const labels = {
     secrecy: "비공지성(S)",
@@ -503,8 +517,15 @@ function renderFactors(f) {
     management: "비밀관리성(M)",
   };
   // 서버 응답은 키워드 가중치 누적값이라 등급에 따라 0~5+ 범위.
-  // 화면 표시는 4 요소 중 상대값을 0~1로 정규화해서 비교 가능하게 한다.
+  // 화면 표시는 3 요소(S·V·M) 상대값을 0~1로 정규화해서 비교 가능하게 한다.
   wrap.innerHTML = "";
+  // 역산 추정치는 법리 근거가 아님을 구분 표기(번들C 컴플라이언스 계약).
+  if (factorsSource === "model_estimated") {
+    const note = document.createElement("div");
+    note.style.cssText = "grid-column:1/-1;font-size:12px;color:#d97706;margin-bottom:4px;";
+    note.textContent = "⚠ 모델 추정치 — 룰이 근거를 못 찾아 등급에 맞춰 역산(법리 근거 아님)";
+    wrap.appendChild(note);
+  }
   const values = Object.keys(labels).map((k) => (typeof f[k] === "number" ? f[k] : 0));
   const maxV = Math.max(1, ...values);
   Object.entries(labels).forEach(([k, l], i) => {

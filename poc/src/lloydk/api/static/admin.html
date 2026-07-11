@@ -653,7 +653,8 @@ async function loadReviewQueue(){
     QUEUE = (d.items||[]).map(it=>({
       inference_id:it.classification_id, doc_id:it.doc_id,
       title:it.filename||it.doc_id, label:it.grade, confidence:it.confidence,
-      model_version:it.model_version, flagged:true, resolved:false
+      model_version:it.model_version, text_preview:it.text_preview, status:it.status,
+      flagged:true, resolved:false
     }));
     renderQueue(); markFlow(2);
     const info=$('rq-info');
@@ -672,10 +673,11 @@ function renderQueue(){
   q.innerHTML=QUEUE.map((it,i)=>`
     <div class="q-item ${it.flagged?'flagged':''} ${it.resolved?'resolved':''}">
       <div class="q-top">
-        <div><span class="q-id">${esc(it.doc_id)}</span> · <span class="q-title">${esc(it.title)}</span></div>
-        <div>${gradeTag(it.label)} <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${(it.confidence*100).toFixed(0)}%</span> ${it.flagged?'<span class="pill warn">검수</span>':'<span class="pill ok">자동</span>'} ${it.resolved?'<span class="pill ok">완료</span>':''}</div>
+        <div><span class="q-id">${esc(it.doc_id)}</span> · <span class="q-title">${esc(it.title)}</span>${it.status?` <span class="pill" style="font-size:10px">${esc(it.status)}</span>`:''}</div>
+        <div>${gradeTag(it.label)} <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${(it.confidence*100).toFixed(0)}%</span> ${it.flagged?'<span class="pill warn">검수</span>':'<span class="pill ok">자동</span>'} ${it.resolved?'<span class="pill ok">완료</span>':(it.pending_second?'<span class="pill warn">2차 검수 필요</span>':'')}</div>
       </div>
-      ${it.resolved?'':`
+      ${it.text_preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:96px;overflow:auto;white-space:pre-wrap;">${esc(it.text_preview)}</div>`:''}
+      ${(it.resolved||it.pending_second)?'':`
       <div class="q-actions">
         <button class="btn sm" onclick="doConfirm(${i})">확정 (현 등급)</button>
         <span style="font-size:11px;color:var(--text-dim)">또는 재라벨 →</span>
@@ -692,8 +694,18 @@ async function doConfirm(i){
     const body={doc_id:it.doc_id, confirmed_label:it.label, model_version:it.model_version, actor:actor(), note:'console confirm'};
     if(it.inference_id) body.inference_id=it.inference_id;
     const d=await api('POST','/confirm',body);
+    if(d.persisted===false){                              // DB미가용/분류 미존재 → 감사-only(무음 성공 아님)
+      it.flagged=true; renderQueue();
+      log(`⚠ 확정 미영속(감사-only): ${it.doc_id} — ${(d.warnings&&d.warnings.length?d.warnings:['DB 미가용 또는 분류 미존재']).join(' · ')}. 항목을 큐에 유지.`,'err');
+      return;
+    }
+    if(d.second_review_required){                         // 고등급 이중검토 보류 → '완료' 아님
+      it.pending_second=true; renderQueue();
+      log(`2차 검수 필요: ${it.doc_id} → ${it.label} — 고등급 이중검토 보류(두 번째 검수자 필요).`,'info');
+      return;
+    }
     it.resolved=true; renderQueue(); markFlow(2);
-    log(`확정 완료: ${it.doc_id} → ${it.label} (confirmation ${d.confirmation_id})`,'ok');
+    log(`확정 완료: ${it.doc_id} → ${it.label} (confirmation ${d.confirmation_id})`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(' · ')}`:''),'ok');
   }catch(e){ alert('확정 실패: '+(e.data?.detail||e.message)); }
 }
 async function doRelabel(i){
@@ -704,8 +716,18 @@ async function doRelabel(i){
     const body={doc_id:it.doc_id, original_label:it.label, corrected_label:corrected, reason:'console relabel', actor:actor()};
     if(it.inference_id) body.inference_id=it.inference_id;
     const d=await api('POST','/relabel',body);
+    if(d.persisted===false){                              // DB미가용/분류 미존재 → 감사-only(무음 성공 아님)
+      it.flagged=true; renderQueue();
+      log(`⚠ 재라벨 미영속(감사-only): ${it.doc_id} — ${(d.warnings&&d.warnings.length?d.warnings:['DB 미가용 또는 분류 미존재']).join(' · ')}. 항목을 큐에 유지.`,'err');
+      return;
+    }
+    if(d.second_review_required){                         // 고등급 이중검토 보류 → '완료' 아님
+      it.label=corrected; it.pending_second=true; renderQueue();
+      log(`2차 검수 필요: ${it.doc_id} → ${corrected} — 고등급 이중검토 보류(두 번째 검수자 필요).`,'info');
+      return;
+    }
     it.resolved=true; it.label=corrected; renderQueue(); markFlow(2);
-    log(`재라벨 완료: ${it.doc_id} → ${corrected} · 큐 ${d.queue_size}/${d.retrain_threshold} (재학습 임계)`,'ok');
+    log(`재라벨 완료: ${it.doc_id} → ${corrected} · 큐 ${d.queue_size}/${d.retrain_threshold} (재학습 임계)`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(' · ')}`:''),'ok');
     if(d.queue_size>=d.retrain_threshold) log(`재학습 임계 도달 (${d.queue_size}≥${d.retrain_threshold}) — 3번 재학습 트리거 권장`,'info');
   }catch(e){ alert('재라벨 실패: '+(e.data?.detail||e.message)); }
 }

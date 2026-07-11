@@ -264,7 +264,7 @@ async function analyze(){
     const ms=Math.round(performance.now()-t0);
     const j = await r.json();
     if(!r.ok){ log('HTTP '+r.status+'  '+JSON.stringify(j).slice(0,240)); $('busy').textContent='실패: HTTP '+r.status; $('go').disabled=false; return; }
-    log('analyze OK '+ms+'ms  '+picked.name+' → '+(j.classification? j.classification.label : '(빈본문)'));
+    log('analyze OK '+ms+'ms  '+picked.name+' → '+(j.classification? j.classification.label : ((j.stages||[]).some(s=>s.name==='분류'&&s.status==='fail')?'(분류 오류)':'(빈본문)')));
     render(j);
     $('busy').textContent='완료 ('+ms+'ms)';
   }catch(e){ log('오류: '+e.message); $('busy').textContent='오류: '+e.message; }
@@ -301,7 +301,12 @@ function render(j){
     : `<div class="gate-ok"><b>자동 경로 통과</b> — 추출 품질·표·OCR 이상 없음(무오탐).</div>`;
   // 분류
   const c=j.classification;
-  if(!c){ $('cls-box').innerHTML='<span class="hint">본문 추출 0자 — 분류 불가(검수 필요).</span>'; }
+  if(!c){
+    const failStage=(j.stages||[]).find(s=>s.name==='분류' && s.status==='fail');
+    $('cls-box').innerHTML = failStage
+      ? `<div class="gate-review"><b>분류 오류 — 검수 필요</b><div class="warn">${esc(failStage.detail||'분류 실패')}</div></div>`
+      : '<span class="hint">본문 추출 0자 — 분류 불가(검수 필요).</span>';
+  }
   else{
     const f=c.factors||{};
     const fbars = ['secrecy','value','management'].map(k=>{
