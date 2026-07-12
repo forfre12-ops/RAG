@@ -151,6 +151,29 @@ def _cell_text(value) -> str:
     return str(value).strip()
 
 
+def _xls_cell_text(value, ctype, datemode) -> str:
+    """xlrd 셀을 타입 인지 문자열로 — 정수는 '.0' 없이, 날짜는 serial 대신 datetime 으로.
+
+    xlrd 는 모든 수치/날짜를 float 로 돌려줘 str() 만 하면 1234→'1234.0', 엑셀 날짜(serial 45306)→
+    '45306.0'(의미 소실)로 열화된다(openpyxl 경로는 int/datetime 보존). 숫자무손실 위해 교정.
+    """
+    import xlrd  # noqa: PLC0415
+    if ctype == xlrd.XL_CELL_NUMBER:
+        try:
+            if float(value).is_integer():
+                return str(int(value))
+        except (TypeError, ValueError, OverflowError):
+            pass
+        return str(value)
+    if ctype == xlrd.XL_CELL_DATE:
+        try:
+            dtv = xlrd.xldate.xldate_as_datetime(value, datemode)
+            return dtv.date().isoformat() if (dtv.hour == dtv.minute == dtv.second == 0) else dtv.isoformat(sep=" ")
+        except Exception:  # noqa: BLE001
+            return str(value)
+    return _cell_text(value)
+
+
 def _trim_trailing_empty(row: list[str]) -> list[str]:
     while row and not row[-1]:
         row.pop()
@@ -960,7 +983,10 @@ def _extract_excel(p: Path) -> ExtractResult:
         parts.append(f"[sheet: {sh.name}]")
         table_rows: list[list[str]] = []
         for r in range(sh.nrows):
-            cells = _trim_trailing_empty([_cell_text(sh.cell_value(r, c)) for c in range(sh.ncols)])
+            cells = _trim_trailing_empty([
+                _xls_cell_text(sh.cell_value(r, c), sh.cell_type(r, c), book.datemode)
+                for c in range(sh.ncols)
+            ])
             if _row_has_text(cells):
                 table_rows.append(cells)
                 parts.append(_table_text_line(cells))
@@ -1201,6 +1227,20 @@ def _pdf_table_coverage(table_warnings: list[str]) -> str | None:
     return None
 
 
+def _pdf_sparse_signal(text: str, pages: int, base_quality: float) -> tuple[float, list[str]]:
+    """부분 텍스트레이어(표지/워터마크/머리말)가 스캔 본문의 OCR 을 가로채는 것 방지(#10).
+
+    pdfminer/PyMuPDF 는 텍스트가 조금이라도 있으면 즉시 채택하고 OCR 로 안 내려간다. 다수 페이지에
+    문자밀도가 매우 낮으면(준스캔 의심) quality 를 검수 임계(extraction_review_min_quality 기본 0.6)
+    아래로 낮춰 자동확정 대신 검수 라우팅되게 한다(table_coverage 와 동형 FNR-safe 신호, 등급·본문
+    불변). 정상 밀도면 base_quality 유지. 순수 스캔(레이어 0)은 이 분기 전에 OCR 로 처리된다.
+    """
+    density = len(text.strip()) / max(1, pages)
+    if pages >= 3 and density < 80:
+        return 0.5, [f"pdf_sparse_text_layer: {density:.0f} chars/page over {pages}p (준스캔 의심 → 검수)"]
+    return base_quality, []
+
+
 def _extract_pdf(p: Path) -> ExtractResult:
     """PDF 추출.
 
@@ -1217,14 +1257,15 @@ def _extract_pdf(p: Path) -> ExtractResult:
             pages = max(1, text.count("\x0c") + 1)
             tables, table_warnings = _pdf_tables_via_pdfplumber(p)
             text = _append_if_missing(text, _tables_to_text(tables))
+            q, sparse_w = _pdf_sparse_signal(text, pages, 0.92)
             return ExtractResult(
                 text=text,
                 method="parser",
-                quality=0.92,
+                quality=q,
                 pages=pages,
                 table_coverage=_pdf_table_coverage(table_warnings),
                 tables=tables,
-                warnings=table_warnings,
+                warnings=table_warnings + sparse_w,
             )
     except Exception:  # noqa: BLE001
         pass
@@ -1243,14 +1284,15 @@ def _extract_pdf(p: Path) -> ExtractResult:
         if text.strip():
             tables, table_warnings = _pdf_tables_via_pdfplumber(p)
             text = _append_if_missing(text, _tables_to_text(tables))
+            q, sparse_w = _pdf_sparse_signal(text, n_pages, 0.95)
             return ExtractResult(
                 text=text,
                 method="parser",
-                quality=0.95,
+                quality=q,
                 pages=n_pages,
                 table_coverage=_pdf_table_coverage(table_warnings),
                 tables=tables,
-                warnings=table_warnings,
+                warnings=table_warnings + sparse_w,
             )
         # 텍스트 레이어 없음 → OCR 시도
         return _ocr_pdf_pages(p, n_pages)

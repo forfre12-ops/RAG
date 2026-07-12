@@ -935,7 +935,22 @@ def assert_production_credentials() -> None:
     """
     # pytest/TestClient 환경에서는 운영 자격증명 검사 skip (하드닝 프로파일을 구성한 단위테스트도
     # 통과하도록 poc_mode/우회 판정보다 먼저). conftest.py가 TESTING=1, pytest가 PYTEST_CURRENT_TEST 주입.
-    if os.environ.get("TESTING", "").strip().lower() in {"1", "true"} or os.environ.get("PYTEST_CURRENT_TEST"):
+    _under_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    _testing = os.environ.get("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}
+    # [#13 defense-in-depth] 운영/하드닝 신호(poc_mode=full 또는 require_safety_gates)인데 pytest 밖에서
+    # TESTING 이 켜져 있으면 = 운영에 테스트 env 가 오상속된 것(dev .env 재사용·베이스이미지 잔존 등).
+    # 그대로 두면 아래 skip 이 전 startup 안전검사(자격증명·CORS·rate-limit·감사·암호화·JWT iss/aud)를
+    # 통째로 무음 우회한다 → fail-clear 로 차단(hardened_poc_mode_bypass 와 대칭). pytest 실행 중
+    # (PYTEST_CURRENT_TEST 존재)은 정상 단위테스트이므로 제외해 테스트를 깨지 않는다.
+    if _testing and not _under_pytest and (
+        settings.poc_mode == "full" or getattr(settings, "require_safety_gates", False)
+    ):
+        raise RuntimeError(
+            "운영/하드닝 프로파일에 TESTING env 유입 감지 — TESTING=1 은 모든 startup 안전검사를 무음 "
+            "우회합니다. .env·베이스이미지·오케스트레이터에서 TESTING(및 PYTEST_CURRENT_TEST)을 제거하세요. "
+            "테스트가 목적이면 비하드닝 프로파일(lite-cloud/dev)·POC_MODE=dryrun 을 쓰세요."
+        )
+    if _testing or _under_pytest:
         return
     # [게이트ON=가시성ON / 무음 우회 차단] 하드닝 프로파일(require_safety_gates=True)인데 poc_mode!=full
     # 이면 아래 startup 시행부 전체가 조기 return 으로 스킵된다 — .env POC_MODE=dryrun 한 줄로 하드닝을

@@ -44,8 +44,13 @@ def cred_or_ip_key(request: Request) -> str:
     return f"ip:{get_remote_address(request)}"
 
 
-# Limiter 인스턴스 — app.state.limiter 등록 + 데코레이터에서 참조.
-# default_limits는 그 외 라우터에 자동 적용 (분당 120).
+# Limiter 인스턴스 — app.state.limiter 등록 + @limiter.limit 데코레이터에서 참조.
+# 주의(#14 정직성): default_limits 는 SlowAPIMiddleware 가 등록돼 있어야만 미장식 라우트에 자동
+# 적용된다. app.py 는 그 미들웨어를 등록하지 않으므로 default_limits(120/min)는 실효가 없고, 한도는
+# @limiter.limit 데코레이터가 붙은 라우트(classify/answer/explain/synthesis/train/async/stream)에만
+# 걸린다(그 외 변경성 라우트는 무제한). 배포모델(폐쇄망·단일 신뢰 KL 호출자·RBAC 게이트)상 블랭킷
+# 한도가 불필요해 미들웨어를 의도적으로 안 켠 상태 — 필요해지면 SlowAPIMiddleware 등록 또는 비용 큰
+# 변경성 라우트(documents/golden/confirm/promotion)에 명시 @limiter.limit 를 붙인다.
 # headers_enabled=False — X-RateLimit-* 헤더 자동 주입을 비활성 (endpoint signature에
 # response: Response 파라미터를 강제하지 않기 위함). 429 응답에는 핸들러가 Retry-After
 # 헤더를 명시 주입하므로 클라이언트는 retry 정보를 받음.

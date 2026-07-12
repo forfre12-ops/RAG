@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import os
+import time
 from dataclasses import dataclass, field
 
 from sqlalchemy import or_, select
@@ -31,6 +33,8 @@ _OVERTURN_MIN_SAMPLES = 5  # overturn율은 표본이 이 미만이면 신뢰불
 # [번들 E] 마지막 kill-gate 점검 결과 캐시 — 안전브레이크가 핫패스(classify)에서 DB 없이
 # tripped 여부를 읽게 한다. run_kill_gate_check()가 주기 refresh에서 갱신. None=아직 미점검.
 _LAST_RESULT: "KillGateResult | None" = None
+_LAST_CHECK_TS: float = 0.0   # 마지막 점검 시각(monotonic) — celery 워커 지연갱신 신선도 판정용
+_STALE_SEC: float = 60.0      # 캐시 신선도 임계 — 초과 시 지연 갱신(feature ON 일 때만 DB 조회)
 
 
 def should_suppress_autoconfirm(grade: str | None) -> bool:
@@ -43,6 +47,19 @@ def should_suppress_autoconfirm(grade: str | None) -> bool:
     from lloydk.config import settings  # noqa: PLC0415
     if not getattr(settings, "kill_gate_suppress_autoconfirm", False):
         return False
+    # [#8kg] celery 워커 등 gauge-refresh 루프가 닿지 않는 프로세스는 _LAST_RESULT 가 영원히 None →
+    # 안전브레이크 무음 미작동(fail-open). feature 가 켜진 경우에 한해, 캐시가 없거나 stale 이면 지연
+    # 갱신(핫패스 부하는 feature ON + 60s 주기로 제한). 갱신 실패는 보수적으로 마지막 값 유지.
+    global _LAST_CHECK_TS
+    # 테스트(pytest)는 _LAST_RESULT 를 직접 세팅해 안전브레이크를 검증하므로 지연갱신을 건너뛴다
+    # (테스트가 세팅한 값 보존). 운영 celery 워커(TESTING/pytest 아님)에서만 지연갱신이 돈다.
+    if not os.environ.get("PYTEST_CURRENT_TEST"):
+        now = time.monotonic()
+        if _LAST_RESULT is None or (now - _LAST_CHECK_TS) > _STALE_SEC:
+            try:
+                run_kill_gate_check()
+            except Exception:  # noqa: BLE001
+                _LAST_CHECK_TS = now  # 실패해도 재시도 폭주 방지(다음 창까지 대기)
     if _LAST_RESULT is None or not _LAST_RESULT.tripped:
         return False
     return str(grade) in _HIGH_GRADES
@@ -163,8 +180,10 @@ def run_kill_gate_check() -> dict:
         overturn_rate_max=float(getattr(settings, "kill_gate_overturn_rate_max", 0.30)),
     )
     # [번들 E] 캐시 갱신 — 안전브레이크(should_suppress_autoconfirm)가 읽는 tripped 상태.
-    global _LAST_RESULT
+    # _LAST_CHECK_TS 도 갱신해 gauge-loop/지연갱신 양쪽이 신선도를 공유(중복 refresh 방지).
+    global _LAST_RESULT, _LAST_CHECK_TS
     _LAST_RESULT = res
+    _LAST_CHECK_TS = time.monotonic()
     try:
         from lloydk.api.prom_metrics import KILL_GATE_TRIPPED  # noqa: PLC0415
 

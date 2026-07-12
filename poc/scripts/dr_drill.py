@@ -41,9 +41,11 @@ def _now() -> str:
 
 def run_stage(name: str, dry_run: bool, cmd: list[str] | None = None) -> dict:
     t0 = time.time()
-    status = "SKIPPED" if dry_run else "RUN"
     error = None
-    if not dry_run and cmd:
+    if dry_run:
+        status = "SKIPPED"
+    elif cmd:
+        status = "RUN"
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             status = "PASS" if r.returncode == 0 else "FAIL"
@@ -51,6 +53,11 @@ def run_stage(name: str, dry_run: bool, cmd: list[str] | None = None) -> dict:
         except Exception as e:  # noqa: BLE001
             status = "ERROR"
             error = str(e)
+    else:
+        # cmd 없음 = 자동 검증 러너 부재 → MANUAL(수동/스크립트 검증 필요). PASS 로 위장하지 않는다:
+        # 과거엔 print() 스텁이 returncode 0 → PASS 로 기록돼 /guide·async batch 가 깨져도 드릴이
+        # '검증됨'을 주장하는 fake-green 이었다. MANUAL 은 passed 집계에서 제외(아래 main).
+        status = "MANUAL"
     elapsed = time.time() - t0
     return {
         "stage": name,
@@ -61,7 +68,7 @@ def run_stage(name: str, dry_run: bool, cmd: list[str] | None = None) -> dict:
     }
 
 
-def stage_commands(staging_compose: str) -> dict[str, list[str]]:
+def stage_commands(staging_compose: str) -> dict[str, list[str] | None]:
     return {
         "find_latest_backups": ["ls", "-la", "backups/"],
         "spin_up_staging": ["docker", "compose", "-p", "lloydk-dr", "-f", staging_compose, "up", "-d"],
@@ -70,9 +77,12 @@ def stage_commands(staging_compose: str) -> dict[str, list[str]]:
         # argparse 오류(exit 2)로 항상 죽었다.
         "restore_postgres": ["python", "scripts/dr_restore.py", "--target", "postgres", "--staging"],
         "restore_storage": ["python", "scripts/dr_restore.py", "--target", "storage", "--staging"],
-        "smoke_classify": ["python", "scripts/p5_e2e_smoke.py", "--mode", "staging"],
-        "smoke_guide": ["python", "-c", "print('staging /guide/* smoke — manual or scripted')"],
-        "smoke_async_batch": ["python", "-c", "print('staging async batch smoke')"],
+        # p5_e2e_smoke.py 는 --mode {http,inproc} 만 허용(staging 은 argparse exit 2 로 항상 죽음) → http.
+        "smoke_classify": ["python", "scripts/p5_e2e_smoke.py", "--mode", "http"],
+        # /guide·async batch 실 스테이징 검증 러너 미구현 → 자동 검증 불가. print 스텁으로 PASS 위장하지
+        # 않고 MANUAL 로 기록(수동/스크립트 검증 필요). 러너 생기면 실 명령으로 교체.
+        "smoke_guide": None,
+        "smoke_async_batch": None,
         "smoke_audit_chain": ["python", "-c",
             "from lloydk.services.audit_chain import verify_chain; r=verify_chain(); print(r)"],
         "smoke_kpi_endpoint": ["curl", "-fsS", "http://staging:8000/api/v1/metrics"],
@@ -113,6 +123,7 @@ def main() -> int:
         r["stage"] for r in results
         if r["status"] in ("FAIL", "ERROR") and r["stage"] != "teardown"
     ]
+    manual_stages = [r["stage"] for r in results if r["status"] == "MANUAL"]
     passed = within_rto and not stage_failures
     report = {
         "ts": _now(),
@@ -121,6 +132,9 @@ def main() -> int:
         "total_elapsed_sec": round(total_elapsed, 2),
         "within_rto": within_rto,
         "stage_failures": stage_failures,
+        # 자동 검증 불가(러너 부재) 단계 — passed 를 막지는 않으나 '검증됨'이 아님을 정직히 노출.
+        "manual_stages": manual_stages,
+        "auto_verified_stages": [r["stage"] for r in results if r["status"] == "PASS"],
         "passed": passed,
         "stages": results,
     }
@@ -128,7 +142,7 @@ def main() -> int:
     args.report_out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nReport: {args.report_out}")
     print(f"Total: {total_elapsed:.1f}s  RTO {args.rto_seconds}s  within={within_rto}  "
-          f"failures={stage_failures or 'none'}  -> {'PASS' if passed else 'FAIL'}")
+          f"failures={stage_failures or 'none'}  manual={manual_stages or 'none'}  -> {'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
 
 
