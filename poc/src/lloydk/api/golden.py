@@ -6,6 +6,7 @@ human_review 승격은 별개 경로(import_review_corrections, 지재원 관리
 """
 from __future__ import annotations
 
+import html as _html
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -26,6 +27,13 @@ from lloydk.schemas.golden import (
 from lloydk.services.golden_build_service import GoldenBuildService
 
 router = APIRouter(tags=["golden"], dependencies=[Depends(require_auth)])
+
+# 검수·서명 HTML 뷰 전용 라우터(인증 없음). 이 페이지들은 브라우저 window.open/직접 URL 로 여는데
+# 브라우저 네비게이션은 커스텀 헤더(X-API-Key/Bearer)를 못 붙여, require_auth 라우터에 두면 무조건
+# 401 이라 골든 검수 화면 자체가 안 열렸다(signoff.html 은 그 안에서 키를 입력받아 POST 하도록 설계된
+# 닭-달걀 모순). → 별도 무인증 라우터로 분리. 실제 권한 행위인 POST /golden/jobs/{id}/signoff 는 그대로
+# require_role 로 보호되고, 페이지가 입력받은 X-API-Key 를 POST 에 실어 보내므로 보안 불변.
+html_router = APIRouter(tags=["golden"])
 
 
 @router.post(
@@ -71,33 +79,61 @@ def golden_job_status(job_id: UUID) -> GoldenBuildStatus:
     return st
 
 
-@router.get(
-    "/golden/jobs/{job_id}/review.html",
-    response_class=HTMLResponse,
-    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
-)
+def _job_gate_html(job_id: UUID) -> HTMLResponse | None:
+    """렌더 전 잡 상태를 확인해 not-found/진행중/실패를 구분한 HTMLResponse 를 돌려주거나,
+    done 이면 None(호출부가 실제 렌더 진행). 진행중·실패·오id 를 같은 404 로 뭉개고 실패 error 를
+    버리던 것 보완 — 검수자가 '기다릴지 재빌드할지'를 화면에서 판단하게 한다.
+    """
+    st = GoldenBuildService().get_status(job_id)
+    if st is None:
+        raise HTTPException(status_code=404, detail="golden build job not found")
+    status = getattr(st, "status", None)
+    if status in ("queued", "running", "pending"):
+        return HTMLResponse(
+            content="<!doctype html><meta charset=utf-8>"
+            "<body style='font-family:sans-serif;padding:40px'>"
+            f"<h2>골든 빌드 진행 중…</h2><p>job {job_id} · status={_html.escape(str(status))}. "
+            "완료 후 이 페이지를 새로고침하세요.</p></body>",
+            status_code=202,
+        )
+    if status == "failed":
+        err = getattr(st, "error", None) or "(사유 미기록)"
+        return HTMLResponse(
+            content="<!doctype html><meta charset=utf-8>"
+            "<body style='font-family:sans-serif;padding:40px'>"
+            "<h2 style='color:#dc2626'>골든 빌드 실패</h2>"
+            f"<p>job {job_id}</p><pre style='background:#fef2f2;padding:12px;border-radius:8px;"
+            f"white-space:pre-wrap'>{_html.escape(str(err))}</pre></body>",
+            status_code=200,
+        )
+    return None
+
+
+@html_router.get("/golden/jobs/{job_id}/review.html", response_class=HTMLResponse)
 def golden_job_review_html(job_id: UUID) -> HTMLResponse:
-    """빌드 잡의 후보를 지재원 관리자 검수용 인터랙티브 HTML로 반환."""
+    """빌드 잡의 후보를 지재원 관리자 검수용 인터랙티브 HTML로 반환(브라우저 직접 접속)."""
+    gate = _job_gate_html(job_id)
+    if gate is not None:
+        return gate
     html = GoldenBuildService().render_review(job_id)
     if html is None:
-        raise HTTPException(status_code=404, detail="golden build review not found")
+        raise HTTPException(status_code=404, detail="golden build review not found (후보 없음)")
     return HTMLResponse(content=html)
 
 
-@router.get(
-    "/golden/jobs/{job_id}/signoff.html",
-    response_class=HTMLResponse,
-    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer"))],
-)
+@html_router.get("/golden/jobs/{job_id}/signoff.html", response_class=HTMLResponse)
 def golden_job_signoff_html(job_id: UUID) -> HTMLResponse:
-    """빌드 잡의 gold 후보를 화면 서명용 인터랙티브 HTML로 반환(골든셋 검수).
+    """빌드 잡의 gold 후보를 화면 서명용 인터랙티브 HTML로 반환(골든셋 검수·브라우저 직접 접속).
 
     review.html(보기 전용)과 달리 승인/등급변경/거부 폼 + 제출 버튼을 붙여, 제출 시
-    POST /golden/jobs/{id}/signoff 로 서명을 보낸다. 서명 캡처 UI 갭 해소.
+    POST /golden/jobs/{id}/signoff 로 서명을 보낸다(그 POST 는 require_role 로 보호).
     """
+    gate = _job_gate_html(job_id)
+    if gate is not None:
+        return gate
     html = GoldenBuildService().render_signoff(job_id)
     if html is None:
-        raise HTTPException(status_code=404, detail="golden build signoff view not found")
+        raise HTTPException(status_code=404, detail="golden build signoff view not found (gold 후보 없음)")
     return HTMLResponse(content=html)
 
 

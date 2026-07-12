@@ -99,10 +99,14 @@ def promote_to_locked(
                 signed_at=max((s.signed_at for s in sl if s.signed_at), default=""),
                 gate_version=SIGNOFF_GATE_VERSION,
                 tier=TIER_LOCKED,
+                note=next((s.note for s in sl if s.note), ""),  # [#3] 검수자 메모 영속(사후 감사·이의제기 근거)
             )
             locked.append(rec)
         else:
-            rejected.append({"doc_id": doc_id, "reason": reason, "grade": c.get("label")})
+            rejected.append({
+                "doc_id": doc_id, "reason": reason, "grade": c.get("label"),
+                "note": next((s.note for s in sl if s.note), ""),  # [#3] 거부 메모 영속
+            })
             reason_counts[reason.split("(")[0]] += 1
 
     stats = {

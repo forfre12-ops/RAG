@@ -370,6 +370,9 @@ else:
     logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
 app.include_router(synthesis_api.router, prefix="/api/v1")
 app.include_router(golden_api.router, prefix="/api/v1")
+# 골든 검수·서명 HTML 뷰(무인증) — 브라우저 window.open/직접 URL 로 열리게 별도 라우터로 분리.
+# (require_auth 라우터에 있으면 브라우저 네비게이션이 헤더를 못 붙여 401. POST signoff 는 보호 유지.)
+app.include_router(golden_api.html_router, prefix="/api/v1")
 app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(documents_api.router, prefix="/api/v1")
 app.include_router(

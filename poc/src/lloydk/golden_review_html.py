@@ -224,7 +224,7 @@ _SIGNOFF_BODY = r"""
   <div class="fld"><label>역할(X-Actor-Role)</label><select id="role"><option value="reviewer">reviewer</option><option value="admin">admin</option><option value="kl_backend">kl_backend</option></select></div>
   <div class="fld"><label>검수자 계정(reviewer_id)</label><input id="reviewer" placeholder="실계정 예: hong.gd"></div>
   <div class="fld chk"><input type="checkbox" id="publish"><label for="publish">라이브 반영(publish)</label></div>
-  <div class="fld chk"><input type="checkbox" id="dual"><label for="dual">TS/S1 이중서명</label></div>
+  <div class="fld chk"><input type="checkbox" id="dual"><label for="dual" title="주의: 이 화면 단일 세션에선 TS/S1 이 독립 2인 서명을 못 채워 전건 거부됩니다(9월 실서명 배치 경로용). 단일 검수면 끄세요.">TS/S1 이중서명 ⓘ</label></div>
   <div class="fld"><label>&nbsp;</label><button id="submit">서명 제출</button></div>
 </div>
 <div class="container">
@@ -322,9 +322,17 @@ document.getElementById('submit').addEventListener('click',async function(){
     const j=await res.json();
     if(!res.ok){box.className='result err';box.textContent='실패('+res.status+'): '+(j.detail||JSON.stringify(j));}
     else{const rd=j.readiness||{};
-      box.className='result ok';
-      box.innerHTML='서명 완료 — locked <b>'+j.locked+'</b>건 승격 (거부/미서명 '+j.rejected+') · 등급별 '+JSON.stringify(j.locked_by_grade)
-        +'<br>readiness: ready=<b>'+rd.ready+'</b> per_grade='+JSON.stringify(rd.per_grade)+' '+(j.published?'· 라이브 반영됨':'· 미리보기(라이브 무변경)')
+      // locked 0 인데 거부만 있으면 성공(ok) 스타일이 오도 → 경고 스타일(대개 dual 토글로 TS/S1 전건 거부).
+      box.className = (j.locked>0) ? 'result ok' : (j.rejected>0 ? 'result err' : 'result ok');
+      // publish 를 체크했는데 실제 미반영(경로 미설정/승격 0)이면 명시 — 조용한 미리보기 강등 방지.
+      var pubTxt = j.published ? '· 라이브 반영됨'
+                 : (publish ? '· ⚠ 라이브 반영 요청됨—미반영 '+esc(j.publish_note||'(locked_eval 경로 미설정 또는 승격 0)')
+                            : '· 미리보기(라이브 무변경)');
+      var rr = (j.rejected_reasons && Object.keys(j.rejected_reasons).length)
+                 ? '<br>거부 사유: '+esc(JSON.stringify(j.rejected_reasons)) : '';
+      box.innerHTML='서명 완료 — locked <b>'+j.locked+'</b>건 승격 (거부/미서명 '+j.rejected+') · 등급별 '+esc(JSON.stringify(j.locked_by_grade))
+        +rr
+        +'<br>readiness: ready=<b>'+rd.ready+'</b> per_grade='+esc(JSON.stringify(rd.per_grade))+' '+pubTxt
         +'<br>서명자: '+esc(j.reviewer_id)+(j.overridden?' (클라 값이 인증 신원으로 교정됨)':'');
     }
   }catch(e){box.className='result err';box.textContent='요청 오류: '+e;}
