@@ -60,6 +60,7 @@ celery_app.conf.task_routes = {
     "lloydk.verify_audit_chain_tick": {"queue": "learning"},
     "lloydk.deliver_outbox_tick": {"queue": "index"},  # I/O-bound, classify와 격리
     "lloydk.ensure_partitions_tick": {"queue": "index"},  # DDL, 경량 I/O
+    "lloydk.beat_heartbeat_tick": {"queue": "index"},  # 경량 생존 신호
 }
 
 # P1-A5: Active Learning 주기 트리거 (Celery beat).
@@ -95,6 +96,13 @@ celery_app.conf.beat_schedule = {
         "task": "lloydk.deliver_outbox_tick",
         "schedule": 60.0,
         "kwargs": {"limit": 50},
+    },
+    # beat 생존 신호 — 매 60초. beat 스케줄러가 죽으면 게시가 멈춰 lloydk_beat_heartbeat_age_seconds
+    # 가 증가 → BeatHeartbeatStale 알람. (감사체인검증·drift·파티션 게이지가 beat 사망 시 마지막
+    #  안전값에 무음 동결되던 사각지대를 beat-down 자체 알람으로 보완.)
+    "beat-heartbeat-every-60s": {
+        "task": "lloydk.beat_heartbeat_tick",
+        "schedule": 60.0,
     },
     # #5 파티션 롤오버 — 매일 02:10, 향후 3개월 월 파티션 보장(IF NOT EXISTS 멱등).
     # baseline은 정적 파티션만 생성하므로 이게 없으면 _default가 비대해진다.

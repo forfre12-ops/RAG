@@ -71,12 +71,24 @@ if [ "$LAYOUT" = "bundle" ]; then
   cp -f "$ENV_FILE" "$COMPOSE_DIR/.env" 2>/dev/null && info "infra-config/.env 미러(서비스 env_file 로드 보장)" || true
 fi
 _env_val() { grep -E "^${1}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' '; }
-for k in POSTGRES_PASSWORD API_KEY; do
+# 하드닝 프로파일(onprem-local)은 저장암호화를 강제 → ENABLED 가 명시적 off 가 아니면 KEY 도 필수.
+_req_keys="POSTGRES_PASSWORD API_KEY"
+case "$(printf '%s' "$(_env_val STORAGE_ENCRYPTION_ENABLED || true)" | tr 'A-Z' 'a-z')" in
+  0|false|no|off) : ;;
+  *)              _req_keys="$_req_keys STORAGE_ENCRYPTION_KEY" ;;
+esac
+for k in $_req_keys; do
   v="$(_env_val "$k" || true)"
-  { [ -z "$v" ] || printf '%s' "$v" | grep -qiE 'change[_-]?me|placeholder|your[_-]'; } \
+  { [ -z "$v" ] || printf '%s' "$v" | grep -qiE 'change[_-]?me|replace[_-]?me|placeholder|your[_-]'; } \
     && die "필수값 미설정/placeholder: $k  ($ENV_FILE 실값 입력)"
 done
-info "env=$ENV_FILE · IMAGE_TAG=$(_env_val IMAGE_TAG || echo '기본(1.0.0-rc1)')"
+# DEPLOY_PROFILE 하드닝 검증 — lite-* 로 뜨면 온도보정·안전게이트·저장암호화가 OFF 라 고등급 무음 미탐 위험.
+case "$(_env_val DEPLOY_PROFILE || true)" in
+  onprem-local|full-train) : ;;
+  "")  info "DEPLOY_PROFILE 미설정 → compose 가 onprem-local 로 기본 주입(하드닝 유지)" ;;
+  *)   die "DEPLOY_PROFILE='$(_env_val DEPLOY_PROFILE)' 은 폐쇄망 하드닝 프로파일 아님 — onprem-local(또는 full-train)로 설정. lite-* 는 안전게이트·저장암호화 OFF." ;;
+esac
+info "env=$ENV_FILE · profile=$(_env_val DEPLOY_PROFILE || echo 'onprem-local(기본)') · IMAGE_TAG=$(_env_val IMAGE_TAG || echo '기본(1.0.0-rc1)')"
 
 # compose 병합 검증(기동 전 조기 실패) — env 치환·상대경로·문법 오류를 up 전에 잡는다.
 if ! cfgerr="$(dc_air config -q 2>&1)"; then

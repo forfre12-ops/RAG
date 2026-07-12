@@ -89,6 +89,12 @@ class RebuildResult:
     # [#25] merge_into_train_jsonl이 holdout 중복으로 train에서 제외한 교정 행 수
     # (병합 시점에 갱신). 0 = 제외 없음/미수행. 호출부가 제외 건수를 조회할 수 있게 노출.
     excluded_holdout: int = 0
+    # [#6] doc_id → 그 문서에 묶인 correction_id 목록. merge 가 홀드아웃/캡 제외 후 '실제 train 에
+    # 편입된 문서'의 교정만 소비 대상으로 추리는 데 쓴다(제외분 무음 유실+감사 오도 방지).
+    corr_ids_by_doc: dict = field(default_factory=dict)
+    # [#6] merge 가 홀드아웃/캡 제외 후 실제 편입된 correction_id(소비 대상). None = merge 미실행
+    # → 호출부는 correction_ids 를 그대로 쓴다(하위호환·전량편입 경로).
+    incorporated_correction_ids: list[int] | None = None
     reason: str = ""
 
     @property
@@ -199,6 +205,7 @@ def build_labeled_rows_from_corrections(
             rows: list[dict] = []
             row_doc_ids: list = []  # [#25] rows와 1:1 정렬 — 홀드아웃 doc_id 누수 차단용
             consumed_ids: list[int] = []
+            kept_corr_by_doc: dict = {}  # [#6] 편입된(text 있는) 문서만의 doc_id→correction_id
             skipped_no_text = 0
             for doc_id, label in doc_label.items():
                 text = _reconstruct_text(db, doc_id, min_chars=min_chars)
@@ -207,12 +214,15 @@ def build_labeled_rows_from_corrections(
                     continue  # 본문 없는 문서는 라벨을 날조하지 않음 + 소비도 안 함
                 rows.append({"text": text, "label": label})
                 row_doc_ids.append(doc_id)
-                consumed_ids.extend(doc_corr_ids.get(doc_id, []))
+                cids = doc_corr_ids.get(doc_id, [])
+                consumed_ids.extend(cids)
+                kept_corr_by_doc[doc_id] = cids
 
             return RebuildResult(
                 rows=rows,
                 correction_ids=sorted(set(consumed_ids)),
                 doc_ids=row_doc_ids,
+                corr_ids_by_doc=kept_corr_by_doc,
                 doc_count=len(rows),
                 skipped_no_text=skipped_no_text,
                 skipped_bad_label=skipped_bad_label,
@@ -340,9 +350,10 @@ def merge_into_train_jsonl(
         hold_texts, hold_doc_ids = _load_holdout_keys(holdout_paths)
 
     excluded = 0
+    aligned_dids = row_doc_ids if len(row_doc_ids) == len(rows) else [None] * len(rows)
     if hold_texts or hold_doc_ids:
         kept_rows: list[dict] = []
-        aligned_dids = row_doc_ids if len(row_doc_ids) == len(rows) else [None] * len(rows)
+        kept_dids: list = []
         for row, did in zip(rows, aligned_dids):
             in_holdout = (did is not None and did in hold_doc_ids) or (
                 _norm_text(row.get("text", "")) in hold_texts
@@ -351,12 +362,27 @@ def merge_into_train_jsonl(
                 excluded += 1
                 continue  # 홀드아웃과 겹치는 보정 문서는 train에 넣지 않는다(평가 누수 차단)
             kept_rows.append(row)
+            kept_dids.append(did)
         rows = kept_rows
+        aligned_dids = kept_dids
 
     # [#25] 제외 건수를 result에 기록(반환/조회 가능) + 로깅(반환·로깅 둘 다).
     try:
         result.excluded_holdout = excluded
     except Exception:  # noqa: BLE001 — result가 dataclass가 아니어도(mock 등) 머지는 진행
+        pass
+    # [#6] 홀드아웃/캡 제외 후 실제 train 에 편입된 문서의 교정만 소비 대상으로 확정한다. 과거엔
+    # 호출부가 result.correction_ids(전량)를 소비해, 제외된 교정이 학습 미반영인데 '반영됨'으로
+    # 소비돼 다음 tick 재유입 불가(무음 유실) + 감사 오도였다. 매핑이 없으면(구 호출/mock) 안전하게
+    # 전량으로 폴백(하위호환). 불확실 시 미소비(재유입) 방향이라 fail-safe.
+    try:
+        cmap = getattr(result, "corr_ids_by_doc", None) or {}
+        surviving = [d for d in aligned_dids if d is not None]
+        result.incorporated_correction_ids = (
+            sorted({cid for d in surviving for cid in cmap.get(d, [])})
+            if cmap else list(result.correction_ids)
+        )
+    except Exception:  # noqa: BLE001
         pass
     if excluded:
         logger.warning(

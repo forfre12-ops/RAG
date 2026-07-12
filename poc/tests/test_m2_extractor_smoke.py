@@ -51,14 +51,19 @@ class TestPlainExtraction:
         assert "col1" in result.text
 
     def test_cp949_fallback(self, tmp_path: Path):
-        """utf-8 디코드 실패 시 cp949 fallback."""
+        """utf-8 실패 시 cp949 로 원문을 정확히 복원 (utf-16 모지바케 무음유실 회귀 방지).
+
+        짝수 길이 순한글은 무BOM utf-16 이 예외 없이 임의 코드포인트로 '성공' 디코드하므로,
+        폴백에서 utf-16 을 cp949 보다 먼저 시도하면 원문이 모지바케로 조용히 유실된다(silent FNR).
+        폴백 순서가 cp949 우선(BOM 없을 때)이어야 원문이 그대로 복원된다.
+        """
+        original = "영업비밀"  # 4자 = cp949 8바이트(짝수) → utf-16 우선이면 모지바케로 깨짐
         p = tmp_path / "cp949.txt"
-        # cp949로 인코딩된 텍스트 (한국어)
-        p.write_bytes("한국어 텍스트".encode("cp949"))
+        p.write_bytes(original.encode("cp949"))
         result = extract(p)
-        # cp949 fallback 작동 — text가 비어있지 않거나 빈 문자열 (둘 다 OK)
-        assert isinstance(result, ExtractResult)
         assert result.method == "plain"
+        assert result.text == original, f"cp949 원문 복원 실패(모지바케 유실): {result.text!r}"
+        assert any("cp949" in w for w in (result.warnings or []))
 
 
 class TestUnsupported:

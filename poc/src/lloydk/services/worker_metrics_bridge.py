@@ -31,6 +31,7 @@ _KEY_PREFIX = "lloydk:metrics:"
 AUDIT_INTEGRITY = "audit_integrity"
 DRIFT_REPORT = "drift_report"
 PARTITION_ENSURE = "partition_ensure"
+HEARTBEAT = "heartbeat"  # beat 생존 신호 — beat_heartbeat_tick(매 60s)이 게시, API 가 노후로 재노출.
 
 # 게시값 TTL(초) — 워커가 죽어 갱신이 멈추면 만료돼 API 가 stale 값을 무한 신뢰하지 않게.
 # 기본 tick 주기(감사=일별, drift=수십분)보다 넉넉히 크게 잡아 정상 운영에선 항상 존재.

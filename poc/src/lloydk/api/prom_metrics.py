@@ -290,6 +290,16 @@ PARTITION_ENSURE_FAILED = Gauge(
     registry=registry,
 )
 
+# beat 스케줄러 생존 — beat_heartbeat_tick(매 60s)이 게시한 heartbeat 의 노후(초). beat 가 죽으면
+# 게시가 멈춰 이 값이 증가 → BeatHeartbeatStale 알람. beat 사망 시 감사체인검증·drift·파티션
+# 게이지가 마지막 안전값에 무음 동결되던 사각지대(beat-down 자체 무알람)를 보완한다.
+# 신호 부재(첫 tick 전 콜드스타트)면 미변경(기본 0) → 거짓경보 없음.
+BEAT_HEARTBEAT_AGE = Gauge(
+    "lloydk_beat_heartbeat_age_seconds",
+    "Seconds since the last celery-beat heartbeat (beat liveness; grows when beat stops)",
+    registry=registry,
+)
+
 # Celery 큐 적체(큐별) — /metrics-prom 스크랩 시 redis LLEN 으로 best-effort 갱신(CeleryQueueBacklog).
 CELERY_QUEUE_LENGTH = Gauge(
     "lloydk_celery_queue_length",
@@ -721,6 +731,25 @@ def _refresh_partition_gauges() -> None:
         _logger.debug("partition gauge refresh skipped: %s", exc)
 
 
+def _refresh_beat_heartbeat_gauge() -> None:
+    """beat 생존 — beat_heartbeat_tick 이 게시한 heartbeat 의 노후(초)를 게이지에 노출.
+
+    beat 가 죽으면 게시가 멈춰 age 가 증가(TTL 48h 동안 마지막 checked_at 로 계속 계산됨)
+    → BeatHeartbeatStale 알람이 페이지한다. 신호 부재(콜드스타트)면 미변경(기본 0, 거짓경보 없음).
+    """
+    try:
+        from lloydk.services.worker_metrics_bridge import (  # noqa: PLC0415
+            HEARTBEAT,
+            load_signal,
+        )
+
+        sig = load_signal(HEARTBEAT)
+        if sig and sig.get("checked_at"):
+            BEAT_HEARTBEAT_AGE.set(max(0.0, time.time() - float(sig["checked_at"])))
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("beat heartbeat gauge refresh skipped: %s", exc)
+
+
 def _refresh_business_gauges() -> None:
     """active_learning gauge를 호출 시점에 lazy 갱신.
 
@@ -756,6 +785,7 @@ def _refresh_business_gauges() -> None:
     _refresh_outbox_gauges()
     _refresh_drift_gauges()
     _refresh_partition_gauges()
+    _refresh_beat_heartbeat_gauge()  # beat 생존(heartbeat 노후) — beat-down 무음 동결 보완
 
 
 def _refresh_escalation_held() -> None:

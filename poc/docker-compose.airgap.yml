@@ -51,6 +51,7 @@ services:
     image: lloydk-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
     env_file: .env
     environment:
+      DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       REDIS_URL: redis://redis:6379/0
@@ -93,6 +94,7 @@ services:
     command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
+      DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
@@ -135,6 +137,7 @@ services:
     command: celery -A lloydk.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
     env_file: .env
     environment:
+      DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
       DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
       REDIS_URL: redis://redis:6379/0
     depends_on:

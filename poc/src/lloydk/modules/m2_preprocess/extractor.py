@@ -122,7 +122,16 @@ def _extract_plain(p: Path) -> ExtractResult:
         pass
     raw = p.read_bytes()
     warnings: list[str] = []
-    for enc in ("utf-16", "utf-16-le", "utf-16-be", "cp949", "euc-kr"):
+    # 인코딩 폴백 순서 주의(무음 유실 방지): bare 'utf-16'(무BOM)은 짝수 길이 CP949/EUC-KR
+    # 한국어 바이트열을 예외 없이 임의 코드포인트로 '성공' 디코드한다. 과거엔 utf-16 을 cp949 보다
+    # 먼저 시도해 레거시 한국어 평문(.txt/.csv/.log/.md·CSV 내보내기·로그)이 모지바케로 무음 유실됐다
+    # (품질 0.9 로 정상 추출 위장 → 한국어 신호 상실 → silent FNR). BOM 이 있을 때만 utf-16 을 쓰고,
+    # 그 외에는 cp949/euc-kr 를 먼저 시도하고 utf-16-le/be 는 최후 폴백으로 둔다(euc-kr⊂cp949).
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        candidates = ("utf-16", "cp949", "euc-kr")
+    else:
+        candidates = ("cp949", "euc-kr", "utf-16-le", "utf-16-be")
+    for enc in candidates:
         try:
             text = raw.decode(enc)
             warnings.append(f"plain_decoded_as_{enc}")

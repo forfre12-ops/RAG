@@ -1016,6 +1016,24 @@ def assert_production_credentials() -> None:
     )
     assert_multiworker_jobstore_safe()
 
+    # [관측성] 멀티워커인데 PROMETHEUS_MULTIPROC_DIR 미설정 → 프로세스-로컬 카운터가 워커별로
+    # 쪼개져 increase()/rate() 알람(특히 serving_gate_fail_open·verified_label_audit_skip 등 안전
+    # 실패 카운터)이 스크랩 타이밍에 따라 신뢰 불가. job/idempotency 는 fail-fast 가드가 있으나
+    # prometheus 는 대칭 가드가 없었다. 데이터 무결성이 아닌 관측성 열화라 fail-fast 대신 startup
+    # 경고로 승격(근본해결은 PROMETHEUS_MULTIPROC_DIR + MultiProcessCollector). 기본 배포=1워커라 무해.
+    try:
+        _web_concurrency = int(os.environ.get("WEB_CONCURRENCY", "1") or "1")
+    except ValueError:
+        _web_concurrency = 1
+    if _web_concurrency > 1 and not os.environ.get("PROMETHEUS_MULTIPROC_DIR", "").strip():
+        import logging as _logging  # noqa: PLC0415
+        _logging.getLogger(__name__).warning(
+            "WEB_CONCURRENCY=%d(멀티워커)인데 PROMETHEUS_MULTIPROC_DIR 미설정 — Prometheus 카운터가 "
+            "워커별로 쪼개져 increase()/rate() 알람(안전 실패 카운터 포함)이 신뢰 불가하다. "
+            "멀티프로세스 aggregation 을 배선하거나 단일 워커(WEB_CONCURRENCY=1)로 운영하라.",
+            _web_concurrency,
+        )
+
     # RATE_LIMIT_DISABLED 운영에서 오류
     if os.environ.get("RATE_LIMIT_DISABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
         raise RuntimeError(

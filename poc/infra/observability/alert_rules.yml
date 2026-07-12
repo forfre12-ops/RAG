@@ -110,6 +110,30 @@ groups:
           summary: "Webhook outbox DLQ 신규 진입 발생"
           runbook: "doc/25 §9 사고 대응"
 
+      - alert: OutboxPendingStuck
+        # outbox pending 이 오래 안 빠짐 → 배송 beat/워커 정지로 KL 콜백이 무음 미배송. 전송 시도조차
+        # 안 되면 attempts 가 안 늘어 DLQ 로도 안 가 OutboxDlqGrowing 이 못 잡는 사각지대. 지속 창(15m)
+        # 으로 정상 in-flight/backoff churn 과 '빠지지 않는 적체'를 구분.
+        expr: lloydk_outbox_pending > 0
+        for: 15m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Webhook outbox pending {{ $value }}건 15분 이상 미배송 — 배송 워커/beat 점검"
+          runbook: "doc/25 §9 사고 대응"
+
+      - alert: BeatHeartbeatStale
+        # celery beat 스케줄러 생존 — heartbeat 노후 임계 초과면 beat 사망. beat 가 멈추면 감사체인
+        # 검증·drift·파티션롤오버·outbox 배송이 모두 정지하는데 그 게이지들은 마지막 안전값(0)에 무음
+        # 동결돼 어떤 알람도 안 울린다 → beat-down 자체를 페이지해 그 사각지대를 봉합(P0 무결성 tick 포함).
+        expr: lloydk_beat_heartbeat_age_seconds > 300
+        for: 2m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Celery beat heartbeat 정지({{ $value }}s) — 주기 안전작업(감사검증·drift·파티션·outbox) 무음 중단"
+          runbook: "doc/23 §6.5 worker/beat 재기동"
+
       - alert: PartitionEnsureFailed
         # 월별 파티션 롤오버 실패 > 0 → _default 비대화·프루닝 무력화 무음열화.
         # 워커 ensure_partitions_tick 이 Redis 게시 → API 가 현재-실패건수 게이지로 재노출.

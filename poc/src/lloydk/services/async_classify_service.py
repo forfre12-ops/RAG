@@ -110,7 +110,11 @@ class AsyncClassifyService:
                 from lloydk.workers.tasks import classify_async  # noqa: PLC0415
 
                 payload = self._strip_async_fields(req).model_dump(mode="json")
-                classify_async.delay(payload, job_id=str(job_id))
+                # callback_url 을 워커로 넘겨 완료 시 webhook 을 발사하게 한다(과거엔 떼어내
+                # 워커에 전달조차 안 돼 운영 경로 webhook 이 영원히 안 울렸다).
+                classify_async.delay(
+                    payload, job_id=str(job_id), callback_url=getattr(req, "callback_url", None)
+                )
                 logger.info("async classify enqueued to celery: job_id=%s doc_id=%s", job_id, req.doc_id)
                 return ClassifyAsyncResponse(
                     job_id=job_id,

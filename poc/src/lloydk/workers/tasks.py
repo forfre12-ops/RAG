@@ -78,11 +78,16 @@ def _record_compensation(job_id: str | None, partial_results: list[dict], reason
     max_retries=2,
     default_retry_delay=1,
 )
-def classify_async(self: Any, payload: dict, job_id: str | None = None) -> dict:
+def classify_async(
+    self: Any, payload: dict, job_id: str | None = None, callback_url: str | None = None
+) -> dict:
     """단일 문서 분류 비동기 task.
 
     Retry: 일시 예외 → self.retry(countdown=2**attempts).
     모든 retry 실패 → 보상 트랜잭션 (JobStore에 partial 상태 기록) 후 예외 재발생.
+    callback_url 이 있으면 최종 완료/실패 시 결과 webhook 을 outbox 로 발사(신뢰전달). 운영(celery)
+    경로는 그동안 callback_url 을 떼어내고 워커도 발사하지 않아 webhook 이 영원히 안 울렸다 — 이제
+    submit_async 가 callback_url 을 워커로 넘기고 여기서 발사한다(in-process 경로와 상호배타 = 중복 없음).
     """
     from lloydk.schemas.classify import ClassifyRequest
     from lloydk.services.classify_service import ClassifyService
@@ -93,6 +98,7 @@ def classify_async(self: Any, payload: dict, job_id: str | None = None) -> dict:
         result = svc.classify(req)
         result_json = result.model_dump(mode="json")
         _record_job_done(job_id, results=[result_json], completed=1)
+        _publish_callback_webhook(callback_url, {"job_id": job_id, "status": "done", "results": [result_json]})
         return result_json
     except Exception as exc:  # noqa: BLE001
         attempts = self.request.retries
@@ -104,13 +110,35 @@ def classify_async(self: Any, payload: dict, job_id: str | None = None) -> dict:
                 attempts + 1, max_r, countdown, type(exc).__name__,
             )
             raise self.retry(exc=exc, countdown=countdown) from exc
-        # 모든 retry 실패 — 보상 트랜잭션.
+        # 모든 retry 실패 — 보상 트랜잭션 + 실패 콜백.
         _record_compensation(
             job_id,
             partial_results=[],
             reason=f"classify_async exhausted: {type(exc).__name__}: {exc}",
         )
+        _publish_callback_webhook(
+            callback_url, {"job_id": job_id, "status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+        )
         raise
+
+
+def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
+    """워커 완료/실패 시 callback_url 로 결과 webhook 을 outbox 에 적재(재시도·DLQ 신뢰전달).
+
+    best-effort — 적재 실패가 분류 결과(이미 job_store 영속)를 폐기하지 않게 예외는 삼키고 로깅만.
+    (in-process 경로의 AsyncClassifyService._publish_callback 와 동일 계약을 celery 워커에서 수행.)
+    """
+    if not callback_url:
+        return
+    try:
+        from lloydk.services.outbox import get_outbox_store, publish  # noqa: PLC0415
+        publish(get_outbox_store(), target_url=callback_url, payload=payload)
+        logger.info("async callback enqueued to outbox: url=%s job=%s", callback_url, payload.get("job_id"))
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "async callback enqueue failed (non-critical): url=%s err=%s",
+            callback_url, type(exc).__name__, exc_info=True,
+        )
 
 
 def _persist_synth_samples(docs: list, *, job_id: str | None) -> int:
@@ -391,7 +419,10 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
             )
             if merged:
                 spec_kwargs["train_path"] = merged
-                incorporated_ids = list(rebuild.correction_ids)
+                # [#6] merge 가 홀드아웃/캡 제외 후 실제 편입된 교정만 소비(제외분은 미소비→다음 tick
+                # 재유입, 무음 유실·감사 오도 방지). incorporated_correction_ids=None 이면 전량 폴백.
+                inc = getattr(rebuild, "incorporated_correction_ids", None)
+                incorporated_ids = list(inc if inc is not None else rebuild.correction_ids)
                 logger.info(
                     "train_classifier: %d corrections(%d docs) merged into train set",
                     len(incorporated_ids), rebuild.row_count,
@@ -571,6 +602,18 @@ def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
     from lloydk.services.worker_metrics_bridge import DRIFT_REPORT, publish_signal
     publish_signal(DRIFT_REPORT, export_to_prometheus(report))
     return out
+
+
+@celery_app.task(name="lloydk.beat_heartbeat_tick")
+def beat_heartbeat_tick() -> dict:
+    """beat 생존 신호 — 매 60초 Redis 에 heartbeat 게시(bridge 가 checked_at 자동 부가).
+
+    beat 스케줄러가 죽으면 게시가 멈춰 API 가 lloydk_beat_heartbeat_age_seconds 로 노후를
+    노출하고 BeatHeartbeatStale 알람이 페이지한다. 감사체인검증·drift·파티션 게이지가 beat
+    사망 시 마지막 안전값에 무음 동결되던 사각지대(beat-down 자체 무알람)를 보완한다.
+    """
+    from lloydk.services.worker_metrics_bridge import HEARTBEAT, publish_signal
+    return {"published": publish_signal(HEARTBEAT, {})}
 
 
 @celery_app.task(name="lloydk.verify_audit_chain_tick")

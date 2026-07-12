@@ -942,23 +942,53 @@ def _copy_infra(out_dir: Path) -> None:
         if _src.exists():
             shutil.copy2(_src, docs_dst / _doc)
 
-    # .env template
+    # .env template — 폐쇄망 번들은 반드시 onprem-local 하드닝 프로파일 전용 템플릿을 출하한다.
+    # (과거엔 dev 용 .env.example 을 복사했는데, 거기엔 DEPLOY_PROFILE 이 없고 POC_MODE=dryrun·
+    #  LLM_PROVIDER=noop 이 박혀 있어 그대로 배포하면 lite-noapi/dryrun 으로 부팅 → 온도보정(T=3.0)·
+    #  안전게이트(agreement/metadata)·저장암호화·escalation 이 전부 OFF 로 열화되고, require_safety_gates
+    #  기본 False 라 startup fail-fast 도 안 걸려 '켰다고 믿지만 실제 꺼진' 상태로 운영됐다. .env.onprem-local
+    #  은 localhost DB URL·IMAGE_TAG 부재라 컨테이너 배포에 부적합하므로, compose 서비스명·IMAGE_TAG·
+    #  POSTGRES_PASSWORD 를 갖춘 에어갭 전용 하드닝 템플릿을 직접 만든다.)
     env_template = infra / ".env.template"
-    env_example = _REPO_ROOT / ".env.example"
-    if env_example.exists():
-        import shutil as _sh
-        _sh.copy2(env_example, env_template)
-    else:
-        env_template.write_text(
-            "# Copy this to .env and fill in values\n"
-            "DATABASE_URL=postgresql://lloydk:lloydk_dev@postgres:5432/lloydk\n"
-            "VECTOR_BACKEND=pg\n"
-            "REDIS_URL=redis://redis:6379/0\n"
-            "STORAGE_BACKEND=local\n"   # 폐쇄망=로컬FS(file://). MinIO 미사용.
-            "LLM_PROVIDER=vllm\n"
-            "DEPLOY_PROFILE=onprem-local\n",
-            encoding="utf-8",
-        )
+    env_template.write_text(
+        "# ============================================================\n"
+        "# Lloydk 폐쇄망(에어갭) 배포 .env 템플릿 — onprem-local 하드닝 프로파일\n"
+        "# 이 파일을 .env 로 복사(deploy_airgap.sh 가 자동 복사)한 뒤 replace_me_* 를 실값으로 채운다.\n"
+        "# DEPLOY_PROFILE=onprem-local 이 온도보정(T=3.0)·안전게이트(agreement/metadata)·저장암호화·\n"
+        "# escalation(τ=0.30)·require_safety_gates 를 자동 활성화한다. 이 줄을 지우거나 lite-* 로 바꾸면\n"
+        "# 안전장치가 꺼진 채 부팅되니 금지(deploy_airgap.sh 가 거부한다).\n"
+        "# ============================================================\n"
+        "DEPLOY_PROFILE=onprem-local\n"
+        "POC_MODE=full\n"
+        "\n"
+        "# --- 필수 (deploy_airgap.sh 가 placeholder 를 검증·거부) ---\n"
+        "IMAGE_TAG=1.0.0-rc1\n"
+        "API_KEY=replace_me_api_key\n"
+        "POSTGRES_USER=lloydk\n"
+        "POSTGRES_PASSWORD=replace_me_postgres_password\n"
+        "\n"
+        "# --- 인프라 (컨테이너 내부 → compose 서비스명 postgres/redis, localhost 아님) ---\n"
+        "# DATABASE_URL 의 비밀번호는 위 POSTGRES_PASSWORD 와 반드시 일치시킬 것.\n"
+        "DATABASE_URL=postgresql+psycopg://lloydk:replace_me_postgres_password@postgres:5432/lloydk\n"
+        "REDIS_URL=redis://redis:6379/0\n"
+        "VECTOR_BACKEND=pg\n"
+        "STORAGE_BACKEND=local\n"   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
+        "\n"
+        "# --- 원본 at-rest 암호화 (onprem-local 이 ENABLED=1 강제; KEY 미설정이면 startup fail-fast) ---\n"
+        "# python -c \"import secrets;print(secrets.token_hex(32))\"\n"
+        "STORAGE_ENCRYPTION_KEY=replace_me_64hex_random\n"
+        "\n"
+        "# --- 모델 / 로컬 LLM (폐쇄망 — 외부 API 0) ---\n"
+        "EMBEDDING_MODEL=nlpai-lab/KURE-v1\n"
+        "LLM_PROVIDER=vllm\n"
+        "LOCAL_LLM_BASE_URL=http://host.docker.internal:8001/v1\n"
+        "LOCAL_LLM_MODEL=Qwen/Qwen3-14B\n"
+        "LOCAL_LLM_API_KEY=EMPTY\n"
+        "\n"
+        "# --- 배포 게이트 · locked_gold_eval (사람서명 평가정답 누적 경로) ---\n"
+        "LOCKED_EVAL_JSONL=datasets/gold_real/locked_gold_eval.jsonl\n",
+        encoding="utf-8",
+    )
 
     # alembic migrations
     alembic_src = _REPO_ROOT / "alembic"
