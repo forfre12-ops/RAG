@@ -47,21 +47,21 @@
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-005 라이브</span>
     <span class="meta-dot">•</span>
-    <span class="meta-soft">2026-05-29</span>
+    <span class="meta-soft">2026-07-17</span>
   </div>
 
   <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>실시간 등급분류 콘솔</h1>
 
   <p class="lede">
     한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정합니다.
-    시드 v4 480+ 키워드 · 부정경쟁방지법 §2조 2호 · KOIPA 가이드 v1 기반으로
+    시드 v4 404개 키워드 · 부정경쟁방지법 §2조 2호 · KOIPA 가이드 v1 기반으로
     분류 근거와 3 평가요소(S·V·M)를 함께 반환합니다.
   </p>
 
   <div class="hero-kpis">
-    <span class="hero-kpi"><span class="dot"></span>BERT <b>1.18s</b> vs LLM <b>25.8s</b> — <b>22×</b> 빠름 (실측)</span>
-    <span class="hero-kpi"><span class="dot"></span>FNR <b>≤ 5%</b> 핵심 KPI 목표</span>
-    <span class="hero-kpi"><span class="dot"></span>시드 v4 <b>480+</b> 키워드 (실측)</span>
+    <span class="hero-kpi"><span class="dot"></span>고등급 <b>파국 미탐 0</b> · TS recall <b>0.92</b> (정직 홀드아웃)</span>
+    <span class="hero-kpi"><span class="dot"></span>FNR <b>≤ 5%</b> 핵심 KPI 목표 (미탐 최소화)</span>
+    <span class="hero-kpi"><span class="dot"></span>시드 v4 <b>404</b>개 키워드 (실측)</span>
     <span class="hero-kpi"><span class="dot"></span><b>4-tier</b> 배포 프로파일 (실측)</span>
   </div>
 
@@ -76,6 +76,7 @@
         <span class="src-tag src-ref">참고</span> V2 통합본 인용 또는 예시 시나리오(미실측)
       </p>
       <p style="margin-top:6px;font-size:13px;">BERT 추론 1.18s · LLM 25.8s는 Phase 4/5 <b>자체 GPU(RTX 5070 Ti) 실측</b>. 사고 손해액은 예시 시나리오 기반으로 <b>발주처 실문서 도착 후</b> 실측치로 갱신 예정.</p>
+      <p style="margin-top:6px;font-size:13px;">이 라이브 데모(lite-noapi)의 실시간 판정은 <b>시드 키워드 룰 분류기(rule-fallback-v0)</b>로 동작하며, 위 학습모델(KF-DeBERTa) 수치는 <b>별도 GPU 환경 벤치</b>입니다(이 데모가 내는 값 아님).</p>
     </div>
   </div>
 
@@ -117,8 +118,8 @@
     <!-- ===== 시간 경쟁 (와우 B) — 분류 버튼 바로 아래 ===== -->
     <div class="race">
       <div class="race-title">
-        BERT (자체 GPU 실측 1.18s) vs LLM zero-shot (Qwen3 14B 실측 25.8s) — <b>22× 빠름</b>
-        <span class="src-tag src-measured" style="margin-left:8px;">Phase 4/5 RTX 5070 Ti 실측</span>
+        BERT 분류 (GPU 학습모델 1.18s) vs LLM <b>/answer</b> (Qwen3 14B 25.8s) — <b>≈22×</b>
+        <span class="src-tag src-ref" style="margin-left:8px;">이종 작업·환경 벤치 (참고)</span>
       </div>
       <div class="race-row">
         <div class="race-label">BERT</div>
@@ -130,7 +131,7 @@
         <div class="race-track"><div class="race-fill llm"></div></div>
         <div class="race-time" id="race-llm-time">—</div>
       </div>
-      <div class="race-note" id="race-note">버튼을 누르면 동일 문서를 두 방식으로 처리. Phase 4 실측: BERT 1.18s · LLM 25.8s → 22× 빠름. V2 §4.4 "왜 LLM 분류기를 안 쓰는가"를 화면에서 실증합니다.</div>
+      <div class="race-note" id="race-note">BERT는 이 데모의 실호출(라이브, lite-noapi에선 룰엔진 응답)이고, LLM 막대는 <b>사전 측정치(25.8s /answer)를 재생</b>하는 참고값입니다(이 데모는 LLM 미호출). 대표 비교값 ≈22×는 학습 KF-DeBERTa 1.18s(Phase 3 GPU) vs Qwen3 /answer 25.8s(Phase 1)로 서로 다른 작업·환경 벤치입니다. V2 §4.4 "왜 LLM 분류기를 안 쓰는가" 참고.</div>
     </div>
   </section>
 
@@ -202,13 +203,20 @@
   <section id="s5">
     <h2><span class="num">§5</span>시스템 능력 — 출처별 분류</h2>
     <p class="h2-sub">각 카드 하단의 코표로 출처를 명시. <span class="src-tag src-measured">실측</span>은 우리가 코드/파일에서 직접 카운트한 사실, <span class="src-tag src-spec">명세</span>는 합격선·법령·목표값, <span class="src-tag src-ref">참고</span>는 V2 통합본 인용으로 미실측.</p>
+    <div class="callout warn" style="margin:10px 0 18px;">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div class="callout-body">
+        <span class="callout-label">정확도 지표 읽는 법</span>
+        <p><b>F1=1.0</b>은 <b>학습분포(합성) 동일분포 상한</b>이며 실문서 정확도가 아닙니다. 같은 KF-DeBERTa 분류기 계열의 <b>정직 홀드아웃 macro-F1은 0.69</b>(경화 consensus·합성프록시 추세용). 실문서 자동분류 정확도는 발주처 실문서 도착 후 <b>운영 학습</b>으로 확정됩니다. 이 시스템의 <b>대표 성능은 정확도가 아니라 고등급 미탐 최소화(안전 veto)</b> — 특급·1급을 공개로 오분류하는 파국 미탐 0건이 핵심입니다.</p>
+      </div>
+    </div>
     <div id="capability-stats" class="stats"></div>
 
     <div class="callout accent" style="margin-top:24px;">
       <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
       <div class="callout-body">
-        <span class="callout-label">PoC 진척 (2026-05-29)</span>
-        <p>W1~W13 + 블록 1~7 + 고도화 33+6+4+3 + RAG 종단 wiring + 4-tier 배포 프로파일 + lite-noapi 라이브 6/6 PASS 완료. 단위 540+ PASS · ruff 0 위반 · 18 시나리오 67 KPI.</p>
+        <span class="callout-label">개발 진척 (2026-07-17 기준)</span>
+        <p>W1~W13 + 블록 1~7 + 고도화 33+6+4+3 + RAG 종단 wiring + 4-tier 배포 프로파일 + lite-noapi 라이브 PASS 완료. 단위 1,900+ PASS · ruff 0 위반 · 18 시나리오 67 KPI.</p>
       </div>
     </div>
   </section>
@@ -231,13 +239,13 @@
       </div>
       <div class="card">
         <div class="eyebrow">데이터 출처</div>
-        <div class="ctitle">시드 v4 480+ 키워드</div>
+        <div class="ctitle">시드 v4 404개 키워드</div>
         <p>부정경쟁방지법 + 시행령 + 산업기술보호법 + KOIPA 가이드 v1 (공개 출처만 사용).</p>
       </div>
       <div class="card">
         <div class="eyebrow">검증 체계</div>
-        <div class="ctitle">540+ 단위 + 67 KPI</div>
-        <p>샘플 12종은 빌드 시 ClassifyService 로 의도 등급 매칭 확인. 12/12 PASS.</p>
+        <div class="ctitle">1,900+ 단위 + 67 KPI</div>
+        <p>샘플 12종은 빌드 시 룰(시드) 분류기로 의도 등급 매칭 12/12 PASS. (학습 KF-DeBERTa 실호출 정합은 §5 10/12.)</p>
       </div>
       <div class="card">
         <div class="eyebrow">설계 통합본</div>
@@ -247,7 +255,7 @@
     </div>
 
     <div class="print-watermark">
-      KOIPA AI 영업비밀관리시스템 · 실시간 등급분류 콘솔 · 로이드케이 · 2026-05-29
+      KOIPA AI 영업비밀관리시스템 · 실시간 등급분류 콘솔 · 로이드케이 · 2026-07-17
     </div>
   </section>
 
@@ -255,7 +263,7 @@
 
 <footer>
   <div>KOIPA AI 영업비밀관리시스템 · Powered by <b>Lloydk</b></div>
-  <div class="mono">로이드케이 · lloydk.co.kr · 2026-05-29</div>
+  <div class="mono">로이드케이 · lloydk.co.kr · 2026-07-17</div>
 </footer>
 
 <script type="module" src="./app.js"></script>

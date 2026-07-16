@@ -661,10 +661,10 @@ async function runRace() {
       const elapsed = performance.now() - startLlm;
       const ratio = Math.min(1, elapsed / estimatedLlmMs);
       if (llmFill) llmFill.style.width = (ratio * 100).toFixed(1) + "%";
-      if (llmTime) llmTime.textContent = Math.round(elapsed) + " ms (실측 25.8s)";
+      if (llmTime) llmTime.textContent = Math.round(elapsed) + " ms (재생·사전 벤치)";
       if (ratio >= 1) {
         clearInterval(tick);
-        if (llmTime) llmTime.textContent = estimatedLlmMs + " ms (Phase 1 실측)";
+        if (llmTime) llmTime.textContent = estimatedLlmMs + " ms (참고·사전 실측 재생, 라이브 아님)";
         resolve();
       }
     }, interval);
@@ -678,14 +678,13 @@ async function runRace() {
     // 입증. Qwen3 25.8s (Phase 1 /answer 실측) vs BERT 1.18s (Phase 3 5070 Ti
     // 학습 모델 실측) = 21.9× 빠름. V2 §4.4 표 정량 검증 완료.
     note.innerHTML = `
-      BERT <b>${bertMs} ms</b> <span class="src-tag src-measured">실측</span>
-      vs LLM <b>${estimatedLlmMs} ms</b>
-      <span class="src-tag src-measured" style="margin-left:6px;">실측</span>
-      — 약 <b>${ratio}× 빠름</b>.
+      이 데모 라이브 BERT(룰엔진) 응답 <b>${bertMs} ms</b> <span class="src-tag src-measured">실측</span>
+      · LLM 막대 <b>${estimatedLlmMs} ms</b>
+      <span class="src-tag src-ref" style="margin-left:6px;">참고·재생</span>
       <br/><span style="font-size:11.5px;color:var(--text-dim);">
-      ※ BERT 1.18s = Phase 3 5070 Ti KF-DeBERTa 학습 모델 실측.
-      Qwen3 25.8s = Phase 1 /answer 실측 (Ollama qwen3:14b).
-      P5 E2E RAG ON: 9.2s 평균, BERT 추론이 99% (V2 §14.2 ≤ 30s 합격선 3.3배 여유).
+      ※ 대표 비교값 <b>≈22×</b> = 학습 KF-DeBERTa 분류 1.18s(Phase 3 GPU) vs Qwen3 /answer 25.8s(Phase 1) — 서로 다른 작업·환경 벤치라 참고값.
+      라이브 막대의 BERT는 이 데모의 룰엔진 응답(학습모델 아님), LLM은 사전 측정치 재생(이 데모는 LLM 미호출).
+      P5 E2E RAG ON 참고: BERT 추론이 대부분(V2 §14.2 ≤ 30s 합격선 이내).
       </span>`;
   }
 
@@ -830,12 +829,15 @@ function renderCapabilityStats() {
   if (!wrap) return;
   // src: "measured" 실측 / "spec" 명세·합격선·코드 사실 / "ref" V2 통합본 참고값.
   const items = [
+    // [정직 대표지표] 안전 veto — 고등급 미탐 최소화가 대표 성능(RFP 성능목표 "미탐 최소화"와 일치)
+    { v: "파국 미탐 0", l: "고등급(TS)→공개 무음미탐 0건 · TS recall 0.92 (정직 홀드아웃 N42)", src: "measured" },
+    { v: "0.69", l: "정직 홀드아웃 macro-F1 (경화 consensus, KF-DeBERTa 계열·합성프록시 추세용)", src: "measured" },
     // Phase 3 실측 (2026-05-30): KF-DeBERTa labeled_5k 1ep 학습 + RTX 5070 Ti
-    { v: "1.18s", l: "BERT 추론 (KF-DeBERTa 학습 모델, 5070 Ti 실측)", src: "measured" },
-    { v: "25.8s", l: "LLM zero-shot (Ollama Qwen3 14B, Phase 1 /answer 실측)", src: "measured" },
+    { v: "1.18s", l: "BERT 추론 (KF-DeBERTa 학습 모델, 5070 Ti 실측·별도 GPU 벤치)", src: "measured" },
+    { v: "25.8s", l: "LLM /answer(RAG 생성) latency (Qwen3 14B, Phase 1 실측·분류 아님)", src: "measured" },
     { v: "33s", l: "BERT 학습 1 epoch (5070 Ti labeled 3500건, 실측)", src: "measured" },
-    { v: "F1=1.0", l: "labeled_5k test 752건 평가 (실측, 학습 분포 한정)", src: "measured" },
-    { v: "10/12", l: "데모 12 샘플 실호출 분류 정합 (학습 외 분포, 실측)", src: "measured" },
+    { v: "F1=1.0", l: "labeled_5k test 752건 (학습분포 상한·실문서 정확도 아님, 실측)", src: "measured" },
+    { v: "10/12", l: "데모 12 샘플 학습모델 실호출 정합 (학습 외 분포, FNR 16.7%, 실측)", src: "measured" },
     { v: "9.2s", l: "P5 E2E RAG ON (5070 Ti 풀스택 실측, V2 §14.2 ≤30s)", src: "measured" },
     // Phase 5 실측 (2026-05-30 02:35): Qwen3 vs Solar 각 200건 합성 비교
     { v: "100%", l: "P3 Qwen3 라벨 일치도 (200건, V2 §14.2 ≥90% PASS)", src: "measured" },
@@ -843,16 +845,16 @@ function renderCapabilityStats() {
     // Phase 8 실측 (2026-05-30 야간 후속): 고도화 측정 일괄
     { v: "5,200", l: "ES docs 영구 인덱싱 (BGE-M3, /answer citations 0→3 실측)", src: "measured" },
     { v: "0.746", l: "Qwen3+5K 학습 모델 평균 confidence (Phase 3 0.632 → +0.114)", src: "measured" },
-    { v: "F1=1.0", l: "KoBigBird-large 비교 학습 65초 (5070 Ti, KF-DeBERTa 동등)", src: "measured" },
-    { v: "39%", l: "Qwen3 thinking OFF 속도 우위 (29 vs 39 tps, 구조화 출력 권장)", src: "measured" },
-    { v: "0.6667", l: "P2 arctic-embed-l-ko (4-way 확장, BGE-M3 1순위 재확인)", src: "measured" },
+    { v: "F1=1.0", l: "KoBigBird-large 비교 (학습분포 상한, KF-DeBERTa 동등)", src: "measured" },
+    { v: "34%", l: "Qwen3 thinking OFF 속도 우위 (29→39 tps, 구조화 출력 권장)", src: "measured" },
+    { v: "0.6667", l: "Recall@5 KURE-v1 (P2 3-way ES dense, 실측·합성 천장)", src: "measured" },
     { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9, 합성 한계로 미달)", src: "spec" },
-    { v: "480+", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
-    { v: "5,000", l: "합성 코퍼스 (datasets/synthetic_5k)", src: "measured" },
+    { v: "404", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
+    { v: "5,000", l: "합성 코퍼스 (datasets/legacy_synthetic/labeled_5k)", src: "measured" },
     // Phase 2 실측 (2026-05-30): BGE-M3 / KURE / dragonkue 3-way
     { v: "0.7222", l: "Recall@5 BGE-M3 dense ES (P2 3-way 실측, 합성 천장)", src: "measured" },
     { v: "111ms", l: "검색 latency p50 (BGE-M3 dense ES, 실측)", src: "measured" },
-    { v: "540+", l: "단위 테스트 PASS (회귀 기준)", src: "measured" },
+    { v: "1,900+", l: "단위 테스트 PASS (회귀 기준)", src: "measured" },
     { v: "4", l: "배포 프로파일 (lite-noapi 외 3)", src: "measured" },
     { v: "≤ 30s", l: "E2E 합격선 (V2 §14.2 목표)", src: "spec" },
     { v: "$0", l: "온프레미스 추론 비용 (자체 GPU 가정)", src: "spec" },
@@ -882,7 +884,7 @@ function renderProfiles() {
   const profiles = [
     {
       name: "lite-noapi", title: "외부 의존 0",
-      detail: "GPU·LLM API·DB 없이 즉시 시연. 본 데모가 이 프로파일.",
+      detail: "GPU·LLM API·DB 없이 즉시 시연. 본 데모가 이 프로파일 — 실시간 판정은 시드 키워드 룰 분류기(rule-fallback-v0), 학습 KF-DeBERTa 미탑재.",
       cmd: "DEPLOY_PROFILE=lite-noapi",
       current: true,
     },
