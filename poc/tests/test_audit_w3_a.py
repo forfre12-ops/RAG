@@ -284,6 +284,10 @@ def test_evidence_failure_does_not_discard_classification(monkeypatch):
     import lloydk.db as db_mod
     monkeypatch.setattr(db_mod, "session_scope", _stub_scope)
     monkeypatch.setattr(cs_mod, "ClassifyRepo", _RecordingClassifyRepo)
+    # 36ff17d 가 _try_persist 에 추가한 optional-DB skip 가드(TESTING+DB미연결→persist skip)는 이
+    # 테스트가 session_scope/ClassifyRepo 를 stub 으로 주입해 DB 타임아웃 위험이 없으므로, 실 영속
+    # 경로(create_classification→classification_id 반환)를 검증하도록 꺼 준다.
+    monkeypatch.setattr(cs_mod, "_skip_optional_db_work", lambda: False)
 
     svc = ClassifyService.__new__(ClassifyService)  # __init__(모델 로드) 우회
 
@@ -322,6 +326,10 @@ def test_classification_returned_when_no_evidence(monkeypatch):
     import lloydk.db as db_mod
     monkeypatch.setattr(db_mod, "session_scope", _stub_scope)
     monkeypatch.setattr(cs_mod, "ClassifyRepo", _RecordingClassifyRepo)
+    # 36ff17d 가 _try_persist 에 추가한 optional-DB skip 가드(TESTING+DB미연결→persist skip)는 이
+    # 테스트가 session_scope/ClassifyRepo 를 stub 으로 주입해 DB 타임아웃 위험이 없으므로, 실 영속
+    # 경로(create_classification→classification_id 반환)를 검증하도록 꺼 준다.
+    monkeypatch.setattr(cs_mod, "_skip_optional_db_work", lambda: False)
 
     svc = ClassifyService.__new__(ClassifyService)
 
