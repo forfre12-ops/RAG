@@ -87,7 +87,7 @@ footer strong{color:var(--text-dim);}
   <p class="lede">담당 6개 기능요건(FUN-003·004·005·022·023·024)을 기능계층으로 분해(FBD)하고, 시스템 경계의 데이터 흐름을 컨텍스트 다이어그램(DFD Level 0)과 주요 처리 흐름(DFD Level 1)으로 도식화한다. 소스 182파일 / 37,684LOC, 6-모듈 파이프라인(M1~M6) 기준.</p>
   <div class="callout inset"><div class="callout-label">범위 · 기준</div><p>담당 6요건 범위. KL 담당 16요건 및 RAG 질의응답(부가 기능)은 도식 경계 밖으로 두되, 데이터 흐름상 접점만 참조 표기한다.</p></div>
   <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">기능분해도(FBD)</span></div>
-<p>담당 6개 기능요건을 <strong>대분류(요건) → 소기능</strong> 2계층으로 분해한다. 대분류 A~F는 각각 파이프라인 모듈 M1~M6에 대응하며, 소기능은 구현 모듈·파일 단위로 추적 가능하도록 식별번호(A1·B1…)를 부여한다.</p><div class="kpi-row"><div class="kpi"><div class="n">6</div><div class="l">담당 기능요건(FUN)</div></div><div class="kpi"><div class="n">M1~M6</div><div class="l">파이프라인 모듈</div></div><div class="kpi"><div class="n">20</div><div class="l">API 라우터</div></div><div class="kpi"><div class="n">21</div><div class="l">DB 테이블(부록A)</div></div></div><h3>기능 트리</h3><pre>영업비밀 자동 등급분류 · RAG 시스템
+<p>담당 6개 기능요건을 <strong>대분류(요건) → 소기능</strong> 2계층으로 분해한다. 대분류 A~F는 각각 파이프라인 모듈 M1~M6에 대응하며, 소기능은 구현 모듈·파일 단위로 추적 가능하도록 식별번호(A1·B1…)를 부여한다.</p><div class="kpi-row"><div class="kpi"><div class="n">6</div><div class="l">담당 기능요건(FUN)</div></div><div class="kpi"><div class="n">M1~M6</div><div class="l">파이프라인 모듈</div></div><div class="kpi"><div class="n">19</div><div class="l">API 라우터</div></div><div class="kpi"><div class="n">21</div><div class="l">DB 테이블(부록A)</div></div></div><h3>기능 트리</h3><pre>영업비밀 자동 등급분류 · RAG 시스템
 ├─ A. 학습데이터 구축 ············ FUN-003 (M1 합성)
 │    ├─ A1 합성문서 생성(프롬프트 체인)
 │    ├─ A2 등급 witness 분류체계

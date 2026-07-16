@@ -103,11 +103,11 @@ footer strong{color:var(--text-dim);}
 <div class="table-wrap"><table>
 <thead><tr><th style="width:80px">요건ID</th><th style="width:150px">요건명</th><th>담당 범위(개요)</th><th style="width:110px">구현 모듈</th></tr></thead>
 <tbody>
-<tr><td class="center"><strong>FUN-003</strong></td><td>등급분류 수행</td><td>문서 등급 자동 판정 — 추론·청크 집계(most-severe)·단계 상태 스트리밍</td><td class="center">M5 추론</td></tr>
+<tr><td class="center"><strong>FUN-003</strong></td><td>합성(샘플) 문서 생성</td><td>학습용 합성 문서 LLM 생성 · 검수 큐 적재</td><td class="center">M1 합성</td></tr>
 <tr><td class="center"><strong>FUN-004</strong></td><td>분류 모델(인코더 PLM)</td><td>KF-DeBERTa 분류기 학습·청크 증강·모델 등록/배포</td><td class="center">M4 학습</td></tr>
-<tr><td class="center"><strong>FUN-005</strong></td><td>분류 결과·상태 처리</td><td>안전 게이트(veto/floor·kill-gate) → 상태(staging/needs_review)·관리자 최종확정</td><td class="center">M5·M6</td></tr>
+<tr><td class="center"><strong>FUN-005</strong></td><td>등급분류(추론)·결과처리·등급체계 관리</td><td>문서 등급 자동판정(추론·most-severe) · 안전 게이트 → 상태 · 관리자 확정 · 등급체계 관리</td><td class="center">M5·M6</td></tr>
 <tr><td class="center"><strong>FUN-022</strong></td><td>전자문서 텍스트 추출</td><td>HWP·HWPX·PDF·DOCX·XLSX·XLS·PPTX·TXT 추출·정규화·PII 마스킹·청킹</td><td class="center">M2 전처리</td></tr>
-<tr><td class="center"><strong>FUN-023</strong></td><td>태깅·키워드 관리</td><td>룰 키워드 사전·등급체계(레벨) 관리(CRUD)·근거 태깅</td><td class="center">M3 라벨링</td></tr>
+<tr><td class="center"><strong>FUN-023</strong></td><td>가이드 기반 라벨링·키워드/태깅</td><td>룰 키워드 사전 · S·V·M 라벨링 · 근거 태깅</td><td class="center">M3 라벨링</td></tr>
 <tr><td class="center"><strong>FUN-024</strong></td><td>산출·리포트</td><td>검수 큐 배분·지표/혼동행렬·리포트 산출·운영 관제</td><td class="center">M6 평가·운영</td></tr>
 </tbody></table></div>
 <h3>범위 외</h3>
