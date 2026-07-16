@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>데이터전환 적용제외 근거서 | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{--bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;--bg-inverse:#09090b;--bg-nav:rgba(255,255,255,.88);--text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--text-faint:#a1a1aa;--border:rgba(0,0,0,.08);--border-mid:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.18);--font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sidebar:220px;--article-max:960px;--container:1360px;}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:5px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(27px,4vw,40px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin:0 0 18px;color:var(--text);text-wrap:balance;}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 28px;max-width:720px;}
+h2{font-size:clamp(18px,2.5vw,23px);font-weight:700;letter-spacing:-.03em;margin:10px 0 12px;color:var(--text);}
+h3{font-size:15px;font-weight:700;margin:24px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:36px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:44px 0 18px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{background:#fffbeb;border-color:#fcd34d;border-left:3px solid #d97706;}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;} td.nowrap{white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.core{background:var(--text);color:var(--bg);} .tag.sup{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.opt{background:transparent;color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.p1{background:#dc2626;color:#fff;} .tag.p2{background:#d97706;color:#fff;} .tag.p3{background:var(--bg-strong);color:var(--text);}
+.tag.pass{background:#16a34a;color:#fff;} .tag.todo{background:transparent;color:#d97706;border:1px solid #fbbf24;}
+.ph{background:#fffbeb;border:1px solid #fbbf24;color:#92400e;padding:1px 6px;font-family:var(--font-mono);font-size:11px;font-weight:600;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--border-mid);margin:18px 0;}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);} .kpi:last-child{border-right:none;}
+.kpi .n{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);} .kpi .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">데이터전환 적용제외</span></a>
+  <div class="nav-right"><span class="nav-badge">MIGRATION</span></div>
+</div></nav>
+<div class="article-layout">
+<article>
+  <div class="meta-row"><span class="badge">DOC-MIG-01</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-07-14</span></div>
+  <h1 class="title">데이터전환 적용제외 근거서</h1>
+  <p class="lede">본 사업은 현행 시스템 데이터를 이관하지 않는 합성-only 신규 구축으로, 표준 감리 산출물 '데이터전환'을 적용제외(N/A)로 판정하고 그 근거와 회원사 초기적재 대안 절차를 기술한다.</p>
+  <div class="callout inset"><div class="callout-label">범위 · 기준</div><p>적용범위: 지재원 담당 6요건(FUN-003·004·005·022·023·024) 및 합성-only 운영 전제. 회원사 자체 실데이터 초기 이관 정책은 본 근거서 범위 밖(→ 확인 필요사항).</p></div>
+  <div class="section-sep" id="s01"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">적용성 판정</span></div>
+<p>본 사업은 현행(레거시) 정보시스템의 데이터를 신규 시스템으로 이관하는 구조가 아니다. 분류 학습 코퍼스는 전량 합성 생성물이며, 발주처 보유 실 문서·라벨을 시스템으로 전환·적재하지 않는다. 따라서 표준 감리 산출물 <b>데이터전환</b>(현행→신규 매핑·정제·이행검증·컷오버)은 본 사업에 <b>적용제외(N/A)</b>로 판정한다.</p><div class="kpi-row"><div class="kpi"><div class="n">0</div><div class="l">전환 대상 실데이터</div></div><div class="kpi"><div class="n">0</div><div class="l">현행 대체 시스템</div></div><div class="kpi"><div class="n">N/A</div><div class="l">데이터전환 산출물</div></div></div><h3>표준 데이터전환 활동 대비 해당 여부</h3><div class="table-wrap"><table><thead><tr><th>표준 활동</th><th>본 사업 해당</th><th>사유</th></tr></thead><tbody><tr><td>현행 데이터 원천 식별</td><td><span class="tag opt">해당없음</span></td><td>신규 구축, 대체·이관 대상 레거시 시스템 없음</td></tr><tr><td>데이터 매핑(현행→신규 스키마)</td><td><span class="tag opt">N/A</span></td><td>원천 데이터 부재로 매핑 대상 없음</td></tr><tr><td>정제·변환(cleansing/transformation)</td><td><span class="tag opt">N/A</span></td><td>동상</td></tr><tr><td>이행 검증(건수·정합성 대사)</td><td><span class="tag opt">N/A</span></td><td>이관 산출물 없음</td></tr><tr><td>컷오버·병행운영</td><td><span class="tag opt">N/A</span></td><td>기존 운영 데이터 승계 없음</td></tr><tr><td>초기 참조데이터 적재</td><td><span class="tag sup">대안 존재</span></td><td>등급체계·키워드 시드(개인정보 아님) — §03</td></tr></tbody></table></div><div class="callout inset"><div class="callout-label">판정</div><p>데이터전환 산출물 = <b>적용제외(N/A)</b>. 단, 신규 시스템 기동에 필요한 <b>초기 참조데이터(등급체계·키워드 시드) 적재</b>는 별도 절차로 존재하며 §03에 기술한다. 적용제외의 최종 확정은 <span class="ph">[발주처·감리 확정]</span>.</p></div>
+<div class="section-sep" id="s02"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">판정 근거</span></div>
+<h3>운영 전제</h3><p>발주처 지시에 따라 <b>실데이터·검수·반출 0</b> 운영 전제가 확정되었다(2026-06-29). 분류기는 합성 부트스트랩(M1 합성 생성 → M3 라벨링 → M4 학습)으로 구축하며, 발주처 보유 실 영업비밀 문서를 시스템으로 이관·학습·평가하지 않는다.</p><div class="table-wrap"><table><thead><tr><th>근거</th><th>내용</th><th>출처</th></tr></thead><tbody><tr><td>합성-only 운영 전제</td><td>실데이터 0 · 검수 0 · 반출 0 확정</td><td>운영 전제 확정 2026-06-29</td></tr><tr><td>무실데이터 분류기 설계</td><td>합성 부트스트랩 + 회원사 비모수 운영학습, 실 문서 이관 없음</td><td><code>doc/result/open/무실데이터_분류기_설계서.html</code></td></tr><tr><td>학습 코퍼스</td><td>전량 합성 생성물(M1), 발주처 실 문서 미포함</td><td>모듈 <code>modules/m1_synthesis</code></td></tr><tr><td>반출 경계</td><td>반출물 = 학습모델 번들뿐, 원본 학습데이터·합성 코퍼스 미반출</td><td><code>poc/docs/EXPORT_IMPORT_RUNBOOK.md</code> §A5</td></tr></tbody></table></div><div class="callout warn"><div class="callout-label">경계</div><p>본 근거서는 발주처 실 업무데이터의 <b>시스템 내 이관·적재가 없음</b>을 전제로 한다. 회원사가 자체 실 운영데이터를 별도로 초기 이관하는 정책이 있는 경우, 해당 범위는 본 적용제외에서 제외되며 별도 데이터전환 계획이 필요하다(→ 확인 필요사항).</p></div>
+<div class="section-sep" id="s03"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">회원사 운영 초기적재 절차 (대안)</span></div>
+<p>표준 데이터전환은 적용제외지만, 신규 시스템 기동에는 <b>초기 참조데이터 적재</b>가 필요하다. 이는 발주처 실 업무데이터·개인정보가 아니라 <b>등급체계와 키워드 시드</b>이며, 전량 공개 출처 기반이다.</p><h3>초기적재 항목</h3><div class="table-wrap"><table><thead><tr><th>항목</th><th>대상 테이블</th><th>원천</th><th>개인정보</th><th>적재 경로</th></tr></thead><tbody><tr><td>등급체계(TS/S1/S2/S3)</td><td><code>tb_classification_levels</code></td><td>baseline 마이그레이션 내장 시드</td><td>없음</td><td><code>alembic upgrade head</code></td></tr><tr><td>평가요소(4대)</td><td><code>tb_evaluation_factors</code></td><td>동상</td><td>없음</td><td>동상</td></tr><tr><td>키워드 시드</td><td><code>tb_level_keywords</code></td><td>공개 법령·가이드라인 <code>modules/m3_labeling/seeds.py</code></td><td>없음</td><td>시드 로더 / 관리 API(FUN-023)</td></tr><tr><td>학습모델 번들</td><td>모델 아티팩트(파일)</td><td>지재원 학습 산출물</td><td>없음</td><td><code>EXPORT_IMPORT_RUNBOOK.md</code> §A–B</td></tr></tbody></table></div><h3>적재 특성</h3><ul><li><b>등급체계·평가요소</b>: baseline 마이그레이션(<code>poc/alembic/versions/000000000001_baseline_init.py</code>)이 <code>ON CONFLICT DO NOTHING</code>으로 시드 → <b>재실행 안전(idempotent)</b>, 별도 전환 절차 불요.</li><li><b>키워드 시드</b>: 공개 출처만 사용 — 부정경쟁방지법·영업비밀보호법 시행령·산업기술의 유출방지 및 보호에 관한 법률·KOIPA 관리 가이드라인·KISA/KOTRA 공개자료. 운영 중 키워드 추가·관리는 FUN-023 태깅/키워드 관리 기능(<code>api/keyword_admin.py</code>)으로 수행.</li><li><b>모델 번들 반입</b>: 지재원 → 회원사(폐쇄망) 오프라인 반입. 반출물은 번들(가중치·설정·시드 스냅샷)뿐이며 원본 학습데이터·합성 코퍼스는 반출하지 않음(<code>EXPORT_IMPORT_RUNBOOK.md</code> §A5).</li><li>반입 매체·승인·해시대조 절차는 KL R&R로 확정 <span class="ph">[KL 협의]</span>(런북 결정항목 D2).</li></ul><div class="callout inset"><div class="callout-label">개인정보</div><p>초기적재 대상(등급체계·평가요소·키워드 시드·모델 번들)에 <b>개인정보 및 발주처 실 업무데이터가 포함되지 않는다.</b> 따라서 개인정보 이관·정제에 따른 데이터전환 산출물 요건이 발생하지 않는다.</p></div>
+  <div class="footnote">DOC-MIG-01 · 데이터전환 적용제외 근거서 · 근거: 무실데이터 분류기 설계서, poc/docs/EXPORT_IMPORT_RUNBOOK.md · 2026-07-14</div>
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#s01">01 적용성 판정</a>
+<a href="#s02">02 판정 근거</a>
+<a href="#s03">03 회원사 초기적재 절차</a>
+</nav></aside>
+</div>
+<footer><strong>로이드케이</strong> · 데이터전환 적용제외 근거서 (DOC-MIG-01) · 감리 대응 산출물</footer>
+<script>
+(function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}
+window.addEventListener('scroll',o,{passive:true});o();})();
+</script>
+</body></html>
