@@ -599,7 +599,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/train/jobs/{train_job_id} · /api/v1/train/jobs</span>
         <span class="ep-summary">학습 작업 상태 · 목록 조회</span>
-        <span class="ep-auth">API Key</span>
+        <span class="ep-auth">JWT (admin · kl_backend · system)</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc"><code>GET /train/jobs/{train_job_id}</code>는 단일 학습 작업의 진행 상태(TrainStatus)를, <code>GET /train/jobs</code>는 최근 작업 목록(TrainJobList)을 반환한다.</p>
@@ -743,14 +743,14 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/golden/build</span>
         <span class="ep-summary">골든 후보 빌드 작업 생성</span>
-        <span class="ep-auth">API Key</span>
+        <span class="ep-auth">JWT (admin · kl_backend · system)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">inline 문서 또는 corpus 디렉터리에서 골든 후보 빌드 작업을 생성한다. 상태 조회는 <code>GET /api/v1/golden/jobs/{job_id}</code>, 사람이 검토하는 HTML 화면은 <code>GET /api/v1/golden/jobs/{job_id}/review.html</code>이다.</p>
+        <p class="ep-desc">inline 문서 또는 corpus 디렉터리에서 골든 후보 빌드 작업을 생성한다. 상태 조회는 <code>GET /api/v1/golden/jobs/{job_id}</code>, 사람이 검토하는 HTML 화면은 <code>GET /api/v1/golden/jobs/{job_id}/review.html</code>이다. 이미 생성된 <code>build_*.jsonl</code>을 재라벨 없이 골든잡으로 등록하려면 <code>POST /api/v1/golden/jobs/register</code>(admin·kl_backend·system, 경로 밖 파일=404)를 사용한다. 검수 서명은 <code>POST /api/v1/golden/jobs/{job_id}/signoff</code>(admin·reviewer·kl_backend + <code>is_human_reviewer</code> 403 게이트)로 수행하며 통과 시 locked로 승격된다. 서명 입력 화면 <code>GET /api/v1/golden/jobs/{job_id}/signoff.html</code>과 검토 화면 <code>review.html</code>은 브라우저 직접 접속용 <strong>무인증</strong> HTML 뷰이고, 실제 서명 POST만 권한 검증을 거친다.</p>
         <h4>Request Body — GoldenBuildRequest</h4>
         <p style="font-size:13px;"><code>{source_type, docs, corpus_dir, n, llm_provider, sensitive, min_rule_conf, min_llm_conf, min_self_consistency, require_evidence, holdout_path, out_dir, actor}</code></p>
         <h4>Response</h4>
-        <p style="font-size:13px;"><code>POST /golden/build</code> → <code>{golden_job_id, status_url}</code> · <code>GET /golden/jobs/{job_id}</code> → <code>{status, stats, gold_count, uncertain_count, gold_path, uncertain_path, error}</code></p>
+        <p style="font-size:13px;"><code>POST /golden/build</code> → <code>{golden_job_id, status_url}</code> · <code>GET /golden/jobs/{job_id}</code> → <code>{status, stats, gold_count, uncertain_count, gold_path, uncertain_path, error}</code> · <code>POST /golden/jobs/register</code> → 기존 build_*.jsonl 골든잡 등록(경로 밖=404) · <code>POST /golden/jobs/{job_id}/signoff</code> → 검수 서명→locked 승격(서명 신원은 인증 컨텍스트에서 확정)</p>
       </div>
     </div>
 
@@ -759,7 +759,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method post">POST</span>
         <span class="ep-path">/api/v1/guide/documents · GET /api/v1/guide/documents/{guide_id}</span>
         <span class="ep-summary">가이드 문서 등록·버전 조회</span>
-        <span class="ep-auth">API Key</span>
+        <span class="ep-auth">JWT (POST admin · kl_backend / GET 인증)</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">가이드 문서를 등록하고 RAG 인덱싱 결과를 반환한다. 버전 조회는 특정 <code>guide_id</code>의 현재 학습 버전과 등록 버전 목록을 반환한다.</p>
@@ -773,7 +773,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/promotions/pending · POST /api/v1/promotions/promote</span>
         <span class="ep-summary">검증 라벨 승격 후보 조회·승격</span>
-        <span class="ep-auth">API Key</span>
+        <span class="ep-auth">JWT (admin · reviewer)</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">사람 검수로 확정된 교정을 검증 라벨로 승격할 후보 목록을 조회하고, 선택한 문서를 승격한다. 자동 학습 데이터 편입이 아니라 검토자가 명시적으로 확정하는 경로다.</p>
@@ -790,7 +790,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/schema/grades</span>
         <span class="ep-summary">현재 등급체계 조회</span>
-        <span class="ep-auth">API Key</span>
+        <span class="ep-auth">JWT (admin · reviewer · system · kl_backend)</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">DB <code>tb_classification_levels</code>에서 현재 활성 등급 정의를 조회한다. GradeRegistry가 런타임에 이 값을 사용한다.</p>
@@ -983,7 +983,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="method get">GET</span>
         <span class="ep-path">/api/v1/admin/escalation-held · /admin/locked-readiness · /admin/dashboard</span>
         <span class="ep-summary">운영 상태·락드 평가 준비도·대시보드</span>
-        <span class="ep-auth">API Key</span>
+        <span class="ep-auth">JWT (admin role)</span>
       </div>
       <div class="ep-body">
         <p class="ep-desc">현재 구현된 admin 조회 API는 키 발급/모델 목록이 아니라 운영 상태 진단이다. <code>/admin/escalation-held</code>는 게이트 보류 건수, <code>/admin/locked-readiness</code>는 등급별 locked eval 준비도, <code>/admin/dashboard</code>는 운영 대시보드 요약을 반환한다.</p>
@@ -1174,6 +1174,21 @@ lloydk_request_duration_seconds{method,route} # 전체 HTTP 요청 latency
 lloydk_embedding_cache_hit_total{layer}  # lru | redis | disk
 lloydk_embedding_cache_miss_total</pre>
         <div class="status-chips"><span class="sc s2xx">200 text/plain (Prometheus exposition format)</span></div>
+      </div>
+    </div>
+
+    <!-- ===== OpenAPI · 정적 ===== -->
+    <div class="cat-divider"><div class="cat-line"></div><span class="cat-label">OpenAPI 문서 · 정적</span><div class="cat-line"></div></div>
+
+    <div class="ep" id="ep-openapi">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/docs · /redoc · /api/v1/openapi.json · /demo/</span>
+        <span class="ep-summary">Swagger/ReDoc UI · OpenAPI 스키마 · 데모 콘솔</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">FastAPI가 <code>openapi_url="/api/v1/openapi.json"</code>·<code>docs_url="/docs"</code>로 명시 설정돼 Swagger UI(<code>/docs</code>)·ReDoc(<code>/redoc</code>, 기본값 유지)·OpenAPI 스키마(<code>/api/v1/openapi.json</code>)가 모두 <strong>무인증으로 노출</strong>된다(비활성화 처리 없음). 데모 SPA <code>/demo/</code>는 StaticFiles 마운트(<code>html=True</code>)로 역시 <strong>무인증</strong> 정적 제공되며, 정적 디렉터리가 없으면 마운트가 조용히 skip된다. <code>/metrics-prom</code>은 <code>include_in_schema=False</code>, <code>/demo/</code>는 StaticFiles 마운트라 OpenAPI 스키마에는 노출되지 않는다(경로 자체는 접근 가능). 다만 golden <code>review.html</code>·<code>signoff.html</code>은 일반 APIRoute(<code>HTMLResponse</code>)로 등록돼 스키마에 노출된다.</p>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span></div>
       </div>
     </div>
 
