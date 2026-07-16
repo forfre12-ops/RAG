@@ -123,22 +123,12 @@ def classify_async(
 
 
 def _publish_callback_webhook(callback_url: str | None, payload: dict) -> None:
-    """워커 완료/실패 시 callback_url 로 결과 webhook 을 outbox 에 적재(재시도·DLQ 신뢰전달).
+    """워커 완료/실패 시 callback_url 로 결과 webhook 발사 — outbox.publish_callback(공용 계약)로 위임.
 
-    best-effort — 적재 실패가 분류 결과(이미 job_store 영속)를 폐기하지 않게 예외는 삼키고 로깅만.
-    (in-process 경로의 AsyncClassifyService._publish_callback 와 동일 계약을 celery 워커에서 수행.)
+    (in-process 경로 AsyncClassifyService._publish_callback 와 동일 계약. 발사 로직은 outbox 로 통합.)
     """
-    if not callback_url:
-        return
-    try:
-        from lloydk.services.outbox import get_outbox_store, publish  # noqa: PLC0415
-        publish(get_outbox_store(), target_url=callback_url, payload=payload)
-        logger.info("async callback enqueued to outbox: url=%s job=%s", callback_url, payload.get("job_id"))
-    except Exception as exc:  # noqa: BLE001
-        logger.error(
-            "async callback enqueue failed (non-critical): url=%s err=%s",
-            callback_url, type(exc).__name__, exc_info=True,
-        )
+    from lloydk.services.outbox import publish_callback  # noqa: PLC0415
+    publish_callback(callback_url, payload)
 
 
 def _persist_synth_samples(docs: list, *, job_id: str | None) -> int:

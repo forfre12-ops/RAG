@@ -280,31 +280,12 @@ class AsyncClassifyService:
 
     @staticmethod
     def _publish_callback(callback_url: str | None, payload: dict) -> None:
-        """callback_url 이 있으면 job 결과를 outbox webhook 으로 publish.
+        """callback_url 로 job 결과 webhook 발사 — outbox.publish_callback(공용 계약)로 위임.
 
-        M-callback: callback_url 은 webhook outbox 의 존재 이유인데 그동안
-        _strip_async_fields 에서 떨어져 나가고 outbox 로 넘어가지 않아 webhook 이
-        절대 울리지 않았다. 여기서 outbox.publish 로 적재 → worker(deliver_once)가
-        재시도·DLQ 포함 신뢰성 있게 전달한다.
-
-        best-effort: outbox 적재 실패가 분류 결과 자체를 폐기하면 안 되므로,
-        예외는 삼키고 로깅만 한다(분류는 이미 job_store 에 영속화됨).
+        발사 로직(best-effort·재시도·DLQ)은 outbox 로 통합했다(celery 워커 경로와 중복 제거).
         """
-        if not callback_url:
-            return
-        try:
-            from lloydk.services.outbox import (  # noqa: PLC0415
-                get_outbox_store,
-                publish,
-            )
-
-            publish(get_outbox_store(), target_url=callback_url, payload=payload)
-            logger.info("callback enqueued to outbox: url=%s job=%s", callback_url, payload.get("job_id"))
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "callback enqueue failed (non-critical): url=%s err=%s",
-                callback_url, type(exc).__name__, exc_info=True,
-            )
+        from lloydk.services.outbox import publish_callback  # noqa: PLC0415
+        publish_callback(callback_url, payload)
 
     @staticmethod
     def _strip_async_fields(req: ClassifyAsyncRequest) -> ClassifyRequest:

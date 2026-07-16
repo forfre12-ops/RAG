@@ -509,6 +509,27 @@ _default_store: OutboxStore | None = None
 _default_lock = threading.Lock()
 
 
+def publish_callback(callback_url: str | None, payload: dict) -> bool:
+    """비동기 분류 완료/실패 결과를 callback_url 로 발사(outbox 적재 — 재시도·DLQ 신뢰전달).
+
+    KL 콜백 계약의 단일 진입점 — in-process(AsyncClassifyService)·celery 워커(classify_async)
+    양쪽이 이 함수로 동일 계약을 발사한다. best-effort: 적재 실패가 분류 결과(이미 job_store 에
+    영속)를 폐기하지 않게 예외는 삼키고 로깅만. callback_url 이 없으면 no-op(False 반환).
+    """
+    if not callback_url:
+        return False
+    try:
+        publish(get_outbox_store(), target_url=callback_url, payload=payload)
+        logger.info("async callback enqueued to outbox: url=%s job=%s", callback_url, payload.get("job_id"))
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "async callback enqueue failed (non-critical): url=%s err=%s",
+            callback_url, type(exc).__name__, exc_info=True,
+        )
+        return False
+
+
 def get_outbox_store(
     redis_url: Optional[str] = None,
     *,
