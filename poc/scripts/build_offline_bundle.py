@@ -721,6 +721,78 @@ _HOST_EXCLUDE_PREFIXES = ("torch", "nvidia", "triton")
 _DEFAULT_WHEEL_PLATFORM = "manylinux2014_x86_64"
 
 
+def _export_locked_requirements(out_dir: Path) -> Path | None:
+    """uv.lock(해시핀·CI강제)에서 requirements를 export → out_dir/_requirements_locked.txt.
+
+    번들 wheel의 출처를 빌드호스트 venv(pip freeze)가 아니라 CI-게이트된 uv.lock으로 고정한다
+    (폐쇄망 재현성·공급망 감사 = uv.lock 도입 목적). uv 미가용/실패 시 None → 호출부가
+    기존 pip freeze 폴백으로 안전 강등한다.
+    """
+    out = out_dir / "_requirements_locked.txt"
+    cmd = [sys.executable, "-m", "uv", "export", "--format", "requirements-txt",
+           "--no-emit-project", "--no-dev"]
+    try:
+        r = subprocess.run(cmd, cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=180)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [uv] export 실패(폴백 freeze): {exc}", file=sys.stderr)
+        return None
+    if r.returncode != 0 or not r.stdout.strip():
+        print(f"  [uv] export 불가(폴백 freeze): {(r.stderr or '')[-200:]}", file=sys.stderr)
+        return None
+    out.write_text(r.stdout, encoding="utf-8")
+    return out
+
+
+def _strip_hashes(text: str) -> str:
+    """uv export(해시·`\\` 연속줄) → 버전핀만 남긴 pip download용 목록.
+
+    크로스플랫폼 pip download(--platform manylinux)는 요구파일에 해시가 있으면 자동으로
+    hash-check가 켜져, 빌드호스트(Windows 등)에서 만든 export가 타깃 wheel 해시와 안 맞으면
+    다운로드가 깨질 수 있다. 그래서 *다운로드 소스*는 해시 없이 pinned 버전만 쓰고,
+    무결성 검증은 타깃 install.sh 의 --require-hashes(네이티브 wheel)로 미룬다.
+    """
+    out: list[str] = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or s.startswith("--hash"):
+            continue
+        s = s.rstrip("\\").strip()   # 'pkg==ver \\' → 'pkg==ver'
+        if s:
+            out.append(s)
+    return "\n".join(out) + "\n"
+
+
+def _strip_host_excluded(text: str) -> str:
+    """호스트 설치 목록에서 torch/nvidia/triton 스탠자를 제거(이미지에 이미 구워짐).
+
+    uv export(멀티라인 --hash 연속) / 평문 requirements 양쪽 처리. 스탠자 = 열0에서 시작하는
+    `pkg==ver` 줄 + 이어지는 들여쓴 --hash/# via 줄. 해시는 보존(호스트 --require-hashes 검증용).
+    """
+    lines = text.splitlines()
+    out: list[str] = []
+    i, n = 0, len(lines)
+    while i < n:
+        line = lines[i]
+        if not line.strip() or line[:1] == "#":     # 헤더/빈 줄 보존
+            out.append(line)
+            i += 1
+            continue
+        if line[:1] not in (" ", "\t"):             # 패키지 스탠자 시작(열0)
+            stanza = [line]
+            j = i + 1
+            while j < n and lines[j][:1] in (" ", "\t") and lines[j].strip():
+                stanza.append(lines[j])
+                j += 1
+            pkg = stanza[0].split("==")[0].split(">")[0].split("<")[0].split(" ")[0].strip().lower()
+            if not pkg.startswith(_HOST_EXCLUDE_PREFIXES):
+                out.extend(stanza)
+            i = j
+            continue
+        out.append(line)                            # 방어: 고아 들여쓴 줄 보존
+        i += 1
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
 def _pip_download_cmd(req: Path, wheels_dir: Path, wheel_platform: str) -> list[str]:
     """pip download 명령 구성(순수 함수 — 테스트 대상). wheel_platform 이 주어지면
     타깃 플랫폼 고정(--platform 은 --only-binary 필수). 빈 문자열이면 빌드 호스트 플랫폼.
@@ -747,37 +819,47 @@ def _pip_download(out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) 
     """
     wheels_dir = out_dir / "wheels"
     wheels_dir.mkdir(parents=True, exist_ok=True)
-    req = _REPO_ROOT / "requirements.txt"
-    if not req.exists():
-        # pyproject.toml 기반 프로젝트 — pip freeze, git+file 의존성 제외
-        print("  [pip] no requirements.txt, exporting from venv (skip editable/git deps)", file=sys.stderr)
-        r = subprocess.run(
-            [sys.executable, "-m", "pip", "freeze", "--exclude-editable"],
-            capture_output=True, text=True,
-        )
-        if r.returncode != 0:
-            print(f"  [ERR] pip freeze 실패: {r.stderr[-300:]}", file=sys.stderr)
-            return False
-        # git+ / file: / @ file: 라인 제거 (폐쇄망 번들에 포함 불가)
-        lines = [
-            line for line in r.stdout.splitlines()
-            if line.strip()
-            and not line.startswith("git+") and not line.startswith("-e ") and "@ file:" not in line
-        ]
-        req = out_dir / "_requirements_freeze.txt"
-        req.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    repo_req = _REPO_ROOT / "requirements.txt"
+    if repo_req.exists():
+        # 명시적 requirements.txt 가 있으면 최우선(기존 동작 보존).
+        req = repo_req
+        no_torch_text = _strip_host_excluded(req.read_text(encoding="utf-8"))
+    else:
+        # [공급망] uv.lock(해시핀·CI강제)에서 export → 빌드호스트 venv freeze 드리프트 차단.
+        # 다운로드 소스는 해시 없이 pinned(크로스플랫폼 --platform 안전), 호스트 설치는 해시
+        # 보존 no_torch 로 --require-hashes(타깃 네이티브 wheel 무결성 검증).
+        locked = _export_locked_requirements(out_dir)
+        if locked is not None:
+            locked_text = locked.read_text(encoding="utf-8")
+            req = out_dir / "_requirements_download.txt"
+            req.write_text(_strip_hashes(locked_text), encoding="utf-8")
+            no_torch_text = _strip_host_excluded(locked_text)
+        else:
+            # 최후수단 — uv 미가용: pip freeze(비핀). git+/editable/file 의존성 제외.
+            print("  [pip] no requirements.txt / uv.lock export 불가 — venv freeze 폴백(비핀)", file=sys.stderr)
+            r = subprocess.run(
+                [sys.executable, "-m", "pip", "freeze", "--exclude-editable"],
+                capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                print(f"  [ERR] pip freeze 실패: {r.stderr[-300:]}", file=sys.stderr)
+                return False
+            lines = [
+                line for line in r.stdout.splitlines()
+                if line.strip()
+                and not line.startswith("git+") and not line.startswith("-e ") and "@ file:" not in line
+            ]
+            req = out_dir / "_requirements_freeze.txt"
+            req.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            no_torch_text = _strip_host_excluded(req.read_text(encoding="utf-8"))
 
-    # 최종 요구 목록(주석·빈 줄 제외).
+    # 최종 요구 목록(주석·해시·빈 줄 제외) — 다운로드 완전성 자기검사용 카운트.
     requested = [
         ln for ln in req.read_text(encoding="utf-8").splitlines()
-        if ln.strip() and not ln.strip().startswith("#")
+        if ln.strip() and not ln.strip().startswith("#") and not ln.strip().startswith("--")
     ]
-    # 호스트 설치용(torch류 제외) 목록 — install.sh 가 이 파일명을 참조하므로 항상 생성.
-    no_torch = [
-        ln for ln in requested
-        if not ln.split("==")[0].split(">")[0].split("<")[0].strip().lower().startswith(_HOST_EXCLUDE_PREFIXES)
-    ]
-    (out_dir / "_requirements_no_torch.txt").write_text("\n".join(no_torch) + "\n", encoding="utf-8")
+    # 호스트 설치용(torch류 제외) 목록 — install.sh 가 이 파일명을 참조하므로 항상 생성(해시 보존).
+    (out_dir / "_requirements_no_torch.txt").write_text(no_torch_text, encoding="utf-8")
 
     r = subprocess.run(
         _pip_download_cmd(req, wheels_dir, wheel_platform),
@@ -1036,7 +1118,9 @@ def _copy_infra(out_dir: Path) -> None:
         "REQ=\"$BUNDLE_DIR/python-deps/_requirements_no_torch.txt\"\n"
         "if command -v pip >/dev/null 2>&1 && [ -f \"$REQ\" ]; then\n"
         "  echo '[deps] host python deps 설치 ...'\n"
-        "  pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" -r \"$REQ\"\n"
+        "  # uv.lock export 목록은 해시핀 → --require-hashes 로 공급망 무결성 검증(타깃 네이티브 wheel).\n"
+        "  HASHFLAG=\"\"; grep -q -- '--hash=' \"$REQ\" && HASHFLAG=\"--require-hashes\"\n"
+        "  pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" $HASHFLAG -r \"$REQ\"\n"
         "else\n"
         "  echo '[deps] host python deps skip (pip 미탑재 또는 컨테이너 전용 배포 — deps 는 이미지에 포함)'\n"
         "fi\n\n"
