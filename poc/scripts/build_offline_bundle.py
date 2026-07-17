@@ -1231,6 +1231,24 @@ def build_bundle(manifest: "BundleManifest", out_dir: Path, wheel_platform: str 
 # ─────────────────────────────────────────────────────────────
 
 
+def enforce_release_gate(readiness: str, allow_conditional: bool) -> int:
+    """실 빌드 직전 release-gate를 fail-closed로 강제한다 (0=통과, !=0=차단→빌드 중단).
+
+    check_release_gate.py는 완비·테스트됐으나 종전엔 make 수동 타깃에만 있어, readiness가
+    FAIL이어도 이 스크립트로 번들이 그대로 빌드·출하될 수 있었다(도크스트링의 'wired into the
+    deploy path' 의도 미이행). 이 함수가 실 build 경로에 게이트를 배선한다 — dry-run(CI manifest
+    검증)은 대상이 아니다. 서브프로세스 호출이라 배포 스크립트가 같은 방식으로 재사용 가능하다.
+    """
+    gate_cmd = [
+        sys.executable, str(_HERE / "check_release_gate.py"),
+        "--readiness", str(readiness),
+    ]
+    if allow_conditional:
+        gate_cmd.append("--allow-conditional")
+    print(f"\n[bundle] release-gate 검사 -> {' '.join(gate_cmd)}", file=sys.stderr)
+    return subprocess.run(gate_cmd).returncode
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", required=True, help="번들 버전 (예: 1.0.0)")
@@ -1266,6 +1284,19 @@ def main() -> int:
         "--wheel-platform", default=_DEFAULT_WHEEL_PLATFORM,
         help=f"pip download 타깃 플랫폼(기본 {_DEFAULT_WHEEL_PLATFORM}=Linux). "
              "빈 문자열이면 빌드 호스트 플랫폼(win/mac wheel 위험 — 비권장).",
+    )
+    ap.add_argument(
+        "--readiness", default="reports/operational_readiness.json",
+        help="실 빌드 직전 release-gate가 검사할 readiness 리포트 경로(fail-closed).",
+    )
+    ap.add_argument(
+        "--allow-conditional", action="store_true",
+        help="파일럿: CONDITIONALLY_READY(데이터천장 BLOCKED만)를 release-gate가 waive하도록 통과. "
+             "FAIL/누락 리포트는 절대 waive 안 함. env RELEASE_GATE_ALLOW_CONDITIONAL=1로도 가능.",
+    )
+    ap.add_argument(
+        "--skip-release-gate", action="store_true",
+        help="release-gate 검사를 건너뛴다(긴급 우회 — GA 비권장·감사대상). 기본은 fail-closed.",
     )
     args = ap.parse_args()
 
@@ -1318,6 +1349,21 @@ def main() -> int:
         print_checklist(manifest)
         print(f"\n[bundle] dry-run OK -> {paths['yaml']}", file=sys.stderr)
         return 0
+
+    # ── [release-gate] 실 빌드 직전 fail-closed 게이트 ──────────
+    # readiness FAIL/BLOCKED(파일럿 미허용)면 번들 빌드를 중단한다. dry-run(CI manifest 검증)은
+    # 위에서 이미 return 했으므로, 이 게이트는 실제로 출하되는 산출물 빌드에만 걸린다.
+    if not args.skip_release_gate:
+        gate_rc = enforce_release_gate(args.readiness, args.allow_conditional)
+        if gate_rc != 0:
+            print(
+                "\n[bundle][FATAL] release-gate 미통과 — 번들 빌드를 중단합니다. "
+                "readiness를 PASS로 올리거나, 파일럿은 --allow-conditional "
+                "(env RELEASE_GATE_ALLOW_CONDITIONAL=1)로 데이터천장 게이트를 waive하세요. "
+                "긴급 우회는 --skip-release-gate(GA 비권장·감사대상).",
+                file=sys.stderr,
+            )
+            return gate_rc
 
     # ── 실 빌드 ──────────────────────────────────────────────
     rc = build_bundle(manifest, out_dir, wheel_platform=args.wheel_platform)

@@ -19,7 +19,7 @@ UV ?= $(PY) -m uv
         gold-set retrieval-gold check-data check-gold check-leakage check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
         eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
-        test-lite test-slow test-fullstack test-model-download test-full
+        test-lite test-slow test-fullstack test-kl-integration test-model-download test-full
 
 help:
 	@echo "Targets:"
@@ -460,6 +460,9 @@ parse-probe: ## 실문서 파싱→게이트→분류 프로브 (예: make parse
 
 test-fullstack: ## fullstack marker tests only
 	$(PY) -m pytest -q -m fullstack
+
+test-kl-integration: ## KL 연동 계약(doc/19) + W3 라우터 + audit 통합 테스트 (slow·PG 필요)
+	$(PY) -m pytest -q tests/test_kl_integration.py tests/test_api_routers_w3.py tests/test_audit_middleware.py
 
 test-model-download: ## model_download marker tests only
 	$(PY) -m pytest -q -m model_download

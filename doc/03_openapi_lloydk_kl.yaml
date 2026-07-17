@@ -922,6 +922,97 @@ paths:
               schema: { type: string }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /golden/jobs/register:
+    post:
+      tags: [golden]
+      summary: 큐레이트 슬레이트를 재라벨링 없이 골든 잡으로 등록 (admin/kl_backend/system)
+      description: >-
+        기존 build_*.jsonl(datasets/ 하위 샌드박스)을 LLM 재라벨링 없이 골든 잡으로 등록해
+        슬레이트 라벨을 보존한다(실서명 스프린트 등). 반환 job_id 로
+        GET /golden/jobs/{job_id}/signoff.html 을 열어 검수자가 화면 서명한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [build_path, actor]
+              properties:
+                build_path: { type: string, description: 'datasets/ 하위 슬레이트 경로(밖이면 404)' }
+                actor: { type: object, additionalProperties: true }
+              additionalProperties: true
+      responses:
+        '200':
+          description: 등록된 골든 잡 (golden_job_id · status_url)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /golden/jobs/{job_id}/signoff.html:
+    get:
+      tags: [golden]
+      summary: 골든 후보 화면 서명용 HTML (브라우저 직접 접속, 무인증 뷰)
+      description: >-
+        review.html(보기 전용)과 달리 승인/등급변경/거부 폼 + 제출 버튼을 붙여, 제출 시
+        POST /golden/jobs/{job_id}/signoff 로 서명을 보낸다(그 POST 는 require_role 로 보호).
+        빌드 진행 중이면 202, 실패면 200(오류 표기).
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: HTML 서명 화면
+          content:
+            text/html:
+              schema: { type: string }
+        '202':
+          description: 빌드 진행 중 (새로고침 안내 HTML)
+          content:
+            text/html:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /golden/jobs/{job_id}/signoff:
+    post:
+      tags: [golden]
+      summary: 골든 후보 검수 서명 → locked_gold_eval 승격 (admin/reviewer/kl_backend)
+      description: >-
+        검수 결정(승인/등급변경/거부)을 골든 후보에 적용해 locked_gold_eval 로 승격한다.
+        reviewer_id 는 인증 신원(jwt sub 우선)으로 확정(자칭 위조 차단), 머신/플레이스홀더
+        reviewer 는 403. 정본 미변경, 라이브 readiness 반영은 publish=true 일 때만.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decisions, actor]
+              properties:
+                decisions:
+                  type: array
+                  items: { type: object, additionalProperties: true }
+                actor: { type: object, additionalProperties: true }
+                publish: { type: boolean, default: false }
+                dual_for_upper: { type: boolean, default: false }
+              additionalProperties: true
+      responses:
+        '200':
+          description: 서명 적용 결과 (승격 요약)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403':
+          description: reviewer_id 가 실계정 아님 (머신/플레이스홀더 거부)
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /promotions/pending:
     get:
       tags: [promotion]

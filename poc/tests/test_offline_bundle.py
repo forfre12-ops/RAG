@@ -26,6 +26,7 @@ from build_offline_bundle import (  # noqa: E402
     build_manifest,
     check_bundle_hygiene,
     check_model_parity,
+    enforce_release_gate,
     estimate_total_size,
     expected_files,
     extract_components_from_compose,
@@ -34,6 +35,49 @@ from build_offline_bundle import (  # noqa: E402
     write_checksums,
     write_manifest,
 )
+
+
+# ─────────────────────────────────────────────────────────────
+# release-gate 배선 회귀 — 번들 빌드가 readiness FAIL을 fail-closed로 막는지
+# (종전엔 check_release_gate가 make 수동 타깃에만 있어 미배선이었다)
+# ─────────────────────────────────────────────────────────────
+
+
+def _write_readiness(path: Path, verdict: str, gates: list) -> Path:
+    path.write_text(json.dumps({"verdict": verdict, "gates": gates}), encoding="utf-8")
+    return path
+
+
+def test_release_gate_blocks_build_on_fail(tmp_path: Path):
+    """실 빌드 직전 release-gate 배선 — FAIL readiness면 enforce_release_gate가 차단(!=0)."""
+    rp = _write_readiness(
+        tmp_path / "readiness.json", "FAIL",
+        [{"name": "p1_classifier", "status": "FAIL", "detail": "F1 regression"}],
+    )
+    assert enforce_release_gate(str(rp), allow_conditional=False) != 0
+
+
+def test_release_gate_missing_report_blocks(tmp_path: Path):
+    """리포트 자체가 없으면(증거 공백) 파일럿에서도 차단."""
+    missing = tmp_path / "nope.json"
+    assert enforce_release_gate(str(missing), allow_conditional=True) != 0
+
+
+def test_release_gate_pilot_waives_conditional_but_not_fail(tmp_path: Path):
+    """CONDITIONALLY_READY(BLOCKED만)는 --allow-conditional로 통과(0)하되, FAIL은 파일럿도 차단."""
+    conditional = _write_readiness(
+        tmp_path / "cond.json", "CONDITIONALLY_READY",
+        [{"name": "human_review_gold", "status": "BLOCKED", "detail": "1/40"},
+         {"name": "p1_classifier", "status": "PASS", "detail": "ok"}],
+    )
+    assert enforce_release_gate(str(conditional), allow_conditional=False) != 0   # 파일럿 미허용 = 차단
+    assert enforce_release_gate(str(conditional), allow_conditional=True) == 0    # 파일럿 waive = 통과
+
+    fail = _write_readiness(
+        tmp_path / "fail.json", "FAIL",
+        [{"name": "p2_retrieval", "status": "FAIL", "detail": "recall drop"}],
+    )
+    assert enforce_release_gate(str(fail), allow_conditional=True) != 0           # FAIL은 파일럿도 차단
 
 
 # ─────────────────────────────────────────────────────────────

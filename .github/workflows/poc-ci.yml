@@ -411,6 +411,13 @@ jobs:
         # (과거엔 workflow_dispatch 전용이라 자동 검증 밖이었다 — 완성도 감사 CI 갭).
         run: make test-fullstack
 
+      - name: Run KL contract + W3 router + audit integration (slow, PG-backed)
+        # doc/19 KL 8-시나리오 연동 계약·W3 라우터·audit 미들웨어는 slow 마커라 test-lite에서
+        # 제외되고, 유일 실행 잡(test-slow)은 workflow_dispatch 전용 + PG 서비스 부재라 dispatch
+        # 해도 _pg_ok()=False로 전부 skip → KL 연동 계약 회귀가 어떤 자동 게이트로도 보호 안 됐다.
+        # 이 잡엔 postgres+alembic이 이미 있으므로 여기서 명시 실행해 매 push/PR에서 보호한다.
+        run: make test-kl-integration
+
       - name: Validate dataset manifest
         run: make check-manifest
 
