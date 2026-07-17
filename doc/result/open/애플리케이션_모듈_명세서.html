@@ -105,7 +105,7 @@ footer strong{color:var(--text-dim);}
     <span class="badge">DOC-MOD-01</span>
     <span class="badge outline">감리 대응</span>
     <span class="meta-dot">·</span>
-    <span class="meta-soft">2026-07-14 · 소스 기준</span>
+    <span class="meta-soft">2026-07-17 · 소스 기준</span>
   </div>
 
   <h1 class="title">애플리케이션 모듈 명세서</h1>
@@ -121,7 +121,7 @@ footer strong{color:var(--text-dim);}
     <div class="kpi"><div class="n">37,684</div><div class="l">코드 라인 (LOC)</div></div>
     <div class="kpi"><div class="n">6</div><div class="l">도메인 파이프라인 (M1–M6)</div></div>
     <div class="kpi"><div class="n">11</div><div class="l">최상위 패키지</div></div>
-    <div class="kpi"><div class="n">218</div><div class="l">테스트 파일</div></div>
+    <div class="kpi"><div class="n">219</div><div class="l">테스트 파일</div></div>
   </div>
 
   <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">아키텍처 계층</span></div>
@@ -152,7 +152,7 @@ footer strong{color:var(--text-dim);}
     <thead><tr><th style="width:60px">모듈</th><th style="width:120px">명</th><th>책임</th><th style="width:220px">주요 파일</th><th style="width:90px">연관 요건</th></tr></thead>
     <tbody>
       <tr><td class="center"><strong>M1</strong></td><td>합성 생성</td><td>학습 부트스트랩용 합성 문서 생성(실데이터 0 제약). 근거(witness) 분류체계 부여</td><td><code>generator.py</code> · <code>witness_taxonomy.py</code></td><td class="center"><strong>FUN-003</strong></td></tr>
-      <tr><td class="center"><strong>M2</strong></td><td>전처리</td><td>전자문서 텍스트 추출(HWP·HWPX·PDF·DOCX·XLSX·XLS·PPTX·TXT·이미지OCR) → 정규화·품질점수 → PII 마스킹 → 청킹</td><td><code>extractor.py</code> · <code>normalizer.py</code> · <code>pii_masker.py</code> · <code>chunker.py</code> · <code>pipeline.py</code></td><td class="center"><strong>FUN-022</strong></td></tr>
+      <tr><td class="center"><strong>M2</strong></td><td>전처리</td><td>전자문서 텍스트 추출(HWP·HWPX·PDF·DOCX·XLSX·XLS·PPTX·TXT) + 이미지OCR〔요건 외 부가〕 → 정규화·품질점수 → PII 마스킹 → 청킹</td><td><code>extractor.py</code> · <code>normalizer.py</code> · <code>pii_masker.py</code> · <code>chunker.py</code> · <code>pipeline.py</code></td><td class="center"><strong>FUN-022</strong></td></tr>
       <tr><td class="center"><strong>M3</strong></td><td>라벨링</td><td>룰(키워드 사전)·LLM 판정·합의 게이트로 합성 문서에 등급 라벨 부여(학습 시드)</td><td><code>rule_engine.py</code> · <code>seeds.py</code> · <code>llm_labeler.py</code> · <code>judge.py</code> · <code>consensus.py</code> · <code>pipeline.py</code></td><td class="center">FUN-023</td></tr>
       <tr><td class="center"><strong>M4</strong></td><td>학습</td><td>인코더 PLM(KF-DeBERTa) 분류기 학습 · 청크 증강 · RAG 벡터 색인</td><td><code>trainer.py</code> · <code>chunk_expand.py</code> · <code>rag_indexer.py</code></td><td class="center"><strong>FUN-004</strong></td></tr>
       <tr><td class="center"><strong>M5</strong></td><td>추론</td><td>임베딩→모델 추론→청크 집계(most-severe)→SSE 단계 스트리밍. 서빙 진입 파이프라인</td><td><code>pipeline.py</code></td><td class="center"><strong>FUN-005</strong></td></tr>
@@ -283,7 +283,7 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <div class="footnote">
-    본 문서는 감리 대응 프로그램 목록 산출물로, <code>poc/src/lloydk</code> 소스 트리를 기준으로 작성됨(2026-07-14). 파일·모듈은 소스 형상과 일치하며, 상세는 RTM(요건추적)·부록A(DB)·부록B(API)를 정본으로 참조한다. 요건 외 부가 기능(RAG 질의응답·가이드)은 존치하되 산출물 판정 범위에서 제외한다.
+    본 문서는 감리 대응 프로그램 목록 산출물로, <code>poc/src/lloydk</code> 소스 트리를 기준으로 작성됨(2026-07-17). 파일·모듈은 소스 형상과 일치하며, 상세는 RTM(요건추적)·부록A(DB)·부록B(API)를 정본으로 참조한다. 요건 외 부가 기능(RAG 질의응답·가이드)은 존치하되 산출물 판정 범위에서 제외한다.
   </div>
 
 </article>
