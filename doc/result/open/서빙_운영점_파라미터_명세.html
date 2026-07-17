@@ -372,7 +372,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th style="width:9%;">분류</th><th style="width:15%;">항목</th><th style="width:24%;">설정 키</th><th style="width:13%;">기본값(base)</th><th style="width:12%;">운영(onprem)</th><th>효과·방향</th></tr></thead>
           <tbody>
-            <tr><td>보정</td><td>온도보정</td><td class="td-code">classifier_temperature</td><td>1.0 (무보정)</td><td>—</td><td>T&gt;1=과신↓(conf 신뢰성↑)</td></tr>
+            <tr><td>보정</td><td>온도보정</td><td class="td-code">classifier_temperature</td><td>1.0 (무보정)</td><td>3.0 (onprem-local·full-train baking)</td><td>T&gt;1=과신↓(conf 신뢰성↑) — 하드닝 프로파일이 3.0 강제(§04)</td></tr>
             <tr><td>신뢰도</td><td>confidence</td><td class="td-code">(산출값, 설정 아님)</td><td>scores[pred]</td><td>—</td><td>높을수록 확신(단, 단독 신뢰 불가)</td></tr>
             <tr><td>게이트</td><td>conf 게이트</td><td class="td-code">review_confidence_threshold</td><td>0.7</td><td>—</td><td>미만이면 검수(↑=검수↑·안전↑)</td></tr>
             <tr><td>게이트</td><td>escalation τ</td><td class="td-code">classifier_escalation_tau</td><td>None (argmax)</td><td class="td-pass">0.30</td><td>τ↓=고등급 적극채택(FNR↓·과분류↑)</td></tr>
@@ -380,7 +380,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>게이트</td><td>합의 게이트</td><td class="td-code">agreement_gate_enabled</td><td>False</td><td class="td-pass">True</td><td>룰==모델일 때만 자동확정(정밀도↑·미탐↓)</td></tr>
             <tr><td>게이트</td><td>FNR-safe override</td><td class="td-code">fnr_rule_ts/s1/s2_threshold</td><td>3.0 / 2.2 / 1.6</td><td>—</td><td>룰 고등급 신호 강하면 상향(FNR↓)</td></tr>
             <tr><td>게이트</td><td>비공지성 cap</td><td class="td-code">source_prior_enabled / _cap_grade</td><td>True / "S3"</td><td>—</td><td>공개출처 → S3 cap(과분류↓·법리정합)</td></tr>
-            <tr><td>게이트</td><td>메타데이터 floor</td><td class="td-code">metadata_floor_enabled</td><td>False (opt-in)</td><td>—</td><td>보안표시 상향·접근범위 충돌 검수(FNR↓)</td></tr>
+            <tr><td>게이트</td><td>메타데이터 floor</td><td class="td-code">metadata_floor_enabled</td><td>False (opt-in)</td><td>True (onprem-local·full-train baking)</td><td>보안표시 상향·접근범위 충돌 검수(FNR↓) — 하드닝 프로파일이 True 강제(§6.7)</td></tr>
             <tr><td>게이트</td><td>LLM 2차의견</td><td class="td-code">model_secondopinion_llm_enabled</td><td>False (기각)</td><td>—</td><td>비-TS 자동확정 시 LLM 재확인(비권장)</td></tr>
             <tr><td>집계</td><td>고등급 max-pool</td><td class="td-code">severe_agg_codes</td><td>TS · S1</td><td>—</td><td>핵심 청크 희석 미탐 차단(FNR↓)</td></tr>
             <tr><td>룰부스트</td><td>고위험 패턴 배수</td><td class="td-code">rule_high_risk_weight_multiplier</td><td>1.0</td><td>—</td><td>범용 약어 과분류 조정(재생성 필요)</td></tr>
