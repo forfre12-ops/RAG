@@ -170,7 +170,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>의존성 설치</td><td>python wheel 오프라인 설치 + torch 배치</td></tr>
       <tr><td>구성</td><td>환경변수(<code>.env</code>) 작성 — 엔드포인트·시크릿·배포 프로파일</td></tr>
       <tr><td>DB 부트스트랩</td><td>스키마 마이그레이션 + 파티션 백필</td></tr>
-      <tr><td>스토리지 초기화</td><td>버킷 생성 (벡터검색 <code>tb_rag_vectors</code>는 마이그레이션이 생성 — 별도 템플릿·사전 불요)</td></tr>
+      <tr><td>스토리지 초기화</td><td>로컬FS(.storage) 디렉토리 자동 생성 (벡터검색 <code>tb_rag_vectors</code>는 마이그레이션이 생성 — 별도 템플릿·사전 불요)</td></tr>
       <tr><td>모델 배치·기동</td><td>학습 가중치·보정값 배치 → 전체 기동</td></tr>
       <tr><td>검증·관측성</td><td>헬스체크·스모크 분류 + 모니터링 구성, (옵션) mTLS 적용</td></tr>
     </tbody>
@@ -234,7 +234,7 @@ docker compose up -d
   <h2>DB · 스토리지 · 인덱스</h2>
   <ul>
     <li><strong>스키마</strong> — 마이그레이션이 baseline + 후속 변경(핫패스 인덱스, 13개월 월 파티션 백필)을 멱등 적용.</li>
-    <li><strong>객체스토리지 버킷</strong> — 원문·모델·아티팩트용 버킷 생성.</li>
+    <li><strong>로컬FS 스토리지(.storage)</strong> — 원문·모델·아티팩트를 로컬 파일시스템에 보관(MinIO/객체스토리지 버킷 미사용).</li>
     <li><strong>벡터검색 초기화</strong> — 별도 절차 불요. <code>tb_rag_vectors</code>(pgvector dense + bigram-tsvector ts_rank)는 alembic 마이그레이션이 생성, 색인은 적재 시 자동.</li>
     <li><strong>모델</strong> — 학습 가중치를 서빙 위치에 배치, 보정값(temperature) 동반(부재 시 무보정·과신 위험).</li>
     <li><strong>파티션</strong> — 주기작업(beat)이 매일 향후 월 파티션을 선생성.</li>
