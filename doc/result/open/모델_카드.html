@@ -161,6 +161,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>F1 (macro)</td><td><strong>0.686</strong></td><td>프록시 holdout 109건 · 운영 정확도 아님</td></tr>
       <tr><td>방향성 FNR (서빙)</td><td><strong>0.018</strong></td><td>프록시 holdout 기준 · 운영 FNR 아님</td></tr>
       <tr><td>FNR_TS (서빙)</td><td><strong>0.000</strong></td><td>프록시 holdout 기준 · locked 평가 전 보증 불가</td></tr>
+      <tr><td>실문서 교차일반화 F1</td><td><strong>≈0.26</strong></td><td>합성학습→gold_real 777 실측(실데이터 학습본 0.736 대비 붕괴) · 자동확정 무용→검수 라우팅 전제 · 안전(서빙 τ로 FNR~1%) · 백서 v7 CAPSTONE 상호참조</td></tr>
       <tr><td>검색 Recall@5</td><td><strong>85%(hybrid) · 76%(dense)</strong></td><td>실 PG 풀스택 측정(2026-06-24, 하이브리드 dense 대비 +9pp) · 쿼리 합성·LLM이라 실 운영쿼리 모니터는 본개발. 0.925는 이전 합성 평가셋값</td></tr>
     </tbody>
   </table></div>
@@ -208,8 +209,8 @@ footer strong{color:var(--text-dim);}
 </div>
 
 <footer>
-  <strong>KOIPA AI 영업비밀관리시스템</strong> — 요구사항 추적표(RTM) · 2026-06-20<br>
-  RFP·가이드 요구사항 → 설계 → 구현 → 검증 추적
+  <strong>KOIPA AI 영업비밀관리시스템</strong> — 모델 카드(Model Card) · 2026-07-17<br>
+  분류 모델 v-dd3abab9 — 용도·성능·한계·거버넌스
 </footer>
 </body>
 </html>
