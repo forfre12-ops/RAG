@@ -180,8 +180,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#overview">개요 · ERD</a>
     <div class="toc-group">
       <div class="toc-group-label">도메인</div>
-      <a class="toc-item" href="#grp-a">A 테넌트</a>
-      <a class="toc-item sub" href="#t-tb_tenants">tb_tenants</a>
       <a class="toc-item" href="#grp-b">B 등급체계</a>
       <a class="toc-item sub" href="#t-classification-levels">tb_classification_levels</a>
       <a class="toc-item sub" href="#t-evaluation-factors">tb_evaluation_factors</a>
@@ -214,19 +212,19 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <span class="badge">부록 A</span>
       <span class="badge outline">DB Schema</span>
       <span style="color:var(--text-dim);font-size:12px;">·</span>
-      <span style="color:var(--text-dim);font-size:12px;">PostgreSQL 16 · SQLAlchemy ORM · 20테이블</span>
+      <span style="color:var(--text-dim);font-size:12px;">PostgreSQL 16 · SQLAlchemy ORM · 19테이블</span>
       <span style="color:var(--text-dim);font-size:12px;">·</span>
       <span style="color:var(--text-dim);font-size:12px;">2026-06-20 갱신</span>
     </div>
     <h1 class="title">DB 스키마</h1>
-    <p class="lede">20개 테이블, 11개 도메인 그룹. tb_chunks·tb_llm_usage·tb_audit_log는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
+    <p class="lede">19개 테이블, 10개 도메인 그룹. tb_chunks·tb_llm_usage·tb_audit_log는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
     <hr class="hero-sep">
 
     <!-- Overview -->
     <section id="overview">
       <h2><span class="num">개요</span> ERD 관계도</h2>
       <div class="erd-diagram" style="overflow-x:auto;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:18px;margin:16px 0;background:#fafafa;">
-<style>.erd-edge{stroke:#cbd5e1;stroke-width:1.1;fill:none;transition:stroke .12s,stroke-width .12s,opacity .12s;}.erd-edge.down{stroke:#2563eb;stroke-width:2.6;}.erd-edge.up{stroke:#f59e0b;stroke-width:2.6;}.erd-node{cursor:pointer;}.erd-node rect{transition:stroke .12s,stroke-width .12s,opacity .12s;}.erd-node:hover rect{stroke:#1e293b;stroke-width:2;}.erd-node.sel rect{stroke:#111;stroke-width:2.8;}.erd-node.reldown rect{stroke:#2563eb;stroke-width:2.4;}.erd-node.relup rect{stroke:#f59e0b;stroke-width:2.4;}.erd-dim{opacity:.25;}</style><svg viewBox="0 0 1196 574" width="100%" style="max-width:1196px;font-family:ui-monospace,Menlo,Consolas,monospace" xmlns="http://www.w3.org/2000/svg"><defs><marker id="erar" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6" fill="none" stroke="#9aa5b5" stroke-width="1.1"/></marker></defs><text x="118" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">테넌트·감사</text><text x="438" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">기준·문서·모델</text><text x="758" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">분류·라벨·학습·샘플</text><text x="1078" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">파생(증거·보정·에폭)</text><path class="erd-edge" data-from="tb_tenants" data-to="tb_documents" d="M218,246 C278,246 278,162 338,162" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_tenants" data-to="tb_chunks" d="M218,237 C438,237 438,51 658,51" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_tenants" data-to="tb_classifications" d="M218,242 C438,242 438,112 658,112" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_tenants" data-to="tb_llm_usage" d="M218,255 C438,255 438,452 658,452" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_tenants" data-to="tb_sample_documents" d="M218,251 C438,251 438,397 658,397" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_tenants" data-to="tb_guides" d="M218,260 C438,260 438,510 658,510" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_chunks" d="M538,150 C598,150 598,40 658,40" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_classifications" d="M538,155 C598,155 598,96 658,96" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_document_labels" d="M538,159 C598,159 598,214 658,214" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_document_factor_scores" d="M538,164 C598,164 598,272 658,272" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_sample_documents" d="M538,173 C598,173 598,384 658,384" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_training_datasets" d="M538,168 C758,168 758,357 978,357" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_classifications" d="M538,208 C598,208 598,104 658,104" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_level_keywords" d="M538,213 C598,213 598,156 658,156" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_document_labels" d="M538,217 C598,217 598,225 658,225" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_corrections" d="M538,222 C758,222 758,249 978,249" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_sample_documents" d="M538,231 C598,231 598,390 658,390" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_training_datasets" d="M538,226 C758,226 758,365 978,365" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_level_keywords" d="M538,270 C598,270 598,167 658,167" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_classification_evidence" d="M538,278 C758,278 758,196 978,196" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_document_factor_scores" d="M538,286 C598,286 598,283 658,283" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classifications" data-to="tb_classification_evidence" d="M858,98 C918,98 918,185 978,185" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classifications" data-to="tb_corrections" d="M858,109 C918,109 918,241 978,241" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_model_versions" data-to="tb_training_runs" d="M538,336 C598,336 598,336 658,336" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_training_epochs" d="M858,336 C918,336 918,307 978,307" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_corrections" d="M858,328 C918,328 918,257 978,257" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_training_datasets" d="M858,344 C918,344 918,373 978,373" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_prompt_versions" data-to="tb_sample_documents" d="M538,394 C598,394 598,403 658,403" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_model_versions" data-to="tb_model_versions" d="M538,329 C560,315 560,357 538,343" marker-end="url(#erar)"/><text x="563" y="339" font-size="9" fill="#64748b">rollback</text><g class="erd-node" data-table="tb_tenants"><rect x="18" y="233" width="200" height="32" rx="5" fill="#e0e7ff" stroke="#475569" stroke-width="1.1"/><text x="118" y="253" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_tenants</text></g><g class="erd-node" data-table="tb_audit_log"><rect x="18" y="291" width="200" height="32" rx="5" fill="#e0e7ff" stroke="#475569" stroke-width="1.1"/><text x="118" y="311" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_audit_log</text></g><g class="erd-node" data-table="tb_documents"><rect x="338" y="146" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="166" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_documents</text></g><g class="erd-node" data-table="tb_classification_levels"><rect x="338" y="204" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="224" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classification_levels</text></g><g class="erd-node" data-table="tb_evaluation_factors"><rect x="338" y="262" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="282" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_evaluation_factors</text></g><g class="erd-node" data-table="tb_model_versions"><rect x="338" y="320" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="340" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_model_versions</text></g><g class="erd-node" data-table="tb_prompt_versions"><rect x="338" y="378" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="398" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_prompt_versions</text></g><g class="erd-node" data-table="tb_chunks"><rect x="658" y="30" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="50" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_chunks</text></g><g class="erd-node" data-table="tb_classifications"><rect x="658" y="88" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="108" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classifications</text></g><g class="erd-node" data-table="tb_level_keywords"><rect x="658" y="146" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="166" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_level_keywords</text></g><g class="erd-node" data-table="tb_document_labels"><rect x="658" y="204" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="224" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_document_labels</text></g><g class="erd-node" data-table="tb_document_factor_scores"><rect x="658" y="262" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="282" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_document_factor_scores</text></g><g class="erd-node" data-table="tb_training_runs"><rect x="658" y="320" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="340" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_runs</text></g><g class="erd-node" data-table="tb_sample_documents"><rect x="658" y="378" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="398" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_sample_documents</text></g><g class="erd-node" data-table="tb_llm_usage"><rect x="658" y="436" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="456" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_llm_usage</text></g><g class="erd-node" data-table="tb_guides"><rect x="658" y="494" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="514" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_guides</text></g><g class="erd-node" data-table="tb_classification_evidence"><rect x="978" y="175" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="195" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classification_evidence</text></g><g class="erd-node" data-table="tb_corrections"><rect x="978" y="233" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="253" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_corrections</text></g><g class="erd-node" data-table="tb_training_epochs"><rect x="978" y="291" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="311" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_epochs</text></g><g class="erd-node" data-table="tb_training_datasets"><rect x="978" y="349" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="369" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_datasets</text></g></svg>
+<style>.erd-edge{stroke:#cbd5e1;stroke-width:1.1;fill:none;transition:stroke .12s,stroke-width .12s,opacity .12s;}.erd-edge.down{stroke:#2563eb;stroke-width:2.6;}.erd-edge.up{stroke:#f59e0b;stroke-width:2.6;}.erd-node{cursor:pointer;}.erd-node rect{transition:stroke .12s,stroke-width .12s,opacity .12s;}.erd-node:hover rect{stroke:#1e293b;stroke-width:2;}.erd-node.sel rect{stroke:#111;stroke-width:2.8;}.erd-node.reldown rect{stroke:#2563eb;stroke-width:2.4;}.erd-node.relup rect{stroke:#f59e0b;stroke-width:2.4;}.erd-dim{opacity:.25;}</style><svg viewBox="0 0 1196 574" width="100%" style="max-width:1196px;font-family:ui-monospace,Menlo,Consolas,monospace" xmlns="http://www.w3.org/2000/svg"><defs><marker id="erar" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6" fill="none" stroke="#9aa5b5" stroke-width="1.1"/></marker></defs><text x="118" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">감사</text><text x="438" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">기준·문서·모델</text><text x="758" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">분류·라벨·학습·샘플</text><text x="1078" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">파생(증거·보정·에폭)</text><path class="erd-edge" data-from="tb_documents" data-to="tb_chunks" d="M538,150 C598,150 598,40 658,40" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_classifications" d="M538,155 C598,155 598,96 658,96" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_document_labels" d="M538,159 C598,159 598,214 658,214" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_document_factor_scores" d="M538,164 C598,164 598,272 658,272" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_sample_documents" d="M538,173 C598,173 598,384 658,384" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_documents" data-to="tb_training_datasets" d="M538,168 C758,168 758,357 978,357" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_classifications" d="M538,208 C598,208 598,104 658,104" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_level_keywords" d="M538,213 C598,213 598,156 658,156" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_document_labels" d="M538,217 C598,217 598,225 658,225" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_corrections" d="M538,222 C758,222 758,249 978,249" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_sample_documents" d="M538,231 C598,231 598,390 658,390" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_training_datasets" d="M538,226 C758,226 758,365 978,365" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_level_keywords" d="M538,270 C598,270 598,167 658,167" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_classification_evidence" d="M538,278 C758,278 758,196 978,196" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_document_factor_scores" d="M538,286 C598,286 598,283 658,283" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classifications" data-to="tb_classification_evidence" d="M858,98 C918,98 918,185 978,185" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classifications" data-to="tb_corrections" d="M858,109 C918,109 918,241 978,241" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_model_versions" data-to="tb_training_runs" d="M538,336 C598,336 598,336 658,336" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_training_epochs" d="M858,336 C918,336 918,307 978,307" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_corrections" d="M858,328 C918,328 918,257 978,257" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_training_datasets" d="M858,344 C918,344 918,373 978,373" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_prompt_versions" data-to="tb_sample_documents" d="M538,394 C598,394 598,403 658,403" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_model_versions" data-to="tb_model_versions" d="M538,329 C560,315 560,357 538,343" marker-end="url(#erar)"/><text x="563" y="339" font-size="9" fill="#64748b">rollback</text><g class="erd-node" data-table="tb_audit_log"><rect x="18" y="291" width="200" height="32" rx="5" fill="#e0e7ff" stroke="#475569" stroke-width="1.1"/><text x="118" y="311" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_audit_log</text></g><g class="erd-node" data-table="tb_documents"><rect x="338" y="146" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="166" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_documents</text></g><g class="erd-node" data-table="tb_classification_levels"><rect x="338" y="204" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="224" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classification_levels</text></g><g class="erd-node" data-table="tb_evaluation_factors"><rect x="338" y="262" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="282" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_evaluation_factors</text></g><g class="erd-node" data-table="tb_model_versions"><rect x="338" y="320" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="340" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_model_versions</text></g><g class="erd-node" data-table="tb_prompt_versions"><rect x="338" y="378" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="398" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_prompt_versions</text></g><g class="erd-node" data-table="tb_chunks"><rect x="658" y="30" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="50" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_chunks</text></g><g class="erd-node" data-table="tb_classifications"><rect x="658" y="88" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="108" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classifications</text></g><g class="erd-node" data-table="tb_level_keywords"><rect x="658" y="146" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="166" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_level_keywords</text></g><g class="erd-node" data-table="tb_document_labels"><rect x="658" y="204" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="224" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_document_labels</text></g><g class="erd-node" data-table="tb_document_factor_scores"><rect x="658" y="262" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="282" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_document_factor_scores</text></g><g class="erd-node" data-table="tb_training_runs"><rect x="658" y="320" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="340" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_runs</text></g><g class="erd-node" data-table="tb_sample_documents"><rect x="658" y="378" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="398" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_sample_documents</text></g><g class="erd-node" data-table="tb_llm_usage"><rect x="658" y="436" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="456" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_llm_usage</text></g><g class="erd-node" data-table="tb_guides"><rect x="658" y="494" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="514" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_guides</text></g><g class="erd-node" data-table="tb_classification_evidence"><rect x="978" y="175" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="195" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classification_evidence</text></g><g class="erd-node" data-table="tb_corrections"><rect x="978" y="233" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="253" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_corrections</text></g><g class="erd-node" data-table="tb_training_epochs"><rect x="978" y="291" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="311" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_epochs</text></g><g class="erd-node" data-table="tb_training_datasets"><rect x="978" y="349" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="369" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_datasets</text></g></svg>
 <script>(function(){var root=document.currentScript.parentNode;var nodes=root.querySelectorAll(".erd-node");var edges=root.querySelectorAll(".erd-edge");
 function clear(){edges.forEach(function(e){e.classList.remove("down","up","erd-dim");});nodes.forEach(function(n){n.classList.remove("sel","reldown","relup","erd-dim");});}
 nodes.forEach(function(node){node.addEventListener("click",function(ev){ev.stopPropagation();var t=node.dataset.table;var was=node.classList.contains("sel");clear();if(was)return;var rel={};rel[t]=1;node.classList.add("sel");
@@ -242,9 +240,8 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       <p style="font-size:12px;color:#888;margin:-6px 0 18px;">※ 실제 ERD 다이어그램(자동 렌더). 표시되지 않으면(오프라인) 아래 텍스트 관계를 참조하세요.</p>
       <div class="group-desc">핵심 외래키 관계 (텍스트)</div>
       <ul class="rel-list">
-        <li><code>tb_documents</code> <span class="rel-arrow">→</span> <code>tb_tenants</code> (tenant_id)</li>
-        <li><code>tb_chunks</code> <span class="rel-arrow">→</span> <code>tb_documents</code> (doc_id) · <code>tb_tenants</code></li>
-        <li><code>tb_classifications</code> <span class="rel-arrow">→</span> <code>tb_documents</code> · <code>tb_classification_levels</code> · <code>tb_tenants</code></li>
+        <li><code>tb_chunks</code> <span class="rel-arrow">→</span> <code>tb_documents</code> (doc_id)</li>
+        <li><code>tb_classifications</code> <span class="rel-arrow">→</span> <code>tb_documents</code> · <code>tb_classification_levels</code></li>
         <li><code>tb_classification_evidence</code> <span class="rel-arrow">→</span> <code>tb_classifications</code> · <code>tb_evaluation_factors</code></li>
         <li><code>tb_document_labels</code> <span class="rel-arrow">→</span> <code>tb_documents</code> · <code>tb_classification_levels</code></li>
         <li><code>tb_level_keywords</code> <span class="rel-arrow">→</span> <code>tb_classification_levels</code> · <code>tb_evaluation_factors</code></li>
@@ -252,36 +249,10 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         <li><code>tb_model_versions</code> <span class="rel-arrow">→</span> <code>tb_model_versions</code> (rolled_back_from, self FK — 롤백 출처)</li>
         <li><code>tb_training_epochs</code> <span class="rel-arrow">→</span> <code>tb_training_runs</code></li>
         <li><code>tb_corrections</code> <span class="rel-arrow">→</span> <code>tb_classifications</code> · <code>tb_classification_levels</code> · <code>tb_training_runs</code></li>
-        <li><code>tb_sample_documents</code> <span class="rel-arrow">→</span> <code>tb_tenants</code> · <code>tb_classification_levels</code> · <code>tb_prompt_versions</code></li>
-        <li><code>tb_llm_usage</code> <span class="rel-arrow">→</span> <code>tb_tenants</code></li>
-        <li><code>tb_guides</code> <span class="rel-arrow">→</span> <code>tb_tenants</code> (tenant_id, 논리 FK)</li>
+        <li><code>tb_sample_documents</code> <span class="rel-arrow">→</span> <code>tb_classification_levels</code> · <code>tb_prompt_versions</code></li>
       </ul>
       <div class="partition-box">⚡ <b>파티션 테이블 3개</b> — <code>tb_chunks</code> · <code>tb_llm_usage</code> · <code>tb_audit_log</code>는 <code>RANGE PARTITION BY (created_at / called_at / occurred_at)</code> 월별 분리. ORM은 부모만 매핑하며, INSERT는 자동 라우팅.</div>
       <div class="partition-box">🔄 <b>월별 파티션 자동 롤오버</b> — 정적 생성(baseline)에 더해, 백필 migration <code>e5f6a7b8c9d0</code>이 2026-06~2027-06(13개월) 파티션을 선생성하고 이후는 beat 잡 <code>ensure_partitions_tick</code>(<code>partitions.ensure_partitions</code>, 향후 N개월·기본 3)이 매일 연장한다. <code>CREATE TABLE IF NOT EXISTS … PARTITION OF</code>라 멱등. 향후 월 파티션을 선생성해 <code>*_default</code> 파티션 비대화와 후속 attach 시 검증 락을 방지한다.</div>
-    </section>
-
-    <!-- Group A -->
-    <div class="group-header" id="grp-a">
-      <span class="group-badge">A</span>
-      <span class="group-title">테넌트</span>
-    </div>
-    <div class="group-desc">멀티테넌트 격리의 최상위 단위. 모든 문서·분류·감사 레코드가 tenant_id로 스코핑된다. 객체 수준 권한(doc_id 소유권, IDOR/BOLA 방지)은 스키마 변경 없이 <b>앱 레이어</b>에서 강제된다 — 인증 신원을 body tenant_id에 결속(불일치 시 403)하고, DocumentRepo·ClassifyRepo 조회를 tenant_id로 스코프하여 교차 테넌트 조회를 차단한다.</div>
-
-    <section id="t-tb_tenants">
-      <h3>tb_tenants</h3>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
-        <tbody>
-          <tr><td class="td-pk">tenant_id</td><td class="td-type">VARCHAR(50) PK</td><td class="td-nn yes">●</td><td>테넌트 식별자 (e.g. "koipa-prod")</td></tr>
-          <tr><td class="td-col">name</td><td class="td-type">VARCHAR(200)</td><td class="td-nn yes">●</td><td>테넌트 표시명</td></tr>
-          <tr><td class="td-col">rag_enabled</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>RAG 검색 활성 여부 (기본 true)</td></tr>
-          <tr><td class="td-col">active_model_version</td><td class="td-type">VARCHAR(50)</td><td></td><td>현재 활성 모델 버전 레이블</td></tr>
-          <tr><td class="td-col">api_key_hash</td><td class="td-type">VARCHAR(128)</td><td></td><td>API 키 SHA-256 해시 (원문 미저장)</td></tr>
-          <tr><td class="td-col">metadata_</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>확장 속성 (기본 {})</td></tr>
-          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>비활성화 소프트 삭제</td></tr>
-          <tr><td class="td-col">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td>생성 시각</td></tr>
-        </tbody>
-      </table></div>
     </section>
 
     <!-- Group B -->
@@ -358,12 +329,11 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
         <tbody>
           <tr><td class="td-pk">doc_id</td><td class="td-type">UUID PK (gen_random_uuid)</td><td class="td-nn yes">●</td><td></td></tr>
-          <tr><td class="td-fk">tenant_id</td><td class="td-type">FK → tb_tenants</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">external_ref</td><td class="td-type">VARCHAR(100)</td><td></td><td>KL 시스템 연계 ID</td></tr>
           <tr><td class="td-col">filename</td><td class="td-type">VARCHAR(500)</td><td class="td-nn yes">●</td><td>원본 파일명</td></tr>
           <tr><td class="td-col">source_format</td><td class="td-type">VARCHAR(10)</td><td class="td-nn yes">●</td><td>hwp / docx / pdf / txt</td></tr>
           <tr><td class="td-col">file_size_bytes</td><td class="td-type">BIGINT</td><td></td><td></td></tr>
-          <tr><td class="td-col">file_hash</td><td class="td-type">VARCHAR(64)</td><td></td><td>SHA-256, UNIQUE (tenant_id, file_hash) 파셜 인덱스</td></tr>
+          <tr><td class="td-col">file_hash</td><td class="td-type">VARCHAR(64)</td><td></td><td>SHA-256, UNIQUE (file_hash) 파셜 인덱스</td></tr>
           <tr><td class="td-col">metadata_</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>확장 속성(기본 {}). <b>source_type</b>(출처 provenance — 공개 출처면 분류 시 Gate-1이 S3로 cap)·<b>doc_type</b> 등. GIN 인덱스.</td></tr>
           <tr><td class="td-col">raw_text_uri</td><td class="td-type">VARCHAR(500)</td><td></td><td>MinIO <code>tb_documents-raw</code> 경로 (원본 파일 — <b>at-rest 암호화 대상</b>)</td></tr>
           <tr><td class="td-col">normalized_text_uri</td><td class="td-type">VARCHAR(500)</td><td></td><td>MinIO <code>tb_documents-normalized</code> 경로 (마스킹된 정규화 텍스트)</td></tr>
@@ -381,13 +351,12 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         </tbody>
       </table></div>
       <div>
-        <span class="idx-chip">IDX tenant_id, processing_status</span>
+        <span class="idx-chip">IDX processing_status (idx_doc_status)</span>
         <span class="idx-chip">IDX source_format</span>
         <span class="idx-chip">IDX uploaded_at</span>
-        <span class="idx-chip">UNIQUE (tenant_id, file_hash) WHERE NOT NULL</span>
+        <span class="idx-chip">UNIQUE (file_hash) WHERE NOT NULL</span>
         <span class="idx-chip">GIN metadata JSONB</span>
         <span class="idx-chip">PARTIAL idx_doc_pending WHERE status='pending'</span>
-        <span class="idx-chip">IDX tenant_id, uploaded_at (hot path)</span>
       </div>
 
       <h4 style="font-size:14px;margin:18px 0 8px;">데이터 흐름 · at-rest 암호화 (단계별 PII·보관)</h4>
@@ -413,7 +382,6 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         <tbody>
           <tr><td class="td-pk">chunk_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">doc_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td>tb_documents 참조</td></tr>
-          <tr><td class="td-col">tenant_id</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">chunk_index</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td>문서 내 청크 순서 (0-based)</td></tr>
           <tr><td class="td-col">content</td><td class="td-type">TEXT</td><td class="td-nn yes">●</td><td>청크 본문 (512 token 기준)</td></tr>
           <tr><td class="td-col">token_count</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td>최대 512</td></tr>
@@ -427,7 +395,6 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       <div>
         <span class="idx-chip">PK (chunk_id, created_at)</span>
         <span class="idx-chip">IDX doc_id, chunk_index</span>
-        <span class="idx-chip">IDX tenant_id</span>
       </div>
       <p style="font-size:12.5px;color:var(--text-dim);">벡터 임베딩은 Elasticsearch <code>docs</code> 인덱스에 별도 저장 (dense_vector 1024-dim, int8_hnsw).</p>
     </section>
@@ -483,7 +450,6 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         <tbody>
           <tr><td class="td-pk">classification_id</td><td class="td-type">UUID PK</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-fk">doc_id</td><td class="td-type">FK → tb_documents</td><td class="td-nn yes">●</td><td></td></tr>
-          <tr><td class="td-fk">tenant_id</td><td class="td-type">FK → tb_tenants</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">model_version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>v-f9b5cedb 형식</td></tr>
           <tr><td class="td-fk">predicted_level_id</td><td class="td-type">FK → tb_classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(5,4)</td><td class="td-nn yes">●</td><td>0.0000~1.0000</td></tr>
@@ -499,10 +465,10 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       </table></div>
       <div>
         <span class="idx-chip">IDX doc_id, classified_at</span>
-        <span class="idx-chip">IDX tenant_id, status</span>
+        <span class="idx-chip">IDX status (idx_cls_status)</span>
         <span class="idx-chip">IDX model_version, level_id, status</span>
         <span class="idx-chip">PARTIAL idx_cls_staging WHERE status='staging'</span>
-        <span class="idx-chip">IDX tenant_id, classified_at (hot path)</span>
+        <span class="idx-chip">IDX classified_at (idx_cls_classified)</span>
       </div>
     </section>
 
@@ -685,7 +651,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       <tbody>
         <tr><td class="td-pk">audit_id + occurred_at</td><td class="td-type">BIGINT + TIMESTAMPTZ PK</td><td>복합 PK (파티션 키 포함)</td></tr>
         <tr><td class="td-col">request_id</td><td class="td-type">UUID</td><td>API 요청 추적 ID</td></tr>
-        <tr><td class="td-col">tenant_id / actor_id / actor_role</td><td class="td-type">VARCHAR</td><td>멀티테넌트 + 행위자 식별</td></tr>
+        <tr><td class="td-col">actor_id / actor_role</td><td class="td-type">VARCHAR</td><td>행위자 식별</td></tr>
         <tr><td class="td-col">action</td><td class="td-type">VARCHAR(50)</td><td>classify / upload / confirm / train / explain 등</td></tr>
         <tr><td class="td-col">target_type / target_id</td><td class="td-type">VARCHAR</td><td>대상 리소스 타입 / ID</td></tr>
         <tr><td class="td-col">payload_hash</td><td class="td-type">VARCHAR(64)</td><td>SHA-256 해시 체인 (이전 레코드 연결)</td></tr>
@@ -697,8 +663,6 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       <span class="idx-chip">IDX actor_id, occurred_at</span>
       <span class="idx-chip">IDX target_type, target_id</span>
       <span class="idx-chip">IDX action, occurred_at</span>
-      <span class="idx-chip">IDX tenant_id, occurred_at (hot path)</span>
-      <span class="idx-chip">IDX tenant_id, action, occurred_at (hot path)</span>
     </div>
 
     <!-- Group K -->
@@ -715,7 +679,6 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
         <tbody>
           <tr><td class="td-pk">id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">guide_id</td><td class="td-type">VARCHAR(200)</td><td class="td-nn yes">●</td><td>가이드 식별자 (파일명 기반)</td></tr>
-          <tr><td class="td-col">tenant_id</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>논리 테넌트 (기본 "default")</td></tr>
           <tr><td class="td-col">version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>가이드 버전 (예: v2)</td></tr>
           <tr><td class="td-col">effective_date</td><td class="td-type">VARCHAR(30)</td><td></td><td>시행 일자</td></tr>
           <tr><td class="td-col">change_summary</td><td class="td-type">TEXT</td><td></td><td>변경 요약</td></tr>
@@ -731,9 +694,8 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       </table></div>
       <div>
         <span class="idx-chip">IDX guide_id</span>
-        <span class="idx-chip">IDX tenant_id, guide_id</span>
         <span class="idx-chip">IDX registered_at</span>
-        <span class="idx-chip">UNIQUE uq_guides_id_version_tenant (guide_id, version, tenant_id) — 버전 이력 중복 방지 · migration d4e5f6a7b8c9</span>
+        <span class="idx-chip">UNIQUE uq_guides_id_version (guide_id, version) — 버전 이력 중복 방지 · migration b2c3d4e5f6a7</span>
       </div>
       <p style="font-size:12.5px;color:var(--text-dim);">가이드 원문 벡터는 ES 별도 인덱스(alias 기반 blue/green 전환). <code>/api/v1/guide</code> POST → 인덱싱 완료 후 <code>indexed=true</code>, <code>embedding_vector_count</code> 갱신.</p>
     </section>
@@ -743,7 +705,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
 
 <footer>
   <span>부록 A — DB 스키마 · KOIPA AI 기술 구현 백서 v5.0 · 2026-06-20 갱신</span>
-  <span>PostgreSQL 16 · SQLAlchemy ORM · 20테이블 기준</span>
+  <span>PostgreSQL 16 · SQLAlchemy ORM · 19테이블 기준</span>
 </footer>
 
 <script>

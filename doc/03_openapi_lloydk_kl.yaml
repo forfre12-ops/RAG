@@ -1274,7 +1274,6 @@ components:
         role:
           type: string
           enum: [admin, reviewer, system, kl_backend]
-        tenant_id: { type: string }
         ip: { type: string, nullable: true }
 
     DocumentInput:
@@ -1284,7 +1283,6 @@ components:
         doc_id:
           type: string
           description: KL 측 문서 식별자
-        tenant_id: { type: string }
         title: { type: string }
         content:
           type: string
@@ -1312,10 +1310,9 @@ components:
               type: string
               description: |
                 선택. RAG 검색 대상 인덱스 alias 명시.
-                미지정 시 `tenant_id` 기반 기본 alias 사용 (`secrets-guides-{tenant_id}`).
-                같은 tenant 내 다중 RAG 인덱스(부서별·정책별)가 필요할 때만 사용.
+                미지정 시 기본 alias `secrets-guides` 사용.
                 상세: doc/13 §4.1 인덱스 명명 규칙.
-              example: secrets-guides-koipa
+              example: secrets-guides
             return_evidence:
               type: boolean
               default: true
@@ -1449,9 +1446,6 @@ components:
           minLength: 1
           maxLength: 4000
           description: 사용자 질의
-        tenant_id:
-          type: string
-          description: tenant 필터(요청 본문 우선, 없으면 metadata.tenant_id)
         namespace:
           type: string
           description: RAG collection 명. 미지정 시 settings.rag_default_collection.
@@ -1467,7 +1461,7 @@ components:
           default: true
         metadata:
           type: object
-          description: "추가 filter (예: dept_id). tenant_id는 본문 tenant_id 우선."
+          description: "추가 filter (예: dept_id)."
           additionalProperties: true
 
     RagCitation:
