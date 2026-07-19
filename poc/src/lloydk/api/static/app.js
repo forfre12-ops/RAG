@@ -282,6 +282,7 @@ async function runClassify() {
 
   const t0 = performance.now();
   let lastStageT = t0;
+  logLine("ev", "POST /api/v1/classify/stream  (SSE 실시간 스트림 시작)");
 
   try {
     await postSSE(apiUrl("/api/v1/classify/stream"), {
@@ -309,6 +310,7 @@ async function runClassify() {
             stageMap[matched.key + "_ms"] = Math.round(now - lastStageT);
             lastStageT = now;
             renderStages(stageMap);
+            logLine("ev", `event: progress · stage=${matched.key} (+${stageMap[matched.key + "_ms"]}ms)`);
           }
         } else if (event === "partial") {
           // 임시 등급
@@ -320,6 +322,7 @@ async function runClassify() {
           renderStages(stageMap);
           state.lastResult = data;
           renderResult(data, Math.round(performance.now() - t0));
+          logLine("ok", `← event: result  최종 ${data.label}  (룰 ${data.rule_grade || "—"} · 모델 ${data.model_grade || "미로드"})  ${Math.round(performance.now() - t0)}ms`);
         } else if (event === "error") {
           showError((data && data.message) || "서버 오류");
         }
@@ -387,6 +390,8 @@ function renderResult(data, elapsedMs) {
     badge.addEventListener("click", () => focusLegalCard(grade));
   }
 
+  // 룰·분류기·최종 이중판정 (운영 하이브리드 그대로)
+  renderDualVerdict(data);
   // 자연어 요약 3단 (양성·음성 근거) + 서버 status/warnings 반영
   renderSummary(data);
   // 평가요소 stats (factors_source=model_estimated 는 '모델 추정'으로 구분)
@@ -398,6 +403,204 @@ function renderResult(data, elapsedMs) {
   // 결과 도착 시점에 한 번 더 스크롤 + 강조 펄스 + 토스트 (사용자 시선 확보).
   scrollToResult({ flash: true });
   showResultToast(grade, elapsed);
+}
+
+function _escLog(s) { return String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function _gradeCls(g) { return g && ["TS", "S1", "S2", "S3"].includes(g) ? "g-" + g : "g-na"; }
+
+// 룰·분류기·최종 이중판정 렌더 (운영 하이브리드와 동일 데이터)
+function renderDualVerdict(data) {
+  const wrap = $("#result-dual");
+  if (!wrap) return;
+  const rule = data.rule_grade || null;
+  const model = data.model_grade || null;
+  const final = data.label;
+  const decision = data.decision_path || "";
+  const modelCard = model
+    ? `<div class="dual-card"><div class="dual-label">② 분류기 (BERT)</div><span class="dual-grade ${_gradeCls(model)}">${_escLog(model)}</span><div class="dual-sub">학습 모델 단독 판정</div></div>`
+    : `<div class="dual-card"><div class="dual-label">② 분류기 (BERT)</div><span class="dual-grade g-na">미로드</span><div class="dual-sub">모델 미로드 — 룰 단독</div></div>`;
+  wrap.innerHTML =
+    `<div class="dual-card"><div class="dual-label">① 룰 엔진</div><span class="dual-grade ${_gradeCls(rule)}">${_escLog(rule || "—")}</span><div class="dual-sub">시드 키워드 S×V×M</div></div>`
+    + modelCard
+    + `<div class="dual-card final"><div class="dual-label">③ 최종 (결합)</div><span class="dual-grade ${_gradeCls(final)}">${_escLog(final)}</span><div class="dual-sub">안전 규칙 결합 결과</div></div>`
+    + (decision ? `<div class="dual-decision"><b>결합:</b> ${_escLog(decision)}</div>` : "");
+}
+
+// 실시간 요청 로그 — 실제 fetch/SSE 기록(위조 아님, 서버 터미널과 대조 가능)
+function logLine(kind, msg) {
+  const box = $("#live-log");
+  if (!box) return;
+  const empty = box.querySelector(".ll-empty");
+  if (empty) empty.remove();
+  const cls = kind === "err" ? "ll-err" : kind === "ev" ? "ll-ev" : kind === "ok" ? "ll-ok" : "";
+  const line = document.createElement("div");
+  line.className = "ll";
+  line.innerHTML = `<span class="ll-time">${new Date().toLocaleTimeString()}</span> <span class="${cls}">${_escLog(msg)}</span>`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+// 파일 업로드 → 실제 백엔드 파싱+이중판정 (POST /documents/analyze)
+// 업로드 경로용 타임라인 — analyze 응답의 실제 단계를 단계별 실측 시간(ms)과 함께 렌더.
+function renderStagesFromAnalyze(stages) {
+  const wrap = $("#stage-seq");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const arr = stages || [];
+  arr.forEach((s, i) => {
+    const cls = s.status === "done" ? "done"
+      : (s.status === "review" || s.status === "fail" || s.status === "skipped") ? "active" : "";
+    const step = document.createElement("div");
+    step.className = `seq-step ${cls}`;
+    step.innerHTML = `
+      <div class="seq-num">${i + 1}</div>
+      <div class="seq-body">
+        <div class="seq-title">${_escLog(s.name)}</div>
+        <div class="seq-detail">${_escLog(s.detail || "")}</div>
+      </div>
+      <div class="seq-sla">${s.ms != null ? s.ms + " ms" : "—"}</div>`;
+    wrap.appendChild(step);
+    if (i < arr.length - 1) {
+      const arrow = document.createElement("div");
+      arrow.className = "seq-arrow";
+      wrap.appendChild(arrow);
+    }
+  });
+}
+
+async function analyzeFile(file) {
+  if (!ensureReady()) return;
+  if (!file) return;
+  $("#btn-classify").disabled = true;
+  const _dz = $("#doc-drop"); if (_dz) _dz.classList.add("busy");
+  clearResult();
+  // 이전 샘플 잔재 초기화 — '지금 분석 중 = 이 파일'만 명확히 보이게
+  const _sel = $("#sample-select"); if (_sel) _sel.value = "";
+  const _tr = $("#toggle-row"); if (_tr) _tr.innerHTML = "";
+  if (state.toggledOff && state.toggledOff.clear) state.toggledOff.clear();
+  state.currentSample = null;
+  state.currentSampleId = null;
+  $("#doc-title").value = file.name;
+  $("#doc-body").value = `업로드 파일 분석 중… (${file.name})`;
+  const stageMap = {};
+  STAGES.forEach((s) => { stageMap[s.key] = "pending"; });
+  renderStages(stageMap);
+  scrollToResult();
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("return_evidence", "true");
+  const t0 = performance.now();
+  logLine("ev", `POST /api/v1/documents/analyze  ← ${file.name} (${file.size.toLocaleString()} bytes)`);
+  try {
+    const resp = await fetch(apiUrl("/api/v1/documents/analyze"), { method: "POST", headers: authHeaders(), body: fd });
+    const ms = Math.round(performance.now() - t0);
+    const j = await resp.json();
+    if (!resp.ok) { logLine("err", `HTTP ${resp.status}  ${JSON.stringify(j).slice(0, 160)}`); showError(`HTTP ${resp.status}: ${JSON.stringify(j).slice(0, 200)}`); return; }
+    const c = j.classification;
+    if (!c) {
+      renderStagesFromAnalyze(j.stages);
+      logLine("err", `← 200 그러나 분류 없음 (본문 0자/게이트) — 검수 필요`);
+      showError("본문 추출 0자 또는 안전 게이트 → 검수 필요");
+      return;
+    }
+    const data = {
+      label: c.label, confidence: c.confidence, scores: c.scores,
+      evaluation_factors: c.factors, factors_source: c.factors_source,
+      evidence: (j.evidence || []), model_version: c.model_version, elapsed_ms: c.elapsed_ms,
+      warnings: c.warnings || [], status: c.status,
+      rule_grade: c.rule_grade, model_grade: c.model_grade, decision_path: c.decision_path,
+    };
+    renderStagesFromAnalyze(j.stages);
+    state.currentSampleId = null;
+    state.lastResult = data;
+    $("#doc-title").value = file.name;
+    $("#doc-body").value = j.text_preview || "";
+    renderResult(data, ms);
+    // 본문 하이라이트 명시적 재호출(업로드 경로 확실히 반영)
+    renderBodyPreview($("#doc-body").value);
+    const g = j.gate || {};
+    logLine("ok", `← 200  최종 ${data.label}  (룰 ${data.rule_grade} · 모델 ${data.model_grade})  ${ms}ms · 파싱 ${(j.parse && j.parse.char_count) || 0}자${g.requires_review ? " · 게이트:검수" : ""}`);
+  } catch (e) {
+    logLine("err", `오류: ${e.message}`);
+    showError(e.message);
+  } finally {
+    $("#btn-classify").disabled = false;
+    const dz = $("#doc-drop"); if (dz) dz.classList.remove("busy");
+  }
+}
+
+// 운영 대시보드 — DB 실측 카운트 폴링
+async function refreshDashboard() {
+  const box = $("#ops-tiles");
+  if (!box) return;
+  try {
+    const r = await apiGet("/api/v1/dashboard/summary");
+    if (!r.ok) return;
+    const d = r.data || {};
+    const g = d.by_grade || {};
+    const chips = ["TS", "S1", "S2", "S3"].map((k) => `<span class="gchip g-${k}">${k} ${g[k] || 0}</span>`).join("");
+    const tiles = [
+      { n: d.total_classifications || 0, l: "총 분류수" },
+      { html: chips, l: "등급 분포", grade: true },
+      { n: d.review_queue || 0, l: "검수 대기" },
+      { n: d.auto_confirmed || 0, l: "자동 확정" },
+      { n: d.corrections || 0, l: "검수 교정" },
+      { n: d.verified_labels || 0, l: "검수 반영" },
+    ];
+    box.innerHTML = tiles.map((t) =>
+      `<div class="ops-tile ${t.grade ? "grade" : ""}"><div class="ops-num">${t.grade ? t.html : t.n}</div><div class="ops-lbl">${t.l}</div></div>`
+    ).join("");
+  } catch (e) { /* best-effort */ }
+}
+
+// 원클릭 "실시간 반영 시연" — 등록→분류→교정→승급→재분류, 전부 서버 실호출
+async function runReflectDemo() {
+  if (!ensureReady()) return;
+  const btn = $("#btn-reflect");
+  if (btn) btn.disabled = true;
+  const stepsBox = $("#reflect-steps");
+  const S = [];
+  const render = () => { stepsBox.innerHTML = S.map((s) => `<div class="rstep ${s.state || ""}"><span class="rdot"></span><span>${s.html}</span></div>`).join(""); };
+  const add = (html) => { S.push({ html, state: "active" }); render(); };
+  const finish = (html) => { if (S.length) { S[S.length - 1].state = "done"; if (html) S[S.length - 1].html = html; } render(); };
+  const rev = { user_id: "reviewer-demo", role: "reviewer" };
+  const jhdr = () => ({ ...authHeaders(), "Content-Type": "application/json" });
+  const busy = $("#reflect-busy");
+  busy.textContent = "실행 중…";
+  try {
+    const content = "본 문서는 일반 사내 공지입니다. 다음 주 회의 일정과 점심 메뉴를 안내합니다. (검수 반영 시연용)";
+    add("① 문서 등록 (POST /documents)…");
+    const fd = new FormData();
+    fd.append("file", new File([content], `reflect_${Date.now()}.txt`, { type: "text/plain" }));
+    fd.append("actor", JSON.stringify(rev));
+    const regj = await (await fetch(apiUrl("/api/v1/documents"), { method: "POST", headers: authHeaders(), body: fd })).json();
+    const docId = regj.doc_id;
+    if (!docId) throw new Error("등록 실패(doc_id 없음): " + JSON.stringify(regj).slice(0, 120));
+    finish(`① 등록 완료 · doc_id=${String(docId).slice(0, 8)}…`);
+
+    add("② 분류 (POST /classify)…");
+    const c1 = await (await fetch(apiUrl("/api/v1/classify"), { method: "POST", headers: jhdr(), body: JSON.stringify({ doc_id: docId, content, return_evidence: false }) })).json();
+    finish(`② 최초 분류: <b class="g-${c1.label}">${c1.label}</b> (룰 ${c1.rule_grade || "—"} · 모델 ${c1.model_grade || "—"})`);
+    await refreshDashboard();
+
+    const corrected = c1.label === "S1" ? "TS" : "S1";
+    add(`③ 검수자 교정 → <b class="g-${corrected}">${corrected}</b> + 승급 (POST /relabel, /promotions/promote)…`);
+    await fetch(apiUrl("/api/v1/relabel"), { method: "POST", headers: jhdr(), body: JSON.stringify({ doc_id: docId, inference_id: c1.inference_id, original_label: c1.label, corrected_label: corrected, actor: rev }) });
+    await fetch(apiUrl("/api/v1/promotions/promote"), { method: "POST", headers: jhdr(), body: JSON.stringify({ doc_id: docId, actor: rev, expected_label: corrected }) });
+    finish(`③ 검수 교정·승급 완료 → <b class="g-${corrected}">${corrected}</b>`);
+    await refreshDashboard();
+
+    add("④ 같은 문서 재분류 (POST /classify)…");
+    const c2 = await (await fetch(apiUrl("/api/v1/classify"), { method: "POST", headers: jhdr(), body: JSON.stringify({ doc_id: docId, content, return_evidence: false }) })).json();
+    const reflected = c2.label === corrected;
+    finish(`④ 재분류: <b class="g-${c2.label}">${c2.label}</b> — ${reflected ? `✅ 검수 결과 반영됨 (최초 ${c1.label} → 교정 ${corrected})` : "반영 확인 필요"}`);
+    await refreshDashboard();
+    busy.textContent = reflected ? "완료 — 교정이 다음 분류에 즉시 반영됨" : "완료";
+  } catch (e) {
+    busy.textContent = "오류: " + e.message;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function scrollToResult({ flash = false } = {}) {
@@ -490,7 +693,7 @@ function renderSummary(data) {
   const warns = Array.isArray(data.warnings) ? data.warnings : [];
   const warnTxt = warns.map((w) => escapeHtml(String(w))).join(" · ");
   const banner = needsReview
-    ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:8px;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨${warnTxt ? `<br><span style="font-weight:500;font-size:12px;">사유: ${warnTxt}</span>` : ""}</p>`
+    ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:0;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨${warnTxt ? `<br><span style="font-weight:500;font-size:12px;">사유: ${warnTxt}</span>` : ""}</p>`
     : warnTxt ? `<p class="neg" style="font-size:12px;">⚠ ${warnTxt}</p>` : "";
   const verdictTxt = needsReview
     ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다. (신뢰도 ${(conf * 100).toFixed(0)}%)`
@@ -536,7 +739,7 @@ function renderFactors(f, factorsSource) {
     stat.innerHTML = `
       <div class="v">${v.toFixed(2)}</div>
       <div class="l">${l}</div>
-      <div style="margin-top:8px;height:4px;background:var(--bg);border-radius:999px;overflow:hidden;">
+      <div style="margin-top:8px;height:4px;background:var(--bg);border-radius:0;overflow:hidden;">
         <div style="width:${(norm * 100).toFixed(0)}%;height:100%;background:var(--text);"></div>
       </div>
     `;
@@ -929,7 +1132,23 @@ function bindConfig() {
   const ep = $("#cfg-endpoint");
   const ak = $("#cfg-apikey");
   if (ep) { ep.value = state.endpoint; ep.addEventListener("change", (e) => { state.endpoint = e.target.value || window.location.origin; }); }
-  if (ak) { ak.value = state.apiKey; ak.addEventListener("change", (e) => { state.apiKey = e.target.value; window.localStorage?.setItem("lloydk_api_key", state.apiKey); }); }
+  if (ak) {
+    // localStorage 저장키가 있으면 그것을, 없으면 HTML에 미리 채운 값(기본 시연키)을 채택.
+    if (state.apiKey) {
+      ak.value = state.apiKey;
+    } else if (ak.value && ak.value.trim()) {
+      state.apiKey = ak.value.trim();
+      window.localStorage?.setItem("lloydk_api_key", state.apiKey);
+    }
+    const _apply = (v) => {
+      state.apiKey = (v || "").trim();
+      window.localStorage?.setItem("lloydk_api_key", state.apiKey);
+      const st = $("#apikey-status");
+      if (st) st.textContent = state.apiKey ? "키 설정됨 ✓ — 이 브라우저에만 저장됩니다." : "키를 입력하세요.";
+    };
+    ak.addEventListener("change", (e) => _apply(e.target.value));
+    ak.addEventListener("input", (e) => { state.apiKey = (e.target.value || "").trim(); });
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -939,9 +1158,6 @@ async function init() {
   bindConfig();
   populateSamples();
   renderLegal();
-  renderIncident();
-  renderCapabilityStats();
-  renderProfiles();
   await pollHealth();
   if (!state.warmupDone) {
     // 1초 간격으로 최대 60초 폴링
@@ -955,6 +1171,32 @@ async function init() {
   $("#btn-classify").addEventListener("click", runClassify);
   $("#btn-race").addEventListener("click", runRace);
   $("#btn-print").addEventListener("click", () => window.print());
+  // 운영 대시보드 + 실시간 반영 시연
+  const btnReflect = $("#btn-reflect");
+  if (btnReflect) btnReflect.addEventListener("click", runReflectDemo);
+  const btnDash = $("#btn-dash-refresh");
+  if (btnDash) btnDash.addEventListener("click", refreshDashboard);
+  if ($("#ops-tiles")) { refreshDashboard(); setInterval(refreshDashboard, 5000); }
+  // 파일 직접 업로드 (드래그드롭 / 클릭) → 즉시 백엔드 파싱+이중판정
+  const dropZone = $("#doc-drop");
+  const fileInput = $("#doc-file");
+  function handleFile(f) {
+    if (!f) return;
+    $("#doc-file-name").textContent = `${f.name} (${f.size.toLocaleString()} bytes)`;
+    analyzeFile(f);
+  }
+  if (dropZone && fileInput) {
+    dropZone.addEventListener("click", () => fileInput.click());
+    dropZone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
+    fileInput.addEventListener("change", (e) => handleFile(e.target.files && e.target.files[0]));
+    ["dragover", "dragenter"].forEach((ev) => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add("over"); }));
+    ["dragleave", "dragend"].forEach((ev) => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.remove("over"); }));
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("over");
+      handleFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+    });
+  }
   $("#btn-reset").addEventListener("click", () => {
     $("#doc-title").value = "";
     $("#doc-body").value = "";

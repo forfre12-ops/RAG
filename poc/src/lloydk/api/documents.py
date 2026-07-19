@@ -175,6 +175,7 @@ class AnalyzeStage(BaseModel):
     name: str          # 업로드 | 추출 | 정규화·PII마스킹 | 청킹 | 검수게이트 | 분류 | 결과
     status: str        # done | review | skipped | fail
     detail: str
+    ms: Optional[int] = None  # 단계 소요(ms) — 실측 가능한 단계만(파싱·분류). 표시 전용.
 
 
 class AnalyzeParseInfo(BaseModel):
@@ -208,6 +209,10 @@ class AnalyzeClassification(BaseModel):
     factors_source: Optional[str] = None
     warnings: list[str] = []
     elapsed_ms: int = 0
+    # [투명성/시연] 하이브리드 각 엔진 원시 판정 + 결합경로
+    rule_grade: Optional[str] = None
+    model_grade: Optional[str] = None
+    decision_path: Optional[str] = None
 
 
 class DocumentAnalysisResponse(BaseModel):
@@ -256,11 +261,13 @@ async def analyze_document(
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(body)
+        _t_parse = time.perf_counter()
         try:
             pre = PreprocessPipeline().run_file(tmp_path)
         except Exception as exc:  # noqa: BLE001
             stages.append(AnalyzeStage(name="추출", status="fail", detail=f"{type(exc).__name__}: {exc}"))
             raise HTTPException(status_code=422, detail=f"parse failed: {exc}") from exc
+        _parse_ms = int((time.perf_counter() - _t_parse) * 1000)
     finally:
         try:
             os.unlink(tmp_path)
@@ -295,6 +302,7 @@ async def analyze_document(
         name="추출", status="fail" if ex.error else "done",
         detail=f"{ex.method} · 품질 {ex.quality:.2f} · {len(pre.text):,}자"
         + (" · OCR" if ex.ocr_used else "") + (f" · {ex.error}" if ex.error else ""),
+        ms=_parse_ms,
     ))
     stages.append(AnalyzeStage(
         name="정규화·PII마스킹", status="done",
@@ -326,7 +334,9 @@ async def analyze_document(
         file_size_bytes=len(body),
         parse=parse,
         gate=gate,
-        text_preview=pre.text[:600],
+        # 본문 미리보기 — 시연에서 본문 확인용으로 넉넉히(8K자). 분류는 전체 본문으로 수행되며
+        # 이 값은 표시 전용. 매우 긴 문서만 말미 절단(응답 비대화 방지).
+        text_preview=pre.text[:8000],
         stages=stages,
     )
 
@@ -369,6 +379,9 @@ async def analyze_document(
         factors_source=getattr(cls, "factors_source", None),
         warnings=cls_warnings,
         elapsed_ms=cls.elapsed_ms or elapsed,
+        rule_grade=getattr(cls, "rule_grade", None),
+        model_grade=getattr(cls, "model_grade", None),
+        decision_path=getattr(cls, "decision_path", None),
     )
     if return_evidence and getattr(cls, "evidence", None):
         resp.evidence = [
@@ -377,6 +390,7 @@ async def analyze_document(
     resp.stages.append(AnalyzeStage(
         name="분류", status="done",
         detail=f"{label} · 신뢰도 {cls.confidence:.2f} · {cls.model_version}",
+        ms=cls.elapsed_ms or elapsed,
     ))
     resp.stages.append(AnalyzeStage(
         name="결과",

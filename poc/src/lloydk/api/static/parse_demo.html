@@ -106,6 +106,10 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
 .factor .fbar{height:6px;border-radius:4px;background:var(--bg-strong);overflow:hidden;}
 .factor .ffill{height:100%;background:var(--blue);border-radius:4px;}
 .chip{display:inline-block;font-family:var(--font-mono);font-size:11.5px;padding:3px 9px;margin:3px 4px 0 0;border-radius:5px;background:var(--bg-mid);border:1px solid var(--border-mid);}
+.kw-chip{cursor:pointer;transition:background .1s,border-color .1s;}
+.kw-chip:hover{border-color:#f59e0b;}
+.kw-chip.active{background:#fef3c7;border-color:#f59e0b;color:#92400e;font-weight:700;}
+mark.kw-hit{background:#fde68a;color:#92400e;border-radius:3px;padding:0 1px;}
 .warn{font-size:12px;color:var(--amber);font-family:var(--font-mono);margin-top:4px;}
 .preview{font-family:var(--font-mono);font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border-mid);border-radius:8px;padding:12px;max-height:180px;overflow:auto;white-space:pre-wrap;}
 .log{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);background:var(--bg-inverse);color:#d4d4d8;border-radius:8px;padding:12px;max-height:150px;overflow:auto;white-space:pre-wrap;}
@@ -154,14 +158,16 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
       <input type="file" id="file" class="hidden" />
     </div>
     <div class="samples-row">
-      <span class="samples-label">시연 샘플 원클릭</span>
-      <button class="btn ghost sample-btn ok" onclick="loadSample('./samples/success_semiconductor.docx','success_semiconductor.docx')">✓ 성공 · 반도체 영업비밀 (DOCX)</button>
-      <button class="btn ghost sample-btn ok" onclick="loadSample('./samples/success_table_xlsx.xlsx','success_table_xlsx.xlsx')">✓ 성공 · 표 추출 (XLSX)</button>
-      <button class="btn ghost sample-btn bad" onclick="loadSample('./samples/fail_corrupt_scan.pdf','fail_corrupt_scan.pdf')">✕ 실패 · 손상/스캔 PDF</button>
-      <button class="btn ghost sample-btn bad" onclick="loadSample('./samples/fail_thin_text.txt','fail_thin_text.txt')">✕ 실패 · 얇은 본문 (TXT)</button>
-      <button class="btn ghost sample-btn bad" disabled title="실파일(noori/koipa류) 제공 대기 — tests/fixtures/adversarial/ 반입 시 활성화">✕ 실패 · 표 포함 HWP (실파일 대기)</button>
+      <span class="samples-label">시연 문서 원클릭</span>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/01_TS_semiconductor_euv.docx','반도체 EUV 공정 레시피(극비).docx')">TS 특급 · 반도체 EUV (DOCX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/02_S1_recsys_source_license.docx','추천엔진 소스·라이선스(영업비밀).docx')">S1 1급 · 소스·라이선스 (DOCX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">S2 대외비 · 납품단가표 (XLSX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/04_S3_press_release.docx','신제품 출시 보도자료(공개).docx')">S3 공개 · 보도자료 (DOCX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/07_HYBRID_semantic_secret.docx','비공개 추진 메모(키워드無).docx')">★ 하이브리드 · 룰 놓침→모델 포착 (DOCX)</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">⚠ 검수 · PDF 표 불완전</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
     </div>
-    <div class="hint">성공=깨끗한 문서가 자동 확정되는 경로. 실패=파싱 이상(손상·얇은본문·표누락)을 <b>조용히 오분류하지 않고 검수로 라우팅</b>하는 안전장치 시연.</div>
+    <div class="hint">위 4종(TS·S1·S2·S3)은 <b>깨끗한 문서가 자동 확정</b>되는 경로. 아래 2종은 파싱 이상(PDF 표 불완전·얇은 본문)을 <b>조용히 오분류하지 않고 검수로 라우팅</b>하는 안전장치 시연. 직접 업무 문서를 끌어다 놓아도 됩니다.</div>
     <div class="row" style="margin-top:14px;">
       <button class="btn" id="go" onclick="analyze()" disabled>분석 실행</button>
       <button class="btn ghost" onclick="reset()">초기화</button>
@@ -171,6 +177,11 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
 
   <!-- 결과 -->
   <div id="result" class="hidden">
+    <div class="card" id="summary-card">
+      <div class="card-title">추출된 문서</div>
+      <div id="doc-title" style="font-size:17px;font-weight:700;line-height:1.4;margin-bottom:4px;"></div>
+      <div id="doc-file" class="hint"></div>
+    </div>
     <div class="card">
       <div class="card-title">2 · 처리 단계 (파싱 → 검수 → 분류)</div>
       <div class="timeline" id="timeline"></div>
@@ -281,6 +292,11 @@ function render(j){
     </div>`).join('');
   // 파싱
   const p=j.parse||{};
+  // 추출된 제목(본문 첫 유효행) + 파일 정보
+  window._previewRaw = (j.text_preview || '');
+  const firstLine = (window._previewRaw.split('\n').map(s=>s.trim()).filter(Boolean)[0]) || j.filename || '(제목 미검출)';
+  $('doc-title').textContent = firstLine;
+  $('doc-file').textContent = (j.filename||'') + '  ·  ' + (p.source_format||'?') + '  ·  ' + (p.char_count||0).toLocaleString() + '자 추출  ·  청크 ' + (p.chunk_count||0);
   $('parse-kv').innerHTML = kv([
     ['파일', j.filename+' ('+(j.file_size_bytes||0).toLocaleString()+'B)'],
     ['포맷', p.source_format],
@@ -321,6 +337,10 @@ function render(j){
           <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">신뢰도 ${fmt(c.confidence)}</div>
           <div class="conf-bar" style="width:160px"><div class="conf-fill" style="width:${(c.confidence*100).toFixed(0)}%"></div></div>
           <div style="margin-top:12px"><span class="status-pill status-${esc(c.status)}">${c.status==='staging'?'자동 확정':'검수 필요'}</span></div>
+          <div style="margin-top:12px;font-size:11.5px;color:var(--text-soft);line-height:1.7;border-top:1px solid var(--border-mid);padding-top:10px">
+            <b>두 엔진 판정</b> · 룰 <b>${esc(c.rule_grade||'—')}</b> · 분류기(BERT) <b>${esc(c.model_grade||'미로드')}</b> · 최종 <b>${esc(c.label)}</b>
+            ${c.decision_path?`<div style="margin-top:4px;color:var(--text-dim)">${esc(c.decision_path)}</div>`:''}
+          </div>
           <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')}</div>
         </div>
         <div style="flex:1;min-width:220px">
@@ -330,13 +350,29 @@ function render(j){
       </div>
       ${(c.warnings&&c.warnings.length)?`<div style="margin-top:12px">${c.warnings.map(w=>`<div class="warn">⚠ ${esc(w)}</div>`).join('')}</div>`:''}`;
   }
-  // 근거
+  // 근거 키워드 — 클릭 시 본문 하이라이트 토글
   const ev=j.evidence||[];
   $('evidence-box').innerHTML = ev.length
-    ? ev.map(e=>`<span class="chip">${esc(e.text||'')} ${e.weight?('· '+Number(e.weight).toFixed(2)):''}</span>`).join('')
+    ? '<div class="hint" style="margin-bottom:6px">키워드를 클릭하면 아래 본문에서 위치가 하이라이트됩니다.</div>'
+      + ev.map(e=>`<span class="chip kw-chip" data-kw="${esc(e.text||'')}" onclick="toggleKw(this)">${esc(e.text||'')} ${e.weight?('· '+Number(e.weight).toFixed(2)):''}</span>`).join('')
     : '<span class="hint">없음</span>';
-  // 미리보기
-  $('preview').textContent = j.text_preview || '(없음)';
+  // 미리보기 (하이라이트 상태 초기화)
+  renderPreviewHighlights();
+}
+
+// 키워드 칩 토글 → 본문 하이라이트
+function toggleKw(el){ el.classList.toggle('active'); renderPreviewHighlights(); }
+function renderPreviewHighlights(){
+  const raw = window._previewRaw || '';
+  if(!raw){ $('preview').textContent = '(없음)'; return; }
+  const active = Array.prototype.slice.call(document.querySelectorAll('.kw-chip.active')).map(c=>c.dataset.kw).filter(Boolean);
+  if(!active.length){ $('preview').textContent = raw; return; }
+  let html = esc(raw);
+  active.forEach(kw=>{
+    const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g');
+    html = html.replace(re, m=>`<mark class="kw-hit">${m}</mark>`);
+  });
+  $('preview').innerHTML = html;
 }
 
 function kv(pairs){ return pairs.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(String(v==null?'—':v))}</dd>`).join(''); }

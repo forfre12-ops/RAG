@@ -94,6 +94,9 @@ class InferenceResult:
     # 게이트가 룰엔진을 두 번 돌리지 않게 노출. label과 별개(label은 모델/청크집계/override
     # 결과, rule_grade는 단일패스 raw 룰등급). None이면 호출부가 폴백 재계산.
     rule_grade: Optional[str] = None
+    # [transparency] 원시 모델 판정(override/cap/floor 적용 이전 _run_model argmax).
+    # 모델 미로드(rule-fallback) 시 None. label과 별개(label은 최종 결합 결과).
+    model_grade: Optional[str] = None
 
 
 _LABELS = [Grade.TS, Grade.S1, Grade.S2, Grade.S3]
@@ -360,8 +363,10 @@ class InferencePipeline:
         metadata: Optional[dict] = None,
         return_evidence: bool = True,
     ) -> InferenceResult:
+        _model_raw_grade: Optional[str] = None
         if self._model is not None:
             result = self._run_model(text, use_rag, return_evidence)
+            _model_raw_grade = result.label.value if hasattr(result.label, "value") else str(result.label)
             # FNR-safe: rule engine이 TS를 강하게 잡는데 모델이 낮은 등급을 줬으면 TS로 올림.
             if result.label != Grade.TS:
                 try:
@@ -533,6 +538,8 @@ class InferencePipeline:
                 # 빈 결과는 운영 신호 — warning에 한 줄 남기되 분류는 그대로 진행.
                 result.warnings = list(result.warnings) + ["rag_context empty (store/encoder unavailable or no hits)"]
 
+        # [transparency] 원시 모델 판정(override/cap/floor 이전)을 최종 결과에 부착 — 룰·모델·최종 대조용.
+        result.model_grade = _model_raw_grade
         return result
 
     @staticmethod

@@ -137,3 +137,11 @@ try:
             pass
 except Exception:  # noqa: BLE001
     pass
+
+
+# [P0 수정] 태스크 등록 — 워커는 `-A lloydk.workers.celery_app`로 기동하므로 이 모듈이
+# tasks.py를 import 해야 @celery_app.task 데코레이터가 실행돼 11개 태스크가 등록된다.
+# (import 누락 시 worker/beat 가 모든 태스크를 NotRegistered로 폐기 — beat 자동화 전멸.)
+# tasks.py 는 celery_app 을 import 하므로, celery_app 정의가 끝난 이 위치(파일 말미)에서
+# import 해야 순환참조가 안전하게 해소된다.
+from lloydk.workers import tasks as _tasks  # noqa: E402,F401

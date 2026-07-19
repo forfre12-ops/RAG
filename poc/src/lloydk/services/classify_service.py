@@ -419,7 +419,36 @@ class ClassifyService:
                 elapsed_ms=0,
                 status=status,
                 warnings=warnings_acc,
+                rule_grade=getattr(pred, "rule_grade", None),
+                model_grade=getattr(pred, "model_grade", None),
+                decision_path=self._decision_path(pred, status, warnings_acc),
             )
+
+    @staticmethod
+    def _decision_path(pred, status: str, warnings: list[str]) -> str:
+        """룰·모델·최종 결합이 어떻게 결정됐는지 한 줄로 설명(시연/투명성).
+
+        label(최종)이 rule_grade/model_grade와 어떻게 관계되는지 warnings 근거로 분류한다.
+        """
+        w = " ".join(warnings or [])
+        final = pred.label.value if hasattr(pred.label, "value") else str(pred.label)
+        rule = getattr(pred, "rule_grade", None)
+        model = getattr(pred, "model_grade", None)
+        if model is None:
+            return "rule-only (모델 미로드 — 룰 엔진 단독 판정)"
+        if "fnr-safe override" in w:
+            return f"rule-override (룰이 {rule} 강하게 잡아 모델 {model}을 안전 상향 → {final})"
+        if "metadata-floor" in w:
+            return f"metadata-floor (ICD 보안표기로 {model}→{final} 상향)"
+        if "cap-conflict" in w or "metadata-access-conflict" in w:
+            return f"escalation (신호 충돌 → 검수 라우팅; 룰 {rule} · 모델 {model})"
+        if "source-prior" in w:
+            return f"source-cap (공개 출처 → {final}로 하향; 모델 {model})"
+        if rule == model == final:
+            return f"agreement (룰·모델 모두 {final} 일치 → 자동 확정)"
+        if status == "needs_review":
+            return f"escalation (룰 {rule} · 모델 {model} → 검수 라우팅)"
+        return f"combined (룰 {rule} · 모델 {model} → 최종 {final})"
 
     @staticmethod
     def _highest_grade() -> str:

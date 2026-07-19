@@ -101,3 +101,10 @@ class ClassifyResponse(BaseModel):
     elapsed_ms: int
     status: str = "staging"
     warnings: list[str] = []
+    # [투명성/시연] 하이브리드 서빙의 각 엔진 원시 판정 — 룰·모델·최종을 대조 표시.
+    #   rule_grade: 룰 엔진(시드 키워드 S×V×M) 단독 판정.
+    #   model_grade: 학습 분류기(BERT) 단독 판정(override/cap/floor 이전). 모델 미로드 시 None.
+    #   decision_path: label(최종)이 어떻게 나왔는지 — agreement/rule-override/source-cap/rule-only 등.
+    rule_grade: Optional[str] = None
+    model_grade: Optional[str] = None
+    decision_path: Optional[str] = None
