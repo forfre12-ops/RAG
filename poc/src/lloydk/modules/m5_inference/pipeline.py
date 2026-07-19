@@ -689,6 +689,19 @@ class InferencePipeline:
                 f"chunk severe-agg/escalation: rule grade {lab_code} → {pred_code} "
                 "(most-severe-wins over chunks; FNR-safe)"
             ]
+            # [FIX-E] 약어-only 승격 백스톱 — 청크 집계가 고등급으로 승격했는데 그 등급의
+            # 근거가 _HIGH_RISK_PATTERNS 영문 약어 부스트(CVD·N2O·EUV 등)뿐이고 한국어
+            # 시드 근거가 전무하면(예: 공개특허 본문의 범용 공정약어) 자동확정을 막고 검수
+            # 라우팅한다. 등급은 절대 내리지 않음(하향 없음·라벨 유지) → FNR-safe. 한국어
+            # 시드(관리표시/공정레시피 등)가 하나라도 있으면 태그를 붙이지 않아 진짜 기밀의
+            # 자동확정을 그대로 보존한다. 전용 태그라 cap-conflict 메트릭/의미와 분리된다.
+            if pred_code in self._SEVERE_AGG_CODES and self._promotion_is_abbrev_only(
+                lab, pred_code
+            ):
+                warnings = warnings + [
+                    f"abbrev-only-escalation: {pred_code} 승격이 영문 약어 부스트에만 근거"
+                    " (한국어 시드 근거 없음) — 자동확정 보류·검수 라우팅 (등급 무변경, FNR-safe)"
+                ]
             if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
                 try:
                     from lloydk.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
@@ -711,6 +724,27 @@ class InferencePipeline:
             warnings=warnings,
             rule_grade=getattr(lab.rule_result, "grade", None),
         )
+
+    @staticmethod
+    def _promotion_is_abbrev_only(lab, promoted_code: str) -> bool:
+        """[FIX-E] 승격 등급이 _HIGH_RISK_PATTERNS 약어 부스트에만 근거하는지(한국어 시드 無).
+
+        규약(rule_engine): 시드 매칭은 MatchedKeyword.start is None, 약어 부스트는
+        start=mo.start()가 채워진다(has_real_evidence와 동일 판별자). 승격 등급 코드의
+        매치 중 start is None(=시드)이 하나라도 있으면 '실 근거 있음' → False(자동확정 보존).
+        전부 start 있음(=약어 부스트)이면 True(검수 라우팅 대상). 매치가 없거나 rule_result
+        미가용이면 보수적으로 False(승격 자동확정 유지 — 백스톱이 오히려 FNR을 만들지 않게).
+        """
+        rr = getattr(lab, "rule_result", None)
+        matches = getattr(rr, "matched_keywords", None) if rr is not None else None
+        if not matches:
+            return False
+        promoted = [m for m in matches if getattr(m, "grade", None) == promoted_code]
+        if not promoted:
+            # 문서 전체엔 승격등급 시드가 없음(청크에서만 떴을 수 있음). 이 경우도 약어-only로
+            # 간주해 검수 라우팅(등급은 그대로) — 문서수준 시드 근거가 없으니 자동확정 보류가 안전.
+            return True
+        return all(getattr(m, "start", None) is not None for m in promoted)
 
     # 청크 어그리게이션에서 most-severe-wins를 적용할 고등급 코드.
     # 이 등급들의 문서확률은 청크 평균이 아니라 max(가장 강한 청크)로 잡아,

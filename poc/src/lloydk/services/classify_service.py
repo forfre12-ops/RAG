@@ -32,6 +32,34 @@ StageCallback = Callable[[str], None]
 
 logger = logging.getLogger(__name__)
 
+import re as _re  # noqa: E402
+
+# [FIX-D] 공개특허공보 마스트헤드 탐지 — 서지헤더 3요소가 문서 '머리'에 동시 존재할 때만 True.
+# 정의상 공개(published) 문서라 source-prior 캡(→S3)의 입력이 된다. 엄격 탐지 자체가 FNR
+# 가드다: (1) 진짜 내부 기밀은 KIPO 공보 마스트헤드를 달지 않는다, (2) 공보를 '인용/편찬'한
+# 내부 문서(S2 편찬물)는 문서 머리에 단일 공보 서지헤더를 갖지 않는다(머리 1500자로 한정).
+_PATENT_INID_RE = _re.compile(r"\((?:11|12|19|21|43|45|54|57)\)")
+_PATENT_GAZETTE_TOKENS = ("공개특허공보", "등록특허공보", "공개실용신안공보", "등록실용신안공보")
+
+
+def _is_published_patent_gazette(text: str) -> bool:
+    """KIPO 공개/등록 특허공보 마스트헤드인가 — 엄격(3요소·머리 위치 한정).
+
+    공보 종별 표기(공개특허공보(A) 등)는 진짜 공보라면 문서 최상단 서지헤더에 온다 →
+    첫 300자로 한정해, 내부 기밀이 본문에서 타 특허공보를 '인용'만 한 경우(편찬물)의
+    오탐을 배제한다. 특허청·INID 코드는 머리 1500자 내면 인정. 오탐(false-positive)이
+    나더라도 source-prior 캡은 TS/S1을 cap-conflict→needs_review로 보내므로 무음 하향은
+    없다. 미탐(false-negative)은 해당 문서가 TS+검수로 남을 뿐이라 FNR-safe 방향이다.
+    """
+    if not text:
+        return False
+    head = text[:1500]
+    masthead = text[:300]  # 공보 종별 표기는 문서 최상단에만 인정(중간 인용 배제)
+    has_gazette = any(tok in masthead for tok in _PATENT_GAZETTE_TOKENS)
+    has_office = "특허청" in head  # 예: 대한민국특허청(KR)
+    has_inid = bool(_PATENT_INID_RE.search(head))  # 서지 INID 코드 (11)공개번호 등
+    return has_gazette and has_office and has_inid
+
 
 def _try_uuid_str(value: str | None) -> "uuid.UUID | None":
     if not value:
@@ -276,7 +304,7 @@ class ClassifyService:
             # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
             notify("embed")
             notify("retrieve" if req.use_rag else "llm")
-            eff_meta = self._effective_metadata(req)
+            eff_meta = self._effective_metadata(req, content=cleaned)
             pred = self.inference.run(
                 text=cleaned,
                 use_rag=req.use_rag,
@@ -337,6 +365,20 @@ class ClassifyService:
                 status = "needs_review"
                 warnings_acc.append(
                     "sparse-evidence: rule auto-confirm rested on thin evidence — routed to human review"
+                )
+
+            # [abbrev-only-escalation | FIX-E] 청크 severe-agg가 고등급으로 승격했으나 그 근거가
+            # _HIGH_RISK_PATTERNS 영문 약어 부스트(CVD·N2O·EUV 등)뿐이고 한국어 시드 근거가 전무한
+            # 경우 — pipeline이 남긴 신호. 공개특허/기술문서의 범용 공정약어 밀도만으로 최고등급
+            # 자동확정되는 과분류(예: 공개특허공보 → TS)를 사람이 확인하게 한다. 등급은 무변경
+            # (하향 없음) — 자동확정만 차단하므로 FNR-safe. 전용 태그라 cap-conflict 계열과 분리.
+            if status != "needs_review" and any(
+                "abbrev-only-escalation" in w for w in warnings_acc
+            ):
+                status = "needs_review"
+                warnings_acc.append(
+                    "abbrev-only-escalation: high grade rested on abbreviation boosts only"
+                    " (no Korean seed) — routed to human review (grade unchanged, FNR-safe)"
                 )
 
             # [metadata-access-conflict] ICD 접근범위가 제한적인데 내용 예측이 낮은 경우 — pipeline이
@@ -1204,7 +1246,7 @@ class ClassifyService:
         except Exception:  # noqa: BLE001
             pass
 
-    def _effective_metadata(self, req: ClassifyRequest) -> dict:
+    def _effective_metadata(self, req: ClassifyRequest, content: str | None = None) -> dict:
         """분류 metadata 구성 — 요청 metadata에 저장된 문서 출처(provenance)를 보강.
 
         Gate-1(출처 게이트, source-prior)은 metadata.source_type/source가 있을 때만
@@ -1213,10 +1255,23 @@ class ClassifyService:
         hydrate해 게이트가 실제로 발동하도록 한다.
 
         - 요청이 출처를 명시했으면 그대로 둔다(요청 우선 — 덮어쓰지 않음).
+        - [FIX-D] 출처가 없으면 본문 마스트헤드에서 공개특허공보 서지헤더를 탐지해
+          source_type='공개특허'를 합성 주입 → 기존 source-prior 캡이 발동(TS/S1→S3 cap +
+          cap-conflict→needs_review). raw PDF 업로드처럼 provenance 메타가 없는 경로 보완.
+          엄격 탐지(3요소·머리 한정)라 진짜 기밀·공보 편찬물은 트리거되지 않음(FNR-safe).
         - best-effort: DB 미가용·문서 부재·content 직접분류(doc_id 없음)면 요청 metadata 그대로.
         """
         meta = dict(req.metadata or {})
         if meta.get("source_type") or meta.get("source"):
+            return meta
+        # [FIX-D] 본문 마스트헤드 기반 공개출처 합성 주입 (요청/DB 출처가 없을 때만)
+        text_for_masthead = content if content is not None else (req.content or "")
+        if _is_published_patent_gazette(text_for_masthead):
+            meta["source_type"] = "공개특허"
+            logger.info(
+                "FIX-D: published-patent gazette masthead detected → source_type='공개특허'"
+                " (source-prior cap will apply, doc_id=%s)", req.doc_id,
+            )
             return meta
         doc_uuid = self._parse_doc_uuid(req.doc_id)
         if doc_uuid is None:
