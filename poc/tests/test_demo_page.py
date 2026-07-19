@@ -9,7 +9,8 @@
 6. GET /demo/incident.js — 200 + INCIDENT export
 7. /healthz 에 데모 콘솔용 필드 노출 (deploy_profile·warmup_done 등 8개)
 8. /demo/ 가 OpenAPI 스키마에 노출되지 않음 (StaticFiles 자동 제외)
-9. 빌드된 샘플 12건이 의도 등급으로 분류되는지 (회귀 보장)
+9. 빌드된 샘플 13건이 의도 등급으로 분류되는지 (회귀 보장)
+10. 경계 데모 샘플: 토글 해제 → 등급이 실제로 S1→S2→S3로 하향되는지 (와우 회귀)
 """
 
 from __future__ import annotations
@@ -89,18 +90,30 @@ def test_demo_samples_js(client):
     assert m, "DEMO_DATA JSON 본체를 찾을 수 없음"
     data = json.loads(m.group(1))
     assert "samples" in data
-    assert len(data["samples"]) == 12
+    # 12 표준 샘플(등급별 3개) + 경계 데모 샘플 1개 = 13
+    assert len(data["samples"]) == 13
     assert "legal" in data
     assert set(data["legal"].keys()) >= {"TS", "S1", "S2", "S3"}
-    # 등급별 3개씩
-    grades = [s["grade"] for s in data["samples"]]
+
+    BORDERLINE_ID = "경계-영업-주간공유"
+    standard = [s for s in data["samples"] if s["id"] != BORDERLINE_ID]
+    borderline = [s for s in data["samples"] if s["id"] == BORDERLINE_ID]
+    assert len(standard) == 12
+    assert len(borderline) == 1, "경계 데모 샘플이 정확히 1건 있어야 함"
+
+    # 표준 12건: 등급별 3개씩 · 토글 키워드 5개
+    grades = [s["grade"] for s in standard]
     assert grades.count("TS") == 3
     assert grades.count("S1") == 3
     assert grades.count("S2") == 3
     assert grades.count("S3") == 3
-    # 각 샘플에 토글 키워드 5개
-    for s in data["samples"]:
+    for s in standard:
         assert len(s["toggle_keywords"]) == 5
+
+    # 경계 샘플: ALL-ON 등급 S1 · 토글 4개(내용 기반 시드만)
+    b = borderline[0]
+    assert b["grade"] == "S1"
+    assert len(b["toggle_keywords"]) == 4
 
 
 def test_demo_incident_js(client):
@@ -162,12 +175,69 @@ def test_demo_not_in_openapi(client):
 
 
 # --------------------------------------------------------------------
-# 9. 빌드된 샘플 12건이 의도 등급으로 분류되는지 (회귀 보장)
+# 10. 경계 데모 샘플 — 토글 해제 시 등급이 실제로 하향되는지 (와우 회귀)
+# --------------------------------------------------------------------
+
+def _parse_neutral_replacements(app_js: str) -> dict:
+    """app.js 의 NEUTRAL_REPLACEMENTS 객체 리터럴에서 "키":"값" 쌍을 추출."""
+    block = re.search(
+        r"NEUTRAL_REPLACEMENTS\s*=\s*\{(.*?)\};", app_js, re.S
+    )
+    assert block, "app.js 에서 NEUTRAL_REPLACEMENTS 를 찾을 수 없음"
+    pairs = re.findall(r'"([^"]+)"\s*:\s*"([^"]+)"', block.group(1))
+    return dict(pairs)
+
+
+@pytest.mark.slow
+def test_borderline_sample_toggle_actually_changes_grade():
+    """경계 샘플에서 토글 해제(→일반어 치환) 시 등급이 실제로 S1→S2→S3 하향되는지.
+
+    데모의 '키워드 토글 와우'가 작동함을 보증한다(프론트가 보내는 것과 동일하게
+    본문을 치환해 실 ClassifyService 로 분류). 또한 치환어가 시드로 회귀해 등급이
+    안 내려가는 사고를 차단한다(치환어=비-시드 계약).
+    """
+    samples_path = STATIC / "samples.js"
+    app_js_path = STATIC / "app.js"
+    raw = samples_path.read_text(encoding="utf-8")
+    m = re.search(r"DEMO_DATA = (\{.*?\});\s*$", raw, re.S)
+    assert m
+    data = json.loads(m.group(1))
+    b = next((s for s in data["samples"] if s["id"] == "경계-영업-주간공유"), None)
+    assert b is not None, "경계 데모 샘플이 없음"
+
+    repl = _parse_neutral_replacements(app_js_path.read_text(encoding="utf-8"))
+    body = b["body"]
+    toggles = b["toggle_keywords"]
+
+    def classify_with_off(off_keywords):
+        text = body
+        for kw in off_keywords:
+            text = text.replace(kw, repl.get(kw, "관련 자료"))
+        from lloydk.schemas.classify import ClassifyRequest
+        from lloydk.services.classify_service import ClassifyService
+        res = ClassifyService.get_instance().classify(
+            ClassifyRequest(
+                doc_id=b["id"], content=text, title=b["title"],
+                use_rag=False, return_evidence=False,
+            )
+        )
+        return res.label.value if hasattr(res.label, "value") else str(res.label)
+
+    # ALL ON → S1 (고객DB·원가구조 = 영업비밀)
+    assert classify_with_off([]) == "S1"
+    # 첫 토글(고객 데이터베이스) 하나만 해제 → S1 신호 소멸 → S2 (즉시 하향)
+    assert classify_with_off([toggles[0]]) == "S2"
+    # 전부 해제 → 콘텐츠 신호 전무 → S3 (공개)
+    assert classify_with_off(toggles) == "S3"
+
+
+# --------------------------------------------------------------------
+# 9. 빌드된 샘플 13건이 의도 등급으로 분류되는지 (회귀 보장)
 # --------------------------------------------------------------------
 
 @pytest.mark.slow
 def test_built_samples_classify_to_intended_grade():
-    """samples.js 의 12 샘플을 ClassifyService 로 분류해 의도 등급 매칭 확인.
+    """samples.js 의 13 샘플을 ClassifyService 로 분류해 의도 등급 매칭 확인.
 
     빌드 스크립트(build_demo_samples.py)가 같은 검증을 하지만, CI 에서도
     회귀 확인. ClassifyService 호출이 무거우므로 1 회만 실행.
