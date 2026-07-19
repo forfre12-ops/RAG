@@ -127,6 +127,32 @@ def _fetch_hits(req: RagAnswerRequest) -> list[RagContextHit]:
     return out
 
 
+@router.post("/rag/search", dependencies=[Depends(require_auth)])
+@limiter.limit("60/minute")
+def rag_search(request: Request, req: RagAnswerRequest) -> dict:
+    """RAG 검색 전용 — 유사 문서/청크 Top-K 반환 (LLM 답변 합성 없음).
+
+    검수 화면에서 '이 문서와 비슷한 과거 문서'를 제시해 검수자 판단을 돕는 용도.
+    /answer 와 달리 LLM 을 호출하지 않는다(요건: RAG=검색, 답변생성은 요건외).
+    """
+    t0 = time.perf_counter()
+    hits = _fetch_hits(req)
+    return {
+        "query": req.query,
+        "count": len(hits),
+        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
+        "hits": [
+            {
+                "source_doc": h.source_doc,
+                "chunk_id": h.chunk_id,
+                "score": round(float(h.score), 4),
+                "text": h.text,
+            }
+            for h in hits
+        ],
+    }
+
+
 @router.post(
     "/answer",
     response_model=RagAnswerResult,

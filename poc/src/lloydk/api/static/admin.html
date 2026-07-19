@@ -336,6 +336,28 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
       </div>
     </section>
 
+    <!-- ===== 2.5 유사 문서 검색 (RAG) ===== -->
+    <section class="card">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no">R</span> 유사 문서 검색 · 검수 보조</div>
+        <span class="ep">POST /rag/search</span>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label class="fld">질의 (검수 중인 문서 본문·제목을 붙여넣거나 키워드 입력)</label>
+          <textarea id="rag-q" rows="3" placeholder="예: 반도체 공정 핵심 기술 유출 위험">반도체 공정 핵심 기술과 수율 파라미터</textarea>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap;">
+          <label class="fld" style="margin:0">Top-K</label>
+          <input id="rag-k" type="number" min="1" max="20" value="5" style="width:70px" />
+          <button class="btn sm" onclick="ragSearch()">유사 문서 검색</button>
+          <span id="rag-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div id="rag-results" class="queue"><div class="q-empty">검수 중인 문서와 비슷한 과거 문서·가이드를 찾아 검수자 판단을 돕습니다. LLM 답변 생성 없이 <b>검색만</b> 수행합니다.</div></div>
+        <p class="sec-note">RAG <b>검색 전용</b> — <code>POST /rag/search</code>(KURE 임베딩 + 하이브리드 + reranker)로 유사 문서 Top-K 반환. <b>LLM 답변 합성(/answer)은 요건외라 호출하지 않습니다.</b> 검수자가 유사 사례를 보고 등급을 판단하는 용도.</p>
+      </div>
+    </section>
+
     <!-- ===== 3. 재학습 ===== -->
     <section class="card">
       <div class="card-head">
@@ -687,6 +709,28 @@ function renderQueue(){
     </div>
   `).join('');
 }
+async function ragSearch(){
+  const q=($('rag-q').value||'').trim();
+  if(!q){ $('rag-info').textContent='질의를 입력하세요'; return; }
+  const k=Math.max(1,Math.min(20,parseInt($('rag-k').value||'5',10)||5));
+  $('rag-info').textContent='검색 중…';
+  try{
+    const d=await api('POST','/rag/search',{query:q, namespace:'docs', top_k:k, use_reranker:true});
+    const hits=(d&&d.hits)||[];
+    $('rag-info').textContent=`${hits.length}건 · ${d.elapsed_ms||0}ms`;
+    if(!hits.length){ $('rag-results').innerHTML='<div class="q-empty">유사 문서 없음 — 색인된 코퍼스가 없을 수 있습니다.</div>'; return; }
+    $('rag-results').innerHTML=hits.map((h,i)=>{
+      const parts=String(h.source_doc||'').split('|');
+      const name=parts[0]||h.source_doc||'?'; const grade=parts[1]||'';
+      const gcls=['TS','S1','S2','S3'].includes(grade)?`pill grade-${grade}`:'pill';
+      return `<div class="q-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">`
+        +`<b>#${i+1} ${esc(name)}</b>`
+        +`<span style="display:flex;gap:6px;align-items:center">${grade?`<span class="${gcls}">${esc(grade)}</span>`:''}<span class="mono" style="color:var(--text-dim)">유사도 ${Number(h.score).toFixed(3)}</span></span></div>`
+        +`<div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">${esc(String(h.text||'').slice(0,180))}</div></div>`;
+    }).join('');
+  }catch(e){ $('rag-info').textContent=`검색 실패: ${e.status||e.message||''}`; $('rag-results').innerHTML=`<div class="q-empty">검색 실패: ${esc(String(e.data?.detail||e.message||e.status||''))}</div>`; }
+}
+
 async function doConfirm(i){
   if(!guardWrite('확정')) return;
   const it=QUEUE[i];
