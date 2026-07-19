@@ -239,8 +239,8 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
           </div>
           <div class="field">
             <label class="fld">X-API-Key</label>
-            <input id="cfg-key" type="password" placeholder="시연 서버 API 키 입력" />
-            <p class="hint">settings.api_key (.env API_KEY). 고객 시연에서는 값을 화면에 노출하지 않습니다.</p>
+            <input id="cfg-key" type="text" value="demo-secret-key" placeholder="시연 서버 API 키 입력" />
+            <p class="hint">settings.api_key (.env API_KEY). 기본 <code>demo-secret-key</code> — 비어 있으면 모든 호출이 401.</p>
           </div>
           <div class="field">
             <label class="fld">Actor Role</label>
