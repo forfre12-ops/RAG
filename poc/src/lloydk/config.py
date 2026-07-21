@@ -114,6 +114,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # 고등급 미탐율 >0.10 이면 deploy gate 거부(degenerate·fnr_high 존재만으로 통과하던 fail-open
         # 차단). 하드닝 GA는 첫 모델도 미탐 하한을 강제. 실데이터 human_review PR곡선으로 값 재확정 권장.
         "deploy_gate_first_deploy_fnr_high_max": 0.10,
+        # 데모 콘솔·파괴적 purge 비활성(고객사 운영 — 시연 표면/물리삭제 엔드포인트 미노출).
+        "demo_console_enabled": False,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -146,6 +148,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "manual_activate_force_requires_reason": True,
         # [P0#①-c] 최초 배포 절대 미탐 floor 0.10 (onprem-local과 동일 — 첫 모델 fail-open 차단).
         "deploy_gate_first_deploy_fnr_high_max": 0.10,
+        # 데모 콘솔·파괴적 purge 비활성(모델공장 내부 — 시연/물리삭제 표면 미노출).
+        "demo_console_enabled": False,
     },
 }
 
@@ -161,6 +165,12 @@ class Settings(BaseSettings):
     # 학습 기능 활성 — full-train 프로파일에서만 True. lite-*·onprem 에서는 False.
     # False면 /api/v1/training/* 라우터 등록 자체 skip (OpenAPI에서 사라짐).
     enable_training: bool = False
+
+    # 데모 콘솔(/demo SPA + POST /admin/demo/purge 물리삭제) 노출 여부. 데모/파일럿(lite-*)만 True,
+    # 하드닝 프로파일(onprem-local·full-train)은 프로파일 default False 로 꺼 파괴적 초기화 엔드포인트를
+    # 고객사 운영에서 비활성화한다. 이 필드가 미선언이던 탓에 admin.py 의 getattr(...,True) 게이트가
+    # 항상 True(죽은 no-op)였던 것을 실배선 — 이제 하드닝 프로파일에서 /demo 미마운트·purge 404.
+    demo_console_enabled: bool = True
 
     # --- 인프라 ---
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.

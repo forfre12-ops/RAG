@@ -42,6 +42,27 @@ def test_profile_applies_defaults(profile: str, monkeypatch: pytest.MonkeyPatch)
         assert sources[field] == "profile"
 
 
+@pytest.mark.parametrize(
+    "profile,expected",
+    [
+        ("lite-noapi", True),
+        ("lite-cloud", True),
+        ("onprem-local", False),
+        ("full-train", False),
+    ],
+)
+def test_demo_console_gated_by_profile(profile: str, expected: bool) -> None:
+    """데모 콘솔·파괴적 POST /admin/demo/purge 노출은 하드닝 프로파일서 꺼져야 한다(SEC-2/3).
+
+    demo_console_enabled 가 Settings 에 미선언이던 탓에 admin.py 의 getattr(...,True) 게이트와
+    app.py /demo 마운트가 죽은 no-op(항상 True)였다 — 이제 데모/파일럿(lite-*)만 True, 고객사
+    운영/모델공장(onprem-local·full-train)은 프로파일 default False 로 실제 비활성(마운트·purge 404).
+    """
+    s = Settings(deploy_profile=profile, _env_file=None)
+    apply_profile_defaults(s)
+    assert s.demo_console_enabled is expected, f"{profile}: demo_console_enabled"
+
+
 def test_explicit_env_wins_over_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     # lite-noapi default는 llm_provider=noop. env로 anthropic 명시 시 그대로 유지.
     # [Wave3 M-config-env] 다른 프로파일 필드(embedding_provider 등)의 'default 채움'을

@@ -390,8 +390,11 @@ prom_metrics_api.register_background_refresh(app)
 # 데모 콘솔 정적 마운트 — /demo/ 경로에 단일 페이지 SPA.
 # OpenAPI 에는 노출되지 않음(StaticFiles 자동 제외). 디렉토리 없으면 silent skip.
 _STATIC_DIR = Path(__file__).parent / "static"
-if _STATIC_DIR.is_dir():
+if _STATIC_DIR.is_dir() and settings.demo_console_enabled:
     app.mount("/demo", StaticFiles(directory=str(_STATIC_DIR), html=True), name="demo")
     logger.info("demo console mounted at /demo/ (static dir=%s)", _STATIC_DIR)
+elif not settings.demo_console_enabled:
+    # 하드닝 프로파일(onprem-local·full-train): 시연 콘솔 SPA·파괴적 purge UI 미노출.
+    logger.info("demo console disabled (deploy_profile=%s) — /demo 미마운트", settings.deploy_profile)
 else:
     logger.info("demo console not mounted (no static dir at %s)", _STATIC_DIR)
