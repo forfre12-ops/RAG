@@ -65,6 +65,7 @@ poc/logs/
 # 생성된 혼합 학습 subset
 poc/datasets/gold_real/train_subset.jsonl
 poc/datasets/gold_real/*.v1_bak_*
+poc/datasets/gold_real/*.pre_depollution.bak
 poc/datasets/corrections/
 # 대용량 실험 데이터(ab_s1 선례) — git 히스토리 부담 방지. 데이터는 별도 보관.
 poc/datasets/labeled_p1_bilingual_exp/

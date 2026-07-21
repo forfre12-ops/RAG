@@ -360,7 +360,7 @@ gold:
     path: poc/datasets/gold_real/classification_gold.jsonl
     use: eval_only
     lines: 777
-    grade_distribution: { S3: 420, S2: 232, S1: 70, TS: 55 }
+    grade_distribution: { S3: 577, S2: 89, S1: 56, TS: 55 }   # 2026-07-22 판례-프록시 디오염 후(scripts/depollute_court_proxy_gold.py)
     label_source_distribution:
       llm_judge_primary: 524
       llm_judge_consensus: 67
@@ -369,6 +369,7 @@ gold:
       public_definitive: 50
       koipa_case_based: 80
       nkt_designated: 30
+      curated_scenario: 6
     source: oss_corpus + public_scenario + synthetic_grounded
     eval_results:
       synthetic_masked_f1: 1.000
@@ -386,7 +387,11 @@ gold:
       디오염 측정은 acceptance.p1_classification.eval_tiers.clean_holdout 참조.
       release 판단은 운영 파이프라인 기준 system FNR 2.8%(≤5% 통과, TS 100%) — 과분류 트레이드오프.
       777 records after high-risk boundary supplement. human_review=1/40; strict GA remains externally blocked.
-    updated_at: "2026-07-06"
+      2026-07-22 판례-프록시 디오염: 공개 판례를 LLM 프록시가 과상향한 157건(S2 143·S1 14)을 S3로 정정
+      (scripts/depollute_court_proxy_gold.py, 결정론적·멱등, corrected 스탬프). 대상은 전부 llm_judge_primary
+      = golden_tiers TIER_SILVER(학습분포)이라 평가 정답(locked/is_real_locked_eval)에는 영향 없음.
+      ⚠ 위 eval_results F1/FNR 블록은 디오염 이전 값 — 재산출(make p1-eval) 필요.
+    updated_at: "2026-07-22"
   retrieval_gold:
     path: poc/datasets/gold_real/retrieval_gold.jsonl
     eval_type: oss_eval_doc_id
@@ -395,6 +400,7 @@ gold:
     note: expected_doc_id/relevant_doc_ids based Recall/MRR/nDCG evaluation set generated on 2026-06-01.
 
 changelog:
+  - { date: "2026-07-22", version: "1.5", note: "판례-프록시 디오염(재현가능 스크립트화): 공개 판례 LLM-프록시 과라벨 157건(S2 143·S1 14)→S3, dist S3 420→577. scripts/depollute_court_proxy_gold.py(결정론적·멱등·--check 가드). 대상 전부 silver tier라 eval 정답 불변. label_source curated_scenario:6 누락 보정 + check-manifest bijective 화(조용한 drift 차단)." }
   - { date: "2026-07-06", version: "1.4", note: "classification_gold_real manifest refreshed to match current label_source distribution; human_review=1/40, strict GA still externally blocked." }
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }
   - { date: "2026-06-01", version: "1.1", note: "데이터 품질 복구: labeled_5k/rag_corpus_qa deprecated, gold set 신설, generator V2 프롬프트 교체" }

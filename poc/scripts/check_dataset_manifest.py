@@ -7,10 +7,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 
 import yaml
+
+# 판례-프록시 디오염 술어(단일 소스). scripts/ 를 경로에 넣어 재사용 — 술어 중복/drift 방지.
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+from depollute_court_proxy_gold import is_court_proxy_overlabel  # noqa: E402
+
+
+def _load_rows(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            rows.append(json.loads(line))
+    return rows
 
 
 def _jsonl_stats(path: Path) -> tuple[int, dict[str, int], dict[str, int]]:
@@ -35,8 +53,8 @@ def _jsonl_stats(path: Path) -> tuple[int, dict[str, int], dict[str, int]]:
 
 
 def _expect_equal(errors: list[str], name: str, actual, expected) -> None:
-    if isinstance(actual, dict) and isinstance(expected, dict):
-        actual = {key: actual.get(key, 0) for key in expected}
+    # bijective: 부분집합 필터를 쓰지 않는다 — 매니페스트가 누락한 키(예: label_source에
+    # curated_scenario)나 오타 키까지 잡아 조용한 lineage drift를 막는다.
     if actual != expected:
         errors.append(f"{name}: expected {expected!r}, got {actual!r}")
 
@@ -63,6 +81,15 @@ def main() -> int:
     _expect_equal(errors, "classification_gold_real.lines", n, cls_gold.get("lines"))
     _expect_equal(errors, "classification_gold_real.grade_distribution", grades, cls_gold.get("grade_distribution"))
     _expect_equal(errors, "classification_gold_real.label_source_distribution", sources, cls_gold.get("label_source_distribution"))
+
+    # gold 불변식: 공개 판례 프록시 과라벨이 남아있으면 안 된다 — 디오염 재현성 트립와이어.
+    # (ungoverned 수기/기계 in-place 정정이나 새 프록시 유입을 잡는다. 재생성: depollute_court_proxy_gold.py)
+    proxy_pending = [r for r in _load_rows(cls_path) if is_court_proxy_overlabel(r)]
+    if proxy_pending:
+        errors.append(
+            f"classification_gold_real.court_proxy_overlabel: {len(proxy_pending)} un-depolluted "
+            "rows (run scripts/depollute_court_proxy_gold.py)"
+        )
 
     ret_gold = gold.get("retrieval_gold", {})
     ret_path = Path(str(ret_gold.get("path", "")).removeprefix("poc/"))
