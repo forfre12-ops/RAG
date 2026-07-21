@@ -14,9 +14,9 @@
 <header class="nav">
   <div class="nav-inner">
     <a href="#top" class="brand">
-      <span class="brand-mark">LK</span>
+      <span class="brand-mark"><img src="./lloydk_logo_mark.png" alt="로이드케이" onerror="this.style.display='none'"/></span>
       <span class="brand-name">로이드케이</span>
-      <span class="brand-sep">·</span>
+      <span class="brand-sep">/</span>
       <span class="brand-url">KOIPA AI 콘솔</span>
     </a>
     <div class="nav-actions">
@@ -74,7 +74,7 @@
         <span class="src-tag src-ref">참고</span> V2 통합본 인용 또는 예시 시나리오(미실측)
       </p>
       <p style="margin-top:6px;font-size:13px;">BERT 추론 1.18s · LLM 25.8s는 Phase 4/5 <b>자체 GPU(RTX 5070 Ti) 실측</b>. 사고 손해액은 예시 시나리오 기반으로 <b>발주처 실문서 도착 후</b> 실측치로 갱신 예정.</p>
-      <p style="margin-top:6px;font-size:13px;">이 라이브 데모(lite-noapi)의 실시간 판정은 <b>시드 키워드 룰 분류기(rule-fallback-v0)</b>로 동작하며, 위 학습모델(KF-DeBERTa) 수치는 <b>별도 GPU 환경 벤치</b>입니다(이 데모가 내는 값 아님).</p>
+      <p style="margin-top:6px;font-size:13px;">이 라이브 데모의 실시간 판정은 기본적으로 <b>시드 키워드 룰 분류기(rule-fallback-v0)</b>로 동작하며, 학습 <b>KF-DeBERTa(v-dd3abab9)</b>가 로드된 하이브리드 프로파일에서는 룰·모델 <b>이중판정</b>을 함께 노출합니다(실제 로드 상태는 하단 이중판정 패널이 표시). 위 1.18s·25.8s는 <b>별도 GPU 환경 벤치 latency</b>로 이 데모의 실측 응답시간과는 다릅니다.</p>
     </div>
   </div>
 
@@ -177,9 +177,8 @@
       <h3 style="font-size:14px;margin-top:18px;">본문 미리보기 (시드 키워드 매칭)</h3>
       <div id="body-preview" class="body-render"></div>
 
-      <h3 style="font-size:14px;margin-top:18px;">실시간 요청 로그 — 실제 백엔드 호출 <span class="src-tag src-measured">위조 아님</span></h3>
-      <p class="toggle-hint" style="margin-top:-4px;">아래 로그는 이 페이지가 실제로 보낸 HTTP 요청/응답 기록입니다. 서버 터미널(uvicorn 액세스 로그)과 대조하면 위조가 아님을 확인할 수 있습니다.</p>
-      <div id="live-log" class="live-log"><div class="ll-empty">요청이 여기에 실시간으로 기록됩니다.</div></div>
+      <!-- 실시간 요청 로그는 하단 고정 콘솔(#logdock)로 이동됨 — 스크롤과 무관하게 항상 보임 -->
+      <p class="toggle-hint" style="margin-top:14px;">실시간 요청 로그는 화면 <b>하단 고정 콘솔</b>에 표시됩니다(스크롤과 무관하게 항상 보임). 서버 uvicorn 로그와 대조하면 위조가 아님을 확인할 수 있습니다.</p>
     </div>
   </section>
 
@@ -217,6 +216,17 @@
   <div class="mono">로이드케이 · lloydk.co.kr · 2026-07-17</div>
 </footer>
 
+<!-- ===== 실시간 요청 로그 — 하단 고정 콘솔 (항상 보임) ===== -->
+<div class="logdock" id="logdock">
+  <div class="logdock-head" onclick="toggleDemoLog()">
+    <b>실시간 요청 로그 <span class="src-tag src-measured" style="vertical-align:middle;">위조 아님</span> <span class="logdock-hint">— 이 페이지가 실제 보낸 HTTP 요청/응답 · 서버 uvicorn 로그와 대조 가능</span></b>
+    <span id="logdock-toggle">접기 ▾</span>
+  </div>
+  <div id="live-log" class="live-log"><div class="ll-empty">요청이 여기에 실시간으로 기록됩니다.</div></div>
+</div>
+<script>
+function toggleDemoLog(){var d=document.getElementById('logdock'),t=document.getElementById('logdock-toggle');if(!d)return;var c=d.classList.toggle('collapsed');if(t)t.textContent=c?'펼치기 ▴':'접기 ▾';document.body.style.paddingBottom=c?'52px':'232px';}
+</script>
 <script type="module" src="./app.js"></script>
 </body>
 </html>
