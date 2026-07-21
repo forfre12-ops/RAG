@@ -25,7 +25,8 @@ def test_demo_safe_mode_and_golden_builder_are_visible():
 
 def test_parser_demo_has_table_sample_pack():
     page = (STATIC / "parse_demo.html").read_text(encoding="utf-8")
-    sample = STATIC / "samples" / "success_table_xlsx.xlsx"
+    # parse_demo 는 demo_docs/ 샘플셋으로 재설계됨(b774e3d) — 표(xlsx) 샘플=03_S2_supplier_price.xlsx.
+    sample = STATIC / "demo_docs" / "03_S2_supplier_price.xlsx"
     assert sample.exists()
     assert sample.stat().st_size > 1000
-    assert "success_table_xlsx.xlsx" in page
+    assert "03_S2_supplier_price.xlsx" in page
