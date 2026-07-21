@@ -37,7 +37,7 @@ h2,h3{letter-spacing:-.02em;margin:0;}
 .nav-badge{background:var(--bg-inverse);color:#fff;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:4px;}
 .health-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px;border:1px solid var(--border-mid);color:var(--text-dim);background:var(--bg-surface);cursor:pointer;}
 .health-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
-.health-pill.ok .dot{background:var(--green);} .health-pill.ok{color:var(--green);border-color:var(--green);}
+.health-pill.ok .dot{background:var(--green);} .health-pill.ok{color:var(--green);border-color:var(--green);background:var(--green-soft);}
 .health-pill.bad .dot{background:var(--red);} .health-pill.bad{color:var(--red);border-color:var(--red-border);}
 
 .wrap{max-width:1180px;margin:0 auto;padding:24px 22px 100px;}
@@ -100,7 +100,16 @@ input:focus,select:focus{outline:none;border-color:var(--text);}
 .conf-fill{height:100%;background:var(--bg-inverse);border-radius:5px;}
 .status-pill{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;}
 .status-staging{background:var(--green-soft);color:var(--green);border:1px solid var(--green-border);}
-.status-needs_review{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-border);}
+.status-needs_review{background:var(--red);color:#fff;border:1px solid var(--red);}
+/* 최종 판정 강조 배너 — 검수필요를 확실히 눈에 띄게(필드형 강조색) */
+.verdict-banner{display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:9px;font-weight:800;font-size:15.5px;letter-spacing:-.01em;margin-bottom:14px;border:1px solid;}
+.verdict-review{background:var(--red);color:#fff;border-color:var(--red);box-shadow:0 2px 8px rgba(225,29,46,.30);}
+.verdict-auto{background:var(--green-soft);color:var(--green);border-color:var(--green-border);}
+.verdict-banner .vb-ico{font-size:19px;line-height:1;flex-shrink:0;}
+.verdict-banner .vb-sub{font-weight:600;font-size:12px;opacity:.94;}
+/* 검수필요일 때 결과 카드 자체도 amber 테두리로 강조 */
+.card.review-hot{border-color:var(--red);box-shadow:0 0 0 1px var(--red),0 6px 20px rgba(225,29,46,.14);}
+.card.review-hot .card-title{color:var(--red);}
 .factor{margin:8px 0;}
 .factor .flabel{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
 .factor .fbar{height:6px;border-radius:4px;background:var(--bg-strong);overflow:hidden;}
@@ -115,13 +124,56 @@ mark.kw-hit{background:#fde68a;color:#92400e;border-radius:3px;padding:0 1px;}
 .log{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);background:var(--bg-inverse);color:#d4d4d8;border-radius:8px;padding:12px;max-height:150px;overflow:auto;white-space:pre-wrap;}
 .hint{font-size:12px;color:var(--text-faint);margin-top:6px;}
 .hidden{display:none;}
+
+/* 요청 로그 — 하단 고정 콘솔 (스크롤과 무관하게 항상 보임) */
+.logdock{position:fixed;left:0;right:0;bottom:0;z-index:120;background:var(--bg-inverse);border-top:1px solid #2a2a2e;box-shadow:0 -2px 14px rgba(0,0,0,.22);}
+.logdock-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 22px;border-bottom:1px solid #2a2a2e;cursor:pointer;}
+.logdock-head b{color:#e4e4e7;font-weight:600;font-size:12.5px;font-family:var(--font-sans);}
+.logdock-hint{color:#8a8a92;font-size:10.5px;font-weight:400;}
+.logdock #logdock-toggle{color:#a1a1aa;font-size:11px;font-family:var(--font-mono);flex-shrink:0;}
+.logdock .log{margin:0;border:none;max-height:150px;background:transparent;padding:8px 22px;}
+.logdock.collapsed .log{display:none;}
+body{padding-bottom:210px;}
+@media(max-width:640px){.logdock-hint{display:none;}}
+
+/* ============================================================
+   직선형 + 모노 전환 — 등급 배지(g-TS/S1/S2/S3) 4색만 포인트로 유지,
+   나머지 상태/장식 색(빨강·초록·주황·파랑)은 전부 흑백·그레이로.
+   ============================================================ */
+*{border-radius:0 !important;}
+:root{
+  --red:#0a0a0a;   --red-soft:#f4f4f4;   --red-border:rgba(0,0,0,.16);
+  --green:#525252; --green-soft:#f4f4f4; --green-border:rgba(0,0,0,.16);
+  --amber:#737373; --amber-soft:#f4f4f4; --amber-border:rgba(0,0,0,.16);
+  --blue:#0a0a0a;  --blue-soft:#f4f4f4;  --blue-border:rgba(0,0,0,.16);
+}
+.g-TS{color:#dc2626 !important;border-color:#dc2626 !important;background:#fef2f2 !important;}
+.g-S1{color:#d97706 !important;border-color:#d97706 !important;background:#fffbeb !important;}
+.g-S2{color:#0070f3 !important;border-color:#0070f3 !important;background:#eff6ff !important;}
+.g-S3{color:#16a34a !important;border-color:#16a34a !important;background:#f0fdf4 !important;}
+/* 하드코딩 유채색(변수 밖) → 모노: 키워드 칩·본문 하이라이트 */
+/* 근거 키워드 → 본문 하이라이트: 눈에 띄는 색 포인트(형광 노랑) */
+.kw-chip:hover { border-color:#eab308 !important; }
+.kw-chip.active { background:#fef08a !important; border-color:#ca8a04 !important; color:#713f12 !important; font-weight:700 !important; }
+mark.kw-hit { background:#fde047 !important; color:#111 !important; box-shadow:0 0 0 1px rgba(0,0,0,.14); font-weight:600; }
+mark.kw-hit.flash { animation:kwflash .9s ease-out; }
+@keyframes kwflash { 0%{background:#f59e0b;} 100%{background:#fde047;} }
+
+/* 검수 필요(needs_review)·검수 라우팅 → 검정 대신 눈에 띄는 오렌지(등급색과 구분되는 상태 포인트) */
+.status-needs_review { background:#ea580c !important; color:#fff !important; border-color:#ea580c !important; }
+.verdict-review { background:#ea580c !important; color:#fff !important; border-color:#ea580c !important; box-shadow:0 2px 10px rgba(234,88,12,.35) !important; }
+.card.review-hot { border-color:#09090b !important; box-shadow:0 0 0 1px #09090b !important; }
+.card.review-hot .card-title { color:var(--text-dim) !important; }
+.gate-review { border-left:3px solid #ea580c !important; background:#fff7ed !important; }
+.tl-step.review { background:#fff7ed !important; border-color:#fdba74 !important; }
+.tl-step.review .tl-dot { background:#ea580c !important; }
 </style>
 </head>
 <body>
 <nav class="nav"><div class="nav-inner">
   <a class="brand" href="./index.html">
     <span class="brand-mark"><img src="./lloydk_logo_mark.png" alt="Lloydk" onerror="this.style.display='none'" /></span>
-    <span><span class="brand-name">Lloydk</span><span class="brand-sep">·</span><span class="brand-sub">문서 파싱·분류 시연</span></span>
+    <span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">문서 파싱·분류 시연</span></span>
   </a>
   <div class="nav-right">
     <a class="nav-link" href="./index.html">분류 콘솔</a>
@@ -141,7 +193,7 @@ mark.kw-hit{background:#fde68a;color:#92400e;border-radius:3px;padding:0 1px;}
     <div class="card-title">연결</div>
     <div class="row">
       <label class="fld">API Base<input type="text" id="base" value="/api/v1" /></label>
-      <label class="fld">X-API-Key<input type="password" id="apikey" placeholder="시연 서버 API 키 입력" /></label>
+      <label class="fld">X-API-Key<input type="text" id="apikey" value="demo-secret-key" placeholder="시연 서버 API 키 입력" /></label>
       <label class="fld">Actor-Role<select id="role"><option>admin</option><option>reviewer</option><option>viewer</option></select></label>
       <label class="fld">근거 표시<select id="ev"><option value="true">on</option><option value="false">off</option></select></label>
     </div>
@@ -168,11 +220,21 @@ mark.kw-hit{background:#fde68a;color:#92400e;border-radius:3px;padding:0 1px;}
       <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
     </div>
     <div class="hint">위 4종(TS·S1·S2·S3)은 <b>깨끗한 문서가 자동 확정</b>되는 경로. 아래 2종은 파싱 이상(PDF 표 불완전·얇은 본문)을 <b>조용히 오분류하지 않고 검수로 라우팅</b>하는 안전장치 시연. 직접 업무 문서를 끌어다 놓아도 됩니다.</div>
-    <div class="row" style="margin-top:14px;">
+    <div class="row" style="margin-top:14px;align-items:center;">
       <button class="btn" id="go" onclick="analyze()" disabled>분석 실행</button>
       <button class="btn ghost" onclick="reset()">초기화</button>
+      <label class="fld" style="flex-direction:row;align-items:center;gap:7px;margin:0;font-weight:600;white-space:nowrap;">
+        <input type="checkbox" id="persist-demo" style="width:auto;" />
+        실적재(검수 큐 전송)
+      </label>
       <span class="hint" id="busy"></span>
     </div>
+    <div class="hint" style="margin-top:6px;">
+      <b>실적재</b>를 켜면 분석과 별개로 문서를 <b>실제 적재</b>(<code>POST /documents</code> → <code>/classify</code>)합니다 —
+      needs_review 건은 <b>거버넌스 콘솔의 DB 검수 큐</b>에 나타나고, 본문은 RAG <code>demo</code> 컬렉션에 색인됩니다.
+      적재 문서는 <code>created_by=demo-console</code> 로만 태깅되어 admin의 <b>「데모 데이터 초기화」</b>로 한 번에 지웁니다.
+    </div>
+    <div id="persist-box" style="margin-top:8px;"></div>
   </div>
 
   <!-- 결과 -->
@@ -216,8 +278,11 @@ mark.kw-hit{background:#fde68a;color:#92400e;border-radius:3px;padding:0 1px;}
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">요청 로그</div>
+  <div class="logdock" id="logdock">
+    <div class="logdock-head" onclick="toggleLog()">
+      <b>요청 로그 <span class="logdock-hint">— 이 페이지가 실제 보낸 요청/응답 기록 · 하단 고정</span></b>
+      <span id="logdock-toggle">접기 ▾</span>
+    </div>
     <div class="log" id="log">준비됨.</div>
   </div>
 </div>
@@ -228,6 +293,7 @@ let picked = null;
 function base(){ return $('base').value.replace(/\/$/,''); }
 function hdr(){ return { 'X-API-Key': $('apikey').value, 'X-Actor-Role': $('role').value }; }
 function log(m){ const el=$('log'); el.textContent = '['+new Date().toLocaleTimeString()+'] '+m+'\n'+el.textContent; }
+function toggleLog(){ const d=$('logdock'); if(!d) return; d.classList.toggle('collapsed'); const t=$('logdock-toggle'); if(t) t.textContent = d.classList.contains('collapsed') ? '펼치기 ▴' : '접기 ▾'; }
 
 async function checkHealth(){
   const pill=$('health');
@@ -278,11 +344,62 @@ async function analyze(){
     log('analyze OK '+ms+'ms  '+picked.name+' → '+(j.classification? j.classification.label : ((j.stages||[]).some(s=>s.name==='분류'&&s.status==='fail')?'(분류 오류)':'(빈본문)')));
     render(j);
     $('busy').textContent='완료 ('+ms+'ms)';
+    if($('persist-demo') && $('persist-demo').checked && window._reviewVerdict){ await persistToQueue(j); }
   }catch(e){ log('오류: '+e.message); $('busy').textContent='오류: '+e.message; }
   $('go').disabled=false;
 }
 
+// 실적재 — 분석과 별개로 실제 서빙 경로(POST /documents → /classify)로 적재해
+// needs_review 건이 거버넌스 콘솔 DB 검수 큐에 나타나게 한다. created_by=demo-console 마커라
+// admin의 「데모 데이터 초기화」로 스코프 삭제 가능. RAG 는 'demo' 컬렉션(평가 'docs' 분리)에 색인.
+async function persistToQueue(analysis){
+  const box=$('persist-box');
+  if(!picked || !box) return;
+  box.innerHTML='<span class="hint">실적재 중… (POST /documents → /classify)</span>';
+  try{
+    // 1) 실제 적재 — documents/chunks 저장 + RAG demo 색인, created_by=demo-console 마커
+    const fd=new FormData();
+    fd.append('actor', JSON.stringify({user_id:'demo-console', role:$('role').value||'admin'}));
+    fd.append('index_for_rag','true');
+    fd.append('rag_namespace','demo');
+    fd.append('file', picked);
+    const up=await fetch(base()+'/documents', {method:'POST', headers:hdr(), body:fd});
+    const uj=await up.json().catch(()=>({}));
+    if(!up.ok || !uj.doc_id){
+      box.innerHTML=`<div class="gate-review"><b>실적재 실패(업로드)</b>: HTTP ${up.status} ${esc(JSON.stringify(uj).slice(0,180))}</div>`;
+      log('실적재 업로드 실패 HTTP '+up.status); return;
+    }
+    log('적재 OK doc_id='+uj.doc_id+' (검수필요='+uj.requires_review+' · RAG색인='+uj.rag_indexed+')');
+    // 2) 실제 서빙 경로 분류 — 본문을 직접 전달(LocalStorage 재읽기 우회). 적재 시 ingestion
+    //    needs_review 격리는 서버가 존중(_ingestion_flagged_for_doc)해 검수 큐에 실린다.
+    const content=(analysis && analysis.text_preview) || '';
+    const cl=await fetch(base()+'/classify', {
+      method:'POST',
+      headers:Object.assign({'Content-Type':'application/json'}, hdr()),
+      body:JSON.stringify(content ? {doc_id:uj.doc_id, content:content} : {doc_id:uj.doc_id}),
+    });
+    const cj=await cl.json().catch(()=>({}));
+    if(!cl.ok){
+      box.innerHTML=`<div class="gate-review"><b>실적재 분류 실패</b>: HTTP ${cl.status} ${esc(JSON.stringify(cj).slice(0,180))}</div>`;
+      log('실적재 분류 실패 HTTP '+cl.status); return;
+    }
+    const st=cj.status||'?';
+    const routed=(st==='needs_review');
+    box.innerHTML=`<div class="${routed?'gate-review':'gate-ok'}">
+      <b>실적재 완료</b> — doc_id <code>${esc(uj.doc_id)}</code> · 등급 <b>${esc(cj.label||'?')}</b> · 상태 <b>${esc(st)}</b>
+      <div style="margin-top:4px">${routed
+        ? '→ <b>거버넌스 콘솔 → 「DB 검수 큐 불러오기」</b> 하면 이 문서가 검수 대기로 나타납니다.'
+        : '자동 확정(staging) — needs_review 가 아니라 검수 큐에는 나타나지 않습니다.'}</div></div>`;
+    log('실적재 분류 OK '+(cj.label||'?')+' status='+st);
+  }catch(e){
+    box.innerHTML=`<div class="gate-review"><b>실적재 오류</b>: ${esc(e.message)}</div>`;
+    log('실적재 오류: '+e.message);
+  }
+}
+
 function render(j){
+  window._lastAnalysis = j;   // 「검수 큐로 전송」 버튼이 참조하는 최근 분석 결과
+  window._reviewVerdict = false;   // needs_review 판정 여부(전송 대상 게이트) — 아래 분기에서 설정
   $('result').classList.remove('hidden');
   // 타임라인
   $('timeline').innerHTML = (j.stages||[]).map(s=>`
@@ -319,9 +436,12 @@ function render(j){
   const c=j.classification;
   if(!c){
     const failStage=(j.stages||[]).find(s=>s.name==='분류' && s.status==='fail');
-    $('cls-box').innerHTML = failStage
-      ? `<div class="gate-review"><b>분류 오류 — 검수 필요</b><div class="warn">${esc(failStage.detail||'분류 실패')}</div></div>`
-      : '<span class="hint">본문 추출 0자 — 분류 불가(검수 필요).</span>';
+    const clsCard=$('cls-box').closest('.card'); if(clsCard) clsCard.classList.add('review-hot');
+    window._reviewVerdict = true;   // 분류 실패/빈본문 = 검수 필요
+    const rb=`<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — ${failStage?'분류 오류로 자동 확정 불가':'본문 추출 0자로 분류 불가'}</span></span></div>`;
+    $('cls-box').innerHTML = rb + (failStage
+      ? `<div class="gate-review"><b>분류 오류</b><div class="warn">${esc(failStage.detail||'분류 실패')}</div></div>`
+      : '<span class="hint">본문 추출 0자 — 사람 검수로 라우팅됩니다.</span>');
   }
   else{
     const f=c.factors||{};
@@ -330,7 +450,13 @@ function render(j){
       const ko={secrecy:'비공지성(S)',value:'경제적 유용성(V)',management:'비밀관리성(M)'}[k];
       return `<div class="factor"><div class="flabel"><span>${ko}</span><span>${v.toFixed(2)}</span></div><div class="fbar"><div class="ffill" style="width:${pct}%"></div></div></div>`;
     }).join('');
-    $('cls-box').innerHTML = `
+    const isReview = c.status !== 'staging';
+    window._reviewVerdict = isReview;   // needs_review 일 때만 전송 대상
+    const verdictBanner = isReview
+      ? `<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — 자동 확정하지 않고 사람 검수로 라우팅</span></span></div>`
+      : `<div class="verdict-banner verdict-auto"><span>자동 확정<span class="vb-sub"> — 게이트 통과(무오탐)</span></span></div>`;
+    const clsCard = $('cls-box').closest('.card'); if(clsCard) clsCard.classList.toggle('review-hot', isReview);
+    $('cls-box').innerHTML = verdictBanner + `
       <div class="row" style="align-items:flex-start;gap:24px;">
         <div>
           <span class="grade-badge g-${esc(c.label)}">${esc(c.label)}</span>
@@ -358,21 +484,31 @@ function render(j){
     : '<span class="hint">없음</span>';
   // 미리보기 (하이라이트 상태 초기화)
   renderPreviewHighlights();
+  // 실적재 버튼 — needs_review 판정일 때만 노출(자동 확정 건은 검수 불요라 전송 대상 아님).
+  if($('persist-box')){
+    $('persist-box').innerHTML = window._reviewVerdict
+      ? `<button class="btn" style="background:var(--red);border-color:var(--red)" onclick="persistToQueue(window._lastAnalysis)">이 문서 검수 큐로 전송 (실적재)</button>`
+        + `<span class="hint" style="margin-left:10px">needs_review 판정 → 거버넌스 콘솔 DB 검수 큐로 등록 · <code>created_by=demo-console</code> 태깅</span>`
+      : `<span class="hint">자동 확정(staging) — 검수 불요라 <b>검수 큐 전송 대상이 아닙니다</b>. needs_review 건만 큐로 보냅니다.</span>`;
+  }
 }
 
 // 키워드 칩 토글 → 본문 하이라이트
-function toggleKw(el){ el.classList.toggle('active'); renderPreviewHighlights(); }
-function renderPreviewHighlights(){
+function toggleKw(el){ const on = !el.classList.contains('active'); el.classList.toggle('active'); renderPreviewHighlights(on ? el.dataset.kw : null); }
+function renderPreviewHighlights(flashKw){
   const raw = window._previewRaw || '';
   if(!raw){ $('preview').textContent = '(없음)'; return; }
   const active = Array.prototype.slice.call(document.querySelectorAll('.kw-chip.active')).map(c=>c.dataset.kw).filter(Boolean);
   if(!active.length){ $('preview').textContent = raw; return; }
   let html = esc(raw);
   active.forEach(kw=>{
+    const cls = (kw===flashKw) ? 'kw-hit flash' : 'kw-hit';
     const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g');
-    html = html.replace(re, m=>`<mark class="kw-hit">${m}</mark>`);
+    html = html.replace(re, m=>`<mark class="${cls}">${m}</mark>`);
   });
   $('preview').innerHTML = html;
+  // 클릭한 키워드의 첫 매치로 스크롤 이동 → 눈에 확 띄게
+  if(flashKw){ const first = $('preview').querySelector('mark.kw-hit.flash'); if(first){ first.scrollIntoView({block:'center', behavior:'smooth'}); } }
 }
 
 function kv(pairs){ return pairs.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(String(v==null?'—':v))}</dd>`).join(''); }

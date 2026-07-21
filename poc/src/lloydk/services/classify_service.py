@@ -222,6 +222,13 @@ class ClassifyService:
                 # [P0#3 후속] ingestion 열화추출(OCR/저품질)로 격리된 문서(processing_status)를
                 # 서빙 진입에서 존중 — 자동확정 금지(무음 자동분류 방지).
                 review_flagged = self._ingestion_review_flagged(_doc_status)
+            else:
+                # 본문이 직접 주어진 경우에도, 이미 적재된 문서(UUID doc_id)가 ingestion 단계에서
+                # 열화추출로 needs_review 격리됐으면 그 격리를 존중한다(FNR-safe·additive). 비-UUID
+                # doc_id(예: /analyze filename, 콘솔 샘플)는 적재문서가 아니라 조회 없이 skip —
+                # 기존 트래픽(전부 비-UUID+content) 무영향. LocalStorage URI 재읽기 우회 경로에서
+                # ingestion 격리가 유실되지 않게 한다(정본 doc_id-serving 과 status 정합).
+                review_flagged = self._ingestion_flagged_for_doc(req.doc_id)
             if not content:
                 # fail-SECURE (미탐 절대 금지): 본문을 못 읽으면 등급을 판단할 수 없다.
                 # 과거엔 label="S3"(공개)로 폴백했는데, 이는 '읽지 못한 비밀문서를 공개로
@@ -941,6 +948,29 @@ class ClassifyService:
         방지). 그 외(processed 등)·None(상태 미상)은 격리 아님(과차단 방지).
         """
         return processing_status in ("needs_review", "failed")
+
+    def _ingestion_flagged_for_doc(self, doc_id_str: str) -> bool:
+        """적재된 문서(UUID doc_id)의 processing_status 가 ingestion 검수격리인지 — best-effort.
+
+        본문을 직접 넘겨 분류할 때(스토리지 재읽기 우회 경로)도 ingestion 격리를 존중하기 위한
+        조회. 비-UUID doc_id(적재문서 아님)·DB미가용·미존재·예외는 모두 False(격리 아님) —
+        과차단·비용을 피하고 기존 비-UUID 트래픽엔 조회조차 하지 않는다.
+        """
+        doc_uuid = self._parse_doc_uuid(doc_id_str)
+        if doc_uuid is None:
+            return False
+        if _skip_optional_db_work():
+            return False
+        try:
+            from lloydk.db import session_scope  # noqa: PLC0415
+            from lloydk.repositories.document_repo import DocumentRepo  # noqa: PLC0415
+            with session_scope() as db:
+                doc = DocumentRepo(db).get(doc_uuid)
+                status = getattr(doc, "processing_status", None) if doc is not None else None
+            return self._ingestion_review_flagged(status)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("_ingestion_flagged_for_doc failed (non-critical): %s", exc)
+            return False
 
     def _fetch_content_by_doc_id(self, doc_id: str) -> tuple[str, str | None]:
         """doc_id로 documents.normalized_text_uri → storage에서 텍스트 읽기.

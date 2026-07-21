@@ -356,6 +356,18 @@ class DocumentIngestionService:
         status = "needs_review" if (text and requires_review) else ("ready" if text else "failed")
 
         def _do(session) -> object:
+            # 멱등 적재: 동일 file_hash 문서가 이미 있으면 재사용(같은 바이트=같은 문서).
+            # 재업로드가 UNIQUE(idx_doc_hash) 위반으로 persisted=False(doc_id=null) 나던 것을
+            # 방지 — 기존 doc_id 를 반환해 시연 반복(같은 샘플 재전송)을 허용한다.
+            if file_hash:
+                from sqlalchemy import select as _sel  # noqa: PLC0415
+
+                from lloydk.db.models import Document as _Doc  # noqa: PLC0415
+                existing = session.execute(
+                    _sel(_Doc.doc_id).where(_Doc.file_hash == file_hash)
+                ).scalar_one_or_none()
+                if existing is not None:
+                    return existing
             doc = DocumentRepo(session).create(
                 filename=filename,
                 source_format=source_format,

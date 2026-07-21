@@ -74,18 +74,15 @@ body {
   white-space: nowrap; min-width: 0; line-height: 1;
 }
 .brand-mark {
-  width: 32px; height: 32px;
+  width: 34px; height: 34px;
   display: grid; place-items: center;
   flex-shrink: 0;
   background: #fff;
-  border-radius: 0;
-  padding: 5px;
+  border-radius: 7px;
+  padding: 4px;
   border: 1px solid rgba(0,0,0,0.12);
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--text);
 }
+.brand-mark img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 3px; }
 .brand-name {
   font-weight: 600; font-size: 15px;
   letter-spacing: -0.02em;
@@ -122,6 +119,9 @@ body {
 }
 .nav-status.warming .dot { background: var(--c-s1); animation: pulse 1.4s infinite; }
 .nav-status.error .dot { background: var(--c-ts); }
+/* 정상(warmup 완료) = 녹색. line 980 모노 override(!important)를 이기려 동일 !important + 상위 특이도. */
+.nav-status.ok .dot { background: var(--c-s3) !important; }
+.nav-status.ok { color: var(--c-s3); border-color: var(--c-s3); }
 
 /* ===== Layout ===== */
 .container {
@@ -938,5 +938,83 @@ code {
 .live-log .ll-time { color: #64748b; }
 .live-log .ll-ok { color: #4ade80; }
 .live-log .ll-err { color: #f87171; }
+
+/* ── 하단 고정 실시간 로그 콘솔 (admin.html 방식 — 스크롤 무관 항상 보임) ── */
+.logdock { position: fixed; bottom: 0; left: 0; right: 0; z-index: 90; background: #0b1020; color: #cbd5e1; border-top: 1px solid #1e293b; box-shadow: 0 -2px 14px rgba(0,0,0,.22); }
+.logdock-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 20px; border-bottom: 1px solid #1e293b; cursor: pointer; }
+.logdock-head b { color: #e2e8f0; font-weight: 600; font-family: var(--font-sans); font-size: 12.5px; }
+.logdock-hint { color: #64748b; font-size: 10.5px; font-weight: 400; }
+.logdock-head #logdock-toggle { color: #94a3b8; font-size: 11px; flex-shrink: 0; font-family: var(--font-mono); }
+.logdock .live-log { border: none; margin: 0; max-height: 170px; background: transparent; box-shadow: none; padding: 8px 20px; }
+.logdock.collapsed .live-log { display: none; }
+body { padding-bottom: 232px; }
+@media (max-width: 700px) { .logdock-hint { display: none; } }
 .live-log .ll-ev { color: #38bdf8; }
 .live-log .ll-empty { color: #64748b; }
+
+/* ============================================================
+   직선형 + 모노 전환 — 등급색 4종(--c-ts/s1/s2/s3, .g-TS/S1/S2/S3)만
+   포인트로 유지하고 나머지 파랑·초록·주황·빨강 장식/상태/배경은 전부
+   흑백·그레이로. (이 블록이 소스 순서상 위 규칙을 덮는다)
+   ============================================================ */
+* { border-radius: 0 !important; }
+
+/* 콜아웃 4종 → 모노(회색 배경 + 좌측 굵은선 강약으로 구분) */
+.callout.accent, .callout.success, .callout.warn, .callout.danger {
+  background: var(--bg-surface); border-color: var(--border-strong);
+}
+.callout.danger { border-left: 3px solid var(--text); }
+.callout.warn   { border-left: 3px solid var(--text-soft); }
+.callout .callout-icon, .callout .callout-label { color: var(--text) !important; }
+
+/* SSE 단계 카드 상태 → 모노 */
+.seq-step.active { background: var(--accent-soft); border-color: var(--border-strong); }
+.seq-step.done  { background: var(--bg-surface); border-color: var(--border-strong); }
+.seq-step.danger{ background: var(--accent-soft); border-color: var(--text-soft); }
+
+/* 출처 태그 3종 → 모노 */
+.src-measured, .src-spec, .src-ref {
+  background: var(--accent-soft) !important;
+  color: var(--text-soft) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* 상태 점(네비/히어로) → 모노 */
+.nav-status .dot, .nav-status.warming .dot { background: var(--text-faint) !important; }
+.nav-status.error .dot, .hero-kpi .dot { background: var(--text) !important; }
+
+/* 히어로 배경 파랑 틴트 제거 */
+.hero-bg { background: none !important; }
+
+/* BERT/LLM 레이스 막대 → 두 그레이로 구분 */
+.race-fill.bert { background: var(--text) !important; }
+.race-fill.llm  { background: var(--text-faint) !important; }
+
+/* 결과 등장/플래시 애니메이션 파랑·주황 → 모노 */
+@keyframes resultPop {
+  0%   { box-shadow: 0 0 0 0 rgba(0,0,0,0.28); border-color: var(--text); transform: scale(1); }
+  40%  { box-shadow: 0 0 0 12px rgba(0,0,0,0); border-color: var(--border-strong); transform: scale(1.005); }
+  100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); border-color: var(--border-strong); transform: scale(1); }
+}
+@keyframes flash { 0% { background: rgba(0,0,0,0.16); } 100% { background: rgba(0,0,0,0.04); } }
+
+/* 업로드 드롭·활성 스텝 등 장식용 빨강 → 검정 강조 */
+.upload-drop:hover, .upload-drop.over { border-color: var(--text) !important; background: var(--accent-soft) !important; }
+.upload-big u, .upload-fname { color: var(--text) !important; }
+.rstep.active { border-left-color: var(--text) !important; background: var(--accent-soft) !important; }
+.rstep.active .rdot { background: var(--text) !important; }
+.rstep.done { border-left-color: var(--text-soft) !important; }
+.rstep.done .rdot { background: var(--text-soft) !important; }
+.ops-tile.bump .ops-num { color: var(--text) !important; }
+
+/* 다크 로그 콘솔의 초록/빨강/하늘 → 중립 그레이(콘솔 자체는 다크 모노 유지) */
+.live-log .ll-ok { color: #e2e8f0 !important; }
+.live-log .ll-err { color: #ffffff !important; }
+.live-log .ll-ev { color: #94a3b8 !important; }
+/* 다크 로그 콘솔 남색 틴트 → 뉴트럴 다크 모노 */
+.live-log, .logdock, .logdock .live-log { background: #141416 !important; }
+.live-log { color: #d4d4d8 !important; border-color: #2a2a2e !important; }
+.logdock, .logdock-head { border-color: #2a2a2e !important; }
+.live-log .ll-time, .live-log .ll-empty, .logdock-hint, .logdock-head #logdock-toggle { color: #8a8a92 !important; }
+.logdock-head b { color: #e4e4e7 !important; }
+.dual-grade.g-na { background: #a1a1aa !important; }

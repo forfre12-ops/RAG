@@ -89,7 +89,7 @@ function renderHealthBadge() {
   const profile = h.deploy_profile || "unknown";
   const provider = h.llm_provider || "—";
   const embedder = h.embedding_provider || "—";
-  const cls = state.warmupDone ? "" : "warming";
+  const cls = state.warmupDone ? "ok" : "warming";   // 정상 = 녹색 배지
   el.className = `nav-status ${cls}`;
   el.innerHTML = "";
   const dot = document.createElement("span");

@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as _dt
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from lloydk.api._rbac import require_role
@@ -275,3 +275,78 @@ def dashboard() -> DashboardResponse:
         drift=_section("drift", _drift_snapshot, degraded),
         degraded=degraded,
     )
+
+
+# ── [DEMO] 시연 실적재 데이터 초기화 ────────────────────────────────────────────
+# parse_demo/admin 콘솔의 '실적재 시연'(POST /documents → /classify)으로 만든 행만 물리삭제한다.
+# 스코프가 created_by='demo-console' + RAG collection='demo' 두 상수로 고정돼, 실 운영 데이터
+# (다른 created_by)는 매칭 자체가 불가하다 — 이 스코프가 1차 안전장치다. FK 순서:
+#   classifications 먼저(evidence·corrections 는 CASCADE 자동) → RESTRICT 참조 테이블 → chunks
+#   → documents(labels·factor_scores 는 CASCADE 자동). rag_vectors 는 별도 best-effort 트랜잭션
+#   (스토어가 pgvector 아니면 tb_rag_vectors 미존재 — 무해 skip). admin 전용.
+DEMO_CREATED_BY = "demo-console"   # 데모 실적재 문서 마커 (parse_demo actor.user_id 와 일치)
+DEMO_RAG_COLLECTION = "demo"       # 데모 업로드 RAG 색인 컬렉션 (평가 'docs' 오염 분리)
+
+
+class DemoPurgeResponse(BaseModel):
+    purged: bool
+    documents: int
+    classifications: int
+    chunks: int
+    rag_vectors: int
+    warnings: list[str] = []
+
+
+@router.post(
+    "/demo/purge",
+    response_model=DemoPurgeResponse,
+    dependencies=_ADMIN_ONLY,
+    summary="[시연] 데모 실적재 데이터 초기화 (created_by='demo-console' 스코프 물리삭제)",
+    description=(
+        "parse_demo/admin 콘솔의 '실적재 시연'으로 만든 문서·분류·청크·RAG벡터만 삭제한다. "
+        "스코프가 created_by='demo-console' + RAG collection='demo' 로 고정돼 실 운영 데이터는 "
+        "건드리지 않는다(다른 created_by 는 매칭 불가). admin 전용·물리삭제."
+    ),
+)
+def purge_demo_data() -> DemoPurgeResponse:
+    from sqlalchemy import text as _sql  # noqa: PLC0415
+
+    from lloydk.config import settings  # noqa: PLC0415
+    from lloydk.db import session_scope  # noqa: PLC0415
+
+    # defense-in-depth: 운영 프로파일에서 실수 노출 차단(스코프가 1차 안전장치, 이건 2차).
+    if not getattr(settings, "demo_console_enabled", True):
+        raise HTTPException(status_code=404, detail="demo console disabled")
+
+    warnings: list[str] = []
+    counts = {"documents": 0, "classifications": 0, "chunks": 0, "rag_vectors": 0}
+    _sub = "SELECT doc_id FROM tb_documents WHERE created_by = :marker"
+    _m = {"marker": DEMO_CREATED_BY}
+    # 관계형 물리삭제 — 원자적(하나라도 실패하면 전체 롤백).
+    relational = [
+        ("classifications", f"DELETE FROM tb_classifications WHERE doc_id IN ({_sub})"),
+        (None, f"DELETE FROM tb_training_datasets WHERE doc_id IN ({_sub})"),
+        (None, f"DELETE FROM tb_sample_documents WHERE doc_id IN ({_sub})"),
+        ("chunks", f"DELETE FROM tb_chunks WHERE doc_id IN ({_sub})"),
+        ("documents", "DELETE FROM tb_documents WHERE created_by = :marker"),
+    ]
+    with session_scope() as db:
+        for key, stmt in relational:
+            res = db.execute(_sql(stmt), _m)
+            if key:
+                counts[key] = int(res.rowcount or 0)
+
+    # RAG 벡터 — 별도 best-effort(테이블 미존재/스토어 상이 시 무해 skip, 문서 purge 는 이미 확정).
+    try:
+        with session_scope() as db2:
+            res = db2.execute(
+                _sql("DELETE FROM tb_rag_vectors WHERE collection = :c"),
+                {"c": DEMO_RAG_COLLECTION},
+            )
+            counts["rag_vectors"] = int(res.rowcount or 0)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("demo purge: rag vectors skipped: %s", exc)
+        warnings.append(f"rag vectors purge skipped: {type(exc).__name__}")
+
+    logger.info("demo purge done: %s", counts)
+    return DemoPurgeResponse(purged=True, warnings=warnings, **counts)
