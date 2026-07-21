@@ -9,7 +9,9 @@ DB/모델 불요 — 순수 판정 + rule-fallback classify(_fetch_content_by_do
 """
 from __future__ import annotations
 
+import contextlib
 import uuid
+from types import SimpleNamespace
 
 from lloydk.schemas.classify import ClassifyRequest
 from lloydk.services.classify_service import ClassifyService
@@ -60,3 +62,72 @@ def test_processed_doc_not_flagged_by_this_gate(monkeypatch):
 def test_none_status_not_flagged(monkeypatch):
     res = _classify_with_status(monkeypatch, None)
     assert not any(_FLAG_WARN in w for w in res.warnings)
+
+
+# ── content-provided 경로: _ingestion_flagged_for_doc (UUID 적재문서 격리 존중) ──────
+# 본문을 직접 넘겨 분류할 때(스토리지 재읽기 우회)도 이미 적재된 UUID 문서의 needs_review
+# 격리를 존중하는 배선. 기존 테스트는 doc_id-fetch 경로만 커버했고, 이 DB 조회 분기는
+# TESTING+무PG서 _skip_optional_db_work()=True 로 死코드였다 — monkeypatch 로 강제 커버.
+
+def test_ingestion_flagged_for_doc_non_uuid_skips_db(monkeypatch):
+    """비-UUID doc_id(적재문서 아님: /analyze 파일명·콘솔 샘플)는 조회 없이 조기 False."""
+    svc = ClassifyService.get_instance()
+
+    def _boom():
+        raise AssertionError("비-UUID 는 DB 경로에 도달하면 안 됨")
+
+    # _parse_doc_uuid 실패로 _skip_optional_db_work 호출 전에 반환돼야 함 → 함정이 안 터짐.
+    monkeypatch.setattr("lloydk.services.classify_service._skip_optional_db_work", _boom)
+    assert svc._ingestion_flagged_for_doc("guide.txt") is False
+    assert svc._ingestion_flagged_for_doc("경계-영업-주간공유") is False
+
+
+def _patch_doc_lookup(monkeypatch, *, status, doc_exists=True, raise_exc=None):
+    monkeypatch.setattr(
+        "lloydk.services.classify_service._skip_optional_db_work", lambda: False
+    )
+
+    @contextlib.contextmanager
+    def _fake_scope():
+        yield object()
+
+    monkeypatch.setattr("lloydk.db.session_scope", _fake_scope)
+
+    class _FakeRepo:
+        def __init__(self, _db):
+            pass
+
+        def get(self, _doc_uuid):
+            if raise_exc is not None:
+                raise raise_exc
+            return SimpleNamespace(processing_status=status) if doc_exists else None
+
+    monkeypatch.setattr("lloydk.repositories.document_repo.DocumentRepo", _FakeRepo)
+
+
+def test_ingestion_flagged_for_doc_reads_persisted_status(monkeypatch):
+    """UUID 적재문서: DB의 processing_status 를 조회해 격리 여부 판정(DB 분기 커버)."""
+    svc = ClassifyService.get_instance()
+    _patch_doc_lookup(monkeypatch, status="needs_review")
+    assert svc._ingestion_flagged_for_doc(str(uuid.uuid4())) is True
+    _patch_doc_lookup(monkeypatch, status="ready")
+    assert svc._ingestion_flagged_for_doc(str(uuid.uuid4())) is False
+    _patch_doc_lookup(monkeypatch, status=None, doc_exists=False)  # 미존재 = 격리 아님
+    assert svc._ingestion_flagged_for_doc(str(uuid.uuid4())) is False
+
+
+def test_ingestion_flagged_for_doc_db_error_is_false(monkeypatch):
+    """DB 조회 예외는 best-effort False(과차단 방지·서빙 핫패스 안전)."""
+    svc = ClassifyService.get_instance()
+    _patch_doc_lookup(monkeypatch, status=None, raise_exc=RuntimeError("db down"))
+    assert svc._ingestion_flagged_for_doc(str(uuid.uuid4())) is False
+
+
+def test_content_path_respects_ingestion_isolation(monkeypatch):
+    """본문 직접 제공(content) + UUID 적재문서가 needs_review 격리면 서빙도 격리 존중."""
+    svc = ClassifyService.get_instance()
+    monkeypatch.setattr(svc, "_ingestion_flagged_for_doc", lambda doc_id: True)
+    req = ClassifyRequest(doc_id=str(uuid.uuid4()), content=_BODY, use_rag=False)
+    res = svc.classify(req)
+    assert res.status == "needs_review"
+    assert any(_FLAG_WARN in w for w in res.warnings)
