@@ -5,7 +5,13 @@
 이 함수로 필터한다.
 
 tier 결정:
-  - locked_gold_eval : 사람 서명(label_source=human_review, 실계정 reviewer) — **유일한 평가 정답**(P3)
+  - locked_gold_eval : 유효 사람 서명(label_source=human_review + 인증 envelope: 실계정 reviewer·
+                       gate_version·signed_at·reviewer_ids, is_valid_signoff). real 평가정답으로
+                       **집계**되려면 실문서 출처(document_origin∈{public_real,customer_real})까지
+                       갖춰야 함(is_real_locked_eval — eval_records/eval_readiness가 강제).
+  - held_review      : human_review인데 유효 서명 미충족(무효/민팅/손편집) 또는 합성 본문 서명 —
+                       평가정답 아님·학습 금지로 격리(역-누수 차단). '사람검수 합성사례'는 여기 남아
+                       회귀 픽스처로만 쓴다.
   - legal_floor      : 법적근거/시나리오(public_definitive·nkt_designated + koipa_case_based·
                        codex_review·curated_scenario) — 릴리스 차단 floor(고→S3 회귀 차단). 평가 정답
                        승격은 사람 서명 후. 합성/템플릿이라 그 자체로 일반화-진실 아님.
@@ -23,12 +29,32 @@ consumer 계약:
 """
 from __future__ import annotations
 
+import re
 from typing import Sequence
 
 TIER_LOCKED = "locked_gold_eval"
 TIER_LEGAL_FLOOR = "legal_floor"
 TIER_CANDIDATE = "gold_candidate"
 TIER_SILVER = "silver_train"
+# human_review 라벨이나 유효 서명(envelope)을 못 갖춘 격리 tier — 평가도 학습도 아님.
+# (무효 서명·correction-import 민팅·손편집 human_review, 및 서명은 유효하나 합성 본문인 사례.)
+# de-locked human_review가 SILVER(학습연료)로 흘러드는 역-누수를 차단하는 명시적 버킷.
+TIER_HELD = "held_review"
+
+# ── 문서 텍스트 출처(document_origin) — 라벨 권위와 직교하는 '본문 실재성' 축 ──────────────
+# real 평가정답·최종 성능근거는 실문서에서만 나온다(capstone F1 0.26 텍스처 갭). 명시 필드가
+# 우선, 없으면 source에서 결정적 유도, 그래도 모르면 unknown(fail-closed).
+ORIGIN_SYNTHETIC = "synthetic"
+ORIGIN_PUBLIC_REAL = "public_real"       # 공개 실문서(판례·금융보고서 등) — 중앙 실텍스트 회귀 근거
+ORIGIN_CUSTOMER_REAL = "customer_real"   # 고객사 실(비식별)문서 — 최종 운영 성능 근거
+ORIGIN_UNKNOWN = "unknown"               # 기본값(fail-closed): 명시·유도 불가 → real 아님
+_VALID_ORIGINS = frozenset({ORIGIN_SYNTHETIC, ORIGIN_PUBLIC_REAL, ORIGIN_CUSTOMER_REAL, ORIGIN_UNKNOWN})
+_REAL_TEXT_ORIGINS = frozenset({ORIGIN_PUBLIC_REAL, ORIGIN_CUSTOMER_REAL})
+# source(본문 태그) → origin 결정적 유도. (콘솔 표시만 깨질 뿐 파일·리터럴은 UTF-8 정상.)
+_SYNTHETIC_ORIGIN_SOURCES = frozenset({"public_scenario", "synthetic_grounded"})
+_CUSTOMER_REAL_ORIGIN_SOURCES = frozenset({"real_deidentified"})
+_PUBLIC_REAL_EXACT_SOURCES = frozenset({"금융보고서"})
+_PUBLIC_REAL_PREFIXES = ("판례",)        # 판례 · 판례(1000+/2000+/3000+) · 판례_공개문서 …
 
 # ── 권위 분류(2026-07-03 감사) — floor tier 안에서도 '실세계 정답'과 '큐레이트 프록시'를 구분한다 ──
 # 외부권위: 라벨 근거가 텍스트 밖 실세계 사실(공개 판결/공시=public_definitive, §9 고시 지정=
@@ -48,7 +74,9 @@ SYNTHETIC_TEXT_SOURCE = "public_scenario"
 _LEGAL_SOURCES = EXTERNAL_AUTHORITY_SOURCES | SYNTHETIC_PROXY_SOURCES
 # 새 게이트(P1) 자동 통과 출처.
 _CANDIDATE_SOURCES = {"rule_llm_agreement"}
-# 사람 아님(머신/플레이스홀더 reviewer) — import_review_corrections._is_machine_reviewer와 정합 유지.
+# 사람 아님(머신/플레이스홀더 reviewer) — 엄격 판정(단일 소스). import_review_corrections.
+# _is_machine_reviewer가 이 함수에 위임해 두 경로(eval/tier·CSV import) 강도를 통일한다.
+# (이전엔 tier 경로가 느슨해 사람형 placeholder[human/reviewer/tbd/system]가 통과하는 구멍이었다.)
 _MACHINE_PREFIXES = (
     "llm_judge",
     "ai_assist",
@@ -66,11 +94,21 @@ _MACHINE_PREFIXES = (
     "bot",
     "judge",
 )
+# 정확매칭 placeholder(사람형 위조 통과 차단) — import 경로와 동일 집합.
+_PLACEHOLDER_REVIEWERS = frozenset(
+    {"", "human", "reviewer", "tbd", "-", "n/a", "na", "system", "ai", "ai_assist",
+     "claude", "unknown", "none", "auto", "bot", "llm"}
+)
+# "aiden" 등 사람이름 오탐 방지: 머신 접두사 뒤 구분자(_/-)를 요구.
+_MACHINE_REVIEWER_PREFIX = re.compile(r"^(ai|llm|gpt|claude|bot|auto)[_\-]")
 
 
 def is_human_reviewer(reviewer_id: object) -> bool:
+    """실계정 사람 검수자인가 — 엄격(placeholder·머신ID 모두 거부, fail-closed)."""
     rid = str(reviewer_id or "").strip().lower()
-    if not rid:
+    if not rid or rid in _PLACEHOLDER_REVIEWERS:
+        return False
+    if "assist" in rid or _MACHINE_REVIEWER_PREFIX.match(rid):
         return False
     return not any(rid.startswith(p) for p in _MACHINE_PREFIXES)
 
@@ -97,11 +135,61 @@ def is_external_authority(record: dict) -> bool:
     return True
 
 
+# 유효 서명(envelope) — promote_to_locked만 스탬프하는 gate_version/서명시각/독립검수자 목록을
+# 묶어 검증한다. gate_version '존재'만 보면 파일에 값을 써넣어 우회 가능하므로 세 필드를 함께
+# 요구한다(단, 세 값을 모두 손으로 위조하는 결정적 공격은 감사이벤트 대조[P1]로만 완전차단 —
+# 여기선 손편집·correction-import 민팅·placeholder를 닫는다).
+SUPPORTED_GATE_VERSIONS = frozenset({"human_signoff_v1"})  # golden_signoff.SIGNOFF_GATE_VERSION와 일치
+
+
+def is_valid_signoff(record: dict) -> bool:
+    """레코드가 인증 서명 envelope(promote_to_locked 산출)를 온전히 갖췄는가."""
+    if record.get("label_source") != "human_review":
+        return False
+    if not is_human_reviewer(record.get("reviewer_id")):
+        return False
+    if record.get("gate_version") not in SUPPORTED_GATE_VERSIONS:
+        return False
+    if not str(record.get("signed_at") or "").strip():
+        return False
+    rids = record.get("reviewer_ids")
+    return isinstance(rids, (list, tuple)) and len(rids) > 0
+
+
+def document_origin(record: dict) -> str:
+    """본문 실재성 축. 명시 document_origin 우선 → source에서 결정적 유도 → unknown(fail-closed)."""
+    explicit = str(record.get("document_origin") or "").strip()
+    if explicit in _VALID_ORIGINS and explicit != ORIGIN_UNKNOWN:
+        return explicit
+    src = str(record.get("source") or "").strip()
+    if src in _SYNTHETIC_ORIGIN_SOURCES:
+        return ORIGIN_SYNTHETIC
+    if src in _CUSTOMER_REAL_ORIGIN_SOURCES:
+        return ORIGIN_CUSTOMER_REAL
+    if src in _PUBLIC_REAL_EXACT_SOURCES or any(src.startswith(p) for p in _PUBLIC_REAL_PREFIXES):
+        return ORIGIN_PUBLIC_REAL
+    return ORIGIN_UNKNOWN
+
+
+def is_real_text_origin(record: dict) -> bool:
+    """본문이 실문서(공개 실문서·고객 실문서)인가 — 합성/unknown은 False."""
+    return document_origin(record) in _REAL_TEXT_ORIGINS
+
+
+def is_real_locked_eval(record: dict) -> bool:
+    """real 평가정답 = 유효 서명 + 실문서 출처. eval pool·readiness가 세는 유일 기준."""
+    return is_valid_signoff(record) and is_real_text_origin(record)
+
+
 def tier_of(record: dict) -> str:
-    """레코드의 논리 tier를 파생. label_source 우선, locked는 사람 서명까지 요구."""
+    """레코드의 논리 tier를 파생.
+
+    human_review는 유효 서명(envelope)까지 요구하고, 못 넘으면 TIER_HELD로 격리한다 —
+    SILVER(학습연료)로 흘러들지 않게(역-누수 차단). locked tier(서명 유효)라도 '실문서 출처'까지
+    갖춰야 real 평가정답으로 집계된다(is_real_locked_eval; eval_records/eval_readiness가 강제)."""
     src = record.get("label_source")
-    if src == "human_review" and is_human_reviewer(record.get("reviewer_id")):
-        return TIER_LOCKED
+    if src == "human_review":
+        return TIER_LOCKED if is_valid_signoff(record) else TIER_HELD
     if src in _LEGAL_SOURCES:
         return TIER_LEGAL_FLOOR
     if src in _CANDIDATE_SOURCES or record.get("review_status") == "gold_candidate":
@@ -111,7 +199,7 @@ def tier_of(record: dict) -> str:
 
 def partition_by_tier(records: Sequence[dict]) -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {
-        TIER_LOCKED: [], TIER_LEGAL_FLOOR: [], TIER_CANDIDATE: [], TIER_SILVER: [],
+        TIER_LOCKED: [], TIER_LEGAL_FLOOR: [], TIER_CANDIDATE: [], TIER_SILVER: [], TIER_HELD: [],
     }
     for r in records:
         out[tier_of(r)].append(r)
@@ -125,16 +213,21 @@ def eval_records(
 
     호출부는 반환된 tier가 legal_floor면 '템플릿 recall·일반화 아님'을 명시해 릴리스 게이트로만 쓴다.
     """
-    locked = [r for r in records if tier_of(r) == TIER_LOCKED]
+    locked = [r for r in records if is_real_locked_eval(r)]  # 서명 유효 + 실문서 출처만
     if locked or not allow_floor_fallback:
         return locked, TIER_LOCKED
     floor = [r for r in records if tier_of(r) == TIER_LEGAL_FLOOR]
     return floor, TIER_LEGAL_FLOOR
 
 
+# 학습 허용 tier(allowlist, fail-closed). LOCKED(평가정답)·HELD(격리)·미래 미지 tier는 기본 제외 —
+# de-locked human_review가 `!= LOCKED` denylist로 학습에 새어들던 역효과를 원천 차단한다.
+TRAIN_TIERS = frozenset({TIER_SILVER, TIER_CANDIDATE, TIER_LEGAL_FLOOR})
+
+
 def train_records(records: Sequence[dict]) -> list[dict]:
-    """학습 = silver + candidate + legal_floor. locked(평가 정답)는 절대 제외(train-on-test 차단)."""
-    return [r for r in records if tier_of(r) != TIER_LOCKED]
+    """학습 = silver + candidate + legal_floor(allowlist). locked·held는 절대 제외(train-on-test·역누수 차단)."""
+    return [r for r in records if tier_of(r) in TRAIN_TIERS]
 
 
 # locked_gold_eval이 '실(real) 평가'로 인정되는 등급별 최소 표본 (readiness 기준).

@@ -108,14 +108,20 @@ def test_locked_readiness_missing_file_is_no_locked(tmp_path):
     assert s["reason"] == "no_locked_records"
 
 
+def _locked_rec(g, reviewer="alice"):
+    # 유효 서명 envelope(gate_version·signed_at·reviewer_ids) + 실문서 출처(판례=public_real).
+    return {
+        "label": g, "label_source": "human_review", "reviewer_id": reviewer,
+        "reviewer_ids": [reviewer], "gate_version": "human_signoff_v1",
+        "signed_at": "2026-09-10T00:00:00+00:00", "source": "판례",
+    }
+
+
 def test_locked_readiness_counts_locked_per_grade(tmp_path):
-    # 사람서명(label_source=human_review + 사람 reviewer)만 locked로 인정.
-    recs = []
-    for g in ("TS", "S1", "S2", "S3"):
-        for _ in range(5):
-            recs.append({"label": g, "label_source": "human_review", "reviewer_id": "alice"})
-    # 머신 reviewer 1건은 locked 아님(무시돼야).
-    recs.append({"label": "TS", "label_source": "human_review", "reviewer_id": "llm_judge_1"})
+    # 유효 서명(envelope) + 실문서 출처를 갖춘 human_review만 real 평가정답(locked)으로 인정.
+    recs = [_locked_rec(g) for g in ("TS", "S1", "S2", "S3") for _ in range(5)]
+    # 머신 reviewer 1건은 유효 서명 아님 → locked 아님(무시돼야).
+    recs.append(_locked_rec("TS", reviewer="llm_judge_1"))
     p = _write_jsonl(tmp_path / "locked.jsonl", recs)
     s = locked_eval_readiness(path=p, min_per_grade=5)
     assert s["ready"] is True

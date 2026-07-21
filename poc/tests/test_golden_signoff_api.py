@@ -49,9 +49,9 @@ def _h(role="reviewer", key=None):
 # ────────────────────────────── 서비스 단위 ──────────────────────────────
 def test_apply_signoff_approve_change_reject(tmp_path):
     docs = [
-        {"doc_id": "a", "text": "ts문서 내용"},
-        {"doc_id": "b", "text": "s1문서 내용"},
-        {"doc_id": "c", "text": "s2문서 내용"},
+        {"doc_id": "a", "text": "ts문서 내용", "source": "판례"},
+        {"doc_id": "b", "text": "s1문서 내용", "source": "판례"},
+        {"doc_id": "c", "text": "s2문서 내용", "source": "판례"},
     ]
     job_id = _make_job(tmp_path, docs)
     svc = GoldenBuildService()
@@ -132,7 +132,7 @@ def test_publish_reaches_deploy_gate_consumer(tmp_path, monkeypatch):
 
     from lloydk.modules.m6_evaluation.locked_readiness import locked_eval_readiness
 
-    job_id = _make_job(tmp_path / "run", [{"doc_id": "a", "text": "ts문서"}])
+    job_id = _make_job(tmp_path / "run", [{"doc_id": "a", "text": "ts문서", "source": "판례"}])
     result = GoldenBuildService().apply_signoff(
         _uuid.UUID(job_id),
         [GoldenSignoffDecision(doc_id="a", decision="approve")],

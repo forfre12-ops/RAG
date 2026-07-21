@@ -11,7 +11,8 @@ from lloydk.modules.m6_evaluation.locked_readiness import locked_eval_readiness
 
 
 def _cand(doc_id, grade):
-    return {"doc_id": doc_id, "text": f"{doc_id} 본문", "label": grade,
+    # source=판례 → document_origin=public_real → 서명 시 real_locked_eval(실문서 서명) 성립.
+    return {"doc_id": doc_id, "text": f"{doc_id} 본문", "label": grade, "source": "판례",
             "label_source": "rule_llm_agreement", "review_status": "gold_candidate"}
 
 
@@ -110,12 +111,12 @@ def test_stats_breakdown():
 def test_merge_locked_records_dedup_and_filters():
     locked = promote_to_locked(
         [_cand("d1", "TS"), _cand("d2", "S1")],
-        [Signoff("d1", "admin_kim", "TS"), Signoff("d2", "admin_lee", "S1")],
+        [Signoff("d1", "admin_kim", "TS", "2026-09-10"), Signoff("d2", "admin_lee", "S1", "2026-09-10")],
     ).locked
     # 재승급(d1 등급 정정) + 신규(d3) + 비-locked 오염 레코드(candidate) 섞어 병합.
     new = promote_to_locked(
         [_cand("d1", "S1"), _cand("d3", "S2")],
-        [Signoff("d1", "admin_park", "S1"), Signoff("d3", "admin_kim", "S2")],
+        [Signoff("d1", "admin_park", "S1", "2026-09-11"), Signoff("d3", "admin_kim", "S2", "2026-09-11")],
     ).locked
     merged = merge_locked_records(locked + [_cand("dX", "TS")], new)
     by_id = {r["doc_id"]: r for r in merged}
@@ -135,7 +136,7 @@ def test_signoff_publish_read_loop_closes(tmp_path):
     assert locked_eval_readiness(path=str(dest), min_per_grade=1)["reason"] == "no_locked_records"
 
     cands = [_cand(f"d{i}", g) for i, g in enumerate(("TS", "S1", "S2", "S3"))]
-    signs = [Signoff(f"d{i}", "admin_kim", g) for i, g in enumerate(("TS", "S1", "S2", "S3"))]
+    signs = [Signoff(f"d{i}", "admin_kim", g, "2026-09-10") for i, g in enumerate(("TS", "S1", "S2", "S3"))]
     locked = promote_to_locked(cands, signs).locked
     merged = merge_locked_records([], locked)
     dest.write_text(

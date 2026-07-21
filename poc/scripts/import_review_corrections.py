@@ -45,6 +45,8 @@ if str(_SRC) not in sys.path:
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
+from lloydk.golden_tiers import is_human_reviewer  # noqa: E402  (sys.path 설정 후 import)
+
 VALID_LABELS = {"TS", "S1", "S2", "S3"}
 VALID_DECISIONS = {"correct", "corrected", "rejected", "uncertain"}
 
@@ -93,12 +95,10 @@ _MACHINE_REVIEWER_PREFIX = re.compile(r"^(ai|llm|gpt|claude|bot|auto)[_\-]")
 
 
 def _is_machine_reviewer(reviewer_id: str) -> bool:
-    r = reviewer_id.strip().lower()
-    return (
-        r in _PLACEHOLDER_REVIEWERS
-        or "assist" in r
-        or bool(_MACHINE_REVIEWER_PREFIX.match(r))
-    )
+    # 엄격 판정 단일화(2026-07-22): golden_tiers.is_human_reviewer에 위임 — eval/tier 경로와 CSV
+    # import 경로가 동일 규칙(placeholder·머신ID 거부)을 쓰도록. (위 로컬 _PLACEHOLDER_REVIEWERS·
+    # _MACHINE_REVIEWER_PREFIX 는 golden_tiers 와 동일 내용의 참고용 — 판정은 단일 소스로 위임.)
+    return not is_human_reviewer(reviewer_id)
 
 
 def validate_record(row: dict, idx: int) -> tuple[dict | None, list[str]]:
@@ -186,9 +186,13 @@ def merge_into_gold(records: list[dict], dry_run: bool, *, as_candidate: bool = 
 
     기존 doc_id(보통 llm_judge pseudo 라벨)는 SKIP하지 않고 human_review로
     '승격'한다. 휴먼 라벨이 최상위 권위이므로 같은 문서를 사람이 검수하면
-    label_source가 human_review로 바뀌어야 readiness 게이트가 이를 인식한다.
-    (예전 append-only + SKIP 동작은 큐가 기존 gold 문서로 구성되는 탓에
-    human_review 레코드를 0건만 만들어 게이트가 영원히 BLOCKED였다.)
+    label_source가 human_review로 바뀐다.
+
+    ⚠️ 계약(2026-07-22): CSV import는 인증 서명 envelope(gate_version·signed_at·reviewer_ids)를
+    스탬프하지 않으므로, 여기서 만든 human_review 레코드는 golden_tiers.tier_of가 TIER_HELD로
+    격리한다(평가정답 아님·학습 금지). real 평가정답(locked_gold_eval) 승격은 오직 인증 서명
+    경로(promote_to_locked / POST /golden/jobs/{id}/signoff)로만 이뤄진다 — CSV가 곧 eval 진실이
+    되던 구멍을 tier 게이트에서 닫는다. (본문이 실문서여야 real 집계됨: document_origin.)
     """
     mergeable = [
         r for r in records

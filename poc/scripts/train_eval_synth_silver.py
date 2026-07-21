@@ -38,15 +38,19 @@ def _record_key(r: dict) -> tuple[str, str]:
     return (str(r.get("doc_id") or ""), str(r.get("text_hash") or ""))
 
 
-def _locked_eval_keys(gold_path: str | Path) -> set[tuple[str, str]]:
-    from lloydk.golden_tiers import TIER_LOCKED, tier_of
+def _non_train_keys(gold_path: str | Path) -> set[tuple[str, str]]:
+    """학습에서 제외할 gold 키 = 학습 불가 tier(LOCKED 평가정답 + HELD 격리).
+
+    denylist(`== TIER_LOCKED`)를 allowlist(`not in TRAIN_TIERS`)로 전환 — de-locked
+    human_review가 HELD가 되며 학습으로 새어들던 역-누수를 차단(golden_tiers TRAIN_TIERS와 정합)."""
+    from lloydk.golden_tiers import TRAIN_TIERS, tier_of
 
     if not Path(gold_path).exists():
         return set()
     return {
         _record_key(r)
         for r in load(gold_path)
-        if tier_of(r) == TIER_LOCKED and any(_record_key(r))
+        if tier_of(r) not in TRAIN_TIERS and any(_record_key(r))
     }
 
 
@@ -65,13 +69,13 @@ def convert_and_split(silver_run, work_dir, val_frac=0.15, *, gold_path=None, al
             f"{split_path} not found. Run scripts/run_golden_split_signoff.py first "
             "or pass --allow-build-fallback explicitly."
         )
-    locked_keys = _locked_eval_keys(gold_path) if gold_path else set()
+    excluded_keys = _non_train_keys(gold_path) if gold_path else set()
     rows = [
         {"text": r["text"], "label": r.get("label") or r.get("llm_grade")}
         for r in source_rows
         if (r.get("label") or r.get("llm_grade"))
         and r.get("text")
-        and _record_key(r) not in locked_keys
+        and _record_key(r) not in excluded_keys
     ]
     by = {}
     for r in rows:
