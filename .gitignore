@@ -144,3 +144,19 @@ poc/scripts/_*.py
 poc/scripts/_*.json
 # 참고용 클라이언트 PDF (기밀 — 트래킹 금지)
 doc/*.pdf
+
+# ── 배포 전 위생 하드닝 (2026-07-22) ──────────────────────────────
+# 루트 로컬스토리지: 운영 문서 원본(documents-raw 평문)+정규화본+codex 운영점검 산출물.
+# `git add -A` 한 번에 고객 영업비밀 원본이 커밋·푸시되는 유출 벡터 차단. (poc/.storage/ 는 이미 위 30행)
+/.storage/
+# 골든 빌더 run-스코프 출력(build_*/uncertain_*) — 정본 아님·재생성 가능. 정본 regate_* 는 계속 추적.
+poc/datasets/gold_real/builds/build_*.jsonl
+poc/datasets/gold_real/builds/uncertain_*.jsonl
+# 일회성 실험 학습셋 (_exp_ 접두 = throwaway 컨벤션, 정본 아님)
+poc/datasets/_exp_*.jsonl
+# 데모 파서 샘플용 실 정부문서(KOGL 공고·제안요청서 HWP/HWPX/PDF, 대용량). 웹서빙 static 트리라
+# 부주의 커밋·서빙 노출 차단 — 필요 시 개별 `git add -f`. 추적 픽스처는 success_*.docx/.xlsx 뿐이라
+# 확장자 글롭이 안전(그 외 pdf/hwp/hwpx는 전부 커밋 대상 아닌 실문서).
+poc/src/lloydk/api/static/samples/*.hwp
+poc/src/lloydk/api/static/samples/*.hwpx
+poc/src/lloydk/api/static/samples/*.pdf
