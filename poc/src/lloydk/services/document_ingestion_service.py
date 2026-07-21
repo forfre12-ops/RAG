@@ -359,6 +359,10 @@ class DocumentIngestionService:
             # 멱등 적재: 동일 file_hash 문서가 이미 있으면 재사용(같은 바이트=같은 문서).
             # 재업로드가 UNIQUE(idx_doc_hash) 위반으로 persisted=False(doc_id=null) 나던 것을
             # 방지 — 기존 doc_id 를 반환해 시연 반복(같은 샘플 재전송)을 허용한다.
+            # [한계] 조회는 created_by 스코프 없는 전역 file_hash 매칭 — 데모가 실문서와 동일
+            # 바이트를 올리면 실 doc_id(다른 created_by)를 반환할 수 있어, 이후 데모 purge
+            # (created_by='demo-console')가 그 문서를 못 지운다. 데모 샘플=공개문서라 실 고객비밀
+            # 과의 바이트 충돌은 사실상 없어 수용 가능하나, 데모↔실 경계가 전역해시로 뚫릴 수 있음.
             if file_hash:
                 from sqlalchemy import select as _sel  # noqa: PLC0415
 

@@ -134,6 +134,13 @@ def rag_search(request: Request, req: RagAnswerRequest) -> dict:
 
     검수 화면에서 '이 문서와 비슷한 과거 문서'를 제시해 검수자 판단을 돕는 용도.
     /answer 와 달리 LLM 을 호출하지 않는다(요건: RAG=검색, 답변생성은 요건외).
+
+    [보안 결정 — 등급 ACL 없음, 단일 고객사 신뢰경계] 인증(require_auth)만 요구하고 등급별
+    접근제어는 두지 않는다. 반환 payload 에 청크 원문(text)이 그대로 담기므로 인증된 주체는
+    TS/S1 등급 문서 청크도 검색·열람할 수 있다. 이는 배포 전제(단일 고객사 폐쇄망·상류 KL 포털
+    격리)에서 의도된 설계다 — 동일 주체가 /documents·/classify 로도 같은 문서에 접근 가능하므로
+    신규 권한상승이 아니다. 향후 다중검수자·최소권한이 필요해지면 검색 결과에 등급/컬렉션
+    화이트리스트 필터를 도입할 것(요건 변경 시).
     """
     t0 = time.perf_counter()
     hits = _fetch_hits(req)
