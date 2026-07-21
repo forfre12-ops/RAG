@@ -286,6 +286,11 @@ def dashboard() -> DashboardResponse:
 #   (스토어가 pgvector 아니면 tb_rag_vectors 미존재 — 무해 skip). admin 전용.
 DEMO_CREATED_BY = "demo-console"   # 데모 실적재 문서 마커 (parse_demo actor.user_id 와 일치)
 DEMO_RAG_COLLECTION = "demo"       # 데모 업로드 RAG 색인 컬렉션 (평가 'docs' 오염 분리)
+# [SEC-4] blast-radius 안전캡 — 데모는 소수 문서다. 삭제 대상이 이 수를 크게 넘으면 실 데이터가
+# 데모 마커(created_by='demo-console')로 오태깅됐을 신호로 보고 물리삭제를 거부(fail-safe·409).
+# created_by 가 클라이언트 제어 값(업로드 actor.user_id)이라 원리상 오염 가능한 데 대한 2차 방어 —
+# 스코프(1차)·demo_console_enabled(운영 비활성)에 더해 '대량 오삭제 절대 금지' 하한.
+DEMO_PURGE_MAX_DOCS = 1000
 
 
 class DemoPurgeResponse(BaseModel):
@@ -322,6 +327,31 @@ def purge_demo_data() -> DemoPurgeResponse:
     counts = {"documents": 0, "classifications": 0, "chunks": 0, "rag_vectors": 0}
     _sub = "SELECT doc_id FROM tb_documents WHERE created_by = :marker"
     _m = {"marker": DEMO_CREATED_BY}
+
+    # [SEC-4] blast-radius 안전캡 — 삭제 전에 스코프 규모만 읽는다. 데모 규모를 크게 넘으면
+    # (실 데이터가 데모 마커로 오태깅됐을 신호) 어떤 삭제도 하지 않고 거부한다(fail-safe).
+    # count 는 별도 read 블록에서 끝내고, 거부는 context manager 밖에서 raise(예외처리 모호성 제거).
+    with session_scope() as db:
+        n_scoped = int(
+            db.execute(
+                _sql("SELECT count(*) FROM tb_documents WHERE created_by = :marker"), _m
+            ).scalar()
+            or 0
+        )
+    if n_scoped > DEMO_PURGE_MAX_DOCS:
+        logger.warning(
+            "demo purge REFUSED: created_by=%s 스코프 %d건 > 안전캡 %d (오태깅 의심)",
+            DEMO_CREATED_BY, n_scoped, DEMO_PURGE_MAX_DOCS,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"demo purge refused: created_by='{DEMO_CREATED_BY}' 스코프 문서 {n_scoped}건이 "
+                f"안전캡 {DEMO_PURGE_MAX_DOCS}건을 초과. 실 데이터가 데모 마커로 오태깅됐을 수 "
+                "있어 대량 물리삭제를 거부합니다. 스코프를 확인하거나 DB 에서 수동 처리하세요."
+            ),
+        )
+
     # 관계형 물리삭제 — 원자적(하나라도 실패하면 전체 롤백).
     relational = [
         ("classifications", f"DELETE FROM tb_classifications WHERE doc_id IN ({_sub})"),
