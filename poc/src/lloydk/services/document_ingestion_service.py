@@ -363,9 +363,16 @@ class DocumentIngestionService:
                 from sqlalchemy import select as _sel  # noqa: PLC0415
 
                 from lloydk.db.models import Document as _Doc  # noqa: PLC0415
-                existing = session.execute(
-                    _sel(_Doc.doc_id).where(_Doc.file_hash == file_hash)
-                ).scalar_one_or_none()
+                # 멱등 조회는 최적화일 뿐 — 실패해도 persist 전체를 죽이지 않고 create 로 진행한다
+                # (실패 시 기존 UNIQUE-충돌 동작으로 복귀). 조회 예외가 broad except 로 새어나가
+                # persisted=False·doc_id=None(무음 적재실패)이 되는 것을 국소 try/except 로 차단.
+                existing = None
+                try:
+                    existing = session.execute(
+                        _sel(_Doc.doc_id).where(_Doc.file_hash == file_hash)
+                    ).scalar_one_or_none()
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("멱등 file_hash 조회 skip (비critical, create 로 진행): %s", exc)
                 if existing is not None:
                     return existing
             doc = DocumentRepo(session).create(
