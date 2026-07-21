@@ -45,12 +45,13 @@ def test_demo_index_returns_html(client):
     assert "KOIPA AI" in r.text
     assert "로이드케이" in r.text
     # 신규 와우 컴포넌트가 마크업에 존재
-    assert 'id="toggle-row"' in r.text  # 와우 A 키워드 토글
-    assert 'class="race"' in r.text  # 와우 B 시간 경쟁
-    assert 'id="legal-grid"' in r.text  # 와우 C 법령
-    assert 'id="fnr-sequence"' in r.text  # 와우 D 사고 시뮬
-    assert 'id="capability-stats"' in r.text  # 와우 E stats
-    assert 'id="profile-grid"' in r.text  # §6 배포
+    assert 'id="toggle-row"' in r.text  # 와우 A 키워드 토글 (정적)
+    assert 'class="race"' in r.text  # 와우 B 시간 경쟁 (정적)
+    assert 'id="legal-grid"' in r.text  # 와우 C 법령 (정적)
+    # 와우 D(fnr-sequence 사고 시뮬)·E(capability-stats)·§6(profile-grid)은 b774e3d 이후
+    # app.js 클라이언트 주입이라 정적 GET 응답엔 없다 — 정적 HTML 마커가 아니므로 단언하지
+    # 않고, 동적 컴포넌트 렌더 스크립트 존재로 대체(정적 마커만 검증).
+    assert './app.js' in r.text
 
 
 def test_demo_styles_css(client):
