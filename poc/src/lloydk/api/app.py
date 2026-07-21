@@ -239,7 +239,9 @@ def _warmup_models(settings_obj) -> None:
     # 미탐 위험). config.assert_production_credentials 는 경로 '존재'만 보고 로드 성공(_model) 여부는
     # 안 봐서 이 열화가 startup 을 통과했다 — 형제 게이트 require_real_embedder 와 동일하게 warmup 에서
     # fail-clear 로 막는다. 부수효과로 분류기 cold-start(가중치 로드)를 startup 에서 1회 흡수한다.
-    # 모델 dir 미해석(rule-fallback 의도)은 대상 아님 — 로드-실패 폴백 경로에서만 작동.
+    # 모델 dir 미해석(부재)은 fail-clear 대상 아님 — 의도적 rule-only 옵트아웃 경로를 보존한다
+    # (계약: test_warmup_ok_when_no_model_dir_is_rule_fallback_intent). 단 [CFG-2] 하드닝 운영(full)
+    # 에선 무음 rule-fallback 을 WARNING 으로 남겨 오구성을 가시화한다(부팅은 막지 않음).
     if getattr(settings_obj, "require_real_classifier", False):
         try:
             from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
@@ -257,6 +259,18 @@ def _warmup_models(settings_obj) -> None:
                 "로드 실패로 rule-fallback-v0 서빙 상태입니다(무음 미탐·미보정 위험). 모델 아티팩트/"
                 "config.id2label 를 확인하거나, rule-fallback 이 의도면 REQUIRE_REAL_CLASSIFIER=0 을 "
                 "명시하세요(하드닝 비권장)."
+            )
+        # [CFG-2] 모델 dir 자체가 미해석(env CLASSIFIER_MODEL_DIR 미설정 + 활성 ModelVersion 없음)이면
+        # 로드-실패가 아니라 '분류기 부재'로 rule-fallback-v0 무음 서빙이다. 이는 의도적 rule-only
+        # 옵트아웃 경로(REQUIRE_REAL_CLASSIFIER=0 없이도 dir 부재 허용)라 fail-clear 하지 않는다 —
+        # 그 계약은 test_warmup_ok_when_no_model_dir_is_rule_fallback_intent 로 고정돼 있다. 다만
+        # 하드닝 프로파일(require_real_classifier=True)의 운영(full)에서 분류기 부재는 거의 항상
+        # 오구성(CLASSIFIER_MODEL_DIR 누락)이므로, 부팅은 막지 않되 무음 열화를 눈에 띄게 경고한다.
+        if model_dir is None and getattr(settings_obj, "poc_mode", "full") == "full":
+            logger.warning(
+                "require_real_classifier=True 인데 분류기 모델 dir 미해석(CLASSIFIER_MODEL_DIR "
+                "미설정+활성 ModelVersion 없음) — rule-fallback-v0 무음 서빙 중(고등급 미탐·미보정 "
+                "위험). 실 분류기 배포면 CLASSIFIER_MODEL_DIR 설정 또는 활성 ModelVersion 시드 필요."
             )
         logger.info("classifier warmup ok — model_dir=%s loaded=%s", model_dir, loaded)
     if settings_obj.reranker_provider not in ("", "noop"):
