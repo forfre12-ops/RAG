@@ -1345,12 +1345,12 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <tbody>
             <tr><td class="td-code"><b>v4_step3 train (현 배포)</b></td><td class="td-center">2,247</td><td class="td-center">5,809</td><td class="td-center">589</td><td class="td-center">5,816</td><td class="td-center"><b>14,461</b></td></tr>
             <tr><td class="td-code">└ patent_proxy (진짜 특허 투입분)</td><td class="td-center">1,800</td><td class="td-center">5,400</td><td class="td-center">0</td><td class="td-center">0</td><td class="td-center"><b>7,200</b></td></tr>
-            <tr><td class="td-code">gold_real (평가셋)</td><td class="td-center">55</td><td class="td-center">70</td><td class="td-center">232</td><td class="td-center">420</td><td class="td-center"><b>777</b></td></tr>
+            <tr><td class="td-code">gold_real (평가셋)</td><td class="td-center">55</td><td class="td-center">56</td><td class="td-center">89</td><td class="td-center">577</td><td class="td-center"><b>777</b></td></tr>
             <tr><td class="td-code">gold_real/holdout (디오염 평가)</td><td class="td-center">17</td><td class="td-center">19</td><td class="td-center">30</td><td class="td-center">43</td><td class="td-center"><b>109</b></td></tr>
           </tbody>
         </table>
       </div>
-      <p style="font-size:12.5px;color:var(--text-soft);">평가셋(gold_real)은 S3(공개)가 54%로 가장 많고 TS(특급)가 7%로 가장 적습니다 — 실제 문서 분포가 공개 자료에 치우친 결과. 학습셋은 합성으로 4등급을 인위적 균형 처리.</p>
+      <p style="font-size:12.5px;color:var(--text-soft);">평가셋(gold_real)은 S3(공개)가 74%로 가장 많고 TS(특급)가 7%로 가장 적습니다 — 실제 문서가 공개 자료에 치우친 데다 2026-07-22 판례-프록시 디오염(공개 판례 157건→S3)을 반영한 결과. 학습셋은 합성으로 4등급을 인위적 균형 처리.</p>
 
       <div class="callout info">
         <span class="callout-icon">🏅</span>

@@ -137,7 +137,7 @@ footer strong{color:var(--text-dim);}
   <p><b>채점</b> : 정답 vs 예측 혼동행렬 → F1-macro + <b>방향성 미탐(FNR_underclass)</b>. 심각도순 <code>TS &lt; S1 &lt; S2 &lt; S3</code>에서 <i>정답보다 낮은 등급으로 예측한 것만</i> 미탐으로 셈(과분류는 보안상 안전오류라 제외). TS&rarr;S3 같은 치명 미탐은 1건만 있어도 critical 알람.</p>
   <p><b>실측</b> : 출처직결 라벨(public·nkt)은 F1 0.83·TS/S1 recall&asymp;1.0이지만, 진짜 실문서(llm_judge holdout)는 F1 0.63·<b>S1 recall 0.26~0.32로 붕괴</b>. 운영 미탐 0.018은 모델이 아니라 <b>서빙 룰/게이트</b>(FNR-safe override·most-severe 집계)가 막아낸 값.</p>
   <div class="callout inset"><div class="callout-label">라벨 신뢰도(label_source) — ★★★★★는 0건</div>
-    <p>llm_judge_primary 524 · koipa_case_based 81 · llm_judge_consensus 67 · public_definitive 50 · nkt_designated 36 · codex_review 19 · <b>human_review 0</b>. 등급분포 S3 420 · S2 232 · <b>S1 70 · TS 55(고등급 16%)</b>. 정답이 사람검증이 아니라 룰+LLM 합의라 <code>target_grade_oss</code>와 불일치도 존재.</p></div>
+    <p>llm_judge_primary 524 · koipa_case_based 81 · llm_judge_consensus 67 · public_definitive 50 · nkt_designated 36 · codex_review 19 · <b>human_review 0</b>. 등급분포 S3 577 · S2 89 · <b>S1 56 · TS 55(고등급 14%)</b>(2026-07-22 판례-프록시 디오염 후). 정답이 사람검증이 아니라 룰+LLM 합의라 <code>target_grade_oss</code>와 불일치도 존재.</p></div>
 
   <h2>② 검색 골든셋 (retrieval, 80 + NL 190)</h2>
   <p><b>의미</b> : "질의 &rarr; 나와야 할 정답 문서" 쌍(현재 질의당 정답 1건). <code>relevant_doc_ids</code>를 상위 k에 회수하면 성공.</p>
@@ -191,7 +191,7 @@ footer strong{color:var(--text-dim);}
       <tr><td>데이터 위생</td><td>누출게이트·순환성·무결성가드 강화</td><td>—</td><td class="center"><span class="tag done">완료</span></td></tr>
       <tr><td>추가 도구(빌더)</td><td>구현·푸시</td><td>(선택) 검토본 엔드포인트</td><td class="center"><span class="tag done">완료</span></td></tr>
       <tr><td><b>사람검증 locked</b></td><td><b>0건</b></td><td>운영 관리자 확정 또는 별도 사람서명</td><td class="center"><span class="tag dep">운영 루프</span></td></tr>
-      <tr><td><b>고등급 데이터</b></td><td>S1 70·TS 55 (16%)</td><td>실 S1/TS 확보(합성 불가)</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+      <tr><td><b>고등급 데이터</b></td><td>S1 56·TS 55 (14%)</td><td>실 S1/TS 확보(합성 불가)</td><td class="center"><span class="tag dep">발주처</span></td></tr>
       <tr><td>규모/균형</td><td>777</td><td>1,000+</td><td class="center"><span class="tag wip">정밀화</span></td></tr>
       <tr><td>답변셋</td><td>0</td><td>후순위 구축</td><td class="center"><span class="tag plan">예정</span></td></tr>
     </tbody>
