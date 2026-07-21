@@ -281,7 +281,7 @@ python scripts/cache_kure_v1.py --dry-run  # 캐시 존재 여부만 확인
 - `make release-gate` is stricter and currently blocks release until at least 40 `human_review` gold samples are added.
 - `test-lite` is the fast non-fullstack suite; exact pass counts move as audit/regression tests are added.
 - CI default pytest path now runs `make test-lite`; slow/fullstack/model_download suites are separated as explicit Make targets.
-- `gold_real` now has 777 records: S3 420, S2 232, S1 70, TS 55. `human_review` is 1/40 and remains the main evidence gap.
+- `gold_real` now has 777 records: S3 577, S2 89, S1 56, TS 55 (after the 2026-07-22 court-proxy depollution — 157 public-ruling LLM-proxy over-labels corrected to S3 via `scripts/depollute_court_proxy_gold.py`; corrected rows stay `silver_train`, eval-truth unchanged). `human_review` is 1/40 and remains the main evidence gap.
 
 ## Release Gates (2026-07-05)
 
