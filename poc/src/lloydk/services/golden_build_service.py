@@ -160,6 +160,18 @@ class GoldenBuildService:
                 require_evidence=req.require_evidence,
             )
             gold_path, unc_path = self._write_outputs(req, job_id, result)
+            # 도메인→등급 shortcut 누출 가시화(플래그+로그 전용, 하드-드롭 없음, 실패-안전).
+            # gold(=학습 silver 후보)가 '도메인이 등급을 결정'하는 shortcut을 얼마나 담는지
+            # stats에 verdict로 남겨 승격/검수 판단에 노출한다(무음 통과 방지).
+            leak = self._domain_leakage_verdict(result.gold)
+            if leak is not None:
+                result.stats["domain_leakage_gate"] = leak
+                if leak.get("blocked"):
+                    logger.warning(
+                        "golden_build 누출경고: job_id=%s 도메인->등급 shortcut 의심(%s) "
+                        "— 플래그+로그만(드롭 안 함). 승격/검수 시 주의.",
+                        job_id, leak.get("reason"),
+                    )
             self.jobs.update(
                 job_id,
                 status="done",
@@ -375,6 +387,32 @@ class GoldenBuildService:
                 if t:
                     texts.append(t)
         return texts
+
+    def _domain_leakage_verdict(self, gold_records) -> "Optional[dict]":
+        """도메인->등급 shortcut 누출 판정(순수·실패-안전). verdict dict 또는 None.
+
+        check_domain_leakage_gate.domain_leakage_verdict + analyze_golden_run.domain_leakage
+        (기존 CLI/빌드 게이트와 **동일 출처**)를 런타임 import로 재사용한다 — 지표 로직을
+        서비스에 복제하지 않아 임계·정의 divergence를 방지. text 중복 dedup(dropped_leaked)과는
+        별개 축(도메인→등급 shortcut)이다. 계산 실패는 빌드를 막지 않고 warning으로만 남긴다.
+        """
+        try:
+            rows = [r.to_dict() if hasattr(r, "to_dict") else r for r in gold_records]
+            if not rows:
+                return None
+            import sys  # noqa: PLC0415
+            scripts_dir = _POC_ROOT / "scripts"
+            if str(scripts_dir) not in sys.path:
+                sys.path.insert(0, str(scripts_dir))
+            from analyze_golden_run import domain_leakage  # noqa: PLC0415
+            from check_domain_leakage_gate import domain_leakage_verdict  # noqa: PLC0415
+
+            return domain_leakage_verdict(domain_leakage(rows))
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "domain_leakage 게이트 계산 실패 — 스킵(빌드 계속)", exc_info=True
+            )
+            return None
 
     def _write_outputs(
         self, req: GoldenBuildRequest, job_id: uuid.UUID, result: GoldenBuildResult,

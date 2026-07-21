@@ -69,7 +69,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
     "onprem-local": {
         "llm_provider": "ollama",
         "embedding_provider": "hf",
-        "reranker_provider": "bge",
+        # reranker: 실측 recall 무개선·CPU 지연 5배 → 폐쇄망 기본 noop (필요시 프로파일서 명시적 bge)
+        "reranker_provider": "noop",
         "vector_backend": "pg",
         # 폐쇄망=로컬FS(file://) — 2026-06-24 결정(MinIO 미사용, 원본만 EncryptingStorage 래핑).
         # 이전 'minio' 기본은 결정과 모순되는 드리프트였다.
@@ -117,7 +118,8 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
     "full-train": {
         "llm_provider": "anthropic",
         "embedding_provider": "hf",
-        "reranker_provider": "bge",
+        # reranker: 실측 recall 무개선·CPU 지연 5배 → 폐쇄망 기본 noop (필요시 프로파일서 명시적 bge)
+        "reranker_provider": "noop",
         "vector_backend": "pg",
         # MinIO 미사용 결정 정합(번들도 minio 제거). 학습 산출물·문서는 로컬FS.
         "storage_backend": "local",

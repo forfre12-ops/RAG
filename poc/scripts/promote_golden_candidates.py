@@ -56,6 +56,27 @@ def _holdout_texts(path: Path | None) -> list[str]:
     return [r.get("text", "") for r in _load_jsonl(path) if r.get("text")]
 
 
+def _leakage_verdict(rows: list[dict], *, max_baseline=None, max_theil_u=None) -> dict | None:
+    """도메인->등급 shortcut 누출 판정(순수·실패-안전) — 승격 후보 가시화용.
+
+    build_synthetic_golden 인라인 게이트와 **동일 출처**(analyze_golden_run.domain_leakage +
+    check_domain_leakage_gate.domain_leakage_verdict)를 재사용. text 중복 dedup(promote_candidates
+    skipped_leaked)과는 별개 축이다. 계산 실패는 승격을 막지 않고 None 반환(경고만)."""
+    try:
+        from analyze_golden_run import domain_leakage  # noqa: PLC0415
+        from check_domain_leakage_gate import (  # noqa: PLC0415
+            DEFAULT_MAX_BASELINE,
+            DEFAULT_MAX_THEIL_U,
+            domain_leakage_verdict,
+        )
+        mb = DEFAULT_MAX_BASELINE if max_baseline is None else max_baseline
+        mt = DEFAULT_MAX_THEIL_U if max_theil_u is None else max_theil_u
+        return domain_leakage_verdict(domain_leakage(list(rows)), max_baseline=mb, max_theil_u=mt)
+    except Exception as e:  # noqa: BLE001
+        print(f"[WARN] 누출 게이트 계산 실패 — 스킵(승격 계속): {e}", file=sys.stderr)
+        return None
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="골든 빌더 후보를 정본 gold 로 승격(게이트 통과분만).")
     p.add_argument("candidates", help="빌더 후보 jsonl (build_<id>.jsonl)")
@@ -64,6 +85,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out", default=None, help="병합 결과 출력(기본: --gold 덮어쓰기)")
     p.add_argument("--no-backup", action="store_true", help="정본 덮어쓰기 전 .bak 백업 생략")
     p.add_argument("--dry-run", action="store_true", help="파일 미작성 — 통계만 출력")
+    # 도메인->등급 shortcut 누출: 기본=경고만(플래그+로그). 위반 시 승격 거부는 플래그 뒤에.
+    p.add_argument("--enforce-leakage-gate", action="store_true",
+                   help="도메인->등급 누출 게이트 위반 시 승격 거부(exit 2). 기본=경고만")
+    p.add_argument("--max-baseline", type=float, default=None,
+                   help="도메인-다수결 정확도 상한(기본=게이트 기본값 0.55)")
+    p.add_argument("--max-theil-u", type=float, default=None,
+                   help="도메인->등급 Theil's U 상한(기본=게이트 기본값 0.35)")
     return p.parse_args()
 
 
@@ -88,6 +116,28 @@ def main() -> int:
         f"중복 {result.skipped_duplicate}, 누출 {result.skipped_leaked}, "
         f"비-gold {result.skipped_not_gold} | 병합 후 gold {result.gold_total}건"
     )
+
+    # 도메인->등급 shortcut 누출 가시화(플래그+로그). 기본은 경고만 — 승격 흐름 무변경.
+    leak = _leakage_verdict(candidates, max_baseline=args.max_baseline, max_theil_u=args.max_theil_u)
+    if leak is not None:
+        lk = leak.get("leakage", {})
+        print(
+            f"[누출] 도메인->등급 baseline={lk.get('trivial_domain_baseline')} "
+            f"theil_u={lk.get('theil_u')} n={lk.get('n')} blocked={leak.get('blocked')} "
+            f"({leak.get('reason')})"
+        )
+        if leak.get("blocked"):
+            print(
+                "[누출경고] 도메인->등급 shortcut 의심 — 도메인이 등급을 과도하게 결정. "
+                "학습 편입 전 검수 권장.",
+                file=sys.stderr,
+            )
+            if args.enforce_leakage_gate:
+                print(
+                    "[BLOCK] --enforce-leakage-gate: 누출 게이트 위반으로 승격 거부(정본 미변경).",
+                    file=sys.stderr,
+                )
+                return 2
 
     if args.dry_run:
         print("[DRY-RUN] 파일 미작성")
