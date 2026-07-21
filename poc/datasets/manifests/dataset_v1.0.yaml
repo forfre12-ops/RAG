@@ -10,7 +10,7 @@ contact: forfre12@gmail.com
 
 # 운영 현황 (2026-06-05) — readiness/배포 모델 정합 (reports/operational_readiness.json)
 current_status:
-  deployed_model: artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb   # step3 (.env CLASSIFIER_MODEL_DIR)
+  deployed_model: artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9   # v4_clean — .env CLASSIFIER_MODEL_DIR 과 일치(v-f9b5cedb 오기 정정 2026-07-22)
   p1_classifier:
     legal_tier_f1: 0.889       # 법적근거 티어(진짜 라벨) — high-risk->S3 = 0 (위험 미탐 없음)
     full_holdout_f1: 0.635     # 전체 홀드아웃 — llm_judge ~47% 오라벨 노이즈 포함 보수적 하한
