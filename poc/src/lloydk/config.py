@@ -62,7 +62,11 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "embedding_provider": "hf",
         "reranker_provider": "noop",
         "vector_backend": "pg",
-        "storage_backend": "minio",
+        # [CFG-5] 로컬FS로 통일(2026-07-22 사용자 확정) — 'MinIO 미사용(전체)' 결정·onprem 정합.
+        # 종전 'minio' 기본은 번들서 minio 제거와 모순(poc_mode=full 시 미가용→startup 크래시)
+        # 드리프트였다. lite-cloud 는 경량 tier(require_safety_gates=False)라 암호화를 강제하지
+        # 않되, 오픈망 파일럿서 원본 at-rest 암호화가 필요하면 .env STORAGE_ENCRYPTION_ENABLED=1(+키).
+        "storage_backend": "local",
         "enable_training": False,
         "poc_mode": "full",
     },
