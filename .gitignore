@@ -161,3 +161,7 @@ poc/datasets/_exp_*.jsonl
 poc/src/lloydk/api/static/samples/*.hwp
 poc/src/lloydk/api/static/samples/*.hwpx
 poc/src/lloydk/api/static/samples/*.pdf
+# 재생성 가능 데모 산출물·목업 (배포 비필수·scripts/build_demo_samples.py로 재생성) — 2026-07-24
+poc/demo_samples/
+poc/demo_formats/
+doc/mockups/
