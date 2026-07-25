@@ -419,7 +419,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
             <tbody id="jobs-body"><tr><td colspan="4" style="color:var(--text-faint)">목록 없음 — "작업 목록 새로고침"</td></tr></tbody>
           </table>
         </div>
-        <p class="sec-note"><code>/train</code>은 <code>enable_training</code>(full-train 프로파일)에서만 등록됩니다. PoC 기본은 stub 잡 — 실제 학습은 <code>scripts/p1_train_classifier.py</code>. 비활성 프로파일이면 404가 정상입니다.</p>
+        <p class="sec-note"><code>/train</code>은 학습 노드 — <code>enable_training</code>(지재원 full-train, URGENT·주간 자동재학습) 또는 <code>enable_incremental_retrain</code>(고객사 onprem-local, 야간 증분 재학습)에서 등록됩니다. 고객사는 매일 02:00 KST 야간 배치(교정-병합 CPU 재학습)로도 트리거됩니다. 재학습본은 <b>후보로만 등록</b>되며 자동 서빙되지 않습니다(활성화는 사람서명 locked-eval/감사 force). 순수 추론 프로파일(lite-*)이면 404가 정상입니다.</p>
       </div>
     </section>
 
@@ -824,7 +824,7 @@ async function submitTrain(){
     log(`재학습 제출: job ${d.train_job_id} · status_url ${d.status_url}`,'ok'); markFlow(3);
     loadJobs();
   }catch(e){
-    if(e.status===404) alert('재학습 라우터 비활성 (enable_training=false 프로파일). full-train 프로파일에서만 동작합니다.');
+    if(e.status===404) alert('재학습 라우터 비활성 (순수 추론 프로파일). 학습 노드(지재원 full-train 또는 고객사 onprem-local 증분 재학습)에서만 동작합니다.');
     else alert('재학습 제출 실패: '+(e.data?.detail||e.message));
   }
 }

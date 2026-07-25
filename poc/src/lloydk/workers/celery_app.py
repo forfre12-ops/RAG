@@ -55,6 +55,7 @@ celery_app.conf.task_routes = {
     "lloydk.train_classifier": {"queue": "learning"},
     "lloydk.golden_build": {"queue": "learning"},  # 빌더 — train과 자원 풀 공유
     "lloydk.active_learning_tick": {"queue": "learning"},
+    "lloydk.nightly_incremental_retrain_tick": {"queue": "learning"},  # 고객사 야간 증분 재학습 트리거
     "lloydk.drift_tick": {"queue": "learning"},
     "lloydk.auto_rollback_tick": {"queue": "learning"},
     "lloydk.verify_audit_chain_tick": {"queue": "learning"},
@@ -76,6 +77,14 @@ celery_app.conf.beat_schedule = {
         "task": "lloydk.active_learning_tick",
         "schedule": crontab(minute=0, hour=3),
         "kwargs": {"mode": "snapshot"},
+    },
+    # [고객사 야간 증분 재학습 2026-07] 매일 02:00 KST — enable_incremental_retrain=True 노드
+    # (고객사 onprem-local)에서만 발화. 태스크가 플래그·unconsumed 교정을 자체 게이트하므로
+    # 지재원(full-train)·순수 추론 노드에서는 no-op(SKIP_*). 재학습본은 후보 등록만 —
+    # 자동 서빙 안 됨(사람서명 locked-eval/감사 force 로만 활성화). partitions(02:10) 직전 off-peak.
+    "nightly-incremental-retrain-0200": {
+        "task": "lloydk.nightly_incremental_retrain_tick",
+        "schedule": crontab(minute=0, hour=2),
     },
     # A4 (2026-05-29): 매 15분 — 운영 임베딩 drift 점검.
     # alert=True면 lloydk_drift_alert gauge=1 → Grafana 알람 룰 트리거.

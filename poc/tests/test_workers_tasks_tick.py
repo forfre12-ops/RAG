@@ -145,6 +145,77 @@ def test_tick_auto_training_disabled_skips_enqueue():
     assert enq.call_count == 0
 
 
+def test_active_learning_urgent_stays_training_gated_not_incremental():
+    """[안전 분리] enable_incremental_retrain(고객사 야간)만으론 URGENT 자동재학습을 열지 않는다.
+
+    고객사(enable_training=False, enable_incremental_retrain=True)에서도 active_learning URGENT
+    자동재학습(30분틱)은 여전히 차단돼야 한다 — 증분 플래그는 통제된 야간 배치만 켜고, 공격적
+    드리프트-트리거 자동재학습(죽음의 나선 우려)은 지재원(enable_training) 전용으로 유지.
+    """
+    with patch("lloydk.config.settings.enable_training", False, create=True):
+        with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
+            with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                       return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
+                with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+                    out = active_learning_tick(mode="auto")
+    assert out["triggered"] == "SKIP_TRAINING_DISABLED"
+    assert enq.call_count == 0
+
+
+# ---------------------------------------------------------------------------
+# nightly_incremental_retrain_tick — 고객사 야간 증분 재학습 (enable_incremental_retrain 전용)
+# ---------------------------------------------------------------------------
+
+
+def test_nightly_incremental_disabled_skips_without_db():
+    """플래그 OFF(지재원·순수 추론 노드) → SKIP_INCREMENTAL_DISABLED, DB(evaluate) 미접촉."""
+    from lloydk.workers.tasks import nightly_incremental_retrain_tick
+    with patch("lloydk.config.settings.enable_incremental_retrain", False, create=True):
+        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need") as ev:
+            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+                out = nightly_incremental_retrain_tick()
+    assert out["triggered"] == "SKIP_INCREMENTAL_DISABLED"
+    assert ev.call_count == 0    # DB 평가조차 하지 않음
+    assert enq.call_count == 0
+
+
+def test_nightly_incremental_no_new_corrections_skips():
+    """플래그 ON이지만 unconsumed 교정 0 → SKIP_NO_NEW_CORRECTIONS(무의미한 야간 재학습 방지)."""
+    from lloydk.workers.tasks import nightly_incremental_retrain_tick
+    with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
+        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                   return_value=_status(retrain="OK", total=0)):
+            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+                out = nightly_incremental_retrain_tick()
+    assert out["triggered"] == "SKIP_NO_NEW_CORRECTIONS"
+    assert enq.call_count == 0
+
+
+def test_nightly_incremental_enqueues_with_new_corrections():
+    """플래그 ON + unconsumed 교정 존재 → train_classifier_task 1회 enqueue(NIGHTLY_INCREMENTAL)."""
+    from lloydk.workers.tasks import nightly_incremental_retrain_tick
+    with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
+        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                   return_value=_status(retrain="RETRAIN_RECOMMENDED", total=12)):
+            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+                out = nightly_incremental_retrain_tick()
+    assert out["triggered"] == "NIGHTLY_INCREMENTAL"
+    assert out["unconsumed_total"] == 12
+    assert enq.call_count == 1
+
+
+def test_nightly_incremental_eval_failure_skips_conservatively():
+    """평가(evaluate_retraining_need) 예외 → SKIP_EVAL_FAILED(불확실 상태에서 무거운 재학습 금지)."""
+    from lloydk.workers.tasks import nightly_incremental_retrain_tick
+    with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
+        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+                   side_effect=RuntimeError("db down")):
+            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+                out = nightly_incremental_retrain_tick()
+    assert out["triggered"] == "SKIP_EVAL_FAILED"
+    assert enq.call_count == 0
+
+
 # ---------------------------------------------------------------------------
 # drift_tick — run_drift_check 결과 그대로 dict로 반환
 # ---------------------------------------------------------------------------

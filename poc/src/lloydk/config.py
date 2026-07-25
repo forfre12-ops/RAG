@@ -120,6 +120,15 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "deploy_gate_first_deploy_fnr_high_max": 0.10,
         # 데모 콘솔·파괴적 purge 비활성(고객사 운영 — 시연 표면/물리삭제 엔드포인트 미노출).
         "demo_console_enabled": False,
+        # [고객사 학습 결정 2026-07] 야간 증분 재학습 ON — 고객사 현장서 사람검수 교정을 기존
+        # 학습셋에 섞어 CPU 풀 파인튜닝을 야간 배치로 무인 실행(cpu-incremental-retrain-measured).
+        # enable_training(지재원 URGENT 자동재학습 경로)과 별개 축: 이 플래그는 nightly 스케줄만
+        # 발화시키고 URGENT 드리프트 자동재학습(30분틱)은 켜지 않는다(죽음의 나선 보수). 재학습본은
+        # 후보로만 등록되고 자동 서빙 안 됨 — 활성화는 여전히 사람서명 locked-eval/감사 force 필요.
+        "enable_incremental_retrain": True,
+        # [고객사 관리자 콘솔] 거버넌스 콘솔(검수→재학습→활성화) 서빙 ON. demo_console_enabled와
+        # 분리 — 파괴적 purge/데모 SPA는 계속 OFF(위), 관리 UI만 노출. 모든 쓰기는 RBAC 보호.
+        "serve_admin_console": True,
     },
     "full-train": {
         "llm_provider": "anthropic",
@@ -154,6 +163,9 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "deploy_gate_first_deploy_fnr_high_max": 0.10,
         # 데모 콘솔·파괴적 purge 비활성(모델공장 내부 — 시연/물리삭제 표면 미노출).
         "demo_console_enabled": False,
+        # [지재원 관리자 콘솔] 거버넌스 콘솔 서빙 ON(모델공장 운영자용). demo purge/데모 SPA는
+        # 계속 OFF(위) — 관리 UI만. 지재원은 enable_training 경로로 학습하므로 야간 증분 플래그는 불필요.
+        "serve_admin_console": True,
     },
 }
 
@@ -170,11 +182,26 @@ class Settings(BaseSettings):
     # False면 /api/v1/training/* 라우터 등록 자체 skip (OpenAPI에서 사라짐).
     enable_training: bool = False
 
+    # [고객사 야간 증분 재학습] enable_training과 별개 축. onprem-local(고객사)에서 True 로,
+    # 야간 beat 스케줄(nightly_incremental_retrain_tick)이 교정-병합 학습셋으로 재학습을 발화
+    # 시킨다. enable_training 이 여는 URGENT 드리프트 자동재학습(active_learning 30분틱)은 여전히
+    # enable_training 노드(지재원)에서만 — 이 플래그는 통제된 야간 배치만 켜 죽음의 나선을 보수한다.
+    # 학습 라우터(/train) 등록·train_classifier_task 실행은 (enable_training OR 이 플래그)로 허용.
+    # 재학습본은 후보 등록만 — 자동 서빙 안 됨(활성화는 사람서명 locked-eval/감사 force 불변).
+    enable_incremental_retrain: bool = False
+
     # 데모 콘솔(/demo SPA + POST /admin/demo/purge 물리삭제) 노출 여부. 데모/파일럿(lite-*)만 True,
     # 하드닝 프로파일(onprem-local·full-train)은 프로파일 default False 로 꺼 파괴적 초기화 엔드포인트를
     # 고객사 운영에서 비활성화한다. 이 필드가 미선언이던 탓에 admin.py 의 getattr(...,True) 게이트가
     # 항상 True(죽은 no-op)였던 것을 실배선 — 이제 하드닝 프로파일에서 /demo 미마운트·purge 404.
     demo_console_enabled: bool = True
+
+    # [관리자 콘솔 서빙] 거버넌스 콘솔(admin.html — 검수→재학습→활성화 폐곡선 UI) 정적 서빙 여부.
+    # demo_console_enabled(파괴적 purge + 데모 SPA)와 분리된 축 — 프로덕션(onprem-local·full-train)은
+    # purge 는 계속 OFF 로 두고 관리 UI 만 True 로 노출한다(파괴적 엔드포인트는 여전히 demo_console_
+    # enabled 게이트로 404). 모든 상태변경(활성화·재학습·확정)은 RBAC 로 보호되므로 UI 노출은 안전.
+    # /demo 마운트 조건 = demo_console_enabled OR serve_admin_console.
+    serve_admin_console: bool = False
 
     # --- 인프라 ---
     # 디폴트는 localhost dev DB. 운영은 DATABASE_URL env 필수.

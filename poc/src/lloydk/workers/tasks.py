@@ -368,12 +368,16 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
     """
     from lloydk.config import settings  # noqa: PLC0415
 
-    # [재학습 토폴로지 가드 · 심층방어] 분류기 학습은 enable_training=True 노드(지재원)에서만.
-    # 고객사(onprem-local, enable_training=False)는 추론+비모수 전용 — 어떤 경로로 enqueue되든
-    # 학습을 수행하지 않는다(무거운 trainer import도 생략). active_learning_tick 가드와 belt+suspenders.
-    if not settings.enable_training:
+    # [재학습 토폴로지 가드 · 심층방어] 분류기 학습은 학습 노드에서만 수행한다:
+    #   enable_training(지재원 full-train, URGENT/weekly 자동재학습) 또는
+    #   enable_incremental_retrain(고객사 onprem-local, 통제된 야간 증분 배치 — 2026-07 결정).
+    # 둘 다 아니면(순수 추론 노드) 어떤 경로로 enqueue되든 학습을 수행하지 않는다(무거운 trainer
+    # import도 생략). active_learning_tick / nightly_incremental_retrain_tick 가드와 belt+suspenders.
+    # 주의: 이 관문을 통과해도 재학습본은 후보로만 등록되며 자동 서빙되지 않는다(activate 게이트 불변).
+    if not (settings.enable_training or settings.enable_incremental_retrain):
         logger.warning(
-            "train_classifier_task skipped — enable_training=False (inference-only node)"
+            "train_classifier_task skipped — training disabled (inference-only node, "
+            "deploy_profile=%s)", settings.deploy_profile,
         )
         return {"skipped": "training_disabled"}
 
@@ -703,5 +707,64 @@ def active_learning_tick(mode: str = "auto") -> dict:
             payload["triggered"] = "SKIP_WAIT_WEEKLY_WINDOW"
     else:
         payload["triggered"] = "NONE"
+
+    return payload
+
+
+@celery_app.task(name="lloydk.nightly_incremental_retrain_tick")
+def nightly_incremental_retrain_tick() -> dict:
+    """고객사(onprem-local) 야간 증분 재학습 트리거 — enable_incremental_retrain=True 노드 전용.
+
+    2026-07 결정(cpu-incremental-retrain-measured): 고객사 현장서 사람검수 교정을 기존 학습셋에
+    섞어 CPU 풀 파인튜닝을 야간 배치로 무인 실행. enable_training(지재원)이 여는 URGENT 드리프트
+    자동재학습(active_learning 30분틱)과는 별개 축 — 이 틱은 통제된 야간 1회만 발화한다.
+
+    안전:
+    - 플래그 OFF(지재원 full-train·순수 추론 노드)면 no-op.
+    - unconsumed 교정이 0이면 skip — 새 신호 없는 야간 재학습(CPU ~1h)을 낭비하지 않는다.
+    - 재학습본은 train_classifier_task 에서 **후보로만** 등록됨(retrain_auto_activate=False 불변).
+      실제 서빙 전환은 사람서명 locked-eval / 감사 force 로만(activate 게이트 불변).
+    """
+    from datetime import datetime  # noqa: PLC0415
+    from lloydk.config import settings as _settings  # noqa: PLC0415
+    from lloydk.modules.m6_evaluation.active_learning import evaluate_retraining_need  # noqa: PLC0415
+
+    payload = {
+        "task": "nightly_incremental_retrain",
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "deploy_profile": _settings.deploy_profile,
+    }
+
+    # [토폴로지 가드] 야간 증분 재학습은 enable_incremental_retrain 노드(고객사)에서만 발화.
+    # 지재원(full-train)은 이 플래그 False → no-op(자체 enable_training/active_learning 경로 사용).
+    if not _settings.enable_incremental_retrain:
+        payload["triggered"] = "SKIP_INCREMENTAL_DISABLED"
+        return payload
+
+    # 새 교정 없으면 skip — base 재현뿐인 야간 재학습(CPU 고비용)을 낭비하지 않는다.
+    # 평가 실패 시 보수적 skip(불확실 상태에서 무거운 재학습을 돌리지 않음).
+    try:
+        status = evaluate_retraining_need()
+        payload["unconsumed_total"] = status.unconsumed_total
+        payload["retrain_status"] = status.retrain_status
+    except Exception:  # noqa: BLE001
+        logger.exception("nightly incremental: evaluate_retraining_need failed — 보수적 skip")
+        payload["triggered"] = "SKIP_EVAL_FAILED"
+        return payload
+
+    if status.unconsumed_total <= 0:
+        payload["triggered"] = "SKIP_NO_NEW_CORRECTIONS"
+        return payload
+
+    try:
+        train_classifier_task.apply_async(kwargs={"spec_kwargs": None})
+        payload["triggered"] = "NIGHTLY_INCREMENTAL"
+        logger.info(
+            "nightly incremental retrain enqueued (unconsumed=%d, profile=%s)",
+            status.unconsumed_total, _settings.deploy_profile,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("nightly incremental: train_classifier_task enqueue failed")
+        payload["triggered"] = "ENQUEUE_FAILED"
 
     return payload

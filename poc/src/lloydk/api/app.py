@@ -373,9 +373,10 @@ app.include_router(answer_api.router, prefix="/api/v1")
 app.include_router(confirm_api.router, prefix="/api/v1")
 # 검수 액션(승급)은 재학습 무관 — enable_training과 무관하게 항상 등록(폐쇄망 운영 경로).
 app.include_router(promotion_api.router, prefix="/api/v1")
-# 학습 라우터는 settings.enable_training=True (full-train 프로파일)에서만 등록.
-# lite-*·onprem에서는 OpenAPI에도 노출되지 않아 고객사가 "있는데 안 쓴다"는 인식 자체가 없음.
-if settings.enable_training:
+# 학습 라우터는 학습 노드에서만 등록: enable_training(지재원 full-train) 또는
+# enable_incremental_retrain(고객사 onprem-local 야간 증분 재학습). 순수 추론 노드(lite-*)에서는
+# OpenAPI에도 노출되지 않는다. 등록되더라도 모든 엔드포인트는 admin/kl_backend/system RBAC 보호.
+if settings.enable_training or settings.enable_incremental_retrain:
     app.include_router(
         training_api.router, prefix="/api/v1",
         dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
@@ -401,14 +402,22 @@ app.include_router(keyword_admin_api.router, prefix="/api/v1")
 # 백그라운드 메트릭 refresh — TESTING=1 또는 pytest 환경이면 자동 skip.
 prom_metrics_api.register_background_refresh(app)
 
-# 데모 콘솔 정적 마운트 — /demo/ 경로에 단일 페이지 SPA.
-# OpenAPI 에는 노출되지 않음(StaticFiles 자동 제외). 디렉토리 없으면 silent skip.
+# 정적 콘솔 마운트 — /demo/ 경로. 두 축이 마운트를 요구할 수 있다:
+#   demo_console_enabled : 데모 SPA(index) + 파괴적 purge UI (데모/파일럿 전용).
+#   serve_admin_console  : 거버넌스 관리 콘솔(admin.html — 검수→재학습→활성화) (프로덕션 관리자용).
+# 프로덕션(onprem-local·full-train)은 serve_admin_console=True·demo_console_enabled=False 조합 —
+# 관리 UI 는 서빙하되 파괴적 purge 엔드포인트(POST /admin/demo/purge)는 admin.py 에서 여전히
+# demo_console_enabled 게이트로 404. 모든 상태변경 API 는 RBAC 보호. OpenAPI 미노출(StaticFiles).
 _STATIC_DIR = Path(__file__).parent / "static"
-if _STATIC_DIR.is_dir() and settings.demo_console_enabled:
+_console_on = settings.demo_console_enabled or settings.serve_admin_console
+if _STATIC_DIR.is_dir() and _console_on:
     app.mount("/demo", StaticFiles(directory=str(_STATIC_DIR), html=True), name="demo")
-    logger.info("demo console mounted at /demo/ (static dir=%s)", _STATIC_DIR)
-elif not settings.demo_console_enabled:
-    # 하드닝 프로파일(onprem-local·full-train): 시연 콘솔 SPA·파괴적 purge UI 미노출.
-    logger.info("demo console disabled (deploy_profile=%s) — /demo 미마운트", settings.deploy_profile)
+    logger.info(
+        "console mounted at /demo/ (dir=%s, demo=%s, admin=%s)",
+        _STATIC_DIR, settings.demo_console_enabled, settings.serve_admin_console,
+    )
+elif not _console_on:
+    # 순수 추론/노-콘솔 프로파일(lite-noapi 등): 콘솔 SPA·purge UI 모두 미노출.
+    logger.info("console disabled (deploy_profile=%s) — /demo 미마운트", settings.deploy_profile)
 else:
-    logger.info("demo console not mounted (no static dir at %s)", _STATIC_DIR)
+    logger.info("console not mounted (no static dir at %s)", _STATIC_DIR)
