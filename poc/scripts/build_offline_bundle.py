@@ -757,6 +757,18 @@ def _strip_hashes(text: str) -> str:
         if not s or s.startswith("#") or s.startswith("--hash"):
             continue
         s = s.rstrip("\\").strip()   # 'pkg==ver \\' → 'pkg==ver'
+        # 환경 마커(; sys_platform 등) 제거 — 크로스플랫폼 다운로드(Windows 호스트→Linux 타깃)에서
+        # pip 이 마커를 빌드호스트 기준으로 평가해 Linux 휠(gunicorn·uvloop 등)을 잘못 배제하고
+        # Windows 휠(pywin32 등)을 잘못 포함하는 것을 막는다. 휠 선택은 --platform/--abi/
+        # --python-version 이 담당. 설치 매니페스트(no_torch, 마커 보존)는 Linux 타깃서 정상 평가.
+        s = s.split(";", 1)[0].rstrip()
+        if not s:
+            continue
+        # Windows 전용 패키지는 Linux 타깃 휠이 없어 다운로드 실패원 → 다운로드 목록서 제외
+        # (설치 매니페스트에선 sys_platform=='win32' 마커가 Linux 에서 자동 skip 하므로 무관).
+        _pkg = s.split("==")[0].split(">")[0].split("<")[0].split("[")[0].split(" ")[0].strip().lower()
+        if _pkg.startswith(("pywin32", "pywinpty", "waitress")):
+            continue
         if s:
             out.append(s)
     return "\n".join(out) + "\n"
