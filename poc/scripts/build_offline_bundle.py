@@ -802,10 +802,13 @@ def _pip_download_cmd(req: Path, wheels_dir: Path, wheel_platform: str) -> list[
         "-d", str(wheels_dir), "--no-deps", "-q",
     ]
     if wheel_platform:
-        cmd += [
-            "--only-binary=:all:", "--platform", wheel_platform,
-            "--python-version", "311", "--implementation", "cp", "--abi", "cp311",
-        ]
+        cmd += ["--only-binary=:all:", "--platform", wheel_platform]
+        # 신규 패키지(예: argon2-cffi-bindings 25.x)는 manylinux2014 휠이 없고 manylinux_2_28+
+        # 만 배포한다. pip 은 --platform 다중 지정 시 어느 하나에 맞는 휠을 받으므로, 구 태그
+        # (2014, 오래된 glibc 커버)를 유지한 채 신 태그를 폴백으로 추가한다(엄격히 더 관대·안전).
+        if wheel_platform == "manylinux2014_x86_64":
+            cmd += ["--platform", "manylinux_2_28_x86_64"]
+        cmd += ["--python-version", "311", "--implementation", "cp", "--abi", "cp311"]
     return cmd
 
 
