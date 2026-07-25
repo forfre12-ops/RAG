@@ -5,6 +5,17 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 3
 mkdir -p reports/v5_gate
+# 단일-인스턴스 락(mkdir 은 원자적). 이전 세션에서 이중 프로세스로 STATUS 덮어쓰기·중복 재학습이
+# 발생했던 문제 차단. stale 락(24h+)은 자동 회수.
+LOCK=reports/v5_gate/.orchestrator.lock
+if ! mkdir "$LOCK" 2>/dev/null; then
+  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1440 2>/dev/null)" ]; then
+    echo "[lock] stale 락 회수" >&2; rmdir "$LOCK" 2>/dev/null; mkdir "$LOCK" 2>/dev/null || { echo "[lock] 획득 실패, 중단" >&2; exit 4; }
+  else
+    echo "[lock] 다른 오케스트레이터가 실행 중 — 중단(중복 방지)" >&2; exit 4
+  fi
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 LOG=reports/v5_gate/overnight.log
 MARK=reports/v5_gate/STATUS
 BASE=artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9

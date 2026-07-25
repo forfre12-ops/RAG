@@ -193,13 +193,16 @@ acceptance:
   # -------------------------------------------------------
   p1_classification:
     pass_criteria: { F1_macro: ">= 0.75", FNR_underclass: "<= 5%" }
-    current_model: artifacts/classifier_p1_retrain_v3/v-3443785f
-    model_spec: KF-DeBERTa-base, max_seq=512, bf16, 5ep, labeled_p1_retrain_v3
+    deployed_model: artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9   # 실제 배포본(current_status.deployed_model 과 일치). 구 v3 오기 정정 2026-07-26
+    candidate_model: artifacts/classifier_p1_v5_clean/v-fe4b386b          # v5_clean 재빌드 후보 — 게이트 양축 PASS(datasets/labeled_p1_v5_clean/GATE_RESULTS.md). 배포 스왑은 사람 결정
+    model_spec: KF-DeBERTa-base, max_seq=512, bf16, 5ep
     model_history:
       v-1ac43d0f: "OSS only, gold_real F1=0.322"
       v-37d130b7: "mixed v1, gold_real F1=0.545, S1_R=0.20"
       v-44384f0c: "mixed v2, gold_real F1=0.487, S1_R=0.68, FNR=0.000"
-      v-3443785f: "p1_retrain_v3 current, OSS test F1=0.794; public/case/nkt direct F1=0.830, TS/S1/S2->S3=0"
+      v-3443785f: "p1_retrain_v3, OSS test F1=0.794; public/case/nkt direct F1=0.830 (train-on-test 오염)"
+      v-dd3abab9: "p1_retrain_v4_clean 배포본. clean holdout f1 0.688, S1_R 0.43, 공개문서 과분류 raw 79%(운영 게이트가 캡)"
+      v-fe4b386b: "labeled_p1_v5_clean 후보(2026-07-26). hardened holdout f1 0.917·S1_R 0.86·high_risk_to_s3 0; 공개문서 과분류 4%; adversarial high->S3 무회귀"
     eval_tiers:
       synthetic_masked_eval:
         eval_type: synthetic_masked
@@ -400,7 +403,7 @@ gold:
     note: expected_doc_id/relevant_doc_ids based Recall/MRR/nDCG evaluation set generated on 2026-06-01.
 
 changelog:
-  - { date: "2026-07-22", version: "1.5", note: "판례-프록시 디오염(재현가능 스크립트화): 공개 판례 LLM-프록시 과라벨 157건(S2 143·S1 14)→S3, dist S3 420→577. scripts/depollute_court_proxy_gold.py(결정론적·멱등·--check 가드). 대상 전부 silver tier라 eval 정답 불변. label_source curated_scenario:6 누락 보정 + check-manifest bijective 화(조용한 drift 차단)." }
+  - { date: "2026-07-26", version: "1.6", note: "v5_clean 원천 재빌드(scripts/build_p1_v5_clean.py, 결정론): 라벨정합·출처보존·공개판결 S3 결정규칙·판례 15%캡·균형영어120·누출0 split → 2554행. 후보 v-fe4b386b 게이트 양축 PASS(hardened holdout f1 0.688→0.917·S1 0.43→0.86, 공개문서 FPR 79%→4%, adversarial high→S3 무회귀). p1_classification.current_model v3 오기→deployed v-dd3abab9/candidate v-fe4b386b 정정. 배포 스왑은 사람 결정." }
   - { date: "2026-07-06", version: "1.4", note: "classification_gold_real manifest refreshed to match current label_source distribution; human_review=1/40, strict GA still externally blocked." }
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }
   - { date: "2026-06-01", version: "1.1", note: "데이터 품질 복구: labeled_5k/rag_corpus_qa deprecated, gold set 신설, generator V2 프롬프트 교체" }
