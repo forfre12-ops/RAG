@@ -743,13 +743,50 @@ def _export_locked_requirements(out_dir: Path) -> Path | None:
     return out
 
 
-def _strip_hashes(text: str) -> str:
-    """uv export(해시·`\\` 연속줄) → 버전핀만 남긴 pip download용 목록.
+# 다운로드 타깃(폐쇄망 Linux 런타임) 환경 — 마커 평가 기준. pip download 의
+# --python-version 311 / --platform manylinux_x86_64 와 반드시 일치(이미지 python 3.11.15).
+# python 버전 승급/이미지 베이스 변경 시 여기와 _pip_download_cmd 를 함께 갱신.
+_TARGET_MARKER_ENV = {
+    "os_name": "posix",
+    "sys_platform": "linux",
+    "platform_system": "Linux",
+    "platform_machine": "x86_64",
+    "platform_python_implementation": "CPython",
+    "implementation_name": "cpython",
+    "python_version": "3.11",
+    "python_full_version": "3.11.15",
+    "implementation_version": "3.11.15",
+}
 
-    크로스플랫폼 pip download(--platform manylinux)는 요구파일에 해시가 있으면 자동으로
-    hash-check가 켜져, 빌드호스트(Windows 등)에서 만든 export가 타깃 wheel 해시와 안 맞으면
-    다운로드가 깨질 수 있다. 그래서 *다운로드 소스*는 해시 없이 pinned 버전만 쓰고,
-    무결성 검증은 타깃 install.sh 의 --require-hashes(네이티브 wheel)로 미룬다.
+
+def _marker_true_for_target(marker_str: str) -> bool:
+    """환경마커가 타깃(Linux/cp311)에서 참인지. packaging 미가용 시 보수적으로 포함(True)."""
+    marker_str = marker_str.strip()
+    if not marker_str:
+        return True
+    try:
+        from packaging.markers import Marker
+        return bool(Marker(marker_str).evaluate(_TARGET_MARKER_ENV))
+    except ImportError:
+        # packaging 미가용 → 알려진 Windows 전용 마커만 수동 배제, 그 외는 포함(보수).
+        low = marker_str.lower().replace('"', "'")
+        return "sys_platform == 'win32'" not in low
+    except Exception:
+        return True   # 파싱 실패 → 포함(누락 wheel 로 런타임 죽는 것보다 과다포함이 안전)
+
+
+def _strip_hashes(text: str) -> str:
+    """uv export(해시·`\\` 연속줄·환경마커) → pip download용 버전핀 목록.
+
+    두 가지를 처리한다:
+    1) 해시 제거 — 크로스플랫폼 pip download(--platform manylinux)는 요구파일에 해시가 있으면
+       hash-check 가 켜져, 빌드호스트(Windows) export 해시가 타깃 wheel 과 안 맞아 깨진다.
+       무결성 검증은 타깃 install.sh 의 --require-hashes(네이티브 wheel)로 미룬다.
+    2) 환경마커를 *타깃(Linux/cp311)* 기준으로 평가 — 빌드호스트(Windows) 기준으로 두면
+       Linux 패키지(gunicorn·uvloop)가 배제되고 Windows 패키지(pywin32·waitress)가 포함된다.
+       반대로 마커를 전부 제거하면 python_version 분기(numpy 2.4.6 vs 2.5.0)가 동시 포함돼
+       ResolutionImpossible. → 타깃 환경으로 평가해 정확히 한 버전만 남긴다.
+    설치 매니페스트(_requirements_no_torch.txt)는 마커 보존(타깃서 정상 평가)이라 별개.
     """
     out: list[str] = []
     for line in text.splitlines():
@@ -757,20 +794,20 @@ def _strip_hashes(text: str) -> str:
         if not s or s.startswith("#") or s.startswith("--hash"):
             continue
         s = s.rstrip("\\").strip()   # 'pkg==ver \\' → 'pkg==ver'
-        # 환경 마커(; sys_platform 등) 제거 — 크로스플랫폼 다운로드(Windows 호스트→Linux 타깃)에서
-        # pip 이 마커를 빌드호스트 기준으로 평가해 Linux 휠(gunicorn·uvloop 등)을 잘못 배제하고
-        # Windows 휠(pywin32 등)을 잘못 포함하는 것을 막는다. 휠 선택은 --platform/--abi/
-        # --python-version 이 담당. 설치 매니페스트(no_torch, 마커 보존)는 Linux 타깃서 정상 평가.
-        s = s.split(";", 1)[0].rstrip()
+        if ";" in s:                 # 'pkg==ver ; sys_platform == ...'
+            req, marker = s.split(";", 1)
+            if not _marker_true_for_target(marker):
+                continue             # 타깃서 거짓 → 배제(pywin32·waitress·numpy 반대분기)
+            s = req.rstrip()         # 타깃서 참 → 마커 떼고 버전핀만
         if not s:
             continue
-        # Windows 전용 패키지는 Linux 타깃 휠이 없어 다운로드 실패원 → 다운로드 목록서 제외
-        # (설치 매니페스트에선 sys_platform=='win32' 마커가 Linux 에서 자동 skip 하므로 무관).
+        # torch/nvidia/triton: 이미지에 구워짐 → 호스트 wheel 불필요. 다운로드 리스트도 install
+        # 매니페스트(no_torch)와 동일 집합이어야 한다. nvidia-* CUDA 휠은 표준 태그로 받을 수도
+        # 없어(No matching distribution) 포함 시 빌드가 fail-closed 로 중단된다.
         _pkg = s.split("==")[0].split(">")[0].split("<")[0].split("[")[0].split(" ")[0].strip().lower()
-        if _pkg.startswith(("pywin32", "pywinpty", "waitress")):
+        if _pkg.startswith(_HOST_EXCLUDE_PREFIXES):
             continue
-        if s:
-            out.append(s)
+        out.append(s)
     return "\n".join(out) + "\n"
 
 
