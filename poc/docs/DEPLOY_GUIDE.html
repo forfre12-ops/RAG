@@ -276,5 +276,29 @@ API_KEY="$API_KEY" BASE_URL=http://localhost:8000 bash acceptance/run_acceptance
 
 <footer><strong>로이드케이(Lloydk)</strong> · KOIPA 영업비밀관리시스템 · 배포 가이드 (고객사·지재원 통합) · 2026-07-26</footer>
 
+<style>
+.codewrap{position:relative;}
+.copybtn{position:absolute;top:8px;right:8px;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.05em;padding:3px 9px;background:#27272a;color:#e4e4e7;border:1px solid #52525b;cursor:pointer;border-radius:0;opacity:.65;transition:opacity .12s;}
+.codewrap:hover .copybtn{opacity:1;}
+.copybtn.done{background:#15803d;color:#fff;border-color:#15803d;}
+</style>
+<script>
+document.querySelectorAll('pre').forEach(function(pre){
+  var wrap=document.createElement('div'); wrap.className='codewrap';
+  pre.parentNode.insertBefore(wrap,pre); wrap.appendChild(pre);
+  var btn=document.createElement('button'); btn.className='copybtn'; btn.type='button'; btn.textContent='복사';
+  wrap.appendChild(btn);
+  btn.addEventListener('click',function(){
+    var txt=pre.innerText;
+    function ok(){btn.textContent='복사됨';btn.classList.add('done');setTimeout(function(){btn.textContent='복사';btn.classList.remove('done');},1500);}
+    function fallback(){
+      var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.focus(); ta.select();
+      try{document.execCommand('copy');ok();}catch(e){}
+      document.body.removeChild(ta);
+    }
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(ok).catch(fallback);}else{fallback();}
+  });
+});
+</script>
 </body>
 </html>
