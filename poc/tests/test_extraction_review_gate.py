@@ -101,6 +101,53 @@ def test_content_quality_default_none_preserves_behavior():
     assert d.requires_review is False
 
 
+# ── 콘텐츠 손실 경고 라우팅(차트/미디어/임베디드 OLE 미추출 — OOXML 손실) ──────────
+
+def test_content_loss_warning_routes_to_review():
+    # pptx가 전부 이미지 슬라이드라 본문은 헤더뿐이고 미디어 미OCR — 자동분류되면 비밀 무음 유실.
+    d = extraction_review_decision(
+        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
+        warnings=["pptx_media_not_ocrd"],
+    )
+    assert d.requires_review is True and "content_dropped" in d.reasons
+
+
+def test_content_loss_variants_all_route():
+    for w in [
+        "docx_charts_not_extracted",
+        "excel_embedded_objects_not_extracted",
+        "excel_drawings_text_may_be_missing",
+        "docx_media_ocr_unavailable",
+        "pdf_ocr_truncated",
+    ]:
+        d = extraction_review_decision(
+            quality=0.95, ocr_used=False, error=None, min_quality=0.6,
+            ocr_requires_review=True, warnings=[w],
+        )
+        assert d.requires_review is True and "content_dropped" in d.reasons, w
+
+
+def test_benign_success_warnings_not_routed():
+    # 성공 warning(추출 완료)은 손실 아님 → 과라우팅 금지.
+    d = extraction_review_decision(
+        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
+        warnings=[
+            "docx_media_ocr_extracted", "docx_ooxml_tables_extracted",
+            "docx_comments_extracted", "docx_textboxes_extracted", "plain_decoded_as_cp949",
+            "hwp_tables_extracted_by_hwp5html", "hwp_table_check_unavailable",
+        ],
+    )
+    assert d.requires_review is False and d.reasons == []
+
+
+def test_warnings_default_none_preserves_behavior():
+    # warnings 미전달(기본 None) = 기존 동작 보존(opt-out 경로).
+    d = extraction_review_decision(
+        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
+    )
+    assert d.requires_review is False and d.reasons == []
+
+
 # ── ingest() 통합 (DB 불요) ──────────────────────────────────────────────────
 
 class _FakeStorage:
@@ -144,6 +191,19 @@ def test_ingest_ocr_doc_flagged_and_metric():
     assert "ocr" in res.review_reasons
     assert any("degraded" in w for w in res.warnings)          # 무음 아님 — 경고 노출
     assert _metric("ocr") >= before + 1                        # 열화 메트릭 증가
+
+
+def test_ingest_content_loss_doc_flagged_and_metric():
+    # 본문은 비어있지 않으나(슬라이드 헤더) 미디어/차트가 미추출된 pptx — content_dropped 라우팅.
+    before = _metric("content_dropped")
+    res = _ingest(ExtractResult(
+        text="[슬라이드 1]\n[슬라이드 2]\n[슬라이드 3]", method="parser", quality=0.95,
+        warnings=["pptx_media_not_ocrd", "pptx_charts_not_extracted"],
+    ))
+    assert res.requires_review is True
+    assert "content_dropped" in res.review_reasons
+    assert any("degraded" in w for w in res.warnings)          # 무음 아님 — 경고 노출
+    assert _metric("content_dropped") >= before + 1            # 열화 메트릭 증가
 
 
 def test_ingest_empty_extraction_counts_empty_not_review():

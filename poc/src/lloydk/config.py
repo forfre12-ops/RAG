@@ -608,6 +608,11 @@ class Settings(BaseSettings):
     # 들어가 표 속 등급·원가·임원보상 같은 영업비밀이 미탐되는 것을 차단(등급 불변·FNR-safe).
     # 기본 ON. 표 다수 HWP 고객사에서 과라우팅 시 0으로 끄거나 [hwp-tables]로 표를 회수.
     extraction_table_coverage_review: bool = True
+    # docx/pptx/xlsx의 차트·도형·임베디드 OLE·미디어(OCR 불가/미설치)처럼 추출본에서 조용히
+    # 빠진 콘텐츠를 추출기가 warning(*_not_extracted·*_not_ocrd·*_may_be_missing·media_ocr_*)
+    # 으로만 남기던 것을, 검수 게이트가 소비해 needs_review로 라우팅(등급 불변·FNR-safe). 표(HWP)
+    # 커버리지와 동일 취지를 OOXML 손실 신호로 확장. 기본 ON. 미디어 다수 문서에서 과라우팅 시 0.
+    extraction_content_loss_review: bool = True
 
     # 표적 1 (2026-05-29): InferencePipeline use_rag 활성 시 retrieval facade 호출 기본값.
     rag_default_collection: str = "docs"

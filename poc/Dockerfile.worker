@@ -14,8 +14,14 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 COPY scripts ./scripts
-# 파싱 글루(hwp/ocr) 포함 — 워커가 무성 파싱 실패하지 않도록(Dockerfile.api 와 동일 extras).
-RUN pip install --upgrade pip && pip install -e ".[hwp,ocr]"
+# 파싱 글루(hwp/ocr/xls) 포함 — 워커가 무성 파싱 실패하지 않도록(Dockerfile.api.prod 와 동일 extras).
+# [xls] xlrd 누락 시 구형 .xls 가 0글자로 추출됨(511dbfb 배치경로 재발 방지).
+RUN pip install --upgrade pip && pip install -e ".[hwp,ocr,xls]"
+
+# [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp-python 번들 FreeType 에 FT_Palette_Data_Get
+# 심볼이 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 배치 파싱이 0글자로 깨진다.
+# 심볼이 있는 시스템 FreeType(libreoffice 의존으로 설치됨)를 LD_PRELOAD 로 먼저 로드해 채운다.
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 # 비-root 사용자 (보안 하드닝 — Dockerfile.api.prod 와 동일 uid1000). HF 캐시는 non-root 홈에.
 RUN useradd -m -u 1000 lloydk && chown -R lloydk:lloydk /app

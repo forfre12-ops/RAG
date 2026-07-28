@@ -64,6 +64,37 @@ def _ocr_max_pages() -> int:
     return _OCR_MAX_PAGES_DEFAULT
 
 
+# ── zip bomb(압축폭탄) 가드 ────────────────────────────────────────────────────
+# DOCX·HWPX·xlsx·pptx 는 모두 zip 컨테이너다. max_upload_mb 는 '압축된' 업로드 크기만 제한하므로,
+# 수십 KB 파일이 GB급으로 팽창하는 압축폭탄을 막지 못한다(추출 단계 OOM/DoS). infolist()의 비압축
+# 크기(file_size)·압축비로 **실제 decompress 전에** 사전 차단한다(central directory 메타만 읽음).
+_ZIP_MAX_TOTAL_UNCOMPRESSED = 512 * 1024 * 1024   # 총 비압축 상한(512MB) — 정상 오피스문서 여유
+_ZIP_MAX_COMPRESSION_RATIO = 200                   # 멤버별 압축비 상한(비정상 팽창=폭탄 시그니처)
+
+
+def _guard_zip_bomb(zf, *, source: str = "archive") -> None:
+    """zip 멤버 메타데이터로 압축폭탄을 사전 차단 — 실제 read 전에 검사(decompress 0).
+
+    zipfile.read()는 선언된 file_size 를 초과하면 CRC/크기 검증에서 실패하므로, central directory
+    의 file_size 합은 실제 팽창량의 신뢰 가능한 상한이다. 총량·멤버 압축비 둘 다 본다.
+    """
+    total = 0
+    for info in zf.infolist():
+        size = int(getattr(info, "file_size", 0) or 0)
+        comp = int(getattr(info, "compress_size", 0) or 0) or 1
+        total += size
+        if total > _ZIP_MAX_TOTAL_UNCOMPRESSED:
+            raise ValueError(
+                f"zip decompression bomb suspected ({source}): uncompressed total "
+                f"> {_ZIP_MAX_TOTAL_UNCOMPRESSED // (1024 * 1024)}MB"
+            )
+        if size and (size / comp) > _ZIP_MAX_COMPRESSION_RATIO:
+            raise ValueError(
+                f"zip member compression ratio too high ({source}: {info.filename}): "
+                f"{size}/{comp} > {_ZIP_MAX_COMPRESSION_RATIO}"
+            )
+
+
 @dataclass
 class ExtractedTable:
     source: str
@@ -256,6 +287,7 @@ def _ocr_package_images(
     parts: list[str] = []
     try:
         with zipfile.ZipFile(p) as zf:
+            _guard_zip_bomb(zf, source="office-zip")
             for name in names[:_PACKAGE_OCR_LIMIT]:
                 try:
                     with Image.open(io.BytesIO(zf.read(name))) as img:
@@ -394,7 +426,7 @@ def _extract_hwp(p: Path) -> ExtractResult:
                   "표 셀 회수에는 pyhwp 필요: pip install '.[hwp-tables]' (AGPL).",
         )
     # 본문은 뽑혔지만 표 셀이 빠졌을 수 있다(rhwp의 조용한 표 미추출) — 커버리지 판정.
-    coverage = _hwp_table_coverage(p, doc, text)
+    coverage = _hwp_table_coverage(p, doc, text, warnings)
     if coverage == "incomplete":
         _warn_once(warnings, "hwp_table_cells_may_be_missing")
     return ExtractResult(
@@ -407,7 +439,7 @@ def _extract_hwp(p: Path) -> ExtractResult:
     )
 
 
-def _hwp_table_coverage(p: Path, doc, text: str) -> str | None:
+def _hwp_table_coverage(p: Path, doc, text: str, warnings: list[str] | None = None) -> str | None:
     """rhwp가 본문은 뽑았으나 표 셀을 흘렸는지 판정 → "incomplete" | None.
 
     표 속 등급·원가·담당·임원보상 같은 영업비밀이 본문에 없으면 분류기가 못 보고
@@ -427,7 +459,14 @@ def _hwp_table_coverage(p: Path, doc, text: str) -> str | None:
                 return "incomplete"
             return None
         if suffix == ".hwp":
-            hwpx_bytes = doc.to_hwpx_bytes()
+            try:
+                hwpx_bytes = doc.to_hwpx_bytes()
+            except Exception:  # noqa: BLE001
+                # 유일한 표-존재 검출기(to_hwpx_bytes)가 이 .hwp에서 실패 — 표 유무 판정 불가.
+                # 조용히 None으로 삼키면 표 속 비밀 미탐이 무음이 된다. 가시화(등급 불변).
+                if warnings is not None:
+                    _warn_once(warnings, "hwp_table_check_unavailable")
+                return None
             if _hwpx_bytes_has_table(hwpx_bytes):
                 return "incomplete"
             return None
@@ -451,6 +490,7 @@ def _hwpx_uncaptured_table_cells(hwpx_bytes: bytes, extracted_text: str) -> bool
     norm = _re.sub(r"\s+", "", extracted_text or "")
     try:
         z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
+        _guard_zip_bomb(z, source="hwpx")
     except Exception:  # noqa: BLE001
         return False
     names = [n for n in z.namelist() if n.lower().endswith(".xml") and "section" in n.lower()]
@@ -477,6 +517,7 @@ def _hwpx_tables(hwpx_bytes: bytes, *, source: str = "hwpx") -> list[ExtractedTa
 
     try:
         z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
+        _guard_zip_bomb(z, source="hwpx")
     except Exception:  # noqa: BLE001
         return []
     names = [n for n in z.namelist() if n.lower().endswith(".xml") and "section" in n.lower()]
@@ -526,6 +567,7 @@ def _hwpx_bytes_has_table(hwpx_bytes: bytes) -> bool:
 
     try:
         z = zipfile.ZipFile(io.BytesIO(hwpx_bytes))
+        _guard_zip_bomb(z, source="hwpx")
     except Exception:  # noqa: BLE001
         return False
     for n in z.namelist():
@@ -650,6 +692,7 @@ def _docx_ooxml_extras(p: Path, warnings: list[str]) -> list[str]:
 
     try:
         with zipfile.ZipFile(p) as zf:
+            _guard_zip_bomb(zf, source="office-zip")
             named_parts = {
                 "word/comments.xml": "docx_comments_extracted",
                 "word/footnotes.xml": "docx_footnotes_extracted",
@@ -697,6 +740,7 @@ def _docx_ooxml_tables(p: Path, warnings: list[str]) -> list[ExtractedTable]:
     ]
     try:
         with zipfile.ZipFile(p) as zf:
+            _guard_zip_bomb(zf, source="office-zip")
             for name in xml_parts:
                 xml = zf.read(name).decode("utf-8", errors="replace")
                 for raw_tbl in _re.findall(
@@ -748,6 +792,7 @@ def _docx_ooxml_text(p: Path, warnings: list[str]) -> str:
     lines: list[str] = []
     try:
         with zipfile.ZipFile(p) as zf:
+            _guard_zip_bomb(zf, source="office-zip")
             for name in xml_parts:
                 text = _xml_text(zf.read(name).decode("utf-8", errors="replace"))
                 if text:
@@ -1069,7 +1114,12 @@ def _excel_formula_cache_warning(path: str) -> str | None:
             for row_f, row_v in zip(ws_f.iter_rows(), ws_v.iter_rows()):
                 for cf, cv in zip(row_f, row_v):
                     fv = cf.value
-                    if isinstance(fv, str) and fv.startswith("=") and cv.value is None:
+                    # 스칼라 수식은 str('='시작), 배열/데이터테이블 수식은 openpyxl이 ArrayFormula·
+                    # DataTableFormula 객체로 준다(str 아님) — isinstance(str) 만 보면 배열수식의
+                    # 캐시 부재를 놓쳐 계산값이 조용히 유실된다. 타입명으로 판별(구버전 import 안전).
+                    is_scalar_formula = isinstance(fv, str) and fv.startswith("=")
+                    is_formula_obj = type(fv).__name__ in ("ArrayFormula", "DataTableFormula")
+                    if (is_scalar_formula or is_formula_obj) and cv.value is None:
                         missing += 1
     except Exception:  # noqa: BLE001
         return None

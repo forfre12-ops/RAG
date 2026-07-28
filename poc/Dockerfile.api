@@ -16,11 +16,15 @@ COPY scripts ./scripts
 COPY alembic ./alembic
 COPY alembic.ini ./
 # extras 동봉 — 위 apt 단계가 OS 바이너리(tesseract/poppler/libreoffice)를 깔지만
-# Python 글루가 빠지면 HWP/OCR/JWT가 무성으로 동작하지 않는다:
+# Python 글루가 빠지면 HWP/OCR/JWT/xls가 무성으로 동작하지 않는다:
 #   [hwp]=rhwp-python (.hwp/.hwpx), [ocr]=pytesseract+pdf2image (스캔 PDF/이미지),
-#   [jwt]=PyJWT+cryptography (운영 JWT 인증).
+#   [jwt]=PyJWT+cryptography (운영 JWT 인증), [xls]=xlrd (구형 .xls, 511dbfb 재발 방지).
 # AGPL인 [pdf-agpl](PyMuPDF)는 doc/14 라이선스 결정에 따라 의도적 제외(기본은 pdfminer.six).
-RUN pip install --upgrade pip && pip install -e ".[hwp,ocr,jwt]"
+RUN pip install --upgrade pip && pip install -e ".[hwp,ocr,jwt,xls]"
+
+# [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp 번들 FreeType 의 undefined symbol
+# (FT_Palette_Data_Get) 로 `import rhwp` 가 깨지는 것을 시스템 FreeType 선로드로 채운다.
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 EXPOSE 8000
 CMD ["uvicorn", "lloydk.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
