@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 # 워커는 classify/index 태스크에서 문서를 파싱한다 → api 와 동일한 OS 파서 바이너리 필요
 # (없으면 HWP/OCR/PDF 파싱이 무성 실패). libreoffice/tesseract/poppler 포함.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential libpq-dev libreoffice-core libreoffice-writer \
+      build-essential libpq-dev libfreetype6 \
       tesseract-ocr tesseract-ocr-kor poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 

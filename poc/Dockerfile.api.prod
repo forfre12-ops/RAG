@@ -19,7 +19,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GUNICORN_TIMEOUT=60
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential libpq-dev curl libreoffice-core libreoffice-writer \
+      build-essential libpq-dev curl libfreetype6 \
       tesseract-ocr tesseract-ocr-kor poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -43,11 +43,13 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # extras: 운영(psh 성능·otel 관측·jwt) + 파싱 의존(hwp·ocr) — 파싱 요건(FUN) 유지.
 RUN pip install --upgrade pip && \
     pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
-    pip install -e ".[psh,otel,jwt,hwp,ocr,xls]" gunicorn
+    pip install -e ".[psh,otel,jwt,hwp,ocr,xls]" gunicorn && \
+    pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0"   # [보안] Trivy 유일 수정가능 2건(빌드툴 CVE) 상향
 
 # [HWP 파싱 복구] rhwp-python 이 번들한 FreeType(libfreetype-*.so.6)에 FT_Palette_Data_Get 심볼이
 # 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 추출이 0글자로 깨진다. 심볼이 있는
-# 시스템 FreeType(libreoffice 의존으로 설치됨)를 LD_PRELOAD 로 먼저 로드해 심볼을 채운다.
+# 시스템 FreeType(libfreetype6 — poppler-utils 의존으로 유지)를 LD_PRELOAD 로 먼저 로드해 심볼을 채운다.
+# (libreoffice 는 문서변환에 코드가 한 번도 호출하지 않아 제거 — perl 등 CRITICAL CVE 다수 동반 제거, 배포감사)
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 # 비-root 사용자 (보안)
