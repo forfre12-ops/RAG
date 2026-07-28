@@ -262,14 +262,14 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <table class="full">
           <thead><tr><th>헤더</th><th>값</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
-            <tr><td class="f-name">X-API-Key</td><td><code>&lt;키&gt;</code></td><td class="f-req">apikey 모드(기본)</td><td><strong>기본 인증 모드</strong>(AUTH_MODE=apikey). 키에 매핑된 역할이 서버 측에서 결정된다(개발 환경은 <code>X-Actor-Role</code> 헤더 허용)</td></tr>
+            <tr><td class="f-name">X-API-Key</td><td><code>&lt;키&gt;</code></td><td class="f-req">api_key 모드(기본)</td><td><strong>기본 인증 모드</strong>(AUTH_MODE=api_key). 키에 매핑된 역할이 서버 측에서 결정된다(개발 환경은 <code>X-Actor-Role</code> 헤더 허용)</td></tr>
             <tr><td class="f-name">Authorization</td><td><code>Bearer &lt;JWT&gt;</code></td><td class="f-req">jwt 모드</td><td>RS256 서명 JWT(AUTH_MODE=jwt|both). <code>sub</code>=actor_id, <code>roles</code> claim 포함</td></tr>
             <tr><td class="f-name">X-Request-ID</td><td>UUID v4</td><td></td><td>요청 추적 ID. 없으면 서버가 생성. 감사 로그에 기록</td></tr>
             <tr><td class="f-name">Content-Type</td><td><code>application/json</code></td><td class="f-req yes">●</td><td>파일 업로드는 <code>multipart/form-data</code></td></tr>
           </tbody>
         </table>
         <h3 style="margin-top:16px;">인증 모드</h3>
-        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>apikey</code>(API 키 전용) · <code>both</code>(둘 다 허용). 설정한 모드가 모든 라우터에 일괄 적용된다. API 키 검증은 타이밍 사이드채널을 차단하도록 수행된다.</p>
+        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>api_key</code>(API 키 전용) · <code>both</code>(둘 다 허용). 설정한 모드가 모든 라우터에 일괄 적용된다. API 키 검증은 타이밍 사이드채널을 차단하도록 수행된다.</p>
         <h3 style="margin-top:16px;">신뢰 경계 — KL 단일 연동 (고객사 격리는 KL 포털)</h3>
         <p style="font-size:13px;"><strong>KL이 고객사(회원사) 페이지를 일원 구축</strong>하므로, 고객사 간 데이터 격리(어느 회원사가 어느 문서를 보는지)는 <strong>KL 포털 계층</strong>에서 처리한다. Lloydk는 KL 백엔드를 단일 신뢰 클라이언트로 받는 분류·RAG 엔진이다. 인증 신원(actor_id·role)은 <code>request.state</code>에 저장되어 <strong>역할 기반 권한(RBAC)</strong>과 감사 로그 actor 식별에만 쓰인다. 감사 로그의 actor_id는 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다. <span class="nego-chip">협의 필요</span> 고객사 식별자(예: <code>external_ref</code> 규약)를 Lloydk 응답·감사에 어느 수준까지 남길지는 KL과 합의.</p>
         <h3 style="margin-top:16px;">Rate Limit</h3>

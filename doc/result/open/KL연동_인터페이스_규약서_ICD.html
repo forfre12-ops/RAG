@@ -153,7 +153,7 @@ footer strong{color:var(--text-dim);}
 
   <div class="callout warn">
     <div class="callout-label">합의 필요 — 현재 갭</div>
-    <p>현행 API 명세(부록B)에는 <code>metadata.source_type</code>(출처) <strong>1개 필드만</strong> 정의돼 있다. 그러나 R6은 <strong>보안표시·접근범위</strong>까지 받아 M(비밀관리성)을 산정해야 한다. <strong>로이드케이 서빙측은 본 ICD §3·§4의 매핑(보안표시 상향 floor·접근범위 충돌→검수)을 이미 구현했다</strong>(<code>metadata_floor_enabled</code>, 옵트인 — 실증: 인사·재무 S1 사각지대 7건을 보안표시=기밀 시 7/7 상향, 임원한정 시 7/7 검수). <strong>남은 합의 = ① 부록B API에 두 필드 정식 정의 · ② KL이 보낼 값 도메인(§3 enum) 확정 · ③ 화요일 미팅 시점 확정.</strong> 즉 게이트는 준비됐고 <strong>KL이 정확한 값을 채워 보내는 것</strong>이 효과의 전제다.</p>
+    <p>현행 API 명세(부록B)는 이미 <code>source_type</code>·<code>security_marking</code>·<code>access_scope</code> <strong>3필드를 정식 정의</strong>한다(2026-07-04 갱신). R6은 이 보안표시·접근범위로 M(비밀관리성)을 산정한다. <strong>로이드케이 서빙측은 본 ICD §3·§4의 매핑(보안표시 상향 floor·접근범위 충돌→검수)을 이미 구현했다</strong>(<code>metadata_floor_enabled</code>, 옵트인 — 실증: 인사·재무 S1 사각지대 7건을 보안표시=기밀 시 7/7 상향, 임원한정 시 7/7 검수). <strong>남은 합의 = ① OpenAPI 스키마에 3필드 타입 반영(2026-07-29 완료) · ② KL이 보낼 값 도메인(§3 enum) 확정 · ③ 화요일 미팅 시점 확정.</strong> 즉 게이트는 준비됐고 <strong>KL이 정확한 값을 채워 보내는 것</strong>이 효과의 전제다.</p>
   </div>
 
   <hr/>

@@ -1291,7 +1291,26 @@ components:
             바이너리 파일 분류는 별도 /preprocess/upload 사용.
         metadata:
           type: object
-          description: 작성 부서, 문서 유형, 작성일 등 라벨링 보조 정보
+          description: |
+            라벨링 보조 정보(작성 부서·문서 유형·작성일 등). 아래 3필드는 KL 연동 R6 계약
+            (⚠ ICD 협의안 v0.9 — 화요일 미팅서 K1~K7 확정 후 동결). metadata_floor 게이트
+            활성 시 등급 상향(floor)·검수 라우팅에 사용(운영 프로파일 onprem-local·full-train은 기본 활성).
+          properties:
+            source_type:
+              type: string
+              description: 문서 출처 유형(예 web_public/internal 등). source-prior 게이트 입력.
+            security_marking:
+              type: string
+              enum: [top_secret, secret, confidential]
+              description: |
+                KL 원본 보안표시 → 등급 floor(안전하게 상향만·하향 없음):
+                top_secret→TS · secret→S1 · confidential→S2. 소문자 exact-match(한글 표기 미매칭=무동작).
+            access_scope:
+              type: string
+              enum: [approved_only, designated, department, all_employees]
+              description: |
+                접근범위 → 비밀관리성(M) 신호. 표기 없고 approved_only/designated/department이면
+                예측이 낮을 때 검수 라우팅(ICD §4.4). (all_employees 처리는 협의 대상)
           additionalProperties: true
         text_already_preprocessed:
           type: boolean
@@ -1305,13 +1324,12 @@ components:
             use_rag:
               type: boolean
               default: false
-              description: 사내규정 RAG 컨텍스트 결합 여부 (Elasticsearch dense kNN + BM25 + RRF 하이브리드)
-            rag_index_alias:
+              description: 사내규정 RAG 컨텍스트 결합 여부 (PostgreSQL pgvector dense + bigram ts_rank 하이브리드)
+            rag_namespace:
               type: string
               description: |
-                선택. RAG 검색 대상 인덱스 alias 명시.
-                미지정 시 기본 alias `secrets-guides` 사용.
-                상세: doc/13 §4.1 인덱스 명명 규칙.
+                선택. RAG 검색 대상 네임스페이스 명시(실제 요청 필드명 = rag_namespace).
+                미지정 시 기본 네임스페이스 사용.
               example: secrets-guides
             return_evidence:
               type: boolean
@@ -1348,12 +1366,16 @@ components:
             maximum: 1
         evaluation_factors:
           type: object
-          description: 가이드 4대 평가요소 점수
+          nullable: true
+          description: 정본 가이드 3요건(S 비공지성 · V 경제적 유용성 · M 비밀관리성) 점수. 각 0~2.
           properties:
-            economic_value: { type: number, minimum: 0, maximum: 5 }
-            non_publicity: { type: number, minimum: 0, maximum: 5 }
-            management_level: { type: number, minimum: 0, maximum: 5 }
-            leak_impact: { type: number, minimum: 0, maximum: 5 }
+            secrecy: { type: number, minimum: 0, maximum: 2, description: 비공지성(S) }
+            value: { type: number, minimum: 0, maximum: 2, description: 경제적 유용성(V) }
+            management: { type: number, minimum: 0, maximum: 2, description: 비밀관리성(M) }
+            scores:
+              type: object
+              description: 도메인 독립 factor_code → 점수 맵
+              additionalProperties: { type: number }
         evidence:
           type: array
           description: 근거 키워드·문맥 span
@@ -1375,13 +1397,31 @@ components:
               score: { type: number }
         model_version: { type: string }
         elapsed_ms: { type: integer }
+        factors_source:
+          type: string
+          enum: [rule_evidenced, model_estimated]
+          default: rule_evidenced
+          description: evaluation_factors 출처 — rule_evidenced(룰엔진 실증 근거·법리 표시 가능) / model_estimated(등급 역산 추정치·법리 근거 아님).
         status:
           type: string
-          enum: [staging, confirmed]
+          enum: [staging, needs_review, needs_second_review]
           default: staging
+          description: staging=자동확정 후보 · needs_review/needs_second_review=검수 라우팅. 최종 확정은 /confirm 소관(이 응답에서 'confirmed'는 발행되지 않음).
         warnings:
           type: array
           items: { type: string }
+        rule_grade:
+          type: string
+          nullable: true
+          description: 룰 엔진(시드 키워드 S×V×M) 단독 판정.
+        model_grade:
+          type: string
+          nullable: true
+          description: 학습 분류기(BERT) 단독 판정(override/cap/floor 이전). 모델 미로드 시 null.
+        decision_path:
+          type: string
+          nullable: true
+          description: 최종 label 도출 경로(agreement/rule-override/source-cap/rule-only 등) — 룰·모델 이중판정 투명성.
 
     ReviewQueueItem:
       type: object
