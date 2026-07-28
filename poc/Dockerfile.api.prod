@@ -43,7 +43,12 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # extras: 운영(psh 성능·otel 관측·jwt) + 파싱 의존(hwp·ocr) — 파싱 요건(FUN) 유지.
 RUN pip install --upgrade pip && \
     pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
-    pip install -e ".[psh,otel,jwt,hwp,ocr]" gunicorn
+    pip install -e ".[psh,otel,jwt,hwp,ocr,xls]" gunicorn
+
+# [HWP 파싱 복구] rhwp-python 이 번들한 FreeType(libfreetype-*.so.6)에 FT_Palette_Data_Get 심볼이
+# 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 추출이 0글자로 깨진다. 심볼이 있는
+# 시스템 FreeType(libreoffice 의존으로 설치됨)를 LD_PRELOAD 로 먼저 로드해 심볼을 채운다.
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 # 비-root 사용자 (보안)
 RUN useradd -m -u 1000 lloydk && chown -R lloydk:lloydk /app
