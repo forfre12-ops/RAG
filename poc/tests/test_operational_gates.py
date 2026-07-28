@@ -118,14 +118,28 @@ def _readiness_argv(tmp_path, gold, **extra):
     return monkeypatch_argv, out
 
 
+def _signed(rec: dict, i: int) -> dict:
+    """[#8] 유효 서명 envelope(실계정 reviewer·gate_version·signed_at·reviewer_ids) + 실문서
+    출처를 붙여 golden_tiers.is_real_locked_eval 를 통과하는 strict human_review 로 만든다."""
+    rec.update({
+        "label_source": "human_review",
+        "reviewer_id": f"reviewer_kim_{i}",
+        "gate_version": "human_signoff_v1",
+        "signed_at": "2026-07-29T00:00:00Z",
+        "reviewer_ids": [f"reviewer_kim_{i}"],
+        "document_origin": "public_real",
+    })
+    return rec
+
+
 def _gold_with_human_review(tmp_path, n_underclass: int):
-    """700 records: 40 human_review (n_underclass of them high-risk -> S3), rest public."""
+    """700 records: 40 strict-signed human_review (n_underclass high-risk -> S3), rest public."""
     lines = []
     for i in range(40):
         if i < n_underclass:
-            rec = {"label": "S2", "model_label": "S3", "label_source": "human_review"}
+            rec = _signed({"label": "S2", "model_label": "S3"}, i)
         else:
-            rec = {"label": "S3", "model_label": "S3", "label_source": "human_review"}
+            rec = _signed({"label": "S3", "model_label": "S3"}, i)
         lines.append(json.dumps(rec))
     for _ in range(660):
         lines.append(json.dumps({"label": "S3", "label_source": "public_definitive"}))
@@ -155,6 +169,26 @@ def test_human_review_gate_passes_with_clean_labels(tmp_path, monkeypatch):
     hr_gate = next(g for g in payload["gates"] if g["name"] == "human review gold")
     assert hr_gate["status"] == "PASS"
     assert payload["verdict"] == "PASS"
+
+
+def test_human_review_gate_blocks_on_unsigned_fakes(tmp_path, monkeypatch):
+    # [#8] 서명 envelope/실문서 출처 없는 가짜 human_review 40건(reviewer_id=r1, all S3)은
+    # strict 계약상 0 → BLOCKED. raw 카운트만 세던 예전 게이트를 가짜로 통과시키던 구멍을 닫는다.
+    lines = [
+        json.dumps({"label": "S3", "model_label": "S3",
+                    "label_source": "human_review", "reviewer_id": "r1"})
+        for _ in range(40)
+    ]
+    lines += [json.dumps({"label": "S3", "label_source": "public_definitive"}) for _ in range(660)]
+    gold = tmp_path / "classification_gold.jsonl"
+    gold.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    argv, out = _readiness_argv(tmp_path, gold)
+    monkeypatch.setattr("sys.argv", argv)
+    build_operational_readiness.main()
+    payload = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+    hr_gate = next(g for g in payload["gates"] if g["name"] == "human review gold")
+    assert hr_gate["status"] == "BLOCKED"                       # raw 40 이지만 strict 0
+    assert "raw label_source=human_review=40" in hr_gate["detail"]
 
 
 def test_model_parity_gate_blocks_when_deployed_differs(tmp_path, monkeypatch):

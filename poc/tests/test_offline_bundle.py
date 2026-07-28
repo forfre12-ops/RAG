@@ -103,12 +103,18 @@ _UV_EXPORT_SAMPLE = (
 )
 
 
-def test_strip_hashes_keeps_pinned_versions_only():
+def test_strip_hashes_keeps_pinned_versions_and_drops_host_excluded():
+    # _strip_hashes 는 pip download 용 버전핀 목록을 만든다: (1) 해시·환경마커 제거,
+    # (2) torch/nvidia/triton 스탠자 제외 — 이미지에 구워지고 CUDA 휠은 표준태그로 못 받아
+    # (No matching distribution) 포함 시 빌드가 fail-closed 로 중단된다. 다운로드 목록은
+    # install 매니페스트(_requirements_no_torch.txt)와 동일 집합이어야 하므로 여기서 뺀다.
     out = _strip_hashes(_UV_EXPORT_SAMPLE)
     lines = [ln for ln in out.splitlines() if ln.strip()]
-    assert lines == ["accelerate==1.14.0", "torch==2.5.0", "nvidia-cudnn-cu12==9.1.0", "aiohttp==3.14.1"]
+    assert lines == ["accelerate==1.14.0", "aiohttp==3.14.1"]
     assert "--hash" not in out
     assert "# via" not in out
+    assert "torch==" not in out          # 이미지에 구워짐 → 호스트 다운로드 목록서 제외
+    assert "nvidia-cudnn-cu12" not in out
 
 
 def test_strip_host_excluded_drops_torch_stanzas_keeps_hashes():
@@ -312,7 +318,9 @@ def test_expected_files_lists_required_artifacts():
     assert "manifest.yaml" in files
     assert "CHECKSUMS.sha256" in files
     assert any(f.startswith("docker-images/postgres") for f in files)
-    assert any(f.startswith("models/foo-bar/") for f in files)
+    # [#2] 임베딩 모델은 HF 캐시 레이아웃으로 기대돼야 한다(HF_HOME=/models/hf 오프라인 로드).
+    assert any(f == "models/hf/hub/models--foo--bar/" for f in files)
+    assert not any(f == "models/foo-bar/" for f in files)  # 옛 잘못된 경로 재발 방지
 
 
 # ─────────────────────────────────────────────────────────────
@@ -425,6 +433,33 @@ def test_write_checksums_skips_missing_files(tmp_path: Path):
     content = cs_path.read_text(encoding="utf-8")
     assert "real.txt" in content
     assert "ghost.txt" not in content
+
+
+def test_write_checksums_excludes_itself_on_rebuild(tmp_path: Path):
+    # [#1 회귀] 재빌드-over-existing: rglob 이 이전 CHECKSUMS.sha256 을 파일 목록에 포함시켜도
+    # 매니페스트는 자기 자신을 해시하면 안 된다. 자기참조 라인이 있으면 파일을 덮어쓴 직후
+    # 반드시 불일치가 되어 verify.sh 가 항상 abort 한다(에어갭 무결성 검증 영구 실패).
+    import hashlib
+
+    out = tmp_path / "bundle"
+    out.mkdir()
+    real = out / "real.txt"
+    real.write_text("payload", encoding="utf-8")
+    stale = out / "CHECKSUMS.sha256"
+    stale.write_text("deadbeef  real.txt\n", encoding="utf-8")  # 이전 빌드의 낡은 매니페스트
+
+    # rglob 이 돌려주듯 CHECKSUMS.sha256 을 목록에 섞어 전달.
+    cs_path = write_checksums(out, [real, stale])
+    content = cs_path.read_text(encoding="utf-8")
+
+    # 자기참조 라인이 없어야 한다.
+    assert "  CHECKSUMS.sha256" not in content
+    assert "real.txt" in content
+    # 남은 모든 라인의 해시는 현재 파일과 일치해야 한다(=verify 통과).
+    for line in [ln for ln in content.splitlines() if ln.strip()]:
+        digest, rel = line.split("  ", 1)
+        actual = hashlib.sha256((out / rel).read_bytes()).hexdigest()
+        assert digest == actual, f"{rel} 해시 불일치 → verify.sh abort"
 
 
 def test_simple_yaml_dump_handles_dict():

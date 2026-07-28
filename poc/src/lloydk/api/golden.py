@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse
 
 from lloydk.api._jwt_auth import require_auth
 from lloydk.api._rbac import require_role
-from lloydk.api.confirm import resolve_actor_user_id
+from lloydk.api.confirm import bind_authenticated_actor, resolve_actor_user_id
 from lloydk.golden_tiers import is_human_reviewer
 from lloydk.schemas.golden import (
     GoldenBuildRequest,
@@ -39,24 +39,32 @@ html_router = APIRouter(tags=["golden"])
 @router.post(
     "/golden/build",
     response_model=GoldenBuildResponse,
-    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
 )
-def golden_build(request: Request, req: GoldenBuildRequest) -> GoldenBuildResponse:
+def golden_build(
+    request: Request,
+    req: GoldenBuildRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+) -> GoldenBuildResponse:
+    # [#13] 감사 신원(created_by 등)을 인증 principal 로 확정(JWT sub 우선; api_key 포털 전파값 유지).
+    bind_authenticated_actor(req.actor, auth)
     return GoldenBuildService().submit(req)
 
 
 @router.post(
     "/golden/jobs/register",
     response_model=GoldenBuildResponse,
-    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
 )
-def golden_register_build(req: GoldenRegisterRequest) -> GoldenBuildResponse:
+def golden_register_build(
+    req: GoldenRegisterRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+) -> GoldenBuildResponse:
     """기존 build_*.jsonl(큐레이트 슬레이트)을 재라벨링 없이 골든 잡으로 등록 → signoff.html 연결.
 
     /golden/build 와 달리 LLM 재라벨링을 하지 않아 슬레이트 라벨을 보존한다(실서명 스프린트 34건
     등). 경로는 datasets/ 하위 샌드박스. 반환 job_id 로 GET /golden/jobs/{id}/signoff.html 을 열어
     검수자가 화면 서명한다.
     """
+    bind_authenticated_actor(req.actor, auth)  # [#13] 감사 신원 = 인증 principal
     job_id = GoldenBuildService().register_build(
         req.build_path, actor_user_id=req.actor.user_id
     )

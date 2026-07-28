@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 import time
 from typing import Optional
@@ -18,6 +19,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from lloydk.api._jwt_auth import require_auth
+from lloydk.api.confirm import bind_authenticated_actor
 from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.services.document_ingestion_service import (
@@ -26,6 +28,31 @@ from lloydk.services.document_ingestion_service import (
 )
 
 router = APIRouter(tags=["documents"], dependencies=[Depends(require_auth)])
+
+# [#14] 업로드 RAG 적재 대상(collection)은 caller 지정이라, 검증 없이 두면 인증 사용자가 시스템/
+# 평가/가이드 코퍼스(docs·legal·secrets-guides·gold 등)에 임의 문서를 심어 검색·평가 결과를
+# 오염(corpus poisoning)시킬 수 있다. pgvector 파라미터 바인딩이라 SQLi 는 아니나, 네임스페이스를
+# 안전 charset(소문자 강제)으로 제한하고 보호 컬렉션을 거부한다. 미지정 시 기본 업로드 컬렉션 사용.
+_RAG_NS_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+_RAG_NS_PROTECTED = frozenset({
+    "docs", "legal", "secrets-guides", "gold", "gold_real", "golden",
+    "eval", "locked_gold_eval", "retrieval_gold",
+})
+
+
+def _validate_rag_namespace(ns: Optional[str]) -> None:
+    """caller 지정 rag_namespace 를 안전 charset + 보호 컬렉션 거부로 검증(빈값=기본 사용, 통과)."""
+    if ns is None:
+        return
+    v = ns.strip()
+    if not v:
+        return
+    if not _RAG_NS_RE.match(v) or v in _RAG_NS_PROTECTED:
+        raise HTTPException(
+            status_code=422,
+            detail=f"invalid rag_namespace: {ns!r} (허용: ^[a-z0-9][a-z0-9_-]{{0,63}}$, "
+                   "시스템/평가 컬렉션 불가)",
+        )
 
 
 def _get_ingestion_service() -> DocumentIngestionService:
@@ -65,6 +92,7 @@ async def upload_document(
     rag_namespace: Optional[str] = Form(default=None, description="RAG 적재 컬렉션(미지정 시 settings.rag_upload_collection)"),
     file: UploadFile = File(...),
     svc: DocumentIngestionService = Depends(_get_ingestion_service),
+    auth: dict = Depends(require_auth),
 ):
     """분류 대상 문서 업로드.
 
@@ -76,6 +104,10 @@ async def upload_document(
         actor_obj = Actor.model_validate(json.loads(actor))
     except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=f"invalid actor json: {exc}") from exc
+    # [#13] created_by 감사 신원을 인증 principal 로 확정(body 자칭 위조 차단; JWT sub 우선).
+    bind_authenticated_actor(actor_obj, auth)
+    # [#14] RAG 적재 네임스페이스 검증 — 시스템/평가 컬렉션 오염 차단(파일 읽기 전 fail-fast).
+    _validate_rag_namespace(rag_namespace)
 
     max_bytes = settings.max_upload_mb * 1024 * 1024
     declared_size = getattr(file, "size", None)
@@ -321,6 +353,8 @@ async def analyze_document(
         ocr_requires_review=bool(getattr(settings, "extraction_ocr_requires_review", True)),
         content_quality=pre.quality,
         table_coverage=getattr(ex, "table_coverage", None),
+        warnings=(getattr(ex, "warnings", None)
+                  if bool(getattr(settings, "extraction_content_loss_review", True)) else None),
     )
     gate = AnalyzeGateInfo(requires_review=dec.requires_review, reasons=list(dec.reasons))
     stages.append(AnalyzeStage(

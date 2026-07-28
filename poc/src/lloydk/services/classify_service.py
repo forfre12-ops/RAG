@@ -990,6 +990,7 @@ class ClassifyService:
             from lloydk.repositories.document_repo import DocumentRepo  # noqa: PLC0415
         except ImportError:
             return "", None
+        status: str | None = None
         try:
             with session_scope() as db:
                 doc = DocumentRepo(db).get(doc_uuid)
@@ -1008,10 +1009,30 @@ class ClassifyService:
                 return "", status
             bucket, key = m.group(1), m.group(2)
             data = storage.get(bucket, key)
-            return data.decode("utf-8", errors="replace"), status
+            text = data.decode("utf-8", errors="replace")
+            if not text:
+                # [#4] normalized_text_uri 는 있는데(위 가드 통과) read-back 이 빈 본문 —
+                # 원문 저장 볼륨 미마운트/미공유(재생성 시 원문 소실·api↔worker 미공유)의
+                # 전형적 신호다. 무음 '빈 본문'으로 흘리면 인프라 장애가 fail-secure(TS+
+                # needs_review) 라우팅으로 세탁돼 안 보인다 → 격리는 유지하되 노출한다.
+                logger.warning(
+                    "content read-back EMPTY for doc_id=%s uri=%s — 원문 저장 볼륨 "
+                    "미마운트/미공유 의심(#4); fail-secure 격리는 유지",
+                    doc_id, uri,
+                )
+                self._inc_persist_failure("content_readback_empty")
+            return text, status
         except Exception as exc:  # noqa: BLE001
-            logger.debug("_fetch_content_by_doc_id failed: %s", exc)
-            return "", None
+            # [#4] uri 는 존재했는데 storage.get 이 실패 = '본문 없음'이 아니라 read-back 자체가
+            # 깨진 것(볼륨 미마운트/백엔드 장애). 과거엔 debug 로 삼켜 fail-secure 격리와 구분
+            # 불가했다 → warning+메트릭으로 인프라 신호를 가시화(등급 판단은 그대로 fail-secure).
+            logger.warning(
+                "_fetch_content_by_doc_id read-back FAILED for doc_id=%s: %s "
+                "(원문 저장 볼륨 미마운트/백엔드 장애 의심 — fail-secure 유지)",
+                doc_id, exc,
+            )
+            self._inc_persist_failure("content_readback_error")
+            return "", status
 
     @staticmethod
     def _inc_persist_failure(reason: str) -> None:

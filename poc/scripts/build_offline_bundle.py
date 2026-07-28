@@ -419,7 +419,14 @@ def expected_files(
     for svc in components:
         files.append(f"docker-images/{svc}.tar")
     for m in models:
-        files.append(f"models/{m.name.replace('/', '-')}/")
+        if m.role == "embedding":
+            # [#2] 임베더는 HF 캐시 레이아웃으로 실린다(HF_HOME=/models/hf; compose 가
+            # ../models:/models 마운트 → 오프라인 로드 경로 models/hf/hub/models--<org>--<name>/).
+            # 종전엔 models/<org>-<name>/ 로 잘못 선언돼 실제 스테이징 경로와 어긋났고(그나마
+            # 스테이징 자체가 없었다), verify_install 이 엉뚱한 경로를 기대했다.
+            files.append(f"models/hf/hub/models--{m.name.replace('/', '--')}/")
+        else:
+            files.append(f"models/{m.name.replace('/', '-')}/")
     files.extend([
         "python-deps/wheels/",
         "python-deps/_requirements_no_torch.txt",
@@ -628,11 +635,17 @@ def write_checksums(out_dir: Path, files: list[Path]) -> Path:
     for f in sorted(files):
         if not f.exists():
             continue
+        rel = f.relative_to(out_dir).as_posix()
+        # [#1] 매니페스트는 자기 자신을 해시하지 않는다. 재빌드-over-existing 시 이전
+        # CHECKSUMS.sha256 이 rglob 목록에 섞여 들어와 옛 해시로 기록되면, 이 파일을 덮어쓴
+        # 직후엔 반드시 불일치가 되어 verify.sh 가 항상 abort 한다(표준 sha256sum 매니페스트도
+        # 자기 자신을 제외한다). 자기참조 라인 1건을 원천 배제해 검증 무한 실패를 막는다.
+        if rel == "CHECKSUMS.sha256":
+            continue
         h = hashlib.sha256()
         with f.open("rb") as fp:
             for chunk in iter(lambda: fp.read(65536), b""):
                 h.update(chunk)
-        rel = f.relative_to(out_dir).as_posix()
         lines.append(f"{h.hexdigest()}  {rel}")
     cs_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return cs_path
@@ -1020,7 +1033,7 @@ else
   PAIRS="$(grep -oE '"file": *"[^"]*"|"expected_grade": *"[^"]*"' "$MANIFEST" | sed -E 's/.*: *"([^"]*)"/\1/' | paste -d'|' - -)"
 fi
 
-n=0; fail=0
+n=0; fail=0; mfail=0
 while IFS='|' read -r file exp; do
   [ -z "$file" ] && continue
   n=$((n+1))
@@ -1028,9 +1041,17 @@ while IFS='|' read -r file exp; do
   if [ -z "$resp" ]; then echo "  FAIL   $file  (분석 응답 없음 = 고등급이면 미탐)"; fail=$((fail+1)); continue; fi
   if command -v python3 >/dev/null 2>&1; then
     pred="$(printf '%s' "$resp" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("classification",{}).get("label",""))' 2>/dev/null)"
+    mv="$(printf '%s' "$resp" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("classification",{}).get("model_version",""))' 2>/dev/null)"
   else
     pred="$(printf '%s' "$resp" | grep -oE '"label": *"[A-Z0-9]+"' | tail -1 | sed -E 's/.*"([A-Z0-9]+)"/\1/')"
+    mv="$(printf '%s' "$resp" | grep -oE '"model_version": *"[^"]*"' | tail -1 | sed -E 's/.*"([^"]*)"/\1/')"
   fi
+  # [#11] 배포 모델이 실제 로드됐는지 — rule-fallback(가중치 미로드)이면 배포 인수 실패.
+  # airgap 배포는 학습·보정 모델이 반드시 서빙돼야 한다(임베더/분류기 로드 실패면 여기서 잡힌다).
+  case "$mv" in
+    rule-fallback-v0|rule-fallback|none)
+      echo "  MODEL! $file  model_version=$mv  (가중치 미로드=rule-fallback; 배포 모델 미검증)"; mfail=$((mfail+1)) ;;
+  esac
   if [ "$(sev "${pred:-X}")" -gt "$(sev "$exp")" ]; then
     echo "  UNDER! $file  exp=$exp pred=${pred:-?}  (고등급 미탐 - veto)"; fail=$((fail+1))
   else
@@ -1038,8 +1059,13 @@ while IFS='|' read -r file exp; do
   fi
 done < <(printf '%s\n' "$PAIRS")
 
-echo "[acceptance] $([ "$fail" -eq 0 ] && echo PASS || echo FAIL): ${n} docs, ${fail} veto(고등급 미탐/파싱실패)"
-[ "$fail" -eq 0 ]
+# rule-fallback 은 FNR-safe 이나 배포 인수에선 '모델 미로드'를 통과시키면 안 된다.
+# 운영자가 의도적으로 rule-only 를 검증할 때만 ALLOW_RULE_FALLBACK=1 로 우회.
+_model_ok=1
+[ "$mfail" -gt 0 ] && [ "${ALLOW_RULE_FALLBACK:-0}" != "1" ] && _model_ok=0
+if [ "$fail" -eq 0 ] && [ "$_model_ok" -eq 1 ]; then _v=PASS; else _v=FAIL; fi
+echo "[acceptance] $_v: ${n} docs, ${fail} veto(고등급 미탐/파싱실패), ${mfail} model-unloaded(rule-fallback)"
+[ "$fail" -eq 0 ] && [ "$_model_ok" -eq 1 ]
 '''
 
 
@@ -1309,7 +1335,80 @@ def _copy_trained_classifier(manifest: "BundleManifest", out_dir: Path) -> bool:
     return True
 
 
-def build_bundle(manifest: "BundleManifest", out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) -> int:
+def _resolve_hf_cache_dir() -> Path:
+    """빌드 호스트의 HF hub 캐시 루트(HF_HOME 우선, 없으면 ~/.cache/huggingface)."""
+    root = os.environ.get("HF_HOME") or str(Path.home() / ".cache" / "huggingface")
+    return Path(root) / "hub"
+
+
+def _copy_embedder_cache(
+    manifest: "BundleManifest", out_dir: Path, *, allow_download: bool = True
+) -> bool:
+    """임베딩 모델(KURE-v1 등) HF 캐시를 번들 models/hf/hub/ 로 스테이징한다.
+
+    airgap compose 는 HF_HOME=/models/hf + HF_HUB_OFFLINE=1 로 임베더를 오프라인 로드하고,
+    onprem-local 프로파일은 require_real_embedder=True 라 임베더가 없으면 startup 이 fail-secure
+    RuntimeError 로 죽는다(#2). 종전 빌더는 분류기만 스테이징하고 임베더를 전혀 담지 않아
+    '자칭 self-contained' 번들이 startup 에서 막혔다 — 이 함수가 그 갭을 닫는다.
+
+    빌드 호스트 캐시에 모델이 없으면 allow_download 시 1회 다운로드를 시도(지재원=외부망 빌드),
+    그래도 없으면 False → build_bundle 이 fail-closed 로 번들 빌드를 실패 처리한다.
+    """
+    import shutil  # noqa: PLC0415
+
+    embedders = [m for m in manifest.models if m.role == "embedding"]
+    if not embedders:
+        print("  [WARN] manifest 에 임베딩 모델 없음 — 임베더 스테이징 skip", file=sys.stderr)
+        return True
+
+    hub = _resolve_hf_cache_dir()
+    dst_hub = out_dir / "models" / "hf" / "hub"
+    ok = True
+    for m in embedders:
+        cache_name = f"models--{m.name.replace('/', '--')}"
+        src = hub / cache_name
+        dst = dst_hub / cache_name
+        if not src.exists() and allow_download:
+            print(f"  [embed] 캐시 부재 → 다운로드 시도: {m.name}", file=sys.stderr)
+            try:
+                from cache_kure_v1 import cache_model  # noqa: PLC0415
+                dl_ok, detail = cache_model(m.name)
+                print(f"  [embed] 다운로드 {'OK' if dl_ok else 'FAIL'}: {detail}", file=sys.stderr)
+            except Exception as exc:  # noqa: BLE001
+                print(f"  [embed] 다운로드 불가: {exc}", file=sys.stderr)
+        if not src.exists():
+            print(
+                f"  [ERR] 임베딩 모델 HF 캐시 부재: {src}. airgap(onprem-local)은 "
+                f"require_real_embedder=True 라 이게 없으면 startup 이 죽습니다(#2). "
+                f"`python scripts/cache_kure_v1.py --models {m.name}` 로 먼저 캐시하세요.",
+                file=sys.stderr,
+            )
+            ok = False
+            continue
+        if dst.exists():
+            print(f"  [skip] already exists: {dst}", file=sys.stderr)
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            # 리눅스 빌드호스트: HF blob↔snapshot 상대 심링크 보존(중복 없음·용량 최소).
+            shutil.copytree(src, dst, symlinks=True)
+        except (OSError, shutil.Error):
+            # Windows 심링크 권한 부재 등 → 심링크 따라가며 실본문 복사(용량↑, 이식성 우선).
+            if dst.exists():
+                shutil.rmtree(dst, ignore_errors=True)
+            shutil.copytree(src, dst, symlinks=False)
+        size_mb = sum(f.stat().st_size for f in dst.rglob("*") if f.is_file()) / 1_048_576
+        print(f"  [embed] {m.name} -> {dst}  ({size_mb:.0f}MB)", file=sys.stderr)
+    return ok
+
+
+def build_bundle(
+    manifest: "BundleManifest",
+    out_dir: Path,
+    wheel_platform: str = _DEFAULT_WHEEL_PLATFORM,
+    *,
+    stage_embedder: bool = True,
+) -> int:
     """실 빌드: docker save + pip download + infra 파일 복사."""
     print("\n=== Lloydk Airgap Bundle - BUILD ===", file=sys.stderr)
     images_dir = out_dir / "docker-images"
@@ -1352,6 +1451,19 @@ def build_bundle(manifest: "BundleManifest", out_dir: Path, wheel_platform: str 
     # #40: 학습된 분류기 모델(가중치 + temperature.json) 복사
     if not _copy_trained_classifier(manifest, out_dir):
         failed.append("classifier-trained")
+
+    # #2: 임베딩 모델(KURE-v1) HF 캐시 스테이징 — airgap onprem-local 은 require_real_embedder
+    # 라 임베더가 없으면 startup 이 fail-secure RuntimeError 로 죽는다. fail-closed(미스테이징 시
+    # 번들 빌드 실패)로 '임베더 없는 self-contained 번들'이 출하되는 무음 갭을 원천 차단한다.
+    if stage_embedder:
+        if not _copy_embedder_cache(manifest, out_dir):
+            failed.append("embedder-cache")
+    else:
+        print(
+            "  [WARN] --skip-embedder — 임베딩 모델 스테이징 생략. airgap onprem-local 은 "
+            "임베더 없으면 startup 이 죽으니 별도 채널로 반드시 공급하세요(#2).",
+            file=sys.stderr,
+        )
 
     if failed:
         print(f"\n[bundle] partial build — failed: {failed}", file=sys.stderr)
@@ -1434,6 +1546,11 @@ def main() -> int:
         "--skip-release-gate", action="store_true",
         help="release-gate 검사를 건너뛴다(긴급 우회 — GA 비권장·감사대상). 기본은 fail-closed.",
     )
+    ap.add_argument(
+        "--skip-embedder", action="store_true",
+        help="임베딩 모델(KURE-v1) HF 캐시 스테이징을 건너뛴다(비권장 — airgap onprem-local 은 "
+             "임베더 없으면 startup 이 죽는다). 임베더를 별도 채널로 공급할 때만.",
+    )
     args = ap.parse_args()
 
     classifier_model_dir = resolve_classifier_model_dir(args.classifier_model_dir)
@@ -1502,7 +1619,11 @@ def main() -> int:
             return gate_rc
 
     # ── 실 빌드 ──────────────────────────────────────────────
-    rc = build_bundle(manifest, out_dir, wheel_platform=args.wheel_platform)
+    rc = build_bundle(
+        manifest, out_dir,
+        wheel_platform=args.wheel_platform,
+        stage_embedder=not args.skip_embedder,
+    )
     if rc == 0:
         all_files = list(out_dir.rglob("*"))
         actual_files = [f for f in all_files if f.is_file()]

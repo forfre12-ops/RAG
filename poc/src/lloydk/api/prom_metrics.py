@@ -88,7 +88,7 @@ CLASSIFY_PERSIST_FAILURE_TOTAL = Counter(
     "lloydk_classify_persist_failure_total",
     "Classify persistence failures (DB unavailable or error, inference_id is ephemeral UUID)",
     # tenant 제거: 'no_tenant' reason 라벨 폐기(단일 고객사 엔진, tenant 스코프 없음).
-    ["reason"],  # db_error | unexpected | no_doc | no_level | import_error
+    ["reason"],  # db_error | unexpected | no_doc | no_level | import_error | content_readback_error | content_readback_empty
     registry=registry,
 )
 

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from lloydk.api._jwt_auth import require_auth
 from lloydk.api._rbac import require_role
+from lloydk.api.confirm import bind_authenticated_actor
 from lloydk.config import settings
 from lloydk.schemas.common import Actor
 from lloydk.schemas.guide import GuideUploadResponse, GuideVersionList
@@ -23,7 +24,6 @@ router = APIRouter(tags=["guide"], dependencies=[Depends(require_auth)])
     "/guide/documents",
     response_model=GuideUploadResponse,
     status_code=201,
-    dependencies=[Depends(require_role("admin", "kl_backend"))],
 )
 async def upload_guide(
     guide_id: str = Form(...),
@@ -33,11 +33,14 @@ async def upload_guide(
     change_summary: Optional[str] = Form(default=None),
     doc_type: Optional[str] = Form(default=None),
     file: UploadFile = File(...),
+    auth: dict = Depends(require_role("admin", "kl_backend")),
 ):
     try:
         actor_obj = Actor.model_validate(json.loads(actor))
     except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=f"invalid actor json: {exc}") from exc
+    # [#13] actor_user_id 감사 신원을 인증 principal 로 확정(body 자칭 위조 차단; JWT sub 우선).
+    bind_authenticated_actor(actor_obj, auth)
     # R3: 업로드 본문 크기 한도 검증 — OOM·DoS 차단.
     # 1차: file.size (multipart Content-Length 기반, 클라이언트 신고값).
     # 2차: read 후 실제 바이트 길이 (조작 방지).

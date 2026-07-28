@@ -85,16 +85,46 @@ def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
 
 HIGH_RISK = {"TS", "S1", "S2"}
 
+_STRICT_VALIDATOR_CACHE: list = []
+
+
+def _strict_signoff_validator():
+    """golden_tiers.is_real_locked_eval 로더 — 유효 서명 envelope(실계정 reviewer·gate_version·
+    signed_at·reviewer_ids) + 실문서 출처(document_origin∈{public_real,customer_real})를 함께 요구.
+
+    [#8] readiness 의 human_review 게이트가 raw label_source=="human_review" 만 세면, 서명·출처
+    envelope 없는 가짜 40건으로 PASS 를 만들 수 있었다(감사 재현). 이 검증기로 '엄격 골든 계약'을
+    강제한다. import 실패(레포 밖 실행 등) 시 None → 호출부가 strict 인정 0 으로 fail-closed 처리
+    (가짜 통과 재개 대신 BLOCKED). 결과를 memo 해 파일당 반복 import 를 피한다.
+    """
+    if _STRICT_VALIDATOR_CACHE:
+        return _STRICT_VALIDATOR_CACHE[0]
+    fn = None
+    try:
+        import sys
+
+        _src = Path(__file__).resolve().parent.parent / "src"
+        if str(_src) not in sys.path:
+            sys.path.insert(0, str(_src))
+        from lloydk.golden_tiers import is_real_locked_eval as fn  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        fn = None
+    _STRICT_VALIDATOR_CACHE.append(fn)
+    return fn
+
 
 def _human_review_agreement(path: Path) -> dict:
     """Collect human_review gold records and measure how often the model
     under-protected a high-risk doc (human=TS/S1/S2 but model predicted S3).
 
-    This is the agreement signal that turns the human-review gate from a pure
-    count into a quality check: filling the queue with rubber-stamp labels no
-    longer flips the gate green if the classifier genuinely under-classifies.
+    [#8] 두 층을 함께 센다:
+      - count      : raw label_source=="human_review" 건수(투명성용).
+      - count_strict: golden_tiers.is_real_locked_eval 통과분(유효 서명 envelope + 실문서 출처).
+        게이트 임계는 이 strict 값을 쓴다 → 서명·출처 없는 가짜 human_review 로 게이트를 넘길 수
+        없다. 동의(underclass) 품질 지표도 strict 모집단에서만 계산한다(진짜 검수 대상).
     """
-    n = high_risk = underclass = missing_model = 0
+    validate = _strict_signoff_validator()
+    n = strict = high_risk = underclass = missing_model = 0
     if path.exists():
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -104,6 +134,9 @@ def _human_review_agreement(path: Path) -> dict:
             if (row.get("label_source") or row.get("source")) != "human_review":
                 continue
             n += 1
+            if not (validate and validate(row)):
+                continue  # 서명 envelope/실문서 출처 미충족 → strict 집계·품질계산에서 제외
+            strict += 1
             human = str(row.get("label") or row.get("expected_grade") or "").upper()
             model = str(row.get("model_label") or "").upper()
             if not model:
@@ -115,6 +148,9 @@ def _human_review_agreement(path: Path) -> dict:
     rate = (underclass / high_risk) if high_risk else 0.0
     return {
         "count": n,
+        "count_strict": strict,
+        "count_unsigned": n - strict,
+        "strict_validator_loaded": validate is not None,
         "high_risk": high_risk,
         "underclass": underclass,
         "missing_model_label": missing_model,
@@ -130,33 +166,38 @@ def _data_gates(
 ) -> tuple[list[Gate], dict]:
     gold_n, grade_counts, source_counts = _count_jsonl(gold_path)
     retrieval_n, _, retrieval_sources = _count_jsonl(retrieval_gold_path)
-    human_review = source_counts.get("human_review", 0)
     hr = _human_review_agreement(gold_path)
+    # [#8] 게이트 임계는 raw 가 아니라 strict(서명 envelope + 실문서 출처)만 센다.
+    human_review = hr["count_strict"]
+    human_review_raw = hr["count"]
+    _drop = f" (raw label_source=human_review={human_review_raw}, {hr['count_unsigned']} dropped: no valid signoff/real-origin)"
+    if not hr["strict_validator_loaded"]:
+        _drop += " [WARN: golden_tiers validator unavailable → strict counted as 0, fail-closed]"
 
     if human_review < min_human_review:
         hr_status = "BLOCKED"
         hr_detail = (
-            f"human_review={human_review}/{min_human_review}; "
+            f"human_review(strict)={human_review}/{min_human_review}{_drop}; "
             "external reviewed samples still required"
         )
     elif hr["missing_model_label"] > 0:
         hr_status = "FAIL"
         hr_detail = (
-            f"human_review={human_review}; "
+            f"human_review(strict)={human_review}{_drop}; "
             f"{hr['missing_model_label']} records missing model_label "
             "(cannot compute model-vs-human agreement)"
         )
     elif hr["high_risk_underclass_rate"] > max_high_risk_underclass:
         hr_status = "FAIL"
         hr_detail = (
-            f"human_review={human_review}; high-risk underclass "
+            f"human_review(strict)={human_review}; high-risk underclass "
             f"{hr['underclass']}/{hr['high_risk']} "
             f"rate={hr['high_risk_underclass_rate']:.3f} > {max_high_risk_underclass:.3f}"
         )
     else:
         hr_status = "PASS"
         hr_detail = (
-            f"human_review={human_review}; high-risk underclass "
+            f"human_review(strict)={human_review}; high-risk underclass "
             f"{hr['underclass']}/{hr['high_risk']} "
             f"rate={hr['high_risk_underclass_rate']:.3f} <= {max_high_risk_underclass:.3f}"
         )

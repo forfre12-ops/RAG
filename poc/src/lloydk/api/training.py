@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from lloydk.api._jwt_auth import require_auth
+from lloydk.api.confirm import bind_authenticated_actor
 from lloydk.api.rate_limit import limiter
 from lloydk.schemas.training import (
     TrainJobList,
@@ -22,7 +23,9 @@ router = APIRouter(tags=["training"], dependencies=[Depends(require_auth)])
 
 @router.post("/train", response_model=TrainResponse, status_code=202)
 @limiter.limit("10/hour")
-def train(request: Request, req: TrainRequest):
+def train(request: Request, req: TrainRequest, auth: dict = Depends(require_auth)):
+    # [#13] created_by 감사 신원을 인증 principal 로 확정(body 자칭 위조 차단; JWT sub 우선).
+    bind_authenticated_actor(req.actor, auth)
     return TrainingService().submit(req)
 
 

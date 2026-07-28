@@ -209,9 +209,9 @@ else
   fi
   # 인수 러너(prod 이미지에 scripts/ 포함): 전 포맷 파싱 + severity floor(고등급 미탐=veto)
   if [ -f scripts/run_acceptance.py ]; then
-    dc exec -T api python scripts/run_acceptance.py --mode http \
+    dc exec -T api python scripts/run_acceptance.py --mode http --require-model \
        --base-url "http://127.0.0.1:${API_PORT}" --api-key "${API_KEY:-}" \
-      || die "인수 스모크 FAIL — 파싱실패/고등급 미탐(UNDER!). /healthz/deep 로 원인 확인"
+      || die "인수 스모크 FAIL — 파싱실패/고등급 미탐(UNDER!)/모델 미로드(rule-fallback). /healthz/deep 로 원인 확인"
   fi
 fi
 

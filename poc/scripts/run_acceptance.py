@@ -29,6 +29,26 @@ _POC = Path(__file__).resolve().parents[1]
 
 SEVERITY = {"TS": 0, "S1": 1, "S2": 2, "S3": 3}  # 작을수록 더 민감(고등급)
 
+# [#11] 학습·보정 모델이 실제 로드됐는지 판정용 신호. rule-fallback(가중치 미로드)은 FNR-safe
+# floor 라 '안전 과분류'로 PASS 하지만, 인수시험이 이를 그대로 PASS 로 넘기면 '배포 모델이 실제
+# 서빙 중'인지와 'rule-only 폴백'인지를 구분 못 한다 → --require-model 로 게이트. 신호:
+#   · model_version == rule-fallback-v0 / none  (pipeline._run_rule_fallback / fail-secure)
+#   · warnings 에 폴백 마커 문자열
+_FALLBACK_MODEL_VERSIONS = {"rule-fallback-v0", "rule-fallback", "none"}
+_FALLBACK_WARN_MARKERS = ("rule-based fallback", "weights not loaded", "model weights not loaded")
+
+
+def _is_model_unloaded(r: dict) -> bool:
+    """이 결과가 학습 가중치 미로드(rule-fallback/fail-secure)로 나왔는가."""
+    mv = str(r.get("model_version") or "").strip().lower()
+    if mv in _FALLBACK_MODEL_VERSIONS:
+        return True
+    for w in (r.get("warnings") or []):
+        wl = str(w).lower()
+        if any(mk in wl for mk in _FALLBACK_WARN_MARKERS):
+            return True
+    return False
+
 
 def _numeric_miss(text: str, tokens: list[str]) -> list[str]:
     return [t for t in (tokens or []) if t not in (text or "")]
@@ -85,16 +105,19 @@ def run_inproc(pack_dir: Path, docs: list[dict]) -> list[dict]:
             results.append({**d, **j, "method": "PARSE_FAIL", "table_coverage": None,
                             "warnings": [f"{type(e).__name__}: {e}"], "elapsed_ms": None})
             continue
+        model_version = None
         try:
             resp = svc.classify(ClassifyRequest(doc_id=d["doc_id"], content=text, return_evidence=False))
             pred = resp.label.value if hasattr(resp.label, "value") else str(resp.label)
             status, warnings = resp.status, list(resp.warnings)
             elapsed = getattr(resp, "elapsed_ms", None)
+            model_version = getattr(resp, "model_version", None)
         except Exception as e:  # noqa: BLE001
             # 분류 크래시 = 운영서도 분류 불능 → 최저심각도 미탐으로 집계(serving_eval 규율).
             pred, status, warnings, elapsed = None, "classify_error", [f"{type(e).__name__}: {e}"], None
         j = judge_doc(d["expected_grade"], d["expected_numeric_tokens"], parse_ok, text, pred, status)
         results.append({**d, **j, "method": method, "table_coverage": tblcov, "warnings": warnings,
+                        "model_version": model_version,
                         "elapsed_ms": elapsed if elapsed is not None else round((time.perf_counter() - t0) * 1000)})
     return results
 
@@ -132,6 +155,7 @@ def run_http(base_url: str, api_key: str, pack_dir: Path, docs: list[dict]) -> l
                 j = judge_doc(d["expected_grade"], [], parse_ok, text, pred, cls.get("status", "?"))
                 results.append({**d, **j, "method": parse.get("extraction_method", "?"),
                                 "table_coverage": parse.get("table_coverage"),
+                                "model_version": cls.get("model_version"),
                                 "warnings": list(parse.get("warnings") or []) + list(cls.get("warnings") or [])
                                 + ["numeric_check_inproc_only:http_text_preview"],
                                 "elapsed_ms": cls.get("elapsed_ms") or elapsed})
@@ -142,7 +166,8 @@ def run_http(base_url: str, api_key: str, pack_dir: Path, docs: list[dict]) -> l
     return results
 
 
-def _report(results: list[dict], mode: str, max_latency_ms: int) -> tuple[str, dict]:
+def _report(results: list[dict], mode: str, max_latency_ms: int,
+            require_model: bool = False) -> tuple[str, dict]:
     from collections import Counter
     n = len(results)
     vetoed = [r for r in results if r["veto"]]
@@ -153,13 +178,24 @@ def _report(results: list[dict], mode: str, max_latency_ms: int) -> tuple[str, d
     exact = sum(1 for r in results if r["exact"])
     review = [r for r in results if r["status"] == "needs_review"]
     slow = [r for r in results if (r.get("elapsed_ms") or 0) > max_latency_ms]
-    verdict = "PASS" if not vetoed else "FAIL"
+    # [#11] 모델 로드 검증 — rule-fallback(가중치 미로드)이 섞였는지. 항상 보고하고,
+    # --require-model 일 때만 게이트(배포 인수는 학습·보정 모델이 실제 서빙돼야 하므로 필수).
+    unloaded = [r for r in results if _is_model_unloaded(r)]
+    model_versions = sorted({str(r.get("model_version")) for r in results if r.get("model_version")})
+    model_loaded = not unloaded
+    model_gate_fail = require_model and bool(unloaded)
+    verdict = "FAIL" if (vetoed or model_gate_fail) else "PASS"
     summary = {
         "verdict": verdict, "mode": mode, "n": n,
         "veto_count": len(vetoed),
         "under_classified": len(under), "numeric_loss": len(numloss), "parse_fail": len(parsefail),
         "exact_match": exact, "over_classified_safe": len(over), "needs_review": len(review),
         "over_latency_budget": len(slow), "latency_budget_ms": max_latency_ms,
+        "model_gate": {
+            "required": require_model, "passed": not model_gate_fail,
+            "model_loaded": model_loaded, "rule_fallback_count": len(unloaded),
+            "model_versions": model_versions,
+        },
         "by_format": dict(Counter(r["format"] for r in results)),
         "parser_by_format": {
             fmt: {
@@ -177,6 +213,8 @@ def _report(results: list[dict], mode: str, max_latency_ms: int) -> tuple[str, d
         "",
         f"- Verdict: **{verdict}**  (mode={mode}, {n} docs)",
         f"- VETO: parse_fail={len(parsefail)} · numeric_loss={len(numloss)} · under_classified(FNR)={len(under)}",
+        f"- MODEL: loaded={model_loaded} · rule_fallback={len(unloaded)}/{n} · versions={model_versions or '-'}"
+        f" · gate={'FAIL' if model_gate_fail else ('PASS' if require_model else 'report-only')}",
         f"- REPORT (non-gating): exact-match={exact}/{n} · over-classified(safe)={len(over)} · "
         f"needs_review={len(review)} · over-latency(>{max_latency_ms}ms)={len(slow)}",
         "",
@@ -211,6 +249,12 @@ def main() -> int:
     ap.add_argument("--api-key", default=os.environ.get("API_KEY", "replace_me_api_key"))
     ap.add_argument("--report", default="reports/acceptance_report.md")
     ap.add_argument("--max-latency-ms", type=int, default=3000, help="문서당 지연 예산(보고용 — veto 아님)")
+    ap.add_argument(
+        "--require-model", action="store_true",
+        help="[#11] 인수 대상이 학습·보정된 모델을 실제 로드했는지 게이트. 하나라도 "
+             "rule-fallback(가중치 미로드)이면 FAIL. 배포(http) 인수시험에서 필수 — 이게 없으면 "
+             "모델 미로드 상태로도 PASS 가 나 '운영 모델 검증'이 무의미해진다.",
+    )
     args = ap.parse_args()
 
     pack_dir = _POC / args.pack if not Path(args.pack).is_absolute() else Path(args.pack)
@@ -228,7 +272,7 @@ def main() -> int:
     else:
         results = run_inproc(pack_dir, docs)
 
-    md, summary = _report(results, args.mode, args.max_latency_ms)
+    md, summary = _report(results, args.mode, args.max_latency_ms, require_model=args.require_model)
     out = _POC / args.report if not Path(args.report).is_absolute() else Path(args.report)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(md, encoding="utf-8")

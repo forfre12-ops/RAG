@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from lloydk.api._jwt_auth import require_auth
 from lloydk.api._rbac import require_role
+from lloydk.api.confirm import bind_authenticated_actor
 from lloydk.api.rate_limit import limiter
 from lloydk.schemas.synthesis import (
     SynthGenerateRequest,
@@ -27,10 +28,15 @@ router = APIRouter(tags=["synthesis"], dependencies=[Depends(require_auth)])
     "/synth/generate",
     response_model=SynthGenerateResponse,
     status_code=202,
-    dependencies=[Depends(require_role("admin", "kl_backend", "system"))],
 )
 @limiter.limit("10/minute")
-def synth_generate(request: Request, req: SynthGenerateRequest):
+def synth_generate(
+    request: Request,
+    req: SynthGenerateRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+):
+    # [#13] created_by 감사 신원 = 인증 principal(body 자칭 위조 차단; JWT sub 우선).
+    bind_authenticated_actor(req.actor, auth)
     return SynthesisService().submit(req)
 
 
@@ -46,9 +52,14 @@ def synth_queue(
 @router.post(
     "/synth/{synth_id}/review",
     response_model=SynthReviewResponse,
-    dependencies=[Depends(require_role("admin", "reviewer"))],
 )
-def synth_review(synth_id: UUID, req: SynthReviewRequest):
+def synth_review(
+    synth_id: UUID,
+    req: SynthReviewRequest,
+    auth: dict = Depends(require_role("admin", "reviewer")),
+):
+    # [#13] reviewed_by 감사 신원 = 인증 principal(body 자칭 위조 차단; JWT sub 우선).
+    bind_authenticated_actor(req.actor, auth)
     res = SynthesisService().review(synth_id, req)
     if res is None:
         raise HTTPException(status_code=404, detail="synth_id not found")

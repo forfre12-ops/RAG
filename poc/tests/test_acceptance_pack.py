@@ -102,6 +102,42 @@ def test_report_includes_parser_format_rollup_and_details():
     assert [r["doc_id"] for r in s["results"]] == ["txt-ok", "pdf-fail"]
 
 
+# ── [#11] 모델 로드 게이트 (rule-fallback 이 '운영 모델 검증'으로 둔갑 금지) ──────
+
+def test_is_model_unloaded_detects_fallback_version_and_warning():
+    assert ra._is_model_unloaded(_res(model_version="rule-fallback-v0")) is True
+    assert ra._is_model_unloaded(_res(model_version="none")) is True
+    assert ra._is_model_unloaded(
+        _res(warnings=["model weights not loaded — using rule-based fallback"])) is True
+    assert ra._is_model_unloaded(_res(model_version="v-dd3abab9", warnings=[])) is False
+
+
+def test_model_gate_report_only_by_default_even_on_fallback():
+    # rule-fallback 은 FNR-safe floor 라 기본(report-only)에선 PASS 를 막지 않는다 —
+    # 단, model_loaded=False 로 반드시 가시화된다(무음 금지).
+    _, s = ra._report([_res(model_version="rule-fallback-v0")], "http", 3000)
+    assert s["verdict"] == "PASS"
+    assert s["model_gate"]["model_loaded"] is False
+    assert s["model_gate"]["rule_fallback_count"] == 1
+    assert s["model_gate"]["required"] is False
+
+
+def test_require_model_fails_on_rule_fallback():
+    _, s = ra._report([_res(model_version="rule-fallback-v0")], "http", 3000, require_model=True)
+    assert s["verdict"] == "FAIL"
+    assert s["model_gate"]["passed"] is False
+
+
+def test_require_model_passes_when_weights_loaded():
+    _, s = ra._report(
+        [_res(model_version="v-dd3abab9"), _res(model_version="v-dd3abab9")],
+        "http", 3000, require_model=True,
+    )
+    assert s["verdict"] == "PASS"
+    assert s["model_gate"]["passed"] is True and s["model_gate"]["model_loaded"] is True
+    assert s["model_gate"]["model_versions"] == ["v-dd3abab9"]
+
+
 # ── 생성기 렌더러 round-trip (base-dep 포맷; 숫자 무손실) ─────────────────────
 
 @pytest.fixture

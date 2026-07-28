@@ -37,7 +37,22 @@ done
 mkdir -p ".ship/poc/artifacts/classifier_p1_retrain_v4_clean"
 cp -r "$MODEL" ".ship/poc/artifacts/classifier_p1_retrain_v4_clean/"   # 모델만 얹기
 tar czf "$PKG" -C .ship poc
+# [#3] 패키징 정합성 게이트 — run 커맨드(deploy_testserver_dual.sh)가 요구하는 파일이 실제
+# tar 에 들어갔는지 전송 전에 확인. 과거 stale tar(피처 커밋 이전 빌드)가 이 두 파일 없이
+# 실려 서버에서 'No such file' 로 죽던 사고 재발 방지 — 누락이면 fail-fast(전송 안 함).
+_need=("poc/scripts/deploy_testserver_dual.sh" "poc/docker-compose.dual.yml")
+_manifest="$(tar tzf "$PKG")"
+_missing=()
+for _f in "${_need[@]}"; do
+  printf '%s\n' "$_manifest" | grep -qx "$_f" || _missing+=("$_f")
+done
 rm -rf .ship
+if [ "${#_missing[@]}" -gt 0 ]; then
+  echo "✗ 패키지 무결성 실패 — tar 에 필수 배포 파일 누락(서버 설치가 반드시 실패):" >&2
+  printf '   - %s\n' "${_missing[@]}" >&2
+  echo "   git ls-files 로 HEAD 포함 여부 / working tree 존재를 확인 후 재실행하세요." >&2
+  exit 1
+fi
 b "      → $PKG ($(du -h "$PKG" | cut -f1))"
 [ "${PACKAGE_ONLY:-0}" = "1" ] && { echo "패키지만 생성 완료: $ROOT/$PKG"; exit 0; }
 

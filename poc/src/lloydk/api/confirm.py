@@ -61,6 +61,11 @@ def _bind_authenticated_actor(actor, auth: dict) -> None:
     actor.user_id = effective
 
 
+# 공개 별칭 — 다른 라우터(promotion/documents/guide/synthesis/training/golden)가 동일 신원
+# 바인딩을 재사용한다(#13: body actor.user_id 가 아니라 인증 principal 로 감사 신원 확정).
+bind_authenticated_actor = _bind_authenticated_actor
+
+
 @router.post("/confirm", response_model=ConfirmResponse)
 def confirm(
     req: ConfirmRequest,
