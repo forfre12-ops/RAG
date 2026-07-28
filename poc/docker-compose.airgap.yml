@@ -17,6 +17,7 @@ name: lloydk-airgap
 services:
   postgres:
     image: ${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}   # ES 제거(§03 ⓑ) — pgvector dense. 폐쇄망: docker load 한 태그
+    restart: unless-stopped   # 호스트 재부팅/데몬 재시작 후 자동 복구(폐쇄망 무인 운영). compose 단축형만 실효.
     environment:
       POSTGRES_DB: lloydk
       POSTGRES_USER: lloydk
@@ -36,6 +37,7 @@ services:
 
   redis:
     image: redis:7.2-alpine
+    restart: unless-stopped
     # appendonly + bgsave 실패 시 쓰기차단 해제(브로커/캐시 용도라 비영속 허용 — 운영 노트 참조)
     command: redis-server --appendonly yes --stop-writes-on-bgsave-error no
     volumes:
@@ -49,6 +51,7 @@ services:
 
   api:
     image: lloydk-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
+    restart: unless-stopped
     env_file: .env
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
@@ -91,6 +94,7 @@ services:
 
   worker:
     image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
+    restart: unless-stopped
     command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
@@ -133,6 +137,7 @@ services:
   # 주기작업 발행기 — 단일 인스턴스만 (다중 beat = 중복 tick). dev compose엔 누락돼 있었음.
   beat:
     image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
+    restart: unless-stopped
     # --schedule 경로 고정 → 헬스체크가 이 파일의 신선도로 beat tick 생존을 판정.
     command: celery -A lloydk.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
     env_file: .env

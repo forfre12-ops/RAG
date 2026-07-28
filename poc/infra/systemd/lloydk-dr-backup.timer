@@ -1,0 +1,15 @@
+# Lloydk DR 백업 스케줄 — 매일 02:00. lloydk-dr-backup.service 를 발화.
+[Unit]
+Description=Lloydk DR 백업 스케줄(매일 02:00)
+
+[Timer]
+# 서버 로컬 타임존 기준. 앱은 KST(Asia/Seoul) 이므로 서버 TZ 도 KST 권장.
+# 참고: 앱 야간 증분 재학습 tick 이 02:00, 파티션 롤오버가 02:10 → 백업을 앞에 두려면 01:30 등으로 조정.
+OnCalendar=*-*-* 02:00:00
+# 무인 서버가 실행 시각에 꺼져 있었으면 부팅 후 곧 보충 실행.
+Persistent=true
+# 다중 타이머 동시 기동에 따른 부하 스파이크 분산.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

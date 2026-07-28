@@ -11,8 +11,9 @@ fail-closed 원칙(안전하게 틀리고 명확히 멈춘다):
 대상(--target):
   postgres : backups/pg 의 최신 *.dump 를 docker exec pg_restore 로 --clean 복원.
              (backup_postgres.py 가 `docker exec pg_dump -F c` 로 만든 custom-format dump 대상)
-  storage  : 폐쇄망 로컬FS 원문 미러(backups/storage)를 storage 경로로 복원.
-             MinIO 는 폐쇄망 미사용 — 로컬FS(file://) 결정이므로 minio 대신 storage 를 쓴다.
+  storage  : backup_storage.py 가 만든 `backups/storage/storage-*.tar.gz`(최신)를 storage 경로로
+             전개 복원(아카이브 없으면 평문 디렉터리 미러도 백-호환). MinIO 미사용 — 로컬FS 결정.
+             주의: 원문은 at-rest 암호문 그대로라 STORAGE_ENCRYPTION_KEY 를 별도 보관해야 평문 복원.
 
 종료 코드:
   0 = 복원(또는 dry-run 전제검증) 성공
@@ -30,10 +31,14 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
+
+from dr_discovery import autodetect_container
 
 logger = logging.getLogger("dr_restore")
 
@@ -109,23 +114,60 @@ def restore_postgres(
     return 0
 
 
+def _latest_storage_archive(mirror_dir: Path) -> Path | None:
+    """backup_storage.py 산출물(`storage-YYYYMMDD-HHMMSS.tar.gz`) 중 최신 아카이브."""
+    if not mirror_dir.exists():
+        return None
+    arcs = [f for f in mirror_dir.glob("*.tar.gz") if f.is_file()]
+    arcs += [f for f in mirror_dir.glob("*.tar") if f.is_file()]
+    if not arcs:
+        return None
+    return max(arcs, key=lambda f: f.stat().st_mtime)
+
+
+def _safe_extractall(tf: tarfile.TarFile, target_dir: Path) -> None:
+    """경로 탈출(../, 절대경로) 멤버를 거부한 뒤 전개 — tar-slip 방어(fail-closed)."""
+    base = target_dir.resolve()
+    base_prefix = str(base) + os.sep
+    for member in tf.getmembers():
+        dest = (base / member.name).resolve()
+        if dest != base and not str(dest).startswith(base_prefix):
+            raise RuntimeError(f"아카이브에 안전하지 않은 경로: {member.name}")
+    tf.extractall(target_dir)  # noqa: S202 — 멤버 경로 사전검증 완료
+
+
 def restore_storage(*, mirror_dir: Path, target_dir: Path, dry_run: bool) -> int:
     if not mirror_dir.exists():
         logger.error("복원할 스토리지 미러 없음: %s", mirror_dir)
         return 1
+
+    # 우선순위 1: backup_storage.py 아카이브(.tar.gz) — 시점별 보존 + retention.
+    archive = _latest_storage_archive(mirror_dir)
+    if archive is not None:
+        logger.info("최신 스토리지 아카이브: %s (%.1f MB)",
+                    archive.name, archive.stat().st_size / 1_048_576)
+        if dry_run:
+            logger.info("[dry-run] 전제조건 충족 — 아카이브 존재")
+            return 0
+        target_dir.mkdir(parents=True, exist_ok=True)
+        # backup_storage.py 는 `tar -C /app/.storage .` 라 멤버 루트가 볼륨 내용 → target_dir 에 그대로 전개.
+        with tarfile.open(archive, "r:*") as tf:
+            _safe_extractall(tf, target_dir)
+        logger.info("스토리지 복원 완료(아카이브) → %s", target_dir)
+        return 0
+
+    # 우선순위 2(백-호환): 아카이브가 없으면 평문 디렉터리 미러(구 방식)로 처리.
     files = [f for f in mirror_dir.rglob("*") if f.is_file()]
     if not files:
-        logger.error("스토리지 미러가 비어 있음: %s", mirror_dir)
+        logger.error("스토리지 미러가 비어 있음(.tar.gz/.tar/파일 모두 없음): %s", mirror_dir)
         return 1
-    logger.info("스토리지 미러: %s (%d files)", mirror_dir, len(files))
-
+    logger.info("스토리지 미러(디렉터리): %s (%d files)", mirror_dir, len(files))
     if dry_run:
         logger.info("[dry-run] 전제조건 충족 — 미러 존재·파일 %d개", len(files))
         return 0
-
     target_dir.mkdir(parents=True, exist_ok=True)
     shutil.copytree(mirror_dir, target_dir, dirs_exist_ok=True)
-    logger.info("스토리지 복원 완료 → %s", target_dir)
+    logger.info("스토리지 복원 완료(디렉터리) → %s", target_dir)
     return 0
 
 
@@ -146,9 +188,13 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     if args.target == "postgres":
-        container = args.container or (
-            _STAGING_PG_CONTAINER if args.staging else _PROD_PG_CONTAINER
-        )
+        if args.container:
+            container = args.container
+        elif args.staging:
+            container = _STAGING_PG_CONTAINER
+        else:
+            # 실복구(비-staging): 실행 중 postgres 컨테이너 자동탐지(airgap/dual 컨테이너명 상이) → 폴백은 dev 명.
+            container = autodetect_container(("postgres",)) or _PROD_PG_CONTAINER
         return restore_postgres(
             pg_dir=args.pg_dir, container=container, db=args.db, user=args.user,
             dry_run=args.dry_run,
