@@ -100,6 +100,24 @@ footer strong{color:var(--text-dim);}
   <div class="callout inset"><div class="callout-label">범례</div><p><span class="tag lk">🅲 CPU</span> GPU 없는 호스트 · <span class="tag kl">🅶 GPU</span> GPU 서버 · <span class="tag dep">🌐 연결망</span> 인터넷 되는 환경 — 각 단계에서 해당 표시를 따라간다.</p></div>
   <hr/>
 
+  <div class="section-sep" id="stldr"><span class="section-sep-num">★</span><span class="section-sep-line"></span><span class="section-sep-title">가장 쉬운 경로 (권장 · TL;DR)</span></div>
+  <h2>아티팩트 1개 · 명령 1개 · <code>.env</code> 몇 줄</h2>
+  <p>고객사·지재원 모두 같은 <code>dist/lloydk-airgap-bundle/</code>(약 12GB — 도커 이미지·<strong>분류 모델(v-dd3abab9+temperature)</strong>·wheel·DB 마이그레이션·인수팩까지 자립)을 쓰고, <code>bash deploy.sh</code>(폐쇄망/연결망 <strong>자동감지</strong>) 한 명령으로 마이그레이션+기동+스모크까지 끝난다. <strong>대상별로 다른 건 <code>.env</code> 프로파일뿐이다.</strong></p>
+  <pre><code># 공통 3단계 (반입/전송 후) — 고객사·지재원 동일
+cd ~/lloydk-airgap-bundle
+bash verify.sh &amp;&amp; bash install.sh                  # 무결성 확인 → 이미지 적재(docker load)
+cp infra-config/.env.template .env &amp;&amp; nano .env    # ↓ 표의 대상별 값만 다름
+bash deploy.sh                                      # 자동감지 → 배포, 이어서 bash verify_install.sh</code></pre>
+  <div class="table-wrap"><table>
+    <thead><tr><th>&nbsp;</th><th>고객사 (폐쇄망)</th><th>지재원 (연결망)</th></tr></thead>
+    <tbody>
+      <tr><td><code>.env</code></td><td><code>DEPLOY_PROFILE=onprem-local</code><br>(CPU면 <code>LLM_PROVIDER=none</code> + A5 GPU블록 주석)</td><td><code>DEPLOY_PROFILE=full-train</code> · <code>ANTHROPIC_API_KEY=…</code><br>(GPU블록 유지)</td></tr>
+      <tr><td>학습</td><td>✅ <strong>야간 CPU 증분재학습</strong><br>(<code>enable_incremental_retrain</code> — 번들 포함)</td><td>✅ <strong>전체 재학습·합성·골든</strong><br>(<code>enable_training</code>, GPU) + 증분</td></tr>
+      <tr><td>번들 밖(별도)</td><td>—</td><td>전체학습용 <strong>CUDA torch·대형 LLM</strong>은 인터넷 조달(배포와 분리)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout inset"><div class="callout-label">핵심 원리</div><p>코드·스키마·모델·설치절차는 <strong>100% 공통</strong>이고 위 표의 세 줄만 대상별로 다르다. DB는 빈 상태로 시작하며 스키마(DDL, Alembic 13개)는 <code>alembic upgrade head</code>가 생성한다 — 사람 검수·교정 데이터(<code>tb_corrections</code>·<code>tb_document_labels</code>·<code>tb_audit_log</code>)는 배포 후 서버에서 쌓인다. <strong>왜 지재원도 번들?</strong> "테스트한 것 = 고객사가 돌리는 것 = 지재원이 돌리는 것"이 비트단위로 동일해져 의존성 드리프트가 없다. 전송이 부담일 때만, 지재원은 인터넷이 되므로 <strong>32MB 소스만 보내 서버가 직접 빌드</strong>하는 경량 경로도 가능하다(단 두 번째 배포 방법을 유지하는 비용이 생긴다).</p></div>
+
   <div class="section-sep" id="s0"><span class="section-sep-num">00</span><span class="section-sep-line"></span><span class="section-sep-title">대상별 차이</span></div>
   <h2>고객사 vs 지재원 — 딱 3가지만 다르다</h2>
   <p>두 프로파일 모두 <code>DEPLOY_PROFILE</code>이 안전 하드닝(온도보정 T=3·안전게이트·원본 암호화·실모델 강제)을 <strong>동일하게</strong> 자동 활성화한다. 이 값을 <code>lite-*</code>로 바꾸거나 지우면 안전장치가 꺼진 채 부팅되며 <code>deploy_airgap.sh</code>가 거부한다.</p>
@@ -270,7 +288,7 @@ API_KEY="$API_KEY" BASE_URL=http://localhost:8000 bash acceptance/run_acceptance
 
 </article>
 <aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
-<a href="#s0">00 · 대상별 차이</a><a href="#s1">01 · 사전 요건</a><a href="#s2">A · 공통 설치</a><a href="#s3">B · 대상별 .env</a><a href="#s4">C · 설치 검증</a><a href="#s5">D · 배포 후 운영</a><a href="#s6">E · 트러블슈팅</a><a href="#s7">F · 부록</a>
+<a href="#stldr">★ 가장 쉬운 경로</a><a href="#s0">00 · 대상별 차이</a><a href="#s1">01 · 사전 요건</a><a href="#s2">A · 공통 설치</a><a href="#s3">B · 대상별 .env</a><a href="#s4">C · 설치 검증</a><a href="#s5">D · 배포 후 운영</a><a href="#s6">E · 트러블슈팅</a><a href="#s7">F · 부록</a>
 </nav></aside>
 </div>
 

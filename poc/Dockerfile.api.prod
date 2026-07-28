@@ -33,8 +33,16 @@ COPY src ./src
 COPY scripts ./scripts
 COPY alembic ./alembic
 COPY alembic.ini ./
+# torch 변형: 기본 CPU 전용(테스트·CPU 고객사) — CUDA 라이브러리(nvidia-cu*·triton, ~7GB)를 빼
+# 이미지를 ~10GB → ~3GB 로 줄인다. CPU 서버에선 CUDA torch 가 순수 낭비(추론은 CPU 로 동작).
+# 지재원 GPU 서버는 빌드 시 override:
+#   docker build --build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu124 -f Dockerfile.api.prod .
+# torch 를 먼저 CPU 인덱스에서 깔아두면, 이어지는 editable 설치의 torch>=2.3 제약이 이미 충족돼
+# PyPI 기본(CUDA) 휠을 다시 끌어오지 않는다.
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # extras: 운영(psh 성능·otel 관측·jwt) + 파싱 의존(hwp·ocr) — 파싱 요건(FUN) 유지.
 RUN pip install --upgrade pip && \
+    pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
     pip install -e ".[psh,otel,jwt,hwp,ocr]" gunicorn
 
 # 비-root 사용자 (보안)

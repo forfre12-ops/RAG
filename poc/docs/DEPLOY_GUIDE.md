@@ -6,6 +6,39 @@
 
 ---
 
+## 가장 쉬운 경로 (권장 · TL;DR)
+
+**아티팩트 1개 + 명령 1개 + `.env` 몇 줄.** 고객사·지재원 모두 같은 `dist/lloydk-airgap-bundle/`
+(약 12GB — 도커 이미지·**분류 모델(v-dd3abab9+temperature)**·wheel·DB 마이그레이션·인수팩까지 자립)을 쓰고,
+`bash deploy.sh`(폐쇄망/연결망 **자동감지**) 한 명령으로 마이그레이션+기동+스모크까지 끝난다.
+**대상별로 다른 건 `.env` 프로파일뿐이다.**
+
+```bash
+# 공통 3단계 (반입/전송 후) — 고객사·지재원 동일
+cd ~/lloydk-airgap-bundle
+bash verify.sh && bash install.sh                  # 무결성 확인 → 이미지 적재(docker load)
+cp infra-config/.env.template .env && nano .env    # ↓ 표의 대상별 값만 다름
+bash deploy.sh                                      # 자동감지 → 배포, 이어서 bash verify_install.sh
+```
+
+| | 고객사 (폐쇄망) | 지재원 (연결망) |
+|---|---|---|
+| `.env` | `DEPLOY_PROFILE=onprem-local`<br>(CPU면 `LLM_PROVIDER=none` + A5 GPU블록 주석) | `DEPLOY_PROFILE=full-train` · `ANTHROPIC_API_KEY=…`<br>(GPU블록 유지) |
+| 학습 | ✅ **야간 CPU 증분재학습**<br>(`enable_incremental_retrain` — 번들에 포함) | ✅ **전체 재학습·합성·골든**<br>(`enable_training`, GPU) + 증분 |
+| 번들 밖(별도) | — | 전체학습용 **CUDA torch·대형 LLM**은 인터넷 조달(배포와 분리된 운영 워크플로) |
+
+> **핵심 원리**: 코드·스키마·모델·설치절차는 **100% 공통**이고, 위 표의 세 줄만 대상별로 다르다.
+> DB는 빈 상태로 시작하며 스키마(DDL, Alembic 13개)는 `deploy.sh`의 `alembic upgrade head`가 생성한다
+> — 사람 검수·교정 데이터(`tb_corrections`·`tb_document_labels`·`tb_audit_log`)는 배포 후 서버에서 쌓인다.
+>
+> **왜 지재원도 번들?** "테스트한 것 = 고객사가 돌리는 것 = 지재원이 돌리는 것"이 비트단위로 동일해져
+> 의존성 드리프트가 없다. 전송이 부담일 때만, 지재원은 인터넷이 되므로 **32MB 소스만 보내 서버가
+> 직접 빌드**하는 경량 경로도 가능하다(단 두 번째 배포 방법을 유지하는 비용이 생긴다).
+
+세부 단계·필수값·트러블슈팅은 아래 PART A~E 참조.
+
+---
+
 ## 0. 대상별 차이 (먼저 읽기)
 
 | 구분 | 고객사 (onprem-local) | 지재원 (full-train) |

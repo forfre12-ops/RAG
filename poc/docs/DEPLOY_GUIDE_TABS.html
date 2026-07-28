@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>설치 가이드 (탭) — 테스트서버 · 지재원 · 고객사 | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-inverse:#09090b;
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --test:#0a0a0a; --jjw:#1e40af; --cust:#7a1f1f;
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+.wrap{max-width:900px;margin:0 auto;padding:36px 24px 120px;}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 14px;}
+.lede{font-size:15px;line-height:1.65;color:var(--text-soft);margin:0 0 24px;max-width:720px;}
+h2{font-size:20px;font-weight:700;letter-spacing:-.03em;margin:8px 0 10px;}
+h3{font-size:15px;font-weight:700;letter-spacing:-.02em;margin:24px 0 6px;display:flex;align-items:center;gap:8px;}
+h3 .st{font-family:var(--font-mono);font-size:11px;font-weight:700;color:#fff;background:var(--text);width:22px;height:22px;display:grid;place-items:center;flex-shrink:0;}
+p{margin:0 0 12px;color:var(--text-soft);font-size:14px;}
+strong{color:var(--text);font-weight:600;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+pre{background:var(--bg-inverse);color:#e4e4e7;font-family:var(--font-mono);font-size:12px;line-height:1.6;padding:15px 16px;overflow-x:auto;margin:12px 0;}
+pre code{background:none;border:none;color:inherit;padding:0;}
+ul,ol{padding-left:1.3em;color:var(--text-soft);} li{margin-bottom:5px;font-size:13.5px;}
+hr{border:none;border-top:1px solid var(--border);margin:28px 0;}
+.callout{padding:12px 16px;margin:14px 0;border:1px solid var(--border-mid);background:var(--bg-surface);font-size:13px;line-height:1.6;color:var(--text-soft);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{border-left:3px solid var(--cust);}
+.callout.go{border-left:3px solid #15803d;background:#f0fdf4;}
+.callout .cl{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;}
+.table-wrap{overflow-x:auto;margin:14px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px;}
+th{padding:8px 11px;text-align:left;font-weight:600;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);background:var(--bg-surface);white-space:nowrap;}
+td{padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);}
+tr:last-child td{border-bottom:none;} td strong{color:var(--text);}
+.tabs{display:flex;gap:0;margin:26px 0 0;border-bottom:2px solid var(--border-mid);flex-wrap:wrap;}
+.tab-btn{appearance:none;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;padding:12px 18px;font-family:var(--font-sans);font-size:14px;font-weight:600;color:var(--text-dim);cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:8px;letter-spacing:-.01em;}
+.tab-btn:hover{color:var(--text);background:var(--bg-surface);}
+.tab-btn .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.tab-btn[data-t="test"] .dot{background:var(--test);}
+.tab-btn[data-t="jjw"]  .dot{background:var(--jjw);}
+.tab-btn[data-t="cust"] .dot{background:var(--cust);}
+.tab-btn.active{color:var(--text);}
+.tab-btn[data-t="test"].active{border-bottom-color:var(--test);}
+.tab-btn[data-t="jjw"].active {border-bottom-color:var(--jjw);}
+.tab-btn[data-t="cust"].active{border-bottom-color:var(--cust);}
+.tab-sub{font-size:11px;font-weight:400;color:var(--text-faint);}
+.panel{display:none;padding-top:22px;animation:fade .18s ease;}
+.panel.active{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}
+.pill{display:inline-block;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 8px;border:1px solid var(--border-strong);margin-right:6px;}
+.pill.t{color:var(--test);border-color:var(--test);} .pill.j{color:var(--jjw);border-color:var(--jjw);} .pill.c{color:var(--cust);border-color:var(--cust);}
+.codewrap{position:relative;}
+.copybtn{position:absolute;top:7px;right:7px;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.05em;padding:3px 9px;background:#27272a;color:#e4e4e7;border:1px solid #52525b;cursor:pointer;opacity:.6;transition:opacity .12s;}
+.codewrap:hover .copybtn{opacity:1;}
+.copybtn.done{background:#15803d;color:#fff;border-color:#15803d;}
+.big{font-size:15px;font-weight:700;}
+footer{border-top:1px solid var(--border);margin-top:48px;padding-top:20px;font-size:12px;color:var(--text-faint);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="meta-row">
+    <span class="badge">DOC-DEPLOY-02</span>
+    <span class="badge outline">설치 파일 방식</span>
+    <span class="meta-soft">· 탭 버전 · 2026-07-28</span>
+  </div>
+  <h1 class="title">설치 가이드 — 설치 파일 보내고 실행만</h1>
+  <p class="lede">개념은 하나다: <strong>설치 파일(패키지)을 서버로 보내고 → 실행하면 한 번에 설치</strong>된다. 대상마다 "설치 파일의 형태"와 "보내는 방법"만 다를 뿐, 나머지는 같다. 지금 할 것은 <strong>테스트서버 탭</strong>(한 대에 지재원+고객사 둘 다), 실서버는 지재원·고객사 탭.</p>
+
+  <div class="callout inset">
+    <div class="cl">한눈에 — 대상별 "설치 파일"</div>
+    <table style="min-width:0;margin:8px 0 0;"><tbody>
+      <tr><td><strong>테스트서버</strong>(지금)</td><td>소스+모델 <strong>620MB 패키지</strong></td><td>scp(인터넷)</td><td>한 줄 스크립트 → <strong>둘 다</strong></td></tr>
+      <tr><td><strong>지재원</strong>(실서버)</td><td>소스+모델 패키지</td><td>scp/rsync(연결망)</td><td><code>deploy.sh</code> → 지재원 하나</td></tr>
+      <tr><td><strong>고객사</strong>(실서버)</td><td><strong>12GB 자립 번들</strong></td><td>USB 반입(폐쇄망)</td><td><code>deploy.sh</code> → 고객사 하나</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-t="test" role="tab"><span class="dot"></span>테스트서버<span class="tab-sub">지금 · 1대에 둘 다</span></button>
+    <button class="tab-btn"        data-t="jjw"  role="tab"><span class="dot"></span>지재원<span class="tab-sub">실서버 · 연결망</span></button>
+    <button class="tab-btn"        data-t="cust" role="tab"><span class="dot"></span>고객사<span class="tab-sub">실서버 · 폐쇄망</span></button>
+  </div>
+
+  <!-- ══════════════ 테스트서버 (지금) ══════════════ -->
+  <section class="panel active" id="p-test" role="tabpanel">
+    <h2><span class="pill t">한 줄 설치</span>테스트서버 1대에 지재원 + 고객사 둘 다</h2>
+    <p>연결망 테스트서버(kip-ai)에 두 프로파일을 동시에 올린다. <strong>설치 파일 만들기 → 전송 → 서버 설치</strong>를 스크립트 하나가 자동 처리한다. 포트·DB·컨테이너는 완전 격리, 임베더 캐시만 공유.</p>
+
+    <div class="callout go">
+      <div class="cl">이 한 줄이면 끝</div>
+      <div class="big">Windows Git Bash · 리포 루트(<code>F:\antigravity\rag</code>)에서:</div>
+    </div>
+    <pre><code>bash poc/scripts/ship_to_testserver.sh</code></pre>
+    <p>자동으로: <strong>①</strong> 소스+모델을 620MB 패키지로 묶고 → <strong>②</strong> 서버로 전송 → <strong>③</strong> 서버에서 압축해제 + 이중배포까지 실행. <strong>비밀번호는 두 번</strong> 물어본다(전송·설치). 빌드로 <strong>10~20분</strong> 걸리니 창을 닫지 말 것.</p>
+
+    <h3><span class="st">✓</span>끝나면</h3>
+    <pre><code>✓ 완료 — 지재원 :8000 · 고객사 :8001</code></pre>
+    <p>api 는 서버 내부(<code>127.0.0.1</code>)에만 열리므로, 내 PC 브라우저로 보려면 <strong>SSH 터널</strong>:</p>
+    <pre><code>ssh -p 56320 -L 8000:127.0.0.1:8000 -L 8001:127.0.0.1:8001 aisadm@182.212.163.182
+# 그 뒤 브라우저:  http://localhost:8000  ·  http://localhost:8001</code></pre>
+
+    <h3><span class="st">?</span>미리 알아둘 것 / 옵션</h3>
+    <ul>
+      <li><strong>대상 서버 바꾸기</strong>: <code>TS_HOST=1.2.3.4 TS_PORT=22 TS_USER=aisadm bash poc/scripts/ship_to_testserver.sh</code> (기본값 = 현재 kip-ai)</li>
+      <li><strong>전송만/설치는 서버에서 직접</strong>: <code>SHIP_ONLY=1 bash poc/scripts/ship_to_testserver.sh</code> → 서버에서 <code>tar xzf ~/lloydk-testserver.tar.gz -C ~ &amp;&amp; cd ~/poc &amp;&amp; bash scripts/deploy_testserver_dual.sh</code></li>
+      <li><strong>패키지만 만들기</strong>(전송 없이): <code>PACKAGE_ONLY=1 bash poc/scripts/ship_to_testserver.sh</code></li>
+      <li>도중 연결이 끊기면 <strong>그냥 다시 실행</strong>하면 된다(비밀키·이미지 캐시 유지 → 이어서 진행).</li>
+    </ul>
+
+    <div class="callout warn"><div class="cl">사전 1가지</div>서버(kip-ai)에 <strong>Docker가 설치</strong>돼 있어야 한다(<code>docker run --rm hello-world</code> 확인). GPU는 불필요(CPU로 동작). RAM은 두 스택이라 <strong>≥16GB(권장 32GB)</strong> — 서버에서 <code>free -h</code> 로 확인.</div>
+  </section>
+
+  <!-- ══════════════ 지재원 실서버 ══════════════ -->
+  <section class="panel" id="p-jjw" role="tabpanel">
+    <h2><span class="pill j">full-train</span>지재원 실서버 (연결망 · 모델공장)</h2>
+    <p>개념은 테스트서버와 동일 — <strong>설치 파일 전송 → 실행</strong>. 단 실서버는 <strong>지재원 한 스택만</strong> 올리고(full-train), 상용 LLM·GPU 학습을 붙인다.</p>
+
+    <h3><span class="st">1</span>설치 파일 전송 (소스+모델)</h3>
+    <p>연결망이라 이미지·임베더는 서버가 인터넷으로 받는다. 소스+모델만 보내면 된다.</p>
+    <pre><code># 로컬(리포 루트)에서 패키지 전송만
+SHIP_ONLY=1 TS_HOST=&lt;지재원IP&gt; TS_PORT=&lt;포트&gt; TS_USER=&lt;계정&gt; bash poc/scripts/ship_to_testserver.sh</code></pre>
+
+    <h3><span class="st">2</span>서버에서 설치 (지재원 한 스택)</h3>
+    <pre><code>tar xzf ~/lloydk-testserver.tar.gz -C ~
+cd ~/poc
+cp .env.full-train .env        # DEPLOY_PROFILE=full-train · ANTHROPIC_API_KEY · API_KEY · POSTGRES_PASSWORD
+bash scripts/deploy.sh          # 연결망 자동감지 → 마이그레이션+기동+스모크</code></pre>
+    <div class="callout"><div class="cl">GPU</div>GPU 서버라 <code>nvidia-container-toolkit</code> 설치(발주처/인프라 범위). 전체 재학습·합성·골든은 배포와 별개 운영 워크플로.</div>
+
+    <h3><span class="st">3</span>확인</h3>
+    <pre><code>API_KEY=$(grep '^API_KEY=' .env | cut -d= -f2)
+curl -s http://localhost:8000/api/v1/healthz/ready ; echo        # 200</code></pre>
+  </section>
+
+  <!-- ══════════════ 고객사 실서버 ══════════════ -->
+  <section class="panel" id="p-cust" role="tabpanel">
+    <h2><span class="pill c">onprem-local</span>고객사 실서버 (폐쇄망 · 운영)</h2>
+    <p>개념은 같다 — <strong>설치 파일 반입 → 실행</strong>. 단 <strong>인터넷이 없어</strong> 소스만으론 안 된다(서버가 이미지·의존성을 못 받음). 그래서 설치 파일이 <strong>이미지·모델·라이브러리를 전부 구운 12GB 자립 번들</strong>이고, USB로 반입한다.</p>
+
+    <h3><span class="st">1</span>설치 파일 = 12GB 번들 (USB 반입)</h3>
+    <p><code>dist/lloydk-airgap-bundle/</code>(약 12GB — 이미지·모델·wheel·마이그레이션 자립. postgres·redis 포함이라 순수 에어갭 OK)를 승인 매체로 서버에 넣는다.</p>
+
+    <h3><span class="st">2</span>서버에서 설치</h3>
+    <pre><code>cd ~/lloydk-airgap-bundle
+bash verify.sh        # 무결성 → Checksums OK
+bash install.sh       # 이미지 적재(docker load)
+
+cp infra-config/.env.template .env
+python3 -c "import secrets;print('STORAGE_ENCRYPTION_KEY='+secrets.token_hex(32))"
+nano .env             # DEPLOY_PROFILE=onprem-local · API_KEY · POSTGRES_PASSWORD · STORAGE_ENCRYPTION_KEY
+                      #   (CPU 서버면 LLM_PROVIDER=none)
+
+bash deploy.sh        # 폐쇄망 자동감지 → 마이그레이션+기동+스모크 (인터넷 0)</code></pre>
+    <div class="callout warn"><div class="cl">CPU 서버면</div>GPU 없으면 compose 의 <code>nvidia</code> 블록을 주석(<code>grep -n nvidia infra-config/docker-compose.airgap.yml</code>). 분류·검색·OCR 전부 CPU로 동작(추론만 느림).</div>
+
+    <h3><span class="st">3</span>확인 + 운영</h3>
+    <pre><code>curl -s http://localhost:8000/api/v1/healthz/ready ; echo        # 200</code></pre>
+    <ul>
+      <li>현장 검수 교정 → <code>tb_corrections</code> → <strong>야간 CPU 증분 재학습</strong>(무인) → 후보 등록. 활성화는 관리자 콘솔 + 사람 확인.</li>
+      <li>임베더(KURE)·대형 LLM은 번들에 없음 — 분류(핵심)는 번들만으로 오프라인 동작, 검색·<code>/answer</code>가 필요하면 별도 반입.</li>
+    </ul>
+  </section>
+
+  <footer>
+    로이드케이(Lloydk) · KOIPA 영업비밀관리시스템 · 설치 가이드(탭·설치파일 방식) ·
+    테스트 <code>scripts/ship_to_testserver.sh</code> · 원문 <code>docs/DEPLOY_GUIDE.md</code>
+  </footer>
+</div>
+
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('p-'+b.dataset.t).classList.add('active');
+    if(history.replaceState) history.replaceState(null,'','#'+b.dataset.t);
+  });
+});
+(function(){var h=(location.hash||'').replace('#','');var b=document.querySelector('.tab-btn[data-t="'+h+'"]');if(b)b.click();})();
+document.querySelectorAll('pre').forEach(function(pre){
+  var wrap=document.createElement('div');wrap.className='codewrap';
+  pre.parentNode.insertBefore(wrap,pre);wrap.appendChild(pre);
+  var btn=document.createElement('button');btn.className='copybtn';btn.type='button';btn.textContent='복사';wrap.appendChild(btn);
+  btn.addEventListener('click',function(){
+    var txt=pre.innerText;
+    function ok(){btn.textContent='복사됨';btn.classList.add('done');setTimeout(function(){btn.textContent='복사';btn.classList.remove('done');},1500);}
+    function fb(){var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.top='-1000px';document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand('copy');ok();}catch(e){}document.body.removeChild(ta);}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(ok).catch(fb);}else{fb();}
+  });
+});
+</script>
+</body>
+</html>

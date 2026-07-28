@@ -1,0 +1,51 @@
+# docker-compose.dual.yml — 한 호스트에 지재원 + 고객사 두 스택 공존용 오버레이
+# ---------------------------------------------------------------------------
+# 목적: 테스트서버 1대에 full-train(지재원)·onprem-local(고객사) 두 배포를 동시에 올린다.
+# 단독 사용 금지 — base + prod 오버레이 위에 얹어 "스택 격리"만 담당한다:
+#   docker compose -p <프로젝트> --env-file <.env> \
+#     -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml up -d
+# 실제 구동은 scripts/deploy_testserver_dual.sh 가 프로젝트명·포트·.env 를 스택별로 주입해 자동 처리.
+#
+# 격리 원리:
+#   - 프로젝트명(-p)이 컨테이너·네트워크·(비-external)볼륨을 스택별로 접두어 격리 → pg/redis 데이터 분리.
+#   - 호스트 노출 포트는 api 하나뿐(127.0.0.1:${API_HOST_PORT}) → 스택마다 다른 포트(8000/8001).
+#   - base 의 ../docker-data 바인드(pg/redis)를 named 볼륨으로 교체 → 두 스택이 같은 폴더를 밟는 충돌 제거.
+#   - minio 의존 제거(storage=local) → 불필요한 minio 미기동.
+#   - 분류 모델은 호스트 artifacts 를 ro 바인드, HF 임베더 캐시는 external 볼륨으로 두 스택이 공유(중복 다운로드 회피).
+services:
+  api:
+    # 스택별 호스트 포트. 리버스 프록시/SSH 터널 전제라 127.0.0.1 바인드 유지.
+    ports: !override
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    # minio 미사용(storage=local) → 의존 제거해 minio 미기동.
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes: !override
+      - ./artifacts:/app/artifacts:ro                       # 분류 모델(v-dd3abab9) ro 공급
+      - lloydk_hf_cache:/home/lloydk/.cache/huggingface     # KURE 임베더 캐시 — 두 스택 공유(external)
+  worker:
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes: !override
+      - ./artifacts:/app/artifacts:ro
+      - lloydk_hf_cache:/home/lloydk/.cache/huggingface
+  postgres:
+    # base 의 ../docker-data/postgres 바인드를 named 볼륨으로 — 프로젝트 접두어로 스택 격리.
+    volumes: !override
+      - pgdata:/var/lib/postgresql/data
+  redis:
+    volumes: !override
+      - redisdata:/data
+
+volumes:
+  pgdata:        # 프로젝트 스코프(비-external) → lloydk-jjw_pgdata / lloydk-cust_pgdata 로 자동 분리
+  redisdata:
+  lloydk_hf_cache:
+    # 두 스택 공유 — 스크립트가 `docker volume create lloydk_hf_cache` 로 선생성.
+    external: true

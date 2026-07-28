@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 .env
 .env.backup-*
+# deploy_testserver_dual.sh 가 생성하는 스택별 실 시크릿 — 커밋 금지
+.env.jjw
+.env.cust
+.env.cloud
 datasets/raw/
 datasets/corrections/
 datasets/external/
