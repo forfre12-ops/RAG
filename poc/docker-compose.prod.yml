@@ -31,6 +31,9 @@ services:
     volumes: !override
       - prod_artifacts:/app/artifacts:ro
       - hf_cache_api:/home/lloydk/.cache/huggingface
+      # [저장 영속·공유] 원본 문서(암호화 at-rest)는 named 볼륨에. 볼륨이 없으면 컨테이너 임시레이어에
+      # 써서 재생성 시 원문 소실 + api↔worker 미공유 → 원문 read-back miss 로 빈문서 분류(무음). 운영 필수.
+      - app_storage:/app/.storage
     # 리버스 프록시(nginx-mtls 등) 뒤 — 외부 직노출 금지.
     ports: !override
       - "127.0.0.1:8000:8000"
@@ -66,6 +69,7 @@ services:
     volumes: !override
       - prod_artifacts:/app/artifacts:ro
       - hf_cache_worker:/home/lloydk/.cache/huggingface
+      - app_storage:/app/.storage                 # api 와 동일 저장 볼륨 공유(원문 read-back)
     deploy:
       restart_policy:
         condition: on-failure
@@ -112,5 +116,8 @@ volumes:
   prod_artifacts:
     external: true
     name: "${PROD_ARTIFACTS_VOLUME:-lloydk_prod_artifacts}"
+  # 원본 문서 저장(암호화 at-rest) — 안정적 이름으로 백업/복구 대상. api·worker 공유·재생성 영속.
+  app_storage:
+    name: "${APP_STORAGE_VOLUME:-lloydk_app_storage}"
   hf_cache_api:
   hf_cache_worker:

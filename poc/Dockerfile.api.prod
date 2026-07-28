@@ -51,7 +51,9 @@ RUN pip install --upgrade pip && \
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 # 비-root 사용자 (보안)
-RUN useradd -m -u 1000 lloydk && chown -R lloydk:lloydk /app
+# /app/.storage 를 미리 만들어 uid1000 소유로 둔다 — 원문 저장 named 볼륨이 첫 마운트 때 이 빈 디렉터리
+# 소유권을 물려받아(Docker 볼륨 초기화) 비-root 가 바로 쓸 수 있다(없으면 root 소유로 생성돼 write 거부).
+RUN useradd -m -u 1000 lloydk && mkdir -p /app/.storage && chown -R lloydk:lloydk /app
 USER lloydk
 
 EXPOSE 8000

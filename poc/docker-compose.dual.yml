@@ -26,6 +26,7 @@ services:
     volumes: !override
       - ./artifacts:/app/artifacts:ro                       # 분류 모델(v-dd3abab9) ro 공급
       - lloydk_hf_cache:/home/lloydk/.cache/huggingface     # KURE 임베더 캐시 — 두 스택 공유(external)
+      - storagedata:/app/.storage                           # [#4] 원문 저장(암호화 at-rest) — api↔worker 공유·영속(볼륨無 시 원문소실·미공유→빈문서 분류)
   worker:
     depends_on: !override
       postgres:
@@ -35,6 +36,7 @@ services:
     volumes: !override
       - ./artifacts:/app/artifacts:ro
       - lloydk_hf_cache:/home/lloydk/.cache/huggingface
+      - storagedata:/app/.storage                           # [#4] api 와 동일 저장 볼륨 공유(원문 read-back)
   postgres:
     # base 의 ../docker-data/postgres 바인드를 named 볼륨으로 — 프로젝트 접두어로 스택 격리.
     volumes: !override
@@ -46,6 +48,7 @@ services:
 volumes:
   pgdata:        # 프로젝트 스코프(비-external) → lloydk-jjw_pgdata / lloydk-cust_pgdata 로 자동 분리
   redisdata:
+  storagedata:   # [#4] 원문 저장 — 프로젝트 스코프(스택별 격리·스택 내 api↔worker 공유·재생성에도 영속)
   lloydk_hf_cache:
     # 두 스택 공유 — 스크립트가 `docker volume create lloydk_hf_cache` 로 선생성.
     external: true
