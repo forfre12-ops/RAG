@@ -14,6 +14,9 @@
 #   - HF 캐시: non-root 경로(/home/lloydk)에 named volume — 매 기동 재다운로드 방지
 services:
   api:
+    # 재기동 정책 — 호스트 재부팅/도커 데몬 재시작 후 자동 복구. deploy.restart_policy 는
+    # `docker compose up`(비-swarm)에서 무시되므로 compose 단축형 restart 를 명시해야 실효.
+    restart: unless-stopped
     build:
       dockerfile: Dockerfile.api.prod
     # dev .env 상속 차단 — 운영 자격/설정은 ENV_FILE 로만. 초기 클라우드 테스트는 ENV_FILE=.env.cloud.
@@ -56,6 +59,7 @@ services:
       start_period: 90s
 
   worker:
+    restart: unless-stopped
     # 하드닝: dev Dockerfile.api(root)가 아니라 non-root(uid1000) 이미지로 빌드 — api 와 동일.
     # Dockerfile.api.prod 는 앱+전 extras(hwp/ocr/jwt/psh/otel) 포함이라 워커 파싱 태스크에도 충분.
     # (compose command 오버라이드가 gunicorn CMD 를 celery worker 로 대체.)
@@ -82,6 +86,7 @@ services:
           memory: "${WORKER_MEM_RESERVATION:-1G}"
 
   beat:
+    restart: unless-stopped
     # 하드닝: worker 와 동일 non-root 이미지(uid1000)로 빌드(dev Dockerfile.api=root 상속 차단).
     build:
       dockerfile: Dockerfile.api.prod
@@ -92,6 +97,7 @@ services:
     volumes: !override []
 
   postgres:
+    restart: unless-stopped
     # 내부 네트워크만 — 호스트 노출 없음(dev 의 0.0.0.0:5432 상속 차단).
     ports: !override []
     deploy:
@@ -100,6 +106,7 @@ services:
           memory: "${POSTGRES_MEM_LIMIT:-2G}"
 
   redis:
+    restart: unless-stopped
     ports: !override []
 
   minio:
