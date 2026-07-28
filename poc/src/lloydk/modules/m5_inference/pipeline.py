@@ -804,6 +804,35 @@ class InferencePipeline:
             doc_prob[i] = torch.maximum(doc_prob[i], chunk_max[i])
         return doc_prob
 
+    def _encode_windows(self, batch: list[str]):
+        """배치를 토큰 윈도우로 인코딩 → (BatchEncoding, sample_mapping).
+
+        [#chunk-trunc] char-청크(≈max_seq_len*3 자)는 max_seq_len(512) 토큰을 넘길 수 있고,
+        truncation=True 만 쓰면 초과분이 '조용히' 잘려(char overlap 로도 못 메우는 gap 밴드 발생)
+        그 구간의 **모델-only 의미 비밀**이 미탐된다(FNR). fast 토크나이저의
+        return_overflowing_tokens 로 초과 청크를 여러 윈도우(각 ≤max_seq_len, stride=chunk_overlap
+        토큰 겹침)로 **무손실** 분할한다. sample_mapping[i]=i번째 윈도우의 원 배치-청크 인덱스
+        (길이 가중치 승계용). slow 토크나이저/미지원/실패 시 기존 truncation(청크당 1윈도우)으로
+        폴백해 동작을 보존한다(무손실은 아니나 회귀 없음 — best-effort 상향).
+        """
+        if getattr(self._tokenizer, "is_fast", False):
+            try:
+                stride = min(int(getattr(settings, "chunk_overlap", 64)), settings.max_seq_len // 4)
+                enc = self._tokenizer(
+                    batch, truncation=True, max_length=settings.max_seq_len,
+                    stride=max(0, stride), return_overflowing_tokens=True,
+                    padding=True, return_tensors="pt",
+                )
+                sample_map = enc.pop("overflow_to_sample_mapping").tolist()
+                return enc, sample_map
+            except Exception:  # noqa: BLE001 — 오버플로 미지원/실패 → truncation 폴백(동작 보존)
+                pass
+        enc = self._tokenizer(
+            batch, truncation=True, max_length=settings.max_seq_len,
+            padding=True, return_tensors="pt",
+        )
+        return enc, list(range(len(batch)))
+
     def _run_model(self, text: str, use_rag: bool, return_evidence: bool) -> InferenceResult:
         import torch
         import torch.nn.functional as F
@@ -815,6 +844,9 @@ class InferencePipeline:
         chunk_weights = [max(len(t.strip()), 1) for t in chunk_texts]
 
         probs = []
+        # win_weights: 오버플로 윈도잉으로 한 청크가 N윈도우로 쪼개지면 각 윈도우가 원 청크의
+        # 길이 가중치를 승계 → chunk_probs 행수와 정합. (severe max-pool은 가중 무관 = FNR 핵심 보존)
+        win_weights: list[int] = []
         # span은 torch.no_grad() **안쪽**에 둔다 — 전체 forward가 grad 비활성 유지(필수).
         # 속성은 스칼라·비민감(model_version·청크수·device)만. OTel 미활성 시 no-op.
         with torch.no_grad():
@@ -826,18 +858,17 @@ class InferencePipeline:
             ):
                 for batch_start in range(0, len(chunk_texts), 8):
                     batch = chunk_texts[batch_start:batch_start + 8]
-                    enc = self._tokenizer(
-                        batch, truncation=True, max_length=settings.max_seq_len,
-                        padding=True, return_tensors="pt",
-                    ).to(self._device)
+                    enc, sample_map = self._encode_windows(batch)
+                    enc = enc.to(self._device)
                     logits = self._model(**enc).logits
                     # 서빙 캘리브레이션: T>1이면 분포를 부드럽게 해 OOD 과신 완화. T=1.0=무보정.
                     temp = self._temperature
                     if temp != 1.0:
                         logits = logits / temp
                     probs.append(F.softmax(logits, dim=-1).cpu())
-        chunk_probs = torch.cat(probs)  # [n_chunks, n_labels]
-        doc_prob = self._aggregate_chunk_probs(chunk_probs, chunk_weights)
+                    win_weights.extend(chunk_weights[batch_start + i] for i in sample_map)
+        chunk_probs = torch.cat(probs)  # [n_windows, n_labels]
+        doc_prob = self._aggregate_chunk_probs(chunk_probs, win_weights)
         # 표시용 scores는 합=1로 재정규화 (모든 인덱스를 같은 상수로 나눠 순서 보존).
         total = float(doc_prob.sum())
         norm = (doc_prob / total) if total > 0 else doc_prob
