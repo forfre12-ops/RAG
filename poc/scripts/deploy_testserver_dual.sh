@@ -123,12 +123,22 @@ smoke() {
     sleep 3
   done
   if [ "$ok" != 1 ]; then c_err "healthz/ready 미도달(:$port) — 'docker compose -p ... logs api' 확인"; return; fi
-  local grade
-  grade=$(curl -fsS -X POST "http://127.0.0.1:$port/api/v1/classify" \
+  local resp grade mv
+  resp=$(curl -fsS -X POST "http://127.0.0.1:$port/api/v1/classify" \
       -H "X-API-Key: $key" -H 'Content-Type: application/json' \
-      -d '{"doc_id":"smoke-1","content":"본 문서는 당사의 반도체 공정 영업비밀을 포함한다"}' 2>/dev/null \
-      | tr ',' '\n' | grep -iE '"(grade|level)"' | head -1)
-  c_ok "ready 200 · 분류 응답: ${grade:-(응답 확인)}"
+      -d '{"doc_id":"smoke-1","content":"본 문서는 당사의 반도체 공정 영업비밀을 포함한다"}' 2>/dev/null || true)
+  grade=$(printf '%s' "$resp" | tr ',' '\n' | grep -iE '"(grade|label|level)"' | head -1)
+  # [#7] 배포 모델이 실제 로드됐는지 검증 — preflight 에서 모델 파일은 확인했으므로 rule-fallback 이면
+  # 로드 실패(가중치·임베더 오류)다. 과거 smoke 는 등급 응답만 보고 rule-fallback 을 무음 통과시켜
+  # '모델 미로드 상태로 배포 성공'처럼 보였다(#11 인수 blind spot). 서빙 model_version 을 노출하고
+  # rule-fallback 이면 loud 경고(비차단 — rule-only 는 지원모드라 배포는 계속하되 반드시 보이게).
+  mv=$(printf '%s' "$resp" | grep -oE '"model_version" *: *"[^"]*"' | head -1 | sed -E 's/.*: *"([^"]*)"/\1/')
+  case "$mv" in
+    rule-fallback*|none|"")
+      c_err "$name: 모델 미로드(model_version=${mv:-없음}=rule-fallback) — 파일은 있으나 로드 실패. 'docker compose -p lloydk-<jjw|cust> $COMPOSE_FILES logs api' 로 원인 확인. 분류: ${grade:-?}" ;;
+    *)
+      c_ok "ready 200 · model=$mv · 분류: ${grade:-(응답 확인)}" ;;
+  esac
 }
 
 print_summary() {
