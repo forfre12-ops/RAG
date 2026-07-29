@@ -43,7 +43,9 @@ from eval_p1_model_gold import predict_direct  # noqa: E402  재사용 추론
 LABELS = ["TS", "S1", "S2", "S3"]
 _HIGH = frozenset({"TS", "S1", "S2"})
 _SEV = {"TS": 3, "S1": 2, "S2": 1, "S3": 0}
-DEPLOYED = "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9"
+# 배포본 = v5_clean/v-fe4b386b (2026-07-29 3축 PASS 승격). 직전 배포본·롤백 타깃 = v4_clean/v-dd3abab9.
+# 향후 후보(v6+)는 기본으로 이 배포본(v5)에 대해 무회귀 판정. v5 승격 재현은 --baseline 로 v4 명시.
+DEPLOYED = "artifacts/classifier_p1_v5_clean/v-fe4b386b"
 
 
 def _jsonl(path: Path) -> list[dict]:

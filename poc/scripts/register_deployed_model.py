@@ -32,7 +32,8 @@ from lloydk.db import session_scope  # noqa: E402
 from lloydk.repositories.training_repo import TrainingRepo  # noqa: E402
 
 # 릴리스 기본 모델(단일 진실원 — build_offline_bundle --release-model 과 동일 경로).
-_RELEASE_DEFAULT = "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9"
+# v5_clean/v-fe4b386b 승격(2026-07-29 3축 PASS). 롤백=classifier_p1_retrain_v4_clean/v-dd3abab9.
+_RELEASE_DEFAULT = "artifacts/classifier_p1_v5_clean/v-fe4b386b"
 
 
 def metrics_from_report(report: dict, report_path: Path) -> dict:

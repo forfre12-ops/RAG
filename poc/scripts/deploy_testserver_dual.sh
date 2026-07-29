@@ -53,7 +53,23 @@ rand(){ openssl rand -hex "${1:-32}"; }
 # ── 스택별 .env 생성(이미 있으면 유지 — 재실행 시 키 회전 방지) ──────────────
 gen_env() {
   local file=$1 profile=$2 port=$3 llm=$4
-  if [ -f "$file" ]; then c_ok "$file 유지(기존)"; return; fi
+  if [ -f "$file" ]; then
+    # 기존 파일 유지(시크릿 회전 방지)하되, 배포 모델 포인터는 MODEL_REL 로 강제 동기화 —
+    # 과거 MODEL_REL(v4)로 만든 .env 가 v5 승격 후에도 낡은 모델을 서빙하던 드리프트를 자동 치유.
+    if grep -q '^CLASSIFIER_MODEL_DIR=' "$file"; then
+      local _cur; _cur=$(grep '^CLASSIFIER_MODEL_DIR=' "$file" | head -1 | cut -d= -f2-)
+      if [ "$_cur" != "$MODEL_REL" ]; then
+        sed -i "s|^CLASSIFIER_MODEL_DIR=.*|CLASSIFIER_MODEL_DIR=$MODEL_REL|" "$file"
+        c_ok "$file 유지 · 모델 포인터 $_cur → $MODEL_REL 동기화(드리프트 치유)"
+      else
+        c_ok "$file 유지(기존 · 모델 $MODEL_REL)"
+      fi
+    else
+      echo "CLASSIFIER_MODEL_DIR=$MODEL_REL" >> "$file"
+      c_ok "$file 유지 · CLASSIFIER_MODEL_DIR=$MODEL_REL 추가"
+    fi
+    return
+  fi
   local pw api sek acs
   pw=$(rand 16); api=$(rand 24); sek=$(rand 32); acs=$(rand 32)
   {

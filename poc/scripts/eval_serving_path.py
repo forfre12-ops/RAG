@@ -7,7 +7,7 @@ evaluate_via_serving으로 홀드아웃을 **실서빙 InferencePipeline.run() �
 
 사용:
   python scripts/eval_serving_path.py \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --gold datasets/gold_real/holdout_eval.jsonl \
     --taus 0,0.35,0.25,0.15 \
     --report reports/serving_path_eval.md

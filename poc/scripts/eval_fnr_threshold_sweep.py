@@ -21,7 +21,7 @@ argmax 결정은 고등급(TS/S1) 확률이 1등이 아니면 저등급으로 �
 사용
 ----
   python scripts/eval_fnr_threshold_sweep.py \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --gold datasets/gold_real/holdout_eval.jsonl \
     --report reports/fnr_threshold_sweep.md
 """

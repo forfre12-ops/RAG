@@ -12,7 +12,7 @@
 
 사용:
   python scripts/eval_anchor_cards.py \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --cap-per-cell 200 \
     --report reports/anchor_eval_cards.md
 """
@@ -36,7 +36,7 @@ if str(_SRC) not in sys.path:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9")
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b")
     ap.add_argument("--cap-per-cell", type=int, default=0,
                     help="(출처×등급) 칸당 최대 표본(CPU 비용 제어). 0=전수. 절단은 로그로 명시.")
     ap.add_argument("--min-n", type=int, default=30, help="칸당 최소 표본(미달=INCONCLUSIVE)")

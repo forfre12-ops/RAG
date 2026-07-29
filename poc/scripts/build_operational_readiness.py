@@ -342,7 +342,7 @@ def main() -> int:
     ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9",
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b",
                     help="evaluated model - the one the F1/FNR reports describe")
     ap.add_argument("--deployed-model", default=_deployed_model_default(),
                     help="live deployment model (defaults to settings.classifier_model_dir / .env)")

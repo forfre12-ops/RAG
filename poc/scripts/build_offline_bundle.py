@@ -1524,7 +1524,7 @@ def main() -> int:
              "기본은 포함 — 안전 알림 소비자는 폐쇄망 운영 필수.",
     )
     ap.add_argument(
-        "--release-model", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9",
+        "--release-model", default="artifacts/classifier_p1_v5_clean/v-fe4b386b",
         help="이번 릴리스의 검증된 분류기(단일 진실원). 번들에 실리는 분류기가 이 버전을 "
              "담지 않으면 빌드 중단(번들↔prod parity). 릴리스마다 갱신.",
     )

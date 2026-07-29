@@ -6,7 +6,7 @@ maximize F1 subject to FNR_고등급(TS·S1) ≤ target. 재학습 0 · CPU · �
 
 사용:
   python scripts/optuna_tune_gates.py \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --gold datasets/gold_real/holdout_eval.clean.jsonl \
     --n-trials 50 --fnr-high-target 0.0 \
     --report reports/optuna_gate_tuning.md

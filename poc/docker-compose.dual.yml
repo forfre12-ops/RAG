@@ -24,7 +24,7 @@ services:
       redis:
         condition: service_started
     volumes: !override
-      - ./artifacts:/app/artifacts:ro                       # 분류 모델(v-dd3abab9) ro 공급
+      - ./artifacts:/app/artifacts:ro                       # 분류 모델(v-fe4b386b · v5) ro 공급
       - lloydk_hf_cache:/home/lloydk/.cache/huggingface     # KURE 임베더 캐시 — 두 스택 공유(external)
       - storagedata:/app/.storage                           # [#4] 원문 저장(암호화 at-rest) — api↔worker 공유·영속(볼륨無 시 원문소실·미공유→빈문서 분류)
   worker:

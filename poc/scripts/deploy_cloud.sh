@@ -60,8 +60,8 @@ if [ ! -f "$ENV_FILE" ]; then
   _gen() { openssl rand -hex "$1" 2>/dev/null || { tr -dc 'a-f0-9' </dev/urandom | head -c "$(( $1 * 2 ))"; echo; }; }
   _api="$(_gen 24)"; _audit="$(_gen 32)"; _pgpw="$(_gen 16)"
   _model_line='# CLASSIFIER_MODEL_DIR 미설정 → 룰 기반 분류(모델 없이도 파싱·등급 E2E 동작)'
-  [ -d "artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9" ] \
-    && _model_line='CLASSIFIER_MODEL_DIR=/app/artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9'
+  [ -d "artifacts/classifier_p1_v5_clean/v-fe4b386b" ] \
+    && _model_line='CLASSIFIER_MODEL_DIR=/app/artifacts/classifier_p1_v5_clean/v-fe4b386b'
   cat > "$ENV_FILE" <<ENVEOF
 # 테스트서버 자동생성(lite-cloud) — 실운영 아님. 재생성: 이 파일 삭제 후 재실행.
 DEPLOY_PROFILE=lite-cloud

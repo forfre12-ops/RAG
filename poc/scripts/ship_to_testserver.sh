@@ -21,7 +21,7 @@ PKG="lloydk-testserver.tar.gz"
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
-MODEL="poc/artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9"
+MODEL="poc/artifacts/classifier_p1_v5_clean/v-fe4b386b"   # 배포본 v5 (2026-07-29 3축 PASS). 롤백=v4_clean/v-dd3abab9
 
 b(){ printf '\033[1m%s\033[0m\n' "$*"; }
 [ -f "$MODEL/model.safetensors" ] || { echo "✗ 모델 없음: $ROOT/$MODEL" >&2; exit 1; }
@@ -34,8 +34,8 @@ git archive --format=tar HEAD:poc | tar -x -C ".ship/poc"          # 추적 소�
 for f in scripts/deploy_testserver_dual.sh docker-compose.dual.yml scripts/deploy_cloud.sh scripts/deploy_airgap.sh; do
   [ -f "poc/$f" ] && { mkdir -p ".ship/poc/$(dirname "$f")"; cp -f "poc/$f" ".ship/poc/$f"; }
 done
-mkdir -p ".ship/poc/artifacts/classifier_p1_retrain_v4_clean"
-cp -r "$MODEL" ".ship/poc/artifacts/classifier_p1_retrain_v4_clean/"   # 모델만 얹기
+mkdir -p ".ship/poc/artifacts/classifier_p1_v5_clean"
+cp -r "$MODEL" ".ship/poc/artifacts/classifier_p1_v5_clean/"   # 모델만 얹기
 tar czf "$PKG" -C .ship poc
 # [#3] 패키징 정합성 게이트 — run 커맨드(deploy_testserver_dual.sh)가 요구하는 파일이 실제
 # tar 에 들어갔는지 전송 전에 확인. 과거 stale tar(피처 커밋 이전 빌드)가 이 두 파일 없이

@@ -10,7 +10,7 @@ predict_via_serving(분류) + metamorphic.build_metamorphic_report(채점, 실�
 
 사용(로컬 Qwen, Ollama):
   python scripts/gen_metamorphic_pairs.py --provider ollama --max-anchors 8 \
-    --model-dir artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9 \
+    --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b \
     --report reports/metamorphic_pairs.md
 """
 from __future__ import annotations
@@ -61,7 +61,7 @@ def _load_samples_fixture(path: Path, sample_cls) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-dir", default="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9")
+    ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b")
     ap.add_argument("--provider", default="", help="LLM provider(빈칸=settings.llm_provider). 예: ollama")
     ap.add_argument("--max-anchors", type=int, default=8, help="생성할 고등급 앵커 수(LLM 비용 제어)")
     ap.add_argument("--max-public", type=int, default=20, help="과분류 베이스라인용 공개(S3) 앵커 수")
