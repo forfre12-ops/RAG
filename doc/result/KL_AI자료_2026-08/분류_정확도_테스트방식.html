@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>분류 정확도 · 테스트 방식 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:920px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:12px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13.5px}
+ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 3</div>
+    <h1>분류 정확도 · 테스트 방식</h1>
+    <div class="meta">등급 판정근거는 <a href="../open/골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(카드형)</a> 참조 · 2026-07-29</div>
+  </div>
+
+  <div class="note"><b>핵심 원칙 — 미탐(FNR) 최소화 우선.</b> 본 시스템의 1차 목표는 "정확도 %"가 아니라 <b>고등급(TS·S1) 영업비밀을 놓치지 않는 것</b>입니다. RFP 성능요건(PER-002)은 속도·자원 기준이며 정확도 수치 목표는 명시돼 있지 않습니다. 애매하면 <b>등급을 올리거나 사람 검수로 라우팅</b>합니다(안전 veto).</div>
+
+  <h2>1. 테스트 방식</h2>
+  <table>
+    <thead><tr><th style="width:200px">평가셋 / 방법</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td>홀드아웃 109</td><td>학습에 쓰지 않은 업무문서(판례 제거) — 서빙 경로 실측</td></tr>
+      <tr><td>경화(hardened) 42 · clean 42</td><td>라벨 경화 평가셋 — 누출 없는 head-to-head 비교</td></tr>
+      <tr><td>공개문서 FPR</td><td>공개 특허·판례·보도자료 등으로 <b>과분류율</b>(오탐) 측정</td></tr>
+      <tr><td>적대(adversarial) veto</td><td>고등급 미탐(진짜 비밀 → 공개 등급) 발생 여부 검증</td></tr>
+      <tr><td>메타모픽</td><td>의미보존 변형 시 등급 일관성 검증</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. 실측 (서빙 경로)</h2>
+  <table>
+    <thead><tr><th style="width:230px">모델</th><th>주요 지표</th></tr></thead>
+    <tbody>
+      <tr><td><b>현행 배포 v4_clean</b> <code>v-dd3abab9</code></td><td>홀드아웃 109 · F1_macro <b>0.686</b> · 방향 FNR <b>0.018</b> · <b>FNR_TS 0.000</b>(TS 미탐 0)</td></tr>
+      <tr><td><b>개선 후보 v5_clean</b> <code>v-fe4b386b</code></td><td>경화 평가셋 F1 <b>0.69→0.92</b> · S1 recall <b>0.43→0.86</b> · 공개문서 과분류 <b>79%→4%</b> · 고등급 미탐 무회귀(위험 미탐 0)</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:#71717a">※ 위 지표는 기계(합성/공개) 라벨 기준입니다. v5는 자동 게이트(경화 홀드아웃 + 공개문서 FPR + 적대 veto) 3축 PASS 후보입니다.</p>
+
+  <h2>3. 등급 판정근거</h2>
+  <p>골든셋 각 건의 판정근거는 <b>카드형 보고서</b>로 제공합니다 — 룰 엔진 등급 · 분류기 등급 · S(비공지)×V(경제가치)×M(비밀관리) 산정 · softmax 신뢰도 분포를 문서별로 노출합니다. <a href="../open/골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(v5 카드형)</a> · <a href="../open/골든셋_분류근거_현행모델_v-dd3abab9.html">현행 모델</a> · <a href="../open/golden500_분류근거_보고서.html">golden500 근거</a>.</p>
+
+  <div class="note"><b>정직한 한계 · 개선 경로.</b> 지재원 단계는 실데이터·현장검수·반출이 0인 <b>합성 부트스트랩</b>이라, 절대 정확도(실세계 %)에는 <b>구조적 천장</b>이 있습니다(사람서명 실문서 평가셋 부재). 따라서 배포 전 "정확도 %"를 단정하지 않으며, 현 지표는 <b>일관성·안전 무회귀</b>의 근거로 해석합니다. <b>진짜 정확도는 발주처 운영 현장의 검수로 실측·개선</b>되며, 그 경로가 <a href="발주처_골든셋_생성갱신_지원.html">발주처 골든셋 생성·갱신(요청 5)</a>입니다.</div>
+
+  <div class="foot">로이드케이(AI 코어) · 분류 정확도·테스트 방식 · 2026-07-29</div>
+</div>
+</body>
+</html>

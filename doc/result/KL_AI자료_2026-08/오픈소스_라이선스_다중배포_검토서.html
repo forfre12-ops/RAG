@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>오픈소스 라이선스 · 다중배포 검토서 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5;--warn:#7a1f1f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:940px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13.5px}
+.warn{border-left-color:var(--warn)}
+ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+.tag{font-size:10.5px;font-weight:700;font-family:ui-monospace,monospace;padding:1px 6px;white-space:nowrap}
+.perm{background:#0a0a0a;color:#fff}
+.copyleft{background:#fff;color:#7a1f1f;border:1px solid #7a1f1f}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 6 (확인)</div>
+    <h1>오픈소스 라이선스 · 다중배포 검토서</h1>
+    <div class="meta">다수 기업(폐쇄망) 배포 관점 · 2026-07-29 · 권위 목록은 SBOM(CycloneDX) 산출</div>
+  </div>
+
+  <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음(기본 구성).</b> 폐쇄망 <b>기본 스택은 전부 permissive</b>(PostgreSQL/BSD/MIT/Apache)라 다수 기업에 자유롭게 재배포·설치할 수 있습니다. 카피레프트(AGPL) 구성요소는 <b>기본 제외</b>이며, 필요한 경우에만 <b>옵트인 + 프로세스 격리</b>로 경계를 국한합니다.</div>
+
+  <h2>1. 기본 스택 라이선스 (전부 permissive)</h2>
+  <table>
+    <thead><tr><th>구성요소</th><th style="width:130px">라이선스</th><th style="width:70px">유형</th></tr></thead>
+    <tbody>
+      <tr><td>PostgreSQL + pgvector</td><td>PostgreSQL License</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>Redis 7.2 · nginx</td><td>BSD-3 · BSD-2</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>FastAPI · SQLAlchemy · openpyxl · python-pptx · PyJWT</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>Uvicorn · Celery · pdfminer.six · xlrd</td><td>BSD</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>transformers · torch · MLflow · bcrypt · cryptography · prometheus · OpenTelemetry · Tesseract</td><td>Apache-2.0</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>모델: KF-DeBERTa · KURE-v1 · BGE-M3</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>모델: Qwen3-14B · KoELECTRA</td><td>Apache-2.0</td><td><span class="tag perm">permissive</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. 카피레프트(AGPL) 처리 — 격리</h2>
+  <table>
+    <thead><tr><th style="width:150px">구성요소</th><th style="width:90px">라이선스</th><th>처리 방식</th></tr></thead>
+    <tbody>
+      <tr><td>PyMuPDF (PDF)</td><td><span class="tag copyleft">AGPL-3.0</span></td><td><b>기본 제외.</b> 옵션 <code>[pdf-agpl]</code>로만 옵트인. 기본 PDF 추출은 pdfminer.six(BSD-3)</td></tr>
+      <tr><td>pyhwp (HWP 표 셀)</td><td><span class="tag copyleft">AGPLv3+</span></td><td><b>기본 제외.</b> 옵션 <code>[hwp-tables]</code>. 채택 시에도 코드가 import하지 않고 <code>hwp5html</code> CLI를 <b>별도 프로세스로 호출(arm's length)</b> → AGPL 경계가 실행파일에 국한. 기본 HWP는 rhwp-python</td></tr>
+      <tr><td>MinIO (객체 스토리지)</td><td><span class="tag copyleft">AGPL-3.0</span></td><td><b>폐쇄망 미사용</b>(로컬 파일시스템). 옵션 <code>[minio]</code>는 클라우드(CSAP) 티어 전용 → AGPL 이슈 해소</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note warn"><b>다중배포 시 유의점.</b> AGPL 옵션 3종(<code>pdf-agpl</code>·<code>hwp-tables</code>·<code>minio</code>)은 폐쇄망 배포 프로파일에 <b>포함하지 않습니다</b>. HWP 표 셀 정밀 추출이 필요한 고객사에 한해 <code>[hwp-tables]</code>를 프로세스 격리로 옵트인하되, 해당 환경의 AGPL 수용 여부를 배포 전 확인합니다.</div>
+
+  <h2>3. 상용 LLM · 외부 API</h2>
+  <ul>
+    <li>폐쇄망 운영은 <b>로컬 LLM(Qwen3-14B, Apache-2.0) 오프라인 동봉</b> — 외부 전송 없음. 등급 결정 핫패스는 LLM-free.</li>
+    <li>원격 상용 API(anthropic·openai)는 <b>클라우드 티어 옵션</b>이며 폐쇄망 기본 구성에 미포함. 상용 LLM 활용은 <b>공개출처 문서에 한정</b>.</li>
+  </ul>
+
+  <h2>4. 산출물</h2>
+  <ul>
+    <li>의존성 라이선스 표: <code>scripts/dump_licenses.py</code> (pip-licenses)</li>
+    <li>SBOM(CycloneDX): <code>cyclonedx-bom</code> — 운영 전환 시 첨부</li>
+  </ul>
+
+  <div class="foot">로이드케이(AI 코어) · 오픈소스 라이선스·다중배포 검토서 · 2026-07-29 · 라이선스 값은 번들 동결 기준, 운영 전환 시 SBOM으로 재확정</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>기술스택 버전표 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:960px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 2</div>
+    <h1>전체 기술 스택 · 버전 · 라이선스</h1>
+    <div class="meta">Python ≥3.11 · 폐쇄망(온프레미스) 기본 구성 · 2026-07-29 · 값은 배포 번들 동결 기준</div>
+  </div>
+
+  <div class="note">폐쇄망 <b>기본 스택은 전부 permissive 라이선스</b>(PostgreSQL/BSD/MIT/Apache). 카피레프트(AGPL) 구성요소는 기본 제외·옵트인 격리 → <a href="오픈소스_라이선스_다중배포_검토서.html">라이선스·다중배포 검토서</a>. 권위 있는 전체 목록은 <code>scripts/dump_licenses.py</code>로 SBOM(CycloneDX) 산출.</div>
+
+  <h2>1. 런타임 · 인프라</h2>
+  <table>
+    <thead><tr><th style="width:200px">구성요소</th><th style="width:110px">버전</th><th style="width:120px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><b>PostgreSQL + pgvector</b></td><td>16</td><td>PostgreSQL License</td><td>메타데이터·감사장부·모델버전 + <b>벡터검색(내장)</b></td></tr>
+      <tr><td>Redis</td><td>7.2</td><td>BSD-3</td><td>캐시 · 작업 큐 브로커</td></tr>
+      <tr><td>FastAPI / Uvicorn</td><td>≥0.115 / ≥0.30</td><td>MIT / BSD-3</td><td>API 서버 (포트 8000)</td></tr>
+      <tr><td>Celery</td><td>≥5.4</td><td>BSD-3</td><td>비동기 워커 · 스케줄(beat)</td></tr>
+      <tr><td>SQLAlchemy / Alembic</td><td>≥2.0 / ≥1.13</td><td>MIT</td><td>ORM · 마이그레이션</td></tr>
+      <tr><td>nginx (mTLS, 옵션)</td><td>1.27</td><td>BSD-2</td><td>mTLS 종료 — 인증서는 발주처/KL PKI</td></tr>
+      <tr><td>MLflow <span style="color:#71717a">(지재원 전용)</span></td><td>2.16</td><td>Apache-2.0</td><td>실험·모델 레지스트리 — 고객사 번들 미포함</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. 벡터 · 검색</h2>
+  <table>
+    <thead><tr><th style="width:200px">구성요소</th><th style="width:110px">버전</th><th style="width:120px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><b>pgvector</b> (dense)</td><td>PG16 확장</td><td>PostgreSQL License</td><td>의미 벡터 유사도 검색</td></tr>
+      <tr><td><b>bigram tsvector + ts_rank</b></td><td>PG 내장</td><td>PostgreSQL License</td><td>한국어 어휘 검색(랭커)</td></tr>
+      <tr><td>RRF 하이브리드</td><td>자체</td><td>—</td><td>dense + 어휘 융합. <b>별도 검색엔진(ES) 없이 DB 통합</b> (ES는 레거시 어댑터만)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. 모델</h2>
+  <table>
+    <thead><tr><th style="width:200px">구분</th><th style="width:230px">모델</th><th style="width:120px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><b>분류기</b></td><td>KF-DeBERTa <span style="color:#71717a">(kakaobank/kf-deberta-base, 110M)</span> / KoELECTRA(대체)</td><td>MIT / Apache-2.0</td><td>영업비밀 등급분류(TS/S1/S2/S3)</td></tr>
+      <tr><td><b>임베딩</b></td><td>KURE-v1(기본) / BGE-M3(대체)</td><td>MIT / MIT</td><td>한국어 검색 임베딩 (<code>sentence-transformers ≥3.0</code>)</td></tr>
+      <tr><td><b>로컬 LLM</b></td><td>Qwen3-14B <span style="color:#71717a">(vLLM/Ollama)</span></td><td>Apache-2.0</td><td>합성·요약 — <b>폐쇄망 공개출처 한정</b>, 등급 핫패스는 LLM-free</td></tr>
+      <tr><td>ML 코어</td><td>transformers ≥4.44 · torch ≥2.3 · scikit-learn ≥1.5</td><td>Apache-2.0 / BSD</td><td>학습·추론(고객사 CPU) · 지재원 GPU 학습</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. 문서 추출</h2>
+  <table>
+    <thead><tr><th style="width:200px">포맷</th><th style="width:200px">라이브러리</th><th style="width:120px">라이선스</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>PDF</td><td>pdfminer.six ≥20240706</td><td>BSD-3</td><td>기본 (AGPL PyMuPDF 회피)</td></tr>
+      <tr><td>DOCX / PPTX</td><td>python-docx ≥1.1 · python-pptx ≥0.6</td><td>MIT</td><td>—</td></tr>
+      <tr><td>XLSX / XLS</td><td>openpyxl ≥3.1 · xlrd ≥2.0</td><td>MIT / BSD</td><td>구형 .xls는 <code>[xls]</code> 옵션</td></tr>
+      <tr><td>HWP / HWPX</td><td>rhwp-python ≥0.5.1</td><td>—</td><td>표 셀 보강은 <code>[hwp-tables]</code>(AGPL 격리, 검토서 참조)</td></tr>
+      <tr><td>스캔 OCR (옵션)</td><td>Tesseract 5.x · pytesseract</td><td>Apache-2.0 / MIT</td><td>요건 외 부가 기능</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5. 보안 · 관측성</h2>
+  <table>
+    <thead><tr><th style="width:200px">구성요소</th><th style="width:170px">버전</th><th style="width:120px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td>bcrypt · PyJWT · cryptography</td><td>≥4.0 · ≥2.9 · ≥43.0</td><td>Apache-2.0 / MIT</td><td>API 키 해시 · JWT · 저장 암호화(AES-256-GCM)</td></tr>
+      <tr><td>prometheus-client · OpenTelemetry</td><td>≥0.20 · ≥1.27</td><td>Apache-2.0</td><td>메트릭 · 분산 트레이싱</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">로이드케이(AI 코어) · 기술스택 버전표 · 2026-07-29 · 라이선스·버전은 번들 동결값 기준, 운영 전환 시 SBOM으로 재확정</div>
+</div>
+</body>
+</html>

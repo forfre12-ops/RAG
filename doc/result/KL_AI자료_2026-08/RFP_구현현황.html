@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RFP 요구기능(AI 파트) 구현현황</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5;--prog:#9a6700;--progbg:#fff8e6;--done:#1a7f37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;line-height:1.65;letter-spacing:-.01em}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:28px 0 8px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:0 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.st{font-size:11px;font-weight:700;font-family:ui-monospace,monospace;padding:1px 7px;white-space:nowrap}
+.st.done{background:#0a0a0a;color:#fff}
+.st.prog{background:var(--progbg);color:var(--prog);border:1px solid var(--prog)}
+tr.prog td{background:var(--progbg)}
+.id{white-space:nowrap;font-weight:700;font-family:ui-monospace,monospace;font-size:11px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 4</div>
+    <h1>RFP 요구기능(AI 파트) 구현현황</h1>
+    <div class="meta">FUN-003·004·005·022·023·024 세부 33항목 · 실제 소스 대조 검증(2026-07-29) · 엑셀 기입본 동봉</div>
+  </div>
+
+  <div class="note"><b>완료 31 · 진행중 2</b> (총 33항목). 진행중 = <b>FUN-003-②</b>(실데이터 대량수집 — 외부동의 대기) · <b>FUN-003-④</b>(LangChain 프레임워크 미사용 — 기능은 자체 어댑터로 구현·동작). 각 항목 근거는 파일·모듈 경로로 명시했으며 과대주장 없이 부분·옵션·유의사항을 비고에 표기했습니다.</div>
+
+  <h2>FUN-003 · 샘플 문서 생성 및 관리</h2>
+  <table>
+    <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FUN-003-①</td><td><span class="st done">완료</span></td><td>m1_synthesis/generator.py(등급별 상황프롬프트·PII가드)·p3_generate_synthetic.py(배치생성+합격판정)·POST /synth/generate·test_m1_synthesis.py</td><td>등급명 직접표기 금지(누출차단). 합성문서 실문서 일반화 한계는 학습효과 이슈(생성 요건과 별개)</td></tr>
+      <tr class="prog"><td class="id">FUN-003-②</td><td><span class="st prog">진행중</span></td><td>collect_public_data.py(공공데이터포털·AI Hub#580·DART·law.go.kr)·kipris_aihub_nkt_ingest.py·p2_koipa_corpus_builder.py. 특허프록시·KOIPA 일부 실적재·학습 반영</td><td>수집·변환 도구 완결. <b>대량 실데이터 확보는 외부동의 대기</b>(AI Hub #580 신청 동결·KOIPA 최신 가이드 발주처 회신 의존)</td></tr>
+      <tr><td class="id">FUN-003-③</td><td><span class="st done">완료</span></td><td>adapters/llm/build_provider()(Claude·GPT·Gemini 상용 + vLLM/Ollama/LM Studio 온프렘, 단일 인터페이스)·config·test_adapters_llm.py</td><td>상용 3종+온프렘 모두 연계. 실 호출은 각 API키·endpoint 필요(배선 완결)</td></tr>
+      <tr class="prog"><td class="id">FUN-003-④</td><td><span class="st prog">진행중</span></td><td>프롬프트 체인 기능은 generator.py(SYSTEM_PROMPT/USER_TEMPLATE·temperature 재시도)로 구현·동작. pyproject에 langchain 선언</td><td><b>정직성 유의:</b> 요건이 명시한 'LangChain 프레임워크'는 실제 미사용(자체 어댑터로 대체). 채택은 본개발 결정사항</td></tr>
+      <tr><td class="id">FUN-003-⑤</td><td><span class="st done">완료</span></td><td>generator.py(target_grade 보존)·p3(룰라벨러 재검증 label_match≥90%·FNR≤5% 게이트)·build_training_rows·test_synth_training_build.py</td><td>라벨=목표등급을 룰라벨러와 대조검증. 저품질 출처는 학습 하드배제(위생게이트)</td></tr>
+      <tr><td class="id">FUN-003-⑥</td><td><span class="st done">완료</span></td><td>adapters/llm/build_provider()(LLM 교체 시 프롬프트·호출부 무변경)·test_llm_generalization.py</td><td>LLM 변경=코드 무변경 동작. 미가용 시 success=False 우아한 실패</td></tr>
+      <tr><td class="id">FUN-003-⑦</td><td><span class="st done">완료</span></td><td>synthesize_batch(→pending_review)·GET /synth/queue·POST /synth/{id}/review(admin/reviewer)·build_training_rows·test_synth_worker_persist.py</td><td>generate→queue→review→train 루프 완결. 승인행 버전 데이터셋 바인딩은 빌드타임 단계</td></tr>
+    </tbody>
+  </table>
+
+  <h2>FUN-004 · AI 기반 영업비밀 등급 분류 학습</h2>
+  <table>
+    <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FUN-004-①</td><td><span class="st done">완료</span></td><td>m4_training/trainer.py train_classifier(KF-DeBERTa base·WeightedTrainer FNR 비대칭 cost)·p1_train_classifier.py --mode full·RTM FUN-004·백서 §03</td><td>BERT계열 4클래스 전이학습 완비. 실 파인튜닝은 full-train 프로파일(enable_training=True)</td></tr>
+      <tr><td class="id">FUN-004-②</td><td><span class="st done">완료</span></td><td>m5_inference/pipeline.py run(use_rag)·하이브리드 검색(ts_rank+RRF·KURE-v1·pgvector)·rag/indexer.index_guide·answer.py</td><td>선택 옵션(기본 OFF). RAG는 보완 컨텍스트·질의응답 부가이며 등급을 바꾸지 않음(요건의 '선택 옵션' 성격과 일치)</td></tr>
+      <tr><td class="id">FUN-004-③</td><td><span class="st done">완료</span></td><td>m4_training/chunk_expand.py·TrainSpec.chunk_expand·trainer(TRAIN만 chunk 확장, val/test 문서단위)·test_chunk_expand.py</td><td>옵션(기본 문서단위). 긴 문서 512 truncation 회수용. val/test 미적용으로 누수 차단</td></tr>
+      <tr><td class="id">FUN-004-④</td><td><span class="st done">완료</span></td><td>build_labeled_dataset.py(층화 3분할 0.7/0.15/0.15·seed42·dedup 누수가드)·hygiene.stratified_holdout_split·trainer(val=베스트·test=최종)</td><td>층화·결정론·누수차단 완비. 실데이터 희소로 고등급 홀드아웃 희소는 stats 노출</td></tr>
+      <tr><td class="id">FUN-004-⑤</td><td><span class="st done">완료</span></td><td>trainer compute_metrics(sklearn Acc·P·R·F1 macro·CM·등급별 FNR)→report.json+MLflow·m6_evaluation·report.py(HTML+CM PNG)</td><td>Acc/P/R/F1/CM/FNR 리포트 완비. FNR(고등급 미탐)이 핵심 KPI로 별도 강조</td></tr>
+      <tr><td class="id">FUN-004-⑥</td><td><span class="st done">완료</span></td><td>trainer.py CUDA 자동감지·bf16 가속(GPU 없으면 CPU 폴백)·config full-train 프로파일·백서 §03/§06</td><td>발주기관 제공 GPU(CUDA) 자동활용. 실 GPU 하드웨어는 발주기관 제공 의존. 지재원=GPU 모델공장</td></tr>
+    </tbody>
+  </table>
+
+  <h2>FUN-005 · AI 영업비밀 문서 등급 분류</h2>
+  <table>
+    <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FUN-005-①</td><td><span class="st done">완료</span></td><td>api/schema_admin.py GET·PUT /schema/grades·schema_admin_service.put(추가·변경·삭제 soft·requires_retraining·캐시무효화)·GradeRegistry DB주도·test_kl_integration.py</td><td>API·서비스·DB 완비. 삭제=소프트삭제(감사보존). 추가/변경/삭제는 PUT API(admin.html은 조회만). 등급 구조변경 시 requires_retraining 통지</td></tr>
+      <tr><td class="id">FUN-005-②</td><td><span class="st done">완료</span></td><td>m5_inference/pipeline.py InferencePipeline(transformers AutoModel·softmax·temperature·escalation)·classify_service.classify()·POST /classify·핫리로드</td><td>실 BERT 추론·서빙 완료. 단독 argmax 아님(FNR-safe override·게이트 결합). 모델 미로드 시 룰폴백 안전망</td></tr>
+      <tr><td class="id">FUN-005-③</td><td><span class="st done">완료</span></td><td>config classifier_base_model=kakaobank/kf-deberta-base(DeBERTa-v2 인코더 한국어 PLM)·trainer/inference 동일 아키텍처</td><td>인코더 중심 PLM 학습·추론 배선. base_model 교체 가능</td></tr>
+      <tr><td class="id">FUN-005-④</td><td><span class="st done">완료</span></td><td>static/index.html(등급 배지·신뢰도·S/V/M·근거키워드·룰/BERT 이중판정)·admin.html(등급배지·decision_path·검수플래그)·ClassifyResponse</td><td>데모·관제 콘솔에 등급·신뢰도·근거 표시 완비. 발주처 운영 포털 최종화면은 ICD 연동 대상일 수 있음</td></tr>
+      <tr><td class="id">FUN-005-⑤</td><td><span class="st done">완료</span></td><td>classify_service(staging 임시저장→needs_review)·confirm_service.confirm(→confirmed 관리자 최종확정, 인증)·GET /review-queue·test_confirm_actor_binding.py</td><td>임시저장→검수→최종확정 전구간 배선. 확정 신원은 인증 principal. 확정·교정이 재학습 큐로 환류</td></tr>
+    </tbody>
+  </table>
+
+  <h2>FUN-022 · 전자문서 텍스트 파싱 및 정규화</h2>
+  <table>
+    <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FUN-022-①</td><td><span class="st done">완료</span></td><td>extractor.py extract() 확장자 라우터(HWP/HWPX/DOCX/DOC/PDF/XLSX/XLS/PPTX/이미지OCR)·pdfminer→PyMuPDF→Tesseract 3단·test_parser_support_matrix.py</td><td>핵심 포맷 자동추출. 일부 선택의존성 graceful-degrade(.hwp 표셀=pyhwp, .xls=xlrd). 미설치는 예외 대신 error 필드로 안전 degrade</td></tr>
+      <tr><td class="id">FUN-022-②</td><td><span class="st done">완료</span></td><td>DOCX 머리글/바닥글/표/글상자·HWPX 표셀·PDF 표(pdfplumber)·PPTX 슬라이드·Excel 병합셀 세로전파·ExtractedTable 구조보존</td><td>본문+머리/바닥/표/글상자를 폐기 않고 포착(표 속 등급·원가 미탐 방지). .hwp 표셀 누락은 table_coverage 신호(등급 불변)</td></tr>
+      <tr><td class="id">FUN-022-③</td><td><span class="st done">완료</span></td><td>normalizer.py normalize(NFKC 전각→반각·CRLF→LF·공백/빈줄 정규화·보일러플레이트 제거)·pipeline 활성</td><td>공백/줄바꿈/특수문자 정규화 활성. 불용어 제거는 구현됐으나 기본 비활성 — 단독 숫자줄(금액·수량) 삭제가 영업비밀 수치 소실(silent FNR) 유발해 보수적 미적용</td></tr>
+      <tr><td class="id">FUN-022-④</td><td><span class="st done">완료</span></td><td>normalizer 페이지번호 3조건 제거·단독숫자줄 삭제 폐지·인코딩 폴백(CP949 차단)·extraction_review_gate·test_extraction_review_gate.py</td><td>처리 기준은 코드 임계·보수 휴리스틱·검수 게이트로 정의. 손실 의심 시 등급 불변·검수 라우팅·경고(조용한 드롭 금지)</td></tr>
+      <tr><td class="id">FUN-022-⑤</td><td><span class="st done">완료</span></td><td>PreprocessResult(정규화 텍스트·heading_path 청크·표·품질/PII 메타)·ChunkRepo.upsert_chunks·split_v2를 분류입력과 RAG 인덱서 공용</td><td>전처리 결과가 DB 적재돼 분류·검색 재사용(단일 처리단위). 청크 512/64 문자기반</td></tr>
+    </tbody>
+  </table>
+
+  <h2>FUN-023 · 보안 가이드라인 기반 라벨링 매핑</h2>
+  <table>
+    <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FUN-023-①</td><td><span class="st done">완료</span></td><td>rule_engine.py grade_from_svm/SVM_GRADE_MAP(가이드 v2.2 S×V×M→등급)·Grade enum·trainer _LABEL2ID·tb_classification_levels·RTM FUN-023</td><td>가이드 등급체계 코드화. 학습라벨 id는 config에 baked·추론 로드 시 fail-closed 검증</td></tr>
+      <tr><td class="id">FUN-023-②</td><td><span class="st done">완료</span></td><td>seeds.py FACTOR_SEEDS(S/V/M, 405 키워드 factor 속성)·EvaluationFactors·ClassificationEvidence.factor_id(근거↔요소 FK)·explain.py 요소분해</td><td>판단 3요건(S/V/M)이 라벨연계 속성. 전용 tb_document_factor_scores는 스키마만·미적재(근거태그+응답으로 보존)</td></tr>
+      <tr><td class="id">FUN-023-③</td><td><span class="st done">완료</span></td><td>키워드(seeds 405+tb_level_keywords)·표현패턴(exact/regex/semantic)·메타데이터(source-prior cap·metadata-floor ICD §4)·학습+추론 활용</td><td>키워드·패턴 태깅 학습·추론 완전배선. source-prior 기본 ON, metadata-floor 옵트인(기본 OFF)</td></tr>
+      <tr><td class="id">FUN-023-④</td><td><span class="st done">완료</span></td><td>api/keyword_admin.py /admin/keywords CRUD(soft delete·RBAC)·서빙 룰엔진 핫리로드·schema_admin requires_retraining·DB주도 seeds·test_keyword_admin.py</td><td>키워드 변경=라이브 핫리로드 즉시 반영. 등급개정=requires_retraining 신호(모델 재학습은 별도 거버넌스)</td></tr>
+      <tr><td class="id">FUN-023-⑤</td><td><span class="st done">완료</span></td><td>분해식 라벨링(grade_from_svm·llm_labeler S/V/M 채점 후 등급)·요소태깅 근거·룰+모델+메타 하이브리드 결정·explain 요소분해</td><td>정직성: 판단요소는 라벨링/결정/설명 계층에서 활용. KF-DeBERTa 파인튜닝 자체는 text→등급 단일 지도학습(S/V/M을 신경망 타깃으로 주입하진 않음)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>FUN-024 · 심층 지표 분석</h2>
+  <table>
+    <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FUN-024-①</td><td><span class="st done">완료</span></td><td>m6_evaluation/metrics.py(Accuracy·Precision·Recall·F1 macro+등급별·FNR·방향성 미탐 FNR)·GET /metrics/latest·history·admin.html 카드·report.py 표</td><td>다양한 지표 산출·API·UI 완비. 실정답 부재(sample=0) 시 N/A 정직 처리</td></tr>
+      <tr><td class="id">FUN-024-②</td><td><span class="st done">완료</span></td><td>방향성 미탐 KPI·confusion_matrix.detect_underclass_alarms(fail-secure)·deploy_gate fnr_high 회귀 차단(fail-closed)·active_learning URGENT_RETRAIN·서빙 안전층</td><td>미탐 최소화가 지표·게이트·알람·능동학습·서빙까지 일관 관철. 실효 고등급 미탐≈2.8%·TS 미탐 0</td></tr>
+      <tr><td class="id">FUN-024-③</td><td><span class="st done">완료</span></td><td>confusion_matrix.py build_confusion_matrix·report.py CM PNG(matplotlib)+HTML·admin.html loadConfusionMatrix(격자·대각선 강조+등급별 FNR)·GET /metrics/confusion-matrix</td><td>등급별 CM 시각 확인 완비. 라이브 시각화=admin 콘솔 격자. report.py PNG 렌더러는 standalone(API 미배선)</td></tr>
+      <tr><td class="id">FUN-024-④</td><td><span class="st done">완료</span></td><td>오분류 파악(detect_underclass_alarms)·수정라벨(POST /confirm·/relabel→Correction)·재학습(active_learning_tick·nightly 증분·corrections_rebuild)·celery beat</td><td>오분류→교정→재학습 end-to-end 배선. 안전게이팅: 재학습본은 후보만(auto_activate=False), 서빙전환은 deploy gate+사람서명. F1 delta는 합성천장으로 미측정</td></tr>
+      <tr><td class="id">FUN-024-⑤</td><td><span class="st done">완료</span></td><td>ModelVersion.metrics JSONB(버전별 지표)·TrainingRun 이력·GET /metrics/history·/train/jobs·admin.html loadHistory·optuna_tuner+deploy_gate 튜닝</td><td>버전별 지표·학습 run 이력·조회·튜닝 스크립트 존재. 이력은 DB 의존. optuna 튜닝은 지재원 오프라인 CLI</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">로이드케이(AI 코어) · RFP 요구기능(AI 파트) 구현현황 · 실제 소스 대조 검증 2026-07-29 · 엑셀 기입본과 동일 내용</div>
+</div>
+</body>
+</html>

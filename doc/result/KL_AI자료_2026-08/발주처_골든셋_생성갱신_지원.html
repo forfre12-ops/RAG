@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>발주처 골든셋·모의문서 생성·갱신 지원 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:920px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:12px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13.5px}
+ol{margin:8px 0;padding-left:22px}li{margin:6px 0}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 5 (확인)</div>
+    <h1>발주처 모의문서·골든셋 생성·갱신 지원</h1>
+    <div class="meta">발주처가 운영 단계에서 자체 생성·갱신 가능한지에 대한 설계상 답변 · 2026-07-29</div>
+  </div>
+
+  <div class="note"><b>지원됩니다.</b> ① <b>생성</b> = 합성 골든 빌더로 모의문서·골든셋을 만들고 검수해 등급을 확정. ② <b>갱신</b> = 운영 중 검수 교정이 <b>현장 CPU 야간 증분재학습</b>으로 반영. ③ 모든 <b>모델 활성화는 사람 사인오프</b>이며 <b>문서는 망 밖으로 나가지 않습니다</b>(무반출).</div>
+
+  <h2>1. 생성 — 모의문서·골든셋</h2>
+  <p>통합 골든 빌더(<code>/golden/build</code>)가 모의문서와 골든셋(정답지)을 생성합니다. 교차 합성 + 합의 게이트 + 외부 앵커 방식으로 초안을 만들고, 관리자가 검수해 등급을 확정합니다. 등급 계층은 <code>silver_train</code>(학습) · <code>gold_candidate</code>(후보) · <code>locked_gold_eval</code>(사람서명 평가)로 분리됩니다.</p>
+
+  <h2>2. 갱신 — 운영 학습 루프</h2>
+  <ol>
+    <li>운영 중 관리자가 분류 결과를 <b>검수·교정</b>(<code>tb_corrections</code> 기록)</li>
+    <li>교정이 <b>고객사 망 내 CPU 야간 증분재학습</b>(02:00, <code>enable_incremental_retrain</code>)으로 기존 학습셋과 혼합 반영 — GPU 불필요, 무반출</li>
+    <li>재학습 결과는 <b>후보로만 등록</b>(자동 활성화 아님, <code>auto_activate=False</code>)</li>
+    <li>shadow 검증 후 <b>사람 사인오프</b> 시에만 활성화</li>
+  </ol>
+
+  <h2>3. 주체 · 책임 경계</h2>
+  <table>
+    <thead><tr><th style="width:150px">주체</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><b>발주처 / 고객사 관리자</b></td><td>모의문서·골든셋 검수, 등급 확정, 운영 교정, 활성화 승인(사인오프)</td></tr>
+      <tr><td><b>지재원(로이드케이)</b></td><td>초기 합성 공장(학습셋·골든·인덱싱), 빌더·모델 재번들 제공, 증분재학습 파이프라인 배선</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note"><b>정확도와의 연결.</b> 합성 부트스트랩의 구조적 천장(<a href="분류_정확도_테스트방식.html">요청 3</a>)을 넘는 <b>유일한 실개선 경로</b>가 이 운영 학습 루프입니다. 발주처가 실문서를 검수·확정할수록 분류기가 현장 분포에 맞춰 개선되며, 안전장치(활성화 사인오프·무반출·후보등록)는 그대로 유지됩니다.</div>
+
+  <div class="foot">로이드케이(AI 코어) · 발주처 골든셋 생성·갱신 지원 · 2026-07-29</div>
+</div>
+</body>
+</html>

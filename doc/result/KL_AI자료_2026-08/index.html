@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 파트 자료 — KL 감리 대응 (2026-08)</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--soft:#52525b;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:960px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:26px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:34px 0 12px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+a{color:#0a0a0a}
+.st{font-size:11px;font-weight:700;font-family:ui-monospace,monospace;padding:1px 7px;white-space:nowrap}
+.st.have{background:#0a0a0a;color:#fff}
+.st.new{background:#fff;color:#0a0a0a;border:1px solid #0a0a0a}
+.st.wait{background:#fff;color:#71717a;border:1px dashed #a1a1aa}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:16px 0;font-size:13.5px}
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KOIPA AI 영업비밀관리시스템 · 로이드케이(AI 코어)</div>
+    <h1>AI 파트 자료 — KL 감리 대응</h1>
+    <div class="meta">2026-07-29 기준 · 케이엘정보통신 요청(2026-07-29, 8/5 순차납기) 대응 · 8/10 사전진단 대비</div>
+  </div>
+
+  <div class="note">요청 6종 중 <b>4종은 기존 산출물</b>(<code>../open/</code>)로 커버되며, <b>5종을 본 폴더에 신규 정리</b>했습니다. RFP 구현현황(요청 4)은 <b>KL 제공 엑셀 양식에 기입 완료</b>(33항목 · 완료 31·진행중 2)했습니다.</div>
+
+  <h2>요청 항목 ↔ 제공 자료</h2>
+  <table>
+    <thead><tr><th style="width:34px">#</th><th>요청</th><th>제공 자료</th><th style="width:74px">상태</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>AI 설계 산출물 — 아키텍처·분류 알고리즘·처리흐름·DB(벡터)</td>
+        <td><a href="../open/시스템_설계도_v4.html">시스템 설계도 v4</a> · <a href="../open/기능분해도_데이터흐름도.html">기능분해도·DFD</a> · <a href="../open/기술구현_백서_v7.html">기술구현 백서 v7</a> + <a href="../open/기술구현_백서_부록A_DB스키마.html">부록A DB 스키마</a> · <a href="../open/서빙_운영점_파라미터_명세.html">서빙 파라미터 명세</a></td>
+        <td><span class="st have">기존</span></td></tr>
+      <tr><td>2</td><td>전체 기술 스택 (버전 포함)</td>
+        <td><a href="기술스택_버전표.html"><b>기술스택 버전표</b></a> (본 폴더)</td>
+        <td><span class="st new">신규</span></td></tr>
+      <tr><td>3</td><td>골든셋 ~700건 · 등급 판정근거 · 분류 정확도(방식)</td>
+        <td><a href="../open/골든셋_종합.html">골든셋 종합</a> · <a href="../open/골든셋_분류근거_v5_clean_v-fe4b386b.html">분류근거(카드형)</a> · <a href="../open/golden500_분류근거_보고서.html">golden500 근거</a> + <a href="분류_정확도_테스트방식.html"><b>정확도·테스트 방식</b></a> (본 폴더)</td>
+        <td><span class="st new">신규</span></td></tr>
+      <tr><td>4</td><td>RFP 요구기능(AI) 구현현황 — 엑셀 양식</td>
+        <td><a href="RFP_구현현황.html"><b>RFP 구현현황</b></a> (본 폴더 · 33항목) + 엑셀 기입본 <code>(세부분할)_구현현황_기입.xlsx</code> · <a href="../open/요구사항_추적표_RTM.html">RTM</a> 근거</td>
+        <td><span class="st new">완료</span></td></tr>
+      <tr><td>5</td><td>발주처 모의문서·골든셋 자체 생성·갱신 지원</td>
+        <td><a href="발주처_골든셋_생성갱신_지원.html"><b>발주처 골든셋 생성·갱신 지원</b></a> (본 폴더)</td>
+        <td><span class="st new">신규</span></td></tr>
+      <tr><td>6</td><td>오픈소스·서드파티·라이선스 · 다중배포 유의사항</td>
+        <td><a href="오픈소스_라이선스_다중배포_검토서.html"><b>오픈소스 라이선스·다중배포 검토서</b></a> (본 폴더)</td>
+        <td><span class="st new">신규</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>감리 일정 (참고)</h2>
+  <table>
+    <tbody>
+      <tr><th style="width:150px">8/10 ~ 8/14</th><td>사전 진단 — 요구사항정의서·산출물 목록·작성 수준·사업관리 체계</td></tr>
+      <tr><th>8/31 ~ 9/4</th><td>설계 감리</td></tr>
+      <tr><th>11월 초</th><td>테스트 사전 점검</td></tr>
+      <tr><th>11/23 ~ 11/27</th><td>종료 감리</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">로이드케이(AI 코어) · KOIPA AI 영업비밀관리시스템 · 협력사(KL) 공유용 · 2026-07-29</div>
+</div>
+</body>
+</html>
