@@ -445,6 +445,29 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
     spec = TrainSpec(**spec_kwargs)
     try:
         report = train_classifier(spec)
+    except OSError as exc:
+        # [#5 재학습 토폴로지 fail-safe] 배포 컨테이너가 datasets(학습셋 입력) 미마운트(ENOENT) 또는
+        # artifacts(출력) read-only(EROFS/EACCES) 면 train 이 여기서 떨어진다(prod 이미지는 datasets
+        # 미COPY·dual compose 는 artifacts:ro). 과거엔 raise → celery 재시도로 02:00 야간 tick 크래시-
+        # 루프였다. 토폴로지 미배선은 '학습 실패'가 아니라 '미가용'이므로 skip(warn)로 흡수한다 —
+        # 서빙 무영향(활성 게이트 불변), compose 에 datasets rw + artifacts writable 배선 시 자동 재동작.
+        import errno as _errno  # noqa: PLC0415
+        # datasets 미마운트 = FileNotFoundError(errno 미설정 케이스 포함, 타입으로 확정).
+        # artifacts read-only/권한 = EROFS/EACCES/EPERM(errno). 디스크풀 등은 제외(실패로 raise).
+        _topology_errnos = {_errno.EACCES, _errno.EPERM, _errno.EROFS}
+        if isinstance(exc, FileNotFoundError) or getattr(exc, "errno", None) in _topology_errnos:
+            _mark_training_run(
+                run_uuid, status="failed",
+                error=f"skipped: retrain topology unavailable ({type(exc).__name__}: {exc})",
+            )
+            logger.warning(
+                "train_classifier_task skipped — 재학습 토폴로지 미배선(datasets 마운트/artifacts "
+                "쓰기권한 확인): %s. 서빙 무영향 · compose 배선 시 자동 재동작.", exc,
+            )
+            return {"skipped": "retrain_topology_unavailable", "reason": f"{type(exc).__name__}: {exc}"}
+        # 그 외 OSError(디스크풀 등)는 실학습 실패 → 종전대로 실패 마킹 후 raise.
+        _mark_training_run(run_uuid, status="failed", error=f"{type(exc).__name__}: {exc}")
+        raise
     except Exception as exc:  # noqa: BLE001
         _mark_training_run(run_uuid, status="failed", error=f"{type(exc).__name__}: {exc}")
         raise

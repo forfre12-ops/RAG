@@ -203,6 +203,51 @@ def test_train_classifier_task_adopts_submitted_run_id():
     assert (str(submitted), "completed") in marks              # 게이트 후 completed
 
 
+def _run_task_with_train_error(exc):
+    """train_classifier 가 exc 를 던지도록 배선하고 train_classifier_task 를 실행(rows=[] → merge 스킵)."""
+    import contextlib
+    from unittest.mock import MagicMock
+    from lloydk.modules.m6_evaluation.corrections_rebuild import RebuildResult
+    from lloydk.workers.tasks import train_classifier_task
+
+    rebuild = RebuildResult(rows=[], correction_ids=[], reason="none")
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("lloydk.config.settings.enable_incremental_retrain", True, create=True))
+        stack.enter_context(patch("lloydk.modules.m4_training.trainer.train_classifier", side_effect=exc))
+        stack.enter_context(patch("lloydk.modules.m4_training.trainer.TrainSpec",
+                                  lambda **kw: SimpleNamespace(
+                                      train_path=kw.get("train_path", "x.jsonl"),
+                                      val_path="v", test_path="t", output_dir="out")))
+        stack.enter_context(patch(
+            "lloydk.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
+            return_value=rebuild))
+        stack.enter_context(patch("lloydk.workers.tasks._create_training_run_guarded", return_value=uuid.uuid4()))
+        stack.enter_context(patch("lloydk.workers.tasks._mark_training_run", MagicMock()))
+        return train_classifier_task(spec_kwargs={"train_path": "base.jsonl"})
+
+
+def test_train_classifier_task_skips_on_missing_datasets():
+    """[#5 fail-safe] datasets 미마운트(FileNotFoundError=ENOENT) → raise 아닌 skip(warn)."""
+    out = _run_task_with_train_error(FileNotFoundError("datasets/labeled/train.jsonl"))
+    assert out.get("skipped") == "retrain_topology_unavailable"
+    assert "FileNotFoundError" in out.get("reason", "")
+
+
+def test_train_classifier_task_skips_on_readonly_artifacts():
+    """[#5 fail-safe] artifacts read-only(OSError EROFS) → skip(warn), 크래시-루프 없음."""
+    import errno
+    out = _run_task_with_train_error(OSError(errno.EROFS, "Read-only file system"))
+    assert out.get("skipped") == "retrain_topology_unavailable"
+
+
+def test_train_classifier_task_reraises_non_topology_oserror():
+    """[#5] 토폴로지 무관 OSError(디스크풀 ENOSPC)는 종전대로 raise(실학습 실패 은폐 금지)."""
+    import errno
+    import pytest
+    with pytest.raises(OSError):
+        _run_task_with_train_error(OSError(errno.ENOSPC, "No space left on device"))
+
+
 # ---------------------------------------------------------------------------
 # 6. PII masker wiring
 # ---------------------------------------------------------------------------
