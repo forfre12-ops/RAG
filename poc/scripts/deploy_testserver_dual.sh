@@ -26,7 +26,7 @@ cd "$ROOT"
 
 JJW_PORT="${JJW_PORT:-8000}"
 CUST_PORT="${CUST_PORT:-8001}"
-MODEL_REL="artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9"
+MODEL_REL="artifacts/classifier_p1_v5_clean/v-fe4b386b"   # v5 승격(gate_p1_candidate 3축 PASS 2026-07-29); 롤백=v-dd3abab9
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml"
 HF_VOLUME="lloydk_hf_cache"
 
