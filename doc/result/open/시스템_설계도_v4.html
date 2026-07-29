@@ -232,18 +232,18 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
   <!-- 02 서버 구조 -->
   <section id="s2">
-    <div class="sec-head"><span class="n">02</span><h2>서버 구조 — 공개영역 / 지재원(학습 GPU) / 고객사(운영 CPU)</h2></div>
-    <div class="sec-sub"><b>고객사 런타임·추론은 CPU(무GPU)</b>. 학습·합성·골든·인덱싱은 <b>지재원(모델공장)에서 GPU</b>로 수행한다(요건 FUN-004: 발주처 제공·CSAP). 비밀은 지재원·고객사 안에만 머물고, 공개 데이터 가공(상용 LLM)은 밖에서.</div>
+    <div class="sec-head"><span class="n">02</span><h2>서버 구조 — 공개영역 / 지재원 / 고객사 (무GPU)</h2></div>
+    <div class="sec-sub"><b>기본 무GPU(추론·학습 CPU)</b>. 비밀은 지재원·고객사 안에만 머문다. <b>지재원이 GPU 지원 시 학습만 가속</b>(요건상 발주처 제공·CSAP). 공개 데이터 가공(상용 LLM·베이스 학습)은 밖에서.</div>
     <div class="deploy3">
       <div class="zone">
         <div class="zl"><span class="zt">공개·개발 영역</span><span class="zb">공개데이터</span></div>
         <div class="subnode hl"><b>상용 LLM(Claude 등)</b> — 골든 후보 구축 · 합성 학습데이터 생성 · silver 라벨</div>
-        <div class="subnode"><b>분류기 학습(GPU·발주처 제공)</b> — 공개+합성으로 학습 → 가중치 파일</div>
-        <div class="subnode"><span class="tag-ok">반출 무관</span> 비밀 0 · 상용 LLM은 클라우드 API</div>
+        <div class="subnode"><b>분류기 베이스 학습(CPU)</b> — 공개+합성으로 학습 → 가중치 파일</div>
+        <div class="subnode"><span class="tag-ok">반출 무관</span> 비밀 0 · 클라우드 API라 로컬 GPU 불요</div>
       </div>
       <div class="conn"><div class="a">→</div>가중치<br>매체 반입</div>
       <div class="zone">
-        <div class="zl"><span class="zt">지재원 (발주처·모델공장)</span><span class="zb">GPU 학습 · CPU 추론</span></div>
+        <div class="zl"><span class="zt">지재원 (발주처)</span><span class="zb no">GPU 0 · CPU</span></div>
         <div class="subnode"><b>운영 비밀데이터</b> — 고객사/KL 시스템에서 처리 · 망 내 잔류</div>
         <div class="subnode hl"><b>합성 holdout·hardcase</b> — 상대비교·회귀 테스트용, locked 평가는 운영 확정 전 0</div>
         <div class="subnode"><b>분류기 추론(CPU)</b> + <b>Optuna 게이트 튜닝(CPU)</b></div>
@@ -485,7 +485,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
 <footer>
   <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 · 2026-07-01 · Lloydk AI Engine · 무GPU·무반출·CPU + 분류기·RDB + 안전 골조(게이트=가시성) 하드닝 · 상세 근거는 기술구현 백서 v7 · 설계검토 하드닝 반영 내역</span>
-  <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa(추론 CPU / 학습 GPU) · KURE-v1 · Optuna · OTel · Docker(폐쇄망)</span>
+  <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa(CPU) · KURE-v1 · Optuna · OTel · Docker(폐쇄망) · GPU 0</span>
 </footer>
 </body>
 </html>
