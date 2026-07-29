@@ -50,14 +50,14 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:230px">모델</th><th>주요 지표</th></tr></thead>
     <tbody>
-      <tr><td><b>현행 배포 v4_clean</b> <code>v-dd3abab9</code></td><td>홀드아웃 109 · F1_macro <b>0.686</b> · 방향 FNR <b>0.018</b> · <b>FNR_TS 0.000</b>(TS 미탐 0)</td></tr>
-      <tr><td><b>개선 후보 v5_clean</b> <code>v-fe4b386b</code></td><td>경화 평가셋 F1 <b>0.69→0.92</b> · S1 recall <b>0.43→0.86</b> · 공개문서 과분류 <b>79%→4%</b> · 고등급 미탐 무회귀(위험 미탐 0)</td></tr>
+      <tr><td><b>현행 배포 v5_clean</b> <code>v-fe4b386b</code></td><td>경화 홀드아웃(n=42) F1_macro <b>0.917</b>(직전 v4 0.688) · S1 recall <b>0.857</b>(v4 0.43) · 공개문서(n=400) 과분류 <b>79%→4%</b> · 고등급(high→S3) 위험 미탐 <b>0</b> · 2026-07-29 승격(3축 PASS·f5316df)</td></tr>
+      <tr><td><b>직전 배포·롤백 v4_clean</b> <code>v-dd3abab9</code></td><td>프록시 홀드아웃 109 · F1_macro <b>0.686</b> · 방향 FNR <b>0.018</b>(서빙) · FNR_TS 0.000 — 이 셋에선 v5≈v4(개선은 경화·공개문서 셋에서)</td></tr>
     </tbody>
   </table>
-  <p style="font-size:12.5px;color:#71717a">※ 위 지표는 기계(합성/공개) 라벨 기준입니다. v5는 자동 게이트(경화 홀드아웃 + 공개문서 FPR + 적대 veto) 3축 PASS 후보입니다.</p>
+  <p style="font-size:12.5px;color:#71717a">※ 위 지표는 기계(합성/공개) 라벨 기준(운영 정확도 보증 아님)입니다. v5는 자동 게이트(경화 홀드아웃 + 공개문서 FPR + 적대 veto) 3축 PASS로 <b>현행 배포본으로 승격</b>됐습니다(2026-07-29·commit f5316df). 109 프록시 홀드아웃에서는 v5≈v4로 개선을 주장하지 않습니다.</p>
 
   <h2>3. 등급 판정근거</h2>
-  <p>골든셋 각 건의 판정근거는 <b>카드형 보고서</b>로 제공합니다 — 룰 엔진 등급 · 분류기 등급 · S(비공지)×V(경제가치)×M(비밀관리) 산정 · softmax 신뢰도 분포를 문서별로 노출합니다. <a href="../open/골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(v5 카드형)</a> · <a href="../open/골든셋_분류근거_현행모델_v-dd3abab9.html">현행 모델</a> · <a href="../open/golden500_분류근거_보고서.html">golden500 근거</a>.</p>
+  <p>골든셋 각 건의 판정근거는 <b>카드형 보고서</b>로 제공합니다 — 룰 엔진 등급 · 분류기 등급 · S(비공지)×V(경제가치)×M(비밀관리) 산정 · softmax 신뢰도 분포를 문서별로 노출합니다. <a href="../open/골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(현행 v5 카드형)</a> · <a href="../open/골든셋_분류근거_v4_clean_v-dd3abab9.html">직전 모델(v4)</a> · <a href="../open/golden500_분류근거_보고서.html">golden500 근거</a>.</p>
 
   <div class="note"><b>정직한 한계 · 개선 경로.</b> 지재원 단계는 실데이터·현장검수·반출이 0인 <b>합성 부트스트랩</b>이라, 절대 정확도(실세계 %)에는 <b>구조적 천장</b>이 있습니다(사람서명 실문서 평가셋 부재). 따라서 배포 전 "정확도 %"를 단정하지 않으며, 현 지표는 <b>일관성·안전 무회귀</b>의 근거로 해석합니다. <b>진짜 정확도는 발주처 운영 현장의 검수로 실측·개선</b>되며, 그 경로가 <a href="발주처_골든셋_생성갱신_지원.html">발주처 골든셋 생성·갱신(요청 5)</a>입니다.</div>
 
