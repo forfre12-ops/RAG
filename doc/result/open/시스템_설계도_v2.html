@@ -179,7 +179,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
   <!-- ★ 실측 베이스라인 -->
   <div class="band"><div class="bt">★ 실측 베이스라인 — 현재 분류기(무재학습·CPU) · 누출제거 holdout · 잠정</div>
-  <p>현재 분류기(<code>v-dd3abab9</code> KF-DeBERTa)를 <b>실서빙 경로</b>(<code>evaluate_via_serving</code> — 온도보정·청크 most-severe·룰·FNR-safe override 포함, 원시 argmax 아님)로 누출제거 holdout(eval 42 · business 35)에 측정한 실값.</p>
+  <p>현행 배포 분류기 <code>v-fe4b386b</code>(v5_clean · 2026-07-29 승격, gate_p1_candidate 3축 PASS)를 <b>실서빙 경로</b>(<code>evaluate_via_serving</code> — 온도보정·청크 most-severe·룰·FNR-safe override 포함, 원시 argmax 아님)로 누출제거 holdout(eval 42 · business 35)에 측정한 v5 실값: <b>hardened(n=42) F1_macro 0.917 · S1 recall 0.857 · high→S3 위험미탐 0</b>, clean(n=42) acc <b>0.929</b>(TS 11/11), 공개문서(n=400) 과분류율 <b>0.79→0.04</b>. <b>아래 상세표는 직전 배포본·롤백 타깃 v4</b>(<code>v-dd3abab9</code>) 동일 holdout 서빙 측정치(동일셋 F1 0.688 · S1 recall 0.429)로 v5 대비용 참고다. 운영 정확도 보증이 아니라 상대비교·메커니즘 검증이며, 자동확정이 아닌 검수 라우팅 전제다.</p>
   <div class="tbl-wrap"><table>
     <thead><tr><th style="width:20%;">설정</th><th>FNR_TS</th><th>FNR_S1</th><th>방향성 FNR</th><th>F1</th><th>Acc</th></tr></thead>
     <tbody>
@@ -187,7 +187,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       <tr><td>escalation τ=0.25</td><td><b>0.0</b></td><td><b>0.0</b></td><td><b>0.0</b></td><td>0.49~0.54</td><td>0.60~0.71</td></tr>
     </tbody>
   </table></div>
-  <p style="font-size:12px;color:var(--dim);"><b>해석:</b> 특급(TS) 미탐 <b>0</b>, S1만 8%(12건 중 1건) 잔여 → <b>escalation으로 S1까지 미탐 0 달성 가능</b>(대가: 정확도↓=검수부담↑). raw 모델 단독 S1 recall 0.42를 <b>서빙 안전장치가 0.92로 회복</b>. &nbsp;<b>단서:</b> N=42·35로 작아 점추정 신뢰 불가(신뢰구간 하한으로 운영), <b>사람서명 전 잠정치</b>, 홀드아웃에 메타 없어 <b>메타 floor·RAG 미반영</b>(실데이터선 S1 더 개선 여지). DB 연결 전후 동일(견고성 검증). 산출물 <code>reports/serving_eval_*.md</code>.</p>
+  <p style="font-size:12px;color:var(--dim);"><b>해석(직전 v4 동일셋):</b> 특급(TS) 미탐 <b>0</b>, S1만 8%(12건 중 1건) 잔여 → <b>escalation으로 S1까지 미탐 0 달성 가능</b>(대가: 정확도↓=검수부담↑). raw 모델 단독 S1 recall 0.42를 <b>서빙 안전장치가 0.92로 회복</b>. &nbsp;<b>단서:</b> N=42·35로 작아 점추정 신뢰 불가(신뢰구간 하한으로 운영), <b>사람서명 전 잠정치</b>, 홀드아웃에 메타 없어 <b>메타 floor·RAG 미반영</b>(실데이터선 S1 더 개선 여지). DB 연결 전후 동일(견고성 검증). 산출물 <code>reports/serving_eval_*.md</code>.</p>
   </div>
 
   <!-- 00 핵심 결정 -->
@@ -302,7 +302,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       <div class="node"><div class="nt">④ readiness gate</div><div class="nd">locked 충분량·holdout guard·표본감사·kill-gate 통과 전 자동 활성 fail-closed</div></div>
     </div>
     <div class="band gray"><div class="bt">왜 무GPU로도 되나</div><p>분류기의 GPU 수요는 전부 <b>공개데이터·지재원 밖</b>에서 끝난다(또는 CPU). 지재원·고객사 안에서는 <b>가중치를 CPU로 추론만</b> 한다. 막히는 건 "실 비밀로 GPU 재학습"뿐이고, 그건 <b>지재원 안 CPU 학습</b>으로 대체하거나(허용 시) 보류한다. ⇒ GPU 0과 분류기 사용은 양립한다.</p></div>
-    <div class="band warn"><div class="bt">한계 — 정직 고지</div><p>실 비밀로 즉시 재학습을 못 하므로 <b>raw 모델 자체의 S1 실력은 약하다</b>(raw S1 recall ≈ 0.42 측정). 단 <b>서빙 안전장치(룰·FNR-safe override·escalation)가 이를 상당부분 회복</b>(서빙 S1 recall 0.92, escalation 시 고등급 미탐 0 — ★실측 베이스라인 참조). 그래도 잔여분·OOD 위험이 있어 <b>고등급은 사람검수 필수</b>가 불가피한 트레이드오프다.</p></div>
+    <div class="band warn"><div class="bt">한계 — 정직 고지</div><p>실 비밀로 즉시 재학습을 못 하므로 <b>raw 모델 자체의 S1 실력은 약하다</b>(raw S1 recall ≈ 0.42 — base/직전 v4 측정, v5 raw 재측정 대기). 단 <b>서빙 안전장치(룰·FNR-safe override·escalation)가 이를 상당부분 회복</b>(현행 v5 서빙 hardened(n=42) S1 recall <b>0.857</b> · high→S3 위험미탐 0 — 동일셋 v4 0.429 대비 회복 폭 확대; ★실측 베이스라인 참조). 그래도 잔여분·OOD 위험이 있어 <b>고등급은 사람검수 필수</b>가 불가피한 트레이드오프다.</p></div>
   </section>
 
   <!-- 05 데이터 자산 -->

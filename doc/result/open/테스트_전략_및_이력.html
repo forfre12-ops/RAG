@@ -331,8 +331,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="card card-dark">
         <div class="card-label">현 배포 모델</div>
-        <div class="card-value sm">v-dd3abab9</div>
-        <div class="card-desc">KF-DeBERTa v4_clean · .env 배포 포인터 (0.686/FNR 0.018 실측 모델 · 정합 완료 2026-06-24)</div>
+        <div class="card-value sm">v-fe4b386b</div>
+        <div class="card-desc">KF-DeBERTa v5_clean · .env 배포 포인터 (hardened holdout F1 0.917 · 공개문서 과분류 0.79→0.04 · high→S3 0 · 승격 2026-07-29). 직전/롤백 = v4_clean/v-dd3abab9.</div>
       </div>
       <div class="card card-muted">
         <div class="card-label">검증 피라미드</div>
@@ -432,7 +432,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <div class="flow-card real-step">
                 <div class="flow-step-name">⑦ KF-DeBERTa 추론 <span class="tag real">진짜</span></div>
                 <div class="flow-step-lib">kakaobank/kf-deberta-base fine-tuned · 110M params · p50 ~10ms</div>
-                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값(기본 0.7) 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 단 confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮아(골든500 AUROC 0.58), <b>자동확정은 confidence 임계 단독이 아니라 다단 게이트로 결정</b>한다 — 추가로 <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON, 단일 약한 키워드만으로 conf=1.0이 되는 자동확정 차단)와 <b>합의 게이트</b>(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도, 자동확정은 예측이 공개등급 S3이거나 룰등급==모델등급일 때만 허용·그 외 불일치는 사람 검수)로 제한한다. 현 배포 v-dd3abab9(v4_clean): 홀드아웃109 F1_macro=0.686 · 서빙 방향성 FNR=0.018 · FNR_TS=0.000.</div>
+                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값(기본 0.7) 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 단 confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮아(골든500 AUROC 0.58), <b>자동확정은 confidence 임계 단독이 아니라 다단 게이트로 결정</b>한다 — 추가로 <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON, 단일 약한 키워드만으로 conf=1.0이 되는 자동확정 차단)와 <b>합의 게이트</b>(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도, 자동확정은 예측이 공개등급 S3이거나 룰등급==모델등급일 때만 허용·그 외 불일치는 사람 검수)로 제한한다. 현 배포 v-fe4b386b(v5_clean): hardened holdout(n=42) F1_macro=0.917 · high→S3 위험미탐 0 · 공개문서(n=400) 과분류 0.04(v4 0.79). 직전 배포본 v4_clean(v-dd3abab9)의 프록시 홀드아웃109 서빙 F1_macro=0.686 · 방향성 FNR=0.018 · FNR_TS=0.000은 §10.1(v4 기준).</div>
               </div>
             </div>
 
@@ -516,16 +516,16 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             </tr>
             <tr>
               <td rowspan="3"><b>분류 정확도</b><br><span style="font-size:11px;color:var(--text-dim);">RTX 5070 Ti로 측정 완료</span></td>
-              <td>F1-macro (홀드아웃 109 · 서빙경로)</td>
+              <td>F1-macro (홀드아웃 109 · 서빙경로 · 직전 v4)</td>
               <td><span class="tag pass">✓ 코드</span></td>
               <td><span class="tag pass">✓ 측정</span></td>
-              <td class="td-pass">0.686 (Acc 0.706)</td>
+              <td class="td-pass">0.686 (v4·홀드109) · v5 hardened(n=42) 0.917</td>
             </tr>
             <tr>
-              <td>방향성 FNR (고등급 미탐 · 서빙경로)</td>
+              <td>방향성 FNR (고등급 미탐 · 서빙경로 · 직전 v4)</td>
               <td><span class="tag neutral">—</span></td>
               <td><span class="tag pass">✓ 측정</span></td>
-              <td class="td-pass">0.018 · FNR_TS 0.000</td>
+              <td class="td-pass">0.018 · FNR_TS 0.000 (v4) · v5 high→S3 0</td>
             </tr>
             <tr>
               <td>FNR (운영 locked, 제3 문체)</td>
@@ -733,13 +733,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h2><span class="num">03</span> 운영점 실측 · 능동학습 폐곡선 <span style="font-size:13px;color:var(--text-dim);font-weight:500;">(2026-06-19)</span></h2>
       <p class="h2-sub">동일 모델·홀드아웃이라도 원시 argmax와 실배포 서빙경로의 안전성이 크게 다릅니다. 운영점(C-esc/C-eval/B1)을 실측해 확정했습니다.</p>
 
-      <h3>10.0 모델 선정 — KF-DeBERTa (활성 v4_clean/v-dd3abab9 · .env 포인터 정합 완료)</h3>
-      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,591건(train 2,071 + val 259 + test 261). 프록시 holdout 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b> · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
+      <h3>10.0 모델 선정 — KF-DeBERTa (현행 배포 v5_clean/v-fe4b386b · 직전/롤백 v4_clean/v-dd3abab9 · .env 포인터 정합)</h3>
+      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 직전 배포본 v4_clean의 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,591건(train 2,071 + val 259 + test 261). 직전 v4_clean의 프록시 holdout 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b>. 현행 배포 <b>v5_clean/v-fe4b386b</b>(2026-07-29 승격): hardened holdout(n=42) F1_macro <b>0.917</b> · high→S3 위험미탐 <b>0</b> · 공개문서(n=400) 과분류 <b>0.04</b>(v4 0.79) · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
 
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
         <div class="callout-body">
-          <b>모델 버전 정합 완료 (2026-06-24 코드 확인):</b> 위 서빙 실측값(F1 0.686·FNR 0.018·Acc 0.706, 홀드아웃 109)은 법률 정제 모델 <code>classifier_p1_retrain_v4_clean/v-dd3abab9</code>의 <code>serving_path_eval_clean.json</code> 기록입니다. <code>.env</code>·<code>.env.example</code>·<code>.env.prod.example</code>의 <code>CLASSIFIER_MODEL_DIR</code> 3종 모두 <b>이 정제 모델 v-dd3abab9</b>를 가리키도록 정합 완료되어 배포 포인터와 0.686 실측 모델이 일치합니다. 정제 <b>이전</b> step3/<code>v-f9b5cedb</code>(14,461건, 원시 F1 0.362·fnr_high 0.798 — S3 붕괴, 서빙 오버라이드 의존)는 정제 효과 비교 baseline이며 백업 <code>.env.bak_modelfix</code>에만 잔존합니다. (활성 모델 확정: A안 v-dd3abab9 유지.)
+          <b>모델 버전 이력 (2026-06-24 정합 · 2026-07-29 v5 승격):</b> 위 서빙 실측값(F1 0.686·FNR 0.018·Acc 0.706, 홀드아웃 109)은 <b>직전 배포본</b> 법률 정제 모델 <code>classifier_p1_retrain_v4_clean/v-dd3abab9</code>의 <code>serving_path_eval_clean.json</code> 기록입니다. <b>현행 배포는 <code>classifier_p1_v5_clean/v-fe4b386b</code></b>(gate_p1_candidate 3축 PASS·커밋 f5316df)로 <code>.env</code>·<code>.env.example</code>·<code>.env.prod.example</code>의 <code>CLASSIFIER_MODEL_DIR</code>가 v5를 가리키며, v4_clean/v-dd3abab9는 직전/롤백 타깃입니다. 정제 <b>이전</b> step3/<code>v-f9b5cedb</code>(14,461건, 원시 F1 0.362·fnr_high 0.798 — S3 붕괴, 서빙 오버라이드 의존)는 정제 효과 비교 baseline입니다.
         </div>
       </div>
       <div class="tbl-wrap">
@@ -755,10 +755,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </tbody>
         </table>
       </div>
-      <p style="font-size:12.5px;color:var(--text-soft);">참고: OSS 공개데이터 학습(v12, 2026-05-31) KF-DeBERTa F1 <b>0.848</b>은 <b>정제 전 벤치마크 수치</b>(법률 오염 전)입니다. 현행 운영값은 서빙경로 F1 0.686.</p>
+      <p style="font-size:12.5px;color:var(--text-soft);">참고: OSS 공개데이터 학습(v12, 2026-05-31) KF-DeBERTa F1 <b>0.848</b>은 <b>정제 전 벤치마크 수치</b>(법률 오염 전)입니다. 직전 배포본 v4_clean의 서빙경로 F1은 0.686(홀드아웃 109); 현행 배포 v5_clean은 hardened holdout(n=42) F1 <b>0.917</b>.</p>
 
       <h3>10.1 평가↔서빙 갭 — 서빙경로 평가(C-eval)</h3>
-      <p style="font-size:13px;">측정: KF-DeBERTa <code>classifier_p1_retrain_v4_clean/v-dd3abab9</code>(정제 모델 — §10.0 버전 정합 주의), 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43). <code>evaluate_via_serving</code>로 실배포 경로 전체(보정+FNR-safe override+most-severe 집계)를 통과해 측정 → 평가=배포 동작 일치를 보장.</p>
+      <p style="font-size:13px;">측정(직전 배포본 v4 기준): KF-DeBERTa <code>classifier_p1_retrain_v4_clean/v-dd3abab9</code>(정제 모델 — §10.0 버전 이력 주의), 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43). <code>evaluate_via_serving</code>로 실배포 경로 전체(보정+FNR-safe override+most-severe 집계)를 통과해 측정 → 평가=배포 동작 일치를 보장. (현행 배포 v5_clean/v-fe4b386b는 이 109 프록시셋에서 v4와 동급 — acc 0.706≈0.697·high→S3 13=13 — 이 셋에선 우위 주장 안 함; v5 개선은 hardened n=42·공개문서 n=400에서 측정.)</p>
       <div class="tbl-wrap">
         <table>
           <thead>
@@ -766,7 +766,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </thead>
           <tbody>
             <tr><td>원시 argmax</td><td class="td-center td-fail">0.167</td><td class="td-center">~0.06</td><td class="td-center">0.632</td><td class="td-center">0.679</td></tr>
-            <tr><td><b>서빙경로 (현 배포)</b></td><td class="td-center td-pass">0.018</td><td class="td-center td-pass">0.000</td><td class="td-center td-pass">0.686</td><td class="td-center td-pass">0.706</td></tr>
+            <tr><td><b>서빙경로 (직전 v4)</b></td><td class="td-center td-pass">0.018</td><td class="td-center td-pass">0.000</td><td class="td-center td-pass">0.686</td><td class="td-center td-pass">0.706</td></tr>
           </tbody>
         </table>
       </div>
@@ -831,7 +831,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             </tbody>
           </table>
         </div>
-        <p style="font-size:12.5px;color:var(--text-soft);">홀드아웃에서 판례 제거(<code>holdout_business.jsonl</code> 90건), 원본은 아카이브 보관. 정제 모델(<code>v4_clean/v-dd3abab9</code>)은 <code>labeled_clean_nolegal</code> 2,591건으로 학습되었습니다 — <code>.env</code> 배포 포인터도 v4_clean/v-dd3abab9로 정합 완료(2026-06-24).</p>
+        <p style="font-size:12.5px;color:var(--text-soft);">홀드아웃에서 판례 제거(<code>holdout_business.jsonl</code> 90건), 원본은 아카이브 보관. 직전 배포본 정제 모델(<code>v4_clean/v-dd3abab9</code>)은 <code>labeled_clean_nolegal</code> 2,591건으로 학습되었습니다 — 현행 <code>.env</code> 배포 포인터는 v5_clean/v-fe4b386b(2026-07-29 승격), v4_clean/v-dd3abab9는 직전/롤백 타깃입니다.</p>
       </div>
     </section>
 
@@ -1179,7 +1179,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
                 <b>채점 정본 전환 + 능동학습 배선 (현행화)</b><br>
                 채점 4요소 가산 → <b>3요건 S×V×M 곱셈</b>(grade_from_svm)<br>
                 법률코퍼스 오염 발견(판례 56%·오라벨 67%) → labeled_clean_nolegal 2,591건 재학습<br>
-                v-dd3abab9 활성(.env) · 운영점 확정(C-esc 기본 None·B1 1.0 유지·C-eval 서빙평가)<br>
+                v-dd3abab9 활성(.env, 당시 배포본 — 현행=v5_clean/v-fe4b386b 2026-07-29 승격) · 운영점 확정(C-esc 기본 None·B1 1.0 유지·C-eval 서빙평가)<br>
                 능동학습 폐곡선 배선(tb_corrections→train→deploy→reload) · 핫리로드 · 자동롤백<br>
                 alembic: evaluation_factors 3요건화 · score 0~2 · tb_model_versions 롤백 FK<br>
                 신규 API: /admin/model/reload · /train · /classify/stream · /relabel<br>
@@ -1261,7 +1261,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout info">
         <span class="callout-icon">🔁</span>
         <div class="callout-body">
-          <b>법률 정제 모델 (2026-06-19): v4_clean/v-dd3abab9</b> — 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,591건</b>으로 재학습한 모델이며 서빙 F1 0.686/FNR 0.018을 낸 주체입니다(§10.4). <code>.env</code> 배포 포인터도 v4_clean/v-dd3abab9로 정합 완료(2026-06-24)이며, step3/v-f9b5cedb(아래 표 14,461건)는 정제 효과 비교 기준(baseline)입니다.
+          <b>현행 배포 모델: v5_clean/v-fe4b386b</b>(2026-07-29 승격·gate_p1_candidate 3축 PASS·커밋 f5316df) — hardened holdout(n=42) F1 0.917 · 공개문서(n=400) 과분류 0.79→0.04 · high→S3 위험미탐 0. <b>직전/롤백 = v4_clean/v-dd3abab9</b>: 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,591건</b>으로 재학습, 서빙 F1 0.686/FNR 0.018(홀드아웃 109)을 낸 주체입니다(§10.4). step3/v-f9b5cedb(아래 표 14,461건)는 정제 전 비교 기준(baseline)입니다.
         </div>
       </div>
 
@@ -1318,7 +1318,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             </tr>
             <tr>
               <td class="td-code">…_step3/train</td>
-              <td><b>현 배포 학습셋</b> = ①②합본</td>
+              <td><b>배포 계보 학습셋(step3)</b> = ①②합본</td>
               <td class="td-center"><span class="tag warn">혼합</span></td>
               <td class="td-center"><b>14,461</b></td>
               <td class="td-center">—</td>
@@ -1330,7 +1330,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout info">
         <span class="callout-icon">🧬</span>
         <div class="callout-body">
-          <b>현 배포 모델(step3) 학습셋 = 14,461건 구성 (label_source 실측):</b>
+          <b>배포 계보 baseline(step3) 학습셋 = 14,461건 구성 (label_source 실측):</b>
           patent_proxy(진짜 특허) <b>7,200</b> (raw 4,800 TS1,200/S1 3,600 → 학습 업웨이트 7,200 TS1,800/S1 5,400) · provenance_gate(oss 판례→S3) <b>2,374</b> · mundane(합성 일상) <b>1,287</b> · 베이스 <b>3,600</b> (rag_corpus_v2 720 + gold_real 학습분 ~1,530 + 기타 ~1,350).
           <br><b>제외(현재 미사용):</b> 137/Other(190K) · 032 특허분야자동분류(280MB) · CPC·공개공보 샘플 · KIPRIS bulk 견본(sample/sample_1=중복/sample_2) — 어느 것도 배포 모델에 기여하지 않음.
         </div>
@@ -1343,7 +1343,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><th>데이터셋</th><th class="td-center">TS</th><th class="td-center">S1</th><th class="td-center">S2</th><th class="td-center">S3</th><th class="td-center">합계</th></tr>
           </thead>
           <tbody>
-            <tr><td class="td-code"><b>v4_step3 train (현 배포)</b></td><td class="td-center">2,247</td><td class="td-center">5,809</td><td class="td-center">589</td><td class="td-center">5,816</td><td class="td-center"><b>14,461</b></td></tr>
+            <tr><td class="td-code"><b>v4_step3 train (배포 계보 baseline)</b></td><td class="td-center">2,247</td><td class="td-center">5,809</td><td class="td-center">589</td><td class="td-center">5,816</td><td class="td-center"><b>14,461</b></td></tr>
             <tr><td class="td-code">└ patent_proxy (진짜 특허 투입분)</td><td class="td-center">1,800</td><td class="td-center">5,400</td><td class="td-center">0</td><td class="td-center">0</td><td class="td-center"><b>7,200</b></td></tr>
             <tr><td class="td-code">gold_real (평가셋)</td><td class="td-center">55</td><td class="td-center">56</td><td class="td-center">89</td><td class="td-center">577</td><td class="td-center"><b>777</b></td></tr>
             <tr><td class="td-code">gold_real/holdout (디오염 평가)</td><td class="td-center">17</td><td class="td-center">19</td><td class="td-center">30</td><td class="td-center">43</td><td class="td-center"><b>109</b></td></tr>
@@ -1485,7 +1485,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="tbl-wrap">
         <table>
           <thead>
-            <tr><th>측정 (진짜 데이터)</th><th class="td-center">cost2 (구 배포)</th><th class="td-center">step3 (현 배포)</th></tr>
+            <tr><th>측정 (진짜 데이터)</th><th class="td-center">cost2 (구 배포)</th><th class="td-center">step3 (배포 계보)</th></tr>
           </thead>
           <tbody>
             <tr><td>특허 고심도 recall (TS/S1 인식)</td><td class="td-center">0.999</td><td class="td-center td-pass">1.000</td></tr>
@@ -1517,7 +1517,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="card card-strong"><div class="card-label">공개판례 과분류</div><div class="card-value">0.85 → 0.002</div><div class="card-desc">cost2 → step3 (진짜 데이터)</div></div>
         <div class="card card-strong"><div class="card-label">TS/S1 캘리브레이션</div><div class="card-value">0.285 → 0.887</div><div class="card-desc">진짜 특허가 기여</div></div>
         <div class="card card-dark"><div class="card-label">진짜 특허 코퍼스</div><div class="card-value sm">66만 건</div><div class="card-desc">AIHub 국가중점기술</div></div>
-        <div class="card card-dark"><div class="card-label">현 배포</div><div class="card-value sm">step3 + Gate1</div><div class="card-desc">공개특허 게이트 정합</div></div>
+        <div class="card card-dark"><div class="card-label">배포 계보</div><div class="card-value sm">step3 + Gate1</div><div class="card-desc">공개특허 게이트 정합</div></div>
       </div>
     </section>
 
@@ -1737,7 +1737,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
 <footer>
   <span>테스트 전략 · 환경 · 이력 · KOIPA AI 영업비밀관리시스템 — Lloydk AI Engine</span>
-  <span>2026-07-22 갱신 · pytest ~1,776(lite) · 채점 S×V×M · 능동학습 폐곡선 · v-dd3abab9</span>
+  <span>2026-07-29 갱신 · pytest ~1,776(lite) · 채점 S×V×M · 능동학습 폐곡선 · 현행 배포 v5_clean/v-fe4b386b (직전/롤백 v-dd3abab9)</span>
 </footer>
 
 <script>

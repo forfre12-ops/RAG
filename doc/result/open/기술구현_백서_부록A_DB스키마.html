@@ -459,7 +459,7 @@ LIMIT  5;</pre>
         <tbody>
           <tr><td class="td-pk">classification_id</td><td class="td-type">UUID PK</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-fk">doc_id</td><td class="td-type">FK → tb_documents</td><td class="td-nn yes">●</td><td></td></tr>
-          <tr><td class="td-col">model_version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>v-dd3abab9 형식</td></tr>
+          <tr><td class="td-col">model_version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>v-fe4b386b 형식</td></tr>
           <tr><td class="td-fk">predicted_level_id</td><td class="td-type">FK → tb_classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(5,4)</td><td class="td-nn yes">●</td><td>0.0000~1.0000</td></tr>
           <tr><td class="td-col">alternatives</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>[{level_code, score}] 전체 등급 softmax</td></tr>
@@ -514,7 +514,7 @@ LIMIT  5;</pre>
         <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
         <tbody>
           <tr><td class="td-pk">version_id</td><td class="td-type">UUID PK</td><td></td></tr>
-          <tr><td class="td-col">version_label</td><td class="td-type">VARCHAR(50) UNIQUE</td><td>v-dd3abab9 형식 (해시 기반)</td></tr>
+          <tr><td class="td-col">version_label</td><td class="td-type">VARCHAR(50) UNIQUE</td><td>v-fe4b386b 형식 (해시 기반)</td></tr>
           <tr><td class="td-col">base_model</td><td class="td-type">VARCHAR(100)</td><td>kakaobank/kf-deberta-base</td></tr>
           <tr><td class="td-col">model_type</td><td class="td-type">VARCHAR(20)</td><td>classifier / reranker (기본 classifier)</td></tr>
           <tr><td class="td-col">trained_at</td><td class="td-type">TIMESTAMPTZ</td><td>학습 완료 시각</td></tr>

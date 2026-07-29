@@ -852,7 +852,7 @@ footer strong{color:var(--text-dim);}
   <div class="kpi-card">
     <div class="kpi-label">🎯 분류 F1 (서빙·홀드아웃 109)</div>
     <div class="kpi-value pass">0.686</div>
-    <div class="kpi-sub">핵심 요건 · KF-DeBERTa v-dd3abab9 · 홀드아웃 109(학습본 42% 누출·참고용) — 운영기준=누출제거 clean F1≈0.78(백서 v7)</div>
+    <div class="kpi-sub">핵심 요건 · KF-DeBERTa v-fe4b386b(v5_clean · 2026-07-29 승격) · 홀드아웃 109(학습본 42% 누출·참고용, 이 셋에선 v5≈v4) — v5 헤드라인=hardened holdout F1 0.917·공개문서 과분류 0.79→0.04·high→S3 위험미탐 0. clean F1≈0.78은 직전 배포본 v4(v-dd3abab9) 기준(백서 v7)</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">🎯 분류 방향성 미탐율 (서빙경로)</div>
@@ -1199,7 +1199,7 @@ footer strong{color:var(--text-dim);}
         <tr><td><code>scores</code></td><td>{TS:0.93, S1:0.04, S2:0.02, S3:0.01}</td><td>각 등급별 확률</td></tr>
         <tr><td><code>evaluation_factors</code></td><td>{secrecy:2, value:2, management:2}</td><td>3요건 점수 (각 0·1·2) — 곱이 등급</td></tr>
         <tr><td><code>evidence</code></td><td>[{start:122, end:180, factor:"SECRECY"}]</td><td>판단 근거 텍스트 구간</td></tr>
-        <tr><td><code>model_version</code></td><td>v-dd3abab9</td><td>사용된 모델 버전</td></tr>
+        <tr><td><code>model_version</code></td><td>v-fe4b386b</td><td>사용된 모델 버전</td></tr>
         </tbody>
       </table>
       </div>
@@ -1259,7 +1259,7 @@ footer strong{color:var(--text-dim);}
      "text": "EUV 리소그래피 공정 파라미터",
      "factor": "SECRECY", "weight": 0.91}
   ],
-  "model_version": "v-dd3abab9",
+  "model_version": "v-fe4b386b",
   "status": "staging",
   "warnings": []
 }</code></pre>
@@ -1285,12 +1285,12 @@ footer strong{color:var(--text-dim);}
   <thead><tr><th>항목</th><th>값</th></tr></thead>
   <tbody>
   <tr><td>모델 ID</td><td><code>kakaobank/kf-deberta-base</code></td></tr>
-  <tr><td>활성 버전</td><td><code>v-dd3abab9</code> (classifier_p1_retrain_v4_clean · labeled_clean_nolegal 학습 · <code>.env</code> 정합 완료 2026-06-24). step3/<code>v-f9b5cedb</code>는 정제 전 비교 baseline</td></tr>
+  <tr><td>활성 버전</td><td><code>v-fe4b386b</code> (classifier_p1_v5_clean · v5로 승격 2026-07-29 · gate_p1_candidate 3축 PASS, 커밋 f5316df). 직전 배포본/롤백 타깃 <code>v-dd3abab9</code>(classifier_p1_retrain_v4_clean · labeled_clean_nolegal 2,591건 학습). step3/<code>v-f9b5cedb</code>는 정제 전 비교 baseline</td></tr>
   <tr><td>파라미터 수</td><td>약 1억 1천만 개</td></tr>
   <tr><td>출력</td><td>TS/S1/S2/S3 확률 4개 + 최고 확률 등급</td></tr>
   <tr><td>학습 데이터</td><td>labeled_clean_nolegal 2,591건 (법률 코퍼스 오염 정제본)</td></tr>
   <tr><td>홀드아웃 F1 (서빙경로)</td><td>0.686 · 방향성 FNR 0.018 · FNR_TS 0.000 · Acc 0.706 (109건)</td></tr>
-  <tr><td>⚠ 지표 주의</td><td>위 0.686/0.018은 활성 <strong>clean 모델 <code>v-dd3abab9</code></strong> 측정값(<code>reports/fnr_threshold_sweep</code>·<code>b1_multiplier_sweep_clean</code>)으로 <code>.env</code> 배포 포인터와 <strong>정합 완료(2026-06-24)</strong>. 단 <strong>홀드아웃 109는 학습본과 본문 42% 중복(누출)</strong>이라 안전성을 과대평가 → 운영기준은 <strong>누출제거 clean F1≈0.78·정확도 77%·FNR 6.6%</strong>(백서 v7). <strong>모든 수치는 합성 골든셋(OOD) 기준 — 운영 locked 확정 전 정식 아님.</strong></td></tr>
+  <tr><td>⚠ 지표 주의</td><td>위 0.686/0.018 및 누출제거 clean F1≈0.78·정확도 77%·FNR 6.6%(백서 v7)는 <strong>직전 배포본/롤백 타깃 v4(<code>v-dd3abab9</code>)</strong> 측정값(<code>reports/fnr_threshold_sweep</code>·<code>b1_multiplier_sweep_clean</code>)이다. <strong>현행 활성 v5(<code>v-fe4b386b</code>) 헤드라인</strong>은 hardened holdout(n=42) <strong>F1_macro 0.917·high→S3 위험미탐 0·S1 recall 0.857</strong>, clean holdout(n=42) <strong>acc 0.929·TS 11/11</strong>, 공개문서(n=400) <strong>과분류 0.79→0.04</strong>. 단 <strong>홀드아웃 109는 학습본과 본문 42% 중복(누출)</strong>이라 안전성을 과대평가하며 <strong>이 셋에선 v5≈v4(개선 주장 안 함)</strong>. <strong>모든 수치는 합성 골든셋(OOD) 기준 — 운영 locked 확정 전 정식 아님.</strong></td></tr>
   <tr><td>추론 속도</td><td>CPU 싱글 문서 p50 약 10ms</td></tr>
   </tbody>
 </table>
@@ -1745,7 +1745,7 @@ footer strong{color:var(--text-dim);}
 
 {
   "status": "healthy",
-  "model": {"status": "loaded", "version": "v-dd3abab9"},
+  "model": {"status": "loaded", "version": "v-fe4b386b"},
   "postgres": {"ok": true},
   "vectorstore": {"ok": true},
   "redis": {"ok": true}
