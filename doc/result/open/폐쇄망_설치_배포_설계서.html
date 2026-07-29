@@ -132,11 +132,11 @@ footer strong{color:var(--text-dim);}
       <tr><td><strong>Redis</strong></td><td>7.2</td><td>6379</td><td>캐시 · 작업 큐 브로커</td><td>BSD-3 (7.2 시점 고정)</td></tr>
       <tr><td><strong>MLflow</strong> (지재원 전용)</td><td>2.16</td><td>—</td><td>실험·모델 레지스트리 — <strong>지재원에서만</strong>, 고객사 번들 미포함</td><td>Apache-2.0</td></tr>
       <tr><td><strong>nginx (mTLS)</strong></td><td>1.27</td><td>443</td><td>mTLS 종료 — 옵션</td><td>BSD-2. 인증서는 발주처/KL PKI 산출물로 교체</td></tr>
-      <tr><td><strong>API</strong></td><td>FastAPI</td><td>8000</td><td>분류·검색·확정·재학습·관리 API <span style="color:#888;font-size:.92em">(재학습 라우트는 <code>full-train</code> 프로파일 한정, 폐쇄망 표준 <code>onprem-local</code>은 추론 전용)</span></td><td>자체</td></tr>
+      <tr><td><strong>API</strong></td><td>FastAPI</td><td>8000</td><td>분류·검색·확정·재학습·관리 API <span style="color:#888;font-size:.92em">(풀 학습 라우트는 <code>full-train</code> 한정; 폐쇄망 표준 <code>onprem-local</code>은 추론 + 야간 CPU 증분재학습)</span></td><td>자체</td></tr>
       <tr><td><strong>Worker / Beat</strong></td><td>Celery</td><td>—</td><td>비동기 분류·인덱싱·주기작업</td><td>자체</td></tr>
     </tbody>
   </table></div>
-  <p style="color:#888;font-size:.92em">※ 능동학습/재학습 환류는 미확정 결정(기본 A안: 고객사=추론 전용, 집계 진단지표만 환류; B안 온사이트 학습 시에만 활성). 모델은 상시 재학습하지 않음 — locked 충분량·shadow 검증·별도 승인 후 단발. <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a> 참조.</p>
+  <p style="color:#888;font-size:.92em">※ 고객사 능동학습→재학습은 <code>onprem-local</code>에서 <b>야간 CPU 증분재학습</b>으로 배선(무반출·후보등록만·활성화는 사람 사인오프). 모델은 상시 재학습하지 않음 — locked 충분량·shadow 검증·별도 승인 후 단발·야간 배치. <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a> 참조.</p>
 
   <h2>런타임 의존 · 모델</h2>
   <div class="table-wrap"><table>

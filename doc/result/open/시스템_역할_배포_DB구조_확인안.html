@@ -255,7 +255,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 │ · DB: 로이드케이 운영    │                    │ · DB: KL 운영            │
 └─────────────────────────┘                    └─────────────────────────┘
         ▲ 네트워크 연결 없음 — 고객사→지재원 직결 불가 (폐쇄망) ▲</div>
-    <div class="ok-box"><span class="ok-label">확정</span>고객사는 폐쇄망이라 지재원에 붙을 수 없음. 골든 번들(모델+골든셋+스키마)은 매체로 반입. <b>로이드케이는 고객사에 라이브 접속이 0</b> → 지재원 DB 권한만으로 충분. <span class="logical-name">단, 역방향(고객사→지재원) 검수교정 반출·재학습은 <b>미확정</b> — §6 확인 5의 결정 대상(기본 권고: 문서 무반출·집계 진단만 환류)</span></div>
+    <div class="ok-box"><span class="ok-label">확정</span>고객사는 폐쇄망이라 지재원에 붙을 수 없음. 골든 번들(모델+골든셋+스키마)은 매체로 반입. <b>로이드케이는 고객사에 라이브 접속이 0</b> → 지재원 DB 권한만으로 충분. <span class="logical-name">역방향(고객사→지재원) 문서 반출은 <b>없음(무반출 확정)</b> — 대신 현장 교정은 고객사 망 내 <b>CPU 야간 증분재학습</b>으로 반영(후보 등록·활성화는 사람 사인오프)</span></div>
 
     <h2 id="db"><span class="num">3</span> DB 구조 — 현재 소스 기준 단일 애플리케이션 스키마</h2>
     <p class="h2-sub">고객사 PostgreSQL 운영 주체는 KL일 수 있으나, 현재 DDL/ORM은 <b>schema 분리 없이 Lloydk 테이블을 같은 기본 스키마에 생성</b>한다.</p>
@@ -328,7 +328,7 @@ OUT (고객사 -&gt; 지재원) :  [확인 5 미정] 검수교정 반출 여부 
       <tbody>
         <tr><td>Lloydk ↔ KL 원천 문서</td><td><code>tb_documents.doc_id</code>는 Lloydk PK, KL EDMS 키는 <code>external_ref</code>로 보존한다. 하드 FK 대신 API/메타데이터 기반 소프트 연동.</td><td>현재 구현</td></tr>
         <tr><td>벤더 경계 FK</td><td><b>소프트 참조</b>가 현 코드와 맞다. schema 분리와 cross-schema FK가 필요하면 별도 설계 변경 대상이다.</td><td>2-벤더 폐쇄망 디커플</td></tr>
-        <tr><td>학습 테이블</td><td><code>training_runs·epochs·datasets</code>·<code>prompt_versions</code>·<code>sample_documents</code>는 고객사 추론 전용 배포에서는 비어 있을 수 있다. <code>model_versions</code>는 감사·롤백용, <code>tb_corrections</code>는 고객사 검수 교정으로 채워진다.</td><td>고객사 = 추론 전용</td></tr>
+        <tr><td>학습 테이블</td><td><code>training_runs·epochs·datasets</code>·<code>prompt_versions</code>·<code>sample_documents</code>는 고객사 CPU 야간 증분재학습이 활성이면 채워진다(비활성 시 비어 있음). <code>model_versions</code>는 감사·롤백용, <code>tb_corrections</code>는 고객사 검수 교정으로 채워진다.</td><td>고객사 = CPU 런타임 + 야간 증분</td></tr>
         <tr class="nego-row"><td><code>tb_llm_usage</code></td><td>고객사 온프렘 LLM(/answer·선택 2차판정) 호출 시 Lloydk DB에 기록한다. KL 비용 정산 시스템으로 넘길지는 별도 API/리포트 계약이다.</td><td>고객사 온프렘 LLM 실재</td></tr>
       </tbody>
     </table></div>

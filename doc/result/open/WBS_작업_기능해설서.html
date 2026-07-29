@@ -172,7 +172,7 @@ footer strong{color:var(--text-dim);}
       <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">고객사 폐쇄망(오프라인·인터넷 차단) 조건에서 돌아갈 데이터 인프라를 세우고 개발환경을 그대로 재현하는 단계다. PostgreSQL 한 대 안에 벡터검색 기능(pgvector)까지 통합한다.</div></div>
       <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">pgvector 기반 PostgreSQL 이미지를 써서 dense 임베딩은 pgvector 코사인 검색으로, 한국어 어휘검색은 애플리케이션 bigram_text와 PostgreSQL 기본 ts_rank로 처리하고 이 둘을 한 개의 SQL 안에서 RRF(순위융합, k=60)로 합친다. 운영 핵심 경로는 pgvector + bigram ts_rank이며, pg_bigm은 별도 검증·후보가속용 커스텀 이미지에 포함할 수 있는 선택 확장이다. 형태소분석기나 별도 검색엔진(Elasticsearch)이 없어도 되고, 스키마를 ai_agent(로이드케이)·admin(KL)로 분리하며 폐쇄망 운영 저장은 로컬FS를 쓴다(MinIO 미사용).</div></div>
       <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">별도 검색엔진 없이 Postgres 한 대로 하이브리드 검색과 트랜잭션(감사체인·확정/보정 잠금)을 모두 처리해 폐쇄망 반입·운영이 단순해지고 규모가 작은 프로젝트에 잘 맞는다. 오프라인 매체 반입만으로 개발환경을 그대로 재현할 수 있다.</div></div>
-      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">ES 백엔드도 어댑터로 지원하지만 폐쇄망 기본은 PG다. 온프렘 GPU=0 방침이라 임베딩·추론은 CPU로 충분하고, 실운영 쿼리 분포에 대한 검색 튜닝은 파일럿 이후 모니터링으로 이어진다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">ES 백엔드도 어댑터로 지원하지만 폐쇄망 기본은 PG다. 고객사 운영망은 GPU 없이 CPU로 임베딩·추론이 충분하고(지재원 모델공장만 GPU), 실운영 쿼리 분포에 대한 검색 튜닝은 파일럿 이후 모니터링으로 이어진다.</div></div>
     </div>
   </div>
   <div class="item" id="item-7">
@@ -203,7 +203,7 @@ footer strong{color:var(--text-dim);}
     <div class="item-body">
       <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">전체 시스템(파싱→분류→검색→검수)과 인프라(폐쇄망·GPU-free·상용LLM 제약)의 큰 그림을 잡는 아키텍처 설계다. 어디서 무엇이 돌고 무엇을 CPU/GPU/LLM으로 처리할지 결정한다.</div></div>
       <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">지재원(개발)=CSAP 클라우드 샌드박스, 고객사(운영)=폐쇄망 분리배포로 나누고, 등급결정 핫패스는 LLM 없이 분류기+룰로만 돌리며 /answer·선택적 2차판정에만 LLM을 쓴다. 추론·임베딩은 CPU, 학습만 GPU에 의존하게 하고, 검색 인덱스는 Blue/Green alias 원자 스왑으로 무중단 재색인한다. 추론 싱글톤은 단일 프로세스 기준 핫리로드가 가능하며, 멀티워커 전체 반영은 순차 재기동 절차를 따른다.</div></div>
-      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">지재원 GPU=0·상용LLM 무제한 제약에 맞춰 핫패스를 CPU로 돌려 폐쇄망·저비용 운영을 가능하게 하고, 핫패스에서 LLM을 빼 응답을 빠르고(핫패스 ~333ms) 결정론적으로 만든다. 원청/하청·개발/운영 경계를 코드가 아닌 배포 토폴로지로 격리한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">지재원은 GPU 모델공장(학습·합성·골든·인덱싱)이고, 고객사 운영망은 대부분 GPU 없이 CPU로 핫패스를 돌려 폐쇄망·저비용 운영을 가능하게 하며, 핫패스에서 LLM을 빼 응답을 빠르고(핫패스 ~333ms) 결정론적으로 만든다. 상용LLM은 폐쇄망이라 공개출처 오프라인에 한정. 원청/하청·개발/운영 경계를 코드가 아닌 배포 토폴로지로 격리한다.</div></div>
       <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">Qwen3-14B는 고객사 호스트에 탑재·확보해야 하는 선택적 2차판정·/answer용 모델 전제이며, 등급결정 핫패스는 LLM-free로 동작한다. 온프렘 스토리지는 로컬FS이고, RFP는 특정 클라우드 사업자를 지정하지 않고 CSAP 공공클라우드·발주기관 제공 조건만 명시한다.</div></div>
     </div>
   </div>
