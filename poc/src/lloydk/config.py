@@ -598,6 +598,14 @@ class Settings(BaseSettings):
     # 표적 6 (2026-05-29): PreprocessPipeline의 PII 마스킹 자동 적용 여부.
     # 보안 민감 도메인이라 기본 True. dryrun/테스트에서 비활성하려면 LLOYDK_PII_MASKING_ENABLED=0.
     pii_masking_enabled: bool = True
+    # [#pii-skew] 분류기 *입력*에도 PII 마스킹을 적용할지. 기본 False(무마스킹).
+    # 근거: 내부 IP·사번·계좌/부품번호는 문서를 S1/S2로 만드는 등급 신호인데 [IP]/[EMP]로 가리면
+    # 분류기가 근거를 잃는다. 게다가 학습·평가(m4/m6)는 무마스킹이라 서빙만 마스킹하면 모델이 못 본
+    # OOD 브라켓 토큰으로 등급이 낮아지는(silent FNR) train/serve 스큐가 생긴다(보고 F1/FNR은 전부
+    # 무마스킹 기준). → 분류기 입력은 무마스킹이 정답(학습·평가 분포와 정합, 재학습 불요). 저장·색인·
+    # 표시용 마스킹은 pii_masking_enabled(_finalize/run_file 경로)에서 그대로 유지 — PII 보호는 그
+    # 노출 경계에서. True로 켜면 (고신뢰 마스킹으로 학습·평가도 마스킹한 모델 배포 시) 정합 가능.
+    pii_mask_classifier_input: bool = False
 
     # [P0#3] 저품질/OCR 추출 검수 라우팅 — 추출 품질이 낮거나 OCR/추출오류인 문서를 자동분류
     # 그대로 통과시키지 않고 processing_status='needs_review'로 격리(무음 오분류 방지). 깨끗한

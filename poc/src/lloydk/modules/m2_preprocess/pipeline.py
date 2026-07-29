@@ -55,10 +55,23 @@ class PreprocessPipeline:
             self.chunk_overlap = chunk_overlap or 64
             self.pii_masking = True if pii_masking is None else pii_masking
 
-    # ClassifyService.run_text 호환 — 정규화(+PII 마스킹) 텍스트만 반환
+    # ClassifyService.run_text 호환 — 분류기 *입력* 전처리(정규화). 기본 무마스킹.
     def run_text(self, text: str) -> str:
+        """분류기 입력용 정규화 텍스트 반환.
+
+        [#pii-skew] PII 마스킹은 등급 신호(내부 IP·사번·계좌/부품번호가 민감도 근거인 경우 다수)를
+        지우고, 학습·평가는 무마스킹이라 서빙만 마스킹하면 OOD 브라켓 토큰으로 등급이 낮아지는
+        silent FNR 스큐가 생긴다. 분류기 입력은 무마스킹이 정답(학습·평가 분포 정합) — 별도 설정
+        pii_mask_classifier_input(기본 False)로만 마스킹한다. 저장/색인/표시용 마스킹은 run_file
+        (_finalize) 경로가 pii_masking_enabled 로 그대로 유지 → PII 보호는 그 노출 경계에서.
+        """
         normalized = normalize(text)
-        if self.pii_masking:
+        try:
+            from lloydk.config import settings  # noqa: PLC0415
+            mask_input = bool(getattr(settings, "pii_mask_classifier_input", False))
+        except Exception:  # noqa: BLE001
+            mask_input = False
+        if mask_input:
             return mask_pii(normalized).text
         return normalized
 
