@@ -313,7 +313,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <span class="badge">Test Strategy</span>
       <span class="badge blue">v1.4</span>
       <span style="color:var(--text-dim);font-size:12.5px;">·</span>
-      <span style="color:var(--text-dim);font-size:12.5px;">2026-06-20 갱신</span>
+      <span style="color:var(--text-dim);font-size:12.5px;">2026-07-22 갱신</span>
       <span style="color:var(--text-dim);font-size:12.5px;">·</span>
       <span style="color:var(--text-dim);font-size:12.5px;">KOIPA AI 영업비밀관리시스템</span>
     </div>
@@ -326,8 +326,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <div class="card-grid col4" style="margin:0 0 32px;">
       <div class="card card-dark">
         <div class="card-label">테스트 현황</div>
-        <div class="card-value sm">~912/912</div>
-        <div class="card-desc">lite pytest PASS · 회귀 0</div>
+        <div class="card-value sm">~1,776</div>
+        <div class="card-desc">lite pytest PASS · 회귀 0 (정본: 시험케이스 및 결과서)</div>
       </div>
       <div class="card card-dark">
         <div class="card-label">현 배포 모델</div>
@@ -535,10 +535,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             </tr>
             <tr>
               <td rowspan="3"><b>검색 품질</b></td>
-              <td>Recall@5 (운영 코퍼스 · KURE+pgvector)</td>
+              <td>Recall@5 (이전 합성셋 · KURE+ES)</td>
               <td><span class="tag warn">로직만</span></td>
               <td><span class="tag pass">✓ 측정</span></td>
-              <td class="td-pass">0.925 (프록시 목표 0.80 충족)</td>
+              <td class="td-pass">0.925 (합성 프록시) · 실 PG 하이브리드 0.85</td>
             </tr>
             <tr>
               <td>Recall@5 (OSS 코퍼스)</td>
@@ -734,7 +734,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="h2-sub">동일 모델·홀드아웃이라도 원시 argmax와 실배포 서빙경로의 안전성이 크게 다릅니다. 운영점(C-esc/C-eval/B1)을 실측해 확정했습니다.</p>
 
       <h3>10.0 모델 선정 — KF-DeBERTa (활성 v4_clean/v-dd3abab9 · .env 포인터 정합 완료)</h3>
-      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,589건(train 2,071 + val 259 + test 261). 프록시 holdout 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b> · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
+      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,591건(train 2,071 + val 259 + test 261). 프록시 holdout 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b> · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
 
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
@@ -816,7 +816,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="callout warn">
           <span class="callout-icon">🔬</span>
           <div class="callout-body">
-            초기 학습셋 5,911건 중 <b>3,320건(56%)이 판례·심결</b>, 그중 <b>2,210건(67%)이 TS/S1/S2 오라벨</b>(공개 법원문서를 고등급으로 라벨). 법률 제외 재학습(<code>labeled_clean_nolegal</code> 2,589건) ablation으로 정제 효과를 정량 확인했습니다.
+            초기 학습셋 5,911건 중 <b>3,320건(56%)이 판례·심결</b>, 그중 <b>2,210건(67%)이 TS/S1/S2 오라벨</b>(공개 법원문서를 고등급으로 라벨). 법률 제외 재학습(<code>labeled_clean_nolegal</code> 2,591건) ablation으로 정제 효과를 정량 확인했습니다.
           </div>
         </div>
         <div class="tbl-wrap">
@@ -831,7 +831,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             </tbody>
           </table>
         </div>
-        <p style="font-size:12.5px;color:var(--text-soft);">홀드아웃에서 판례 제거(<code>holdout_business.jsonl</code> 90건), 원본은 아카이브 보관. 정제 모델(<code>v4_clean/v-dd3abab9</code>)은 <code>labeled_clean_nolegal</code> 2,589건으로 학습되었습니다 — <code>.env</code> 배포 포인터도 v4_clean/v-dd3abab9로 정합 완료(2026-06-24).</p>
+        <p style="font-size:12.5px;color:var(--text-soft);">홀드아웃에서 판례 제거(<code>holdout_business.jsonl</code> 90건), 원본은 아카이브 보관. 정제 모델(<code>v4_clean/v-dd3abab9</code>)은 <code>labeled_clean_nolegal</code> 2,591건으로 학습되었습니다 — <code>.env</code> 배포 포인터도 v4_clean/v-dd3abab9로 정합 완료(2026-06-24).</p>
       </div>
     </section>
 
@@ -1196,7 +1196,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <td>
                 <span class="tag real">설계검토 하드닝 26건 — 워커/멱등성/회귀게이트</span><br>
                 <div style="font-size:12px;margin-top:4px;">
-                  lite 스위트 <b>약 912 PASS</b> · 0 FAIL (인프라 비의존)<br>
+                  lite 스위트 <b>약 912 PASS</b> · 0 FAIL (인프라 비의존, 2026-06-20 시점)<br>
                   워커 tick 단위테스트 <b>11건</b> 신규 (DB/redis 비의존 mock)<br>
                   멱등성 스토어 단위테스트 · outbox 원자성 테스트 갱신<br>
                   perf 회귀로직(detect_regressions)·집계 하니스 <b>기본 pytest 실행</b>
@@ -1223,8 +1223,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="card-grid col4" style="margin:16px 0;">
         <div class="card card-dark">
           <div class="card-label">현행 lite pytest</div>
-          <div class="card-value sm">~912/912</div>
-          <div class="card-desc">PASS · 회귀 0 (인프라 비의존)</div>
+          <div class="card-value sm">~1,776</div>
+          <div class="card-desc">PASS · 회귀 0 (인프라 비의존) · 전체 수집 ≈2,031</div>
         </div>
         <div class="card card-dark">
           <div class="card-label">검증 피라미드</div>
@@ -1246,7 +1246,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout info">
         <span class="callout-icon">ℹ</span>
         <div class="callout-body">
-          <b>lite 스위트(약 912 PASS)는 인프라 비의존</b> 단위·순수함수 회귀입니다. PG 의존 테스트(advisory-lock·파티션 DDL·일부 repo)는 <b>dialect 가드</b>로 비-PG 환경에서 자동 skip되며 카운트에 포함되지 않습니다. 배포 전 <b>PostgreSQL 백엔드로 1회 검증</b>을 권장합니다. 4차 하드닝 26건은 파일분할 병렬구현 → 배치별 타깃테스트 → 배치별 커밋으로 진행했으며, 전 항목 보수적(opt-in/no-op/FNR-safe)으로 적용했습니다.
+          <b>lite 스위트(현행 약 1,776 PASS)는 인프라 비의존</b> 단위·순수함수 회귀입니다. PG 의존 테스트(advisory-lock·파티션 DDL·일부 repo)는 <b>dialect 가드</b>로 비-PG 환경에서 자동 skip되며 카운트에 포함되지 않습니다. 배포 전 <b>PostgreSQL 백엔드로 1회 검증</b>을 권장합니다. 4차 하드닝 26건은 파일분할 병렬구현 → 배치별 타깃테스트 → 배치별 커밋으로 진행했으며, 전 항목 보수적(opt-in/no-op/FNR-safe)으로 적용했습니다.
         </div>
       </div>
     </section>
@@ -1261,7 +1261,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout info">
         <span class="callout-icon">🔁</span>
         <div class="callout-body">
-          <b>법률 정제 모델 (2026-06-19): v4_clean/v-dd3abab9</b> — 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,589건</b>으로 재학습한 모델이며 서빙 F1 0.686/FNR 0.018을 낸 주체입니다(§10.4). <code>.env</code> 배포 포인터도 v4_clean/v-dd3abab9로 정합 완료(2026-06-24)이며, step3/v-f9b5cedb(아래 표 14,461건)는 정제 효과 비교 기준(baseline)입니다.
+          <b>법률 정제 모델 (2026-06-19): v4_clean/v-dd3abab9</b> — 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,591건</b>으로 재학습한 모델이며 서빙 F1 0.686/FNR 0.018을 낸 주체입니다(§10.4). <code>.env</code> 배포 포인터도 v4_clean/v-dd3abab9로 정합 완료(2026-06-24)이며, step3/v-f9b5cedb(아래 표 14,461건)는 정제 효과 비교 기준(baseline)입니다.
         </div>
       </div>
 
@@ -1697,7 +1697,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <span class="phase-item-icon">🎯</span>
               <div class="phase-item-body">
                 <div class="phase-item-title">발주처 실문서 재학습 → 제3 문체 recall 측정</div>
-                <div class="phase-item-desc">폐쇄망 내 실 영업비밀 문서로 학습셋 보강. step3 재학습. 진짜 미공개 비밀(특허·판례 외 문체) 재현율의 첫 실측 — 구조적으로 여기서만 가능. 환류=재학습은 미확정(A 무반출 기본 / B 온사이트 / C 반출); 본 항목은 B안(고객 망 내 온사이트 학습)에 해당하며 문서·발췌는 어느 안이든 망 밖 반출 금지, 기본 A안에서는 지재원이 자기 골든셋으로 재학습하고 집계 진단지표만 환류한다.</div>
+                <div class="phase-item-desc">폐쇄망 내 실 영업비밀 문서로 학습셋 보강. step3 재학습. 진짜 미공개 비밀(특허·판례 외 문체) 재현율의 첫 실측 — 구조적으로 여기서만 가능. 환류=재학습은 고객사 망 내 CPU 야간 증분재학습으로 확정(무반출·후보등록만·활성화는 사람 사인오프); 문서·발췌는 망 밖 반출 금지이며, 지재원은 자기 합성 골든셋으로·고객사는 현장 CPU 증분으로 각각 재학습한다.</div>
               </div>
             </li>
             <li class="phase-item">
@@ -1737,7 +1737,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
 <footer>
   <span>테스트 전략 · 환경 · 이력 · KOIPA AI 영업비밀관리시스템 — Lloydk AI Engine</span>
-  <span>2026-06-24 갱신 · pytest 922(lite) · 채점 S×V×M · 능동학습 폐곡선 · v-dd3abab9</span>
+  <span>2026-07-22 갱신 · pytest ~1,776(lite) · 채점 S×V×M · 능동학습 폐곡선 · v-dd3abab9</span>
 </footer>
 
 <script>

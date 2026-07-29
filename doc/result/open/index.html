@@ -92,14 +92,14 @@ footer strong{color:var(--text-dim);}
     <div class="eyebrow">KOIPA AI 영업비밀관리시스템 · 협력사 공유본</div>
     <h1>프로젝트 문서 허브</h1>
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
-    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+    <b>운영 전제 (필독):</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
   </div>
     <p>본 시스템의 설계·등급기준·연동 규약·일정을 한곳에서 보는 공유 인덱스입니다. 아래 문서는 <strong>로이드케이(AI 코어) ↔ KL(웹수집 계층)</strong> 협업에 필요한 자료로 구성됩니다. 처음이라면 <strong>"읽는 순서"</strong>를 따라가세요.</p>
     <div class="hero-meta">
       <span class="chip dark">KL 공유본</span>
-      <span class="chip">문서 45종</span>
-      <span class="chip">2026-07-17 기준</span>
-      <span class="chip">설계 미팅 06-23(화)</span>
+      <span class="chip">문서 50+종</span>
+      <span class="chip">2026-07-29 기준</span>
+      <span class="chip">테스트서버 파일럿</span>
     </div>
   </section>
 
@@ -158,10 +158,15 @@ footer strong{color:var(--text-dim);}
       <div class="ttl">영업비밀 등급분류 기준 적용서 v2.2</div>
       <div class="desc">정본 가이드(PDF) 기반 4등급·S×V×M 산정·v2.2 보정·A/B안 역할분담.</div>
     </a>
-    <a class="doc-card" href="golden100_분류근거_보고서.html">
-      <div class="num">실증</div>
-      <div class="ttl">골든셋 분류근거 보고서</div>
-      <div class="desc">골든셋 100건 분류 결과·근거 — 등급기준 실증.</div>
+    <a class="doc-card" href="골든셋_분류근거_v5_clean_v-fe4b386b.html">
+      <div class="num">v5</div>
+      <div class="ttl">골든셋 분류근거 — v5_clean 후보</div>
+      <div class="desc">골든 777건 실엔진 카드형(룰·모델·S/V/M·softmax 분포) — 개선 후보 v-fe4b386b, 과분류 격감·자동확정 72%.</div>
+    </a>
+    <a class="doc-card" href="골든셋_분류근거_현행모델_v-dd3abab9.html">
+      <div class="num">배포</div>
+      <div class="ttl">골든셋 분류근거 — 현행 배포모델</div>
+      <div class="desc">골든 777건 실엔진 카드형 — 현행 v-dd3abab9(v4_clean), v5 후보와 나란히 비교.</div>
     </a>
   </div>
 
@@ -271,7 +276,7 @@ footer strong{color:var(--text-dim);}
     <a class="doc-card" href="시험케이스_및_결과서.html">
       <div class="num">TEST</div>
       <div class="ttl">시험케이스 · 결과서</div>
-      <div class="desc">219 테스트 기반 대상별 케이스·판정·인수 severity floor.</div>
+      <div class="desc">221 테스트 기반 대상별 케이스·판정·인수 severity floor.</div>
     </a>
     <a class="doc-card" href="결함관리대장.html">
       <div class="num">DEFECT</div>
@@ -308,6 +313,16 @@ footer strong{color:var(--text-dim);}
       <div class="ttl">사업수행계획서</div>
       <div class="desc">범위·산출물목록(사실) + 인력·일정·금액 골격(발주처 입력).</div>
     </a>
+    <a class="doc-card" href="품질보증_결과서.html">
+      <div class="num">SQA-R</div>
+      <div class="ttl">품질보증 결과서</div>
+      <div class="desc">품질활동 수행 결과 — 테스트·CI·리뷰·정적분석 이행 실적.</div>
+    </a>
+    <a class="doc-card" href="소프트웨어_개발보안_적용내역.html">
+      <div class="num">SECDEV</div>
+      <div class="ttl">소프트웨어 개발보안 적용내역</div>
+      <div class="desc">시큐어코딩 기준 항목별 적용·점검 내역 — 감리 보안 산출물.</div>
+    </a>
   </div>
 
   <h2 class="sec">읽는 순서 — KL 관점</h2>
@@ -335,7 +350,7 @@ footer strong{color:var(--text-dim);}
 
 <footer>
   <strong>KOIPA AI 영업비밀관리시스템</strong> — 프로젝트 공유 인덱스 (KL) · 로이드케이<br>
-  2026-07-17 기준 · 감리 대응 산출물 반영
+  2026-07-29 기준 · 감리 대응 산출물 반영
 </footer>
 
 </body>

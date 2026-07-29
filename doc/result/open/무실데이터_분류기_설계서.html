@@ -181,7 +181,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
   <article id="top">
     <div class="meta-row">
       <span class="badge">설계서</span>
-      <span class="badge warn">내부용 · 대외공유 금지</span>
+      <span class="badge">감리 참고자료</span>
       <span class="meta-dot">·</span>
       <span class="meta-soft">합성 부트스트랩 · 운영 학습 · 죽음의 나선 방어</span>
       <span class="meta-dot">·</span>
@@ -299,7 +299,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>행동 라우터(다단 status)</td><td class="td-pass">✅ 이미 있음</td><td>status 5종 + 라우팅 시그널 6종 — <code>classify_service.py:254-313</code>. 형식화+hard block만 추가</td></tr>
             <tr><td>corrections→재학습 트리거</td><td class="td-pass">✅ 이미 있음 (자동)</td><td>URGENT≥10·RECOMMENDED≥50, 30분 beat — <code>active_learning.py:28-29</code>, <code>celery_app.py:48-52</code></td></tr>
             <tr><td>고객사 자동 재학습 루프</td><td class="td-pass">✅ OFF 구현</td><td>active_learning_tick/train_classifier_task를 enable_training으로 게이트 — 고객사 자동 재학습 차단 (2f2c04e)</td></tr>
-            <tr><td>교정→지재원 반출 경로</td><td class="td-fail">⬜ 없음(무반출)</td><td>export 도구 없음·<code>corrections_rebuild</code> 로컬 DB만 읽음 → 고객사 교정은 분류기 재학습에 영영 안 들어감(설계상 무반출)</td></tr>
+            <tr><td>교정→재학습 경로 (무반출)</td><td class="td-warn">⬜ 로컬 CPU 증분</td><td>지재원 반출은 없음(무반출 유지). 대신 고객사 교정이 <b>망 내 CPU 야간 증분재학습</b>으로 분류기에 반영된다(<code>nightly_incremental_retrain_tick</code> 02:00·후보등록·활성화는 사람 사인오프)</td></tr>
             <tr><td>S3부터 좁게(등급차등)</td><td class="td-pass">✅ 이미 있음</td><td>agreement_gate가 S3만 conf단독 허용 — <code>config.py:84-85,97-98</code></td></tr>
             <tr><td>안전 KPI</td><td class="td-pass">✅ 이미 있음</td><td>fnr_underclass · reviewer_trust · drift — <code>metrics.py</code>, <code>reviewer_trust.py</code></td></tr>
             <tr><td>FNR-safe 운영점(τ=0.30·agreement)</td><td class="td-pass">✅ ON</td><td>onprem/full-train 프로파일 기본 — <code>config.py:84-98</code></td></tr>
@@ -445,7 +445,7 @@ A1.  [데이터]  고등급(TS/S1)은 앵커(사람 서명)로 — 서명 불가
         <li><b>운영 첫 교정이 첫 진실 신호</b> — 그 전까진 깜깜이. 안전망(게이트·표본감사·미탐 0 floor)은 협상 불가.</li>
         <li><b>콜드스타트 부담(실측 심각)</b> — 합성모델은 실 문서를 대량 과분류(실 S3의 ~94%를 S1/S2로) → <b>초기 검수 부담이 매우 큼</b>(전 문서가 고등급 알람에 가까움). 단 <b>FNR-안전</b>(서빙 escalation τ=0.15에서 고등급 미탐 ~1%)이라 과분류는 안전 방향이고 누출은 안 함. 운영 교정이 실분포·텍스처를 가르치며 과분류·검수부담이 줄어드는 구조.</li>
         <li><b>선례 일반화 한계</b> — kNN 선례는 유사 케이스만 패치, 새 유형 일반화는 재학습 영역.</li>
-        <li><b>분류기는 합성 천장에 영구 고정(수용)</b> — 무반출 + 무실데이터라 분류기 <b>가중치가 실데이터로 개선될 경로가 없다</b>. <b>고객사 로컬 재학습은 원래 설계에 없음</b>(추론 전용). 분류기 갱신=지재원의 새 합성 재번들로만, 실세계 개선=고객사 비모수(선례·게이트·보정)로만. 이 천장은 설계의 <b>수용된 귀결</b>이며 열린 결정이 아니다.</li>
+        <li><b>초기 합성 천장은 고객사 CPU 야간 증분재학습으로 돌파 경로가 열렸다</b> — 무반출을 유지한 채, 고객사 현장 검수 교정을 <b>야간 CPU 증분재학습</b>(기존 학습셋과 혼합)으로 분류기에 반영한다(<code>enable_incremental_retrain</code>, onprem-local). 후보 등록까지 자동이며 <b>활성화는 사람 사인오프</b>(auto_activate=False). 분류기 갱신=지재원 합성 재번들 + 고객사 CPU 증분, 실세계 개선=비모수(선례·게이트·보정) 병행. 부트스트랩 시점 천장은 합성이나, 운영 루프로 개선된다.</li>
       </ul>
       <div class="callout warn"><span class="callout-icon">🧭</span><div class="callout-body"><b>전략 정식화 (capstone 후 — 두 기둥의 역할 재정의).</b>
       <ol style="margin:6px 0 0 18px;padding:0;">
@@ -461,14 +461,14 @@ A1.  [데이터]  고등급(TS/S1)은 앵커(사람 서명)로 — 서명 불가
     </section>
 
     <div class="appendix-links" style="margin-top:36px;">
-      <a class="appendix-link" href="../result/open/분류검수게이트_강화_보고서.html"><span>관련 — 분류 검수 게이트 강화 보고서</span><span class="al-arrow">→</span></a>
-      <a class="appendix-link" href="../result/open/서빙_운영점_파라미터_명세.html"><span>관련 — 서빙 운영점·게이트 파라미터 명세</span><span class="al-arrow">→</span></a>
+      <a class="appendix-link" href="분류검수게이트_강화_보고서.html"><span>관련 — 분류 검수 게이트 강화 보고서</span><span class="al-arrow">→</span></a>
+      <a class="appendix-link" href="서빙_운영점_파라미터_명세.html"><span>관련 — 서빙 운영점·게이트 파라미터 명세</span><span class="al-arrow">→</span></a>
     </div>
   </article>
 </div>
 
 <footer>
-  <span>무실데이터 분류기 설계서 · 내부용(대외공유 금지) · 2026-06 · Lloydk AI Engine</span>
+  <span>무실데이터 분류기 설계서 · 감리 참고자료 · 2026-06 · Lloydk AI Engine</span>
   <span>합성 부트스트랩 · 운영 학습 · 죽음의 나선 방어 — 코드 검증 기준 · rev.3(capstone 실증: 합성=안전seed·자동화=운영학습)</span>
 </footer>
 <script>
