@@ -6,15 +6,18 @@ human_review 승격은 별개 경로(import_review_corrections, 지재원 관리
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import html as _html
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
 from lloydk.api._jwt_auth import require_auth
 from lloydk.api._rbac import require_role
 from lloydk.api.confirm import bind_authenticated_actor, resolve_actor_user_id
+from lloydk.config import settings
 from lloydk.golden_tiers import is_human_reviewer
 from lloydk.schemas.golden import (
     GoldenBuildRequest,
@@ -36,6 +39,43 @@ router = APIRouter(tags=["golden"], dependencies=[Depends(require_auth)])
 html_router = APIRouter(tags=["golden"])
 
 
+# ── [#14a] 골든 HTML 서명 URL 토큰 ────────────────────────────────────────────
+# review.html/signoff.html 은 브라우저 네비게이션용 무인증 라우터라 헤더 인증을 못 붙인다.
+# uuid4 job_id 만으로는 URL 만 새면 후보 full-text 가 무인증 노출된다. 비밀키 설정 시 job_id 에
+# 바인딩된 HMAC 토큰(?t=)을 강제해 이를 닫는다(변경성 POST signoff 는 별도 require_role 유지).
+# 비밀키 미설정(dev/test)이면 미강제 — 기존 브라우저 네비게이션·테스트 무변경(backward-compat).
+def _golden_url_secret() -> str | None:
+    # 전용 비밀키 설정 시에만 토큰 강제(opt-in) — api_key 로 폴백하지 않는다. 업그레이드 시
+    # 기존 배포의 골든 HTML 북마크를 무단으로 깨지 않고, 운영자가 명시적으로 켜서 닫는다.
+    secret = (getattr(settings, "golden_html_url_secret", "") or "").strip()
+    return secret or None
+
+
+def _mint_html_token(job_id) -> str | None:
+    """job_id 바인딩 HMAC-SHA256 토큰(24 hex). 비밀키 미설정이면 None."""
+    secret = _golden_url_secret()
+    if not secret:
+        return None
+    mac = hmac.new(secret.encode("utf-8"), f"golden:{job_id}".encode("utf-8"), hashlib.sha256)
+    return mac.hexdigest()[:24]
+
+
+def _verify_html_token(job_id, token: str | None) -> bool:
+    """비밀키 설정 시 상수시간 검증(부재/위조 거부); 미설정이면 항상 통과(미강제)."""
+    expected = _mint_html_token(job_id)
+    if expected is None:
+        return True
+    return bool(token) and hmac.compare_digest(expected, token)
+
+
+def _signed_html_urls(job_id) -> tuple[str, str]:
+    """(review_url, signoff_url) — 비밀키 설정 시 ?t= 토큰 포함, 아니면 평문 경로."""
+    base = f"/api/v1/golden/jobs/{job_id}"
+    tok = _mint_html_token(job_id)
+    q = f"?t={tok}" if tok else ""
+    return f"{base}/review.html{q}", f"{base}/signoff.html{q}"
+
+
 @router.post(
     "/golden/build",
     response_model=GoldenBuildResponse,
@@ -47,7 +87,10 @@ def golden_build(
 ) -> GoldenBuildResponse:
     # [#13] 감사 신원(created_by 등)을 인증 principal 로 확정(JWT sub 우선; api_key 포털 전파값 유지).
     bind_authenticated_actor(req.actor, auth)
-    return GoldenBuildService().submit(req)
+    resp = GoldenBuildService().submit(req)
+    # [#14a] 브라우저로 바로 열 수 있는 서명 검수/서명 URL 동봉(비밀키 설정 시 ?t= 토큰).
+    resp.review_url, resp.signoff_url = _signed_html_urls(resp.golden_job_id)
+    return resp
 
 
 @router.post(
@@ -72,7 +115,11 @@ def golden_register_build(
         raise HTTPException(
             status_code=404, detail="build_path 없음 또는 datasets/ 밖(샌드박스 거부)"
         )
-    return GoldenBuildResponse(golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}")
+    review_url, signoff_url = _signed_html_urls(job_id)  # [#14a]
+    return GoldenBuildResponse(
+        golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}",
+        review_url=review_url, signoff_url=signoff_url,
+    )
 
 
 @router.get(
@@ -84,6 +131,8 @@ def golden_job_status(job_id: UUID) -> GoldenBuildStatus:
     st = GoldenBuildService().get_status(job_id)
     if st is None:
         raise HTTPException(status_code=404, detail="golden build job not found")
+    # [#14a] 콘솔이 이 값으로 review/signoff HTML 을 연다(인증 경로에서 서명 URL 발급).
+    st.review_url, st.signoff_url = _signed_html_urls(job_id)
     return st
 
 
@@ -118,8 +167,13 @@ def _job_gate_html(job_id: UUID) -> HTMLResponse | None:
 
 
 @html_router.get("/golden/jobs/{job_id}/review.html", response_class=HTMLResponse)
-def golden_job_review_html(job_id: UUID) -> HTMLResponse:
+def golden_job_review_html(
+    job_id: UUID, t: str | None = Query(default=None)
+) -> HTMLResponse:
     """빌드 잡의 후보를 지재원 관리자 검수용 인터랙티브 HTML로 반환(브라우저 직접 접속)."""
+    # [#14a] 비밀키 설정 시 서명 URL 토큰(?t=)을 강제 — 무인증 full-text 노출 차단.
+    if not _verify_html_token(job_id, t):
+        raise HTTPException(status_code=403, detail="invalid or missing signed-URL token (?t=)")
     gate = _job_gate_html(job_id)
     if gate is not None:
         return gate
@@ -130,12 +184,17 @@ def golden_job_review_html(job_id: UUID) -> HTMLResponse:
 
 
 @html_router.get("/golden/jobs/{job_id}/signoff.html", response_class=HTMLResponse)
-def golden_job_signoff_html(job_id: UUID) -> HTMLResponse:
+def golden_job_signoff_html(
+    job_id: UUID, t: str | None = Query(default=None)
+) -> HTMLResponse:
     """빌드 잡의 gold 후보를 화면 서명용 인터랙티브 HTML로 반환(골든셋 검수·브라우저 직접 접속).
 
     review.html(보기 전용)과 달리 승인/등급변경/거부 폼 + 제출 버튼을 붙여, 제출 시
     POST /golden/jobs/{id}/signoff 로 서명을 보낸다(그 POST 는 require_role 로 보호).
     """
+    # [#14a] 비밀키 설정 시 서명 URL 토큰(?t=)을 강제 — 무인증 full-text 노출 차단.
+    if not _verify_html_token(job_id, t):
+        raise HTTPException(status_code=403, detail="invalid or missing signed-URL token (?t=)")
     gate = _job_gate_html(job_id)
     if gate is not None:
         return gate

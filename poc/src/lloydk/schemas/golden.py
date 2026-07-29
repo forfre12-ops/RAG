@@ -37,6 +37,10 @@ class GoldenBuildRequest(BaseModel):
 class GoldenBuildResponse(BaseModel):
     golden_job_id: UUID
     status_url: str
+    # [#14a] 서명 URL(HMAC 토큰 ?t=) — 비밀키 설정 시 채워지며, 브라우저로 바로 열 수 있는
+    # 검수/서명 HTML 링크. 미설정(dev/test)이면 토큰 없는 평문 경로.
+    review_url: Optional[str] = None
+    signoff_url: Optional[str] = None
 
 
 class GoldenRegisterRequest(BaseModel):
@@ -58,6 +62,10 @@ class GoldenBuildStatus(BaseModel):
     gold_path: Optional[str] = None
     uncertain_path: Optional[str] = None
     error: Optional[str] = None
+    # [#14a] 서명 URL(HMAC ?t=) — 콘솔이 이 값으로 review/signoff HTML 을 연다(인증 경로에서
+    # 발급). 비밀키 미설정이면 토큰 없는 평문 경로.
+    review_url: Optional[str] = None
+    signoff_url: Optional[str] = None
 
 
 # ── 골든셋 검수 서명(locked_gold_eval 승격) — POST /golden/jobs/{id}/signoff ──────

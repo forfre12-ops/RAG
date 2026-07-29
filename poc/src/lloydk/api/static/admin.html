@@ -1057,11 +1057,18 @@ async function loadGoldenJob(){
     $('gold-result').textContent=`골든셋 후보 잡 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
   }
 }
-function openGoldenReview(){
+async function openGoldenReview(){
   const id=LAST_GOLDEN_JOB_ID || prompt('리뷰 HTML을 열 golden_job_id를 입력하세요');
   if(!id) return;
   LAST_GOLDEN_JOB_ID=id;
-  window.open(`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/review.html`, '_blank', 'noopener');
+  let url=`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/review.html`;
+  // [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문).
+  try{
+    const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
+    const m=d&&d.review_url?String(d.review_url).match(/[?&]t=([^&]+)/):null;
+    if(m) url+=`?t=${m[1]}`;
+  }catch(e){/* 조회 실패 시 평문 폴백 */}
+  window.open(url, '_blank', 'noopener');
 }
 
 /* ---- 실시간 관제 (auto-refresh · 읽기 전용 폴링) ----

@@ -266,6 +266,13 @@ class Settings(BaseSettings):
     api_key_role: str = "system"
     api_key_trust_actor_role_header: bool = False
 
+    # [#14a] 골든 검수/서명 HTML(브라우저 네비게이션용 무인증 라우터)의 서명 URL 토큰 비밀키.
+    # 설정(opt-in) 시 review.html/signoff.html GET 에 HMAC(job_id) 토큰(?t=)을 강제해 uuid4-only
+    # capability-URL 의 full-text 노출을 닫는다(변경성 POST signoff 는 별도 require_role 유지).
+    # 인증된 GET /golden/jobs/{id} 가 서명 URL 을 발급하고 콘솔이 이를 사용한다. 미설정이면 미강제
+    # (기존 배포·브라우저 네비게이션·dev/test 무변경 — 업그레이드 시 북마크를 깨지 않는다).
+    golden_html_url_secret: str = ""
+
     # NFR-SEC-01: 감사체인 HMAC 비밀키. 설정 시 audit_log hash chain을 HMAC-SHA256으로 링크해
     # 키 없는 과거 row 재작성(rewrite)을 차단(audit_chain._link_hex). 빈 값이면 레거시 sha256
     # 폴백(dev/test 비파괴). 운영(poc_mode=full)에서는 assert_production_credentials가 fail-fast.
