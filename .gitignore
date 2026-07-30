@@ -165,3 +165,9 @@ poc/src/lloydk/api/static/samples/*.pdf
 poc/demo_samples/
 poc/demo_formats/
 doc/mockups/
+# ── 배포 아카이브·임시 덤프 (2026-07-30 배포감사) ──────────────────
+# 릴리스 tar 는 poc/scripts/ship_to_testserver.sh 로 커밋본에서 재생성되는 빌드 산출물이다.
+# 리포에 두면 소스와 어긋난 stale 아카이브가 남아 "어느 게 배포본인가"가 흐려진다.
+/lloydk-*.tar.gz
+# 분석 중 생성된 일회성 텍스트 덤프 — 산출물 아님.
+/scratch_*.txt
