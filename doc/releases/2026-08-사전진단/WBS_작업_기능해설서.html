@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WBS 작업 기능해설서 — 설계 근거 | Lloydk</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --bg-nav:rgba(255,255,255,.88);
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:220px; --article-max:920px; --container:1360px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:4px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 36px;max-width:680px;}
+h2{font-size:clamp(19px,2.6vw,24px);font-weight:700;letter-spacing:-.03em;margin:46px 0 12px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:46px 0 22px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{border-radius:0;padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{background:#fefce8;border-color:#fbbf24;border-left:3px solid #f59e0b;}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout.warn .callout-label{color:#92400e;}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.callout.warn p{color:#78350f;}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:0;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.lk{background:var(--text);color:var(--bg);} .tag.kl{background:#3f3f46;color:#fff;}
+.tag.koipa{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.audit{background:#fefce8;color:#92400e;border:1px solid #fbbf24;}
+/* gantt — 7 months (6월~12월) */
+.gantt{border:1px solid var(--border-mid);margin:20px 0;font-size:12px;}
+.gantt-head,.gantt-row{display:grid;grid-template-columns:190px repeat(7,1fr);align-items:center;}
+.gantt-head{background:var(--bg-surface);border-bottom:1px solid var(--border-mid);}
+.gantt-head > div{padding:8px 6px;font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--text-dim);text-align:center;border-left:1px solid var(--border);}
+.gantt-head > div:first-child{text-align:left;border-left:none;padding-left:12px;}
+.gantt-row{border-bottom:1px solid var(--border);}
+.gantt-row:last-child{border-bottom:none;}
+.gantt-label{padding:9px 12px;font-size:12px;font-weight:600;color:var(--text);}
+.gantt-cell{height:100%;min-height:38px;border-left:1px solid var(--border);position:relative;}
+.gantt-bar{position:absolute;top:10px;bottom:10px;left:3px;right:3px;background:var(--text);}
+.gantt-bar.soft{background:#3f3f46;} .gantt-bar.light{background:var(--bg-strong);border:1px solid var(--border-strong);}
+.gantt-ms{position:absolute;top:50%;left:50%;width:11px;height:11px;background:#92400e;transform:translate(-50%,-50%) rotate(45deg);border:1px solid #fff;}
+.ms{display:flex;flex-direction:column;gap:8px;margin:18px 0;}
+.ms-item{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border-mid);padding:11px 14px;}
+.ms-item.audit{border-color:#fbbf24;background:#fffbeb;}
+.ms-when{font-family:var(--font-mono);font-size:11.5px;font-weight:700;color:var(--text);background:var(--bg-strong);padding:3px 9px;white-space:nowrap;flex-shrink:0;}
+.ms-item.audit .ms-when{background:#fef08a;color:#92400e;}
+.ms-what{font-size:13.5px;color:var(--text-soft);}
+.ms-what b{color:var(--text);}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}.gantt{display:none;}}
+</style>
+
+<style>
+.item{border:1px solid var(--border-mid);margin:14px 0;background:var(--bg);}
+.item-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:11px 15px;background:var(--bg-surface);border-bottom:1px solid var(--border-mid);}
+.item-tag{font-family:var(--font-mono);font-size:10px;font-weight:700;background:var(--text);color:var(--bg);padding:2px 7px;letter-spacing:.03em;white-space:nowrap;flex-shrink:0;}
+.item-tag.ms{background:#92400e;}
+.item-jakup{font-weight:700;font-size:14.5px;color:var(--text);}
+.item-gubun{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-left:auto;}
+.item-detail{padding:9px 15px 2px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);line-height:1.55;}
+.item-detail b{color:var(--text-soft);font-weight:600;}
+.item-body{padding:4px 15px 13px;}
+.aspect{margin:9px 0;padding-left:12px;border-left:2px solid var(--border-strong);}
+.aspect.notes{border-left-color:#f59e0b;}
+.aspect-label{font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim);display:block;margin-bottom:3px;}
+.aspect.notes .aspect-label{color:#92400e;}
+.aspect-text{font-size:13.5px;line-height:1.62;color:var(--text-soft);}
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0;}
+.ov-card{border:1px solid var(--border-mid);border-left:3px solid var(--text);padding:11px 14px;background:var(--bg-surface);}
+.ov-card b{color:var(--text);font-size:13.5px;}
+.ov-card p{margin:4px 0 0;font-size:12.5px;color:var(--text-soft);line-height:1.55;}
+@media(max-width:640px){.ov-grid{grid-template-columns:1fr;}.item-gubun{margin-left:0;width:100%;}}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">WBS 작업 기능해설서</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">WBS 해설 · 2026</span></div>
+  </div>
+</nav>
+<div class="article-layout">
+<article>
+  <div class="meta-row">
+    <span class="badge">DOC-WBS-02</span>
+    <span class="badge outline">2026.06 – 12</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">WBS 항목별 설계 근거 해설</span>
+  </div>
+  <h1 class="title">WBS 작업 기능해설서</h1>
+  <p class="lede">WBS(작업분해구조)의 각 작업·기능상세가 <strong>무슨 기능을 담당하고, 어떻게 처리했으며, 왜 그렇게 했는지(장점·근거)와 참고사항</strong>을 항목별로 풀어 쓴 해설서입니다. 표만으로는 드러나지 않는 <strong>설계 의도</strong>를 담아, 이 파일만 읽어도 "왜 이렇게 개발했는지"가 납득되도록 정리했습니다. 각 항목은 WBS 엑셀의 행 번호와 1:1로 대응합니다.</p>
+
+  <div class="section-sep" id="s0"><span class="section-sep-num">00</span><span class="section-sep-line"></span><span class="section-sep-title">한눈에 보기 — 시스템을 관통하는 4대 원칙</span></div>
+  <p>아래 4가지가 거의 모든 항목의 "왜"를 설명합니다. 개별 기법은 이 원칙들의 구체적 구현입니다.</p>
+  
+  <div class="ov-grid">
+    <div class="ov-card"><b>① FNR 우선 (미탐 최소화)</b><p>정확도보다 <strong>고등급(TS·S1) 놓치지 않기</strong>가 먼저다. 애매하면 등급을 상향하거나 사람 검수로 보낸다.</p></div>
+    <div class="ov-card"><b>② 무음실패 방지</b><p>안전 게이트가 조용히 열리면 비밀이 샌다. <strong>게이트ON = 가시성ON</strong>으로 게이트 발동을 전부 계측·경보한다.</p></div>
+    <div class="ov-card"><b>③ 무실데이터 → 합성 + 운영학습</b><p>실데이터·검수·반출 0이라 <strong>합성으로 부팅</strong>하고, 실분포 성능은 고객사 사람검수(비모수 운영학습)로만 올린다.</p></div>
+    <div class="ov-card"><b>④ 폐쇄망 · GPU-free · 반출0</b><p>Postgres 한 대(+pgvector)로 통합, 등급 핫패스는 <strong>CPU·LLM-free</strong>, 문서·신원은 밖으로 내보내지 않는다.</p></div>
+  </div>
+  <div class="callout inset"><div class="callout-label">읽는 법</div><p>각 항목은 <strong>담당 기능 · 처리 방식 · 장점·근거 · 참고사항</strong> 4블록으로 되어 있습니다. <strong>참고사항</strong>에는 전제·한계(예: 합성 데이터 천장, 파일럿 이후 확정, 운영 프로파일에서만 ON)를 정직하게 표기해, 강점과 함께 한계까지 납득되게 했습니다.</p></div>
+
+  <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">환경 구축</span></div>
+  <div class="item" id="item-5">
+    <div class="item-head"><span class="item-tag">행 5</span><span class="item-jakup">PoC 자산 실사 및 개발환경 반입</span><span class="item-gubun">환경 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · PoC 파이프라인(M1~M6)·모델·데이터·문서 자산 실사 및 반입</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">PoC에서 만든 6단계 파이프라인(M1 합성데이터 생성 → M2 문서파싱/전처리 → … → M5 추론·등급판정)과 학습모델·데이터셋·설계문서 자산을 전수 조사(실사)해 개발환경으로 옮겨오는 단계다. '실제로 무엇이 살아 돌아가고(LIVE) 무엇이 배치·휴면인지'를 지도로 만드는 작업이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">코드를 모듈 경계(m1_synthesis·m2_preprocess·m5_inference 등)로 실사하고, 실제 실행 프로세스 3종(API 서버·Celery 워커·beat 스케줄러)과 모델 버전 대장(ModelVersion)을 대조했다. 주요 설치 컴포넌트(pgvector·redis·KURE 임베더·bge 리랭커·kf-deberta 분류기·Qwen3-14B·로컬FS 등)와 데이터셋 경로를 인벤토리로 정리해 반입 범위를 확정했다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">무엇이 진짜 쓰이는지 먼저 확정해야 반입·재현 범위가 명확해지고, 죽은 코드나 미배선 자산을 폐쇄망 배포에 실어 나르는 낭비·위험을 막는다. 레이어별 LIVE/BATCH/DORMANT 지도가 '실제 뭘 쓰나' 질문에 바로 답하는 근거가 된다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">실데이터·검수·반출 0 방침이라 반입 자산은 합성 데이터와 공개 출처 기반이다. 등급결정 핫패스는 M5 추론 중심이며, 파이프라인이 M6까지 있어도 일부 단계는 배치·휴면 상태로 구분된다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-6">
+    <div class="item-head"><span class="item-tag">행 6</span><span class="item-jakup">PoC 자산 실사 및 개발환경 반입</span><span class="item-gubun">환경 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · 폐쇄망 인프라 구성(PostgreSQL·pgvector) 및 개발환경 재현</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">고객사 폐쇄망(오프라인·인터넷 차단) 조건에서 돌아갈 데이터 인프라를 세우고 개발환경을 그대로 재현하는 단계다. PostgreSQL 한 대 안에 벡터검색 기능(pgvector)까지 통합한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">pgvector 기반 PostgreSQL 이미지를 써서 dense 임베딩은 pgvector 코사인 검색으로, 한국어 어휘검색은 애플리케이션 bigram_text와 PostgreSQL 기본 ts_rank로 처리하고 이 둘을 한 개의 SQL 안에서 RRF(순위융합, k=60)로 합친다. 운영 핵심 경로는 pgvector + bigram ts_rank이며, pg_bigm은 별도 검증·후보가속용 커스텀 이미지에 포함할 수 있는 선택 확장이다. 형태소분석기나 별도 검색엔진(Elasticsearch)이 없어도 되고, 스키마를 ai_agent(로이드케이)·admin(KL)로 분리하며 폐쇄망 운영 저장은 로컬FS를 쓴다(MinIO 미사용).</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">별도 검색엔진 없이 Postgres 한 대로 하이브리드 검색과 트랜잭션(감사체인·확정/보정 잠금)을 모두 처리해 폐쇄망 반입·운영이 단순해지고 규모가 작은 프로젝트에 잘 맞는다. 오프라인 매체 반입만으로 개발환경을 그대로 재현할 수 있다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">ES 백엔드도 어댑터로 지원하지만 폐쇄망 기본은 PG다. 고객사 운영망은 GPU 없이 CPU로 임베딩·추론이 충분하고(지재원 모델공장만 GPU), 실운영 쿼리 분포에 대한 검색 튜닝은 파일럿 이후 모니터링으로 이어진다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-7">
+    <div class="item-head"><span class="item-tag">행 7</span><span class="item-jakup">보안·운영 기본값</span><span class="item-gubun">환경 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · 보안등급 룰 사전·키워드 seed·운영 프로파일 구성</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">등급 판정에 쓰는 룰 엔진의 키워드 사전(KEYWORD_SEEDS)과, 배포 환경마다 게이트·보정·저장방식을 한 번에 정하는 운영 기본값(프로파일)을 셋업한다. '개발은 가볍게, 운영은 안전하게'를 설정으로 강제하는 토대다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">등급별 한국어 시드 어휘 + 고위험 영어약어(EUV·HSM·M&amp;A·EBITDA) 부스트를 룰 사전으로 두고, 배포 프로파일 4종(lite-noapi·lite-cloud·onprem-local·full-train)이 안전게이트(합의·metadata_floor·저장암호화)·보정온도(T≈3)·실임베더 강제 여부를 일괄 설정한다. 폐쇄망 운영 프로파일(onprem-local·full-train)은 require_safety_gates=True로 켜서, 게이트가 하나라도 꺼지면 startup에서 부팅을 막는다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">'base 기본 OFF, 운영 프로파일 ON' 원칙으로 CI·개발은 외부 의존 없이 가볍게 돌리고 폐쇄망 운영은 안전 기본값으로 부팅한다. 프로파일 하나가 수십 개 설정을 정합화해 설정명 드리프트나 오구성으로 인한 무음 위험을 막는다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">KEYWORD_SEEDS는 '라벨 인증'이 아니라 합의·탈락(veto) 신호로만 쓴다(분류기↔평가 순환 방지). 안전게이트를 켜 두고 몰래 끄면 startup 차단으로 회귀가 드러나며(무음 OFF 방지), 미보정 온도(T=1.0)는 OOD 과신 미탐을 유발해 운영 프로파일에서 3.0으로 baking했다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-8">
+    <div class="item-head"><span class="item-tag">행 8</span><span class="item-jakup">가용성·DR 테스트</span><span class="item-gubun">환경 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · 서비스 가용성·장애 복구·관측성 기본 점검</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">서비스가 살아있는지(가용성), 장애 뒤 되살아나는지(DR), 관측 지표가 실제로 채워지는지를 기본 점검하는 단계다. '안전장치가 있다고 착각하지 않게' 관측성 배선의 진위를 확인한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">health 엔드포인트와 성능 점검 harness(PSH)가 KPI별 요구자원(pg·es·redis·llm·학습모델)을 선언해 자원 미충족은 FAIL이 아니라 SKIP으로 분류하고, 워커에서만 계산되는 신호(감사체인 무결성·임베딩 드리프트)를 Redis 키(TTL 48h)로 API의 /metrics에 브리지한다. 폐쇄망 pushgateway는 외부 라이브러리 없이 stdlib(urllib)만으로 Prometheus 노출 포맷을 직접 만들어 전송한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">외부 의존 부재를 실패로 오판하지 않고 SKIP 사유별로 분류해 '무엇이 실제 미측정인지'를 정직하게 드러낸다. 워커 신호가 /metrics에 영원히 0으로 남아 경보가 '거짓 all-clear'가 되던 fake-green 구멍을, 카운터가 아닌 상태+TTL(워커 사망 감지) 방식으로 닫았다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">과거 DR 게이트가 fake-green이던 것을 수정한 이력이 있어 '테스트가 초록=실제 복구'가 아님을 전제로 본다. 관측성 배선은 '게이트ON=가시성ON' 원칙의 일부이며, 실부하 기반 GA 검증은 파일럿 이후 확정된다.</div></div>
+    </div>
+  </div>
+
+  <div class="section-sep" id="s2"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">설계</span></div>
+  <div class="item" id="item-9">
+    <div class="item-head"><span class="item-tag">행 9</span><span class="item-jakup">아키텍처 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 시스템·인프라 아키텍처 설계</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">전체 시스템(파싱→분류→검색→검수)과 인프라(폐쇄망·GPU-free·상용LLM 제약)의 큰 그림을 잡는 아키텍처 설계다. 어디서 무엇이 돌고 무엇을 CPU/GPU/LLM으로 처리할지 결정한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">지재원(개발)=CSAP 클라우드 샌드박스, 고객사(운영)=폐쇄망 분리배포로 나누고, 등급결정 핫패스는 LLM 없이 분류기+룰로만 돌리며 /answer·선택적 2차판정에만 LLM을 쓴다. 추론·임베딩은 CPU, 학습만 GPU에 의존하게 하고, 검색 인덱스는 Blue/Green alias 원자 스왑으로 무중단 재색인한다. 추론 싱글톤은 단일 프로세스 기준 핫리로드가 가능하며, 멀티워커 전체 반영은 순차 재기동 절차를 따른다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">지재원은 GPU 모델공장(학습·합성·골든·인덱싱)이고, 고객사 운영망은 대부분 GPU 없이 CPU로 핫패스를 돌려 폐쇄망·저비용 운영을 가능하게 하며, 핫패스에서 LLM을 빼 응답을 빠르고(핫패스 ~333ms) 결정론적으로 만든다. 상용LLM은 폐쇄망이라 공개출처 오프라인에 한정. 원청/하청·개발/운영 경계를 코드가 아닌 배포 토폴로지로 격리한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">Qwen3-14B는 고객사 호스트에 탑재·확보해야 하는 선택적 2차판정·/answer용 모델 전제이며, 등급결정 핫패스는 LLM-free로 동작한다. 온프렘 스토리지는 로컬FS이고, RFP는 특정 클라우드 사업자를 지정하지 않고 CSAP 공공클라우드·발주기관 제공 조건만 명시한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-10">
+    <div class="item-head"><span class="item-tag">행 10</span><span class="item-jakup">아키텍처 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 데이터 거버넌스·무실데이터 운영 전제 설계</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">실데이터·검수·반출이 전부 0인 제약 아래, 데이터가 어디서 오고(합성) 어떻게 학습·평가되며 고객사 밖으로 새지 않게 하는지의 데이터 거버넌스 설계다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">학습 데이터는 합성 부트스트랩(Qwen 생성·심판, 등급명을 본문에 안 넣는 상황프롬프트)으로 만들고 실분포는 고객사 비모수 운영학습으로 메운다. 평가 골든셋은 3-tier(silver_train/gold_candidate/locked_gold_eval)를 저장컬럼이 아니라 label_source·reviewer에서 파생하고, 고객사→지재원 연합평가는 등급코드·신뢰도·맥락만 반출(문서·신원 필드 제거, redact_for_export·assert_export_safe로 전 깊이 강제)한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">실데이터 없이도 안전한 분류기를 부팅하고, 실분포 성능은 '유일한 정답원'인 고객사 사람검수로만 배우게 해 반출 0 규율과 양립시킨다. 합성↔실 텍스처 갭을 운영학습 레버로 좁히는 구조를 처음부터 못 박는다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">합성 데이터 천장(실 F1 ~0.26)은 영구 고정으로 수용하고, 합격선을 '정확도%'가 아니라 안전(고등급 미탐 최소화)으로 재정의했다. 사람서명 평가정답(locked)이 없으면 무인 GA 자동배포를 금지한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-11">
+    <div class="item-head"><span class="item-tag">행 11</span><span class="item-jakup">아키텍처 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 감사체인·접근격리(deny-by-default)·JWT confused-deputy 방지·rate-limit·idempotency 보안 설계</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">영업비밀 시스템의 보안 코어 설계 — 변조증거 감사기록, 최소권한 접근격리, 신원위조(confused-deputy) 방지, 남용·중복요청 방어를 담당한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">모든 변경 이벤트를 감사 해시체인(prev16:full32 패킹 + HMAC 링크 + pg_advisory 잠금으로 직렬화)으로 잇고, RBAC는 require_role로 허용 롤과 겹치지 않으면 403(deny-by-default)을 낸다. JWT는 RS256만 허용(HS256/none 거부·exp 필수·운영에서 iss/aud 미설정 자체를 fail-fast)하고, rate-limit·idempotency 키는 위조 가능한 원시헤더가 아니라 검증된 auth_actor·헤더해시로 잡는다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">순수 SHA-256 체인은 공격자가 서버비밀 없이 통째 재서명할 수 있으나 HMAC 링크가 실질 방어선이 되어 삭제·삽입·재배열을 검출한다. 같은 키로 서명된 타 용도 토큰 수락(confused deputy)을 startup에서 차단하고, 원문은 저장하지 않고 해시만 남겨 비밀 잔존을 원천 차단한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">감사기록이 실패하면 고위험 변경은 503으로 막는다(fail-closed). 체인 부분검증은 scan_truncated로 노출해 '스캔된 일부에만 없음'을 '변조 없음'으로 오인하지 않게 하며, 원문 미저장이라 사고조사에는 해시+메타만 남는다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-12">
+    <div class="item-head"><span class="item-tag">행 12</span><span class="item-jakup">아키텍처 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 관측성·kill-gate 모니터링·워커→API 메트릭 브리지·게이트 fail-open 카운터 설계</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">안전 게이트와 시스템 상태가 '조용히 죽지 않게' 만드는 관측성·모니터링 설계다. 게이트가 무음으로 열리면 비밀이 미탐되므로 그 발동 여부를 전부 계측한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">kill-gate(고등급 미탐 floor·검수 과부하 fatigue·번복률 overturn)를 순수 결정함수로 tripped 판정하되 자동중단은 하지 않고 경보만 낸다(비파괴). 워커 전용 계산(감사체인·드리프트)을 Redis TTL로 API /metrics에 브리지하고, 서빙 게이트가 예외로 no-op이 되면 fail-open 카운터(lloydk_serving_gate_fail_open_total)를 Prometheus로 올린다(호출부는 debug 로그).</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">'게이트ON=가시성ON'을 한몸으로 배선해, 상향·라우팅 게이트가 조용히 열려 비밀이 무음 유지되는 것을 운영자가 즉시 본다. 오작동으로 운영을 멈추는 위험은 피하면서(경보 우선) 죽음의 나선 신호가 뜬 동안만 보수화한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">kill-gate 안전브레이크(고등급 자동확정 억제)는 opt-in으로 기본은 경보만이다. 워커가 죽으면 TTL 만료로 stale-guard가 작동하고, 합성 평가신호만으로는 운영을 정지시키지 않는다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-13">
+    <div class="item-head"><span class="item-tag">행 13</span><span class="item-jakup">등급·라벨 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 보안등급 체계(TS/S1/S2/S3) 정의</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">4단계 보안등급 체계(TS 특급기밀·S1·S2·S3)를 정의한다. 분류·게이트·검수·평가 등 전 시스템이 공유하는 공통 등급 어휘를 잡는 일이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">코드에는 Grade enum(TS/S1/S2/S3)을 두되 런타임엔 DB 동적 레지스트리(GradeRegistry)가 classification_levels 테이블을 level_order 순으로 로드하고, DB 미가용 시 enum으로 폴백한다. 심각도 순서(GRADE_ORDER)로 고등급(TS·S1)을 정의해 severe_agg_codes·high_grade_review_codes 등에서 재사용한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">등급을 DB에서 동적 로드하므로 다른 프로젝트가 다른 등급체계를 쓰면 schema API로 등록만 하면 되어 하드코딩을 피한다. 심각도 순서가 한 곳에 있어 most-severe-wins 집계·FNR-safe 동점처리·검수 라우팅이 전 계층에서 일관된다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">응답 스키마가 Grade 필수라 '미분류(UNCLASSIFIED)'를 표현할 수 없어, 본문을 못 읽은 문서는 최고등급(TS)+검수로 격리한다. 고등급(TS/S1)은 미탐 최소화(FNR 우선)의 핵심 대상이다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-14">
+    <div class="item-head"><span class="item-tag">행 14</span><span class="item-jakup">등급·라벨 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 등급기준 적용서 대조·v2.2 곱셈 보정 설계</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">정부·KL 등급기준 적용서에 맞춰 등급 산정식을 정의하고, 곱셈식이 만드는 구조적 미탐 구멍을 메우는 v2.2 보정을 설계한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">등급은 비공지성(S)×경제유용성(V)×비밀관리성(M) 곱(grade_from_svm)으로 산정하되, s=2·v=2·m=0(곱=0)을 S3로 붕괴시키지 않고 S1로 특수 분기한다. floor 원칙 래퍼가 요소값 0을 '입증된 공개·무가치·무관리'일 때만 인정하고, 단지 '미언급'이면 max(level,1)로 올려(proven_absent 플래그로 구분) 넘긴다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">순수 곱셈은 '관리표시 없는 고가치 영업비밀(m=0)'을 S3로 과소분류하는 미탐 구멍이 있는데, v2.2 분기+floor가 이를 수학적으로 봉쇄한다. 골든셋 분석으로 분기를 명문화해 적용서 예시와 정합하면서도 dead-zone(S2→S3 과소분류)을 없앤다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">grade_from_svm 순수함수는 가이드 예시 계약에 묶여 못 바꾸므로 floor 처리는 바깥 래퍼에서 한다. 동점 상황은 항상 더 위험한 상위등급을 택하고(FNR-safe), 과대분류는 뒤의 합의 게이트가 거른다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-15">
+    <div class="item-head"><span class="item-tag">행 15</span><span class="item-jakup">등급·라벨 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 룰 엔진·키워드 사전 적용 및 관리</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">등급 힌트를 주는 룰 엔진과 키워드 사전을 만들고 관리한다. 콘텐츠 모델이 못 보는 도메인 사각지대를 보완하는 안전 보조축이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">등급별 한국어 시드(KEYWORD_SEEDS) 매칭에 더해 한국어 시드가 못 잡는 고위험 영어약어(EUV·HSM·M&amp;A·EBITDA 등)를 정규식으로 보수 부스트하고, start 규약으로 evidence를 판별해 약어 단독 부스트는 합의 근거로 인정하지 않는다. 형식적 관리표시(기밀·대외비 등, M축)는 탐지해 검수 경고만 내고 등급·FNR·정밀도엔 일절 개입하지 않는다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">모델이 미학습한 TS 도메인(M&amp;A·암호·국방)을 룰이 잡아 FNR-safe override로 미탐을 방어한다. 룰을 '라벨 인증'이 아니라 '상향 방어·탈락(veto) 신호'로만 단방향 사용해 분류기↔평가 순환을 차단하고, M축 분리로 과분류 피드백 루프를 피한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">시드는 합의(rule==llm) 게이트의 독립신호로만 승격되며 단독 자동확정 근거가 아니다. 사전은 도메인 재사용을 위해 주입식으로 두었고, 관리표시 목록을 KEYWORD_SEEDS로 승격하지 않도록 명시적으로 분리했다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-16">
+    <div class="item-head"><span class="item-tag">행 16</span><span class="item-jakup">분류·게이트 설계</span><span class="item-gubun">설계</span></div>
+    <div class="item-detail"><b>기능상세</b> · 분류·검수 라우팅 프로세스 정의</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">문서가 들어와 등급이 자동확정되거나 사람 검수 큐로 가는 전체 결정 흐름(분류→게이트 체인→검수 라우팅)을 정의한다. 무음실패 방지의 최전선이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">청크 분류(고등급은 most-severe-wins max 집계)→FNR-safe 룰 override→source-prior cap→metadata floor→저신뢰/sparse-evidence/합의/LLM 2차의견/kill-gate/유사도 escalation 게이트를 순서대로 적용한다. 게이트는 등급을 안 바꾸거나 안전한 방향(상향)으로만 움직이고, 애매하면 등급 그대로 두고 needs_review로 라우팅한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">확신(confidence)이 아니라 독립 신호(룰 합의 등)로 자동확정을 판정해 conf 단독(AUROC 0.58)의 러버스탬프 위험을 없앤다 — 실측상 자동확정 정밀도 63→81%, 고등급 미탐 46→8건으로 개선됐다. 게이트가 오작동해도 등급 자체는 망가지지 않는다(라우팅 전용).</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">검수는 두 루프로 구분한다(지재원 골든 검수 vs 고객사 운영 검수). 자동확정 임계·상당수 게이트는 opt-in이며 운영 프로파일에서 ON이고, 자동화 커버리지는 파일럿 이후 운영학습으로만 상향된다.</div></div>
+    </div>
+  </div>
+
+  <div class="section-sep" id="s3"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">데이터셋 구축</span></div>
+  <div class="item" id="item-17">
+    <div class="item-head"><span class="item-tag">행 17</span><span class="item-jakup">silver/합성 코퍼스 구성</span><span class="item-gubun">데이터셋 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · silver_train·합성 holdout 생성(등급명 누출차단 프롬프트·label_source 학습금지 마커)·PII·누출 필터 구성</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">실데이터·검수·반출이 0으로 확정된 환경에서, 분류기를 처음 학습시킬 '씨앗 데이터'(silver_train=학습 전용 은셋)와 성능을 재는 '홀드아웃(holdout=학습엔 안 쓰고 채점용으로만 떼어둔 몫)'을 사람 없이 합성으로 만들어내는 역할이다. 실제 영업비밀 문서를 한 건도 못 쓰기 때문에, 이 코퍼스가 모델의 유일한 출발점이 된다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">LLM(Qwen)으로 문서를 생성하되 프롬프트에 'TS/1급/대외비' 같은 등급 이름을 절대 넣지 않고 유출 피해 범위·공개 여부 같은 '상황'만 줘서 내용 자체가 민감도를 드러내게 한다(GRADE_SITUATION_PROMPTS=상황기반 프롬프트). JSON 파싱 실패나 비정상 LLM 응답은 label_source에 noop_fallback·llm_nonjson 같은 '학습금지 마커'로 찍어 걸러내고, 그 본문은 등급 신호를 지운 중립 텍스트로 대체한다. PII(개인정보) 마스킹은 주민·사업자번호를 무하이픈 우회까지 막고 국세청 체크섬으로 검증하며, 공백을 모두 제거한 SHA1 text_hash로 train↔holdout 중복(누출)을 잡아 등급 층화 홀드아웃으로 분리한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">등급명이 본문에 새면 룰·분류기가 실데이터엔 없는 '등급 토큰'이라는 지름길에 과적합하는데, 상황기반 프롬프트가 이 shortcut을 원천 차단한다. label_source 마커 덕에 노이즈·placeholder 문서가 학습 가중치에 박히지 않고, text_hash 누출검사가 '같은 문서가 학습·평가 양쪽에 있어 점수가 부풀려지는' 구조적 순환을 막아 홀드아웃이 정직한 채점자가 된다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">합성 데이터의 텍스처는 실문서와 달라 분류기 정확도 천장이 구조적으로 낮다(합성 627건 학습→실 777건 평가에서 F1 0.26 실측). 즉 이 코퍼스는 '안전하게 학습을 시작'하게 해줄 뿐이고, 자동화 정확도를 끌어올리는 레버는 운영 단계의 실데이터 학습이다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-18">
+    <div class="item-head"><span class="item-tag">행 18</span><span class="item-jakup">silver/합성 코퍼스 구성</span><span class="item-gubun">데이터셋 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · leakage manifest·domain leakage gate·도메인×등급 교차설계(shortcut 차단)·정제 파이프라인</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">합성 코퍼스가 '내용의 민감도'가 아니라 도메인(주제)이나 문서 길이 같은 껍데기 단서로 등급을 맞히는 지름길 학습(shortcut)에 빠지지 않도록, 데이터 자체의 구조적 편향을 검사·차단하는 품질 게이트다. 누출로 생긴 가짜 고성능을 빌드 단계에서 잡아낸다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">합성 골든 빌드가 '등급=도메인' 잠금 풀(TS=기술만·S3=public만)을 버리고 finance/tech/business/legal/hr/mixed 공유 풀에서 모든 등급을 생성해 도메인과 등급을 직교(교차)시킨다. analyze_golden_run이 trivial_domain_baseline(도메인 다수결만으로 맞는 정확도)과 Theil's U(도메인→등급 종속도)를 계산하고, 임계 초과 시 빌드 스크립트와 독립된 게이트가 exit 2로 산출물을 거부한다. 누출 매니페스트(leakage manifest)는 gitignore된 대용량 학습풀을 CI에 올리지 않고도 holdout↔train 누출검사를 실제로 돌리게, 검사 측과 100% 동일한 정규화 해시(패리티)만 커밋해 게이트가 무음 SKIP(fake-green)되는 것을 막는다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">실제로 도메인→등급 누출 85.6%(Theil U 0.808) 사건이 있었고 교차설계로 0.411/0.072까지 낮춘 실측 근거가 있다. 게이트를 빌드 스크립트에서 분리해 '스크립트를 안 고쳐도' 독립적으로 막고, 측정불가(표본 n=0)와 실제 누출을 구분해 fail-closed로 처리하므로 편향이 조용히 통과하지 못한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">교차설계는 shortcut을 줄이는 대신 수율이 떨어지고 심판 FNR이 다소 악화되는 근본 텐션(shortcut↔노이즈)이 있어, 714건 단독학습은 보류로 판정됐다. 즉 누출을 없앤 것이 '합성 데이터로 충분해졌다'는 뜻은 아니고, 안전한 학습 시드의 조건을 만족시킨 것이다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-19">
+    <div class="item-head"><span class="item-tag">행 19</span><span class="item-jakup">라벨링·골든 후보</span><span class="item-gubun">데이터셋 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · 룰·LLM 합의 라벨링 자동화(gold_candidate/needs_review)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">사람 검수가 0인 상태에서 합성 문서에 등급 라벨을 자동으로 달되, 신뢰할 만한 것만 'gold_candidate(골든 후보=사람 서명 대기)'로 올리고 애매한 것은 'needs_review(검수 필요)'로 빼내는 라벨링 자동화다. 어떤 라벨을 학습·평가에 쓸지 자동 선별하는 문지기 역할이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">편입 판정에서 confidence(모델 확신도)를 아예 제거하고, 룰엔진 등급==LLM 등급 합의 + 실제 한국어 시드 근거 span(그 근거 문구가 문서에 진짜 있는지) + 판정자 self-consistency(같은 문서를 k번 물어 같은 답이 나오는지, k-샘플 다수결)로만 통과시킨다. ts_downgrade_suspect(고등급을 낮춘 의심)나 공개출처 상위등급 같은 위험 신호가 하나라도 있으면 자동 통과를 막고 needs_review로 라우팅한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">실측에서 LLM confidence의 판별력이 AUROC 0.535(동전 던지기 수준)로 신뢰불가여서, 확신이 아니라 '독립된 두 판정자의 합의 + 실근거'라는 검증 가능한 신호에서 품질을 얻는다. 근거 없는 단일 LLM 라벨이 골든이 되던 67% 경로를 구조적으로 폐기해, 사람 없이도 라벨 품질을 방어한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">이 게이트를 통과해도 gold_candidate일 뿐 '평가 정답'은 아니다 — 평가 정답(locked_gold_eval)은 사람 서명이 있어야만 승격된다. 합의 라벨은 학습 시드로는 안전하지만, 두 판정자가 같은 합성 천장을 공유하므로 실분포 정확도를 보증하지는 않는다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-20">
+    <div class="item-head"><span class="item-tag">행 20</span><span class="item-jakup">라벨링·골든 후보</span><span class="item-gubun">데이터셋 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · 앵커·메타모픽 회귀셋·serving_invariants·심판/검수자 신뢰도·constructed_floor 보강(고등급·인사·재무 하드케이스)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">사람 서명 평가정답이 영구히 부족한 환경에서, '정답 라벨 없이도' 모델이 미탐 방향으로 후퇴했는지 잡아내는 다층 안전망을 구성한다. 배포 게이트가 합성 test.jsonl만 보다가 실분포 미탐에 눈머는 것을 막는 외부 사실 그라운딩·회귀 신호를 공급한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">앵커(anchor)는 NKT 특허 공식 분류·큐레이트 홀드아웃처럼 '외부 사실에 등급이 묶인' 문서만 인정하고, 메타모픽 회귀셋(metamorphic)은 문체만 바꿔도 등급이 내려가면 안 된다는 불변식을 순방향(미탐)·역방향(과분류)·과분류 3종 대칭으로 검사하되 '전부 TS로 찍어 공허 통과'를 막으려 quality_score를 코드로 금지(NotImplementedError)하고 위반율만 Wilson CI로 보고한다. serving_invariants는 서빙 출력만 보고 '공개출처 cap이 고등급 콘텐츠를 덮었는데 검수신호가 없는' silent_cap 미탐을 정답 없이 탐지하며, 심판/검수자 신뢰도는 검수자를 '동료(본인 외)와 함께 도달한 최종등급 일치율'로 평가(recency 게이밍 차단)하고 LLM 심판 불일치는 라벨 수정 없이 폭로만 한다. constructed_floor는 witness(등급을 결정하는 사실 문장)를 결정적 문자열 검사로 floor(≥등급)만 인정하되, 고등급(TS 반도체·방산 파라미터)·인사(임원 성과보상 산식·조직개편)·재무(미공개 인수 협상 상한·부품 단가) 하드케이스를 카탈로그로 보강한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">모두 '실패만 정보'라는 규율(정답 없이 회귀만 잡음)이라 합성 천장과 무관하게 작동하고, 지표를 단일 숫자로 뭉뚱그려 거짓 신뢰를 주는 것을 코드 레벨에서 금지한다. constructed_floor를 exact-grade가 아닌 floor로만 주장하고 룰엔진을 '라벨 인증'이 아닌 '탈락 전용(veto)'으로만 단방향 재사용해 분류기↔평가 순환을 차단한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">constructed_floor·앵커는 '최소 이 등급'만 기계 증명하며 exact-grade나 실문서 성능 보증, 사람서명(locked_gold_eval)이 아니다 — 상향오염은 열린집합이라 0% 오염은 원리상 증명 불가하다. floor 소스는 기본 opt-in(배포 게이트에 자동 유입 안 됨)이고, LLM 심판끼리 채점하는 합의 홀드아웃은 순환이라 천장이 부풀려짐을 스스로 인정한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-21">
+    <div class="item-head"><span class="item-tag">행 21</span><span class="item-jakup">라벨링·골든 후보</span><span class="item-gubun">데이터셋 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · 골든셋 3분할 정의(silver_train·gold_candidate·locked_gold_eval)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">데이터 한 벌을 용도별로 엄격히 갈라, '학습에 쓸 것'과 '채점에만 쓸 정답'이 절대 섞이지 않게 하는 데이터 거버넌스 뼈대다. train-on-test(정답으로 배운 뒤 그 정답으로 채점하는 부정)를 구조적으로 봉쇄한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">tier를 물리 파일 3개로 쪼개지 않고 label_source·review_status·reviewer로부터 파생(계산)해 스키마 드리프트를 방지한다(golden_tiers.py). silver_train=학습 시드 전용(평가 금지), gold_candidate=합의 게이트 자동통과·학습 가능·사람서명 대기, locked_gold_eval=사람 서명(실계정 reviewer)만 승격되는 유일한 평가 정답으로 정의한다. 추가로 legal_floor(법적근거·시나리오)를 평가정답이 비었을 때 임시 floor로 쓰되, 그 안에서도 외부권위(public_definitive·nkt_designated)와 큐레이트 프록시(koipa 판례 인용 조작 확인→강등)를 구분한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">tier를 저장 컬럼이 아니라 파생값으로 두어 '3분할 파일이 서로 doc_id/스키마가 어긋나는' 재발 버그를 없앤다. locked는 절대 학습 금지, silver는 절대 평가 금지라는 소비 계약이 코드로 강제돼 평가 부풀림과 오염이 원천 차단된다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">현재 locked_gold_eval은 사람 서명이 사실상 비어 있어(human_review 1/40), 실제 배포 판정은 legal_floor를 interim floor로 쓰며 호출부가 경고를 남긴다. legal_floor는 합성/템플릿이라 그 자체로 일반화 진실이 아니고, 평가정답 승격은 반드시 사람 서명 후에만 가능하다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-22">
+    <div class="item-head"><span class="item-tag">행 22</span><span class="item-jakup">고객 인수 샘플팩</span><span class="item-gubun">데이터셋 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · 고객 인수 샘플팩 생성·검증(TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">고객사 폐쇄망에 배포한 뒤, 실제 문서 포맷들이 파싱→분류→게이트 경로를 제대로 통과하는지 현장에서 검증하는 자기완비 샘플팩이다. 배포가 '설치는 됐는데 실문서를 못 읽는' 상태로 나가는 것을 막는 인수검증(acceptance) 도구다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">build_acceptance_pack.py가 전 포맷 대표 표본(TXT·PDF·DOCX·XLSX·XLS·PPTX·HWPX)과 등급별 샘플을 공개(특허/판례 텍스처)+합성([가상기업A]) 시드로 생성하며 실비밀은 0건이다. 채점(run_acceptance.py)은 정확 등급일치가 아니라 severity floor로 판정한다 — (1)파싱 성공+숫자 무손실, (2)고등급이 기대보다 덜 민감하게(under) 나오면 veto, (3)표 커버리지·needs_review·경고는 품질 리포트와 검수 라우팅 신호로 확인. HWP 바이너리는 파이썬 생성이 불가라 HWPX(한국어 네이티브)로 대체하고 실 .hwp 픽스처가 있으면 동봉하며, PDF용 reportlab·XLS용 xlwt는 optional import로 없으면 그 포맷만 스킵한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">합성 천장 때문에 '정확도 몇 %'를 합격선으로 걸면 거짓 판정이 되므로, 안전 방향(고등급 미탐=veto)만 강제하고 정확도는 보고만 하는 규율이 핵심이다. 렌더된 팩을 커밋해 폐쇄망에 결정적으로 배송하므로, 인터넷 없는 현장에서도 재현 가능한 인수검증이 가능하다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">이 팩은 파서 무결성과 미탐 안전을 증명할 뿐 분류 정확도 자체를 보증하지 않는다(공개+합성 시드라 실비밀 텍스처가 아님). HWP 표 셀 회수 같은 일부 경로는 실 .hwp 픽스처가 있어야 완전 검증되고, 없으면 HWPX로 대체된다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-23">
+    <div class="item-head"><span class="item-tag">행 23</span><span class="item-jakup">고객 인수 샘플팩</span><span class="item-gubun">데이터셋 구축</span></div>
+    <div class="item-detail"><b>기능상세</b> · locked_gold_eval 확보 계획(human_review 1/40, 파일럿 이후 고객 검수 연계)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">유일한 '진짜 평가 정답'인 사람 서명 골든셋(locked_gold_eval)이 현재 거의 비어 있는 현실을 관리하고, 파일럿·운영을 거치며 이를 채워가는 확보 로드맵이다. GA(상용 정식 배포) 자동승인의 마지막 잠금장치를 실측 정답으로 채우는 계획이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">gold_candidate→locked 승격의 유일 경로는 사람 서명 검증(golden_signoff)으로, 기본은 단일 서명이고 고등급은 dual_for_upper 시 2인 이상 독립 reviewer를 요구하며 머신·불일치·미서명은 거부한다. 자동활성 게이트가 'deploy gate 통과 AND retrain_auto_activate AND locked_gold_eval readiness'를 모두 요구해, 사람서명 정답이 없으면 무인 GA 자동배포가 막힌다. 운영 단계에서는 고객사 폐쇄망 검수 결과를 반출 0으로 받는 federated_eval(등급코드·신뢰도·맥락만, 문서·신원 필드 없음)로 실분포 성능을 집계해 정답을 축적한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">합성 평가는 실분포 미탐에 맹목이라, 사람 서명 정답이라는 별도 축을 GA 자동배포의 필수 조건으로 걸어 '검증 안 된 모델의 무심한 배포(죽음의 나선)'를 구조적으로 봉쇄한다. 현재 1/40이라는 상태를 게이트가 정직하게 BLOCKED로 표시(파일럿에서는 --allow-conditional로 명시 웨이버)해, 데이터 천장을 '가짜 초록'으로 숨기지 않는다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">locked_gold_eval 확보는 코드가 아니라 데이터·운영 절차 과제로, 지재원(로이드케이) 관리자 검수와 별개로 파일럿 이후 고객 검수와 연계해 채워야 한다. federated_eval의 반출 0 전제(redact_for_export + assert_export_safe가 노드별 허용 키를 깊이 무관하게 강제)가 지켜져야 실분포 정답 수집이 성립한다.</div></div>
+    </div>
+  </div>
+
+  <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">분류·서빙 개발 · 파일럿 진입</span></div>
+  <div class="item" id="item-24">
+    <div class="item-head"><span class="item-tag">행 24</span><span class="item-jakup">분류 모델·게이트</span><span class="item-gubun">분류·서빙 개발</span></div>
+    <div class="item-detail"><b>기능상세</b> · 재학습 파이프라인 정식화(KF-DeBERTa, M4·FNR 비대칭 cost·degenerate 게이밍 방지) 및 source-prior 정책</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">분류 모델을 다시 학습시키는 파이프라인(M4 학습 단계)을 표준 절차로 정립하는 항목이다. 한국어 사전학습 언어모델인 KF-DeBERTa를 영업비밀 4등급(TS/S1/S2/S3) 분류기로 파인튜닝(추가 학습)하는 경로와, 문서 '출처'에 따라 등급 상한을 두는 source-prior 정책을 함께 정의한다. 학습에서 서빙까지 매번 재현 가능한 형태로 묶는 것이 목표다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">WeightedTrainer(가중치 학습기)가 클래스 불균형 보정 위에, 고등급(TS/S1) 표본의 학습 손실을 fnr_cost_multiplier(권장 2~3배)만큼 추가로 키우는 FNR 비대칭 cost를 건다. 최적 모델 선택 지표를 고등급 미탐율(fnr_high) 단독이 아니라 'fnr_high + 과분류율 + degenerate_penalty' 합성값으로 삼아 '전부 TS로 찍기' 같은 지표 게이밍을 막는다. source-prior는 판례·공시·보도자료·공개특허 같은 공개 출처 예측을 cap 등급(기본 S3)으로 하향하는 규칙으로, 서빙 게이트에 커밋된 것을 평가가 그대로 재현한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">미탐(고등급을 저등급으로 놓치는 최악 오류)의 비용을 손실함수에 명시적으로 올려 recall(재현율)을 높이고 FNR(미탐률)을 낮추는 것을, 숨기지 않고 조절 노브로 노출한다. degenerate_penalty 짝지표로 '미탐 0'을 노리다 전부-고등급으로 붕괴하는 자명한 게이밍 해를 봉쇄한다. source-prior가 커밋된 서빙 게이트라, 평가가 이를 그대로 재현하면 지표 조작이 아니라 정직한 재현이 된다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">합성 데이터로 부트스트랩한 구조적 천장이 있어 실문서 일반화엔 한계가 있다(교차합성 학습→실데이터 평가 F1 0.26, 실데이터 학습 시 0.736 대비). fnr_cost_multiplier는 저등급 과분류와의 trade-off를 드러내는 튜닝값이며, cost=1.0으로도 텍스처 갭은 안 닫혔다. source-prior cap이 내부 비밀의 '공개' 오태깅을 덮으면 자동확정하지 않고 cap-conflict로 검수 라우팅한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-25">
+    <div class="item-head"><span class="item-tag">행 25</span><span class="item-jakup">분류 모델·게이트</span><span class="item-gubun">분류·서빙 개발</span></div>
+    <div class="item-detail"><b>기능상세</b> · 서빙 API 개발(등급 산정·보정 T·라벨 재정규화/id2label fail-secure·검수 라우팅·룰 폴백·needs_review fail-closed)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">학습된 모델을 실제 요청에 태워 등급을 산정하는 추론 서빙 API(m5 InferencePipeline)와 그 안전장치들을 개발하는 항목이다. 등급 계산 한 줄이 아니라 보정·라벨 정합·검수 라우팅·룰 폴백을 한 결정 경로에 배선한다. '조용히 틀리지 않게(무음실패 방지)'가 설계 축이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">softmax 전 logit을 T로 나누는 temperature scaling(T≈3, 과신 완화) 보정을 적용하고, 청크(문서 조각)별 확률을 고등급은 max로 잡는 most-severe-wins로 집계한다. override/cap 후 _enforce_label_consistency가 최종 등급의 score를 다른 모든 등급보다 epsilon 크게 만들어 strict argmax(라벨=최댓값 등급)를 보장하고(라벨/점수 불일치로 미탐이 은폐되는 것 차단), softmax 인덱스→등급 매핑은 학습 체크포인트의 config.id2label에서 읽어 활성 등급표와 불일치하면 로드를 거부한다(fail-secure). 본문 미판독·저신뢰·룰 불일치는 등급을 최고등급으로 격리하고 needs_review로 라우팅하며(fail-closed), 모델 미로드 시 룰 폴백도 모델 경로와 동일한 청크 집계를 태운다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">보정 안 된 과신 위에 0.7 confidence 게이트가 서면 고등급이 무음 자동확정되므로, T 보정이 그 게이트의 전제조건이다. id2label을 DB의 level_order로 재구성하면 학습-DB 스키마 어긋남 시 '비밀→공개' 미탐이 나므로 학습본 config를 신뢰원으로 고정한다. 과거엔 못 읽은 문서를 공개(S3)로 흘렸는데, 이를 최고등급+검수 노출로 바꿔 전형적 미탐 경로를 제거했다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">응답 스키마가 Grade 필수라 UNCLASSIFIED가 없어 '최고등급(TS)+needs_review'로 안전을 표현한다. 보정값 우선순위는 env(classifier_temperature) &gt; 모델 동봉 temperature.json &gt; 1.0(무보정)이며, 무보정이면 loud-warn으로 가시화한다. 룰 폴백은 폐쇄망 초기 PoC 다수가 타는 경로라, 단일패스가 핵심 비밀 청크를 희석시켜 FNR이 커지지 않도록 모델 경로와 미탐 방어를 동등화한 점이 핵심이다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-26">
+    <div class="item-head"><span class="item-tag">행 26</span><span class="item-jakup">분류 모델·게이트</span><span class="item-gubun">분류·서빙 개발</span></div>
+    <div class="item-detail"><b>기능상세</b> · KL 연동 ICD 정의(request/response, metadata_floor 입력)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">원청 KL 포털과 하청 로이드케이 분류엔진 사이의 인터페이스 규격(ICD, Interface Control Document)을 정의하는 항목이다. 주고받는 request/response 스키마를 확정하고, 특히 KL이 넘겨주는 메타데이터를 metadata_floor(하한 상향) 게이트의 입력으로 규정한다. 계약 경계를 문서화해 양사 연동 오해를 없앤다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">요청에 security_marking(top_secret/secret/confidential)·access_scope(approved_only/designated/department)·출처(source) 메타를 받아, ICD §4.2에서 명시표기 등급이 예측보다 높으면 그 등급으로 상향 floor(하향은 절대 안 함)하고, §4.4에서 표기가 없고 접근이 제한적인데 예측이 낮으면 metadata-access-conflict로 검수 라우팅한다. 이 로직은 m5 pipeline.py에 _MARK 매핑(top_secret→TS·secret→S1·confidential→S2)으로 배선돼 있다. 출처 메타는 source-prior cap의 입력으로도 쓰인다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">내용 분류기가 못 보는 비밀관리성(M)·출처(S) 축을 KL이 이미 아는 메타로 보완하되, 안전하게 '높은 쪽으로만' 움직여 미탐 위험을 키우지 않는다(floor). 인사·재무 비밀이 평범한 내부문서(S2)로 보이는 사각지대(golden500에서 S1→S2 7건)를 메타로 방어할 수 있다. request/response를 정본화해 KL(갑)과 로이드케이(을)의 연동 계약을 명확히 한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">metadata_floor는 base 프로파일에서 기본 OFF·운영 프로파일(onprem-local·full-train)에서 ON이고, source_prior는 기본 ON(모든 프로파일에서 활성)이다. 발동은 프로메테우스 카운터(lloydk_metadata_floor_applied_total)로 관측하며, 메타가 없으면 'none'으로 집계돼 게이트 무입력이 가시화된다. ICD 정본은 openapi yaml(doc/03_openapi_lloydk_kl.yaml)과 ICD HTML이며, 폐쇄망 반출0 원칙상 KL이 문서/신원 없이 등급·메타만 주고받는 경계를 전제한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-27">
+    <div class="item-head"><span class="item-tag">행 27</span><span class="item-jakup">파일럿 진입 게이트</span><span class="item-gubun">파일럿 전 검증</span></div>
+    <div class="item-detail"><b>기능상세</b> · readiness·parser·leakage·metamorphic·adversarial·acceptance gate 구성 및 점검</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">파일럿(테스트서버 시범운영) 진입 전에 통과해야 하는 검증 게이트 6종을 구성·점검하는 항목이다. readiness·parser·leakage·metamorphic·adversarial·acceptance 각각을 관문으로 세워, '합격이면 파일럿에 태워도 안전하다'를 판정한다. 각 게이트가 조용히 건너뛰어져 거짓 초록(fake-green)이 되지 않게 강제하는 것이 핵심이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">readiness는 release-gate로 사람서명 평가(locked human_review) 준비를 점검하고, parser는 실문서 파싱·숫자 무손실·표 커버리지를 본다. leakage는 공백 제거+정규화 후 SHA1 텍스트해시로 train↔eval 본문 누출을 잡고 해시 매니페스트로 학습풀 미추적 SKIP을 막으며, metamorphic은 문체만 바꿔 등급이 내려가면(=미탐) 실패로 잡는 최소쌍 회귀(정답 불필요, 실패만 정보)다. adversarial은 적대 픽스처·앵커 고등급 미탐을 점검하고, acceptance는 전 포맷 대표 표본(TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX 등)을 실 API에 올려 severity-floor(고등급 미탐=veto)로 판정한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">require_*/해시패리티/exit코드로 각 게이트가 무음 skip으로 통과되는 fail-open을 fail-closed로 바꿔, 게이트가 초록인지 아니면 애초에 안 돈 건지를 구분한다. metamorphic·serving-invariant는 정답셋 없이도(합성 천장과 무관) 회귀를 잡아, 사람서명 정답이 영구 불가한 환경의 유효한 안전망이 된다. acceptance가 정확일치가 아니라 severity floor라, 합성 천장 위에서도 '위험하게 틀리지 않음'만 게이팅해 실용적이다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">metamorphic·anchor는 배포(deploy) 게이트에선 opt-in이지만 릴리스 경로에선 리포트를 필수화해 '한 번도 안 돌고 초록' 구멍을 막는다. adversarial 픽스처는 gemma3 18쌍 앵커 등 일부만 확보돼 있고, HWP 실파일·실TS 텍스처는 0건이라 커버리지 한계가 있다. leakage 게이트는 학습풀이 gitignore라 CI에선 매니페스트 해시 패리티로 실제 실행을 보장한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-28">
+    <div class="item-head"><span class="item-tag ms">행 28</span><span class="item-jakup">파일럿 진입 게이트</span><span class="item-gubun">1차 구현 완료 / 파일럿 준비 기준선</span></div>
+    <div class="item-detail"><b>기능상세</b> · 기능 구현·release-gate·acceptance 경로 확보 (마일스톤)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">1차 기능 구현 완료(검수·검증 전) 마일스톤이자 파일럿 준비 기준선이다. 기능 구현과 release-gate·acceptance 배포 경로가 확보됐음을 표시하되, 상용 정식출시(strict GA)는 human_review(사람서명 평가정답) 확보 후 별도로 판단하도록 유보하는 관문이다. '파일럿 부팅'과 'GA 준비'를 명확히 구분하는 이정표다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">release-gate가 실패를 두 종류로 분리한다 — BLOCKED(데이터 천장·자기해소성 항목, 예: human_review 1/40 미달)와 FAIL(실제 회귀·결함). --allow-conditional(PILOT) 모드에선 BLOCKED만 감사기록 남기고 통과시키되 실 회귀 FAIL은 GA처럼 차단하고, acceptance는 배포 후 severity-floor로 판정한다. 자동 활성화는 deploy gate 통과 AND retrain_auto_activate=True AND locked_gold_eval 준비를 모두 요구해, 사람서명 없는 무심한 GA 자동배포를 구조적으로 막는다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">알려진 데이터 천장(사람서명 부족)에는 초록을 유지해 release-gate를 실제 배포 경로에 배선할 수 있게 하는 이중 실패분류(BLOCKED vs FAIL)가 핵심이다. 기능과 경로는 확보하되, locked-eval 게이트로 검증 안 된 모델의 무인 자동배포(죽음의 나선)를 봉쇄한다. 이로써 '파일럿 가능'과 'GA 금지'를 코드 수준에서 갈라 놓는다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">현재 유일 strict 블로커는 human_review 1/40(데이터 천장)로, 코드 결함이 아니라 사람서명 평가정답의 부재다(verdict=CONDITIONALLY_READY, 파일럿 가능·GA 금지). GA 전 남은 P0는 airgap 번들 재빌드(Linux 필요)·컨테이너 non-root/해시핀 등 코드 밖 절차·빌드환경 항목이다. 이 마일스톤은 파일럿 이후 운영학습으로 커버리지를 올린 뒤 GA를 별도 판단한다는 전제 위에 있다.</div></div>
+    </div>
+  </div>
+
+  <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">배포 준비</span></div>
+  <div class="item" id="item-29">
+    <div class="item-head"><span class="item-tag">행 29</span><span class="item-jakup">게이트 보완</span><span class="item-gubun">배포 준비</span></div>
+    <div class="item-detail"><b>기능상세</b> · v2.2 보정·FNR-safe 운영점 정리</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">분류 결과를 자동확정할지 사람검수로 보낼지 정하는 안전 게이트들의 '동작 기준점'을 배포 직전에 확정하는 작업이다. 특히 모델 신뢰도(confidence)가 과장되지 않게 보정하고, 고등급(TS·S1=1급 영업비밀) 미탐(놓침)을 최소화하는 운영 지점을 못박는다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">두 축으로 처리한다. (1) 서빙 temperature scaling 보정 — 모델 원점수(logit)를 확률화 직전 T로 나눠 과신을 눅인다. 온프렘·폐쇄망(onprem-local·full-train) 프로파일의 T를 미보정(1.0)에서 T=3.0으로 baking(config.py:88·126). 예전엔 데모(lite-cloud)에만 3.0이 있고 정작 안전이 중요한 GA 프로파일이 누락됐던 드리프트를 정합. (2) FNR-safe 운영점 = escalation τ(등급별로 심각한 등급부터 검사해 임계 넘으면 올리는 예측선택 임계)를 0.30으로 확정(config.py:83). 등급 산정은 v2.2 곱셈식(비공지성 S×경제유용성 V×비밀관리성 M)에 s=2·v=2·m=0을 S3로 안 떨구고 S1로 확정하는 분기 + '미언급을 0으로 보지 않는' floor 원칙을 얹는다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">0.7 신뢰도 게이트가 보정 안 된 과신 위에 서면 고등급이 무음 자동확정(미탐)되므로 temperature 보정이 그 게이트의 전제조건이다. τ=0.30은 clean 홀드아웃 77행 sweep 실측에서 고등급 미탐율(FNR) 0.174→0.087로 절반, TS recall 0.91→1.0, 검토부담 +5pp인 저후회(low-regret) 지점이라 임의값이 아니다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">τ·T는 .env(CLASSIFIER_TEMPERATURE·CLASSIFIER_ESCALATION_TAU)로 고객사 검수역량에 맞춰 조정 가능(더 낮추면 FNR≤0.05이나 검토부담 0.80+). 모델 폴더에 temperature.json이 동봉되면 학습 직후 산출된 그 값이 우선한다. 실측이 합성 clean 홀드아웃 기준이라 파일럿 이후 실데이터 PR곡선으로 재확정을 권장한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-30">
+    <div class="item-head"><span class="item-tag">행 30</span><span class="item-jakup">운영 설정</span><span class="item-gubun">배포 준비</span></div>
+    <div class="item-detail"><b>기능상세</b> · 운영 스크립트·설정값 정리</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">실제 배포 현장(오픈망/폐쇄망)에서 '명령 하나로' 서비스를 띄우고, 프로파일별 운영 설정값을 한 곳에서 일관되게 켜고 끄는 배포 자동화·설정 정리 작업이다. 각 납품 환경이 서로 다른 안전 수준을 갖도록 설정을 묶어 스위칭한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">세 가지로 처리한다. (1) 4-tier 배포 프로파일(lite-noapi·lite-cloud·onprem-local·full-train)을 config.py에 정의하고 .env 한 줄(LLOYDK_DEPLOY_PROFILE=)로 전환 — LLM/임베더/리랭커/벡터백엔드/스토리지/학습 on-off/안전게이트를 프로파일이 통째로 스위칭한다. (2) 통합 진입점 deploy.sh가 번들 레이아웃·환경을 자동 감지해 deploy_cloud.sh(오픈망 VM 빌드)·deploy_airgap.sh(폐쇄망 이미지 load)로 디스패치하고, 각 스크립트가 fail-fast·헬시대기·모델적재·스모크테스트까지 자동 수행한다. (3) deploy_rollback.sh는 known-good 이전 버전을 재활성해 deploy gate 통과 후 API 핫리로드 경로로 반영한다. 단일 프로세스는 재기동 없이 반영되며, 멀티워커 전체 반영은 순차 재기동이 필요하다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">프로파일 한 줄 전환이라 '폐쇄망인데 데모 설정이 새는' 드리프트를 구조적으로 막는다. 운영(onprem/full)엔 require_safety_gates·require_real_embedder·원본 at-rest 암호화·수동활성 locked-eval 요구가 기본 ON이라, 안전 게이트가 꺼진 채로 배포되면 startup에서 즉시 차단된다(게이트ON=가시성ON 원칙).</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">운영에선 실 임베더 로드 실패 시 hash 무음폴백을 거부(startup fail)하고, 원본 암호화 키(STORAGE_ENCRYPTION_KEY) 미설정 시 fail-fast하는 등 '조용히 못 넘어가게' 설계됐다. 멀티워커(WEB_CONCURRENCY&gt;1)에선 핫리로드가 로컬 프로세스만 갱신되는 한계를 명시한다. minio는 옵션 extra이고, 폐쇄망·운영 프로파일(onprem-local·full-train)과 base 기본값은 storage_backend=local이다(클라우드 샌드박스 프로파일 lite-cloud만 minio 티어).</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-31">
+    <div class="item-head"><span class="item-tag">행 31</span><span class="item-jakup">게이트 점검</span><span class="item-gubun">배포 준비</span></div>
+    <div class="item-detail"><b>기능상세</b> · 희소근거·합의·metadata_floor 게이트 점검</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">자동확정 직전 '이 판정을 믿어도 되나'를 독립 신호로 재확인하는 3대 안전 게이트가 실제로 작동하는지 배포 전 점검하는 작업이다. 세 게이트 모두 등급 자체는 바꾸지 않고(FNR-safe), 의심스러우면 사람검수(needs_review)로만 라우팅한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">(1) 희소근거(sparse-evidence) 게이트 — 룰 폴백 시 근거 점수 총합이 임계(rule_fallback_min_evidence=0.9) 미만이면, 약한 키워드 하나가 한 등급에 전 질량을 몰아 신뢰도가 1.0으로 나와도 검수로 보낸다. (2) 합의(agreement) 게이트 — 예측이 공개등급(S3)이면 신뢰도 단독 자동확정 허용, TS/S1/S2는 룰엔진 등급과 합의해야 자동확정하고 불일치면 검수 라우팅(run이 이미 낸 룰 등급을 재사용해 룰엔진 2회 호출 회피). (3) metadata_floor — KL ICD 메타(security_marking·access_scope)가 예측보다 높으면 그 등급으로 상향 floor(하향은 안 함), 표기 없고 접근제한인데 예측이 낮으면 검수 라우팅.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">신뢰도(confidence) 단독 자동확정은 실측 AUROC 0.58(동전에 가까움)로 신뢰불가여서, 확신을 신뢰도가 아닌 독립 신호(룰 합의·메타)에서 얻어 자동확정 정밀도 63→81%, 고등급 미탐 46→8건으로 개선했다. metadata_floor는 내용 분류기가 못 보는 출처(S)·비밀관리성(M) 축을 메타로 보완하되 안전하게 위로만 이동한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">세 게이트 모두 'fail-open 가시화' 계약을 따른다 — 게이트가 조용히 죽으면 프로메테우스 카운터(lloydk_metadata_floor_applied_total 등)로 드러나게 배선했다(게이트ON=가시성ON 한몸). 발동 여부와 메타 존재율을 함께 계측하며, 입력 메타가 없으면 metadata_floor는 안전한 no-op이다. 이 게이트들은 운영 프로파일 기본 ON, base는 OFF다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-32">
+    <div class="item-head"><span class="item-tag">행 32</span><span class="item-jakup">감사 설정</span><span class="item-gubun">배포 준비</span></div>
+    <div class="item-detail"><b>기능상세</b> · admission·kill-gate·표본감사 설정 점검</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">운영 중 '나쁜 라벨이 재학습에 스며들거나, 시스템이 서서히 무너지는 죽음의 나선 신호를 놓치는' 것을 막는 거버넌스 장치들의 설정을 점검하는 작업이다. 사후 검증 가능한 감사 흔적을 남기는 것까지 포함한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">(1) admission(편입) 게이트 — 고객사 교정이 재학습 라벨이 되려면 '사람 검수자(머신·ai_assist·플레이스홀더 id 제외) AND 분류 status가 finalized(confirmed/corrected)'를 통과해야 하고, 미통과분은 소비하지 않아 나중 확정되면 유실 없이 반영된다. (2) kill-gate — 고등급 미탐 floor·검수 과부하(fatigue)·번복(overturn)율을 순수함수로 tripped 판정하되 자동중단은 안 하고(오작동 운영정지 회피) opt-in 브레이크가 켜지면 tripped 동안 고등급 자동확정만 보수화한다. (3) 표본감사 — rule==model로 자동확정된 TS/S1도 등급은 유지하되 무작위 표본감사(random_audit) 대상으로 남겨, 연합평가에서 유일한 무편향 추정층으로 쓴다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">admission 게이트가 죽음의 나선(무검수 교정이 가중치에 박혀 모델이 스스로 나빠지는 루프)의 최약 고리를 닫는다. kill-gate는 '멈추지 않고 경보 후 보수화만'이라 오작동으로 운영을 세우는 위험을 피하면서 위험 신호는 사람에게 넘긴다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">이 모든 변경 이벤트는 변조증거 감사 해시체인(payload_hash prev+HMAC 링크, pg_advisory로 직렬화)에 남아 삭제·삽입·재배열이 검출된다. kill-gate 브레이크는 기본 opt-in OFF(합성 평가신호로 운영을 멈추지 않기 위함)이고 운영에서 켠다. 표본감사의 무편향성은 명시적 감사 플래그가 스키마에 채워질 때만 성립하며(자동확정-미검수는 이 집합에 없음) 표본 크기 확인이 전제다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-33">
+    <div class="item-head"><span class="item-tag">행 33</span><span class="item-jakup">파서 보완</span><span class="item-gubun">배포 준비</span></div>
+    <div class="item-detail"><b>기능상세</b> · 파서 표 커버리지(HWP/HWPX/PDF)·숫자 무손실·Excel 병합셀/수식캐시·OOXML 숨은텍스트·OCR 가드·needs_review 라우팅 보완</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">문서에서 텍스트·표·숫자를 '손실 없이' 뽑아 분류기에 넘기는 추출기(파서) 보강이다. 표 속 등급·원가나 단독 줄 숫자가 새면 곧바로 분류기가 못 보는 미탐(FNR)이 되므로, 놓치는 경로를 메우고 추출이 부실하면 검수로 라우팅한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">(1) HWP/HWPX 표 — rhwp가 본문만 뽑고 표를 흘리므로 .hwpx는 zip section XML에서 tbl/tr/tc를 네임스페이스 무관 정규식으로 복원하고, .hwp는 pyhwp를 라이브러리 import 대신 hwp5html CLI subprocess로 격리 호출(AGPL 라이선스 전염 차단). (2) Excel — read_only가 못 주는 병합정보를 비-read_only 재오픈으로 세로 병합 라벨을 각 행에 전파, data_only True/False 두 번 열어 계산 안 된 수식 캐시(None) 누락·숨김시트를 탐지. (3) 숫자 무손실 — 1~3자리 단독 줄을 통째 삭제하던 버그를 '문서 가장자리 + 빈줄 경계 + 순서 단조증가'인 페이지번호로만 좁혀 금액·연도를 보존. (4) OOXML 숨은 텍스트 — 글상자·머리/꼬리말·주석/각주를 zip XML 직접 파싱으로 회수. (5) OCR 가드 — 스캔 PDF를 [1, max_pages]만 렌더(OOM/DoS 방어)하고 미설치 언어팩은 교집합만 사용. (6) 이 열화·표 미추출·OCR 신호(table_coverage·warnings·ocr_used)를 ingestion이 받아 등급은 안 바꾸고 needs_review로 라우팅.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">영업비밀이 본문이 아니라 표·주석·글상자·숨은 셀에 있는 경우가 많아, 이 회수들이 없으면 곧바로 저등급 무음 미탐이 된다. pyhwp를 프로세스로 격리해 표 회수는 opt-in으로 얻으면서 AGPL 전염은 실행파일에 국한시킨 것이 실용적 균형이다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">HWP 표 회수는 [hwp-tables] extra(AGPL) opt-in이고, 이것 없이도 rhwp로 본문 추출은 된다. 실 HWP 바이너리 테스트 파일이 0건이라 표 커버리지는 HWPX·합성 위주로 검증된 한계가 있다. OCR·수식 재계산 필요 여부는 신호만 surface하고 최종 판단(예: LibreOffice 재계산)은 검수자에게 넘긴다. OCR(스캔/이미지 PDF)은 FUN-022 요건(전자문서 텍스트 추출) 외 부가 방어이며, 미설치 시 스캔 PDF만 needs_review로 라우팅된다(계약 무관).</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-34">
+    <div class="item-head"><span class="item-tag">행 34</span><span class="item-jakup">번들 점검</span><span class="item-gubun">배포 준비</span></div>
+    <div class="item-detail"><b>기능상세</b> · 배포 번들 점검(release-gate-pilot·airgap·SBOM·acceptance·CI 안전게이트 강제·require_* opt-in)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">폐쇄망 고객사에 오프라인 매체로 넘기는 배포 번들이 '그대로 설치되고, 안전 게이트가 강제되며, 무엇을 담았는지 정직하게 증빙되는가'를 배포 전 점검하는 작업이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">(1) release-gate-pilot — check_release_gate.py가 릴리스 판정에서 FAIL(진짜 회귀·결함)과 BLOCKED(데이터 천장·자기해소 항목, 예: human_review 미달)를 구분해, --allow-conditional(PILOT) 모드는 BLOCKED만 감사기록된 웨이버로 통과시키고 FAIL·리포트 부재는 절대 통과시키지 않는다. (2) airgap 번들 — 필수 코어서비스(postgres/redis/api/worker/beat) 누락, 이질 이미지 tar(예전 ES 잔존), 비-Linux wheel(win/mac)을 fail-closed로 잡아 런타임 ImportError·stale 번들을 방지. (3) SBOM — CycloneDX를 외부의존 0 단일 HTML로 렌더하며 라이선스를 StrongCopyleft(AGPL/GPL) 등으로 위험등급화하고, SecurityScan은 안 한 스캔을 scanned=False로 정직 표기. (4) acceptance — 배포 후 전 포맷 대표 표본을 실 API(POST /api/v1/documents/analyze)에 올려 '정확 등급일치'가 아니라 '파싱 성공 + 고등급 미탐 없음(severity floor)'으로 판정. (5) CI 안전게이트 강제 — require_safety_gates 하드닝이 게이트를 하나도 안 껐는지(양성) + 하나 끄면 강제로직이 반드시 막는지(음성)를 hermetic 검증. (6) require_* opt-in — 앵커/메타모픽 리포트가 opt-in이라 '미제공=생략(통과)'인데, require_anchor/require_metamorphic가 켜진 운영에선 리포트 무음 누락을 hard-block으로 승격.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">합성 데이터 천장이라 정확일치 게이트는 거짓 신뢰여서 금지하고, 대신 '고등급 미탐=veto'라는 severity floor만 강제하는 것이 인수검증의 핵심 규율이다. release-gate가 FAIL/BLOCKED를 나눠 실 회귀는 GA처럼 막으면서 알려진 데이터 천장엔 초록을 유지해 배포 경로에 게이트를 배선할 수 있게 한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">airgap 번들 재빌드는 Linux 환경이 필요하다(win wheel 거부). SBOM의 정직한 scanned=False는 실제 trivy 스캔이 아직 dry-run임을 감사에 드러내는 의도적 표기다. require_* 강제·CI hermetic 검증은 운영 하드닝 프로파일에서 켜며(기본 opt-in), PILOT 웨이버는 loud하게 감사 기록되고 FAIL은 절대 웨이브되지 않는다.</div></div>
+    </div>
+  </div>
+
+  <div class="section-sep" id="s6"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">KL API 협의 · 최종 검증</span></div>
+  <div class="item" id="item-35">
+    <div class="item-head"><span class="item-tag">행 35</span><span class="item-jakup">연동 협의</span><span class="item-gubun">KL API 협의</span></div>
+    <div class="item-detail"><b>기능상세</b> · KL API 연동 협의(ICD 요청/응답·metadata_floor·오류/재시도)</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">KL(원청 웹시스템)이 로이드케이 AI 엔진을 호출할 때 쓰는 REST 연동 계약(ICD)을 확정하는 협의 단계다. 요청/응답 데이터 모양, metadata_floor(문서에 붙은 보안표기·접근범위 같은 메타정보로 등급을 안전하게 올리는 장치), 오류코드와 재시도 규약을 KL과 맞춘다. '어떤 필드를 주고받고, 실패하면 어떻게 다시 부르나'를 문서 하나로 못박는 일이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">OpenAPI 3.0.3 명세(doc/03_openapi_lloydk_kl.yaml)를 '진실 소스'로 삼아 협의한다. ClassifyRequest는 DocumentInput(doc_id·content·metadata)을 상속하고, metadata에 security_marking(top_secret/secret/confidential)이나 제한적 access_scope를 실으면 서빙단 metadata_floor 게이트가 예측보다 높은 표기일 때 그 등급으로 상향 floor(하향은 절대 안 함)한다. 공통 에러 envelope(code·message·request_id), 429 응답의 Retry-After 헤더(재시도 대기 초), 비동기 분류의 callback_url 콜백까지 규약으로 확정한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">명세가 backend-agnostic(내부 검색엔진 세부와 무관)이라 KL은 우리 RAG 내부(pgvector dense + bigram ts_rank 하이브리드)를 전혀 몰라도 그대로 호출할 수 있다. metadata_floor는 내용 분류기가 못 보는 출처(S)·비밀관리성(M) 축을 KL의 ICD 메타로 보완해, 인사·재무 비밀이 평범한 내부문서로 보이는 사각지대의 미탐(FNR, 고등급을 낮게 보는 오류)을 막는다. 재시도·에러 코드를 표준화해 KL이 무음으로 실패를 삼키지 않고 재처리 여부를 판단할 수 있다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">KL 측 정식 명세 회신 전이라 OpenAPI가 잠정 진실소스(버전 1.0.0-draft)이며 회신 후 재정합이 필요하다. metadata_floor는 안전방향(상향)만 하며, 표기가 고등급 콘텐츠를 오히려 덮어버릴 위험이 있는 충돌 상황은 자동확정하지 않고 needs_review(사람 검수)로 라우팅한다. 명세에 tenant_id 필드가 잔존하나 실제 격리는 폐쇄망 분리배포+RBAC로 대체된 상태라 설명용 잔재다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-36">
+    <div class="item-head"><span class="item-tag">행 36</span><span class="item-jakup">연동 보완</span><span class="item-gubun">KL API 협의</span></div>
+    <div class="item-detail"><b>기능상세</b> · API 보완사항 반영·mock/contract fixture 갱신</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">협의로 바뀐 스키마·필드를 코드와 테스트에 반영하고, KL 서버가 없어도 계약 호환성을 스스로 검증하는 mock/contract fixture를 최신 상태로 유지하는 일이다. '명세를 고쳤는데 코드가 안 따라와 어긋나는' 상황을 자동으로 잡아내는 안전망을 갱신한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">test_kl_contract.py가 각 테스트에 하드코딩한 더미 페이로드를 실제 pydantic 모델(ClassifyRequest·ClassifyResponse·공통 Error)로 왕복 파싱(round-trip)해, 파싱이 깨지면 코드↔계약 drift(어긋남)를 잡는다. 함께 로드한 OpenAPI 명세(openapi_spec)는 필수 엔드포인트 존재 확인에 쓴다(스키마 example로 더미를 자동 생성하진 않는다). 실행 중인 KL mock 없이도 /healthz 응답 필드 모양을 검증하고, 리포트 계약(metamorphic_report_contract) 같은 부수 계약도 별도로 잠근다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">명세와 구현이 벌어지면 CI(자동 빌드 검증)에서 즉시 드러나 배포 후 연동 사고를 예방한다. KL 회신이 늦어도 우리 쪽에서 선제적으로 계약 호환을 검증할 수 있어 협업 병목에 강하다. 실제 KL 서버 없이 결정론적으로 서버 간 통신 형태를 회귀 테스트하므로 재현성이 높다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">진실소스가 draft라 KL이 최종 확정을 회신하면 fixture를 다시 갱신해야 한다. .env에 한국어 주석이 있으면 starlette가 cp949로 읽다 UnicodeDecodeError가 나 일부 테스트가 skip되므로 운영은 PYTHONIOENCODING=utf-8을 권장한다. 현재 fixture는 명세 example 기반 합성이라, 실제 KL 페이로드의 변형은 회신 이후에 반영된다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-37">
+    <div class="item-head"><span class="item-tag">행 37</span><span class="item-jakup">API 테스트</span><span class="item-gubun">최종 검증</span></div>
+    <div class="item-detail"><b>기능상세</b> · API contract·parser·leakage·release-gate 테스트</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">배포 직전 네 축을 자동 검증하는 관문이다 — API 계약(스키마 호환), 파서(문서 추출 무손실), 누출(leakage, 학습셋과 평가셋 겹침), 릴리스 게이트(내보내도 되는 상태인가). 각 축이 하나라도 무너지면 배포를 막는 최종 코드 검증층이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">contract는 OpenAPI 왕복 파싱, parser는 HWPX 표 셀 회수·엑셀 세로병합 전파·숫자 단독줄 무손실 같은 추출 정합을 회귀 테스트한다. leakage는 본문을 '공백 제거 후 SHA1'로 정규화 해시해 train↔holdout 중복을 잡고, 도메인→등급 shortcut 게이트가 trivial_domain_baseline(도메인 다수결 정확도)·Theil U(도메인→등급 종속도)가 임계 초과면 exit 2로 빌드를 거부한다. release-gate(check_release_gate.py)는 readiness 리포트에서 FAIL(진짜 회귀/결함)과 BLOCKED(데이터 천장·자기해소 항목)을 분리해, --allow-conditional PILOT 모드는 BLOCKED만 감사 웨이버로 통과시키되 FAIL이나 리포트 부재는 항상 차단한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">'검사가 조용히 건너뛰고 초록으로 통과'하는 fake-green을 구조적으로 막는다(누출 게이트는 검사측과 100% 해시 패리티 강제, 릴리스 게이트는 리포트 부재를 통과가 아닌 하드블록으로 처리). FAIL/BLOCKED 이중 분류 덕분에 릴리스 게이트를 배포 경로에 배선해도, 알려진 데이터 천장에는 초록을 유지하면서 실제 회귀는 파일럿에서도 GA처럼 막는다. 파서 누출은 표 속 등급·원가 같은 비밀이 미탐되는 사각을 회귀로 봉쇄한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">학습풀은 gitignore라 CI에 커밋하지 않고 누출 매니페스트(정규화 텍스트해시)로만 검사하므로 무음 SKIP이 나지 않게 배선돼 있다. release-gate의 BLOCKED는 사람서명 평가정답(human_review) 미달 같은 자기해소성 항목이고, PILOT 웨이버는 어떤 게이트를 면제했는지 감사기록을 남긴다. 누출 실측 앵커는 오염 시 baseline 0.856·Theil U 0.808(차단), 건전 시 0.411·0.072(통과)다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-38">
+    <div class="item-head"><span class="item-tag">행 38</span><span class="item-jakup">E2E 테스트</span><span class="item-gubun">최종 검증</span></div>
+    <div class="item-detail"><b>기능상세</b> · 고객 인수팩 기반 parse→classify→gate E2E 테스트</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">배포된 전체 파이프라인(파싱→분류→안전게이트)을 고객 인수 샘플팩으로 처음부터 끝까지 관통시켜, 실제 파일을 넣었을 때 안전하게 판정되는지 확인하는 E2E(끝단 간) 검증이다. '단위 테스트는 통과했는데 실물 파일이 들어오면?'을 실증한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">run_acceptance.py가 datasets/acceptance_pack의 전 포맷 대표 표본(TXT·PDF·DOCX·XLSX·XLS·PPTX·HWPX)과 등급별 샘플을, --mode inproc(PreprocessPipeline+ClassifyService로 배포 서빙 경로 그대로) 또는 --mode http(POST /api/v1/documents/analyze로 폐쇄망 실배포 API)로 채점한다. 순수 판정함수 judge_doc는 severity floor(안전 하한) 규율로 VETO(불합격)를 세 가지—파싱 실패·숫자 무손실 위반·under 분류(고등급을 덜 민감한 등급으로=미탐, 분류 크래시도 미탐으로 집계)—만 잡는다. 표 커버리지·정확 등급일치율·over 분류(안전방향)·needs_review 라우팅 수·포맷별 품질·지연은 게이트가 아닌 REPORT로 남긴다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">정확 등급일치가 아니라 '고등급 미탐 없음'(severity floor)으로 판정하는 게 핵심이다—합성 데이터 천장(실문서 F1 0.26)에서 정확일치를 게이트로 걸면 올바르게 '안전하게 과분류'하는 시스템을 오히려 불합격시키기 때문이다. 실제 파일 바이트가 파서부터 안전게이트까지 실경로로 관통해 배선 누락을 잡는다. inproc/http 두 모드로 개발 검증과 고객 폐쇄망 검증을 한 도구로 커버한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">샘플팩 정답은 합성 시드 기반이라 정확도 수치는 보고용일 뿐 게이트가 아니다. HWP 바이너리는 프로그램 생성이 불가해 HWPX를 손수 저작했고, over 분류(안전방향)는 VETO가 아니라 검수로 흡수한다. 종료코드는 0=PASS, 1=veto 발생, 2=설정/입력 오류다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-39">
+    <div class="item-head"><span class="item-tag">행 39</span><span class="item-jakup">성능·운영 테스트</span><span class="item-gubun">최종 검증</span></div>
+    <div class="item-detail"><b>기능상세</b> · 응답시간·FNR-safe·needs_review·kill-gate·연합평가(반출0 실분포)·성능회귀(PSH) 리허설</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">배포 전 운영 관점의 종합 리허설이다 — 응답시간, FNR-safe(고등급 미탐 최소화 동작), needs_review 검수 라우팅, kill-gate 안전 브레이크, 연합평가(고객 실분포, 반출 0), 성능회귀(PSH) 자동탐지를 한 번에 점검한다. '실제로 굴렸을 때 느리지 않고, 안전하게 틀리고, 빨리 감지되나'를 확인한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">PSH(성능 harness)는 각 KPI가 요구자원(pg/es/redis/llm/trained_model)을 선언하고 미충족 시 FAIL이 아닌 SKIP으로 빼며(자원-게이팅), regression.py가 직전 회차 대비 상대 변화율로 회귀를 판정(compare le=증가가 악화, ge=감소가 악화)하고 N회차 시계열로 연속회귀 추세까지 본다. FNR-safe는 룰 override·metadata_floor로 미탐을 방어하고, 자동확정 못한 건은 needs_review로 라우팅하며, kill-gate는 미탐 floor·검수 피로·overturn율이 임계를 넘으면 tripped 경보(비파괴)+opt-in 브레이크로 고등급 자동확정만 보수화한다. 연합평가는 고객 폐쇄망 교정을 EvalPair(등급코드·신뢰도·맥락만, 문서·신원 필드 없음)로 받아 혼동행렬을 집계하되 redact_for_export+assert_export_safe로 반출 0을 강제하고, 결과는 외부 의존 없는 stdlib-only pushgateway로 폐쇄망 Prometheus에 올린다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">실분포 성능의 유일한 정답원이 '고객 사람 검수'임을 인정하되, 연합평가로 집계 수치만 안전하게 활용해 실 문서 텍스처를 한 글자도 내보내지 않는다(반출 0). SKIP/FAIL을 구분해 외부 의존 부재를 실패로 오판하지 않고 '무엇이 진짜 미측정인지'를 정직하게 드러낸다. 방향성+추세 기반 회귀탐지는 단발 잡음과 지속적 열화를 구분해 단순 임계 비교보다 오경보가 적다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">합성 평가는 실분포 미탐에 맹목이라 kill-gate는 자동으로 운영을 멈추지 않고(오작동 정지 위험 회피) 경보·보수화만 한다. 연합평가는 고객 협의와 폐쇄망 반출 파이프에 의존하며, 반출 화이트리스트는 depth-complete로 모든 깊이의 노드별 허용키를 강제한다. 응답시간·회귀 수치는 파일럿 이후 실환경에서 확정되고, 다수 안전게이트는 base 프로파일 기본 OFF·운영(onprem/full) 프로파일 ON이다.</div></div>
+    </div>
+  </div>
+
+  <div class="section-sep" id="s7"><span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">시스템 연계 · 베타 · 완료 · 오픈</span></div>
+  <div class="item" id="item-40">
+    <div class="item-head"><span class="item-tag">행 40</span><span class="item-jakup">통합 테스트</span><span class="item-gubun">시스템 연계</span></div>
+    <div class="item-detail"><b>기능상세</b> · KL API 연계·운영 시나리오·고객 인수팩 E2E 통합 테스트</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">KL(원청) 백엔드와 로이드케이 분류 시스템이 실제로 맞물려 도는지, 그리고 고객에게 넘길 배포본이 인수 기준을 통과하는지를 '문서 파싱→등급 분류→안전 게이트'까지 한 흐름으로 검증하는 통합 테스트 단계다. KL 연동 8개 운영 시나리오(단건·비동기 분류, 관리자 확정·재라벨, 등급체계 변경, 가이드 업로드→RAG 색인, 합성 생성→검수, 능동학습 트리거, 지표 조회)를 자동 재현하고, 전 포맷 샘플로 고객 인수팩 E2E를 돌린다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">test_kl_integration.py가 KL ICD와 OpenAPI 정본의 S1~S8 시나리오를 테스트 클라이언트 in-process 호출로 1:1 매핑하고(KL 측은 X-Actor-Id/Role 헤더로 흉내), DB·검색엔진·LLM 가용성에 따라 자동 스킵한다. 고객 인수는 run_acceptance.py가 datasets/acceptance_pack의 전 포맷 대표 표본(TXT·PDF·DOCX·XLSX·XLS·PPTX·HWPX 등)을 inproc(ClassifyService 직접) 또는 http(POST /api/v1/documents/analyze 업로드)로 태워 채점한다. 판정은 severity-floor(안전선) 규율 — 파싱 성공 + 숫자 무손실 + 고등급 미탐 없음(덜 민감하게 예측한 under-분류=veto)만 합격 게이트로 걸고, 표 커버리지·정확 등급일치율·과분류 수·지연은 보고만 한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">배포 서빙 코드를 그대로 태우기 때문에 인증·감사로그·프로메테우스 카운트·검수 라우팅 같은 통합 결함이 운영과 동일한 경로에서 드러난다. 합성 데이터 천장(실문서 F1 0.26)에서 정확 등급일치로 합격을 매기면 '안전하게 과분류하는' 옳은 시스템을 부당 불합격시키므로, 미탐만 veto하는 규율이 고등급 미탐 최소화(FNR 우선) 철학과 정확히 맞는다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">KL 측은 헤더 mock이라 실제 KL 포털과의 왕복 연동은 파일럿 현장에서 최종 확인이 필요하다. inproc 인수 모드는 hash 임베더 폴백을 허용하므로 검색 품질은 별도 검증 대상이며 운영 tier는 REQUIRE_REAL_EMBEDDER로 실모델을 강제한다. 정확 등급일치는 합성 라벨 천장 탓에 성능 지표가 아니라 참고치로만 읽어야 한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-41">
+    <div class="item-head"><span class="item-tag">행 41</span><span class="item-jakup">베타 테스트</span><span class="item-gubun">베타·감리</span></div>
+    <div class="item-detail"><b>기능상세</b> · 운영 베타 테스트·고객 피드백 수집·검수 라우팅·교정 환류·확정 축적(비모수 운영학습) 점검</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">실운영 베타에서 (1)자동확정하지 못한 문서를 검수 큐로 모으고(검수 라우팅), (2)고객 관리자의 교정을 받아 학습·서빙에 안전하게 되먹이며(교정 환류), (3)사람이 확정한 라벨을 쌓아 재학습 없이도 성능을 올리는(비모수 운영학습) 루프가 실제로 도는지 점검하는 단계다. 고객 피드백을 성능·안전 개선의 유일한 실데이터 레버로 흡수하는 것이 목표다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">검수 라우팅은 서빙 안전 게이트 체인(저신뢰·룰↔모델 합의 불일치·공개출처 cap 충돌·근거 희박·유사도 escalation)이 등급은 그대로 두고 needs_review로 흘려 GET /review-queue(FUN-024)에서 승인 대기 목록으로 보인다. 교정 환류는 import_review_corrections가 검수자 신원(머신·플레이스홀더 계정 거부)을 검증해 반입하고 기본은 human_review 평가라벨로 승격하며(평가셋 오염을 피하려면 --as-candidate로 gold_candidate에만 넣는 opt-in을 명시해야 한다), 분류 status가 finalized인 것만 학습에 편입하는 admission 판정은 재학습 데이터 빌드 단계(corrections_rebuild)에서 별도로 적용한다. 확정 축적은 재학습이 막힌 폐쇄망(enable_training=False)에서 사람 승인 교정을 검증 DocumentLabel로 승급(exact-match override)해, 서빙이 동일 sha256 문서 재업로드 시 추론을 건너뛰고 그 등급을 반환한다(가중치 무변경=비모수).</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">모델 가중치를 안 건드리고도 사람 교정이 즉시 서빙에 반영돼, 데이터 반출 0·폐쇄망 제약 아래에서 자동화 커버리지를 올릴 수 있는 사실상 유일한 실레버다. admission 게이트가 무검수·머신 라벨이 자동재학습에 박히는 '죽음의 나선'을 끊어 안전을 지키고, 정확 바이트 일치만 매칭하므로 다른 문서로 잘못 전파될 위험이 없다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">비모수 승급은 같은 문서 재업로드(exact-match)만 자동 적용되고, '유사' 문서는 등급 전파 0으로 검수 신호로만 쓴다. 자동재학습 활성화는 기본 OFF(retrain_auto_activate=False)이며 deploy gate와 locked-eval readiness까지 얹은 3중 게이트를 통과해야 한다. 축적 효과는 실제 고객 문서량과 검수 참여도에 비례하므로 베타 기간·데이터에 의존한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-42">
+    <div class="item-head"><span class="item-tag">행 42</span><span class="item-jakup">결과 보완·종료감리</span><span class="item-gubun">베타·감리</span></div>
+    <div class="item-detail"><b>기능상세</b> · 베타 결과 보완·성능 재측정·종료감리 대응 자료 정리</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">베타에서 드러난 오분류·미탐을 보완하고, 성능을 부풀리지 않게 정직하게 재측정하며, 발주처 종료감리에 낼 근거자료(지표·감사·컴플라이언스)를 정리하는 단계다. 합성 천장의 한계를 인정한 채 실분포에 가장 가까운 신호로 마무리 판정을 준비한다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">성능 재측정은 출처×등급 분리 평가카드(칸마다 under-class FNR과 Wilson 신뢰구간 산출, 표본 부족은 PASS 대신 INCONCLUSIVE, 가중평균 F1 같은 단일 headline 숫자는 코드로 금지)와 연합평가(고객 폐쇄망 교정을 등급코드·신뢰도·맥락만 담은 EvalPair로 받아 혼동행렬 집계, 문서·신원 필드는 반출 0)로 한다. PSH 성능 harness가 KPI를 자원-게이팅 SKIP·방향성 상대변화율로 회귀 판정하고, 런타임 ECE/Brier로 보정 상태를 측정한다. 종료감리 자료는 변조증거 감사 해시체인(HMAC 링크) 검증 리포트, SBOM 라이선스 위험등급 HTML, 배포·관리 하드닝 감사 문서로 구성한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">단일 숫자 거짓 신뢰를 코드 레벨에서 막고 신뢰구간 하한으로만 PASS를 주장하므로, 감리에서 성능을 과대포장하지 않은 정직한 근거로 방어할 수 있다. 실분포 성능을 재는 유일한 정답원인 고객 사람검수를 반출 0을 지키면서 흡수해, 폐쇄망 컴플라이언스와 성능 근거를 동시에 만족한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">'재측정'의 절대 기준은 여전히 사람서명 잠금 평가셋(locked eval)이며, 현재 human_review 1/40이 유일한 GA 하드블로커라 상용 강판정은 이 데이터 천장에 걸린다. 합성 홀드아웃 지표는 실텍스처 갭 때문에 낙관 편향이 있어 연합평가·외부 사실 앵커로 보완한다. 감사체인 검증은 스캔 상한에 걸리면 scan_truncated로 '일부만 검증'임을 명시해 거짓 all-clear를 피한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-43">
+    <div class="item-head"><span class="item-tag">행 43</span><span class="item-jakup">완료보고</span><span class="item-gubun">완료보고</span></div>
+    <div class="item-detail"><b>기능상세</b> · 완료보고서·운영 매뉴얼·릴리즈 매니페스트 최종화</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">사업 산출물을 최종본으로 고정하는 단계다 — 완료보고서(기술구현 백서), 운영 매뉴얼(런북), 릴리즈 매니페스트(무엇을 어떤 버전·해시로 배포했는지 기록)를 확정한다. 인수 이후에도 '무엇이 배포됐고 어떻게 운영하는가'가 문서만으로 재현되게 만드는 것이 핵심이다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">릴리즈 매니페스트는 make release-manifest로 생성하며(현재 커밋 해시를 기록하되 clean-tree/태그를 강제하진 않음; 출력 reports/release_artifact_manifest.json), 배포모델==평가모델 parity 게이트로 버전 일치를 강제한다. 폐쇄망 번들 매니페스트는 실제로 수행하지 않은 취약점 스캔을 SecurityScan.scanned=False로 정직 표기하고, 필수 코어서비스 누락·비-Linux wheel을 fail-closed로 잡는다. 운영 매뉴얼은 OPERATION.md·CLOUD_DEPLOY_RUNBOOK·죽음의 나선/롤백 런북으로, 완료보고서는 doc/result/open/ 정본 HTML(기술구현 백서 v7 + 부록 DB스키마·API명세·지표용어)로 정리하며, RELEASE_CHECKLIST가 릴리즈 게이트를 BLOCKED(데이터 천장)와 FAIL(실제 회귀)로 나눠 판정 상태를 명문화한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">매니페스트가 해시·모델버전·스캔 수행 여부를 정직하게 박아 감사·컴플라이언스 오독('안 한 스캔을 한 것처럼')을 원천 차단하고, parity 게이트가 '문서엔 A인데 실제 배포는 B'인 버전 드리프트를 막는다. 문서는 RTM 골격(head·nav·footer)을 재사용해 폼 일관성을 유지한다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">현재 릴리즈 상태는 operational_readiness 산출물 기준 CONDITIONALLY_READY로 파일럿은 가능하나, strict GA는 locked human_review 최소치 충족 전까지 BLOCKED(데이터 천장)로 남는다(현재 기준 1/40, 부족분은 산출물 갱신 시 재계산). 취약점 스캔이 미수행이면 scanned=False로 남기는 정직한 부재 표기이므로, 실제 스캔은 빌드 환경에서 별도 수행이 필요하다. 공유 정본 갱신은 반출 정책상 doc/result/open/ HTML로만 한다.</div></div>
+    </div>
+  </div>
+  <div class="item" id="item-44">
+    <div class="item-head"><span class="item-tag">행 44</span><span class="item-jakup">인수인계</span><span class="item-gubun">운영 오픈</span></div>
+    <div class="item-detail"><b>기능상세</b> · 운영 오픈·관리자 교육·인수인계·안정화 지원</div>
+    <div class="item-body">
+      <div class="aspect"><span class="aspect-label">담당 기능</span><div class="aspect-text">실운영을 열고(운영 오픈), 고객 관리자에게 관제·검수·모델관리 사용법을 교육하며, 인수인계 후 초기 안정화를 지원하는 단계다. 오픈 직후 문제 발생 시 빠르고 안전하게 되돌릴 수 있는 운영 체계를 넘겨주는 것이 목표다.</div></div>
+      <div class="aspect"><span class="aspect-label">처리 방식</span><div class="aspect-text">운영 오픈은 deploy.sh 단일 진입점이 번들 레이아웃을 감지해 오픈망(cloud)/폐쇄망(airgap) 배포로 자동 디스패치하고, 각 스크립트가 사전검증·헬시대기·모델적재·스모크까지 자동 수행한다. 관리자 도구는 admin.html 관제 대시보드(모델 activate·혼동행렬·검수 큐)와 RBAC(reviewer/admin)이며, 모델 교체는 POST /admin/model/activate(deploy gate 통과, force 강제 시 why·who 감사기록)·reload 핫리로드·deploy_rollback.sh 이전버전 재활성 경로로 한다. 단일 프로세스는 무중단 반영이 가능하고, 멀티워커 전체 반영은 순차 재기동 절차를 따른다. 안정화는 kill-gate 죽음의 나선 모니터(비파괴 경보 + opt-in 안전브레이크), 워커→API 메트릭 브리지(Redis TTL로 stale 방지), drift·ECE 관측으로 뒷받침한다.</div></div>
+      <div class="aspect"><span class="aspect-label">장점 · 근거</span><div class="aspect-text">단일 프로세스에서는 컨테이너 재기동 없이 활성/롤백이 서빙에 반영돼, 오픈 직후 이상 시 known-good 버전으로 빠르게 회귀할 수 있다. 멀티워커 운영에서는 호출 프로세스 핫리로드 한계를 감안해 순차 재기동으로 전체 반영한다. 강제 활성조차 게이트 통과 또는 탬퍼-증거 기록으로만 허용해 미검증 모델의 무인 배포를 막고, 관측성이 게이트와 한몸(게이트ON=가시성ON)이라 무음실패를 운영자가 대시보드에서 볼 수 있다.</div></div>
+      <div class="aspect notes"><span class="aspect-label">참고사항</span><div class="aspect-text">멀티워커(WEB_CONCURRENCY&gt;1) 환경에서 핫리로드는 호출된 로컬 프로세스만 갱신하므로 전체 반영은 순차 재기동이 필요하다. 폐쇄망은 민감문서 반출 0을 위해 상용 클라우드 API를 쓰지 않으며, 고객 호스트의 Qwen3-14B는 등급 결정 핫패스가 아닌 선택적 2차판정·답변 생성용이다. 안정화 효과는 운영 데이터·검수 참여 축적에 비례하고, kill-gate는 자동 중단이 아니라 경보와 보수화(고등급 한 번 더 사람 확인)만 수행한다.</div></div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <p>본 해설서는 WBS 엑셀(<code>[지재원] AI 영업비밀관리시스템 구축 WBS.xlsx</code>)의 작업·기능상세와 실제 소스코드(<code>poc/src/lloydk</code>)의 구현을 대조해 작성했습니다. 수치·게이트 효과는 합성 골든셋(OOD) 기준이며 운영 확정치가 아닙니다.</p>
+    <p>관련: <a href="WBS_본개발_작업분해구조.html">본개발 WBS</a> · <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="기술구현_백서_부록B_API명세.html">부록B API명세</a> · <a href="기술구현_백서_부록C_지표용어해설.html">부록C 지표해설</a></p>
+  </div>
+</article>
+<aside class="toc-aside">
+  <nav class="toc">
+    <div class="toc-title">목차</div>
+    <a href="#s0">00 · 한눈에 보기</a>
+    <a href="#s1">01 · 환경 구축</a>
+    <a href="#s2">02 · 설계</a>
+    <a href="#s3">03 · 데이터셋 구축</a>
+    <a href="#s4">04 · 분류·서빙 개발 · 파일럿 진입</a>
+    <a href="#s5">05 · 배포 준비</a>
+    <a href="#s6">06 · KL API 협의 · 최종 검증</a>
+    <a href="#s7">07 · 시스템 연계 · 베타 · 완료 · 오픈</a>
+  </nav>
+</aside>
+</div>
+<footer>
+  <strong>KOIPA AI 영업비밀관리시스템</strong> — WBS 작업 기능해설서 · 2026.06 – 12<br>
+  WBS 항목별 설계 근거 · 로이드케이
+</footer>
+</body>
+</html>
