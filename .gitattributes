@@ -50,3 +50,9 @@ Makefile      text eol=lf
 *.safetensors binary
 *.bin    binary
 *.pt     binary
+
+# ── 감리 동결 번들 (2026-07-30) ────────────────────────────────────
+# 동결본은 '바이트 동일'이 요건이다. INTEGRITY.sha256 은 작업트리 파일의 SHA-256 을
+# 기록하므로, git 이 줄바꿈을 정규화하면 신선한 clone 에서 검증이 반드시 실패한다.
+# → 텍스트 처리 일체 비활성(-text). 정본(doc/result/open/)은 위 정책(eol=lf) 그대로.
+doc/releases/** -text
