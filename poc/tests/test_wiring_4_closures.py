@@ -253,23 +253,31 @@ def test_train_classifier_task_reraises_non_topology_oserror():
 # ---------------------------------------------------------------------------
 
 
-def test_preprocess_pipeline_run_text_masks_pii_by_default():
+def test_preprocess_pipeline_run_text_does_not_mask_classifier_input():
+    # [#pii-skew] 57653ae 이후 분류기 입력(run_text)은 무마스킹이 정답이다.
+    # 마스킹은 등급 신호(내부 IP·사번·계좌)를 지우고, 학습·평가가 무마스킹이라
+    # 서빙만 마스킹하면 OOD 브라켓 토큰으로 등급이 낮아지는 silent FNR 스큐가 난다.
+    # 상세·opt-in 마스킹·저장경로 유지는 tests/test_pii_classifier_input.py 가 잠근다.
     from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
     p = PreprocessPipeline()
     text = "연락처는 010-1234-5678, 이메일 john@example.com 입니다."
     out = p.run_text(text)
-    assert "010-1234-5678" not in out
-    assert "john@example.com" not in out
-    assert "[PHONE]" in out or "[EMAIL]" in out
+    assert "010-1234-5678" in out
+    assert "john@example.com" in out
+    assert "[PHONE]" not in out and "[EMAIL]" not in out
 
 
 def test_preprocess_pipeline_pii_masking_disabled():
+    # PII 보호 경계는 저장/색인 경로(_finalize)다 — 생성자 플래그가 여기서 실효해야 한다.
+    # (run_text 로는 이 플래그를 검증할 수 없다: 위 테스트대로 어차피 마스킹하지 않는다.)
     from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
-    p = PreprocessPipeline(pii_masking=False)
     text = "전화 010-1234-5678 보존"
-    out = p.run_text(text)
-    assert "010-1234-5678" in out
-    assert "[PHONE]" not in out
+    off = PreprocessPipeline(pii_masking=False).run_text_full(text)
+    assert "010-1234-5678" in off.text
+    assert "[PHONE]" not in off.text
+    on = PreprocessPipeline(pii_masking=True).run_text_full(text)
+    assert "010-1234-5678" not in on.text
+    assert on.pii_counts
 
 
 def test_preprocess_pipeline_run_text_full_records_pii_counts():
