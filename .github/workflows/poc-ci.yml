@@ -108,7 +108,12 @@ jobs:
 
       - name: Bandit SAST (HIGH only fails build)
         run: |
-          bandit -r src/ -ll -f json -o bandit-report.json || true
+          # -c 를 명시해야 설정(exclude_dirs·skips)이 실제로 적용된다. 플래그 없이 호출하면
+          # 설정이 로드되지 않아 의도한 스캔 범위와 어긋난다(배포감사 지적).
+          # 설정은 pyproject.toml [tool.bandit] — 구 .bandit(INI)는 한글 주석 + 비-UTF8 로캘에서
+          # configparser 가 죽어 스캔 자체가 실패했다. TOML 은 UTF-8 고정이라 안전.
+          bandit -r src/ -ll -c pyproject.toml -f json -o bandit-report.json || true
+          test -f bandit-report.json || { echo "::error::bandit 이 리포트를 생성하지 못했다(설정 로드 실패 등)"; exit 1; }
           # exit code 1 if any HIGH severity finding
           python -c "
           import json, sys

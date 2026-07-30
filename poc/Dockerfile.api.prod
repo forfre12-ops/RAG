@@ -8,7 +8,10 @@
 # 멀티 인스턴스:
 #   docker-compose 또는 k8s에서 replicas + HPA
 
-FROM python:3.11-slim AS base
+# [재현성] base image 를 digest 로 고정 — 태그(3.11-slim)는 재빌드 시 다른 이미지를 가리킬 수 있어
+# 폐쇄망 반입본과 재빌드본의 동일성을 보증하지 못한다. 갱신 시:
+#   docker buildx imagetools inspect python:3.11-slim   # → Digest 를 아래에 반영
+FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -236,6 +236,20 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.bandit]
+# C8: 보안 SAST — 운영 진입 직전 OWASP ASVS L2 스캔.
+# 구 `.bandit`(INI) 에서 이관. INI 는 configparser 가 시스템 기본 인코딩으로 읽어
+# 한글 주석이 있으면 비-UTF8 로캘(예: Windows cp949)에서 UnicodeDecodeError 로 죽는다.
+# TOML 은 사양상 UTF-8 고정이라 인코딩 무관하게 안전하다.
+# CI 호출: bandit -r src/ -ll -c pyproject.toml
+exclude_dirs = ["tests", "migrations", "scripts/legacy", "build", "dist", ".venv"]
+skips = [
+  "B101",  # assert_used — pytest assert 는 정상
+  "B404",  # subprocess import — backup·DR 스크립트에서 의도적 사용
+  "B603",  # subprocess call without shell — 신뢰 가능 인자에만 사용
+  "B607",  # start process with partial path — 컨테이너 고정 PATH 전제
+]
+
 [tool.ruff]
 target-version = "py311"
 
