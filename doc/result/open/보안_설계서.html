@@ -153,7 +153,7 @@ footer strong{color:var(--text-dim);}
   <div class="table-wrap"><table>
     <thead><tr><th>대상</th><th>현재</th><th>본개발</th></tr></thead>
     <tbody>
-      <tr><td>원문 저장 암호화</td><td>AES-256-GCM 지원(기본 비활성)</td><td><strong>기본 활성 + KMS 연동</strong>, 데이터 키 회전</td></tr>
+      <tr><td>원문 저장 암호화</td><td>AES-256-GCM — 폐쇄망 운영 프로파일(<code>onprem-local</code>·<code>full-train</code>) <strong>기본 활성</strong>, 키 미설정 시 startup <strong>fail-fast</strong>(평문 저장 차단). lite/개발 프로파일은 기본 비활성</td><td><strong>KMS 연동 + 데이터 키 회전</strong>(정적 키 대체)</td></tr>
       <tr><td>전송 구간</td><td>KL↔AI 서버 mTLS</td><td>인증서 자동 발급·갱신, TLS 1.3 강제</td></tr>
       <tr><td>PII 마스킹</td><td>NER 기반(모델 부재 시 원문 통과)</td><td><strong>fail-secure</strong>(마스킹 실패 시 차단)</td></tr>
       <tr><td>비밀 관리</td><td>환경설정 기반</td><td>Vault/KMS로 이관, 코드·로그에 비밀 노출 점검</td></tr>
@@ -184,7 +184,7 @@ footer strong{color:var(--text-dim);}
     <tbody>
       <tr><td class="center">P0</td><td>감사 체인 비밀키 + fail-fast + 정기 검증</td><td>키 부재 → 키 없는 SHA-256(운영 1회 경고), 런타임 정기 검증 미배선</td><td class="center">3~5일</td></tr>
       <tr><td class="center">P0</td><td>접근 격리 deny-by-default + RLS</td><td>권한·등급 결속 미흡 분기 잔존, 앱레벨 only</td><td class="center">1~2주</td></tr>
-      <tr><td class="center">P1</td><td>저장 암호화 기본 활성 + KMS·키회전</td><td>기본 비활성, 정적 키</td><td class="center">1주</td></tr>
+      <tr><td class="center">P1</td><td>저장 암호화 KMS 연동 + 키 회전</td><td>운영 프로파일은 활성이나 정적 키·KMS 미연동</td><td class="center">1주</td></tr>
       <tr><td class="center">P1</td><td>API 키 주기적 회전 절차</td><td>회전 운영 절차 미수립(상수시간 비교는 적용 완료)</td><td class="center">3일</td></tr>
     </tbody>
   </table></div>

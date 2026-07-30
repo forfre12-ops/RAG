@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: 2026-07-10
+updated_at: 2026-07-25
 
 policy:
   active_public_root: doc/result/open
@@ -132,6 +132,22 @@ documents:
   - id: DOC-EVAL-002
     title: golden500 분류근거 보고서
     path: doc/result/open/golden500_분류근거_보고서.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-004
+    title: 골든셋 분류근거 보고서 (현행 배포모델 v5_clean v-fe4b386b · 실엔진 카드형)
+    path: doc/result/open/골든셋_분류근거_v5_clean_v-fe4b386b.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-EVAL-005
+    title: 골든셋 분류근거 보고서 (직전 배포모델 v4_clean v-dd3abab9 · 실엔진 카드형)
+    path: doc/result/open/골든셋_분류근거_v4_clean_v-dd3abab9.html
     owner: data
     audience: customer
     status: current
@@ -368,3 +384,116 @@ documents:
     audience: internal
     status: current
     version: 2026-07-pilot
+
+  # --- 감리 정식 산출물 (2026-07-25 등재 정합: 이전 미등재분) ---
+  - id: DOC-PLAN-001
+    title: 사업수행계획서
+    path: doc/result/open/사업수행계획서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-QA-001
+    title: 품질보증계획서
+    path: doc/result/open/품질보증계획서.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-TEST-001
+    title: 시험케이스 및 결과서
+    path: doc/result/open/시험케이스_및_결과서.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DEFECT-001
+    title: 결함관리대장
+    path: doc/result/open/결함관리대장.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SCREEN-001
+    title: 화면설계서
+    path: doc/result/open/화면설계서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MODULE-001
+    title: 애플리케이션 모듈 명세서
+    path: doc/result/open/애플리케이션_모듈_명세서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-DFD-001
+    title: 기능분해도 데이터흐름도
+    path: doc/result/open/기능분해도_데이터흐름도.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-PIA-001
+    title: 개인정보영향평가 적용성 판정서
+    path: doc/result/open/개인정보영향평가_적용성_판정서.html
+    owner: security
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MIGRATE-001
+    title: 데이터전환 적용제외 근거서
+    path: doc/result/open/데이터전환_적용제외_근거서.html
+    owner: data
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-MANUAL-001
+    title: 사용자매뉴얼 검수관리자
+    path: doc/result/open/사용자매뉴얼_검수관리자.html
+    owner: operations
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-QA-002
+    title: 품질보증 결과서
+    path: doc/result/open/품질보증_결과서.html
+    owner: qa
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-SEC-002
+    title: 소프트웨어 개발보안 적용 내역
+    path: doc/result/open/소프트웨어_개발보안_적용내역.html
+    owner: security
+    audience: customer
+    status: current
+    version: 2026-07-pilot
+
+  - id: DOC-WEEKLY-002
+    title: 7월 2주 주간보고
+    path: doc/result/open/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 2주 - 260710.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week2
+
+  - id: DOC-WEEKLY-003
+    title: 7월 3주 주간보고
+    path: doc/result/open/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 3주 - 260717.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week3
