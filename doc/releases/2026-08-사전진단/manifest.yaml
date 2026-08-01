@@ -1,7 +1,7 @@
 release_id: 2026-08-사전진단
 purpose: 제3자 감리(supervision) 대응 산출물 제출본
 frozen_at: '2026-08-02'
-source_commit: 863e32d6f0c9ec40434081b2feeffa17f087f680
+source_commit: 9223f2cb29d87277831c7a06e9b6711cf127f7c8
 source_of_truth: doc/result/open/
 id_authority: doc/docs_registry.yaml
 inherited_from: 2026-07-감리
