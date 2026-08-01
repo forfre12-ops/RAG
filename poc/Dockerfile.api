@@ -5,7 +5,7 @@ FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627a
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential libpq-dev curl libfreetype6 \
+      build-essential libpq-dev curl libfreetype6 libexpat1 \
       tesseract-ocr tesseract-ocr-kor poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -22,7 +22,8 @@ COPY alembic.ini ./
 #   [hwp]=rhwp-python (.hwp/.hwpx), [ocr]=pytesseract+pdf2image (스캔 PDF/이미지),
 #   [jwt]=PyJWT+cryptography (운영 JWT 인증), [xls]=xlrd (구형 .xls, 511dbfb 재발 방지).
 # AGPL인 [pdf-agpl](PyMuPDF)는 doc/14 라이선스 결정에 따라 의도적 제외(기본은 pdfminer.six).
-RUN pip install --upgrade pip && pip install -e ".[hwp,ocr,jwt,xls]"
+# [hwp-tables] unhwp(MIT) — .hwp 표 셀 회수. rhwp 단독은 표를 통째로 흘린다(FUN-022 갭).
+RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,ocr,jwt,xls]"
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp 번들 FreeType 의 undefined symbol
 # (FT_Palette_Data_Get) 로 `import rhwp` 가 깨지는 것을 시스템 FreeType 선로드로 채운다.

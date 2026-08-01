@@ -78,15 +78,18 @@ xls = [
   "xlrd>=2.0",                     # BIFF .xls 리더 (BSD). 2.0+는 .xls 전용(.xlsx 미지원)
 ]
 
-# HWP 표·글상자 셀 텍스트 회수 (AGPL 옵트인). 기본 rhwp([hwp])는 본문만 뽑고 표 셀을
-# 흘린다(실측: 보도자료 표셀 29/31 누락). pyhwp의 HWP5→XHTML 변환이 표 셀까지 렌더해
-# extractor.py가 rhwp보다 많이 뽑히면 채택. pyhwp는 AGPLv3+ — PyMuPDF([pdf-agpl])와
-# 동일하게 기본 제외, 라이선스 수용 환경에서만 옵트인. HWP5(.hwp) 전용(.hwpx 미지원).
-# AGPL 격리: extractor.py는 pyhwp를 import하지 않고 hwp5html 콘솔 스크립트를 별도
-# 프로세스로 호출(arm's length) → AGPL 경계가 pyhwp 실행파일에 국한.
+# HWP 표 셀 회수. 기본 rhwp([hwp])는 .hwp 바이너리에서 본문만 뽑고 표 셀을 통째로
+# 흘린다(실측: 공고문 표 0행 → unhwp 593행, 숫자 7/7 보존 + 21개 추가 회수).
+# 2026-08-01 구 pyhwp(AGPLv3+) → unhwp(MIT) 교체. AGPL 옵트인 경로 자체를 없앴다.
+#   - 라이선스 검증: unhwp 네이티브는 Rust, 동봉 크레이트 29종 전수가 MIT/Apache-2.0/
+#     Unlicense/Zlib. 카피레프트 문자열 0건, pyhwp/hwp.js/hwplib 파생 흔적 0건
+#     (바이너리 문자열 + crates.io 전수 조회).
+#   - 적용 범위는 .hwp 한정. .hwpx 는 rhwp 가 이미 정확하고 unhwp 가 오히려 표를
+#     누락한 사례가 있다(acc-S1-03.hwpx: 표 5행→0행) → extractor 가 형식으로 차단.
+#   - 배포 이미지에 포함된다(Dockerfile extras). 미설치여도 graceful degrade.
 # 활성: pip install -e ".[hwp-tables]"
 hwp-tables = [
-  "pyhwp>=0.1b15",                 # HWP5 파서 (AGPLv3+). hwp5html CLI로 표 셀 추출
+  "unhwp>=0.8",                    # HWP5 파서 (MIT). to_markdown()으로 표 셀 회수
 ]
 
 # OCR — Tesseract 5.x + 한국어팩 (Apache 2.0, 무료).

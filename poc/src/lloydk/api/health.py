@@ -198,7 +198,9 @@ def _check_extractors() -> dict:
     _tess_ok = (shutil.which(TESSERACT_CMD) is not None or Path(TESSERACT_CMD).exists()) and _mod("pytesseract")
     probes: dict[str, dict] = {
         "hwp_body(rhwp)": {"available": _mod("rhwp")},
-        "hwp_table(pyhwp/hwp5html)": {"available": shutil.which("hwp5html") is not None},
+        # .hwp 표 셀 회수(unhwp/MIT). 미설치면 rhwp 본문만 남아 표 속 등급·원가가
+        # 분류기에 안 보인다 — 조용한 미탐이 되므로 가용성을 노출한다.
+        "hwp_table(unhwp)": {"available": _mod("unhwp")},
         "xls(xlrd)": {"available": _mod("xlrd")},
         "xlsx(openpyxl)": {"available": _mod("openpyxl")},
         "docx(python-docx)": {"available": _mod("docx")},

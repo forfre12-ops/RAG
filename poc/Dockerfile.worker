@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 # 워커는 classify/index 태스크에서 문서를 파싱한다 → api 와 동일한 OS 파서 바이너리 필요
 # (없으면 HWP/PDF 파싱이 무성 실패). libfreetype6(rhwp LD_PRELOAD)만 유지 — OCR(tesseract/poppler=GPL)은 배포 제외.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential libpq-dev libfreetype6 \
+      build-essential libpq-dev libfreetype6 libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -15,10 +15,11 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 COPY scripts ./scripts
-# 파싱 글루(hwp/xls) 포함 — 워커가 무성 파싱 실패하지 않도록(Dockerfile.api.prod 와 동일 extras).
+# 파싱 글루(hwp/hwp-tables/xls) 포함 — 워커가 무성 파싱 실패하지 않도록(api.prod 와 동일 extras).
+# [hwp-tables] unhwp(MIT) — 배치 경로도 .hwp 표 셀을 회수해야 API 경로와 등급이 일치한다.
 # [xls] xlrd 누락 시 구형 .xls 가 0글자로 추출됨(511dbfb 배치경로 재발 방지).
 # [라이선스] OCR([ocr], GPL poppler)은 요건 외라 배포 이미지에서 제외(코드·extra는 리포 존치).
-RUN pip install --upgrade pip && pip install -e ".[hwp,xls]"
+RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,xls]"
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp-python 번들 FreeType 에 FT_Palette_Data_Get
 # 심볼이 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 배치 파싱이 0글자로 깨진다.

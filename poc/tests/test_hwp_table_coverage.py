@@ -16,8 +16,8 @@ from pathlib import Path
 
 from lloydk.modules.m2_preprocess.extractor import (
     ExtractResult,
-    _hwp_via_pyhwp,
     _hwp_table_coverage,
+    _hwp_tables_via_unhwp,
     _hwpx_bytes_has_table,
     _hwpx_tables,
     _hwpx_uncaptured_table_cells,
@@ -204,32 +204,115 @@ class TestExtractResultField:
         assert r.table_coverage is None
 
 
-class TestPyhwpTableParsing:
-    def test_hwp5html_xhtml_tables_are_structured(self, tmp_path: Path, monkeypatch):
-        import subprocess
-        from types import SimpleNamespace
+def _fake_unhwp(monkeypatch, markdown: str | None, *, raises: bool = False):
+    """`import unhwp` 를 가짜 모듈로 대체. markdown=None + raises=False → 미설치 시뮬레이션."""
+    import sys
+    from types import SimpleNamespace
 
+    if markdown is None and not raises:
+        monkeypatch.setitem(sys.modules, "unhwp", None)  # import 시 ImportError
+        return
+
+    def to_markdown(_path):
+        if raises:
+            raise RuntimeError("parse failed")
+        return markdown
+
+    monkeypatch.setitem(sys.modules, "unhwp", SimpleNamespace(to_markdown=to_markdown))
+
+
+_MD = (
+    "본문 단락\n\n"
+    "| item | amount |\n"
+    "| :--- | ---: |\n"
+    "| secret | 12000 |\n"
+    "| 담당<br>부서 | 연구소 |\n"
+    "|  |  |\n"
+)
+
+
+class TestMarkdownTableParsing:
+    """unhwp 마크다운 → ExtractedTable 파싱 (구분선·빈행 제거, <br> 환원)."""
+
+    def test_separator_and_empty_rows_dropped(self):
+        from lloydk.modules.m2_preprocess.extractor import _markdown_tables
+
+        tables = _markdown_tables(_MD, source="hwp", name_prefix="x.hwp")
+        assert len(tables) == 1
+        assert tables[0].rows == [
+            ["item", "amount"],
+            ["secret", "12000"],
+            ["담당 부서", "연구소"],   # <br> → 공백
+        ]
+
+    def test_no_tables_returns_empty(self):
+        from lloydk.modules.m2_preprocess.extractor import _markdown_tables
+
+        assert _markdown_tables("표 없는 본문뿐", source="hwp", name_prefix="x") == []
+
+
+class TestUnhwpTableRecovery:
+    """.hwp 표 보강 — 형식 가드·graceful degrade·셀 회수."""
+
+    def test_recovers_table_cells_from_hwp(self, tmp_path: Path, monkeypatch):
+        _fake_unhwp(monkeypatch, _MD)
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        text, tables = _hwp_tables_via_unhwp(p)
+        assert "secret | 12000" in text
+        assert tables and tables[0].rows[1] == ["secret", "12000"]
+
+    def test_hwpx_is_never_touched(self, tmp_path: Path, monkeypatch):
+        # .hwpx 는 rhwp+_hwpx_tables 가 정확하고 unhwp 는 표를 통째로 누락한 실측
+        # 사례가 있다(acc-S1-03.hwpx 표 5행→0행) → 형식으로 차단해야 한다.
+        _fake_unhwp(monkeypatch, _MD)
+        p = tmp_path / "sample.hwpx"
+        p.write_bytes(b"PK\x03\x04")
+
+        assert _hwp_tables_via_unhwp(p) == (None, [])
+
+    def test_missing_package_is_graceful(self, tmp_path: Path, monkeypatch):
+        _fake_unhwp(monkeypatch, None)
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        assert _hwp_tables_via_unhwp(p) == (None, [])
+
+    def test_parse_failure_is_graceful(self, tmp_path: Path, monkeypatch):
+        _fake_unhwp(monkeypatch, "", raises=True)
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        assert _hwp_tables_via_unhwp(p) == (None, [])
+
+
+class TestAugmentationKeepsReviewRouting:
+    """보강에 성공해도 table_coverage 는 incomplete 유지 → 검수 라우팅 불변.
+
+    표 내용을 분류기에 넣는 이득(미탐 감소)과 검수 라우팅 완화는 별개 결정이며,
+    후자는 현장 데이터 확보 후 판단한다. 여기서 완화되면 확실한 사람 검수를
+    신규 파서 신뢰와 맞바꾸는 셈이라 회귀로 본다.
+    """
+
+    def test_coverage_stays_incomplete_after_recovery(self, tmp_path: Path, monkeypatch):
         import lloydk.modules.m2_preprocess.extractor as ex
 
         p = tmp_path / "sample.hwp"
         p.write_bytes(b"\xd0\xcf\x11\xe0")
 
-        def fake_run(args, **kwargs):
-            out_dir = Path(args[args.index("--output") + 1])
-            out_dir.mkdir(parents=True, exist_ok=True)
-            (out_dir / "index.xhtml").write_text(
-                "<html><body><p>body</p><table>"
-                "<tr><td>item</td><td>amount</td></tr>"
-                "<tr><td>secret</td><td>12000</td></tr>"
-                "</table></body></html>",
-                encoding="utf-8",
-            )
-            return SimpleNamespace(returncode=0)
+        class _Doc:
+            def extract_text(self):
+                return "본문 단락"
 
-        monkeypatch.setattr(ex, "_hwp5html_cmd", lambda: "hwp5html")
-        monkeypatch.setattr(subprocess, "run", fake_run)
+        monkeypatch.setitem(__import__("sys").modules, "rhwp",
+                            __import__("types").SimpleNamespace(parse=lambda _p: _Doc()))
+        monkeypatch.setattr(ex, "_hwp_table_coverage", lambda *a, **k: "incomplete")
+        _fake_unhwp(monkeypatch, _MD)
 
-        text, tables = _hwp_via_pyhwp(p)
-        assert "secret | 12000" in text
-        assert tables
-        assert tables[0].rows == [["item", "amount"], ["secret", "12000"]]
+        r = ex._extract_hwp(p)
+        assert r.table_coverage == "incomplete"          # 라우팅 유지
+        assert "hwp_table_cells_may_be_missing" in r.warnings
+        assert "hwp_tables_recovered_by_unhwp" in r.warnings
+        assert "secret | 12000" in r.text                # 표 내용은 분류기에 도달
+        assert "본문 단락" in r.text                       # 합집합 — 본문 보존

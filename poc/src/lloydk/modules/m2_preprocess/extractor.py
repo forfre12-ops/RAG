@@ -108,7 +108,7 @@ class ExtractedTable:
 @dataclass
 class ExtractResult:
     text: str
-    method: str           # parser/rhwp/pyhwp/ocr/ocr_llm/libreoffice/plain
+    method: str           # parser/rhwp/ocr/ocr_llm/libreoffice/plain
     quality: float        # 0.0~1.0 (추정)
     ocr_used: bool = False
     pages: int | None = None
@@ -375,12 +375,18 @@ def _extract_hwp(p: Path) -> ExtractResult:
       (noori.hwp 표셀 29/31 누락, basicsReport.hwp 23/23 누락). 영업비밀 문서는
       등급·원가·담당 정보가 표에 들어가는 일이 많아 '조용한 표 미추출'이 곧 미탐이다.
 
-    표 보강(opt-in): pyhwp([hwp-tables] extra)가 설치돼 있으면 표 셀까지 렌더하는
-      pyhwp 경로로 더 많은 텍스트를 뽑아 그쪽을 채택(_hwp_text_via_pyhwp). pyhwp는
-      AGPL이라 PyMuPDF([pdf-agpl])와 동일하게 기본 제외·옵트인. **AGPL 전염을 막기
-      위해 in-process import가 아니라 hwp5html 콘솔 스크립트를 별도 프로세스로 호출**
-      (데이터는 파일로만 주고받음 → arm's length). 미설치 시 rhwp 결과 유지하되,
-      rhwp가 빈 텍스트면 표 전용 문서 가능성을 경고로 surface한다.
+    표 보강(2026-08-01, unhwp/MIT — 구 pyhwp/AGPL 대체): **.hwp 에서 표 누락이
+      의심될 때만**(table_coverage=="incomplete") unhwp 로 표 셀을 회수해 rhwp
+      본문에 **합집합으로** 덧붙인다(_hwp_tables_via_unhwp). 세 가지가 모두 실측
+      근거다(8문서×3경로 A/B):
+        - .hwp 는 rhwp 가 표를 통째로 흘린다 → unhwp 가 593행 회수, 숫자 7/7 보존 + 21개 추가.
+        - .hwpx 는 반대다. rhwp 가 이미 잘 뽑고 unhwp 가 표를 통째로 누락한 사례가 있다
+          (acc-S1-03.hwpx: 표 5행→0행, 인수 기대숫자 3/3→0/3) → **.hwpx 는 건드리지 않는다**.
+        - 따라서 교체가 아니라 합집합이다. unhwp 는 rhwp 의 상위집합이 아니다.
+      보강에 성공해도 table_coverage 는 "incomplete" 로 유지한다 — 표 내용을 분류기에
+      넣는 이득(미탐 감소)과 검수 라우팅 완화는 별개 결정이며, 후자는 현장 데이터
+      확보 후 판단한다(확실한 사람 검수를 신규 파서 신뢰와 맞바꾸지 않는다).
+      미설치·실패는 graceful — rhwp 결과를 그대로 쓴다.
     """
     try:
         import rhwp  # type: ignore
@@ -395,40 +401,37 @@ def _extract_hwp(p: Path) -> ExtractResult:
     except Exception as exc:  # noqa: BLE001
         return ExtractResult(text="", method="rhwp", quality=0.0, error=str(exc))
 
-    # 표·글상자 보강(opt-in pyhwp). rhwp보다 많이 뽑히면 = 표 셀을 회수했단 뜻이라 채택.
     warnings: list[str] = []
     tables: list[ExtractedTable] = []
-    if p.suffix.lower() == ".hwpx":
+    is_hwpx = p.suffix.lower() == ".hwpx"
+    if is_hwpx:
+        # .hwpx 는 원본 zip 의 section XML 에서 셀을 직접 뽑는다(정밀). unhwp 보강 대상 아님.
         tables = _hwpx_tables(p.read_bytes(), source="hwpx")
         if tables:
             text = _append_if_missing(text or "", _tables_to_text(tables))
             _warn_once(warnings, "hwpx_tables_structured")
 
-    full, pyhwp_tables = _hwp_via_pyhwp(p)
-    if full and len(full) > len(text or ""):
-        pyhwp_warnings = ["hwp_tables_extracted_by_hwp5html"] if pyhwp_tables else [
-            "hwp_tables_flattened_by_hwp5html"
-        ]
-        return ExtractResult(
-            text=full,
-            method="pyhwp",
-            quality=0.9,
-            tables=pyhwp_tables,
-            warnings=pyhwp_warnings,
-        )
-
     if not text or not text.strip():
         # 빈 추출 = 성공 아님. 표/글상자 전용 HWP일 가능성을 경고로 surface.
-        # ([hwp-tables] 미설치 시 표 회수 불가 — 설치하면 위 pyhwp 경로로 복구.)
         return ExtractResult(
             text="", method="rhwp", quality=0.0,
             error="rhwp가 본문 텍스트를 추출하지 못함 — 표·글상자 전용 문서일 수 있음. "
-                  "표 셀 회수에는 pyhwp 필요: pip install '.[hwp-tables]' (AGPL).",
+                  "표 셀 회수 보강에는 unhwp 필요: pip install '.[hwp-tables]'.",
         )
     # 본문은 뽑혔지만 표 셀이 빠졌을 수 있다(rhwp의 조용한 표 미추출) — 커버리지 판정.
     coverage = _hwp_table_coverage(p, doc, text, warnings)
     if coverage == "incomplete":
         _warn_once(warnings, "hwp_table_cells_may_be_missing")
+        # .hwp 한정 표 보강. 합집합이라 rhwp 가 이미 잡은 내용은 중복되지 않는다.
+        # coverage 는 그대로 "incomplete" 로 둔다 → 검수 라우팅 유지(설계 의도).
+        if not is_hwpx:
+            recovered, unhwp_tables = _hwp_tables_via_unhwp(p)
+            if recovered:
+                merged = _append_if_missing(text, recovered)
+                if len(merged) > len(text):
+                    text = merged
+                    tables = tables + unhwp_tables
+                    _warn_once(warnings, "hwp_tables_recovered_by_unhwp")
     return ExtractResult(
         text=text,
         method="rhwp",
@@ -448,7 +451,10 @@ def _hwp_table_coverage(p: Path, doc, text: str, warnings: list[str] | None = No
     - **.hwpx**: 원본 zip의 section XML에서 표 셀 텍스트(<...:t>)를 뽑아 추출본과 대조.
       셀 텍스트가 추출본에 없으면 "incomplete"(정밀 — rhwp가 회수했으면 flag 안 함).
     - **.hwp(바이너리)**: 셀 텍스트는 rhwp HWPX 변환에도 빠지므로 대조 불가. 표 *구조*
-      존재만 보고 "incomplete"(pyhwp로 회수했으면 이 경로에 안 옴). 보수적(FNR-safe).
+      존재만 보고 "incomplete". 보수적(FNR-safe).
+      이 판정이 곧 unhwp 표 보강의 트리거다 — 보강에 성공해도 "incomplete" 는
+      유지한다(검수 라우팅 완화는 별개 결정). 즉 이 값은 "표 셀 미회수"가 아니라
+      "rhwp 단독으로는 표를 못 봤다"는 뜻이다.
 
     판정 실패·예외·표 없음은 None(graceful) — 과라우팅을 피한다.
     """
@@ -582,78 +588,79 @@ def _hwpx_bytes_has_table(hwpx_bytes: bytes) -> bool:
     return False
 
 
-def _hwp5html_cmd() -> str | None:
-    """pyhwp ``hwp5html`` 실행파일 경로 — 환경변수 > 현재 venv Scripts > PATH. 없으면 None.
+def _markdown_tables(md: str, *, source: str, name_prefix: str) -> list[ExtractedTable]:
+    """마크다운 표(``| a | b |``)를 ExtractedTable 로 파싱.
 
-    AGPL 격리를 위해 pyhwp는 라이브러리로 import하지 않고 이 실행파일로만 쓴다.
+    연속된 파이프 행을 하나의 표로 묶고, 구분선(``| --- |``)과 전 셀이 빈 행은 버린다.
+    셀 안 줄바꿈은 unhwp 가 ``<br>`` 로 내보내므로 공백으로 환원한다.
     """
-    import shutil
-    import sys
+    import re as _re
 
-    env = os.environ.get("HWP5HTML_CMD")
-    if env and Path(env).exists():
-        return env
-    exe = "hwp5html.exe" if os.name == "nt" else "hwp5html"
-    local = Path(sys.executable).parent / exe
-    if local.exists():
-        return str(local)
-    return shutil.which("hwp5html")
+    tables: list[ExtractedTable] = []
+    block: list[list[str]] = []
+
+    def flush() -> None:
+        if block:
+            tables.append(
+                ExtractedTable(
+                    source=source,
+                    name=f"{name_prefix} table {len(tables) + 1}",
+                    rows=list(block),
+                    table_index=len(tables) + 1,
+                )
+            )
+            block.clear()
+
+    for line in (md or "").splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            flush()
+            continue
+        # 구분선(--- / :---:)은 구조일 뿐 내용이 아니다.
+        if not _re.sub(r"[|\s:-]", "", s):
+            continue
+        cells = [_cell_text(_re.sub(r"<br\s*/?>", " ", c)) for c in s.strip("|").split("|")]
+        cells = _trim_trailing_empty(cells)
+        if _row_has_text(cells):
+            block.append(cells)
+    flush()
+    return tables
 
 
-def _hwp_via_pyhwp(p: Path) -> tuple[str | None, list[ExtractedTable]]:
-    """pyhwp(hwp5html CLI)로 .hwp의 표·글상자 포함 전체 텍스트 추출 (opt-in, AGPL).
+def _hwp_tables_via_unhwp(p: Path) -> tuple[str | None, list[ExtractedTable]]:
+    """unhwp(MIT)로 .hwp 표 셀을 회수 — 표 부분만 돌려준다(본문 대체 아님).
 
-    rhwp.extract_text()가 표 셀을 흘리는 것을 보강한다. pyhwp의 HWP5→XHTML 변환은
-    표 셀까지 렌더하므로 결과 xhtml에서 태그를 제거해 평문을 얻는다.
+    rhwp 는 .hwp 바이너리에서 표 셀을 통째로 흘린다(실측: 공고문 표 0행). unhwp 의
+    HWP5 파서는 표를 마크다운으로 렌더하므로 그 표 행만 뽑아, 호출부가 본문에
+    **합집합**으로 덧붙인다.
 
-    **AGPL 격리**: pyhwp를 in-process import하지 않고 ``hwp5html`` 콘솔 스크립트를
-    별도 프로세스로 호출한다(임시 디렉터리로만 데이터 교환 → arm's length). AGPL
-    경계가 pyhwp 실행파일에 국한돼 본 코드로 전염되지 않는다. [hwp-tables] extra
-    (=pyhwp) 설치 시에만 동작.
+    **.hwp 전용이다.** .hwpx 는 rhwp + _hwpx_tables 가 이미 정확한 반면 unhwp 는
+    표를 통째로 누락한 실측 사례가 있다(acc-S1-03.hwpx: 표 5행→0행, 인수 기대숫자
+    3/3→0/3). 형식을 넓히면 회귀한다.
 
-    HWP5(바이너리 .hwp) 전용 — .hwpx(OWPML/zip)는 pyhwp 미지원이라 None.
-    실행파일 부재·변환 실패는 None(graceful) → 호출부가 rhwp 결과를 사용.
+    라이선스: unhwp 는 MIT. 네이티브 부분은 Rust 이고 동봉 크레이트 29종 전수가
+    MIT/Apache-2.0/Unlicense/Zlib — 카피레프트도, 기존 AGPL 구현(pyhwp/hwp.js/
+    hwplib) 파생도 없음을 바이너리 문자열 + crates.io 조회로 확인(2026-08-01).
+    구 pyhwp(AGPL, hwp5html CLI arm's length) 경로를 대체한다.
+
+    미설치·파싱 실패는 (None, []) — 호출부가 rhwp 결과를 그대로 쓴다.
     """
     if p.suffix.lower() != ".hwp":
         return None, []
-    cmd = _hwp5html_cmd()
-    if not cmd:
-        return None, []
-
-    import html as _html
-    import re as _re
-    import shutil
-    import subprocess
-    import tempfile
-
-    tmpdir = tempfile.mkdtemp(prefix="hwp5html_")
     try:
-        proc = subprocess.run(
-            [cmd, "--output", tmpdir, str(p)],
-            capture_output=True, timeout=120,
-        )
-        xhtml = Path(tmpdir) / "index.xhtml"
-        if proc.returncode != 0 or not xhtml.exists():
-            return None, []
-        raw = xhtml.read_text(encoding="utf-8", errors="replace")
+        import unhwp  # type: ignore
+    except ImportError:
+        return None, []
+    try:
+        md = unhwp.to_markdown(str(p))
     except Exception:  # noqa: BLE001
         return None, []
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-    raw = _re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw, flags=_re.S)
-    text = _re.sub(r"<[^>]+>", " ", raw)
-    text = _html.unescape(text)
-    text = _re.sub(r"[ \t ]+", " ", text)
-    text = _re.sub(r"\s*\n\s*", "\n", text).strip()
-    tables = _html_tables(raw, source="hwp", name_prefix=p.name)
-    text = _append_if_missing(_html_to_text(raw), _tables_to_text(tables))
-    return (text or None), tables
-
-
-def _hwp_text_via_pyhwp(p: Path) -> str | None:
-    text, _tables = _hwp_via_pyhwp(p)
-    return text
+    if not md:
+        return None, []
+    tables = _markdown_tables(md, source="hwp", name_prefix=p.name)
+    if not tables:
+        return None, []
+    return _tables_to_text(tables), tables
 
 
 def _docx_collect_tables(container, *, source: str, tables: list[ExtractedTable],

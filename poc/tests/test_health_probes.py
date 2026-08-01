@@ -16,7 +16,7 @@ def test_check_extractors_contract() -> None:
     assert isinstance(out["unavailable"], list)
     expected = {
         "hwp_body(rhwp)",
-        "hwp_table(pyhwp/hwp5html)",
+        "hwp_table(unhwp)",
         "xls(xlrd)",
         "xlsx(openpyxl)",
         "docx(python-docx)",

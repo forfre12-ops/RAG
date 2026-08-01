@@ -22,7 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GUNICORN_TIMEOUT=60
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential libpq-dev curl libfreetype6 \
+      build-essential libpq-dev curl libfreetype6 libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -42,12 +42,14 @@ COPY alembic.ini ./
 # torch 를 먼저 CPU 인덱스에서 깔아두면, 이어지는 editable 설치의 torch>=2.3 제약이 이미 충족돼
 # PyPI 기본(CUDA) 휠을 다시 끌어오지 않는다.
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
-# extras: 운영(psh 성능·otel 관측·jwt) + 파싱 의존(hwp·xls) — 파싱 요건(FUN) 유지.
+# extras: 운영(psh 성능·otel 관측·jwt) + 파싱 의존(hwp·hwp-tables·xls) — 파싱 요건(FUN) 유지.
+# [hwp-tables] unhwp(MIT). rhwp 는 .hwp 바이너리의 표 셀을 통째로 흘려 표 안의 등급·원가·
+# 담당 정보가 분류기에 안 보인다(=조용한 미탐). 구 pyhwp(AGPL) 대체 — 반출본에 AGPL 없음.
 # [라이선스] OCR([ocr]=pytesseract/pdf2image+poppler-utils=GPL)은 요건 외(FUN-022=전자문서 텍스트추출뿐)라
 # 배포 이미지에서 제외 → GPL(poppler) 반출 소거. OCR 코드·[ocr] extra는 리포·dev(Dockerfile.api)에 존치.
 RUN pip install --upgrade pip && \
     pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
-    pip install -e ".[psh,otel,jwt,hwp,xls]" gunicorn && \
+    pip install -e ".[psh,otel,jwt,hwp,hwp-tables,xls]" gunicorn && \
     pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0"   # [보안] Trivy 유일 수정가능 2건(빌드툴 CVE) 상향
 
 # [HWP 파싱 복구] rhwp-python 이 번들한 FreeType(libfreetype-*.so.6)에 FT_Palette_Data_Get 심볼이
