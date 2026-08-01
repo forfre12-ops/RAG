@@ -31,7 +31,7 @@ a{color:#0a0a0a}
     <div class="meta">Python ≥3.11 · 폐쇄망(온프레미스) 기본 구성 · 2026-07-29 · 값은 배포 번들 동결 기준</div>
   </div>
 
-  <div class="note">폐쇄망 <b>기본 스택은 전부 permissive 라이선스</b>(PostgreSQL/BSD/MIT/Apache). 카피레프트(AGPL) 구성요소는 기본 제외·옵트인 격리 → <a href="오픈소스_라이선스_다중배포_검토서.html">라이선스·다중배포 검토서</a>. 권위 있는 전체 목록은 <code>scripts/dump_licenses.py</code>로 SBOM(CycloneDX) 산출.</div>
+  <div class="note">폐쇄망 <b>기본 스택은 permissive 중심</b>(PostgreSQL/BSD/MIT/Apache)이며, DB 드라이버(psycopg)만 <b>LGPL(약한 copyleft·재배포 자유·고지만 필요)</b>. 강한 카피레프트(AGPL·GPL)는 배포 제외·옵트인 격리 → <a href="오픈소스_라이선스_다중배포_검토서.html">라이선스·다중배포 검토서</a>. 권위 있는 전체 목록은 <code>scripts/dump_licenses.py</code>로 SBOM(CycloneDX) 산출.</div>
 
   <h2>1. 런타임 · 인프라</h2>
   <table>
@@ -76,7 +76,7 @@ a{color:#0a0a0a}
       <tr><td>DOCX / PPTX</td><td>python-docx ≥1.1 · python-pptx ≥0.6</td><td>MIT</td><td>—</td></tr>
       <tr><td>XLSX / XLS</td><td>openpyxl ≥3.1 · xlrd ≥2.0</td><td>MIT / BSD</td><td>구형 .xls는 <code>[xls]</code> 옵션</td></tr>
       <tr><td>HWP / HWPX</td><td>rhwp-python ≥0.5.1</td><td>—</td><td>표 셀 보강은 <code>[hwp-tables]</code>(AGPL 격리, 검토서 참조)</td></tr>
-      <tr><td>스캔 OCR (옵션)</td><td>Tesseract 5.x · pytesseract</td><td>Apache-2.0 / MIT</td><td>요건 외 부가 기능</td></tr>
+      <tr><td>스캔 OCR (옵션)</td><td>Tesseract 5.x · pytesseract</td><td>Apache-2.0 / MIT</td><td>요건 외 부가 — <b>배포 이미지 제외</b>(poppler=GPL 반출 소거), 코드·옵션 존치</td></tr>
     </tbody>
   </table>
 
