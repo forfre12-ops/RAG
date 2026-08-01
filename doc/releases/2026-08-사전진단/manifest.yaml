@@ -12,7 +12,7 @@ counts:
   formal_other_format: 1
   navigation_hub: 1
   root_files_total: 35
-  supplementary: 9
+  supplementary: 8
   progress_reports: 4
   verification_evidence: 2
 deployed_model:
@@ -103,24 +103,22 @@ formal_deliverables:
 supplementary:
   path_prefix: 참고자료/
   documents:
-  - file: 골든셋_쉬운설명.html
-    id: DOC-DATA-003
-  - file: 점수_채점_방식_쉬운설명.html
-    id: DOC-SCORE-001
-  - file: 시스템_완전이해_가이드_V3.html
-    id: DOC-GUIDE-001
-  - file: golden500_분류근거_보고서.html
-    id: DOC-EVAL-002
   - file: 검색단독_vs_분류기_등급분류_비교.html
-    id: DOC-COMPARE-001
-  - file: 골든셋_합성생성_설계검토.html
-    id: DOC-DATA-004
-  - file: 무실데이터_분류기_설계서.html
-    id: DOC-CLASSIFIER-001
+    id: (참고)
   - file: 골든셋_분류근거_v4_clean_v-dd3abab9.html
-    id: DOC-EVAL-005
+    id: (참고)
   - file: 골든셋_분류근거_v5_clean_v-fe4b386b.html
-    id: DOC-EVAL-004
+    id: (참고)
+  - file: 골든셋_쉬운설명.html
+    id: (참고)
+  - file: 골든셋_합성생성_설계검토.html
+    id: (참고)
+  - file: 무실데이터_분류기_설계서.html
+    id: (참고)
+  - file: 시스템_완전이해_가이드_V3.html
+    id: (참고)
+  - file: 점수_채점_방식_쉬운설명.html
+    id: (참고)
 progress_reports:
   path_prefix: 사업관리보고/
   documents:
