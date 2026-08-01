@@ -270,7 +270,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     <div class="diag">
       <div class="node soft"><div class="nt">문서 업로드</div></div>
       <div class="arr">→</div>
-      <div class="node soft"><div class="nt">추출·전처리</div><div class="nd">정규화 · 청킹 (CPU) · OCR(스캔 PDF, 부가)</div></div>
+      <div class="node soft"><div class="nt">추출·전처리</div><div class="nd">정규화 · 청킹 (CPU) · 스캔 PDF는 추출 0자 → failed 격리(OCR 미사용)</div></div>
       <div class="arr">→</div>
       <div class="grp" style="flex:2 1 320px;">
         <div class="grp-l">분류 연산 (CPU · LLM-free)</div>
@@ -407,13 +407,13 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     </ul></div>
     <div class="band"><div class="bt">관측 가시성 + 운영 검수 대시보드</div><p>품질이 조용히 떨어지던 지점을 메트릭·트레이스로 노출했다: <b>① LLM 비용추적 전 경로 배선</b>(개발/운영 분리 집계) <b>② 비동기 작업 상태 메트릭</b>(진입 카운터+소요시간 히스토그램) <b>③ OTel 추론·검색 span</b>(스칼라·비민감만, 본문 미노출) <b>④ 검색 폴백 가시화</b>(reranker→RRF·encode 실패·쿼리확장 폴백). 이 신호를 <code>GET /admin/dashboard</code> <b>한 화면</b>으로 종합 — 이중검토 보류·locked readiness·교정 backlog·kill-gate 발동·임베딩 드리프트를 함께 본다(섹션별 독립 best-effort·부분 가용 표기).</p></div>
     <div class="band gray"><div class="bt">통제 루프 — 지재원 export/import 런북 (G1·G2)</div><p>지재원(개발)에서 고객사(운영)로 가는 릴리스·활성·검수반입을 런북으로 통제한다: <b>G1 — 수동 활성 엔드포인트</b>(<code>POST /admin/model/activate</code>, deploy gate 통과 + force 시 감사) · <b>G2 — 검수 반입 <code>--as-candidate</code></b>(고객사 교정을 <code>gold_candidate</code>로만 편입해 <b>평가셋 오염 차단</b>, 지재원 golden-build 기본 무변경). CI 하드게이트(P0#5)가 이 통제가 코드 회귀로 풀리지 않게 영속화한다.</p></div>
-    <div style="margin-top:10px;font-size:12.5px;color:var(--dim);">상세 반영 내역: <a href="#" style="color:var(--text);">설계검토 하드닝 반영 내역</a> · <a href="#" style="color:var(--text);">분류 검수 게이트 강화 보고서</a> · <a href="#" style="color:var(--text);">운영 런북</a></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--dim);">상세 반영 내역: <a href="설계검토_하드닝_반영_내역.html" style="color:var(--text);">설계검토 하드닝 반영 내역</a> · <a href="분류검수게이트_강화_보고서.html" style="color:var(--text);">분류 검수 게이트 강화 보고서</a> · <a href="운영_런북.html" style="color:var(--text);">운영 런북</a></div>
   </section>
 
   <!-- 09 확인① 분류기 채택 -->
   <section id="s9">
     <div class="sec-head"><span class="n">09</span><h2>확인 ① 분류기 채택 — 검색 단독(Dense kNN)은 붕괴</h2></div>
-    <div class="sec-sub">"분류기 빼고 검색(BM25/Dense kNN) 상위 5건 중 가장 높은 등급"으로 매기는 안을, 동일 테스트셋·누출 0으로 분류기와 정면 실측 (<a href="#">검색단독_vs_분류기</a> 요약).</div>
+    <div class="sec-sub">"분류기 빼고 검색(BM25/Dense kNN) 상위 5건 중 가장 높은 등급"으로 매기는 안을, 동일 테스트셋·누출 0으로 분류기와 정면 실측 (<a href="검색단독_vs_분류기_등급분류_비교.html">검색단독_vs_분류기</a> 요약).</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th style="width:26%;">방식</th><th>등급 정확도</th><th>고등급 미탐</th><th>분포</th></tr></thead>
       <tbody>

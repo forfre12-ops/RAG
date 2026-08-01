@@ -302,7 +302,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
     <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
   </div>
-    <p class="lede">분류 서빙 경로에서 <b>재학습 없이 후처리로 조정하는 모든 노브</b>를 한 곳에 모은 <b>레퍼런스</b>다. <a href="#">분류 검수 게이트 강화 보고서</a>가 <b>"왜 이렇게 했나"(서사·실증)</b>를 다룬다면, 본 문서는 <b>"무엇을 얼마로 두는가"(설정 키·기본값·유효범위·효과방향·코드위치·측정근거)</b>를 노브별로 세밀하게 명세한다. 모든 값은 <code>config.py</code>·서빙 코드 기준이다.</p>
+    <p class="lede">분류 서빙 경로에서 <b>재학습 없이 후처리로 조정하는 모든 노브</b>를 한 곳에 모은 <b>레퍼런스</b>다. <a href="분류검수게이트_강화_보고서.html">분류 검수 게이트 강화 보고서</a>가 <b>"왜 이렇게 했나"(서사·실증)</b>를 다룬다면, 본 문서는 <b>"무엇을 얼마로 두는가"(설정 키·기본값·유효범위·효과방향·코드위치·측정근거)</b>를 노브별로 세밀하게 명세한다. 모든 값은 <code>config.py</code>·서빙 코드 기준이다.</p>
 
     <div class="hero-kpis">
       <div class="hero-kpi"><span class="dot"></span> 보정 <b>temperature</b></div>
@@ -324,7 +324,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="h2-sub">보고서는 "왜", 이 명세는 "무엇을 얼마로". 두 문서는 짝이다.</p>
       <p>같은 주제를 두 장르로 나눠 둔다 — 섞으면 둘 다 읽기 어려워진다.</p>
       <div class="appendix-links">
-        <a class="appendix-link" href="#"><span>왜 이렇게 설계했나 — 분류 검수 게이트 강화 보고서</span><span class="al-arrow">→</span></a>
+        <a class="appendix-link" href="분류검수게이트_강화_보고서.html"><span>왜 이렇게 설계했나 — 분류 검수 게이트 강화 보고서</span><span class="al-arrow">→</span></a>
         <a class="appendix-link" href="기술구현_백서_부록C_지표용어해설.html#tools"><span>용어 사전 — 부록C 지표·용어 해설</span><span class="al-arrow">→</span></a>
       </div>
       <div class="tbl-wrap">
