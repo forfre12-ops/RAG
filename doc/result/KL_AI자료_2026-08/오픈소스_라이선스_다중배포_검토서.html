@@ -56,7 +56,7 @@ a{color:#0a0a0a}
   <div class="top">
     <div class="eyebrow">KL 감리 대응 · 요청 6 (확인)</div>
     <h1>오픈소스 라이선스 · 다중배포 검토서</h1>
-    <div class="meta">다수 기업(폐쇄망) 배포 관점 · 2026-07-29 · 권위 목록은 SBOM(CycloneDX) 산출</div>
+    <div class="meta">다수 기업(폐쇄망) 배포 관점 · 2026-08-02 · 권위 목록은 SBOM(CycloneDX) 산출</div>
   </div>
 
   <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음(기본 구성).</b> 폐쇄망 <b>기본 스택은 permissive 중심</b>(PostgreSQL/BSD/MIT/Apache)이며, DB 드라이버(psycopg) 1건만 <b>LGPL-3.0(약한 copyleft)</b>이나 파이썬 동적 링크라 <b>재배포는 자유</b>·라이선스 고지만 하면 됩니다. 강한 copyleft(AGPL·GPL) 구성요소는 <b>배포본에서 전부 제외</b>이며, 필요한 경우에만 <b>옵트인 + 프로세스 격리</b>로 경계를 국한합니다.</div>
@@ -68,9 +68,9 @@ a{color:#0a0a0a}
       <tr><td>PostgreSQL + pgvector</td><td>PostgreSQL License</td><td><span class="tag perm">permissive</span></td></tr>
       <tr><td>psycopg 3 (PostgreSQL 드라이버) — 재배포 자유·고지만 필요</td><td>LGPL-3.0</td><td><span class="tag copyleft">LGPL</span></td></tr>
       <tr><td>Redis 7.2 · nginx</td><td>BSD-3 · BSD-2</td><td><span class="tag perm">permissive</span></td></tr>
-      <tr><td>FastAPI · SQLAlchemy · openpyxl · python-pptx · PyJWT</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
-      <tr><td>Uvicorn · Celery · pdfminer.six · xlrd · torch</td><td>BSD-3</td><td><span class="tag perm">permissive</span></td></tr>
-      <tr><td>transformers · MLflow · bcrypt · cryptography · prometheus · OpenTelemetry</td><td>Apache-2.0</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>FastAPI · SQLAlchemy · openpyxl · python-pptx · PyJWT · pdfminer.six</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>Uvicorn · Celery · xlrd · torch</td><td>BSD-3</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>transformers · MLflow<span style="color:#71717a"> (지재원 학습서버 전용·고객사 운영 번들 미포함)</span> · bcrypt · cryptography · prometheus · OpenTelemetry</td><td>Apache-2.0</td><td><span class="tag perm">permissive</span></td></tr>
       <tr><td>HWP/HWPX 파서: rhwp-python(본문) · unhwp(.hwp 표 셀)</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
       <tr><td>모델(동봉): KF-DeBERTa <span style="color:#71717a">(분류 기반)</span> · KURE-v1 <span style="color:#71717a">(임베딩)</span></td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
       <tr><td>모델(고객사 기동, 번들 미동봉): Qwen3-14B <span style="color:#71717a">— GPU 보유 시 부가기능용</span></td><td>Apache-2.0</td><td><span class="tag perm">permissive</span></td></tr>
@@ -81,10 +81,11 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:150px">구성요소</th><th style="width:90px">라이선스</th><th>처리 방식</th></tr></thead>
     <tbody>
-      <tr><td>PyMuPDF (PDF)</td><td><span class="tag copyleft">AGPL-3.0</span></td><td><b>기본 제외.</b> 옵션 <code>[pdf-agpl]</code>로만 옵트인. 기본 PDF 추출은 pdfminer.six(BSD-3)</td></tr>
+      <tr><td>PyMuPDF (PDF)</td><td><span class="tag copyleft">AGPL-3.0</span></td><td><b>기본 제외.</b> 옵션 <code>[pdf-agpl]</code>로만 옵트인. 기본 PDF 추출은 pdfminer.six(MIT)</td></tr>
       <tr><td>pyhwp (HWP 표 셀) <b>— 제거됨</b></td><td><span class="tag copyleft">AGPLv3+</span></td><td><b>의존성 자체를 삭제(2026-08-01).</b> HWP 표 셀 회수를 AGPL 없이 얻기 위해 대체 후보를 실측 비교한 결과 <code>unhwp</code>(MIT)로 교체했고, 소스·<code>uv.lock</code> 양쪽에서 pyhwp가 0건임을 확인했다. 이로써 <code>[hwp-tables]</code>는 AGPL 옵트인이 아니라 <b>기본 배포에 포함되는 MIT 구성요소</b>가 되었다. 검증: unhwp 네이티브(Rust)에 카피레프트 문자열 0건, 동봉 크레이트 29종 전수가 MIT/Apache-2.0/Unlicense/Zlib, 기존 AGPL 구현(pyhwp·hwp.js·hwplib) 파생 흔적 0건</td></tr>
       <tr><td>MinIO (객체 스토리지)</td><td><span class="tag copyleft">AGPL-3.0</span></td><td><b>폐쇄망 미사용</b>(로컬 파일시스템). 옵션 <code>[minio]</code>는 클라우드(CSAP) 티어 전용 → AGPL 이슈 해소. (파이썬 클라이언트는 Apache-2.0, AGPL은 서버 바이너리)</td></tr>
       <tr><td>poppler-utils (OCR용 PDF→이미지)</td><td><span class="tag copyleft">GPL-2/3</span></td><td><b>배포 이미지에서 제외</b>(2026-08). OCR은 요건 외(FUN-022=전자문서 텍스트추출뿐)라 배포본에 <code>[ocr]</code>·<code>poppler-utils</code> 미포함 → GPL 반출 소거. OCR 코드·옵션은 리포에 존치(옵트인). 참고: Tesseract는 Apache-2.0</td></tr>
+      <tr><td>Elasticsearch (검색엔진)</td><td><span class="tag copyleft">SSPL/Elastic</span></td><td><b>배포·의존성 미포함.</b> 검색을 PostgreSQL(pgvector + bigram ts_rank)로 통합해 SSPL(비-OSI·소스공개 의무)을 회피 — 레거시 어댑터 코드만 존치, 설치하지 않음</td></tr>
     </tbody>
   </table>
 
@@ -101,10 +102,10 @@ a{color:#0a0a0a}
   <ul>
     <li>의존성 라이선스 표: <code>scripts/dump_licenses.py</code> (pip-licenses)</li>
     <li>SBOM(CycloneDX): <code>cyclonedx-bom</code> — <b>권위 확정본은 배포 이미지(Dockerfile.api.prod) 내에서 생성·첨부</b>(운영 전환 시)</li>
-    <li><b>실측 스팟체크(2026-08, Trove classifier 기준)</b>: psycopg=<b>LGPL-3.0</b> · torch=<b>BSD-3</b> · transformers/mlflow/bcrypt=Apache-2.0 · SQLAlchemy/openpyxl/python-docx/python-pptx/redis=MIT · xlrd=BSD · PyMuPDF(AGPL)은 <b>배포 미포함 확인</b>. 그 외 <b>MPL-2.0 소수</b>(certifi·tqdm·pathspec 등)는 파일단위 약카피레프트·미수정 사용이라 <b>재배포 자유</b>(배포 포함 무방).</li>
+    <li><b>실측 스팟체크(2026-08, Trove classifier 기준)</b>: psycopg=<b>LGPL-3.0</b> · torch=<b>BSD-3</b> · transformers/mlflow(지재원 학습서버 전용·고객사 미포함)/bcrypt=Apache-2.0 · SQLAlchemy/openpyxl/python-docx/python-pptx/redis=MIT · xlrd=BSD · PyMuPDF(AGPL)은 <b>배포 미포함 확인</b>. 그 외 <b>MPL-2.0 소수</b>(certifi·tqdm·pathspec 등)는 파일단위 약카피레프트·미수정 사용이라 <b>재배포 자유</b>(배포 포함 무방).</li>
   </ul>
 
-  <div class="foot">로이드케이(AI 코어) · 오픈소스 라이선스·다중배포 검토서 · 2026-07-29 · 라이선스 값은 번들 동결 기준, 운영 전환 시 SBOM으로 재확정</div>
+  <div class="foot">로이드케이(AI 코어) · 오픈소스 라이선스·다중배포 검토서 · 2026-08-02 · 라이선스 값은 번들 동결 기준, 운영 전환 시 SBOM으로 재확정</div>
 </div>
 </body>
 </html>

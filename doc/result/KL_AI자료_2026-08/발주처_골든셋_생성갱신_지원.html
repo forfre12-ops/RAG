@@ -87,7 +87,7 @@ a{color:#0a0a0a}
     <li><code>POST /synth/{id}/review</code> — 담당자가 승인/반려<span class="who">admin · reviewer</span></li>
     <li>승인분만 학습 데이터셋 빌드에 편입 — 반려분은 학습에 들어가지 않음</li>
   </ol>
-  <p style="font-size:12.5px;color:#71717a">※ 합성 LLM은 폐쇄망에서 <b>로컬 Qwen3-14B</b>(Apache-2.0, 오프라인 동봉)를 사용합니다. 외부 전송이 없으며, LLM을 교체해도 호출부 코드 변경이 필요 없습니다(어댑터 분리).</p>
+  <p style="font-size:12.5px;color:#71717a">※ 합성 LLM은 폐쇄망에서 <b>로컬 Qwen3-14B</b>(Apache-2.0)를 사용합니다. 이 가중치는 <b>본 번들에 동봉하지 않으며</b>, GPU를 보유한 고객사가 vLLM/Ollama로 직접 기동한 망 내 엔드포인트를 연결하는 방식입니다(무GPU 현장은 본 경로 A 구동 불가 → 경로 B·C로 대체). 외부 전송이 없으며, LLM을 교체해도 호출부 코드 변경이 필요 없습니다(어댑터 분리).</p>
 
   <h2>2. 생성 경로 B — 골든셋 빌드 + 서명 승격 <span class="tag on">구현</span></h2>
   <p>흩어진 문서를 넣으면 위생검사 → 자동 라벨 → 합의 → <b>검토본 HTML</b>까지 한 번에 나옵니다. 담당자는 그 검토본을 보고 서명하며, <b>서명 전에는 어떤 것도 평가 정답지가 되지 않습니다</b>.</p>
@@ -170,7 +170,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:74px">가부</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td><span class="tag on">가능</span></td><td>발주처가 <b>자체적으로</b> 모의문서 생성 · 골든셋 빌드 · 실문서 등급 확정 · 교정 환류 · 재학습·활성화까지 전부 수행</td></tr>
+      <tr><td><span class="tag on">가능</span></td><td>발주처가 <b>자체적으로</b> 모의문서 생성 · 골든셋 빌드 · 실문서 등급 확정 · 교정 환류 · 재학습·활성화까지 전부 수행<br /><span style="font-size:12px;color:#71717a">※ <b>모의문서 생성(경로 A)</b>은 합성 LLM(Qwen3-14B)을 <b>고객사 GPU로 구동</b>해야 하므로 GPU 보유 현장에 한합니다. 무GPU 운영 현장은 경로 B·C와 갱신 루프(§4)로 정답지·학습셋을 확보합니다.</span></td></tr>
       <tr><td><span class="tag on">가능</span></td><td>운영 서버 <b>GPU 없이</b> 갱신 루프 유지(야간 CPU 증분재학습)</td></tr>
       <tr><td><span class="tag opt">조건부</span></td><td>평가 정답지(<code>locked_gold_eval</code>) 확보 — <b>담당자의 실계정 서명 작업이 필요</b>합니다. 자동 생성으로는 만들 수 없습니다(만들면 순환 논리)</td></tr>
       <tr><td><span class="tag opt">조건부</span></td><td>정확도의 <b>실질 개선</b> — 교정 데이터가 쌓이는 만큼 좋아집니다. 초기 소량으로는 체감 변화가 작습니다</td></tr>

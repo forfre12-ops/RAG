@@ -850,9 +850,9 @@ footer strong{color:var(--text-dim);}
 <p style="margin:6px 0 8px;font-size:13px;color:var(--text-dim);"><strong>분류(핵심 요건)</strong>는 F1·미탐율로, <strong>검색(요건 외 부가)</strong>은 Recall@5로 — <u>서로 다른 축</u>입니다. 검색 점수가 분류 등급을 바꾸지 않습니다.</p>
 <div class="kpi-grid">
   <div class="kpi-card">
-    <div class="kpi-label">🎯 분류 F1 (서빙·홀드아웃 109)</div>
-    <div class="kpi-value pass">0.686</div>
-    <div class="kpi-sub">핵심 요건 · KF-DeBERTa v-fe4b386b(v5_clean · 2026-07-29 승격) · 홀드아웃 109(학습본 42% 누출·참고용, 이 셋에선 v5≈v4) — v5 헤드라인=hardened holdout F1 0.917·공개문서 과분류 0.79→0.04·high→S3 위험미탐 0. clean F1≈0.78은 직전 배포본 v4(v-dd3abab9) 기준(백서 v7)</div>
+    <div class="kpi-label">🎯 분류 F1 (hardened holdout · 현행 v5)</div>
+    <div class="kpi-value pass">0.917</div>
+    <div class="kpi-sub">핵심 요건 · KF-DeBERTa v-fe4b386b(v5_clean · 2026-07-29 승격) — hardened holdout(누출0·n=42) F1 0.917 · 공개문서 과분류 0.79→0.04 · high→S3 위험미탐 0. 직전 배포본 v4(v-dd3abab9)는 홀드아웃 109(학습본 42% 누출·참고용, 이 셋에선 v5≈v4) F1 0.686 · clean F1≈0.78(백서 v7)</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">🎯 분류 방향성 미탐율 (서빙경로)</div>
@@ -874,7 +874,7 @@ footer strong{color:var(--text-dim);}
 <div class="callout">
   <div class="callout-label">📖 F1 / Recall@5 가 뭔가요?</div>
   <p>
-    <strong>F1 점수</strong>는 분류 정확도를 0~1로 나타낸 것입니다. 0.686은 100건 중 약 69건을 올바르게 분류(4등급 균형 난이도 기준).
+    <strong>F1 점수</strong>는 분류 정확도를 0~1로 나타낸 것입니다. 현행 v5의 0.917은 100건 중 약 92건을 올바르게 분류(hardened holdout 기준; 직전 v4 홀드아웃 109에선 0.686).
     <br/><strong>Recall@5</strong>는 "관련 문서가 검색 결과 상위 5개 안에 있을 확률"입니다.
     0.808이면 80.8%의 질문에서 정답 문서를 상위 5개 안에 찾아냄.
   </p>
@@ -1306,13 +1306,13 @@ footer strong{color:var(--text-dim);}
 </div>
 
 <div class="callout dark">
-  <div class="callout-label">📦 정답셋(골든셋) — 500건 4등급 균형</div>
+  <div class="callout-label">📦 정답셋(골든셋) — 현행 gold_real 777건</div>
   <p>
-    모델 성능을 채점하는 기준 정답지(골든셋)는 <strong>본셋 500건</strong>으로, TS/S1/S2/S3 <strong>각 125건씩 4등급을 균형(25%)</strong>있게 맞췄습니다.
-    한 등급에 쏠려 있으면 점수가 부풀 수 있어 일부러 고르게 분포시킵니다.
-    도메인은 반도체(EUV)·방위사업·M&A·AI·바이오약물·보안 6종, 각 600~1,000자에 구체적 기술 지표를 담았습니다.
-    S/V/M을 독립적으로 판독한 뒤 곱한 등급이 정답 등급과 <strong>500/500 정합</strong>함을 검증했습니다.
+    모델 성능을 채점하는 기준 정답지(골든셋)는 현행 <strong>gold_real 777건</strong>입니다.
+    초기 후보셋 <strong>golden500</strong>(TS/S1/S2/S3 각 125건 균형(25%)·S/V/M 곱 등급이 정답과 <strong>500/500 정합</strong>·반도체(EUV)·방위사업·M&A·AI·바이오약물·보안 6종, 각 600~1,000자)과 golden100은 <strong>구 후보셋으로 현행 777로 대체·폐기</strong>됐습니다.
+    한 등급에 쏠리면 점수가 부풀 수 있어 등급 분포는 고르게 유지합니다.
     (초기 파일럿은 52건이었고, 그중 67%가 전문가 검수가 필요한 경계 케이스였습니다.)
+    모든 골든셋 수치는 합성·LLM 라벨 기준이며 사람서명 locked 확정 전입니다.
   </p>
 </div>
 
@@ -1389,7 +1389,7 @@ footer strong{color:var(--text-dim);}
 <table>
   <thead><tr><th>구분</th><th>운영 기준</th><th>현재 값</th><th>상태</th></tr></thead>
   <tbody>
-  <tr><td><strong>분류 — 홀드아웃 F1 (서빙경로)</strong></td><td>F1-macro 측정</td><td>0.686 <span style="color:var(--text-dim);font-size:.85em;">· 원시 argmax 0.632</span></td><td><span class="tag mid">측정</span></td></tr>
+  <tr><td><strong>분류 — F1 헤드라인 (현행 v5)</strong></td><td>F1-macro 측정</td><td>0.917 <span style="color:var(--text-dim);font-size:.85em;">· hardened holdout(누출0) · 직전 v4 홀드아웃109 0.686·원시 argmax 0.632</span></td><td><span class="tag mid">측정</span></td></tr>
   <tr><td><strong>분류 — 방향성 FNR (서빙경로)</strong></td><td>고등급 미탐 최소화</td><td>0.018 <span style="color:var(--text-dim);font-size:.85em;">· FNR_TS 0.000 · 원시 0.167</span></td><td><span class="tag mid">프록시</span></td></tr>
   <tr><td><strong>법률 정제 효과 (test 정확도)</strong></td><td>오염 제거 후 향상</td><td>93% <span style="color:var(--text-dim);font-size:.85em;">· 정제 전 78%</span></td><td><span class="tag mid">개선</span></td></tr>
   <tr><td><strong>단위 테스트 (pytest)</strong></td><td>전통과 · 회귀 0</td><td>약 1,200건</td><td><span class="tag mid">프록시</span></td></tr>
@@ -1443,7 +1443,7 @@ footer strong{color:var(--text-dim);}
 <div class="callout dark">
   <div class="callout-label">⚡ 신규 — 자동확정/검수는 confidence 단독이 아니라 다단 게이트로 결정 (희소근거 룰-폴백 기본 ON · 합의/메타 base 기본 OFF)</div>
   <p>
-    confidence는 분류기가 학습한 신뢰도가 아니라 <strong>softmax 파생값</strong>이라 OOD(학습 분포 밖)에서 과신하며 정답/오답 판별력이 낮습니다(골든500 AUROC 0.58).
+    confidence는 분류기가 학습한 신뢰도가 아니라 <strong>softmax 파생값</strong>이라 OOD(학습 분포 밖)에서 과신하며 정답/오답 판별력이 낮습니다(구 후보셋 골든500 AUROC 0.58; 현행 정본 골든셋은 gold_real 777).
     그래서 자동확정은 confidence 임계(기본 0.7) 단독이 아니라 아래 게이트들로 판단합니다. <strong>모두 opt-in이며 기본은 OFF</strong>라 켜기 전에는 기존 동작이 그대로입니다.
   </p>
   <ul>

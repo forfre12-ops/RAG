@@ -208,7 +208,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
         <tr><td>GPU</td><td class="pick">학습·골든셋 = 지재원 A100 GPU · 추론 = CPU</td><td>운영 추론은 CPU로 충분(LLM-free 핫패스). 학습·골든셋·합성은 <b>지재원 A100 80GB GPU 모델공장</b>(요건 FUN-004 발주처 제공·CSAP). 고객사 증분 재학습만 현장 CPU(§11 D7 결정)</td></tr>
         <tr><td>상용 LLM</td><td class="pick">공개 데이터에만</td><td>골든 후보 구축·합성 학습데이터 생성용. <b>비밀 본문은 절대 미투입</b>(반출=비공지성 파괴)</td></tr>
         <tr><td>임계·가중치</td><td class="pick">Optuna 자동 최적화</td><td>골든셋 기준으로 게이트·온도·가중치를 자동 탐색(재학습 아닌 후처리 → CPU 초~분) → §06</td></tr>
-        <tr><td>골든셋 1,000건</td><td class="pick">평가·검수 전용(봉인)</td><td>학습 연료 아님 — 성능 지표 측정 + Optuna 튜닝 기준. 사람 서명 필수(단일)</td></tr>
+        <tr><td>골든셋 현행 777 · 목표 1,000</td><td class="pick">평가·검수 전용(봉인)</td><td>학습 연료 아님 — 성능 지표 측정 + Optuna 튜닝 기준. <b>현행 정본 <code>gold_real</code> 777건(§04) · 본개발 목표 1,000건.</b> 사람 서명 필수(단일)</td></tr>
         <tr><td>안전 골조</td><td class="pick">게이트 = 가시성 (번들 A–F · P0#1~#7)</td><td>모델을 덜 믿어도 <b>안전하게 틀리고·빨리 배우고·명확히 멈추게</b>. 게이트를 켜면 그 발동을 메트릭·<code>/admin/dashboard</code>로 같이 노출 → §08</td></tr>
       </tbody>
     </table></div>
@@ -438,7 +438,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
         <tr><td><b>단일 정본</b></td><td>폐쇄망 하나의 정합 DB</td><td><span class="tag-no">❌ 별도 시스템·이중쓰기</span></td></tr>
       </tbody>
     </table></div>
-    <div class="band"><div class="bt">ES는 "못 쓰는" 게 아니라 "불필요"</div><p>분류는 모델이 하고 검색은 보조라 ES 강점이 핵심에 안 닿는다. <b>pgvector가 PG 안에서 벡터+lexical을 통합</b>(실측 dense 55% 동일·하이브리드 85%)하므로 ES를 더하면 이중시스템 부담만 늘 뿐. <b>고객사=운영 RDB 필수 / 지재원=파일+가벼운 DB로 충분</b>(§05·§07 저장 정책 참조).</p></div>
+    <div class="band"><div class="bt">ES는 "못 쓰는" 게 아니라 "불필요"</div><p>분류는 모델이 하고 검색은 보조라 ES 강점이 핵심에 안 닿는다. <b>pgvector가 PG 안에서 벡터+lexical을 통합</b>(실측 dense 76%·하이브리드 85%, 의사결정_대장 §03)하므로 ES를 더하면 이중시스템 부담만 늘 뿐. <b>고객사=운영 RDB 필수 / 지재원=파일+가벼운 DB로 충분</b>(§05·§07 저장 정책 참조).</p></div>
   </section>
 
   <!-- 11 남은 의사결정 -->

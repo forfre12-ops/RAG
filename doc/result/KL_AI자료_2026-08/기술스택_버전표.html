@@ -113,7 +113,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:130px">포맷</th><th style="width:210px">라이브러리</th><th style="width:110px">버전</th><th style="width:100px">라이선스</th><th>비고</th></tr></thead>
     <tbody>
-      <tr><td>PDF</td><td>pdfminer.six</td><td>20260107</td><td>BSD-3</td><td>기본 추출기</td></tr>
+      <tr><td>PDF</td><td>pdfminer.six</td><td>20260107</td><td>MIT</td><td>기본 추출기</td></tr>
       <tr><td>DOCX</td><td>python-docx</td><td>1.2.0</td><td>MIT</td><td>머리글·바닥글·표·글상자 포함</td></tr>
       <tr><td>PPTX</td><td>python-pptx</td><td>1.0.2</td><td>MIT</td><td>슬라이드 본문·표</td></tr>
       <tr><td>XLSX</td><td>openpyxl</td><td>3.1.5</td><td>MIT</td><td>병합셀 세로 전파</td></tr>
@@ -142,12 +142,12 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:190px">구성요소</th><th style="width:120px">라이선스</th><th>제외 사유</th></tr></thead>
     <tbody>
-      <tr><td>PyMuPDF</td><td>AGPL-3.0</td><td>강한 카피레프트. 기본 PDF 추출은 pdfminer.six(BSD-3)로 충분 — extras <code>[pdf-agpl]</code> 옵트인 전용</td></tr>
+      <tr><td>PyMuPDF</td><td>AGPL-3.0</td><td>강한 카피레프트. 기본 PDF 추출은 pdfminer.six(MIT)로 충분 — extras <code>[pdf-agpl]</code> 옵트인 전용</td></tr>
       <tr><td>Tesseract · poppler-utils</td><td>Apache-2.0 · <b>GPL-2/3</b></td><td>스캔 OCR은 요건 외(FUN-022=전자문서 텍스트 추출). poppler GPL 반출 소거 위해 이미지에서 제외</td></tr>
       <tr><td>MinIO</td><td>서버 AGPL-3.0</td><td>폐쇄망 저장소는 로컬 파일시스템 사용. extras <code>[minio]</code>는 클라우드 티어 전용</td></tr>
       <tr><td>Elasticsearch</td><td>SSPL/Elastic</td><td>검색을 PostgreSQL로 통합 — 의존성 자체를 설치하지 않음(레거시 어댑터 코드만 존치)</td></tr>
       <tr><td>MLflow</td><td>Apache-2.0</td><td>실험·모델 레지스트리는 <b>지재원 학습 서버 전용</b> — 고객사 운영 번들 미포함</td></tr>
-      <tr><td>상용 LLM SDK <span style="color:#71717a">(anthropic · openai)</span></td><td>MIT</td><td>폐쇄망 기본 구성에서 미사용. 외부 전송 없음(로컬 엔드포인트 호출에만 openai 호환 클라이언트 사용)</td></tr>
+      <tr><td>상용 LLM SDK <span style="color:#71717a">(anthropic · openai)</span></td><td>anthropic=MIT<br />openai=Apache-2.0</td><td>폐쇄망 기본 구성에서 미사용. 외부 전송 없음(로컬 엔드포인트 호출에만 openai 호환 클라이언트 사용)</td></tr>
       <tr><td>LangChain</td><td>MIT</td><td>프롬프트 체인은 자체 어댑터로 구현 — 실사용 없음(RFP 구현현황 FUN-003-④에 명시)</td></tr>
       <tr><td>pyhwp</td><td>AGPLv3+</td><td>2026-08-01 의존성 삭제 — HWP 표 셀 회수를 unhwp(MIT)로 대체</td></tr>
     </tbody>

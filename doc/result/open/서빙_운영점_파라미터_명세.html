@@ -291,7 +291,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
   <article id="top">
     <div class="meta-row">
       <span class="badge">운영점·파라미터 명세</span>
-      <span class="badge blue">2026-06 · 보조문서</span>
+      <span class="badge blue">정식 산출물 · 2026-08-02 검토</span>
       <span class="meta-dot">·</span>
       <span class="meta-soft">온도보정 · 게이트 임계 · 신뢰도 · 검색 융합 — 코드 기준 1:1 정합</span>
       <span class="meta-dot">·</span>
@@ -339,7 +339,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
-        <div class="callout-body"><b>전제.</b> 본 명세의 측정 수치는 전부 <b>합성·OOD 골든셋</b>(golden100/500)과 <b>clean 홀드아웃 77건</b>(<code>datasets/gold_real/holdout_eval.clean.jsonl</code>) 기준이다. 임계의 <b>정밀 튜닝은 제약 완화 시 실데이터 1,000건 사람서명 locked 평가셋</b>에서 확정하며, 그 전 값은 안전(미탐) 방향의 보수적 잠정값이다.</div>
+        <div class="callout-body"><b>전제.</b> 본 명세의 측정 수치는 전부 <b>합성·OOD 골든셋</b>(구 후보셋 golden100/500 — 현행 평가정본=gold_real 777)과 <b>clean 홀드아웃 77건</b>(<code>datasets/gold_real/holdout_eval.clean.jsonl</code>) 기준이다. 임계의 <b>정밀 튜닝은 제약 완화 시 실데이터 1,000건 사람서명 locked 평가셋</b>에서 확정하며, 그 전 값은 안전(미탐) 방향의 보수적 잠정값이다.</div>
       </div>
     </section>
 
@@ -397,14 +397,14 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="card"><div class="card-label">설정 키</div><div class="card-value sm">classifier_<br>temperature</div><div class="card-desc">float, 양수만</div></div>
         <div class="card"><div class="card-label">기본값</div><div class="card-value sm">1.0</div><div class="card-desc">무보정(동작 보존)</div></div>
         <div class="card"><div class="card-label">온도 보정 T</div><div class="card-value sm">운영 3.0</div><div class="card-desc">측정 최적 2.0(ECE 0.045) 대비 FNR-보수 마진</div></div>
-        <div class="card card-warn"><div class="card-label">OOD 잔존</div><div class="card-value sm">ECE 0.184</div><div class="card-desc">golden500 — 전이 안 됨</div></div>
+        <div class="card card-warn"><div class="card-label">OOD 잔존</div><div class="card-value sm">ECE 0.184</div><div class="card-desc">구 후보셋 golden500 — 전이 안 됨</div></div>
       </div>
       <p><b>무엇:</b> softmax 직전 logit을 T로 나눠 분포를 평탄화한다 — <code>temp = self._temperature; if temp != 1.0: logits = logits / temp</code> (<code>m5_inference/pipeline.py</code> <code>_run_model</code>). T&gt;1이면 과신(overconfident)이 완화된다.</p>
       <p><b>왜:</b> 분류기는 학습에 없던 새 문체(OOD)에서 과신해, conf 게이트(0.7)가 부풀려진 값 위에 서면 틀린 예측이 conf=1.0으로 자동확정되는 무인 미탐이 난다.</p>
       <p><b>적용 순서:</b> 모델 폴더에 <code>temperature.json</code>이 있으면 서빙이 자동 로드한다. <code>settings.classifier_temperature</code>가 명시값(≠1.0)이면 그게 최우선, 아니면 모델 동봉값, 둘 다 없으면 1.0.</p>
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
-        <div class="callout-body"><b>보정은 필요조건이지 충분조건이 아니다.</b> val에서 ECE 0.045였던 같은 보정이 분포가 다른 golden500(OOD)에선 ECE 0.184로 다시 나빠진다. 즉 <b>온도보정만으로 confidence가 자동확정의 신뢰 근거가 되지 않는다</b> — 그래서 §6의 게이트가 필요하다. (보고서 §04)</div>
+        <div class="callout-body"><b>보정은 필요조건이지 충분조건이 아니다.</b> val에서 ECE 0.045였던 같은 보정이 분포가 다른 구 후보셋 golden500(OOD)에선 ECE 0.184로 다시 나빠진다. 즉 <b>온도보정만으로 confidence가 자동확정의 신뢰 근거가 되지 않는다</b> — 그래서 §6의 게이트가 필요하다. (보고서 §04)</div>
       </div>
     </section>
 
@@ -451,21 +451,21 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="tbl-wrap"><table><tbody>
         <tr><td style="width:18%;">기본 / 운영</td><td><b>False</b> / onprem·full-train <b>True</b></td></tr>
         <tr><td>동작</td><td>자동확정 조건을 좁힌다: <b>공개등급(S3) 예측은 conf 단독 허용</b>(S3 conf 정밀도 94%), <b>그 외(TS·S1·S2)는 룰엔진 원시등급 == 모델등급일 때만</b> 자동확정·불일치면 검수. 등급은 무인 변경 없이 라우팅만.</td></tr>
-        <tr><td>측정</td><td>golden500 자동확정 정밀도 <b>63→81%</b>·고등급 미탐 <b>46→8</b>(~6배↓). 대가는 자동확정 커버리지↓(검수↑). 적대적 9에이전트·5차원 리뷰 통과(correctness 결함 0).</td></tr>
+        <tr><td>측정</td><td>구 후보셋 golden500 자동확정 정밀도 <b>63→81%</b>·고등급 미탐 <b>46→8</b>(~6배↓). 대가는 자동확정 커버리지↓(검수↑). 적대적 9에이전트·5차원 리뷰 통과(correctness 결함 0).</td></tr>
       </tbody></table></div>
 
       <h3>6.5 FNR-safe override — <code>fnr_rule_ts/s1/s2_threshold</code></h3>
       <div class="tbl-wrap"><table><tbody>
         <tr><td style="width:18%;">기본값</td><td>TS <b>3.0</b> · S1 <b>2.2</b> · S2 <b>1.6</b></td></tr>
         <tr><td>동작</td><td>룰 엔진이 고등급을 이 점수 이상으로 잡는데 모델이 더 낮은 등급을 주면, 더 민감한(높은) 등급으로 상향(<code>run()</code> override). 모델이 미학습 도메인(M&amp;A·암호·국방 등)을 낮게 줄 때 방어. 항상 적용.</td></tr>
-        <tr><td>기각된 변형</td><td>임계 3.0→1.5 인하는 golden100 +1로 싸 보였으나 golden500 +12로 일반화 실패(과적합) → <b>미반영</b>(보고서 §7.2).</td></tr>
+        <tr><td>기각된 변형</td><td>임계 3.0→1.5 인하는 구 후보셋 golden100 +1로 싸 보였으나 golden500 +12로 일반화 실패(과적합) → <b>미반영</b>(보고서 §7.2).</td></tr>
       </tbody></table></div>
 
       <h3>6.6 비공지성 cap — <code>source_prior_enabled</code> / <code>source_prior_cap_grade</code></h3>
       <div class="tbl-wrap"><table><tbody>
         <tr><td style="width:18%;">기본값</td><td>True / "S3"</td></tr>
         <tr><td>동작</td><td>이미 공개된 출처(판례·공시·보도자료·공개특허 등)의 문서는 내용이 비밀급이어도 영업비밀 불성립(부정경쟁방지법 §2.2 비공지성) → 등급을 S3로 cap. 단 강한 상향신호(TS/S1)를 cap이 덮으면 'cap-conflict'로 검수 라우팅(무인 미탐 방지). metadata.source가 공개 출처일 때만 발동 → 내부문서 탐지엔 영향 없음.</td></tr>
-        <tr><td>측정</td><td>게이트 미적용 시 진짜 공개판례의 85%가 비밀로 과분류(<code>reports/p1_real_public_fpr</code>). 유일 위험=출처 메타데이터 무결성(ingest 책임).</td></tr>
+        <tr><td>측정</td><td>게이트 미적용 시 진짜 공개판례의 85%가 비밀로 과분류(구 판례 legacy 실험값 <code>reports/p1_real_public_fpr</code>) — 현행 v5(v-fe4b386b) 게이트 적용 시 공개 과분류 <b>79%→4%</b>(n=400)로 억제. 유일 위험=출처 메타데이터 무결성(ingest 책임).</td></tr>
       </tbody></table></div>
 
       <h3>6.7 메타데이터 floor — <code>metadata_floor_enabled</code></h3>
@@ -555,7 +555,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 </div>
 
 <footer>
-  <span>서빙 운영점·게이트 파라미터 명세 · 2026-06 · Lloydk AI Engine</span>
+  <span>서빙 운영점·게이트 파라미터 명세 · 2026-08-02 제출본 · Lloydk AI Engine</span>
   <span>온도보정 · 게이트 임계 · 신뢰도 · 검색 융합 — 코드 기준 정합</span>
 </footer>
 <script>
