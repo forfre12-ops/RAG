@@ -80,7 +80,7 @@ class TestScanIsBlind:
     def test_intake_carries_text_and_hash(self, docs: Path, tmp_path: Path):
         out = tmp_path / "intake"
         _run("scan", "--docs-dir", str(docs), "--out-dir", str(out))
-        recs = [json.loads(l) for l in (out / INTAKE).read_text(encoding="utf-8").splitlines() if l.strip()]
+        recs = [json.loads(ln) for ln in (out / INTAKE).read_text(encoding="utf-8").splitlines() if ln.strip()]
         assert len(recs) == 2
         assert all(r["text"] and len(r["text_sha256"]) == 64 for r in recs)
 
@@ -100,7 +100,7 @@ class TestBuildGates:
         r = _run("build", "--intake-dir", str(out))
         assert r.returncode == 0, r.stderr
 
-        locked = [json.loads(l) for l in (out / LOCKED).read_text(encoding="utf-8").splitlines() if l.strip()]
+        locked = [json.loads(ln) for ln in (out / LOCKED).read_text(encoding="utf-8").splitlines() if ln.strip()]
         assert len(locked) == 2
         for rec in locked:
             assert rec["label_source"] == "human_review"   # 평가 정답지의 자격
@@ -162,5 +162,5 @@ class TestBuildGates:
 
         r = _run("build", "--intake-dir", str(out))
         assert r.returncode == 0
-        locked = [json.loads(l) for l in (out / LOCKED).read_text(encoding="utf-8").splitlines() if l.strip()]
+        locked = [json.loads(ln) for ln in (out / LOCKED).read_text(encoding="utf-8").splitlines() if ln.strip()]
         assert len(locked) == 1
