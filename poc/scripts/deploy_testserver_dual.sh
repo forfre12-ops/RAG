@@ -121,6 +121,12 @@ deploy_stack() {
   export API_HOST_PORT="$port"
   dc "$proj" "$envf" up -d postgres redis
   wait_pg "$proj" "$envf"
+  # 빌드를 마이그레이션보다 **먼저** 돌린다. compose 는 이미지가 있으면 재사용하므로, 빌드를
+  # 생략하면 소스를 새로 올려도 예전 코드가 뜬다(2026-08-01 실측: 소스는 최신인데 3일 전
+  # 이미지가 기동 — unhwp 미설치·제외한 OCR 잔존). 그 상태로 `run --rm api alembic upgrade`
+  # 를 돌리면 신규 마이그레이션이 통째로 누락된다. 레이어 캐시는 살아 있어 변경분만 재설치된다.
+  c_b "  이미지 빌드(소스 반영)…"
+  dc "$proj" "$envf" build api worker beat
   c_b "  마이그레이션(alembic upgrade head)…"
   dc "$proj" "$envf" run --rm api alembic upgrade head
   c_b "  앱 기동(api·worker·beat)…"
@@ -167,7 +173,10 @@ print_summary() {
   printf '  %-8s  %-28s  API_KEY=%s\n' "고객사"  "http://127.0.0.1:$CUST_PORT" "${kc:-?}"
   echo
   echo "  · 원격 접근(터널): ssh -L $JJW_PORT:127.0.0.1:$JJW_PORT -L $CUST_PORT:127.0.0.1:$CUST_PORT <user>@<host>"
-  echo "  · 관리 콘솔: http://127.0.0.1:$JJW_PORT/admin.html  (하드닝 프로파일이라 /demo purge 는 비활성)"
+  # 정적 콘솔은 app.py 에서 "/demo" 로 mount 된다 — 루트(/admin.html)는 404 다(2026-08-01 실측).
+  echo "  · 관리 콘솔: http://127.0.0.1:$JJW_PORT/demo/admin.html · http://127.0.0.1:$CUST_PORT/demo/admin.html"
+  echo "               (하드닝 프로파일이라 파괴적 /demo purge 는 비활성)"
+  echo "  · 헬스     : http://127.0.0.1:$JJW_PORT/api/v1/healthz/ready"
   echo "  · 로그: docker compose -p lloydk-jjw $COMPOSE_FILES logs -f api"
   echo "  · 중지: bash scripts/deploy_testserver_dual.sh down"
 }
