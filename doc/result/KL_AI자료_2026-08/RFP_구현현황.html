@@ -81,7 +81,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:88px">세부ID</th><th style="width:64px">상태</th><th>근거·증빙</th><th style="width:280px">비고</th></tr></thead>
     <tbody>
-      <tr><td class="id">FUN-022-①</td><td><span class="st done">완료</span></td><td>extractor.py extract() 확장자 라우터(HWP/HWPX/DOCX/DOC/PDF/XLSX/XLS/PPTX)·PDF=pdfminer.six(배포 기본)·PyMuPDF/OCR은 옵트인(배포 이미지 제외)·test_parser_support_matrix.py</td><td>핵심 포맷 자동추출. 일부 선택의존성 graceful-degrade(.hwp 표셀=pyhwp, .xls=xlrd). 미설치는 예외 대신 error 필드로 안전 degrade</td></tr>
+      <tr><td class="id">FUN-022-①</td><td><span class="st done">완료</span></td><td>extractor.py extract() 확장자 라우터(HWP/HWPX/DOCX/DOC/PDF/XLSX/XLS/PPTX)·PDF=pdfminer.six(배포 기본)·PyMuPDF/OCR은 옵트인(배포 이미지 제외)·test_parser_support_matrix.py</td><td>핵심 포맷 자동추출. 일부 선택의존성 graceful-degrade(.hwp 표셀=unhwp, .xls=xlrd). 미설치는 예외 대신 error 필드로 안전 degrade</td></tr>
       <tr><td class="id">FUN-022-②</td><td><span class="st done">완료</span></td><td>DOCX 머리글/바닥글/표/글상자·HWPX 표셀·PDF 표(pdfplumber)·PPTX 슬라이드·Excel 병합셀 세로전파·ExtractedTable 구조보존</td><td>본문+머리/바닥/표/글상자를 폐기 않고 포착(표 속 등급·원가 미탐 방지). .hwp 표셀 누락은 table_coverage 신호(등급 불변)</td></tr>
       <tr><td class="id">FUN-022-③</td><td><span class="st done">완료</span></td><td>normalizer.py normalize(NFKC 전각→반각·CRLF→LF·공백/빈줄 정규화·보일러플레이트 제거)·pipeline 활성</td><td>공백/줄바꿈/특수문자 정규화 활성. 불용어 제거는 구현됐으나 기본 비활성 — 단독 숫자줄(금액·수량) 삭제가 영업비밀 수치 소실(silent FNR) 유발해 보수적 미적용</td></tr>
       <tr><td class="id">FUN-022-④</td><td><span class="st done">완료</span></td><td>normalizer 페이지번호 3조건 제거·단독숫자줄 삭제 폐지·인코딩 폴백(CP949 차단)·extraction_review_gate·test_extraction_review_gate.py</td><td>처리 기준은 코드 임계·보수 휴리스틱·검수 게이트로 정의. 손실 의심 시 등급 불변·검수 라우팅·경고(조용한 드롭 금지)</td></tr>

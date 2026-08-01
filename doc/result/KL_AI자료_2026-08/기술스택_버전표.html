@@ -75,7 +75,7 @@ a{color:#0a0a0a}
       <tr><td>PDF</td><td>pdfminer.six ≥20240706</td><td>BSD-3</td><td>기본 (AGPL PyMuPDF 회피)</td></tr>
       <tr><td>DOCX / PPTX</td><td>python-docx ≥1.1 · python-pptx ≥0.6</td><td>MIT</td><td>—</td></tr>
       <tr><td>XLSX / XLS</td><td>openpyxl ≥3.1 · xlrd ≥2.0</td><td>MIT / BSD</td><td>구형 .xls는 <code>[xls]</code> 옵션</td></tr>
-      <tr><td>HWP / HWPX</td><td>rhwp-python ≥0.5.1</td><td>—</td><td>표 셀 보강은 <code>[hwp-tables]</code>(AGPL 격리, 검토서 참조)</td></tr>
+      <tr><td>HWP / HWPX</td><td>rhwp-python ≥0.5.1 · unhwp ≥0.8</td><td>MIT</td><td>본문은 rhwp, <b>.hwp 표 셀은 unhwp로 보강</b>(<code>[hwp-tables]</code>, 배포 이미지 포함). 구 pyhwp(AGPL)는 2026-08-01 제거 — 검토서 §2 참조. .hwpx 표는 원본 XML에서 직접 복원</td></tr>
       <tr><td>스캔 OCR (옵션)</td><td>Tesseract 5.x · pytesseract</td><td>Apache-2.0 / MIT</td><td>요건 외 부가 — <b>배포 이미지 제외</b>(poppler=GPL 반출 소거), 코드·옵션 존치</td></tr>
     </tbody>
   </table>
