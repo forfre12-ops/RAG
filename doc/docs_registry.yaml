@@ -386,6 +386,14 @@ documents:
     version: 2026-07-pilot
 
   # --- 감리 정식 산출물 (2026-07-25 등재 정합: 이전 미등재분) ---
+  - id: DOC-PLAN-002
+    title: 산출물 통폐합 제안서
+    path: doc/result/open/산출물_통폐합_제안서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-pilot
+
   - id: DOC-PLAN-001
     title: 사업수행계획서
     path: doc/result/open/사업수행계획서.html

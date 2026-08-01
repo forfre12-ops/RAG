@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>산출물 통폐합 제안서 | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{--bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;--bg-inverse:#09090b;--bg-nav:rgba(255,255,255,.88);--text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--text-faint:#a1a1aa;--border:rgba(0,0,0,.08);--border-mid:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.18);--font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sidebar:220px;--article-max:960px;--container:1360px;}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:5px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(27px,4vw,40px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin:0 0 18px;color:var(--text);text-wrap:balance;}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 28px;max-width:720px;}
+h2{font-size:clamp(18px,2.5vw,23px);font-weight:700;letter-spacing:-.03em;margin:10px 0 12px;color:var(--text);}
+h3{font-size:15px;font-weight:700;margin:24px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:36px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:44px 0 18px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{background:#fffbeb;border-color:#fcd34d;border-left:3px solid #d97706;}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;} td.nowrap{white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.core{background:var(--text);color:var(--bg);} .tag.sup{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.opt{background:transparent;color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.p1{background:#dc2626;color:#fff;} .tag.p2{background:#d97706;color:#fff;} .tag.p3{background:var(--bg-strong);color:var(--text);}
+.tag.pass{background:#16a34a;color:#fff;} .tag.todo{background:transparent;color:#d97706;border:1px solid #fbbf24;}
+.ph{background:#fffbeb;border:1px solid #fbbf24;color:#92400e;padding:1px 6px;font-family:var(--font-mono);font-size:11px;font-weight:600;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--border-mid);margin:18px 0;}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);} .kpi:last-child{border-right:none;}
+.kpi .n{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);} .kpi .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">산출물 통폐합 제안서</span></a>
+  <div class="nav-right"><span class="nav-badge">QA RESULT</span></div>
+</div></nav>
+<div class="article-layout">
+<article>
+  <div class="meta-row"><span class="badge">DOC-PLAN-002</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-08-01 · 발주처·감리 확정 대상</span></div>
+  <h1 class="title">산출물 통폐합 제안서</h1>
+  <p class="lede">감리 제출 산출물을 <b>정식 34종 → 28종</b>, 참고자료 <b>11종 → 6종</b>으로 정리하는 제안이다. 사업수행계획서 §05 비고에 따라 산출물 구성·명칭은 발주처·감리 확정 대상이므로, 수행사가 임의로 조정하지 않고 근거와 매핑을 제시해 확정을 요청한다.</p>
+
+<div class="section-sep" id="s01"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">제안 골자</span></div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="n">34 → 28</div><div class="l">정식 산출물</div></div>
+    <div class="kpi"><div class="n">11 → 6</div><div class="l">참고자료</div></div>
+    <div class="kpi"><div class="n">2건</div><div class="l">실제 병합</div></div>
+    <div class="kpi"><div class="n">0건</div><div class="l">내용 삭제</div></div>
+  </div>
+  <p>제안은 두 갈래다. <b>(A) 세는 방식 정정</b> — 부록·원본형식 파일을 상위 산출물의 하위로 세어 물리적 병합 없이 표기 종수를 줄인다. <b>(B) 실제 병합</b> — 내용이 겹치거나 본문·해설이 역전된 2건만 하나로 합친다.</p>
+  <div class="callout inset"><div class="callout-label">삭제하는 내용은 없다</div><p>본 제안은 <b>문서를 없애는 것이 아니라 묶는 것</b>이다. 병합 대상의 본문은 모두 흡수처에 보존한다. 참고자료 정리도 §05 외 자료에 한하며, 그중 2종은 삭제가 아니라 <b>현행 배포모델 기준 보고서로 교체</b>다.</p></div>
+
+<div class="section-sep" id="s02"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">왜 줄이는가 — 중복 비용 실측</span></div>
+  <p>산출물이 많은 것 자체보다, <b>같은 사실이 여러 문서에 흩어져 사는 것</b>이 더 큰 리스크다. 값 하나가 바뀌면 여러 문서를 동시에 고쳐야 하고, 하나라도 빠지면 문서 간 상충으로 감리 지적이 된다. 2026-08-01 정본 전수 스캔 실측:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>사실</th><th style="width:120px">반복 문서 수</th><th>바뀔 때 수정 범위</th></tr></thead>
+    <tbody>
+      <tr><td>골든셋 규모 <code>777</code>건</td><td><b>37</b></td><td>골든셋 재빌드 시 37개 문서</td></tr>
+      <tr><td>배포 모델 <code>v-fe4b386b</code></td><td><b>11</b></td><td>모델 승격·롤백 시 11개 문서</td></tr>
+      <tr><td>시험파일 <code>225</code></td><td>9</td><td>테스트 추가 시마다</td></tr>
+      <tr><td>경화 홀드아웃 F1 <code>0.917</code></td><td>9</td><td>재평가 시마다</td></tr>
+      <tr><td>소스 <code>38,699</code> LOC</td><td>5</td><td>코드 변경 시마다</td></tr>
+    </tbody>
+  </table></div>
+  <p>실제로 이 구조 때문에 발생한 사례가 있다. (1) 시험 수치가 낡아 <b>10개 문서를 동시에 정정</b>했고, (2) GPU 토폴로지가 <b>4개 문서에서 서로 다르게</b> 기술돼 있었으며, (3) 문서 ID <code>DOC-DEC-01</code>이 두 산출물에 중복 부여됐다. 셋 다 "같은 사실이 여러 곳에 산다"는 하나의 원인에서 나왔다.</p>
+  <div class="callout"><div class="callout-label">따라서</div><p>종수 축소만으로는 부족하다. §07의 <b>숫자 단일출처 규율</b>이 함께 가야 실질적인 상충 위험이 줄어든다.</p></div>
+
+<div class="section-sep" id="s03"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">제안 A · 세는 방식 정정 (물리 병합 없음)</span></div>
+  <p>현행 34종에는 <b>한 산출물의 부록·원본형식이 별도 종으로 계수된 것</b>이 4건 있다. 파일은 그대로 두고 계수만 상위 산출물에 귀속시킨다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>현행 계수</th><th style="width:90px">분량</th><th>제안</th></tr></thead>
+    <tbody>
+      <tr><td>기술구현_백서_v7</td><td>49,600자</td><td rowspan="4"><b>1종(백서 세트)</b>으로 계수. 부록은 백서의 하위 참조자료다.<br><span class="meta-soft">물리적 병합은 <b>반대</b> — 4종을 합치면 102,238자 단일 문서가 된다. DB 스키마·API 명세·용어 해설은 통독용이 아니라 <b>조회용</b>이라 분리가 옳다.</span></td></tr>
+      <tr><td>└ 부록A DB스키마</td><td>14,159자</td></tr>
+      <tr><td>└ 부록B API명세</td><td>26,560자</td></tr>
+      <tr><td>└ 부록C 지표용어해설</td><td>11,919자</td></tr>
+      <tr><td>[지재원] … 구축 WBS.xlsx</td><td>원본형식</td><td><b>산출물로 계수하지 않음.</b> WBS HTML의 <b>원본 형식 첨부</b>로 표기(§05 "산출물 원본형식")</td></tr>
+    </tbody>
+  </table></div>
+  <p class="meta-soft">효과: 34종 → <b>30종</b>. 파일 변경 없음.</p>
+
+<div class="section-sep" id="s04"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">제안 B · 실제 병합 (2건)</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:230px">병합</th><th style="width:90px">합계 분량</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td>WBS_작업_기능해설서<br>→ <b>WBS_본개발_작업분해구조</b></td><td>48,728자</td><td>해설서(41,797자)가 본문(6,931자)의 <b>6배</b>다. 사실상 해설서가 본문이고 본문이 요약인 역전 상태 — 하나로 두는 편이 읽기도 관리도 낫다</td></tr>
+      <tr><td>테스트_전략_및_이력<br>+ 시험케이스_및_결과서<br>→ <b>1종</b></td><td>33,517자</td><td>전략(27,227자)과 케이스·결과(6,290자)가 같은 대상(pytest 회귀 프로파일)을 서술한다. 시험 수치가 양쪽에 중복돼 이번 정정에서 <b>둘 다 고쳐야 했다</b></td></tr>
+      <tr><td>품질보증계획서<br>+ 품질보증_결과서</td><td>5,262자</td><td><b>병합하지 않음(유지).</b> 계획/결과 분리는 감리 표준 관례다. 다만 결과서가 1,571자로 얇아 "결과 부실" 지적 위험이 있어 <b>병합이 아니라 내용 보강</b>이 답이다</td></tr>
+      <tr><td>의사결정_대장<br>+ 발주처_의사결정_안건서</td><td>8,211자</td><td><b>병합하지 않음(유지).</b> 전자는 수행사 결정 이력, 후자는 <b>발주처 결정 대기 안건</b>으로 성격과 수신자가 다르다</td></tr>
+    </tbody>
+  </table></div>
+  <p class="meta-soft">효과: 30종 → <b>28종</b>.</p>
+
+<div class="section-sep" id="s05"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">유지해야 하는 산출물</span></div>
+  <p>아래는 감리·RFP가 명시적으로 확인하는 산출물이라 축소 대상에서 제외한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:260px">산출물</th><th>유지 근거</th></tr></thead>
+    <tbody>
+      <tr><td>요구사항_추적표(RTM)</td><td>요건–설계–구현–시험 추적성의 유일한 근거</td></tr>
+      <tr><td>모델_카드</td><td>모델 버전·성능·한계의 정본(§07 단일출처 지정)</td></tr>
+      <tr><td>서빙_운영점_파라미터_명세</td><td>임계·게이트 운영점의 정본(§07 단일출처 지정)</td></tr>
+      <tr><td>보안_설계서 · 소프트웨어_개발보안_적용내역</td><td>보안 감리 항목</td></tr>
+      <tr><td>개인정보영향평가_적용성_판정서</td><td>법정 검토 산출물</td></tr>
+      <tr><td>골든셋_종합</td><td>학습·평가 데이터 근거(§07 단일출처 지정)</td></tr>
+      <tr><td>영업비밀_등급분류_기준_적용서</td><td>발주처 제공 가이드의 시스템 적용 근거</td></tr>
+      <tr><td>운영_런북 · 폐쇄망_설치_배포_설계서</td><td>인수·운영 이관 산출물</td></tr>
+    </tbody>
+  </table></div>
+
+<div class="section-sep" id="s06"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">참고자료 정리 (11종 → 6종)</span></div>
+  <p>참고자료는 §05 산출물 목록 외의 보조자료로 <b>감리 필수가 아니다</b>. 제출본의 신호 대 잡음을 높이기 위해 정리한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:250px">자료</th><th style="width:80px">처리</th><th>사유</th></tr></thead>
+    <tbody>
+      <tr><td>golden100_분류근거_보고서<br>golden500_분류근거_보고서</td><td><b>교체</b></td><td>구 모델(bpilot_v2·T=2.0) 기준이다. <b>현행 배포모델 실엔진 보고서</b>(골든셋_분류근거_v5_clean_v-fe4b386b)로 갈음 — 감리가 "배포 모델이 왜 이렇게 판정하나"를 물을 때 맞는 근거가 된다</td></tr>
+      <tr><td>시스템_역할_배포_DB구조_확인안</td><td><b>제외</b></td><td>확정되지 않은 draft. 미확정 문서를 제출본에 넣는 것이 오히려 위험</td></tr>
+      <tr><td>무실데이터_분류기_설계서</td><td><b>제외</b></td><td>기술구현_백서가 정식 문서로 대체함</td></tr>
+      <tr><td>골든셋_쉬운설명<br>점수_채점_방식_쉬운설명<br>시스템_완전이해_가이드_V3</td><td><b>제외</b></td><td>내부 온보딩용 요약이다. 감리 대상 산출물에 동일 내용의 쉬운말 판이 겹쳐 잡음이 된다(내부 보관은 유지)</td></tr>
+      <tr><td>검색단독_vs_분류기_비교<br>분류검수게이트_강화_보고서<br>설계검토_하드닝_반영_내역<br>골든셋_합성생성_설계검토</td><td><b>유지</b></td><td>설계 판단의 근거를 담은 분석 자료로, 감리 질의 대응에 실제로 쓰인다</td></tr>
+    </tbody>
+  </table></div>
+  <p class="meta-soft">결과: 유지 4 + 교체본 1(v5 실엔진) + 기존 1 = <b>6종</b>.</p>
+
+<div class="section-sep" id="s07"><span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">숫자 단일출처 규율</span></div>
+  <p>§02에서 본 중복은 종수를 줄여도 사라지지 않는다. 28종으로 줄여도 <code>v-fe4b386b</code>가 8개 문서에 남으면 같은 문제다. 아래 규율을 함께 확정할 것을 제안한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:200px">사실 범주</th><th style="width:250px">원본(단일출처)</th><th>다른 문서의 취급</th></tr></thead>
+    <tbody>
+      <tr><td>모델 버전·성능지표·한계</td><td>모델_카드 <code>DOC-MODEL-001</code></td><td rowspan="4">값을 <b>복제하지 않고 참조</b>한다. 불가피하게 인용할 때는 원본 문서와 실측일을 함께 표기</td></tr>
+      <tr><td>임계·게이트 운영점</td><td>서빙_운영점_파라미터_명세 <code>DOC-SERVING-001</code></td></tr>
+      <tr><td>시험 규모·회귀 결과</td><td>시험케이스_및_결과서 <code>DOC-TEST-001</code></td></tr>
+      <tr><td>골든셋·학습셋 규모</td><td>골든셋_종합 <code>DOC-DATA-002</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>동결 시점에 자동 검사를 걸 수 있다. 번들 생성기(<code>scripts/build_supervision_bundle.py</code>)가 이미 문서 ID·산출물 수를 계산으로 고정하고 SHA-256 무결성을 발급하므로, <b>지정 수치의 다중 출현 검사</b>를 같은 자리에 추가하면 재동결마다 상충이 자동 검출된다.</p>
+
+<div class="section-sep" id="s08"><span class="section-sep-num">08</span><span class="section-sep-line"></span><span class="section-sep-title">확정 요청 사항</span></div>
+  <p>사업수행계획서 §05 비고는 최종 제출본의 산출물 구성·명칭·서식을 <b>발주처·감리 확정 대상</b>으로 둔다. 수행사는 아래 3건의 확정을 요청한다.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th style="width:60px">번호</th><th>확정 요청</th><th style="width:110px">확정 시 조치</th></tr></thead>
+    <tbody>
+      <tr><td><b>1</b></td><td>제안 A — 부록·원본형식을 상위 산출물의 하위로 계수(34종 → 30종, 파일 변경 없음)</td><td>manifest 계수 규칙만 조정</td></tr>
+      <tr><td><b>2</b></td><td>제안 B — WBS 2종 → 1종, 시험 2종 → 1종 병합(30종 → 28종)</td><td>정본 병합 후 새 release_id 로 재동결</td></tr>
+      <tr><td><b>3</b></td><td>§07 숫자 단일출처 규율 채택</td><td>정본 정리 + 동결 시 자동 검사 배선</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout inset"><div class="callout-label">미확정 시</div><p>확정 전까지는 <b>현행 34종 구성을 그대로 유지</b>한다. 확정 없이 수행사가 산출물을 줄이면 감리 체크리스트와 어긋나 누락 지적이 될 수 있으므로, 본 제안은 실행이 아니라 <b>협의 안건</b>으로 제출한다.</p></div>
+
+  <div class="footnote">DOC-PLAN-002 · 산출물 통폐합 제안서 · 근거: 사업수행계획서 §05 산출물 목록·비고, doc/docs_registry.yaml, doc/releases/2026-08-사전진단/manifest.yaml · 중복·분량 실측일 2026-08-01</div>
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#s01">01 제안 골자</a>
+<a href="#s02">02 왜 줄이는가 — 중복 비용 실측</a>
+<a href="#s03">03 제안 A · 세는 방식 정정</a>
+<a href="#s04">04 제안 B · 실제 병합</a>
+<a href="#s05">05 유지해야 하는 산출물</a>
+<a href="#s06">06 참고자료 정리</a>
+<a href="#s07">07 숫자 단일출처 규율</a>
+<a href="#s08">08 확정 요청 사항</a>
+</nav></aside>
+</div>
+<footer><strong>로이드케이</strong> · 산출물 통폐합 제안서 (DOC-PLAN-002) · 감리 대응 산출물</footer>
+<script>
+(function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}
+window.addEventListener('scroll',o,{passive:true});o();})();
+</script>
+</body></html>
