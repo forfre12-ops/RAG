@@ -72,10 +72,11 @@ a{color:#0a0a0a}
     <li>원격 상용 API(anthropic·openai)는 <b>클라우드 티어 옵션</b>이며 폐쇄망 기본 구성에 미포함. 상용 LLM 활용은 <b>공개출처 문서에 한정</b>.</li>
   </ul>
 
-  <h2>4. 산출물</h2>
+  <h2>4. 산출물 · 실측 검증</h2>
   <ul>
     <li>의존성 라이선스 표: <code>scripts/dump_licenses.py</code> (pip-licenses)</li>
-    <li>SBOM(CycloneDX): <code>cyclonedx-bom</code> — 운영 전환 시 첨부</li>
+    <li>SBOM(CycloneDX): <code>cyclonedx-bom</code> — <b>권위 확정본은 배포 이미지(Dockerfile.api.prod) 내에서 생성·첨부</b>(운영 전환 시)</li>
+    <li><b>실측 스팟체크(2026-08, Trove classifier 기준)</b>: psycopg=<b>LGPL-3.0</b> · torch=<b>BSD-3</b> · transformers/mlflow/bcrypt=Apache-2.0 · SQLAlchemy/openpyxl/python-docx/python-pptx/redis=MIT · xlrd=BSD · PyMuPDF(AGPL)은 <b>배포 미포함 확인</b>. 그 외 <b>MPL-2.0 소수</b>(certifi·tqdm·pathspec 등)는 파일단위 약카피레프트·미수정 사용이라 <b>재배포 자유</b>(배포 포함 무방).</li>
   </ul>
 
   <div class="foot">로이드케이(AI 코어) · 오픈소스 라이선스·다중배포 검토서 · 2026-07-29 · 라이선스 값은 번들 동결 기준, 운영 전환 시 SBOM으로 재확정</div>
