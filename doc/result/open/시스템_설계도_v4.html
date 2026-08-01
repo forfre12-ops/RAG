@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 (무GPU·CPU·분류기·RDB·안전골조) | Lloydk</title>
+<title>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 (학습 GPU·추론 CPU·분류기·RDB·안전골조) | Lloydk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
@@ -160,7 +160,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       <span class="brand-sep">·</span>
       <span class="brand-url">lloydk.co.kr</span>
     </a>
-    <span class="nav-tag">시스템 설계도 v4 · 무GPU·CPU·분류기·RDB · 안전골조</span>
+    <span class="nav-tag">시스템 설계도 v4 · 학습 GPU·추론 CPU·분류기·RDB · 안전골조</span>
   </div>
 </header>
 
@@ -169,7 +169,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     <span class="badge">시스템 설계도 v4</span>
     <span class="badge ghost">2026-07-01 · 안전 골조(게이트=가시성) 하드닝 반영</span>
     <span class="dotc">·</span>
-    <span class="muted">무GPU · 무반출 · 상용LLM 공개전용 · CPU · 차후학습</span>
+    <span class="muted">학습 GPU(지재원 A100) · 추론 CPU · 무반출 · 상용LLM 공개전용 · 차후학습</span>
   </div>
   <h1 class="title">시스템 설계도 v4</h1>
   <div style="margin:14px 0 18px;padding:13px 16px;border:1px solid #16a34a;background:#f0fdf4;color:#166534;font-size:13.5px;line-height:1.6;">
@@ -184,17 +184,17 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
   <div class="body-layout">
   <div class="body-main">
-  <p class="lede">발주처(지재원) 제약 — <b>① 보안문서 반출 금지 ② 기본 무GPU(CPU) · GPU 제공 시 학습 가속 ③ 상용 LLM은 공개 데이터에만</b> — 을 충족하는 구조. 분류기는 <b>이미 학습된 가중치를 CPU로 추론</b>하고, 학습은 <b>기본 CPU(지재원 GPU 제공 시 가속)·검수된 학습셋이 쌓였을 때</b> 수행한다. 임계·가중치는 <b>Optuna</b>가 골든셋 기준으로 자동 최적화한다. 상세 근거는 기술구현 백서 v7 참조.</p>
+  <p class="lede">발주처(지재원) 제약 — <b>① 보안문서 반출 금지 ② 학습·골든셋은 지재원 GPU(A100 80GB) 모델공장 · 운영 추론은 CPU ③ 상용 LLM은 공개 데이터에만</b> — 을 충족하는 구조. 분류기는 <b>이미 학습된 가중치를 CPU로 추론</b>하고, 학습·골든셋 구축은 <b>지재원 A100 GPU</b>에서(고객사 증분 재학습은 현장 CPU·야간). 임계·가중치는 <b>Optuna</b>가 골든셋 기준으로 자동 최적화한다. 상세 근거는 기술구현 백서 v7 참조.</p>
 
 
   <!-- KPI -->
   <div class="kpi">
-    <div class="cell"><div class="v">CPU</div><div class="l">기본 = 무GPU 동작</div><div class="s">GPU 제공 시 학습만 가속(선택)</div></div>
+    <div class="cell"><div class="v">GPU/CPU</div><div class="l">학습 = 지재원 A100 GPU</div><div class="s">운영 추론·증분재학습 = CPU</div></div>
     <div class="cell"><div class="v">0</div><div class="l">비밀문서 반출</div><div class="s">실데이터 망 내 잔류</div></div>
     <div class="cell"><div class="v">공개</div><div class="l">상용 LLM 사용 범위</div><div class="s">골든·합성 생성 한정</div></div>
     <div class="cell"><div class="v">CPU</div><div class="l">비밀 분류 핫패스</div><div class="s">분류기+룰, LLM-free</div></div>
   </div>
-  <p class="sec-sub" style="margin-top:6px;">※ 본 설계는 v1(시스템_설계도.html)에서 <b>로컬 GPU LLM(Qwen)·학습 GPU·온프렘 GPU 가정을 제거</b>한 갱신본이다. 정확도·미탐 수치는 운영 관리자 확정 라벨이 충분히 쌓인 뒤에만 확정하며, 그 전 수치는 프록시로만 해석한다.</p>
+  <p class="sec-sub" style="margin-top:6px;">※ 본 설계는 v1(시스템_설계도.html)에서 <b>고객사 로컬 GPU LLM(Qwen) 가정을 제거</b>하고, 학습·골든셋은 지재원 GPU(A100) 모델공장·운영 추론은 CPU로 정리한 갱신본이다. 정확도·미탐 수치는 운영 관리자 확정 라벨이 충분히 쌓인 뒤에만 확정하며, 그 전 수치는 프록시로만 해석한다.</p>
 
   <!-- 00 핵심 결정 -->
   <section id="s0">
@@ -204,10 +204,10 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       <thead><tr><th style="width:24%;">항목</th><th style="width:30%;">선택</th><th>이유</th></tr></thead>
       <tbody>
         <tr><td>분류 엔진</td><td class="pick">분류기(KF-DeBERTa) + 룰 + RAG검색 + 메타 + 게이트 + 사람검수</td><td>비밀 등급판정 핫패스는 <b>LLM-free</b>. 분류기가 고등급에서 검색단독보다 우위(분류기 59–77% vs kNN 38–49%)</td></tr>
-        <tr><td>분류기 학습</td><td class="pick">지금=기존 가중치 그대로 · 학습은 차후</td><td>이미 학습된 베이스 존재 → <b>CPU 추론</b>이면 충분. 재학습은 검수된 학습셋이 쌓이면 CPU로(무GPU)</td></tr>
-        <tr><td>GPU</td><td class="pick">기본 무GPU(CPU) 설계 · GPU 제공 시 학습 활용</td><td>무GPU로도 전부 동작(추론·학습 CPU). <b>지재원이 GPU(요건상 발주처 제공·CSAP) 지원하면 학습만 가속</b> — 선택적 가속이지 필수 아님(§11 D7 결정)</td></tr>
+        <tr><td>분류기 학습</td><td class="pick">지금=기존 가중치 그대로 · 학습은 차후</td><td>이미 학습된 베이스 존재 → <b>CPU 추론</b>이면 충분. 지재원 풀 학습·골든셋 구축은 <b>A100 GPU</b>, 고객사 증분 재학습은 현장 CPU(야간)</td></tr>
+        <tr><td>GPU</td><td class="pick">학습·골든셋 = 지재원 A100 GPU · 추론 = CPU</td><td>운영 추론은 CPU로 충분(LLM-free 핫패스). 학습·골든셋·합성은 <b>지재원 A100 80GB GPU 모델공장</b>(요건 FUN-004 발주처 제공·CSAP). 고객사 증분 재학습만 현장 CPU(§11 D7 결정)</td></tr>
         <tr><td>상용 LLM</td><td class="pick">공개 데이터에만</td><td>골든 후보 구축·합성 학습데이터 생성용. <b>비밀 본문은 절대 미투입</b>(반출=비공지성 파괴)</td></tr>
-        <tr><td>임계·가중치</td><td class="pick">Optuna 자동 최적화</td><td>골든셋 기준으로 게이트·온도·가중치를 자동 탐색(무GPU, CPU 초~분) → §06</td></tr>
+        <tr><td>임계·가중치</td><td class="pick">Optuna 자동 최적화</td><td>골든셋 기준으로 게이트·온도·가중치를 자동 탐색(재학습 아닌 후처리 → CPU 초~분) → §06</td></tr>
         <tr><td>골든셋 1,000건</td><td class="pick">평가·검수 전용(봉인)</td><td>학습 연료 아님 — 성능 지표 측정 + Optuna 튜닝 기준. 사람 서명 필수(단일)</td></tr>
         <tr><td>안전 골조</td><td class="pick">게이트 = 가시성 (번들 A–F · P0#1~#7)</td><td>모델을 덜 믿어도 <b>안전하게 틀리고·빨리 배우고·명확히 멈추게</b>. 게이트를 켜면 그 발동을 메트릭·<code>/admin/dashboard</code>로 같이 노출 → §08</td></tr>
       </tbody>
@@ -232,18 +232,18 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
   <!-- 02 서버 구조 -->
   <section id="s2">
-    <div class="sec-head"><span class="n">02</span><h2>서버 구조 — 공개영역 / 지재원 / 고객사 (무GPU)</h2></div>
-    <div class="sec-sub"><b>기본 무GPU(추론·학습 CPU)</b>. 비밀은 지재원·고객사 안에만 머문다. <b>지재원이 GPU 지원 시 학습만 가속</b>(요건상 발주처 제공·CSAP). 공개 데이터 가공(상용 LLM·베이스 학습)은 밖에서.</div>
+    <div class="sec-head"><span class="n">02</span><h2>서버 구조 — 공개영역 / 지재원(학습 GPU) / 고객사(운영 CPU)</h2></div>
+    <div class="sec-sub"><b>운영 추론은 CPU, 학습·합성·골든·인덱싱은 지재원 A100 GPU 모델공장</b>에서 수행(요건 FUN-004 발주처 제공·CSAP). 비밀은 지재원·고객사 안에만 머물고, 고객사 증분 재학습은 현장 CPU(야간). 공개 데이터 가공(상용 LLM)은 밖에서.</div>
     <div class="deploy3">
       <div class="zone">
         <div class="zl"><span class="zt">공개·개발 영역</span><span class="zb">공개데이터</span></div>
         <div class="subnode hl"><b>상용 LLM(Claude 등)</b> — 골든 후보 구축 · 합성 학습데이터 생성 · silver 라벨</div>
-        <div class="subnode"><b>분류기 베이스 학습(CPU)</b> — 공개+합성으로 학습 → 가중치 파일</div>
-        <div class="subnode"><span class="tag-ok">반출 무관</span> 비밀 0 · 클라우드 API라 로컬 GPU 불요</div>
+        <div class="subnode"><b>분류기 베이스 학습(지재원 A100 GPU)</b> — 공개+합성으로 학습 → 가중치 파일</div>
+        <div class="subnode"><span class="tag-ok">반출 무관</span> 비밀 0 · 상용 LLM은 클라우드 API(공개 데이터만)</div>
       </div>
       <div class="conn"><div class="a">→</div>가중치<br>매체 반입</div>
       <div class="zone">
-        <div class="zl"><span class="zt">지재원 (발주처)</span><span class="zb no">GPU 0 · CPU</span></div>
+        <div class="zl"><span class="zt">지재원 (발주처·모델공장)</span><span class="zb">A100 GPU 학습 · CPU 추론</span></div>
         <div class="subnode"><b>운영 비밀데이터</b> — 고객사/KL 시스템에서 처리 · 망 내 잔류</div>
         <div class="subnode hl"><b>합성 holdout·hardcase</b> — 상대비교·회귀 테스트용, locked 평가는 운영 확정 전 0</div>
         <div class="subnode"><b>분류기 추론(CPU)</b> + <b>Optuna 게이트 튜닝(CPU)</b></div>
@@ -290,7 +290,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       <div class="node soft" style="flex:1 1 46%;"><div class="nt">자동확정</div><div class="nd">고신뢰 + 룰·모델 합의 + 공개등급일 때만</div></div>
       <div class="node soft" style="flex:1 1 46%;"><div class="nt">검수 라우팅 (사람 확인)</div><div class="nd">저신뢰 · 불일치 · <b>고등급(TS/S1)은 필수</b></div></div>
     </div>
-    <div class="band"><div class="bt">안전 모드 — fail-closed (상향 격리)</div><p>판독 불가·모호 시 <b>낮은 등급으로 떨어뜨리지 않고 최고등급으로 격리</b> 후 사람 검수. <b>미탐(비밀→공개) 0을 최우선</b>으로 한다. 무GPU로 재학습이 즉시 안 되는 만큼, <b>고등급은 사람검수가 설계 전제</b>다.</p></div>
+    <div class="band"><div class="bt">안전 모드 — fail-closed (상향 격리)</div><p>판독 불가·모호 시 <b>낮은 등급으로 떨어뜨리지 않고 최고등급으로 격리</b> 후 사람 검수. <b>미탐(비밀→공개) 0을 최우선</b>으로 한다. 재학습이 즉시 반영되지 않는 만큼, <b>고등급은 사람검수가 설계 전제</b>다.</p></div>
   </section>
 
   <!-- 04 학습 전략 -->
@@ -338,7 +338,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
   <!-- 06 Optuna -->
   <section id="s6">
     <div class="sec-head"><span class="n">06</span><h2>Optuna — 무엇을 튜닝해서 품질을 올리나</h2></div>
-    <div class="sec-sub">Optuna = 하이퍼파라미터·임계 <b>자동 탐색</b> 도구. <b>분류기를 대체하는 게 아니라</b>, 분류기 주변의 설정값을 골든셋 기준으로 최적화해 품질을 끌어올린다. <b>재학습 없는 후처리 노브는 CPU·무GPU로 초~분.</b></div>
+    <div class="sec-sub">Optuna = 하이퍼파라미터·임계 <b>자동 탐색</b> 도구. <b>분류기를 대체하는 게 아니라</b>, 분류기 주변의 설정값을 골든셋 기준으로 최적화해 품질을 끌어올린다. <b>재학습 없는 후처리 노브는 CPU로 초~분(GPU 불요).</b></div>
     <div class="diag">
       <div class="node soft"><div class="nt">목적함수</div><div class="nd">골든셋 기준 — "고등급 FNR ≤ 목표" 제약 하에 <b>자동확정율·F1 최대</b></div></div>
       <div class="arr">→</div>
@@ -355,7 +355,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       </tbody>
     </table></div>
     <div class="band gray"><div class="bt">즉시 가치</div><p>지금 가진 모델·골든셋만으로 <b>①~③(후처리 노브)</b>을 GPU 없이 최적화할 수 있다 → 우리가 계속 다룬 <b>자동확정 FNR/정밀도</b>를 골든 기준으로 바로 끌어올린다. 가장 가성비 높은 첫 작업.</p>
-    <p style="font-size:12px;color:var(--dim);"><b>구현 상태: P1 하네스 구현·검증 완료</b> — <code>m6_evaluation/optuna_tuner.py</code> + <code>scripts/optuna_tune_gates.py</code>. 평가 하네스(<code>evaluate_via_serving</code>) 재사용 · CPU·무GPU. 스모크(3-trial)에서 <b>고등급 FNR=0 제약 충족 + val/test 분할 검증</b> 확인. <b>본 정밀 튜닝(50~100 trial)은 1,000 사람골든 확보 후 실행</b>(작은 N=과적합) → best 설정을 번들 ②③④로 통합.</p></div>
+    <p style="font-size:12px;color:var(--dim);"><b>구현 상태: P1 하네스 구현·검증 완료</b> — <code>m6_evaluation/optuna_tuner.py</code> + <code>scripts/optuna_tune_gates.py</code>. 평가 하네스(<code>evaluate_via_serving</code>) 재사용 · CPU(GPU 불요). 스모크(3-trial)에서 <b>고등급 FNR=0 제약 충족 + val/test 분할 검증</b> 확인. <b>본 정밀 튜닝(50~100 trial)은 1,000 사람골든 확보 후 실행</b>(작은 N=과적합) → best 설정을 번들 ②③④로 통합.</p></div>
   </section>
 
   <!-- 07 지표 -->
@@ -448,11 +448,11 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     <div class="tbl-wrap"><table>
       <thead><tr><th style="width:5%;">#</th><th style="width:30%;">결정 사항</th><th>내용 · 영향</th></tr></thead>
       <tbody>
-        <tr><td>D1</td><td><b>FUN-024 지표 "기획서"를 KL이 진행하나?</b></td><td>지표 6개는 <b>FUN-004·024 명시로 확정(§07)</b>. 잔여 = 지표 분석 <b>화면 기획서</b> 주체 — KL(포털·대시보드 FUN-009) vs Lloydk(지표 산출 FUN-024). <b>화면=KL / 산출·API=Lloydk</b>가 자연스러움(K7 합의 안건)</td></tr>        <tr><td>D3</td><td><b>지재원 관리자가 보안등급을 검수해줄 수 있나?</b> <span class="tag-q">정확도 핵심</span></td><td>실데이터 보안등급을 <b>지재원 관리자/전문가가 직접 검수·서명</b>할 수 있는지(검토자 자격·인력 확보). ⭐ <b>이게 되어야 ① 사람서명 locked 평가셋 구축 ② 재학습으로 등급분류 정확도↑</b>(특히 S1 약점 해소). <b>검수 불가 시 정확도가 "공개+합성 학습 수준"에 묶임.</b></td></tr>        <tr><td>D7</td><td>GPU 제공 여부 <span class="tag-ok">결정</span></td><td><b>결정 — 기본 무GPU(CPU)로 설계, 지재원이 GPU 지원 가능하면 학습에 활용(선택 가속).</b> 요건(FUN-004)도 발주처 GPU·CSAP 제공 명시. 학습 코드·MLflow는 <b>코드 보존·휴면</b>(고객 번들 미포함), 본격 셋팅은 재학습 착수 시</td></tr>
+        <tr><td>D1</td><td><b>FUN-024 지표 "기획서"를 KL이 진행하나?</b></td><td>지표 6개는 <b>FUN-004·024 명시로 확정(§07)</b>. 잔여 = 지표 분석 <b>화면 기획서</b> 주체 — KL(포털·대시보드 FUN-009) vs Lloydk(지표 산출 FUN-024). <b>화면=KL / 산출·API=Lloydk</b>가 자연스러움(K7 합의 안건)</td></tr>        <tr><td>D3</td><td><b>지재원 관리자가 보안등급을 검수해줄 수 있나?</b> <span class="tag-q">정확도 핵심</span></td><td>실데이터 보안등급을 <b>지재원 관리자/전문가가 직접 검수·서명</b>할 수 있는지(검토자 자격·인력 확보). ⭐ <b>이게 되어야 ① 사람서명 locked 평가셋 구축 ② 재학습으로 등급분류 정확도↑</b>(특히 S1 약점 해소). <b>검수 불가 시 정확도가 "공개+합성 학습 수준"에 묶임.</b></td></tr>        <tr><td>D7</td><td>GPU 제공 여부 <span class="tag-ok">결정</span></td><td><b>결정 — 학습·골든셋은 지재원 A100 80GB GPU 모델공장, 운영 추론은 CPU.</b> 요건(FUN-004) 발주처 GPU·CSAP 제공 명시. 학습 코드·MLflow는 <b>지재원 전용</b>(고객 번들 미포함), 고객사 증분 재학습만 현장 CPU(야간)</td></tr>
       </tbody>
     </table></div>
     <div class="band gray"><div class="bt">v4에서 닫힌 것 (코드로 반영) — 남은 것은 "절차·사람"</div><p>안전 골조(§08)는 <b>구현·검증 완료</b>다: 안전 게이트 번들 A–F + P0#1~#7 운영 ON · 관측 메트릭·<code>/admin/dashboard</code> · 비모수 레버 P1/P2 · 지재원 export/import 런북(G1·G2) · CI 하드게이트. 즉 <b>"안전하게 틀리고·빨리 배우고·명확히 멈추는" 골조는 코드에 있다.</b> 남은 병목은 코드가 아니라 <b>D3(지재원 사람검수·서명)</b> — 이게 풀려야 사람서명 locked 평가셋과 운영 확정 학습(정확도·자동화율의 유일 레버, §04 CAPSTONE)이 열린다.</p></div>
-    <div class="band"><div class="bt">진행 1순위 (무GPU·CPU로 당장 가능)</div><p>① 1,000건 <b>사람서명 locked 평가셋</b> 구축 → ② 기존 분류기를 그 골든으로 <b>확정 실측</b> → ③ <b>Optuna로 게이트·온도 튜닝</b>(고등급 FNR=0 제약 하 자동확정율 최대). 셋 다 GPU·재학습 없이 진행된다. <span class="muted">※ Optuna 정밀 튜닝은 N이 충분한 1,000 골든서 수행(작은 N 튜닝은 과적합).</span></p></div>
+    <div class="band"><div class="bt">진행 1순위 (재학습 없이·CPU로 당장 가능)</div><p>① 1,000건 <b>사람서명 locked 평가셋</b> 구축 → ② 기존 분류기를 그 골든으로 <b>확정 실측</b> → ③ <b>Optuna로 게이트·온도 튜닝</b>(고등급 FNR=0 제약 하 자동확정율 최대). 셋 다 GPU·재학습 없이 진행된다. <span class="muted">※ Optuna 정밀 튜닝은 N이 충분한 1,000 골든서 수행(작은 N 튜닝은 과적합).</span></p></div>
   </section>
 
   </div>
@@ -484,8 +484,8 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 </script>
 
 <footer>
-  <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 · 2026-07-01 · Lloydk AI Engine · 무GPU·무반출·CPU + 분류기·RDB + 안전 골조(게이트=가시성) 하드닝 · 상세 근거는 기술구현 백서 v7 · 설계검토 하드닝 반영 내역</span>
-  <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa(CPU) · KURE-v1 · Optuna · OTel · Docker(폐쇄망) · GPU 0</span>
+  <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 · 2026-07-01 · Lloydk AI Engine · 학습 GPU(지재원 A100)·추론 CPU·무반출 + 분류기·RDB + 안전 골조(게이트=가시성) 하드닝 · 상세 근거는 기술구현 백서 v7 · 설계검토 하드닝 반영 내역</span>
+  <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa(추론 CPU / 학습 A100 GPU) · KURE-v1 · Optuna · OTel · Docker(폐쇄망)</span>
 </footer>
 </body>
 </html>
