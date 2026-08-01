@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>품질보증계획서 (SQA) | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{--bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;--bg-inverse:#09090b;--bg-nav:rgba(255,255,255,.88);--text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--text-faint:#a1a1aa;--border:rgba(0,0,0,.08);--border-mid:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.18);--font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sidebar:220px;--article-max:960px;--container:1360px;}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:5px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(27px,4vw,40px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin:0 0 18px;color:var(--text);text-wrap:balance;}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 28px;max-width:720px;}
+h2{font-size:clamp(18px,2.5vw,23px);font-weight:700;letter-spacing:-.03em;margin:10px 0 12px;color:var(--text);}
+h3{font-size:15px;font-weight:700;margin:24px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:36px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:44px 0 18px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{background:#fffbeb;border-color:#fcd34d;border-left:3px solid #d97706;}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;} td.nowrap{white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.core{background:var(--text);color:var(--bg);} .tag.sup{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.opt{background:transparent;color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.p1{background:#dc2626;color:#fff;} .tag.p2{background:#d97706;color:#fff;} .tag.p3{background:var(--bg-strong);color:var(--text);}
+.tag.pass{background:#16a34a;color:#fff;} .tag.todo{background:transparent;color:#d97706;border:1px solid #fbbf24;}
+.ph{background:#fffbeb;border:1px solid #fbbf24;color:#92400e;padding:1px 6px;font-family:var(--font-mono);font-size:11px;font-weight:600;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--border-mid);margin:18px 0;}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);} .kpi:last-child{border-right:none;}
+.kpi .n{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);} .kpi .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">품질보증계획서</span></a>
+  <div class="nav-right"><span class="nav-badge">SQA</span></div>
+</div></nav>
+<div class="article-layout">
+<article>
+  <div class="meta-row"><span class="badge">DOC-QA-01</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-07-17</span></div>
+  <h1 class="title">품질보증계획서 (SQA)</h1>
+  <p class="lede">영업비밀 자동 등급분류·RAG 시스템(담당 6요건 FUN-003·004·005·022·023·024)의 품질보증 목표·활동·조직·검토승인·형상관리·결함연계를 정의한다. 실데이터 0·검수 0·반출 0(합성-only) 제약에서 품질 판정 기준은 정확도 수치 달성이 아니라 요건 충족 · 고등급 미탐 최소화 · 회귀 방지이며, 실제 품질활동(자동화 테스트 225파일·CI 게이트·정적분석·인수 severity floor)은 코드·CI에 근거한다. 조직·일정 항목은 발주처/수행사 협의로 확정한다.</p>
+  
+  <div class="section-sep" id="s01"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">품질목표</span></div>
+<p>본 계획서는 담당 6요건(FUN-003 합성문서 생성·004 분류모델 학습(인코더PLM)·005 등급분류(추론)·결과처리·등급체계 관리·022 전자문서 텍스트추출·023 가이드기반 라벨링(S·V·M)·키워드/태깅·024 산출·리포트·검수)을 대상으로 한다. 합성-only(실데이터 0·검수 0·반출 0) 제약에서 품질목표는 정확도 수치 달성이 아니라 <b>요건 충족 · 고등급(TS/S1) 미탐 최소화 · 회귀 방지</b> 세 축으로 설정한다.</p><div class="table-wrap"><table><thead><tr><th>목표</th><th>정의</th><th>검증 수단</th><th>상태</th></tr></thead><tbody><tr><td>요건 충족</td><td>담당 6요건 기능 구현·추적</td><td>요구사항 추적표(RTM) 대사 · 요건별 테스트</td><td><span class="tag core">FUN-003~024</span></td></tr><tr><td>안전(미탐 최소화)</td><td>고등급 오분류·유실이 무인 확정으로 새지 않음</td><td>veto/floor · kill-gate · 인수 severity floor</td><td><span class="tag pass">게이트 ON</span></td></tr><tr><td>회귀 방지</td><td>기능·성능(KPI) 퇴행을 병합 전 차단</td><td>CI ~1,845 케이스(225 파일) · PSH KPI 회귀탐지</td><td><span class="tag pass">CI 강제</span></td></tr></tbody></table></div><div class="callout inset"><div class="callout-label">품질 기준선</div><p>RFP 성능요건(PER-002)은 속도·자원 항목이며 정확도 수치목표가 없다. 따라서 품질 합격 판정은 <b>severity FLOOR(고등급 미탐 = veto) + 숫자 무손실 + 게이트 가시성</b>을 1차 기준으로 하고, 정확도 지표는 보고(리포트) 항목으로 둔다.</p></div>
+<div class="section-sep" id="s02"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">품질활동</span></div>
+<h3>2.1 자동화 테스트</h3><p>테스트 코드 <b>225</b>개 파일(<code>poc/tests/</code>). 계층별 회귀 스위트를 CI(<code>.github/workflows/poc-ci.yml</code>)에서 병합 전 실행한다.</p><div class="table-wrap"><table><thead><tr><th>스위트</th><th>범위</th><th>실행(CI)</th></tr></thead><tbody><tr><td>test-lite</td><td>단위·API·서비스 빠른 회귀(도커 비의존)</td><td><code>make test-lite-cov</code> + 커버리지 수집</td></tr><tr><td>test-fullstack</td><td>PostgreSQL/pgvector 연동(리포지토리·감사체인·멱등)</td><td><code>make test-fullstack</code></td></tr><tr><td>dryrun P1~P5</td><td>파이프라인 시나리오 E2E</td><td>PoC dryrun 스위트</td></tr><tr><td>PSH 시나리오 성능</td><td>KPI 측정·회귀 자동탐지</td><td>KPI 미달·회귀 ≥30% 시 fail</td></tr></tbody></table></div><h3>2.2 정적분석·보안 스캔</h3><div class="table-wrap"><table><thead><tr><th>활동</th><th>도구</th><th>게이트 기준</th></tr></thead><tbody><tr><td>린트</td><td>ruff</td><td><code>ruff check src/ scripts/</code></td></tr><tr><td>SAST</td><td>bandit</td><td>HIGH severity 발견 시 build fail</td></tr><tr><td>규칙기반 스캔</td><td>semgrep(OWASP Top10)</td><td>ERROR 발견 시 fail</td></tr><tr><td>비밀정보 스캔</td><td>gitleaks</td><td>커밋 시크릿 탐지</td></tr></tbody></table></div><h3>2.3 인수·데이터 무결성 게이트</h3><div class="table-wrap"><table><thead><tr><th>게이트</th><th>실행</th><th>차단 조건</th></tr></thead><tbody><tr><td>인수 severity floor</td><td><code>run_acceptance.py</code></td><td>파싱실패·숫자유실·고등급 미탐(FNR) → veto FAIL</td></tr><tr><td>누출(leakage)</td><td><code>make check-leakage</code></td><td>학습/홀드아웃 텍스트 해시 중복</td></tr><tr><td>골든 데이터 위생</td><td><code>make check-gold</code></td><td>누수·합성마커·금지 source</td></tr><tr><td>매니페스트·평가증거</td><td><code>make check-manifest</code> · <code>check-release-evidence</code></td><td>데이터셋/증거 불일치</td></tr></tbody></table></div><h3>2.4 커버리지</h3><p>커버리지는 <code>pytest-cov</code>로 수집·<code>coverage.xml</code> 산출(소프트 지표). 하드 임계 게이트는 현행 미도입이며 목표선은 <span class="ph">[QA 커버리지 임계치 확정]</span>.</p><h3>2.5 코드리뷰</h3><p>변경은 브랜치 기반 PR로 관리하며 병합 전 CI 전 게이트 통과를 필수로 한다. 리뷰 담당·승인 규칙은 <span class="ph">[QA/PM 리뷰 정책 입력]</span>.</p>
+<div class="section-sep" id="s03"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">품질조직·역할</span></div>
+<p>품질보증 조직과 역할자는 발주처/수행사 협의로 확정한다. 아래 표의 성명·직위는 임의로 채우지 않는다.</p><div class="table-wrap"><table><thead><tr><th>역할</th><th>담당</th><th>주요 책임</th></tr></thead><tbody><tr><td>품질보증(QA) 책임</td><td><span class="ph">[QA 책임자 입력]</span></td><td>품질계획 수립·게이트 기준 승인·감리 대응</td></tr><tr><td>프로젝트관리(PM)</td><td><span class="ph">[PM 입력]</span></td><td>일정·자원·이해관계자 조율</td></tr><tr><td>개발 리드</td><td><span class="ph">[개발 리드 입력]</span></td><td>설계·구현·코드리뷰 승인</td></tr><tr><td>형상관리자</td><td><span class="ph">[형상관리 담당 입력]</span></td><td>git 정책·정본 문서·릴리스 태깅</td></tr></tbody></table></div><div class="callout warn"><div class="callout-label">확정 필요</div><p>조직 구성·역할자·품질 일정(마일스톤)은 협의 확정 대상이다. 확정 전까지 본 절은 역할 정의만 유효하다.</p></div>
+<div class="section-sep" id="s04"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">검토·승인 절차</span></div>
+<div class="table-wrap"><table><thead><tr><th>검토 유형</th><th>대상·시점</th><th>산출·근거</th></tr></thead><tbody><tr><td>설계검토</td><td>주요 설계 변경 시</td><td>설계검토 하드닝 반영 내역(<code>doc/result/open</code>)</td></tr><tr><td>코드리뷰</td><td>PR 병합 전</td><td>CI 게이트 통과 + 리뷰 승인</td></tr><tr><td>릴리스 게이트</td><td>배포 승인 시</td><td><code>make release-gate</code>(STRICT/GA) · <code>release-gate-pilot</code>(PILOT)</td></tr><tr><td>감리 대응</td><td>감리 지적사항 접수 시</td><td>지적→조치→검증 이력(형상 커밋 연계)</td></tr></tbody></table></div><div class="callout inset"><div class="callout-label">릴리스 승인 2모드</div><p>STRICT(GA)는 전 readiness 게이트 PASS를 요구한다. PILOT은 회귀 FAIL에서만 차단하고 데이터 천장(human_review·parity) 항목은 감사 기록과 함께 유예한다. 승인 권한자는 <span class="ph">[승인권자 입력]</span>.</p></div>
+<div class="section-sep" id="s05"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">형상관리</span></div>
+<div class="table-wrap"><table><thead><tr><th>형상 항목</th><th>관리 방식</th><th>위치·게이트</th></tr></thead><tbody><tr><td>소스코드</td><td>git 브랜치·커밋·PR</td><td><code>poc/src/lloydk</code></td></tr><tr><td>문서 정본</td><td>HTML 정본만 갱신(골격 재사용)</td><td><code>doc/result/open/*.html</code></td></tr><tr><td>의존성</td><td>결정론적 lock(uv.lock ↔ pyproject 동기)</td><td><code>deps-lock-check</code>(CI)</td></tr><tr><td>DB 스키마</td><td>alembic 단일 마이그레이션 경로 + drift 점검</td><td>alembic migration</td></tr><tr><td>OSS 구성</td><td>SBOM(CycloneDX) 생성·라이선스 위험 점검</td><td><code>licenses-check</code>(CI)</td></tr></tbody></table></div><p>정본 문서 갱신은 <code>doc/result/open/</code> HTML에 한정하며, head·nav·footer 골격을 재사용해 폼 일관성을 유지한다. 배포 형상은 릴리스 매니페스트(<code>make check-manifest</code>)로 검증한다.</p>
+<div class="section-sep" id="s06"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">결함관리 연계</span></div>
+<p>결함의 등록·분류·추적·종결 절차는 별도 <b>결함관리대장(DOC-DEF-01)</b>에 정의한다. 본 계획서는 품질활동에서 검출된 결함을 결함관리 체계로 연계하는 접점만 규정한다.</p><div class="table-wrap"><table><thead><tr><th>검출 경로</th><th>연계 동작</th><th>비고</th></tr></thead><tbody><tr><td>CI 실패(main push)</td><td>GitHub Issue 자동 생성</td><td>PSH F3</td></tr><tr><td>KPI 회귀</td><td>PR 코멘트로 회귀 표 게시</td><td>회귀 ≥30% fail</td></tr><tr><td>인수 veto</td><td>FAIL 사유(파싱/숫자/미탐) 리포트</td><td>severity floor</td></tr><tr><td>운영 안전정지</td><td>kill-gate 발동·감사 hash 체인 기록</td><td>무인 확정 차단</td></tr></tbody></table></div><div class="callout inset"><div class="callout-label">연계 원칙</div><p>결함 심각도 분류·SLA·재발방지 판정은 DOC-DEF-01을 따른다. 안전 관련(고등급 미탐) 결함은 최우선 등급으로 처리한다.</p></div>
+  <div class="footnote">DOC-QA-01 품질보증계획서 · 2026-07-17 · 실제 품질활동(테스트 225파일·CI 게이트·정적분석·인수 severity floor)은 코드·CI 근거. 조직·역할자·품질 일정 및 커버리지 임계치는 발주처/수행사 협의 확정 대상. 결함관리 상세는 DOC-DEF-01 참조.</div>
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#s01">01 품질목표</a>
+<a href="#s02">02 품질활동</a>
+<a href="#s03">03 품질조직·역할</a>
+<a href="#s04">04 검토·승인 절차</a>
+<a href="#s05">05 형상관리</a>
+<a href="#s06">06 결함관리 연계</a>
+</nav></aside>
+</div>
+<footer><strong>로이드케이</strong> · 품질보증계획서 (SQA) (DOC-QA-01) · 감리 대응 산출물</footer>
+<script>
+(function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}
+window.addEventListener('scroll',o,{passive:true});o();})();
+</script>
+</body></html>

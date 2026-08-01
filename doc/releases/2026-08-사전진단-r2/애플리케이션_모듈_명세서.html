@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>애플리케이션 모듈 명세서 — 소스코드 구조·프로그램 목록 | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --bg-nav:rgba(255,255,255,.88);
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:220px; --article-max:960px; --container:1360px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:4px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 30px;max-width:720px;}
+h2{font-size:clamp(19px,2.6vw,24px);font-weight:700;letter-spacing:-.03em;margin:10px 0 12px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:36px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:44px 0 18px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{border-radius:0;padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+td.nowrap{white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:0;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.core{background:var(--text);color:var(--bg);}
+.tag.sup{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.opt{background:transparent;color:var(--text-dim);border:1px solid var(--border-mid);}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--border-mid);margin:18px 0;}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);}
+.kpi:last-child{border-right:none;}
+.kpi .n{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);}
+.kpi .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">애플리케이션 모듈 명세서</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">MODULE</span></div>
+  </div>
+</nav>
+
+<div class="article-layout">
+<article>
+
+  <div class="meta-row">
+    <span class="badge">DOC-MOD-01</span>
+    <span class="badge outline">감리 대응</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">2026-07-17 · 소스 기준</span>
+  </div>
+
+  <h1 class="title">애플리케이션 모듈 명세서</h1>
+  <p class="lede">개발된 소스코드를 계층·패키지·모듈 단위로 정의한 프로그램 목록 산출물. 각 모듈의 <strong>식별자·책임(역할)·주요 파일·연관 요건ID</strong>를 표로 정리한다. 상세 요건↔구현 추적은 <code>요구사항_추적표_RTM</code>, 인터페이스 계약은 <code>기술구현_백서_부록B_API명세</code>, 데이터 구조는 <code>기술구현_백서_부록A_DB스키마</code>를 참조한다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">범위 · 기준</div>
+    <p>대상: <code>poc/src/lloydk</code> 애플리케이션 소스(182 파일 · 38,699 LOC, 테스트·벤더 제외). 담당 범위는 로이드케이 소유 6개 기능요건(FUN-003·004·005·022·023·024)이며, KL(원청) 소유 포털·연동은 범위 외. 표기: <span class="tag core">코어</span> 요건 직접 구현 · <span class="tag sup">지원</span> 공통·운영 인프라 · <span class="tag opt">부가</span> 요건 외 옵션.</p>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="n">182</div><div class="l">소스 파일 (.py)</div></div>
+    <div class="kpi"><div class="n">38,699</div><div class="l">코드 라인 (LOC)</div></div>
+    <div class="kpi"><div class="n">6</div><div class="l">도메인 파이프라인 (M1–M6)</div></div>
+    <div class="kpi"><div class="n">11</div><div class="l">최상위 패키지</div></div>
+    <div class="kpi"><div class="n">219</div><div class="l">테스트 파일</div></div>
+  </div>
+
+  <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">아키텍처 계층</span></div>
+  <h2>계층 구조 개요</h2>
+  <p>계층형(layered) 구조. 외부 요청은 <strong>인터페이스(api) → 업무로직(services) → 데이터접근(repositories) → DB</strong> 순으로 흐르고, 등급분류 도메인 처리는 <strong>M1–M6 파이프라인</strong>이 담당한다. 외부 의존(임베딩·LLM·저장소·벡터스토어)은 <strong>어댑터(adapters)</strong>가 Protocol로 추상화해 교체 가능하다.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:150px">계층 / 패키지</th><th>책임</th><th style="width:110px">구분</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><strong>api</strong></td><td>HTTP 인터페이스(FastAPI 라우터)·인증(RBAC)·미들웨어·관측성 노출</td><td><span class="tag sup">인터페이스</span></td></tr>
+      <tr><td class="nowrap"><strong>services</strong></td><td>업무 로직(분류 서빙·검수·골든빌드·감사·재학습·웹훅 등) 오케스트레이션</td><td><span class="tag sup">업무로직</span></td></tr>
+      <tr><td class="nowrap"><strong>modules (M1–M6)</strong></td><td>등급분류 도메인 파이프라인 — 생성·전처리·라벨링·학습·추론·평가</td><td><span class="tag core">도메인</span></td></tr>
+      <tr><td class="nowrap"><strong>repositories</strong></td><td>DB 접근 계층(테이블별 CRUD·질의) — 업무로직과 ORM 분리</td><td><span class="tag sup">데이터접근</span></td></tr>
+      <tr><td class="nowrap"><strong>adapters</strong></td><td>외부 연동 추상화(임베딩·LLM·리랭커·저장소·벡터스토어) — 교체 가능</td><td><span class="tag sup">연동</span></td></tr>
+      <tr><td class="nowrap"><strong>db</strong></td><td>ORM 모델(models)·세션(session)·마이그레이션(alembic)</td><td><span class="tag sup">데이터</span></td></tr>
+      <tr><td class="nowrap"><strong>schemas</strong></td><td>요청/응답·도메인 DTO(Pydantic) — 계약 정의</td><td><span class="tag sup">계약</span></td></tr>
+      <tr><td class="nowrap"><strong>workers</strong></td><td>비동기 작업(Celery worker)·주기 스케줄러(beat)</td><td><span class="tag sup">비동기</span></td></tr>
+      <tr><td class="nowrap"><strong>obs · perf</strong></td><td>관측성(로깅·메트릭 보조)·성능 시나리오/KPI 산정</td><td><span class="tag sup">운영</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s2"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">도메인 파이프라인 모듈 (M1–M6)</span></div>
+  <h2>등급분류 도메인 처리</h2>
+  <p>문서가 등급으로 분류되기까지의 도메인 파이프라인. <code>modules/</code> 하위 6개 모듈로 구성된다.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:60px">모듈</th><th style="width:120px">명</th><th>책임</th><th style="width:220px">주요 파일</th><th style="width:90px">연관 요건</th></tr></thead>
+    <tbody>
+      <tr><td class="center"><strong>M1</strong></td><td>합성 생성</td><td>학습 부트스트랩용 합성 문서 생성(실데이터 0 제약). 근거(witness) 분류체계 부여</td><td><code>generator.py</code> · <code>witness_taxonomy.py</code></td><td class="center"><strong>FUN-003</strong></td></tr>
+      <tr><td class="center"><strong>M2</strong></td><td>전처리</td><td>전자문서 텍스트 추출(HWP·HWPX·PDF·DOCX·XLSX·XLS·PPTX·TXT) → 정규화·품질점수 → PII 마스킹 → 청킹 〔OCR은 요건 외이며 배포본 미포함 — 스캔본은 추출 0자로 failed 격리〕</td><td><code>extractor.py</code> · <code>normalizer.py</code> · <code>pii_masker.py</code> · <code>chunker.py</code> · <code>pipeline.py</code></td><td class="center"><strong>FUN-022</strong></td></tr>
+      <tr><td class="center"><strong>M3</strong></td><td>라벨링</td><td>룰(키워드 사전)·LLM 판정·합의 게이트로 합성 문서에 등급 라벨 부여(학습 시드)</td><td><code>rule_engine.py</code> · <code>seeds.py</code> · <code>llm_labeler.py</code> · <code>judge.py</code> · <code>consensus.py</code> · <code>pipeline.py</code></td><td class="center">FUN-023</td></tr>
+      <tr><td class="center"><strong>M4</strong></td><td>학습</td><td>인코더 PLM(KF-DeBERTa) 분류기 학습 · 청크 증강 · RAG 벡터 색인</td><td><code>trainer.py</code> · <code>chunk_expand.py</code> · <code>rag_indexer.py</code></td><td class="center"><strong>FUN-004</strong></td></tr>
+      <tr><td class="center"><strong>M5</strong></td><td>추론</td><td>임베딩→모델 추론→청크 집계(most-severe)→SSE 단계 스트리밍. 서빙 진입 파이프라인</td><td><code>pipeline.py</code></td><td class="center"><strong>FUN-005</strong></td></tr>
+      <tr><td class="center"><strong>M6</strong></td><td>평가·운영</td><td>지표·리포트 산출 · 온도 보정 · 배포/안전 게이트 · 운영학습(교정 환류) · 평가 앵커 · 검수자/심판 신뢰도</td><td>24개 파일 — 아래 세부표</td><td class="center"><strong>FUN-024</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>M6 평가·운영 세부</h2>
+  <p>안전 기계(안전하게 틀리고·빨리 배우고·명확히 멈추는)의 핵심 로직이 집중된 모듈. 기능군별 파일 분류.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:150px">기능군</th><th>파일</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap">지표·리포트</td><td><code>metrics.py</code> · <code>confusion_matrix.py</code> · <code>report.py</code> · <code>eval_cards.py</code></td><td>정확도·F1·FNR·혼동행렬·평가카드 산출 (FUN-024)</td></tr>
+      <tr><td class="nowrap">보정</td><td><code>calibration.py</code> · <code>temperature.py</code></td><td>미보정 서빙 과신 방지 — 온도 스케일링(T≈3)</td></tr>
+      <tr><td class="nowrap">배포·안전 게이트</td><td><code>deploy_gate.py</code> · <code>kill_gate.py</code> · <code>serving_invariants.py</code> · <code>serving_eval.py</code></td><td>고등급 미탐(FNR) 회귀 차단 · 품질붕괴 브레이크 · 서빙 불변식</td></tr>
+      <tr><td class="nowrap">운영학습</td><td><code>active_learning.py</code> · <code>corrections_rebuild.py</code></td><td>관리자 교정→재학습 트리거·라벨 재구성(홀드아웃 누수 차단)</td></tr>
+      <tr><td class="nowrap">평가 앵커</td><td><code>anchor_corpus.py</code> · <code>anchor_eval.py</code> · <code>federated_eval.py</code> · <code>metamorphic.py</code> · <code>constructed_floor.py</code> · <code>paraphrase_gen.py</code></td><td>외부권위 앵커·연합평가·메타모픽 회귀 테스트(합성 천장 보완)</td></tr>
+      <tr><td class="nowrap">신뢰도·튜닝</td><td><code>reviewer_trust.py</code> · <code>judge_reliability.py</code> · <code>optuna_tuner.py</code> · <code>locked_readiness.py</code></td><td>검수자/심판 신뢰도 · 하이퍼파라미터 탐색 · 사람서명 readiness</td></tr>
+      <tr><td class="nowrap">검색·답변 지표</td><td><code>retrieval_metrics.py</code> · <code>answer_metrics.py</code></td><td>검색 R@k·답변 품질 지표(부가)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s3"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">인터페이스 계층 (api)</span></div>
+  <h2>API 라우터</h2>
+  <p>FastAPI 라우터. 상세 엔드포인트·요청/응답·인증은 <code>부록B_API명세</code> 참조. 여기서는 프로그램(모듈) 단위 책임만 정의한다.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:200px">파일</th><th>책임</th><th style="width:90px">연관 요건</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><code>classify.py</code> · <code>classify_stream.py</code> · <code>async_classify.py</code></td><td>등급분류 — 동기 · SSE 단계 스트리밍 · 비동기(배치/콜백)</td><td class="center"><strong>FUN-005</strong></td></tr>
+      <tr><td class="nowrap"><code>documents.py</code></td><td>문서 업로드·분석(파싱→게이트→분류 E2E)</td><td class="center">FUN-022</td></tr>
+      <tr><td class="nowrap"><code>confirm.py</code></td><td>검수 큐 조회 · 확정 · 재라벨(운영 검수 루프)</td><td class="center"><strong>FUN-024</strong></td></tr>
+      <tr><td class="nowrap"><code>golden.py</code></td><td>골든셋 후보 빌드 · 검수 뷰 · 사람서명(locked_gold_eval 승격)</td><td class="center">FUN-024</td></tr>
+      <tr><td class="nowrap"><code>admin.py</code></td><td>운영 관제 대시보드 · 모델 활성화(배포)/핫리로드</td><td class="center">FUN-024</td></tr>
+      <tr><td class="nowrap"><code>metrics.py</code> · <code>explain.py</code></td><td>모델 지표·혼동행렬 조회 · 분류 설명가능성(근거)</td><td class="center">FUN-024</td></tr>
+      <tr><td class="nowrap"><code>keyword_admin.py</code> · <code>schema_admin.py</code></td><td>키워드 사전 관리 · 등급체계(레벨) 관리</td><td class="center"><strong>FUN-023·005a</strong></td></tr>
+      <tr><td class="nowrap"><code>synthesis.py</code> · <code>training.py</code> · <code>promotion.py</code></td><td>합성 생성 잡 · 재학습 트리거 · 검증라벨 승급</td><td class="center">FUN-003·004</td></tr>
+      <tr><td class="nowrap"><code>guide.py</code> · <code>answer.py</code></td><td>규정 가이드 RAG · RAG 질의응답 <span class="tag opt">부가</span></td><td class="center">—</td></tr>
+      <tr><td class="nowrap"><code>health.py</code></td><td>헬스체크(live/ready/deep) — 운영 probe</td><td class="center">NFR</td></tr>
+      <tr><td class="nowrap"><code>app.py</code> · <code>middleware.py</code> · <code>rate_limit.py</code> · <code>prom_metrics.py</code></td><td>앱 부트·라우터 마운트 · 감사/요청ID 미들웨어 · 레이트리밋 · Prometheus 노출</td><td class="center">NFR</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s4"><span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">업무 로직 (services)</span></div>
+  <h2>서비스 계층</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:210px">파일</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><code>classify_service.py</code></td><td>서빙 핵심 — 추론 호출 + 안전 게이트(저신뢰·희소근거·kill-gate·유사도·검증라벨 오버라이드)로 status(staging/needs_review) 결정</td></tr>
+      <tr><td class="nowrap"><code>document_ingestion_service.py</code> · <code>document_service.py</code></td><td>문서 수집(추출→게이트→영속) · 문서 조회·soft-delete</td></tr>
+      <tr><td class="nowrap"><code>confirm_service.py</code></td><td>검수 확정/재라벨 · 검수 큐 질의 · 2인검토 게이트 · 교정 기록</td></tr>
+      <tr><td class="nowrap"><code>golden_build_service.py</code> · <code>promotion_service.py</code></td><td>골든셋 후보 빌드/검수/서명 · 검증라벨(문서별) 승급</td></tr>
+      <tr><td class="nowrap"><code>training_service.py</code> · <code>synthesis_service.py</code></td><td>모델 등록·배포 게이트·활성화 · 합성 생성 오케스트레이션</td></tr>
+      <tr><td class="nowrap"><code>retrieval.py</code> · <code>rag_answer_service.py</code> · <code>guide_service.py</code></td><td>하이브리드 검색(dense+ts_rank) · RAG 답변 · 가이드 색인 <span class="tag opt">부가</span></td></tr>
+      <tr><td class="nowrap"><code>audit_chain.py</code></td><td>감사 로그 hash-chain 무결성(NFR-SEC-01)</td></tr>
+      <tr><td class="nowrap"><code>outbox.py</code> · <code>idempotency.py</code> · <code>_retry.py</code></td><td>웹훅 신뢰전달(outbox·재시도·DLQ) · 멱등성 · 재시도 유틸</td></tr>
+      <tr><td class="nowrap"><code>drift_monitor.py</code> · <code>metrics_service.py</code> · <code>worker_metrics_bridge.py</code></td><td>임베딩 드리프트 · 지표 서비스 · 워커→API 메트릭 브리지</td></tr>
+      <tr><td class="nowrap"><code>async_classify_service.py</code> · <code>job_store.py</code></td><td>비동기 분류 제출·콜백 · 잡 상태 저장소</td></tr>
+      <tr><td class="nowrap"><code>keyword_admin_service.py</code> · <code>schema_admin_service.py</code></td><td>키워드·등급체계 관리 업무로직 (FUN-023)</td></tr>
+      <tr><td class="nowrap"><code>llm_usage_service.py</code> · <code>secrets_manager.py</code> · <code>partitions.py</code></td><td>LLM 비용 회계 · 비밀관리(Vault/AWS SM) · 파티션 롤오버</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s5"><span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">데이터 접근 · 어댑터</span></div>
+  <h2>Repositories (DB 접근)</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:200px">파일</th><th>대상 테이블(주)</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><code>classify_repo.py</code></td><td><code>tb_classifications</code> · <code>tb_classification_evidence</code> · <code>tb_corrections</code></td></tr>
+      <tr><td class="nowrap"><code>document_repo.py</code> · <code>chunk_repo.py</code></td><td><code>tb_documents</code> · <code>tb_document_labels</code> · <code>tb_chunks</code></td></tr>
+      <tr><td class="nowrap"><code>training_repo.py</code></td><td><code>tb_model_versions</code> · <code>tb_training_runs</code> · <code>tb_training_epochs</code> · <code>tb_training_datasets</code></td></tr>
+      <tr><td class="nowrap"><code>synth_repo.py</code> · <code>guide_repo.py</code></td><td><code>tb_sample_documents</code> · <code>tb_prompt_versions</code> · <code>tb_guides</code></td></tr>
+      <tr><td class="nowrap"><code>audit_repo.py</code> · <code>llm_usage_repo.py</code></td><td><code>tb_audit_log</code> · <code>tb_llm_usage</code> (월별 파티션)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Adapters (외부 연동 · 교체 가능)</h2>
+  <p>각 어댑터는 <code>base.py</code>의 Protocol을 구현하며, 배포 프로파일(<code>DEPLOY_PROFILE</code>)·설정으로 구현체를 선택한다.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:130px">어댑터군</th><th>구현체</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><strong>embedding</strong></td><td><code>hf_embedding</code>(KURE-v1) · <code>hash_embedding</code> · <code>cache_layer</code></td><td>hash는 폴백(운영 거부)</td></tr>
+      <tr><td class="nowrap"><strong>llm</strong></td><td><code>vllm</code> · <code>local_openai</code> · <code>anthropic</code> · <code>openai</code> · <code>noop</code></td><td>폐쇄망=로컬(vLLM/Ollama)</td></tr>
+      <tr><td class="nowrap"><strong>reranker</strong></td><td><code>bge_reranker</code> · <code>noop</code></td><td>선택(검색 보조)</td></tr>
+      <tr><td class="nowrap"><strong>storage</strong></td><td><code>local_store</code> · <code>encrypted_store</code>(AES-256-GCM) · <code>minio_store</code> · <code>seaweedfs_store</code></td><td>폐쇄망=로컬FS+원본암호화</td></tr>
+      <tr><td class="nowrap"><strong>vectorstore</strong></td><td><code>pg_store</code>(pgvector) · <code>inmemory_store</code> · <code>es_store</code></td><td>정본=pgvector(ES 폐기)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s6"><span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">지원 패키지 · 요건 추적</span></div>
+  <h2>지원 패키지</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:150px">패키지</th><th>구성</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><code>db/</code></td><td>ORM 모델(<code>models.py</code>, 19테이블) · 세션(<code>session.py</code>) · 마이그레이션(<code>poc/alembic/</code>, RAG 벡터 2테이블 포함)</td></tr>
+      <tr><td class="nowrap"><code>schemas/</code></td><td>요청/응답·도메인 DTO(Pydantic) — classify·confirm·golden·common 등</td></tr>
+      <tr><td class="nowrap"><code>workers/</code></td><td>Celery 앱(<code>celery_app.py</code>) · 태스크·주기 tick(<code>tasks.py</code> — 재학습·드리프트·감사검증·outbox·파티션·heartbeat)</td></tr>
+      <tr><td class="nowrap"><code>obs/ · perf/</code></td><td>관측성 보조 · 성능 시나리오(<code>scenarios.py</code>)·KPI 산정(<code>kpis.py</code>, PER-002)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>요건 추적성</h2>
+  <p>로이드케이 담당 6개 기능요건과 주 구현 모듈의 매핑. 상세 추적(RFP→설계→구현→검증)은 <code>요구사항_추적표_RTM</code>에 있다.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:90px">요건ID</th><th style="width:200px">요건</th><th>주 구현 모듈</th></tr></thead>
+    <tbody>
+      <tr><td class="center"><strong>FUN-003</strong></td><td>합성(샘플) 문서 생성</td><td>M1 <code>generator</code> · <code>synthesis_service</code></td></tr>
+      <tr><td class="center"><strong>FUN-004</strong></td><td>분류 모델(인코더 PLM)</td><td>M4 <code>trainer</code> · <code>training_service</code> · <code>tb_model_versions</code></td></tr>
+      <tr><td class="center"><strong>FUN-005</strong></td><td>등급분류(추론)·결과처리·등급체계 관리</td><td>M5 <code>inference</code> · <code>classify_service</code> · api/classify · <code>schema_admin</code>(005a)</td></tr>
+      <tr><td class="center"><strong>FUN-022</strong></td><td>전자문서 텍스트 추출</td><td>M2 <code>extractor</code>(HWP/PDF/DOCX…) · <code>document_ingestion_service</code></td></tr>
+      <tr><td class="center"><strong>FUN-023</strong></td><td>가이드 기반 라벨링(S·V·M)·키워드/태깅</td><td>M3 <code>rule_engine·seeds</code> · <code>keyword_admin</code></td></tr>
+      <tr><td class="center"><strong>FUN-024</strong></td><td>산출·리포트(검수·지표)</td><td>M6 지표·리포트 · <code>confirm</code>(검수큐) · <code>admin</code>(관제)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="footnote">
+    본 문서는 감리 대응 프로그램 목록 산출물로, <code>poc/src/lloydk</code> 소스 트리를 기준으로 작성됨(2026-07-17). 파일·모듈은 소스 형상과 일치하며, 상세는 RTM(요건추적)·부록A(DB)·부록B(API)를 정본으로 참조한다. 요건 외 부가 기능(RAG 질의응답·가이드)은 존치하되 산출물 판정 범위에서 제외한다.
+  </div>
+
+</article>
+
+<aside class="toc-aside">
+  <nav class="toc">
+    <div class="toc-title">목차</div>
+    <a href="#s1">01 · 아키텍처 계층</a>
+    <a href="#s2">02 · 도메인 파이프라인 M1–M6</a>
+    <a href="#s3">03 · 인터페이스 (api)</a>
+    <a href="#s4">04 · 업무 로직 (services)</a>
+    <a href="#s5">05 · 데이터접근 · 어댑터</a>
+    <a href="#s6">06 · 지원 · 요건 추적</a>
+  </nav>
+</aside>
+</div>
+
+<footer>
+  <strong>로이드케이</strong> · 애플리케이션 모듈 명세서 (DOC-MOD-01) · 감리 대응 산출물
+</footer>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  function onScroll(){
+    var y=window.scrollY+90,cur=0;
+    for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}
+    links.forEach(function(a,i){a.classList.toggle('active',i===cur);});
+  }
+  window.addEventListener('scroll',onScroll,{passive:true});onScroll();
+})();
+</script>
+</body>
+</html>
