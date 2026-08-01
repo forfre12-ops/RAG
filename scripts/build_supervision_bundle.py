@@ -190,6 +190,35 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
         shutil.rmtree(dest)
         raise SystemExit("정본에 없는 파일 — 중단:\n  " + "\n  ".join(missing))
 
+    # ── index.html 링크 무결성 (회귀 방지) ──
+    # 이전 생성기는 index 를 그대로 복사만 해, 참고자료/ 하위로 이동한 문서 링크와
+    # 정본에만 있고 layout 에 없던 문서(예: 골든 분류근거 리포트) 링크가 전부 깨졌다.
+    # 여기서 (1) index 가 링크하나 미수록인 정본 문서를 참고자료/ 로 자동 수록하고
+    #        (2) 참고자료 소재 문서의 루트 링크에 접두사를 붙이며
+    #        (3) 미해결 내부 링크가 남으면 동결을 중단한다.
+    import re  # noqa: PLC0415
+
+    index_path = dest / "index.html"
+    if index_path.exists():
+        html = index_path.read_text(encoding="utf-8")
+        linked = sorted(set(re.findall(r'href="([^"#?]+\.html)"', html)))
+        for href in linked:
+            base = href.split("/")[-1]
+            if (dest / base).exists() or (dest / "참고자료" / base).exists():
+                continue
+            if (OPEN / base).exists() and copy_one(base, "참고자료"):
+                supp_out.append({"file": base, "id": registry.get(base, "(미등록)")})
+        for name in {r["file"] for r in supp_out}:
+            html = html.replace(f'href="{name}"', f'href="참고자료/{name}"')
+        index_path.write_text(html, encoding="utf-8")
+        broken_links = sorted({
+            h for h in re.findall(r'href="([^"#?]+\.html)"', html)
+            if not (dest / h).exists()
+        })
+        if broken_links:
+            shutil.rmtree(dest)
+            raise SystemExit("index.html 미해결 링크(동결 중단):\n  " + "\n  ".join(broken_links))
+
     # 검증 증적(회귀 로그·스캔 리포트 등) — 감리가 "전 시험 통과"를 확인할 수 있게 동봉.
     evidence_out: list[str] = []
     if attach:

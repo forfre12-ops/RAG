@@ -1,7 +1,7 @@
 release_id: 2026-08-사전진단
 purpose: 제3자 감리(supervision) 대응 산출물 제출본
-frozen_at: '2026-07-30'
-source_commit: 2dd59c8adb56a30835c3bfd4f1ec423c6f0916cb
+frozen_at: '2026-08-02'
+source_commit: 863e32d6f0c9ec40434081b2feeffa17f087f680
 source_of_truth: doc/result/open/
 id_authority: doc/docs_registry.yaml
 inherited_from: 2026-07-감리
@@ -12,7 +12,7 @@ counts:
   formal_other_format: 1
   navigation_hub: 1
   root_files_total: 35
-  supplementary: 11
+  supplementary: 9
   progress_reports: 4
   verification_evidence: 2
 deployed_model:
@@ -109,22 +109,18 @@ supplementary:
     id: DOC-SCORE-001
   - file: 시스템_완전이해_가이드_V3.html
     id: DOC-GUIDE-001
-  - file: golden100_분류근거_보고서.html
-    id: DOC-EVAL-001
   - file: golden500_분류근거_보고서.html
     id: DOC-EVAL-002
   - file: 검색단독_vs_분류기_등급분류_비교.html
     id: DOC-COMPARE-001
-  - file: 분류검수게이트_강화_보고서.html
-    id: DOC-GATE-001
-  - file: 설계검토_하드닝_반영_내역.html
-    id: DOC-HARDENING-001
   - file: 골든셋_합성생성_설계검토.html
     id: DOC-DATA-004
   - file: 무실데이터_분류기_설계서.html
     id: DOC-CLASSIFIER-001
-  - file: 시스템_역할_배포_DB구조_확인안.html
-    id: DOC-ARCH-002
+  - file: 골든셋_분류근거_v4_clean_v-dd3abab9.html
+    id: DOC-EVAL-005
+  - file: 골든셋_분류근거_v5_clean_v-fe4b386b.html
+    id: DOC-EVAL-004
 progress_reports:
   path_prefix: 사업관리보고/
   documents:
@@ -135,8 +131,8 @@ progress_reports:
 verification_evidence:
   path_prefix: 검증로그/
   documents:
-  - lite_regression_green.log
   - bandit_sast_report.json
+  - lite_regression_green.log
 notes:
 - 동결 사본이다. 수정이 필요하면 정본(doc/result/open/)을 고치고 새 release_id 로 다시 동결한다.
 - 문서 ID 는 doc/docs_registry.yaml 에서만 해석한다 — 번들은 자체 ID 체계를 갖지 않는다.

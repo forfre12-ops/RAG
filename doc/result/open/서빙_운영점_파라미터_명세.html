@@ -396,7 +396,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="card-grid col4" style="margin:16px 0;">
         <div class="card"><div class="card-label">설정 키</div><div class="card-value sm">classifier_<br>temperature</div><div class="card-desc">float, 양수만</div></div>
         <div class="card"><div class="card-label">기본값</div><div class="card-value sm">1.0</div><div class="card-desc">무보정(동작 보존)</div></div>
-        <div class="card"><div class="card-label">측정 최적</div><div class="card-value sm">T*=2.0</div><div class="card-desc">val ECE 0.131→0.045</div></div>
+        <div class="card"><div class="card-label">온도 보정 T</div><div class="card-value sm">운영 3.0</div><div class="card-desc">측정 최적 2.0(ECE 0.045) 대비 FNR-보수 마진</div></div>
         <div class="card card-warn"><div class="card-label">OOD 잔존</div><div class="card-value sm">ECE 0.184</div><div class="card-desc">golden500 — 전이 안 됨</div></div>
       </div>
       <p><b>무엇:</b> softmax 직전 logit을 T로 나눠 분포를 평탄화한다 — <code>temp = self._temperature; if temp != 1.0: logits = logits / temp</code> (<code>m5_inference/pipeline.py</code> <code>_run_model</code>). T&gt;1이면 과신(overconfident)이 완화된다.</p>

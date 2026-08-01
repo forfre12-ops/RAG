@@ -182,7 +182,7 @@ footer strong{color:var(--text-dim);}
   <ul>
     <li><strong>FNR-safe override</strong> — 룰이 모델보다 높은 등급을 가리키면 상향(미탐 방지).</li>
     <li><strong>출처 cap</strong> — 공개 출처(공개특허 등)는 S3로 하향 가드.</li>
-    <li><strong>검수 게이트</strong> — 신뢰도 &lt; 0.7 또는 출처-내용 충돌(cap-conflict) 시 <code>needs_review</code>. 단, confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 그래서 자동확정·검수 라우팅은 confidence 임계(기본 0.7) 단독이 아니라 아래 <strong>다단 게이트</strong>로 결정한다(두 게이트 모두 <strong>opt-in·기본 OFF</strong> — 기본 동작은 변하지 않음).</li>
+    <li><strong>검수 게이트</strong> — 신뢰도 &lt; 0.7 또는 출처-내용 충돌(cap-conflict) 시 <code>needs_review</code>. 단, confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하며 정답/오답 판별력이 낮다(골든500 AUROC 0.58). 그래서 자동확정·검수 라우팅은 confidence 임계(기본 0.7) 단독이 아니라 아래 <strong>다단 게이트</strong>로 결정한다(합의 게이트는 <strong>기본 OFF</strong>·희소근거 게이트는 <strong>기본 ON</strong>).</li>
     <li><strong>희소근거 게이트</strong> (<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON) — 단일 약한 키워드만으로 <code>conf=1.0</code>이 되는 룰-폴백 자동확정을 차단(golden100 무성 TS 미탐 5→0).</li>
     <li><strong>합의 게이트</strong> (<code>agreement_gate_enabled</code>, opt-in·기본 OFF) — 자동확정은 예측이 공개등급(S3)이거나 룰등급==모델등급일 때만 허용하고 그 외 불일치는 사람 검수로 보낸다(자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8). TS/S1 자동확정분은 표본감사한다.</li>
     <li><strong>fail-secure</strong> — 본문 없음/조회 불가 시 <strong>최고등급(TS) + 검수</strong>로 격리(절대 공개/S3로 기본값 안 함).</li>

@@ -726,8 +726,8 @@ footer strong{color:var(--text-dim);}
     <span class="section-sep-title">구현 반영 영향</span>
   </div>
 
-  <h2>구현 반영 영향 (코드 — 후속 작업)</h2>
-  <p>본 v2는 <strong>문서 기준</strong>이며, 아래 코드 반영은 후속 패치다.</p>
+  <h2>구현 반영 영향 (핵심 코드 반영 완료)</h2>
+  <p>본 v2 기준의 <strong>핵심 코드 반영은 완료</strong>됐다 — 3요소 시드·곱셈 등급식·DB score 0~2 CHECK는 실코드 반영 확인. 데이터 재라벨·회귀 케이스는 진행/후속.</p>
 
   <div class="table-wrap">
     <table>
@@ -736,17 +736,17 @@ footer strong{color:var(--text-dim);}
         <tr>
           <td><code>seeds.py</code> <code>FACTOR_SEEDS</code></td>
           <td>4요소 → 3요소(SECRECY/VALUE/MANAGEMENT), DAMAGE 제거, 키워드 factor 재매핑</td>
-          <td class="center"><span class="tag light">☐ 후속</span></td>
+          <td class="center"><span class="tag light">✅ 완료</span></td>
         </tr>
         <tr>
           <td><code>rule_engine.py</code></td>
           <td>가중합·정규화(0~5) → <strong>S/V/M 0~2 산정 후 곱셈</strong> + 4단계 매핑</td>
-          <td class="center"><span class="tag light">☐ 후속</span></td>
+          <td class="center"><span class="tag light">✅ 완료</span></td>
         </tr>
         <tr>
           <td><code>evaluation_factors</code> DB / CHECK / 트리거</td>
           <td>3요소 시드, score 0~2 CHECK, weight 합계=1.0 트리거 → 곱셈 모델에 맞게 완화/삭제</td>
-          <td class="center"><span class="tag light">☐ 후속</span></td>
+          <td class="center"><span class="tag light">✅ 완료</span></td>
         </tr>
         <tr>
           <td>골든셋·학습셋</td>
@@ -906,7 +906,7 @@ A안 없음             → B안(AI)이 1차 자동분류
     <p>근거(정본): <strong>발주처 정본 가이드 PDF</strong> (특허청·한국지식재산보호원·영업비밀보호센터, 「영업비밀 자료 등급분류 체계 마련 연구」 특허청 2016 기반)</p>
     <p>부수 근거: <em>AI 영업비밀 관리시스템 구축 사업 제안요청서</em> (FUN-023·FUN-005·PMR-002)</p>
     <p>대상: KOIPA AI 영업비밀관리시스템 — M3 라벨링 룰·골든셋·학습 데이터 라벨 기준</p>
-    <p>관련: <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="시스템_완전이해_가이드_V3.html">시스템 완전이해 가이드 V3</a> · <a href="golden100_분류근거_보고서.html">골든셋 분류근거 보고서</a></p>
+    <p>관련: <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="시스템_완전이해_가이드_V3.html">시스템 완전이해 가이드 V3</a> · <a href="골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거 보고서(현행 배포본 v5 기준)</a></p>
   </div>
 
 </article>

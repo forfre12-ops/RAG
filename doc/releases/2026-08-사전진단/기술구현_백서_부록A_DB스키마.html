@@ -297,7 +297,7 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
 
     <section id="t-evaluation-factors">
       <h3>tb_evaluation_factors<span class="logical-name">평가 요건</span></h3>
-      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">정본 <b>3요건</b> 체계. 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M), 각 요건 0·1·2점의 <b>곱셈식</b>(B안, 2026-06-18 전환). 곱 매핑 8→TS · 4→S1 · 1·2→S2 · 0→S3. 곱셈식이라 <code>weight</code> 컬럼은 미사용(하위호환 1.0). 레거시 4요소는 <code>is_active=FALSE</code>로 보존(키워드 시드 태그 및 FK 정합 유지, migration <code>c7d8e9f0a1b2</code>). 정본/레거시 매핑은 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 폴딩(LEAK_IMPACT→VALUE).</p>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">정본 <b>3요건</b> 체계. 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M), 각 요건 0·1·2점의 <b>곱셈식</b>(B안, 2026-06-18 전환). 곱 매핑: S=2·V=2일 때 곱≥4(M≥1)→TS·M=0→S1, 그 외 곱≥1→S2·곱=0→S3 (<code>grade_from_svm</code>). 곱셈식이라 <code>weight</code> 컬럼은 미사용(하위호환 1.0). 레거시 4요소는 <code>is_active=FALSE</code>로 보존(키워드 시드 태그 및 FK 정합 유지, migration <code>c7d8e9f0a1b2</code>). 정본/레거시 매핑은 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 폴딩(LEAK_IMPACT→VALUE).</p>
       <div class="tbl-wrap"><table>
         <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
         <tbody>
@@ -308,7 +308,7 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
           <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>정본 3요건 TRUE · 레거시 4요소 FALSE</td></tr>
         </tbody>
       </table></div>
-      <div class="partition-box" style="margin-top:8px;">요건별 점수 기준(LLM 라벨러 정본 룰브릭) — <b>S</b>: 0=이미 공개·1=통상적 입수 곤란·2=보유자 통하지 않곤 모름 / <b>V</b>: 0=가치 없음·1=비용·노력 투입·2=상당한 비용·노력 / <b>M</b>: 0=공개·관리 안됨·1=임직원 일부 공유·2=승인된 자만. 한 요건이라도 0이면 곱=0 → S3.</div>
+      <div class="partition-box" style="margin-top:8px;">요건별 점수 기준(LLM 라벨러 정본 룰브릭) — <b>S</b>: 0=이미 공개·1=통상적 입수 곤란·2=보유자 통하지 않곤 모름 / <b>V</b>: 0=가치 없음·1=비용·노력 투입·2=상당한 비용·노력 / <b>M</b>: 0=공개·관리 안됨·1=임직원 일부 공유·2=승인된 자만. 한 요건이 0이면 곱=0 → S3. 단 <b>S=2·V=2·M=0은 S1 예외</b>(관리 미공식화 고가치 영업비밀).</div>
     </section>
 
     <section id="t-level-keywords">
