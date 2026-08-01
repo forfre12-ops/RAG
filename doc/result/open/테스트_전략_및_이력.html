@@ -509,10 +509,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <td class="td-warn">P4 보류</td>
             </tr>
             <tr>
-              <td>OCR 스캔 PDF<br><span style="font-size:11px;color:var(--text-dim);">FUN-022 요건 외 부가(요건=<b>전자문서</b> 텍스트 추출, 스캔/이미지는 부가 방어)</span></td>
-              <td><span class="tag warn">smoke 수준</span></td>
-              <td><span class="tag real">실스캔 필요</span></td>
-              <td class="td-pend">미측정 · 요건 외</td>
+              <td>스캔 PDF (OCR)<br><span style="font-size:11px;color:var(--text-dim);">FUN-022 요건 외(요건=<b>전자문서</b> 텍스트 추출). 2026-08-02 배포본에서 OCR 제거 — 검증 대상 자체가 소멸</span></td>
+              <td>—</td>
+              <td>—</td>
+              <td class="td-pend">해당 없음 · 요건 외<br><span style="font-size:11px;">스캔본은 추출 0자 → <code>failed</code> 격리(회귀는 추출 게이트 테스트가 담당)</span></td>
             </tr>
             <tr>
               <td rowspan="3"><b>분류 정확도</b><br><span style="font-size:11px;color:var(--text-dim);">RTX 5070 Ti로 측정 완료</span></td>
@@ -1704,7 +1704,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <span class="phase-item-icon">🎯</span>
               <div class="phase-item-body">
                 <div class="phase-item-title">P4 HWP 실문서 추출 품질 평가</div>
-                <div class="phase-item-desc">실 HWP 파일 파싱. 누락률 ≤ 5% · 품질 ≥ 0.7 목표. OCR 스캔 PDF 병행 검증(FUN-022 요건 외 부가 — 미측정이어도 계약 무관).</div>
+                <div class="phase-item-desc">실 HWP 파일 파싱. 누락률 ≤ 5% · 품질 ≥ 0.7 목표. <b>구형 .hwp(표 포함) 실서버 경로</b>를 포함한다 — 표 회수 후 needs_review 라우팅 및 대용량 처리시간이 검증 대상. OCR 스캔 PDF는 배포본에서 제거되어 검증 범위에서 제외.</div>
               </div>
             </li>
             <li class="phase-item">

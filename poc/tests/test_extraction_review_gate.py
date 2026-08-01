@@ -134,7 +134,9 @@ def test_benign_success_warnings_not_routed():
         warnings=[
             "docx_media_ocr_extracted", "docx_ooxml_tables_extracted",
             "docx_comments_extracted", "docx_textboxes_extracted", "plain_decoded_as_cp949",
-            "hwp_tables_extracted_by_hwp5html", "hwp_table_check_unavailable",
+            # 실제 추출기가 내는 성공 warning 명(구 pyhwp/hwp5html 경로는 폐기, unhwp/MIT 로 대체).
+            "hwp_tables_recovered_by_unhwp", "hwpx_tables_structured",
+            "hwp_table_check_unavailable",
         ],
     )
     assert d.requires_review is False and d.reasons == []

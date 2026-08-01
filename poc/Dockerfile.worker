@@ -18,7 +18,8 @@ COPY scripts ./scripts
 # 파싱 글루(hwp/hwp-tables/xls) 포함 — 워커가 무성 파싱 실패하지 않도록(api.prod 와 동일 extras).
 # [hwp-tables] unhwp(MIT) — 배치 경로도 .hwp 표 셀을 회수해야 API 경로와 등급이 일치한다.
 # [xls] xlrd 누락 시 구형 .xls 가 0글자로 추출됨(511dbfb 배치경로 재발 방지).
-# [라이선스] OCR([ocr], GPL poppler)은 요건 외라 배포 이미지에서 제외(코드·extra는 리포 존치).
+# [라이선스] OCR([ocr], GPL poppler)은 요건 외라 배포 이미지에서 제외(코드·extra 정의만 리포 존치).
+# 2026-08-02: dev(Dockerfile.api)·에어갭 번들에서도 동일 제거 — 전 빌드 경로가 GPL-free.
 RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,xls]"
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp-python 번들 FreeType 에 FT_Palette_Data_Get

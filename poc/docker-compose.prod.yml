@@ -61,7 +61,8 @@ services:
   worker:
     restart: unless-stopped
     # 하드닝: dev Dockerfile.api(root)가 아니라 non-root(uid1000) 이미지로 빌드 — api 와 동일.
-    # Dockerfile.api.prod 는 앱+전 extras(hwp/ocr/jwt/psh/otel) 포함이라 워커 파싱 태스크에도 충분.
+    # Dockerfile.api.prod 는 앱+운영/파싱 extras(hwp/hwp-tables/xls/jwt/psh/otel) 포함이라 워커
+    # 파싱 태스크에도 충분. OCR([ocr])은 요건 외 + poppler=GPL 이라 전 이미지에서 제외.
     # (compose command 오버라이드가 gunicorn CMD 를 celery worker 로 대체.)
     build:
       dockerfile: Dockerfile.api.prod

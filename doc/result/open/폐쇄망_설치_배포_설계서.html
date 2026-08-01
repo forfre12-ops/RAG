@@ -148,10 +148,10 @@ footer strong{color:var(--text-dim);}
       <tr><td>분류 모델</td><td>KF-DeBERTa (MIT) / KoELECTRA (Apache-2.0)</td><td>학습 가중치+보정값 동봉</td></tr>
       <tr><td>임베딩 모델</td><td>KURE-v1 (MIT) / BGE-M3 (MIT)</td><td>한국어 검색 — 가중치 사전 동봉</td></tr>
       <tr><td>로컬 LLM 모델</td><td>Qwen3-14B (Apache-2.0)</td><td>합성·요약 (onprem) — 가중치 사전 동봉</td></tr>
-      <tr><td>OCR (스캔 PDF)</td><td>Tesseract + 한국어 데이터(kor.traineddata) + poppler</td><td>시스템 바이너리 사전 반입 — 스캔 문서 텍스트 추출용(FUN-022 요건 외 부가 방어 · 미반입 시 스캔 PDF만 needs_review)</td></tr>
+      <tr><td>OCR (스캔 PDF)</td><td><b>반입 대상 아님 — 미동봉</b></td><td>OCR은 FUN-022 요건 외(요건은 <b>전자문서</b> 텍스트 추출)이며, 실행에 필요한 <code>poppler</code>가 GPL이라 <b>반출 번들·전 배포 이미지에서 제외</b>한다(2026-08-02). 스캔 PDF는 본문 0자로 추출되어 <code>processing_status='failed'</code>로 격리되므로 무음 통과하지 않는다.</td></tr>
     </tbody>
   </table></div>
-  <div class="callout"><div class="callout-label">모델·바이너리 사전 동봉 (중요)</div><p>폐쇄망에서는 런타임 다운로드가 불가하므로, <strong>분류기 학습 가중치+보정값(temperature), 임베딩(KURE-v1/BGE-M3), 로컬 LLM(Qwen3-14B), OCR 바이너리를 모두 반입 매체에 사전 동봉</strong>해야 한다. 베이스 모델만 넣으면 미학습·무보정으로 동작하고, 임베딩 모델이 빠지면 검색이 동작하지 않는다.</p></div>
+  <div class="callout"><div class="callout-label">모델·바이너리 사전 동봉 (중요)</div><p>폐쇄망에서는 런타임 다운로드가 불가하므로, <strong>분류기 학습 가중치+보정값(temperature), 임베딩(KURE-v1/BGE-M3), 로컬 LLM(Qwen3-14B)을 모두 반입 매체에 사전 동봉</strong>해야 한다. 베이스 모델만 넣으면 미학습·무보정으로 동작하고, 임베딩 모델이 빠지면 검색이 동작하지 않는다. <b>OCR 바이너리는 동봉 대상이 아니다</b> — 요건 외 + GPL(poppler)이라 번들에서 제외했다.</p></div>
 
   <div class="section-sep" id="s3"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">책임 경계 (R&amp;R)</span></div>
   <h2>누가 무엇을 준비/설치하는가 — 핵심</h2>
@@ -185,7 +185,7 @@ footer strong{color:var(--text-dim);}
     <li><strong>포트</strong> — 5432·6379·8000 (+ mTLS 443) 내부 가용 (MinIO 9000/9001·MLflow 5000 불요). 방화벽 규칙은 망 정책에 맞춰 신청.</li>
     <li><strong>커널 파라미터</strong> — 기본값으로 충분(별도 검색엔진 mmap·memlock 튜닝 불요 — pgvector 통합).</li>
     <li><strong>로컬 LLM 서버</strong> — onprem-local 프로파일은 vLLM/Ollama 서버 기동 + Qwen3-14B 적재가 선행되어야 한다(별도 프로세스).</li>
-    <li><strong>OCR</strong> — 스캔 PDF 처리를 위해 Tesseract(한국어 데이터)·poppler 시스템 바이너리 설치(번들 동봉분 사용).</li>
+    <li><strong>OCR</strong> — <b>설치 불요</b>. 요건 외 + GPL(poppler)이라 번들·이미지에서 제외했다. 스캔 PDF는 추출 0자 → <code>failed</code> 격리.</li>
     <li><strong>시간·로캘</strong> — NTP 동기, UTF-8 로캘(한국어 텍스트 처리).</li>
   </ul>
 
@@ -206,8 +206,8 @@ footer strong{color:var(--text-dim);}
   <pre><code># 1) 무결성 검증
 bash verify.sh
 
-# 2) 이미지 적재 + 의존성·OCR 설치
-bash install.sh            # docker load + wheel 설치 + OCR 바이너리(Tesseract/poppler)
+# 2) 이미지 적재 + 의존성 설치
+bash install.sh            # docker load + wheel 설치 (OCR 바이너리 없음 — 요건 외·GPL 제외)
 #   torch는 GPU 환경에 맞춰 별도 설치 (또는 CPU)
 
 # 3) 로컬 LLM 서버 기동 (onprem-local)
@@ -301,7 +301,7 @@ docker compose up -d
       <tr><td>모델 가중치 동봉</td><td><span class="tag lk">로이드케이</span></td><td>분류기 학습본+보정값·임베딩·로컬 LLM을 반입 매체에 사전 동봉 (런타임 다운로드 불가)</td></tr>
       <tr><td>로컬 LLM 기동</td><td><span class="tag lk">로이드케이</span></td><td>vLLM/Ollama 서버 기동 + 모델 적재 + endpoint 연결</td></tr>
       <tr><td>GPU·torch 확정</td><td><span class="tag kl">발주처/KL</span> + <span class="tag lk">로이드케이</span></td><td>Driver·CUDA·Container Toolkit 버전 확인, torch 확보(또는 CPU 폴백)</td></tr>
-      <tr><td>OCR 바이너리</td><td><span class="tag lk">로이드케이</span></td><td>Tesseract(한국어)·poppler — api 이미지 동봉(컨테이너) / 호스트 실행 시 별도</td></tr>
+      <tr><td>OCR 바이너리</td><td>—</td><td><b>해당 없음</b> — 요건 외 + GPL(poppler)로 전 배포 경로에서 제외(2026-08-02). 반입·설치·책임 주체 모두 발생하지 않는다.</td></tr>
       <tr><td>매체 반입</td><td><span class="tag kl">발주처/KL</span></td><td>반입 신청·보안 검토·승인 절차 및 담당 채널 확정</td></tr>
     </tbody>
   </table></div>

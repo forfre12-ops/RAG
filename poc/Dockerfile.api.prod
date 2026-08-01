@@ -46,7 +46,9 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # [hwp-tables] unhwp(MIT). rhwp 는 .hwp 바이너리의 표 셀을 통째로 흘려 표 안의 등급·원가·
 # 담당 정보가 분류기에 안 보인다(=조용한 미탐). 구 pyhwp(AGPL) 대체 — 반출본에 AGPL 없음.
 # [라이선스] OCR([ocr]=pytesseract/pdf2image+poppler-utils=GPL)은 요건 외(FUN-022=전자문서 텍스트추출뿐)라
-# 배포 이미지에서 제외 → GPL(poppler) 반출 소거. OCR 코드·[ocr] extra는 리포·dev(Dockerfile.api)에 존치.
+# 배포 이미지에서 제외 → GPL(poppler) 반출 소거. 2026-08-02 부터 dev(Dockerfile.api)·워커·에어갭
+# 번들도 동일하게 OCR 미포함 — 어느 이미지로 빌드해도 GPL 이 반출되지 않는다. OCR 코드·[ocr] extra
+# 정의만 리포에 존치(요건화 시 재활성). 스캔 PDF 는 본문 0자 → processing_status='failed' 격리.
 RUN pip install --upgrade pip && \
     pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
     pip install -e ".[psh,otel,jwt,hwp,hwp-tables,xls]" gunicorn && \

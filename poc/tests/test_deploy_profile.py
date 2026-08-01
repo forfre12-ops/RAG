@@ -155,7 +155,11 @@ def test_training_router_visibility(
     importlib.reload(app_mod)
 
     try:
-        paths = {route.path for route in app_mod.app.routes}
+        # [starlette 호환] 신버전은 include_router 결과를 path 없는 `_IncludedRouter` 로 감싸서
+        # app.routes 직접 순회로는 엔드포인트 path 를 얻을 수 없다(구버전 전제 코드가 AttributeError).
+        # 내부 구조 대신 공개 API 인 openapi() 를 쓴다 — prefix 가 적용된 최종 path 를 주고,
+        # "순수 추론 노드에서는 OpenAPI 에도 노출되지 않는다"는 이 테스트의 계약과도 정확히 일치한다.
+        paths = set(app_mod.app.openapi().get("paths", {}))
         # training router의 실제 path는 /api/v1/train, /api/v1/train/jobs 등
         training_paths = {p for p in paths if p.startswith("/api/v1/train")}
 

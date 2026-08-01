@@ -235,6 +235,9 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-model-reload"><span class="toc-method post">POST</span> /admin/model/reload</a>
     <a class="toc-item" href="#ep-model-activate"><span class="toc-method post">POST</span> /admin/model/activate</a>
     <a class="toc-item" href="#ep-admin-status"><span class="toc-method get">GET</span> /admin/dashboard</a>
+    <a class="toc-item" href="#ep-dashboard-summary"><span class="toc-method get">GET</span> /dashboard/summary</a>
+    <a class="toc-item" href="#ep-rag-search"><span class="toc-method post">POST</span> /rag/search</a>
+    <a class="toc-item" href="#ep-demo-purge"><span class="toc-method post">POST</span> /admin/demo/purge</a>
     <a class="toc-item" href="#ep-metrics-latest"><span class="toc-method get">GET</span> /metrics/latest</a>
     <a class="toc-item" href="#ep-metrics-history"><span class="toc-method get">GET</span> /metrics/history</a>
     <a class="toc-item" href="#ep-metrics-cm"><span class="toc-method get">GET</span> /metrics/confusion-matrix/{ver}</a>
@@ -998,6 +1001,74 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         </table>
         <p style="font-size:12.5px;color:var(--text-dim);"><code>/api/v1/admin/rotate-api-key</code>와 <code>/api/v1/admin/models</code>는 현재 라우터에 없다. 모델 버전 이력은 메트릭/DB 내부 조회로 다루며, API 키 회전은 별도 운영 절차 또는 추후 구현 항목이다.</p>
         <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">503 DB 미가용</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-dashboard-summary">
+      <div class="ep-header">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/v1/dashboard/summary</span>
+        <span class="ep-summary">운영 현황 실측 카운트</span>
+        <span class="ep-auth">JWT / API Key</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">운영 화면용 집계. <strong>모두 DB 실측 COUNT</strong>이며 가공·추정값이 없다. 실문서 정답이 없어 '정밀도'는 산출 불가하므로, 측정 가능한 지표(자동확정률·검수큐·교정수·검수반영수)만 노출한다. DB 미가용 시 예외 대신 <code>db:"unavailable"</code> + 전 카운트 0을 반환한다(운영 화면 무중단).</p>
+        <h4>Response 200</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">total_classifications</td><td class="f-type">integer</td><td>누적 분류 건수</td></tr>
+            <tr><td class="f-name">by_grade</td><td class="f-type">object</td><td>등급별 분포 (TS·S1·S2·S3)</td></tr>
+            <tr><td class="f-name">by_status</td><td class="f-type">object</td><td>처리상태별 분포 (ready·needs_review·failed 등)</td></tr>
+            <tr><td class="f-name">review_queue</td><td class="f-type">integer</td><td>검수 대기 건수</td></tr>
+            <tr><td class="f-name">auto_confirmed</td><td class="f-type">integer</td><td>자동확정 건수</td></tr>
+            <tr><td class="f-name">reviewed</td><td class="f-type">integer</td><td>검수 완료 건수</td></tr>
+            <tr><td class="f-name">corrections</td><td class="f-type">integer</td><td>검수자 교정 건수 (운영학습 입력)</td></tr>
+            <tr><td class="f-name">verified_labels</td><td class="f-type">integer</td><td>검증 라벨 건수</td></tr>
+            <tr><td class="f-name">db</td><td class="f-type">string</td><td>DB 미가용 시에만 <code>"unavailable"</code></td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-rag-search">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/rag/search</span>
+        <span class="ep-summary">유사 문서·청크 Top-K 검색 (LLM 미호출)</span>
+        <span class="ep-auth">JWT / API Key · 60 req/min</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">검수 화면에서 '이 문서와 비슷한 과거 문서'를 제시해 검수자 판단을 돕는 <strong>검색 전용</strong> 엔드포인트다. <code>/answer</code>와 달리 <strong>LLM을 호출하지 않는다</strong> — 요건상 RAG는 검색이고 답변 생성은 요건 외이므로, LLM-free 고객사에서도 이 경로는 동작한다.</p>
+        <div class="callout"><div class="callout-label">보안 결정 — 등급 ACL 없음 (의도된 설계)</div><p style="font-size:13px;">인증(<code>require_auth</code>)만 요구하고 등급별 접근제어는 두지 않는다. 응답 <code>hits[].text</code>에 청크 원문이 담기므로 인증 주체는 TS/S1 청크도 열람할 수 있다. 배포 전제(<b>단일 고객사 폐쇄망 · 상류 KL 포털 격리</b>)에서 동일 주체가 <code>/documents</code>·<code>/classify</code>로도 같은 문서에 접근 가능하므로 신규 권한상승이 아니다. 다중검수자·최소권한이 요건화되면 등급/컬렉션 화이트리스트 필터를 도입한다.</p></div>
+        <h4>Response 200</h4>
+        <table class="ftbl">
+          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
+          <tbody>
+            <tr><td class="f-name">query</td><td class="f-type">string</td><td>질의 원문</td></tr>
+            <tr><td class="f-name">count</td><td class="f-type">integer</td><td>반환 hit 수</td></tr>
+            <tr><td class="f-name">elapsed_ms</td><td class="f-type">integer</td><td>검색 소요(ms)</td></tr>
+            <tr><td class="f-name">hits[]</td><td class="f-type">array</td><td><code>{source_doc, chunk_id, score, text}</code></td></tr>
+          </tbody>
+        </table>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">401 인증 필요</span><span class="sc s4xx">429 한도 초과</span></div>
+      </div>
+    </div>
+
+    <div class="ep" id="ep-demo-purge">
+      <div class="ep-header">
+        <span class="method post">POST</span>
+        <span class="ep-path">/api/v1/admin/demo/purge</span>
+        <span class="ep-summary">[시연] 데모 실적재 데이터 초기화 (물리삭제)</span>
+        <span class="ep-auth">JWT (admin role)</span>
+      </div>
+      <div class="ep-body">
+        <p class="ep-desc">시연 콘솔(<code>parse_demo</code>/admin)의 '실적재 시연'으로 생성된 문서·분류·청크·RAG벡터만 <strong>물리삭제</strong>한다. 시연 반복 시 데모 데이터가 운영 집계를 오염시키는 것을 막는 용도다.</p>
+        <div class="callout"><div class="callout-label">파괴적 엔드포인트 — 2중 안전장치</div><p style="font-size:13px;"><b>① 스코프 고정</b> — 삭제 대상이 <code>created_by='demo-console'</code> + RAG <code>collection='demo'</code>로 하드코딩돼 있어 다른 <code>created_by</code>는 매칭 자체가 불가하다. 실 운영 데이터는 구조적으로 지워지지 않는다.<br><b>② 프로파일 차단</b> — <code>demo_console_enabled=false</code>(운영 프로파일 기본)면 <code>404</code>로 거부한다. 즉 <b>납품 운영본에서는 이 엔드포인트가 존재하지 않는다.</b></p></div>
+        <h4>Response 200 — DemoPurgeResponse</h4>
+        <p style="font-size:13px;"><code>{documents, classifications, chunks, rag_vectors, warnings[]}</code> — 각 항목의 실삭제 건수.</p>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s4xx">404 데모 콘솔 비활성(운영 기본)</span></div>
       </div>
     </div>
 

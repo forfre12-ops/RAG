@@ -92,10 +92,12 @@ hwp-tables = [
   "unhwp>=0.8",                    # HWP5 파서 (MIT). to_markdown()으로 표 셀 회수
 ]
 
-# OCR — Tesseract 5.x + 한국어팩 (Apache 2.0, 무료).
+# OCR — 요건 외(FUN-022 는 전자문서 텍스트추출뿐)이며 어떤 배포 이미지·에어갭 번들에도
+# 포함하지 않는다(2026-08-02). 아래 파이썬 패키지는 MIT/HPND 로 라이선스 문제가 없으나,
+# 실동작에 필요한 OS 바이너리 poppler 가 GPL 이라 반출 경로를 통째로 없앴다.
+# extra 정의만 남겨 둔 것은 향후 OCR 이 요건화될 때 재활성하기 위함이다(로컬 개발 한정).
 # 시스템 선설치 필요: winget install UB-Mannheim.TesseractOCR 후 kor.traineddata 복사.
-# 스캔 PDF는 pdf2image + poppler 추가 필요 (poppler Windows 바이너리 별도).
-# 활성: pip install -e ".[ocr]"
+# 활성(로컬 전용): pip install -e ".[ocr]"
 ocr = [
   "pytesseract>=0.3.10",           # Tesseract Python 래퍼 (MIT)
   "Pillow>=10.0",                   # 이미지 처리 (PIL 대체, HPND)

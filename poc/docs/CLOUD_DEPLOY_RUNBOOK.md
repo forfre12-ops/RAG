@@ -123,8 +123,8 @@ python scripts/run_acceptance.py --mode http --base-url http://<host>:8000 --api
   한계 해소). SQL 직접 확인(`documents.processing_status='needs_review'`)도 여전히 가능.
 - **모델 reload 멀티레플리카 팬아웃 미구현 (NFR-OPS-01)**: 프로모션 후 `/admin/model/reload` 는
   로컬 프로세스만 갱신. 멀티워커/멀티레플리카면 재기동으로 갱신.
-- **`.doc`(구 워드)·HWP 표 셀**: 이미지에 antiword·pyhwp[hwp-tables] 미포함 → 해당 입력은 검수 라우팅
-  (무음 미탐 아님). 필요 시 이미지에 추가.
+- **`.doc`(구 워드)**: 이미지에 antiword 미포함 → 해당 입력은 검수 라우팅(무음 미탐 아님). 필요 시 추가.
+  HWP 표 셀은 `[hwp-tables]`(unhwp, MIT)로 **전 배포 이미지에 포함**되어 회수된다(구 pyhwp/AGPL 경로 폐기).
 - **안전게이트 warn-only**: lite-cloud 는 agreement/metadata-floor 등이 OFF 여도 경고만(dev/staging
   의도). 하드닝 운영은 onprem-local tier 로 배포.
 

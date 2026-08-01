@@ -459,7 +459,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
 
-      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 표는 <b>지재원 풀 스택</b> 기준이다. <b>고객사 폐쇄망 번들 = api·worker·beat·redis·vLLM</b>(Qwen3-14B — RAG <code>/answer</code>·선택적 2차판정, 분류 핫패스엔 미사용) <b>+ KL 제공 PostgreSQL</b>, 스토리지=로컬 파일시스템. <b>mlflow·학습 파이프라인은 지재원 전용</b>(번들 미포함 · 스토리지=로컬FS로 MinIO 미사용). tier별 구성은 §2.1.2 참조.</p>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ 위 표는 <b>지재원 풀 스택</b> 기준이다. <b>고객사 폐쇄망 번들 = api·worker·beat·redis·nginx(mTLS)</b> <b>+ KL 제공 PostgreSQL</b>, 스토리지=로컬 파일시스템. <b>LLM(Qwen3-14B)은 번들에 포함하지 않는다</b> — GPU 보유 고객사가 vLLM/Ollama로 기동한 망 내 엔드포인트를 <code>LLM_PROVIDER</code> 설정으로 연결하며, 용도는 RAG <code>/answer</code>·선택적 2차판정으로 한정되고 <b>분류 핫패스에는 쓰이지 않아 미연결 상태에서도 등급 분류가 동작</b>한다. <b>mlflow·학습 파이프라인은 지재원 전용</b>(번들 미포함 · 스토리지=로컬FS로 MinIO 미사용). tier별 구성은 §2.1.2 참조.</p>
 
       <h3>2.1.1 서버 구조도</h3>
       <div style="margin:16px 0;overflow-x:auto;">

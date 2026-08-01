@@ -38,12 +38,13 @@ bash install.sh                # docker images 적재 + (호스트 실행용) wh
 docker images | grep -E 'lloydk|postgres|redis|nginx'   # 적재 확인
 ```
 
-- 컨테이너 배포(본 절차)에서는 의존성·OCR이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`의 wheel/OCR 단계는 호스트에서 스크립트를 직접 구동할 때만 의미가 있다.
+- 컨테이너 배포(본 절차)에서는 의존성이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`의 wheel 단계는 호스트에서 스크립트를 직접 구동할 때만 의미가 있다. **OCR은 어떤 이미지·번들에도 포함되지 않는다**(요건 외 + poppler=GPL, 2026-08-02 제거).
 - **torch**: GPU 환경에 맞는 휠은 이미지에 포함된다. 호스트 직접 실행 시에만 별도 설치:
   `pip install --no-index --find-links=python-deps/wheels torch-*.whl`
-- **문서 파싱 선택 의존성**: HWP 표 셀은 `.[hwp-tables]`/`hwp5html`, PDF 표 행열은
-  `.[pdf-tables]`/`pdfplumber`, Office 내부 이미지 OCR은 `.[ocr]`/Tesseract가 있어야 구조화된다.
+- **문서 파싱 선택 의존성**: HWP 표 셀은 `.[hwp-tables]`(unhwp, MIT — 구 pyhwp/AGPL 대체),
+  PDF 표 행열은 `.[pdf-tables]`/`pdfplumber`가 있어야 구조화된다. 둘 다 배포 이미지에 포함된다.
   미설치 시 API는 추출을 계속하되 `parse.warnings`와 `/healthz/deep` extractor probe에 누락 사유를 표시한다.
+  Office 내부 이미지 OCR(`.[ocr]`)은 **요건 외 + GPL이라 배포하지 않는다** — 해당 입력은 검수 라우팅된다.
 
 ---
 
