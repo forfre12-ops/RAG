@@ -7,7 +7,7 @@
   3) 정식 산출물 7종에 문서 ID 없음                       → 등록부에 있으면 자동 부여
   4) 파일별 SHA-256·소스 commit·모델 SHA 부재            → INTEGRITY.sha256 을 함께 동결
 
-핵심 원칙: 번들은 doc/result/open/ 정본의 **동결 사본**이고, 문서 ID 의 유일한
+핵심 원칙: 번들은 doc/result/감리정본/ 의 **동결 사본**이고, 문서 ID 의 유일한
 진실원은 doc/docs_registry.yaml 이다. 번들이 자체 ID 체계를 갖지 않는다.
 
 사용:
@@ -31,7 +31,11 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
-OPEN = REPO / "doc" / "result" / "open"
+# [2026-08-02] 정본 위치 이전 — doc/result/open/ → doc/result/감리정본/.
+# open/ 은 KL 제출묶음이 자체 원본으로 분리되면서 진실원이 둘이 되는 문제가 있어
+# 참조 대상에서 내렸다. 감리 트랙(8/31 설계감리·11월 테스트점검·11/23 종료감리)은
+# 이 폴더를 편집하고 새 release_id 로 동결한다.
+CANON = REPO / "doc" / "result" / "감리정본"
 RELEASES = REPO / "doc" / "releases"
 REGISTRY = REPO / "doc" / "docs_registry.yaml"
 ENV_FILE = REPO / "poc" / ".env.onprem-local"
@@ -61,11 +65,11 @@ def git(*args: str) -> str:
 def load_registry() -> dict[str, str]:
     """정본 파일명 → 문서 ID. 등록부가 유일한 ID 진실원이다.
 
-    번들은 doc/result/open/ 만 동결하므로 그 경로의 등재만 인덱싱한다.
+    번들은 doc/result/감리정본/ 만 동결하므로 그 경로의 등재만 인덱싱한다.
     동일 파일명이 doc/internal/ 에도 있으면 별도 ID 가 정상이다(내부 사본).
     """
     data = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
-    prefix = "doc/result/open/"
+    prefix = "doc/result/감리정본/"
     mapping: dict[str, str] = {}
     for doc in data["documents"]:
         path = doc["path"].replace("\\", "/")
@@ -131,7 +135,7 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
     supp_src = [strip_id_comment(e) for e in layout["supplementary"]["documents"]]
 
     # 주간보고는 open/ 을 다시 스캔한다 — 새 주차가 자동 포함되도록.
-    weekly = sorted(p.name for p in OPEN.glob("-주간보고-*.docx"))
+    weekly = sorted(p.name for p in CANON.glob("-주간보고-*.docx"))
 
     dest.mkdir(parents=True)
     (dest / "참고자료").mkdir()
@@ -143,7 +147,7 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
 
     def copy_one(name: str, subdir: str = "") -> bool:
         nonlocal copied
-        src = OPEN / name
+        src = CANON / name
         if not src.exists():
             missing.append(name)
             return False
@@ -181,7 +185,7 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
             weekly_out.append(name)
 
     # assets (로고 등 — HTML 이 상대참조)
-    assets_src = OPEN / "assets"
+    assets_src = CANON / "assets"
     if assets_src.is_dir():
         shutil.copytree(assets_src, dest / "assets")
         copied += sum(1 for _ in (dest / "assets").rglob("*") if _.is_file())
@@ -206,7 +210,7 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
             base = href.split("/")[-1]
             if (dest / base).exists() or (dest / "참고자료" / base).exists():
                 continue
-            if (OPEN / base).exists() and copy_one(base, "참고자료"):
+            if (CANON / base).exists() and copy_one(base, "참고자료"):
                 supp_out.append({"file": base, "id": registry.get(base, "(미등록)")})
         for name in {r["file"] for r in supp_out}:
             html = html.replace(f'href="{name}"', f'href="참고자료/{name}"')
@@ -246,7 +250,7 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
         "purpose": purpose,
         "frozen_at": git("log", "-1", "--format=%ad", "--date=short"),
         "source_commit": commit,
-        "source_of_truth": "doc/result/open/",
+        "source_of_truth": "doc/result/감리정본/",
         "id_authority": "doc/docs_registry.yaml",
         "inherited_from": src_release,
         "prepared_by": "로이드케이(수행사)",
@@ -271,7 +275,7 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
         "progress_reports": {"path_prefix": "사업관리보고/", "documents": weekly_out},
         "verification_evidence": {"path_prefix": "검증로그/", "documents": evidence_out},
         "notes": [
-            "동결 사본이다. 수정이 필요하면 정본(doc/result/open/)을 고치고 새 release_id 로 다시 동결한다.",
+            "동결 사본이다. 수정이 필요하면 정본(doc/result/감리정본/)을 고치고 새 release_id 로 다시 동결한다.",
             "문서 ID 는 doc/docs_registry.yaml 에서만 해석한다 — 번들은 자체 ID 체계를 갖지 않는다.",
             f"재생성: python scripts/build_supervision_bundle.py --from-release {src_release} --release-id {release_id}",
             f"검증:   python scripts/build_supervision_bundle.py --check {release_id}",

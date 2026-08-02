@@ -102,7 +102,7 @@ def audit(*, strict_unregistered: bool = False) -> int:
         if p.suffix.lower() not in {".html", ".yaml", ".yml", ".md", ".xlsx", ".docx", ".pdf", ".sql"}:
             continue
         rp = rel(p)
-        if rp.startswith("doc/result/open/assets/"):
+        if rp.startswith("doc/result/감리정본/assets/"):
             continue
         if rp not in registered_paths:
             msg = f"unregistered active document: {rp}"
