@@ -1,6 +1,6 @@
 {
   "pack": "lloydk-acceptance-pack",
-  "note": "고객 배포 인수검증용. 판정 규율: 정확 등급일치가 아니라 severity FLOOR(고등급 미탐=veto) + 숫자무손실 + 게이트 가시성. 소스=공개+합성 혼합, 실비밀 텍스트 0. HWP 바이너리는 생성불가.",
+  "note": "고객 배포 인수검증용. 판정 규율: 정확 등급일치가 아니라 severity FLOOR(고등급 미탐=veto) + 숫자무손실 + 게이트 가시성. 소스=공개+합성 혼합, 실비밀 텍스트 0. 구형 .hwp 는 합성이 불가하므로 공개 공고문 실파일로 커버한다(real-S3-iprd-notice) — 표 47개·셀 1,815개가 rhwp 본문에는 없고 unhwp 보강으로만 회수되는 경로라, 이 건이 빠지면 무음 표 유실이 인수검증을 통과한다(2026-08-02 실측으로 확인).",
   "grades": [
     "TS",
     "S1",
@@ -132,6 +132,24 @@
       ],
       "_numeric_note": "실문서는 PII 마스킹이 전화번호 등 숫자를 정당하게 제거(파싱손실 아님)하므로, 파이프라인 통과 후 살아남는 비-PII 표 셀 숫자(연도 2026)만 무손실 기준으로 삼는다. 파서 실검증의 핵심은 파싱성공(rhwp 표 23셀)+severity floor.",
       "has_table": true
+    },
+    {
+      "doc_id": "real-S3-iprd-notice",
+      "file": "docs/real-S3-iprd-notice.hwp",
+      "format": "hwp",
+      "expected_grade": "S3",
+      "source_kind": "public",
+      "legal_basis": "지식재산처 공개 사업공고문 — 공개문서이므로 S3(대외공개). 비밀 텍스트 0.",
+      "expected_numeric_tokens": [
+        "1,000",
+        "15,000",
+        "2200",
+        "2500",
+        "3287"
+      ],
+      "has_table": true,
+      "expects_needs_review": true,
+      "why": "구형 .hwp(표 포함) 경로 회귀. rhwp 단독은 본문 10,439자·표 0개로 자동확정되지만 unhwp 보강 시 46,473자·표 47개·셀 1,815개. 표 유실이 확인되므로 등급은 그대로 두고 needs_review 로 라우팅되어야 한다(FNR-safe). 표 검출기(to_hwpx_bytes)가 이 파일에서 실패하므로 '판정 불가 → 보강·라우팅 생략' 회귀를 함께 막는다."
     }
   ],
   "generated": 8,

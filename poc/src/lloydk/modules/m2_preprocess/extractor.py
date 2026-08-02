@@ -420,8 +420,17 @@ def _extract_hwp(p: Path) -> ExtractResult:
         )
     # 본문은 뽑혔지만 표 셀이 빠졌을 수 있다(rhwp의 조용한 표 미추출) — 커버리지 판정.
     coverage = _hwp_table_coverage(p, doc, text, warnings)
-    if coverage == "incomplete":
-        _warn_once(warnings, "hwp_table_cells_may_be_missing")
+
+    # [FNR] 판정 불가(None + hwp_table_check_unavailable)도 보강 대상이다.
+    # 종전엔 보강이 coverage=="incomplete" 안에만 있어서, 표 검출기(to_hwpx_bytes)가
+    # 실패하는 .hwp 는 "표가 있는지 모른다"는 이유로 보강도 검수 라우팅도 건너뛰었다.
+    # 실측(공고문 .hwp): rhwp 단독 10,439자·표 0개로 자동확정 → unhwp 직접호출은
+    # 36,033자·표 47개·셀 1,815개. 문서의 71%가 무음 유실되고 게이트는 통과시켰다.
+    # 검출기가 모른다고 답할수록 더 봐야 한다 — 모름을 안전으로 읽지 않는다.
+    unknown = coverage is None and "hwp_table_check_unavailable" in (warnings or [])
+    if coverage == "incomplete" or unknown:
+        if coverage == "incomplete":
+            _warn_once(warnings, "hwp_table_cells_may_be_missing")
         # .hwp 한정 표 보강. 합집합이라 rhwp 가 이미 잡은 내용은 중복되지 않는다.
         # coverage 는 그대로 "incomplete" 로 둔다 → 검수 라우팅 유지(설계 의도).
         if not is_hwpx:
@@ -432,6 +441,15 @@ def _extract_hwp(p: Path) -> ExtractResult:
                     text = merged
                     tables = tables + unhwp_tables
                     _warn_once(warnings, "hwp_tables_recovered_by_unhwp")
+                    # 회수됐다는 것은 rhwp 가 실제로 표를 흘렸다는 뜻 — 판정 불가였더라도
+                    # 이제는 유실이 확인된 것이므로 incomplete 로 확정해 검수로 보낸다.
+                    coverage = "incomplete"
+                    _warn_once(warnings, "hwp_table_cells_may_be_missing")
+            elif unknown:
+                # 표 유무도 모르고 회수도 못 했다 = 유실 없음을 입증할 수 없다.
+                # 무음 통과 대신 검수로 보낸다(등급은 불변 — FNR-safe).
+                _warn_once(warnings, "hwp_table_cells_may_be_missing")
+                coverage = "incomplete"
     return ExtractResult(
         text=text,
         method="rhwp",

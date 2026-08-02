@@ -316,3 +316,75 @@ class TestAugmentationKeepsReviewRouting:
         assert "hwp_tables_recovered_by_unhwp" in r.warnings
         assert "secret | 12000" in r.text                # 표 내용은 분류기에 도달
         assert "본문 단락" in r.text                       # 합집합 — 본문 보존
+
+
+class TestCoverageUnknownStillRecovers:
+    """표 검출기가 실패해 '판정 불가'인 .hwp 도 보강·검수 라우팅 대상이다.
+
+    실측으로 잡힌 무음 미탐 경로다(2026-08-02). 종전 코드는 보강을 coverage=="incomplete"
+    안에만 두어서, 유일한 표-존재 검출기(rhwp.to_hwpx_bytes)가 실패하는 .hwp 는
+    "표가 있는지 모른다"는 이유로 보강도 라우팅도 건너뛰었다. 공개 공고문 .hwp 실측:
+    rhwp 단독 10,439자·표 0개로 자동확정 → unhwp 직접호출 36,033자·표 47개·셀 1,815개.
+    문서의 71%가 사라졌는데 게이트는 통과시켰다.
+
+    규율: 검출기가 '모른다'고 답할수록 더 봐야 한다. 모름을 안전으로 읽지 않는다.
+    """
+
+    @staticmethod
+    def _hwp_with_unknown_coverage(tmp_path: Path, monkeypatch):
+        import lloydk.modules.m2_preprocess.extractor as ex
+
+        p = tmp_path / "unknown.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        class _Doc:
+            def extract_text(self):
+                return "본문 단락"
+
+            def to_hwpx_bytes(self):  # 유일한 표-존재 검출기가 실패하는 실제 상황
+                raise RuntimeError("to_hwpx_bytes failed")
+
+        monkeypatch.setitem(__import__("sys").modules, "rhwp",
+                            __import__("types").SimpleNamespace(parse=lambda _p: _Doc()))
+        return ex, p
+
+    def test_unknown_coverage_triggers_recovery_and_routing(self, tmp_path: Path, monkeypatch):
+        ex, p = self._hwp_with_unknown_coverage(tmp_path, monkeypatch)
+        _fake_unhwp(monkeypatch, _MD)
+
+        r = ex._extract_hwp(p)
+
+        assert "hwp_table_check_unavailable" in r.warnings   # 판정 불가는 그대로 가시화
+        assert "hwp_tables_recovered_by_unhwp" in r.warnings  # 그럼에도 보강은 시도됐다
+        assert "secret | 12000" in r.text                     # 표 내용이 분류기에 도달
+        assert "본문 단락" in r.text                            # 합집합 — 본문 보존
+        # 회수됐다 = rhwp 가 실제로 표를 흘렸다 → 유실이 확인됐으므로 검수로 보낸다.
+        assert r.table_coverage == "incomplete"
+        assert "hwp_table_cells_may_be_missing" in r.warnings
+
+    def test_unknown_coverage_without_unhwp_routes_to_review(self, tmp_path: Path, monkeypatch):
+        """보강도 못 하면 '유실 없음'을 입증할 수 없다 → 무음 통과 대신 검수."""
+        ex, p = self._hwp_with_unknown_coverage(tmp_path, monkeypatch)
+        _fake_unhwp(monkeypatch, None)  # 미설치
+
+        r = ex._extract_hwp(p)
+
+        assert r.text.strip() == "본문 단락"          # 본문은 살아 있고
+        assert r.table_coverage == "incomplete"      # 등급 불변, 라우팅만 발동
+        assert "hwp_table_cells_may_be_missing" in r.warnings
+
+    def test_review_gate_actually_routes_on_unknown(self, tmp_path: Path, monkeypatch):
+        """추출기 판정이 실제 적재 게이트까지 배선돼 있는가(경고만 남고 끝나던 회귀)."""
+        from lloydk.services.document_ingestion_service import extraction_review_decision
+
+        ex, p = self._hwp_with_unknown_coverage(tmp_path, monkeypatch)
+        _fake_unhwp(monkeypatch, None)
+        r = ex._extract_hwp(p)
+
+        d = extraction_review_decision(
+            quality=float(r.quality), ocr_used=False, error=r.error, min_quality=0.6,
+            ocr_requires_review=True, content_quality=None,
+            table_coverage=r.table_coverage, warnings=r.warnings,
+        )
+        assert d.requires_review is True
+        assert "table_incomplete" in d.reasons
