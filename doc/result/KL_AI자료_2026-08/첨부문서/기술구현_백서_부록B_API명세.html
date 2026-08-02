@@ -708,7 +708,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         </table>
         <div class="status-chips">
           <span class="sc s2xx">201 업로드 완료</span>
-          <span class="sc s4xx">409 동일 해시 문서 존재 (DUPLICATE_DOC)</span>
           <span class="sc s4xx">413 파일 크기 초과 (20MB)</span>
           <span class="sc s4xx">422 actor JSON 오류 / 빈 파일</span>
         </div>
@@ -1263,30 +1262,28 @@ lloydk_embedding_cache_miss_total</pre>
 
     <!-- ===== 오류 코드표 ===== -->
     <div class="cat-divider" id="errors"><div class="cat-line"></div><span class="cat-label">오류 코드표</span><div class="cat-line"></div></div>
+
+    <div class="nego"><span class="nego-label">실측 기준</span><b>오류 응답 규약.</b> 본 시스템은 <b>기계판독용 심볼릭 오류코드 체계를 전면 운영하지 않는다</b>. 대부분의 오류는 FastAPI 기본 형태인 <code>{"detail": "…"}</code>(422는 필드별 오류 배열)로 반환되며, 응답 바디에 <code>code</code> 필드를 담는 경로는 <b>2건뿐</b>이다 — <code>LLOYDK_BODY_TOO_LARGE</code>·<code>LLOYDK_RATE_LIMIT</code>. 따라서 <b>연동 클라이언트는 HTTP 상태코드로 분기해야 하며</b>, 심볼릭 코드 문자열로 분기해서는 안 된다. 아래 표의 <code>detail</code> 문자열은 안내용이며 계약 대상이 아니다(문구는 변경될 수 있음). 심볼릭 코드 체계가 연동 요건으로 필요하면 KL과 ICD 개정으로 확정한 뒤 구현한다.</div>
+
     <div class="tbl-wrap">
       <table class="full">
-        <thead><tr><th>HTTP</th><th>error_code</th><th>설명</th><th>조치</th></tr></thead>
+        <thead><tr><th style="width:64px">HTTP</th><th style="width:210px">응답 <code>code</code> 필드</th><th>상황 (실제 <code>detail</code> 문자열)</th><th style="width:230px">조치</th></tr></thead>
         <tbody>
-          <tr><td>400</td><td><code>MISSING_FIELD</code></td><td>필수 필드 누락</td><td>요청 바디 확인</td></tr>
-          <tr><td>400</td><td><code>INVALID_LEVEL</code></td><td>등급 코드 오류</td><td>TS/S1/S2/S3 중 하나 사용</td></tr>
-          <tr><td>400</td><td><code>UNSUPPORTED_FORMAT</code></td><td>파일 형식 미지원</td><td>HWP/DOCX/PDF만 허용</td></tr>
-          <tr><td>401</td><td><code>AUTH_REQUIRED</code></td><td>토큰 없음</td><td>Authorization 헤더 확인</td></tr>
-          <tr><td>401</td><td><code>TOKEN_EXPIRED</code></td><td>JWT 만료</td><td>토큰 갱신</td></tr>
-          <tr><td>403</td><td><code>INSUFFICIENT_ROLE</code></td><td>권한 부족</td><td>admin 역할 필요</td></tr>
-          <tr><td>404</td><td><code>DOC_NOT_FOUND</code></td><td>문서 없음</td><td>doc_id 확인</td></tr>
-          <tr><td>404</td><td><code>CLASSIFICATION_NOT_FOUND</code></td><td>분류 결과 없음</td><td>classification_id 확인</td></tr>
-          <tr><td>409</td><td><code>DUPLICATE_DOC</code></td><td>동일 해시 문서 존재</td><td>file_hash 중복 (전역)</td></tr>
-          <tr><td>413</td><td><code>FILE_TOO_LARGE</code></td><td>파일 크기 초과 (멀티파트 업로드)</td><td>20MB 이하 업로드</td></tr>
+          <tr><td>400</td><td>—</td><td>요청 바디 검증 실패 — <code>documents must not be empty</code></td><td>detail 메시지 확인</td></tr>
+          <tr><td>401</td><td>—</td><td>인증 실패 — <code>missing bearer token</code> · <code>missing authorization</code> · <code>invalid api key</code> · <code>unauthenticated</code></td><td>Authorization 헤더 · API 키 확인</td></tr>
+          <tr><td>403</td><td>—</td><td>권한 부족 · 서명 URL 토큰 무효 — <code>invalid or missing signed-URL token (?t=)</code></td><td>admin 역할 · 서명 URL 확인</td></tr>
+          <tr><td>404</td><td>—</td><td>리소스 없음 — <code>job not found</code> · <code>no classification for doc_id</code> · <code>guide_id not found</code> · <code>model_version not found</code> · <code>no active model</code> 등</td><td>식별자 확인</td></tr>
+          <tr><td>409</td><td>—</td><td>동일 <code>Idempotency-Key</code> 요청이 처리 중(in-flight) · 데모 마커 문서의 물리삭제 거부(fail-safe)</td><td>완료 후 재시도 · 관리자 확인</td></tr>
+          <tr><td>413</td><td>—</td><td>업로드 파일 크기 초과(<code>max_upload_mb</code>, 기본 20MB) · 배치 크기 초과(<code>batch size &gt; 1000</code>)</td><td>파일 · 배치 크기 축소</td></tr>
           <tr><td>413</td><td><code>LLOYDK_BODY_TOO_LARGE</code></td><td>요청 본문 크기 초과 (일반 JSON)</td><td>본문 25MB 이하로</td></tr>
-          <tr><td>422</td><td><code>VALIDATION_ERROR</code></td><td>요청 스키마 검증 실패</td><td>detail 배열에서 필드별 오류 확인</td></tr>
+          <tr><td>422</td><td>—</td><td>스키마 검증 실패(FastAPI 기본 <code>detail</code> 배열) · <code>doc_id must be a UUID</code> · <code>empty file</code></td><td>detail 배열에서 필드별 오류 확인</td></tr>
           <tr><td>429</td><td><code>LLOYDK_RATE_LIMIT</code></td><td>요청 한도 초과</td><td>라우터별 한도(기본 120/분, /train 10/시간 등). Retry-After 헤더 이후 재시도</td></tr>
-          <tr><td>503</td><td><code>MODEL_WARMING_UP</code></td><td>모델 로딩 중</td><td>warmup_done=true 확인 후 재시도 (최대 82초)</td></tr>
-          <tr><td>503</td><td><code>LLM_UNAVAILABLE</code></td><td>LLM 비응답</td><td>LLM 서버(설정 시·상용/로컬) 상태·API 확인</td></tr>
+          <tr><td>503</td><td>—</td><td>일시적 서비스 불가 — <code>service temporarily unavailable</code> · 감사기록 실패 시 고위험 액션 fail-closed 차단(opt-in · 기본 off)</td><td>재시도 · 감사로그 상태 확인</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p style="margin-top:32px;font-size:13px;color:var(--text-dim);">한국어 오류 메시지는 정적 오류 메시지 파일(errors_ko) (50항목) 참고. 응답 바디 예시: <code>{"error_code":"DOC_NOT_FOUND","message":"문서를 찾을 수 없습니다.","detail":null}</code></p>
+    <p style="margin-top:32px;font-size:13px;color:var(--text-dim);">실제 응답 바디 예시: <code>{"detail":"guide_id not found"}</code> · 본문 초과 시 <code>{"detail":"…","code":"LLOYDK_BODY_TOO_LARGE"}</code>. 데모 콘솔(<code>/demo/</code>)은 영문 <code>detail</code>이 발주처에 그대로 노출되지 않도록 정적 매핑 파일 <code>api/static/errors_ko.js</code>로 한국어 문구를 <b>화면 표시 시점에</b> 치환한다 — 서버 응답 자체를 한국어로 바꾸는 것이 아니며, 오류코드 카탈로그도 아니다.</p>
 
   </article>
 </div>

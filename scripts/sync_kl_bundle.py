@@ -31,6 +31,19 @@ import sys
 import urllib.parse
 from pathlib import Path
 
+# Windows 기본 콘솔(cp949)에서는 판정 줄의 '—' 같은 문자가 UnicodeEncodeError를 내
+# 최종 판정을 찍기 직전에 죽는다. 그러면 "검증이 통과했는지"를 종료코드로도 화면으로도
+# 알 수 없는데, 이 스크립트는 발송 게이트라 조용히 죽는 것이 가장 위험하다. 출력 스트림을
+# UTF-8로 고정하고, 그마저 안 되는 환경에서는 대체문자로 낮춰서라도 판정은 반드시 찍는다.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        try:
+            _stream.reconfigure(errors="replace")
+        except (AttributeError, OSError):
+            pass
+
 ROOT = Path(__file__).resolve().parents[1]
 KL = ROOT / "doc" / "result" / "KL_AI자료_2026-08"
 ATTACH = KL / "첨부문서"

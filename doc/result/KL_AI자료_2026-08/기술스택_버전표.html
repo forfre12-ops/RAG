@@ -67,7 +67,7 @@ a{color:#0a0a0a}
       <tr><td>워커 · 스케줄러</td><td><code>lloydk-worker</code></td><td>자체</td><td>Celery worker + beat(야간 배치)</td></tr>
     </tbody>
   </table>
-  <p style="font-size:12.5px;color:#71717a">※ 폐쇄망 배포 서비스는 위 5개가 전부입니다(<code>docker-compose.airgap.yml</code>). 이미지는 <code>docker load</code>로 복원하며 인터넷 접속이 필요 없습니다.</p>
+  <p style="font-size:12.5px;color:#71717a">※ 폐쇄망 배포 서비스는 위 구성요소가 전부입니다 — <code>docker-compose.airgap.yml</code> 기준 <b>서비스 6개</b>(<code>postgres</code>·<code>redis</code>·<code>api</code>·<code>worker</code>·<code>beat</code>·<code>nginx-mtls</code>)이며, 위 표는 <code>worker</code>와 <code>beat</code>가 <b>같은 <code>lloydk-worker</code> 이미지</b>를 공유하므로 한 행으로 묶어 5행으로 표기했습니다(이미지 종류 5 · 실행 서비스 6). 이미지는 <code>docker load</code>로 복원하며 인터넷 접속이 필요 없습니다.</p>
 
   <h2>2. 애플리케이션 — Python 패키지</h2>
   <table>
