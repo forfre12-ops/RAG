@@ -570,6 +570,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       </div>
       <div class="ep-body">
         <p class="ep-desc">KF-DeBERTa 학습 작업을 제출하는 관리자 전용 API다. 학습이 완료되어 새 모델이 등록되어도 자동으로 서빙에 활성화되지 않는다(활성화는 별도 관리자 조치 필요).</p>
+        <div class="nego"><span class="nego-label">조건부 등록</span><code>/train</code>·<code>/train/jobs</code>는 <b>학습 노드에서만 라우터가 등록된다</b> — <code>enable_training</code>(지재원 full-train) 또는 <code>enable_incremental_retrain</code>(고객사 야간 증분) 중 하나가 참일 때만이다. 두 플래그가 모두 꺼진 표준 추론 프로파일에서는 <b>라우터 자체가 등록되지 않아 404가 되며 OpenAPI 스키마에도 나타나지 않는다</b>(기동 로그에 <code>training router disabled</code>). 반면 <b>검수 승급 라우터는 재학습과 무관한 비모수 안전 레버이므로 플래그와 무관하게 항상 등록된다</b>.</div>
         <h4>Request Body — TrainRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>

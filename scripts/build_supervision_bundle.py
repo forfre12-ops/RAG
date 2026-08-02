@@ -271,6 +271,23 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
             raise SystemExit("index.html 미해결 링크(동결 중단):\n  " + "\n  ".join(broken_links))
 
     # 검증 증적(회귀 로그·스캔 리포트 등) — 감리가 "전 시험 통과"를 확인할 수 있게 동봉.
+    #
+    # --attach 는 --from-release 로 이월되지 않는다(증적은 커밋마다 다시 만드는 것이
+    # 원칙이라 자동 승계하지 않는다). 문제는 빠져도 조용하다는 것 — 실제로 r8 첫 빌드에서
+    # 검증로그 2종이 경고 없이 누락된 채 동결됐고, 이전 릴리스와 파일목록을 diff 해서야
+    # 발견했다. 증적 없는 제출본은 "전 시험 통과"를 확인할 방법이 사라진 제출본이다.
+    # 이전 번들에 증적이 있었는데 이번에 --attach 가 없으면 반드시 시끄럽게 알린다.
+    prior_evidence = [
+        strip_id_comment(e)
+        for e in (layout.get("verification_evidence") or {}).get("documents", [])
+    ]
+    if prior_evidence and not attach:
+        print(f"  [확인 요망] {src_release} 에는 검증 증적 {len(prior_evidence)}종이 있었으나 "
+              f"이번 빌드는 --attach 가 없어 증적 없이 동결된다 — "
+              f"의도적 제외가 아니면 --attach 로 다시 동봉하라:", file=sys.stderr)
+        for n in prior_evidence:
+            print(f"      · {n}  (예: doc/releases/{src_release}/검증로그/{n})", file=sys.stderr)
+
     evidence_out: list[str] = []
     if attach:
         (dest / "검증로그").mkdir()
