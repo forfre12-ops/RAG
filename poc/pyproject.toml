@@ -68,7 +68,12 @@ dependencies = [
 # HWP/HWPX 추출 (한국 공공문서). extractor.py가 try/except로 graceful 처리.
 # 활성: pip install -e ".[hwp]"
 hwp = [
-  "rhwp-python>=0.5.1",            # 최신 PyPI 0.5.1, 모든 플랫폼 wheel
+  # [하한 중요] 0.8.1 미만에는 Document.to_hwpx_bytes 가 없다. 그 메서드가 .hwp 의
+  # 유일한 표-존재 검출기라, 없으면 표 커버리지 판정이 실패하고 표 셀 회수가
+  # 통째로 생략된다(공고문 .hwp 실측: 46,473자·표 47개 → 10,439자·표 0개).
+  # 배포 이미지는 0.8.1 이므로 개발 환경도 같은 하한으로 맞춘다 — 하한이 낮으면
+  # 새 venv 가 조용히 구버전을 받아 로컬 실측이 배포본과 어긋난다(2026-08-02 실제 발생).
+  "rhwp-python>=0.8.1",           # 모든 플랫폼 wheel
 ]
 
 # 구형 .xls(Excel 97-2003 BIFF) 추출. .xlsx/.xlsm은 base openpyxl로 충분하나
@@ -175,7 +180,7 @@ lint = [
 # 모든 옵션 한 번에 설치 (운영 환경용)
 # 활성: pip install -e ".[full]"
 full = [
-  "rhwp-python>=0.5.1",
+  "rhwp-python>=0.8.1",
   "xlrd>=2.0",
   "pdfplumber>=0.11",
   "soynlp>=0.0.493",

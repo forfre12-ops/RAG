@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # 구형 .hwp 실경로 검증 — 배포된 서버가 표를 회수하고 검수로 보내는가.
 #
-# 2026-08-02 로컬 실측으로 기대값이 확정됐다. 종전엔 파이프라인이 본문 10,439자·표 0개로
-# 자동확정했는데(문서의 71% 무음 유실), 표-존재 검출기(rhwp.to_hwpx_bytes)가 이 파일에서
-# 실패해 보강·라우팅이 통째로 생략됐기 때문이다(커밋 77f6c15).
+# 2026-08-02 기대값 확정 — 로컬·서버 양쪽에서 동일하게 재현했다:
+#   본문 46,473자 · 표 47개 · 셀 1,815개 · processing_status=needs_review
 #
-# ⚠ unhwp 설치만으로는 안 고쳐진다. 보강이 실패한 검출기 뒤에 갇혀 있어서, 라이브러리가
-#   있어도 호출되지 않는다. 소스 수정(77f6c15)이 반영된 이미지로 재배포돼야 한다.
+# 실패 시 원인 두 가지를 구분할 것:
+#   ① 표 미회수(본문 10,439자·표 0개) — rhwp-python 이 낡아 to_hwpx_bytes 가 없으면
+#      검출기가 실패한다. 0.8.1 이상인지 먼저 확인(0.5.1 에서 실측 재현됨).
+#      unhwp 설치 여부만 봐서는 안 된다 — unhwp 가 있어도 검출기가 죽으면 호출되지 않는다.
+#   ② 타임아웃 — 표 47개 회수는 CPU 시간을 쓴다. 워커 타임아웃·입력 크기 상한을 볼 것.
+#      이쪽이 원래 보고된 증상(gunicorn 워커 강제 재시작)에 해당한다.
 #
 # 사용:
 #   BASE_URL=http://127.0.0.1:8000 API_KEY=<키> bash scripts/verify_hwp_path_remote.sh
@@ -108,5 +111,7 @@ if [ "$FAIL" -eq 0 ]; then
   echo; echo "→ PASS — 구형 .hwp 경로 정상(표 ${EXP_TABLES}개·셀 ${EXP_CELLS}개 기준)"
   exit 0
 fi
-echo; echo "→ FAIL — 커밋 77f6c15 가 반영된 이미지인지 확인할 것(unhwp 설치만으로는 해소되지 않음)"
+echo; echo "→ FAIL — 위 ①②를 순서대로 확인할 것:"
+echo "     ① docker exec <api> python -c 'import importlib.metadata as m; print(m.version(\"rhwp-python\"))'  # 0.8.1 이상인가"
+echo "     ② 워커 타임아웃·입력 크기 상한 (표 47개 회수는 CPU 시간을 쓴다)"
 exit 1

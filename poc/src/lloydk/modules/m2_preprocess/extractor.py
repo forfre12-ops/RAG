@@ -423,10 +423,14 @@ def _extract_hwp(p: Path) -> ExtractResult:
 
     # [FNR] 판정 불가(None + hwp_table_check_unavailable)도 보강 대상이다.
     # 종전엔 보강이 coverage=="incomplete" 안에만 있어서, 표 검출기(to_hwpx_bytes)가
-    # 실패하는 .hwp 는 "표가 있는지 모른다"는 이유로 보강도 검수 라우팅도 건너뛰었다.
-    # 실측(공고문 .hwp): rhwp 단독 10,439자·표 0개로 자동확정 → unhwp 직접호출은
-    # 36,033자·표 47개·셀 1,815개. 문서의 71%가 무음 유실되고 게이트는 통과시켰다.
-    # 검출기가 모른다고 답할수록 더 봐야 한다 — 모름을 안전으로 읽지 않는다.
+    # 실패하면 "표가 있는지 모른다"는 이유로 보강도 검수 라우팅도 건너뛰었다 — fail-open.
+    #
+    # 실측(공고문 .hwp · 2026-08-02): rhwp-python 0.5.1 처럼 to_hwpx_bytes 가 없는
+    # 환경에서 본문 10,439자·표 0개로 자동확정됐다. 같은 파일이 0.8.1(배포 이미지)에서는
+    # 검출기가 동작해 46,473자·표 47개·셀 1,815개로 정상 회수·검수 라우팅된다.
+    # 즉 이 분기는 배포본의 현재 동작이 아니라 rhwp 버전·파일에 따라 열리는 잠재 경로다.
+    # 그래도 닫는 이유: 검출기가 "모른다"고 답할 때 무음 통과시키면 표 속 비밀이 그대로
+    # 미탐이 된다. 모름을 안전으로 읽지 않는다.
     unknown = coverage is None and "hwp_table_check_unavailable" in (warnings or [])
     if coverage == "incomplete" or unknown:
         if coverage == "incomplete":
