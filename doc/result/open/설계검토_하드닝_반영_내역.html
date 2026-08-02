@@ -333,7 +333,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <li><b>A. 메타데이터 floor 운영 ON.</b> 실데이터 0 환경에선 모델보다 메타데이터가 더 믿을 만하다. 보안표시(security_marking)가 예측보다 높으면 상향(FNR-safe·하향 없음), 접근범위(access_scope) 충돌이면 검수 라우팅. 입력 메타 부재 시 무음 no-op이라, <b>게이트 발동·메타 존재율 메트릭</b>을 같이 달아 "켰는데 효과가 있는지"를 가시화.</li>
         <li><b>B. 고등급 이중검토 보류 가시화.</b> 이중검토는 1인 동의 시 needs_second_review로 무음 보류된다. 등급별 보류 건수 메트릭 + 조회 엔드포인트를 신설. (정족수 플래그 자체는 1인 운영 데드락 방지를 위해 opt-in 유지.)</li>
         <li><b>C. factor 출처 분리 표시.</b> 모델이 룰보다 고등급일 때 S/V/M factor를 등급에 맞춰 역산하는데, 이 추정치가 법리 근거로 오인되지 않도록 응답에 <b>rule_evidenced / model_estimated</b> 출처를 분리 표기(컴플라이언스).</li>
-        <li><b>D. locked readiness 가시화.</b> 자동활성에 필요한 등급별 사람서명 평가정답 충족 여부를 노출. 무실데이터 단계엔 비어 있어 ready=false(진실), 사람서명으로 채워지면 자동으로 켜진다.</li>
+        <li><b>D. locked readiness 가시화.</b> (골든 locked-eval 봉인 트랙) 등급별 사람서명 평가정답 충족 여부를 노출. 무실데이터 단계엔 비어 있어 ready=false(진실), 사람서명으로 채워지면 locked-eval 준비 플래그가 켜진다. ※ 이는 골든 평가셋 봉인용 지표일 뿐이며 <b>모델 배포 승격 게이트와는 별개</b>다 — 승격은 하드닝 홀드아웃(누출0) FNR-safe 자동 게이트만으로 결정(사람 서명·adjudicated eval 조건 없음).</li>
         <li><b>E. kill-gate 안전브레이크(admin-actuated).</b> 품질붕괴 발동 시 고등급 자동확정만 검수로 보수화(등급 무변경, 조건 풀리면 자동 해제). 합성 신호로 운영을 자동정지하지 않는다 — 기본 off.</li>
         <li><b>F. 원본 at-rest 암호화 기본 ON.</b> 영업비밀 폐쇄망에서 원본 평문 저장 금지. 운영 프로파일 기본 활성, 키 미설정 시 startup fail-fast(fail-secure).</li>
       </ul>

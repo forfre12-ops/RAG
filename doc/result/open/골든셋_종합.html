@@ -128,7 +128,7 @@ footer strong{color:var(--text-dim);}
       <tr><td><b>검색</b> retrieval (80 + NL 190)</td><td>근거문서 회수</td><td>판례 실문서</td><td>Recall@5</td><td>base 0.89(천장) / 정직 ~0.55~0.70</td><td class="center"><span class="tag done">사용</span></td></tr>
       <tr><td><b>적대적</b> golden_100 (100)</td><td>함정 방어(치명 미탐)</td><td>한 문장 함정</td><td>고위험 미탐 &le; 임계</td><td>미탐 4건 PASS (정확도 41%)</td><td class="center"><span class="tag done">게이트</span></td></tr>
       <tr><td><b>답변</b> answer_gold (0)</td><td>생성 답 정확성</td><td>—</td><td>Citation-F1·충실도</td><td>—</td><td class="center"><span class="tag plan">미구축</span></td></tr>
-      <tr><td>합성 golden50/100/500</td><td>(성능 아님) 방법론·균형</td><td>LLM 생성</td><td>—</td><td>운영 점수 불가(READONLY)</td><td class="center"><span class="tag dep">보조</span></td></tr>
+      <tr><td>합성 golden50/100/500 (구 후보셋 · 현행 정본 gold_real 777)</td><td>(성능 아님) 방법론·균형</td><td>LLM 생성</td><td>—</td><td>운영 점수 불가(READONLY)</td><td class="center"><span class="tag dep">보조</span></td></tr>
       <tr><td>구 classification_gold (144)</td><td>(무의미)</td><td>구 generator(키워드주입)</td><td>—</td><td>F1=1.0 가짜</td><td class="center"><span class="tag dep">폐기</span></td></tr>
     </tbody>
   </table></div>
@@ -145,7 +145,7 @@ footer strong{color:var(--text-dim);}
   <h2>② 검색 골든셋 (retrieval, 80 + NL 190)</h2>
   <p><b>의미</b> : "질의 &rarr; 나와야 할 정답 문서" 쌍(현재 질의당 정답 1건). <code>relevant_doc_ids</code>를 상위 k에 회수하면 성공.</p>
   <p><b>채점</b> : 상위 5개에 정답 doc_id가 있나 &rarr; <b>Recall@5</b>(+ Precision@5·MRR·nDCG@5). P2 합격선 Recall@5 &ge; 0.80, 지연 p50 &le; 200ms.</p>
-  <p><b>실측·함정</b> : base 질의는 정답 본문 <i>발췌 그대로</i>라 글자만 겹쳐도 맞음(천장 0.89). 이를 고치려 <b>NL 변종</b>(패러프레이즈·글자겹침 &lt;10 필터)을 만들었고, NL·실임베더 기준 정직값은 <b>~0.55~0.70 &rarr; P2 0.80 미달</b>. S1 검색은 25%로 붕괴, reranker는 +1%p로 무용.</p>
+  <p><b>실측·함정</b> : base 질의는 정답 본문 <i>발췌 그대로</i>라 글자만 겹쳐도 맞음(천장 0.89). 이를 고치려 <b>NL 변종</b>(패러프레이즈·글자겹침 &lt;10 필터)을 만들었고, NL·실임베더 기준 정직값은 <b>~0.55~0.70</b>(NL변종·dense 단독 보수 천장 &rarr; 이 셋 기준 P2 0.80 미달). 단 <b>실 PG 하이브리드 랭커</b> 측정은 <b>0.85</b>(2026-06-24)로 <b>대상 셋·랭커에 따라 P2 판정이 갈린다</b> — 제출 시 측정셋 명시 필요(테스트_전략 참조). S1 검색은 25%로 붕괴, reranker는 +1%p로 무용.</p>
 
   <h2>③ 적대적 골든셋 (golden_100, 100) — 안전 게이트</h2>
   <p><b>의미</b> : 실문서가 아니라 <b>한 문장 함정 100개</b>. <i>성능 벤치마크가 아니라</i> "기밀을 공개(S3)로 흘리는 치명적 미탐이 늘었는지" 감시하는 회귀 트립와이어.</p>

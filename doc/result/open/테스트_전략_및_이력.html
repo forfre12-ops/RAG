@@ -614,7 +614,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
       <p style="font-size:12.5px;color:var(--text-soft);">
-        <b>핵심:</b> "실측"의 GPU 의존 항목(분류 F1·FNR·Recall@5·E2E)은 <b>RTX 5070 Ti로 이미 측정 완료</b>입니다 — GPU는 블로커가 아닙니다. <b>운영 성능은 관리자 확정 locked가 쌓여야만 측정 가능합니다.</b> 폐쇄망 원문은 반출하지 않습니다.
+        <b>핵심:</b> "실측"의 GPU 의존 항목(분류 F1·FNR·Recall@5·E2E)은 <b>PoC GPU 환경에서 이미 측정 완료</b>입니다(지재원 학습서버는 A100 80GB ×1) — GPU는 블로커가 아닙니다. <b>운영 성능은 관리자 확정 locked가 쌓여야만 측정 가능합니다.</b> 폐쇄망 원문은 반출하지 않습니다.
         <span style="color:var(--text-dim);">* 검증 피라미드: 단위 385/385 · DB-backed 20/20 · 풀스택(PG+pgvector) 95/95 · 실 GPU E2E 7/7(tb_corrections→train→deploy→reload 메커니즘 검증, 자동 활성 아님) · 라이브 API 데모(PDF→S1 0.997→confirm/relabel→재학습 큐). PSH S1~S13(11종)×30+ KPI 회귀 자동탐지.</span>
       </p>
     </section>

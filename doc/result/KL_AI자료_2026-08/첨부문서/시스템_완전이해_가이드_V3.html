@@ -857,7 +857,7 @@ footer strong{color:var(--text-dim);}
   <div class="kpi-card">
     <div class="kpi-label">🎯 분류 방향성 미탐율 (서빙경로)</div>
     <div class="kpi-value pass">0.018</div>
-    <div class="kpi-sub">핵심 요건 · FNR_TS=0.000 · 원시 대비 9배↓</div>
+    <div class="kpi-sub">핵심 요건 · 값은 직전 v4 홀드아웃109 서빙경로 방향성 FNR(FNR_TS=0.000 · 원시 대비 9배↓) · 현행 v5는 hardened holdout high→S3 위험미탐 0</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">🔎 검색 Recall@5 <span style="font-size:.8em;color:var(--text-dim);">(요건 외 부가)</span></div>
@@ -1452,7 +1452,7 @@ footer strong{color:var(--text-dim);}
     <li><strong>③ 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>)</strong> — KL ICD R6의 <strong>보안표시·접근범위</strong>로, 내용 분류기가 못 보는 비밀관리성(M)·출처(S)를 보완합니다. 출처 게이트(공개출처→S3 하향)의 <strong>상향 대칭</strong>으로, ① 보안표시(<code>top_secret→TS</code>·<code>secret→S1</code>·<code>confidential→S2</code>)가 예측보다 높으면 그 등급으로 <strong>상향 floor</strong>(명시표기 우선·하향은 하지 않음), ② 접근범위가 제한적(<code>approved_only/designated/department</code>)인데 예측이 낮으면 검수로 라우팅합니다. 인사·재무 S1 사각지대를 재학습 전 결정론적으로 차단합니다(KL 마킹 신뢰 전제).</li>
   </ul>
   <p style="margin-top:8px;">
-    합의 게이트 적용 시 재생성 기준 — golden100: 자동확정 35 / 검수 65 (미탐 0), golden500: 자동확정 189 / 검수 311 (TS·S1 미탐 8).
+    합의 게이트 적용 시 재생성 기준(<strong>구 후보셋</strong> — 현행 정본은 gold_real 777) — golden100: 자동확정 35 / 검수 65 (미탐 0), golden500: 자동확정 189 / 검수 311 (TS·S1 미탐 8).
     모든 수치는 합성 골든셋(OOD) 기준이며 운영 human_review/locked 확정 전에는 운영 FNR/정확도 수치가 아닙니다.
   </p>
 </div>
@@ -1824,22 +1824,22 @@ footer strong{color:var(--text-dim);}
 </div>
 
 <h2 id="cost">API와 GPU는 각각 어디에 쓰나요?</h2>
-<p><strong>기본은 무GPU(CPU)</strong>입니다. 민감 데이터를 다루는 추론(분류·임베딩)은 폐쇄망 <strong>CPU</strong>에서 처리하고(LLM-free 핫패스), 상용 LLM(Claude 등)은 데이터 반출이 허용되는 <strong>공개·개발용으로만</strong> 씁니다. GPU는 <strong>학습 가속 옵션</strong>(요건상 발주처 제공·CSAP 샌드박스)으로 필수가 아닙니다.</p>
+<p><strong>추론(운영)은 CPU, 학습은 GPU</strong>입니다. 민감 데이터를 다루는 추론(분류·임베딩)은 폐쇄망 <strong>CPU</strong>에서 처리하고(LLM-free 핫패스), 상용 LLM(Claude 등)은 데이터 반출이 허용되는 <strong>공개·개발용으로만</strong> 씁니다. 분류기 학습·골든셋 생성은 지재원 <strong>A100 80GB ×1 GPU 서버</strong>에서 수행하며, 고객사 운영노드는 <strong>GPU 없이 CPU 전용</strong>(야간 CPU 증분재학습 포함)입니다.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>기능</th><th>실행 위치</th><th>비고</th></tr></thead>
   <tbody>
   <tr><td>문서 분류 (KF-DeBERTa)</td><td><span class="tag mid">CPU</span></td><td>핵심 요건 · LLM-free 핫패스 · 무GPU(≈333ms/건)</td></tr>
   <tr><td>임베딩·검색 (KURE-v1)</td><td><span class="tag mid">CPU</span></td><td>온프렘 인덱싱·검색(CPU로 충분)</td></tr>
-  <tr><td>분류기 학습 (재학습 시)</td><td><span class="tag filled">GPU 선택</span></td><td>발주처 GPU 제공 시 가속 · 미제공 시 CPU(느림)</td></tr>
+  <tr><td>분류기 학습 (재학습 시)</td><td><span class="tag filled">GPU (지재원)</span></td><td>지재원 A100 80GB 서버에서 학습 · 고객사 야간 증분재학습은 CPU</td></tr>
   <tr><td>상용 LLM (Claude)</td><td><span class="tag mid">공개데이터만</span></td><td>골든·합성 생성 보조 · <strong>비밀 본문 미투입</strong></td></tr>
   </tbody>
 </table>
 </div>
 
 <div class="callout inset">
-  <div class="callout-label">🔒 왜 무GPU(CPU)인가</div>
-  <p>영업비밀은 <strong>데이터 외부 반출이 금지</strong>되어, 폐쇄망 운영에서는 상용 LLM·클라우드를 <strong>비밀 분류 본경로에 쓸 수 없습니다</strong>. 그래서 비밀 분류는 학습된 <strong>분류기+룰로 CPU에서 처리</strong>(LLM-free)하고, 임베딩·검색도 CPU로 충분합니다 — <strong>무GPU로도 동작</strong>. GPU는 (요건상 발주처 제공 시) <strong>학습 가속에만</strong> 쓰고 추론엔 불필요합니다. 상용 LLM은 공개·합성 데이터 가공에만 활용합니다. (상세 용량·비용은 본개발에서 별도 제시)</p>
+  <div class="callout-label">🔒 추론=CPU · 학습=GPU(지재원 A100 80GB)</div>
+  <p>영업비밀은 <strong>데이터 외부 반출이 금지</strong>되어, 폐쇄망 운영에서는 상용 LLM·클라우드를 <strong>비밀 분류 본경로에 쓸 수 없습니다</strong>. 그래서 비밀 분류는 학습된 <strong>분류기+룰로 CPU에서 처리</strong>(LLM-free)하고, 임베딩·검색도 CPU로 충분합니다 — <strong>고객사 운영노드는 GPU 없이 동작</strong>. 분류기 학습·골든셋 생성은 지재원 <strong>A100 80GB GPU 서버</strong>에서 수행하며 추론엔 GPU가 불필요합니다. 상용 LLM은 공개·합성 데이터 가공에만 활용합니다. (상세 용량·비용은 본개발에서 별도 제시)</p>
 </div>
 
 <!-- ═══ 15 ═══ -->
@@ -1928,7 +1928,7 @@ footer strong{color:var(--text-dim);}
     <div class="gloss-term">F1 점수</div>
     <div class="gloss-eng">F1 Score</div>
     <div class="gloss-def">분류 정확도를 0~1로 표현한 수치. 정밀도(맞다고 한 것 중 실제로 맞은 비율)와 재현율(실제 맞는 것 중 찾아낸 비율)의 조화 평균. F1_macro는 4등급 F1의 단순 평균.</div>
-    <div class="gloss-ex">예: F1=0.686 = 프록시 holdout의 서빙경로 측정값(운영 정확도 보증 아님)</div>
+    <div class="gloss-ex">예: 현행 v5 F1=0.917(hardened holdout) · 직전 v4 프록시 holdout 서빙경로 0.686 — 모두 운영 정확도 보증 아님</div>
   </div>
   <div class="gloss-card">
     <div class="gloss-term">FNR (미탐율)</div>
@@ -1939,7 +1939,7 @@ footer strong{color:var(--text-dim);}
   <div class="gloss-card">
     <div class="gloss-term">Confidence (신뢰도)</div>
     <div class="gloss-eng">Confidence Score</div>
-    <div class="gloss-def">logits→온도→softmax→청크집계→정규화로 만든 <strong>softmax 파생 점수</strong>(0~1)이며, 보정된 정답확률이 아닙니다. OOD에서 과신하고(골든500 ECE 0.18, 정답/오답 AUROC 0.58) 높은 confidence가 정확을 보장하지 않습니다. 그래서 자동확정은 confidence 단독이 아니라 합의 게이트로 판단합니다.</div>
+    <div class="gloss-def">logits→온도→softmax→청크집계→정규화로 만든 <strong>softmax 파생 점수</strong>(0~1)이며, 보정된 정답확률이 아닙니다. OOD에서 과신하고(구 후보셋 골든500 ECE 0.18, 정답/오답 AUROC 0.58) 높은 confidence가 정확을 보장하지 않습니다. 그래서 자동확정은 confidence 단독이 아니라 합의 게이트로 판단합니다.</div>
     <div class="gloss-ex">예: confidence=0.932은 softmax 파생 점수가 0.932라는 뜻이며 "정답일 확률 93.2%"가 아닙니다.</div>
   </div>
   <div class="gloss-card">
