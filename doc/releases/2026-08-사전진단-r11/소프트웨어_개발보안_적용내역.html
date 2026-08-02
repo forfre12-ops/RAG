@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>소프트웨어 개발보안 적용 내역 | Lloydk</title>
+<style>
+:root{--bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;--bg-inverse:#09090b;--bg-nav:rgba(255,255,255,.88);--text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--text-faint:#a1a1aa;--border:rgba(0,0,0,.08);--border-mid:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.18);--font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sidebar:220px;--article-max:960px;--container:1360px;}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:5px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(27px,4vw,40px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin:0 0 18px;color:var(--text);text-wrap:balance;}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 28px;max-width:720px;}
+h2{font-size:clamp(18px,2.5vw,23px);font-weight:700;letter-spacing:-.03em;margin:10px 0 12px;color:var(--text);}
+h3{font-size:15px;font-weight:700;margin:24px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:36px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:44px 0 18px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{background:#fffbeb;border-color:#fcd34d;border-left:3px solid #d97706;}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;} td.nowrap{white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.core{background:var(--text);color:var(--bg);} .tag.sup{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.opt{background:transparent;color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.p1{background:#dc2626;color:#fff;} .tag.p2{background:#d97706;color:#fff;} .tag.p3{background:var(--bg-strong);color:var(--text);}
+.tag.pass{background:#16a34a;color:#fff;} .tag.todo{background:transparent;color:#d97706;border:1px solid #fbbf24;}
+.ph{background:#fffbeb;border:1px solid #fbbf24;color:#92400e;padding:1px 6px;font-family:var(--font-mono);font-size:11px;font-weight:600;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--border-mid);margin:18px 0;}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);} .kpi:last-child{border-right:none;}
+.kpi .n{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);} .kpi .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">개발보안 적용 내역</span></a>
+  <div class="nav-right"><span class="nav-badge">SECURE CODING</span></div>
+</div></nav>
+<div class="article-layout">
+<article>
+  <div class="meta-row"><span class="badge">DOC-SEC-02</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-07-26</span></div>
+  <h1 class="title">소프트웨어 개발보안 적용 내역</h1>
+  <p class="lede">행정안전부 SW 개발보안 가이드 관점에서 현행 소스에 반영된 개발보안 통제와 구현 위치, 정적 점검 현황을 정리한다(RFP SER-006 대응).</p>
+
+  <div class="section-sep" id="s01"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">적용 통제</span></div>
+  <p>아래 통제는 현행 소스에 반영 완료(<span class="tag pass">구현</span>)이며, 보안 설계서(DOC-SEC-01) §07과 동일하다. 개발보안 항목 분류는 SW 개발보안 가이드 기준.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>개발보안 항목</th><th>적용 통제</th><th>구현 위치</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="2">입력데이터 검증·표현</td><td>요청 본문 크기 한도(413) — 대용량 JSON OOM 차단</td><td><code>api/app.py</code></td></tr>
+      <tr><td>저장형 XSS 방어 — 콘솔 본문·입력 escape 후 렌더</td><td>콘솔 렌더 경로</td></tr>
+      <tr><td rowspan="3">보안기능(인증·접근통제·기밀성)</td><td>API 키 <b>상수시간 비교</b>(<code>hmac.compare_digest</code>) — 타이밍 사이드채널 차단</td><td><code>api/_jwt_auth.py</code></td></tr>
+      <tr><td>객체수준 인가(IDOR/BOLA) — 요청을 인증 신원에 결속, 권한·등급 스코프 불일치 403</td><td><code>api</code> 분류 라우트</td></tr>
+      <tr><td>저장 <b>AES-256-GCM</b>(운영 프로파일 기본 활성·키 미설정 시 fail-fast) / 전송 mTLS·TLS 1.3</td><td><code>adapters/storage/encrypted_store.py</code></td></tr>
+      <tr><td rowspan="2">시간 및 상태</td><td>멱등키 주체 격리 — <code>Idempotency-Key</code>를 자격증명 해시로 네임스페이스 분리(응답 replay 차단)</td><td><code>api</code> 미들웨어</td></tr>
+      <tr><td>감사 해시체인 직렬화 — prev-read+insert를 advisory-lock 단일 트랜잭션으로 직렬화</td><td><code>api/middleware.py</code></td></tr>
+      <tr><td>에러처리</td><td>fail-secure — PII 마스킹 실패·감사 미가용 시 통과 대신 차단/폴백</td><td>서빙·감사 경로</td></tr>
+      <tr><td>비밀 관리</td><td>감사체인 비밀키·저장 암호화 키 미설정 시 <b>startup fail-fast</b>(평문·무결성 미보증 기동 차단)</td><td><code>config.py</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="section-sep" id="s02"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">정적 점검</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>점검</th><th>도구 / 기준</th><th class="center">상태</th></tr></thead>
+    <tbody>
+      <tr><td>정적 린트</td><td><code>ruff</code> — CI <code>ruff-lint</code> job 상시 수행</td><td class="center"><span class="tag pass">적용</span></td></tr>
+      <tr><td>보안 회귀 시험</td><td>인가·멱등·감사체인·암호화 단위시험(<code>test_storage_encryption</code>·<code>test_audit_chain_wiring</code> 등)</td><td class="center"><span class="tag pass">통과</span></td></tr>
+      <tr><td>시큐어코딩 자동점검(형식)</td><td>개발보안 가이드 항목별 전용 정적분석 도구 리포트</td><td class="center"><span class="tag todo">본개발 산출</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><div class="callout-label">잔여</div><p>위 통제는 소스에 반영되어 있으나, <b>개발보안 가이드 항목별 전용 정적분석 도구의 자동점검 리포트(취약점 진단·조치 이행 결과)</b>는 본개발 단계 산출물로 별도 수행한다(RFP SER-003·SER-006). 도구·수행 시점은 <span class="ph">[발주처·감리 확정]</span>.</p></div>
+
+  <div class="section-sep" id="s03"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">연계 산출물</span></div>
+  <ul>
+    <li>보안 설계·위협 대응(STRIDE)·통제 상세 — <code>보안 설계서(DOC-SEC-01)</code></li>
+    <li>보안 요건 추적 — <code>요구사항 추적표(RTM)</code> NFR-SEC</li>
+    <li>저장·전송·비밀 관리 — 보안 설계서 §06</li>
+  </ul>
+
+  <div class="footnote">DOC-SEC-02 · 소프트웨어 개발보안 적용 내역 · 근거: poc/src/lloydk(api·adapters·config), .github/workflows/poc-ci.yml, 보안 설계서 §07 · 2026-07-26</div>
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#s01">01 적용 통제</a>
+<a href="#s02">02 정적 점검</a>
+<a href="#s03">03 연계 산출물</a>
+</nav></aside>
+</div>
+<footer><strong>로이드케이</strong> · 소프트웨어 개발보안 적용 내역 (DOC-SEC-02) · 감리 대응 산출물</footer>
+<script>
+(function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}
+window.addEventListener('scroll',o,{passive:true});o();})();
+</script>
+</body></html>
