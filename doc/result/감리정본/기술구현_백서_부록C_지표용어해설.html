@@ -334,7 +334,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 
     <div class="global-card" id="m-p4">
       <h3>P4 — 누락 · 품질 (문서 추출)</h3>
-      <p style="font-size:13.5px;"><b>오픈소스:</b> hwp5(HWP) · python-docx(DOCX) · pdfminer.six(PDF) · openpyxl(Excel) · python-pptx(PPTX). (PDF는 라이선스 위험이 있는 라이브러리 대신 pdfminer.six 사용)</p>
+      <p style="font-size:13.5px;"><b>오픈소스:</b> rhwp-python(HWP 본문) + unhwp(HWP 표 셀) · python-docx(DOCX) · pdfminer.six(PDF) · openpyxl(Excel) · python-pptx(PPTX) — <b>전부 MIT/BSD-3</b>. HWP 는 2026-08-01 구 pyhwp(AGPLv3+) 의존성을 삭제하고 unhwp(MIT)로 교체했다(소스·uv.lock 양쪽 0건 확인). PDF 도 PyMuPDF(AGPL) 대신 pdfminer.six(BSD-3)를 쓴다 — <b>배포본에 강한 카피레프트 없음</b>.</p>
       <p style="font-size:13.5px;"><b>측정 방법:</b> 추출 라이브러리로 텍스트를 뽑아 원문(정답 텍스트)과 대조한다. <b>누락률</b> = 빠진 내용 ÷ 원문 전체, <b>품질</b> = 추출 텍스트와 원문의 유사도(문자 일치·편집거리 기반).</p>
       <p style="font-size:13px;color:var(--text-dim);">※ 현황: 파이프라인은 구현됐으나 HWP 실문서가 없어 최종 측정은 보류이며, 실문서 확보 후 산출한다(백서 §7.3).</p>
     </div>
@@ -355,7 +355,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <tr><td>임베딩</td><td>KURE-v1 (HuggingFace · BGE-M3 폴백)</td><td>문서 → 벡터</td><td>오픈소스</td></tr>
           <tr><td>검색</td><td>PostgreSQL pgvector + ts_rank</td><td>벡터(dense) + 키워드(bigram) 하이브리드</td><td>오픈소스(PostgreSQL License)</td></tr>
           <tr><td>합성 LLM</td><td>Qwen3 + Ollama</td><td>학습 데이터 생성</td><td>Apache 2.0 (공공 적합)</td></tr>
-          <tr><td>문서 추출</td><td>hwp5 · python-docx · pdfminer.six · openpyxl · python-pptx</td><td>텍스트 추출</td><td>오픈소스</td></tr>
+          <tr><td>문서 추출</td><td>rhwp-python + unhwp · python-docx · pdfminer.six · openpyxl · python-pptx</td><td>텍스트 추출</td><td>MIT / BSD-3 (AGPL 없음)</td></tr>
           <tr><td>실험 추적</td><td>MLflow</td><td>측정 지표·이력 기록</td><td>오픈소스</td></tr>
           <tr><td>전체 흐름 테스트</td><td>FastAPI + pytest</td><td>E2E 검증</td><td>오픈소스</td></tr>
         </tbody>
