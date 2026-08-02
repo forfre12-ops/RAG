@@ -70,8 +70,8 @@ gen_env() {
     fi
     return
   fi
-  local pw api sek acs
-  pw=$(rand 16); api=$(rand 24); sek=$(rand 32); acs=$(rand 32)
+  local pw api sek acs ghs
+  pw=$(rand 16); api=$(rand 24); sek=$(rand 32); acs=$(rand 32); ghs=$(rand 32)
   {
     echo "# 자동생성 — $profile (deploy_testserver_dual.sh). 재생성하려면 이 파일을 지우고 재실행."
     echo "DEPLOY_PROFILE=$profile"
@@ -81,6 +81,9 @@ gen_env() {
     # (실배포 deploy.sh/.env 템플릿은 기본 system 유지 — 최소권한. 콘솔용 admin 자격은 별도 발급 권장.)
     echo "API_KEY_ROLE=admin"
     echo "LLOYDK_AUDIT_CHAIN_SECRET=$acs"
+    # 골든 검수/서명 HTML 서명 URL 강제 — 미설정이면 job_id 만 알면 후보 원문(TS 포함)이
+    # 무인증으로 열린다. 배포가 항상 켜서 내보내도록 시크릿 대열에 편입(2026-08-02).
+    echo "GOLDEN_HTML_URL_SECRET=$ghs"
     echo "STORAGE_BACKEND=local"
     echo "STORAGE_ENCRYPTION_ENABLED=1"
     echo "STORAGE_ENCRYPTION_KEY=$sek"

@@ -58,7 +58,7 @@ if [ ! -f "$ENV_FILE" ]; then
   [ "${NO_AUTO_ENV:-0}" = "1" ] && die "env 없음: $ENV_FILE (NO_AUTO_ENV=1) — cp .env.lite-cloud $ENV_FILE 후 실값 입력"
   log "env 자동 생성 (테스트서버용 · $ENV_FILE)"
   _gen() { openssl rand -hex "$1" 2>/dev/null || { tr -dc 'a-f0-9' </dev/urandom | head -c "$(( $1 * 2 ))"; echo; }; }
-  _api="$(_gen 24)"; _audit="$(_gen 32)"; _pgpw="$(_gen 16)"
+  _api="$(_gen 24)"; _audit="$(_gen 32)"; _pgpw="$(_gen 16)"; _golden="$(_gen 32)"
   _model_line='# CLASSIFIER_MODEL_DIR 미설정 → 룰 기반 분류(모델 없이도 파싱·등급 E2E 동작)'
   [ -d "artifacts/classifier_p1_v5_clean/v-fe4b386b" ] \
     && _model_line='CLASSIFIER_MODEL_DIR=/app/artifacts/classifier_p1_v5_clean/v-fe4b386b'
@@ -68,6 +68,7 @@ DEPLOY_PROFILE=lite-cloud
 POC_MODE=full
 API_KEY=$_api
 LLOYDK_AUDIT_CHAIN_SECRET=$_audit
+GOLDEN_HTML_URL_SECRET=$_golden
 # 저장소=로컬FS → minio 불요(무설정). 업로드 문서는 컨테이너 볼륨에 저장.
 STORAGE_BACKEND=local
 VECTOR_BACKEND=pg
@@ -93,7 +94,8 @@ fi
 
 # 앱도 startup 에서 재검증하나(fail-fast), 부팅 전에 친절히 잡는다.
 _ph_re='change[_-]?me|replace[_-]?me|placeholder|xxx|your[_-]'
-for k in API_KEY LLOYDK_AUDIT_CHAIN_SECRET; do
+# GOLDEN_HTML_URL_SECRET 포함 — 미설정이면 골든 후보 원문(TS 포함)이 URL 만으로 열린다.
+for k in API_KEY LLOYDK_AUDIT_CHAIN_SECRET GOLDEN_HTML_URL_SECRET; do
   v="$(_env_val "$k" || true)"
   { [ -z "$v" ] || printf '%s' "$v" | grep -qiE "$_ph_re"; } \
     && die "필수값 미설정/placeholder: $k  ($ENV_FILE 실값 입력)"
