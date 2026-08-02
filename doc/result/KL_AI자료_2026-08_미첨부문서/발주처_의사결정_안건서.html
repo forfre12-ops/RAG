@@ -136,7 +136,7 @@ footer strong{color:var(--text-dim);}
   <div class="section-sep" id="s0">
     <span class="section-sep-num">00</span><span class="section-sep-line"></span><span class="section-sep-title">안건 요약</span>
   </div>
-  <h2>안건 요약 — 6건</h2>
+  <h2>안건 요약 — 7건</h2>
   <div class="table-wrap">
     <table>
       <thead><tr><th class="center">No</th><th>안건</th><th class="center">유형</th><th>수행사 권고</th></tr></thead>
@@ -147,6 +147,7 @@ footer strong{color:var(--text-dim);}
         <tr><td class="center">A4</td><td>등급 한국어/영문 표시명 확정</td><td class="center"><span class="tag agree">합의</span></td><td>정본 한국어 + 가이드 영문(특급=Confidential)</td></tr>
         <tr><td class="center">A5</td><td>운영 관리자 확정 라벨 포착</td><td class="center"><span class="tag assist">협조</span></td><td>tb_corrections/locked 후보 포착, admission gate, 표본감사에 필수</td></tr>
         <tr><td class="center">A6</td><td>GPU·서버 사양 확정</td><td class="center"><span class="tag agree">합의</span></td><td>본개발 학습·서빙 사양(PER-002) — 지재원 학습노드 A100 80GB ×1 · 32 vCore+ · RAM 192GB · Ubuntu 22.04 LTS / 고객사 운영노드 CPU 전용</td></tr>
+        <tr><td class="center">A7</td><td>FUN-003-④ LangChain 명시요건 — 자체 어댑터 대체구현</td><td class="center"><span class="tag confirm">확인</span></td><td>기능은 충족·수단만 상이. 대체구현 유지 확인 요청(요구 시 어댑터 추가 대응 가능)</td></tr>
       </tbody>
     </table>
   </div>
@@ -169,6 +170,22 @@ footer strong{color:var(--text-dim);}
       <div class="decide-box">
         <span><i class="chk"></i> 승인(정정 동의)</span>
         <span><i class="chk"></i> 보류(가이드 2급 유지)</span>
+        <span><i class="chk"></i> 조건부:______________</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="agenda">
+    <div class="agenda-head"><span class="agenda-id">A7</span><span class="agenda-title">FUN-003-④ LangChain 명시요건 — 자체 어댑터 대체구현</span><span class="tag confirm">확인</span></div>
+    <div class="agenda-body">
+      <h4>배경</h4>
+      <p>기능요구사항 <strong>FUN-003-④</strong>는 수단으로 <strong>LangChain 프레임워크</strong>를 명시한다. 요건이 요구한 기능(프롬프트 체인을 구성해 보안등급 기준에 맞는 문서를 자동 생성)은 정상 동작하나, 그 체인을 LangChain이 아닌 <strong>자체 모듈</strong>(<code>generator.py</code> + <code>adapters/llm</code>)로 구현했다. 즉 기능 미구현이 아니라 <strong>수단의 차이</strong>다.</p>
+      <h4>근거</h4>
+      <p>① 폐쇄망은 반입 물량이 통제된다 — 라이브러리는 하위 의존성까지 전부 사전 반입·보안검토·SBOM 등재 대상이라, LangChain은 검토·반입 부담만 늘고 새로 생기는 기능이 없다. ② 이 시스템에서 LLM 역할이 단순하다 — 등급 결정 본경로에는 LLM이 없고(분류기+규칙 엔진), LLM은 학습 샘플 생성·라벨 보조에만 쓰여 "1회 호출 + 실패 시 재시도"로 끝난다. 다단계 체인·에이전트·메모리가 들어설 자리가 없다. 상세 사유는 <em>RFP 구현현황</em> 문서의 FUN-003-④ 별도 박스 참조.</p>
+      <div class="agenda-rec"><b>수행사 권고:</b> <b>대체구현 유지</b>. RFP 구현현황에는 <b>완료(대체구현)</b>로 표기하고 사유를 공개했다. 발주처가 LangChain 채택을 요구할 경우 <code>build_provider()</code> 위에 얇은 어댑터를 얹는 방식으로 대응 가능하다(본개발 결정사항). <b>본 안건의 목적은 대체구현 수용 여부를 8/10 사전진단에서 결정 기록으로 남기는 것</b>이다.</div>
+      <div class="decide-box">
+        <span><i class="chk"></i> 승인(대체구현 유지)</span>
+        <span><i class="chk"></i> 보류(LangChain 채택 요구)</span>
         <span><i class="chk"></i> 조건부:______________</span>
       </div>
     </div>
@@ -287,6 +304,7 @@ footer strong{color:var(--text-dim);}
         <tr><td class="center">A4</td><td class="center">　</td><td>　</td><td class="center">　</td></tr>
         <tr><td class="center">A5</td><td class="center">　</td><td>　</td><td class="center">　</td></tr>
         <tr><td class="center">A6</td><td class="center">　</td><td>　</td><td class="center">　</td></tr>
+        <tr><td class="center">A7</td><td class="center">　</td><td>　</td><td class="center">　</td></tr>
       </tbody>
     </table>
   </div>
@@ -302,7 +320,7 @@ footer strong{color:var(--text-dim);}
 <aside class="toc-aside">
   <nav class="toc">
     <div class="toc-title">목차</div>
-    <a href="#s0">00 · 안건 요약 (6건)</a>
+    <a href="#s0">00 · 안건 요약 (7건)</a>
     <a href="#s1">01 · 확인 — A1 공개특허</a>
     <a href="#s2">02 · 승인 — A2 v2.2 보정</a>
     <a href="#s3">03 · 합의 — A3·A4</a>
