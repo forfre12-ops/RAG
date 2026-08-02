@@ -110,3 +110,25 @@ class GoldenSignoffResponse(BaseModel):
     overridden: bool           # 클라 actor.user_id 가 인증 sub 로 덮어써졌나(위조 시도/클라 버그 신호)
     # publish 요청이 라이브 경로에 반영되지 못한 이유(경로 미설정·승격 0건). 정상 반영/미요청이면 None.
     publish_note: Optional[str] = None
+
+
+class GoldenJobSummary(BaseModel):
+    """잡 목록 1행 — 목록에서 개별 잡(검수/서명)으로 진입하기 위한 최소 정보."""
+    job_id: str
+    kind: str = ""                      # golden_build | golden_register
+    status: str = ""
+    actor: str = ""
+    submitted_at: Optional[str] = None
+    source_type: Optional[str] = None
+    gold_count: Optional[int] = None
+    uncertain_count: Optional[int] = None
+    error: Optional[str] = None
+    review_url: Optional[str] = None    # 서명 URL(비밀키 설정 시 ?t= 포함)
+    signoff_url: Optional[str] = None
+
+
+class GoldenJobListResponse(BaseModel):
+    jobs: list[GoldenJobSummary]
+    # 정렬 신뢰도 고지 — Redis 백엔드의 list_recent 는 SCAN 순서라 최근순을 보장하지 않는다.
+    # 화면이 "최신 목록"이라고 단정하지 않도록 응답에 실어 보낸다(무음 오도 방지).
+    ordering: str = "best_effort"

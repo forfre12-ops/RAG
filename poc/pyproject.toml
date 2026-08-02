@@ -228,6 +228,17 @@ evaluation = [
   "seaborn>=0.13",                  # 분포 시각화 (선택)
 ]
 
+# 서빙 노브(온도·게이트 임계) 자동 탐색 — 지재원 오프라인 CLI 전용.
+# 활성: pip install -e ".[tuning]" · 실행: scripts/optuna_tune_gates.py
+# base 에 넣지 않는 이유: 운영 서빙 경로는 optuna 를 import 하지 않는다(튜너가 lazy import).
+#   폐쇄망 런타임 이미지에 불필요한 의존을 넣지 않고 공격표면·감사대상을 줄인다.
+# 그럼에도 extra 로 선언하는 이유: 설계도 §06·서빙 파라미터 명세가 이 튜너를 산출물로
+#   기술하는데 pyproject 어디에도 없으면 문서만 있고 설치 경로가 없는 유령 의존이 된다
+#   (폐쇄망은 wheel vendoring 필요). 2026-08-02 문서↔코드 대조에서 확인.
+tuning = [
+  "optuna>=3.6",                    # Apache-2.0
+]
+
 # 개발 (테스트·린트·노트북)
 dev = [
   "pytest>=8.0",

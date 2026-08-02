@@ -119,8 +119,11 @@ class InMemoryJobStore:
         self.update(job_id, status=status)
 
     def list_recent(self, limit: int = 50) -> list[dict[str, Any]]:
+        # job_id 를 함께 실어 준다 — 레코드에는 id 가 없고(키로만 존재) 호출부가 목록에서
+        # 개별 잡으로 진입할 수 없어 목록 자체가 무용해진다.
         with self._lock:
-            return [dict(j) for j in list(self._jobs.values())[-limit:]]
+            items = list(self._jobs.items())[-limit:]
+        return [{"job_id": k, **v} for k, v in items]
 
 
 # 하위 호환: 기존 코드의 ``from job_store import JobStore`` 보존
@@ -240,9 +243,13 @@ class RedisJobStore:
             if raw is None:
                 continue
             try:
-                out.append(json.loads(raw))
+                doc = json.loads(raw)
             except json.JSONDecodeError:
                 logger.warning("redis_job_store list_recent: bad json — key=%s", key)
+            else:
+                # 키 접두를 떼어 job_id 복원 — InMemory 백엔드와 동일 계약.
+                k = key.decode() if isinstance(key, (bytes, bytearray)) else str(key)
+                out.append({"job_id": k[len(_REDIS_KEY_PREFIX):], **doc})
             if len(out) >= limit:
                 break
         return out

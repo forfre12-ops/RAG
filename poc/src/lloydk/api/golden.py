@@ -19,10 +19,13 @@ from lloydk.api._rbac import require_role
 from lloydk.api.confirm import bind_authenticated_actor, resolve_actor_user_id
 from lloydk.config import settings
 from lloydk.golden_tiers import is_human_reviewer
+from lloydk.services.job_store import get_default_store
 from lloydk.schemas.golden import (
     GoldenBuildRequest,
     GoldenBuildResponse,
     GoldenBuildStatus,
+    GoldenJobListResponse,
+    GoldenJobSummary,
     GoldenRegisterRequest,
     GoldenSignoffRequest,
     GoldenSignoffResponse,
@@ -134,6 +137,50 @@ def golden_job_status(job_id: UUID) -> GoldenBuildStatus:
     # [#14a] 콘솔이 이 값으로 review/signoff HTML 을 연다(인증 경로에서 서명 URL 발급).
     st.review_url, st.signoff_url = _signed_html_urls(job_id)
     return st
+
+
+@router.get(
+    "/golden/jobs",
+    response_model=GoldenJobListResponse,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+)
+def golden_job_list(limit: int = 20) -> GoldenJobListResponse:
+    """최근 골든 잡 목록.
+
+    목록이 없으면 콘솔은 마지막 job_id 를 메모리에만 들고 있어 새로고침 한 번에 검수하던
+    후보로 돌아갈 길이 사라진다(229건을 절반 서명하다 F5 를 누르면 길을 잃는다).
+
+    JobStore 에는 골든 외 잡(분류·학습)도 섞이므로 kind 로 걸러낸다. 정렬은 백엔드에 따라
+    best-effort(Redis 는 SCAN 순서) — 응답 ordering 필드로 그 한계를 명시한다.
+    """
+    limit = max(1, min(100, limit))
+    # 필터로 걸러지는 만큼 여유 있게 읽고 자른다(골든 잡이 뒤로 밀려 안 보이는 것 방지).
+    raw = get_default_store().list_recent(limit=limit * 5)
+    jobs: list[GoldenJobSummary] = []
+    for j in raw:
+        if j.get("kind") not in ("golden_build", "golden_register"):
+            continue
+        jid = str(j.get("job_id") or "")
+        if not jid:
+            continue
+        try:
+            review_url, signoff_url = _signed_html_urls(UUID(jid))
+        except ValueError:      # job_id 형식 이상 — 목록에서 제외하지 않고 링크만 생략
+            review_url = signoff_url = None
+        jobs.append(GoldenJobSummary(
+            job_id=jid,
+            kind=str(j.get("kind") or ""),
+            status=str(j.get("status") or ""),
+            actor=str(j.get("actor") or ""),
+            submitted_at=j.get("submitted_at"),
+            source_type=j.get("source_type"),
+            gold_count=j.get("gold_count"),
+            uncertain_count=j.get("uncertain_count"),
+            error=j.get("error"),
+            review_url=review_url,
+            signoff_url=signoff_url,
+        ))
+    return GoldenJobListResponse(jobs=jobs[:limit])
 
 
 def _job_gate_html(job_id: UUID) -> HTMLResponse | None:
