@@ -58,16 +58,87 @@ a{color:#0a0a0a}
   <div class="note"><b>핵심 원칙 — 미탐(FNR) 최소화 우선.</b> 본 시스템의 1차 목표는 "정확도 %"가 아니라 <b>고등급(TS·S1) 영업비밀을 놓치지 않는 것</b>입니다. RFP 성능요건(PER-002)은 속도·자원 기준이며 정확도 수치 목표는 명시돼 있지 않습니다. 애매하면 <b>등급을 올리거나 사람 검수로 라우팅</b>합니다(안전 veto).</div>
 
   <h2>1. 테스트 방식</h2>
+
+  <p style="font-size:13.5px">평가는 두 축입니다. <b>① 정확도 측정</b>(경화 42 · 프록시 109 · 공개 판례 400)은 "얼마나 맞히나"를, <b>② 안전 게이트</b>(적대 · 메타모픽)는 "위험한 방향으로 틀리지 않나"를 봅니다. 두 축 모두 채점은 <b>실배포 서빙 경로</b>로 하며(§1.3), 셋 구성·채점은 전부 스크립트로 재현됩니다(§1.4).</p>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.1 정확도 측정 셋 — 어떻게 만들었나</h3>
   <table>
-    <thead><tr><th style="width:200px">평가셋 / 방법</th><th>내용</th></tr></thead>
+    <thead><tr><th style="width:110px">평가셋</th><th style="width:190px">데이터 출처</th><th>구성 방법</th><th style="width:170px">채점 기준</th></tr></thead>
     <tbody>
-      <tr><td>홀드아웃 109</td><td>학습에 쓰지 않은 업무문서(판례 제거) — 서빙 경로 실측</td></tr>
-      <tr><td>경화(hardened) 42 · clean 42</td><td>라벨 경화 평가셋 — 누출 없는 head-to-head 비교</td></tr>
-      <tr><td>공개 판례 FPR</td><td>법원 공개판례(학습 미포함)로 <b>과분류율</b>(오탐) 측정</td></tr>
-      <tr><td>적대(adversarial) veto</td><td>고등급 미탐(진짜 비밀 → 공개 등급) 발생 여부 검증</td></tr>
-      <tr><td>메타모픽</td><td>의미보존 변형 시 등급 일관성 검증</td></tr>
+      <tr>
+        <td><b>경화 홀드아웃</b><br>42건<br><span style="font-size:11px;color:#71717a">hardened</span></td>
+        <td>gold_real 홀드아웃 중 <b>학습 누출 제거분</b>(아래 프록시 109에서 중복 67건을 뺀 잔여 42건)</td>
+        <td>① 이중 라벨러(설계자 의도 · LLM 심판)가 <b>합의한 18건</b>은 그대로 채택(trust_tier=anchor).<br>② <b>불일치 24건</b>은 정본 루브릭(<code>rule_engine.grade_from_svm</code> — S 비공지성 × V 경제가치 × M 비밀관리)을 앵커로 <b>3심판 블라인드 재판정</b>. 라벨이 근거를 갖고 바뀐 4건만 adjudicated로 승격.<br>③ 최종 anchor 38 · adjudicated 4 = 42건, 등급분포 TS 12 · S1 14 · S2 9 · S3 7.<br>④ 조립은 결정적(스크립트 재실행 시 동일 산출). LLM '판단'은 재현하지 않고 저장된 판정 기록을 소비합니다.</td>
+        <td>4등급 exact match → <b>F1_macro</b> · 등급별 recall<br><span style="font-size:11px;color:#71717a">진실도 표기 = machine_adjudicated_silver(사람 서명 아님)</span></td>
+      </tr>
+      <tr>
+        <td><b>프록시 홀드아웃</b><br>109건</td>
+        <td>gold_real(실문서 성격 업무문서 · 판례 제거)</td>
+        <td>(label_source × label) <b>층화 분리</b>. 분할 키는 <b>공백 정규화 텍스트</b>라 동일 본문이 학습/평가에 나뉘어 걸치지 않으며, 정렬 순서 고정으로 결정적입니다.<br><b>사후 감사에서 결함이 드러난 셋입니다</b> — 학습셋(610건)과 텍스트 해시가 겹치는 문서가 <b>109건 중 67건(42%)</b> 확인됐습니다(doc_id만 다르고 본문 동일). 그 67건을 제거한 잔여가 위 경화 42입니다.</td>
+        <td>서빙 경로 통과 후 F1_macro · <b>방향성 FNR</b>(고등급→저등급 오분류)<br><span style="font-size:11px;color:#71717a">누출분 포함 → 과대평가된 참고치</span></td>
+      </tr>
+      <tr>
+        <td><b>공개 판례 FPR</b><br>400건</td>
+        <td>법원 공개판례(oss_corpus) 중 <b>학습셋 미포함분만</b> — 텍스트 정규화 대조로 배포 모델 학습셋과 교집합 0 확인</td>
+        <td>고정 시드(<code>20260603</code>) 무작위 400건 추출 · <b>부트스트랩 5,000 리샘플</b>로 신뢰구간 산출. 합성·LLM 심판·사람 라벨링이 일절 개입하지 않는 <b>유일한 실데이터 셋</b>입니다.</td>
+        <td>공개된 판례 = 정의상 공개(S3). <b>S3 이외 예측은 전부 과분류(FP)</b>로 계산</td>
+      </tr>
+      <tr>
+        <td><b>clean 홀드아웃</b><br>77건<br><span style="font-size:11px;color:#71717a">튜닝 전용</span></td>
+        <td>누출 제거본 2종 합본 — 평가 홀드아웃 42 + 업무 홀드아웃 35</td>
+        <td>모델 추론을 <b>1회만</b> 수행해 문서별 softmax 전체를 확보한 뒤, 에스컬레이션 임계 τ 그리드를 순수 계산으로 훑어 trade 곡선을 만듭니다(재학습·GPU 불필요).</td>
+        <td>fnr_underclass · high_to_s3 · overclass_s3 · review_burden(검수 큐 부하)<br><span style="font-size:11px;color:#71717a">튜닝에 쓴 셋 → 성능 주장 불가</span></td>
+      </tr>
     </tbody>
   </table>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.2 안전 게이트 — 위험한 방향의 오류만 본다</h3>
+  <table>
+    <thead><tr><th style="width:110px">게이트</th><th style="width:190px">데이터 출처</th><th>구성 방법</th><th style="width:170px">합격 조건</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>적대 veto</b><br>100건<br><span style="font-size:11px;color:#71717a">golden_100</span></td>
+        <td>정본 가이드 기준으로 작성한 적대 시나리오(짧은 문서 설명 + 정답등급 + 함정 유형)</td>
+        <td>사람이 틀리기 쉬운 <b>함정을 유형별로</b> 심었습니다 — 단어 함정("예비"·"예산서"·"이메일 형식" 때문에 등급을 낮게 보는 경우), 시점 함정(공개 전/후 동일 문서), 출처 혼동(공개 공시를 내부문서로 오인), 공개·비공개 혼합문서.<br>등급분포 TS 22 · S1 30 · S2 13 · S3 35 → <b>고등급 정답 65건</b>이 감시 대상.</td>
+        <td><b>고등급 미탐</b>(정답 TS/S1/S2인데 S3로 예측) 건수 <b>≤ 6</b>.<br>기준선 = 정제 전 step3의 4/65<br><span style="font-size:11px;color:#71717a">exact 정확도는 낮게 나오는 게 정상 — 모델이 안전하게 상향하기 때문. 여기서 보는 건 미탐뿐</span></td>
+      </tr>
+      <tr>
+        <td><b>메타모픽</b><br>변형쌍 18건<br><span style="font-size:11px;color:#71717a">forward 11 · reverse 7<br>앵커 16건</span></td>
+        <td>커밋된 패러프레이즈 픽스처 — <b>라이브 LLM을 호출하지 않아</b> 같은 픽스처·같은 모델이면 항상 같은 리포트</td>
+        <td>앵커 문서를 의미보존 변형(패러프레이즈)·사실제거 변형해 쌍을 만들고, 변형 전후 등급이 어긋나는지 봅니다. 라벨 상속은 결정적 사실보존 게이트로만 판단하며 룰·LLM 심판을 쓰지 않습니다(순환 논증 차단).<br><b>forward</b>(변형 후 등급 하락 = 미탐) · <b>reverse</b>(과분류) · <b>over_class</b>(공개→비밀)를 대칭으로 함께 봅니다.</td>
+        <td>forward 위반율 <b>Wilson 신뢰구간 하한 &gt; 0</b>이면 회귀로 차단.<br>순방향 쌍 <b>5쌍 미만이면 "측정 불가"로 실패</b> 처리(fail-closed) — 리포트를 생성하지 않고 넘어가는 경로를 막습니다.<br><span style="font-size:11px;color:#71717a">규율: 통과는 품질 증거가 아니며 <b>실패만 정보</b>로 취급</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.3 채점 절차 — 모델 원시출력이 아니라 실서빙 경로로 잰다</h3>
+  <p style="font-size:13.5px">평가 문서를 모델에 바로 넣어 <code>argmax</code>를 읽으면 <b>실제 배포 동작과 다른 숫자</b>가 나옵니다. 배포본은 모델 출력 뒤에 안전장치가 붙어 있기 때문입니다. 그래서 모든 채점은 운영과 동일한 <b>InferencePipeline 전 구간</b>을 통과시켜 수행합니다.</p>
+  <table>
+    <thead><tr><th style="width:190px">서빙 경로 단계</th><th>채점에 미치는 영향</th></tr></thead>
+    <tbody>
+      <tr><td>① temperature 보정</td><td>모델 과신을 완화 — 이후 신뢰도 게이트가 보정된 값 위에서 동작</td></tr>
+      <tr><td>② 청크 최고위험 집계</td><td>문서를 나눈 조각 중 <b>가장 심각한 등급</b>을 문서 등급으로 채택(평균이 아님)</td></tr>
+      <tr><td>③ FNR-safe 오버라이드</td><td>미탐 위험 패턴에서 등급을 강제 상향</td></tr>
+      <tr><td>④ 출처 prior 게이트</td><td>이미 공개된 출처(판례·공시)는 S3로 상한 — 과분류 억제</td></tr>
+      <tr><td>⑤ 에스컬레이션 τ</td><td>가장 심각한 등급의 softmax가 τ 이상이면 그 등급으로 승격, 없으면 argmax 폴백</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>왜 이 구분이 중요한가.</b> 같은 모델·같은 셋(프록시 109)이라도 원시 argmax로 재면 방향성 FNR <b>0.167</b>, 실서빙 경로로 재면 <b>0.018</b>로 <b>약 9배</b> 차이납니다. 안전성 수치는 반드시 서빙 경로 기준으로 읽어야 하며, 이 격차가 곧 <b>"미탐을 막는 것은 모델이 아니라 서빙 장치"</b>라는 본 시스템의 설계 요지입니다.</div>
+
+  <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">1.4 재현 — 감리 시 그대로 실행 가능</h3>
+  <table>
+    <thead><tr><th style="width:230px">대상</th><th>실행 스크립트</th></tr></thead>
+    <tbody>
+      <tr><td>누출 제거(clean본 생성)</td><td><code>scripts/clean_holdout_leakage.py</code></td></tr>
+      <tr><td>라벨 경화(hardened 42 조립)</td><td><code>scripts/harden_eval_labels.py</code></td></tr>
+      <tr><td>서빙 경로 채점</td><td><code>scripts/eval_serving_path.py</code></td></tr>
+      <tr><td>공개 판례 과분류(FPR)</td><td><code>scripts/eval_real_public_fpr.py</code></td></tr>
+      <tr><td>적대 회귀 게이트</td><td><code>scripts/eval_adversarial.py</code></td></tr>
+      <tr><td>메타모픽 릴리스 게이트</td><td><code>scripts/gen_metamorphic_pairs.py</code> → <code>scripts/check_metamorphic_gate.py</code> (<code>make metamorphic-gate</code>)</td></tr>
+      <tr><td>임계 τ 튜닝 곡선</td><td><code>scripts/eval_fnr_threshold_sweep.py</code></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:#71717a">※ 평가 대상 모델은 스크립트에 하드코딩하지 않고 <code>.env</code>의 <code>CLASSIFIER_MODEL_DIR</code> 단일 출처에서 읽습니다 — 문서에 적힌 버전과 실제 채점한 모델이 어긋나는 드리프트를 구조적으로 차단하기 위함입니다.</p>
 
   <h2>2. 실측 (서빙 경로)</h2>
   <table>
