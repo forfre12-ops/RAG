@@ -95,7 +95,7 @@ a{color:#0a0a0a}
       <tr><td>RRF 하이브리드</td><td>자체 구현</td><td>—</td><td>dense + 어휘 융합. <b>별도 검색엔진 없이 DB 통합</b></td></tr>
     </tbody>
   </table>
-  <p style="font-size:12.5px;color:#71717a">※ Elasticsearch는 <b>설치하지 않습니다</b>(의존성 미포함). 검색은 PostgreSQL 한 대로 끝납니다.</p>
+  
 
   <h2>4. 모델 — 가중치 실물 기준</h2>
   <table>
@@ -134,22 +134,6 @@ a{color:#0a0a0a}
       <tr><td>prometheus-client</td><td>0.25.0</td><td>Apache-2.0</td><td>메트릭 노출</td></tr>
       <tr><td>OpenTelemetry SDK</td><td>1.43.0</td><td>Apache-2.0</td><td>분산 트레이싱 — extras <code>[otel]</code></td></tr>
       <tr><td>matplotlib</td><td>3.11.0</td><td>PSF 계열(BSD 호환)</td><td>혼동행렬 PNG 렌더</td></tr>
-    </tbody>
-  </table>
-
-  <h2>7. 배포본에 <b>설치하지 않는</b> 것</h2>
-  <p>아래는 코드·옵션은 리포에 있으나 <b>폐쇄망 배포 이미지·번들에 포함하지 않습니다.</b> 라이선스 반출 소거와 공격표면 축소가 목적입니다.</p>
-  <table>
-    <thead><tr><th style="width:190px">구성요소</th><th style="width:120px">라이선스</th><th>제외 사유</th></tr></thead>
-    <tbody>
-      <tr><td>PyMuPDF</td><td>AGPL-3.0</td><td>강한 카피레프트. 기본 PDF 추출은 pdfminer.six(MIT)로 충분 — extras <code>[pdf-agpl]</code> 옵트인 전용</td></tr>
-      <tr><td>Tesseract · poppler-utils</td><td>Apache-2.0 · <b>GPL-2/3</b></td><td>스캔 OCR은 요건 외(FUN-022=전자문서 텍스트 추출). poppler GPL 반출 소거 위해 이미지에서 제외</td></tr>
-      <tr><td>MinIO</td><td>서버 AGPL-3.0</td><td>폐쇄망 저장소는 로컬 파일시스템 사용. extras <code>[minio]</code>는 클라우드 티어 전용</td></tr>
-      <tr><td>Elasticsearch</td><td>SSPL/Elastic</td><td>검색을 PostgreSQL로 통합 — 의존성 자체를 설치하지 않음(레거시 어댑터 코드만 존치)</td></tr>
-      <tr><td>MLflow</td><td>Apache-2.0</td><td>실험·모델 레지스트리는 <b>지재원 학습 서버 전용</b> — 고객사 운영 번들 미포함</td></tr>
-      <tr><td>상용 LLM SDK <span style="color:#71717a">(anthropic · openai)</span></td><td>anthropic=MIT<br />openai=Apache-2.0</td><td>폐쇄망 기본 구성에서 미사용. 외부 전송 없음(로컬 엔드포인트 호출에만 openai 호환 클라이언트 사용)</td></tr>
-      <tr><td>LangChain</td><td>MIT</td><td>프롬프트 체인은 자체 어댑터로 구현 — 실사용 없음(RFP 구현현황 FUN-003-④에 명시)</td></tr>
-      <tr><td>pyhwp</td><td>AGPLv3+</td><td>2026-08-01 의존성 삭제 — HWP 표 셀 회수를 unhwp(MIT)로 대체</td></tr>
     </tbody>
   </table>
 

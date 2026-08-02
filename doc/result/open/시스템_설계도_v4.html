@@ -424,18 +424,9 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
   <!-- 10 확인② RDB 필수 -->
   <section id="s10">
-    <div class="sec-head"><span class="n">10</span><h2>확인 ② RDB(PostgreSQL) 필수 — ES가 대체 못 함</h2></div>
-    <div class="sec-sub">이 시스템 데이터는 "검색 문서"가 아니라 <b>트랜잭션·관계형 파이프라인</b>이다. 검색은 보조(근거)뿐 → 정합성을 우선한다.</div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th style="width:24%;">필요</th><th>내용</th><th style="width:18%;">ES는?</th></tr></thead>
-      <tbody>
-        <tr><td><b>트랜잭션 정합성(ACID)</b></td><td>등급 확정/보정(FOR UPDATE 행잠금)·감사체인(pg_advisory)·교정 멱등(UNIQUE)</td><td><span class="tag-no">❌ ACID 아님</span></td></tr>
-        <tr><td><b>관계 무결성(FK/JOIN)</b></td><td>doc_id가 documents→chunks→classifications→corrections로 FK로 꿰임</td><td><span class="tag-no">❌ JOIN·FK 빈약</span></td></tr>
-        <tr><td><b>즉시 일관성</b></td><td>업로드→분류→검수가 read-after-write 즉시 반영</td><td><span class="tag-no">❌ refresh ~5s(최종일관)</span></td></tr>
-        <tr><td><b>단일 정본</b></td><td>폐쇄망 하나의 정합 DB</td><td><span class="tag-no">❌ 별도 시스템·이중쓰기</span></td></tr>
-      </tbody>
-    </table></div>
-    <div class="band"><div class="bt">ES는 "못 쓰는" 게 아니라 "불필요"</div><p>분류는 모델이 하고 검색은 보조라 ES 강점이 핵심에 안 닿는다. <b>pgvector가 PG 안에서 벡터+lexical을 통합</b>(실측 dense 76%·하이브리드 85%, 의사결정_대장 §03)하므로 ES를 더하면 이중시스템 부담만 늘 뿐. <b>고객사=운영 RDB 필수 / 지재원=파일+가벼운 DB로 충분</b>(§05·§07 저장 정책 참조).</p></div>
+    <div class="sec-head"><span class="n">10</span><h2>확인 ② RDB(PostgreSQL) 필수</h2></div>
+    <div class="sec-sub">이 시스템 데이터는 "검색 문서"가 아니라 <b>트랜잭션·관계형 파이프라인</b>이다 — 검색은 보조(근거).</div>
+    <div class="band"><div class="bt">PostgreSQL 단일 정본</div><p>등급 확정/보정(행잠금)·감사체인(pg_advisory)·교정 멱등(UNIQUE)이 ACID·FK·즉시일관성을 요구하고, <b>pgvector가 PG 안에서 벡터+lexical을 통합</b>(dense 76%·하이브리드 85%, 의사결정_대장 §03)한다. 별도 검색엔진은 이중시스템 부담만 늘 뿐이라 두지 않는다. <b>고객사=운영 RDB 필수 / 지재원=파일+가벼운 DB로 충분</b>(§05·§07).</p></div>
   </section>
 
   <!-- 11 남은 의사결정 -->
