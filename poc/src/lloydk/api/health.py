@@ -221,6 +221,66 @@ def _check_extractors() -> dict:
     }
 
 
+def _check_compute() -> dict:
+    """분류 처리량을 좌우하는 CPU·스레드 실효값 진단 — 조용한 3배 감속을 가시화한다.
+
+    [배경 2026-08-02] 구형 .hwp 업로드 시 gunicorn 워커가 강제 재시작되던 증상을 추적하니
+    파서가 아니라 처리량이 원인이었다. 8코어 호스트에서 API 컨테이너가 cgroup 으로 2 CPU 에
+    묶여 1페이지 분류에 12.7초가 걸렸고(--timeout 60 → 6~7페이지에서 사망), 호스트는 부하
+    0.28 로 놀고 있었다. 게다가 torch 는 cgroup 한도를 못 봐 8스레드를 띄워 오버서브스크립션
+    까지 겹쳤다. 둘 다 어디에도 안 떠서 오래 방치됐다 — 그래서 여기에 노출한다.
+
+    ok 는 항상 True(가용성 판단 아님). 실효 CPU 와 스레드가 어긋나면 status=degraded.
+    """
+    import os
+
+    host_cpus = os.cpu_count() or 0
+    quota = None
+    try:  # cgroup v2 — 컨테이너에 실제로 허용된 CPU
+        raw = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if raw[0] != "max":
+            quota = round(int(raw[0]) / int(raw[1]), 2)
+    except Exception:  # noqa: BLE001
+        pass
+    if quota is None:
+        try:  # cgroup v1
+            q = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
+            p = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
+            quota = round(q / p, 2) if q > 0 else None
+        except Exception:  # noqa: BLE001
+            pass
+
+    threads = None
+    try:
+        import torch  # noqa: PLC0415
+
+        threads = torch.get_num_threads()
+    except Exception:  # noqa: BLE001
+        pass
+
+    effective = quota or host_cpus
+    notes: list[str] = []
+    if quota and host_cpus and quota <= host_cpus / 2:
+        notes.append(
+            f"컨테이너가 {quota} CPU 로 제한됨(호스트 {host_cpus}) — 분류 처리량이 그만큼 낮다. "
+            f"단일 배포면 API_CPU_LIMIT 를 올릴 것"
+        )
+    if threads and effective and threads > effective + 0.5:
+        notes.append(
+            f"torch 스레드({threads}) > 실효 CPU({effective}) — 오버서브스크립션. "
+            f"OMP_NUM_THREADS 를 CPU 한도에 맞출 것"
+        )
+    return {
+        "status": "degraded" if notes else "ok",
+        "ok": True,  # 처리량 진단 — 가용성 판단엔 미반영
+        "host_cpus": host_cpus,
+        "container_cpu_limit": quota,
+        "torch_threads": threads,
+        "omp_num_threads": os.environ.get("OMP_NUM_THREADS"),
+        "notes": notes,
+    }
+
+
 def _operational_config() -> dict:
     return {
         "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
@@ -297,6 +357,7 @@ def healthz_deep():
         "embedder": _check_embedder(),
         "reranker": _check_reranker(),
         "extractors": _check_extractors(),
+        "compute": _check_compute(),
         "warmup": {"status": "complete" if STARTUP_COMPLETE else "pending",
                    "ok": STARTUP_COMPLETE},
     }
