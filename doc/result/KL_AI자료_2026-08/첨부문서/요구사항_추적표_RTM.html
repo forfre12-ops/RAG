@@ -102,7 +102,7 @@ footer strong{color:var(--text-dim);}
 
   <h1 class="title">요구사항 추적표 (RTM)</h1>
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
-    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+    <b>운영 전제:</b> 지재원 단계는 공개·합성 데이터 기반 <b>구축 단계</b>이고, 비밀 실문서 검수·사람 서명 평가는 고객사 폐쇄망 <b>운영 단계</b>에서 수행한다. <code>locked_gold_eval</code> 0건은 누락이 아니라 <b>단계 분리의 결과</b>다. 상세는 <a href="골든셋_종합.html">골든셋 종합</a> 참조.
   </div>
   <p class="lede">제안요청서(RFP) 기능·성능 요건과 발주처 정본 가이드 등급기준이 <strong>어느 설계 문서 → 어느 구현(코드) → 어느 검증(테스트)</strong>으로 충족되는지 추적하는 표. 감리의 "요구사항 → 구현 증빙" 요청에 대응한다.</p>
 
