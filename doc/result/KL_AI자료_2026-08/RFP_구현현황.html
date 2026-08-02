@@ -76,15 +76,7 @@ a{color:#0a0a0a}
   </table>
 
   <div class="note">
-    <b>FUN-003-④ LangChain 미사용 사유</b> — 요건 문구는 프레임워크(LangChain)를 명시했으나, 프롬프트 체인 <u>기능</u>은 자체 LLM 어댑터로 구현·동작합니다. 프레임워크를 도입하지 않은 사유는 다음 5가지이며, 기능 미구현이 아니라 <b>구현 수단의 차이</b>입니다.
-    <ol style="margin:8px 0 0;padding-left:20px">
-      <li><b>폐쇄망 동결 번들 원칙</b> — 운영 이미지는 <code>.[psh,otel,jwt,hwp,hwp-tables,xls]</code>만 설치(<code>Dockerfile.api.prod</code>). langchain은 선택 extra <code>[orchestration]</code>에만 선언되어 배포본 미포함. 에어갭 반입 시 <code>langchain-core</code>·<code>langchain-protocol</code>·<code>langgraph</code>·provider 패키지까지 의존성 트리 전체를 사전 반입해야 함.</li>
-      <li><b>다중배포 라이선스·SBOM 부담</b> — 다수 기업 폐쇄망 배포 구조상 의존성 1개 추가는 트리 전체가 라이선스 검토·SBOM(CycloneDX) 등재 대상이 됨.</li>
-      <li><b>필요 표면적이 작음</b> — 등급 결정 핫패스는 LLM-free이며 LLM 사용처는 합성문서 생성·라벨링 보조에 한정. 단일 프롬프트 + temperature 단계강화 재시도로 요건이 충족되어 체인·에이전트·툴 추상화의 실익이 없음.</li>
-      <li><b>요구 통제를 자체 어댑터가 직접 보유</b> — <code>adapters/llm/base.py</code>가 호출 1건당 토큰·비용·지연·실패코드를 <code>UsageRecord</code>로 DB(<code>llm_usage</code>) 적재하고 full-jitter 지수 백오프를 provider 공통 통제. LangChain 경유 시 콜백 계층이 추가됨.</li>
-      <li><b>온프렘·상용 단일 인터페이스</b> — vLLM·Ollama·LM Studio를 상용 3종과 동일 Protocol로 다루는 <code>build_provider()</code>가 FUN-003-③·⑥의 근거와 동일 코드. 프레임워크 비종속 구조가 'LLM 교체 시 코드 무변경' 요건에 더 직접적.</li>
-    </ol>
-    <div style="margin-top:8px">향후 LangChain 채택이 필요할 경우 <code>build_provider()</code> 위에 어댑터를 얹는 방식으로 대응 가능하며, 이 경우 폐쇄망 번들 의존성 트리와 라이선스 검토서 갱신이 함께 수반됩니다. 채택 여부는 본개발 단계 결정사항입니다.</div>
+    <b>FUN-003-④ LangChain 미사용 사유</b> — 요건이 명시한 프레임워크(LangChain)는 도입하지 않았으나 프롬프트 체인 <u>기능</u>은 자체 LLM 어댑터로 구현·동작합니다(기능 미구현이 아니라 <b>구현 수단의 차이</b>). 핵심 사유 둘 — ① <b>폐쇄망 동결 번들 원칙</b>: 운영 이미지는 최소 extras만 설치(langchain은 배포본 미포함, 반입 시 의존성 트리 전체 사전반입·SBOM 부담), ② <b>실익 없음</b>: 등급 결정 핫패스는 LLM-free이고 LLM은 합성·라벨링 보조에 한정 — 단일 프롬프트+temperature 재시도로 요건이 충족돼 체인·에이전트 추상화 이득이 없음(토큰·비용·백오프 통제는 <code>adapters/llm/base.py</code>가 직접 보유). 향후 필요 시 <code>build_provider()</code> 위에 어댑터로 대응 가능(본개발 결정사항).
   </div>
 
   <h2>FUN-004 · AI 기반 영업비밀 등급 분류 학습</h2>
