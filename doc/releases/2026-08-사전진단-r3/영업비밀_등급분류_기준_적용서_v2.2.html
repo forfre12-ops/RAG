@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>영업비밀 등급분류 기준 적용서 v2.2 | Lloydk</title>
+<style>
+/* ============================================================
+   Monochrome Design System — NovaX inspired, pure grayscale
+   ============================================================ */
+:root {
+  --bg:           #ffffff;
+  --bg-surface:   #fafafa;
+  --bg-mid:       #f4f4f5;
+  --bg-strong:    #e4e4e7;
+  --bg-inverse:   #09090b;
+  --bg-nav:       rgba(255,255,255,.88);
+  --text:         #09090b;
+  --text-soft:    #52525b;
+  --text-dim:     #71717a;
+  --text-faint:   #a1a1aa;
+  --border:       rgba(0,0,0,.08);
+  --border-mid:   rgba(0,0,0,.12);
+  --border-strong:rgba(0,0,0,.18);
+  --radius-sm:    0;
+  --radius:       0;
+  --radius-lg:    0;
+  --radius-xl:    0;
+  --radius-pill:  0;
+  --shadow-sm:    0 1px 2px rgba(0,0,0,.05);
+  --shadow:       0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.07);
+  --font-sans:    "Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:    "Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:      220px;
+  --article-max:  860px;
+  --container:    1320px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.75;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img,svg{max-width:100%;}
+ul,ol{padding-left:1.4em;color:var(--text-soft);}
+li{margin-bottom:4px;font-size:14px;line-height:1.65;}
+
+/* ─── NAV ─── */
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);overflow:visible;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-mark svg{width:16px;height:16px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+
+/* ─── LAYOUT ─── */
+.page-wrap{max-width:var(--container);margin:0 auto;padding:0 24px;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:52px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+
+/* ─── TOC ─── */
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc::-webkit-scrollbar{width:2px;}
+.toc::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.toc-sub{padding-left:20px!important;font-size:11.5px!important;}
+
+/* ─── ARTICLE HEADER ─── */
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);}
+.meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,46px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 40px;max-width:640px;}
+
+/* ─── HEADINGS ─── */
+h2{font-size:clamp(20px,2.8vw,26px);font-weight:700;letter-spacing:-.03em;margin:52px 0 14px;padding-top:4px;color:var(--text);}
+h3{font-size:clamp(16px,2vw,19px);font-weight:600;letter-spacing:-.02em;margin:32px 0 10px;color:var(--text);}
+h4{font-size:15px;font-weight:600;margin:20px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+p:last-child{margin-bottom:0;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:44px 0;}
+
+/* ─── SECTION SEPARATOR ─── */
+.section-sep{display:flex;align-items:center;gap:14px;margin:52px 0 28px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+
+/* ─── CALLOUTS ─── */
+.callout{border-radius:var(--radius);padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.callout.dark{background:var(--bg-mid);border-color:var(--border-strong);}
+.callout.inset{background:var(--bg-mid);border-color:var(--border-mid);border-left:3px solid var(--text);}
+.callout.inset .callout-label{color:var(--text);}
+.callout.warn{background:#fefce8;border-color:#fbbf24;border-left:3px solid #f59e0b;}
+.callout.warn .callout-label{color:#92400e;}
+.callout.warn p{color:#78350f;}
+.callout ul{margin:6px 0 0;padding-left:1.2em;color:var(--text-soft);}
+.callout li{font-size:13.5px;}
+
+/* ─── TABLES ─── */
+.table-wrap{overflow-x:auto;margin:20px 0;border:1px solid var(--border-mid);border-radius:var(--radius-lg);-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:400px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 14px;text-align:left;font-weight:600;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.55;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg-surface);}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+
+/* ─── CODE ─── */
+code{font-family:var(--font-mono);font-size:12px;background:var(--bg-mid);border:1px solid var(--border-mid);border-radius:var(--radius-sm);padding:1px 5px;color:var(--text);word-break:break-all;}
+pre{background:var(--bg-mid);border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:16px 20px;overflow-x:auto;margin:16px 0;-webkit-overflow-scrolling:touch;}
+pre code{background:none;border:none;padding:0;font-size:12.5px;line-height:1.65;word-break:normal;}
+
+/* ─── TAGS ─── */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:0;font-size:10px;font-weight:700;font-family:var(--font-mono);letter-spacing:.05em;white-space:nowrap;}
+.tag.filled{background:var(--text);color:var(--bg);}
+.tag.dark{background:#3f3f46;color:#fff;}
+.tag.mid{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.light{background:var(--bg-surface);color:var(--text-dim);border:1px solid var(--border-mid);}
+
+/* ─── GRADE CARDS ─── */
+.grade-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0;}
+.grade-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:18px;transition:box-shadow .18s;}
+.grade-card:hover{box-shadow:var(--shadow);}
+.grade-badge{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:0;margin-bottom:8px;letter-spacing:.04em;}
+.grade-ts .grade-badge{background:var(--text);color:var(--bg);}
+.grade-s1 .grade-badge{background:#3f3f46;color:#fff;}
+.grade-s2 .grade-badge{background:#71717a;color:#fff;}
+.grade-s3 .grade-badge{background:var(--bg-strong);color:var(--text);}
+.grade-name{font-size:14px;font-weight:700;margin-bottom:5px;color:var(--text);}
+.grade-desc{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;}
+.grade-svm{font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);}
+
+/* ─── DECISION TREE ─── */
+.decision{background:var(--bg-surface);border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:20px;margin:18px 0;}
+.decision pre{background:none;border:none;padding:0;margin:0;font-size:13px;line-height:1.7;color:var(--text-soft);}
+.decision pre code{background:none;border:none;padding:0;}
+
+/* ─── KPI / STAT ROW ─── */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0;}
+.stat-card{border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:18px 16px;background:var(--bg-surface);}
+.stat-label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;font-family:var(--font-mono);}
+.stat-value{font-size:clamp(20px,2.5vw,26px);font-weight:800;letter-spacing:-.04em;color:var(--text);}
+.stat-sub{font-size:11.5px;color:var(--text-faint);margin-top:4px;}
+
+/* ─── CHANGE TABLE HIGHLIGHT ─── */
+td.new{color:var(--text);font-weight:600;}
+td.old{color:var(--text-faint);text-decoration:line-through;}
+
+/* ─── FOOTNOTE / FOOTER ─── */
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+
+/* ─── MOBILE ─── */
+@media(max-width:860px){
+  .article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}
+  .toc-aside{display:none;}
+  .grade-grid{grid-template-columns:1fr;}
+  .stat-row{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:560px){
+  .stat-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">영업비밀 등급분류 기준 적용서</span>
+    </a>
+    <div class="nav-right">
+      <span class="nav-badge">v2.2</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ARTICLE + TOC -->
+<div class="article-layout">
+<article>
+
+  <!-- Header -->
+  <div class="meta-row">
+    <span class="badge">DOC-22</span>
+    <span class="badge outline">v2.2</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">2026-08-02 갱신</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">발주처 정본 가이드 기반</span>
+  </div>
+
+  <h1 class="title">영업비밀 등급분류<br>기준 적용서</h1>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+  </div>
+  <p class="lede">KOIPA AI 영업비밀관리시스템 M3 라벨링 룰·골든셋·학습 데이터 라벨의 공식 기준서. 발주처 정본 가이드(PDF)를 본 AI 시스템에 어떻게 반영했는지를 규정하는 적용서(구현 기준서)이며, 감리 요구사항 추적(가이드 → 구현 증빙)의 근거 문서다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">본 문서의 역할</div>
+    <p>발주처 정본 가이드(PDF)는 <em>표준 방법론·등급정의·예시</em>를 제공하나, 가이드 2p 명시대로 <strong>"각 기업의 현실에 맞도록 수정하여 활용"</strong>하는 적용은 수행사 몫이다. 본 문서는 <em>PDF 기준 ↔ 코드(seeds/rule_engine)</em>를 잇는 다리이며, 감리 증빙의 근거다.</p>
+  </div>
+
+  <hr/>
+
+  <!-- §0 -->
+  <div class="section-sep" id="s0">
+    <span class="section-sep-num">00</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">v1 → v2 변경 요약</span>
+  </div>
+
+  <h2>v1 → v2 핵심 변경 요약</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>항목</th><th>v1.1 (임시·공개법령 추정)</th><th>v2 (정본 가이드 반영)</th></tr></thead>
+      <tbody>
+        <tr><td>평가요소</td><td class="old">4요소: 유출영향도·경제가치·비공지성·관리수준</td><td class="new">3요소: 비공지성(S)·경제적 유용성(V)·비밀관리성(M) — 영업비밀 법적 3요건</td></tr>
+        <tr><td>산정 방식</td><td class="old">가중합 Σ(score×weight), 0~5 스케일</td><td class="new"><strong>곱셈 S×V×M</strong> (각 0/1/2점)</td></tr>
+        <tr><td>임계값</td><td class="old">TS≥4.0 / S1 3.0~4.0 / S2 2.0~3.0 / S3&lt;2.0</td><td class="new">S×V×M: 8·4(s=2·v=2)→특급 / (2·2·0)→1급 특례 / 1·2→2급 / 0→3급 <small style="color:var(--text-faint)">(운영로직 §4.6)</small></td></tr>
+        <tr><td>비공지성 처리</td><td class="old">v1.1에서 게이트로 별도 보강(가중합 위에 덮어쓰기)</td><td class="new">곱셈식이 게이트를 내포 (S=0이면 곱이 0 → 자동 공개)</td></tr>
+        <tr><td>특급기밀</td><td class="old">키워드/점수로 산출</td><td class="new">S=V=M=2(극비) 또는 자체분류·명시표기 수동지정</td></tr>
+        <tr><td>'유출영향도' 요소</td><td class="old">별도 4번째 요소(가중 0.30)</td><td class="new"><strong>삭제</strong> (정본 3요건에 없음 — A안 보조모델에만 존재)</td></tr>
+        <tr><td>근거 출처</td><td class="old">공개 법령 추정</td><td class="new">발주처 정본 가이드 PDF</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-label">채택 방식</div>
+    <p>본 v2는 <strong>B안(곱셈 S×V×M)</strong>을 정본 산정식으로 채택한다. 가이드의 또 다른 방식인 A안(5요소 100점 가산식)은 §6에 <strong>보조(회원사 자가진단)</strong> 옵션으로 보존한다.</p>
+  </div>
+
+  <hr/>
+
+  <!-- §1 -->
+  <div class="section-sep" id="s1">
+    <span class="section-sep-num">01</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">정본 가이드 산정법</span>
+  </div>
+
+  <h2>정본 가이드가 제시하는 2가지 산정법</h2>
+  <p>발주처 정본 가이드는 <strong>같은 4등급에 이르는 두 경로</strong>를 제시한다. 가이드 12p 상단에 <em>"기업 현황·여건에 따라 2~4단계 중 적용 가능한 단계를 선택"</em>으로 택일·선택 적용을 명시한다.</p>
+
+  <h3 id="s1-1">1.1 A안 — 5요소 100점 가산식 (가이드 5p)</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>평가항목</th><th class="center">배점</th><th>평가점수</th></tr></thead>
+      <tbody>
+        <tr><td>정보 창출 및 유지비용</td><td class="center">10</td><td>상10·중6·하1 (A)</td></tr>
+        <tr><td>산출 정보 수준</td><td class="center">15</td><td>상15·중9·하3 (B)</td></tr>
+        <tr><td>정보 활용도(공유 정도)</td><td class="center">10</td><td>상10·중6·하1 (C)</td></tr>
+        <tr><td>정보 활용 파급효과 — 내부 활용 효과</td><td class="center">35</td><td>상35·중21·하7 (D)</td></tr>
+        <tr><td>정보 활용 파급효과 — 외부 유출 위험</td><td class="center">30</td><td>상30·중18·하6 (E)</td></tr>
+        <tr><td><strong>총점</strong></td><td class="center"><strong>100</strong></td><td><strong>A+B+C+D+E</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>등급 기준:</strong> 특급기밀 = 별도 산정 없이 기업 자체분류 / 1등급 비밀 = <strong>≥75점</strong> / 2등급 대외비 = <strong>≥50점</strong> / 3급 공개 = <strong>&lt;50점</strong></p>
+
+  <h3 id="s1-2">1.2 B안 — 3요소 곱셈식 S×V×M (가이드 11~12p) <span class="tag filled" style="margin-left:6px;vertical-align:middle;">본 시스템 채택</span></h3>
+
+  <p>각 요소를 0/1/2점으로 평가한 뒤 <strong>세 점수를 곱한다.</strong></p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="center">점수</th><th>비공지성 (S)</th><th>경제적 유용성 (V)</th><th>비밀관리성 (M)</th></tr></thead>
+      <tbody>
+        <tr><td class="center"><strong>0</strong></td><td>불특정 다수에게 공개된 정보</td><td>경제적 가치 없는 정보</td><td>비밀로 관리 불가 / 임직원 외 모두 알아야</td></tr>
+        <tr><td class="center"><strong>1</strong></td><td>통상적 방법으론 입수 곤란</td><td>취득·개발에 비용·노력 투입</td><td>임직원 일부만 자체 공개</td></tr>
+        <tr><td class="center"><strong>2</strong></td><td>보유자를 통하지 않곤 알 수 없음</td><td>상당한 비용·노력 투입</td><td>승인된 자에 한해 공개</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>S×V×M → 등급 (운영 매핑, 시스템 코드 <code>grade_from_svm()</code> 기준)</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="center">S×V×M</th><th>등급(시스템 코드)</th><th>가이드 표기</th></tr></thead>
+      <tbody>
+        <tr><td class="center"><strong>8</strong></td><td><span class="tag filled">TS</span> 특급기밀</td><td>극비 (등급 1)</td></tr>
+        <tr><td class="center"><strong>4</strong></td><td><span class="tag filled">TS</span> 특급기밀 <small style="color:var(--text-faint)">※ s=2·v=2·m=1. 곱=4는 운영로직상 TS — §4.6</small></td><td>비밀 (등급 2)</td></tr>
+        <tr><td class="center"><strong>1 또는 2</strong></td><td><span class="tag mid">S2</span> 2등급 대외비</td><td>대외비 (등급 3)</td></tr>
+        <tr><td class="center"><strong>0</strong></td><td><span class="tag light">S3</span> 3급 공개 <small style="color:var(--text-faint)">※ 단 (2·2·0) 곱=0은 <span class="tag dark">S1</span> 1급 특례 — §4.5</small></td><td>일반공개정보 (등급 4)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <p>위 표는 <strong>시스템 운영로직(§4.6)</strong> 기준이다. <code>SVM_GRADE_MAP={8:TS, 4:TS, 2:S2, 1:S2, 0:S3}</code>(근사값·직접 사용 금지)에 <strong>S1 특례 분기</strong>(<code>s=2 AND v=2 AND m=0 → S1</code>)를 더한 것으로, S1은 곱=4가 아니라 <strong>(2·2·0) 특례</strong>로만 산출된다. 가이드 원본(p12)이 곱=4를 "비밀"로 표기한 것과의 차이는 §3.7 참조.</p>
+  </div>
+
+  <h4>가이드 12p 워크드 예시 (검증용 시드)</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>문서</th><th class="center">S</th><th class="center">V</th><th class="center">M</th><th class="center">S×V×M</th><th>등급</th></tr></thead>
+      <tbody>
+        <tr><td>조직도</td><td class="center">1</td><td class="center">1</td><td class="center">1</td><td class="center">1</td><td><span class="tag mid">S2</span> 2급 대외비</td></tr>
+        <tr><td>내선번호</td><td class="center">0</td><td class="center">0</td><td class="center">0</td><td class="center">0</td><td><span class="tag light">S3</span> 3급 공개</td></tr>
+        <tr><td>인사평가보고서</td><td class="center">1</td><td class="center">2</td><td class="center">2</td><td class="center">4</td><td><span class="tag dark">S1</span> 1급 비밀 <small style="color:var(--text-faint)">※ 가이드 원본 표기. v2.2는 <span class="tag mid">S2</span>로 보정 — §3.7</small></td></tr>
+        <tr><td>중장기 경영계획</td><td class="center">2</td><td class="center">2</td><td class="center">2</td><td class="center">8</td><td><span class="tag filled">TS</span> 특급기밀</td></tr>
+        <tr><td>사무실 배치도</td><td class="center">1</td><td class="center">1</td><td class="center">0</td><td class="center">0</td><td><span class="tag light">S3</span> 3급 공개</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr/>
+
+  <!-- §2 -->
+  <div class="section-sep" id="s2">
+    <span class="section-sep-num">02</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">4등급 체계</span>
+  </div>
+
+  <h2>4등급 체계 (정본 가이드 정합)</h2>
+
+  <div class="grade-grid">
+    <div class="grade-card grade-ts">
+      <span class="grade-badge">TS</span>
+      <div class="grade-name">특급기밀 / Confidential</div>
+      <div class="grade-desc">기업의 생존과 직결 — 관련 임원 등 한정 인원만 접근</div>
+      <div class="grade-svm">S×V×M = 8 · 4(s=2·v=2) / 자체분류</div>
+    </div>
+    <div class="grade-card grade-s1">
+      <span class="grade-badge">S1</span>
+      <div class="grade-name">1등급 비밀 / Restricted</div>
+      <div class="grade-desc">내부 직원 중 관련 직원 일부에게만 접근 제한</div>
+      <div class="grade-svm">S×V×M = 0 (2·2·0 특례)</div>
+    </div>
+    <div class="grade-card grade-s2">
+      <span class="grade-badge">S2</span>
+      <div class="grade-name">2등급 대외비 / Internal Use</div>
+      <div class="grade-desc">내부 직원에게만 접근 제한</div>
+      <div class="grade-svm">S×V×M = 1·2</div>
+    </div>
+    <div class="grade-card grade-s3">
+      <span class="grade-badge">S3</span>
+      <div class="grade-name">3급 공개 / Public</div>
+      <div class="grade-desc">기업 내·외부에 공개된 정보</div>
+      <div class="grade-svm">S×V×M = 0</div>
+    </div>
+  </div>
+
+  <div class="callout dark">
+    <div class="callout-label">표기 정합 주의</div>
+    <p>v1.1은 영문을 TS=Top Secret, S1=Restricted, <strong>S2=Confidential</strong>로 표기해 정본(특급=Confidential)과 충돌했다. v2는 정본 영문을 채택. 내부 식별 코드(TS/S1/S2/S3)는 안정적 식별자로 유지하되, UI·감리문서 표시명은 정본 한국어("<strong>특급기밀/1등급 비밀/2등급 대외비/3급 공개</strong>")를 사용한다.</p>
+  </div>
+
+  <hr/>
+
+  <!-- §3 -->
+  <div class="section-sep" id="s3">
+    <span class="section-sep-num">03</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">시스템 적용 결정</span>
+  </div>
+
+  <h2>본 시스템 적용 결정</h2>
+
+  <h3 id="s3-1">3.1 산정 요소: 정본 3요건 채택</h3>
+  <p>영업비밀의 법적 정의(부정경쟁방지법 §2.2)는 <strong>비공지성·경제적 유용성·비밀관리성</strong> 3요건이고, 정본 가이드 B안이 이를 그대로 S/V/M으로 쓴다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>코드</th><th>명칭</th><th>정본 대응</th><th>비고</th></tr></thead>
+      <tbody>
+        <tr><td><code>SECRECY</code></td><td>비공지성 (S)</td><td>가이드 비공지성 0/1/2</td><td><strong>곱셈 게이트</strong> — 0이면 전체 0</td></tr>
+        <tr><td><code>VALUE</code></td><td>경제적 유용성 (V)</td><td>가이드 경제적 유용성 0/1/2</td><td></td></tr>
+        <tr><td><code>MANAGEMENT</code></td><td>비밀관리성 (M)</td><td>가이드 비밀관리성 0/1/2</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <p>v1.1의 4번째 요소 <strong><code>DAMAGE</code>/<code>LEAK_IMPACT</code>(유출영향도)는 삭제</strong>한다. 정본 3요건에 없고, '외부 유출 위험'은 A안(보조)에만 존재한다. 유출영향도 의미는 등급 서열 + <code>tb_classification_levels.loss_weight</code>(고등급 오분류 가중)로 보존한다.</p>
+  </div>
+
+  <h3 id="s3-2">3.2 점수 스케일 변경: 0~5 → 0~2, 합산 → 곱셈</h3>
+  <ul>
+    <li>각 요소 점수 도메인을 <strong>0/1/2</strong>로 변경(현 0.0~5.0 CHECK → 0~2)</li>
+    <li>최종 등급 = <code>grade_from(S × V × M)</code> (가이드 4단계 매핑). 기존 가중합·임계값(4.0/3.0/2.0) 폐기</li>
+  </ul>
+
+  <h3 id="s3-3">3.3 왜 B안(곱셈)인가 — 채택 근거</h3>
+
+  <ol>
+    <li><strong>4등급 1:1 매핑</strong> — 8/4/1·2/0 → 특급/1급/2급/3급으로 깔끔히 대응</li>
+    <li><strong>과분류 근본 차단</strong> — 곱셈은 한 요소라도 0이면 0(공개). v1.1이 게이트(§4.0)로 따로 막던 "공개문서 과분류"(구 판례 legacy 학습 실험 실측: 공개판례 85% 과분류)를 <strong>산정식 자체가 내포</strong>. <small style="color:var(--text-faint)">현행 배포본 v5_clean(v-fe4b386b)의 공개 과분류는 79%→4%(n=400).</small></li>
+    <li><strong>라벨링·골든셋 단순화</strong> — 입력이 0/1/2 3단계뿐이라 사람 검수·합성 라벨·일치도 측정이 단순하고 재현성이 높다</li>
+    <li><strong>정본 예시와 직접 대조 가능</strong> — 가이드 12p 워크드 예시를 회귀 테스트 정답으로 그대로 사용</li>
+    <li><strong>AI 운영 가능성 (결정적 근거)</strong> — A안 5요소 중 '정보 창출·유지 비용', '내부 활용 효과', '외부 유출 위험'은 문서 본문에 거의 없는 외부 경영·재무 정보라 텍스트 분류 AI로 산출 불가. 반면 B안 3요건은 텍스트·메타데이터로 근사 가능. <em>A안=사람 수기 정량평가용, B안=AI 자동분류용.</em></li>
+  </ol>
+
+  <div class="callout inset">
+    <div class="callout-label">설계 결정 (수행사 전문가 판단)</div>
+    <p>AI 자동분류 정본 산정법 = <strong>B안(S×V×M)</strong>. A안은 회원사 수기 자가진단 보조(§6)로 보존. 이는 위 5개 기술·법리 근거에 따른 수행사 설계 결정이며, 발주처에는 근거와 함께 통보한다. <em>트레이드오프</em>: B안은 0/1/2 3단계라 A안의 100점 그라데이션보다 세밀도가 낮다 — 단 R1·R2로 보완되며 AI 운영가능성·법리정합 이득이 세밀도 손실을 압도한다.</p>
+  </div>
+
+  <h3 id="s3-4">3.4 특급기밀(TS) 처리 — 자동분류 + 수동지정 병행</h3>
+  <p>정본은 특급을 <em>자체분류</em>(A안) 또는 <em>극비 S=V=M=2</em>(B안)로 본다. 본 시스템은 다음 <strong>OR</strong> 조건으로 TS를 부여한다:</p>
+  <ol>
+    <li><strong>S×V×M = 8</strong> (S=V=M=2), 또는</li>
+    <li><strong>명시 표기</strong> 본문/메타에 "특급기밀·극비·Top Secret·1급 보안·Eyes-Only" 등, 또는</li>
+    <li><strong>관리자 자체분류(수동 오버라이드)</strong> — 점수와 무관하게 기업/담당자가 특급 지정</li>
+  </ol>
+
+  <div class="callout">
+    <p>AI는 특급을 <em>제안</em>하되 특급은 본질적으로 판단·자체분류 영역이므로 <strong>항상 사람 확정</strong>을 거친다(FUN-005 임시저장→확정과 정합). 평가 시 <strong>특급의 미탐율(FNR)</strong>을 보안상 최우선 지표로 관리한다. AI 특급-FNR 평가 대상은 "텍스트로 산출 가능한 특급(S=V=M=2 신호 보유)"에 한정하고, 텍스트 신호가 없는 순수 자체분류 특급은 AI 책임 범위 밖으로 둔다.</p>
+  </div>
+
+  <h3 id="s3-5">3.5 설계 정합성 점검 — 적용 정밀화 (R1~R6)</h3>
+  <p>"B안이 AI 시스템에 최선인가"를 과분류↔과소분류(미탐) 트레이드오프 관점에서 재점검한 결과 도출한 6개 정밀화다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>항목</th><th>내용</th><th>상태</th></tr></thead>
+      <tbody>
+        <tr><td><strong>R1</strong> 룰↔모델 분리</td><td>BERT 분류기는 텍스트→등급을 직접 학습·추론한다. S×V×M은 학습 라벨·룰 후보·근거(evidence) 산정 계층이지 모델의 추론식이 아님 → 곱셈의 "급변(cliff)"이 모델 추론에 직접 전가되지 않는다.</td><td><span class="tag mid">기설계 내포</span></td></tr>
+        <tr><td><strong>R2</strong> 추론단 미탐 안전장치</td><td>출처(비공지성) 게이트는 공개문서 과분류를 대폭 억제한다(구 판례 legacy 실험 93%→0%; 현행 v5_clean 정본 공개 과분류 79%→4%). 곱셈 게이트는 출처/비공지성(S) 축에만 하드 적용, 내용(V·M) 축은 콘텐츠 미탐 가드 + 상향충돌 시 검수 라우팅 유지(silent 하향 금지).</td><td><span class="tag mid">기설계 내포</span></td></tr>
+        <tr><td><strong>R3</strong> 등급체계·매핑 설정화</td><td>등급 개수와 S×V×M→등급 매핑(8/4/1·2/0)을 하드코딩하지 않고 DB·설정 주도로 둔다(FUN-005 관리자 등급체계 변경 요구사항).</td><td><span class="tag light">신규 반영</span></td></tr>
+        <tr><td><strong>R4</strong> 유출영향도 처리</td><td>정본 3요건에 없음. 등급 서열 + <code>loss_weight</code>(고등급 오분류 가중) + 등급별 FNR로 보존(별도 입력 요소 아님).</td><td><span class="tag light">신규 반영</span></td></tr>
+        <tr><td><strong>R5</strong> 특급 표본·기대치</td><td>특급은 희소. 골든셋 특급은 합성·수동 시드로 별도 확보, 내용만으로 특급을 못 만들어도 미탐으로 과벌하지 않는다.</td><td><span class="tag light">신규 반영</span></td></tr>
+        <tr><td><strong>R6</strong> S·M은 메타데이터 의존</td><td>비밀관리성(M)과 사실적 비공지성(S)은 본문 텍스트만으로 판정 곤란. KL 웹계층의 출처·보안표시·접근범위 메타데이터를 S/M 산정 입력으로 받는다.</td><td><span class="tag light">신규 반영</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="s3-6">3.6 가이드 내부 변이 — 설계 판정 + 근거</h3>
+  <p>가이드 예시표(p6~9)와 산정법(p11~12)이 일부 불일치. <strong>B안 채택의 귀결로 등급은 S×V×M 계산이 정본</strong>이고 예시표는 전형값 예시로 본다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>변이</th><th>예시표</th><th>본 시스템 판정</th><th>근거 / 결정 주체</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>중장기 경영계획</td>
+          <td>1급(S1)</td>
+          <td>S×V×M 계산 결과 (문서별 S/V/M에 따라 1급~특급)</td>
+          <td>예시표 단일 등급은 전형 케이스 약식. 실제 등급은 S/V/M 산정 — <strong>B안 채택의 귀결. 수행사 결정</strong></td>
+        </tr>
+        <tr>
+          <td>공개·등록 특허·실용신안</td>
+          <td>2급 대외비</td>
+          <td><span class="tag light">S3</span> <strong>3급 공개</strong><br><small>(등록·공개분 한정. 출원 전·미공개 IP는 S1/S2)</small></td>
+          <td>등록·공개 특허는 특허청 공표 → 비공지성=0 → 곱=0 → 공개. 부정경쟁방지법 §2.2상 공개특허는 영업비밀 불성립. ⚠ <strong>발주처 확인 필요</strong>(§7.2)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="s3-7">3.7 가이드 원본 곱셈 매핑 vs v2.2 운영 보정 — PDF 직접 대조 <span class="tag filled" style="vertical-align:middle;margin-left:4px;">2026-06-20 추가</span></h3>
+
+  <div class="callout inset">
+    <div class="callout-label">PDF 직접 확인 — 정본 가이드 16p 스캔 이미지본 전수 판독</div>
+    <p>정본 가이드 PDF는 텍스트 레이어가 없는 <strong>스캔 이미지본(16p)</strong>이라 전 페이지를 직접 판독했다. 확인 결과 가이드는 <strong>두 산정법을 모두 제시</strong>한다 — <strong>A안(Σ 5요소 100점)은 p4 절차도·p5 산정식</strong>, <strong>B안(S×V×M 곱셈)은 p11 배점·p12 방법</strong>. p12는 곱셈값 4단계 매핑(<code>0→공개 / 1·2→대외비 / 4→비밀 / 8→극비</code>)과 워크드 예시(조직도 1·1·1=1=대외비, 인사평가보고서 1·2·2=4=비밀, 중장기경영계획 2·2·2=8=극비)를 제시한다. 가이드는 또한 <strong>"기업 여건에 따라 2~4단계 중 선택"</strong>(p12)과 <strong>"S 또는 V 단독값만으로 분류 가능"</strong>(p11)을 명문화해, 산정법·단계 선택을 기업 재량으로 둔다 — 본 시스템의 B안·4단계 채택은 가이드 위배가 아니다.</p>
+  </div>
+
+  <p>본 시스템 v2.2의 <code>grade_from_svm</code>은 가이드 B안(p12) 곱셈 매핑을 기반으로 하되, 골든셋 100건 실증에 따라 <strong>두 곳을 운영 보정</strong>했다. 가이드 원본 매핑과의 정확한 차이는 다음과 같다.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="center">케이스 S·V·M</th><th>가이드 원본 (p12)</th><th>v2.2 운영 보정</th><th>방향</th><th>근거</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="center"><code>2·2·0</code><br>곱=0</td>
+          <td><span class="tag light">S3</span> 3급 공개</td>
+          <td><span class="tag dark">S1</span> 1급 비밀</td>
+          <td><strong>더 보수적</strong><br>(미탐↓)</td>
+          <td>관리 미공식화 고가치 영업비밀 — 곱=0이어도 <code>s=2·v=2</code>면 비밀 성립(§4.5). 부정경쟁방지법 §2.2 정합</td>
+        </tr>
+        <tr>
+          <td class="center"><code>1·2·2</code><br>곱=4</td>
+          <td><span class="tag dark">S1</span> 1급 비밀<br><small>(가이드 12p 인사평가보고서 예시)</small></td>
+          <td><span class="tag mid">S2</span> 2급 대외비</td>
+          <td><strong>덜 보수적</strong><br>(과분류↓)</td>
+          <td><code>s&lt;2</code>(공개 가능성 존재) 시 1급 상향 보류 — §3.3 #2 과분류 차단</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-label">설계 권고 — 보정을 "설정값"으로 분리</div>
+    <p>위 두 보정은 골든셋 실증 근거가 있으나 <strong>엄밀히는 발주처 가이드의 예시값을 정정</strong>하는 것이다. 따라서 <strong>가이드 순수 곱셈 매핑(0 / 1·2 / 4 / 8)을 기본값(default)으로 두고, v2.2 보정 규칙(2·2·0→S1, 곱4 강등)을 운영 토글</strong>로 분리한다 — 등급체계 설정화(R3)와 동일하게 <strong>하드코딩 금지·DB/설정 주도</strong>. "가이드 그대로"가 요구되면 보정 off, "FNR 최우선"이면 on. (§7.2 정책 승인 항목)</p>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">A안 = 사람 수기 (역할 분담 확정)</div>
+    <p>A안 5요소 중 <strong>65점(내부 활용효과 35 + 외부 유출위험 30)</strong>은 문서 텍스트에 없는 <strong>경영·재무 판단값</strong>이라 텍스트 분류 AI로 산출 불가. 가이드도 A안 특급을 "기업 자체분류"로 두어 사람 판단을 전제한다. ∴ <strong>AI = B안 곱셈으로 1차 자동분류 / 사람 = A안으로 가치 정밀평가</strong>(회원사 수기 자가진단 보조, §6). 경쟁이 아니라 <strong>용도가 다른 보완 관계</strong> — A안의 AI 구현은 시도하지 않는다.</p>
+  </div>
+
+  <hr/>
+
+  <!-- §4 -->
+  <div class="section-sep" id="s4">
+    <span class="section-sep-num">04</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">등급별 판단 기준</span>
+  </div>
+
+  <h2>등급별 판단 기준 + 정본 직무별 예시</h2>
+  <p>정본 가이드 6~9페이지의 <strong>직무별 문서유형 → 등급 예시표</strong>를 시드/골든셋 라벨의 1차 정답지로 채택한다.</p>
+
+  <h3 id="s4-1">4.1 인사 / 총무</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>문서유형</th><th>등급</th></tr></thead>
+      <tbody>
+        <tr><td>직원 개인정보·인사기록카드·급여/연봉·조직도</td><td><span class="tag mid">S2</span> 2급 대외비</td></tr>
+        <tr><td>근태·출퇴근·휴가·복지·퇴직 정보</td><td><span class="tag light">S3</span> 3급 공개</td></tr>
+        <tr><td>교육계획·교육결과 보고서</td><td><span class="tag light">S3</span> 3급 공개</td></tr>
+        <tr><td><strong>중장기 경영계획·투자계획·신규 투자계획</strong></td><td><span class="tag dark">S1</span> <strong>1급 비밀</strong></td></tr>
+        <tr><td>경영전략·경영실적·경영분석 보고서</td><td><span class="tag mid">S2</span> 2급 대외비</td></tr>
+        <tr><td>임원 회의록·이사회 회의록</td><td><span class="tag dark">S1</span> 1급 비밀</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="s4-2">4.2 회계</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>문서유형</th><th>등급</th></tr></thead>
+      <tbody>
+        <tr><td>자금계획·자금수지</td><td><span class="tag dark">S1</span> 1급 비밀</td></tr>
+        <tr><td>매출입(전표·세금계산서·재무제표·손익계산서)</td><td><span class="tag mid">S2</span> 2급 대외비</td></tr>
+        <tr><td><strong>원가분석·제품별 단가표·판매가격 정보</strong></td><td><span class="tag dark">S1</span> <strong>1급 비밀</strong></td></tr>
+        <tr><td>법인세·부가세·취득세·세무조정</td><td><span class="tag light">S3</span> 3급 공개</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="s4-3">4.3 연구개발 / 생산제조 / 구매</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>문서유형</th><th>등급</th></tr></thead>
+      <tbody>
+        <tr><td><strong>연구개발 계획서·신제품 개발계획</strong></td><td><span class="tag dark">S1</span> <strong>1급 비밀</strong></td></tr>
+        <tr><td><strong>연구개발 보고서·성과물·실험결과·시제품 성능</strong></td><td><span class="tag dark">S1</span> <strong>1급 비밀</strong></td></tr>
+        <tr><td>연구개발 노트·개발 회의록</td><td><span class="tag mid">S2</span> 2급 대외비</td></tr>
+        <tr><td>특허·실용신안·디자인(등록 공개분)</td><td><span class="tag light">S3</span> 3급 공개</td></tr>
+        <tr><td>생산계획·공정 배치도·라인 공정도</td><td><span class="tag mid">S2</span> 2급 대외비</td></tr>
+        <tr><td>원부자재 구매·발주·단가 정보</td><td><span class="tag light">S3</span> 3급 공개</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <p>위 예시는 <strong>사람 판단용 기본 등급</strong>이다. 시스템은 동일 문서를 S/V/M으로 환산해 곱셈으로 산정하되, 본 예시표와 <strong>일치하지 않으면 검수 라우팅</strong>한다(룰↔정답표 정합 회귀).</p>
+  </div>
+
+  <h3 id="s4-4">4.4 등급 경계 게이트 (M3 룰 라벨러)</h3>
+  <ul>
+    <li><strong>Gate-1 (출처/비공지성=S)</strong>: 공개 출처(판례·공시·보도·공개특허·공개논문·정부공개)면 <strong>S=0 → 곱 0 → S3 강제</strong>. 내부문서엔 미적용. (v1.1 §4.0 출처 게이트를 곱셈식이 흡수 — 별도 override 불필요, 단 출처 메타는 S 산정 입력으로 유지)</li>
+    <li><strong>명시표기 우선</strong>: "특급기밀/극비"→TS, "1급 비밀/기밀"→S1, "대외비"→S2</li>
+    <li><strong>모호 사례 검수 라우팅</strong>: "M&amp;A 검토(미확정)", "특허 출원 전/후", "익명화 고객DB" 등은 사람 검수</li>
+  </ul>
+
+  <!-- §4.5 v2.2 신설 -->
+  <h3 id="s4-5">4.5 S1 운영 판단 기준 — 골든셋 100건 실증 보강 <span class="tag filled" style="vertical-align:middle;margin-left:4px;">v2.2 신설</span></h3>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-label">S1 Rule FNR</div>
+      <div class="stat-value">76%</div>
+      <div class="stat-sub">룰 엔진 S1 미탐율 (100건 실증)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">S1 LLM FNR</div>
+      <div class="stat-value">48%</div>
+      <div class="stat-sub">LLM S1 미탐율</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">S1 핵심 케이스</div>
+      <div class="stat-value">s=2,v=2,m=0</div>
+      <div class="stat-sub">관리 미공식화 고가치 영업비밀</div>
+    </div>
+  </div>
+
+  <p>골든셋 100건 평가에서 S1 FNR이 높은 주원인은 <strong><code>s=2, v=2, m=0</code> 조합</strong>을 시스템이 S1으로 올바르게 분류하지 못하는 사례다. 본 절은 그 판단 기준을 명문화한다.</p>
+
+  <h4>S1 확정 조건 (아래 3가지 모두 충족)</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>요소</th><th class="center">기준값</th><th>판단 근거</th></tr></thead>
+      <tbody>
+        <tr><td>비공지성 S</td><td class="center"><strong>= 2</strong></td><td>보유자 없이 알 수 없는 정보 (경쟁사가 독자 취득 불가)</td></tr>
+        <tr><td>경제적 유용성 V</td><td class="center"><strong>= 2</strong></td><td>직접 경쟁 우위 또는 매출에 기여 (복제 시 즉각 피해)</td></tr>
+        <tr><td>비밀관리성 M</td><td class="center"><strong>= 0</strong></td><td>공식 문서 등급·물리적 통제 미존재. 비공식 열람 제한만 있어도 해당</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout inset">
+    <div class="callout-label">설계 의도</div>
+    <p><code>S×V×M = 0</code>이지만 <code>s==2 AND v==2</code> 조건에 의해 곱셈식이 S1을 반환한다. 이는 "관리 체계가 미흡해도 비공개 고가치 정보는 영업비밀로 성립"하는 법리(부정경쟁방지법 §2.2)를 반영한 의도적 설계다.</p>
+  </div>
+
+  <h4>S1 전형 문서 유형 (골든셋 확인 사례 기반)</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유형</th><th>예시</th><th class="center">S/V/M</th></tr></thead>
+      <tbody>
+        <tr><td>알고리즘·모델 운영 파라미터</td><td>가격 최적화 알고리즘 임계값, 사기 탐지 드롭률 테이블, AVM 보정 계수</td><td class="center"><code>2/2/0</code></td></tr>
+        <tr><td>장기 축적 노하우</td><td>금형 공차 설계 집성 문서, 발효 배합비·공정 명세</td><td class="center"><code>2/2/0</code></td></tr>
+        <tr><td>비공식 열람 제한 영업 전략</td><td>수익 배분 기준서, 공급망 헤징 전략 및 대체 공급사 목록</td><td class="center"><code>2/2/0</code></td></tr>
+        <tr><td>NDA만 있고 내부 등급 미부여</td><td>M&amp;A 자문 쇼트리스트, 임원 보상·스톡옵션 풀 설계</td><td class="center"><code>2/2/0</code></td></tr>
+        <tr><td>승인 전 단계 임상·검증 데이터</td><td>IRB 승인 전 예후 예측 모델 검증 보고서</td><td class="center"><code>2/2/0</code></td></tr>
+        <tr><td>비공개 계리 가정·위험률 테이블</td><td>장기보험 사망률·해지율 운영 테이블</td><td class="center"><code>2/2/0</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout dark">
+    <div class="callout-label">S1 vs TS 분기 핵심</div>
+    <p><code>m = 0</code> → <span class="tag dark">S1</span> (관리 공식화 없음)<br>
+    <code>m ≥ 1</code> → <span class="tag filled">TS</span> 후보 (비밀관리성 존재, 아래 §4.6 분기표 확인)</p>
+  </div>
+
+  <!-- §4.6 v2.2 신설 -->
+  <h3 id="s4-6">4.6 등급 결정 분기표 (TS · S1 · S2 · S3) <span class="tag filled" style="vertical-align:middle;margin-left:4px;">v2.2 신설</span></h3>
+
+  <div class="decision">
+    <pre><code>s == 2 AND v == 2?
+├── YES
+│   ├── m == 0  → S1  (관리 미공식화 고가치 영업비밀)
+│   ├── m == 1  → TS  (S×V×M=4, 비밀관리 존재)
+│   └── m == 2  → TS  (S×V×M=8, 엄격 통제)
+└── NO  (s &lt; 2 OR v &lt; 2)
+    ├── s == 0       → S3  (Gate-1 비공지성 게이트 강제)
+    ├── S×V×M ≥ 1   → S2
+    └── S×V×M == 0  → S3</code></pre>
+  </div>
+
+  <h4>경계 케이스 판단 보조표</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="center">S</th><th class="center">V</th><th class="center">M</th><th class="center">S×V×M</th><th>등급</th><th>대표 케이스</th></tr></thead>
+      <tbody>
+        <tr><td class="center">2</td><td class="center">2</td><td class="center">2</td><td class="center">8</td><td><span class="tag filled">TS</span></td><td>반도체 공정 레시피, 군사 AI 아키텍처</td></tr>
+        <tr><td class="center">2</td><td class="center">2</td><td class="center">1</td><td class="center">4</td><td><span class="tag filled">TS</span></td><td>임상 1상 중간 데이터, 양자컴퓨팅 실험셋</td></tr>
+        <tr><td class="center">2</td><td class="center">2</td><td class="center">0</td><td class="center">0*</td><td><span class="tag dark">S1</span></td><td>알고리즘 운영 파라미터, 임원 보상 체계</td></tr>
+        <tr><td class="center">2</td><td class="center">1</td><td class="center">2</td><td class="center">4</td><td><span class="tag mid">S2</span></td><td>내부 기술 검토안 (가치 간접적)</td></tr>
+        <tr><td class="center">2</td><td class="center">1</td><td class="center">1</td><td class="center">2</td><td><span class="tag mid">S2</span></td><td>사업 계획 초안, 협상 조건</td></tr>
+        <tr><td class="center">1</td><td class="center">2</td><td class="center">1</td><td class="center">2</td><td><span class="tag mid">S2</span></td><td>경영 전략 보고서</td></tr>
+        <tr><td class="center">1</td><td class="center">1</td><td class="center">1</td><td class="center">1</td><td><span class="tag mid">S2</span></td><td>조직도, 교육 교안</td></tr>
+        <tr><td class="center">1</td><td class="center">1</td><td class="center">0</td><td class="center">0</td><td><span class="tag light">S3</span></td><td>사무실 배치도 (가이드 예시)</td></tr>
+        <tr><td class="center">0</td><td class="center">*</td><td class="center">*</td><td class="center">0</td><td><span class="tag light">S3</span></td><td>공시·보도자료·공개특허·학술논문</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <p>* <code>s=2, v=2, m=0</code> → 곱=0이나 <code>s==2 AND v==2</code> 분기에 의해 S1 반환. 이 케이스에 한해 곱=0이 S3가 아닌 S1을 의미한다.</p>
+  </div>
+
+  <!-- §4.7 v2.2 신설 -->
+  <h3 id="s4-7">4.7 도메인별 S / V / M 기본값 앵커 <span class="tag filled" style="vertical-align:middle;margin-left:4px;">v2.2 신설</span></h3>
+
+  <p>골든셋 100건 실증에서 도출한 도메인 유형별 S/V/M 기본값. 문서 본문에 별도 신호가 없을 때 1차 앵커로 사용하며, LLM 판단이 이 앵커와 ±1 이상 차이나면 검수 라우팅.</p>
+
+  <h4>비공지성(S) 앵커</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="center">S 값</th><th>해당 유형</th></tr></thead>
+      <tbody>
+        <tr><td class="center"><strong>2</strong></td><td>특허 출원 전 설계서·실험 데이터 / 임상 1~3상 미공개 데이터 / 알고리즘·모델 가중치·파라미터 / M&amp;A 실사·협상 조건 / 소스코드(비공개 저장소)</td></tr>
+        <tr><td class="center"><strong>1</strong></td><td>내부 기획·계획 문서 (미확정·공시 전) / 협상 중 계약 초안 / 조직 개편·예산안 (발표 전) / 사내 교육 교안·전략 브리핑</td></tr>
+        <tr><td class="center"><strong>0</strong></td><td>공개 보도자료·IR 자료 / DART 공시 / 등록·공개 특허 / 학술 발표 논문 / 제품 카탈로그·매뉴얼·FAQ / 사내 공개 뉴스레터</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>경제적 유용성(V) 앵커</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="center">V 값</th><th>해당 유형</th></tr></thead>
+      <tbody>
+        <tr><td class="center"><strong>2</strong></td><td>복제 시 수익 직접 잠식 (알고리즘 파라미터·배합비·임상 데이터) / 유출 시 경쟁사 수년치 R&amp;D 단축 / 특허 우선권·신약 파이프라인 직결</td></tr>
+        <tr><td class="center"><strong>1</strong></td><td>경쟁 우위에 간접 기여 (사업 계획·예산안·로드맵) / 협상 교섭력 보호 (공급사 목록·단가 목표)</td></tr>
+        <tr><td class="center"><strong>0</strong></td><td>공개 정보와 동등한 가치 / 경제적 가치 없는 절차 정보</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>비밀관리성(M) 앵커</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="center">M 값</th><th>해당 조건</th></tr></thead>
+      <tbody>
+        <tr><td class="center"><strong>2</strong></td><td>공식 보안 등급 표기(극비·TS) + 물리적 통제 병행 (에어갭·HSM·격리서버 / 방사청·국방부 인가 / IRB·NDA 공식 체계)</td></tr>
+        <tr><td class="center"><strong>1</strong></td><td>접근자 지정 + 비공개 명시 (공식 등급 미부여 가능) / NDA 체결 + 열람 제한 / 사내 ERP·보안 저장소 문서 등급 분류</td></tr>
+        <tr><td class="center"><strong>0</strong></td><td>관리 체계 미명문화 / 비공식 열람 제한만 있음 (구두 전달·암묵적 공유 제한) / NDA 없이 구두 보안 요청만 있는 경우</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr/>
+
+  <!-- §5 -->
+  <div class="section-sep" id="s5">
+    <span class="section-sep-num">05</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">구현 반영 영향</span>
+  </div>
+
+  <h2>구현 반영 영향 (핵심 코드 반영 완료)</h2>
+  <p>본 v2 기준의 <strong>핵심 코드 반영은 완료</strong>됐다 — 3요소 시드·곱셈 등급식·DB score 0~2 CHECK는 실코드 반영 확인. 데이터 재라벨·회귀 케이스는 진행/후속.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>대상</th><th>변경</th><th class="center">상태</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>seeds.py</code> <code>FACTOR_SEEDS</code></td>
+          <td>4요소 → 3요소(SECRECY/VALUE/MANAGEMENT), DAMAGE 제거, 키워드 factor 재매핑</td>
+          <td class="center"><span class="tag light">✅ 완료</span></td>
+        </tr>
+        <tr>
+          <td><code>rule_engine.py</code></td>
+          <td>가중합·정규화(0~5) → <strong>S/V/M 0~2 산정 후 곱셈</strong> + 4단계 매핑</td>
+          <td class="center"><span class="tag light">✅ 완료</span></td>
+        </tr>
+        <tr>
+          <td><code>evaluation_factors</code> DB / CHECK / 트리거</td>
+          <td>3요소 시드, score 0~2 CHECK, weight 합계=1.0 트리거 → 곱셈 모델에 맞게 완화/삭제</td>
+          <td class="center"><span class="tag light">✅ 완료</span></td>
+        </tr>
+        <tr>
+          <td>골든셋·학습셋</td>
+          <td>전량 v2(S×V×M) 기준 <strong>재라벨</strong></td>
+          <td class="center"><span class="tag light">☐ 후속</span></td>
+        </tr>
+        <tr>
+          <td>PSH 회귀</td>
+          <td>가이드 12p 워크드 예시를 정답 케이스로 추가, <code>--fail-on-regression</code></td>
+          <td class="center"><span class="tag light">☐ 후속</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">스키마는 DDL 거의 불변</div>
+    <p>평가요소는 <code>evaluation_factors</code>의 행, 점수는 <code>tb_classification_evidence.score</code> 값, 등급은 코드 로직이다. 변경은 대부분 데이터·룰·CHECK 범위(0~5→0~2)·트리거 완화 수준이다. 파이프라인(M1~M6)·API·등급 개수(4)는 불변.</p>
+  </div>
+
+  <hr/>
+
+  <!-- §6 -->
+  <div class="section-sep" id="s6">
+    <span class="section-sep-num">06</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">A안 보조 보존</span>
+  </div>
+
+  <h2>A안(5요소 100점) 보존 — 보조 옵션 + 충돌 해소 정책</h2>
+  <p>A안(§1.1)은 <strong>회원사 자가진단/정량 산정</strong> 보조 모드로 보존한다. AI 자동분류 정본 룰은 B안이며, A안은 기업이 수동으로 자료 가치를 정량 평가할 때 별도 산식으로 제공한다(선택).</p>
+
+  <h3 id="s6-1">6.1 A안과 B안은 합산하지 않는다 — 다른 척도</h3>
+  <p>두 안은 <strong>척도가 달라 점수를 직접 더하거나 평균낼 수 없다.</strong> 각자 4등급으로 환산한 뒤 <strong>등급 코드 수준에서만</strong> 비교한다. A안과 B안을 가중합하는 <strong>제3의 공식은 두지 않는다.</strong></p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>A안 (사람 수기)</th><th>B안 (AI 자동)</th></tr></thead>
+      <tbody>
+        <tr><td>척도</td><td>0~<strong>100점 가산</strong> (Σ 5요소)</td><td>0~<strong>8 곱셈</strong> (S×V×M)</td></tr>
+        <tr><td>등급 임계</td><td>특급=자체분류 / ≥75 1급 / ≥50 2급 / &lt;50 3급</td><td>8·4(s=2·v=2) 특급 / (2·2·0) 1급 특례 / 1·2 2급 / 0 3급 (§4.6)</td></tr>
+        <tr><td>특급 산출</td><td><strong>점수로 안 나옴</strong> — 자체분류(사람 별도 지정). 100점 만점도 자동은 1급까지</td><td>곱=8이면 특급 산출 (단 확정은 항상 사람)</td></tr>
+        <tr><td>입력 정보</td><td>매출 기여도·유출 손실 등 <strong>경영·재무 판단</strong> 포함</td><td>문서 <strong>텍스트·메타데이터</strong> 근사</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="s6-2">6.2 A안으로 매기면 그게 절대기준 — 사람 우선</h3>
+  <p>사람이 A안 100점으로 정량 평가하면, <strong>A안 자체의 임계(특급=자체분류 / ≥75 / ≥50 / &lt;50)로 확정된 등급이 그 문서의 절대기준</strong>이 된다. 이는 시스템의 기존 원칙 <em>"사람이 확정한 라벨이 있으면 AI 추론을 건너뛴다"</em>(verified_label 우선, <code>classify_service</code>)와 동일하다. 사람 판단 &gt; 기계 추론.</p>
+
+  <div class="decision">
+    <pre><code>A안(사람 확정) 있음   → A안이 절대기준. AI(B안) 추론 스킵
+A안 없음             → B안(AI)이 1차 자동분류
+둘 다 있고 불일치     → 사람(A안) 우선
+                       단 AI가 더 높은 등급이면(미탐 위험) 검수 라우팅
+                       AI가 더 낮으면 무시(사람 우선)</code></pre>
+  </div>
+
+  <div class="callout inset">
+    <div class="callout-label">충돌 해소 = 산술 합산이 아니라 우선순위 + 보안 게이트</div>
+    <p>핵심은 <strong>"사람 우선 + 보안상 AI가 더 높으면 재확인"</strong>이다. AI(B안)가 사람(A안)보다 <strong>낮게</strong> 보면 사람 판단을 따르고, <strong>높게</strong> 보면 흘려보내지 않고 검수로 띄운다(미탐 방지). 두 등급을 평균·가중합하는 일은 없다.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-label">특급은 A안에서 점수로 안 나온다</div>
+    <p>A안은 <strong>특급기밀 = "기업 자체분류"</strong>라 100점 만점을 받아도 자동으로는 <strong>1급까지만</strong> 산출된다. 특급은 사람이 <strong>별도 명시 지정</strong>해야 한다(§3.4 — AI는 제안만, 특급 확정은 항상 사람). 운영 화면에서 A안 75점↑ 문서는 "1급(특급 후보)"로 표시하고 특급 승격은 별도 결재로 둘 것.</p>
+  </div>
+
+  <hr/>
+
+  <!-- §7 -->
+  <div class="section-sep" id="s7">
+    <span class="section-sep-num">07</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">결정 상태</span>
+  </div>
+
+  <h2>결정 상태 — 수행사 확정 / 발주처 확인 / 협조</h2>
+
+  <h3 id="s7-1">7.1 수행사 설계 확정 — 근거 통보(승인 대기 아님)</h3>
+  <ul>
+    <li><strong>산정법 = B안(S×V×M)</strong> — §3.3 근거 5종(특히 AI 운영가능성: A안 요소는 문서 텍스트로 산출 불가). A안은 수기 보조(§6)</li>
+    <li><strong>특급 = 자동(S=V=M=2)+명시표기+수동 병행, 항상 사람 확정</strong> — §3.4. 가이드 A·B 모두 만족</li>
+    <li><strong>변이①(중장기 경영계획 등) = S×V×M 계산 정본</strong>, 예시표는 전형값 참고 — §3.6</li>
+  </ul>
+
+  <h3 id="s7-2">7.2 발주처 확인 필요 — 발주처 자체 가이드를 정정하는 판정</h3>
+
+  <div class="callout warn">
+    <div class="callout-label">발주처 확인 필요 ①</div>
+    <p><strong>변이②: 공개·등록 특허·실용신안 = 3급 공개(S3)</strong> — 예시표는 2급이나 비공지성 법리상 공개 IP는 영업비밀 불성립(§3.6). 근거 제시 후 확인. (출원 전·미공개 IP 전략은 별도)</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-label">발주처 확인 필요 ② — v2.2 곱셈 보정 (PDF 대조 신규)</div>
+    <p><strong>v2.2 운영 보정 2건(<code>2·2·0→S1</code>, <code>1·2·2 등 곱4 강등→S2</code>) = 가이드 p12 곱셈 매핑 정정</strong>(§3.7). 골든셋 실증 근거가 있으나 가이드 원본과 다르므로, <strong>기본값(가이드 순수 곱셈)·보정 토글</strong> 구조로 두고 정책 승인 후 보정 활성화를 권고한다.</p>
+  </div>
+
+  <h3 id="s7-3">7.3 발주처 협조·값 합의 필요</h3>
+  <ul>
+    <li>모델 운영 임계값(confidence·검수 라우팅) + <strong>locked 기반 운영 성능 기준</strong>(전체 vs 등급별) + 확정 라벨 포착 방식 — PMR-002</li>
+    <li>등급 한국어/영문 표시명 최종 확정(§2)</li>
+    <li>(KL) R6 S/V/M 메타데이터 인터페이스</li>
+    <li>GPU·서버 사양(PER-002)</li>
+  </ul>
+
+  <hr/>
+
+  <!-- §8 -->
+  <div class="section-sep" id="s8">
+    <span class="section-sep-num">08</span>
+    <span class="section-sep-line"></span>
+    <span class="section-sep-title">갱신 이력</span>
+  </div>
+
+  <h2>갱신 이력</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>버전</th><th>날짜</th><th>주요 변경</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>v1.0</code></td>
+          <td>2026-05-28</td>
+          <td>공개법령 기반 자체 임시본(4요소 가중합) 초안</td>
+        </tr>
+        <tr>
+          <td><code>v1.1</code></td>
+          <td>2026-06-03</td>
+          <td>§4.0 비공지성 게이트(출처 우선) 추가</td>
+        </tr>
+        <tr>
+          <td><code>v2.0</code></td>
+          <td>2026-06-18</td>
+          <td><strong>발주처 정본 가이드 PDF 반영.</strong> 4요소 가중합 → <strong>3요소 곱셈 S×V×M(B안)</strong> 채택. 유출영향도 요소 삭제, 임계값·점수 스케일·특급 처리·영문 표기 정정. 정본 직무별 예시표를 시드/골든셋 정답지로 채택. v1.1은 비교 부록 보존</td>
+        </tr>
+        <tr>
+          <td><code>v2.1</code></td>
+          <td>2026-06-18</td>
+          <td>산정법·특급·변이를 "발주처 결정 대기"에서 <strong>수행사 설계 확정(근거 통보)</strong>으로 전환(§3.3 #5 AI 운영가능성 근거, §3.4 평가범위, §3.6 변이 판정, §7 결정상태 재구성). 공개특허 등급(§7.2)만 발주처 자체 가이드 정정이라 확인 대상으로 분리</td>
+        </tr>
+        <tr>
+          <td><code>v2.2</code></td>
+          <td>2026-06-19</td>
+          <td><strong>골든셋 100건 실증 기반 운영 기준 보강.</strong> §4.5 S1 운영 판단 기준(<code>s=2·v=2·m=0</code> 케이스 명문화·전형 문서 6유형), §4.6 TS·S1·S2·S3 결정 분기표, §4.7 도메인별 S/V/M 기본값 앵커 신설. FNR 취약 구간(S1 룰 76%·LLM 48%) 대응 자체 보강 — 발주처 4등급 정의·임계값 불변, 운영 판단 기준 수행사 추가</td>
+        </tr>
+        <tr style="background:var(--bg-surface);">
+          <td><code><strong>v2.2.1</strong></code></td>
+          <td><strong>2026-06-20</strong></td>
+          <td><strong>정본 가이드 PDF(16p 스캔본) 전수 직접 판독·대조.</strong> §3.7 신설 — 가이드 B안 곱셈 매핑(p11~12)과 v2.2 운영 보정 2건(<code>2·2·0→S1</code>, <code>곱4 강등→S2</code>)의 정확한 차이 명시, 보정을 "가이드 기본값 + 운영 토글"로 분리하는 설계 권고. A안(Σ5요소 100점, p4~5)=사람 수기 역할 분담 확정. §7.2에 v2.2 보정 정책 승인 항목 추가. <strong>§6 보강 — A↔B 충돌 해소 정책 명문화</strong>(§6.1 다른 척도라 합산 불가·제3공식 없음 / §6.2 A안=사람 절대기준, "사람 우선 + AI 상위 시 검수" / 특급은 A안에서 점수 미산출=자체분류)</td>
+        </tr>
+        <tr style="background:var(--bg-surface);">
+          <td><code><strong>v2.2.2</strong></code></td>
+          <td><strong>2026-08-02</strong></td>
+          <td><strong>곱셈식 내부 정합 정정(감리 제출본).</strong> §0·§1.2·§2 등급카드·§6.1의 "곱=4 → S1" 표기를 실코드 <code>grade_from_svm()</code> 운영로직(§4.6)에 통일 — <strong>곱=4(s=2·v=2·m=1) → TS</strong>, <strong>S1은 (2·2·0) 곱=0 특례</strong>로만 산출(<code>SVM_GRADE_MAP={8:TS,4:TS,2:S2,1:S2,0:S3}</code>). 과분류 실측치(§3.3 85%·§3.5 93%→0%)를 <strong>구 판례 legacy 실험</strong>으로 귀속하고 현행 배포본 v5_clean(<code>v-fe4b386b</code>) 공개 과분류 79%→4%(n=400) 병기. 4등급 정의·임계 불변, 표기 정합만 정정.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footnote">
+    <p>근거(정본): <strong>발주처 정본 가이드 PDF</strong> (특허청·한국지식재산보호원·영업비밀보호센터, 「영업비밀 자료 등급분류 체계 마련 연구」 특허청 2016 기반)</p>
+    <p>부수 근거: <em>AI 영업비밀 관리시스템 구축 사업 제안요청서</em> (FUN-023·FUN-005·PMR-002)</p>
+    <p>대상: KOIPA AI 영업비밀관리시스템 — M3 라벨링 룰·골든셋·학습 데이터 라벨 기준</p>
+    <p>관련: <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="시스템_완전이해_가이드_V3.html">시스템 완전이해 가이드 V3</a> · <a href="골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거 보고서(현행 배포본 v5 기준)</a></p>
+  </div>
+
+</article>
+
+<!-- TOC SIDEBAR -->
+<aside class="toc-aside">
+  <nav class="toc">
+    <div class="toc-title">목차</div>
+    <a href="#s0">00 · v1→v2 변경 요약</a>
+    <a href="#s1">01 · 정본 가이드 산정법</a>
+    <a class="toc-sub" href="#s1-1">1.1 A안 — 5요소 가산식</a>
+    <a class="toc-sub" href="#s1-2">1.2 B안 — 곱셈 S×V×M</a>
+    <a href="#s2">02 · 4등급 체계</a>
+    <a href="#s3">03 · 시스템 적용 결정</a>
+    <a class="toc-sub" href="#s3-1">3.1 산정 요소</a>
+    <a class="toc-sub" href="#s3-2">3.2 점수 스케일</a>
+    <a class="toc-sub" href="#s3-3">3.3 왜 B안인가</a>
+    <a class="toc-sub" href="#s3-4">3.4 특급기밀 처리</a>
+    <a class="toc-sub" href="#s3-5">3.5 정합성 점검 R1~R6</a>
+    <a class="toc-sub" href="#s3-6">3.6 가이드 내부 변이</a>
+    <a class="toc-sub" href="#s3-7">3.7 원본 vs v2.2 보정 <small>PDF대조</small></a>
+    <a href="#s4">04 · 등급별 판단 기준</a>
+    <a class="toc-sub" href="#s4-1">4.1 인사/총무</a>
+    <a class="toc-sub" href="#s4-2">4.2 회계</a>
+    <a class="toc-sub" href="#s4-3">4.3 연구개발/생산/구매</a>
+    <a class="toc-sub" href="#s4-4">4.4 경계 게이트</a>
+    <a class="toc-sub" href="#s4-5">4.5 S1 판단 기준 <small>v2.2</small></a>
+    <a class="toc-sub" href="#s4-6">4.6 등급 결정 분기표 <small>v2.2</small></a>
+    <a class="toc-sub" href="#s4-7">4.7 S/V/M 앵커 <small>v2.2</small></a>
+    <a href="#s5">05 · 구현 반영 영향</a>
+    <a href="#s6">06 · A안 보조 보존</a>
+    <a class="toc-sub" href="#s6-1">6.1 합산 안 함 — 다른 척도</a>
+    <a class="toc-sub" href="#s6-2">6.2 A안=절대기준·사람 우선</a>
+    <a href="#s7">07 · 결정 상태</a>
+    <a class="toc-sub" href="#s7-1">7.1 수행사 확정</a>
+    <a class="toc-sub" href="#s7-2">7.2 발주처 확인</a>
+    <a class="toc-sub" href="#s7-3">7.3 협조 필요</a>
+    <a href="#s8">08 · 갱신 이력</a>
+  </nav>
+</aside>
+
+</div><!-- article-layout -->
+
+<footer>
+  <strong>KOIPA AI 영업비밀관리시스템</strong> — M3 라벨링 기준 문서 v2.2 · 2026-08-02<br>
+  발주처 정본 가이드(PDF) 기반 적용서 · 수행사 설계 확정본
+</footer>
+
+<script>
+/* TOC active highlight on scroll */
+(function(){
+  const links = document.querySelectorAll('.toc a[href^="#"]');
+  const headings = Array.from(links).map(l => {
+    const id = l.getAttribute('href').slice(1);
+    return { link: l, el: document.getElementById(id) };
+  }).filter(x => x.el);
+
+  function update(){
+    const scrollY = window.scrollY + 100;
+    let cur = headings[0];
+    for(const h of headings){
+      if(h.el.getBoundingClientRect().top + window.scrollY <= scrollY) cur = h;
+    }
+    links.forEach(l => l.classList.remove('active'));
+    if(cur) cur.link.classList.add('active');
+  }
+  window.addEventListener('scroll', update, {passive:true});
+  update();
+})();
+</script>
+
+</body>
+</html>
