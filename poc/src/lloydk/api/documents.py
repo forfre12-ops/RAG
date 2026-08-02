@@ -336,6 +336,27 @@ async def analyze_document(
         + (" · OCR" if ex.ocr_used else "") + (f" · {ex.error}" if ex.error else ""),
         ms=_parse_ms,
     ))
+
+    # [용량 게이트] 분류는 청크 수에 비례한다. 상한을 넘으면 여기서 거절한다 —
+    # 그냥 진행하면 gunicorn --timeout 이 워커를 죽이고 클라이언트는 아무 설명 없이
+    # 빈 응답을 받으며, --workers 1 이면 동시에 처리 중이던 다른 요청도 함께 끊긴다.
+    # 조용히 죽는 것보다 즉시 이유를 말하고 거절하는 편이 낫다. 추출 결과는 이미
+    # 나왔으므로 무엇이 얼마나 컸는지 숫자로 알려준다(문제 진단이 가능해야 한다).
+    _chunk_cap = int(getattr(settings, "analyze_sync_max_chunks", 0) or 0)
+    if _chunk_cap > 0 and len(pre.chunks) > _chunk_cap:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"document too large for synchronous analysis: "
+                f"{len(pre.chunks)} chunks > {_chunk_cap} "
+                f"({len(pre.text):,} chars, {len(extracted_tables)} tables). "
+                f"이 엔드포인트는 진단용 동기 경로라 요청 안에서 분류까지 끝낸다 — "
+                f"청크가 많으면 워커 타임아웃으로 무응답이 된다. "
+                f"대용량 문서는 적재 후 비동기 분류(POST /documents → POST /classify/async)를 쓰거나, "
+                f"배포 처리량을 재고(scripts/probe_ingest_capacity.py) "
+                f"LLOYDK_ANALYZE_SYNC_MAX_CHUNKS 를 조정할 것."
+            ),
+        )
     stages.append(AnalyzeStage(
         name="정규화·PII마스킹", status="done",
         detail=f"콘텐츠품질 {pre.quality:.2f} · 개인정보 {pii_count}건 마스킹",

@@ -661,6 +661,21 @@ class Settings(BaseSettings):
     # 정상 JSON 요청·dryrun/테스트는 통과하게 한다. 환경변수 LLOYDK_MAX_REQUEST_BODY_MB로 조정.
     max_request_body_mb: int = 25
 
+    # --- 동기 분석 경로 청크 상한 (워커 타임아웃 차단) ---
+    # [실측 2026-08-02] /documents/analyze 는 업로드→추출→분류를 한 요청 안에서 끝낸다.
+    # 바이트 상한(max_upload_mb)만으로는 못 막는다 — 문제가 된 .hwp 는 304KB 였는데
+    # 표 47개를 회수하면 본문이 46,473자·청크 155개가 되어 분류에서 60초를 넘겼다.
+    # gunicorn --timeout 60 이 워커를 SIGABRT 로 죽이고, 클라이언트는 아무 설명 없이
+    # 빈 응답(curl: (52) Empty reply from server)을 받는다. --workers 1 이라 그동안
+    # 다른 요청도 함께 끊긴다. 비용 동인은 업로드 크기가 아니라 **청크 수**다.
+    #
+    # 기본값 산정: 2 CPU 컨테이너에서 18청크 45.3초(≈2.5초/청크) 실측. CPU 한도 기본이
+    # 6 으로 올라가(docker-compose.prod.yml) 대략 0.8초/청크가 되므로 60초 예산의 절반을
+    # 안전계수로 두고 40청크(≈10페이지)로 잡는다. 배포 환경의 실제 처리량은
+    # scripts/probe_ingest_capacity.py 로 재고 이 값을 조정할 것.
+    # 0 이하면 검사 비활성(측정·디버깅용).
+    analyze_sync_max_chunks: int = 40
+
     # OCR DoS 가드 — 스캔 PDF 한 건을 OCR할 때 변환·인식할 최대 페이지 수.
     # 수백쪽 스캔본 한 건이 pdf2image/Tesseract를 수십분~OOM으로 모는 것을 차단.
     # 초과 페이지는 변환하지 않고 '잘림' 경고를 남긴다. 0 이하면 무제한(명시적 opt-out).

@@ -122,3 +122,41 @@ class TestAnalyzeContract:
         gate_fired = j["gate"]["requires_review"]
         empty_body = j["parse"]["char_count"] == 0
         assert gate_fired or empty_body, f"손상 문서 미격리: {j['gate']}, chars={j['parse']['char_count']}"
+
+
+class TestSyncChunkCap:
+    """[용량 게이트] 청크 상한 초과 시 조용히 죽지 말고 즉시 이유를 말하고 거절한다.
+
+    실측(2026-08-02 테스트서버) — 304KB .hwp 가 표 47개 회수 후 청크 155개가 되어
+    분류에서 60초를 넘겼고, gunicorn 이 워커를 SIGABRT 로 죽였다. 클라이언트는
+    설명 없는 빈 응답(curl: (52) Empty reply from server)을 받았고, --workers 1 이라
+    동시에 처리 중이던 다른 요청도 함께 끊겼다. 바이트 상한(20MB)으로는 못 막는다 —
+    비용 동인은 업로드 크기가 아니라 청크 수다.
+    """
+
+    def test_over_cap_rejected_with_actionable_413(self, client, monkeypatch):
+        from lloydk.config import settings
+
+        monkeypatch.setattr(settings, "analyze_sync_max_chunks", 1, raising=False)
+        r = _upload(client, _GOLD_DOCX)
+
+        assert r.status_code == 413, r.text
+        d = r.json()["detail"]
+        # 진단 가능해야 한다 — 무엇이 얼마나 컸는지와 다음 행동이 함께 있어야 한다.
+        assert "chunks" in d
+        assert "비동기" in d or "async" in d
+        assert "LLOYDK_ANALYZE_SYNC_MAX_CHUNKS" in d
+
+    def test_under_cap_passes(self, client, monkeypatch):
+        """상한을 넉넉히 두면 기존 경로가 그대로 동작한다(게이트가 정상 문서를 막지 않는다)."""
+        from lloydk.config import settings
+
+        monkeypatch.setattr(settings, "analyze_sync_max_chunks", 100_000, raising=False)
+        assert _upload(client, _GOLD_DOCX).status_code == 200
+
+    def test_zero_disables_gate(self, client, monkeypatch):
+        """0 이하 = 검사 비활성(측정·디버깅용) — 상한 로직이 켜져 있어도 통과해야 한다."""
+        from lloydk.config import settings
+
+        monkeypatch.setattr(settings, "analyze_sync_max_chunks", 0, raising=False)
+        assert _upload(client, _GOLD_DOCX).status_code == 200
