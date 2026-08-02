@@ -28,7 +28,10 @@ RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,xls]"
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 # 비-root 사용자 (보안 하드닝 — Dockerfile.api.prod 와 동일 uid1000). HF 캐시는 non-root 홈에.
-RUN useradd -m -u 1000 lloydk && chown -R lloydk:lloydk /app
+# api.prod 와 동일하게 named 볼륨 마운트 지점을 미리 만들어 uid1000 소유로 둔다. Docker 는
+# **먼저 마운트하는 컨테이너의 이미지**로 빈 볼륨을 초기화하므로, worker 가 api 보다 먼저 뜨면
+# 이 디렉터리가 없어 볼륨이 root 소유로 굳는다(그 뒤 양쪽 다 write 거부).
+RUN useradd -m -u 1000 lloydk && mkdir -p /app/.storage /app/datasets && chown -R lloydk:lloydk /app
 USER lloydk
 ENV HF_HOME=/home/lloydk/.cache/huggingface
 

@@ -61,9 +61,12 @@ RUN pip install --upgrade pip && \
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 # 비-root 사용자 (보안)
-# /app/.storage 를 미리 만들어 uid1000 소유로 둔다 — 원문 저장 named 볼륨이 첫 마운트 때 이 빈 디렉터리
-# 소유권을 물려받아(Docker 볼륨 초기화) 비-root 가 바로 쓸 수 있다(없으면 root 소유로 생성돼 write 거부).
-RUN useradd -m -u 1000 lloydk && mkdir -p /app/.storage && chown -R lloydk:lloydk /app
+# /app/.storage · /app/datasets 를 미리 만들어 uid1000 소유로 둔다 — named 볼륨이 첫 마운트 때
+# 이 빈 디렉터리 소유권을 물려받아(Docker 볼륨 초기화) 비-root 가 바로 쓸 수 있다(없으면 root
+# 소유로 생성돼 write 거부). datasets 는 골든 후보 산출 경로이고 .dockerignore 라 이미지에
+# 내용이 없으므로, 이 mkdir 이 없으면 prod 프로파일에서 골든 빌드가 Permission denied 로
+# 죽는다(2026-08-02 prod 프로파일 실측에서 재현).
+RUN useradd -m -u 1000 lloydk && mkdir -p /app/.storage /app/datasets && chown -R lloydk:lloydk /app
 USER lloydk
 
 EXPOSE 8000
