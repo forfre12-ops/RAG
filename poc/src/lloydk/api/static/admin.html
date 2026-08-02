@@ -498,9 +498,11 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
         <div class="row3">
           <div class="field">
             <label class="fld">후보 소스</label>
-            <select id="gold-source">
+            <select id="gold-source" onchange="syncGoldenSource()">
               <option value="samples">데모 샘플 12종</option>
               <option value="editor">위 §1 분류 패널 본문</option>
+              <option value="upload">파일 업로드(다중)</option>
+              <option value="corpus">서버 코퍼스 경로</option>
             </select>
           </div>
           <div class="field">
@@ -518,12 +520,34 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
             <input id="gold-n" type="number" min="1" max="50" value="8" />
           </div>
         </div>
+        <div id="gold-src-upload" class="field" style="display:none;margin-top:8px;">
+          <label class="fld">문서 파일 — HWP · PDF · DOCX · XLSX · PPTX · TXT (다중 선택)</label>
+          <input id="gold-files" type="file" multiple
+                 accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.txt" />
+          <p class="sec-note" style="margin-top:4px;">각 파일을 <code>POST /documents/analyze</code>(전체 본문)로 추출해 후보 본문으로 씁니다 — 시연 콘솔과 같은 파싱 경로입니다.</p>
+        </div>
+        <div id="gold-src-corpus" class="field" style="display:none;margin-top:8px;">
+          <label class="fld">코퍼스 경로 — <code>datasets/</code> 하위 jsonl 파일 또는 *.json 디렉터리</label>
+          <input id="gold-corpus-dir" type="text" placeholder="datasets/gold_real/candidates.jsonl" />
+          <p class="sec-note" style="margin-top:4px;">서버 파일시스템 경로입니다. <code>datasets/</code> 밖은 샌드박스가 거부합니다.</p>
+        </div>
+
         <div class="btn-row">
           <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;margin-right:auto;">
             <input id="gold-require-evidence" type="checkbox" style="width:auto" checked /> require_evidence
           </label>
           <button class="btn" id="gold-go" onclick="startGoldenBuild()">후보 생성 → 검수</button>
           <button class="btn sec sm" onclick="loadGoldenJob()">상태 새로고침</button>
+        </div>
+
+        <div class="field" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <label class="fld">기존 슬레이트 등록 — 재라벨링 없이 검수·서명만 (<code>POST /golden/jobs/register</code>)</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input id="gold-build-path" type="text" style="flex:1"
+                   placeholder="datasets/gold_real/builds/build_xxxx.jsonl" />
+            <button class="btn sec sm" id="gold-reg" onclick="registerGoldenBuild()">등록</button>
+          </div>
+          <p class="sec-note" style="margin-top:4px;">이미 만들어둔 <code>build_*.jsonl</code>을 그대로 잡으로 올립니다. LLM 재라벨링을 하지 않아 큐레이트된 슬레이트 라벨이 보존됩니다.</p>
         </div>
 
         <div id="gold-progress" class="sec-note" style="margin-top:10px;">아직 생성된 골든셋 후보 잡이 없습니다.</div>
@@ -1043,6 +1067,35 @@ async function loadDashboard(){
  * 종전에는 [생성]→[상태 조회]→[리뷰 열기] 3버튼을 사람이 순서대로 눌러야 했고, job_id 를
  * prompt() 로 되묻는 경로까지 있었다. 여기서는 생성 후 완료까지 자동 폴링하고, 끝나면
  * 요약 카드와 검수/서명 버튼을 스스로 활성화한다(사람 클릭 3회 → 1회). */
+function syncGoldenSource(){
+  const v=($('gold-source')||{}).value;
+  const up=$('gold-src-upload'), co=$('gold-src-corpus');
+  if(up) up.style.display = v==='upload' ? '' : 'none';
+  if(co) co.style.display = v==='corpus' ? '' : 'none';
+}
+/* 업로드 파일 → 기존 파싱 경로(/documents/analyze)로 전체 본문 추출 → inline 후보.
+ * full_text=true 를 주는 이유: 기본 응답의 text_preview 는 8K 절단이라 그대로 후보로 쓰면
+ * 라벨은 전문 기준인데 저장 본문만 잘린 오염된 골든이 만들어진다. */
+async function goldenDocsFromFiles(){
+  const files=Array.from(($('gold-files')||{}).files || []);
+  if(!files.length) return [];
+  const c=cfg(), out=[];
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    goldenProgress(`본문 추출 ${i+1}/${files.length} — ${f.name}`);
+    const fd=new FormData();
+    fd.append('file', f);
+    fd.append('full_text','true');
+    const r=await fetch(`${c.base}/documents/analyze`,
+      {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+    if(!r.ok) throw Object.assign(new Error(`추출 실패: ${f.name}`), {status:r.status});
+    const d=await r.json();
+    const text=(d.text || d.text_preview || '').trim();
+    if(!text){ log(`빈 본문 — 후보에서 제외: ${f.name}`,'err'); continue; }
+    out.push({doc_id:`upload-${Date.now()}-${i}`, title:f.name, text, source:'console_upload'});
+  }
+  return out;
+}
 function goldenDocs(){
   const n = Math.max(1, Math.min(50, Number($('gold-n').value || 8)));
   if(($('gold-source')||{}).value === 'editor'){
@@ -1093,19 +1146,30 @@ function renderGoldenSummary(d){
 }
 async function startGoldenBuild(){
   if(!guardWrite('골든셋 후보 생성')) return;
-  const docs=goldenDocs();
-  if(!docs.length){ goldenProgress('후보로 보낼 본문이 비어 있습니다 — §1 분류 패널에 본문을 넣거나 소스를 "데모 샘플"로 바꾸세요.'); return; }
+  const src=($('gold-source')||{}).value;
   const btn=$('gold-go'); if(btn) btn.disabled=true;
   try{
     const body={
-      source_type:'inline',
-      docs,
       n:Number($('gold-n').value || 8),
       llm_provider:$('gold-provider').value,
       require_evidence:$('gold-require-evidence').checked,
       out_dir:'datasets/gold_real/builds',
       actor:actor()
     };
+    if(src==='corpus'){
+      const dir=($('gold-corpus-dir').value||'').trim();
+      if(!dir){ goldenProgress('코퍼스 경로를 입력하세요 (datasets/ 하위).'); return; }
+      body.source_type='corpus'; body.corpus_dir=dir; body.docs=[];
+    }else{
+      const docs = src==='upload' ? await goldenDocsFromFiles() : goldenDocs();
+      if(!docs.length){
+        goldenProgress(src==='upload'
+          ? '추출된 본문이 없습니다 — 파일을 선택했는지, 빈 문서가 아닌지 확인하세요.'
+          : '후보로 보낼 본문이 비어 있습니다 — §1 분류 패널에 본문을 넣거나 소스를 "데모 샘플"로 바꾸세요.');
+        return;
+      }
+      body.source_type='inline'; body.docs=docs;
+    }
     const d=await api('POST','/golden/build',body);
     LAST_GOLDEN_JOB_ID=d.golden_job_id;
     $('gold-result').textContent=JSON.stringify(d,null,2);
@@ -1115,6 +1179,26 @@ async function startGoldenBuild(){
   }catch(e){
     goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
     $('gold-result').textContent=`골든셋 후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+  }finally{ if(btn) btn.disabled=false; }
+}
+/* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
+ * /golden/build 와 달리 즉시 done 이라 폴링 없이 상태를 한 번만 읽는다. */
+async function registerGoldenBuild(){
+  if(!guardWrite('골든 슬레이트 등록')) return;
+  const path=($('gold-build-path').value||'').trim();
+  if(!path){ goldenProgress('등록할 build 파일 경로를 입력하세요 (datasets/ 하위).'); return; }
+  const btn=$('gold-reg'); if(btn) btn.disabled=true;
+  try{
+    const d=await api('POST','/golden/jobs/register',{build_path:path, actor:actor()});
+    LAST_GOLDEN_JOB_ID=d.golden_job_id;
+    $('gold-result').textContent=JSON.stringify(d,null,2);
+    log(`골든 슬레이트 등록: ${LAST_GOLDEN_JOB_ID} ← ${path}`,'ok');
+    goldenProgress(`등록됨 — job ${LAST_GOLDEN_JOB_ID}`);
+    await loadGoldenJob();
+  }catch(e){
+    const detail=e.data?.detail||e.message||'';
+    goldenProgress(`등록 실패: ${e.status||''} ${detail}${e.status===404?' — 경로가 없거나 datasets/ 밖입니다.':''}`);
+    $('gold-result').textContent=`골든 슬레이트 등록 실패: ${e.status||''} ${detail}`;
   }finally{ if(btn) btn.disabled=false; }
 }
 /* 완료(done/failed)까지 자동 폴링. 상한 40회×1.5s=60s — 넘으면 수동 새로고침으로 넘긴다. */

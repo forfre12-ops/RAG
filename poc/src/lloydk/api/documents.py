@@ -255,6 +255,9 @@ class DocumentAnalysisResponse(BaseModel):
     classification: Optional[AnalyzeClassification] = None
     evidence: list[dict] = []
     text_preview: str = ""
+    # [골든] 절단 없는 전체 추출 본문 — full_text=true 일 때만 채운다. 골든 후보 텍스트로
+    # text_preview(8K 절단)를 쓰면 라벨은 전문 기준인데 저장 본문만 잘려 후보가 오염된다.
+    text: Optional[str] = None
     stages: list[AnalyzeStage] = []
 
 
@@ -262,6 +265,7 @@ class DocumentAnalysisResponse(BaseModel):
 async def analyze_document(
     file: UploadFile = File(...),
     return_evidence: bool = Form(default=True),
+    full_text: bool = Form(default=False),
 ):
     """업로드 문서를 파싱→검수게이트→분류까지 한 번에 돌려 단계별 진단 결과를 반환.
 
@@ -392,6 +396,8 @@ async def analyze_document(
         # 본문 미리보기 — 시연에서 본문 확인용으로 넉넉히(8K자). 분류는 전체 본문으로 수행되며
         # 이 값은 표시 전용. 매우 긴 문서만 말미 절단(응답 비대화 방지).
         text_preview=pre.text[:8000],
+        # 골든 후보 적재처럼 무손실 본문이 필요한 호출만 opt-in(기본 미포함 — 응답 비대화 방지).
+        text=pre.text if full_text else None,
         stages=stages,
     )
 
