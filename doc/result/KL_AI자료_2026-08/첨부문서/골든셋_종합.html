@@ -137,7 +137,7 @@ footer strong{color:var(--text-dim);}
   <p><b>채점</b> : 정답 vs 예측 혼동행렬 → F1-macro + <b>방향성 미탐(FNR_underclass)</b>. 심각도순 <code>TS &lt; S1 &lt; S2 &lt; S3</code>에서 <i>정답보다 낮은 등급으로 예측한 것만</i> 미탐으로 셈(과분류는 보안상 안전오류라 제외). TS&rarr;S3 같은 치명 미탐은 1건만 있어도 critical 알람.</p>
   <p><b>실측(직전 배포본 v4 <code>v-dd3abab9</code> 기준)</b> : 출처직결 라벨(public·nkt)은 F1 0.83·TS/S1 recall&asymp;1.0이지만, 진짜 실문서(llm_judge holdout)는 F1 0.63·<b>S1 recall 0.26~0.32로 붕괴</b>. 운영 미탐 0.018은 모델이 아니라 <b>서빙 룰/게이트</b>(FNR-safe override·most-severe 집계)가 막아낸 값.</p>
   <div class="callout inset"><div class="callout-label">라벨 신뢰도(label_source) — ★★★★★는 0건</div>
-    <p>llm_judge_primary 524 · koipa_case_based 81 · llm_judge_consensus 67 · public_definitive 50 · nkt_designated 36 · codex_review 19 · <b>human_review 0</b>. 등급분포 S3 577 · S2 89 · <b>S1 56 · TS 55(고등급 14%)</b>(2026-07-22 판례-프록시 디오염 후). 정답이 사람검증이 아니라 룰+LLM 합의라 <code>target_grade_oss</code>와 불일치도 존재.</p></div>
+    <p>llm_judge_primary 524 · koipa_case_based 81 · llm_judge_consensus 67 · public_definitive 50 · nkt_designated 30 · codex_review 19 · <b>human_review 1</b>. 등급분포 S3 577 · S2 89 · <b>S1 56 · TS 55(고등급 14%)</b>(2026-07-22 판례-프록시 디오염 후). 정답이 사람검증이 아니라 룰+LLM 합의라 <code>target_grade_oss</code>와 불일치도 존재.</p></div>
 
   <h2>② 검색 골든셋 (retrieval, 80 + NL 190)</h2>
   <p><b>의미</b> : "질의 &rarr; 나와야 할 정답 문서" 쌍(현재 질의당 정답 1건). <code>relevant_doc_ids</code>를 상위 k에 회수하면 성공.</p>

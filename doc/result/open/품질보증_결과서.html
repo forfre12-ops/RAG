@@ -85,14 +85,14 @@ footer strong{color:var(--text-dim);}
   <p class="lede">품질보증계획서(DOC-QA-01)에 정의한 품질활동의 수행 결과. 자동화 시험·인수 검증·결함 조치·정적 품질 게이트의 실측을 정리한다.</p>
 
   <div class="section-sep" id="s01"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">결과 요약</span></div>
-  <div class="kpi-row"><div class="kpi"><div class="n">225</div><div class="l">시험 파일</div></div><div class="kpi"><div class="n">1,804</div><div class="l">lite 회귀 PASS</div></div><div class="kpi"><div class="n">17</div><div class="l">인수 판정</div></div><div class="kpi"><div class="n">39</div><div class="l">결함(조치 37)</div></div></div>
-  <p>lite 회귀 — dependency 완비 환경에서 <b>green</b>(2026-07-30, commit 257bf92: 1,845건 수집 → 1,804 PASS · 44 SKIP · 0 FAIL, 15분 34초). r2 재검증(commit 0af6e75) 동봉 로그는 <b>1,817 PASS · 43 SKIP · 5 FAIL</b>이나, 5건은 전부 해당 실행 환경의 <b>torch 미설치 아티팩트</b>(<code>module 'torch' has no attribute 'tensor'</code> — test_audit_w2_a 4건 · <code>No module named 'torch.nn'</code> — test_calibration_temperature 1건)로 <b>코드 회귀가 아니며 torch 완비 시 green</b>이다. 고등급 미탐 방지 불변식(severity floor)·게이트가 결정론적으로 통과. 결함 39건 중 <b>37건 조치완료·2건 진행</b>. 실 학습모델 정확도·자원(FUN-004)·GPU 실측은 발주기관 제공 모델 기준 release-gate 수행 대상.</p>
+  <div class="kpi-row"><div class="kpi"><div class="n">226</div><div class="l">시험 파일</div></div><div class="kpi"><div class="n">1,804</div><div class="l">lite 회귀 PASS</div></div><div class="kpi"><div class="n">17</div><div class="l">인수 판정</div></div><div class="kpi"><div class="n">39</div><div class="l">결함(조치 37)</div></div></div>
+  <p>lite 회귀 — dependency 완비 환경에서 <b>green</b>(2026-07-30, commit 257bf92: 1,848건 수집 → 1,804 PASS · 44 SKIP · 0 FAIL, 15분 34초). r2 재검증(commit 0af6e75) 동봉 로그는 <b>1,817 PASS · 43 SKIP · 5 FAIL</b>이나, 5건은 전부 해당 실행 환경의 <b>torch 미설치 아티팩트</b>(<code>module 'torch' has no attribute 'tensor'</code> — test_audit_w2_a 4건 · <code>No module named 'torch.nn'</code> — test_calibration_temperature 1건)로 <b>코드 회귀가 아니며 torch 완비 시 green</b>이다. 고등급 미탐 방지 불변식(severity floor)·게이트가 결정론적으로 통과. 결함 39건 중 <b>37건 조치완료·2건 진행</b>. 실 학습모델 정확도·자원(FUN-004)·GPU 실측은 발주기관 제공 모델 기준 release-gate 수행 대상.</p>
 
   <div class="section-sep" id="s02"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">시험 수행 결과</span></div>
   <div class="table-wrap"><table>
     <thead><tr><th>시험 집합</th><th>수집/실행</th><th class="center">결과</th><th>실행 조건</th></tr></thead>
     <tbody>
-      <tr><td><strong>lite 회귀</strong> (CI 기본 게이트)</td><td>1,845 케이스 (총 2,150 중 305 deselect)</td><td class="center"><span class="tag pass">green(완비) · r2 5 FAIL=torch env</span></td><td>CPU 단독·DB/모델 불요</td></tr>
+      <tr><td><strong>lite 회귀</strong> (CI 기본 게이트)</td><td>1,865 케이스 (총 2,168 중 303 deselect)</td><td class="center"><span class="tag pass">green(완비) · r2 5 FAIL=torch env</span></td><td>CPU 단독·DB/모델 불요</td></tr>
       <tr><td><strong>인수(severity floor)</strong></td><td>17건 (<code>test_acceptance_pack.py</code>)</td><td class="center"><span class="tag pass">PASS</span></td><td>전 포맷×등급 샘플팩</td></tr>
       <tr><td>fullstack</td><td>10 파일(52 케이스)</td><td class="center">실 PG/Redis 가용 시 수행, 미가용 자동 skip</td><td>compose 인프라</td></tr>
       <tr><td>slow / gpu / model_download</td><td>34+ 파일</td><td class="center">실 모델·GPU 실측(별도 수행)</td><td>모델·GPU 의존</td></tr>
@@ -116,7 +116,7 @@ footer strong{color:var(--text-dim);}
   </table></div>
   <div class="callout inset"><div class="callout-label">비고</div><p>본 결과서 수치는 <b>2026-07-26 기준 실측</b>이며 시험 자산 증가에 따라 갱신된다. 발주처 환경·실 학습모델 기준 최종 품질 verdict는 인수시험 결과에 따른다(<span class="ph">[발주처 환경 실행 결과]</span>).</p></div>
 
-  <div class="footnote">DOC-QA-02 · 품질보증 결과서 · 근거: poc/tests(225 파일)·make test-lite·결함관리대장·.github/workflows/poc-ci.yml · 2026-07-26</div>
+  <div class="footnote">DOC-QA-02 · 품질보증 결과서 · 근거: poc/tests(226 파일)·make test-lite·결함관리대장·.github/workflows/poc-ci.yml · 2026-07-26</div>
 </article>
 <aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
 <a href="#s01">01 결과 요약</a>
