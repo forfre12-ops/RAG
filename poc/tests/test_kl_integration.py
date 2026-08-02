@@ -349,6 +349,9 @@ class TestCrossCutting:
         assert len(rows) >= 1
         assert any(r.actor_role == "kl_backend" for r in rows)
 
+    # /metrics-prom 은 DB 게이지를 동기 수집하므로 PG 미가용 시 커넥션 타임아웃으로 실패한다.
+    # 같은 클래스의 형제 테스트와 동일하게 가드 — 미기동 환경에서 fail 이 아니라 skip 이어야 한다.
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_prometheus_endpoint_records_kl_calls(self):
         """KL 시나리오 호출이 lloydk_requests_total에 카운트되는지."""
         with TestClient(app) as cli:

@@ -131,7 +131,20 @@ class KeywordAdminService:
                     )
                     for kw in rows
                 ]
-                return KeywordListResponse(keywords=items, count=len(items))
+                warnings: list[str] = []
+                # DB 자체가 비어 있으면 서빙 룰엔진은 코드 시드로 폴백 중이다. '0건'을
+                # '규칙 없음'으로 오해하지 않도록 상태를 명시한다(무음 아님).
+                if db.query(LevelKeyword).limit(1).first() is None:
+                    from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
+
+                    warnings.append(
+                        f"tb_level_keywords is empty — serving rule engine is running on "
+                        f"{len(KEYWORD_SEEDS)} built-in code seeds. 첫 키워드 추가 시 코드 시드가 "
+                        f"DB로 자동 승격됩니다."
+                    )
+                return KeywordListResponse(
+                    keywords=items, count=len(items), warnings=warnings
+                )
         except SQLAlchemyError as exc:
             logger.warning("keyword list db unavailable: %s", exc)
             return KeywordListResponse(
@@ -140,10 +153,14 @@ class KeywordAdminService:
 
     # ── 추가 ──────────────────────────────────────────────────────────────────
     def create(self, req: KeywordCreateRequest) -> KeywordMutationResponse:
+        seeded = 0
         try:
             with session_scope() as db:
                 grade_to_id, _id_to_grade = self._grade_maps(db)
                 factor_to_id, id_to_factor = self._factor_maps(db)
+                # [시드 절벽 차단] 빈 DB에 첫 키워드를 넣기 전에 코드 시드를 먼저 승격.
+                # 이유는 _ensure_seeded 독스트링 참조 — 안 하면 룰 시드가 404→1건으로 붕괴한다.
+                seeded = self._ensure_seeded(db, grade_to_id, factor_to_id)
                 level_id = resolve_grade_id(grade_to_id, req.grade)
                 factor_id, warns = resolve_factor_id(factor_to_id, req.factor)
                 kw = LevelKeyword(
@@ -165,6 +182,11 @@ class KeywordAdminService:
             logger.error("keyword create db failed: %s", exc, exc_info=True)
             raise KeywordAdminError(503, f"db unavailable: {type(exc).__name__}") from exc
 
+        if seeded:
+            warns.append(
+                f"code seeds promoted to DB before first insert: {seeded} rows "
+                "(빈 DB 상태에서 룰엔진이 코드 시드로 폴백 중이었음 — DB를 상위집합으로 승격)"
+            )
         reloaded, seed_count = self._reload_serving()
         return KeywordMutationResponse(
             keyword_id=kid, action="created", item=item,
@@ -229,6 +251,52 @@ class KeywordAdminService:
         )
 
     # ── 내부 ──────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _ensure_seeded(db, grade_to_id: dict[str, int], factor_to_id: dict[str, int]) -> int:
+        """DB 키워드가 0건이면 코드 시드(KEYWORD_SEEDS)를 먼저 적재하고 적재 수를 반환.
+
+        왜 필요한가 — 룰엔진 시드 절벽:
+        build_rule_engine_from_db() 는 load_seeds_from_db() 가 **비어 있지 않으면 그것만**
+        정본으로 쓰고 KEYWORD_SEEDS 를 버린다(폴백은 '0건일 때'만). 따라서 시드되지 않은
+        DB(현장 기본 상태)에 관리 API로 키워드를 1건 추가하면, 그 순간 서빙 룰 시드가
+        404건 → 1건으로 붕괴해 룰 경로 고등급 미탐이 급증한다. 관리 화면의 한 번 클릭이
+        조용한 FNR 회귀를 만드는 경로라 첫 쓰기 시점에 코드 시드를 DB로 승격시켜
+        **DB가 항상 코드 시드의 상위집합**이 되도록 한다.
+
+        멱등: 이미 1건이라도 있으면 아무것도 하지 않고 0을 반환한다. 활성/비활성 무관하게
+        존재 여부로 판단한다(비활성만 남은 상태를 '빈 DB'로 오인해 중복 적재하지 않도록).
+        """
+        if db.query(LevelKeyword).limit(1).first() is not None:
+            return 0
+
+        from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
+
+        inserted = 0
+        for seed in KEYWORD_SEEDS:
+            level_id = grade_to_id.get(seed.get("grade"))
+            if level_id is None:
+                continue  # 활성 등급이 아닌 시드는 건너뜀(등급체계 변경 정합)
+            factor_id = factor_to_id.get(to_canonical_factor(seed.get("factor") or ""))
+            db.add(
+                LevelKeyword(
+                    level_id=level_id,
+                    keyword=str(seed["keyword"]).strip(),
+                    pattern_type=seed.get("pattern_type") or "exact",
+                    factor_id=factor_id,
+                    weight=float(seed.get("weight") or 1.0),
+                    source="seed_v1",
+                    is_active=True,
+                )
+            )
+            inserted += 1
+        db.flush()
+        logger.warning(
+            "keyword admin: DB was empty — promoted %d code seeds to tb_level_keywords "
+            "before first admin insert (rule-engine seed cliff guard)",
+            inserted,
+        )
+        return inserted
+
     @staticmethod
     def _grade_maps(db) -> tuple[dict[str, int], dict[int, str]]:
         levels = (

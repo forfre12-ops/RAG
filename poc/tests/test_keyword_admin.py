@@ -85,6 +85,9 @@ class _FakeQuery:
     def all(self):
         return list(self._rows)
 
+    def first(self):
+        return self._rows[0] if self._rows else None
+
     def one_or_none(self):
         return self._rows[0] if self._rows else None
 
@@ -148,10 +151,60 @@ def test_create_happy_path_maps_ids_and_reloads(monkeypatch):
     assert resp.action == "created"
     assert resp.serving_reloaded is True and resp.seed_count == 42
     # ORM 객체 필드 매핑: 등급 S1→level_id 2, 레거시 factor NON_PUBLICITY→SECRECY(10), trim.
-    added = sess.added[0]
+    # 빈 DB라 코드 시드가 먼저 승격되므로(시드 절벽 가드) 신규 행은 마지막에 추가된다.
+    added = sess.added[-1]
     assert added.level_id == 2 and added.factor_id == 10
     assert added.keyword == "자금계획" and added.source.startswith("admin:")
     assert resp.item.grade == "S1" and resp.item.keyword == "자금계획"
+
+
+# ── 시드 절벽 가드 (룰엔진 404건 → 1건 붕괴 차단) ──────────────────────────────
+def test_create_on_empty_db_promotes_code_seeds_first(monkeypatch):
+    """빈 tb_level_keywords 에 첫 키워드를 넣으면 코드 시드가 먼저 DB로 승격돼야 한다.
+
+    승격이 없으면 build_rule_engine_from_db 가 'DB 비어있지 않음'으로 판단해 DB의 1건만
+    정본으로 삼고 KEYWORD_SEEDS 404건을 통째로 버린다 = 룰 경로 고등급 미탐 급증.
+    """
+    from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+
+    sess = _FakeSession(_levels(), _factors(), [])  # DB 비어 있음
+    _install_fake(monkeypatch, sess)
+    req = KeywordCreateRequest(
+        grade="TS", keyword="신규기밀어", actor=Actor(user_id="admin1", role="admin")
+    )
+    resp = KeywordAdminService().create(req)
+
+    # 활성 등급(TS·S1)에 해당하는 코드 시드가 승격된 뒤 신규 1건이 추가된다.
+    expected_seeds = sum(1 for s in KEYWORD_SEEDS if s["grade"] in {"TS", "S1"})
+    assert expected_seeds > 0
+    assert len(sess.added) == expected_seeds + 1
+    assert sum(1 for o in sess.added if o.source == "seed_v1") == expected_seeds
+    assert sess.added[-1].keyword == "신규기밀어"
+    assert "code seeds promoted" in resp.note
+
+
+def test_create_on_populated_db_does_not_reseed(monkeypatch):
+    existing = LevelKeyword(
+        level_id=1, keyword="극비", pattern_type="exact", factor_id=11,
+        weight=0.9, is_active=True,
+    )
+    existing.keyword_id = 1
+    sess = _FakeSession(_levels(), _factors(), [existing])
+    _install_fake(monkeypatch, sess)
+    resp = KeywordAdminService().create(
+        KeywordCreateRequest(grade="TS", keyword="추가어", actor=Actor(user_id="a", role="admin"))
+    )
+    assert len(sess.added) == 1  # 신규 1건만, 재시드 없음(멱등)
+    assert "code seeds promoted" not in resp.note
+
+
+def test_list_on_empty_db_warns_code_seed_fallback(monkeypatch):
+    sess = _FakeSession(_levels(), _factors(), [])
+    _install_fake(monkeypatch, sess)
+    resp = KeywordAdminService().list()
+    assert resp.count == 0
+    # '0건'을 '규칙 없음'으로 오독하지 않도록 폴백 상태를 명시해야 한다.
+    assert resp.warnings and "code seeds" in resp.warnings[0]
 
 
 def test_create_bad_grade_raises_400(monkeypatch):

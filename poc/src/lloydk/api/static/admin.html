@@ -384,6 +384,68 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
       </div>
     </section>
 
+    <!-- ===== N. 합성 샘플 생성 · 검수 (FUN-003) ===== -->
+    <section class="card col-span">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no">N</span> 합성 샘플 생성 · 검수 → 학습셋 편입</div>
+        <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
+      </div>
+      <div class="card-body">
+        <div class="row3">
+          <div class="field">
+            <label class="fld">목표 등급</label>
+            <select id="sy-grade"></select>
+          </div>
+          <div class="field">
+            <label class="fld">도메인</label>
+            <select id="sy-domain">
+              <option value="mixed">mixed (혼합)</option>
+              <option value="tech">tech (기술)</option>
+              <option value="business">business (영업)</option>
+              <option value="hr">hr (인사)</option>
+              <option value="finance">finance (재무)</option>
+              <option value="legal">legal (법무)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">생성 건수</label>
+            <input id="sy-count" type="number" min="1" max="500" value="5" />
+          </div>
+        </div>
+        <div class="row3" style="margin-top:8px;">
+          <div class="field">
+            <label class="fld">LLM provider</label>
+            <select id="sy-provider">
+              <option value="noop">noop (결정론 · 외부 API 없이)</option>
+              <option value="anthropic">anthropic (Claude)</option>
+              <option value="openai">openai (GPT)</option>
+              <option value="google">google (Gemini)</option>
+              <option value="vllm_qwen">vllm_qwen (온프렘)</option>
+              <option value="vllm_exaone">vllm_exaone (온프렘)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">검수 큐 상태</label>
+            <select id="sy-status" onchange="loadSynthQueue()">
+              <option value="pending">pending (검수 대기)</option>
+              <option value="approved">approved (승인됨)</option>
+              <option value="rejected">rejected (반려됨)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">&nbsp;</label>
+            <div class="btn-row" style="margin:0;">
+              <button class="btn" id="sy-gen" onclick="synthGenerate()">생성 요청</button>
+              <button class="btn sec sm" onclick="loadSynthQueue()">검수 큐 새로고침</button>
+            </div>
+          </div>
+        </div>
+        <div id="sy-info" class="hint"></div>
+        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검수 큐 새로고침」으로 생성된 합성 문서의 검수 대기분을 조회합니다. 승인한 건만 <code>build_training_rows</code>가 학습행으로 편입합니다.</div></div>
+        <p class="sec-note">생성(<code>POST /synth/generate</code>)은 admin·system 권한, 검수(<code>POST /synth/{id}/review</code>)는 admin·reviewer 권한입니다. <b>승인 시 목표등급을 바꾸면</b> <code>corrected_grade</code>로 전송돼 그 등급으로 학습행이 만들어집니다. 생성은 워커 비동기 작업이라 요청 직후 큐가 비어 있을 수 있습니다 — 잠시 후 새로고침하세요. <code>provider=noop</code>은 외부 API 키 없이 결정론 텍스트를 만들며, 위생 게이트가 저품질 출처를 학습에서 하드 배제합니다.</p>
+      </div>
+    </section>
+
     <!-- ===== 3. 재학습 ===== -->
     <section class="card">
       <div class="card-head">
@@ -466,7 +528,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
           <button class="btn sec sm" onclick="loadConfusionMatrix()">혼동행렬</button>
           <button class="btn sec sm" onclick="loadSchema()">등급체계 조회</button>
         </div>
-        <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(3,1fr)"></div>
         <div id="metrics-extra"></div>
         <p class="sec-note"><b>FNR 전체·등급별</b>은 <b>분류기 raw(서빙 안전층 미적용)</b> 수치입니다 — 실제 서빙은 severity-floor·source-prior·escalation 안전층을 거치므로 <b>실효 고등급 미탐은 훨씬 낮습니다</b>(정직 홀드아웃 기준 고등급 미탐 ≈2.8%·TS 미탐 0). <b>정확도</b>가 학습셋과 겹치는 골든 대비면 train-on-test 착시가 있을 수 있고, 미학습 홀드아웃 표본이면 그 일반화 성능입니다(정직 홀드아웃 macro-F1 ≈0.63).</p>
       </div>
@@ -570,6 +632,102 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
         </details>
 
         <p class="sec-note">이 패널은 정본 골든셋을 직접 수정하지 않고 <code>datasets/gold_real/builds</code> 아래 후보 산출물만 만듭니다. locked_gold_eval 승격은 별도 검수·승격 절차가 필요합니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
+    <section class="card col-span">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no">E</span> 등급체계 관리 — 추가 · 변경 · 삭제</div>
+        <span class="ep">GET · PUT /schema/grades</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row">
+          <button class="btn sec sm" onclick="loadGradeEditor()">현재 등급체계 불러오기</button>
+          <button class="btn sec sm" onclick="addGradeRow()">등급 행 추가</button>
+          <button class="btn" id="grade-save" onclick="saveGrades()">변경 저장 (PUT)</button>
+          <span id="grade-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div class="tbl-wrap" style="margin-top:10px;">
+          <table>
+            <thead><tr><th>코드</th><th>명칭</th><th>순서</th><th>설명</th><th>색상</th><th></th></tr></thead>
+            <tbody id="grade-body"><tr><td colspan="6" style="color:var(--text-faint)">「현재 등급체계 불러오기」를 눌러 시작하세요.</td></tr></tbody>
+          </table>
+        </div>
+        <div id="grade-result" style="margin-top:10px;"></div>
+        <p class="sec-note"><b>PUT은 목록 전체를 치환</b>합니다 — 표에서 <b>삭제한 등급은 비활성(소프트 삭제)</b> 처리되고, 기존 분류 이력과 감사 기록은 보존됩니다(하드 삭제 아님). <b>코드 추가·삭제·순서 변경</b>은 학습 라벨 공간이 바뀌므로 응답의 <code>requires_retraining=true</code>로 통지되며, <b>재학습 전까지 배포 모델은 기존 라벨로 추론</b>합니다. 저장 후 등급 캐시(<code>GradeRegistry</code>)가 무효화돼 다음 추론부터 반영됩니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== T. 태깅 키워드 관리 (FUN-023-④) ===== -->
+    <section class="card col-span">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no">T</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴</div>
+        <span class="ep">GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
+      </div>
+      <div class="card-body">
+        <div class="row3">
+          <div class="field">
+            <label class="fld">등급 필터</label>
+            <select id="kw-f-grade"><option value="">전체</option></select>
+          </div>
+          <div class="field">
+            <label class="fld">평가요소 필터</label>
+            <select id="kw-f-factor">
+              <option value="">전체</option>
+              <option value="SECRECY">SECRECY — 비공지성(S)</option>
+              <option value="VALUE">VALUE — 경제적 유용성(V)</option>
+              <option value="MANAGEMENT">MANAGEMENT — 비밀관리성(M)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">표시 범위</label>
+            <select id="kw-f-active">
+              <option value="true">활성만</option>
+              <option value="false">비활성 포함</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn sec sm" onclick="loadKeywords()">키워드 조회</button>
+          <span id="kw-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div id="kw-warn"></div>
+
+        <div class="field" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <label class="fld">키워드 추가 (POST)</label>
+          <div class="row3">
+            <div class="field"><select id="kw-n-grade"></select></div>
+            <div class="field"><input id="kw-n-keyword" type="text" placeholder="키워드 또는 정규식" /></div>
+            <div class="field">
+              <select id="kw-n-pattern">
+                <option value="exact">exact — 부분문자열</option>
+                <option value="regex">regex — 정규식</option>
+                <option value="semantic">semantic — 임베딩 유사</option>
+              </select>
+            </div>
+          </div>
+          <div class="row3" style="margin-top:8px;">
+            <div class="field">
+              <select id="kw-n-factor">
+                <option value="">요소 없음(NULL)</option>
+                <option value="SECRECY">SECRECY — 비공지성(S)</option>
+                <option value="VALUE">VALUE — 경제적 유용성(V)</option>
+                <option value="MANAGEMENT">MANAGEMENT — 비밀관리성(M)</option>
+              </select>
+            </div>
+            <div class="field"><input id="kw-n-weight" type="number" min="0" max="9.99" step="0.05" value="1.0" title="가중치 0 ~ 9.99" /></div>
+            <div class="field"><button class="btn" onclick="createKeyword()">키워드 추가</button></div>
+          </div>
+        </div>
+
+        <div class="tbl-wrap" style="margin-top:10px;">
+          <table>
+            <thead><tr><th>ID</th><th>등급</th><th>키워드</th><th>매칭</th><th>요소</th><th>가중치</th><th>상태</th><th></th></tr></thead>
+            <tbody id="kw-body"><tr><td colspan="8" style="color:var(--text-faint)">「키워드 조회」로 현재 태깅 규칙을 불러옵니다.</td></tr></tbody>
+          </table>
+        </div>
+        <p class="sec-note">변경은 <b>서빙 룰엔진 핫리로드</b>로 재기동 없이 반영됩니다 — 응답의 <code>serving_reloaded</code>가 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code>를 워커 수만큼 호출하거나 롤링 재기동하세요. <b>삭제는 소프트 삭제</b>(<code>is_active=false</code>)이며 FK·감사 이력이 보존됩니다. 가중치 상한은 9.99(<code>Numeric(3,2)</code>)입니다.</p>
       </div>
     </section>
 
@@ -951,13 +1109,13 @@ async function loadMetrics(){
     const d=await api('GET','/metrics/latest');
     LAST_MODEL_VERSION = d.model_version || LAST_MODEL_VERSION;
     const cards=$('metrics-cards');
-    const acc=d.accuracy!=null?(d.accuracy*100).toFixed(1)+'%':'—';
-    const f1=d.f1_macro!=null?(d.f1_macro*100).toFixed(1)+'%':'—';
-    const fnr=d.fnr_overall!=null?(d.fnr_overall*100).toFixed(1)+'%':'—';
+    const pct = v => v!=null ? (v*100).toFixed(1)+'%' : '—';
     cards.innerHTML=`
-      ${metricCard('정확도', acc)}
-      ${metricCard('F1 (macro)', f1)}
-      ${metricCard('FNR 전체', fnr, d.fnr_overall>0.05)}
+      ${metricCard('정확도 Accuracy', pct(d.accuracy))}
+      ${metricCard('정밀도 Precision (macro)', pct(d.precision_macro))}
+      ${metricCard('재현율 Recall (macro)', pct(d.recall_macro))}
+      ${metricCard('F1 (macro)', pct(d.f1_macro))}
+      ${metricCard('FNR 전체', pct(d.fnr_overall), d.fnr_overall>0.05)}
       ${metricCard('표본', d.sample_count??'—')}`;
     const byg=d.fnr_by_grade||{};
     $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 FNR · 모델 ${d.model_version} (측정 ${d.measured_at||'-'})</label>
@@ -971,13 +1129,15 @@ async function loadHistory(){
     const d=await api('GET','/metrics/history');
     const items=d.items||[];
     $('metrics-extra').innerHTML=`<div class="tbl-wrap" style="margin-top:12px"><table>
-      <thead><tr><th>모델</th><th>측정</th><th>정확도</th><th>F1</th><th>FNR</th><th>표본</th></tr></thead>
+      <thead><tr><th>모델</th><th>측정</th><th>정확도</th><th>정밀도</th><th>재현율</th><th>F1</th><th>FNR</th><th>표본</th></tr></thead>
       <tbody>${items.length?items.map(m=>`<tr>
         <td class="mono">${m.model_version}</td><td>${m.measured_at||'-'}</td>
         <td>${m.accuracy!=null?(m.accuracy*100).toFixed(1)+'%':'-'}</td>
+        <td>${m.precision_macro!=null?(m.precision_macro*100).toFixed(1)+'%':'-'}</td>
+        <td>${m.recall_macro!=null?(m.recall_macro*100).toFixed(1)+'%':'-'}</td>
         <td>${m.f1_macro!=null?(m.f1_macro*100).toFixed(1)+'%':'-'}</td>
         <td style="color:${m.fnr_overall>0.05?'var(--red)':'inherit'}">${m.fnr_overall!=null?(m.fnr_overall*100).toFixed(1)+'%':'-'}</td>
-        <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="6" style="color:var(--text-faint)">이력 없음</td></tr>'}</tbody></table></div>`;
+        <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="8" style="color:var(--text-faint)">이력 없음</td></tr>'}</tbody></table></div>`;
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${e.status||''}</div>`; }
 }
 async function loadConfusionMatrix(){
@@ -1301,12 +1461,285 @@ function onAutoChange(){
   }
 }
 
+/* ---- N. 합성 샘플 생성 · 검수 (FUN-003-①⑤⑦) ---- */
+let SYNTH = [];   // /synth/queue 응답 items
+
+async function synthGenerate(){
+  if(!guardWrite('합성 생성')) return;
+  const btn=$('sy-gen'); btn.disabled=true; btn.textContent='요청 중…';
+  try{
+    const body={
+      target_grade: $('sy-grade').value,
+      domain: $('sy-domain').value,
+      count: Math.max(1, Math.min(500, parseInt($('sy-count').value||'5',10)||5)),
+      llm_provider: $('sy-provider').value,
+      actor: actor(),
+    };
+    const d=await api('POST','/synth/generate',body);
+    $('sy-info').textContent=`생성 작업 접수 — job ${d.synth_job_id} · 예상 ${d.expected_count}건 · 예상비용 $${Number(d.estimated_cost_usd||0).toFixed(4)}`;
+    log(`합성 생성 요청: ${body.target_grade}/${body.domain} ${body.count}건 (${body.llm_provider}) → job ${d.synth_job_id}`,'ok');
+  }catch(e){ $('sy-info').textContent=`생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`; }
+  finally{ btn.disabled=false; btn.textContent='생성 요청'; }
+}
+
+async function loadSynthQueue(){
+  const status=$('sy-status').value;
+  try{
+    const d=await api('GET',`/synth/queue?status=${encodeURIComponent(status)}&limit=50`);
+    SYNTH=d.items||[];
+    $('sy-info').textContent=`${status} ${d.total??SYNTH.length}건 (표시 ${SYNTH.length})`;
+    renderSynthQueue();
+  }catch(e){ $('sy-info').textContent=`검수 큐 조회 실패: ${e.status||''}`; }
+}
+
+function renderSynthQueue(){
+  const box=$('sy-queue');
+  const reviewable = $('sy-status').value==='pending';
+  if(!SYNTH.length){ box.innerHTML='<div class="q-empty">해당 상태의 합성 문서가 없습니다. 생성 직후라면 워커 처리까지 잠시 걸립니다.</div>'; return; }
+  box.innerHTML=SYNTH.map((it,i)=>`
+    <div class="q-item">
+      <div class="q-top">
+        <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain?` · <span class="q-title">${esc(it.domain)}</span>`:''}</div>
+        <div>${gradeTag(it.target_grade)}
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
+          ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
+          <span class="pill">${esc(it.review_status)}</span></div>
+      </div>
+      ${it.preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:110px;overflow:auto;white-space:pre-wrap;">${esc(it.preview)}</div>`:''}
+      ${reviewable?`
+      <div class="q-actions">
+        <span style="font-size:11px;color:var(--text-dim)">확정 등급</span>
+        <select id="sy-g-${i}">${ACTIVE_GRADES.map(g=>`<option value="${esc(g)}" ${g===it.target_grade?'selected':''}>${esc(g)}</option>`).join('')}</select>
+        <button class="btn sm" onclick="synthReview(${i},'approve')">승인 → 학습셋</button>
+        <button class="btn sec sm" onclick="synthReview(${i},'reject')">반려</button>
+      </div>`:''}
+    </div>`).join('');
+}
+
+async function synthReview(i, decision){
+  if(!guardWrite('합성 검수')) return;
+  const it=SYNTH[i]; if(!it) return;
+  const chosen=$('sy-g-'+i) ? $('sy-g-'+i).value : it.target_grade;
+  const body={decision, comment:'console synth review', actor:actor()};
+  // 목표등급과 다른 등급으로 승인하면 corrected_grade 로 전송 — 그 등급으로 학습행이 만들어진다.
+  if(decision==='approve' && chosen && chosen!==it.target_grade) body.corrected_grade=chosen;
+  try{
+    const d=await api('POST',`/synth/${encodeURIComponent(it.synth_id)}/review`,body);
+    log(`합성 검수 ${decision}: ${it.synth_id} → ${d.final_status}`+(d.added_to_dataset_version?` · dataset ${d.added_to_dataset_version}`:''),'ok');
+    SYNTH.splice(i,1); renderSynthQueue();
+  }catch(e){ alert('합성 검수 실패: '+(e.data?.detail||e.message)); }
+}
+
+/* ---- E. 등급체계 관리 (FUN-005-①) ---- */
+let GRADE_ROWS = [];        // 편집 중인 행 [{code,name,order,description,color}]
+let GRADE_LOADED_CODES = [];// GET 시점의 활성 코드 — 삭제(비활성) 감지용
+
+async function loadGradeEditor(){
+  try{
+    const d=await api('GET','/schema/grades');
+    GRADE_ROWS=(d.grades||[]).map(g=>({
+      code:g.code||'', name:g.name||'', order:g.order??0,
+      description:g.description||'', color:g.color||'#888888',
+    }));
+    GRADE_LOADED_CODES=GRADE_ROWS.map(g=>g.code);
+    syncActiveGrades(GRADE_LOADED_CODES);
+    $('grade-info').textContent=`활성 ${GRADE_ROWS.length}개 · version ${d.version||'-'}`;
+    $('grade-result').innerHTML='';
+    renderGradeEditor();
+  }catch(e){ $('grade-info').textContent=`조회 실패: ${e.status||''}`; }
+}
+
+function renderGradeEditor(){
+  const body=$('grade-body');
+  if(!GRADE_ROWS.length){ body.innerHTML='<tr><td colspan="6" style="color:var(--text-faint)">등급이 없습니다 — 「등급 행 추가」로 새 체계를 만들 수 있습니다.</td></tr>'; return; }
+  body.innerHTML=GRADE_ROWS.map((g,i)=>`
+    <tr>
+      <td><input class="mono" id="ge-code-${i}" type="text" value="${esc(g.code)}" style="width:88px" placeholder="TS" /></td>
+      <td><input id="ge-name-${i}" type="text" value="${esc(g.name)}" placeholder="특급기밀" /></td>
+      <td><input id="ge-order-${i}" type="number" value="${Number(g.order)||0}" style="width:74px" /></td>
+      <td><input id="ge-desc-${i}" type="text" value="${esc(g.description)}" placeholder="(선택)" /></td>
+      <td><input id="ge-color-${i}" type="text" value="${esc(g.color)}" style="width:96px" placeholder="#7B1FA2" /></td>
+      <td><button class="btn sec sm" onclick="removeGradeRow(${i})">행 삭제</button></td>
+    </tr>`).join('');
+}
+
+function readGradeEditor(){
+  return GRADE_ROWS.map((_,i)=>({
+    code:($('ge-code-'+i).value||'').trim(),
+    name:($('ge-name-'+i).value||'').trim(),
+    order:parseInt($('ge-order-'+i).value||'0',10)||0,
+    description:($('ge-desc-'+i).value||'').trim() || null,
+    color:($('ge-color-'+i).value||'').trim() || null,
+  }));
+}
+
+function addGradeRow(){
+  if(GRADE_ROWS.length) GRADE_ROWS=readGradeEditor();   // 입력 중 값 보존
+  const nextOrder=GRADE_ROWS.reduce((m,g)=>Math.max(m, Number(g.order)||0), 0)+1;
+  GRADE_ROWS.push({code:'', name:'', order:nextOrder, description:'', color:'#888888'});
+  renderGradeEditor();
+}
+
+function removeGradeRow(i){
+  GRADE_ROWS=readGradeEditor();
+  const gone=GRADE_ROWS[i];
+  GRADE_ROWS.splice(i,1);
+  renderGradeEditor();
+  if(gone && gone.code && GRADE_LOADED_CODES.includes(gone.code)){
+    $('grade-info').textContent=`표에서 ${gone.code} 제거됨 — 저장하면 비활성(소프트 삭제) 처리됩니다.`;
+  }
+}
+
+async function saveGrades(){
+  if(!guardWrite('등급체계 변경')) return;
+  const rows=readGradeEditor();
+  // 클라이언트 선검증 — 서버 400 왕복 전에 명확히 알린다.
+  const codes=rows.map(r=>r.code);
+  if(rows.some(r=>!r.code || !r.name)){ alert('코드와 명칭은 모두 필수입니다.'); return; }
+  const dup=codes.find((c,i)=>codes.indexOf(c)!==i);
+  if(dup){ alert(`등급 코드가 중복됩니다: ${dup}`); return; }
+  if(!rows.length){ alert('등급을 0개로 저장할 수 없습니다.'); return; }
+  const removed=GRADE_LOADED_CODES.filter(c=>!codes.includes(c));
+  const added=codes.filter(c=>!GRADE_LOADED_CODES.includes(c));
+  let msg='등급체계를 저장합니다.';
+  if(removed.length) msg+=`\n\n비활성(소프트 삭제)될 등급: ${removed.join(', ')}\n기존 분류 이력은 보존되지만 신규 분류에서 해당 등급은 사라집니다.`;
+  if(added.length) msg+=`\n\n추가될 등급: ${added.join(', ')}\n학습 라벨 공간이 바뀌므로 재학습이 필요합니다.`;
+  if(!confirm(msg)) return;
+
+  const btn=$('grade-save'); btn.disabled=true; btn.textContent='저장 중…';
+  try{
+    const d=await api('PUT','/schema/grades',{grades:rows, actor:actor()});
+    GRADE_ROWS=rows; GRADE_LOADED_CODES=codes;
+    syncActiveGrades(codes);
+    $('grade-result').innerHTML = d.requires_retraining
+      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>등급 구조가 바뀌었습니다. 배포 모델은 <b>재학습 전까지 기존 라벨</b>로 추론합니다. §3 재학습 트리거 → §4 활성화 순서로 진행하세요.</div>`
+      : `<div class="kv"><div><span>저장됨</span> <b>version ${esc(d.version)}</b></div><div><span>재학습</span> <b>불필요</b></div><div><span>사유</span> <b>${esc(d.reason)}</b></div></div>`;
+    $('grade-info').textContent=`저장 완료 · 활성 ${rows.length}개`;
+    log(`등급체계 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
+  }catch(e){ $('grade-result').innerHTML=`<div class="warnbox">저장 실패: ${e.status||''} ${esc(String(e.data?.detail||e.message||''))}</div>`; }
+  finally{ btn.disabled=false; btn.textContent='변경 저장 (PUT)'; }
+}
+
+/* ---- T. 태깅 키워드 관리 (FUN-023-④) ---- */
+let KEYWORDS = [];
+
+async function loadKeywords(){
+  const g=$('kw-f-grade').value, f=$('kw-f-factor').value, act=$('kw-f-active').value;
+  const qs=new URLSearchParams({active_only:act, limit:'500'});
+  if(g) qs.set('grade', g);
+  if(f) qs.set('factor', f);
+  try{
+    const d=await api('GET','/admin/keywords?'+qs.toString());
+    KEYWORDS=d.keywords||[];
+    $('kw-info').textContent=`${d.count??KEYWORDS.length}건`;
+    // DB 미시드/DB 미가용 등 상태 경고는 접어두지 않고 배너로 노출한다(0건을 '규칙 없음'으로 오독 방지).
+    $('kw-warn').innerHTML=(d.warnings&&d.warnings.length)
+      ? `<div class="warnbox" style="margin-top:8px">${d.warnings.map(esc).join('<br/>')}</div>` : '';
+    renderKeywords();
+  }catch(e){ $('kw-info').textContent=`조회 실패: ${e.status||''}`; $('kw-warn').innerHTML=''; }
+}
+
+function renderKeywords(){
+  const body=$('kw-body');
+  if(!KEYWORDS.length){ body.innerHTML='<tr><td colspan="8" style="color:var(--text-faint)">조건에 맞는 키워드가 없습니다.</td></tr>'; return; }
+  body.innerHTML=KEYWORDS.map((k,i)=>`
+    <tr style="${k.is_active?'':'opacity:.55'}">
+      <td class="mono">${k.keyword_id}</td>
+      <td>${gradeTag(k.grade)}</td>
+      <td><input id="kw-k-${i}" type="text" value="${esc(k.keyword)}" /></td>
+      <td><select id="kw-p-${i}">${['exact','regex','semantic'].map(p=>`<option value="${p}" ${p===k.pattern_type?'selected':''}>${p}</option>`).join('')}</select></td>
+      <td><select id="kw-fa-${i}">${['','SECRECY','VALUE','MANAGEMENT'].map(f=>`<option value="${f}" ${f===(k.factor||'')?'selected':''}>${f||'(없음)'}</option>`).join('')}</select></td>
+      <td><input id="kw-w-${i}" type="number" min="0" max="9.99" step="0.05" value="${Number(k.weight)}" style="width:82px" /></td>
+      <td>${k.is_active?'<span class="pill ok">활성</span>':'<span class="pill">비활성</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn sec sm" onclick="patchKeyword(${i})">수정</button>
+        <button class="btn sec sm" onclick="toggleKeyword(${i})">${k.is_active?'비활성':'활성화'}</button>
+      </td>
+    </tr>`).join('');
+}
+
+function noteKeywordReload(d, what){
+  const seed=(d.seed_count!=null)?` · 시드 ${d.seed_count}건`:'';
+  const reload=d.serving_reloaded
+    ? '룰엔진 핫리로드 반영(이 요청을 처리한 워커)'
+    : '⚠ 핫리로드 미반영 — 서빙 반영까지 재기동/다음 리로드 필요';
+  log(`키워드 ${what}: id=${d.keyword_id} action=${d.action} · ${reload}${seed}`, d.serving_reloaded?'ok':'info');
+  $('kw-info').textContent=`${what} 완료 — ${reload}${seed}`;
+}
+
+async function createKeyword(){
+  if(!guardWrite('키워드 추가')) return;
+  const kw=($('kw-n-keyword').value||'').trim();
+  if(!kw){ alert('키워드를 입력하세요.'); return; }
+  const body={
+    grade:$('kw-n-grade').value,
+    keyword:kw,
+    pattern_type:$('kw-n-pattern').value,
+    weight:Math.max(0, Math.min(9.99, parseFloat($('kw-n-weight').value||'1')||1)),
+    actor:actor(),
+  };
+  const f=$('kw-n-factor').value; if(f) body.factor=f;
+  try{
+    const d=await api('POST','/admin/keywords',body);
+    noteKeywordReload(d,'추가');
+    $('kw-n-keyword').value='';
+    loadKeywords();
+  }catch(e){ alert('키워드 추가 실패: '+(e.data?.detail||e.message)); }
+}
+
+async function patchKeyword(i){
+  if(!guardWrite('키워드 수정')) return;
+  const k=KEYWORDS[i]; if(!k) return;
+  const body={
+    keyword:($('kw-k-'+i).value||'').trim(),
+    pattern_type:$('kw-p-'+i).value,
+    factor:$('kw-fa-'+i).value || null,
+    weight:Math.max(0, Math.min(9.99, parseFloat($('kw-w-'+i).value||'1')||0)),
+    actor:actor(),
+  };
+  if(!body.keyword){ alert('키워드는 비울 수 없습니다.'); return; }
+  try{
+    const d=await api('PATCH',`/admin/keywords/${k.keyword_id}`,body);
+    noteKeywordReload(d,'수정');
+    loadKeywords();
+  }catch(e){ alert('키워드 수정 실패: '+(e.data?.detail||e.message)); }
+}
+
+async function toggleKeyword(i){
+  const k=KEYWORDS[i]; if(!k) return;
+  const turningOff=k.is_active;
+  if(!guardWrite(turningOff?'키워드 비활성':'키워드 활성화')) return;
+  if(turningOff && !confirm(`키워드 "${k.keyword}"(id=${k.keyword_id})를 비활성합니다.\n\n하드 삭제가 아니라 소프트 삭제(is_active=false)이며, 감사·FK 이력은 보존됩니다. 룰엔진에서는 즉시 제외됩니다.`)) return;
+  try{
+    const d=await api('PATCH',`/admin/keywords/${k.keyword_id}`,{is_active:!k.is_active, actor:actor()});
+    noteKeywordReload(d, turningOff?'비활성':'활성화');
+    loadKeywords();
+  }catch(e){ alert('상태 변경 실패: '+(e.data?.detail||e.message)); }
+}
+
+/* ---- 등급 목록 동기화 — 등급체계가 DB 주도이므로 셀렉트를 실제 활성 등급으로 채운다 ---- */
+let ACTIVE_GRADES = GRADES.slice();
+function syncActiveGrades(codes){
+  if(Array.isArray(codes) && codes.length) ACTIVE_GRADES=codes.slice();
+  [['sy-grade',false],['kw-f-grade',true],['kw-n-grade',false]].forEach(([id, withAll])=>{
+    const sel=$(id); if(!sel) return;
+    const prev=sel.value;
+    sel.innerHTML=(withAll?'<option value="">전체</option>':'')
+      + ACTIVE_GRADES.map(g=>`<option value="${esc(g)}">${esc(g)}${GRADE_KR[g]?' — '+esc(GRADE_KR[g]):''}</option>`).join('');
+    if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value=prev;
+  });
+}
+
 /* init */
 populateSamples();
+syncActiveGrades();
 checkHealth();
 setAutoStatus('paused');
 log('거버넌스 콘솔 준비 완료. Safe Mode가 켜져 있어 상태 변경 작업은 기본 차단됩니다.','info');
 </script>
+
+<!-- 골든 잡 목록 패널 — 본체는 별도 파일(위 인라인 스크립트의 cfg/api/log/esc 재사용). -->
+<script src="./golden_jobs.js"></script>
 
 </body>
 </html>
