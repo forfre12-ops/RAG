@@ -102,7 +102,7 @@ footer strong{color:var(--text-dim);}
 
   <h1 class="title">합성 코퍼스·프록시 평가 종합 — locked 평가와의 구분</h1>
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #0a0a0a;background:#fff;color:#18181b;font-size:13.5px;line-height:1.65;">
-    <b>2026-08-02 현행 배포본 기준 갱신:</b> 본문의 절대 수치(F1 0.63·0.83, 운영 미탐 0.018 등)는 <b>직전 배포본 v4_clean(<code>v-dd3abab9</code>)</b> 시점 값이다. <b>현행 배포본은 v5_clean(<code>v-fe4b386b</code>)</b>으로 2026-07-29 자동 게이트 3축(경화 홀드아웃 + 공개문서 FPR + 적대 veto) PASS로 승격됐으며, 경화 홀드아웃(n=42) F1_macro <b>0.917</b> · S1 recall <b>0.857</b> · 공개문서(n=400) 과분류 <b>0.79→0.04</b> · high→S3 위험 미탐 <b>0</b>이다(프록시 홀드아웃 109에서는 v5&asymp;v4로 개선을 주장하지 않는다). <b>골든셋 구성·라벨 신뢰도·사람서명 0건이라는 이 문서의 구조적 판단은 v5에서도 그대로 유효하다</b> — 바뀐 것은 분류기이지 정답지가 아니다. 건별 판정 근거는 <a href="골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(v5 카드형·777건 전수)</a> 참조.
+    <b>현행 배포본 = v5_clean(<code>v-fe4b386b</code>) · 2026-08-02 기준:</b> 2026-07-29 자동 게이트 3축(경화 홀드아웃 + 공개문서 FPR + 적대 veto) PASS로 승격됐으며, 경화 홀드아웃(n=42) F1_macro <b>0.917</b> · S1 recall <b>0.857</b> · 공개문서(n=400) 과분류 <b>0.79→0.04</b> · high→S3 위험 미탐 <b>0</b>이다(프록시 홀드아웃 109에서는 v5&asymp;v4로 개선을 주장하지 않는다). <b>골든셋 구성·라벨 신뢰도·사람서명 0건이라는 이 문서의 구조적 판단은 v5에서도 그대로 유효하다</b> — 바뀐 것은 분류기이지 정답지가 아니다. 건별 판정 근거는 <a href="골든셋_분류근거_v5_clean_v-fe4b386b.html">골든셋 분류근거(v5 카드형·777건 전수)</a> 참조.
   </div>
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
     <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
@@ -135,7 +135,8 @@ footer strong{color:var(--text-dim);}
   <h2>① 분류 proxy/holdout — 운영 전 상대비교</h2>
   <p><b>의미</b> : 합성·공개·LLM 라벨로 만든 상대비교용 데이터. 채점 형식은 <code>text</code> + <code>label</code>이지만, 이 label은 locked 평가 진실이 아니라 프록시다.</p>
   <p><b>채점</b> : 정답 vs 예측 혼동행렬 → F1-macro + <b>방향성 미탐(FNR_underclass)</b>. 심각도순 <code>TS &lt; S1 &lt; S2 &lt; S3</code>에서 <i>정답보다 낮은 등급으로 예측한 것만</i> 미탐으로 셈(과분류는 보안상 안전오류라 제외). TS&rarr;S3 같은 치명 미탐은 1건만 있어도 critical 알람.</p>
-  <p><b>실측(직전 배포본 v4 <code>v-dd3abab9</code> 기준)</b> : 출처직결 라벨(public·nkt)은 F1 0.83·TS/S1 recall&asymp;1.0이지만, 진짜 실문서(llm_judge holdout)는 F1 0.63·<b>S1 recall 0.26~0.32로 붕괴</b>. 운영 미탐 0.018은 모델이 아니라 <b>서빙 룰/게이트</b>(FNR-safe override·most-severe 집계)가 막아낸 값.</p>
+  <p><b>실측 — 현행 배포본 v5_clean <code>v-fe4b386b</code></b> : 경화 홀드아웃(n=42, 누출 0) <b>F1_macro 0.917 · S1 recall 0.857</b>, 공개문서(n=400) 과분류 0.79&rarr;<b>0.04</b>, <b>high&rarr;S3 위험 미탐 0</b>. 2026-07-29 자동 게이트 3축(경화 홀드아웃 + 공개문서 FPR + 적대 veto) PASS로 승격.</p>
+  <p style="font-size:13px;color:var(--text-dim);"><b>직전 배포본 v4_clean <code>v-dd3abab9</code>(비교용)</b> : 출처직결 라벨(public·nkt) F1 0.83·TS/S1 recall&asymp;1.0이지만, 진짜 실문서(llm_judge holdout)는 F1 0.63·S1 recall 0.26~0.32로 붕괴. 운영 미탐 0.018은 모델이 아니라 <b>서빙 룰/게이트</b>(FNR-safe override·most-severe 집계)가 막아낸 값. &mdash; 프록시 홀드아웃 109에서는 v5&asymp;v4로, 개선을 주장하지 않는다.</p>
   <div class="callout inset"><div class="callout-label">라벨 신뢰도(label_source) — ★★★★★는 0건</div>
     <p>llm_judge_primary 524 · koipa_case_based 81 · llm_judge_consensus 67 · public_definitive 50 · nkt_designated 30 · codex_review 19 · <b>human_review 1</b>. 등급분포 S3 577 · S2 89 · <b>S1 56 · TS 55(고등급 14%)</b>(2026-07-22 판례-프록시 디오염 후). 정답이 사람검증이 아니라 룰+LLM 합의라 <code>target_grade_oss</code>와 불일치도 존재.</p></div>
 

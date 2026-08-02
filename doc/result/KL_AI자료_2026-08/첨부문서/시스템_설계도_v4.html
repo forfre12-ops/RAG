@@ -164,7 +164,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 <div class="page" id="top">
   <div class="eyebrow">
     <span class="badge">시스템 설계도 v4</span>
-    <span class="badge ghost">2026-07-01 · 안전 골조(게이트=가시성) 하드닝 반영</span>
+    <span class="badge ghost">2026-08-02 기준 · 학습 GPU(지재원 A100 80GB)·운영 추론 CPU · 안전 골조(게이트=가시성) 하드닝 반영</span>
     <span class="dotc">·</span>
     <span class="muted">학습 GPU(지재원 A100) · 추론 CPU · 무반출 · 상용LLM 공개전용 · 차후학습</span>
   </div>
@@ -173,9 +173,9 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     <b>✔ 정본(최신):</b> 본 문서는 시스템 설계도의 <b>현행 정본</b>입니다. v1~v3은 이력본이며 감리 검토 기준은 본 v4입니다.
   </div>
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
-    <b>2026-06-29 운영 전제:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+    <b>운영 전제:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
     <div style="margin-top:9px;padding-top:9px;border-top:1px solid #e4e4e7;">
-    <b>2026-07-01 v4 갱신 — 안전 골조 하드닝:</b> "모델을 더 믿게" 하는 대신 <b>모델을 덜 믿어도 안전하게 운영되는 구조</b>로 강화했다. 핵심 원칙은 <b>"게이트를 켜는 곳마다 그 출력이 어디로 갔는지 보이게"</b>(안전장치 ON = 가시성 ON 한 몸). 안전 게이트 <b>번들 A–F + P0#1~#7</b>을 운영 프로파일에 켜고, 그 발동·비용·작업·드리프트를 <b>한 화면(<code>/admin/dashboard</code>)</b>에서 보이게 했으며, CI 하드게이트·지재원 export/import 런북으로 통제 루프를 영속화했다(§08). 또한 CAPSTONE 실측 — <b>합성-only 학습은 실문서에 일반화 실패(gold_real F1 0.26)</b> — 로 <b>자동화의 유일 레버는 운영 확정 학습</b>임을 확정했다(§04).
+    <b>안전 골조 하드닝:</b> "모델을 더 믿게" 하는 대신 <b>모델을 덜 믿어도 안전하게 운영되는 구조</b>로 강화했다. 핵심 원칙은 <b>"게이트를 켜는 곳마다 그 출력이 어디로 갔는지 보이게"</b>(안전장치 ON = 가시성 ON 한 몸). 안전 게이트 <b>번들 A–F + P0#1~#7</b>을 운영 프로파일에 켜고, 그 발동·비용·작업·드리프트를 <b>한 화면(<code>/admin/dashboard</code>)</b>에서 보이게 했으며, CI 하드게이트·지재원 export/import 런북으로 통제 루프를 영속화했다(§08). 또한 CAPSTONE 실측 — <b>합성-only 학습은 실문서에 일반화 실패(gold_real F1 0.26)</b> — 로 <b>자동화의 유일 레버는 운영 확정 학습</b>임을 확정했다(§04).
     </div>
   </div>
 
@@ -191,7 +191,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     <div class="cell"><div class="v">공개</div><div class="l">상용 LLM 사용 범위</div><div class="s">골든·합성 생성 한정</div></div>
     <div class="cell"><div class="v">CPU</div><div class="l">비밀 분류 핫패스</div><div class="s">분류기+룰, LLM-free</div></div>
   </div>
-  <p class="sec-sub" style="margin-top:6px;">※ 본 설계는 v1(시스템_설계도.html)에서 <b>고객사 로컬 GPU LLM(Qwen) 가정을 제거</b>하고, 학습·골든셋은 지재원 GPU(A100) 모델공장·운영 추론은 CPU로 정리한 갱신본이다. 정확도·미탐 수치는 운영 관리자 확정 라벨이 충분히 쌓인 뒤에만 확정하며, 그 전 수치는 프록시로만 해석한다.</p>
+  <p class="sec-sub" style="margin-top:6px;">※ 정확도·미탐 수치는 운영 관리자 확정 라벨이 충분히 쌓인 뒤에만 확정하며, 그 전 수치는 프록시로만 해석한다.</p>
 
   <!-- 00 핵심 결정 -->
   <section id="s0">
@@ -472,7 +472,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 </script>
 
 <footer>
-  <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 · 2026-07-01 · Lloydk AI Engine · 학습 GPU(지재원 A100)·추론 CPU·무반출 + 분류기·RDB + 안전 골조(게이트=가시성) 하드닝 · 상세 근거는 기술구현 백서 v7 · 설계검토 하드닝 반영 내역</span>
+  <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 · 2026-08-02 · Lloydk AI Engine · 학습 GPU(지재원 A100)·추론 CPU·무반출 + 분류기·RDB + 안전 골조(게이트=가시성) 하드닝 · 상세 근거는 기술구현 백서 v7 · 설계검토 하드닝 반영 내역</span>
   <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa(추론 CPU / 학습 A100 GPU) · KURE-v1 · Optuna · OTel · Docker(폐쇄망)</span>
 </footer>
 </body>

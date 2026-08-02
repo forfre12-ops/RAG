@@ -146,7 +146,7 @@ footer strong{color:var(--text-dim);}
         <tr><td class="center">A3</td><td>운영 확정 기반 성능 기준</td><td class="center"><span class="tag agree">합의</span></td><td>합성/프록시 수치는 참고, 운영 locked 기준 전체 정확도 + 고등급(TS·S1) FNR kill-gate</td></tr>
         <tr><td class="center">A4</td><td>등급 한국어/영문 표시명 확정</td><td class="center"><span class="tag agree">합의</span></td><td>정본 한국어 + 가이드 영문(특급=Confidential)</td></tr>
         <tr><td class="center">A5</td><td>운영 관리자 확정 라벨 포착</td><td class="center"><span class="tag assist">협조</span></td><td>tb_corrections/locked 후보 포착, admission gate, 표본감사에 필수</td></tr>
-        <tr><td class="center">A6</td><td>GPU·서버 사양 확정</td><td class="center"><span class="tag assist">협조</span></td><td>본개발 학습·서빙 사양(PER-002)</td></tr>
+        <tr><td class="center">A6</td><td>GPU·서버 사양 확정</td><td class="center"><span class="tag agree">합의</span></td><td>본개발 학습·서빙 사양(PER-002) — 지재원 학습노드 A100 80GB ×1 · 32 vCore+ · RAM 192GB · Ubuntu 22.04 LTS / 고객사 운영노드 CPU 전용</td></tr>
       </tbody>
     </table>
   </div>
@@ -263,12 +263,11 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <div class="agenda">
-    <div class="agenda-head"><span class="agenda-id">A6</span><span class="agenda-title">GPU·서버 사양 확정</span><span class="tag assist">협조</span></div>
+    <div class="agenda-head"><span class="agenda-id">A6</span><span class="agenda-title">GPU·서버 사양 확정</span><span class="tag agree">합의</span></div>
     <div class="agenda-body">
-      <p>서빙(실시간 추론)·확정 포착(tb_corrections)·locked readiness/kill-gate 운영의 GPU·서버 사양 확정 필요. (PER-002)</p>
-      <p style="font-size:13px;color:var(--text-dim);">※ 환류 방식은 확정 — 고객 교정·원문은 망 내 잔류하고 <b>현장 CPU 야간 증분 재학습</b>으로 그 자리에서 반영, 지재원엔 집계 진단지표만 환류(문서 반출 없음).</p>
-      <div class="agenda-rec"><b>요청:</b> 운영 환경(온프레미스/클라우드)·GPU 등급·동시처리 목표 합의.</div>
-      <div class="decide-box"><span><i class="chk"></i> 온프레미스</span><span><i class="chk"></i> 클라우드</span><span><i class="chk"></i> 추후 확정</span></div>
+      <p>서빙(실시간 추론)·확정 포착(tb_corrections)·locked readiness/kill-gate 운영의 GPU·서버 사양(PER-002)은 <b>확정</b>됐다 — <b>지재원 학습·골든 노드</b> NVIDIA A100 80GB ×1 · 32 vCore+ · RAM 192GB · OS Disk 100GB · Data SSD 4TB · Ubuntu 22.04 LTS, <b>고객사 운영 노드</b>는 CPU 전용(실시간 추론·야간 CPU 증분 재학습, GPU 불요). 상세 준비 항목은 <code>폐쇄망_설치_배포_설계서</code> 사전 준비 표에 따른다.</p>
+      <p style="font-size:13px;color:var(--text-dim);">※ 환류 방식도 확정 — 고객 교정·원문은 망 내 잔류하고 <b>현장 CPU 야간 증분 재학습</b>으로 그 자리에서 반영, 지재원엔 집계 진단지표만 환류(문서 반출 없음).</p>
+      <div class="agenda-rec"><b>확정:</b> 온프레미스 · 학습 GPU = A100 80GB ×1(지재원) · 운영 추론 = CPU 전용(고객사).</div>
     </div>
   </div>
 

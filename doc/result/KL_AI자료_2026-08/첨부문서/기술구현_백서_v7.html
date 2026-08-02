@@ -1158,7 +1158,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <h3>3.1 벡터검색 선정 — PostgreSQL + pgvector</h3>
       <p>RAG 검색(유사 규정·선례 조회, 답변 합성)에는 별도 검색엔진(Elasticsearch) 대신 <b>PostgreSQL + pgvector</b>를 선정했다. 등급 결정은 분류기가 수행하고 벡터검색은 보조(설명·RAG)에 국한되며, 코퍼스 규모가 수천 건이라 분산 검색엔진의 강점이 쓰이지 않기 때문이다. 근거는 5가지다.</p>
       <div class="card-grid col2" style="margin:16px 0;">
-        <div class="card"><div class="card-label">검색 품질 동등 (실 PG 측정)</div><div class="card-desc">dense <b>Recall@5 ≈ ES 하이브리드(BM25+RRF)</b>(당시 bge-m3 측정 0.722=0.722, △+0.000). 하이브리드는 추가 이득 0이면서 약 4배 느림(52→226ms) — ES의 강점이 본 시스템에선 미사용. <b>실 PG 풀스택 측정 완료(2026-06-24, 하이브리드 85%&gt;dense 76%)</b> · 단 쿼리가 합성·LLM 생성이라 실 운영쿼리 모니터는 본개발(현 임베딩 기본=KURE-v1). 검색 모델 선정은 §7.2.</div></div>
+        <div class="card"><div class="card-label">검색 품질 (실 PG 풀스택 측정 · 2026-06-24)</div><div class="card-desc">PostgreSQL + pgvector 단독으로 요구 품질을 충족한다 — <b>하이브리드(dense+ts_rank) 85% &gt; dense 76%</b>. 단 쿼리가 합성·LLM 생성이라 실 운영쿼리 기준 재측정은 본개발 과제다(현 임베딩 기본 = KURE-v1). 검색 모델 선정은 §7.2.</div></div>
         <div class="card"><div class="card-label">컴포넌트 감소 · 정합성</div><div class="card-desc">PostgreSQL은 감사·확정/보정 <b>트랜잭션 때문에 어차피 필수</b> → pgvector는 신규 컴포넌트 0(ES는 무거운 1개 추가). 문서·청크·벡터·분류가 <b>한 ACID</b>로 묶여 이중쓰기 불일치가 사라진다.</div></div>
         <div class="card"><div class="card-label">규모 적합</div><div class="card-desc">골든셋 수천 건 → pgvector HNSW로 sub-100ms(수백만까지 여유). ES의 분산·대규모 강점은 불필요하다.</div></div>
         <div class="card"><div class="card-label">라이선스 · 폐쇄망</div><div class="card-desc">ES Hybrid RRF는 platinum 라이선스가 필요하나 pgvector·PostgreSQL은 오픈 — 폐쇄망 설치·번들이 단순해진다.</div></div>
