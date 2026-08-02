@@ -32,10 +32,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# 납품 대상 — index 의 "외부 링크 없음" 서술이 걸려 있는 곳.
 TARGETS = [
     ROOT / "doc" / "result" / "open",
     ROOT / "doc" / "result" / "KL_AI자료_2026-08",
 ]
+
+# 하드닝 자체는 어느 HTML 에나 안전한 개선(웹폰트 제거 + JS-off 대체 표)이라
+# 동결본을 뺀 doc/ 전체에 적용한다. 납품본과 동명인 구세대 사본이 옆에 남아
+# 검토자를 오도한 사례가 실제로 있었으므로(stale_twins 참조) 사본도 같이 고친다.
+SWEEP_ROOT = ROOT / "doc"
 
 # Google Fonts 를 부르는 <link> 3형태(preconnect 2 + stylesheet 1).
 FONT_LINK = re.compile(
@@ -149,6 +156,39 @@ def harden_evidence_report(path: Path, text: str) -> tuple[str, bool]:
     return text[:idx] + block + text[idx:], True
 
 
+# 과거에 실제로 내보낸 묶음 — 그때 보낸 것이 그것이라는 기록이므로 소급 수정하지 않는다.
+FROZEN = ("doc/releases/", "doc/archive/")
+
+
+def stale_twins() -> list[str]:
+    """납품본과 '같은 파일명'인데 하드닝이 안 된 사본을 찾는다.
+
+    이 검사가 없어서 실제로 오진이 났다 — 검토자가 납품 폴더가 아닌 곳의 동명 파일을
+    열고 "판정근거가 JS 없이는 빈 화면"·"첨부 전체가 웹폰트를 부른다"고 보고했다.
+    납품본은 이미 하드닝돼 있었고 --check 도 통과하고 있었다. 즉 묶음은 멀쩡한데
+    옆에 놓인 구세대 사본이 같은 이름으로 사람을 오도한 것이다.
+
+    releases/·archive/ 는 과거 제출 기록이라 제외한다. 그 밖에서 이름이 겹치면 실패.
+    """
+    delivered = {p.name for base in TARGETS if base.exists() for p in base.rglob("*.html")}
+    out: list[str] = []
+    for p in sorted((ROOT / "doc").rglob("*.html")):
+        rel = p.relative_to(ROOT).as_posix()
+        if p.name not in delivered or any(rel.startswith(f) for f in FROZEN):
+            continue
+        if any(str(p).startswith(str(b)) for b in TARGETS):
+            continue
+        text = io.open(p, encoding="utf-8", errors="ignore").read()
+        why = []
+        if FONT_LINK.search(text):
+            why.append("웹폰트")
+        if looks_js_only(text) and NOSCRIPT_MARK not in text:
+            why.append("JS-off 빈 화면")
+        if why:
+            out.append(f"납품본과 동명인 미하드닝 사본({'·'.join(why)}): {rel}")
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="검사만 — 위반 시 exit 1")
@@ -156,42 +196,51 @@ def main() -> int:
 
     violations: list[str] = []
     changed = 0
-    for base in TARGETS:
-        if not base.exists():
-            continue
-        for p in sorted(base.rglob("*.html")):
-            orig = io.open(p, encoding="utf-8", errors="ignore").read()
-            text, nfont = strip_font_links(orig)
-            text, added = harden_evidence_report(p, text)
-            rel = p.relative_to(ROOT).as_posix()
-            if args.check:
-                if nfont:
-                    violations.append(f"외부 웹폰트 {nfont}건: {rel}")
-                # [중요] added=False 는 "이미 되어 있음"과 "데이터를 못 찾음" 둘 다다.
-                # 후자를 통과시키면 검사가 무의미하므로 JS-only 문서는 별도로 못 박는다.
-                if looks_js_only(orig) and NOSCRIPT_MARK not in orig:
-                    violations.append(f"JS-off 시 빈 화면(대체 표 없음): {rel}")
+    for p in sorted(SWEEP_ROOT.rglob("*.html")):
+        rel = p.relative_to(ROOT).as_posix()
+        if any(rel.startswith(f) for f in FROZEN):
+            continue  # 과거 제출 기록 — 그때 보낸 것이 그것이라는 기록이므로 소급 수정하지 않는다
+        # "외부 참조 0"은 납품본이 문서에 적어 둔 약속이다. 내부 자료의 정상적인
+        # 외부 링크까지 위반으로 세면 검사가 무의미해지므로 그 판정은 납품본에만 건다.
+        delivered = any(str(p).startswith(str(b)) for b in TARGETS)
+
+        orig = io.open(p, encoding="utf-8", errors="ignore").read()
+        text, nfont = strip_font_links(orig)
+        text, added = harden_evidence_report(p, text)
+
+        if args.check:
+            if nfont:
+                violations.append(f"외부 웹폰트 {nfont}건: {rel}")
+            # [중요] added=False 는 "이미 되어 있음"과 "데이터를 못 찾음" 둘 다다.
+            # 후자를 통과시키면 검사가 무의미하므로 JS-only 문서는 별도로 못 박는다.
+            if looks_js_only(orig) and NOSCRIPT_MARK not in orig:
+                violations.append(f"JS-off 시 빈 화면(대체 표 없음): {rel}")
+            if delivered:
                 for m in EXTERNAL.finditer(orig):
-                    violations.append(f"외부 리소스 참조: {rel} ({m.group(0)}…)")
+                    violations.append(f"납품본에 외부 리소스 참조: {rel} ({m.group(0)}…)")
                     break
-                continue
-            if text != orig:
-                io.open(p, "w", encoding="utf-8", newline="").write(text)
-                changed += 1
-                bits = []
-                if nfont:
-                    bits.append(f"웹폰트 {nfont}건 제거")
-                if added:
-                    bits.append("JS-off 정적 표 삽입")
-                print(f"  {rel} — {' · '.join(bits)}")
+            continue
+
+        if text != orig:
+            io.open(p, "w", encoding="utf-8", newline="").write(text)
+            changed += 1
+            bits = []
+            if nfont:
+                bits.append(f"웹폰트 {nfont}건 제거")
+            if added:
+                bits.append("JS-off 정적 표 삽입")
+            print(f"  {rel} — {' · '.join(bits)}")
 
     if args.check:
+        violations.extend(stale_twins())
         if violations:
             print(f"[FAIL] 오프라인 하드닝 위반 {len(violations)}건")
             for v in violations[:20]:
                 print("  -", v)
+            if len(violations) > 20:
+                print(f"  … 외 {len(violations)-20}건")
             return 1
-        print("[OK] 외부 리소스 0 · JS-off 판독 가능")
+        print("[OK] 납품본 외부 리소스 0 · JS-off 판독 가능 · 동명 미하드닝 사본 0")
         return 0
     print(f"\n하드닝 완료 — {changed}개 파일 수정")
     return 0

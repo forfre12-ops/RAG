@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>기능분해도 · 데이터흐름도 | Lloydk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
+<style>
+:root{--bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;--bg-inverse:#09090b;--bg-nav:rgba(255,255,255,.88);--text:#09090b;--text-soft:#52525b;--text-dim:#71717a;--text-faint:#a1a1aa;--border:rgba(0,0,0,.08);--border-mid:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.18);--font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sidebar:220px;--article-max:960px;--container:1360px;}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:5px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap;}
+.article-layout{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar);gap:48px;padding:36px 24px 120px;max-width:var(--container);margin:0 auto;}
+article{min-width:0;max-width:var(--article-max);}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(27px,4vw,40px);font-weight:800;letter-spacing:-.04em;line-height:1.1;margin:0 0 18px;color:var(--text);text-wrap:balance;}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 28px;max-width:720px;}
+h2{font-size:clamp(18px,2.5vw,23px);font-weight:700;letter-spacing:-.03em;margin:10px 0 12px;color:var(--text);}
+h3{font-size:15px;font-weight:700;margin:24px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:36px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:44px 0 18px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout.warn{background:#fffbeb;border-color:#fcd34d;border-left:3px solid #d97706;}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.table-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;} td.nowrap{white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.core{background:var(--text);color:var(--bg);} .tag.sup{background:var(--bg-strong);color:var(--text);border:1px solid var(--border-mid);}
+.tag.opt{background:transparent;color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.p1{background:#dc2626;color:#fff;} .tag.p2{background:#d97706;color:#fff;} .tag.p3{background:var(--bg-strong);color:var(--text);}
+.tag.pass{background:#16a34a;color:#fff;} .tag.todo{background:transparent;color:#d97706;border:1px solid #fbbf24;}
+.ph{background:#fffbeb;border:1px solid #fbbf24;color:#92400e;padding:1px 6px;font-family:var(--font-mono);font-size:11px;font-weight:600;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0;border:1px solid var(--border-mid);margin:18px 0;}
+.kpi{padding:14px 16px;border-right:1px solid var(--border);} .kpi:last-child{border-right:none;}
+.kpi .n{font-family:var(--font-mono);font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);} .kpi .l{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:860px){.article-layout{grid-template-columns:1fr;gap:0;padding:24px 0 80px;}.toc-aside{display:none;}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">분석·기능분해·DFD</span></a>
+  <div class="nav-right"><span class="nav-badge">ANALYSIS</span></div>
+</div></nav>
+<div class="article-layout">
+<article>
+  <div class="meta-row"><span class="badge">DOC-ANL-01</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-07-17</span></div>
+  <h1 class="title">기능분해도 · 데이터흐름도</h1>
+  <p class="lede">담당 6개 기능요건(FUN-003·004·005·022·023·024)을 기능계층으로 분해(FBD)하고, 시스템 경계의 데이터 흐름을 컨텍스트 다이어그램(DFD Level 0)과 주요 처리 흐름(DFD Level 1)으로 도식화한다. 소스 182파일 / 37,684LOC, 6-모듈 파이프라인(M1~M6) 기준.</p>
+  <div class="callout inset"><div class="callout-label">범위 · 기준</div><p>담당 6요건 범위. KL 담당 16요건 및 RAG 질의응답(부가 기능)은 도식 경계 밖으로 두되, 데이터 흐름상 접점만 참조 표기한다.</p></div>
+  <div class="section-sep" id="s1"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">기능분해도(FBD)</span></div>
+<p>담당 6개 기능요건을 <strong>대분류(요건) → 소기능</strong> 2계층으로 분해한다. 대분류 A~F는 각각 파이프라인 모듈 M1~M6에 대응하며, 소기능은 구현 모듈·파일 단위로 추적 가능하도록 식별번호(A1·B1…)를 부여한다.</p><div class="kpi-row"><div class="kpi"><div class="n">6</div><div class="l">담당 기능요건(FUN)</div></div><div class="kpi"><div class="n">M1~M6</div><div class="l">파이프라인 모듈</div></div><div class="kpi"><div class="n">19</div><div class="l">API 라우터</div></div><div class="kpi"><div class="n">21</div><div class="l">DB 테이블(부록A)</div></div></div><h3>기능 트리</h3><pre>영업비밀 자동 등급분류 · RAG 시스템
+├─ A. 학습데이터 구축 ············ FUN-003 (M1 합성)
+│    ├─ A1 합성문서 생성(프롬프트 체인)
+│    ├─ A2 등급 witness 분류체계
+│    └─ A3 라벨 자동화 → 검수 편입
+├─ B. 문서 전처리·청킹 ·········· FUN-022 (M2 전처리)
+│    ├─ B1 텍스트 추출(HWP/DOCX/PDF/XLSX/PPTX…)
+│    ├─ B2 정규화·품질평가
+│    ├─ B3 PII 마스킹
+│    ├─ B4 청킹(split_v2)
+│    └─ B5 저품질·OCR 추출 검수 격리
+├─ C. 가이드 라벨링 ············· FUN-023 (M3 라벨링)
+│    ├─ C1 룰엔진 S·V·M 판독 → 곱셈 등급
+│    ├─ C2 시드 키워드 사전
+│    ├─ C3 LLM 라벨러
+│    └─ C4 합의 게이트(rule × LLM)
+├─ D. 분류모델 학습 ············· FUN-004 (M4 학습)
+│    ├─ D1 KF-DeBERTa 학습(Train/Val/Test 자동분리)
+│    ├─ D2 청크 확장
+│    ├─ D3 RAG 인덱싱
+│    └─ D4 재학습 admission 게이트·잠금
+├─ E. 문서 분류 추론 ············ FUN-005 (M5 추론)
+│    ├─ E1 출처 게이트(source-prior cap) [1단]
+│    ├─ E2 콘텐츠 추론(모델·룰폴백·청크 최고심각) [2단]
+│    ├─ E3 metadata-floor 상향 게이트(ICD R6)
+│    ├─ E4 근거 span 추출
+│    ├─ E5 임시저장 → 검수 라우팅 → 최종확정
+│    └─ E6 등급체계 자체수정(추가·변경·삭제)
+└─ F. 검수·확정·리포트 ·········· FUN-024 (M5·M6)
+     ├─ F1 검수자 큐 다단 게이트
+     ├─ F2 확정·교정(confirm/relabel)
+     ├─ F3 교정 환류·재빌드
+     ├─ F4 심층지표·리포트
+     └─ F5 골든 검수·서명</pre><h3>소기능 분해표</h3><div class="table-wrap"><table><thead><tr><th>기능ID</th><th>소기능</th><th>담당요건</th><th>구현(모듈·파일)</th></tr></thead><tbody><tr><td>A1</td><td>합성문서 생성(프롬프트 체인)</td><td><code>FUN-003</code></td><td><code>m1_synthesis/generator.py</code></td></tr><tr><td>A2</td><td>등급 witness 분류체계</td><td><code>FUN-003</code></td><td><code>m1_synthesis/witness_taxonomy.py</code></td></tr><tr><td>A3</td><td>라벨 자동화 → 검수 편입</td><td><code>FUN-003</code></td><td><code>golden_builder.py</code> · <code>m3/consensus.py</code></td></tr><tr><td>B1</td><td>텍스트 추출(HWP·HWPX·DOCX·PDF·XLSX·XLS·PPTX·TXT·CSV)</td><td><code>FUN-022</code></td><td><code>m2_preprocess/extractor.py</code></td></tr><tr><td>B2</td><td>정규화·품질평가</td><td><code>FUN-022</code></td><td><code>m2_preprocess/normalizer.py</code></td></tr><tr><td>B3</td><td>PII 마스킹</td><td><code>FUN-022</code></td><td><code>m2_preprocess/pii_masker.py</code></td></tr><tr><td>B4</td><td>청킹(split_v2)</td><td><code>FUN-022</code></td><td><code>m2_preprocess/chunker.py</code></td></tr><tr><td>B5</td><td>저품질·OCR 추출 검수 격리</td><td><code>FUN-022</code></td><td><code>document_ingestion_service.py</code></td></tr><tr><td>C1</td><td>룰엔진 S·V·M 판독 → 곱셈 등급</td><td><code>FUN-023</code></td><td><code>m3_labeling/rule_engine.py</code> <code>grade_from_svm()</code></td></tr><tr><td>C2</td><td>시드 키워드 사전</td><td><code>FUN-023</code></td><td><code>m3_labeling/seeds.py</code></td></tr><tr><td>C3</td><td>LLM 라벨러</td><td><code>FUN-023</code></td><td><code>m3_labeling/llm_labeler.py</code></td></tr><tr><td>C4</td><td>합의 게이트(rule × LLM)</td><td><code>FUN-023</code></td><td><code>m3_labeling/consensus.py</code> · <code>judge.py</code></td></tr><tr><td>D1</td><td>KF-DeBERTa 학습(Train/Val/Test 자동분리)</td><td><code>FUN-004</code></td><td><code>m4_training/trainer.py</code></td></tr><tr><td>D2</td><td>청크 확장</td><td><code>FUN-004</code></td><td><code>m4_training/chunk_expand.py</code></td></tr><tr><td>D3</td><td>RAG 인덱싱</td><td><code>FUN-004</code></td><td><code>rag/indexer.py</code>(RagIndexer)</td></tr><tr><td>D4</td><td>재학습 admission 게이트·잠금</td><td><code>FUN-004</code></td><td><code>m6/deploy_gate.py</code> · <code>promotion_service.py</code></td></tr><tr><td>E1</td><td>출처 게이트(source-prior cap) — 1단</td><td><code>FUN-005</code></td><td><code>m5_inference/pipeline.py</code></td></tr><tr><td>E2</td><td>콘텐츠 추론(모델·룰폴백·청크 최고심각) — 2단</td><td><code>FUN-005</code></td><td><code>m5_inference/pipeline.py</code></td></tr><tr><td>E3</td><td>metadata-floor 상향 게이트(ICD R6)</td><td><code>FUN-005</code></td><td><code>m5_inference/pipeline.py</code></td></tr><tr><td>E4</td><td>근거 span 추출</td><td><code>FUN-005</code></td><td><code>m5_inference/pipeline.py</code></td></tr><tr><td>E5</td><td>임시저장 → 검수 라우팅 → 최종확정</td><td><code>FUN-005</code></td><td><code>classify_service.py</code> · <code>confirm_service.py</code></td></tr><tr><td>E6</td><td>등급체계 자체수정(추가·변경·삭제)</td><td><code>FUN-005a</code></td><td><code>schema_admin_service.py</code></td></tr><tr><td>F1</td><td>검수자 큐 다단 게이트</td><td><code>FUN-024</code></td><td><code>classify_service.py</code></td></tr><tr><td>F2</td><td>확정·교정(confirm/relabel)</td><td><code>FUN-024</code></td><td><code>confirm_service.py</code></td></tr><tr><td>F3</td><td>교정 환류·재빌드</td><td><code>FUN-024</code></td><td><code>m6/corrections_rebuild.py</code></td></tr><tr><td>F4</td><td>심층지표·리포트</td><td><code>FUN-024</code></td><td><code>m6/(confusion_matrix·eval_cards·report)</code></td></tr><tr><td>F5</td><td>골든 검수·서명</td><td><code>FUN-024</code></td><td><code>golden_review_html.py</code> · <code>golden_signoff.py</code></td></tr></tbody></table></div><div class="callout inset"><div class="callout-label">횡단 기능(전 대분류 공통)</div><p>안전·거버넌스 <span class="tag sup">SUP</span> 는 특정 요건이 아니라 전 기능에 걸친다: veto/floor 등급 안전판(E1~E3)·kill-gate(배포 차단)·2인 검토(dual-review admission)·감사 hash체인(<code>audit_chain.py</code>, <code>tb_audit_log</code>). RAG 질의응답 <span class="tag opt">OPT</span>(<code>/answer</code>, <code>rag_answer_service.py</code>)은 요건 외 부가로 도식 경계 밖.</p></div>
+<div class="section-sep" id="s2"><span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">데이터흐름도 Level 0 (컨텍스트)</span></div>
+<p>시스템을 단일 프로세스 <code>P0</code>로 보고, 외부 엔티티 3종과 데이터 저장소 3종 사이의 최상위 흐름만 표기한다. 내부 처리 분해는 §03(Level 1)에서 다룬다.</p><h3>컨텍스트 다이어그램</h3><pre> 외부 엔티티                        프로세스
+ ──────────                        ────────
+ [E1 회원사] ──F1 문서원본───────▶ ┌─────────────────┐
+ [E1 회원사] ◀─F2 등급·근거─────── │                 │
+ [E2 KL포털] ──F3 ICD 메타──────▶ │      P0         │
+ [E2 KL포털] ◀─F4 등급조회·통계─── │  영업비밀 등급   │
+ [E3 관리자] ──F5 검수·확정·교정─▶ │  분류 · RAG     │
+ [E3 관리자] ◀─F6 큐·관제·감사──── └────────┬────────┘
+                                           │
+              ┌──────────────┬─────────────┴──────────────┐
+              ▼              ▼                            ▼
+         DS1 PostgreSQL   DS2 벡터스토어              DS3 로컬FS
+         문서·분류·교정·   pgvector                   원본AES암호화·
+         감사 로그         청크 임베딩                추출텍스트·모델</pre><h3>외부 엔티티</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>엔티티</th><th>역할</th><th>인터페이스</th></tr></thead><tbody><tr><td>E1</td><td>회원사</td><td>문서 업로드·분류결과 수신</td><td>HTTP API(폐쇄망 배포)</td></tr><tr><td>E2</td><td>KL 포털</td><td>보안표시·접근범위 메타데이터 제공 · 등급/통계 조회</td><td>KL ICD 연동 규약</td></tr><tr><td>E3</td><td>관리자(지재원)</td><td>검수·확정·교정·거버넌스(RBAC reviewer/admin)</td><td>거버넌스 관제콘솔 · 골든 검수화면</td></tr></tbody></table></div><h3>Level 0 데이터 흐름</h3><div class="table-wrap"><table><thead><tr><th>흐름</th><th>내용</th><th>방향</th><th>매체 / 계약</th></tr></thead><tbody><tr><td>F1</td><td>문서 원본(파일)</td><td>E1 → P0</td><td>HTTP 업로드</td></tr><tr><td>F2</td><td>분류 등급 · 근거 · 신뢰도</td><td>P0 → E1</td><td>분류 응답 API</td></tr><tr><td>F3</td><td>보안표시·접근범위(<code>security_marking</code>·<code>access_scope</code>)</td><td>E2 → P0</td><td>KL ICD R6(opt-in)</td></tr><tr><td>F4</td><td>등급 조회 · 통계</td><td>P0 → E2</td><td>조회 API</td></tr><tr><td>F5</td><td>검수·확정·교정·거버넌스 지시</td><td>E3 → P0</td><td>관제콘솔 · <code>/confirm</code>·<code>/relabel</code></td></tr><tr><td>F6</td><td>검수큐 · 관제 지표 · 감사 로그</td><td>P0 → E3</td><td>관제콘솔 · 감사 조회</td></tr></tbody></table></div><h3>데이터 저장소</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>저장소</th><th>기술</th><th>저장 내용</th></tr></thead><tbody><tr><td>DS1</td><td>PostgreSQL</td><td>PG(21테이블·부록A)</td><td>문서·청크·분류·근거·교정·감사·모델버전</td></tr><tr><td>DS2</td><td>벡터스토어</td><td>pgvector(폐쇄망)</td><td>청크 임베딩(RAG 검색 인덱스)</td></tr><tr><td>DS3</td><td>로컬FS</td><td>LocalStorage(file://)</td><td>원본(AES-256-GCM 암호화)·추출텍스트·모델 아티팩트</td></tr></tbody></table></div><div class="callout warn"><div class="callout-label">경계 조건</div><p>F3(ICD R6 메타데이터) 흐름은 KL 인터페이스 필드 합의 확정 전까지 <code>metadata_floor_enabled</code> opt-in OFF 상태이며, 발주처·KL 명세 확정이 활성 전제다(<span class="ph">[발주처 입력]</span> — R6 필드·신뢰 범위).</p></div>
+<div class="section-sep" id="s3"><span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">데이터흐름도 Level 1</span></div>
+<p><code>P0</code>를 7개 하위 프로세스(<code>P1</code>~<code>P7</code>)로 분해한다. 감리 관점 <strong>주 처리 경로</strong>는 <code>F1→P1→F3→P2→F5→P3→F6/F7→P4→F10→F12→P5</code>(문서업로드 → M2추출 → M5분류 → 검수큐 → 관리자확정 → 교정 → M4재학습)이며, 각 단계마다 안전장치가 배치된다.</p><h3>Level 1 다이어그램</h3><pre>[E1 회원사] ─F1 문서원본─▶ ┌────────────────┐ ─F2 추출텍스트·청크─▶ [DS-FS 로컬FS]
+                           │ P1 수집·전처리  │ ─F14 청크 임베딩───▶ [DS-VEC 벡터]
+                           │ (FUN-022·M2)   │
+                           └───────┬────────┘
+                                   │ F3 정규화텍스트
+[E2 KL포털] ─F4 ICD 메타─▶ ┌───────▼────────┐ ◀─F15 RAG 컨텍스트─ [DS-VEC 벡터]
+                           │ P2 분류 추론    │
+                           │ (FUN-005·M5)   │
+                           └───────┬────────┘
+                                   │ F5 예측등급·근거·conf
+                           ┌───────▼────────┐ ─F6 분류행(staging/needs_review)─▶ [DS2 분류·근거]
+                           │ P3 검수 라우팅  │
+                           │ (FUN-024)      │
+                           └───────┬────────┘
+                                   │ F7 검수큐
+[E3 관리자] ─F8 확정·교정─▶ ┌───────▼────────┐ ─F9 상태갱신(confirmed/corrected)─▶ [DS2]
+                           │ P4 검수·확정    │ ─F10 교정 레코드─────────────────▶ [DS3 교정]
+                           │ (FUN-024·005)  │
+                           └───────┬────────┘
+                                   │ F12 미소비 교정
+                           ┌───────▼────────┐ ─F13 모델버전(잠금·admission)────▶ [DS-FS 모델]
+                           │ P5 교정환류·재학습
+                           │ (FUN-004·M4)   │
+                           └────────────────┘
+
+  [DS2·DS3·DS4] ─F16 지표·리포트─▶ [P7 지표·거버넌스(M6)] ─▶ [E3 관리자]
+  * F11 감사 이벤트 : P2·P3·P4·P5 → [DS4 감사 hash체인(tb_audit_log)]</pre><h3>프로세스 명세</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>프로세스</th><th>요건</th><th>구현</th><th>입력 → 출력</th></tr></thead><tbody><tr><td>P1</td><td>수집·전처리</td><td><code>FUN-022</code></td><td><code>document_ingestion_service</code> · M2 pipeline</td><td>문서원본 → 추출텍스트·청크</td></tr><tr><td>P2</td><td>분류 추론</td><td><code>FUN-005</code></td><td><code>m5_inference/pipeline</code> · <code>classify_service</code></td><td>정규화텍스트+메타 → 예측등급·근거</td></tr><tr><td>P3</td><td>검수 라우팅</td><td><code>FUN-024</code></td><td><code>classify_service</code> 다단 게이트</td><td>예측 → status(staging/needs_review)</td></tr><tr><td>P4</td><td>검수·확정</td><td><code>FUN-024·005</code></td><td><code>confirm_service</code> · <code>golden_signoff</code></td><td>확정지시 → confirmed/corrected·교정</td></tr><tr><td>P5</td><td>교정환류·재학습</td><td><code>FUN-004</code></td><td><code>corrections_rebuild</code> · M4 trainer</td><td>미소비교정 → 학습셋·모델버전(잠금)</td></tr><tr><td>P6</td><td>인덱싱·검색 <span class="tag opt">OPT</span></td><td>부가(RAG)</td><td><code>rag/indexer</code> · <code>retrieval</code></td><td>청크 → 임베딩·RAG 컨텍스트</td></tr><tr><td>P7</td><td>지표·거버넌스</td><td><code>FUN-024</code></td><td><code>m6_evaluation</code> · admin 콘솔</td><td>분류·교정·감사 → 지표·리포트</td></tr></tbody></table></div><h3>Level 1 데이터 흐름</h3><div class="table-wrap"><table><thead><tr><th>흐름</th><th>내용</th><th>From → To</th><th>저장 / 트리거</th></tr></thead><tbody><tr><td>F1</td><td>문서 원본(파일)</td><td>E1 → P1</td><td>HTTP 업로드</td></tr><tr><td>F2</td><td>추출텍스트·청크</td><td>P1 → DS-FS / DS1</td><td>원본 AES 암호화 저장 · <code>tb_chunks</code></td></tr><tr><td>F3</td><td>정규화텍스트(+PII 마스킹)</td><td>P1 → P2</td><td>in-proc</td></tr><tr><td>F4</td><td>ICD 메타데이터</td><td>E2 → P2</td><td><code>security_marking</code>·<code>access_scope</code>(opt-in)</td></tr><tr><td>F5</td><td>예측등급·근거·신뢰도</td><td>P2 → P3</td><td>in-proc</td></tr><tr><td>F6</td><td>분류행(staging / needs_review)</td><td>P3 → DS2</td><td><code>tb_classifications</code></td></tr><tr><td>F7</td><td>검수큐</td><td>DS2 → E3</td><td>GET <code>/review-queue</code></td></tr><tr><td>F8</td><td>확정·교정 지시</td><td>E3 → P4</td><td><code>/confirm</code> · <code>/relabel</code></td></tr><tr><td>F9</td><td>상태 갱신(confirmed / corrected)</td><td>P4 → DS2</td><td><code>tb_classifications.status</code></td></tr><tr><td>F10</td><td>교정 레코드</td><td>P4 → DS3</td><td><code>tb_corrections</code></td></tr><tr><td>F11</td><td>감사 이벤트</td><td>P2·P3·P4·P5 → DS4</td><td><code>tb_audit_log</code>(hash체인)</td></tr><tr><td>F12</td><td>미소비 교정</td><td>DS3 → P5</td><td><code>corrections_rebuild</code></td></tr><tr><td>F13</td><td>모델버전(잠금·admission)</td><td>P5 → DS-FS</td><td><code>tb_model_versions</code>(재학습 잠금)</td></tr><tr><td>F14</td><td>청크 임베딩</td><td>P1 → DS-VEC</td><td>pgvector 인덱싱</td></tr><tr><td>F15</td><td>RAG 컨텍스트</td><td>DS-VEC → P2</td><td>근거 보강(옵션)</td></tr><tr><td>F16</td><td>지표·리포트</td><td>DS2·DS3·DS4 → P7 → E3</td><td>관제 콘솔</td></tr></tbody></table></div><h3>Level 1 데이터 저장소</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>저장소</th><th>기술</th><th>내용</th></tr></thead><tbody><tr><td>DS1</td><td>문서·청크</td><td>PG</td><td><code>tb_documents</code> · <code>tb_chunks</code></td></tr><tr><td>DS2</td><td>분류·근거</td><td>PG</td><td><code>tb_classifications</code> · <code>tb_classification_evidence</code></td></tr><tr><td>DS3</td><td>교정</td><td>PG</td><td><code>tb_corrections</code></td></tr><tr><td>DS4</td><td>감사 hash체인</td><td>PG</td><td><code>tb_audit_log</code></td></tr><tr><td>DS-VEC</td><td>벡터스토어</td><td>pgvector</td><td>청크 임베딩</td></tr><tr><td>DS-FS</td><td>로컬FS</td><td>file://</td><td>원본 AES암호화·추출텍스트·모델 아티팩트</td></tr></tbody></table></div><div class="callout inset"><div class="callout-label">주 경로 안전장치</div><p>① P3에서 저신뢰·희소근거·cap-conflict·access-conflict 신호는 신뢰도와 무관하게 <code>needs_review</code>로 격리(자동확정 차단). ② P1 저품질·OCR 추출 문서는 <code>processing_status</code>로 격리되어 자동분류 우회 불가. ③ P5 재학습은 admission 게이트(사람검수+확정) 통과 교정만 반영하며, 자동 활성은 잠금(<code>retrain_auto_activate=False</code>). ④ P2·P3·P4·P5 전 상태전이는 F11로 감사 hash체인에 기록.</p></div>
+  <div class="footnote">DOC-ANL-01 · 분석 산출물(기능분해도·DFD) · 근거: RTM(FUN-003·004·005·022·023·024) · 소스 poc/src/lloydk(M1~M6) · DB 부록A</div>
+</article>
+<aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
+<a href="#s1">01 기능분해도(FBD)</a>
+<a href="#s2">02 데이터흐름도 Level 0</a>
+<a href="#s3">03 데이터흐름도 Level 1</a>
+</nav></aside>
+</div>
+<footer><strong>로이드케이</strong> · 기능분해도 · 데이터흐름도 (DOC-ANL-01) · 감리 대응 산출물</footer>
+<script>
+(function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}
+window.addEventListener('scroll',o,{passive:true});o();})();
+</script>
+</body></html>

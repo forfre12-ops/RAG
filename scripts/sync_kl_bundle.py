@@ -93,14 +93,61 @@ def main() -> int:
     for n in orphan:
         print("고아(정리 후보):", n)
 
+    # [전달 검증] 내용이 정합해도 열람 환경에서 깨지면 소용없다. 실제로 두 건이 있었다 —
+    # 첨부 26종 전부가 외부 웹폰트를 부르는데 index 는 "외부 링크 없음"이라 적혀 있었고,
+    # 판정근거 보고서는 JS 를 끄면 "조건에 맞는 문서가 없습니다"만 남았다(요청 3 핵심 산출물이
+    # '근거 없음'으로 읽힘). 링크·수치만 보는 검사로는 둘 다 안 잡혀 발송 게이트에 함께 건다.
+    offline = _offline_violations()
+    for v in offline:
+        print("전달 결함:", v)
+
     total = sum(f.stat().st_size for f in ATTACH.iterdir() if f.is_file()) / 1048576
     print(f"\n첨부문서/ {len(present)}종 · {total:.1f} MB · "
-          f"누락 {len(missing)} · 깨진 링크 {len(broken)} · 고아 {len(orphan)}")
-    if missing or broken:
-        print("→ 발송 불가: 누락/깨진 링크 해소 필요")
+          f"누락 {len(missing)} · 깨진 링크 {len(broken)} · 고아 {len(orphan)} · "
+          f"전달 결함 {len(offline)}")
+    if missing or broken or offline:
+        print("→ 발송 불가: 누락/깨진 링크/전달 결함 해소 필요"
+              " (전달 결함은 scripts/harden_bundle_offline.py 로 일괄 수정)")
         return 1
-    print("→ 발송 가능(자체 완결·링크 완결)" + (" · 고아 파일 검토 권장" if orphan else ""))
+    print("→ 발송 가능(자체 완결·링크 완결·오프라인 판독 가능)"
+          + (" · 고아 파일 검토 권장" if orphan else ""))
     return 0
+
+
+def _offline_violations() -> list[str]:
+    """오프라인/JS-off 판독 검사를 발송 게이트로 끌어온다.
+
+    검사 로직은 harden_bundle_offline.py 한 곳에만 두고 여기서는 호출만 한다 —
+    규칙이 두 벌이 되면 반드시 어긋난다. 모듈을 못 불러오면 조용히 통과시키지 않고
+    그 사실 자체를 결함으로 보고한다. 검사기가 죽은 것을 '이상 없음'으로 읽는 사고가
+    이 프로젝트에서 이미 두 번 있었다(외부 URL 을 건너뛴 링크검사, 데이터 형태를
+    못 찾고 OK 를 낸 하드닝 검사).
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "harden_bundle_offline", ROOT / "scripts" / "harden_bundle_offline.py"
+    )
+    if spec is None or spec.loader is None:
+        return ["오프라인 하드닝 검사기를 불러오지 못함(scripts/harden_bundle_offline.py)"]
+    try:
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except Exception as exc:  # noqa: BLE001
+        return [f"오프라인 하드닝 검사기 로드 실패: {type(exc).__name__}: {exc}"]
+
+    out: list[str] = []
+    for p in sorted(KL.rglob("*.html")):
+        text = p.read_text(encoding="utf-8", errors="replace")
+        rel = p.relative_to(KL).as_posix()
+        if mod.FONT_LINK.search(text):
+            out.append(f"외부 웹폰트 참조: {rel}")
+        elif mod.EXTERNAL.search(text):
+            out.append(f"외부 리소스 참조(index 의 '외부 링크 없음'과 상충): {rel}")
+        if mod.looks_js_only(text) and mod.NOSCRIPT_MARK not in text:
+            out.append(f"JS-off 시 빈 화면(대체 표 없음): {rel}")
+    out.extend(mod.stale_twins())
+    return out
 
 
 if __name__ == "__main__":
