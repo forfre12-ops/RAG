@@ -59,9 +59,9 @@ a{color:#0a0a0a}
     <div class="meta">다수 기업(폐쇄망) 배포 관점 · 2026-08-02 · 권위 목록은 SBOM(CycloneDX) 산출</div>
   </div>
 
-  <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음(기본 구성).</b> 폐쇄망 <b>기본 스택은 permissive 중심</b>(PostgreSQL/BSD/MIT/Apache)이며, DB 드라이버(psycopg) 1건만 <b>LGPL-3.0(약한 copyleft)</b>이나 파이썬 동적 링크라 <b>재배포는 자유</b>·라이선스 고지만 하면 됩니다. 강한 copyleft(AGPL·GPL) 구성요소는 <b>배포본에서 전부 제외</b>이며, 필요한 경우에만 <b>옵트인 + 프로세스 격리</b>로 경계를 국한합니다.</div>
+  <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음.</b> 배포 스택은 <b>permissive 중심</b>(PostgreSQL/BSD/MIT/Apache)이며, DB 드라이버(psycopg) 1건만 <b>LGPL-3.0(약한 copyleft)</b>이나 파이썬 동적 링크라 <b>재배포는 자유</b>·라이선스 고지만 하면 됩니다. 강한 copyleft(AGPL·GPL·SSPL) 구성요소는 <b>배포 이미지에 설치되지 않습니다</b>(§2).</div>
 
-  <h2>1. 기본 스택 라이선스 (permissive 중심 · LGPL 1건)</h2>
+  <h2>1. 배포 구성요소 라이선스 (permissive 중심 · LGPL 1건)</h2>
   <table>
     <thead><tr><th>구성요소</th><th style="width:130px">라이선스</th><th style="width:70px">유형</th></tr></thead>
     <tbody>
@@ -77,19 +77,8 @@ a{color:#0a0a0a}
     </tbody>
   </table>
 
-  <h2>2. 강한 카피레프트(AGPL·GPL) 처리 — 배포본 제외·격리</h2>
-  <table>
-    <thead><tr><th style="width:150px">구성요소</th><th style="width:90px">라이선스</th><th>처리 방식</th></tr></thead>
-    <tbody>
-      <tr><td>PyMuPDF (PDF)</td><td><span class="tag copyleft">AGPL-3.0</span></td><td><b>기본 제외.</b> 옵션 <code>[pdf-agpl]</code>로만 옵트인. 기본 PDF 추출은 pdfminer.six(MIT)</td></tr>
-      <tr><td>pyhwp (HWP 표 셀) <b>— 제거됨</b></td><td><span class="tag copyleft">AGPLv3+</span></td><td><b>의존성 자체를 삭제(2026-08-01).</b> HWP 표 셀 회수를 AGPL 없이 얻기 위해 대체 후보를 실측 비교한 결과 <code>unhwp</code>(MIT)로 교체했고, 소스·<code>uv.lock</code> 양쪽에서 pyhwp가 0건임을 확인했다. 이로써 <code>[hwp-tables]</code>는 AGPL 옵트인이 아니라 <b>기본 배포에 포함되는 MIT 구성요소</b>가 되었다. 검증: unhwp 네이티브(Rust)에 카피레프트 문자열 0건, 동봉 크레이트 29종 전수가 MIT/Apache-2.0/Unlicense/Zlib, 기존 AGPL 구현(pyhwp·hwp.js·hwplib) 파생 흔적 0건</td></tr>
-      <tr><td>MinIO (객체 스토리지)</td><td><span class="tag copyleft">AGPL-3.0</span></td><td><b>폐쇄망 미사용</b>(로컬 파일시스템). 옵션 <code>[minio]</code>는 클라우드(CSAP) 티어 전용 → AGPL 이슈 해소. (파이썬 클라이언트는 Apache-2.0, AGPL은 서버 바이너리)</td></tr>
-      <tr><td>poppler-utils (OCR용 PDF→이미지)</td><td><span class="tag copyleft">GPL-2/3</span></td><td><b>배포 이미지에서 제외</b>(2026-08). OCR은 요건 외(FUN-022=전자문서 텍스트추출뿐)라 배포본에 <code>[ocr]</code>·<code>poppler-utils</code> 미포함 → GPL 반출 소거. OCR 코드·옵션은 리포에 존치(옵트인). 참고: Tesseract는 Apache-2.0</td></tr>
-      <tr><td>Elasticsearch (검색엔진)</td><td><span class="tag copyleft">SSPL/Elastic</span></td><td><b>배포·의존성 미포함.</b> 검색을 PostgreSQL(pgvector + bigram ts_rank)로 통합해 SSPL(비-OSI·소스공개 의무)을 회피 — 레거시 어댑터 코드만 존치, 설치하지 않음</td></tr>
-    </tbody>
-  </table>
-
-  <div class="note warn"><b>다중배포 시 유의점.</b> 강한 copyleft <b>AGPL 2종</b>(<code>[pdf-agpl]</code>/PyMuPDF · <code>[minio]</code>)과 <b>GPL</b>(<code>[ocr]</code>/poppler-utils)은 폐쇄망 배포 프로파일에 <b>포함하지 않습니다</b>. <code>[hwp-tables]</code>는 2026-08-01 pyhwp(AGPL) → unhwp(MIT) 교체로 <b>더 이상 copyleft가 아니며</b>, 프로세스 격리나 AGPL 수용 확인 절차 없이 <b>기본 배포에 포함</b>합니다(위 표 참조). psycopg(LGPL)는 배포 대상이나 동적 링크·라이선스 고지로 다중배포에 지장 없습니다. <b>권위 목록은 SBOM(CycloneDX)로 최종 확정</b>합니다.</div>
+  <h2>2. 배포 범위 고정 — 카피레프트 반출 경로 없음</h2>
+  <div class="note">배포 이미지가 설치하는 extras는 <code>[psh, otel, jwt, hwp, hwp-tables, xls]</code>로 고정돼 있습니다(<code>Dockerfile.api.prod</code>). 이 범위 밖의 선택 구성 — <b>PyMuPDF</b>(AGPL-3.0) · <b>MinIO 서버</b>(AGPL-3.0) · <b>poppler-utils</b>(GPL-2/3, OCR용) — 과 레거시 <b>Elasticsearch</b>(SSPL) 어댑터는 <b>소스에 옵션으로만 존재하고 배포본에 설치되지 않아</b> AGPL·GPL·SSPL 반출 경로가 없습니다. 배포되는 유일한 copyleft는 psycopg(LGPL-3.0)이며 동적 링크·고지로 다중배포에 지장 없습니다. <b>권위 목록은 SBOM(CycloneDX)으로 최종 확정</b>합니다.</div>
 
   <h2>3. 상용 LLM · 외부 API</h2>
   <ul>
