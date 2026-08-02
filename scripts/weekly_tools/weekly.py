@@ -10,7 +10,7 @@ weekly.py — 매주 WBS/주간보고 갱신 CLI
   python -m scripts.weekly_tools.weekly read-report
   python -m scripts.weekly_tools.weekly new-week
 
---wbs / --report 로 파일 경로 지정 가능(기본=doc/result/open/ 정본).
+--wbs / --report 로 파일 경로 지정 가능(기본=doc/result/감리정본/).
 쓰기 명령은 기본 --dry-run 아님(바로 저장). 미리보기는 --dry 옵션.
 """
 import os
@@ -31,18 +31,19 @@ except ImportError:
     from scripts.weekly_tools.wbs import WBSGantt
     from scripts.weekly_tools.report import WeeklyReport
 
-OPEN_DIR = os.path.join("doc", "result", "open")
-DEFAULT_WBS = os.path.join(OPEN_DIR, "[지재원] AI 영업비밀관리시스템 구축 WBS.xlsx")
+# [2026-08-02] 정본 이전 — doc/result/open/ → doc/result/감리정본/.
+CANON_DIR = os.path.join("doc", "result", "감리정본")
+DEFAULT_WBS = os.path.join(CANON_DIR, "[지재원] AI 영업비밀관리시스템 구축 WBS.xlsx")
 
 
 def latest_report():
     """open/ 에서 가장 최근(파일명 YYMMDD 최대) 주간보고 .docx 를 반환.
     없으면 정적 기본값. 임시 잠금파일(~$) 제외."""
-    cands = [c for c in glob.glob(os.path.join(OPEN_DIR, "*주간보고*지재원*.docx"))
+    cands = [c for c in glob.glob(os.path.join(CANON_DIR, "*주간보고*지재원*.docx"))
              if not os.path.basename(c).startswith("~$")]
     if not cands:
         return os.path.join(
-            OPEN_DIR, "-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 1주 - 260703.docx")
+            CANON_DIR, "-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 1주 - 260703.docx")
     def tag(c):
         m = re.search(r"(\d{6})\.docx$", os.path.basename(c))
         return m.group(1) if m else "000000"
