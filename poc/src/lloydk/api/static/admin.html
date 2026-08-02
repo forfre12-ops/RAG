@@ -508,7 +508,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
           <div class="field">
             <label class="fld">provider</label>
             <select id="gold-provider">
-              <option value="noop">noop (배관 확인용 · 후보 0건)</option>
+              <option value="noop">noop (룰 단독 · 외부 LLM 없이)</option>
               <option value="local_openai">local_openai</option>
               <option value="vllm_qwen">vllm_qwen</option>
               <option value="anthropic">anthropic</option>
@@ -1137,11 +1137,19 @@ function renderGoldenSummary(d){
     `<div><span>gold</span> <b>${gold}</b></div>`+
     `<div><span>uncertain</span> <b>${unc}</b></div>`+
     `<div><span>중복 제외</span> <b>${st.dropped_duplicate??0}</b></div>`+
-    `<div><span>누출 제외</span> <b>${st.dropped_leaked??0}</b></div>`;
+    `<div><span>누출 제외</span> <b>${st.dropped_leaked??0}</b></div>`+
+    // 본문 없어 빠진 입력 — 0이면 감춰서 평시 노이즈를 만들지 않는다.
+    (st.dropped_no_text ? `<div><span>본문없음 제외</span> <b>${st.dropped_no_text}</b></div>` : '');
   const byg=st.gold_by_grade||{};
-  $('gold-grades').innerHTML = GRADES.some(g=>byg[g])
+  // 도메인→등급 shortcut 누출 판정은 서버가 stats 에 남기지만 화면에 없으면 아무도 못 본다.
+  // 하드-드롭이 아닌 경고라 더더욱 노출이 필요하다(무음 통과 방지).
+  const dl=st.domain_leakage_gate;
+  const leakLine = dl && dl.blocked
+    ? `<div class="warnbox" style="margin-top:8px;">도메인→등급 누출 의심 — ${esc(dl.reason||'')} · 승격 전 검수 필요(드롭은 하지 않음)</div>`
+    : '';
+  $('gold-grades').innerHTML = (GRADES.some(g=>byg[g])
     ? GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')
-    : '<span style="color:var(--text-faint)">등급 분포 없음 — gold 후보 0건</span>';
+    : '<span style="color:var(--text-faint)">등급 분포 없음 — gold 후보 0건</span>') + leakLine;
   goldenButtons(d.status, gold);
 }
 async function startGoldenBuild(){

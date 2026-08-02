@@ -149,6 +149,7 @@ class GoldenBuildService:
         """실제 빌드: 문서 로드 → build_golden_set → run-스코프 파일 출력 → JobStore 갱신."""
         self.jobs.update(job_id, status="running")
         try:
+            self._dropped_no_text = 0
             docs = self._load_docs(req)
             holdout = self._load_holdout(req)
             lf = label_fn or make_label_fn(req.llm_provider, sensitive=req.sensitive)
@@ -160,6 +161,9 @@ class GoldenBuildService:
                 require_evidence=req.require_evidence,
             )
             gold_path, unc_path = self._write_outputs(req, job_id, result)
+            # 본문 없어 제외된 입력을 stats 에 노출 — 무음 소멸 방지(입력 수가 안 맞는 이유가 보이게).
+            if self._dropped_no_text:
+                result.stats["dropped_no_text"] = self._dropped_no_text
             # 도메인→등급 shortcut 누출 가시화(플래그+로그 전용, 하드-드롭 없음, 실패-안전).
             # gold(=학습 silver 후보)가 '도메인이 등급을 결정'하는 shortcut을 얼마나 담는지
             # stats에 verdict로 남겨 승격/검수 판단에 노출한다(무음 통과 방지).
@@ -356,7 +360,26 @@ class GoldenBuildService:
     # ------------------------------------------------------------------ helpers
     def _load_docs(self, req: GoldenBuildRequest) -> list[dict]:
         if req.source_type == "inline":
-            return list(req.docs)
+            # 본문 키 정규화 + 빈 본문 제거. 종전에는 req.docs 를 그대로 넘겨, 빌더가 읽는
+            # `text` 대신 `content`/`body` 로 보낸 문서가 **아무 카운터에도 안 잡히고 조용히
+            # 사라졌다**(입력 2 → gold 0·uncertain 0·dropped 0). 어느 단계에서 없어졌는지
+            # 화면으로 알 길이 없어 "게이트 전량 탈락"으로 오독된다(2026-08-02 실측).
+            out: list[dict] = []
+            self._dropped_no_text = 0
+            for d in req.docs:
+                text = str(
+                    d.get("text") or d.get("content") or d.get("body") or ""
+                ).strip()
+                if not text:
+                    self._dropped_no_text += 1
+                    continue
+                out.append({**d, "text": text})
+            if self._dropped_no_text:
+                logger.warning(
+                    "golden_build: 본문 없는 inline 문서 %d건 제외(text/content/body 전부 빈 값)",
+                    self._dropped_no_text,
+                )
+            return out
         # corpus: jsonl 파일 또는 *.json 디렉토리 (허용 루트 하위로 제한)
         p = _safe_path(req.corpus_dir)
         if not p.exists():
