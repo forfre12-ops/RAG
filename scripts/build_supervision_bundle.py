@@ -82,6 +82,22 @@ def load_registry() -> dict[str, str]:
     return mapping
 
 
+def load_registry_meta() -> dict[str, dict]:
+    """정본 파일명 → 등재 메타(id·status 등). 자동 편입 판정에 status 가 필요하다.
+
+    등록부는 '무엇이 현행인가'를 표현하는 수단이기도 하다 — 구버전 설계도(v1~v3)나
+    수기 픽스처 보고서처럼 이력으로만 남긴 항목은 status 가 current 가 아니다.
+    """
+    data = yaml.safe_load(REGISTRY.read_text(encoding="utf-8"))
+    prefix = "doc/result/감리정본/"
+    out: dict[str, dict] = {}
+    for doc in data["documents"]:
+        path = doc["path"].replace("\\", "/")
+        if path.startswith(prefix):
+            out[Path(path).name] = doc
+    return out
+
+
 def model_pointer() -> tuple[str, Path | None]:
     """배포 기본값 .env 가 가리키는 분류기 모델 디렉터리."""
     if not ENV_FILE.exists():
@@ -124,8 +140,10 @@ def strip_id_comment(entry) -> str:
 
 # ─────────────────────────────── 생성 ───────────────────────────────
 
-def build(src_release: str, release_id: str, purpose: str, attach: list[str] | None = None) -> int:
+def build(src_release: str, release_id: str, purpose: str, attach: list[str] | None = None,
+          add: list[str] | None = None) -> int:
     registry = load_registry()
+    registry_meta = load_registry_meta()
     layout = inherit_layout(src_release)
     dest = RELEASES / release_id
     if dest.exists():
@@ -171,6 +189,35 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
             if name != "index.html":
                 formal_count += 1
         formal_out[category] = rows
+
+    # [신규 문서] 이월 목록에만 의존하면 새로 만든 산출물이 조용히 빠진다 — 실제로
+    # 2쪽 요약본이 등록부에 등재되고 정본에도 있는데 번들에서 누락됐다(주간보고만 재스캔하고
+    # 정식 산출물은 이월만 했기 때문).
+    #
+    # 그렇다고 "등록부에 있으면 전부 넣는다"로 바꾸면 과하다. 등록부에는 구버전 설계도(v1~v3)·
+    # 수기 픽스처 보고서·미결 Draft 확인안처럼 **의도적으로 제외한** 문서도 이력으로 남아 있고,
+    # 실제로 그 조건에서 34→43종이 되며 그 9종이 전부 딸려 들어왔다. 무엇을 제출할지는
+    # 도구가 내릴 판단이 아니다.
+    #
+    # 그래서 **경고만 하고 넣지 않는다.** 넣으려면 --add 로 명시한다(감사 추적이 남는다).
+    already = {strip_id_comment(e) for entries in formal_src.values() for e in entries}
+    already |= set(supp_src) | set(weekly)
+    for name in add or []:
+        if name in already:
+            continue
+        if not copy_one(name):
+            raise SystemExit(f"--add 대상이 정본에 없다: {name}")
+        already.add(name)
+        formal_count += 1
+        formal_out.setdefault("신규", []).append({"file": name, "id": registry.get(name, "(미등록)")})
+        print(f"  [신규 추가] {name} ({registry.get(name, '미등록')})", file=sys.stderr)
+
+    orphan_reg = sorted(n for n in registry if n not in already and (CANON / n).exists())
+    if orphan_reg:
+        print(f"  [확인 요망] 등록부·정본에 있으나 번들에 없는 문서 {len(orphan_reg)}종 — "
+              f"의도적 제외면 무시, 아니면 --add 로 편입:", file=sys.stderr)
+        for n in orphan_reg:
+            print(f"      · {n}", file=sys.stderr)
 
     # 참고자료
     supp_out = []
@@ -367,6 +414,8 @@ def main() -> int:
     ap.add_argument("--from-release", help="산출물 구성을 물려받을 기존 release_id")
     ap.add_argument("--release-id", help="새로 동결할 release_id")
     ap.add_argument("--purpose", default="제3자 감리(supervision) 대응 산출물 제출본")
+    ap.add_argument("--add", nargs="*", default=[],
+                    help="이월 목록에 없는 신규 정식 산출물을 명시 편입(파일명)")
     ap.add_argument("--attach", nargs="*", default=[],
                     help="검증로그/ 로 동봉할 증적 파일(회귀 로그·스캔 리포트 등)")
     ap.add_argument("--check", metavar="RELEASE_ID", help="동결본 무결성 검증")
@@ -376,7 +425,7 @@ def main() -> int:
         return check(args.check)
     if not (args.from_release and args.release_id):
         ap.error("--from-release 와 --release-id 를 함께 주거나, --check 를 쓰라.")
-    return build(args.from_release, args.release_id, args.purpose, args.attach)
+    return build(args.from_release, args.release_id, args.purpose, args.attach, args.add)
 
 
 if __name__ == "__main__":

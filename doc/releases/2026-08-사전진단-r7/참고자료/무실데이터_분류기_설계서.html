@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>무실데이터 분류기 설계서 — 합성 부트스트랩·운영 학습·죽음의 나선 방어 (내부용)</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-elevated:#ffffff; --bg-code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.80);
+  --text:#0a0a0a; --text-soft:#525252; --text-dim:#737373; --text-faint:#a3a3a3;
+  --border:rgba(0,0,0,0.08); --border-strong:rgba(0,0,0,0.16); --border-soft:rgba(0,0,0,0.05);
+  --accent:#0a0a0a; --accent-blue:rgba(0,0,0,0.04);
+  --pass:#2a2a2a; --fail:#525252; --warn:#737373; --pend:#737373;
+  --radius-sm:6px; --radius:8px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04);
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.06);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-0.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;white-space:nowrap;min-width:0;line-height:1;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#ffffff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,0.12);overflow:visible;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;color:var(--text);}
+.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400;}
+.brand-url{font-family:var(--font-mono);font-size:13.5px;font-weight:400;color:var(--text-dim);letter-spacing:0;}
+.nav-search{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:13px;cursor:pointer;transition:all .15s;min-width:200px;}
+.nav-search:hover{border-color:var(--border-strong);color:var(--text-soft);}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+
+.page{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:32px 0 32px 0;border-right:1px solid var(--border);}
+.sidebar::-webkit-scrollbar{width:3px;} .sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 24px 10px;font-family:var(--font-mono);}
+.toc-item{display:block;padding:5px 24px;font-size:13px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .15s;line-height:1.4;}
+.toc-item:hover{color:var(--text);border-left-color:var(--border-strong);}
+.toc-item.active{color:var(--text);border-left-color:var(--text);font-weight:600;}
+
+article{padding:40px 0 120px 40px;min-width:0;}
+
+.meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;font-size:12.5px;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:var(--radius-pill);background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--font-mono);}
+.badge.blue{background:#404040;}
+.badge.warn{background:#7a1f1f;}
+.meta-dot{color:var(--text-faint);}
+.meta-soft{color:var(--text-dim);}
+h1.title{font-size:48px;font-weight:800;letter-spacing:-0.04em;line-height:1.07;margin:0 0 20px;color:var(--text);}
+.lede{font-size:18px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0 0 28px;letter-spacing:-0.012em;max-width:720px;}
+.hero-kpis{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 32px;}
+.hero-kpi{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text-soft);font-family:var(--font-mono);}
+.hero-kpi b{color:var(--text);font-weight:600;}
+.hero-sep{border:none;border-top:1px solid var(--border-strong);margin:44px 0 52px;}
+
+article h2{font-size:28px;font-weight:700;letter-spacing:-0.028em;line-height:1.2;margin:76px 0 10px;scroll-margin-top:80px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+article h2 .num{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-dim);padding:2px 8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);line-height:1;}
+article h2+.h2-sub{color:var(--text-dim);font-size:15px;margin:0 0 24px;max-width:720px;}
+article h3{font-size:17px;font-weight:600;letter-spacing:-0.018em;margin:32px 0 10px;}
+article h4{font-size:14px;font-weight:600;margin:20px 0 6px;color:var(--text);}
+article p{margin:12px 0;color:var(--text);}
+article ul,article ol{padding-left:22px;}
+article li{margin:6px 0;}
+article a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border-strong);transition:border-color .15s;}
+article a:hover{border-bottom-color:var(--text);}
+section{position:relative;padding-top:8px;}
+
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;position:relative;overflow:hidden;min-width:0;}
+.card-grid{display:grid;gap:12px;min-width:0;}
+.card-grid>*{min-width:0;}
+.card-grid.col2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.card-grid.col3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.card-grid.col4{grid-template-columns:repeat(4,minmax(0,1fr));}
+.card-label{font-size:10.5px;font-weight:700;letter-spacing:0.06em;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:6px;}
+.card-value{font-size:22px;font-weight:700;letter-spacing:-0.03em;line-height:1.1;margin-bottom:4px;}
+.card-value.sm{font-size:17px;}
+.card-desc{font-size:12.5px;color:var(--text-dim);word-break:keep-all;overflow-wrap:break-word;}
+.card-pass{border-left:3px solid rgba(0,0,0,.25);border-radius:0;}
+.card-fail{border-left:3px solid rgba(0,0,0,.55);border-radius:0;}
+.card-warn{border-left:3px solid rgba(0,0,0,.4);border-radius:0;}
+[class*="card"][style*="border-left"]{border-radius:0 !important;}
+
+.tbl-wrap{overflow-x:auto;margin:16px 0;border-radius:var(--radius-lg);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+thead{background:var(--bg-surface);}
+th{padding:10px 14px;text-align:left;font-weight:600;font-size:12px;letter-spacing:0.02em;color:var(--text-soft);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 14px;border-bottom:1px solid var(--border-soft);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--bg-surface);}
+.td-code{font-family:var(--font-mono);font-size:12.5px;}
+.td-pass{color:var(--text);font-weight:600;}
+.td-fail{color:rgba(0,0,0,.5);font-weight:600;}
+.td-center{text-align:center;}
+
+pre{background:var(--bg-code);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font-family:var(--font-mono);font-size:12.5px;line-height:1.6;margin:16px 0;}
+code{font-family:var(--font-mono);font-size:12.5px;background:var(--bg-code);padding:2px 5px;border-radius:4px;border:1px solid var(--border);}
+pre code{background:none;border:none;padding:0;}
+
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:var(--radius);margin:16px 0;}
+.callout.warn{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.16);border-left:3px solid rgba(0,0,0,.5);border-radius:0;}
+.callout.info{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.1);}
+.callout.pass{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.12);}
+.callout.danger{background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.2);border-left:3px solid #7a1f1f;border-radius:0;}
+.callout.ok{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.16);border-left:3px solid #1f5f3a;border-radius:0;}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.callout-body{font-size:13.5px;line-height:1.6;}
+
+.appendix-link{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--border);border-radius:var(--radius);font-size:13.5px;color:var(--text);text-decoration:none;transition:all .15s;background:var(--bg-surface);}
+.appendix-link:hover{border-color:var(--border-strong);background:var(--bg);box-shadow:var(--shadow-sm);}
+.appendix-link .al-arrow{color:var(--text-dim);}
+.appendix-links{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;}
+
+footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size:12.5px;color:var(--text-dim);display:flex;justify-content:space-between;max-width:1380px;margin-left:auto;margin-right:auto;flex-wrap:wrap;gap:8px;}
+
+@media(max-width:1200px){ .nav-search{display:none;} }
+@media(max-width:1024px){ .page{padding:0 24px;} article{padding:36px 0 80px 32px;} .card-grid.col4{grid-template-columns:repeat(2,minmax(0,1fr));} h1.title{font-size:40px;} }
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;padding:0 24px;}
+  .sidebar{display:none;}
+  article{padding:32px 0 80px;}
+  h1.title{font-size:32px;letter-spacing:-0.03em;}
+  article h2{font-size:23px;margin:54px 0 8px;}
+  .lede{font-size:16px;}
+  .card-grid.col3,.card-grid.col4{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:680px){
+  .page{padding:0 16px;}
+  h1.title{font-size:27px;}
+  article h2{font-size:20px;}
+  .card-grid.col2,.card-grid.col3,.card-grid.col4{grid-template-columns:minmax(0,1fr);}
+  pre{font-size:11.5px;}
+  table{font-size:12.5px;}
+  th,td{padding:7px 10px;}
+  footer{flex-direction:column;}
+}
+@media print{ .nav,.sidebar,footer{display:none !important;} .page{grid-template-columns:1fr;padding:0;} article{padding:0;} .card,pre{break-inside:avoid;} }
+</style>
+</head>
+
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">lloydk.co.kr</span>
+    </a>
+    <div class="nav-actions">
+      <div class="nav-search" role="search" aria-label="Search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        무실데이터 분류기 설계서 (내부용)
+      </div>
+    </div>
+  </div>
+</header>
+<div class="page">
+  <aside class="sidebar">
+    <div class="toc-title">목차</div>
+    <a class="toc-item active" href="#s01">01 한눈에 보기</a>
+    <a class="toc-item" href="#s02">02 제약 — 없는 것 3가지</a>
+    <a class="toc-item" href="#s03">03 전략 전환</a>
+    <a class="toc-item" href="#s04">04 두 기둥</a>
+    <a class="toc-item" href="#s05">05 코드 현황 (검증됨)</a>
+    <a class="toc-item" href="#s06">06 죽음의 나선 검증</a>
+    <a class="toc-item" href="#s07">07 4대 하드닝</a>
+    <a class="toc-item" href="#s08">08 안전 방어선</a>
+    <a class="toc-item" href="#s09">09 운영 KPI</a>
+    <a class="toc-item" href="#s10">10 우선순위 로드맵</a>
+    <a class="toc-item" href="#s11">11 한계·전제</a>
+  </aside>
+
+  <article id="top">
+    <div class="meta-row">
+      <span class="badge">설계서</span>
+      <span class="badge">감리 참고자료</span>
+      <span class="meta-dot">·</span>
+      <span class="meta-soft">합성 부트스트랩 · 운영 학습 · 죽음의 나선 방어</span>
+      <span class="meta-dot">·</span>
+      <span class="meta-soft">2026-06 · Lloydk AI Engine</span>
+    </div>
+
+    <h1 class="title">무실데이터 분류기 설계서</h1>
+    <p class="lede"><b>실데이터 0 · 빌드 검수 0 · 반출 0</b> 제약 아래에서 영업비밀 등급 분류기를 어떻게 만들고(합성 부트스트랩) 어떻게 운영에서 개선하며(선례·재학습), <b>오염이 운영까지 도달하는 "죽음의 나선"을 어떻게 막는가</b>를 코드 기준으로 확정한 설계서다. 모든 코드 주장은 제어흐름 추적 + 적대적 검증으로 확인했다.</p>
+
+    <div class="hero-kpis">
+      <div class="hero-kpi">제약 <b>실데이터·검수·반출 0</b></div>
+      <div class="hero-kpi">전략 <b>안전배포+운영학습</b></div>
+      <div class="hero-kpi">기둥 <b>합성 부트스트랩 / 운영 선례</b></div>
+      <div class="hero-kpi">죽음의 나선 <b>오늘은 차단(단일 플래그)</b></div>
+      <div class="hero-kpi">하드닝 <b>4건</b></div>
+    </div>
+    <hr class="hero-sep">
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ</span>
+      <div class="callout-body"><b>한눈에 보기.</b> 우리는 <b>진짜 문서도, 사람 검수도, 데이터 반출도 못 쓰는</b> 상황에서 비밀등급 분류기를 만들어야 한다. 그래서 ① <b>합성 데이터 + 여러 AI의 합의</b>로 "출발 모델"을 만들고(검수 대역), ② 배포 후 <b>고객사 관리자가 확정한 등급</b>을 시스템이 즉시 참고·학습한다. 핵심 위험은 정확도가 아니라 — <b>지친 관리자가 틀린 걸 그냥 승인 → 그 오염이 자동 재학습으로 모델에 박혀 점점 바보가 되는데 똑똑해진 줄 착각하는 "죽음의 나선"</b>이다. 검증 결과 오늘은 단 하나의 설정(<code>retrain_auto_activate=False</code>)이 이걸 막고 있고, 진짜 구멍은 <b>교정→학습 편입에 품질 게이트가 없다는 것</b>이다(§6·§7). 이 설계서는 그 단일 차단점에 기대지 않도록 <b>4곳을 하드닝</b>한다.</div>
+    </div>
+
+    <section id="s01">
+      <h2><span class="num">01</span> 한눈에 보기 — 무엇을 결정했나</h2>
+      <p class="h2-sub">이 설계서가 확정하는 것 5가지.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:22%;">항목</th><th>확정 내용</th></tr></thead>
+          <tbody>
+            <tr><td><b>전략 무게중심</b></td><td>"검증 후 배포"(불가능) → <b>"안전 배포 + 운영에서 학습"</b></td></tr>
+            <tr><td><b>골든셋 생성</b></td><td>생성=Qwen / 심판=Claude+Qwen섀도 · 구성 TS20·S130·S230·S320 · 25% holdout · 과생성 ~1,600→1,000</td></tr>
+            <tr><td><b>평가 진실</b></td><td>합성은 <code>locked_gold_eval</code>이 될 수 없음(사람 서명 전용) → 운영 관리자 확정으로만 채워짐</td></tr>
+            <tr><td><b>운영 개선</b></td><td>관리자 확정 → 선례(FNR-safe 상향·검수 라우팅만) + 재학습. kNN/CP는 shadow로만 시험</td></tr>
+            <tr><td><b>핵심 방어</b></td><td>죽음의 나선을 단일 플래그에 안 기대고 <b>4곳 하드닝</b>(교정 admission·deploy gate·누수가드·per-run 사인오프)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s02">
+      <h2><span class="num">02</span> 제약 — 없는 것 3가지</h2>
+      <p class="h2-sub">이 설계의 모든 결정은 이 세 제약에서 나온다. 제약을 바꿀 수 없다고 확정됨.</p>
+      <div class="card-grid col3" style="margin:16px 0;">
+        <div class="card card-fail"><div class="card-label">실데이터</div><div class="card-value sm">0</div><div class="card-desc">실제 비밀문서 제공 불가. 합성·공개프록시만</div></div>
+        <div class="card card-fail"><div class="card-label">빌드 검수</div><div class="card-value sm">0</div><div class="card-desc">전문가 사람 검수·서명 불가. 자동 합의로 대역</div></div>
+        <div class="card card-fail"><div class="card-label">반출(exfil)</div><div class="card-value sm">0</div><div class="card-desc">고객사 데이터 밖으로 못 나감. 로컬 학습</div></div>
+      </div>
+      <div class="callout warn">
+        <span class="callout-icon">⚠</span>
+        <div class="callout-body"><b>제약이 결과 천장을 정한다.</b> 아무리 좋은 방법도 "실데이터 한 줌"을 못 이긴다. 실데이터 50~100건이라도 합성 1,000건보다 평가 가치가 크지만, <b>그 경로가 닫혔음을 확인</b>했다. 따라서 이 설계는 "좋은 모델 보증"이 아니라 <b>"안전하게 깨지는 부트스트랩 + 운영 학습"</b>을 목표로 한다.</div>
+      </div>
+    </section>
+
+    <section id="s03">
+      <h2><span class="num">03</span> 전략 전환 — 검증후배포 → 안전배포+운영학습</h2>
+      <p class="h2-sub">배포 전에 모델이 좋은지 알 방법이 없다 → 목표를 바꾼다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:50%;">❌ 불가능</th><th>✅ 채택</th></tr></thead>
+          <tbody>
+            <tr><td>좋은 모델을 만들어 검증 후 배포</td><td><b>안전하게 깨지는 부트스트랩 + 운영에서 빠르게 학습</b></td></tr>
+            <tr><td>합성 골든을 "평가 진실"로 사용</td><td>합성=silver/gold_candidate(학습) · 평가 진실=운영 사람확정(locked)</td></tr>
+            <tr><td>정확도 KPI 자랑</td><td>안전(미탐 0) + 검수 절약 + 오염 탐지 KPI</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>→ 무게중심이 <b>빌드(기둥1)에서 운영 학습 루프</b>로 옮겨간다. 데이터 흐름은 <b>고객사→지재원이 아니라(반출 0), 운영 확정이 고객사 안에서 진짜 데이터를 만든다.</b></p>
+    </section>
+
+    <section id="s04">
+      <h2><span class="num">04</span> 두 기둥</h2>
+      <p class="h2-sub">같은 문제(데이터·검수·반출 0)를 푸는 2단 전략.</p>
+
+      <h3>기둥 1 — 지재원(빌드): 합성으로 모델 부트스트랩</h3>
+      <pre><code>합성 생성(Qwen) → 자동 합의 라벨 → 티어링 → 학습
+  └ 등급별 상황 프롬프트       └ 룰 == Claude(주심판) + Qwen 섀도
+    (등급명 leakage 차단)         = 사람 검수의 "대역"</code></pre>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:26%;">설계 결정</th><th>값 / 근거</th></tr></thead>
+          <tbody>
+            <tr><td>생성 ↔ 심판 분리</td><td>생성=Qwen(로컬) / 주심판=Claude / 섀도=Qwen — circularity(자기채점) 차단. 동일모델 생성+판정 시 품질검증 0</td></tr>
+            <tr><td>등급 구성</td><td>고등급 과대표집 <b>TS 20 / S1 30 / S2 30 / S3 20</b> — 자연분포(S3 다수)는 약점인 고등급 부족</td></tr>
+            <tr><td>학습/평가 분리</td><td>~700 silver_train / ~250 합성 holdout(상대비교용, "일반화 아님" 명시)</td></tr>
+            <tr><td>과생성</td><td>합의 게이트 탈락분 보정 위해 ~1,600 생성→순통과 1,000. 고등급 탈락률↑ → 더 생성. <b>파일럿 100건으로 통과율 먼저 측정</b></td></tr>
+            <tr><td>합의 게이트</td><td><code>evaluate_consensus</code>: 근거 span ∧ 룰==심판 ∧ self-consist≥0.67 ∧ ¬ts_downgrade ∧ ¬섀도불일치. <b>conf 안 봄</b></td></tr>
+            <tr><td>티어 계약</td><td>합성·무검수는 <b>gold_candidate/silver까지만</b>. <code>locked_gold_eval</code>(평가 진실)은 사람 서명 전용 — 구조적으로 합성 불가</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>기둥 2 — 고객사(운영): 관리자 확정을 선례로</h3>
+      <pre><code>관리자 등급 확정 → tb_corrections 적재
+        ↓ 다음 유사 문서
+유사 선례 검색 → "과거 이 문서는 S1로 확정됨" → FNR-safe 적용 (재학습 0)</code></pre>
+      <div class="callout warn">
+        <span class="callout-icon">⚠</span>
+        <div class="callout-body"><b>선례 적용의 절대 제약 (안 지키면 위험).</b> 임베딩 유사도 ≠ 등급(등급은 출처·관리수준에 좌우, 임베딩은 내용만 봄). 따라서 ① 선례가 <b>더 높으면 상향 override</b> / 충돌·유사면 <b>검수 라우팅</b>만, ② <b>자동 하향 override 절대 금지</b>(임베딩 유사도로 무인 미탐 주입), ③ exact-match 재사용(이미 구현)에서 출발 → 고유사 kNN은 <b>shadow mode로 검증 후에만</b> 권한 부여, ④ 신뢰 보정만(사람 서명, 머신 제외) + 메타데이터 교차확인.</div>
+      </div>
+      <p><b>의미:</b> 운영 관리자 확정 = 시스템이 처음 만나는 "진짜 사람 검증 데이터"이자, <code>locked_gold_eval</code>을 채울 유일한 경로. 기둥 1의 합성 맹점을 실전이 치료한다.</p>
+      <div class="callout danger">
+        <span class="callout-icon">🔧</span>
+        <div class="callout-body"><b>코드-설계 불일치 (수정 필요).</b> 고객사는 <b>분류기 재학습을 하지 않는다(비모수만)</b>가 설계인데, 검증 결과 <b>자동 재학습(분류기 가중치) 루프가 고객사 서버에서도 돈다</b> — <code>enable_training=False</code>가 HTTP 라우트만 막고 celery beat 루프는 안 막기 때문(버그). → 이 루프를 <b>OFF</b>해 설계(고객사=비모수)에 맞춰야 한다. 새 결정이 아니라 코드를 설계에 맞추는 수정(§10 0.5).</div>
+      </div>
+    </section>
+
+    <section id="s05">
+      <h2><span class="num">05</span> 코드 현황 (제어흐름 검증됨)</h2>
+      <p class="h2-sub">"새로 설계"가 아니라 "있는 것 / 빈 것 / 위험"을 코드로 확인한 결과.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:30%;">기능</th><th style="width:16%;">상태</th><th>근거 (코드)</th></tr></thead>
+          <tbody>
+            <tr><td>행동 라우터(다단 status)</td><td class="td-pass">✅ 이미 있음</td><td>status 5종 + 라우팅 시그널 6종 — <code>classify_service.py:254-313</code>. 형식화+hard block만 추가</td></tr>
+            <tr><td>corrections→재학습 트리거</td><td class="td-pass">✅ 이미 있음 (자동)</td><td>URGENT≥10·RECOMMENDED≥50, 30분 beat — <code>active_learning.py:28-29</code>, <code>celery_app.py:48-52</code></td></tr>
+            <tr><td>고객사 자동 재학습 루프</td><td class="td-pass">✅ OFF 구현</td><td>active_learning_tick/train_classifier_task를 enable_training으로 게이트 — 고객사 자동 재학습 차단 (2f2c04e)</td></tr>
+            <tr><td>교정→재학습 경로 (무반출)</td><td class="td-warn">⬜ 로컬 CPU 증분</td><td>지재원 반출은 없음(무반출 유지). 대신 고객사 교정이 <b>망 내 CPU 야간 증분재학습</b>으로 분류기에 반영된다(<code>nightly_incremental_retrain_tick</code> 02:00·후보등록·활성화는 사람 사인오프)</td></tr>
+            <tr><td>S3부터 좁게(등급차등)</td><td class="td-pass">✅ 이미 있음</td><td>agreement_gate가 S3만 conf단독 허용 — <code>config.py:84-85,97-98</code></td></tr>
+            <tr><td>안전 KPI</td><td class="td-pass">✅ 이미 있음</td><td>fnr_underclass · reviewer_trust · drift — <code>metrics.py</code>, <code>reviewer_trust.py</code></td></tr>
+            <tr><td>FNR-safe 운영점(τ=0.30·agreement)</td><td class="td-pass">✅ ON</td><td>onprem/full-train 프로파일 기본 — <code>config.py:84-98</code></td></tr>
+            <tr><td>효율 KPI(취소율·처리시간·재등장)</td><td class="td-pass">✅ 대부분</td><td>교정 발생률(direction별)·관리자 처리시간·동일문서 재등장 구현(ae9836d·717c584·27b1686); 검수 라우팅 적중률만 후속(사후 outcome 추적)</td></tr>
+            <tr><td>kill-gate 모니터(미탐∧fatigue∧번복)</td><td class="td-pass">✅ 구현(경보)</td><td>run_kill_gate_check — 3축 평가 + KILL_GATE_TRIPPED 게이지, <b>비파괴(경보만)</b>. 자동 halt는 정책결정 후 — <code>kill_gate.py</code> (717c584)</td></tr>
+            <tr><td>합성 빌드 게이트(require_evidence)</td><td class="td-pass">✅ 구현</td><td>합성모드 <code>require_evidence=False</code>로 룰시드 부재 no_evidence 탈락 완화(운영 게이트 기본 True 불변) — <code>consensus.py</code> (44f8154)</td></tr>
+            <tr><td>locked_gold_eval readiness gate</td><td class="td-pass">✅ 구현</td><td>eval_readiness(등급별 min N) + 자동활성 가드 — 합성-맹목 자동승격 차단 (04c77de); train 경로 eval_ready 산출은 후속</td></tr>
+            <tr><td>serving shadow mode</td><td class="td-fail">⬜ 없음 (net-new)</td><td>빌드시 Qwen 섀도뿐. 모델버전+deploy gate 토대는 있음</td></tr>
+            <tr><td>교정→학습 품질 게이트</td><td class="td-pass">✅ 구현</td><td>사람검수+finalized(confirmed/corrected)만 학습 편입 — 최약 고리 차단 (2f2c04e)</td></tr>
+            <tr><td>"룰 비중 ↑" knob</td><td class="td-fail">⚠️ 없음</td><td>upweight 없음. 유일 knob은 downweight. 실효 레버=τ↓(검수↑), 툴 <code>eval_fnr_threshold_sweep.py</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s06">
+      <h2><span class="num">06</span> 죽음의 나선 검증 (적대적 테스트)</h2>
+      <p class="h2-sub">오염 교정이 운영까지 도달하는 경로를 6단계로 추적 + Opus 스켑틱 공격.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:6%;">#</th><th style="width:30%;">단계</th><th style="width:14%;">결과</th><th>막는/뚫는 것</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>오염 교정 기록(러버스탬프)</td><td class="td-fail">🔴 통과</td><td>교정 작성에 품질 게이트 없음</td></tr>
+            <tr><td>2</td><td><b>학습셋 편입 (최약 고리)</b></td><td class="td-fail">🔴 통과</td><td><code>WHERE consumed_in_run IS NULL</code>뿐 — 신뢰도·status·이중검수·사람여부 필터 0 (<code>corrections_rebuild.py:122-127</code>)</td></tr>
+            <tr><td>3</td><td>누수 가드(merge)</td><td class="td-fail">🟡 fail-open</td><td>retrain 경로에서 holdout_paths 미전달(경고만) — <i>구현 시 확인 권장</i></td></tr>
+            <tr><td>4</td><td>재학습 발화(≥10)</td><td class="td-fail">🔴 통과</td><td>30분 beat 자동 enqueue, 사람 없음 (<code>tasks.py:427</code>)</td></tr>
+            <tr><td>5</td><td>deploy gate</td><td class="td-fail">🔴 통과</td><td><code>datasets/labeled/test.jsonl</code>(정적·합성)에서 재고 <code>locked_gold_eval</code> 안 봄 → 실분포 오염에 맹목 (<code>trainer.py:170</code>)</td></tr>
+            <tr><td>6</td><td><b>운영 활성화</b></td><td class="td-pass">✅ 차단</td><td><code>if decision.passed and auto:</code> — <code>auto=retrain_auto_activate=False</code>(기본) → 등록만 (<code>training_service.py:130-134</code>)</td></tr>
+            <tr><td>7</td><td>서빙</td><td class="td-pass">✅ 도달불가</td><td>활성 안 됨. auto_rollback도 기본 False</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout danger">
+        <span class="callout-icon">🔴</span>
+        <div class="callout-body"><b>판정 — 오늘은 차단, 단 단일 플래그로.</b> 기본 설정에서 죽음의 나선은 <b>활성화 단계 한 곳</b>에서만 막힌다(<code>retrain_auto_activate=False</code>). 1~5단계는 전부 무방비다. <b>운영자가 <code>retrain_auto_activate=True</code> 한 줄만 켜면 오염→운영이 그대로 도달</b>한다(auto_rollback도 기본 False라 사후망도 없음). <b>진짜 약한 고리는 활성화 플래그가 아니라 2단계(교정→학습 편입에 품질 게이트 0)</b>다. 플래그는 운 좋게 꺼진 다운스트림 안전망일 뿐, 구멍은 위에 뚫려 있다. <b>또한 검증 확정:</b> 이 자동 재학습 루프는 <code>enable_training=False</code>인 <b>고객사 서버에서도 돈다</b>(beat 미게이트) — 즉 죽음의 나선은 <b>고객사에서, 고객사 관리자의 러버스탬프로</b> 일어날 수 있다. 설계상 고객사=비모수만이므로 <b>이 루프를 OFF</b>하면(§10 0.5) 고객사에선 위험 자체가 사라진다.</div>
+      </div>
+    </section>
+
+    <section id="s07">
+      <h2><span class="num">07</span> 4대 하드닝 — 단일 플래그에 기대지 마라</h2>
+      <p class="h2-sub">정확한 코드 위치까지 확정된 수정 4건. 재학습 자동활성(retrain_auto_activate=True) 전에 반드시 박혀야 한다.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:6%;">#</th><th style="width:28%;">하드닝</th><th>내용 · 코드 위치</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><b>교정 admission 게이트</b> (최우선)</td><td><code>build_labeled_rows_from_corrections</code>에 필터 추가: Classification.status=confirmed ∧ 이중검수 완료 ∧ 사람(non-machine) 검수자만 학습 편입. <code>needs_second_review</code>·<code>ai_assist</code>·머신ID 제외(<code>_is_machine_reviewer</code> 재사용). 위치 <code>corrections_rebuild.py:122-127</code></td></tr>
+            <tr><td>2</td><td>deploy gate를 locked로</td><td>학습 중 <code>golden_tiers.eval_records</code> 호출해 <code>locked_gold_eval</code>에서 fnr 재측정, locked 비면 <b>fail-closed</b>. 현재는 합성 test.jsonl만 봐서 맹목</td></tr>
+            <tr><td>3</td><td>누수 가드 강제</td><td><code>merge_into_train_jsonl</code>에 항상 holdout_paths 전달(fail-open→fail-closed)</td></tr>
+            <tr><td>4</td><td>per-run 사인오프 + 롤백</td><td><code>retrain_auto_activate=False</code> 유지 + <b>전역 불린 말고 per-run 사람 사인오프</b>. 실서명 baseline 생기면 <code>auto_rollback_enabled=True</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s08">
+      <h2><span class="num">08</span> 안전 방어선 (모델 밖)</h2>
+      <p class="h2-sub">이런 시스템은 보통 모델이 아니라 UX·프로세스에서 무너진다.</p>
+
+      <h3>8.1 자동화 편향 3중 방어 (죽음의 나선 #1 방어)</h3>
+      <p>러버스탬프는 랜덤 노이즈가 아니라 <b>모델의 체계적 약점(S1 과소분류)을 그대로 승인</b> → 오염이 FNR 방향과 정렬(최악). UI 마찰만으론 부족:</p>
+      <ol>
+        <li><b>UI 마찰</b> — 저신뢰 건 승인 3초 지연 · 원문 하이라이트 대조 · 판단 근거 시각화로 능동 사고 유도</li>
+        <li><b>reviewer_trust 가중</b>(이미 코드 존재) — 확정을 무조건 진실로 안 받고 검수자 신뢰도로 가중. 자주 번복되는 확정은 골든 승급 제외</li>
+        <li><b>행동 텔레메트리 + 표본 재검수</b> — "2초 만에 99% 동의"=러버스탬프 시그니처 자동 플래그 + TS/S1 확정 무작위 표본 2차 확인</li>
+      </ol>
+
+      <h3>8.2 kill-gate — fatigue ∧ error-rate ∧ overturn (셋 다)</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>지표</th><th>기준</th><th>왜</th></tr></thead>
+          <tbody>
+            <tr><td><b>TS/S1 미탐</b></td><td>≥ 1건 → 즉시 중단 (절대 floor)</td><td>가장 위험한 오류. fnr_underclass로 측정 가능</td></tr>
+            <tr><td>관리자 처리 부담</td><td>≥ 일 처리능력 150%</td><td>fatigue → 러버스탬프 나선 트리거</td></tr>
+            <tr><td>자동확정 취소율</td><td>임계 초과 시 중단</td><td>러버스탬프·오염 탐지(KPI 신규)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;color:var(--text-dim);">※ error-rate만으론 저volume 침묵을, fatigue만으론 정확도 붕괴를 놓친다 → 세 축 모두.</p>
+      <div class="callout ok"><span class="callout-icon">✅</span><div class="callout-body"><b>구현됨(경보만, 717c584):</b> <code>run_kill_gate_check</code>가 세 축(고등급 미탐 floor·일 처리부담 fatigue·자동확정 번복율)을 한 번의 DB 질의(admissible 교정만)로 모아 <code>evaluate_kill_gate</code>로 판정하고 <code>KILL_GATE_TRIPPED</code> 게이지를 set한다. 현재는 <b>비파괴(자동 중단 없이 경보)</b> — 자동 halt 전환과 일 처리능력(capacity)·임계 운영값은 정책 결정 후. fatigue capacity 기본값 0이면 부담 축은 비활성.</div></div>
+
+      <h3>8.3 보류·정정</h3>
+      <ul>
+        <li><b>Conformal Prediction 보류</b> — 합성 보정은 exchangeability 깨져 "95% 보장" 무효 + 합성은 쉬워서 집합이 과도하게 좁아져(과신) 정작 하드케이스에 기권 안 함. <b>phase 1엔 빼고</b>, 실라벨 N 쌓인 뒤 도입(그때도 휴리스틱 지표로만, "수학적 보장" 프레이밍 금지)</li>
+        <li><b>룰은 "대체"가 아니라 "합집합"</b> — FNR-safe override는 most-severe로 더하는 구조라 룰 비중↑가 recall을 깎지 않음. 진짜 위험은 룰·모델 둘 다 모르는 <b>합동 침묵(joint silent miss)</b> → "룰방어/모델적중/둘다놓침" 분리 모니터링</li>
+      </ul>
+    </section>
+
+    <section id="s09">
+      <h2><span class="num">09</span> 운영 KPI</h2>
+      <p class="h2-sub">"몇 개 자동처리했나"보다 "관리자 시간 줄였나 + 위험한 걸 놓치지 않았나".</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:40%;">KPI</th><th style="width:16%;">상태</th><th>비고</th></tr></thead>
+          <tbody>
+            <tr><td>고위험 미탐률(fnr_underclass)</td><td class="td-pass">✅ 있음</td><td>kill-gate 절대 floor</td></tr>
+            <tr><td>검수자 신뢰도(reviewer_trust)</td><td class="td-pass">✅ 있음</td><td>오염 가중 방어</td></tr>
+            <tr><td>드리프트(KL·cosine)</td><td class="td-pass">✅ 있음</td><td>분포 변화 경보</td></tr>
+            <tr><td>자동확정률</td><td class="td-pass">✅ 있음</td><td>단독 KPI로 쓰면 위험(열고 싶어짐)</td></tr>
+            <tr><td><b>자동확정 취소/번복율</b></td><td class="td-pass">✅ 있음</td><td>CORRECTION_TOTAL(direction별, underclass=죽음나선 신호) — ae9836d</td></tr>
+            <tr><td><b>관리자 처리시간 감소</b></td><td class="td-pass">✅ 있음</td><td>ADMIN_REVIEW_SECONDS 히스토그램(classified_at→교정시각) — 717c584</td></tr>
+            <tr><td><b>검수 라우팅 적중률</b></td><td class="td-fail">⬜ 추가</td><td>라우팅 결정 정확도 — 사후 outcome 추적 필요(실시간 카운터 부적합)</td></tr>
+            <tr><td><b>동일문서 재검수 감소율</b></td><td class="td-pass">✅ 있음</td><td>SAME_DOC_RESURFACE_TOTAL(동일 doc 재교정 횟수) — 27b1686</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s10">
+      <h2><span class="num">10</span> 우선순위 로드맵</h2>
+      <p class="h2-sub">"부재가 아니라 무방비" — 이미 도는 자동재학습을 먼저 제약한다.</p>
+      <pre><code>0.   [안전점검] retrain_auto_activate=False가 활성화를 막는지 확인        ✅ 검증(막음)
+0.5  [버그수정] 고객사 자동 재학습 루프 OFF(enable_training 게이트)       ✅ 완료 (2f2c04e)
+2.   [제약]    교정 admission 게이트(사람검수+finalized만 학습)           ✅ 완료 (2f2c04e)
+3.   [강제]    merge 누수가드(holdout_paths) fail-open→fail-closed        ✅ 완료 (ed0df39)
+1.   [계측]    교정 발생률 KPI(direction별, underclass=죽음나선 신호)     ✅ 완료 (ae9836d)
+4.   [게이트]  자동활성에 실(locked) 평가 readiness 요구                  ✅ 완료 (04c77de)
+                (train 경로 eval_ready 산출·전달은 locked 충분 시 후속)
+7.   [계측]    kill-gate 모니터(3축 평가 + 게이지, 경보만·비파괴)          ✅ 완료 (717c584)
+1b.  [계측]    처리시간·동일문서 재등장 KPI                              ✅ 완료 (717c584·27b1686)
+8.   [게이트]  합성 빌드 require_evidence(no_evidence 탈락 완화·레버3)     ✅ 완료 (44f8154)
+── 후속 ──────────────────────────────────────────────────────────────
+1c.  검수 라우팅 적중률(사후 outcome 추적)                               ⬜
+3b.  τ sweep on 합성(eval_fnr_threshold_sweep) → 운영점·검수부담         ⬜
+A4.  [러너]    합성 빌드 러너 build_synthetic_golden.py + 서비스 require_evidence  ✅ 완료 (0bfc252·b769042)
+A2a. [생성]    S3 명확-공개화(gemma 과분류 0.67→0.17 · gold 1/6→4/6)        ✅ 완료 (a3b238f)
+A2b. [진단]    고등급 룰 침묵=exact-match 취약성 / semantic 반증 → 수용      ✅ 진단·수용
+A1.  [데이터]  고등급(TS/S1)은 앵커(사람 서명)로 — 서명 불가 전제상 구조적 보류  ⬜(블록)
+5.   [정리]    라우팅 형식화(RoutingPolicy enum) + hard "block" tier      ⬜
+6.   [빌드]    serving shadow mode (후보/kNN/CP record-only 검증)         ⬜</code></pre>
+      <p><b>상태:</b> 죽음의 나선은 이제 <b>2·3·4·0.5 네 군데 독립 방어</b> + kill-gate 경보로 다층 차단(이전엔 단일 플래그뿐). <code>retrain_auto_activate</code>는 locked 평가 readiness 배선(train 경로) 전까지 유지 — 켜도 합성 평가만으론 자동승격 안 됨(#4).</p>
+      <div class="callout warn"><span class="callout-icon">🔬</span><div class="callout-body"><b>파일럿 실측(로컬 Ollama, 생성 qwen3:14b·심판 gemma3:12b 독립):</b> 파이프라인 end-to-end 실동작(Claude 불요·비용 0). 합의게이트 통과율 <b>운영모드 25% → 합성모드(레버3) 37.5%</b>(N=8·24 일치, 안정). <b>고등급 gold는 규모에서 가능</b>(N=24: TS 2/6·S1 3/6 — N=8 "0"은 소표본 노이즈). 잔여 탈락은 <code>no_evidence</code>에서 <b>rule↔LLM 불일치</b>로 이동.</div></div>
+      <div class="callout warn"><span class="callout-icon">🩺</span><div class="callout-body"><b>불일치 진단(judge_reliability 층화):</b> 지배항=LLM이 룰보다 더 비밀(up 46% vs down 12%) — <b>병목은 LLM 오류가 아니라 룰의 침묵</b>(FNR-안전 방향). <b>(A2a 완료)</b> S3 과분류는 생성기 <code>public</code> 도메인+프롬프트 강화로 해결(과분류 0.67→0.17·gold 1/6→4/6). <b>(A2b 진단·수용)</b> 고등급(TS) 룰 침묵 = exact-substring 시드 취약성(시드 "신약 후보물질"↔생성문 "항암제 후보물질" 미매칭→과소분류). <b>semantic 매칭 반증</b>: KURE-v1 실측, 패러프레이즈 sim조차 0.718&lt;0.75, 실패문서 0.49~0.65 전부 미달 → 싸게 안 됨. 시드 확장은 운영 분류기 영향(과분류↑→검수부하↑, 단 합의 게이트가 거르므로 나쁜 gold는 안 생김). <b>결론: 고등급 합성 gold는 룰 취약성으로 상한 — 수용.</b> 진짜 고등급 평가정답은 앵커(사람 서명)뿐이나 무서명 전제상 구조적 보류(A1).</div></div>
+      <div class="callout danger"><span class="callout-icon">🏁</span><div class="callout-body"><b>본 생성 714 silver 마일스톤 — 9-에이전트 다각감사(적대검증, 2026-06-30):</b> 1,280건 생성(실패 0)→<b>714 silver_train 후보</b>(통과율 55.8%, 등급균형 TS163/S1160/S2169/S3222, 내부중복 0). 판정 <b>yes_with_caveats</b>. ✅<b>합의 게이트 안전 실증</b>: 심판 고등급 under-class FNR(TS 20.6%·S1 8.1% 둘 다 FAIL)을 silver 오라벨 <b>1.55%(CI상한 3.6%)·catastrophic 0</b>으로 16.8배 압축, 최악 joint-miss 32건 전부 needs_review로(silver 오염 0). 🔴<b>치명 블로커 — 도메인→등급 누출(shortcut)</b>: 도메인만으로 등급을 <b>85.6% 결정</b>(자명 baseline; leave-one-out도 동일=암기 아님), Theil U=0.808; S3=public 단독·TS=8개 기술도메인 한정·mixed→S2 100%, 길이만으로 S3 84% 분리 → KF-DeBERTa가 <b>민감도가 아니라 도메인 토픽·길이·템플릿을 학습</b>할 위험(운영서 교차 등급 문서에 FNR/FPR 동시 붕괴). 원인=러너 <code>GRADE_DOMAINS</code>의 등급별 분리 도메인 풀. <b>결론: 714 단독 학습 보류 → 생성기 도메인×등급 교차 재설계(각 등급 여러 도메인·각 도메인 여러 등급) 선결 후 재생성.</b> 검수셋 566은 ~34% 즉시 회수 가능(rule 침묵형 거짓 불일치). 도구: <code>build_synthetic_golden.py</code>·<code>analyze_golden_run.py</code>.</div></div>
+      <div class="callout danger"><span class="callout-icon">🎯</span><div class="callout-body"><b>CAPSTONE — 합성-only 분류기는 실 문서에 일반화되지 않는다(2026-06-30):</b> 교차 silver 627건(누출 해결판)으로 KF-DeBERTa 학습 → <b>gold_real 777 실 한국어 문서</b> 평가(<code>train_eval_synth_silver.py</code>). <b>F1-macro 0.26</b>(cost2.0)/0.29(cost1.0) vs 실데이터 배포모델 0.736 — <b>일반화 실패</b>. 실패 양상=<b>체계적 과분류</b>: 실 S3 420건 → 예측 S1 226~287·S2 120~166·<b>S3 정답 3~6%만</b>(모델이 실 공개문서를 비밀 S1으로 못 알아봄, 합성 S1 텍스처를 전 문서에 적용). 단 <b>FNR-안전 방향</b>(고등급→S3 catastrophic 미탐 2건); 서빙 escalation τ가 under-class FNR을 <b>~1%로 회복</b>(τ0.15: TS FNR 0.15·전체 0.01) — 과분류는 못 고쳐 F1 ~0.2 그대로. <b>교란 분리: cost=1.0도 동일 과분류</b>(F1 0.29, 실S3→S1 287) → fnr_cost 탓 아닌 <b>합성↔실 분포·텍스처 갭이 원인</b>(확정). <b>결론: 합성-only = 안전한 cold-start(반출0·미탐안전)이나 과분류로 자동화 무용(검수 폭증). 분류 품질의 진짜 레버 = 고객사 운영학습(Pillar2)이지 합성 부트스트랩 아니다.</b> 누출은 교차설계로 풀어도 합성↔실 텍스처 갭은 합성으로 못 푼다.</div></div>
+    </section>
+
+    <section id="s11">
+      <h2><span class="num">11</span> 한계·전제 (정직)</h2>
+      <p class="h2-sub">이 설계가 할 수 있는 것과 없는 것.</p>
+      <ul>
+        <li><b>운영 정확도 보증 불가</b> — 합성·OOD 기준이라 실분포 정확도는 운영 후 재측정해야 확정. 모델 카드에 명시(계약 방어).</li>
+        <li><b>합성 천장(capstone 실증)</b> — 합성 silver 627건 학습모델은 <b>실 문서에 일반화되지 않음: gold_real 777 F1-macro 0.26</b>(vs 실데이터 배포모델 0.736). 실 공개문서(S3)를 비밀(S1)로 체계적 과분류(실 S3 정답 3~6%만). 도메인 누출은 교차설계로 풀어도(baseline 0.856→0.337) <b>합성↔실 텍스처 갭은 합성으로 못 풂</b>. <code>fnr_cost=1.0</code>도 동일 → 학습 하이퍼 탓 아닌 합성 갭 자체. 합성 골든은 "정확도"가 아니라 "안전한 출발선".</li>
+        <li><b>운영 첫 교정이 첫 진실 신호</b> — 그 전까진 깜깜이. 안전망(게이트·표본감사·미탐 0 floor)은 협상 불가.</li>
+        <li><b>콜드스타트 부담(실측 심각)</b> — 합성모델은 실 문서를 대량 과분류(실 S3의 ~94%를 S1/S2로) → <b>초기 검수 부담이 매우 큼</b>(전 문서가 고등급 알람에 가까움). 단 <b>FNR-안전</b>(서빙 escalation τ=0.15에서 고등급 미탐 ~1%)이라 과분류는 안전 방향이고 누출은 안 함. 운영 교정이 실분포·텍스처를 가르치며 과분류·검수부담이 줄어드는 구조.</li>
+        <li><b>선례 일반화 한계</b> — kNN 선례는 유사 케이스만 패치, 새 유형 일반화는 재학습 영역.</li>
+        <li><b>초기 합성 천장은 고객사 CPU 야간 증분재학습으로 돌파 경로가 열렸다</b> — 무반출을 유지한 채, 고객사 현장 검수 교정을 <b>야간 CPU 증분재학습</b>(기존 학습셋과 혼합)으로 분류기에 반영한다(<code>enable_incremental_retrain</code>, onprem-local). 후보 등록까지 자동이며 <b>활성화는 사람 사인오프</b>(auto_activate=False). 분류기 갱신=지재원 합성 재번들 + 고객사 CPU 증분, 실세계 개선=비모수(선례·게이트·보정) 병행. 부트스트랩 시점 천장은 합성이나, 운영 루프로 개선된다.</li>
+      </ul>
+      <div class="callout warn"><span class="callout-icon">🧭</span><div class="callout-body"><b>전략 정식화 (capstone 후 — 두 기둥의 역할 재정의).</b>
+      <ol style="margin:6px 0 0 18px;padding:0;">
+        <li><b>합성 부트스트랩 = 안전한 cold-start (자동화 가치 ≈ 0)</b>. 실증: 서빙 escalation τ로 고등급 미탐 ~1%(누출 안전) — 그러나 gold_real F1 0.26·실 공개문서를 S1으로 과분류(자동화 불가). 합성의 역할은 "정확한 분류기"가 아니라 "<b>틀려도 안전하게 틀리는 출하 가능한 seed</b>".</li>
+        <li><b>자동화율의 유일한 레버 = 고객사 운영학습(Pillar 2 비모수)</b> — 선례 kNN·재보정(temperature)·게이트 재튜닝·관리자 교정. <b>합성 재번들이 아니다</b>(합성↔실 텍스처 갭은 합성으로 못 좁힘). 분류 품질은 배포 후 실 문서 교정에서만 오른다.</li>
+        <li><b>배포 궤적</b>: ① 보수적 과분류 seed로 출하(검수 부담 큼·미탐 안전) → ② 운영 교정이 실분포·텍스처를 가르침 → ③ 비모수 메모리·보정으로 과분류↓·자동화율↑. 분류기 가중치는 합성 천장 고정, 실세계 개선은 비모수 층에 축적.</li>
+        <li><b>계약·모델카드 명시</b>: "합성 학습 정확도(F1 0.26)는 운영 성능 보증이 아니며, 자동화율은 운영 학습으로만 확보된다. 초기 검수 부담은 설계상 수용된 cold-start 비용이다." (over-claim 방어)</li>
+      </ol></div></div>
+      <div class="callout info">
+        <span class="callout-icon">ℹ</span>
+        <div class="callout-body"><b>종합.</b> 실데이터·검수·반출이 모두 0인 세계에서 — <b>합성 LLM합의 골든으로 부트스트랩하고, 보수적 안전망으로 미탐을 막은 채 운영하며, 관리자 확정으로 고객사 비모수(선례·게이트·보정) 개선을 쌓는</b> 것이 가능한 최선이다. <b>분류기 가중치 자체는 합성 천장에 고정</b>되고(실데이터 경로 없음·수용), 실세계 신호는 비모수 메모리에만 남는다. 한편 지재원의 (합성 기반) 재학습 경로는 <b>오염으로 자기파괴(죽음의 나선)하지 않도록</b> §7의 4대 하드닝이 필요하고, <b>고객사에서는 그 재학습 루프 자체를 OFF</b>해 위험을 제거한다(§10 0.5). 이 설계서의 모든 코드 주장은 제어흐름 추적 + 적대적 검증으로 확인됐다. <b>2026-06-30 capstone가 이 전략을 실증·정량화</b>: 합성 학습모델은 실 문서(gold_real 777)에 F1 0.26·과분류로 자동화 불가하나 미탐은 안전(서빙 τ로 ~1%) — 따라서 <b>합성 = 안전 seed, 자동화율 = 운영학습 레버</b>임이 확정됐다.</div>
+      </div>
+    </section>
+
+    <div class="appendix-links" style="margin-top:36px;">
+      <a class="appendix-link" href="분류검수게이트_강화_보고서.html"><span>관련 — 분류 검수 게이트 강화 보고서</span><span class="al-arrow">→</span></a>
+      <a class="appendix-link" href="서빙_운영점_파라미터_명세.html"><span>관련 — 서빙 운영점·게이트 파라미터 명세</span><span class="al-arrow">→</span></a>
+    </div>
+  </article>
+</div>
+
+<footer>
+  <span>무실데이터 분류기 설계서 · 감리 참고자료 · 2026-06 · Lloydk AI Engine</span>
+  <span>합성 부트스트랩 · 운영 학습 · 죽음의 나선 방어 — 코드 검증 기준 · rev.3(capstone 실증: 합성=안전seed·자동화=운영학습)</span>
+</footer>
+<script>
+const items = document.querySelectorAll('.toc-item[href^="#"]');
+const sections = [...items].map(i => document.querySelector(i.getAttribute('href'))).filter(Boolean);
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      items.forEach(i => i.classList.remove('active'));
+      const link = document.querySelector(`.toc-item[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

@@ -1,0 +1,480 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 (학습 GPU·추론 CPU·분류기·RDB·안전골조) | Lloydk</title>
+<style>
+:root{
+  --bg:#ffffff; --surface:#fafafa; --surface2:#f2f2f2; --code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.82);
+  --text:#0a0a0a; --soft:#525252; --dim:#737373; --faint:#a3a3a3;
+  --border:rgba(0,0,0,0.10); --border-strong:rgba(0,0,0,0.18);
+  --radius-sm:6px; --radius:8px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);
+  --sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14.5px;line-height:1.65;letter-spacing:-0.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+
+/* ===== Nav ===== */
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1180px;margin:0 auto;padding:13px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;white-space:nowrap;line-height:1;}
+.brand-mark{width:40px;height:40px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,0.12);box-shadow:var(--shadow-sm);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;}
+.brand-sep{color:var(--dim);font-size:14px;margin:0 5px;}
+.brand-url{font-family:var(--mono);font-size:13px;color:var(--dim);}
+.nav-tag{font-family:var(--mono);font-size:11.5px;color:var(--dim);border:1px solid var(--border);background:var(--surface);padding:5px 10px;border-radius:6px;}
+
+/* ===== Layout ===== */
+.page{max-width:1180px;margin:0 auto;padding:38px 28px 100px;}
+.eyebrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;margin-bottom:16px;}
+.badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:3px;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--mono);}
+.badge.ghost{background:#404040;}
+.dotc{color:var(--faint);}
+.muted{color:var(--dim);}
+h1.title{font-size:40px;font-weight:800;letter-spacing:-0.035em;line-height:1.08;margin:0 0 14px;}
+.lede{font-size:16px;font-weight:300;color:var(--soft);max-width:820px;margin:0 0 26px;line-height:1.55;}
+
+/* ===== Section ===== */
+section{margin:0 0 14px;scroll-margin-top:70px;}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:34px 0 4px;}
+.sec-head .n{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--dim);border:1px solid var(--border);background:var(--surface);padding:3px 8px;border-radius:5px;line-height:1;}
+.sec-head h2{font-size:21px;font-weight:700;letter-spacing:-0.022em;margin:0;}
+.sec-sub{color:var(--dim);font-size:13px;margin:2px 0 14px;}
+
+/* ===== KPI strip ===== */
+.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--border-strong);border-radius:0;overflow:hidden;margin:0 0 8px;}
+.kpi .cell{padding:16px 18px;border-right:1px solid var(--border);}
+.kpi .cell:last-child{border-right:none;}
+.kpi .v{font-size:26px;font-weight:800;letter-spacing:-0.03em;line-height:1;}
+.kpi .l{font-size:11.5px;color:var(--dim);margin-top:6px;font-family:var(--mono);}
+.kpi .s{font-size:11px;color:var(--faint);margin-top:2px;}
+
+/* ===== TOC (우측 사이드바) ===== */
+.body-layout{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:40px;}
+.body-main{min-width:0;}
+.toc-aside{position:relative;}
+.toc{position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:6px 10px;color:var(--dim);text-decoration:none;font-size:12.5px;line-height:1.4;border-left:2px solid transparent;transition:all .12s;}
+.toc a:hover{color:var(--text);background:var(--surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.toc a .tn{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-right:6px;}
+@media(max-width:980px){.body-layout{grid-template-columns:1fr;}.toc-aside{display:none;}}
+
+/* ===== Diagram primitives (직선형·사각) ===== */
+.diag{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:8px 0;}
+.node{flex:1 1 140px;min-width:140px;border:1px solid var(--border-strong);border-radius:0;background:var(--surface);padding:12px 14px;}
+.node .nt{font-size:13.5px;font-weight:700;letter-spacing:-0.01em;}
+.node .nd{font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.45;}
+.node.dark{background:var(--text);color:var(--bg);border-color:var(--text);}
+.node.dark .nd{color:#cfcfcf;}
+.node.soft{background:var(--bg);}
+.arr{display:flex;align-items:center;justify-content:center;color:var(--dim);font-family:var(--mono);font-size:17px;flex:0 0 auto;padding:0 2px;}
+.grp{border:1px dashed var(--border-strong);border-radius:0;padding:10px;}
+.grp-l{font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--dim);letter-spacing:0.05em;margin-bottom:8px;text-transform:uppercase;}
+
+/* ===== straight band callout (직선형 띠) ===== */
+.band{border-left:4px solid var(--text);border-radius:0;background:var(--surface);padding:13px 16px;margin:10px 0;}
+.band.gray{border-left-color:var(--dim);background:var(--surface);}
+.band.warn{border-left-color:#b45309;background:#fffbeb;}
+.band .bt{font-size:12.5px;font-weight:700;font-family:var(--mono);letter-spacing:0.02em;margin-bottom:6px;}
+.band p{margin:5px 0;font-size:13px;line-height:1.6;}
+.band ul{margin:5px 0;padding-left:18px;} .band li{font-size:12.5px;margin:3px 0;}
+
+/* ===== deployment zones ===== */
+.deploy3{display:grid;grid-template-columns:1fr 44px 1fr 44px 1fr;align-items:stretch;gap:0;margin:8px 0;}
+.zone{border:1px solid var(--border-strong);border-radius:0;padding:14px 16px;background:var(--bg);}
+.zone .zl{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.zone .zt{font-size:14px;font-weight:700;}
+.zone .zb{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--bg);background:var(--text);padding:3px 7px;border-radius:3px;letter-spacing:0.04em;}
+.zone .zb.ok{background:#15803d;}
+.zone .zb.no{background:#b91c1c;}
+.subnode{border:1px solid var(--border);border-radius:0;background:var(--surface);padding:8px 11px;margin:6px 0;font-size:12.5px;}
+.subnode b{font-weight:600;}
+.subnode.hl{border-color:var(--text);}
+.conn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--dim);font-family:var(--mono);font-size:10px;text-align:center;}
+.conn .a{font-size:18px;line-height:1;}
+
+/* ===== grade box ===== */
+.grade{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;border:1px solid var(--border-strong);border-radius:0;padding:14px 16px;background:var(--surface);margin:8px 0;}
+.grade .formula{font-family:var(--mono);font-size:13px;font-weight:600;white-space:nowrap;}
+.grade .chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{font-family:var(--mono);font-size:12px;font-weight:700;border:1px solid var(--border-strong);border-radius:0;padding:5px 11px;background:var(--bg);}
+.chip.top{background:var(--text);color:var(--bg);border-color:var(--text);}
+
+/* ===== tables ===== */
+.tbl-wrap{border:1px solid var(--border);border-radius:0;overflow:hidden;margin:8px 0;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead{background:var(--surface);}
+th{padding:9px 13px;text-align:left;font-weight:600;font-size:11.5px;color:var(--soft);border-bottom:1px solid var(--border);}
+td{padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td .pick{font-weight:700;}
+td code,.mono{font-family:var(--mono);font-size:12px;}
+.tag-ok{font-family:var(--mono);font-size:10.5px;font-weight:700;color:#15803d;}
+.tag-no{font-family:var(--mono);font-size:10.5px;font-weight:700;color:#b91c1c;}
+.tag-q{font-family:var(--mono);font-size:10.5px;font-weight:700;color:#b45309;}
+
+/* ===== golden / data flow ===== */
+.gs{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0;}
+.gs-step{flex:1 1 122px;min-width:122px;border:1px solid var(--border);border-radius:0;background:var(--surface);padding:10px 12px;}
+.gs-step.hl{border-color:var(--text);}
+.gs-step .n{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--dim);letter-spacing:0.03em;}
+.gs-step .t{font-size:12.5px;font-weight:600;margin-top:3px;}
+.gs-step .d{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.4;}
+
+footer{border-top:1px solid var(--border);max-width:1180px;margin:30px auto 0;padding:24px 28px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
+
+/* ===== 반응형 ===== */
+@media(max-width:860px){
+  .kpi{grid-template-columns:repeat(2,1fr);} .kpi .cell:nth-child(2){border-right:none;}
+  .deploy3{grid-template-columns:1fr;} .conn{flex-direction:row;padding:10px 0;} .conn .a{transform:rotate(90deg);}
+  .grade{grid-template-columns:1fr;}
+}
+@media(max-width:560px){
+  .page{padding:28px 16px 70px;} h1.title{font-size:30px;}
+  .diag{flex-direction:column;} .arr{transform:rotate(90deg);padding:3px 0;}
+  .kpi{grid-template-columns:1fr;} .kpi .cell{border-right:none;}
+}
+@media print{.nav{position:static;}}
+</style>
+</head>
+
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="로이드케이 Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">lloydk.co.kr</span>
+    </a>
+    <span class="nav-tag">시스템 설계도 v4 · 학습 GPU·추론 CPU·분류기·RDB · 안전골조</span>
+  </div>
+</header>
+
+<div class="page" id="top">
+  <div class="eyebrow">
+    <span class="badge">시스템 설계도 v4</span>
+    <span class="badge ghost">2026-07-01 · 안전 골조(게이트=가시성) 하드닝 반영</span>
+    <span class="dotc">·</span>
+    <span class="muted">학습 GPU(지재원 A100) · 추론 CPU · 무반출 · 상용LLM 공개전용 · 차후학습</span>
+  </div>
+  <h1 class="title">시스템 설계도 v4</h1>
+  <div style="margin:14px 0 18px;padding:13px 16px;border:1px solid #16a34a;background:#f0fdf4;color:#166534;font-size:13.5px;line-height:1.6;">
+    <b>✔ 정본(최신):</b> 본 문서는 시스템 설계도의 <b>현행 정본</b>입니다. v1~v3은 이력본이며 감리 검토 기준은 본 v4입니다.
+  </div>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>2026-06-29 운영 전제:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
+    <div style="margin-top:9px;padding-top:9px;border-top:1px solid #e4e4e7;">
+    <b>2026-07-01 v4 갱신 — 안전 골조 하드닝:</b> "모델을 더 믿게" 하는 대신 <b>모델을 덜 믿어도 안전하게 운영되는 구조</b>로 강화했다. 핵심 원칙은 <b>"게이트를 켜는 곳마다 그 출력이 어디로 갔는지 보이게"</b>(안전장치 ON = 가시성 ON 한 몸). 안전 게이트 <b>번들 A–F + P0#1~#7</b>을 운영 프로파일에 켜고, 그 발동·비용·작업·드리프트를 <b>한 화면(<code>/admin/dashboard</code>)</b>에서 보이게 했으며, CI 하드게이트·지재원 export/import 런북으로 통제 루프를 영속화했다(§08). 또한 CAPSTONE 실측 — <b>합성-only 학습은 실문서에 일반화 실패(gold_real F1 0.26)</b> — 로 <b>자동화의 유일 레버는 운영 확정 학습</b>임을 확정했다(§04).
+    </div>
+  </div>
+
+  <div class="body-layout">
+  <div class="body-main">
+  <p class="lede">발주처(지재원) 제약 — <b>① 보안문서 반출 금지 ② 학습·골든셋은 지재원 GPU(A100 80GB) 모델공장 · 운영 추론은 CPU ③ 상용 LLM은 공개 데이터에만</b> — 을 충족하는 구조. 분류기는 <b>이미 학습된 가중치를 CPU로 추론</b>하고, 학습·골든셋 구축은 <b>지재원 A100 GPU</b>에서(고객사 증분 재학습은 현장 CPU·야간). 임계·가중치는 <b>Optuna</b>가 골든셋 기준으로 자동 최적화한다. 상세 근거는 기술구현 백서 v7 참조.</p>
+
+
+  <!-- KPI -->
+  <div class="kpi">
+    <div class="cell"><div class="v">GPU/CPU</div><div class="l">학습 = 지재원 A100 GPU</div><div class="s">운영 추론·증분재학습 = CPU</div></div>
+    <div class="cell"><div class="v">0</div><div class="l">비밀문서 반출</div><div class="s">실데이터 망 내 잔류</div></div>
+    <div class="cell"><div class="v">공개</div><div class="l">상용 LLM 사용 범위</div><div class="s">골든·합성 생성 한정</div></div>
+    <div class="cell"><div class="v">CPU</div><div class="l">비밀 분류 핫패스</div><div class="s">분류기+룰, LLM-free</div></div>
+  </div>
+  <p class="sec-sub" style="margin-top:6px;">※ 본 설계는 v1(시스템_설계도.html)에서 <b>고객사 로컬 GPU LLM(Qwen) 가정을 제거</b>하고, 학습·골든셋은 지재원 GPU(A100) 모델공장·운영 추론은 CPU로 정리한 갱신본이다. 정확도·미탐 수치는 운영 관리자 확정 라벨이 충분히 쌓인 뒤에만 확정하며, 그 전 수치는 프록시로만 해석한다.</p>
+
+  <!-- 00 핵심 결정 -->
+  <section id="s0">
+    <div class="sec-head"><span class="n">00</span><h2>우리가 선택한 방법 — 한눈에</h2></div>
+    <div class="sec-sub">이번 대화에서 확정한 핵심 결정 요약.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:24%;">항목</th><th style="width:30%;">선택</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>분류 엔진</td><td class="pick">분류기(KF-DeBERTa) + 룰 + RAG검색 + 메타 + 게이트 + 사람검수</td><td>비밀 등급판정 핫패스는 <b>LLM-free</b>. 분류기가 고등급에서 검색단독보다 우위(분류기 59–77% vs kNN 38–49%)</td></tr>
+        <tr><td>분류기 학습</td><td class="pick">지금=기존 가중치 그대로 · 학습은 차후</td><td>이미 학습된 베이스 존재 → <b>CPU 추론</b>이면 충분. 지재원 풀 학습·골든셋 구축은 <b>A100 GPU</b>, 고객사 증분 재학습은 현장 CPU(야간)</td></tr>
+        <tr><td>GPU</td><td class="pick">학습·골든셋 = 지재원 A100 GPU · 추론 = CPU</td><td>운영 추론은 CPU로 충분(LLM-free 핫패스). 학습·골든셋·합성은 <b>지재원 A100 80GB GPU 모델공장</b>(요건 FUN-004 발주처 제공·CSAP). 고객사 증분 재학습만 현장 CPU(§11 D7 결정)</td></tr>
+        <tr><td>상용 LLM</td><td class="pick">공개 데이터에만</td><td>골든 후보 구축·합성 학습데이터 생성용. <b>비밀 본문은 절대 미투입</b>(반출=비공지성 파괴)</td></tr>
+        <tr><td>임계·가중치</td><td class="pick">Optuna 자동 최적화</td><td>골든셋 기준으로 게이트·온도·가중치를 자동 탐색(재학습 아닌 후처리 → CPU 초~분) → §06</td></tr>
+        <tr><td>골든셋 현행 777 · 목표 1,000</td><td class="pick">평가·검수 전용(봉인)</td><td>학습 연료 아님 — 성능 지표 측정 + Optuna 튜닝 기준. <b>현행 정본 <code>gold_real</code> 777건(§04) · 본개발 목표 1,000건.</b> 사람 서명 필수(단일)</td></tr>
+        <tr><td>안전 골조</td><td class="pick">게이트 = 가시성 (번들 A–F · P0#1~#7)</td><td>모델을 덜 믿어도 <b>안전하게 틀리고·빨리 배우고·명확히 멈추게</b>. 게이트를 켜면 그 발동을 메트릭·<code>/admin/dashboard</code>로 같이 노출 → §08</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- 01 조직 -->
+  <section id="s1">
+    <div class="sec-head"><span class="n">01</span><h2>조직·역할 — 발주처 / 수주 / 협력사</h2></div>
+    <div class="sec-sub">발주처(지재원)가 제품을 소유하고 고객사(회원사)에 납품. 우리(로이드케이)는 AI 코어를 담당하는 협력사다.</div>
+    <div class="diag">
+      <div class="node dark"><div class="nt">발주처 — 지재원(KOIPA)</div><div class="nd">발주·제품 소유 · 운영 전제 승인 · 고객사 납품 주체</div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="nt">수주(원청) — KL</div><div class="nd">시스템 구축 — 포털·업로드·저장·배포·권한 (FUN-001·006·007·008·021 등 16개)</div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="nt">협력사(AI) — 로이드케이</div><div class="nd">AI 코어 — 합성·학습·추론·파싱·라벨링·지표 (FUN-003·004·005·022·023·024)</div></div>
+      <div class="arr">→</div>
+      <div class="node soft"><div class="nt">고객사 — 회원사</div><div class="nd">폐쇄망 end-user · 실 비밀 업로드</div></div>
+    </div>
+    <div class="band gray"><div class="bt">납품 흐름</div><p>KL(구축)+로이드케이(AI)가 만든 제품을 <b>지재원(발주처)이 소유</b>하고, <b>고객사(회원사 폐쇄망)에 납품</b>한다. 합성 코퍼스·룰/게이트 번들은 <b>지재원/개발 환경</b>에서 만들고, 운영 문서·관리자 확정 라벨은 <b>고객사 폐쇄망</b>에 머문다.</p></div>
+  </section>
+
+  <!-- 02 서버 구조 -->
+  <section id="s2">
+    <div class="sec-head"><span class="n">02</span><h2>서버 구조 — 공개영역 / 지재원(학습 GPU) / 고객사(운영 CPU)</h2></div>
+    <div class="sec-sub"><b>운영 추론은 CPU, 학습·합성·골든·인덱싱은 지재원 A100 GPU 모델공장</b>에서 수행(요건 FUN-004 발주처 제공·CSAP). 비밀은 지재원·고객사 안에만 머물고, 고객사 증분 재학습은 현장 CPU(야간). 공개 데이터 가공(상용 LLM)은 밖에서.</div>
+    <div class="deploy3">
+      <div class="zone">
+        <div class="zl"><span class="zt">공개·개발 영역</span><span class="zb">공개데이터</span></div>
+        <div class="subnode hl"><b>상용 LLM(Claude 등)</b> — 골든 후보 구축 · 합성 학습데이터 생성 · silver 라벨</div>
+        <div class="subnode"><b>분류기 베이스 학습(지재원 A100 GPU)</b> — 공개+합성으로 학습 → 가중치 파일</div>
+        <div class="subnode"><span class="tag-ok">반출 무관</span> 비밀 0 · 상용 LLM은 클라우드 API(공개 데이터만)</div>
+      </div>
+      <div class="conn"><div class="a">→</div>가중치<br>매체 반입</div>
+      <div class="zone">
+        <div class="zl"><span class="zt">지재원 (발주처·모델공장)</span><span class="zb">A100 GPU 학습 · CPU 추론</span></div>
+        <div class="subnode"><b>운영 비밀데이터</b> — 고객사/KL 시스템에서 처리 · 망 내 잔류</div>
+        <div class="subnode hl"><b>합성 holdout·hardcase</b> — 상대비교·회귀 테스트용, locked 평가는 운영 확정 전 0</div>
+        <div class="subnode"><b>분류기 추론(CPU)</b> + <b>Optuna 게이트 튜닝(CPU)</b></div>
+        <div class="subnode"><b>운영 확정 포착</b> — tb_corrections·exact-match 선례 우선, 재학습은 별도 승인</div>
+      </div>
+      <div class="conn"><div class="a">→</div>납품 번들<br>모델+설정</div>
+      <div class="zone">
+        <div class="zl"><span class="zt">고객사 (회원사)</span><span class="zb no">폐쇄망 · CPU</span></div>
+        <div class="subnode"><b>AI Agent</b> — 업로드 → 분류 → 저장 (CPU)</div>
+        <div class="subnode hl"><b>운영 검수 API</b> — confirm/relabel (UI는 KL)</div>
+        <div class="subnode"><b>로컬 정본 DB</b> — 외부 미반출 · 인터넷·GPU·LLM 없음</div>
+      </div>
+    </div>
+    <div class="band"><div class="bt">고객사로 가는 "납품 번들" — 안전 부트스트랩 운영점이 담긴다</div><p>지재원에서 <b>합성 부트스트랩과 룰/게이트 운영점을 패키징한 결과물</b>을 패키징해 고객사에 설치한다: <b>① 분류기 가중치 ② 온도 보정계수 ③ 게이트 임계 ④ fusion 가중치 ⑤ 룰셋</b> (+선택: 골든셋 현장 재검증용). 고객사는 이 번들을 <b>핫리로드</b>로 적용해 CPU 추론과 검수 라우팅을 수행한다. <b>주의 — 합성 holdout은 locked 평가가 아니며 모델 학습에도 재사용하지 않는다</b>. 운영 확정 라벨은 고객사 DB에 남기고, 기본은 exact-match 선례·상향 override·검수 라우팅으로만 반영한다.</p></div>  </section>
+
+  <!-- 03 분류 동작 -->
+  <section id="s3">
+    <div class="sec-head"><span class="n">03</span><h2>분류 동작 — E2E (비밀 핫패스 = LLM-free)</h2></div>
+    <div class="sec-sub">업로드부터 등급 확정·검수 분기까지. 비밀 등급결정에 <b>LLM·GPU를 쓰지 않는다</b>.</div>
+    <div class="grade">
+      <div class="formula">등급 = 비공지성(S) × 경제적유용성(V) × 비밀관리성(M)</div>
+      <div class="chips"><span class="chip top">TS</span><span class="chip">S1</span><span class="chip">S2</span><span class="chip">S3</span><span class="muted" style="font-size:11.5px;align-self:center;margin-left:4px;">부정경쟁방지법 3요건</span></div>
+    </div>
+    <div class="diag">
+      <div class="node soft"><div class="nt">문서 업로드</div></div>
+      <div class="arr">→</div>
+      <div class="node soft"><div class="nt">추출·전처리</div><div class="nd">정규화 · 청킹 (CPU) · 스캔 PDF는 추출 0자 → failed 격리(OCR 미사용)</div></div>
+      <div class="arr">→</div>
+      <div class="grp" style="flex:2 1 320px;">
+        <div class="grp-l">분류 연산 (CPU · LLM-free)</div>
+        <div class="diag" style="margin:0;gap:6px;">
+          <div class="node" style="min-width:120px;"><div class="nt">분류기</div><div class="nd">KF-DeBERTa · 등급+신뢰도</div></div>
+          <div class="node" style="min-width:110px;"><div class="nt">룰 모델</div><div class="nd">S/V/M 키워드</div></div>
+          <div class="node" style="min-width:110px;"><div class="nt">RAG 근거</div><div class="nd">pgvector 유사 선례</div></div>
+          <div class="node" style="min-width:120px;"><div class="nt">메타데이터</div><div class="nd">보안표시·접근범위·출처</div></div>
+        </div>
+      </div>
+      <div class="arr">→</div>
+      <div class="node dark"><div class="nt">합의·보정 게이트</div><div class="nd">룰·모델 합의 + 메타 floor (Optuna 튜닝)</div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="nt">등급 + 신뢰도</div><div class="nd">자동확정 / 검수 라우팅</div></div>
+    </div>
+    <div class="diag" style="gap:8px;">
+      <div class="node soft" style="flex:1 1 46%;"><div class="nt">자동확정</div><div class="nd">고신뢰 + 룰·모델 합의 + 공개등급일 때만</div></div>
+      <div class="node soft" style="flex:1 1 46%;"><div class="nt">검수 라우팅 (사람 확인)</div><div class="nd">저신뢰 · 불일치 · <b>고등급(TS/S1)은 필수</b></div></div>
+    </div>
+    <div class="band"><div class="bt">안전 모드 — fail-closed (상향 격리)</div><p>판독 불가·모호 시 <b>낮은 등급으로 떨어뜨리지 않고 최고등급으로 격리</b> 후 사람 검수. <b>미탐(비밀→공개) 0을 최우선</b>으로 한다. 재학습이 즉시 반영되지 않는 만큼, <b>고등급은 사람검수가 설계 전제</b>다.</p></div>
+  </section>
+
+  <!-- 04 학습 전략 -->
+  <section id="s4">
+    <div class="sec-head"><span class="n">04</span><h2>학습 전략 — 기본은 추론, 운영 확정은 안전하게 포착</h2></div>
+    <div class="sec-sub">지금은 <b>룰 우선 + 기존 가중치 보조</b>로 안전하게 시작한다. 고객사 기본값은 재학습 OFF이며, 운영 확정은 먼저 검수·감사·exact-match 선례로만 쓴다.</div>
+    <div class="diag">
+      <div class="node"><div class="nt">① 지금 — 배포</div><div class="nd">기존 가중치(KF-DeBERTa baseline)를 <b>CPU 추론</b>. GPU·학습 불필요. 약점(S1)은 룰·게이트·사람검수가 보완</div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="nt">② 누적</div><div class="nd">운영 관리자 확정이 <b>tb_corrections/confirmed label</b>에 쌓임. admission gate와 감사 로그로 오염을 차단</div></div>
+      <div class="arr">→</div>
+      <div class="node dark"><div class="nt">③ 기본 — 비모수 반영</div><div class="nd">동일 해시·동일 템플릿 exact-match 선례(P1: 교정→검증라벨 사람승인 승급), 상향 override, 유사도 escalation 검수 라우팅(P2, opt-in OFF·등급 무변경). kNN/재학습은 shadow 후 별도 승인</div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="nt">④ readiness gate</div><div class="nd">locked 충분량·holdout guard·표본감사·kill-gate 통과 전 자동 활성 fail-closed</div></div>
+    </div>
+    <div class="band"><div class="bt">모델을 만들려면 — 학습 1회는 필수 · 학습 환경</div><p>모델은 <b>학습의 산출물</b>이라 만들려면 <b>학습 최소 1회 필수</b>(베이스는 과거 학습본이 이미 있어 지금은 추론만, 개선은 재학습). 학습은 <b>중앙(지재원) 1회</b>, 고객사는 추론만. <b>학습 환경(§11 D7 미결):</b> 요건(FUN-004)은 <b>발주기관 제공 GPU·CSAP 공공클라우드 샌드박스</b>에서 <b>데이터 반출 없이</b> 학습 명시 → <b>GPU 제공 시 거기서</b>(절차: Train/Val/Test 자동분리 → Chunk 단위 학습(KF-DeBERTa) → 온도 보정 → 골든 평가 게이트 통과 시만 등록). <b>미제공 시 CPU 대체</b>(B1 풀파인튜닝/B2 동결+헤드, 느림).</p></div>
+    <div class="band gray"><div class="bt">배포 = "모델만" (학습셋·골든 아님)</div><p>고객사로 가는 건 <b>완성된 모델 + 설정(번들, §02)</b>뿐이다. <b>학습셋은 안 보냄</b>(학습 내용이 이미 모델 가중치에 녹아있음). <b>골든셋은 선택</b>(운영엔 불필요 · 현장 재검증용으로만 옵션). 즉 배포는 학습의 <b>재료가 아니라 결과물</b>만.</p></div>
+    <div class="band warn"><div class="bt">CAPSTONE 실측 (2026-07-01) — 합성-only 학습은 자동화 레버가 아니다</div><p>교차설계 합성 silver 627건으로 KF-DeBERTa를 학습해 <b>실문서 gold_real 777건</b>에 평가한 결과 <b>macro-F1 0.26</b>(실데이터 학습본 0.736 대비 붕괴). 실 S3를 S1로 과분류하는 등 <b>합성↔실 텍스처 갭</b>이 원인이며, 손실가중(cost)·생성기·합성증강 어느 노브로도 안 올랐다. <b>안전성은 유지</b>(서빙 게이트의 상향격리·검수 라우팅으로 미탐 ~1%)되나 <b>자동화(무인 확정)는 무용</b>하다 → 검수 폭증. <b>결론: 정확도·자동화율을 올리는 유일한 레버는 "운영 확정 라벨 학습"</b>이며, 그전까지 합성은 <b>안전 부트스트랩 시드</b>로만 쓴다(등급 천장은 합성으로 고정). 이 때문에 v4의 개선은 모델이 아니라 <b>천장 아래에서 안전하게 운영하는 골조</b>(§08)에 집중한다.</p></div>
+  </section>
+
+  <!-- 05 데이터 자산 -->
+  <section id="s5">
+    <div class="sec-head"><span class="n">05</span><h2>데이터 자산 — "지금 만든 데이터는 어디에 쓰나"</h2></div>
+    <div class="sec-sub">현재 보유 데이터는 <b>학습 시드·프록시 holdout·운영 locked</b>로 나눈다. 합성/LLM 라벨은 상대비교용이고, 운영 정확도 정답지는 사람 서명 locked뿐이다.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:22%;">자산</th><th style="width:18%;">용도</th><th>설명 · 현황(파일 실측)</th></tr></thead>
+      <tbody>
+        <tr><td><b>학습셋 (silver)</b><br><span class="muted mono" style="font-size:11px;">train_subset 610 · bilingual 6,711 등</span></td><td class="pick">분류기 <b>학습</b></td><td>LLM(Qwen)·룰 자동라벨, 노이즈 허용. 분류기 파인튜닝 연료(FUN-004). <b>지표용 아님</b></td></tr>
+        <tr><td><b>프록시 holdout</b><br><span class="muted mono" style="font-size:11px;">classification_gold 777 · holdout.clean 42/35 등</span></td><td class="pick"><b>상대비교</b> + 회귀 테스트</td><td>합성·LLM·공개 라벨 기반이라 운영 정답지가 아니다. <span class="tag-q">locked 사람서명 0건</span> — 자동평가 수치는 프록시로만 사용</td></tr>
+        <tr><td><b>적대 케이스</b><br><span class="muted mono" style="font-size:11px;">golden_100</span></td><td class="pick">게이트 강건성</td><td>수작업 함정 100건 — 게이트가 트릭에 안 속는지 점검(평가 보조)</td></tr>
+        <tr><td><b>운영 DB</b><br><span class="muted mono" style="font-size:11px;">PostgreSQL ai_agent</span></td><td class="pick"><b>운영</b> 데이터</td><td>업로드 문서·분류결과·검수·교정·감사. 폐쇄망 정본 — 학습/지표용 데이터셋과 별개</td></tr>
+      </tbody>
+    </table></div>    <div class="band"><div class="bt">데이터 구성 — 골든은 "진짜만", 학습은 "혼합"</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:22%;">데이터셋</th><th>구성</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td><b>locked_gold_eval</b></td><td><b>운영 관리자 확정 + 사람서명만</b> — 현재 0건 정상</td><td>운영 정답지. 합성·자동라벨은 승격 불가</td></tr>
+        <tr><td><b>학습셋(silver)</b></td><td><b>합성(LLM) + 공개데이터 + 운영 확정 후보</b></td><td>현재는 합성 다양성·하드케이스를 극대화하고, 운영 확정은 admission gate 후 별도 편입</td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:12.5px;"><b>운영 편입 원칙:</b> 합성은 학습 시드·하드케이스·회귀 테스트용이고, locked 평가는 사람서명 전용이다. 운영 확정 라벨은 즉시 재학습하지 않고 exact-match 선례와 검수 라우팅부터 쓰며, kNN/재학습은 충분한 표본감사와 kill-gate 이후 별도 승인한다.</p></div>
+    <div class="band gray"><div class="bt">원본 보관 정책</div><p><b>지재원 = 원본 바이너리 미보관</b> — 텍스트만 추출해 골든/학습에 쓰고 원본은 폐기(보안 노출↓ · 처리 중 임시보관만). <b>고객사 = KL 책임</b>(자료저장 FUN-007·생애주기 FUN-012 — 보관·암호화 여부 KL 결정). DB엔 메타·해시·텍스트만, 무거운 원본 저장 없음.</p></div>
+  </section>
+
+  <!-- 06 Optuna -->
+  <section id="s6">
+    <div class="sec-head"><span class="n">06</span><h2>Optuna — 무엇을 튜닝해서 품질을 올리나</h2></div>
+    <div class="sec-sub">Optuna = 하이퍼파라미터·임계 <b>자동 탐색</b> 도구. <b>분류기를 대체하는 게 아니라</b>, 분류기 주변의 설정값을 골든셋 기준으로 최적화해 품질을 끌어올린다. <b>재학습 없는 후처리 노브는 CPU로 초~분(GPU 불요).</b></div>
+    <div class="diag">
+      <div class="node soft"><div class="nt">목적함수</div><div class="nd">골든셋 기준 — "고등급 FNR ≤ 목표" 제약 하에 <b>자동확정율·F1 최대</b></div></div>
+      <div class="arr">→</div>
+      <div class="node"><div class="nt">탐색 대상(노브)</div><div class="nd">① 온도보정 T ② 게이트 임계(conf·합의·희소근거) ③ 합의 게이트 on/off·희소근거 임계 — 모두 재학습 없이 CPU로</div></div>
+      <div class="arr">→</div>
+      <div class="node dark"><div class="nt">최적 설정 산출</div><div class="nd">수동 추측 대신 <b>재현 가능·일관</b>된 임계 자동 도출</div></div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:30%;">Optuna가 맞추는 것</th><th style="width:14%;">GPU</th><th>품질이 올라가는 원리</th></tr></thead>
+      <tbody>
+        <tr><td>온도 보정(temperature)</td><td><span class="tag-ok">불요</span></td><td>OOD 과신 완화 → 신뢰도 게이트 판단이 정확해짐</td></tr>
+        <tr><td>게이트 임계(합의·희소근거)</td><td><span class="tag-ok">불요</span></td><td>자동확정 정밀도 <b>63→81%</b>, 무성 TS 미탐 <b>5→0</b> 같은 임계를 사람 손 대신 골든 기준으로 산출</td></tr>
+        <tr><td>합의 게이트 on/off·희소근거 임계</td><td><span class="tag-ok">불요</span></td><td>신호 결합 비중 최적화 → 등급 정확도·미탐 동시 개선</td></tr>
+      </tbody>
+    </table></div>
+    <div class="band gray"><div class="bt">즉시 가치</div><p>지금 가진 모델·골든셋만으로 <b>①~③(후처리 노브)</b>을 GPU 없이 최적화할 수 있다 → 우리가 계속 다룬 <b>자동확정 FNR/정밀도</b>를 골든 기준으로 바로 끌어올린다. 가장 가성비 높은 첫 작업.</p>
+    <p style="font-size:12px;color:var(--dim);"><b>구현 상태: P1 하네스(스켈레톤) 구현</b> — <code>m6_evaluation/optuna_tuner.py</code> + <code>scripts/optuna_tune_gates.py</code>. 평가 하네스(<code>evaluate_via_serving</code>) 재사용 · CPU(GPU 불요). 스모크(3-trial)에서 <b>고등급 FNR=0 제약 충족 + val/test 분할 검증</b> 확인. <b>본 정밀 튜닝(50~100 trial)은 1,000 사람골든 확보 후 실행</b>(작은 N=과적합) → best 설정을 번들 ②③④로 통합.</p></div>
+  </section>
+
+  <!-- 07 지표 -->
+  <section id="s7">
+    <div class="sec-head"><span class="n">07</span><h2>성능 지표 (FUN-024) — 요건 명시 6개 · 학습 무관</h2></div>
+    <div class="sec-sub"><b>지표는 "평가(모델+골든 채점)"의 산출물 — 학습과 무관하다.</b> 무학습으로도 산출됨(기존 모델을 골든으로 채점하면 됨). 6개는 <b>요건(FUN-004·FUN-024)이 직접 명시</b>한 지표.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:6%;">#</th><th style="width:30%;">지표</th><th>요건 출처 · 쓰임</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="pick">Accuracy (정확도)</td><td>FUN-004·024 — 분류 정답률</td></tr>
+        <tr><td>2</td><td class="pick">Precision (정밀도)</td><td>FUN-004·024 — 과분류 억제</td></tr>
+        <tr><td>3</td><td class="pick">Recall (재현율)</td><td>FUN-004·024 — <b>운영 성능기준(발주처 합의)</b>(PMR-002; RFP 정확도 수치목표 부재)</td></tr>
+        <tr><td>4</td><td class="pick">F1-Score</td><td>FUN-004 — 정밀도·재현율 균형</td></tr>
+        <tr><td>5</td><td class="pick">미탐율 (FNR)</td><td>FUN-024 — <b>보안사고 직결, 최우선 관리</b></td></tr>
+        <tr><td>6</td><td class="pick">Confusion Matrix</td><td>FUN-024 — 판단결과 분류표(등급 간 오분류 경향)</td></tr>
+      </tbody>
+    </table></div>  </section>
+
+  <!-- 08 안전 골조 -->
+  <section id="s8">
+    <div class="sec-head"><span class="n">08</span><h2>안전 골조 — 게이트 = 가시성 (안전실패 하드닝)</h2></div>
+    <div class="sec-sub">v4의 핵심 갱신. 합성 천장은 못 올리므로 <b>천장 아래에서 안전하게 운영</b>하는 골조를 강화했다 — <b>안전하게 틀리고 · 빨리 배우고 · 명확히 멈추는</b> 시스템.</div>
+    <div class="band"><div class="bt">원칙 — 액추에이터와 가시성은 한 몸</div><p><b>게이트를 켜는 곳마다 그 출력이 어디로 갔는지 보이게.</b> 안전장치를 켜면서 그 발동이 보이는 메트릭/화면을 같이 켜야 무음 실패가 '안 보이는 검수 보류큐'로 이사하지 않는다. 또 <b>강한 액추에이터는 사람이 방아쇠를</b> — 평가 신호가 합성인 단계에서 자동정지는 위험하므로 kill-gate·정족수는 opt-in. 모든 변경은 <b>best-effort(실패가 분류·검색 경로를 막지 않음)</b>이고 기본값은 동작 보존이다.</p></div>
+    <div class="diag">
+      <div class="node"><div class="nt">안전하게 틀리고</div><div class="nd">fail-closed 상향격리 · 메타데이터 floor(A) · 고등급 필수 검수 · 원본 at-rest 암호화(F)</div></div>
+      <div class="node"><div class="nt">빨리 배우고</div><div class="nd">운영 확정 포착 · 비모수 승급(P1) · 검수큐 적재 루프(P0#1) · 한 화면 대시보드</div></div>
+      <div class="node"><div class="nt">명확히 멈추고</div><div class="nd">locked readiness 게이트(D) · kill-gate 브레이크(E) · CI 하드게이트(P0#5) · deploy gate(P0#6)</div></div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:20%;">안전 게이트 (번들 A–F)</th><th>동작 · 가시성 (게이트 = 메트릭 한 몸)</th></tr></thead>
+      <tbody>
+        <tr><td><b>A · 메타데이터 floor</b><br><span class="tag-ok">운영 ON</span></td><td>보안표시가 예측보다 높으면 상향(FNR-safe·하향 없음), 접근범위 충돌이면 검수 라우팅. 메타 부재 시 무음 no-op → <b>게이트 발동·메타 존재율 메트릭</b> 동반</td></tr>
+        <tr><td><b>B · 고등급 이중검토</b></td><td>1인 동의 시 needs_second_review 무음 보류 → <b>등급별 보류 카운터 + 조회 API</b>. 정족수 플래그는 1인 운영 데드락 방지로 opt-in</td></tr>
+        <tr><td><b>C · factor 출처 분리</b></td><td>모델이 룰보다 고등급이면 S/V/M을 역산 → 법리 근거 오인 방지 위해 <code>rule_evidenced / model_estimated</code> 출처 분리 표기</td></tr>
+        <tr><td><b>D · locked readiness</b></td><td>자동활성에 필요한 등급별 <b>사람서명 평가정답 충족 여부</b> 노출. 무실데이터 단계엔 비어 ready=false(진실), 채워지면 자동 ON</td></tr>
+        <tr><td><b>E · kill-gate 브레이크</b><br><span class="tag-q">admin-actuated</span></td><td>품질붕괴 발동 시 <b>고등급 자동확정만 검수로 보수화</b>(등급 무변경·조건 풀리면 해제). 합성 신호로 운영을 자동정지하지 않음 — 기본 off</td></tr>
+        <tr><td><b>F · 원본 at-rest 암호화</b><br><span class="tag-ok">기본 ON</span></td><td>폐쇄망 원본 평문 저장 금지(AES-256-GCM). 키 미설정 시 <b>startup fail-fast(fail-secure)</b></td></tr>
+      </tbody>
+    </table></div>
+    <div class="band gray"><div class="bt">P0 하드닝 게이트 (#1~#7) — 파이프라인 구멍 봉인</div>
+    <ul>
+      <li><b>P0#1 검수큐 적재 루프.</b> synthesize_batch 산출을 검수큐에 적재해 <b>generate→queue→review</b> 루프를 마감(승인 샘플만 학습셋 편입, label_source 노이즈 배제)</li>
+      <li><b>P0#2 도메인→등급 누출 게이트.</b> 도메인만 보고 등급을 맞히는 shortcut(누출 85.6%) 산출을 <b>분석 지표에서 hard 차단선으로 승격</b> → 누출 학습 자동 차단</li>
+      <li><b>P0#3 저품질/OCR 라우팅.</b> 추출 품질이 낮으면 <b>분류 전에 검수 라우팅</b>(쓰레기 텍스트로 오분류 방지)</li>
+      <li><b>P0#4 능동 경보 룰.</b> 안전 게이트 실패·무결성(payload_hash) 신호를 <b>알림 룰</b>로 능동 경보</li>
+      <li><b>P0#5 CI 하드게이트.</b> 안전 게이트 강제·airgap 번들 검증을 <b>CI로 영속화</b>(코드 회귀로 안전장치가 꺼지는 것 차단)</li>
+      <li><b>P0#6 메타모픽 deploy gate.</b> 순방향 메타모픽 회귀(불변식 위반)를 <b>배포 게이트 hard-signal</b>로 배선</li>
+      <li><b>P0#7 SSRF 가드.</b> 웹훅 콜백에서 <b>클라우드 메타데이터·예약대역 무조건 차단</b> + loopback·비 http(s) 거부</li>
+    </ul></div>
+    <div class="band"><div class="bt">관측 가시성 + 운영 검수 대시보드</div><p>품질이 조용히 떨어지던 지점을 메트릭·트레이스로 노출했다: <b>① LLM 비용추적 전 경로 배선</b>(개발/운영 분리 집계) <b>② 비동기 작업 상태 메트릭</b>(진입 카운터+소요시간 히스토그램) <b>③ OTel 추론·검색 span</b>(스칼라·비민감만, 본문 미노출) <b>④ 검색 폴백 가시화</b>(reranker→RRF·encode 실패·쿼리확장 폴백). 이 신호를 <code>GET /admin/dashboard</code> <b>한 화면</b>으로 종합 — 이중검토 보류·locked readiness·교정 backlog·kill-gate 발동·임베딩 드리프트를 함께 본다(섹션별 독립 best-effort·부분 가용 표기).</p></div>
+    <div class="band gray"><div class="bt">통제 루프 — 지재원 export/import 런북 (G1·G2)</div><p>지재원(개발)에서 고객사(운영)로 가는 릴리스·활성·검수반입을 런북으로 통제한다: <b>G1 — 수동 활성 엔드포인트</b>(<code>POST /admin/model/activate</code>, deploy gate 통과 + force 시 감사) · <b>G2 — 검수 반입 <code>--as-candidate</code></b>(고객사 교정을 <code>gold_candidate</code>로만 편입해 <b>평가셋 오염 차단</b>, 지재원 golden-build 기본 무변경). CI 하드게이트(P0#5)가 이 통제가 코드 회귀로 풀리지 않게 영속화한다.</p></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--dim);">상세 반영 내역: <a href="설계검토_하드닝_반영_내역.html" style="color:var(--text);">설계검토 하드닝 반영 내역</a> · <a href="분류검수게이트_강화_보고서.html" style="color:var(--text);">분류 검수 게이트 강화 보고서</a> · <a href="운영_런북.html" style="color:var(--text);">운영 런북</a></div>
+  </section>
+
+  <!-- 09 확인① 분류기 채택 -->
+  <section id="s9">
+    <div class="sec-head"><span class="n">09</span><h2>확인 ① 분류기 채택 — 검색 단독(Dense kNN)은 붕괴</h2></div>
+    <div class="sec-sub">"분류기 빼고 검색(BM25/Dense kNN) 상위 5건 중 가장 높은 등급"으로 매기는 안을, 동일 테스트셋·누출 0으로 분류기와 정면 실측 (<a href="검색단독_vs_분류기_등급분류_비교.html">검색단독_vs_분류기</a> 요약).</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:26%;">방식</th><th>등급 정확도</th><th>고등급 미탐</th><th>분포</th></tr></thead>
+      <tbody>
+        <tr><td><b>검색 단독</b> (most-severe)</td><td><span class="tag-no">20%</span></td><td>0% (착시)</td><td>🔴 문서 54%를 TS로(실제 7%) — "무조건 TS 도장기" 붕괴</td></tr>
+        <tr><td><b>검색 + 분류기</b> (채택)</td><td><span class="tag-ok">59~77%</span></td><td>5~14%</td><td>✅ 정상 분포 유지</td></tr>
+      </tbody>
+    </table></div>
+    <div class="band"><div class="bt">왜 검색 단독은 붕괴하나</div><p>검색(BM25 R@5 94%)은 <b>주제가 비슷한 문서 찾기</b>엔 탁월하지만, 등급은 <b>주제가 아니라 S·V·M</b>(비공지성·경제가치·비밀관리성)에서 나온다. "상위 5 중 가장 높은 등급(most-severe)" 방식은 검색을 분류로 오용 → <b>참조셋(레퍼런스)에 따라 28~76%로 출렁이고, most-severe면 전부 TS로 퇴행</b>(미탐 0은 "다 최고등급으로 밀어서" 만든 착시·양치기 소년). → <b>분류기를 1차, 검색을 근거 보완</b>으로.</p></div>
+    <div class="band gray"><div class="bt">결론 — 분류기 채택 확정</div><p>분류기 학습은 <b>중앙(지재원) 1회</b>, 고객사는 <b>CPU 추론(333ms/건)</b>. 검색은 검색·근거 담당. (※ FUN-004/005도 인코더 PLM 분류기 의무화와 정합)</p></div>
+  </section>
+
+  <!-- 10 확인② RDB 필수 -->
+  <section id="s10">
+    <div class="sec-head"><span class="n">10</span><h2>확인 ② RDB(PostgreSQL) 필수</h2></div>
+    <div class="sec-sub">이 시스템 데이터는 "검색 문서"가 아니라 <b>트랜잭션·관계형 파이프라인</b>이다 — 검색은 보조(근거).</div>
+    <div class="band"><div class="bt">PostgreSQL 단일 정본</div><p>등급 확정/보정(행잠금)·감사체인(pg_advisory)·교정 멱등(UNIQUE)이 ACID·FK·즉시일관성을 요구하고, <b>pgvector가 PG 안에서 벡터+lexical을 통합</b>(dense 76%·하이브리드 85%, 의사결정_대장 §03)한다. 별도 검색엔진은 이중시스템 부담만 늘 뿐이라 두지 않는다. <b>고객사=운영 RDB 필수 / 지재원=파일+가벼운 DB로 충분</b>(§05·§07).</p></div>
+  </section>
+
+  <!-- 11 남은 의사결정 -->
+  <section id="s11">
+    <div class="sec-head"><span class="n">11</span><h2>남은 의사결정 사항</h2></div>
+    <div class="sec-sub">설계를 확정·진행하기 전에 발주처·KL과 합의가 필요한 항목.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="width:5%;">#</th><th style="width:30%;">결정 사항</th><th>내용 · 영향</th></tr></thead>
+      <tbody>
+        <tr><td>D1</td><td><b>FUN-024 지표 "기획서"를 KL이 진행하나?</b></td><td>지표 6개는 <b>FUN-004·024 명시로 확정(§07)</b>. 잔여 = 지표 분석 <b>화면 기획서</b> 주체 — KL(포털·대시보드 FUN-009) vs Lloydk(지표 산출 FUN-024). <b>화면=KL / 산출·API=Lloydk</b>가 자연스러움(K7 합의 안건)</td></tr>        <tr><td>D3</td><td><b>지재원 관리자가 보안등급을 검수해줄 수 있나?</b> <span class="tag-q">정확도 핵심</span></td><td>실데이터 보안등급을 <b>지재원 관리자/전문가가 직접 검수·서명</b>할 수 있는지(검토자 자격·인력 확보). ⭐ <b>이게 되어야 ① 사람서명 locked 평가셋 구축 ② 재학습으로 등급분류 정확도↑</b>(특히 S1 약점 해소). <b>검수 불가 시 정확도가 "공개+합성 학습 수준"에 묶임.</b></td></tr>        <tr><td>D7</td><td>GPU 제공 여부 <span class="tag-ok">결정</span></td><td><b>결정 — 학습·골든셋은 지재원 A100 80GB GPU 모델공장, 운영 추론은 CPU.</b> 요건(FUN-004) 발주처 GPU·CSAP 제공 명시. 학습 코드·MLflow는 <b>지재원 전용</b>(고객 번들 미포함), 고객사 증분 재학습만 현장 CPU(야간)</td></tr>
+      </tbody>
+    </table></div>
+    <div class="band gray"><div class="bt">v4에서 닫힌 것 (코드로 반영) — 남은 것은 "절차·사람"</div><p>안전 골조(§08)는 <b>구현·검증 완료</b>다: 안전 게이트 번들 A–F + P0#1~#7 운영 ON · 관측 메트릭·<code>/admin/dashboard</code> · 비모수 레버 P1/P2 · 지재원 export/import 런북(G1·G2) · CI 하드게이트. 즉 <b>"안전하게 틀리고·빨리 배우고·명확히 멈추는" 골조는 코드에 있다.</b> 남은 병목은 코드가 아니라 <b>D3(지재원 사람검수·서명)</b> — 이게 풀려야 사람서명 locked 평가셋과 운영 확정 학습(정확도·자동화율의 유일 레버, §04 CAPSTONE)이 열린다.</p></div>
+    <div class="band"><div class="bt">진행 1순위 (재학습 없이·CPU로 당장 가능)</div><p>① 1,000건 <b>사람서명 locked 평가셋</b> 구축 → ② 기존 분류기를 그 골든으로 <b>확정 실측</b> → ③ <b>Optuna로 게이트·온도 튜닝</b>(고등급 FNR=0 제약 하 자동확정율 최대). 셋 다 GPU·재학습 없이 진행된다. <span class="muted">※ Optuna 정밀 튜닝은 N이 충분한 1,000 골든서 수행(작은 N 튜닝은 과적합).</span></p></div>
+  </section>
+
+  </div>
+  <aside class="toc-aside"><nav class="toc">
+    <div class="toc-title">목차</div>
+    <a href="#s0"><span class="tn">00</span> 우리가 선택한 방법</a>
+    <a href="#s1"><span class="tn">01</span> 조직·역할</a>
+    <a href="#s2"><span class="tn">02</span> 서버 구조</a>
+    <a href="#s3"><span class="tn">03</span> 분류 동작 (E2E)</a>
+    <a href="#s4"><span class="tn">04</span> 학습 전략</a>
+    <a href="#s5"><span class="tn">05</span> 데이터 자산</a>
+    <a href="#s6"><span class="tn">06</span> Optuna</a>
+    <a href="#s7"><span class="tn">07</span> 성능 지표</a>
+    <a href="#s8"><span class="tn">08</span> 안전 골조 (게이트=가시성)</a>
+    <a href="#s9"><span class="tn">09</span> 확인① 분류기 채택</a>
+    <a href="#s10"><span class="tn">10</span> 확인② RDB 필수</a>
+    <a href="#s11"><span class="tn">11</span> 남은 의사결정</a>
+  </nav></aside>
+  </div>
+</div>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  var heads=links.map(function(l){var id=l.getAttribute('href').slice(1);return{link:l,el:document.getElementById(id)};}).filter(function(x){return x.el;});
+  function update(){var y=window.scrollY+120;var cur=heads[0];heads.forEach(function(h){if(h.el.getBoundingClientRect().top+window.scrollY<=y)cur=h;});links.forEach(function(l){l.classList.remove('active');});if(cur)cur.link.classList.add('active');}
+  window.addEventListener('scroll',update,{passive:true});window.addEventListener('resize',update);update();
+})();
+</script>
+
+<footer>
+  <span>KOIPA AI 영업비밀관리시스템 — 시스템 설계도 v4 · 2026-07-01 · Lloydk AI Engine · 학습 GPU(지재원 A100)·추론 CPU·무반출 + 분류기·RDB + 안전 골조(게이트=가시성) 하드닝 · 상세 근거는 기술구현 백서 v7 · 설계검토 하드닝 반영 내역</span>
+  <span class="stack">Python · FastAPI · PostgreSQL+pgvector · KF-DeBERTa(추론 CPU / 학습 A100 GPU) · KURE-v1 · Optuna · OTel · Docker(폐쇄망)</span>
+</footer>
+</body>
+</html>
+
