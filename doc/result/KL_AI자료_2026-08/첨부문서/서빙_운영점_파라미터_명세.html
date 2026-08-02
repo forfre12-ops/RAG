@@ -462,7 +462,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="tbl-wrap"><table><tbody>
         <tr><td style="width:18%;">기본값</td><td>True / "S3"</td></tr>
         <tr><td>동작</td><td>이미 공개된 출처(판례·공시·보도자료·공개특허 등)의 문서는 내용이 비밀급이어도 영업비밀 불성립(부정경쟁방지법 §2.2 비공지성) → 등급을 S3로 cap. 단 강한 상향신호(TS/S1)를 cap이 덮으면 'cap-conflict'로 검수 라우팅(무인 미탐 방지). metadata.source가 공개 출처일 때만 발동 → 내부문서 탐지엔 영향 없음.</td></tr>
-        <tr><td>측정</td><td>게이트 미적용 시 진짜 공개판례의 85%가 비밀로 과분류(구 판례 legacy 실험값 <code>reports/p1_real_public_fpr</code>) — 현행 v5(v-fe4b386b) 게이트 적용 시 공개 과분류 <b>79%→4%</b>(n=400)로 억제. 유일 위험=출처 메타데이터 무결성(ingest 책임).</td></tr>
+        <tr><td>측정</td><td>게이트 미적용 시 진짜 공개판례의 85%가 비밀로 과분류(구 판례 legacy 실험값 <code>reports/p1_real_public_fpr</code>) — 현행 v5(v-fe4b386b) 게이트 적용 시 공개 <b>판례</b> 과분류 <b>79%→4%</b>(n=400)로 억제. 유일 위험=출처 메타데이터 무결성(ingest 책임).</td></tr>
       </tbody></table></div>
 
       <h3>6.7 메타데이터 floor — <code>metadata_floor_enabled</code></h3>

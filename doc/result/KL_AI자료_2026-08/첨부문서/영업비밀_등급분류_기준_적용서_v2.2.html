@@ -408,7 +408,7 @@ footer strong{color:var(--text-dim);}
 
   <ol>
     <li><strong>4등급 1:1 매핑</strong> — 8/4/1·2/0 → 특급/1급/2급/3급으로 깔끔히 대응</li>
-    <li><strong>과분류 근본 차단</strong> — 곱셈은 한 요소라도 0이면 0(공개). v1.1이 게이트(§4.0)로 따로 막던 "공개문서 과분류"(구 판례 legacy 학습 실험 실측: 공개판례 85% 과분류)를 <strong>산정식 자체가 내포</strong>. <small style="color:var(--text-faint)">현행 배포본 v5_clean(v-fe4b386b)의 공개 과분류는 79%→4%(n=400).</small></li>
+    <li><strong>과분류 근본 차단</strong> — 곱셈은 한 요소라도 0이면 0(공개). v1.1이 게이트(§4.0)로 따로 막던 "공개문서 과분류"(구 판례 legacy 학습 실험 실측: 공개판례 85% 과분류)를 <strong>산정식 자체가 내포</strong>. <small style="color:var(--text-faint)">현행 배포본 v5_clean(v-fe4b386b)의 공개 <b>판례</b> 과분류는 79%→4%(n=400).</small></li>
     <li><strong>라벨링·골든셋 단순화</strong> — 입력이 0/1/2 3단계뿐이라 사람 검수·합성 라벨·일치도 측정이 단순하고 재현성이 높다</li>
     <li><strong>정본 예시와 직접 대조 가능</strong> — 가이드 12p 워크드 예시를 회귀 테스트 정답으로 그대로 사용</li>
     <li><strong>AI 운영 가능성 (결정적 근거)</strong> — A안 5요소 중 '정보 창출·유지 비용', '내부 활용 효과', '외부 유출 위험'은 문서 본문에 거의 없는 외부 경영·재무 정보라 텍스트 분류 AI로 산출 불가. 반면 B안 3요건은 텍스트·메타데이터로 근사 가능. <em>A안=사람 수기 정량평가용, B안=AI 자동분류용.</em></li>
@@ -439,7 +439,7 @@ footer strong{color:var(--text-dim);}
       <thead><tr><th>항목</th><th>내용</th><th>상태</th></tr></thead>
       <tbody>
         <tr><td><strong>R1</strong> 룰↔모델 분리</td><td>BERT 분류기는 텍스트→등급을 직접 학습·추론한다. S×V×M은 학습 라벨·룰 후보·근거(evidence) 산정 계층이지 모델의 추론식이 아님 → 곱셈의 "급변(cliff)"이 모델 추론에 직접 전가되지 않는다.</td><td><span class="tag mid">기설계 내포</span></td></tr>
-        <tr><td><strong>R2</strong> 추론단 미탐 안전장치</td><td>출처(비공지성) 게이트는 공개문서 과분류를 대폭 억제한다(구 판례 legacy 실험 93%→0%; 현행 v5_clean 정본 공개 과분류 79%→4%). 곱셈 게이트는 출처/비공지성(S) 축에만 하드 적용, 내용(V·M) 축은 콘텐츠 미탐 가드 + 상향충돌 시 검수 라우팅 유지(silent 하향 금지).</td><td><span class="tag mid">기설계 내포</span></td></tr>
+        <tr><td><strong>R2</strong> 추론단 미탐 안전장치</td><td>출처(비공지성) 게이트는 공개문서 과분류를 대폭 억제한다(구 판례 legacy 실험 93%→0%; 현행 v5_clean 정본 공개 <b>판례</b> 과분류 79%→4%). 곱셈 게이트는 출처/비공지성(S) 축에만 하드 적용, 내용(V·M) 축은 콘텐츠 미탐 가드 + 상향충돌 시 검수 라우팅 유지(silent 하향 금지).</td><td><span class="tag mid">기설계 내포</span></td></tr>
         <tr><td><strong>R3</strong> 등급체계·매핑 설정화</td><td>등급 개수와 S×V×M→등급 매핑(8/4/1·2/0)을 하드코딩하지 않고 DB·설정 주도로 둔다(FUN-005 관리자 등급체계 변경 요구사항).</td><td><span class="tag light">신규 반영</span></td></tr>
         <tr><td><strong>R4</strong> 유출영향도 처리</td><td>정본 3요건에 없음. 등급 서열 + <code>loss_weight</code>(고등급 오분류 가중) + 등급별 FNR로 보존(별도 입력 요소 아님).</td><td><span class="tag light">신규 반영</span></td></tr>
         <tr><td><strong>R5</strong> 특급 표본·기대치</td><td>특급은 희소. 골든셋 특급은 합성·수동 시드로 별도 확보, 내용만으로 특급을 못 만들어도 미탐으로 과벌하지 않는다.</td><td><span class="tag light">신규 반영</span></td></tr>
@@ -901,7 +901,7 @@ A안 없음             → B안(AI)이 1차 자동분류
         <tr style="background:var(--bg-surface);">
           <td><code><strong>v2.2.2</strong></code></td>
           <td><strong>2026-08-02</strong></td>
-          <td><strong>곱셈식 내부 정합 정정(감리 제출본).</strong> §0·§1.2·§2 등급카드·§6.1의 "곱=4 → S1" 표기를 실코드 <code>grade_from_svm()</code> 운영로직(§4.6)에 통일 — <strong>곱=4(s=2·v=2·m=1) → TS</strong>, <strong>S1은 (2·2·0) 곱=0 특례</strong>로만 산출(<code>SVM_GRADE_MAP={8:TS,4:TS,2:S2,1:S2,0:S3}</code>). 과분류 실측치(§3.3 85%·§3.5 93%→0%)를 <strong>구 판례 legacy 실험</strong>으로 귀속하고 현행 배포본 v5_clean(<code>v-fe4b386b</code>) 공개 과분류 79%→4%(n=400) 병기. 4등급 정의·임계 불변, 표기 정합만 정정.</td>
+          <td><strong>곱셈식 내부 정합 정정(감리 제출본).</strong> §0·§1.2·§2 등급카드·§6.1의 "곱=4 → S1" 표기를 실코드 <code>grade_from_svm()</code> 운영로직(§4.6)에 통일 — <strong>곱=4(s=2·v=2·m=1) → TS</strong>, <strong>S1은 (2·2·0) 곱=0 특례</strong>로만 산출(<code>SVM_GRADE_MAP={8:TS,4:TS,2:S2,1:S2,0:S3}</code>). 과분류 실측치(§3.3 85%·§3.5 93%→0%)를 <strong>구 판례 legacy 실험</strong>으로 귀속하고 현행 배포본 v5_clean(<code>v-fe4b386b</code>) 공개 <b>판례</b> 과분류 79%→4%(n=400) 병기. 4등급 정의·임계 불변, 표기 정합만 정정.</td>
         </tr>
       </tbody>
     </table>

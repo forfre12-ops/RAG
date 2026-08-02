@@ -63,7 +63,7 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td>홀드아웃 109</td><td>학습에 쓰지 않은 업무문서(판례 제거) — 서빙 경로 실측</td></tr>
       <tr><td>경화(hardened) 42 · clean 42</td><td>라벨 경화 평가셋 — 누출 없는 head-to-head 비교</td></tr>
-      <tr><td>공개문서 FPR</td><td>공개 특허·판례·보도자료 등으로 <b>과분류율</b>(오탐) 측정</td></tr>
+      <tr><td>공개 판례 FPR</td><td>법원 공개판례(학습 미포함)로 <b>과분류율</b>(오탐) 측정</td></tr>
       <tr><td>적대(adversarial) veto</td><td>고등급 미탐(진짜 비밀 → 공개 등급) 발생 여부 검증</td></tr>
       <tr><td>메타모픽</td><td>의미보존 변형 시 등급 일관성 검증</td></tr>
     </tbody>
@@ -73,11 +73,11 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:230px">모델</th><th>주요 지표</th></tr></thead>
     <tbody>
-      <tr><td><b>현행 배포 v5_clean</b> <code>v-fe4b386b</code></td><td>경화 홀드아웃(n=42) F1_macro <b>0.917</b>(직전 v4 0.688) · S1 recall <b>0.857</b>(v4 0.43) · 공개문서(n=400) 과분류 <b>79%→4%</b> · 고등급(high→S3) 위험 미탐 <b>0</b> · 2026-07-29 승격(3축 PASS·f5316df)</td></tr>
-      <tr><td><b>직전 배포·롤백 v4_clean</b> <code>v-dd3abab9</code></td><td>프록시 홀드아웃 109 · F1_macro <b>0.686</b> · 방향 FNR <b>0.018</b>(서빙) · FNR_TS 0.000 — 이 셋에선 v5≈v4(개선은 경화·공개문서 셋에서)</td></tr>
+      <tr><td><b>현행 배포 v5_clean</b> <code>v-fe4b386b</code></td><td>경화 홀드아웃(n=42) F1_macro <b>0.917</b>(직전 v4 0.688) · S1 recall <b>0.857</b>(v4 0.43) · <b>공개 판례</b>(n=400) 과분류 <b>79%→4%</b> · 고등급(high→S3) 위험 미탐 <b>0</b> · 2026-07-29 승격(3축 PASS·f5316df)</td></tr>
+      <tr><td><b>직전 배포·롤백 v4_clean</b> <code>v-dd3abab9</code></td><td>프록시 홀드아웃 109 · F1_macro <b>0.686</b> · 방향 FNR <b>0.018</b>(서빙) · FNR_TS 0.000 — 이 셋에선 v5≈v4(개선은 경화·공개 판례 셋에서)</td></tr>
     </tbody>
   </table>
-  <p style="font-size:12.5px;color:#71717a">※ 위 지표는 기계(합성/공개) 라벨 기준(운영 정확도 보증 아님)입니다. v5는 자동 게이트(경화 홀드아웃 + 공개문서 FPR + 적대 veto) 3축 PASS로 <b>현행 배포본으로 승격</b>됐습니다(2026-07-29·commit f5316df). 109 프록시 홀드아웃에서는 v5≈v4로 개선을 주장하지 않습니다.</p>
+  <p style="font-size:12.5px;color:#71717a">※ 위 지표는 기계(합성/공개) 라벨 기준(운영 정확도 보증 아님)입니다. v5는 자동 게이트(경화 홀드아웃 + 공개 판례 FPR + 적대 veto) 3축 PASS로 <b>현행 배포본으로 승격</b>됐습니다(2026-07-29·commit f5316df). 109 프록시 홀드아웃에서는 v5≈v4로 개선을 주장하지 않습니다.</p>
 
   <h2>3. 지표 읽는 법 — 왜 문서마다 숫자가 다른가</h2>
 
@@ -89,14 +89,14 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td><b>경화 홀드아웃</b><br><span style="font-size:11px;color:#71717a">hardened</span></td><td>42</td><td>라벨을 사람이 검토 가능한 수준으로 경화한 셋. <b>누출 없는 head-to-head 비교</b>용 — 모델 세대 간 우열 판정의 정본.</td><td>N이 작아 절대 정확도로 읽으면 안 됨. <b>상대 비교용</b>.</td></tr>
       <tr><td><b>프록시 홀드아웃</b></td><td>109</td><td>학습에 쓰지 않은 업무문서(판례 제거). 서빙 경로 전체(보정→게이트→집계)의 <b>동작 확인</b>.</td><td><b>학습셋 42% 누출</b>로 과대평가된 참고치. 운영 대표값 아님.</td></tr>
-      <tr><td><b>공개문서 FPR</b></td><td>400</td><td>공개 특허·판례·보도자료. 공개 문서를 비밀로 잘못 올리는 <b>과분류율</b> 측정.</td><td>과분류만 봄(미탐은 못 봄). 적대 veto와 짝으로 읽어야 함.</td></tr>
+      <tr><td><b>공개 판례 FPR</b></td><td>400</td><td>법원 공개판례(학습 미포함). 공개 문서를 비밀로 잘못 올리는 <b>과분류율</b> 측정.</td><td>과분류만 봄(미탐은 못 봄). 적대 veto와 짝으로 읽어야 함. <b>판례 단일 장르</b>라 다른 종류의 공개문서로 일반화되지 않음.</td></tr>
       <tr><td><b>clean 홀드아웃</b></td><td>77</td><td>서빙 임계값(τ·conf) <b>튜닝 전용</b>. 노브를 돌렸을 때 미탐·검토량이 어떻게 움직이는지 보는 자.</td><td>튜닝에 쓴 셋이라 <b>성능 주장 불가</b>(과적합). 서빙 파라미터 명세 전용.</td></tr>
     </tbody>
   </table>
 
   <h3 style="font-size:13px;font-weight:800;margin:20px 0 8px">3.2 격자 — 어느 숫자가 어느 칸의 값인가</h3>
   <table>
-    <thead><tr><th style="width:190px">모델</th><th>경화 42</th><th>프록시 109 (서빙)</th><th>공개 400 (과분류)</th></tr></thead>
+    <thead><tr><th style="width:190px">모델</th><th>경화 42</th><th>프록시 109 (서빙)</th><th>공개 판례 400 (과분류)</th></tr></thead>
     <tbody>
       <tr>
         <td><b>v5_clean</b> <code>v-fe4b386b</code><br><span style="font-size:11px;color:#71717a">현행 배포 · 2026-07-29 승격</span></td>
