@@ -185,7 +185,7 @@ footer strong{color:var(--text-dim);}
       </tr>
     </tbody>
   </table></div>
-  <div class="callout inset"><div class="callout-label">보정 환류 · 재학습 경계</div><p>위 보정(corrections) 기반 재학습은 <strong>학습 사이트(지재원)</strong>의 활동이다. <strong>고객사는 추론 전용</strong>이라 자체 학습하지 않으며, 고객사 검수교정을 지재원으로 반출할지는 <strong>미확정 결정</strong>이다(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인 5</a> A/B/C — <strong>기본 권고: 문서 무반출·집계 진단만</strong>). 또한 모델은 <strong>상시 재학습되지 않는다</strong> — 하드 요건은 <strong>제약 완화 시 별도 학습</strong>(제약 완화 시 실문서 반입)이며, 이후 일상 적응은 룰·키워드·임계·보정·LLM 2차·사람 게이트(비-모델 레버)가 담당하고, 모델 재학습은 <strong>드리프트·이벤트 트리거 시 단발</strong>로 수행한다.</p></div>
+  <div class="callout inset"><div class="callout-label">보정 환류 · 재학습 경계</div><p>재학습은 <strong>두 사이트에서 각각</strong> 일어난다. ① <strong>지재원(학습 사이트·A100 GPU)</strong> — 합성·골든셋 기반 <strong>최초·전체 학습</strong>과 배포 번들 제작. ② <strong>고객사(운영 사이트·CPU)</strong> — 검수 보정(corrections)을 기존 학습셋과 섞어 <strong>매일 02:00 야간 증분 재학습</strong>(<code>enable_incremental_retrain</code>, GPU 불요). 고객사 <strong>교정·원문은 반출하지 않고 망 내에서 그대로 학습</strong>에 쓰이며, 지재원으로는 집계 진단지표만 환류한다(문서 반출 0). 다만 <strong>재학습이 곧 배포는 아니다</strong> — 재학습본은 <strong>후보로만 등록</strong>되고(<code>retrain_auto_activate=False</code>) 운영 전환은 평가 게이트 통과 + 사람 승인을 거친다. 일상 적응은 여전히 룰·키워드·임계·보정·LLM 2차·사람 게이트(비-모델 레버)가 1차로 담당한다.</p></div>
   <div class="callout inset"><div class="callout-label">정책 경계</div><p>위 통제는 <strong>메커니즘</strong>을 코드·스키마에 반영한 것이며, 기본값은 기존 동작을 보존한다. <strong>보존기간·신뢰도 임계·검토자 자격</strong> 등 운영 정책 수치는 발주처 협의로 확정한다.</p></div>
 
   <div class="section-sep" id="s8"><span class="section-sep-num">08</span><span class="section-sep-line"></span><span class="section-sep-title">본개발 데이터 과제 (P0)</span></div>

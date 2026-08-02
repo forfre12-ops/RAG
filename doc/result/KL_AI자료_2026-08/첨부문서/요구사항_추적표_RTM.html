@@ -168,11 +168,11 @@ footer strong{color:var(--text-dim);}
         </tr>
         <tr>
           <td><code>FUN-024</code></td>
-          <td>산출·리포트(평가지표·검수 라우팅) <span style="font-size:.92em;color:#666;">— 구현 범위: 검수자 큐 배분·심층지표.</span> 자동확정·검수 라우팅은 confidence(softmax 파생, 단독 신뢰불가 · OOD AUROC 0.58) 임계 단독이 아닌 다단 게이트로 결정: 희소근거 게이트(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON) + 합의 게이트(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도) + 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, base 기본 OFF, 입력=KL ICD <code>security_marking</code>/<code>access_scope</code> — 보안표시가 예측보다 높으면 상향 floor·접근범위 제한 시 검수 라우팅, <code>source_prior</code> 하향의 상향 대칭) → 검수자 큐, FNR 핵심관리, 운영 확정 환류(기본: 고객문서 무반출·exact-match 선례·집계 진단, 재학습 잠금)</td>
+          <td>산출·리포트(평가지표·검수 라우팅) <span style="font-size:.92em;color:#666;">— 구현 범위: 검수자 큐 배분·심층지표.</span> 자동확정·검수 라우팅은 confidence(softmax 파생, 단독 신뢰불가 · OOD AUROC 0.58) 임계 단독이 아닌 다단 게이트로 결정: 희소근거 게이트(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON) + 합의 게이트(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도) + 메타데이터 floor 게이트(<code>metadata_floor_enabled</code>, base 기본 OFF, 입력=KL ICD <code>security_marking</code>/<code>access_scope</code> — 보안표시가 예측보다 높으면 상향 floor·접근범위 제한 시 검수 라우팅, <code>source_prior</code> 하향의 상향 대칭) → 검수자 큐, FNR 핵심관리, 운영 확정 환류(고객문서 무반출 · exact-match 선례 · <b>현장 CPU 야간 증분 재학습</b>(<code>enable_incremental_retrain</code>, 매일 02:00)으로 교정 반영 · 지재원엔 집계 진단만 · 재학습본은 후보 등록까지)</td>
           <td class="center">M5·M6</td>
           <td>적용서 §3.4 · 테스트전략 §03</td>
           <td><code>confirm/relabel</code> · <code>m6_evaluation</code> · 거버넌스 콘솔</td>
-          <td>검수→확정 admission gate→집계 진단 환류 · 검수자 신뢰도</td>
+          <td>검수→확정 admission gate→야간 증분 재학습(현장)·집계 진단 환류(중앙) · 검수자 신뢰도</td>
           <td class="center"><span class="tag wip">정밀화</span></td>
         </tr>
       </tbody>
@@ -239,8 +239,9 @@ footer strong{color:var(--text-dim);}
 
   <div class="footnote">
     <p>근거: 제안요청서(FUN-003·004·005·022·023·024 / PMR-002 / PER-002) · 발주처 정본 가이드 PDF · 적용서 v2.2 · 테스트 전략 문서</p>
-    <p>관련: <a href="영업비밀_등급분류_기준_적용서_v2.2.html">적용서 v2.2</a> · <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="테스트_전략_및_이력.html">테스트 전략·이력</a> · <a href="시험케이스_및_결과서.html">시험케이스·결과서</a> · <a href="결함관리대장.html">결함관리대장</a> · <a href="발주처_의사결정_안건서.html">의사결정 안건서</a> · <a href="WBS_본개발_작업분해구조.html">WBS</a></p>
-    <p><strong>P0 NFR 상태(부분구현):</strong> 하드닝 조치가 구현·커밋되었으나 완전충족은 잔여다 — <code>NFR-DAT-01</code> 사람서명 locked 500건(readiness strict 블로커)·<code>NFR-SEC-01</code> 빈 키 기동 거부(현재 warn-only)·<code>NFR-SEC-02</code> Postgres RLS. 요건→시험은 <a href="시험케이스_및_결과서.html">시험케이스·결과서</a>의 요건–시험 대응표, 조치 이력은 <a href="결함관리대장.html">결함관리대장</a> 참조.</p>
+    <p>관련: <a href="영업비밀_등급분류_기준_적용서_v2.2.html">적용서 v2.2</a> · <a href="기술구현_백서_v7.html">기술구현 백서 v7</a></p>
+    <p>관련(본 묶음 미포함 · 감리 산출물 트랙 · 요청 시 별도 제공): 테스트 전략·이력 · 시험케이스·결과서 · 결함관리대장 · 발주처 의사결정 안건서 · WBS 본개발 작업분해구조</p>
+    <p><strong>P0 NFR 상태(부분구현):</strong> 하드닝 조치가 구현·커밋되었으나 완전충족은 잔여다 — <code>NFR-DAT-01</code> 사람서명 locked 500건(readiness strict 블로커)·<code>NFR-SEC-01</code> 빈 키 기동 거부(현재 warn-only)·<code>NFR-SEC-02</code> Postgres RLS. 요건→시험은 「시험케이스·결과서」의 요건–시험 대응표, 조치 이력은 「결함관리대장」 참조(두 문서 모두 본 묶음 미포함).</p>
   </div>
 
 </article>

@@ -13,6 +13,14 @@
   · 누락  — 인용됐으나 첨부문서/ 에 없는 문서(있으면 깨진 링크가 됨)
   · 깨진 링크 — 묶음 안 상대경로 href 가 실제 파일로 해석 안 됨
   · 고아  — 첨부문서/ 에 있으나 아무 문서도 인용하지 않음(정리 후보 — 자동 삭제 안 함)
+  · 범위 이탈 — 첨부문서/ 구성이 요청 6건 대응분(DELIVER)과 다름
+
+2026-08-02 범위 축소: 첨부는 한때 26종이었다. 폐포가 "본문이 인용하면 넣는다"로만
+돌아가 참조 문서 16종이 따라 들어왔는데, 발주처가 검토를 요청한 적 없는 자료까지
+제출하면 감리 대상 표면만 넓어진다. 요청 6건에 해당하는 11종으로 줄이고, 뺀 15종은
+doc/result/KL_AI자료_2026-08_미첨부문서/ 에 보관했다(정본은 doc/result/open/).
+폐포는 링크를 타고 다시 자라므로 DELIVER 목록으로 범위를 못박는다 — 목록을 안 고치고
+파일만 넣으면 발송이 막힌다.
 """
 
 from __future__ import annotations
@@ -26,6 +34,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 KL = ROOT / "doc" / "result" / "KL_AI자료_2026-08"
 ATTACH = KL / "첨부문서"
+HELD = ROOT / "doc" / "result" / "KL_AI자료_2026-08_미첨부문서"
+
+# 발송 범위 — 8/5 요청 6건에 해당하는 문서만. 늘리려면 여기부터 고친다.
+DELIVER = {
+    # 요청 1 — AI 설계 산출물
+    "시스템_설계도_v4.html",
+    "기능분해도_데이터흐름도.html",
+    "기술구현_백서_v7.html",
+    "기술구현_백서_부록A_DB스키마.html",
+    "기술구현_백서_부록B_API명세.html",
+    "기술구현_백서_부록C_지표용어해설.html",
+    "서빙_운영점_파라미터_명세.html",
+    # 요청 3 — 골든셋·등급 판정근거·정확도
+    "골든셋_종합.html",
+    "골든셋_분류근거_v5_clean_v-fe4b386b.html",
+    "영업비밀_등급분류_기준_적용서_v2.2.html",
+    # 요청 4 — RFP 구현현황 근거
+    "요구사항_추적표_RTM.html",
+}
 
 _HREF = re.compile(r'href="([^"#][^"]*)"')
 
@@ -79,6 +106,8 @@ def main() -> int:
 
     missing = sorted(want - present)          # 인용됐는데 파일 없음
     orphan = sorted(present - want)            # 파일 있는데 인용 없음
+    intruder = sorted(present - DELIVER)       # 범위 밖인데 첨부됨
+    dropped = sorted(DELIVER - present)        # 범위 안인데 빠짐
 
     broken = []
     for p in sorted(KL.rglob("*.html")):
@@ -92,6 +121,10 @@ def main() -> int:
         print("깨진 링크:", b)
     for n in orphan:
         print("고아(정리 후보):", n)
+    for n in intruder:
+        print("범위 이탈(요청 6건 대응분 아님):", n)
+    for n in dropped:
+        print("범위 누락(DELIVER 인데 첨부 안 됨):", n)
 
     # [전달 검증] 내용이 정합해도 열람 환경에서 깨지면 소용없다. 실제로 두 건이 있었다 —
     # 첨부 26종 전부가 외부 웹폰트를 부르는데 index 는 "외부 링크 없음"이라 적혀 있었고,
@@ -102,14 +135,16 @@ def main() -> int:
         print("전달 결함:", v)
 
     total = sum(f.stat().st_size for f in ATTACH.iterdir() if f.is_file()) / 1048576
+    held = len(list(HELD.glob("*.html"))) if HELD.exists() else 0
     print(f"\n첨부문서/ {len(present)}종 · {total:.1f} MB · "
           f"누락 {len(missing)} · 깨진 링크 {len(broken)} · 고아 {len(orphan)} · "
-          f"전달 결함 {len(offline)}")
-    if missing or broken or offline:
-        print("→ 발송 불가: 누락/깨진 링크/전달 결함 해소 필요"
+          f"범위 이탈 {len(intruder)} · 전달 결함 {len(offline)}")
+    print(f"미첨부 보관(발송 제외) {held}종 — {HELD.relative_to(ROOT).as_posix()}/")
+    if missing or broken or offline or intruder or dropped:
+        print("→ 발송 불가: 누락/깨진 링크/범위 이탈/전달 결함 해소 필요"
               " (전달 결함은 scripts/harden_bundle_offline.py 로 일괄 수정)")
         return 1
-    print("→ 발송 가능(자체 완결·링크 완결·오프라인 판독 가능)"
+    print("→ 발송 가능(요청 6건 범위 일치·자체 완결·링크 완결·오프라인 판독 가능)"
           + (" · 고아 파일 검토 권장" if orphan else ""))
     return 0
 

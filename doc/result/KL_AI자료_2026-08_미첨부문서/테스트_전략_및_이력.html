@@ -785,7 +785,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
 
       <h3>10.3 능동학습 폐곡선 (A2/C-ver) — 실 GPU E2E 7/7</h3>
-      <p style="font-size:13px;">분류 → 검수자 교정(tb_corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다. <span style="color:var(--text-dim,#71717a);">단 이는 단일 배포 내부 메커니즘 검증이며 자동 운영 활성화가 아닙니다. 고객사는 기본 추론 전용이고, 확정값은 admission gate 뒤 exact-match 선례·진단 지표에 먼저 쓰며, 재학습/kNN 전파는 shadow와 별도 승인 후에만 엽니다.</span></p>
+      <p style="font-size:13px;">분류 → 검수자 교정(tb_corrections) → 능동학습 주기 → 교정 재빌드 → 학습셋 병합(train만) → 학습 → 모델 등록 → 배포게이트 → (조건부)활성 → 핫리로드 → 운영 → 자동롤백 점검의 폐곡선을 배선·검증했습니다. <span style="color:var(--text-dim,#71717a);">단 이는 단일 배포 내부 메커니즘 검증이며 자동 운영 활성화가 아닙니다. 고객사에서는 이 폐곡선이 <b>야간 CPU 증분 재학습</b>(매일 02:00, <code>enable_incremental_retrain</code>)으로 돌지만 <b>후보 등록까지</b>이며, 확정값은 admission gate 뒤 exact-match 선례·진단 지표에 먼저 쓰고, 활성(운영 전환)·kNN 전파는 게이트 통과와 사람 승인 후에만 엽니다.</span></p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>단계</th><th>구현</th><th>동작</th></tr></thead>

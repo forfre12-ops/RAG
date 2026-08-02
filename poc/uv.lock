@@ -2838,8 +2838,8 @@ requires-dist = [
     { name = "python-pptx", specifier = ">=0.6" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "redis", specifier = ">=5.0" },
-    { name = "rhwp-python", marker = "extra == 'full'", specifier = ">=0.5.1" },
-    { name = "rhwp-python", marker = "extra == 'hwp'", specifier = ">=0.5.1" },
+    { name = "rhwp-python", marker = "extra == 'full'", specifier = ">=0.8.1" },
+    { name = "rhwp-python", marker = "extra == 'hwp'", specifier = ">=0.8.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "scikit-learn", specifier = ">=1.5" },
     { name = "seaborn", marker = "extra == 'evaluation'", specifier = ">=0.13" },
@@ -5494,18 +5494,18 @@ wheels = [
 
 [[package]]
 name = "rhwp-python"
-version = "0.8.0"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/8d/21f19d7b8020e0a7bf608beb655092be41741327b1007e8f262d0fa0ca78/rhwp_python-0.8.0.tar.gz", hash = "sha256:055a85f7cf54ea64dca1f29b927847730f941b0559e141d8cb8fa8a3b74e87de", size = 11875377, upload-time = "2026-06-21T05:57:33.12Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/c2/77e7cdaeeba23fb24b1e38703816cbd8566000ddd8955cf053ef92824770/rhwp_python-0.8.1.tar.gz", hash = "sha256:d21775a85033123b5b2d45604661d24bee15ba9c6d4cd67e6eeee9d2fc98b9cc", size = 11963043, upload-time = "2026-07-07T16:49:11.064Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/83/fe/834ef7bb6a494b3cab8cfbeef5610d7bc1fef504fa028c958deb7c09d23c/rhwp_python-0.8.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:ebc6db25b5a5bacc54156f8f733433fd2386021eea771445e2345de179733aa3", size = 6243340, upload-time = "2026-06-21T05:57:24.798Z" },
-    { url = "https://files.pythonhosted.org/packages/df/3f/307486e1a70c1e0d049a12b1ada81032ffb3ce1a38596147a29aec4a0734/rhwp_python-0.8.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:50761df65f6b683c7b2e448d3b705874e9302bd6b3e54ee3e92d30e47bb0bb06", size = 5865644, upload-time = "2026-06-21T05:57:26.645Z" },
-    { url = "https://files.pythonhosted.org/packages/da/13/0dbff517105c25e8372612f1b6aafe5100ea11598badbe470377b6dc5927/rhwp_python-0.8.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3c1dccd6750c79485d47195f8071ecc7d0437950008dccd0e242272cbae2a0e7", size = 6947787, upload-time = "2026-06-21T05:57:28.297Z" },
-    { url = "https://files.pythonhosted.org/packages/7e/45/1a568bde8cc83312ac0104e1194e2600534d65d20b02e8060616378614d1/rhwp_python-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a276ee82089fe2f6f6c610f61b3e08a44170822e8426b36913384bf17f1dab56", size = 7257927, upload-time = "2026-06-21T05:57:29.859Z" },
-    { url = "https://files.pythonhosted.org/packages/96/49/3e3382c8433dc51bdf2a5fa10eca065355ad9c6337ae20acae1468ddedf4/rhwp_python-0.8.0-cp310-abi3-win_amd64.whl", hash = "sha256:670e5a30c44cb76ff65ebb1036f33104ef440b9dd0c4a6fc7e593b2fa95d4e52", size = 6957166, upload-time = "2026-06-21T05:57:31.594Z" },
+    { url = "https://files.pythonhosted.org/packages/89/b0/cfb91b06fe5936735ec6f310f77011ba05de95121e80b215e693eff6d49f/rhwp_python-0.8.1-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:68dd8c8b9be779d2dff4dafbe77f78b38466c58c484d7a253d5e0ee5be19ba46", size = 6303839, upload-time = "2026-07-07T16:48:59.352Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/5b/de9cb6ed9c98ab077e03316d3e1ade7b25c72fbd2b1823487b066bdb6db0/rhwp_python-0.8.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:eb4a2f49adb811c78bb60c4218f232867b1d62984c1f88e67f5e560bbace41a6", size = 5914845, upload-time = "2026-07-07T16:49:01.912Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/ac/b4f0b8e38307c8d7cf6c0c2c802494bd7ab9c25b2496559d5173ce67eb7c/rhwp_python-0.8.1-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7eb773ef6cbb62df9294266aadb7bb2e36fb2ec517a9b0e42da4221691471b02", size = 6990104, upload-time = "2026-07-07T16:49:04.335Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/cd/28994e428fff8c737a842a8557e1618ed7a3ce1b44decbe2082eefb315f7/rhwp_python-0.8.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:76d88a6e929c4a19bb3fe11ec80739841d15f9c4f55977f32493a2f6a42dba52", size = 7310166, upload-time = "2026-07-07T16:49:06.533Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/77/4812632722c2c5b8dbf51e0071e8550529b3189170a358e7986d4bbe9140/rhwp_python-0.8.1-cp310-abi3-win_amd64.whl", hash = "sha256:cb5ac0a03f8b6084c587df98d3ff92d68cf50f8923474d78c7ba287a2dfebac2", size = 7005738, upload-time = "2026-07-07T16:49:08.602Z" },
 ]
 
 [[package]]

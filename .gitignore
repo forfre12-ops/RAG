@@ -113,6 +113,11 @@ doc/result/*
 !doc/result/open/
 doc/result/open/*
 !doc/result/open/*.html
+# KL 발주처 제출 묶음은 자체 원본이라 폴더째 추적(엑셀 기입본 포함).
+# 파일들은 과거 -f 로 들어와 추적 중이었을 뿐 규칙상으론 무시 대상이었다 —
+# 새 파일이 조용히 누락되므로(README 가 실제로 그랬다) 규칙을 의도대로 적는다.
+!doc/result/KL_AI자료_2026-08/
+!doc/result/KL_AI자료_2026-08_미첨부문서/
 doc/temp_pptx.zip
 doc/temp_pptx/
 doc/temp_xlsx.zip

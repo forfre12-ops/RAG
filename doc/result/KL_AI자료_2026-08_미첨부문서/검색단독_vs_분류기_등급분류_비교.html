@@ -340,7 +340,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="card" style="border-left:4px solid var(--c-good);border-radius:0;">
           <div class="card-label">방식 B — 검색 + 분류기</div>
           <p style="font-size:13.5px;margin:8px 0;">① 학습된 <b>분류기(kf-deberta-base)</b>가 등급 산출<br>② <b>검색</b>으로 유사 근거·후보 제시<br>③ 룰·합의 게이트로 검수 라우팅<br>④ 등급 확정 + 근거 동봉</p>
-          <p class="card-desc">분류기 학습은 <b>중앙(지재원)에서 1회</b>, 고객사는 추론만(CPU 333ms/건이면 충분). 검색엔진은 검색·근거 담당.</p>
+          <p class="card-desc">최초 학습은 <b>중앙(지재원) A100 GPU</b>, 고객사는 <b>CPU 추론(333ms/건)</b> + <b>야간 CPU 증분 재학습</b>(검수 교정 반영). 검색엔진은 검색·근거 담당.</p>
         </div>
       </div>
     </section>
@@ -615,7 +615,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="band warn" style="margin-top:14px;">
           <div class="bt">단점 (관리 가능)</div>
           <ul>
-            <li>분류기 <b>학습 필요</b> — 단, 지재원 중앙 1회. 고객사는 추론만</li>
+            <li>분류기 <b>학습 필요</b> — 최초 학습은 지재원 GPU 1회, 이후 고객사는 추론 + 야간 CPU 증분 재학습</li>
             <li>추론 비용 — 단, <b>CPU 333ms/건</b>이면 충분(GPU 선택)</li>
             <li>등급체계 변경 시 재학습 고려</li>
           </ul>

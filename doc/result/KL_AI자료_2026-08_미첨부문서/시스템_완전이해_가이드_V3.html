@@ -987,7 +987,7 @@ footer strong{color:var(--text-dim);}
 <tr><td><code>POST /api/v1/documents</code></td><td>동기</td><td>HWP/PDF/DOCX 파일 업로드 및 등록 (최대 20MB)</td></tr>
 <tr><td><code>POST /api/v1/relabel</code></td><td>동기</td><td>분류 재라벨 — 사람 정정(correction)을 능동학습 입력으로 등록</td></tr>
 <tr><td><code>POST /api/v1/confirm</code></td><td>동기</td><td>분류 결과를 검증 라벨로 확정</td></tr>
-<tr><td><code>POST /api/v1/train</code></td><td>동기 (admin)</td><td>재학습 트리거 — 정정 데이터로 모델 다시 학습 (10회/시간) <span style="color:var(--text-dim);">※ 환류=재학습 정책 미확정·기본 A안 무반출(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)</span></td></tr>
+<tr><td><code>POST /api/v1/train</code></td><td>동기 (admin)</td><td>재학습 트리거 — 정정 데이터로 모델 다시 학습 (10회/시간) <span style="color:var(--text-dim);">※ 환류=재학습 정책 확정 — 문서 무반출 · 고객사 현장 CPU 야간 증분 재학습(매일 02:00)으로 반영(<a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 확인 5 · B안</a>)</span></td></tr>
 <tr><td><code>POST /api/v1/admin/model/reload</code></td><td>동기 (admin)</td><td>모델 핫리로드 — 프로세스 재기동 없이 새 모델로 교체</td></tr>
 <tr><td><code>PUT /api/v1/schema/grades</code></td><td>동기 (admin)</td><td>등급 체계 변경 (조회는 <code>GET</code>)</td></tr>
 <tr><td><code>GET /api/v1/healthz</code></td><td>동기</td><td>시스템 상태 확인 (공개)</td></tr>

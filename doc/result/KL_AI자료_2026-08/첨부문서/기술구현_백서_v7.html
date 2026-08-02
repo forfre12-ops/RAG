@@ -547,8 +547,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </svg>
       </div>
 
-      <h3>2.1.2 배포 토폴로지 — 지재원(골든셋·학습) / 고객사 agent(추론)</h3>
-      <p>본 시스템은 <b>2-tier 배포</b>다. 중앙의 <b>지재원</b> 1곳은 합성 코퍼스·룰/게이트 번들과 모델 패키징을 담당하고, <b>고객사 AI agent</b> N곳은 추론(등급 분류)·RAG 보조·감사·관리자 확정 포착을 담당한다. 고객사 교정·원문은 망 내 잔류(반출 금지)하며, 기본 반영은 exact-match 선례·상향 라우팅·집계 진단지표로 제한한다. 재학습/kNN 전파는 locked 충분량·shadow 검증·별도 승인 이후 단발로만 연다. 고객사 웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위이며, 고객사 agent는 OpenAPI 계약만 노출한다.</p>
+      <h3>2.1.2 배포 토폴로지 — 지재원(최초 학습·골든셋, GPU) / 고객사 agent(추론 + 야간 증분재학습, CPU)</h3>
+      <p>본 시스템은 <b>2-tier 배포</b>다. 중앙의 <b>지재원</b> 1곳은 합성 코퍼스·골든셋·룰/게이트 번들과 <b>최초(전체) 모델 학습</b>을 A100 GPU로 담당하고, <b>고객사 AI agent</b> N곳은 추론(등급 분류)·RAG 보조·감사·관리자 확정 포착에 더해 <b>현장 CPU 야간 증분 재학습</b>을 담당한다. 즉 <b>학습은 두 곳에서 일어난다</b> — 지재원 = 최초 학습·배포용 모델 제작(GPU), 고객사 = 운영 검수 교정을 반영하는 증분 재학습(GPU 없이 CPU, 매일 02:00 KST 무인 야간 배치). 고객사 교정·원문은 <b>망 내에 그대로 두고 그 자리에서 학습</b>하므로 문서·발췌의 <b>반출은 0</b>이다. 재학습본은 <b>후보로만 등록</b>되고(<code>retrain_auto_activate=False</code>) 운영 전환은 사람 승인을 거친다. 고객사 웹 페이지 전부와 원문 저장(로컬FS) 구성은 <b>발주처(KL)</b> 범위이며, 고객사 agent는 OpenAPI 계약만 노출한다.</p>
 
       <div style="margin:16px 0;overflow-x:auto;">
         <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;min-width:600px;display:block;" aria-label="2-tier 배포 토폴로지">
@@ -595,13 +595,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <text x="290" y="170" text-anchor="middle" font-size="9.5" fill="#404040" font-family="Geist,sans-serif">① 번들 적재</text>
           <text x="290" y="184" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">pgvector·참조테이블</text>
 
-          <!-- 고객사 → 지재원: 집계 진단지표만 환류 (A안, 문서 반출 없음) -->
+          <!-- 고객사 → 지재원: 집계 진단지표만 환류 (문서 반출 없음) -->
           <line x1="356" y1="290" x2="224" y2="290" stroke="#737373" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#tp-arr)"/>
-          <text x="290" y="282" text-anchor="middle" font-size="9.5" fill="#525252" font-family="Geist,sans-serif">② 집계 진단 환류(A안)</text>
+          <text x="290" y="282" text-anchor="middle" font-size="9.5" fill="#525252" font-family="Geist,sans-serif">② 집계 진단 환류</text>
           <text x="290" y="306" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">오분류율·혼동행렬 · 문서 반출 없음</text>
 
           <!-- 하단 캡션 -->
-          <text x="380" y="350" text-anchor="middle" font-size="9.5" fill="#a3a3a3" font-family="Geist Mono,monospace">중앙 학습 → 오프라인 번들 → N곳 추론 (폐쇄망 · CPU 추론)</text>
+          <text x="380" y="350" text-anchor="middle" font-size="9.5" fill="#a3a3a3" font-family="Geist Mono,monospace">지재원 최초학습(GPU) → 오프라인 번들 → N곳 추론 + 야간 증분재학습(CPU)</text>
         </svg>
       </div>
 
@@ -629,7 +629,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
 
 
       <h3>2.1.3 골든셋 구축 워크플로우 · 검수 콘솔 (지재원)</h3>
-      <p>지재원의 핵심 업무는 <b>골든셋(정답 라벨 데이터) 구축</b>이다. 합성·수집 → 자동 1차 라벨 → <b>사람 검수</b> → 골든셋 편입 → 학습의 사이클로 운영하며, 대부분 단계는 파이프라인으로 구현돼 있다(고객 운영신호 환류 방식은 미확정 결정 A/B/C — 기본 A안은 집계 진단지표만). 사람 검수·라벨링은 <b>지재원 내부 검수 콘솔</b>(Lloydk 제공)로 수행하며, 이는 KL의 고객 영업비밀관리시스템과는 <b>별개의 도구</b>다.</p>
+      <p>지재원의 핵심 업무는 <b>골든셋(정답 라벨 데이터) 구축</b>이다. 합성·수집 → 자동 1차 라벨 → <b>사람 검수</b> → 골든셋 편입 → 학습의 사이클로 운영하며, 대부분 단계는 파이프라인으로 구현돼 있다(고객사 운영 교정은 <b>망 내 로컬 증분 재학습</b>으로 그 자리에서 반영되고, 지재원으로는 <b>집계 진단지표만</b> 환류 — 문서 반출 없음). 사람 검수·라벨링은 <b>지재원 내부 검수 콘솔</b>(Lloydk 제공)로 수행하며, 이는 KL의 고객 영업비밀관리시스템과는 <b>별개의 도구</b>다.</p>
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>단계</th><th>내용</th><th>산출 · 도구</th></tr></thead>
@@ -640,7 +640,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-warn"><b>④ 사람 검수 · 라벨링</b></td><td>검수자가 한 화면에서 <b>accept / correct</b> → 최종 라벨 · 검수자 · 근거 기록</td><td><b>검수 콘솔 (지재원 · 본개발)</b></td></tr>
             <tr><td><b>⑤ 골든셋 편입</b></td><td>accepted만 골든셋에 편입, 버전 · 근거 · 검수자 감사 기록</td><td>편입 파이프라인</td></tr>
             <tr><td><b>⑥ 학습 · 배포</b></td><td>골든셋 → 모델 학습 → <b>오프라인 골든 번들</b>로 고객사 배포</td><td>학습 파이프라인</td></tr>
-            <tr><td><b>⑦ 진단 환류 <span style="font-weight:400">(미확정 A/B/C)</span></b></td><td><b>기본 A안</b>: 고객사 <b>집계 진단지표</b>(오분류율·혼동행렬, 문서식별 불가)만 환류 → 골든셋 보강 우선순위 참고(교정·문서는 망 내 잔류). 문서단위 반출 후 중앙 재학습=C안(비권장), 망 내 로컬 재학습=B안(최고보안)</td><td>(집계 지표 · 결정 대기)</td></tr>
+            <tr><td><b>⑦ 운영 교정 반영 · 진단 환류</b></td><td><b>망 내 로컬 재학습(확정)</b>: 고객사 검수 교정은 반출하지 않고 <b>현장 CPU 야간 증분 재학습</b>(매일 02:00 KST)으로 그 자리에서 모델에 반영한다. 지재원으로는 <b>집계 진단지표</b>(오분류율·혼동행렬, 문서식별 불가)만 환류해 골든셋 보강 우선순위에 참고한다. 문서단위 반출 후 중앙 재학습은 <b>채택하지 않는다</b></td><td>증분 재학습 배치 · 집계 지표</td></tr>
           </tbody>
         </table>
       </div>
@@ -1001,7 +1001,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <span class="callout-icon">⚠</span>
         <div class="callout-body"><b>데이터 자동 학습은 신중히 검토 후 진행한다.</b> 운영 중 쌓인 검수 결과로 모델을 다시 학습시키는 "능동학습"은, 데이터 분포가 변하면 <b>정확성을 일정하게 보장하기 어렵고</b> 잘못된 자동 반영이 미탐(비밀문서 누락) 위험으로 이어질 수 있다. 따라서 본 사업에서는 <b>수집·재학습·배포·롤백 폐곡선을 모두 갖추되 자동 활성·자동 롤백은 기본 OFF</b>로 두고(§2.4.1), 모델 교체는 <b>관리자가 평가 결과를 신중히 검토·승인한 경우에만</b> 단계적으로 진행한다.</div>
       </div>
-      <p>운영 중 <b>상시 자동</b>은 <b>G1(검수 결과 수집)</b>이며, 누적 임계 도달 시 스케줄러(Celery beat, 30분 주기)가 <b>G2(재학습)·G3(평가 게이트)까지 자동 수행</b>해 새 "후보 모델"을 만들 수 있다. 다만 <b>G4(운영 교체·활성)는 <code>retrain_auto_activate</code> 기본 OFF로 차단</b>되어 관리자 사인오프가 있어야만 일어난다 — 즉 <b>무인(無人) 자동 '배포'는 없다</b>(후보 생성·채점은 자동이어도 운영 반영은 사람 승인). 이 절차가 진행 중이거나 수행되지 않아도 운영 분류(①–⑧)는 기존 모델로 정상 동작한다.</p>
+      <p>운영 중 <b>상시 자동</b>은 <b>G1(검수 결과 수집)</b>이며, 스케줄러(Celery beat)가 <b>G2(재학습)·G3(평가 게이트)까지 자동 수행</b>해 새 "후보 모델"을 만든다. 발화 주기는 배포처마다 다르다 — <b>고객사(운영·CPU)</b>는 <code>enable_incremental_retrain</code>으로 <b>매일 02:00 KST 야간 증분 재학습</b> 한 번만 돌고(드리프트 URGENT 30분틱은 켜지 않음 — 과잉 재학습 보수), <b>지재원(학습·GPU)</b>은 누적 임계 도달 시 30분 주기 틱으로 전체 재학습 경로를 쓴다. 다만 <b>G4(운영 교체·활성)는 <code>retrain_auto_activate</code> 기본 OFF로 차단</b>되어 관리자 사인오프가 있어야만 일어난다 — 즉 <b>무인(無人) 자동 '배포'는 없다</b>(후보 생성·채점은 자동이어도 운영 반영은 사람 승인). 이 절차가 진행 중이거나 수행되지 않아도 운영 분류(①–⑧)는 기존 모델로 정상 동작한다.</p>
       <div style="margin:16px 0;overflow-x:auto;">
         <svg viewBox="0 0 840 240" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;min-width:680px;display:block;" aria-label="모델 갱신 절차">
           <defs>
@@ -1110,7 +1110,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <thead><tr><th>층</th><th>동작</th><th>효과</th></tr></thead>
           <tbody>
             <tr><td><b>① 즉시 override</b><br>(사람 라벨)</td><td>도메인 관리자가 라벨·사유를 부여한 문서는 <b>그 라벨을 직접 정답으로</b> 사용(모델 추론 건너뜀)</td><td class="td-pass">해당 문서 100% 정확 — 재학습을 기다리지 않고 즉시 반영</td></tr>
-            <tr><td><b>② 게이트형 재학습</b><br>(주기·자동/수동)</td><td>tb_corrections가 N건(권장 <b>50</b>, 미탐 누적 ≥10 시 긴급) 누적되면 스케줄러(또는 관리자) 트리거 → F1/FNR/적대 게이트 통과 → <b>사람 승인(G4) 후</b> 배포</td><td class="td-pass">신규 문서 일반화 향상 — 재현·감사 가능</td></tr>
+            <tr><td><b>② 게이트형 재학습</b><br>(주기·자동/수동)</td><td>고객사는 <b>매일 02:00 야간 CPU 증분 재학습</b>(교정분을 기존 학습셋과 섞어 파인튜닝 · 실측 약 1시간/1,000건), 지재원은 tb_corrections가 N건(권장 <b>50</b>, 미탐 누적 ≥10 시 긴급) 누적 시 트리거 → 양쪽 모두 F1/FNR/적대 게이트 통과 → <b>사람 승인(G4) 후</b> 배포</td><td class="td-pass">신규 문서 일반화 향상 — 재현·감사 가능</td></tr>
             <tr><td><b>③ 자동 배포 기본 차단</b></td><td>자동 활성 스위치(<code>retrain_auto_activate</code>)·자동 롤백(<code>auto_rollback_enabled</code>) 모두 <b>기본 OFF</b>. 모든 모델 교체는 게이트(fail-closed) + 사람 사인오프 경유</td><td class="td-pass">FNR 회귀(비밀→공개 유출) 원천 차단</td></tr>
           </tbody>
         </table>
@@ -1421,7 +1421,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           </tbody>
         </table>
       </div>
-      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ LLM 판정만으로 채점하면 "정답과의 일치"가 아니라 "LLM과의 닮음"을 재는 자기참조 함정에 빠진다. 따라서 보고 수치는 자명·외부근거·사람 라벨 기반을 우선하며, 최종 납품 신뢰성은 <code>human_review</code> 티어(발주처 협조 시 확정)로 마감한다. 운영 중 검수자 교정은 (환류 결정 §2.1.2 A/B/C에 따라) 고객 망 내에서 사람 라벨을 누적하는 경로이며, 중앙 골든셋으로의 문서 반출 없이 집계 진단지표만 환류한다(기본 A안).</p>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);">※ LLM 판정만으로 채점하면 "정답과의 일치"가 아니라 "LLM과의 닮음"을 재는 자기참조 함정에 빠진다. 따라서 보고 수치는 자명·외부근거·사람 라벨 기반을 우선하며, 최종 납품 신뢰성은 <code>human_review</code> 티어(발주처 협조 시 확정)로 마감한다. 운영 중 검수자 교정은 고객사 망 내에서 사람 라벨을 누적해 <b>현장 증분 재학습</b>으로 반영되는 경로이며(§2.1.2), 중앙 골든셋으로의 문서 반출 없이 집계 진단지표만 환류한다.</p>
 
       <h4 id="goldenset-workflow" style="margin-top:24px;">골든셋 구성 워크플로우 — 폐곡선 파이프라인</h4>
       <p>골든셋은 일회성 구축이 아니라 <b>생성·수집 → 자동 1차 라벨 → 검수 큐 → 사람 검수 → 골든셋 편입 → 학습·배포 → 환류</b>의 폐곡선으로 운영한다. ①~③·⑤~⑦은 파이프라인으로 자동화돼 있고, <b>④ 사람 검수만 검수 콘솔(본개발 웹 UI)</b>로 수행한다. 단계별 도구·산출물은 §2.1.3과 동일하며, 아래는 그 구성 흐름의 시각화다.</p>
@@ -1441,9 +1441,9 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <div class="gs-step hl"><div class="n">④ 사람 검수</div><div class="t">accept / correct</div><div class="d">검수 콘솔 — 최종 라벨·검수자·근거 기록</div></div>
         <div class="gs-step"><div class="n">⑤ 골든셋 편입</div><div class="t">tier 분리 · 사람 이중서명</div><div class="d">locked(평가정답)=TS/S1 ≥2 검수자 서명 · 버전·근거 감사</div></div>
         <div class="gs-step"><div class="n">⑥ 학습·배포</div><div class="t">모델 학습 → 번들</div><div class="d">오프라인 골든 번들로 고객사 배포</div></div>
-        <div class="gs-step"><div class="n">⑦ 진단 환류</div><div class="t">집계 지표(A안)</div><div class="d">오분류율·혼동행렬 → 골든셋 보강 우선순위(문서 미반출)</div></div>
+        <div class="gs-step"><div class="n">⑦ 교정 반영·환류</div><div class="t">현장 증분재학습 + 집계 지표</div><div class="d">교정은 망 내 CPU 야간 재학습으로 반영 · 지재원엔 오분류율·혼동행렬만(문서 미반출)</div></div>
       </div>
-      <div class="gs-loop"><b>환류 방식은 미확정 결정(A/B/C, §2.1.2).</b> 기본 A안은 ⑦ 집계 진단지표(오분류율·혼동행렬, 문서식별 불가)만 회수해 골든셋 보강 우선순위에 참고하고, 교정·문서는 고객사 망 내 잔류한다. 모델은 상시 재학습이 아니라 제약 완화 시 별도 학습 + 드리프트/이벤트 트리거 단발이다(§2.4.1). 단계별 구축 계획(검토본 100건 → 1,000건 확장)은 위 5.4 참조.</div>
+      <div class="gs-loop"><b>환류 방식 = 망 내 로컬 증분 재학습 (확정 · §2.1.2).</b> 교정·문서는 고객사 망 내에 잔류하며, 그 자리에서 <b>현장 CPU 야간 증분 재학습</b>(매일 02:00 KST)으로 모델에 반영된다. 지재원으로는 ⑦ 집계 진단지표(오분류율·혼동행렬, 문서식별 불가)만 회수해 골든셋 보강 우선순위에 참고한다. 고객사에서는 드리프트 자동 재학습(30분틱)은 켜지 않고 <b>통제된 야간 배치만</b> 돌리며, 재학습본은 후보 등록까지이고 운영 전환은 사람 승인이다(§2.4.1). 단계별 구축 계획(검토본 100건 → 1,000건 확장)은 위 5.4 참조.</div>
       <div class="gs-loop" style="margin-top:14px;border-left-color:var(--text);"><b style="display:block;margin-bottom:6px;font-size:13.5px;color:var(--text);">골든셋 생성·평가 재설계 (2026-06)</b>
       <b>① 생성 게이트 = 합의 + 근거 + self-consistency.</b> 단일 confidence 임계(자동확정 신뢰 불가 — 실측 AUROC 0.535)를 게이트에서 <b>제거</b>하고, <b>룰등급 == LLM등급 합의 + 실제 한국어 시드 근거 span + 주 판정자 k-샘플 자기일관(self-consistency)</b>이 모두 충족될 때만 <code>gold_candidate</code>로 자동 인정한다. confidence는 사람 검토 큐 <b>정렬용</b>일 뿐 판정 권한이 없다.<br>
       <b>② 판정자 = ConsensusJudge.</b> 주 판정자는 상용 LLM 택일(Claude·Gemini·GPT — 지재원 중앙 한정), 미연동·민감문서는 온프렘 Qwen(airgap)으로 라우팅. 배포급 Qwen <b>섀도</b>가 주 판정과 갈리면 '배포 모델이 틀릴 지점'(production_suspect)으로 사람 큐에 표시한다.<br>
