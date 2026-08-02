@@ -339,7 +339,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     <div class="diag">
       <div class="node soft"><div class="nt">목적함수</div><div class="nd">골든셋 기준 — "고등급 FNR ≤ 목표" 제약 하에 <b>자동확정율·F1 최대</b></div></div>
       <div class="arr">→</div>
-      <div class="node"><div class="nt">탐색 대상(노브)</div><div class="nd">① 온도보정 T ② 게이트 임계(conf·합의·희소근거) ③ fusion 가중치(룰/모델/RAG/메타) — 모두 재학습 없이 CPU로</div></div>
+      <div class="node"><div class="nt">탐색 대상(노브)</div><div class="nd">① 온도보정 T ② 게이트 임계(conf·합의·희소근거) ③ 합의 게이트 on/off·희소근거 임계 — 모두 재학습 없이 CPU로</div></div>
       <div class="arr">→</div>
       <div class="node dark"><div class="nt">최적 설정 산출</div><div class="nd">수동 추측 대신 <b>재현 가능·일관</b>된 임계 자동 도출</div></div>
     </div>
@@ -348,11 +348,11 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
       <tbody>
         <tr><td>온도 보정(temperature)</td><td><span class="tag-ok">불요</span></td><td>OOD 과신 완화 → 신뢰도 게이트 판단이 정확해짐</td></tr>
         <tr><td>게이트 임계(합의·희소근거)</td><td><span class="tag-ok">불요</span></td><td>자동확정 정밀도 <b>63→81%</b>, 무성 TS 미탐 <b>5→0</b> 같은 임계를 사람 손 대신 골든 기준으로 산출</td></tr>
-        <tr><td>fusion 가중치(룰/모델/RAG/메타)</td><td><span class="tag-ok">불요</span></td><td>신호 결합 비중 최적화 → 등급 정확도·미탐 동시 개선</td></tr>
+        <tr><td>합의 게이트 on/off·희소근거 임계</td><td><span class="tag-ok">불요</span></td><td>신호 결합 비중 최적화 → 등급 정확도·미탐 동시 개선</td></tr>
       </tbody>
     </table></div>
     <div class="band gray"><div class="bt">즉시 가치</div><p>지금 가진 모델·골든셋만으로 <b>①~③(후처리 노브)</b>을 GPU 없이 최적화할 수 있다 → 우리가 계속 다룬 <b>자동확정 FNR/정밀도</b>를 골든 기준으로 바로 끌어올린다. 가장 가성비 높은 첫 작업.</p>
-    <p style="font-size:12px;color:var(--dim);"><b>구현 상태: P1 하네스 구현·검증 완료</b> — <code>m6_evaluation/optuna_tuner.py</code> + <code>scripts/optuna_tune_gates.py</code>. 평가 하네스(<code>evaluate_via_serving</code>) 재사용 · CPU(GPU 불요). 스모크(3-trial)에서 <b>고등급 FNR=0 제약 충족 + val/test 분할 검증</b> 확인. <b>본 정밀 튜닝(50~100 trial)은 1,000 사람골든 확보 후 실행</b>(작은 N=과적합) → best 설정을 번들 ②③④로 통합.</p></div>
+    <p style="font-size:12px;color:var(--dim);"><b>구현 상태: P1 하네스(스켈레톤) 구현</b> — <code>m6_evaluation/optuna_tuner.py</code> + <code>scripts/optuna_tune_gates.py</code>. 평가 하네스(<code>evaluate_via_serving</code>) 재사용 · CPU(GPU 불요). 스모크(3-trial)에서 <b>고등급 FNR=0 제약 충족 + val/test 분할 검증</b> 확인. <b>본 정밀 튜닝(50~100 trial)은 1,000 사람골든 확보 후 실행</b>(작은 N=과적합) → best 설정을 번들 ②③④로 통합.</p></div>
   </section>
 
   <!-- 07 지표 -->
@@ -404,13 +404,13 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
     </ul></div>
     <div class="band"><div class="bt">관측 가시성 + 운영 검수 대시보드</div><p>품질이 조용히 떨어지던 지점을 메트릭·트레이스로 노출했다: <b>① LLM 비용추적 전 경로 배선</b>(개발/운영 분리 집계) <b>② 비동기 작업 상태 메트릭</b>(진입 카운터+소요시간 히스토그램) <b>③ OTel 추론·검색 span</b>(스칼라·비민감만, 본문 미노출) <b>④ 검색 폴백 가시화</b>(reranker→RRF·encode 실패·쿼리확장 폴백). 이 신호를 <code>GET /admin/dashboard</code> <b>한 화면</b>으로 종합 — 이중검토 보류·locked readiness·교정 backlog·kill-gate 발동·임베딩 드리프트를 함께 본다(섹션별 독립 best-effort·부분 가용 표기).</p></div>
     <div class="band gray"><div class="bt">통제 루프 — 지재원 export/import 런북 (G1·G2)</div><p>지재원(개발)에서 고객사(운영)로 가는 릴리스·활성·검수반입을 런북으로 통제한다: <b>G1 — 수동 활성 엔드포인트</b>(<code>POST /admin/model/activate</code>, deploy gate 통과 + force 시 감사) · <b>G2 — 검수 반입 <code>--as-candidate</code></b>(고객사 교정을 <code>gold_candidate</code>로만 편입해 <b>평가셋 오염 차단</b>, 지재원 golden-build 기본 무변경). CI 하드게이트(P0#5)가 이 통제가 코드 회귀로 풀리지 않게 영속화한다.</p></div>
-    <div style="margin-top:10px;font-size:12.5px;color:var(--dim);">상세 반영 내역: <a href="설계검토_하드닝_반영_내역.html" style="color:var(--text);">설계검토 하드닝 반영 내역</a> · <a href="분류검수게이트_강화_보고서.html" style="color:var(--text);">분류 검수 게이트 강화 보고서</a> · <a href="운영_런북.html" style="color:var(--text);">운영 런북</a></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--dim);">상세 반영 내역: 설계검토 하드닝 반영 내역 · 분류 검수 게이트 강화 보고서 · 운영 런북 — <b>본 묶음 미포함</b>(감리 산출물 트랙 · 요청 시 별도 제공)</div>
   </section>
 
   <!-- 09 확인① 분류기 채택 -->
   <section id="s9">
     <div class="sec-head"><span class="n">09</span><h2>확인 ① 분류기 채택 — 검색 단독(Dense kNN)은 붕괴</h2></div>
-    <div class="sec-sub">"분류기 빼고 검색(BM25/Dense kNN) 상위 5건 중 가장 높은 등급"으로 매기는 안을, 동일 테스트셋·누출 0으로 분류기와 정면 실측 (<a href="검색단독_vs_분류기_등급분류_비교.html">검색단독_vs_분류기</a> 요약).</div>
+    <div class="sec-sub">"분류기 빼고 검색(BM25/Dense kNN) 상위 5건 중 가장 높은 등급"으로 매기는 안을, 동일 테스트셋·누출 0으로 분류기와 정면 실측 (「검색단독 vs 분류기 등급분류 비교」 요약 — 본 묶음 미포함).</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th style="width:26%;">방식</th><th>등급 정확도</th><th>고등급 미탐</th><th>분포</th></tr></thead>
       <tbody>

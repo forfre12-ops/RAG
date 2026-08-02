@@ -451,7 +451,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td class="td-code">로컬FS</td><td>—</td><td>문서·모델·아티팩트 스토리지(file://)</td><td>—</td><td>원본 AES-256-GCM 암호화 · MinIO 미사용</td></tr>
             <tr><td class="td-code">redis</td><td>7.2</td><td>Celery 브로커·백엔드 · 잡상태·아웃박스/DLQ</td><td>6379</td><td>폐쇄망 적합 · 임베딩 캐시는 인메모리 LRU</td></tr>
             <tr><td class="td-code">mlflow</td><td>2.16.2</td><td>학습 실험 추적</td><td>5000</td><td>모델 버전·지표 이력 관리</td></tr>
-            <tr><td class="td-code">api + worker</td><td>—</td><td>추론 API 서버 + 비동기 워커</td><td>18030</td><td>운영 모드 자동 적용</td></tr>
+            <tr><td class="td-code">api + worker</td><td>—</td><td>추론 API 서버 + 비동기 워커</td><td>8000</td><td>운영 모드 자동 적용</td></tr>
           </tbody>
         </table>
       </div>
@@ -601,7 +601,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <text x="290" y="306" text-anchor="middle" font-size="9" fill="#737373" font-family="Geist,sans-serif">오분류율·혼동행렬 · 문서 반출 없음</text>
 
           <!-- 하단 캡션 -->
-          <text x="380" y="350" text-anchor="middle" font-size="9.5" fill="#a3a3a3" font-family="Geist Mono,monospace">중앙 학습 → 오프라인 번들 → N곳 추론 (폐쇄망 · 온프렘 GPU)</text>
+          <text x="380" y="350" text-anchor="middle" font-size="9.5" fill="#a3a3a3" font-family="Geist Mono,monospace">중앙 학습 → 오프라인 번들 → N곳 추론 (폐쇄망 · CPU 추론)</text>
         </svg>
       </div>
 
@@ -1590,7 +1590,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th></th><th>폐쇄망 (기본)</th><th>연결형</th></tr></thead>
           <tbody>
-            <tr><td>LLM·임베딩·분류</td><td class="td-pass">전부 로컬 GPU (외부 호출 없음)</td><td>로컬 + 외부 LLM API 허용</td></tr>
+            <tr><td>LLM·임베딩·분류</td><td class="td-pass">폐쇄망 로컬 (CPU·LLM-free, 외부 호출 없음)</td><td>로컬 + 외부 LLM API 허용</td></tr>
             <tr><td>외부 통신</td><td class="td-pass">차단</td><td>허용 (합성·증강에 한정)</td></tr>
             <tr><td>설치 번들</td><td>자기완비(오프라인)</td><td>경량</td></tr>
             <tr><td>대상</td><td>이 고객사·보안기관</td><td>비폐쇄망 일반 기업</td></tr>
@@ -1599,7 +1599,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       </div>
       <div class="callout warn">
         <span class="callout-icon">🔒</span>
-        <div class="callout-body"><b>안전 불변식 (깨지지 않는 규칙):</b> 연결형이라 하더라도 <b>실 영업비밀 문서를 외부 LLM에 보내지 않는다</b>(전송 자체가 유출이므로). 외부 LLM은 <b>합성·증강 전용</b>이며, <b>실 영업비밀의 등급 분류는 어느 모드에서도 항상 로컬 GPU</b>에서 수행된다.</div>
+        <div class="callout-body"><b>안전 불변식 (깨지지 않는 규칙):</b> 연결형이라 하더라도 <b>실 영업비밀 문서를 외부 LLM에 보내지 않는다</b>(전송 자체가 유출이므로). 외부 LLM은 <b>합성·증강 전용</b>이며, <b>실 영업비밀의 등급 분류는 어느 모드에서도 항상 폐쇄망 로컬(CPU·LLM-free)</b>에서 수행된다.</div>
       </div>
 
       <h3>8.2 멀티 고객 납품</h3>
