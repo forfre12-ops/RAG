@@ -669,12 +669,15 @@ class Settings(BaseSettings):
     # 빈 응답(curl: (52) Empty reply from server)을 받는다. --workers 1 이라 그동안
     # 다른 요청도 함께 끊긴다. 비용 동인은 업로드 크기가 아니라 **청크 수**다.
     #
-    # 기본값 산정: 2 CPU 컨테이너에서 18청크 45.3초(≈2.5초/청크) 실측. CPU 한도 기본이
-    # 6 으로 올라가(docker-compose.prod.yml) 대략 0.8초/청크가 되므로 60초 예산의 절반을
-    # 안전계수로 두고 40청크(≈10페이지)로 잡는다. 배포 환경의 실제 처리량은
-    # scripts/probe_ingest_capacity.py 로 재고 이 값을 조정할 것.
+    # 기본값 산정 — 6 CPU(현 기본) 테스트서버 실측 2026-08-02:
+    #     4청크 4.3s · 18청크 16.1s · 36청크 32.4s · 88청크 79.8s · 351청크 320.3s
+    #     → 고정비 ≈2.9s + 0.82s/청크 (CPU 에 거의 정확히 비례. 2 CPU 대비 2.8~3.0배)
+    # 60초 예산의 절반(30초)을 안전선으로 두면 (30-2.9)/0.82 ≈ 33청크. 여유를 둬 34.
+    # 절반을 쓰는 이유: 워커가 1개라(WEB_CONCURRENCY=1) 동시 요청이 서로를 밀어낸다 —
+    # 단독 실행 기준으로 상한을 잡으면 두 건만 겹쳐도 타임아웃이 난다.
+    # ≈9페이지. CPU 한도를 바꾸면 scripts/probe_ingest_capacity.py 로 재고 이 값도 조정할 것.
     # 0 이하면 검사 비활성(측정·디버깅용).
-    analyze_sync_max_chunks: int = 40
+    analyze_sync_max_chunks: int = 34
 
     # OCR DoS 가드 — 스캔 PDF 한 건을 OCR할 때 변환·인식할 최대 페이지 수.
     # 수백쪽 스캔본 한 건이 pdf2image/Tesseract를 수십분~OOM으로 모는 것을 차단.
