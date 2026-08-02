@@ -4,9 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>검색 단독 vs 검색+분류기 — 등급분류 방식 비교</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
 <style>
 :root {
   --bg:#ffffff; --bg-surface:#fafafa; --bg-elevated:#ffffff; --bg-code:#f4f4f4;
@@ -215,6 +212,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     <div class="meta-row">
       <span class="badge">실측 비교 보고서</span>
       <span class="badge blue">2026-06 · 의사결정 보조</span>
+      <span class="badge" style="background:#7a1f1f;color:#fff">측정 모델 v-137066a1 (구세대)</span>
       <span class="meta-dot">·</span>
       <span class="meta-soft">검색 단독 분류 (BM25 실측) vs 검색+분류기</span>
       <span class="meta-dot">·</span>
@@ -222,6 +220,13 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
     </div>
 
     <h1 class="title">검색 단독 vs 검색 + 분류기</h1>
+  <div style="margin:16px 0 0;padding:12px 16px;border:1px solid #7a1f1f;border-left-width:4px;background:#fff;color:#27272a;font-size:13.5px;line-height:1.6;">
+    <b>이 문서만 측정 모델이 다릅니다.</b> 본 비교는 <code>kf-deberta-base</code> <code>v-137066a1</code>로 수행됐습니다 —
+    다른 문서의 기준인 현행 배포본 <code>v5_clean</code>(<code>v-fe4b386b</code>)이 아닙니다. 이 문서가 답하는 질문은
+    <b>"분류기를 두느냐 마느냐"</b>라는 아키텍처 선택이고, 그 결론은 모델 세대에 좌우되지 않아 재측정하지 않았습니다
+    (측정 조건은 §10 참조). <b>본 문서의 절대 수치를 현행 성능으로 인용하지 마십시오</b> — 현행 성능은
+    <b>「분류 정확도·테스트 방식」 §3.2 격자</b>의 ★ 칸(v5_clean · 경화 홀드아웃 42 · F1_macro 0.917)이 기준입니다.
+  </div>
   <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
     <b>2026-06-29 운영 전제 업데이트:</b> 실데이터 0 · 빌드 검수 0 · 반출 0 제약에서는 배포 전 정확도 검증을 주장하지 않는다. 합성/LLM 라벨은 학습 시드·상대비교·회귀 테스트용이며, <code>locked_gold_eval</code>은 사람 서명 전용이다. 현재 목표는 "검증된 분류기 배포"가 아니라 <b>룰 우선 안전 부트스트랩 + 보수적 검수 라우팅 + 운영 관리자 확정에서 배우는 루프</b>다. 이 문서의 기존 F1/FNR/PASS 수치는 합성·OOD·프록시 또는 메커니즘 검증으로만 해석한다.
   </div>

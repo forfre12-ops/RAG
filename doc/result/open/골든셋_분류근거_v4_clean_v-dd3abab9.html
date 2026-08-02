@@ -2,8 +2,6 @@
 <html lang="ko"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>골든셋 분류 근거 보고서 — 직전 배포모델 v4_clean(v-dd3abab9) · 현행 배포본은 v5 v-fe4b386b (실엔진) | Lloydk</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap">
 <style>
 :root{
   --bg:#ffffff;--bg-surface:#fafafa;--bg-mid:#f4f4f5;--bg-strong:#e4e4e7;
@@ -237,6 +235,797 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);font-si
   </div>
   <div class="result-count" id="rc"></div>
   <div class="records-grid" id="grid"></div>
+<!-- offline-fallback: static evidence table -->
+<noscript>
+  <div style="border:2px solid #0a0a0a;padding:14px 16px;margin:18px 0;background:#fafafa">
+    <b>스크립트 없이 열람 중입니다.</b> 아래는 위 카드 UI 와 <b>동일한 데이터</b>를 정적 표로
+    옮긴 것입니다 — 전 777건 전수이며 생략이 없습니다. 등급 분포: TS(특급) 55건 · S1(1급) 56건 · S2(2급) 89건 · S3(3급) 577건.
+    각 건의 근거 문장·신뢰도 분포까지 보시려면 스크립트를 허용해 주십시오.
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+    <thead><tr style="background:#f4f4f5"><th>문서 ID</th><th>도메인</th><th>정답 등급</th><th>룰 등급</th><th>모델 등급</th><th>최종 등급</th><th>룰·모델 합의</th><th>라벨 출처</th><th>계층</th><th>결정 경로</th></tr></thead>
+    <tbody>
+<tr><td>b6e4e27b71e9625e</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>cda18c742bdd23d3</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d378edbca705fd8d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>4ad7934b5345322d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4df57a645e74c567</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b1964e8547996e4a</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>670931d0e2a20612</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f75e76c8c6c38d5b</td><td>기타</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>88b68a864af543fb</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>336f55a0480a026f</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>35778841b83178b9</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>39ad972da5a4e866</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>a950ebbae38a0d09</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7ba89b19f17e315b</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>cfb63e088f9344fa</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>82c4354f3e1e6cd4</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>455130cca418a2b4</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>00b52a06d1975528</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>793f8a5f09480ed8</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>f8510da0d7cf760e</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>153f4088eee5cd97</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>a7e55384908c0451</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>58ef591d5abc75ea</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>6b1d7f2af204e933</td><td>소프트웨어</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>0cd36969bc2e5236</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>0c306a0a51bca737</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>ac01929dcb21e63a</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>e3154ea6dcc2e3b2</td><td>경영정보</td><td>S3</td><td>S2</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7231132a559cdf42</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>9da290c6e68526d0</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>b079839cf744944e</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>cd2c9365837391c7</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>9e9019b1b93b7d55</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>8f18ed4249100639</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>1287050f098e3639</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>0f919301876da6f6</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>0730716fcfe92701</td><td>바이오_농업</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4ffd300158e536dc</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>4af0f8c947a1437d</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>e049a545c02321e5</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>9769f7cd89b25639</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>27919c8b13306cb8</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5276d134abb0ce6c</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>405453240b582b0e</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>5530c0ae187c961b</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>e1cdc205ea2e78f5</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>24e24f2c8c5ac19e</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>974adfca4d3b20b2</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>147c597671cd46b3</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4f161f6ac4de9b9e</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>c91bacad3688825a</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3bc6ecda10144294</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>183076b63cbde44f</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4d2c017f14f7ce08</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>79e70b33a86b4136</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f84e5cc06b94da32</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>60e83ddbdb73b01a</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c57083fd51f91991</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>65159af1e7bdfe82</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>19513048db0b4293</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>d9149cc2f6c9e76b</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c078f22dd1d829af</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>e36038f73c5ae86c</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>08b97a306a0e63e9</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e36c21d27344ef20</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>7c81b4a487e94f6f</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>0746c9f764fbc35e</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>477b1a5634a960d9</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f08eb1aa7c441b1f</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>2f3895a26730d453</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>38cf848099a24a8e</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>6e6951d06e698bf6</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>73643aa1d9684867</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>370ac51d91caf4ab</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4d6a70f337c15cfb</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c8ea71503aca06d2</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>63b18147f5632f8a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>323c78cca2ec4568</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5beb46fcb3885073</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>731bf34e407e69c1</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f4b58b14eacce6ef</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>363058833772592e</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>91420ee510f97b65</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>0d57a73274d94da9</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>635857c162b0b6ae</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>a6df10bbd9526458</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d15eec88fb2756cc</td><td>기타</td><td>S3</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>547ed36dc7a38c01</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>126c4edc0f6e5d37</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>ab0560c89da0e967</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>dd315ceee40fed28</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a3e41fd0274afad3</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>8272b374b689e5dd</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>06cb1d8f304a041b</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4c4c8d18ce3c9c31</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>9fede1f2ea1da965</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ee4ba9b6a98d17aa</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f3879b5240de1ddf</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f8f59df70a960781</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>40b7ff3d2a8f4d95</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>fab9303f117aa0eb</td><td>배터리</td><td>S2</td><td>S2</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>abec3b7c060837ed</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>929f74eb71dbf95d</td><td>반도체</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>51db6a32e119beb0</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>b595b4f378e36c87</td><td>기타</td><td>S3</td><td>TS</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4ab534ee7e448e1b</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>70ae424beae901a5</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>8cdbb59a8eb76611</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>e7817de9ad24d78f</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f7bf3fe5f40a8e3d</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>d921480a4ab81888</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>48faf719cf468f36</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>846628b76ca71671</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>91b2601aa8d93a97</td><td>기타</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>4dea635259ba54b4</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>e16adfce1010d5e7</td><td>배터리</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>8bf51b55cb03fe48</td><td>화학_제약</td><td>S3</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>dd9ec07327a6d7f6</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>6e2151c8e25fc381</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>f938ab0a4c587641</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>df3ae3802261894b</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>74c37bee942251bf</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e40134d9d56fb98d</td><td>반도체</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>c19baa0ff47a7ec7</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>be87e7e1b1f8f087</td><td>경영정보</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>33fa4681098bb057</td><td>기타</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>c93b87290577e522</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>9891c1bd13db3349</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>92e488f173dc5287</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 TS)</td></tr>
+<tr><td>f46560c96a3d9eb1</td><td>기타</td><td>S2</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>a39ac2a68bf9b426</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>f7aa5aee26eaa213</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>40c1340446219d8a</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ef937dcebbb889c1</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a72975f0a5294bf0</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 TS)</td></tr>
+<tr><td>5d1603563159c7e3</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e3684ac022469470</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>6afa03b29088a7bc</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d845151b0c082d23</td><td>기타</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>7217561823de6743</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>fb0baa312d51404b</td><td>배터리</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a0aa14be586920f5</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>d391fa90453da148</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>7c2682afac4abbe8</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>da11bf2d0204a89f</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>51879321be80751f</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>fd35d232b470f407</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>883a87777fdac6e3</td><td>경영정보</td><td>S2</td><td>S1</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>3ca8d676d9bac379</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>953a61cced755a31</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>651ba279ca7533a9</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3c330d30d99a31fa</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>00c79ac32ae4ec00</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>787ec9d50847c07a</td><td>반도체</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>2a699e97f1eb8616</td><td>기타</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>85c6cb458093ab3c</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>1a96cc4124922eb8</td><td>화학_제약</td><td>S3</td><td>TS</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>5e99ebb64d44e149</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e153c3e142cce855</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ccda39f873016e15</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3cdda9c5ed09fdf1</td><td>배터리</td><td>S3</td><td>S2</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>807ad105785752d8</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>6ba3d823ea8dff65</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c8b74f5c5c472ada</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>346c3c139e259d74</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d63715d9eb80c5dc</td><td>반도체</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>ebd3bf85b3ccedd5</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>51f3cf2c9372d126</td><td>화학_제약</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>948832562b247fd6</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>1e2837d7232a9a44</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>0313c4f43cdb5b46</td><td>기타</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>a74b5a2ed628c7f9</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>980fbadfdbf08802</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>783e863aa7721cb9</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b36edcc32c94546c</td><td>반도체</td><td>S2</td><td>TS</td><td>S2</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S2 → 최종 TS)</td></tr>
+<tr><td>878306f1693ddcc6</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>46d687f25b593621</td><td>기타</td><td>S1</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>c2f788a87e9ccb8e</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>41585475c04e911b</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b1f9176dc7d7004e</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>78ccb9276c9728b0</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>31c4b2918bc391a0</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d27515e32253068b</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>60196ee0a76291de</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c40ce8d4a65d10c9</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>6c21156d480f78c5</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d98762f9a4e25714</td><td>배터리</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4f65cced640700c0</td><td>소프트웨어</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>32c71674d3df1421</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e57ce685f8d86df1</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>f7dc3e4c3fc4b803</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>61dc8473eee7eab9</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>d9ef7584ca0117d4</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e3dc163e46d56727</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a7bbe1f7affa0e56</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>7b9ab99ee1597151</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>333802eba3257ab0</td><td>배터리</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>759aae5ff46d2c9e</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>31422ed28bf43140</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>21b5880ff16609d2</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e9754132e87adbf3</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>9285e8b4be4529ba</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>051da201a0d28b7d</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ccea21c22a66c31a</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>1a0b5217fbfc8c78</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>168287ce92ce74e3</td><td>배터리</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>13eab23c81290100</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ea3584cb5f64d3fb</td><td>경영정보</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>f5125a947f2158ec</td><td>배터리</td><td>S2</td><td>S2</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5ea566e54e2ef313</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>21be37e3f346eda9</td><td>소프트웨어</td><td>S3</td><td>S2</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>40e538f63d258859</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>6432d83e478f1a70</td><td>소프트웨어</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>6fe1d33d65012db2</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>0970f754d2713992</td><td>경영정보</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>c9f303b59862bd53</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>7b27f11b1fbf28da</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3e181f490c7d0326</td><td>경영정보</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>02ca607889ccac3b</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>82f07eec4c285f49</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ecd100add3e0229e</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>8b03e9674b34ee23</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>e03254cfc166b740</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3d0882a84059ff65</td><td>소프트웨어</td><td>S3</td><td>S2</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>387ab427f3689c37</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>bf990aeb51f4a66c</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>f41caa41f1fd4fa6</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>7dc23388af238097</td><td>화학_제약</td><td>S3</td><td>S1</td><td>S2</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 S2 → 최종 S1)</td></tr>
+<tr><td>1c5db03466688606</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>7e217cef17d60a32</td><td>배터리</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>fa17f8f14232b648</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>e7972cd7effdb7b1</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e8a557615cbafe8f</td><td>배터리</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>247eedbd005eb113</td><td>기타</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>976424afa7e58b4e</td><td>경영정보</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>78fa479c2aa6220d</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>c5c58805690fdab3</td><td>반도체</td><td>S2</td><td>S1</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>b2962e0771e8820a</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>efe30a185383840e</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>36eb4cec7dee711c</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>8137f58a407f84ab</td><td>경영정보</td><td>S2</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>32b99318f79fa826</td><td>반도체</td><td>S2</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>ade213f6ac1e554a</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>1f7c851081e91aab</td><td>기타</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>f64522fb7664492b</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>015d8f1643318692</td><td>배터리</td><td>S2</td><td>S2</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S2 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8a1cde277f7e1af9</td><td>반도체</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>281f116976add4da</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>7892b45c5df5dd7b</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>0b05ddf61859e612</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3d93a5bf4e90c2d2</td><td>반도체</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>f5cc7f8fbe168a54</td><td>반도체</td><td>S2</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a114db35250158b0</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>75a36a580ef8c010</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>af504024b5b918f8</td><td>화학_제약</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>56677d3df0dfdb54</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3da82bfa5ab2f983</td><td>기타</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>6a62b5addbbd5a11</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b3feeb43304bf6b2</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>cfff7c61af88e516</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>3a7afc2e547433d7</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>917a21cca881040f</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>1f7e466c221b3fa9</td><td>화학_제약</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>62dfe507bb917780</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>312d3cf418ad01fc</td><td>화학_제약</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>4e085f916a134460</td><td>화학_제약</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>864ecb96f252bfbe</td><td>기타</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>552fa15c678fc878</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>84ac3699f83cd587</td><td>경영정보</td><td>S2</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>bd01afc9010c402d</td><td>배터리</td><td>S2</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>b019c25037af3c83</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ba3fa3333654304e</td><td>기타</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>144883a67b625a7b</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>85903bfcce37cfb0</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>63fa97cf4b2fa83e</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>24748963df4205c2</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>452af07af56a6296</td><td>배터리</td><td>S2</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>e2e9d225581582b8</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>29520ca864adfc77</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a3903987e494b5ef</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>42f43d062670186c</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b9a91735ee5c6156</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d5689d4b4d074a53</td><td>경영정보</td><td>S2</td><td>TS</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 TS · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>b0a8d661d7a06f9a</td><td>경영정보</td><td>S1</td><td>S1</td><td>S3</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 S3 → 최종 S1)</td></tr>
+<tr><td>145b7d74c128b03c</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>4b67d0ac40c0061d</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>2bbcb2d1a6da3bd8</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>6a57e7de02bdca84</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e4ee4830d7d855d0</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>8b8ae3d3fbadecf8</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>19c490a389c003e9</td><td>기타</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>5005f8c00d6a08d1</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>55730a407798edf7</td><td>경영정보</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>afc0eb439c7928ff</td><td>semiconductor</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>dde570b5ed07d53e</td><td>semiconductor</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>585ce26958b5509d</td><td>battery</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>61fe8dab4fae3bfb</td><td>battery</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>c359c490a96e0f15</td><td>security</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>a0c0a380e25e79dc</td><td>security</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>5e6e7cec0a1eb0ad</td><td>business</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>82dfdfb2a376410f</td><td>business</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>ade9c7822bb04166</td><td>defense</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>79f9b2e1150189ef</td><td>defense</td><td>TS</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>codex_review</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>2cceb764668f0d0b</td><td>pharma</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>3f68e5bf85de9658</td><td>pharma</td><td>TS</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>codex_review</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5b8e53fd38f8e1b4</td><td>ai</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>50405815921ffb09</td><td>ai</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>f392ae90c62b6fdb</td><td>chemical</td><td>TS</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>codex_review</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>06c2ab8a87cb944e</td><td>display</td><td>TS</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>codex_review</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>b77c1690996f05bd</td><td>finance</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>e1e82a5a237c371c</td><td>telecom</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>codex_review</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>4c4a64da06afebe9</td><td>security</td><td>TS</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>codex_review</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>98afc752e5e8389e</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>94784d00169ee8ec</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c69a716c2b77cfea</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>f0c683a62bef1715</td><td>기타</td><td>S3</td><td>S2</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>c1410f2c06147184</td><td>화학_제약</td><td>S3</td><td>S2</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>d28880f869bf1493</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c3ea3758fd0bd779</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>57b2b348b6d50f88</td><td>경영정보</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>b4ee09a9f7e764ba</td><td>소프트웨어</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>a4d531eea4f26c47</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>a2ee9db6e5383715</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d729b2453f466a5b</td><td>경영정보</td><td>S3</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>79b366a45b3b1c0c</td><td>반도체</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>12b63d83d7df5c36</td><td>반도체</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>83c85ea87c3a28cc</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>678f71215c38e07e</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>1797cf6c81169b70</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>a8451f0cb7cf74dd</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>270ca8d526fbfa9f</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>908238c2a8c48122</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>101f988f83fcf86b</td><td>화학_제약</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>dd7ef6a88c88fa3b</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d575002ecbc57009</td><td>반도체</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9c8c4881f087a181</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>fe113ab83c47c2e2</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8d37103e83d37098</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>789e27bd884a6d7a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>5b6de81739f2dcf2</td><td>경영정보</td><td>S2</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>75e9f28d53135190</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>70dca4536d6dae62</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>cf7badaec51ce72e</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>95e610a6f99e77e3</td><td>화학_제약</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>266f3ff24dd3fe58</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>950fc244aebaa3b8</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f53332bf5a644a78</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>c9a23389384a9687</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>cec10f7534c3e791</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>c647b89a7a1194d3</td><td>경영정보</td><td>S3</td><td>S2</td><td>S3</td><td>S2</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S2 · 모델 S3 → 최종 S2)</td></tr>
+<tr><td>c5a10db603b023d9</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>b05db96eaf4fb14f</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>55f6866bc2baf0d4</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>9c61de28a393f9ac</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f99e008d91dabb5f</td><td>소프트웨어</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>a080fb7cb2c80902</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>200db3f671fcd1c7</td><td>반도체</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7dd50e0e355f25a5</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>d0e185ac6297db5d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a572d88d2bfbf4b9</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>c18abd3e8b31c02a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>8870aaa939f6cbb6</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b2aff4ad69c63dc1</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>345987254cfa22d6</td><td>화학_제약</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>51000c1dd7fa9f32</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>ea11c076fcc572b7</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>b19a2dcfac7d4e3c</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c74ce600dc779376</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>203d0ebf5156953b</td><td>경영정보</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>b8406c3320be5637</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ed0db1eac9432bb5</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>1f33145dd6ca9984</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>c44a78bd1acbdf41</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ca836f0e2ecbbf0f</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>8f6ca0b0189f6b37</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>ab44c083547dffac</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9f9d80ae70d14903</td><td>경영정보</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>fcdb999dc65bd99a</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>0a196700a41fa9aa</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>6477751ae7d8291e</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8b2594ac98977b09</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>e314431117481d85</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>ead5fb6f6bd8fe84</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>990662bfb5127f9b</td><td>반도체</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>d0068a85a2460418</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>fc0b3dd4ce77a7b7</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>b2079e61e774ba0b</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>48bb8ad55ab7b127</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>c93468651fa5418a</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>665d05b7507f0084</td><td>화학_제약</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>81678c68882c6510</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a48e35bf13058941</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>51f277d7360daaba</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ef087b9ca5cbaf67</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>54499d57c03a3951</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>0ab6782910ead5f6</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>1e5f21f57807a6e1</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>c91a7cf79a00f00e</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>12d0ab3df4f84480</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>5fe70a1a554cd863</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9da7b5c19a83d709</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>9080c284c2ec51f1</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>278567262468077d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>a053d9ad82343445</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>d59138fdd31a3d0f</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>f124d7e77a8f4e5e</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4f6d9924ae012a41</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>8d8b1523d1f5fcc3</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>8816e03c8008c59b</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>7b1eaeb687c7542a</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b31f2245eb47e7a6</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>55dc90a570ca3eca</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f8e1280f5f655b85</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>502fb985bd99a7f2</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>fec4377fda69a2a9</td><td>반도체</td><td>S3</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>5b75f0bedfa43b60</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ed3866f4ff3e1db0</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>ca94b2e6dc34c438</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>1f9da7347dab55b3</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>fe081aaf508fe5b1</td><td>반도체</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7c144b658ef21078</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b50ff62592e5c032</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>647b94644009095b</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>debf8e357831f6f1</td><td>반도체</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>437a6ad6b4dd5d75</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>e992948332931433</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>d5562e7192b9a3a7</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>0637eef044b9401a</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>b3062fa857f8063a</td><td>경영정보</td><td>S1</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>d9786ead0f98f7cf</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>530f4848d15f14ab</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>b8b2f648a78b021e</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>65a91975ddb02bf8</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>60f61ca4a56c58d2</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>2384c39d9b09124e</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d0b0b9443d0a4288</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>e82b52b4b140aa28</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>6f5b831e3b72f29b</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>11164ce4bdd30a50</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>32745dcbbb5b7224</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4d532ba0ee3bf46b</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>74b2ce8c9cb956a3</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ae17af015463a15a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>118ded61d90c1133</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8189690a8093b30f</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>b2c9dd6ac87e8811</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>2f562e10b49e65d8</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>faf8ba18f16aa81d</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>687415087c844871</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>68444420580c1cef</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f6d80902c26e4b16</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>d720435436e0beba</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>99e3f28efc3be7d5</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>fe295f2e0ab3f31c</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>2ab48bfd94b60568</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>d02622b55b7a3d63</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>27bb9b5c720ddd0f</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>463209dccd32472c</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>2d558c959046e6d3</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>43f67bcd5488d15b</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>76601646a4114541</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>effc7eae83b94d74</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>c8d91803925e3c33</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>6f69db250605bf41</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>b3f93f562919d57e</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>2ee24a740b2ce4a9</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5fabef102bab07d9</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>01afeb2536019633</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4576ffd4f991baa6</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>33a0c66cfabd6ef2</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>6d86c3733344aaec</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a1763d92ba473e0f</td><td>반도체</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>7b598d799568b4ac</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7624e108b2a5205a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>1e3f6050e36e94cf</td><td>소프트웨어</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8b0bf6b92a78321c</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>b7281b30a0333f6a</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>27b5e4f350a1f2af</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>c7040dab0e514049</td><td>경영정보</td><td>S3</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>57b309916970fffd</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>7bbe7137c75a9fce</td><td>경영정보</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4f2a631c051d10bd</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>c3daf4d4cfeaeb98</td><td>반도체</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>be01aa9a7b50762b</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>2bb6af4bff54f640</td><td>반도체</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>3ee4da9b5ad3ff2c</td><td>경영정보</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>3c1eee68d8367c5c</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>23a1f4fa03e6cbd7</td><td>경영정보</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7ee8c361f1a5af1a</td><td>반도체</td><td>S2</td><td>TS</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>16d6856769b04e68</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>649332c3a1e064b6</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>51ee1fc19386e6ae</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>e3317e07f11ddf85</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>7be43e86bee5163b</td><td>경영정보</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>315fbfae7888256b</td><td>반도체</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>cf44816f4a8fbf07</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>282c279ba3de167a</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>578fafefd1851f55</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ededaceba60b0c2a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>0f4b2617e35bbbd8</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>a2fef2cc80473a9a</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>f9833fb185fd83fe</td><td>반도체</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>c7f64d81526ed593</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>841f8145020924ee</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>187b2966ee913a0d</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>6a89e30a6505a175</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>db04e539ed8aaf23</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>15c71b0fff401602</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f0ed941671ec3dfe</td><td>기타</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4a76ec7c9cc76bcc</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>304b479598136e74</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>638d7524c9173187</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>4e8a562223bb039a</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7f8d821b4a730aa6</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>a3fcbcfa24ef2252</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>6a285765936441fc</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>c3265fdd906b40e1</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>ddfd48caba5ebb74</td><td>화학_제약</td><td>S3</td><td>S2</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S2 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>645d807eac2fe727</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>1c68cc73e1389921</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>0e970d8b3292bb90</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5a945d9f56b47f78</td><td>반도체</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7fdebc5adc596928</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>80227abe8a181a63</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4af11710e6cb017d</td><td>경영정보</td><td>S2</td><td>S1</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>f8b1e2e59e63e699</td><td>반도체</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>0a963242468b0947</td><td>소프트웨어</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>51a09377360b9627</td><td>기타</td><td>S2</td><td>TS</td><td>S3</td><td>S3</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S3 → 최종 S3)</td></tr>
+<tr><td>dded6a0c84ddd265</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>4e88a89fca83a8ac</td><td>화학_제약</td><td>S2</td><td>S1</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>f835f55f204f0b8a</td><td>소프트웨어</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>750538f69685995e</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>677eb3bdbcf20ea3</td><td>배터리</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>79c96475e7850488</td><td>경영정보</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>de1a06b736003bc5</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>50c94867d1a425d8</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5ae809c1ad65b0cc</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>a9a3a20f5e059622</td><td>소프트웨어</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>e58e70e9e24ae214</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ee6552fe07b698e2</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>63d97d3b50679a4c</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>3a0d272fba3f1ff2</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4f9b30a6175f04a5</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>20eb547aa9baff44</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>5c8665a23ebcb273</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>1095e22c29c0fb5e</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>80ab8bc127be189b</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>0ae8aa62e6721fff</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>3bd0cc26ca89f285</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>3e2a0a53a221fc9b</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>45303f7207fc8262</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>987e1bd235d9bd6d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>05dbf77a3770bc7b</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>dd54b2cfd98ff590</td><td>경영정보</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>34312e47706988b9</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>748319552ebc8ffd</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>b6d3cf92f57fd095</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>d1f265c2ccc4772e</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>612f08b9bae78ef8</td><td>소프트웨어</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9845a153569908c3</td><td>경영정보</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>6b4ad965813721ea</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>13db021be42078f4</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>04b9f51a27589e9f</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>88c81cf16367f16d</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>1f34cfa1b67e5ec7</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>bb0e63d2c901156c</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>333d4dd8552d7327</td><td>화학_제약</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9deeb182aba62441</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>484967bb11e2c3f7</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>00163ccf12d52540</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>672b7dde7c06a32d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>6190651fdae86297</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4eaad4c666f4b881</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>c4364d3467074638</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>1a98781e439c9dd6</td><td>화학_제약</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>a5ff2f5f589701b1</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f8a8855f8bd79e91</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>7bdbc47aa662d726</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f33fc3b7d5e90b64</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>34aa826830a6f383</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>170a3634b85c4935</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>4f95f3c65a53f08d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>666da47bf94d8a62</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>25c4bb92cb61adcf</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>346e0e957244162f</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>44e5f27770bfabc2</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e3a5e83a9f24d261</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>ed24eb7257849e06</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>5a99378a2f6e6f84</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>3e668fbffb69167a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>96ff4d2642e8f633</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8bc6d98c482709be</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>0ab2fb30c9783594</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>936956d5296b9dbc</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>1211a4fdf4b3dbf9</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>52150d4efbaab54f</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>39284fa6f16b4dc3</td><td>반도체</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>cff031e69da0bc2a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>50aa0464a9dd3271</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>e7beb61ab7f26e63</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>4020e45e0225306a</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_primary</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>521adf4eb588c0d4</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>d18f4a470c220c07</td><td>경영정보</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_consensus</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>18e971afdb283088</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>09ef20a4753426b5</td><td>반도체</td><td>S2</td><td>TS</td><td>S2</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 TS · 모델 S2 → 최종 TS)</td></tr>
+<tr><td>20a3636891860428</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>23721d3f799ab800</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f2a9c2bdc3abbc83</td><td>반도체</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>llm_judge_consensus</td><td>silver</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>209548df33367259</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>f2756ca29d83c412</td><td>경영정보</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>llm_judge_primary</td><td>silver</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>254ccdf19256bcf4</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>62cd069fffcbdd31</td><td>경영정보</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>14d07b5e1ecbeb76</td><td>화학_제약</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>20687a700a8a8bf7</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>01104c189cadd300</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>945008c413572b70</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>45edee655eb5c1b3</td><td>기타</td><td>S3</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>74a4700e527a320b</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>615f2d3b059602d1</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>626971a86e6a92a8</td><td>기타</td><td>S3</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>b5bc6ed6a0dc3d8d</td><td>소프트웨어</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>ea5dbc96b5bf125b</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>92e21d789c6b7116</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>52efd0d889ed70f5</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>77a7db2d5846a0b6</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>d2bbda23850ea812</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>d5f4490a4c3b6887</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>71dfdcdff7f9abac</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>77ee8dd3f2727ae0</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>51b9e8edc8c491d6</td><td>반도체</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8fb5d09ed3bb91e7</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>d6d6b201882343b9</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>37cf8bea4f636735</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>f65771d5e515684b</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>12aa88a7c782df94</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>8544136b7cdd0d94</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>113483c344ace0a4</td><td>mixed</td><td>S2</td><td>S1</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S1 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>95f4597ef604d759</td><td>mixed</td><td>S2</td><td>S1</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S1 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>22967be1d88c1d71</td><td>mixed</td><td>S1</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>human_review</td><td>held</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>db92c518f090375e</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>0e1b9b26514568c4</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>7b693b813509d08a</td><td>mixed</td><td>S1</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>2f52dae967c7b468</td><td>mixed</td><td>S1</td><td>S2</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S2 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>09d2831c6c5b3a01</td><td>mixed</td><td>S1</td><td>TS</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 TS · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>fdd5193d796eb246</td><td>mixed</td><td>S1</td><td>TS</td><td>S2</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 TS · 모델 S2 → 최종 S1)</td></tr>
+<tr><td>daf70c80ffcc720d</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>a98badc91a48b1be</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>558c0801c86bcbc2</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>0fcb2d38382eefee</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>b893ef333329831b</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>33af858a14bdf960</td><td>경영정보</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>956ef802c401231d</td><td>소프트웨어</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>1827ba8b62ce7e8e</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>f7daea9382312c3a</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>0b416bd64c0ea24e</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>54be831bf5b81c8f</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>25ed68b43f8fee59</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>dcdcdace88dee486</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>601b0325cdc37a4d</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>978910de46db154d</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>2263be962f0656d7</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>8aa581b1e2c4bf05</td><td>경영정보</td><td>S3</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9a1b7472cff31606</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>32e9768e2356466f</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>c6a9156113a07d75</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>5bd69d7a2babb0de</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>c71dbc06a713dd3b</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>7f92cc225c13f295</td><td>화학_제약</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>29f93437970bcd42</td><td>경영정보</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>da3332bd5b15873d</td><td>화학_제약</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>aed402a64c3d17ed</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>29f128cb63ab4576</td><td>경영정보</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>d86fcaf9ffd3c49b</td><td>소프트웨어</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>a8a2172d16985320</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>e3372f4814f45044</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>0c3081341e618ab2</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>2b830c3133a25055</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>8d05fe07232cb966</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>975110b3f5495a3b</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>50caf5b079a595dd</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>090350cf659c6263</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>ec19916d97f80a1a</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>535aa6f33f3f5dc6</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>67a3b26508dcae27</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>d1a0a3c0111aab8f</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>e6820c3178dcf611</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>a1beb524ceafe108</td><td>mixed</td><td>S2</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>3739a4b3e652e0d4</td><td>mixed</td><td>S1</td><td>TS</td><td>S1</td><td>TS</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 TS · 모델 S1 → 최종 TS)</td></tr>
+<tr><td>9c9f5658170d79cd</td><td>mixed</td><td>S1</td><td>TS</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 TS · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ebe12c791d5ba94f</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>1bff92bcf4f8b55c</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>3f2fc2527eab5667</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>753f405868ac8d78</td><td>mixed</td><td>S1</td><td>S2</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S2 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>13a3b4a0c1fec209</td><td>mixed</td><td>S1</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>4543d67caa7f2d20</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>46f728f57dcaaf8a</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>520462aefd9268e1</td><td>mixed</td><td>S1</td><td>S2</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S2 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4633c36c8dabd5da</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>444159316eb8737d</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>6cb0732ddae72484</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>ede37cfddfd37b2e</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>a61ea12e678d86da</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>59949790846b5d8c</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>3deb5cc7b6b35edf</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>05275470efacff5d</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>7633e7ec4a17f7ed</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>0133457f8a15b71d</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>dadbdc5e8ac6e764</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>9354f07c44837915</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>4ff815f973704eec</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>b309a46aa5178dda</td><td>기타</td><td>S3</td><td>S3</td><td>S3</td><td>S3</td><td>○</td><td>public_definitive</td><td>legal_floor</td><td>agreement (룰·모델 모두 S3 일치 → 자동 확정)</td></tr>
+<tr><td>2d67990edd643f57</td><td>기타</td><td>S3</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>47b650fabd501a84</td><td>기타</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>91a780316e5b9b0a</td><td>경영정보</td><td>S3</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>b48c822ba0f7d7b9</td><td>기타</td><td>S3</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>public_definitive</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>823545b7edf3a0ef</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>11d9ff0ce7424232</td><td>mixed</td><td>S2</td><td>TS</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 TS · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>c1477dea3c059e1a</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>e9021472b249648c</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>41d6d82834260df8</td><td>mixed</td><td>S2</td><td>TS</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 TS · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>d3aa862176cbed13</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>51183ebeeb5f5d86</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>183251a1935dcaf0</td><td>mixed</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>a8ea386915392423</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>0528c308c933243e</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>3ed3a89e87cfc2f7</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>7be2846f2ea364a0</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>4838b4ec33679687</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>4a283b7a692d7b31</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>565f3181068afcb0</td><td>mixed</td><td>S2</td><td>S3</td><td>S2</td><td>S2</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S2 → 최종 S2)</td></tr>
+<tr><td>b12079f048453c22</td><td>mixed</td><td>S1</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>875a457fa9e29c67</td><td>mixed</td><td>S1</td><td>S2</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S2 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f6c3344d8d28a04f</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>0951ba69a6be1063</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f34785b95dfb2393</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>4b821dc7ac11c66a</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>f655b2e10e080253</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>5cc711520698d2dc</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>3bb5fe37a318e6ff</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>aa2dd776d9f4bf9d</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>a61f791e4dece835</td><td>mixed</td><td>S1</td><td>S1</td><td>S1</td><td>S1</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S1 일치 → 자동 확정)</td></tr>
+<tr><td>dd3171f71d51ad40</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>9e1d657f88660353</td><td>mixed</td><td>S1</td><td>S3</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>df0983931cef6564</td><td>mixed</td><td>S1</td><td>S2</td><td>S1</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S2 · 모델 S1 → 최종 S1)</td></tr>
+<tr><td>36e438b7faaf43fa</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>a26b29517d47eb5e</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>5ddb377cb5287784</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>c56c7b5fc04267d5</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>bce8ec1812b08a45</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>b21783067821a0fc</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>326d0f16f4ac4510</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>7aa8a7a5f9560573</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>347b56e14deb0eea</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>acf152b46490a834</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>46051c71f5422ea4</td><td>mixed</td><td>TS</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>nkt_designated</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>7d3522209150a702</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>4ef537e826c64ad6</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>abdb467e695d3e5e</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>c7d14e749345fa90</td><td>mixed</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>nkt_designated</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>b0c94e7f392f92f3</td><td>semiconductor</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>curated_scenario</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>e28b7763a5e000ec</td><td>battery</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>curated_scenario</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>ab71b54ebe76b4e4</td><td>security</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>curated_scenario</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>caca4c19ecad4225</td><td>business</td><td>TS</td><td>TS</td><td>S2</td><td>TS</td><td>×</td><td>curated_scenario</td><td>legal_floor</td><td>combined (룰 TS · 모델 S2 → 최종 TS)</td></tr>
+<tr><td>caea175d89e8cc09</td><td>ai</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>curated_scenario</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>b391d2be6b03368a</td><td>defense</td><td>TS</td><td>TS</td><td>TS</td><td>TS</td><td>○</td><td>curated_scenario</td><td>legal_floor</td><td>agreement (룰·모델 모두 TS 일치 → 자동 확정)</td></tr>
+<tr><td>1655fcc25715b5e3</td><td>sales</td><td>S1</td><td>S1</td><td>S2</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S1 · 모델 S2 → 최종 S1)</td></tr>
+<tr><td>0a17cd97d0444d97</td><td>manufacturing</td><td>S1</td><td>S3</td><td>TS</td><td>TS</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S3 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9a4ace0da18602c1</td><td>software</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>e5c18dde49a41611</td><td>finance</td><td>S1</td><td>S1</td><td>S2</td><td>S1</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S1 · 모델 S2 → 최종 S1)</td></tr>
+<tr><td>f7c79d1718734220</td><td>legal</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>202c81580de90fcc</td><td>bio</td><td>S1</td><td>S1</td><td>TS</td><td>TS</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S1 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>9e4b03d3deaf83ee</td><td>operations</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>862835307c74dc28</td><td>planning</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>d0598defd004ded7</td><td>finance</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>6ea073680b55d1e9</td><td>procurement</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+<tr><td>657e55b2c348103b</td><td>telecom</td><td>S2</td><td>S2</td><td>TS</td><td>TS</td><td>×</td><td>koipa_case_based</td><td>legal_floor</td><td>combined (룰 S2 · 모델 TS → 최종 TS)</td></tr>
+<tr><td>005ec1d624eff4fa</td><td>market</td><td>S2</td><td>S2</td><td>S2</td><td>S2</td><td>○</td><td>koipa_case_based</td><td>legal_floor</td><td>agreement (룰·모델 모두 S2 일치 → 자동 확정)</td></tr>
+    </tbody>
+  </table>
+</noscript>
+
   <button id="more" style="display:none"></button>
   <div class="no-results" id="nores" style="display:none">조건에 맞는 문서가 없습니다.</div>
 </div>
