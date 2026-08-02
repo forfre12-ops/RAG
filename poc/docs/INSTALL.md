@@ -13,12 +13,12 @@
 |---|---|
 | OS | Ubuntu 22.04 LTS |
 | Docker | `docker version` (Engine 24+), `docker compose version` (v2) |
-| GPU | `nvidia-smi` 인식 + `docker run --rm --gpus all nvidia/cuda:12.4.0-base nvidia-smi` 동작 |
+| GPU | **불요**(기본 CPU). GPU 노드에서만 §5의 GPU 오버레이를 덧붙인다 |
 | 커널 | `sysctl vm.max_map_count` ≥ 262144 (미만 시 `sudo sysctl -w vm.max_map_count=262144`) |
-| 디스크 | Data SSD 여유 ≥ 70GB (번들 ~23GB + 관측성 이미지 ~2GB + 적재 + 데이터/메트릭 볼륨) |
-| 포트 | 5432·6379·8000 (+ mTLS 443, + 관측성 9090·9093·3000·3100) 내부 가용 |
+| 디스크 | Data SSD 여유 ≥ 40GB (번들 ~6GB + 적재 이미지 ~10GB + 데이터/메트릭 볼륨) |
+| 포트 | 5432·6379·8000 (+ mTLS 443, + 관측성 9090·9093·3000·3100) 내부 가용 — **이미 쓰는 중이면 `.env`의 `API_PORT`·`PG_PORT`·`REDIS_PORT`로 바꾼다**(YAML 수정 불요) |
 
-GPU가 없으면: `.env`에서 `POC_MODE`를 유지하되 임베딩 CPU 모드로 두고, compose의 `deploy.resources...devices`(nvidia) 블록을 주석 처리한다. 추론 성능이 40~60% 하락한다.
+**GPU**: 본 시스템의 운영(추론·야간 증분재학습) 경로는 **CPU 전용으로 성립**한다. compose 기본값에 GPU 예약이 없으므로 GPU 없는 서버에서 그대로 기동된다. GPU 노드(학습 공장)만 §5에서 `-f infra-config/docker-compose.gpu.yml`을 추가한다.
 
 ---
 
@@ -34,11 +34,11 @@ bash verify.sh                 # CHECKSUMS.sha256 대조 → "Checksums OK"
 ## 2. 이미지 적재 + (호스트) 의존성
 
 ```bash
-bash install.sh                # docker images 적재 + (호스트 실행용) wheel·OCR 설치
+bash install.sh                # docker images 적재 (+ .env 초안 생성)
 docker images | grep -E 'lloydk|postgres|redis|nginx'   # 적재 확인
 ```
 
-- 컨테이너 배포(본 절차)에서는 의존성이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`의 wheel 단계는 호스트에서 스크립트를 직접 구동할 때만 의미가 있다. **OCR은 어떤 이미지·번들에도 포함되지 않는다**(요건 외 + poppler=GPL, 2026-08-02 제거).
+- 컨테이너 배포(본 절차)에서는 의존성이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`는 호스트 파이썬 deps 설치를 **기본적으로 실행하지 않는다** — 번들 wheel은 컨테이너 인터프리터(cp311) 전용이라 Ubuntu 22.04 기본 파이썬(3.10)에서는 반드시 실패한다. 호스트에서 스크립트를 직접 구동해야 할 때만 python3.11 환경에서 `INSTALL_HOST_DEPS=1 bash install.sh`로 켠다. **OCR은 어떤 이미지·번들에도 포함되지 않는다**(요건 외 + poppler=GPL, 2026-08-02 제거).
 - **torch**: GPU 환경에 맞는 휠은 이미지에 포함된다. 호스트 직접 실행 시에만 별도 설치:
   `pip install --no-index --find-links=python-deps/wheels torch-*.whl`
 - **문서 파싱 선택 의존성**: HWP 표 셀은 `.[hwp-tables]`(unhwp, MIT — 구 pyhwp/AGPL 대체),
@@ -84,6 +84,12 @@ cp infra-config/.env.template .env
 | `LOCAL_LLM_MODEL` | `Qwen/Qwen3-14B` | |
 | `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1` | |
 | `CLASSIFIER_MODEL_DIR` | `/models/classifier-trained` | 컨테이너 내 경로(모델 마운트) |
+| `STORAGE_ENCRYPTION_KEY` | `<64 hex>` | 원본 at-rest 암호화. onprem-local은 암호화 강제라 **없으면 startup 실패** |
+| `LLOYDK_AUDIT_CHAIN_SECRET` | `<64 hex>` | 감사체인 HMAC(NFR-SEC-01). **없으면 api startup 실패** |
+| `CORS_ALLOW_ORIGINS` | `["https://<콘솔 오리진>"]` | 운영 모드는 와일드카드(`*`) 거부. **JSON 배열** 형식 |
+
+> 64 hex 생성: `python3 -c "import secrets;print(secrets.token_hex(32))"`
+> 마지막 세 값이 비면 api 컨테이너가 재시작 루프에 빠진다(원인은 `docker logs`에 한 줄로 찍힌다).
 
 DB·Redis 엔드포인트는 compose가 컨테이너 네트워크 기준으로 자동 주입하므로 `.env`에 둘 필요 없다. 폐쇄망 번들은 원문·산출물을 로컬 파일시스템 볼륨에 저장하므로 MinIO·MLflow 엔드포인트를 설정하지 않는다.
 
@@ -96,6 +102,9 @@ export COMPOSE="docker compose --env-file .env -f infra-config/docker-compose.ai
 $COMPOSE up -d postgres redis
 $COMPOSE ps        # postgres healthy 까지 대기 (~30s)
 ```
+
+- **GPU 노드에서만**: 위 `COMPOSE` 정의 끝에 `-f infra-config/docker-compose.gpu.yml`을 덧붙인다. CPU 노드는 그대로 둔다(기본값이 CPU).
+- 한 서버에서 다른 스택과 포트가 겹치면 `.env`의 `API_PORT`/`PG_PORT`/`REDIS_PORT`만 바꾼다.
 
 ---
 
@@ -145,6 +154,8 @@ $COMPOSE ps
 ---
 
 ## 10. 설치 검증
+
+> 아래 `8000`은 `.env`의 `API_PORT` 기본값이다. 포트를 바꿨으면 그 값으로 읽는다.
 
 ```bash
 curl -s http://localhost:8000/api/v1/healthz/ready    # 의존성 실측 → 200 (503이면 미준비)

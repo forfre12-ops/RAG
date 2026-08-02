@@ -974,19 +974,63 @@ else
   PAIRS="$(grep -oE '"file": *"[^"]*"|"expected_grade": *"[^"]*"' "$MANIFEST" | sed -E 's/.*: *"([^"]*)"/\1/' | paste -d'|' - -)"
 fi
 
-n=0; fail=0; mfail=0
+# [2026-08-02] 동기 진단 경로(/documents/analyze)는 청크 상한을 넘는 대용량 문서를 명시 거절한다
+# (워커 타임아웃으로 조용히 죽는 대신 이유를 말하고 거절 — 의도된 설계). 종전 러너는 그 거절을
+# 빈 응답으로 받아 '고등급 미탐(veto)'으로 채점해 **정상 배포에서도 FAIL** 이 떴다(리허설 실측:
+# 46,076자·표 47개 .hwp 가 155청크 > 상한 34). 대용량은 운영에서도 비동기 경로를 쓰므로,
+# 거절이면 적재→비동기 분류→폴링으로 재시도해 같은 기준(등급)으로 채점한다.
+_async_classify() {   # $1=파일경로 → "label|model_version" (실패 시 빈 문자열)
+  # actor 는 multipart Form 필드(JSON 문자열) — 누락 시 422.
+  up="$(curl -fsS -X POST "$BASE_URL/api/v1/documents" -H "X-API-Key: $API_KEY" \
+         -F 'actor={"user_id":"acceptance","role":"admin"}' -F "file=@$1" 2>/dev/null)" || return 1
+  did="$(printf '%s' "$up" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("doc_id") or "")' 2>/dev/null)"
+  [ -z "$did" ] && return 1
+  job="$(curl -fsS -X POST "$BASE_URL/api/v1/classify/async" -H "X-API-Key: $API_KEY" \
+          -H 'Content-Type: application/json' \
+          -d "{\"doc_id\":\"$did\",\"actor\":{\"user_id\":\"acceptance\",\"role\":\"admin\"}}" 2>/dev/null)" || return 1
+  jid="$(printf '%s' "$job" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("job_id") or "")' 2>/dev/null)"
+  [ -z "$jid" ] && return 1
+  i=0
+  while [ "$i" -lt "${ASYNC_POLL_MAX:-60}" ]; do
+    sleep 5; i=$((i+1))
+    st="$(curl -fsS "$BASE_URL/api/v1/classify/jobs/$jid" -H "X-API-Key: $API_KEY" 2>/dev/null)" || continue
+    printf '%s' "$st" | python3 -c '
+import json,sys
+d=json.load(sys.stdin); s=d.get("status")
+if s in ("done","partial"):
+    r=(d.get("results") or [{}])[0]
+    print((r.get("label") or "")+"|"+(r.get("model_version") or "")); sys.exit(0)
+sys.exit(1 if s!="failed" else 2)' 2>/dev/null && return 0
+    [ "$?" = "2" ] && return 1
+  done
+  return 1
+}
+
+n=0; fail=0; mfail=0; async_used=0
 while IFS='|' read -r file exp; do
   [ -z "$file" ] && continue
   n=$((n+1))
-  resp="$(curl -fsS -X POST "$BASE_URL/api/v1/documents/analyze" -H "X-API-Key: $API_KEY" -F "file=@$HERE/$file" 2>/dev/null)"
-  if [ -z "$resp" ]; then echo "  FAIL   $file  (분석 응답 없음 = 고등급이면 미탐)"; fail=$((fail+1)); continue; fi
-  if command -v python3 >/dev/null 2>&1; then
-    pred="$(printf '%s' "$resp" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("classification",{}).get("label",""))' 2>/dev/null)"
-    mv="$(printf '%s' "$resp" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("classification",{}).get("model_version",""))' 2>/dev/null)"
-  else
-    pred="$(printf '%s' "$resp" | grep -oE '"label": *"[A-Z0-9]+"' | tail -1 | sed -E 's/.*"([A-Z0-9]+)"/\1/')"
-    mv="$(printf '%s' "$resp" | grep -oE '"model_version": *"[^"]*"' | tail -1 | sed -E 's/.*"([^"]*)"/\1/')"
+  http="$(curl -sS -o /tmp/_acc_resp.$$ -w '%{http_code}' -X POST "$BASE_URL/api/v1/documents/analyze" \
+           -H "X-API-Key: $API_KEY" -F "file=@$HERE/$file" 2>/dev/null)"
+  resp="$(cat /tmp/_acc_resp.$$ 2>/dev/null)"; rm -f /tmp/_acc_resp.$$
+  pred=""; mv=""
+  if [ "$http" = "200" ] && [ -n "$resp" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+      pred="$(printf '%s' "$resp" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("classification",{}).get("label",""))' 2>/dev/null)"
+      mv="$(printf '%s' "$resp" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("classification",{}).get("model_version",""))' 2>/dev/null)"
+    else
+      pred="$(printf '%s' "$resp" | grep -oE '"label": *"[A-Z0-9]+"' | tail -1 | sed -E 's/.*"([A-Z0-9]+)"/\1/')"
+      mv="$(printf '%s' "$resp" | grep -oE '"model_version": *"[^"]*"' | tail -1 | sed -E 's/.*"([^"]*)"/\1/')"
+    fi
+  elif printf '%s' "$resp" | grep -q "too large for synchronous analysis"; then
+    # 대용량 — 운영과 동일하게 비동기 경로로 채점(스킵하지 않는다. 미탐 검증을 건너뛰면 인수의 의미가 없다).
+    pair="$(_async_classify "$HERE/$file")" || pair=""
+    pred="${pair%%|*}"; mv="${pair##*|}"
+    if [ -n "$pred" ]; then async_used=$((async_used+1)); else
+      echo "  FAIL   $file  (동기 거절 후 비동기 분류도 실패 = 고등급이면 미탐)"; fail=$((fail+1)); continue
+    fi
   fi
+  if [ -z "$pred" ]; then echo "  FAIL   $file  (분석 응답 없음/HTTP $http = 고등급이면 미탐)"; fail=$((fail+1)); continue; fi
   # [#11] 배포 모델이 실제 로드됐는지 — rule-fallback(가중치 미로드)이면 배포 인수 실패.
   # airgap 배포는 학습·보정 모델이 반드시 서빙돼야 한다(임베더/분류기 로드 실패면 여기서 잡힌다).
   case "$mv" in
@@ -1005,7 +1049,7 @@ done < <(printf '%s\n' "$PAIRS")
 _model_ok=1
 [ "$mfail" -gt 0 ] && [ "${ALLOW_RULE_FALLBACK:-0}" != "1" ] && _model_ok=0
 if [ "$fail" -eq 0 ] && [ "$_model_ok" -eq 1 ]; then _v=PASS; else _v=FAIL; fi
-echo "[acceptance] $_v: ${n} docs, ${fail} veto(고등급 미탐/파싱실패), ${mfail} model-unloaded(rule-fallback)"
+echo "[acceptance] $_v: ${n} docs, ${fail} veto(고등급 미탐/파싱실패), ${mfail} model-unloaded(rule-fallback), ${async_used} 비동기경로(대용량)"
 [ "$fail" -eq 0 ] && [ "$_model_ok" -eq 1 ]
 '''
 
@@ -1021,9 +1065,24 @@ def _copy_infra(out_dir: Path) -> None:
         (_REPO_ROOT / "docker-compose.yml",              infra / "docker-compose.yml"),
         # 폐쇄망 전용 compose (image 참조·beat 서비스·named 볼륨) — 운영 배포는 이걸 사용.
         (_REPO_ROOT / "docker-compose.airgap.yml",       infra / "docker-compose.airgap.yml"),
+        # GPU 오버레이(옵인) — base 는 CPU. NVIDIA 노드만 -f 로 덧붙인다.
+        (_REPO_ROOT / "docker-compose.gpu.yml",          infra / "docker-compose.gpu.yml"),
     ]:
         if src.exists():
             shutil.copy2(src, dst)
+
+    # [env_file 경로 정합] compose 의 `env_file: .env` 는 **compose 파일 위치 기준**으로 해석된다.
+    # 리포 레이아웃(poc/docker-compose.airgap.yml + poc/.env)에서는 맞지만, 번들에서는 compose 가
+    # infra-config/ 로 들어가고 .env 는 INSTALL.md 지시대로 번들 루트에 만들어져 경로가 어긋난다
+    # (실측 2026-08-02 리허설: api·worker·beat 가 .env 를 못 읽어 `env file ... not found` 로 기동 실패).
+    # 번들 레이아웃은 고정이므로 복사 시점에 한 단계 위(../.env)로 재작성한다.
+    _airgap_dst = infra / "docker-compose.airgap.yml"
+    if _airgap_dst.exists():
+        _txt = _airgap_dst.read_text(encoding="utf-8")
+        _fixed = _txt.replace("env_file: .env", "env_file: ../.env")
+        if _fixed != _txt:
+            _airgap_dst.write_text(_fixed, encoding="utf-8")
+            print("  [infra] airgap compose env_file → ../.env (번들 루트 .env 로드)", file=sys.stderr)
 
     # mTLS 종료 nginx 설정(opt-in `--profile mtls`). airgap/base compose 의 nginx-mtls 가
     # `./mtls/nginx.mtls.conf` 를 마운트하므로 번들 infra-config/mtls/ 에 실제 파일이 있어야
@@ -1067,6 +1126,18 @@ def _copy_infra(out_dir: Path) -> None:
         "API_KEY=replace_me_api_key\n"
         "POSTGRES_USER=lloydk\n"
         "POSTGRES_PASSWORD=replace_me_postgres_password\n"
+        "# 감사체인 HMAC 비밀키(NFR-SEC-01). 미설정이면 api startup 이 fail-fast 로 죽는다 —\n"
+        "# 종전 템플릿에 이 줄이 없어 설치자가 기동 실패로만 알게 됐다(2026-08-02 리허설 실측).\n"
+        "# python3 -c \"import secrets;print(secrets.token_hex(32))\"\n"
+        "LLOYDK_AUDIT_CHAIN_SECRET=replace_me_64hex_random\n"
+        "# 운영 모드에서 CORS 와일드카드(*)는 startup 에서 거부된다. 콘솔을 여는 실제 오리진으로 적을 것.\n"
+        "# 값은 JSON 배열 형식. 예) [\"https://ai.example.go.kr\"]  ·  여러 개면 쉼표로 나열.\n"
+        "CORS_ALLOW_ORIGINS=[\"https://replace_me.your.domain\"]\n"
+        "\n"
+        "# --- 호스트 포트 (기본값이 이미 쓰이는 중이면 여기서만 바꾼다 — YAML 수정 불요) ---\n"
+        "API_PORT=8000\n"
+        "PG_PORT=5432\n"
+        "REDIS_PORT=6379\n"
         "\n"
         "# --- 인프라 (컨테이너 내부 → compose 서비스명 postgres/redis, localhost 아님) ---\n"
         "# DATABASE_URL 의 비밀번호는 위 POSTGRES_PASSWORD 와 반드시 일치시킬 것.\n"
@@ -1132,16 +1203,28 @@ def _copy_infra(out_dir: Path) -> None:
         "  docker load -i \"$tar\"\n"
         "done\n\n"
         "# 2) (옵션) 호스트 파이썬 deps — 컨테이너 배포는 deps 가 이미지에 포함(INSTALL.md).\n"
-        "#    pip 이 있으면 fail-closed 로 설치(오류 시 set -e 로 스크립트 중단), 없으면 명시적 skip.\n"
-        "#    과거의 `|| true` 는 누락 wheel 을 조용히 성공 처리해 런타임 ImportError 로 이어졌다.\n"
+        "#    번들 wheel 은 타깃 인터프리터(cp311) 전용이다. Ubuntu 22.04 기본 파이썬은 3.10 이라\n"
+        "#    호스트에서 설치를 시도하면 'No matching distribution' 으로 반드시 실패하는데, 종전엔\n"
+        "#    그 실패가 set -e 로 install.sh 전체를 죽여 **아래 4) .env 생성까지 실행되지 않았다**\n"
+        "#    (실측 2026-08-02 리허설: exit 1, .env 미생성 → INSTALL.md 2단계에서 설치 중단).\n"
+        "#    → 기본은 실행하지 않는다. 호스트에서 스크립트를 직접 구동할 때만 켠다. 켠 경우에는\n"
+        "#    종전대로 fail-closed(누락 wheel 을 조용히 넘기면 런타임 ImportError 로 이어짐).\n"
         "REQ=\"$BUNDLE_DIR/python-deps/_requirements_no_torch.txt\"\n"
-        "if command -v pip >/dev/null 2>&1 && [ -f \"$REQ\" ]; then\n"
-        "  echo '[deps] host python deps 설치 ...'\n"
-        "  # uv.lock export 목록은 해시핀 → --require-hashes 로 공급망 무결성 검증(타깃 네이티브 wheel).\n"
-        "  HASHFLAG=\"\"; grep -q -- '--hash=' \"$REQ\" && HASHFLAG=\"--require-hashes\"\n"
-        "  pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" $HASHFLAG -r \"$REQ\"\n"
+        "if [ \"${INSTALL_HOST_DEPS:-0}\" != \"1\" ]; then\n"
+        "  echo '[deps] SKIP — 컨테이너 배포는 deps 가 이미지에 포함. 호스트 직접구동이면 INSTALL_HOST_DEPS=1 로 재실행.'\n"
+        "elif ! command -v pip >/dev/null 2>&1 || [ ! -f \"$REQ\" ]; then\n"
+        "  echo '[deps] SKIP — pip 미탑재 또는 요구목록 부재.'\n"
         "else\n"
-        "  echo '[deps] host python deps skip (pip 미탑재 또는 컨테이너 전용 배포 — deps 는 이미지에 포함)'\n"
+        "  PYV=\"$(python3 -c 'import sys;print(\"%d.%d\"%sys.version_info[:2])' 2>/dev/null || echo unknown)\"\n"
+        "  if [ \"$PYV\" != \"3.11\" ]; then\n"
+        "    echo \"[deps] SKIP — 호스트 파이썬 $PYV != 번들 wheel 타깃 3.11. 설치하면 반드시 실패한다.\"\n"
+        "    echo '       호스트 직접구동이 필요하면 python3.11 환경에서 재실행하라(컨테이너 배포는 불필요).'\n"
+        "  else\n"
+        "    echo '[deps] host python deps 설치 ...'\n"
+        "    # uv.lock export 목록은 해시핀 → --require-hashes 로 공급망 무결성 검증(타깃 네이티브 wheel).\n"
+        "    HASHFLAG=\"\"; grep -q -- '--hash=' \"$REQ\" && HASHFLAG=\"--require-hashes\"\n"
+        "    pip install --no-index --find-links=\"$BUNDLE_DIR/python-deps/wheels\" $HASHFLAG -r \"$REQ\"\n"
+        "  fi\n"
         "fi\n\n"
         "# 3) OCR 바이너리 설치 — 제거됨(2026-08-02). OCR 은 요건 외이고 poppler 는 GPL 이라\n"
         "#    반출 번들에서 소거했다. 스캔 PDF 는 본문 0자로 'failed' 격리되어 무음 통과하지 않는다.\n\n"

@@ -15,12 +15,21 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 COPY scripts ./scripts
+# [이미지 크기] torch 를 먼저 명시 인덱스로 깐다 — 안 하면 pip 이 PyPI 기본(CUDA) 휠을 끌어와
+# nvidia 런타임 패키지만 2.7GB, 이미지가 9.9GB 가 된다(api.prod=CPU 3.4GB 와 대비). 고객사
+# 운영노드는 CPU 전용이라 그 2.7GB 는 전부 사표(死票)다. 기본값 CPU 는 Dockerfile.api.prod 와
+# 동일 규약이며, GPU 학습 노드(지재원)는 빌드 때 인덱스를 넘겨 CUDA 휠로 만든다:
+#   docker build --build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu124 -f Dockerfile.worker .
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+
 # 파싱 글루(hwp/hwp-tables/xls) 포함 — 워커가 무성 파싱 실패하지 않도록(api.prod 와 동일 extras).
 # [hwp-tables] unhwp(MIT) — 배치 경로도 .hwp 표 셀을 회수해야 API 경로와 등급이 일치한다.
 # [xls] xlrd 누락 시 구형 .xls 가 0글자로 추출됨(511dbfb 배치경로 재발 방지).
 # [라이선스] OCR([ocr], GPL poppler)은 요건 외라 배포 이미지에서 제외(코드·extra 정의만 리포 존치).
 # 2026-08-02: dev(Dockerfile.api)·에어갭 번들에서도 동일 제거 — 전 빌드 경로가 GPL-free.
-RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,xls]"
+RUN pip install --upgrade pip && \
+    pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
+    pip install -e ".[hwp,hwp-tables,xls]"
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp-python 번들 FreeType 에 FT_Palette_Data_Get
 # 심볼이 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 배치 파싱이 0글자로 깨진다.

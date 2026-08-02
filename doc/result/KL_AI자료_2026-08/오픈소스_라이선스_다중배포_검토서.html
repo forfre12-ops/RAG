@@ -59,14 +59,16 @@ a{color:#0a0a0a}
     <div class="meta">다수 기업(폐쇄망) 배포 관점 · 2026-08-02 · 권위 목록은 SBOM(CycloneDX) 산출</div>
   </div>
 
-  <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음.</b> 배포 스택은 <b>permissive 중심</b>(PostgreSQL/BSD/MIT/Apache)이며, DB 드라이버(psycopg) 1건만 <b>LGPL-3.0(약한 copyleft)</b>이나 파이썬 동적 링크라 <b>재배포는 자유</b>·라이선스 고지만 하면 됩니다. 강한 copyleft(AGPL·GPL·SSPL) 구성요소는 <b>배포 이미지에 설치되지 않습니다</b>(§2).</div>
+  <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음.</b> 배포 스택은 <b>permissive 중심</b>이며(배포 이미지 실측 199개 중 <b>189개 permissive</b>), 약한 copyleft는 <b>LGPL 2건</b>(DB 드라이버 <code>psycopg</code>·문자셋 판별 <code>chardet</code>)과 <b>MPL-2.0 소수</b>(certifi·tqdm·fqdn)뿐입니다. 모두 <b>미수정·동적 링크 사용</b>이라 <b>재배포는 자유</b>이고 라이선스 고지만 하면 됩니다. 강한 copyleft(AGPL·GPL·SSPL) 구성요소는 <b>배포 이미지에 설치되지 않습니다</b>(§2 · 이미지 내 <code>poppler</code>·<code>tesseract</code> 바이너리 부재 실측 확인).</div>
+  <div class="note" style="border-left-color:#3f3f46"><b>산출 근거.</b> 위 수치는 <b>실제 배포 이미지(<code>lloydk-api</code>) 안에서 <code>scripts/dump_licenses.py</code>를 돌려</b> 얻은 것이며, 그 결과물(<code>third-party-licenses.txt</code> · <code>sbom.cyclonedx.json</code>, CycloneDX)이 <b>폐쇄망 번들 <code>licenses/</code>에 동봉</b>됩니다. 문서와 번들이 같은 산출물을 가리킵니다.</div>
 
-  <h2>1. 배포 구성요소 라이선스 (permissive 중심 · LGPL 1건)</h2>
+  <h2>1. 배포 구성요소 라이선스 (permissive 중심 · LGPL 2건)</h2>
   <table>
     <thead><tr><th>구성요소</th><th style="width:130px">라이선스</th><th style="width:70px">유형</th></tr></thead>
     <tbody>
       <tr><td>PostgreSQL + pgvector</td><td>PostgreSQL License</td><td><span class="tag perm">permissive</span></td></tr>
-      <tr><td>psycopg 3 (PostgreSQL 드라이버) — 재배포 자유·고지만 필요</td><td>LGPL-3.0</td><td><span class="tag copyleft">LGPL</span></td></tr>
+      <tr><td>psycopg 3 · psycopg-binary (PostgreSQL 드라이버) — 재배포 자유·고지만 필요</td><td>LGPL-3.0</td><td><span class="tag copyleft">LGPL</span></td></tr>
+      <tr><td>chardet (문자셋 판별 — 문서 인코딩 추정) — 미수정·동적 링크, 재배포 자유·고지만 필요</td><td>LGPL-2.1+</td><td><span class="tag copyleft">LGPL</span></td></tr>
       <tr><td>Redis 7.2 · nginx</td><td>BSD-3 · BSD-2</td><td><span class="tag perm">permissive</span></td></tr>
       <tr><td>FastAPI · SQLAlchemy · openpyxl · python-pptx · PyJWT · pdfminer.six</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
       <tr><td>Uvicorn · Celery · xlrd · torch</td><td>BSD-3</td><td><span class="tag perm">permissive</span></td></tr>
@@ -78,7 +80,7 @@ a{color:#0a0a0a}
   </table>
 
   <h2>2. 배포 범위 고정 — 카피레프트 반출 경로 없음</h2>
-  <div class="note">배포 이미지가 설치하는 extras는 <code>[psh, otel, jwt, hwp, hwp-tables, xls]</code>로 고정돼 있습니다(<code>Dockerfile.api.prod</code>). 이 범위 밖의 선택 구성 — <b>PyMuPDF</b>(AGPL-3.0) · <b>MinIO 서버</b>(AGPL-3.0) · <b>poppler-utils</b>(GPL-2/3, OCR용) — 과 레거시 <b>Elasticsearch</b>(SSPL) 어댑터는 <b>소스에 옵션으로만 존재하고 배포본에 설치되지 않아</b> AGPL·GPL·SSPL 반출 경로가 없습니다. 배포되는 유일한 copyleft는 psycopg(LGPL-3.0)이며 동적 링크·고지로 다중배포에 지장 없습니다. <b>권위 목록은 SBOM(CycloneDX)으로 최종 확정</b>합니다.</div>
+  <div class="note">배포 이미지가 설치하는 extras는 <code>[psh, otel, jwt, hwp, hwp-tables, xls]</code>로 고정돼 있습니다(<code>Dockerfile.api.prod</code>). 이 범위 밖의 선택 구성 — <b>PyMuPDF</b>(AGPL-3.0) · <b>MinIO 서버</b>(AGPL-3.0) · <b>poppler-utils</b>(GPL-2/3, OCR용) — 과 레거시 <b>Elasticsearch</b>(SSPL) 어댑터는 <b>소스에 옵션으로만 존재하고 배포본에 설치되지 않아</b> AGPL·GPL·SSPL 반출 경로가 없습니다. 배포되는 copyleft는 <b>LGPL 2건</b>(psycopg·chardet)과 MPL-2.0 소수뿐이며, 모두 동적 링크·미수정 사용이라 다중배포에 지장 없습니다. <b>권위 목록은 번들 <code>licenses/sbom.cyclonedx.json</code>(배포 이미지에서 직접 산출)</b>입니다.</div>
 
   <h2>3. 상용 LLM · 외부 API</h2>
   <ul>
@@ -91,7 +93,8 @@ a{color:#0a0a0a}
   <ul>
     <li>의존성 라이선스 표: <code>scripts/dump_licenses.py</code> (pip-licenses)</li>
     <li>SBOM(CycloneDX): <code>cyclonedx-bom</code> — <b>권위 확정본은 배포 이미지(Dockerfile.api.prod) 내에서 생성·첨부</b>(운영 전환 시)</li>
-    <li><b>실측 스팟체크(2026-08, Trove classifier 기준)</b>: psycopg=<b>LGPL-3.0</b> · torch=<b>BSD-3</b> · transformers/mlflow(지재원 학습서버 전용·고객사 미포함)/bcrypt=Apache-2.0 · SQLAlchemy/openpyxl/python-docx/python-pptx/redis=MIT · xlrd=BSD · PyMuPDF(AGPL)은 <b>배포 미포함 확인</b>. 그 외 <b>MPL-2.0 소수</b>(certifi·tqdm·pathspec 등)는 파일단위 약카피레프트·미수정 사용이라 <b>재배포 자유</b>(배포 포함 무방).</li>
+    <li><b>실측 전수(2026-08-02, 배포 이미지 내 산출 · 199개)</b>: permissive <b>189</b> · 약한 copyleft <b>5</b>(psycopg·psycopg-binary LGPL-3.0, chardet LGPL-2.1+, certifi·fqdn·tqdm MPL-2.0) · 분류 미상 <b>5</b>(자사 패키지 2건 포함). <b>AGPL·GPL·SSPL 0건.</b></li>
+    <li><b>스팟체크(Trove classifier 기준)</b>: psycopg=<b>LGPL-3.0</b> · torch=<b>BSD-3</b> · transformers/mlflow(지재원 학습서버 전용·고객사 미포함)/bcrypt=Apache-2.0 · SQLAlchemy/openpyxl/python-docx/python-pptx/redis=MIT · xlrd=BSD · PyMuPDF(AGPL)은 <b>배포 미포함 확인</b>. 그 외 <b>MPL-2.0 소수</b>(certifi·tqdm·pathspec 등)는 파일단위 약카피레프트·미수정 사용이라 <b>재배포 자유</b>(배포 포함 무방).</li>
   </ul>
 
   <div class="foot">로이드케이(AI 코어) · 오픈소스 라이선스·다중배포 검토서 · 2026-08-02 · 라이선스 값은 번들 동결 기준, 운영 전환 시 SBOM으로 재확정</div>

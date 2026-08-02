@@ -25,7 +25,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${PG_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lloydk"]
       interval: 5s
@@ -43,7 +43,7 @@ services:
     volumes:
       - redisdata:/data
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
 
   # mlflow 제거 — 폐쇄망(고객사) 배포는 추론 전용(enable_training=False)이라 모델 트래킹/레지스트리
   # 불요. 학습·MLflow 는 지재원(Lloydk) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
@@ -76,21 +76,19 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
     ports:
-      - "8000:8000"
+      # [2026-08-02] 하드코딩 8000 이면 이미 8000 을 쓰는 호스트에서 기동이 실패하고, 운영자가
+      # 번들 안 YAML 을 손으로 고쳐야 했다 → .env 로 뺀다(기본값은 종전과 동일).
+      - "${API_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthz/live"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 90s
-    # GPU (NVIDIA Container Toolkit 필요) — 미보유 환경은 아래 블록 주석 처리 + POC_MODE/임베딩 CPU
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # GPU 는 여기 없다 — 기본 CPU. NVIDIA 노드는 오버레이를 덧붙인다:
+    #   docker compose -f infra-config/docker-compose.airgap.yml -f infra-config/docker-compose.gpu.yml up -d
+    # 종전엔 이 블록이 base 에 있어 GPU 없는 호스트에서 `could not select device driver "nvidia"` 로
+    # 기동 자체가 막혔다(고객사 운영노드는 CPU 전용 — 기본값이 반대였다).
 
   worker:
     image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
@@ -126,13 +124,7 @@ services:
       timeout: 15s
       retries: 5
       start_period: 60s
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # GPU 예약 없음(기본 CPU) — GPU 노드는 docker-compose.gpu.yml 오버레이 사용. api 주석 참조.
 
   # 주기작업 발행기 — 단일 인스턴스만 (다중 beat = 중복 tick). dev compose엔 누락돼 있었음.
   beat:
