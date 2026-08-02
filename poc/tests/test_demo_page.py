@@ -46,8 +46,13 @@ def test_demo_index_returns_html(client):
     assert "로이드케이" in r.text
     # 신규 와우 컴포넌트가 마크업에 존재
     assert 'id="toggle-row"' in r.text  # 와우 A 키워드 토글 (정적)
-    assert 'class="race"' in r.text  # 와우 B 시간 경쟁 (정적)
     assert 'id="legal-grid"' in r.text  # 와우 C 법령 (정적)
+    # 와우 B(BERT vs LLM 시간 경쟁)는 제거됐다 — 분류 latency 와 /answer(RAG 생성)
+    # latency 를 서로 다른 GPU 에서 잰 값끼리 붙여 "≈22× 빠름"으로 보이게 하는
+    # 비교였고, LLM 막대는 호출 없이 25.8s 를 재생하는 애니메이션이었다. 되살아나지
+    # 않도록 부재를 단언한다.
+    assert 'class="race"' not in r.text
+    assert 'btn-race' not in r.text
     # 와우 D(fnr-sequence 사고 시뮬)·E(capability-stats)·§6(profile-grid)은 b774e3d 이후
     # app.js 클라이언트 주입이라 정적 GET 응답엔 없다 — 정적 HTML 마커가 아니므로 단언하지
     # 않고, 동적 컴포넌트 렌더 스크립트 존재로 대체(정적 마커만 검증).
@@ -65,8 +70,8 @@ def test_demo_styles_css(client):
     assert "Malgun Gothic" in r.text
     # 데모 신규 컴포넌트
     assert ".kw-toggle" in r.text
-    assert ".race-fill" in r.text
     assert ".legal-card" in r.text
+    assert ".race" not in r.text  # 와우 B 제거 — 스타일까지 남기지 않는다
     assert "@media print" in r.text
 
 

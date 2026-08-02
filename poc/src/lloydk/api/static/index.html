@@ -7,6 +7,7 @@
 <meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·신뢰도·평가요소·법령 근거를 확인합니다." />
 
 <link rel="stylesheet" href="./styles.css" />
+<script src="./deploy_badge.js" data-screen="시연"></script>
 </head>
 <body>
 
@@ -123,29 +124,9 @@
 
       <div class="btn-row">
         <button id="btn-classify" class="btn">분류하기</button>
-        <button id="btn-race" class="btn secondary">BERT vs LLM 시간 경쟁</button>
         <button id="btn-print" class="btn secondary">PDF 인쇄</button>
         <button id="btn-reset" class="btn ghost">초기화</button>
       </div>
-    </div>
-
-    <!-- ===== 시간 경쟁 (와우 B) — 분류 버튼 바로 아래 ===== -->
-    <div class="race">
-      <div class="race-title">
-        BERT 분류 (GPU 학습모델 1.18s) vs LLM <b>/answer</b> (Qwen3 14B 25.8s) — <b>≈22×</b>
-        <span class="src-tag src-ref" style="margin-left:8px;">이종 작업·환경 벤치 (참고)</span>
-      </div>
-      <div class="race-row">
-        <div class="race-label">BERT</div>
-        <div class="race-track"><div class="race-fill bert"></div></div>
-        <div class="race-time" id="race-bert-time">—</div>
-      </div>
-      <div class="race-row">
-        <div class="race-label">LLM</div>
-        <div class="race-track"><div class="race-fill llm"></div></div>
-        <div class="race-time" id="race-llm-time">—</div>
-      </div>
-      <div class="race-note" id="race-note">BERT는 이 데모의 실호출(라이브, lite-noapi에선 룰엔진 응답)이고, LLM 막대는 <b>사전 측정치(25.8s /answer)를 재생</b>하는 참고값입니다(이 데모는 LLM 미호출). 대표 비교값 ≈22×는 학습 KF-DeBERTa 1.18s(Phase 3 GPU) vs Qwen3 /answer 25.8s(Phase 1)로 서로 다른 작업·환경 벤치입니다. V2 §4.4 "왜 LLM 분류기를 안 쓰는가" 참고.</div>
     </div>
   </section>
 

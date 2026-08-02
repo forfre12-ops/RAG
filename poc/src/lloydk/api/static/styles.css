@@ -505,65 +505,6 @@ section h3 {
   font-family: var(--font-mono);
 }
 
-/* ===== 와우 B — 시간 경주 막대 ===== */
-.race {
-  margin: 24px 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
-  padding: 18px 22px;
-}
-.race-title {
-  font-family: var(--font-mono);
-  font-size: 11px; font-weight: 500;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-bottom: 14px;
-}
-.race-row {
-  display: grid;
-  grid-template-columns: 90px 1fr 90px;
-  align-items: center;
-  gap: 14px;
-  margin: 10px 0;
-}
-.race-label {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-.race-track {
-  position: relative;
-  height: 18px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-}
-.race-fill {
-  position: absolute;
-  top: 0; left: 0; bottom: 0;
-  width: 0%;
-  background: var(--text);
-  border-radius: var(--radius-pill);
-  transition: width .3s linear;
-}
-.race-fill.bert { background: var(--c-s3); }
-.race-fill.llm  { background: var(--c-s1); }
-.race-time {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  text-align: right;
-  color: var(--text);
-}
-.race-note {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.race-note b { color: var(--text); }
 
 /* ===== 결과 카드 ===== */
 .result {
@@ -853,7 +794,6 @@ code {
   .container { padding: 28px 20px 80px; }
   .nav-inner { padding: 12px 16px; gap: 8px; }
   .nav-status { display: none; }
-  .race-row { grid-template-columns: 70px 1fr 70px; gap: 10px; }
 }
 @media (max-width: 600px) {
   h1.title { font-size: 28px; }
@@ -873,7 +813,6 @@ code {
     box-shadow: none;
     page-break-inside: avoid;
   }
-  .race-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .pill.grade-TS, .pill.grade-S1, .pill.grade-S2, .pill.grade-S3,
   .result-grade { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-watermark { display: block !important; }
@@ -985,10 +924,6 @@ body { padding-bottom: 232px; }
 
 /* 히어로 배경 파랑 틴트 제거 */
 .hero-bg { background: none !important; }
-
-/* BERT/LLM 레이스 막대 → 두 그레이로 구분 */
-.race-fill.bert { background: var(--text) !important; }
-.race-fill.llm  { background: var(--text-faint) !important; }
 
 /* 결과 등장/플래시 애니메이션 파랑·주황 → 모노 */
 @keyframes resultPop {

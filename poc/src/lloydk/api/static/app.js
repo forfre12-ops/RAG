@@ -274,7 +274,6 @@ async function runClassify() {
     return;
   }
   $("#btn-classify").disabled = true;
-  $("#btn-race").disabled = true;
   clearResult();
   const stageMap = {};
   STAGES.forEach((s) => { stageMap[s.key] = "pending"; });
@@ -351,7 +350,6 @@ async function runClassify() {
     }
   } finally {
     $("#btn-classify").disabled = false;
-    $("#btn-race").disabled = false;
   }
 }
 
@@ -811,94 +809,6 @@ function ensureReady() {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// 와우 B — BERT vs LLM 시간 경쟁
-// ──────────────────────────────────────────────────────────────────────
-async function runRace() {
-  if (!ensureReady()) return;
-  const body = $("#doc-body").value;
-  if (!body || body.length < 5) {
-    showError("문서 본문이 너무 짧습니다.");
-    return;
-  }
-  $("#btn-classify").disabled = true;
-  $("#btn-race").disabled = true;
-
-  const bertFill = $(".race-fill.bert");
-  const llmFill = $(".race-fill.llm");
-  const bertTime = $("#race-bert-time");
-  const llmTime = $("#race-llm-time");
-  if (bertFill) { bertFill.style.width = "0%"; bertTime.textContent = "—"; }
-  if (llmFill) { llmFill.style.width = "0%"; llmTime.textContent = "—"; }
-
-  // BERT 실호출
-  const t0 = performance.now();
-  const r = await apiPost("/api/v1/classify", {
-    doc_id: state.currentSampleId || "demo-input",
-    title: $("#doc-title").value || "demo",
-    content: body,
-    use_rag: false,
-    return_evidence: true,
-  });
-  const bertMs = Math.round(performance.now() - t0);
-  if (bertFill) {
-    // bert 시간을 4800ms 대비 비율로 채움 (LLM 4.8s 기준)
-    const ratio = Math.min(1, bertMs / 4800);
-    bertFill.style.width = (ratio * 100).toFixed(1) + "%";
-    bertTime.textContent = bertMs + " ms";
-  }
-  if (r.ok) {
-    state.lastResult = r.data;
-    renderResult(r.data, bertMs);
-  }
-
-  // LLM — V2 §4.4 표 참고값으로 진행 막대 시뮬레이션.
-  // 실 호출이 아니라 "비교 기준값" 시각화. lite-noapi 환경에서는 LLM 자체가
-  // 호출되지 않으므로 실측 불가. 운영 시 LLM_PROVIDER=anthropic 등으로 실 호출하면
-  // 별도 실측 라운드 필요(현재 코드는 표시 안 함).
-  // Phase 1 실측 (2026-05-30) — Ollama Qwen3 14B Q4 /answer 호출 latency 25.8s.
-  // 이전 V2 §4.4 "1.5~5s" 참고값(4,800ms)에서 실측치로 교체.
-  const estimatedLlmMs = 25800;
-  const llmIsReal = state.health && state.health.llm_provider &&
-    !["noop", "", "hash"].includes(state.health.llm_provider);
-  const startLlm = performance.now();
-  const interval = 50;
-  await new Promise((resolve) => {
-    const tick = setInterval(() => {
-      const elapsed = performance.now() - startLlm;
-      const ratio = Math.min(1, elapsed / estimatedLlmMs);
-      if (llmFill) llmFill.style.width = (ratio * 100).toFixed(1) + "%";
-      if (llmTime) llmTime.textContent = Math.round(elapsed) + " ms (재생·사전 벤치)";
-      if (ratio >= 1) {
-        clearInterval(tick);
-        if (llmTime) llmTime.textContent = estimatedLlmMs + " ms (참고·사전 실측 재생, 라이브 아님)";
-        resolve();
-      }
-    }, interval);
-  });
-
-  // 결론 — Phase 1 실측치(25.8s) vs Phase 3 학습 모델 실측치(1.18s) 비교.
-  const note = $("#race-note");
-  if (note) {
-    const ratio = (estimatedLlmMs / Math.max(1, bertMs)).toFixed(1);
-    // Phase 4 (2026-05-30): /classify/stream SSE 단계 분해로 BERT 추론 비중 99%
-    // 입증. Qwen3 25.8s (Phase 1 /answer 실측) vs BERT 1.18s (Phase 3 5070 Ti
-    // 학습 모델 실측) = 21.9× 빠름. V2 §4.4 표 정량 검증 완료.
-    note.innerHTML = `
-      이 데모 라이브 BERT(룰엔진) 응답 <b>${bertMs} ms</b> <span class="src-tag src-measured">실측</span>
-      · LLM 막대 <b>${estimatedLlmMs} ms</b>
-      <span class="src-tag src-ref" style="margin-left:6px;">참고·재생</span>
-      <br/><span style="font-size:11.5px;color:var(--text-dim);">
-      ※ 대표 비교값 <b>≈22×</b> = 학습 KF-DeBERTa 분류 1.18s(Phase 3 GPU) vs Qwen3 /answer 25.8s(Phase 1) — 서로 다른 작업·환경 벤치라 참고값.
-      라이브 막대의 BERT는 이 데모의 룰엔진 응답(학습모델 아님), LLM은 사전 측정치 재생(이 데모는 LLM 미호출).
-      P5 E2E RAG ON 참고: BERT 추론이 대부분(V2 §14.2 ≤ 30s 합격선 이내).
-      </span>`;
-  }
-
-  $("#btn-classify").disabled = false;
-  $("#btn-race").disabled = false;
-}
-
-// ──────────────────────────────────────────────────────────────────────
 // 법령 카드 (와우 C-2: 키워드 클릭 → 본문 하이라이트)
 // ──────────────────────────────────────────────────────────────────────
 function renderLegal() {
@@ -1172,7 +1082,6 @@ async function init() {
     }, 1000);
   }
   $("#btn-classify").addEventListener("click", runClassify);
-  $("#btn-race").addEventListener("click", runRace);
   $("#btn-print").addEventListener("click", () => window.print());
   // 운영 대시보드 + 실시간 반영 시연
   const btnReflect = $("#btn-reflect");
