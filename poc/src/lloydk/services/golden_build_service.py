@@ -218,7 +218,11 @@ class GoldenBuildService:
         paths = [p for p in (job.get("gold_path"), job.get("uncertain_path")) if p]
         if not paths:
             return None
-        return render_review_html_from_jsonl(paths, title=title, subtitle=f"job {job_id}")
+        from lloydk.config import settings  # noqa: PLC0415 — 모듈 상단 미임포트(지연 로드 관례)
+        return render_review_html_from_jsonl(
+            paths, title=title, subtitle=f"job {job_id}",
+            profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
+        )
 
     def render_signoff(
         self, job_id: uuid.UUID, *, title: str = "골든셋 검수 · 서명"
@@ -235,11 +239,13 @@ class GoldenBuildService:
         gold_path = job.get("gold_path")
         if not gold_path:
             return None
+        from lloydk.config import settings  # noqa: PLC0415
         return render_signoff_html_from_jsonl(
             [gold_path],
             job_id=str(job_id),
             post_url=f"/api/v1/golden/jobs/{job_id}/signoff",
             title=title,
+            profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
         )
 
     def apply_signoff(

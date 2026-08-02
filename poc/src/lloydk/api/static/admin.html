@@ -181,6 +181,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .logline.ok .m, .logline.req .m { color:#e4e4e7 !important; }
 .logline.err .m { color:#ffffff !important; }
 </style>
+<script src="./deploy_badge.js" data-screen="관리자"></script>
 </head>
 <body>
 
@@ -496,9 +497,16 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
       <div class="card-body">
         <div class="row3">
           <div class="field">
+            <label class="fld">후보 소스</label>
+            <select id="gold-source">
+              <option value="samples">데모 샘플 12종</option>
+              <option value="editor">위 §1 분류 패널 본문</option>
+            </select>
+          </div>
+          <div class="field">
             <label class="fld">provider</label>
             <select id="gold-provider">
-              <option value="noop">noop (시연/검증)</option>
+              <option value="noop">noop (배관 확인용 · 후보 0건)</option>
               <option value="local_openai">local_openai</option>
               <option value="vllm_qwen">vllm_qwen</option>
               <option value="anthropic">anthropic</option>
@@ -509,18 +517,34 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
             <label class="fld">n</label>
             <input id="gold-n" type="number" min="1" max="50" value="8" />
           </div>
-          <div class="field" style="display:flex;align-items:flex-end;gap:6px;">
-            <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;">
-              <input id="gold-require-evidence" type="checkbox" style="width:auto" checked /> require_evidence
-            </label>
-          </div>
         </div>
         <div class="btn-row">
-          <button class="btn" onclick="startGoldenBuild()">후보 생성 시작</button>
-          <button class="btn sec sm" onclick="loadGoldenJob()">상태 조회</button>
-          <button class="btn sec sm" onclick="openGoldenReview()">리뷰 HTML 열기</button>
+          <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;margin-right:auto;">
+            <input id="gold-require-evidence" type="checkbox" style="width:auto" checked /> require_evidence
+          </label>
+          <button class="btn" id="gold-go" onclick="startGoldenBuild()">후보 생성 → 검수</button>
+          <button class="btn sec sm" onclick="loadGoldenJob()">상태 새로고침</button>
         </div>
-        <div id="gold-result" class="json">아직 생성된 골든셋 후보 잡이 없습니다.</div>
+
+        <div id="gold-progress" class="sec-note" style="margin-top:10px;">아직 생성된 골든셋 후보 잡이 없습니다.</div>
+
+        <div id="gold-summary" style="display:none;margin-top:10px;">
+          <div class="dash-panel">
+            <div class="dp-h"><span>후보 생성 결과</span><span id="gold-verdict" class="pill">-</span></div>
+            <div class="dp-row" id="gold-counts"></div>
+            <div class="dp-row" id="gold-grades" style="margin-top:6px;"></div>
+          </div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn sec sm" id="gold-btn-review" onclick="openGoldenReview()" disabled>검수 HTML 열기</button>
+            <button class="btn sec sm" id="gold-btn-signoff" onclick="openGoldenSignoff()" disabled>서명 HTML 열기</button>
+          </div>
+        </div>
+
+        <details style="margin-top:10px;">
+          <summary style="font-size:12px;color:var(--text-dim);cursor:pointer;">원시 응답(JSON)</summary>
+          <div id="gold-result" class="json" style="margin-top:6px;">-</div>
+        </details>
+
         <p class="sec-note">이 패널은 정본 골든셋을 직접 수정하지 않고 <code>datasets/gold_real/builds</code> 아래 후보 산출물만 만듭니다. locked_gold_eval 승격은 별도 검수·승격 절차가 필요합니다.</p>
       </div>
     </section>
@@ -1015,22 +1039,67 @@ async function loadDashboard(){
   }
 }
 
-/* ---- 7. GOLDEN BUILD ---- */
+/* ---- 7. GOLDEN BUILD ----
+ * 종전에는 [생성]→[상태 조회]→[리뷰 열기] 3버튼을 사람이 순서대로 눌러야 했고, job_id 를
+ * prompt() 로 되묻는 경로까지 있었다. 여기서는 생성 후 완료까지 자동 폴링하고, 끝나면
+ * 요약 카드와 검수/서명 버튼을 스스로 활성화한다(사람 클릭 3회 → 1회). */
 function goldenDocs(){
-  return SAMPLES.slice(0, Math.max(1, Math.min(8, Number($('gold-n').value || 8)))).map(s=>({
-    doc_id: s.id,
-    title: s.t,
-    text: s.b,
-    label_hint: s.exp,
-    source: 'demo_console'
+  const n = Math.max(1, Math.min(50, Number($('gold-n').value || 8)));
+  if(($('gold-source')||{}).value === 'editor'){
+    // §1 분류 패널에 지금 들어 있는 본문을 그대로 후보로 — 방금 다룬 문서를 골든 후보로
+    // 올리는 게 데모 샘플 고정보다 실사용에 가깝다.
+    const body = ($('cl-body').value||'').trim();
+    if(!body) return [];
+    return [{
+      doc_id: ($('cl-docid').value||'').trim() || `console-${Date.now()}`,
+      title: ($('cl-title').value||'').trim() || '분류 패널 입력',
+      text: body,
+      source: 'demo_console_editor'
+    }];
+  }
+  return SAMPLES.slice(0, Math.min(8, n)).map(s=>({
+    doc_id: s.id, title: s.t, text: s.b, label_hint: s.exp, source: 'demo_console'
   }));
+}
+function goldenProgress(msg){ const el=$('gold-progress'); if(el) el.textContent=msg; }
+function goldenButtons(status, goldCount){
+  const rv=$('gold-btn-review'), sg=$('gold-btn-signoff');
+  const done = status==='done';
+  if(rv) rv.disabled = !done;                       // 검토본은 uncertain 만 있어도 볼 값이 있다
+  if(sg) sg.disabled = !done || !(goldCount>0);     // 서명은 gold 후보가 있어야 의미가 있다
+}
+function renderGoldenSummary(d){
+  const box=$('gold-summary'); if(!box) return;
+  box.style.display='';
+  const st=d.stats||{}, gold=d.gold_count??st.gold??0, unc=d.uncertain_count??st.uncertain??0;
+  const pill=$('gold-verdict');
+  if(pill){
+    const ok = d.status==='done' && gold>0;
+    pill.className = 'pill ' + (d.status==='failed'||d.error ? 'warn' : (ok?'ok':'warn'));
+    pill.textContent = d.status==='failed'||d.error ? '실패'
+                     : (d.status!=='done' ? d.status||'진행중' : (gold>0?'후보 확보':'후보 0건'));
+  }
+  $('gold-counts').innerHTML =
+    `<div><span>입력</span> <b>${st.input??'-'}</b></div>`+
+    `<div><span>gold</span> <b>${gold}</b></div>`+
+    `<div><span>uncertain</span> <b>${unc}</b></div>`+
+    `<div><span>중복 제외</span> <b>${st.dropped_duplicate??0}</b></div>`+
+    `<div><span>누출 제외</span> <b>${st.dropped_leaked??0}</b></div>`;
+  const byg=st.gold_by_grade||{};
+  $('gold-grades').innerHTML = GRADES.some(g=>byg[g])
+    ? GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')
+    : '<span style="color:var(--text-faint)">등급 분포 없음 — gold 후보 0건</span>';
+  goldenButtons(d.status, gold);
 }
 async function startGoldenBuild(){
   if(!guardWrite('골든셋 후보 생성')) return;
+  const docs=goldenDocs();
+  if(!docs.length){ goldenProgress('후보로 보낼 본문이 비어 있습니다 — §1 분류 패널에 본문을 넣거나 소스를 "데모 샘플"로 바꾸세요.'); return; }
+  const btn=$('gold-go'); if(btn) btn.disabled=true;
   try{
     const body={
       source_type:'inline',
-      docs:goldenDocs(),
+      docs,
       n:Number($('gold-n').value || 8),
       llm_provider:$('gold-provider').value,
       require_evidence:$('gold-require-evidence').checked,
@@ -1041,35 +1110,63 @@ async function startGoldenBuild(){
     LAST_GOLDEN_JOB_ID=d.golden_job_id;
     $('gold-result').textContent=JSON.stringify(d,null,2);
     log(`골든셋 후보 생성 시작: ${LAST_GOLDEN_JOB_ID}`,'ok');
+    goldenProgress(`job ${LAST_GOLDEN_JOB_ID} 생성됨 — 완료 대기 중…`);
+    await pollGoldenJob(LAST_GOLDEN_JOB_ID);
   }catch(e){
+    goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
     $('gold-result').textContent=`골든셋 후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+  }finally{ if(btn) btn.disabled=false; }
+}
+/* 완료(done/failed)까지 자동 폴링. 상한 40회×1.5s=60s — 넘으면 수동 새로고침으로 넘긴다. */
+async function pollGoldenJob(id){
+  for(let i=0;i<40;i++){
+    let d;
+    try{ d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`); }
+    catch(e){ goldenProgress(`상태 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`); return; }
+    $('gold-result').textContent=JSON.stringify(d,null,2);
+    if(d.status==='done'||d.status==='failed'||d.error){
+      renderGoldenSummary(d);
+      const gold=d.gold_count??0;
+      goldenProgress(d.error ? `실패: ${d.error}`
+        : (gold>0 ? `완료 — gold 후보 ${gold}건. 아래에서 검수/서명 화면을 여세요.`
+                  : '완료 — 승격 가능한 gold 후보가 0건입니다(admission 게이트 탈락). provider·require_evidence를 확인하세요.'));
+      log(`골든셋 후보 잡 ${d.status}: ${id} · gold ${gold}`, d.error?'err':'ok');
+      return;
+    }
+    goldenProgress(`job ${id} · ${d.status||'진행중'} — 대기 ${((i+1)*1.5).toFixed(0)}s`);
+    await new Promise(r=>setTimeout(r,1500));
   }
+  goldenProgress('60초 내 완료되지 않았습니다 — [상태 새로고침]으로 확인하세요.');
 }
 async function loadGoldenJob(){
-  const id=LAST_GOLDEN_JOB_ID || prompt('조회할 golden_job_id를 입력하세요');
-  if(!id) return;
-  LAST_GOLDEN_JOB_ID=id;
+  const id=LAST_GOLDEN_JOB_ID;
+  if(!id){ goldenProgress('조회할 잡이 없습니다 — 먼저 [후보 생성 → 검수]를 실행하세요.'); return; }
   try{
     const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
     $('gold-result').textContent=JSON.stringify(d,null,2);
+    renderGoldenSummary(d);
+    goldenProgress(`job ${id} · ${d.status||'-'}`);
     log(`골든셋 후보 잡 상태: ${id} → ${d.status}`,'ok');
   }catch(e){
+    goldenProgress(`상태 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
     $('gold-result').textContent=`골든셋 후보 잡 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
   }
 }
-async function openGoldenReview(){
-  const id=LAST_GOLDEN_JOB_ID || prompt('리뷰 HTML을 열 golden_job_id를 입력하세요');
-  if(!id) return;
-  LAST_GOLDEN_JOB_ID=id;
-  let url=`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/review.html`;
-  // [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문).
+/* [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문). */
+async function openGoldenHtml(kind){
+  const id=LAST_GOLDEN_JOB_ID;
+  if(!id){ goldenProgress('열 잡이 없습니다 — 먼저 [후보 생성 → 검수]를 실행하세요.'); return; }
+  let url=`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/${kind}.html`;
   try{
     const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
-    const m=d&&d.review_url?String(d.review_url).match(/[?&]t=([^&]+)/):null;
+    const src = kind==='signoff' ? d.signoff_url : d.review_url;
+    const m = src ? String(src).match(/[?&]t=([^&]+)/) : null;
     if(m) url+=`?t=${m[1]}`;
   }catch(e){/* 조회 실패 시 평문 폴백 */}
   window.open(url, '_blank', 'noopener');
 }
+function openGoldenReview(){ return openGoldenHtml('review'); }
+function openGoldenSignoff(){ return openGoldenHtml('signoff'); }
 
 /* ---- 실시간 관제 (auto-refresh · 읽기 전용 폴링) ----
  * 이 콘솔은 원래 수동 새로고침만 있었다(웹소켓/폴링 0). 여기서 읽기 전용 조회

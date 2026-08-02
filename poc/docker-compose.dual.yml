@@ -25,6 +25,7 @@ services:
         condition: service_started
     volumes: !override
       - ./artifacts:/app/artifacts:ro                       # 분류 모델(v-fe4b386b · v5) ro 공급
+      - ./datasets:/app/datasets                            # 골든 후보 — 아래 [골든] 주석 참조(api↔worker 공유·rw 필수)
       - lloydk_hf_cache:/home/lloydk/.cache/huggingface     # KURE 임베더 캐시 — 두 스택 공유(external)
       - storagedata:/app/.storage                           # [#4] 원문 저장(암호화 at-rest) — api↔worker 공유·영속(볼륨無 시 원문소실·미공유→빈문서 분류)
   worker:
@@ -35,6 +36,13 @@ services:
         condition: service_started
     volumes: !override
       - ./artifacts:/app/artifacts:ro
+      # [골든] datasets 는 .dockerignore 에 있어 이미지에 안 들어간다. 이 바인드가 없으면
+      # /golden/build 를 실행한 worker 는 자기 컨테이너 FS 에 build_*.jsonl 을 쓰고,
+      # review.html/signoff.html 을 렌더하는 api 에는 /app/datasets 자체가 없어 후보를
+      # 영원히 못 읽는다(빈 검수 화면). 산출물도 컨테이너 재생성 시 소실된다.
+      # celery 미가용 시 api 가 in-proc 으로 빌드하던 경로에서는 드러나지 않던 결함
+      # (2026-08-02 테스트서버 실측). 정본 골든 시딩도 이 바인드로 들어온다.
+      - ./datasets:/app/datasets
       - lloydk_hf_cache:/home/lloydk/.cache/huggingface
       - storagedata:/app/.storage                           # [#4] api 와 동일 저장 볼륨 공유(원문 read-back)
   postgres:

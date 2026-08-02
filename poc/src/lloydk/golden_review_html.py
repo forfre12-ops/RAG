@@ -10,39 +10,145 @@ target 대조·정오답·미탐)다. 빌더 검토본은 정답이 아직 없�
 """
 from __future__ import annotations
 
+import base64
 import html as _html
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
 
-_DEFAULT_CSS = """<style>
-*{box-sizing:border-box}body{font-family:'Malgun Gothic',system-ui,sans-serif;margin:0;background:#f4f4f5;color:#18181b}
-.app-header{background:#1e293b;color:#fff;padding:18px 24px}.app-header h1{margin:0;font-size:18px}
-.app-header .sub{font-size:12px;color:#94a3b8;margin-top:4px}
-.container{max-width:1100px;margin:0 auto;padding:20px}
+# 콘솔(static/styles.css)과 동일한 NovaX 토큰 — 골든 화면이 /demo 콘솔과 한 시스템으로 보이게
+# 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
+# 감리 증적으로 단독 저장·전달될 수 있어 self-contained 여야 한다(정적 마운트 의존 금지).
+_TOKENS = """
+:root{
+  --bg:#ffffff;--bg-surface:#fafafa;--text:#0a0a0a;--text-soft:#525252;--text-dim:#737373;
+  --border:rgba(0,0,0,0.08);--border-strong:rgba(0,0,0,0.16);--accent:#0a0a0a;--accent-soft:#f4f4f4;
+  --radius:0;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;
+}
+"""
+
+_DEFAULT_CSS = """<style>""" + _TOKENS + """
+*{box-sizing:border-box}
+body{font-family:var(--font-sans);margin:0;background:var(--bg);color:var(--text);
+     -webkit-font-smoothing:antialiased}
+/* ── 콘솔(static/styles.css)과 동일한 nav·브랜드 크롬 ─────────────────────────── */
+.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,0.72);
+     backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);
+     border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;
+           gap:10px;min-width:0}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;
+       white-space:nowrap;min-width:0;line-height:1}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;
+            border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}
+.brand-mark img{max-width:100%;max-height:100%;display:block}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-.02em;color:var(--text)}
+.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400}
+.brand-sub{font-size:12.5px;color:var(--text-dim)}
+/* 배포 주체 배지 — 콘솔 deploy_badge.js 와 동일 폼(골든 화면은 서버 렌더라 값도 서버가 넣는다) */
+.site-badge{display:inline-flex;align-items:center;gap:0;font-size:11.5px;font-weight:600;
+            line-height:1;white-space:nowrap}
+.site-badge>span{padding:4px 8px;border:1px solid transparent}
+.site-badge .site-name{color:#fff;letter-spacing:-.01em}
+.site-badge .site-role{background:#fff;color:var(--text-soft);border-color:var(--border-strong);border-left:0;font-weight:500}
+.site-badge .site-kind{background:var(--accent-soft);color:var(--text);border-color:var(--border-strong);border-left:0}
+.site-badge.jjw .site-name{background:#0a0a0a}
+.site-badge.cust .site-name{background:#0070f3}
+.site-badge.pilot .site-name{background:#d97706}
+.site-badge.dev .site-name{background:#737373}
+.site-badge.unknown .site-name{background:#fff;color:var(--text-dim);border-color:var(--border-strong)}
+@media (max-width:720px){.site-badge .site-role{display:none}}
+.lede-row{max-width:1320px;margin:0 auto;padding:28px 32px 0}
+.h1{font-size:30px;font-weight:600;letter-spacing:-.03em;margin:0 0 10px;line-height:1.2}
+.lede{font-size:15px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0;
+      letter-spacing:-.012em;max-width:820px}
+.container{max-width:1320px;margin:0 auto;padding:24px 32px 48px}
 .stats-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.stat-card{background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:10px 14px;min-width:80px;text-align:center}
-.stat-card .num{font-size:20px;font-weight:700}.stat-card .lbl{font-size:11px;color:#71717a}
+.stat-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;min-width:80px;text-align:center}
+.stat-card .num{font-size:20px;font-weight:700;font-family:var(--font-mono)}
+.stat-card .lbl{font-size:11px;color:var(--text-dim)}
 .filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.filter-btn{border:1px solid #d4d4d8;background:#fff;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer}
-.filter-btn.active{background:#1e293b;color:#fff;border-color:#1e293b}
-.filter-sep{width:1px;height:20px;background:#d4d4d8;margin:0 4px}
-.search-box{border:1px solid #d4d4d8;border-radius:6px;padding:5px 10px;font-size:12px;flex:1;min-width:140px}
-.result-count{font-size:12px;color:#71717a;margin-bottom:8px}
+.filter-btn{border:1px solid var(--border-strong);background:var(--bg);color:var(--text);
+            border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+.filter-btn:hover{background:var(--accent-soft)}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.filter-sep{width:1px;height:20px;background:var(--border-strong);margin:0 4px}
+.search-box{border:1px solid var(--border-strong);border-radius:var(--radius);padding:5px 10px;
+            font-size:12px;flex:1;min-width:140px;font-family:inherit}
+.result-count{font-size:12px;color:var(--text-dim);margin-bottom:8px}
 .records-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
-.card{background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:14px}
-.card-meta{font-size:11px;color:#71717a;display:flex;gap:8px}
+.card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.card-meta{font-size:11px;color:var(--text-dim);display:flex;gap:8px;font-family:var(--font-mono)}
 .card-title{font-weight:600;font-size:13px;margin:6px 0 8px;display:flex;align-items:center;gap:8px}
-.grade-mark{font-weight:700;border-radius:4px;padding:2px 8px;color:#fff;font-size:12px}
-.g-TS{background:#dc2626}.g-S1{background:#ea580c}.g-S2{background:#ca8a04}.g-S3{background:#16a34a}
+.grade-mark{font-weight:700;border-radius:var(--radius);padding:2px 8px;color:#fff;font-size:12px}
+.g-TS{background:var(--c-ts)}.g-S1{background:var(--c-s1)}.g-S2{background:var(--c-s2)}.g-S3{background:var(--c-s3)}
 .row{font-size:12px;margin:6px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.status-txt{font-size:11px;border:1px solid #d4d4d8;border-radius:4px;padding:1px 6px}
-.status-txt.uncertain{border-color:#dc2626;color:#dc2626}
-.preview{font-size:11.5px;color:#52525b;margin-top:8px;line-height:1.5}
-.no-results{padding:30px;text-align:center;color:#9ca3af}
+.status-txt{font-size:11px;border:1px solid var(--border-strong);border-radius:var(--radius);padding:1px 6px}
+.status-txt.uncertain{border-color:var(--c-ts);color:var(--c-ts)}
+.preview{font-size:11.5px;color:var(--text-soft);margin-top:8px;line-height:1.5}
+.no-results{padding:30px;text-align:center;color:var(--text-dim)}
 </style>"""
 
 _GRADES = ("TS", "S1", "S2", "S3")
+
+# ── 콘솔과 동일한 nav 크롬 조립 ────────────────────────────────────────────────
+# 로고는 base64 인라인 — 이 HTML 은 /api/v1/golden/... 에서 서빙되므로 콘솔의 상대경로
+# (./lloydk_logo_mark.png)가 안 맞고, 감리 증적으로 단독 저장될 때도 깨지면 안 된다
+# (프로젝트 규칙: 새 HTML 은 로고 base64 인라인).
+_LOGO_PATH = Path(__file__).with_name("api") / "static" / "lloydk_logo_mark.png"
+
+
+@lru_cache(maxsize=1)
+def _logo_data_uri() -> str:
+    """로고 data URI. 파일이 없으면 빈 문자열 — 마크는 생략되고 나머지는 정상 렌더."""
+    try:
+        return "data:image/png;base64," + base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+
+
+# deploy_profile → 배포 주체. static/deploy_badge.js 의 표와 동일하게 유지할 것.
+_SITES = {
+    "full-train": ("지재원", "모델 공장", "jjw"),
+    "onprem-local": ("고객사", "폐쇄망 운영", "cust"),
+    "lite-cloud": ("오픈망 파일럿", "경량", "pilot"),
+    "lite-noapi": ("로컬·개발", "dryrun", "dev"),
+}
+
+
+def _site_badge_html(profile: Optional[str], screen: str) -> str:
+    """배포 주체·화면 배지. profile 미지정/미등록이면 단정하지 않고 원시값을 회색으로 표기."""
+    if not profile:
+        return ""
+    site, role, cls = _SITES.get(profile, (profile, "", "unknown"))
+    parts = [f'<span class="site-name">{_html.escape(site)}</span>']
+    if role:
+        parts.append(f'<span class="site-role">{_html.escape(role)}</span>')
+    parts.append(f'<span class="site-kind">{_html.escape(screen)}</span>')
+    return (
+        f'<span class="site-badge {cls}" title="deploy_profile={_html.escape(profile)}">'
+        + "".join(parts)
+        + "</span>"
+    )
+
+
+def _nav_html(sub: str, profile: Optional[str], screen: str) -> str:
+    """콘솔(static/*.html)과 같은 브랜드 바."""
+    logo = _logo_data_uri()
+    mark = f'<span class="brand-mark"><img src="{logo}" alt="Lloydk"/></span>' if logo else ""
+    return (
+        '<nav class="nav"><div class="nav-inner">'
+        f'<span class="brand">{mark}'
+        '<span class="brand-name">로이드케이</span>'
+        '<span class="brand-sep">/</span>'
+        f'<span class="brand-sub">{_html.escape(sub)}</span></span>'
+        + _site_badge_html(profile, screen)
+        + "</div></nav>"
+    )
 
 
 def _display_records(records: Sequence[dict]) -> list[dict]:
@@ -89,8 +195,13 @@ def render_review_html(
     title: str = "골든셋 후보 검토본",
     subtitle: str = "",
     css: Optional[str] = None,
+    profile: Optional[str] = None,
 ) -> str:
-    """빌더 후보 레코드(dict)들을 지재원 관리자 검수용 인터랙티브 HTML로 렌더."""
+    """빌더 후보 레코드(dict)들을 지재원 관리자 검수용 인터랙티브 HTML로 렌더.
+
+    profile = settings.deploy_profile. 주면 콘솔과 같은 배포 주체 배지(지재원/고객사)를
+    nav 에 박는다 — 이중배포에서 어느 스택의 후보를 보는지 화면만으로 구분된다.
+    """
     data = _display_records(records)
     n_gold = sum(1 for d in data if d["is_gold"])
     head = (
@@ -99,6 +210,7 @@ def render_review_html(
     )
     return head + (
         _BODY_TEMPLATE
+        .replace("__NAV__", _nav_html("골든셋 후보 검토본", profile, "검수"))
         .replace("__TITLE__", _html.escape(title))
         .replace("__SUBTITLE__", _html.escape(subtitle))
         .replace("__TOTAL__", str(len(data)))
@@ -114,6 +226,7 @@ def render_review_html_from_jsonl(
     title: str = "골든셋 후보 검토본",
     subtitle: str = "",
     css: Optional[str] = None,
+    profile: Optional[str] = None,
 ) -> str:
     """build_<id>.jsonl·uncertain_<id>.jsonl 등을 읽어 검토본 HTML로 렌더."""
     recs: list[dict] = []
@@ -124,7 +237,7 @@ def render_review_html_from_jsonl(
         for line in pp.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 recs.append(json.loads(line))
-    return render_review_html(recs, title=title, subtitle=subtitle, css=css)
+    return render_review_html(recs, title=title, subtitle=subtitle, css=css, profile=profile)
 
 
 # ── 골든셋 검수 · 화면 서명(signoff) 인터랙티브 렌더 ──────────────────────────────
@@ -156,6 +269,7 @@ def render_signoff_html(
     post_url: str,
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
+    profile: Optional[str] = None,
 ) -> str:
     """gold 후보를 화면 서명용 인터랙티브 HTML로 렌더(승인/등급변경/거부 → POST signoff)."""
     data = _signoff_records(records)
@@ -165,6 +279,7 @@ def render_signoff_html(
     )
     return head + (
         _SIGNOFF_BODY
+        .replace("__NAV__", _nav_html("골든셋 검수 · 서명", profile, "서명"))
         .replace("__TITLE__", _html.escape(title))
         .replace("__JOB__", _html.escape(job_id))
         .replace("__POST_URL__", _html.escape(post_url))
@@ -180,6 +295,7 @@ def render_signoff_html_from_jsonl(
     post_url: str,
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
+    profile: Optional[str] = None,
 ) -> str:
     """build_<id>.jsonl(gold 후보)을 읽어 서명 HTML로 렌더."""
     recs: list[dict] = []
@@ -190,35 +306,48 @@ def render_signoff_html_from_jsonl(
         for line in pp.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 recs.append(json.loads(line))
-    return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css)
+    return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css,
+                               profile=profile)
 
 
-_SIGNOFF_CSS = """<style>
-.signbar{position:sticky;top:0;z-index:10;background:#0f172a;color:#e2e8f0;padding:12px 24px;display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+# 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
+# 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
+_SIGNOFF_CSS = """<style>""" + _TOKENS + """
+.signbar{position:sticky;top:0;z-index:10;background:var(--accent);color:#e4e4e7;padding:12px 24px;
+         display:flex;gap:10px;flex-wrap:wrap;align-items:end;border-bottom:1px solid var(--accent)}
 .signbar .fld{display:flex;flex-direction:column;font-size:11px;gap:3px}
-.signbar input,.signbar select{padding:5px 8px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#e2e8f0;font-size:12px}
+.signbar input,.signbar select{padding:5px 8px;border:1px solid #3f3f46;border-radius:var(--radius);
+                               background:#18181b;color:#f4f4f5;font-size:12px;font-family:inherit}
 .signbar .chk{flex-direction:row;align-items:center;gap:4px}
-.signbar button{padding:8px 18px;border:0;border-radius:6px;background:#16a34a;color:#fff;font-weight:700;font-size:13px;cursor:pointer}
-.signbar button:disabled{background:#475569;cursor:not-allowed}
-.rubric{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin:14px 0;font-size:12px;line-height:1.6}
-.rubric b{color:#92400e}
-.scard{background:#fff;border:1px solid #e4e4e7;border-radius:8px;padding:14px;margin-bottom:12px}
-.scard.decided{border-color:#16a34a;box-shadow:0 0 0 1px #16a34a inset}
-.scard.rejected{border-color:#dc2626;box-shadow:0 0 0 1px #dc2626 inset;opacity:.75}
-.stext{font-size:12.5px;color:#27272a;white-space:pre-wrap;max-height:220px;overflow:auto;background:#fafafa;border:1px solid #f0f0f0;border-radius:6px;padding:10px;margin:8px 0;line-height:1.55}
+.signbar button{padding:8px 18px;border:0;border-radius:var(--radius);background:var(--c-s3);color:#fff;
+                font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+.signbar button:disabled{background:#52525b;cursor:not-allowed}
+.rubric{background:var(--accent-soft);border:1px solid var(--border-strong);border-left:3px solid var(--c-s1);
+        border-radius:var(--radius);padding:10px 14px;margin:14px 0;font-size:12px;line-height:1.6}
+.rubric b{color:var(--text)}
+.scard{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.scard.decided{border-color:var(--c-s3);box-shadow:0 0 0 1px var(--c-s3) inset}
+.scard.rejected{border-color:var(--c-ts);box-shadow:0 0 0 1px var(--c-ts) inset;opacity:.75}
+.stext{font-size:12.5px;color:var(--text-soft);white-space:pre-wrap;max-height:220px;overflow:auto;
+       background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);
+       padding:10px;margin:8px 0;line-height:1.55;font-family:var(--font-mono)}
 .decrow{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:13px}
 .decrow label{display:flex;gap:5px;align-items:center;cursor:pointer}
-.decrow select{padding:3px 6px;border:1px solid #d4d4d8;border-radius:4px}
-.note{width:100%;margin-top:8px;padding:6px 8px;border:1px solid #e4e4e7;border-radius:6px;font-size:12px}
-.result{margin:14px 0;padding:12px 16px;border-radius:8px;font-size:13px;display:none}
-.result.ok{background:#f0fdf4;border:1px solid #86efac;color:#166534;display:block}
-.result.err{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;display:block}
+.decrow select{padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit}
+.note{width:100%;margin-top:8px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);
+      font-size:12px;font-family:inherit}
+.result{margin:14px 0;padding:12px 16px;border-radius:var(--radius);font-size:13px;display:none}
+.result.ok{background:#f0fdf4;border:1px solid var(--c-s3);border-left:3px solid var(--c-s3);color:#166534;display:block}
+.result.err{background:#fef2f2;border:1px solid var(--c-ts);border-left:3px solid var(--c-ts);color:#991b1b;display:block}
 </style>"""
 
 _SIGNOFF_BODY = r"""
 <body>
-<header class="app-header"><h1>__TITLE__</h1>
-<div class="sub">job __JOB__ · gold 후보 __TOTAL__건 · 지재원 관리자 골든셋 검수 — 승인/등급변경/거부 후 서명하면 locked_gold_eval(사람서명 평가정답)로 승격</div></header>
+__NAV__
+<div class="lede-row">
+  <h1 class="h1">__TITLE__</h1>
+  <p class="lede">job __JOB__ · gold 후보 __TOTAL__건 — 승인/등급변경/거부 후 서명하면 <b>locked_gold_eval</b>(사람서명 평가정답)로 승격됩니다.</p>
+</div>
 <div class="signbar">
   <div class="fld"><label>X-API-Key</label><input id="key" type="password" placeholder="settings.api_key"></div>
   <div class="fld"><label>역할(X-Actor-Role)</label><select id="role"><option value="reviewer">reviewer</option><option value="admin">admin</option><option value="kl_backend">kl_backend</option></select></div>
@@ -242,7 +371,7 @@ _SIGNOFF_BODY = r"""
     <button class="filter-btn" data-v="S3">S3</button>
     <span class="filter-sep"></span>
     <input class="search-box" id="q" placeholder="id·본문 검색...">
-    <span id="deccount" style="font-size:12px;color:#71717a"></span>
+    <span id="deccount" style="font-size:12px;color:var(--text-dim)"></span>
   </div>
   <div class="result" id="result"></div>
   <div id="grid"></div>
@@ -260,7 +389,7 @@ function card(r){
   const d=DEC[r.id]||{};
   const cls=d.decision==='reject'?'scard rejected':(d.decision?'scard decided':'scard');
   return '<div class="'+cls+'" data-id="'+esc(r.id)+'">'
-    +'<div class="card-meta"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> <span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> <span style="color:#71717a">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)+' conf '+r.conf.toFixed(2)+'</span></div>'
+    +'<div class="card-meta"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> <span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> <span style="color:var(--text-dim)">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)+' conf '+r.conf.toFixed(2)+'</span></div>'
     +'<div class="stext">'+esc(r.text)+'</div>'
     +'<div class="decrow">'
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="approve"'+(d.decision==='approve'?' checked':'')+'> 승인 ('+r.grade+' 유지)</label>'
@@ -346,8 +475,11 @@ render();
 
 _BODY_TEMPLATE = r"""
 <body>
-<header class="app-header"><h1>__TITLE__</h1>
-<div class="sub">__SUBTITLE__ · 후보 __TOTAL__건 (gold __GOLD__ / 검수대상 __UNCERTAIN__) · 지재원 관리자 검수용 — 정답이 아니라 검토 후보</div></header>
+__NAV__
+<div class="lede-row">
+  <h1 class="h1">__TITLE__</h1>
+  <p class="lede">__SUBTITLE__ · 후보 __TOTAL__건 (gold __GOLD__ / 검수대상 __UNCERTAIN__) — 지재원 관리자 검수용. <b>정답이 아니라 검토 후보</b>입니다.</p>
+</div>
 <div class="container">
   <div class="stats-bar" id="stats"></div>
   <div class="filters">
@@ -379,8 +511,8 @@ function card(r){
   return '<div class="card">'
     +'<div class="card-meta"><span>'+esc(r.id)+'</span><span>'+esc(r.domain)+'</span></div>'
     +'<div class="card-title"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> 후보 등급</div>'
-    +'<div class="row">룰 <b>'+esc(r.rule)+'</b> · LLM <b>'+esc(r.llm)+'</b> <span style="color:#71717a">conf '+r.conf.toFixed(2)+'</span> '+st+'</div>'
-    +'<div class="row" style="font-size:11px;color:#71717a">'+ag+'</div>'
+    +'<div class="row">룰 <b>'+esc(r.rule)+'</b> · LLM <b>'+esc(r.llm)+'</b> <span style="color:var(--text-dim)">conf '+r.conf.toFixed(2)+'</span> '+st+'</div>'
+    +'<div class="row" style="font-size:11px;color:var(--text-dim)">'+ag+'</div>'
     +'<div class="preview">'+esc(r.preview)+'</div>'
     +'</div>';
 }
