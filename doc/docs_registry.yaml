@@ -17,6 +17,14 @@ documents:
     status: current
     version: 2026-07-pilot
 
+  - id: DOC-SUMMARY-001
+    title: AI 파트 한눈에 — 2쪽 요약
+    path: doc/result/감리정본/AI파트_한눈에_요약.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-사전진단
+
   - id: DOC-WBS-001
     title: WBS 본개발 작업분해구조
     path: doc/result/감리정본/WBS_본개발_작업분해구조.html
