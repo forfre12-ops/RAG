@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 파트 한눈에 — 2쪽 요약 | KOIPA AI 영업비밀관리시스템</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--soft:#3f3f46;--dim:#71717a;--line:rgba(0,0,0,.12);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5;--warn:#7a1f1f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:14.5px;line-height:1.65;letter-spacing:-.01em}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px 60px}
+.top{border-bottom:2px solid var(--band);padding:26px 0 14px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:25px;font-weight:800;letter-spacing:-.03em;margin:9px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:700;margin:18px 0 7px;color:var(--soft)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:9px 0}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:11px 15px;margin:13px 0;font-size:13.5px}
+.note.warn{border-left-color:var(--warn)}
+ul{margin:7px 0;padding-left:19px}li{margin:4px 0}
+.foot{margin-top:34px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+.tag{font-size:10.5px;font-weight:700;font-family:ui-monospace,monospace;padding:1px 6px;white-space:nowrap}
+.ok{background:#0a0a0a;color:#fff}
+.no{background:#fff;color:var(--warn);border:1px solid var(--warn)}
+.pg{page-break-before:always}
+@media print{.wrap{max-width:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div class="eyebrow">KOIPA AI 영업비밀관리시스템 · 로이드케이(AI 코어)</div>
+  <h1>AI 파트 한눈에 — 2쪽 요약</h1>
+  <div class="meta">2026-08-02 · 배포본 <code>v5_clean(v-fe4b386b)</code> · 골든 정본 <code>gold_real</code> 777건</div>
+</div>
+
+<div class="note"><b>이 문서의 목적.</b> 처음 보시는 분이 <b>5분 안에</b> 전체를 잡으실 수 있도록
+① 무엇을 만드는지 ② 지금 되는 것 ③ <b>안 되는 것과 안전장치</b> ④ <b>발주처가 결정·제공해야 할 것</b>
+네 가지만 담았습니다. 상세 근거는 각 항목에서 해당 문서를 가리킵니다 —
+<b>여기서 읽기를 멈추셔도 됩니다.</b></div>
+
+<h2>1. 무엇을 만드는가</h2>
+<p>사내 문서를 자동으로 읽어 <b>영업비밀 등급 4단계</b>(특급 TS · 1급 S1 · 2급 S2 · 3급 공개 S3)를
+매기는 시스템입니다. AI 파트는 <b>등급을 정하는 엔진</b>을 담당하고(문서 파싱 → 등급 분류 → 검수 라우팅),
+관리시스템·인프라·회원사 운영은 KL이 담당합니다.</p>
+<p><b>설계 원칙은 정확도가 아니라 미탐(FNR) 최소화</b>입니다. RFP 성능요건(PER-002)은 속도·자원 기준이며
+정확도 수치 목표가 없습니다. 애매하면 <b>등급을 올리거나 사람 검수로 보냅니다</b> — 비밀을 공개로
+잘못 내리는 것이 그 반대보다 훨씬 위험하기 때문입니다.</p>
+
+<h2>2. 지금 되는 것</h2>
+<table>
+  <thead><tr><th style="width:150px">항목</th><th style="width:120px">현재</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td>등급 분류 정확도</td><td><b>F1_macro 0.917</b></td>
+        <td>경화 홀드아웃 42건 · 직전 모델 0.688에서 개선. <b>이 값 하나가 대표값</b>이며 다른 문서의
+            여러 F1 값이 각각 무엇인지는 「분류 정확도·테스트 방식」 §3.2 격자 참조</td></tr>
+    <tr><td>고등급 미탐</td><td><b>0건</b></td><td>적대(adversarial) veto 검증 — 진짜 비밀이 공개 등급으로 내려간 사례 없음</td></tr>
+    <tr><td>공개문서 과분류</td><td><b>79% → 4%</b></td><td>공개 특허·판례 400건 — 공개문서를 비밀로 잘못 올리는 비율</td></tr>
+    <tr><td>문서 포맷</td><td>8종</td><td>HWP · HWPX · PDF · DOCX · XLSX · XLS · PPTX · TXT. 표 셀·숫자 무손실 검증</td></tr>
+    <tr><td>운영 형태</td><td>CPU 전용</td><td>등급 결정 경로에 LLM 불필요 — 회원사 서버에 GPU가 없어도 동작</td></tr>
+  </tbody>
+</table>
+
+<h2>3. 안 되는 것과 안전장치</h2>
+<div class="note warn"><b>먼저 밝힙니다.</b> 아래는 감리에서 지적받기 전에 저희가 먼저 적는 것입니다.
+각각에 <b>왜 못 하는지</b>와 <b>그래서 무엇으로 막고 있는지</b>를 함께 적었습니다.</div>
+
+<table>
+  <thead><tr><th style="width:34px"></th><th style="width:190px">안 되는 것</th><th style="width:250px">이유</th><th>안전장치</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tag no">1</span></td>
+      <td><b>실세계 정확도를 보증하지 못합니다</b><br>
+          <span style="font-size:11.5px;color:var(--dim)">사람이 서명한 평가정답 <b>0건</b></span></td>
+      <td>지재원 단계는 <b>실데이터·현장검수·반출이 모두 0</b>입니다. 정답지를 룰+LLM 합의로 만들었고
+          사람 검증을 거치지 않았습니다. 합성 데이터만으로 학습하면 실문서에 일반화되지 않는다는 것도
+          실측으로 확인했습니다(CAPSTONE F1 0.26).</td>
+      <td>현재 지표는 <b>일관성·안전 무회귀</b>의 근거로만 씁니다. 배포 전 "정확도 %"를 단정하지 않고,
+          자동 게이트 3축(경화 홀드아웃 + 공개문서 과분류 + 적대 veto)을 모두 통과해야 배포본으로 승격합니다.
+          <b>진짜 정확도는 운영 현장 검수로 실측·개선</b>되며 그 경로가 요청 5 답변입니다.</td>
+    </tr>
+    <tr>
+      <td><span class="tag no">2</span></td>
+      <td><b>대용량 문서를 즉시 처리하지 못합니다</b><br>
+          <span style="font-size:11.5px;color:var(--dim)">동기 처리 한계 약 <b>18페이지</b></span></td>
+      <td>등급 분류는 문서를 조각(청크)으로 나눠 각각 판정하므로 분량에 비례해 시간이 듭니다.
+          실측(2026-08-02 · CPU 6코어): 1페이지 4.3초 · 10페이지 32초 · <b>100페이지 5.3분</b>.</td>
+      <td>상한을 넘으면 <b>즉시 사유를 담아 거절</b>합니다(무응답으로 두지 않습니다). 대용량은 적재 후
+          비동기 분류 경로로 처리하며, 이 경로 보완은 8월 중 예정입니다.</td>
+    </tr>
+    <tr>
+      <td><span class="tag no">3</span></td>
+      <td><b>스캔 문서(이미지 PDF)를 읽지 못합니다</b></td>
+      <td>OCR은 요건이 아닙니다(FUN-022 = <b>전자문서</b> 텍스트 추출). 실행에 필요한
+          <code>poppler</code>가 GPL이라 반출 번들에서 제외했습니다.</td>
+      <td>스캔 문서는 본문 0자로 추출되어 <b>자동확정되지 않고 격리</b>됩니다. 조용히 낮은 등급으로
+          통과하는 일이 없습니다.</td>
+    </tr>
+    <tr>
+      <td><span class="tag no">4</span></td>
+      <td><b>표가 있는 구형 HWP는 자동확정하지 않습니다</b></td>
+      <td>구형 <code>.hwp</code>는 본문 추출기가 표 셀을 흘립니다. 별도 회수기로 되살리지만
+          (실측: 표 47개·셀 1,815개 회수), 원본 대비 유실이 없었음을 <b>증명할 수는 없습니다</b>.</td>
+      <td>회수에 성공해도 <b>사람 검수로 보냅니다</b>. 등급은 낮추지 않습니다 —
+          표 안에 있던 등급·원가·담당이 분류기에 안 보였을 가능성을 남겨두지 않기 위함입니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note"><b>공통 원칙 — 모르면 사람에게 보냅니다.</b> 위 네 가지의 안전장치는 전부 같은 형태입니다.
+<b>등급을 임의로 낮추지 않고, 확신이 없으면 검수로 라우팅</b>합니다. 자동화율이 떨어지는 대신
+비밀이 공개로 새는 경로를 만들지 않습니다. 자동화율은 운영 검수가 쌓이면 올라갑니다.</div>
+
+<div class="pg"></div>
+<h2>4. 발주처가 결정·제공해야 할 것</h2>
+<p>아래는 <b>수행사가 정할 수 없는 항목</b>입니다. 상세 배경·근거·권고 사유는
+<b>「발주처 의사결정 안건서」</b>에 안건별로 정리돼 있으며, 여기서는 결정이 필요한 것만 추립니다.</p>
+
+<table>
+  <thead><tr><th style="width:38px">No</th><th style="width:210px">결정 사항</th><th style="width:64px">유형</th><th>수행사 권고</th></tr></thead>
+  <tbody>
+    <tr><td>A1</td><td>공개·등록 특허 = <b>3급 공개(S3)</b></td><td>확인</td>
+        <td>발주처 정본 가이드 예시표는 2급 대외비로 표기하나, 공개된 특허는 비공지성이 없어 법리상
+            영업비밀이 성립하지 않습니다. <b>가이드 예시 정정</b>이라 발주처 확인을 요청드립니다.</td></tr>
+    <tr><td>A2</td><td>등급 곱셈 보정 2건 활성화</td><td>승인</td>
+        <td>가이드 곱셈을 기본값으로 두고 보정 2건은 <b>운영 토글</b>로 분리했습니다(하드코딩하지 않음).
+            골든셋 미탐 근거로 ON을 권고하나 활성화 가부는 발주처 승인 사항입니다.</td></tr>
+    <tr><td>A3</td><td>성능 기준 정의</td><td>합의</td>
+        <td>"정확도 90%"를 무엇으로 재는지 정해야 합니다. 전체 평균은 다수 등급(S2·S3)에 유리해
+            <b>고등급 미탐을 가립니다.</b> 전체 정확도는 참고지표로 두고 <b>고등급 미탐율을 별도
+            기준</b>으로 분리할 것을 권고합니다.</td></tr>
+    <tr><td>A4</td><td>등급 표시명 확정</td><td>합의</td>
+        <td>내부 코드(TS/S1/S2/S3)는 고정입니다. 화면·문서 <b>표시명</b>만 확정이 필요합니다
+            (정본 한국어 + 가이드 영문).</td></tr>
+    <tr><td>A5</td><td><b>운영 검수자 배정·라벨 포착</b></td><td>협조</td>
+        <td>위 <b>3-①(정확도 보증 불가)을 푸는 유일한 경로</b>입니다. 현장 검수자가 실문서에 등급을
+            확정하면 그 라벨이 야간 재학습으로 환류됩니다. <b>이것 없이는 정확도가 구조적으로
+            올라가지 않습니다.</b></td></tr>
+    <tr><td>A6</td><td>서버 사양 확정</td><td>합의</td>
+        <td>학습 노드(지재원)와 운영 노드(회원사)를 분리 확정해야 합니다. 운영은 CPU 전용으로 동작하나,
+            <b>할당 코어 수가 처리 속도에 거의 비례</b>합니다(실측 2→6코어에서 약 3배).</td></tr>
+  </tbody>
+</table>
+
+<h2>5. 감리 일정과 다음 단계</h2>
+<table>
+  <thead><tr><th style="width:130px">시점</th><th style="width:150px">단계</th><th>AI 파트 준비 상태</th></tr></thead>
+  <tbody>
+    <tr><td>8/10 ~ 8/14</td><td><b>사전 진단</b></td>
+        <td>산출물 34종 동결 제출 · 요구사항 추적표(RTM) · 결함관리대장 · 주간보고·WBS 최신화 완료</td></tr>
+    <tr><td>8/31 ~ 9/4</td><td>설계 감리</td><td>설계 산출물 제출본 유지 · 대용량 비동기 처리 보완 반영 예정</td></tr>
+    <tr><td>11월 초</td><td>테스트 사전 점검</td><td>운영 검수 라벨 축적 후 성능 재측정(A5 진행 정도에 연동)</td></tr>
+    <tr><td>11/23 ~ 11/27</td><td>종료 감리</td><td>운영 학습 루프 실적 · 최종 성능 보고</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><b>가장 중요한 한 가지.</b> 위 표의 11월 두 단계는 <b>A5(운영 검수자 배정)에 연동</b>됩니다.
+현재 시스템은 "안전하게 틀리는" 상태로 완성돼 있고, 여기서 정확도를 올리는 방법은
+<b>현장 검수 데이터를 쌓는 것 하나뿐</b>입니다. 검수자 배정이 늦어지면 11월 성능 보고에 담을
+운영 실적이 그만큼 줄어듭니다.</div>
+
+<div class="foot">
+  <b>로이드케이(Lloydk)</b> · KOIPA AI 영업비밀관리시스템 AI 파트 · 2026-08-02 ·
+  상세 근거는 함께 제출된 산출물 참조
+</div>
+
+</div>
+</body>
+</html>
