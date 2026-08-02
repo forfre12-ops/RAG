@@ -171,3 +171,6 @@ doc/mockups/
 /lloydk-*.tar.gz
 # 분석 중 생성된 일회성 텍스트 덤프 — 산출물 아님.
 /scratch_*.txt
+
+# HWP 평가용 임시 가상환경 (재현 불요)
+.tmp_hwp_eval_venv/
