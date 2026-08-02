@@ -1,0 +1,142 @@
+release_id: 2026-08-사전진단-r12
+purpose: 제3자 감리(supervision) 대응 산출물 제출본
+frozen_at: '2026-08-02'
+source_commit: 1686991e902b3dd724631ae31b6c84fd3abbb716
+source_of_truth: doc/result/감리정본/
+id_authority: doc/docs_registry.yaml
+inherited_from: 2026-08-사전진단-r11
+prepared_by: 로이드케이(수행사)
+counts:
+  formal_deliverables: 35
+  formal_html: 34
+  formal_other_format: 1
+  navigation_hub: 1
+  root_files_total: 36
+  supplementary: 8
+  progress_reports: 5
+  verification_evidence: 2
+deployed_model:
+  pointer: artifacts/classifier_p1_v5_clean/v-fe4b386b
+  note: poc/.env.onprem-local CLASSIFIER_MODEL_DIR 기준 — 배포 기본값
+base_image_digests:
+- 'Dockerfile.api: python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93'
+- 'Dockerfile.api.prod: python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93'
+- 'Dockerfile.worker: python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93'
+integrity: INTEGRITY.sha256 — 번들 전 파일 SHA-256 + 소스 commit + 모델 SHA
+formal_deliverables:
+  계획·관리:
+  - file: 사업수행계획서.html
+    id: DOC-PLAN-001
+  - file: 품질보증계획서.html
+    id: DOC-QA-001
+  - file: 품질보증_결과서.html
+    id: DOC-QA-002
+  - file: 데이터_거버넌스_계획.html
+    id: DOC-DATA-001
+  - file: WBS_본개발_작업분해구조.html
+    id: DOC-WBS-001
+  - file: WBS_작업_기능해설서.html
+    id: DOC-WBS-002
+  - file: '[지재원] AI 영업비밀관리시스템 구축 WBS.xlsx'
+    id: DOC-WBS-XLSX-001
+  - file: 의사결정_대장.html
+    id: DOC-DECISION-002
+  - file: 발주처_의사결정_안건서.html
+    id: DOC-DECISION-001
+  - file: 개인정보영향평가_적용성_판정서.html
+    id: DOC-PIA-001
+  요구·설계:
+  - file: 요구사항_추적표_RTM.html
+    id: DOC-REQ-001
+  - file: 기능분해도_데이터흐름도.html
+    id: DOC-DFD-001
+  - file: 시스템_설계도_v4.html
+    id: DOC-ARCH-001
+  - file: 화면설계서.html
+    id: DOC-SCREEN-001
+  - file: 기술구현_백서_v7.html
+    id: DOC-TECH-001
+  - file: 기술구현_백서_부록A_DB스키마.html
+    id: DOC-TECH-002
+  - file: 기술구현_백서_부록B_API명세.html
+    id: DOC-TECH-003
+  - file: 기술구현_백서_부록C_지표용어해설.html
+    id: DOC-TECH-004
+  - file: 보안_설계서.html
+    id: DOC-SEC-001
+  - file: KL연동_인터페이스_규약서_ICD.html
+    id: DOC-API-001
+  - file: 영업비밀_등급분류_기준_적용서_v2.2.html
+    id: DOC-GRADE-001
+  구현:
+  - file: 애플리케이션_모듈_명세서.html
+    id: DOC-MODULE-001
+  - file: 소프트웨어_개발보안_적용내역.html
+    id: DOC-SEC-002
+  - file: 모델_카드.html
+    id: DOC-MODEL-001
+  - file: 골든셋_종합.html
+    id: DOC-DATA-002
+  - file: 서빙_운영점_파라미터_명세.html
+    id: DOC-SERVING-001
+  시험·검증:
+  - file: 테스트_전략_및_이력.html
+    id: DOC-EVAL-003
+  - file: 시험케이스_및_결과서.html
+    id: DOC-TEST-001
+  - file: 결함관리대장.html
+    id: DOC-DEFECT-001
+  - file: 시연_콘솔_소개.html
+    id: DOC-DEMO-001
+  운영·배포:
+  - file: 운영_런북.html
+    id: DOC-RUN-001
+  - file: 폐쇄망_설치_배포_설계서.html
+    id: DOC-ARCH-003
+  - file: 사용자매뉴얼_검수관리자.html
+    id: DOC-MANUAL-001
+  - file: 데이터전환_적용제외_근거서.html
+    id: DOC-MIGRATE-001
+  탐색:
+  - file: index.html
+    id: DOC-INDEX-001
+  신규:
+  - file: AI파트_한눈에_요약.html
+    id: DOC-SUMMARY-001
+supplementary:
+  path_prefix: 참고자료/
+  documents:
+  - file: 검색단독_vs_분류기_등급분류_비교.html
+    id: DOC-COMPARE-001
+  - file: 골든셋_분류근거_v4_clean_v-dd3abab9.html
+    id: DOC-EVAL-005
+  - file: 골든셋_분류근거_v5_clean_v-fe4b386b.html
+    id: DOC-EVAL-004
+  - file: 골든셋_쉬운설명.html
+    id: DOC-DATA-003
+  - file: 골든셋_합성생성_설계검토.html
+    id: DOC-DATA-004
+  - file: 무실데이터_분류기_설계서.html
+    id: DOC-CLASSIFIER-001
+  - file: 시스템_완전이해_가이드_V3.html
+    id: DOC-GUIDE-001
+  - file: 점수_채점_방식_쉬운설명.html
+    id: DOC-SCORE-001
+progress_reports:
+  path_prefix: 사업관리보고/
+  documents:
+  - -주간보고- 지재원 AI 영업비밀관리시스템 - 7월 1주 - 260703.docx
+  - -주간보고- 지재원 AI 영업비밀관리시스템 - 7월 2주 - 260710.docx
+  - -주간보고- 지재원 AI 영업비밀관리시스템 - 7월 3주 - 260717.docx
+  - -주간보고- 지재원 AI 영업비밀관리시스템 - 7월 4주 - 260724.docx
+  - -주간보고- 지재원 AI 영업비밀관리시스템 - 7월 5주 - 260731.docx
+verification_evidence:
+  path_prefix: 검증로그/
+  documents:
+  - lite_regression.log
+  - bandit_sast_report.json
+notes:
+- 동결 사본이다. 수정이 필요하면 정본(doc/result/감리정본/)을 고치고 새 release_id 로 다시 동결한다.
+- 문서 ID 는 doc/docs_registry.yaml 에서만 해석한다 — 번들은 자체 ID 체계를 갖지 않는다.
+- '재생성: python scripts/build_supervision_bundle.py --from-release 2026-08-사전진단-r11 --release-id 2026-08-사전진단-r12'
+- '검증:   python scripts/build_supervision_bundle.py --check 2026-08-사전진단-r12'
