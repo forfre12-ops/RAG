@@ -128,6 +128,11 @@ _ROUTER_IGNORE_PREFIXES: tuple[str, ...] = (
 _ROUTER_IGNORE_EXACT: set[str] = {
     "/api/v1/metrics-prom",
     "/api/v1/openapi.json",
+    # 내부 운영/관리 라우트 — KL 연동(외부) 계약 명세(03_openapi_lloydk_kl.yaml) 범위 밖이며,
+    # 전체 라우트는 부록B API 명세(DEF-2026-39, 48건 전수 문서화)가 다룬다.
+    "/api/v1/admin/demo/purge",   # 데모 데이터 purge — 관리·파괴적, 외부 계약 아님
+    "/api/v1/dashboard/summary",  # 운영 대시보드 집계 — 내부 관측성
+    "/api/v1/rag/search",         # LLM-free 내부 검색 — 외부 KL API 아님
 }
 
 
@@ -162,17 +167,18 @@ def _collect_router_paths() -> tuple[set[tuple[str, str]], set[tuple[str, str]]]
     training_enabled = getattr(settings, "enable_training", False)
 
     out: set[tuple[str, str]] = set()
-    for route in app.routes:
-        path = getattr(route, "path", None)
-        methods = getattr(route, "methods", None)
-        if not path or not methods:
-            continue
+    # Starlette 신버전은 include_router 결과를 path 없는 래퍼로 감싸 route.path 가 None →
+    # app.routes 순회는 include_router 경로를 전부 놓쳐 43개를 '미구현'으로 오탐한다.
+    # 공개 API app.openapi() 로 경로를 수집한다(test_deploy_profile.py 와 동일 방식, DEF-2026-38).
+    _http_methods = {"GET", "POST", "PUT", "DELETE", "PATCH"}
+    for path, path_item in (app.openapi().get("paths") or {}).items():
         if _is_ignored(path):
             continue
-        for m in methods:
-            if m.upper() in {"HEAD", "OPTIONS"}:
+        for method in path_item:
+            m = method.upper()
+            if m not in _http_methods:
                 continue
-            out.add((m.upper(), path))
+            out.add((m, path))
 
     # training 라우터는 profile 조건부 — YAML에는 있지만 현재 환경에서 미등록일 수 있음
     training_paths: set[tuple[str, str]] = set()

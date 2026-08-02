@@ -4,9 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>폐쇄망 설치·배포 설계서 — 인벤토리·R&amp;R·절차 | Lloydk</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
 <style>
 :root {
   --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
@@ -159,7 +156,7 @@ footer strong{color:var(--text-dim);}
   <div class="table-wrap"><table>
     <thead><tr><th>구분</th><th>책임</th><th>항목</th></tr></thead>
     <tbody>
-      <tr><td rowspan="6"><span class="tag kl">발주처/KL</span> 사전 준비</td><td>물리/가상 서버</td><td>GPU A100 80GB×2 · 32 vCore+ · RAM 192GB · OS Disk 100GB · Data SSD 4TB</td></tr>
+      <tr><td rowspan="6"><span class="tag kl">발주처/KL</span> 사전 준비</td><td>물리/가상 서버</td><td>GPU A100 80GB×1 (지재원 학습·골든 노드) · 32 vCore+ · RAM 192GB · OS Disk 100GB · Data SSD 4TB 〔고객사 운영노드는 GPU 없이 CPU 전용〕</td></tr>
       <tr><td>OS</td><td>Ubuntu 22.04 LTS</td></tr>
       <tr><td>네트워크</td><td>폐쇄망 구성, 내부 DNS·NTP(시간동기), 컨테이너 간 통신 허용</td></tr>
       <tr><td>GPU 스택 <span class="tag dep">확인필요</span></td><td>NVIDIA Driver · CUDA 12.x · Container Toolkit(<code>--gpus all</code>) — 버전·가용성 확인</td></tr>
