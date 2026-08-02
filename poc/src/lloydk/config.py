@@ -295,9 +295,17 @@ class Settings(BaseSettings):
     db_connect_timeout: int = 5
 
     # --- Celery worker safety limits ---
+    # [실측 2026-08-02] 종전 soft=300 은 대용량 문서 분류를 완주시키지 못했다.
+    # 100페이지(180,000자 · 351청크)가 6 CPU 에서 312초 걸리는데 12초 차이로 잘려
+    # `SoftTimeLimitExceeded` → status=partial 로 끝났다. 동기 경로는 이미 청크 상한으로
+    # 막아 두었으므로(analyze_sync_max_chunks) 대용량은 이 비동기 경로가 유일한 처리 수단인데,
+    # 그 경로마저 완주 못 하면 100페이지는 처리 방법이 없다.
+    # 900/1200 은 100페이지(312초) 기준 약 3배 여유 — CPU 할당이 낮은 회원사(2코어면
+    # 3배 느려 ~900초)에서도 완주하도록 잡은 값이다. 처리량은
+    # scripts/probe_ingest_capacity.py 로 재고 환경에 맞춰 조정할 것.
     celery_result_expires: int = 24 * 60 * 60
-    celery_task_soft_time_limit: int = 300
-    celery_task_time_limit: int = 600
+    celery_task_soft_time_limit: int = 900
+    celery_task_time_limit: int = 1200
     celery_worker_max_tasks_per_child: int = 100
 
     # CORS allow-origins. 운영에서는 .env로 origin allowlist 설정.

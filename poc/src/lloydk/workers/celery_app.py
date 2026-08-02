@@ -26,9 +26,17 @@ celery_app.conf.task_acks_late = True
 celery_app.conf.task_reject_on_worker_lost = True
 celery_app.conf.worker_prefetch_multiplier = 1
 celery_app.conf.task_annotations = {
+    # [실측 2026-08-02] 종전 min(설정, 120) 은 설정을 올려도 120초로 깎아, 대용량 문서가
+    # 완주하지 못하고 3회 재시도 끝에 status=partial 로 끝났다
+    # (100페이지 = 180,000자 · 351청크 → 6 CPU 에서 312초 소요).
+    # 동기 경로는 청크 상한(analyze_sync_max_chunks)으로 막아 두었으므로 대용량은 이
+    # 비동기 경로가 유일한 처리 수단이다 — 여기서 잘리면 처리 방법이 아예 없다.
+    # 짧은 상한은 "분류는 빠르다"는 전제였는데 문서 분량에 비례하므로 성립하지 않는다.
+    # 전역값을 그대로 쓰되(설정으로 조정 가능해야 한다) 하한만 900 으로 둔다 —
+    # CPU 가 낮은 회원사(2코어면 3배 느려 ~900초)에서도 완주하도록.
     "lloydk.classify_async": {
-        "soft_time_limit": min(settings.celery_task_soft_time_limit, 120),
-        "time_limit": min(settings.celery_task_time_limit, 180),
+        "soft_time_limit": max(settings.celery_task_soft_time_limit, 900),
+        "time_limit": max(settings.celery_task_time_limit, 1200),
     },
     "lloydk.synthesize_batch": {
         "soft_time_limit": min(settings.celery_task_soft_time_limit, 300),
