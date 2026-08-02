@@ -64,9 +64,14 @@ class TestPathTraversal:
             filename=evil, content_bytes=b"secret-bytes", persist=False
         )
         root = (tmp_path / "store").resolve()
-        # 1) raw_uri 의 실제 경로가 루트 하위
-        path_part = res.raw_text_uri.replace("file://", "")
-        written = Path(path_part).resolve()
+        # 1) 기록된 실제 경로가 루트 하위
+        # [2026-08-02] URI 는 이제 `file://<bucket>/<key>` 논리 경로다 — 저장 루트를 담지
+        # 않는다(s3/minio 와 동일 형식). 종전엔 URI 에서 실경로를 잘라 썼는데, 그 형식은
+        # 읽기 쪽 파싱과 어긋나 read-back 이 상시 실패하는 원인이었다(P0). 여기서는
+        # URI 문자열이 아니라 백엔드가 실제로 쓴 경로를 확인한다 — 검사 대상은 같다.
+        bucket, key = res.raw_text_uri.replace("file://", "").split("/", 1)
+        written = (root / bucket / key).resolve()
+        assert written.exists(), f"기록 파일 없음: {written}"
         written.relative_to(root)  # ValueError 면 테스트 실패
         # 2) 루트 밖 어디에도 유출 파일이 없음
         for leaked_name in ("evil.txt", "passwd", "leak.txt", "sys.txt"):
@@ -99,11 +104,17 @@ class TestPathTraversal:
 
 
 def _key_of(res) -> str:
-    """raw_text_uri 에서 (bucket 이후) 스토리지 key 복원."""
+    """raw_text_uri 에서 (bucket 이후) 스토리지 key 복원.
+
+    [2026-08-02] URI 형식이 `file://<bucket>/<key>` 로 바뀌었다(저장 루트 미포함 —
+    s3/minio 와 동일). 종전 형식(`file://<root>/<bucket>/<key>`)도 DB 에 남아 있으므로
+    둘 다 받는다. 버킷명 앞을 전부 버리면 두 형식이 같은 key 로 수렴한다.
+    """
     p = res.raw_text_uri.replace("file://", "")
-    # .../store/documents-raw/<hash>/<name>
-    parts = p.split("/documents-raw/")
-    return parts[1]
+    marker = "documents-raw/"
+    i = p.find(marker)
+    assert i >= 0, f"버킷 성분 없음: {res.raw_text_uri}"
+    return p[i + len(marker):]
 
 
 # ===========================================================================

@@ -66,7 +66,22 @@ class LocalStorage:
         return self._path_readonly(bucket, key).exists()
 
     def uri(self, bucket: str, key: str) -> str:
-        return f"file://{(self.root / bucket / key).as_posix()}"
+        """`file://<bucket>/<key>` — **저장 루트를 포함하지 않는다.**
+
+        [2026-08-02 실측 결함] 종전엔 root 까지 넣어 `file://.storage/documents-normalized/…`
+        를 반환했다. 그런데 읽기 쪽(classify_service._fetch_content_by_doc_id)은 URI 를
+        `(?:s3|minio|file)://<bucket>/<key>` 로 파싱해 storage.get(bucket, key) 를 부른다.
+        그러면 bucket 이 `.storage` 로 잡혀 실제 경로가 `.storage/.storage/documents-normalized/…`
+        가 되어 read-back 이 항상 실패했다.
+
+        조용히 실패하지 않고 fail-secure(TS + needs_review)로 흘러서 더 위험했다 —
+        본문을 못 읽은 것이 "위험한 문서"로 세탁돼, 실서버에서 100페이지 문서가
+        confidence 0.0 · scores 1개 · TS 로 나왔다(모델은 돌지도 않았다).
+
+        s3/minio 백엔드는 원래 root 개념이 없어 `<bucket>/<key>` 형식이다 — 그쪽과 형식을
+        맞추는 것이기도 하다. 실제 파일 위치는 self.root 아래 그대로이며 저장 경로는 불변.
+        """
+        return f"file://{bucket}/{key}"
 
     # --- #36: 객체 열거·삭제 (보존정책·재처리·마이그레이션용) -----------------
 

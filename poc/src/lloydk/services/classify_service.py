@@ -986,6 +986,9 @@ class ClassifyService:
             return "", None
         try:
             from lloydk.adapters.storage import build_storage  # noqa: PLC0415
+            from lloydk.services.document_ingestion_service import (  # noqa: PLC0415
+                DocumentIngestionService,
+            )
             from lloydk.db import session_scope  # noqa: PLC0415
             from lloydk.repositories.document_repo import DocumentRepo  # noqa: PLC0415
         except ImportError:
@@ -1008,6 +1011,22 @@ class ClassifyService:
             if not m:
                 return "", status
             bucket, key = m.group(1), m.group(2)
+            # [호환] 2026-08-02 이전 LocalStorage.uri 는 저장 루트까지 URI 에 넣어
+            # `file://.storage/documents-normalized/<hash>/normalized.txt` 를 만들었다.
+            # 그대로 파싱하면 bucket 이 루트로 잡혀 `.storage/.storage/…` 를 읽다 실패한다
+            # (read-back 상시 실패 → fail-secure 로 TS+needs_review 세탁).
+            # DB 에 이미 쌓인 옛 URI 를 마이그레이션 없이 읽도록 앞 성분을 벗긴다.
+            #
+            # storage 의 root 를 보고 판단하면 안 된다 — 폐쇄망 기본 구성은
+            # EncryptingStorage 가 LocalStorage 를 감싸고 있어 래퍼에 root 가 없다.
+            # (실제로 그 이유로 이 호환 처리가 한 번 죽었다.) 버킷명은 적재 쪽이
+            # 정하는 고정 상수이므로 그것으로 판정한다.
+            _BUCKETS = (
+                DocumentIngestionService.NORM_BUCKET,
+                DocumentIngestionService.RAW_BUCKET,
+            )
+            while bucket not in _BUCKETS and "/" in key:
+                bucket, key = key.split("/", 1)
             data = storage.get(bucket, key)
             text = data.decode("utf-8", errors="replace")
             if not text:
