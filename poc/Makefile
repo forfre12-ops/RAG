@@ -207,7 +207,11 @@ p1-boundary: ## Build focused P1 boundary report from the latest llm gold eval
 # 운영 P1 평가 — 배포 모델(.env CLASSIFIER_MODEL_DIR과 일치해야 하며 readiness parity
 # 게이트가 검증)을 두 티어로 평가해 operational-readiness가 읽는 리포트를 생성(단일 진실원).
 # 법적근거 티어 = 신뢰 신호(게이트 판정), 전체 홀드아웃 = 노이즈 포함 보수적 하한.
-P1_MODEL ?= artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9
+# [2026-08-05] 기본값을 배포본(v5)으로 정정. 종전엔 v4(v-dd3abab9)를 가리켜, `make readiness` 를
+# 그냥 돌리면 **배포하지 않는 모델의 리포트**가 생성되고 그게 번들 release-gate 입력이 됐다
+# (실측: 번들은 v-fe4b386b 인데 readiness 는 v-dd3abab9 · 2026-07-06). 롤백 평가는 인자로 지정한다:
+#   make p1-eval P1_MODEL=artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9
+P1_MODEL ?= artifacts/classifier_p1_v5_clean/v-fe4b386b
 DEPLOYED_MODEL ?= $(or $(CLASSIFIER_MODEL_DIR),$(P1_MODEL))
 p1-eval: ## 배포 P1 모델을 gold 티어(법적근거+전체)로 평가 → readiness 입력 생성
 	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \

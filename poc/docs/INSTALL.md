@@ -208,9 +208,17 @@ API_KEY="$API_KEY" BASE_URL=http://localhost:8000 bash acceptance/run_acceptance
 
 번들에는 관측성 설정과 이미지가 `observability/`·`docker-images/obs-*.tar`로 동봉된다(빌드 시 `--skip-observability`로 제외 가능 — 그 경우 이 절 생략).
 
+먼저 `.env`에 Grafana 관리자 비밀번호를 넣는다(**없으면 기동이 즉시 실패**한다).
+
+```bash
+echo "GRAFANA_PASSWORD=$(python3 -c 'import secrets;print(secrets.token_urlsafe(16))')" >> .env
+```
+
 ```bash
 # 메인 스택(§9)이 먼저 떠서 lloydk-airgap_default 네트워크가 존재해야 한다.
-export OBS="docker compose --env-file .env -f observability/docker-compose.observability.airgap.yml"
+# --env-file 은 **절대경로**로 준다: compose 가 상대경로를 compose 파일 디렉터리(observability/)
+# 기준으로 풀어 `.env` 를 못 찾고 `POSTGRES_PASSWORD is missing a value` 로 죽는다(실측 2026-08-04).
+export OBS="docker compose --env-file $PWD/.env -f observability/docker-compose.observability.airgap.yml"
 $OBS up -d
 $OBS ps                                        # prometheus·grafana·loki·exporters healthy
 curl -s http://localhost:9090/-/ready          # Prometheus ready
