@@ -772,6 +772,34 @@ _TARGET_MARKER_ENV = {
 }
 
 
+def _readiness_evaluated_model(readiness_path: str) -> str:
+    """readiness 리포트가 '무슨 모델을 평가한' 것인지 — 없으면 빈 문자열."""
+    try:
+        data = json.loads(Path(readiness_path).read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - 부재/파손은 상위 게이트가 판정
+        return ""
+    return str(data.get("evaluated_model") or data.get("deployed_model") or "")
+
+
+def _require_packaging_for_markers() -> None:
+    """빌드 전제 검사 — packaging 없이 돌리면 조용히 깨진 wheel 목록이 나온다(fail-loud).
+
+    _marker_true_for_target 은 packaging 부재 시 '보수적으로 포함'으로 폴백하는데, 그러면
+    python_version 분기(numpy 2.4.6 vs 2.5.0)가 동시에 남아 pip download 가 ResolutionImpossible
+    로 죽는다. 실측(2026-08-02): 빌드 호스트에 packaging 이 없어 첫 번들 빌드가 이 지점에서
+    partial 로 끝났고, 원인이 로그 어디에도 드러나지 않았다. 전제를 앞에서 명시적으로 막는다.
+    """
+    try:
+        from packaging.markers import Marker  # noqa: F401,PLC0415
+    except ImportError as exc:  # pragma: no cover - 환경 의존
+        raise SystemExit(
+            "[bundle] 빌드 전제 미충족: packaging 미설치.\n"
+            "  환경마커(python_version·sys_platform)를 타깃 기준으로 평가할 수 없어\n"
+            "  wheel 목록이 조용히 깨진다(numpy 이중 핀 → pip ResolutionImpossible).\n"
+            f"  해결: {sys.executable} -m pip install packaging   (원인: {exc})"
+        ) from exc
+
+
 def _marker_true_for_target(marker_str: str) -> bool:
     """환경마커가 타깃(Linux/cp311)에서 참인지. packaging 미가용 시 보수적으로 포함(True)."""
     marker_str = marker_str.strip()
@@ -1006,7 +1034,7 @@ sys.exit(1 if s!="failed" else 2)' 2>/dev/null && return 0
   return 1
 }
 
-n=0; fail=0; mfail=0; async_used=0
+n=0; fail=0; mfail=0; async_used=0; over=0
 while IFS='|' read -r file exp; do
   [ -z "$file" ] && continue
   n=$((n+1))
@@ -1039,6 +1067,10 @@ while IFS='|' read -r file exp; do
   esac
   if [ "$(sev "${pred:-X}")" -gt "$(sev "$exp")" ]; then
     echo "  UNDER! $file  exp=$exp pred=${pred:-?}  (고등급 미탐 - veto)"; fail=$((fail+1))
+  elif [ "$(sev "${pred:-X}")" -lt "$(sev "$exp")" ]; then
+    # 과분류는 안전방향이라 판정은 통과다. 다만 '통과'로만 찍으면 시연에서 공개문서가 TS 로 나온 걸
+    # 설명할 수 없다(실측: 공개 공고문 S3 → TS). 판정은 그대로 두고 건수만 드러낸다.
+    echo "  ok(+)  $file  exp=$exp pred=${pred:-?}  (과분류 — 안전방향, 검수부하↑)"; over=$((over+1))
   else
     echo "  ok     $file  exp=$exp pred=${pred:-?}"
   fi
@@ -1049,12 +1081,12 @@ done < <(printf '%s\n' "$PAIRS")
 _model_ok=1
 [ "$mfail" -gt 0 ] && [ "${ALLOW_RULE_FALLBACK:-0}" != "1" ] && _model_ok=0
 if [ "$fail" -eq 0 ] && [ "$_model_ok" -eq 1 ]; then _v=PASS; else _v=FAIL; fi
-echo "[acceptance] $_v: ${n} docs, ${fail} veto(고등급 미탐/파싱실패), ${mfail} model-unloaded(rule-fallback), ${async_used} 비동기경로(대용량)"
+echo "[acceptance] $_v: ${n} docs, ${fail} veto(고등급 미탐/파싱실패), ${mfail} model-unloaded(rule-fallback), ${async_used} 비동기경로(대용량), ${over} 과분류(안전방향·판정통과)"
 [ "$fail" -eq 0 ] && [ "$_model_ok" -eq 1 ]
 '''
 
 
-def _copy_infra(out_dir: Path) -> None:
+def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     """docker-compose(airgap 포함), env template, alembic, OCR 바이너리 복사. (ES 설정 폐기 — §03)"""
     import shutil
 
@@ -1122,7 +1154,10 @@ def _copy_infra(out_dir: Path) -> None:
         "POC_MODE=full\n"
         "\n"
         "# --- 필수 (deploy_airgap.sh 가 placeholder 를 검증·거부) ---\n"
-        "IMAGE_TAG=1.0.0-rc1\n"
+        # [2026-08-03] 종전엔 1.0.0-rc1 이 하드코딩돼, 다른 버전으로 구운 번들을 문서대로 설치하면
+        # `manifest for lloydk-api:1.0.0-rc1 not found` 로 기동이 실패했다(운영자가 태그 일치를
+        # 손으로 챙겨야 했다). 번들이 실제로 담은 태그를 그대로 적어 docker load 태그와 자동 일치시킨다.
+        f"IMAGE_TAG={version}\n"
         "API_KEY=replace_me_api_key\n"
         "POSTGRES_USER=lloydk\n"
         "POSTGRES_PASSWORD=replace_me_postgres_password\n"
@@ -1152,7 +1187,14 @@ def _copy_infra(out_dir: Path) -> None:
         "\n"
         "# --- 모델 / 로컬 LLM (폐쇄망 — 외부 API 0) ---\n"
         "EMBEDDING_MODEL=nlpai-lab/KURE-v1\n"
-        "LLM_PROVIDER=vllm\n"
+        "# 컨테이너 내 경로(compose 가 ../models 를 /models 로 마운트). 값 자체는 compose 기본값과\n"
+        "# 같지만, INSTALL.md 필수값 표에 실려 있는데 템플릿엔 없어 문서↔산출물이 어긋나 있었다.\n"
+        "CLASSIFIER_MODEL_DIR=/models/classifier-trained\n"
+        "\n"
+        "# 등급 분류는 LLM 을 쓰지 않는다(룰+분류기). LLM 은 RAG 질의응답·합성문서 생성에만 쓰이며\n"
+        "# 그건 GPU 보유 현장 한정이다. 그래서 기본은 noop — LLM 서버가 없는 현장에서 연결 실패가\n"
+        "# 나지 않는다. GPU 로 로컬 LLM 을 띄운 현장만 vllm(또는 ollama)으로 바꾸고 아래 URL 을 채운다.\n"
+        "LLM_PROVIDER=noop\n"
         "LOCAL_LLM_BASE_URL=http://host.docker.internal:8001/v1\n"
         "LOCAL_LLM_MODEL=Qwen/Qwen3-14B\n"
         "LOCAL_LLM_API_KEY=EMPTY\n"
@@ -1256,12 +1298,22 @@ def _copy_infra(out_dir: Path) -> None:
 
     # deploy.sh(통합 진입점) + deploy_airgap.sh(전체 스택 원커맨드 기동). 리포 scripts/ 의 정본을
     # 번들 루트로 복사(단일 출처). install.sh(docker load) 이후 `bash deploy.sh` 로 기동.
+    # [줄바꿈 정규화] 리눅스 타깃으로 나가는 셸 스크립트는 반드시 LF 여야 한다. Windows 빌드 호스트
+    # 에서 `git archive HEAD:poc` 로 소스를 뽑으면 **poc/ 가 아카이브 루트라 리포 루트의
+    # .gitattributes(*.sh eol=lf)를 못 보고** core.autocrlf=true 가 먹어 CRLF 로 나온다. 그대로 실으면
+    # 타깃에서 `set: pipefail: invalid option name` · `$'\r': command not found` 로 **원커맨드 배포
+    # 경로 전체가 죽는다**(실측 2026-08-03 리허설: deploy_airgap.sh·verify_install.sh 둘 다 미실행).
+    # 빌드 호스트가 어떤 환경이든 번들 산출물만은 LF 로 고정한다.
     import shutil as _sh
     for _script in ("deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh"):
         _src = _REPO_ROOT / "scripts" / _script
         if _src.exists():
             _dst = out_dir / _script
             _sh.copy2(_src, _dst)
+            _raw = _dst.read_bytes()
+            if b"\r\n" in _raw:
+                _dst.write_bytes(_raw.replace(b"\r\n", b"\n"))
+                print(f"  [fix]  {_script}: CRLF → LF 정규화", file=sys.stderr)
             _dst.chmod(0o755)
         else:
             print(f"  [WARN] scripts/{_script} 없음 — 번들에 배포 스크립트 미동봉.", file=sys.stderr)
@@ -1440,7 +1492,7 @@ def build_bundle(
         failed.append("pip-download")
 
     # infra 파일
-    _copy_infra(out_dir)
+    _copy_infra(out_dir, manifest.version)
 
     # 관측성 스택 — 설정은 항상 복사, 이미지는 best-effort(실패해도 빌드 중단 아님).
     # 관측성은 핵심 기동 요소가 아니므로 fail-visible(경고)로 두되, 무엇이 빠졌는지 반드시 알린다.
@@ -1554,6 +1606,11 @@ def main() -> int:
              "FAIL/누락 리포트는 절대 waive 안 함. env RELEASE_GATE_ALLOW_CONDITIONAL=1로도 가능.",
     )
     ap.add_argument(
+        "--strict-parity", action="store_true",
+        help="readiness 리포트의 평가모델이 번들 분류기와 다르면 빌드 중단(GA 권장). "
+             "기본은 경고만 — 파일럿은 낡은 readiness 로도 굽되 근거 불일치를 로그로 남긴다.",
+    )
+    ap.add_argument(
         "--skip-release-gate", action="store_true",
         help="release-gate 검사를 건너뛴다(긴급 우회 — GA 비권장·감사대상). 기본은 fail-closed.",
     )
@@ -1613,6 +1670,27 @@ def main() -> int:
         print_checklist(manifest)
         print(f"\n[bundle] dry-run OK -> {paths['yaml']}", file=sys.stderr)
         return 0
+
+    # ── [빌드 전제] 환경마커 평가기 — 없으면 조용히 깨진 wheel 목록이 나온다 ──
+    _require_packaging_for_markers()
+
+    # ── [증거 정합] readiness 리포트가 '이 번들에 실린 모델'을 설명하는가 ──────
+    # release-gate 는 verdict(PASS/CONDITIONALLY_READY)만 본다. 그래서 **다른 모델로 만든 낡은
+    # readiness** 로도 게이트가 통과한다(실측 2026-08-02: readiness=v-dd3abab9(2026-07-06) 인데
+    # 번들 분류기는 v-fe4b386b). 성능 근거와 출하물이 어긋난 채 납품되는 경로라 표면화한다.
+    _readiness_model = _readiness_evaluated_model(args.readiness)
+    _bundled_model = Path(classifier_model_dir).name if classifier_model_dir else ""
+    _parity_ok = bool(_readiness_model) and _bundled_model and _bundled_model in _readiness_model
+    if not _parity_ok:
+        msg = (
+            f"[bundle][WARN] readiness 평가모델({_readiness_model or '미상'}) != 번들 분류기"
+            f"({_bundled_model or '미상'}) — 이 번들의 성능 근거는 출하 모델의 것이 아닙니다. "
+            "GA 전에 `make operational-readiness`를 출하 모델로 재생성하세요."
+        )
+        if getattr(args, "strict_parity", False):
+            print(msg.replace("[WARN]", "[FATAL]"), file=sys.stderr)
+            return 3
+        print(msg, file=sys.stderr)
 
     # ── [release-gate] 실 빌드 직전 fail-closed 게이트 ──────────
     # readiness FAIL/BLOCKED(파일럿 미허용)면 번들 빌드를 중단한다. dry-run(CI manifest 검증)은

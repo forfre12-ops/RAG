@@ -1,0 +1,43 @@
+# poc/ 전용 줄바꿈 규칙 — 리포 루트 .gitattributes 의 사본이 아니라 **필수 보완**이다.
+#
+# 왜 여기에도 있어야 하나 (2026-08-03 리허설 실측):
+#   반출 패키징은 `git archive HEAD:poc` 로 소스를 뽑는다(ship_to_testserver.sh · 번들 빌드).
+#   git archive 에 **트리(HEAD:poc)** 를 주면 그 트리가 아카이브 루트가 되어, 속성 조회도 poc/
+#   기준으로만 이뤄진다 → **리포 루트의 .gitattributes(*.sh eol=lf)가 적용되지 않는다.**
+#   그 결과 Windows 빌드 호스트(core.autocrlf=true)에서 뽑은 아카이브의 .sh 가 CRLF 로 나갔고,
+#   리눅스 타깃에서 `set: pipefail: invalid option name` · `$'\r': command not found` 로
+#   deploy_airgap.sh · verify_install.sh 가 통째로 실행 불가였다(원커맨드 배포 경로 사망).
+#
+# 번들 빌더도 산출물을 LF 로 정규화하지만(이중 방어), 원인은 여기서 끊는다.
+
+* text=auto eol=lf
+
+*.sh     text eol=lf
+*.py     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.cfg    text eol=lf
+*.ini    text eol=lf
+*.json   text eol=lf
+*.jsonl  text eol=lf
+*.md     text eol=lf
+*.sql    text eol=lf
+Dockerfile*  text eol=lf
+Makefile     text eol=lf
+
+# 바이너리 — 변환 금지
+*.png    binary
+*.jpg    binary
+*.pdf    binary
+*.hwp    binary
+*.hwpx   binary
+*.docx   binary
+*.xlsx   binary
+*.xls    binary
+*.pptx   binary
+*.safetensors binary
+*.bin    binary
+*.tar    binary
+*.gz     binary
+*.whl    binary

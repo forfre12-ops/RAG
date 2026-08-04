@@ -120,6 +120,21 @@ _SITES = {
 }
 
 
+def _reviewer_label(profile: Optional[str]) -> str:
+    """검수 주체 문구 — 배포처에 따라 달라진다.
+
+    종전엔 "지재원 관리자 검수용"이 템플릿에 박혀 있어, **고객사 폐쇄망에 배포된 화면에서도**
+    발주처 검수자에게 '지재원'이 표시됐다(제출문서 `발주처_골든셋_생성갱신_지원` §2 의 설명과
+    화면이 어긋나는 지점). 배지와 같은 프로파일 근거로 문구도 맞춘다.
+    """
+    site = _SITES.get(profile or "", ("", "", ""))[0]
+    if site == "고객사":
+        return "발주처 검수자"
+    if site == "지재원":
+        return "지재원 관리자"
+    return "검수자"
+
+
 def _site_badge_html(profile: Optional[str], screen: str) -> str:
     """배포 주체·화면 배지. profile 미지정/미등록이면 단정하지 않고 원시값을 회색으로 표기."""
     if not profile:
@@ -213,6 +228,7 @@ def render_review_html(
         .replace("__NAV__", _nav_html("골든셋 후보 검토본", profile, "검수"))
         .replace("__TITLE__", _html.escape(title))
         .replace("__SUBTITLE__", _html.escape(subtitle))
+        .replace("__REVIEWER__", _html.escape(_reviewer_label(profile)))
         .replace("__TOTAL__", str(len(data)))
         .replace("__GOLD__", str(n_gold))
         .replace("__UNCERTAIN__", str(len(data) - n_gold))
@@ -478,7 +494,7 @@ _BODY_TEMPLATE = r"""
 __NAV__
 <div class="lede-row">
   <h1 class="h1">__TITLE__</h1>
-  <p class="lede">__SUBTITLE__ · 후보 __TOTAL__건 (gold __GOLD__ / 검수대상 __UNCERTAIN__) — 지재원 관리자 검수용. <b>정답이 아니라 검토 후보</b>입니다.</p>
+  <p class="lede">__SUBTITLE__ · 후보 __TOTAL__건 (gold __GOLD__ / 검수대상 __UNCERTAIN__) — __REVIEWER__ 검수용. <b>정답이 아니라 검토 후보</b>입니다.</p>
 </div>
 <div class="container">
   <div class="stats-bar" id="stats"></div>

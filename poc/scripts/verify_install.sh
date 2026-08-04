@@ -14,14 +14,24 @@
 set -uo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
-ENV_FILE="${ENV_FILE:-.env.cloud}"
 FILE="${FILE:-}"
 API_KEY="${API_KEY:-}"
 
-# API_KEY 없으면 env 파일에서 추출
-if [ -z "$API_KEY" ] && [ -f "$ENV_FILE" ]; then
-  API_KEY="$(grep -E '^API_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' ')"
+# env 파일 자동탐색 — 폐쇄망 번들은 `.env`(INSTALL.md §4), 클라우드 파일럿은 `.env.cloud` 를 쓴다.
+# 종전엔 .env.cloud 만 봐서, 번들 설치를 검증할 때 키를 못 찾고 E2E 항목이 통째로 FAIL 로 찍혔다
+# (실측 2026-08-03: 배포는 정상인데 "API_KEY 미확보"로 설치확인 실패). 있는 것을 순서대로 쓴다.
+if [ -n "${ENV_FILE:-}" ]; then
+  _env_candidates="$ENV_FILE"
+else
+  _env_candidates=".env .env.cloud"
 fi
+for _cand in $_env_candidates; do
+  [ -n "$API_KEY" ] && break
+  [ -f "$_cand" ] || continue
+  API_KEY="$(grep -E '^API_KEY=' "$_cand" | head -1 | cut -d= -f2- | tr -d '"'"'"' ')"
+  [ -n "$API_KEY" ] && ENV_FILE="$_cand"
+done
+ENV_FILE="${ENV_FILE:-$_env_candidates}"
 
 c_bold=$'\033[1m'; c_red=$'\033[31m'; c_grn=$'\033[32m'; c_dim=$'\033[2m'; c_off=$'\033[0m'
 hdr()  { printf '\n%s== %s ==%s\n' "$c_bold" "$*" "$c_off"; }

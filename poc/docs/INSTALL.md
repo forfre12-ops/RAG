@@ -169,6 +169,21 @@ curl -s -X POST http://localhost:8000/api/v1/classify \
 
 기대: 등급(TS/S1/S2/S3) + confidence 반환, `/ready` 200.
 
+### 10.0 배포 모델을 레지스트리에 등록 — **관리자 콘솔을 쓰려면 필수**
+
+서빙 자체는 `.env`의 `CLASSIFIER_MODEL_DIR`로 바로 동작하지만, **DB의 ModelVersion 행이 없으면**
+`GET /metrics/latest`가 404(`no active model`)이고 `POST /admin/model/activate`가 '미등록'으로 실패한다
+— 즉 **관리자 콘솔의 정밀도·재현율 지표 카드와 모델 활성화 화면이 빈 채로 뜬다.**
+
+```bash
+$COMPOSE exec api python scripts/register_deployed_model.py
+```
+
+- `report.json`의 **실측 메트릭**을 읽어 ModelVersion을 등록한다(멱등). **활성화는 하지 않는다** —
+  활성화는 배포 게이트·감사가 걸린 `POST /admin/model/activate`(콘솔 카드 4)로만 한다.
+- 등록 후에도 지표 카드가 비어 있으면 아직 **활성 모델이 없는 상태**가 맞다. 활성화는 발주처가
+  평가 정답지(`locked_gold_eval`)를 확보한 뒤 진행한다(→ `발주처_골든셋_생성갱신_지원` §2).
+
 ### 10.1 인수(acceptance) 샘플팩 검증 — 권장
 
 번들에 동봉된 **인수 샘플팩**(전 포맷 TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX × 등급, 공개+합성 혼합)을
