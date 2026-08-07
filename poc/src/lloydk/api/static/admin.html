@@ -246,6 +246,11 @@ details.adv[open]{padding-bottom:12px;}
          margin-top:12px;padding:13px 15px;font-size:12.5px;line-height:1.55;
          background:#f0fdf4;border:1px solid #86efac;color:#14532d;}
 
+/* 쓰기 게이트 — 허용(기본)일 땐 조용히, 해제했을 때만 경고색으로 */
+.writegate{padding:9px 12px;border:1px solid var(--border-mid);background:var(--bg-mid);}
+.writegate.off{background:#fffbeb !important;border-color:#fcd34d !important;color:#b45309 !important;}
+.writegate.off #write-gate-msg{color:#b45309 !important;}
+
 /* 드래그&드롭 업로드 */
 .dropzone{border:2px dashed var(--border-strong);background:var(--bg-mid);cursor:pointer;
           padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;
@@ -343,7 +348,7 @@ details.adv[open]{padding-bottom:12px;}
     </label>
     <span id="auto-status" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);">정지</span>
     <span id="auto-stamp" style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-left:auto;"></span>
-    <span class="hint" style="margin:0;flex-basis:100%;">켜두면 <b>관제 대시보드·검수 큐</b>를 주기적으로 <b>읽기 전용</b>으로 자동 조회합니다. 확정·재라벨·재학습·활성화 같은 쓰기 작업은 폴링하지 않습니다(Safe Mode 무관). 메트릭·혼동행렬은 재학습 때만 바뀌므로 수동 조회로 둡니다.</span>
+    <span class="hint" style="margin:0;flex-basis:100%;">관제 대시보드와 검수 큐를 주기적으로 <b>읽기 전용</b>으로 조회합니다.</span>
   </div>
 
   <div class="grid">
@@ -374,7 +379,7 @@ details.adv[open]{padding-bottom:12px;}
               <option value="kl_backend">kl_backend</option>
               <option value="system">system</option>
             </select>
-            <p class="hint">confirm/relabel 본문의 <code>actor.role</code>로 쓰입니다. <b>권한 판정에는 쓰이지 않습니다</b> — 실제 역할은 서버의 <code>API_KEY_ROLE</code>이 정합니다.</p>
+            <p class="hint">기록에 남는 이름표입니다. 권한은 서버의 <code>API_KEY_ROLE</code>이 정합니다.</p>
           </div>
         </div>
         <div class="row2">
@@ -387,28 +392,19 @@ details.adv[open]{padding-bottom:12px;}
             <button class="btn sec" onclick="checkHealth()" style="width:100%;height:38px">헬스체크 실행</button>
           </div>
         </div>
-        <div class="warnbox">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-soft);">
-            <input id="cfg-write-enable" type="checkbox" style="width:auto" checked />
-            쓰기 작업 허용
+        <!-- 기본 상태(허용)에서는 조용히 있고, 해제했을 때만 눈에 띈다 —
+             "눌렀는데 아무 일도 안 일어나는" 이유가 화면에 보여야 하는 쪽은 해제 상태다. -->
+        <div id="write-gate" class="writegate">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:0;">
+            <input id="cfg-write-enable" type="checkbox" style="width:auto" checked onchange="syncWriteGate()" />
+            <b>쓰기 작업 허용</b>
+            <span id="write-gate-msg" style="font-size:11.5px;color:var(--text-faint);"></span>
           </label>
-          <div style="margin-top:6px;font-size:11.5px;line-height:1.45;">
-            <b>기본으로 켜져 있습니다.</b> 확정·재라벨·재학습·모델 활성화·핫리로드 같은 상태 변경 작업을 실행할 수 있습니다.
-            매번 체크해야 해서 "눌렀는데 아무 일도 안 일어나는" 상황이 잦았고, 정작 위험한 동작
-            (재학습 제출·모델 활성화·핫리로드·등급체계 변경·키워드 비활성·데모 초기화)에는 모두
-            <b>확인 창</b>이 따로 걸려 있으므로 오조작 방지는 그쪽이 담당합니다.
-            읽기 전용으로만 둘러보려면 이 체크를 해제하십시오 — 조회와 분류 시연만 수행합니다.
-          </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <button class="btn red sm" onclick="purgeDemoData()">데모 데이터 초기화</button>
-          <span id="purge-result" class="hint" style="margin:0;">실적재 시연으로 DB에 쌓인 <code>created_by=demo-console</code> 문서·분류·청크·RAG벡터만 물리삭제합니다(운영 데이터 무관). <code>POST /admin/demo/purge</code> · admin 전용.</span>
+          <span id="purge-result" class="hint" style="margin:0;">시연으로 쌓인 데이터만 삭제합니다. 운영 데이터는 대상이 아닙니다.</span>
         </div>
-        <p class="sec-note">권한 주의: confirm/relabel은 admin·reviewer, train·model/reload·keywords는 admin 역할이 필요합니다.
-          권한을 정하는 것은 위 <b>Actor Role 선택이 아니라 서버의 <code>API_KEY_ROLE</code></b>입니다
-          (<code>api_key_trust_actor_role_header</code> 기본값 <b>False</b> — <code>X-Actor-Role</code> 헤더는 역할 위조 차단을 위해 무시됩니다).
-          <b>403이 반복되면</b> 서버 <code>.env</code>의 <code>API_KEY_ROLE</code>이 <code>system</code>일 가능성이 큽니다 — 콘솔을 쓰려면 <code>admin</code>이어야 합니다.
-          테스트서버는 <code>deploy_testserver_dual.sh</code>가 <code>admin</code>을 자동 주입합니다.</p>
       </div>
     </section>
 
@@ -439,10 +435,8 @@ details.adv[open]{padding-bottom:12px;}
             <button class="btn sm" id="btn-extract-classify" onclick="classifyFromFile(true)">추출 → 분류</button>
           </div>
           <p class="sec-note" style="margin-top:4px;">
-            작은 문서는 <code>POST /documents/analyze</code>(동기 진단 경로)로 즉시 추출합니다.
-            <b>큰 문서는 이 경로가 413으로 거절</b>합니다 — 요청 안에서 분류까지 끝내는 구조라 워커가 죽기 때문입니다.
-            그때는 <code>POST /documents</code>(적재) → <code>POST /classify/async</code>(비동기 분류)로 <b>자동 전환</b>합니다.
-            파싱 단계별 진행 화면이 필요하면 상단 <b>[파싱·분류 시연]</b>을 여십시오.
+            <b>[본문 추출]</b>은 저장하지 않고 아래 입력란만 채웁니다. <b>[추출 → 분류]</b>는 분류까지 실행해 검수 큐에 넣습니다.
+            큰 문서(약 9쪽 이상)는 자동으로 백그라운드 분류로 전환되며 진행 상태가 아래에 표시됩니다.
           </p>
           <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
         </div>
@@ -468,7 +462,7 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" id="btn-classify" onclick="runClassify()">분류하기</button>
           <button class="btn sec" id="btn-batch" onclick="runBatch()">골든셋 8건 일괄 분류</button>
         </div>
-        <p class="hint">샘플은 <b>운영 골든셋(golden100_labeled_v2)</b>에서 등급별 2건 선별 — doc_id로 보고서·메트릭과 추적됩니다. <b>일괄 분류</b>는 4등급(TS·S1·S2·S3) 8건을 순차 분류해 검수 큐에 적재합니다. <span style="color:var(--text-dim)">※ body는 합성 텍스트(발주처 실문서 도착 전 기준).</span></p>
+        <p class="hint">샘플은 운영 골든셋에서 등급별 2건씩 뽑은 것입니다. <b>일괄 분류</b>는 8건을 순차 분류해 검수 큐에 넣습니다.</p>
         <div id="cl-result"></div>
       </div>
     </section>
@@ -494,7 +488,7 @@ details.adv[open]{padding-bottom:12px;}
           <span id="rq-info" class="hint" style="margin:0;"></span>
         </div>
         <div id="queue" class="queue"><div class="q-empty">「DB 검수 큐 불러오기」로 서버의 승인 대기 건을 조회하거나, 분류를 실행하면 결과가 적재됩니다.</div></div>
-        <p class="sec-note"><b>DB 검수 큐 불러오기</b>는 <code>GET /review-queue</code>(서버측 needs_review 대기 목록, FIFO)를 불러옵니다 — 브라우저 세션과 무관하게 실제 대기 건을 봅니다. 분류를 실행하면 이 세션 건도 누적됩니다. 확정/재라벨은 <code>/confirm</code>·<code>/relabel</code>로 전송되어 corrections·재학습 큐에 반영됩니다.</p>
+        <p class="sec-note">서버의 실제 대기 목록을 불러옵니다. 확정·재라벨 결과는 재학습 큐에 반영됩니다.</p>
       </div>
     </section>
 
@@ -507,16 +501,19 @@ details.adv[open]{padding-bottom:12px;}
       <div class="card-body">
         <div class="field">
           <label class="fld">질의 (검수 중인 문서 본문·제목을 붙여넣거나 키워드 입력)</label>
-          <textarea id="rag-q" rows="3" placeholder="예: 반도체 공정 핵심 기술 유출 위험">반도체 공정 핵심 기술과 수율 파라미터</textarea>
+          <!-- 하드코딩 기본값을 두면 검수 큐가 비어 자동 채움이 돌지 않을 때 늘 같은 문구가 박혀 있어
+               "동작하지 않는 화면"으로 보인다. 비워 두고 placeholder 로만 안내한다. -->
+          <textarea id="rag-q" rows="3" placeholder="검수 중인 문서 본문을 붙여넣거나 키워드를 입력하세요"></textarea>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap;">
           <label class="fld" style="margin:0">Top-K</label>
           <input id="rag-k" type="number" min="1" max="20" value="5" style="width:70px" />
+          <button class="btn sec sm" onclick="ragFromClassifyPanel()">위 분류 본문 가져오기</button>
           <button class="btn sm" onclick="ragSearch()">유사 문서 검색</button>
           <span id="rag-info" class="hint" style="margin:0;"></span>
         </div>
-        <div id="rag-results" class="queue"><div class="q-empty">검수 중인 문서와 비슷한 과거 문서·가이드를 찾아 검수자 판단을 돕습니다. LLM 답변 생성 없이 <b>검색만</b> 수행합니다.</div></div>
-        <p class="sec-note">RAG <b>검색 전용</b> — <code>POST /rag/search</code>(KURE 임베딩 + 하이브리드 + reranker)로 유사 문서 Top-K 반환. <b>LLM 답변 합성(/answer)은 요건외라 호출하지 않습니다.</b> 검수자가 유사 사례를 보고 등급을 판단하는 용도. <b>「DB 검수 큐 불러오기」를 누르면 최상단 문서 본문 기준으로 이 패널이 자동 조회</b>됩니다(폴링 tick 은 제외). 데모 실적재 문서가 색인된 <code>demo</code> 컬렉션을 조회합니다.</p>
+        <div id="rag-results" class="queue"><div class="q-empty">검수 중인 문서와 비슷한 과거 문서를 찾아 판단을 돕습니다.</div></div>
+        <p class="sec-note">검수자가 유사 사례를 보고 등급을 판단하는 용도입니다. <b>검색만 하고 답변은 만들지 않습니다.</b></p>
       </div>
     </section>
 
@@ -532,15 +529,13 @@ details.adv[open]{padding-bottom:12px;}
       <div class="card-body">
         <div class="btn-row" style="margin:0 0 10px;">
           <span class="sec-note" style="margin-right:auto;">
-            사람이 서명해 확정된 평가정답(<code>locked_gold_eval</code>)이 등급별로 얼마나 찼는지 봅니다.
-            <b>배포 게이트가 요구하는 기준</b>과 같은 수치입니다 — 여기가 차야 모델 자동 활성화가 열립니다.
+            서명으로 확정된 평가정답이 등급별로 얼마나 찼는지 봅니다. 여기가 차야 모델 자동 활성화가 열립니다.
           </span>
           <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
         </div>
         <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
         <p class="sec-note" style="margin-top:8px;">
-          서명해도 <b>publish 를 하지 않으면 이 수치는 오르지 않습니다</b> — 서명 화면의 publish 옵션이
-          꺼져 있으면 run-스코프 미리보기라 라이브 평가경로(<code>locked_eval_jsonl</code>)에 병합되지 않습니다.
+          서명 화면에서 <b>publish 를 켜지 않으면 이 수치는 오르지 않습니다</b>(미리보기로만 처리됨).
         </p>
       </div>
     </section>
@@ -603,7 +598,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div id="sy-info" class="hint"></div>
         <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검수 큐 새로고침」으로 생성된 합성 문서의 검수 대기분을 조회합니다. 승인한 건만 <code>build_training_rows</code>가 학습행으로 편입합니다.</div></div>
-        <p class="sec-note">생성(<code>POST /synth/generate</code>)은 admin·system 권한, 검수(<code>POST /synth/{id}/review</code>)는 admin·reviewer 권한입니다. <b>승인 시 목표등급을 바꾸면</b> <code>corrected_grade</code>로 전송돼 그 등급으로 학습행이 만들어집니다. 생성은 워커 비동기 작업이라 요청 직후 큐가 비어 있을 수 있습니다 — 잠시 후 새로고침하세요. <code>provider=noop</code>은 외부 API 키 없이 결정론 텍스트를 만들며, 위생 게이트가 저품질 출처를 학습에서 하드 배제합니다.</p>
+        <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 등급을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
       </div>
     </section>
 
@@ -643,7 +638,7 @@ details.adv[open]{padding-bottom:12px;}
             <tbody id="jobs-body"><tr><td colspan="4" style="color:var(--text-faint)">목록 없음 — "작업 목록 새로고침"</td></tr></tbody>
           </table>
         </div>
-        <p class="sec-note"><code>/train</code>은 학습 노드 — <code>enable_training</code>(지재원 full-train, URGENT·주간 자동재학습) 또는 <code>enable_incremental_retrain</code>(고객사 onprem-local, 야간 증분 재학습)에서 등록됩니다. 고객사는 매일 02:00 KST 야간 배치(교정-병합 CPU 재학습)로도 트리거됩니다. 재학습본은 <b>후보로만 등록</b>되며 자동 서빙되지 않습니다(활성화는 사람서명 locked-eval/감사 force). 순수 추론 프로파일(lite-*)이면 404가 정상입니다.</p>
+        <p class="sec-note">재학습본은 <b>후보로만 등록</b>되고 자동 서빙되지 않습니다 — 배포는 아래 4번에서 별도로 합니다. 학습 노드가 아닌 배포에서는 404가 정상입니다.</p>
       </div>
     </section>
 
@@ -672,7 +667,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div id="reload-result"></div>
         <div class="warnbox" style="display:none" id="rollback-note"></div>
-        <p class="sec-note"><b>activate</b>(<code>POST /admin/model/activate</code>)는 현재 활성본 대비 deploy gate(고등급 미탐 FNR·F1 회귀)를 적용해 특정 ModelVersion을 배포하며, gate 미통과는 <code>force</code>로만 우회됩니다(감사 기록). <b>핫리로드</b>는 활성 ModelVersion을 프로세스 재기동 없이 서빙에 반영합니다. <b>rollback</b> 및 자동 배포는 거버넌스 스케줄러·CLI가 담당합니다.</p>
+        <p class="sec-note">배포는 <b>회귀 게이트</b>(고등급 미탐·F1)를 통과해야 하며, 미통과 시 <code>force</code>로만 우회됩니다(감사 기록). <b>핫리로드</b>는 재기동 없이 활성 모델을 서빙에 반영합니다.</p>
       </div>
     </section>
 
@@ -691,7 +686,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(3,1fr)"></div>
         <div id="metrics-extra"></div>
-        <p class="sec-note"><b>FNR 전체·등급별</b>은 <b>분류기 raw(서빙 안전층 미적용)</b> 수치입니다 — 실제 서빙은 severity-floor·source-prior·escalation 안전층을 거치므로 <b>실효 고등급 미탐은 훨씬 낮습니다</b>(정직 홀드아웃 기준 고등급 미탐 ≈2.8%·TS 미탐 0). <b>정확도</b>가 학습셋과 겹치는 골든 대비면 train-on-test 착시가 있을 수 있고, 미학습 홀드아웃 표본이면 그 일반화 성능입니다(정직 홀드아웃 macro-F1 ≈0.63).</p>
+        <p class="sec-note">여기 FNR은 <b>안전층을 적용하기 전</b> 분류기 raw 수치입니다 — 실제 서빙 미탐은 이보다 낮습니다. 평가셋이 학습셋과 겹치면 정확도가 과대평가될 수 있습니다.</p>
       </div>
     </section>
 
@@ -707,7 +702,7 @@ details.adv[open]{padding-bottom:12px;}
           <span id="dash-meta" class="hint"></span>
         </div>
         <div id="dash-grid" class="dash-grid"><div class="q-empty">“관제 종합 새로고침”으로 보류큐·배포 readiness·재학습 backlog·kill-gate·드리프트를 한 번에 조회합니다 (admin 전용).</div></div>
-        <p class="sec-note">이중검토 보류·<code>locked_gold_eval</code> 배포 readiness·재학습 backlog·kill-gate·임베딩 드리프트를 한 화면에 종합합니다(admin 전용·읽기 전용). 각 섹션은 독립 best-effort — 일부 소스 미가용 시 그 섹션만 <span class="pill warn">degraded</span>로 표기됩니다(500 없음). 드리프트는 마지막 게이지 값(주기 refresh 갱신)이라 표본 0이면 “데이터 없음”으로 표시됩니다.</p>
+        <p class="sec-note">읽기 전용 종합 화면입니다. 일부 소스를 못 읽으면 그 칸만 <span class="pill warn">degraded</span>로 표시되고 나머지는 정상 표시됩니다.</p>
       </div>
     </section>
 
@@ -824,7 +819,7 @@ details.adv[open]{padding-bottom:12px;}
           <div id="gold-result" class="json" style="margin-top:6px;">-</div>
         </details>
 
-        <p class="sec-note">이 패널은 정본 골든셋을 직접 수정하지 않고 <code>datasets/gold_real/builds</code> 아래 후보 산출물만 만듭니다. locked_gold_eval 승격은 별도 검수·승격 절차가 필요합니다.</p>
+        <p class="sec-note">정본 골든셋은 건드리지 않고 <b>후보만</b> 만듭니다. 정본 승격은 별도 절차입니다.</p>
       </div>
     </section>
 
@@ -848,7 +843,7 @@ details.adv[open]{padding-bottom:12px;}
           </table>
         </div>
         <div id="grade-result" style="margin-top:10px;"></div>
-        <p class="sec-note"><b>PUT은 목록 전체를 치환</b>합니다 — 표에서 <b>삭제한 등급은 비활성(소프트 삭제)</b> 처리되고, 기존 분류 이력과 감사 기록은 보존됩니다(하드 삭제 아님). <b>코드 추가·삭제·순서 변경</b>은 학습 라벨 공간이 바뀌므로 응답의 <code>requires_retraining=true</code>로 통지되며, <b>재학습 전까지 배포 모델은 기존 라벨로 추론</b>합니다. 저장 후 등급 캐시(<code>GradeRegistry</code>)가 무효화돼 다음 추론부터 반영됩니다.</p>
+        <p class="sec-note">표에서 <b>삭제한 등급은 비활성 처리</b>되고 기존 이력은 보존됩니다. 등급을 바꾸면 <b>재학습이 필요</b>하며, 그 전까지 배포 모델은 기존 라벨로 추론합니다.</p>
       </div>
     </section>
 
@@ -1107,6 +1102,15 @@ async function classifyOne(doc_id, title, content){
  * G1 카드의 goldenDocsFromFiles 와 같은 경로(/documents/analyze · full_text=true)를 쓴다.
  * full_text 를 주는 이유는 그쪽과 같다 — 기본 응답의 text_preview 는 8K 절단이라 그대로
  * 쓰면 등급 판단이 잘린 본문 기준이 된다. 추출은 저장하지 않는다(분류해야 큐에 적재). */
+function syncWriteGate(){
+  const on=($('cfg-write-enable')||{}).checked;
+  const box=$('write-gate'), msg=$('write-gate-msg');
+  if(box) box.classList.toggle('off', !on);
+  if(msg) msg.textContent = on
+    ? '해제하면 읽기 전용이 됩니다.'
+    : '읽기 전용 — 확정·재라벨·재학습·활성화 같은 상태 변경은 실행되지 않습니다.';
+}
+
 /* 드래그&드롭 — 파일 선택 대화상자를 열지 않고도 올릴 수 있어야 한다. */
 function dzOver(ev, on){ ev.preventDefault(); const z=$('cl-drop'); if(z) z.classList.toggle('over', !!on); }
 function dzDrop(ev){
@@ -1335,6 +1339,14 @@ function autoRagForQueue(){
   const q=String(top.text_preview||top.title||top.doc_id||'').slice(0,400).trim();
   if(!q) return;
   ragSearch(q);
+}
+/* 지금 분류 패널에 들어 있는 본문을 질의로 가져온다 — 검수 중인 문서를 다시 붙여넣지 않아도 되게. */
+function ragFromClassifyPanel(){
+  const body=($('cl-body').value||'').trim();
+  const info=$('rag-info');
+  if(!body){ if(info) info.textContent='분류 패널에 본문이 없습니다.'; return; }
+  $('rag-q').value = body.slice(0, 400);
+  if(info) info.textContent='분류 패널 본문을 가져왔습니다 — [유사 문서 검색]을 누르세요.';
 }
 async function ragSearch(presetQuery){
   const q=(presetQuery!=null?String(presetQuery):($('rag-q').value||'')).trim();
@@ -2250,6 +2262,7 @@ function syncActiveGrades(codes){
 
 /* init */
 initPane();          // 탭 초기 표시 — 카드 12장 상시 노출 대신 루프별로 나눈다
+syncWriteGate();
 populateSamples();
 syncActiveGrades();
 checkHealth();
