@@ -659,7 +659,9 @@ details.adv[open]{padding-bottom:12px;}
         <div class="quickstart">
           <div class="qs-txt">
             <b>처음이라면 이 버튼 하나로 시작합니다.</b><br />
-            데모 샘플을 룰 단독(noop)으로 8건 라벨링해 골든셋 후보를 만들고, 이어서 검수 화면으로 넘어갑니다.
+            데모 샘플을 8건 라벨링해 골든셋 후보를 만들고, 이어서 검수 화면으로 넘어갑니다.
+            <span style="color:var(--text-faint)">기본 provider <code>noop</code>은 연결 점검용이라 gold 후보가 0건으로 나옵니다 —
+            LLM이 있는 서버면 고급 설정에서 provider를 바꾸고, 없으면 아래 <b>기존 슬레이트 등록</b>을 쓰십시오.</span>
           </div>
           <button class="btn" id="gold-quick" onclick="startGoldenQuick()">기본값으로 시작</button>
         </div>
@@ -730,6 +732,7 @@ details.adv[open]{padding-bottom:12px;}
             <div class="dp-row" id="gold-counts"></div>
             <div class="dp-row" id="gold-grades" style="margin-top:6px;"></div>
           </div>
+          <div id="gold-zero-hint" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
           <div class="btn-row" style="margin-top:10px;">
             <button class="btn sec sm" id="gold-btn-review" onclick="openGoldenReview()" disabled>검수 HTML 열기 (G2)</button>
             <button class="btn sec sm" id="gold-btn-signoff" onclick="openGoldenSignoff()" disabled>서명 HTML 열기 (G2)</button>
@@ -1497,6 +1500,27 @@ function renderGoldenSummary(d){
   $('gold-grades').innerHTML = (GRADES.some(g=>byg[g])
     ? GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')
     : '<span style="color:var(--text-faint)">등급 분포 없음 — gold 후보 0건</span>') + leakLine;
+
+  // gold 0건이면 "왜 0건인지"를 화면에서 답해야 한다. 특히 provider=noop 은 등급 라벨러가
+  // 아니라 합성 문서 생성기라, 라벨 파싱이 S3/0.5 로 떨어져 룰과 합의되지 않고 전건이
+  // needs_review 로 간다(2026-08-08 실측: 8건 중 gold 0 · uncertain 8). 이걸 모르면
+  // [기본값으로 시작]을 누른 사람은 원인 없이 막힌다.
+  const zeroBox=$('gold-zero-hint');
+  if(zeroBox){
+    const prov=($('gold-provider')||{}).value;
+    if(gold>0 || d.status!=='done'){ zeroBox.style.display='none'; zeroBox.innerHTML=''; }
+    else{
+      zeroBox.style.display='';
+      zeroBox.innerHTML = (prov==='noop')
+        ? '<b>gold 후보가 0건입니다 — provider가 <code>noop</code>이기 때문입니다.</b><br/>'
+          + 'noop은 등급을 매기는 라벨러가 아니라 합성 문서 생성기라, 룰 판정과 합의가 되지 않아 전건이 보류로 갑니다.<br/>'
+          + '· LLM이 있는 서버(지재원 GPU)라면 위 <b>고급 설정</b>에서 provider를 <code>vllm_qwen</code> 등으로 바꿔 다시 실행하세요.<br/>'
+          + '· LLM이 없는 환경이라면 아래 <b>기존 슬레이트 등록</b>으로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
+        : '<b>gold 후보가 0건입니다.</b><br/>'
+          + '룰↔LLM 합의 또는 근거 요건에서 전건이 보류로 갔습니다. 고급 설정의 <code>require_evidence</code>를 끄거나 '
+          + '후보 수를 늘려 보고, 그래도 0건이면 아래 <b>기존 슬레이트 등록</b>으로 검수·서명만 진행하세요.';
+    }
+  }
   goldenButtons(d.status, gold);
 }
 async function startGoldenBuild(){

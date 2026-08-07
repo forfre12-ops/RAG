@@ -18,11 +18,23 @@
   .venv/Scripts/python.exe scripts/demo_e2e_golden.py --train --activate   # 배포·메트릭까지
 
 플래그:
+  --register   G1 을 LLM 재라벨링 대신 '기존 슬레이트 등록'(POST /golden/jobs/register)으로
+               수행한다. LLM 이 없는 환경(고객사 CPU 런타임·CI)에서 유일하게 도는 경로다.
+  --slate P    --register 가 등록할 파일 경로(기본 DEFAULT_SLATE). datasets/ 하위만 허용.
   --train      G2 이후 재학습(incremental)을 실행하고 완료까지 폴링한다.
   --activate   재학습 산출 모델을 배포한다(deploy gate 적용). --train 과 함께 쓴다.
   --publish    서명 결과를 라이브 locked_gold_eval 경로에 병합한다. 기본은 미병합
                (run-스코프 미리보기)이라 정본·라이브 평가경로를 건드리지 않는다.
   --manual     G2 자동 서명을 하지 않고 검수·서명 HTML 주소만 출력하고 멈춘다.
+
+provider 주의 (2026-08-08 실측):
+  llm_provider=noop 으로는 gold 후보가 절대 나오지 않는다. noop 은 등급 라벨러가 아니라
+  합성 문서 생성기(title/body 반환)라, 골든 빌드의 라벨 파싱이 S3/0.5 로 떨어지고 룰과
+  합의가 되지 않아 전건이 needs_review 로 간다(자체 docstring: label_match_rate ~25%).
+  실측 결과 8건 중 gold 0 · uncertain 8. 따라서
+    - LLM 이 있는 지재원 GPU 서버  → --train 없이 기본 경로(vllm_qwen 등)
+    - LLM 이 없는 환경·시연 리허설 → --register
+  두 경로 모두 G2 이후(서명·재학습·배포)는 동일하다.
 
 서명에 관하여:
   평가 정답의 서명 주체는 지재원 관리자(실계정)다. 이 스크립트의 자동 서명은 체인이
@@ -52,6 +64,9 @@ BASE = os.getenv("DEMO_BASE_URL", "http://localhost:8010").rstrip("/")
 API = f"{BASE}/api/v1"
 HEADERS = {"X-API-Key": os.getenv("DEMO_API_KEY", "lloydk_dev_apikey")}
 ACTOR = {"user_id": os.getenv("DEMO_ACTOR", "demo-console"), "role": "admin"}
+
+# --register 기본 슬레이트 — 정본에서 등급별 2건씩 뽑은 시연용 소형 슬레이트.
+DEFAULT_SLATE = "datasets/gold_real/builds/demo_slate_v1.jsonl"
 
 # 콘솔 G1 카드의 '데모 샘플'과 같은 성격의 후보 본문. 스크립트를 자기완결로 두어
 # 데이터셋 파일 유무와 무관하게 어느 서버에서나 그대로 돈다.
@@ -132,16 +147,36 @@ def poll(cli, url: str, done: set[str], label: str, timeout_s: int = 900, every:
     return last
 
 
-def read_candidates(gold_path: str | None):
+def _local_candidates(gold_path: str) -> list[Path]:
+    """서버가 준 경로를 이 머신에서 찾아볼 후보들.
+
+    서버가 컨테이너 안에서 돌면 gold_path 는 /app/datasets/... 같은 컨테이너 절대경로라
+    호스트에서 그대로는 열리지 않는다. datasets/ 이후를 잘라 cwd(=poc/) 기준으로도 찾는다.
+    """
+    out = [Path(gold_path)]
+    norm = gold_path.replace("\\", "/")
+    idx = norm.find("datasets/")
+    if idx >= 0:
+        out.append(Path(norm[idx:]))
+    return out
+
+
+def read_candidates(gold_path: str | None, *, local_hint: str | None = None):
     """서명 대상 후보(doc_id)를 읽는다.
 
-    gold_path 는 서버 파일시스템 경로다. 이 스크립트가 서버와 같은 머신에서 돌면
-    그대로 읽히고, 원격이면 읽지 못한다 — 그 경우 화면 서명 경로로 안내한다.
+    gold_path 는 서버 파일시스템 경로다. 서버와 같은 머신(또는 datasets/ 를 바인드 마운트한
+    컨테이너)이면 읽히고, 진짜 원격이면 읽지 못한다 — 그 경우 화면 서명 경로로 안내한다.
+    local_hint 는 --register 로 우리가 직접 지정한 경로(이미 로컬 상대경로).
     """
-    if not gold_path:
+    if not gold_path and not local_hint:
         return None
-    p = Path(gold_path)
-    if not p.exists():
+    tries: list[Path] = []
+    if local_hint:
+        tries.append(Path(local_hint))
+    if gold_path:
+        tries.extend(_local_candidates(gold_path))
+    p = next((t for t in tries if t.exists() and t.is_file()), None)
+    if p is None:
         return None
     docs = []
     with p.open(encoding="utf-8") as f:
@@ -158,45 +193,87 @@ def read_candidates(gold_path: str | None):
     return docs
 
 
+def _arg_value(argv: list[str], name: str, default: str) -> str:
+    """--slate PATH / --slate=PATH 둘 다 받는다(표준 라이브러리만 쓰는 최소 파싱)."""
+    for i, a in enumerate(argv):
+        if a == name and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith(name + "="):
+            return a.split("=", 1)[1]
+    return default
+
+
 def main() -> int:
-    args = set(sys.argv[1:])
+    argv = sys.argv[1:]
+    args = set(argv)
     do_train = "--train" in args
     do_activate = "--activate" in args
     publish = "--publish" in args
     manual = "--manual" in args
+    use_register = "--register" in args or "--slate" in args or any(a.startswith("--slate=") for a in argv)
+    slate = _arg_value(argv, "--slate", DEFAULT_SLATE)
 
     line("═")
     print("  시나리오 B — 골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭 (루프 B · 모델 갱신)")
     print(f"  대상 서버: {BASE}")
+    print(f"  G1 방식  : {'기존 슬레이트 등록(LLM 불필요)' if use_register else 'LLM 재라벨링 빌드'}")
     print(f"  단계 범위: G1·G2" + (" → 재학습" if do_train else "") + (" → 배포·메트릭" if do_activate else ""))
     if publish:
         print("  ⚠ --publish — 서명 결과를 라이브 locked_gold_eval 경로에 병합합니다.")
     line("═")
 
     with httpx.Client(timeout=300.0) as cli:
-        # ── G1. 골든셋 후보 생성 ──────────────────────────────────────────────
-        step("G1", "골든셋 후보 생성 (데모 샘플 · noop · require_evidence)",
-             "[모델] 탭 → G1 골든셋 후보 빌더 · [기본값으로 시작]")
-        r = cli.post(f"{API}/golden/build", headers=HEADERS, json={
-            "source_type": "inline",
-            "docs": DEMO_DOCS,
-            "n": len(DEMO_DOCS),
-            "llm_provider": "noop",
-            "require_evidence": True,
-            "actor": ACTOR,
-        })
-        if r.status_code >= 400:
-            return fail("골든셋 후보 생성 요청 거부", r)
-        job_id = r.json()["golden_job_id"]
-        print(f"  • job_id            : {job_id}")
+        # ── G1. 골든셋 후보 확보 ──────────────────────────────────────────────
+        if use_register:
+            step("G1", f"기존 슬레이트 등록 — 재라벨링 없이 검수·서명만 ({slate})",
+                 "[모델] 탭 → G1 골든셋 후보 빌더 · 하단 [기존 슬레이트 등록]")
+            r = cli.post(f"{API}/golden/jobs/register", headers=HEADERS,
+                         json={"build_path": slate, "actor": ACTOR})
+            if r.status_code == 404:
+                return fail(f"슬레이트를 찾을 수 없습니다: {slate}\n"
+                            f"         서버 파일시스템 기준이며 datasets/ 하위만 허용됩니다.", r)
+            if r.status_code >= 400:
+                return fail("슬레이트 등록 거부", r)
+            job_id = r.json()["golden_job_id"]
+            print(f"  • job_id            : {job_id}")
+            st = cli.get(f"{API}/golden/jobs/{job_id}", headers=HEADERS).json()
+        else:
+            step("G1", "골든셋 후보 생성 (데모 샘플 · noop · require_evidence)",
+                 "[모델] 탭 → G1 골든셋 후보 빌더 · [기본값으로 시작]")
+            r = cli.post(f"{API}/golden/build", headers=HEADERS, json={
+                "source_type": "inline",
+                "docs": DEMO_DOCS,
+                "n": len(DEMO_DOCS),
+                "llm_provider": "noop",
+                "require_evidence": True,
+                "actor": ACTOR,
+            })
+            if r.status_code >= 400:
+                return fail("골든셋 후보 생성 요청 거부", r)
+            job_id = r.json()["golden_job_id"]
+            print(f"  • job_id            : {job_id}")
 
-        st = poll(cli, f"{API}/golden/jobs/{job_id}", {"done", "failed"}, "골든 빌드", timeout_s=600)
-        if not st or st.get("status") != "done":
-            return fail(f"골든 빌드 미완료 (status={st.get('status') if st else '?'} error={st.get('error') if st else ''})")
+            st = poll(cli, f"{API}/golden/jobs/{job_id}", {"done", "failed"}, "골든 빌드", timeout_s=600)
+            if not st or st.get("status") != "done":
+                return fail(f"골든 빌드 미완료 (status={st.get('status') if st else '?'} error={st.get('error') if st else ''})")
+
         gold = st.get("gold_count") or 0
         unc = st.get("uncertain_count") or 0
         print(f"  • 후보(gold)        : {gold}건   보류(uncertain): {unc}건")
         print(f"  • gold_path         : {st.get('gold_path')}")
+
+        if gold == 0 and not use_register:
+            line("═")
+            print("  gold 후보가 0건입니다. llm_provider=noop 의 구조적 한계입니다.")
+            print("  noop 은 등급 라벨러가 아니라 합성 문서 생성기라, 라벨 파싱이 S3/0.5 로 떨어져")
+            print("  룰과 합의되지 않고 전건이 needs_review 로 갑니다(2026-08-08 실측: gold 0 · uncertain 8).")
+            print("")
+            print("  둘 중 하나로 진행하세요:")
+            print("    · LLM 이 있는 서버   → 콘솔 G1 카드의 provider 를 vllm_qwen 등으로 바꿔 실행")
+            print("    · LLM 이 없는 환경   → 이 스크립트를 --register 로 다시 실행")
+            print(f"        .venv/Scripts/python.exe scripts/demo_e2e_golden.py --register{' --train' if do_train else ''}")
+            line("═")
+            return 1
 
         review_url = st.get("review_url") or f"/api/v1/golden/jobs/{job_id}/review.html"
         signoff_url = st.get("signoff_url") or f"/api/v1/golden/jobs/{job_id}/signoff.html"
@@ -217,7 +294,7 @@ def main() -> int:
         if gold <= 0:
             return fail("서명할 gold 후보가 0건입니다 — require_evidence 를 낮추거나 후보를 늘리세요.")
 
-        cands = read_candidates(st.get("gold_path"))
+        cands = read_candidates(st.get("gold_path"), local_hint=slate if use_register else None)
         if cands is None:
             line("═")
             print("  후보 파일을 이 머신에서 읽지 못했습니다(원격 서버 경로).")
@@ -293,13 +370,25 @@ def main() -> int:
         # ── 5. 메트릭 ─────────────────────────────────────────────────────────
         step("5", "모델 메트릭 확인", "[모델] 탭 → 5 모델 메트릭 · FNR 게이트")
         r = cli.get(f"{API}/metrics/latest", headers=HEADERS)
-        if r.status_code >= 400:
+        if r.status_code == 404:
+            # 활성 모델이 없으면 404 "no active model" — 배포가 게이트에 막힌 경우의 정상 귀결이라
+            # 실패로 다루지 않는다(위 4단계에서 이미 차단 사유를 출력했다).
+            print("  • 활성 모델 없음     : 메트릭을 산출할 대상이 아직 없습니다(정상 — 배포 미완료).")
+        elif r.status_code >= 400:
             return fail("메트릭 조회 실패", r)
-        m = r.json()
-        print(f"  • model_version     : {m.get('model_version')}")
-        for k in ("macro_f1", "accuracy", "high_grade_fnr", "eval_size"):
-            if k in m:
-                print(f"  • {k:<18}: {m[k]}")
+        else:
+            m = r.json()
+            # 필드명은 schemas/metrics.py MetricsReport 기준(2026-08-08 실측 정정).
+            print(f"  • model_version     : {m.get('model_version')}")
+            for key, label in (("f1_macro", "F1(macro)"), ("accuracy", "정확도"),
+                               ("fnr_overall", "미탐률(전체)"), ("sample_count", "평가 건수")):
+                if m.get(key) is not None:
+                    print(f"  • {label:<16}: {m[key]}")
+            fnr = m.get("fnr_by_grade") or {}
+            if fnr:
+                # 고등급 미탐이 이 시스템의 핵심 KPI — 등급별로 펼쳐 보인다.
+                print("  • 등급별 미탐률     : "
+                      + "  ".join(f"{g}={v}" for g, v in fnr.items()))
 
     line("═")
     print("  시나리오 B 완료 — 골든셋에서 배포까지 한 바퀴 돌았습니다.")

@@ -198,6 +198,7 @@ m1 합성 → m2 전처리 → m3 라벨링 → m4 학습 → m5 추론 → m6 �
 
 | 헷갈리는 것 | 실제 |
 |---|---|
+| `noop` provider로 골든셋을 만들 수 있나 | **없습니다.** `noop`은 등급 라벨러가 아니라 합성 문서 생성기(title/body 반환)라 라벨 파싱이 `S3/0.5`로 떨어지고 룰과 합의되지 않아 **전건이 보류**로 갑니다(2026-08-08 실측: 8건 중 gold 0 · uncertain 8). LLM이 없는 환경에서는 `POST /golden/jobs/register`(재라벨링 없는 슬레이트 등록)가 유일하게 도는 경로입니다 |
 | 검수가 두 개 | **골든 검수**(`/golden/.../signoff`, 평가 정답 생성) ≠ **운영 검수**(`/confirm`, 재학습 교정) |
 | 학습이 어디서 도나 | `training_service`는 게이트·등록만. 실제 학습은 `workers/tasks.py` → `m4_training/trainer.py` |
 | 분류에 LLM을 쓰나 | 등급 결정 핫패스는 **LLM-free**. LLM은 골든셋 구축·`/answer`에서만 |

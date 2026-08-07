@@ -80,10 +80,16 @@ src/lloydk/
 .venv/Scripts/python.exe scripts/demo_e2e_8010.py
 
 # 시나리오 B — 골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭 (루프 B)
-.venv/Scripts/python.exe scripts/demo_e2e_golden.py                    # G1·G2 까지
-.venv/Scripts/python.exe scripts/demo_e2e_golden.py --train --activate # 배포까지
-.venv/Scripts/python.exe scripts/demo_e2e_golden.py --manual           # 서명은 화면에서 사람이
+.venv/Scripts/python.exe scripts/demo_e2e_golden.py --register         # LLM 없는 환경(권장)
+.venv/Scripts/python.exe scripts/demo_e2e_golden.py                    # LLM 있는 서버
+.venv/Scripts/python.exe scripts/demo_e2e_golden.py --register --train --activate
+.venv/Scripts/python.exe scripts/demo_e2e_golden.py --register --manual  # 서명은 화면에서 사람이
 ```
+
+> **`--register`가 필요한 이유** — 기본 provider `noop`은 등급 라벨러가 아니라 합성 문서
+> 생성기여서 룰과 합의가 되지 않고 **gold 후보가 0건**으로 끝납니다(실측). LLM이 없는
+> 환경에서는 `--register`(재라벨링 없는 슬레이트 등록)가 유일하게 도는 경로이고,
+> G2 이후(서명 → 재학습 → 배포)는 두 경로가 동일합니다.
 
 대상 서버는 환경변수로 바꿉니다 — 로컬과 실서버 리허설에 같은 스크립트를 씁니다.
 
