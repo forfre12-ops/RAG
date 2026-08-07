@@ -1,26 +1,106 @@
-# Lloydk AI Engine — PoC
+# Lloydk AI Engine — 영업비밀 등급분류 엔진
 
-한국지식재산보호원(KOIPA) AI 영업비밀관리시스템 / 로이드케이 파트.
+한국지식재산보호원(KOIPA) AI 영업비밀 관리시스템 / 로이드케이 담당 파트.
+문서를 읽어 **TS · S1 · S2 · S3** 4등급으로 분류하고, 사람이 검수한 결과로 다시 학습한다.
 
-설계 문서: 최신 외부 공유본은 [`../doc/result/open/index.html`](../doc/result/open/index.html)에서 시작한다. 아래 00~15 Markdown 링크 일부는 초기 PoC 산출물 경로라 현재 HTML 산출물과 다를 수 있다.
-
-| 영역 | 문서 |
-|---|---|
-| **종합 진척 보고서 (회신 직전)** | [doc/15](../doc/15_진척_종합_보고서.md) ← **시작 권장** |
-| 사업 개요·기능 분담 | [doc/01](../doc/01_프로젝트_개요_및_로이드케이_파트_설계.md) |
-| 기술 스택·PoC 계획 + 부록 A·B·C | [doc/02](../doc/02_기술스택_확정_및_PoC_계획.md) |
-| AI 코어 모듈 상세 | [doc/04](../doc/04_AI코어_모듈_상세설계.md) |
-| 협의요청서 (Q1~Q7, K1~K5, E1~E9) | [doc/06](../doc/06_협의요청서_KL_발주처.md) |
-| 전체 설계 통합본 | [doc/07](../doc/07_전체설계_통합본.md) |
-| **위험관리대장 (31개 위험)** | [doc/10](../doc/10_위험관리대장.md) |
-| **운영 Runbook (6개 시나리오, RTO 4h)** | [doc/11](../doc/11_운영_Runbook.md) |
-| **폐쇄망 배포 설계** | [doc/12](../doc/12_폐쇄망_배포_설계.md) |
-| **벡터DB ES 전환 계획서 v0.9-final** | [doc/13](../doc/13_벡터DB_ES_전환_계획서.md) |
-| **OSS 라이선스 보고서 (AGPL/GPL 위험)** | [doc/14](../doc/14_OSS_라이선스_보고서.md) |
+> **처음 이 저장소를 여는 분께** — 소스는 33,803줄 / 182 파일이지만, 전부 읽을 필요는 없습니다.
+> 아래 **요건별 진입 경로** 표에서 관심 있는 요건 한 줄만 따라가면 4~5개 파일로 끝납니다.
+> 더 자세한 호출 경로는 [docs/CODE_MAP.md](docs/CODE_MAP.md)에 있습니다.
 
 ---
 
-## 빠른 시작 (Docker/GPU 없어도 동작)
+## 1. 이 엔진이 도는 방식 — 루프가 두 개다
+
+이것만 알면 나머지는 세부사항입니다.
+
+```
+루프 A · 일상 운영 (매일 · 현업)
+  문서 업로드 → 분류 → 사람 검수·확정          ← 교정 결과가 쌓인다
+
+루프 B · 모델 갱신 (주기적 · 관리자)
+  골든셋 후보 생성 → 검수·서명 → 재학습 → 배포 → 메트릭 확인
+```
+
+관리자 콘솔(`/demo/admin.html`)의 탭도 이 두 루프로 나뉘어 있습니다.
+
+**설계의 중심 개념 하나** — 이 엔진은 정확도 극대화가 아니라 **미탐 최소화**를 목표로 합니다.
+애매하면 높은 등급으로 올립니다(veto). 낮게 잡아 놓치는 쪽이 높게 잡아 과분류하는 쪽보다
+훨씬 위험하기 때문입니다. 지표에서 `high_grade_fnr`(고등급 미탐률)을 F1보다 먼저 보는 이유입니다.
+
+---
+
+## 2. 요건별 진입 경로
+
+| 요건 | 무엇 | API 진입점 | 서비스 | 코어 모듈 |
+|---|---|---|---|---|
+| **FUN-002** | 가이드 문서 업로드·버전관리 | [api/guide.py](src/lloydk/api/guide.py) | `guide_service.py` | — |
+| **FUN-003** | 합성 샘플 · 골든셋 구축 | [api/synthesis.py](src/lloydk/api/synthesis.py)<br>[api/golden.py](src/lloydk/api/golden.py) | `synthesis_service.py`<br>`golden_build_service.py` | [m1_synthesis/](src/lloydk/modules/m1_synthesis/)<br>`golden_tiers.py` · `golden_signoff.py` |
+| **FUN-004** | 학습 · 재학습 | [api/training.py](src/lloydk/api/training.py) | `training_service.py` | [m4_training/](src/lloydk/modules/m4_training/) |
+| **FUN-005** | 등급 분류 · 등급체계 | [api/classify.py](src/lloydk/api/classify.py)<br>[api/schema_admin.py](src/lloydk/api/schema_admin.py) | `classify_service.py`<br>`schema_admin_service.py` | [m5_inference/](src/lloydk/modules/m5_inference/) |
+| **FUN-022** | 문서 텍스트 추출·전처리 | [api/documents.py](src/lloydk/api/documents.py) | `document_ingestion_service.py` | [m2_preprocess/](src/lloydk/modules/m2_preprocess/) |
+| **FUN-023** | 라벨링 규칙 · 태깅 키워드 | [api/keyword_admin.py](src/lloydk/api/keyword_admin.py) | `keyword_admin_service.py` | [m3_labeling/](src/lloydk/modules/m3_labeling/) |
+| **FUN-024** | 검수 · 평가 · 배포 게이트 | [api/confirm.py](src/lloydk/api/confirm.py) | `confirm_service.py` | [m6_evaluation/](src/lloydk/modules/m6_evaluation/) |
+
+읽는 순서는 언제나 같습니다 — **API 라우터 → 서비스 → 코어 모듈**.
+라우터는 계약(요청·응답·권한)만, 서비스는 조율만, 실제 알고리즘은 모듈에 있습니다.
+
+---
+
+## 3. 디렉터리 구조
+
+```
+src/lloydk/
+  api/           25 파일  HTTP 라우터 · 인증 · 미들웨어           (계약)
+  services/      26 파일  유스케이스 조율 · 트랜잭션 경계         (조율)
+  modules/       48 파일  m1~m6 — 실제 AI 파이프라인             (알고리즘)
+    m1_synthesis    합성 문서 생성
+    m2_preprocess   추출 · 정규화 · 청킹 · 마스킹
+    m3_labeling     룰 엔진 + LLM 라벨링 + 합의
+    m4_training     학습 · chunk 확장 · RAG 색인
+    m5_inference    서빙 추론 파이프라인
+    m6_evaluation   지표 · 배포 게이트 · 능동학습
+  adapters/      28 파일  임베딩 · 벡터스토어 · LLM · 스토리지    (외부 경계)
+  repositories/   9 파일  DB 접근
+  db/             4 파일  SQLAlchemy 모델 · 마이그레이션
+  schemas/       14 파일  Pydantic 요청·응답 계약
+  workers/        3 파일  Celery 비동기 작업
+```
+
+`modules/`의 **m1~m6 번호가 곧 파이프라인 순서**이고, 기능분해도·DFD의 프로세스와 1:1로 대응합니다.
+
+---
+
+## 4. 시연 — 시나리오 두 개
+
+두 루프에 각각 하나씩. 터미널 판과 화면 판이 **같은 대본**이라, 스크립트 출력에
+대응하는 콘솔 카드가 함께 찍힙니다.
+
+```bash
+# 시나리오 A — 문서 업로드 → 분류 → 검수 (루프 A)
+.venv/Scripts/python.exe scripts/demo_e2e_8010.py
+
+# 시나리오 B — 골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭 (루프 B)
+.venv/Scripts/python.exe scripts/demo_e2e_golden.py                    # G1·G2 까지
+.venv/Scripts/python.exe scripts/demo_e2e_golden.py --train --activate # 배포까지
+.venv/Scripts/python.exe scripts/demo_e2e_golden.py --manual           # 서명은 화면에서 사람이
+```
+
+대상 서버는 환경변수로 바꿉니다 — 로컬과 실서버 리허설에 같은 스크립트를 씁니다.
+
+```bash
+DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_golden.py
+```
+
+**화면 판**: `/demo/admin.html` (관리자 콘솔) · `/demo/parse_demo.html` (업로드·파싱)
+사용법은 [docs/관리자콘솔_사용설명서.html](docs/관리자콘솔_사용설명서.html).
+
+**시연 되돌리기**: 콘솔 [운영] 탭의 `데모 데이터 초기화`
+(`POST /admin/demo/purge` — `created_by='demo-console'` 스코프만 삭제).
+운영 데이터는 서버 스코프상 대상이 아니라, 리허설을 몇 번이든 반복할 수 있습니다.
+
+---
+
+## 5. 빠른 시작
 
 ```bash
 # 1) Python 3.11 venv + 의존성
@@ -28,276 +108,52 @@ python -m venv .venv
 . .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
-# 2) .env 준비 (기본은 noop provider — API 키 불필요)
+# 2) .env 준비 (기본은 noop provider — 외부 LLM API 키 불필요)
 cp .env.example .env
 
-# 3) PoC 5종 일괄 실행 (~2초)
-python scripts/run_all_pocs.py
-# 또는: make poc-all
-
-# 4) 결과 확인
-cat reports/summary.md
-```
-
-종합 PASS면 `reports/`에 P1~P5 개별 리포트(.md/.json)가 생성됩니다.
-
----
-
-## 풀 인프라 실행 (협의·GPU 확보 후)
-
-```bash
-# Postgres(pgvector) / Redis 등 dev 인프라 기동
+# 3) 인프라(Postgres+pgvector / Redis) 기동
 make infra-up
-python scripts/verify_infra.py     # 헬스 체크
-python scripts/init_minio_buckets.py
-python scripts/seed_keywords.py --db    # 키워드 시드 DB 적재
+python scripts/verify_infra.py
 
-# API + Worker (VECTOR_BACKEND=pg 기본, ES는 레거시)
-make api      # uvicorn lloydk.api.app:app --reload
-make worker   # celery -A lloydk.workers.celery_app worker -l info
-
-# 또는 docker compose로 한 번에
-docker compose up -d
+# 4) API + Worker
+make api          # uvicorn lloydk.api.app:app --reload
+make worker       # celery -A lloydk.workers.celery_app worker -l info
 ```
 
----
+> **주의** — 테스트·로컬 기동에는 `TESTING=1`이 필요합니다. 없으면 uvicorn 기동에 실패합니다.
 
-## 디렉토리 구조
-
-```
-poc/
-├── docker-compose.yml          # dev 스택(Postgres/Redis 등) + api/worker
-├── Dockerfile.api              # FastAPI + PyTorch + Transformers
-├── Makefile                    # poc-all, infra-up, p2-full, bundle-dry 등
-├── alembic/versions/           # PostgreSQL 스키마 단일 진실 소스 (baseline + 변경분)
-├── infra/es/                   # ES 인덱스 템플릿 + Nori 사용자 사전
-│   ├── index_template_secrets.json
-│   └── userdict_ko.txt
-├── src/lloydk/
-│   ├── adapters/               # 외부 의존성 교체 가능 계층
-│   │   ├── llm/                #   noop/anthropic/openai/vllm
-│   │   ├── embedding/          #   hash(드라이런)/KURE-v1/BGE-M3
-│   │   ├── vectorstore/        #   pg(기본)/inmemory(dryrun)/es(레거시)
-│   │   │                       #   Protocol에 search_hybrid 포함, 폴리필 일관
-│   │   └── storage/            #   local(드라이런)/minio
-│   ├── modules/
-│   │   ├── m1_synthesis/       # FUN-003 합성 문서 생성
-│   │   ├── m2_preprocess/      # FUN-022 HWP/DOCX/PDF 추출·정규화·청크
-│   │   ├── m3_labeling/        # FUN-023 룰 라벨러 + 키워드 시드 + LLM fallback
-│   │   ├── m4_training/        # FUN-004 KF-DeBERTa 학습 (Trainer + MLflow)
-│   │   └── m5_inference/       # FUN-005 청크 분류 + RAG + 룰 폴백
-│   ├── services/               # ClassifyService, LLMUsageService
-│   ├── schemas/                # Pydantic (Grade, ClassifyRequest/Response)
-│   ├── api/                    # FastAPI (healthz, classify)
-│   ├── workers/                # Celery 비동기 태스크
-│   └── config.py               # pydantic-settings (.env 로드)
-├── scripts/                    # PoC 진입점·시드·평가·번들·마이그 CLI (아래 표)
-├── tests/                      # 126개 pytest (어댑터/모듈/서비스/API/마이그/번들)
-└── datasets/                   # gitignore 대상 (raw/external/synthetic/p4_corpus)
+```bash
+TESTING=1 python -m pytest -q          # 전체 테스트
 ```
 
----
-
-## Make 타깃 한눈에
-
-| 타깃 | 용도 | 회신 의존 |
-|---|---|---|
-| `make poc-all` | P4→P3→P2→P1→P5 dryrun 일괄 | ❌ |
-| `make p2` | P2 임베딩 dryrun (inmemory) | ❌ |
-| `make p2-full` | **P2 KURE/BGE hybrid 측정(레거시 ES 포함 가능)** | ✅ Q1+E1+E5 |
-| `make p1` / `p3` / `p4` / `p5` | 개별 PoC | 일부 ✅ |
-| `make infra-up` | postgres(pgvector)·minio·redis·mlflow 기동 | ✅ E5 |
-| `make infra-verify` | 헬스체크 (postgres/minio/redis/mlflow) | ✅ E1·E2 |
-| `make bundle-dry` | **폐쇄망 번들 manifest dry-run** | ❌ |
-| `make api` / `worker` | 로컬 기동 | ❌ |
-
-`make help`로 전체 목록.
+**권한** — 관리자 콘솔은 `confirm`/`relabel`(admin·reviewer)과
+`train`/`model/reload`/`keywords`(admin)를 호출합니다. 서버 `.env`의 `API_KEY_ROLE`이
+`system`이면 이 호출들이 **403**입니다. 개발·시연 기본값은 `admin`이고,
+테스트서버는 `scripts/deploy_testserver_dual.sh`가 `admin`을 자동 주입합니다.
+`X-Actor-Role` 헤더는 역할 위조 차단을 위해 **무시**됩니다(`api_key_trust_actor_role_header=False`).
 
 ---
 
-## PoC 스크립트 매핑
+## 6. 운영 문서
 
-| PoC | 검증 항목 | 합격선 (v0.9) | 진입점 |
-|---|---|---|---|
-| **P1** | KF-DeBERTa 분류 / 룰 surrogate | F1 ≥ 0.75, FNR ≤ 5% | `p1_train_classifier.py --mode dryrun\|full` |
-| **P2** | KURE/BGE-M3 × PG pgvector+ts_rank hybrid | Recall@5 ≥ 0.80, Lat p50 ≤ 200ms | `revalidate_pg_lexical.py` / `p2_compare_embeddings.py --mode dryrun\|full --hybrid` |
-| **P3** | LLM 합성 + 라벨 일치 + 비용 | 라벨 일치 ≥ 90% | `p3_generate_synthetic.py --total 40 --provider noop\|anthropic` |
-| **P4** | HWP/DOCX/PDF/MD 추출 | 누락 ≤ 5%, 품질 ≥ 0.7 | `build_p4_corpus.py` + `p4_extract_eval.py` |
-| **P5** | API E2E 스모크 | 200 OK + 라벨 OK | `p5_e2e_smoke.py --mode inproc\|http` |
-
-추가 스크립트:
-- `run_all_pocs.py` — P4→P3→P2→P1→P5 일괄 실행 + `summary.md`
-- `seed_keywords.py` — 40개 키워드 시드 DB 또는 JSON dump
-- `p3a_eval_rule_labeler.py` — M3 룰 라벨러 자가검증 (12 시나리오)
-- `init_minio_buckets.py` — MinIO 초기 버킷 생성
-- `verify_infra.py` — Postgres(pgvector) / MinIO / Redis / MLflow
-- **`build_offline_bundle.py`** — 폐쇄망 자기완비 번들 빌더 (dry-run / 실 빌드)
-
----
-
-## 동작 모드 (POC_MODE / VECTOR_BACKEND)
-
-| 모드 | 의미 | 사용 케이스 |
-|---|---|---|
-| **dryrun** (기본) | noop LLM + hash embedding + inmemory + local FS | Docker/GPU/API 키 없이 파이프라인·합격선 검증 |
-| **full** | 실제 모델 로드 + 인프라 연결 | 발주처 데이터·GPU·API 키 확보 후 |
-
-| `VECTOR_BACKEND` | 효과 |
+| 영역 | 문서 |
 |---|---|
-| `pg` (기본) | Postgres pgvector dense + bigram-tsvector ts_rank 하이브리드 (의사결정_대장 §03 ⓑ) |
-| `inmemory` | dryrun / 강제 in-memory |
-| `es` | (레거시) elasticsearch 패키지 별도 설치 시에만 |
+| **코드 맵 — 요건→파일 상세** | [docs/CODE_MAP.md](docs/CODE_MAP.md) |
+| 설치 (폐쇄망 포함) | [docs/INSTALL.md](docs/INSTALL.md) |
+| 배포 가이드 | [docs/DEPLOY_GUIDE.md](docs/DEPLOY_GUIDE.md) · [docs/CLOUD_DEPLOY_RUNBOOK.md](docs/CLOUD_DEPLOY_RUNBOOK.md) |
+| 운영 | [docs/OPERATION.md](docs/OPERATION.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
+| 반출·반입 | [docs/EXPORT_IMPORT_RUNBOOK.md](docs/EXPORT_IMPORT_RUNBOOK.md) |
+| 관리자 콘솔 사용법 | [docs/관리자콘솔_사용설명서.html](docs/관리자콘솔_사용설명서.html) |
+| 파서 지원 범위 | [docs/parser_support_matrix.json](docs/parser_support_matrix.json) |
+| 릴리스 점검 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
 
-`.env` 값만 바꾸면 동일 코드에서 모드·백엔드 전환. ES→PG 전환 근거는 의사결정_대장 §03 (실 PG 측정: 하이브리드 R@5 85% > dense 76%, ts_rank_cd 아닌 ts_rank+norm1).
-
----
-
-## 테스트
-
-```bash
-pytest                  # 어댑터 + 모듈 + 서비스 + API + 번들
-pytest -k es_store      # ES 어댑터만
-pytest -k offline       # 폐쇄망 번들
-pytest --tb=short -v    # 상세 실패 표시
-```
-
-CI는 `.github/workflows/poc-ci.yml` — 푸시/PR 시 pytest + PoC dryrun + 리포트 아티팩트 업로드.
+발주처 제출 문서(설계도·백서·RTM 등)는 이 저장소 밖의 `doc/result/KL_AI자료_2026-08/`에서
+관리합니다.
 
 ---
 
-## 환경 변수
+## 7. 스크립트
 
-`.env.example` 참고. dryrun 기본값은 모두 채워져 있어 키 없이 시작 가능.
-
-| 키 | 용도 |
-|---|---|
-| `LLM_PROVIDER` | `noop`(기본) / `anthropic` / `openai` / `google` / `vllm` / `ollama` / `lm_studio` / `local_openai` |
-| `ANTHROPIC_API_KEY` | 원격 — P3를 실제 Claude로 돌릴 때 |
-| `OPENAI_API_KEY` | 원격 — OpenAI GPT-4o 사용 시 |
-| `LOCAL_LLM_BASE_URL` | 로컬 — vLLM·Ollama·LM Studio OpenAI 호환 endpoint |
-| `LOCAL_LLM_MODEL` / `LOCAL_LLM_API_KEY` | 로컬 모델명·인증 |
-| `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1`(기본) / `BAAI/bge-m3` |
-| `CLASSIFIER_BASE_MODEL` | `kakaobank/kf-deberta-base`(기본) / KoELECTRA |
-| `POC_MODE` | `dryrun`(기본) / `full` |
-| **`VECTOR_BACKEND`** | `pg`(기본) / `inmemory` / `es`(레거시) |
-| **`DATABASE_URL`** | Postgres(pgvector) — 트랜잭션 + 벡터스토어 겸용 |
-
-### LLM 설정 시나리오 (W9 일반화 — 원격/로컬 자유 선택)
-
-본 시스템은 KOIPA 외 다른 기관에도 일반화 납품되는 시스템입니다. LLM·임베딩은 환경에 따라 선택:
-
-**시나리오 A — CI·테스트·dryrun** (가장 가벼움, API 키 불필요)
-```bash
-LLM_PROVIDER=noop
-EMBEDDING_MODEL=nlpai-lab/KURE-v1   # sentence-transformers로 로컬 로드
-```
-
-**시나리오 B — GPU 미보유 + 원격 API 비용 허용** (운영 환경 일반)
-```bash
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-xxxxxxxx
-LLM_MODEL=claude-sonnet-4-6
-EMBEDDING_MODEL=nlpai-lab/KURE-v1   # CPU 추론 (느리지만 동작)
-```
-
-**시나리오 C — GPU 보유 + 운영비 0** (폐쇄망 권장)
-```bash
-# Ollama 가동: `ollama serve` + `ollama pull qwen3:14b`
-LLM_PROVIDER=ollama
-LOCAL_LLM_MODEL=qwen3:14b
-EMBEDDING_MODEL=nlpai-lab/KURE-v1   # CUDA 가속
-```
-
-**시나리오 D — vLLM 자체호스팅** (대규모 처리량 필요)
-```bash
-# vLLM 서버 가동: `vllm serve Qwen/Qwen3-14B --port 8001`
-LLM_PROVIDER=vllm
-LOCAL_LLM_BASE_URL=http://localhost:8001/v1
-LOCAL_LLM_MODEL=Qwen/Qwen3-14B
-```
-
-**폐쇄망 사전 캐시** — 모델 가중치를 미리 다운로드:
-```bash
-python scripts/cache_kure_v1.py        # KURE-v1 + BGE-M3 캐시
-python scripts/cache_kure_v1.py --dry-run  # 캐시 존재 여부만 확인
-```
-
----
-
-## 회신 의존 작업 (KL E1~E9, 발주처 Q1~Q7)
-
-회신이 도착하면 [doc/10 위험관리대장 §6](../doc/10_위험관리대장.md) 시나리오 매핑을 따라 즉시 1차 대응을 실행합니다. 회신 전까지는 다음 작업이 가능합니다:
-
-| 작업 | 명령 | 검증 가능? |
-|---|---|---|
-| P2 dryrun 시뮬레이션 | `make p2 --hybrid` | ✅ ES SKIP 처리 |
-| 폐쇄망 번들 manifest 검증 | `make bundle-dry` | ✅ |
-| EsStore 단위 테스트 (mocked) | `pytest -k es_store` | ✅ |
-| ES 매핑·인덱스 템플릿 검증 | `infra/es/index_template_secrets.json` | ✅ |
-| 분류기 학습 dryrun (룰 surrogate) | `make p1` | ✅ |
-
----
-
-## 1차 PoC 결과 (2026-05-26, dryrun)
-
-- P4 추출: 누락 0.0% / 품질 0.986
-- P3 합성: 라벨 일치 100% (40건), FNR 0%, $0
-- P2 임베딩: hash baseline Recall 0.70 (실측은 full 모드 + E1 회신 후 4-way)
-- P1 분류: F1 1.0 / FNR 0% (룰 surrogate, 실측은 KF-DeBERTa 학습 + Q1 회신)
-- P5 E2E: 4/4 라벨 일치, max 4ms (TestClient)
-
-상세는 [`reports/summary.md`](reports/summary.md) 및 [`../doc/02 §부록 A`](../doc/02_기술스택_확정_및_PoC_계획.md).
-
----
-
-## 최근 주요 변경 (2026-05-27)
-
-### 설계 문서 신규 5종
-- **[doc/10](../doc/10_위험관리대장.md) 위험관리대장 (v0.9, 312줄)** — 31개 위험, 회신 변수 8개 시나리오 트리, 조합 위험 3종
-- **[doc/11](../doc/11_운영_Runbook.md) 운영 Runbook (v0.9, 461줄)** — 장애 P0~P3 / 재학습 Canary / 모델·인덱스 롤백 / 백업 / DR (RTO 4시간)
-- **[doc/12](../doc/12_폐쇄망_배포_설계.md) 폐쇄망 배포 설계 (v0.9, 535줄)** — 자기완비 번들 25~30GB, vLLM 강제, Blue/Green
-- **[doc/13](../doc/13_벡터DB_ES_전환_계획서.md) ES 전환 계획서 (v0.9-final, 615줄)** — retriever API + Nori + int8_hnsw + 마이그 7단계 + 라이선스 매트릭스
-- **[doc/14](../doc/14_OSS_라이선스_보고서.md) OSS 라이선스 보고서 (v0.9, 309줄)** — PyMuPDF·MinIO AGPL · konlpy GPL 위험 식별
-- **[doc/15](../doc/15_진척_종합_보고서.md) 진척 종합 보고서 (v1)** — 회신 직전 인덱스 + 즉시 발동 가이드
-
-### 코드·인프라
-- **벡터 DB Elasticsearch 8.14+ 단일 백엔드** — `VectorStore` Protocol v2 + `EsStore` 3단 폴백 + Nori + int8_hnsw + alias
-- **`build_offline_bundle.py`** — 폐쇄망 번들 manifest dry-run, doc/12 §3·§4 구현
-- **OpenAPI 03 정합화** — `rag_namespace` → `rag_index_alias` rename + ES 컨텍스트 명시
-- **pyproject 재구성** — 기본 23개 + 7개 extras (hwp·nlp·embedding·llm·orchestration·lint·full·dev) + dead deps 제거
-- **CI 강화** — openapi-lint 잡 추가, bundle-dry 통합 (Qdrant migrate는 2026-05-27 v2 제거)
-- **테스트 48 → 126** (어댑터 36 + 번들 23 신규, 0 회귀)
-
-상세 진척과 회신 도착 시 발동 가이드: **[doc/15 종합 보고서](../doc/15_진척_종합_보고서.md)**
-
----
-
-## Current Status
-
-- P1 release candidate is the cleaned KF-DeBERTa model `artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9`.
-- P2 retrieval operational config is KURE-v1 + PostgreSQL `pgvector` dense + bigram `ts_rank` hybrid + chunk_size=1200 / overlap=100. ES remains a legacy adapter, not the default production path.
-- Retrieval gold is `datasets/gold_real/retrieval_gold.jsonl`; PG lexical revalidation is documented in `infra/postgres/README.md` and implemented by `scripts/revalidate_pg_lexical.py`.
-- `make operational-readiness` builds the combined P1/P2/data readiness report. Current verdict is `CONDITIONALLY_READY`.
-- `make release-gate` is stricter and currently blocks release until at least 40 `human_review` gold samples are added.
-- `test-lite` is the fast non-fullstack suite; exact pass counts move as audit/regression tests are added.
-- CI default pytest path now runs `make test-lite`; slow/fullstack/model_download suites are separated as explicit Make targets.
-- `gold_real` now has 777 records: S3 577, S2 89, S1 56, TS 55 (after the 2026-07-22 court-proxy depollution — 157 public-ruling LLM-proxy over-labels corrected to S3 via `scripts/depollute_court_proxy_gold.py`; corrected rows stay `silver_train`, eval-truth unchanged). `human_review` is 1/40 and remains the main evidence gap.
-
-## Release Gates (2026-07-05)
-
-Before an operational release, run:
-
-```bash
-make check-manifest
-make check-release-evidence
-make human-review-queue
-make p1-boundary
-make p1-eval
-make operational-readiness
-make release-gate
-make release-manifest
-make p2-full-gold
-```
-
-Strict release requires all readiness gates to be `PASS`. Current blocker is external human review gold: `human_review=1/40`. Pre-human readiness is `CONDITIONALLY_READY`; P1 release-tier F1 now passes with source-prior policy applied to public-source records.
-See [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) for the reviewer import, rollback, and final release sequence.
+`scripts/`는 공식 진입점과 실험용이 섞여 있습니다. **`_` 로 시작하는 파일과 `_lab/`
+하위는 실험·일회성**이니 무시하십시오. 공식 진입점은 [scripts/README.md](scripts/README.md)
+에 정리돼 있습니다.
