@@ -14,6 +14,20 @@ import pytest
 
 pytestmark = pytest.mark.slow
 
+
+def _pg_ok() -> bool:
+    """Postgres 5432 빠른 연결 확인 — conftest._check_postgres 와 같은 방식."""
+    import socket
+    try:
+        sock = socket.create_connection(("localhost", 5432), timeout=0.5)
+        sock.close()
+        return True
+    except OSError:
+        return False
+
+
+_PG = _pg_ok()
+
 HDR = {"X-API-Key": settings.api_key}
 
 
@@ -64,6 +78,11 @@ class TestPrometheusEndpoint:
 
 
 class TestMetricsCollection:
+    # DB 미가동이면 /schema/grades 가 db_unavailable 로 끝나 route 라벨이 아예 등록되지
+    # 않는다(레지스트리에 audit_write_failure 만 남음). 관측성 결함이 아니라 전제 부재이므로
+    # 이 스위트의 다른 파일들과 같은 방식으로 스킵한다 — 가드가 없어 Postgres 없는 개발
+    # 머신·CI 에서 전체 스위트가 green 이 될 수 없었다.
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_requests_counter_increments(self):
         # 라벨 조합이 새로 생기는지만 검증 (사전 카운트는 다른 테스트로 오염될 수 있음)
         with TestClient(app) as cli:
