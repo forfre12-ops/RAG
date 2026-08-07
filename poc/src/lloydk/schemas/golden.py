@@ -112,6 +112,24 @@ class GoldenSignoffResponse(BaseModel):
     publish_note: Optional[str] = None
 
 
+class GoldenCorpusSummary(BaseModel):
+    """정본 골든셋 구성 집계 — GET /golden/summary.
+
+    tier 는 저장 컬럼이 아니라 golden_tiers.tier_of 로 파생되는 값이라(드리프트 방지)
+    이 응답도 그 함수 결과를 그대로 집계한다.
+    """
+    path: str
+    total: int
+    by_tier: dict = {}              # locked_gold_eval / held_review / legal_floor / gold_candidate / silver_train
+    by_grade: dict = {}             # TS / S1 / S2 / S3
+    by_origin: dict = {}            # synthetic / public_real / customer_real / unknown
+    by_label_source: dict = {}
+    tier_by_grade: dict = {}        # tier → {grade: n}
+    # locked 중 실문서 출처까지 갖춘 것(= real 평가정답으로 집계되는 수). 합성 본문에 서명이
+    # 붙어도 일반화 근거가 되지 못하므로 locked 총수와 구분해서 낸다.
+    real_locked_eval: int = 0
+
+
 class GoldenJobSummary(BaseModel):
     """잡 목록 1행 — 목록에서 개별 잡(검수/서명)으로 진입하기 위한 최소 정보."""
     job_id: str

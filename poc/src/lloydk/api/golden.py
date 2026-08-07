@@ -24,6 +24,7 @@ from lloydk.schemas.golden import (
     GoldenBuildRequest,
     GoldenBuildResponse,
     GoldenBuildStatus,
+    GoldenCorpusSummary,
     GoldenJobListResponse,
     GoldenJobSummary,
     GoldenRegisterRequest,
@@ -137,6 +138,32 @@ def golden_job_status(job_id: UUID) -> GoldenBuildStatus:
     # [#14a] 콘솔이 이 값으로 review/signoff HTML 을 연다(인증 경로에서 서명 URL 발급).
     st.review_url, st.signoff_url = _signed_html_urls(job_id)
     return st
+
+
+@router.get(
+    "/golden/summary",
+    response_model=GoldenCorpusSummary,
+    dependencies=[Depends(require_role("admin", "kl_backend", "reviewer", "system"))],
+    summary="정본 골든셋 구성 집계 (tier·등급·출처·라벨출처)",
+    description=(
+        "골든셋이 지금 어떤 tier(locked_gold_eval·held_review·legal_floor·gold_candidate·"
+        "silver_train)·등급·문서출처로 구성돼 있는지 집계한다. tier 는 저장 컬럼이 아니라 "
+        "label_source/review_status/서명 envelope 에서 파생되므로 golden_tiers 의 tier_of 로 "
+        "유도한다. 읽기 전용 — 정본 변경은 promote_golden_candidates.py 게이트만 담당한다."
+    ),
+)
+def golden_corpus_summary(path: str | None = None) -> GoldenCorpusSummary:
+    """정본 골든셋 구성 집계. path 미지정이면 settings.golden_corpus_jsonl."""
+    target = (path or "").strip() or getattr(
+        settings, "golden_corpus_jsonl", "datasets/gold_real/classification_gold.jsonl"
+    )
+    res = GoldenBuildService().corpus_summary(target)
+    if res is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"골든셋 정본을 찾을 수 없습니다: {target} (datasets/ 하위만 허용)",
+        )
+    return GoldenCorpusSummary(**res)
 
 
 @router.get(

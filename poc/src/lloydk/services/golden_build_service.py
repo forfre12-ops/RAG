@@ -139,6 +139,64 @@ class GoldenBuildService:
         )
         return job_id
 
+    def corpus_summary(self, corpus_path: str) -> "Optional[dict]":
+        """정본 골든셋의 구성 집계 — 읽기 전용.
+
+        잡 목록(/golden/jobs)은 '무엇을 만들었나'만 보여줄 뿐, 골든셋이 지금 어떤 tier·등급·
+        출처로 구성돼 있는지는 화면에서 답할 수가 없었다. 감리에서 "평가 정답이 어떻게
+        만들어졌나"를 물으면 그 답이 여기다.
+
+        tier 는 저장 컬럼이 아니라 label_source/review_status/서명 envelope 에서 파생되므로
+        (golden_tiers 모듈 계약) 여기서도 같은 함수로 유도한다 — 별도 집계를 두면 드리프트한다.
+        경로는 _safe_path 로 datasets/ 하위 샌드박스. 파일 없음/밖이면 None(호출부 404).
+        """
+        from collections import Counter  # noqa: PLC0415
+
+        from lloydk.golden_tiers import (  # noqa: PLC0415
+            document_origin,
+            is_real_locked_eval,
+            tier_of,
+        )
+
+        try:
+            p = _safe_path(corpus_path)
+        except ValueError:
+            return None
+        if not p.exists() or not p.is_file():
+            return None
+
+        rows = _read_jsonl(p)
+        by_tier: Counter[str] = Counter()
+        by_grade: Counter[str] = Counter()
+        by_origin: Counter[str] = Counter()
+        by_label_source: Counter[str] = Counter()
+        tier_grade: dict[str, Counter] = {}
+        real_locked = 0
+
+        for r in rows:
+            t = tier_of(r)
+            g = str(r.get("label") or "?")
+            by_tier[t] += 1
+            by_grade[g] += 1
+            by_origin[document_origin(r)] += 1
+            by_label_source[str(r.get("label_source") or "(없음)")] += 1
+            tier_grade.setdefault(t, Counter())[g] += 1
+            if is_real_locked_eval(r):
+                real_locked += 1
+
+        return {
+            "path": str(p.relative_to(_POC_ROOT)) if p.is_relative_to(_POC_ROOT) else str(p),
+            "total": len(rows),
+            "by_tier": dict(by_tier),
+            "by_grade": dict(by_grade),
+            "by_origin": dict(by_origin),
+            "by_label_source": dict(by_label_source),
+            "tier_by_grade": {k: dict(v) for k, v in tier_grade.items()},
+            # locked 중에서도 '실문서 출처'까지 갖춘 것만 real 평가정답으로 집계된다
+            # (합성 본문에 서명이 붙어도 일반화 근거가 되지 못한다 — golden_tiers 계약).
+            "real_locked_eval": real_locked,
+        }
+
     def run_build(
         self,
         req: GoldenBuildRequest,

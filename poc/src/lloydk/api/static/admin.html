@@ -523,19 +523,19 @@ details.adv[open]{padding-bottom:12px;}
          동일하다 — GET /admin/locked-readiness. -->
     <section class="card col-span" data-pane="model" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">G3</span> 골든셋 현황 — 서명 확정 / 남은 것 <span class="reqtag">FUN-024</span></div>
-        <span class="ep">GET /admin/locked-readiness</span>
+        <div class="ttl"><span class="step-no">G3</span> 골든셋 현황 — 구성 · 서명 확정 <span class="reqtag">FUN-024</span></div>
+        <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
       </div>
       <div class="card-body">
         <div class="btn-row" style="margin:0 0 10px;">
           <span class="sec-note" style="margin-right:auto;">
-            서명으로 확정된 평가정답이 등급별로 얼마나 찼는지 봅니다. 여기가 차야 모델 자동 활성화가 열립니다.
+            골든셋이 지금 어떤 단계·등급·출처로 구성돼 있는지, 서명으로 확정된 평가정답이 얼마나 찼는지 봅니다.
           </span>
           <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
         </div>
         <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
         <p class="sec-note" style="margin-top:8px;">
-          서명 화면에서 <b>publish 를 켜지 않으면 이 수치는 오르지 않습니다</b>(미리보기로만 처리됨).
+          읽기 전용입니다. 정본 승격은 별도 절차이며, 서명 화면에서 <b>publish 를 켜지 않으면</b> 확정 수치는 오르지 않습니다.
         </p>
       </div>
     </section>
@@ -1526,11 +1526,52 @@ async function purgeDemoData(){
  * GET /admin/locked-readiness — 사람이 서명해 확정된 평가정답이 등급별로 얼마나 찼는지.
  * 같은 수치가 [관제] 대시보드의 '배포 readiness' 패널에도 있지만, 골든 검수를 하는 사람이
  * 다른 탭의 다른 이름으로 자기 작업 현황을 찾기는 어렵다. 루프 B 안에서도 보이게 한다. */
+// tier 이름은 코드 값 그대로 두면 운영자가 못 읽는다 — 무엇에 쓰이는지로 옮긴다.
+const TIER_LABEL={
+  locked_gold_eval: ['평가 정답', '사람이 서명해 확정 — 학습에는 쓰지 않음'],
+  gold_candidate:   ['승격 대기', '자동 게이트 통과 · 사람 서명 대기'],
+  legal_floor:      ['법적 근거', '판례·고시 기반 — 회귀 차단용'],
+  silver_train:     ['학습 시드', '학습에만 사용 · 평가 금지'],
+  held_review:      ['보류', '서명이 요건을 못 갖춰 격리 — 평가·학습 모두 제외'],
+};
+const ORIGIN_LABEL={ public_real:'공개 실문서', customer_real:'고객사 실문서', synthetic:'합성', unknown:'미상' };
+
 async function loadGoldenStatus(){
   const box=$('gs-body'); if(!box) return;
   box.innerHTML='<span style="color:var(--text-faint);font-size:12px;">조회 중…</span>';
+  let corpus=null;
+  try{ corpus=await api('GET','/golden/summary'); }
+  catch(e){ corpus={__err:`${e.status||''} ${e.data?.detail||e.message||''}`}; }
   try{
     const d=await api('GET','/admin/locked-readiness');
+    // ── 정본 구성 ────────────────────────────────────────────────────────────
+    let corpusHtml='';
+    if(corpus && !corpus.__err){
+      const tiers=Object.entries(corpus.by_tier||{}).sort((a,b)=>b[1]-a[1]);
+      const tot=corpus.total||0;
+      corpusHtml=`
+        <div class="dash-panel" style="margin-bottom:10px;">
+          <div class="dp-h"><span>정본 구성</span><span class="pill">${tot}건</span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>단계</th><th>건수</th><th>비중</th><th>쓰임</th></tr></thead>
+            <tbody>${tiers.map(([k,v])=>{
+              const L=TIER_LABEL[k]||[k,''];
+              return `<tr><td><b>${esc(L[0])}</b></td><td class="mono">${v}</td>`
+                + `<td class="mono">${tot?((v/tot)*100).toFixed(1):0}%</td>`
+                + `<td style="color:var(--text-faint);font-size:11.5px;">${esc(L[1])}</td></tr>`;
+            }).join('')}</tbody>
+          </table></div>
+          <div class="dp-row" style="margin-top:8px;">
+            ${GRADES.map(g=>`<div><span>${g}</span> <b>${(corpus.by_grade||{})[g]??0}</b></div>`).join('')}
+          </div>
+          <div class="dp-row">
+            ${Object.entries(corpus.by_origin||{}).map(([k,v])=>
+              `<div><span>${esc(ORIGIN_LABEL[k]||k)}</span> <b>${v}</b></div>`).join('')}
+          </div>
+        </div>`;
+    }else if(corpus && corpus.__err){
+      corpusHtml=`<div class="warnbox" style="margin-bottom:10px;">정본 구성 조회 실패: ${esc(corpus.__err)}</div>`;
+    }
     const min=d.min_per_grade ?? 0;
     const pg=d.per_grade||{}, rp=d.real_per_grade||{}, sp=d.synthetic_per_grade||{};
     const missing=d.missing||[];
@@ -1550,9 +1591,9 @@ async function loadGoldenStatus(){
     const badge = d.ready
       ? '<span class="pill ok">배포 가능</span>'
       : '<span class="pill warn">미충족</span>';
-    box.innerHTML=`
+    box.innerHTML=corpusHtml+`
       <div class="dash-panel">
-        <div class="dp-h"><span>서명 확정 평가정답 (locked_gold_eval)</span>${badge}</div>
+        <div class="dp-h"><span>서명 확정 평가정답</span>${badge}</div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>등급</th><th>확정 / 목표</th><th>남은 것</th><th>구성</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -2267,7 +2308,7 @@ populateSamples();
 syncActiveGrades();
 checkHealth();
 setAutoStatus('paused');
-log('거버넌스 콘솔 준비 완료. Safe Mode가 켜져 있어 상태 변경 작업은 기본 차단됩니다.','info');
+log('거버넌스 콘솔 준비 완료.','info');
 </script>
 
 <!-- 골든 잡 목록 패널 — 본체는 별도 파일(위 인라인 스크립트의 cfg/api/log/esc 재사용). -->

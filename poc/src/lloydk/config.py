@@ -551,6 +551,11 @@ class Settings(BaseSettings):
     # (등급별 locked 보유/부족·배포가능 여부). 빈 값(기본)이면 readiness=no_locked_records(무실데이터
     # 단계의 진실). 파일이 쌓이면 GET /admin/locked-readiness·게이지가 자동으로 켜진다. 읽기 전용.
     locked_eval_jsonl: str = ""
+    # 정본 골든셋 jsonl 경로 — GET /golden/summary(구성 집계) 전용 읽기 경로.
+    # 잡 목록은 '무엇을 만들었나'만 보여줄 뿐 골든셋이 지금 어떤 tier·등급·출처로 구성돼
+    # 있는지는 화면에서 답할 수 없었다. 이 경로는 조회만 하며 어떤 쓰기 경로도 쓰지 않는다
+    # (정본 변경은 promote_golden_candidates.py 의 명시적 게이트만 담당).
+    golden_corpus_jsonl: str = "datasets/gold_real/classification_gold.jsonl"
     # [앵커 연결] 합성 test.jsonl만 보던 게이트에 **외부 사실 앵커 코퍼스**(NKT 공식분류·큐레이트
     # 홀드아웃) 실측 미탐을 주입한다. True면 후보 모델을 앵커로 통과시켜 고등급(TS/S1) under-class
     # 카드가 FAIL이면 게이트 hard block. 기본 False=동작 보존(앵커 측정은 CPU 추론 비용 발생).
