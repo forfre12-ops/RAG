@@ -6,7 +6,17 @@
   ① 업로드      (추출·정규화·청킹·마스킹·원문저장)   ← parse_demo 화면
   ② 분류        (등급·신뢰도·근거)                    ← [운영] 1 분류 실행
   ③ 검수 확정   (/confirm)                            ← [운영] 2 분류 검수 큐
-  ④ 검수 교정   (/relabel · 재학습 큐 적재)           ← [운영] 2 분류 검수 큐
+  ④ 검수 교정   (/relabel · 재학습 큐 적재)           ← [운영] 2 분류 검수 큐  ※ --relabel 일 때만
+
+플래그:
+  --relabel   ④ 교정 단계까지 수행한다. 기본은 ③ 확정까지만.
+              교정은 S1→TS 상향(미탐 방향 = underclass)이라 재학습 큐에 쌓이고,
+              누적이 RETRAIN_THRESHOLD_DEFAULT(10, confirm_service.py)에 닿으면
+              active_learning_tick(30분)이 URGENT_RETRAIN 을 자동 큐잉한다
+              (지재원 full-train 은 enable_training 이 열려 있어 이 경로가 산다).
+              1회당 교정 2건이 쌓이므로 리허설을 반복하면 시연용 가짜 교정이 실제
+              재학습을 트리거할 수 있다 — 그래서 기본에서 뺐다.
+              감리에서 교정 화면을 보여줘야 할 때만 붙이고, 끝나면 OPERATION.md §8 로 정리한다.
 
 루프 B(골든셋 → 재학습 → 배포)는 scripts/demo_e2e_golden.py 가 담당한다.
 
@@ -65,7 +75,9 @@ def step(no: str, title: str, card: str):
 
 
 def main() -> int:
-    pdf = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("datasets/test_docs_pdf/business_S1_030.pdf")
+    argv = [a for a in sys.argv[1:] if not a.startswith("--")]
+    do_relabel = "--relabel" in sys.argv[1:]
+    pdf = Path(argv[0]) if argv else Path("datasets/test_docs_pdf/business_S1_030.pdf")
     if not pdf.exists():
         print(f"[오류] 파일 없음: {pdf}")
         return 1
@@ -142,7 +154,16 @@ def main() -> int:
         else:
             print("  [실패]", r.status_code, r.text[:200])
 
-        # ── ④ 검수 교정 (재학습 큐 적재) ──
+        # ── ④ 검수 교정 (재학습 큐 적재) — 기본 비활성 ──
+        if not do_relabel:
+            line("═")
+            print("  시나리오 A 완료 (③ 확정까지) — 여기까지가 루프 A(일상 운영)입니다.")
+            print("  ④ 교정(/relabel) 단계는 재학습 큐에 쌓이므로 기본에서 뺐습니다.")
+            print("  교정 화면까지 보여주려면 --relabel 을 붙이고, 끝나면 OPERATION.md §8 로 정리하세요.")
+            print(f"  화면으로 같은 흐름 보기: {BASE}/demo/admin.html  → [운영] 탭")
+            line("═")
+            return 0
+
         higher = {"S3": "S2", "S2": "S1", "S1": "TS", "TS": "TS"}[label]
         step("④", f"검수 — 교정(/relabel) 시연: {label} → {higher} 상향",
              "[운영] 탭 → 2 분류 검수 큐 · [재라벨] 버튼")
@@ -166,9 +187,10 @@ def main() -> int:
             print("  [실패]", r.status_code, r.text[:200])
 
     line("═")
-    print("  시나리오 A 완료 — 여기까지가 루프 A(일상 운영)입니다.")
+    print("  시나리오 A 완료 (④ 교정까지) — 여기까지가 루프 A(일상 운영)입니다.")
+    print("  ⚠ 교정이 재학습 큐에 쌓였습니다. 리허설을 마치면 OPERATION.md §8 로 정리하세요.")
     print("  이 교정들이 쌓이면 루프 B(모델 갱신)로 넘어갑니다:")
-    print("    .venv/Scripts/python.exe scripts/demo_e2e_golden.py")
+    print("    .venv/Scripts/python.exe scripts/demo_e2e_golden.py --register")
     print(f"  화면으로 같은 흐름 보기: {BASE}/demo/admin.html  → [운영] 탭")
     line("═")
     return 0

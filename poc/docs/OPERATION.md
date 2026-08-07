@@ -129,7 +129,82 @@ beat가 발행하는 정기 작업 — 누락 시 아래가 전부 정지:
 
 ---
 
-## 8. 백업 · DR
+## 8. 시연·리허설 데이터 정리
+
+시연 스크립트(`scripts/demo_e2e_8010.py` · `demo_e2e_golden.py`)와 화면 경로
+(`parse_demo.html`)로 만든 데이터는 **두 마커**로 식별됩니다.
+
+| 마커 | 값 |
+|---|---|
+| 문서 소유자 | `tb_documents.created_by = 'demo-console'` |
+| RAG 컬렉션 | `tb_rag_vectors.collection = 'demo'` |
+
+**`POST /admin/demo/purge`는 지재원·고객사 배포에서 404입니다.** 고장이 아니라
+하드닝 프로파일(`onprem-local` · `full-train`)이 `demo_console_enabled=False`로
+파괴적 물리삭제 표면을 운영에서 없앤 것입니다(데모·파일럿 `lite-*`에서만 동작).
+따라서 **실서버 리허설 데이터는 자동으로 지워지지 않으므로 아래를 수동 실행**합니다.
+
+### 왜 방치하면 안 되는가
+
+시연 ④단계는 `S1 → TS` **상향 교정**을 넣는데, 이는 미탐 방향(underclass) 교정으로
+집계됩니다. `RETRAIN_THRESHOLD_DEFAULT = 10`(`confirm_service.py`)에 도달하면
+`active_learning_tick`(30분)이 **URGENT_RETRAIN을 자동 큐잉**합니다
+(`workers/tasks.py`). 지재원 `full-train`은 `enable_training`이 열려 있어 이 경로가
+살아 있습니다. **시나리오 A 1회당 교정 2건**이 쌓이므로 리허설 5회면 임계에 닿아,
+시연용 가짜 교정이 실제 재학습을 트리거할 수 있습니다.
+
+### 정리 절차
+
+FK 순서를 지켜야 합니다(`evidence`·`corrections`는 CASCADE로 함께 삭제 —
+재학습 큐 오염도 여기서 해소됩니다).
+
+```bash
+$COMPOSE exec postgres psql -U lloydk -d lloydk <<'SQL'
+BEGIN;
+DELETE FROM tb_classifications   WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
+DELETE FROM tb_training_datasets WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
+DELETE FROM tb_sample_documents  WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
+DELETE FROM tb_chunks            WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
+DELETE FROM tb_documents         WHERE created_by='demo-console';
+DELETE FROM tb_rag_vectors       WHERE collection='demo';
+COMMIT;
+SQL
+```
+
+정리 후 확인 — 검수 큐와 재학습 큐가 비었는지:
+
+```bash
+curl -s "http://localhost:8000/api/v1/review-queue?limit=50" -H "X-API-Key: $API_KEY"
+```
+
+> **실행 전 스코프 확인** — `SELECT count(*) FROM tb_documents WHERE created_by='demo-console';`
+> 가 예상 리허설 횟수보다 크게 많으면 실 데이터가 데모 마커로 오태깅됐을 신호이므로
+> 삭제하지 말고 원인을 먼저 확인합니다(API 경로에도 같은 취지의 안전캡 1000건이 있습니다).
+
+### 배포 검증 스크립트가 남기는 것
+
+`scripts/verify_deploy_live.sh`는 문서를 `created_by='verify'`로 적재합니다
+(`actor={"user_id":"verify"}`). **데모 마커가 아니므로 위 절차로는 지워지지 않고**,
+재배포 검증을 반복할수록 검수 큐에 쌓입니다. 같이 정리하려면 마커만 바꿔 실행합니다.
+
+```sql
+-- 위 블록의 'demo-console' 을 'verify' 로 바꿔 동일 순서로 실행
+-- (RAG 벡터는 컬렉션이 다르므로 마지막 DELETE 는 생략)
+```
+
+현재 남은 건수 확인:
+
+```bash
+$COMPOSE exec postgres psql -U lloydk -d lloydk \
+  -c "SELECT created_by, count(*) FROM tb_documents GROUP BY created_by ORDER BY 2 DESC;"
+```
+
+**교정 단계를 아예 만들지 않으려면** 시나리오 A를 기본값으로 돌리십시오 —
+`--relabel`을 주지 않으면 ③ 확정까지만 수행하고 재학습 큐를 건드리지 않습니다.
+
+---
+
+## 9. 백업 · DR
 
 - **DB**: `pg_dump`(정기) + named 볼륨 스냅샷. 복구 후 `alembic upgrade head`로 스키마 정합 확인.
 - **원본 스토리지**: `/app/.storage`(storagedata 볼륨) — 원본은 AES-256-GCM 암호화 저장. 키(`STORAGE_ENCRYPTION_KEY`) 별도 백업·에스크로.
