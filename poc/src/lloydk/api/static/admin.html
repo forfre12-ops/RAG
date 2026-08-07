@@ -245,6 +245,16 @@ details.adv[open]{padding-bottom:12px;}
 .nextbox{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
          margin-top:12px;padding:13px 15px;font-size:12.5px;line-height:1.55;
          background:#f0fdf4;border:1px solid #86efac;color:#14532d;}
+
+/* 드래그&드롭 업로드 */
+.dropzone{border:2px dashed var(--border-strong);background:var(--bg-mid);cursor:pointer;
+          padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;
+          font-size:12.5px;color:var(--text-soft);transition:background .12s,border-color .12s;}
+.dropzone b{font-size:13px;color:var(--text);}
+.dropzone span{font-size:11.5px;color:var(--text-faint);}
+.dropzone:hover{background:var(--bg-strong);}
+.dropzone.over{border-color:#0070f3;background:#eff6ff;color:#1d4ed8;}
+.dropzone.over b{color:#1d4ed8;}
 </style>
 <script src="./deploy_badge.js" data-screen="관리자"></script>
 </head>
@@ -379,12 +389,15 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div class="warnbox">
           <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-soft);">
-            <input id="cfg-write-enable" type="checkbox" style="width:auto" />
+            <input id="cfg-write-enable" type="checkbox" style="width:auto" checked />
             쓰기 작업 허용
           </label>
           <div style="margin-top:6px;font-size:11.5px;line-height:1.45;">
-            Safe Mode 기본값입니다. 체크하지 않으면 확정·재라벨·재학습·모델 활성화·핫리로드 같은 상태 변경 작업은 실행되지 않고,
-            조회와 분류 시연만 수행합니다.
+            <b>기본으로 켜져 있습니다.</b> 확정·재라벨·재학습·모델 활성화·핫리로드 같은 상태 변경 작업을 실행할 수 있습니다.
+            매번 체크해야 해서 "눌렀는데 아무 일도 안 일어나는" 상황이 잦았고, 정작 위험한 동작
+            (재학습 제출·모델 활성화·핫리로드·등급체계 변경·키워드 비활성·데모 초기화)에는 모두
+            <b>확인 창</b>이 따로 걸려 있으므로 오조작 방지는 그쪽이 담당합니다.
+            읽기 전용으로만 둘러보려면 이 체크를 해제하십시오 — 조회와 분류 시연만 수행합니다.
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -412,15 +425,23 @@ details.adv[open]{padding-bottom:12px;}
              이행하는 화면도 콘솔에 없었다. G1 카드가 쓰는 것과 같은 추출 경로를 재사용한다. -->
         <div class="field upload-row">
           <label class="fld">문서 업로드 — HWP · PDF · DOCX · XLSX · PPTX · TXT <span class="reqtag">FUN-022</span></label>
-          <div class="btn-row" style="margin:0;">
-            <input id="cl-file" type="file" style="flex:1;min-width:220px;"
-                   accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.txt" />
+          <div id="cl-drop" class="dropzone"
+               ondragover="dzOver(event,true)" ondragleave="dzOver(event,false)" ondrop="dzDrop(event)"
+               onclick="document.getElementById('cl-file').click()">
+            <b>파일을 여기로 끌어다 놓으세요</b><span>또는 클릭해 선택</span>
+            <input id="cl-file" type="file" style="display:none"
+                   accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.txt"
+                   onchange="onPickFile()" />
+          </div>
+          <div class="btn-row" style="margin:8px 0 0;">
+            <span id="cl-file-name" class="hint" style="margin:0 auto 0 0;">선택된 파일 없음</span>
             <button class="btn sec sm" id="btn-extract" onclick="classifyFromFile(false)">본문 추출</button>
             <button class="btn sm" id="btn-extract-classify" onclick="classifyFromFile(true)">추출 → 분류</button>
           </div>
           <p class="sec-note" style="margin-top:4px;">
-            <code>POST /documents/analyze</code>(full_text)로 전체 본문을 추출해 아래 입력란을 채웁니다.
-            추출만 하면 저장되지 않고, <b>분류</b>를 실행해야 검수 큐에 적재됩니다.
+            작은 문서는 <code>POST /documents/analyze</code>(동기 진단 경로)로 즉시 추출합니다.
+            <b>큰 문서는 이 경로가 413으로 거절</b>합니다 — 요청 안에서 분류까지 끝내는 구조라 워커가 죽기 때문입니다.
+            그때는 <code>POST /documents</code>(적재) → <code>POST /classify/async</code>(비동기 분류)로 <b>자동 전환</b>합니다.
             파싱 단계별 진행 화면이 필요하면 상단 <b>[파싱·분류 시연]</b>을 여십시오.
           </p>
           <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
@@ -499,8 +520,33 @@ details.adv[open]{padding-bottom:12px;}
       </div>
     </section>
 
-    <!-- ===== N. 합성 샘플 생성 · 검수 (FUN-003) ===== -->
+    <!-- ===== G3. 골든셋 현황 ===== 서명 결과가 "얼마나 찼는지"를 루프 B 안에서 보여준다.
+         같은 수치가 [관제] 탭 대시보드에도 '배포 readiness'라는 이름으로 있었지만, 골든 검수를
+         하는 사람이 자기 작업의 현황으로 알아보기 어려웠다(다른 탭 · 다른 이름). 엔드포인트는
+         동일하다 — GET /admin/locked-readiness. -->
     <section class="card col-span" data-pane="model" style="order:4">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no">G3</span> 골든셋 현황 — 서명 확정 / 남은 것 <span class="reqtag">FUN-024</span></div>
+        <span class="ep">GET /admin/locked-readiness</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row" style="margin:0 0 10px;">
+          <span class="sec-note" style="margin-right:auto;">
+            사람이 서명해 확정된 평가정답(<code>locked_gold_eval</code>)이 등급별로 얼마나 찼는지 봅니다.
+            <b>배포 게이트가 요구하는 기준</b>과 같은 수치입니다 — 여기가 차야 모델 자동 활성화가 열립니다.
+          </span>
+          <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
+        </div>
+        <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
+        <p class="sec-note" style="margin-top:8px;">
+          서명해도 <b>publish 를 하지 않으면 이 수치는 오르지 않습니다</b> — 서명 화면의 publish 옵션이
+          꺼져 있으면 run-스코프 미리보기라 라이브 평가경로(<code>locked_eval_jsonl</code>)에 병합되지 않습니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== N. 합성 샘플 생성 · 검수 (FUN-003) ===== -->
+    <section class="card col-span" data-pane="model" style="order:5">
       <div class="card-head">
         <div class="ttl"><span class="step-no">N</span> 합성 샘플 생성 · 검수 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
@@ -562,7 +608,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 3. 재학습 ===== -->
-    <section class="card" data-pane="model" style="order:5">
+        <section class="card" data-pane="model" style="order:6">
       <div class="card-head">
         <div class="ttl"><span class="step-no">3</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
         <span class="ep">POST /train · GET /train/jobs</span>
@@ -602,7 +648,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 4. 모델 서빙/리로드 ===== -->
-    <section class="card" data-pane="model" style="order:6">
+        <section class="card" data-pane="model" style="order:7">
       <div class="card-head">
         <div class="ttl"><span class="step-no">4</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
         <span class="ep">POST /admin/model/activate · /reload</span>
@@ -631,7 +677,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 5. 메트릭 ===== -->
-    <section class="card col-span" data-pane="model" style="order:7">
+    <section class="card col-span" data-pane="model" style="order:8">
       <div class="card-head">
         <div class="ttl"><span class="step-no">5</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /metrics/latest · /history · /confusion-matrix</span>
@@ -979,6 +1025,8 @@ function confirmSignoffDone(){
   dismissSignoffReturn();
   log('골든 검수·서명 완료로 표시 — 다음 단계는 3 재학습','ok');
   showPane('model');
+  // 서명 직후에는 "얼마나 찼는지"가 가장 궁금하다 — 현황을 자동으로 갱신해 준다.
+  if(typeof loadGoldenStatus==='function') loadGoldenStatus();
   const t=$('tr-kind') || $('gold-progress');
   if(t) t.scrollIntoView({behavior:'smooth', block:'center'});
 }
@@ -1059,11 +1107,78 @@ async function classifyOne(doc_id, title, content){
  * G1 카드의 goldenDocsFromFiles 와 같은 경로(/documents/analyze · full_text=true)를 쓴다.
  * full_text 를 주는 이유는 그쪽과 같다 — 기본 응답의 text_preview 는 8K 절단이라 그대로
  * 쓰면 등급 판단이 잘린 본문 기준이 된다. 추출은 저장하지 않는다(분류해야 큐에 적재). */
+/* 드래그&드롭 — 파일 선택 대화상자를 열지 않고도 올릴 수 있어야 한다. */
+function dzOver(ev, on){ ev.preventDefault(); const z=$('cl-drop'); if(z) z.classList.toggle('over', !!on); }
+function dzDrop(ev){
+  ev.preventDefault();
+  const z=$('cl-drop'); if(z) z.classList.remove('over');
+  const files=(ev.dataTransfer && ev.dataTransfer.files) || [];
+  if(!files.length) return;
+  // input.files 는 읽기 전용이라 DataTransfer 로 옮겨 담는다(그래야 이후 로직이 동일하다).
+  const dt=new DataTransfer(); dt.items.add(files[0]);
+  $('cl-file').files = dt.files;
+  onPickFile();
+}
+function onPickFile(){
+  const f=(($('cl-file')||{}).files||[])[0];
+  const n=$('cl-file-name');
+  if(n) n.textContent = f ? `${f.name} · ${(f.size/1024).toFixed(0)}KB` : '선택된 파일 없음';
+}
+
+/* 대용량 폴백 — /documents/analyze 는 요청 안에서 분류까지 끝내는 동기 진단 경로라
+ * analyze_sync_max_chunks(기본 34 ≈ 9페이지)를 넘으면 413 으로 거절한다. 그때 서버가
+ * 안내하는 경로 그대로 POST /documents(적재) → POST /classify/async → 잡 폴링으로 넘긴다.
+ * 이 경로는 문서를 실제로 적재하므로 데모 마커(created_by · rag_namespace)를 화면 경로와
+ * 동일하게 달아 정리 절차(OPERATION.md §8)가 걷어갈 수 있게 한다. */
+async function ingestLargeDocument(f, info){
+  const c=cfg();
+  if(info) info.innerHTML='<span class="pill warn">대용량</span> 동기 경로 상한 초과 — 적재 후 비동기 분류로 전환합니다…';
+  const fd=new FormData();
+  fd.append('file', f);
+  fd.append('actor', JSON.stringify({user_id:'demo-console', role:c.role||'admin'}));
+  // index_for_rag 는 반드시 false. 색인은 청크마다 임베딩을 돌리는데 그걸 요청 안에서 하면
+  // 대용량에서 gunicorn 워커가 타임아웃으로 SIGKILL 된다(실측 2026-08-08: 75K자·401청크에서
+  // 워커 2회 사망). --workers 1 이면 동시에 처리 중이던 다른 요청까지 함께 끊긴다.
+  // 같은 문서를 index_for_rag=false 로 보내면 0.6초에 201 로 끝난다 — 분류에는 색인이 필요 없다.
+  fd.append('index_for_rag','false');
+  const r=await fetch(`${c.base}/documents`,
+    {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+  if(!r.ok){
+    const t=await r.text();
+    throw Object.assign(new Error(t.slice(0,300)), {status:r.status});
+  }
+  const up=await r.json();
+  log(`대용량 적재: doc_id=${up.doc_id} · ${up.char_count}자 · 청크 ${up.chunk_count} (RAG 색인 생략 — 분류에는 불필요)`,'ok');
+  $('cl-docid').value = up.doc_id;
+  $('cl-title').value = f.name;
+  $('cl-body').value  = `(적재 완료 — 본문은 서버에 저장되어 있습니다. doc_id ${up.doc_id} 기준으로 비동기 분류 중)`;
+  if(info) info.innerHTML=`<span class="pill ok">적재됨</span> ${esc(f.name)} · ${up.char_count}자 · 청크 ${up.chunk_count} · 비동기 분류 요청 중…`;
+
+  const a=await api('POST','/classify/async',{doc_id:up.doc_id, return_evidence:true});
+  const jid=a.job_id;
+  log(`비동기 분류 제출: job ${jid}`,'ok');
+  for(let i=0;i<120;i++){
+    await new Promise(r2=>setTimeout(r2,2000));
+    const st=await api('GET',`/classify/jobs/${encodeURIComponent(jid)}`);
+    if(info) info.innerHTML=`<span class="pill warn">분류 중</span> ${esc(f.name)} · job ${esc(String(jid)).slice(0,8)} · ${esc(st.status)} (${(i+1)*2}s)`;
+    if(st.status==='done' || st.status==='partial'){
+      const res=(st.results||[])[0];
+      if(res){ renderClassify(res); enqueue(res, f.name); markFlow(1); }
+      if(info) info.innerHTML=`<span class="pill ok">분류 완료</span> ${esc(f.name)} · 청크 ${up.chunk_count} · 비동기 경로`;
+      return;
+    }
+    if(st.status==='failed'){
+      throw Object.assign(new Error(st.error||'분류 실패'), {status:0});
+    }
+  }
+  if(info) info.innerHTML=`<span class="pill warn">대기 중</span> 240초 내에 끝나지 않았습니다 — 「DB 검수 큐 불러오기」로 확인하세요.`;
+}
+
 async function classifyFromFile(alsoClassify){
   const el=$('cl-file');
   const f=(el && el.files && el.files[0]) || null;
   const info=$('cl-file-info');
-  if(!f){ if(info) info.textContent='파일을 선택하세요.'; return; }
+  if(!f){ if(info) info.textContent='파일을 선택하거나 위 영역에 끌어다 놓으세요.'; return; }
   const btns=['btn-extract','btn-extract-classify'].map($).filter(Boolean);
   btns.forEach(b=>b.disabled=true);
   if(info) info.textContent=`본문 추출 중 — ${f.name}`;
@@ -1074,6 +1189,15 @@ async function classifyFromFile(alsoClassify){
     fd.append('full_text','true');
     const r=await fetch(`${c.base}/documents/analyze`,
       {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+    if(r.status===413){
+      // 동기 경로 상한 초과 — 서버가 안내한 대용량 경로로 자동 전환한다.
+      if(!guardWrite('대용량 문서 적재')) {
+        if(info) info.innerHTML='<span class="pill warn">대용량</span> 이 문서는 적재가 필요합니다 — 위 <b>쓰기 작업 허용</b>을 켠 뒤 다시 시도하세요.';
+        return;
+      }
+      await ingestLargeDocument(f, info);
+      return;
+    }
     if(!r.ok){
       const t=await r.text();
       throw Object.assign(new Error(t.slice(0,200)), {status:r.status});
@@ -1284,6 +1408,13 @@ async function doRelabel(i){
 /* ---- 3. TRAIN ---- */
 async function submitTrain(){
   if(!guardWrite('재학습 제출')) return;
+  // Safe Mode 기본값을 '허용'으로 바꾸면서(오조작 방지를 체크박스 대신 확인창으로 옮김)
+  // 재학습이 무확인 1클릭으로 나가지 않도록 여기서 한 번 확인받는다. 학습은 시작하면
+  // 되돌리는 절차가 없고 GPU/CPU 를 길게 점유한다.
+  const _tt=$('tr-type').value;
+  if(!confirm(`재학습을 제출합니다 (training_type=${_tt}).\n\n`
+    + '학습이 시작되면 중간에 되돌리는 절차가 없고, 완료까지 자원을 점유합니다.\n'
+    + '산출 모델은 후보로 등록되며 배포는 별도 활성화 단계에서 게이트를 통과해야 합니다. 진행할까요?')) return;
   try{
     const body={training_type:$('tr-type').value, base_model:$('tr-base').value, use_rag:$('tr-rag').checked, actor:actor()};
     const d=await api('POST','/train',body);
@@ -1376,6 +1507,55 @@ async function purgeDemoData(){
     }
     if(el) el.innerHTML=`<span class="pill err">실패</span> ${e.status||''} ${esc(String(e.data?.detail||e.message||''))} ${e.status===403?'— admin 역할 필요':''}`;
     log('데모 초기화 실패: '+(e.status||e.message),'err');
+  }
+}
+
+/* ---- G3. 골든셋 현황 ----
+ * GET /admin/locked-readiness — 사람이 서명해 확정된 평가정답이 등급별로 얼마나 찼는지.
+ * 같은 수치가 [관제] 대시보드의 '배포 readiness' 패널에도 있지만, 골든 검수를 하는 사람이
+ * 다른 탭의 다른 이름으로 자기 작업 현황을 찾기는 어렵다. 루프 B 안에서도 보이게 한다. */
+async function loadGoldenStatus(){
+  const box=$('gs-body'); if(!box) return;
+  box.innerHTML='<span style="color:var(--text-faint);font-size:12px;">조회 중…</span>';
+  try{
+    const d=await api('GET','/admin/locked-readiness');
+    const min=d.min_per_grade ?? 0;
+    const pg=d.per_grade||{}, rp=d.real_per_grade||{}, sp=d.synthetic_per_grade||{};
+    const missing=d.missing||[];
+    // 등급별로 "확정 / 목표"와 남은 건수를 같이 보여준다 — 남은 것을 세는 게 이 카드의 목적이다.
+    const rows=GRADES.map(g=>{
+      const have=pg[g]??0, need=Math.max(0, min-have), ok=have>=min;
+      const compo=[];
+      if(rp[g]!=null) compo.push(`실문서 ${rp[g]}`);
+      if(sp[g]!=null) compo.push(`합성 ${sp[g]}`);
+      return `<tr>
+        <td>${gradeTag(g)}</td>
+        <td class="mono"><b>${have}</b> / ${min}</td>
+        <td>${ok?'<span class="pill ok">충족</span>':`<span class="pill warn">${need}건 남음</span>`}</td>
+        <td style="color:var(--text-faint);font-size:11.5px;">${compo.join(' · ')||'—'}</td>
+      </tr>`;
+    }).join('');
+    const badge = d.ready
+      ? '<span class="pill ok">배포 가능</span>'
+      : '<span class="pill warn">미충족</span>';
+    box.innerHTML=`
+      <div class="dash-panel">
+        <div class="dp-h"><span>서명 확정 평가정답 (locked_gold_eval)</span>${badge}</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>등급</th><th>확정 / 목표</th><th>남은 것</th><th>구성</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+        <div class="dp-row" style="margin-top:8px;">
+          <div><span>실문서</span> <b>${d.real_total??0}</b></div>
+          <div><span>합성</span> <b>${d.synthetic_total??0}</b></div>
+          <div><span>배포 게이트</span> <b>${d.deploy_locked_gate_passed?'통과':'미통과'}</b></div>
+        </div>
+        ${missing.length?`<div class="dp-note">부족 등급: ${missing.join(', ')}</div>`:''}
+        ${d.reason?`<div class="dp-note">사유: ${esc(d.reason)}</div>`:''}
+      </div>`;
+    log(`골든셋 현황: ready=${d.ready} · 부족 ${missing.join(',')||'없음'}`,'ok');
+  }catch(e){
+    box.innerHTML=`<div class="warnbox">현황 조회 실패: ${e.status||''} ${esc(String(e.data?.detail||e.message||''))} ${e.status===403?'— admin 역할 필요':''}</div>`;
   }
 }
 
