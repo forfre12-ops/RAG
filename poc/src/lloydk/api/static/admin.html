@@ -1287,6 +1287,17 @@ async function purgeDemoData(){
     log(`데모 데이터 초기화: 문서 ${d.documents}·분류 ${d.classifications}·청크 ${d.chunks}·RAG ${d.rag_vectors}`,'ok');
     QUEUE=[]; renderQueue();   // 화면 검수 큐도 비움
   }catch(e){
+    // 404 "demo console disabled" 는 고장이 아니라 프로파일 정책이다.
+    // 하드닝 프로파일(onprem-local·full-train)은 demo_console_enabled=False 로 두어
+    // 파괴적 물리삭제 표면을 운영에서 없앤다(config.py). 관리 UI 는 serve_admin_console
+    // 로 따로 켜지므로 버튼은 보이는데 호출만 404 다 — 그 사유를 화면이 답해야 한다.
+    if(e.status===404){
+      if(el) el.innerHTML='<span class="pill warn">비활성</span> 이 배포 프로파일에서는 데모 초기화가 <b>의도적으로 꺼져 있습니다</b>'
+        + '(<code>demo_console_enabled=False</code> — 운영에서 파괴적 물리삭제 표면을 없애기 위함). '
+        + '데모/파일럿 프로파일에서만 동작합니다. 시연 데이터는 <code>created_by=demo-console</code>·RAG 컬렉션 <code>demo</code> 로 식별됩니다.';
+      log('데모 초기화 비활성(프로파일 정책) — 고장 아님','info');
+      return;
+    }
     if(el) el.innerHTML=`<span class="pill err">실패</span> ${e.status||''} ${esc(String(e.data?.detail||e.message||''))} ${e.status===403?'— admin 역할 필요':''}`;
     log('데모 초기화 실패: '+(e.status||e.message),'err');
   }

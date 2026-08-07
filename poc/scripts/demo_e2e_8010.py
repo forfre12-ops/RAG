@@ -20,8 +20,13 @@
   DEMO_API_KEY    기본 lloydk_dev_apikey (.env.example 값)
 
 전제: 인프라 + API 가동. 실서버 리허설은 배포 서버의 BASE/KEY 를 넣어 그대로 돌린다.
-반복 시연으로 쌓인 데모 데이터는 콘솔 [운영] 탭의 '데모 데이터 초기화'
-(POST /admin/demo/purge, created_by='demo-console' 스코프)로 지운다.
+
+되돌리기 주의 (2026-08-08 실측):
+  이 스크립트가 만든 데이터는 화면 경로(parse_demo.html)와 같은 마커를 단다 —
+  actor.user_id='demo-console' + RAG 컬렉션 'demo'. 그러나 POST /admin/demo/purge 는
+  하드닝 프로파일(onprem-local·full-train)에서 404 다. demo_console_enabled=False 로
+  운영에서 파괴적 물리삭제 표면을 없앤 의도된 설계이고, 데모·파일럿(lite-*)에서만 동작한다.
+  따라서 실서버 리허설 데이터는 자동으로 지워지지 않는다 — 두 마커로 식별해 DB 측에서 정리한다.
 """
 import io
 import json
@@ -79,7 +84,11 @@ def main() -> int:
                 f"{BASE}/api/v1/documents",
                 headers=HEADERS,
                 files={"file": (pdf.name, f, "application/pdf")},
-                data={"actor": ACTOR, "index_for_rag": "true"},
+                # rag_namespace='demo' 는 화면 경로(parse_demo.html)와 반드시 같아야 한다.
+                # 생략하면 설정 기본값('uploads')으로 색인되는데, 데모 초기화
+                # (POST /admin/demo/purge)의 스코프는 created_by='demo-console' + collection='demo'
+                # 두 상수라 uploads 로 간 벡터는 지워지지 않는다 — 리허설을 반복할수록 잔류가 쌓인다.
+                data={"actor": ACTOR, "index_for_rag": "true", "rag_namespace": "demo"},
             )
         if r.status_code >= 400:
             print("  [실패]", r.status_code, r.text[:300])
