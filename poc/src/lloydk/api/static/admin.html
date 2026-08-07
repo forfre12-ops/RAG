@@ -403,9 +403,28 @@ details.adv[open]{padding-bottom:12px;}
     <section class="card" data-pane="ops" style="order:2">
       <div class="card-head">
         <div class="ttl"><span class="step-no">1</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
-        <span class="ep">POST /classify</span>
+        <span class="ep">POST /documents/analyze · POST /classify</span>
       </div>
       <div class="card-body">
+        <!-- 문서 업로드 — 종전에는 본문을 붙여넣거나 샘플을 고르는 길뿐이었고, 파일 업로드는
+             별도 화면(parse_demo.html)에만 있었다. 그래서 이 콘솔만 보면 "문서를 올려서
+             분류한다"는 실제 업무 흐름이 보이지 않고, 요건 FUN-022(전자문서 텍스트 추출)를
+             이행하는 화면도 콘솔에 없었다. G1 카드가 쓰는 것과 같은 추출 경로를 재사용한다. -->
+        <div class="field upload-row">
+          <label class="fld">문서 업로드 — HWP · PDF · DOCX · XLSX · PPTX · TXT <span class="reqtag">FUN-022</span></label>
+          <div class="btn-row" style="margin:0;">
+            <input id="cl-file" type="file" style="flex:1;min-width:220px;"
+                   accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.txt" />
+            <button class="btn sec sm" id="btn-extract" onclick="classifyFromFile(false)">본문 추출</button>
+            <button class="btn sm" id="btn-extract-classify" onclick="classifyFromFile(true)">추출 → 분류</button>
+          </div>
+          <p class="sec-note" style="margin-top:4px;">
+            <code>POST /documents/analyze</code>(full_text)로 전체 본문을 추출해 아래 입력란을 채웁니다.
+            추출만 하면 저장되지 않고, <b>분류</b>를 실행해야 검수 큐에 적재됩니다.
+            파싱 단계별 진행 화면이 필요하면 상단 <b>[파싱·분류 시연]</b>을 여십시오.
+          </p>
+          <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
+        </div>
         <div class="field">
           <label class="fld">샘플 문서 (골든셋 8건 — 등급별 2건)</label>
           <select id="sample-select" onchange="pickSample(this.value)"></select>
@@ -1034,6 +1053,63 @@ async function classifyOne(doc_id, title, content){
   const d=await api('POST','/classify',body);
   enqueue(d, title); markFlow(1);
   return d;
+}
+
+/* 업로드 파일 → 본문 추출 → 분류 패널 채움 (→ 옵션으로 바로 분류).
+ * G1 카드의 goldenDocsFromFiles 와 같은 경로(/documents/analyze · full_text=true)를 쓴다.
+ * full_text 를 주는 이유는 그쪽과 같다 — 기본 응답의 text_preview 는 8K 절단이라 그대로
+ * 쓰면 등급 판단이 잘린 본문 기준이 된다. 추출은 저장하지 않는다(분류해야 큐에 적재). */
+async function classifyFromFile(alsoClassify){
+  const el=$('cl-file');
+  const f=(el && el.files && el.files[0]) || null;
+  const info=$('cl-file-info');
+  if(!f){ if(info) info.textContent='파일을 선택하세요.'; return; }
+  const btns=['btn-extract','btn-extract-classify'].map($).filter(Boolean);
+  btns.forEach(b=>b.disabled=true);
+  if(info) info.textContent=`본문 추출 중 — ${f.name}`;
+  try{
+    const c=cfg();
+    const fd=new FormData();
+    fd.append('file', f);
+    fd.append('full_text','true');
+    const r=await fetch(`${c.base}/documents/analyze`,
+      {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+    if(!r.ok){
+      const t=await r.text();
+      throw Object.assign(new Error(t.slice(0,200)), {status:r.status});
+    }
+    const d=await r.json();
+    const text=(d.text || d.text_preview || '').trim();
+    if(!text){ if(info) info.textContent='추출된 본문이 비어 있습니다 — 스캔본이면 텍스트 레이어가 없을 수 있습니다.'; return; }
+    $('cl-docid').value = `upload-${Date.now()}`;
+    $('cl-title').value = f.name;
+    $('cl-body').value  = text;
+    // 파싱 메타는 최상위가 아니라 parse 아래에 중첩돼 있다(DocumentAnalysisResponse).
+    const pi=d.parse||{}, gate=d.gate||{};
+    const meta=[];
+    if(pi.source_format) meta.push(esc(pi.source_format));
+    if(pi.extraction_method) meta.push(`추출 ${esc(pi.extraction_method)}`);
+    if(pi.extraction_quality!=null) meta.push(`품질 ${pi.extraction_quality}`);
+    if(pi.ocr_used!=null) meta.push(`OCR ${pi.ocr_used?'사용':'미사용'}`);
+    if(pi.table_count) meta.push(`표 ${pi.table_count}`);
+    if(pi.pii_masked_count) meta.push(`PII 마스킹 ${pi.pii_masked_count}`);
+    meta.push(`${text.length}자`);
+    // 검수 게이트가 이미 "사람이 봐야 한다"고 판정했으면 그 사유를 여기서 보여준다 —
+    // 분류 결과만 보고 넘어가면 왜 검수 큐로 가는지 알 수 없다.
+    const gateLine = gate.requires_review
+      ? `<br/><span class="pill warn">검수 필요</span> ${esc((gate.reasons||[]).join(', ')||'게이트 판정')}`
+      : '';
+    const warnLine = (pi.warnings && pi.warnings.length)
+      ? `<br/><span class="pill warn">추출 경고</span> ${esc(pi.warnings.join(', '))}` : '';
+    if(info) info.innerHTML=`<span class="pill ok">추출됨</span> ${esc(f.name)} · ${meta.join(' · ')}${gateLine}${warnLine}`;
+    log(`문서 추출: ${f.name} · ${text.length}자`,'ok');
+    if(alsoClassify) await runClassify();
+  }catch(e){
+    if(info) info.innerHTML=`<span class="pill err">추출 실패</span> ${e.status||''} ${esc(String(e.message||''))}`;
+    log('문서 추출 실패: '+(e.status||e.message),'err');
+  }finally{
+    btns.forEach(b=>b.disabled=false);
+  }
 }
 
 async function runClassify(){
