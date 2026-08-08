@@ -165,6 +165,20 @@ poc/datasets/gold_real/builds/uncertain_*.jsonl
 poc/datasets/gold_real/builds/locked_*.jsonl
 # 일회성 실험 학습셋 (_exp_ 접두 = throwaway 컨벤션, 정본 아님)
 poc/datasets/_exp_*.jsonl
+
+# ── 프록시 골든 파이프라인 산출물 (2026-08-08) ──────────────────────────────
+# 수집·생성 run 출력. 규모(korea_policy_runs 721MB/6,514파일, _artifacts 92MB)도 문제지만
+# records.jsonl·raw_html 이 **문서 전문**을 싣는다 — 위 golden_review/locked_gold_eval 와
+# 같은 취지로 커밋 경로 자체를 막는다. 재현은 각 run 의 manifest.json + 수집 스크립트로.
+# 정본은 proxy_gold 루트의 카탈로그·레지스트리 json 과 정책 md 이며 그쪽은 계속 추적한다.
+poc/datasets/proxy_gold/korea_policy_runs/
+poc/datasets/proxy_gold/public_s3_challenges/*/
+poc/datasets/proxy_gold/public_s3_training/*/
+poc/datasets/public_eval_negatives/
+# 실행 로그·릴리스 tarball·감사 산출물 — 전부 재생성물(_ 접두 throwaway 컨벤션과 동일 취지).
+# deploy/proxy_gold_runtime/ 은 배포 '소스'(compose·model-lock·prefetch)라 추적 대상이다.
+poc/_artifacts/
+poc/.release-build/
 # 데모 파서 샘플용 실 정부문서(KOGL 공고·제안요청서 HWP/HWPX/PDF, 대용량). 웹서빙 static 트리라
 # 부주의 커밋·서빙 노출 차단 — 필요 시 개별 `git add -f`. 추적 픽스처는 success_*.docx/.xlsx 뿐이라
 # 확장자 글롭이 안전(그 외 pdf/hwp/hwpx는 전부 커밋 대상 아닌 실문서).
