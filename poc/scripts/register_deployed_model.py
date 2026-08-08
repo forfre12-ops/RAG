@@ -41,6 +41,15 @@ def metrics_from_report(report: dict, report_path: Path) -> dict:
 
     sample_count 는 confusion_matrix 셀 합으로 산출(report 에 명시 필드가 없어도 안전).
     하드코딩(seed_active_model_version)과 달리 런타임에 실측 report 를 읽는다(드리프트 차단).
+
+    [실측 2026-08-08] 이 매핑은 deploy gate 가 읽는 키와 **계약**이다. 종전에는 fnr_high 와
+    confusion_matrix 를 옮기지 않아, 이 스크립트로 등록한 모델이 게이트를 **영원히 통과할 수
+    없었다** — 이 파일 docstring 이 안내하는 "등록 → activate" 경로가 끝까지 이어지지 않았다.
+    실서버에서 그대로 재현: 배포본 v-fe4b386b 의 report.json 에 fnr_high=0.0625 (floor 0.10
+    이하 → 통과할 값)이 있는데도 활성화가
+        fnr_high_present: 후보에 fnr_high 지표 없음 — 미탐 회귀 검증 불가, 배포 보류(fail-closed)
+    로 막혔고, degenerate 검사도 "confusion_matrix 없음"으로 건너뛰어 무력화돼 있었다.
+    deploy_gate.py 가 읽는 키(fnr_high·f1_macro·confusion_matrix)는 반드시 여기 포함할 것.
     """
     cm = report.get("confusion_matrix") or []
     sample_count = sum(sum(row) for row in cm) if cm else report.get("sample_count")
@@ -49,6 +58,9 @@ def metrics_from_report(report: dict, report_path: Path) -> dict:
         "precision_macro": report.get("precision_macro"),
         "recall_macro": report.get("recall_macro"),
         "f1_macro": report.get("f1_macro"),
+        # ↓ deploy gate 필수 — 빠지면 fail-closed 로 활성화가 영구 차단된다.
+        "fnr_high": report.get("fnr_high"),
+        "confusion_matrix": cm,
         "fnr_overall": report.get("fnr_overall"),
         "fnr_by_grade": report.get("fnr_by_grade") or {},
         "sample_count": sample_count,

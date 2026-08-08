@@ -22,6 +22,7 @@ _REPORT = {
     "recall_macro": 0.7833,
     "f1_macro": 0.7833,
     "fnr_overall": 0.2169,
+    "fnr_high": 0.0625,
     "fnr_by_grade": {"TS": 0.3179, "S1": 0.1792, "S2": 0.1850, "S3": 0.1845},
     "confusion_matrix": [[118, 11, 15, 29], [9, 142, 9, 13], [5, 3, 141, 24], [8, 13, 10, 137]],
 }
@@ -48,6 +49,31 @@ def test_metrics_from_report_maps_fields_and_counts_samples():
     # sample_count 는 confusion_matrix 셀 합(173+173+173+168=687)
     assert m["sample_count"] == 687
     assert m["eval_source"].endswith("report.json")
+
+
+def test_registered_metrics_satisfy_deploy_gate_contract():
+    """등록 매핑 ↔ deploy gate 는 계약이다 — 게이트가 읽는 키가 빠지면 활성화가 영구 차단된다.
+
+    [실측 2026-08-08] 종전 매핑은 fnr_high 와 confusion_matrix 를 옮기지 않아,
+    이 스크립트로 등록한 모델이 게이트를 통과할 수 없었다(fnr_high_present → fail-closed,
+    degenerate → "confusion_matrix 없음"으로 검사 생략). 실서버 배포본 v-fe4b386b 는
+    report.json 에 fnr_high=0.0625 를 갖고 있어 통과했어야 할 모델이었다.
+    키 존재만 보지 않고 **게이트에 실제로 통과시켜** 계약을 고정한다.
+    """
+    from lloydk.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate
+
+    m = metrics_from_report(_REPORT, Path("artifacts/x/report.json"))
+    assert m["fnr_high"] == 0.0625
+    assert m["confusion_matrix"] == _REPORT["confusion_matrix"]
+
+    dec = evaluate_deploy_gate(m, None, first_deploy_fnr_high_max=0.10)
+    named = {c.name: c for c in dec.checks}
+    # fail-closed 축: 지표가 실려야 검사가 성립한다
+    assert named["fnr_high_present"].passed, named["fnr_high_present"].detail
+    # degenerate 검사가 "confusion_matrix 없음"으로 생략되지 않아야 한다
+    assert "없음" not in named["degenerate"].detail
+    # 0.0625 ≤ floor 0.10 → 최초배포 floor 통과
+    assert named["first_deploy_fnr_floor"].passed, named["first_deploy_fnr_floor"].detail
 
 
 def test_metrics_from_report_sample_count_falls_back_without_cm():
