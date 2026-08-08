@@ -152,6 +152,16 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 
 /* DASHBOARD (관제 종합) */
 .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;}
+/* 검수 근거 펼침 — 클릭한 행에서만 조회한다(lazy). */
+.q-why{margin-top:2px;}
+.why-box{margin-top:8px;border:1px solid var(--border-mid);border-radius:8px;padding:9px 11px;background:var(--bg-surface);}
+.why-head{font-size:12px;margin-bottom:7px;}
+.why-agg{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.why-ev{display:flex;align-items:baseline;gap:8px;font-size:12px;padding:4px 0;border-top:1px solid var(--border);}
+.why-ev:first-of-type{border-top:0;}
+.why-t{font-size:10.5px;color:var(--text-faint);white-space:nowrap;min-width:118px;}
+.why-x{flex:1;word-break:break-all;}
+.why-w{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);white-space:nowrap;}
 .dash-panel{border:1px solid var(--border-mid);border-radius:10px;padding:12px 13px;background:var(--bg-surface);display:flex;flex-direction:column;gap:8px;}
 .dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .dash-panel .dp-big{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1;}
@@ -1332,6 +1342,11 @@ function renderQueue(){
         <div>${gradeTag(it.label)} <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${(it.confidence*100).toFixed(0)}%</span> ${it.flagged?'<span class="pill warn">검수</span>':'<span class="pill ok">자동</span>'} ${it.resolved?'<span class="pill ok">완료</span>':(it.pending_second?'<span class="pill warn">2차 검수 필요</span>':'')}</div>
       </div>
       ${it.text_preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:96px;overflow:auto;white-space:pre-wrap;">${esc(it.text_preview)}</div>`:''}
+      ${it.inference_id?`
+      <div class="q-why">
+        <button class="btn sec sm" onclick="toggleWhy(${i})" id="why-btn-${i}">왜 이 등급인가?</button>
+        <div id="why-${i}" class="why-box" style="display:none"></div>
+      </div>`:''}
       ${(it.resolved||it.pending_second)?'':`
       <div class="q-actions">
         <button class="btn sm" onclick="doConfirm(${i})">확정 (현 등급)</button>
@@ -1341,6 +1356,55 @@ function renderQueue(){
       </div>`}
     </div>
   `).join('');
+}
+/* ── 검수 근거: "왜 이 등급인가" (FUN-023 근거 출력 · FUN-024 검수자 UI) ──────────
+ * 큐 목록에는 등급·신뢰도만 있어 검수자가 판단 근거를 볼 수 없었다.
+ * 클릭한 행에서만 조회한다(lazy) — 목록 전체를 미리 불러오면 대기건이 많을 때 낭비다.
+ * 조회 대상은 GET /review-queue/{id}/evidence 로, **분류 시점에 저장된 근거**를 그대로 읽는다.
+ * (/classify/explain 은 쓰지 않는다 — 문서를 다시 분류하므로 큐가 가진 300자 미리보기로는
+ *  원문과 다른 결과가 나오고, 그 사이 모델이 바뀌면 화면 등급과 근거가 어긋난다.) */
+const WHY_CACHE = {};
+function whyRow(e){
+  const w=(e.contribution==null)?'':`<span class="why-w">${Number(e.contribution).toFixed(2)}</span>`;
+  return `<div class="why-ev"><span class="why-t">${esc(e.type||'-')}</span>`
+       + `<span class="why-x">${esc(e.excerpt||'')}</span>${w}</div>`;
+}
+function renderWhy(d){
+  if(d.error==='not_found') return '<div class="sec-note">이 분류를 찾을 수 없습니다.</div>';
+  if(d.error) return `<div class="warnbox">근거 조회 실패: ${esc(d.error)}</div>`;
+  const r=d.recorded||{};
+  const alts=(r.alternatives||[]).map(a=>
+    `${esc(a.level_code||'?')} ${((a.confidence||0)*100).toFixed(1)}%`).join(' · ');
+  const warn=(d.warnings||[]).map(w=>`<div class="sec-note">· ${esc(w)}</div>`).join('');
+  const evs=(d.evidence||[]).map(whyRow).join('') ||
+    '<div class="sec-note">표시할 근거 항목이 없습니다.</div>';
+  const byType=Object.entries(d.by_type||{}).map(([k,v])=>
+    `<span class="pill">${esc(k)} ${Number(v).toFixed(2)}</span>`).join(' ');
+  return `<div class="why-head">판정 <b>${esc(r.grade||'-')}</b>`
+       + (r.confidence!=null?` · 신뢰도 ${(r.confidence*100).toFixed(1)}%`:'')
+       + ` · 모델 <code>${esc(r.model_version||'-')}</code>`
+       + (r.rag_used?' · RAG 사용':'')+'</div>'
+       + (byType?`<div class="why-agg">${byType}</div>`:'')
+       + evs
+       + (alts?`<div class="sec-note" style="margin-top:6px">차순위: ${esc(alts)}</div>`:'')
+       + warn;
+}
+async function toggleWhy(i){
+  const it=QUEUE[i]; if(!it||!it.inference_id) return;
+  const box=$(`why-${i}`), btn=$(`why-btn-${i}`);
+  if(!box) return;
+  if(box.style.display!=='none'){ box.style.display='none'; btn.textContent='왜 이 등급인가?'; return; }
+  box.style.display=''; btn.textContent='근거 접기';
+  const id=it.inference_id;
+  if(WHY_CACHE[id]){ box.innerHTML=renderWhy(WHY_CACHE[id]); return; }
+  box.innerHTML='<div class="sec-note">근거를 불러오는 중…</div>';
+  try{
+    const d=await api('GET',`/review-queue/${encodeURIComponent(id)}/evidence`);
+    WHY_CACHE[id]=d; box.innerHTML=renderWhy(d);
+  }catch(e){
+    box.innerHTML=`<div class="warnbox">근거 조회 실패: ${esc(String(e.status||''))} `
+      + `${esc(e.data?.detail||e.message||'')}</div>`;
+  }
 }
 // 검수 큐 최상단 문서 기준 유사문서 자동 조회(검수 보조). 수동 「DB 검수 큐 불러오기」 때만
 // 발화하고, 실시간 관제 폴링 tick(AUTO_SILENT)에서는 스킵한다 — 임베딩 비용·로그 스팸 방지.

@@ -439,3 +439,88 @@ def to_relabel_response(result: RelabelResult) -> RelabelResponse:
         warnings=result.warnings,
         second_review_required=result.second_review_required,
     )
+
+
+# ── 검수 근거 조회 (FUN-023 근거 출력 · FUN-024 검수자 UI) ──────────────────────
+# [실측 2026-08-08] 검수 큐는 등급·신뢰도만 보여 주고 "왜 이 등급인가"가 없었다.
+# /classify/explain 이 있지만 검수 화면이 쓸 수 없다 — 그 엔드포인트는 **문서를 다시 분류**하고
+# (docstring 1단계), 큐가 가진 본문은 text_preview 300자뿐이라 그 조각으로 돌리면 원문이 아닌
+# 다른 입력을 설명하게 된다. 게다가 재분류는 '지금 활성 모델' 기준이라, 그 사이 모델이 바뀌면
+# 화면의 등급과 근거가 어긋난다.
+#
+# 그럴 필요가 없다. 근거는 분류 시점에 이미 저장된다 —
+# tb_classification_evidence(excerpt·contribution·evidence_type·rag_ref), classify_service 가
+# add_evidence_from_spans 로 기록한다. 실서버 확인: 4건 분류에 13행 적재돼 있었다.
+# 저장분을 읽으면 (1) 재추론 비용 0 (2) 모델 불일치 없음 (3) **그 등급을 실제로 만든 근거**다.
+def load_review_evidence(classification_id) -> dict:
+    """검수 큐 1건의 '왜 이 등급인가' — 저장된 근거를 그대로 돌려준다(재추론 없음).
+
+    반환: {classification_id, recorded{grade·confidence·model_version·alternatives}, evidence[],
+           by_type{}, warnings[]}. 근거가 없으면 evidence=[] + 그 사실을 warnings 로 알린다 —
+    비어 있는 것을 "근거 없음"으로 조용히 넘기지 않는다(룰 경로 미적재/구버전 분류 구분).
+    """
+    out: dict = {"classification_id": str(classification_id), "evidence": [], "warnings": []}
+    try:
+        from sqlalchemy import select  # noqa: PLC0415
+        from lloydk.db.models import (  # noqa: PLC0415
+            Classification, ClassificationEvidence, ClassificationLevel,
+        )
+        with session_scope() as db:
+            row = db.execute(
+                select(Classification, ClassificationLevel.level_code)
+                .join(ClassificationLevel,
+                      ClassificationLevel.level_id == Classification.predicted_level_id)
+                .where(Classification.classification_id == classification_id)
+            ).first()
+            if row is None:
+                return {**out, "error": "not_found"}
+            cls, level_code = row
+            out["doc_id"] = str(cls.doc_id)
+            out["recorded"] = {
+                "grade": level_code,
+                "confidence": float(cls.confidence) if cls.confidence is not None else None,
+                "model_version": cls.model_version,
+                "classified_at": cls.classified_at.isoformat() if cls.classified_at else None,
+                "alternatives": list(cls.alternatives or []),
+                "rag_used": bool(cls.rag_used),
+            }
+            evs = db.execute(
+                select(ClassificationEvidence)
+                .where(ClassificationEvidence.classification_id == classification_id)
+                .order_by(ClassificationEvidence.contribution.desc())
+            ).scalars().all()
+            for e in evs:
+                out["evidence"].append({
+                    "type": e.evidence_type,
+                    "excerpt": e.excerpt,
+                    "contribution": float(e.contribution) if e.contribution is not None else None,
+                    "start": e.excerpt_start,
+                    "end": e.excerpt_end,
+                    "rag_similarity": (float(e.rag_similarity)
+                                       if e.rag_similarity is not None else None),
+                })
+    except SQLAlchemyError as exc:
+        logger.warning("load_review_evidence failed: id=%s err=%s", classification_id, exc)
+        return {**out, "error": "db_unavailable"}
+    except Exception:  # noqa: BLE001
+        logger.exception("load_review_evidence unexpected failure: id=%s", classification_id)
+        return {**out, "error": "lookup_failed"}
+
+    # 유형별 기여도 합 — 화면이 "무엇이 이 등급을 끌어올렸나"를 한눈에 보여줄 수 있게.
+    agg: dict[str, float] = {}
+    for e in out["evidence"]:
+        agg[e["type"]] = round(agg.get(e["type"], 0.0) + (e["contribution"] or 0.0), 3)
+    out["by_type"] = dict(sorted(agg.items(), key=lambda kv: -kv[1]))
+
+    if not out["evidence"]:
+        # 근거 0 은 결함이 아니라 신호다. 적재 조건이 "룰 증거 span 이 잡혔을 때"
+        # (classify_service: `if pred.evidence or pred.rag_context`)이므로, 키워드 앵커 없이
+        # 모델 확률만으로 판정된 건은 남길 근거가 없다. 그리고 그런 건이 바로 신뢰도가 낮아
+        # 검수로 라우팅되는 건이다 — 실서버 실측(2026-08-08)에서 needs_review 8건은 전부 근거 0,
+        # 근거가 있는 건은 confirmed/staging 쪽이었다.
+        # 검수자에게는 "왜 비었는지"와 "그럼 무엇을 보고 판단하는지"를 함께 알려야 한다.
+        out["warnings"].append(
+            "룰 근거(키워드·문맥 앵커)가 잡히지 않은 건입니다 — 모델 확률만으로 판정됐다는 뜻이고, "
+            "검수로 넘어온 이유이기도 합니다. 아래 차순위 등급과 신뢰도를 근거로 판단하십시오."
+        )
+    return out

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query
 
 from lloydk.api._rbac import require_role
@@ -18,6 +20,7 @@ from lloydk.services.confirm_service import (
     ConfirmService,
     RelabelService,
     list_review_queue,
+    load_review_evidence,
     resolve_review_statuses,
     to_confirm_response,
     to_relabel_response,
@@ -97,6 +100,24 @@ def review_queue(
     statuses = resolve_review_statuses(status)
     items, total, warnings = list_review_queue(limit=limit, offset=offset, statuses=statuses)
     return ReviewQueueResponse(items=items, total=total, limit=limit, offset=offset, warnings=warnings)
+
+
+@router.get(
+    "/review-queue/{classification_id}/evidence",
+    summary="검수 1건의 근거 — '왜 이 등급인가' (저장분 조회, 재추론 없음)",
+    description=(
+        "분류 시점에 tb_classification_evidence 로 적재된 근거를 그대로 반환한다(FUN-023 근거 "
+        "출력 · FUN-024 검수자 UI). 재분류하지 않는다 — /classify/explain 은 문서를 다시 "
+        "분류하므로 (1) 큐가 가진 300자 미리보기로는 원문과 다른 결과가 나오고 (2) 그 사이 "
+        "모델이 바뀌면 화면의 등급과 근거가 어긋난다. 저장분은 그 등급을 실제로 만든 근거다. "
+        "근거가 0건이면 evidence=[] 와 함께 그 사실을 warnings 로 알린다(무음 처리하지 않음)."
+    ),
+)
+def review_item_evidence(
+    classification_id: UUID,
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
+) -> dict:
+    return load_review_evidence(classification_id)
 
 
 @router.post("/relabel", response_model=RelabelResponse)
