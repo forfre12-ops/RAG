@@ -3,7 +3,7 @@
 한국지식재산보호원(KOIPA) AI 영업비밀 관리시스템 / 로이드케이 담당 파트.
 문서를 읽어 **TS · S1 · S2 · S3** 4등급으로 분류하고, 사람이 검수한 결과로 다시 학습한다.
 
-> **처음 이 저장소를 여는 분께** — 소스는 33,803줄 / 182 파일이지만, 전부 읽을 필요는 없습니다.
+> **처음 이 저장소를 여는 분께** — 소스는 4만여 줄이지만, 전부 읽을 필요는 없습니다.
 > 아래 **요건별 진입 경로** 표에서 관심 있는 요건 한 줄만 따라가면 4~5개 파일로 끝납니다.
 > 더 자세한 호출 경로는 [docs/CODE_MAP.md](docs/CODE_MAP.md)에 있습니다.
 
@@ -50,21 +50,27 @@
 
 ```
 src/lloydk/
-  api/           25 파일  HTTP 라우터 · 인증 · 미들웨어           (계약)
-  services/      26 파일  유스케이스 조율 · 트랜잭션 경계         (조율)
-  modules/       48 파일  m1~m6 — 실제 AI 파이프라인             (알고리즘)
+  api/            HTTP 라우터 · 인증 · 미들웨어           (계약)
+  services/       유스케이스 조율 · 트랜잭션 경계         (조율)
+  modules/        m1~m6 — 실제 AI 파이프라인             (알고리즘)
     m1_synthesis    합성 문서 생성
     m2_preprocess   추출 · 정규화 · 청킹 · 마스킹
     m3_labeling     룰 엔진 + LLM 라벨링 + 합의
     m4_training     학습 · chunk 확장 · RAG 색인
     m5_inference    서빙 추론 파이프라인
     m6_evaluation   지표 · 배포 게이트 · 능동학습
-  adapters/      28 파일  임베딩 · 벡터스토어 · LLM · 스토리지    (외부 경계)
-  repositories/   9 파일  DB 접근
-  db/             4 파일  SQLAlchemy 모델 · 마이그레이션
-  schemas/       14 파일  Pydantic 요청·응답 계약
-  workers/        3 파일  Celery 비동기 작업
+  adapters/       임베딩 · 벡터스토어 · LLM · 스토리지    (외부 경계)
+  repositories/   DB 접근
+  db/             SQLAlchemy 모델 · 마이그레이션
+  schemas/        Pydantic 요청·응답 계약
+  workers/        Celery 비동기 작업
+  *.py            루트 도메인 모듈 — 계층에 속하지 않는 순수 로직
+                  golden_tiers · golden_signoff · golden_builder · config 등
 ```
+
+> 루트의 `*.py`는 계층 밖입니다. HTTP·DB에 의존하지 않는 순수 함수 묶음이라
+> 어느 계층에서든 import 합니다(`golden_signoff.py`가 대표적 — 시계·DB가 없어 감사에서 재현 가능).
+> **새 파일을 여기 두려면 그 조건을 만족해야 합니다.** 그렇지 않으면 `services/` 또는 `modules/`입니다.
 
 `modules/`의 **m1~m6 번호가 곧 파이프라인 순서**이고, 기능분해도·DFD의 프로세스와 1:1로 대응합니다.
 
