@@ -164,17 +164,29 @@ def _load_jsonl(path: str) -> tuple[list[str], list[int]]:
 
 
 def _parse_sample_weight(value: object, *, path: str, row_number: int) -> float:
-    """Parse one externally supplied sample weight using a fail-closed contract."""
+    """Parse one externally supplied sample weight using a fail-closed contract.
+
+    상한을 두지 않는다(> 0 · 유한만 요구). 종전엔 (0, 1] 이었는데 그 상한이 **정본 학습셋을
+    거부**했다 — datasets/labeled_p1_v5_clean/train.jsonl 2,042행 중 91행(4.5%)이 1.078·1.133
+    이고, 그 학습셋이 배포 모델 artifacts/classifier_p1_v5_clean/v-fe4b386b 를 만들었다.
+    가중이 1 을 넘는 것은 버그가 아니라 설계다 — build_p1_v5_clean.assign_weights 가
+    'tier 신뢰도 × 클래스 희소도'로 계산하며 희소도 상한이 2x 라 최대 1.5 가 나온다.
+    구 gold ×3 **물리 복제를 대체**하는 장치이므로(manifest no_physical_replication) 1 로 자르면
+    희소 클래스(S1/TS) 업웨이팅이 사라진다.
+    실측 2026-08-08(실서버): 이 상한 때문에 재학습이 교정 병합 단계에서 항상 실패했다
+    (ValueError: sample_weight must be finite and in (0, 1] · 실제 값 1.133).
+    쓰레기 값(0·음수·NaN·inf·bool·비수치)은 계속 거부한다 — fail-closed 취지는 유지.
+    """
     if isinstance(value, bool):
-        raise ValueError(f"{path}:{row_number}: sample_weight must be a number in (0, 1]")
+        raise ValueError(f"{path}:{row_number}: sample_weight must be a positive number")
     try:
         weight = float(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(
-            f"{path}:{row_number}: sample_weight must be a number in (0, 1]"
+            f"{path}:{row_number}: sample_weight must be a positive number"
         ) from exc
-    if not math.isfinite(weight) or not 0.0 < weight <= 1.0:
-        raise ValueError(f"{path}:{row_number}: sample_weight must be finite and in (0, 1]")
+    if not math.isfinite(weight) or weight <= 0.0:
+        raise ValueError(f"{path}:{row_number}: sample_weight must be finite and > 0")
     return weight
 
 

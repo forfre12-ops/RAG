@@ -51,13 +51,38 @@ def test_training_loader_defaults_missing_weight_and_accepts_valid_weight(tmp_pa
     assert mode == "documents"
 
 
-@pytest.mark.parametrize("bad_weight", [0, -0.1, 1.01, float("nan"), float("inf"), True, None])
+@pytest.mark.parametrize("bad_weight", [0, -0.1, float("nan"), float("inf"), True, None])
 def test_training_loader_rejects_invalid_sample_weight(tmp_path: Path, bad_weight: object):
     path = tmp_path / "bad.jsonl"
     _write_jsonl(path, [{"text": "문서", "label": "S3", "sample_weight": bad_weight}])
 
     with pytest.raises(ValueError, match="sample_weight"):
         _load_training_jsonl(str(path))
+
+
+@pytest.mark.parametrize("good_weight", [1.0, 1.078, 1.133, 1.5])
+def test_training_loader_accepts_upweighted_sample_weight(tmp_path: Path, good_weight: float):
+    """1 을 넘는 가중은 정상이다 — 희소 클래스 업웨이팅이 물리 복제를 대체한다.
+
+    정본 datasets/labeled_p1_v5_clean/train.jsonl 은 2,042행 중 91행(4.5%)이 1.078·1.133 이고
+    그 학습셋이 배포 모델 v-fe4b386b 를 만들었다. build_p1_v5_clean.assign_weights 의
+    희소도 상한이 2x 라 이론 최대는 1.5. 상한을 1 로 두면 정본 학습셋 자체가 거부된다.
+    """
+    path = tmp_path / "good.jsonl"
+    _write_jsonl(path, [{"text": "문서", "label": "S3", "sample_weight": good_weight}])
+
+    _texts, _labels, weights, _mode = _load_training_jsonl(str(path))
+    assert weights == [good_weight]
+
+
+def test_canonical_training_set_weights_are_accepted():
+    """정본 학습셋을 로더가 통째로 받아들이는가 — 회귀 방어(실서버 재학습 차단 재발 방지)."""
+    path = Path("datasets/labeled_p1_v5_clean/train.jsonl")
+    if not path.exists():
+        pytest.skip("정본 학습셋 미존재(축소 체크아웃)")
+    _texts, _labels, weights, _mode = _load_training_jsonl(str(path))
+    assert weights, "가중이 비어 있다"
+    assert max(weights) > 1.0, "정본에 1 초과 가중이 있어야 한다(희소 업웨이팅)"
 
 
 def test_pre_chunked_input_cannot_be_expanded_twice(tmp_path: Path):
