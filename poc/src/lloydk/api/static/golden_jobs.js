@@ -77,6 +77,15 @@
     try {
       var d = await api('GET', '/golden/jobs?limit=20');
       var jobs = (d && d.jobs) || [];
+      // [실측 2026-08-08] 서버는 ordering:"best_effort" 로 정직하게 고지하지만(Redis SCAN 순서라
+      // 최근순 보장 없음), 화면이 그 순서를 그대로 그리면 방금 만든 잡이 목록 중간에 박힌다.
+      // 실서버 응답이 실제로 07:02 → 07:05 오름차순으로 왔다. 고지만으로는 부족하다 —
+      // 감리 시연 중 "방금 만든 잡"을 눈으로 찾아야 하는 상황이 나온다.
+      // submitted_at(ISO8601·UTC)은 문자열 비교로 시간순이 성립하므로 여기서 내림차순 정렬한다.
+      // 값이 없는 행은 뒤로 보낸다(빈 문자열이 항상 작다).
+      jobs = jobs.slice().sort(function (a, b) {
+        return String(b.submitted_at || '').localeCompare(String(a.submitted_at || ''));
+      });
       if (!jobs.length) {
         box.innerHTML = '<span style="color:var(--text-faint);font-size:12px;">'
           + '골든 잡이 없습니다 — 위에서 후보를 생성하거나 슬레이트를 등록하세요.</span>';
@@ -104,10 +113,12 @@
         + '<th style="text-align:left">상태</th><th style="text-align:right">gold</th>'
         + '<th style="text-align:right">uncertain</th><th style="text-align:left">생성</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        // 정렬 신뢰도는 서버가 응답으로 알려준다 — 화면이 "최신순"이라 단정하지 않는다.
+        // 서버 정렬은 best-effort(Redis SCAN 순서)라, 화면에서 생성 시각으로 다시 정렬해 놓았다.
+        // 그 사실을 밝혀 둔다 — "서버가 준 순서"와 "화면 순서"가 다르다는 것을 감춰선 안 된다.
         + (d.ordering === 'best_effort'
-            ? '<p class="sec-note" style="margin-top:6px;">정렬은 잡 저장소 백엔드 기준 '
-              + '<b>best-effort</b>입니다(최근순 보장 아님) — 생성 시각으로 확인하세요.</p>'
+            ? '<p class="sec-note" style="margin-top:6px;">서버 정렬은 잡 저장소 기준 '
+              + '<b>best-effort</b>(최근순 보장 아님)라, <b>생성 시각으로 최신순 재정렬</b>해 표시합니다. '
+              + '목록이 20건으로 잘리므로 그보다 오래된 잡은 여기 없을 수 있습니다.</p>'
             : '');
       log('골든 잡 목록 ' + jobs.length + '건 조회', 'ok');
     } catch (e) {
