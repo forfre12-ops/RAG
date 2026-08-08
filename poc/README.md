@@ -164,6 +164,7 @@ TESTING=1 python -m pytest -q          # 전체 테스트
 | 배포 가이드 | [docs/DEPLOY_GUIDE.md](docs/DEPLOY_GUIDE.md) · [docs/CLOUD_DEPLOY_RUNBOOK.md](docs/CLOUD_DEPLOY_RUNBOOK.md) |
 | 운영 | [docs/OPERATION.md](docs/OPERATION.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 | 반출·반입 | [docs/EXPORT_IMPORT_RUNBOOK.md](docs/EXPORT_IMPORT_RUNBOOK.md) |
+| KL 프록시 골든·학습 코퍼스 장기 상태 | [docs/KL_PROXY_GOLD_RUNBOOK.md](docs/KL_PROXY_GOLD_RUNBOOK.md) |
 | 관리자 콘솔 사용법 | [docs/관리자콘솔_사용설명서.html](docs/관리자콘솔_사용설명서.html) |
 | 파서 지원 범위 | [docs/parser_support_matrix.json](docs/parser_support_matrix.json) |
 | 릴리스 점검 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |

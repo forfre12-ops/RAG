@@ -32,3 +32,15 @@ datasets/gold_real/*.bak-forged-nkt
 # signoff_slate/ 는 결정적 슬레이트(build_signoff_slate_v1.jsonl)만 tracked.
 # 서명 run 출력 locked_<job_id>.jsonl 은 per-run 산출물 → 무시(정본은 LOCKED_EVAL_JSONL).
 datasets/signoff_slate/locked_*.jsonl
+# 관리자 엑셀 검수 발행/회수본 — 워크북·본문 txt·후보·승격본이 전부 **문서 전문**을 싣는다.
+# 지정 망 외 반출 금지 대상이라 커밋 경로를 아예 막는다(signoff_slate 와 같은 취지).
+# 재현: scripts/export_golden_review_xlsx.py (정본 + 학습코퍼스 해시로 결정적).
+datasets/golden_review/
+# 사람 서명 누적 정본. 검수가 쌓이는 파일이고 문서 전문을 포함한다 → 반출 차단.
+datasets/gold_real/locked_gold_eval.jsonl
+datasets/gold_real/locked_gold_eval.jsonl.lock
+# AI-Hub recipient-approved data and receipts are restricted, local-only inputs.
+# Keep the checked-in schema/template and intake documentation outside these paths.
+datasets/proxy_gold/aihub_runs/
+datasets/proxy_gold/aihub_receipts/
+datasets/proxy_gold/aihub_71813_extracted/

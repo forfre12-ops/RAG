@@ -86,6 +86,7 @@ cp infra-config/.env.template .env
 | `CLASSIFIER_MODEL_DIR` | `/models/classifier-trained` | 컨테이너 내 경로(모델 마운트) |
 | `STORAGE_ENCRYPTION_KEY` | `<64 hex>` | 원본 at-rest 암호화. onprem-local은 암호화 강제라 **없으면 startup 실패** |
 | `LLOYDK_AUDIT_CHAIN_SECRET` | `<64 hex>` | 감사체인 HMAC(NFR-SEC-01). **없으면 api startup 실패** |
+| `GOLDEN_HTML_URL_SECRET` | `<64 hex>` | 골든 검수·서명 화면 서명 URL 키. **없으면 그 화면이 무인증으로 열려 후보 문서 본문이 노출된다**(startup 은 통과하므로 조용히 열린 채 운영됨) |
 | `CORS_ALLOW_ORIGINS` | `["https://<콘솔 오리진>"]` | 운영 모드는 와일드카드(`*`) 거부. **JSON 배열** 형식 |
 
 > 64 hex 생성: `python3 -c "import secrets;print(secrets.token_hex(32))"`

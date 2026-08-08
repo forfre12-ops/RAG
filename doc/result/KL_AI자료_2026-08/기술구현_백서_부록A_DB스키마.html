@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>부록 A — DB 스키마 | KOIPA AI 기술 구현 백서</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-code:#f4f4f4;
+  --bg-nav:rgba(255,255,255,0.80);
+  --text:#0a0a0a; --text-soft:#525252; --text-dim:#737373; --text-faint:#a3a3a3;
+  --border:rgba(0,0,0,0.08); --border-strong:rgba(0,0,0,0.16);
+  --pass:#2a2a2a; --fail:#525252; --warn:#737373; --pend:#737373;
+  --radius-sm:6px; --radius:8px; --radius-lg:12px; --radius-pill:999px;
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.65;letter-spacing:-0.01em;-webkit-font-smoothing:antialiased;}
+::selection{background:var(--text);color:var(--bg);}
+
+.nav{position:sticky;top:0;z-index:50;background:var(--bg-nav);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;white-space:nowrap;min-width:0;line-height:1;}
+.brand-mark{width:32px;height:32px;display:grid;place-items:center;flex-shrink:0;background:#ffffff;border-radius:8px;padding:5px;border:1px solid rgba(0,0,0,0.12);overflow:hidden;}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-0.02em;color:var(--text);}
+.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400;}
+.brand-url{font-family:var(--font-mono);font-size:13.5px;font-weight:400;color:var(--text-dim);letter-spacing:0;}
+.nav-search{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-size:13px;cursor:pointer;transition:all .15s;min-width:200px;}
+.nav-search:hover{border-color:var(--border-strong);color:var(--text-soft);}
+.nav-search kbd{font-family:var(--font-mono);font-size:10.5px;padding:1px 6px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--bg);color:var(--text-dim);margin-left:auto;}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+.nav-link{color:var(--text-soft);text-decoration:none;font-size:13.5px;font-weight:500;padding:6px 10px;border-radius:var(--radius-sm);transition:color .15s;}
+.nav-link:hover{color:var(--text);}
+.brand-sub{font-size:13px;color:var(--text-dim);}
+.nav-pills{display:flex;gap:6px;}
+.nav-pill{font-size:12px;padding:4px 10px;border-radius:var(--radius-pill);background:var(--bg-surface);border:1px solid var(--border);color:var(--text-dim);text-decoration:none;font-family:var(--font-mono);}
+.nav-pill:hover{border-color:var(--border-strong);color:var(--text);}
+.nav-pill.active{background:var(--text);color:var(--bg);border-color:var(--text);}
+
+.page{max-width:1380px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:0;padding:0 32px;}
+.sidebar{order:2;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;padding:28px 0;border-right:1px solid var(--border);}
+.sidebar::-webkit-scrollbar{width:3px;}.sidebar::-webkit-scrollbar-thumb{background:var(--border-strong);}
+.toc-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 20px 10px;font-family:var(--font-mono);}
+.toc-item{display:block;padding:4px 20px;font-size:12.5px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent;transition:all .12s;line-height:1.4;}
+.toc-item:hover{color:var(--text);border-left-color:var(--border-strong);}
+.toc-item.active{color:var(--text);border-left-color:var(--text);font-weight:600;}
+.toc-group{margin-top:12px;}
+.toc-group-label{font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);padding:0 20px 4px;font-family:var(--font-mono);}
+.toc-item.sub{padding-left:30px;font-size:12px;}
+
+article{padding:40px 0 100px 48px;min-width:0;}
+.meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:var(--radius-pill);background:var(--text);color:var(--bg);font-size:9.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-family:var(--font-mono);}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+h1.title{font-size:40px;font-weight:800;letter-spacing:-0.04em;line-height:1.08;margin:0 0 16px;}
+.lede{font-size:16px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0 0 32px;max-width:640px;}
+.hero-sep{border:none;border-top:1px solid var(--border-strong);margin:36px 0 44px;}
+section{padding-top:4px;}
+article h2{font-size:24px;font-weight:700;letter-spacing:-0.025em;margin:64px 0 8px;scroll-margin-top:80px;display:flex;align-items:baseline;gap:12px;}
+article h2 .num{font-family:var(--font-mono);font-size:10.5px;font-weight:500;color:var(--text-dim);padding:2px 7px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);line-height:1;}
+article h2+.h2-sub{color:var(--text-dim);font-size:13.5px;margin:0 0 20px;max-width:640px;}
+article h3{font-size:16px;font-weight:600;margin:28px 0 10px;letter-spacing:-0.015em;}
+article h3 .logical-name{font-weight:400;font-size:14px;color:var(--text-soft);margin-left:10px;padding-left:10px;border-left:1px solid var(--border-strong);font-family:var(--font-sans);}
+/* ===== ERD name toggle ===== */
+.erd-toggle{display:inline-flex;align-items:center;border:1px solid var(--border-strong);border-radius:var(--radius-pill);overflow:hidden;font-family:var(--font-mono);font-size:11px;background:#fff;}
+.erd-toggle button{border:none;background:transparent;padding:5px 12px;cursor:pointer;color:var(--text-dim);font:inherit;transition:all .12s;}
+.erd-toggle button.active{background:var(--text);color:var(--bg);font-weight:600;}
+.erd-toggle button:not(.active):hover{color:var(--text);background:var(--bg-surface);}
+article p{margin:10px 0;color:var(--text);}
+
+/* ===== Table ===== */
+.tbl-wrap{overflow-x:auto;margin:12px 0;border-radius:var(--radius-lg);border:1px solid var(--border);min-width:0;}
+table{min-width:0;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead{background:var(--bg-surface);}
+th{padding:9px 13px;text-align:left;font-weight:600;font-size:11px;letter-spacing:0.02em;color:var(--text-soft);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:8px 13px;border-bottom:1px solid rgba(0,0,0,0.05);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--bg-surface);}
+.td-pk{color:#404040;font-weight:700;font-family:var(--font-mono);font-size:11.5px;}
+.td-fk{color:rgba(0,0,0,.55);font-weight:600;font-family:var(--font-mono);font-size:11.5px;}
+.td-col{font-family:var(--font-mono);font-size:12px;}
+.td-type{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);}
+.td-nn{font-size:11px;text-align:center;}
+.td-nn.yes{color:rgba(0,0,0,.45);}
+.td-pass{color:var(--text);font-weight:600;}
+.td-warn{color:rgba(0,0,0,.55);}
+.td-center{text-align:center;}
+code{font-family:var(--font-mono);font-size:12px;background:var(--bg-code);padding:1px 5px;border-radius:4px;border:1px solid var(--border);}
+pre{background:var(--bg-code);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;font-family:var(--font-mono);font-size:12px;line-height:1.6;margin:12px 0;}
+
+/* ===== Group header ===== */
+.group-header{display:flex;align-items:center;gap:10px;margin:48px 0 12px;}
+.group-badge{padding:3px 10px;border-radius:var(--radius-pill);font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:0.05em;background:var(--text);color:var(--bg);}
+.group-title{font-size:18px;font-weight:700;letter-spacing:-0.02em;}
+.group-desc{font-size:13px;color:var(--text-dim);margin:-8px 0 12px;}
+
+/* ===== Index chip ===== */
+.idx-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:var(--radius-pill);font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-dim);margin:2px;}
+
+/* ===== ERD relations ===== */
+.rel-list{list-style:none;padding:0;margin:8px 0;font-size:12.5px;}
+.rel-list li{padding:4px 0;display:flex;align-items:center;gap:8px;color:var(--text-soft);}
+.rel-list li code{font-size:11.5px;}
+.rel-arrow{color:var(--text-faint);font-size:12px;}
+
+/* ===== Partition callout ===== */
+.partition-box{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.12);border-radius:var(--radius);padding:12px 14px;margin:10px 0;font-size:13px;}
+
+/* ===== 협의 필요 (KL 인터페이스 합의 미완) — 눈에 띄는 색상 ===== */
+.nego{background:#fff7ed;border:1px solid #fdba74;border-left:4px solid #f59e0b;border-radius:0;padding:11px 14px;margin:10px 0;font-size:13px;line-height:1.55;color:#9a3412;}
+.nego-label{display:inline-block;background:#f59e0b;color:#fff;font-size:9.5px;font-weight:700;letter-spacing:0.05em;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);margin-right:7px;text-transform:uppercase;}
+.nego-chip{display:inline-block;background:#fff7ed;color:#b45309;border:1px solid #fdba74;border-radius:3px;padding:1px 8px;font-size:10.5px;font-weight:700;font-family:var(--font-mono);white-space:nowrap;}
+tr.nego-row td{background:#fff7ed !important;}
+.new-badge{display:inline-block;background:#16a34a;color:#fff;font-size:9px;font-weight:700;letter-spacing:0.04em;padding:1px 7px;border-radius:3px;font-family:var(--font-mono);margin-left:8px;vertical-align:middle;text-transform:uppercase;}
+
+footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color:var(--text-dim);display:flex;justify-content:space-between;max-width:1380px;margin:0 auto;}
+@media(max-width:1200px){.nav-search{display:none;}}
+@media(max-width:900px){
+  .page{grid-template-columns:1fr;padding:0 20px;}
+  .sidebar{display:none;}
+  article{padding:28px 0 60px;}
+  h1.title{font-size:32px;}
+}
+@media(max-width:600px){
+  .nav-inner{padding:12px 14px;}
+  .brand-url{display:none;}
+  .nav-link.hide-sm{display:none;}
+  .page{padding:0 14px;}
+  h1.title{font-size:26px;}
+  article{padding:20px 0 50px;}
+  .tbl-wrap{border-radius:4px;}
+  table{font-size:11.5px;}
+  th,td{padding:6px 8px;}
+  .group-title{font-size:16px;}
+  footer{flex-direction:column;gap:4px;padding:16px 14px;}
+}
+@media(max-width:480px){
+  .nav-inner{padding:10px 12px;gap:4px;}
+  .nav-link{font-size:12px;padding:4px 6px;}
+  h1.title{font-size:22px;letter-spacing:-0.03em;}
+  .lede{font-size:13.5px;}
+  article{padding:16px 0 40px;}
+  table{font-size:11px;}
+  th,td{padding:5px 6px;}
+  .group-title{font-size:15px;}
+  code{font-size:11px;}
+  footer{font-size:11px;padding:14px 12px;}
+}
+@media print{
+  .nav,.sidebar,footer{display:none!important;}
+  .page{grid-template-columns:1fr;padding:0;}
+  article{padding:0;}
+  body{font-size:12px;}
+  table{break-inside:avoid;}
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="Lloydk" /></span>
+      <span class="brand-name">로이드케이</span>
+      <span class="brand-sep">·</span>
+      <span class="brand-url">lloydk.co.kr</span>
+    </a>
+    <div class="nav-actions">
+      <div class="nav-search" role="search" aria-label="Search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search whitepaper
+        <kbd>⌘K</kbd>
+      </div>
+      <a class="nav-link" href="기술구현_백서_v7.html">← 본문</a>
+      <a class="nav-link" href="#overview">ERD</a>
+      <a class="nav-link hide-sm" href="#grp-c">청크</a>
+      <a class="nav-link hide-sm" href="#grp-e">추론</a>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <aside class="sidebar">
+    <div class="toc-title">DB 그룹</div>
+    <a class="toc-item" href="#overview">개요 · ERD</a>
+    <div class="toc-group">
+      <div class="toc-group-label">도메인 (Lloydk 소유)</div>
+      <a class="toc-item" href="#grp-b">A 등급체계</a>
+      <a class="toc-item sub" href="#t-classification-levels">tb_classification_levels</a>
+      <a class="toc-item sub" href="#t-evaluation-factors">tb_evaluation_factors</a>
+      <a class="toc-item sub" href="#t-level-keywords">tb_level_keywords</a>
+      <a class="toc-item" href="#grp-c">B 청크</a>
+      <a class="toc-item sub" href="#t-tb_chunks">tb_chunks (파티션)</a>
+      <a class="toc-item" href="#grp-d">C 라벨링</a>
+      <a class="toc-item sub" href="#t-document-labels">tb_document_labels</a>
+      <a class="toc-item sub" href="#t-factor-scores">tb_document_factor_scores</a>
+      <a class="toc-item" href="#grp-e">D 추론</a>
+      <a class="toc-item sub" href="#t-tb_classifications">tb_classifications</a>
+      <a class="toc-item sub" href="#t-evidence">tb_classification_evidence</a>
+      <a class="toc-item" href="#grp-f">E 학습</a>
+      <a class="toc-item sub" href="#t-model-versions">tb_model_versions</a>
+      <a class="toc-item sub" href="#t-training-runs">tb_training_runs</a>
+      <a class="toc-item sub" href="#t-training-epochs">tb_training_epochs</a>
+      <a class="toc-item sub" href="#t-training-datasets">tb_training_datasets</a>
+      <a class="toc-item" href="#grp-g">F 보정</a>
+      <a class="toc-item" href="#grp-h">G 합성</a>
+    </div>
+  </aside>
+
+  <article>
+    <div class="meta-row">
+      <span class="badge">부록 A</span>
+      <span class="badge outline">DB Schema</span>
+      <span style="color:var(--text-dim);font-size:12px;">·</span>
+      <span style="color:var(--text-dim);font-size:12px;">PostgreSQL 16 · SQLAlchemy ORM · 19테이블 + RAG 2테이블 (Lloydk 소유)</span>
+      <span style="color:var(--text-dim);font-size:12px;">·</span>
+      <span style="color:var(--text-dim);font-size:12px;">2026-07-17 갱신</span>
+    </div>
+    <h1 class="title">DB 스키마</h1>
+  <div style="margin:10px 0 16px;padding:8px 13px;border-left:3px solid #0a0a0a;background:#fafafa;font-size:12.5px;color:#3f3f46;"><b>2026-08-02 재확인</b> — 본문 작성일은 2026-07-17 이며, 그 이후 변경 사항이 없음을 2026-08-02 확인했다. 기준 데이터: 배포본 <code>v5_clean(v-fe4b386b)</code> · 골든 정본 <code>gold_real</code> 777건.</div>
+  <div class="direction-pivot-notice" style="margin:16px 0 18px;padding:14px 16px;border:1px solid #d4d4d8;background:#fafafa;color:#27272a;font-size:13.5px;line-height:1.65;">
+    <b>운영 전제:</b> 지재원 단계는 공개·합성 데이터 기반 <b>구축 단계</b>이고, 비밀 실문서 검수·사람 서명 평가는 고객사 폐쇄망 <b>운영 단계</b>에서 수행한다. <code>locked_gold_eval</code> 0건은 누락이 아니라 <b>단계 분리의 결과</b>다. 상세는 <a href="골든셋_종합.html">골든셋 종합</a> 참조.
+  </div>
+    <p class="lede">현재 ORM 기준 19개 테이블과 Alembic SQL의 RAG 2테이블(<code>tb_rag_vectors</code> 임베딩 · <code>tb_rag_aliases</code> 무중단 재색인 alias)을 운영한다. <code>tb_chunks</code>·<code>tb_llm_usage</code>·<code>tb_audit_log</code>는 월별 RANGE PARTITION 부모 테이블이다. 채점은 3요건(S·V·M) 곱셈식(B안)으로 정합되어 있다.</p>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;max-width:700px;">본 부록은 <b>현재 소스가 생성·매핑하는 Lloydk 애플리케이션 테이블</b>을 다룬다 — AI 코어 6모듈(M1 합성·M2 청킹·M3 라벨링·M4 학습·M5 추론·M6 보정), 등급체계, 문서/감사/비용/가이드 운영 테이블. 현 ORM에는 <code>tb_documents</code>, <code>tb_audit_log</code>, <code>tb_llm_usage</code>, <code>tb_guides</code>도 Lloydk 모델로 포함된다. KL 원천 문서·EDMS·회원/권한·자가진단(<code>tb_self_assessments</code>)은 외부 시스템이며, 연동 키는 <code>external_ref</code>와 메타데이터로 다룬다.</p>
+    <hr class="hero-sep">
+
+    <!-- Overview -->
+    <section id="overview">
+      <h2><span class="num">개요</span> ERD 관계도</h2>
+      <div class="erd-diagram" style="overflow-x:auto;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:18px;margin:16px 0;background:#fafafa;">
+<style>.erd-edge{stroke:#cbd5e1;stroke-width:1.1;fill:none;transition:stroke .12s,stroke-width .12s,opacity .12s;}.erd-edge.down{stroke:#2563eb;stroke-width:2.6;}.erd-edge.up{stroke:#f59e0b;stroke-width:2.6;}.erd-node{cursor:pointer;}.erd-node rect{transition:stroke .12s,stroke-width .12s,opacity .12s;}.erd-node:hover rect{stroke:#1e293b;stroke-width:2;}.erd-node.sel rect{stroke:#111;stroke-width:2.8;}.erd-node.reldown rect{stroke:#2563eb;stroke-width:2.4;}.erd-node.relup rect{stroke:#f59e0b;stroke-width:2.4;}.erd-dim{opacity:.25;}</style><svg viewBox="0 0 1196 574" width="100%" style="max-width:1196px;font-family:ui-monospace,Menlo,Consolas,monospace" xmlns="http://www.w3.org/2000/svg"><defs><marker id="erar" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6" fill="none" stroke="#9aa5b5" stroke-width="1.1"/></marker></defs><text x="438" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">기준·모델</text><text x="758" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">분류·라벨·학습·샘플</text><text x="1078" y="16" text-anchor="middle" font-size="10.5" fill="#64748b" font-weight="bold">파생(증거·보정·에폭)</text><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_classifications" d="M538,208 C598,208 598,104 658,104" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_level_keywords" d="M538,213 C598,213 598,156 658,156" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_document_labels" d="M538,217 C598,217 598,225 658,225" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_corrections" d="M538,222 C758,222 758,249 978,249" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_sample_documents" d="M538,231 C598,231 598,390 658,390" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classification_levels" data-to="tb_training_datasets" d="M538,226 C758,226 758,365 978,365" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_level_keywords" d="M538,270 C598,270 598,167 658,167" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_classification_evidence" d="M538,278 C758,278 758,196 978,196" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_evaluation_factors" data-to="tb_document_factor_scores" d="M538,286 C598,286 598,283 658,283" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classifications" data-to="tb_classification_evidence" d="M858,98 C918,98 918,185 978,185" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_classifications" data-to="tb_corrections" d="M858,109 C918,109 918,241 978,241" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_model_versions" data-to="tb_training_runs" d="M538,336 C598,336 598,336 658,336" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_training_epochs" d="M858,336 C918,336 918,307 978,307" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_corrections" d="M858,328 C918,328 918,257 978,257" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_training_runs" data-to="tb_training_datasets" d="M858,344 C918,344 918,373 978,373" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_prompt_versions" data-to="tb_sample_documents" d="M538,394 C598,394 598,403 658,403" marker-end="url(#erar)"/><path class="erd-edge" data-from="tb_model_versions" data-to="tb_model_versions" d="M538,329 C560,315 560,357 538,343" marker-end="url(#erar)"/><text x="563" y="339" font-size="9" fill="#64748b">rollback</text><g class="erd-node" data-table="tb_classification_levels"><rect x="338" y="204" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="224" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classification_levels</text></g><g class="erd-node" data-table="tb_evaluation_factors"><rect x="338" y="262" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="282" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_evaluation_factors</text></g><g class="erd-node" data-table="tb_model_versions"><rect x="338" y="320" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="340" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_model_versions</text></g><g class="erd-node" data-table="tb_prompt_versions"><rect x="338" y="378" width="200" height="32" rx="5" fill="#dcfce7" stroke="#475569" stroke-width="1.1"/><text x="438" y="398" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_prompt_versions</text></g><g class="erd-node" data-table="tb_chunks"><rect x="658" y="30" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="50" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_chunks</text></g><g class="erd-node" data-table="tb_classifications"><rect x="658" y="88" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="108" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classifications</text></g><g class="erd-node" data-table="tb_level_keywords"><rect x="658" y="146" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="166" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_level_keywords</text></g><g class="erd-node" data-table="tb_document_labels"><rect x="658" y="204" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="224" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_document_labels</text></g><g class="erd-node" data-table="tb_document_factor_scores"><rect x="658" y="262" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="282" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_document_factor_scores</text></g><g class="erd-node" data-table="tb_training_runs"><rect x="658" y="320" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="340" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_runs</text></g><g class="erd-node" data-table="tb_sample_documents"><rect x="658" y="378" width="200" height="32" rx="5" fill="#fef9c3" stroke="#475569" stroke-width="1.1"/><text x="758" y="398" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_sample_documents</text></g><g class="erd-node" data-table="tb_classification_evidence"><rect x="978" y="175" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="195" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_classification_evidence</text></g><g class="erd-node" data-table="tb_corrections"><rect x="978" y="233" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="253" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_corrections</text></g><g class="erd-node" data-table="tb_training_epochs"><rect x="978" y="291" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="311" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_epochs</text></g><g class="erd-node" data-table="tb_training_datasets"><rect x="978" y="349" width="200" height="32" rx="5" fill="#fee2e2" stroke="#475569" stroke-width="1.1"/><text x="1078" y="369" text-anchor="middle" font-size="11.5" fill="#0f172a">tb_training_datasets</text></g></svg>
+<script>(function(){var root=document.currentScript.parentNode;var nodes=root.querySelectorAll(".erd-node");var edges=root.querySelectorAll(".erd-edge");
+function clear(){edges.forEach(function(e){e.classList.remove("down","up","erd-dim");});nodes.forEach(function(n){n.classList.remove("sel","reldown","relup","erd-dim");});}
+nodes.forEach(function(node){node.addEventListener("click",function(ev){ev.stopPropagation();var t=node.dataset.table;var was=node.classList.contains("sel");clear();if(was)return;var rel={};rel[t]=1;node.classList.add("sel");
+edges.forEach(function(e){var f=e.dataset.from,to=e.dataset.to;
+if(f===t&&to!==t){e.classList.add("down");rel[to]=1;var n=root.querySelector('.erd-node[data-table="'+to+'"]');if(n)n.classList.add("reldown");}
+else if(to===t&&f!==t){e.classList.add("up");rel[f]=1;var m=root.querySelector('.erd-node[data-table="'+f+'"]');if(m)m.classList.add("relup");}
+else if(f===t&&to===t){e.classList.add("down");}});
+edges.forEach(function(e){if(!e.classList.contains("down")&&!e.classList.contains("up"))e.classList.add("erd-dim");});
+nodes.forEach(function(n){if(!rel[n.dataset.table])n.classList.add("erd-dim");});});});
+document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))clear();});})();</script>
+<div style="display:flex;gap:18px;align-items:center;font-size:12px;color:#475569;margin:10px 2px 0;flex-wrap:wrap;"><span class="erd-toggle" role="group" aria-label="ERD 이름 표시 전환"><button type="button" data-mode="phys" class="active">물리명</button><button type="button" data-mode="logical">논리명</button></span><span><b>박스 클릭</b> → 관계 강조 (다시 클릭/빈곳 클릭 = 해제)</span><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:22px;height:3px;background:#2563eb;display:inline-block;"></span>하위(자식)</span><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:22px;height:3px;background:#f59e0b;display:inline-block;"></span>상위(부모)</span></div>
+<script>(function(){var root=document.currentScript.parentNode;var LOGICAL={"tb_chunks":"청크","tb_classification_levels":"분류 등급","tb_evaluation_factors":"평가 요건","tb_level_keywords":"등급 키워드","tb_classifications":"분류 결과","tb_classification_evidence":"분류 근거","tb_document_labels":"문서 라벨","tb_document_factor_scores":"문서 요건 점수","tb_model_versions":"모델 버전","tb_training_runs":"학습 실행","tb_training_epochs":"학습 에폭","tb_training_datasets":"학습 데이터셋","tb_corrections":"보정","tb_prompt_versions":"프롬프트 버전","tb_sample_documents":"합성 샘플 문서"};
+var texts=root.querySelectorAll(".erd-node text");var btns=root.querySelectorAll(".erd-toggle button");
+function apply(mode){texts.forEach(function(t){var k=t.closest(".erd-node").dataset.table;if(mode==="logical"){t.textContent=LOGICAL[k]||k;t.setAttribute("font-size","11");}else{t.textContent=k;t.setAttribute("font-size","11.5");}});btns.forEach(function(b){b.classList.toggle("active",b.dataset.mode===mode);});}
+btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.mode);});});})();</script>
+</div>
+      <p style="font-size:12px;color:#888;margin:-6px 0 18px;">※ 이 ERD 그림은 핵심 AI 테이블 중심의 축약도다. 현재 ORM에는 <code>tb_documents</code>·<code>tb_audit_log</code>·<code>tb_llm_usage</code>·<code>tb_guides</code>가 추가로 매핑되어 있으며, <code>tb_rag_vectors</code>는 Alembic SQL로 생성된다. 미표시(오프라인) 시에도 아래 관계와 운영 테이블 메모를 함께 본다.</p>
+      <div class="group-desc">핵심 외래키 관계 (텍스트)</div>
+      <ul class="rel-list">
+        <li><code>tb_chunks</code> <span class="rel-arrow">→</span> <code>tb_documents</code> (doc_id · <b>Lloydk 문서 레코드</b>, KL 원천 키는 <code>external_ref</code>)</li>
+        <li><code>tb_classifications</code> <span class="rel-arrow">→</span> <code>tb_documents</code> · <code>tb_classification_levels</code></li>
+        <li><code>tb_classification_evidence</code> <span class="rel-arrow">→</span> <code>tb_classifications</code> · <code>tb_evaluation_factors</code></li>
+        <li><code>tb_document_labels</code> <span class="rel-arrow">→</span> <code>tb_documents</code> · <code>tb_classification_levels</code></li>
+        <li><code>tb_level_keywords</code> <span class="rel-arrow">→</span> <code>tb_classification_levels</code> · <code>tb_evaluation_factors</code></li>
+        <li><code>tb_training_runs</code> <span class="rel-arrow">→</span> <code>tb_model_versions</code></li>
+        <li><code>tb_model_versions</code> <span class="rel-arrow">→</span> <code>tb_model_versions</code> (rolled_back_from, self FK — 롤백 출처)</li>
+        <li><code>tb_training_epochs</code> <span class="rel-arrow">→</span> <code>tb_training_runs</code></li>
+        <li><code>tb_training_datasets</code> <span class="rel-arrow">→</span> <code>tb_training_runs</code> · <code>tb_documents</code> · <code>tb_classification_levels</code></li>
+        <li><code>tb_corrections</code> <span class="rel-arrow">→</span> <code>tb_classifications</code> · <code>tb_classification_levels</code> · <code>tb_training_runs</code></li>
+        <li><code>tb_sample_documents</code> <span class="rel-arrow">→</span> <code>tb_classification_levels</code> · <code>tb_prompt_versions</code></li>
+      </ul>
+      <div class="partition-box">⚡ <b>파티션 테이블 3개</b> — <code>tb_chunks</code>(<code>RANGE BY created_at</code>) · <code>tb_llm_usage</code>(<code>RANGE BY called_at</code>) · <code>tb_audit_log</code>(<code>RANGE BY occurred_at</code>)가 모두 월별 RANGE 파티션 부모다(baseline 000000000001 + backfill e5f6a7b8c9d0). ORM은 부모만 매핑하며, INSERT는 자동 라우팅. 그 외 운영 테이블: <code>tb_documents</code>(문서·URI·메타), <code>tb_guides</code>(가이드 버전), <code>tb_rag_vectors</code>(pgvector RAG 저장소), <code>tb_rag_aliases</code>(무중단 재색인 alias).</div>
+    </section>
+
+    <!-- Group A — 등급체계 -->
+    <div class="group-header" id="grp-b">
+      <span class="group-badge">A</span>
+      <span class="group-title">등급체계</span>
+    </div>
+    <div class="group-desc">TS·S1·S2·S3 등급 정의, 평가 인자(정본 3요건 S·V·M), 키워드 시드.</div>
+
+    <section id="t-classification-levels">
+      <h3>tb_classification_levels<span class="logical-name">분류 등급</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">level_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">level_code</td><td class="td-type">VARCHAR(20) UNIQUE</td><td class="td-nn yes">●</td><td>TS · S1 · S2 · S3</td></tr>
+          <tr><td class="td-col">level_name</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>특급기밀 / 기밀 / 대외비 / 일반</td></tr>
+          <tr><td class="td-col">level_order</td><td class="td-type">SMALLINT</td><td class="td-nn yes">●</td><td>정렬 순서 (1=최고등급)</td></tr>
+          <tr><td class="td-col">color_hex</td><td class="td-type">VARCHAR(7)</td><td></td><td>UI 표시 색상 (#525252 등)</td></tr>
+          <tr><td class="td-col">loss_weight</td><td class="td-type">NUMERIC(4,2)</td><td></td><td>class_weighted loss 가중치</td></tr>
+          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">created_by</td><td class="td-type">VARCHAR(50)</td><td></td><td></td></tr>
+        </tbody>
+      </table></div>
+      <div><span class="idx-chip">IDX is_active, level_order</span></div>
+    </section>
+
+    <section id="t-evaluation-factors">
+      <h3>tb_evaluation_factors<span class="logical-name">평가 요건</span></h3>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">정본 <b>3요건</b> 체계. 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M), 각 요건 0·1·2점의 <b>곱셈식</b>(B안, 2026-06-18 전환). 곱 매핑: S=2·V=2일 때 곱≥4(M≥1)→TS·M=0→S1, 그 외 곱≥1→S2·곱=0→S3 (<code>grade_from_svm</code>). 곱셈식이라 <code>weight</code> 컬럼은 미사용(하위호환 1.0). 레거시 4요소는 <code>is_active=FALSE</code>로 보존(키워드 시드 태그 및 FK 정합 유지, migration <code>c7d8e9f0a1b2</code>). 정본/레거시 매핑은 <code>LEGACY_FACTOR_ALIAS</code>로 3요건에 폴딩(LEAK_IMPACT→VALUE).</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">factor_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">factor_code</td><td class="td-type">VARCHAR(30) UNIQUE</td><td class="td-nn yes">●</td><td>정본: SECRECY · VALUE · MANAGEMENT (is_active=TRUE) / 레거시(is_active=FALSE): NON_PUBLICITY · ECONOMIC_VALUE · MANAGEMENT_LEVEL · LEAK_IMPACT</td></tr>
+          <tr><td class="td-col">factor_name</td><td class="td-type">VARCHAR(100)</td><td class="td-nn yes">●</td><td>비공지성(S) / 경제적 유용성(V) / 비밀관리성(M)</td></tr>
+          <tr><td class="td-col">weight</td><td class="td-type">NUMERIC(3,2)</td><td class="td-nn yes">●</td><td>미사용 (곱셈식 등급 = S×V×M, 가중치 가산 안 함). 하위호환 기본 1.0. weight 합계=1.0 트리거 제거됨</td></tr>
+          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>정본 3요건 TRUE · 레거시 4요소 FALSE</td></tr>
+        </tbody>
+      </table></div>
+      <div class="partition-box" style="margin-top:8px;">요건별 점수 기준(LLM 라벨러 정본 룰브릭) — <b>S</b>: 0=이미 공개·1=통상적 입수 곤란·2=보유자 통하지 않곤 모름 / <b>V</b>: 0=가치 없음·1=비용·노력 투입·2=상당한 비용·노력 / <b>M</b>: 0=공개·관리 안됨·1=임직원 일부 공유·2=승인된 자만. 한 요건이 0이면 곱=0 → S3. 단 <b>S=2·V=2·M=0은 S1 예외</b>(관리 미공식화 고가치 영업비밀).</div>
+    </section>
+
+    <section id="t-level-keywords">
+      <h3>tb_level_keywords<span class="logical-name">등급 키워드</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">keyword_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">level_id</td><td class="td-type">FK → tb_classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">keyword</td><td class="td-type">VARCHAR(200)</td><td class="td-nn yes">●</td><td>예: "영업비밀" · "M&A" · "연구노트"</td></tr>
+          <tr><td class="td-col">pattern_type</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>exact / regex / semantic</td></tr>
+          <tr><td class="td-fk">factor_id</td><td class="td-type">FK → tb_evaluation_factors</td><td></td><td>키워드와 연결되는 평가 인자</td></tr>
+          <tr><td class="td-col">weight</td><td class="td-type">NUMERIC(3,2)</td><td></td><td>해당 키워드의 등급 기여 가중치</td></tr>
+          <tr><td class="td-col">source</td><td class="td-type">VARCHAR(30)</td><td></td><td>manual / seed_v4 / llm_generated</td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">IDX level_id, is_active</span>
+        <span class="idx-chip">GIN keyword gin_trgm_ops (트라이그램 검색)</span>
+      </div>
+    </section>
+
+    <!-- Group B -->
+    <div class="group-header" id="grp-c">
+      <span class="group-badge">B</span>
+      <span class="group-title">청크</span>
+    </div>
+    <div class="group-desc">Lloydk 문서 레코드(<code>tb_documents</code>)와 KL 원천 참조(<code>external_ref</code>)에서 M2 전처리로 생성한 청크 파티션 테이블.</div>
+
+    <section id="t-tb_chunks">
+      <h3>tb_chunks<span class="logical-name">청크</span> <span style="font-size:12px;font-weight:400;color:var(--text-dim);font-family:var(--font-mono);">RANGE PARTITION (created_at)</span></h3>
+      <div class="partition-box">월별 자식 파티션으로 자동 라우팅. ORM은 부모만 매핑. INSERT는 created_at 기준 분배.</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">chunk_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">doc_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td>Lloydk <code>tb_documents</code> 참조. KL 원천 문서 키는 <code>external_ref</code></td></tr>
+          <tr><td class="td-col">chunk_index</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td>문서 내 청크 순서 (0-based)</td></tr>
+          <tr><td class="td-col">content</td><td class="td-type">TEXT</td><td class="td-nn yes">●</td><td>청크 본문 (512 token 기준)</td></tr>
+          <tr><td class="td-col">token_count</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td>최대 512</td></tr>
+          <tr><td class="td-col">char_count</td><td class="td-type">INTEGER</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">page_start / page_end</td><td class="td-type">SMALLINT</td><td></td><td>원문 페이지 범위</td></tr>
+          <tr><td class="td-col">section_path</td><td class="td-type">TEXT[]</td><td></td><td>계층 섹션 경로 (예: ["3장", "3.1절"])</td></tr>
+          <tr><td class="td-col">overlap_prev / overlap_next</td><td class="td-type">SMALLINT</td><td></td><td>overlap 토큰 수 (기본 64)</td></tr>
+          <tr><td class="td-col">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td>파티션 키</td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">PK (chunk_id, created_at)</span>
+        <span class="idx-chip">IDX doc_id, chunk_index</span>
+      </div>
+      <h4 style="font-size:14px;margin:18px 0 8px;">벡터 검색 — PostgreSQL pgvector 통합</h4>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">벡터 임베딩(KURE-v1 1024차원)은 Alembic 마이그레이션이 생성하는 <code>tb_rag_vectors.embedding</code> 컬럼에 저장하고 HNSW 인덱스로 검색한다. <code>tb_chunks</code>는 원문 청크·페이지·섹션 메타의 운영 원장이고, RAG 검색용 벡터/렉시컬 색인은 <code>tb_rag_vectors</code>가 담당한다. 한국어 렉시컬은 앱이 만든 bigram 토큰 <code>tsvector</code>를 <code>ts_rank</code>로 채점(코어 FTS)하고, <code>pg_bigm</code> GIN은 설치 시 후보생성 가속으로만 보완한다.</p>
+      <pre>-- 확장 (1회)
+CREATE EXTENSION IF NOT EXISTS vector;     -- 벡터 검색 (pgvector)
+CREATE EXTENSION IF NOT EXISTS pg_bigm;    -- (선택) 한국어 bigram GIN 후보가속 — 랭킹은 코어 ts_rank
+
+-- RAG 벡터 테이블 (KURE-v1 = 1024차원)
+CREATE TABLE tb_rag_vectors (
+  collection  TEXT NOT NULL,        -- 논리 네임스페이스(ES index 대체). PK 1번째
+  id          TEXT NOT NULL,        -- 항목 고유 ID(컬렉션 내 유일, 보통 doc_id#chunk_idx). PK 2번째
+  doc_id      TEXT,                 -- 원문 문서 식별자(느슨한 참조·FK 아님). 문서 단위 삭제·필터
+  chunk_idx   INTEGER,              -- 문서 내 청크 순번(0-base). 원문 재구성·인접 청크 조회
+  content     TEXT NOT NULL,        -- 청크 원문 텍스트. 결과 반환 + pg_bigm 후보생성 대상
+  bigram_text TEXT,                 -- content의 bigram 토큰(앱이 채움). 한국어 ts_rank 채점 소스(조사·굴절에 강함)
+  embedding   vector(1024),         -- dense 임베딩(KURE-v1/BGE-M3, 차원 고정·가변불가). HNSW 코사인 kNN 대상
+  tsv         tsvector GENERATED ALWAYS AS (to_tsvector('simple', coalesce(bigram_text, ''))) STORED,  -- 어휘 인덱스원(bigram서 DB 자동파생). 어절 NL R@5 47%→bigram 87%
+  payload     JSONB NOT NULL DEFAULT '{}'::jsonb,  -- 임의 메타데이터(heading_path·source·등급 등)
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),  -- 적재 시각(재색인·감사)
+  PRIMARY KEY (collection, id)      -- 복합 PK — 같은 id 다른 컬렉션 공존(재색인 blue/green)
+);
+
+-- 의미 검색용 HNSW 인덱스 (코사인 거리)
+CREATE INDEX idx_ragvec_embedding
+  ON tb_rag_vectors USING hnsw (embedding vector_cosine_ops);
+
+-- 한국어 렉시컬 랭커 — 앱이 만든 bigram 텍스트의 tsvector + ts_rank (코어 FTS)
+CREATE INDEX idx_ragvec_tsv ON tb_rag_vectors USING gin (tsv);
+
+-- (선택) 후보생성 가속 — pg_bigm GIN. 랭킹 아님(위 ts_rank).
+CREATE INDEX idx_ragvec_content_bigm
+  ON tb_rag_vectors USING gin (content gin_bigm_ops);
+
+-- Blue/Green 무중단 재색인 alias
+CREATE TABLE tb_rag_aliases (
+  alias       TEXT PRIMARY KEY,     -- 논리 이름(예: uploads). 앱이 참조하는 안정적 이름
+  collection  TEXT NOT NULL,        -- 실제 물리 collection(예: uploads_v3). 재색인 시 이 값만 교체
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()  -- alias→collection 갱신 시각
+);
+
+-- 최근접 이웃 (상위 5건)
+SELECT id, doc_id, content
+FROM   tb_rag_vectors
+WHERE  collection = :collection
+ORDER  BY embedding &lt;=&gt; :q
+LIMIT  5;</pre>
+      <p class="note-soft" style="font-size:13px;color:var(--text-dim);margin:8px 0 0;">※ 골든셋 수천~수십만 건은 HNSW로 sub-100ms 응답이며 수백만 건까지 여유가 있다. 임베딩 컬럼은 고객사 agent의 Postgres+pgvector에 오프라인 골든 번들로 적재된다.</p>
+    </section>
+
+    <!-- Group C -->
+    <div class="group-header" id="grp-d">
+      <span class="group-badge">C</span>
+      <span class="group-title">라벨링</span>
+    </div>
+    <div class="group-desc">M3 자동 라벨링 및 사람 검수 결과 저장.</div>
+
+    <section id="t-document-labels">
+      <h3>tb_document_labels<span class="logical-name">문서 라벨</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk td-fk">doc_id</td><td class="td-type">UUID PK FK→tb_documents CASCADE</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">level_id</td><td class="td-type">FK → tb_classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">labeled_by</td><td class="td-type">VARCHAR(30)</td><td class="td-nn yes">●</td><td>rule / llm / human</td></tr>
+          <tr><td class="td-col">labeler_id</td><td class="td-type">VARCHAR(50)</td><td></td><td>사람 라벨러 ID</td></tr>
+          <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(3,2)</td><td></td><td>룰/LLM 신뢰도 — 검토 큐 정렬용(판정 권한 없음). 골든 생성 게이트는 합의(룰==LLM)+시드 근거+self-consistency로 판정</td></tr>
+          <tr><td class="td-col">total_score</td><td class="td-type">NUMERIC(4,2)</td><td></td><td>평가 인자 합산 점수</td></tr>
+          <tr><td class="td-col">is_verified</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>검수 완료 여부 — 검수자 1인 서명 시 true(단일 서명). 고등급은 선택적 추가 검토 가능</td></tr>
+          <tr><td class="td-col">verified_by</td><td class="td-type">VARCHAR(50)</td><td></td><td>검수자(실계정)</td></tr>
+          <tr><td class="td-col">labeled_at / verified_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●/</td><td></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="t-factor-scores">
+      <h3>tb_document_factor_scores<span class="logical-name">문서 요건 점수</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk td-fk">doc_id</td><td class="td-type">UUID PK FK→tb_documents CASCADE</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-pk td-fk">factor_id</td><td class="td-type">INTEGER PK FK→tb_evaluation_factors</td><td class="td-nn yes">●</td><td>정본 3요건(S·V·M) 중 하나</td></tr>
+          <tr><td class="td-col">score</td><td class="td-type">NUMERIC(4,2)</td><td class="td-nn yes">●</td><td><b>0~2</b> (CHECK <code>ck_dfs_score_0_2</code>) — B안 각 요건 0·1·2. 기존 0~5 제약은 migration <code>c7d8e9f0a1b2</code>에서 0~2로 교체</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- Group D -->
+    <div class="group-header" id="grp-e">
+      <span class="group-badge">D</span>
+      <span class="group-title">추론</span>
+    </div>
+    <div class="group-desc">M5 분류 결과와 근거 청크.</div>
+
+    <section id="t-tb_classifications">
+      <h3>tb_classifications<span class="logical-name">분류 결과</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">classification_id</td><td class="td-type">UUID PK</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">doc_id</td><td class="td-type">FK → tb_documents</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">model_version</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>v-fe4b386b 형식</td></tr>
+          <tr><td class="td-fk">predicted_level_id</td><td class="td-type">FK → tb_classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">confidence</td><td class="td-type">NUMERIC(5,4)</td><td class="td-nn yes">●</td><td>0.0000~1.0000</td></tr>
+          <tr><td class="td-col">alternatives</td><td class="td-type">JSONB</td><td class="td-nn yes">●</td><td>[{level_code, score}] 전체 등급 softmax</td></tr>
+          <tr><td class="td-col">aggregation_method</td><td class="td-type">VARCHAR(20)</td><td></td><td>hybrid / rule / llm</td></tr>
+          <tr><td class="td-col">chunk_count</td><td class="td-type">SMALLINT</td><td></td><td>분류에 사용된 청크 수</td></tr>
+          <tr><td class="td-col">rag_used</td><td class="td-type">BOOLEAN</td><td class="td-nn yes">●</td><td>RAG 검색 사용 여부</td></tr>
+          <tr><td class="td-col">rag_top_k / rag_agreement</td><td class="td-type">SMALLINT / BOOLEAN</td><td></td><td>RAG 검색 수 / RAG와 분류기 일치 여부</td></tr>
+          <tr><td class="td-col">status</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>staging / confirmed / rejected</td></tr>
+          <tr><td class="td-col">inference_ms</td><td class="td-type">INTEGER</td><td></td><td>추론 소요 ms</td></tr>
+          <tr><td class="td-col">classified_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-nn yes">●</td><td></td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <span class="idx-chip">IDX doc_id, classified_at (hot path)</span>
+        <span class="idx-chip">IDX status</span>
+        <span class="idx-chip">IDX model_version, level_id, status</span>
+        <span class="idx-chip">PARTIAL idx_cls_staging WHERE status='staging'</span>
+      </div>
+    </section>
+
+    <section id="t-evidence">
+      <h3>tb_classification_evidence<span class="logical-name">분류 근거</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">evidence_id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-fk">classification_id</td><td class="td-type">FK → tb_classifications CASCADE</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">chunk_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-col">evidence_type</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>keyword / rag / model</td></tr>
+          <tr><td class="td-fk">factor_id</td><td class="td-type">FK → tb_evaluation_factors</td><td></td><td></td></tr>
+          <tr><td class="td-col">excerpt</td><td class="td-type">TEXT</td><td class="td-nn yes">●</td><td>근거 문장 발췌</td></tr>
+          <tr><td class="td-col">excerpt_start / excerpt_end</td><td class="td-type">INTEGER</td><td></td><td>원문 내 문자 위치</td></tr>
+          <tr><td class="td-col">contribution</td><td class="td-type">NUMERIC(4,3)</td><td class="td-nn yes">●</td><td>분류 결정 기여도 (0~1)</td></tr>
+          <tr><td class="td-col">attention_scores</td><td class="td-type">JSONB</td><td></td><td>BERT attention 가중치</td></tr>
+          <tr><td class="td-col">rag_ref_doc_id</td><td class="td-type">UUID</td><td></td><td>RAG 참조 문서 ID</td></tr>
+          <tr><td class="td-col">rag_similarity</td><td class="td-type">NUMERIC(4,3)</td><td></td><td>코사인 유사도</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- Group E -->
+    <div class="group-header" id="grp-f">
+      <span class="group-badge">E</span>
+      <span class="group-title">학습</span>
+    </div>
+    <div class="group-desc">모델 버전 관리, 학습 실행 추적, 에폭별 메트릭, 학습 데이터셋 구성.</div>
+
+    <section id="t-model-versions">
+      <h3>tb_model_versions<span class="logical-name">모델 버전</span></h3>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">모델 버전 레지스트리 — 항상 register(이력), activate는 배포게이트 통과 AND <code>retrain_auto_activate=True</code>일 때만(보수적). 핫리로드(<code>POST /admin/model/reload</code>)는 활성 버전의 <code>model_uri</code>로 InferencePipeline 재구성. 자동 롤백 시 직전 활성으로 복귀하며 <code>rolled_back_from</code>/<code>rollback_reason</code>에 출처 기록.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">version_id</td><td class="td-type">UUID PK</td><td></td></tr>
+          <tr><td class="td-col">version_label</td><td class="td-type">VARCHAR(50) UNIQUE</td><td>v-fe4b386b 형식 (해시 기반)</td></tr>
+          <tr><td class="td-col">base_model</td><td class="td-type">VARCHAR(100)</td><td>kakaobank/kf-deberta-base</td></tr>
+          <tr><td class="td-col">model_type</td><td class="td-type">VARCHAR(20)</td><td>classifier / reranker (기본 classifier)</td></tr>
+          <tr><td class="td-col">trained_at</td><td class="td-type">TIMESTAMPTZ</td><td>학습 완료 시각</td></tr>
+          <tr><td class="td-fk">training_run_id</td><td class="td-type">UUID</td><td>학습 실행 참조 (tb_training_runs.run_id)</td></tr>
+          <tr><td class="td-col">training_data_count</td><td class="td-type">INTEGER</td><td>학습 샘플 수</td></tr>
+          <tr><td class="td-col">metrics</td><td class="td-type">JSONB</td><td>F1, FNR, Recall@5 등 최종 메트릭</td></tr>
+          <tr><td class="td-col">model_uri</td><td class="td-type">VARCHAR(500)</td><td>로컬 모델 저장소 경로 (핫리로드 시 이 경로로 재구성)</td></tr>
+          <tr><td class="td-col">model_size_mb</td><td class="td-type">INTEGER</td><td>모델 크기 (MB)</td></tr>
+          <tr><td class="td-col">mlflow_run_id</td><td class="td-type">VARCHAR(64)</td><td>MLflow 실험 추적 ID</td></tr>
+          <tr><td class="td-col">is_active</td><td class="td-type">BOOLEAN</td><td>활성 모델 1개 보장 (partial UNIQUE <code>idx_mv_active</code> WHERE is_active=TRUE)</td></tr>
+          <tr><td class="td-col">activated_at</td><td class="td-type">TIMESTAMPTZ</td><td>활성화 시각</td></tr>
+          <tr><td class="td-col">deactivated_at</td><td class="td-type">TIMESTAMPTZ</td><td>비활성화 시각</td></tr>
+          <tr><td class="td-fk">rolled_back_from</td><td class="td-type">UUID FK (self → version_id)</td><td>자동 롤백 출처 버전</td></tr>
+          <tr><td class="td-col">rollback_reason</td><td class="td-type">TEXT</td><td>롤백 사유 (예: fnr_high &gt; baseline+tolerance)</td></tr>
+          <tr><td class="td-col">level_snapshot</td><td class="td-type">JSONB</td><td>학습 시점 등급체계 스냅샷</td></tr>
+          <tr><td class="td-col">created_at</td><td class="td-type">TIMESTAMPTZ</td><td>등록 시각</td></tr>
+        </tbody>
+      </table></div>
+      <div><span class="idx-chip">UNIQUE PARTIAL idx_mv_active (is_active) WHERE is_active=TRUE</span><span class="idx-chip">IDX mlflow_run_id</span></div>
+    </section>
+
+    <section id="t-training-runs">
+      <h3>tb_training_runs<span class="logical-name">학습 실행</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">run_id</td><td class="td-type">UUID PK</td><td></td></tr>
+          <tr><td class="td-fk">model_version</td><td class="td-type">FK → tb_model_versions</td><td></td></tr>
+          <tr><td class="td-col">status</td><td class="td-type">VARCHAR(20)</td><td>queued / running / done / failed</td></tr>
+          <tr><td class="td-col">total_samples</td><td class="td-type">INTEGER</td><td>전체 학습 샘플 수</td></tr>
+          <tr><td class="td-col">train_count / val_count / test_count</td><td class="td-type">INTEGER</td><td>split 구성</td></tr>
+          <tr><td class="td-col">split_method</td><td class="td-type">VARCHAR(30)</td><td>stratified (기본)</td></tr>
+          <tr><td class="td-col">hyperparameters</td><td class="td-type">JSONB</td><td>epochs, lr, batch_size, warmup_ratio 등</td></tr>
+          <tr><td class="td-col">gpu_info</td><td class="td-type">JSONB</td><td>GPU 모델, VRAM, CUDA 버전</td></tr>
+          <tr><td class="td-col">final_metrics</td><td class="td-type">JSONB</td><td>F1, FNR, 혼동행렬</td></tr>
+          <tr><td class="td-col">trigger_type</td><td class="td-type">VARCHAR(30)</td><td>manual / scheduled / active_learning</td></tr>
+          <tr><td class="td-col">duration_sec</td><td class="td-type">INTEGER</td><td>실제 소요 초 (1epoch ≈ 33s)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="t-training-epochs">
+      <h3>tb_training_epochs<span class="logical-name">학습 에폭</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk td-fk">run_id</td><td class="td-type">UUID PK FK→tb_training_runs CASCADE</td><td></td></tr>
+          <tr><td class="td-pk">epoch</td><td class="td-type">INTEGER PK</td><td></td></tr>
+          <tr><td class="td-col">train_loss / val_loss</td><td class="td-type">NUMERIC</td><td></td></tr>
+          <tr><td class="td-col">val_metrics</td><td class="td-type">JSONB</td><td>F1, FNR, confusion matrix per epoch</td></tr>
+          <tr><td class="td-col">learning_rate</td><td class="td-type">NUMERIC</td><td>스케줄러 적용 후 실제 lr</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="t-training-datasets">
+      <h3>tb_training_datasets<span class="logical-name">학습 데이터셋</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td class="td-pk">id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td></td></tr>
+          <tr><td class="td-fk">run_id</td><td class="td-type">FK → tb_training_runs CASCADE</td><td></td></tr>
+          <tr><td class="td-fk">doc_id</td><td class="td-type">FK → tb_documents</td><td></td></tr>
+          <tr><td class="td-col">split_type</td><td class="td-type">VARCHAR(10)</td><td>train / val / test</td></tr>
+          <tr><td class="td-fk">level_id</td><td class="td-type">FK → tb_classification_levels</td><td>학습 시점 레이블</td></tr>
+        </tbody>
+      </table></div>
+      <div><span class="idx-chip">UNIQUE (run_id, doc_id)</span></div>
+    </section>
+
+    <!-- Group F -->
+    <div class="group-header" id="grp-g">
+      <span class="group-badge">F</span>
+      <span class="group-title">보정 — tb_corrections</span>
+    </div>
+    <div class="group-desc">검수자 수정 결과. 운영 확정 라벨의 진실 소스. 기본 경로는 분류 → 검수자 확정/교정 → admission gate → exact-match 선례·집계 진단이며, 재학습은 별도 승인된 full-train 프로파일에서만 수행한다. <b>반영분만 소비</b>(consumed_in_run·consumed_at) — 미반영은 무손실. <b>※ 환류 정책:</b> 고객 교정·원문은 망 밖 반출 금지이며, 집계 진단지표만 환류한다. 모델은 상시 재학습하지 않고, retrain_auto_activate=False·locked readiness gate로 fail-closed한다.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="td-pk">correction_id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td></td></tr>
+        <tr><td class="td-fk">classification_id</td><td class="td-type">FK → tb_classifications CASCADE</td><td></td></tr>
+        <tr><td class="td-fk">original_level_id</td><td class="td-type">FK → tb_classification_levels</td><td>AI 예측 등급</td></tr>
+        <tr><td class="td-fk">corrected_level_id</td><td class="td-type">FK → tb_classification_levels</td><td>검수자 확정 등급 (confirm 시 predicted와 동일)</td></tr>
+        <tr><td class="td-col">direction</td><td class="td-type">VARCHAR(10)</td><td>underclass(미탐 보정) / overclass(과분류 보정) / lateral(동위 변경) / confirm(보정 없이 확정)</td></tr>
+        <tr><td class="td-col">reason</td><td class="td-type">TEXT</td><td>보정 사유</td></tr>
+        <tr><td class="td-col">corrected_by</td><td class="td-type">VARCHAR(50)</td><td>검수자 ID</td></tr>
+        <tr><td class="td-col">corrected_at</td><td class="td-type">TIMESTAMPTZ</td><td>보정 시각 (재빌드 결정성: corrected_at desc + correction_id desc)</td></tr>
+        <tr><td class="td-fk">consumed_in_run</td><td class="td-type">UUID FK→tb_training_runs</td><td>재학습에 반영된 run_id (NULL=미소비)</td></tr>
+        <tr><td class="td-col">consumed_at</td><td class="td-type">TIMESTAMPTZ</td><td>재학습 반영 시각</td></tr>
+      </tbody>
+    </table></div>
+    <div>
+      <span class="idx-chip">IDX classification_id</span>
+      <span class="idx-chip">IDX direction</span>
+      <span class="idx-chip">IDX corrected_at</span>
+      <span class="idx-chip">PARTIAL idx_corr_unconsumed (consumed_in_run) WHERE consumed_in_run IS NULL — 능동학습 hot path</span>
+    </div>
+
+    <!-- Group G -->
+    <div class="group-header" id="grp-h">
+      <span class="group-badge">G</span>
+      <span class="group-title">합성 — tb_prompt_versions · tb_sample_documents</span>
+    </div>
+    <div class="group-desc">M1 합성 문서 생성 이력 및 프롬프트 버전 관리.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>테이블</th><th>주요 컬럼</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="td-col">tb_prompt_versions</td><td class="td-col">prompt_version (PK) · chain_stage · template · avg_quality_score · approval_rate</td><td>합성 프롬프트 버전 추적 (outline / body / qc)</td></tr>
+        <tr><td class="td-col">tb_sample_documents</td><td class="td-col">sample_id (UUID PK) · target_level_id · llm_provider · llm_model · generated_content · quality_score · review_status</td><td>Qwen3/Claude 합성 결과 저장 · pending_review → approved 흐름</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="group-header" id="grp-i">
+      <span class="group-badge">H</span>
+      <span class="group-title">운영 — tb_documents · tb_llm_usage · tb_audit_log · tb_guides</span>
+    </div>
+    <div class="group-desc">현 ORM에 매핑된 Lloydk 운영 테이블(19 ORM에 포함). <code>tb_llm_usage</code>·<code>tb_audit_log</code>는 <code>tb_chunks</code>와 함께 월별 RANGE 파티션 부모다.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>테이블</th><th>주요 컬럼</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td class="td-col">tb_documents</td><td class="td-col">doc_id (UUID PK) · file_hash (unique partial) · source_format · processing_status · metadata (JSONB) · deleted_at</td><td>업로드 문서 메타·추출텍스트 URI·처리상태·soft-delete. 청크·분류·라벨의 중심 허브(FK 대상)</td></tr>
+        <tr><td class="td-col">tb_llm_usage</td><td class="td-col">usage_id · called_at (PK 복합) · provider · model · cost_usd · billing_phase</td><td>LLM 비용/토큰 사용 기록. 월별 RANGE 파티션 부모(called_at 기준)</td></tr>
+        <tr><td class="td-col">tb_audit_log</td><td class="td-col">audit_id · occurred_at (PK 복합) · actor_id · action · target_type · ip_address (INET)</td><td>전 API 호출 감사로그. 월별 RANGE 파티션 부모(occurred_at 기준)</td></tr>
+        <tr><td class="td-col">tb_guides</td><td class="td-col">id (BigInt PK) · guide_id · version · uq_guides_id_version · indexed</td><td>가이드 문서 업로드/색인 버전 이력(GuideService in-memory 대체)</td></tr>
+      </tbody>
+    </table></div>
+
+  </article>
+</div>
+
+<footer>
+  <span>부록 A — DB 스키마 · KOIPA AI 기술 구현 백서 v7 · 2026-07-17 갱신</span>
+  <span>PostgreSQL 16 · SQLAlchemy ORM · 19테이블 + RAG 2테이블 (Lloydk 소유 · 문서·감사·비용·가이드 포함)</span>
+</footer>
+
+<script>
+const items = document.querySelectorAll('.toc-item[href^="#"]');
+const secs = [...items].map(i=>document.querySelector(i.getAttribute('href'))).filter(Boolean);
+const obs = new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){items.forEach(i=>i.classList.remove('active'));const l=document.querySelector(`.toc-item[href="#${e.target.id}"]`);if(l)l.classList.add('active');}});},{rootMargin:'-15% 0px -70% 0px'});
+secs.forEach(s=>obs.observe(s));
+</script>
+
+</body>
+</html>
