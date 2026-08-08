@@ -609,6 +609,18 @@ details.adv[open]{padding-bottom:12px;}
         <span class="ep">POST /train · GET /train/jobs</span>
       </div>
       <div class="card-body">
+        <!-- 학습 규모 preset — 자유 입력란을 열지 않는다. 임의 값은 감리장에서 사고가 되고,
+             기본값 학습은 실측 13시간이라 현장에서 끝나지 않는다. 두 조합만 고정한다.
+             표시된 소요는 실서버(16vCPU·GPU 없음, 2,042행) 실측값이다 — "이 수치 근거가
+             뭐냐"는 질문에 바로 답이 되도록 화면에 그대로 적어 둔다. -->
+        <div class="field">
+          <label class="fld">학습 규모</label>
+          <select id="tr-preset" onchange="onTrainPresetChange()">
+            <option value="full">정식 학습 — 기본값(5에폭 · seq512) · 실측 약 13시간</option>
+            <option value="demo">시연용 빠른 학습 — 1에폭 · seq128 · batch16 · 실측 약 39분</option>
+          </select>
+          <p class="sec-note" id="tr-preset-note" style="margin-top:4px;"></p>
+        </div>
         <div class="row3">
           <div class="field">
             <label class="fld">training_type</label>
@@ -1418,17 +1430,41 @@ async function doRelabel(i){
 }
 
 /* ---- 3. TRAIN ---- */
+/* 학습 규모 preset — 실측(실서버 16vCPU·GPU 없음, 정본 2,042행) 기준.
+ * 기본값(5에폭·seq512·batch8)은 1,280스텝 × 37초 ≒ 13시간이라 감리 현장에서 끝나지 않는다.
+ * 시연용은 같은 서버에서 128스텝 × 17초 + 평가 ≒ 39분으로 실측했다.
+ * 자유 입력란을 열지 않는 이유: 임의 값이 들어가면 학습이 몇 시간짜리가 될지 예측이 안 되고,
+ * 되돌리는 절차도 없다. 두 조합만 고정해 "무엇을 누르면 얼마나 걸리는지"를 확정한다. */
+const TRAIN_PRESETS = {
+  full: { hyperparams: null,
+          note: '정본 학습셋 전체를 기본 하이퍼파라미터로 학습합니다. 야간·비대면 실행용입니다.' },
+  demo: { hyperparams: { epochs: 1, max_seq_len: 128, batch_size: 16, use_mlflow: false },
+          note: '파이프라인 시연용입니다 — 학습→등록→게이트→배포 경로를 확인하는 용도이고, '
+              + '이 설정으로 나온 모델은 품질 기준(고등급 미탐 floor)을 통과하지 못할 수 있습니다.' },
+};
+function onTrainPresetChange(){
+  const p=TRAIN_PRESETS[$('tr-preset')?.value] || TRAIN_PRESETS.full;
+  const el=$('tr-preset-note'); if(el) el.textContent=p.note;
+}
 async function submitTrain(){
   if(!guardWrite('재학습 제출')) return;
   // Safe Mode 기본값을 '허용'으로 바꾸면서(오조작 방지를 체크박스 대신 확인창으로 옮김)
   // 재학습이 무확인 1클릭으로 나가지 않도록 여기서 한 번 확인받는다. 학습은 시작하면
   // 되돌리는 절차가 없고 GPU/CPU 를 길게 점유한다.
   const _tt=$('tr-type').value;
+  const _pk=$('tr-preset')?.value || 'full';
+  const _p=TRAIN_PRESETS[_pk] || TRAIN_PRESETS.full;
+  // 확인창에 예상 소요를 실측값으로 적는다 — 13시간짜리를 모르고 누르는 일이 없게.
+  const _eta = _pk==='demo' ? '약 39분(실측)' : '약 13시간(실측)';
   if(!confirm(`재학습을 제출합니다 (training_type=${_tt}).\n\n`
+    + `학습 규모: ${_pk==='demo'?'시연용 빠른 학습(1에폭·seq128)':'정식 학습(기본값)'}\n`
+    + `예상 소요: ${_eta} — 이 서버 기준\n\n`
     + '학습이 시작되면 중간에 되돌리는 절차가 없고, 완료까지 자원을 점유합니다.\n'
     + '산출 모델은 후보로 등록되며 배포는 별도 활성화 단계에서 게이트를 통과해야 합니다. 진행할까요?')) return;
   try{
     const body={training_type:$('tr-type').value, base_model:$('tr-base').value, use_rag:$('tr-rag').checked, actor:actor()};
+    // hyperparams 가 null 이면 넣지 않는다 — 서버 기본값(TrainSpec)이 그대로 쓰이게.
+    if(_p.hyperparams) body.hyperparams=_p.hyperparams;
     const d=await api('POST','/train',body);
     log(`재학습 제출: job ${d.train_job_id} · status_url ${d.status_url}`,'ok'); markFlow(3);
     loadJobs();
@@ -2303,6 +2339,7 @@ function syncActiveGrades(codes){
 
 /* init */
 initPane();          // 탭 초기 표시 — 카드 12장 상시 노출 대신 루프별로 나눈다
+onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncWriteGate();
 populateSamples();
 syncActiveGrades();
