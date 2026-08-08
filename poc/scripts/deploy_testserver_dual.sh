@@ -95,6 +95,15 @@ gen_env() {
     echo "CLASSIFIER_MODEL_DIR=$MODEL_REL"
     echo "ALLOWED_ORIGIN=http://localhost:$port"
     echo "WEB_CONCURRENCY=1"
+    # [학습 노드] 워커 기본 메모리 상한 4G 는 '배치 분류·인덱싱' 기준으로 잡힌 값이라
+    # (docker-compose.prod.yml:109 주석) 모델 학습을 버티지 못한다. 실측 2026-08-08:
+    # 재학습이 3.7GiB 에서 OOMKilled 되고 celery 가 재시도해 무한 반복했다.
+    # full-train(지재원=모델 공장)에서만 올린다 — 고객사(onprem-local)는 학습을 하지 않으므로
+    # 기본값 유지(한 호스트에 두 스택이 올라가는 테스트서버에서 메모리를 서로 뺏지 않게).
+    if [ "$profile" = "full-train" ]; then
+      echo "WORKER_MEM_LIMIT=${WORKER_MEM_LIMIT:-16G}"
+      echo "WORKER_MEM_RESERVATION=${WORKER_MEM_RESERVATION:-2G}"
+    fi
     if [ "$llm" = "anthropic" ]; then
       echo "LLM_PROVIDER=anthropic"
       echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}"
