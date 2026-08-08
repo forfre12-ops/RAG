@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 # RateLimitError(429)/APITimeoutError/APIConnectionError + status>=500.
 _RETRYABLE_EXC_NAMES = frozenset(
     {
-        "RateLimitError",        # 429
-        "APITimeoutError",       # 요청 타임아웃
-        "APIConnectionError",    # 일시 네트워크
-        "InternalServerError",   # 5xx
+        "RateLimitError",  # 429
+        "APITimeoutError",  # 요청 타임아웃
+        "APIConnectionError",  # 일시 네트워크
+        "InternalServerError",  # 5xx
         "APIConnectionTimeoutError",
     }
 )
@@ -71,7 +71,9 @@ class LocalOpenAIProvider:
         from openai import OpenAI
 
         # local_llm_* 우선, 없으면 vllm_* (하위호환)
-        effective_base = base_url or settings.local_llm_base_url or settings.vllm_base_url
+        effective_base = (
+            base_url or settings.local_llm_base_url or settings.vllm_base_url
+        )
         effective_model = model or settings.local_llm_model or settings.vllm_model
         effective_key = api_key or settings.local_llm_api_key or "EMPTY"
 
@@ -135,7 +137,9 @@ class LocalOpenAIProvider:
                 max_delay=self._max_delay,
                 label=self.name,
             )
-            text = resp.choices[0].message.content or ""
+            choice = resp.choices[0]
+            text = choice.message.content or ""
+            finish_reason = str(getattr(choice, "finish_reason", None) or "unavailable")
             in_tok = getattr(resp.usage, "prompt_tokens", 0) if resp.usage else 0
             out_tok = getattr(resp.usage, "completion_tokens", 0) if resp.usage else 0
             return LLMResponse(
@@ -148,7 +152,11 @@ class LocalOpenAIProvider:
                     cost_usd=estimate_cost_usd(self.model, in_tok, out_tok),
                     latency_ms=int((time.perf_counter() - start) * 1000),
                 ),
-                meta={"thinking": self.enable_thinking, "endpoint": "local_openai"},
+                meta={
+                    "thinking": self.enable_thinking,
+                    "endpoint": "local_openai",
+                    "finish_reason": finish_reason,
+                },
             )
         except Exception as exc:  # noqa: BLE001
             return LLMResponse(
@@ -176,22 +184,37 @@ class LocalOpenAIProvider:
 # ============================================================
 
 
-def ollama_provider(model: str = "qwen3:14b", base_url: str = "http://localhost:11434/v1") -> LocalOpenAIProvider:
+def ollama_provider(
+    model: str = "qwen3:14b", base_url: str = "http://localhost:11434/v1"
+) -> LocalOpenAIProvider:
     """Ollama OpenAI 호환 endpoint."""
     return LocalOpenAIProvider(
-        base_url=base_url, model=model, api_key="ollama", provider_label="ollama",
+        base_url=base_url,
+        model=model,
+        api_key="ollama",
+        provider_label="ollama",
     )
 
 
-def lm_studio_provider(model: str, base_url: str = "http://localhost:1234/v1") -> LocalOpenAIProvider:
+def lm_studio_provider(
+    model: str, base_url: str = "http://localhost:1234/v1"
+) -> LocalOpenAIProvider:
     """LM Studio OpenAI 호환 endpoint."""
     return LocalOpenAIProvider(
-        base_url=base_url, model=model, api_key="lm-studio", provider_label="lm_studio",
+        base_url=base_url,
+        model=model,
+        api_key="lm-studio",
+        provider_label="lm_studio",
     )
 
 
-def vllm_provider(model: Optional[str] = None, base_url: Optional[str] = None) -> LocalOpenAIProvider:
+def vllm_provider(
+    model: Optional[str] = None, base_url: Optional[str] = None
+) -> LocalOpenAIProvider:
     """vLLM OpenAI 호환 endpoint — VLLMProvider 호환."""
     return LocalOpenAIProvider(
-        base_url=base_url, model=model, api_key="EMPTY", provider_label="vllm",
+        base_url=base_url,
+        model=model,
+        api_key="EMPTY",
+        provider_label="vllm",
     )

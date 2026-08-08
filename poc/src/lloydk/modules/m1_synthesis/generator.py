@@ -6,6 +6,7 @@ Noop provider를 쓰면 API 키 없이 결정론적 더미 문서로 파이프�
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -82,14 +83,34 @@ GRADE_SITUATION_PROMPTS = {
     },
 }
 
-SYSTEM_PROMPT = """당신은 한국의 영업비밀 등급분류 가이드 전문가다.
+SYSTEM_PROMPT = """당신은 한국 조직에서 쓰이는 현실적인 사내 문서를 작성하는 전문 문서 작성자다.
 주어진 문서 상황·맥락을 읽고 해당 상황에 실재할 법한 가상의 사내 문서를 작성한다.
 
 [준수]
 - 실재 기업명/인명/주민번호/연락처/이메일 등 PII 금지
-- 가상 표기: [가상기업A], [홍길동(가명)]
+- 사람 이름은 가명도 만들지 말고 [공정책임자A], 품질관리팀처럼 역할 식별자만 사용
+- 사용자 요청에 정량 사실 출력 금지 또는 숫자 금지가 있으면 그 요청이 아래의 수치·날짜·표 작성
+  지시보다 항상 우선한다. 이 경우 제목·본문·표에 아라비아 숫자·날짜·금액·단위·범위·비율을 쓰지 않고,
+  정성적인 관찰·책임·판단·조치만 작성한다.
+- 수치·날짜·단위·목표와 실적 사이에 산술 또는 시간 모순이 없도록 자체 점검
+- 한 문서의 절대 날짜는 하나의 기준연도 안에서 시간순으로 배치하고, 기준연도가 주어지지
+  않았으면 1주차·시험 종료 후 10영업일처럼 상대 시점을 사용한다. 후속조치 기한은 원인분석·
+  시험·회의가 끝난 뒤여야 한다.
+- 표에 적은 정상범위·경고값·실패경계와 본문 원인 설명을 일치시키고, 경계 미만 값이 실패
+  원인이라면 다른 조건과의 결합효과 또는 예외 근거를 명시한다.
+- 차이·증감률·합계·평균·절감액 같은 파생값은 기초값으로 다시 계산하고 분모·기간·단위를 명시한다.
+  의사결정에 필요하지 않거나 검산이 확실하지 않은 파생값은 추정해서 채우지 말고 생략한다.
+- 변경 전→후 차이는 두 기초값을 직접 빼서 검산한다. 예를 들어 150에서 160으로
+  바뀌면 차이는 10이며, 임계치나 다른 기준값을 실제 차이처럼 서술하지 않는다.
+- 표의 모든 헤더·데이터 셀을 구체적인 값이나 "해당 없음"과 그 사유로 채운다. 빈 셀,
+  하이픈(-), 긴 대시(—)를 미작성 값 대신 사용하지 않는다.
+- 표로 문서를 끝내지 않는다. 마지막 표 뒤에 결론과 후속 조치 문단을 쓰고 책임 역할,
+  기한, 완료 판정 기준을 다시 확인한 뒤 JSON을 닫는다.
+- 문서 유형에 맞는 절 제목·항목·표 형식·승인/조치란을 실제 본문 구조로 표현하고 장문 서술 하나로 뭉치지 않기
 - 출력은 반드시 다음 JSON 한 객체:
   {"title": str, "body": str, "document_type": str, "dept_hint": str, "rationale_tags": [str, ...]}
+- 요청한 body 상한에 가까워지면 새 절이나 부록을 시작하지 말고 현재 문장을 마친 뒤
+  JSON 문자열과 객체를 정상적으로 닫는다. 유효한 JSON 완결을 추가 내용보다 우선한다.
 - 그 외 텍스트(설명, 코드펜스) 출력 금지
 
 [중요 — 등급 표기 금지]
@@ -112,11 +133,29 @@ USER_TEMPLATE_V2 = """[문서 상황]
 [문서 유형 후보]
 {doc_types}
 
+[구조·완성도 요구]
+{structure_requirements}
+
+[사실 원장 우선순위]
+구조·완성도 요구에 코드가 정한 사실·수치 제한 또는 정량 사실 출력 금지가 있으면, 그 제한이
+아래의 일반적인 구체성 요구보다 우선한다. 원장 밖의 기초 수치나 파생 수치를 임의로 보충하지
+않으며, 정량 출력 금지인 경우 제목·본문·표에 아라비아 숫자를 쓰지 않는다.
+
 [작성 길이]
-body는 한국어 {len_min}자 이상 {len_max}자 이내. 단답 금지 — 여러 단락으로, 구체적 항목·수치·일정·금액·기술 사양 등 세부를 실제 사내 문서처럼 충실히 작성.
+body는 한국어 {len_min}자 이상 {len_max}자 이내. 단답 금지 — 여러 단락으로, 관찰 과정, 책임 역할,
+의사결정 근거, 예외 처리, 후속 조치 등 서로 다른 세부를 실제 사내 문서처럼 충실히 작성.
+body가 {len_max}자에 가까워지면 새 내용 추가를 멈추고 JSON의 닫는 따옴표와 중괄호까지 반드시 출력한다. JSON 완결을 분량 확대보다 우선한다.
+
+{revision_context}
 
 위 상황에 해당하는 가상의 사내 문서를 JSON 객체로 작성하시오.
 - body는 반드시 {len_min}자 이상의 상세 문서(여러 단락).
+- 문서 계열 조건에 지정된 구성 순서가 본문에서 섹션 제목이나 항목으로 확인되어야 한다.
+- 같은 사실을 표현만 바꾸어 반복하지 말고, 관찰·판단·조치의 연결을 일관되게 유지한다.
+- 정량 출력이 허용된 경우에만 표와 본문의 기초값을 일치시키고 차이·비율·합계를 다시 계산한다. 검산할 수 없는 파생 수치는 쓰지 않는다.
+- 정량 출력이 허용된 경우에만 정상범위·실패경계와 원인 설명, 시험·결과·후속조치의 시간 순서를 대조한다.
+- 정량 출력이 허용된 경우에만 변경 전·후 차이를 직접 검산한다. 표에는 빈 셀이나 대시 placeholder를 두지 않는다.
+- 마지막 표 뒤에는 반드시 결론과 책임 역할·기한·완료 기준이 있는 후속 조치 문단을 둔다.
 - 등급명(비밀, 기밀, TS, S1, S2, S3, 대외비, 극비 등)은 문서 내용에 포함하지 마시오."""
 
 DOMAIN_DOC_TYPES = {
@@ -137,6 +176,54 @@ DOMAIN_DOC_TYPES = {
     "ai": "사전학습 데이터셋 명세, 모델 가중치 관리 문서, RLHF 보상 설계서, 핵심 알고리즘 특허 전략",
 }
 
+
+class PromptLanguageContractError(ValueError):
+    """A required Korean prompt was damaged or decoded with the wrong codec."""
+
+
+def _hangul_syllable_count(value: str) -> int:
+    return sum(0xAC00 <= ord(char) <= 0xD7A3 for char in value)
+
+
+def _require_korean_prompt_text(
+    value: object,
+    *,
+    field: str,
+    min_hangul: int = 3,
+    min_hangul_ratio: float = 0.55,
+) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise PromptLanguageContractError(f"Korean prompt text is missing: {field}")
+    if "\ufffd" in value or any(
+        ord(char) < 32 and char not in "\n\r\t" for char in value
+    ):
+        raise PromptLanguageContractError(
+            f"Korean prompt text has invalid Unicode: {field}"
+        )
+    hangul = _hangul_syllable_count(value)
+    alphabetic = sum(char.isalpha() for char in value)
+    if hangul < min_hangul or (alphabetic and hangul / alphabetic < min_hangul_ratio):
+        raise PromptLanguageContractError(
+            f"Korean prompt failed the UTF-8/Hangul integrity gate: {field}"
+        )
+
+
+def validate_generator_prompt_contract() -> None:
+    """Validate every static Korean input before constructing a generator."""
+    _require_korean_prompt_text(SYSTEM_PROMPT, field="SYSTEM_PROMPT", min_hangul=100)
+    _require_korean_prompt_text(
+        USER_TEMPLATE_V2, field="USER_TEMPLATE_V2", min_hangul=100
+    )
+    for grade, fields in GRADE_SITUATION_PROMPTS.items():
+        for prompt_field in ("situation", "disclosure_scope", "harm_potential"):
+            _require_korean_prompt_text(
+                fields.get(prompt_field),
+                field=f"GRADE_SITUATION_PROMPTS[{grade!r}].{prompt_field}",
+            )
+    for domain, value in DOMAIN_DOC_TYPES.items():
+        _require_korean_prompt_text(value, field=f"DOMAIN_DOC_TYPES[{domain!r}]")
+
+
 _PII_PATTERNS = [
     re.compile(r"\d{6}-\d{7}"),
     re.compile(r"\d{3}-\d{3,4}-\d{4}"),
@@ -146,11 +233,26 @@ _PII_PATTERNS = [
 
 @dataclass
 class SynthRequest:
-    target_grade: str       # TS|S1|S2|S3
+    target_grade: str  # TS|S1|S2|S3
     domain: str = "mixed"
     count: int = 1
     len_min: int = 600
     len_max: int = 2000
+    # Optional proxy-corpus controls.  Existing generic generation remains
+    # unchanged when these are empty; catalog-driven generation can require a
+    # document-shaped scenario instead of a short grade-shaped prompt.
+    scenario_context: str = ""
+    disclosure_scope: str = ""
+    harm_potential: str = ""
+    document_type_hint: str = ""
+    # Korean prose can consume more than one token per character.  Catalog
+    # runners may raise this for long document profiles while keeping the
+    # legacy default unchanged.
+    max_output_tokens: int = 3500
+    # Optional, catalog-specific controls.  They are deliberately empty by
+    # default so legacy/generic callers keep their previous request contract.
+    structure_requirements: str = ""
+    revision_context: str = ""
 
 
 @dataclass
@@ -171,10 +273,14 @@ class SynthDoc:
     # placeholder 본문 사용(CI 연결 테스트, 학습 편입 금지 마커). "llm_nonjson"=실 LLM이 비-JSON
     # 텍스트를 줘서 raw를 body로 사용. parse_error만으론 뒤 둘이 뭉뚱그려져 grep 식별 불가였다.
     label_source: Optional[str] = None
+    # 원문을 중복 보관하지 않고도 출력 절단/빈 응답/비정상 JSON을 감사할 수 있는
+    # 호출별 메타데이터. 내부 JSON 재시도에서 먼저 실패하고 성공한 경우도 보존한다.
+    response_audit: list[dict[str, object]] = field(default_factory=list)
 
 
 class SyntheticDocGenerator:
     def __init__(self, llm: Optional[LLMProvider] = None) -> None:
+        validate_generator_prompt_contract()
         self.llm = llm or build_provider()
 
     @staticmethod
@@ -182,6 +288,7 @@ class SyntheticDocGenerator:
         """[QW] 합성 LLM 호출 비용 best-effort 기록 (purpose='synthesis')."""
         try:
             from lloydk.services.llm_usage_service import record_llm_usage  # noqa: PLC0415
+
             record_llm_usage(resp, purpose="synthesis")
         except Exception:  # noqa: BLE001
             pass
@@ -206,33 +313,142 @@ class SyntheticDocGenerator:
             except json.JSONDecodeError:
                 return None
 
+    @staticmethod
+    def _response_audit_entry(
+        resp: object,
+        *,
+        attempt: int,
+        max_output_tokens: int,
+        parse_ok: bool,
+    ) -> dict[str, object]:
+        """Return non-content diagnostics for one generation response.
+
+        OpenAI-compatible servers normally expose ``finish_reason`` and token
+        usage, but lightweight test/legacy providers may expose neither.  A
+        response exactly at the requested completion budget is still treated
+        as a truncation signal so old Ollama responses remain diagnosable.
+        """
+        text = str(getattr(resp, "text", "") or "")
+        usage = getattr(resp, "usage", None)
+        raw_input_tokens = getattr(usage, "input_tokens", None)
+        raw_output_tokens = getattr(usage, "output_tokens", None)
+        try:
+            input_tokens = (
+                int(raw_input_tokens) if raw_input_tokens is not None else None
+            )
+        except (TypeError, ValueError):
+            input_tokens = None
+        try:
+            output_tokens = (
+                int(raw_output_tokens) if raw_output_tokens is not None else None
+            )
+        except (TypeError, ValueError):
+            output_tokens = None
+        meta = getattr(resp, "meta", None)
+        meta = meta if isinstance(meta, dict) else {}
+        finish_reason = str(meta.get("finish_reason") or "unavailable")
+        token_limit_reached = finish_reason == "length" or (
+            output_tokens is not None and output_tokens >= max_output_tokens
+        )
+        provider_error = str(
+            getattr(usage, "error_code", None) or meta.get("error_code") or ""
+        ).strip()
+        failure_reason: str | None = None
+        if not parse_ok:
+            if token_limit_reached:
+                failure_reason = "output_token_limit_reached"
+            elif not text and provider_error:
+                failure_reason = f"provider_error:{provider_error}"
+            elif not text:
+                failure_reason = "empty_response"
+            else:
+                failure_reason = "invalid_json"
+        return {
+            "attempt": attempt,
+            "parse_ok": parse_ok,
+            "failure_reason": failure_reason,
+            "finish_reason": finish_reason,
+            "token_limit_reached": token_limit_reached,
+            "output_chars": len(text),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "max_output_tokens": max_output_tokens,
+            "output_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        }
+
     def generate_one(self, req: SynthRequest) -> SynthDoc:
-        grade_code = req.target_grade.value if hasattr(req.target_grade, "value") else str(req.target_grade)
-        situation = GRADE_SITUATION_PROMPTS.get(grade_code, GRADE_SITUATION_PROMPTS["S3"])
+        grade_code = (
+            req.target_grade.value
+            if hasattr(req.target_grade, "value")
+            else str(req.target_grade)
+        )
+        situation = GRADE_SITUATION_PROMPTS.get(
+            grade_code, GRADE_SITUATION_PROMPTS["S3"]
+        )
+        structure_requirements = req.structure_requirements.strip() or (
+            "문서 유형에 자연스러운 여러 절과 항목을 사용하고 각 절에는 서로 다른 사실을 담는다."
+        )
+        revision_context = req.revision_context.strip()
+        if revision_context:
+            revision_context = f"[재작성 참고]\n{revision_context}"
         user = USER_TEMPLATE_V2.format(
-            situation=situation["situation"],
-            disclosure_scope=situation["disclosure_scope"],
-            harm_potential=situation["harm_potential"],
+            situation=req.scenario_context or situation["situation"],
+            disclosure_scope=req.disclosure_scope or situation["disclosure_scope"],
+            harm_potential=req.harm_potential or situation["harm_potential"],
             domain=req.domain,
-            doc_types=DOMAIN_DOC_TYPES.get(req.domain, DOMAIN_DOC_TYPES["mixed"]),
+            doc_types=req.document_type_hint
+            or DOMAIN_DOC_TYPES.get(req.domain, DOMAIN_DOC_TYPES["mixed"]),
+            structure_requirements=structure_requirements,
             len_min=req.len_min,
             len_max=req.len_max,
+            revision_context=revision_context,
         )
         # C3-7 (2026-05-30): JSON 파싱 실패 시 최대 2회 재시도. Solar 등 JSON 출력
         # 안정성 약한 LLM 에서 76.5% → 30% 미만으로 실패율 감소 기대.
         # 재시도 시 temperature 낮춰 deterministic 시도 + system prompt 강화.
         max_retries = 2
         attempt = 0
-        resp = self.llm.generate(user, system=SYSTEM_PROMPT, temperature=0.7, max_tokens=3500)
+        max_output_tokens = max(512, int(req.max_output_tokens))
+        response_audit: list[dict[str, object]] = []
+        resp = self.llm.generate(
+            user,
+            system=SYSTEM_PROMPT,
+            temperature=0.7,
+            max_tokens=max_output_tokens,
+        )
         self._record_usage(resp)
         parsed = self._parse(resp.text)
+        response_audit.append(
+            self._response_audit_entry(
+                resp,
+                attempt=attempt + 1,
+                max_output_tokens=max_output_tokens,
+                parse_ok=parsed is not None,
+            )
+        )
         while parsed is None and attempt < max_retries:
             attempt += 1
             # 재시도: temperature 0.3, system prompt 에 "반드시 유효한 JSON 만 출력" 추가
-            retry_system = SYSTEM_PROMPT + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
-            resp = self.llm.generate(user, system=retry_system, temperature=0.3, max_tokens=3500)
+            retry_system = (
+                SYSTEM_PROMPT
+                + "\n\n[중요] 반드시 유효한 JSON 객체 1개만 출력하세요. 코드블록·설명·주석 모두 금지."
+            )
+            resp = self.llm.generate(
+                user,
+                system=retry_system,
+                temperature=0.3,
+                max_tokens=max_output_tokens,
+            )
             self._record_usage(resp)  # 재시도도 실제 LLM 비용 — 누락 없이 기록
             parsed = self._parse(resp.text)
+            response_audit.append(
+                self._response_audit_entry(
+                    resp,
+                    attempt=attempt + 1,
+                    max_output_tokens=max_output_tokens,
+                    parse_ok=parsed is not None,
+                )
+            )
 
         if parsed is None:
             # noop provider 등은 JSON이 아님 — fallback으로 텍스트 그대로 body 사용.
@@ -241,8 +457,13 @@ class SyntheticDocGenerator:
             raw_text = resp.text or ""
             body = raw_text or _fallback_body(grade_code, req.domain)
             label_source = "llm_nonjson" if raw_text else "noop_fallback"
-            title = f"{DOMAIN_DOC_TYPES.get(req.domain, '내부 자료').split(',')[0].strip()} 합성 v{abs(hash(user)) % 10000:04d}"
-            doc_type = DOMAIN_DOC_TYPES.get(req.domain, "내부 자료").split(",")[0].strip()
+            doc_types = req.document_type_hint or DOMAIN_DOC_TYPES.get(
+                req.domain, "내부 자료"
+            )
+            title = (
+                f"{doc_types.split(',')[0].strip()} 합성 v{abs(hash(user)) % 10000:04d}"
+            )
+            doc_type = doc_types.split(",")[0].strip()
             return SynthDoc(
                 target_grade=grade_code,
                 domain=req.domain,
@@ -257,6 +478,7 @@ class SyntheticDocGenerator:
                 pii_violations=self._pii_violations(body),
                 parse_error="non-json response",
                 label_source=label_source,
+                response_audit=response_audit,
             )
 
         body = parsed.get("body", "") or ""
@@ -272,6 +494,7 @@ class SyntheticDocGenerator:
             llm_model=getattr(self.llm, "model", "") or "",
             usage=resp.usage,
             pii_violations=self._pii_violations(body),
+            response_audit=response_audit,
         )
 
     def generate(self, req: SynthRequest) -> list[SynthDoc]:
@@ -290,7 +513,9 @@ def _fallback_body(grade_code: str, domain: str) -> str:
     과적합한다. 본문은 **grade-중립 placeholder**로만 둔다(모든 등급에서 동일). 등급은 본문이
     아니라 메타(target_grade)로만 보존되며, grade_code는 호환을 위해 시그니처에만 유지한다.
     """
-    del grade_code  # 본문에 등급 신호를 넣지 않는다(누출 차단) — 시그니처는 호출부 호환용.
+    del (
+        grade_code
+    )  # 본문에 등급 신호를 넣지 않는다(누출 차단) — 시그니처는 호출부 호환용.
     return (
         f"[Noop fallback — {domain} 도메인 합성 문서 (파이프라인 연결 테스트)]\n\n"
         "1. 문서 개요\n"

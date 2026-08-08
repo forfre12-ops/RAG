@@ -251,8 +251,41 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=None,
                     help="학습 시드(모델 init·데이터 셔플). 미지정 시 TrainSpec 기본 42.")
     ap.add_argument("--train-path", default=None)
+    ap.add_argument(
+        "--train-input-mode",
+        choices=["auto", "documents", "pre_chunked"],
+        default=None,
+        help=(
+            "학습 입력 계약. train_chunks.jsonl은 pre_chunked로 명시(기본 auto도 "
+            "chunk 표식을 fail-closed 검사)"
+        ),
+    )
+    ap.add_argument(
+        "--chunk-expand",
+        action="store_true",
+        help="문서단위 train만 레거시 chunk 확장; pre_chunked 입력과 동시 사용 불가",
+    )
     ap.add_argument("--val-path", default=None)
     ap.add_argument("--test-path", default=None)
+    ap.add_argument(
+        "--proxy-candidate-mode",
+        action="store_true",
+        help=(
+            "프록시 production 후보 모드: attested train_chunks로 epoch checkpoints만 "
+            "생성하며 test/val-temperature/deployable v-* 산출을 금지"
+        ),
+    )
+    ap.add_argument(
+        "--proxy-training-run-dir",
+        help=(
+            "materialize_proxy_training_set.py의 committed run dir. proxy candidate "
+            "mode에서 train/validation 경로와 SHA를 여기서만 결합"
+        ),
+    )
+    ap.add_argument(
+        "--base-model-revision",
+        help="프록시 후보 모드의 immutable Hugging Face commit(40-hex); 로컬 모델은 생략 가능",
+    )
     ap.add_argument("--batch-size", type=int, default=None)
     ap.add_argument("--base-model", default=None)
     ap.add_argument("--output-dir", default=None)
@@ -286,9 +319,42 @@ def main() -> int:
         from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
 
         spec_kwargs: dict = {"epochs": args.epochs}
+        if args.proxy_candidate_mode:
+            if not args.proxy_training_run_dir:
+                ap.error("--proxy-candidate-mode requires --proxy-training-run-dir")
+            if (
+                args.train_path
+                or args.val_path
+                or args.test_path
+                or args.train_input_mode
+                or args.chunk_expand
+            ):
+                ap.error(
+                    "proxy candidate mode derives train/validation paths from the attested "
+                    "run and forbids manual train/validation/test/input-mode/chunk paths"
+                )
+            if not args.output_dir:
+                ap.error("proxy candidate mode requires a new --output-dir checkpoint root")
+            proxy_run = Path(args.proxy_training_run_dir)
+            spec_kwargs.update(
+                {
+                    "proxy_candidate_mode": True,
+                    "proxy_training_run_dir": str(proxy_run),
+                    "train_path": str(proxy_run / "train_chunks.jsonl"),
+                    "val_path": str(proxy_run / "validation_documents.jsonl"),
+                    "test_path": None,
+                    "train_input_mode": "pre_chunked",
+                    "chunk_expand": False,
+                    "training_entrypoint_path": str(Path(__file__).resolve()),
+                }
+            )
+        elif args.proxy_training_run_dir:
+            ap.error("--proxy-training-run-dir requires --proxy-candidate-mode")
         for k, v in [("train_path", args.train_path), ("val_path", args.val_path),
                      ("test_path", args.test_path), ("batch_size", args.batch_size),
                      ("base_model", args.base_model), ("output_dir", args.output_dir),
+                     ("train_input_mode", args.train_input_mode),
+                     ("base_model_revision", args.base_model_revision),
                      ("fnr_cost_multiplier", args.fnr_cost_multiplier),
                      ("early_stop_metric", args.early_stop_metric),
                      ("seed", args.seed)]:
@@ -300,6 +366,8 @@ def main() -> int:
             spec_kwargs["bf16"] = False
         if getattr(args, "max_seq_len", None):
             spec_kwargs["max_seq_len"] = args.max_seq_len
+        if args.chunk_expand:
+            spec_kwargs["chunk_expand"] = True
         spec = TrainSpec(**spec_kwargs)
         print(f"[p1] full mode spec: {spec_kwargs}", file=sys.stderr)
         report = train_classifier(spec)

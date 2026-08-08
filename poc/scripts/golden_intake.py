@@ -246,7 +246,7 @@ def _load_train_hashes() -> set[str]:
     return out
 
 
-def cmd_build(intake_dir: Path, out_path: Path | None, dual_for_upper: bool) -> int:
+def cmd_build(intake_dir: Path, out_path: Path | None) -> int:
     from lloydk.golden_signoff import Signoff, promote_to_locked  # noqa: PLC0415
 
     intake_path = intake_dir / "intake.jsonl"
@@ -305,7 +305,7 @@ def cmd_build(intake_dir: Path, out_path: Path | None, dual_for_upper: bool) -> 
         candidates.append({
             "doc_id": did, "text": d["text"], "source": d["source"],
             "domain": d.get("domain", ""), "label": grade,
-            "origin": "customer_real", "format": d.get("format", ""),
+            "document_origin": "customer_real", "format": d.get("format", ""),
             "text_sha256": d["text_sha256"],
         })
         signoffs.append(Signoff(
@@ -320,7 +320,7 @@ def cmd_build(intake_dir: Path, out_path: Path | None, dual_for_upper: bool) -> 
         return 2
 
     # 운영 서명 게이트 그대로 통과시킨다 — 기계 계정·불일치·미서명은 여기서 거부.
-    res = promote_to_locked(candidates, signoffs, dual_for_upper=dual_for_upper)
+    res = promote_to_locked(candidates, signoffs)
 
     out = out_path or (intake_dir / "locked_gold_eval.jsonl")
     out.write_text(
@@ -354,13 +354,11 @@ def main() -> int:
     b = sub.add_parser("build", help="기입된 CSV → locked_gold_eval 정답지")
     b.add_argument("--intake-dir", default="datasets/gold_real/intake")
     b.add_argument("--out")
-    b.add_argument("--dual-for-upper", action="store_true",
-                   help="TS/S1 은 독립 검수자 2인 서명 요구")
 
     a = ap.parse_args()
     if a.cmd == "scan":
         return cmd_scan(Path(a.docs_dir), Path(a.out_dir))
-    return cmd_build(Path(a.intake_dir), Path(a.out) if a.out else None, a.dual_for_upper)
+    return cmd_build(Path(a.intake_dir), Path(a.out) if a.out else None)
 
 
 if __name__ == "__main__":

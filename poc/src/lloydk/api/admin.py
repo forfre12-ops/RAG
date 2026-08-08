@@ -158,7 +158,11 @@ def escalation_held() -> EscalationHeldResponse:
 # ── [번들 D] locked_gold_eval readiness 가시화 ───────────────────────────────
 class LockedReadinessResponse(BaseModel):
     ready: bool
-    per_grade: dict[str, int]
+    per_grade: dict[str, int]                    # 사람 서명 확정 = 평가정답(게이트 기준)
+    real_per_grade: dict[str, int] = {}          # 그중 실문서 출처(판례 등) — 구성 보고
+    synthetic_per_grade: dict[str, int] = {}     # 그중 합성 출처 — 구성 보고
+    real_total: int = 0
+    synthetic_total: int = 0
     missing: list[str]
     min_per_grade: int
     require_locked_eval: bool
@@ -185,6 +189,10 @@ def locked_readiness() -> LockedReadinessResponse:
     return LockedReadinessResponse(
         ready=bool(s["ready"]),
         per_grade=s["per_grade"],
+        real_per_grade=s.get("real_per_grade", {}),
+        synthetic_per_grade=s.get("synthetic_per_grade", {}),
+        real_total=int(s.get("real_total", 0)),
+        synthetic_total=int(s.get("synthetic_total", 0)),
         missing=list(s["missing"]),
         min_per_grade=int(s["min_per_grade"]),
         require_locked_eval=bool(s["require_locked_eval"]),

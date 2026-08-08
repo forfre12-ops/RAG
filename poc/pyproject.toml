@@ -46,6 +46,7 @@ dependencies = [
   "datasets>=2.20",
   "evaluate>=0.4",
   "scikit-learn>=1.5",
+  "scipy>=1.14",                 # exact joint scenario/family/shape MILP selector
   "mlflow>=2.16",
   "matplotlib>=3.9",  # M6 평가 — confusion-matrix PNG 렌더 (report.py)
 

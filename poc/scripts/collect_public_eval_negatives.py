@@ -56,7 +56,7 @@ import time
 import urllib.parse
 import urllib.request
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
@@ -122,30 +122,56 @@ def _http_get(url: str, params: dict[str, str], timeout: int = 60) -> bytes:
 
 
 # ── DART ────────────────────────────────────────────────────────────────────
+def _date_windows(bgn: str, end: str, days: int = 89) -> list[tuple[str, str]]:
+    """[bgn, end] 를 days 이하 구간으로 분할.
+
+    OpenDART 공시검색은 corp_code 없이 조회하면 검색기간이 3개월로 제한된다
+    (status=100). 긴 구간을 넣으면 조용히 잘리는 게 아니라 오류라서, 호출부에서
+    창을 쪼개 순회해야 한다.
+    """
+    d0 = datetime.strptime(bgn, "%Y%m%d").date()
+    d1 = datetime.strptime(end, "%Y%m%d").date()
+    if d1 < d0:
+        raise SystemExit(f"[ERR] --end-de({end}) 가 --bgn-de({bgn}) 보다 앞섭니다")
+    out: list[tuple[str, str]] = []
+    cur = d0
+    while cur <= d1:
+        nxt = min(cur + timedelta(days=days), d1)
+        out.append((cur.strftime("%Y%m%d"), nxt.strftime("%Y%m%d")))
+        cur = nxt + timedelta(days=1)
+    return out
+
+
 def dart_list(key: str, bgn: str, end: str, ptype: str, corp_cls: str, want: int,
               sleep_ms: int) -> list[dict]:
-    """공시검색 — 접수번호 목록. 페이지를 돌며 want 건까지 모은다."""
+    """공시검색 — 접수번호 목록. 3개월 창을 순회하며 want 건까지 모은다."""
     out: list[dict] = []
-    page = 1
-    while len(out) < want and page <= 20:
-        body = _http_get(DART_LIST_URL, {
-            "crtfc_key": key, "bgn_de": bgn, "end_de": end, "pblntf_ty": ptype,
-            "corp_cls": corp_cls, "page_no": str(page), "page_count": "100",
-        })
-        payload = json.loads(body.decode("utf-8"))
-        status = str(payload.get("status"))
-        if status != "000":
-            reason = DART_STATUS.get(status, "알 수 없음")
-            if status == "013" and out:
+    for w_bgn, w_end in _date_windows(bgn, end):
+        if len(out) >= want:
+            break
+        page = 1
+        while len(out) < want and page <= 20:
+            body = _http_get(DART_LIST_URL, {
+                "crtfc_key": key, "bgn_de": w_bgn, "end_de": w_end, "pblntf_ty": ptype,
+                "corp_cls": corp_cls, "page_no": str(page), "page_count": "100",
+            })
+            payload = json.loads(body.decode("utf-8"))
+            status = str(payload.get("status"))
+            if status == "013":       # 이 창에 데이터 없음 — 다음 창으로
                 break
-            raise SystemExit(f"[ERR] OpenDART list status={status} ({reason}) — {payload.get('message','')}")
-        items = payload.get("list") or []
-        if not items:
-            break
-        out.extend(items)
-        if page >= int(payload.get("total_page") or 1):
-            break
-        page += 1
+            if status != "000":
+                reason = DART_STATUS.get(status, "알 수 없음")
+                raise SystemExit(
+                    f"[ERR] OpenDART list status={status} ({reason}) — {payload.get('message','')}")
+            items = payload.get("list") or []
+            if not items:
+                break
+            out.extend(items)
+            if page >= int(payload.get("total_page") or 1):
+                break
+            page += 1
+            time.sleep(sleep_ms / 1000)
+        print(f"[dart]   창 {w_bgn}~{w_end} → 누적 {len(out)}건")
         time.sleep(sleep_ms / 1000)
     # 결정론: 접수번호 오름차순 고정 후 절단.
     out.sort(key=lambda r: str(r.get("rcept_no", "")))
@@ -178,6 +204,27 @@ def dart_document_text(key: str, rcept_no: str) -> tuple[str, str | None]:
     return _norm_text("\n".join(chunks)), None
 
 
+# 사업보고서 표지·목차 제거용 앵커. 목차에도 같은 제목이 있으므로 "앞 60% 안에서
+# 마지막 출현"을 본문 시작으로 본다.
+_DART_CONTENT_ANCHORS = ("I. 회사의 개요", "1. 회사의 개요", "회사의 개요")
+
+
+def _dart_content_start(text: str) -> int:
+    """표지·목차가 끝나는 지점.
+
+    사업보고서 앞 2~3천 자는 표지(제출법인 유형·대표이사·주소)와 목차라 문서마다
+    거의 동일하다. 그대로 두면 평가가 본문 앞부분만 보는 구조에서 200건이 같은
+    보일러플레이트로 수렴해 과분류 측정이 퇴화한다. 잘라낸 위치는 레코드에
+    content_offset 으로 남겨 추적 가능하게 둔다.
+    """
+    limit = int(len(text) * 0.6)
+    for anchor in _DART_CONTENT_ANCHORS:
+        pos = text.rfind(anchor, 0, limit)
+        if pos > 0:
+            return pos
+    return 0
+
+
 def collect_dart(args: argparse.Namespace, key: str) -> list[dict]:
     print(f"[dart] 공시검색 {args.bgn_de}~{args.end_de} (pblntf_ty={args.report_type}, "
           f"corp_cls={args.corp_cls}) 최대 {args.max_docs}건")
@@ -195,21 +242,24 @@ def collect_dart(args: argparse.Namespace, key: str) -> list[dict]:
     for i, r in enumerate(listing, 1):
         rcept = str(r.get("rcept_no", ""))
         text, err = dart_document_text(key, rcept)
+        offset = _dart_content_start(text) if text else 0
+        body = text[offset: offset + args.max_chars]
         if err:
             failed += 1
             print(f"[dart]   ! {rcept} 본문 실패: {err}", file=sys.stderr)
-        elif len(text) < args.min_len:
+        elif len(body) < args.min_len:
             short += 1
         else:
             docs.append({
                 "title": f"{r.get('corp_name','')} {r.get('report_nm','')}".strip(),
-                "body": text[: args.max_chars],
+                "body": body,
                 "source": "DART",
                 "domain": "",
                 "grade": "S3",
                 "grade_basis": "법정 공시서류 — 정의상 공개(S3)",
                 "upstream": {"api": "opendart", "rcept_no": rcept,
-                             "corp_code": r.get("corp_code"), "rcept_dt": r.get("rcept_dt")},
+                             "corp_code": r.get("corp_code"), "rcept_dt": r.get("rcept_dt"),
+                             "content_offset": offset},
             })
         if i % 20 == 0:
             print(f"[dart]   {i}/{len(listing)} 처리 (수집 {len(docs)} · 짧음 {short} · 실패 {failed})")

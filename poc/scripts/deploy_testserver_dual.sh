@@ -193,6 +193,15 @@ case "$cmd" in
     # external 볼륨은 root 소유로 생성됨 → 비-root(uid1000) 컨테이너가 HF 캐시에 못 써
     # 임베더 warmup 이 Permission denied 로 fail-clear(require_real_embedder). 소유권을 컨테이너 uid 로 보정.
     docker run --rm -v "$HF_VOLUME":/c alpine sh -c 'chown -R 1000:1000 /c' >/dev/null 2>&1 || true
+    # [2026-08-06] datasets/ 는 호스트 bind(rw) 라 **호스트 계정 uid 가 1000 이 아니면** 컨테이너
+    # (uid1000)가 골든 산출물을 못 쓴다 → 검수 서명이 500(PermissionError)으로 죽는다.
+    # 실측: KL 제공 서버의 계정 kopia=uid1001 에서 재현(우리 테스트서버는 aisadm=1000 이라 우연히 통과).
+    # HF 캐시와 같은 이유·같은 처방이며, 여기서 함께 보정한다(호스트 계정도 그룹 쓰기 유지).
+    if [ -d "$ROOT/datasets" ] && [ "$(stat -c %u "$ROOT/datasets" 2>/dev/null || echo 1000)" != "1000" ]; then
+      c_b "datasets/ 소유권 보정(uid1000) — 컨테이너 쓰기 권한"
+      sudo chown -R 1000:1000 "$ROOT/datasets" 2>/dev/null || chown -R 1000:1000 "$ROOT/datasets" 2>/dev/null || true
+      sudo chmod -R g+w "$ROOT/datasets" 2>/dev/null || chmod -R g+w "$ROOT/datasets" 2>/dev/null || true
+    fi
     gen_env .env.jjw  full-train   "$JJW_PORT"  "$([ -n "${ANTHROPIC_API_KEY:-}" ] && echo anthropic || echo noop)"
     gen_env .env.cust onprem-local "$CUST_PORT" noop
     deploy_stack lloydk-jjw  .env.jjw  "$JJW_PORT"

@@ -106,6 +106,7 @@ def test_document_origin_mapping():
     assert document_origin({"source": "금융보고서"}) == ORIGIN_PUBLIC_REAL
     assert document_origin({"source": "public_scenario"}) == ORIGIN_SYNTHETIC
     assert document_origin({"source": "synthetic_grounded"}) == ORIGIN_SYNTHETIC
+    assert document_origin({"source": "synthetic"}) == ORIGIN_SYNTHETIC
     assert document_origin({"source": "real_deidentified"}) == ORIGIN_CUSTOMER_REAL
     assert document_origin({"source": "wat"}) == ORIGIN_UNKNOWN
     assert document_origin({}) == ORIGIN_UNKNOWN  # fail-closed
@@ -114,13 +115,15 @@ def test_document_origin_mapping():
 
 
 def test_synthetic_signoff_is_locked_tier_but_not_real_eval():
-    # 서명은 유효하나 본문이 합성 → tier LOCKED(=서명유효, 학습선 제외)이나 real 평가엔 미집계.
+    # 서명은 유효하나 본문이 합성 → is_real_locked_eval(실문서 축)은 False.
+    # 단 평가정답 편입은 '사람 서명' 기준이므로 eval pool 에는 들어간다(2026-08-06 결정:
+    # 발주처는 검수만 하고 실문서를 올리지 않는다 → 실문서 요구 시 TS 가 영원히 0).
     rec = _signed("TS", source="public_scenario")
     assert is_valid_signoff(rec) and tier_of(rec) == TIER_LOCKED
     assert not is_real_text_origin(rec) and not is_real_locked_eval(rec)
     ev, _ = eval_records([rec], allow_floor_fallback=False)
-    assert ev == []                       # eval pool 제외(실문서 아님)
-    assert train_records([rec]) == []     # 학습도 제외(LOCKED tier)
+    assert ev == [rec]                    # 사람 서명 → eval pool 편입
+    assert train_records([rec]) == []     # 평가정답이므로 학습에서는 제외(train-on-test 차단)
 
 
 # ── 권위 분류(2026-07-03 감사) — 외부권위 vs 큐레이트 프록시 ─────────────────────
@@ -178,7 +181,7 @@ def test_partition_and_filters():
     assert len(p[TIER_CANDIDATE]) == 1
     assert len(p[TIER_SILVER]) == 1
     assert len(p[TIER_HELD]) == 1
-    # train = allowlist(silver+candidate+legal_floor) = 3 (locked·held 제외)
+    # train = silver+candidate+legal_floor = 3 (실문서 서명분·held 제외)
     assert len(train_records(recs)) == 3
     # eval = real_locked_eval(서명유효+실문서)만 = 1
     ev, used = eval_records(recs)
@@ -219,11 +222,16 @@ def test_eval_readiness_empty_locked_not_ready():
     assert r["reason"] == "no_locked_records"
 
 
-def test_eval_readiness_synthetic_signoff_does_not_count():
-    # 서명 유효하나 합성 본문 4등급 → real 평가정답 아님 → readiness 미집계(no_locked_records).
+def test_eval_readiness_counts_signed_synthetic_and_reports_composition():
+    # [2026-08-06] 사람 서명이 곧 평가정답 편입 조건. 합성 본문도 서명되면 집계된다
+    # (발주처는 검수만 하고 실문서를 올리지 않는 운영 전제 — 실문서 요구 시 TS 가 영원히 0).
+    # 대신 구성(실문서/합성)을 함께 보고해 수치 인용 시 한정할 수 있게 한다.
     recs = [_signed(g, source="public_scenario") for g in ("TS", "S1", "S2", "S3")]
     r = eval_readiness(recs, min_per_grade=1)
-    assert r["ready"] is False and r["reason"] == "no_locked_records"
+    assert r["ready"] is True
+    assert r["per_grade"] == {"TS": 1, "S1": 1, "S2": 1, "S3": 1}
+    assert r["synthetic_per_grade"] == {"TS": 1, "S1": 1, "S2": 1, "S3": 1}
+    assert r["real_total"] == 0 and r["synthetic_total"] == 4
 
 
 def test_eval_readiness_insufficient_per_grade():

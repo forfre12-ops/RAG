@@ -308,6 +308,11 @@ class GoldenBuildService:
             post_url=f"/api/v1/golden/jobs/{job_id}/signoff",
             title=title,
             profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
+            # 시연·반복 검수에서 매번 타이핑하지 않도록 기본 검수자를 미리 채운다(사람이 화면에서
+            # 수정 가능). 운영 기본값은 빈 문자열이라 강제되지 않는다 — .env 로 켜는 편의 기능.
+            default_reviewer=str(getattr(settings, "signoff_default_reviewer", "") or ""),
+            default_api_key=(str(getattr(settings, "api_key", "") or "")
+                             if getattr(settings, "signoff_prefill_api_key", False) else ""),
         )
 
     def apply_signoff(
@@ -317,7 +322,6 @@ class GoldenBuildService:
         *,
         reviewer_id: str,
         publish: bool = False,
-        dual_for_upper: bool = False,
     ) -> Optional[dict]:
         """검수 결정(승인/변경/거부)을 골든 후보에 적용해 locked_gold_eval 로 승격.
 
@@ -367,7 +371,7 @@ class GoldenBuildService:
 
         # 결정된 후보만 승격 대상으로(미결정 후보가 rejected 로 잡히는 노이즈 차단).
         subset = [c for c in candidates if c.get("doc_id") in decided_ids]
-        res = promote_to_locked(subset, signoffs, dual_for_upper=dual_for_upper)
+        res = promote_to_locked(subset, signoffs)
 
         # run-스코프 감사 기록(정본·라이브 무변경) — 항상. 같은 잡을 여러 세션에 나눠 서명하는 게
         # 정상 흐름(대량 후보)이므로 덮어쓰기 대신 기존 승격분과 doc_id dedup 누적(라이브 경로와 동일

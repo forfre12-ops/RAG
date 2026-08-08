@@ -6,10 +6,16 @@ P1 분류기 학습기.
 - KPI: F1-macro, FNR-overall, FNR per grade
 """
 from __future__ import annotations
+from contextlib import nullcontext
+import hashlib
 import json
+import math
+import os
+import re
+import uuid
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 from sklearn.metrics import (
@@ -23,19 +29,51 @@ _LABEL_LIST: list[str] = [g.value for g in (Grade.TS, Grade.S1, Grade.S2, Grade.
 _LABEL2ID = {label: i for i, label in enumerate(_LABEL_LIST)}
 _ID2LABEL = {i: label for label, i in _LABEL2ID.items()}
 
+TrainInputMode = Literal["auto", "documents", "pre_chunked"]
+_PRE_CHUNK_FIELDS = ("chunk_id", "source_doc_id", "chunk_label_strength")
+_CHUNK_SENTINEL_FIELDS = (
+    "chunk_id",
+    "chunk_index",
+    "chunk_start",
+    "chunk_end",
+    "chunk_label_strength",
+)
+
+
+@dataclass(frozen=True)
+class _LocalRunInfo:
+    run_id: str
+
+
+@dataclass(frozen=True)
+class _LocalRun:
+    info: _LocalRunInfo
+
+
+def _training_run_context(mlflow_module, spec: "TrainSpec"):
+    """Return a tracking context without touching MLflow when it is disabled."""
+    if spec.use_mlflow:
+        mlflow_module.set_experiment(spec.experiment_name)
+        return mlflow_module.start_run()
+    return nullcontext(_LocalRun(info=_LocalRunInfo(run_id=uuid.uuid4().hex)))
+
 
 @dataclass
 class TrainSpec:
     base_model: str = "kakaobank/kf-deberta-base"
     train_path: str = "datasets/labeled/train.jsonl"
     val_path: str = "datasets/labeled/val.jsonl"
-    test_path: str = "datasets/labeled/test.jsonl"
+    test_path: str | None = "datasets/labeled/test.jsonl"
     output_dir: str = "artifacts/classifier"
     max_seq_len: int = 512
     # [FUN-004 Chunk 단위 학습] True 면 TRAIN 분할을 chunk 단위로 확장(각 chunk=문서 라벨 상속).
     # 긴 문서의 max_seq_len truncation 으로 잘리던 뒷부분까지 학습 신호로 사용. val/test/holdout 은
     # 문서 단위 유지(누수차단 — chunk_expand 모듈 주석 참조). 기본 False=기존 문서단위 학습 보존.
     chunk_expand: bool = False
+    # auto: chunk 계약 필드를 검사해 문서/기생성 chunk를 자동 판별.
+    # pre_chunked: materializer의 train_chunks.jsonl 계약을 강제.
+    # documents: chunk 표식이 하나라도 있으면 이중 확장 위험으로 거부.
+    train_input_mode: TrainInputMode = "auto"
     # chunk char 크기(0=auto=max_seq_len*3, 추론측 chunk_text 와 동일 휴리스틱)·overlap·최소 글자.
     chunk_char_size: int = 0
     chunk_overlap: int = 64
@@ -64,6 +102,13 @@ class TrainSpec:
     bf16: bool = True           # bf16 가속 (CUDA GPU 필요; GPU 없으면 자동 비활성)
     use_mlflow: bool = True     # MLflow 로깅 (서버 없으면 False 권장)
     logging_steps: int = 20
+    # Proxy production path: this trainer emits epoch checkpoint candidates and
+    # a hash-bound TRAINING_EXECUTION.json only.  It does not choose a deployable
+    # model, evaluate test/frozen data, or fit temperature from validation.
+    proxy_candidate_mode: bool = False
+    proxy_training_run_dir: str | None = None
+    base_model_revision: str | None = None
+    training_entrypoint_path: str | None = None
 
 
 @dataclass
@@ -78,17 +123,191 @@ class TrainReport:
     fnr_high: float = 0.0   # 고등급(TS/S1) 미탐율 — 핵심 KPI
     confusion_matrix: list[list[int]] = field(default_factory=list)
     classification_report: str = ""
+    artifact_status: str = "legacy_trained_model"
+    claim_scope: str = "legacy_training_report"
+    deployable: bool = True
+    training_execution_manifest: str | None = None
 
 
 def _load_jsonl(path: str) -> tuple[list[str], list[int]]:
     texts, labels = [], []
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
+    for row_number, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
         row = json.loads(line)
+        if any(field in row for field in _CHUNK_SENTINEL_FIELDS):
+            raise ValueError(
+                f"{path}:{row_number}: validation/test input must be document-level, "
+                "not pre-chunked"
+            )
         texts.append(row["text"])
         labels.append(_LABEL2ID[row["label"]])
     return texts, labels
+
+
+def _parse_sample_weight(value: object, *, path: str, row_number: int) -> float:
+    """Parse one externally supplied sample weight using a fail-closed contract."""
+    if isinstance(value, bool):
+        raise ValueError(f"{path}:{row_number}: sample_weight must be a number in (0, 1]")
+    try:
+        weight = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{path}:{row_number}: sample_weight must be a number in (0, 1]"
+        ) from exc
+    if not math.isfinite(weight) or not 0.0 < weight <= 1.0:
+        raise ValueError(f"{path}:{row_number}: sample_weight must be finite and in (0, 1]")
+    return weight
+
+
+def _load_training_jsonl(
+    path: str,
+    *,
+    input_mode: TrainInputMode = "auto",
+) -> tuple[list[str], list[int], list[float], Literal["documents", "pre_chunked"]]:
+    """Load training rows, validate weights, and detect materialized chunks.
+
+    Missing ``sample_weight`` remains backwards compatible at 1.0.  Partial or
+    mixed chunk metadata is rejected because silently treating those rows as
+    documents could expand an already materialized chunk a second time.
+    """
+    if input_mode not in {"auto", "documents", "pre_chunked"}:
+        raise ValueError(f"unsupported train_input_mode: {input_mode!r}")
+
+    rows: list[dict] = []
+    source = Path(path)
+    for row_number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        parsed = json.loads(line)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{path}:{row_number}: training row must be a JSON object")
+        parsed["_input_row_number"] = row_number
+        rows.append(parsed)
+
+    chunk_marked = [any(field in row for field in _CHUNK_SENTINEL_FIELDS) for row in rows]
+    chunk_complete = [
+        all(str(row.get(field) or "").strip() for field in _PRE_CHUNK_FIELDS)
+        for row in rows
+    ]
+    if input_mode == "auto":
+        if any(chunk_marked):
+            if not rows or not all(chunk_complete):
+                raise ValueError(
+                    f"{path}: mixed or incomplete pre-chunked rows; "
+                    f"required fields={_PRE_CHUNK_FIELDS}"
+                )
+            detected_mode: Literal["documents", "pre_chunked"] = "pre_chunked"
+        else:
+            detected_mode = "documents"
+    elif input_mode == "pre_chunked":
+        if not rows or not all(chunk_complete):
+            raise ValueError(
+                f"{path}: pre_chunked mode requires every row to contain "
+                f"{_PRE_CHUNK_FIELDS}"
+            )
+        detected_mode = "pre_chunked"
+    else:
+        if any(chunk_marked):
+            raise ValueError(f"{path}: documents mode rejects pre-chunked row markers")
+        detected_mode = "documents"
+
+    texts: list[str] = []
+    labels: list[int] = []
+    sample_weights: list[float] = []
+    chunk_ids: set[str] = set()
+    for row in rows:
+        row_number = int(row.pop("_input_row_number"))
+        texts.append(row["text"])
+        labels.append(_LABEL2ID[row["label"]])
+        raw_weight = row["sample_weight"] if "sample_weight" in row else 1.0
+        sample_weights.append(
+            _parse_sample_weight(raw_weight, path=path, row_number=row_number)
+        )
+        if detected_mode == "pre_chunked":
+            chunk_id = str(row["chunk_id"]).strip()
+            if chunk_id in chunk_ids:
+                raise ValueError(f"{path}:{row_number}: duplicate chunk_id {chunk_id!r}")
+            chunk_ids.add(chunk_id)
+    return texts, labels, sample_weights, detected_mode
+
+
+def _prepare_training_rows(
+    spec: TrainSpec,
+) -> tuple[list[str], list[int], list[float], Literal["documents", "pre_chunked"]]:
+    """Prepare train-only rows without requiring transformers or a model load."""
+    train_x, train_y, sample_weights, detected_mode = _load_training_jsonl(
+        spec.train_path,
+        input_mode=spec.train_input_mode,
+    )
+    if not spec.chunk_expand:
+        return train_x, train_y, sample_weights, detected_mode
+    if detected_mode == "pre_chunked":
+        raise ValueError(
+            "chunk_expand=True cannot be used with pre-chunked training input; "
+            "use train_input_mode='pre_chunked' and chunk_expand=False"
+        )
+
+    from lloydk.modules.m4_training.chunk_expand import expand_chunks
+
+    char_size = spec.chunk_char_size or (spec.max_seq_len * 3)
+    metadata = list(zip(train_y, sample_weights))
+    expanded_x, expanded_metadata = expand_chunks(
+        train_x,
+        metadata,
+        char_size=char_size,
+        overlap=spec.chunk_overlap,
+        min_chars=spec.chunk_min_chars,
+    )
+    expanded_y = [label for label, _ in expanded_metadata]
+    expanded_weights = [weight for _, weight in expanded_metadata]
+    return expanded_x, expanded_y, expanded_weights, detected_mode
+
+
+def _weighted_cross_entropy(
+    logits,
+    labels,
+    *,
+    class_weights=None,
+    sample_weights=None,
+):
+    """Combine class and per-sample weights with stable weighted-mean CE.
+
+    With no sample weights this is exactly PyTorch's legacy weighted CE.  With
+    sample weights, each row's numerator and normalization mass are scaled by
+    that weight, so a 0.5 neighbor has half the influence of a 1.0 evidence row.
+    """
+    import torch.nn.functional as functional
+
+    if sample_weights is None:
+        effective_class_weights = (
+            class_weights.to(device=logits.device, dtype=logits.dtype)
+            if class_weights is not None
+            else None
+        )
+        return functional.cross_entropy(logits, labels, weight=effective_class_weights)
+
+    weights = sample_weights.to(device=logits.device, dtype=logits.dtype).reshape(-1)
+    if weights.numel() != labels.numel():
+        raise ValueError("sample_weights length must match labels")
+    effective_class_weights = (
+        class_weights.to(device=logits.device, dtype=logits.dtype)
+        if class_weights is not None
+        else None
+    )
+    per_row = functional.cross_entropy(
+        logits,
+        labels,
+        weight=effective_class_weights,
+        reduction="none",
+    )
+    normalization = weights
+    if effective_class_weights is not None:
+        normalization = normalization * effective_class_weights[labels]
+    denominator = normalization.sum()
+    # External values were validated once by _load_training_jsonl.  Avoid a
+    # device-to-host synchronization on every GPU batch here.
+    return (per_row * weights).sum() / denominator
 
 
 def _compute_fnr(cm: np.ndarray) -> tuple[float, dict[str, float]]:
@@ -150,14 +369,292 @@ def _compute_degenerate_penalty(cm: np.ndarray) -> float:
     return 1.0 if int(col_sums.max()) >= 0.99 * total else 0.0
 
 
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _atomic_write_new(path: Path, payload: bytes) -> None:
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # Hard-link publication is atomic and fails if the single-assignment
+        # destination already exists (unlike POSIX rename, which can replace).
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise ValueError(
+                f"proxy training execution artifact already exists: {path}"
+            ) from exc
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _proxy_materialization_audit(spec: TrainSpec) -> dict[str, object] | None:
+    if not spec.proxy_candidate_mode:
+        if spec.proxy_training_run_dir is not None:
+            raise ValueError(
+                "proxy_training_run_dir requires proxy_candidate_mode=True"
+            )
+        return None
+    if not spec.proxy_training_run_dir:
+        raise ValueError("proxy candidate mode requires proxy_training_run_dir")
+    if spec.test_path is not None:
+        raise ValueError(
+            "proxy candidate mode forbids test_path; frozen/calibration data must not be test input"
+        )
+    if spec.train_input_mode != "pre_chunked" or spec.chunk_expand:
+        raise ValueError(
+            "proxy candidate mode requires pre_chunked train input without chunk_expand"
+        )
+    if not spec.training_entrypoint_path:
+        raise ValueError("proxy candidate mode requires training_entrypoint_path")
+    from lloydk.proxy_training_finalization import (  # noqa: PLC0415
+        verify_materialized_training_run,
+    )
+
+    bound = verify_materialized_training_run(Path(spec.proxy_training_run_dir))
+    artifacts = bound["artifacts"]
+    expected_train = Path(str(artifacts["train_chunks"]["path"])).resolve()
+    expected_validation = Path(
+        str(artifacts["validation_documents"]["path"])
+    ).resolve()
+    if Path(spec.train_path).resolve() != expected_train:
+        raise ValueError(
+            "proxy train_path must be the attested training run train_chunks.jsonl"
+        )
+    if Path(spec.val_path).resolve() != expected_validation:
+        raise ValueError(
+            "proxy val_path must be the attested training run validation_documents.jsonl"
+        )
+    output = Path(spec.output_dir)
+    if output.exists() and not output.is_dir():
+        raise ValueError(f"proxy checkpoint root is not a directory: {output}")
+    if output.exists() and any(output.iterdir()):
+        raise ValueError(
+            f"proxy checkpoint root must be new or empty: {output}"
+        )
+    return {key: value for key, value in bound.items() if key != "document_rows"}
+
+
+def _hash_model_state_dict(model) -> str:
+    """Hash exact initial parameter bytes before any optimizer step."""
+    import torch  # noqa: PLC0415
+
+    digest = hashlib.sha256()
+    for name, tensor in sorted(model.state_dict().items()):
+        detached = tensor.detach().cpu().contiguous()
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(detached.dtype).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(json.dumps(list(detached.shape), separators=(",", ":")).encode("ascii"))
+        digest.update(b"\0")
+        # uint8 view supports bf16 and every other dense numeric dtype without
+        # a lossy numpy dtype conversion.
+        digest.update(detached.view(-1).view(torch.uint8).numpy().tobytes())
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _attest_base_model(model, tokenizer, spec: TrainSpec) -> dict[str, object]:
+    config = getattr(model, "config", None)
+    resolved_revision = getattr(config, "_commit_hash", None)
+    if not resolved_revision:
+        resolved_revision = getattr(tokenizer, "init_kwargs", {}).get("_commit_hash")
+    base_path = Path(spec.base_model)
+    if base_path.exists():
+        revision_kind = "local_exact_state"
+        resolved_revision = str(resolved_revision or "local")
+    else:
+        revision_kind = "huggingface_commit"
+        requested = spec.base_model_revision
+        if requested and not re.fullmatch(r"[0-9a-f]{40,64}", requested):
+            raise ValueError(
+                "proxy base_model_revision must be an immutable 40-64 hex commit"
+            )
+        if requested and re.fullmatch(r"[0-9a-f]{40,64}", requested):
+            if resolved_revision and str(resolved_revision) != requested:
+                raise ValueError(
+                    "resolved base-model commit does not match requested immutable revision"
+                )
+            resolved_revision = str(resolved_revision or requested)
+        if not isinstance(resolved_revision, str) or not re.fullmatch(
+            r"[0-9a-f]{40,64}", resolved_revision
+        ):
+            raise ValueError(
+                "proxy candidate mode requires an immutable Hugging Face commit revision; "
+                "pass --base-model-revision <40-hex-commit>"
+            )
+    config_json = (
+        config.to_json_string(use_diff=False)
+        if config is not None and hasattr(config, "to_json_string")
+        else json.dumps(getattr(config, "to_dict", lambda: {})(), sort_keys=True)
+    )
+    tokenizer_contract = {
+        "class": type(tokenizer).__name__,
+        "is_fast": bool(getattr(tokenizer, "is_fast", False)),
+        "vocab": tokenizer.get_vocab(),
+        "special_tokens_map": getattr(tokenizer, "special_tokens_map", {}),
+    }
+    tokenizer_bytes = json.dumps(
+        tokenizer_contract,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "identifier": spec.base_model,
+        "requested_revision": spec.base_model_revision,
+        "resolved_revision": resolved_revision,
+        "revision_kind": revision_kind,
+        "initial_state_dict_sha256": _hash_model_state_dict(model),
+        "config_sha256": _sha256_bytes(config_json.encode("utf-8")),
+        "tokenizer_contract_sha256": _sha256_bytes(tokenizer_bytes),
+        "tokenizer_is_fast": bool(getattr(tokenizer, "is_fast", False)),
+    }
+
+
+def _write_proxy_training_execution(
+    *,
+    spec: TrainSpec,
+    materialization_start: dict[str, object],
+    base_model_attestation: dict[str, object],
+    run_id: str,
+) -> Path:
+    from lloydk.proxy_model_comparison import hash_model_directory  # noqa: PLC0415
+    from lloydk.proxy_training_finalization import (  # noqa: PLC0415
+        verify_materialized_training_run,
+    )
+
+    checkpoint_root = Path(spec.output_dir)
+    checkpoints = sorted(
+        (
+            path
+            for path in checkpoint_root.iterdir()
+            if path.is_dir() and re.fullmatch(r"checkpoint-[0-9]+", path.name)
+        ),
+        key=lambda path: int(path.name.split("-")[1]),
+    )
+    if not checkpoints:
+        raise ValueError("proxy training produced no checkpoint-* candidates")
+    if os.name != "nt":
+        for checkpoint in checkpoints:
+            for child in checkpoint.rglob("*"):
+                child.chmod(0o2750 if child.is_dir() else 0o640)
+            checkpoint.chmod(0o2750)
+    checkpoint_attestations = [
+        {"name": path.name, "artifact": hash_model_directory(path)}
+        for path in checkpoints
+    ]
+    checkpoint_set_bytes = json.dumps(
+        checkpoint_attestations,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    materialization_end_bound = verify_materialized_training_run(
+        Path(str(spec.proxy_training_run_dir))
+    )
+    materialization_end = {
+        key: value
+        for key, value in materialization_end_bound.items()
+        if key != "document_rows"
+    }
+    if materialization_end != materialization_start:
+        raise ValueError("materialized training run changed during proxy training")
+    trainer_source = Path(__file__).resolve()
+    source: dict[str, object] = {
+        "trainer_path": str(trainer_source),
+        "trainer_sha256": _sha256_file(trainer_source),
+    }
+    if spec.training_entrypoint_path:
+        entrypoint = Path(spec.training_entrypoint_path).resolve()
+        if not entrypoint.is_file():
+            raise ValueError(f"training entrypoint is missing: {entrypoint}")
+        source.update(
+            {
+                "entrypoint_path": str(entrypoint),
+                "entrypoint_sha256": _sha256_file(entrypoint),
+            }
+        )
+    manifest = {
+        "schema_version": "proxy-training-execution-v1",
+        "status": "checkpoint_candidates_complete",
+        "run_id": run_id,
+        "claim_scope": "proxy_training_checkpoint_candidates_only_not_customer_accuracy",
+        "deployable": False,
+        "finalizer_required": True,
+        "materialized_training_run": materialization_start,
+        "inputs": {
+            "train_chunks_sha256": materialization_start["artifacts"]["train_chunks"][
+                "sha256"
+            ],
+            "validation_documents_sha256": materialization_start["artifacts"][
+                "validation_documents"
+            ]["sha256"],
+            "calibration_documents_used": False,
+            "test_or_frozen_documents_used": False,
+        },
+        "base_model": base_model_attestation,
+        "training_spec": asdict(spec),
+        "seed": spec.seed,
+        "validation_policy": {
+            "during_training": "diagnostic_epoch_metrics_only",
+            "deployable_checkpoint_selected": False,
+            "temperature_fitted": False,
+            "val_logits_exported": False,
+        },
+        "checkpoint_root": str(checkpoint_root.resolve()),
+        "checkpoint_set_sha256": _sha256_bytes(checkpoint_set_bytes),
+        "checkpoints": checkpoint_attestations,
+        "source": source,
+    }
+    manifest_bytes = (
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    manifest_path = checkpoint_root / "TRAINING_EXECUTION.json"
+    _atomic_write_new(manifest_path, manifest_bytes)
+    complete = {
+        "schema_version": "proxy-training-execution-v1",
+        "status": "complete",
+        "run_id": run_id,
+        "manifest_sha256": _sha256_bytes(manifest_bytes),
+        "checkpoint_set_sha256": manifest["checkpoint_set_sha256"],
+    }
+    _atomic_write_new(
+        checkpoint_root / "TRAINING_CANDIDATES_COMPLETE",
+        (json.dumps(complete, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode(
+            "utf-8"
+        ),
+    )
+    if os.name != "nt":
+        manifest_path.chmod(0o640)
+        (checkpoint_root / "TRAINING_CANDIDATES_COMPLETE").chmod(0o640)
+        checkpoint_root.chmod(0o2750)
+    return manifest_path
+
+
 def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     spec = spec or TrainSpec()
+    proxy_materialization = _proxy_materialization_audit(spec)
 
     import torch
     from datasets import Dataset
     from transformers import (
         AutoTokenizer, AutoModelForSequenceClassification,
-        TrainingArguments, Trainer, DataCollatorWithPadding,
+        TrainingArguments, Trainer, DataCollatorWithPadding, set_seed,
     )
     import mlflow
 
@@ -171,39 +668,64 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     ):
         _logging.getLogger(_name).setLevel(_logging.CRITICAL)
 
-    mlflow.set_experiment(spec.experiment_name)
+    # Model heads can be initialized during from_pretrained, before Trainer has
+    # a chance to apply TrainingArguments.seed.  Seed here so the attested base
+    # state and the actual optimization start are reproducible.
+    set_seed(spec.seed)
 
-    train_x, train_y = _load_jsonl(spec.train_path)
+    train_x, train_y, train_sample_weights, detected_train_mode = _prepare_training_rows(spec)
     val_x, val_y = _load_jsonl(spec.val_path)
-    test_x, test_y = _load_jsonl(spec.test_path)
+    if spec.proxy_candidate_mode:
+        test_x: list[str] = []
+        test_y: list[int] = []
+    else:
+        if spec.test_path is None:
+            raise ValueError("legacy training mode requires test_path")
+        test_x, test_y = _load_jsonl(spec.test_path)
 
     # [FUN-004] chunk 단위 학습: TRAIN 만 chunk 확장(val/test 는 문서 단위 유지 = 누수차단).
+    # _prepare_training_rows가 기생성 train_chunks의 이중 확장을 fail-closed로 차단한다.
     if spec.chunk_expand:
-        from lloydk.modules.m4_training.chunk_expand import expand_chunks  # noqa: PLC0415
-
         _csz = spec.chunk_char_size or (spec.max_seq_len * 3)
-        _n_before = len(train_x)
-        train_x, train_y = expand_chunks(
-            train_x, train_y,
-            char_size=_csz, overlap=spec.chunk_overlap, min_chars=spec.chunk_min_chars,
-        )
-        print(f"  [chunk-expand] train {_n_before} docs → {len(train_x)} chunk rows "
+        print(f"  [chunk-expand] prepared {len(train_x)} chunk rows "
               f"(char_size={_csz}); val/test 문서단위 유지(누수차단)")
+    elif detected_train_mode == "pre_chunked":
+        print(f"  [pre-chunked] consuming {len(train_x)} weighted train chunk rows; "
+              "val/test 문서단위 유지(누수차단)")
 
-    tok = AutoTokenizer.from_pretrained(spec.base_model)
+    revision_kwargs = (
+        {"revision": spec.base_model_revision} if spec.base_model_revision else {}
+    )
+    tok = AutoTokenizer.from_pretrained(spec.base_model, **revision_kwargs)
 
     def tokenize(batch):
         return tok(batch["text"], truncation=True, max_length=spec.max_seq_len)
 
-    ds_train = Dataset.from_dict({"text": train_x, "label": train_y}).map(tokenize, batched=True)
-    ds_val = Dataset.from_dict({"text": val_x, "label": val_y}).map(tokenize, batched=True)
-    ds_test = Dataset.from_dict({"text": test_x, "label": test_y}).map(tokenize, batched=True)
+    def make_dataset(texts, labels, sample_weights):
+        return Dataset.from_dict({
+            "text": texts,
+            "label": labels,
+            "sample_weight": sample_weights,
+        }).map(tokenize, batched=True, remove_columns=["text"])
+
+    ds_train = make_dataset(train_x, train_y, train_sample_weights)
+    # 평가는 기존과 동일하게 문서단위·비가중으로 집계한다.
+    ds_val = make_dataset(val_x, val_y, [1.0] * len(val_y))
+    ds_test = (
+        None
+        if spec.proxy_candidate_mode
+        else make_dataset(test_x, test_y, [1.0] * len(test_y))
+    )
 
     model = AutoModelForSequenceClassification.from_pretrained(
         spec.base_model,
         num_labels=len(_LABEL_LIST),
         id2label=_ID2LABEL,
         label2id=_LABEL2ID,
+        **revision_kwargs,
+    )
+    base_model_attestation = (
+        _attest_base_model(model, tok, spec) if spec.proxy_candidate_mode else None
     )
 
     # 고등급 id (TS/S1 등) — 미탐 비대칭 가중·fnr_high 계산 공통 기준
@@ -211,7 +733,11 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
 
     # class weight (불균형 보정) + FNR 비대칭 cost
     if spec.class_weighted:
-        counts = np.bincount(train_y, minlength=len(_LABEL_LIST))
+        counts = np.bincount(
+            train_y,
+            weights=np.asarray(train_sample_weights, dtype=np.float64),
+            minlength=len(_LABEL_LIST),
+        )
         weights = counts.sum() / (len(_LABEL_LIST) * np.maximum(counts, 1))
         # 고등급 표본의 손실을 추가 증폭 → 미탐(고등급을 저등급으로) 비용 ↑
         if spec.fnr_cost_multiplier != 1.0:
@@ -230,14 +756,29 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     class WeightedTrainer(Trainer):
         def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
             labels = inputs.pop("labels")
+            sample_weights = inputs.pop("sample_weight", None)
             outputs = model(**inputs)
             logits = outputs.logits
-            if class_weights is not None:
-                loss_fct = torch.nn.CrossEntropyLoss(weight=class_weights.to(logits.device))
-            else:
-                loss_fct = torch.nn.CrossEntropyLoss()
-            loss = loss_fct(logits, labels)
+            loss = _weighted_cross_entropy(
+                logits,
+                labels,
+                class_weights=class_weights,
+                sample_weights=sample_weights,
+            )
             return (loss, outputs) if return_outputs else loss
+
+    base_data_collator = DataCollatorWithPadding(tok)
+
+    def weighted_data_collator(features):
+        model_features = []
+        weights = []
+        for feature in features:
+            model_feature = dict(feature)
+            weights.append(float(model_feature.pop("sample_weight", 1.0)))
+            model_features.append(model_feature)
+        batch = base_data_collator(model_features)
+        batch["sample_weight"] = torch.tensor(weights, dtype=torch.float32)
+        return batch
 
     def compute_metrics(eval_pred):
         preds = np.argmax(eval_pred.predictions, axis=-1)
@@ -273,7 +814,10 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         warmup_ratio=spec.warmup_ratio,
         eval_strategy="epoch",
         save_strategy="epoch",
-        load_best_model_at_end=True,
+        # Proxy mode deliberately retains every epoch checkpoint as a candidate.
+        # The serving-faithful finalizer, not this 512-token diagnostic loop,
+        # chooses the restricted proxy candidate on validation_documents.
+        load_best_model_at_end=not spec.proxy_candidate_mode,
         metric_for_best_model=spec.early_stop_metric,
         greater_is_better=False,
         logging_steps=spec.logging_steps,
@@ -282,6 +826,9 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         report_to=report_to,
         dataloader_num_workers=0,   # Windows deadlock 방지
         dataloader_pin_memory=False,
+        # sample_weight는 model.forward 인자가 아니므로 Trainer의 자동 column
+        # 제거를 끄고, 위 collator/compute_loss에서만 소비한다.
+        remove_unused_columns=False,
     )
 
     # transformers v5+ 호환: Trainer.__init__ 가 `tokenizer` → `processing_class`로 이름
@@ -292,21 +839,58 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             model=model, args=args,
             train_dataset=ds_train, eval_dataset=ds_val,
             processing_class=tok,
-            data_collator=DataCollatorWithPadding(tok),
+            data_collator=weighted_data_collator,
             compute_metrics=compute_metrics,
         )
     except TypeError:  # v4 폴백
         trainer = WeightedTrainer(
             model=model, args=args,
             train_dataset=ds_train, eval_dataset=ds_val,
-            tokenizer=tok, data_collator=DataCollatorWithPadding(tok),
+            tokenizer=tok, data_collator=weighted_data_collator,
             compute_metrics=compute_metrics,
         )
 
-    with mlflow.start_run() as run:
-        mlflow.log_params(asdict(spec))
+    with _training_run_context(mlflow, spec) as run:
+        if spec.use_mlflow:
+            mlflow.log_params(asdict(spec))
         trainer.train()
 
+        if spec.proxy_candidate_mode:
+            if proxy_materialization is None or base_model_attestation is None:
+                raise AssertionError("proxy training attestations were not initialized")
+            execution_manifest = _write_proxy_training_execution(
+                spec=spec,
+                materialization_start=proxy_materialization,
+                base_model_attestation=base_model_attestation,
+                run_id=str(run.info.run_id),
+            )
+            if spec.use_mlflow:
+                mlflow.log_artifact(str(execution_manifest))
+            # This is intentionally not a model-quality report.  No test/frozen
+            # split was loaded and no validation logits or temperature artifact
+            # was produced.  Only the finalizer can publish a deployment candidate.
+            return TrainReport(
+                model_version=f"proxy-candidates-{run.info.run_id[:8]}",
+                accuracy=0.0,
+                precision_macro=0.0,
+                recall_macro=0.0,
+                f1_macro=0.0,
+                fnr_overall=0.0,
+                fnr_by_grade={},
+                fnr_high=0.0,
+                confusion_matrix=[],
+                classification_report=(
+                    "NOT_EVALUATED: checkpoint candidates only; serving-faithful "
+                    "selection/calibration finalizer required"
+                ),
+                artifact_status="proxy_checkpoint_candidates_only",
+                claim_scope="proxy_training_only_not_customer_accuracy",
+                deployable=False,
+                training_execution_manifest=str(execution_manifest),
+            )
+
+        if ds_test is None:  # pragma: no cover - proxy branch returned above
+            raise AssertionError("legacy test dataset is missing")
         pred_out = trainer.predict(ds_test)
         preds = np.argmax(pred_out.predictions, axis=-1)
         cm = confusion_matrix(test_y, preds, labels=list(_ID2LABEL.keys()))
@@ -389,10 +973,11 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         (out_dir / "report.json").write_text(
             json.dumps(asdict(result), indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        mlflow.log_metrics({
-            "test_accuracy": acc, "test_f1_macro": float(f),
-            "test_fnr_overall": float(fnr), "test_fnr_high": float(fnr_high),
-            **{f"test_fnr_{k}": v for k, v in fnr_by.items()},
-        })
-        mlflow.log_artifact(str(out_dir / "report.json"))
+        if spec.use_mlflow:
+            mlflow.log_metrics({
+                "test_accuracy": acc, "test_f1_macro": float(f),
+                "test_fnr_overall": float(fnr), "test_fnr_high": float(fnr_high),
+                **{f"test_fnr_{k}": v for k, v in fnr_by.items()},
+            })
+            mlflow.log_artifact(str(out_dir / "report.json"))
         return result

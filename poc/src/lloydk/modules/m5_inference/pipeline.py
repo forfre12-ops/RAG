@@ -131,6 +131,13 @@ class InferencePipeline:
         self._model = None
         self._tokenizer = None
         self._model_temperature: float | None = None  # [A1] 모델 동봉 temperature.json 자동로드값
+        # proxy finalizer가 temperature와 같은 calibration split에서 고정한 운영점.
+        # operating_point.json이 유효하면 모델별 T/τ를 하나의 잠금 계약으로 취급해
+        # 일반 배포 프로파일 기본값(temperature=3, tau=.30)이 덮어쓰지 못하게 한다.
+        self._model_escalation_tau: float | None = None
+        self._locked_operating_point: bool = False
+        self._operating_point_source: str = "settings_or_argmax"
+        self._finalization_attestation: dict | None = None
         # [calibration-visibility] 서빙 보정 상태 — None=rule-fallback(보정 N/A), True=동봉/주입
         # 보정 적용, False=무보정(T=1.0) 서빙(무음실패 위험). _apply_bundle_calibration에서 셋.
         self.calibrated: bool | None = None
@@ -173,6 +180,7 @@ class InferencePipeline:
         # 보정 스크립트(calibrate_classifier.py)가 모델 폴더에 {"temperature": T}를 남기면
         # 서빙이 자동으로 logit/T 적용. settings.classifier_temperature가 명시(≠1.0)면 그게 우선.
         self._calibration_source = self._apply_bundle_calibration()
+        self._operating_point_source = self._apply_bundle_operating_point()
 
     def _apply_bundle_calibration(self) -> str:
         """모델 dir 동봉 temperature.json을 로드하고 무보정 서빙을 가시화.
@@ -225,6 +233,154 @@ class InferencePipeline:
             self.model_dir,
         )
         return "uncalibrated"
+
+    def _apply_bundle_operating_point(self) -> str:
+        """Load a jointly attested model-specific escalation operating point.
+
+        ``operating_point.json`` is emitted only after checkpoint selection on
+        validation documents and T/τ fitting on a separate calibration split.
+        When it exists, both the bundled temperature and tau (including an
+        explicit ``null`` meaning argmax) are locked together.  A malformed or
+        cross-temperature artifact is a load error, not a silent settings
+        fallback, because tau is only valid for the probability distribution at
+        the T on which it was selected.
+        """
+        import json as _json  # noqa: PLC0415
+        import math as _math  # noqa: PLC0415
+
+        self._model_escalation_tau = None
+        self._locked_operating_point = False
+        if self.model_dir is None:
+            return "settings_or_argmax"
+        path = self.model_dir / "operating_point.json"
+        if not path.exists():
+            return "settings_or_argmax"
+        # A proxy operating point is valid only with the exact finalized model
+        # payload and aggregation contract that produced it.  Do this before
+        # accepting any calibration value so a copied/stale sidecar cannot alter
+        # production decisions.  The import is deliberately local: the
+        # comparison module mirrors M5 but does not import this runtime module.
+        try:
+            from lloydk.proxy_model_comparison import (  # noqa: PLC0415
+                SERVING_INFERENCE_BATCH_SIZE,
+                _verify_finalized_model_bundle,
+                serving_aggregation_contract,
+            )
+
+            finalization = _verify_finalized_model_bundle(self.model_dir)
+            runtime_contract = serving_aggregation_contract(
+                max_length=int(settings.max_seq_len),
+                chunk_overlap=int(settings.chunk_overlap),
+                severe_codes=self._SEVERE_AGG_CODES,
+                forward_batch_size=SERVING_INFERENCE_BATCH_SIZE,
+                apply_bundle_operating_point=True,
+                require_fast_overflow=True,
+            )
+            if (
+                finalization.get("serving_aggregation_contract_sha256")
+                != runtime_contract["contract_sha256"]
+            ):
+                raise ValueError(
+                    "finalized proxy operating point was calibrated for a different "
+                    "M5 aggregation contract"
+                )
+            self._finalization_attestation = finalization
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(
+                f"cannot verify finalized proxy model bundle {self.model_dir}: {exc}"
+            ) from exc
+        try:
+            payload = _json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"cannot read model operating point {path}: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"model operating point must be a JSON object: {path}")
+        if (
+            payload.get("schema_version") != "proxy-operating-point-v1"
+            or payload.get("status") != "complete"
+            or payload.get("selection_split") != "calibration_documents"
+            or payload.get("selection_unit") != "document"
+        ):
+            raise ValueError(f"model operating point contract is invalid: {path}")
+        if self._model_temperature is None:
+            raise ValueError(
+                f"model operating point requires a valid bundled temperature.json: {path}"
+            )
+        fitted_temperature = payload.get("temperature")
+        if (
+            isinstance(fitted_temperature, bool)
+            or not isinstance(fitted_temperature, (int, float))
+            or not _math.isfinite(float(fitted_temperature))
+            or float(fitted_temperature) <= 0
+            or not _math.isclose(
+                float(fitted_temperature),
+                float(self._model_temperature),
+                rel_tol=1e-9,
+                abs_tol=1e-12,
+            )
+        ):
+            raise ValueError(
+                f"operating-point temperature does not match temperature.json: {path}"
+            )
+        tau = payload.get("classifier_escalation_tau")
+        if tau is not None:
+            if (
+                isinstance(tau, bool)
+                or not isinstance(tau, (int, float))
+                or not _math.isfinite(float(tau))
+                or not 0.0 < float(tau) < 1.0
+            ):
+                raise ValueError(f"model escalation tau must be null or in (0,1): {path}")
+            self._model_escalation_tau = float(tau)
+        temperature_trace = None
+        try:
+            temperature_payload = _json.loads(
+                (self.model_dir / "temperature.json").read_text(encoding="utf-8")
+            )
+            if (
+                not isinstance(temperature_payload, dict)
+                or temperature_payload.get("schema_version")
+                != "proxy-document-temperature-v1"
+                or temperature_payload.get("status") != "complete"
+                or temperature_payload.get("fit_unit") != "document"
+            ):
+                raise ValueError(
+                    "bundled temperature does not satisfy the finalized proxy contract"
+                )
+            temperature_trace = temperature_payload.get("calibration_trace_sha256")
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"cannot re-read bundled temperature contract: {exc}") from exc
+        operating_trace = payload.get("calibration_trace_sha256")
+        def _is_sha256(value: object) -> bool:
+            return (
+                isinstance(value, str)
+                and len(value) == 64
+                and all(char in "0123456789abcdef" for char in value)
+            )
+
+        if (
+            not _is_sha256(temperature_trace)
+            or operating_trace != temperature_trace
+        ):
+            raise ValueError(
+                f"temperature and operating point are not bound to the same calibration trace: {path}"
+            )
+        for binding_field in (
+            "calibration_input_sha256",
+            "training_run_manifest_sha256",
+        ):
+            temperature_value = temperature_payload.get(binding_field)
+            operating_value = payload.get(binding_field)
+            if (
+                not _is_sha256(temperature_value)
+                or operating_value != temperature_value
+            ):
+                raise ValueError(
+                    "temperature and operating point have different "
+                    f"{binding_field}: {path}"
+                )
+        self._locked_operating_point = True
+        return "bundle_locked"
 
     def _id2label_from_config(self) -> dict[int, object] | None:
         """학습 체크포인트 config.id2label → {int index: Grade|str} 매핑.
@@ -297,6 +453,10 @@ class InferencePipeline:
     @property
     def _escalation_tau(self) -> float | None:
         """서빙 escalation τ (C-esc). None=순수 argmax(동작 보존). 0<τ<1만 유효."""
+        # Finalized proxy model은 T와 τ가 동일 calibration trace에 묶여 있다.
+        # 명시적인 null도 '검증된 argmax'이므로 프로파일 기본 tau로 덮지 않는다.
+        if self._locked_operating_point:
+            return self._model_escalation_tau
         try:
             from lloydk.config import settings  # noqa: PLC0415
             t = settings.classifier_escalation_tau
@@ -343,6 +503,11 @@ class InferencePipeline:
         나눠 분포를 부드럽게 해 과신을 완화(calibration)한다. 기본 1.0 = 무보정(기존
         동작 보존). 평가에서 측정한 temperature를 settings.classifier_temperature로 주입.
         """
+        # Finalized proxy model은 operating_point.json이 temperature.json과 같은
+        # calibration trace를 증명한 경우에만 모델별 T를 잠근다. 레거시 모델은
+        # 아래의 기존 env/profile 우선순위를 그대로 유지한다.
+        if self._locked_operating_point and self._model_temperature is not None:
+            return self._model_temperature
         try:
             from lloydk.config import settings  # noqa: PLC0415
             t = float(settings.classifier_temperature)

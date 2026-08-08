@@ -13,12 +13,16 @@ JudgeResult를 consensus.evaluate_consensus의 인자(self_consistency·shadow_g
 """
 from __future__ import annotations
 
+import math
 from collections import Counter
 from dataclasses import dataclass, field
 
 from lloydk.adapters.llm import build_provider
 from lloydk.modules.m3_labeling.consensus import GRADE_RANK
-from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+from lloydk.modules.m3_labeling.llm_labeler import (
+    PROXY_QUALITY_CHECKS,
+    LLMLabeler,
+)
 
 _PARSE_FAIL = "PARSE_FAIL"
 # 상용(공개 클라우드) provider — 민감문서는 여기로 보내지 않는다(거버넌스).
@@ -36,6 +40,20 @@ class JudgeResult:
     primary_provider: str
     rationale: str             # 다수표 샘플의 근거
     usage: list = field(default_factory=list)
+    factor_scores: dict[str, int] = field(default_factory=dict)
+    # Per-sample S/V/M audit. Coverage is deliberately separate from the
+    # distribution so missing or malformed factor JSON cannot be hidden by an
+    # aggregate majority. Proxy admission consumes these fields fail-closed;
+    # the ordinary golden-builder contract remains unchanged.
+    factor_votes: dict[str, dict[int, int]] = field(default_factory=dict)
+    factor_coverage: dict[str, int] = field(default_factory=dict)
+    sample_count: int = 0
+    # Proxy-only document-quality audit. Ordinary callers leave these at their
+    # defaults and retain the historical JudgeResult behaviour.
+    document_quality_required: bool = False
+    quality_votes: dict[str, dict[bool, int]] = field(default_factory=dict)
+    quality_coverage: dict[str, int] = field(default_factory=dict)
+    quality_samples: list[dict[str, object]] = field(default_factory=list)
 
 
 class ConsensusJudge:
@@ -48,6 +66,7 @@ class ConsensusJudge:
         k_min: int = 3,
         k_max: int = 5,
         temperature: float = 0.7,
+        require_document_quality: bool = False,
     ) -> None:
         self.primary = primary
         self.shadow = shadow
@@ -55,41 +74,116 @@ class ConsensusJudge:
         self.k_min = max(1, int(k_min))
         self.k_max = max(self.k_min, int(k_max))
         self.temperature = float(temperature)
+        self.require_document_quality = bool(require_document_quality)
 
     def judge(self, text: str) -> JudgeResult:
         grades: list[str] = []
         confs: list[float] = []
         rationales: list[str] = []
+        factor_samples: list[dict[str, float]] = []
+        quality_samples: list[dict[str, object]] = []
 
         def _sample() -> None:
-            r = self.primary.label(text, temperature=self.temperature)
+            if self.require_document_quality:
+                r = self.primary.label(
+                    text,
+                    temperature=self.temperature,
+                    include_document_quality=True,
+                )
+            else:
+                r = self.primary.label(text, temperature=self.temperature)
             grades.append(r.grade if r.grade in GRADE_RANK else _PARSE_FAIL)
             confs.append(float(r.confidence))
             rationales.append(str(r.rationale))
+            factor_samples.append(dict(getattr(r, "factor_scores", {}) or {}))
+            if self.require_document_quality:
+                raw_checks = getattr(r, "quality_checks", None)
+                checks: object
+                if isinstance(raw_checks, dict):
+                    checks = dict(raw_checks)
+                else:
+                    checks = raw_checks
+                raw_issues = getattr(r, "quality_issues", None)
+                issues: object
+                if isinstance(raw_issues, list):
+                    issues = [dict(item) if isinstance(item, dict) else item for item in raw_issues]
+                else:
+                    issues = raw_issues
+                quality_samples.append(
+                    {
+                        "sample_index": len(grades),
+                        "checks": checks,
+                        "issues": issues,
+                    }
+                )
 
         for _ in range(self.k_min):
             _sample()
-        # adaptive-k: 의견이 갈릴 때만 추가 샘플(만장일치면 commercial 호출 절감).
-        if len(set(grades)) > 1:
+        # Grade unanimity alone is insufficient: escalate when any S/V/M vote
+        # is missing, malformed, or split as well.
+        if (
+            len(set(grades)) > 1
+            or _factor_samples_need_more(factor_samples)
+            or (
+                self.require_document_quality
+                and _quality_samples_need_more(quality_samples)
+            )
+        ):
             for _ in range(self.k_max - self.k_min):
                 _sample()
 
-        graded = [(g, c, rat) for g, c, rat in zip(grades, confs, rationales) if g != _PARSE_FAIL]
-        counts = Counter(g for g, _, _ in graded)
+        factor_votes, factor_coverage = _factor_vote_audit(factor_samples)
+        if self.require_document_quality:
+            quality_votes, quality_coverage = _quality_vote_audit(quality_samples)
+        else:
+            quality_votes, quality_coverage = {}, {}
+
+        graded = [
+            (g, c, rat, factors)
+            for g, c, rat, factors in zip(grades, confs, rationales, factor_samples, strict=True)
+            if g != _PARSE_FAIL
+        ]
+        counts = Counter(g for g, _, _, _ in graded)
         if not counts:
             # 전부 파싱 실패 → 강제 사람검토(S3 placeholder, self_consistency=0).
             return JudgeResult(
                 grade="S3", self_consistency=0.0, votes={_PARSE_FAIL: len(grades)},
                 mean_conf=0.0, shadow_grade=None, airgap=self.airgap,
                 primary_provider=self._provider_name(), rationale="", usage=[],
+                factor_votes=factor_votes,
+                factor_coverage=factor_coverage,
+                sample_count=len(grades),
+                document_quality_required=self.require_document_quality,
+                quality_votes=quality_votes,
+                quality_coverage=quality_coverage,
+                quality_samples=quality_samples,
             )
 
         top = max(counts.values())
         # FNR-safe 동점처리: 동점이면 더 높은 등급(낮은 GRADE_RANK). rule_engine 정책과 동일.
         grade = min((g for g, c in counts.items() if c == top), key=lambda g: GRADE_RANK[g])
         sc = top / len(graded)
-        mean_conf = sum(c for _, c, _ in graded) / len(graded)
-        rationale = next((rat for g, _, rat in graded if g == grade), "")
+        mean_conf = sum(c for _, c, _, _ in graded) / len(graded)
+        rationale = next((rat for g, _, rat, _ in graded if g == grade), "")
+        vote_audit = dict(counts)
+        parse_fail_count = grades.count(_PARSE_FAIL)
+        if parse_fail_count:
+            vote_audit[_PARSE_FAIL] = parse_fail_count
+        winning_factors = [factors for g, _, _, factors in graded if g == grade]
+        factor_scores: dict[str, int] = {}
+        for factor in ("secrecy", "value", "management"):
+            values = [
+                max(0, min(2, round(float(sample[factor]))))
+                for sample in winning_factors
+                if factor in sample
+            ]
+            if values:
+                frequencies = Counter(values)
+                top_count = max(frequencies.values())
+                # An exact tie is resolved upward for false-negative safety.
+                factor_scores[factor] = max(
+                    value for value, count in frequencies.items() if count == top_count
+                )
 
         shadow_grade = None
         if self.shadow is not None and not self.airgap:
@@ -97,13 +191,95 @@ class ConsensusJudge:
             shadow_grade = sr.grade if sr.grade in GRADE_RANK else None
 
         return JudgeResult(
-            grade=grade, self_consistency=sc, votes=dict(counts), mean_conf=mean_conf,
+            grade=grade, self_consistency=sc, votes=vote_audit, mean_conf=mean_conf,
             shadow_grade=shadow_grade, airgap=self.airgap,
             primary_provider=self._provider_name(), rationale=rationale, usage=[],
+            factor_scores=factor_scores,
+            factor_votes=factor_votes,
+            factor_coverage=factor_coverage,
+            sample_count=len(grades),
+            document_quality_required=self.require_document_quality,
+            quality_votes=quality_votes,
+            quality_coverage=quality_coverage,
+            quality_samples=quality_samples,
         )
 
     def _provider_name(self) -> str:
         return getattr(getattr(self.primary, "provider", None), "name", "unknown")
+
+
+_FACTORS = ("secrecy", "value", "management")
+
+
+def _factor_level(value: object) -> int | None:
+    """Return an explicit 0/1/2 level without clipping malformed judge JSON."""
+    try:
+        numeric = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(numeric) or not numeric.is_integer():
+        return None
+    level = int(numeric)
+    return level if level in {0, 1, 2} else None
+
+
+def _factor_vote_audit(
+    samples: list[dict[str, float]],
+) -> tuple[dict[str, dict[int, int]], dict[str, int]]:
+    votes: dict[str, dict[int, int]] = {}
+    coverage: dict[str, int] = {}
+    for factor in _FACTORS:
+        counts = Counter(
+            level
+            for sample in samples
+            if (level := _factor_level(sample.get(factor))) is not None
+        )
+        votes[factor] = dict(sorted(counts.items()))
+        coverage[factor] = sum(counts.values())
+    return votes, coverage
+
+
+def _factor_samples_need_more(samples: list[dict[str, float]]) -> bool:
+    """Request k_max if any initial factor is absent/invalid or disagrees."""
+    if not samples:
+        return True
+    votes, coverage = _factor_vote_audit(samples)
+    return any(
+        coverage[factor] != len(samples) or len(votes[factor]) != 1
+        for factor in _FACTORS
+    )
+
+
+def _quality_vote_audit(
+    samples: list[dict[str, object]],
+) -> tuple[dict[str, dict[bool, int]], dict[str, int]]:
+    """Count only literal JSON booleans for each proxy-quality field."""
+    votes: dict[str, dict[bool, int]] = {}
+    coverage: dict[str, int] = {}
+    for check in PROXY_QUALITY_CHECKS:
+        values: list[bool] = []
+        for sample in samples:
+            checks = sample.get("checks")
+            if not isinstance(checks, dict):
+                continue
+            value = checks.get(check)
+            if type(value) is bool:
+                values.append(value)
+        counts = Counter(values)
+        votes[check] = dict(counts)
+        coverage[check] = len(values)
+    return votes, coverage
+
+
+def _quality_samples_need_more(samples: list[dict[str, object]]) -> bool:
+    """Request k_max for missing, malformed, or split proxy-quality votes."""
+    if not samples:
+        return True
+    votes, coverage = _quality_vote_audit(samples)
+    return any(
+        coverage[check] != len(samples) or len(votes[check]) != 1
+        for check in PROXY_QUALITY_CHECKS
+    )
 
 
 def build_consensus_judge(

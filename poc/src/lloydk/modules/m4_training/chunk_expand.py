@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 
 from lloydk.modules.m2_preprocess.chunker import split
 
@@ -65,3 +66,128 @@ def expand_chunks(
         len(texts), len(out_x), char_size, overlap, min_chars,
     )
     return out_x, out_y
+
+
+def _chunk_offsets(text: str, *, char_size: int, overlap: int) -> list[tuple[str, int, int]]:
+    """Return serving-compatible chunk text and its exact non-overlap core offsets.
+
+    The legacy serving splitter concatenates an overlap tail and the next part
+    without restoring the separator, so the rendered chunk is not always one
+    contiguous substring of the source.  Offsets therefore describe the exact
+    core; evidence appearing only in overlap is still selected in its preceding
+    core chunk.
+    """
+    chunks = split(text, size=char_size, overlap=overlap)
+    located: list[tuple[str, int, int]] = []
+    cursor = 0
+    for chunk in chunks:
+        core = chunk.text[chunk.overlap_prev:] if chunk.overlap_prev else chunk.text
+        core_start = text.find(core, cursor)
+        if core_start < 0:
+            core_start = text.find(core)
+        if core_start < 0:
+            raise ValueError(f"cannot map chunk {chunk.index} back to canonical text")
+        start = core_start
+        end = core_start + len(core)
+        if text[start:end] != core:
+            raise ValueError(f"chunk {chunk.index} core offset is not an exact text match")
+        located.append((chunk.text, start, end))
+        cursor = end
+    return located
+
+
+def _evidence_offsets(record: Mapping[str, object], text: str) -> list[tuple[int, int]]:
+    card = record.get("evidence_card")
+    if not isinstance(card, Mapping):
+        return []
+    factors = card.get("factors")
+    if not isinstance(factors, Mapping):
+        return []
+    offsets: set[tuple[int, int]] = set()
+    for factor in factors.values():
+        if not isinstance(factor, Mapping):
+            continue
+        spans = factor.get("spans")
+        if not isinstance(spans, Sequence) or isinstance(spans, (str, bytes)):
+            continue
+        for span in spans:
+            if not isinstance(span, Mapping):
+                continue
+            try:
+                start, end = int(span["start"]), int(span["end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            quote = str(span.get("quote") or "")
+            if 0 <= start < end <= len(text) and text[start:end] == quote:
+                offsets.add((start, end))
+    return sorted(offsets)
+
+
+def expand_records_evidence_aware(
+    records: Sequence[Mapping[str, object]],
+    *,
+    char_size: int = DEFAULT_CHAR_SIZE,
+    overlap: int = DEFAULT_OVERLAP,
+    min_chars: int = DEFAULT_MIN_CHARS,
+    high_grades: frozenset[str] = frozenset({"TS", "S1"}),
+    include_neighbor_chunks: bool = True,
+) -> list[dict]:
+    """Expand training records while avoiding whole-document high-grade noise.
+
+    TS/S1 documents contribute only chunks intersecting an exact evidence span
+    plus one adjacent context chunk on each side.  Other chunks are excluded
+    instead of blindly inheriting a severe document label.  Lower grades retain
+    all serving-shaped chunks.  The function never touches validation/test rows;
+    callers must pass train-only, family-separated records.
+    """
+    expanded: list[dict] = []
+    for record in records:
+        text = str(record.get("text") or "")
+        label = str(record.get("label") or "")
+        doc_id = str(record.get("doc_id") or "")
+        if not text or not label or not doc_id:
+            raise ValueError("each training record requires doc_id, text, and label")
+        located = [
+            item for item in _chunk_offsets(text, char_size=char_size, overlap=overlap)
+            if len(item[0].strip()) >= min_chars
+        ]
+        if not located:
+            located = [(text, 0, len(text))]
+
+        strong: set[int] = set()
+        if label in high_grades:
+            evidence = _evidence_offsets(record, text)
+            if not evidence:
+                raise ValueError(f"high-grade record {doc_id} has no exact evidence spans")
+            for index, (_, chunk_start, chunk_end) in enumerate(located):
+                if any(start < chunk_end and end > chunk_start for start, end in evidence):
+                    strong.add(index)
+            if not strong:
+                raise ValueError(f"high-grade record {doc_id} evidence misses all chunks")
+            selected = set(strong)
+            if include_neighbor_chunks:
+                for index in tuple(strong):
+                    if index > 0:
+                        selected.add(index - 1)
+                    if index + 1 < len(located):
+                        selected.add(index + 1)
+        else:
+            selected = set(range(len(located)))
+
+        for index in sorted(selected):
+            chunk_text, start, end = located[index]
+            strength = "evidence" if index in strong else (
+                "neighbor" if label in high_grades else "document"
+            )
+            expanded.append({
+                **dict(record),
+                "text": chunk_text,
+                "source_doc_id": doc_id,
+                "chunk_id": f"{doc_id}:chunk-{index:04d}",
+                "chunk_index": index,
+                "chunk_start": start,
+                "chunk_end": end,
+                "chunk_label_strength": strength,
+                "sample_weight": 1.0 if strength != "neighbor" else 0.5,
+            })
+    return expanded

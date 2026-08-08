@@ -2,9 +2,10 @@
 
 gold_candidate(자동 합의+근거 통과)를 **평가 정답**(locked_gold_eval)으로 올리는 유일한 경로 = 사람 서명.
 규칙(2026-06-29 결정: 골든 평가정답도 단일 서명):
-  - 기본 단일 서명: 모든 등급(TS/S1 포함) 독립 지재원 reviewer 1인 서명이면 승격.
-  - 옵션(dual_for_upper=True): 고등급(TS/S1)만 ≥2 독립 reviewer 합의 요구 — 운영
-    (confirm_service._apply_dual_review_gate / distinct_reviewers_for_level)와 동일 강도.
+  - 단일 서명: 모든 등급(TS/S1 포함) 독립 지재원 reviewer 1인 서명이면 승격.
+    [2026-08-06] 고등급 이중서명 옵션(dual_for_upper) 제거 — RFP 기능요구사항·RTM 어디에도
+    2인 서명 요구가 없다(검색 0건). 요건 없는 선택지가 화면·문서에 남아 감리 스크루티니와
+    문서↔코드 불일치(백서는 '이중서명'을 표준처럼 서술)를 만들고 있었다.
   - 머신/플레이스홀더 reviewer 거부(golden_tiers.is_human_reviewer 재사용).
   - 서명자 등급 불일치 → 거부(조정 필요).
 
@@ -45,7 +46,7 @@ class SignoffResult:
     stats: dict
 
 
-def _evaluate(signoffs: list[Signoff], *, dual_for_upper: bool):
+def _evaluate(signoffs: list[Signoff]):
     """서명 묶음을 평가 → (확정등급|None, 사유, 독립reviewer목록)."""
     if not signoffs:
         return None, "no_signoff", []
@@ -59,21 +60,18 @@ def _evaluate(signoffs: list[Signoff], *, dual_for_upper: bool):
     if grade not in _LABELS:
         return None, "invalid_grade", []
     reviewers = sorted({s.reviewer_id for s in human})
-    need = 2 if (dual_for_upper and grade in UPPER_GRADES) else 1
-    if len(reviewers) < need:
-        return None, f"insufficient_reviewers(need {need}, got {len(reviewers)})", reviewers
+    if not reviewers:
+        return None, "insufficient_reviewers(need 1, got 0)", reviewers
     return grade, "ok", reviewers
 
 
 def promote_to_locked(
     candidates: list[dict],
     signoffs: list[Signoff],
-    *,
-    dual_for_upper: bool = False,
 ) -> SignoffResult:
     """gold_candidate를 사람 서명으로 locked_gold_eval로 승격(순수 함수, 정본 미변경).
 
-    기본 단일 서명: 모든 등급이 독립 reviewer 1인이면 승격(dual_for_upper=True면 TS/S1만 ≥2).
+    단일 서명: 모든 등급이 독립 reviewer 1인이면 승격.
     머신/불일치/미서명/등급외는 거부. 승격 레코드는 label_source=human_review·tier=locked_gold_eval.
     """
     by_doc: dict[str, list[Signoff]] = defaultdict(list)
@@ -87,7 +85,7 @@ def promote_to_locked(
     for c in candidates:
         doc_id = c.get("doc_id")
         sl = by_doc.get(doc_id, [])
-        grade, reason, reviewers = _evaluate(sl, dual_for_upper=dual_for_upper)
+        grade, reason, reviewers = _evaluate(sl)
         if grade is not None:
             rec = dict(c)
             rec.update(

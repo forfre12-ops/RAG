@@ -720,6 +720,18 @@ wheels = [
 ]
 
 [[package]]
+name = "colorlog"
+version = "6.12.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8c/55/ba79756cb90c8d69d599d57785398ac87bba7b19c80e87f4e8a562197c93/colorlog-6.12.0.tar.gz", hash = "sha256:2a7924c1dadf18b22a0eb8b06d1c7b01d5341707ec1641eb6fcc4fde0c3e8e5f", size = 18151, upload-time = "2026-07-23T13:40:40.71Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/19/0b6647bf5e331521e55d2b63bfbdc210bd9cd605189273f03614a05f702d/colorlog-6.12.0-py3-none-any.whl", hash = "sha256:30d392604e9110045a2c2aeefc27d7a017abbab63f3a8aee594eac0801df784e", size = 12239, upload-time = "2026-07-23T13:40:39.562Z" },
+]
+
+[[package]]
 name = "comm"
 version = "0.2.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2664,6 +2676,8 @@ dependencies = [
     { name = "pyyaml" },
     { name = "redis" },
     { name = "scikit-learn" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "sentence-transformers" },
     { name = "slowapi" },
     { name = "sqlalchemy" },
@@ -2765,6 +2779,9 @@ reranker = [
     { name = "flagembedding" },
     { name = "sentence-transformers" },
 ]
+tuning = [
+    { name = "optuna" },
+]
 xls = [
     { name = "xlrd" },
 ]
@@ -2816,6 +2833,7 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-redis", marker = "extra == 'otel'", specifier = ">=0.48b0" },
     { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'otel'", specifier = ">=0.48b0" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.27" },
+    { name = "optuna", marker = "extra == 'tuning'", specifier = ">=3.6" },
     { name = "pdf2image", marker = "extra == 'ocr'", specifier = ">=1.16" },
     { name = "pdfminer-six", specifier = ">=20240706" },
     { name = "pdfplumber", marker = "extra == 'full'", specifier = ">=0.11" },
@@ -2842,6 +2860,7 @@ requires-dist = [
     { name = "rhwp-python", marker = "extra == 'hwp'", specifier = ">=0.8.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "scipy", specifier = ">=1.14" },
     { name = "seaborn", marker = "extra == 'evaluation'", specifier = ">=0.13" },
     { name = "sentence-transformers", specifier = ">=3.0" },
     { name = "sentence-transformers", marker = "extra == 'embedding'", specifier = ">=3.0" },
@@ -2858,7 +2877,7 @@ requires-dist = [
     { name = "xlrd", marker = "extra == 'full'", specifier = ">=2.0" },
     { name = "xlrd", marker = "extra == 'xls'", specifier = ">=2.0" },
 ]
-provides-extras = ["hwp", "xls", "hwp-tables", "ocr", "pdf-agpl", "pdf-tables", "nlp", "embedding", "reranker", "minio", "llm", "orchestration", "lint", "full", "psh", "otel", "jwt", "evaluation", "dev"]
+provides-extras = ["hwp", "xls", "hwp-tables", "ocr", "pdf-agpl", "pdf-tables", "nlp", "embedding", "reranker", "minio", "llm", "orchestration", "lint", "full", "psh", "otel", "jwt", "evaluation", "tuning", "dev"]
 
 [[package]]
 name = "lxml"
@@ -4034,6 +4053,25 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c3/1b/1029a805fd7242f7dfce91633b244c3b14a94d703232878f71e01ce862b1/opentelemetry_util_http-0.64b0.tar.gz", hash = "sha256:8a86a220dbfc56d736f47f1e5c4e7932a21fcf69052312e1bcf166444dc79322", size = 11102, upload-time = "2026-06-24T15:19:48.974Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/c7/5f8ec5b30546f2dc22cd5fc5759bce2ab5be6e89a2e710a405ac9ef64ed3/opentelemetry_util_http-0.64b0-py3-none-any.whl", hash = "sha256:c1e5350d25507c1afcd6076cf9ac062485a0a4f79cd9971366996fd3056bacdb", size = 8204, upload-time = "2026-06-24T15:19:09.02Z" },
+]
+
+[[package]]
+name = "optuna"
+version = "4.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "alembic" },
+    { name = "colorlog" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "sqlalchemy" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f4/aa/05f5e3f662cc96a4c478fc3446b8ed6359825a2b504ecb614a9ac84e4a4d/optuna-4.9.0.tar.gz", hash = "sha256:b322e5cbdf1655fb84c37646c4a7a1f391de1b47806bbe222e015825d0a82b87", size = 485834, upload-time = "2026-06-01T06:23:30.424Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/f3/e5fcd5d9b15771ed6dc10e3a7eeddc672e418f4f4c4653d216cc1d857e2d/optuna-4.9.0-py3-none-any.whl", hash = "sha256:f52f3be6148654850c92a5860d398fd88ec6b2c84ab68d9c3d07dcff02e7afee", size = 425553, upload-time = "2026-06-01T06:23:28.804Z" },
 ]
 
 [[package]]

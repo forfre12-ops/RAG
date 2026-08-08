@@ -272,6 +272,12 @@ class Settings(BaseSettings):
     # 인증된 GET /golden/jobs/{id} 가 서명 URL 을 발급하고 콘솔이 이를 사용한다. 미설정이면 미강제
     # (기존 배포·브라우저 네비게이션·dev/test 무변경 — 업그레이드 시 북마크를 깨지 않는다).
     golden_html_url_secret: str = ""
+    # 서명 화면의 검수자 입력란 기본값(비면 빈칸). 시연·반복 검수 편의용이며 사람이 화면에서
+    # 수정할 수 있다. 게이트(is_human_reviewer)는 그대로 적용되므로 머신/플레이스홀더 값은 거부된다.
+    signoff_default_reviewer: str = ""
+    # 서명 화면의 X-API-Key 입력란을 서버 키로 미리 채운다(시연·반복 검수 편의). 화면 자체가
+    # 서명 URL 토큰(?t=)으로 보호되며, 제출에는 어차피 같은 키가 필요하다. 기본 False.
+    signoff_prefill_api_key: bool = False
 
     # NFR-SEC-01: 감사체인 HMAC 비밀키. 설정 시 audit_log hash chain을 HMAC-SHA256으로 링크해
     # 키 없는 과거 row 재작성(rewrite)을 차단(audit_chain._link_hex). 빈 값이면 레거시 sha256

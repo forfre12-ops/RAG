@@ -94,9 +94,6 @@ class GoldenSignoffRequest(BaseModel):
     # True 면 승격 locked 를 운영 readiness 읽기경로(settings.locked_eval_jsonl)에 dedup 병합
     # (배포 게이트가 즉시 소비). 기본 False = run-스코프 미리보기만(정본·라이브 경로 무변경).
     publish: bool = False
-    # 고등급(TS/S1)만 독립 reviewer ≥2 요구(golden_signoff.dual_for_upper). 단일 세션 서명이라
-    # 기본 False(단일). True 로 켜면 이 요청의 단일 서명으론 TS/S1 이 insufficient_reviewers 로 남는다.
-    dual_for_upper: bool = False
 
 
 class GoldenSignoffResponse(BaseModel):

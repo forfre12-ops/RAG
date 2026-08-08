@@ -305,7 +305,6 @@ def golden_job_signoff(
         req.decisions,
         reviewer_id=reviewer_id,
         publish=req.publish,
-        dual_for_upper=req.dual_for_upper,
     )
     if result is None:
         raise HTTPException(

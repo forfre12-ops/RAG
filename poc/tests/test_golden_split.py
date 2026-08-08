@@ -63,6 +63,11 @@ def test_tiny_stratum_no_holdout():
     assert res2.stats["per_grade"]["TS"]["holdout"] == 1
 
 
+def test_zero_holdout_fraction_keeps_everything_in_training():
+    res = split_for_training(_recs("S2", 5), holdout_frac=0)
+    assert len(res.silver) == 5 and not res.holdout
+
+
 def test_split_role_stamps_and_holdout_note():
     res = split_for_training(_recs("S2", 8))
     assert all(r["split_role"] == HOLDOUT and "일반화 아님" in r["eval_note"] for r in res.holdout)
@@ -83,3 +88,60 @@ def test_high_grade_holdout_signal():
     # 고등급 holdout 수치가 stats에 노출(앵커 의존 신호)
     assert "high_grade_holdout" in res.stats
     assert res.stats["high_grade_holdout"] == res.stats["per_grade"]["TS"]["holdout"]
+
+
+def test_document_family_never_crosses_train_and_holdout():
+    recs = _recs("S1", 8)
+    for i, rec in enumerate(recs):
+        rec["document_family_id"] = f"template-{i // 2}"
+
+    res = split_for_training(recs, holdout_frac=0.25)
+    train_families = {r["document_family_id"] for r in res.silver}
+    holdout_families = {r["document_family_id"] for r in res.holdout}
+    assert train_families.isdisjoint(holdout_families)
+    assert res.stats["family_overlap"] == 0
+
+
+def test_single_family_is_reported_not_split_for_holdout():
+    recs = _recs("TS", 4)
+    for rec in recs:
+        rec["document_family_id"] = "one-scenario"
+
+    res = split_for_training(recs)
+    assert not res.holdout
+    assert res.stats["unsplittable_families"] == {"TS": 4}
+
+
+def test_existing_eval_family_is_dropped_from_training_candidates():
+    recs = _recs("S1", 4)
+    recs[0]["document_family_id"] = "eval-family"
+    recs[1]["document_family_id"] = "train-family-a"
+    recs[2]["document_family_id"] = "train-family-b"
+    recs[3]["document_family_id"] = "train-family-c"
+
+    res = split_for_training(recs, existing_family_ids=["eval-family"])
+    kept_ids = {row["doc_id"] for row in res.silver + res.holdout}
+    assert recs[0]["doc_id"] not in kept_ids
+    assert res.stats["dropped_family_leaked"] == 1
+
+
+def test_matched_family_spanning_grades_is_globally_atomic():
+    recs = _recs("TS", 4, "ts-") + _recs("S1", 4, "s1-")
+    for index, record in enumerate(recs):
+        record["document_family_id"] = f"family-{index % 4}"
+    result = split_for_training(recs, holdout_frac=0.25)
+    train_families = {row["document_family_id"] for row in result.silver}
+    holdout_families = {row["document_family_id"] for row in result.holdout}
+    assert train_families.isdisjoint(holdout_families)
+    assert result.stats["family_overlap"] == 0
+
+
+def test_each_scenario_stratum_gets_holdout_coverage():
+    recs = _recs("TS", 20)
+    for index, record in enumerate(recs):
+        scenario = f"scenario-{index // 10}"
+        record["scenario_id"] = scenario
+        record["document_family_id"] = f"{scenario}:family-{index % 10}"
+    result = split_for_training(recs, holdout_frac=0.2)
+    assert result.stats["per_stratum"]["TS|scenario-0"]["holdout"] == 2
+    assert result.stats["per_stratum"]["TS|scenario-1"]["holdout"] == 2

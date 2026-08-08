@@ -1,6 +1,6 @@
 """golden_signoff.promote_to_locked — 사람 서명 승격 게이트(P3 골격) 계약 테스트.
 
-기본 단일 서명(TS/S1 포함). dual_for_upper=True면 고등급 ≥2. 머신/불일치/미서명 거부. 승격분 tier=locked.
+단일 서명(TS/S1 포함). 머신/불일치/미서명 거부. 승격분 tier=locked.
 + last-mile 배선: merge_locked_records(doc_id dedup 누적) → locked_eval_readiness 읽기경로 폐쇄.
 """
 import json
@@ -32,38 +32,6 @@ def test_upper_grade_single_signoff_promotes_by_default():
     assert res.locked[0]["label"] == "TS" and res.locked[0]["label_source"] == "human_review"
 
 
-def test_upper_grade_needs_two_reviewers_when_dual_enabled():
-    # 옵션(dual_for_upper=True): TS 단일 → 부족(이중 필요).
-    res = promote_to_locked(
-        [_cand("d1", "TS")], [Signoff("d1", "admin_kim", "TS")], dual_for_upper=True,
-    )
-    assert res.stats["locked"] == 0 and res.stats["rejected"] == 1
-    assert res.rejected[0]["reason"].startswith("insufficient_reviewers")
-
-
-def test_upper_grade_dual_signoff_promotes():
-    res = promote_to_locked(
-        [_cand("d1", "TS")],
-        [Signoff("d1", "admin_kim", "TS", "2026-09-10"),
-         Signoff("d1", "admin_lee", "TS", "2026-09-11")],
-    )
-    assert res.stats["locked"] == 1
-    rec = res.locked[0]
-    assert set(rec["reviewer_ids"]) == {"admin_kim", "admin_lee"}
-    assert rec["signed_at"] == "2026-09-11"     # 최신 서명시각
-
-
-def test_reviewers_must_be_distinct_in_dual_mode():
-    # dual 옵션에서 같은 사람 두 번 서명 → 독립 2인 아님 → 부족.
-    res = promote_to_locked(
-        [_cand("d1", "S1")],
-        [Signoff("d1", "admin_kim", "S1"), Signoff("d1", "admin_kim", "S1")],
-        dual_for_upper=True,
-    )
-    assert res.stats["locked"] == 0
-    assert res.rejected[0]["reason"].startswith("insufficient_reviewers")
-
-
 def test_grade_disagreement_rejected():
     res = promote_to_locked(
         [_cand("d1", "TS")],
@@ -83,13 +51,6 @@ def test_machine_reviewer_rejected():
 def test_no_signoff_rejected():
     res = promote_to_locked([_cand("d1", "S2")], [])
     assert res.stats["locked"] == 0 and res.rejected[0]["reason"] == "no_signoff"
-
-
-def test_dual_disabled_allows_single_upper():
-    res = promote_to_locked(
-        [_cand("d1", "TS")], [Signoff("d1", "admin_kim", "TS")], dual_for_upper=False,
-    )
-    assert res.stats["locked"] == 1
 
 
 def test_stats_breakdown():

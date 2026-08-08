@@ -138,7 +138,18 @@ JobStore = InMemoryJobStore
 # TTL: 운영자가 24h 윈도우 안에서 job 상태를 폴링 가능. 그 이후는 Celery
 # result backend / Postgres가 진실 소스.
 _REDIS_JOB_TTL_SEC = 24 * 60 * 60
+# [2026-08-07] 골든 검수 잡은 성격이 다르다 — 사람이 수백 건을 며칠에 걸쳐 검수한다.
+# 24h 로는 이튿날 이어서 하려 할 때 잡 목록이 사라져 "어디까지 검수했는지"가 날아간다
+# (실측: KL 서버에서 229건 잡이 24h 경과로 소멸 → 재등록 필요). 서명 결과(locked_gold_eval)는
+# 파일이라 안전하지만 작업 목록은 보존돼야 한다. 종류별로 TTL 을 나눈다.
+_REDIS_LONG_TTL_SEC = 30 * 24 * 60 * 60      # 사람 검수 주기(골든 빌드·등록)
+_LONG_TTL_JOB_KINDS = frozenset({"golden_build", "golden_register"})
 _REDIS_KEY_PREFIX = "lloydk:job:"
+
+
+def _ttl_for(payload: dict[str, Any], default_ttl: int) -> int:
+    """잡 종류에 맞는 TTL — 사람이 며칠 걸려 다루는 잡은 길게."""
+    return _REDIS_LONG_TTL_SEC if payload.get("kind") in _LONG_TTL_JOB_KINDS else default_ttl
 
 
 class RedisJobStore:
@@ -167,9 +178,11 @@ class RedisJobStore:
         key = self._key(job_id)
         # _created_at: 완료 소요시간 산정용(float, json default=str로 직렬화·TTL 내 보존).
         doc = {"status": "queued", "_created_at": time.time(), **payload}
-        self._client.set(key, json.dumps(doc, default=str), ex=self._ttl)
+        ttl = _ttl_for(payload, self._ttl)
+        self._client.set(key, json.dumps(doc, default=str), ex=ttl)
         logger.debug(
-            "redis_job_store create: job_id=%s keys=%s", job_id, list(payload.keys()),
+            "redis_job_store create: job_id=%s kind=%s ttl=%ds keys=%s",
+            job_id, payload.get("kind"), ttl, list(payload.keys()),
         )
         _emit_job_state_metric("queued")
 
@@ -195,7 +208,9 @@ class RedisJobStore:
                     doc = json.loads(raw)
                     doc.update(fields)
                     pipe.multi()
-                    pipe.set(key, json.dumps(doc, default=str), ex=self._ttl)
+                    # 갱신 때도 종류별 TTL 을 다시 적용 — 기본 TTL 로 덮으면 골든 잡이
+                    # 상태 한 번 바뀔 때마다 24h 로 깎여 애써 늘린 보존기간이 무의미해진다.
+                    pipe.set(key, json.dumps(doc, default=str), ex=_ttl_for(doc, self._ttl))
                     pipe.execute()
                     break
                 except self._redis_module.WatchError:

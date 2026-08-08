@@ -107,7 +107,7 @@ class TestBuildGates:
             assert rec["tier"] == "locked_gold_eval"
             assert rec["reviewer_id"] == "kipo.hong"
             assert rec["note"]                              # 판단근거 = 감리 질의 대응
-            assert rec["origin"] == "customer_real"
+            assert rec["document_origin"] == "customer_real"
 
     def test_machine_reviewer_rejected(self, docs: Path, tmp_path: Path):
         # 기계/보조 계정이 사람 서명으로 섞이면 정답지가 다시 기계 라벨이 된다.

@@ -51,7 +51,7 @@ ORIGIN_UNKNOWN = "unknown"               # 기본값(fail-closed): 명시·유�
 _VALID_ORIGINS = frozenset({ORIGIN_SYNTHETIC, ORIGIN_PUBLIC_REAL, ORIGIN_CUSTOMER_REAL, ORIGIN_UNKNOWN})
 _REAL_TEXT_ORIGINS = frozenset({ORIGIN_PUBLIC_REAL, ORIGIN_CUSTOMER_REAL})
 # source(본문 태그) → origin 결정적 유도. (콘솔 표시만 깨질 뿐 파일·리터럴은 UTF-8 정상.)
-_SYNTHETIC_ORIGIN_SOURCES = frozenset({"public_scenario", "synthetic_grounded"})
+_SYNTHETIC_ORIGIN_SOURCES = frozenset({"synthetic", "public_scenario", "synthetic_grounded"})
 _CUSTOMER_REAL_ORIGIN_SOURCES = frozenset({"real_deidentified"})
 _PUBLIC_REAL_EXACT_SOURCES = frozenset({"금융보고서"})
 _PUBLIC_REAL_PREFIXES = ("판례",)        # 판례 · 판례(1000+/2000+/3000+) · 판례_공개문서 …
@@ -182,8 +182,27 @@ def is_real_text_origin(record: dict) -> bool:
 
 
 def is_real_locked_eval(record: dict) -> bool:
-    """real 평가정답 = 유효 서명 + 실문서 출처. eval pool·readiness가 세는 유일 기준."""
+    """유효 서명 + **실문서 출처**. 평가셋 구성 보고(실문서 몇 건인지)에 쓴다.
+
+    [2026-08-06 변경] 이 술어는 더 이상 eval pool 편입 조건이 아니다 — is_locked_eval 참조.
+    """
     return is_valid_signoff(record) and is_real_text_origin(record)
+
+
+def is_locked_eval(record: dict) -> bool:
+    """평가정답인가 = **사람의 유효 서명**. 본문이 합성인지는 편입 조건이 아니다.
+
+    [2026-08-06 결정] 종전엔 '실문서 출처'까지 요구해, 사람이 서명한 합성 고등급 문서가
+    평가정답에 들어가지 못했다. 그런데 본 사업에서 발주처(관리자)는 **검수만** 수행하고
+    실문서를 신규로 올리지 않는다 — 그 전제에서는 TS 평가정답이 **영원히 0** 이 되어
+    배포 readiness 가 구조적으로 도달 불가였다(사람이 아무리 서명해도 게이트가 안 움직임).
+    사람 서명이 곧 정답 확정이라는 원칙에 맞춰 편입 조건을 서명으로 단순화한다.
+
+    대신 **평가셋 구성(실문서/합성 비율)은 항상 함께 보고**한다(eval_readiness 의
+    real_per_grade/synthetic_per_grade). 수치를 인용할 때 구성으로 한정할 수 있게 하기 위함이며,
+    구성 은폐가 아니라 명시가 목적이다.
+    """
+    return is_valid_signoff(record)
 
 
 def tier_of(record: dict) -> str:
@@ -218,7 +237,7 @@ def eval_records(
 
     호출부는 반환된 tier가 legal_floor면 '템플릿 recall·일반화 아님'을 명시해 릴리스 게이트로만 쓴다.
     """
-    locked = [r for r in records if is_real_locked_eval(r)]  # 서명 유효 + 실문서 출처만
+    locked = [r for r in records if is_locked_eval(r)]  # 사람 서명이 곧 평가정답
     if locked or not allow_floor_fallback:
         return locked, TIER_LOCKED
     floor = [r for r in records if tier_of(r) == TIER_LEGAL_FLOOR]
@@ -231,8 +250,26 @@ TRAIN_TIERS = frozenset({TIER_SILVER, TIER_CANDIDATE, TIER_LEGAL_FLOOR})
 
 
 def train_records(records: Sequence[dict]) -> list[dict]:
-    """학습 = silver + candidate + legal_floor(allowlist). locked·held는 절대 제외(train-on-test·역누수 차단)."""
-    return [r for r in records if tier_of(r) in TRAIN_TIERS]
+    """학습 = silver + candidate + legal_floor + **평가에 쓰이지 않는 서명분**. held는 제외.
+
+    제외 기준을 'locked tier'가 아니라 **is_real_locked_eval(실제 평가정답인가)** 로 잡는다.
+    train-on-test 차단은 '평가에 쓰이는 레코드'를 학습에서 빼는 것이 목적인데, 종전 규칙은
+    tier==LOCKED 전부를 뺐다. 그 결과 **사람이 서명한 합성문서**(예: 합성 TS)가
+      · eval_records: 실문서 아님 → 평가 제외
+      · train_records: locked tier → 학습 제외
+    양쪽에서 빠져 **어디에도 쓰이지 않는 사각지대**가 됐다(2026-08-06 확인). 평가 pool 에 들어가지
+    않는 레코드는 유출 위험이 없으므로 학습에 남긴다 — 사람 서명이 붙어 라벨 품질은 오히려 높다.
+    두 함수가 같은 술어(is_real_locked_eval)에서 파생되므로 규칙이 어긋날 여지도 없다.
+    held(서명 무효)는 종전대로 제외한다(역-누수 차단).
+    """
+    out: list[dict] = []
+    for r in records:
+        if is_locked_eval(r):               # 평가정답 → train-on-test 차단
+            continue
+        tier = tier_of(r)
+        if tier in TRAIN_TIERS or tier == TIER_LOCKED:
+            out.append(r)
+    return out
 
 
 # locked_gold_eval이 '실(real) 평가'로 인정되는 등급별 최소 표본 (readiness 기준).
@@ -253,7 +290,15 @@ def eval_readiness(
     test.jsonl만 보는(실분포 오염 맹목) 상태에서 **자동 활성(오염 자동승격)을 막는 근거**가 된다.
     locked가 운영 사람서명으로 충분히 쌓이면 ready=True → 그때 자동 활성을 허용한다.
 
-    반환: {ready, per_grade, missing, reason}. (순수 함수 — DB/파일 불요, 단위테스트 가능.)
+    [2026-08-06] 서명된 합성문서를 **별도 축으로 함께 보고**한다(signed_synthetic_per_grade).
+    종전엔 게이트 판정에서 빠지는 것과 동시에 **집계에서도 사라져**, 사람이 서명한 합성 TS 가
+    화면상 0 으로만 보였다("서명했는데 아무 일도 안 일어난다"). 게이트(ready/missing)는 실문서
+    기준 그대로 두되 — 합성으로 잰 정확도는 실세계 성능이 아니다(자체 실측: 합성학습→실문서
+    F1 0.26) — **서명이라는 사람 노동의 결과는 보이게** 한다. 두 축을 분리해 보고하는 것이지
+    게이트를 완화하는 것이 아니다.
+
+    반환: {ready, per_grade, missing, reason, real_per_grade, synthetic_per_grade, ...}.
+    (순수 함수 — DB/파일 불요, 단위테스트 가능.)
     """
     locked, _ = eval_records(records, allow_floor_fallback=False)  # locked tier만
     per_grade = {g: 0 for g in grades}
@@ -263,6 +308,19 @@ def eval_readiness(
             per_grade[code] += 1
     missing = [g for g in grades if per_grade[g] < min_per_grade]
     ready = bool(locked) and not missing
+
+    # 평가셋 구성 — 같은 서명분을 실문서/합성으로 쪼개 보고한다(수치 인용 시 구성 한정용).
+    real_per_grade = {g: 0 for g in grades}
+    synth_per_grade = {g: 0 for g in grades}
+    for r in locked:
+        code = r.get("label") or r.get("expected_grade")
+        if code not in real_per_grade:
+            continue
+        if is_real_text_origin(r):
+            real_per_grade[code] += 1
+        else:
+            synth_per_grade[code] += 1
+
     return {
         "ready": ready,
         "per_grade": per_grade,
@@ -271,4 +329,8 @@ def eval_readiness(
             "ok" if ready
             else ("no_locked_records" if not locked else f"insufficient_per_grade:{missing}")
         ),
+        "real_per_grade": real_per_grade,
+        "synthetic_per_grade": synth_per_grade,
+        "real_total": sum(real_per_grade.values()),
+        "synthetic_total": sum(synth_per_grade.values()),
     }

@@ -283,6 +283,8 @@ def render_signoff_html(
     *,
     job_id: str,
     post_url: str,
+    default_reviewer: str = "",
+    default_api_key: str = "",
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
     profile: Optional[str] = None,
@@ -299,6 +301,8 @@ def render_signoff_html(
         .replace("__TITLE__", _html.escape(title))
         .replace("__JOB__", _html.escape(job_id))
         .replace("__POST_URL__", _html.escape(post_url))
+        .replace("__REVIEWER_DEFAULT__", _html.escape(default_reviewer or ""))
+        .replace("__APIKEY_DEFAULT__", _html.escape(default_api_key or ""))
         .replace("__TOTAL__", str(len(data)))
         .replace("__DATA__", _embed_json(data))
     )
@@ -309,6 +313,8 @@ def render_signoff_html_from_jsonl(
     *,
     job_id: str,
     post_url: str,
+    default_reviewer: str = "",
+    default_api_key: str = "",
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
     profile: Optional[str] = None,
@@ -323,7 +329,8 @@ def render_signoff_html_from_jsonl(
             if line.strip():
                 recs.append(json.loads(line))
     return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css,
-                               profile=profile)
+                               profile=profile, default_reviewer=default_reviewer,
+                               default_api_key=default_api_key)
 
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
@@ -365,11 +372,10 @@ __NAV__
   <p class="lede">job __JOB__ · gold 후보 __TOTAL__건 — 승인/등급변경/거부 후 서명하면 <b>locked_gold_eval</b>(사람서명 평가정답)로 승격됩니다.</p>
 </div>
 <div class="signbar">
-  <div class="fld"><label>X-API-Key</label><input id="key" type="password" placeholder="settings.api_key"></div>
+  <div class="fld"><label>X-API-Key</label><input id="key" type="password" value="__APIKEY_DEFAULT__" placeholder="settings.api_key"></div>
   <div class="fld"><label>역할(X-Actor-Role)</label><select id="role"><option value="reviewer">reviewer</option><option value="admin">admin</option><option value="kl_backend">kl_backend</option></select></div>
-  <div class="fld"><label>검수자 계정(reviewer_id)</label><input id="reviewer" placeholder="실계정 예: hong.gd"></div>
-  <div class="fld chk"><input type="checkbox" id="publish"><label for="publish">라이브 반영(publish)</label></div>
-  <div class="fld chk"><input type="checkbox" id="dual"><label for="dual" title="주의: 이 화면 단일 세션에선 TS/S1 이 독립 2인 서명을 못 채워 전건 거부됩니다(9월 실서명 배치 경로용). 단일 검수면 끄세요.">TS/S1 이중서명 ⓘ</label></div>
+  <div class="fld"><label>검수자 계정(reviewer_id)</label><input id="reviewer" value="__REVIEWER_DEFAULT__" placeholder="실계정 예: hong.gd"></div>
+  <div class="fld chk"><input type="checkbox" id="publish" checked><label for="publish">라이브 반영(publish)</label></div>
   <div class="fld"><label>&nbsp;</label><button id="submit">서명 제출</button></div>
 </div>
 <div class="container">
@@ -452,7 +458,6 @@ document.getElementById('submit').addEventListener('click',async function(){
   const role=document.getElementById('role').value;
   const reviewer=document.getElementById('reviewer').value.trim();
   const publish=document.getElementById('publish').checked;
-  const dual=document.getElementById('dual').checked;
   const box=document.getElementById('result');
   if(!reviewer){box.className='result err';box.textContent='검수자 계정(reviewer_id)을 입력하세요.';return;}
   const decisions=Object.keys(DEC).filter(id=>DEC[id].decision).map(id=>{
@@ -463,11 +468,11 @@ document.getElementById('submit').addEventListener('click',async function(){
   this.disabled=true;this.textContent='제출 중...';
   try{
     const res=await fetch(POST_URL,{method:'POST',headers:{'X-API-Key':key,'X-Actor-Role':role,'Content-Type':'application/json; charset=utf-8'},
-      body:JSON.stringify({decisions,actor:{user_id:reviewer,role:role},publish,dual_for_upper:dual})});
+      body:JSON.stringify({decisions,actor:{user_id:reviewer,role:role},publish})});
     const j=await res.json();
     if(!res.ok){box.className='result err';box.textContent='실패('+res.status+'): '+(j.detail||JSON.stringify(j));}
     else{const rd=j.readiness||{};
-      // locked 0 인데 거부만 있으면 성공(ok) 스타일이 오도 → 경고 스타일(대개 dual 토글로 TS/S1 전건 거부).
+      // locked 0 인데 거부만 있으면 성공(ok) 스타일이 오도 → 경고 스타일.
       box.className = (j.locked>0) ? 'result ok' : (j.rejected>0 ? 'result err' : 'result ok');
       // publish 를 체크했는데 실제 미반영(경로 미설정/승격 0)이면 명시 — 조용한 미리보기 강등 방지.
       var pubTxt = j.published ? '· 라이브 반영됨'

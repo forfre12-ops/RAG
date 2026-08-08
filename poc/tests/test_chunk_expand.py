@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m4_training.chunk_expand import expand_chunks
+from lloydk.modules.m4_training.chunk_expand import expand_chunks, expand_records_evidence_aware
 
 
 def test_short_doc_single_chunk_same_label():
@@ -64,3 +64,46 @@ def test_trainspec_flag_defaults_off_preserves_doc_level():
     s = TrainSpec()
     assert s.chunk_expand is False  # 기본 = 기존 문서단위 학습 보존
     assert s.chunk_overlap == 64 and s.chunk_min_chars == 40 and s.chunk_char_size == 0
+
+
+def _evidence_record(label="TS"):
+    text = "서론 공개 배경 설명. " * 30 + "\n\n" + "핵심 조합은 온도 128도와 압력 0.84의 결합조건이다. " * 20 + "\n\n" + "일반 부록 설명. " * 50
+    quote = "핵심 조합은 온도 128도와 압력 0.84의 결합조건이다."
+    start = text.index(quote)
+    return {
+        "doc_id": "high-1",
+        "document_family_id": "family-1",
+        "text": text,
+        "label": label,
+        "evidence_card": {
+            "factors": {
+                "competitive_value": {
+                    "spans": [{"start": start, "end": start + len(quote), "quote": quote}]
+                }
+            }
+        },
+    }
+
+
+def test_high_grade_expansion_keeps_evidence_and_neighbors_not_every_chunk():
+    record = _evidence_record()
+    all_chunks, _ = expand_chunks([record["text"]], [record["label"]], char_size=220, overlap=20)
+    rows = expand_records_evidence_aware([record], char_size=220, overlap=20)
+    assert 1 <= len(rows) < len(all_chunks)
+    assert any(row["chunk_label_strength"] == "evidence" for row in rows)
+    assert all(row["source_doc_id"] == "high-1" for row in rows)
+    for row in rows:
+        assert record["text"][row["chunk_start"]:row["chunk_end"]] in row["text"]
+
+
+def test_high_grade_without_exact_evidence_fails_closed():
+    record = _evidence_record()
+    record.pop("evidence_card")
+    with pytest.raises(ValueError, match="no exact evidence"):
+        expand_records_evidence_aware([record], char_size=220)
+
+
+def test_lower_grade_keeps_all_chunks_with_document_strength():
+    record = _evidence_record(label="S2")
+    rows = expand_records_evidence_aware([record], char_size=220, overlap=20)
+    assert rows and {row["chunk_label_strength"] for row in rows} == {"document"}
