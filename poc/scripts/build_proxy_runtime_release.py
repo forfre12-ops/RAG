@@ -525,6 +525,20 @@ elif mode == "help":
 else:
     raise RuntimeError(mode)
 
+# 인터프리터 환경(venv)은 '소스 워크트리'가 아니다. 표준 설치가 poc/.venv 라
+# (README 빠른시작: python -m venv .venv) venv 가 source 아래에 들어오고, 그러면 설치된
+# 서드파티가 전부 source-worktree fallback 으로 오판된다. 실제로 setuptools 가 .pth 로
+# 자동 로드하는 _distutils_hack 이 항상 걸려 이 검사가 상시 실패했다.
+# 검사 의도(릴리스가 프로젝트 '소스'로 되돌아가지 않는가)는 그대로 두고 환경만 뺀다.
+env_roots = [Path(sys.prefix).resolve()]
+if sys.base_prefix != sys.prefix:
+    env_roots.append(Path(sys.base_prefix).resolve())
+
+
+def _under(path, base):
+    return path == base or base in path.parents
+
+
 for name, module in list(sys.modules.items()):
     origins = []
     file_name = getattr(module, "__file__", None)
@@ -534,10 +548,12 @@ for name, module in list(sys.modules.items()):
     if module_paths:
         origins.extend(Path(value).resolve() for value in module_paths)
     for origin in origins:
+        if any(_under(origin, base) for base in env_roots):
+            continue
         local_name = name == "lloydk" or name.startswith("lloydk.")
         local_name = local_name or name == "scripts" or name.startswith("scripts.")
-        under_root = origin == root or root in origin.parents
-        under_source = origin == source or source in origin.parents
+        under_root = _under(origin, root)
+        under_source = _under(origin, source)
         if local_name and not under_root:
             raise RuntimeError(f"local module escaped release: {name} -> {origin}")
         if under_source and not under_root:
