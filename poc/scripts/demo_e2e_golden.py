@@ -25,7 +25,17 @@
   --activate   재학습 산출 모델을 배포한다(deploy gate 적용). --train 과 함께 쓴다.
   --publish    서명 결과를 라이브 locked_gold_eval 경로에 병합한다. 기본은 미병합
                (run-스코프 미리보기)이라 정본·라이브 평가경로를 건드리지 않는다.
-  --manual     G2 자동 서명을 하지 않고 검수·서명 HTML 주소만 출력하고 멈춘다.
+  --reviewer ID  G2 서명을 이 스크립트가 대신 수행한다. **실계정 ID 가 필요하다.**
+
+G2 서명에 관하여 (2026-08-08 실서버 실측으로 정정):
+  기본은 서명하지 않고 검수·서명 HTML 주소만 출력하고 멈춘다. 서명은 사람이 하는 단계이고,
+  서버가 reviewer_id 를 실계정으로 강제하기 때문이다(golden_tiers.is_human_reviewer).
+  종전에는 이 스크립트가 actor 'demo-console' 로 자동 서명했는데, 그 값은 시연 마커라
+  403 으로 거부된다 — 그리고 그게 옳다. 통과시키려고 가드를 피하는 이름을 고르면
+  시연 산출물이 '사람 서명 평가정답(locked_gold_eval)'으로 집계되고, 배포 게이트가
+  검증되지 않은 모델을 검증된 것으로 오판한다.
+  리허설에서 서명까지 자동으로 밟아야 하면 --reviewer 에 실계정을 주되, 그 서명은
+  실제로 그 사람 이름으로 기록된다는 점을 알고 쓸 것.
 
 provider 주의 (2026-08-08 실측):
   llm_provider=noop 으로는 gold 후보가 절대 나오지 않는다. noop 은 등급 라벨러가 아니라
@@ -36,11 +46,9 @@ provider 주의 (2026-08-08 실측):
     - LLM 이 없는 환경·시연 리허설 → --register
   두 경로 모두 G2 이후(서명·재학습·배포)는 동일하다.
 
-서명에 관하여:
-  평가 정답의 서명 주체는 지재원 관리자(실계정)다. 이 스크립트의 자동 서명은 체인이
-  끊기지 않는지 확인하기 위한 시연·점검용이며, 기본값(--publish 미지정)에서는 라이브
-  평가경로에 병합되지 않는다. 감리 시연에서 정본 경로를 보여줄 때는 --manual 로 멈춘 뒤
-  검수·서명 HTML 을 화면에서 사람이 처리하는 것이 맞다.
+서명 주체:
+  평가 정답의 서명 주체는 지재원 관리자(실계정)다. 서버가 이를 강제하므로 이 스크립트는
+  기본적으로 서명하지 않고 검수·서명 HTML 주소만 내고 멈춘다 — 위 "G2 서명에 관하여" 참조.
 
 환경변수(미설정 시 로컬 개발 기본값):
   DEMO_BASE_URL   기본 http://localhost:8010
@@ -209,9 +217,10 @@ def main() -> int:
     do_train = "--train" in args
     do_activate = "--activate" in args
     publish = "--publish" in args
-    manual = "--manual" in args
     use_register = "--register" in args or "--slate" in args or any(a.startswith("--slate=") for a in argv)
     slate = _arg_value(argv, "--slate", DEFAULT_SLATE)
+    # 서명은 기본으로 하지 않는다 — 사람이 하는 단계다. --reviewer 에 실계정을 주면 대행.
+    reviewer = _arg_value(argv, "--reviewer", "").strip()
 
     line("═")
     print("  시나리오 B — 골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭 (루프 B · 모델 갱신)")
@@ -283,47 +292,56 @@ def main() -> int:
         print(f"  • 검수 화면          : {BASE}{review_url}")
         print(f"  • 서명 화면          : {BASE}{signoff_url}")
 
-        if manual:
-            line("═")
-            print("  --manual — 여기서 멈춥니다. 위 서명 화면에서 사람이 서명한 뒤")
-            print("  콘솔 [모델] 탭의 [서명 완료 · 재학습으로] 를 누르거나, 이 스크립트를")
-            print("  --train 으로 다시 실행하세요.")
-            line("═")
-            return 0
+        if not reviewer:
+            print("  • 서명               : 하지 않음 — 사람이 하는 단계입니다.")
+            print("    서버가 reviewer_id 를 실계정으로 강제하므로(시연 마커 'demo-console' 은 403)")
+            print("    위 서명 화면에서 처리하거나, 리허설이라면 --reviewer <실계정> 을 주십시오.")
+            if not do_train:
+                line("═")
+                print("  G1 완료. 서명 후 이어가려면 --train (배포까지는 --train --activate).")
+                line("═")
+                return 0
+            print("    (--train 이 지정돼 재학습으로 계속 진행합니다 — 서명 없이도 학습은 돕니다.)")
 
-        if gold <= 0:
+        elif gold <= 0:
             return fail("서명할 gold 후보가 0건입니다 — require_evidence 를 낮추거나 후보를 늘리세요.")
 
-        cands = read_candidates(st.get("gold_path"), local_hint=slate if use_register else None)
-        if cands is None:
-            line("═")
-            print("  후보 파일을 이 머신에서 읽지 못했습니다(원격 서버 경로).")
-            print("  → 위 서명 화면에서 사람이 서명한 뒤 --train 으로 다시 실행하세요.")
-            line("═")
-            return 0
+        else:
+            cands = read_candidates(st.get("gold_path"), local_hint=slate if use_register else None)
+            if cands is None:
+                line("═")
+                print("  후보 파일을 이 머신에서 읽지 못했습니다(원격 서버 경로).")
+                print("  → 위 서명 화면에서 사람이 서명한 뒤 --train 으로 다시 실행하세요.")
+                line("═")
+                return 0
 
-        print(f"  • 서명 대상          : {len(cands)}건 (전건 approve — 시연·점검용 자동 서명)")
-        print(f"  • publish            : {publish} " + ("(라이브 평가경로 병합)" if publish else "(run-스코프 미리보기 · 정본 무변경)"))
-        r = cli.post(f"{API}/golden/jobs/{job_id}/signoff", headers=HEADERS, json={
-            "decisions": [{"doc_id": d["doc_id"], "decision": "approve",
-                           "note": "시연 자동 서명"} for d in cands],
-            "actor": ACTOR,
-            "publish": publish,
-        })
-        if r.status_code >= 400:
-            return fail("서명 요청 거부", r)
-        sg = r.json()
-        print(f"  • 서명 결과          : locked={sg.get('locked')} rejected={sg.get('rejected')}")
-        print(f"  • 서명자(서버 기록)  : {sg.get('reviewer_id')}"
-              + ("  ⚠ 클라 actor 가 인증 신원으로 덮어써짐" if sg.get("overridden") else ""))
-        if sg.get("publish_note"):
-            print(f"  • publish 비고       : {sg['publish_note']}")
+            print(f"  • 서명 대상          : {len(cands)}건 (전건 approve)")
+            print(f"  • 서명자             : {reviewer}  ⚠ 이 이름으로 실제 기록됩니다")
+            print(f"  • publish            : {publish} " + ("(라이브 평가경로 병합)" if publish else "(run-스코프 미리보기 · 정본 무변경)"))
+            r = cli.post(f"{API}/golden/jobs/{job_id}/signoff", headers=HEADERS, json={
+                "decisions": [{"doc_id": d["doc_id"], "decision": "approve",
+                               "note": "리허설 서명"} for d in cands],
+                "actor": {"user_id": reviewer, "role": "reviewer"},
+                "publish": publish,
+            })
+            if r.status_code == 403:
+                return fail(
+                    f"서명 거부 — reviewer_id '{reviewer}' 가 실계정으로 인정되지 않았습니다.\n"
+                    f"         머신·플레이스홀더 접두(ai_·llm_·demo·auto·bot 등)는 거부됩니다.", r)
+            if r.status_code >= 400:
+                return fail("서명 요청 거부", r)
+            sg = r.json()
+            print(f"  • 서명 결과          : locked={sg.get('locked')} rejected={sg.get('rejected')}")
+            print(f"  • 서명자(서버 기록)  : {sg.get('reviewer_id')}"
+                  + ("  ⚠ 클라 actor 가 인증 신원으로 덮어써짐" if sg.get("overridden") else ""))
+            if sg.get("publish_note"):
+                print(f"  • publish 비고       : {sg['publish_note']}")
 
-        if not do_train:
-            line("═")
-            print("  G1·G2 완료. 재학습부터 이어가려면 --train (배포까지는 --train --activate).")
-            line("═")
-            return 0
+            if not do_train:
+                line("═")
+                print("  G1·G2 완료. 재학습부터 이어가려면 --train (배포까지는 --train --activate).")
+                line("═")
+                return 0
 
         # ── 3. 재학습 ─────────────────────────────────────────────────────────
         step("3", "재학습 트리거 (incremental)", "[모델] 탭 → 3 재학습 트리거")

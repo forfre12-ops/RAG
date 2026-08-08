@@ -557,6 +557,15 @@ class Settings(BaseSettings):
     # (등급별 locked 보유/부족·배포가능 여부). 빈 값(기본)이면 readiness=no_locked_records(무실데이터
     # 단계의 진실). 파일이 쌓이면 GET /admin/locked-readiness·게이지가 자동으로 켜진다. 읽기 전용.
     locked_eval_jsonl: str = ""
+    # 재학습 기본 학습셋 디렉터리 — TrainSpec 의 train/val/test 기본 경로가 여기서 파생된다.
+    # 종전 하드코딩 기본값 'datasets/labeled' 는 리포에도 배포본에도 존재한 적이 없어,
+    # 콘솔 「3 재학습 트리거」와 hyperparams 없는 POST /train 이 배포 서버에서 즉시 실패했다
+    # (2026-08-08 실서버 실측: FileNotFoundError 'datasets/labeled/val.jsonl' → 10초 만에 failed.
+    #  워커가 이를 'retrain topology unavailable' 로 흡수해 조용한 skip 처럼 보였다).
+    # 이 경로가 배포 모델 artifacts/classifier_p1_v5_clean/v-fe4b386b 를 낸 학습셋이다
+    # (datasets/labeled_p1_v5_clean/GATE_RESULTS.md · manifests/dataset_v1.0.yaml).
+    # 학습셋 세대가 바뀌면 코드가 아니라 이 값만 바꾼다.
+    training_dataset_dir: str = "datasets/labeled_p1_v5_clean"
     # 정본 골든셋 jsonl 경로 — GET /golden/summary(구성 집계) 전용 읽기 경로.
     # 잡 목록은 '무엇을 만들었나'만 보여줄 뿐 골든셋이 지금 어떤 tier·등급·출처로 구성돼
     # 있는지는 화면에서 답할 수 없었다. 이 경로는 조회만 하며 어떤 쓰기 경로도 쓰지 않는다

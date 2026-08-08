@@ -58,12 +58,30 @@ def _training_run_context(mlflow_module, spec: "TrainSpec"):
     return nullcontext(_LocalRun(info=_LocalRunInfo(run_id=uuid.uuid4().hex)))
 
 
+def _dataset_split(name: str) -> str:
+    """기본 학습셋 분할 경로 — settings.training_dataset_dir 에서 파생.
+
+    종전엔 'datasets/labeled/...' 가 하드코딩돼 있었는데 그 디렉터리는 리포에도 배포본에도
+    없다. 그래서 hyperparams 없이 호출되는 경로(콘솔 「3 재학습 트리거」, POST /train 기본형)가
+    배포 서버에서 항상 FileNotFoundError 로 끝났다(2026-08-08 실서버 실측). 설정에서 끌어와
+    학습셋 세대 교체 시 코드를 고치지 않게 한다. import 는 지연 — 이 모듈이 config 로드
+    시점에 묶이지 않도록.
+    """
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+
+        base = str(getattr(settings, "training_dataset_dir", "") or "").strip()
+    except Exception:  # noqa: BLE001 - 설정 미가용 환경(단독 스크립트)에서도 동작
+        base = ""
+    return f"{base or 'datasets/labeled_p1_v5_clean'}/{name}"
+
+
 @dataclass
 class TrainSpec:
     base_model: str = "kakaobank/kf-deberta-base"
-    train_path: str = "datasets/labeled/train.jsonl"
-    val_path: str = "datasets/labeled/val.jsonl"
-    test_path: str | None = "datasets/labeled/test.jsonl"
+    train_path: str = field(default_factory=lambda: _dataset_split("train.jsonl"))
+    val_path: str = field(default_factory=lambda: _dataset_split("val.jsonl"))
+    test_path: str | None = field(default_factory=lambda: _dataset_split("test.jsonl"))
     output_dir: str = "artifacts/classifier"
     max_seq_len: int = 512
     # [FUN-004 Chunk 단위 학습] True 면 TRAIN 분할을 chunk 단위로 확장(각 chunk=문서 라벨 상속).
