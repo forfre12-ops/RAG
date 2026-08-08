@@ -23,7 +23,8 @@
 사용:
   cd poc
   .venv/Scripts/python.exe scripts/demo_e2e_8010.py
-  # 다른 파일:  ... scripts/demo_e2e_8010.py datasets/test_docs_pdf/finance_S1_030.pdf
+  # 다른 파일:  ... scripts/demo_e2e_8010.py datasets/acceptance_pack/docs/acc-TS-01.docx
+  # 인자를 주지 않으면 추적되는 인수팩 문서 중 존재하는 첫 후보를 자동 선택한다.
 
 환경변수(미설정 시 로컬 개발 기본값):
   DEMO_BASE_URL   기본 http://localhost:8010
@@ -56,6 +57,26 @@ HEADERS = {"X-API-Key": os.getenv("DEMO_API_KEY", "lloydk_dev_apikey")}
 ACTOR = json.dumps({"user_id": "demo-console", "role": "reviewer"})
 REVIEWER = {"user_id": "demo-console", "role": "reviewer"}
 
+# 기본 시연 문서 후보 — 전부 **git 추적** 경로라 배포본에도 실린다(위 _pick_default_doc 주석 참조).
+DEFAULT_DOC_CANDIDATES = (
+    "datasets/acceptance_pack/docs/acc-S1-04.pdf",
+    "datasets/acceptance_pack/docs/acc-TS-01.docx",
+    "datasets/acceptance_pack/docs/acc-S3-08.docx",
+)
+
+# 확장자 → MIME. 종전엔 무조건 application/pdf 를 보내 docx·hwp 를 올려도 pdf 로 신고했다.
+_MIME = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".doc": "application/msword",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xls": "application/vnd.ms-excel",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".hwp": "application/x-hwp",
+    ".hwpx": "application/hwp+zip",
+    ".txt": "text/plain",
+}
+
 GRADE_DESC = {
     "TS": "특급기밀 — 유출 시 회사 존립 위협",
     "S1": "1급 비밀 — 유출 시 중대한 손해",
@@ -74,10 +95,34 @@ def step(no: str, title: str, card: str):
     print(f"     콘솔 대응: {card}")
 
 
+def _pick_default_doc() -> "Path | None":
+    """기본 시연 문서 — **추적되는** 경로에서 고른다.
+
+    종전 기본값 datasets/test_docs_pdf/ 는 .gitignore 대상이라 어떤 배포에도 실리지 않는다
+    (실서버 실측 2026-08-08: "[오류] 파일 없음"으로 시나리오 A 가 시작조차 못 했다).
+    인수팩 문서는 리포에 추적되므로 로컬·서버 어디서나 존재한다.
+    """
+    for rel in DEFAULT_DOC_CANDIDATES:
+        p = Path(rel)
+        if p.exists():
+            return p
+    return None
+
+
 def main() -> int:
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
     do_relabel = "--relabel" in sys.argv[1:]
-    pdf = Path(argv[0]) if argv else Path("datasets/test_docs_pdf/business_S1_030.pdf")
+    if argv:
+        pdf = Path(argv[0])
+    else:
+        picked = _pick_default_doc()
+        if picked is None:
+            print("[오류] 기본 시연 문서를 찾지 못했습니다. 후보:")
+            for rel in DEFAULT_DOC_CANDIDATES:
+                print(f"        {rel}")
+            print("       경로를 인자로 직접 주십시오.")
+            return 1
+        pdf = picked
     if not pdf.exists():
         print(f"[오류] 파일 없음: {pdf}")
         return 1
@@ -95,7 +140,8 @@ def main() -> int:
             r = cli.post(
                 f"{BASE}/api/v1/documents",
                 headers=HEADERS,
-                files={"file": (pdf.name, f, "application/pdf")},
+                files={"file": (pdf.name, f,
+                                _MIME.get(pdf.suffix.lower(), "application/octet-stream"))},
                 # rag_namespace='demo' 는 화면 경로(parse_demo.html)와 반드시 같아야 한다.
                 # 생략하면 설정 기본값('uploads')으로 색인되는데, 데모 초기화
                 # (POST /admin/demo/purge)의 스코프는 created_by='demo-console' + collection='demo'

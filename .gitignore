@@ -179,6 +179,15 @@ poc/datasets/public_eval_negatives/
 # deploy/proxy_gold_runtime/ 은 배포 '소스'(compose·model-lock·prefetch)라 추적 대상이다.
 poc/_artifacts/
 poc/.release-build/
+# 파일럿 화면(HTML) — .md/.json 원본에서 build_{blind_quality,case_pilot,single_candidate}_html.py
+# 가 다시 만든다. 원본과 manifest·지침은 계속 추적한다(정본은 그쪽).
+poc/datasets/proxy_gold/**/*_view.v*.html
+poc/datasets/proxy_gold/**/case_view.v*.html
+poc/datasets/proxy_gold/blind_quality_pilot/review_form.v*.html
+# 블라인드 검수 정답키 — 저장소에 두면 검수자가 볼 수 있어 블라인드가 성립하지 않는다.
+# 검수 팩(review_pack)도 배포용 워크북이라 datasets/golden_review/ 와 같은 취지로 제외한다.
+poc/datasets/proxy_gold/blind_quality_pilot/blind_key.v*.json
+poc/datasets/proxy_gold/blind_quality_pilot/review_pack.v*.jsonl
 # 데모 파서 샘플용 실 정부문서(KOGL 공고·제안요청서 HWP/HWPX/PDF, 대용량). 웹서빙 static 트리라
 # 부주의 커밋·서빙 노출 차단 — 필요 시 개별 `git add -f`. 추적 픽스처는 success_*.docx/.xlsx 뿐이라
 # 확장자 글롭이 안전(그 외 pdf/hwp/hwpx는 전부 커밋 대상 아닌 실문서).
