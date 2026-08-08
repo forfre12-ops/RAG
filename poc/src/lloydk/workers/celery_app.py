@@ -25,6 +25,12 @@ celery_app.conf.worker_max_tasks_per_child = settings.celery_worker_max_tasks_pe
 celery_app.conf.task_acks_late = True
 celery_app.conf.task_reject_on_worker_lost = True
 celery_app.conf.worker_prefetch_multiplier = 1
+# ⚠ [배포 함정 · 실측 2026-08-08] 아래 시간제한은 **발행자(publisher) 측 값이 메시지 헤더에
+# 실려** 워커로 간다. 워커는 자기 설정보다 메시지에 실린 값을 우선한다.
+# 그래서 이 파일을 고친 뒤 **워커만 재시작하면 아무것도 바뀌지 않는다** — /train 을 받아
+# 태스크를 발행하는 것은 api 컨테이너이므로, api 가 옛 값을 그대로 메시지에 박아 보낸다.
+# 실제로 워커에서 새 값(21600)이 확인되는데도 학습이 정확히 옛 상한(1800)에 잘렸다.
+# 시간제한을 바꿀 때는 **api 와 worker 를 함께 재기동**할 것.
 celery_app.conf.task_annotations = {
     # [실측 2026-08-02] 종전 min(설정, 120) 은 설정을 올려도 120초로 깎아, 대용량 문서가
     # 완주하지 못하고 3회 재시도 끝에 status=partial 로 끝났다
@@ -46,9 +52,30 @@ celery_app.conf.task_annotations = {
         "soft_time_limit": max(settings.celery_task_soft_time_limit, 900),
         "time_limit": max(settings.celery_task_time_limit, 1200),
     },
+    # [실측 2026-08-08] 종전 하한 1800(30분) 은 학습을 완주시키지 못했다. 실서버(16vCPU,
+    # GPU 없음)에서 정본 학습셋(2,042행) 풀 파인튜닝이 29분 30초 지점에서
+    # SoftTimeLimitExceeded 로 잘렸다 — 메모리는 정상이었다(피크 13.4GiB/16GiB, OOM 0).
+    # 30분이라는 값은 학습 소요를 재지 않고 잡힌 것으로 보인다. 같은 파일 tasks.py:747 이
+    # 이 작업을 "야간 재학습(CPU ~1h)" 이라고 적고 있어, 한 시간짜리로 문서화한 작업을
+    # 30분에 죽이는 자기모순이었다.
+    # 영향 범위는 콘솔 수동 /train 만이 아니다 — 지재원 URGENT 드리프트 자동재학습
+    # (tasks.py:713·724)과 고객사 야간 증분 재학습(tasks.py:783)이 모두 이 태스크를 태운다.
+    # 즉 고객사 무인 야간 재학습은 구조적으로 완주할 수 없었다.
+    # 하한 산정은 추정하지 말고 실측을 쓴다. 같은 실서버에서 학습 진행률 로그가
+    # 남긴 값(2026-08-08):
+    #     51/1280 [33:33<12:42:44, 37.24s/it]
+    # 즉 기본 하이퍼파라미터(epochs=5 · batch_size=8 · max_seq_len=512, 2,042행 →
+    # 256스텝/에폭 × 5 = 1,280스텝)로 **총 약 13시간**이 걸린다. 스텝당 37초는 CPU 라
+    # 그렇다 — 지재원 A100 이면 이 값이 아니다(GPU 노드에서는 이 하한이 과할 뿐 해롭지 않다).
+    # 따라서 하한을 18h/19h 로 둔다: 실측 13h 에 코어 점유 경합·평가·등록 단계를 얹은 여유.
+    # soft 에서 graceful 정리, hard 는 그보다 크게 두어 진짜 멈춘 작업은 여전히 SIGKILL 로
+    # 회수한다(워커 동시성=코어수라 1슬롯 장기점유가 분류를 굶기지 않는다).
+    # ⚠ 13시간은 **감리 현장에서 실시간 시연할 수 없는 길이**다. 시연은 사전에 학습해 둔
+    # 결과로 하거나 hyperparams(epochs 등)를 줄여 별도 실행할 것 — API 의 hyperparams 가
+    # TrainSpec 으로 전달된다(training_service.py:559).
     "lloydk.train_classifier": {
-        "soft_time_limit": max(settings.celery_task_soft_time_limit, 1800),
-        "time_limit": max(settings.celery_task_time_limit, 2400),
+        "soft_time_limit": max(settings.celery_task_soft_time_limit, 64800),
+        "time_limit": max(settings.celery_task_time_limit, 68400),
     },
 }
 
