@@ -1,0 +1,71 @@
+"""시연 마커 서명이 사람 검수로 집계되지 않는가 — 평가정답 무결성 회귀 방어.
+
+배경(2026-08-08 실측): 시연 드라이버(scripts/demo_e2e_golden.py)와 화면 경로
+(parse_demo.html)는 actor.user_id 로 'demo-console' 을 쓴다(admin.DEMO_CREATED_BY).
+그 값으로 골든 서명을 하면 label_source='human_review' · reviewer_id='demo-console' 인
+레코드가 나오는데, is_human_reviewer 의 머신 접두 목록에 'demo' 가 없어서 이것이
+사람 서명으로 통과했고 tier 가 locked_gold_eval 로 잡혔다.
+
+locked_gold_eval 은 '사람이 서명한 평가 정답'이라는 뜻이고 배포 게이트가 그것을 근거로
+자동 활성화를 연다. 시연·리허설 산출물이 여기 섞이면 게이트가 검증되지 않은 모델을
+검증된 것으로 오판한다. 실제로 --publish 를 주면 라이브 경로에 병합되는 길이 열려 있다.
+"""
+from __future__ import annotations
+
+import pytest
+
+from lloydk.golden_tiers import (
+    SUPPORTED_GATE_VERSIONS,
+    TIER_HELD,
+    is_human_reviewer,
+    is_valid_signoff,
+    tier_of,
+)
+
+
+@pytest.mark.parametrize(
+    "reviewer_id",
+    ["demo-console", "demo_console", "DEMO-CONSOLE", "demo-user", "demo"],
+)
+def test_demo_marker_is_not_a_human_reviewer(reviewer_id):
+    assert is_human_reviewer(reviewer_id) is False
+
+
+@pytest.mark.parametrize("reviewer_id", ["admin@koipa", "reviewer-kim", "hong.gildong"])
+def test_real_accounts_still_pass(reviewer_id):
+    """오탐 방지 — 실계정은 그대로 통과해야 한다."""
+    assert is_human_reviewer(reviewer_id) is True
+
+
+def _signed_record(reviewer_id: str) -> dict:
+    """서명 envelope 를 갖춘 레코드 — reviewer_id 만 바꿔 판정을 가른다.
+
+    gate_version 은 빌드 게이트(v2_agreement_evidence)가 아니라 **서명 게이트**
+    (SUPPORTED_GATE_VERSIONS = human_signoff_v1)를 넣어야 한다. 둘은 다른 축이고
+    is_valid_signoff 는 후자만 인정한다.
+    """
+    return {
+        "doc_id": "d1",
+        "text": "본문",
+        "label": "S1",
+        "label_source": "human_review",
+        "reviewer_id": reviewer_id,
+        "reviewer_ids": [reviewer_id],
+        "gate_version": next(iter(SUPPORTED_GATE_VERSIONS)),
+        "signed_at": "2026-08-08T00:00:00Z",
+        "source": "판례",
+    }
+
+
+def test_demo_signoff_does_not_become_locked_eval():
+    """시연 서명은 평가 정답이 아니라 격리(held_review)로 가야 한다."""
+    rec = _signed_record("demo-console")
+    assert is_valid_signoff(rec) is False
+    assert tier_of(rec) == TIER_HELD
+
+
+def test_real_signoff_still_becomes_locked_eval():
+    """실계정 서명은 종전대로 평가 정답으로 승격된다(과교정 방지)."""
+    rec = _signed_record("admin@koipa")
+    assert is_valid_signoff(rec) is True
+    assert tier_of(rec) != TIER_HELD

@@ -159,6 +159,10 @@ doc/*.pdf
 # 골든 빌더 run-스코프 출력(build_*/uncertain_*) — 정본 아님·재생성 가능. 정본 regate_* 는 계속 추적.
 poc/datasets/gold_real/builds/build_*.jsonl
 poc/datasets/gold_real/builds/uncertain_*.jsonl
+# 서명 run 산출물. build_*/uncertain_* 은 막아 두었으나 locked_* 만 빠져 있어 시연 서명
+# 결과가 커밋 후보로 올라왔다(2026-08-08). datasets/signoff_slate/locked_*.jsonl 과 같은 취지 —
+# 정본은 LOCKED_EVAL_JSONL 경로이고 이건 per-run 출력이다.
+poc/datasets/gold_real/builds/locked_*.jsonl
 # 일회성 실험 학습셋 (_exp_ 접두 = throwaway 컨벤션, 정본 아님)
 poc/datasets/_exp_*.jsonl
 # 데모 파서 샘플용 실 정부문서(KOGL 공고·제안요청서 HWP/HWPX/PDF, 대용량). 웹서빙 static 트리라
