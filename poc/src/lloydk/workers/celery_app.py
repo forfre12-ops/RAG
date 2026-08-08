@@ -25,6 +25,21 @@ celery_app.conf.worker_max_tasks_per_child = settings.celery_worker_max_tasks_pe
 celery_app.conf.task_acks_late = True
 celery_app.conf.task_reject_on_worker_lost = True
 celery_app.conf.worker_prefetch_multiplier = 1
+
+# [실측 2026-08-08] Redis 브로커의 visibility_timeout 기본값은 **3600초(1시간)** 다.
+# 이 시간 안에 ack 되지 않은 메시지를 브로커가 "워커가 죽었다"고 보고 **다시 배달**한다.
+# task_acks_late=True 라 ack 는 작업이 끝나야 나가므로, 1시간을 넘기는 작업은 아직 정상
+# 실행 중인데도 재배달되어 **같은 작업이 중복 실행**된다.
+# 실서버에서 그대로 재현했다 — 학습 시작 10:07:34 → 재배달 11:08:34(정확히 1시간 뒤) →
+# 학습 두 개가 동시에 돌며 anon-rss 9.26GB + 3.43GB → 11:09:39 커널 cgroup OOM 으로 둘 다 사망.
+# 시간제한을 아무리 올려도 소용없다: 1시간마다 재배달·중복 실행되어 영원히 완주하지 못한다.
+# (실제로 완주에 13시간이 걸리는 train_classifier 가 여기 걸린다. classify_async·golden_build 는
+#  하드 상한이 1,200초라 1시간 안에 끝나므로 영향이 없었고, 그래서 여태 드러나지 않았다.)
+# 규칙: visibility_timeout 은 **가장 긴 하드 시간제한보다 커야 한다**. 아래 train_classifier
+# 하한이 19h(68,400s)이므로 24h 로 둔다. 결과 백엔드도 같은 Redis 라 함께 지정한다.
+_VISIBILITY_TIMEOUT = 86400
+celery_app.conf.broker_transport_options = {"visibility_timeout": _VISIBILITY_TIMEOUT}
+celery_app.conf.result_backend_transport_options = {"visibility_timeout": _VISIBILITY_TIMEOUT}
 # ⚠ [배포 함정 · 실측 2026-08-08] 아래 시간제한은 **발행자(publisher) 측 값이 메시지 헤더에
 # 실려** 워커로 간다. 워커는 자기 설정보다 메시지에 실린 값을 우선한다.
 # 그래서 이 파일을 고친 뒤 **워커만 재시작하면 아무것도 바뀌지 않는다** — /train 을 받아
