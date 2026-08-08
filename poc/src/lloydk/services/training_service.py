@@ -579,10 +579,22 @@ class TrainingService:
         # DB(TrainingRun) 우선, 없으면 JobStore
         run = self._get_run(train_job_id)
         if run is not None:
+            # [진행률 배선 2026-08-08] status 만으로는 running 이 내내 0.5 라, 13시간짜리 학습에서
+            # 막대가 멈춘 것처럼 보였다. 트레이너 콜백이 JobStore 에 실제 스텝을 쓰므로 그걸 얹는다.
+            # DB 가 진실원인 것은 그대로다 — status·error 는 DB, 진행 세부는 JobStore(휘발성 TTL).
+            # JobStore 미가용/미기록이면 종전 동작(status 유도값)으로 조용히 되돌아간다.
+            prog = self._live_progress(train_job_id)
             return TrainStatus(
                 train_job_id=train_job_id,
                 status=run.status,
-                progress=self._progress_from_status(run.status),
+                progress=(
+                    prog.get("progress")
+                    if run.status == "running" and prog.get("progress") is not None
+                    else self._progress_from_status(run.status)
+                ),
+                current_epoch=prog.get("current_epoch"),
+                total_epochs=prog.get("total_epochs"),
+                estimated_finish_at=prog.get("estimated_finish_at"),
                 started_at=run.started_at.isoformat() if run.started_at else None,
                 error=run.error_message,
             )
@@ -654,6 +666,24 @@ class TrainingService:
         except SQLAlchemyError as exc:
             logger.warning("training run lookup failed: run_id=%s err=%s", run_id, exc)
             return None
+
+    def _live_progress(self, train_job_id: uuid.UUID) -> dict:
+        """JobStore 에 트레이너 콜백이 남긴 진행 세부를 읽는다. 없으면 빈 dict.
+
+        조회 실패는 삼킨다 — 진행률 때문에 상태조회 자체가 실패하면 안 된다(부가 정보).
+        """
+        try:
+            job = self.jobs.get(train_job_id) or {}
+        except Exception:  # noqa: BLE001
+            return {}
+        out: dict = {}
+        p = job.get("train_progress")
+        if isinstance(p, (int, float)) and 0.0 <= float(p) <= 1.0:
+            out["progress"] = float(p)
+        for k in ("current_epoch", "total_epochs", "estimated_finish_at"):
+            if job.get(k) is not None:
+                out[k] = job[k]
+        return out
 
     @staticmethod
     def _progress_from_status(status: str) -> float:

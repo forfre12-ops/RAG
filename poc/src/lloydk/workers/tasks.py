@@ -461,6 +461,12 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
     _mark_training_run(run_uuid, status="running")
 
     # ── 학습 ────────────────────────────────────────────────────────────────────
+    # [진행률 배선 2026-08-08] 이 run_id 를 넘기면 트레이너가 HF TrainerState 를 읽어
+    # JobStore(같은 키)에 스텝·에폭·예상완료를 기록한다 → GET /train/jobs/{id} 가 노출.
+    # API hyperparams 로 들어온 값이 아니라 워커가 붙이는 것이므로 여기서 주입한다.
+    # run_uuid 가 None(DB 미가용)이면 넣지 않는다 — 진행률은 부가 정보이고 학습은 계속돼야 한다.
+    if run_uuid is not None:
+        spec_kwargs.setdefault("progress_run_id", str(run_uuid))
     spec = TrainSpec(**spec_kwargs)
     try:
         report = train_classifier(spec)

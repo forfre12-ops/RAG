@@ -7,11 +7,13 @@ P1 분류기 학습기.
 """
 from __future__ import annotations
 from contextlib import nullcontext
+import datetime as _dt
 import hashlib
 import json
 import math
 import os
 import re
+import time
 import uuid
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -76,6 +78,81 @@ def _dataset_split(name: str) -> str:
     return f"{base or 'datasets/labeled_p1_v5_clean'}/{name}"
 
 
+def _build_progress_callback(run_id: str):
+    """학습 진행률을 JobStore(run_id 키)에 기록하는 HF TrainerCallback 을 만든다.
+
+    HF TrainerState 가 주는 값을 그대로 쓴다 — 로그 파싱 없음:
+        state.global_step / state.max_steps → progress · current_step · total_steps
+        state.epoch      / args.num_train_epochs → current_epoch · total_epochs
+        경과시간 × 남은스텝/완료스텝 → estimated_finish_at
+    기록 실패(Redis 미가용 등)는 학습을 절대 막지 않는다 — 진행률은 부가 정보다.
+
+    쓰기 빈도: 스텝마다 쓰면 13시간 학습에서 1,280회 + eval 마다 Redis 왕복이 붙는다.
+    가치가 없는 부하라 _MIN_INTERVAL_SEC 간격으로 스로틀한다(첫 스텝과 마지막은 항상 기록 —
+    화면이 "시작했다"와 "끝났다"를 놓치지 않게).
+    """
+    from transformers import TrainerCallback  # noqa: PLC0415
+
+    _MIN_INTERVAL_SEC = 20.0
+
+    class _ProgressCallback(TrainerCallback):
+        def __init__(self) -> None:
+            self._last_write = 0.0
+            self._started = time.time()
+
+        def _write(self, state, args, *, force: bool = False) -> None:
+            now = time.time()
+            if not force and (now - self._last_write) < _MIN_INTERVAL_SEC:
+                return
+            self._last_write = now
+            try:
+                import uuid as _uuid  # noqa: PLC0415
+                from lloydk.services.job_store import get_default_store  # noqa: PLC0415
+
+                total = int(getattr(state, "max_steps", 0) or 0)
+                done = int(getattr(state, "global_step", 0) or 0)
+                total_ep = int(getattr(args, "num_train_epochs", 0) or 0) if args else 0
+                # HF state.epoch 은 "완료한 에폭 수"라 첫 에폭 동안 0.x 다. 그대로 정수화하면
+                # 화면에 "에폭 0 / 1" 로 떠서 시작도 안 한 것처럼 보인다 — 지금 고치는 증상과 같다.
+                # 사람이 읽는 값은 1-based("1번째 에폭 진행 중")여야 하므로 +1 하고 총수로 clamp
+                # 한다(학습 종료 시 epoch == total 이라 그대로 두면 total+1 이 된다).
+                cur_ep = None
+                if getattr(state, "epoch", None) is not None:
+                    cur_ep = int(state.epoch) + 1
+                    if total_ep:
+                        cur_ep = min(cur_ep, total_ep)
+                fields: dict = {
+                    "current_step": done,
+                    "total_steps": total or None,
+                    "current_epoch": cur_ep,
+                    "total_epochs": total_ep or None,
+                }
+                if total > 0:
+                    fields["train_progress"] = round(done / total, 4)
+                    if done > 0:
+                        elapsed = now - self._started
+                        remain = elapsed * (total - done) / done
+                        fields["estimated_finish_at"] = (
+                            _dt.datetime.now(_dt.timezone.utc)
+                            + _dt.timedelta(seconds=remain)
+                        ).isoformat()
+                get_default_store().update(_uuid.UUID(str(run_id)), **fields)
+            except Exception:  # noqa: BLE001 — 진행률 기록 실패가 학습을 막지 않는다
+                pass
+
+        def on_train_begin(self, args, state, control, **kw):  # noqa: ANN001,ANN003
+            self._started = time.time()
+            self._write(state, args, force=True)
+
+        def on_step_end(self, args, state, control, **kw):  # noqa: ANN001,ANN003
+            self._write(state, args)
+
+        def on_train_end(self, args, state, control, **kw):  # noqa: ANN001,ANN003
+            self._write(state, args, force=True)
+
+    return _ProgressCallback()
+
+
 def _training_output_dir() -> str:
     """학습 산출물 기본 경로 — settings.training_output_dir.
 
@@ -98,6 +175,14 @@ class TrainSpec:
     val_path: str = field(default_factory=lambda: _dataset_split("val.jsonl"))
     test_path: str | None = field(default_factory=lambda: _dataset_split("test.jsonl"))
     output_dir: str = field(default_factory=lambda: _training_output_dir())
+    # [진행률 배선 2026-08-08] 이 값이 있으면 학습 중 진행률을 JobStore(run_id 키)에 기록한다.
+    # 워커(tasks.py)가 TrainingRun 의 run_id 를 넣어 준다 — API hyperparams 로 받는 값이 아니다.
+    # 없으면(None) 아무것도 기록하지 않는다: 스크립트 직접 실행·테스트 경로 동작 보존.
+    # 종전에는 TrainStatus 의 progress 가 status 에서 유도된 상수(queued 0.0/running 0.5/
+    # completed 1.0)뿐이었고 current_epoch·total_epochs·estimated_finish_at 은 스키마에
+    # 선언만 되어 있고 채우는 코드가 없었다. 실측 13시간짜리 학습에서 막대가 내내 50% 에
+    # 멈춰 있어 "멈춘 건지 도는 건지" 화면으로 구분할 수 없었다.
+    progress_run_id: str | None = None
     max_seq_len: int = 512
     # [FUN-004 Chunk 단위 학습] True 면 TRAIN 분할을 chunk 단위로 확장(각 chunk=문서 라벨 상속).
     # 긴 문서의 max_seq_len truncation 으로 잘리던 뒷부분까지 학습 신호로 사용. val/test/holdout 은
@@ -894,6 +979,13 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
             tokenizer=tok, data_collator=weighted_data_collator,
             compute_metrics=compute_metrics,
         )
+
+    # [진행률 배선] HF TrainerState 가 스키마에 선언만 돼 있던 값들을 그대로 갖고 있다
+    # (global_step/max_steps/epoch). 로그(tqdm)를 파싱하지 않고 여기서 직접 읽어 JobStore 에
+    # 쓴다 — tqdm 출력 형식은 transformers 버전에 따라 바뀌므로 파싱은 조용히 깨진다.
+    # add_callback 으로 붙이는 이유: 위 v4/v5 생성자 분기 두 곳을 건드리지 않기 위해서다.
+    if spec.progress_run_id:
+        trainer.add_callback(_build_progress_callback(spec.progress_run_id))
 
     with _training_run_context(mlflow, spec) as run:
         if spec.use_mlflow:
