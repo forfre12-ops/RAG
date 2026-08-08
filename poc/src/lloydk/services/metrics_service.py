@@ -131,8 +131,31 @@ class MetricsService:
             f1_macro=m.get("f1_macro"),
             fnr_overall=m.get("fnr_overall"),
             fnr_by_grade=m.get("fnr_by_grade", {}),
-            sample_count=mv.training_data_count or m.get("sample_count") or 0,
+            sample_count=MetricsService._eval_sample_count(mv, m),
         )
+
+    @staticmethod
+    def _eval_sample_count(mv: ModelVersion, m: dict) -> int:
+        """MetricsReport.sample_count = **평가 표본 수**.
+
+        [실측 2026-08-08] 종전에는 mv.training_data_count 를 먼저 봤다. 그 컬럼은 학습 카운트라
+        의미가 다르고(같은 필드를 _from_m6 는 live.sample_count = 평가 표본 수로 채운다 —
+        경로에 따라 뜻이 갈렸다), 게다가 학습 경로가 그 자리에 '병합된 교정 건수'를 넣고 있었다.
+        그 결과 2,044행으로 학습해 256건으로 평가한 모델이 화면에 sample_count=2 로 표시됐다.
+        학습 경로가 저장하는 metrics 는 TrainReport 전체라 sample_count 키가 없고 confusion_matrix
+        만 있으므로, 없으면 혼동행렬 셀 합으로 유도한다(register_deployed_model 과 동일 규칙).
+        training_data_count 는 둘 다 없을 때의 마지막 폴백으로만 남긴다(하위호환).
+        """
+        n = m.get("sample_count")
+        if n:
+            return int(n)
+        cm = m.get("confusion_matrix") or []
+        if cm:
+            try:
+                return int(sum(sum(row) for row in cm))
+            except Exception:  # noqa: BLE001
+                pass
+        return int(mv.training_data_count or 0)
 
     @staticmethod
     def _from_m6(live: MetricsResult, mv: ModelVersion) -> MetricsReport:

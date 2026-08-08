@@ -155,8 +155,19 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "require_real_embedder": True,
         # [obs] 실 분류기 필수(onprem-local과 동일) — 모델 dir 로드 실패 시 rule-fallback 무음 열화 거부.
         "require_real_classifier": True,
-        # [배포전 하드닝 P0#①] 수동 GA 활성 locked-eval 요구(onprem-local과 동일).
-        "deploy_gate_manual_require_locked_eval": True,
+        # [정정 2026-08-08] 수동 GA 활성의 사람서명 locked-eval 요구는 **끈다** — onprem-local 에서
+        # 복사해 온 값이었는데, 그 프로파일의 근거(현장에 실제 검수자가 있다)가 지재원엔 성립하지 않는다.
+        # 지재원은 합성 모델공장이라 실문서·검수자·반출이 구조적으로 0 이고, 따라서 locked_gold_eval 을
+        # 채울 서명 주체 자체가 없다. 실측으로 막다른 길이 확인됐다(실서버 2026-08-08):
+        #   1) 자동 deploy gate 는 **통과**한다 — 배포본 v-fe4b386b: degenerate 아님 ·
+        #      fnr_high=0.0625 ≤ floor 0.10 · "all gate checks passed"
+        #   2) 그런데 수동 활성이 locked_eval_not_ready(no_locked_records)로 거부
+        #   3) 설계상 탈출구인 force 는 식별된 actor(JWT)를 요구하는데 배포 인증은 auth_mode=api_key
+        # → 세 설정이 각각은 합리적인데 조합하면 **어떤 경로로도 활성화가 불가능**했고,
+        #   /metrics/latest 가 영구히 "no active model" 이었다(관제·거버넌스 화면이 빈 상태).
+        # 지재원의 실 게이트는 자동 축(degenerate·fnr_high·first_deploy_fnr_floor·회귀)이며 그건 그대로
+        # 살아 있다. 사람 검수는 고객사 현장에서 일어나므로 onprem-local 은 True 를 유지한다(위 참조).
+        "deploy_gate_manual_require_locked_eval": False,
         # [P0#①-b] force 우회 시 사유 필수(onprem-local과 동일).
         "manual_activate_force_requires_reason": True,
         # [P0#①-c] 최초 배포 절대 미탐 floor 0.10 (onprem-local과 동일 — 첫 모델 fail-open 차단).

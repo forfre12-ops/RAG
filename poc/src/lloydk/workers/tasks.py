@@ -296,6 +296,25 @@ def golden_build_task(self: Any, req_dict: dict, job_id: str | None = None) -> d
         raise
 
 
+def _train_rows_count(spec_kwargs: dict) -> int | None:
+    """이번 학습에 **실제로 쓰이는** train.jsonl 행 수. 못 세면 None(기록 생략).
+
+    [실측 2026-08-08] 종전에는 이 자리에 rebuild.row_count(=교정에서 만든 행 수)가 들어갔다.
+    학습셋 크기가 아니라 '이번에 병합된 교정 건수'라, 실서버에서 2,044행으로 학습한 모델이
+    training_data_count=2 로 기록됐다. 그 값이 화면까지 흘러가 /metrics/latest 의
+    sample_count(=평가 표본 수) 자리에 2 로 표시됐다(metrics_service._from_stored).
+    교정이 0건이면 병합이 없어 base 학습셋이 그대로 쓰이므로, spec_kwargs 의 train_path
+    (병합됐으면 병합본, 아니면 TrainSpec 기본값)를 세는 것이 두 경우 모두에서 정확하다.
+    """
+    try:
+        from lloydk.modules.m4_training.trainer import TrainSpec  # noqa: PLC0415
+        path = spec_kwargs.get("train_path") or TrainSpec().train_path
+        with open(path, encoding="utf-8") as fh:
+            return sum(1 for line in fh if line.strip())
+    except Exception:  # noqa: BLE001 — 카운트 실패가 학습을 막지 않는다(기록만 생략)
+        return None
+
+
 def _create_training_run_guarded(
     spec_kwargs: dict, *, total_samples: int, trigger: str = "active_learning"
 ):
@@ -433,11 +452,11 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
             run_uuid = run_id if hasattr(run_id, "hex") else _uuid.UUID(str(run_id))
         except Exception:  # noqa: BLE001
             run_uuid = _create_training_run_guarded(
-                spec_kwargs, total_samples=getattr(rebuild, "row_count", 0)
+                spec_kwargs, total_samples=_train_rows_count(spec_kwargs) or 0
             )
     else:
         run_uuid = _create_training_run_guarded(
-            spec_kwargs, total_samples=getattr(rebuild, "row_count", 0)
+            spec_kwargs, total_samples=_train_rows_count(spec_kwargs) or 0
         )
     _mark_training_run(run_uuid, status="running")
 
@@ -496,7 +515,7 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         out["deploy"] = register_and_gate_model(
             report,
             training_run_id=run_uuid,
-            training_data_count=getattr(rebuild, "row_count", None) or None,
+            training_data_count=_train_rows_count(spec_kwargs),
             model_uri=model_uri,
             eval_ready=_eval_ready,
         )
