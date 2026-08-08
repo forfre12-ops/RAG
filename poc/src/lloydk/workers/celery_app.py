@@ -128,14 +128,8 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=3),
         "kwargs": {"mode": "snapshot"},
     },
-    # [고객사 야간 증분 재학습 2026-07] 매일 02:00 KST — enable_incremental_retrain=True 노드
-    # (고객사 onprem-local)에서만 발화. 태스크가 플래그·unconsumed 교정을 자체 게이트하므로
-    # 지재원(full-train)·순수 추론 노드에서는 no-op(SKIP_*). 재학습본은 후보 등록만 —
-    # 자동 서빙 안 됨(사람서명 locked-eval/감사 force 로만 활성화). partitions(02:10) 직전 off-peak.
-    "nightly-incremental-retrain-0200": {
-        "task": "lloydk.nightly_incremental_retrain_tick",
-        "schedule": crontab(minute=0, hour=2),
-    },
+    # 야간 무인 재학습 스케줄은 아래에서 **설정으로만** 등록한다(기본 미등록) — beat_schedule
+    # 정의부에 두면 플래그와 무관하게 항상 발화한다. 근거는 그 블록 주석 참조.
     # A4 (2026-05-29): 매 15분 — 운영 임베딩 drift 점검.
     # alert=True면 lloydk_drift_alert gauge=1 → Grafana 알람 룰 트리거.
     "drift-check-every-15min": {
@@ -177,6 +171,28 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=30, hour=3),
     },
 }
+
+# ── 고객사 야간 무인 재학습 — 기본 미등록(수동 트리거) ────────────────────────────
+# [정정 2026-08-08] 2026-07 결정으로 매일 02:00 KST 무인 발화하도록 걸려 있었다. 실측이
+# 그 전제를 부정한다:
+#   ① 이 틱이 태우는 것은 train_classifier_task(spec_kwargs=None) = **기본 TrainSpec**,
+#      즉 5에폭 풀 파인튜닝이다. 실측 약 13시간(CPU) → 02:00 에 시작하면 15:00 에 끝난다.
+#      "야간에 조용히 끝나 있다"가 성립하지 않고 업무시간 내내 고객사 CPU 를 점유한다.
+#      (설계 근거였던 "~1시간/1,000행"과도 어긋난다 — 2,042행이 13시간이었다.)
+#   ② 고객사 프로파일 워커는 4GiB 다. 같은 태스크를 그 워커에서 실제로 발화해 보니
+#      **40초 만에 OOMKilled**(2.805GiB → kill). enable_training=False 여도 막히지 않는다 —
+#      enable_incremental_retrain=True 가 학습 가드를 열어 준다.
+#   ③ 새벽 2시에 죽으면 아무도 모른다. 화면에 뜨는 신호가 없다.
+# 야간 배치를 넣은 원래 목적은 "고객사 교정을 **반출하지 않고** 현장에서 반영"이다. 그 목적은
+# 관리자가 버튼을 눌러도 그대로 달성된다 — 반출은 여전히 0이다. 무인 실행으로 얻는 것은 편의
+# 하나인데 대가가 위 셋이다. 그래서 **기본은 등록하지 않고** 수동 트리거로 둔다.
+# 기능 자체는 남긴다(태스크·플래그 불변) — 사양이 충분한 회원사는 이 설정만 켜면 복원된다.
+if bool(getattr(settings, "enable_nightly_retrain_schedule", False)):
+    celery_app.conf.beat_schedule["nightly-incremental-retrain-0200"] = {
+        "task": "lloydk.nightly_incremental_retrain_tick",
+        "schedule": crontab(minute=0, hour=2),
+    }
+
 celery_app.conf.timezone = "Asia/Seoul"
 
 
