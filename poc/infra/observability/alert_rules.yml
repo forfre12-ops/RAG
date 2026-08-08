@@ -148,6 +148,9 @@ groups:
 
       - alert: DriftKlDivergenceHigh
         # B4 drift KL 임계 초과
+        # [스코프 2026-08-08] 드리프트 감지는 요건이 아니라 기본 OFF(settings.drift_detection_enabled).
+        # 꺼진 상태에선 게이지가 갱신되지 않아 이 룰은 발화하지 않는다(시계열 부재 → 오탐 없음).
+        # 룰은 남겨 둔다 — 플래그를 켜면 그대로 동작한다.
         expr: lloydk_drift_kl_divergence >= 0.5
         for: 30m
         labels:

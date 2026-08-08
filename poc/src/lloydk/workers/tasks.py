@@ -625,7 +625,17 @@ def drift_tick(limit: int = 200, threshold: float = 0.5) -> dict:
 
     drift_monitor.run_drift_check가 train centroid + 최근 운영 표본을 비교하고
     Prometheus gauge에 직접 set. alert=True면 알람 룰이 페이지.
+
+    [스코프 결정 2026-08-08] settings.drift_detection_enabled 기본 OFF — 드리프트 감지는
+    요건이 아니다(RTM 무행 · 담당 요건 FUN-003·004·005·022·023·024 어디에도 없음).
+    끈 상태에선 no-op 으로 즉시 반환한다. 표본이 적을 때 의미 없는 경보를 내던 것도 함께 멎는다
+    (실측: sample=2 · kl=4.8614 · alert=True — 표본 2건짜리 판정은 신호가 아니다).
+    근거·복원 방법은 config.py 의 drift_detection_enabled 주석 참조.
     """
+    from lloydk.config import settings as _settings  # noqa: PLC0415
+    if not bool(getattr(_settings, "drift_detection_enabled", False)):
+        return {"skipped": "drift_detection_disabled"}
+
     from lloydk.services.drift_monitor import export_to_prometheus, run_drift_check
     report = run_drift_check(limit=limit, threshold=threshold)
     out = report.to_dict()

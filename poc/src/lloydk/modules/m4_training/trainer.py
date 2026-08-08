@@ -994,14 +994,24 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
 
         # [드리프트 배선] 학습 표본 임베딩으로 train centroid 저장 → run_drift_check 활성화.
         # 기존: centroid 미저장이라 drift_tick이 영원히 skip(드리프트 감지 무력). 베스트에포트(비치명적).
+        # [스코프 결정 2026-08-08] settings.drift_detection_enabled 기본 OFF 로 건너뛴다 —
+        # 드리프트 감지는 요건이 아니고(RTM 무행), 이 단계 비용이 실측 30분 10초였다(69분 재학습 중).
+        # 고객사 야간 무인 배치에 매번 얹히는 시간이라 기본으로 지불할 이유가 없다. 근거는 config.py
+        # drift_detection_enabled 주석 참조. 켜면 종전 동작 그대로 복원된다.
         try:
-            from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
-            from lloydk.services.drift_monitor import save_train_centroid  # noqa: PLC0415
-            _vecs = build_embedder().embed(train_x[:200]).vectors
-            if _vecs:
-                save_train_centroid(_vecs)
+            from lloydk.config import settings as _settings  # noqa: PLC0415
+            _drift_on = bool(getattr(_settings, "drift_detection_enabled", False))
         except Exception:  # noqa: BLE001
-            pass
+            _drift_on = False
+        if _drift_on:
+            try:
+                from lloydk.adapters.embedding import build_embedder  # noqa: PLC0415
+                from lloydk.services.drift_monitor import save_train_centroid  # noqa: PLC0415
+                _vecs = build_embedder().embed(train_x[:200]).vectors
+                if _vecs:
+                    save_train_centroid(_vecs)
+            except Exception:  # noqa: BLE001
+                pass
 
         result = TrainReport(
             model_version=f"v-{run.info.run_id[:8]}",

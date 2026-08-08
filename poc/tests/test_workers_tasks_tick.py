@@ -13,6 +13,8 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from lloydk.modules.m6_evaluation.active_learning import ActiveLearningStatus
 from lloydk.services.drift_monitor import DriftReport
 from lloydk.workers.tasks import (
@@ -217,11 +219,30 @@ def test_nightly_incremental_eval_failure_skips_conservatively():
 
 
 # ---------------------------------------------------------------------------
-# drift_tick — run_drift_check 결과 그대로 dict로 반환
+# drift_tick — 기본 OFF(요건 아님) · 켜면 run_drift_check 결과 그대로 dict로 반환
 # ---------------------------------------------------------------------------
 
 
-def test_drift_tick_returns_report_dict():
+@pytest.fixture
+def drift_on(monkeypatch):
+    """드리프트 감지 ON — 기본이 OFF 라 켜야 종전 동작을 검증할 수 있다.
+
+    [스코프 결정 2026-08-08] 드리프트 감지는 요건이 아니다(RTM 무행) → drift_detection_enabled
+    기본 False. 코드는 남겨 두었으므로 켰을 때의 동작은 계속 회귀 검증한다.
+    """
+    from lloydk import config as config_mod
+    monkeypatch.setattr(config_mod.settings, "drift_detection_enabled", True)
+
+
+def test_drift_tick_disabled_by_default_is_noop():
+    """기본값에서 drift_tick 은 아무 것도 재지 않고 즉시 반환한다(임베딩 비용·노이즈 경보 차단)."""
+    with patch("lloydk.services.drift_monitor.run_drift_check") as spy:
+        out = drift_tick()
+    assert out == {"skipped": "drift_detection_disabled"}
+    assert spy.call_count == 0
+
+
+def test_drift_tick_returns_report_dict(drift_on):
     report = DriftReport(
         sample_size=10, cosine_mean=0.5, cosine_std=0.1,
         kl_divergence=0.2, alert=False, threshold_alert=0.5,
@@ -233,7 +254,7 @@ def test_drift_tick_returns_report_dict():
     assert out["alert"] is False
 
 
-def test_drift_tick_alert_passthrough():
+def test_drift_tick_alert_passthrough(drift_on):
     report = DriftReport(
         sample_size=200, cosine_mean=0.1, cosine_std=0.05,
         kl_divergence=0.8, alert=True, threshold_alert=0.5,
