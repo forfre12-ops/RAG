@@ -566,6 +566,14 @@ class Settings(BaseSettings):
     # (datasets/labeled_p1_v5_clean/GATE_RESULTS.md · manifests/dataset_v1.0.yaml).
     # 학습셋 세대가 바뀌면 코드가 아니라 이 값만 바꾼다.
     training_dataset_dir: str = "datasets/labeled_p1_v5_clean"
+    # 재학습 산출물 디렉터리 — TrainSpec.output_dir 기본값이 여기서 온다.
+    # artifacts/ 는 서빙 모델 공급용으로 **ro 마운트**다(compose prod/dual 양쪽). 학습이 거기
+    # 쓰려다 실패했다(2026-08-08 실서버 실측: OSError [Errno 30] Read-only file system:
+    # 'artifacts/classifier'). ro 는 '학습이 서빙 모델을 덮어쓰지 못하게' 하는 의도된 보호이므로
+    # rw 로 바꾸는 대신 **산출 전용 rw 경로**를 따로 둔다(읽기=서빙 / 쓰기=학습 분리).
+    # 서빙은 활성 ModelVersion.model_uri 를 우선 읽으므로(classify_service._resolve_model_dir)
+    # 이 경로에 산출해도 등록→활성화→서빙이 그대로 이어진다. 승격은 여전히 명시적 절차다.
+    training_output_dir: str = "artifacts_out/classifier"
     # 정본 골든셋 jsonl 경로 — GET /golden/summary(구성 집계) 전용 읽기 경로.
     # 잡 목록은 '무엇을 만들었나'만 보여줄 뿐 골든셋이 지금 어떤 tier·등급·출처로 구성돼
     # 있는지는 화면에서 답할 수 없었다. 이 경로는 조회만 하며 어떤 쓰기 경로도 쓰지 않는다

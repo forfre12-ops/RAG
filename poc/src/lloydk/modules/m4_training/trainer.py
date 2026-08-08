@@ -76,13 +76,28 @@ def _dataset_split(name: str) -> str:
     return f"{base or 'datasets/labeled_p1_v5_clean'}/{name}"
 
 
+def _training_output_dir() -> str:
+    """학습 산출물 기본 경로 — settings.training_output_dir.
+
+    종전 'artifacts/classifier' 는 ro 마운트라 학습이 산출물을 쓸 수 없었다(실서버 실측).
+    artifacts 의 ro 는 서빙 모델 보호 목적이라 유지하고, 쓰기는 별도 경로로 분리한다.
+    """
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+
+        out = str(getattr(settings, "training_output_dir", "") or "").strip()
+    except Exception:  # noqa: BLE001
+        out = ""
+    return out or "artifacts_out/classifier"
+
+
 @dataclass
 class TrainSpec:
     base_model: str = "kakaobank/kf-deberta-base"
     train_path: str = field(default_factory=lambda: _dataset_split("train.jsonl"))
     val_path: str = field(default_factory=lambda: _dataset_split("val.jsonl"))
     test_path: str | None = field(default_factory=lambda: _dataset_split("test.jsonl"))
-    output_dir: str = "artifacts/classifier"
+    output_dir: str = field(default_factory=lambda: _training_output_dir())
     max_seq_len: int = 512
     # [FUN-004 Chunk 단위 학습] True 면 TRAIN 분할을 chunk 단위로 확장(각 chunk=문서 라벨 상속).
     # 긴 문서의 max_seq_len truncation 으로 잘리던 뒷부분까지 학습 신호로 사용. val/test/holdout 은
