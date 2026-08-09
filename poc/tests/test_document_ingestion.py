@@ -264,7 +264,9 @@ class TestPersistence:
         assert doc.extraction_method == "plain"
         assert doc.processing_status == "ready"
         assert doc.created_by == "u1"
-        assert doc.metadata_ == {"doc_type": "가이드"}
+        # extraction_complete 는 추출이 중간에 잘렸는지를 소비자가 볼 수 있게 항상 남긴다
+        # (OCR 상한·페이지 절단 감지). txt 는 페이지 개념이 없어 pages_* 는 기록되지 않는다.
+        assert doc.metadata_ == {"doc_type": "가이드", "extraction_complete": True}
         # chunks 적재
         assert len(chunks) >= 1
         assert all(c.doc_id == doc.doc_id for c in chunks)
