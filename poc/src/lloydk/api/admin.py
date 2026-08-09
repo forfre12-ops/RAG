@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as _dt
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from lloydk.api._rbac import require_role
@@ -187,6 +187,110 @@ def rollback_model(
         reloaded=reloaded,
         model_version=model_version,
         model_loaded=model_loaded,
+    )
+
+
+# ── [감사] 감사 로그 조회 ────────────────────────────────────────────────────────
+class AuditLogEntry(BaseModel):
+    occurred_at: str | None = None
+    action: str = ""
+    actor_id: str | None = None
+    actor_role: str | None = None
+    target_type: str | None = None
+    target_id: str | None = None
+    success: bool = True
+    error_code: str | None = None
+    ip_address: str | None = None
+    request_id: str | None = None
+
+
+class AuditLogResponse(BaseModel):
+    items: list[AuditLogEntry]
+    total: int
+    limit: int
+    offset: int
+    # 행위자 신원이 비어 있는 비율 — 감사 추적의 실효성을 화면이 스스로 밝히게 한다.
+    # 공유 API 키 모드에서는 개별 신원이 없어 actor_id 가 NULL 로 쌓인다.
+    actorless_ratio: float = 0.0
+    warnings: list[str] = []
+
+
+@router.get(
+    "/audit-log",
+    response_model=AuditLogResponse,
+    dependencies=_ADMIN_ONLY,
+    summary="감사 로그 조회 — 누가 언제 무엇을 했는가",
+    description=(
+        "tb_audit_log 를 최근순으로 조회한다. 종전에는 미들웨어가 **쓰기만** 하고 읽는 경로가 "
+        "없어(라우트 0건), 35,000행이 쌓여 있어도 화면에서 확인할 방법이 없었다. "
+        "action(부분일치)·success·actor_id 로 좁힐 수 있다. "
+        "응답의 actorless_ratio 는 행위자 신원이 비어 있는 비율이다 — 공유 API 키 모드에서는 "
+        "개별 신원이 남지 않으므로, 감사 추적이 실제로 성립하는지를 화면이 스스로 드러낸다."
+    ),
+)
+def audit_log(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    action: str | None = Query(default=None, description="action 부분일치(대소문자 무시)"),
+    success: bool | None = Query(default=None, description="성공/실패만 보기"),
+    actor_id: str | None = Query(default=None),
+) -> AuditLogResponse:
+    from sqlalchemy import func as _func, select  # noqa: PLC0415
+
+    from lloydk.db import session_scope  # noqa: PLC0415
+    from lloydk.db.models import AuditLog  # noqa: PLC0415
+
+    warnings: list[str] = []
+    try:
+        with session_scope() as db:
+            conds = []
+            if action:
+                conds.append(AuditLog.action.ilike(f"%{action}%"))
+            if success is not None:
+                conds.append(AuditLog.success.is_(success))
+            if actor_id:
+                conds.append(AuditLog.actor_id == actor_id)
+            total = int(
+                db.execute(select(_func.count()).select_from(AuditLog).where(*conds)).scalar() or 0
+            )
+            rows = db.execute(
+                select(AuditLog).where(*conds)
+                .order_by(AuditLog.occurred_at.desc())
+                .limit(limit).offset(offset)
+            ).scalars().all()
+            items = [
+                AuditLogEntry(
+                    occurred_at=r.occurred_at.isoformat() if r.occurred_at else None,
+                    action=r.action or "",
+                    actor_id=r.actor_id,
+                    actor_role=r.actor_role,
+                    target_type=r.target_type,
+                    target_id=r.target_id,
+                    success=bool(r.success),
+                    error_code=r.error_code,
+                    ip_address=str(r.ip_address) if r.ip_address else None,
+                    request_id=str(r.request_id) if r.request_id else None,
+                )
+                for r in rows
+            ]
+    except Exception:  # noqa: BLE001
+        logger.exception("audit_log 조회 실패")
+        return AuditLogResponse(
+            items=[], total=0, limit=limit, offset=offset,
+            warnings=["감사 로그 조회에 실패했습니다(DB 미가용) — 빈 목록과 구분하십시오."],
+        )
+
+    n = len(items)
+    anon = sum(1 for i in items if not i.actor_id)
+    ratio = round(anon / n, 3) if n else 0.0
+    if n and anon == n:
+        warnings.append(
+            "이 페이지의 모든 기록에 행위자(actor_id)가 없습니다 — 공유 API 키 모드에서는 개별 "
+            "신원이 남지 않습니다. 사람 단위 추적이 필요하면 AUTH_MODE 를 jwt/both 로 운영하십시오."
+        )
+    return AuditLogResponse(
+        items=items, total=total, limit=limit, offset=offset,
+        actorless_ratio=ratio, warnings=warnings,
     )
 
 

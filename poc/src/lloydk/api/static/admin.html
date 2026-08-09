@@ -752,6 +752,34 @@ details.adv[open]{padding-bottom:12px;}
       </div>
     </section>
 
+    <!-- ===== 감사 로그 ===== 미들웨어가 쓰기만 하고 읽는 경로가 없어, 35,000행이 쌓여도
+         화면에서 "누가 언제 무엇을 했는가"를 볼 수 없었다. -->
+    <section class="card col-span" data-pane="monitor" style="order:3">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no">A</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
+        <span class="ep">GET /admin/audit-log</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">
+          <input id="au-action" type="text" placeholder="action 검색 (예: train, confirm, activate)" style="flex:1;min-width:180px" />
+          <select id="au-success" style="width:auto">
+            <option value="">전체</option>
+            <option value="true">성공만</option>
+            <option value="false">실패만</option>
+          </select>
+          <button class="btn sm" onclick="loadAuditLog()">조회</button>
+        </div>
+        <p class="sec-note" id="au-info" style="margin-top:6px;">헬스체크·정적 자산은 기록 대상에서 제외됩니다 — 상태를 바꾸는 행위만 남습니다.</p>
+        <div id="au-warn"></div>
+        <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
+          <table>
+            <thead><tr><th>시각</th><th>action</th><th>행위자</th><th>대상</th><th>결과</th></tr></thead>
+            <tbody id="au-body"><tr><td colspan="5" style="color:var(--text-faint)">「조회」를 누르세요.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== 7. 골든셋 후보 빌더 ===== 루프 B 의 시작점(G1) -->
     <section class="card col-span" data-pane="model" style="order:2" data-profile="full-train">
       <div class="card-head">
@@ -1717,6 +1745,44 @@ async function rollbackModel(){
     if(box){ box.style.display=''; box.className='warnbox';
       box.innerHTML=`롤백 실패: ${esc(String(e.status||''))} ${esc(e.data?.detail||e.message||'')}`
         + (e.status===403?' — admin 역할 필요':''); }
+  }
+}
+
+/* ---- 감사 로그 조회 ----
+ * 미들웨어는 tb_audit_log 에 쓰기만 했고 읽는 경로가 없었다(라우트 0건). 35,000행이 쌓여도
+ * "누가 언제 무엇을 했는가"를 화면에서 볼 수 없었다 — 영업비밀 분류 시스템에서 감리가 반드시
+ * 묻는 항목이다. 응답의 actorless_ratio 를 함께 보여 준다: 공유 API 키 모드에서는 행위자
+ * 신원이 남지 않으므로, 감사 추적이 실제로 성립하는지를 화면이 스스로 드러내야 한다. */
+async function loadAuditLog(){
+  const body=$('au-body'), warn=$('au-warn'), info=$('au-info');
+  body.innerHTML='<tr><td colspan="5" style="color:var(--text-faint)">조회 중…</td></tr>';
+  if(warn) warn.innerHTML='';
+  try{
+    const q=new URLSearchParams({limit:'50'});
+    const a=$('au-action')?.value.trim(); if(a) q.set('action',a);
+    const sc=$('au-success')?.value; if(sc) q.set('success',sc);
+    const d=await api('GET',`/admin/audit-log?${q.toString()}`);
+    const items=d.items||[];
+    if(!items.length){
+      body.innerHTML='<tr><td colspan="5" style="color:var(--text-faint)">해당 기록이 없습니다.</td></tr>';
+    }else{
+      body.innerHTML=items.map(it=>{
+        const t=String(it.occurred_at||'').replace('T',' ').replace(/\.\d+/,'').replace('Z','').slice(0,19);
+        const who=it.actor_id ? esc(it.actor_id)+(it.actor_role?` <span class="hint">(${esc(it.actor_role)})</span>`:'')
+                              : '<span class="hint">신원 없음</span>';
+        const tgt=[it.target_type,it.target_id].filter(Boolean).map(esc).join(' / ') || '<span class="hint">-</span>';
+        const ok=it.success ? '<span class="pill ok">성공</span>'
+                            : `<span class="pill err">실패</span> <span class="hint">${esc(it.error_code||'')}</span>`;
+        return `<tr><td class="mono" style="white-space:nowrap">${esc(t)}</td>`
+             + `<td>${esc(it.action||'')}</td><td>${who}</td><td>${tgt}</td><td>${ok}</td></tr>`;
+      }).join('');
+    }
+    if(info) info.textContent=`전체 ${d.total??0}건 중 최근 ${items.length}건 · 헬스체크·정적 자산은 기록 대상에서 제외됩니다.`;
+    (d.warnings||[]).forEach(w=>{ if(warn) warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">${esc(w)}</div>`; });
+    log(`감사 로그 ${items.length}건 조회 (전체 ${d.total??0})`,'ok');
+  }catch(e){
+    body.innerHTML=`<tr><td colspan="5">조회 실패: ${esc(String(e.status||''))} ${esc(e.data?.detail||e.message||'')}`
+      + (e.status===403?' — admin 역할 필요':'')+'</td></tr>';
   }
 }
 

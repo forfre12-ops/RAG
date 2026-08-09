@@ -81,6 +81,21 @@ _EXCLUDED_PATHS: frozenset[str] = frozenset(
     }
 )
 
+# [정합 2026-08-09] 위 집합은 **정확히 일치**만 걸러 낸다. 그래서 /api/v1/healthz/ready·/live·
+# /deep(도커 헬스체크가 수 초마다 호출)과 /demo/* 정적 파일이 전부 감사 로그에 쌓이고 있었다.
+# 실측: tb_audit_log 35,000행 중 healthz 33,771행(95%) + admin.html·logo.png 같은 정적 자산.
+# 감사 로그의 목적은 "누가 무엇을 바꿨는가"인데, 진짜 대상(classify 691·train 385·golden 69)이
+# 노이즈에 파묻혀 사람이 찾을 수 없었다. 접두 일치로 걸러 낸다.
+# 주의: 여기 넣는 경로는 감사 흔적이 남지 않는다 — 상태를 바꾸는 엔드포인트를 넣으면 안 된다.
+_EXCLUDED_PREFIXES: tuple[str, ...] = (
+    "/api/v1/healthz",   # /ready · /live · /deep — 프로브, 상태 변경 없음
+    "/healthz",          # 루트 프로브(옛 경로)
+    "/demo/",            # 콘솔 정적 자산(html·js·png)
+    "/static/",
+    "/favicon",
+    "/api/v1/metrics-prom",   # Prometheus 스크랩(주기 호출, 읽기 전용)
+)
+
 # L-audit-noalarm fail-closed 대상 — 보안/감사상 흔적이 반드시 남아야 하는 변경성 액션.
 # 조회성(classify/answer 등)은 제외해 가용성 영향 최소화. _derive_action 코드 기준.
 _HIGH_RISK_ACTIONS: frozenset[str] = frozenset(
@@ -168,7 +183,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # /healthz·/docs 등은 skip
-        if path in _EXCLUDED_PATHS:
+        if path in _EXCLUDED_PATHS or path.startswith(_EXCLUDED_PREFIXES):
             return await call_next(request)
 
         # body는 핸들러보다 먼저 읽어 payload_hash 계산
