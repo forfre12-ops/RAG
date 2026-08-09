@@ -11,7 +11,7 @@ import datetime as _dt
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from lloydk.api._rbac import require_role
 
@@ -124,6 +124,66 @@ def activate_model(
         reason=str(res.get("reason", "")),
         gate=res.get("gate"),
         locked_readiness=res.get("locked"),
+        reloaded=reloaded,
+        model_version=model_version,
+        model_loaded=model_loaded,
+    )
+
+
+# ── [G2] 활성 모델 롤백 (직전 활성으로 복귀) ─────────────────────────────────────
+class RollbackModelRequest(BaseModel):
+    # 롤백은 되돌리기 어려운 운영 조치라 '왜'를 남긴다 — 활성화의 force reason 과 같은 취지.
+    # 활성화와 달리 게이트가 없다(회귀를 되돌리는 방향이므로 막을 이유가 없다). 그래서 감사에는
+    # 사유가 유일한 맥락이다.
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class RollbackModelResponse(BaseModel):
+    rolled_back: bool
+    from_version: str | None = None
+    to_version: str | None = None
+    reason: str = ""
+    reloaded: bool = False
+    model_version: str | None = None
+    model_loaded: bool | None = None
+
+
+@router.post(
+    "/model/rollback",
+    response_model=RollbackModelResponse,
+    dependencies=_ADMIN_ONLY,
+    summary="활성 모델을 직전 활성본으로 롤백 + 무중단 리로드",
+    description=(
+        "잘못 활성된 모델이나 운영에서 미탐 회귀를 보이는 모델을 직전 활성본으로 되돌린다(C-ver). "
+        "활성 전환과 **같은 advisory lock** 으로 직렬화되므로 동시 activate/rollback 이 엇갈리지 "
+        "않는다. 활성화와 달리 deploy gate 를 적용하지 않는다 — 회귀를 되돌리는 방향이라 막을 "
+        "이유가 없고, 게이트로 막으면 정작 사고 시 복구가 불가능해진다. 복귀 후보가 없으면 "
+        "rolled_back=false·reason=no_previous_version. 성공 시 프로세스 재기동 없이 서빙을 "
+        "리로드한다(활성화 경로와 동일)."
+    ),
+)
+def rollback_model(
+    req: RollbackModelRequest,
+    auth: dict = Depends(require_role("admin")),
+) -> RollbackModelResponse:
+    from lloydk.services.training_service import rollback_active_model  # noqa: PLC0415
+
+    res = rollback_active_model(req.reason)
+    reloaded = False
+    model_version = model_loaded = None
+    # 롤백이 실제로 일어났을 때만 리로드한다 — 복귀 후보가 없어 아무것도 안 바뀐 경우까지
+    # 모델을 다시 읽으면 불필요한 지연(수 초)만 생긴다.
+    if res.get("rolled_back"):
+        from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
+        info = ClassifyService.get_instance().reload_model()
+        reloaded = bool(info["reloaded"])
+        model_version = str(info.get("model_version"))
+        model_loaded = bool(info.get("model_loaded"))
+    return RollbackModelResponse(
+        rolled_back=bool(res.get("rolled_back")),
+        from_version=res.get("from"),
+        to_version=res.get("to"),
+        reason=str(res.get("reason", "")),
         reloaded=reloaded,
         model_version=model_version,
         model_loaded=model_loaded,
