@@ -23,7 +23,7 @@ import os
 import time
 from dataclasses import dataclass
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Cookie, Header, HTTPException, Request
 
 from lloydk.config import settings
 
@@ -297,6 +297,7 @@ def require_auth(
     request: Request,
     authorization: str | None = Header(default=None),
     x_api_key: str | None = Header(default=None),
+    lloydk_access_token: str | None = Cookie(default=None),
 ):
     """모드 자동 선택 — settings.auth_mode=jwt|api_key.
 
@@ -319,6 +320,11 @@ def require_auth(
         if mode == "api_key":
             raise HTTPException(status_code=401, detail="invalid api key")
     if mode in ("jwt", "both"):
+        # 포털이 동일 사이트 HttpOnly 쿠키로 전달한 JWT를 콘솔 브라우저 요청에도 사용한다.
+        # 자바스크립트가 토큰을 읽거나 화면에 노출할 필요가 없으며, Authorization 헤더가 있으면
+        # 그것이 우선한다(서비스 간 호출 호환성 유지).
+        if not authorization and lloydk_access_token:
+            authorization = f"Bearer {lloydk_access_token}"
         if not authorization:
             raise HTTPException(status_code=401, detail="missing authorization")
         try:

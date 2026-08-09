@@ -44,3 +44,6 @@ datasets/gold_real/locked_gold_eval.jsonl.lock
 datasets/proxy_gold/aihub_runs/
 datasets/proxy_gold/aihub_receipts/
 datasets/proxy_gold/aihub_71813_extracted/
+
+# 콘솔 테스트 로그인 키 — 배포본·리포에 넣지 않는다
+secrets/

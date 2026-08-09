@@ -214,3 +214,37 @@ def test_ingest_empty_extraction_counts_empty_not_review():
     # 빈 본문은 processing_status='failed'로 별도 격리 — requires_review 판정 대상 아님.
     assert res.requires_review is False
     assert _metric("empty") >= before + 1
+
+
+def test_truncated_100_page_ocr_is_exposed_as_incomplete_ingest():
+    """앞 50페이지만 OCR한 100페이지 문서는 완료·자동확정으로 보이면 안 된다."""
+    res = _ingest(ExtractResult(
+        text="OCR 본문 " * 100,
+        method="ocr",
+        quality=0.75,
+        ocr_used=True,
+        pages=50,
+        total_pages=100,
+        warnings=["pdf_ocr_truncated"],
+    ))
+
+    assert res.pages_processed == 50
+    assert res.pages_total == 100
+    assert res.extraction_complete is False
+    assert res.requires_review is True
+    assert "content_dropped" in res.review_reasons
+
+
+def test_complete_100_page_text_extraction_reports_full_coverage():
+    res = _ingest(ExtractResult(
+        text="텍스트 PDF 본문 " * 100,
+        method="parser",
+        quality=0.95,
+        pages=100,
+        total_pages=100,
+    ))
+
+    assert res.pages_processed == 100
+    assert res.pages_total == 100
+    assert res.extraction_complete is True
+    assert res.requires_review is False

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -51,8 +52,20 @@ def main() -> int:
     ap.add_argument("--multipliers", default="",
                     help="쉼표구분 rule_high_risk_weight_multiplier 스윕(B1). 주면 τ=None 고정, "
                          "배수별 서빙 FNR 측정(배수마다 파이프라인 재생성=모델 재로드).")
+    ap.add_argument(
+        "--offline-default-registry",
+        action="store_true",
+        help=(
+            "Use built-in TS/S1/S2/S3 registry and skip optional local DB keyword "
+            "loading when the DB is unreachable. Use for immutable proxy-file "
+            "evaluation, not production parity checks."
+        ),
+    )
     ap.add_argument("--report", default="reports/serving_path_eval.md")
     args = ap.parse_args()
+
+    if args.offline_default_registry:
+        os.environ.setdefault("TESTING", "1")
 
     from lloydk.config import settings
     from lloydk.modules.m5_inference.pipeline import InferencePipeline

@@ -330,7 +330,9 @@ def verify_materialized_training_run(
         train_chunk_rows,
     )
     _assert_train_chunks_match_documents(
-        document_rows["train_documents"], train_chunk_rows
+        document_rows["train_documents"],
+        train_chunk_rows,
+        grade_weight_multipliers=_grade_weight_multipliers_from_manifest(manifest),
     )
     leakage_checks = manifest.get("leakage_checks")
     if not isinstance(leakage_checks, Mapping):
@@ -456,9 +458,67 @@ def _load_train_chunk_rows(path: Path) -> list[dict[str, object]]:
     return rows
 
 
+def _grade_weight_multipliers_from_manifest(
+    manifest: Mapping[str, object],
+) -> dict[str, float]:
+    contract = manifest.get("contract")
+    if not isinstance(contract, Mapping):
+        return {}
+    raw = contract.get("grade_weight_multipliers")
+    if raw in (None, {}):
+        return {}
+    if not isinstance(raw, Mapping):
+        raise ProxyTrainingFinalizationError(
+            "training materialization grade_weight_multipliers must be an object"
+        )
+    allowed = {"TS", "S1", "S2", "S3"}
+    multipliers: dict[str, float] = {}
+    for key, value in raw.items():
+        grade = str(key)
+        if grade not in allowed:
+            raise ProxyTrainingFinalizationError(
+                f"unknown grade weight multiplier target: {grade!r}"
+            )
+        try:
+            multiplier = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ProxyTrainingFinalizationError(
+                f"invalid grade weight multiplier for {grade}: {value!r}"
+            ) from exc
+        if not (0.0 < multiplier <= 10.0):
+            raise ProxyTrainingFinalizationError(
+                f"grade weight multiplier for {grade} must be in (0, 10], got {multiplier}"
+            )
+        multipliers[grade] = multiplier
+    return multipliers
+
+
+def _apply_grade_weight_multipliers_to_chunks(
+    chunks: Sequence[Mapping[str, object]],
+    multipliers: Mapping[str, float],
+) -> list[dict[str, object]]:
+    if not multipliers:
+        return [dict(chunk) for chunk in chunks]
+    weighted: list[dict[str, object]] = []
+    for chunk in chunks:
+        row = dict(chunk)
+        label = str(row.get("label") or "")
+        multiplier = float(multipliers.get(label, 1.0))
+        if multiplier != 1.0:
+            base_weight = float(row.get("sample_weight", 1.0))
+            row["sample_weight"] = base_weight * multiplier
+            notes = list(row.get("weighting_notes") or [])
+            notes.append(f"grade_weight_multiplier:{label}:{multiplier:g}")
+            row["weighting_notes"] = notes
+        weighted.append(row)
+    return weighted
+
+
 def _assert_train_chunks_match_documents(
     train_rows: Sequence[Mapping[str, object]],
     stored_chunks: Sequence[Mapping[str, object]],
+    *,
+    grade_weight_multipliers: Mapping[str, float] | None = None,
 ) -> None:
     """Rebuild train chunks to bind every chunk byte to its source document.
 
@@ -473,7 +533,10 @@ def _assert_train_chunks_match_documents(
             expand_records_evidence_aware,
         )
 
-        expected_chunks = expand_records_evidence_aware(train_rows)
+        expected_chunks = _apply_grade_weight_multipliers_to_chunks(
+            expand_records_evidence_aware(train_rows),
+            dict(grade_weight_multipliers or {}),
+        )
     except Exception as exc:  # noqa: BLE001
         raise ProxyTrainingFinalizationError(
             f"cannot deterministically reconstruct train_chunks from train_documents: {exc}"

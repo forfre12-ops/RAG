@@ -29,7 +29,7 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # 2026-08-02: dev(Dockerfile.api)·에어갭 번들에서도 동일 제거 — 전 빌드 경로가 GPL-free.
 RUN pip install --upgrade pip && \
     pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
-    pip install -e ".[hwp,hwp-tables,xls]"
+    pip install -e ".[hwp,hwp-tables,pdf-tables,xls]"
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp-python 번들 FreeType 에 FT_Palette_Data_Get
 # 심볼이 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 배치 파싱이 0글자로 깨진다.

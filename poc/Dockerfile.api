@@ -25,7 +25,7 @@ COPY alembic.ini ./
 #   [hwp-tables] unhwp(MIT) — .hwp 표 셀 회수. rhwp 단독은 표를 통째로 흘린다(FUN-022 갭).
 # 의도적 제외: [ocr](요건 외 + poppler=GPL), [pdf-agpl](PyMuPDF=AGPL, 기본은 pdfminer.six).
 # → api.prod/worker 와 동일한 파싱 extras. 스캔 PDF 는 본문 0자 → processing_status='failed' 격리.
-RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,jwt,xls]"
+RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,pdf-tables,jwt,xls]"
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp 번들 FreeType 의 undefined symbol
 # (FT_Palette_Data_Get) 로 `import rhwp` 가 깨지는 것을 시스템 FreeType 선로드로 채운다.

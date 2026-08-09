@@ -82,6 +82,27 @@ def test_split_long_text_produces_chunks_with_overlap():
     assert all(c.overlap_prev > 0 for c in chunks[1:])
 
 
+def test_hundred_page_text_contract_preserves_final_page_through_chunking():
+    """100페이지 전자문서는 끝 페이지까지 분류 입력 청크에 남아야 한다."""
+    text = "\n\n".join(
+        f"[PAGE {page:03d}]\n" + ("본문 내용 " * 200)
+        for page in range(1, 101)
+    )
+    chunks = split(text, size=512, overlap=64)
+
+    all_chunk_text = "\n".join(chunk.text for chunk in chunks)
+    assert all(f"[PAGE {page:03d}]" in all_chunk_text for page in range(1, 101))
+    assert len(chunks) > 100
+
+
+def test_pdfminer_terminal_form_feed_does_not_create_extra_page():
+    from lloydk.modules.m2_preprocess.extractor import _pdf_text_page_count
+
+    assert _pdf_text_page_count("page 1\fpage 2\f") == 2
+    assert _pdf_text_page_count("page 1\fpage 2\f\n") == 2
+    assert _pdf_text_page_count("page 1") == 1
+
+
 def test_pipeline_run_text_normalizes_for_classify_service():
     pipe = PreprocessPipeline()
     out = pipe.run_text("foo   bar\n\n\n\nbaz")

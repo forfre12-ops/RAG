@@ -39,6 +39,8 @@ from scripts.assemble_public_s3_training_pool import (  # noqa: E402
 )
 from lloydk.hygiene import text_hash  # noqa: E402
 from lloydk.proxy_corpus import (  # noqa: E402
+    DIRECT_AUTHORED_TRAINING_BUCKET,
+    DIRECT_AUTHORED_TRAINING_GATE_VERSION,
     GRADE_CODES,
     proxy_record_intended_use,
     validate_proxy_record,
@@ -286,10 +288,21 @@ def _strict_quality_gate_errors(record: Mapping[str, object]) -> tuple[str, ...]
     errors: list[str] = []
     if record.get("training_use_permitted") is not True:
         errors.append("training_use_permitted_not_true")
-    if record.get("decision_bucket") != "gold_candidate":
-        errors.append("decision_bucket_not_gold_candidate")
-    if record.get("gate_version") != "proxy_semantic_quality_v2":
+    is_direct_authored = (
+        record.get("decision_bucket") == DIRECT_AUTHORED_TRAINING_BUCKET
+        and record.get("gate_version") == DIRECT_AUTHORED_TRAINING_GATE_VERSION
+    )
+    if record.get("decision_bucket") != "gold_candidate" and not is_direct_authored:
+        errors.append("decision_bucket_not_training_eligible")
+    if not is_direct_authored and record.get("gate_version") != "proxy_semantic_quality_v2":
         errors.append("gate_version_not_proxy_semantic_quality_v2")
+    if is_direct_authored:
+        if record.get("source") != "direct_authored_proxy":
+            errors.append("direct_authored_source_not_declared")
+        if not str(record.get("authoring_method") or "").startswith(
+            "codex_direct_authored_"
+        ):
+            errors.append("direct_authored_method_not_declared")
     evidence_card = record.get("evidence_card")
     if (
         not isinstance(evidence_card, Mapping)
@@ -299,7 +312,12 @@ def _strict_quality_gate_errors(record: Mapping[str, object]) -> tuple[str, ...]
     evidence = record.get("consensus_evidence")
     if not isinstance(evidence, Mapping):
         return (*errors, "missing_consensus_evidence")
-    if evidence.get("schema") != "proxy-semantic-quality-adjudication-v2":
+    expected_schema = (
+        "direct-authored-quality-audit-v1"
+        if is_direct_authored
+        else "proxy-semantic-quality-adjudication-v2"
+    )
+    if evidence.get("schema") != expected_schema:
         errors.append("consensus_schema_not_quality_v2")
     if evidence.get("semantic_gate_passed") is not True:
         errors.append("semantic_gate_not_passed")

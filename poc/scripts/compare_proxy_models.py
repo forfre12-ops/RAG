@@ -27,10 +27,14 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     parser.add_argument("--frozen-corpus", required=True)
-    parser.add_argument(
+    manifest_group = parser.add_mutually_exclusive_group(required=True)
+    manifest_group.add_argument(
         "--frozen-manifest",
-        required=True,
-        help="ready assembly report that attests the frozen corpus SHA-256",
+        help="ready assembly report that attests the full frozen corpus SHA-256",
+    )
+    manifest_group.add_argument(
+        "--final-suite-manifest",
+        help="development-200/final-800 suite manifest; compares final_locked 800 only",
     )
     parser.add_argument("--baseline-model-dir", required=True)
     parser.add_argument("--candidate-model-dir", required=True)
@@ -94,7 +98,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         run_dir, report, complete = compare_proxy_models(
             frozen_corpus_path=Path(args.frozen_corpus),
-            frozen_manifest_path=Path(args.frozen_manifest),
+            frozen_manifest_path=(Path(args.frozen_manifest) if args.frozen_manifest else None),
+            final_suite_manifest_path=(
+                Path(args.final_suite_manifest) if args.final_suite_manifest else None
+            ),
             baseline_model_dir=Path(args.baseline_model_dir),
             candidate_model_dir=Path(args.candidate_model_dir),
             baseline_training_manifest_path=(

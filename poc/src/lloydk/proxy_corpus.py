@@ -28,6 +28,9 @@ from lloydk.modules.m3_labeling.rule_engine import grade_from_svm
 
 
 GRADE_CODES = frozenset({"TS", "S1", "S2", "S3"})
+DIRECT_AUTHORED_TRAINING_BUCKET = "direct_authored_training_candidate"
+DIRECT_AUTHORED_EVALUATION_BUCKET = "direct_authored_evaluation_candidate"
+DIRECT_AUTHORED_TRAINING_GATE_VERSION = "direct_authored_quality_v1"
 IntendedUse = Literal["training", "evaluation"]
 INTENDED_USES = frozenset({"training", "evaluation"})
 CATALOG_SPLIT_INTENDED_USES: dict[str, IntendedUse] = {
@@ -578,7 +581,12 @@ def _validate_document_quality_audit(
 
 
 def _validate_adjudication(record: Mapping[str, object], errors: list[str]) -> None:
-    if record.get("decision_bucket") != "gold_candidate":
+    direct_authored = (
+        record.get("decision_bucket")
+        in {DIRECT_AUTHORED_TRAINING_BUCKET, DIRECT_AUTHORED_EVALUATION_BUCKET}
+        and record.get("gate_version") == DIRECT_AUTHORED_TRAINING_GATE_VERSION
+    )
+    if record.get("decision_bucket") != "gold_candidate" and not direct_authored:
         errors.append("adjudication:not_gold_candidate")
         return
     evidence = record.get("consensus_evidence")
@@ -588,16 +596,21 @@ def _validate_adjudication(record: Mapping[str, object], errors: list[str]) -> N
     semantic_gate = record.get("gate_version") in {
         "proxy_semantic_v1",
         "proxy_semantic_quality_v2",
+        DIRECT_AUTHORED_TRAINING_GATE_VERSION,
     } or evidence.get("schema") in {
         "proxy-semantic-adjudication-v1",
         "proxy-semantic-quality-adjudication-v2",
+        "direct-authored-quality-audit-v1",
     }
     if semantic_gate:
         failures = evidence.get("semantic_gate_failures")
+        valid_gate_statuses = {"gold_candidate"}
+        if direct_authored:
+            valid_gate_statuses.add(str(record.get("decision_bucket") or ""))
         if (
             evidence.get("semantic_gate_passed") is not True
             or failures not in ([], ())
-            or evidence.get("gate_status") != "gold_candidate"
+            or evidence.get("gate_status") not in valid_gate_statuses
         ):
             errors.append("adjudication:semantic_gate_not_passed")
         if evidence.get("rule_advisory_only") is not True:

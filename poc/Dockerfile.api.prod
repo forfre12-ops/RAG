@@ -51,7 +51,7 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # 정의만 리포에 존치(요건화 시 재활성). 스캔 PDF 는 본문 0자 → processing_status='failed' 격리.
 RUN pip install --upgrade pip && \
     pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
-    pip install -e ".[psh,otel,jwt,hwp,hwp-tables,xls]" gunicorn && \
+    pip install -e ".[psh,otel,jwt,hwp,hwp-tables,pdf-tables,xls]" gunicorn && \
     pip install -U "wheel>=0.46.2" "jaraco.context>=6.1.0"   # [보안] Trivy 유일 수정가능 2건(빌드툴 CVE) 상향
 
 # [HWP 파싱 복구] rhwp-python 이 번들한 FreeType(libfreetype-*.so.6)에 FT_Palette_Data_Get 심볼이

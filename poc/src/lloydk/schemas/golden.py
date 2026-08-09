@@ -147,3 +147,29 @@ class GoldenJobListResponse(BaseModel):
     # 정렬 신뢰도 고지 — Redis 백엔드의 list_recent 는 SCAN 순서라 최근순을 보장하지 않는다.
     # 화면이 "최신 목록"이라고 단정하지 않도록 응답에 실어 보낸다(무음 오도 방지).
     ordering: str = "best_effort"
+
+
+# ── 합성 Proxy Gold 후보 관리 ────────────────────────────────────────────────
+# 고객/실문서 골든과 분리된 후보 인벤토리다. 여기의 승인 상태는 approved_proxy일 뿐
+# locked_gold_eval 승격이나 실운영 정확도 주장 근거가 될 수 없다.
+class ProxyGoldCandidateDecisionRequest(BaseModel):
+    action: str = Field(pattern=r"^(approve|change|defer|reject|discard|reopen)$")
+    grade: Optional[str] = Field(default=None, pattern=r"^(TS|S1|S2|S3)$")
+    reason: str = Field(default="", max_length=4000)
+
+    @model_validator(mode="after")
+    def _decision_contract(self) -> "ProxyGoldCandidateDecisionRequest":
+        if self.action == "change" and not self.grade:
+            raise ValueError("action=change 인데 grade 미지정")
+        if self.action != "change" and self.grade is not None:
+            raise ValueError("grade 는 action=change 에서만 지정")
+        if self.action in {"change", "defer", "reject", "discard"} and not self.reason.strip():
+            raise ValueError("change/defer/reject/discard 에는 사유가 필요")
+        return self
+
+
+class ProxyGoldCandidateDecisionResponse(BaseModel):
+    doc_id: str
+    status: str
+    final_grade: Optional[str] = None
+    latest_decision: Optional[dict] = None

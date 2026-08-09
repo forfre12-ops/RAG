@@ -71,6 +71,12 @@ class DocumentUploadResponse(BaseModel):
     ocr_used: bool
     char_count: int
     chunk_count: int
+    pages_processed: Optional[int] = None
+    pages_total: Optional[int] = None
+    extraction_complete: bool = True
+    classification_job_id: Optional[str] = None
+    classification_status: Optional[str] = None
+    classification_status_url: Optional[str] = None
     persisted: bool
     warnings: list[str]
     # [P0#3] 저품질/OCR 추출 → 분류 전 검수 라우팅 신호. True면 processing_status='needs_review'로
@@ -90,6 +96,7 @@ async def upload_document(
     external_ref: Optional[str] = Form(default=None, description="외부 문서 ID (EDMS 등)"),
     index_for_rag: bool = Form(default=False, description="True면 업로드 문서를 RAG 검색 컬렉션에도 적재"),
     rag_namespace: Optional[str] = Form(default=None, description="RAG 적재 컬렉션(미지정 시 settings.rag_upload_collection)"),
+    enqueue_classification: bool = Form(default=False),
     file: UploadFile = File(...),
     svc: DocumentIngestionService = Depends(_get_ingestion_service),
     auth: dict = Depends(require_auth),
@@ -136,6 +143,30 @@ async def upload_document(
         created_by=actor_obj.user_id,
     )
 
+    classification_job_id: Optional[str] = None
+    classification_status: Optional[str] = None
+    classification_status_url: Optional[str] = None
+    if enqueue_classification:
+        if not result.persisted or result.doc_id is None or result.char_count == 0:
+            result.warnings.append(
+                "classification was not queued: document was not persisted or has no extracted text"
+            )
+        else:
+            try:
+                from lloydk.schemas.classify_async import ClassifyAsyncRequest  # noqa: PLC0415
+                from lloydk.services.async_classify_service import AsyncClassifyService  # noqa: PLC0415
+
+                job = AsyncClassifyService().submit_async(
+                    ClassifyAsyncRequest(doc_id=str(result.doc_id))
+                )
+                classification_job_id = str(job.job_id)
+                classification_status = job.status
+                classification_status_url = job.status_url
+            except Exception as exc:  # noqa: BLE001
+                result.warnings.append(
+                    f"classification was not queued: {type(exc).__name__}"
+                )
+
     rag_indexed = False
     rag_collection: Optional[str] = None
     rag_vector_count = 0
@@ -158,6 +189,12 @@ async def upload_document(
         ocr_used=result.ocr_used,
         char_count=result.char_count,
         chunk_count=result.chunk_count,
+        pages_processed=result.pages_processed,
+        pages_total=result.pages_total,
+        extraction_complete=result.extraction_complete,
+        classification_job_id=classification_job_id,
+        classification_status=classification_status,
+        classification_status_url=classification_status_url,
         persisted=result.persisted,
         warnings=result.warnings,
         requires_review=result.requires_review,
@@ -218,6 +255,9 @@ class AnalyzeParseInfo(BaseModel):
     ocr_used: bool
     char_count: int
     chunk_count: int
+    pages_processed: Optional[int] = None
+    pages_total: Optional[int] = None
+    extraction_complete: bool = True
     table_coverage: Optional[str] = None
     table_count: int = 0
     table_cell_count: int = 0
@@ -327,6 +367,16 @@ async def analyze_document(
         ocr_used=ex.ocr_used,
         char_count=len(pre.text),
         chunk_count=len(pre.chunks),
+        pages_processed=getattr(ex, "pages", None),
+        pages_total=(getattr(ex, "total_pages", None) or getattr(ex, "pages", None)),
+        extraction_complete=(
+            not any("truncated" in str(w).lower() for w in extraction_warnings)
+            and not (
+                getattr(ex, "pages", None) is not None
+                and getattr(ex, "total_pages", None) is not None
+                and getattr(ex, "pages") < getattr(ex, "total_pages")
+            )
+        ),
         table_coverage=getattr(ex, "table_coverage", None),
         table_count=len(extracted_tables),
         table_cell_count=table_cell_count,

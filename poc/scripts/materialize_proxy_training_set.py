@@ -1165,6 +1165,52 @@ def _validate_train_chunks(
         )
 
 
+def _parse_grade_weight_multipliers(values: Sequence[str]) -> dict[str, float]:
+    multipliers: dict[str, float] = {}
+    for raw in values:
+        if "=" not in raw:
+            raise TrainingMaterializationError(
+                f"grade weight must be GRADE=MULTIPLIER, got {raw!r}"
+            )
+        grade, value = raw.split("=", 1)
+        grade = grade.strip()
+        if grade not in GRADE_CODES:
+            raise TrainingMaterializationError(f"unknown grade weight target: {grade!r}")
+        try:
+            multiplier = float(value)
+        except ValueError as exc:
+            raise TrainingMaterializationError(
+                f"invalid grade weight multiplier for {grade}: {value!r}"
+            ) from exc
+        if not (0.0 < multiplier <= 10.0):
+            raise TrainingMaterializationError(
+                f"grade weight multiplier for {grade} must be in (0, 10], got {multiplier}"
+            )
+        multipliers[grade] = multiplier
+    return multipliers
+
+
+def _apply_grade_weight_multipliers(
+    chunks: Sequence[Mapping[str, object]],
+    multipliers: Mapping[str, float],
+) -> list[dict[str, object]]:
+    if not multipliers:
+        return [dict(chunk) for chunk in chunks]
+    weighted: list[dict[str, object]] = []
+    for chunk in chunks:
+        row = dict(chunk)
+        label = str(row.get("label") or "")
+        multiplier = float(multipliers.get(label, 1.0))
+        if multiplier != 1.0:
+            base_weight = float(row.get("sample_weight", 1.0))
+            row["sample_weight"] = base_weight * multiplier
+            notes = list(row.get("weighting_notes") or [])
+            notes.append(f"grade_weight_multiplier:{label}:{multiplier:g}")
+            row["weighting_notes"] = notes
+        weighted.append(row)
+    return weighted
+
+
 def _new_run_id() -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"proxy-train-{stamp}-{uuid.uuid4().hex[:10]}"
@@ -1182,6 +1228,7 @@ def materialize_proxy_training_set(
     required_origin_label_counts: Mapping[tuple[str, str], int] | None = None,
     require_training_pool_envelope: bool | None = None,
     seed: str = SPLIT_SEED,
+    grade_weight_multipliers: Mapping[str, float] | None = None,
 ) -> tuple[Path, dict[str, object]]:
     """Validate, split, expand, and atomically publish one immutable run."""
     if not input_paths:
@@ -1249,7 +1296,11 @@ def materialize_proxy_training_set(
     _ensure_no_blocked_overlap(training, [*frozen, *additionally_blocked])
 
     splits = deterministic_family_split(training, seed=seed)
-    train_chunks = expand_records_evidence_aware(splits["train"])
+    weight_multipliers = dict(grade_weight_multipliers or {})
+    train_chunks = _apply_grade_weight_multipliers(
+        expand_records_evidence_aware(splits["train"]),
+        weight_multipliers,
+    )
     if not train_chunks:
         raise TrainingMaterializationError("train chunk expansion produced no rows")
     _validate_train_chunks(splits["train"], train_chunks)
@@ -1333,6 +1384,7 @@ def materialize_proxy_training_set(
             "frozen_membership_allowed": False,
             "training_validation_intended_use": "training",
             "frozen_validation_intended_use": "evaluation",
+            "grade_weight_multipliers": weight_multipliers,
             "required_origin_label_counts": (
                 {
                     f"{origin}:{grade}": count
@@ -1441,14 +1493,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--out-root", default="datasets/proxy_gold/training_runs")
     parser.add_argument("--run-id", help="optional unique immutable run id")
+    parser.add_argument(
+        "--grade-weight",
+        action="append",
+        default=[],
+        help=(
+            "optional train-chunk sample weight multiplier in GRADE=MULTIPLIER form; "
+            "for controlled boundary experiments only"
+        ),
+    )
     args = parser.parse_args(argv)
     try:
+        grade_weights = _parse_grade_weight_multipliers(args.grade_weight)
         run_dir, manifest = materialize_proxy_training_set(
             input_paths=[Path(value) for value in args.input],
             frozen_paths=[Path(value) for value in args.frozen_corpus],
             blocked_paths=[Path(value) for value in args.blocked_corpus],
             out_root=Path(args.out_root),
             run_id=args.run_id,
+            grade_weight_multipliers=grade_weights,
         )
     except (CorpusLoadError, TrainingMaterializationError, ValueError) as exc:
         raise SystemExit(f"training materialization failed: {exc}") from exc

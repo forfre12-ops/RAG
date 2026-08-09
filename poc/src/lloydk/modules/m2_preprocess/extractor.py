@@ -112,6 +112,10 @@ class ExtractResult:
     quality: float        # 0.0~1.0 (추정)
     ocr_used: bool = False
     pages: int | None = None
+    # pages is the number actually extracted.  For a scanned PDF this can be
+    # lower than total_pages when the OCR safety cap stops processing early.
+    # Keeping both numbers makes incomplete extraction visible to callers.
+    total_pages: int | None = None
     error: str | None = None
     # 표 커버리지 신호 — 원문에 표가 있는데 셀 텍스트가 추출본에 빠졌을 때 "incomplete".
     # HWP/HWPX에서 rhwp가 표·글상자 셀을 흘리면 본문만 분류기에 들어가 표 속 영업비밀이
@@ -1306,6 +1310,14 @@ def _pdf_table_coverage(table_warnings: list[str]) -> str | None:
     return None
 
 
+def _pdf_text_page_count(text: str) -> int:
+    """pdfminer의 끝 페이지 구분자(\f)를 별도 빈 페이지로 세지 않는다."""
+    # pdfminer는 보통 각 페이지 뒤에 form-feed를 붙인다. 마지막 구분자까지
+    # ``count("\f") + 1``로 세면 N페이지 PDF가 N+1로 기록된다.
+    trimmed = text.rstrip()
+    return max(1, trimmed.count("\f") + 1)
+
+
 def _pdf_sparse_signal(text: str, pages: int, base_quality: float) -> tuple[float, list[str]]:
     """부분 텍스트레이어(표지/워터마크/머리말)가 스캔 본문의 OCR 을 가로채는 것 방지(#10).
 
@@ -1333,7 +1345,7 @@ def _extract_pdf(p: Path) -> ExtractResult:
 
         text = extract_text(str(p)) or ""
         if text.strip():
-            pages = max(1, text.count("\x0c") + 1)
+            pages = _pdf_text_page_count(text)
             tables, table_warnings = _pdf_tables_via_pdfplumber(p)
             text = _append_if_missing(text, _tables_to_text(tables))
             q, sparse_w = _pdf_sparse_signal(text, pages, 0.92)
@@ -1342,6 +1354,7 @@ def _extract_pdf(p: Path) -> ExtractResult:
                 method="parser",
                 quality=q,
                 pages=pages,
+                total_pages=pages,
                 table_coverage=_pdf_table_coverage(table_warnings),
                 tables=tables,
                 warnings=table_warnings + sparse_w,
@@ -1369,6 +1382,7 @@ def _extract_pdf(p: Path) -> ExtractResult:
                 method="parser",
                 quality=q,
                 pages=n_pages,
+                total_pages=n_pages,
                 table_coverage=_pdf_table_coverage(table_warnings),
                 tables=tables,
                 warnings=table_warnings + sparse_w,
@@ -1423,13 +1437,14 @@ def _ocr_pdf_pages(p: Path, n_pages: int | None) -> ExtractResult:
                 warnings.append("pdf_ocr_truncated")
             return ExtractResult(
                 text=text, method="ocr", quality=0.75,
-                ocr_used=True, pages=len(images), error=note, warnings=warnings,
+                ocr_used=True, pages=len(images), total_pages=n_pages,
+                error=note, warnings=warnings,
             )
     except Exception:  # noqa: BLE001
         pass
     return ExtractResult(
         text="", method="ocr", quality=0.0, ocr_used=False,
-        pages=n_pages,
+        pages=n_pages, total_pages=n_pages,
         error="OCR failed (no text layer, pdf2image/tesseract unavailable)",
         warnings=["pdf_ocr_unavailable"],
     )

@@ -37,6 +37,7 @@ from lloydk.proxy_corpus import (
 
 SCHEMA_VERSION = "proxy-model-comparison-v1"
 EXPECTED_FROZEN_DOCUMENTS = 1_000
+EXPECTED_FINAL_LOCKED_DOCUMENTS = 800
 EXPECTED_PUBLIC_S3_CHALLENGE_DOCUMENTS = 300
 LABELS = ("TS", "S1", "S2", "S3")
 GRADE_SEVERITY = {label: index for index, label in enumerate(LABELS)}
@@ -262,6 +263,65 @@ def load_frozen_proxy_gold(
         },
     }
     return rows, audit
+
+
+def load_final_locked_proxy_eval(
+    corpus_path: Path, suite_manifest_path: Path
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """Load the one-shot final 800 partition of a frozen Proxy suite.
+
+    The companion 200-document development partition is intentionally not
+    accepted here.  It is for iteration and model selection only; this loader
+    makes accidental re-use of that partition in a final comparison fail.
+    """
+    rows, corpus_bytes = _read_jsonl(corpus_path, purpose="final locked proxy corpus")
+    manifest, manifest_bytes = _read_json_object(
+        suite_manifest_path, purpose="final proxy suite manifest"
+    )
+    if manifest.get("schema") != "frozen-proxy-eval-split-audit-v1":
+        raise ProxyComparisonError("final proxy suite manifest schema is invalid")
+    if manifest.get("final_documents") != EXPECTED_FINAL_LOCKED_DOCUMENTS:
+        raise ProxyComparisonError("final proxy suite must attest exactly 800 records")
+    expected_hash = str(manifest.get("final_sha256") or "")
+    actual_hash = _sha256_bytes(corpus_bytes)
+    if not _SHA256.fullmatch(expected_hash) or expected_hash != actual_hash:
+        raise ProxyComparisonError("final proxy corpus SHA-256 does not match suite manifest")
+    expected_distribution = {"TS": 160, "S1": 200, "S2": 200, "S3": 240}
+    if len(rows) != EXPECTED_FINAL_LOCKED_DOCUMENTS:
+        raise ProxyComparisonError(f"final proxy corpus must contain 800 records; found {len(rows)}")
+    identities = _required_record_fields(rows, purpose="final locked proxy corpus")
+    distribution = Counter(str(row["label"]) for row in rows)
+    if dict(distribution) != expected_distribution:
+        raise ProxyComparisonError(
+            "final proxy grade distribution mismatch: "
+            f"expected {expected_distribution}, found {dict(distribution)}"
+        )
+    for index, row in enumerate(rows):
+        if row.get("evaluation_partition") != "final_locked":
+            raise ProxyComparisonError(f"final proxy row {index} is not final_locked")
+        if row.get("catalog_split_role") != "frozen_proxy_eval_only":
+            raise ProxyComparisonError(f"final proxy row {index} has invalid split role")
+        if row.get("training_use_permitted") is not False:
+            raise ProxyComparisonError(f"final proxy row {index} permits training")
+        if row.get("evaluation_use_permitted") is not True:
+            raise ProxyComparisonError(f"final proxy row {index} lacks evaluation permission")
+    return rows, {
+        "path": str(corpus_path.resolve()),
+        "file_sha256": actual_hash,
+        "records_sha256": _canonical_records_sha256(rows),
+        "records": len(rows),
+        "grade_distribution": expected_distribution,
+        "partition": "final_locked",
+        "unique_doc_ids": len(identities["doc_ids"]),
+        "unique_family_ids": len(identities["family_ids"]),
+        "unique_normalized_text_hashes": len(identities["text_hashes"]),
+        "suite_manifest": {
+            "path": str(suite_manifest_path.resolve()),
+            "sha256": _sha256_bytes(manifest_bytes),
+            "development_documents": manifest.get("development_documents"),
+            "final_documents": EXPECTED_FINAL_LOCKED_DOCUMENTS,
+        },
+    }
 
 
 def load_public_s3_challenge(
@@ -2246,7 +2306,7 @@ Predictor = Callable[..., ModelPredictionBatch]
 def compare_proxy_models(
     *,
     frozen_corpus_path: Path,
-    frozen_manifest_path: Path,
+    frozen_manifest_path: Path | None,
     baseline_model_dir: Path,
     candidate_model_dir: Path,
     output_root: Path,
@@ -2255,6 +2315,7 @@ def compare_proxy_models(
     baseline_legacy_training_attestation_path: Path | None = None,
     candidate_legacy_training_attestation_path: Path | None = None,
     public_s3_challenge_path: Path | None = None,
+    final_suite_manifest_path: Path | None = None,
     run_id: str | None = None,
     batch_size: int = SERVING_INFERENCE_BATCH_SIZE,
     device: str = "auto",
@@ -2290,9 +2351,22 @@ def compare_proxy_models(
     if final_dir.exists():
         raise ProxyComparisonError(f"comparison run already exists: {final_dir}")
 
-    rows, frozen_audit = load_frozen_proxy_gold(
-        frozen_corpus_path, frozen_manifest_path
-    )
+    if final_suite_manifest_path is not None:
+        if frozen_manifest_path is not None:
+            raise ProxyComparisonError(
+                "supply either frozen assembly manifest or final suite manifest, not both"
+            )
+        rows, frozen_audit = load_final_locked_proxy_eval(
+            frozen_corpus_path, final_suite_manifest_path
+        )
+    else:
+        if frozen_manifest_path is None:
+            raise ProxyComparisonError(
+                "comparison requires frozen assembly manifest or final suite manifest"
+            )
+        rows, frozen_audit = load_frozen_proxy_gold(
+            frozen_corpus_path, frozen_manifest_path
+        )
     public_s3_rows: list[dict[str, object]] = []
     public_s3_audit: dict[str, object] | None = None
     public_s3_separation: dict[str, object] = {
@@ -2589,8 +2663,8 @@ def compare_proxy_models(
             "fixed proxy corpus only."
         ),
         "evaluation_contract": {
-            "frozen_records": EXPECTED_FROZEN_DOCUMENTS,
-            "expected_grade_distribution": dict(DEFAULT_TARGET_COUNTS),
+            "frozen_records": len(rows),
+            "expected_grade_distribution": dict(frozen_audit["grade_distribution"]),
             "prediction_mode": (
                 "m5_chunked_severe_aggregate_bundle_operating_point"
                 if apply_operating_point

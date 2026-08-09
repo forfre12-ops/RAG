@@ -141,6 +141,9 @@ class IngestResult:
     ocr_used: bool
     char_count: int
     chunk_count: int
+    pages_processed: int | None
+    pages_total: int | None
+    extraction_complete: bool
     raw_text_uri: str
     normalized_text_uri: Optional[str]
     persisted: bool
@@ -220,6 +223,21 @@ class DocumentIngestionService:
         if not text:
             warns.append("no text extracted (parser/OCR needed)")
 
+        pages_processed = getattr(ext, "pages", None) if ext else None
+        pages_total = getattr(ext, "total_pages", None) if ext else None
+        if pages_total is None:
+            pages_total = pages_processed
+        extraction_complete = not any(
+            "truncated" in str(w).lower()
+            for w in (getattr(ext, "warnings", None) or [])
+        )
+        if (
+            pages_processed is not None
+            and pages_total is not None
+            and pages_processed < pages_total
+        ):
+            extraction_complete = False
+
         # [P0#3] 저품질/OCR 추출 → 검수 라우팅 판정 + 열화 메트릭(무음 오분류 방지).
         review_decision, degrade_reasons = self._extraction_review(
             ext, content_quality=(pre.quality if pre else None), has_text=bool(text)
@@ -256,6 +274,9 @@ class DocumentIngestionService:
                 external_ref=external_ref,
                 created_by=created_by,
                 requires_review=review_decision.requires_review,
+                pages_processed=pages_processed,
+                pages_total=pages_total,
+                extraction_complete=extraction_complete,
             )
             warns.extend(pwarns)
 
@@ -278,6 +299,9 @@ class DocumentIngestionService:
             ocr_used=(bool(ext.ocr_used) if ext else False),
             char_count=len(text),
             chunk_count=(len(pre.chunks) if pre else 0),
+            pages_processed=pages_processed,
+            pages_total=pages_total,
+            extraction_complete=extraction_complete,
             raw_text_uri=raw_uri,
             normalized_text_uri=norm_uri,
             persisted=persisted,
@@ -388,6 +412,9 @@ class DocumentIngestionService:
         external_ref: Optional[str],
         created_by: Optional[str],
         requires_review: bool = False,
+        pages_processed: int | None = None,
+        pages_total: int | None = None,
+        extraction_complete: bool = True,
     ) -> tuple[object, bool, list[str]]:
         warns: list[str] = []
         ext = pre.extraction if pre else None
@@ -436,8 +463,14 @@ class DocumentIngestionService:
                 metadata=(
                     {
                         k: v
-                        for k, v in {"doc_type": doc_type, "source_type": source_type}.items()
-                        if v
+                        for k, v in {
+                            "doc_type": doc_type,
+                            "source_type": source_type,
+                            "pages_processed": pages_processed,
+                            "pages_total": pages_total,
+                            "extraction_complete": extraction_complete,
+                        }.items()
+                        if v is not None
                     }
                     or None
                 ),

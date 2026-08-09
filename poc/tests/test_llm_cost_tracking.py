@@ -48,6 +48,21 @@ def test_record_noop_on_text_only_or_none(tmp_path):
     record_llm_usage(None, purpose="answer", service=svc)
 
 
+def test_isolated_runner_can_skip_db_but_keeps_jsonl_audit(tmp_path, monkeypatch):
+    svc = LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl"))
+    called = False
+
+    def no_db(*args, **kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(svc, "_insert_db", no_db)
+    monkeypatch.setenv("LLOYDK_LLM_USAGE_DB_ENABLED", "false")
+    record_llm_usage(_usage(), purpose="synthesis", service=svc)
+    assert called is False
+    assert (tmp_path / "u.jsonl").is_file()
+
+
 def test_billing_phase_from_settings(tmp_path, monkeypatch):
     from lloydk import config as cfg
     monkeypatch.setattr(cfg.settings, "llm_billing_phase", "production", raising=False)

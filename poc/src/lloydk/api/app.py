@@ -384,10 +384,15 @@ if settings.enable_training or settings.enable_incremental_retrain:
 else:
     logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
 app.include_router(synthesis_api.router, prefix="/api/v1")
-app.include_router(golden_api.router, prefix="/api/v1")
-# 골든 검수·서명 HTML 뷰(무인증) — 브라우저 window.open/직접 URL 로 열리게 별도 라우터로 분리.
+# 골든 검수·서명 HTML 뷰 — 브라우저 window.open/직접 URL 로 열리게 별도 라우터로 분리.
 # (require_auth 라우터에 있으면 브라우저 네비게이션이 헤더를 못 붙여 401. POST signoff 는 보호 유지.)
+#
+# ⚠ html_router 를 **먼저** 등록해야 한다. golden_api.router 에 있는
+# `/golden/candidates/{doc_id}` 가 `/golden/candidates/manage.html` 을 doc_id="manage.html"
+# 로 삼켜서, 인증을 통과하면 404 "proxy-gold candidate not found" 가 났다(2026-08-09 실측).
+# FastAPI 는 등록 순서대로 매칭하므로 정적 경로를 가변 경로보다 앞에 둔다.
 app.include_router(golden_api.html_router, prefix="/api/v1")
+app.include_router(golden_api.router, prefix="/api/v1")
 app.include_router(guide_api.router, prefix="/api/v1")
 app.include_router(documents_api.router, prefix="/api/v1")
 app.include_router(

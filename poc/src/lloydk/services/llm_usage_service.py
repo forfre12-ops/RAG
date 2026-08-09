@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,8 +57,18 @@ class LLMUsageService:
         # JSONL은 항상 먼저 남긴다 — DB 적재가 실패해도 비용 기록은 보존.
         self._append_jsonl(row)
         # #28: 공유 풀(session_scope) + LlmUsageRepo로 best-effort 적재.
-        self._insert_db(usage, purpose, reference_type, reference_id,
-                        billing_phase, called_at)
+        # Isolated corpus-generation runners can have no PostgreSQL service.
+        # Keep their append-only JSONL audit while avoiding one connection
+        # timeout per LLM call.  Production keeps the existing DB behaviour
+        # unless the runner explicitly opts out.
+        if os.getenv("LLOYDK_LLM_USAGE_DB_ENABLED", "true").strip().lower() not in {
+            "0",
+            "false",
+            "no",
+            "off",
+        }:
+            self._insert_db(usage, purpose, reference_type, reference_id,
+                            billing_phase, called_at)
         self._emit_metrics(row, purpose)
         logger.info(
             "llm_usage recorded: provider=%s model=%s cost_usd=%s",
