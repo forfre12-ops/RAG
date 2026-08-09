@@ -46,7 +46,6 @@ import argparse
 import datetime as _dt
 import hashlib
 import json
-import os
 import sys
 from pathlib import Path
 

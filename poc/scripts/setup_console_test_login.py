@@ -40,6 +40,10 @@ def main(argv=None) -> int:
     ap.add_argument("--sub", default="kl-admin-test", help="검수 기록에 남을 계정 ID")
     ap.add_argument("--roles", default="admin", help="쉼표 구분")
     ap.add_argument("--days", type=int, default=30)
+    # auth_mode=both/jwt 운영 모드는 iss/aud 검증을 강제한다(_jwt_auth.assert_production_auth_config).
+    # 미설정 시 같은 키로 서명된 타 용도 JWT 를 수락하게 되므로(confused deputy) 기본값을 준다.
+    ap.add_argument("--iss", default="lloydk-console", help="JWT_ISSUER 와 일치해야 한다")
+    ap.add_argument("--aud", default="lloydk-api", help="JWT_AUDIENCE 와 일치해야 한다")
     ap.add_argument("--regenerate-key", action="store_true", help="키쌍을 새로 만든다")
     args = ap.parse_args(argv)
 
@@ -80,6 +84,8 @@ def main(argv=None) -> int:
     payload = {
         "sub": args.sub,
         "roles": [r.strip() for r in args.roles.split(",") if r.strip()],
+        "iss": args.iss,
+        "aud": args.aud,
         "iat": now,
         "exp": now + args.days * 86400,
     }
@@ -100,6 +106,8 @@ def main(argv=None) -> int:
     print("\n서버 환경변수:")
     print("  AUTH_MODE=both")
     print(f"  JWT_JWKS_PATH={jwks_path.relative_to(ROOT).as_posix()}")
+    print(f"  JWT_ISSUER={args.iss}")
+    print(f"  JWT_AUDIENCE={args.aud}")
     print("\n브라우저: 개발자도구 콘솔에서")
     print(f"  document.cookie='lloydk_access_token={token[:28]}...; path=/'")
     return 0

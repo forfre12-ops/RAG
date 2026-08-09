@@ -289,6 +289,11 @@ class Settings(BaseSettings):
     # 서명 화면의 X-API-Key 입력란을 서버 키로 미리 채운다(시연·반복 검수 편의). 화면 자체가
     # 서명 URL 토큰(?t=)으로 보호되며, 제출에는 어차피 같은 키가 필요하다. 기본 False.
     signoff_prefill_api_key: bool = False
+    # 골든셋 콘솔 로그인 화면(login.html)의 토큰 입력란을 이 값으로 미리 채운다.
+    # ⚠ login.html 은 무인증 페이지다 — 이 값을 채우면 그 주소를 여는 누구나 관리자 토큰을
+    # 얻는다(= 사실상 인증 해제). 폐쇄망·시연 서버에서만 쓰고, 외부 노출 서버에서는 비워 둘 것.
+    # 화면에도 경고를 띄운다(무음 위험 금지). 기본은 빈 값.
+    console_login_prefill_token: str = ""
 
     # NFR-SEC-01: 감사체인 HMAC 비밀키. 설정 시 audit_log hash chain을 HMAC-SHA256으로 링크해
     # 키 없는 과거 row 재작성(rewrite)을 차단(audit_chain._link_hex). 빈 값이면 레거시 sha256

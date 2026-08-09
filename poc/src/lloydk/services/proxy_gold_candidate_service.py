@@ -22,8 +22,14 @@ from uuid import uuid4
 _POC_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_ROOT = _POC_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
 _LEDGER_NAME = "candidate_decisions.jsonl"
+
+# 후보 목록 캐시 — 키에 (루트·파일수·최신 mtime·원장 mtime) 이 들어 있어 파일이 하나라도
+# 바뀌면 자동 무효화된다. 캐시가 없으면 매 요청 30MB 본문을 다시 읽고 해시한다.
+_CANDIDATE_CACHE: dict[tuple, list[dict[str, Any]]] = {}
 _VALID_GRADES = {"TS", "S1", "S2", "S3"}
 _VALID_ACTIONS = {"approve", "change", "defer", "reject", "discard", "reopen"}
+# 본문에 등급 문자열이 그대로 남아 있으면 검수자가 읽기 전에 답을 본다.
+_GRADE_TOKEN = re.compile(r"\b(TS|S1|S2|S3)\b")
 _DOCUMENT_ORIGINS = {"uploaded_document", "public_real", "organization_real"}
 
 
@@ -79,14 +85,92 @@ class ProxyGoldCandidateService:
             if needle:
                 candidates = [c for c in candidates if needle in c["doc_id"].lower() or needle in c["title"].lower()]
         candidates.sort(key=lambda c: c["doc_id"])
+        # 화면은 목록 응답에 실린 summary 로 KPI·품질 지표를 그린다(별도 /summary 를 안 부른다).
+        # quality 를 여기 빼먹으면 품질 패널이 "지표를 낼 수 없습니다"로만 뜬다(실측).
+        embedded = self._summary(all_candidates)
+        embedded["quality"] = self._quality(all_candidates)
         return {
             "total": len(candidates),
-            "summary": self._summary(all_candidates),
+            "summary": embedded,
             "candidates": [{k: v for k, v in c.items() if k != "text"} for c in candidates],
         }
 
     def summary(self) -> dict[str, Any]:
-        return self._summary(self._candidates())
+        candidates = self._candidates()
+        out = self._summary(candidates)
+        out["quality"] = self._quality(candidates)
+        return out
+
+    def recent_decisions(self, limit: int = 100) -> dict[str, Any]:
+        """결정 원장 최근 기록 — 보류·폐기·번복까지 그대로 보인다.
+
+        화면에는 문서 하나를 골라야 이력이 보였다. 보류·폐기가 왜 그렇게 됐는지 훑어보려면
+        문서를 일일이 열어야 해서, 감사 목적으로는 쓸 수 없었다.
+        """
+        events: list[dict[str, Any]] = []
+        if self.ledger_path.exists():
+            for line in self.ledger_path.read_text(encoding="utf-8").splitlines():
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        by_action = Counter(str(e.get("action") or "") for e in events)
+        return {
+            "total": len(events),
+            "by_action": dict(sorted(by_action.items())),
+            "events": list(reversed(events))[: max(1, min(int(limit), 500))],
+        }
+
+    @staticmethod
+    def _quality(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        """골든셋 자체의 건강도 — 등급을 맞히는 데 본문 말고 다른 단서가 섞였는지 본다.
+
+        · length_only_1nn: 문서 **길이만** 보고 등급을 맞히는 비율. 무작위(0.25)를 크게 넘으면
+          길이가 등급의 대리변수라는 뜻이고, 그 셋으로 잰 정확도는 부풀려진다.
+          (실측: 기존 777건 패키지 0.793 — 짧으면 고등급 / 길면 S3)
+        · grade_token_exposed: 본문에 자기 등급 문자열이 남아 있는 건수. 검수자가 문서를 읽기
+          전에 답을 보면 검수가 검증이 아니라 확인 절차가 된다.
+        """
+        graded = [
+            (len(c.get("text") or ""), c.get("final_grade") or c.get("proposed_grade"), c)
+            for c in candidates
+        ]
+        graded = [(ln, g, c) for ln, g, c in graded if g in _VALID_GRADES and ln > 0]
+        if not graded:
+            return {"documents": 0}
+
+        pairs = sorted((ln, g) for ln, g, _c in graded)
+        hit = 0
+        for i, (ln, lab) in enumerate(pairs):
+            best, best_d = None, None
+            for j in (i - 1, i + 1):
+                if 0 <= j < len(pairs):
+                    d = abs(pairs[j][0] - ln)
+                    if best_d is None or d < best_d:
+                        best_d, best = d, pairs[j][1]
+            hit += best == lab
+        leak = round(hit / len(pairs), 3)
+
+        exposed = sum(1 for _ln, g, c in graded if _GRADE_TOKEN.search(c.get("text") or ""))
+        per_grade: dict[str, dict[str, int]] = {}
+        for g in sorted(_VALID_GRADES):
+            v = sorted(ln for ln, gg, _c in graded if gg == g)
+            if v:
+                per_grade[g] = {"n": len(v), "min": v[0], "p50": v[len(v) // 2], "max": v[-1]}
+        counts = [d["n"] for d in per_grade.values()]
+        allv = sorted(ln for ln, _g, _c in graded)
+        real = sum(1 for _ln, _g, c in graded if c.get("is_actual_document"))
+        return {
+            "documents": len(graded),
+            "length": {"min": allv[0], "p50": allv[len(allv) // 2], "max": allv[-1]},
+            "length_by_grade": per_grade,
+            "length_only_1nn": leak,
+            "length_only_random": 0.25,
+            "grade_token_exposed": exposed,
+            "real_documents": real,
+            "real_ratio": round(real / len(graded), 3),
+            "grade_balance_ratio": round(max(counts) / max(min(counts), 1), 2) if counts else None,
+        }
 
     def get_candidate(self, doc_id: str) -> dict[str, Any] | None:
         candidate = next((c for c in self._candidates() if c["doc_id"] == doc_id), None)
@@ -252,12 +336,52 @@ class ProxyGoldCandidateService:
         assert candidate is not None
         return candidate
 
+    def _scan(self) -> tuple[tuple, list[str], dict[str, list[str]]]:
+        """디렉터리를 **한 번만** 훑어 (캐시키, metadata 목록, doc_id→본문파일) 을 만든다.
+
+        종전에는 후보마다 `glob(f"{doc_id}_*.md")` 를 돌려 2,440개 엔트리 디렉터리를 272번
+        재스캔했고(바인드 마운트에서 O(N×M)), 목록 응답에서 버릴 본문 30MB 를 매 요청 읽었다.
+        실측: /golden/candidates 와 /summary 가 **120초 타임아웃**.
+        """
+        metas: list[str] = []
+        docs: dict[str, list[str]] = {}
+        newest = 0
+        count = 0
+        with os.scandir(self.root) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+                name = entry.name
+                count += 1
+                try:
+                    mtime = entry.stat().st_mtime_ns
+                except OSError:
+                    mtime = 0
+                if mtime > newest:
+                    newest = mtime
+                if name.endswith(".metadata.json"):
+                    metas.append(name)
+                elif name.endswith(".md") and "_" in name:
+                    docs.setdefault(name.split("_", 1)[0], []).append(name)
+        metas.sort()
+        ledger_mtime = 0
+        try:
+            ledger_mtime = self.ledger_path.stat().st_mtime_ns
+        except OSError:
+            pass
+        return (str(self.root), count, newest, ledger_mtime), metas, docs
+
     def _candidates(self) -> list[dict[str, Any]]:
         if not self.root.exists():
             return []
+        cache_key, metas, docs_by_id = self._scan()
+        cached = _CANDIDATE_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
         latest = self._latest_decisions()
         rows: list[dict[str, Any]] = []
-        for meta_path in sorted(self.root.glob("*.metadata.json")):
+        for meta_name in metas:
+            meta_path = self.root / meta_name
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
@@ -270,11 +394,14 @@ class ProxyGoldCandidateService:
             if revision_path and revision_path.is_relative_to(self.root) and revision_path.is_file():
                 source = revision_path
             else:
-                docs = list(self.root.glob(f"{doc_id}_*.md"))
-                if len(docs) != 1:
+                names = docs_by_id.get(doc_id) or []
+                if len(names) != 1:
                     continue
-                source = docs[0]
-            text = source.read_text(encoding="utf-8")
+                source = self.root / names[0]
+            try:
+                text = source.read_text(encoding="utf-8")
+            except OSError:
+                continue
             decision = latest.get(doc_id, {})
             document_origin = str(meta.get("document_origin") or "unknown")
             proposed = str(meta.get("intended_label") or "") or None
@@ -309,6 +436,11 @@ class ProxyGoldCandidateService:
                 "is_actual_document": document_origin in {"public_real", "organization_real"},
                 "text": text,
             })
+        # 캐시키에 (파일수·최신 mtime·원장 mtime) 이 들어 있어 문서 추가·수정·결정 기록이
+        # 생기면 자동으로 무효화된다. 폭주를 막기 위해 최근 몇 세대만 유지한다.
+        if len(_CANDIDATE_CACHE) > 4:
+            _CANDIDATE_CACHE.clear()
+        _CANDIDATE_CACHE[cache_key] = rows
         return rows
 
     @staticmethod
