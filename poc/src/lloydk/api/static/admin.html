@@ -162,6 +162,8 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .why-t{font-size:10.5px;color:var(--text-faint);white-space:nowrap;min-width:118px;}
 .why-x{flex:1;word-break:break-all;}
 .why-w{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);white-space:nowrap;}
+.srv-gate{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg-surface);}
+.srv-gate>b{font-size:17px;font-family:var(--font-mono);}
 .dash-panel{border:1px solid var(--border-mid);border-radius:10px;padding:12px 13px;background:var(--bg-surface);display:flex;flex-direction:column;gap:8px;}
 .dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .dash-panel .dp-big{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1;}
@@ -484,13 +486,22 @@ details.adv[open]{padding-bottom:12px;}
         <span class="ep">POST /confirm · /relabel</span>
       </div>
       <div class="card-body">
+        <!-- [정합 2026-08-09] 종전에는 이 자리에 "신뢰도 게이트(검수 라우팅 임계)"라는 입력이
+             하나뿐이었는데, 값을 바꿔도 API 호출이 0건이라 **서버 라우팅과 무관**했다. 관리자가
+             0.5로 내리고 "임계를 조정했다"고 믿게 되는 화면이었다. 둘을 명확히 분리한다:
+               · 서버 임계 = 실제로 needs_review 를 결정하는 값(읽기 전용, healthz 에서 조회)
+               · 목록 필터 = 이 화면에서 강조 표시할 기준(클라이언트 전용) -->
         <div class="row2">
           <div class="field">
-            <label class="fld">신뢰도 게이트 (검수 라우팅 임계)</label>
-            <input id="gate" type="number" min="0" max="1" step="0.05" value="0.70" oninput="document.getElementById('gate-v').textContent=(+this.value).toFixed(2)" />
+            <label class="fld">서버 검수 임계 <span class="pill">읽기 전용</span></label>
+            <div class="srv-gate"><b id="srv-gate-v">—</b>
+              <span class="hint" style="margin:0">confidence &lt; 이 값이면 서버가 <span class="pill warn">검수 필요</span>로 라우팅합니다. 변경은 배포 설정(<code>REVIEW_CONFIDENCE_THRESHOLD</code>)으로만 가능합니다.</span>
+            </div>
           </div>
-          <div class="field" style="display:flex;align-items:flex-end;">
-            <p class="hint">confidence &lt; <b id="gate-v">0.70</b> 이거나 warnings 존재 시 <span class="pill warn">검수 필요</span> 플래그. 게이트 이상이면 자동 확정 후보.</p>
+          <div class="field">
+            <label class="fld">목록 강조 기준 (이 화면에서만)</label>
+            <input id="gate" type="number" min="0" max="1" step="0.05" value="0.70" oninput="this.dataset.touched=1;document.getElementById('gate-v').textContent=(+this.value).toFixed(2)" />
+            <p class="hint">아래 목록에서 confidence &lt; <b id="gate-v">0.70</b> 인 건을 강조합니다. <b>서버 판정에는 영향이 없습니다.</b></p>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin:2px 0 8px;">
@@ -1094,7 +1105,25 @@ async function checkHealth(){
   try{
     const d=await api('GET','/healthz');
     pill.className='health-pill ok'; txt.textContent='정상 · '+(d.status||'ok');
+    applyServerConfig(d);
   }catch(e){ pill.className='health-pill bad'; txt.textContent='실패 '+(e.status||''); }
+}
+/* healthz 가 실어 보내는 서버 실제 설정을 화면에 반영한다.
+ * [정합 2026-08-09] 검수 임계는 **서버 값이 진실**이다. 종전 콘솔은 0.70 슬라이더를 두고
+ * "검수 라우팅 임계"라 적었지만 API 호출이 0건이라 서버와 무관했다 — 화면이 사실과 달랐다.
+ * 이제 서버 값을 읽어 읽기 전용으로 보여주고, 화면 필터는 별도 입력으로 분리했다. */
+function applyServerConfig(d){
+  const oc=(d&&d.operational_config)||{};
+  const t=oc.review_confidence_threshold;
+  const el=$('srv-gate-v');
+  if(el) el.textContent = (typeof t==='number') ? t.toFixed(2) : '—';
+  // 목록 강조 기준의 초기값을 서버 임계에 맞춰 둔다 — 처음 열었을 때 화면과 서버가 같은
+  // 기준을 보게 해, 사용자가 굳이 만지지 않으면 오해가 생기지 않는다.
+  const g=$('gate');
+  if(g && typeof t==='number' && !g.dataset.touched){
+    g.value=t.toFixed(2);
+    const gv=$('gate-v'); if(gv) gv.textContent=t.toFixed(2);
+  }
 }
 
 /* ---- 1. CLASSIFY ---- */

@@ -284,6 +284,14 @@ def _check_compute() -> dict:
 def _operational_config() -> dict:
     return {
         "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
+        # [정합 2026-08-09] 검수 라우팅 임계 — 콘솔이 **서버의 실제 값**을 표시하기 위해 노출한다.
+        # 종전에는 콘솔에 0.70 슬라이더가 있었지만 그것은 화면 필터일 뿐이고(API 호출 0건)
+        # 서버 라우팅과 무관했다. 관리자가 값을 내리고 "임계를 조정했다"고 믿을 수 있었다.
+        # 실제 판정은 classify_service._review_confidence_threshold() 가 이 설정을 읽어
+        # confidence < threshold 인 건을 needs_review 로 보낸다.
+        "review_confidence_threshold": float(
+            getattr(settings, "review_confidence_threshold", 0.7)
+        ),
         "rag": {
             "collection": getattr(settings, "rag_default_collection", "docs"),
             "embedding_model": getattr(settings, "rag_operational_embedding_model", ""),
