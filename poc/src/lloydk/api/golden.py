@@ -390,7 +390,40 @@ def _render_proxy_candidate_manager_html() -> str:
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Proxy Gold 후보 관리</title>
 <style>
-body{margin:0;background:#f4f7fb;color:#172033;font:14px/1.5 system-ui,sans-serif}main{max-width:1400px;margin:auto;padding:28px}h1{margin:0 0 4px}.notice{background:#fff8df;border:1px solid #f1d686;padding:12px;border-radius:8px}.bar,.filters,.decision{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:16px 0}.bar label,.filters label,.decision label{display:grid;gap:4px;font-weight:600}input,select,textarea,button{font:inherit;padding:8px;border:1px solid #b9c4d2;border-radius:6px}button{background:#155eef;color:white;border:0;cursor:pointer}button.secondary{background:#475467}.stats{display:flex;gap:8px;flex-wrap:wrap}.chip{background:#e8eef9;padding:6px 10px;border-radius:999px}.grid{display:grid;grid-template-columns:minmax(420px,1fr) minmax(500px,1.3fr);gap:16px}.pane{background:white;border:1px solid #d9e1ec;border-radius:10px;padding:16px;min-width:0}table{border-collapse:collapse;width:100%}th,td{padding:8px;border-bottom:1px solid #e7ebf1;text-align:left;vertical-align:top}tr:hover{background:#f8fbff}pre{white-space:pre-wrap;word-break:break-word;background:#f8fafc;padding:14px;border-radius:6px;max-height:560px;overflow:auto}#result{min-height:20px;color:#0b6b37}.error{color:#b42318}.muted{color:#667085}.hide{display:none}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+/* [디자인 통일 2026-08-09] 제출 문서(골든셋_관리콘솔_사용매뉴얼.html 등)·관리자 콘솔과
+   같은 팔레트로 맞춘다. 종전에는 이 화면만 파랑(#155eef)+알약(999px)+system-ui 라
+   문서·콘솔(무채색·직선·Pretendard)과 따로 놀았다. 실측 대조:
+     문서  --bg #fff · --ink #0a0a0a · --dim #71717a · --surf #fafafa · --mid #f4f4f5 · 알약 0건
+     콘솔  #ffffff   · #09090b      · #71717a      · #fafafa       · #f4f4f5      (동일 팔레트)
+     이 화면  #f4f7fb · #172033 · 파랑버튼 · 알약 999px           ← 혼자 다름
+   강조는 문서와 같은 방식(좌측 4px 색선)을 쓴다. 색으로 구분하지 않으므로 흑백 출력·
+   인쇄본에서도 구조가 유지된다. */
+body{margin:0;background:#fff;color:#0a0a0a;font:14px/1.6 "Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif}
+main{max-width:1400px;margin:auto;padding:28px}
+h1{margin:0 0 6px;font-size:26px;font-weight:800;letter-spacing:-.03em}
+h2{font-size:15px;font-weight:800;margin:34px 0 12px;padding-left:10px;border-left:4px solid #0a0a0a}
+.notice{background:#fafafa;border:1px solid rgba(0,0,0,.1);border-left:4px solid #0a0a0a;padding:12px;border-radius:0}
+.bar,.filters,.decision{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:16px 0}
+.bar label,.filters label,.decision label{display:grid;gap:4px;font-weight:700;font-size:12px}
+input,select,textarea,button{font:inherit;padding:8px;border:1px solid rgba(0,0,0,.18);border-radius:0}
+button{background:#0a0a0a;color:#fff;border:1px solid #0a0a0a;cursor:pointer;font-weight:600}
+button:hover{opacity:.88}
+button.secondary{background:#fff;color:#0a0a0a;border-color:rgba(0,0,0,.18)}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+/* 사각 배지 — 문서 방침상 알약(999px) 금지 */
+.chip{background:#f4f4f5;border:1px solid rgba(0,0,0,.1);padding:5px 10px;border-radius:0;font-size:12px}
+.grid{display:grid;grid-template-columns:minmax(420px,1fr) minmax(500px,1.3fr);gap:16px}
+.pane{background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:0;padding:16px;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{background:#f4f4f5;font-weight:700}
+th,td{padding:8px;border-bottom:1px solid rgba(0,0,0,.1);text-align:left;vertical-align:top}
+tr:hover{background:#fafafa}
+pre{white-space:pre-wrap;word-break:break-word;background:#fafafa;border:1px solid rgba(0,0,0,.1);padding:14px;border-radius:0;max-height:560px;overflow:auto}
+#result{min-height:20px;color:#0a0a0a;font-weight:600}
+.error{color:#b42318}
+.muted{color:#71717a}
+.hide{display:none}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
 </style></head><body><main>
 <h1>Proxy Gold 후보 관리</h1><p class="muted">합성 후보를 검수·관리하는 화면입니다. 여기서의 승인은 <b>approved_proxy</b>이며, 실문서 골든 또는 locked 평가 정답지 승격이 아닙니다.</p>
 <div class="notice">등급 변경·보류·반려에는 사유가 필수이며, 모든 결정은 관리자·시각·문서 해시와 함께 append-only 원장에 남습니다.</div>
