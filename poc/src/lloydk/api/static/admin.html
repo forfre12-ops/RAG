@@ -563,6 +563,17 @@ details.adv[open]{padding-bottom:12px;}
           </span>
           <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
         </div>
+        <!-- 후보 관리·실문서 인테이크 — 별도 화면이라 URL 을 아는 사람만 들어갈 수 있었다.
+             콘솔 어디에도 링크가 없어 "그 화면이 있다는 사실" 자체가 화면에 없었다.
+             두 화면은 포털 JWT 쿠키를 요구하므로 로그인 화면을 거쳐 들어간다
+             (토큰을 URL 에 싣지 않는 설계 — 액세스로그·브라우저 히스토리 잔존 방지). -->
+        <div class="btn-row" style="margin:0 0 10px;flex-wrap:wrap;">
+          <span class="sec-note" style="margin-right:auto;">
+            후보를 개별로 열어 등급을 판정·승인하거나, 실문서를 새로 넣으려면 아래 화면을 씁니다.
+          </span>
+          <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
+          <a class="btn sec sm" href="../api/v1/golden/candidates/actual-intake.html" target="_blank" rel="noopener">실문서 인테이크 ↗</a>
+        </div>
         <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
         <p class="sec-note" style="margin-top:8px;">
           읽기 전용입니다. 정본 승격은 별도 절차이며, 서명 화면에서 <b>publish 를 켜지 않으면</b> 확정 수치는 오르지 않습니다.
