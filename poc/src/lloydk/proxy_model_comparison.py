@@ -81,6 +81,43 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_source_members(path: Path, names: Sequence[str]) -> str:
+    """지정한 함수/메서드의 **본문 소스만** 해시한다 — 줄바꿈은 LF 로 정규화.
+
+    종전엔 파일을 통째로 raw 바이트 해시했다. 두 가지가 깨졌다:
+
+    1) **줄바꿈**. `.gitattributes` 가 `*.py text eol=lf` 를 강제하므로 컨테이너 이미지의
+       소스는 항상 LF 인데, 개발 체크아웃(core.autocrlf=true)은 CRLF 다. git 은 "수정 없음"
+       으로 보지만 바이트 해시는 다르다 — 실측 chunker.py 9,858B(CRLF) vs 9,593B(LF),
+       LF 정규화하면 완전 동일. 그래서 **Windows 에서 finalize 한 번들은 Linux 컨테이너에서
+       영원히 로드 거부**됐다(2026-08-09 실측).
+    2) **범위**. 계약이 선언하는 것은 집계 동작(`methods` 목록)인데 파일 전체를 해시해,
+       주석 한 줄만 고쳐도 기존 번들이 전부 무효가 됐다.
+
+    선언된 멤버를 못 찾으면 계약을 만들지 않는다(fail-closed) — 이름이 바뀐 것을 조용히
+    "해시 대상 없음"으로 넘기면 계약이 아무것도 보증하지 않게 된다.
+    """
+    import ast  # noqa: PLC0415
+
+    text = path.read_bytes().decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    tree = ast.parse(text)
+    found: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names:
+            if node.name in found:
+                raise ProxyComparisonError(
+                    f"aggregation contract member is ambiguous: {node.name} in {path.name}"
+                )
+            found[node.name] = ast.get_source_segment(text, node) or ""
+    missing = [n for n in names if n not in found]
+    if missing:
+        raise ProxyComparisonError(
+            f"aggregation contract members not found in {path.name}: {', '.join(missing)}"
+        )
+    payload = "\n".join(found[n] for n in names).encode("utf-8")
+    return _sha256_bytes(payload)
+
+
 def _strict_json_loads(raw: str, *, location: str) -> Any:
     def reject_constant(value: str) -> None:
         raise ValueError(f"non-standard JSON constant {value}")
@@ -872,13 +909,17 @@ def serving_aggregation_contract(
         ) from exc
     token_stride = min(chunk_overlap, max_length // 4)
     contract: dict[str, object] = {
-        "schema_version": "m5-model-aggregation-mirror-v1",
+        # v2: 소스 해시를 파일 전체 raw 바이트 → **선언된 함수 본문 + LF 정규화** 로 바꿨다.
+        # CRLF 체크아웃에서 만든 번들이 LF 컨테이너에서 로드 거부되던 것과, 주석 수정만으로
+        # 전 번들이 무효가 되던 것을 함께 없앤다(_sha256_source_members 주석 참조).
+        # v1 번들은 이 계약과 맞지 않으므로 재-finalize 가 필요하다.
+        "schema_version": "m5-model-aggregation-mirror-v2",
         "evaluation_unit": "document",
         "chunk_rows_are_not_evaluation_samples": True,
         "char_split": {
             "implementation": "lloydk.modules.m2_preprocess.chunker.split",
             "source_path": splitter_reference,
-            "source_sha256": _sha256_file(splitter_source),
+            "source_sha256": _sha256_source_members(splitter_source, ("split",)),
             "size_formula": "max_length*3",
             "size_chars": max_length * SERVING_CHAR_CHUNK_MULTIPLIER,
             "overlap_chars": chunk_overlap,
@@ -922,7 +963,9 @@ def serving_aggregation_contract(
         "forward_batch_size": forward_batch_size,
         "m5_reference": {
             "path": m5_reference,
-            "sha256": _sha256_file(m5_source),
+            "sha256": _sha256_source_members(
+                m5_source, ("chunk_text", "_encode_windows", "_aggregate_chunk_probs")
+            ),
             "methods": ["chunk_text", "_encode_windows", "_aggregate_chunk_probs"],
         },
     }

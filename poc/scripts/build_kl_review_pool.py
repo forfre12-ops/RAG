@@ -234,6 +234,21 @@ for g, want in PER_GRADE.items():
             "authoring_note": "합성 저작 후보 — 검수 스캐폴딩 제거본. 외부 권위 근거 없음.",
         })
 
+# ── 누출 게이트 ────────────────────────────────────────────────────────────
+# 사람이 읽고 등급을 정할 후보다. 본문에 답이 적혀 있거나 길이가 등급을 알려주면
+# 검수가 검증이 아니라 확인 절차가 되고, 그 라벨로 잰 정확도는 부풀려진다.
+# 발행 **전에** 막는다 — 내보낸 뒤 알면 검수자 시간이 이미 버려진 뒤다.
+from lloydk.dataset_leakage import check_or_raise  # noqa: E402
+
+leak = check_or_raise(
+    [(r["label"], r["text"]) for r in rows],
+    label=f"KL 검수 후보 {len(rows)}건",
+    allow_grade_token=False,
+)
+print("\n=== 누출 검사 통과 ===")
+print(f"  길이-only 1NN {leak['length_only_1nn']} (무작위 {leak['length_only_random']})"
+      f" · 등급 전용 문장 {leak['tell_coverage']:.1%} · 본문 등급 노출 {leak['grade_token_exposed']}건")
+
 OUT.parent.mkdir(parents=True, exist_ok=True)
 with OUT.open("w", encoding="utf-8") as fh:
     for r in rows:

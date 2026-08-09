@@ -60,6 +60,15 @@ def _training_run_context(mlflow_module, spec: "TrainSpec"):
     return nullcontext(_LocalRun(info=_LocalRunInfo(run_id=uuid.uuid4().hex)))
 
 
+# 학습셋 run 디렉터리 파일명 ↔ 고전 규약 대응. 앞에 있는 것부터 찾는다.
+# train 은 청크가 이미 펼쳐진 train_chunks 를 우선한다(로더가 pre_chunked 를 자동 감지).
+_RUN_DIR_ALIASES: dict[str, tuple[str, ...]] = {
+    "train.jsonl": ("train_chunks.jsonl", "train_documents.jsonl"),
+    "val.jsonl": ("validation_documents.jsonl",),
+    "test.jsonl": ("calibration_documents.jsonl",),
+}
+
+
 def _dataset_split(name: str) -> str:
     """기본 학습셋 분할 경로 — settings.training_dataset_dir 에서 파생.
 
@@ -75,7 +84,19 @@ def _dataset_split(name: str) -> str:
         base = str(getattr(settings, "training_dataset_dir", "") or "").strip()
     except Exception:  # noqa: BLE001 - 설정 미가용 환경(단독 스크립트)에서도 동작
         base = ""
-    return f"{base or 'datasets/labeled_p1_v5_clean'}/{name}"
+    base = base or "datasets/labeled_p1_v5_clean"
+    classic = Path(base) / name
+    if classic.is_file():
+        return str(classic)
+    # 학습셋 run 디렉터리(materialize_proxy_training_set 산출)는 파일명 규약이 다르다.
+    # 그대로 두면 콘솔 「재학습 트리거」가 FileNotFoundError 로 끝나고, workers/tasks.py 가
+    # 그걸 "skipped: retrain topology unavailable" 로 흡수해 **마운트 문제처럼 보인다**
+    # (2026-08-08 실측). 세대가 바뀔 때마다 파일명을 손으로 맞추지 않도록 여기서 흡수한다.
+    for alt in _RUN_DIR_ALIASES.get(name, ()):  # noqa: SIM118
+        candidate = Path(base) / alt
+        if candidate.is_file():
+            return str(candidate)
+    return str(classic)
 
 
 def _build_progress_callback(run_id: str):
