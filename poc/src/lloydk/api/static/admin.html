@@ -162,6 +162,11 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .why-t{font-size:10.5px;color:var(--text-faint);white-space:nowrap;min-width:118px;}
 .why-x{flex:1;word-break:break-all;}
 .why-w{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);white-space:nowrap;}
+/* 프로파일에 맞지 않는 카드 — showPane 의 인라인 display 보다 우선해야 하므로 !important. */
+.pf-hidden{display:none !important;}
+.profile-banner{margin:10px 0 4px;padding:9px 13px;border-radius:8px;font-size:12.5px;font-weight:600;border-left:4px solid;}
+.profile-banner.jjw{background:var(--bg-surface);border-color:var(--accent);}
+.profile-banner.cust{background:var(--bg-surface);border-color:#b8860b;}
 .srv-gate{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg-surface);}
 .srv-gate>b{font-size:17px;font-family:var(--font-mono);}
 .dash-panel{border:1px solid var(--border-mid);border-radius:10px;padding:12px 13px;background:var(--bg-surface);display:flex;flex-direction:column;gap:8px;}
@@ -334,6 +339,10 @@ details.adv[open]{padding-bottom:12px;}
   <!-- 탭 — 카드 12장을 상시 노출하는 대신 루프별로 나눈다.
        DOM 에서 제거하지 않고 display 만 전환하므로, 요건 이행 증빙(해당 기능이
        화면에 존재한다는 사실)은 그대로 유지된다. 삭제·비활성이 아니라 이동이다. -->
+  <!-- 어느 시스템에 접속했는지 항상 밝힌다 — 지재원과 고객사가 같은 화면을 쓰므로,
+       배너가 없으면 운영자가 어느 서버에서 무엇을 누르는지 구분할 근거가 화면에 없다. -->
+  <div id="profile-banner" class="profile-banner" style="display:none"></div>
+
   <div class="tabbar" role="tablist">
     <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">분류 · 검수</span></button>
     <button class="tab"        data-tab="model"   role="tab" onclick="showPane('model')">모델<span class="tab-sub">골든셋 · 학습 · 배포</span></button>
@@ -562,7 +571,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== N. 합성 샘플 생성 · 검수 (FUN-003) ===== -->
-    <section class="card col-span" data-pane="model" style="order:5">
+    <section class="card col-span" data-pane="model" style="order:5" data-profile="full-train">
       <div class="card-head">
         <div class="ttl"><span class="step-no">N</span> 합성 샘플 생성 · 검수 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
@@ -744,7 +753,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 7. 골든셋 후보 빌더 ===== 루프 B 의 시작점(G1) -->
-    <section class="card col-span" data-pane="model" style="order:2">
+    <section class="card col-span" data-pane="model" style="order:2" data-profile="full-train">
       <div class="card-head">
         <div class="ttl"><span class="step-no">G1</span> 골든셋 후보 빌더 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
@@ -1112,7 +1121,47 @@ async function checkHealth(){
  * [정합 2026-08-09] 검수 임계는 **서버 값이 진실**이다. 종전 콘솔은 0.70 슬라이더를 두고
  * "검수 라우팅 임계"라 적었지만 API 호출이 0건이라 서버와 무관했다 — 화면이 사실과 달랐다.
  * 이제 서버 값을 읽어 읽기 전용으로 보여주고, 화면 필터는 별도 입력으로 분리했다. */
+/* [프로파일 정합 2026-08-09] 한 벌의 콘솔을 지재원(full-train)과 고객사(onprem-local)에 그대로
+ * 서빙하고 있었다. 콘솔이 deploy_profile 을 한 번도 읽지 않아(grep 0건) 카드 14장이 두 곳에서
+ * 글자 하나 다르지 않았다. 회원사 관리자에게 지재원 전용 기능이 그대로 보였고, 누르면
+ * llm_provider=noop 이라 결과가 0건으로 나왔다.
+ *
+ * 기준은 **deploy_profile** 이다(llm_provider 가 아니다). 처음엔 "LLM 이 없으면 무의미하니
+ * llm_provider=noop 이면 숨기자"로 짰는데, 테스트 환경은 지재원도 noop 이라 **감리 시연의 핵심인
+ * 골든셋 후보 빌더가 지재원에서도 사라졌다**. 제공자 설정은 환경마다 달라 화면 구성의 기준이
+ * 될 수 없다 — 이 서버가 무엇을 하는 시스템인지(프로파일)가 기준이어야 한다.
+ *
+ * 대상은 모델 공장 전용 기능만: 골든셋 후보 빌더 · 합성 샘플 생성.
+ * 골든 현황·잡 목록은 숨기지 않는다 — 고객사도 검수·서명 경로가 살아 있다
+ * (onprem-local 은 deploy_gate_manual_require_locked_eval=True 를 유지한다).
+ * 그리고 조용히 감추지 않는다 — 어느 시스템에 접속했는지 배너로 항상 밝힌다. */
+function applyProfileVisibility(d){
+  const profile=String((d&&d.deploy_profile)||'');
+  const llm=String((d&&d.llm_provider)||'');
+  const llmOff = !llm || llm==='noop';
+  // 프로파일을 모르면(healthz 실패 등) 숨기지 않는다 — 판단 근거가 없을 때 기능을 감추면
+  // "왜 안 보이지"로 헤매게 된다. fail-open.
+  const hideFactory = (profile === 'onprem-local');
+  // ⚠ 인라인 style 로 숨기면 showPane() 이 탭 전환 때 [data-pane] 전체의 display 를 다시
+  //   써서 숨김이 지워진다(실측: 탭을 한 번 누르면 숨긴 카드가 되살아났다).
+  //   클래스 + !important 로 두어 두 로직이 서로 간섭하지 않게 한다.
+  document.querySelectorAll('[data-profile="full-train"]').forEach(el=>{
+    el.classList.toggle('pf-hidden', hideFactory);
+  });
+  const b=$('profile-banner');
+  if(b && profile){
+    const isCust = hideFactory;
+    b.textContent = isCust
+      ? `고객사 운영 시스템(${profile}) — 문서 분류·검수·모델 운영 화면입니다.`
+        + ' 골든셋 후보 구성·합성 문서 생성은 지재원 모델 공장에서 수행하므로 표시하지 않습니다.'
+      : `지재원 모델 공장(${profile}) — 골든셋 구성·학습·배포까지 전 구간 화면입니다.`
+        + (llmOff ? ' (현재 LLM 제공자가 noop 이라 합성·자동 라벨링 결과는 0건으로 나옵니다.)' : '');
+    b.className = 'profile-banner ' + (isCust ? 'cust' : 'jjw');
+    b.style.display='';
+  }
+}
 function applyServerConfig(d){
+  applyProfileVisibility(d);
   const oc=(d&&d.operational_config)||{};
   const t=oc.review_confidence_threshold;
   const el=$('srv-gate-v');
