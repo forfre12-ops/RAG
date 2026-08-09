@@ -45,6 +45,15 @@ def main(argv=None) -> int:
     ap.add_argument("--iss", default="lloydk-console", help="JWT_ISSUER 와 일치해야 한다")
     ap.add_argument("--aud", default="lloydk-api", help="JWT_AUDIENCE 와 일치해야 한다")
     ap.add_argument("--regenerate-key", action="store_true", help="키쌍을 새로 만든다")
+    # 토큰이 파일과 .env 두 곳에 살면 재발급 때 한쪽만 갱신돼 어긋난다.
+    # 실측(2026-08-09): iss/aud 를 추가하며 재발급했는데 .env 에는 옛 토큰이 남아
+    # 로그인 화면이 채워준 토큰이 그대로 401(signature verification failed) 이었다.
+    # 발급과 동시에 갱신해 사람이 두 곳을 맞추지 않게 한다.
+    ap.add_argument("--env-file", action="append", default=[],
+                    help="CONSOLE_LOGIN_PREFILL_TOKEN 을 갱신할 .env (여러 번 지정 가능)")
+    ap.add_argument("--also-copy-jwks", default="",
+                    help="검증키를 복사할 경로. 컨테이너는 secrets/ 를 마운트하지 않으므로 "
+                         "바인드되는 경로(예: datasets/_console_jwt/jwks.json)로 준다")
     args = ap.parse_args(argv)
 
     from cryptography.hazmat.primitives import hashes, serialization
@@ -95,6 +104,38 @@ def main(argv=None) -> int:
     token = f"{signing_input.decode()}.{b64u(sig)}"
     (OUT / "token.txt").write_text(token + "\n", encoding="utf-8")
 
+    updated: list[str] = []
+    for env_name in args.env_file:
+        env_path = Path(env_name)
+        if not env_path.is_absolute():
+            env_path = ROOT / env_path
+        if not env_path.is_file():
+            print(f"  [건너뜀] .env 없음: {env_path}")
+            continue
+        lines = [
+            ln for ln in env_path.read_text(encoding="utf-8").splitlines()
+            if not ln.startswith("CONSOLE_LOGIN_PREFILL_TOKEN=")
+        ]
+        lines.append(f"CONSOLE_LOGIN_PREFILL_TOKEN={token}")
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        updated.append(str(env_path))
+
+    copied = ""
+    if args.also_copy_jwks:
+        dst = Path(args.also_copy_jwks)
+        if not dst.is_absolute():
+            dst = ROOT / dst
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(jwks_path.read_text(encoding="utf-8"), encoding="utf-8")
+        # 권한 조정은 편의일 뿐이다. 바인드 마운트에서 파일 소유자가 컨테이너 uid(1000)이면
+        # 호스트 계정(1001)은 chmod 를 못 하는데(실측 PermissionError), 내용은 이미 써졌고
+        # 그룹 쓰기로 충분하다. 여기서 죽으면 토큰 발급 전체가 실패한 것처럼 보인다.
+        try:
+            dst.chmod(0o644)
+        except OSError as exc:
+            print(f"  [알림] jwks 권한 조정 생략({exc.__class__.__name__}) — 내용은 기록됨")
+        copied = str(dst)
+
     print(json.dumps({
         "키": made,
         "jwks": str(jwks_path.relative_to(ROOT)).replace("\\", "/"),
@@ -102,6 +143,8 @@ def main(argv=None) -> int:
         "roles": payload["roles"],
         "만료": dt.datetime.fromtimestamp(payload["exp"], dt.timezone.utc).isoformat(),
         "token_file": str((OUT / "token.txt").relative_to(ROOT)).replace("\\", "/"),
+        "env_updated": updated,
+        "jwks_copied_to": copied or None,
     }, ensure_ascii=False, indent=2))
     print("\n서버 환경변수:")
     print("  AUTH_MODE=both")
