@@ -423,7 +423,6 @@ details.adv[open]{padding-bottom:12px;}
           </label>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button class="btn red sm" onclick="purgeDemoData()">데모 데이터 초기화</button>
           <span id="purge-result" class="hint" style="margin:0;">시연으로 쌓인 데이터만 삭제합니다. 운영 데이터는 대상이 아닙니다.</span>
         </div>
       </div>
@@ -523,29 +522,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 2.5 유사 문서 검색 (RAG) ===== 요건 아님(RAG=선택 보완). 시연 대본에서 제외. -->
-    <section class="card" data-pane="ops" style="order:9">
-      <div class="card-head">
-        <div class="ttl"><span class="step-no">R</span> 유사 문서 검색 · 검수 보조 <span class="reqtag out">요건외 · 부가</span></div>
-        <span class="ep">POST /rag/search</span>
-      </div>
-      <div class="card-body">
-        <div class="field">
-          <label class="fld">질의 (검수 중인 문서 본문·제목을 붙여넣거나 키워드 입력)</label>
-          <!-- 하드코딩 기본값을 두면 검수 큐가 비어 자동 채움이 돌지 않을 때 늘 같은 문구가 박혀 있어
-               "동작하지 않는 화면"으로 보인다. 비워 두고 placeholder 로만 안내한다. -->
-          <textarea id="rag-q" rows="3" placeholder="검수 중인 문서 본문을 붙여넣거나 키워드를 입력하세요"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap;">
-          <label class="fld" style="margin:0">Top-K</label>
-          <input id="rag-k" type="number" min="1" max="20" value="5" style="width:70px" />
-          <button class="btn sec sm" onclick="ragFromClassifyPanel()">위 분류 본문 가져오기</button>
-          <button class="btn sm" onclick="ragSearch()">유사 문서 검색</button>
-          <span id="rag-info" class="hint" style="margin:0;"></span>
-        </div>
-        <div id="rag-results" class="queue"><div class="q-empty">검수 중인 문서와 비슷한 과거 문서를 찾아 판단을 돕습니다.</div></div>
-        <p class="sec-note">검수자가 유사 사례를 보고 등급을 판단하는 용도입니다. <b>검색만 하고 답변은 만들지 않습니다.</b></p>
-      </div>
-    </section>
+    
 
     <!-- ===== G3. 골든셋 현황 ===== 서명 결과가 "얼마나 찼는지"를 루프 B 안에서 보여준다.
          같은 수치가 [관제] 탭 대시보드에도 '배포 readiness'라는 이름으로 있었지만, 골든 검수를
@@ -1445,7 +1422,6 @@ async function loadReviewQueue(){
     const info=$('rq-info');
     if(info) info.textContent = `대기 ${d.total||0}건 (표시 ${QUEUE.length})`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(', ')}`:'');
     log(`검수 큐 로드: ${QUEUE.length}건 (전체 ${d.total||0})`, 'ok');
-    autoRagForQueue();   // 수동 로드 시 최상단 문서 기준 유사문서 자동 조회(폴링 tick 은 스킵)
   }catch(e){ log(`검수 큐 로드 실패: ${e.status||e.message}`,'err'); }
 }
 function enqueue(d, title){
@@ -1529,45 +1505,7 @@ async function toggleWhy(i){
 }
 // 검수 큐 최상단 문서 기준 유사문서 자동 조회(검수 보조). 수동 「DB 검수 큐 불러오기」 때만
 // 발화하고, 실시간 관제 폴링 tick(AUTO_SILENT)에서는 스킵한다 — 임베딩 비용·로그 스팸 방지.
-function autoRagForQueue(){
-  if(AUTO_SILENT) return;
-  if(!QUEUE.length) return;
-  const top=QUEUE[0];
-  const q=String(top.text_preview||top.title||top.doc_id||'').slice(0,400).trim();
-  if(!q) return;
-  ragSearch(q);
-}
 /* 지금 분류 패널에 들어 있는 본문을 질의로 가져온다 — 검수 중인 문서를 다시 붙여넣지 않아도 되게. */
-function ragFromClassifyPanel(){
-  const body=($('cl-body').value||'').trim();
-  const info=$('rag-info');
-  if(!body){ if(info) info.textContent='분류 패널에 본문이 없습니다.'; return; }
-  $('rag-q').value = body.slice(0, 400);
-  if(info) info.textContent='분류 패널 본문을 가져왔습니다 — [유사 문서 검색]을 누르세요.';
-}
-async function ragSearch(presetQuery){
-  const q=(presetQuery!=null?String(presetQuery):($('rag-q').value||'')).trim();
-  if(!q){ $('rag-info').textContent='질의를 입력하세요'; return; }
-  if(presetQuery!=null) $('rag-q').value=q;   // 자동 조회 시 실제 질의를 노출
-  const k=Math.max(1,Math.min(20,parseInt($('rag-k').value||'5',10)||5));
-  $('rag-info').textContent=(presetQuery!=null?'검수 큐 최상단 문서 기준 자동 조회…':'검색 중…');
-  try{
-    // 데모 실적재 문서는 RAG 'demo' 컬렉션에 색인(평가 'docs' 오염 분리)되므로 그 컬렉션을 조회.
-    const d=await api('POST','/rag/search',{query:q, namespace:'demo', top_k:k, use_reranker:true});
-    const hits=(d&&d.hits)||[];
-    $('rag-info').textContent=`${hits.length}건 · ${d.elapsed_ms||0}ms`;
-    if(!hits.length){ $('rag-results').innerHTML='<div class="q-empty">유사 문서 없음 — 색인된 코퍼스가 없을 수 있습니다.</div>'; return; }
-    $('rag-results').innerHTML=hits.map((h,i)=>{
-      const parts=String(h.source_doc||'').split('|');
-      const name=parts[0]||h.source_doc||'?'; const grade=parts[1]||'';
-      const gcls=['TS','S1','S2','S3'].includes(grade)?`pill grade-${grade}`:'pill';
-      return `<div class="q-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">`
-        +`<b>#${i+1} ${esc(name)}</b>`
-        +`<span style="display:flex;gap:6px;align-items:center">${grade?`<span class="${gcls}">${esc(grade)}</span>`:''}<span class="mono" style="color:var(--text-dim)">유사도 ${Number(h.score).toFixed(3)}</span></span></div>`
-        +`<div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">${esc(String(h.text||'').slice(0,180))}</div></div>`;
-    }).join('');
-  }catch(e){ $('rag-info').textContent=`검색 실패: ${e.status||e.message||''}`; $('rag-results').innerHTML=`<div class="q-empty">검색 실패: ${esc(String(e.data?.detail||e.message||e.status||''))}</div>`; }
-}
 
 async function doConfirm(i){
   if(!guardWrite('확정')) return;
@@ -1800,31 +1738,6 @@ async function loadAuditLog(){
 /* ---- 데모 데이터 초기화 (시연 반복용) ---- */
 // 실적재 시연으로 쌓인 created_by=demo-console 문서·분류·RAG벡터만 스코프 물리삭제.
 // Safe Mode 가드 + 확인 팝업. 운영 데이터(다른 created_by)는 서버 스코프상 대상이 아님.
-async function purgeDemoData(){
-  if(!guardWrite('데모 데이터 초기화')) return;
-  if(!confirm('실적재 시연으로 만든 데모 데이터(created_by=demo-console 문서·분류·청크·RAG벡터)를 DB에서 물리삭제합니다.\n운영 데이터는 대상이 아닙니다. 진행할까요?')) return;
-  const el=$('purge-result');
-  try{
-    const d=await api('POST','/admin/demo/purge');
-    if(el) el.innerHTML=`<span class="pill ok">초기화됨</span> 문서 ${d.documents} · 분류 ${d.classifications} · 청크 ${d.chunks} · RAG벡터 ${d.rag_vectors} 삭제`+((d.warnings&&d.warnings.length)?` · ⚠ ${esc(d.warnings.join(', '))}`:'');
-    log(`데모 데이터 초기화: 문서 ${d.documents}·분류 ${d.classifications}·청크 ${d.chunks}·RAG ${d.rag_vectors}`,'ok');
-    QUEUE=[]; renderQueue();   // 화면 검수 큐도 비움
-  }catch(e){
-    // 404 "demo console disabled" 는 고장이 아니라 프로파일 정책이다.
-    // 하드닝 프로파일(onprem-local·full-train)은 demo_console_enabled=False 로 두어
-    // 파괴적 물리삭제 표면을 운영에서 없앤다(config.py). 관리 UI 는 serve_admin_console
-    // 로 따로 켜지므로 버튼은 보이는데 호출만 404 다 — 그 사유를 화면이 답해야 한다.
-    if(e.status===404){
-      if(el) el.innerHTML='<span class="pill warn">비활성</span> 이 배포 프로파일에서는 데모 초기화가 <b>의도적으로 꺼져 있습니다</b>'
-        + '(<code>demo_console_enabled=False</code> — 운영에서 파괴적 물리삭제 표면을 없애기 위함). '
-        + '데모/파일럿 프로파일에서만 동작합니다. 시연 데이터는 <code>created_by=demo-console</code>·RAG 컬렉션 <code>demo</code> 로 식별됩니다.';
-      log('데모 초기화 비활성(프로파일 정책) — 고장 아님','info');
-      return;
-    }
-    if(el) el.innerHTML=`<span class="pill err">실패</span> ${e.status||''} ${esc(String(e.data?.detail||e.message||''))} ${e.status===403?'— admin 역할 필요':''}`;
-    log('데모 초기화 실패: '+(e.status||e.message),'err');
-  }
-}
 
 /* ---- G3. 골든셋 현황 ----
  * GET /admin/locked-readiness — 사람이 서명해 확정된 평가정답이 등급별로 얼마나 찼는지.
