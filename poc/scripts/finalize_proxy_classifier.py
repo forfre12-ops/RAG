@@ -44,6 +44,7 @@ from lloydk.proxy_training_finalization import (  # noqa: E402
     canonical_trace_bytes,
     evaluate_checkpoint_traces,
     fit_document_temperature,
+    CHANCE_LEVEL_F1_MACRO,
     fit_escalation_operating_point,
     load_model_document_logits,
     select_checkpoint,
@@ -330,6 +331,8 @@ def finalize_proxy_classifier(
     batch_size: int = 8,
     device: str = "auto",
     fnr_target: float = 0.05,
+    min_f1_macro: float = CHANCE_LEVEL_F1_MACRO,
+    baseline_f1_macro: float | None = None,
 ) -> tuple[Path, dict[str, object], dict[str, object]]:
     """Select, calibrate, and publish one restricted proxy deployment candidate."""
     if batch_size != SERVING_INFERENCE_BATCH_SIZE:
@@ -409,6 +412,8 @@ def finalize_proxy_classifier(
             calibration_batch.documents,
             temperature=float(temperature["temperature"]),
             fnr_target=fnr_target,
+            min_f1_macro=min_f1_macro,
+            baseline_f1_macro=baseline_f1_macro,
         )
         calibration_input_sha256 = str(
             materialization_audit["calibration_documents"]["sha256"]
@@ -566,6 +571,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--fnr-target", type=float, default=0.05)
+    # 품질 하한(2026-08-11). 기본은 무작위 수준이라 깨진 후보만 막는다.
+    # 운영 게이트로 쓸 값은 --baseline-f1-macro 쪽이다(무회귀 강제).
+    parser.add_argument("--min-f1-macro", type=float,
+                        default=CHANCE_LEVEL_F1_MACRO,
+                        help="선택된 운영점의 macro F1 절대 하한")
+    parser.add_argument("--baseline-f1-macro", type=float, default=None,
+                        help="직전 배포/기준 모델의 macro F1. 주면 무회귀 강제")
     args = parser.parse_args(argv)
     try:
         run_dir, manifest, complete = finalize_proxy_classifier(
@@ -576,6 +588,8 @@ def main(argv: list[str] | None = None) -> int:
             batch_size=args.batch_size,
             device=args.device,
             fnr_target=args.fnr_target,
+            min_f1_macro=args.min_f1_macro,
+            baseline_f1_macro=args.baseline_f1_macro,
         )
     except (OSError, ProxyTrainingFinalizationError, ValueError) as exc:
         print(f"proxy classifier finalization failed: {exc}", file=sys.stderr)

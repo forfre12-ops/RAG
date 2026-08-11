@@ -1115,11 +1115,18 @@ def _tau_candidates(probabilities: Sequence[Mapping[str, float]]) -> list[float 
     return [None, *sorted(candidates, reverse=True)]
 
 
+# 4등급 균형 표본에서 무작위 예측의 macro F1 은 약 0.25 다. 그 아래는 "설정이 보수적"이
+# 아니라 후보가 깨졌다는 뜻이라, 어떤 정당한 학습 run 도 여기 있을 이유가 없다.
+CHANCE_LEVEL_F1_MACRO = 0.25
+
+
 def fit_escalation_operating_point(
     traces: Sequence[DocumentWindowLogits],
     *,
     temperature: float,
     fnr_target: float = 0.05,
+    min_f1_macro: float = CHANCE_LEVEL_F1_MACRO,
+    baseline_f1_macro: float | None = None,
 ) -> dict[str, object]:
     """Select tau only on calibration documents after T is frozen.
 
@@ -1127,9 +1134,25 @@ def fit_escalation_operating_point(
     target.  Within that set we maximize macro F1, then minimize S3
     overclassification and review burden, and finally prefer the less aggressive
     (higher) threshold.  No feasible point is a loud failure.
+
+    품질 하한(2026-08-11 신설). 종전에는 통과 조건이 fnr_high 와 퇴행성뿐이라, 고등급 미탐만
+    낮으면 **macro F1 이 아무리 낮은 후보도 COMPLETE** 가 됐다. 미탐을 0 으로 만드는 가장 쉬운
+    방법은 전건을 고등급으로 올리는 것이고 그건 퇴행성 검사만으로 다 걸리지 않는다.
+
+      min_f1_macro       절대 하한. 기본 = 무작위 수준(0.25) — 깨진 후보만 막고 연구 반복은
+                         막지 않는다. 실제 품질 게이트로 쓰려면 호출부에서 올려 줄 것.
+      baseline_f1_macro  직전 배포·기준 모델의 macro F1. 주면 **무회귀**를 강제한다.
+                         운영 게이트는 이쪽이다 — 절대값은 셋마다 의미가 달라진다.
+
+    두 검사는 feasible 필터가 아니라 **선택된 운영점**에 적용한다. 필터에 섞으면 "FNR 목표
+    미달"과 "품질 미달"이 같은 오류로 뭉개져 무엇을 고쳐야 하는지 알 수 없다.
     """
     if not 0.0 <= fnr_target <= 1.0:
         raise ProxyTrainingFinalizationError("fnr_target must be in [0,1]")
+    if not 0.0 <= min_f1_macro <= 1.0:
+        raise ProxyTrainingFinalizationError("min_f1_macro must be in [0,1]")
+    if baseline_f1_macro is not None and not 0.0 <= baseline_f1_macro <= 1.0:
+        raise ProxyTrainingFinalizationError("baseline_f1_macro must be in [0,1]")
     probabilities = document_probabilities(traces, temperature=temperature)
     truths = [trace.label for trace in traces]
     candidates = _tau_candidates(probabilities)
@@ -1168,6 +1191,18 @@ def fit_escalation_operating_point(
 
     selected = max(feasible, key=rank)
     selected_tau = selected["tau"]
+    selected_f1 = float(selected["f1_macro"])
+    if selected_f1 < min_f1_macro:
+        raise ProxyTrainingFinalizationError(
+            "selected operating point is below the absolute macro-F1 floor: "
+            f"f1_macro={selected_f1:.4f} < min_f1_macro={min_f1_macro} "
+            f"(fnr_high={float(selected['fnr_high']):.4f} 는 목표를 만족하지만 품질이 하한 미만이다)"
+        )
+    if baseline_f1_macro is not None and selected_f1 < baseline_f1_macro:
+        raise ProxyTrainingFinalizationError(
+            "selected operating point regresses against the baseline: "
+            f"f1_macro={selected_f1:.4f} < baseline={baseline_f1_macro:.4f}"
+        )
     # ``None`` is a valid, explicitly calibrated argmax operating point.  The
     # serving artifact keeps that distinction rather than inventing a number.
     compact_keys = (
@@ -1193,6 +1228,10 @@ def fit_escalation_operating_point(
         "selection_unit": "document",
         "temperature": temperature,
         "fnr_target": fnr_target,
+        # 적용된 품질 하한을 산출물에 남긴다 — 매니페스트만 보고 "무엇을 통과한 값인지"
+        # 알 수 있어야 한다(하한을 코드에만 두면 소스 버전마다 뜻이 달라진다).
+        "min_f1_macro": min_f1_macro,
+        "baseline_f1_macro": baseline_f1_macro,
         "selection_policy": (
             "meet_fnr_target_then_max_f1_then_min_s3_overclassification_"
             "then_min_review_burden_then_min_overclass_then_high_tau"

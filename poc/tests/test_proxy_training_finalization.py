@@ -29,6 +29,7 @@ from lloydk.proxy_training_finalization import (
     collect_document_window_logits,
     evaluate_checkpoint_traces,
     fit_document_temperature,
+    CHANCE_LEVEL_F1_MACRO,
     fit_escalation_operating_point,
     load_document_rows,
     predict_with_escalation,
@@ -936,3 +937,77 @@ def test_p1_proxy_candidate_cli_derives_only_attested_train_and_validation_paths
     assert spec.chunk_expand is False
     assert spec.training_entrypoint_path.endswith("p1_train_classifier.py")
     assert "deployable" in capsys.readouterr().out
+
+
+# ── 품질 하한 (2026-08-11 신설) ────────────────────────────────────────────────
+# 종전 통과 조건은 fnr_high 와 퇴행성뿐이라, 고등급 미탐만 낮으면 macro F1 이 아무리 낮은
+# 후보도 COMPLETE 가 됐다. 미탐을 0 으로 만드는 가장 쉬운 방법이 "전건 고등급"이고 그건
+# 퇴행성 검사만으로 다 걸리지 않는다.
+
+def _weak_traces():
+    """종전 게이트를 그대로 통과하던 모양 — fnr_high 0.0 · 퇴행성 0.0 인데 품질은 낮다.
+
+    전건을 한 등급으로 몰면 퇴행성 검사에 먼저 걸리므로(실측 확인) 예측을 흩되 절반을
+    틀리게 둔다. 실측: f1_macro 0.6667 · fnr_high 0.0 · degenerate 0.0.
+    """
+    return (
+        _trace("ts", "TS", [[2.0, 1.0, 0.0, 0.0]]),
+        _trace("s1", "S1", [[0.1, 0.2, 2.0, 0.1]]),   # S2 로 오분류
+        _trace("s2", "S2", [[0.1, 0.1, 0.2, 2.0]]),   # S3 로 오분류
+        _trace("s3", "S3", [[0.1, 0.1, 2.0, 0.2]]),   # S2 로 오분류
+    )
+
+
+def test_weak_candidate_passes_legacy_conditions():
+    """하한이 없으면 이 후보가 통과한다는 것을 못박는다 — 하한의 존재 이유."""
+    report = fit_escalation_operating_point(
+        _weak_traces(), temperature=1.0, fnr_target=1.0, min_f1_macro=0.0
+    )
+    metrics = report["selected_metrics"]
+    assert float(metrics["fnr_high"]) == 0.0
+    assert float(metrics["degenerate_penalty"]) == 0.0
+    assert float(metrics["f1_macro"]) < 0.70
+
+
+def test_absolute_f1_floor_blocks_low_quality_candidate():
+    with pytest.raises(ProxyTrainingFinalizationError, match="absolute macro-F1 floor"):
+        fit_escalation_operating_point(
+            _weak_traces(), temperature=1.0, fnr_target=1.0, min_f1_macro=0.90
+        )
+
+
+def test_baseline_no_regression_blocks_worse_candidate():
+    with pytest.raises(ProxyTrainingFinalizationError, match="regresses against the baseline"):
+        fit_escalation_operating_point(
+            _weak_traces(), temperature=1.0, fnr_target=1.0,
+            min_f1_macro=0.0, baseline_f1_macro=0.99,
+        )
+
+
+def test_floor_and_baseline_are_recorded_in_artifact():
+    """매니페스트만 보고 '무엇을 통과한 값인지' 알 수 있어야 한다."""
+    report = fit_escalation_operating_point(
+        _trace_set_healthy(), temperature=2.0, fnr_target=0.0,
+        min_f1_macro=0.10, baseline_f1_macro=0.10,
+    )
+    assert report["min_f1_macro"] == 0.10
+    assert report["baseline_f1_macro"] == 0.10
+
+
+def test_default_floor_is_chance_level_and_does_not_block_healthy_run():
+    """기본값은 깨진 후보만 막고 정상 run 은 막지 않는다(동작 보존)."""
+    report = fit_escalation_operating_point(
+        _trace_set_healthy(), temperature=2.0, fnr_target=0.0
+    )
+    assert report["min_f1_macro"] == CHANCE_LEVEL_F1_MACRO
+    assert report["baseline_f1_macro"] is None
+    assert float(report["selected_metrics"]["f1_macro"]) >= CHANCE_LEVEL_F1_MACRO
+
+
+def _trace_set_healthy():
+    return (
+        _trace("ts", "TS", [[2.0, 1.0, 0.0, 0.0]]),
+        _trace("s1", "S1", [[0.9, 1.2, 0.8, 0.0]]),
+        _trace("s2", "S2", [[0.2, 0.1, 2.0, 0.3]]),
+        _trace("s3", "S3", [[0.1, 0.1, 0.2, 2.0]]),
+    )
