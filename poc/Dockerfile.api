@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+# [재현성] uv.lock 동봉 — api.prod·worker 와 동일 규약(scripts/docker_install_locked.sh).
+COPY pyproject.toml uv.lock ./
 COPY src ./src
 COPY scripts ./scripts
 # alembic 마이그레이션 동봉 — 폐쇄망에서 `docker compose run --rm api alembic upgrade head` 실행 가능
@@ -25,7 +26,14 @@ COPY alembic.ini ./
 #   [hwp-tables] unhwp(MIT) — .hwp 표 셀 회수. rhwp 단독은 표를 통째로 흘린다(FUN-022 갭).
 # 의도적 제외: [ocr](요건 외 + poppler=GPL), [pdf-agpl](PyMuPDF=AGPL, 기본은 pdfminer.six).
 # → api.prod/worker 와 동일한 파싱 extras. 스캔 PDF 는 본문 0자 → processing_status='failed' 격리.
-RUN pip install --upgrade pip && pip install -e ".[hwp,hwp-tables,pdf-tables,jwt,xls]"
+# [재현성] uv.lock 고정 설치 — api.prod·worker 와 같은 잠금에서 나온다. dev 이미지가 다른
+# 버전으로 돌면 여기서 재현한 결함이 배포본에서 재현되지 않는다.
+# ⚠ 종전에는 torch 를 인덱스 지정 없이 전이 의존으로 받아 PyPI 기본(CUDA) 휠이 깔렸다.
+# api.prod·worker 와 동일하게 기본 CPU 로 맞춘다(GPU 필요 시 --build-arg TORCH_INDEX 로 override).
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+RUN pip install --upgrade pip && \
+    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
+        hwp hwp-tables pdf-tables jwt xls
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp 번들 FreeType 의 undefined symbol
 # (FT_Palette_Data_Get) 로 `import rhwp` 가 깨지는 것을 시스템 FreeType 선로드로 채운다.

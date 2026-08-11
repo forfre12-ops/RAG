@@ -39,6 +39,7 @@ DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_
 | `cache_kure_v1.py` | 임베딩 모델 사전 캐시 (폐쇄망 필수) | [INSTALL](../docs/INSTALL.md) |
 | `register_deployed_model.py`<br>`seed_active_model_version.py` | 배포 모델 등록·활성 버전 시드 | [INSTALL](../docs/INSTALL.md) |
 | `seed_keywords.py` | 태깅 키워드 시드 DB 적재 | — |
+| `docker_install_locked.sh` | **Dockerfile 3종이 호출** — `uv.lock` 고정 설치. 직접 실행할 일은 없다 | — |
 
 ---
 
@@ -67,6 +68,7 @@ DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_
 | **성능** | `run_perf_scenarios.py` · `run_soak.py` |
 | **계약** | `openapi_consistency.py` |
 | **라이선스·SBOM** | `dump_licenses.py` · `render_sbom_html.py` |
+| **데이터 누출** | `audit_dataset_leakage.py` (`--gate` 로 임계 초과 시 exit 1 — 길이·등급전용문장이 등급을 알려주는지) |
 | **CI** | `ci_alembic_drift_check.sh` (내부적으로 `_drift_probe_empty_check.py` 호출) |
 
 전체 타깃은 [Makefile](../Makefile)에서 확인하십시오.

@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
+# [재현성] uv.lock 동봉 — api.prod 와 동일 규약(scripts/docker_install_locked.sh).
+COPY pyproject.toml uv.lock ./
 COPY src ./src
 COPY scripts ./scripts
 # [이미지 크기] torch 를 먼저 명시 인덱스로 깐다 — 안 하면 pip 이 PyPI 기본(CUDA) 휠을 끌어와
@@ -27,9 +28,11 @@ ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 # [xls] xlrd 누락 시 구형 .xls 가 0글자로 추출됨(511dbfb 배치경로 재발 방지).
 # [라이선스] OCR([ocr], GPL poppler)은 요건 외라 배포 이미지에서 제외(코드·extra 정의만 리포 존치).
 # 2026-08-02: dev(Dockerfile.api)·에어갭 번들에서도 동일 제거 — 전 빌드 경로가 GPL-free.
+# [재현성] api.prod 와 동일하게 uv.lock 고정 설치. 워커와 api 가 다른 버전으로 돌면
+# 같은 문서가 경로에 따라 다른 등급을 받을 수 있다 — 두 이미지의 의존성은 한 lock 에서 나와야 한다.
 RUN pip install --upgrade pip && \
-    pip install --index-url ${TORCH_INDEX} "torch>=2.3" && \
-    pip install -e ".[hwp,hwp-tables,pdf-tables,xls]"
+    TORCH_INDEX=${TORCH_INDEX} bash ./scripts/docker_install_locked.sh \
+        hwp hwp-tables pdf-tables xls
 
 # [HWP 파싱 복구 — Dockerfile.api.prod 와 동일] rhwp-python 번들 FreeType 에 FT_Palette_Data_Get
 # 심볼이 없어 `import rhwp` 가 undefined symbol 로 실패 → .hwp/.hwpx 배치 파싱이 0글자로 깨진다.
