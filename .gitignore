@@ -175,6 +175,26 @@ poc/datasets/proxy_gold/korea_policy_runs/
 poc/datasets/proxy_gold/public_s3_challenges/*/
 poc/datasets/proxy_gold/public_s3_training/*/
 poc/datasets/public_eval_negatives/
+# [2026-08-11] 같은 취지인데 규칙이 빠져 있던 run 산출물. 실측 미추적 규모:
+#   training_runs 579M · training_pool_runs 247M · single_document_candidates 30M
+#   (그 외 frozen_candidates·review_queues·training_generation_runs·real_public_s3 각 <1M)
+# 전부 run 스코프 재생성물이고 본문을 싣는다 — 재현은 각 run 의 manifest + 빌드 스크립트로.
+poc/datasets/proxy_gold/training_runs/
+poc/datasets/proxy_gold/training_pool_runs/
+poc/datasets/proxy_gold/training_generation_runs/
+poc/datasets/proxy_gold/single_document_candidates/
+poc/datasets/proxy_gold/frozen_candidates/
+poc/datasets/proxy_gold/review_queues/
+poc/datasets/proxy_gold/real_public_s3/
+# 코퍼스 **본문**(proxy_gold 루트 639M · proxy_eval 소스 33M)은 막고 매니페스트(해시 증적,
+# 각 1KB)는 계속 추적한다 — signoff_slate 와 같은 취지(정본 슬레이트만 tracked).
+# ⚠ 본문 정본을 git 에 둘지 별도 불변 아티팩트 저장소에 둘지는 **미확정**이다. 그 결정 전까지
+# 부주의 커밋만 막는 것이고, 확정되면 이 두 줄을 다시 판단할 것. curated_master/ 는 정책상
+# 추적 대상이라 글롭(최상위 한 단계)에 걸리지 않는다.
+poc/datasets/proxy_gold/*.jsonl
+poc/datasets/proxy_eval/*.jsonl
+!poc/datasets/proxy_gold/*.manifest.json
+!poc/datasets/proxy_eval/*.manifest.json
 # 실행 로그·릴리스 tarball·감사 산출물 — 전부 재생성물(_ 접두 throwaway 컨벤션과 동일 취지).
 # deploy/proxy_gold_runtime/ 은 배포 '소스'(compose·model-lock·prefetch)라 추적 대상이다.
 poc/_artifacts/

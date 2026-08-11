@@ -18,6 +18,10 @@ datasets/synthetic_800/
 datasets/synthetic_qwen3/
 datasets/synthetic_solar/
 artifacts/
+# [2026-08-11] 학습 산출 전용 rw 경로(settings.training_output_dir · 5539b807 에서 artifacts:ro 와
+# 분리하며 신설). artifacts/ 와 성격이 같은데 그때 무시 규칙을 함께 넣지 않았다 —
+# 실측 102GB · model.safetensors 57개가 커밋 후보로 노출돼 있었다(체크포인트 = 재생성물).
+artifacts_out/
 mlruns/
 reports/
 dist/

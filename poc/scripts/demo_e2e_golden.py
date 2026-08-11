@@ -226,7 +226,7 @@ def main() -> int:
     print("  시나리오 B — 골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭 (루프 B · 모델 갱신)")
     print(f"  대상 서버: {BASE}")
     print(f"  G1 방식  : {'기존 슬레이트 등록(LLM 불필요)' if use_register else 'LLM 재라벨링 빌드'}")
-    print(f"  단계 범위: G1·G2" + (" → 재학습" if do_train else "") + (" → 배포·메트릭" if do_activate else ""))
+    print("  단계 범위: G1·G2" + (" → 재학습" if do_train else "") + (" → 배포·메트릭" if do_activate else ""))
     if publish:
         print("  ⚠ --publish — 서명 결과를 라이브 locked_gold_eval 경로에 병합합니다.")
     line("═")
