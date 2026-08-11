@@ -541,6 +541,31 @@ _EXCLUDED = {
 }
 
 
+def _mount_prefix(request: Request, template: str) -> str:
+    """라우터 상대 템플릿에 실제 마운트 접두사를 복원한다.
+
+    [2026-08-11] 이 FastAPI/Starlette 버전은 scope['route'] 에 **라우터 상대** 경로를 담는다 —
+    include_router(prefix='/api/v1') 로 등록해도 route.path 는 '/classify/{doc_id}' 다.
+    그대로 라벨로 쓰면 route="/schema/grades" 처럼 /api/v1 이 사라져,
+      · 대시보드에서 어느 API 인지 분간이 안 되고
+      · 서로 다른 라우터가 같은 상대경로를 가지면 한 라벨로 합쳐진다
+    (DEF-2026-38 과 같은 뿌리 — 그때는 OpenAPI 경로 수집이 같은 이유로 틀렸다).
+
+    scope['path'](구체 경로)에서 '템플릿에 파라미터를 되꽂은 구체 상대경로'를 잘라내
+    접두사를 얻는다. 접두사가 없으면 빈 문자열이라 결과가 그대로다.
+    복원 실패(경로 컨버터 등)는 종전 값을 유지한다 — 라벨은 부가 정보이고,
+    카디널리티는 접두사가 유한(/api/v1 또는 없음)해서 늘지 않는다.
+    """
+    concrete = request.scope.get("path") or ""
+    params = request.scope.get("path_params") or {}
+    relative = template
+    for name, value in params.items():
+        relative = relative.replace("{" + name + "}", str(value))
+    if relative and concrete.endswith(relative):
+        return concrete[: len(concrete) - len(relative)] + template
+    return template
+
+
 def _route_template(request: Request) -> str:
     """카디널리티 안정 — path template 우선, 라우팅 실패 시 'unknown'으로 collapse.
 
@@ -549,7 +574,10 @@ def _route_template(request: Request) -> str:
     """
     route = request.scope.get("route")
     if route is not None and getattr(route, "path", None):
-        return route.path
+        try:
+            return _mount_prefix(request, route.path)
+        except Exception:  # noqa: BLE001 — 라벨 보정 실패가 요청을 막지 않는다
+            return route.path
     # 라우팅 실패 시 — 카디널리티 폭증 차단
     return "unknown"
 
