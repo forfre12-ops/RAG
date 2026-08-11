@@ -51,6 +51,12 @@ _PARTITION_SUFFIX = re.compile(r"_(?:\d{4}_\d{2}|default)$")
 # 실측(2026-08-11): DB 실테이블 67개 중 ORM 미선언은 파티션을 빼면 **이 둘뿐**이다.
 _MIGRATION_ONLY_TABLES = frozenset({"tb_rag_aliases", "tb_rag_vectors"})
 
+# DB 가 계산하는 생성 컬럼(GENERATED ALWAYS AS ... STORED). ORM 은 의도적으로 선언하지 않는다
+# — 쓰기 대상이 아니기 때문이고, models.py 에도 그렇게 적혀 있다. autogenerate 는 그 의도를
+# 알 수 없어 "모델에 없는 컬럼"으로 보고 drop 하려 든다.
+# 실측(2026-08-11): tb_llm_usage.total_tokens = GENERATED ALWAYS AS (input_tokens + output_tokens).
+_GENERATED_COLUMNS = frozenset({("tb_llm_usage", "total_tokens")})
+
 
 def _is_runtime_partition(name: str) -> bool:
     return any(
@@ -72,6 +78,9 @@ def include_object(obj, name, type_, reflected, compare_to):  # noqa: ANN001,ARG
     if type_ == "index":
         parent = getattr(getattr(obj, "table", None), "name", "") or ""
         return not _is_out_of_orm(parent)
+    if type_ == "column":
+        parent = getattr(getattr(obj, "table", None), "name", "") or ""
+        return (parent, name) not in _GENERATED_COLUMNS
     return True
 
 
