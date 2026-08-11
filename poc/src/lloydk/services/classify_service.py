@@ -410,6 +410,21 @@ class ClassifyService:
                     "s2-underclass-risk: internal/non-public signals with S3 prediction — routed to human review"
                 )
 
+            # [gate-fail-open] 미탐 방향 게이트가 예외로 미적용된 경우 — pipeline 이 남긴 신호.
+            # 종전엔 프로메테우스 카운터만 올렸다. 그건 사후에 사람이 대시보드를 봐야 알고,
+            # 그 사이 문서는 자동확정으로 나간다 — 게이트가 죽은 줄 모른 채 미탐이 흐른다.
+            # 방향별로 갈랐다: 상향/라우팅 게이트(fnr_safe_override · ts_tie_break ·
+            # metadata_floor · s2_underclass_risk)의 실패만 검수로 보내고, 하향 게이트
+            # (source_prior_cap)는 실패해도 과분류 쪽이라 현행 유지한다 — 안전 방향 실패에
+            # 검수부담만 붙이지 않는다. 등급은 무변경(FNR-safe): 예외 상황에서 등급을
+            # 추측하면 새 오류원이 된다. 관련: m5_inference.pipeline._MISS_DIRECTION_GATES
+            if status != "needs_review" and any("gate-fail-open" in w for w in warnings_acc):
+                status = "needs_review"
+                warnings_acc.append(
+                    "gate-fail-open: an underclassification-side serving gate did not apply"
+                    " — routed to human review (grade unchanged, FNR-safe)"
+                )
+
             if status != "needs_review":
                 ag = self._agreement_gate(pred, cleaned)
                 if ag is not None:

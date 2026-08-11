@@ -95,13 +95,37 @@ def _source_prior_is_public(src: object) -> bool:
     return text in _PUBLIC_SOURCE_TOKENS or bool(tokens & _PUBLIC_SOURCE_TOKENS)
 
 
-def _record_gate_fail_open(gate: str) -> None:
+# [gate fail-open 방향 분류 2026-08-12] 게이트가 예외로 미적용됐을 때 **어느 방향으로**
+# 틀리는지가 조치를 가른다. "전부 fail-secure" 는 과잉이고, "전부 계량만" 은 미탐을 놓친다.
+#
+#   fnr_safe_override  상향 미적용 → 모델의 낮은 등급 유지        = 미탐
+#   ts_tie_break       TS 가 S1 로 잔류                            = 미탐
+#   metadata_floor     비밀이 낮은 등급 유지 / 검수라우팅 유실     = 미탐
+#   s2_underclass_risk S3 예측의 미달분류 의심 신호 유실           = 미탐
+#   ─────────────────────────────────────────────────────────────
+#   source_prior_cap   하향 미적용 → 공개출처가 상위등급 유지      = 과분류(안전 방향)
+#
+# 미탐 방향 4개는 계량만으로 부족하다 — 카운터는 사후에 사람이 대시보드를 봐야 알고, 그
+# 사이 문서는 자동확정으로 나간다. 경고를 남겨 classify_service 가 needs_review 로 보낸다
+# (등급은 안 바꾼다 — 예외 상황에서 등급을 추측하면 새 오류원이 된다).
+# source_prior_cap 은 현행 유지: 안전 방향 실패에 검수부담만 붙는다.
+_MISS_DIRECTION_GATES = frozenset(
+    {"fnr_safe_override", "ts_tie_break", "metadata_floor", "s2_underclass_risk"}
+)
+GATE_FAIL_OPEN_WARNING = "gate-fail-open"
+
+
+def _record_gate_fail_open(gate: str, result: "InferenceResult | None" = None) -> None:
     """[obs] 서빙 파이프라인 게이트가 예외로 fail-open(미적용)했음을 가시화 — best-effort.
 
     metadata-floor·FNR-safe override 같은 상향/라우팅 게이트가 조용히 실패하면 비밀이 낮은
     등급을 무음 유지할 수 있다("게이트ON=가시성ON" 위반). classify_service 와 동일한
     SERVING_GATE_FAIL_OPEN_TOTAL 카운터에 gate 라벨로 기록한다 — 분류 제어흐름은 그대로
     (예외는 계속 삼켜 fail-safe 유지), 가시성만 추가. 메트릭/로그 실패는 무시.
+
+    ``result`` 를 주면 **미탐 방향 게이트에 한해** 경고를 덧붙여 사람 검수로 보낸다
+    (위 _MISS_DIRECTION_GATES 주석 참조). 등급은 건드리지 않으므로 FNR-safe 이고,
+    비용은 검수 부담뿐이다. 경고 부착 자체가 실패해도 분류는 계속된다.
     """
     try:
         from lloydk.api.prom_metrics import SERVING_GATE_FAIL_OPEN_TOTAL  # noqa: PLC0415
@@ -109,6 +133,15 @@ def _record_gate_fail_open(gate: str) -> None:
     except Exception:  # noqa: BLE001
         pass
     logger.debug("serving gate fail-open (예외로 미적용): %s", gate)
+    if result is None or gate not in _MISS_DIRECTION_GATES:
+        return
+    try:
+        result.warnings = list(result.warnings) + [
+            f"{GATE_FAIL_OPEN_WARNING}: {gate} 가 예외로 미적용됐다 — 미탐 방향이라 "
+            "등급을 그대로 두고 검수로 보낸다"
+        ]
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def chunk_text(text: str, size: int = 512, overlap: int = 64):
@@ -608,7 +641,7 @@ class InferencePipeline:
                             )
                 except Exception:  # noqa: BLE001
                     # FNR-safe 상향이 예외로 미적용 → 모델의 낮은 등급 유지(무음 미탐 위험). 가시화.
-                    _record_gate_fail_open("fnr_safe_override")
+                    _record_gate_fail_open("fnr_safe_override", result)
         else:
             result = self._run_rule_fallback(text, return_evidence)
 
@@ -682,7 +715,7 @@ class InferencePipeline:
             result = self._apply_ts_tie_break(result)
         except Exception:  # noqa: BLE001
             # 동점 브레이크(상향)가 예외로 미적용 → TS 가 S1 로 남는다. 미탐 방향이라 가시화.
-            _record_gate_fail_open("ts_tie_break")
+            _record_gate_fail_open("ts_tie_break", result)
 
         # [metadata-floor] ICD R6 S/V/M 메타데이터 상향 게이트 (opt-in, 기본 OFF).
         # 내용 분류기는 비밀관리성(M)·출처(S)를 못 본다 — 인사·재무 비밀이 일상 내부문서(S2)로
@@ -724,7 +757,7 @@ class InferencePipeline:
         except Exception:  # noqa: BLE001 — 메타데이터 처리 오류는 분류를 막지 않음(fail-safe)
             # metadata-floor 상향/access-conflict 라우팅이 예외로 미적용 → 비밀이 낮은 등급을
             # 무음 유지할 수 있다(shipping-ON 게이트). 분류는 계속하되 가시화(운영자 신호).
-            _record_gate_fail_open("metadata_floor")
+            _record_gate_fail_open("metadata_floor", result)
 
         try:
             cur = result.label.value if hasattr(result.label, "value") else str(result.label)
@@ -733,7 +766,7 @@ class InferencePipeline:
                     "s2-underclass-risk: S3 prediction contains internal/non-public access-control signals"
                 ]
         except Exception:  # noqa: BLE001
-            _record_gate_fail_open("s2_underclass_risk")
+            _record_gate_fail_open("s2_underclass_risk", result)
 
         # 표적 1 (2026-05-29): use_rag=True면 retrieval facade 호출하여 rag_context 채움.
         # rule-fallback / _run_model 어느 경로든 동일하게 RAG context 보강 — 분류 본문은 안 건드림.

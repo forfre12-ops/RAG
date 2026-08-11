@@ -1143,9 +1143,26 @@ def fit_escalation_operating_point(
                          막지 않는다. 실제 품질 게이트로 쓰려면 호출부에서 올려 줄 것.
       baseline_f1_macro  직전 배포·기준 모델의 macro F1. 주면 **무회귀**를 강제한다.
                          운영 게이트는 이쪽이다 — 절대값은 셋마다 의미가 달라진다.
+                         CLI(finalize_proxy_classifier)에서는 **필수**다 — optional 이던
+                         동안 인자를 빠뜨리면 이 검사가 통째로 안 돌고 COMPLETE 가 났다.
 
     두 검사는 feasible 필터가 아니라 **선택된 운영점**에 적용한다. 필터에 섞으면 "FNR 목표
     미달"과 "품질 미달"이 같은 오류로 뭉개져 무엇을 고쳐야 하는지 알 수 없다.
+
+    ── 게이트 우선순위 (2026-08-12 명문화) ────────────────────────────────────
+    RFP 에는 **정확도 수치목표가 없고** 핵심목표는 미탐 최소화다. 그래서 F1 은 마지막에
+    본다. 아래 순서를 바꾸면 "미탐을 줄이면서 F1 이 소폭 떨어지는 개선"이 자동 차단된다 —
+    그건 이 사업에서 정확히 원하는 개선이다.
+
+      ① 고등급 FNR 상한   fnr_target — feasible 필터. 못 넘으면 후보가 아니다.
+      ② 퇴행성 0          degenerate_penalty — 전건 고등급 같은 붕괴를 막는다.
+                          (①만 보면 전건 TS 가 FNR 0 으로 만점을 받는다.)
+      ③ 검수부담 상한     review_burden · s3_overclassification_rate — rank 정렬 기준.
+                          사람이 감당 못 할 운영점은 배포해도 실제로 안 쓰인다.
+      ④ F1 무회귀         min_f1_macro(절대 하한) → baseline_f1_macro(무회귀). **마지막.**
+
+    ①②는 feasible 집합을 만들고, ③은 그 안에서 순위를 매기고, ④는 선택된 하나를 검사한다.
+    ④를 앞으로 당기면 ①을 개선한 후보가 ④에서 죽는다.
     """
     if not 0.0 <= fnr_target <= 1.0:
         raise ProxyTrainingFinalizationError("fnr_target must be in [0,1]")
