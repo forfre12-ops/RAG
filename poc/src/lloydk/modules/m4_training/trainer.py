@@ -189,9 +189,19 @@ def _training_output_dir() -> str:
     return out or "artifacts_out/classifier"
 
 
+# [재현성] 정본 베이스 모델과 그 **불변 커밋**. 태그·브랜치는 움직이므로 커밋으로 고정한다.
+# 안 걸면 허브가 그때 주는 것을 받게 되고, 같은 소스 커밋을 다시 빌드해도 다른 가중치에서
+# 출발할 수 있다 — 그러면 "같은 코드·같은 데이터"라는 재현성 주장이 성립하지 않는다.
+# 실측 근거(2026-08-11): artifacts_out 의 전 학습 run TRAINING_EXECUTION.json 이 이 커밋으로
+# resolved 돼 있다. 종전에는 requested_revision=None 이라 **사후 기록만 하고 사전 고정은 없었다.**
+# base_model 을 다른 모델로 바꾸면 이 핀은 적용하지 않는다(_effective_base_revision 참조).
+DEFAULT_BASE_MODEL = "kakaobank/kf-deberta-base"
+DEFAULT_BASE_MODEL_REVISION = "363b171d71443b0874b0bf9cea053eb5b1650633"
+
+
 @dataclass
 class TrainSpec:
-    base_model: str = "kakaobank/kf-deberta-base"
+    base_model: str = DEFAULT_BASE_MODEL
     train_path: str = field(default_factory=lambda: _dataset_split("train.jsonl"))
     val_path: str = field(default_factory=lambda: _dataset_split("val.jsonl"))
     test_path: str | None = field(default_factory=lambda: _dataset_split("test.jsonl"))
@@ -619,6 +629,20 @@ def _hash_model_state_dict(model) -> str:
     return digest.hexdigest()
 
 
+def _effective_base_revision(spec: TrainSpec) -> str | None:
+    """실제로 적용할 베이스 모델 리비전 — 명시값 > 정본 기본핀 > 없음.
+
+    정본 모델(DEFAULT_BASE_MODEL)일 때만 기본핀을 적용한다. 다른 모델로 바꾼 사용자에게
+    남의 커밋을 강요하면 'revision not found' 로 엉뚱하게 죽는다 — 그 경우는 핀 없이
+    두고, 아래 _attest_base_model 이 resolved 커밋을 기록·검증한다.
+    """
+    if spec.base_model_revision:
+        return spec.base_model_revision
+    if spec.base_model == DEFAULT_BASE_MODEL:
+        return DEFAULT_BASE_MODEL_REVISION
+    return None
+
+
 def _attest_base_model(model, tokenizer, spec: TrainSpec) -> dict[str, object]:
     config = getattr(model, "config", None)
     resolved_revision = getattr(config, "_commit_hash", None)
@@ -630,7 +654,7 @@ def _attest_base_model(model, tokenizer, spec: TrainSpec) -> dict[str, object]:
         resolved_revision = str(resolved_revision or "local")
     else:
         revision_kind = "huggingface_commit"
-        requested = spec.base_model_revision
+        requested = _effective_base_revision(spec)
         if requested and not re.fullmatch(r"[0-9a-f]{40,64}", requested):
             raise ValueError(
                 "proxy base_model_revision must be an immutable 40-64 hex commit"
@@ -667,7 +691,7 @@ def _attest_base_model(model, tokenizer, spec: TrainSpec) -> dict[str, object]:
     ).encode("utf-8")
     return {
         "identifier": spec.base_model,
-        "requested_revision": spec.base_model_revision,
+        "requested_revision": _effective_base_revision(spec),
         "resolved_revision": resolved_revision,
         "revision_kind": revision_kind,
         "initial_state_dict_sha256": _hash_model_state_dict(model),
@@ -844,9 +868,10 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         print(f"  [pre-chunked] consuming {len(train_x)} weighted train chunk rows; "
               "val/test 문서단위 유지(누수차단)")
 
-    revision_kwargs = (
-        {"revision": spec.base_model_revision} if spec.base_model_revision else {}
-    )
+    # [재현성] 핀을 실제 내려받기에 적용한다. 종전에는 spec.base_model_revision 이 기본 None
+    # 이라 kwargs 가 비어, 검증부만 사후 기록하고 다운로드는 무핀이었다.
+    _pinned_revision = _effective_base_revision(spec)
+    revision_kwargs = {"revision": _pinned_revision} if _pinned_revision else {}
     tok = AutoTokenizer.from_pretrained(spec.base_model, **revision_kwargs)
 
     def tokenize(batch):
