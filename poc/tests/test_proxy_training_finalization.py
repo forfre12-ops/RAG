@@ -1011,3 +1011,79 @@ def _trace_set_healthy():
         _trace("s2", "S2", [[0.2, 0.1, 2.0, 0.3]]),
         _trace("s3", "S3", [[0.1, 0.1, 0.2, 2.0]]),
     )
+
+
+# ── 무회귀 게이트 필수화 (2026-08-12) ───────────────────────────────────────
+# 위 test_default_floor_is_chance_level... 이 보여주듯 baseline_f1_macro 는 None 이면
+# **검사가 아예 실행되지 않는다.** 라이브러리 계층에서는 그게 맞다(연구 반복용 순수 함수).
+# 문제는 운영 진입점인 CLI 가 그 None 을 기본값으로 그대로 넘겨, 인자를 빠뜨리면
+# 무회귀 검사 없이 COMPLETE 가 나던 것이다. 게이트가 optional 이면 게이트가 아니다.
+# 여기서 막는 것은 하한값(0.25)이 아니라 **인자 누락**이다.
+
+def test_cli_requires_baseline_or_explicit_no_baseline():
+    from scripts.finalize_proxy_classifier import main as finalize_main
+
+    with pytest.raises(SystemExit) as exc:
+        finalize_main([
+            "--training-run-dir", "x", "--checkpoint-root", "y",
+        ])
+    assert exc.value.code == 2  # argparse.error
+
+
+def test_cli_rejects_baseline_and_no_baseline_together():
+    from scripts.finalize_proxy_classifier import main as finalize_main
+
+    with pytest.raises(SystemExit) as exc:
+        finalize_main([
+            "--training-run-dir", "x", "--checkpoint-root", "y",
+            "--baseline-f1-macro", "0.9", "--no-baseline",
+        ])
+    assert exc.value.code == 2
+
+
+def test_cli_accepts_explicit_no_baseline(monkeypatch, tmp_path):
+    """기준모델이 없는 최초 학습은 **선언**해야 통과한다 — 빠뜨림과 구분된다."""
+    from scripts import finalize_proxy_classifier as cli
+
+    seen = {}
+
+    def _fake(**kwargs):
+        seen.update(kwargs)
+        return (
+            tmp_path,
+            {"run_id": "r", "selection": {"selected_checkpoint": "c"},
+             "calibration": {"temperature": {"temperature": 1.0},
+                             "operating_point": {"classifier_escalation_tau": 0.5}}},
+            {"manifest_sha256": "0" * 64},
+        )
+
+    monkeypatch.setattr(cli, "finalize_proxy_classifier", _fake)
+    assert cli.main([
+        "--training-run-dir", "x", "--checkpoint-root", "y", "--no-baseline",
+    ]) == 0
+    assert seen["baseline_f1_macro"] is None
+    # 절대 하한은 건드리지 않았다 — 0.25 는 "깨진 후보만 막는" 값으로 의도대로 유지.
+    assert seen["min_f1_macro"] == CHANCE_LEVEL_F1_MACRO
+
+
+def test_cli_passes_baseline_through(monkeypatch, tmp_path):
+    from scripts import finalize_proxy_classifier as cli
+
+    seen = {}
+
+    def _fake(**kwargs):
+        seen.update(kwargs)
+        return (
+            tmp_path,
+            {"run_id": "r", "selection": {"selected_checkpoint": "c"},
+             "calibration": {"temperature": {"temperature": 1.0},
+                             "operating_point": {"classifier_escalation_tau": 0.5}}},
+            {"manifest_sha256": "0" * 64},
+        )
+
+    monkeypatch.setattr(cli, "finalize_proxy_classifier", _fake)
+    assert cli.main([
+        "--training-run-dir", "x", "--checkpoint-root", "y",
+        "--baseline-f1-macro", "0.87",
+    ]) == 0
+    assert seen["baseline_f1_macro"] == 0.87

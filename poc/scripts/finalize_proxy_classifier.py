@@ -39,6 +39,10 @@ from lloydk.proxy_model_comparison import (  # noqa: E402
     SERVING_INFERENCE_BATCH_SIZE,
     hash_model_directory,
 )
+from lloydk.source_provenance import (  # noqa: E402
+    SourceProvenanceError,
+    require_clean_source_tree,
+)
 from lloydk.proxy_training_finalization import (  # noqa: E402
     ProxyTrainingFinalizationError,
     canonical_trace_bytes,
@@ -340,6 +344,10 @@ def finalize_proxy_classifier(
             "proxy finalization batch_size must match M5 serving "
             f"({SERVING_INFERENCE_BATCH_SIZE})"
         )
+    # [소스 계보] GPU 를 쓰기 **전에** 센다. 미커밋 소스로 만든 번들은 계약 해시가
+    # 막아 주지 않는다(post-model 서빙 규칙은 계약에서 명시적으로 제외됨) — 조용히
+    # 로드되고 숫자만 틀린다. lloydk.source_provenance 주석 참조.
+    source_provenance = require_clean_source_tree(_ROOT, what="proxy classifier finalize")
     validation_rows, calibration_rows, materialization_audit = (
         verify_materialized_training_run(training_run_dir)
     )
@@ -508,6 +516,11 @@ def finalize_proxy_classifier(
                 "core_sha256": _sha256_file(
                     (_SRC / "lloydk" / "proxy_training_finalization.py").resolve()
                 ),
+                # 두 파일 해시만으로는 "이 번들을 어느 소스가 만들었나"에 답할 수 없다.
+                # 서빙 가드는 pipeline.py 에 있고 학습셋은 scripts/ 가 만든다 —
+                # 커밋 sha + dirty 여부가 그 답이다. bypassed=true 면 미커밋 트리에서
+                # 의도적으로 만든 번들이라는 뜻이므로 감사에서 그렇게 읽어야 한다.
+                "git": source_provenance,
             },
         }
         manifest_path = staging / "finalization_manifest.json"
@@ -576,9 +589,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-f1-macro", type=float,
                         default=CHANCE_LEVEL_F1_MACRO,
                         help="선택된 운영점의 macro F1 절대 하한")
+    # [무회귀 필수화 2026-08-12] 종전 default=None → **인자를 안 주면 무회귀 검사가 아예
+    # 실행되지 않고 그대로 COMPLETE 가 났다**(proxy_training_finalization:1201 은 None 이면
+    # 건너뛴다). 운영 게이트가 optional 이면 게이트가 아니다. 고칠 지점은 --min-f1-macro
+    # 하한값(0.25)이 아니라 여기다 — 0.25 는 "깨진 후보만 막는" 절대 하한으로 의도대로 둔다.
+    #
+    # 기준모델이 없는 최초 학습에는 --no-baseline 을 명시하게 한다. 값을 안 주는 것과
+    # "기준이 없다고 선언하는 것"은 다르고, 후자는 매니페스트에 남는다.
     parser.add_argument("--baseline-f1-macro", type=float, default=None,
-                        help="직전 배포/기준 모델의 macro F1. 주면 무회귀 강제")
+                        help="직전 배포/기준 모델의 macro F1 — 무회귀 강제(필수)")
+    parser.add_argument("--no-baseline", action="store_true",
+                        help="기준모델 없음(최초 학습)을 명시. --baseline-f1-macro 와 배타")
     args = parser.parse_args(argv)
+    if args.no_baseline and args.baseline_f1_macro is not None:
+        parser.error("--no-baseline 과 --baseline-f1-macro 는 함께 쓸 수 없습니다")
+    if not args.no_baseline and args.baseline_f1_macro is None:
+        parser.error(
+            "--baseline-f1-macro 가 필요합니다 — 직전 배포/기준 모델의 macro F1 을 주면 "
+            "무회귀를 강제합니다. 이 값이 없으면 무회귀 검사가 실행되지 않은 채 COMPLETE 가 "
+            "납니다. 기준모델이 없는 최초 학습이면 --no-baseline 을 명시하십시오.\n"
+            "주의: F1 무회귀는 마지막 게이트입니다. 미탐(고등급 FNR)을 줄이면서 F1 이 소폭 "
+            "떨어지는 개선을 이 값으로 막지 마십시오 — 게이트 순서는 "
+            "proxy_training_finalization.fit_escalation_operating_point 주석 참조."
+        )
     try:
         run_dir, manifest, complete = finalize_proxy_classifier(
             training_run_dir=Path(args.training_run_dir),
@@ -591,7 +624,12 @@ def main(argv: list[str] | None = None) -> int:
             min_f1_macro=args.min_f1_macro,
             baseline_f1_macro=args.baseline_f1_macro,
         )
-    except (OSError, ProxyTrainingFinalizationError, ValueError) as exc:
+    except (
+        OSError,
+        ProxyTrainingFinalizationError,
+        SourceProvenanceError,
+        ValueError,
+    ) as exc:
         print(f"proxy classifier finalization failed: {exc}", file=sys.stderr)
         return 1
     print(
