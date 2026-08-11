@@ -1363,15 +1363,17 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><th>label_source</th><th class="td-center">신뢰도</th><th>방법</th><th class="td-center">gold_real 건수</th><th class="td-center">운영근거</th></tr>
           </thead>
           <tbody>
-            <tr><td class="td-code">human_review</td><td class="td-center">★★★★★</td><td>사람이 직접 검수</td><td class="td-center">0</td><td class="td-center"><span class="tag pass">가능</span></td></tr>
+            <tr><td class="td-code">human_review</td><td class="td-center">★★★★★</td><td>사람이 직접 검수</td><td class="td-center">1<sup>*</sup></td><td class="td-center"><span class="tag pass">가능</span></td></tr>
             <tr><td class="td-code">codex_review</td><td class="td-center">★★★★</td><td>AI 생성 + 사람 서명 필요</td><td class="td-center">19</td><td class="td-center"><span class="tag warn">조건부</span></td></tr>
             <tr><td class="td-code">llm_judge_consensus</td><td class="td-center">★★★</td><td>룰 라벨러 + LLM 동의</td><td class="td-center">67</td><td class="td-center"><span class="tag warn">참고</span></td></tr>
             <tr><td class="td-code">llm_judge_primary</td><td class="td-center">★★</td><td>LLM(OpenAI 호환) 단독 고신뢰</td><td class="td-center">524</td><td class="td-center"><span class="tag warn">참고</span></td></tr>
             <tr><td class="td-code">public_definitive</td><td class="td-center">근거형</td><td>이미 공개된 판례 → 정의상 S3</td><td class="td-center">50</td><td class="td-center"><span class="tag real">진짜</span></td></tr>
-            <tr><td class="td-code">koipa_case_based</td><td class="td-center">근거형</td><td>판례·가이드 근거 <b>손작성 시나리오</b> (S1/S2)</td><td class="td-center">81</td><td class="td-center"><span class="tag warn">합성</span></td></tr>
-            <tr><td class="td-code">nkt_designated</td><td class="td-center">근거형</td><td>국가핵심기술 고시 근거 <b>손작성 시나리오</b> (TS)</td><td class="td-center">36</td><td class="td-center"><span class="tag warn">합성</span></td></tr>
+            <tr><td class="td-code">koipa_case_based</td><td class="td-center">근거형</td><td>판례·가이드 근거 <b>손작성 시나리오</b> (S1/S2)</td><td class="td-center">80</td><td class="td-center"><span class="tag warn">합성</span></td></tr>
+            <tr><td class="td-code">curated_scenario</td><td class="td-center">근거형</td><td>큐레이션 <b>손작성 시나리오</b></td><td class="td-center">6</td><td class="td-center"><span class="tag warn">합성</span></td></tr>
+            <tr><td class="td-code">nkt_designated</td><td class="td-center">근거형</td><td>국가핵심기술 고시 근거 <b>손작성 시나리오</b> (TS)</td><td class="td-center">30</td><td class="td-center"><span class="tag warn">합성</span></td></tr>
           </tbody>
-        </table>
+        </table>        <p class="note"><sup>*</sup> <b>label_source 필드값 기준 1건이나 유효 서명은 0건이다.</b> 그 1건(<code>reviewer_id=r1</code>)은 서명 envelope(gate_version·signed_at)이 없어 <code>tier_of</code> 가 <code>held_review</code> 로 격리한다. 실측(2026-08-11, 777건): <code>silver_train</code> 591 · <code>legal_floor</code> 185 · <code>held_review</code> 1 · <b><code>locked_gold_eval</code> 0</b> — 사람이 서명한 평가 정답은 아직 없다.</p>
+
       </div>
 
       <h3>7.4 4등급 판정 기준 (요약 ·)</h3>
