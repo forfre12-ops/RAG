@@ -1186,6 +1186,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         </table>
       </div>
       <p>선정 아키텍처는 <b>KF-DeBERTa</b>이며, <b>현행 배포본은 v5_clean(<code>v-fe4b386b</code>, 2026-07-29 <code>gate_p1_candidate</code> 3축 PASS로 승격)</b>, 직전 배포본·롤백 타깃은 v4_clean(<code>v-dd3abab9</code>, 법률 오염 정제 학습본 <code>labeled_clean_nolegal</code> 2,591건)이다. <b>v5 헤드라인</b>: 서빙경로 hardened holdout(n=42) <b>F1_macro 0.917</b>(직전 v4 0.688) · 공개 판례(n=400) 과분류율 <b>0.79→0.04</b> · 고위험(high→S3) 위험미탐 <b>0</b>. 아래 카드는 <b>학습 데이터와 본문 텍스트가 겹치지 않게 누출을 제거한 평가셋</b> 기준 실측(굵은 값=현행 v5, 괄호=직전 v4)이다.</p>
+      <p style="font-size:12.5px;color:#71717a"><b>⚠ "누출 제거"의 범위</b> — 학습셋과 <b>본문 텍스트가 겹치지 않는다</b>는 뜻이며(중복 67건 제거), 본문 말고 다른 단서가 없다는 뜻이 아니다. 실측(2026-08-12): 이 셋의 <b>S3 7건은 길이 2,323~3,023자로 나머지 35건(151~317자)과 완전히 분리</b>돼 <b>글자 수 임계 1,320자 하나로 42건 전부 갈린다</b>. F1_macro는 네 등급 단순평균이므로 <b>S3 한 칸은 길이만으로도 만점이 나오는 칸</b>이다 — 등급별 값과 함께 읽고 S3 성적을 내용 이해의 근거로 인용하지 않는다. 고등급(TS·S1)은 길이 구간이 겹쳐 미탐 판정에는 영향이 없다. 상세 <b>분류 정확도 테스트방식</b> §2.1.</p>
       <div class="card-grid col3" style="margin:16px 0;">
         <div class="card card-pass"><div class="card-label">F1_macro (v5 hardened)</div><div class="card-value sm">0.917</div><div class="card-desc">hardened holdout n=42 · 직전 v4 0.688 · v4 clean(90) ≈0.78</div></div>
         <div class="card card-pass"><div class="card-label">정확도 (v5 clean)</div><div class="card-value sm">92.9%</div><div class="card-desc">clean holdout n=42 (누출 제거) · 직전 v4 76.2%</div></div>
