@@ -165,6 +165,19 @@ jobs:
       - name: Validate OpenAPI spec (doc/03_openapi_lloydk_kl.yaml)
         run: openapi-spec-validator doc/03_openapi_lloydk_kl.yaml
 
+      # [2026-08-11] 스펙이 well-formed 한지만 보고 **라우터와 맞는지는 안 보고 있었다.**
+      # 실측: 라우터 58 · 스펙 43 → 15경로가 명세에 없는 채로 통과하고 있었다(콘솔·감사로그·
+      # 롤백 등 8/8~8/9 신설분 전부). scripts/openapi_consistency.py --strict 가 이미 있었고
+      # Makefile 에도 걸려 있었으나 CI 에서 부르지 않아 아무도 몰랐다.
+      - name: Install poc deps for router import
+        working-directory: poc
+        run: pip install -e ".[jwt]"
+      - name: OpenAPI ↔ FastAPI router drift (strict)
+        working-directory: poc
+        env:
+          TESTING: '1'
+        run: python scripts/openapi_consistency.py --strict
+
   openapi-artifacts:
     # P1-E1·E4: OpenAPI → Postman 컬렉션 + 클라이언트 SDK 자동 생성.
     # main push 시 dist/ 산출물 artifact 게시 → KL 측 다운로드 가능.

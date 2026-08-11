@@ -1214,6 +1214,286 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalError' }
 
+  # ── 관리자 콘솔·골든셋 검수 (2026-08-08~09 신설, 2026-08-11 명세 반영) ─────────
+  # 라우터에는 있었으나 본 명세에 없던 15경로. KL 연동 대상은 아니고 지재원 관리자 콘솔이
+  # 쓰는 내부 경로이지만, 명세에 없으면 감리에서 "구현 미기술"로 읽힌다.
+  /admin/audit-log:
+    get:
+      tags: [admin]
+      summary: 감사 로그 조회 — 누가 언제 무엇을 했는가
+      description: >-
+        헬스체크·정적자산은 기록에서 제외된다. 응답의 actorless_ratio 는 행위자(actor_id)가
+        없는 기록 비율 — 공유 API 키 모드에서는 개별 신원이 남지 않는다.
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, default: 0 } }
+        - { in: query, name: action, schema: { type: string }, description: 부분일치 }
+        - { in: query, name: success, schema: { type: boolean } }
+        - { in: query, name: actor_id, schema: { type: string } }
+      responses:
+        '200':
+          description: 감사 로그 페이지
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+
+  /admin/model/rollback:
+    post:
+      tags: [admin]
+      summary: 활성 모델을 직전 활성본으로 롤백 + 무중단 리로드
+      description: >-
+        배포 게이트를 적용하지 않는다 — 회귀를 되돌리는 방향이라 막으면 사고 시 복구가
+        불가능해진다. 대신 사유(reason)가 필수이며 활성화와 동일한 advisory lock 으로
+        직렬화된다. 복귀 후보가 없으면 rolled_back=false 로 응답한다(리로드 안 함).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, description: 감사에 남는 유일한 맥락이므로 필수 }
+      responses:
+        '200':
+          description: 롤백 결과 (rolled_back · reason)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+
+  /review-queue/{classification_id}/evidence:
+    get:
+      tags: [confirm]
+      summary: 검수 1건의 근거 — "왜 이 등급인가"
+      description: >-
+        분류 시점에 저장된 근거(tb_classification_evidence)를 읽는다. 재분류하지 않는다 —
+        큐 본문은 미리보기라 다른 입력을 설명하게 되고, 재분류는 현재 활성 모델 기준이라
+        저장된 등급과 어긋난다. 룰 근거 span 이 없던 건은 evidence 가 비며, 그것은 결함이
+        아니라 "모델 확률만으로 판정돼 검수로 왔다"는 신호다.
+      parameters:
+        - in: path
+          name: classification_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: recorded(등급·신뢰도·모델·차순위) + evidence[] + by_type
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /golden/summary:
+    get:
+      tags: [golden]
+      summary: 정본 골든셋 구성 집계 (tier·등급·출처·라벨출처)
+      description: >-
+        tier 는 저장 컬럼이 아니라 label_source/review_status/서명 envelope 에서 파생된다
+        (golden_tiers.tier_of 를 그대로 호출 — 별도 로직을 두면 드리프트한다).
+        locked 총수와 real_locked_eval 을 구분해 낸다. 읽기 전용이며 정본 변경은
+        promote_golden_candidates.py 의 명시적 게이트만 담당한다.
+      parameters:
+        - { in: query, name: path, schema: { type: string }, description: "datasets/ 하위 샌드박스로 제한" }
+      responses:
+        '200':
+          description: tier·등급·출처별 집계
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /golden/jobs:
+    get:
+      tags: [golden]
+      summary: 골든 빌드 작업 목록
+      description: >-
+        서버 순서는 Redis SCAN 순서라 최신순 보장이 없다(응답 ordering 필드로 고지).
+        화면은 submitted_at 기준으로 재정렬해 표시한다.
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: 작업 목록 (ordering 고지 포함)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /golden/candidates:
+    get:
+      tags: [golden]
+      summary: 합성 Proxy Gold 후보 목록
+      description: >-
+        여기서 확정한 등급은 Proxy Gold 이며 Locked Gold 승격이 아니다.
+        공유 API 키를 거부하고 포털 JWT(헤더 또는 lloydk_access_token 쿠키)만 인정한다 —
+        검수 기록에 실계정이 남아야 하기 때문.
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: grade, schema: { type: string, enum: [TS, S1, S2, S3] } }
+        - { in: query, name: origin, schema: { type: string }, description: "public_real | organization_real 등" }
+        - { in: query, name: query, schema: { type: string }, description: 본문·제목 부분일치 }
+      responses:
+        '200':
+          description: 후보 목록 + summary(품질 지표 포함)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /golden/candidates/summary:
+    get:
+      tags: [golden]
+      summary: 골든셋 관리 콘솔 집계
+      responses:
+        '200':
+          description: 등급·출처·확정 진행 집계
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /golden/candidates/decisions:
+    get:
+      tags: [golden]
+      summary: 결정 원장 최근 기록 (보류·폐기·번복 포함)
+      description: 원장은 append-only 라 기록을 지울 수 없다.
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 100 } }
+      responses:
+        '200':
+          description: 결정 원장 페이지
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /golden/candidates/session:
+    get:
+      tags: [golden]
+      summary: 골든셋 관리 콘솔 로그인 신원
+      responses:
+        '200':
+          description: 현재 검수자 신원
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /golden/candidates/upload:
+    post:
+      tags: [golden]
+      summary: 골든셋 관리 콘솔 문서 업로드
+      description: >-
+        출처(origin)·사용권한(usage_right)이 필수다 — 이 기록이 없으면 나중에 평가셋으로
+        쓸 수 없다. 적재 후 분류 큐에 등록하고 status_url 을 반환한다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, origin, usage_right]
+              properties:
+                file: { type: string, format: binary }
+                origin: { type: string }
+                usage_right: { type: string }
+      responses:
+        '200':
+          description: 적재 결과 + status_url
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /golden/candidates/{doc_id}:
+    get:
+      tags: [golden]
+      summary: 합성 Proxy Gold 후보 상세
+      parameters:
+        - in: path
+          name: doc_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 후보 상세 (본문·판정 이력)
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /golden/candidates/{doc_id}/decision:
+    post:
+      tags: [golden]
+      summary: 합성 Proxy Gold 후보의 관리자 결정 기록
+      description: >-
+        결정은 append-only 로 원장에 남는다. 등급변경·보류·반려·폐기는 사유가 필수이며
+        미기입 시 422. 승인은 approved_proxy 로만 남고 Locked Gold 평가 레코드를 만들지 않는다.
+      parameters:
+        - in: path
+          name: doc_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, description: "확정·등급변경·보류·반려·폐기·재검토" }
+                grade: { type: string, enum: [TS, S1, S2, S3] }
+                reason: { type: string, description: 등급변경·보류·반려·폐기 시 필수 }
+      responses:
+        '200':
+          description: 결정 기록 결과
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { description: "사유 필수인 결정에 reason 미기입" }
+
+  /golden/candidates/login.html:
+    get:
+      tags: [golden]
+      summary: 골든셋 관리 콘솔 진입 화면 (무인증)
+      description: >-
+        manage.html·actual-intake.html 은 포털 JWT 쿠키를 요구하는데 쿠키를 심을 화면이
+        없어 브라우저로 열면 401 JSON 한 줄만 보였다. 토큰을 URL 에 싣지 않는다
+        (액세스로그·브라우저 히스토리 잔존 방지).
+      responses:
+        '200':
+          description: 로그인 HTML
+          content:
+            text/html:
+              schema: { type: string }
+
+  /golden/candidates/manage.html:
+    get:
+      tags: [golden]
+      summary: 골든셋 후보 관리 화면
+      responses:
+        '200':
+          description: 관리 HTML
+          content:
+            text/html:
+              schema: { type: string }
+        '401': { description: "포털 JWT 쿠키 필요 — login.html 경유" }
+
+  /golden/candidates/actual-intake.html:
+    get:
+      tags: [golden]
+      summary: 실문서 인테이크 화면
+      responses:
+        '200':
+          description: 인테이크 HTML
+          content:
+            text/html:
+              schema: { type: string }
+        '401': { description: "포털 JWT 쿠키 필요 — login.html 경유" }
+
 components:
   securitySchemes:
     ApiKeyAuth:
