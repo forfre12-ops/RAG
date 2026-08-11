@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from lloydk.adapters.embedding import build_embedder
+from lloydk.adapters.embedding import build_embedder, embedder_digest
 from lloydk.adapters.vectorstore import build_store
 from lloydk.services.retrieval import expand_then_search
 
@@ -51,6 +51,16 @@ def main() -> int:
     methods = [m.strip() for m in args.methods.split(",") if m.strip()]
 
     emb = build_embedder()
+    # [embedder digest] 아래 리포트 머리말이 "KURE-v1" 을 **하드코딩**하고 있었다.
+    # 임베더가 hash 로 무음 폴백해도 리포트에는 KURE-v1 로 적혔다는 뜻이다.
+    # 실제로 무엇이 돌았는지를 적는다.
+    digest = embedder_digest(emb)
+    if digest["degraded"]:
+        print(
+            "[p2-qe] WARNING: 실 임베더를 요청했으나 hash 로 열화됐다 — 이 리포트의 Recall 은 "
+            "검색품질 근거로 인용하지 말 것.",
+            file=sys.stderr, flush=True,
+        )
     store = build_store()
 
     def encode(t: str):
@@ -103,7 +113,9 @@ def main() -> int:
     lines = [
         "# P2 Query Expansion Eval",
         "",
-        f"- collection: `{COLLECTION}` (KURE-v1 + ES hybrid, oss_corpus chunk)",
+        f"- collection: `{COLLECTION}` ({digest['effective']} + ES hybrid, oss_corpus chunk)",
+        f"- embedder: requested=`{digest['requested']}` effective=`{digest['effective']}`"
+        + ("  ⚠ **hash 로 열화됨 — 검색품질 근거로 인용 금지**" if digest["degraded"] else ""),
         f"- queries: {len(queries)} (retrieval_gold)",
         f"- top_k: {TOP_K}",
         "",

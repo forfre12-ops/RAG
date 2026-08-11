@@ -23,7 +23,41 @@ __all__ = [
     "CachedEmbedding",
     "EmbeddingCache",
     "build_embedder",
+    "embedder_digest",
 ]
+
+
+def embedder_digest(
+    provider: EmbeddingProvider, *, requested: str | None = None
+) -> dict[str, object]:
+    """이 산출물을 어느 임베더가 만들었나 — 결과 파일에 그대로 실을 한 덩어리.
+
+    실서빙은 ``require_real_embedder`` 가 기동을 거부하므로(api/app.py) HashEmbedding
+    무음 폴백이 남아 있는 곳은 **평가·학습 스크립트 경로**뿐이다. 거기서는 즉시 실패보다
+    이쪽이 실질적이다 — 폐쇄망·오프라인에서 해시로 돌려 보는 것 자체는 정당한 작업이고,
+    문제는 그렇게 나온 숫자가 나중에 실 임베더 숫자와 구분되지 않는 것이다.
+
+    ``degraded=True`` 는 **실 모델을 요청했는데 해시가 돌아온** 경우다. 그 숫자는 검색
+    품질 근거로 인용하면 안 된다(HashEmbedding = 의미 없는 결정론적 해시).
+    ``requested`` 를 안 주면 설정값(settings.embedding_model)을 기준으로 판정한다.
+    """
+    try:
+        from lloydk.config import settings  # noqa: PLC0415
+        configured = str(getattr(settings, "embedding_model", "") or "")
+    except Exception:  # noqa: BLE001
+        configured = ""
+    asked = str(requested or configured or "")
+    # CachedEmbedding 으로 wrap 되면 name 이 "cached" 라 모델 구분이 사라진다.
+    effective = str(getattr(provider, "_underlying_name", None) or getattr(provider, "name", "unknown"))
+    return {
+        "requested": asked or None,
+        "effective": effective,
+        "dim": int(getattr(provider, "dim", 0) or 0),
+        "cached": bool(getattr(provider, "_underlying_name", None)),
+        # 명시적 hash 요청은 열화가 아니다 — 의도한 드라이런이다.
+        "degraded": bool(effective == "hash" and asked not in {"", "hash"}),
+        "provider_class": type(provider).__name__,
+    }
 
 
 def _cache_enabled() -> bool:

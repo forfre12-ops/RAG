@@ -165,7 +165,7 @@ def evaluate(
     reranker_provider: None이면 reranker 미적용. "noop"/"bge"/"qwen3" 지정 시
         1차 dense에서 top_k*oversample_factor만큼 가져온 뒤 cross-encoder로 재정렬.
     """
-    from lloydk.adapters.embedding import build_embedder
+    from lloydk.adapters.embedding import build_embedder, embedder_digest
     from lloydk.adapters.vectorstore import build_store
 
     emb = build_embedder(embedder_name, force_hash=(embedder_name == "hash"))
@@ -175,6 +175,18 @@ def evaluate(
     display_name = getattr(emb, "_underlying_name", None) or emb.name
     rr_label = f" + rr={reranker_provider}" if reranker_provider else ""
     label = f"{display_name} / {backend} / {search_mode}{rr_label}"
+
+    # [embedder digest] 실 모델을 요청했는데 HashEmbedding 이 돌아왔는지를 **결과에 박는다.**
+    # 실서빙은 require_real_embedder 가 기동을 거부하지만(api/app.py) 이 평가 스크립트 경로에는
+    # 무음 폴백이 남아 있다. 그 자체를 막을 이유는 없다(오프라인 드라이런은 정당한 작업) —
+    # 문제는 그렇게 나온 recall 수치가 나중에 실 임베더 수치와 구분되지 않는 것이다.
+    digest = embedder_digest(emb, requested=embedder_name)
+    if digest["degraded"]:
+        print(
+            f"[p2] WARNING {label}: 실 임베더 {embedder_name!r} 를 요청했으나 hash 로 열화됐다 — "
+            "이 행의 recall 은 검색품질 근거로 인용하지 말 것(embedder_digest.degraded=true).",
+            file=sys.stderr,
+        )
 
     # reranker lazy 빌드 — 첫 쿼리에서 모델 다운로드/로드 비용 발생
     reranker = None
@@ -194,6 +206,7 @@ def evaluate(
             "search_mode": search_mode,
             "label": label,
             "dim": emb.dim,
+            "embedder_digest": digest,
             "status": "SKIP",
             "skip_reason": f"{type(exc).__name__}: {exc}",
             "recall_at_k": 0.0,
@@ -229,7 +242,7 @@ def evaluate(
             print(f"[p2] SKIP {label}: upsert failed — {exc}", file=sys.stderr)
             return {
                 "embedder": display_name, "backend": backend, "search_mode": search_mode,
-                "label": label, "dim": emb.dim, "status": "SKIP",
+                "label": label, "dim": emb.dim, "embedder_digest": digest, "status": "SKIP",
                 "skip_reason": f"upsert: {exc}",
                 "recall_at_k": 0.0, "latency_ms_p50": 0.0, "latency_ms_p95": 0.0,
                 "latency_ms_avg": 0.0, "embed_corpus_ms": 0.0,
@@ -344,6 +357,7 @@ def evaluate(
         "label": label,
         "status": "OK",
         "dim": emb.dim,
+        "embedder_digest": digest,
         "corpus_size": len(docs),
         "query_count": len(queries),
         "top_k": top_k,
