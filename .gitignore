@@ -195,6 +195,13 @@ poc/datasets/proxy_gold/*.jsonl
 poc/datasets/proxy_eval/*.jsonl
 !poc/datasets/proxy_gold/*.manifest.json
 !poc/datasets/proxy_eval/*.manifest.json
+# 위 글롭은 최상위 한 단계만 잡는다 — 봉인 평가셋 split 은 하위 디렉터리라 안 걸렸다
+# (direct_authored_proxy_eval_split.v*/ 3벌 25M). 같은 취지로 본문만 막고 봉인 증적
+# (manifest.json · COMPLETE.json)은 추적한다. 봉인 여부는 해시로 증명하는 것이지
+# 본문을 저장소에 두어 증명하는 것이 아니다.
+poc/datasets/proxy_eval/**/*.jsonl
+!poc/datasets/proxy_eval/**/manifest.json
+!poc/datasets/proxy_eval/**/COMPLETE.json
 # 실행 로그·릴리스 tarball·감사 산출물 — 전부 재생성물(_ 접두 throwaway 컨벤션과 동일 취지).
 # deploy/proxy_gold_runtime/ 은 배포 '소스'(compose·model-lock·prefetch)라 추적 대상이다.
 poc/_artifacts/
@@ -227,3 +234,8 @@ doc/mockups/
 
 # HWP 평가용 임시 가상환경 (재현 불요)
 .tmp_hwp_eval_venv/
+
+# 시안·임시 산출물 — 배포 트리에 들어가면 안 되는 작업물.
+# admin_preview.html 은 manage.html 통일안 시안(192K)이고 어디서도 참조하지 않는다.
+poc/src/lloydk/api/static/admin_preview.html
+poc/tmp_*.pdf

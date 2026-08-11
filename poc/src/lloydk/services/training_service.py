@@ -632,6 +632,10 @@ class TrainingService:
                         duration_sec=r.duration_sec,
                         model_version=None,
                         trigger_type=r.trigger_type,
+                        # 실패 사유를 목록에 실어 화면이 "왜 실패했는지"를 답할 수 있게 한다.
+                        # 성공 잡의 잔여 메시지까지 노출하지는 않는다.
+                        error=(getattr(r, "error_message", None)
+                               if str(r.status) in ("failed", "error") else None),
                     )
                     for r in runs
                 ]

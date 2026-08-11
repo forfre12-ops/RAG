@@ -47,6 +47,7 @@ from __future__ import annotations
 
 from collections import Counter
 import hashlib
+import re
 import json
 import os
 from pathlib import Path
@@ -57,7 +58,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from lloydk.dataset_leakage import check_or_raise
+from lloydk.dataset_leakage import check_or_raise, grade_tells
 from lloydk.proxy_corpus import validate_proxy_record
 
 
@@ -136,6 +137,8 @@ FORM_NOTES = (
 # 등급과 무관한 중립 문단. 전 등급에 고루 섞이므로 등급 전용 문장(tell)이 되지 않는다.
 # 문장은 검토 절차 일반론만 담고 비밀성·가치·관리성 판단 어휘를 쓰지 않는다 —
 # 그런 어휘가 들어가면 길이 대신 새로운 지름길을 만들게 된다.
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
 NEUTRAL_NOTES = (
     "검토 기록은 작성 시점과 확인 시점을 나누어 남기고, 두 시점 사이에 바뀐 항목만 따로 표시한다.",
     "표와 본문이 어긋나면 표를 원본으로 보고 본문 요약을 다시 쓴다. 반대 방향으로 고치지 않는다.",
@@ -174,6 +177,77 @@ def _neutral_padding(row: dict) -> str:
     return "\n\n## 검토 메모\n\n" + " ".join(picked)
 
 
+def _grade_verdict_sentences(rows: list[dict]) -> set[str]:
+    """등급 결론을 그대로 적어 둔 문장 — 코퍼스 전체를 봐야 알 수 있어 2패스로 뽑는다.
+
+    실측(v3_9 2,700행): 74종이 나오고 그중 4종은 **각 등급 문서의 100%** 에 글자 그대로 들어 있다.
+        750회(S1 100%)  "이 조합은 일반 원칙을 넘어 ... 비공개 조합이다"
+        750회(S2 100%)  "... 고등급 핵심정보는 아니다"
+        750회(TS 100%)  "이 조합은 외부에 공개되지 않은 설계·제어 조건과 ..."
+        450회(S3 100%)  "공개 규격·공개 안내자료·일반 업무 기준에 근거한다."
+    즉 본문이 정답을 말로 적어 준다. 이런 셋으로 학습하면 모델은 문서를 읽는 대신 그 문장을
+    찾는 법을 배운다 — 실문서에는 그 문장이 없으므로 그대로 무너진다.
+
+    문장을 30가지로 바꿔 쓰는 방법도 있지만 그건 암기를 어렵게 할 뿐 성격은 같다.
+    **지운다.** 실문서는 "이것은 영업비밀이다"라고 적지 않는다 — 비밀을 담고 있을 뿐이다.
+    등급은 문장이 아니라 본문에 남는 사실(접근통제·승인 기록·조합의 재현성)에서 나와야 한다.
+    """
+    return set(grade_tells([(str(r["label"]), str(r["text"])) for r in rows]))
+
+
+def _strip_verdicts(text: str, verdicts: set[str]) -> str:
+    """등급 결론 문장만 걷어내고 나머지 서술은 그대로 둔다.
+
+    ⚠ 본문 **중간**을 지우므로 evidence_card 의 span 오프셋이 전부 밀린다. v5 의 원래 변환은
+    뒤에 덧붙이기만 해서 오프셋이 보존됐다 — 그 불변식이 여기서 깨진다.
+    호출부는 반드시 _evidence_survival() 로 재정착 가능 여부를 먼저 확인할 것.
+    """
+    kept_lines = []
+    for line in text.split("\n"):
+        kept = [
+            sentence
+            for sentence in _SENTENCE_SPLIT.split(line)
+            if " ".join(sentence.split()).strip() not in verdicts
+        ]
+        kept_lines.append(" ".join(part for part in kept if part.strip()).strip())
+    return "\n".join(kept_lines)
+
+
+def _evidence_quotes(row: dict) -> list[tuple[str, str]]:
+    """evidence_card 의 (factor, quote) — 등급 판단의 근거로 인용된 본문 구절."""
+    factors = ((row.get("evidence_card") or {}).get("factors") or {})
+    out: list[tuple[str, str]] = []
+    for name, factor in factors.items():
+        if not isinstance(factor, dict):
+            continue
+        for span in factor.get("spans") or []:
+            if isinstance(span, dict) and span.get("quote"):
+                out.append((str(name), str(span["quote"])))
+    return out
+
+
+def _evidence_survival(rows: list[dict], verdicts: set[str]) -> tuple[int, int]:
+    """(살아남은 인용, 전체 인용) — 결론 문장을 지운 본문에서 인용을 다시 찾을 수 있는가.
+
+    실측(v3_9 2,700행 전수): 인용 8,100건 중 **7,150건(88.3%)이 사라진다.** 즉 등급 판단의
+    '근거 인용'이 대부분 등급 전용 결론 문장이다 — 근거가 본문 사실을 가리키는 게 아니라
+    정답을 적어 둔 문장을 되가리키고 있다. 남는 950건으로는 게이트 요건(TS/S1 최소 2 span ·
+    40자, 그리고 competitive_value 는 반드시 text 근거)을 어느 문서도 채우지 못한다.
+
+    그래서 이 코퍼스에서는 tell 제거와 evidence 게이트가 **동시에 만족될 수 없다**:
+    proxy_corpus.validate_proxy_record 는 인용이 본문에 그대로 있을 것을 요구하고,
+    dataset_leakage 는 바로 그 문장이 없을 것을 요구한다. 변환 단계에서 풀 수 없는 충돌이며
+    시나리오 카탈로그의 내용 모델(등급을 문장이 아니라 사실로 드러내기)을 고쳐야 한다.
+    """
+    survived = total = 0
+    for row in rows:
+        stripped = _strip_verdicts(str(row["text"]), verdicts)
+        for _factor, quote in _evidence_quotes(row):
+            total += 1
+            survived += quote in stripped
+    return survived, total
+
+
 def _sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
@@ -208,12 +282,12 @@ def _extension(grade: str, ordinal: int) -> str:
 """.rstrip()
 
 
-def _rewrite_record(row: dict[str, object], ordinal: int) -> dict[str, object]:
+def _rewrite_record(row: dict[str, object], ordinal: int, verdicts: set[str]) -> dict[str, object]:
     grade = str(row["label"])
     if grade not in GRADE_EXTENSIONS:
         raise ValueError(f"unknown label: {grade}")
     text = (
-        str(row["text"]).rstrip()
+        _strip_verdicts(str(row["text"]), verdicts).rstrip()
         + _extension(grade, ordinal)
         + _neutral_padding(row)          # 등급 무관 길이 변동 — v5 의 핵심
         + "\n"
@@ -257,7 +331,24 @@ def _write_new(path: Path, payload: bytes) -> None:
 
 def main() -> int:
     source_rows = _read_jsonl(SOURCE)
-    rows = [_rewrite_record(row, idx) for idx, row in enumerate(source_rows)]
+    verdicts = _grade_verdict_sentences(source_rows)
+    print(f"[verdict] 등급 결론 문장 {len(verdicts)}종 검출")
+
+    # 결론 문장을 지우면 evidence_card 의 인용이 본문에서 사라지는지 **먼저** 센다.
+    # 이걸 안 재고 그냥 진행하면 2,700행 × 5개 오류가 쏟아져 진짜 원인이 묻힌다.
+    survived, quoted = _evidence_survival(source_rows, verdicts)
+    print(f"[evidence] 결론 문장 제거 후 살아남은 인용 {survived}/{quoted}")
+    if quoted and survived < quoted:
+        raise RuntimeError(
+            f"등급 결론 문장을 지우면 evidence 인용 {quoted - survived}/{quoted} 건이 본문에서 "
+            "사라진다 — 등급 판단의 '근거 인용'이 곧 등급 전용 결론 문장이라는 뜻이다.\n"
+            "proxy_corpus 는 인용이 본문에 그대로 있을 것을 요구하고 dataset_leakage 는 그 문장이 "
+            "없을 것을 요구하므로, 이 코퍼스에서 두 게이트는 동시에 만족될 수 없다.\n"
+            "변환 단계에서 풀 수 없다 — 시나리오 카탈로그의 내용 모델을 고쳐(등급을 결론 문장이 "
+            "아니라 본문 사실로 드러내게) 재생성한 뒤 SOURCE 를 바꿔 다시 돌릴 것."
+        )
+
+    rows = [_rewrite_record(row, idx, verdicts) for idx, row in enumerate(source_rows)]
     failures = {
         str(row["doc_id"]): list(validate_proxy_record(row, stage="eligible", intended_use="training").errors)
         for row in rows

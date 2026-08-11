@@ -48,6 +48,11 @@ class TrainJobSummary(BaseModel):
     duration_sec: Optional[int] = None
     model_version: Optional[str] = None
     trigger_type: Optional[str] = None
+    # 실패 사유. 워커는 tb_training_runs.error_message 에 남기는데 목록 응답에 없어서
+    # 화면에는 status=failed 만 뜨고 **왜 실패했는지 알 방법이 없었다**(실측 2026-08-09:
+    # "skipped: retrain topology unavailable (FileNotFoundError: datasets/labeled/train.jsonl)"
+    # 가 DB 에 있었는데 화면엔 안 나왔다). 상세 조회로 넘어가지 않고 목록에서 바로 보이게 한다.
+    error: Optional[str] = None
 
 
 class TrainJobList(BaseModel):

@@ -212,11 +212,17 @@ class TestRebuildLive:
         db.commit()
         try:
             res = build_labeled_rows_from_corrections()
-            assert res.row_count == 1
-            assert res.rows[0]["label"] == "TS"          # 최신 교정
-            assert "마스터 키" in res.rows[0]["text"]      # 본문은 chunk
+            # 이 함수는 DB 전체의 미소비 교정을 읽는다. 공유 DB 에는 데모·운영 교정이 이미
+            # 들어 있어(실측: reviewer-demo·admin@koipa 5건) 전체 건수로 단정하면 환경에 따라
+            # 깨진다. 이 테스트가 만든 문서의 행만 골라 본다.
+            mine = [
+                row for row, doc_id in zip(res.rows, res.doc_ids) if doc_id == doc.doc_id
+            ]
+            assert len(mine) == 1
+            assert mine[0]["label"] == "TS"          # 최신 교정
+            assert "마스터 키" in mine[0]["text"]      # 본문은 chunk
             # 같은 문서의 unconsumed correction은 전부 소비대상
-            assert set(res.correction_ids) == {c1.correction_id, c2.correction_id}
+            assert {c1.correction_id, c2.correction_id} <= set(res.correction_ids)
         finally:
             with session_scope() as s:
                 s.query(Correction).filter(
@@ -245,10 +251,17 @@ class TestRebuildLive:
         db.commit()
         try:
             res = build_labeled_rows_from_corrections()
-            assert res.row_count == 1
-            assert res.rows[0]["label"] == "S1"
-            assert "프리뷰 본문" in res.rows[0]["text"]
-            assert res.skipped_no_text == 1
+            # 전체 건수 단정 금지 — 공유 DB 의 기존 교정이 함께 잡힌다(위 테스트 주석 참조).
+            mine = [
+                row for row, doc_id in zip(res.rows, res.doc_ids) if doc_id == doc_a.doc_id
+            ]
+            assert len(mine) == 1
+            assert mine[0]["label"] == "S1"
+            assert "프리뷰 본문" in mine[0]["text"]
+            # 문서 B(본문 없음)는 한 건도 나오지 않는다 — skipped_no_text 전역 카운트 대신
+            # 이 테스트가 만든 문서로 확인한다.
+            assert not [d for d in res.doc_ids if d == doc_b.doc_id]
+            assert res.skipped_no_text >= 1
             assert cb.correction_id not in res.correction_ids   # 본문 없는 문서는 미소비
             assert ca.correction_id in res.correction_ids
         finally:
