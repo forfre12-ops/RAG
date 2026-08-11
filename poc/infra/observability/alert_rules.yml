@@ -190,8 +190,17 @@ groups:
     interval: 1m
     rules:
       - alert: ServingGateFailOpen
-        # 서빙 검수 게이트(agreement/llm_second_opinion/similarity)가 예외로 fail-open →
-        # 고등급 자동확정이 게이트 없이 통과. fail-safe 설계지만 발생 자체가 검토 신호.
+        # 서빙 게이트가 예외로 fail-open → 종전 판정이 게이트 없이 통과.
+        # fail-safe 설계지만 발생 자체가 검토 신호다.
+        # gate 라벨 9종의 정본은 lloydk.api.prom_metrics.SERVING_FAIL_OPEN_GATES 이고,
+        # 두 계열로 갈린다:
+        #   검수 라우팅  agreement · llm_second_opinion · similarity_escalation · kill_gate
+        #                s2_underclass_risk        → 자동확정을 막지 못하고 통과
+        #   등급 판정    fnr_safe_override · source_prior_cap · metadata_floor · ts_tie_break
+        #                                          → 상향/하향 보정이 미적용
+        # 상향 계열(fnr_safe_override·metadata_floor·ts_tie_break)의 fail-open 은 곧 미탐
+        # 방향이므로 우선 확인한다.
+        # expr 은 라벨을 열거하지 않으므로 게이트를 새로 추가해도 자동으로 잡힌다.
         expr: sum by (gate) (increase(lloydk_serving_gate_fail_open_total[15m])) > 0
         for: 0m
         labels:

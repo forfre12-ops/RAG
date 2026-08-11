@@ -470,13 +470,32 @@ VERIFIED_LABEL_PROMOTED_TOTAL = Counter(
     registry=registry,
 )
 
-# [obs] 서빙 검수 게이트가 예외로 fail-open한 횟수(gate별). agreement/llm_second_opinion 게이트는
-# 룰엔진·LLM 오류 시 None을 반환해 자동확정을 그대로 통과시킨다(fail-safe). 무음이면 고등급
-# 자동확정이 게이트 없이 진행됐는지 안 보인다 — 이 카운터로 'fail-open 발생'을 가시화한다.
+# [obs] 서빙 게이트가 예외로 fail-open한 횟수(gate별). 게이트들은 룰엔진·LLM·메타데이터 오류 시
+# 예외를 삼키고 종전 판정을 그대로 통과시킨다(fail-safe). 무음이면 고등급 자동확정이 게이트 없이
+# 진행됐는지 안 보인다 — 이 카운터로 'fail-open 발생'을 가시화한다.
+#
+# 아래가 gate 라벨의 **정본 목록**이다. 종전에는 주석에 3종만 적혀 있었는데 실제로는 8종이
+# 기록되고 있었다(2026-08-11 실측) — 운영자가 metadata_floor·ts_tie_break fail-open 을 보고
+# "정의에 없는 라벨"로 오판할 수 있었다. 새 게이트를 추가하면서 여기 등록하지 않으면
+# tests/test_serving_gate_fail_open_labels.py 가 실패한다(주석이 아니라 계약).
+SERVING_FAIL_OPEN_GATES: frozenset[str] = frozenset({
+    # 검수 라우팅 — 자동확정을 막지 못하고 통과시킨다(services/classify_service.py)
+    "agreement",              # 룰·모델 합의 게이트: 룰엔진 미가용
+    "llm_second_opinion",     # LLM 2차 의견: 제공자 오류
+    "similarity_escalation",  # 유사도 에스컬레이션
+    "kill_gate",              # kill-gate 발동 중 고등급 자동확정 억제
+    # 등급 판정 — 상향/하향 보정이 미적용된다(modules/m5_inference/pipeline.py)
+    "fnr_safe_override",      # 룰이 TS를 강하게 잡을 때의 상향
+    "source_prior_cap",       # 공개 출처 하향(cap)
+    "metadata_floor",         # 보안표시·접근범위 상향(floor)
+    "ts_tie_break",           # TS/S1 동점 브레이크(opt-in)
+    "s2_underclass_risk",     # S3 예측의 미달분류 의심 → 검수 라우팅(등급은 안 바꾼다)
+})
+
 SERVING_GATE_FAIL_OPEN_TOTAL = Counter(
     "lloydk_serving_gate_fail_open_total",
-    "Serving review gates that failed open (exception) and let auto-confirm proceed ungated, by gate",
-    ["gate"],  # agreement | llm_second_opinion | similarity_escalation
+    "Serving gates that failed open (exception) and left the prior verdict ungated, by gate",
+    ["gate"],  # 값은 SERVING_FAIL_OPEN_GATES 참조
     registry=registry,
 )
 
