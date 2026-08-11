@@ -1,0 +1,65 @@
+{
+  "change_summary": "Rewrote every grade-keyed verdict section — body and heading — from expected_factor_scores instead of from the grade, and re-anchored every evidence span in the rewritten text. Sentences are now selected by factor level, so the same statement appears across the grades that share that level (secrecy=2 spans TS/S1/S2/S3); grade is expressed only by the combination. Section headings were grade-announcing too ('핵심 보호 근거' = TS) and are replaced with record-hash-selected neutral titles. Scenario ids, factor profiles, expected_factor_scores, and all narrative outside the verdict sections are unchanged.",
+  "evidence_inside_grade_tells": {
+    "inside": 214,
+    "total": 8100
+  },
+  "grade_counts": {
+    "S1": 750,
+    "S2": 750,
+    "S3": 450,
+    "TS": 750
+  },
+  "known_limits": {
+    "not_a_generalization_claim": "이 코퍼스로 잰 수치는 합성 내부 일관성이다. 실문서 일반화 근거가 아니다(자체 실측: 합성학습→실문서 F1 0.26).",
+    "s3_only_factor_levels": "secrecy=0·value=0 은 이 카탈로그에서 S3 에만 나온다. 템플릿 인공물이 아니라 진짜 판별 사실이므로 남기되, 문자열 암기를 막으려고 변형을 각각 16종 두었다(각 변형이 S3 문서의 5% 미만).",
+    "tell_coverage_headroom": "tell 커버 0.090 vs 한계 0.10 — 통과지만 여유가 크지 않다. 남은 15종은 판정 섹션 밖 서술이며, 소스 코퍼스를 재생성하지 않는 한 변환 단계에서 더 줄이기 어렵다."
+  },
+  "leakage": {
+    "documents": 2700,
+    "grade_token_exposed": 0,
+    "length_by_grade": {
+      "S1": {
+        "max": 3625,
+        "min": 2168,
+        "n": 750,
+        "p50": 2892
+      },
+      "S2": {
+        "max": 3427,
+        "min": 2147,
+        "n": 750,
+        "p50": 2774
+      },
+      "S3": {
+        "max": 3423,
+        "min": 2140,
+        "n": 450,
+        "p50": 2754
+      },
+      "TS": {
+        "max": 3439,
+        "min": 2171,
+        "n": 750,
+        "p50": 2799
+      }
+    },
+    "length_only_1nn": 0.392,
+    "length_only_random": 0.25,
+    "tell_coverage": 0.09,
+    "tell_sentences": 15
+  },
+  "no_llm_generation": true,
+  "records": 2700,
+  "records_sha256": "7643f7f86c95ab72433567e56fd8329ea52e4a1c6e296781ef542e2490cc93cf",
+  "schema": "direct-authored-catalog-training-v6",
+  "source_corpus": "datasets\\proxy_gold\\direct_authored_catalog_training.v3_9.jsonl",
+  "source_manifest_sha256": "2583b59c51357c2f9521192b1e83850412246cb787933c7766bdf2f97aaf85b6",
+  "source_records_sha256": "5759f15269e896a2821543d695c6329d6735821a3471294cecc0bee1275397f8",
+  "text_length": {
+    "max": 3625,
+    "mean": 2830.57,
+    "min": 2140
+  },
+  "training_only": true
+}
