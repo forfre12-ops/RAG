@@ -597,7 +597,7 @@ def main(argv: list[str] | None = None) -> int:
     # 기준모델이 없는 최초 학습에는 --no-baseline 을 명시하게 한다. 값을 안 주는 것과
     # "기준이 없다고 선언하는 것"은 다르고, 후자는 매니페스트에 남는다.
     parser.add_argument("--baseline-f1-macro", type=float, default=None,
-                        help="직전 배포/기준 모델의 macro F1 — 무회귀 강제(필수)")
+                        help="직전 배포/기준 모델의 macro F1. 주면 무회귀 강제(필수)")
     parser.add_argument("--no-baseline", action="store_true",
                         help="기준모델 없음(최초 학습)을 명시. --baseline-f1-macro 와 배타")
     args = parser.parse_args(argv)

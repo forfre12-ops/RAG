@@ -31,14 +31,19 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    # description 에 __doc__ 를 그대로 넣지 않는다 — argparse 는 --help 를 stdout 인코딩으로
+    # 쓰는데, 콘솔이 cp949 면 em dash 같은 문자에서 UnicodeEncodeError 로 죽는다
+    # (실측: 릴리스 번들 help closure 검증이 정확히 이걸로 실패했다).
+    parser = argparse.ArgumentParser(
+        description="학습셋 <-> 홀드아웃 계보 독립성 + 누출 계량 보고서",
+    )
     parser.add_argument("--train", required=True)
     parser.add_argument("--holdout", required=True)
     parser.add_argument("--label", default="holdout")
-    parser.add_argument("--out", default=None, help="JSON 보고서 경로(미지정 시 표준출력만)")
+    parser.add_argument("--out", default=None, help="JSON 보고서 경로. 미지정 시 표준출력만")
     parser.add_argument(
         "--strict", action="store_true",
-        help="비교에 쓸 수 없는 상태면 exit 1 — 파이프라인이 조용히 지나가지 않게",
+        help="비교에 쓸 수 없는 상태면 exit 1. 파이프라인이 조용히 지나가지 않게",
     )
     args = parser.parse_args(argv)
 
