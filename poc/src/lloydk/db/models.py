@@ -35,11 +35,13 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    REAL,
     PrimaryKeyConstraint,
     SmallInteger,
     String,
     Text,
     UniqueConstraint,
+    desc,
     func,
     text,
 )
@@ -64,9 +66,9 @@ class ClassificationLevel(Base):
     level_name: Mapped[str] = mapped_column(String(50), nullable=False)
     level_order: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    color_hex: Mapped[str | None] = mapped_column(String(7), default="#808080")
-    loss_weight: Mapped[float | None] = mapped_column(Numeric(4, 2), default=1.0)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    color_hex: Mapped[str | None] = mapped_column(String(7), default="#808080", server_default=text("'#808080'::character varying"))
+    loss_weight: Mapped[float | None] = mapped_column(Numeric(4, 2), default=1.0, server_default=text("1.0"))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_by: Mapped[str | None] = mapped_column(String(50))
@@ -83,8 +85,8 @@ class EvaluationFactor(Base):
     factor_code: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
     factor_name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    weight: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False, default=0.25)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    weight: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False, default=0.25, server_default=text("0.25"))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -95,12 +97,12 @@ class LevelKeyword(Base):
     keyword_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     keyword: Mapped[str] = mapped_column(String(200), nullable=False)
-    pattern_type: Mapped[str] = mapped_column(String(20), nullable=False, default="exact")
+    pattern_type: Mapped[str] = mapped_column(String(20), nullable=False, default="exact", server_default=text("'exact'::character varying"))
     factor_id: Mapped[int | None] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"))
-    weight: Mapped[float | None] = mapped_column(Numeric(3, 2), default=1.0)
-    source: Mapped[str | None] = mapped_column(String(30), default="manual")
+    weight: Mapped[float | None] = mapped_column(Numeric(3, 2), default=1.0, server_default=text("1.0"))
+    source: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'::character varying"))
     example_context: Mapped[str | None] = mapped_column(Text)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -129,18 +131,18 @@ class Document(Base):
     file_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     file_hash: Mapped[str | None] = mapped_column(String(64))
 
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, server_default=text("'{}'::jsonb"))
 
     raw_text_uri: Mapped[str | None] = mapped_column(String(500))
     normalized_text_uri: Mapped[str | None] = mapped_column(String(500))
     text_preview: Mapped[str | None] = mapped_column(String(2000))
     char_count: Mapped[int | None] = mapped_column(Integer)
 
-    extraction_method: Mapped[str | None] = mapped_column(String(30), default="parser")
+    extraction_method: Mapped[str | None] = mapped_column(String(30), default="parser", server_default=text("'parser'::character varying"))
     extraction_quality: Mapped[float | None] = mapped_column(Numeric(3, 2))
-    ocr_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    ocr_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
-    processing_status: Mapped[str] = mapped_column(String(20), default="pending")
+    processing_status: Mapped[str] = mapped_column(String(20), default="pending", server_default=text("'pending'::character varying"))
     error_message: Mapped[str | None] = mapped_column(Text)
 
     uploaded_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -157,7 +159,7 @@ class Document(Base):
         # idx_doc_status — tenant 제거로 idx_doc_tenant_status 의 prefix 컬럼만 잔존.
         Index("idx_doc_status", "processing_status"),
         Index("idx_doc_format", "source_format"),
-        Index("idx_doc_uploaded", "uploaded_at"),
+        Index("idx_doc_uploaded", desc("uploaded_at")),
         # init.sql 보유 — ORM 동기화 (drift 방지).
         # tenant 제거: file_hash 단독 UNIQUE(중복 업로드 dedup). 격리는 KL 포털 전담.
         Index(
@@ -193,8 +195,8 @@ class Chunk(Base):
     page_start: Mapped[int | None] = mapped_column(SmallInteger)
     page_end: Mapped[int | None] = mapped_column(SmallInteger)
     section_path: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
-    overlap_prev: Mapped[int | None] = mapped_column(SmallInteger, default=0)
-    overlap_next: Mapped[int | None] = mapped_column(SmallInteger, default=0)
+    overlap_prev: Mapped[int | None] = mapped_column(SmallInteger, default=0, server_default=text("0"))
+    overlap_next: Mapped[int | None] = mapped_column(SmallInteger, default=0, server_default=text("0"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
@@ -219,7 +221,7 @@ class DocumentLabel(Base):
     confidence: Mapped[float | None] = mapped_column(Numeric(3, 2))
     total_score: Mapped[float | None] = mapped_column(Numeric(4, 2))
     notes: Mapped[str | None] = mapped_column(Text)
-    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     verified_by: Mapped[str | None] = mapped_column(String(50))
     labeled_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     verified_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
@@ -256,25 +258,25 @@ class Classification(Base):
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     predicted_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
-    alternatives: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid")
+    alternatives: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid", server_default=text("'hybrid'::character varying"))
     chunk_count: Mapped[int | None] = mapped_column(SmallInteger)
-    rag_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    rag_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     rag_top_k: Mapped[int | None] = mapped_column(SmallInteger)
     rag_agreement: Mapped[bool | None] = mapped_column(Boolean)
-    status: Mapped[str] = mapped_column(String(20), default="staging")
+    status: Mapped[str] = mapped_column(String(20), default="staging", server_default=text("'staging'::character varying"))
     inference_ms: Mapped[int | None] = mapped_column(Integer)
     classified_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        Index("idx_cls_doc", "doc_id", "classified_at"),
+        Index("idx_cls_doc", "doc_id", desc("classified_at")),
         # idx_cls_status — tenant 제거로 idx_cls_tenant_status 의 status 컬럼만 잔존.
         Index("idx_cls_status", "status"),
         Index("idx_cls_model_level", "model_version", "predicted_level_id", "status"),
         # init.sql 보유 — ORM 동기화 (drift 방지)
         Index(
             "idx_cls_staging",
-            "classified_at",
+            desc("classified_at"),
             postgresql_where=text("status = 'staging'"),
         ),
         # 최근 분류 시계열 조회 hot path (tenant 제거 — 전역 스코프).
@@ -301,7 +303,7 @@ class ClassificationEvidence(Base):
 
     __table_args__ = (
         Index("idx_ce_classification", "classification_id"),
-        Index("idx_ce_chunk_contrib", "chunk_id", "contribution"),
+        Index("idx_ce_chunk_contrib", "chunk_id", desc("contribution")),
     )
 
 
@@ -315,15 +317,15 @@ class ModelVersion(Base):
     version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     version_label: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     base_model: Mapped[str] = mapped_column(String(100), nullable=False)
-    model_type: Mapped[str | None] = mapped_column(String(20), default="classifier")
+    model_type: Mapped[str | None] = mapped_column(String(20), default="classifier", server_default=text("'classifier'::character varying"))
     trained_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     training_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     training_data_count: Mapped[int | None] = mapped_column(Integer)
-    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     model_uri: Mapped[str | None] = mapped_column(String(500))
     model_size_mb: Mapped[int | None] = mapped_column(Integer)
     mlflow_run_id: Mapped[str | None] = mapped_column(String(64))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     activated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     deactivated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
@@ -349,7 +351,7 @@ class TrainingRun(Base):
     run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     model_version: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     mlflow_run_id: Mapped[str | None] = mapped_column(String(64))
-    status: Mapped[str] = mapped_column(String(20), default="queued")
+    status: Mapped[str] = mapped_column(String(20), default="queued", server_default=text("'queued'::character varying"))
     started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     duration_sec: Mapped[int | None] = mapped_column(Integer)
@@ -357,12 +359,12 @@ class TrainingRun(Base):
     train_count: Mapped[int | None] = mapped_column(Integer)
     val_count: Mapped[int | None] = mapped_column(Integer)
     test_count: Mapped[int | None] = mapped_column(Integer)
-    split_method: Mapped[str | None] = mapped_column(String(30), default="stratified")
+    split_method: Mapped[str | None] = mapped_column(String(30), default="stratified", server_default=text("'stratified'::character varying"))
     split_seed: Mapped[int | None] = mapped_column(Integer)
-    hyperparameters: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    hyperparameters: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     gpu_info: Mapped[dict | None] = mapped_column(JSONB)
     final_metrics: Mapped[dict | None] = mapped_column(JSONB)
-    trigger_type: Mapped[str | None] = mapped_column(String(30), default="manual")
+    trigger_type: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'::character varying"))
     trigger_ref: Mapped[str | None] = mapped_column(String(100))
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -371,7 +373,7 @@ class TrainingRun(Base):
     __table_args__ = (
         Index("idx_tr_model", "model_version"),
         Index("idx_tr_status", "status"),
-        Index("idx_tr_date", "started_at"),
+        Index("idx_tr_date", desc("started_at")),
         # N4 신규 — list_recent_runs() ORDER BY created_at DESC hot path
         Index("idx_tr_created", "created_at"),
     )
@@ -382,10 +384,10 @@ class TrainingEpoch(Base):
 
     run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), primary_key=True)
     epoch: Mapped[int] = mapped_column(Integer, primary_key=True)
-    train_loss: Mapped[float | None] = mapped_column(Numeric)
-    val_loss: Mapped[float | None] = mapped_column(Numeric)
-    val_metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    learning_rate: Mapped[float | None] = mapped_column(Numeric)
+    train_loss: Mapped[float | None] = mapped_column(REAL)
+    val_loss: Mapped[float | None] = mapped_column(REAL)
+    val_metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    learning_rate: Mapped[float | None] = mapped_column(REAL)
     logged_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -399,7 +401,9 @@ class TrainingDataset(Base):
     level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("run_id", "doc_id", name="uq_td_run_doc"),
+        # DB 실명은 PG 가 자동 생성한 tb_training_datasets_run_id_doc_id_key 다(실측 pg_constraint).
+        # 이름을 바꾸는 것은 DB 변경이므로 선언을 실제에 맞춘다.
+        UniqueConstraint("run_id", "doc_id", name="tb_training_datasets_run_id_doc_id_key"),
         Index("idx_td_run_split", "run_id", "split_type"),
         Index("idx_td_doc", "doc_id"),
     )
@@ -435,7 +439,7 @@ class Correction(Base):
         ),
         Index("idx_corr_cls", "classification_id"),
         Index("idx_corr_direction", "direction"),
-        Index("idx_corr_at", "corrected_at"),
+        Index("idx_corr_at", desc("corrected_at")),
         # init.sql 보유 — ORM 동기화 (drift 방지)
         # unconsumed_corrections() WHERE consumed_in_run IS NULL hot path
         Index(
@@ -457,7 +461,7 @@ class PromptVersion(Base):
     chain_stage: Mapped[str] = mapped_column(String(20), nullable=False)
     template: Mapped[str] = mapped_column(Text, nullable=False)
     avg_quality_score: Mapped[float | None] = mapped_column(Numeric(3, 2))
-    usage_count: Mapped[int | None] = mapped_column(Integer, default=0)
+    usage_count: Mapped[int | None] = mapped_column(Integer, default=0, server_default=text("0"))
     approval_rate: Mapped[float | None] = mapped_column(Numeric(3, 2))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_by: Mapped[str | None] = mapped_column(String(50))
@@ -485,7 +489,7 @@ class SampleDocument(Base):
     # 워커가 이 마커 없이 list[dict]만 반환하던 시절엔 검수큐 적재 자체가 없어 마커도 소실됐다.
     label_source: Mapped[str | None] = mapped_column(String(30))
     parse_error: Mapped[str | None] = mapped_column(Text)
-    review_status: Mapped[str | None] = mapped_column(String(20), default="pending_review")
+    review_status: Mapped[str | None] = mapped_column(String(20), default="pending_review", server_default=text("'pending_review'::character varying"))
     reviewed_by: Mapped[str | None] = mapped_column(String(50))
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
@@ -518,15 +522,15 @@ class LlmUsage(Base):
     # total_tokens는 DB측 generated column. ORM은 server_default 미설정으로 read-only처럼 처리.
     cost_usd: Mapped[float] = mapped_column(Numeric(10, 6), nullable=False)
     cost_krw: Mapped[float | None] = mapped_column(Numeric(12, 2))
-    billing_phase: Mapped[str] = mapped_column(String(20), nullable=False, default="development")
+    billing_phase: Mapped[str] = mapped_column(String(20), nullable=False, default="development", server_default=text("'development'::character varying"))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
-    success: Mapped[bool] = mapped_column(Boolean, default=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     error_code: Mapped[str | None] = mapped_column(String(50))
     called_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         PrimaryKeyConstraint("usage_id", "called_at"),
-        Index("idx_lu_phase", "billing_phase", "called_at"),
+        Index("idx_lu_phase", "billing_phase", desc("called_at")),
         Index("idx_lu_purpose", "purpose"),
         Index("idx_lu_ref", "reference_type", "reference_id"),
     )
@@ -550,15 +554,15 @@ class AuditLog(Base):
     payload_hash: Mapped[str | None] = mapped_column(String(64))
     ip_address: Mapped[str | None] = mapped_column(INET)
     user_agent: Mapped[str | None] = mapped_column(String(500))
-    success: Mapped[bool] = mapped_column(Boolean, default=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     error_code: Mapped[str | None] = mapped_column(String(50))
     occurred_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         PrimaryKeyConstraint("audit_id", "occurred_at"),
-        Index("idx_audit_actor", "actor_id", "occurred_at"),
+        Index("idx_audit_actor", "actor_id", desc("occurred_at")),
         Index("idx_audit_target", "target_type", "target_id"),
-        Index("idx_audit_action", "action", "occurred_at"),
+        Index("idx_audit_action", "action", desc("occurred_at")),
     )
 
 
@@ -577,8 +581,8 @@ class Guide(Base):
     change_summary: Mapped[str | None] = mapped_column(Text)
     doc_type: Mapped[str | None] = mapped_column(String(50))
     filename: Mapped[str | None] = mapped_column(String(500))
-    indexed: Mapped[bool] = mapped_column(Boolean, default=False)
-    embedding_vector_count: Mapped[int] = mapped_column(Integer, default=0)
+    indexed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    embedding_vector_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
     index_name: Mapped[str | None] = mapped_column(String(300))
     alias: Mapped[str | None] = mapped_column(String(300))
     model: Mapped[str | None] = mapped_column(String(100))
