@@ -43,6 +43,42 @@ _PUBLIC_SOURCE_NEGATIVE_TOKENS = {
     "\uc608\uc815",  # 예정
 }
 
+# [s2-underclass-risk] S3 예측이 내부·비공개 접근통제 신호를 담고 있으면 **검수로 보낸다**.
+# 등급은 바꾸지 않는다 — 라우팅 전용이라 F1 등 모델 지표에 영향이 없고, 오탐 비용은
+# 검수 부담뿐이다(FNR-safe).
+#
+# ⚠ 한계(실측 2026-08-11, direct_authored_catalog_training.v3_1 2,700행):
+#   "접근을 제한" 825행 = S2 390 · TS 375 · S3 60.
+#   P(문구|S3)=13.3% vs P(문구|TS)=50% · P(문구|S2)=52% → S3 예측의 미달분류 신호로는 유효하다.
+#   다만 세 문구("접근을 제한"·"반출 승인"·"공유 이력")가 **정확히 같은 825행**에 함께 나온다 =
+#   생성기 템플릿 한 벌이다. 즉 이 목록은 합성 코퍼스의 작문 어투에 맞춰져 있고,
+#   회원사 실문서는 다르게 쓴다 — 실환경에서는 거의 발화하지 않을 것으로 본다.
+#   따라서 **합성 평가셋에서 이 게이트가 잡은 건수를 실환경 성능 근거로 제시하지 말 것.**
+#   실문서 확보 후 실제 표현으로 재작성이 필요하다.
+_S2_PUBLIC_NEGATING_RE = re.compile(
+    r"(?:"
+    r"공개\s*자료로\s*관리|공개\s*출처|누구나\s*확인|"
+    r"공개\s*지침|공개\s*규격|공개\s*안내자료|이미\s*배포된|"
+    r"접근\s*제한[^.\n]{0,40}적용하지\s*않|"
+    r"반출\s*(?:통제|승인)[^.\n]{0,40}적용하지\s*않|"
+    r"수신자\s*제한[^.\n]{0,40}적용하지\s*않|"
+    r"비공개\s*조합[^.\n]{0,40}포함하지\s*않|"
+    r"non[-\s]?confidential|publicly available|public source"
+    r")",
+    re.IGNORECASE,
+)
+_S2_STRONG_RISK_RE = re.compile(
+    r"(?:"
+    r"일부\s*내부|공개되지\s*않|비공개\s*운영자료|"
+    r"프로젝트\s*구성원|협력사|고객별\s*일정|"
+    r"자료\s*접근을\s*제한|접근을\s*제한|공유\s*이력|"
+    r"반출\s*승인|권한\s*회수|수신자\s*기록\s*중\s*일부가\s*빠져|"
+    r"전용\s*저장소|internal\s+(?:only|review|plan|memo)|"
+    r"restricted\s+access|confidential"
+    r")",
+    re.IGNORECASE,
+)
+
 
 def _source_prior_is_public(src: object) -> bool:
     text = str(src or "").strip().lower()
@@ -642,6 +678,12 @@ class InferencePipeline:
             # source-prior cap(하향)이 예외로 미적용 → 공개출처 문서가 상위등급 유지. 가시화.
             _record_gate_fail_open("source_prior_cap")
 
+        try:
+            result = self._apply_ts_tie_break(result)
+        except Exception:  # noqa: BLE001
+            # 동점 브레이크(상향)가 예외로 미적용 → TS 가 S1 로 남는다. 미탐 방향이라 가시화.
+            _record_gate_fail_open("ts_tie_break")
+
         # [metadata-floor] ICD R6 S/V/M 메타데이터 상향 게이트 (opt-in, 기본 OFF).
         # 내용 분류기는 비밀관리성(M)·출처(S)를 못 본다 — 인사·재무 비밀이 일상 내부문서(S2)로
         # 보이는 사각지대(golden500 S1→S2 미탐 7건, 룰·모델 공유)가 그 결과. KL ICD가 주는
@@ -684,6 +726,15 @@ class InferencePipeline:
             # 무음 유지할 수 있다(shipping-ON 게이트). 분류는 계속하되 가시화(운영자 신호).
             _record_gate_fail_open("metadata_floor")
 
+        try:
+            cur = result.label.value if hasattr(result.label, "value") else str(result.label)
+            if cur == "S3" and self._has_s2_underclass_risk(text, metadata):
+                result.warnings = list(result.warnings) + [
+                    "s2-underclass-risk: S3 prediction contains internal/non-public access-control signals"
+                ]
+        except Exception:  # noqa: BLE001
+            _record_gate_fail_open("s2_underclass_risk")
+
         # 표적 1 (2026-05-29): use_rag=True면 retrieval facade 호출하여 rag_context 채움.
         # rule-fallback / _run_model 어느 경로든 동일하게 RAG context 보강 — 분류 본문은 안 건드림.
         # 모든 외부 의존(벡터스토어/임베더/reranker) 실패는 silent + 빈 컨텍스트 폴백.
@@ -706,6 +757,76 @@ class InferencePipeline:
         # [transparency] 원시 모델 판정(override/cap/floor 이전)을 최종 결과에 부착 — 룰·모델·최종 대조용.
         result.model_grade = _model_raw_grade
         return result
+
+    def _apply_ts_tie_break(self, result: InferenceResult) -> InferenceResult:
+        """TS/S1 동점 브레이크 — 사실상 동점이면 상위 등급(TS)을 택한다.
+
+        **모델 성능이 아니라 post-model 서빙 운영점이다.** source_prior cap ·
+        metadata_floor 와 같은 계층이며, proxy_model_comparison 의
+        ``excluded_post_model_serving_rules`` 에 선언돼 모델 비교 지표에서 제외된다.
+        이 규칙을 켠 상태로 잰 F1 을 "재학습 모델 자체 성능"으로 보고하면 안 된다.
+
+        상향 전용이다 — TS 는 최고 등급이므로 미탐(FNR)을 줄이는 방향이고, 계약
+        핵심목표("미탐 최소화")·veto 설계와 같은 방향이다. 하향(예: S1→S3 클램프)은
+        여기서 하지 않는다: 미탐을 늘리는 방향이라 과분류 지표만 좋아 보이게 만든다.
+
+        기본 OFF(settings.ts_tie_break_enabled). 켜면 배포본 판정이 바뀌는데 그 변화를
+        발주처 평가셋에서 아직 재지 않았다 — 과분류 축과 함께 측정한 뒤 켤 것.
+        """
+        from lloydk.config import settings as _s  # noqa: PLC0415
+
+        if not getattr(_s, "ts_tie_break_enabled", False):
+            return result
+
+        label = result.label.value if hasattr(result.label, "value") else str(result.label)
+        if label != "S1":
+            return result
+
+        scores = result.scores or {}
+        ts = float(scores.get("TS", 0.0))
+        s1 = float(scores.get("S1", 0.0))
+
+        min_ts = float(getattr(_s, "ts_tie_break_min_ts_score", 0.05))
+        margin = float(getattr(_s, "ts_tie_break_margin", 0.005))
+        if not (ts > min_ts and ts + margin >= s1):
+            return result
+
+        new_scores, new_conf = self._enforce_label_consistency(
+            scores, "TS", floor=max(ts, s1)
+        )
+        return InferenceResult(
+            label=Grade.TS,
+            confidence=new_conf,
+            scores=new_scores,
+            factors=result.factors,
+            evidence=result.evidence,
+            rag_context=result.rag_context,
+            model_version=result.model_version,
+            warnings=list(result.warnings)
+            + [
+                "ts-tie-break: TS/S1 near-tie resolved to TS "
+                f"(TS={ts:.4f}, S1={s1:.4f}, margin={margin})"
+            ],
+            rule_grade=result.rule_grade,
+            model_grade=result.model_grade,
+        )
+
+    @staticmethod
+    def _has_s2_underclass_risk(text: str, metadata: Optional[dict]) -> bool:
+        if metadata:
+            src = metadata.get("source_type", "") or metadata.get("source", "")
+            if _source_prior_is_public(src):
+                return False
+            scope = str(metadata.get("access_scope", "") or "").strip().lower()
+            if scope in {"approved_only", "designated", "department"}:
+                return True
+            mark = str(metadata.get("security_marking", "") or "").strip().lower()
+            if mark == "confidential":
+                return True
+        body = text or ""
+        if _S2_PUBLIC_NEGATING_RE.search(body):
+            return False
+        return bool(_S2_STRONG_RISK_RE.search(body))
 
     @staticmethod
     def _enforce_label_consistency(

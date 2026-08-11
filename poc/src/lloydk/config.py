@@ -539,6 +539,21 @@ class Settings(BaseSettings):
     # cap 레벨: "S3"(공개=S3 강제, 법리 정합·권장) | "S2"(부분완화, TS/S1만 하향 — 레거시).
     source_prior_cap_grade: str = "S3"
 
+    # TS/S1 동점 브레이크 (post-model 서빙 운영점, opt-in · 기본 OFF).
+    # TS와 S1이 사실상 동점일 때 TS(상위)를 택한다 — 계약 핵심목표인 "미탐 최소화"와 같은 방향의
+    # **상향 전용** 규칙이다(하향은 하지 않는다 — 그건 source_prior cap 담당).
+    # 기본 OFF인 이유: 켜면 배포본 판정이 바뀌는데 그 변화를 발주처 평가셋에서 아직 재지 않았다.
+    # 켜기 전에 과분류 축(공개문서 negative)과 함께 측정할 것 — 상향은 미탐을 줄이는 대신
+    # 과분류를 늘린다. metadata_floor 와 동일한 opt-in 취급이다.
+    # ⚠ 이 규칙은 **모델 성능이 아니다.** proxy_model_comparison 의
+    # excluded_post_model_serving_rules 에 선언돼 모델 비교 지표에서 제외된다 —
+    # 이 값을 켠 상태로 잰 F1 을 "재학습 모델 자체 성능"으로 보고하면 안 된다.
+    ts_tie_break_enabled: bool = False
+    # TS 확률이 이 값 이하면 동점으로 보지 않는다(잡음으로 TS 승격되는 것 차단).
+    ts_tie_break_min_ts_score: float = 0.05
+    # TS + margin >= S1 이면 동점으로 본다.
+    ts_tie_break_margin: float = 0.005
+
     # 고등급(TS/S1) 변경 2인검토 (C-cons, doc/36). 기본 False=단일검수자 즉시확정(동작 보존).
     # True면 고등급으로의 confirm/relabel은 **서로 다른 2인**이 같은 등급에 동의해야 확정되고,
     # 1인만 동의한 동안은 classification.status='needs_second_review'로 보류된다(편향·오염 방지).

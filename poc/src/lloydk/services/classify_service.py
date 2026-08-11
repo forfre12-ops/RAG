@@ -404,6 +404,12 @@ class ClassifyService:
             #   · 예측이 그 외(TS/S1/S2): 룰엔진과 등급이 합의해야 자동확정, 불일치면 검수
             # 측정(golden500): 자동확정 정밀도 63→81%, 고등급 미탐 46→8. 등급은 무인으로 바꾸지
             # 않고 검수 라우팅만 한다. 룰 산출 실패는 silent 폴백(게이트가 죽어도 분류는 진행).
+            if status != "needs_review" and any("s2-underclass-risk" in w for w in warnings_acc):
+                status = "needs_review"
+                warnings_acc.append(
+                    "s2-underclass-risk: internal/non-public signals with S3 prediction — routed to human review"
+                )
+
             if status != "needs_review":
                 ag = self._agreement_gate(pred, cleaned)
                 if ag is not None:

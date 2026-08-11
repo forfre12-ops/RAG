@@ -159,3 +159,133 @@ class TestGateEscalationRouting:
         resp = svc.classify(ClassifyRequest(doc_id="not-a-uuid", content="본문 텍스트"))
         # 다른 사유로 needs_review일 수는 있어도 low-confidence 사유로는 라우팅되지 않아야 함
         assert not any("low-confidence" in w for w in resp.warnings), resp.warnings
+
+
+class TestS2UnderclassRiskRouting:
+    def test_s2_underclass_risk_routes_to_review(self, monkeypatch, _no_db):
+        from lloydk.schemas.classify import ClassifyRequest
+
+        svc = _service(monkeypatch)
+        monkeypatch.setattr(
+            svc.inference,
+            "run",
+            lambda *a, **k: _fake_pred(
+                label=Grade.S3,
+                confidence=0.95,
+                warnings=[
+                    "s2-underclass-risk: S3 prediction contains internal/non-public access-control signals"
+                ],
+            ),
+        )
+        resp = svc.classify(ClassifyRequest(doc_id="not-a-uuid", content="body"))
+        assert resp.status == "needs_review"
+        assert resp.label == Grade.S3
+        assert any("s2-underclass-risk" in w for w in resp.warnings), resp.warnings
+
+
+class TestS2UnderclassRiskSignal:
+    def test_internal_limited_document_is_risk(self):
+        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+
+        text = (
+            "\uc77c\ubd80 \ub0b4\ubd80 \uc791\uc5c5 \uc21c\uc11c\uc640 "
+            "\uace0\uac1d\ubcc4 \uc77c\uc815\uc740 \uacf5\uac1c\ub418\uc9c0 "
+            "\uc54a\uc558\uace0, \ud611\ub825\uc0ac\uc5d0\uac8c \uc790\ub8cc "
+            "\uc811\uadfc\uc744 \uc81c\ud55c\ud558\uace0 \uacf5\uc720 "
+            "\uc774\ub825\uc744 \uae30\ub85d\ud55c\ub2e4."
+        )
+        assert InferencePipeline._has_s2_underclass_risk(text, None) is True
+
+    def test_public_source_context_is_not_risk(self):
+        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+
+        text = (
+            "\ubb38\uc11c\uc758 \uae30\uc900\uacfc \uc218\uce58\ub294 "
+            "\uacf5\uac1c \uc9c0\uce68\uacfc \uacf5\uac1c \uaddc\uaca9\uc5d0\uc11c "
+            "\ud655\uc778\ub41c\ub2e4. \uc811\uadfc \uc81c\ud55c\u00b7\ubc18\ucd9c "
+            "\ud1b5\uc81c\u00b7\uc218\uc2e0\uc790 \uc81c\ud55c\uc744 "
+            "\uc801\uc6a9\ud558\uc9c0 \uc54a\uc558\ub2e4."
+        )
+        assert InferencePipeline._has_s2_underclass_risk(text, None) is False
+
+    def test_public_metadata_suppresses_risk(self):
+        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+
+        text = "\ube44\uacf5\uac1c \uc6b4\uc601\uc790\ub8cc \ucd08\uc548"
+        assert (
+            InferencePipeline._has_s2_underclass_risk(
+                text,
+                {"source_type": "\ubcf4\ub3c4\uc790\ub8cc"},
+            )
+            is False
+        )
+
+
+class TestTsTieBreak:
+    """TS/S1 동점 브레이크 = opt-in post-model 운영점(기본 OFF · 상향 전용)."""
+
+    @staticmethod
+    def _near_tie():
+        from lloydk.modules.m5_inference.pipeline import InferenceResult
+
+        return InferenceResult(
+            label=Grade.S1,
+            confidence=0.486,
+            scores={"TS": 0.4854, "S1": 0.4856, "S2": 0.0062, "S3": 0.0228},
+            rule_grade="S3",
+        )
+
+    def test_disabled_by_default_leaves_result_untouched(self, _no_db):
+        """기본값에서 서빙 판정이 바뀌면 안 된다 — 배포본 동작 보존."""
+        from lloydk.config import settings
+        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+
+        assert settings.ts_tie_break_enabled is False
+        result = self._near_tie()
+
+        guarded = InferencePipeline(model_dir=None)._apply_ts_tie_break(result)
+
+        assert guarded.label == Grade.S1
+        assert guarded is result
+
+    def test_enabled_near_tie_resolves_to_ts(self, monkeypatch, _no_db):
+        from lloydk.config import settings
+        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+
+        monkeypatch.setattr(settings, "ts_tie_break_enabled", True)
+
+        guarded = InferencePipeline(model_dir=None)._apply_ts_tie_break(self._near_tie())
+
+        assert guarded.label == Grade.TS
+        assert guarded.scores["TS"] > guarded.scores["S1"]
+        assert any("ts-tie-break" in warning for warning in guarded.warnings)
+
+    def test_enabled_strong_s1_is_not_promoted_to_ts(self, monkeypatch, _no_db):
+        from lloydk.config import settings
+        from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
+
+        monkeypatch.setattr(settings, "ts_tie_break_enabled", True)
+        result = InferenceResult(
+            label=Grade.S1,
+            confidence=0.77,
+            scores={"TS": 0.058, "S1": 0.773, "S2": 0.005, "S3": 0.164},
+            rule_grade="S3",
+        )
+
+        assert InferencePipeline(model_dir=None)._apply_ts_tie_break(result).label == Grade.S1
+
+    def test_enabled_never_downgrades(self, monkeypatch, _no_db):
+        """하향은 하지 않는다 — 미탐을 늘리는 방향이라 이 규칙의 범위 밖이다."""
+        from lloydk.config import settings
+        from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
+
+        monkeypatch.setattr(settings, "ts_tie_break_enabled", True)
+        # 구 S3 clamp 가 S3 로 내리던 입력(룰 S3 · TS 무시가능 · S1/S3 마진 약함).
+        result = InferenceResult(
+            label=Grade.S1,
+            confidence=0.56,
+            scores={"TS": 0.0021, "S1": 0.5553, "S2": 0.0015, "S3": 0.4411},
+            rule_grade="S3",
+        )
+
+        assert InferencePipeline(model_dir=None)._apply_ts_tie_break(result).label == Grade.S1

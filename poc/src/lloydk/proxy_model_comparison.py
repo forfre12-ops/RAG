@@ -912,8 +912,11 @@ def serving_aggregation_contract(
         # v2: 소스 해시를 파일 전체 raw 바이트 → **선언된 함수 본문 + LF 정규화** 로 바꿨다.
         # CRLF 체크아웃에서 만든 번들이 LF 컨테이너에서 로드 거부되던 것과, 주석 수정만으로
         # 전 번들이 무효가 되던 것을 함께 없앤다(_sha256_source_members 주석 참조).
-        # v1 번들은 이 계약과 맞지 않으므로 재-finalize 가 필요하다.
-        "schema_version": "m5-model-aggregation-mirror-v2",
+        # v3: TS/S1 동점 브레이크를 excluded_post_model_serving_rules 에 선언 추가.
+        # 선언되지 않은 post-model 규칙이 서빙에서 라벨을 바꾸면 같은 모델 파일이 소스 버전에
+        # 따라 다른 결과를 내므로, 존재를 계약에 적고 모델 비교에서는 제외한다.
+        # v1·v2 번들은 이 계약과 맞지 않으므로 재-finalize 가 필요하다.
+        "schema_version": "m5-model-aggregation-mirror-v3",
         "evaluation_unit": "document",
         "chunk_rows_are_not_evaluation_samples": True,
         "char_split": {
@@ -959,6 +962,9 @@ def serving_aggregation_contract(
             "source-prior cap",
             "metadata floor",
             "escalation tau",
+            # TS/S1 동점 브레이크(settings.ts_tie_break_enabled · 기본 OFF). 상향 전용
+            # 운영점이며 모델 성능이 아니다 — 켠 상태로 잰 지표를 모델 비교에 쓰지 않는다.
+            "ts/s1 near-tie break",
         ],
         "forward_batch_size": forward_batch_size,
         "m5_reference": {
