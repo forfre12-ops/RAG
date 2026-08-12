@@ -1,6 +1,6 @@
-# Lloydk DR 백업 스케줄 — 매일 02:00. lloydk-dr-backup.service 를 발화.
+# Koipa DR 백업 스케줄 — 매일 02:00. koipa-dr-backup.service 를 발화.
 [Unit]
-Description=Lloydk DR 백업 스케줄(매일 02:00)
+Description=Koipa DR 백업 스케줄(매일 02:00)
 
 [Timer]
 # 서버 로컬 타임존 기준. 앱은 KST(Asia/Seoul) 이므로 서버 TZ 도 KST 권장.
