@@ -124,7 +124,13 @@ def main(argv: list[str] | None = None) -> int:
         "eval_set": args.eval,
         "documents": len(truth),
         "temperature": temperature,
-        "scoring_path": "M5 serving (char chunk -> overflow windows -> T -> length-weighted mean -> severe max -> renormalize -> argmax)",
+        "scoring_path": (
+            "M5 aggregation only: char chunk -> fast-tokenizer overflow windows -> T -> "
+            "length-weighted mean -> severe max -> renormalize -> argmax. "
+            "POST-MODEL SERVING GUARDS ARE NOT APPLIED (FNR-safe override, source-prior cap, "
+            "metadata floor, escalation tau, agreement gate) — these are exactly the "
+            "excluded_post_model_serving_rules of the aggregation contract. 운영 FNR 은 이보다 낮다."
+        ),
         "accuracy": round(accuracy, 4),
         "f1_macro": round(f1, 4),
         "per_grade": per_grade,
