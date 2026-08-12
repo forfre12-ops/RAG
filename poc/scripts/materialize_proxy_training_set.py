@@ -31,11 +31,11 @@ from scripts.assemble_public_s3_challenge import (  # noqa: E402
     SCHEMA as PUBLIC_HOLDOUT_MANIFEST_SCHEMA,
     load_blocked_corpora,
 )
-from lloydk.hygiene import text_hash  # noqa: E402
-from lloydk.modules.m4_training.chunk_expand import (  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
+from koipa.modules.m4_training.chunk_expand import (  # noqa: E402
     expand_records_evidence_aware,
 )
-from lloydk.proxy_corpus import (  # noqa: E402
+from koipa.proxy_corpus import (  # noqa: E402
     GRADE_CODES,
     IntendedUse,
     validate_proxy_record,
@@ -1351,7 +1351,7 @@ def materialize_proxy_training_set(
     # relying on the family splitter's in-memory invariant.  The finalizer
     # repeats this check from disk; recording the same numbers makes a manifest
     # disagreement a hard failure at either boundary.
-    from lloydk.proxy_training_finalization import (  # noqa: PLC0415
+    from koipa.proxy_training_finalization import (  # noqa: PLC0415
         assert_materialized_split_isolation,
     )
 
@@ -1379,7 +1379,7 @@ def materialize_proxy_training_set(
             "split_seed": seed,
             "target_ratios": dict(SPLIT_RATIOS),
             "split_unit": "document_family_id",
-            "normalized_text_hash": "lloydk.hygiene.text_hash",
+            "normalized_text_hash": "koipa.hygiene.text_hash",
             "chunk_policy": "train_only_evidence_aware",
             "frozen_membership_allowed": False,
             "training_validation_intended_use": "training",

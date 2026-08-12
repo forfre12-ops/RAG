@@ -24,10 +24,10 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
-from lloydk.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
-from lloydk.modules.m3_labeling.seeds import to_canonical_factor  # noqa: E402
+from koipa.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
+from koipa.modules.m3_labeling.seeds import to_canonical_factor  # noqa: E402
 
 GRADE_NAME = {"TS": "특급기밀", "S1": "1급비밀", "S2": "2급대외비", "S3": "3급공개"}
 FACTOR_KO = {"SECRECY": "비공지성(S)", "VALUE": "경제유용성(V)", "MANAGEMENT": "비밀관리성(M)"}

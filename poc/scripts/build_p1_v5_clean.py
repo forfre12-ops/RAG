@@ -50,7 +50,7 @@ _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.golden_tiers import (  # noqa: E402
+from koipa.golden_tiers import (  # noqa: E402
     TIER_CANDIDATE,
     TIER_LEGAL_FLOOR,
     TIER_SILVER,

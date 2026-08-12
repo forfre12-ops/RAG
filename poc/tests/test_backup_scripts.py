@@ -86,7 +86,7 @@ class TestBackupMinioMirror:
 class TestDrRestoreCheck:
     def test_pg_backup_recency_fresh(self, tmp_path):
         import dr_restore_check as dr
-        f = tmp_path / "lloydk-20260527-020000.dump"
+        f = tmp_path / "koipa-20260527-020000.dump"
         f.write_text("x")
         result = dr.check_pg_backup_recency(tmp_path, hours=24)
         assert result.ok is True
@@ -169,28 +169,28 @@ class TestDrRestoreCheck:
 
 class TestDrDiscovery:
     _CONTAINERS = [
-        {"name": "lloydk-airgap-postgres-1", "project": "lloydk-airgap", "service": "postgres"},
-        {"name": "lloydk-airgap-worker-1", "project": "lloydk-airgap", "service": "worker"},
-        {"name": "lloydk-airgap-api-1", "project": "lloydk-airgap", "service": "api"},
+        {"name": "koipa-airgap-postgres-1", "project": "koipa-airgap", "service": "postgres"},
+        {"name": "koipa-airgap-worker-1", "project": "koipa-airgap", "service": "worker"},
+        {"name": "koipa-airgap-api-1", "project": "koipa-airgap", "service": "api"},
     ]
     _DUAL = _CONTAINERS + [
-        {"name": "lloydk-cust-postgres-1", "project": "lloydk-cust", "service": "postgres"},
-        {"name": "lloydk-cust-api-1", "project": "lloydk-cust", "service": "api"},
+        {"name": "koipa-cust-postgres-1", "project": "koipa-cust", "service": "postgres"},
+        {"name": "koipa-cust-api-1", "project": "koipa-cust", "service": "api"},
     ]
 
     def test_autodetect_pg_single_stack(self):
         import dr_discovery as d
-        assert d.autodetect_container(("postgres",), self._CONTAINERS) == "lloydk-airgap-postgres-1"
+        assert d.autodetect_container(("postgres",), self._CONTAINERS) == "koipa-airgap-postgres-1"
 
     def test_autodetect_storage_prefers_worker(self):
         import dr_discovery as d
         # worker 가 api 보다 우선
-        assert d.autodetect_container(("worker", "api"), self._CONTAINERS) == "lloydk-airgap-worker-1"
+        assert d.autodetect_container(("worker", "api"), self._CONTAINERS) == "koipa-airgap-worker-1"
 
     def test_autodetect_storage_falls_back_to_api(self):
         import dr_discovery as d
         only_api = [c for c in self._CONTAINERS if c["service"] in ("postgres", "api")]
-        assert d.autodetect_container(("worker", "api"), only_api) == "lloydk-airgap-api-1"
+        assert d.autodetect_container(("worker", "api"), only_api) == "koipa-airgap-api-1"
 
     def test_autodetect_ambiguous_two_stacks_returns_none(self):
         import dr_discovery as d
@@ -204,20 +204,20 @@ class TestDrDiscovery:
     def test_group_stacks_single(self):
         import dr_discovery as d
         stacks = d.group_stacks(self._CONTAINERS)
-        assert set(stacks) == {"lloydk-airgap"}
-        assert stacks["lloydk-airgap"]["postgres"] == "lloydk-airgap-postgres-1"
-        assert stacks["lloydk-airgap"]["storage"] == "lloydk-airgap-worker-1"  # worker 우선
+        assert set(stacks) == {"koipa-airgap"}
+        assert stacks["koipa-airgap"]["postgres"] == "koipa-airgap-postgres-1"
+        assert stacks["koipa-airgap"]["storage"] == "koipa-airgap-worker-1"  # worker 우선
 
     def test_group_stacks_dual(self):
         import dr_discovery as d
         stacks = d.group_stacks(self._DUAL)
-        assert set(stacks) == {"lloydk-airgap", "lloydk-cust"}
-        assert stacks["lloydk-cust"]["storage"] == "lloydk-cust-api-1"  # cust 는 api 만
+        assert set(stacks) == {"koipa-airgap", "koipa-cust"}
+        assert stacks["koipa-cust"]["storage"] == "koipa-cust-api-1"  # cust 는 api 만
 
     def test_group_stacks_skips_incomplete(self):
         import dr_discovery as d
         # postgres 만 있고 api/worker 없는 스택은 제외(스토리지 백업 불가)
-        pg_only = [{"name": "lloydk-x-postgres-1", "project": "lloydk-x", "service": "postgres"}]
+        pg_only = [{"name": "koipa-x-postgres-1", "project": "koipa-x", "service": "postgres"}]
         assert d.group_stacks(pg_only) == {}
 
 
@@ -259,7 +259,7 @@ class TestBackupStorage:
 class TestBackupDr:
     def test_plan_targets_single_stack_uses_default_paths(self, tmp_path):
         import backup_dr as bdr
-        stacks = {"lloydk-airgap": {"postgres": "pg1", "storage": "wk1"}}
+        stacks = {"koipa-airgap": {"postgres": "pg1", "storage": "wk1"}}
         targets = bdr.plan_targets(stacks, tmp_path)
         assert len(targets) == 1
         t = targets[0]
@@ -270,20 +270,20 @@ class TestBackupDr:
     def test_plan_targets_dual_uses_project_subdirs(self, tmp_path):
         import backup_dr as bdr
         stacks = {
-            "lloydk-jjw": {"postgres": "pgj", "storage": "wkj"},
-            "lloydk-cust": {"postgres": "pgc", "storage": "wkc"},
+            "koipa-jjw": {"postgres": "pgj", "storage": "wkj"},
+            "koipa-cust": {"postgres": "pgc", "storage": "wkc"},
         }
         targets = bdr.plan_targets(stacks, tmp_path)
         assert len(targets) == 2
         dirs = {t["project"]: t["pg_dir"] for t in targets}
-        assert dirs["lloydk-jjw"] == tmp_path / "lloydk-jjw" / "pg"
-        assert dirs["lloydk-cust"] == tmp_path / "lloydk-cust" / "pg"
+        assert dirs["koipa-jjw"] == tmp_path / "koipa-jjw" / "pg"
+        assert dirs["koipa-cust"] == tmp_path / "koipa-cust" / "pg"
 
     def test_main_dry_run_reports_plan(self, tmp_path, monkeypatch):
         import backup_dr as bdr
         monkeypatch.setattr(bdr.shutil, "which", lambda _n: "/usr/bin/docker")
         monkeypatch.setattr(bdr, "group_stacks",
-                            lambda: {"lloydk-airgap": {"postgres": "pg1", "storage": "wk1"}})
+                            lambda: {"koipa-airgap": {"postgres": "pg1", "storage": "wk1"}})
         rc = bdr.main([
             "--dry-run", "--backups-root", str(tmp_path / "b"),
             "--report-dir", str(tmp_path / "r"),
@@ -306,7 +306,7 @@ class TestBackupDr:
         import backup_dr as bdr
         monkeypatch.setattr(bdr.shutil, "which", lambda _n: "/usr/bin/docker")
         monkeypatch.setattr(bdr, "group_stacks",
-                            lambda: {"lloydk-airgap": {"postgres": "pg1", "storage": "wk1"}})
+                            lambda: {"koipa-airgap": {"postgres": "pg1", "storage": "wk1"}})
 
         def _boom(**_kw):
             raise RuntimeError("simulated backup failure")

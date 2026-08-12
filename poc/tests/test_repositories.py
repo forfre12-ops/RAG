@@ -12,13 +12,13 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import SessionLocal, engine
-from lloydk.db.models import (
+from koipa.db import SessionLocal, engine
+from koipa.db.models import (
     ClassificationLevel,
     Correction,
     Document,
 )
-from lloydk.repositories import (
+from koipa.repositories import (
     AuditRepo,
     ClassifyRepo,
     LlmUsageRepo,
@@ -110,7 +110,7 @@ class TestClassifyRepo:
         assert float(cls.confidence) == pytest.approx(0.92, abs=1e-4)
 
     def test_evidence_round_trip_from_spans(self, db, document, levels):
-        from lloydk.schemas.classify import EvidenceSpan
+        from koipa.schemas.classify import EvidenceSpan
 
         repo = ClassifyRepo(db)
         cls = repo.create_classification(
@@ -130,7 +130,7 @@ class TestClassifyRepo:
         assert added == 2
         db.flush()
 
-        from lloydk.db.models import ClassificationEvidence
+        from koipa.db.models import ClassificationEvidence
 
         evs = (
             db.query(ClassificationEvidence)
@@ -293,8 +293,16 @@ class TestSynthRepo:
         )
         assert sd.review_status == "pending_review"
 
-        pending = repo.list_pending_review()
-        assert any(s.sample_id == sd.sample_id for s in pending)
+        # list_pending_review 는 limit=50 · created_at 오름차순이다. 공유 DB 에 pending 이
+        # 50건 넘게 쌓이면 **방금 만든 샘플이 가장 뒤라 상위 50건 밖으로 밀려난다**
+        # (실측 2026-08-12: pending 55건 상태에서 이 단언이 깨졌다 — 코드 결함이 아니라
+        # 테스트가 공유 DB 누적을 고려하지 않은 것이다).
+        # 조회 자체가 동작하는지와, 내가 만든 건이 pending 으로 잡히는지를 나눠 본다.
+        assert repo.list_pending_review(), "pending 조회가 비어 있다"
+        mine = repo.list_by_status(
+            "pending_review", limit=repo.count_pending_review() or 1
+        )
+        assert any(s.sample_id == sd.sample_id for s in mine)
 
         reviewed = repo.review(sd.sample_id, approved=True, reviewed_by="qa@test")
         assert reviewed is not None

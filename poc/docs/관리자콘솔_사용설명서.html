@@ -49,7 +49,7 @@ figure.shot figcaption b{color:var(--ink)}
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="eyebrow">LLOYDK · AI 거버넌스 콘솔</div>
+    <div class="eyebrow">KOIPA · AI 거버넌스 콘솔</div>
     <h1>지재원 관리자 콘솔 사용설명서</h1>
     <div class="meta">처음 쓰는 분을 위한 안내 · 화면 캡처는 KL 제공 테스트서버(223.130.156.134)에서 직접 촬영 · 2026-08-07</div>
   </div>
@@ -118,7 +118,7 @@ figure.shot figcaption b{color:var(--ink)}
     <tbody>
       <tr><td>지금 잘 떠 있나 확인</td><td><code>curl -s http://127.0.0.1:8000/api/v1/healthz</code></td></tr>
       <tr><td>컨테이너 상태 보기</td><td><code>sudo docker ps</code></td></tr>
-      <tr><td>로그 보기(오류 원인)</td><td><code>sudo docker logs --tail 50 lloydk-jjw-api-1</code></td></tr>
+      <tr><td>로그 보기(오류 원인)</td><td><code>sudo docker logs --tail 50 koipa-jjw-api-1</code></td></tr>
       <tr><td>전체 재시작</td><td><code>bash ~/open_demo.sh</code> (다시 실행하면 재기동됩니다)</td></tr>
       <tr><td>API 키 확인</td><td><code>grep ^API_KEY= ~/poc/.env.jjw</code></td></tr>
     </tbody>
@@ -446,10 +446,10 @@ figure.shot figcaption b{color:var(--ink)}
   </table>
 
   <div class="note"><b>로그로 원인 찾기</b> — 무엇이 잘못됐는지 모를 때는 서버에서 이 한 줄이면 대부분 나옵니다.
-  <pre class="cmd" style="margin-top:8px">sudo docker logs --tail 50 lloydk-jjw-api-1</pre>
+  <pre class="cmd" style="margin-top:8px">sudo docker logs --tail 50 koipa-jjw-api-1</pre>
   콘솔 화면 <b>맨 아래 검은 띠(요청 로그)</b>에도 방금 누른 버튼이 어떤 API를 불렀고 응답이 무엇이었는지 실시간으로 남습니다.</div>
 
-  <div class="foot">로이드케이(AI 코어) · 지재원 관리자 콘솔 사용설명서 · 2026-08-07 · 모든 화면 캡처는 KL 제공 테스트서버(223.130.156.134, NVIDIA L4)에서 실제 동작 상태로 촬영했으며 합성 이미지가 아닙니다.</div>
+  <div class="foot">한국지식재산보호원(AI 코어) · 지재원 관리자 콘솔 사용설명서 · 2026-08-07 · 모든 화면 캡처는 KL 제공 테스트서버(223.130.156.134, NVIDIA L4)에서 실제 동작 상태로 촬영했으며 합성 이미지가 아닙니다.</div>
 </div>
 </body>
 </html>

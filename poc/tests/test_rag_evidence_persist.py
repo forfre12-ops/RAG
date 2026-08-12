@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import uuid
 
-from lloydk.db.models import ClassificationEvidence
-from lloydk.repositories.classify_repo import ClassifyRepo, _try_uuid
-from lloydk.schemas.classify import RagContextHit
+from koipa.db.models import ClassificationEvidence
+from koipa.repositories.classify_repo import ClassifyRepo, _try_uuid
+from koipa.schemas.classify import RagContextHit
 
 
 class _StubSession:

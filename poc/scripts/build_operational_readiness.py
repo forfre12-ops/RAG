@@ -106,7 +106,7 @@ def _strict_signoff_validator():
         _src = Path(__file__).resolve().parent.parent / "src"
         if str(_src) not in sys.path:
             sys.path.insert(0, str(_src))
-        from lloydk.golden_tiers import is_real_locked_eval as fn  # noqa: PLC0415
+        from koipa.golden_tiers import is_real_locked_eval as fn  # noqa: PLC0415
     except Exception:  # noqa: BLE001
         fn = None
     _STRICT_VALIDATOR_CACHE.append(fn)
@@ -248,7 +248,7 @@ def _deployed_model_default() -> str:
         _src = Path(__file__).resolve().parent.parent / "src"
         if str(_src) not in sys.path:
             sys.path.insert(0, str(_src))
-        from lloydk.config import settings  # noqa: PLC0415
+        from koipa.config import settings  # noqa: PLC0415
 
         if settings.classifier_model_dir:
             return settings.classifier_model_dir

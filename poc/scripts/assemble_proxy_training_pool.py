@@ -37,8 +37,8 @@ from scripts.assemble_public_s3_training_pool import (  # noqa: E402
     PublicTrainingAssemblyError,
     load_public_s3_training_pool,
 )
-from lloydk.hygiene import text_hash  # noqa: E402
-from lloydk.proxy_corpus import (  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
+from koipa.proxy_corpus import (  # noqa: E402
     DIRECT_AUTHORED_TRAINING_BUCKET,
     DIRECT_AUTHORED_TRAINING_GATE_VERSION,
     GRADE_CODES,
@@ -165,8 +165,8 @@ def _code_attestation() -> dict[str, object]:
         (_POC / "scripts" / "assemble_proxy_gold.py").resolve(),
         (_POC / "scripts" / "assemble_public_s3_challenge.py").resolve(),
         (_POC / "scripts" / "assemble_public_s3_training_pool.py").resolve(),
-        (_POC / "src" / "lloydk" / "proxy_corpus.py").resolve(),
-        (_POC / "src" / "lloydk" / "hygiene.py").resolve(),
+        (_POC / "src" / "koipa" / "proxy_corpus.py").resolve(),
+        (_POC / "src" / "koipa" / "hygiene.py").resolve(),
     )
     files = []
     for path in paths:
@@ -1641,7 +1641,7 @@ def assemble_training_pool_run(
                 "attested public-real S3 training artifact with source licence, "
                 "attribution, and explicit training permission"
             ),
-            "normalized_text_hash": "lloydk.hygiene.text_hash (SHA1 of whitespace-free text)",
+            "normalized_text_hash": "koipa.hygiene.text_hash (SHA1 of whitespace-free text)",
             "frozen_primary_role": "evaluation_exclusion_only",
             "blocked_public_holdout_role": (
                 "development_diagnostic_exclusion_only; never training selection"

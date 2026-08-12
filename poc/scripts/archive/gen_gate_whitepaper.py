@@ -51,7 +51,7 @@ __NAV__
       <span class="meta-dot">·</span>
       <span class="meta-soft">분류 검수 게이트 강화 — silent FNR 방어 · 자동확정 신뢰성</span>
       <span class="meta-dot">·</span>
-      <span class="meta-soft">Lloydk AI Engine</span>
+      <span class="meta-soft">Koipa AI Engine</span>
     </div>
 
     <h1 class="title">분류 검수 게이트 강화</h1>
@@ -209,7 +209,7 @@ __NAV__
 </div>
 
 <footer>
-  <span>분류 검수 게이트 강화 — 실증·설계 보고서 · 2026-06 · Lloydk AI Engine</span>
+  <span>분류 검수 게이트 강화 — 실증·설계 보고서 · 2026-06 · Koipa AI Engine</span>
   <span>silent FNR 방어 · 자동확정 신뢰성 · 합성 골든셋 기준</span>
 </footer>
 __SCRIPT__

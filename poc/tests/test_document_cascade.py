@@ -23,10 +23,10 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import SessionLocal, engine
-from lloydk.db.models import AuditLog, Chunk, Document
-from lloydk.repositories import ChunkRepo, DocumentRepo
-from lloydk.services.document_service import DocumentService
+from koipa.db import SessionLocal, engine
+from koipa.db.models import AuditLog, Chunk, Document
+from koipa.repositories import ChunkRepo, DocumentRepo
+from koipa.services.document_service import DocumentService
 
 
 def _pg_ok() -> bool:

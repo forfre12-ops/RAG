@@ -92,8 +92,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=0, help="앞 N건만(빠른 확인용). 0=전체")
     args = parser.parse_args(argv)
 
-    from lloydk.proxy_training_finalization import load_model_document_logits  # noqa: PLC0415
-    from lloydk.proxy_training_finalization import aggregate_trace_probabilities  # noqa: PLC0415
+    from koipa.proxy_training_finalization import load_model_document_logits  # noqa: PLC0415
+    from koipa.proxy_training_finalization import aggregate_trace_probabilities  # noqa: PLC0415
 
     rows = _read_jsonl(Path(args.eval))
     if args.limit:
@@ -142,14 +142,18 @@ def main(argv: list[str] | None = None) -> int:
             "수치와 나란히 놓지 말 것 — 자가 다르면 비교가 성립하지 않는다."
         ),
     }
-    print(json.dumps({k: v for k, v in report.items() if k != "claim_ceiling"},
-                     ensure_ascii=False, indent=2))
+    # [순서 주의] 파일을 **먼저** 쓴다. 표준출력 인코딩(cp949 콘솔)에서 터지면 수십 분짜리
+    # 인퍼런스 결과가 통째로 날아간다 — 실제로 한 번 날렸다(scoring_path 의 em dash).
     if args.out:
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
                        encoding="utf-8")
-        print(f"[report] {out}")
+    # 콘솔이 못 쓰는 문자가 있어도 죽지 않게 ascii 로 떨어뜨린다(파일은 UTF-8 원문 유지).
+    print(json.dumps({k: v for k, v in report.items() if k != "claim_ceiling"},
+                     ensure_ascii=True, indent=2))
+    if args.out:
+        print(f"[report] {args.out}")
     return 0
 
 

@@ -60,7 +60,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-s
 if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-from lloydk.modules.m3_labeling.consensus import evaluate_consensus  # noqa: E402 (sys.path 설정 후)
+from koipa.modules.m3_labeling.consensus import evaluate_consensus  # noqa: E402 (sys.path 설정 후)
 
 LABELS = ["TS", "S1", "S2", "S3"]
 DEFAULT_CANONICAL_GOLD = Path("datasets/gold_real/classification_gold.jsonl")
@@ -126,8 +126,8 @@ def load_oss_corpus(
 
 
 def run_rule_labeler(text: str) -> tuple[str, float, bool]:
-    from lloydk.modules.m3_labeling import LabelingPipeline
-    from lloydk.modules.m3_labeling.rule_engine import has_real_evidence
+    from koipa.modules.m3_labeling import LabelingPipeline
+    from koipa.modules.m3_labeling.rule_engine import has_real_evidence
     pipe = LabelingPipeline()
     result = pipe.label(text)
     grade = result.grade.value if hasattr(result.grade, "value") else str(result.grade)
@@ -200,8 +200,8 @@ def run_llm_labeler(text: str, provider_name: str) -> tuple[str, float, str, dic
         grade, conf, rationale = _ollama_judge(text, base_url)
         return grade, conf, rationale, {}
     # Anthropic / OpenAI
-    from lloydk.adapters.llm import build_provider
-    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+    from koipa.adapters.llm import build_provider
+    from koipa.modules.m3_labeling.llm_labeler import LLMLabeler
     provider = build_provider(provider_name)
     labeler = LLMLabeler(provider=provider)
     result = labeler.label(text)

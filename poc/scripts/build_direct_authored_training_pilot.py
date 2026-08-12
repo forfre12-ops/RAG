@@ -18,7 +18,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.proxy_corpus import validate_proxy_record
 
 
 OUT = ROOT / "datasets" / "proxy_gold" / "direct_authored_training_pilot.v6.jsonl"

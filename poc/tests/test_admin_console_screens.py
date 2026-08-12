@@ -2,7 +2,7 @@
 
 왜 이 파일이 있나:
 요건 중 "관리자가 …할 수 있어야 한다"류는 API만으로는 충족 주장이 약하다(화면 경계는 ICD §01·K7
-에서 Lloydk 구간). 실제로 2026-08 시점에 등급체계 편집·합성 검수·키워드 관리는 API만 있고
+에서 Koipa 구간). 실제로 2026-08 시점에 등급체계 편집·합성 검수·키워드 관리는 API만 있고
 admin.html 에 화면이 없었다. 화면을 추가한 뒤 그 화면이 조용히 사라지거나 엔드포인트가
 어긋나는 회귀를 막기 위해 두 축을 고정한다:
 
@@ -19,11 +19,11 @@ from uuid import uuid4
 
 import pytest
 
-from lloydk.schemas.common import Actor, GradeDefinition
+from koipa.schemas.common import Actor, GradeDefinition
 
 _ADMIN_HTML = (
     Path(__file__).resolve().parent.parent
-    / "src" / "lloydk" / "api" / "static" / "admin.html"
+    / "src" / "koipa" / "api" / "static" / "admin.html"
 )
 
 
@@ -66,7 +66,7 @@ def test_console_warns_before_grade_deactivation(console: str):
 # ── B. 계약 축 ────────────────────────────────────────────────────────────────
 def test_grade_put_payload_matches_schema():
     """콘솔 saveGrades() 가 만드는 본문 = {grades:[{code,name,order,description,color}], actor}."""
-    from lloydk.schemas.schema_admin import GradesPutRequest
+    from koipa.schemas.schema_admin import GradesPutRequest
 
     req = GradesPutRequest(
         grades=[
@@ -79,8 +79,8 @@ def test_grade_put_payload_matches_schema():
 
 
 def test_grade_put_handler_returns_retraining_signal(monkeypatch):
-    from lloydk.api import schema_admin as sa
-    from lloydk.schemas.schema_admin import GradesPutRequest, GradesPutResponse
+    from koipa.api import schema_admin as sa
+    from koipa.schemas.schema_admin import GradesPutRequest, GradesPutResponse
 
     monkeypatch.setattr(
         sa.SchemaAdminService, "put",
@@ -100,7 +100,7 @@ def test_grade_put_handler_returns_retraining_signal(monkeypatch):
 
 def test_keyword_create_payload_matches_schema():
     """콘솔 createKeyword() 본문: grade·keyword·pattern_type·weight(+factor 선택)·actor."""
-    from lloydk.schemas.keyword_admin import KeywordCreateRequest
+    from koipa.schemas.keyword_admin import KeywordCreateRequest
 
     req = KeywordCreateRequest(
         grade="TS", keyword="극비", pattern_type="regex",
@@ -113,7 +113,7 @@ def test_keyword_weight_upper_bound_is_enforced():
     """콘솔이 9.99 로 클램프하는 근거 — Numeric(3,2) 상한."""
     from pydantic import ValidationError
 
-    from lloydk.schemas.keyword_admin import KeywordCreateRequest
+    from koipa.schemas.keyword_admin import KeywordCreateRequest
 
     with pytest.raises(ValidationError):
         KeywordCreateRequest(
@@ -123,7 +123,7 @@ def test_keyword_weight_upper_bound_is_enforced():
 
 def test_keyword_toggle_payload_is_partial_patch():
     """비활성 버튼은 is_active 만 보낸다 — 나머지 필드는 None 이어야 덮어쓰기 사고가 없다."""
-    from lloydk.schemas.keyword_admin import KeywordUpdateRequest
+    from koipa.schemas.keyword_admin import KeywordUpdateRequest
 
     req = KeywordUpdateRequest(is_active=False, actor=Actor(user_id="console", role="admin"))
     assert req.is_active is False
@@ -132,7 +132,7 @@ def test_keyword_toggle_payload_is_partial_patch():
 
 def test_synth_review_payload_carries_corrected_grade():
     """승인 시 등급을 바꾸면 corrected_grade 로 실려야 학습행이 그 등급으로 만들어진다."""
-    from lloydk.schemas.synthesis import SynthReviewRequest
+    from koipa.schemas.synthesis import SynthReviewRequest
 
     req = SynthReviewRequest(
         decision="approve", corrected_grade="S1",
@@ -142,7 +142,7 @@ def test_synth_review_payload_carries_corrected_grade():
 
 
 def test_synth_generate_payload_matches_schema():
-    from lloydk.schemas.synthesis import SynthGenerateRequest
+    from koipa.schemas.synthesis import SynthGenerateRequest
 
     req = SynthGenerateRequest(
         target_grade="TS", domain="hr", count=5, llm_provider="noop",
@@ -154,8 +154,8 @@ def test_synth_generate_payload_matches_schema():
 def test_synth_review_handler_404_when_missing(monkeypatch):
     from fastapi import HTTPException
 
-    from lloydk.api import synthesis as syn
-    from lloydk.schemas.synthesis import SynthReviewRequest
+    from koipa.api import synthesis as syn
+    from koipa.schemas.synthesis import SynthReviewRequest
 
     monkeypatch.setattr(syn.SynthesisService, "review", lambda self, sid, req: None)
     with pytest.raises(HTTPException) as ei:

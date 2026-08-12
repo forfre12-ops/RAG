@@ -4,14 +4,14 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from lloydk.api import _jwt_auth
-from lloydk.api.golden import (
+from koipa.api import _jwt_auth
+from koipa.api.golden import (
     _console_actor_id,
     _render_actual_document_intake_html,
     _render_specledger_gold_console_html,
 )
-from lloydk.api._jwt_auth import JWTClaims
-from lloydk.config import settings
+from koipa.api._jwt_auth import JWTClaims
+from koipa.config import settings
 
 
 def _request() -> Request:
@@ -30,7 +30,7 @@ def test_jwt_cookie_is_accepted_without_authorization_header(monkeypatch):
     monkeypatch.setattr(settings, "auth_mode", "jwt")
     monkeypatch.setattr(_jwt_auth, "verify_jwt", lambda token: claims)
     auth = _jwt_auth.require_auth(
-        _request(), authorization=None, x_api_key=None, lloydk_access_token="http-only-cookie-token"
+        _request(), authorization=None, x_api_key=None, koipa_access_token="http-only-cookie-token"
     )
     assert auth["mode"] == "jwt" and auth["claims"].sub == "portal-admin-kim"
 

@@ -15,9 +15,9 @@ from unittest.mock import patch
 
 import pytest
 
-from lloydk.modules.m6_evaluation.active_learning import ActiveLearningStatus
-from lloydk.services.drift_monitor import DriftReport
-from lloydk.workers.tasks import (
+from koipa.modules.m6_evaluation.active_learning import ActiveLearningStatus
+from koipa.services.drift_monitor import DriftReport
+from koipa.workers.tasks import (
     active_learning_tick,
     auto_rollback_tick,
     deliver_outbox_tick,
@@ -42,9 +42,9 @@ def _status(retrain="OK", reason="x", underclass=0, total=0):
 
 
 def test_tick_dry_mode_returns_status_no_enqueue():
-    with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
-        with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+        with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
             out = active_learning_tick(mode="dry")
     assert out["mode"] == "dry"
     assert "triggered" not in out  # dry는 enqueue 안 함
@@ -52,9 +52,9 @@ def test_tick_dry_mode_returns_status_no_enqueue():
 
 
 def test_tick_snapshot_mode_returns_status_no_enqueue():
-    with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
-        with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+        with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
             out = active_learning_tick(mode="snapshot")
     assert out["mode"] == "snapshot"
     assert "triggered" not in out
@@ -62,19 +62,19 @@ def test_tick_snapshot_mode_returns_status_no_enqueue():
 
 
 def test_tick_auto_urgent_enqueues_train():
-    with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                return_value=_status(retrain="URGENT_RETRAIN", underclass=20,
                                      reason="pending_underclass=20 >= urgent=10")):
-        with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+        with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
             out = active_learning_tick(mode="auto")
     assert out["triggered"] == "URGENT_RETRAIN"
     assert enq.call_count == 1
 
 
 def test_tick_auto_urgent_enqueue_failure_marked():
-    with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
-        with patch("lloydk.workers.tasks.train_classifier_task.apply_async",
+        with patch("koipa.workers.tasks.train_classifier_task.apply_async",
                    side_effect=RuntimeError("broker down")):
             out = active_learning_tick(mode="auto")
     assert out["triggered"] == "ENQUEUE_FAILED"
@@ -95,9 +95,9 @@ def test_tick_auto_recommended_outside_window_skips():
 
     import datetime as _dt
     with patch.object(_dt, "datetime", FakeDateTime):
-        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                    return_value=_status(retrain="RETRAIN_RECOMMENDED", total=60)):
-            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = active_learning_tick(mode="auto")
     assert out["triggered"] == "SKIP_WAIT_WEEKLY_WINDOW"
     assert enq.call_count == 0
@@ -115,18 +115,18 @@ def test_tick_auto_recommended_inside_window_enqueues():
 
     import datetime as _dt
     with patch.object(_dt, "datetime", FakeDateTime):
-        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                    return_value=_status(retrain="RETRAIN_RECOMMENDED", total=60)):
-            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = active_learning_tick(mode="auto")
     assert out["triggered"] == "RETRAIN_RECOMMENDED"
     assert enq.call_count == 1
 
 
 def test_tick_auto_ok_does_nothing():
-    with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                return_value=_status(retrain="OK")):
-        with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+        with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
             out = active_learning_tick(mode="auto")
     assert out["triggered"] == "NONE"
     assert enq.call_count == 0
@@ -138,10 +138,10 @@ def test_tick_auto_training_disabled_skips_enqueue():
     고객사(onprem-local)는 설계상 추론+비모수 전용 — 자동 재학습 루프가 돌면 안 된다(죽음의 나선
     고객사 차단). status 평가는 유지하되 triggered=SKIP_TRAINING_DISABLED로 조기 반환.
     """
-    with patch("lloydk.config.settings.enable_training", False, create=True):
-        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    with patch("koipa.config.settings.enable_training", False, create=True):
+        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                    return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
-            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = active_learning_tick(mode="auto")
     assert out["triggered"] == "SKIP_TRAINING_DISABLED"
     assert enq.call_count == 0
@@ -154,11 +154,11 @@ def test_active_learning_urgent_stays_training_gated_not_incremental():
     자동재학습(30분틱)은 여전히 차단돼야 한다 — 증분 플래그는 통제된 야간 배치만 켜고, 공격적
     드리프트-트리거 자동재학습(죽음의 나선 우려)은 지재원(enable_training) 전용으로 유지.
     """
-    with patch("lloydk.config.settings.enable_training", False, create=True):
-        with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
-            with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    with patch("koipa.config.settings.enable_training", False, create=True):
+        with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
+            with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                        return_value=_status(retrain="URGENT_RETRAIN", underclass=20)):
-                with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+                with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                     out = active_learning_tick(mode="auto")
     assert out["triggered"] == "SKIP_TRAINING_DISABLED"
     assert enq.call_count == 0
@@ -171,10 +171,10 @@ def test_active_learning_urgent_stays_training_gated_not_incremental():
 
 def test_nightly_incremental_disabled_skips_without_db():
     """플래그 OFF(지재원·순수 추론 노드) → SKIP_INCREMENTAL_DISABLED, DB(evaluate) 미접촉."""
-    from lloydk.workers.tasks import nightly_incremental_retrain_tick
-    with patch("lloydk.config.settings.enable_incremental_retrain", False, create=True):
-        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need") as ev:
-            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+    from koipa.workers.tasks import nightly_incremental_retrain_tick
+    with patch("koipa.config.settings.enable_incremental_retrain", False, create=True):
+        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need") as ev:
+            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = nightly_incremental_retrain_tick()
     assert out["triggered"] == "SKIP_INCREMENTAL_DISABLED"
     assert ev.call_count == 0    # DB 평가조차 하지 않음
@@ -183,11 +183,11 @@ def test_nightly_incremental_disabled_skips_without_db():
 
 def test_nightly_incremental_no_new_corrections_skips():
     """플래그 ON이지만 unconsumed 교정 0 → SKIP_NO_NEW_CORRECTIONS(무의미한 야간 재학습 방지)."""
-    from lloydk.workers.tasks import nightly_incremental_retrain_tick
-    with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
-        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    from koipa.workers.tasks import nightly_incremental_retrain_tick
+    with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
+        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                    return_value=_status(retrain="OK", total=0)):
-            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = nightly_incremental_retrain_tick()
     assert out["triggered"] == "SKIP_NO_NEW_CORRECTIONS"
     assert enq.call_count == 0
@@ -195,11 +195,11 @@ def test_nightly_incremental_no_new_corrections_skips():
 
 def test_nightly_incremental_enqueues_with_new_corrections():
     """플래그 ON + unconsumed 교정 존재 → train_classifier_task 1회 enqueue(NIGHTLY_INCREMENTAL)."""
-    from lloydk.workers.tasks import nightly_incremental_retrain_tick
-    with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
-        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    from koipa.workers.tasks import nightly_incremental_retrain_tick
+    with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
+        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                    return_value=_status(retrain="RETRAIN_RECOMMENDED", total=12)):
-            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = nightly_incremental_retrain_tick()
     assert out["triggered"] == "NIGHTLY_INCREMENTAL"
     assert out["unconsumed_total"] == 12
@@ -208,11 +208,11 @@ def test_nightly_incremental_enqueues_with_new_corrections():
 
 def test_nightly_incremental_eval_failure_skips_conservatively():
     """평가(evaluate_retraining_need) 예외 → SKIP_EVAL_FAILED(불확실 상태에서 무거운 재학습 금지)."""
-    from lloydk.workers.tasks import nightly_incremental_retrain_tick
-    with patch("lloydk.config.settings.enable_incremental_retrain", True, create=True):
-        with patch("lloydk.modules.m6_evaluation.active_learning.evaluate_retraining_need",
+    from koipa.workers.tasks import nightly_incremental_retrain_tick
+    with patch("koipa.config.settings.enable_incremental_retrain", True, create=True):
+        with patch("koipa.modules.m6_evaluation.active_learning.evaluate_retraining_need",
                    side_effect=RuntimeError("db down")):
-            with patch("lloydk.workers.tasks.train_classifier_task.apply_async") as enq:
+            with patch("koipa.workers.tasks.train_classifier_task.apply_async") as enq:
                 out = nightly_incremental_retrain_tick()
     assert out["triggered"] == "SKIP_EVAL_FAILED"
     assert enq.call_count == 0
@@ -230,13 +230,13 @@ def drift_on(monkeypatch):
     [스코프 결정 2026-08-08] 드리프트 감지는 요건이 아니다(RTM 무행) → drift_detection_enabled
     기본 False. 코드는 남겨 두었으므로 켰을 때의 동작은 계속 회귀 검증한다.
     """
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
     monkeypatch.setattr(config_mod.settings, "drift_detection_enabled", True)
 
 
 def test_drift_tick_disabled_by_default_is_noop():
     """기본값에서 drift_tick 은 아무 것도 재지 않고 즉시 반환한다(임베딩 비용·노이즈 경보 차단)."""
-    with patch("lloydk.services.drift_monitor.run_drift_check") as spy:
+    with patch("koipa.services.drift_monitor.run_drift_check") as spy:
         out = drift_tick()
     assert out == {"skipped": "drift_detection_disabled"}
     assert spy.call_count == 0
@@ -247,7 +247,7 @@ def test_drift_tick_returns_report_dict(drift_on):
         sample_size=10, cosine_mean=0.5, cosine_std=0.1,
         kl_divergence=0.2, alert=False, threshold_alert=0.5,
     )
-    with patch("lloydk.services.drift_monitor.run_drift_check", return_value=report):
+    with patch("koipa.services.drift_monitor.run_drift_check", return_value=report):
         out = drift_tick(limit=10, threshold=0.5)
     assert out["sample_size"] == 10
     assert out["kl_divergence"] == 0.2
@@ -259,7 +259,7 @@ def test_drift_tick_alert_passthrough(drift_on):
         sample_size=200, cosine_mean=0.1, cosine_std=0.05,
         kl_divergence=0.8, alert=True, threshold_alert=0.5,
     )
-    with patch("lloydk.services.drift_monitor.run_drift_check", return_value=report):
+    with patch("koipa.services.drift_monitor.run_drift_check", return_value=report):
         out = drift_tick()
     assert out["alert"] is True
 
@@ -283,13 +283,13 @@ def test_auto_rollback_tick_disabled_does_not_call_rollback():
         "baseline_fnr_high": 0.10,
         "tolerance": 0.05,
     }
-    with patch("lloydk.config.settings.auto_rollback_enabled", False, create=True):
+    with patch("koipa.config.settings.auto_rollback_enabled", False, create=True):
         with patch(
-            "lloydk.services.training_service.evaluate_rollback_need",
+            "koipa.services.training_service.evaluate_rollback_need",
             return_value=decision,
         ):
             with patch(
-                "lloydk.services.training_service.rollback_active_model"
+                "koipa.services.training_service.rollback_active_model"
             ) as rb:
                 out = auto_rollback_tick()
 
@@ -309,13 +309,13 @@ def test_auto_rollback_tick_enabled_and_should_rollback_calls_rollback():
         "tolerance": 0.05,
     }
     rollback_result = {"rolled_back": True, "to_version": "v2"}
-    with patch("lloydk.config.settings.auto_rollback_enabled", True, create=True):
+    with patch("koipa.config.settings.auto_rollback_enabled", True, create=True):
         with patch(
-            "lloydk.services.training_service.evaluate_rollback_need",
+            "koipa.services.training_service.evaluate_rollback_need",
             return_value=decision,
         ):
             with patch(
-                "lloydk.services.training_service.rollback_active_model",
+                "koipa.services.training_service.rollback_active_model",
                 return_value=rollback_result,
             ) as rb:
                 out = auto_rollback_tick()
@@ -328,13 +328,13 @@ def test_auto_rollback_tick_enabled_and_should_rollback_calls_rollback():
 def test_auto_rollback_tick_enabled_but_no_regression_skips():
     """enabled=True여도 should_rollback=False면 롤백 미호출."""
     decision = {"should_rollback": False, "reason": "ok"}
-    with patch("lloydk.config.settings.auto_rollback_enabled", True, create=True):
+    with patch("koipa.config.settings.auto_rollback_enabled", True, create=True):
         with patch(
-            "lloydk.services.training_service.evaluate_rollback_need",
+            "koipa.services.training_service.evaluate_rollback_need",
             return_value=decision,
         ):
             with patch(
-                "lloydk.services.training_service.rollback_active_model"
+                "koipa.services.training_service.rollback_active_model"
             ) as rb:
                 out = auto_rollback_tick()
 
@@ -352,10 +352,10 @@ def test_auto_rollback_tick_enabled_but_no_regression_skips():
 def test_deliver_outbox_tick_dlq_warning_path_passthrough():
     """dlq>0 → warning 경로, deliver_once 반환 dict 그대로 전달."""
     result = {"sent": 1, "failed": 0, "dlq": 2, "ready": 3}
-    with patch("lloydk.services.outbox.get_outbox_store", return_value=object()):
-        with patch("lloydk.services.outbox.http_send_via_httpx", return_value=200):
+    with patch("koipa.services.outbox.get_outbox_store", return_value=object()):
+        with patch("koipa.services.outbox.http_send_via_httpx", return_value=200):
             with patch(
-                "lloydk.services.outbox.deliver_once", return_value=result
+                "koipa.services.outbox.deliver_once", return_value=result
             ) as dl:
                 out = deliver_outbox_tick(limit=7)
 
@@ -368,9 +368,9 @@ def test_deliver_outbox_tick_dlq_warning_path_passthrough():
 def test_deliver_outbox_tick_info_path_passthrough():
     """dlq==0, sent/failed>0 → info 경로, 반환 dict 그대로 전달."""
     result = {"sent": 5, "failed": 1, "dlq": 0, "ready": 6}
-    with patch("lloydk.services.outbox.get_outbox_store", return_value=object()):
-        with patch("lloydk.services.outbox.http_send_via_httpx", return_value=200):
-            with patch("lloydk.services.outbox.deliver_once", return_value=result):
+    with patch("koipa.services.outbox.get_outbox_store", return_value=object()):
+        with patch("koipa.services.outbox.http_send_via_httpx", return_value=200):
+            with patch("koipa.services.outbox.deliver_once", return_value=result):
                 out = deliver_outbox_tick()
 
     assert out == result
@@ -379,9 +379,9 @@ def test_deliver_outbox_tick_info_path_passthrough():
 def test_deliver_outbox_tick_idle_passthrough():
     """아무 것도 안 보낸 경우(sent/failed/dlq 모두 0)에도 반환 dict 전달."""
     result = {"sent": 0, "failed": 0, "dlq": 0, "ready": 0}
-    with patch("lloydk.services.outbox.get_outbox_store", return_value=object()):
-        with patch("lloydk.services.outbox.http_send_via_httpx", return_value=200):
-            with patch("lloydk.services.outbox.deliver_once", return_value=result):
+    with patch("koipa.services.outbox.get_outbox_store", return_value=object()):
+        with patch("koipa.services.outbox.http_send_via_httpx", return_value=200):
+            with patch("koipa.services.outbox.deliver_once", return_value=result):
                 out = deliver_outbox_tick()
 
     assert out == result
@@ -395,7 +395,7 @@ def test_ensure_partitions_tick_failed_warning_passthrough():
     """failed가 있으면 warning 경로, 반환 dict 그대로 전달."""
     result = {"ensured": ["t_2026_06"], "failed": ["t_2026_07"]}
     with patch(
-        "lloydk.services.partitions.ensure_partitions", return_value=result
+        "koipa.services.partitions.ensure_partitions", return_value=result
     ) as ep:
         out = ensure_partitions_tick(months_ahead=2)
 
@@ -408,7 +408,7 @@ def test_ensure_partitions_tick_all_ok_passthrough():
     """failed 없으면 경고 없이 반환 dict 그대로 전달."""
     result = {"ensured": ["t_2026_06", "t_2026_07"], "failed": []}
     with patch(
-        "lloydk.services.partitions.ensure_partitions", return_value=result
+        "koipa.services.partitions.ensure_partitions", return_value=result
     ):
         out = ensure_partitions_tick()
 
@@ -431,22 +431,22 @@ def test_train_classifier_task_no_corrections_no_run_early_return():
         model_version=None,
     )
     with patch(
-        "lloydk.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
+        "koipa.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
         return_value=_empty_rebuild(),
     ):
         with patch(
-            "lloydk.workers.tasks._create_training_run_guarded", return_value=None
+            "koipa.workers.tasks._create_training_run_guarded", return_value=None
         ):
             with patch(
-                "lloydk.modules.m4_training.trainer.train_classifier",
+                "koipa.modules.m4_training.trainer.train_classifier",
                 return_value=fake_report,
             ) as tc:
                 with patch(
-                    "lloydk.services.training_service.register_and_gate_model",
+                    "koipa.services.training_service.register_and_gate_model",
                     return_value={"registered": True},
                 ):
                     with patch(
-                        "lloydk.modules.m6_evaluation.active_learning.consume_corrections_for_run"
+                        "koipa.modules.m6_evaluation.active_learning.consume_corrections_for_run"
                     ) as consume:
                         out = train_classifier_task(spec_kwargs={})
 
@@ -466,18 +466,18 @@ def test_train_classifier_task_register_exception_falls_back():
         model_version=None,
     )
     with patch(
-        "lloydk.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
+        "koipa.modules.m6_evaluation.corrections_rebuild.build_labeled_rows_from_corrections",
         return_value=_empty_rebuild(),
     ):
         with patch(
-            "lloydk.workers.tasks._create_training_run_guarded", return_value=None
+            "koipa.workers.tasks._create_training_run_guarded", return_value=None
         ):
             with patch(
-                "lloydk.modules.m4_training.trainer.train_classifier",
+                "koipa.modules.m4_training.trainer.train_classifier",
                 return_value=fake_report,
             ):
                 with patch(
-                    "lloydk.services.training_service.register_and_gate_model",
+                    "koipa.services.training_service.register_and_gate_model",
                     side_effect=RuntimeError("db down"),
                 ):
                     out = train_classifier_task(spec_kwargs={})
@@ -491,6 +491,6 @@ def test_train_classifier_task_training_disabled_skips():
 
     가드가 무거운 trainer import 이전에 반환하므로 별도 mock 불필요 — 반환 dict만 검증한다.
     """
-    with patch("lloydk.config.settings.enable_training", False, create=True):
+    with patch("koipa.config.settings.enable_training", False, create=True):
         out = train_classifier_task(spec_kwargs={})
     assert out == {"skipped": "training_disabled"}

@@ -101,8 +101,8 @@ def prepare_base(seed: int) -> tuple[Path, Path, dict]:
 
 def generate_s1(model: str, out: Path, n: int, seed: int) -> dict:
     """model로 S1 문서 n건 생성(도메인 순환). resumable: 이미 n건이면 skip."""
-    from lloydk.adapters.llm.local_openai_provider import ollama_provider
-    from lloydk.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest
+    from koipa.adapters.llm.local_openai_provider import ollama_provider
+    from koipa.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest
 
     out.parent.mkdir(parents=True, exist_ok=True)
     existing = load_jsonl(out) if out.exists() else []

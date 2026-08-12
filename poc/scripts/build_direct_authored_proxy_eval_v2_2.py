@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.proxy_corpus import validate_proxy_record
 
 
 OUT = ROOT / "datasets" / "proxy_eval" / "direct_authored_proxy_eval.v2_2.jsonl"

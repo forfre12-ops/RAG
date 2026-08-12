@@ -26,22 +26,22 @@ _POC = _HERE.parent
 sys.path.insert(0, str(_POC))
 sys.path.insert(0, str(_POC / "src"))
 
-from lloydk.adapters.llm import build_provider  # noqa: E402
-from lloydk.modules.m1_synthesis.generator import (  # noqa: E402
+from koipa.adapters.llm import build_provider  # noqa: E402
+from koipa.modules.m1_synthesis.generator import (  # noqa: E402
     SYSTEM_PROMPT,
     USER_TEMPLATE_V2,
     SynthDoc,
     SynthRequest,
     SyntheticDocGenerator,
 )
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
-from lloydk.ollama_attestation import (  # noqa: E402
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
+from koipa.ollama_attestation import (  # noqa: E402
     OllamaAttestationError,
     pending_ollama_model_attestation,
     validate_ollama_attestation,
     verify_ollama_model,
 )
-from lloydk.proxy_corpus import (  # noqa: E402
+from koipa.proxy_corpus import (  # noqa: E402
     proxy_record_intended_use,
     validate_proxy_record,
 )
@@ -4133,7 +4133,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         catalog_sha256 = _sha256_bytes(catalog_path.read_bytes())
         runner_code_sha256 = _sha256_bytes(Path(__file__).read_bytes())
-        generator_path = _POC / "src/lloydk/modules/m1_synthesis/generator.py"
+        generator_path = _POC / "src/koipa/modules/m1_synthesis/generator.py"
         generator_code_sha256 = _sha256_bytes(generator_path.read_bytes())
         prompt_contract_sha256 = _sha256_bytes(
             _canonical_json_bytes(

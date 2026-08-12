@@ -10,7 +10,7 @@ import io
 
 import pytest
 
-from lloydk.modules.m2_preprocess.extractor import POPPLER_PATH, extract
+from koipa.modules.m2_preprocess.extractor import POPPLER_PATH, extract
 
 
 def _scanned_pdf_from_image() -> bytes:
@@ -90,8 +90,8 @@ class TestScannedPdfOcr:
         if not POPPLER_PATH:
             pytest.skip("poppler 미설치")
 
-        from lloydk.adapters.storage import LocalStorage
-        from lloydk.services.document_ingestion_service import DocumentIngestionService
+        from koipa.adapters.storage import LocalStorage
+        from koipa.services.document_ingestion_service import DocumentIngestionService
 
         body = _scanned_pdf_from_image()
         storage = LocalStorage(root=str(tmp_path / "store"))

@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lloydk.adapters.embedding import HashEmbedding
-from lloydk.modules.m3_labeling import (
+from koipa.adapters.embedding import HashEmbedding
+from koipa.modules.m3_labeling import (
     FACTOR_SEEDS,
     GRADE_ORDER,
     KEYWORD_SEEDS,
@@ -34,7 +34,7 @@ def test_reconcile_grade_fnr_safe_fixes_prompt_drift():
     - LLM이 더 높게(severe) 보고하면 그대로 둠(절대 낮추지 않음 = 과대분류는 게이트가 처리).
     - S/V/M 불완전·무효 등급이면 LLM 자가등급 보존.
     """
-    from lloydk.modules.m3_labeling.llm_labeler import _reconcile_grade
+    from koipa.modules.m3_labeling.llm_labeler import _reconcile_grade
 
     assert _reconcile_grade("S1", {"secrecy": 2, "value": 2, "management": 1}) == "TS"
     assert _reconcile_grade("S3", {"secrecy": 2, "value": 2, "management": 0}) == "S1"
@@ -51,7 +51,7 @@ def test_reconcile_grade_fnr_safe_fixes_prompt_drift():
 
 
 def test_llm_labeler_parse_fail_is_not_s3():
-    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+    from koipa.modules.m3_labeling.llm_labeler import LLMLabeler
 
     out = LLMLabeler(provider=_TextProvider("not json")).label("doc")
     assert out.grade == "PARSE_FAIL"
@@ -72,7 +72,7 @@ def test_grade_order_has_all_four_levels():
 
 
 def test_source_prior_public_detection_rejects_negated_public_terms():
-    from lloydk.modules.m5_inference.pipeline import _source_prior_is_public
+    from koipa.modules.m5_inference.pipeline import _source_prior_is_public
 
     assert _source_prior_is_public("public_disclosure") is True
     assert _source_prior_is_public("공시") is True

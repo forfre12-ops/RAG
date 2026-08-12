@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.proxy_evidence import ProxyEvidenceError, build_evidence_card
+from koipa.proxy_evidence import ProxyEvidenceError, build_evidence_card
 
 
 def _record(label: str = "S1") -> dict:

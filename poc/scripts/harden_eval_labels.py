@@ -49,7 +49,7 @@ _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm_floored  # noqa: E402
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm_floored  # noqa: E402
 
 GOLD_REAL = Path("datasets/gold_real")
 HARDEN_DIR = GOLD_REAL / "_eval_harden"

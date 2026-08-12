@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from lloydk.api.admin import ActivateModelRequest, activate_model
+from koipa.api.admin import ActivateModelRequest, activate_model
 
 
 def _patch_capture(monkeypatch) -> dict:
@@ -34,7 +34,7 @@ def _patch_capture(monkeypatch) -> dict:
             "reason": "test",
         }
 
-    import lloydk.services.training_service as ts
+    import koipa.services.training_service as ts
 
     monkeypatch.setattr(ts, "activate_model_manually", _fake)
     return captured

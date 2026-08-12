@@ -1,6 +1,6 @@
 """D1: secrets_manager → settings 보충 wiring 검증.
 
-LLOYDK_SECRETS_BACKEND 환경별 (env/vault/aws) sm 객체가 잘 만들어지는지,
+KOIPA_SECRETS_BACKEND 환경별 (env/vault/aws) sm 객체가 잘 만들어지는지,
 fill_from_secrets_manager가 빈 자리만 보충하고 채워진 자리는 보존하는지.
 """
 
@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-import lloydk.config as config_mod
-from lloydk.services.secrets_manager import (
+import koipa.config as config_mod
+from koipa.services.secrets_manager import (
     EnvSecretsManager,
     SecretsManager,
     get_secrets_manager,
@@ -18,9 +18,9 @@ from lloydk.services.secrets_manager import (
 
 
 def test_env_backend_default():
-    os.environ.pop("LLOYDK_SECRETS_BACKEND", None)
+    os.environ.pop("KOIPA_SECRETS_BACKEND", None)
     # 캐시된 _default 초기화 (모듈 글로벌)
-    import lloydk.services.secrets_manager as sm_mod
+    import koipa.services.secrets_manager as sm_mod
     sm_mod._default = None
     sm = get_secrets_manager()
     assert isinstance(sm, EnvSecretsManager)
@@ -28,18 +28,18 @@ def test_env_backend_default():
 
 
 def test_env_backend_reads_environment(monkeypatch):
-    monkeypatch.setenv("LLOYDK_TEST_VAR", "value-from-env")
-    import lloydk.services.secrets_manager as sm_mod
+    monkeypatch.setenv("KOIPA_TEST_VAR", "value-from-env")
+    import koipa.services.secrets_manager as sm_mod
     sm_mod._default = None
     sm = get_secrets_manager()
-    assert sm.get("LLOYDK_TEST_VAR") == "value-from-env"
-    assert sm.get("LLOYDK_MISSING_VAR", "fallback") == "fallback"
+    assert sm.get("KOIPA_TEST_VAR") == "value-from-env"
+    assert sm.get("KOIPA_MISSING_VAR", "fallback") == "fallback"
 
 
 def test_env_backend_get_required_raises_when_missing():
     sm = EnvSecretsManager()
     try:
-        sm.get_required("LLOYDK_DEFINITELY_NOT_SET_XYZ")
+        sm.get_required("KOIPA_DEFINITELY_NOT_SET_XYZ")
     except RuntimeError as exc:
         assert "secret not found" in str(exc)
     else:
@@ -75,10 +75,10 @@ def test_fill_skips_already_set_fields():
     config_mod.settings.anthropic_api_key = ""
 
     fake = _FakeSM(
-        LLOYDK_API_KEY="sm-key-should-be-ignored",
-        LLOYDK_MINIO_SECRET_KEY="sm-minio",
+        KOIPA_API_KEY="sm-key-should-be-ignored",
+        KOIPA_MINIO_SECRET_KEY="sm-minio",
     )
-    with patch("lloydk.services.secrets_manager.get_secrets_manager", return_value=fake):
+    with patch("koipa.services.secrets_manager.get_secrets_manager", return_value=fake):
         sources = config_mod.fill_from_secrets_manager()
 
     assert config_mod.settings.api_key == "env-key"  # 보존
@@ -91,8 +91,8 @@ def test_fill_idempotent_second_call_noop():
     config_mod._SECRETS_FILLED = False
     config_mod.settings.api_key = ""
 
-    fake = _FakeSM(LLOYDK_API_KEY="sm-key")
-    with patch("lloydk.services.secrets_manager.get_secrets_manager", return_value=fake):
+    fake = _FakeSM(KOIPA_API_KEY="sm-key")
+    with patch("koipa.services.secrets_manager.get_secrets_manager", return_value=fake):
         sources_1 = config_mod.fill_from_secrets_manager()
     assert config_mod.settings.api_key == "sm-key"
     assert sources_1["api_key"].startswith("sm-")
@@ -113,11 +113,11 @@ def test_assert_production_credentials_uses_sm_fill():
     config_mod.settings.poc_mode = "full"
 
     fake = _FakeSM(
-        LLOYDK_API_KEY="sm-key",
-        LLOYDK_MINIO_SECRET_KEY="sm-minio",
+        KOIPA_API_KEY="sm-key",
+        KOIPA_MINIO_SECRET_KEY="sm-minio",
     )
     try:
-        with patch("lloydk.services.secrets_manager.get_secrets_manager", return_value=fake):
+        with patch("koipa.services.secrets_manager.get_secrets_manager", return_value=fake):
             config_mod.assert_production_credentials()
         # 통과 = 예외 없음
     finally:
@@ -135,12 +135,12 @@ def test_assert_production_credentials_raises_when_missing_everywhere():
     # TESTING/PYTEST_CURRENT_TEST를 falsy로 만들어 운영 경로(raise) 실행.
     # 10cea2e에서 추가된 pytest 환경 skip을 우회하여 함수 자체 동작을 검증.
     try:
-        with patch("lloydk.services.secrets_manager.get_secrets_manager", return_value=fake), \
+        with patch("koipa.services.secrets_manager.get_secrets_manager", return_value=fake), \
              patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": ""}):
             try:
                 config_mod.assert_production_credentials()
             except RuntimeError as exc:
-                assert "LLOYDK_API_KEY" in str(exc)
+                assert "KOIPA_API_KEY" in str(exc)
             else:
                 raise AssertionError("운영 모드 + 모든 자격증명 부재 → RuntimeError 기대")
     finally:
@@ -161,12 +161,12 @@ def test_assert_production_credentials_requires_audit_chain_secret():
     try:
         with patch.dict(
             os.environ,
-            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "LLOYDK_AUDIT_CHAIN_SECRET": ""},
+            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "KOIPA_AUDIT_CHAIN_SECRET": ""},
         ):
             try:
                 config_mod.assert_production_credentials()
             except RuntimeError as exc:
-                assert "LLOYDK_AUDIT_CHAIN_SECRET" in str(exc)
+                assert "KOIPA_AUDIT_CHAIN_SECRET" in str(exc)
             else:
                 raise AssertionError("운영 모드 + 감사체인 비밀키 부재 → RuntimeError 기대")
     finally:
@@ -244,7 +244,7 @@ def test_assert_production_credentials_blocks_audit_disabled():
         with patch.dict(
             os.environ,
             {"TESTING": "", "PYTEST_CURRENT_TEST": "", "RATE_LIMIT_DISABLED": "", "AUDIT_DISABLED": "1",
-             "LLOYDK_AUDIT_CHAIN_SECRET": ""},
+             "KOIPA_AUDIT_CHAIN_SECRET": ""},
         ):
             try:
                 config_mod.assert_production_credentials()

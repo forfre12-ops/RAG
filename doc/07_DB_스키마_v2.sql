@@ -1,6 +1,6 @@
 -- ============================================================
 -- 한국지식재산보호원 AI 영업비밀 등급분류 시스템
--- Lloydk AI 파이프라인 DB 스키마 v2 (PostgreSQL 15+)
+-- Koipa AI 파이프라인 DB 스키마 v2 (PostgreSQL 15+)
 --
 -- v1 → v2 주요 개선:
 --   [F1] 대용량 텍스트 분리: documents.raw_text → MinIO 외부화
@@ -112,8 +112,8 @@ CREATE TABLE documents (
     metadata            JSONB           DEFAULT '{}',  -- {author_dept, doc_type, title, created_date, ...}
 
     -- 대용량 텍스트는 MinIO 외부화. PG에는 위치 + 미리보기만.
-    raw_text_uri        VARCHAR(500),   -- s3://lloydk/docs/raw/{doc_id}.txt
-    normalized_text_uri VARCHAR(500),   -- s3://lloydk/docs/normalized/{doc_id}.txt
+    raw_text_uri        VARCHAR(500),   -- s3://koipa/docs/raw/{doc_id}.txt
+    normalized_text_uri VARCHAR(500),   -- s3://koipa/docs/normalized/{doc_id}.txt
     text_preview        VARCHAR(2000),  -- 검색/UI 표시용 앞부분
     char_count          INT,
 
@@ -294,7 +294,7 @@ CREATE TABLE model_versions (
     metrics             JSONB           NOT NULL DEFAULT '{}',
     -- 스키마: {accuracy, f1_macro, fnr_overall, per_class:{TS:{precision,recall,f1,fnr},...}, confusion_matrix}
 
-    model_uri           VARCHAR(500),                     -- s3://lloydk/models/{version_id}/
+    model_uri           VARCHAR(500),                     -- s3://koipa/models/{version_id}/
     model_size_mb       INT,
 
     mlflow_run_id       VARCHAR(64),                      -- v1에 누락된 MLflow 추적 키

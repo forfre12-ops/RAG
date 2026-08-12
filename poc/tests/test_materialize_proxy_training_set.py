@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import materialize_proxy_training_set as materializer
-from lloydk.proxy_corpus import ProxyRecordCheck
+from koipa.proxy_corpus import ProxyRecordCheck
 
 
 GRADES = ("TS", "S1", "S2", "S3")

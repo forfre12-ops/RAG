@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.adapters.vectorstore.base import HybridVectorStore, VectorStore
-from lloydk.adapters.vectorstore.pg_store import PgVectorStore
+from koipa.adapters.vectorstore.base import HybridVectorStore, VectorStore
+from koipa.adapters.vectorstore.pg_store import PgVectorStore
 
 
 def test_vec_lit_format():

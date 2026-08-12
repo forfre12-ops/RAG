@@ -5,7 +5,7 @@ source_commit: 0af6e75065e2538770468d8b16130a4ecf6bd48e
 source_of_truth: doc/result/open/
 id_authority: doc/docs_registry.yaml
 inherited_from: 2026-08-사전진단
-prepared_by: 로이드케이(수행사)
+prepared_by: 한국지식재산보호원(수행사)
 counts:
   formal_deliverables: 34
   formal_html: 33

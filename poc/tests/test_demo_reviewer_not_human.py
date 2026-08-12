@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.golden_tiers import (
+from koipa.golden_tiers import (
     SUPPORTED_GATE_VERSIONS,
     TIER_HELD,
     is_human_reviewer,

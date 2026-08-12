@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.api.prom_metrics import (
+from koipa.api.app import app
+from koipa.api.prom_metrics import (
     registry,
 )
-from lloydk.config import settings
+from koipa.config import settings
 
 import pytest
 
@@ -45,19 +45,19 @@ class TestPrometheusEndpoint:
             r = cli.get("/api/v1/metrics-prom")
             body = r.text
             # Counter
-            assert "lloydk_requests_total" in body
+            assert "koipa_requests_total" in body
             # Histogram (sklearn-style bucket suffix)
-            assert "lloydk_request_duration_seconds_bucket" in body
-            assert "lloydk_request_duration_seconds_sum" in body
-            assert "lloydk_request_duration_seconds_count" in body
+            assert "koipa_request_duration_seconds_bucket" in body
+            assert "koipa_request_duration_seconds_sum" in body
+            assert "koipa_request_duration_seconds_count" in body
             # Gauge
-            assert "lloydk_active_learning_pending_total" in body
-            assert "lloydk_active_learning_pending_underclass" in body
+            assert "koipa_active_learning_pending_total" in body
+            assert "koipa_active_learning_pending_underclass" in body
             # Exception counter (등록만)
-            assert "lloydk_request_exceptions_total" in body
+            assert "koipa_request_exceptions_total" in body
 
     def test_metrics_prom_excluded_from_self_counting(self):
-        """/metrics-prom 자체 호출은 lloydk_requests_total 카운터에 안 잡혀야 함."""
+        """/metrics-prom 자체 호출은 koipa_requests_total 카운터에 안 잡혀야 함."""
         # 직접 라벨로 측정 — 호출 전후 변화 0
         registry_text_before = _registry_text()
         with TestClient(app) as cli:

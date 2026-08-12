@@ -2,9 +2,9 @@
 # 목적: 진정한 병렬 요청 처리 (S11.5 ≥0.5 도달).
 #
 # 빌드:
-#   docker build -f Dockerfile.api.prod -t lloydk-api:prod .
+#   docker build -f Dockerfile.api.prod -t koipa-api:prod .
 # 실행 (단일 인스턴스):
-#   docker run -p 8000:8000 -e WEB_CONCURRENCY=4 lloydk-api:prod
+#   docker run -p 8000:8000 -e WEB_CONCURRENCY=4 koipa-api:prod
 # 멀티 인스턴스:
 #   docker-compose 또는 k8s에서 replicas + HPA
 
@@ -72,8 +72,8 @@ ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 # 소유로 생성돼 write 거부). datasets 는 골든 후보 산출 경로이고 .dockerignore 라 이미지에
 # 내용이 없으므로, 이 mkdir 이 없으면 prod 프로파일에서 골든 빌드가 Permission denied 로
 # 죽는다(2026-08-02 prod 프로파일 실측에서 재현).
-RUN useradd -m -u 1000 lloydk && mkdir -p /app/.storage /app/datasets && chown -R lloydk:lloydk /app
-USER lloydk
+RUN useradd -m -u 1000 koipa && mkdir -p /app/.storage /app/datasets && chown -R koipa:koipa /app
+USER koipa
 
 EXPOSE 8000
 
@@ -82,7 +82,7 @@ EXPOSE 8000
 # - worker-class: uvicorn.workers.UvicornWorker
 # - timeout: GUNICORN_TIMEOUT (긴 요청 대비)
 # - graceful: SIGTERM 시 진행 중 요청 완료까지 대기
-CMD ["sh", "-c", "exec gunicorn lloydk.api.app:app \
+CMD ["sh", "-c", "exec gunicorn koipa.api.app:app \
     --bind 0.0.0.0:8000 \
     --workers ${WEB_CONCURRENCY} \
     --worker-class uvicorn.workers.UvicornWorker \

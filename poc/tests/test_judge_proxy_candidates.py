@@ -10,8 +10,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lloydk.modules.m3_labeling.judge import JudgeResult
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.modules.m3_labeling.judge import JudgeResult
+from koipa.proxy_corpus import validate_proxy_record
 from scripts import judge_proxy_candidates as judge_cli
 from scripts.judge_proxy_candidates import (
     ProxyJudgeContractError,
@@ -29,7 +29,7 @@ def test_static_rule_pipeline_is_db_independent(monkeypatch):
         raise AssertionError("operational DB rule loader must not be called")
 
     monkeypatch.setattr(
-        "lloydk.modules.m3_labeling.pipeline.build_rule_engine_from_db",
+        "koipa.modules.m3_labeling.pipeline.build_rule_engine_from_db",
         fail_if_called,
     )
     pipeline, seed_sha256 = _static_rule_pipeline()

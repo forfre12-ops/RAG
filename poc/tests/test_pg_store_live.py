@@ -16,8 +16,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.adapters.embedding import HashEmbedding
-from lloydk.db import engine
+from koipa.adapters.embedding import HashEmbedding
+from koipa.db import engine
 
 
 def _pg_ok() -> bool:
@@ -44,7 +44,7 @@ _COLLECTION = "pytest-pg-live-hybrid"
 @pytest.mark.fullstack
 class TestPgLiveHybrid:
     def _store(self):
-        from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
+        from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
 
         return build_store(backend="pg")
 

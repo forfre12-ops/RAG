@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm
 
 _ANCHORS = Path(__file__).resolve().parents[1] / "datasets" / "gold" / "guide_v2_anchors.jsonl"
 

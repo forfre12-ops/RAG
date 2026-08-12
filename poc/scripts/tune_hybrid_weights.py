@@ -11,7 +11,7 @@
 사용:
   python scripts/tune_hybrid_weights.py \
       --eval-set datasets/eval/queries_v1.jsonl \
-      --collection lloydk-docs \
+      --collection koipa-docs \
       --steps 11 \
       --top-k 5
 
@@ -76,8 +76,8 @@ def _run_search_stub(query: str, alpha: float, collection: str, top_k: int) -> l
     """A2 스텁 — 실 ES 어댑터 연동은 운영 환경에서 활성화.
 
     실 구현 예시(주석):
-        from lloydk.adapters.vectorstore import EsStore
-        from lloydk.adapters.embedding import get_embedder
+        from koipa.adapters.vectorstore import EsStore
+        from koipa.adapters.embedding import get_embedder
         store = EsStore(...)
         emb = get_embedder()
         vec = emb.embed([query])[0]
@@ -150,7 +150,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="A2: hybrid 가중치 grid search")
     parser.add_argument("--eval-set", type=Path, required=False,
                         help="평가셋 JSONL ({query, relevant_ids})")
-    parser.add_argument("--collection", default="lloydk-docs")
+    parser.add_argument("--collection", default="koipa-docs")
     parser.add_argument("--steps", type=int, default=11, help="α 그리드 step 수 (default 11 → 0.0~1.0 by 0.1)")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--output-json", type=Path, default=None)

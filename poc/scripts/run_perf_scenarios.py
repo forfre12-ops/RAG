@@ -38,14 +38,14 @@ sys.path.insert(0, str(POC_ROOT / "src"))
 # 사용자가 명시적으로 RATE_LIMIT_DISABLED=0 설정한 경우만 활성 유지.
 os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 
-from lloydk.perf import capture_env  # noqa: E402
-from lloydk.perf.harness import (  # noqa: E402
+from koipa.perf import capture_env  # noqa: E402
+from koipa.perf.harness import (  # noqa: E402
     AvailableResources,
     ScenarioRunner,
     summarize,
 )
-from lloydk.perf.recorder import write_report  # noqa: E402
-from lloydk.perf.scenarios import SPECS  # noqa: E402
+from koipa.perf.recorder import write_report  # noqa: E402
+from koipa.perf.scenarios import SPECS  # noqa: E402
 
 
 def build_report(*, mode: str, probe_services: bool) -> dict:
@@ -101,7 +101,7 @@ def main() -> int:
     )
     ap.add_argument(
         "--push-job",
-        default="lloydk_psh",
+        default="koipa_psh",
         help="pushgateway job 이름 (Prometheus 라벨)",
     )
     ap.add_argument(
@@ -126,8 +126,8 @@ def main() -> int:
     # 회귀 비교 — 직전 회차 (동일 mode) 1건만 사용
     regressions: list[dict] = []
     if args.regression_threshold > 0:
-        from lloydk.perf.recorder import load_history  # noqa: PLC0415
-        from lloydk.perf.regression import (  # noqa: PLC0415
+        from koipa.perf.recorder import load_history  # noqa: PLC0415
+        from koipa.perf.regression import (  # noqa: PLC0415
             detect_regression_trend,
             detect_regressions,
         )
@@ -176,7 +176,7 @@ def main() -> int:
         print(f"[PSH] HTML → {html_path}")
 
     if args.push_prom:
-        from lloydk.perf.pushgateway import push  # noqa: PLC0415
+        from koipa.perf.pushgateway import push  # noqa: PLC0415
 
         ok = push(report, url=args.push_prom, job=args.push_job)
         if ok:

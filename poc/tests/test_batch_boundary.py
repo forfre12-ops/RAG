@@ -1,6 +1,6 @@
 """M1 — /classify/batch 경계값 가드.
 
-검증 대상: lloydk/api/async_classify.py classify_batch
+검증 대상: koipa/api/async_classify.py classify_batch
 - 빈 배열   → 400 (의미 없는 요청 가드)
 - 999건    → 202 (한도 이하)
 - 1000건   → 202 (한도 경계 — 정확히 1000은 허용)
@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
+from koipa.api.app import app
+from koipa.config import settings
 
 import pytest
 

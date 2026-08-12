@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lloydk.schemas.common import Grade
+from koipa.schemas.common import Grade
 
 
 # ---------------------------------------------------------------------------
@@ -26,26 +26,26 @@ from lloydk.schemas.common import Grade
 @pytest.fixture
 def _no_db(monkeypatch):
     """GradeRegistry / rule-engine 빌드가 PG에 매달리지 않게 스텁."""
-    from lloydk.schemas import common as _common
+    from koipa.schemas import common as _common
 
     monkeypatch.setattr(
         _common.GradeRegistry, "get_codes", lambda *a, **k: ["TS", "S1", "S2", "S3"]
     )
-    from lloydk.modules.m3_labeling import pipeline as _m3
+    from koipa.modules.m3_labeling import pipeline as _m3
 
     monkeypatch.setattr(_m3, "build_rule_engine_from_db", lambda *a, **k: object())
 
 
 def _service(monkeypatch):
     """모델 미로드(model_dir=None) ClassifyService — 빠른 구성, rule-fallback."""
-    import lloydk.services.classify_service as cs
+    import koipa.services.classify_service as cs
 
     monkeypatch.setattr(cs, "_resolve_serving_model_dir", lambda *a, **k: None)
     return cs.ClassifyService()
 
 
 def _fake_pred(*, label=Grade.S2, confidence=1.0, warnings=None):
-    from lloydk.modules.m5_inference.pipeline import InferenceResult
+    from koipa.modules.m5_inference.pipeline import InferenceResult
 
     return InferenceResult(
         label=label,
@@ -62,7 +62,7 @@ def _fake_pred(*, label=Grade.S2, confidence=1.0, warnings=None):
 # ---------------------------------------------------------------------------
 class TestSparseEvidenceEmission:
     def _pipe_with_rule_total(self, monkeypatch, total: float):
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
 
         pipe = InferencePipeline(model_dir=None)
 
@@ -87,7 +87,7 @@ class TestSparseEvidenceEmission:
         return pipe
 
     def test_thin_rule_score_emits_warning(self, monkeypatch, _no_db):
-        from lloydk import config as cfg
+        from koipa import config as cfg
 
         monkeypatch.setattr(cfg.settings, "rule_fallback_min_evidence", 0.9, raising=False)
         pipe = self._pipe_with_rule_total(monkeypatch, 0.5)  # 0 < 0.5 < 0.9 → 빈약
@@ -95,7 +95,7 @@ class TestSparseEvidenceEmission:
         assert any("sparse-evidence" in w for w in res.warnings), res.warnings
 
     def test_strong_rule_score_no_warning(self, monkeypatch, _no_db):
-        from lloydk import config as cfg
+        from koipa import config as cfg
 
         monkeypatch.setattr(cfg.settings, "rule_fallback_min_evidence", 0.9, raising=False)
         pipe = self._pipe_with_rule_total(monkeypatch, 1.5)  # >= floor → 충분
@@ -104,7 +104,7 @@ class TestSparseEvidenceEmission:
 
     def test_zero_score_no_warning(self, monkeypatch, _no_db):
         # ev==0(무신호)은 conf=0으로 저신뢰 게이트가 잡으므로 sparse-evidence는 0<ev<floor만.
-        from lloydk import config as cfg
+        from koipa import config as cfg
 
         monkeypatch.setattr(cfg.settings, "rule_fallback_min_evidence", 0.9, raising=False)
         pipe = self._pipe_with_rule_total(monkeypatch, 0.0)
@@ -117,7 +117,7 @@ class TestSparseEvidenceEmission:
 # ---------------------------------------------------------------------------
 class TestGateEscalationRouting:
     def test_sparse_evidence_routes_to_review(self, monkeypatch, _no_db):
-        from lloydk.schemas.classify import ClassifyRequest
+        from koipa.schemas.classify import ClassifyRequest
 
         svc = _service(monkeypatch)
         monkeypatch.setattr(
@@ -133,8 +133,8 @@ class TestGateEscalationRouting:
         assert any("sparse-evidence" in w for w in resp.warnings), resp.warnings
 
     def test_low_confidence_routes_to_review(self, monkeypatch, _no_db):
-        from lloydk import config as cfg
-        from lloydk.schemas.classify import ClassifyRequest
+        from koipa import config as cfg
+        from koipa.schemas.classify import ClassifyRequest
 
         svc = _service(monkeypatch)
         monkeypatch.setattr(cfg.settings, "review_confidence_threshold", 0.7, raising=False)
@@ -147,8 +147,8 @@ class TestGateEscalationRouting:
         assert any("low-confidence" in w for w in resp.warnings), resp.warnings
 
     def test_high_confidence_not_flagged_low_confidence(self, monkeypatch, _no_db):
-        from lloydk import config as cfg
-        from lloydk.schemas.classify import ClassifyRequest
+        from koipa import config as cfg
+        from koipa.schemas.classify import ClassifyRequest
 
         svc = _service(monkeypatch)
         monkeypatch.setattr(cfg.settings, "review_confidence_threshold", 0.7, raising=False)
@@ -163,7 +163,7 @@ class TestGateEscalationRouting:
 
 class TestS2UnderclassRiskRouting:
     def test_s2_underclass_risk_routes_to_review(self, monkeypatch, _no_db):
-        from lloydk.schemas.classify import ClassifyRequest
+        from koipa.schemas.classify import ClassifyRequest
 
         svc = _service(monkeypatch)
         monkeypatch.setattr(
@@ -185,7 +185,7 @@ class TestS2UnderclassRiskRouting:
 
 class TestS2UnderclassRiskSignal:
     def test_internal_limited_document_is_risk(self):
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
 
         text = (
             "\uc77c\ubd80 \ub0b4\ubd80 \uc791\uc5c5 \uc21c\uc11c\uc640 "
@@ -197,7 +197,7 @@ class TestS2UnderclassRiskSignal:
         assert InferencePipeline._has_s2_underclass_risk(text, None) is True
 
     def test_public_source_context_is_not_risk(self):
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
 
         text = (
             "\ubb38\uc11c\uc758 \uae30\uc900\uacfc \uc218\uce58\ub294 "
@@ -209,7 +209,7 @@ class TestS2UnderclassRiskSignal:
         assert InferencePipeline._has_s2_underclass_risk(text, None) is False
 
     def test_public_metadata_suppresses_risk(self):
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
 
         text = "\ube44\uacf5\uac1c \uc6b4\uc601\uc790\ub8cc \ucd08\uc548"
         assert (
@@ -226,7 +226,7 @@ class TestTsTieBreak:
 
     @staticmethod
     def _near_tie():
-        from lloydk.modules.m5_inference.pipeline import InferenceResult
+        from koipa.modules.m5_inference.pipeline import InferenceResult
 
         return InferenceResult(
             label=Grade.S1,
@@ -237,8 +237,8 @@ class TestTsTieBreak:
 
     def test_disabled_by_default_leaves_result_untouched(self, _no_db):
         """기본값에서 서빙 판정이 바뀌면 안 된다 — 배포본 동작 보존."""
-        from lloydk.config import settings
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+        from koipa.config import settings
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
 
         assert settings.ts_tie_break_enabled is False
         result = self._near_tie()
@@ -249,8 +249,8 @@ class TestTsTieBreak:
         assert guarded is result
 
     def test_enabled_near_tie_resolves_to_ts(self, monkeypatch, _no_db):
-        from lloydk.config import settings
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline
+        from koipa.config import settings
+        from koipa.modules.m5_inference.pipeline import InferencePipeline
 
         monkeypatch.setattr(settings, "ts_tie_break_enabled", True)
 
@@ -261,8 +261,8 @@ class TestTsTieBreak:
         assert any("ts-tie-break" in warning for warning in guarded.warnings)
 
     def test_enabled_strong_s1_is_not_promoted_to_ts(self, monkeypatch, _no_db):
-        from lloydk.config import settings
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
+        from koipa.config import settings
+        from koipa.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
 
         monkeypatch.setattr(settings, "ts_tie_break_enabled", True)
         result = InferenceResult(
@@ -276,8 +276,8 @@ class TestTsTieBreak:
 
     def test_enabled_never_downgrades(self, monkeypatch, _no_db):
         """하향은 하지 않는다 — 미탐을 늘리는 방향이라 이 규칙의 범위 밖이다."""
-        from lloydk.config import settings
-        from lloydk.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
+        from koipa.config import settings
+        from koipa.modules.m5_inference.pipeline import InferencePipeline, InferenceResult
 
         monkeypatch.setattr(settings, "ts_tie_break_enabled", True)
         # 구 S3 clamp 가 S3 로 내리던 입력(룰 S3 · TS 무시가능 · S1/S3 마진 약함).

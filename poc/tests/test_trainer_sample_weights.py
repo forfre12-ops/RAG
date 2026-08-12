@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m4_training.trainer import (
+from koipa.modules.m4_training.trainer import (
     TrainSpec,
     _load_jsonl,
     _load_training_jsonl,

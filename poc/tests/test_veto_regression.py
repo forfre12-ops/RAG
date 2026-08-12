@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m5_inference.pipeline import InferencePipeline
-from lloydk.schemas.common import Grade
+from koipa.modules.m5_inference.pipeline import InferencePipeline
+from koipa.schemas.common import Grade
 
 # 작을수록 더 민감(고등급). judge_doc(run_acceptance) 와 동일 규약.
 _SEVERITY = {"TS": 0, "S1": 1, "S2": 2, "S3": 3}

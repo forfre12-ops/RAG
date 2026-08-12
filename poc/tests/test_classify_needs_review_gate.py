@@ -13,8 +13,8 @@ import contextlib
 import uuid
 from types import SimpleNamespace
 
-from lloydk.schemas.classify import ClassifyRequest
-from lloydk.services.classify_service import ClassifyService
+from koipa.schemas.classify import ClassifyRequest
+from koipa.services.classify_service import ClassifyService
 
 _BODY = "영업비밀 등급 분류 대상 본문입니다. 반도체 공정 레시피와 조성 비율. " * 5
 _FLAG_WARN = "flagged at ingestion"
@@ -77,21 +77,21 @@ def test_ingestion_flagged_for_doc_non_uuid_skips_db(monkeypatch):
         raise AssertionError("비-UUID 는 DB 경로에 도달하면 안 됨")
 
     # _parse_doc_uuid 실패로 _skip_optional_db_work 호출 전에 반환돼야 함 → 함정이 안 터짐.
-    monkeypatch.setattr("lloydk.services.classify_service._skip_optional_db_work", _boom)
+    monkeypatch.setattr("koipa.services.classify_service._skip_optional_db_work", _boom)
     assert svc._ingestion_flagged_for_doc("guide.txt") is False
     assert svc._ingestion_flagged_for_doc("경계-영업-주간공유") is False
 
 
 def _patch_doc_lookup(monkeypatch, *, status, doc_exists=True, raise_exc=None):
     monkeypatch.setattr(
-        "lloydk.services.classify_service._skip_optional_db_work", lambda: False
+        "koipa.services.classify_service._skip_optional_db_work", lambda: False
     )
 
     @contextlib.contextmanager
     def _fake_scope():
         yield object()
 
-    monkeypatch.setattr("lloydk.db.session_scope", _fake_scope)
+    monkeypatch.setattr("koipa.db.session_scope", _fake_scope)
 
     class _FakeRepo:
         def __init__(self, _db):
@@ -102,7 +102,7 @@ def _patch_doc_lookup(monkeypatch, *, status, doc_exists=True, raise_exc=None):
                 raise raise_exc
             return SimpleNamespace(processing_status=status) if doc_exists else None
 
-    monkeypatch.setattr("lloydk.repositories.document_repo.DocumentRepo", _FakeRepo)
+    monkeypatch.setattr("koipa.repositories.document_repo.DocumentRepo", _FakeRepo)
 
 
 def test_ingestion_flagged_for_doc_reads_persisted_status(monkeypatch):

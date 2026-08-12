@@ -147,7 +147,7 @@ def spec():
 
 
 def _extract(path: Path):
-    from lloydk.modules.m2_preprocess.extractor import extract
+    from koipa.modules.m2_preprocess.extractor import extract
     return extract(str(path))
 
 

@@ -1,4 +1,4 @@
-# Lloydk PoC — make targets
+# Koipa PoC — make targets
 # 사용:
 #   make venv                 # 의존성 설치
 #   make poc-all              # PoC 5종 일괄 실행 (dryrun)
@@ -94,7 +94,7 @@ infra-verify:
 
 # ── ES→PG 단일화 재검증 (의사결정_대장 §03 게이트; infra/postgres/README.md) ──
 # 기본 dev 스택과 격리된 pgvector+pg_bigm PG(:5433). ES 스택 비건드림.
-REVALID_DB ?= postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk
+REVALID_DB ?= postgresql+psycopg://koipa:koipa_dev@localhost:5433/koipa
 
 revalidate-pg-up:
 	docker compose -f docker-compose.pgvector.yml up -d --build
@@ -115,13 +115,13 @@ revalidate-tsrank-crux:
 	$(PY) scripts/revalidate_pg_tsrank_crux.py
 
 api:
-	uvicorn lloydk.api.app:app --reload --host 0.0.0.0 --port 8000
+	uvicorn koipa.api.app:app --reload --host 0.0.0.0 --port 8000
 
 worker:
-	celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+	celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
 
 beat:
-	celery -A lloydk.workers.celery_app beat -l info
+	celery -A koipa.workers.celery_app beat -l info
 
 p4:
 	$(PY) scripts/build_p4_corpus.py
@@ -144,7 +144,7 @@ p2-full:
 
 bundle-dry:
 	$(PY) scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run \
-	    --output dist/lloydk-airgap-bundle
+	    --output dist/koipa-airgap-bundle
 
 licenses:
 	$(PY) scripts/dump_licenses.py --output licenses/
@@ -270,7 +270,7 @@ llm-judge-local: ## LLM-as-judge (로컬 Qwen3/Ollama, 무료)
 
 metamorphic-report: ## 후보 모델 대상 메타모픽 회귀 리포트 생성 → deploy_gate 경로에 물릴 JSON (로컬 Qwen/Ollama)
 	## MODEL_DIR=<후보 모델> 로 후보를 지정. 산출 reports/metamorphic_pairs.json 을
-	## LLOYDK_DEPLOY_GATE_METAMORPHIC_REPORT_PATH 로 게이트에 연결(계약: 로더가 report 키 언랩).
+	## KOIPA_DEPLOY_GATE_METAMORPHIC_REPORT_PATH 로 게이트에 연결(계약: 로더가 report 키 언랩).
 	$(PY) scripts/gen_metamorphic_pairs.py \
 	    --provider $(or $(PROVIDER),ollama) \
 	    --model-dir $(or $(MODEL_DIR),artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9) \
@@ -451,7 +451,7 @@ test-lite: ## 빠른 테스트 suite (2분 이내 목표, CI 기본 — slow/ful
 
 test-lite-cov: ## test-lite + coverage 측정·리포트 (CI용 — 소프트, 하드 게이트 없음)
 	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow" \
-	    --cov=lloydk --cov-report=term-missing:skip-covered --cov-report=xml
+	    --cov=koipa --cov-report=term-missing:skip-covered --cov-report=xml
 
 test-slow: ## slow marker tests only
 	$(PY) -m pytest -q -m slow
@@ -538,14 +538,14 @@ incident-api-down:
 
 incident-queue-backlog:
 	@echo "[incident] Celery 큐 적체 1차 대응"
-	@celery -A lloydk.workers.celery_app inspect active || true
-	@celery -A lloydk.workers.celery_app inspect reserved || true
+	@celery -A koipa.workers.celery_app inspect active || true
+	@celery -A koipa.workers.celery_app inspect reserved || true
 	@echo "[hint] worker 스케일 아웃: docker compose up -d --scale worker=8"
 
 incident-drift:
 	@echo "[incident] 모델 드리프트 점검"
-	$(PY) -c "from lloydk.services.drift_monitor import compute_drift; print('drift_monitor 모듈 OK — 실 임베딩 표본 필요')"
+	$(PY) -c "from koipa.services.drift_monitor import compute_drift; print('drift_monitor 모듈 OK — 실 임베딩 표본 필요')"
 
 incident-audit-verify:
 	@echo "[incident] 감사 로그 hash chain 검증"
-	$(PY) -c "from lloydk.services.audit_chain import verify_chain; r = verify_chain(); print('verified', r.verified, 'broken', r.broken, 'first_break', r.first_break_audit_id)"
+	$(PY) -c "from koipa.services.audit_chain import verify_chain; r = verify_chain(); print('verified', r.verified, 'broken', r.broken, 'first_break', r.first_break_audit_id)"

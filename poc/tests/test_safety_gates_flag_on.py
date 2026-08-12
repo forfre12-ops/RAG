@@ -12,13 +12,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from lloydk.schemas.common import Grade
+from koipa.schemas.common import Grade
 
 
 @pytest.fixture
 def _stub_grades(monkeypatch):
     """GradeRegistry.get_codes 를 DB 없이 고정(get_order 는 이로부터 파생)."""
-    from lloydk.schemas import common as _common
+    from koipa.schemas import common as _common
 
     monkeypatch.setattr(
         _common.GradeRegistry, "get_codes", lambda *a, **k: ["TS", "S1", "S2", "S3"]
@@ -28,7 +28,7 @@ def _stub_grades(monkeypatch):
 # ── agreement_gate (model vs rule 합의) ───────────────────────────────────────
 
 def _agreement(pred_label, rule_grade):
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.services.classify_service import ClassifyService
 
     # pred.rule_grade 를 주면 self.inference 경로(룰엔진 재계산)는 타지 않으므로 self 는 스텁.
     pred = SimpleNamespace(label=pred_label, rule_grade=rule_grade)
@@ -36,7 +36,7 @@ def _agreement(pred_label, rule_grade):
 
 
 def test_agreement_gate_on_disagreement_routes_review(monkeypatch, _stub_grades):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", True, raising=False)
     reason = _agreement(Grade.S1, Grade.S2)   # 비공개 등급에서 model≠rule
@@ -44,14 +44,14 @@ def test_agreement_gate_on_disagreement_routes_review(monkeypatch, _stub_grades)
 
 
 def test_agreement_gate_on_public_grade_no_route(monkeypatch, _stub_grades):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", True, raising=False)
     assert _agreement(Grade.S3, Grade.S2) is None   # 공개등급(S3)은 conf 단독 신뢰 → 합의 불요
 
 
 def test_agreement_gate_off_default_no_route(monkeypatch, _stub_grades):
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", False, raising=False)
     assert _agreement(Grade.S1, Grade.S2) is None   # 기본 OFF → 비파괴(불일치여도 라우팅 안 함)
@@ -60,12 +60,12 @@ def test_agreement_gate_off_default_no_route(monkeypatch, _stub_grades):
 # ── llm_second_opinion (모델 비-TS 자동확정에 대한 LLM 2차의견) ───────────────
 
 def test_llm_second_opinion_on_higher_grade_routes_review(monkeypatch, _stub_grades):
-    from lloydk import config as cfg
-    from lloydk.services.classify_service import ClassifyService
+    from koipa import config as cfg
+    from koipa.services.classify_service import ClassifyService
 
     monkeypatch.setattr(cfg.settings, "model_secondopinion_llm_enabled", True, raising=False)
 
-    import lloydk.modules.m3_labeling.llm_labeler as llm_mod
+    import koipa.modules.m3_labeling.llm_labeler as llm_mod
 
     class _StubLLM:
         def label(self, text, **k):
@@ -78,8 +78,8 @@ def test_llm_second_opinion_on_higher_grade_routes_review(monkeypatch, _stub_gra
 
 
 def test_llm_second_opinion_off_default_no_route(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.services.classify_service import ClassifyService
+    from koipa import config as cfg
+    from koipa.services.classify_service import ClassifyService
 
     monkeypatch.setattr(cfg.settings, "model_secondopinion_llm_enabled", False, raising=False)
     assert ClassifyService._llm_second_opinion("본문", "S2") is None   # 기본 OFF → 비파괴
@@ -90,18 +90,18 @@ def test_llm_second_opinion_off_default_no_route(monkeypatch):
 @pytest.fixture
 def _stub_pipeline_db(monkeypatch):
     """InferencePipeline/LabelingPipeline 생성이 PG에 매달리지 않게 스텁(lite 실행)."""
-    from lloydk.schemas import common as _common
+    from koipa.schemas import common as _common
 
     monkeypatch.setattr(
         _common.GradeRegistry, "get_codes", lambda *a, **k: ["TS", "S1", "S2", "S3"]
     )
-    from lloydk.modules.m3_labeling import pipeline as _m3
+    from koipa.modules.m3_labeling import pipeline as _m3
 
     monkeypatch.setattr(_m3, "build_rule_engine_from_db", lambda *a, **k: object())
 
 
 def _force_rule(pipe, monkeypatch, grade):
-    from lloydk.modules.m5_inference.pipeline import InferenceResult
+    from koipa.modules.m5_inference.pipeline import InferenceResult
 
     res = InferenceResult(
         label=grade, confidence=0.9,
@@ -111,8 +111,8 @@ def _force_rule(pipe, monkeypatch, grade):
 
 
 def test_metadata_floor_on_security_marking_raises_grade(monkeypatch, _stub_pipeline_db):
-    from lloydk import config as cfg
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    from koipa import config as cfg
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     monkeypatch.setattr(cfg.settings, "metadata_floor_enabled", True, raising=False)
     pipe = InferencePipeline()
@@ -123,8 +123,8 @@ def test_metadata_floor_on_security_marking_raises_grade(monkeypatch, _stub_pipe
 
 
 def test_metadata_floor_on_access_scope_conflict_routes_review(monkeypatch, _stub_pipeline_db):
-    from lloydk import config as cfg
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    from koipa import config as cfg
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     monkeypatch.setattr(cfg.settings, "metadata_floor_enabled", True, raising=False)
     pipe = InferencePipeline()
@@ -134,8 +134,8 @@ def test_metadata_floor_on_access_scope_conflict_routes_review(monkeypatch, _stu
 
 
 def test_metadata_floor_off_default_no_change(monkeypatch, _stub_pipeline_db):
-    from lloydk import config as cfg
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    from koipa import config as cfg
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     monkeypatch.setattr(cfg.settings, "metadata_floor_enabled", False, raising=False)
     pipe = InferencePipeline()

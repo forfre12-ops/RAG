@@ -56,7 +56,7 @@ from scripts.validate_public_source_registry import (  # noqa: E402
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36 "
-    "lloydk-public-proxy-collector/1.0"
+    "koipa-public-proxy-collector/1.0"
 )
 DEFAULT_OUTPUT_ROOT = _ROOT / "datasets" / "proxy_gold" / "public_proxy_runs"
 DEFAULT_MAX_BYTES = 512 * 1024 * 1024

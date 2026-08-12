@@ -1,0 +1,159 @@
+{
+  "title": "Koipa KPI v2 (분류·검수·드리프트·큐)",
+  "uid": "koipa-kpi-v2",
+  "tags": ["koipa", "kpi", "p1-f1"],
+  "timezone": "Asia/Seoul",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-24h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "분류 처리량 (5m)",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "sum(rate(koipa_requests_total{route=~\"/api/v1/classify.*\"}[5m]))",
+         "refId": "A"}
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "p95 latency (분류, ms)",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum(rate(koipa_request_duration_seconds_bucket{route=~\"/api/v1/classify.*\"}[5m])) by (le)) * 1000",
+         "refId": "A"}
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "FNR overall (%, 24h) — 검수확정 모집단 정탐율(배선됨·선택편향); 실분포는 연합평가·실시간 미탐은 패널8",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "100 * (1 - sum(rate(koipa_classify_correct_total[24h])) / sum(rate(koipa_classify_total[24h])))",
+         "refId": "A"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Drift KL divergence",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "koipa_drift_kl_divergence", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": null, "color": "green"},
+              {"value": 0.3, "color": "yellow"},
+              {"value": 0.5, "color": "red"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "분류 등급 분포 (TS/S1/S2/S3)",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sum by (grade) (rate(koipa_classify_grade_total[5m]))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "교정 방향 (confirm/underclass/overclass/lateral)",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sum by (direction) (rate(koipa_corrections_total[5m]))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Celery 큐 적체 (큐별)",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum by (queue) (koipa_celery_queue_length)", "refId": "A"}
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Active Learning 큐 (unconsumed corrections)",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "koipa_active_learning_pending_total", "refId": "A"},
+        {"expr": "koipa_active_learning_pending_underclass", "refId": "B"}
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "PII 마스킹 카운트 (5m)",
+      "gridPos": {"x": 0, "y": 18, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum by (pii_type) (rate(koipa_pii_masked_total[5m]))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Outbox 상태 (pending vs DLQ)",
+      "gridPos": {"x": 12, "y": 18, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "koipa_outbox_pending", "refId": "A"},
+        {"expr": "koipa_outbox_dlq_pending", "refId": "B"}
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "서빙 열화 (rule-fallback / 영속화 실패)",
+      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum(rate(koipa_rule_fallback_total[5m]))", "refId": "A"},
+        {"expr": "sum by (reason) (rate(koipa_classify_persist_failure_total[5m]))", "refId": "B"}
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "서빙 게이트 발동 (metadata-floor / source-prior / similarity, action별)",
+      "gridPos": {"x": 12, "y": 24, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum by (action) (rate(koipa_metadata_floor_applied_total[5m]))", "refId": "A"},
+        {"expr": "sum by (action) (rate(koipa_source_prior_applied_total[5m]))", "refId": "B"},
+        {"expr": "sum by (action) (rate(koipa_similarity_escalation_total[5m]))", "refId": "C"}
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "locked_gold_eval readiness (배포 준비 0/1 · 등급별 보유)",
+      "gridPos": {"x": 0, "y": 30, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "koipa_locked_eval_ready", "refId": "A"},
+        {"expr": "sum by (grade) (koipa_locked_eval_per_grade)", "refId": "B"}
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "고등급 이중검토 보류 (escalation held, 등급별)",
+      "gridPos": {"x": 12, "y": 30, "w": 12, "h": 6},
+      "targets": [
+        {"expr": "sum by (grade) (koipa_escalation_held)", "refId": "A"}
+      ]
+    }
+  ]
+}

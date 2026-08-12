@@ -6,11 +6,11 @@ import math
 
 import pytest
 
-from lloydk.modules.m6_evaluation import (
+from koipa.modules.m6_evaluation import (
     RetrievalMetricsResult,
     compute_retrieval_metrics_from_arrays,
 )
-from lloydk.modules.m6_evaluation.retrieval_metrics import (
+from koipa.modules.m6_evaluation.retrieval_metrics import (
     compute_retrieval_metrics_from_db,
 )
 

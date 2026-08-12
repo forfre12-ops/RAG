@@ -29,12 +29,12 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.modules.m6_evaluation.confusion_matrix import build_confusion_matrix  # noqa: E402
-from lloydk.modules.m6_evaluation.metrics import (  # noqa: E402
+from koipa.modules.m6_evaluation.confusion_matrix import build_confusion_matrix  # noqa: E402
+from koipa.modules.m6_evaluation.metrics import (  # noqa: E402
     compute_metrics_from_arrays,
     compute_metrics_from_db,
 )
-from lloydk.modules.m6_evaluation.report import (  # noqa: E402
+from koipa.modules.m6_evaluation.report import (  # noqa: E402
     render_confusion_matrix_png,
     render_html_report,
 )

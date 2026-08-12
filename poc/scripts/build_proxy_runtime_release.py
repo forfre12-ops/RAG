@@ -74,7 +74,7 @@ ALLOWLIST_FILES = (
 
 # Python-only recursive trees.  The suffix restriction is part of the
 # allowlist, so static samples, models, caches, and arbitrary data cannot enter.
-ALLOWLIST_PYTHON_TREES = ("src/lloydk",)
+ALLOWLIST_PYTHON_TREES = ("src/koipa",)
 
 # The source tree intentionally has no scripts/__init__.py.  A runtime archive
 # adds one deterministic marker so an unrelated site-packages ``scripts``
@@ -550,7 +550,7 @@ for name, module in list(sys.modules.items()):
     for origin in origins:
         if any(_under(origin, base) for base in env_roots):
             continue
-        local_name = name == "lloydk" or name.startswith("lloydk.")
+        local_name = name == "koipa" or name.startswith("koipa.")
         local_name = local_name or name == "scripts" or name.startswith("scripts.")
         under_root = _under(origin, root)
         under_source = _under(origin, source)

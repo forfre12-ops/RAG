@@ -12,15 +12,15 @@ from scripts.finalize_proxy_classifier import (
     verify_materialized_training_run,
     verify_proxy_training_execution,
 )
-from lloydk.modules.m4_training.trainer import (
+from koipa.modules.m4_training.trainer import (
     TrainSpec,
     _proxy_materialization_audit,
     _write_proxy_training_execution,
 )
-from lloydk.modules.m4_training.chunk_expand import expand_records_evidence_aware
-from lloydk.modules.m5_inference.pipeline import InferencePipeline
-from lloydk import proxy_model_comparison as comparison
-from lloydk.proxy_training_finalization import (
+from koipa.modules.m4_training.chunk_expand import expand_records_evidence_aware
+from koipa.modules.m5_inference.pipeline import InferencePipeline
+from koipa import proxy_model_comparison as comparison
+from koipa.proxy_training_finalization import (
     DocumentWindowLogits,
     ProxyTrainingFinalizationError,
     aggregate_trace_probabilities,
@@ -324,7 +324,7 @@ def test_collection_fails_closed_when_fast_overflow_falls_back(monkeypatch):
             return SimpleNamespace(logits=torch.tensor([[1.0, 0.0, 0.0, 0.0]]))
 
     monkeypatch.setattr(
-        "lloydk.proxy_training_finalization._encode_serving_windows",
+        "koipa.proxy_training_finalization._encode_serving_windows",
         lambda *_args, **_kwargs: (Encoding(input_ids=torch.tensor([[1]])), [0], "fast_overflow_error_truncation"),
     )
     rows = [
@@ -528,7 +528,7 @@ def test_m5_locks_bundle_temperature_and_tau_from_same_trace(
     assert pipe._apply_bundle_calibration() == "bundle"
     assert pipe._apply_bundle_operating_point() == "bundle_locked"
 
-    from lloydk import config
+    from koipa import config
 
     monkeypatch.setattr(config.settings, "classifier_temperature", 3.0)
     monkeypatch.setattr(config.settings, "classifier_escalation_tau", 0.30)
@@ -910,7 +910,7 @@ def test_p1_proxy_candidate_cli_derives_only_attested_train_and_validation_paths
         )
 
     monkeypatch.setattr(
-        "lloydk.modules.m4_training.trainer.train_classifier", fake_train
+        "koipa.modules.m4_training.trainer.train_classifier", fake_train
     )
     monkeypatch.setattr(
         "sys.argv",

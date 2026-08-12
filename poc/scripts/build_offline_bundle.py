@@ -8,7 +8,7 @@ doc/12_폐쇄망_배포_설계.md §3·§4 구현.
 
 핵심 설계:
   - docker-compose.yml에서 image: 라인 파싱 → 컴포넌트 자동 추출
-  - poc/src/lloydk/config.py의 모델명 정적 분석 (import 없이 텍스트 파싱)
+  - poc/src/koipa/config.py의 모델명 정적 분석 (import 없이 텍스트 파싱)
   - dry-run은 외부 네트워크 호출 0 → CI에서 PR마다 검증 가능
   - manifest.yaml 스키마는 doc/12 §3.3 따름
 
@@ -167,7 +167,7 @@ def _expand_env_vars(value: str, overrides: dict[str, str] | None = None) -> str
 
     우선순위: overrides > 환경변수(비어있지 않을 때) > default > 빈 문자열.
     번들러는 실제 태그를 알아야 docker save/load 가 일치한다 — `${IMAGE_TAG:-1.0.0-rc1}` 을
-    리터럴로 캡처하면 `docker save lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}` 가 존재불가 태그로
+    리터럴로 캡처하면 `docker save koipa-worker:${IMAGE_TAG:-1.0.0-rc1}` 가 존재불가 태그로
     실패한다. overrides 로 번들 --version 을 IMAGE_TAG 에 주입해 save/load 태그를 맞춘다.
     """
     overrides = overrides or {}
@@ -276,12 +276,12 @@ def resolve_classifier_model_dir(explicit: str | None) -> Path | None:
     """학습된 분류기 가중치 디렉토리 해석 — 폐쇄망 번들에 동봉할 대상.
 
     우선순위: --classifier-model-dir 인자 → env CLASSIFIER_MODEL_DIR →
-    env LLOYDK_CLASSIFIER_MODEL_DIR. 미설정이면 None(베이스 모델만 번들 — 경고 대상).
+    env KOIPA_CLASSIFIER_MODEL_DIR. 미설정이면 None(베이스 모델만 번들 — 경고 대상).
     서빙은 이 디렉토리에서 가중치 + temperature.json(보정)을 로드하므로, 빠지면
     폐쇄망에서 미학습·무보정으로 동작한다(#40).
     """
     import os  # noqa: PLC0415
-    cand = explicit or os.environ.get("CLASSIFIER_MODEL_DIR") or os.environ.get("LLOYDK_CLASSIFIER_MODEL_DIR")
+    cand = explicit or os.environ.get("CLASSIFIER_MODEL_DIR") or os.environ.get("KOIPA_CLASSIFIER_MODEL_DIR")
     if not cand:
         return None
     p = Path(cand)
@@ -504,7 +504,7 @@ def build_manifest(
     for svc in ("api", "worker"):
         components.setdefault(
             svc,
-            ComponentEntry(image=f"lloydk-{svc}:{version}", version=version),
+            ComponentEntry(image=f"koipa-{svc}:{version}", version=version),
         )
 
     models = extract_models_from_config(config_path)
@@ -538,7 +538,7 @@ def build_manifest(
     files = expected_files(components, models, obs_images)
 
     return BundleManifest(
-        bundle_name="lloydk-airgap-bundle",
+        bundle_name="koipa-airgap-bundle",
         version=version,
         build_date=time.strftime("%Y-%m-%d"),
         git_commit=get_git_commit(),
@@ -660,7 +660,7 @@ def print_checklist(manifest: BundleManifest, *, stream=sys.stdout) -> None:
     """ASCII-only 출력 (Windows cp949 콘솔 호환)."""
     p = lambda s: print(s, file=stream)  # noqa: E731
 
-    p("\n=== Lloydk Airgap Bundle - Pre-flight Checklist ===")
+    p("\n=== Koipa Airgap Bundle - Pre-flight Checklist ===")
     p(f"Bundle      : {manifest.bundle_name} v{manifest.version}")
     p(f"Target env  : {manifest.target_env}")
     p(f"Git commit  : {manifest.git_commit}")
@@ -982,7 +982,7 @@ def _pip_download(out_dir: Path, wheel_platform: str = _DEFAULT_WHEEL_PLATFORM) 
 # 업로드(POST /documents/analyze)해 severity floor 를 검증한다. 판정 규율: 정확 등급일치가 아니라
 # (1) 파싱 성공 + (2) 고등급 미탐 없음(pred 가 기대보다 '덜 민감'하면 FAIL). over-분류(더 민감)는 안전방향=통과.
 _ACCEPTANCE_SH = r'''#!/usr/bin/env bash
-# Lloydk 고객 인수(acceptance) 러너 — 배포 후 파서·분류·안전 게이트를 실문서로 검증.
+# Koipa 고객 인수(acceptance) 러너 — 배포 후 파서·분류·안전 게이트를 실문서로 검증.
 # 판정: 정확 등급일치가 아니라 (1) 파싱 성공 + (2) 고등급 미탐 없음(severity floor). over-분류는 안전=통과.
 # 사용:  API_KEY=<배포키> BASE_URL=http://localhost:8000 bash acceptance/run_acceptance.sh
 set -uo pipefail
@@ -1144,7 +1144,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     env_template = infra / ".env.template"
     env_template.write_text(
         "# ============================================================\n"
-        "# Lloydk 폐쇄망(에어갭) 배포 .env 템플릿 — onprem-local 하드닝 프로파일\n"
+        "# Koipa 폐쇄망(에어갭) 배포 .env 템플릿 — onprem-local 하드닝 프로파일\n"
         "# 이 파일을 .env 로 복사(deploy_airgap.sh 가 자동 복사)한 뒤 replace_me_* 를 실값으로 채운다.\n"
         "# DEPLOY_PROFILE=onprem-local 이 온도보정(T=3.0)·안전게이트(agreement/metadata)·저장암호화·\n"
         "# escalation(τ=0.30)·require_safety_gates 를 자동 활성화한다. 이 줄을 지우거나 lite-* 로 바꾸면\n"
@@ -1155,16 +1155,16 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "\n"
         "# --- 필수 (deploy_airgap.sh 가 placeholder 를 검증·거부) ---\n"
         # [2026-08-03] 종전엔 1.0.0-rc1 이 하드코딩돼, 다른 버전으로 구운 번들을 문서대로 설치하면
-        # `manifest for lloydk-api:1.0.0-rc1 not found` 로 기동이 실패했다(운영자가 태그 일치를
+        # `manifest for koipa-api:1.0.0-rc1 not found` 로 기동이 실패했다(운영자가 태그 일치를
         # 손으로 챙겨야 했다). 번들이 실제로 담은 태그를 그대로 적어 docker load 태그와 자동 일치시킨다.
         f"IMAGE_TAG={version}\n"
         "API_KEY=replace_me_api_key\n"
-        "POSTGRES_USER=lloydk\n"
+        "POSTGRES_USER=koipa\n"
         "POSTGRES_PASSWORD=replace_me_postgres_password\n"
         "# 감사체인 HMAC 비밀키(NFR-SEC-01). 미설정이면 api startup 이 fail-fast 로 죽는다 —\n"
         "# 종전 템플릿에 이 줄이 없어 설치자가 기동 실패로만 알게 됐다(2026-08-02 리허설 실측).\n"
         "# python3 -c \"import secrets;print(secrets.token_hex(32))\"\n"
-        "LLOYDK_AUDIT_CHAIN_SECRET=replace_me_64hex_random\n"
+        "KOIPA_AUDIT_CHAIN_SECRET=replace_me_64hex_random\n"
         "# 골든 검수·서명 화면(review.html·signoff.html)의 서명 URL HMAC 키. **미설정이면 그 화면들이\n"
         "# 무인증으로 열린다** — 후보 문서 본문(고등급 포함)이 URL 만 알면 노출된다(코드는 하위호환을 위해\n"
         "# opt-in 강제라 키가 있어야 닫힌다). deploy_cloud.sh·deploy_testserver_dual.sh 는 이 값을 자동\n"
@@ -1186,7 +1186,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "\n"
         "# --- 인프라 (컨테이너 내부 → compose 서비스명 postgres/redis, localhost 아님) ---\n"
         "# DATABASE_URL 의 비밀번호는 위 POSTGRES_PASSWORD 와 반드시 일치시킬 것.\n"
-        "DATABASE_URL=postgresql+psycopg://lloydk:replace_me_postgres_password@postgres:5432/lloydk\n"
+        "DATABASE_URL=postgresql+psycopg://koipa:replace_me_postgres_password@postgres:5432/koipa\n"
         "REDIS_URL=redis://redis:6379/0\n"
         "VECTOR_BACKEND=pg\n"
         "STORAGE_BACKEND=local\n"   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
@@ -1248,7 +1248,7 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         "BUNDLE_DIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\n\n"
-        "echo '=== Lloydk Airgap Bundle Install ==='\n"
+        "echo '=== Koipa Airgap Bundle Install ==='\n"
         "# 1) docker load\n"
         "for tar in \"$BUNDLE_DIR/docker-images\"/*.tar; do\n"
         "  echo \"Loading $tar ...\"\n"
@@ -1367,7 +1367,7 @@ def _copy_observability(out_dir: Path) -> None:
     if dst.exists():
         print(f"  [skip] already exists: {dst}", file=sys.stderr)
         return
-    # dev overlay(lloydk-poc 네트워크)는 폐쇄망에서 무용이므로 제외하고 나머지 전부 복사.
+    # dev overlay(koipa-poc 네트워크)는 폐쇄망에서 무용이므로 제외하고 나머지 전부 복사.
     shutil.copytree(
         src, dst,
         ignore=shutil.ignore_patterns("docker-compose.observability.yml"),
@@ -1483,7 +1483,7 @@ def build_bundle(
     stage_embedder: bool = True,
 ) -> int:
     """실 빌드: docker save + pip download + infra 파일 복사."""
-    print("\n=== Lloydk Airgap Bundle - BUILD ===", file=sys.stderr)
+    print("\n=== Koipa Airgap Bundle - BUILD ===", file=sys.stderr)
     images_dir = out_dir / "docker-images"
     images_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1573,7 +1573,7 @@ def enforce_release_gate(readiness: str, allow_conditional: bool) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", required=True, help="번들 버전 (예: 1.0.0)")
-    ap.add_argument("--output", default="dist/lloydk-airgap-bundle", help="출력 디렉터리")
+    ap.add_argument("--output", default="dist/koipa-airgap-bundle", help="출력 디렉터리")
     ap.add_argument("--target-env", default="KOIPA-prod")
     ap.add_argument("--dry-run", action="store_true", help="다운로드 없이 manifest만 생성")
     ap.add_argument(
@@ -1583,13 +1583,13 @@ def main() -> int:
         help="파싱할 docker-compose 경로(기본: airgap)",
     )
     ap.add_argument(
-        "--config", default=str(_REPO_ROOT / "src" / "lloydk" / "config.py"),
+        "--config", default=str(_REPO_ROOT / "src" / "koipa" / "config.py"),
         help="파싱할 config.py 경로",
     )
     ap.add_argument(
         "--classifier-model-dir", default=None,
         help="학습된 분류기 가중치 디렉토리(가중치+temperature.json). "
-             "미지정 시 env CLASSIFIER_MODEL_DIR/LLOYDK_CLASSIFIER_MODEL_DIR 사용(#40)",
+             "미지정 시 env CLASSIFIER_MODEL_DIR/KOIPA_CLASSIFIER_MODEL_DIR 사용(#40)",
     )
     ap.add_argument(
         "--skip-observability", action="store_true",

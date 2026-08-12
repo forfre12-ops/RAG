@@ -43,7 +43,7 @@ def _non_train_keys(gold_path: str | Path) -> set[tuple[str, str]]:
 
     denylist(`== TIER_LOCKED`)를 allowlist(`not in TRAIN_TIERS`)로 전환 — de-locked
     human_review가 HELD가 되며 학습으로 새어들던 역-누수를 차단(golden_tiers TRAIN_TIERS와 정합)."""
-    from lloydk.golden_tiers import TRAIN_TIERS, tier_of
+    from koipa.golden_tiers import TRAIN_TIERS, tier_of
 
     if not Path(gold_path).exists():
         return set()

@@ -17,15 +17,15 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import SessionLocal, engine, session_scope
-from lloydk.db.models import (
+from koipa.db import SessionLocal, engine, session_scope
+from koipa.db.models import (
     Chunk,
     Classification,
     ClassificationLevel,
     Correction,
     Document,
 )
-from lloydk.modules.m6_evaluation.corrections_rebuild import (
+from koipa.modules.m6_evaluation.corrections_rebuild import (
     RebuildResult,
     _correction_admissible,
     build_labeled_rows_from_corrections,
@@ -81,7 +81,7 @@ def test_merge_no_rows_returns_none(tmp_path: Path):
 
 def test_rebuild_db_unavailable_graceful(monkeypatch):
     """session_scope가 SQLAlchemyError를 던지면 빈 결과 + reason."""
-    from lloydk.modules.m6_evaluation import corrections_rebuild as mod
+    from koipa.modules.m6_evaluation import corrections_rebuild as mod
 
     class _Boom:
         def __enter__(self):

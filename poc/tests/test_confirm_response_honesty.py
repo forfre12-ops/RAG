@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 
-from lloydk.services.confirm_service import (
+from koipa.services.confirm_service import (
     ConfirmResult,
     RelabelResult,
     to_confirm_response,

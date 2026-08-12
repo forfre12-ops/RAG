@@ -38,8 +38,8 @@ try:
 except (AttributeError, ValueError):
     pass
 
-from lloydk.golden_tiers import is_human_reviewer  # noqa: E402
-from lloydk.modules.m6_evaluation.federated_eval import (  # noqa: E402
+from koipa.golden_tiers import is_human_reviewer  # noqa: E402
+from koipa.modules.m6_evaluation.federated_eval import (  # noqa: E402
     CTX_ESCALATED_PROXY,
     CTX_HIGH_CONF_PROXY,
     CTX_RANDOM_AUDIT,
@@ -122,8 +122,8 @@ def _fetch_rows(since: dt.date | None) -> list[dict]:
     """폐쇄망 DB에서 교정×분류×등급 조인 → 행 dict. **집계 필드만 SELECT**(문서/텍스트 제외)."""
     from sqlalchemy import select  # noqa: PLC0415
 
-    from lloydk.db import SessionLocal  # noqa: PLC0415
-    from lloydk.db.models import Classification, ClassificationLevel, Correction  # noqa: PLC0415
+    from koipa.db import SessionLocal  # noqa: PLC0415
+    from koipa.db.models import Classification, ClassificationLevel, Correction  # noqa: PLC0415
 
     orig = ClassificationLevel.__table__.alias("orig")
     corr = ClassificationLevel.__table__.alias("corr")

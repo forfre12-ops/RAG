@@ -25,8 +25,8 @@ _POC = _HERE.parent
 sys.path.insert(0, str(_POC))
 sys.path.insert(0, str(_POC / "src"))
 
-from lloydk.hygiene import text_hash  # noqa: E402
-from lloydk.proxy_corpus import record_text, validate_proxy_record  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
+from koipa.proxy_corpus import record_text, validate_proxy_record  # noqa: E402
 from scripts import assemble_public_s3_challenge as public_challenge  # noqa: E402
 
 

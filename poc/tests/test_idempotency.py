@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from lloydk.services.idempotency import _MemoryStore
+from koipa.services.idempotency import _MemoryStore
 
 
 def test_acquire_then_store_then_get():
@@ -54,7 +54,7 @@ def test_release_allows_retry():
 
 
 def test_lock_expiry_allows_retry(monkeypatch):
-    import lloydk.services.idempotency as idem
+    import koipa.services.idempotency as idem
     monkeypatch.setattr(idem, "_LOCK_TTL", 0)  # 즉시 만료
     s = _MemoryStore()
     key = "k5"

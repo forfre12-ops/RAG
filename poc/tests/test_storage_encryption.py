@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.adapters.storage.encrypted_store import _MAGIC, EncryptingStorage
+from koipa.adapters.storage.encrypted_store import _MAGIC, EncryptingStorage
 
 KEY = "test-encryption-secret-high-entropy-0123456789"
 
@@ -102,8 +102,8 @@ def test_ciphertext_bound_to_bucket_and_key():
 
 
 def test_build_storage_wraps_when_enabled(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.adapters import storage as st
+    from koipa import config as cfg
+    from koipa.adapters import storage as st
 
     monkeypatch.setattr(cfg.settings, "storage_encryption_enabled", True, raising=False)
     monkeypatch.setattr(cfg.settings, "storage_encryption_key", KEY, raising=False)
@@ -112,8 +112,8 @@ def test_build_storage_wraps_when_enabled(monkeypatch):
 
 
 def test_build_storage_plain_when_disabled(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.adapters import storage as st
+    from koipa import config as cfg
+    from koipa.adapters import storage as st
 
     monkeypatch.setattr(cfg.settings, "storage_encryption_enabled", False, raising=False)
     s = st.build_storage(force_local=True)

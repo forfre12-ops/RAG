@@ -11,7 +11,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from lloydk.services.confirm_service import _apply_dual_review_gate
+from koipa.services.confirm_service import _apply_dual_review_gate
 
 
 class _FakeRepo:
@@ -28,7 +28,7 @@ class _Cls:
 
 
 def _gate(reviewers, label, *, enabled, codes=("TS", "S1")):
-    from lloydk.config import settings
+    from koipa.config import settings
     warns: list[str] = []
     # monkeypatch 없이 직접 — 호출 후 원복은 _restore_settings가 일부만 하므로 명시 복원.
     saved_enabled = settings.high_grade_dual_review
@@ -76,7 +76,7 @@ def test_high_grade_two_reviewers_confirmed():
 
 def _gate_held(reviewers, label, prior_status):
     """prior_status 를 넘겨 게이트 호출(보류 해제 경로 검증)."""
-    from lloydk.config import settings
+    from koipa.config import settings
     warns: list[str] = []
     saved = settings.high_grade_dual_review, settings.high_grade_review_codes
     settings.high_grade_dual_review = True
@@ -118,8 +118,8 @@ def test_not_held_low_grade_unchanged():
 
 def _gate_trust(monkeypatch, reviewers, rel_map, min_rel):
     """min_reliability + reviewer_trust 모킹으로 게이트 호출."""
-    from lloydk.config import settings
-    import lloydk.modules.m6_evaluation.reviewer_trust as rt
+    from koipa.config import settings
+    import koipa.modules.m6_evaluation.reviewer_trust as rt
     monkeypatch.setattr(settings, "high_grade_dual_review", True)
     monkeypatch.setattr(settings, "high_grade_review_codes", ["TS", "S1"])
     monkeypatch.setattr(settings, "high_grade_review_min_reliability", min_rel)
@@ -156,7 +156,7 @@ def test_new_reviewer_trusted_by_default(monkeypatch):
 
 
 def _pg_ok() -> bool:
-    from lloydk.db import engine
+    from koipa.db import engine
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -179,15 +179,15 @@ def require_pg():
 @db_backed
 class TestRelabelDualReviewLive:
     def test_high_grade_relabel_held_until_second_reviewer(self, monkeypatch):
-        from lloydk.config import settings
-        from lloydk.db import SessionLocal, session_scope
-        from lloydk.db.models import (
+        from koipa.config import settings
+        from koipa.db import SessionLocal, session_scope
+        from koipa.db.models import (
             Classification, ClassificationLevel, Correction, Document,
         )
-        from lloydk.repositories import ClassifyRepo
-        from lloydk.schemas.common import Actor
-        from lloydk.schemas.confirm import RelabelRequest
-        from lloydk.services.confirm_service import RelabelService
+        from koipa.repositories import ClassifyRepo
+        from koipa.schemas.common import Actor
+        from koipa.schemas.confirm import RelabelRequest
+        from koipa.services.confirm_service import RelabelService
 
         monkeypatch.setattr(settings, "high_grade_dual_review", True)
 
@@ -232,15 +232,15 @@ class TestRelabelDualReviewLive:
 
     def test_low_grade_confirm_cannot_release_held_review(self, monkeypatch):
         """SVC-2: A가 S3→TS 로 보류시킨 건을 B 1인이 S3 confirm 으로 해제하지 못한다."""
-        from lloydk.config import settings
-        from lloydk.db import SessionLocal, session_scope
-        from lloydk.db.models import (
+        from koipa.config import settings
+        from koipa.db import SessionLocal, session_scope
+        from koipa.db.models import (
             Classification, ClassificationLevel, Correction, Document,
         )
-        from lloydk.repositories import ClassifyRepo
-        from lloydk.schemas.common import Actor
-        from lloydk.schemas.confirm import ConfirmRequest, RelabelRequest
-        from lloydk.services.confirm_service import ConfirmService, RelabelService
+        from koipa.repositories import ClassifyRepo
+        from koipa.schemas.common import Actor
+        from koipa.schemas.confirm import ConfirmRequest, RelabelRequest
+        from koipa.services.confirm_service import ConfirmService, RelabelService
 
         monkeypatch.setattr(settings, "high_grade_dual_review", True)
 

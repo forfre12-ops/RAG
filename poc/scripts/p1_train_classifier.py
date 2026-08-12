@@ -90,7 +90,7 @@ def build_test_from_synth(synth_dir: Path) -> list[dict]:
 
 
 def evaluate_dryrun(rows: list[dict]) -> dict:
-    from lloydk.modules.m3_labeling import LabelingPipeline
+    from koipa.modules.m3_labeling import LabelingPipeline
 
     pipe = LabelingPipeline()
     y_true: list[str] = []
@@ -316,7 +316,7 @@ def main() -> int:
         gold_path = _EVAL_TYPE_PATHS[eval_type]
 
     if args.mode == "full":
-        from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
+        from koipa.modules.m4_training.trainer import TrainSpec, train_classifier
 
         spec_kwargs: dict = {"epochs": args.epochs}
         if args.proxy_candidate_mode:

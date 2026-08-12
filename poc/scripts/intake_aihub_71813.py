@@ -30,7 +30,7 @@ _POC = _HERE.parent
 sys.path.insert(0, str(_POC))
 sys.path.insert(0, str(_POC / "src"))
 
-from lloydk.proxy_corpus import validate_proxy_record  # noqa: E402
+from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
 
 
 DATASET_ID = "71813"

@@ -18,7 +18,7 @@ import uuid
 
 import pytest
 
-from lloydk.repositories.audit_repo import AuditRepo
+from koipa.repositories.audit_repo import AuditRepo
 
 
 class FakeSession:

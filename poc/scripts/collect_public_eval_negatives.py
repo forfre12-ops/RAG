@@ -116,7 +116,7 @@ def _norm_text(raw: str) -> str:
 
 def _http_get(url: str, params: dict[str, str], timeout: int = 60) -> bytes:
     full = f"{url}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(full, headers={"User-Agent": "lloydk-eval-collector/1.0"})
+    req = urllib.request.Request(full, headers={"User-Agent": "koipa-eval-collector/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (고정 도메인)
         return resp.read()
 
@@ -270,7 +270,7 @@ def collect_dart(args: argparse.Namespace, key: str) -> list[dict]:
 
 # ── 수동 다운로드 파일 (data.go.kr 등) ───────────────────────────────────────
 def collect_files(args: argparse.Namespace) -> list[dict]:
-    from lloydk.modules.m2_preprocess.extractor import extract  # 배포본과 동일한 추출기
+    from koipa.modules.m2_preprocess.extractor import extract  # 배포본과 동일한 추출기
 
     raw_dir = Path(args.raw_dir)
     if not raw_dir.is_dir():

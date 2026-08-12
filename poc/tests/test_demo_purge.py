@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from lloydk.api import admin as admin_mod
+from koipa.api import admin as admin_mod
 
 
 class _FakeRes:
@@ -46,7 +46,7 @@ def _patch_scope(monkeypatch, scoped_count: int, log: list[str]):
     def _fake_scope():
         yield _FakeDB(scoped_count, log)
 
-    monkeypatch.setattr("lloydk.db.session_scope", _fake_scope)
+    monkeypatch.setattr("koipa.db.session_scope", _fake_scope)
 
 
 def test_demo_purge_refuses_over_cap(monkeypatch):
@@ -73,7 +73,7 @@ def test_demo_purge_disabled_returns_404(monkeypatch):
     log: list[str] = []
     _patch_scope(monkeypatch, 7, log)
     monkeypatch.setattr(
-        "lloydk.config.settings", SimpleNamespace(demo_console_enabled=False)
+        "koipa.config.settings", SimpleNamespace(demo_console_enabled=False)
     )
     with pytest.raises(HTTPException) as ei:
         admin_mod.purge_demo_data()

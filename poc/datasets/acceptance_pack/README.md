@@ -1,4 +1,4 @@
-# Lloydk 인수(acceptance) 샘플팩
+# Koipa 인수(acceptance) 샘플팩
 
 고객 폐쇄망 배포 후 parse -> classify -> gate 를 실문서 포맷으로 검증하는 자기완비 팩.
 

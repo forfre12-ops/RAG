@@ -8,13 +8,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lloydk.modules.m6_evaluation.anchor_corpus import (
+from koipa.modules.m6_evaluation.anchor_corpus import (
     DEFAULT_ANCHOR_SOURCES,
     load_anchor_corpus,
     normalize_patent_timeaxis_prepub,
     patent_timeaxis_prepub_source,
 )
-from lloydk.modules.m6_evaluation.anchor_eval import run_anchor_cards
+from koipa.modules.m6_evaluation.anchor_eval import run_anchor_cards
 
 
 def _rec(doc_id, grade="S2", app_no=None):

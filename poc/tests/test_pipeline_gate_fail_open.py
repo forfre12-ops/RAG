@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.api import prom_metrics as pm
-from lloydk.modules.m5_inference import pipeline as P
-from lloydk.modules.m5_inference.pipeline import InferencePipeline
+from koipa.api import prom_metrics as pm
+from koipa.modules.m5_inference import pipeline as P
+from koipa.modules.m5_inference.pipeline import InferencePipeline
 
 
 def _gate_val(gate) -> float:
@@ -34,7 +34,7 @@ def test_pipeline_record_gate_fail_open_best_effort(monkeypatch):
     real = builtins.__import__
 
     def _no_metrics(name, *a, **k):
-        if name == "lloydk.api.prom_metrics":
+        if name == "koipa.api.prom_metrics":
             raise ImportError("x")
         return real(name, *a, **k)
 
@@ -45,7 +45,7 @@ def test_pipeline_record_gate_fail_open_best_effort(monkeypatch):
 def test_metadata_floor_fail_open_records_and_stays_fail_safe(monkeypatch):
     """실제 콜사이트: metadata-floor 상향 진입 후 _enforce_label_consistency 예외 →
     분류는 계속(fail-safe, 원 등급 유지) + metadata_floor fail-open 기록."""
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "metadata_floor_enabled", True, raising=False)
     # 상향 게이트가 등급 재계산에 진입하면 예외 → except 로 fail-open.
@@ -114,7 +114,7 @@ def test_warning_attachment_never_breaks_classification():
 
 def test_metadata_floor_fail_open_routes_real_pipeline_result(monkeypatch):
     """콜사이트 통합 — 실제 run() 결과에 검수 신호가 붙는다."""
-    from lloydk import config as cfg
+    from koipa import config as cfg
 
     monkeypatch.setattr(cfg.settings, "metadata_floor_enabled", True, raising=False)
     monkeypatch.setattr(InferencePipeline, "_enforce_label_consistency", _boom)
@@ -137,7 +137,7 @@ def test_classify_service_routes_gate_fail_open_to_needs_review():
     """
     import inspect
 
-    from lloydk.services import classify_service as cs
+    from koipa.services import classify_service as cs
 
     source = inspect.getsource(cs)
     assert 'any("gate-fail-open" in w for w in warnings_acc)' in source

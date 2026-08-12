@@ -11,8 +11,8 @@ import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-import lloydk.services.synthesis_service as ss
-from lloydk.services.synthesis_service import SynthesisService
+import koipa.services.synthesis_service as ss
+from koipa.services.synthesis_service import SynthesisService
 
 
 def _fake_sample(status: str) -> SimpleNamespace:

@@ -33,7 +33,7 @@ if str(_SRC) not in sys.path:
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from lloydk.config import settings
+from koipa.config import settings
 
 
 # ─────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ def make_queries(
             "python scripts/p2_oss_corpus_builder.py 먼저 실행"
         )
 
-    from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+    from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
 
     grade_kws: dict[str, list[str]] = {"TS": [], "S1": [], "S2": [], "S3": []}
     for s in KEYWORD_SEEDS:
@@ -165,8 +165,8 @@ def evaluate(
     reranker_provider: None이면 reranker 미적용. "noop"/"bge"/"qwen3" 지정 시
         1차 dense에서 top_k*oversample_factor만큼 가져온 뒤 cross-encoder로 재정렬.
     """
-    from lloydk.adapters.embedding import build_embedder, embedder_digest
-    from lloydk.adapters.vectorstore import build_store
+    from koipa.adapters.embedding import build_embedder, embedder_digest
+    from koipa.adapters.vectorstore import build_store
 
     emb = build_embedder(embedder_name, force_hash=(embedder_name == "hash"))
 
@@ -191,7 +191,7 @@ def evaluate(
     # reranker lazy 빌드 — 첫 쿼리에서 모델 다운로드/로드 비용 발생
     reranker = None
     if reranker_provider:
-        from lloydk.adapters.reranker import get_reranker
+        from koipa.adapters.reranker import get_reranker
         reranker = get_reranker(reranker_provider)
     try:
         vs = build_store(backend=backend)
@@ -377,7 +377,7 @@ def evaluate(
 
 def write_report(rows: list[dict], out: Path, *, best_config_mode: bool = True) -> str:
     """4-way 비교 리포트. baseline 행과 △ 컬럼 포함. SKIP 행은 따로 표시."""
-    from lloydk.modules.m6_evaluation.retrieval_metrics import (
+    from koipa.modules.m6_evaluation.retrieval_metrics import (
         compute_retrieval_metrics_from_arrays,
     )
 

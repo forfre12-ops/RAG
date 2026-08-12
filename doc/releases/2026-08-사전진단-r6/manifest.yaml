@@ -5,7 +5,7 @@ source_commit: 1acd3919b68cd199db42fef606d24eb60d088795
 source_of_truth: doc/result/감리정본/
 id_authority: doc/docs_registry.yaml
 inherited_from: 2026-08-사전진단-r5
-prepared_by: 로이드케이(수행사)
+prepared_by: 한국지식재산보호원(수행사)
 counts:
   formal_deliverables: 34
   formal_html: 33

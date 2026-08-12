@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m6_evaluation.deploy_gate import (
+from koipa.modules.m6_evaluation.deploy_gate import (
     DeployDecision,
     evaluate_deploy_gate,
 )
@@ -234,7 +234,7 @@ def test_decision_to_dict_serializable():
 
 # ── 앵커 연결 (외부 사실 앵커 측정 미탐을 게이트에 주입) ─────────────────────────
 
-from lloydk.modules.m6_evaluation.deploy_gate import summarize_anchor_high_grade  # noqa: E402
+from koipa.modules.m6_evaluation.deploy_gate import summarize_anchor_high_grade  # noqa: E402
 
 
 def _anchor_report(cards):
@@ -294,8 +294,8 @@ def test_summarize_anchor_high_grade_counts():
 
 
 # ── [P0#6] 메타모픽 순방향 회귀 hard-signal ─────────────────────────────────────
-from lloydk.modules.m6_evaluation.deploy_gate import summarize_metamorphic  # noqa: E402
-from lloydk.modules.m6_evaluation.metamorphic import build_metamorphic_report  # noqa: E402
+from koipa.modules.m6_evaluation.deploy_gate import summarize_metamorphic  # noqa: E402
+from koipa.modules.m6_evaluation.metamorphic import build_metamorphic_report  # noqa: E402
 
 
 def _metamorphic(n, violations):

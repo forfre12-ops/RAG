@@ -7,10 +7,10 @@ pytestmark = pytest.mark.slow
 import json
 from pathlib import Path
 
-from lloydk.adapters.llm.base import UsageRecord
-from lloydk.schemas.classify import ClassifyRequest
-from lloydk.services.classify_service import ClassifyService
-from lloydk.services.llm_usage_service import LLMUsageService
+from koipa.adapters.llm.base import UsageRecord
+from koipa.schemas.classify import ClassifyRequest
+from koipa.services.classify_service import ClassifyService
+from koipa.services.llm_usage_service import LLMUsageService
 
 
 def test_classify_service_singleton():
@@ -37,7 +37,7 @@ def test_classify_service_end_to_end():
 # ── [FIX-D] 공개특허공보 마스트헤드 → source-prior 캡 (TS 과분류 완화) ──────────
 
 def test_fix_d_masthead_detector():
-    from lloydk.services.classify_service import _is_published_patent_gazette
+    from koipa.services.classify_service import _is_published_patent_gazette
     # 실제 공개특허공보 서지헤더(3요소: 공보종별 + 특허청 + INID)
     patent_head = (
         "공개특허 10-2017-0094559\n\n(19) 대한민국특허청(KR)\n"

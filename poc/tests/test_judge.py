@@ -4,7 +4,7 @@
 """
 import pytest
 
-from lloydk.modules.m3_labeling.judge import ConsensusJudge, build_consensus_judge
+from koipa.modules.m3_labeling.judge import ConsensusJudge, build_consensus_judge
 
 
 class _Prov:

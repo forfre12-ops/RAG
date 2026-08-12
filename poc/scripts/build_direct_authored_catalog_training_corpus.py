@@ -10,7 +10,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.proxy_corpus import validate_proxy_record
 from scripts.build_direct_authored_training_corpus import (
     CLOSING_VERIFICATION, COMPREHENSIVE_APPENDIX, CONTROL_APPENDICES, LENGTHS,
     SHAPES, VARIANT_FOCI, _shape_indices_for_grade,

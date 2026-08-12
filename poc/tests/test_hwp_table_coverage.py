@@ -14,7 +14,7 @@ import io
 import zipfile
 from pathlib import Path
 
-from lloydk.modules.m2_preprocess.extractor import (
+from koipa.modules.m2_preprocess.extractor import (
     ExtractResult,
     _hwp_table_coverage,
     _hwp_tables_via_unhwp,
@@ -22,7 +22,7 @@ from lloydk.modules.m2_preprocess.extractor import (
     _hwpx_tables,
     _hwpx_uncaptured_table_cells,
 )
-from lloydk.services.document_ingestion_service import extraction_review_decision
+from koipa.services.document_ingestion_service import extraction_review_decision
 
 
 def _make_hwpx(section_xml: str) -> bytes:
@@ -235,7 +235,7 @@ class TestMarkdownTableParsing:
     """unhwp 마크다운 → ExtractedTable 파싱 (구분선·빈행 제거, <br> 환원)."""
 
     def test_separator_and_empty_rows_dropped(self):
-        from lloydk.modules.m2_preprocess.extractor import _markdown_tables
+        from koipa.modules.m2_preprocess.extractor import _markdown_tables
 
         tables = _markdown_tables(_MD, source="hwp", name_prefix="x.hwp")
         assert len(tables) == 1
@@ -246,7 +246,7 @@ class TestMarkdownTableParsing:
         ]
 
     def test_no_tables_returns_empty(self):
-        from lloydk.modules.m2_preprocess.extractor import _markdown_tables
+        from koipa.modules.m2_preprocess.extractor import _markdown_tables
 
         assert _markdown_tables("표 없는 본문뿐", source="hwp", name_prefix="x") == []
 
@@ -296,7 +296,7 @@ class TestAugmentationKeepsReviewRouting:
     """
 
     def test_coverage_stays_incomplete_after_recovery(self, tmp_path: Path, monkeypatch):
-        import lloydk.modules.m2_preprocess.extractor as ex
+        import koipa.modules.m2_preprocess.extractor as ex
 
         p = tmp_path / "sample.hwp"
         p.write_bytes(b"\xd0\xcf\x11\xe0")
@@ -336,7 +336,7 @@ class TestCoverageUnknownStillRecovers:
 
     @staticmethod
     def _hwp_with_unknown_coverage(tmp_path: Path, monkeypatch):
-        import lloydk.modules.m2_preprocess.extractor as ex
+        import koipa.modules.m2_preprocess.extractor as ex
 
         p = tmp_path / "unknown.hwp"
         p.write_bytes(b"\xd0\xcf\x11\xe0")
@@ -379,7 +379,7 @@ class TestCoverageUnknownStillRecovers:
 
     def test_review_gate_actually_routes_on_unknown(self, tmp_path: Path, monkeypatch):
         """추출기 판정이 실제 적재 게이트까지 배선돼 있는가(경고만 남고 끝나던 회귀)."""
-        from lloydk.services.document_ingestion_service import extraction_review_decision
+        from koipa.services.document_ingestion_service import extraction_review_decision
 
         ex, p = self._hwp_with_unknown_coverage(tmp_path, monkeypatch)
         _fake_unhwp(monkeypatch, None)

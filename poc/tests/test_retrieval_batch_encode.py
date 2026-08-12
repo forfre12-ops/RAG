@@ -7,7 +7,7 @@ encode_batch 미주입·길이 불일치·예외 시 단건 encode로 폴백.
 from __future__ import annotations
 
 
-from lloydk.adapters.vectorstore.base import SearchHit
+from koipa.adapters.vectorstore.base import SearchHit
 
 
 class _FakeStore:
@@ -30,7 +30,7 @@ class _FakeStore:
 
 def test_encode_batch_invoked_once_for_all_expanded_queries() -> None:
     """encode_batch 주입 시 확장 쿼리 N개에 대해 1회만 호출. encode는 0회."""
-    from lloydk.services.retrieval import expand_then_search
+    from koipa.services.retrieval import expand_then_search
 
     encode_calls: list[str] = []
     batch_calls: list[list[str]] = []
@@ -63,7 +63,7 @@ def test_encode_batch_invoked_once_for_all_expanded_queries() -> None:
 
 def test_falls_back_to_single_encode_when_no_batch() -> None:
     """encode_batch 미주입 시 단건 encode 경로 그대로."""
-    from lloydk.services.retrieval import expand_then_search
+    from koipa.services.retrieval import expand_then_search
 
     encode_calls: list[str] = []
 
@@ -87,7 +87,7 @@ def test_falls_back_to_single_encode_when_no_batch() -> None:
 
 def test_falls_back_to_single_encode_on_batch_exception() -> None:
     """encode_batch가 예외 던지면 단건 encode로 안전 폴백."""
-    from lloydk.services.retrieval import expand_then_search
+    from koipa.services.retrieval import expand_then_search
 
     encode_calls: list[str] = []
 
@@ -115,7 +115,7 @@ def test_falls_back_to_single_encode_on_batch_exception() -> None:
 
 def test_falls_back_when_batch_length_mismatch() -> None:
     """encode_batch 반환 길이가 쿼리 수와 다르면 폴백."""
-    from lloydk.services.retrieval import expand_then_search
+    from koipa.services.retrieval import expand_then_search
 
     encode_calls: list[str] = []
 

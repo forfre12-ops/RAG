@@ -10,13 +10,13 @@ import uuid
 
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.golden_builder import LabelPair
-from lloydk.schemas.common import Actor
-from lloydk.schemas.golden import GoldenBuildRequest
-from lloydk.services.golden_build_service import GoldenBuildService
-from lloydk.services.job_store import InMemoryJobStore, get_default_store
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.golden_builder import LabelPair
+from koipa.schemas.common import Actor
+from koipa.schemas.golden import GoldenBuildRequest
+from koipa.services.golden_build_service import GoldenBuildService
+from koipa.services.job_store import InMemoryJobStore, get_default_store
 
 client = TestClient(app)
 API = "/api/v1"

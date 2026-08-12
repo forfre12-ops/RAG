@@ -115,7 +115,7 @@ def _restore_settings():
 
     각 테스트 전후로 settings의 주요 필드를 저장/복원해 테스트 간 상태 오염을 차단.
     """
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
 
     saved = {
         "api_key": config_mod.settings.api_key,

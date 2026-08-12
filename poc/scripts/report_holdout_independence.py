@@ -22,7 +22,7 @@ import sys
 _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "src"))
 
-from lloydk.holdout_independence import assess  # noqa: E402
+from koipa.holdout_independence import assess  # noqa: E402
 
 
 def _read_jsonl(path: Path) -> list[dict]:

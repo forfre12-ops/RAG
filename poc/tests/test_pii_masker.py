@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m2_preprocess import mask_pii
+from koipa.modules.m2_preprocess import mask_pii
 
 
 def test_rrn_masked():

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from lloydk.api import confirm as confirm_api
-from lloydk.schemas.confirm import ReviewQueueItem
-from lloydk.services import confirm_service as cs
-from lloydk.services.confirm_service import resolve_review_statuses
+from koipa.api import confirm as confirm_api
+from koipa.schemas.confirm import ReviewQueueItem
+from koipa.services import confirm_service as cs
+from koipa.services.confirm_service import resolve_review_statuses
 
 
 # ── 상태 해석 (순수) ─────────────────────────────────────────────────────────

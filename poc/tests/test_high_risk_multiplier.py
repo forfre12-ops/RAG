@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine
+from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine
 
 # 범용 약어 2개(EUV→TS w1.6, M&A→TS w1.4) 포함 — 한글 시드 매칭은 피하려 영문 위주.
 _TEXT = "The EUV process and the M&A valuation were reviewed."

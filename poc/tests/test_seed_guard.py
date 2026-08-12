@@ -16,7 +16,7 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 import seed_active_model_version as seed  # noqa: E402
-from lloydk import config as cfg  # noqa: E402
+from koipa import config as cfg  # noqa: E402
 
 
 @pytest.mark.parametrize("profile", ["onprem-local", "full-train"])

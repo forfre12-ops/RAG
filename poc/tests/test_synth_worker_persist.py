@@ -14,10 +14,10 @@ import uuid
 
 import pytest
 
-from lloydk.adapters.llm.base import LLMResponse, UsageRecord
-from lloydk.adapters.llm.noop_provider import NoopProvider
-from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
-from lloydk.workers.tasks import _persist_synth_samples
+from koipa.adapters.llm.base import LLMResponse, UsageRecord
+from koipa.adapters.llm.noop_provider import NoopProvider
+from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+from koipa.workers.tasks import _persist_synth_samples
 
 
 class _FakeProvider:
@@ -81,8 +81,8 @@ def test_persist_to_review_queue_preserves_markers():
     """워커 적재 헬퍼가 검수큐에 pending_review 로 쌓고 label_source/parse_error 를 보존한다."""
     from sqlalchemy import select
 
-    from lloydk.db import session_scope
-    from lloydk.db.models import SampleDocument
+    from koipa.db import session_scope
+    from koipa.db.models import SampleDocument
 
     token = f"p0persist-{uuid.uuid4().hex[:8]}"  # 이 실행분만 격리 조회할 고유 doc_type
     gen = SyntheticDocGenerator(llm=_FakeProvider(""))  # 빈 응답 → 전부 noop_fallback
@@ -112,7 +112,7 @@ def test_persist_to_review_queue_preserves_markers():
 @pytest.mark.skipif(not _pg_up(), reason="postgres not available (5432)")
 def test_persisted_samples_visible_in_synth_queue():
     """적재분이 SynthesisService.queue(검수큐 조회)에 실제로 노출되는지 — 루프 연결 E2E."""
-    from lloydk.services.synthesis_service import SynthesisService
+    from koipa.services.synthesis_service import SynthesisService
 
     gen = SyntheticDocGenerator(llm=_FakeProvider(""))
     docs = gen.generate(SynthRequest(target_grade="TS", domain="mixed", count=2))

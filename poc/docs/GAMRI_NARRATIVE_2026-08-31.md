@@ -127,4 +127,4 @@ A. 실 문서·검수·반출이 발생하지 않는 것이 본 사업의 데이
 ---
 
 관련: `docs/V6_TRAINING_RUNBOOK.md` · `datasets/proxy_eval/ROLE.md` ·
-`src/lloydk/dataset_leakage.py` · `src/lloydk/holdout_independence.py`
+`src/koipa/dataset_leakage.py` · `src/koipa/holdout_independence.py`

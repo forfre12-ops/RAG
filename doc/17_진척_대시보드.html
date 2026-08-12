@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KOIPA AI 영업비밀관리시스템 — 진척 대시보드 | Lloydk AI</title>
+<title>KOIPA AI 영업비밀관리시스템 — 진척 대시보드 | Koipa AI</title>
 <meta name="description" content="W1~W13 + 블록 1~7 + 고도화 33건 + 고도화 6건(A1·A3·A4·A2·B1+B3·B2) 진척률. 자체결정 동결 변수 16개, 차단 항목 1건. 2026-05-29 outbox redis·SSE stage·drift wiring·audit chain wiring 실가동화 + CI redis/ES service 추가로 R1·outbox·RAG SKIP 자동 해소, pytest 540+ PASS · ruff 0 위반 · 18 시나리오 67 KPI." />
 
 <style>
@@ -579,8 +579,8 @@
 <nav class="nav">
   <div class="nav-inner">
     <a class="brand" href="#top">
-      <span class="brand-mark"><img src="assets/lloydk_logo_mark.png" alt="Lloydk AI" /></span>
-      <span class="brand-name">Lloydk AI</span>
+      <span class="brand-mark"><img src="assets/koipa_logo_mark.png" alt="Koipa AI" /></span>
+      <span class="brand-name">Koipa AI</span>
       <span class="brand-sep">/</span>
       <span class="brand-url">koipa/progress</span>
     </a>
@@ -601,7 +601,7 @@
 
   <div class="meta-row">
     <span class="badge">진척 대시보드</span>
-    <span class="meta-category">Lloydk AI 코어</span>
+    <span class="meta-category">Koipa AI 코어</span>
     <span class="meta-dot">•</span>
     <span class="meta-soft">FUN-003·004·005·022·023·024</span>
     <span class="meta-dot">•</span>
@@ -619,7 +619,7 @@
     pytest <b>505 PASS</b>(409 → +96), 자체결정으로 회신 의존 변수 16개 동결. 남은 차단은 가이드 v2(자체 v1 완료)·GPU·API 키 1건뿐.
     <br/><b>P2 검색 품질 실측 완료 (2026-05-29)</b> — KURE-v1·BGE-M3 × dense·hybrid(BM25+RRF) 4-way 측정, Recall@5 0.667~0.700 (합격선 0.80 미달). dense → hybrid 갱신폭 KURE +0.033/BGE 0. <b>시드 키워드 쿼리 환경의 천장 0.700 확정</b> — reranker(효과 0)·RRF 모두 미달.
     <br/><b>P2 천장 원인 정량 입증 (의도형 쿼리 30종 추가 측정)</b> — 가이드 v1 기반 자연어 의도형 쿼리는 시드 쿼리 대비 오히려 <b>-0.067 ~ -0.133 하락</b> (KURE 0.600, BGE 0.567). 진짜 천장 원인은 알고리즘이 아닌 <b>합성 5K 코퍼스 본문 boilerplate</b> — 등급당 키워드 5종 반복 나열로 다양한 의도 매칭 불가. <b>합격선 도달 결정 경로</b>: 발주처 LLM API 키 도착 → P3 풀 모드 LLM 합성 → 본문 다양화 → 0.80 도달 시도. 측정 중 ES basic 라이선스 RRF 차단 사전결함도 동시 정리(license-aware fallback, +4 단위).
-    <br/><b>4-tier 배포 프로파일 (commit 5a2b4e0)</b> — LLOYDK_DEPLOY_PROFILE 한 줄로 lite-noapi/lite-cloud/onprem-local/full-train 4-tier 납품 모드 전환. enable_training=False면 training_api 라우터 등록 자체 skip → OpenAPI에서 사라짐. 신규 11 PASS.
+    <br/><b>4-tier 배포 프로파일 (commit 5a2b4e0)</b> — KOIPA_DEPLOY_PROFILE 한 줄로 lite-noapi/lite-cloud/onprem-local/full-train 4-tier 납품 모드 전환. enable_training=False면 training_api 라우터 등록 자체 skip → OpenAPI에서 사라짐. 신규 11 PASS.
     <br/><b>데모 콘솔 — /demo/ 마운트 (2026-05-29)</b> — V2 통합본 NovaX 디자인 100% 차용 + 시드 v4 480+ 키워드에서 자동 빌드한 4등급 × 3 도메인 = 12 샘플(빌드 시 ClassifyService 의도 등급 매칭 검증 통과 12/12). 와우 6: 키워드 토글로 등급 변동·BERT vs LLM 시간 경쟁(§4.4 실증)·본문↔결과↔법령 양방향 하이라이트·FNR 사고 시뮬레이션(§9 핵심)·stat grid 12·PDF 인쇄 보고서. 단위 9/9 + 라이브 9/9 PASS(lite-noapi 부팅 후 /demo/ 직접 호출). 발주처 시연·내부 QA·KL 통합 점검 전용 — KL 운영 화면 침범 X.
     <br/><b>5070 Ti 풀가동 PoC Phase 0~5+7 완료 (2026-05-30)</b> — Blackwell sm_120 + torch 2.12 nightly cu128 + transformers BERT GPU 학습 입증. 인프라 4 컨테이너 healthy + Ollama Qwen3 14B (76 tps) + Solar 10.7B + BGE-M3/KURE-v1/dragonkue 3종 캐시. <b>P2 3-way 실측 (BGE-M3 dense 1순위 Recall@5 0.7222, latency p50 111ms)</b> — V2 §5 가정과 역전(KURE 0.6667). 합성 5K 천장 진짜 임베딩에서도 재확인. <b>P1 KF-DeBERTa 1ep 33초 학습 (test 752 F1=1.0 FNR=0)</b> + ClassifyService wiring으로 confidence 0.85 고정 → 동적(0.30~0.98). 데모 12 샘플 10/12 PASS. <b>P5 E2E 풀스택 측정 (RAG OFF 380ms · RAG ON 9.2s, V2 §14.2 양쪽 합격)</b> — 단계별 분해로 BERT 추론 99% 입증. <b>P3 Qwen3 vs Solar 200건 비교 (Qwen3 라벨 일치도 100% FNR 0% PASS, Solar 81%/27% FAIL — Qwen3 1순위 확정)</b> — V2 §6 채택 정량 입증. 야간 무중단 자동화 입증(overnight script). <b>데모 §5 실측 비율 88%</b> (17카드 중 15 measured + 2 spec). commits 14f38af·ad5f285·774e984·863f69b·04dffc9 + Phase 4·5·7.
     <br/><b>Phase 8 고도화 9건 일괄 (2026-05-30, commit eeb5603)</b> — 야간 무중단 마무리 후 사용자 개입 0건 추가 진행. <b>B1-2 ES `docs` 영구 인덱싱 5,200건</b>(BGE-M3, 13분 6.8 docs/s, synthetic_5k 5,000 + synthetic_qwen3 200) → /answer citations 0→3 실측(RAG ON 데모 효과 입증). <b>B1-3 Qwen3+5K 재학습</b>(labeled_5k+Qwen3 = 3,700건, 43초, F1=1.0 학습 분포, confidence 0.632 → 0.746 +0.114, 미탐 패턴 1단계 개선). <b>C1-1 KoBigBird-large 비교 학습</b>(65초, F1=1.0 KF-DeBERTa 동등 — 4,096 토큰 우위 합성에서 무관, KF-DeBERTa 1순위 유지). <b>C2-1 P2 4-way 확장 (arctic-l-ko 추가, Recall 0.6667 미달, BGE-M3 1순위 재확인)</b>. <b>C2-2 dragonkue/bge-reranker-v2-m3-ko</b> 다운+score 0.9998 확인. <b>C3-1 Qwen3 thinking on/off 비교</b>(off 39.3 vs on 28.2 tps, +39%, 구조화 출력은 OFF 권장). <b>C3-7 JSON retry 정책</b>(파싱 실패 시 temp 0.3 + system 강화 재시도 2회). <b>C5-4 합성 본문 길이 4 band 다양화</b>(200~10K 균등). <b>B1-4 safetensors 403 silent</b>·<b>B1-5 race-note 22× 정확화</b>·<b>B3-3 errors_ko.js 50항 신규</b>. 데모 §5 5 카드 신규 → 22 카드 중 19 measured + 3 spec = <b>86% 실측 비율</b>.
@@ -827,7 +827,7 @@
       <div class="step-body">
         <div class="step-title">PSH — 시나리오 성능 하네스 + KPI 매트릭스 + 단일 HTML 보고서</div>
         <div class="step-desc">
-          <code>poc/src/lloydk/perf/</code> + <code>scripts/run_perf_scenarios.py</code> 신규.
+          <code>poc/src/koipa/perf/</code> + <code>scripts/run_perf_scenarios.py</code> 신규.
           S1~S11+S13 11 시나리오 × 평균 3.8 KPI = <b>42 KPI</b>(6 core).
           <a href="20_시나리오_성능_보고서.html">doc/20</a> 단일 HTML + <a href="20a_시나리오_성능_KPI매트릭스.md">doc/20a</a> 매트릭스.
           <code>trained_model</code> 게이팅으로 보고 노이즈 제거, poc-ci 잡 통합. PSH 단위 테스트 50+ 추가.
@@ -1087,7 +1087,7 @@
     </svg>
     <div class="callout-body">
       <span class="callout-label">DECISION LOCKED</span>
-      <p>발주처/KL 회신을 기다리지 않고 로이드케이 내부 결정으로 잠가 후속 모든 잔여 개발이 즉시 착수 가능.</p>
+      <p>발주처/KL 회신을 기다리지 않고 한국지식재산보호원 내부 결정으로 잠가 후속 모든 잔여 개발이 즉시 착수 가능.</p>
     </div>
   </div>
 
@@ -1101,7 +1101,7 @@
         <tr><td><b>Q2</b> 합성 데이터</td><td>사업단 내부 사용만</td><td>자체결정</td></tr>
         <tr><td><b>Q3</b> 실문서</td><td>미제공 가정, 합성+공개로만</td><td>자체결정</td></tr>
         <tr><td><b>Q4</b> 가이드</td><td>현 시드 동결, 회신 시 v2 패치</td><td><code>seeds.py</code></td></tr>
-        <tr><td><b>Q5</b> AI Hub</td><td>로이드케이 명의</td><td>자체결정</td></tr>
+        <tr><td><b>Q5</b> AI Hub</td><td>한국지식재산보호원 명의</td><td>자체결정</td></tr>
         <tr><td><b>Q6</b> EXAONE</td><td>제외</td><td>자체결정</td></tr>
         <tr><td><b>Q7</b> 검수</td><td>검수자 2명 + AI팀 셀프</td><td>자체결정</td></tr>
         <tr><td><b>E1</b> ES 버전</td><td>8.15.3</td><td><code>docker-compose.yml</code></td></tr>
@@ -1152,7 +1152,7 @@
     <div class="card done">
       <div class="eyebrow">✓ Observability</div>
       <div class="ctitle">Prometheus + Grafana + Loki 스택</div>
-      <p>FastAPI /api/v1/metrics-prom으로 lloydk_requests_total·duration_seconds·active_learning_pending 노출. infra/observability/ docker-compose 한 명령 가동. 백업 3종 cron · dr_restore_check.py 자동 RTO 검증.</p>
+      <p>FastAPI /api/v1/metrics-prom으로 koipa_requests_total·duration_seconds·active_learning_pending 노출. infra/observability/ docker-compose 한 명령 가동. 백업 3종 cron · dr_restore_check.py 자동 RTO 검증.</p>
     </div>
     <div class="card done">
       <div class="eyebrow">✓ CI</div>
@@ -1374,9 +1374,9 @@
         <tr><td>2026-05-29</td><td><b>고도화 1건 — 표적 1 InferencePipeline RAG 본격 wiring: m5_inference/pipeline에 _build_rag_context 헬퍼 신규(retrieval.expand_then_search 안전 호출, build_store + build_embedder lazy import, 모든 외부 실패는 silent + 빈 컨텍스트). run(use_rag=True) 분기에서 rule-fallback/_run_model 어느 경로든 동일하게 RAG context 보강(분류 본문은 불변). settings에 rag_default_collection/top_k/query_expansion_method 추가, namespace/metadata.tenant_id가 retrieval filter로 자동 전달. SearchHit→RagContextHit 변환(payload.doc_id 우선·없으면 id 폴백). 신규 11 PASS(true 채움 4 + false 회귀 가드 1 + store/encoder 실패 silent 2 + namespace/filter 2 + 변환 2) + 관련 회귀 63 PASS 영향 0 · ruff 0</b></td><td><b>+ RAG 종단 wiring 완성</b></td><td>없음</td></tr>
         <tr><td>2026-05-29</td><td><b>고도화 1건 — RAG 검색 품질 평가 함수: m6_evaluation/retrieval_metrics.py 신설 — RetrievalMetricsResult 데이터클래스 + compute_retrieval_metrics_from_arrays(순수) + compute_retrieval_metrics_from_db(ClassificationEvidence evidence_type='rag_context'에서 rag_similarity 내림차순 top_k 컷 → 외부 주입 relevants_by_classification와 매칭). 지표: Recall@k·Precision@k·MRR·nDCG@k(binary gain) + per-query 보고 + relevant 비어있는 쿼리 skipped 분리 집계. 분류 평가(metrics.py)와 동일 인터페이스 — m6_evaluation/__init__.py 노출. 기존 스크립트(p2_compare_embeddings)에만 박혀있던 retrieval 평가를 in-system 재사용 가능 모듈로 승격. 신규 11 PASS(perfect/miss/MRR2위/top_k truncation/multi-relevant/empty rel skip/empty input/per-query label/to_dict/dataclass 타입/from_db None) + m6+retrieval+inference RAG 회귀 37 PASS 영향 0 · ruff 0</b></td><td><b>+ RAG 검색 품질 보고 가능</b></td><td>없음</td></tr>
         <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — RAG 답안 합성 서비스: services/rag_answer_service.py + schemas/rag_answer.py 신설. synthesize_answer(query, hits, grade, provider)가 build_provider() 또는 주입 provider로 LLM 호출 → RagAnswerResult(answer + citations[rank 1-based] + usage + warnings + deterministic_fallback) 반환. build_answer_prompt가 query/hits/grade 반영하고 인용 강제 지시 포함. noop provider는 합성 데이터 JSON 어댑터라 답안 부적합 → 자동 deterministic 분기(LLM 호출 안 함). LLM 실패·빈 응답·provider 빌드 실패 모두 silent fallback(예외 미전파). ClassifyService에는 강제 wiring 안 함 — 분류와 별개 단계로 호출자가 명시 호출. 부수 정리: m4_training/query_expansion.expand_llm의 get_llm 오타 import(존재하지 않는 심볼 — build_provider) + LLMResponse.text 추출 누락(raw 결과를 str로 처리하던 결함) 2건. 기존엔 try/except에 silently 죽어있어 LLM expansion이 영영 안 돌던 상태. 신규 14 PASS(prompt 4 + 입력가드 3 + noop 분기 1 + provider 성공/raise/빈/raw 4 + citations rank/직렬화 2) + RAG/LLM 어댑터 회귀 89 PASS 영향 0 · ruff 0</b></td><td><b>+ RAG 답안 단계 등장</b></td><td>없음</td></tr>
-        <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — POST /api/v1/answer 엔드포인트 wiring: api/answer.py 신설(question→retrieval facade→synthesize_answer 일관 흐름), schemas/rag_answer.py에 RagAnswerRequest 추가(query 1-4000자, tenant_id/namespace/top_k 1-20/grade/use_reranker/metadata). app.py 라우터 등록(prefix /api/v1, tags=answer, X-API-Key 인증, slowapi 30/minute). 흐름: build_store + build_embedder lazy import → expand_then_search(use_reranker 전달, tenant 필터는 본문 tenant_id 우선·없으면 metadata.tenant_id) → SearchHit→RagContextHit 변환 → synthesize_answer(grade 전달). vectorstore/embedder/검색 어느 단계든 실패 silent + 빈 hits → deterministic_fallback. doc/03_openapi_lloydk_kl.yaml에 /answer + RagAnswerRequest/RagCitation/RagAnswerUsage/RagAnswerResult 4개 스키마 등록. 신규 7 PASS(인증 누락 401/422 · 잘못된 키 401 · 정상 200+fallback · 빈 query 422 · query 길이 초과 422 · top_k 범위 위반 422 · grade·metadata 정상 200 + openapi.json 노출 확인) · ruff 0 (로컬 .env cp949 결함으로 collection 차단 — CI UTF-8에서 검증)</b></td><td><b>+ RAG 답안 API 노출</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — POST /api/v1/answer 엔드포인트 wiring: api/answer.py 신설(question→retrieval facade→synthesize_answer 일관 흐름), schemas/rag_answer.py에 RagAnswerRequest 추가(query 1-4000자, tenant_id/namespace/top_k 1-20/grade/use_reranker/metadata). app.py 라우터 등록(prefix /api/v1, tags=answer, X-API-Key 인증, slowapi 30/minute). 흐름: build_store + build_embedder lazy import → expand_then_search(use_reranker 전달, tenant 필터는 본문 tenant_id 우선·없으면 metadata.tenant_id) → SearchHit→RagContextHit 변환 → synthesize_answer(grade 전달). vectorstore/embedder/검색 어느 단계든 실패 silent + 빈 hits → deterministic_fallback. doc/03_openapi_koipa_kl.yaml에 /answer + RagAnswerRequest/RagCitation/RagAnswerUsage/RagAnswerResult 4개 스키마 등록. 신규 7 PASS(인증 누락 401/422 · 잘못된 키 401 · 정상 200+fallback · 빈 query 422 · query 길이 초과 422 · top_k 범위 위반 422 · grade·metadata 정상 200 + openapi.json 노출 확인) · ruff 0 (로컬 .env cp949 결함으로 collection 차단 — CI UTF-8에서 검증)</b></td><td><b>+ RAG 답안 API 노출</b></td><td>없음</td></tr>
         <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — /answer 라이브 실호출 검증 + 라이브에서 발견된 사전결함 2건 정리: 외부 의존 없이 uvicorn 실가동 → 6시나리오 HTTP 호출 실증(OpenAPI 노출 OK · 인증 누락 422 · 잘못된 키 401 · 빈 query 422 · top_k 범위 422 · 정상 200+deterministic_fallback). 발견 결함 ① api/answer.py의 `from __future__ import annotations`로 FastAPI 라우터 등록 시 RagAnswerRequest forward ref 미해결(`PydanticUndefinedAnnotation`) — 줄 삭제로 즉시 픽스, 실 부팅 가능해짐 ② AuditMiddleware의 `_try_build_chained_hash` + `_record`가 매 요청마다 동기 DB connect → Postgres 부재 환경에서 TCP timeout으로 응답 hang(curl exit 56). RATE_LIMIT_DISABLED와 동등한 AUDIT_DISABLED 환경변수 스위치 신설(chain hash·record 양쪽 진입부에서 truthy 검사 → 즉시 noop·sha256 폴백). 효과: 라이브 응답 6ms대 정상화, 정상 호출 200(time≈ES TCP timeout 한 번에 묶임 — 운영 ES 가용 시 무관). 일반화 납품 전제(Postgres 부재 환경 가능)에서도 안전망</b></td><td><b>+ 라이브 실호출 확인 + 결함 2건 정리</b></td><td>없음</td></tr>
-        <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — 로컬 .env cp949 사전결함 우회 + 테스트 결함 1건 정리: rate_limit.py에 SLOWAPI_SKIP_DOTENV 환경변수 스위치 신설. truthy 시 Limiter(config_filename="/__lloydk_skip_dotenv__")로 starlette 자동 .env 스캔을 안전 skip(isfile 검사로 폴백). 윈도우 한국어 로케일에서 .env가 UTF-8 한글 포함 시 starlette가 cp949로 강제 디코드해 UnicodeDecodeError로 collection 차단되던 결함 해소. 동시에 test_api_answer.test_openapi_lists_answer_path 어설션이 paths key를 prefix 없는 `/answer`로 찾아 실패하던 테스트 결함 픽스(FastAPI는 router include 시 prefix 포함해 `/api/v1/answer`로 노출). 결과: 로컬에서 test_api_answer 8/8 PASS 회복(187초, 대부분 ES TCP timeout 대기). 변경 후 단위 사전검증이 다시 가능</b></td><td><b>+ 로컬 단위 사전검증 복권</b></td><td>없음</td></tr>
+        <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — 로컬 .env cp949 사전결함 우회 + 테스트 결함 1건 정리: rate_limit.py에 SLOWAPI_SKIP_DOTENV 환경변수 스위치 신설. truthy 시 Limiter(config_filename="/__koipa_skip_dotenv__")로 starlette 자동 .env 스캔을 안전 skip(isfile 검사로 폴백). 윈도우 한국어 로케일에서 .env가 UTF-8 한글 포함 시 starlette가 cp949로 강제 디코드해 UnicodeDecodeError로 collection 차단되던 결함 해소. 동시에 test_api_answer.test_openapi_lists_answer_path 어설션이 paths key를 prefix 없는 `/answer`로 찾아 실패하던 테스트 결함 픽스(FastAPI는 router include 시 prefix 포함해 `/api/v1/answer`로 노출). 결과: 로컬에서 test_api_answer 8/8 PASS 회복(187초, 대부분 ES TCP timeout 대기). 변경 후 단위 사전검증이 다시 가능</b></td><td><b>+ 로컬 단위 사전검증 복권</b></td><td>없음</td></tr>
         <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — P2 임베딩 실측 1차(KURE-v1 vs BGE-M3, n=5000·q=30) + 캐시 키 결함 픽스 + p2 라벨·증량 픽스: 실측 결과 KURE-v1 Recall@5 0.667·Lat p50 629ms / BGE-M3 0.700·568ms — 둘 다 합격선 0.80·200ms 미달. 1차 실행에서 두 모델이 모두 "cached" 라벨로 동일 Recall 0.750이 떨어진 게 발견되어 원인 추적 → `_hash_key(text)`가 underlying model_name 미포함 → 동일 텍스트의 KURE/BGE 벡터가 LRU/disk/redis에서 캐시 충돌하던 결함 가드. _hash_key에 model 인자 추가 + CachedEmbedding.embed가 self._underlying_name 전달. p2 evaluate는 `emb.name`("cached") 대신 `_underlying_name`을 라벨·embedder 필드에 우선 노출, --queries-per-grade CLI 옵션 신설(default 3, full=9로 36 쿼리). 단위 캐시 가드 +1 PASS(`test_different_models_do_not_share_cache_keys`). p2 재실행에서 두 모델이 실제로 다르게 측정됨(BGE-M3 +3.3pp 우세). doc/02 §C 부록 A 표 P2 행 실측 수치 갱신. 합격선 미달 사유 명시: (a)시드 쿼리 패턴 한계 (b)dense-only — ES 하이브리드·reranker 미적용 (c)Lat에 쿼리 임베딩 forward 포함. 다음 단계: ES/hybrid·reranker·실 가이드 쿼리 도입 후 재측정</b></td><td><b>+ P2 실측 1차 + 캐시 결함 픽스</b></td><td>합격선 도달은 하이브리드/reranker/실쿼리 필요</td></tr>
         <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — P2 reranker(BGE-reranker-v2-m3) 적용 측정 + 워밍업 + p2 reranker CLI 노출: p2_compare_embeddings에 --reranker(noop|bge|qwen3) + --oversample-factor 옵션 신설, evaluate 검색 루프에 1차 dense oversample → cross-encoder rerank → top_k 슬라이스 wiring. 첫 쿼리 cold start outlier(KURE p95 32337ms 관측) 정리용 워밍업 1회 추가. <b>측정 결과 reranker 효과 0</b>: KURE 0.667 / BGE 0.700이 noop / BGE(x4) / BGE(x10) 모두 동일, oversample factor 4→10→50 후보 늘려도 Recall 변동 0. Lat p50은 reranker 적용 시 629→2925ms(x4)→6729ms(x10)로 cross-encoder forward 비용만 누적. 결론: 합성 시드 쿼리 패턴 한계가 천장 — dense가 못 잡은 정답을 cross-encoder도 못 잡음. 합격선 도달은 ES 하이브리드(BM25 시그널 추가) 또는 실 가이드 v2 쿼리 도착 전엔 불가. .gitignore 인라인 주석 결함 동시 정리(docker-data 등 노이즈 6건 차단). doc/11 운영 Runbook에 §13 토글 환경변수 표준화 추가(RATE_LIMIT_DISABLED·SLOWAPI_SKIP_DOTENV·AUDIT_DISABLED 3종)</b></td><td><b>+ P2 reranker 효과 0 확정 + 운영 토글 표준화</b></td><td>합격선 도달은 하이브리드/실 가이드 쿼리 도착 후</td></tr>
         <tr><td>2026-05-29 (오늘)</td><td><b>고도화 1건 — 4-tier 배포 프로파일 도입(GPU·학습 옵션화): DEPLOY_PROFILE env 1줄로 lite-noapi / lite-cloud / onprem-local / full-train 4모드 전환. config.py에 deploy_profile·embedding_provider·enable_training 3필드 + _PROFILE_DEFAULTS 매트릭스 + apply_profile_defaults() 신설(명시 env는 항상 default를 override). app.py lifespan에 부팅 로그(profile/llm/embedding/reranker/vector/storage/training 7요소 표시) 추가 + <code>if settings.enable_training: include_router(training_api)</code>로 학습 라우터 조건부 등록 — lite-*·onprem 프로파일에서는 <code>/api/v1/train*</code>이 OpenAPI에서도 사라짐(고객사 입장 "있는데 비활성" 인식 차단). <b>매트릭스</b>: lite-noapi(noop/hash/inmemory/local·외부의존 0) · lite-cloud(anthropic/hf/es/minio) · onprem-local(ollama/hf+bge/es/minio·폐쇄망) · full-train(anthropic/hf+bge/es/minio·학습 ON). .env.{4종} 샘플 신설. 신규 단위 11 PASS(4 프로파일 default·explicit override·unknown skip·empty noop·라우터 노출 4매트릭스). 디폴트 lite-noapi라 아무 .env 없이 부팅 즉시 외부 호출 0으로 가동 — KOIPA 외 타기관 일반화 납품 진입장벽 제거</b></td><td><b>+ 4-tier 옵션 납품 체계</b></td><td>없음</td></tr>
@@ -1424,8 +1424,8 @@
         <tr><td>2026-05-28</td><td>v0.9.4</td><td>W12 시나리오 확장 — 회복력·확장성 시나리오 3종 추가: <b>S12 대용량 일괄 분류</b>(N=100/500/1000/1001 경계, throughput 2,050 docs/s, p95 90ms), <b>S14 ES DR 리허설</b>(가용성 식별·full에서 정전 시뮬), <b>S15 백업·복원 라운드트립</b>(dr_restore_check 실행 OK). 18 시나리오 × 평균 3.6 KPI = <b>65 KPI</b>. dryrun PASS 46 / FAIL 0 / SKIP 19. doc/19 §2.11 + doc/20a v1.3 갱신. 389 → <b>396 PASS</b>.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.3</td><td>W11 시나리오 확장 — 보안·운영·배포 시나리오 4종 추가: <b>S10 RAG 인용 충실도</b>(grounded_ratio·환각 방지), <b>S16 권한·인증 거부</b>(401/422 일관성·거부 p95), <b>S17 감사 로그 무결성</b>(actor·role·tenant 정합, PG 의존), <b>S18 폐쇄망 번들 무결성</b>(manifest 결정론·SHA256·30s). 15 시나리오 × 평균 3.7 KPI = <b>55 KPI</b>(7 core). dryrun PASS 39 / FAIL 0 / SKIP 16. doc/19 §2.10 + doc/20a 갱신. 385 → <b>389 PASS</b>.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.2</td><td>W10 확장 — 성능·보안 시나리오 3종 추가: <b>S9 적대적 문서 FNR 스트레스</b>(동의어·OCR 변형 일관성), <b>S11 부하 (Concurrent Stress)</b>(동시 20~50 워커 error_rate·p95·throughput), <b>S13 멀티 테넌트 격리</b>(교차 노출 0회·인덱스 분리). 11 시나리오 × 평균 3.8 KPI = <b>42 KPI</b>(6 core). dryrun PASS 29 / FAIL 0 / SKIP 13. doc/19 §2.9 + doc/20a v1.2 갱신. 385 PASS 유지.</td></tr>
-        <tr><td>2026-05-28</td><td>v0.9.1</td><td>W10 PSH 운영 보강 — 임계선 sparkline + 전체 KPI 추세 표(§2.5) + pushgateway 모듈(<code>lloydk/perf/pushgateway.py</code>, stdlib urllib) + 회귀 자동 감지(<code>--regression-threshold 30 --fail-on-regression</code>) + CI PR 코멘트 자동(<code>github-script@v7</code>) + GitHub Pages 자동 배포(main push 시). 50+ 신규 단위 테스트.</td></tr>
-        <tr><td>2026-05-28</td><td>v0.9</td><td>W10 PSH — 시나리오 성능 하네스 (<code>poc/src/lloydk/perf/</code> + <code>scripts/run_perf_scenarios.py</code>) + 단일 HTML 보고서 (<a href="20_시나리오_성능_보고서.html">doc/20</a>) + KPI 매트릭스 (<a href="20a_시나리오_성능_KPI매트릭스.md">doc/20a</a>, 33 KPI 5 core). S1~S8 × 평균 4.1 KPI, dryrun PASS 22 / FAIL 0 / SKIP 11 (외부 자원 의존). F1·FNR·Recall@5는 <code>trained_model</code> 게이팅으로 보고 노이즈 제거. poc-ci 잡 통합 (dryrun FAIL-ON-MISS). 301 → <b>324 PASS</b> (PSH 단위 테스트 23 추가).</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9.1</td><td>W10 PSH 운영 보강 — 임계선 sparkline + 전체 KPI 추세 표(§2.5) + pushgateway 모듈(<code>koipa/perf/pushgateway.py</code>, stdlib urllib) + 회귀 자동 감지(<code>--regression-threshold 30 --fail-on-regression</code>) + CI PR 코멘트 자동(<code>github-script@v7</code>) + GitHub Pages 자동 배포(main push 시). 50+ 신규 단위 테스트.</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9</td><td>W10 PSH — 시나리오 성능 하네스 (<code>poc/src/koipa/perf/</code> + <code>scripts/run_perf_scenarios.py</code>) + 단일 HTML 보고서 (<a href="20_시나리오_성능_보고서.html">doc/20</a>) + KPI 매트릭스 (<a href="20a_시나리오_성능_KPI매트릭스.md">doc/20a</a>, 33 KPI 5 core). S1~S8 × 평균 4.1 KPI, dryrun PASS 22 / FAIL 0 / SKIP 11 (외부 자원 의존). F1·FNR·Recall@5는 <code>trained_model</code> 게이팅으로 보고 노이즈 제거. poc-ci 잡 통합 (dryrun FAIL-ON-MISS). 301 → <b>324 PASS</b> (PSH 단위 테스트 23 추가).</td></tr>
         <tr><td>2026-05-27</td><td>v0.8</td><td>W9 일반화 — LLM 이중경로(원격 Anthropic/OpenAI ↔ 로컬 vLLM/Ollama/LM Studio, OpenAI 호환 endpoint 통합), 임베딩 로컬화(sentence-transformers + cache_kure_v1.py), 시드 v2(142개, 일반화 도메인), Nori 사전(235항목, 15 카테고리). doc/16 차단 6→3, doc/05 일반화 정직성 노트. 301 PASS. Hero KPI 95%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.7</td><td>W8 종료 — PyMuPDF→pdfminer.six 교체, SBOM CycloneDX CI 자동 산출, doc/19 KL 통합 8시나리오 18 자동 테스트, MinIO 결정 보류+SeaweedFS 부록. 285 PASS. Hero KPI 90%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.6.1</td><td>인프라 정비 — Docker 데이터 볼륨 E드라이브 bind mount 이전(esdata만 named volume 유지) + Qdrant 어댑터·마이그레이션·롤백 경로 완전 제거 (코드·테스트·CI·docs). 267 PASS (의도 22개 제거).</td></tr>
@@ -1448,7 +1448,7 @@
   ============================================================ -->
   <div class="footer">
     <p>
-      Lloydk AI · KOIPA AI 영업비밀관리시스템 · FUN-003·004·005·022·023·024 ·
+      Koipa AI · KOIPA AI 영업비밀관리시스템 · FUN-003·004·005·022·023·024 ·
       <a href="07_전체설계_통합본_V2.html">전체 설계 통합본 V2</a> ·
       <a href="15_진척_종합_보고서.md">진척 종합 보고서</a> ·
       <a href="16_미준비_자원_체크리스트.md">미준비 자원 체크리스트</a> ·

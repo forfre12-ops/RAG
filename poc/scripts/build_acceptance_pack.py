@@ -367,7 +367,7 @@ def build_pack(out_dir: Path) -> dict:
                 print(f"  [WARN] real_fixtures 파일 없음(스킵): {d['file']}")
 
     manifest = {
-        "pack": "lloydk-acceptance-pack",
+        "pack": "koipa-acceptance-pack",
         "note": ("고객 배포 인수검증용. 판정 규율: 정확 등급일치가 아니라 severity FLOOR(고등급 미탐=veto) "
                  "+ 숫자무손실 + 게이트 가시성. 소스=공개+합성 혼합, 실비밀 텍스트 0. HWP 바이너리는 생성불가."),
         "grades": GRADES,
@@ -379,7 +379,7 @@ def build_pack(out_dir: Path) -> dict:
     (out_dir / "expected_labels.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (out_dir / "README.md").write_text(
-        "# Lloydk 인수(acceptance) 샘플팩\n\n"
+        "# Koipa 인수(acceptance) 샘플팩\n\n"
         "고객 폐쇄망 배포 후 parse -> classify -> gate 를 실문서 포맷으로 검증하는 자기완비 팩.\n\n"
         "- 소스: 공개+합성 혼합. 실비밀 텍스트 0 (공개 판례/특허 텍스처 + [가상기업A] 합성).\n"
         "- 포맷: TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX (HWP 바이너리는 파이썬 생성 불가 -> HWPX 로 대체).\n"

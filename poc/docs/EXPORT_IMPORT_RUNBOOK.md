@@ -1,6 +1,6 @@
-# Lloydk 릴리스 · Export/Import 런북 (지재원 내부)
+# Koipa 릴리스 · Export/Import 런북 (지재원 내부)
 
-대상: **지재원(Lloydk) 릴리스 담당자** — 학습된 분류기를 폐쇄망 고객사(KL/KOIPA)로
+대상: **지재원(Koipa) 릴리스 담당자** — 학습된 분류기를 폐쇄망 고객사(KL/KOIPA)로
 안전하게 내보내고(export), 활성화하고, 운영 검수 결과를 통제된 절차로 되받는(import) 절차.
 
 짝 문서
@@ -64,14 +64,14 @@ ls artifacts/<VERSION>/temperature.json                     # 존재 필수(목�
     --version 1.0.0-rc1 \
     --classifier-model-dir artifacts/<VERSION>
 ```
-- **`--version` 값 = 고객사 `.env`의 `IMAGE_TAG`.** 빌더는 이미지를 `lloydk-api:<version>`으로 태깅하고 airgap compose 기본값은 `${IMAGE_TAG:-1.0.0-rc1}`이다. `--version`과 INSTALL.md §4의 `IMAGE_TAG`가 **다르면** compose가 없는 태그를 참조해 `image not found`로 기동 실패한다. 한 문자열로 고정할 것(여기선 `1.0.0-rc1`).
-- `--classifier-model-dir` **미지정 시** env `CLASSIFIER_MODEL_DIR`/`LLOYDK_CLASSIFIER_MODEL_DIR` 사용. **셋 다 없으면 베이스 모델만 번들 → 고객사에서 rule-fallback(분류기 미탑재)**. 반드시 지정·확인.
-- 출력: `dist/lloydk-airgap-bundle/` (`docker-images/*.tar`, `python-deps/wheels/`, `models/classifier-trained/`(+temperature.json), `models/hf/`(KURE-v1 등), `db-migrations/alembic/`, `infra-config/docker-compose.airgap.yml`, `.env.template`, `install.sh`, `verify.sh`, `CHECKSUMS.sha256`).
+- **`--version` 값 = 고객사 `.env`의 `IMAGE_TAG`.** 빌더는 이미지를 `koipa-api:<version>`으로 태깅하고 airgap compose 기본값은 `${IMAGE_TAG:-1.0.0-rc1}`이다. `--version`과 INSTALL.md §4의 `IMAGE_TAG`가 **다르면** compose가 없는 태그를 참조해 `image not found`로 기동 실패한다. 한 문자열로 고정할 것(여기선 `1.0.0-rc1`).
+- `--classifier-model-dir` **미지정 시** env `CLASSIFIER_MODEL_DIR`/`KOIPA_CLASSIFIER_MODEL_DIR` 사용. **셋 다 없으면 베이스 모델만 번들 → 고객사에서 rule-fallback(분류기 미탑재)**. 반드시 지정·확인.
+- 출력: `dist/koipa-airgap-bundle/` (`docker-images/*.tar`, `python-deps/wheels/`, `models/classifier-trained/`(+temperature.json), `models/hf/`(KURE-v1 등), `db-migrations/alembic/`, `infra-config/docker-compose.airgap.yml`, `.env.template`, `install.sh`, `verify.sh`, `CHECKSUMS.sha256`).
 - 파싱 기준 compose는 `docker-compose.airgap.yml`(기본) — dev compose(build:/minio/mlflow 잔존)로 빌드하지 말 것.
 
 ### A4. 무결성 + 릴리스 사인오프
 ```bash
-cd dist/lloydk-airgap-bundle && bash verify.sh     # CHECKSUMS.sha256 대조 → "Checksums OK"
+cd dist/koipa-airgap-bundle && bash verify.sh     # CHECKSUMS.sha256 대조 → "Checksums OK"
 # manifest 는 version/target_env 를 .bundle 아래에, 이미지 집합을 .components 로 담는다(최상위 아님).
 cat manifest.json | jq '{version: .bundle.version, target_env: .bundle.target_env, git_commit: .bundle.git_commit, components: (.components|keys), models: [.models[].name]}'
 ```
@@ -104,8 +104,8 @@ cat manifest.json | jq '{version: .bundle.version, target_env: .bundle.target_en
 > 역할만 부여하므로(=`api_key_role` 기본값) 아래 curl을 `X-API-Key`만으로 치면 **403 forbidden**이다.
 > 다음 중 하나로 admin 권한을 확보한다: **(a)[권장]** `auth_mode=jwt`(또는 `both`)에서 KL이 서명한, roles
 > claim에 `"admin"`을 담은 JWT로 `Authorization: Bearer $ADMIN_JWT` 사용; **(b)** 운영 정책상 허용 시 admin
-> 전용 키에 `LLOYDK_API_KEY_ROLE=admin` 분리 설정(공유 서비스 키에 admin 부여 금지); **(c)** 실험실 한정
-> `LLOYDK_API_KEY_TRUST_ACTOR_ROLE_HEADER=1`(운영 poc_mode=full에선 startup 차단) + `-H "X-Actor-Role: admin"`.
+> 전용 키에 `KOIPA_API_KEY_ROLE=admin` 분리 설정(공유 서비스 키에 admin 부여 금지); **(c)** 실험실 한정
+> `KOIPA_API_KEY_TRUST_ACTOR_ROLE_HEADER=1`(운영 poc_mode=full에선 startup 차단) + `-H "X-Actor-Role: admin"`.
 > 아래에서 `$ADMIN`은 이렇게 확보한 admin 인증 헤더를 뜻한다.
 
 - 활성 전 준비 상태 확인:
@@ -231,7 +231,7 @@ cd poc
 python scripts/calibrate_classifier.py --model-dir artifacts/<V>          # --val 생략=val_logits.jsonl 자동
 python scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run --classifier-model-dir artifacts/<V>
 python scripts/build_offline_bundle.py --version 1.0.0-rc1 --classifier-model-dir artifacts/<V>
-( cd dist/lloydk-airgap-bundle && bash verify.sh )
+( cd dist/koipa-airgap-bundle && bash verify.sh )
 
 # 고객사: 설치는 INSTALL.md(§B1 주의 반영), 활성 상태·리로드 ($ADMIN=admin 인증 — §B2; X-API-Key만이면 403)
 curl .../api/v1/admin/locked-readiness $ADMIN

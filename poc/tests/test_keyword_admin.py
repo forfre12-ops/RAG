@@ -12,11 +12,11 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from lloydk.db.models import ClassificationLevel, EvaluationFactor, LevelKeyword
-from lloydk.schemas.common import Actor
-from lloydk.schemas.keyword_admin import KeywordCreateRequest, KeywordUpdateRequest
-from lloydk.services import keyword_admin_service as kas
-from lloydk.services.keyword_admin_service import (
+from koipa.db.models import ClassificationLevel, EvaluationFactor, LevelKeyword
+from koipa.schemas.common import Actor
+from koipa.schemas.keyword_admin import KeywordCreateRequest, KeywordUpdateRequest
+from koipa.services import keyword_admin_service as kas
+from koipa.services.keyword_admin_service import (
     KeywordAdminError,
     KeywordAdminService,
     resolve_factor_id,
@@ -165,7 +165,7 @@ def test_create_on_empty_db_promotes_code_seeds_first(monkeypatch):
     승격이 없으면 build_rule_engine_from_db 가 'DB 비어있지 않음'으로 판단해 DB의 1건만
     정본으로 삼고 KEYWORD_SEEDS 404건을 통째로 버린다 = 룰 경로 고등급 미탐 급증.
     """
-    from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+    from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
 
     sess = _FakeSession(_levels(), _factors(), [])  # DB 비어 있음
     _install_fake(monkeypatch, sess)
@@ -286,7 +286,7 @@ def test_list_db_unavailable_is_best_effort(monkeypatch):
 
 # ── reload_rules 통합 (실 싱글턴, DB 없이 KEYWORD_SEEDS 폴백) ───────────────────
 def test_reload_rules_rebuilds_engine_from_seeds():
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.services.classify_service import ClassifyService
 
     info = ClassifyService.get_instance().reload_rules()
     assert info["reloaded"] is True
@@ -296,8 +296,8 @@ def test_reload_rules_rebuilds_engine_from_seeds():
 
 # ── 엔드포인트 매핑 (핸들러 직접 호출) ────────────────────────────────────────
 def test_endpoint_create_maps_service(monkeypatch):
-    from lloydk.api import keyword_admin as kadmin
-    from lloydk.schemas.keyword_admin import KeywordItem, KeywordMutationResponse
+    from koipa.api import keyword_admin as kadmin
+    from koipa.schemas.keyword_admin import KeywordItem, KeywordMutationResponse
 
     sample = KeywordMutationResponse(
         keyword_id=1, action="created",
@@ -314,7 +314,7 @@ def test_endpoint_create_maps_service(monkeypatch):
 def test_endpoint_create_translates_error_to_http(monkeypatch):
     from fastapi import HTTPException
 
-    from lloydk.api import keyword_admin as kadmin
+    from koipa.api import keyword_admin as kadmin
 
     def _raise(self, req):
         raise KeywordAdminError(400, "bad grade")

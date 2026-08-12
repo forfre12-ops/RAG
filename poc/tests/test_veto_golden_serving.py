@@ -35,9 +35,9 @@ def _high_grade_rows() -> list[dict]:
 
 @pytest.fixture(scope="module")
 def _serving(monkeypatch_module):
-    from lloydk.config import settings
-    from lloydk.schemas.classify import ClassifyRequest
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.config import settings
+    from koipa.schemas.classify import ClassifyRequest
+    from koipa.services.classify_service import ClassifyService
 
     # 배포 서빙 운영점: escalation τ=0.30 (onprem-local/full-train 프로파일 값) 고정.
     monkeypatch_module.setattr(settings, "classifier_escalation_tau", 0.30, raising=False)

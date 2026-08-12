@@ -35,15 +35,15 @@ for _entry in (_ROOT, _SRC):
     if str(_entry) not in sys.path:
         sys.path.insert(0, str(_entry))
 
-from lloydk.proxy_model_comparison import (  # noqa: E402
+from koipa.proxy_model_comparison import (  # noqa: E402
     SERVING_INFERENCE_BATCH_SIZE,
     hash_model_directory,
 )
-from lloydk.source_provenance import (  # noqa: E402
+from koipa.source_provenance import (  # noqa: E402
     SourceProvenanceError,
     require_clean_source_tree,
 )
-from lloydk.proxy_training_finalization import (  # noqa: E402
+from koipa.proxy_training_finalization import (  # noqa: E402
     ProxyTrainingFinalizationError,
     canonical_trace_bytes,
     evaluate_checkpoint_traces,
@@ -346,7 +346,7 @@ def finalize_proxy_classifier(
         )
     # [소스 계보] GPU 를 쓰기 **전에** 센다. 미커밋 소스로 만든 번들은 계약 해시가
     # 막아 주지 않는다(post-model 서빙 규칙은 계약에서 명시적으로 제외됨) — 조용히
-    # 로드되고 숫자만 틀린다. lloydk.source_provenance 주석 참조.
+    # 로드되고 숫자만 틀린다. koipa.source_provenance 주석 참조.
     source_provenance = require_clean_source_tree(_ROOT, what="proxy classifier finalize")
     validation_rows, calibration_rows, materialization_audit = (
         verify_materialized_training_run(training_run_dir)
@@ -514,7 +514,7 @@ def finalize_proxy_classifier(
             "source": {
                 "finalizer_sha256": _sha256_file(Path(__file__).resolve()),
                 "core_sha256": _sha256_file(
-                    (_SRC / "lloydk" / "proxy_training_finalization.py").resolve()
+                    (_SRC / "koipa" / "proxy_training_finalization.py").resolve()
                 ),
                 # 두 파일 해시만으로는 "이 번들을 어느 소스가 만들었나"에 답할 수 없다.
                 # 서빙 가드는 pipeline.py 에 있고 학습셋은 scripts/ 가 만든다 —

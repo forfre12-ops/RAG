@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lloydk.services.training_service import TrainingService
+from koipa.services.training_service import TrainingService
 
 
 class _FakeStore:
@@ -99,7 +99,7 @@ def test_out_of_range_progress_is_ignored(monkeypatch):
 
 def test_trainspec_carries_progress_run_id_and_defaults_off():
     """진행률 기록은 opt-in — run_id 가 없으면 트레이너가 아무것도 쓰지 않는다."""
-    from lloydk.modules.m4_training.trainer import TrainSpec
+    from koipa.modules.m4_training.trainer import TrainSpec
     assert TrainSpec().progress_run_id is None
     assert TrainSpec(progress_run_id="abc").progress_run_id == "abc"
 

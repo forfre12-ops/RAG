@@ -11,7 +11,7 @@ from pathlib import Path
 
 from scripts.depollute_court_proxy_gold import apply_depollution, is_court_proxy_overlabel
 
-from lloydk.golden_tiers import TIER_SILVER, is_real_locked_eval, tier_of
+from koipa.golden_tiers import TIER_SILVER, is_real_locked_eval, tier_of
 
 _GOLD = Path(__file__).resolve().parents[1] / "datasets" / "gold_real" / "classification_gold.jsonl"
 

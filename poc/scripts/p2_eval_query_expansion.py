@@ -18,9 +18,9 @@ import sys
 import time
 from pathlib import Path
 
-from lloydk.adapters.embedding import build_embedder, embedder_digest
-from lloydk.adapters.vectorstore import build_store
-from lloydk.services.retrieval import expand_then_search
+from koipa.adapters.embedding import build_embedder, embedder_digest
+from koipa.adapters.vectorstore import build_store
+from koipa.services.retrieval import expand_then_search
 
 COLLECTION = "p2_cached_es"
 GOLD = Path("datasets/gold_real/retrieval_gold.jsonl")

@@ -102,8 +102,8 @@ def main() -> int:
 
     # 실제 LLM 호출
     try:
-        from lloydk.adapters.llm import build_provider  # type: ignore
-        from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+        from koipa.adapters.llm import build_provider  # type: ignore
+        from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
     except Exception as e:  # noqa: BLE001
         print(f"[ERR] LLM adapter import 실패: {e}", file=sys.stderr)
         return 2

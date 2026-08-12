@@ -1,7 +1,7 @@
 """document_indexer: 업로드 문서 chunks → 검색 컬렉션 적재 + 조회 가능 검증."""
-from lloydk.adapters.embedding import build_embedder
-from lloydk.adapters.vectorstore.inmemory_store import InMemoryStore
-from lloydk.rag.document_indexer import index_document_for_rag
+from koipa.adapters.embedding import build_embedder
+from koipa.adapters.vectorstore.inmemory_store import InMemoryStore
+from koipa.rag.document_indexer import index_document_for_rag
 
 
 def _emb():

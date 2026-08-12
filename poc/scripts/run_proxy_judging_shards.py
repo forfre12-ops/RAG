@@ -51,7 +51,7 @@ from scripts.run_proxy_generation_shards import (  # noqa: E402
     CONTROLLER_SCHEMA_VERSION as GENERATION_CONTROLLER_SCHEMA_VERSION,
     SHARD_COUNT,
 )
-from lloydk.ollama_attestation import (  # noqa: E402
+from koipa.ollama_attestation import (  # noqa: E402
     OllamaAttestationError,
     pending_ollama_model_attestation,
     validate_ollama_attestation,

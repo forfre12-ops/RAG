@@ -1,6 +1,6 @@
-# Lloydk AI 장애 대응 (TROUBLESHOOTING)
+# Koipa AI 장애 대응 (TROUBLESHOOTING)
 
-대상: KOIPA 영업비밀관리시스템 폐쇄망 운영자 · 번들 `lloydk-airgap-bundle`
+대상: KOIPA 영업비밀관리시스템 폐쇄망 운영자 · 번들 `koipa-airgap-bundle`
 짝 문서: 설치 [`INSTALL.md`](INSTALL.md) · 운영 [`OPERATION.md`](OPERATION.md).
 
 > INSTALL §11이 설치 단계 증상을, 이 문서는 **운영 중 장애**를 증상→진단→조치로 다룬다.
@@ -104,9 +104,9 @@ in-memory 폴백` (또는 동일 취지의 idempotency 메시지)으로 **fail-f
 
 ## 8. 감사체인 파손
 
-**증상**: `lloydk_audit_chain_broken_total > 0`, P0 `AuditChainBroken` 알림.
+**증상**: `koipa_audit_chain_broken_total > 0`, P0 `AuditChainBroken` 알림.
 
-**원인**: 과거 감사 행 변조·삭제·재배열, 또는 HMAC 키(`LLOYDK_AUDIT_CHAIN_SECRET`) 불일치.
+**원인**: 과거 감사 행 변조·삭제·재배열, 또는 HMAC 키(`KOIPA_AUDIT_CHAIN_SECRET`) 불일치.
 
 **조치**: `verify_audit_chain_tick` 수동 실행으로 파손 구간 특정. 키 회전 이력·백업 대조. 운영(poc_mode=full)은
 키 미설정 시 기동 자체가 fail-fast하므로, 파손은 대개 데이터 무결성 사건 — 보안 절차에 따라 보고.
@@ -135,4 +135,4 @@ in-memory 폴백` (또는 동일 취지의 idempotency 메시지)으로 **fail-f
 ---
 
 > 여기서 해결되지 않는 증상은 `$COMPOSE logs api worker beat`와 `/api/v1/healthz/deep` 프로브 출력을
-> 첨부해 로이드케이에 에스컬레이션한다.
+> 첨부해 한국지식재산보호원에 에스컬레이션한다.

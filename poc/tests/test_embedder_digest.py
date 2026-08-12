@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from lloydk.adapters.embedding import (
+from koipa.adapters.embedding import (
     HashEmbedding,
     build_embedder,
     embedder_digest,

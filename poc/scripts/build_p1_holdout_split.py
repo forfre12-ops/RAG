@@ -30,7 +30,7 @@ from pathlib import Path
 _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
-from lloydk.golden_tiers import TRAIN_TIERS, tier_of  # noqa: E402
+from koipa.golden_tiers import TRAIN_TIERS, tier_of  # noqa: E402
 
 LABELS = {"TS", "S1", "S2", "S3"}
 

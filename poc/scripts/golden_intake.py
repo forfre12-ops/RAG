@@ -104,7 +104,7 @@ def _doc_id(text: str) -> str:
 # ────────────────────────────── 1단계: scan ──────────────────────────────
 
 def cmd_scan(docs_dir: Path, out_dir: Path) -> int:
-    from lloydk.modules.m2_preprocess.extractor import extract  # noqa: PLC0415
+    from koipa.modules.m2_preprocess.extractor import extract  # noqa: PLC0415
 
     files = sorted(p for p in docs_dir.rglob("*") if p.is_file() and p.suffix.lower() in SUPPORTED)
     if not files:
@@ -247,7 +247,7 @@ def _load_train_hashes() -> set[str]:
 
 
 def cmd_build(intake_dir: Path, out_path: Path | None) -> int:
-    from lloydk.golden_signoff import Signoff, promote_to_locked  # noqa: PLC0415
+    from koipa.golden_signoff import Signoff, promote_to_locked  # noqa: PLC0415
 
     intake_path = intake_dir / "intake.jsonl"
     sheet_path = intake_dir / "label_sheet.csv"

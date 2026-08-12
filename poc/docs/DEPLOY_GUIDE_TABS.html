@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>설치 가이드 (탭) — 테스트서버 · 지재원 · 고객사 | Lloydk</title>
+<title>설치 가이드 (탭) — 테스트서버 · 지재원 · 고객사 | Koipa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
@@ -119,7 +119,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:20px;font-
     <h3><span class="st">?</span>미리 알아둘 것 / 옵션</h3>
     <ul>
       <li><strong>대상 서버 바꾸기</strong>: <code>TS_HOST=1.2.3.4 TS_PORT=22 TS_USER=aisadm bash poc/scripts/ship_to_testserver.sh</code> (기본값 = 현재 kip-ai)</li>
-      <li><strong>전송만/설치는 서버에서 직접</strong>: <code>SHIP_ONLY=1 bash poc/scripts/ship_to_testserver.sh</code> → 서버에서 <code>tar xzf ~/lloydk-testserver.tar.gz -C ~ &amp;&amp; cd ~/poc &amp;&amp; bash scripts/deploy_testserver_dual.sh</code></li>
+      <li><strong>전송만/설치는 서버에서 직접</strong>: <code>SHIP_ONLY=1 bash poc/scripts/ship_to_testserver.sh</code> → 서버에서 <code>tar xzf ~/koipa-testserver.tar.gz -C ~ &amp;&amp; cd ~/poc &amp;&amp; bash scripts/deploy_testserver_dual.sh</code></li>
       <li><strong>패키지만 만들기</strong>(전송 없이): <code>PACKAGE_ONLY=1 bash poc/scripts/ship_to_testserver.sh</code></li>
       <li>도중 연결이 끊기면 <strong>그냥 다시 실행</strong>하면 된다(비밀키·이미지 캐시 유지 → 이어서 진행).</li>
     </ul>
@@ -138,7 +138,7 @@ footer{border-top:1px solid var(--border);margin-top:48px;padding-top:20px;font-
 SHIP_ONLY=1 TS_HOST=&lt;지재원IP&gt; TS_PORT=&lt;포트&gt; TS_USER=&lt;계정&gt; bash poc/scripts/ship_to_testserver.sh</code></pre>
 
     <h3><span class="st">2</span>서버에서 설치 (지재원 한 스택)</h3>
-    <pre><code>tar xzf ~/lloydk-testserver.tar.gz -C ~
+    <pre><code>tar xzf ~/koipa-testserver.tar.gz -C ~
 cd ~/poc
 cp .env.full-train .env        # DEPLOY_PROFILE=full-train · ANTHROPIC_API_KEY · API_KEY · POSTGRES_PASSWORD
 bash scripts/deploy.sh          # 연결망 자동감지 → 마이그레이션+기동+스모크</code></pre>
@@ -155,10 +155,10 @@ curl -s http://localhost:8000/api/v1/healthz/ready ; echo        # 200</code></p
     <p>개념은 같다 — <strong>설치 파일 반입 → 실행</strong>. 단 <strong>인터넷이 없어</strong> 소스만으론 안 된다(서버가 이미지·의존성을 못 받음). 그래서 설치 파일이 <strong>이미지·모델·라이브러리를 전부 구운 12GB 자립 번들</strong>이고, USB로 반입한다.</p>
 
     <h3><span class="st">1</span>설치 파일 = 12GB 번들 (USB 반입)</h3>
-    <p><code>dist/lloydk-airgap-bundle/</code>(약 12GB — 이미지·모델·wheel·마이그레이션 자립. postgres·redis 포함이라 순수 에어갭 OK)를 승인 매체로 서버에 넣는다.</p>
+    <p><code>dist/koipa-airgap-bundle/</code>(약 12GB — 이미지·모델·wheel·마이그레이션 자립. postgres·redis 포함이라 순수 에어갭 OK)를 승인 매체로 서버에 넣는다.</p>
 
     <h3><span class="st">2</span>서버에서 설치</h3>
-    <pre><code>cd ~/lloydk-airgap-bundle
+    <pre><code>cd ~/koipa-airgap-bundle
 bash verify.sh        # 무결성 → Checksums OK
 bash install.sh       # 이미지 적재(docker load)
 
@@ -179,7 +179,7 @@ bash deploy.sh        # 폐쇄망 자동감지 → 마이그레이션+기동+스
   </section>
 
   <footer>
-    로이드케이(Lloydk) · KOIPA 영업비밀관리시스템 · 설치 가이드(탭·설치파일 방식) ·
+    한국지식재산보호원(Koipa) · KOIPA 영업비밀관리시스템 · 설치 가이드(탭·설치파일 방식) ·
     테스트 <code>scripts/ship_to_testserver.sh</code> · 원문 <code>docs/DEPLOY_GUIDE.md</code>
   </footer>
 </div>

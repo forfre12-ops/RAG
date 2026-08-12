@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import json
 
-from lloydk.api import prom_metrics as pm
-from lloydk.modules.m6_evaluation import kill_gate as kg
-from lloydk.modules.m6_evaluation.kill_gate import (
+from koipa.api import prom_metrics as pm
+from koipa.modules.m6_evaluation import kill_gate as kg
+from koipa.modules.m6_evaluation.kill_gate import (
     KillGateResult,
     should_suppress_autoconfirm,
 )
-from lloydk.modules.m6_evaluation.locked_readiness import locked_eval_readiness
-from lloydk.schemas.common import Grade
-from lloydk.services.classify_service import ClassifyService
+from koipa.modules.m6_evaluation.locked_readiness import locked_eval_readiness
+from koipa.schemas.common import Grade
+from koipa.services.classify_service import ClassifyService
 
 
 # ── C: factors_source ─────────────────────────────────────────────────────────
@@ -40,14 +40,14 @@ def test_factors_source_rule_evidenced_default():
 # ── E: kill-gate 안전브레이크 ──────────────────────────────────────────────────
 
 def test_brake_off_by_default(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "kill_gate_suppress_autoconfirm", False, raising=False)
     monkeypatch.setattr(kg, "_LAST_RESULT", KillGateResult(tripped=True))
     assert should_suppress_autoconfirm("TS") is False
 
 
 def test_brake_high_grade_when_tripped(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "kill_gate_suppress_autoconfirm", True, raising=False)
     monkeypatch.setattr(kg, "_LAST_RESULT", KillGateResult(tripped=True))
     assert should_suppress_autoconfirm("TS") is True
@@ -57,21 +57,21 @@ def test_brake_high_grade_when_tripped(monkeypatch):
 
 
 def test_brake_not_when_not_tripped(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "kill_gate_suppress_autoconfirm", True, raising=False)
     monkeypatch.setattr(kg, "_LAST_RESULT", KillGateResult(tripped=False))
     assert should_suppress_autoconfirm("TS") is False
 
 
 def test_brake_not_when_no_check(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "kill_gate_suppress_autoconfirm", True, raising=False)
     monkeypatch.setattr(kg, "_LAST_RESULT", None)
     assert should_suppress_autoconfirm("TS") is False
 
 
 def test_kill_gate_brake_reason_and_metric(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "kill_gate_suppress_autoconfirm", True, raising=False)
     monkeypatch.setattr(kg, "_LAST_RESULT", KillGateResult(tripped=True))
     before = pm.KILL_GATE_AUTOCONFIRM_SUPPRESSED_TOTAL.labels(grade="TS")._value.get()
@@ -82,7 +82,7 @@ def test_kill_gate_brake_reason_and_metric(monkeypatch):
 
 
 def test_kill_gate_brake_none_when_off(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "kill_gate_suppress_autoconfirm", False, raising=False)
     assert ClassifyService._kill_gate_brake(Grade.TS) is None
 
@@ -140,7 +140,7 @@ def test_locked_readiness_insufficient_marks_missing(tmp_path):
 # ── B: 보류 집계 best-effort ──────────────────────────────────────────────────
 
 def test_count_held_best_effort_without_db():
-    from lloydk.services.confirm_service import count_needs_second_review_by_grade
+    from koipa.services.confirm_service import count_needs_second_review_by_grade
     # DB 미가용 환경에서도 예외 없이 dict 반환(best-effort).
     out = count_needs_second_review_by_grade()
     assert isinstance(out, dict)

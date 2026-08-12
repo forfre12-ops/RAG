@@ -101,7 +101,7 @@ def render(acceptance: dict, readiness: dict) -> str:
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>Lloydk Pilot Scorecard</title>
+<title>Koipa Pilot Scorecard</title>
 <style>
 :root{{--bg:#f7f8fb;--panel:#fff;--line:#d8dde8;--text:#172033;--muted:#697386;--ok:#137333;--bad:#b3261e;--warn:#a15c00;}}
 body{{margin:0;background:var(--bg);color:var(--text);font-family:Arial,'Malgun Gothic',sans-serif;}}

@@ -15,7 +15,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\__init__.py": {
+    "src/koipa\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -28,7 +28,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\__init__.py": {
+    "src/koipa\\adapters\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -41,7 +41,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\embedding\\__init__.py": {
+    "src/koipa\\adapters\\embedding\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -54,7 +54,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\embedding\\base.py": {
+    "src/koipa\\adapters\\embedding\\base.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -67,7 +67,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\embedding\\cache_layer.py": {
+    "src/koipa\\adapters\\embedding\\cache_layer.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -80,7 +80,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\embedding\\hash_embedding.py": {
+    "src/koipa\\adapters\\embedding\\hash_embedding.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -93,7 +93,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\embedding\\hf_embedding.py": {
+    "src/koipa\\adapters\\embedding\\hf_embedding.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -106,7 +106,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\llm\\__init__.py": {
+    "src/koipa\\adapters\\llm\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -119,7 +119,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\llm\\anthropic_provider.py": {
+    "src/koipa\\adapters\\llm\\anthropic_provider.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -132,7 +132,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\llm\\base.py": {
+    "src/koipa\\adapters\\llm\\base.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -145,7 +145,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\llm\\local_openai_provider.py": {
+    "src/koipa\\adapters\\llm\\local_openai_provider.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -158,7 +158,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\llm\\noop_provider.py": {
+    "src/koipa\\adapters\\llm\\noop_provider.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -171,7 +171,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\llm\\openai_provider.py": {
+    "src/koipa\\adapters\\llm\\openai_provider.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -184,7 +184,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\llm\\vllm_provider.py": {
+    "src/koipa\\adapters\\llm\\vllm_provider.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -197,7 +197,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\reranker\\__init__.py": {
+    "src/koipa\\adapters\\reranker\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -210,7 +210,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\reranker\\base.py": {
+    "src/koipa\\adapters\\reranker\\base.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -223,7 +223,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\reranker\\bge_reranker.py": {
+    "src/koipa\\adapters\\reranker\\bge_reranker.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -236,7 +236,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\reranker\\noop_reranker.py": {
+    "src/koipa\\adapters\\reranker\\noop_reranker.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -249,7 +249,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\storage\\__init__.py": {
+    "src/koipa\\adapters\\storage\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -262,7 +262,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\storage\\base.py": {
+    "src/koipa\\adapters\\storage\\base.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -275,7 +275,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\storage\\encrypted_store.py": {
+    "src/koipa\\adapters\\storage\\encrypted_store.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -288,7 +288,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\storage\\local_store.py": {
+    "src/koipa\\adapters\\storage\\local_store.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -301,7 +301,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\storage\\minio_store.py": {
+    "src/koipa\\adapters\\storage\\minio_store.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -314,7 +314,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\storage\\seaweedfs_store.py": {
+    "src/koipa\\adapters\\storage\\seaweedfs_store.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -327,7 +327,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\vectorstore\\__init__.py": {
+    "src/koipa\\adapters\\vectorstore\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -340,7 +340,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\vectorstore\\base.py": {
+    "src/koipa\\adapters\\vectorstore\\base.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -353,7 +353,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\vectorstore\\es_store.py": {
+    "src/koipa\\adapters\\vectorstore\\es_store.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -366,7 +366,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\vectorstore\\inmemory_store.py": {
+    "src/koipa\\adapters\\vectorstore\\inmemory_store.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -379,7 +379,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\adapters\\vectorstore\\pg_store.py": {
+    "src/koipa\\adapters\\vectorstore\\pg_store.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 4,
       "CONFIDENCE.MEDIUM": 0,
@@ -392,7 +392,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\__init__.py": {
+    "src/koipa\\api\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -405,7 +405,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\_idempotency_mw.py": {
+    "src/koipa\\api\\_idempotency_mw.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -418,7 +418,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\_jwt_auth.py": {
+    "src/koipa\\api\\_jwt_auth.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -431,7 +431,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\_rbac.py": {
+    "src/koipa\\api\\_rbac.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -444,7 +444,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\admin.py": {
+    "src/koipa\\api\\admin.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 4,
       "CONFIDENCE.MEDIUM": 0,
@@ -457,7 +457,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\answer.py": {
+    "src/koipa\\api\\answer.py": {
       "CONFIDENCE.HIGH": 2,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -470,7 +470,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\app.py": {
+    "src/koipa\\api\\app.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -483,7 +483,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\async_classify.py": {
+    "src/koipa\\api\\async_classify.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -496,7 +496,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\classify.py": {
+    "src/koipa\\api\\classify.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -509,7 +509,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\classify_stream.py": {
+    "src/koipa\\api\\classify_stream.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -522,7 +522,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\confirm.py": {
+    "src/koipa\\api\\confirm.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -535,7 +535,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\documents.py": {
+    "src/koipa\\api\\documents.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -548,7 +548,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\explain.py": {
+    "src/koipa\\api\\explain.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -561,7 +561,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\golden.py": {
+    "src/koipa\\api\\golden.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -574,7 +574,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\guide.py": {
+    "src/koipa\\api\\guide.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -587,7 +587,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\health.py": {
+    "src/koipa\\api\\health.py": {
       "CONFIDENCE.HIGH": 3,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -600,7 +600,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\keyword_admin.py": {
+    "src/koipa\\api\\keyword_admin.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -613,7 +613,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\metrics.py": {
+    "src/koipa\\api\\metrics.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -626,7 +626,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\middleware.py": {
+    "src/koipa\\api\\middleware.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -639,7 +639,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\prom_metrics.py": {
+    "src/koipa\\api\\prom_metrics.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -652,7 +652,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\promotion.py": {
+    "src/koipa\\api\\promotion.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -665,7 +665,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\rate_limit.py": {
+    "src/koipa\\api\\rate_limit.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -678,7 +678,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\schema_admin.py": {
+    "src/koipa\\api\\schema_admin.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -691,7 +691,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\synthesis.py": {
+    "src/koipa\\api\\synthesis.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -704,7 +704,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\api\\training.py": {
+    "src/koipa\\api\\training.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -717,7 +717,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\config.py": {
+    "src/koipa\\config.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -730,7 +730,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\db\\__init__.py": {
+    "src/koipa\\db\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -743,7 +743,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\db\\listeners.py": {
+    "src/koipa\\db\\listeners.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -756,7 +756,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\db\\models.py": {
+    "src/koipa\\db\\models.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -769,7 +769,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\db\\session.py": {
+    "src/koipa\\db\\session.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -782,7 +782,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\golden_defense.py": {
+    "src/koipa\\golden_defense.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -795,7 +795,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\golden_review_html.py": {
+    "src/koipa\\golden_review_html.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -808,7 +808,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\golden_signoff.py": {
+    "src/koipa\\golden_signoff.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -821,7 +821,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\golden_split.py": {
+    "src/koipa\\golden_split.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -834,7 +834,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\golden_tiers.py": {
+    "src/koipa\\golden_tiers.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -847,7 +847,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\hygiene.py": {
+    "src/koipa\\hygiene.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -860,7 +860,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\__init__.py": {
+    "src/koipa\\modules\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -873,7 +873,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m1_synthesis\\__init__.py": {
+    "src/koipa\\modules\\m1_synthesis\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -886,7 +886,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m1_synthesis\\generator.py": {
+    "src/koipa\\modules\\m1_synthesis\\generator.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -899,7 +899,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m1_synthesis\\witness_taxonomy.py": {
+    "src/koipa\\modules\\m1_synthesis\\witness_taxonomy.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 12,
@@ -912,7 +912,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m2_preprocess\\__init__.py": {
+    "src/koipa\\modules\\m2_preprocess\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -925,7 +925,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m2_preprocess\\chunker.py": {
+    "src/koipa\\modules\\m2_preprocess\\chunker.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -938,7 +938,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m2_preprocess\\extractor.py": {
+    "src/koipa\\modules\\m2_preprocess\\extractor.py": {
       "CONFIDENCE.HIGH": 9,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -951,7 +951,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m2_preprocess\\normalizer.py": {
+    "src/koipa\\modules\\m2_preprocess\\normalizer.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -964,7 +964,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m2_preprocess\\pii_masker.py": {
+    "src/koipa\\modules\\m2_preprocess\\pii_masker.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -977,7 +977,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m2_preprocess\\pipeline.py": {
+    "src/koipa\\modules\\m2_preprocess\\pipeline.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -990,7 +990,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m3_labeling\\__init__.py": {
+    "src/koipa\\modules\\m3_labeling\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1003,7 +1003,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m3_labeling\\consensus.py": {
+    "src/koipa\\modules\\m3_labeling\\consensus.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1016,7 +1016,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m3_labeling\\judge.py": {
+    "src/koipa\\modules\\m3_labeling\\judge.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1029,7 +1029,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m3_labeling\\llm_labeler.py": {
+    "src/koipa\\modules\\m3_labeling\\llm_labeler.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1042,7 +1042,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m3_labeling\\pipeline.py": {
+    "src/koipa\\modules\\m3_labeling\\pipeline.py": {
       "CONFIDENCE.HIGH": 2,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1055,7 +1055,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m3_labeling\\rule_engine.py": {
+    "src/koipa\\modules\\m3_labeling\\rule_engine.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1068,7 +1068,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m3_labeling\\seeds.py": {
+    "src/koipa\\modules\\m3_labeling\\seeds.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1081,7 +1081,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m4_training\\__init__.py": {
+    "src/koipa\\modules\\m4_training\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1094,7 +1094,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m4_training\\chunk_expand.py": {
+    "src/koipa\\modules\\m4_training\\chunk_expand.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1107,7 +1107,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m4_training\\rag_indexer.py": {
+    "src/koipa\\modules\\m4_training\\rag_indexer.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1120,7 +1120,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m4_training\\trainer.py": {
+    "src/koipa\\modules\\m4_training\\trainer.py": {
       "CONFIDENCE.HIGH": 5,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1133,7 +1133,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m5_inference\\__init__.py": {
+    "src/koipa\\modules\\m5_inference\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1146,7 +1146,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m5_inference\\pipeline.py": {
+    "src/koipa\\modules\\m5_inference\\pipeline.py": {
       "CONFIDENCE.HIGH": 7,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 2,
@@ -1159,7 +1159,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\__init__.py": {
+    "src/koipa\\modules\\m6_evaluation\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1172,7 +1172,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\active_learning.py": {
+    "src/koipa\\modules\\m6_evaluation\\active_learning.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1185,7 +1185,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\anchor_corpus.py": {
+    "src/koipa\\modules\\m6_evaluation\\anchor_corpus.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1198,7 +1198,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\anchor_eval.py": {
+    "src/koipa\\modules\\m6_evaluation\\anchor_eval.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1211,7 +1211,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\answer_metrics.py": {
+    "src/koipa\\modules\\m6_evaluation\\answer_metrics.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1224,7 +1224,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\calibration.py": {
+    "src/koipa\\modules\\m6_evaluation\\calibration.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1237,7 +1237,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\confusion_matrix.py": {
+    "src/koipa\\modules\\m6_evaluation\\confusion_matrix.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1250,7 +1250,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\constructed_floor.py": {
+    "src/koipa\\modules\\m6_evaluation\\constructed_floor.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1263,7 +1263,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\deploy_gate.py": {
+    "src/koipa\\modules\\m6_evaluation\\deploy_gate.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1276,7 +1276,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\eval_cards.py": {
+    "src/koipa\\modules\\m6_evaluation\\eval_cards.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 1,
@@ -1289,7 +1289,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\federated_eval.py": {
+    "src/koipa\\modules\\m6_evaluation\\federated_eval.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1302,7 +1302,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\judge_reliability.py": {
+    "src/koipa\\modules\\m6_evaluation\\judge_reliability.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1315,7 +1315,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\kill_gate.py": {
+    "src/koipa\\modules\\m6_evaluation\\kill_gate.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1328,7 +1328,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\locked_readiness.py": {
+    "src/koipa\\modules\\m6_evaluation\\locked_readiness.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1341,7 +1341,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\metamorphic.py": {
+    "src/koipa\\modules\\m6_evaluation\\metamorphic.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1354,7 +1354,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\metrics.py": {
+    "src/koipa\\modules\\m6_evaluation\\metrics.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1367,7 +1367,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\optuna_tuner.py": {
+    "src/koipa\\modules\\m6_evaluation\\optuna_tuner.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1380,7 +1380,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\paraphrase_gen.py": {
+    "src/koipa\\modules\\m6_evaluation\\paraphrase_gen.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1393,7 +1393,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\report.py": {
+    "src/koipa\\modules\\m6_evaluation\\report.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1406,7 +1406,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\retrieval_metrics.py": {
+    "src/koipa\\modules\\m6_evaluation\\retrieval_metrics.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1419,7 +1419,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\reviewer_trust.py": {
+    "src/koipa\\modules\\m6_evaluation\\reviewer_trust.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1432,7 +1432,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\serving_eval.py": {
+    "src/koipa\\modules\\m6_evaluation\\serving_eval.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1445,7 +1445,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\serving_invariants.py": {
+    "src/koipa\\modules\\m6_evaluation\\serving_invariants.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1458,7 +1458,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\modules\\m6_evaluation\\temperature.py": {
+    "src/koipa\\modules\\m6_evaluation\\temperature.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1471,7 +1471,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\obs\\__init__.py": {
+    "src/koipa\\obs\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1484,7 +1484,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\obs\\otel.py": {
+    "src/koipa\\obs\\otel.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1497,7 +1497,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\__init__.py": {
+    "src/koipa\\perf\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1510,7 +1510,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\env.py": {
+    "src/koipa\\perf\\env.py": {
       "CONFIDENCE.HIGH": 3,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1523,7 +1523,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\harness.py": {
+    "src/koipa\\perf\\harness.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1536,7 +1536,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\kpis.py": {
+    "src/koipa\\perf\\kpis.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1549,7 +1549,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\pushgateway.py": {
+    "src/koipa\\perf\\pushgateway.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 1,
@@ -1562,7 +1562,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\recorder.py": {
+    "src/koipa\\perf\\recorder.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1575,7 +1575,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\regression.py": {
+    "src/koipa\\perf\\regression.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1588,7 +1588,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\perf\\scenarios.py": {
+    "src/koipa\\perf\\scenarios.py": {
       "CONFIDENCE.HIGH": 5,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1601,7 +1601,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\rag\\__init__.py": {
+    "src/koipa\\rag\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1614,7 +1614,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\rag\\answer.py": {
+    "src/koipa\\rag\\answer.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1627,7 +1627,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\rag\\document_indexer.py": {
+    "src/koipa\\rag\\document_indexer.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1640,7 +1640,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\rag\\indexer.py": {
+    "src/koipa\\rag\\indexer.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1653,7 +1653,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\rag\\query_expansion.py": {
+    "src/koipa\\rag\\query_expansion.py": {
       "CONFIDENCE.HIGH": 2,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1666,7 +1666,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\rag\\retrieval.py": {
+    "src/koipa\\rag\\retrieval.py": {
       "CONFIDENCE.HIGH": 2,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1679,7 +1679,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\__init__.py": {
+    "src/koipa\\repositories\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1692,7 +1692,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\audit_repo.py": {
+    "src/koipa\\repositories\\audit_repo.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1705,7 +1705,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\chunk_repo.py": {
+    "src/koipa\\repositories\\chunk_repo.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1718,7 +1718,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\classify_repo.py": {
+    "src/koipa\\repositories\\classify_repo.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1731,7 +1731,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\document_repo.py": {
+    "src/koipa\\repositories\\document_repo.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1744,7 +1744,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\guide_repo.py": {
+    "src/koipa\\repositories\\guide_repo.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1757,7 +1757,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\llm_usage_repo.py": {
+    "src/koipa\\repositories\\llm_usage_repo.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1770,7 +1770,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\synth_repo.py": {
+    "src/koipa\\repositories\\synth_repo.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1783,7 +1783,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\repositories\\training_repo.py": {
+    "src/koipa\\repositories\\training_repo.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1796,7 +1796,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\__init__.py": {
+    "src/koipa\\schemas\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1809,7 +1809,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\classify.py": {
+    "src/koipa\\schemas\\classify.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1822,7 +1822,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\classify_async.py": {
+    "src/koipa\\schemas\\classify_async.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1835,7 +1835,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\common.py": {
+    "src/koipa\\schemas\\common.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1848,7 +1848,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\confirm.py": {
+    "src/koipa\\schemas\\confirm.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1861,7 +1861,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\golden.py": {
+    "src/koipa\\schemas\\golden.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1874,7 +1874,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\guide.py": {
+    "src/koipa\\schemas\\guide.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1887,7 +1887,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\keyword_admin.py": {
+    "src/koipa\\schemas\\keyword_admin.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1900,7 +1900,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\metrics.py": {
+    "src/koipa\\schemas\\metrics.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1913,7 +1913,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\promotion.py": {
+    "src/koipa\\schemas\\promotion.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1926,7 +1926,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\rag_answer.py": {
+    "src/koipa\\schemas\\rag_answer.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1939,7 +1939,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\schema_admin.py": {
+    "src/koipa\\schemas\\schema_admin.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1952,7 +1952,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\synthesis.py": {
+    "src/koipa\\schemas\\synthesis.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1965,7 +1965,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\schemas\\training.py": {
+    "src/koipa\\schemas\\training.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1978,7 +1978,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\__init__.py": {
+    "src/koipa\\services\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -1991,7 +1991,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\_retry.py": {
+    "src/koipa\\services\\_retry.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2004,7 +2004,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\async_classify_service.py": {
+    "src/koipa\\services\\async_classify_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2017,7 +2017,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\audit_chain.py": {
+    "src/koipa\\services\\audit_chain.py": {
       "CONFIDENCE.HIGH": 3,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2030,7 +2030,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\classify_service.py": {
+    "src/koipa\\services\\classify_service.py": {
       "CONFIDENCE.HIGH": 6,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2043,7 +2043,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\confirm_service.py": {
+    "src/koipa\\services\\confirm_service.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2056,7 +2056,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\document_ingestion_service.py": {
+    "src/koipa\\services\\document_ingestion_service.py": {
       "CONFIDENCE.HIGH": 2,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2069,7 +2069,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\document_service.py": {
+    "src/koipa\\services\\document_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2082,7 +2082,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\drift_monitor.py": {
+    "src/koipa\\services\\drift_monitor.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2095,7 +2095,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\guide_service.py": {
+    "src/koipa\\services\\guide_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2108,7 +2108,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\idempotency.py": {
+    "src/koipa\\services\\idempotency.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2121,7 +2121,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\job_store.py": {
+    "src/koipa\\services\\job_store.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2134,7 +2134,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\keyword_admin_service.py": {
+    "src/koipa\\services\\keyword_admin_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2147,7 +2147,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\llm_usage_service.py": {
+    "src/koipa\\services\\llm_usage_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2160,7 +2160,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\metrics_service.py": {
+    "src/koipa\\services\\metrics_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2173,7 +2173,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\outbox.py": {
+    "src/koipa\\services\\outbox.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2186,7 +2186,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\partitions.py": {
+    "src/koipa\\services\\partitions.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2199,7 +2199,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\promotion_service.py": {
+    "src/koipa\\services\\promotion_service.py": {
       "CONFIDENCE.HIGH": 2,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2212,7 +2212,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\rag_answer_service.py": {
+    "src/koipa\\services\\rag_answer_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2225,7 +2225,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\retrieval.py": {
+    "src/koipa\\services\\retrieval.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2238,7 +2238,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\schema_admin_service.py": {
+    "src/koipa\\services\\schema_admin_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2251,7 +2251,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\secrets_manager.py": {
+    "src/koipa\\services\\secrets_manager.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2264,7 +2264,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\synthesis_service.py": {
+    "src/koipa\\services\\synthesis_service.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2277,7 +2277,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\training_service.py": {
+    "src/koipa\\services\\training_service.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2290,7 +2290,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\services\\worker_metrics_bridge.py": {
+    "src/koipa\\services\\worker_metrics_bridge.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2303,7 +2303,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\workers\\__init__.py": {
+    "src/koipa\\workers\\__init__.py": {
       "CONFIDENCE.HIGH": 0,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2316,7 +2316,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\workers\\celery_app.py": {
+    "src/koipa\\workers\\celery_app.py": {
       "CONFIDENCE.HIGH": 2,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2329,7 +2329,7 @@
       "nosec": 0,
       "skipped_tests": 0
     },
-    "src/lloydk\\workers\\tasks.py": {
+    "src/koipa\\workers\\tasks.py": {
       "CONFIDENCE.HIGH": 1,
       "CONFIDENCE.LOW": 0,
       "CONFIDENCE.MEDIUM": 0,
@@ -2348,7 +2348,7 @@
       "code": "214         where += self._filter_sql(filter, params)\n215         sql = text(f\"DELETE FROM tb_rag_vectors WHERE {where}\")\n216         if ids:\n",
       "col_offset": 19,
       "end_col_offset": 62,
-      "filename": "src/lloydk\\adapters\\vectorstore\\pg_store.py",
+      "filename": "src/koipa\\adapters\\vectorstore\\pg_store.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2368,7 +2368,7 @@
       "code": "234         sql = text(\n235             f\"\"\"\n236             SELECT id, payload, content, 1 - (embedding <=> (:q)::vector) AS score\n237             FROM tb_rag_vectors\n238             WHERE {where} AND embedding IS NOT NULL\n239             ORDER BY embedding <=> (:q)::vector\n240             LIMIT :k\n241             \"\"\"\n242         )\n",
       "col_offset": 12,
       "end_col_offset": 15,
-      "filename": "src/lloydk\\adapters\\vectorstore\\pg_store.py",
+      "filename": "src/koipa\\adapters\\vectorstore\\pg_store.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2394,7 +2394,7 @@
       "code": "275         sql = text(\n276             f\"\"\"\n277             WITH d AS (\n278                 SELECT id, payload, content,\n279                        row_number() OVER (ORDER BY embedding <=> (:q)::vector) AS rn\n280                 FROM tb_rag_vectors\n281                 WHERE collection = :collection AND embedding IS NOT NULL{fwhere}\n282                 ORDER BY embedding <=> (:q)::vector\n283                 LIMIT :cand\n284             ),\n285             l AS (\n286                 SELECT id, payload, content,\n287                        row_number() OVER (\n288                            -- ts_rank(plain, norm=1: 1+log(len) \uae38\uc774\uc815\uaddc\ud654) \u2014 cover-density(ts_rank_cd)\ub294\n289                            -- OR-\ub9e4\uce6d \ud769\uc5b4\uc9c4 bigram\uc5d0 \uadfc\uc811\ub3c4 0\uc774\ub77c \ubd95\uad34(\uc2e4\uce21 39%); plain+norm1=87%(\u2248nori). \ud06c\ub7ed\uc2a4 \uc2a4\uc715 \uadfc\uac70.\n290                            ORDER BY ts_rank(tsv, to_tsquery('simple', :qt), 1) DESC\n291                        ) AS rn\n292                 FROM tb_rag_vectors\n293                 WHERE collection = :collection\n294                   AND tsv @@ to_tsquery('simple', :qt){fwhere}\n295                 LIMIT :cand\n296             ),\n297             fused AS (\n298                 SELECT\n299                     COALESCE(d.id, l.id) AS id,\n300                     COALESCE(d.payload, l.payload) AS payload,\n301                     COALESCE(d.content, l.content) AS content,\n302                     COALESCE(1.0 / (:k + d.rn), 0) + COALESCE(1.0 / (:k + l.rn), 0) AS score\n303                 FROM d FULL OUTER JOIN l ON d.id = l.id\n304             )\n305             SELECT id, payload, content, score\n306             FROM fused\n307             ORDER BY score DESC\n308             LIMIT :topk\n309             \"\"\"\n310         )\n",
       "col_offset": 12,
       "end_col_offset": 15,
-      "filename": "src/lloydk\\adapters\\vectorstore\\pg_store.py",
+      "filename": "src/koipa\\adapters\\vectorstore\\pg_store.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2447,7 +2447,7 @@
       "code": "344         sql = text(\n345             f\"\"\"\n346             SELECT embedding FROM tb_rag_vectors\n347             WHERE {where}\n348             ORDER BY created_at DESC\n349             LIMIT :limit\n350             \"\"\"\n351         )\n",
       "col_offset": 12,
       "end_col_offset": 15,
-      "filename": "src/lloydk\\adapters\\vectorstore\\pg_store.py",
+      "filename": "src/koipa\\adapters\\vectorstore\\pg_store.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2472,7 +2472,7 @@
       "code": "356     relational = [\n357         (\"classifications\", f\"DELETE FROM tb_classifications WHERE doc_id IN ({_sub})\"),\n358         (None, f\"DELETE FROM tb_training_datasets WHERE doc_id IN ({_sub})\"),\n",
       "col_offset": 28,
       "end_col_offset": 86,
-      "filename": "src/lloydk\\api\\admin.py",
+      "filename": "src/koipa\\api\\admin.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2492,7 +2492,7 @@
       "code": "357         (\"classifications\", f\"DELETE FROM tb_classifications WHERE doc_id IN ({_sub})\"),\n358         (None, f\"DELETE FROM tb_training_datasets WHERE doc_id IN ({_sub})\"),\n359         (None, f\"DELETE FROM tb_sample_documents WHERE doc_id IN ({_sub})\"),\n",
       "col_offset": 15,
       "end_col_offset": 75,
-      "filename": "src/lloydk\\api\\admin.py",
+      "filename": "src/koipa\\api\\admin.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2512,7 +2512,7 @@
       "code": "358         (None, f\"DELETE FROM tb_training_datasets WHERE doc_id IN ({_sub})\"),\n359         (None, f\"DELETE FROM tb_sample_documents WHERE doc_id IN ({_sub})\"),\n360         (\"chunks\", f\"DELETE FROM tb_chunks WHERE doc_id IN ({_sub})\"),\n",
       "col_offset": 15,
       "end_col_offset": 74,
-      "filename": "src/lloydk\\api\\admin.py",
+      "filename": "src/koipa\\api\\admin.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2532,7 +2532,7 @@
       "code": "359         (None, f\"DELETE FROM tb_sample_documents WHERE doc_id IN ({_sub})\"),\n360         (\"chunks\", f\"DELETE FROM tb_chunks WHERE doc_id IN ({_sub})\"),\n361         (\"documents\", \"DELETE FROM tb_documents WHERE created_by = :marker\"),\n",
       "col_offset": 19,
       "end_col_offset": 68,
-      "filename": "src/lloydk\\api\\admin.py",
+      "filename": "src/koipa\\api\\admin.py",
       "issue_confidence": "LOW",
       "issue_cwe": {
         "id": 89,
@@ -2552,7 +2552,7 @@
       "code": "192 \n193     tok = AutoTokenizer.from_pretrained(spec.base_model)\n194 \n",
       "col_offset": 10,
       "end_col_offset": 56,
-      "filename": "src/lloydk\\modules\\m4_training\\trainer.py",
+      "filename": "src/koipa\\modules\\m4_training\\trainer.py",
       "issue_confidence": "HIGH",
       "issue_cwe": {
         "id": 494,
@@ -2572,7 +2572,7 @@
       "code": "201 \n202     model = AutoModelForSequenceClassification.from_pretrained(\n203         spec.base_model,\n204         num_labels=len(_LABEL_LIST),\n205         id2label=_ID2LABEL,\n206         label2id=_LABEL2ID,\n207     )\n208 \n",
       "col_offset": 12,
       "end_col_offset": 5,
-      "filename": "src/lloydk\\modules\\m4_training\\trainer.py",
+      "filename": "src/koipa\\modules\\m4_training\\trainer.py",
       "issue_confidence": "HIGH",
       "issue_cwe": {
         "id": 494,
@@ -2597,7 +2597,7 @@
       "code": "148         import torch\n149         self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir))\n150         self._model = AutoModelForSequenceClassification.from_pretrained(str(self.model_dir))\n",
       "col_offset": 26,
       "end_col_offset": 76,
-      "filename": "src/lloydk\\modules\\m5_inference\\pipeline.py",
+      "filename": "src/koipa\\modules\\m5_inference\\pipeline.py",
       "issue_confidence": "HIGH",
       "issue_cwe": {
         "id": 494,
@@ -2617,7 +2617,7 @@
       "code": "149         self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir))\n150         self._model = AutoModelForSequenceClassification.from_pretrained(str(self.model_dir))\n151         # \u2500\u2500 id2label\uc740 \ud559\uc2b5 \uccb4\ud06c\ud3ec\uc778\ud2b8 config\uc5d0\uc11c \uac00\uc838\uc628\ub2e4 (fail-closed) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n",
       "col_offset": 22,
       "end_col_offset": 93,
-      "filename": "src/lloydk\\modules\\m5_inference\\pipeline.py",
+      "filename": "src/koipa\\modules\\m5_inference\\pipeline.py",
       "issue_confidence": "HIGH",
       "issue_cwe": {
         "id": 494,
@@ -2637,7 +2637,7 @@
       "code": "117     try:\n118         with urllib.request.urlopen(req, timeout=timeout) as resp:\n119             ok = 200 <= resp.status < 300\n",
       "col_offset": 13,
       "end_col_offset": 57,
-      "filename": "src/lloydk\\perf\\pushgateway.py",
+      "filename": "src/koipa\\perf\\pushgateway.py",
       "issue_confidence": "HIGH",
       "issue_cwe": {
         "id": 22,

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate
-from lloydk.services.outbox import (
+from koipa.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate
+from koipa.services.outbox import (
     InMemoryOutboxStore,
     _validate_target_url,
     publish,
@@ -41,14 +41,14 @@ def test_ssrf_allows_normal_https():
 
 def test_ssrf_allows_private_ip_by_default(monkeypatch):
     # 폐쇄망: 사설IP 콜백은 정상 — 기본 허용(과차단 방지).
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", False, raising=False)
     _validate_target_url("http://10.0.0.5/cb")
     _validate_target_url("http://192.168.1.10/cb")
 
 
 def test_ssrf_blocks_private_ip_when_enabled(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", True, raising=False)
     with pytest.raises(ValueError):
         _validate_target_url("http://10.0.0.5/cb")
@@ -70,7 +70,7 @@ def test_ssrf_blocks_private_ip_when_enabled(monkeypatch):
     "http://metadata/x",                                    # GCP 축약 메타데이터 호스트명
 ])
 def test_ssrf_blocks_metadata_and_reserved_even_when_private_allowed(monkeypatch, url):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", False, raising=False)
     with pytest.raises(ValueError):
         _validate_target_url(url)
@@ -78,7 +78,7 @@ def test_ssrf_blocks_metadata_and_reserved_even_when_private_allowed(monkeypatch
 
 def test_ssrf_still_allows_normal_public_and_private(monkeypatch):
     # 회귀 방지: 정상 공인/사설(기본 허용) 대상은 여전히 통과(과차단 아님).
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", False, raising=False)
     _validate_target_url("https://kl.example.com/webhook")
     _validate_target_url("http://10.0.0.5/cb")
@@ -90,7 +90,7 @@ def test_ssrf_still_allows_normal_public_and_private(monkeypatch):
 import ipaddress  # noqa: E402
 import socket  # noqa: E402
 
-from lloydk.services.outbox import _assert_send_target_safe, _ip_block_reason  # noqa: E402
+from koipa.services.outbox import _assert_send_target_safe, _ip_block_reason  # noqa: E402
 
 
 def _fake_getaddrinfo(ip: str):
@@ -100,7 +100,7 @@ def _fake_getaddrinfo(ip: str):
 
 
 def test_ip_block_reason_categories(monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "outbox_block_private_ips", False, raising=False)
     ipa = ipaddress.ip_address
     assert _ip_block_reason(ipa("169.254.169.254")) is not None   # 메타데이터
@@ -160,30 +160,30 @@ def test_publish_accepts_good_url():
 # ── P1a: rule semantic 임계 config화 ──────────────────────────────────────────
 
 def test_settings_semantic_threshold(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.modules.m3_labeling.rule_engine import _settings_semantic_threshold
+    from koipa import config as cfg
+    from koipa.modules.m3_labeling.rule_engine import _settings_semantic_threshold
     monkeypatch.setattr(cfg.settings, "rule_semantic_threshold", 0.83, raising=False)
     assert _settings_semantic_threshold() == 0.83
 
 
 def test_rule_engine_uses_settings_threshold(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine
+    from koipa import config as cfg
+    from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine
     monkeypatch.delenv("EMB_SEMANTIC_THRESHOLD", raising=False)
     monkeypatch.setattr(cfg.settings, "rule_semantic_threshold", 0.88, raising=False)
     assert LabelRuleEngine().semantic_threshold == 0.88
 
 
 def test_rule_engine_ctor_arg_wins_over_settings(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine
+    from koipa import config as cfg
+    from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine
     monkeypatch.setattr(cfg.settings, "rule_semantic_threshold", 0.88, raising=False)
     assert LabelRuleEngine(semantic_threshold=0.6).semantic_threshold == 0.6
 
 
 def test_rule_engine_env_wins_over_settings(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine
+    from koipa import config as cfg
+    from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine
     monkeypatch.setenv("EMB_SEMANTIC_THRESHOLD", "0.70")
     monkeypatch.setattr(cfg.settings, "rule_semantic_threshold", 0.88, raising=False)
     assert LabelRuleEngine().semantic_threshold == 0.70

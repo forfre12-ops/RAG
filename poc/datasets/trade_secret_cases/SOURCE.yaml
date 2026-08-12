@@ -39,7 +39,7 @@ usage:
   runtime: 없음
   runtime_evidence: |
     src/ 전체에서 이 경로를 읽는 코드 0건. 유일한 언급은
-    src/lloydk/modules/m6_evaluation/anchor_corpus.py 주석의 "의도적 제외" 선언
+    src/koipa/modules/m6_evaluation/anchor_corpus.py 주석의 "의도적 제외" 선언
     (등급 필드가 없는 원자료라 앵커 코퍼스에서 뺀다).
   build_time: scripts/mine_trade_secret_cases.py 산출물 — 학습셋 구성 실험용
   deployment: |

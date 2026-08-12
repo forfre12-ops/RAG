@@ -15,8 +15,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import lloydk.config as config_mod
-from lloydk.config import (
+import koipa.config as config_mod
+from koipa.config import (
     _PROFILE_DEFAULTS,
     Settings,
     evaluate_safety_gates,
@@ -79,7 +79,7 @@ def test_evaluate_not_required_off_is_report_only() -> None:
 
 def test_source_prior_in_enforced_safety_gates() -> None:
     """[P1] 비공지성 source-prior 게이트가 강제집합에 포함되어 하드닝서 .env로 못 끄게."""
-    from lloydk.config import _SAFETY_GATES
+    from koipa.config import _SAFETY_GATES
 
     envs = {env for _, env in _SAFETY_GATES}
     assert "SOURCE_PRIOR_ENABLED" in envs
@@ -98,7 +98,7 @@ def test_source_prior_in_enforced_safety_gates() -> None:
 def _hermetic_gate_env(monkeypatch) -> None:
     """conftest(REQUIRE_REAL_EMBEDDER=false) 등 호출자 env override 가 프로파일 기본값 해석을
     오염시키지 않게 강제집합 env 를 걷어낸다 — '순수 프로파일 기본값'만 평가."""
-    from lloydk.config import _SAFETY_GATES
+    from koipa.config import _SAFETY_GATES
 
     for _, env in _SAFETY_GATES:
         monkeypatch.delenv(env, raising=False)
@@ -106,7 +106,7 @@ def _hermetic_gate_env(monkeypatch) -> None:
 
 def test_hardened_profiles_source_prior_on_by_default(monkeypatch) -> None:
     """하드닝 프로파일 기본값에 source_prior가 켜져 있어 강제집합 추가가 오탐 안 냄."""
-    from lloydk.config import Settings, apply_profile_defaults
+    from koipa.config import Settings, apply_profile_defaults
 
     _hermetic_gate_env(monkeypatch)
     for profile in ("onprem-local", "full-train"):
@@ -126,7 +126,7 @@ def test_hardened_profiles_require_safety_gates() -> None:
 
 def test_new_gates_in_enforced_set() -> None:
     """[하드닝] require_real_embedder·deploy_gate_require_locked_eval 가 강제집합에 포함."""
-    from lloydk.config import _SAFETY_GATES
+    from koipa.config import _SAFETY_GATES
 
     envs = {env for _, env in _SAFETY_GATES}
     assert "REQUIRE_REAL_EMBEDDER" in envs
@@ -136,7 +136,7 @@ def test_new_gates_in_enforced_set() -> None:
 
 def test_hardened_profiles_new_gates_on_by_default(monkeypatch) -> None:
     """하드닝 프로파일 기본값이 신규 강제 게이트를 켜 둬야 강제집합 추가가 오탐 안 냄(off=[])."""
-    from lloydk.config import Settings, apply_profile_defaults
+    from koipa.config import Settings, apply_profile_defaults
 
     _hermetic_gate_env(monkeypatch)
     for profile in ("onprem-local", "full-train"):
@@ -176,7 +176,7 @@ def test_require_real_embedder_off_blocks_when_hardened() -> None:
 
 def test_hardened_poc_mode_bypass_predicate() -> None:
     """[무음 우회] require_safety_gates=True + poc_mode!=full 을 순수 함수가 True 로 잡는다."""
-    from lloydk.config import hardened_poc_mode_bypass
+    from koipa.config import hardened_poc_mode_bypass
 
     assert hardened_poc_mode_bypass(_settings(require_safety_gates=True, poc_mode="dryrun")) is True
     # 정상: 하드닝 + full → 우회 아님.
@@ -234,7 +234,7 @@ def test_assert_blocks_hardened_with_gate_off() -> None:
     try:
         with patch.dict(
             os.environ,
-            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "LLOYDK_AUDIT_CHAIN_SECRET": "z"},
+            {"TESTING": "", "PYTEST_CURRENT_TEST": "", "KOIPA_AUDIT_CHAIN_SECRET": "z"},
         ):
             try:
                 config_mod.assert_production_credentials()
@@ -305,7 +305,7 @@ def test_assert_allows_non_hardened_with_gate_off() -> None:
                 "PYTEST_CURRENT_TEST": "",
                 "RATE_LIMIT_DISABLED": "",
                 "AUDIT_DISABLED": "",
-                "LLOYDK_AUDIT_CHAIN_SECRET": "z",
+                "KOIPA_AUDIT_CHAIN_SECRET": "z",
             },
         ):
             # 안전게이트 사유로 raise 하면 안 됨. (다른 운영 체크는 위에서 모두 통과하도록 구성)

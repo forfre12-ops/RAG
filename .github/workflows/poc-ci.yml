@@ -23,12 +23,12 @@ on:
     branches: [main]
     paths:
       - 'poc/**'
-      - 'doc/03_openapi_lloydk_kl.yaml'
+      - 'doc/03_openapi_koipa_kl.yaml'
       - '.github/workflows/poc-ci.yml'
   pull_request:
     paths:
       - 'poc/**'
-      - 'doc/03_openapi_lloydk_kl.yaml'
+      - 'doc/03_openapi_koipa_kl.yaml'
       - '.github/workflows/poc-ci.yml'
 
 jobs:
@@ -162,8 +162,8 @@ jobs:
       - name: Install openapi-spec-validator
         run: pip install "openapi-spec-validator>=0.7"
 
-      - name: Validate OpenAPI spec (doc/03_openapi_lloydk_kl.yaml)
-        run: openapi-spec-validator doc/03_openapi_lloydk_kl.yaml
+      - name: Validate OpenAPI spec (doc/03_openapi_koipa_kl.yaml)
+        run: openapi-spec-validator doc/03_openapi_koipa_kl.yaml
 
       # [2026-08-11] 스펙이 well-formed 한지만 보고 **라우터와 맞는지는 안 보고 있었다.**
       # 실측: 라우터 58 · 스펙 43 → 15경로가 명세에 없는 채로 통과하고 있었다(콘솔·감사로그·
@@ -198,9 +198,9 @@ jobs:
         run: |
           mkdir -p dist
           python poc/scripts/generate_postman_collection.py \
-            --spec doc/03_openapi_lloydk_kl.yaml \
-            --output dist/lloydk_kl_postman.json \
-            --base-url "https://api.lloydk.example.com"
+            --spec doc/03_openapi_koipa_kl.yaml \
+            --output dist/koipa_kl_postman.json \
+            --base-url "https://api.koipa.example.com"
 
       - name: Install openapi-generator (E4)
         run: |
@@ -211,7 +211,7 @@ jobs:
       - name: Generate Python SDK (E4)
         run: |
           java -jar /tmp/openapi-generator-cli.jar generate \
-            -i doc/03_openapi_lloydk_kl.yaml \
+            -i doc/03_openapi_koipa_kl.yaml \
             -g python \
             -o dist/sdk-python \
             --skip-validate-spec || echo "SDK generation soft-failed"
@@ -219,7 +219,7 @@ jobs:
       - name: Generate TypeScript SDK (E4)
         run: |
           java -jar /tmp/openapi-generator-cli.jar generate \
-            -i doc/03_openapi_lloydk_kl.yaml \
+            -i doc/03_openapi_koipa_kl.yaml \
             -g typescript-fetch \
             -o dist/sdk-typescript \
             --skip-validate-spec || echo "SDK generation soft-failed"
@@ -229,7 +229,7 @@ jobs:
         with:
           name: openapi-artifacts-${{ github.sha }}
           path: |
-            dist/lloydk_kl_postman.json
+            dist/koipa_kl_postman.json
             dist/sdk-python/
             dist/sdk-typescript/
           retention-days: 90
@@ -328,7 +328,7 @@ jobs:
           rm -f .env
 
       - name: Build production API image
-        run: docker build -f Dockerfile.api.prod -t lloydk-api:ci .
+        run: docker build -f Dockerfile.api.prod -t koipa-api:ci .
 
   test-lite:
     runs-on: ubuntu-latest
@@ -341,13 +341,13 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: lloydk
-          POSTGRES_PASSWORD: lloydk_dev_pg
-          POSTGRES_DB: lloydk
+          POSTGRES_USER: koipa
+          POSTGRES_PASSWORD: koipa_dev_pg
+          POSTGRES_DB: koipa
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U lloydk -d lloydk"
+          --health-cmd "pg_isready -U koipa -d koipa"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -375,8 +375,8 @@ jobs:
           --health-retries 20
     env:
       # pydantic-settings는 case-insensitive로 DATABASE_URL → settings.database_url 매핑
-      DATABASE_URL: postgresql+psycopg://lloydk:lloydk_dev_pg@localhost:5432/lloydk
-      PGPASSWORD: lloydk_dev_pg
+      DATABASE_URL: postgresql+psycopg://koipa:koipa_dev_pg@localhost:5432/koipa
+      PGPASSWORD: koipa_dev_pg
       # B1: R1·outbox redis 백엔드 테스트가 실 Redis로 동작 (fakeredis 폴백 아님)
       REDIS_URL_TEST: redis://localhost:6379/15
       # B2: ES skipif 해제 — _ES 가용 시 RAG indexer/DR 실측
@@ -626,7 +626,7 @@ jobs:
           python scripts/build_offline_bundle.py \
             --version "ci-${{ github.sha }}" \
             --dry-run \
-            --output dist/lloydk-airgap-bundle
+            --output dist/koipa-airgap-bundle
 
       - name: Upload PoC reports
         if: always()
@@ -642,9 +642,9 @@ jobs:
         with:
           name: bundle-manifest
           path: |
-            poc/dist/lloydk-airgap-bundle/manifest.yaml
-            poc/dist/lloydk-airgap-bundle/manifest.json
-            poc/dist/lloydk-airgap-bundle/CHECKSUMS.sha256
+            poc/dist/koipa-airgap-bundle/manifest.yaml
+            poc/dist/koipa-airgap-bundle/manifest.json
+            poc/dist/koipa-airgap-bundle/CHECKSUMS.sha256
           retention-days: 14
           if-no-files-found: warn
 
@@ -715,13 +715,13 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: lloydk
-          POSTGRES_PASSWORD: lloydk_dev_pg
-          POSTGRES_DB: lloydk
+          POSTGRES_USER: koipa
+          POSTGRES_PASSWORD: koipa_dev_pg
+          POSTGRES_DB: koipa
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U lloydk -d lloydk"
+          --health-cmd "pg_isready -U koipa -d koipa"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -748,8 +748,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DATABASE_URL: postgresql+psycopg://lloydk:lloydk_dev_pg@localhost:5432/lloydk
-      PGPASSWORD: lloydk_dev_pg
+      DATABASE_URL: postgresql+psycopg://koipa:koipa_dev_pg@localhost:5432/koipa
+      PGPASSWORD: koipa_dev_pg
       REDIS_URL_TEST: redis://localhost:6379/15
       ES_URL: http://localhost:9200
     steps:

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KOIPA AI 영업비밀관리시스템 — KL 통합 가이드 | Lloydk AI</title>
-<meta name="description" content="KL ↔ Lloydk AI API 통합 명세: 21개 엔드포인트 상세, 인증, 상태값, 오류 코드, 통합 체크리스트. 2026-05-29 기준 (POST /answer RAG 답안 합성 라이브 검증 완료 포함)." />
+<title>KOIPA AI 영업비밀관리시스템 — KL 통합 가이드 | Koipa AI</title>
+<meta name="description" content="KL ↔ Koipa AI API 통합 명세: 21개 엔드포인트 상세, 인증, 상태값, 오류 코드, 통합 체크리스트. 2026-05-29 기준 (POST /answer RAG 답안 합성 라이브 검증 완료 포함)." />
 
 <style>
   /* ============================================================
@@ -402,8 +402,8 @@
 <nav class="nav">
   <div class="nav-inner">
     <a class="brand" href="#top">
-      <span class="brand-mark"><img src="assets/lloydk_logo_mark.png" alt="Lloydk AI" /></span>
-      <span class="brand-name">Lloydk AI</span>
+      <span class="brand-mark"><img src="assets/koipa_logo_mark.png" alt="Koipa AI" /></span>
+      <span class="brand-name">Koipa AI</span>
       <span class="brand-sep">/</span>
       <span class="brand-url">koipa/kl-integration</span>
     </a>
@@ -431,10 +431,10 @@
   <span class="meta-dot">·</span>
   <span class="meta-soft">2026-05-29 갱신 · POST /answer 라이브 검증 완료 포함</span>
   <span class="meta-dot">·</span>
-  <span class="meta-category">Lloydk AI → KL</span>
+  <span class="meta-category">Koipa AI → KL</span>
 </div>
 <h1 class="title" id="top">KL 통합 가이드</h1>
-<p class="lede">KL 시스템이 Lloydk AI API를 연동하기 위한 인증·엔드포인트·상태값·오류 처리 레퍼런스. 21개 엔드포인트, 실제 구현 기준 작성.</p>
+<p class="lede">KL 시스템이 Koipa AI API를 연동하기 위한 인증·엔드포인트·상태값·오류 처리 레퍼런스. 21개 엔드포인트, 실제 구현 기준 작성.</p>
 
 <div class="callout warn">
   <span class="callout-icon">⚠️</span>
@@ -1113,7 +1113,7 @@
   <span class="callout-icon">ℹ️</span>
   <div class="callout-body">
     <div class="callout-label">요청 추적</div>
-    <p>모든 응답 헤더에 <code>X-Request-ID</code>가 포함됩니다. 오류 발생 시 이 값을 로이드케이 기술지원에 전달하면 서버 로그에서 즉시 추적 가능합니다.</p>
+    <p>모든 응답 헤더에 <code>X-Request-ID</code>가 포함됩니다. 오류 발생 시 이 값을 한국지식재산보호원 기술지원에 전달하면 서버 로그에서 즉시 추적 가능합니다.</p>
   </div>
 </div>
 
@@ -1171,7 +1171,7 @@
     <span class="check-icon">☐</span>
     <div>
       <div class="check-label">API Key 발급 확인</div>
-      <div class="check-note">로이드케이로부터 API Key 수령 및 테스트 환경 접속 확인</div>
+      <div class="check-note">한국지식재산보호원로부터 API Key 수령 및 테스트 환경 접속 확인</div>
     </div>
   </li>
   <li>
@@ -1185,7 +1185,7 @@
     <span class="check-icon">☐</span>
     <div>
       <div class="check-label">네트워크 접근 권한</div>
-      <div class="check-note">KL 서버 → Lloydk AI 서버 포트 8000 허용 (또는 HTTPS 포트)</div>
+      <div class="check-note">KL 서버 → Koipa AI 서버 포트 8000 허용 (또는 HTTPS 포트)</div>
     </div>
   </li>
 </ul>
@@ -1267,7 +1267,7 @@
     <span class="check-icon">⏳</span>
     <div>
       <div class="check-label">K2 — OpenAPI 명세 검토</div>
-      <div class="check-note"><code>03_openapi_lloydk_kl.yaml</code> 16개 엔드포인트 KL 검토 의견</div>
+      <div class="check-note"><code>03_openapi_koipa_kl.yaml</code> 16개 엔드포인트 KL 검토 의견</div>
     </div>
   </li>
   <li>
@@ -1321,7 +1321,7 @@
 <!-- ===== FOOTER ===== -->
 <footer>
   <div>
-    <strong>Lloydk AI</strong> · KOIPA AI 영업비밀관리시스템
+    <strong>Koipa AI</strong> · KOIPA AI 영업비밀관리시스템
     <span style="margin: 0 8px; color: var(--border-strong)">|</span>
     doc/18 · KL 통합 가이드 · 2026-05-29 갱신
   </div>

@@ -15,7 +15,7 @@ import importlib
 
 import pytest
 
-from lloydk.config import (
+from koipa.config import (
     DEPLOY_PROFILES,
     Settings,
     _PROFILE_DEFAULTS,
@@ -148,10 +148,10 @@ def test_training_router_visibility(
     monkeypatch.setenv("ENABLE_TRAINING", "true" if en_train else "false")
     monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "true" if en_incr else "false")
 
-    import lloydk.config as cfg_mod
+    import koipa.config as cfg_mod
     _orig_settings = cfg_mod.settings  # 원본 settings 객체 — import-bound 모듈(_jwt_auth 등 44개)이 참조
     importlib.reload(cfg_mod)
-    import lloydk.api.app as app_mod
+    import koipa.api.app as app_mod
     importlib.reload(app_mod)
 
     try:
@@ -189,10 +189,10 @@ def test_admin_console_mounts_without_enabling_purge(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("SERVE_ADMIN_CONSOLE", "true")
     monkeypatch.setenv("DEMO_CONSOLE_ENABLED", "false")
 
-    import lloydk.config as cfg_mod
+    import koipa.config as cfg_mod
     _orig_settings = cfg_mod.settings
     importlib.reload(cfg_mod)
-    import lloydk.api.app as app_mod
+    import koipa.api.app as app_mod
     importlib.reload(app_mod)
 
     try:

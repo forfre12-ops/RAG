@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))
 
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.proxy_corpus import validate_proxy_record
 from scripts.build_direct_authored_catalog_training_corpus_v3_7 import (
     _sha256,
     _sha256_text,

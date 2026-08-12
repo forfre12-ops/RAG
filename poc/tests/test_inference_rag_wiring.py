@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
-from lloydk.adapters.vectorstore.inmemory_store import InMemoryStore
-from lloydk.modules.m5_inference.pipeline import InferencePipeline
+from koipa.adapters.vectorstore.inmemory_store import InMemoryStore
+from koipa.modules.m5_inference.pipeline import InferencePipeline
 
 pytestmark = pytest.mark.slow
 
@@ -78,8 +78,8 @@ def test_use_rag_true_populates_rag_context_via_real_facade():
     store = _populated_store()
     embedder = _FakeEmbedder()
 
-    with patch("lloydk.adapters.vectorstore.build_store", return_value=store):
-        with patch("lloydk.adapters.embedding.build_embedder", return_value=embedder):
+    with patch("koipa.adapters.vectorstore.build_store", return_value=store):
+        with patch("koipa.adapters.embedding.build_embedder", return_value=embedder):
             pipe = InferencePipeline()
             result = pipe.run("M&A 인수 검토", use_rag=True)
 
@@ -98,8 +98,8 @@ def test_use_rag_true_empty_store_returns_empty_context_with_warning():
     empty.ensure_collection("docs", dim=4)
     embedder = _FakeEmbedder()
 
-    with patch("lloydk.adapters.vectorstore.build_store", return_value=empty):
-        with patch("lloydk.adapters.embedding.build_embedder", return_value=embedder):
+    with patch("koipa.adapters.vectorstore.build_store", return_value=empty):
+        with patch("koipa.adapters.embedding.build_embedder", return_value=embedder):
             pipe = InferencePipeline()
             result = pipe.run("M&A 인수", use_rag=True)
 
@@ -109,7 +109,7 @@ def test_use_rag_true_empty_store_returns_empty_context_with_warning():
 
 def test_use_rag_true_store_build_failure_silently_empty():
     """벡터스토어 빌드 실패도 분류 결과를 막지 않음."""
-    with patch("lloydk.adapters.vectorstore.build_store", side_effect=RuntimeError("ES down")):
+    with patch("koipa.adapters.vectorstore.build_store", side_effect=RuntimeError("ES down")):
         pipe = InferencePipeline()
         result = pipe.run("M&A 인수", use_rag=True)
     assert result.rag_context == []
@@ -123,8 +123,8 @@ def test_use_rag_true_encoder_failure_silently_empty():
         def embed(self, texts):
             raise RuntimeError("HF load failed")
 
-    with patch("lloydk.adapters.vectorstore.build_store", return_value=store):
-        with patch("lloydk.adapters.embedding.build_embedder", return_value=_BrokenEmbedder()):
+    with patch("koipa.adapters.vectorstore.build_store", return_value=store):
+        with patch("koipa.adapters.embedding.build_embedder", return_value=_BrokenEmbedder()):
             pipe = InferencePipeline()
             result = pipe.run("M&A 인수", use_rag=True)
     assert result.rag_context == []
@@ -156,8 +156,8 @@ def test_build_rag_context_uses_namespace_collection():
 
     store.search_hybrid = spy  # type: ignore[method-assign]
 
-    with patch("lloydk.adapters.vectorstore.build_store", return_value=store):
-        with patch("lloydk.adapters.embedding.build_embedder", return_value=embedder):
+    with patch("koipa.adapters.vectorstore.build_store", return_value=store):
+        with patch("koipa.adapters.embedding.build_embedder", return_value=embedder):
             pipe = InferencePipeline()
             pipe._build_rag_context(query="M&A 인수", namespace="docs", metadata=None)
 
@@ -169,8 +169,8 @@ def test_build_rag_context_searchhit_to_rag_context_hit_conversion():
     store = _populated_store()
     embedder = _FakeEmbedder()
 
-    with patch("lloydk.adapters.vectorstore.build_store", return_value=store):
-        with patch("lloydk.adapters.embedding.build_embedder", return_value=embedder):
+    with patch("koipa.adapters.vectorstore.build_store", return_value=store):
+        with patch("koipa.adapters.embedding.build_embedder", return_value=embedder):
             pipe = InferencePipeline()
             hits = pipe._build_rag_context(query="M&A 인수", namespace="docs", metadata=None)
 
@@ -188,8 +188,8 @@ def test_build_rag_context_fallback_to_id_when_no_doc_id_in_payload():
              payloads=[{"text": "M&A 인수"}])  # doc_id 없음
     embedder = _FakeEmbedder()
 
-    with patch("lloydk.adapters.vectorstore.build_store", return_value=s):
-        with patch("lloydk.adapters.embedding.build_embedder", return_value=embedder):
+    with patch("koipa.adapters.vectorstore.build_store", return_value=s):
+        with patch("koipa.adapters.embedding.build_embedder", return_value=embedder):
             pipe = InferencePipeline()
             hits = pipe._build_rag_context(query="M&A", namespace="docs", metadata=None)
 
@@ -201,7 +201,7 @@ def test_build_rag_context_fallback_to_id_when_no_doc_id_in_payload():
 def test_build_rag_context_adapter_import_failure_returns_empty():
     """retrieval 모듈 import 실패 시 silent empty."""
     pipe = InferencePipeline()
-    with patch("lloydk.services.retrieval.expand_then_search",
+    with patch("koipa.services.retrieval.expand_then_search",
                side_effect=ImportError("missing")):
         hits = pipe._build_rag_context(query="M&A", namespace=None, metadata=None)
     # ImportError는 outer try에서 못 잡힘 — 본 케이스는 적어도 빈 리스트 또는 raise

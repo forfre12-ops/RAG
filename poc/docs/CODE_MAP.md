@@ -4,7 +4,7 @@
 이 문서는 "FUN-0XX 를 어디서 구현했나"를 파일 경로까지 답하기 위한 것입니다.
 
 > 규모는 계속 바뀌므로 어림수로만 적습니다. 정확한 수치가 필요하면 직접 세십시오 —
-> `Get-ChildItem src/lloydk -Recurse -Filter *.py | Measure-Object`.
+> `Get-ChildItem src/koipa -Recurse -Filter *.py | Measure-Object`.
 
 읽는 규칙은 어디서나 같습니다.
 

@@ -20,19 +20,19 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import SessionLocal, engine, session_scope
-from lloydk.db.models import (
+from koipa.db import SessionLocal, engine, session_scope
+from koipa.db.models import (
     Classification,
     ClassificationLevel,
     Correction,
     Document,
     DocumentLabel,
 )
-from lloydk.repositories import ClassifyRepo
-from lloydk.schemas.common import Actor, Grade
-from lloydk.schemas.promotion import PromoteRequest
-from lloydk.services import promotion_service as ps
-from lloydk.services.promotion_service import (
+from koipa.repositories import ClassifyRepo
+from koipa.schemas.common import Actor, Grade
+from koipa.schemas.promotion import PromoteRequest
+from koipa.services import promotion_service as ps
+from koipa.services.promotion_service import (
     PromoteResult,
     PromotionService,
     _grade_ok,
@@ -80,15 +80,15 @@ def test_promote_response_surfaces_persisted():
 
 def test_emit_promote_success_increments_counter():
     # 순수(DB 불요): 성공 발동 카운터가 등급별로 증가하는지.
-    from lloydk.api.prom_metrics import VERIFIED_LABEL_PROMOTED_TOTAL, registry
+    from koipa.api.prom_metrics import VERIFIED_LABEL_PROMOTED_TOTAL, registry
 
     VERIFIED_LABEL_PROMOTED_TOTAL.labels(grade="TS").inc(0)  # child materialize
     before = registry.get_sample_value(
-        "lloydk_verified_label_promoted_total", {"grade": "TS"}
+        "koipa_verified_label_promoted_total", {"grade": "TS"}
     ) or 0.0
     ps._emit_promote_success("TS")
     after = registry.get_sample_value(
-        "lloydk_verified_label_promoted_total", {"grade": "TS"}
+        "koipa_verified_label_promoted_total", {"grade": "TS"}
     ) or 0.0
     assert after >= before + 1
 
@@ -223,7 +223,7 @@ def _level_code(level_id):
 @db_backed
 class TestPromotionLive:
     def test_promote_creates_verified_human_label(self, db, levels):
-        from lloydk.api.prom_metrics import VERIFIED_LABEL_PROMOTED_TOTAL, registry
+        from koipa.api.prom_metrics import VERIFIED_LABEL_PROMOTED_TOTAL, registry
 
         version = f"v-prom-{uuid.uuid4().hex[:6]}"
         doc = _seed_doc(db)
@@ -232,7 +232,7 @@ class TestPromotionLive:
         db.commit()
         VERIFIED_LABEL_PROMOTED_TOTAL.labels(grade="S1").inc(0)  # child materialize
         before = registry.get_sample_value(
-            "lloydk_verified_label_promoted_total", {"grade": "S1"}
+            "koipa_verified_label_promoted_total", {"grade": "S1"}
         ) or 0.0
         try:
             res = PromotionService().promote(
@@ -243,7 +243,7 @@ class TestPromotionLive:
             assert res.labeler_id == "qa_human"
             # [P1 가시성] 승급 성공 발동률 카운터가 등급별로 증가(가시성 비대칭 해소).
             after = registry.get_sample_value(
-                "lloydk_verified_label_promoted_total", {"grade": "S1"}
+                "koipa_verified_label_promoted_total", {"grade": "S1"}
             ) or 0.0
             assert after >= before + 1
             # 서빙 hook(get_verified_document_label)이 보는 라벨이 정확히 박혔는가.
@@ -269,8 +269,8 @@ class TestPromotionLive:
             PromotionService().promote(
                 PromoteRequest(doc_id=str(doc.doc_id), actor=_actor("reviewer_kim"))
             )
-            from lloydk.schemas.classify import ClassifyRequest
-            from lloydk.services.classify_service import ClassifyService
+            from koipa.schemas.classify import ClassifyRequest
+            from koipa.services.classify_service import ClassifyService
 
             resp = ClassifyService().classify(
                 ClassifyRequest(
@@ -409,7 +409,7 @@ class TestPromotionLive:
 
 
 def _hdr(role="admin"):
-    from lloydk.config import settings
+    from koipa.config import settings
 
     return {"X-API-Key": settings.api_key, "X-Actor-Role": role}
 
@@ -419,7 +419,7 @@ class TestPromotionAPI:
     def test_pending_requires_auth(self):
         from fastapi.testclient import TestClient
 
-        from lloydk.api.app import app
+        from koipa.api.app import app
 
         with TestClient(app) as cli:
             r = cli.get("/api/v1/promotions/pending")
@@ -429,7 +429,7 @@ class TestPromotionAPI:
     def test_pending_allowed_roles_ok(self, role):
         from fastapi.testclient import TestClient
 
-        from lloydk.api.app import app
+        from koipa.api.app import app
 
         with TestClient(app) as cli:
             r = cli.get("/api/v1/promotions/pending", headers=_hdr(role))
@@ -441,7 +441,7 @@ class TestPromotionAPI:
     def test_pending_forbidden_role(self):
         from fastapi.testclient import TestClient
 
-        from lloydk.api.app import app
+        from koipa.api.app import app
 
         with TestClient(app) as cli:
             r = cli.get("/api/v1/promotions/pending", headers=_hdr("system"))
@@ -450,7 +450,7 @@ class TestPromotionAPI:
     def test_promote_non_uuid_not_promotable(self):
         from fastapi.testclient import TestClient
 
-        from lloydk.api.app import app
+        from koipa.api.app import app
 
         with TestClient(app) as cli:
             r = cli.post(
@@ -468,13 +468,13 @@ class TestPromotionAPI:
 # AUDIT_SKIP_TOTAL(#4 VerifiedLabelAuditSkip 알람 감시)을 증가시켜 alert로 승격한다.
 
 def test_emit_promote_audit_skip_increments_metric():
-    from lloydk.api.prom_metrics import (
+    from koipa.api.prom_metrics import (
         CLASSIFY_VERIFIED_LABEL_AUDIT_SKIP_TOTAL,  # noqa: F401
         registry,
     )
-    from lloydk.services.promotion_service import _emit_promote_audit_skip
+    from koipa.services.promotion_service import _emit_promote_audit_skip
 
-    name = "lloydk_classify_verified_label_audit_skip_total"
+    name = "koipa_classify_verified_label_audit_skip_total"
     before = registry.get_sample_value(name) or 0.0
     _emit_promote_audit_skip()
     after = registry.get_sample_value(name) or 0.0
@@ -483,15 +483,15 @@ def test_emit_promote_audit_skip_increments_metric():
 
 def test_audit_promote_failure_is_visible_not_silent(monkeypatch):
     # 감사 세션이 터져도(승급 자체는 fail-open 진행) 예외 미전파 + 메트릭↑(무음 아님).
-    import lloydk.db as db_mod
-    from lloydk.api.prom_metrics import registry
-    from lloydk.services.promotion_service import PromotionService
+    import koipa.db as db_mod
+    from koipa.api.prom_metrics import registry
+    from koipa.services.promotion_service import PromotionService
 
     def _boom(*a, **k):
         raise RuntimeError("audit db down")
 
     monkeypatch.setattr(db_mod, "SessionLocal", _boom, raising=False)
-    name = "lloydk_classify_verified_label_audit_skip_total"
+    name = "koipa_classify_verified_label_audit_skip_total"
     before = registry.get_sample_value(name) or 0.0
     # 예외가 전파되면 실패(fail-open 계약 위반). None 반환·메트릭 증가만 기대.
     PromotionService._audit_promote(

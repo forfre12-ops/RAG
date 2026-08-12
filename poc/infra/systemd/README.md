@@ -1,9 +1,9 @@
-# Lloydk DR 백업 스케줄링 (호스트 systemd / cron)
+# Koipa DR 백업 스케줄링 (호스트 systemd / cron)
 
 원문 스토리지 볼륨은 이전에 **백업이 전혀 없었고**, PG 백업 스크립트도 cron 에 배선돼 있지
 않아 "누가 host cron 을 걸어야만" 도는 상태였다. 이 디렉터리는 그 배선을 turnkey 로 제공한다.
 
-백업 진입점은 `scripts/backup_dr.py` 하나다 — 실행 중 모든 lloydk 스택을 자동탐지해
+백업 진입점은 `scripts/backup_dr.py` 하나다 — 실행 중 모든 koipa 스택을 자동탐지해
 PG 덤프 + 원문 스토리지 아카이브를 `backups/` 에 만들고, retention·JSON 리포트까지 처리한다.
 **fail-closed**(하나라도 실패하면 non-zero)라서 systemd/cron 이 실패를 놓치지 않는다.
 
@@ -14,18 +14,18 @@ PG 덤프 + 원문 스토리지 아카이브를 `backups/` 에 만들고, retent
 
 ## systemd (권장)
 ```bash
-sudo cp infra/systemd/lloydk-dr-backup.{service,timer} /etc/systemd/system/
+sudo cp infra/systemd/koipa-dr-backup.{service,timer} /etc/systemd/system/
 # .service 의 WorkingDirectory 를 실제 poc 경로로 수정
 sudo systemctl daemon-reload
-sudo systemctl enable --now lloydk-dr-backup.timer
-systemctl list-timers lloydk-dr-backup.timer   # 다음 실행 시각
-journalctl -u lloydk-dr-backup -n 50           # 실행/실패 로그
+sudo systemctl enable --now koipa-dr-backup.timer
+systemctl list-timers koipa-dr-backup.timer   # 다음 실행 시각
+journalctl -u koipa-dr-backup -n 50           # 실행/실패 로그
 ```
 
 ## cron (대안)
 ```cron
 # crontab -e — 매일 02:00, 로그 append
-0 2 * * * cd /opt/lloydk/poc && /usr/bin/python3 scripts/backup_dr.py >> /var/log/lloydk-dr-backup.log 2>&1
+0 2 * * * cd /opt/koipa/poc && /usr/bin/python3 scripts/backup_dr.py >> /var/log/koipa-dr-backup.log 2>&1
 ```
 
 ## 오프사이트(두 번째 매체) 사본

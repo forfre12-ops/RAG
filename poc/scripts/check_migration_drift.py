@@ -75,7 +75,7 @@ def main() -> int:
 
     result: dict
     try:
-        from lloydk.config import settings  # noqa: PLC0415
+        from koipa.config import settings  # noqa: PLC0415
 
         expected = _script_heads(args.alembic_ini)
         applied = _db_heads(settings.database_url)

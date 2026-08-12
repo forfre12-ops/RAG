@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lloydk.modules.m6_evaluation.serving_eval import (
+from koipa.modules.m6_evaluation.serving_eval import (
     evaluate_via_serving,
     predict_via_serving,
 )
-from lloydk.schemas.common import Grade
+from koipa.schemas.common import Grade
 
 
 @dataclass

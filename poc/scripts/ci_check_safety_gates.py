@@ -28,7 +28,7 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 # 프로세스 전역 env 오염 방지: 음성 테스트 전에 clean 상태에서 양성부터 평가.
-from lloydk.config import (  # noqa: E402
+from koipa.config import (  # noqa: E402
     _PROFILE_DEFAULTS,
     _SAFETY_GATES,
     Settings,

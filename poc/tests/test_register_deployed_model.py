@@ -30,7 +30,7 @@ _REPORT = {
 
 def _pg_ok() -> bool:
     try:
-        from lloydk.db import session_scope
+        from koipa.db import session_scope
         from sqlalchemy import text
         with session_scope() as db:
             db.execute(text("SELECT 1"))
@@ -60,7 +60,7 @@ def test_registered_metrics_satisfy_deploy_gate_contract():
     report.json 에 fnr_high=0.0625 를 갖고 있어 통과했어야 할 모델이었다.
     키 존재만 보지 않고 **게이트에 실제로 통과시켜** 계약을 고정한다.
     """
-    from lloydk.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate
+    from koipa.modules.m6_evaluation.deploy_gate import evaluate_deploy_gate
 
     m = metrics_from_report(_REPORT, Path("artifacts/x/report.json"))
     assert m["fnr_high"] == 0.0625
@@ -91,9 +91,9 @@ def test_register_is_idempotent_and_inactive(tmp_path, monkeypatch):
         pytest.skip("Postgres not reachable")
     from sqlalchemy import func, select
 
-    from lloydk.db import session_scope
-    from lloydk.db.models import ModelVersion
-    from lloydk.repositories.training_repo import TrainingRepo
+    from koipa.db import session_scope
+    from koipa.db.models import ModelVersion
+    from koipa.repositories.training_repo import TrainingRepo
 
     (tmp_path / "report.json").write_text(json.dumps(_REPORT), encoding="utf-8")
     label = "test-reg-" + uuid.uuid4().hex[:8]

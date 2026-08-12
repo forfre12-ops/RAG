@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import math
 
-from lloydk.adapters.embedding import HashEmbedding
-from lloydk.adapters.vectorstore import InMemoryStore
+from koipa.adapters.embedding import HashEmbedding
+from koipa.adapters.vectorstore import InMemoryStore
 
 
 def _cos(a: list[float], b: list[float]) -> float:

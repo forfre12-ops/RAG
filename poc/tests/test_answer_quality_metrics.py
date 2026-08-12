@@ -8,15 +8,15 @@
 
 from __future__ import annotations
 
-from lloydk.modules.m6_evaluation.answer_metrics import (
+from koipa.modules.m6_evaluation.answer_metrics import (
     citation_alignment,
     citation_metrics,
     cited_source_docs,
     extract_citations,
     grounding_signals,
 )
-from lloydk.schemas.classify import RagContextHit
-from lloydk.services.rag_answer_service import synthesize_answer
+from koipa.schemas.classify import RagContextHit
+from koipa.services.rag_answer_service import synthesize_answer
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ def test_synthesize_answer_clean_citations_no_warning():
 
 def test_enforce_citations_off_keeps_llm_answer_with_warning():
     """기본 OFF: out-of-range 인용이 있어도 LLM 답변 유지 + 경고만(동작 보존)."""
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
 
     saved = config_mod.settings.answer_enforce_citations
     config_mod.settings.answer_enforce_citations = False
@@ -186,7 +186,7 @@ def test_enforce_citations_off_keeps_llm_answer_with_warning():
 
 def test_enforce_citations_on_demotes_out_of_range_to_deterministic():
     """ON: out-of-range 인용이 있으면 결정론적 답변으로 강등(환각 인용 차단)."""
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
 
     saved = config_mod.settings.answer_enforce_citations
     config_mod.settings.answer_enforce_citations = True
@@ -207,7 +207,7 @@ def test_enforce_citations_on_demotes_out_of_range_to_deterministic():
 
 def test_enforce_citations_on_clean_answer_not_demoted():
     """ON이어도 인용이 정상(범위 내)이면 LLM 답변 유지 — 깨끗한 답변은 강등 안 함."""
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
 
     saved = config_mod.settings.answer_enforce_citations
     config_mod.settings.answer_enforce_citations = True

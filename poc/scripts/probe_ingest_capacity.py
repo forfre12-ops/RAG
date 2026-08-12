@@ -43,9 +43,9 @@ STOP_AFTER_SEC = 180  # 이보다 오래 걸리면 이후 규모는 재지 않�
 def main() -> int:
     import torch
 
-    from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
-    from lloydk.schemas.classify import ClassifyRequest
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.modules.m2_preprocess.pipeline import PreprocessPipeline
+    from koipa.schemas.classify import ClassifyRequest
+    from koipa.services.classify_service import ClassifyService
 
     print(f"torch threads={torch.get_num_threads()} "
           f"OMP={os.environ.get('OMP_NUM_THREADS')} "

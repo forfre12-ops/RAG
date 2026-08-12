@@ -21,9 +21,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from lloydk.golden_defense import assess_defense_liveness  # noqa: E402
-from lloydk.modules.m6_evaluation.eval_cards import GRADE_ORDER, build_eval_cards  # noqa: E402
-from lloydk.modules.m6_evaluation.judge_reliability import build_judge_reliability  # noqa: E402
+from koipa.golden_defense import assess_defense_liveness  # noqa: E402
+from koipa.modules.m6_evaluation.eval_cards import GRADE_ORDER, build_eval_cards  # noqa: E402
+from koipa.modules.m6_evaluation.judge_reliability import build_judge_reliability  # noqa: E402
 
 
 def _load(path: str) -> list[dict]:

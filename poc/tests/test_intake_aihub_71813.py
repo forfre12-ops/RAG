@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import intake_aihub_71813 as intake
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.proxy_corpus import validate_proxy_record
 
 
 def _page_text(page: int) -> str:
@@ -92,7 +92,7 @@ def _write_receipt(
         "dataset_version": "1.1",
         "dataset_page_url": intake.DATASET_PAGE_URL,
         "terms_url": intake.TERMS_URL,
-        "approved_recipient_legal_name": "주식회사 로이드케이",
+        "approved_recipient_legal_name": "주식회사 한국지식재산보호원",
         "approval_reference": "AIHUB-APPROVAL-20260808-001",
         "approval_granted": approval_granted,
         "approval_issued_at": "2026-08-08T09:00:00+09:00",
@@ -186,7 +186,7 @@ def test_intake_preserves_hashes_lineage_and_train_only_scope(tmp_path: Path) ->
     assert all(row["source_document_sha256"] for row in records)
     assert all(row["page_lineage"] for row in records)
     assert all(row["approval_receipt_sha256"] for row in records)
-    assert "주식회사 로이드케이" not in (run_dir / "records.jsonl").read_text(
+    assert "주식회사 한국지식재산보호원" not in (run_dir / "records.jsonl").read_text(
         encoding="utf-8"
     )
 

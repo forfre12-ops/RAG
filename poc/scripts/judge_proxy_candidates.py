@@ -38,21 +38,21 @@ _POC = _HERE.parent
 sys.path.insert(0, str(_POC))
 sys.path.insert(0, str(_POC / "src"))
 
-from lloydk.hygiene import text_hash  # noqa: E402
-from lloydk.ollama_attestation import (  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
+from koipa.ollama_attestation import (  # noqa: E402
     OllamaAttestationError,
     validate_ollama_attestation,
     verify_ollama_model,
 )
-from lloydk.modules.m3_labeling.rule_engine import (  # noqa: E402
+from koipa.modules.m3_labeling.rule_engine import (  # noqa: E402
     grade_from_svm,
     has_real_evidence,
 )
-from lloydk.modules.m3_labeling.llm_labeler import (  # noqa: E402
+from koipa.modules.m3_labeling.llm_labeler import (  # noqa: E402
     PROXY_QUALITY_CHECKS,
 )
-from lloydk.proxy_evidence import ProxyEvidenceError, build_evidence_card  # noqa: E402
-from lloydk.proxy_corpus import validate_proxy_record  # noqa: E402
+from koipa.proxy_evidence import ProxyEvidenceError, build_evidence_card  # noqa: E402
+from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
 
 
 _BLOCKED_IDENTITIES = frozenset(
@@ -957,9 +957,9 @@ def _legacy_unattested_input(
 
 def _static_rule_pipeline() -> tuple[object, str]:
     """Build a deterministic rule side without consulting an operational DB."""
-    from lloydk.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: PLC0415
-    from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine  # noqa: PLC0415
-    from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
+    from koipa.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: PLC0415
+    from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine  # noqa: PLC0415
+    from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS  # noqa: PLC0415
 
     seed_bytes = json.dumps(
         KEYWORD_SEEDS,
@@ -2036,11 +2036,11 @@ def _build_judge(
     # Keep this production runner self-contained. Importing the helper from
     # ``build_synthetic_golden.py`` made the judge depend on an unrelated CLI
     # that is intentionally absent from the minimal proxy runtime release.
-    from lloydk.adapters.llm.local_openai_provider import (  # noqa: PLC0415
+    from koipa.adapters.llm.local_openai_provider import (  # noqa: PLC0415
         LocalOpenAIProvider,
     )
-    from lloydk.modules.m3_labeling.judge import ConsensusJudge  # noqa: PLC0415
-    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: PLC0415
+    from koipa.modules.m3_labeling.judge import ConsensusJudge  # noqa: PLC0415
+    from koipa.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: PLC0415
 
     def _provider(model: str, label: str) -> LocalOpenAIProvider:
         return LocalOpenAIProvider(

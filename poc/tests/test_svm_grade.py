@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m3_labeling.rule_engine import (
+from koipa.modules.m3_labeling.rule_engine import (
     grade_from_svm,
     grade_from_svm_floored,
     svm_levels_for_grade,
 )
-from lloydk.modules.m3_labeling.seeds import to_canonical_factor
+from koipa.modules.m3_labeling.seeds import to_canonical_factor
 
 
 # 가이드 12p 워크드 예시 (v2.2 기준 재검토)

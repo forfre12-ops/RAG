@@ -16,8 +16,8 @@ pytestmark = pytest.mark.slow
 
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
+from koipa.api.app import app
+from koipa.config import settings
 
 
 def _post(cli, body, headers=None):

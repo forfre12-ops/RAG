@@ -144,8 +144,8 @@ def test_write_to_db_dry_run_signature_has_no_tenant():
 def test_write_to_db_constructs_document_without_tenant(monkeypatch):
     # 테넌트 제거 후 Document(tenant_id=...) 잔재로 write_to_db 가 런타임에 깨졌었다(TypeError).
     # 페이크 세션으로 DB 없이 Document 생성 경로를 태워 더는 깨지지 않음을 확인.
-    import lloydk.db as db_mod
-    import lloydk.repositories.classify_repo as repo_mod
+    import koipa.db as db_mod
+    import koipa.repositories.classify_repo as repo_mod
 
     fake = _FakeSession()
     monkeypatch.setattr(db_mod, "SessionLocal", lambda: fake)
@@ -162,7 +162,7 @@ def test_write_to_db_constructs_document_without_tenant(monkeypatch):
 
 # ── [G2] --as-candidate: 고객사 반입이 locked_gold_eval(평가정답)을 오염하지 않음 ──
 
-from lloydk import golden_tiers  # noqa: E402
+from koipa import golden_tiers  # noqa: E402
 
 
 def test_merge_gold_default_human_review_is_held(tmp_path, monkeypatch):
@@ -204,8 +204,8 @@ def test_to_gold_record_neither_import_path_is_eval_truth():
 
 
 def test_write_to_db_as_candidate_runs(monkeypatch):
-    import lloydk.db as db_mod
-    import lloydk.repositories.classify_repo as repo_mod
+    import koipa.db as db_mod
+    import koipa.repositories.classify_repo as repo_mod
 
     fake = _FakeSession()
     monkeypatch.setattr(db_mod, "SessionLocal", lambda: fake)

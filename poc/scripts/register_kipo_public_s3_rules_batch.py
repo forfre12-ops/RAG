@@ -5,7 +5,7 @@ import json
 
 import requests
 
-from lloydk.services.proxy_gold_candidate_service import ProxyGoldCandidateService
+from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 
 
 AUTHORIZATION = "지식재산처 공개 고시·공고 원문; 내부 평가·검수용 보관, 외부 재배포 금지"

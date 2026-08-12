@@ -21,8 +21,8 @@ SECRET = ("마스터 키 롤링 절차: HSM root CA 개인키 90일 교체. EUV 
 
 
 def seed_document() -> str:
-    from lloydk.db import SessionLocal
-    from lloydk.db.models import Chunk, Document
+    from koipa.db import SessionLocal
+    from koipa.db.models import Chunk, Document
     s = SessionLocal()
     try:
         doc = Document(tenant_id=T, filename="demo_secret.pdf", source_format="pdf",
@@ -41,8 +41,8 @@ def seed_document() -> str:
 def cleanup(doc_id: str):
     import uuid as _u
 
-    from lloydk.db import session_scope
-    from lloydk.db.models import Chunk, Classification, Correction, Document
+    from koipa.db import session_scope
+    from koipa.db.models import Chunk, Classification, Correction, Document
     try:
         with session_scope() as db:
             du = _u.UUID(doc_id)
@@ -59,13 +59,13 @@ def cleanup(doc_id: str):
 
 
 def al_status() -> dict:
-    from lloydk.modules.m6_evaluation.active_learning import evaluate_retraining_need
+    from koipa.modules.m6_evaluation.active_learning import evaluate_retraining_need
     return evaluate_retraining_need().to_dict()
 
 
 def main() -> int:
     print("=" * 64)
-    print("  LLOYDK 능동학습 루프 라이브 데모 (문서 시드 → classify → confirm → relabel)")
+    print("  KOIPA 능동학습 루프 라이브 데모 (문서 시드 → classify → confirm → relabel)")
     print("=" * 64)
     doc_id = seed_document()
     print(f"① 문서 시드 완료: doc_id={doc_id} (tenant=default)")

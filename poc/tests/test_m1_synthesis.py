@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.adapters.llm import NoopProvider
-from lloydk.modules.m1_synthesis import generator as generator_module
-from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+from koipa.adapters.llm import NoopProvider
+from koipa.modules.m1_synthesis import generator as generator_module
+from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
 
 
 def test_generator_rejects_damaged_static_prompt_before_provider_use(monkeypatch):

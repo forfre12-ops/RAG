@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.testclient import TestClient
 
-from lloydk.api._idempotency_mw import IdempotencyMiddleware
+from koipa.api._idempotency_mw import IdempotencyMiddleware
 
 
 class FakeStore:
@@ -83,7 +83,7 @@ def ctx(monkeypatch):
         return PlainTextResponse("data: x\n\n", media_type="text/event-stream")
 
     monkeypatch.setattr(
-        "lloydk.services.idempotency.get_idempotency_store", lambda: store
+        "koipa.services.idempotency.get_idempotency_store", lambda: store
     )
     return TestClient(app, raise_server_exceptions=False), store, calls
 
@@ -202,7 +202,7 @@ def test_store_error_disables_idempotency_but_serves_request(monkeypatch):
     def _boom():
         raise RuntimeError("redis down")
 
-    monkeypatch.setattr("lloydk.services.idempotency.get_idempotency_store", _boom)
+    monkeypatch.setattr("koipa.services.idempotency.get_idempotency_store", _boom)
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.post("/echo", headers={"Idempotency-Key": "k1"})
     assert resp.status_code == 200

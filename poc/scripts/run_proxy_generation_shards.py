@@ -39,8 +39,8 @@ from scripts.build_proxy_scenarios import (  # noqa: E402
     load_catalog,
     partition_generation_plan_by_family,
 )
-from lloydk.adapters.llm import build_provider  # noqa: E402
-from lloydk.ollama_attestation import (  # noqa: E402
+from koipa.adapters.llm import build_provider  # noqa: E402
+from koipa.ollama_attestation import (  # noqa: E402
     OllamaAttestationError,
     validate_ollama_attestation,
 )
@@ -511,7 +511,7 @@ def _controller_contract(
 ) -> dict[str, object]:
     profile = _USE_PROFILES[intended_use]
     builder_path = _HERE / "build_proxy_scenarios.py"
-    generator_path = _POC / "src/lloydk/modules/m1_synthesis/generator.py"
+    generator_path = _POC / "src/koipa/modules/m1_synthesis/generator.py"
     material: dict[str, object] = {
         "schema_version": CONTROLLER_SCHEMA_VERSION,
         "run_prefix": run_prefix,

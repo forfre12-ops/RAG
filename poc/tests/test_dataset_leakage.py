@@ -7,7 +7,7 @@
 """
 import pytest
 
-from lloydk.dataset_leakage import (
+from koipa.dataset_leakage import (
     DatasetLeakageError,
     audit,
     check_or_raise,

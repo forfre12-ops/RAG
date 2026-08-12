@@ -6,8 +6,8 @@ import hashlib
 
 import pytest
 
-from lloydk.hygiene import text_hash
-from lloydk.proxy_corpus import (
+from koipa.hygiene import text_hash
+from koipa.proxy_corpus import (
     MATCHED_SYNTHETIC_TARGET_ORIGINS,
     PUBLIC_REAL,
     SYNTHETIC,

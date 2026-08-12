@@ -41,13 +41,13 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from eval_p1_model_gold import compute_metrics, predict_direct  # noqa: E402
-from lloydk.config import settings as _settings  # noqa: E402
+from koipa.config import settings as _settings  # noqa: E402
 
 # 배포 모델 단일 진실원 = .env CLASSIFIER_MODEL_DIR (버전 하드코딩 드리프트 방지).
 _DEPLOYED_MODEL = _settings.classifier_model_dir or "artifacts/classifier_p1_v5_clean/v-fe4b386b"
 
-# 외부권위만 legally_grounded — 단일 진실원은 lloydk.golden_tiers(EXTERNAL_AUTHORITY_SOURCES).
-from lloydk.golden_tiers import EXTERNAL_AUTHORITY_SOURCES as LEGAL  # noqa: E402
+# 외부권위만 legally_grounded — 단일 진실원은 koipa.golden_tiers(EXTERNAL_AUTHORITY_SOURCES).
+from koipa.golden_tiers import EXTERNAL_AUTHORITY_SOURCES as LEGAL  # noqa: E402
 
 CURATED = {"koipa_case_based", "curated_scenario"}  # 손작성 시나리오 — floor 회귀용, 정답 아님
 LLMJ = {"llm_judge_primary", "llm_judge_consensus", "codex_review"}

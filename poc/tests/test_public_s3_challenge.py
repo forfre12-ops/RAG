@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from lloydk import proxy_model_comparison as comparison
-from lloydk import public_s3_challenge as challenge
+from koipa import proxy_model_comparison as comparison
+from koipa import public_s3_challenge as challenge
 
 
 def _challenge_rows() -> list[dict[str, object]]:

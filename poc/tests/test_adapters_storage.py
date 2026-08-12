@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.adapters.storage import LocalStorage
+from koipa.adapters.storage import LocalStorage
 
 
 def test_local_storage_put_get_roundtrip(tmp_path: Path):
@@ -49,8 +49,8 @@ def test_local_storage_put_leaves_no_temp_file(tmp_path: Path):
 @pytest.mark.parametrize(
     "store_path",
     [
-        "lloydk.adapters.storage.seaweedfs_store:SeaweedFSStore",
-        "lloydk.adapters.storage.minio_store:MinioStorage",
+        "koipa.adapters.storage.seaweedfs_store:SeaweedFSStore",
+        "koipa.adapters.storage.minio_store:MinioStorage",
     ],
 )
 def test_s3_store_norm_key_strips_leading_slash(store_path: str):
@@ -66,8 +66,8 @@ def test_s3_store_norm_key_strips_leading_slash(store_path: str):
 @pytest.mark.parametrize(
     "store_path",
     [
-        "lloydk.adapters.storage.seaweedfs_store:SeaweedFSStore",
-        "lloydk.adapters.storage.minio_store:MinioStorage",
+        "koipa.adapters.storage.seaweedfs_store:SeaweedFSStore",
+        "koipa.adapters.storage.minio_store:MinioStorage",
     ],
 )
 def test_s3_store_norm_key_blocks_traversal(store_path: str):
@@ -96,7 +96,7 @@ class TestUriRoundTrip:
     """
 
     def test_uri_excludes_storage_root(self, tmp_path):
-        from lloydk.adapters.storage.local_store import LocalStorage
+        from koipa.adapters.storage.local_store import LocalStorage
 
         st = LocalStorage(root=str(tmp_path / ".storage"))
         uri = st.put("documents-normalized", "abc/normalized.txt", b"hello")
@@ -107,7 +107,7 @@ class TestUriRoundTrip:
         """읽기 쪽과 동일한 정규식으로 파싱해 get() 이 성립하는가."""
         import re
 
-        from lloydk.adapters.storage.local_store import LocalStorage
+        from koipa.adapters.storage.local_store import LocalStorage
 
         st = LocalStorage(root=str(tmp_path / ".storage"))
         uri = st.put("documents-normalized", "h4sh/normalized.txt", "본문".encode())
@@ -120,7 +120,7 @@ class TestUriRoundTrip:
         """옛 형식(루트 포함) URI 도 루트 한 겹을 벗기면 읽힌다 — DB 마이그레이션 불요."""
         import re
 
-        from lloydk.adapters.storage.local_store import LocalStorage
+        from koipa.adapters.storage.local_store import LocalStorage
 
         root = tmp_path / ".storage"
         st = LocalStorage(root=str(root))

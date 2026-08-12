@@ -9,8 +9,8 @@ from __future__ import annotations
 import uuid
 from unittest.mock import MagicMock
 
-from lloydk.repositories.classify_repo import ClassifyRepo
-from lloydk.schemas.classify import EvidenceSpan, RagContextHit
+from koipa.repositories.classify_repo import ClassifyRepo
+from koipa.schemas.classify import EvidenceSpan, RagContextHit
 
 
 def _mock_db() -> MagicMock:

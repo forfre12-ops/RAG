@@ -218,9 +218,9 @@ poc/datasets/proxy_gold/blind_quality_pilot/review_pack.v*.jsonl
 # 데모 파서 샘플용 실 정부문서(KOGL 공고·제안요청서 HWP/HWPX/PDF, 대용량). 웹서빙 static 트리라
 # 부주의 커밋·서빙 노출 차단 — 필요 시 개별 `git add -f`. 추적 픽스처는 success_*.docx/.xlsx 뿐이라
 # 확장자 글롭이 안전(그 외 pdf/hwp/hwpx는 전부 커밋 대상 아닌 실문서).
-poc/src/lloydk/api/static/samples/*.hwp
-poc/src/lloydk/api/static/samples/*.hwpx
-poc/src/lloydk/api/static/samples/*.pdf
+poc/src/koipa/api/static/samples/*.hwp
+poc/src/koipa/api/static/samples/*.hwpx
+poc/src/koipa/api/static/samples/*.pdf
 # 재생성 가능 데모 산출물·목업 (배포 비필수·scripts/build_demo_samples.py로 재생성) — 2026-07-24
 poc/demo_samples/
 poc/demo_formats/
@@ -228,6 +228,10 @@ doc/mockups/
 # ── 배포 아카이브·임시 덤프 (2026-07-30 배포감사) ──────────────────
 # 릴리스 tar 는 poc/scripts/ship_to_testserver.sh 로 커밋본에서 재생성되는 빌드 산출물이다.
 # 리포에 두면 소스와 어긋난 stale 아카이브가 남아 "어느 게 배포본인가"가 흐려진다.
+# 릴리스 tarball. **옛 이름도 함께 막는다** — 2026-08-12 koipa 리네임 때 이 줄이
+# /lloydk-*.tar.gz 에서 바뀌면서 기존 lloydk-testserver.tar.gz(636MB)가 제외 대상에서
+# 빠져 커밋될 뻔했다. 이름을 바꿀 때는 옛 패턴을 지우지 말고 남겨야 한다.
+/koipa-*.tar.gz
 /lloydk-*.tar.gz
 # 분석 중 생성된 일회성 텍스트 덤프 — 산출물 아님.
 /scratch_*.txt
@@ -237,5 +241,10 @@ doc/mockups/
 
 # 시안·임시 산출물 — 배포 트리에 들어가면 안 되는 작업물.
 # admin_preview.html 은 manage.html 통일안 시안(192K)이고 어디서도 참조하지 않는다.
-poc/src/lloydk/api/static/admin_preview.html
+poc/src/koipa/api/static/admin_preview.html
 poc/tmp_*.pdf
+
+# v6 요인근거 학습셋 분할 — 코퍼스 **본문**은 추적하지 않는다(proxy_gold/proxy_eval 과 같은
+# 취지). 재현은 manifest.json 의 해시 + split_v6_training_corpus.py 로 한다.
+poc/datasets/labeled_v6_factor_grounded/*.jsonl
+!poc/datasets/labeled_v6_factor_grounded/manifest.json

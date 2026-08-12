@@ -134,7 +134,7 @@ for g in PER_GRADE:
 
 # ── 2) gold_real 실문서 ─────────────────────────────────────────────────────
 sys.path.insert(0, str(ROOT / "src"))
-from lloydk.hygiene import text_hash  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
 
 # 배포본 v-fe4b386b 의 실학습 코퍼스에 들어간 문서는 검수해도 평가 정답으로 쓸 수 없다
 # (train-on-test). 발행 전에 빼서 검수자 시간을 낭비하지 않는다.
@@ -238,7 +238,7 @@ for g, want in PER_GRADE.items():
 # 사람이 읽고 등급을 정할 후보다. 본문에 답이 적혀 있거나 길이가 등급을 알려주면
 # 검수가 검증이 아니라 확인 절차가 되고, 그 라벨로 잰 정확도는 부풀려진다.
 # 발행 **전에** 막는다 — 내보낸 뒤 알면 검수자 시간이 이미 버려진 뒤다.
-from lloydk.dataset_leakage import check_or_raise  # noqa: E402
+from koipa.dataset_leakage import check_or_raise  # noqa: E402
 
 leak = check_or_raise(
     [(r["label"], r["text"]) for r in rows],

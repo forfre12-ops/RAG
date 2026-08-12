@@ -16,7 +16,7 @@
   AUTH_MODE=both                    (api_key 경로 유지 + jwt 허용)
   JWT_JWKS_PATH=secrets/console_jwt/jwks.json
 
-브라우저 사용: 포털이 `lloydk_access_token` 쿠키로 토큰을 심는다. 쿠키만 넣으면 화면이 열린다.
+브라우저 사용: 포털이 `koipa_access_token` 쿠키로 토큰을 심는다. 쿠키만 넣으면 화면이 열린다.
 """
 from __future__ import annotations
 
@@ -42,8 +42,8 @@ def main(argv=None) -> int:
     ap.add_argument("--days", type=int, default=30)
     # auth_mode=both/jwt 운영 모드는 iss/aud 검증을 강제한다(_jwt_auth.assert_production_auth_config).
     # 미설정 시 같은 키로 서명된 타 용도 JWT 를 수락하게 되므로(confused deputy) 기본값을 준다.
-    ap.add_argument("--iss", default="lloydk-console", help="JWT_ISSUER 와 일치해야 한다")
-    ap.add_argument("--aud", default="lloydk-api", help="JWT_AUDIENCE 와 일치해야 한다")
+    ap.add_argument("--iss", default="koipa-console", help="JWT_ISSUER 와 일치해야 한다")
+    ap.add_argument("--aud", default="koipa-api", help="JWT_AUDIENCE 와 일치해야 한다")
     ap.add_argument("--regenerate-key", action="store_true", help="키쌍을 새로 만든다")
     # 토큰이 파일과 .env 두 곳에 살면 재발급 때 한쪽만 갱신돼 어긋난다.
     # 실측(2026-08-09): iss/aud 를 추가하며 재발급했는데 .env 에는 옛 토큰이 남아
@@ -152,7 +152,7 @@ def main(argv=None) -> int:
     print(f"  JWT_ISSUER={args.iss}")
     print(f"  JWT_AUDIENCE={args.aud}")
     print("\n브라우저: 개발자도구 콘솔에서")
-    print(f"  document.cookie='lloydk_access_token={token[:28]}...; path=/'")
+    print(f"  document.cookie='koipa_access_token={token[:28]}...; path=/'")
     return 0
 
 

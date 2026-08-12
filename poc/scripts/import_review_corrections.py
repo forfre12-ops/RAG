@@ -45,7 +45,7 @@ if str(_SRC) not in sys.path:
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from lloydk.golden_tiers import is_human_reviewer  # noqa: E402  (sys.path 설정 후 import)
+from koipa.golden_tiers import is_human_reviewer  # noqa: E402  (sys.path 설정 후 import)
 
 VALID_LABELS = {"TS", "S1", "S2", "S3"}
 VALID_DECISIONS = {"correct", "corrected", "rejected", "uncertain"}
@@ -255,9 +255,9 @@ def write_to_db(records: list[dict], dry_run: bool, *, as_candidate: bool = Fals
       - 없으면 skip (문서 원문 없이 label 기록 불가)
     """
     from sqlalchemy.dialects.postgresql import insert as pg_insert
-    from lloydk.db import SessionLocal
-    from lloydk.db.models import Document, DocumentLabel
-    from lloydk.repositories.classify_repo import ClassifyRepo
+    from koipa.db import SessionLocal
+    from koipa.db.models import Document, DocumentLabel
+    from koipa.repositories.classify_repo import ClassifyRepo
 
     # [G2] 고객사 반입(as_candidate)은 authoritative 라벨로 굳히지 않는다.
     labeled_by = "customer_review" if as_candidate else "human_review"

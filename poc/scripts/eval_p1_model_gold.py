@@ -111,7 +111,7 @@ def predict_direct(model_dir: Path, rows: list[dict], batch_size: int = 16) -> l
 
 
 def predict_api_like(model_dir: Path, rows: list[dict]) -> list[dict]:
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     pipe = InferencePipeline(model_dir=model_dir)
     preds = []
@@ -251,7 +251,7 @@ def main() -> int:
     rows = load_jsonl(Path(args.gold), label_sources or None)
     eval_tier = "all"
     if args.tier in ("eval", "locked"):
-        from lloydk.golden_tiers import eval_records
+        from koipa.golden_tiers import eval_records
         rows, eval_tier = eval_records(rows, allow_floor_fallback=(args.tier == "eval"))
         if not rows:
             print(

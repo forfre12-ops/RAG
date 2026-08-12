@@ -5,10 +5,10 @@ submit → run_build(in-proc) → run-스코프 후보 파일 출력 + JobStore 
 import json
 import uuid
 
-from lloydk.golden_builder import LabelPair
-from lloydk.schemas.common import Actor
-from lloydk.schemas.golden import GoldenBuildRequest
-from lloydk.services.golden_build_service import GoldenBuildService
+from koipa.golden_builder import LabelPair
+from koipa.schemas.common import Actor
+from koipa.schemas.golden import GoldenBuildRequest
+from koipa.services.golden_build_service import GoldenBuildService
 
 _ACTOR = Actor(user_id="t1", role="admin")
 

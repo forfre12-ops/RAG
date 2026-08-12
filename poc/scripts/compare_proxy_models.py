@@ -13,7 +13,7 @@ _SRC = _PROJECT_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.proxy_model_comparison import (  # noqa: E402
+from koipa.proxy_model_comparison import (  # noqa: E402
     ProxyComparisonError,
     compare_proxy_models,
 )

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>기능분해도 · 데이터흐름도 | Lloydk</title>
+<title>기능분해도 · 데이터흐름도 | Koipa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
 <style>
@@ -77,7 +77,7 @@ footer strong{color:var(--text-dim);}
 </head>
 <body>
 <nav class="nav"><div class="nav-inner">
-  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">분석·기능분해·DFD</span></a>
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Koipa"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">한국지식재산보호원</span><span class="brand-sep">/</span><span class="brand-sub">분석·기능분해·DFD</span></a>
   <div class="nav-right"><span class="nav-badge">ANALYSIS</span></div>
 </div></nav>
 <div class="article-layout">
@@ -164,7 +164,7 @@ footer strong{color:var(--text-dim);}
 
   [DS2·DS3·DS4] ─F16 지표·리포트─▶ [P7 지표·거버넌스(M6)] ─▶ [E3 관리자]
   * F11 감사 이벤트 : P2·P3·P4·P5 → [DS4 감사 hash체인(tb_audit_log)]</pre><h3>프로세스 명세</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>프로세스</th><th>요건</th><th>구현</th><th>입력 → 출력</th></tr></thead><tbody><tr><td>P1</td><td>수집·전처리</td><td><code>FUN-022</code></td><td><code>document_ingestion_service</code> · M2 pipeline</td><td>문서원본 → 추출텍스트·청크</td></tr><tr><td>P2</td><td>분류 추론</td><td><code>FUN-005</code></td><td><code>m5_inference/pipeline</code> · <code>classify_service</code></td><td>정규화텍스트+메타 → 예측등급·근거</td></tr><tr><td>P3</td><td>검수 라우팅</td><td><code>FUN-024</code></td><td><code>classify_service</code> 다단 게이트</td><td>예측 → status(staging/needs_review)</td></tr><tr><td>P4</td><td>검수·확정</td><td><code>FUN-024·005</code></td><td><code>confirm_service</code> · <code>golden_signoff</code></td><td>확정지시 → confirmed/corrected·교정</td></tr><tr><td>P5</td><td>교정환류·재학습</td><td><code>FUN-004</code></td><td><code>corrections_rebuild</code> · M4 trainer</td><td>미소비교정 → 학습셋·모델버전(잠금)</td></tr><tr><td>P6</td><td>인덱싱·검색 <span class="tag opt">OPT</span></td><td>부가(RAG)</td><td><code>rag/indexer</code> · <code>retrieval</code></td><td>청크 → 임베딩·RAG 컨텍스트</td></tr><tr><td>P7</td><td>지표·거버넌스</td><td><code>FUN-024</code></td><td><code>m6_evaluation</code> · admin 콘솔</td><td>분류·교정·감사 → 지표·리포트</td></tr></tbody></table></div><h3>Level 1 데이터 흐름</h3><div class="table-wrap"><table><thead><tr><th>흐름</th><th>내용</th><th>From → To</th><th>저장 / 트리거</th></tr></thead><tbody><tr><td>F1</td><td>문서 원본(파일)</td><td>E1 → P1</td><td>HTTP 업로드</td></tr><tr><td>F2</td><td>추출텍스트·청크</td><td>P1 → DS-FS / DS1</td><td>원본 AES 암호화 저장 · <code>tb_chunks</code></td></tr><tr><td>F3</td><td>정규화텍스트(+PII 마스킹)</td><td>P1 → P2</td><td>in-proc</td></tr><tr><td>F4</td><td>ICD 메타데이터</td><td>E2 → P2</td><td><code>security_marking</code>·<code>access_scope</code>(opt-in)</td></tr><tr><td>F5</td><td>예측등급·근거·신뢰도</td><td>P2 → P3</td><td>in-proc</td></tr><tr><td>F6</td><td>분류행(staging / needs_review)</td><td>P3 → DS2</td><td><code>tb_classifications</code></td></tr><tr><td>F7</td><td>검수큐</td><td>DS2 → E3</td><td>GET <code>/review-queue</code></td></tr><tr><td>F8</td><td>확정·교정 지시</td><td>E3 → P4</td><td><code>/confirm</code> · <code>/relabel</code></td></tr><tr><td>F9</td><td>상태 갱신(confirmed / corrected)</td><td>P4 → DS2</td><td><code>tb_classifications.status</code></td></tr><tr><td>F10</td><td>교정 레코드</td><td>P4 → DS3</td><td><code>tb_corrections</code></td></tr><tr><td>F11</td><td>감사 이벤트</td><td>P2·P3·P4·P5 → DS4</td><td><code>tb_audit_log</code>(hash체인)</td></tr><tr><td>F12</td><td>미소비 교정</td><td>DS3 → P5</td><td><code>corrections_rebuild</code></td></tr><tr><td>F13</td><td>모델버전(잠금·admission)</td><td>P5 → DS-FS</td><td><code>tb_model_versions</code>(재학습 잠금)</td></tr><tr><td>F14</td><td>청크 임베딩</td><td>P1 → DS-VEC</td><td>pgvector 인덱싱</td></tr><tr><td>F15</td><td>RAG 컨텍스트</td><td>DS-VEC → P2</td><td>근거 보강(옵션)</td></tr><tr><td>F16</td><td>지표·리포트</td><td>DS2·DS3·DS4 → P7 → E3</td><td>관제 콘솔</td></tr></tbody></table></div><h3>Level 1 데이터 저장소</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>저장소</th><th>기술</th><th>내용</th></tr></thead><tbody><tr><td>DS1</td><td>문서·청크</td><td>PG</td><td><code>tb_documents</code> · <code>tb_chunks</code></td></tr><tr><td>DS2</td><td>분류·근거</td><td>PG</td><td><code>tb_classifications</code> · <code>tb_classification_evidence</code></td></tr><tr><td>DS3</td><td>교정</td><td>PG</td><td><code>tb_corrections</code></td></tr><tr><td>DS4</td><td>감사 hash체인</td><td>PG</td><td><code>tb_audit_log</code></td></tr><tr><td>DS-VEC</td><td>벡터스토어</td><td>pgvector</td><td>청크 임베딩</td></tr><tr><td>DS-FS</td><td>로컬FS</td><td>file://</td><td>원본 AES암호화·추출텍스트·모델 아티팩트</td></tr></tbody></table></div><div class="callout inset"><div class="callout-label">주 경로 안전장치</div><p>① P3에서 저신뢰·희소근거·cap-conflict·access-conflict 신호는 신뢰도와 무관하게 <code>needs_review</code>로 격리(자동확정 차단). ② P1 저품질·OCR 추출 문서는 <code>processing_status</code>로 격리되어 자동분류 우회 불가. ③ P5 재학습은 admission 게이트(사람검수+확정) 통과 교정만 반영하며, 자동 활성은 잠금(<code>retrain_auto_activate=False</code>). ④ P2·P3·P4·P5 전 상태전이는 F11로 감사 hash체인에 기록.</p></div>
-  <div class="footnote">DOC-ANL-01 · 분석 산출물(기능분해도·DFD) · 근거: RTM(FUN-003·004·005·022·023·024) · 소스 poc/src/lloydk(M1~M6) · DB 부록A</div>
+  <div class="footnote">DOC-ANL-01 · 분석 산출물(기능분해도·DFD) · 근거: RTM(FUN-003·004·005·022·023·024) · 소스 poc/src/koipa(M1~M6) · DB 부록A</div>
 </article>
 <aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
 <a href="#s1">01 기능분해도(FBD)</a>
@@ -172,7 +172,7 @@ footer strong{color:var(--text-dim);}
 <a href="#s3">03 데이터흐름도 Level 1</a>
 </nav></aside>
 </div>
-<footer><strong>로이드케이</strong> · 기능분해도 · 데이터흐름도 (DOC-ANL-01) · 감리 대응 산출물</footer>
+<footer><strong>한국지식재산보호원</strong> · 기능분해도 · 데이터흐름도 (DOC-ANL-01) · 감리 대응 산출물</footer>
 <script>
 (function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
 function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}

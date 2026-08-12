@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm
 from scripts.build_proxy_scenarios import expand_catalog_scenarios, generation_plan
 
 

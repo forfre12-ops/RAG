@@ -28,8 +28,8 @@ SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SMOKE="${SKIP_SMOKE:-0}"
 AUTO_LOAD_MODEL="${AUTO_LOAD_MODEL:-1}"
 READY_TIMEOUT="${READY_TIMEOUT:-180}"
-ARTIFACT_VOLUME="${ARTIFACT_VOLUME:-lloydk_prod_artifacts}"
-PG_USER="${PG_USER:-lloydk}"
+ARTIFACT_VOLUME="${ARTIFACT_VOLUME:-koipa_prod_artifacts}"
+PG_USER="${PG_USER:-koipa}"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
@@ -67,7 +67,7 @@ if [ ! -f "$ENV_FILE" ]; then
 DEPLOY_PROFILE=lite-cloud
 POC_MODE=full
 API_KEY=$_api
-LLOYDK_AUDIT_CHAIN_SECRET=$_audit
+KOIPA_AUDIT_CHAIN_SECRET=$_audit
 GOLDEN_HTML_URL_SECRET=$_golden
 # 저장소=로컬FS → minio 불요(무설정). 업로드 문서는 컨테이너 볼륨에 저장.
 STORAGE_BACKEND=local
@@ -77,7 +77,7 @@ VECTOR_BACKEND=pg
 # !override 로 제거하므로(worker/beat 는 아예 빈 environment) 이 env 값이 유일한 연결 소스다.
 # POSTGRES_PASSWORD 는 postgres 컨테이너 초기화값이자 DATABASE_URL 의 비밀번호와 일치해야 한다.
 POSTGRES_PASSWORD=$_pgpw
-DATABASE_URL=postgresql+psycopg://lloydk:$_pgpw@postgres:5432/lloydk
+DATABASE_URL=postgresql+psycopg://koipa:$_pgpw@postgres:5432/koipa
 REDIS_URL=redis://redis:6379/0
 # CORS: 데모 콘솔은 same-origin이라 무관. 타 머신 브라우저 직접 접근 시 실 origin으로.
 ALLOWED_ORIGIN=http://localhost:$API_PORT
@@ -95,7 +95,7 @@ fi
 # 앱도 startup 에서 재검증하나(fail-fast), 부팅 전에 친절히 잡는다.
 _ph_re='change[_-]?me|replace[_-]?me|placeholder|xxx|your[_-]'
 # GOLDEN_HTML_URL_SECRET 포함 — 미설정이면 골든 후보 원문(TS 포함)이 URL 만으로 열린다.
-for k in API_KEY LLOYDK_AUDIT_CHAIN_SECRET GOLDEN_HTML_URL_SECRET; do
+for k in API_KEY KOIPA_AUDIT_CHAIN_SECRET GOLDEN_HTML_URL_SECRET; do
   v="$(_env_val "$k" || true)"
   { [ -z "$v" ] || printf '%s' "$v" | grep -qiE "$_ph_re"; } \
     && die "필수값 미설정/placeholder: $k  ($ENV_FILE 실값 입력)"

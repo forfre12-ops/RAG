@@ -39,7 +39,7 @@ def main(argv=None) -> int:
 
     # 표준 스크립트 관례: src 를 import 경로에 추가(standalone 실행 지원).
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-    from lloydk.services.synthesis_service import SynthesisService
+    from koipa.services.synthesis_service import SynthesisService
 
     result = SynthesisService().build_training_rows(limit=args.limit)
     rows = result["rows"]

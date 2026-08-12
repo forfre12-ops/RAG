@@ -10,7 +10,7 @@ import logging
 
 import pytest
 
-from lloydk.config import _assert_classifier_artifacts
+from koipa.config import _assert_classifier_artifacts
 
 
 def test_missing_path_raises(tmp_path):
@@ -42,7 +42,7 @@ def test_safetensors_index_counts_as_weights(tmp_path):
 def test_valid_dir_warns_on_missing_temperature(tmp_path, caplog):
     (tmp_path / "config.json").write_text("{}", encoding="utf-8")
     (tmp_path / "model.safetensors").write_bytes(b"\x00")
-    with caplog.at_level(logging.WARNING, logger="lloydk.config"):
+    with caplog.at_level(logging.WARNING, logger="koipa.config"):
         _assert_classifier_artifacts(str(tmp_path))  # no raise
     assert "temperature.json" in caplog.text
 
@@ -51,6 +51,6 @@ def test_full_valid_dir_no_temperature_warning(tmp_path, caplog):
     (tmp_path / "config.json").write_text("{}", encoding="utf-8")
     (tmp_path / "pytorch_model.bin").write_bytes(b"\x00")
     (tmp_path / "temperature.json").write_text('{"temperature": 3.0}', encoding="utf-8")
-    with caplog.at_level(logging.WARNING, logger="lloydk.config"):
+    with caplog.at_level(logging.WARNING, logger="koipa.config"):
         _assert_classifier_artifacts(str(tmp_path))
     assert "temperature.json" not in caplog.text

@@ -52,9 +52,9 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from lloydk.golden_signoff import SIGNOFF_GATE_VERSION  # noqa: E402
-from lloydk.golden_tiers import document_origin, is_external_authority, tier_of  # noqa: E402
-from lloydk.hygiene import text_hash  # noqa: E402
+from koipa.golden_signoff import SIGNOFF_GATE_VERSION  # noqa: E402
+from koipa.golden_tiers import document_origin, is_external_authority, tier_of  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
 
 GOLD = _ROOT / "datasets" / "gold_real" / "classification_gold.jsonl"
 # 배포본 v-fe4b386b 의 실학습 코퍼스. 구 train_subset.jsonl(610행)이 아니다 —

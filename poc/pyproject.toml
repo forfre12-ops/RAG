@@ -1,7 +1,7 @@
 [project]
-name = "lloydk-ai"
+name = "koipa-ai"
 version = "0.1.0"
-description = "Lloydk AI Engine for KOIPA Trade-Secret System (PoC)"
+description = "Koipa AI Engine for KOIPA Trade-Secret System (PoC)"
 requires-python = ">=3.11"
 # 기본 dependencies — CI · 핵심 학습/추론 파이프라인 필수
 # 무거운/선택적 의존성은 모두 [project.optional-dependencies]로 분리됨

@@ -15,10 +15,10 @@ from pathlib import Path
 
 sys.path.insert(0, "src")
 
-from lloydk.config import settings  # noqa: E402
-from lloydk.modules.m3_labeling.rule_engine import LabelRuleEngine  # noqa: E402
-from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS, to_canonical_factor  # noqa: E402
-from lloydk.modules.m5_inference.pipeline import InferencePipeline  # noqa: E402
+from koipa.config import settings  # noqa: E402
+from koipa.modules.m3_labeling.rule_engine import LabelRuleEngine  # noqa: E402
+from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS, to_canonical_factor  # noqa: E402
+from koipa.modules.m5_inference.pipeline import InferencePipeline  # noqa: E402
 
 # argv[1]=jsonl, argv[2]=출력 html (기본: golden100). golden500도 동일 포맷으로 재사용.
 JSONL = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("datasets/gold/golden100_labeled_v2.jsonl")

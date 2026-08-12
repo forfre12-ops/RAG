@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔 | Lloydk</title>
+<title>검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔 | Koipa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
 <style>
@@ -77,14 +77,14 @@ footer strong{color:var(--text-dim);}
 </head>
 <body>
 <nav class="nav"><div class="nav-inner">
-  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Lloydk"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">로이드케이</span><span class="brand-sep">/</span><span class="brand-sub">사용자매뉴얼(검수자)</span></a>
+  <a class="brand" href="#"><span class="brand-mark"><svg viewBox="0 0 32 32" width="28" height="28" aria-label="Koipa"><rect width="32" height="32" rx="6" fill="#09090b"/><text x="16" y="22" font-family="Geist,sans-serif" font-size="17" font-weight="800" fill="#fff" text-anchor="middle">L</text></svg></span><span class="brand-name">한국지식재산보호원</span><span class="brand-sep">/</span><span class="brand-sub">사용자매뉴얼(검수자)</span></a>
   <div class="nav-right"><span class="nav-badge">MANUAL</span></div>
 </div></nav>
 <div class="article-layout">
 <article>
   <div class="meta-row"><span class="badge">DOC-MAN-01</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-07-17</span></div>
   <h1 class="title">검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔</h1>
-  <p class="lede">로이드케이/지재원 영업비밀 자동 등급분류·RAG 시스템의 거버넌스 관제콘솔(admin.html) 검수 관리자 조작 절차서. 분류 → 검수(확정·재라벨) → 재학습·활성화 → 실시간 관제 → 골든셋 서명의 폐곡선을 화면 단위로 안내한다. 모든 동작은 기존 /api/v1 엔드포인트를 호출하며, 상태 변경 작업은 Safe Mode 해제 후에만 실행된다.</p>
+  <p class="lede">한국지식재산보호원/지재원 영업비밀 자동 등급분류·RAG 시스템의 거버넌스 관제콘솔(admin.html) 검수 관리자 조작 절차서. 분류 → 검수(확정·재라벨) → 재학습·활성화 → 실시간 관제 → 골든셋 서명의 폐곡선을 화면 단위로 안내한다. 모든 동작은 기존 /api/v1 엔드포인트를 호출하며, 상태 변경 작업은 Safe Mode 해제 후에만 실행된다.</p>
   <div class="callout inset"><div class="callout-label">범위 · 기준</div><p>본 매뉴얼은 관제콘솔(admin.html)과 골든셋 서명 화면(signoff.html)의 검수 관리자 조작만 다룬다. KL 포털 인증·격리, 회원사 업로드 화면, 파싱 시연(parse_demo.html)은 범위 외다.</p></div>
   <div class="section-sep" id="sec-01-access"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">접속 · 인증 · Safe Mode</span></div>
 <p>관제콘솔(<code>admin.html</code>)은 API 서버가 서빙하는 단일 화면으로, 분류 → 검수 → 재학습 → 모델 리로드 → 메트릭의 거버넌스 폐곡선을 한 곳에서 조작한다. 모든 버튼은 기존 <code>/api/v1</code> 엔드포인트를 호출한다. 운영 배포 호스트 주소는 <span class="ph">[발주처 입력]</span>.</p>
@@ -143,7 +143,7 @@ footer strong{color:var(--text-dim);}
 <h3>서명 무결성 · 주의</h3>
 <div class="callout warn"><div class="callout-label">TS/S1 이중서명 토글</div><p>「TS/S1 이중서명」을 체크하면 고등급은 독립 2인 서명이 필요해, 이 화면 <b>단일 세션에서는 TS/S1 후보가 전건 거부</b>된다(9월 실서명 배치 경로용). 단일 검수라면 끈다.</p></div>
 <ul><li><b>reviewer_id는 실계정만</b> 허용된다. 머신/플레이스홀더 계정은 403으로 거부된다.</li><li>인증 신원(JWT sub)이 있으면 클라이언트가 보낸 reviewer_id 대신 <b>인증 신원으로 교정</b>된다(위조 차단).</li><li>미결정 후보는 제출에서 제외된다.</li><li>정본 골든셋은 직접 변경되지 않는다. 승격분은 별도 <code>locked_gold_eval</code> 경로에 doc_id 기준으로 누적된다.</li></ul>
-  <div class="footnote">로이드케이 / 지재원 영업비밀 자동 등급분류 · RAG 시스템 · 검수 관리자 사용자매뉴얼(DOC-MAN-01) · 기준 화면 admin.html · signoff.html · 2026-07-17</div>
+  <div class="footnote">한국지식재산보호원 / 지재원 영업비밀 자동 등급분류 · RAG 시스템 · 검수 관리자 사용자매뉴얼(DOC-MAN-01) · 기준 화면 admin.html · signoff.html · 2026-07-17</div>
 </article>
 <aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
 <a href="#sec-01-access">01 접속 · 인증 · Safe Mode</a>
@@ -154,7 +154,7 @@ footer strong{color:var(--text-dim);}
 <a href="#sec-06-golden">06 골든셋 검수 · 서명</a>
 </nav></aside>
 </div>
-<footer><strong>로이드케이</strong> · 검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔 (DOC-MAN-01) · 감리 대응 산출물</footer>
+<footer><strong>한국지식재산보호원</strong> · 검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔 (DOC-MAN-01) · 감리 대응 산출물</footer>
 <script>
 (function(){var links=[].slice.call(document.querySelectorAll('.toc a'));var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
 function o(){var y=window.scrollY+90,cur=0;for(var i=0;i<secs.length;i++){if(secs[i]&&secs[i].offsetTop<=y)cur=i;}links.forEach(function(a,i){a.classList.toggle('active',i===cur);});}

@@ -98,7 +98,7 @@ DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_
 | 파일 | 참조하는 곳 |
 |---|---|
 | `_drift_probe_empty_check.py` | `ci_alembic_drift_check.sh` — **CI가 실행합니다** |
-| `_bench_pg_lexical_revalidation.py` | alembic 마이그레이션 주석 · `src/lloydk/adapters/vectorstore/pg_store.py` 설계 노트 · `infra/postgres/README.md` · `revalidate_pg_lexical.py` · `build_nl_revalidation_queries.py` — **실측 근거로 인용됩니다** |
+| `_bench_pg_lexical_revalidation.py` | alembic 마이그레이션 주석 · `src/koipa/adapters/vectorstore/pg_store.py` 설계 노트 · `infra/postgres/README.md` · `revalidate_pg_lexical.py` · `build_nl_revalidation_queries.py` — **실측 근거로 인용됩니다** |
 
 ---
 

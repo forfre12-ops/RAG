@@ -15,9 +15,9 @@ import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-import lloydk.db as db_mod
-import lloydk.repositories as repos_mod
-from lloydk.workers.tasks import _persist_synth_samples, _record_job_done
+import koipa.db as db_mod
+import koipa.repositories as repos_mod
+from koipa.workers.tasks import _persist_synth_samples, _record_job_done
 
 _LEVELS = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
 
@@ -122,7 +122,7 @@ def test_persist_db_failure_does_not_raise(monkeypatch) -> None:
 
 
 def test_record_job_done_updates_default_store(monkeypatch) -> None:
-    import lloydk.services.job_store as job_store_mod
+    import koipa.services.job_store as job_store_mod
 
     job_id = uuid.uuid4()
     calls = []

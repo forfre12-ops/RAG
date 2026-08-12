@@ -12,7 +12,7 @@ ts_rank≈87%, morph≈85%)와 대조. ±5pp 이내면 **ⓑ 확정**, 크게 �
 
 전제: stock Postgres 16 가동. usage:
   python scripts/revalidate_pg_tsrank_crux.py \
-    --db postgresql://lloydk:lloydk_dev@localhost:5432/lloydk \
+    --db postgresql://koipa:koipa_dev@localhost:5432/koipa \
     --queries datasets/gold_real/retrieval_gold_nl.jsonl
 (make revalidate-tsrank-crux 로도 실행)
 
@@ -42,7 +42,7 @@ def san(s):
 
 
 def load_corpus(limit=None):
-    from lloydk.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
+    from koipa.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
     ids, bigrams, grades = [], [], []
     files = sorted(glob.glob(str(CORPUS_DIR / "*.json")))
     if limit:
@@ -72,14 +72,14 @@ def recall_by_grade(hits, q_gold, q_grade, k):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default=os.getenv("DATABASE_URL", "postgresql://lloydk:lloydk_dev@localhost:5432/lloydk"))
+    ap.add_argument("--db", default=os.getenv("DATABASE_URL", "postgresql://koipa:koipa_dev@localhost:5432/koipa"))
     ap.add_argument("--queries", default=str(ROOT / "datasets/gold_real/retrieval_gold_nl.jsonl"))
     ap.add_argument("--limit-corpus", type=int, default=None)
     cli = ap.parse_args()
     dsn = cli.db.replace("postgresql+psycopg://", "postgresql://")
 
     import psycopg  # noqa: PLC0415
-    from lloydk.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
+    from koipa.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
 
     ids, bigrams, grades = load_corpus(cli.limit_corpus)
     print(f"[corpus] {len(ids)} docs bigram-tokenized")

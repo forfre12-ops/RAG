@@ -20,8 +20,8 @@ _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.db import session_scope  # noqa: E402
-from lloydk.repositories.training_repo import TrainingRepo  # noqa: E402
+from koipa.db import session_scope  # noqa: E402
+from koipa.repositories.training_repo import TrainingRepo  # noqa: E402
 
 LABEL = "v-fe4b386b"
 BASE_MODEL = "kakaobank/kf-deberta-base"
@@ -48,7 +48,7 @@ def main() -> int:
     # [P0#①-a] 이 스크립트는 activate_model_version 을 직접 호출해 deploy gate·locked-eval·감사를
     # 모두 우회한다(데모 metrics/latest 시딩 전용). 하드닝/운영 프로파일에서는 이 우회를 거부한다 —
     # 운영 활성은 POST /admin/model/activate(게이트·감사)로만.
-    from lloydk.config import settings  # noqa: PLC0415
+    from koipa.config import settings  # noqa: PLC0415
     profile = (getattr(settings, "deploy_profile", "") or "").lower()
     if getattr(settings, "require_safety_gates", False) or profile in ("onprem-local", "full-train"):
         print(

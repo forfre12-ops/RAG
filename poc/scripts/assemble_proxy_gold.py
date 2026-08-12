@@ -16,8 +16,8 @@ _POC = _HERE.parent
 sys.path.insert(0, str(_POC))
 sys.path.insert(0, str(_POC / "src"))
 
-from lloydk.hygiene import text_hash  # noqa: E402
-from lloydk.proxy_corpus import (  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
+from koipa.proxy_corpus import (  # noqa: E402
     DEFAULT_TARGET_COUNTS,
     ORIGIN_EXPECTATION_PROFILES,
     PUBLIC_REAL,

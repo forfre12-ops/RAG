@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lloydk.services import job_store as js
-from lloydk.services.job_store import (
+from koipa.services import job_store as js
+from koipa.services.job_store import (
     InMemoryJobStore,
     assert_multiworker_jobstore_safe,
 )

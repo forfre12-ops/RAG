@@ -75,11 +75,11 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
-    from lloydk.modules.m6_evaluation.anchor_corpus import load_anchor_corpus
-    from lloydk.modules.m6_evaluation.metamorphic import build_metamorphic_report
-    from lloydk.modules.m6_evaluation.paraphrase_gen import GeneratedSample, generate_minimal_pairs
-    from lloydk.modules.m6_evaluation.serving_eval import predict_via_serving
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.modules.m6_evaluation.anchor_corpus import load_anchor_corpus
+    from koipa.modules.m6_evaluation.metamorphic import build_metamorphic_report
+    from koipa.modules.m6_evaluation.paraphrase_gen import GeneratedSample, generate_minimal_pairs
+    from koipa.modules.m6_evaluation.serving_eval import predict_via_serving
 
     records = load_anchor_corpus()
     # 공개(S3) 과분류 베이스라인용 앵커 — 결정적(LLM 불요), 두 모드 공통.
@@ -95,7 +95,7 @@ def main() -> int:
             print(f"픽스처에 forward 샘플 0건: {args.from_samples}", file=sys.stderr)
             return 2
     else:
-        from lloydk.adapters.llm import build_provider  # noqa: PLC0415
+        from koipa.adapters.llm import build_provider  # noqa: PLC0415
         # 고등급(TS/S1) + 필수토큰 보유만 생성 대상(보존 게이트가 의미 있는 것). 결정적 정렬 후 절단.
         hi = sorted([r for r in records if r.anchor_grade in HIGH_GRADES and r.required_tokens],
                     key=lambda r: r.anchor_id)[:args.max_anchors]

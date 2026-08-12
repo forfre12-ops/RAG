@@ -48,7 +48,7 @@ def test_default_allowlist_contains_runtime_closure_but_no_sensitive_data():
     assert "scripts/finalize_proxy_classifier.py" in paths
     assert "scripts/attest_legacy_training_corpus.py" in paths
     assert "docs/LEGACY_RAW_MODEL_PROVENANCE.md" in paths
-    assert "src/lloydk/proxy_training_finalization.py" in paths
+    assert "src/koipa/proxy_training_finalization.py" in paths
     assert "scripts/__init__.py" in paths
     assert "scripts/build_synthetic_golden.py" not in paths
     assert all(

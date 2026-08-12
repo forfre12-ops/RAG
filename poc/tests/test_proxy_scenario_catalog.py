@@ -6,9 +6,9 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from lloydk.proxy_corpus import REQUIRED_HIGH_GRADE_EVIDENCE
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm
-from lloydk.proxy_shortcuts import strict_shortcut_gate
+from koipa.proxy_corpus import REQUIRED_HIGH_GRADE_EVIDENCE
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm
+from koipa.proxy_shortcuts import strict_shortcut_gate
 from scripts.build_proxy_scenarios import expand_catalog_scenarios, generation_plan
 
 

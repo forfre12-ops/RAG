@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
 
 
 class _FakeProvider:

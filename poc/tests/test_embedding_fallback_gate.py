@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import pytest
 
-import lloydk.adapters.embedding as emb
-from lloydk.adapters.embedding.hash_embedding import HashEmbedding
+import koipa.adapters.embedding as emb
+from koipa.adapters.embedding.hash_embedding import HashEmbedding
 
 
 @pytest.fixture
 def _break_hf(monkeypatch):
     """HFEmbedding 로드가 항상 실패하도록(네트워크/디스크/CUDA 장애 시뮬)."""
-    import lloydk.adapters.embedding.hf_embedding as hf
+    import koipa.adapters.embedding.hf_embedding as hf
 
     def _boom(*a, **k):
         raise RuntimeError("HF load failed (simulated)")
@@ -27,7 +27,7 @@ def _break_hf(monkeypatch):
 
 
 def test_fallback_allowed_by_default(_break_hf, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
 
     monkeypatch.setattr(settings, "require_real_embedder", False, raising=False)
     with pytest.warns(RuntimeWarning):
@@ -36,7 +36,7 @@ def test_fallback_allowed_by_default(_break_hf, monkeypatch):
 
 
 def test_fallback_refused_when_required(_break_hf, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
 
     monkeypatch.setattr(settings, "require_real_embedder", True, raising=False)
     with pytest.raises(RuntimeError, match="require_real_embedder"):
@@ -45,7 +45,7 @@ def test_fallback_refused_when_required(_break_hf, monkeypatch):
 
 def test_explicit_hash_allowed_even_when_required(monkeypatch):
     # 명시적 hash 요청은 '폴백'이 아니라 의도된 dryrun → require_real_embedder=True여도 허용.
-    from lloydk.config import settings
+    from koipa.config import settings
 
     monkeypatch.setattr(settings, "require_real_embedder", True, raising=False)
     assert isinstance(emb.build_embedder(force_hash=True), HashEmbedding)
@@ -68,8 +68,8 @@ def test_warmup_reraises_when_real_embedder_required(monkeypatch):
     """require_real_embedder=True 하드닝 서빙: 임베더 warmup 실패는 startup fail-clear(re-raise).
 
     lazy(첫 요청)까지 지연하지 않고 startup 에서 걸린다 — 형제 게이트(require_safety_gates)와 대칭."""
-    from lloydk.api import app as app_mod
-    import lloydk.adapters.embedding as emb_mod
+    from koipa.api import app as app_mod
+    import koipa.adapters.embedding as emb_mod
 
     def _boom(*a, **k):
         raise RuntimeError("real embedder required but HF load failed (simulated)")
@@ -81,8 +81,8 @@ def test_warmup_reraises_when_real_embedder_required(monkeypatch):
 
 def test_warmup_swallows_when_not_required(monkeypatch):
     """require_real_embedder=False(기본): warmup 실패는 best-effort 스킵(부팅 안 막음 — 동작 보존)."""
-    from lloydk.api import app as app_mod
-    import lloydk.adapters.embedding as emb_mod
+    from koipa.api import app as app_mod
+    import koipa.adapters.embedding as emb_mod
 
     def _boom(*a, **k):
         raise RuntimeError("HF load failed (simulated)")

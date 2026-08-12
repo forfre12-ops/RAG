@@ -5,9 +5,9 @@
 """
 import json
 
-from lloydk.golden_signoff import Signoff, merge_locked_records, promote_to_locked
-from lloydk.golden_tiers import TIER_LOCKED, tier_of
-from lloydk.modules.m6_evaluation.locked_readiness import locked_eval_readiness
+from koipa.golden_signoff import Signoff, merge_locked_records, promote_to_locked
+from koipa.golden_tiers import TIER_LOCKED, tier_of
+from koipa.modules.m6_evaluation.locked_readiness import locked_eval_readiness
 
 
 def _cand(doc_id, grade):

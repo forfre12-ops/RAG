@@ -4,13 +4,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lloydk.modules.m6_evaluation.anchor_corpus import (
+from koipa.modules.m6_evaluation.anchor_corpus import (
     DEFAULT_ANCHOR_SOURCES,
     constructed_floor_source,
     load_anchor_corpus,
     normalize_constructed_floor,
 )
-from lloydk.modules.m6_evaluation.anchor_eval import run_anchor_cards
+from koipa.modules.m6_evaluation.anchor_eval import run_anchor_cards
 
 
 def _write_admitted(tmp_path: Path, rows: list[dict]) -> Path:

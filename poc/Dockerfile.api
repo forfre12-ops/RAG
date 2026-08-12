@@ -40,4 +40,4 @@ RUN pip install --upgrade pip && \
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfreetype.so.6
 
 EXPOSE 8000
-CMD ["uvicorn", "lloydk.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "koipa.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -24,7 +24,7 @@ set -u
 HWP=${1:?"사용: verify_hwp_tables_live.sh <표가있는.hwp> [포트] [envfile]"}
 PORT=${2:-8000}
 ENVF=${3:-.env.jjw}
-CONTAINERS=${CONTAINERS:-"lloydk-jjw-api-1 lloydk-jjw-worker-1"}
+CONTAINERS=${CONTAINERS:-"koipa-jjw-api-1 koipa-jjw-worker-1"}
 B="http://127.0.0.1:$PORT/api/v1"
 FAIL=0
 
@@ -42,7 +42,7 @@ PROBE=$(mktemp /tmp/hwp_probe.XXXXXX.py)
 cat > "$PROBE" <<'PYEOF'
 import json
 from pathlib import Path
-from lloydk.modules.m2_preprocess.extractor import extract, _hwp_tables_via_unhwp
+from koipa.modules.m2_preprocess.extractor import extract, _hwp_tables_via_unhwp
 
 p = Path("/tmp/_hwp_verify.hwp")
 o = {}
@@ -140,7 +140,7 @@ done
 rm -f "$PROBE"
 
 # ── 2) E2E: 적재 → 검수게이트 → 비동기 분류 ──────────────────────────────────
-# 동기 /documents/analyze 는 청크 상한(LLOYDK_ANALYZE_SYNC_MAX_CHUNKS)에 걸려 거부되는 게
+# 동기 /documents/analyze 는 청크 상한(KOIPA_ANALYZE_SYNC_MAX_CHUNKS)에 걸려 거부되는 게
 # 정상이다. 대용량 .hwp 의 정본 경로는 /documents + /classify/async 다.
 echo "── E2E (:$PORT) ──"
 up=$(curl -s -X POST "$B/documents" -H "X-API-Key: $K" -H "X-Actor-Role: admin" \

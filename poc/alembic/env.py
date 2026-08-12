@@ -1,4 +1,4 @@
-"""Alembic 실행 환경. lloydk.db.Base.metadata와 settings.database_url을 사용.
+"""Alembic 실행 환경. koipa.db.Base.metadata와 settings.database_url을 사용.
 
 2026-05-28: init.sql 외부 부트스트랩 폐기. 모든 DDL은 alembic 단일 경로로 일원화.
 - 신규 DB: `alembic upgrade head` 한 번으로 baseline + 모든 후속 revision 적용.
@@ -13,10 +13,10 @@ import re
 
 from alembic import context
 
-# lloydk DB 모듈 import — Base.metadata에 모든 테이블 등록.
-from lloydk.config import settings
-from lloydk.db import Base
-from lloydk.db import models as _models  # 부수효과: 19 ORM 클래스 → Base.metadata 등록
+# koipa DB 모듈 import — Base.metadata에 모든 테이블 등록.
+from koipa.config import settings
+from koipa.db import Base
+from koipa.db import models as _models  # 부수효과: 19 ORM 클래스 → Base.metadata 등록
 
 assert _models  # 미사용 import 경고 차단 + 등록 실행 보장
 

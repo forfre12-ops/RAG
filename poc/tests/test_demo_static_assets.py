@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-STATIC = Path(__file__).resolve().parents[1] / "src" / "lloydk" / "api" / "static"
+STATIC = Path(__file__).resolve().parents[1] / "src" / "koipa" / "api" / "static"
 
 
 def test_demo_pages_are_airgap_safe_static_assets():

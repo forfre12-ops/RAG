@@ -26,9 +26,9 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.adapters.llm import build_provider  # noqa: E402
-from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator  # noqa: E402
-from lloydk.modules.m3_labeling import LabelingPipeline  # noqa: E402
+from koipa.adapters.llm import build_provider  # noqa: E402
+from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator  # noqa: E402
+from koipa.modules.m3_labeling import LabelingPipeline  # noqa: E402
 
 # 참고 (2026-05-30 실측): Qwen3 14B 가 16GB GPU 에 완전히 안 올라가 일부 CPU
 # 오프로딩 → 건당 ~16-20초. /no_think 는 오히려 출력 토큰이 늘어 더 느렸음

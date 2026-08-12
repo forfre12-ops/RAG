@@ -22,7 +22,7 @@ import importlib
 import pytest
 
 _KEY = "nightly-incremental-retrain-0200"
-_TASK = "lloydk.nightly_incremental_retrain_tick"
+_TASK = "koipa.nightly_incremental_retrain_tick"
 
 
 def _reload_celery(monkeypatch, *, enabled: bool):
@@ -30,9 +30,9 @@ def _reload_celery(monkeypatch, *, enabled: bool):
 
     beat_schedule 은 import 시점에 만들어지므로, 설정 효과를 보려면 재로드가 필요하다.
     """
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
     monkeypatch.setattr(config_mod.settings, "enable_nightly_retrain_schedule", enabled)
-    import lloydk.workers.celery_app as mod
+    import koipa.workers.celery_app as mod
     return importlib.reload(mod)
 
 
@@ -47,8 +47,8 @@ def test_other_periodic_jobs_unaffected(monkeypatch):
     sched = mod.celery_app.conf.beat_schedule
     assert len(sched) >= 5
     tasks = {v.get("task") for v in sched.values()}
-    assert "lloydk.verify_audit_chain_tick" in tasks
-    assert "lloydk.deliver_outbox_tick" in tasks
+    assert "koipa.verify_audit_chain_tick" in tasks
+    assert "koipa.deliver_outbox_tick" in tasks
     assert _TASK not in tasks
 
 
@@ -66,7 +66,7 @@ def test_setting_restores_schedule(monkeypatch):
 def test_task_still_callable_for_manual_trigger(monkeypatch):
     """스케줄을 껐다고 태스크가 사라지면 안 된다 — 수동 트리거 경로가 남아야 한다."""
     _reload_celery(monkeypatch, enabled=False)
-    from lloydk.workers.tasks import nightly_incremental_retrain_tick
+    from koipa.workers.tasks import nightly_incremental_retrain_tick
     assert callable(nightly_incremental_retrain_tick)
 
 
@@ -74,5 +74,5 @@ def test_task_still_callable_for_manual_trigger(monkeypatch):
 def _restore_module():
     """테스트가 모듈을 재로드하므로 끝나고 기본 상태로 되돌린다(다른 테스트 오염 방지)."""
     yield
-    import lloydk.workers.celery_app as mod
+    import koipa.workers.celery_app as mod
     importlib.reload(mod)

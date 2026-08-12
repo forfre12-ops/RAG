@@ -45,10 +45,10 @@ for _path in (_ROOT, _SRC):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-from lloydk.proxy_corpus import validate_proxy_record  # noqa: E402
+from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
 
 
-USER_AGENT = "lloydk-korea-policy-collector/1.1"
+USER_AGENT = "koipa-korea-policy-collector/1.1"
 DEFAULT_OUTPUT_ROOT = _ROOT / "datasets" / "proxy_gold" / "korea_policy_runs"
 DEFAULT_LIMIT = 5
 HARD_LIMIT = 300

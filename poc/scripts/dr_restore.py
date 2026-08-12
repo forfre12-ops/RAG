@@ -43,9 +43,9 @@ from dr_discovery import autodetect_container
 logger = logging.getLogger("dr_restore")
 
 # backup_postgres.py DEFAULT_PG_CONTAINER 와 정합(운영 dev compose 컨테이너명).
-_PROD_PG_CONTAINER = "lloydk-poc-postgres-1"
-# dr_drill.py 가 `docker compose -p lloydk-dr` 로 띄우는 staging 프로젝트의 pg 컨테이너.
-_STAGING_PG_CONTAINER = "lloydk-dr-postgres-1"
+_PROD_PG_CONTAINER = "koipa-poc-postgres-1"
+# dr_drill.py 가 `docker compose -p koipa-dr` 로 띄우는 staging 프로젝트의 pg 컨테이너.
+_STAGING_PG_CONTAINER = "koipa-dr-postgres-1"
 
 
 def _latest_dump(pg_dir: Path) -> Path | None:
@@ -173,7 +173,7 @@ def restore_storage(*, mirror_dir: Path, target_dir: Path, dry_run: bool) -> int
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    p = argparse.ArgumentParser(description="Lloydk DR 실복구 실행기 (fail-closed)")
+    p = argparse.ArgumentParser(description="Koipa DR 실복구 실행기 (fail-closed)")
     p.add_argument("--target", required=True, choices=["postgres", "storage"])
     p.add_argument("--staging", action="store_true", help="staging(dr_drill) 컨테이너/경로 대상")
     p.add_argument("--dry-run", action="store_true", help="실 write 없이 전제조건만 검증")
@@ -181,8 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--mirror-dir", type=Path, default=Path("backups/storage"))
     p.add_argument("--target-dir", type=Path, default=Path(".storage"),
                    help="storage 복원 대상 경로")
-    p.add_argument("--db", default="lloydk")
-    p.add_argument("--user", default="lloydk")
+    p.add_argument("--db", default="koipa")
+    p.add_argument("--user", default="koipa")
     p.add_argument("--container", default=None,
                    help="pg 컨테이너명(미지정 시 --staging 여부로 자동 선택)")
     args = p.parse_args(argv)

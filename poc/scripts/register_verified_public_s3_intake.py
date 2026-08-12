@@ -9,7 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from lloydk.services.proxy_gold_candidate_service import ProxyGoldCandidateService
+from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 
 
 ROOT = Path(__file__).resolve().parents[1]

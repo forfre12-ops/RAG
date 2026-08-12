@@ -19,7 +19,7 @@ pytestmark = pytest.mark.model_download
 # ---- 어댑터 존재 확인 (없으면 skip) ---------------------------------------
 
 try:
-    from lloydk.adapters.llm.local_openai_provider import (  # noqa: F401
+    from koipa.adapters.llm.local_openai_provider import (  # noqa: F401
         LocalOpenAIProvider,
         lm_studio_provider,
         ollama_provider,

@@ -9,7 +9,7 @@
 """
 from __future__ import annotations
 
-from lloydk.modules.m6_evaluation.constructed_floor import (
+from koipa.modules.m6_evaluation.constructed_floor import (
     TIER_CONSTRUCTED_FLOOR,
     check_witness,
     evaluate_constructed_floor,

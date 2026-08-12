@@ -1,7 +1,7 @@
 """CORS middleware tests.
 
 These tests use a tiny FastAPI app with the same CORSMiddleware options instead
-of importing the full Lloydk API app. That keeps the suite fast and avoids model
+of importing the full Koipa API app. That keeps the suite fast and avoids model
 or router startup work when only CORS behavior is under test.
 """
 
@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-from lloydk.config import Settings
+from koipa.config import Settings
 
 
 def _allowed_origin(origins: list[str]) -> str:

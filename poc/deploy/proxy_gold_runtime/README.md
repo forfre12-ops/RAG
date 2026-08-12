@@ -5,7 +5,7 @@ CUSTOMER_ACCURACY_UNVERIFIED**. These runs are synthetic/public proxy evidence,
 not a validation of accuracy on customer documents.
 
 This runtime is intentionally separate from the deployed KL API/worker stack.
-It exposes no host port, joins only the internal `lloydk-proxy-gold-internal`
+It exposes no host port, joins only the internal `koipa-proxy-gold-internal`
 network, loads at most one model, and must never restart the product services.
 The active batch model remains warm for five minutes; switching from generation
 to judging evicts it automatically because `OLLAMA_MAX_LOADED_MODELS=1`.
@@ -138,7 +138,7 @@ test "$(docker image inspect "$PROXY_RUNNER_IMAGE" --format '{{.Id}}')" = "$PROX
 
 runner() {
   docker run --rm --init --pull never \
-    --network lloydk-proxy-gold-internal \
+    --network koipa-proxy-gold-internal \
     --read-only --tmpfs /tmp:rw,noexec,nosuid,size=1g \
     --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
     --user 1000:1000 \
@@ -170,7 +170,7 @@ sidecar with every pilot/controller operator record, and use
 
 ```sh
 export EXPECTED_PRODUCT_IMAGE='sha256:578846335a11f047a1dcbb89276650b80b695b9af3aea37e515f48332b6a6e57'
-export PRODUCT_API_CONTAINER=lloydk-jjw-api-1
+export PRODUCT_API_CONTAINER=koipa-jjw-api-1
 export PREFLIGHT_ROOT="$PROXY_RUN_ROOT/preflight"
 install -d -m 2770 "$PREFLIGHT_ROOT"
 chgrp 1000 "$PREFLIGHT_ROOT"
@@ -181,8 +181,8 @@ export RUNNER_IMAGE_ID="$(docker image inspect "$PROXY_RUNNER_IMAGE" --format '{
 test "$RUNNER_IMAGE_ID" = "$PROXY_RUNNER_IMAGE"
 export PRODUCT_IMAGE_ID="$(docker inspect "$PRODUCT_API_CONTAINER" --format '{{.Image}}')"
 test "$PRODUCT_IMAGE_ID" = "$EXPECTED_PRODUCT_IMAGE"
-export OLLAMA_IMAGE_ID="$(docker inspect lloydk-proxy-ollama --format '{{.Image}}')"
-export OLLAMA_CONFIG_IMAGE="$(docker inspect lloydk-proxy-ollama --format '{{.Config.Image}}')"
+export OLLAMA_IMAGE_ID="$(docker inspect koipa-proxy-ollama --format '{{.Image}}')"
+export OLLAMA_CONFIG_IMAGE="$(docker inspect koipa-proxy-ollama --format '{{.Config.Image}}')"
 export PRODUCT_CONFIG_IMAGE="$(docker inspect "$PRODUCT_API_CONTAINER" --format '{{.Config.Image}}')"
 export PRODUCT_GPU_REQUESTS="$(docker inspect "$PRODUCT_API_CONTAINER" --format '{{json .HostConfig.DeviceRequests}}')"
 export PRODUCT_HEALTH_JSON="$(curl --fail --silent --show-error http://localhost:8000/api/v1/healthz/live)"
@@ -880,7 +880,7 @@ mv "$BASE_MODEL_STAGING" "$PROXY_BASE_MODEL_ROOT/v-fe4b386b"
 docker compose \
   -f "$PROXY_RELEASE_ROOT/deploy/proxy_gold_runtime/compose.yaml" \
   stop ollama
-test "$(docker inspect -f '{{.State.Running}}' lloydk-proxy-ollama)" = false
+test "$(docker inspect -f '{{.State.Running}}' koipa-proxy-ollama)" = false
 curl --fail --silent --show-error http://localhost:8000/api/v1/healthz/live
 nvidia-smi
 ```
@@ -919,7 +919,7 @@ training_runner() {
     "$PROXY_RUNNER_IMAGE" "$@"
 }
 
-training_runner python -c 'import os; from pathlib import Path; from lloydk.proxy_model_comparison import hash_model_directory; expected=os.environ["EXPECTED_BASE_MODEL_TREE_SHA256"]; actual=hash_model_directory(Path("/base-model/v-fe4b386b"))["tree_sha256"]; assert actual == expected, (actual, expected); print(actual)'
+training_runner python -c 'import os; from pathlib import Path; from koipa.proxy_model_comparison import hash_model_directory; expected=os.environ["EXPECTED_BASE_MODEL_TREE_SHA256"]; actual=hash_model_directory(Path("/base-model/v-fe4b386b"))["tree_sha256"]; assert actual == expected, (actual, expected); print(actual)'
 training_runner python -c 'import json,torch,transformers,datasets,mlflow,accelerate,evaluate,sklearn,scipy; assert torch.cuda.is_available(); assert torch.cuda.device_count()==1; print(json.dumps({"torch":torch.__version__,"cuda_runtime":torch.version.cuda,"cuda_device":torch.cuda.get_device_name(0),"transformers":transformers.__version__,"datasets":datasets.__version__,"mlflow":mlflow.__version__,"accelerate":accelerate.__version__,"evaluate":evaluate.__version__,"sklearn":sklearn.__version__,"scipy":scipy.__version__},sort_keys=True))'
 
 export LEGACY_ATTESTATION_CONTAINER=/work/attestations/baseline-v-fe4b386b.json

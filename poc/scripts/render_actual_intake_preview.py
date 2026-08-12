@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lloydk.api.golden import _render_actual_document_intake_html
+from koipa.api.golden import _render_actual_document_intake_html
 
 
 ROOT = Path(__file__).resolve().parents[1]

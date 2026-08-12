@@ -61,5 +61,5 @@ n 이 작으면 한두 건 차이로 넘는다.
 
 ---
 
-관련: `docs/V6_TRAINING_RUNBOOK.md` · `src/lloydk/holdout_independence.py` ·
-`src/lloydk/dataset_leakage.py`
+관련: `docs/V6_TRAINING_RUNBOOK.md` · `src/koipa/holdout_independence.py` ·
+`src/koipa/dataset_leakage.py`

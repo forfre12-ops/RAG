@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """학습셋·평가셋 누출 감사 CLI — 등급을 맞히는 데 본문 말고 다른 단서가 섞였는지 잰다.
 
-``lloydk.dataset_leakage`` 는 빌드 게이트(build_kl_review_pool)에만 배선돼 있어, 이미 만들어
+``koipa.dataset_leakage`` 는 빌드 게이트(build_kl_review_pool)에만 배선돼 있어, 이미 만들어
 둔 학습셋·평가셋을 나중에 확인할 방법이 없었다. 이 스크립트가 그 자리를 채운다.
 
     python scripts/audit_dataset_leakage.py datasets/proxy_eval/**/development_200.jsonl
@@ -28,7 +28,7 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.dataset_leakage import (  # noqa: E402
+from koipa.dataset_leakage import (  # noqa: E402
     DEFAULT_MAX_LENGTH_LEAK,
     DEFAULT_MAX_TELL_COVERAGE,
     GRADES,

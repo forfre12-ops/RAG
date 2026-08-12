@@ -13,7 +13,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from analyze_label_noise import _is_ruling  # noqa: E402
-from lloydk.golden_tiers import (  # noqa: E402
+from koipa.golden_tiers import (  # noqa: E402
     EXTERNAL_AUTHORITY_SOURCES,
     is_external_authority,
     tier_of,
@@ -22,7 +22,7 @@ from lloydk.golden_tiers import (  # noqa: E402
 LABELS = ("TS", "S1", "S2", "S3")
 LLM_SOURCES = {"llm_judge_primary", "llm_judge_consensus"}
 # 외부 권위 정답(사람서명 대체 가능한 유일한 진짜 정답원): 정부지정 NKT·공개판례/공시 —
-# 단일 진실원은 lloydk.golden_tiers. 나머지(koipa 손작성 시나리오·rule_llm 합의·codex 리뷰)는
+# 단일 진실원은 koipa.golden_tiers. 나머지(koipa 손작성 시나리오·rule_llm 합의·codex 리뷰)는
 # 합성/LLM 프록시 — 분류기와 편향을 공유할 수 있어(상관오류) '통과'가 실문서 정확도를 보증하지
 # 않는다. 단일 F1로 뭉개지 않도록 분리. record 수준 검증(is_external_authority)까지 통과해야
 # external — nkt_designated는 legal_reference(지정근거) 없으면 위조로 보고 synthetic 처리

@@ -12,12 +12,12 @@ import json
 
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.golden_builder import LabelPair
-from lloydk.schemas.common import Actor
-from lloydk.schemas.golden import GoldenBuildRequest, GoldenSignoffDecision
-from lloydk.services.golden_build_service import GoldenBuildService
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.golden_builder import LabelPair
+from koipa.schemas.common import Actor
+from koipa.schemas.golden import GoldenBuildRequest, GoldenSignoffDecision
+from koipa.services.golden_build_service import GoldenBuildService
 
 client = TestClient(app)
 API = "/api/v1"
@@ -130,7 +130,7 @@ def test_publish_reaches_deploy_gate_consumer(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "locked_eval_jsonl", str(live))
     import uuid as _uuid
 
-    from lloydk.modules.m6_evaluation.locked_readiness import locked_eval_readiness
+    from koipa.modules.m6_evaluation.locked_readiness import locked_eval_readiness
 
     job_id = _make_job(tmp_path / "run", [{"doc_id": "a", "text": "ts문서", "source": "판례"}])
     result = GoldenBuildService().apply_signoff(

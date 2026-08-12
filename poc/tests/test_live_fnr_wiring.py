@@ -5,8 +5,8 @@
 """
 from __future__ import annotations
 
-from lloydk.api.prom_metrics import CLASSIFY_CORRECT_TOTAL, CLASSIFY_TOTAL
-from lloydk.services.confirm_service import _record_live_fnr
+from koipa.api.prom_metrics import CLASSIFY_CORRECT_TOTAL, CLASSIFY_TOTAL
+from koipa.services.confirm_service import _record_live_fnr
 
 
 def _read(counter) -> float:

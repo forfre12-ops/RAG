@@ -2,7 +2,7 @@
 set -eu
 
 ROOT=${PROXY_ROOT:-/home/kopia/proxy_gold_runtime}
-CONTAINER=${PROXY_PREFETCH_CONTAINER:-lloydk-proxy-ollama-prefetch}
+CONTAINER=${PROXY_PREFETCH_CONTAINER:-koipa-proxy-ollama-prefetch}
 QWEN_MANIFEST=bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8
 QWEN4_MANIFEST=359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7
 GEMMA_MANIFEST=f4031aab637d1ffa37b42570452ae0e4fad0314754d17ded67322e4b95836f8a
@@ -11,7 +11,7 @@ if [ "$(readlink -f "$ROOT")" != "/home/kopia/proxy_gold_runtime" ]; then
   echo "unexpected proxy runtime root: $ROOT" >&2
   exit 2
 fi
-if [ "$(docker inspect -f '{{index .Config.Labels "io.lloydk.purpose"}}' "$CONTAINER")" != "proxy-model-prefetch" ]; then
+if [ "$(docker inspect -f '{{index .Config.Labels "io.koipa.purpose"}}' "$CONTAINER")" != "proxy-model-prefetch" ]; then
   echo "refusing to use an unlabeled prefetch container" >&2
   exit 2
 fi

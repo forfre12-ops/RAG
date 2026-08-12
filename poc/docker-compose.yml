@@ -1,13 +1,13 @@
-name: lloydk-poc
+name: koipa-poc
 
 services:
   postgres:
     # ES 제거(의사결정_대장 §03 ⓑ) — pgvector dense + ts_rank 하이브리드. (stock pgvector 이미지, pg_bigm 불요)
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: lloydk
-      POSTGRES_USER: lloydk
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dev}
+      POSTGRES_DB: koipa
+      POSTGRES_USER: koipa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-koipa_dev}
     volumes:
       - ../docker-data/postgres:/var/lib/postgresql/data
       # 2026-05-28: init.sql 자동 부트스트랩 제거 — alembic baseline 단일 경로로 일원화.
@@ -15,7 +15,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lloydk"]
+      test: ["CMD-SHELL", "pg_isready -U koipa"]
       interval: 5s
       retries: 10
 
@@ -23,8 +23,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lloydk}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-koipa}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-koipa_dev_minio}
     volumes:
       - ../docker-data/minio:/data
     ports:
@@ -45,12 +45,12 @@ services:
     # Phase 4 (5070 Ti 풀가동): vanilla 이미지 → psycopg2-binary 동봉 빌드.
     # Dockerfile.mlflow 가 v2.16.2 베이스에 pip install psycopg2-binary 적용.
     #
-    # Backend는 SQLite 로 변경 (우리 lloydk DB 와 MLflow alembic 충돌 회피).
+    # Backend는 SQLite 로 변경 (우리 koipa DB 와 MLflow alembic 충돌 회피).
     # 운영 환경은 별도 mlflow DB 분리 또는 별도 Postgres 인스턴스 권장.
     build:
       context: ./infra/mlflow
       dockerfile: Dockerfile.mlflow
-    image: lloydk/mlflow:2.16.2-psycopg
+    image: koipa/mlflow:2.16.2-psycopg
     command: >
       mlflow server
       --backend-store-uri sqlite:////mlflow-data/mlflow.db
@@ -60,8 +60,8 @@ services:
       - mlflow_data:/mlflow-data
     environment:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-lloydk}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-koipa}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-koipa_dev_minio}
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,13 +76,13 @@ services:
       dockerfile: Dockerfile.api
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
       STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-lloydk}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-lloydk_dev_minio}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-koipa}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-koipa_dev_minio}
       REDIS_URL: redis://redis:6379/0
       MLFLOW_TRACKING_URI: http://mlflow:5000
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
@@ -108,10 +108,10 @@ services:
       dockerfile: Dockerfile.api
     # -Q 없이 기동하면 default(celery) 큐만 소비 → task_routes로 classify/index/
     # synthesis/learning 큐에 보낸 작업이 영영 소비되지 않는다. 모든 큐를 구독한다.
-    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+    command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
@@ -132,10 +132,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
-    command: celery -A lloydk.workers.celery_app beat -l info
+    command: celery -A koipa.workers.celery_app beat -l info
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:

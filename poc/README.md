@@ -1,6 +1,6 @@
-# Lloydk AI Engine — 영업비밀 등급분류 엔진
+# Koipa AI Engine — 영업비밀 등급분류 엔진
 
-한국지식재산보호원(KOIPA) AI 영업비밀 관리시스템 / 로이드케이 담당 파트.
+한국지식재산보호원(KOIPA) AI 영업비밀 관리시스템 / 한국지식재산보호원 담당 파트.
 문서를 읽어 **TS · S1 · S2 · S3** 4등급으로 분류하고, 사람이 검수한 결과로 다시 학습한다.
 
 > **처음 이 저장소를 여는 분께** — 소스는 4만여 줄이지만, 전부 읽을 필요는 없습니다.
@@ -33,13 +33,13 @@
 
 | 요건 | 무엇 | API 진입점 | 서비스 | 코어 모듈 |
 |---|---|---|---|---|
-| **FUN-002** | 가이드 문서 업로드·버전관리 | [api/guide.py](src/lloydk/api/guide.py) | `guide_service.py` | — |
-| **FUN-003** | 합성 샘플 · 골든셋 구축 | [api/synthesis.py](src/lloydk/api/synthesis.py)<br>[api/golden.py](src/lloydk/api/golden.py) | `synthesis_service.py`<br>`golden_build_service.py` | [m1_synthesis/](src/lloydk/modules/m1_synthesis/)<br>`golden_tiers.py` · `golden_signoff.py` |
-| **FUN-004** | 학습 · 재학습 | [api/training.py](src/lloydk/api/training.py) | `training_service.py` | [m4_training/](src/lloydk/modules/m4_training/) |
-| **FUN-005** | 등급 분류 · 등급체계 | [api/classify.py](src/lloydk/api/classify.py)<br>[api/schema_admin.py](src/lloydk/api/schema_admin.py) | `classify_service.py`<br>`schema_admin_service.py` | [m5_inference/](src/lloydk/modules/m5_inference/) |
-| **FUN-022** | 문서 텍스트 추출·전처리 | [api/documents.py](src/lloydk/api/documents.py) | `document_ingestion_service.py` | [m2_preprocess/](src/lloydk/modules/m2_preprocess/) |
-| **FUN-023** | 라벨링 규칙 · 태깅 키워드 | [api/keyword_admin.py](src/lloydk/api/keyword_admin.py) | `keyword_admin_service.py` | [m3_labeling/](src/lloydk/modules/m3_labeling/) |
-| **FUN-024** | 검수 · 평가 · 배포 게이트 | [api/confirm.py](src/lloydk/api/confirm.py) | `confirm_service.py` | [m6_evaluation/](src/lloydk/modules/m6_evaluation/) |
+| **FUN-002** | 가이드 문서 업로드·버전관리 | [api/guide.py](src/koipa/api/guide.py) | `guide_service.py` | — |
+| **FUN-003** | 합성 샘플 · 골든셋 구축 | [api/synthesis.py](src/koipa/api/synthesis.py)<br>[api/golden.py](src/koipa/api/golden.py) | `synthesis_service.py`<br>`golden_build_service.py` | [m1_synthesis/](src/koipa/modules/m1_synthesis/)<br>`golden_tiers.py` · `golden_signoff.py` |
+| **FUN-004** | 학습 · 재학습 | [api/training.py](src/koipa/api/training.py) | `training_service.py` | [m4_training/](src/koipa/modules/m4_training/) |
+| **FUN-005** | 등급 분류 · 등급체계 | [api/classify.py](src/koipa/api/classify.py)<br>[api/schema_admin.py](src/koipa/api/schema_admin.py) | `classify_service.py`<br>`schema_admin_service.py` | [m5_inference/](src/koipa/modules/m5_inference/) |
+| **FUN-022** | 문서 텍스트 추출·전처리 | [api/documents.py](src/koipa/api/documents.py) | `document_ingestion_service.py` | [m2_preprocess/](src/koipa/modules/m2_preprocess/) |
+| **FUN-023** | 라벨링 규칙 · 태깅 키워드 | [api/keyword_admin.py](src/koipa/api/keyword_admin.py) | `keyword_admin_service.py` | [m3_labeling/](src/koipa/modules/m3_labeling/) |
+| **FUN-024** | 검수 · 평가 · 배포 게이트 | [api/confirm.py](src/koipa/api/confirm.py) | `confirm_service.py` | [m6_evaluation/](src/koipa/modules/m6_evaluation/) |
 
 읽는 순서는 언제나 같습니다 — **API 라우터 → 서비스 → 코어 모듈**.
 라우터는 계약(요청·응답·권한)만, 서비스는 조율만, 실제 알고리즘은 모듈에 있습니다.
@@ -49,7 +49,7 @@
 ## 3. 디렉터리 구조
 
 ```
-src/lloydk/
+src/koipa/
   api/            HTTP 라우터 · 인증 · 미들웨어           (계약)
   services/       유스케이스 조율 · 트랜잭션 경계         (조율)
   modules/        m1~m6 — 실제 AI 파이프라인             (알고리즘)
@@ -137,8 +137,8 @@ make infra-up
 python scripts/verify_infra.py
 
 # 4) API + Worker
-make api          # uvicorn lloydk.api.app:app --reload
-make worker       # celery -A lloydk.workers.celery_app worker -l info
+make api          # uvicorn koipa.api.app:app --reload
+make worker       # celery -A koipa.workers.celery_app worker -l info
 ```
 
 > **주의** — 테스트·로컬 기동에는 `TESTING=1`이 필요합니다. 없으면 uvicorn 기동에 실패합니다.

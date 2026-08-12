@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from scripts import assemble_proxy_gold as cli
-from lloydk import proxy_corpus as core
-from lloydk.proxy_corpus import ProxyRecordCheck
+from koipa import proxy_corpus as core
+from koipa.proxy_corpus import ProxyRecordCheck
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from lloydk.api import prom_metrics as pm
-from lloydk.schemas.common import Grade
-from lloydk.services.classify_service import ClassifyService
+from koipa.api import prom_metrics as pm
+from koipa.schemas.common import Grade
+from koipa.services.classify_service import ClassifyService
 
 
 def _gate_val(gate) -> float:
@@ -43,7 +43,7 @@ def test_record_grade_best_effort(monkeypatch):
     real = builtins.__import__
 
     def _boom(name, *a, **k):
-        if name == "lloydk.api.prom_metrics":
+        if name == "koipa.api.prom_metrics":
             raise ImportError("x")
         return real(name, *a, **k)
 
@@ -57,7 +57,7 @@ def test_record_gate_fail_open_best_effort(monkeypatch):
     real = builtins.__import__
 
     def _boom(name, *a, **k):
-        if name == "lloydk.api.prom_metrics":
+        if name == "koipa.api.prom_metrics":
             raise ImportError("x")
         return real(name, *a, **k)
 
@@ -66,8 +66,8 @@ def test_record_gate_fail_open_best_effort(monkeypatch):
 
 
 def test_agreement_gate_fail_open_records(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.schemas import common as _common
+    from koipa import config as cfg
+    from koipa.schemas import common as _common
 
     monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", True, raising=False)
     monkeypatch.setattr(_common.GradeRegistry, "get_codes", lambda *a, **k: ["TS", "S1", "S2", "S3"])
@@ -87,7 +87,7 @@ def test_agreement_gate_fail_open_records(monkeypatch):
 def test_kill_gate_brake_fail_open_records(monkeypatch):
     # kill-gate 계통장애(should_suppress_autoconfirm 예외)도 다른 게이트와 동일하게
     # fail-open(동작 보존)하되 SERVING_GATE_FAIL_OPEN_TOTAL{gate="kill_gate"}로 가시화.
-    import lloydk.modules.m6_evaluation.kill_gate as kg
+    import koipa.modules.m6_evaluation.kill_gate as kg
 
     def _boom(*a, **k):
         raise RuntimeError("kill-gate read failed")
@@ -100,14 +100,14 @@ def test_kill_gate_brake_fail_open_records(monkeypatch):
 
 
 def test_llm_second_opinion_fail_open_records(monkeypatch):
-    from lloydk import config as cfg
-    from lloydk.schemas import common as _common
+    from koipa import config as cfg
+    from koipa.schemas import common as _common
 
     monkeypatch.setattr(cfg.settings, "model_secondopinion_llm_enabled", True, raising=False)
     monkeypatch.setattr(
         _common.GradeRegistry, "get_order", lambda *a, **k: {"TS": 0, "S1": 1, "S2": 2, "S3": 3}
     )
-    import lloydk.modules.m3_labeling.llm_labeler as llm_mod
+    import koipa.modules.m3_labeling.llm_labeler as llm_mod
 
     class _Boom:
         def label(self, *a, **k):

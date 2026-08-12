@@ -5,7 +5,7 @@ from collections import defaultdict
 
 import pytest
 
-from lloydk.proxy_shortcuts import (
+from koipa.proxy_shortcuts import (
     DEFAULT_SHORTCUT_FEATURES,
     deterministic_group_folds,
     strict_shortcut_gate,

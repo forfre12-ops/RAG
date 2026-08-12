@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 import scripts.build_proxy_scenarios as scenario_builder
-from lloydk.ollama_attestation import verify_ollama_model
+from koipa.ollama_attestation import verify_ollama_model
 from scripts.build_proxy_scenarios import (
     _CONTEXT_SAFETY_TOKENS,
     _OLLAMA_CONTEXT_WINDOW_TOKENS,

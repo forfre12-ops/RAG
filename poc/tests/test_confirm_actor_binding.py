@@ -13,9 +13,9 @@ from __future__ import annotations
 import uuid
 from types import SimpleNamespace
 
-from lloydk.api.confirm import confirm, relabel, resolve_actor_user_id
-from lloydk.schemas.confirm import ConfirmRequest, RelabelRequest
-from lloydk.services.confirm_service import ConfirmResult, RelabelResult
+from koipa.api.confirm import confirm, relabel, resolve_actor_user_id
+from koipa.schemas.confirm import ConfirmRequest, RelabelRequest
+from koipa.services.confirm_service import ConfirmResult, RelabelResult
 
 
 # ── 순수 판정 ────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ def _stub_confirm(monkeypatch) -> dict:
             persisted=True, warnings=[],
         )
 
-    from lloydk.services import confirm_service as cs
+    from koipa.services import confirm_service as cs
     monkeypatch.setattr(cs.ConfirmService, "confirm", _fake)
     return captured
 
@@ -71,7 +71,7 @@ def _stub_relabel(monkeypatch) -> dict:
             persisted=True, warnings=[],
         )
 
-    from lloydk.services import confirm_service as cs
+    from koipa.services import confirm_service as cs
     monkeypatch.setattr(cs.RelabelService, "relabel", _fake)
     return captured
 

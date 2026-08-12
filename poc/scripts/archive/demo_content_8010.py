@@ -29,7 +29,7 @@ SAMPLES = [
 def main() -> int:
     with httpx.Client(timeout=180.0) as cli:
         print("=" * 64)
-        print("  LLOYDK 라이브 데모 — classify(content) → confirm → relabel")
+        print("  KOIPA 라이브 데모 — classify(content) → confirm → relabel")
         print("=" * 64)
         first = None
         for name, text in SAMPLES:

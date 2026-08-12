@@ -12,22 +12,22 @@
 #
 # 이미지 태그는 .env의 IMAGE_TAG로 일괄 전환 (docker load 로 복원된 태그와 일치해야 함).
 
-name: lloydk-airgap
+name: koipa-airgap
 
 services:
   postgres:
     image: ${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}   # ES 제거(§03 ⓑ) — pgvector dense. 폐쇄망: docker load 한 태그
     restart: unless-stopped   # 호스트 재부팅/데몬 재시작 후 자동 복구(폐쇄망 무인 운영). compose 단축형만 실효.
     environment:
-      POSTGRES_DB: lloydk
-      POSTGRES_USER: lloydk
+      POSTGRES_DB: koipa
+      POSTGRES_USER: koipa
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:${PG_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lloydk"]
+      test: ["CMD-SHELL", "pg_isready -U koipa"]
       interval: 5s
       retries: 10
 
@@ -46,16 +46,16 @@ services:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
 
   # mlflow 제거 — 폐쇄망(고객사) 배포는 추론 전용(enable_training=False)이라 모델 트래킹/레지스트리
-  # 불요. 학습·MLflow 는 지재원(Lloydk) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
+  # 불요. 학습·MLflow 는 지재원(Koipa) full-train 환경에서만. (mlflow 가 minio 아티팩트 저장에
   # 의존했으므로 minio 제거와 함께 제거.)
 
   api:
-    image: lloydk-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
+    image: koipa-api:${IMAGE_TAG:-1.0.0-rc1}        # docker load 로 복원된 태그
     restart: unless-stopped
     env_file: .env
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       REDIS_URL: redis://redis:6379/0
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS(/app/.storage). MinIO 미사용.
@@ -91,13 +91,13 @@ services:
     # 기동 자체가 막혔다(고객사 운영노드는 CPU 전용 — 기본값이 반대였다).
 
   worker:
-    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
+    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
     restart: unless-stopped
-    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+    command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     env_file: .env
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}   # 폐쇄망=로컬FS. api 와 동일 storagedata 볼륨 공유.
@@ -119,7 +119,7 @@ services:
     healthcheck:
       # celery worker 응답성 — 브로커 연결 + 워커 프로세스 생존. 응답 없으면 non-zero.
       # 과거엔 worker/beat 헬스체크가 전 compose에서 부재라 죽은 워커를 오케스트레이터가 몰랐다.
-      test: ["CMD-SHELL", "celery -A lloydk.workers.celery_app inspect ping -t 10 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "celery -A koipa.workers.celery_app inspect ping -t 10 >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 5
@@ -128,14 +128,14 @@ services:
 
   # 주기작업 발행기 — 단일 인스턴스만 (다중 beat = 중복 tick). dev compose엔 누락돼 있었음.
   beat:
-    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
+    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
     restart: unless-stopped
     # --schedule 경로 고정 → 헬스체크가 이 파일의 신선도로 beat tick 생존을 판정.
-    command: celery -A lloydk.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
+    command: celery -A koipa.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
     env_file: .env
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 하드닝 프로파일 강제 — .env 에 없어도 안전(비하드닝 부팅 방지)
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
     depends_on:
       - redis

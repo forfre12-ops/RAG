@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
-from lloydk.modules.m6_evaluation.deploy_gate import summarize_metamorphic
-from lloydk.services.training_service import _maybe_metamorphic_report
+from koipa.modules.m6_evaluation.deploy_gate import summarize_metamorphic
+from koipa.services.training_service import _maybe_metamorphic_report
 
 _INNER = {
     "forward": {"name": "forward", "n": 8, "violations": 3, "violation_rate": 0.375,

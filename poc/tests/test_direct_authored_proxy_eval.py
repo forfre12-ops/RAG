@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections import Counter
 
-from lloydk.proxy_corpus import validate_proxy_record
-from lloydk.proxy_eval_split import split_frozen_proxy_eval
+from koipa.proxy_corpus import validate_proxy_record
+from koipa.proxy_eval_split import split_frozen_proxy_eval
 from scripts import build_direct_authored_proxy_eval as evaluation
 from scripts import build_direct_authored_proxy_eval_v2_2 as evaluation_v2_2
 

@@ -19,7 +19,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from lloydk.api.prom_metrics import _mount_prefix, _route_template
+from koipa.api.prom_metrics import _mount_prefix, _route_template
 
 
 class _Req:
@@ -86,7 +86,7 @@ def test_route_template_applies_prefix():
 def labels():
     from prometheus_client import generate_latest
 
-    from lloydk.api.prom_metrics import PrometheusMiddleware, registry
+    from koipa.api.prom_metrics import PrometheusMiddleware, registry
 
     app = FastAPI()
     app.add_middleware(PrometheusMiddleware)

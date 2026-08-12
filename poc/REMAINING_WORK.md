@@ -1,4 +1,4 @@
-# 남은 작업 (Remaining Work) — Lloydk AI Engine PoC
+# 남은 작업 (Remaining Work) — Koipa AI Engine PoC
 
 > 소스 + 기획문서/RTM/요구사항을 8개 병렬 감사로 대조해 도출한 144개 발견을 중복제거·통합한 목록.
 > **모든 수치/판정은 합성 골든셋(OOD) 기준** — 실데이터(human_review) 검증 전에는 정식 수치가 아니다.
@@ -110,8 +110,8 @@ lite pytest **922 passed / 0 failed** (14 skip 환경성). 변경된 스트림 �
 
 ### 🔨 코드 패치 (2026-06-27, 폐쇄망 storage 기본값 정합 — 관련 61 테스트 green)
 
-- [x] **NEW-H4 — 폐쇄망 local 배포가 운영 startup에서 차단되던 버그** — `assert_production_credentials()`가 `storage_backend`와 무관하게 `LLOYDK_MINIO_SECRET_KEY`를 무조건 요구([config.py](src/lloydk/config.py)) → onprem-local(storage=local·poc_mode=full)이 쓰지도 않는 minio 키 부재로 부팅 실패. **수정:** `storage_backend in (minio,seaweedfs,s3)`일 때만 요구.
-- [x] **base storage_backend 기본값 minio→local** — 폐쇄망 결정 정합([config.py](src/lloydk/config.py)). dev compose(api/worker)는 `STORAGE_BACKEND=minio` 명시 고정([docker-compose.yml](docker-compose.yml))로 dev minio 경로 보존. lite-cloud 프로파일은 의도상 minio 유지.
+- [x] **NEW-H4 — 폐쇄망 local 배포가 운영 startup에서 차단되던 버그** — `assert_production_credentials()`가 `storage_backend`와 무관하게 `KOIPA_MINIO_SECRET_KEY`를 무조건 요구([config.py](src/koipa/config.py)) → onprem-local(storage=local·poc_mode=full)이 쓰지도 않는 minio 키 부재로 부팅 실패. **수정:** `storage_backend in (minio,seaweedfs,s3)`일 때만 요구.
+- [x] **base storage_backend 기본값 minio→local** — 폐쇄망 결정 정합([config.py](src/koipa/config.py)). dev compose(api/worker)는 `STORAGE_BACKEND=minio` 명시 고정([docker-compose.yml](docker-compose.yml))로 dev minio 경로 보존. lite-cloud 프로파일은 의도상 minio 유지.
 
 ### stale 정정 (재검증)
 
@@ -209,7 +209,7 @@ lite pytest **922 passed / 0 failed** (14 skip 환경성). 변경된 스트림 �
 - [ ] **M2 split_v2 미배선** — RAG indexer는 v2, M2 PreprocessPipeline은 v1 → ingestion heading_path 메타 누락.
 - [ ] **LLM labeler fallback 기본 OFF** — 모든 진입점 `use_llm_fallback=False`.
 - [ ] **`_svm_confidence` 미검증 휴리스틱** — "골든셋 누적 후 상관 검증 필요" 마커.
-- [ ] **m4_training query_expansion.py/rag_indexer.py** — 순수 backward-compat shim(실구현은 lloydk.rag.*).
+- [ ] **m4_training query_expansion.py/rag_indexer.py** — 순수 backward-compat shim(실구현은 koipa.rag.*).
 - [ ] **storage 키 위생 불일치** — SeaweedFS `_norm_key`가 delete()에만; Minio는 정규화 가드 없음.
 - [ ] **citation enforcement 기본 OFF + config 필드 없음** — `answer_enforce_citations`가 Settings에 미정의.
 - [ ] **RAG answer 기본 결정론 폴백** — noop이면 `/answer`가 citation-list 스텁 반환.

@@ -7,8 +7,8 @@
 """
 from __future__ import annotations
 
-from lloydk.dataset_leakage import theils_u
-from lloydk.holdout_independence import assess
+from koipa.dataset_leakage import theils_u
+from koipa.holdout_independence import assess
 
 
 def _doc(doc_id, grade, text, *, family="fam-a", method="gen-v1", scenario="sc-a"):

@@ -12,10 +12,10 @@ import pytest
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.schemas.classify import ClassifyRequest
-from lloydk.services.classify_service import ClassifyService
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.schemas.classify import ClassifyRequest
+from koipa.services.classify_service import ClassifyService
 
 
 @pytest.fixture

@@ -15,7 +15,7 @@ _HERE = Path(__file__).resolve().parent
 _POC = _HERE.parent
 sys.path.insert(0, str(_POC / "src"))
 
-from lloydk.proxy_eval_split import FrozenEvalSplitError, split_frozen_proxy_eval
+from koipa.proxy_eval_split import FrozenEvalSplitError, split_frozen_proxy_eval
 
 
 def _read_jsonl(path: Path) -> list[dict[str, object]]:

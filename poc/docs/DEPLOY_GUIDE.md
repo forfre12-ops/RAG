@@ -1,4 +1,4 @@
-# Lloydk AI 배포 가이드 (통합) — 고객사 · 지재원
+# Koipa AI 배포 가이드 (통합) — 고객사 · 지재원
 
 > **이 문서 하나로 따라 배포**할 수 있게 정리한 절차서입니다. 고객사(운영 런타임)와 지재원(모델공장)
 > 두 대상을 다루되, **설치 절차는 공통**이고 `.env` 프로파일 몇 줄만 다릅니다.
@@ -8,14 +8,14 @@
 
 ## 가장 쉬운 경로 (권장 · TL;DR)
 
-**아티팩트 1개 + 명령 1개 + `.env` 몇 줄.** 고객사·지재원 모두 같은 `dist/lloydk-airgap-bundle/`
+**아티팩트 1개 + 명령 1개 + `.env` 몇 줄.** 고객사·지재원 모두 같은 `dist/koipa-airgap-bundle/`
 (약 12GB — 도커 이미지·**분류 모델(v-dd3abab9+temperature)**·wheel·DB 마이그레이션·인수팩까지 자립)을 쓰고,
 `bash deploy.sh`(폐쇄망/연결망 **자동감지**) 한 명령으로 마이그레이션+기동+스모크까지 끝난다.
 **대상별로 다른 건 `.env` 프로파일뿐이다.**
 
 ```bash
 # 공통 3단계 (반입/전송 후) — 고객사·지재원 동일
-cd ~/lloydk-airgap-bundle
+cd ~/koipa-airgap-bundle
 bash verify.sh && bash install.sh                  # 무결성 확인 → 이미지 적재(docker load)
 cp infra-config/.env.template .env && nano .env    # ↓ 표의 대상별 값만 다름
 bash deploy.sh                                      # 자동감지 → 배포, 이어서 bash verify_install.sh
@@ -94,22 +94,22 @@ sudo apt-get install -y nvidia-container-toolkit && sudo nvidia-ctk runtime conf
 ```
 
 ### A1. 번들 반입 · 무결성 검증
-번들: `dist/lloydk-airgap-bundle/` (약 12GB — docker 이미지 11GB + 모델 0.7GB).
+번들: `dist/koipa-airgap-bundle/` (약 12GB — docker 이미지 11GB + 모델 0.7GB).
 ```bash
 # (로컬 PC → 서버) 전체:
-scp -P <PORT> -r dist/lloydk-airgap-bundle <user>@<host>:~/
+scp -P <PORT> -r dist/koipa-airgap-bundle <user>@<host>:~/
 # 또는 최소(분류 스모크만, ~4GB): api.tar + 모델 + 설정 + 스크립트
 #   docker-images/api.tar docker-images/nginx-mtls.tar models infra-config acceptance install.sh verify.sh deploy_airgap.sh manifest.json CHECKSUMS.sha256
-# 대용량은 rsync 이어받기 권장: rsync -avP -e "ssh -p <PORT>" dist/lloydk-airgap-bundle <user>@<host>:~/
+# 대용량은 rsync 이어받기 권장: rsync -avP -e "ssh -p <PORT>" dist/koipa-airgap-bundle <user>@<host>:~/
 
-cd ~/lloydk-airgap-bundle
+cd ~/koipa-airgap-bundle
 bash verify.sh                       # "Checksums OK"
 ```
 
 ### A2. 이미지 적재
 ```bash
 bash install.sh                      # docker-images/*.tar 를 docker load
-docker images | grep -E 'lloydk|pgvector|redis|nginx'
+docker images | grep -E 'koipa|pgvector|redis|nginx'
 ```
 🅲🌐 **번들에 postgres/redis 이미지가 없다** (공개 이미지). 연결망이면 온라인 pull:
 ```bash
@@ -123,7 +123,7 @@ docker pull redis:7.2-alpine
 **v5_clean(v-fe4b386b)로 교체 배포**하려면:
 ```bash
 scp -P <PORT> -r artifacts/classifier_p1_v5_clean/v-fe4b386b/* \
-    <user>@<host>:~/lloydk-airgap-bundle/models/classifier-trained/
+    <user>@<host>:~/koipa-airgap-bundle/models/classifier-trained/
 ```
 > ⚠️ `temperature.json`이 반드시 함께 있어야 보정(T)이 적용된다(없으면 T=1.0 과신 위험).
 > 🌐 임베딩(KURE-v1) 캐시가 번들 `models/hf/`에 없으면: 연결망은 `.env`에 `HF_HUB_OFFLINE=0`(첫 기동 시
@@ -139,9 +139,9 @@ nano .env
 ```ini
 IMAGE_TAG=1.0.0-rc1
 API_KEY=<강한 임의값>
-POSTGRES_USER=lloydk
+POSTGRES_USER=koipa
 POSTGRES_PASSWORD=<강한 임의값>
-DATABASE_URL=postgresql+psycopg://lloydk:<위와 동일 비번>@postgres:5432/lloydk
+DATABASE_URL=postgresql+psycopg://koipa:<위와 동일 비번>@postgres:5432/koipa
 REDIS_URL=redis://redis:6379/0
 VECTOR_BACKEND=pg
 STORAGE_BACKEND=local
@@ -266,7 +266,7 @@ $OBS up -d ; curl -s http://localhost:9090/-/ready
 
 ## 부록 — 책임 경계 (R&R)
 - **발주처/KL 준비**: 서버·폐쇄망·(GPU 시)드라이버/CUDA/Container Toolkit·Docker·매체 반입 승인
-- **로이드케이 수행**: PART A~C 전 과정 (반입·적재·구성·마이그레이션·기동·검증)
+- **한국지식재산보호원 수행**: PART A~C 전 과정 (반입·적재·구성·마이그레이션·기동·검증)
 
 ## 부록 — CPU·연결망 테스트 서버 빠른 참고 (예: kip-ai)
 CPU 전용 + 인터넷 되는 테스트 서버(고객사 프로파일 검증용): A0(도커 설치) → A1(scp) → A2(load+online

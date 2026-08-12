@@ -16,7 +16,7 @@ v5 가 바꾸는 것은 **길이뿐**이다. 등급별 블록의 내용은 그�
 길이 변동의 씨앗은 **레코드 해시**다(순번이 아니라). 순번은 소스 정렬이 등급별로 묶여 있으면
 그대로 등급과 상관되기 때문이다.
 
-발행 전에 lloydk.dataset_leakage 게이트를 통과해야 한다 — 통과 못 하면 파일을 쓰지 않는다.
+발행 전에 koipa.dataset_leakage 게이트를 통과해야 한다 — 통과 못 하면 파일을 쓰지 않는다.
 
 ⛔ **이 스크립트는 발행되지 않는다. 후속은 v6 다**
 (build_direct_authored_catalog_training_corpus_v6.py — 2026-08-12 발행 완료).
@@ -69,8 +69,8 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from lloydk.dataset_leakage import check_or_raise, grade_tells
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.dataset_leakage import check_or_raise, grade_tells
+from koipa.proxy_corpus import validate_proxy_record
 
 
 SOURCE = ROOT / "datasets" / "proxy_gold" / "direct_authored_catalog_training.v3_9.jsonl"

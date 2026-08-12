@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.api.explain import _method_label
+from koipa.api.explain import _method_label
 
 
 @pytest.mark.parametrize(

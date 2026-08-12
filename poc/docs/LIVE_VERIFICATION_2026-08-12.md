@@ -30,9 +30,9 @@ GET  /api/v1/classify/jobs/…  → {"status":"done","total":1,"completed":1}
 워커 로그(같은 job):
 
 ```
-Task lloydk.classify_async[3484473d-…] received
+Task koipa.classify_async[3484473d-…] received
 classify done: doc_id=live-async-verify-… label=Grade.S1 confidence=0.793 status=needs_review
-Task lloydk.classify_async[3484473d-…] succeeded in 7.856s
+Task koipa.classify_async[3484473d-…] succeeded in 7.856s
 ```
 
 **브로커를 실제로 경유했다** — API 가 큐에 넣고 별도 컨테이너의 워커가 집어 처리했다.

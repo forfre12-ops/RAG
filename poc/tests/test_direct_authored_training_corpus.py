@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from lloydk.proxy_corpus import validate_proxy_record
+from koipa.proxy_corpus import validate_proxy_record
 from scripts import build_direct_authored_training_corpus as corpus
 
 

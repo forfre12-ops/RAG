@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m6_evaluation.eval_cards import (
+from koipa.modules.m6_evaluation.eval_cards import (
     VERDICT_FAIL,
     VERDICT_INCONCLUSIVE,
     VERDICT_NA,

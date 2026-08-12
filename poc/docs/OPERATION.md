@@ -1,6 +1,6 @@
-# Lloydk AI 운영 절차서 (OPERATION)
+# Koipa AI 운영 절차서 (OPERATION)
 
-대상: KOIPA 영업비밀관리시스템 폐쇄망 운영자 · 번들 `lloydk-airgap-bundle`
+대상: KOIPA 영업비밀관리시스템 폐쇄망 운영자 · 번들 `koipa-airgap-bundle`
 짝 문서: 설치는 [`INSTALL.md`](INSTALL.md), 장애 대응은 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md),
 정본 운영 절차·책임경계는 `운영_런북`(HTML) 참조.
 
@@ -31,7 +31,7 @@ $COMPOSE down                          # 전체 정지 (named 볼륨은 보존)
 
 ## 2. 분류 서빙 · 안전 게이트 상태 확인
 
-운영 프로파일은 `LLOYDK_DEPLOY_PROFILE=onprem-local`(또는 `full-train`). 이 프로파일 기본값:
+운영 프로파일은 `KOIPA_DEPLOY_PROFILE=onprem-local`(또는 `full-train`). 이 프로파일 기본값:
 
 | 게이트 | 기본(onprem-local) | 역할 |
 |---|---|---|
@@ -121,7 +121,7 @@ beat가 발행하는 정기 작업 — 누락 시 아래가 전부 정지:
 | 작업 | 주기 | 역할 |
 |---|---|---|
 | `active_learning_tick` | 30분 + 매일 03:00 스냅샷 | 검수 교정 소비 → 학습 후보 |
-| `drift_tick` | 15분 | 운영 임베딩 drift 점검(초과 시 `lloydk_drift_alert=1`) |
+| `drift_tick` | 15분 | 운영 임베딩 drift 점검(초과 시 `koipa_drift_alert=1`) |
 | `auto_rollback_tick` | 60분 | 활성 모델 라이브 미탐 회귀 점검(`auto_rollback_enabled`면 실롤백) |
 | `deliver_outbox_tick` | 60초 | KL webhook 콜백 송신(실패 지수백오프→DLQ) |
 | `ensure_partitions_tick` | 매일 02:10 | 향후 3개월 월 파티션 보장(멱등) |
@@ -159,7 +159,7 @@ FK 순서를 지켜야 합니다(`evidence`·`corrections`는 CASCADE로 함께 
 재학습 큐 오염도 여기서 해소됩니다).
 
 ```bash
-$COMPOSE exec postgres psql -U lloydk -d lloydk <<'SQL'
+$COMPOSE exec postgres psql -U koipa -d koipa <<'SQL'
 BEGIN;
 DELETE FROM tb_classifications   WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
 DELETE FROM tb_training_datasets WHERE doc_id IN (SELECT doc_id FROM tb_documents WHERE created_by='demo-console');
@@ -195,7 +195,7 @@ curl -s "http://localhost:8000/api/v1/review-queue?limit=50" -H "X-API-Key: $API
 현재 남은 건수 확인:
 
 ```bash
-$COMPOSE exec postgres psql -U lloydk -d lloydk \
+$COMPOSE exec postgres psql -U koipa -d koipa \
   -c "SELECT created_by, count(*) FROM tb_documents GROUP BY created_by ORDER BY 2 DESC;"
 ```
 
@@ -208,7 +208,7 @@ $COMPOSE exec postgres psql -U lloydk -d lloydk \
 
 - **DB**: `pg_dump`(정기) + named 볼륨 스냅샷. 복구 후 `alembic upgrade head`로 스키마 정합 확인.
 - **원본 스토리지**: `/app/.storage`(storagedata 볼륨) — 원본은 AES-256-GCM 암호화 저장. 키(`STORAGE_ENCRYPTION_KEY`) 별도 백업·에스크로.
-- **감사체인**: 백업 전/후 `verify_audit_chain_tick` 수동 1회(무결성 증빙). HMAC 키(`LLOYDK_AUDIT_CHAIN_SECRET`) 유실 시 과거 행 재검증 불가.
+- **감사체인**: 백업 전/후 `verify_audit_chain_tick` 수동 1회(무결성 증빙). HMAC 키(`KOIPA_AUDIT_CHAIN_SECRET`) 유실 시 과거 행 재검증 불가.
 - **DR 드릴**: `scripts/dr_drill.py`(10단계 + RTO 게이트). 목표 RTO 리허설은 인프라 확보 후 정기 수행.
 
 ---

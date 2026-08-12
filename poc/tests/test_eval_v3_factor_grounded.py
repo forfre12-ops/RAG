@@ -24,7 +24,7 @@ _SCRIPTS = _ROOT / "scripts"
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from lloydk.proxy_corpus import _DIRECT_GRADE_MARKER, grade_from_svm  # noqa: E402
+from koipa.proxy_corpus import _DIRECT_GRADE_MARKER, grade_from_svm  # noqa: E402
 
 import eval_fact_pools as EP  # noqa: E402
 import v6_fact_pools as TP  # noqa: E402

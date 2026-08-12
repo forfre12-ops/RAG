@@ -81,7 +81,7 @@ def main() -> int:
 
     from optuna.trial import FixedTrial  # noqa: PLC0415
 
-    from lloydk.modules.m6_evaluation.optuna_tuner import (  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.optuna_tuner import (  # noqa: PLC0415
         TuneConfig,
         make_objective,
         run_study,

@@ -38,13 +38,13 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.golden_signoff import (  # noqa: E402
+from koipa.golden_signoff import (  # noqa: E402
     Signoff,
     merge_locked_records,
     promote_to_locked,
 )
-from lloydk.golden_split import split_run_dir  # noqa: E402
-from lloydk.golden_tiers import eval_readiness, partition_by_tier  # noqa: E402
+from koipa.golden_split import split_run_dir  # noqa: E402
+from koipa.golden_tiers import eval_readiness, partition_by_tier  # noqa: E402
 
 # 누출 가드 대상(silver 가 eval/정본과 본문 겹치면 드롭) — eval holdout·정본 gold.
 DEFAULT_GUARD = [
@@ -75,7 +75,7 @@ def _publish_locked(new_locked: list[dict], override_path: str | None) -> None:
     """승격 locked 레코드를 운영 readiness 읽기경로에 doc_id dedup 누적 병합(opt-in)."""
     dest = override_path
     if dest is None:
-        from lloydk.config import settings  # noqa: PLC0415
+        from koipa.config import settings  # noqa: PLC0415
 
         dest = getattr(settings, "locked_eval_jsonl", "") or ""
     if not dest:
@@ -89,7 +89,7 @@ def _publish_locked(new_locked: list[dict], override_path: str | None) -> None:
         print("[publish] locked 0건 — 읽기경로 무변경(no-op). 사람 서명이 없으면 정상.")
         return
 
-    from lloydk.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.locked_readiness import (  # noqa: PLC0415
         locked_eval_readiness,
     )
 

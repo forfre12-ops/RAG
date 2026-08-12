@@ -25,7 +25,7 @@ cp .env.lite-cloud .env.cloud
 반드시 실제값으로 교체(placeholder면 부팅 거부):
 - `API_KEY` — 관리자 API 키
 - `ANTHROPIC_API_KEY` (또는 `OPENAI_API_KEY`) — 외부 LLM
-- `LLOYDK_AUDIT_CHAIN_SECRET` — `openssl rand -hex 32` 로 생성 (NFR-SEC-01, 미설정=부팅 거부)
+- `KOIPA_AUDIT_CHAIN_SECRET` — `openssl rand -hex 32` 로 생성 (NFR-SEC-01, 미설정=부팅 거부)
 - `CORS_ALLOW_ORIGINS` — 포털/프런트 origin 명시 (`["*"]` 은 부팅 거부)
 - `MINIO_SECRET_KEY` — 객체스토어 시크릿 (lite-cloud 는 storage_backend=minio)
 - `CLASSIFIER_MODEL_DIR` — 컨테이너 내 모델 경로 (§3). 모델 없이 룰만 테스트하려면 주석 처리.
@@ -62,9 +62,9 @@ ENV_FILE=$CF docker compose --env-file $CF $BASE up -d
 (external·ro)를 `/app/artifacts` 에 마운트한다:
 
 ```bash
-docker volume create lloydk_prod_artifacts
+docker volume create koipa_prod_artifacts
 # 호스트의 모델을 볼륨에 적재 (헬퍼 컨테이너로 복사)
-docker run --rm -v lloydk_prod_artifacts:/dst -v "$(pwd)/artifacts:/src:ro" alpine \
+docker run --rm -v koipa_prod_artifacts:/dst -v "$(pwd)/artifacts:/src:ro" alpine \
   sh -c "mkdir -p /dst/classifier_p1_retrain_v4_clean && \
          cp -r /src/classifier_p1_retrain_v4_clean/v-dd3abab9 /dst/classifier_p1_retrain_v4_clean/"
 ```
@@ -137,7 +137,7 @@ S/V/M 분해·evidence, 772ms). 리허설이 잡은 실 이슈:
 - **[해결] `Dockerfile.api.prod` 빌드 불가였음** — ① editable 설치를 src 복사 전에 실행(egg_base 'src'
   없음) ② alembic/alembic.ini 미복사(마이그레이션 불가) ③ extras 에 hwp/ocr 없음(파싱 저하). 소스
   선복사 + alembic 복사 + `.[psh,otel,jwt,hwp,ocr]` 로 교정함.
-- **[주의] non-root 이미지 + HF 캐시 경로 불일치** — prod 이미지는 uid1000(lloydk, home /home/lloydk)
+- **[주의] non-root 이미지 + HF 캐시 경로 불일치** — prod 이미지는 uid1000(koipa, home /home/koipa)
   로 도는데 base compose 는 HF 캐시를 `/root/.cache/huggingface` 에 마운트 → 비-root 는 못 읽어
   임베더(bge-m3)를 매 기동 재다운로드(startup ~2.5분). 클라우드는 `HF_HOME` 을 쓰기가능한 마운트
   경로로 지정하거나 임베딩 모델을 이미지/볼륨에 미리 넣을 것.
@@ -148,7 +148,7 @@ S/V/M 분해·evidence, 772ms). 리허설이 잡은 실 이슈:
 
 ## 배포 전 최종 체크리스트
 
-- [ ] `.env.cloud` — API_KEY·LLM 키·`LLOYDK_AUDIT_CHAIN_SECRET`·`CORS_ALLOW_ORIGINS`·MINIO_SECRET_KEY 실값
+- [ ] `.env.cloud` — API_KEY·LLM 키·`KOIPA_AUDIT_CHAIN_SECRET`·`CORS_ALLOW_ORIGINS`·MINIO_SECRET_KEY 실값
 - [ ] 명시 compose 경로(`-f docker-compose.yml -f docker-compose.prod.yml`) — override 제외
 - [ ] `alembic upgrade head` (단일 head)
 - [ ] `prod_artifacts` 볼륨에 모델 적재 + `CLASSIFIER_MODEL_DIR` 경로 일치

@@ -36,11 +36,11 @@ os.environ.setdefault("VECTOR_BACKEND", "inmemory")
 os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
 os.environ.setdefault("TESTING", "1")
 
-from lloydk.config import settings  # noqa: E402
-from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline  # noqa: E402
-from lloydk.schemas.classify import ClassifyRequest  # noqa: E402
-from lloydk.services.classify_service import ClassifyService  # noqa: E402
-from lloydk.services.document_ingestion_service import (  # noqa: E402
+from koipa.config import settings  # noqa: E402
+from koipa.modules.m2_preprocess.pipeline import PreprocessPipeline  # noqa: E402
+from koipa.schemas.classify import ClassifyRequest  # noqa: E402
+from koipa.services.classify_service import ClassifyService  # noqa: E402
+from koipa.services.document_ingestion_service import (  # noqa: E402
     extraction_review_decision,
 )
 

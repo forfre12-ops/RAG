@@ -32,7 +32,7 @@ if str(_SRC) not in sys.path:
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from lloydk.golden_builder import promote_candidates  # noqa: E402
+from koipa.golden_builder import promote_candidates  # noqa: E402
 
 DEFAULT_GOLD = Path("datasets/gold_real/classification_gold.jsonl")
 

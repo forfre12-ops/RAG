@@ -43,8 +43,8 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from lloydk.golden_signoff import Signoff, merge_locked_records, promote_to_locked  # noqa: E402
-from lloydk.golden_tiers import (  # noqa: E402
+from koipa.golden_signoff import Signoff, merge_locked_records, promote_to_locked  # noqa: E402
+from koipa.golden_tiers import (  # noqa: E402
     document_origin, eval_readiness, is_human_reviewer, is_real_locked_eval, tier_of,
 )
 

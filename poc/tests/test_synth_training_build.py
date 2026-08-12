@@ -14,8 +14,8 @@ import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-import lloydk.services.synthesis_service as ss
-from lloydk.services.synthesis_service import SynthesisService, _is_training_admissible
+import koipa.services.synthesis_service as ss
+from koipa.services.synthesis_service import SynthesisService, _is_training_admissible
 
 _LEVELS = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
 

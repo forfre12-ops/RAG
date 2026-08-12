@@ -38,11 +38,11 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-s
 if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-# lloydk.hygiene 정본 위생 유틸 (정규화 텍스트 해시 — 누출 게이트 강화)
+# koipa.hygiene 정본 위생 유틸 (정규화 텍스트 해시 — 누출 게이트 강화)
 _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
-from lloydk.hygiene import text_hash  # noqa: E402 (sys.path 설정 후)
+from koipa.hygiene import text_hash  # noqa: E402 (sys.path 설정 후)
 
 
 # bracket-style 키워드 삽입 패턴 (hard leakage)

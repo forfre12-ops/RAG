@@ -108,10 +108,10 @@ fi
 # ── 2. 이미지 적재 확인 (install.sh 선행) ──────────────────
 log "2/7  적재 이미지 확인"
 _tag="$(_env_val IMAGE_TAG || true)"; _tag="${_tag:-1.0.0-rc1}"
-if ! docker image inspect "lloydk-api:${_tag}" >/dev/null 2>&1; then
-  die "lloydk-api:${_tag} 이미지 없음. 먼저 'sudo bash install.sh' 로 docker load(§2). IMAGE_TAG 도 확인."
+if ! docker image inspect "koipa-api:${_tag}" >/dev/null 2>&1; then
+  die "koipa-api:${_tag} 이미지 없음. 먼저 'sudo bash install.sh' 로 docker load(§2). IMAGE_TAG 도 확인."
 fi
-info "lloydk-api:${_tag} 적재됨"
+info "koipa-api:${_tag} 적재됨"
 
 # ── 3. 모델 배치 확인 (§3) ─────────────────────────────────
 log "3/7  모델 배치 확인 (../models)"
@@ -124,7 +124,7 @@ mdir="$COMPOSE_DIR/../models"
 log "4/7  인프라 기동 + postgres 헬시 대기"
 dc_air up -d postgres redis
 for i in $(seq 1 60); do
-  if dc_air exec -T postgres pg_isready -U "$(_env_val POSTGRES_USER || echo lloydk)" >/dev/null 2>&1; then
+  if dc_air exec -T postgres pg_isready -U "$(_env_val POSTGRES_USER || echo koipa)" >/dev/null 2>&1; then
     info "postgres ready (${i}s)"; break
   fi
   [ "$i" = 60 ] && die "postgres 헬시 실패(60s). 'dc_air ps'/'logs postgres' 확인(pgvector 이미지)"

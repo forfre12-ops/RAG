@@ -7,8 +7,8 @@
 
 from __future__ import annotations
 
-from lloydk.config import settings
-from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
+from koipa.config import settings
+from koipa.modules.m2_preprocess.pipeline import PreprocessPipeline
 
 _SAMPLE = "내부 서버 10.1.2.3 에 접속, 사업자등록번호 123-45-67890, 주민 800101-1234567 포함된 대외비 문서."
 

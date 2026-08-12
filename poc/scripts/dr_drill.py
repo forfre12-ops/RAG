@@ -71,7 +71,7 @@ def run_stage(name: str, dry_run: bool, cmd: list[str] | None = None) -> dict:
 def stage_commands(staging_compose: str) -> dict[str, list[str] | None]:
     return {
         "find_latest_backups": ["ls", "-la", "backups/"],
-        "spin_up_staging": ["docker", "compose", "-p", "lloydk-dr", "-f", staging_compose, "up", "-d"],
+        "spin_up_staging": ["docker", "compose", "-p", "koipa-dr", "-f", staging_compose, "up", "-d"],
         # 실복구는 dr_restore.py(실 pg_restore, fail-closed) — dr_restore_check.py 는 recency
         # 점검일 뿐 복원을 하지 않는다. 과거엔 존재하지 않는 --target/--staging 플래그로 호출해
         # argparse 오류(exit 2)로 항상 죽었다.
@@ -84,9 +84,9 @@ def stage_commands(staging_compose: str) -> dict[str, list[str] | None]:
         "smoke_guide": None,
         "smoke_async_batch": None,
         "smoke_audit_chain": ["python", "-c",
-            "from lloydk.services.audit_chain import verify_chain; r=verify_chain(); print(r)"],
+            "from koipa.services.audit_chain import verify_chain; r=verify_chain(); print(r)"],
         "smoke_kpi_endpoint": ["curl", "-fsS", "http://staging:8000/api/v1/metrics"],
-        "teardown": ["docker", "compose", "-p", "lloydk-dr", "-f", staging_compose, "down", "-v"],
+        "teardown": ["docker", "compose", "-p", "koipa-dr", "-f", staging_compose, "down", "-v"],
     }
 
 

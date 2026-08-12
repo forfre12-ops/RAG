@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.proxy_eval_split import (
+from koipa.proxy_eval_split import (
     DEVELOPMENT_GRADE_COUNTS,
     FINAL_GRADE_COUNTS,
     FROZEN_GRADE_COUNTS,
     FrozenEvalSplitError,
     split_frozen_proxy_eval,
 )
-from lloydk.proxy_model_comparison import (
+from koipa.proxy_model_comparison import (
     ProxyComparisonError,
     load_final_locked_proxy_eval,
 )

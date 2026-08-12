@@ -26,10 +26,10 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lloydk.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest  # noqa: E402
-from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
-from lloydk.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
-from lloydk.modules.m3_labeling.seeds import to_canonical_factor  # noqa: E402
+from koipa.modules.m1_synthesis.generator import SyntheticDocGenerator, SynthRequest  # noqa: E402
+from koipa.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
+from koipa.modules.m3_labeling.seeds import to_canonical_factor  # noqa: E402
 
 PER_GRADE = int(os.environ.get("PER_GRADE", "13"))
 ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}

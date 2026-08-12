@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm_floored
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm_floored
 
 
 @pytest.fixture(scope="module")

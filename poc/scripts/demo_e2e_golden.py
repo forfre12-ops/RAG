@@ -52,7 +52,7 @@ provider 주의 (2026-08-08 실측):
 
 환경변수(미설정 시 로컬 개발 기본값):
   DEMO_BASE_URL   기본 http://localhost:8010
-  DEMO_API_KEY    기본 lloydk_dev_apikey
+  DEMO_API_KEY    기본 koipa_dev_apikey
   DEMO_ACTOR      기본 demo-console   (서명·학습 요청의 actor.user_id)
 
 전제: API 가동 + API_KEY_ROLE=admin (train·model/activate 는 admin 역할 필요).
@@ -70,7 +70,7 @@ import httpx
 
 BASE = os.getenv("DEMO_BASE_URL", "http://localhost:8010").rstrip("/")
 API = f"{BASE}/api/v1"
-HEADERS = {"X-API-Key": os.getenv("DEMO_API_KEY", "lloydk_dev_apikey")}
+HEADERS = {"X-API-Key": os.getenv("DEMO_API_KEY", "koipa_dev_apikey")}
 ACTOR = {"user_id": os.getenv("DEMO_ACTOR", "demo-console"), "role": "admin"}
 
 # --register 기본 슬레이트 — 정본에서 등급별 2건씩 뽑은 시연용 소형 슬레이트.

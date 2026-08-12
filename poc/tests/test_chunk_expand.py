@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m4_training.chunk_expand import expand_chunks, expand_records_evidence_aware
+from koipa.modules.m4_training.chunk_expand import expand_chunks, expand_records_evidence_aware
 
 
 def test_short_doc_single_chunk_same_label():
@@ -59,7 +59,7 @@ def test_rows_non_decreasing_and_never_lose_docs():
 
 
 def test_trainspec_flag_defaults_off_preserves_doc_level():
-    from lloydk.modules.m4_training.trainer import TrainSpec
+    from koipa.modules.m4_training.trainer import TrainSpec
 
     s = TrainSpec()
     assert s.chunk_expand is False  # 기본 = 기존 문서단위 학습 보존

@@ -41,7 +41,7 @@ def load_gold(path: Path) -> list[dict]:
 
 def run_classifier(recs: list[dict]) -> list[tuple[str, str]]:
     """rule labeler로 전체 gold 분류."""
-    from lloydk.modules.m3_labeling import LabelingPipeline
+    from koipa.modules.m3_labeling import LabelingPipeline
     pipe = LabelingPipeline()
     results = []
     for r in recs:

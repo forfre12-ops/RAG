@@ -39,7 +39,7 @@ GRADE_DOMAINS = {g: SPAN_DOMAINS for g in ("TS", "S1", "S2", "S3")}
 
 
 def _provider(base_url: str, model: str, label: str):
-    from lloydk.adapters.llm.local_openai_provider import LocalOpenAIProvider
+    from koipa.adapters.llm.local_openai_provider import LocalOpenAIProvider
     return LocalOpenAIProvider(base_url=base_url, api_key="ollama", model=model,
                                enable_thinking=False, provider_label=label)
 
@@ -69,7 +69,7 @@ def generate_docs(gen_model, base_url, grades, per_grade, len_min, len_max, log,
     append+flush 하므로 프로세스가 도중 죽어도 그때까지 생성분은 디스크에 남고, --build-from
     으로 재개 가능.
     """
-    from lloydk.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
+    from koipa.modules.m1_synthesis.generator import SynthRequest, SyntheticDocGenerator
     gen = SyntheticDocGenerator(llm=_provider(base_url, gen_model, "ollama-gen"))
     docs, intended_by_id, gen_fail, pii_hits = [], {}, 0, 0
     cand_path = Path(run_dir) / "candidates.jsonl"
@@ -114,9 +114,9 @@ def load_candidates(build_from):
 
 
 def build(docs, judge_model, base_url, require_evidence, k_min, k_max, shadow_model, temperature, log):
-    from lloydk.golden_builder import LabelPair, build_golden_set, make_label_fn
-    from lloydk.modules.m3_labeling.judge import ConsensusJudge
-    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+    from koipa.golden_builder import LabelPair, build_golden_set, make_label_fn
+    from koipa.modules.m3_labeling.judge import ConsensusJudge
+    from koipa.modules.m3_labeling.llm_labeler import LLMLabeler
     primary = LLMLabeler(provider=_provider(base_url, judge_model, "ollama-judge"))
     shadow = (LLMLabeler(provider=_provider(base_url, shadow_model, "ollama-shadow"))
               if shadow_model else None)
@@ -260,7 +260,7 @@ def main(argv=None):
 
     # [B-2] 다층방어 liveness — 어느 방어 축이 실제 발화했나(무음으로 꺼진 방어 폭로).
     # gold+review 전체 레코드로 shadow 커버리지·self-consistency 정보성·발화수를 집계.
-    from lloydk.golden_defense import assess_defense_liveness  # noqa: PLC0415
+    from koipa.golden_defense import assess_defense_liveness  # noqa: PLC0415
     defense = assess_defense_liveness(
         [r.to_dict() for r in result.gold] + [r.to_dict() for r in result.uncertain]
     )

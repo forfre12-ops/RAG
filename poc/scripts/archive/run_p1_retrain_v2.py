@@ -47,7 +47,7 @@ def main():
     print(f"병합 train: {len(combined)}건 → {out_train}")
 
     # 3. 재학습 (5 epochs)
-    from lloydk.modules.m4_training.trainer import TrainSpec, train_classifier
+    from koipa.modules.m4_training.trainer import TrainSpec, train_classifier
 
     spec = TrainSpec(
         train_path=str(out_train),

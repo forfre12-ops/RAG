@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.db.models import Chunk, Document
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.db.models import Chunk, Document
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 pytestmark = pytest.mark.slow
 

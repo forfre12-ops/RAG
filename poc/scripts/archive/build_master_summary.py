@@ -28,7 +28,7 @@ HEAD = (
     '<!DOCTYPE html>\n<html lang="ko">\n<head>\n'
     '<meta charset="UTF-8" />\n'
     '<meta name="viewport" content="width=device-width, initial-scale=1.0" />\n'
-    '<title>통합 마스터 요약 — KOIPA AI 영업비밀 분류 시스템 | Lloydk</title>\n'
+    '<title>통합 마스터 요약 — KOIPA AI 영업비밀 분류 시스템 | Koipa</title>\n'
     '<link rel="preconnect" href="https://fonts.googleapis.com" />\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />\n'
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />\n'
@@ -39,8 +39,8 @@ HEAD = (
 NAV = (
     '<nav class="nav"><div class="nav-inner">'
     '<a href="#top" class="brand">'
-    '<div class="brand-mark"><img src="' + logo + '" alt="Lloydk" /></div>'
-    '<span class="brand-name">로이드케이</span>'
+    '<div class="brand-mark"><img src="' + logo + '" alt="Koipa" /></div>'
+    '<span class="brand-name">한국지식재산보호원</span>'
     '<span class="brand-sep">/</span>'
     '<span class="brand-sub">KOIPA AI 영업비밀 분류 — 통합 마스터 요약</span>'
     '</a>'
@@ -91,7 +91,7 @@ ARTICLE = pathlib.Path(r"F:/antigravity/rag/poc/scripts/_master_article.html").r
 
 FOOTER = (
     '<footer><strong>KOIPA AI 영업비밀 분류 시스템 — 통합 마스터 요약</strong> · '
-    'Lloydk AI Engine · 9개 정본 문서 병합본 · 2026-06-23<br>'
+    'Koipa AI Engine · 9개 정본 문서 병합본 · 2026-06-23<br>'
     '수치는 코드·리포트 대조 기준. 모델 버전 정합(§version-note)은 미해결 항목.</footer>\n'
 )
 

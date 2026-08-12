@@ -11,9 +11,9 @@ import contextlib
 import datetime as dt
 from types import SimpleNamespace
 
-from lloydk.api import prom_metrics as pm
-from lloydk.services import audit_chain as ac
-from lloydk.services.audit_chain import (
+from koipa.api import prom_metrics as pm
+from koipa.services import audit_chain as ac
+from koipa.services.audit_chain import (
     ChainVerificationResult,
     scan_was_truncated,
     verify_chain,

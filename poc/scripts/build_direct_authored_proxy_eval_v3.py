@@ -77,9 +77,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lloydk.dataset_leakage import _normalize_sentences, check_or_raise  # noqa: E402
-from lloydk.holdout_independence import assess  # noqa: E402
-from lloydk.proxy_corpus import validate_proxy_record  # noqa: E402
+from koipa.dataset_leakage import _normalize_sentences, check_or_raise  # noqa: E402
+from koipa.holdout_independence import assess  # noqa: E402
+from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
 from eval_fact_pools import NEUTRAL_NOTES, POOLS  # noqa: E402
 from v6_fact_pools import FACTOR_SCORE_KEY  # noqa: E402
 
@@ -156,7 +156,7 @@ def _grade_combination_pool() -> dict[str, list[tuple[int, int, int]]]:
             판별 사실이므로 남기고, 문자열 암기만 막도록 변형을 16종씩 둔다(각 변형이
             S3 문서의 5% 미만). 학습셋과 같은 처방이다.
     """
-    from lloydk.proxy_corpus import grade_from_svm  # noqa: PLC0415
+    from koipa.proxy_corpus import grade_from_svm  # noqa: PLC0415
 
     pool: dict[str, list[tuple[int, int, int]]] = {}
     for secrecy in range(3):

@@ -13,8 +13,8 @@ _SRC = _PROJECT_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.proxy_model_comparison import ProxyComparisonError  # noqa: E402
-from lloydk.public_s3_challenge import (  # noqa: E402
+from koipa.proxy_model_comparison import ProxyComparisonError  # noqa: E402
+from koipa.public_s3_challenge import (  # noqa: E402
     evaluate_public_s3_challenge,
 )
 

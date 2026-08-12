@@ -22,13 +22,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-STATIC = Path(__file__).resolve().parents[1] / "src" / "lloydk" / "api" / "static"
+STATIC = Path(__file__).resolve().parents[1] / "src" / "koipa" / "api" / "static"
 pytestmark = pytest.mark.slow
 
 
 @pytest.fixture(scope="module")
 def client():
-    from lloydk.api.app import app
+    from koipa.api.app import app
     with TestClient(app) as c:
         yield c
 
@@ -43,7 +43,7 @@ def test_demo_index_returns_html(client):
     assert "text/html" in r.headers.get("content-type", "")
     # V2 디자인 토큰을 차용한 흔적
     assert "KOIPA AI" in r.text
-    assert "로이드케이" in r.text
+    assert "한국지식재산보호원" in r.text
     # 신규 와우 컴포넌트가 마크업에 존재
     assert 'id="toggle-row"' in r.text  # 와우 A 키워드 토글 (정적)
     assert 'id="legal-grid"' in r.text  # 와우 C 법령 (정적)
@@ -219,8 +219,8 @@ def test_borderline_sample_toggle_actually_changes_grade():
         text = body
         for kw in off_keywords:
             text = text.replace(kw, repl.get(kw, "관련 자료"))
-        from lloydk.schemas.classify import ClassifyRequest
-        from lloydk.services.classify_service import ClassifyService
+        from koipa.schemas.classify import ClassifyRequest
+        from koipa.services.classify_service import ClassifyService
         res = ClassifyService.get_instance().classify(
             ClassifyRequest(
                 doc_id=b["id"], content=text, title=b["title"],
@@ -255,8 +255,8 @@ def test_built_samples_classify_to_intended_grade():
     assert m
     data = json.loads(m.group(1))
 
-    from lloydk.schemas.classify import ClassifyRequest
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.schemas.classify import ClassifyRequest
+    from koipa.services.classify_service import ClassifyService
 
     svc = ClassifyService.get_instance()
     misses = []

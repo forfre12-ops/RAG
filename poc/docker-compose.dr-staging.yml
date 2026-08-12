@@ -3,34 +3,34 @@
 # 목적: 분기 1회 DR 리허설(RTO 4h 검증)에서 pg_restore + 로컬FS 미러 복원 대상이 되는
 #   격리 스테이징을 기동한다. docker-compose.airgap.yml(프로드)과 동일 토폴로지를 미러하되:
 #     1) 격리 볼륨(dr_*) + 별도 호스트 포트 → 운영 데이터/포트와 절대 충돌하지 않음
-#     2) .env 불필요 — dr_drill.py 는 `docker compose -p lloydk-dr -f <이 파일> up -d` 를
+#     2) .env 불필요 — dr_drill.py 는 `docker compose -p koipa-dr -f <이 파일> up -d` 를
 #        --env-file 없이 호출하므로, 필수 변수는 전부 인라인 기본값(:-)으로 자기완결
 #     3) GPU 비필수 — DR 검증은 데이터 복원·API 응답 확인이 목적이라 CPU로 충분(NVIDIA 미보유
 #        DR 호스트에서도 기동). 추론 지연이 아니라 복구 무결성을 본다.
 #   spin_up_staging 이 참조하는 파일이 없어 드릴이 2단계에서 abort 하던 '끊긴 default 참조'를 봉합.
 #
 # 실행(dr_drill 이 자동 호출):
-#   docker compose -p lloydk-dr -f docker-compose.dr-staging.yml up -d
-#   docker compose -p lloydk-dr -f docker-compose.dr-staging.yml down -v   # teardown
+#   docker compose -p koipa-dr -f docker-compose.dr-staging.yml up -d
+#   docker compose -p koipa-dr -f docker-compose.dr-staging.yml down -v   # teardown
 #
 # 주의: 실 DR 드릴은 복원 대상 backups/ + 사전 동봉 모델(../models) + Docker 호스트가 필요하다
 #   (RTO 실측은 인프라 의존 — 이 파일은 '끊긴 배선 봉합'까지만 커버).
 
-name: lloydk-dr-staging
+name: koipa-dr-staging
 
 services:
   postgres:
     image: ${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}
     environment:
-      POSTGRES_DB: lloydk
-      POSTGRES_USER: lloydk
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lloydk_dr_staging}   # 격리 스테이징 throwaway
+      POSTGRES_DB: koipa
+      POSTGRES_USER: koipa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-koipa_dr_staging}   # 격리 스테이징 throwaway
     volumes:
       - dr_pgdata:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5442:5432"     # 프로드 5432 와 분리
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lloydk"]
+      test: ["CMD-SHELL", "pg_isready -U koipa"]
       interval: 5s
       retries: 10
 
@@ -43,10 +43,10 @@ services:
       - "127.0.0.1:6389:6379"     # 프로드 6379 와 분리
 
   api:
-    image: lloydk-api:${IMAGE_TAG:-1.0.0-rc1}
+    image: koipa-api:${IMAGE_TAG:-1.0.0-rc1}
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}   # 프로드 parity — 하드닝 프로파일
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dr_staging}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dr_staging}@postgres:5432/koipa
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       REDIS_URL: redis://redis:6379/0
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -77,11 +77,11 @@ services:
       start_period: 90s
 
   worker:
-    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
-    command: celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
+    command: celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dr_staging}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dr_staging}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -99,18 +99,18 @@ services:
       - redis
       - postgres
     healthcheck:
-      test: ["CMD-SHELL", "celery -A lloydk.workers.celery_app inspect ping -t 10 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "celery -A koipa.workers.celery_app inspect ping -t 10 >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 5
       start_period: 60s
 
   beat:
-    image: lloydk-worker:${IMAGE_TAG:-1.0.0-rc1}
-    command: celery -A lloydk.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
+    image: koipa-worker:${IMAGE_TAG:-1.0.0-rc1}
+    command: celery -A koipa.workers.celery_app beat -l info --schedule /tmp/celerybeat-schedule
     environment:
       DEPLOY_PROFILE: ${DEPLOY_PROFILE:-onprem-local}
-      DATABASE_URL: postgresql+psycopg://lloydk:${POSTGRES_PASSWORD:-lloydk_dr_staging}@postgres:5432/lloydk
+      DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dr_staging}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
     depends_on:
       - redis

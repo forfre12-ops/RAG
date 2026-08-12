@@ -6,7 +6,7 @@ release_id: 2026-07-감리
 purpose: 제3자 감리(supervision) 대응 산출물 제출본
 frozen_at: 2026-07-25
 source_of_truth: doc/result/open/     # 이 번들은 위 정본의 동결 사본
-prepared_by: 로이드케이(수행사)
+prepared_by: 한국지식재산보호원(수행사)
 deliverable_basis: |
   정식 감리 산출물 목록의 근거는 사업수행계획서 §05 "산출물 목록"이다.
   단, 최종 제출본의 산출물 구성·명칭·서식은 발주처·감리 확정 대상이다(사업수행계획서 §05 비고).

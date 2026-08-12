@@ -1,5 +1,5 @@
 {
-  "pack": "lloydk-acceptance-pack",
+  "pack": "koipa-acceptance-pack",
   "note": "고객 배포 인수검증용. 판정 규율: 정확 등급일치가 아니라 severity FLOOR(고등급 미탐=veto) + 숫자무손실 + 게이트 가시성. 소스=공개+합성 혼합, 실비밀 텍스트 0. 구형 .hwp 는 합성이 불가하므로 공개 공고문 실파일로 커버한다(real-S3-iprd-notice) — 표 47개·셀 1,815개가 rhwp 본문에는 없고 unhwp 보강으로만 회수되는 경로라, 이 건이 빠지면 무음 표 유실이 인수검증을 통과한다(2026-08-02 실측으로 확인).",
   "grades": [
     "TS",

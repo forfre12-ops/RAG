@@ -157,7 +157,7 @@ def run_checks(
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    p = argparse.ArgumentParser(description="Lloydk DR readiness check")
+    p = argparse.ArgumentParser(description="Koipa DR readiness check")
     p.add_argument("--pg-dir", type=Path, default=Path("backups/pg"))
     p.add_argument("--mirror-dir", type=Path, default=Path("backups/minio"))
     p.add_argument("--storage-dir", type=Path, default=Path("backups/storage"),

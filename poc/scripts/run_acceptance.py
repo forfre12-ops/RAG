@@ -84,9 +84,9 @@ def run_inproc(pack_dir: Path, docs: list[dict]) -> list[dict]:
     os.environ.setdefault("TESTING", "1")
     if str(_POC / "src") not in sys.path:
         sys.path.insert(0, str(_POC / "src"))
-    from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline  # noqa: PLC0415
-    from lloydk.schemas.classify import ClassifyRequest  # noqa: PLC0415
-    from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
+    from koipa.modules.m2_preprocess.pipeline import PreprocessPipeline  # noqa: PLC0415
+    from koipa.schemas.classify import ClassifyRequest  # noqa: PLC0415
+    from koipa.services.classify_service import ClassifyService  # noqa: PLC0415
 
     pipe, svc = PreprocessPipeline(), ClassifyService()
     results: list[dict] = []

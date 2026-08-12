@@ -76,7 +76,7 @@ def test_s3_only_levels_have_enough_paraphrases():
 
 def test_quotes_carry_no_grade_marker():
     """인용에 등급 표기가 있으면 proxy_corpus 가 evidence_grade_marker 로 거부한다."""
-    from lloydk.proxy_corpus import _DIRECT_GRADE_MARKER
+    from koipa.proxy_corpus import _DIRECT_GRADE_MARKER
 
     for factor, levels in POOLS.items():
         for level, pool in levels.items():

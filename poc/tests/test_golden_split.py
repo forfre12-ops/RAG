@@ -1,7 +1,7 @@
 """golden_split — 누출 가드 + 등급층화 75/25 결정적 분할 + split_role 스탬프 테스트."""
 from __future__ import annotations
 
-from lloydk.golden_split import (
+from koipa.golden_split import (
     HOLDOUT,
     SILVER,
     split_for_training,

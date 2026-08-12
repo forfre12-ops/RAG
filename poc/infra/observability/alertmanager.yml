@@ -27,7 +27,7 @@ receivers:
   # (통지 채널 미결) — 알림은 Alertmanager UI(:9093)에서 확인. 사내 채널 연결 예시:
   #   email_configs:
   #     - to: 'ai-ops@사내메일'
-  #       from: 'lloydk-alert@사내메일'
+  #       from: 'koipa-alert@사내메일'
   #       smarthost: 'smtp.사내:25'
   #       require_tls: false
   #   webhook_configs:

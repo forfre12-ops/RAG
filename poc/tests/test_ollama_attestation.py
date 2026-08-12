@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from lloydk.ollama_attestation import (
+from koipa.ollama_attestation import (
     OllamaAttestationError,
     pending_ollama_model_attestation,
     validate_ollama_attestation,

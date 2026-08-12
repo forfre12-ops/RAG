@@ -9,7 +9,7 @@ import json
 
 import requests
 
-from lloydk.services.proxy_gold_candidate_service import ProxyGoldCandidateService
+from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 
 
 BASE = "https://www.kipo.go.kr/ko/kpoBultnDetail.do?aprchId=BUT0000029&menuCd=SCD0200618"

@@ -20,8 +20,8 @@ if str(_SRC) not in sys.path:
 
 import check_metamorphic_gate  # noqa: E402
 from gen_metamorphic_pairs import _load_samples_fixture  # noqa: E402
-from lloydk.modules.m6_evaluation.metamorphic import build_metamorphic_report  # noqa: E402
-from lloydk.modules.m6_evaluation.paraphrase_gen import GeneratedSample  # noqa: E402
+from koipa.modules.m6_evaluation.metamorphic import build_metamorphic_report  # noqa: E402
+from koipa.modules.m6_evaluation.paraphrase_gen import GeneratedSample  # noqa: E402
 
 
 def _report(n: int, violations: int) -> dict:

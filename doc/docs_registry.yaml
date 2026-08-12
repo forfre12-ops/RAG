@@ -51,7 +51,7 @@ documents:
 
   - id: DOC-OPENAPI-001
     title: KL OpenAPI YAML
-    path: doc/03_openapi_lloydk_kl.yaml
+    path: doc/03_openapi_koipa_kl.yaml
     owner: engineering
     audience: customer
     status: current

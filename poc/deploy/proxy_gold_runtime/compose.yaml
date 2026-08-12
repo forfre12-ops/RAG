@@ -1,9 +1,9 @@
-name: lloydk-proxy-gold
+name: koipa-proxy-gold
 
 services:
   ollama:
     image: ollama/ollama@sha256:98c19ced6600f2924e80b92d701cd867d8f7ef0c4dde516c619484e31e47f103
-    container_name: lloydk-proxy-ollama
+    container_name: koipa-proxy-ollama
     restart: "no"
     init: true
     gpus: all
@@ -39,6 +39,6 @@ services:
 
 networks:
   proxy_llm_internal:
-    name: lloydk-proxy-gold-internal
+    name: koipa-proxy-gold-internal
     internal: true
     driver: bridge

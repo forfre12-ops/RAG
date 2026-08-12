@@ -17,8 +17,8 @@ set -euo pipefail
 TS_HOST="${TS_HOST:-182.212.163.182}"
 TS_PORT="${TS_PORT:-56320}"
 TS_USER="${TS_USER:-aisadm}"
-PKG="lloydk-testserver.tar.gz"        # 소스 + 배포 모델 (서버 설치용)
-SRC_PKG="lloydk-poc-src.tar.gz"       # 소스만 (모델 제외 — 소스 검토·감리 제출용)
+PKG="koipa-testserver.tar.gz"        # 소스 + 배포 모델 (서버 설치용)
+SRC_PKG="koipa-poc-src.tar.gz"       # 소스만 (모델 제외 — 소스 검토·감리 제출용)
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"

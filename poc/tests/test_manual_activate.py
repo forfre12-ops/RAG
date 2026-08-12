@@ -18,11 +18,11 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-import lloydk.config as config_mod
-from lloydk.db import engine, session_scope
-from lloydk.db.models import ModelVersion
-from lloydk.repositories.training_repo import TrainingRepo
-from lloydk.services.training_service import activate_model_manually
+import koipa.config as config_mod
+from koipa.db import engine, session_scope
+from koipa.db.models import ModelVersion
+from koipa.repositories.training_repo import TrainingRepo
+from koipa.services.training_service import activate_model_manually
 
 
 def _pg_ok() -> bool:
@@ -188,7 +188,7 @@ def test_force_requires_reason_and_actor_when_hardened(monkeypatch):
 
 def test_forced_activation_writes_audit_chain_row(monkeypatch):
     """[P0#①-c] 강제(미검증) 활성은 model.activate.forced 감사 체인 행을 남긴다(누가·왜·우회대상)."""
-    from lloydk.db.models import AuditLog
+    from koipa.db.models import AuditLog
 
     monkeypatch.setattr(config_mod.settings, "deploy_gate_manual_require_locked_eval", True)
     monkeypatch.setattr(config_mod.settings, "locked_eval_jsonl", "")

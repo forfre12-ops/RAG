@@ -36,7 +36,7 @@ DEMO_FILES = [
 
 results = []
 print("=" * 60)
-print("  LLOYDK AI 영업비밀 등급분류 시스템 데모")
+print("  KOIPA AI 영업비밀 등급분류 시스템 데모")
 print("=" * 60)
 
 with httpx.Client(timeout=120.0) as cli:

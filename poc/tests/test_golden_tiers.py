@@ -4,7 +4,7 @@
 real 평가정답 집계는 실문서 출처(document_origin)까지 요구한다. 무효 human_review는 SILVER(학습연료)가
 아니라 TIER_HELD로 격리(역-누수 차단). train은 denylist(!=LOCKED)가 아니라 allowlist(TRAIN_TIERS).
 """
-from lloydk.golden_tiers import (
+from koipa.golden_tiers import (
     EXTERNAL_AUTHORITY_SOURCES,
     ORIGIN_CUSTOMER_REAL,
     ORIGIN_PUBLIC_REAL,

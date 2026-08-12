@@ -39,12 +39,12 @@ try:
 except (AttributeError, ValueError):
     pass
 
-from lloydk.modules.m1_synthesis.witness_taxonomy import (  # noqa: E402
+from koipa.modules.m1_synthesis.witness_taxonomy import (  # noqa: E402
     WITNESS_TYPES,
     WitnessSpec,
     instantiate_witness,
 )
-from lloydk.modules.m6_evaluation.constructed_floor import (  # noqa: E402
+from koipa.modules.m6_evaluation.constructed_floor import (  # noqa: E402
     LABEL_SOURCE_CONSTRUCTED_FLOOR,
     TIER_CONSTRUCTED_FLOOR,
     TRUTH_WARNING,
@@ -80,7 +80,7 @@ def _fake_generate(spec: WitnessSpec, token: str, index: int) -> str:
 
 
 def make_llm_generate(base_url: str, model: str):
-    from lloydk.adapters.llm.local_openai_provider import LocalOpenAIProvider  # noqa: PLC0415
+    from koipa.adapters.llm.local_openai_provider import LocalOpenAIProvider  # noqa: PLC0415
 
     llm = LocalOpenAIProvider(base_url=base_url, api_key="ollama", model=model,
                               enable_thinking=False, provider_label="ollama-witness-gen")

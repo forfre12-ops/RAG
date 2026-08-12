@@ -5,8 +5,8 @@
 # "그냥 실행만" 목표: 필수 시크릿(API 키·감사키·암호화키)·DB·모델·마이그레이션·스모크를
 # 전부 자동 처리한다. 인터넷 되는 테스트서버(연결망) 기준 — 이미지는 소스에서 직접 빌드한다.
 #
-#   지재원 스택  : profile=full-train   · 포트 8000 · project=lloydk-jjw
-#   고객사 스택  : profile=onprem-local · 포트 8001 · project=lloydk-cust
+#   지재원 스택  : profile=full-train   · 포트 8000 · project=koipa-jjw
+#   고객사 스택  : profile=onprem-local · 포트 8001 · project=koipa-cust
 # 두 스택은 컨테이너·네트워크·DB 볼륨이 완전 격리되고, HF 임베더 캐시만 공유한다.
 #
 # 사용:
@@ -28,7 +28,7 @@ JJW_PORT="${JJW_PORT:-8000}"
 CUST_PORT="${CUST_PORT:-8001}"
 MODEL_REL="artifacts/classifier_p1_v5_clean/v-fe4b386b"   # v5 승격(gate_p1_candidate 3축 PASS 2026-07-29); 롤백=v-dd3abab9
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml"
-HF_VOLUME="lloydk_hf_cache"
+HF_VOLUME="koipa_hf_cache"
 
 c_b(){ printf '\033[1m%s\033[0m\n' "$*"; }
 c_ok(){ printf '\033[1;32m✓ %s\033[0m\n' "$*"; }
@@ -80,7 +80,7 @@ gen_env() {
     # 테스트 편의: 단일 키로 관리자 콘솔(/demo/admin.html)까지 사용 가능하게 admin 역할 부여.
     # (실배포 deploy.sh/.env 템플릿은 기본 system 유지 — 최소권한. 콘솔용 admin 자격은 별도 발급 권장.)
     echo "API_KEY_ROLE=admin"
-    echo "LLOYDK_AUDIT_CHAIN_SECRET=$acs"
+    echo "KOIPA_AUDIT_CHAIN_SECRET=$acs"
     # 골든 검수/서명 HTML 서명 URL 강제 — 미설정이면 job_id 만 알면 후보 원문(TS 포함)이
     # 무인증으로 열린다. 배포가 항상 켜서 내보내도록 시크릿 대열에 편입(2026-08-02).
     echo "GOLDEN_HTML_URL_SECRET=$ghs"
@@ -89,7 +89,7 @@ gen_env() {
     echo "STORAGE_ENCRYPTION_KEY=$sek"
     echo "VECTOR_BACKEND=pg"
     echo "POSTGRES_PASSWORD=$pw"
-    echo "DATABASE_URL=postgresql+psycopg://lloydk:$pw@postgres:5432/lloydk"
+    echo "DATABASE_URL=postgresql+psycopg://koipa:$pw@postgres:5432/koipa"
     echo "REDIS_URL=redis://redis:6379/0"
     echo "EMBEDDING_MODEL=nlpai-lab/KURE-v1"
     echo "CLASSIFIER_MODEL_DIR=$MODEL_REL"
@@ -120,7 +120,7 @@ dc() { local proj=$1 envf=$2; shift 2; ENV_FILE="$envf" docker compose -p "$proj
 wait_pg() {
   local proj=$1 envf=$2 i
   for i in $(seq 1 30); do
-    if dc "$proj" "$envf" exec -T postgres pg_isready -U lloydk -q 2>/dev/null; then return 0; fi
+    if dc "$proj" "$envf" exec -T postgres pg_isready -U koipa -q 2>/dev/null; then return 0; fi
     sleep 2
   done
   c_err "postgres 헬시 대기 초과 ($proj)"; return 1
@@ -169,7 +169,7 @@ smoke() {
   mv=$(printf '%s' "$resp" | grep -oE '"model_version" *: *"[^"]*"' | head -1 | sed -E 's/.*: *"([^"]*)"/\1/')
   case "$mv" in
     rule-fallback*|none|"")
-      c_err "$name: 모델 미로드(model_version=${mv:-없음}=rule-fallback) — 파일은 있으나 로드 실패. 'docker compose -p lloydk-<jjw|cust> $COMPOSE_FILES logs api' 로 원인 확인. 분류: ${grade:-?}" ;;
+      c_err "$name: 모델 미로드(model_version=${mv:-없음}=rule-fallback) — 파일은 있으나 로드 실패. 'docker compose -p koipa-<jjw|cust> $COMPOSE_FILES logs api' 로 원인 확인. 분류: ${grade:-?}" ;;
     *)
       c_ok "ready 200 · model=$mv · 분류: ${grade:-(응답 확인)}" ;;
   esac
@@ -189,7 +189,7 @@ print_summary() {
   echo "  · 관리 콘솔: http://127.0.0.1:$JJW_PORT/demo/admin.html · http://127.0.0.1:$CUST_PORT/demo/admin.html"
   echo "               (하드닝 프로파일이라 파괴적 /demo purge 는 비활성)"
   echo "  · 헬스     : http://127.0.0.1:$JJW_PORT/api/v1/healthz/ready"
-  echo "  · 로그: docker compose -p lloydk-jjw $COMPOSE_FILES logs -f api"
+  echo "  · 로그: docker compose -p koipa-jjw $COMPOSE_FILES logs -f api"
   echo "  · 중지: bash scripts/deploy_testserver_dual.sh down"
 }
 
@@ -213,20 +213,20 @@ case "$cmd" in
     fi
     gen_env .env.jjw  full-train   "$JJW_PORT"  "$([ -n "${ANTHROPIC_API_KEY:-}" ] && echo anthropic || echo noop)"
     gen_env .env.cust onprem-local "$CUST_PORT" noop
-    deploy_stack lloydk-jjw  .env.jjw  "$JJW_PORT"
-    deploy_stack lloydk-cust .env.cust "$CUST_PORT"
+    deploy_stack koipa-jjw  .env.jjw  "$JJW_PORT"
+    deploy_stack koipa-cust .env.cust "$CUST_PORT"
     c_b "── 스모크 검증 ──"
     smoke 지재원 .env.jjw  "$JJW_PORT"
     smoke 고객사 .env.cust "$CUST_PORT"
     print_summary
     ;;
   status)
-    for p in lloydk-jjw lloydk-cust; do c_b "[$p]"; docker compose -p "$p" $COMPOSE_FILES ps 2>/dev/null || true; done
+    for p in koipa-jjw koipa-cust; do c_b "[$p]"; docker compose -p "$p" $COMPOSE_FILES ps 2>/dev/null || true; done
     print_summary
     ;;
   down)
     extra=""; [ "${2:-}" = "--wipe" ] && extra="--volumes"
-    for pe in "lloydk-jjw .env.jjw" "lloydk-cust .env.cust"; do
+    for pe in "koipa-jjw .env.jjw" "koipa-cust .env.cust"; do
       set -- $pe
       ENV_FILE="$2" docker compose -p "$1" --env-file "$2" $COMPOSE_FILES down $extra 2>/dev/null || true
       c_ok "$1 중지 ${extra:+(볼륨 삭제)}"

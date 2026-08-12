@@ -14,7 +14,7 @@ import pytest
 
 xlrd = pytest.importorskip("xlrd")  # 구형 .xls 는 opt-in [xls] extra
 
-from lloydk.modules.m2_preprocess.extractor import _xls_cell_text  # noqa: E402
+from koipa.modules.m2_preprocess.extractor import _xls_cell_text  # noqa: E402
 
 
 def _num(v):

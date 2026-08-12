@@ -1,9 +1,9 @@
-# Lloydk AI 폐쇄망 설치 절차서 (INSTALL)
+# Koipa AI 폐쇄망 설치 절차서 (INSTALL)
 
-대상: KOIPA 영업비밀관리시스템 운영망(에어갭) · 번들 `lloydk-airgap-bundle`
+대상: KOIPA 영업비밀관리시스템 운영망(에어갭) · 번들 `koipa-airgap-bundle`
 짝 문서: 설계·인벤토리·책임경계는 `폐쇄망_설치_배포_설계서`, 운영 절차는 `운영_런북` 참조.
 
-> 이 문서는 **운영자가 그대로 따라 치는 단계별 절차**다. 모든 명령은 번들 루트(`lloydk-airgap-bundle/`)에서 실행한다. 폐쇄망 전용 compose는 `infra-config/docker-compose.airgap.yml`(이미지 참조·beat 포함·named 볼륨)를 사용한다.
+> 이 문서는 **운영자가 그대로 따라 치는 단계별 절차**다. 모든 명령은 번들 루트(`koipa-airgap-bundle/`)에서 실행한다. 폐쇄망 전용 compose는 `infra-config/docker-compose.airgap.yml`(이미지 참조·beat 포함·named 볼륨)를 사용한다.
 
 ---
 
@@ -25,7 +25,7 @@
 ## 1. 반입 · 무결성 검증
 
 ```bash
-cd lloydk-airgap-bundle
+cd koipa-airgap-bundle
 bash verify.sh                 # CHECKSUMS.sha256 대조 → "Checksums OK"
 ```
 
@@ -35,7 +35,7 @@ bash verify.sh                 # CHECKSUMS.sha256 대조 → "Checksums OK"
 
 ```bash
 bash install.sh                # docker images 적재 (+ .env 초안 생성)
-docker images | grep -E 'lloydk|postgres|redis|nginx'   # 적재 확인
+docker images | grep -E 'koipa|postgres|redis|nginx'   # 적재 확인
 ```
 
 - 컨테이너 배포(본 절차)에서는 의존성이 **이미지에 이미 포함**되어 별도 설치가 불필요하다. `install.sh`는 호스트 파이썬 deps 설치를 **기본적으로 실행하지 않는다** — 번들 wheel은 컨테이너 인터프리터(cp311) 전용이라 Ubuntu 22.04 기본 파이썬(3.10)에서는 반드시 실패한다. 호스트에서 스크립트를 직접 구동해야 할 때만 python3.11 환경에서 `INSTALL_HOST_DEPS=1 bash install.sh`로 켠다. **OCR은 어떤 이미지·번들에도 포함되지 않는다**(요건 외 + poppler=GPL, 2026-08-02 제거).
@@ -85,7 +85,7 @@ cp infra-config/.env.template .env
 | `EMBEDDING_MODEL` | `nlpai-lab/KURE-v1` | |
 | `CLASSIFIER_MODEL_DIR` | `/models/classifier-trained` | 컨테이너 내 경로(모델 마운트) |
 | `STORAGE_ENCRYPTION_KEY` | `<64 hex>` | 원본 at-rest 암호화. onprem-local은 암호화 강제라 **없으면 startup 실패** |
-| `LLOYDK_AUDIT_CHAIN_SECRET` | `<64 hex>` | 감사체인 HMAC(NFR-SEC-01). **없으면 api startup 실패** |
+| `KOIPA_AUDIT_CHAIN_SECRET` | `<64 hex>` | 감사체인 HMAC(NFR-SEC-01). **없으면 api startup 실패** |
 | `GOLDEN_HTML_URL_SECRET` | `<64 hex>` | 골든 검수·서명 화면 서명 URL 키. **없으면 그 화면이 무인증으로 열려 후보 문서 본문이 노출된다**(startup 은 통과하므로 조용히 열린 채 운영됨) |
 | `CORS_ALLOW_ORIGINS` | `["https://<콘솔 오리진>"]` | 운영 모드는 와일드카드(`*`) 거부. **JSON 배열** 형식 |
 
@@ -216,7 +216,7 @@ echo "GRAFANA_PASSWORD=$(python3 -c 'import secrets;print(secrets.token_urlsafe(
 ```
 
 ```bash
-# 메인 스택(§9)이 먼저 떠서 lloydk-airgap_default 네트워크가 존재해야 한다.
+# 메인 스택(§9)이 먼저 떠서 koipa-airgap_default 네트워크가 존재해야 한다.
 # --env-file 은 **절대경로**로 준다: compose 가 상대경로를 compose 파일 디렉터리(observability/)
 # 기준으로 풀어 `.env` 를 못 찾고 `POSTGRES_PASSWORD is missing a value` 로 죽는다(실측 2026-08-04).
 export OBS="docker compose --env-file $PWD/.env -f observability/docker-compose.observability.airgap.yml"
@@ -240,7 +240,7 @@ curl -s http://localhost:9090/-/ready          # Prometheus ready
 | 분류 confidence 비정상 | `temperature.json` 부재 | 보정값 동봉 후 모델 재배치 |
 | 큐 작업 미소비 | worker `-Q` 누락 / beat 미기동 | §9대로 worker 전큐 구독 + beat 단일 기동 |
 | 마이그레이션 `alembic: not found` | 구버전 이미지(alembic 미동봉) | 최신 api 이미지 사용(Dockerfile에 alembic 포함) |
-| 관측성 `network lloydk-airgap_default not found` | 메인 스택 미기동 | §9 먼저 실행 후 §10.5 관측성 up |
+| 관측성 `network koipa-airgap_default not found` | 메인 스택 미기동 | §9 먼저 실행 후 §10.5 관측성 up |
 | Prometheus `/alerts` 비어있음 | 규칙 미로드 | airgap overlay 사용 확인(`alert_rules.yml` 마운트) — dev overlay는 마운트 없음 |
 | 관측성 이미지 `no such image` | 빌드 시 obs 이미지 미저장(WARN) | 외부망서 pull 후 재빌드 또는 `docker-images/obs-*.tar` 수동 동봉 |
 
@@ -251,4 +251,4 @@ curl -s http://localhost:9090/-/ready          # Prometheus ready
 ## 부록 — 책임 경계 (R&R) 요약
 
 - **발주처/KL 준비**: 서버(A100 80GB×2·Ubuntu 22.04)·폐쇄망·GPU 드라이버/CUDA/Container Toolkit·Docker·매체 반입 승인
-- **로이드케이 수행**: §1~§10 전 과정 (반입·적재·구성·마이그레이션·초기화·기동·검증)
+- **한국지식재산보호원 수행**: §1~§10 전 과정 (반입·적재·구성·마이그레이션·초기화·기동·검증)

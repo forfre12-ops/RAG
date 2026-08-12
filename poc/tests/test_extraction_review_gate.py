@@ -8,10 +8,10 @@
 
 from __future__ import annotations
 
-from lloydk.api.prom_metrics import registry
-from lloydk.modules.m2_preprocess.extractor import ExtractResult
-from lloydk.modules.m2_preprocess.pipeline import PreprocessResult
-from lloydk.services.document_ingestion_service import (
+from koipa.api.prom_metrics import registry
+from koipa.modules.m2_preprocess.extractor import ExtractResult
+from koipa.modules.m2_preprocess.pipeline import PreprocessResult
+from koipa.services.document_ingestion_service import (
     DocumentIngestionService,
     extraction_review_decision,
 )
@@ -176,7 +176,7 @@ def _ingest(ext: ExtractResult):
 
 
 def _metric(reason: str) -> float:
-    return registry.get_sample_value("lloydk_extraction_degraded_total", {"reason": reason}) or 0.0
+    return registry.get_sample_value("koipa_extraction_degraded_total", {"reason": reason}) or 0.0
 
 
 def test_ingest_clean_doc_not_flagged():

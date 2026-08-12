@@ -13,7 +13,7 @@ v5 까지 막혀 있던 지점(실측 2026-08-12, v3_9 2,700행 전수):
 그래서 두 게이트가 동시에 만족될 수 없었다:
 
     proxy_corpus.validate_proxy_record   인용이 본문에 글자 그대로 있을 것
-    lloydk.dataset_leakage.check_or_raise 바로 그 문장이 없을 것
+    koipa.dataset_leakage.check_or_raise 바로 그 문장이 없을 것
 
 v5 는 결론 문장을 지워서 풀려 했지만, 본문 중간을 지우면 evidence span 오프셋이 밀려
 2,700행 전건이 무효가 됐다(0 → 2,700 실패). 변환 단계에서는 풀 수 없는 문제였다.
@@ -61,8 +61,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lloydk.dataset_leakage import check_or_raise, grade_tells  # noqa: E402
-from lloydk.proxy_corpus import validate_proxy_record  # noqa: E402
+from koipa.dataset_leakage import check_or_raise, grade_tells  # noqa: E402
+from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
 from v6_fact_pools import FACTOR_SCORE_KEY, POOLS  # noqa: E402
 
 

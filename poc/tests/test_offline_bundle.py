@@ -92,10 +92,10 @@ _UV_EXPORT_SAMPLE = (
     "accelerate==1.14.0 \\\n"
     "    --hash=sha256:aaaa \\\n"
     "    --hash=sha256:bbbb\n"
-    "    # via lloydk-ai\n"
+    "    # via koipa-ai\n"
     "torch==2.5.0 \\\n"
     "    --hash=sha256:cccc\n"
-    "    # via lloydk-ai\n"
+    "    # via koipa-ai\n"
     "nvidia-cudnn-cu12==9.1.0 \\\n"
     "    --hash=sha256:dddd\n"
     "aiohttp==3.14.1 \\\n"
@@ -163,13 +163,13 @@ def test_export_locked_requirements_from_real_uvlock(tmp_path: Path):
 def sample_compose(tmp_path: Path) -> Path:
     path = tmp_path / "docker-compose.yml"
     path.write_text(
-        "name: lloydk-poc\n"
+        "name: koipa-poc\n"
         "\n"
         "services:\n"
         "  postgres:\n"
         "    image: postgres:16-alpine\n"
         "    environment:\n"
-        "      POSTGRES_DB: lloydk\n"
+        "      POSTGRES_DB: koipa\n"
         "\n"
         "  elasticsearch:\n"
         "    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3\n"
@@ -339,7 +339,7 @@ def test_build_manifest_adds_local_build_services(sample_compose: Path, sample_c
     )
     assert "api" in m.components
     assert "worker" in m.components
-    assert m.components["api"].image == "lloydk-api:1.0.0"
+    assert m.components["api"].image == "koipa-api:1.0.0"
 
 
 def test_build_manifest_dry_run_no_sha256(sample_compose: Path, sample_config: Path):

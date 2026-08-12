@@ -6,10 +6,10 @@
 - recall 회귀가 ≥1%p 이내인지 확인
 
 사용:
-  python scripts/es_mapping_int8_hnsw.py --create lloydk-docs-v2
+  python scripts/es_mapping_int8_hnsw.py --create koipa-docs-v2
   python scripts/es_mapping_int8_hnsw.py --recall-check \
-      --baseline lloydk-docs \
-      --target lloydk-docs-v2 \
+      --baseline koipa-docs \
+      --target koipa-docs-v2 \
       --queries datasets/eval/queries_v1.jsonl
 """
 
@@ -115,8 +115,8 @@ def main() -> int:
     parser.add_argument("--es-url", default="http://localhost:9200")
     parser.add_argument("--create", metavar="INDEX_NAME")
     parser.add_argument("--recall-check", action="store_true")
-    parser.add_argument("--baseline", default="lloydk-docs")
-    parser.add_argument("--target", default="lloydk-docs-v2")
+    parser.add_argument("--baseline", default="koipa-docs")
+    parser.add_argument("--target", default="koipa-docs-v2")
     parser.add_argument("--queries", type=Path)
     args = parser.parse_args()
 

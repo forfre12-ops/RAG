@@ -18,7 +18,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lloydk.schemas.common import Grade
+from koipa.schemas.common import Grade
 
 
 # ===========================================================================
@@ -28,8 +28,8 @@ from lloydk.schemas.common import Grade
 
 def _empty_req(monkeypatch):
     """content 없음 + doc_id가 storage에 없음 → 본문 미확보 케이스 구성."""
-    from lloydk.schemas.classify import ClassifyRequest
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.schemas.classify import ClassifyRequest
+    from koipa.services.classify_service import ClassifyService
 
     svc = ClassifyService()
     # 본문 조회는 storage/DB 없이도 (빈 문자열, 상태 None) 반환하도록 강제 (조회 실패 시뮬레이션)
@@ -57,15 +57,15 @@ def test_h2_empty_text_isolates_at_highest_grade_and_needs_review(monkeypatch):
 
 
 def test_h2_highest_grade_helper_returns_top_of_registry_order():
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.services.classify_service import ClassifyService
 
     # DB 미가용 → GradeRegistry fallback = [TS,S1,S2,S3], 선두=TS
     assert ClassifyService._highest_grade() == "TS"
 
 
 def test_h2_highest_grade_respects_custom_registry_order(monkeypatch):
-    from lloydk.schemas import common as common_mod
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.schemas import common as common_mod
+    from koipa.services.classify_service import ClassifyService
 
     # level_order가 다른 프로젝트: S1이 선두(가장 비밀)라고 가정
     monkeypatch.setattr(common_mod.GradeRegistry, "get_codes",
@@ -91,7 +91,7 @@ class _FakeModel:
 
 
 def _fresh_pipeline():
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
 
     # model_dir 미지정 → _load_model 미호출, _id2label은 GradeRegistry 기반(rule-fallback용)
     return InferencePipeline(model_dir=None)
@@ -114,7 +114,7 @@ def test_h6_config_order_honored_not_registry_order(monkeypatch):
     이게 핵심 버그: GradeRegistry로 매핑을 만들면 인덱스가 엉뚱한 등급에 붙어
     '비밀→공개' 미탐을 일으킨다. config 인덱스 0이 TS면 0은 반드시 TS여야 함.
     """
-    from lloydk.schemas import common as common_mod
+    from koipa.schemas import common as common_mod
 
     # DB 순서를 반대로 (S3 선두) 시뮬레이션 — 코드집합은 동일
     monkeypatch.setattr(common_mod.GradeRegistry, "get_codes",
@@ -206,10 +206,10 @@ def test_h8_none_metadata_preserves_search(monkeypatch):
         captured["filter"] = filter
         return []  # hit 없음이어도 검색은 호출됐다는 사실이 핵심
 
-    monkeypatch.setattr("lloydk.services.retrieval.expand_then_search", _spy)
+    monkeypatch.setattr("koipa.services.retrieval.expand_then_search", _spy)
     # build_store/build_embedder도 안전 fake
-    monkeypatch.setattr("lloydk.adapters.vectorstore.build_store", lambda *a, **k: object())
-    monkeypatch.setattr("lloydk.adapters.embedding.build_embedder",
+    monkeypatch.setattr("koipa.adapters.vectorstore.build_store", lambda *a, **k: object())
+    monkeypatch.setattr("koipa.adapters.embedding.build_embedder",
                         lambda *a, **k: type("E", (), {"embed": lambda self, t: [[0.0]]})())
 
     pipe._build_rag_context(query="q", namespace="docs", metadata=None)
@@ -239,7 +239,7 @@ def _cm_perfect(n_per_grade=10):
 
 def test_h4_all_ts_predictor_has_zero_fnr_high_but_high_penalty():
     """전부-TS는 fnr_high=0(게임됨)이지만 합성 지표는 크게 패널티되어야 한다."""
-    from lloydk.modules.m4_training.trainer import (
+    from koipa.modules.m4_training.trainer import (
         _compute_fnr_high, _compute_over_class_rate, _compute_degenerate_penalty,
     )
 
@@ -266,7 +266,7 @@ def test_h4_balanced_predictor_beats_degenerate_on_composite():
 
     metric_for_best_model은 greater_is_better=False이므로 낮을수록 선택됨.
     """
-    from lloydk.modules.m4_training.trainer import (
+    from koipa.modules.m4_training.trainer import (
         _compute_fnr_high, _compute_over_class_rate, _compute_degenerate_penalty,
     )
     high_ids = [0, 1]
@@ -288,14 +288,14 @@ def test_h4_balanced_predictor_beats_degenerate_on_composite():
 
 def test_h4_default_early_stop_metric_is_balanced():
     """기본 best-metric이 게이밍 가능한 fnr_high 단독이 아니라 합성 지표여야 한다."""
-    from lloydk.modules.m4_training.trainer import TrainSpec
+    from koipa.modules.m4_training.trainer import TrainSpec
 
     assert TrainSpec().early_stop_metric == "fnr_high_balanced"
 
 
 def test_h4_over_class_rate_zero_when_no_overclassification():
     """저등급을 고등급으로 올리지 않으면 over_class_rate=0."""
-    from lloydk.modules.m4_training.trainer import _compute_over_class_rate
+    from koipa.modules.m4_training.trainer import _compute_over_class_rate
 
     cm = _cm_perfect()
     assert _compute_over_class_rate(cm, [0, 1]) == 0.0

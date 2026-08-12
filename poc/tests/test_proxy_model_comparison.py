@@ -12,16 +12,16 @@ import sys
 import pytest
 
 from scripts import compare_proxy_models as cli
-from lloydk import proxy_model_comparison as comparison
+from koipa import proxy_model_comparison as comparison
 
 
 def test_evaluator_import_has_no_m5_db_or_service_side_effects():
     script = (
         "import json,sys; sys.path.insert(0, 'src'); "
-        "import lloydk.proxy_model_comparison; "
+        "import koipa.proxy_model_comparison; "
         "print(json.dumps(sorted(n for n in sys.modules if "
-        "n == 'lloydk.db' or n.startswith('lloydk.services') or "
-        "n == 'lloydk.modules.m5_inference.pipeline')))"
+        "n == 'koipa.db' or n.startswith('koipa.services') or "
+        "n == 'koipa.modules.m5_inference.pipeline')))"
     )
     completed = subprocess.run(
         [sys.executable, "-c", script],

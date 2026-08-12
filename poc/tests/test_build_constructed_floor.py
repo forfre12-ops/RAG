@@ -9,7 +9,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from lloydk.modules.m1_synthesis.witness_taxonomy import (
+from koipa.modules.m1_synthesis.witness_taxonomy import (
     WITNESS_TYPES,
     instantiate_witness,
     specs_by_grade,

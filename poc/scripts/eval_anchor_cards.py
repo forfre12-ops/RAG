@@ -50,13 +50,13 @@ def main() -> int:
                          "(opt-in·반복 가능). 라벨=S2 floor(≥등급): FNR verdict만 의미, recall은 참고용.")
     args = ap.parse_args()
 
-    from lloydk.config import settings
-    from lloydk.modules.m6_evaluation.anchor_corpus import (
+    from koipa.config import settings
+    from koipa.modules.m6_evaluation.anchor_corpus import (
         DEFAULT_ANCHOR_SOURCES,
         constructed_floor_source,
         patent_timeaxis_prepub_source,
     )
-    from lloydk.modules.m6_evaluation.anchor_eval import run_anchor_cards
+    from koipa.modules.m6_evaluation.anchor_eval import run_anchor_cards
 
     model_dir = Path(args.model_dir)
     if not model_dir.is_absolute():

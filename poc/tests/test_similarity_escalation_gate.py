@@ -18,9 +18,9 @@ import types
 
 import pytest
 
-from lloydk.adapters.vectorstore.base import SearchHit
-from lloydk.schemas.common import Grade, GradeRegistry
-from lloydk.services.classify_service import ClassifyService
+from koipa.adapters.vectorstore.base import SearchHit
+from koipa.schemas.common import Grade, GradeRegistry
+from koipa.services.classify_service import ClassifyService
 
 GATE = ClassifyService._similarity_escalation_gate  # 언바운드 — fake-self로 호출
 
@@ -60,9 +60,9 @@ def _patch(
     embed_ok=True,
     search_exc=None,
 ):
-    from lloydk import config as cfg
-    import lloydk.adapters.embedding as emb_mod
-    import lloydk.adapters.vectorstore as vs_mod
+    from koipa import config as cfg
+    import koipa.adapters.embedding as emb_mod
+    import koipa.adapters.vectorstore as vs_mod
 
     monkeypatch.setattr(cfg.settings, "similarity_escalation_enabled", enabled, raising=False)
     monkeypatch.setattr(cfg.settings, "similarity_escalation_tau", tau, raising=False)
@@ -93,8 +93,8 @@ def _patch(
 
 def test_off_default_is_noop(monkeypatch):
     """기본 OFF면 임베딩/검색 비용 전에 즉시 None(비파괴)."""
-    from lloydk import config as cfg
-    import lloydk.adapters.embedding as emb_mod
+    from koipa import config as cfg
+    import koipa.adapters.embedding as emb_mod
 
     monkeypatch.setattr(cfg.settings, "similarity_escalation_enabled", False, raising=False)
 
@@ -158,7 +158,7 @@ def test_already_top_grade_noop(monkeypatch):
     # 모델이 이미 최고등급(TS) → 과소분류 불가 → 검색조차 안 함.
     _patch(monkeypatch, enabled=True,
            hits=[SearchHit("docA:c0", 0.99, {"doc_id": "docA"})])
-    import lloydk.adapters.embedding as emb_mod
+    import koipa.adapters.embedding as emb_mod
 
     def _boom(*a, **k):
         raise AssertionError("top-grade prediction must not embed")
@@ -230,7 +230,7 @@ def test_empty_store_keyerror_fail_open(monkeypatch):
 
 
 def test_config_defaults_off():
-    from lloydk.config import Settings
+    from koipa.config import Settings
 
     s = Settings(_env_file=None)
     assert s.similarity_escalation_enabled is False  # 기본 OFF(비파괴)
@@ -239,14 +239,14 @@ def test_config_defaults_off():
 
 @pytest.mark.parametrize("bad", [1.0, 0.0, 1.5, -0.1])
 def test_config_validator_rejects_bad_tau(bad):
-    from lloydk.config import Settings
+    from koipa.config import Settings
 
     with pytest.raises(Exception):
         Settings(_env_file=None, similarity_escalation_tau=bad)
 
 
 def test_config_accepts_valid_tau():
-    from lloydk.config import Settings
+    from koipa.config import Settings
 
     s = Settings(_env_file=None, similarity_escalation_tau=0.85)
     assert s.similarity_escalation_tau == 0.85
@@ -257,8 +257,8 @@ def test_config_accepts_valid_tau():
 
 def test_gate_wired_into_classify_no_grade_change(monkeypatch):
     """게이트가 classify() 체인에 실제로 배선됐고, 발동 시 등급 무변경·needs_review."""
-    from lloydk import config as cfg
-    from lloydk.schemas.classify import ClassifyRequest
+    from koipa import config as cfg
+    from koipa.schemas.classify import ClassifyRequest
 
     # 앞단 opt-in 게이트(합의·LLM 2차)를 꺼서 유사도 게이트만 status를 뒤집게 격리.
     monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", False, raising=False)
@@ -297,8 +297,8 @@ def test_es_backend_noop(monkeypatch):
     # es는 _score=(1+cos)/2라 τ(코사인) 의미가 어긋남 → 검색조차 안 하고 no-op.
     _patch(monkeypatch, enabled=True,
            hits=[SearchHit("docA:c0", 0.99, {"doc_id": "docA"})])
-    from lloydk import config as cfg
-    import lloydk.adapters.embedding as emb_mod
+    from koipa import config as cfg
+    import koipa.adapters.embedding as emb_mod
 
     monkeypatch.setattr(cfg.settings, "vector_backend", "es", raising=False)
 
@@ -335,22 +335,22 @@ def test_ran_and_routed_on_escalation(monkeypatch):
 
 
 def test_inc_similarity_escalation_real_counter():
-    from lloydk.api import prom_metrics as pm
+    from koipa.api import prom_metrics as pm
 
     labels = {"action": "routed"}
-    before = pm.registry.get_sample_value("lloydk_similarity_escalation_total", labels) or 0.0
+    before = pm.registry.get_sample_value("koipa_similarity_escalation_total", labels) or 0.0
     ClassifyService._inc_similarity_escalation("routed")
-    after = pm.registry.get_sample_value("lloydk_similarity_escalation_total", labels) or 0.0
+    after = pm.registry.get_sample_value("koipa_similarity_escalation_total", labels) or 0.0
     assert after == before + 1
 
 
 def test_record_gate_fail_open_real_counter():
-    from lloydk.api import prom_metrics as pm
+    from koipa.api import prom_metrics as pm
 
     labels = {"gate": "similarity_escalation"}
-    before = pm.registry.get_sample_value("lloydk_serving_gate_fail_open_total", labels) or 0.0
+    before = pm.registry.get_sample_value("koipa_serving_gate_fail_open_total", labels) or 0.0
     ClassifyService._record_gate_fail_open("similarity_escalation")
-    after = pm.registry.get_sample_value("lloydk_serving_gate_fail_open_total", labels) or 0.0
+    after = pm.registry.get_sample_value("koipa_serving_gate_fail_open_total", labels) or 0.0
     assert after == before + 1
 
 
@@ -360,7 +360,7 @@ def test_record_gate_fail_open_real_counter():
 def _pg_ok() -> bool:
     from sqlalchemy import text as _text
 
-    from lloydk.db import engine
+    from koipa.db import engine
 
     try:
         with engine.connect() as conn:
@@ -382,7 +382,7 @@ def require_pg():
 
 @pytest.fixture
 def db():
-    from lloydk.db import SessionLocal
+    from koipa.db import SessionLocal
 
     s = SessionLocal()
     try:
@@ -394,13 +394,13 @@ def db():
 
 @pytest.fixture
 def levels(db):
-    from lloydk.db.models import ClassificationLevel
+    from koipa.db.models import ClassificationLevel
 
     return {lv.level_code: lv.level_id for lv in db.query(ClassificationLevel).all()}
 
 
 def _seed_doc(db):
-    from lloydk.db.models import Document
+    from koipa.db.models import Document
 
     doc = Document(filename="sim.pdf", source_format="pdf", text_preview="유사도 테스트 문서")
     db.add(doc)
@@ -409,7 +409,7 @@ def _seed_doc(db):
 
 
 def _upsert_label(db, doc, level_id, labeled_by):
-    from lloydk.repositories import ClassifyRepo
+    from koipa.repositories import ClassifyRepo
 
     ClassifyRepo(db).upsert_verified_label(
         doc_id=doc.doc_id, level_id=level_id, labeled_by=labeled_by,
@@ -419,8 +419,8 @@ def _upsert_label(db, doc, level_id, labeled_by):
 
 
 def _cleanup_docs(doc_ids):
-    from lloydk.db import session_scope
-    from lloydk.db.models import Document, DocumentLabel
+    from koipa.db import session_scope
+    from koipa.db.models import Document, DocumentLabel
 
     with session_scope() as s:
         s.query(DocumentLabel).filter(
@@ -438,9 +438,9 @@ class _RealRefSelf:
 
 
 def _patch_real_gate_deps(monkeypatch, neighbor_doc_id, *, score=0.97):
-    from lloydk import config as cfg
-    import lloydk.adapters.embedding as emb_mod
-    import lloydk.adapters.vectorstore as vs_mod
+    from koipa import config as cfg
+    import koipa.adapters.embedding as emb_mod
+    import koipa.adapters.vectorstore as vs_mod
 
     monkeypatch.setattr(cfg.settings, "similarity_escalation_enabled", True, raising=False)
     monkeypatch.setattr(cfg.settings, "similarity_escalation_tau", 0.92, raising=False)

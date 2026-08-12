@@ -17,8 +17,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lloydk.adapters.vectorstore.base import SearchHit
-from lloydk.adapters.vectorstore.es_store import (
+from koipa.adapters.vectorstore.base import SearchHit
+from koipa.adapters.vectorstore.es_store import (
     EsStore,
     _build_term_filters,
     _hits_from_response,

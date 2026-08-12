@@ -31,7 +31,7 @@
 <p>한국지식재산보호원(KOIPA)의 <strong>영업비밀 문서 자동 등급분류 시스템</strong>입니다. 문서를 넣으면 부정경쟁방지법 영업비밀 3요건에 따라 <strong>TS(특급)·S1(1급)·S2(2급/대외비)·S3(3급/공개)</strong> 중 하나로 분류하고, 분류 근거와 신뢰도를 함께 제시합니다.</p>
 <div class="callout inset">
   <div class="callout-label">사업 구조</div>
-  <p><strong>KL = 원청(갑)</strong> · <strong>로이드케이 = AI 코어 하청(을)</strong>. KL이 웹 수집계층에서 문서·메타데이터를 모아 전달하면, 로이드케이 AI 코어가 분류·근거·검수 라우팅을 담당합니다. 영업비밀 문서는 외부 반출이 보안 위반이므로 <strong>발주처 폐쇄망에 온프렘 GPU로 배포</strong>(RTX 5070 Ti 검증)되며, 추론은 클라우드 API가 아닌 온프렘 GPU 전제입니다.</p>
+  <p><strong>KL = 원청(갑)</strong> · <strong>한국지식재산보호원 = AI 코어 하청(을)</strong>. KL이 웹 수집계층에서 문서·메타데이터를 모아 전달하면, 한국지식재산보호원 AI 코어가 분류·근거·검수 라우팅을 담당합니다. 영업비밀 문서는 외부 반출이 보안 위반이므로 <strong>발주처 폐쇄망에 온프렘 GPU로 배포</strong>(RTX 5070 Ti 검증)되며, 추론은 클라우드 API가 아닌 온프렘 GPU 전제입니다.</p>
 </div>
 <div class="grade-grid">
   <div class="grade-card grade-ts"><span class="grade-badge">TS</span><div class="grade-name">특급기밀</div><div class="grade-desc">유출 시 회사 존립·국가안보 위협</div><div class="grade-examples"><strong>예 ▸</strong> 미공개 핵심기술·진행중 M&amp;A 가격·국가핵심기술·루트 CA 키</div></div>
@@ -202,7 +202,7 @@
 <div class="section-sep"><span class="section-sep-num">10</span><span class="section-sep-line"></span><span class="section-sep-title">KL Interface</span></div>
 <section id="kl">
 <h2>10. KL 연동 — ICD v0.9</h2>
-<p>KL 수집계층 → 로이드케이 AI 코어로 전달하는 <strong>3필드 메타데이터 인터페이스</strong>. 텍스트만으로 부족한 외부신호를 보완해 S/V/M 채점에 투입합니다.</p>
+<p>KL 수집계층 → 한국지식재산보호원 AI 코어로 전달하는 <strong>3필드 메타데이터 인터페이스</strong>. 텍스트만으로 부족한 외부신호를 보완해 S/V/M 채점에 투입합니다.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>필드</th><th>값</th><th>채점 반영</th></tr></thead>
 <tbody>

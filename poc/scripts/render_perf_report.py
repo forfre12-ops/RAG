@@ -13,9 +13,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lloydk.perf.kpis import core_kpis  # type: ignore
-from lloydk.perf.recorder import load_history  # type: ignore
-from lloydk.perf.regression import (  # type: ignore
+from koipa.perf.kpis import core_kpis  # type: ignore
+from koipa.perf.recorder import load_history  # type: ignore
+from koipa.perf.regression import (  # type: ignore
     detect_regression_trend,
     summarize_skip_reasons,
 )
@@ -331,8 +331,8 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KOIPA AI 시나리오 성능 보고서 — Lloydk AI</title>
-<meta name="generator" content="lloydk.perf PSH v1.0" />
+<title>KOIPA AI 시나리오 성능 보고서 — Koipa AI</title>
+<meta name="generator" content="koipa.perf PSH v1.0" />
 <style>{CSS}</style>
 </head>
 <body>
@@ -418,7 +418,7 @@ make perf-scenarios FAIL_ON_MISS=1 # KPI 미달 시 exit 1 (CI용)</pre>
 </section>
 
 <div class="foot">
-  생성: lloydk.perf PSH v1.0 · 외부 의존 0 (CSS·JS 인라인) · 폐쇄망 호환
+  생성: koipa.perf PSH v1.0 · 외부 의존 0 (CSS·JS 인라인) · 폐쇄망 호환
 </div>
 
 </div>

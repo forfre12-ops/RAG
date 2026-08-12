@@ -1,7 +1,7 @@
 """B5 — OpenAPI yaml ↔ 실 FastAPI 라우터 정합성 검사.
 
 용도:
-- doc/03_openapi_lloydk_kl.yaml 에 정의된 path/method가 실 app에 모두 구현됐는가
+- doc/03_openapi_koipa_kl.yaml 에 정의된 path/method가 실 app에 모두 구현됐는가
 - 반대로 app에 있지만 yaml에 없는 path (drift) 식별
 - KL 회신 K2 검토 의견 처리 시 빠른 영향 분석
 
@@ -35,7 +35,7 @@ POC_ROOT = HERE.parent
 REPO_ROOT = POC_ROOT.parent
 sys.path.insert(0, str(POC_ROOT / "src"))
 
-DEFAULT_YAML = REPO_ROOT / "doc" / "03_openapi_lloydk_kl.yaml"
+DEFAULT_YAML = REPO_ROOT / "doc" / "03_openapi_koipa_kl.yaml"
 
 
 def _parse_yaml_paths(yaml_path: Path) -> tuple[set[tuple[str, str]], str]:
@@ -43,7 +43,7 @@ def _parse_yaml_paths(yaml_path: Path) -> tuple[set[tuple[str, str]], str]:
 
     spec format:
       servers:
-        - url: http://lloydk-api:8000/api/v1
+        - url: http://koipa-api:8000/api/v1
       paths:
         /classify:
           post:
@@ -128,7 +128,7 @@ _ROUTER_IGNORE_PREFIXES: tuple[str, ...] = (
 _ROUTER_IGNORE_EXACT: set[str] = {
     "/api/v1/metrics-prom",
     "/api/v1/openapi.json",
-    # 내부 운영/관리 라우트 — KL 연동(외부) 계약 명세(03_openapi_lloydk_kl.yaml) 범위 밖이며,
+    # 내부 운영/관리 라우트 — KL 연동(외부) 계약 명세(03_openapi_koipa_kl.yaml) 범위 밖이며,
     # 전체 라우트는 부록B API 명세(DEF-2026-39, 48건 전수 문서화)가 다룬다.
     "/api/v1/admin/demo/purge",   # 데모 데이터 purge — 관리·파괴적, 외부 계약 아님
     "/api/v1/dashboard/summary",  # 운영 대시보드 집계 — 내부 관측성
@@ -158,10 +158,10 @@ def _collect_router_paths() -> tuple[set[tuple[str, str]], set[tuple[str, str]]]
         - training_only_paths: enable_training=True 일 때만 등록되는 경로
     """
     try:
-        from lloydk.api.app import app  # noqa: PLC0415
-        from lloydk.config import settings  # noqa: PLC0415
+        from koipa.api.app import app  # noqa: PLC0415
+        from koipa.config import settings  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001
-        print(f"  ERROR: lloydk.api.app import 실패: {exc}")
+        print(f"  ERROR: koipa.api.app import 실패: {exc}")
         return set(), set()
 
     training_enabled = getattr(settings, "enable_training", False)
@@ -259,7 +259,7 @@ def main() -> int:
     # training 라우터는 full-train 프로파일 전용 — 현재 프로파일에서 비활성이면
     # YAML의 /train/* 경로를 strict 비교에서 제외 (profile-conditional)
     try:
-        from lloydk.config import settings as _s  # noqa: PLC0415
+        from koipa.config import settings as _s  # noqa: PLC0415
         _training_enabled = getattr(_s, "enable_training", False)
     except Exception:  # noqa: BLE001
         _training_enabled = False

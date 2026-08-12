@@ -4,8 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 import json
 
-from lloydk.api.golden import _render_specledger_gold_console_html
-from lloydk.services.proxy_gold_candidate_service import ProxyGoldCandidateService
+from koipa.api.golden import _render_specledger_gold_console_html
+from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 
 
 ROOT = Path(__file__).resolve().parents[1]

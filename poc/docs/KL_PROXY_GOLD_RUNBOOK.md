@@ -347,5 +347,5 @@ KL 기준 모델은 제품 컨테이너를 수정하지 않고 읽기 전용 복
 - 학습셋 materialize: [`scripts/materialize_proxy_training_set.py`](../scripts/materialize_proxy_training_set.py)
 - proxy checkpoint 후보 학습: [`scripts/p1_train_classifier.py`](../scripts/p1_train_classifier.py)
 - serving-faithful 선택·T/τ 보정: [`scripts/finalize_proxy_classifier.py`](../scripts/finalize_proxy_classifier.py)
-- 문서 window logits/보정 core: [`src/lloydk/proxy_training_finalization.py`](../src/lloydk/proxy_training_finalization.py)
+- 문서 window logits/보정 core: [`src/koipa/proxy_training_finalization.py`](../src/koipa/proxy_training_finalization.py)
 - raw/bundle 비교: [`scripts/compare_proxy_models.py`](../scripts/compare_proxy_models.py)

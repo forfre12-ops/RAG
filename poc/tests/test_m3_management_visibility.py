@@ -9,7 +9,7 @@ eval 에서 'S3+사외비→TS' 과분류가 드러나 폐기(rule_engine s=2·v
 
 from __future__ import annotations
 
-from lloydk.modules.m3_labeling.rule_engine import (
+from koipa.modules.m3_labeling.rule_engine import (
     LabelRuleEngine,
     detect_management_marking,
 )

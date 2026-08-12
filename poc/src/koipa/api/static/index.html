@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KOIPA AI 영업비밀관리시스템 — 실시간 등급분류 콘솔 | Koipa</title>
+<meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·신뢰도·평가요소·법령 근거를 확인합니다." />
+
+<link rel="stylesheet" href="./styles.css" />
+<script src="./deploy_badge.js" data-screen="시연"></script>
+</head>
+<body>
+
+<!-- ============ NAVBAR ============ -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand">
+      <span class="brand-mark"><img src="./koipa_logo_mark.png" alt="한국지식재산보호원" onerror="this.style.display='none'"/></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-url">KOIPA AI 콘솔</span>
+    </a>
+    <div class="nav-actions">
+      <span id="nav-status" class="nav-status warming"><span class="dot"></span><span>warmup…</span></span>
+      <a class="nav-link" href="#s1">시연</a>
+      <a class="nav-link" href="#sec-ops">운영·반영</a>
+      <a class="nav-link" href="#s3">법령</a>
+      <a class="nav-link" href="./parse_demo.html">파싱·분류 시연 ↗</a>
+      <a class="nav-link" href="./admin.html">거버넌스 콘솔 ↗</a>
+    </div>
+  </div>
+</header>
+
+<div class="hero-bg"></div>
+
+<div class="container" id="top">
+
+  <!-- ============ HERO ============ -->
+  <div class="meta-row">
+    <span class="badge">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Live Demo
+    </span>
+    <span class="meta-dot">•</span>
+    <span class="meta-category">KOIPA AI 영업비밀관리</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">FUN-005 라이브</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">2026-07-17</span>
+  </div>
+
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>실시간 등급분류 콘솔</h1>
+
+  <p class="lede">
+    한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정합니다.
+    시드 v4 404개 키워드 · 부정경쟁방지법 §2조 2호 · KOIPA 가이드 v1 기반으로
+    분류 근거와 3 평가요소(S·V·M)를 함께 반환합니다.
+  </p>
+
+  <div class="hero-kpis">
+    <span class="hero-kpi"><span class="dot"></span>고등급 <b>파국 미탐 0</b> · TS recall <b>0.92</b> (정직 홀드아웃)</span>
+    <span class="hero-kpi"><span class="dot"></span>FNR <b>≤ 5%</b> 핵심 KPI 목표 (미탐 최소화)</span>
+    <span class="hero-kpi"><span class="dot"></span>시드 v4 <b>404</b>개 키워드 (실측)</span>
+    <span class="hero-kpi"><span class="dot"></span><b>4-tier</b> 배포 프로파일 (실측)</span>
+  </div>
+
+  <div class="callout warn" style="margin-bottom:32px;">
+    <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <div class="callout-body">
+      <span class="callout-label">정직성 표기 규칙</span>
+      <p>본 데모의 수치는 출처가 다음 3 종으로 명시됩니다.</p>
+      <p>
+        <span class="src-tag src-measured">실측</span> 우리가 직접 측정 / 코드에서 카운트한 사실 ·
+        <span class="src-tag src-spec">명세</span> 합격선·목표값·법령 등 명문화된 기준 ·
+        <span class="src-tag src-ref">참고</span> V2 통합본 인용 또는 예시 시나리오(미실측)
+      </p>
+      <p style="margin-top:6px;font-size:13px;">BERT 추론 1.18s · LLM 25.8s는 Phase 4/5 <b>자체 GPU(RTX 5070 Ti) 실측</b>. 사고 손해액은 예시 시나리오 기반으로 <b>발주처 실문서 도착 후</b> 실측치로 갱신 예정.</p>
+      <p style="margin-top:6px;font-size:13px;">이 라이브 데모의 실시간 판정은 기본적으로 <b>시드 키워드 룰 분류기(rule-fallback-v0)</b>로 동작하며, 학습 <b>KF-DeBERTa(v-dd3abab9)</b>가 로드된 하이브리드 프로파일에서는 룰·모델 <b>이중판정</b>을 함께 노출합니다(실제 로드 상태는 하단 이중판정 패널이 표시). 위 1.18s·25.8s는 <b>별도 GPU 환경 벤치 latency</b>로 이 데모의 실측 응답시간과는 다릅니다.</p>
+    </div>
+  </div>
+
+  <hr class="hero-sep" />
+
+  <!-- ===== §1 시연 ===== -->
+  <section id="s1">
+    <h2><span class="num">§1</span>시연 — 30초 안에 4단계가 갈리는 순간</h2>
+    <p class="h2-sub">샘플 12종(시드 v4 빌드 + 의도 등급 검증 통과)을 선택하거나 직접 입력. SSE 7단계 점등으로 실시간 분류 과정이 보입니다.</p>
+
+    <div class="card" style="padding: 20px 24px;">
+      <div class="form-row" style="align-items:center;">
+        <label for="cfg-apikey">API 키</label>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input id="cfg-apikey" type="text" value="demo-secret-key" placeholder="시연 서버 API 키" style="font-family:var(--font-mono);font-size:13px;min-width:220px;padding:6px 10px;" />
+          <span id="apikey-status" class="toggle-hint" style="margin:0;">기본 <code>demo-secret-key</code></span>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>파일 직접 업로드</label>
+        <div class="upload-drop" id="doc-drop" role="button" tabindex="0">
+          <div class="upload-big">📄 파일을 여기로 끌어다 놓거나 <u>클릭해 선택</u></div>
+          <div class="upload-sub">HWP · PDF · DOCX · XLSX · TXT — 올리면 즉시 파싱→이중판정</div>
+          <div class="upload-fname" id="doc-file-name"></div>
+          <input id="doc-file" type="file" accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.txt" style="display:none" />
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="sample-select">샘플 문서</label>
+        <select id="sample-select"></select>
+      </div>
+      <div class="form-row">
+        <label for="doc-title">제목</label>
+        <input id="doc-title" type="text" placeholder="문서 제목 (선택)" />
+      </div>
+      <div class="form-row">
+        <label for="doc-body">본문</label>
+        <textarea id="doc-body" placeholder="여기에 한국어 문서 본문을 붙여넣거나 위에서 샘플을 선택하세요."></textarea>
+      </div>
+
+      <div style="margin-top:8px">
+        <label style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">와우 — 키워드 토글</label>
+        <p class="toggle-hint">아래 키워드의 체크를 해제하면 본문에서 해당 단어가 일반어로 치환됩니다. 다시 <b>「분류하기」</b>를 눌러 등급 변화를 확인하세요. <b>「영업팀 주간 업무 공유 초안」</b> 샘플에서는 체크 해제만으로 <b>S1 → S2 → S3</b>로 등급이 실제로 내려갑니다. (특급·1급 문서는 비밀 신호가 촘촘해 몇 개를 꺼도 등급이 유지되는데, 이는 <b>미탐 0을 지향하는 안전 설계</b>입니다.)</p>
+        <div class="toggle-row" id="toggle-row"></div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-classify" class="btn">분류하기</button>
+        <button id="btn-print" class="btn secondary">PDF 인쇄</button>
+        <button id="btn-reset" class="btn ghost">초기화</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== §2 결과 — 진행바를 카드 맨 위로 이동해 한 시야에 표시 ===== -->
+  <section id="sec-result">
+    <h2><span class="num">§2</span>결과 — 왜 이 등급인가</h2>
+    <p class="h2-sub">등급·신뢰도·자연어 판단(양성+음성 근거)·3 평가요소(S·V·M)·근거 키워드. 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
+
+    <div class="result" id="result-card">
+      <h3 style="font-size:13px;margin:0 0 12px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">진행 단계 — SSE 실시간 점등</h3>
+      <div id="stage-seq" class="seq" style="margin-bottom:18px;"></div>
+
+      <div id="result-head" class="result-head">
+        <div style="font-size:14px;color:var(--text-dim);">샘플을 선택하고 "분류하기"를 누르세요.</div>
+      </div>
+
+      <h3 style="font-size:14px;margin-top:18px;">두 엔진의 판정 — 룰 · 분류기 · 최종 결합</h3>
+      <p class="toggle-hint" style="margin-top:-4px;">운영과 동일하게 <b>룰 엔진</b>과 <b>학습 분류기(BERT)</b>가 각각 독립 판정하고, 안전 규칙으로 결합해 최종 등급을 냅니다.</p>
+      <div id="result-dual" class="dual-wrap"><div class="dual-empty">분류 후 표시됩니다.</div></div>
+
+      <div id="result-summary" class="summary"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">3 평가요소 S·V·M (KOIPA 가이드 v1)</h3>
+      <div id="result-factors" class="stats"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">근거 키워드 — 클릭 시 본문 하이라이트</h3>
+      <div id="result-keywords" class="kw-chips"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">본문 미리보기 (시드 키워드 매칭)</h3>
+      <div id="body-preview" class="body-render"></div>
+
+      <!-- 실시간 요청 로그는 하단 고정 콘솔(#logdock)로 이동됨 — 스크롤과 무관하게 항상 보임 -->
+      <p class="toggle-hint" style="margin-top:14px;">실시간 요청 로그는 화면 <b>하단 고정 콘솔</b>에 표시됩니다(스크롤과 무관하게 항상 보임). 서버 uvicorn 로그와 대조하면 위조가 아님을 확인할 수 있습니다.</p>
+    </div>
+  </section>
+
+  <!-- ===== §2.5 운영 대시보드 + 실시간 반영 ===== -->
+  <section id="sec-ops">
+    <h2><span class="num">§2.5</span>운영 현황 · 검수 반영 <span class="src-tag src-measured">DB 실측</span></h2>
+    <p class="h2-sub">아래 수치는 모두 DB 실측 카운트(가공 없음)입니다. "실시간 반영 시연"은 등록→분류→검수 교정→재분류를 <b>실제로 호출</b>하며, 교정 결과가 다음 분류에 반영되는 것을 보여줍니다.</p>
+    <div class="ops-tiles" id="ops-tiles"></div>
+    <div class="card" style="margin-top:14px;padding:16px 18px;">
+      <div class="btn-row" style="margin-bottom:10px;">
+        <button id="btn-reflect" class="btn">▶ 실시간 반영 시연 (등록→분류→교정→재분류)</button>
+        <button id="btn-dash-refresh" class="btn ghost">대시보드 새로고침</button>
+        <span class="hint" id="reflect-busy"></span>
+      </div>
+      <div id="reflect-steps" class="reflect-steps"><div class="hint">버튼을 누르면 실제 문서를 등록·분류하고, 검수자가 등급을 교정한 뒤 같은 문서를 재분류합니다. 각 단계는 서버 실호출이며 위 카운터가 실시간으로 바뀝니다.</div></div>
+    </div>
+  </section>
+
+  <!-- ===== §3 법령 ===== -->
+  <section id="s3">
+    <h2><span class="num">§3</span>법령 근거 — 부정경쟁방지 및 영업비밀보호에 관한 법률 §2조 2호</h2>
+    <p class="h2-sub">등급별 법령 출처 + KOIPA 가이드 v1 §번호 + 시드 키워드. 카드의 키워드를 클릭하면 §2 본문에서 해당 단어가 깜빡입니다.</p>
+    <div id="legal-grid" class="card-grid"></div>
+  </section>
+
+  <!-- §4~§7(미탐 설명·벤치·배포·신뢰)은 발표 멘트/제안서로 이관 — 데모 페이지는 분류 흐름에 집중 -->
+  <div class="print-watermark">
+    KOIPA AI 영업비밀관리시스템 · 실시간 등급분류 콘솔 · 한국지식재산보호원
+  </div>
+
+</div>
+
+<footer>
+  <div>KOIPA AI 영업비밀관리시스템 · Powered by <b>Koipa</b></div>
+  <div class="mono">한국지식재산보호원 · www.koipa.re.kr · 2026-07-17</div>
+</footer>
+
+<!-- ===== 실시간 요청 로그 — 하단 고정 콘솔 (항상 보임) ===== -->
+<div class="logdock" id="logdock">
+  <div class="logdock-head" onclick="toggleDemoLog()">
+    <b>실시간 요청 로그 <span class="src-tag src-measured" style="vertical-align:middle;">위조 아님</span> <span class="logdock-hint">— 이 페이지가 실제 보낸 HTTP 요청/응답 · 서버 uvicorn 로그와 대조 가능</span></b>
+    <span id="logdock-toggle">접기 ▾</span>
+  </div>
+  <div id="live-log" class="live-log"><div class="ll-empty">요청이 여기에 실시간으로 기록됩니다.</div></div>
+</div>
+<script>
+function toggleDemoLog(){var d=document.getElementById('logdock'),t=document.getElementById('logdock-toggle');if(!d)return;var c=d.classList.toggle('collapsed');if(t)t.textContent=c?'펼치기 ▴':'접기 ▾';document.body.style.paddingBottom=c?'52px':'232px';}
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

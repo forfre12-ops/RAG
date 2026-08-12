@@ -67,9 +67,9 @@ def main() -> int:
     if args.offline_default_registry:
         os.environ.setdefault("TESTING", "1")
 
-    from lloydk.config import settings
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline
-    from lloydk.modules.m6_evaluation.serving_eval import evaluate_via_serving
+    from koipa.config import settings
+    from koipa.modules.m5_inference.pipeline import InferencePipeline
+    from koipa.modules.m6_evaluation.serving_eval import evaluate_via_serving
 
     gold = Path(args.gold)
     if not gold.is_absolute():

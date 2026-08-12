@@ -1,8 +1,8 @@
-"""lloydk.hygiene 위생 유틸 단위 테스트 — 정규화·텍스트해시·누출탐지·홀드아웃 분리.
+"""koipa.hygiene 위생 유틸 단위 테스트 — 정규화·텍스트해시·누출탐지·홀드아웃 분리.
 
 정본 정규화 표준(공백 전부 제거 + 대소문자 보존)과 build_p1 분리 알고리즘의 동작을 고정한다.
 """
-from lloydk.hygiene import (
+from koipa.hygiene import (
     find_leaked,
     normalize_text,
     stratified_holdout_split,

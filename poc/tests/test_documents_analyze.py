@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
+from koipa.api.app import app
 
 pytestmark = pytest.mark.slow  # classify 모델 로드
 
@@ -98,7 +98,7 @@ class TestAnalyzeContract:
 
     def test_oversized_file_rejected(self, client, monkeypatch):
         """max_upload_mb 초과 업로드 → 413 (DoS/자원 보호). 파싱·분류 진입 전 차단."""
-        from lloydk import config as cfg
+        from koipa import config as cfg
 
         monkeypatch.setattr(cfg.settings, "max_upload_mb", 1, raising=False)
         big = b"x" * (2 * 1024 * 1024)  # 2MB > 1MB 한도
@@ -135,7 +135,7 @@ class TestSyncChunkCap:
     """
 
     def test_over_cap_rejected_with_actionable_413(self, client, monkeypatch):
-        from lloydk.config import settings
+        from koipa.config import settings
 
         monkeypatch.setattr(settings, "analyze_sync_max_chunks", 1, raising=False)
         r = _upload(client, _GOLD_DOCX)
@@ -145,18 +145,18 @@ class TestSyncChunkCap:
         # 진단 가능해야 한다 — 무엇이 얼마나 컸는지와 다음 행동이 함께 있어야 한다.
         assert "chunks" in d
         assert "비동기" in d or "async" in d
-        assert "LLOYDK_ANALYZE_SYNC_MAX_CHUNKS" in d
+        assert "KOIPA_ANALYZE_SYNC_MAX_CHUNKS" in d
 
     def test_under_cap_passes(self, client, monkeypatch):
         """상한을 넉넉히 두면 기존 경로가 그대로 동작한다(게이트가 정상 문서를 막지 않는다)."""
-        from lloydk.config import settings
+        from koipa.config import settings
 
         monkeypatch.setattr(settings, "analyze_sync_max_chunks", 100_000, raising=False)
         assert _upload(client, _GOLD_DOCX).status_code == 200
 
     def test_zero_disables_gate(self, client, monkeypatch):
         """0 이하 = 검사 비활성(측정·디버깅용) — 상한 로직이 켜져 있어도 통과해야 한다."""
-        from lloydk.config import settings
+        from koipa.config import settings
 
         monkeypatch.setattr(settings, "analyze_sync_max_chunks", 0, raising=False)
         assert _upload(client, _GOLD_DOCX).status_code == 200

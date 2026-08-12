@@ -20,9 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.api.prom_metrics import SERVING_FAIL_OPEN_GATES
+from koipa.api.prom_metrics import SERVING_FAIL_OPEN_GATES
 
-_SRC = Path(__file__).resolve().parents[1] / "src" / "lloydk"
+_SRC = Path(__file__).resolve().parents[1] / "src" / "koipa"
 # 두 곳에 같은 이름의 기록 헬퍼가 있다(pipeline 모듈 함수 · ClassifyService 정적 메서드).
 # 호출 형태를 모두 잡으려고 함수명 뒤의 첫 문자열 리터럴을 읽는다.
 _CALL_RE = re.compile(r"_record_gate_fail_open\(\s*[\"']([a-z0-9_]+)[\"']")
@@ -61,6 +61,6 @@ def test_every_declared_gate_is_recorded():
 @pytest.mark.parametrize("gate", sorted(SERVING_FAIL_OPEN_GATES))
 def test_declared_gate_label_is_usable(gate):
     """선언된 라벨로 실제 카운터를 증가시킬 수 있는지(라벨 카디널리티 계약)."""
-    from lloydk.api.prom_metrics import SERVING_GATE_FAIL_OPEN_TOTAL
+    from koipa.api.prom_metrics import SERVING_GATE_FAIL_OPEN_TOTAL
 
     SERVING_GATE_FAIL_OPEN_TOTAL.labels(gate=gate).inc(0)

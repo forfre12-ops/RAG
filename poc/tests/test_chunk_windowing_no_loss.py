@@ -38,7 +38,7 @@ def _fast_tokenizer():
 
 
 def _bare_pipe_with(tok):
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline  # noqa: PLC0415
+    from koipa.modules.m5_inference.pipeline import InferencePipeline  # noqa: PLC0415
 
     pipe = InferencePipeline(model_dir=None)  # 모델 미로드 — 토크나이저만 주입해 _encode_windows 단위검증
     pipe._tokenizer = tok
@@ -46,7 +46,7 @@ def _bare_pipe_with(tok):
 
 
 def test_encode_windows_recovers_gap_band_marker():
-    from lloydk.config import settings  # noqa: PLC0415
+    from koipa.config import settings  # noqa: PLC0415
 
     tok = _fast_tokenizer()
     pipe = _bare_pipe_with(tok)
@@ -89,8 +89,8 @@ def test_run_model_end_to_end_long_doc_no_error():
         pytest.skip("classifier model not present")
     pytest.importorskip("transformers")
     pytest.importorskip("torch")
-    from lloydk.modules.m5_inference.pipeline import InferencePipeline  # noqa: PLC0415
-    from lloydk.schemas.common import Grade  # noqa: PLC0415
+    from koipa.modules.m5_inference.pipeline import InferencePipeline  # noqa: PLC0415
+    from koipa.schemas.common import Grade  # noqa: PLC0415
 
     pipe = InferencePipeline(model_dir=str(_MODEL_DIR))
     if pipe._model is None:

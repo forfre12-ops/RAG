@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lloydk.modules.m2_preprocess import (
+from koipa.modules.m2_preprocess import (
     PreprocessPipeline,
     extract,
     normalize,
@@ -96,7 +96,7 @@ def test_hundred_page_text_contract_preserves_final_page_through_chunking():
 
 
 def test_pdfminer_terminal_form_feed_does_not_create_extra_page():
-    from lloydk.modules.m2_preprocess.extractor import _pdf_text_page_count
+    from koipa.modules.m2_preprocess.extractor import _pdf_text_page_count
 
     assert _pdf_text_page_count("page 1\fpage 2\f") == 2
     assert _pdf_text_page_count("page 1\fpage 2\f\n") == 2

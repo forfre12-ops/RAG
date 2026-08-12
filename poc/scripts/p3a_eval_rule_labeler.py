@@ -21,8 +21,8 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.modules.m3_labeling import LabelingPipeline  # noqa: E402
-from lloydk.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: E402
+from koipa.modules.m3_labeling import LabelingPipeline  # noqa: E402
+from koipa.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: E402
 
 # 등급별 검증 시나리오 — 각 등급의 전형적 문장 패턴 (가이드라인 기반)
 SCENARIOS: list[dict] = [

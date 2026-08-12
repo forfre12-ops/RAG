@@ -51,7 +51,7 @@ def main() -> int:
     _src = Path(__file__).resolve().parent.parent / "src"
     if str(_src) not in sys.path:
         sys.path.insert(0, str(_src))
-    from lloydk.modules.m6_evaluation.deploy_gate import summarize_metamorphic  # noqa: PLC0415
+    from koipa.modules.m6_evaluation.deploy_gate import summarize_metamorphic  # noqa: PLC0415
 
     report = _load_report(Path(args.report))
     if report is None:

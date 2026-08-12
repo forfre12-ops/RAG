@@ -17,12 +17,12 @@ import uuid
 import pytest
 from sqlalchemy import delete, text
 
-from lloydk.db import engine, session_scope
-from lloydk.db.models import Classification, Correction, Document
-from lloydk.repositories import ClassifyRepo
-from lloydk.schemas.common import Actor, Grade
-from lloydk.schemas.confirm import ConfirmRequest, RelabelRequest
-from lloydk.services.confirm_service import ConfirmService, RelabelService
+from koipa.db import engine, session_scope
+from koipa.db.models import Classification, Correction, Document
+from koipa.repositories import ClassifyRepo
+from koipa.schemas.common import Actor, Grade
+from koipa.schemas.confirm import ConfirmRequest, RelabelRequest
+from koipa.services.confirm_service import ConfirmService, RelabelService
 
 pytestmark = pytest.mark.fullstack
 

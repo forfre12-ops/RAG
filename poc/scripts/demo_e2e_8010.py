@@ -28,7 +28,7 @@
 
 환경변수(미설정 시 로컬 개발 기본값):
   DEMO_BASE_URL   기본 http://localhost:8010
-  DEMO_API_KEY    기본 lloydk_dev_apikey (.env.example 값)
+  DEMO_API_KEY    기본 koipa_dev_apikey (.env.example 값)
 
 전제: 인프라 + API 가동. 실서버 리허설은 배포 서버의 BASE/KEY 를 넣어 그대로 돌린다.
 
@@ -51,7 +51,7 @@ import httpx
 
 # 하드코딩 대신 환경변수 — 같은 스크립트로 로컬과 실서버 리허설을 모두 돌릴 수 있어야 한다.
 BASE = os.getenv("DEMO_BASE_URL", "http://localhost:8010").rstrip("/")
-HEADERS = {"X-API-Key": os.getenv("DEMO_API_KEY", "lloydk_dev_apikey")}
+HEADERS = {"X-API-Key": os.getenv("DEMO_API_KEY", "koipa_dev_apikey")}
 
 # tenant 제거: 격리는 KL 포털 전담(단일 KL 인증). Actor 스키마에 tenant_id 필드가 없다.
 ACTOR = json.dumps({"user_id": "demo-console", "role": "reviewer"})

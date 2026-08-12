@@ -185,7 +185,7 @@ def render(in_path: Path, out_path: Path) -> Path:
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>KOIPA AI — OSS SBOM 보고서 | Lloydk AI</title>
+<title>KOIPA AI — OSS SBOM 보고서 | Koipa AI</title>
 <style>{CSS}</style>
 </head>
 <body>

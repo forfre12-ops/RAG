@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.modules.m2_preprocess.extractor import ExtractResult, _pdf_tables_via_pdfplumber, extract
+from koipa.modules.m2_preprocess.extractor import ExtractResult, _pdf_tables_via_pdfplumber, extract
 
 
 @pytest.fixture
@@ -300,6 +300,9 @@ class TestExcelExtraction:
         assert "영업비밀목록" in result.text       # 첫 시트명
         assert "ALD레시피" in result.text          # 셀 값
         assert "협력사" in result.text             # 둘째 시트도
+        # ⚠ 이 문자열은 **브랜드 표기가 아니라 픽스처 내용**이다. sample.xls 는 바이너리라
+        # 2026-08-12 koipa 리네임에서 치환 대상이 아니었고, 그 안의 셀 값은 "로이드케이"
+        # 그대로다. 여기를 기관명으로 바꾸면 픽스처와 어긋나 테스트가 깨진다.
         assert "로이드케이" in result.text
         assert "|" in result.text                  # 표 셀 구분자
 
@@ -456,7 +459,7 @@ class TestPiiMaskingOnTables:
     def test_pii_in_xlsx_cell_is_masked(self, tmp_path: Path):
         from openpyxl import Workbook
 
-        from lloydk.modules.m2_preprocess.pii_masker import mask_pii
+        from koipa.modules.m2_preprocess.pii_masker import mask_pii
 
         wb = Workbook()
         ws = wb.active
@@ -477,7 +480,7 @@ class TestPiiMaskingOnTables:
         from pptx import Presentation
         from pptx.util import Inches
 
-        from lloydk.modules.m2_preprocess.pii_masker import mask_pii
+        from koipa.modules.m2_preprocess.pii_masker import mask_pii
 
         prs = Presentation()
         slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank

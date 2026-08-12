@@ -19,9 +19,9 @@ from unittest import mock
 
 import pytest
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.modules.m2_preprocess.pii_masker import mask_pii
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.modules.m2_preprocess.pii_masker import mask_pii
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 
 def _storage(tmp_path) -> LocalStorage:
@@ -183,7 +183,7 @@ class TestPiiNoHyphenBypass:
 # ===========================================================================
 class TestHealthReady503:
     def _patch_checks(self, model_ok, db_ok=True, es_ok=True, st_ok=True):
-        import lloydk.api.health as h
+        import koipa.api.health as h
 
         return [
             mock.patch.object(h, "_check_model", return_value={"status": "m", "ok": model_ok}),
@@ -195,7 +195,7 @@ class TestHealthReady503:
     def test_returns_503_when_unhealthy(self):
         import json
 
-        import lloydk.api.health as h
+        import koipa.api.health as h
         from fastapi.responses import JSONResponse
 
         patches = self._patch_checks(model_ok=False)
@@ -209,7 +209,7 @@ class TestHealthReady503:
         assert body["checks"]["model"]["ok"] is False
 
     def test_returns_200_when_healthy(self):
-        import lloydk.api.health as h
+        import koipa.api.health as h
         from fastapi.responses import JSONResponse
 
         patches = self._patch_checks(model_ok=True)
@@ -221,7 +221,7 @@ class TestHealthReady503:
 
     def test_503_when_warmup_pending(self):
         """모든 probe ok 라도 warmup 미완이면 not_ready(503)."""
-        import lloydk.api.health as h
+        import koipa.api.health as h
 
         patches = self._patch_checks(model_ok=True)
         with patches[0], patches[1], patches[2], patches[3]:

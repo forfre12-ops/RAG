@@ -18,7 +18,7 @@
 cron 등록은 backup_dr.py(오케스트레이터)가 pg+storage 를 한 번에 돌리는 것을 권장.
 단독 사용 예:
   python scripts/backup_storage.py                         # 실행 중 스택 자동탐지
-  python scripts/backup_storage.py --container lloydk-airgap-worker-1
+  python scripts/backup_storage.py --container koipa-airgap-worker-1
 """
 
 from __future__ import annotations
@@ -105,7 +105,7 @@ def mirror_to_second_media(path: Path, mirror_dir: Path) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    p = argparse.ArgumentParser(description="Lloydk 원문 스토리지 볼륨 백업(로컬FS, fail-closed)")
+    p = argparse.ArgumentParser(description="Koipa 원문 스토리지 볼륨 백업(로컬FS, fail-closed)")
     p.add_argument("--container", default=None,
                    help="api/worker 컨테이너명(미지정 시 실행 중 스택 자동탐지; 2스택+면 모호→명시 필요)")
     p.add_argument("--mount", default=DEFAULT_MOUNT, help="컨테이너 내 스토리지 경로")

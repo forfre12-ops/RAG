@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from lloydk.services.proxy_gold_candidate_service import ProxyGoldCandidateService
+from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 
 
 def _candidate(root, doc_id="CAND-001", grade="S1"):

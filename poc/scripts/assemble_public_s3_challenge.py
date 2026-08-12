@@ -27,8 +27,8 @@ _HERE = Path(__file__).resolve().parent
 _POC = _HERE.parent
 sys.path.insert(0, str(_POC / "src"))
 
-from lloydk.hygiene import text_hash  # noqa: E402
-from lloydk.proxy_corpus import record_text, validate_proxy_record  # noqa: E402
+from koipa.hygiene import text_hash  # noqa: E402
+from koipa.proxy_corpus import record_text, validate_proxy_record  # noqa: E402
 
 
 SCHEMA = "public-s3-overclassification-challenge-manifest-v1"

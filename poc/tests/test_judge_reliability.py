@@ -7,7 +7,7 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-from lloydk.modules.m6_evaluation.judge_reliability import (
+from koipa.modules.m6_evaluation.judge_reliability import (
     FLAG_HIGH_DISAGREEMENT,
     FLAG_PROXY_CAVEAT,
     FLAG_SYSTEMATIC_DOWNGRADE,

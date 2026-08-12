@@ -29,7 +29,7 @@ services:
       # 분리한다(settings.training_output_dir). worker 가 쓰고 api 가 서빙으로 읽으므로 양쪽 필수.
       - ./artifacts_out:/app/artifacts_out
       - ./datasets:/app/datasets                            # 골든 후보 — 아래 [골든] 주석 참조(api↔worker 공유·rw 필수)
-      - lloydk_hf_cache:/home/lloydk/.cache/huggingface     # KURE 임베더 캐시 — 두 스택 공유(external)
+      - koipa_hf_cache:/home/koipa/.cache/huggingface     # KURE 임베더 캐시 — 두 스택 공유(external)
       - storagedata:/app/.storage                           # [#4] 원문 저장(암호화 at-rest) — api↔worker 공유·영속(볼륨無 시 원문소실·미공유→빈문서 분류)
   worker:
     depends_on: !override
@@ -47,7 +47,7 @@ services:
       # celery 미가용 시 api 가 in-proc 으로 빌드하던 경로에서는 드러나지 않던 결함
       # (2026-08-02 테스트서버 실측). 정본 골든 시딩도 이 바인드로 들어온다.
       - ./datasets:/app/datasets
-      - lloydk_hf_cache:/home/lloydk/.cache/huggingface
+      - koipa_hf_cache:/home/koipa/.cache/huggingface
       - storagedata:/app/.storage                           # [#4] api 와 동일 저장 볼륨 공유(원문 read-back)
   postgres:
     # base 의 ../docker-data/postgres 바인드를 named 볼륨으로 — 프로젝트 접두어로 스택 격리.
@@ -58,9 +58,9 @@ services:
       - redisdata:/data
 
 volumes:
-  pgdata:        # 프로젝트 스코프(비-external) → lloydk-jjw_pgdata / lloydk-cust_pgdata 로 자동 분리
+  pgdata:        # 프로젝트 스코프(비-external) → koipa-jjw_pgdata / koipa-cust_pgdata 로 자동 분리
   redisdata:
   storagedata:   # [#4] 원문 저장 — 프로젝트 스코프(스택별 격리·스택 내 api↔worker 공유·재생성에도 영속)
-  lloydk_hf_cache:
-    # 두 스택 공유 — 스크립트가 `docker volume create lloydk_hf_cache` 로 선생성.
+  koipa_hf_cache:
+    # 두 스택 공유 — 스크립트가 `docker volume create koipa_hf_cache` 로 선생성.
     external: true

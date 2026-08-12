@@ -1,7 +1,7 @@
 """다층방어 liveness 감사 — 무음으로 꺼진 방어 축 폭로 회귀."""
 from __future__ import annotations
 
-from lloydk.golden_defense import assess_defense_liveness
+from koipa.golden_defense import assess_defense_liveness
 
 
 def _rec(*, flags=(), shadow=None, sc=1.0, agree=True, llm="S1"):

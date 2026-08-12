@@ -11,7 +11,7 @@
 #   - volumes: ./src·./scripts hot-reload bind 제거(불변 이미지). 모델은 external volume(ro)로만
 #   - ports: api 만 127.0.0.1:8000(리버스 프록시 뒤). pg/redis/minio/mlflow 는 미노출(내부 네트워크)
 #   - 이미지: Dockerfile.api.prod(non-root uid1000·gunicorn), CPU 임베딩, 원격 LLM
-#   - HF 캐시: non-root 경로(/home/lloydk)에 named volume — 매 기동 재다운로드 방지
+#   - HF 캐시: non-root 경로(/home/koipa)에 named volume — 매 기동 재다운로드 방지
 services:
   api:
     # 재기동 정책 — 호스트 재부팅/도커 데몬 재시작 후 자동 복구. deploy.restart_policy 는
@@ -29,7 +29,7 @@ services:
       EMBEDDING_PROVIDER: hf
       EMBEDDING_MODEL: "${EMBEDDING_MODEL:-BAAI/bge-m3}"
       CORS_ALLOW_ORIGINS: '["${ALLOWED_ORIGIN:-https://app.example.com}"]'
-      HF_HOME: /home/lloydk/.cache/huggingface
+      HF_HOME: /home/koipa/.cache/huggingface
       # [스레드 정합] torch 는 cgroup CPU 한도를 못 본다 — 호스트 코어 수만큼 스레드를 띄운다.
       # 실측: 2 CPU 컨테이너에서 torch.get_num_threads()=8 로 오버서브스크립션 상태였다.
       # 스레드 수를 CPU 한도와 같은 값으로 묶어 둔다(한쪽만 바꾸면 다시 어긋난다).
@@ -40,7 +40,7 @@ services:
       - prod_artifacts:/app/artifacts:ro
       # [학습 산출] artifacts 는 ro(서빙 모델 보호) → 재학습 산출 전용 rw 볼륨을 분리.
       - prod_artifacts_out:/app/artifacts_out
-      - hf_cache_api:/home/lloydk/.cache/huggingface
+      - hf_cache_api:/home/koipa/.cache/huggingface
       # [저장 영속·공유] 원본 문서(암호화 at-rest)는 named 볼륨에. 볼륨이 없으면 컨테이너 임시레이어에
       # 써서 재생성 시 원문 소실 + api↔worker 미공유 → 원문 read-back miss 로 빈문서 분류(무음). 운영 필수.
       - app_storage:/app/.storage
@@ -92,12 +92,12 @@ services:
       OMP_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
       MKL_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
     # dev 코드 bind 제거. 워커도 모델 접근 필요(classify/index 태스크) → ro external volume.
-    # HF 캐시는 non-root 홈(/home/lloydk) — root 캐시(/root)는 uid1000 이 쓸 수 없어 재다운로드 유발.
+    # HF 캐시는 non-root 홈(/home/koipa) — root 캐시(/root)는 uid1000 이 쓸 수 없어 재다운로드 유발.
     volumes: !override
       - prod_artifacts:/app/artifacts:ro
       # [학습 산출] artifacts 는 ro(서빙 모델 보호) → 재학습 산출 전용 rw 볼륨을 분리.
       - prod_artifacts_out:/app/artifacts_out
-      - hf_cache_worker:/home/lloydk/.cache/huggingface
+      - hf_cache_worker:/home/koipa/.cache/huggingface
       - app_storage:/app/.storage                 # api 와 동일 저장 볼륨 공유(원문 read-back)
       - golden_data:/app/datasets                 # [골든] api 와 동일 — 빌드 산출물을 api 가 읽어 검수 HTML 렌더
     deploy:
@@ -149,15 +149,15 @@ services:
 
 volumes:
   prod_artifacts_out:
-    name: "${PROD_ARTIFACTS_OUT_VOLUME:-lloydk_prod_artifacts_out}"
+    name: "${PROD_ARTIFACTS_OUT_VOLUME:-koipa_prod_artifacts_out}"
   prod_artifacts:
     external: true
-    name: "${PROD_ARTIFACTS_VOLUME:-lloydk_prod_artifacts}"
+    name: "${PROD_ARTIFACTS_VOLUME:-koipa_prod_artifacts}"
   # 원본 문서 저장(암호화 at-rest) — 안정적 이름으로 백업/복구 대상. api·worker 공유·재생성 영속.
   app_storage:
-    name: "${APP_STORAGE_VOLUME:-lloydk_app_storage}"
+    name: "${APP_STORAGE_VOLUME:-koipa_app_storage}"
   # 골든 후보·정본(datasets/) — api·worker 공유. 사람서명 산출물이 들어가므로 백업 대상.
   golden_data:
-    name: "${GOLDEN_DATA_VOLUME:-lloydk_golden_data}"
+    name: "${GOLDEN_DATA_VOLUME:-koipa_golden_data}"
   hf_cache_api:
   hf_cache_worker:

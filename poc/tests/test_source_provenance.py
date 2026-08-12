@@ -1,6 +1,6 @@
 """소스 계보 가드 — 미커밋 트리에서 finalize 를 막는가.
 
-이 가드가 왜 있는지는 lloydk.source_provenance 모듈 주석 참조(2026-08-09 실측:
+이 가드가 왜 있는지는 koipa.source_provenance 모듈 주석 참조(2026-08-09 실측:
 미커밋 pipeline.py 가드 118줄이 dev200 F1 을 0.816 → 0.990 으로 바꿨고, 계약 해시는
 post-model 서빙 규칙을 명시적으로 제외하므로 그 번들을 막지 못한다).
 
@@ -15,7 +15,7 @@ import subprocess
 
 import pytest
 
-from lloydk.source_provenance import (
+from koipa.source_provenance import (
     BYPASS_ENV,
     SourceProvenanceError,
     git_provenance,

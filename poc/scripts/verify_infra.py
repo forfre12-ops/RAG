@@ -35,7 +35,7 @@ def _http_ok(url: str, timeout: float = 3.0) -> tuple[bool, str]:
 
 
 def check_postgres() -> CheckResult:
-    url = os.environ.get("DATABASE_URL", "postgresql+psycopg://lloydk:lloydk_dev@localhost:5432/lloydk")
+    url = os.environ.get("DATABASE_URL", "postgresql+psycopg://koipa:koipa_dev@localhost:5432/koipa")
     try:
         from sqlalchemy import bindparam, create_engine, text
     except ImportError:
@@ -72,11 +72,11 @@ def check_minio() -> CheckResult:
     try:
         client = Minio(
             endpoint,
-            access_key=os.environ.get("MINIO_ROOT_USER", "lloydk"),
-            secret_key=os.environ.get("MINIO_ROOT_PASSWORD", "lloydk_dev_minio"),
+            access_key=os.environ.get("MINIO_ROOT_USER", "koipa"),
+            secret_key=os.environ.get("MINIO_ROOT_PASSWORD", "koipa_dev_minio"),
             secure=False,
         )
-        needed = {"lloydk-docs", "lloydk-models", "mlflow"}
+        needed = {"koipa-docs", "koipa-models", "mlflow"}
         present = {b.name for b in client.list_buckets()}
         missing = needed - present
         return CheckResult("minio", not missing, f"present={sorted(present)}, missing={sorted(missing)}")

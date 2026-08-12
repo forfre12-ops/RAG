@@ -1,10 +1,10 @@
-"""lloydk.golden_review_html 검토본 렌더 단위 테스트 (G4-html).
+"""koipa.golden_review_html 검토본 렌더 단위 테스트 (G4-html).
 
 빌더 후보 레코드 → 인터랙티브 HTML. 렌더 자체는 content-check(문서·등급·필터·임베드 JSON).
 """
 import json
 
-from lloydk.golden_review_html import render_review_html, render_review_html_from_jsonl
+from koipa.golden_review_html import render_review_html, render_review_html_from_jsonl
 
 _RECS = [
     {

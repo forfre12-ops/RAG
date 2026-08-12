@@ -27,12 +27,12 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.config import settings
-from lloydk.modules.m2_preprocess.extractor import extract
-from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
-from lloydk.schemas.classify import ClassifyRequest
-from lloydk.services.classify_service import ClassifyService
-from lloydk.services.document_ingestion_service import extraction_review_decision
+from koipa.config import settings
+from koipa.modules.m2_preprocess.extractor import extract
+from koipa.modules.m2_preprocess.pipeline import PreprocessPipeline
+from koipa.schemas.classify import ClassifyRequest
+from koipa.services.classify_service import ClassifyService
+from koipa.services.document_ingestion_service import extraction_review_decision
 
 pytestmark = pytest.mark.slow  # 분류가 ML 모델(또는 rule-fallback) 로드 — heavy
 

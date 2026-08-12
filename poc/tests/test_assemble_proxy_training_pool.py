@@ -17,8 +17,8 @@ from scripts.build_proxy_scenarios import (
     generation_plan,
     generation_target_maps,
 )
-from lloydk.hygiene import text_hash
-from lloydk.proxy_corpus import ProxyRecordCheck
+from koipa.hygiene import text_hash
+from koipa.proxy_corpus import ProxyRecordCheck
 
 
 GRADES = ("TS", "S1", "S2", "S3")

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m6_evaluation.federated_eval import (
+from koipa.modules.m6_evaluation.federated_eval import (
     CTX_ESCALATED_PROXY,
     CTX_HIGH_CONF_PROXY,
     CTX_RANDOM_AUDIT,

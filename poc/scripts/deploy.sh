@@ -36,7 +36,7 @@ if [ -z "$target" ]; then
     target=airgap; reason="번들 레이아웃 감지"
   else
     # 2) DEPLOY_PROFILE 힌트
-    prof="${LLOYDK_DEPLOY_PROFILE:-${DEPLOY_PROFILE:-}}"
+    prof="${KOIPA_DEPLOY_PROFILE:-${DEPLOY_PROFILE:-}}"
     case "$(_norm "$prof")" in
       airgap) target=airgap; reason="DEPLOY_PROFILE=$prof" ;;
       cloud)  target=cloud;  reason="DEPLOY_PROFILE=$prof" ;;

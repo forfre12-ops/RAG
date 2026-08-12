@@ -31,9 +31,9 @@ if str(_HERE) not in sys.path:
 
 from eval_p1_model_gold import compute_metrics, predict_direct  # noqa: E402
 
-# 외부권위만 legally_grounded(단일 진실원=lloydk.golden_tiers). koipa는 2026-07-03 강등
+# 외부권위만 legally_grounded(단일 진실원=koipa.golden_tiers). koipa는 2026-07-03 강등
 # (판례 인용 조작 확인 — 손작성 시나리오) → curated_scenario로 분리 보고.
-from lloydk.golden_tiers import EXTERNAL_AUTHORITY_SOURCES as LEGAL  # noqa: E402
+from koipa.golden_tiers import EXTERNAL_AUTHORITY_SOURCES as LEGAL  # noqa: E402
 
 CURATED = {"koipa_case_based", "curated_scenario"}
 LLMJ = {"llm_judge_primary", "llm_judge_consensus", "codex_review"}
