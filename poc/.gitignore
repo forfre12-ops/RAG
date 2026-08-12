@@ -1,4 +1,8 @@
 .venv/
+# 학습 실험용 GPU venv(cu128 torch, 4.5GB). 생산 .venv 는 CPU torch 로 두어 운영 런타임
+# (GPU 없음)을 재현한다 — 한 환경에 섞으면 "운영에서 왜 다르지"를 추적할 수 없다.
+# 기존 `.venv/` 패턴은 정확히 그 이름만 걸러서 이 디렉토리를 놓친다. 지우지 말 것.
+.venv-gpu/
 __pycache__/
 *.pyc
 .env
