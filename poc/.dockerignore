@@ -2,6 +2,13 @@
 # 이 목록이 없으면 `build: context: .`(poc/) 가 artifacts(373G)·dist(7.6G)·.venv(5.8G)·
 # datasets 를 통째로 데몬에 전송한다(빌드 급락 + .env·모델 등 민감물 유입 위험).
 # COPY 대상(pyproject.toml·src/·scripts/·alembic/·alembic.ini)은 제외하지 않는다.
+#
+# ⚠ 패턴은 **경로 전체**에 매칭되고 `*` 는 `/` 를 넘지 않는다. 즉 `*.py[cod]` 는
+# 최상위 파일만 걸러내고 `src/koipa/api/__pycache__/x.pyc` 는 못 거른다. 실제로
+# 그래서 배포 이미지에 .pyc 197개가 실려 있었고 그중 47개가 리네임 이전 브랜드
+# 문자열을 담고 있었다(2026-08-12 확인). 중첩까지 걸러야 하면 `**/` 를 붙일 것.
+# 아래는 최상위용 원래 줄을 **남긴 채** `**/` 형을 나란히 둔다 — 한쪽만 남기면
+# 의도가 사라진다.
 
 # ── 대용량 산출물·데이터 (이미지 미사용) ──
 artifacts/
@@ -22,6 +29,12 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .hypothesis/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
 
 # ── VCS·CI ──
 .git/
@@ -35,6 +48,12 @@ __pycache__/
 *.pem
 *.key
 *.crt
+# 중첩 시크릿 — 현재 유입 0건이나 최상위 패턴만으로는 못 막는다(위 ⚠ 참조)
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.crt
 
 # ── 테스트·문서 (이미지 미사용) ──
 tests/
@@ -49,3 +68,6 @@ node_modules/
 .vscode/
 .idea/
 *.bak
+**/*.log
+**/node_modules/
+**/*.bak
