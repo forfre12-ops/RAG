@@ -248,3 +248,9 @@ poc/tmp_*.pdf
 # 취지). 재현은 manifest.json 의 해시 + split_v6_training_corpus.py 로 한다.
 poc/datasets/labeled_v6_factor_grounded/*.jsonl
 !poc/datasets/labeled_v6_factor_grounded/manifest.json
+
+# v7 다양화 학습셋 — 코퍼스 본문은 추적하지 않는다(매니페스트 해시로 재현).
+poc/datasets/labeled_v7_diverse/*.jsonl
+!poc/datasets/labeled_v7_diverse/manifest.json
+# 채점용 정규화 사본(doc_id·family 부여). 원본 raw.jsonl 에서 재생성된다.
+poc/datasets/mundane_s3/raw.scored.jsonl
