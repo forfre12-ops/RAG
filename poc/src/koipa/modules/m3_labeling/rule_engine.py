@@ -29,6 +29,9 @@ from koipa.modules.m3_labeling.seeds import (
 
 logger = logging.getLogger(__name__)
 
+# 정본 3요건 — _accumulate_factor 가 여기 속한 코드에만 정규화 누산한다.
+_CANONICAL_FACTORS = frozenset(f["code"] for f in FACTOR_SEEDS)
+
 # semantic 매칭 기본 코사인 임계값. EMB_SEMANTIC_THRESHOLD 환경변수로 오버라이드 가능.
 _DEFAULT_SEMANTIC_THRESHOLD = 0.75
 
@@ -140,6 +143,26 @@ class RuleLabelResult:
     management_evidenced: bool = False
 
 
+def _accumulate_factor(factor_raw: dict[str, float], factor: str, score: float) -> None:
+    """키워드 점수를 원래 코드와 정본 3요소 **양쪽**에 누산한다.
+
+    왜 양쪽인가(2026-08-12 진단). 시드 사전은 레거시 4요소 코드
+    (NON_PUBLICITY·ECONOMIC_VALUE·MANAGEMENT_LEVEL·LEAK_IMPACT)를 쓰고 출력 스키마는
+    정본 3요건(SECRECY·VALUE·MANAGEMENT)을 쓴다. **두 집합의 교집합이 공집합이다.**
+    종전 누산은 `factor_raw.get(factor, 0.0) + score` 라 KeyError 대신 레거시 키가 조용히
+    새로 생겼고, 정본 3요소는 영원히 0.0 에 머물렀다. DB 커스텀 스킴의 KeyError 를 막으려던
+    방어가 결함을 가린 셈이다.
+
+    원래 코드도 남기는 이유는 genericity 계약이다 — 타 프로젝트 DB 스킴이 자기 factor_code
+    로 값을 읽어갈 수 있어야 한다. to_canonical_factor() 가 매핑을 모르는 코드면 정본 쪽에는
+    쌓지 않는다(모르는 축을 3요건 중 하나로 우겨넣지 않는다).
+    """
+    factor_raw[factor] = factor_raw.get(factor, 0.0) + score
+    canonical = to_canonical_factor(factor)
+    if canonical != factor and canonical in _CANONICAL_FACTORS:
+        factor_raw[canonical] = factor_raw.get(canonical, 0.0) + score
+
+
 def has_real_evidence(result: "RuleLabelResult") -> bool:
     """룰이 실제 한국어 시드 span을 냈는가 — 영어 약어 단독 부스트는 근거로 치지 않는다.
 
@@ -200,7 +223,7 @@ def _apply_high_risk_overrides(
             matched = mo.group(0)
             score = eff_weight  # finditer는 매치당 1회 → count=1
             grade_scores[grade] = grade_scores.get(grade, 0.0) + score
-            factor_raw[factor] = factor_raw.get(factor, 0.0) + score
+            _accumulate_factor(factor_raw, factor, score)
             matches.append(
                 MatchedKeyword(
                     keyword=matched,
@@ -403,7 +426,7 @@ class LabelRuleEngine:
             # [M-rule-factor] DB LevelKeyword가 시드 외 grade/factor_code를 가지면 KeyError가
             # 나므로 setdefault 누산(get+더하기)으로 방어. 미초기화 키는 0.0에서 시작.
             grade_scores[grade] = grade_scores.get(grade, 0.0) + score
-            factor_raw[factor] = factor_raw.get(factor, 0.0) + score
+            _accumulate_factor(factor_raw, factor, score)
 
         _apply_high_risk_overrides(
             text, grade_scores, factor_raw, matches,
