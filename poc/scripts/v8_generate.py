@@ -79,6 +79,7 @@ FILLER = {
     ],
 }
 
+NL = chr(10)
 DEPTS = ["소재개발팀", "품질팀", "생산기술팀", "구매팀", "영업기획팀", "설비운영팀"]
 STYLE_BULLET = {"bullet", "numbered"}
 
@@ -246,6 +247,28 @@ def generate_unsignaled(forms: list[dict], *, count: int, split: str,
     return rows
 
 
+def generate_provable_s3(forms: list[dict], *, count: int, split: str,
+                         pool_split: str = "train") -> list[dict]:
+    """S3-입증형 보강 — 부재가 입증된 문서.
+
+    경계 표집만으로는 proven_absent 가 6~8% 에 그친다. 그런데 S3 자동확정의 **유일한**
+    근거가 이것이라(§보수적 완성 규칙) 얇으면 게이트가 열리지 않는다. secrecy 또는 value
+    가 0 인 조합만 골라 채운다 - management 단독 0 은 s·v 가 2 미만일 때만 S3 라 별도다.
+    """
+    patterns = [
+        (0, 1, 1), (0, 2, 2), (0, 0, 1), (1, 0, 1), (2, 0, 2), (0, 1, 2),
+        (1, 0, 2), (0, 2, 0), (2, 0, 0), (0, 0, 0), (0, 2, 1), (1, 0, 0),
+    ]
+    rows: list[dict] = []
+    for i in range(count):
+        doc_id = f"v8-{split}-pv-{i:04d}"
+        prng = _rng(f"assign-{doc_id}")
+        rows.append(_build(doc_id, prng.choice(forms), patterns[i % len(patterns)],
+                           near_miss=(i % 2 == 0), idx=i, rot=i,
+                           split=pool_split, lineage=prng.choice(LINEAGES)))
+    return rows
+
+
 def generate(forms: list[dict], *, per_boundary: int, split: str,
              pool_split: str = "train") -> list[dict]:
     """경계마다 counterfactual 쌍을 만들고 형태를 라운드로빈으로 독립 배정한다."""
@@ -253,7 +276,9 @@ def generate(forms: list[dict], *, per_boundary: int, split: str,
     high = {"TS", "S1"}
     # 고등급이 걸린 경계에 예산을 더 준다. 1차 목표가 미탐 최소화이고, S1 은 조합이 220
     # 하나뿐이라 균등 배분하면 구조적으로 과소표집된다(기존 진단: S1 약점은 데이터 양).
-    quota = [per_boundary * (3 if ({g1, g2} & high) else 1) for _, _, g1, g2 in edges]
+    # 가중 4배. S3-입증형 보강(자동확정 근거)이 전부 S3 라 고등급이 희석되는데,
+    # 1차 목표가 미탐 최소화라 고등급 표본이 줄면 안 된다(실측: 보강 후 고등급 34% -> 28.5%).
+    quota = [per_boundary * (4 if ({g1, g2} & high) else 1) for _, _, g1, g2 in edges]
 
     # 경계를 **교대로** 돈다. 한 경계가 연속 슬롯을 차지하면 문장 순환이 그 경계의
     # 등급에 정렬돼 문장 자체가 tell 이 된다(실측: 연속 배치 시 tell 3종, 교대 시 감소).
@@ -290,6 +315,13 @@ def main() -> int:
     ap.add_argument("--per-boundary", type=int, default=8, help="경계당 쌍 수(문서는 x2)")
     ap.add_argument("--holdout-per-boundary", type=int, default=0,
                     help="0 이면 홀드아웃 미생성. 판정면 만들 때만 켠다")
+    # 조기종료 검증면. v6 val 은 학습셋과 같은 코퍼스라 1 epoch 만에 정확도 1.000 이 나와
+    # 아무 신호도 주지 못했다. 학습 형태 중 하나를 통째로 떼어 **미관측 형태**로 만든다.
+    # 최종 판정면(holdout_forms)은 형태와 표현이 둘 다 새로우므로 여기에 쓰지 않는다.
+    ap.add_argument("--dev-form", default="work_manual",
+                    help="이 형태는 학습에서 빼고 dev.jsonl 로 낸다. 빈 문자열이면 미분리")
+    ap.add_argument("--provable", type=int, default=240,
+                    help="S3-입증형 보강 건수 — 자동확정 후보의 유일한 근거라 얇으면 안 된다")
     ap.add_argument("--unsignaled", type=int, default=96,
                     help="S3-무신호형 건수 — 회원사 실문서 다수가 이 유형이다")
     ap.add_argument("--out-dir", default="datasets/v8")
@@ -306,15 +338,39 @@ def main() -> int:
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    train = generate(TRAIN_FORMS, per_boundary=args.per_boundary, split="tr")
-    train += generate_unsignaled(TRAIN_FORMS, count=args.unsignaled, split="tr")
+    fit_forms = TRAIN_FORMS
+    dev_forms: list[dict] = []
+    if args.dev_form:
+        dev_forms = [f for f in TRAIN_FORMS if f["id"] == args.dev_form]
+        if not dev_forms:
+            print(f"--dev-form '{args.dev_form}' 가 학습 형태에 없다")
+            return 1
+        fit_forms = [f for f in TRAIN_FORMS if f["id"] != args.dev_form]
+
+    train = generate(fit_forms, per_boundary=args.per_boundary, split="tr")
+    train += generate_unsignaled(fit_forms, count=args.unsignaled, split="tr")
+    train += generate_provable_s3(fit_forms, count=args.provable, split="tr")
     (out / "train.jsonl").write_text(
         "\n".join(json.dumps(r, ensure_ascii=False) for r in train) + "\n", encoding="utf-8")
-    print(f"학습 {len(train)}건 (형태 {len(TRAIN_FORMS)}종 · 경계 {len(adjacent_boundaries())}개)")
+    print(f"학습 {len(train)}건 (형태 {len(fit_forms)}종 · 경계 {len(adjacent_boundaries())}개)")
+
+    if dev_forms:
+        dev = generate(dev_forms, per_boundary=max(2, args.per_boundary // 4), split="dv")
+        dev += generate_unsignaled(dev_forms, count=max(8, args.unsignaled // 4), split="dv")
+        dev += generate_provable_s3(dev_forms, count=max(8, args.provable // 4), split="dv")
+        (out / "dev.jsonl").write_text(
+            NL.join(json.dumps(r, ensure_ascii=False) for r in dev) + NL, encoding="utf-8")
+        print(f"dev {len(dev)}건 (형태 {args.dev_form} — 학습에서 제외)")
 
     if args.holdout_per_boundary:
         hold = generate(HOLDOUT_FORMS, per_boundary=args.holdout_per_boundary, split="ho",
                         pool_split="holdout")
+        # 판정면에도 S3-무신호형이 있어야 한다. 없으면 "부재가 입증된 S3"와 "아무 말 없는
+        # S3"를 구별하는 능력을 **측정할 수 없고**, S3 자동확정 정책 전체가 검증 없이 나간다.
+        hold += generate_unsignaled(HOLDOUT_FORMS, count=max(64, args.holdout_per_boundary * 10),
+                                    split="ho", pool_split="holdout")
+        hold += generate_provable_s3(HOLDOUT_FORMS, count=max(64, args.provable // 3),
+                                     split="ho", pool_split="holdout")
         (out / "holdout_forms.jsonl").write_text(
             "\n".join(json.dumps(r, ensure_ascii=False) for r in hold) + "\n", encoding="utf-8")
         print(f"홀드아웃 {len(hold)}건 (형태 {[f['id'] for f in HOLDOUT_FORMS]})")

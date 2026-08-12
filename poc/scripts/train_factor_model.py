@@ -48,16 +48,69 @@ def _load(path: Path) -> tuple[list[str], list[tuple[int, int, int]], list[str]]
             continue
         row = json.loads(line)
         text = row.get("text") or row.get("content") or ""
-        efs = row.get("expected_factor_scores")
-        if not text or not isinstance(efs, dict):
+        if not text:
+            continue
+        code = _codes_from_row(row)
+        if code is None:
             continue
         texts.append(text)
-        levels.append(tuple(int(efs[f]) for f in FACTORS))  # type: ignore[arg-type]
+        levels.append(code)
         grades.append(row.get("label") or row.get("grade") or "")
     return texts, levels, grades
 
 
-def _build_model(base: str, torch):
+# ── 요소 클래스 인코딩 ────────────────────────────────────────────────────────
+#
+# v6 는 요소값 0/1/2 만 갖는다. v8 은 3상태(proven_absent · present · unknown)이고
+# **그 구분이 S3 정책의 전제다** — "부재가 입증된 S3"만 자동확정 후보이고 "아무 말 없는
+# S3"는 검수로 가야 한다. 0 과 unknown 을 한 클래스로 뭉치면 게이트가 둘을 구별할 수
+# 없으므로 v8 에서는 헤드를 4-way 로 넓힌다.
+#
+#   0 proven_absent   1 present_lv1   2 present_lv2   3 unknown
+#
+# unknown 은 서수가 아니다(2 보다 크지도 작지도 않다). 그래서 MAE 는 클래스 인덱스가
+# 아니라 **점수로 환산한 뒤** 잰다. 등급 산출도 마찬가지다.
+CLS_ABSENT, CLS_LV1, CLS_LV2, CLS_UNKNOWN = 0, 1, 2, 3
+
+
+def cls_to_score(c: int) -> int:
+    """등급 산출용 점수. unknown 은 0 으로 본다(요소가 확인되지 않았다)."""
+    return 0 if c in (CLS_ABSENT, CLS_UNKNOWN) else int(c)
+
+
+def cls_to_worst(c: int) -> int:
+    """보수적 완성 — unknown 을 최악값으로 채운다. S3-입증형 판정에 쓴다."""
+    if c == CLS_ABSENT:
+        return 0
+    return 2 if c == CLS_UNKNOWN else int(c)
+
+
+def _codes_from_row(row: dict) -> tuple[int, int, int] | None:
+    """v8 3상태와 v6 요소값을 모두 받는다."""
+    fl = row.get("factor_labels")
+    if isinstance(fl, dict) and all(f in fl for f in FACTORS):
+        out = []
+        for f in FACTORS:
+            st = fl[f].get("state")
+            if st == "proven_absent":
+                out.append(CLS_ABSENT)
+            elif st == "unknown":
+                out.append(CLS_UNKNOWN)
+            elif st == "present":
+                lv = int(fl[f].get("level") or 0)
+                if lv not in (1, 2):
+                    return None
+                out.append(lv)
+            else:
+                return None
+        return tuple(out)  # type: ignore[return-value]
+    efs = row.get("expected_factor_scores")
+    if isinstance(efs, dict) and all(f in efs for f in FACTORS):
+        return tuple(int(efs[f]) for f in FACTORS)  # type: ignore[return-value]
+    return None
+
+
+def _build_model(base: str, torch, n_classes: int = 3):
     from transformers import AutoModel
 
     class FactorModel(torch.nn.Module):
@@ -69,9 +122,9 @@ def _build_model(base: str, torch):
             hidden = self.backbone.config.hidden_size
             self.dropout = torch.nn.Dropout(0.1)
             # 헤드를 ModuleList 가 아니라 이름으로 두면 state_dict 가 읽기 쉬워진다.
-            self.head_secrecy = torch.nn.Linear(hidden, 3)
-            self.head_value = torch.nn.Linear(hidden, 3)
-            self.head_management = torch.nn.Linear(hidden, 3)
+            self.head_secrecy = torch.nn.Linear(hidden, n_classes)
+            self.head_value = torch.nn.Linear(hidden, n_classes)
+            self.head_management = torch.nn.Linear(hidden, n_classes)
 
         def forward(self, input_ids, attention_mask):
             out = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
@@ -112,6 +165,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--max-len", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
+    # v8 3상태를 쓰면 4-way 여야 한다. proven_absent 와 unknown 을 한 클래스로 뭉치면
+    # "부재가 입증된 S3" 와 "아무 말 없는 S3" 를 구별할 수 없고, S3 자동확정 정책 전체가
+    # 성립하지 않는다.
+    parser.add_argument("--classes", type=int, default=3, choices=(3, 4))
     parser.add_argument("--out", default="artifacts/factor_model/v1")
     args = parser.parse_args(argv)
 
@@ -170,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         # print 에 em dash 금지 (Windows cp949 콘솔에서 UnicodeEncodeError)
         print(f"[data] dev {len(de_x)} (계보 다름, 조기종료 기준)")
 
-    model = _build_model(args.base, torch).to(device)
+    model = _build_model(args.base, torch, args.classes).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     lossf = torch.nn.CrossEntropyLoss()
     steps = args.epochs * len(dl_train)
@@ -183,6 +240,7 @@ def main(argv: list[str] | None = None) -> int:
         abs_err = [0, 0, 0]
         n = 0
         grade_hit = 0
+        s3_true = s3_hit = s3_false = 0
         with torch.no_grad():
             for i, (ids, mask, y) in enumerate(loader):
                 ids, mask, y = ids.to(device), mask.to(device), y.to(device)
@@ -190,19 +248,36 @@ def main(argv: list[str] | None = None) -> int:
                 preds = [lg.argmax(-1) for lg in logits]
                 for k in range(3):
                     correct[k] += int((preds[k] == y[:, k]).sum())
-                    abs_err[k] += int((preds[k] - y[:, k]).abs().sum())
-                if grades is not None:
-                    for b in range(y.size(0)):
-                        g = grade_from_svm(int(preds[0][b]), int(preds[1][b]), int(preds[2][b]))
+                for b in range(y.size(0)):
+                    # MAE 와 등급은 **점수로 환산한 뒤** 잰다. 4-way 에서 unknown(3) 은
+                    # 서수가 아니라 클래스 인덱스로 빼면 무의미한 값이 나온다.
+                    ps = [cls_to_score(int(preds[k][b])) for k in range(3)]
+                    ts = [cls_to_score(int(y[b, k])) for k in range(3)]
+                    for k in range(3):
+                        abs_err[k] += abs(ps[k] - ts[k])
+                    if grades is not None:
                         idx = i * loader.batch_size + b
-                        if idx < len(grades) and g == grades[idx]:
+                        if idx < len(grades) and grade_from_svm(*ps) == grades[idx]:
                             grade_hit += 1
+                    # S3-입증형 판정 — 보수적 완성 후에도 S3 인가. 자동확정 후보 판별이다.
+                    pw = grade_from_svm(*[cls_to_worst(int(preds[k][b])) for k in range(3)])
+                    tw = grade_from_svm(*[cls_to_worst(int(y[b, k])) for k in range(3)])
+                    if tw == "S3":
+                        s3_true += 1
+                        if pw == "S3":
+                            s3_hit += 1
+                    elif pw == "S3":
+                        s3_false += 1
                 n += y.size(0)
         return {
             "n": n,
             "acc": {FACTORS[k]: round(correct[k] / n, 4) for k in range(3)},
             "mae": {FACTORS[k]: round(abs_err[k] / n, 4) for k in range(3)},
             "grade_acc": round(grade_hit / n, 4) if grades is not None else None,
+            # 자동확정 후보 판별 성능. s3_false 는 **자동확정하면 안 되는 문서를 후보로
+            # 올린 건수**라 미탐 위험에 직결된다.
+            "s3_provable_recall": round(s3_hit / s3_true, 4) if s3_true else None,
+            "s3_provable_false": s3_false,
         }
 
     best_dev: tuple[float, int, dict | None] = (float("inf"), -1, None)
