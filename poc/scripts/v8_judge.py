@@ -30,6 +30,7 @@ for _p in (str(_ROOT / "src"), str(_ROOT / "scripts")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+NL = chr(10)
 FACTORS = ("secrecy", "value", "management")
 GRADES = ("TS", "S1", "S2", "S3")
 ORDER = {g: i for i, g in enumerate(GRADES)}   # 작을수록 높은 등급
@@ -79,10 +80,17 @@ def wilson_upper(k: int, n: int, z: float = 1.96) -> float:
     return min(1.0, (c + r) / d)
 
 
-def predict(model, tok, texts: list[str], device, max_len: int, batch: int):
+def predict(model, tok, texts: list[str], device, max_len: int, batch: int,
+            want_probs: bool = False):
+    """예측 클래스와(선택) 헤드별 최대확률을 돌려준다.
+
+    확률을 같이 뽑는 이유는 게이트 시뮬레이션 때문이다. 추론을 두 번 돌리면 2시간짜리
+    사이클이 또 늘어나므로 한 번에 뽑아 기록으로 남긴다.
+    """
     import torch
 
     out: list[tuple[int, int, int]] = []
+    probs: list[tuple[float, float, float]] = []
     model.eval()
     with torch.no_grad():
         for i in range(0, len(texts), batch):
@@ -91,7 +99,10 @@ def predict(model, tok, texts: list[str], device, max_len: int, batch: int):
             logits = model(enc["input_ids"].to(device), enc["attention_mask"].to(device))
             preds = [lg.argmax(-1).tolist() for lg in logits]
             out.extend(zip(preds[0], preds[1], preds[2]))
-    return out
+            if want_probs:
+                sm = [torch.softmax(lg, dim=-1).max(-1).values.tolist() for lg in logits]
+                probs.extend(zip(sm[0], sm[1], sm[2]))
+    return (out, probs) if want_probs else out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -104,6 +115,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-len", type=int, default=768)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--report", default=None)
+    ap.add_argument("--records", default=None,
+                    help="문서별 예측·확률 기록 — 게이트 시뮬레이션 입력")
     args = ap.parse_args(argv)
 
     import torch
@@ -120,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     model = _build_model(args.base, torch, args.classes).to(device)
     model.load_state_dict(torch.load(Path(args.model) / "model.pt", map_location=device))
 
-    preds = predict(model, tok, [r["text"] for r in rows], device, args.max_len, args.batch)
+    preds, probs = predict(model, tok, [r["text"] for r in rows], device,
+                           args.max_len, args.batch, want_probs=True)
 
     truth_g = [r["label"] for r in rows]
     pred_g = [grade_from_svm(*[cls_to_score(c) for c in p]) for p in preds]
@@ -219,6 +233,19 @@ def main(argv: list[str] | None = None) -> int:
         "extra_by_s3_kind": group(lambda r: r.get("s3_kind")),
         "extra_by_trap": group(lambda r: "trap=%s" % bool(r.get("has_language_trap"))),
     }
+
+    if args.records:
+        with Path(args.records).open("w", encoding="utf-8") as fh:
+            for i, r in enumerate(rows):
+                fh.write(json.dumps({
+                    "doc_id": r["doc_id"], "form_id": r["form_id"],
+                    "truth": truth_g[i], "pred": pred_g[i],
+                    "truth_codes": list(row_codes(r)), "pred_codes": list(preds[i]),
+                    "head_conf": [round(x, 6) for x in probs[i]],
+                    "s3_kind": r.get("s3_kind"), "pair_id": r.get("pair_id"),
+                    "lineage": r.get("lineage"),
+                }, ensure_ascii=False) + NL)
+        print(f"[records] {args.records}")
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if args.report:
