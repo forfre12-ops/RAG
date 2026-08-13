@@ -35,8 +35,11 @@ from v8_factor_labels import (  # noqa: E402
     FactorLabel,
     adjacent_boundaries,
 )
-from v8_factor_sentences import audit as sentence_audit  # noqa: E402
-from v8_factor_sentences import near_miss_for, sentences_for  # noqa: E402
+# 1차 판정에서 어휘 연상 실패가 확인돼 프레임 기반 극성 최소쌍으로 교체했다
+# (V8_RESULT_2026-08-13.md §4~6). 문장 단위 분할이 같은 어휘의 긍정형과 부정형을
+# 서로 다른 분할에 넣어 어휘 연상을 최적해로 만들었다.
+from v8_factor_frames import audit as sentence_audit  # noqa: E402
+from v8_factor_frames import near_miss_for, sentences_for  # noqa: E402
 from v8_registers import LINEAGES  # noqa: E402
 from v8_registers import render as render_register  # noqa: E402
 
