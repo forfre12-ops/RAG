@@ -151,7 +151,8 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td>누출 제거(clean본 생성)</td><td><code>scripts/clean_holdout_leakage.py</code></td></tr>
       <tr><td>라벨 경화(hardened 42 조립)</td><td><code>scripts/harden_eval_labels.py</code></td></tr>
-      <tr><td>서빙 경로 채점</td><td><code>scripts/eval_serving_path.py</code></td></tr>
+      <tr><td><strong>§2 ★ 대표값 산출</strong>(경화 42 · F1 0.917)</td><td><code>scripts/gate_p1_candidate.py --candidate &lt;model&gt;</code></td></tr>
+      <tr><td>서빙 경로 τ 감도 분석</td><td><code>scripts/eval_serving_path.py --taus 0,0.25,0.30</code></td></tr>
       <tr><td>공개 판례 과분류(FPR)</td><td><code>scripts/eval_real_public_fpr.py</code></td></tr>
       <tr><td>적대 회귀 게이트</td><td><code>scripts/eval_adversarial.py</code></td></tr>
       <tr><td>메타모픽 릴리스 게이트</td><td><code>scripts/gen_metamorphic_pairs.py</code> → <code>scripts/check_metamorphic_gate.py</code> (<code>make metamorphic-gate</code>)</td></tr>
