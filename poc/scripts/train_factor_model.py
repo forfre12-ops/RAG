@@ -169,6 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     # "부재가 입증된 S3" 와 "아무 말 없는 S3" 를 구별할 수 없고, S3 자동확정 정책 전체가
     # 성립하지 않는다.
     parser.add_argument("--classes", type=int, default=3, choices=(3, 4))
+    # [비대칭 손실] 실측 2026-08-13: 홀드아웃에서 value 오류가 낮게봄 737 · 높게봄 33 으로
+    # 22배 쏠린다. 미탐은 전부 낮게 본 오류다. 그런데 CrossEntropy 는 두 방향을 똑같이
+    # 취급한다 - 1차 목표가 미탐 최소화인데 학습이 그것을 모른다.
+    parser.add_argument("--under-penalty", type=float, default=0.0,
+                        help="미탐 방향 벌점 계수. 0 이면 기존 CrossEntropy 그대로")
     parser.add_argument("--out", default="artifacts/factor_model/v1")
     args = parser.parse_args(argv)
 
@@ -230,6 +235,20 @@ def main(argv: list[str] | None = None) -> int:
     model = _build_model(args.base, torch, args.classes).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     lossf = torch.nn.CrossEntropyLoss()
+
+    # 클래스 -> 등급 점수. 이 순서로 "낮게 봄" 을 정의한다(unknown 은 등급 산출에서 0 점).
+    _score = torch.tensor([float(cls_to_score(c)) for c in range(args.classes)],
+                          device=device)
+
+    def under_penalty(logits, target):
+        """예측 분포가 정답보다 **낮은 점수** 쪽에 실은 질량에 벌점을 준다.
+
+        sum_j p_j * max(0, score(y) - score(j)) 이며 미분 가능하다. 과분류(높게 봄)에는
+        벌점이 없다 - 안전 방향이라 억제할 이유가 없다.
+        """
+        p = torch.softmax(logits, dim=-1)
+        gap = (_score[target].unsqueeze(1) - _score.unsqueeze(0)).clamp(min=0)
+        return (p * gap).sum(dim=-1).mean()
     steps = args.epochs * len(dl_train)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, total_steps=steps,
                                                 pct_start=0.1)
@@ -288,6 +307,9 @@ def main(argv: list[str] | None = None) -> int:
             ids, mask, y = ids.to(device), mask.to(device), y.to(device)
             logits = model(ids, mask)
             loss = sum(lossf(logits[k], y[:, k]) for k in range(3))
+            if args.under_penalty > 0:
+                loss = loss + args.under_penalty * sum(
+                    under_penalty(logits[k], y[:, k]) for k in range(3))
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()

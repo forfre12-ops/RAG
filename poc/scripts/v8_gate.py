@@ -50,8 +50,20 @@ def wilson_upper(k: int, n: int, z: float = 1.96) -> float:
     return min(1.0, (c + r) / d)
 
 
+def boundary_margin(dist: list[float]) -> float:
+    """인접 등급 사이 접전 정도 — 1위와 2위 확률의 차.
+
+    최대확률만 보면 "확신 있게 lv1" 로 보이는 문서가, 실제로는 lv1 0.52 · lv2 0.47 처럼
+    경계에 얹혀 있을 수 있다. 정본 규칙에서 lv1/lv2 한 단계가 등급을 뒤집으므로
+    ((2,2,1)=TS vs (1,2,1)=S2) 그 접전이 곧 미탐 위험이다.
+    4차 미탐 5건이 전부 value lv2->lv1 이었다.
+    """
+    a = sorted(dist, reverse=True)
+    return a[0] - a[1] if len(a) > 1 else 1.0
+
+
 def evaluate(records: list[dict], tau: float, *, s3_policy: bool,
-             grade_from_svm) -> dict:
+             grade_from_svm, margin: float = 0.0) -> dict:
     """한 임계에서의 게이트 동작.
 
     무음 미탐 = **자동확정된 것 중** 정답보다 낮은 등급을 준 건. 검수로 간 것은 사람이
@@ -60,11 +72,17 @@ def evaluate(records: list[dict], tau: float, *, s3_policy: bool,
     auto = miss = 0
     auto_correct = 0
     blocked_by_s3 = 0
+    blocked_by_margin = 0
     miss_detail: dict[str, int] = {}
     for r in records:
         conf = min(r["head_conf"])
         if conf < tau:
             continue
+        if margin > 0 and r.get("head_dist"):
+            # 세 요소 중 하나라도 경계에 얹혀 있으면 검수로 보낸다.
+            if min(boundary_margin(d) for d in r["head_dist"]) < margin:
+                blocked_by_margin += 1
+                continue
         if s3_policy and r["pred"] == "S3":
             # 보수적 완성 - unknown 을 최악으로 채워도 S3 여야 자동확정 후보다
             pw = grade_from_svm(*[cls_to_worst(c) for c in r["pred_codes"]])
@@ -87,6 +105,7 @@ def evaluate(records: list[dict], tau: float, *, s3_policy: bool,
         "silent_miss_rate": round(miss / auto, 4) if auto else None,
         "silent_miss_95_upper": round(wilson_upper(miss, auto), 4) if auto else None,
         "blocked_by_s3_policy": blocked_by_s3,
+        "blocked_by_margin": blocked_by_margin,
         "miss_detail": miss_detail,
     }
 
@@ -100,6 +119,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="사전등록 1단계 조건 — 이 미만이면 조건 미달")
     ap.add_argument("--max-miss-upper", type=float, default=0.02,
                     help="무음 미탐 95% 상한 허용치")
+    ap.add_argument("--margin", type=float, default=0.0,
+                    help="요소 확률 1-2위 차가 이 미만이면 경계로 보고 검수행")
     ap.add_argument("--temperature", default=None,
                     help="요소별 온도 json — 신뢰도를 보정해 게이트에 넣는다")
     ap.add_argument("--report", default=None)
@@ -139,7 +160,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{'tau':>6s}{'커버리지':>10s}{'자동n':>7s}{'정밀도':>9s}"
               f"{'무음미탐':>9s}{'95%상한':>9s}{'S3차단':>8s}  판정")
         for tau in taus:
-            r = evaluate(records, tau, s3_policy=policy, grade_from_svm=grade_from_svm)
+            r = evaluate(records, tau, s3_policy=policy, grade_from_svm=grade_from_svm,
+                         margin=args.margin)
             out[key].append(r)
             ok = (r["coverage"] >= args.min_coverage
                   and r["silent_miss_95_upper"] is not None

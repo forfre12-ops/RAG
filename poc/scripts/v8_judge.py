@@ -100,7 +100,10 @@ def predict(model, tok, texts: list[str], device, max_len: int, batch: int,
             preds = [lg.argmax(-1).tolist() for lg in logits]
             out.extend(zip(preds[0], preds[1], preds[2]))
             if want_probs:
-                sm = [torch.softmax(lg, dim=-1).max(-1).values.tolist() for lg in logits]
+                # **전체 분포**를 남긴다. 최대확률만 남기면 게이트가 "lv1 과 lv2 가 접전"
+                # 같은 경계 불확실성을 못 본다. 4차 미탐 5건이 전부 lv2->lv1 이었고,
+                # 그 경계가 등급을 뒤집는다((2,2,1)=TS vs (1,2,1)=S2).
+                sm = [torch.softmax(lg, dim=-1).tolist() for lg in logits]
                 probs.extend(zip(sm[0], sm[1], sm[2]))
     return (out, probs) if want_probs else out
 
@@ -241,7 +244,8 @@ def main(argv: list[str] | None = None) -> int:
                     "doc_id": r["doc_id"], "form_id": r["form_id"],
                     "truth": truth_g[i], "pred": pred_g[i],
                     "truth_codes": list(row_codes(r)), "pred_codes": list(preds[i]),
-                    "head_conf": [round(x, 6) for x in probs[i]],
+                    "head_conf": [round(max(d), 6) for d in probs[i]],
+                    "head_dist": [[round(x, 6) for x in d] for d in probs[i]],
                     "s3_kind": r.get("s3_kind"), "pair_id": r.get("pair_id"),
                     "lineage": r.get("lineage"),
                 }, ensure_ascii=False) + NL)
