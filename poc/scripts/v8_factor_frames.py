@@ -330,7 +330,15 @@ FRAMES: dict[str, list[dict]] = {
     ],
 }
 
-SPLIT_RATIO = 0.6   # 프레임 앞 60% 학습 · 뒤 40% 홀드아웃
+SPLIT_RATIO = 0.6    # 프레임 앞 60% 학습
+CALIB_RATIO = 0.15   # 그다음 15% 는 **보정 전용** — 판정면과 프레임이 겹치면 안 된다
+
+# 보정면이 따로 필요한 이유(실측). 게이트는 min(head_conf) >= tau 로 동작하는데 4차 모델은
+# tau 0.995 에서 자동 73건인 것이 0.999 에서 0건이 된다 — 신뢰도가 뭉쳐 있어 임계가
+# 사실상 스위치처럼 동작한다. 온도 보정이 그 분포를 펴 준다.
+#   dev 는 못 쓴다: 프레임을 다 봐서 MAE 0.000 이라 온도 추정 신호가 없다(v6 가 val
+#                  정확도 1.000 때문에 온도 0.05 로 퇴화한 것과 같은 함정).
+#   판정면도 못 쓴다: 거기서 맞추면 판정면이 튜닝면이 되어 잠금이 풀린다.
 
 
 def frames_for(factor: str, split: str = "all") -> list[dict]:
@@ -342,10 +350,13 @@ def frames_for(factor: str, split: str = "all") -> list[dict]:
     """
     fr = FRAMES[factor]
     cut = max(1, round(len(fr) * SPLIT_RATIO))
+    cal = cut + max(1, round(len(fr) * CALIB_RATIO))
     if split == "train":
         return list(fr[:cut])
+    if split == "calib":
+        return list(fr[cut:cal])
     if split == "holdout":
-        return list(fr[cut:])
+        return list(fr[cal:])
     return list(fr)
 
 
@@ -362,14 +373,14 @@ def near_miss_for(factor: str, split: str = "all") -> list[tuple[str, str]]:
 
 def split_overlap() -> list[str]:
     """학습·홀드아웃 문장 교집합. 0 이어야 한다."""
-    tr, ho = set(), set()
+    seen: dict[str, set] = {"train": set(), "calib": set(), "holdout": set()}
     for factor in FACTORS:
-        for st, lv in (("proven_absent", None), ("present", 1), ("present", 2)):
-            tr |= set(sentences_for(factor, st, lv, "train"))
-            ho |= set(sentences_for(factor, st, lv, "holdout"))
-        tr |= {s for s, _ in near_miss_for(factor, "train")}
-        ho |= {s for s, _ in near_miss_for(factor, "holdout")}
-    return sorted(tr & ho)
+        for sp in seen:
+            for st, lv in (("proven_absent", None), ("present", 1), ("present", 2)):
+                seen[sp] |= set(sentences_for(factor, st, lv, sp))
+            seen[sp] |= {s for s, _ in near_miss_for(factor, sp)}
+    bad = (seen["train"] & seen["holdout"]) | (seen["calib"] & seen["holdout"])         | (seen["train"] & seen["calib"])
+    return sorted(bad)
 
 
 def audit() -> list[str]:

@@ -366,6 +366,19 @@ def main() -> int:
         print(f"dev {len(dev)}건 (형태 {args.dev_form} — 학습에서 제외)")
 
     if args.holdout_per_boundary:
+        # 보정면 — 판정면과 **프레임이 겹치지 않는** 미관측 프레임으로 만든다.
+        # 온도는 스칼라 3개뿐이라 표본이 크지 않아도 되지만, 오차가 있어야 추정이 된다.
+        cal = generate(HOLDOUT_FORMS, per_boundary=max(4, args.holdout_per_boundary // 3),
+                       split="ca", pool_split="calib")
+        cal += generate_provable_s3(HOLDOUT_FORMS, count=max(32, args.provable // 8),
+                                    split="ca", pool_split="calib")
+        cal += generate_unsignaled(HOLDOUT_FORMS, count=max(24, args.unsignaled // 8),
+                                   split="ca", pool_split="calib")
+        (out / "calib.jsonl").write_text(
+            NL.join(json.dumps(r, ensure_ascii=False) for r in cal) + NL, encoding="utf-8")
+        print(f"보정 {len(cal)}건 (판정면과 프레임 겹침 0)")
+
+    if args.holdout_per_boundary:
         hold = generate(HOLDOUT_FORMS, per_boundary=args.holdout_per_boundary, split="ho",
                         pool_split="holdout")
         # 판정면에도 S3-무신호형이 있어야 한다. 없으면 "부재가 입증된 S3"와 "아무 말 없는

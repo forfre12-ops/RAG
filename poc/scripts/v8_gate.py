@@ -100,6 +100,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="사전등록 1단계 조건 — 이 미만이면 조건 미달")
     ap.add_argument("--max-miss-upper", type=float, default=0.02,
                     help="무음 미탐 95% 상한 허용치")
+    ap.add_argument("--temperature", default=None,
+                    help="요소별 온도 json — 신뢰도를 보정해 게이트에 넣는다")
     ap.add_argument("--report", default=None)
     args = ap.parse_args(argv)
 
@@ -107,6 +109,23 @@ def main(argv: list[str] | None = None) -> int:
 
     records = [json.loads(l) for l in Path(args.records).read_text("utf-8").splitlines() if l.strip()]
     print(f"[records] {args.records} - {len(records)}건")
+
+    if args.temperature:
+        # 기록에는 헤드별 **최대확률** 만 있다. 4-way softmax 의 최대확률 p 를 온도 T 로
+        # 다시 조인 값은 정확히는 로짓이 있어야 하지만, 최대 로짓과 나머지를 균등으로 보는
+        # 근사(p -> p^(1/T) 정규화)로 순서를 보존하며 분포를 편다. 순서가 보존되므로
+        # 게이트 판정(임계 통과 여부)의 상대 순위는 그대로다.
+        temps = json.loads(Path(args.temperature).read_text("utf-8"))["per_factor"]
+        tv = [temps[f] for f in ("secrecy", "value", "management")]
+        print(f"[temperature] {dict(zip(('secrecy','value','management'), tv))}")
+        for r in records:
+            new = []
+            for p, t in zip(r["head_conf"], tv):
+                p = min(max(p, 1e-9), 1 - 1e-9)
+                a = p ** (1.0 / t)
+                b = (1 - p) ** (1.0 / t)
+                new.append(a / (a + b))
+            r["head_conf"] = new
 
     taus = [float(x) for x in args.taus.split(",")]
     out = {"records": args.records, "n": len(records),
