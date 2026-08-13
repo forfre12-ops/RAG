@@ -25,7 +25,9 @@ from pathlib import Path
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
-from v8_document_forms import FORM_BY_ID, HOLDOUT_FORMS, TRAIN_FORMS, sanity_check  # noqa: E402
+from v8_document_forms import (  # noqa: E402
+    FORM_BY_ID, HOLDOUT2_FORMS, HOLDOUT_FORMS, TRAIN_FORMS, sanity_check,
+)
 from v8_factor_labels import (  # noqa: E402
     FACTORS,
     PRESENT,
@@ -323,6 +325,10 @@ def main() -> int:
     # 최종 판정면(holdout_forms)은 형태와 표현이 둘 다 새로우므로 여기에 쓰지 않는다.
     ap.add_argument("--dev-form", default="work_manual",
                     help="이 형태는 학습에서 빼고 dev.jsonl 로 낸다. 빈 문자열이면 미분리")
+    # 2차 판정면 — 1차에서 조건을 통과한 뒤 **여기서 다시 재는 것**이 과적합 여부를 가른다.
+    # 형태 6종이 전부 학습·1차판정 어디에도 안 나온 것이고 골격도 더 크게 흔들었다.
+    ap.add_argument("--holdout2-per-boundary", type=int, default=0,
+                    help="0 이면 2차 판정면 미생성")
     ap.add_argument("--provable", type=int, default=240,
                     help="S3-입증형 보강 건수 — 자동확정 후보의 유일한 근거라 얇으면 안 된다")
     ap.add_argument("--unsignaled", type=int, default=96,
@@ -364,6 +370,17 @@ def main() -> int:
         (out / "dev.jsonl").write_text(
             NL.join(json.dumps(r, ensure_ascii=False) for r in dev) + NL, encoding="utf-8")
         print(f"dev {len(dev)}건 (형태 {args.dev_form} — 학습에서 제외)")
+
+    if args.holdout2_per_boundary:
+        h2 = generate(HOLDOUT2_FORMS, per_boundary=args.holdout2_per_boundary, split="h2",
+                      pool_split="holdout")
+        h2 += generate_provable_s3(HOLDOUT2_FORMS, count=max(64, args.provable // 3),
+                                   split="h2", pool_split="holdout")
+        h2 += generate_unsignaled(HOLDOUT2_FORMS, count=max(64, args.holdout2_per_boundary * 10),
+                                  split="h2", pool_split="holdout")
+        (out / "holdout2_forms.jsonl").write_text(
+            NL.join(json.dumps(r, ensure_ascii=False) for r in h2) + NL, encoding="utf-8")
+        print(f"2차 판정면 {len(h2)}건 (형태 {[f['id'] for f in HOLDOUT2_FORMS]})")
 
     if args.holdout_per_boundary:
         # 보정면 — 판정면과 **프레임이 겹치지 않는** 미관측 프레임으로 만든다.

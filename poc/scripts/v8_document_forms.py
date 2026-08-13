@@ -153,14 +153,111 @@ FORMS: list[dict] = [
             ("갱신 주기", "memo"),
         ],
     },
+    # ── 이하 6종은 **2차 판정면(확대판)** 전용이다 ─────────────────────────
+    # 1차 판정면은 형태 2종 x 프레임 4~6종이라 조합이 좁다. 거기서 조건을 통과해도
+    # "그 조합에서 통과" 이지 실문서 보장이 아니고, 계속 그것만 보면 과적합한다.
+    # 그래서 학습·1차 판정 어디에도 쓰지 않은 형태를 따로 둔다. 문서 골격을 더 크게
+    # 흔든다 - 섹션 수 4~9 · 요소 위치 극단(맨앞/맨뒤) · 요소 두 개가 붙어 있는 배치.
+    {
+        "id": "audit_memo",
+        "title": "내부감사 메모",
+        "header": "감사번호 {docnum} / 실시 {date} / 감사인 {owners}명",
+        "style": "prose",
+        "sections": [
+            ("자료 보관 상태", "factor:management"),
+            ("확인 경위", "intro"),
+            ("대외 노출 여부", "factor:secrecy"),
+            ("업무상 중요도", "factor:value"),
+        ],
+    },
+    {
+        "id": "handover",
+        "title": "업무인수인계서",
+        "header": "인계 {dept} / 인수일 {date} / 관리번호 {docnum}",
+        "style": "numbered",
+        "sections": [
+            ("인계 범위", "intro"),
+            ("진행 현황", "observe"),
+            ("절차 요약", "procedure"),
+            ("주요 수치", "numbers"),
+            ("예외 사항", "exception"),
+            ("자료 성격", "factor:secrecy"),
+            ("보관 인계", "factor:management"),
+            ("업무 영향", "factor:value"),
+            ("특이사항", "memo"),
+        ],
+    },
+    {
+        "id": "incident_report",
+        "title": "사고보고서",
+        "header": "접수 {date} / 보고 {dept} / 문서 {docnum}",
+        "style": "bullet",
+        "sections": [
+            ("발생 개요", "intro"),
+            ("업무 파급", "factor:value"),
+            ("경과", "observe"),
+            ("자료 취급 상태", "factor:management"),
+            ("대외 알림 여부", "factor:secrecy"),
+            ("재발 방지", "closing"),
+        ],
+    },
+    {
+        "id": "budget_plan",
+        "title": "예산집행계획",
+        "header": "회계연도 {date} / 부서 {dept} / 계획 {docnum}",
+        "style": "table",
+        "sections": [
+            ("집행 근거", "intro"),
+            ("항목별 배정", "numbers"),
+            ("공개 범위", "factor:secrecy"),
+            ("집행 통제", "factor:management"),
+            ("기대 효과", "factor:value"),
+            ("보류 항목", "exception"),
+            ("비고", "memo"),
+        ],
+    },
+    {
+        "id": "spec_change_log",
+        "title": "사양변경이력",
+        "header": "이력번호 {docnum} / 최종 {date} / 관리 {dept}",
+        "style": "table",
+        "sections": [
+            ("변경 이력", "memo"),
+            ("사업적 의미", "factor:value"),
+            ("자료 공개 상태", "factor:secrecy"),
+            ("이력 관리 방식", "factor:management"),
+        ],
+    },
+    {
+        "id": "risk_review",
+        "title": "위험성검토서",
+        "header": "검토 {date} / 주관 {dept} / 문서 {docnum}",
+        "style": "prose",
+        "sections": [
+            ("검토 배경", "intro"),
+            ("식별된 위험", "observe"),
+            ("통제 현황", "factor:management"),
+            ("완화 절차", "procedure"),
+            ("잔여 위험", "exception"),
+            ("정보 노출도", "factor:secrecy"),
+            ("손실 규모", "factor:value"),
+            ("결론", "closing"),
+        ],
+    },
 ]
 
 # 학습에 쓰지 않는 형태. 모델이 한 번도 못 본 형태에서 신뢰도가 유지되는지가 판정 기준이다.
 FORM_HOLDOUT = ("contract_terms", "customer_list")
 
+# 2차 판정면(확대판) 전용 형태. 학습에도 1차 판정면에도 쓰지 않는다.
+# 1차 판정면에서 조건을 통과한 뒤 **여기서 다시 재는 것**이 과적합 여부를 가른다.
+FORM_HOLDOUT2 = ("audit_memo", "handover", "incident_report",
+                 "budget_plan", "spec_change_log", "risk_review")
+
 FORM_BY_ID = {f["id"]: f for f in FORMS}
-TRAIN_FORMS = [f for f in FORMS if f["id"] not in FORM_HOLDOUT]
+TRAIN_FORMS = [f for f in FORMS if f["id"] not in FORM_HOLDOUT + FORM_HOLDOUT2]
 HOLDOUT_FORMS = [f for f in FORMS if f["id"] in FORM_HOLDOUT]
+HOLDOUT2_FORMS = [f for f in FORMS if f["id"] in FORM_HOLDOUT2]
 
 
 def sanity_check() -> None:
