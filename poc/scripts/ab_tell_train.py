@@ -88,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--lr", type=float, default=2e-5)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--cross-eval", default=None,
+                    help="학습 후 이 디렉터리의 val/test 로도 평가한다 — 교차 평가")
     ap.add_argument("--report", default="reports/AB_TELL_MASKING.json")
     args = ap.parse_args(argv)
 
@@ -149,11 +151,26 @@ def main(argv: list[str] | None = None) -> int:
     te = evaluate(model, tok, te_x, te_y, device, args.max_len, args.batch)
     print(f"\n[{args.tag}] 채택 epoch {best['epoch']} · test {te}")
 
+    cross = None
+    if args.cross_eval:
+        cd = Path(args.cross_eval)
+        cv_x, cv_y = load(cd / "val.jsonl")
+        ct_x, ct_y = load(cd / "test.jsonl")
+        cross = {
+            "data": str(cd),
+            "val": evaluate(model, tok, cv_x, cv_y, device, args.max_len, args.batch),
+            "test": evaluate(model, tok, ct_x, ct_y, device, args.max_len, args.batch),
+        }
+        print(f"[{args.tag}] 교차 평가 ({cd})")
+        print(f"   val  {cross['val']}")
+        print(f"   test {cross['test']}")
+
     rp = Path(args.report)
     rp.parent.mkdir(parents=True, exist_ok=True)
     out = json.loads(rp.read_text("utf-8")) if rp.exists() else {}
     out[args.tag] = {"data": str(d), "epoch": best["epoch"],
                      "val": best["val"], "test": te,
+                     "cross": cross,
                      "hparams": {"base": args.base, "max_len": args.max_len,
                                  "batch": args.batch, "epochs": args.epochs,
                                  "lr": args.lr, "seed": args.seed}}
