@@ -213,6 +213,29 @@ FRAMES: dict[str, list[dict]] = {
          1: "검색으로 제목은 확인되나 본문은 확인되지 않는다.",
          2: "검색으로는 이 문서의 존재조차 확인되지 않는다.",
          "trap": ("인터넷 검색으로 유사 사례를 찾아 참고했다.", "지시")},
+        # ── 이하 4종은 **2차 판정면 전용**이다 ─────────────────────────────
+        # 1차 판정면(partner·portal·exhibition·search)과 어휘가 겹치지 않는 공개 경로를 쓴다.
+        # 2차 판정면은 형태도 표현도 새로워야 "1차 통과가 좁은 조합의 산물인지" 를 가른다.
+        {"id": "h2_broadcast",
+         "absent": "방송 취재에 응해 화면으로 전 항목이 나갔다.",
+         1: "취재에는 개요만 설명하고 세부 수치는 설명하지 않았다.",
+         2: "어떤 취재에도 이 수치를 언급한 적이 없다.",
+         "trap": ("취재 대응 지침을 마련할 예정이다.", "시제")},
+        {"id": "h2_franchise",
+         "absent": "가맹점 안내 책자에 그대로 실어 배포했다.",
+         1: "책자에는 운영 절차만 싣고 원가 항목은 뺐다.",
+         2: "가맹 안내물에 이 항목을 실은 적이 없다.",
+         "trap": ("책자 개정 작업을 검토 중이다.", "시제")},
+        {"id": "h2_museum",
+         "absent": "기업 전시관에 원본 도면을 상설 전시하고 있다.",
+         1: "전시관에는 완성품만 두고 도면은 두지 않았다.",
+         2: "전시관을 포함해 외부에 도면을 내놓은 적이 없다.",
+         "trap": ("전시 구성을 다시 짤 계획이다.", "시제")},
+        {"id": "h2_thesis",
+         "absent": "산학 논문에 부록으로 전량 실려 공개됐다.",
+         1: "논문에는 방법만 싣고 조건표는 싣지 않았다.",
+         2: "어떤 논문에도 이 조건표가 실린 적이 없다.",
+         "trap": ("공동 연구 논문을 준비하고 있다.", "시제")},
     ],
     # ── 경제적 유용성 — 가치/대체 어휘를 세 상태가 공유한다 ────────────────
     "value": [
@@ -417,6 +440,37 @@ FRAMES: dict[str, list[dict]] = {
          1: "성과에 간접적으로 기여하나 지표로 환산되지는 않는다.",
          2: "이 자료가 곧바로 성과 지표에 반영되는 핵심 값이다.",
          "trap": ("성과 지표 반영 여부는 운영 결과를 보고 정한다.", "시제")},
+        # ── 이하 6종은 **2차 판정면 전용**이다 ─────────────────────────────
+        {"id": "h2_lead_time",
+         "absent": "이 자료가 있어도 납기가 줄지 않는다.",
+         1: "납기를 다소 앞당기나 결정적이지는 않다.",
+         2: "이 조건 없이는 요구 납기를 맞출 방법이 없다.",
+         "trap": ("납기 개선 효과는 다음 분기에 본다.", "시제")},
+        {"id": "h2_defect_cost",
+         "absent": "불량 비용에 영향을 준 적이 없는 기록이다.",
+         1: "불량을 줄이나 금액으로 잡히지는 않는다.",
+         2: "이 판단 기준이 연간 불량 비용을 좌우한다.",
+         "trap": ("불량 비용 집계 체계를 정비 중이다.", "시제")},
+        {"id": "h2_talent",
+         "absent": "누가 맡아도 결과가 같아 사람에 매이지 않는다.",
+         1: "담당자에 따라 편차가 있으나 대체는 가능하다.",
+         2: "이 판단을 할 수 있는 인력이 사내에 한 명뿐이다.",
+         "trap": ("담당 인력 충원을 계획하고 있다.", "시제")},
+        {"id": "h2_license",
+         "absent": "실시권 대상이 아니어서 대가를 받은 적이 없다.",
+         1: "일부 항목만 실시권에 포함돼 소액을 받는다.",
+         2: "이 조건이 실시권 대가 산정의 근거가 된다.",
+         "trap": ("실시권 협상은 아직 시작하지 않았다.", "시제")},
+        {"id": "h2_recall_risk",
+         "absent": "공개되어도 회수 위험이 달라지지 않는다.",
+         1: "회수 판단에 참고되나 결정 요인은 아니다.",
+         2: "이 기준이 흔들리면 대량 회수로 이어진다.",
+         "trap": ("회수 대응 절차를 점검할 예정이다.", "시제")},
+        {"id": "h2_energy",
+         "absent": "에너지 비용에 차이를 만들지 않는 값이다.",
+         1: "일부 구간에서 절감되나 폭이 크지 않다.",
+         2: "이 운전 조건이 연간 전력비의 상당 부분을 정한다.",
+         "trap": ("에너지 절감 목표를 수립 중이다.", "시제")},
     ],
     # ── 비밀관리성 — 통제 어휘를 세 상태가 공유한다 ─────────────────────────
     "management": [
@@ -591,11 +645,36 @@ FRAMES: dict[str, list[dict]] = {
          1: "회수 절차는 있으나 실제 회수율을 확인하지 않는다.",
          2: "배포본을 대장으로 관리하고 회수까지 확인한다.",
          "trap": ("회수 절차를 문서화할 예정이다.", "시제")},
+        # ── 이하 4종은 **2차 판정면 전용**이다 ─────────────────────────────
+        {"id": "h2_clean_desk",
+         "absent": "책상 위에 그대로 두고 퇴근한다.",
+         1: "정리 지침은 있으나 점검하지 않는다.",
+         2: "퇴근 시 시건을 확인하고 점검 결과를 남긴다.",
+         "trap": ("정리 지침을 다시 안내할 예정이다.", "시제")},
+        {"id": "h2_visitor",
+         "absent": "방문자가 열람 구역을 자유롭게 드나든다.",
+         1: "방문자 동행은 하나 열람 이력은 남기지 않는다.",
+         2: "방문자 동선을 제한하고 동행 기록을 남긴다.",
+         "trap": ("방문자 관리 절차를 개편할 계획이다.", "시제")},
+        {"id": "h2_versioning",
+         "absent": "같은 파일이 여러 이름으로 흩어져 최신본을 모른다.",
+         1: "버전은 붙이나 폐기본을 회수하지 않는다.",
+         2: "최신본만 열리고 구버전은 자동 잠긴다.",
+         "trap": ("버전 관리 규칙을 정리할 예정이다.", "시제")},
+        {"id": "h2_offshore",
+         "absent": "해외 법인에 조건 없이 그대로 넘겼다.",
+         1: "넘기되 현지 관리 실태는 확인하지 않는다.",
+         2: "해외 이전 시 승인·기록·현지 점검을 모두 거친다.",
+         "trap": ("해외 이전 기준을 마련하고 있다.", "시제")},
     ],
 }
 
 # 판정면·보정면은 요소마다 **고정 개수**다. 프레임을 추가해도 이 목록은 그대로여야
 # 회차 간 비교가 성립한다(4차에서 비율 분할이 판정면을 흔든 것을 확인하고 바꿨다).
+# 2차 판정면 전용 프레임. 목록 **끝에서부터** 떼므로 새 프레임을 끝에 붙이면
+# 학습·보정·1차 판정면은 그대로이고 2차 판정면만 새로 생긴다.
+# 1차 판정면과 문장이 겹치면 2차가 새 증거가 되지 못한다(실측: 겹침 108/109 였다).
+HOLDOUT2_FRAMES = {"secrecy": 4, "value": 6, "management": 4}
 HOLDOUT_FRAMES = {"secrecy": 4, "value": 6, "management": 4}
 CALIB_FRAMES = {"secrecy": 2, "value": 4, "management": 2}
 
@@ -619,9 +698,11 @@ def frames_for(factor: str, split: str = "all") -> list[dict]:
     # 경계가 밀려 판정면 구성이 바뀌고, 회차 간 비교가 성립하지 않는다. 실제로 4차 뒤
     # 학습 프레임 6종을 넣자 판정면에 새 프레임이 끼어들어 평균이 흔들렸다.
     # 목록 **끝에서부터** 판정 -> 보정 순으로 떼므로, 새 프레임은 항상 학습에만 들어간다.
+    n_h2 = HOLDOUT2_FRAMES.get(factor, 0)
     n_hold = HOLDOUT_FRAMES.get(factor, 6)
     n_cal = CALIB_FRAMES.get(factor, 4)
-    hold_start = len(fr) - n_hold
+    h2_start = len(fr) - n_h2
+    hold_start = h2_start - n_hold
     cal_start = hold_start - n_cal
     if cal_start < 1:
         raise ValueError(f"{factor}: 프레임이 부족하다 - 학습 몫이 남지 않는다")
@@ -630,7 +711,9 @@ def frames_for(factor: str, split: str = "all") -> list[dict]:
     if split == "calib":
         return list(fr[cal_start:hold_start])
     if split == "holdout":
-        return list(fr[hold_start:])
+        return list(fr[hold_start:h2_start])
+    if split == "holdout2":
+        return list(fr[h2_start:])
     return list(fr)
 
 
@@ -647,13 +730,18 @@ def near_miss_for(factor: str, split: str = "all") -> list[tuple[str, str]]:
 
 def split_overlap() -> list[str]:
     """학습·홀드아웃 문장 교집합. 0 이어야 한다."""
-    seen: dict[str, set] = {"train": set(), "calib": set(), "holdout": set()}
+    seen: dict[str, set] = {"train": set(), "calib": set(), "holdout": set(),
+                            "holdout2": set()}
     for factor in FACTORS:
         for sp in seen:
             for st, lv in (("proven_absent", None), ("present", 1), ("present", 2)):
                 seen[sp] |= set(sentences_for(factor, st, lv, sp))
             seen[sp] |= {s for s, _ in near_miss_for(factor, sp)}
-    bad = (seen["train"] & seen["holdout"]) | (seen["calib"] & seen["holdout"])         | (seen["train"] & seen["calib"])
+    keys = list(seen)
+    bad: set = set()
+    for i, a in enumerate(keys):
+        for b in keys[i + 1:]:
+            bad |= seen[a] & seen[b]
     return sorted(bad)
 
 

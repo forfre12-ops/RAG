@@ -372,12 +372,14 @@ def main() -> int:
         print(f"dev {len(dev)}건 (형태 {args.dev_form} — 학습에서 제외)")
 
     if args.holdout2_per_boundary:
+        # ⚠ pool_split 은 반드시 "holdout2" 다. 처음에 "holdout" 을 그대로 써서 1차 판정면과
+        # 근거문장이 108/109 겹쳤다 — 형태만 새롭고 표현은 같아 2차가 새 증거가 되지 못했다.
         h2 = generate(HOLDOUT2_FORMS, per_boundary=args.holdout2_per_boundary, split="h2",
-                      pool_split="holdout")
+                      pool_split="holdout2")
         h2 += generate_provable_s3(HOLDOUT2_FORMS, count=max(64, args.provable // 3),
-                                   split="h2", pool_split="holdout")
+                                   split="h2", pool_split="holdout2")
         h2 += generate_unsignaled(HOLDOUT2_FORMS, count=max(64, args.holdout2_per_boundary * 10),
-                                  split="h2", pool_split="holdout")
+                                  split="h2", pool_split="holdout2")
         (out / "holdout2_forms.jsonl").write_text(
             NL.join(json.dumps(r, ensure_ascii=False) for r in h2) + NL, encoding="utf-8")
         print(f"2차 판정면 {len(h2)}건 (형태 {[f['id'] for f in HOLDOUT2_FORMS]})")
