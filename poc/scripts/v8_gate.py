@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -62,6 +63,11 @@ def boundary_margin(dist: list[float]) -> float:
     return a[0] - a[1] if len(a) > 1 else 1.0
 
 
+def _slice_stats(auto: list[dict]) -> tuple[int, int, float]:
+    miss = [r for r in auto if ORDER[r["pred"]] > ORDER[r["truth"]]]
+    return len(auto), len(miss), wilson_upper(len(miss), len(auto)) if auto else 1.0
+
+
 def evaluate(records: list[dict], tau: float, *, s3_policy: bool,
              grade_from_svm, margin: float = 0.0) -> dict:
     """한 임계에서의 게이트 동작.
@@ -74,6 +80,7 @@ def evaluate(records: list[dict], tau: float, *, s3_policy: bool,
     blocked_by_s3 = 0
     blocked_by_margin = 0
     miss_detail: dict[str, int] = {}
+    accepted: list[dict] = []
     for r in records:
         conf = min(r["head_conf"])
         if conf < tau:
@@ -90,14 +97,30 @@ def evaluate(records: list[dict], tau: float, *, s3_policy: bool,
                 blocked_by_s3 += 1
                 continue
         auto += 1
+        accepted.append(r)
         if r["pred"] == r["truth"]:
             auto_correct += 1
         elif ORDER[r["pred"]] > ORDER[r["truth"]]:
             miss += 1
             miss_detail[f"{r['truth']}->{r['pred']}"] = miss_detail.get(f"{r['truth']}->{r['pred']}", 0) + 1
     n = len(records)
+    # 사전등록 §2 는 "형태별 최악 성능 — 홀드아웃 형태 **각각**에서 충족" 을 요구한다.
+    # 합산만 보면 두 형태가 각각 미달인데 합쳐서 통과하는 일이 생긴다(6차에서 실제로
+    # contract_terms 0.0356 · customer_list 0.0340 인데 합산 0.0177 로 통과했다).
+    per_form: dict[str, dict] = {}
+    for form in sorted({r.get("form_id", "?") for r in accepted}):
+        a = [r for r in accepted if r.get("form_id") == form]
+        an, mn, up = _slice_stats(a)
+        per_form[form] = {"n": an, "silent_miss_n": mn,
+                          "silent_miss_95_upper": round(up, 4),
+                          "coverage_in_form": round(
+                              an / max(1, sum(1 for r in records if r.get("form_id") == form)), 4)}
+    worst = max((v["silent_miss_95_upper"] for v in per_form.values()), default=1.0)
     return {
         "tau": tau,
+        "per_form": per_form,
+        "worst_form_miss_95_upper": round(worst, 4),
+        "min_form_n": min((v["n"] for v in per_form.values()), default=0),
         "coverage": round(auto / n, 4),
         "auto_n": auto,
         "precision": round(auto_correct / auto, 4) if auto else None,
@@ -119,6 +142,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="사전등록 1단계 조건 — 이 미만이면 조건 미달")
     ap.add_argument("--max-miss-upper", type=float, default=0.02,
                     help="무음 미탐 95% 상한 허용치")
+    # 0/n 에서 Wilson 상한이 0.02 이하가 되려면 n>=189 다(0/150 -> 0.02497 로 초과).
+    # 사전등록 표의 "2.0% -> 150건" 은 산술 오류였다.
+    ap.add_argument("--min-form-n", type=int, default=189,
+                    help="형태당 최소 자동확정 건수 — 이 미만이면 상한을 주장할 수 없다")
     ap.add_argument("--margin", type=float, default=0.0,
                     help="요소 확률 1-2위 차가 이 미만이면 경계로 보고 검수행")
     ap.add_argument("--temperature", default=None,
@@ -132,21 +159,27 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[records] {args.records} - {len(records)}건")
 
     if args.temperature:
-        # 기록에는 헤드별 **최대확률** 만 있다. 4-way softmax 의 최대확률 p 를 온도 T 로
-        # 다시 조인 값은 정확히는 로짓이 있어야 하지만, 최대 로짓과 나머지를 균등으로 보는
-        # 근사(p -> p^(1/T) 정규화)로 순서를 보존하며 분포를 편다. 순서가 보존되므로
-        # 게이트 판정(임계 통과 여부)의 상대 순위는 그대로다.
+        # 기록에 head_dist(4-way 전체 분포)가 있으므로 **정식으로** 온도를 적용한다.
+        # 이전에는 최대확률만 있다고 보고 p -> p^(1/T) 근사를 썼는데, 기록을 확인하니
+        # 전체 분포가 들어 있었다. 근사할 이유가 없었고 값도 달랐다.
         temps = json.loads(Path(args.temperature).read_text("utf-8"))["per_factor"]
         tv = [temps[f] for f in ("secrecy", "value", "management")]
         print(f"[temperature] {dict(zip(('secrecy','value','management'), tv))}")
+        missing = 0
         for r in records:
+            if not r.get("head_dist"):
+                missing += 1
+                continue
             new = []
-            for p, t in zip(r["head_conf"], tv):
-                p = min(max(p, 1e-9), 1 - 1e-9)
-                a = p ** (1.0 / t)
-                b = (1 - p) ** (1.0 / t)
-                new.append(a / (a + b))
+            for dist, t in zip(r["head_dist"], tv):
+                lg = [math.log(max(x, 1e-12)) / t for x in dist]
+                m = max(lg)
+                e = [math.exp(x - m) for x in lg]
+                z = sum(e)
+                new.append(max(x / z for x in e))
             r["head_conf"] = new
+        if missing:
+            raise SystemExit(f"head_dist 없는 기록 {missing}건 — 정식 보정 불가. 판정기를 다시 돌릴 것")
 
     taus = [float(x) for x in args.taus.split(",")]
     out = {"records": args.records, "n": len(records),
@@ -163,26 +196,33 @@ def main(argv: list[str] | None = None) -> int:
             r = evaluate(records, tau, s3_policy=policy, grade_from_svm=grade_from_svm,
                          margin=args.margin)
             out[key].append(r)
+            # 판정은 **형태별 최악** 으로 한다. 합산 통과는 조건이 아니다.
             ok = (r["coverage"] >= args.min_coverage
-                  and r["silent_miss_95_upper"] is not None
-                  and r["silent_miss_95_upper"] <= args.max_miss_upper)
-            verdict = "통과" if ok else (
-                "커버리지 미달" if r["coverage"] < args.min_coverage else "미탐 상한 초과")
+                  and r["min_form_n"] >= args.min_form_n
+                  and r["worst_form_miss_95_upper"] <= args.max_miss_upper)
+            verdict = ("통과" if ok else
+                       "커버리지 미달" if r["coverage"] < args.min_coverage else
+                       f"형태당 표본 부족({r['min_form_n']}<{args.min_form_n})"
+                       if r["min_form_n"] < args.min_form_n else "형태별 미탐 상한 초과")
             print(f"{tau:>6.2f}{r['coverage']:>10.4f}{r['auto_n']:>7d}"
                   f"{(r['precision'] if r['precision'] is not None else 0):>9.4f}"
                   f"{r['silent_miss_n']:>9d}"
                   f"{(r['silent_miss_95_upper'] if r['silent_miss_95_upper'] is not None else 1):>9.4f}"
                   f"{r['blocked_by_s3_policy']:>8d}  {verdict}")
+            for form, v in r["per_form"].items():
+                print(f"        {form:18s} n={v['n']:4d} 미탐 {v['silent_miss_n']:2d} "
+                      f"상한 {v['silent_miss_95_upper']:.4f}")
 
     passing = [r for r in out["with_s3_policy"]
                if r["coverage"] >= args.min_coverage
-               and r["silent_miss_95_upper"] is not None
-               and r["silent_miss_95_upper"] <= args.max_miss_upper]
+               and r["min_form_n"] >= args.min_form_n
+               and r["worst_form_miss_95_upper"] <= args.max_miss_upper]
     print()
     if passing:
         best = max(passing, key=lambda r: r["coverage"])
-        print(f"사전등록 1단계 조건 통과 — tau {best['tau']:.2f} 에서 "
-              f"커버리지 {best['coverage']:.1%} · 무음 미탐 상한 {best['silent_miss_95_upper']:.4f}")
+        print(f"사전등록 1단계 조건 통과 — tau {best['tau']:.3f} 에서 "
+              f"커버리지 {best['coverage']:.1%} · **형태별 최악** 상한 "
+              f"{best['worst_form_miss_95_upper']:.4f} · 형태당 최소 n={best['min_form_n']}")
     else:
         print("사전등록 1단계 조건 미달 — 어떤 임계에서도 "
               f"커버리지 >= {args.min_coverage:.0%} 이면서 미탐 상한 <= {args.max_miss_upper:.0%} 이 안 된다.")
