@@ -26,6 +26,11 @@ NM = {0: "absent", 1: "lv1", 2: "lv2", 3: "unk"}
 
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default="artifacts/factor_model/v8")
+    ap.add_argument("--out", default="reports/V8_DIAGNOSE.json")
+    args = ap.parse_args()
     import torch
     from transformers import AutoTokenizer
 
@@ -35,7 +40,8 @@ def main() -> int:
 
     tok = AutoTokenizer.from_pretrained("kakaobank/kf-deberta-base")
     model = _build_model("kakaobank/kf-deberta-base", torch, 4).cuda()
-    model.load_state_dict(torch.load("artifacts/factor_model/v8/model.pt"))
+    model.load_state_dict(torch.load(f"{args.model}/model.pt"))
+    print(f"[model] {args.model}")
 
     out: dict = {}
     for name in ("dev", "holdout_forms"):
@@ -69,15 +75,15 @@ def main() -> int:
         for idx in P.values():
             if len(idx) != 2:
                 continue
-            a, b = preds[idx[0]], preds[idx[1]]
-            if a == b:
+            pa, pb = preds[idx[0]], preds[idx[1]]
+            if pa == pb:
                 same += 1
             else:
                 diff += 1
             # 정답에서 달라야 하는 그 요소만 봤을 때 같은가
             ta, tb = row_codes(rows[idx[0]]), row_codes(rows[idx[1]])
             vk = [k for k in range(3) if ta[k] != tb[k]]
-            if vk and a[vk[0]] == b[vk[0]]:
+            if vk and pa[vk[0]] == pb[vk[0]]:
                 same_factor += 1
         print(f"  쌍 {len(P)}개 — 요소예측 전부 동일 {same} · 다름 {diff} · "
               f"변경된 요소를 같게 본 쌍 {same_factor}")
@@ -85,9 +91,9 @@ def main() -> int:
                               "varied_factor_same": same_factor}
         print()
 
-    Path("reports/V8_DIAGNOSE.json").write_text(
+    Path(args.out).write_text(
         json.dumps(out, ensure_ascii=False, indent=2), "utf-8")
-    print("[report] reports/V8_DIAGNOSE.json")
+    print(f"[report] {args.out}")
     return 0
 
 
