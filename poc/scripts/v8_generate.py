@@ -29,6 +29,7 @@ from v8_document_forms import (  # noqa: E402
     FORM_BY_ID, HOLDOUT2_FORMS, HOLDOUT_FORMS, NO_FACTOR_FORMS, TRAIN_FORMS,
     sanity_check,
 )
+from v8_value_levels import DOMAINS as VALUE_DOMAINS, content_for as value_content
 from v8_factor_labels import (  # noqa: E402
     FACTORS,
     PRESENT,
@@ -112,6 +113,27 @@ CONTENT = [
     "개정 3차에서 승온 곡선과 가압 시점이 이전 차수와 달라졌다.",
 ]
 
+def content_pool(rng, value_level: int | None, domain: str, split: str) -> list[str]:
+    """문서의 **가치 수준**에 맞는 내용 문장 풀.
+
+    왜(실측 2026-08-14). business 판정면에서 모델이 value 를 lv2 49 · lv1 2 로 낸다 -
+    수준을 못 가른다. 그런데 S2 와 TS/S1 을 가르는 것이 s·v 의 수준이라 판별이 0 이
+    된다(이진정확 0.764 = 전부 "영업비밀" 이라 답한 값과 같다).
+
+    원인은 학습셋에서 수준이 프레임의 **명시 진술**로만 갈린다는 것이다. 실문서에서
+    수준은 내용이 무엇인가로 드러난다 - 노하우 자체인가, 노하우 주변의 관리·계획인가.
+    그래서 lv1/lv2 문서에 각각 그에 맞는 내용을 넣는다.
+
+    absent/unknown 은 중립 풀(CONTENT)을 그대로 쓴다. 가치가 없다고 입증된 문서와
+    확인되지 않은 문서까지 수준 내용을 주면 라벨과 내용이 어긋난다.
+    """
+    if value_level not in (1, 2):
+        return CONTENT
+    pool = value_content(domain, value_level, split)
+    # 수준 내용만 쓰면 문서가 짧고 단조로워진다. 중립 문장을 섞어 길이와 어휘를 흔든다.
+    return pool + rng.sample(CONTENT, k=min(4, len(CONTENT)))
+
+
 NL = chr(10)
 DEPTS = ["소재개발팀", "품질팀", "생산기술팀", "구매팀", "영업기획팀", "설비운영팀"]
 STYLE_BULLET = {"bullet", "numbered"}
@@ -148,7 +170,9 @@ def _rng(seed: str) -> random.Random:
 
 
 def _factor_label(factor: str, code: int | None, rng: random.Random, *, near_miss: bool,
-                  rot: int = 0, split: str = "train") -> FactorLabel:
+                  rot: int = 0, split: str = "train",
+                  content_only: bool = False,
+                  content_pool: list[str] | None = None) -> FactorLabel:
     """요소 코드 -> 3상태 라벨. None 이면 unknown(주제만 언급, 단언 없음).
 
     문장은 **문서별 rng** 로 뽑는다. 슬롯 번호로 순환 배정해 봤더니 오히려 나빴다 —
@@ -157,6 +181,16 @@ def _factor_label(factor: str, code: int | None, rng: random.Random, *, near_mis
     """
     if code is None:
         return FactorLabel(state=UNKNOWN, direction="불명", reason="no_claim_in_body")
+    if content_only and code in (1, 2):
+        # [내용만] 수준을 **말하는 문장이 없고 내용 자체가 근거인** 문서다. 실문서의
+        # 가장 흔한 모습이고 학습셋에 13건뿐이었다(실측 2026-08-14). 그 결핍 때문에
+        # r13 에서 secrecy 가 가치 수준 내용을 보고 lv1 로 외삽했다
+        # (secrecy lv1 1건 -> 24건 · 비밀놓침 3 -> 23).
+        #
+        # 스키마는 present 에 근거 span 을 요구한다(근거 없는 상태 금지). 옳은 요구다 -
+        # 그래서 **내용 문장 자체를 근거로 인용한다.** 별도 진술을 만들지 않는다.
+        return FactorLabel(state=PRESENT, level=code, span=rng.choice(content_pool),
+                           direction="존재", reason=f"present_{code}_from_content")
     if code == 0:
         pool = sentences_for(factor, PROVEN_ABSENT, None, split)
         span = rng.choice(pool)
@@ -174,8 +208,18 @@ def _factor_label(factor: str, code: int | None, rng: random.Random, *, near_mis
 
 
 def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx: int,
-            lineage: str = "prose", inline: bool = False, split: str = "train") -> str:
-    """형태 정의에 따라 본문을 조립한다. 섹션 제목은 형태에서 오고 등급을 말하지 않는다."""
+            lineage: str = "prose", inline: bool = False, split: str = "train",
+            domain: str | None = None) -> str:
+    """형태 정의에 따라 본문을 조립한다. 섹션 제목은 형태에서 오고 등급을 말하지 않는다.
+
+    내용 문장은 **문서의 가치 수준**에 맞춰 뽑는다(`content_pool`). 도메인은 문서별로
+    무작위라 수준과 직교한다 - 주제로 수준을 맞히는 길을 막는다.
+    """
+    vl = labels["value"].level if labels["value"].state == PRESENT else None
+    # 관리성만 내용으로 드러나는 문서도 있다. 그때는 관리 수준이 내용을 정한다.
+    if vl is None and labels["management"].state == PRESENT and not labels["management"].span:
+        vl = labels["management"].level
+    body_pool = content_pool(rng, vl, domain or rng.choice(VALUE_DOMAINS), split)
     bullet = form["style"] in STYLE_BULLET
     # 분량은 문서마다 다르고 **등급과 무관**하게 뽑는다. rng 는 doc_id 에서만 오므로
     # 등급 정보가 들어갈 경로가 없다.
@@ -208,14 +252,18 @@ def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx:
                 # "중립 문구 = unknown" 을 배웠으므로 그 문구가 없으면 unknown 을 못 내고
                 # absent 로 답한다. 그것이 곱셈 규칙에서 등급을 무너뜨린다.
                 # 그래서 unknown 의 60% 는 요소 섹션에 **아무 언급도 없이** 내용만 넣는다.
-                body = " ".join(rng.sample(CONTENT, k=min(2 + verbosity, len(CONTENT))))
+                body = " ".join(rng.sample(body_pool, k=min(2 + verbosity, len(body_pool))))
             elif lab.span and inline:
                 # [삽입형] 실문서는 요소를 별도 문장으로 쓰지 않고 내용 문장 안에 짧게
                 # 끼워 넣는다("… 모델 (외부 미공개)"). 경화42 고등급 26건을 100%
                 # 과소분류한 원인이 이 형태를 학습에서 못 봤기 때문이다.
                 # 요소 자리에 채움 서술을 깔고 그 위에 짧은 진술을 붙인다.
-                base = " ".join(rng.sample(CONTENT, k=2))
+                base = " ".join(rng.sample(body_pool, k=2))
                 body = embed_inline(base, factor, lab.state, lab.level, rng, split)
+            elif lab.state == PRESENT and not lab.span:
+                # [내용만] 수준은 확정인데 그것을 말하는 문장이 없다. 근거가 내용 자체
+                # 이므로 요소 섹션에도 내용만 넣는다 - 중립 문구조차 붙이지 않는다.
+                body = " ".join(rng.sample(body_pool, k=min(2 + verbosity, len(body_pool))))
             else:
                 body = lab.span or rng.choice(NEUTRAL_FACTOR[factor])
             # 중립 문장이 unknown 에만 나오면 그 자체가 등급 tell 이 된다(실측: tell 4종).
@@ -226,7 +274,7 @@ def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx:
             if kind in ("numbers", "observe", "procedure"):
                 # 실질 내용을 넣는다. 절차 상투어만 깔면 "빈 문서" 가 되고, 모델은 그것을
                 # 이미 S3 로 배웠다(무요소 투입이 실패한 원인).
-                body = " ".join(rng.sample(CONTENT, k=min(2 + verbosity, len(CONTENT))))
+                body = " ".join(rng.sample(body_pool, k=min(2 + verbosity, len(body_pool))))
             else:
                 body = " ".join(rng.sample(FILLER[kind], k=min(verbosity, len(FILLER[kind]))))
             # 길이를 등급과 무관하게 흔든다. 고정 길이면 같은 경계·같은 쪽 문서끼리
@@ -244,9 +292,16 @@ def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx:
 def _build(doc_id: str, form: dict, svm, *,
            near_miss: bool, idx: int, pair_id: str | None = None,
            varied: str | None = None, rot: int = 0, split: str = "train",
-           lineage: str = "prose", inline: bool = False) -> dict:
+           lineage: str = "prose", inline: bool = False,
+           content_only: tuple[str, ...] = ()) -> dict:
     rng = _rng(doc_id)
-    labels = {f: _factor_label(f, c, rng, near_miss=near_miss, rot=rot, split=split)
+    # 도메인은 문서 단위로 한 번 고른다. 라벨의 근거 인용과 본문 내용이 같은 풀에서
+    # 나와야 "인용한 문장이 본문에 있다" 는 계약이 성립한다.
+    domain = rng.choice(VALUE_DOMAINS)
+    pools = {lv: value_content(domain, lv, split) for lv in (1, 2)}
+    labels = {f: _factor_label(f, c, rng, near_miss=near_miss, rot=rot, split=split,
+                               content_only=(f in content_only),
+                               content_pool=pools.get(c if c in (1, 2) else 2))
               for f, c in zip(FACTORS, svm)}
     doc = DocumentLabel(secrecy=labels["secrecy"], value=labels["value"],
                         management=labels["management"])
@@ -254,7 +309,7 @@ def _build(doc_id: str, form: dict, svm, *,
         "doc_id": doc_id,
         "form_id": form["id"],
         "document_type": form["title"],
-        "text": _render(form, labels, rng, idx, lineage, inline, split),
+        "text": _render(form, labels, rng, idx, lineage, inline, split, domain=domain),
         "label": doc.grade(),
         "label_source": "derived_from_factor_states",
         "factor_labels": {f: {k: v for k, v in vars(labels[f]).items() if v not in (None, "")}
@@ -266,9 +321,52 @@ def _build(doc_id: str, form: dict, svm, *,
         "varied_factor": varied,
         "has_language_trap": near_miss,
         "inline_form": inline,
+        "content_only": list(content_only),
         "lineage": lineage,
         "schema": "v8-3state-1",
     }
+
+
+def generate_content_only(forms: list[dict], *, count: int, split: str,
+                          pool_split: str = "train") -> list[dict]:
+    """**내용만 있는 문서** - 가치 수준은 내용이 드러내고 비공지성·관리성은 언급이 없다.
+
+    왜(실측 2026-08-14). 실문서 판정면의 업무문서가 정확히 이 모습이다:
+
+        «차세대 HBM 스택 식각 선택비 최적화 실험보고서»  236자
+        가치를 말하는 문장도, 비공개를 말하는 문장도, 접근통제를 말하는 문장도 없다.
+
+    그런데 학습셋에 이 조합이 13건뿐이었다. 수준 내용은 value 가 확정일 때만 붙고
+    그런 문서는 secrecy 도 대개 확정이라, "수준 내용 + secrecy 무언급" 을 모델이 본
+    적이 없다. 그래서 r13 에서 secrecy 가 가치 수준 내용을 보고 lv1 로 외삽했다
+    (secrecy lv1 1 -> 24건 · 비밀놓침 3 -> 23건).
+
+    이 문서들의 저술 등급은 S3 다(unknown 을 0 으로 보므로). 서빙 등급은 보수적 완성이
+    채워 고등급이 된다 - **그것이 맞는 동작이다.** 가치 있는 내용인데 공개 여부를 모르면
+    안전측으로 올려 사람에게 보내야 한다.
+    """
+    rows: list[dict] = []
+    # value 수준만 확정하고 나머지는 무언급. management 도 한 축 섞어 준다 -
+    # 관리성만 확정된 문서가 없으면 그쪽도 같은 외삽이 생긴다.
+    patterns = [
+        ("value", (None, 2, None)), ("value", (None, 1, None)),
+        ("value", (None, 2, None)), ("value", (None, 1, None)),
+        ("management", (None, None, 2)), ("management", (None, None, 1)),
+        ("value", (None, 2, None)), ("value", (None, 1, None)),
+        # 두 요소가 내용으로 드러나고 비공지성만 무언급 - 가장 흔한 실문서 모습
+        ("value,management", (None, 2, 2)), ("value,management", (None, 1, 1)),
+        ("value,management", (None, 2, 1)), ("value,management", (None, 1, 2)),
+    ]
+    for i in range(count):
+        doc_id = f"v8-{split}-co-{i:04d}"
+        prng = _rng(f"assign-{doc_id}")
+        form = prng.choice(forms)
+        who, svm = patterns[i % len(patterns)]
+        row = _build(doc_id, form, svm, near_miss=False, idx=i, rot=i,
+                     split=pool_split, lineage=prng.choice(LINEAGES),
+                     content_only=tuple(who.split(",")))
+        rows.append(row)
+    return rows
 
 
 def generate_no_factor(forms: list[dict], *, count: int, split: str) -> list[dict]:
@@ -406,6 +504,11 @@ def main() -> int:
                     help="요소 섹션이 없는 문서 수 — 실문서 다수가 이 모습이다")
     ap.add_argument("--provable", type=int, default=240,
                     help="S3-입증형 보강 건수 — 자동확정 후보의 유일한 근거라 얇으면 안 된다")
+    # [내용만] 실측 2026-08-14: 학습셋에 "수준 내용 + 비공지성 무언급" 조합이 13건뿐
+    # 이라 r13 에서 secrecy 가 가치 수준 내용을 보고 lv1 로 외삽했다. 실문서의 가장
+    # 흔한 모습이므로 충분히 넣는다.
+    ap.add_argument("--content-only", type=int, default=480,
+                    help="수준은 내용이 드러내고 나머지 요소는 언급이 없는 문서 수")
     ap.add_argument("--unsignaled", type=int, default=96,
                     help="S3-무신호형 건수 — 회원사 실문서 다수가 이 유형이다")
     ap.add_argument("--out-dir", default="datasets/v8")
@@ -433,6 +536,7 @@ def main() -> int:
 
     train = generate(fit_forms, per_boundary=args.per_boundary, split="tr")
     train += generate_unsignaled(fit_forms, count=args.unsignaled, split="tr")
+    train += generate_content_only(fit_forms, count=args.content_only, split="tr")
     train += generate_provable_s3(fit_forms, count=args.provable, split="tr")
     # 요소 섹션이 없는 문서 — "근거 없으면 unknown" 을 배우게 한다(실데이터 진단 대응)
     train += generate_no_factor(NO_FACTOR_FORMS, count=args.no_factor, split="tr")
@@ -443,6 +547,7 @@ def main() -> int:
     if dev_forms:
         dev = generate(dev_forms, per_boundary=max(2, args.per_boundary // 4), split="dv")
         dev += generate_unsignaled(dev_forms, count=max(8, args.unsignaled // 4), split="dv")
+        dev += generate_content_only(dev_forms, count=max(8, args.content_only // 6), split="dv")
         dev += generate_provable_s3(dev_forms, count=max(8, args.provable // 4), split="dv")
         (out / "dev.jsonl").write_text(
             NL.join(json.dumps(r, ensure_ascii=False) for r in dev) + NL, encoding="utf-8")

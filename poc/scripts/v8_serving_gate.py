@@ -33,7 +33,10 @@ for _p in (str(_ROOT / "src"), str(_ROOT / "scripts")):
 
 GRADES = ("TS", "S1", "S2", "S3")
 ORDER = {g: i for i, g in enumerate(GRADES)}
-CLS_ABSENT, CLS_UNKNOWN = 0, 3
+CLS_ABSENT, CLS_LV1, CLS_LV2, CLS_UNKNOWN = 0, 1, 2, 3
+# 하향 단언 - 이 클래스들이 고등급을 깬다. absent 는 곱을 0 으로 만들고 lv1 은
+# s==2/v==2 조건을 깨 S2 를 상한으로 만든다. 둘 다 무음 미탐의 경로다.
+DOWNGRADE = (CLS_ABSENT, CLS_LV1)
 PUBLIC = ("판례", "공시", "금융보고서", "보도자료", "공개")
 
 
@@ -63,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--kappa", type=float, default=0.99)
     ap.add_argument("--max-len", type=int, default=768)
     ap.add_argument("--batch", type=int, default=4)
+    ap.add_argument("--kappa-lv1", action="store_true",
+                    help="lv1 단언에도 문턱을 건다 - lv1 도 고등급을 깬다")
     ap.add_argument("--auto-top", action="store_true",
                     help="서빙 등급이 TS 면 확신 문턱 없이 확정한다 - 미탐 불가능")
     ap.add_argument("--unseal", action="store_true")
@@ -92,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     tot = {"n": 0, "auto": 0, "miss": 0, "auto_src": 0, "auto_conf": 0}
     print(f"tau {args.tau} · kappa {args.kappa}\n")
     print(f"{'면':16s}{'n':>5s}{'자동확정':>10s}{'무음미탐':>9s}{'미탐상한':>10s}"
-          f"{'확정정확':>9s}{'과분류':>8s}")
+          f"{'확정정확':>9s}{'과분류':>8s}{'이진정확':>9s}{'비밀놓침':>8s}{'헛경보':>8s}")
     for name, path in sets:
         rows = [json.loads(l) for l in Path(path).read_text("utf-8").splitlines() if l.strip()]
         rows = [r for r in rows if (r.get("text") or r.get("content")) and r.get("label") in ORDER]
@@ -109,7 +114,17 @@ def main(argv: list[str] | None = None) -> int:
                 grade.append("S3"); auto.append(i); why.append("출처"); continue
             c3 = list(preds[i])
             for k in range(3):                                       # 2층
-                if c3[k] == CLS_ABSENT and probs[i][k][CLS_ABSENT] < args.kappa:
+                # [하향 단언] 무음 미탐을 만드는 것은 absent 만이 아니다. 정본에서
+                # TS/S1 은 s==2 and v==2 를 요구하므로 **lv1 단언도 고등급을 깬다**:
+                #     s=1 v=2 m=2 -> 곱 4 이지만 s!=2 라 S2 가 상한
+                # 실측 2026-08-14(r13): 수준 내용을 넣자 secrecy lv1 이 1건에서 24건
+                # 으로 늘고 비밀놓침이 3 -> 23 으로 뛰었다. absent 만 지키는 문턱은
+                # 이 경로를 못 막는다.
+                #
+                # 그래서 **하향 단언 전체**에 문턱을 건다. unknown 은 여전히 무료다 -
+                # 유보는 보수적 완성이 받아 검수로 보낸다.
+                low = DOWNGRADE if args.kappa_lv1 else (CLS_ABSENT,)
+                if c3[k] in low and probs[i][k][c3[k]] < args.kappa:
                     c3[k] = CLS_UNKNOWN
             g = grade_from_svm(*[cls_to_worst(c) for c in c3])
             grade.append(g)
@@ -133,6 +148,20 @@ def main(argv: list[str] | None = None) -> int:
         # 않고 전부 최상단으로 밀어 올린 것뿐이므로 반드시 함께 본다.
         over = [i for i in auto if ORDER[grade[i]] < ORDER[truth[i]]]
         exact = [i for i in auto if grade[i] == truth[i]]
+        # [이진 판정] 4등급 일치는 S1 -> TS 를 오류로 센다. 그러나 운영에서 그 둘은
+        # 같은 결정이다 - 둘 다 "영업비밀이니 보호하라" 다. 실제로 갈리는 결정은
+        # **영업비밀인가 아닌가** 이고, 그것이 미탐이 문제가 되는 경계다.
+        #
+        # 그리고 정본상 S1 은 management 가 0 으로 확정될 때만 나오는데(조합 (2,2,0)
+        # 하나뿐) 보수적 완성이 unknown 을 2 로 채우므로 **S1 은 도달 불가**다. 4등급
+        # 지표는 그 도달 불가분을 전부 오류로 세어 성능을 구조적으로 깎는다.
+        SECRET = ("TS", "S1")
+        tb = [t in SECRET for t in truth]
+        pb = [grade[i] in SECRET for i in range(len(rows))]
+        bin_hit = sum(1 for i in range(len(rows)) if tb[i] == pb[i])
+        bin_miss = [i for i in range(len(rows)) if tb[i] and not pb[i]]   # 놓친 영업비밀
+        bin_over = [i for i in range(len(rows)) if pb[i] and not tb[i]]   # 헛경보
+        bin_auto_miss = [i for i in auto if tb[i] and not pb[i]]
         n_src = sum(1 for w in why if w == "출처")
         n_cnf = sum(1 for w in why if w in ("확신", "최상단"))
         blk = {"n": len(rows), "auto_n": len(auto),
@@ -141,13 +170,22 @@ def main(argv: list[str] | None = None) -> int:
                "silent_miss_95_upper": round(wilson_upper(len(miss), len(auto)), 5),
                "by_source": n_src, "by_conf": n_cnf,
                "auto_exact": len(exact), "auto_over": len(over),
+               "binary": {
+                   "acc": round(bin_hit / len(rows), 4),
+                   "missed_secret_n": len(bin_miss),
+                   "missed_secret_rate": round(len(bin_miss) / max(1, sum(tb)), 4),
+                   "false_alarm_n": len(bin_over),
+                   "auto_missed_secret_n": len(bin_auto_miss),
+                   "auto_missed_95_upper": round(wilson_upper(len(bin_auto_miss), len(auto)), 5),
+               },
                "auto_exact_rate": round(len(exact) / len(auto), 4) if auto else None,
                "grade_acc": round(sum(1 for a, b in zip(truth, grade) if a == b) / len(rows), 4),
                "pred_dist": dict(Counter(grade)), "truth_dist": dict(Counter(truth))}
         out[name] = blk
         print(f"{name:16s}{len(rows):>5d}{blk['auto_rate']:>10.1%}{len(miss):>9d}"
               f"{blk['silent_miss_95_upper']:>10.5f}"
-              f"{(blk['auto_exact_rate'] or 0):>9.3f}{len(over):>8d}")
+              f"{(blk['auto_exact_rate'] or 0):>9.3f}{len(over):>8d}"
+              f"{blk['binary']['acc']:>9.3f}{len(bin_miss):>8d}{len(bin_over):>8d}")
         tot["n"] += len(rows); tot["auto"] += len(auto); tot["miss"] += len(miss)
         tot["auto_src"] += n_src; tot["auto_conf"] += n_cnf
         tot["exact"] = tot.get("exact", 0) + len(exact)
