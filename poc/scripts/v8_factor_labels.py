@@ -103,8 +103,29 @@ class DocumentLabel:
         return tuple(x.worst_case() if worst else x.score() for x in f)  # type: ignore[return-value]
 
     def grade(self) -> str:
-        """저술 의도 등급. unknown 은 0 으로 본다(요소가 실제로 없는 문서)."""
+        """**저술 의도 등급.** unknown 을 0 으로 본다 — 데이터를 만들 때 쓰는 값이다.
+
+        ⚠ 서빙에서 사람에게 보여주는 등급으로 쓰면 안 된다. 실측(2026-08-14) 에서
+        요소 진술이 없는 실문서 400건 중 399건이 이 경로로 S3 가 됐다. "모른다" 가
+        "최하등급" 으로 가는 것은 미탐 방향이다. 서빙은 `serving_grade()` 를 쓴다.
+        """
         return grade_from_svm(*self._triple(worst=False))
+
+    def serving_grade(self) -> str:
+        """**서빙 등급.** 확인되지 않은 요소가 있으면 안전측(최악값)으로 채워 제시한다.
+
+        요소가 전부 확정된 문서는 grade() 와 같다. unknown 이 하나라도 있으면 그것을
+        최악으로 보고 등급을 올린다 - 근거 없이 낮춰 부르지 않는다.
+
+        이 값이 사람에게 보이는 등급이고 검수 큐의 정렬 기준이다. 자동확정 여부는
+        `s3_provable()` 과 게이트가 따로 판단하므로, 여기서 등급을 올려도 자동확정이
+        늘지는 않는다(오히려 준다).
+        """
+        return self.grade_worst_case()
+
+    def has_unknown(self) -> bool:
+        """확인되지 않은 요소가 있는가 — 검수 라우팅의 직접 근거."""
+        return any(f.state == UNKNOWN for f in (self.secrecy, self.value, self.management))
 
     def grade_worst_case(self) -> str:
         """unknown 을 최악으로 채웠을 때의 등급. S3 자동확정 판정용."""

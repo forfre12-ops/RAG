@@ -244,6 +244,63 @@ FORMS: list[dict] = [
             ("결론", "closing"),
         ],
     },
+    # ── 이하 4종은 **요소 섹션이 아예 없는** 형태다 ────────────────────────
+    # 실측(2026-08-14) 에서 드러난 결함에 대응한다. 실데이터 400건 중 399건이 S3 로
+    # 떨어졌고 원인은 secrecy=absent 369건이었다. 우리 학습셋은 unknown 문서조차
+    # '자료 성격'·'공유 범위' 같은 **요소 섹션을 갖고 있어서**, 모델이 "요소 얘기가
+    # 나오는 문서" 만 봤다. 실제 업무문서는 기술 내용만 쓰고 요소를 언급하지 않는다.
+    #
+    # 이 형태들은 요소 자리를 두지 않는다. 세 요소가 전부 unknown 이 되고, 모델은
+    # "근거가 없으면 unknown" 을 배워야 한다. 지금은 그 자리에서 absent(=부재가 입증됨)
+    # 라고 단언하는데 그것이 미탐의 뿌리다.
+    {
+        "id": "tech_note",
+        "title": "기술검토 노트",
+        "header": "검토 {date} / 작성 {dept} / 문서 {docnum}",
+        "style": "prose",
+        "sections": [
+            ("검토 배경", "intro"),
+            ("구성 및 수치", "numbers"),
+            ("확인 사항", "observe"),
+            ("후속", "closing"),
+        ],
+    },
+    {
+        "id": "process_sheet",
+        "title": "공정 조건표",
+        "header": "관리번호 {docnum} / 적용 {date} / 담당 {dept}",
+        "style": "table",
+        "sections": [
+            ("적용 대상", "intro"),
+            ("조건값", "numbers"),
+            ("작업 순서", "procedure"),
+            ("예외", "exception"),
+            ("비고", "memo"),
+        ],
+    },
+    {
+        "id": "meeting_brief",
+        "title": "약식 회의 메모",
+        "header": "일시 {date} / 참석 {owners}명",
+        "style": "bullet",
+        "sections": [
+            ("논의", "observe"),
+            ("결정", "closing"),
+        ],
+    },
+    {
+        "id": "field_log",
+        "title": "현장 점검 일지",
+        "header": "점검일 {date} / 점검자 {owners}명 / {dept}",
+        "style": "numbered",
+        "sections": [
+            ("점검 범위", "intro"),
+            ("측정값", "numbers"),
+            ("이상 여부", "observe"),
+            ("조치 절차", "procedure"),
+            ("특이사항", "memo"),
+        ],
+    },
 ]
 
 # 학습에 쓰지 않는 형태. 모델이 한 번도 못 본 형태에서 신뢰도가 유지되는지가 판정 기준이다.
@@ -254,8 +311,14 @@ FORM_HOLDOUT = ("contract_terms", "customer_list")
 FORM_HOLDOUT2 = ("audit_memo", "handover", "incident_report",
                  "budget_plan", "spec_change_log", "risk_review")
 
+# 요소 섹션이 없는 형태. 세 요소가 전부 unknown 이 되며 학습에 쓴다 —
+# "근거가 없으면 unknown" 을 배우게 하는 것이 목적이다.
+FORM_NO_FACTOR = ("tech_note", "process_sheet", "meeting_brief", "field_log")
+
 FORM_BY_ID = {f["id"]: f for f in FORMS}
-TRAIN_FORMS = [f for f in FORMS if f["id"] not in FORM_HOLDOUT + FORM_HOLDOUT2]
+TRAIN_FORMS = [f for f in FORMS
+               if f["id"] not in FORM_HOLDOUT + FORM_HOLDOUT2 + FORM_NO_FACTOR]
+NO_FACTOR_FORMS = [f for f in FORMS if f["id"] in FORM_NO_FACTOR]
 HOLDOUT_FORMS = [f for f in FORMS if f["id"] in FORM_HOLDOUT]
 HOLDOUT2_FORMS = [f for f in FORMS if f["id"] in FORM_HOLDOUT2]
 
@@ -267,12 +330,18 @@ def sanity_check() -> None:
         raise ValueError("form id 중복")
     for f in FORMS:
         kinds = [k for _, k in f["sections"]]
+        if f["id"] in FORM_NO_FACTOR:
+            # 무요소 형태는 요소 자리를 두지 않는 것이 목적이다.
+            if any(k.startswith("factor:") for k in kinds):
+                raise ValueError(f"{f['id']}: 무요소 형태에 요소 섹션이 있다")
+            continue
         for need in ("factor:secrecy", "factor:value", "factor:management"):
             if kinds.count(need) != 1:
                 raise ValueError(f"{f['id']}: {need} 가 정확히 1회 있어야 한다")
     # 요소가 같은 자리에만 오면 형태를 늘린 의미가 없다.
     for need in ("factor:secrecy", "factor:value", "factor:management"):
-        pos = {f["id"]: [k for _, k in f["sections"]].index(need) for f in FORMS}
+        pos = {f["id"]: [k for _, k in f["sections"]].index(need)
+               for f in FORMS if f["id"] not in FORM_NO_FACTOR}
         if len(set(pos.values())) < 3:
             raise ValueError(f"{need} 위치가 {sorted(set(pos.values()))} 뿐이다 - 더 흩어야 한다")
     if not HOLDOUT_FORMS:

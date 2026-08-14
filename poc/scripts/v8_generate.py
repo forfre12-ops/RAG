@@ -26,7 +26,8 @@ _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
 from v8_document_forms import (  # noqa: E402
-    FORM_BY_ID, HOLDOUT2_FORMS, HOLDOUT_FORMS, TRAIN_FORMS, sanity_check,
+    FORM_BY_ID, HOLDOUT2_FORMS, HOLDOUT_FORMS, NO_FACTOR_FORMS, TRAIN_FORMS,
+    sanity_check,
 )
 from v8_factor_labels import (  # noqa: E402
     FACTORS,
@@ -221,6 +222,29 @@ def _build(doc_id: str, form: dict, svm, *,
     }
 
 
+def generate_no_factor(forms: list[dict], *, count: int, split: str) -> list[dict]:
+    """**요소 섹션이 아예 없는** 문서 — 세 요소가 전부 unknown 이다.
+
+    왜(실측 2026-08-14). 요소 모델을 실데이터로 재니 400건 중 399건이 S3 로 떨어졌고
+    원인은 secrecy=absent 369건이었다. 근거가 없는데 "공개되었음이 입증됨" 이라고 단언한다.
+
+    우리 학습셋은 unknown 문서조차 '자료 성격'·'공유 범위' 같은 요소 섹션을 갖고 있어서,
+    모델이 본 것은 전부 "요소 얘기가 나오는 문서" 였다. 실제 업무문서는 기술 내용만 쓰고
+    요소를 언급하지 않는다. 그 유형이 학습에 없으니 모델이 absent 로 답할 수밖에 없었다.
+
+    이 문서들은 요소 자리가 없다. 정답은 세 요소 전부 unknown 이고, 서빙 등급은 보수적
+    완성으로 TS 가 된다 — **모르면 높게 보고 검수로 보낸다.** 자동확정 후보에서는 빠진다.
+    """
+    rows: list[dict] = []
+    for i in range(count):
+        doc_id = f"v8-{split}-nf-{i:04d}"
+        prng = _rng(f"assign-{doc_id}")
+        rows.append(_build(doc_id, prng.choice(forms), (None, None, None),
+                           near_miss=False, idx=i, rot=i,
+                           lineage=prng.choice(LINEAGES)))
+    return rows
+
+
 def generate_unsignaled(forms: list[dict], *, count: int, split: str,
                         pool_split: str = "train") -> list[dict]:
     """S3-무신호형 — 요소 일부 또는 전부가 unknown 인 문서.
@@ -329,6 +353,8 @@ def main() -> int:
     # 형태 6종이 전부 학습·1차판정 어디에도 안 나온 것이고 골격도 더 크게 흔들었다.
     ap.add_argument("--holdout2-per-boundary", type=int, default=0,
                     help="0 이면 2차 판정면 미생성")
+    ap.add_argument("--no-factor", type=int, default=600,
+                    help="요소 섹션이 없는 문서 수 — 실문서 다수가 이 모습이다")
     ap.add_argument("--provable", type=int, default=240,
                     help="S3-입증형 보강 건수 — 자동확정 후보의 유일한 근거라 얇으면 안 된다")
     ap.add_argument("--unsignaled", type=int, default=96,
@@ -359,6 +385,8 @@ def main() -> int:
     train = generate(fit_forms, per_boundary=args.per_boundary, split="tr")
     train += generate_unsignaled(fit_forms, count=args.unsignaled, split="tr")
     train += generate_provable_s3(fit_forms, count=args.provable, split="tr")
+    # 요소 섹션이 없는 문서 — "근거 없으면 unknown" 을 배우게 한다(실데이터 진단 대응)
+    train += generate_no_factor(NO_FACTOR_FORMS, count=args.no_factor, split="tr")
     (out / "train.jsonl").write_text(
         "\n".join(json.dumps(r, ensure_ascii=False) for r in train) + "\n", encoding="utf-8")
     print(f"학습 {len(train)}건 (형태 {len(fit_forms)}종 · 경계 {len(adjacent_boundaries())}개)")
