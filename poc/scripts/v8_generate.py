@@ -201,7 +201,15 @@ def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx:
             lab = labels[factor]
             # unknown 은 span 이 없다(스키마 계약). 주제만 언급하는 중립 문장을 넣는다 —
             # 섹션을 비우면 '섹션 부재'가 곧 tell 이 된다.
-            if lab.span and inline:
+            if lab.state == UNKNOWN and rng.random() < 0.6:
+                # [무언급 unknown] 실측 2026-08-14. 지금 unknown 은 "배포와 관련한 사항은
+                # 담당자가 별도로 안내함" 같은 **중립 문구**로 학습된다. 그런데 실문서
+                # (M&A 실사 보고서 등)에는 중립 문구조차 없다 — 내용만 있다. 모델은
+                # "중립 문구 = unknown" 을 배웠으므로 그 문구가 없으면 unknown 을 못 내고
+                # absent 로 답한다. 그것이 곱셈 규칙에서 등급을 무너뜨린다.
+                # 그래서 unknown 의 60% 는 요소 섹션에 **아무 언급도 없이** 내용만 넣는다.
+                body = " ".join(rng.sample(CONTENT, k=min(2 + verbosity, len(CONTENT))))
+            elif lab.span and inline:
                 # [삽입형] 실문서는 요소를 별도 문장으로 쓰지 않고 내용 문장 안에 짧게
                 # 끼워 넣는다("… 모델 (외부 미공개)"). 경화42 고등급 26건을 100%
                 # 과소분류한 원인이 이 형태를 학습에서 못 봤기 때문이다.

@@ -91,12 +91,20 @@ def main(argv: list[str] | None = None) -> int:
 
         preds, probs = predict(model, tok, texts, "cuda", args.max_len, args.batch,
                                want_probs=True)
+        # [규칙 선택] grade() 는 unknown 을 0 으로 본다 — 데이터 만들 때 쓰는 값이다.
+        # 서빙에서 사람에게 보이는 등급은 serving_grade() 이고 unknown 을 최악으로 채운다.
+        # 실측 2026-08-14: 무언급 unknown 학습으로 unknown 이 18->28 로 늘었는데 grade()
+        # 로 재니 등급이 그대로였다. 규칙을 잘못 쓰면 개선이 안 보인다.
         pred = [grade_from_svm(*[cls_to_score(c) for c in c3]) for c3 in preds]
+        pred_serving = [grade_from_svm(*[cls_to_worst(c) for c in c3]) for c3 in preds]
 
         hi = [i for i, g in enumerate(truth) if g in ("TS", "S1")]
         under = [i for i in hi if ORDER[pred[i]] > ORDER[truth[i]]]
         to_s3 = [i for i in hi if pred[i] == "S3"]
         acc = sum(1 for a, b in zip(truth, pred) if a == b) / len(rows)
+        # 서빙 규칙 기준 — 이것이 실제 운영에서 사람이 보는 등급이다
+        under_s = [i for i in hi if ORDER[pred_serving[i]] > ORDER[truth[i]]]
+        acc_s = sum(1 for a, b in zip(truth, pred_serving) if a == b) / len(rows)
 
         # 자동확정 게이트를 태웠을 때 — 실문서에서 무음 미탐이 나오는가
         auto = []
@@ -117,6 +125,12 @@ def main(argv: list[str] | None = None) -> int:
             "high_n": len(hi),
             "under_rate": round(len(under) / len(hi), 4) if hi else None,
             "high_to_s3": len(to_s3),
+            "serving": {
+                "grade_acc": round(acc_s, 4),
+                "under_rate": round(len(under_s) / len(hi), 4) if hi else None,
+                "high_to_s3": len([i for i in hi if pred_serving[i] == "S3"]),
+                "pred_dist": dict(Counter(pred_serving)),
+            },
             "factor_pred_dist": {
                 f: dict(Counter(NM[c[k]] for c in preds)) for k, f in enumerate(FACTORS)
             },
@@ -129,8 +143,10 @@ def main(argv: list[str] | None = None) -> int:
         }
         out[name] = blk
         print(f"\n=== {name} (n={blk['n']})")
-        print(f"  등급 일치 {blk['grade_acc']:.4f} · 고등급 {blk['high_n']}건 중 과소분류 "
-              f"{blk['under_rate']} · S3 추락 {blk['high_to_s3']}")
+        sv = blk["serving"]
+        print(f"  [저술규칙] 등급일치 {blk['grade_acc']:.4f} · 과소분류 {blk['under_rate']} · S3추락 {blk['high_to_s3']}")
+        print(f"  [서빙규칙] 등급일치 {sv['grade_acc']:.4f} · 과소분류 {sv['under_rate']} · S3추락 {sv['high_to_s3']}")
+        print(f"             예측 {sv['pred_dist']}")
         print(f"  정답 {blk['truth_dist']}")
         print(f"  예측 {blk['pred_dist']}")
         for f in FACTORS:
