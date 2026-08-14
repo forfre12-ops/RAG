@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--limit", type=int, default=0, help="0 이면 전체")
     ap.add_argument("--report", default="reports/V8_REAL_PROBE.json")
+    ap.add_argument("--unseal", action="store_true",
+                    help="봉인한 business_sealed 를 연다. 개선 종료 판정 때 한 번만")
     args = ap.parse_args(argv)
 
     import torch
@@ -75,13 +77,23 @@ def main(argv: list[str] | None = None) -> int:
 
     # 출처별로 갈라 만든 실문서 판정면(v8_real_surface.py). 섞으면 수치가 어디서 왔는지
     # 알 수 없다 — 판례는 우리 루브릭으로 S3 가 정답이라 모델이 S3 라 해도 맞다.
+    # [봉인] 2026-08-14. business 136건 전체를 진단에 썼다(과소분류 52건 중 secrecy=absent
+    # 가 45건이라는 결론이 거기서 나왔고, 그 결론으로 학습 데이터를 고쳤다). 그 순간 이
+    # 면은 판정면이 아니게 된다. 문서 해시로 절반을 갈라 work 만 회차마다 보고 sealed 는
+    # 개선이 끝났다고 판단할 때 한 번만 연다.
+    #
+    #     business_work    72건 · 고등급 55   회차용. 이미 소비됐다
+    #     business_sealed  64건 · 고등급 40   봉인. --unseal 없이는 열리지 않는다
     sets = [
-        ("business(주판정면)", "datasets/v8_real/business.jsonl"),
+        ("business_work(회차)", "datasets/v8_real/business_work.jsonl"),
         ("finance", "datasets/v8_real/finance.jsonl"),
         ("court", "datasets/v8_real/court.jsonl"),
         ("경화42(이전기준)", "datasets/gold_real/holdout_eval.hardened.jsonl"),
     ]
-    out: dict = {"model": args.model}
+    if args.unseal:
+        sets.insert(1, ("business_sealed(봉인해제)", "datasets/v8_real/business_sealed.jsonl"))
+        print("⚠ 봉인을 열었다. 이 결과를 보고 학습 데이터를 고치면 이 면도 소비된다.")
+    out: dict = {"model": args.model, "unsealed": args.unseal}
     for name, path in sets:
         p = Path(path)
         if not p.exists():

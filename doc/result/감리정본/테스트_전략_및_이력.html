@@ -329,7 +329,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="card card-dark">
         <div class="card-label">현 배포 모델</div>
         <div class="card-value sm">v-fe4b386b</div>
-        <div class="card-desc">KF-DeBERTa v5_clean · .env 배포 포인터 (hardened holdout F1 0.917 · 공개문서 과분류 0.79→0.04 · high→S3 0 · 승격 2026-07-29). 직전/롤백 = v4_clean/v-dd3abab9.</div>
+        <div class="card-desc">KF-DeBERTa v5_clean · .env 배포 포인터 (hardened holdout F1 0.917 · 공개 판례 과분류 0.79→0.04 · high→S3 0 · 승격 2026-07-29). 직전/롤백 = v4_clean/v-dd3abab9.</div>
       </div>
       <div class="card card-muted">
         <div class="card-label">검증 피라미드</div>
@@ -429,7 +429,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
               <div class="flow-card real-step">
                 <div class="flow-step-name">⑦ KF-DeBERTa 추론 <span class="tag real">진짜</span></div>
                 <div class="flow-step-lib">kakaobank/kf-deberta-base fine-tuned · 110M params · p50 ~10ms</div>
-                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값(기본 0.7) 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 단 confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮아(골든500 AUROC 0.58), <b>자동확정은 confidence 임계 단독이 아니라 다단 게이트로 결정</b>한다 — 추가로 <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON, 단일 약한 키워드만으로 conf=1.0이 되는 자동확정 차단)와 <b>합의 게이트</b>(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도, 자동확정은 예측이 공개등급 S3이거나 룰등급==모델등급일 때만 허용·그 외 불일치는 사람 검수)로 제한한다. 현 배포 v-fe4b386b(v5_clean): hardened holdout(n=42) F1_macro=0.917 · high→S3 위험미탐 0 · 공개문서(n=400) 과분류 0.04(v4 0.79). 직전 배포본 v4_clean(v-dd3abab9)의 프록시 홀드아웃109 서빙 F1_macro=0.686 · 방향성 FNR=0.018 · FNR_TS=0.000은 §10.1(v4 기준).</div>
+                <div class="flow-step-desc">청크별 softmax 집계(고등급 TS·S1은 <b>max-pooling</b> — 한 청크의 비밀이 평균에 희석되지 않게) + <b>서빙 보정(temperature)·FNR-safe override·most-severe 집계</b> → 문서 등급. 공개 출처는 <b>비공지성 게이트로 S3 cap</b>. confidence &lt; 임계값(기본 0.7) 또는 출처 cap이 고등급을 덮을 때(cap-conflict) 검수자 큐 배분. 단 confidence는 분류기가 학습한 신뢰도가 아니라 softmax 파생값이라 OOD에서 과신하고 정답/오답 판별력이 낮아(골든500 AUROC 0.58), <b>자동확정은 confidence 임계 단독이 아니라 다단 게이트로 결정</b>한다 — 추가로 <b>희소근거 게이트</b>(<code>rule_fallback_min_evidence=0.9</code>, 룰-폴백 기본 ON, 단일 약한 키워드만으로 conf=1.0이 되는 자동확정 차단)와 <b>합의 게이트</b>(<code>agreement_gate_enabled</code>, base 기본 OFF·운영 프로파일 별도, 자동확정은 예측이 공개등급 S3이거나 룰등급==모델등급일 때만 허용·그 외 불일치는 사람 검수)로 제한한다. 현 배포 v-fe4b386b(v5_clean): hardened holdout(n=42) F1_macro=0.917 · high→S3 위험미탐 0 · 공개 판례(n=400) 과분류 0.04(v4 0.79). 직전 배포본 v4_clean(v-dd3abab9)의 프록시 홀드아웃109 서빙 F1_macro=0.686 · 방향성 FNR=0.018 · FNR_TS=0.000은 §10.1(v4 기준).</div>
               </div>
             </div>
 
@@ -731,7 +731,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p class="h2-sub">동일 모델·홀드아웃이라도 원시 argmax와 실배포 서빙경로의 안전성이 크게 다릅니다. 운영점(C-esc/C-eval/B1)을 실측해 확정했습니다.</p>
 
       <h3>10.0 모델 선정 — KF-DeBERTa (현행 배포 v5_clean/v-fe4b386b · 직전/롤백 v4_clean/v-dd3abab9 · .env 포인터 정합)</h3>
-      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 직전 배포본 v4_clean의 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,591건(train 2,071 + val 259 + test 261). 직전 v4_clean의 프록시 holdout 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b>. 현행 배포 <b>v5_clean/v-fe4b386b</b>(2026-07-29 승격): hardened holdout(n=42) F1_macro <b>0.917</b> · high→S3 위험미탐 <b>0</b> · 공개문서(n=400) 과분류 <b>0.04</b>(v4 0.79) · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
+      <p style="font-size:13px;">선정 모델: <b>KF-DeBERTa</b>(kakaobank/kf-deberta-base, 110M). 직전 배포본 v4_clean의 법률 정제 학습셋 <code>labeled_clean_nolegal</code>은 2,591건(train 2,071 + val 259 + test 261). 직전 v4_clean의 프록시 holdout 109건 서빙경로 성능: F1_macro <b>0.686</b> · 방향성 FNR <b>0.018</b> · Acc <b>0.706</b> · FNR_TS <b>0.000</b>. 현행 배포 <b>v5_clean/v-fe4b386b</b>(2026-07-29 승격): hardened holdout(n=42) F1_macro <b>0.917</b> · high→S3 위험미탐 <b>0</b> · 공개 판례(n=400) 과분류 <b>0.04</b>(v4 0.79) · 추론 p50 ~10ms(CPU 싱글문서). LLM(합성·설명·라벨)은 Qwen3-14B(vLLM)·Anthropic/OpenAI 선택 가능.</p>
 
       <div class="callout warn">
         <span class="callout-icon">⚠</span>
@@ -755,7 +755,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <p style="font-size:12.5px;color:var(--text-soft);">참고: OSS 공개데이터 학습(v12, 2026-05-31) KF-DeBERTa F1 <b>0.848</b>은 <b>정제 전 벤치마크 수치</b>(법률 오염 전)입니다. 직전 배포본 v4_clean의 서빙경로 F1은 0.686(홀드아웃 109); 현행 배포 v5_clean은 hardened holdout(n=42) F1 <b>0.917</b>.</p>
 
       <h3>10.1 평가↔서빙 갭 — 서빙경로 평가(C-eval)</h3>
-      <p style="font-size:13px;">측정(직전 배포본 v4 기준): KF-DeBERTa <code>classifier_p1_retrain_v4_clean/v-dd3abab9</code>(정제 모델 — §10.0 버전 이력 주의), 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43). <code>evaluate_via_serving</code>로 실배포 경로 전체(보정+FNR-safe override+most-severe 집계)를 통과해 측정 → 평가=배포 동작 일치를 보장. (현행 배포 v5_clean/v-fe4b386b는 이 109 프록시셋에서 v4와 동급 — acc 0.706≈0.697·high→S3 13=13 — 이 셋에선 우위 주장 안 함; v5 개선은 hardened n=42·공개문서 n=400에서 측정.)</p>
+      <p style="font-size:13px;">측정(직전 배포본 v4 기준): KF-DeBERTa <code>classifier_p1_retrain_v4_clean/v-dd3abab9</code>(정제 모델 — §10.0 버전 이력 주의), 홀드아웃 109건(TS 17·S1 19·S2 30·S3 43). <code>evaluate_via_serving</code>로 실배포 경로 전체(보정+FNR-safe override+most-severe 집계)를 통과해 측정 → 평가=배포 동작 일치를 보장. (현행 배포 v5_clean/v-fe4b386b는 이 109 프록시셋에서 v4와 동급 — acc 0.706≈0.697·high→S3 13=13 — 이 셋에선 우위 주장 안 함; v5 개선은 hardened n=42·공개 판례 n=400에서 측정.)</p>
       <div class="tbl-wrap">
         <table>
           <thead>
@@ -1258,7 +1258,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="callout info">
         <span class="callout-icon">🔁</span>
         <div class="callout-body">
-          <b>현행 배포 모델: v5_clean/v-fe4b386b</b>(2026-07-29 승격·gate_p1_candidate 3축 PASS·커밋 f5316df) — hardened holdout(n=42) F1 0.917 · 공개문서(n=400) 과분류 0.79→0.04 · high→S3 위험미탐 0. <b>직전/롤백 = v4_clean/v-dd3abab9</b>: 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,591건</b>으로 재학습, 서빙 F1 0.686/FNR 0.018(홀드아웃 109)을 낸 주체입니다(§10.4). step3/v-f9b5cedb(아래 표 14,461건)는 정제 전 비교 기준(baseline)입니다.
+          <b>현행 배포 모델: v5_clean/v-fe4b386b</b>(2026-07-29 승격·gate_p1_candidate 3축 PASS·커밋 f5316df) — hardened holdout(n=42) F1 0.917 · 공개 판례(n=400) 과분류 0.79→0.04 · high→S3 위험미탐 0. <b>직전/롤백 = v4_clean/v-dd3abab9</b>: 법률코퍼스 오염 정제 후 <code>labeled_clean_nolegal</code> <b>2,591건</b>으로 재학습, 서빙 F1 0.686/FNR 0.018(홀드아웃 109)을 낸 주체입니다(§10.4). step3/v-f9b5cedb(아래 표 14,461건)는 정제 전 비교 기준(baseline)입니다.
         </div>
       </div>
 

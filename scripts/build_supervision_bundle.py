@@ -317,7 +317,7 @@ def build(src_release: str, release_id: str, purpose: str, attach: list[str] | N
         "source_of_truth": "doc/result/감리정본/",
         "id_authority": "doc/docs_registry.yaml",
         "inherited_from": src_release,
-        "prepared_by": "로이드케이(수행사)",
+        "prepared_by": "한국지식재산보호원(수행사)",
         "counts": {
             "formal_deliverables": formal_count,
             "formal_html": html_formal,

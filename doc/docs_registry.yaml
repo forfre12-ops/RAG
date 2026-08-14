@@ -1,8 +1,8 @@
 schema_version: 1
-updated_at: 2026-07-25
+updated_at: 2026-08-13
 
 policy:
-  active_public_root: doc/result/open
+  active_public_root: doc/result/감리정본
   internal_root: doc/internal
   archive_root: doc/archive
   release_root: doc/releases
@@ -139,10 +139,13 @@ documents:
 
   - id: DOC-EVAL-002
     title: golden500 분류근거 보고서
-    path: doc/result/감리정본/golden500_분류근거_보고서.html
+    # [2026-08-13] 정본 경로에 실체가 없었다 — 원본은 e1a90bc1(2026-08-02)에서 doc/result/open/ 과
+    # 함께 내려갔고 22726467 경로 일괄치환 때 등재만 감리정본/ 으로 따라왔다. 후속 산출물은
+    # DOC-EVAL-001(golden100)·DOC-EVAL-004/005(v5·v4 카드형)이다. ID 는 참조 보존을 위해 남긴다.
+    path: doc/releases/2026-07-감리/참고자료/golden500_분류근거_보고서.html
     owner: data
     audience: customer
-    status: current
+    status: superseded
     version: 2026-07-pilot
 
   - id: DOC-EVAL-004
@@ -513,3 +516,35 @@ documents:
     audience: customer
     status: released
     version: 2026-07-week3
+
+  - id: DOC-WEEKLY-004
+    title: 7월 4주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 4주 - 260724.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week4
+
+  - id: DOC-WEEKLY-005
+    title: 7월 5주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 7월 5주 - 260731.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-07-week5
+
+  - id: DOC-WEEKLY-006
+    title: 8월 1주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 8월 1주 - 260807.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-08-week1
+
+  - id: DOC-WEEKLY-007
+    title: 8월 2주 주간보고
+    path: doc/result/감리정본/-주간보고- 지재원 AI 영업비밀관리시스템 - 8월 2주 - 260814.docx
+    owner: pm
+    audience: customer
+    status: released
+    version: 2026-08-week2

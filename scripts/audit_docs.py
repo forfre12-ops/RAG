@@ -17,7 +17,9 @@ DOC = ROOT / "doc"
 REGISTRY = DOC / "docs_registry.yaml"
 
 ACTIVE_DIRS = (
-    DOC / "result" / "open",
+    # [2026-08-13] 정본 이전(22726467) 이후에도 삭제된 doc/result/open 을 스캔하고 있어
+    # 감리정본 59파일 전체가 검사 사각지대였다 — 등록부 누락이 경고 없이 쌓였다.
+    DOC / "result" / "감리정본",
     DOC / "internal",
 )
 

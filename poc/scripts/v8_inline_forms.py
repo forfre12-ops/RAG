@@ -55,6 +55,23 @@ INLINE: dict[str, dict] = {
             ("tail", "는 어디에도 배포되지 않았다"), ("clause", "외부 노출 없음"),
             ("tail", "는 외부 문의에 회신한 적이 없다"),
             ("clause", "대외 언급 이력 없음"),
+            # ── 이하 12종은 **간접 신호**다(실측 2026-08-14).
+            # business 판정면 고등급 95건의 비공개 신호를 세어 보니 우리가 쓰던 명시적
+            # 부정("공개한 적 없다")은 20.0% 뿐이고, 독자성 53.7% · 유출위험 42.1% ·
+            # 기밀표시 30.5% 가 더 흔했다. 실문서는 "공개 안 했다" 고 쓰지 않고
+            # "독자 개발" · "운영 기밀" · "유출 시 위험" 으로 쓴다.
+            # 우리 학습셋이 20% 만 커버하는 형태였고, 그래서 secrecy 가 45건을
+            # absent 로 단언해 과소분류 52건 중 86.5% 를 만들었다.
+            ("paren", "(독자 개발분)"), ("paren", "(자사 고유 기술)"),
+            ("tail", "는 자체 개발한 고유 방식이다"),
+            ("clause", "타사 공개 자료에 없는 조건"),
+            ("paren", "(운영 기밀)"), ("paren", "(사내 한정)"),
+            ("tail", "는 사내 취급 한정 자료다"),
+            ("clause", "내부 취급 문서"),
+            ("tail", "가 유출되면 경쟁사가 즉시 추격한다"),
+            ("clause", "유출 시 기술 우위 상실"),
+            ("paren", "(경쟁사 미보유)"),
+            ("tail", "는 경쟁사가 확보하지 못한 영역이다"),
         ],
     },
     "value": {
@@ -117,7 +134,9 @@ INLINE: dict[str, dict] = {
     },
 }
 
-SPLIT_TRAIN = 6   # 앞 6개 학습 · 나머지 6개를 보정·1차판정·2차판정이 2개씩 나눈다
+# 앞 SPLIT_TRAIN 개가 학습. 나머지를 보정·1차판정·2차판정이 나눠 갖는다.
+# secrecy lv2 만 24종(간접 신호 12종 추가)이라 학습 몫을 비율로 잡는다.
+SPLIT_TRAIN = 6
 
 
 def inline_for(factor: str, state: str, level: int | None,
@@ -126,10 +145,12 @@ def inline_for(factor: str, state: str, level: int | None,
     if state == "unknown" or key is None:
         return []
     pool = INLINE[factor][key]
+    # 풀이 큰 경우(간접 신호를 더한 secrecy lv2)에도 학습이 절반을 갖도록 비율로 자른다.
+    cut = max(SPLIT_TRAIN, len(pool) // 2)
     if split == "train":
-        return list(pool[:SPLIT_TRAIN])
+        return list(pool[:cut])
     if split in ("calib", "holdout", "holdout2"):
-        rest = pool[SPLIT_TRAIN:]
+        rest = pool[cut:]
         # 보정·1차판정·2차판정이 같은 삽입형을 쓰면 판정면이 오염된다. 셋으로 나눈다.
         i = {"calib": 0, "holdout": 1, "holdout2": 2}[split]
         return [x for j, x in enumerate(rest) if j % 3 == i]

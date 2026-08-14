@@ -176,7 +176,7 @@ footer .stack{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
 
   <!-- ★ 실측 베이스라인 -->
   <div class="band"><div class="bt">★ 실측 베이스라인 — 현재 분류기(무재학습·CPU) · 누출제거 holdout · 잠정</div>
-  <p>현행 배포 분류기 <code>v-fe4b386b</code>(v5_clean · 2026-07-29 승격, gate_p1_candidate 3축 PASS)를 <b>실서빙 경로</b>(<code>evaluate_via_serving</code> — 온도보정·청크 most-severe·룰·FNR-safe override 포함, 원시 argmax 아님)로 누출제거 holdout(eval 42 · business 35)에 측정한 v5 실값: <b>hardened(n=42) F1_macro 0.917 · S1 recall 0.857 · high→S3 위험미탐 0</b>, clean(n=42) acc <b>0.929</b>(TS 11/11), 공개문서(n=400) 과분류율 <b>0.79→0.04</b>. <b>아래 상세표는 직전 배포본·롤백 타깃 v4</b>(<code>v-dd3abab9</code>) 동일 holdout 서빙 측정치(동일셋 F1 0.688 · S1 recall 0.429)로 v5 대비용 참고다. 운영 정확도 보증이 아니라 상대비교·메커니즘 검증이며, 자동확정이 아닌 검수 라우팅 전제다.</p>
+  <p>현행 배포 분류기 <code>v-fe4b386b</code>(v5_clean · 2026-07-29 승격, gate_p1_candidate 3축 PASS)를 <b>실서빙 경로</b>(<code>evaluate_via_serving</code> — 온도보정·청크 most-severe·룰·FNR-safe override 포함, 원시 argmax 아님)로 누출제거 holdout(eval 42 · business 35)에 측정한 v5 실값: <b>hardened(n=42) F1_macro 0.917 · S1 recall 0.857 · high→S3 위험미탐 0</b>, clean(n=42) acc <b>0.929</b>(TS 11/11), 공개 판례(n=400) 과분류율 <b>0.79→0.04</b>. <b>아래 상세표는 직전 배포본·롤백 타깃 v4</b>(<code>v-dd3abab9</code>) 동일 holdout 서빙 측정치(동일셋 F1 0.688 · S1 recall 0.429)로 v5 대비용 참고다. 운영 정확도 보증이 아니라 상대비교·메커니즘 검증이며, 자동확정이 아닌 검수 라우팅 전제다.</p>
   <div class="tbl-wrap"><table>
     <thead><tr><th style="width:20%;">설정</th><th>FNR_TS</th><th>FNR_S1</th><th>방향성 FNR</th><th>F1</th><th>Acc</th></tr></thead>
     <tbody>

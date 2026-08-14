@@ -174,6 +174,22 @@ def main(argv: list[str] | None = None) -> int:
     # 취급한다 - 1차 목표가 미탐 최소화인데 학습이 그것을 모른다.
     parser.add_argument("--under-penalty", type=float, default=0.0,
                         help="미탐 방향 벌점 계수. 0 이면 기존 CrossEntropy 그대로")
+    # [벌점을 어느 규칙으로 잴 것인가] 실측 2026-08-14: business 판정면 과소분류 52건 중
+    # **45건(86.5%)이 secrecy=absent** 한 상태에서 나왔다. value 는 lv2 를 88건 맞히고
+    # management 도 72건 맞히는데 secrecy 만 47건을 absent 로 단언한다.
+    #
+    # 왜 그런가. under_penalty 가 cls_to_score 를 쓰는데 그 표에서 **unknown 도 0** 이다.
+    # 즉 "모른다" 를 "공개됐음이 입증됨" 과 똑같이 벌한다. 유보에 아무 이득이 없으니
+    # 모델은 확신 없이도 absent 를 고른다.
+    #
+    # 그런데 사람에게 보이는 등급은 serving_grade() 가 만들고 거기서 unknown 은 최악값
+    # 으로 채워진다 — 유보는 미탐을 만들지 않는다. 미탐을 만드는 것은 absent 단언뿐이다.
+    # 손실은 **실제로 사람이 보는 등급을 만드는 규칙**으로 재야 한다.
+    #
+    #     정답 lv2 · 예측 unknown   저술 gap 2 (벌점)  서빙 gap 0 (무해)   ← 유보. 검수로 감
+    #     정답 lv2 · 예측 absent    저술 gap 2 (벌점)  서빙 gap 2 (미탐)   ← 단언. 무음 통과
+    parser.add_argument("--penalty-rule", default="serving", choices=("serving", "authoring"),
+                        help="벌점 산정 규칙. serving 이면 unknown 유보에 벌점이 없다")
     parser.add_argument("--out", default="artifacts/factor_model/v1")
     args = parser.parse_args(argv)
 
@@ -237,7 +253,8 @@ def main(argv: list[str] | None = None) -> int:
     lossf = torch.nn.CrossEntropyLoss()
 
     # 클래스 -> 등급 점수. 이 순서로 "낮게 봄" 을 정의한다(unknown 은 등급 산출에서 0 점).
-    _score = torch.tensor([float(cls_to_score(c)) for c in range(args.classes)],
+    _cls_fn = cls_to_worst if args.penalty_rule == "serving" else cls_to_score
+    _score = torch.tensor([float(_cls_fn(c)) for c in range(args.classes)],
                           device=device)
 
     def under_penalty(logits, target):
@@ -245,6 +262,9 @@ def main(argv: list[str] | None = None) -> int:
 
         sum_j p_j * max(0, score(y) - score(j)) 이며 미분 가능하다. 과분류(높게 봄)에는
         벌점이 없다 - 안전 방향이라 억제할 이유가 없다.
+
+        점수표는 --penalty-rule 이 고른다. 기본 serving 에서는 unknown 이 최악값이라
+        유보에 벌점이 붙지 않는다 - 모르는 것을 모른다고 말할 길이 열린다.
         """
         p = torch.softmax(logits, dim=-1)
         gap = (_score[target].unsqueeze(1) - _score.unsqueeze(0)).clamp(min=0)

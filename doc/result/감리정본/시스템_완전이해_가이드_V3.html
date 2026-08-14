@@ -452,7 +452,7 @@ footer strong{color:var(--text-dim);}
     <li>등급 = <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈 — 한 요건이라도 0이면 공개(S3).</li>
     <li>문서 업로드 → <strong>2~3초 → 등급 + 판단 근거</strong> 반환.</li>
     <li>"영업비밀"이란 단어가 없어도 <strong>내용의 의미를 보고 판단</strong>합니다.</li>
-    <li>현행 모델 KF-DeBERTa <strong>v5(v-fe4b386b) — hardened holdout(누출0) F1 0.917 · 공개문서 과분류 0.79→0.04 · 위험미탐 0</strong> (2026-07-29 승격). ※ 홀드아웃 109건의 F1 0.686·FNR 0.018은 직전 배포본 v4(v-dd3abab9)·학습본 42% 누출 참고치.</li>
+    <li>현행 모델 KF-DeBERTa <strong>v5(v-fe4b386b) — hardened holdout(누출0) F1 0.917 · 공개 판례 과분류 0.79→0.04 · 위험미탐 0</strong> (2026-07-29 승격). ※ 홀드아웃 109건의 F1 0.686·FNR 0.018은 직전 배포본 v4(v-dd3abab9)·학습본 42% 누출 참고치.</li>
     <li>AI가 틀리면 사람이 수정 — <strong>정정은 진단·교정 데이터로 축적</strong>되며, 재학습 반영 방식은 미확정(A 무반출 기본 / B 온사이트 / C 문서반출 — <a href="시스템_역할_배포_DB구조_확인안.html#confirm">확인안 §6</a>)이고 모델은 상시 재학습하지 않습니다(지재원 자기 골든셋 1차학습 + 드리프트 트리거 단발).</li>
     <li>인터넷 없는 폐쇄망에서도 <strong>로컬 AI 모델로 완전 동작</strong>합니다.</li>
     <li>모든 분류 요청이 <strong>감사 로그에 기록</strong>됩니다.</li>
@@ -849,7 +849,7 @@ footer strong{color:var(--text-dim);}
   <div class="kpi-card">
     <div class="kpi-label">🎯 분류 F1 (hardened holdout · 현행 v5)</div>
     <div class="kpi-value pass">0.917</div>
-    <div class="kpi-sub">핵심 요건 · KF-DeBERTa v-fe4b386b(v5_clean · 2026-07-29 승격) — hardened holdout(누출0·n=42) F1 0.917 · 공개문서 과분류 0.79→0.04 · high→S3 위험미탐 0. 직전 배포본 v4(v-dd3abab9)는 홀드아웃 109(학습본 42% 누출·참고용, 이 셋에선 v5≈v4) F1 0.686 · clean F1≈0.78(백서 v7)</div>
+    <div class="kpi-sub">핵심 요건 · KF-DeBERTa v-fe4b386b(v5_clean · 2026-07-29 승격) — hardened holdout(누출0·n=42) F1 0.917 · 공개 판례 과분류 0.79→0.04 · high→S3 위험미탐 0. 직전 배포본 v4(v-dd3abab9)는 홀드아웃 109(학습본 42% 누출·참고용, 이 셋에선 v5≈v4) F1 0.686 · clean F1≈0.78(백서 v7)</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">🎯 분류 방향성 미탐율 (서빙경로)</div>
@@ -1287,7 +1287,7 @@ footer strong{color:var(--text-dim);}
   <tr><td>출력</td><td>TS/S1/S2/S3 확률 4개 + 최고 확률 등급</td></tr>
   <tr><td>학습 데이터</td><td>labeled_clean_nolegal 2,591건 (법률 코퍼스 오염 정제본)</td></tr>
   <tr><td>홀드아웃 F1 (서빙경로)</td><td>0.686 · 방향성 FNR 0.018 · FNR_TS 0.000 · Acc 0.706 (109건)</td></tr>
-  <tr><td>⚠ 지표 주의</td><td>위 0.686/0.018 및 누출제거 clean F1≈0.78·정확도 77%·FNR 6.6%(백서 v7)는 <strong>직전 배포본/롤백 타깃 v4(<code>v-dd3abab9</code>)</strong> 측정값(<code>reports/fnr_threshold_sweep</code>·<code>b1_multiplier_sweep_clean</code>)이다. <strong>현행 활성 v5(<code>v-fe4b386b</code>) 헤드라인</strong>은 hardened holdout(n=42) <strong>F1_macro 0.917·high→S3 위험미탐 0·S1 recall 0.857</strong>, clean holdout(n=42) <strong>acc 0.929·TS 11/11</strong>, 공개문서(n=400) <strong>과분류 0.79→0.04</strong>. 단 <strong>홀드아웃 109는 학습본과 본문 42% 중복(누출)</strong>이라 안전성을 과대평가하며 <strong>이 셋에선 v5≈v4(개선 주장 안 함)</strong>. <strong>모든 수치는 합성 골든셋(OOD) 기준 — 운영 locked 확정 전 정식 아님.</strong></td></tr>
+  <tr><td>⚠ 지표 주의</td><td>위 0.686/0.018 및 누출제거 clean F1≈0.78·정확도 77%·FNR 6.6%(백서 v7)는 <strong>직전 배포본/롤백 타깃 v4(<code>v-dd3abab9</code>)</strong> 측정값(<code>reports/fnr_threshold_sweep</code>·<code>b1_multiplier_sweep_clean</code>)이다. <strong>현행 활성 v5(<code>v-fe4b386b</code>) 헤드라인</strong>은 hardened holdout(n=42) <strong>F1_macro 0.917·high→S3 위험미탐 0·S1 recall 0.857</strong>, clean holdout(n=42) <strong>acc 0.929·TS 11/11</strong>, 공개 판례(n=400) <strong>과분류 0.79→0.04</strong>. 단 <strong>홀드아웃 109는 학습본과 본문 42% 중복(누출)</strong>이라 안전성을 과대평가하며 <strong>이 셋에선 v5≈v4(개선 주장 안 함)</strong>. <strong>모든 수치는 합성 골든셋(OOD) 기준 — 운영 locked 확정 전 정식 아님.</strong></td></tr>
   <tr><td>추론 속도</td><td>CPU 싱글 문서 p50 약 10ms</td></tr>
   </tbody>
 </table>

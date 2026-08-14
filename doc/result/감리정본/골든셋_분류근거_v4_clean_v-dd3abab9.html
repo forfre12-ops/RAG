@@ -194,7 +194,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);font-si
       <div class="m"><span class="v">0</span><span class="k">위험 미탐(고→S3) · 독립 hardened holdout(누출0)</span></div>
       <div class="m"><span class="v">395</span><span class="k">과분류(안전 방향) · 미탐보다 과검출</span></div>
     </div>
-    <p>이 보고서는 <b>직전 배포모델(롤백 타깃)</b> v-dd3abab9(v4_clean) 실측이다. 안전(사람서명 고등급 → 공개 유출 <b>0건</b>)은 유지하나, 공개문서를 고등급으로 올리는 <b>과분류가 raw 수준에서 높다</b>(운영 source-prior 게이트가 서빙 시 캡). <b>현행 배포본 v5_clean(v-fe4b386b)</b>은 독립 게이트에서 공개문서 과분류 <b>79%→4%</b> · S1 재현율 <b>0.43→0.86</b>으로 이를 앞서 2026-07-29 배포본으로 승격됐다 — 별도 보고서 <code>골든셋_분류근거_v5_clean_v-fe4b386b.html</code> 참조.</p>
+    <p>이 보고서는 <b>직전 배포모델(롤백 타깃)</b> v-dd3abab9(v4_clean) 실측이다. 안전(사람서명 고등급 → 공개 유출 <b>0건</b>)은 유지하나, 공개문서를 고등급으로 올리는 <b>과분류가 raw 수준에서 높다</b>(운영 source-prior 게이트가 서빙 시 캡). <b>현행 배포본 v5_clean(v-fe4b386b)</b>은 독립 게이트에서 공개 판례 과분류 <b>79%→4%</b> · S1 재현율 <b>0.43→0.86</b>으로 이를 앞서 2026-07-29 배포본으로 승격됐다 — 별도 보고서 <code>골든셋_분류근거_v5_clean_v-fe4b386b.html</code> 참조.</p>
   </div>
   <div class="stats-bar">
     <div class="stat-card hero"><div class="num">0</div><div class="lbl">진짜 위험 미탐(사람서명 고→S3)</div></div>
@@ -205,7 +205,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);font-si
     <div class="stat-card"><div class="num">0</div><div class="lbl">사람 서명 실평가정답(구조적 천장)</div></div>
   </div>
   <div class="banner"><h2>■ 방법론 및 해석 주의 (정직성)</h2><ul>
-    <li class="warn">⚠ '최종==골든 380/777(49%)'는 <b>정확도 지표가 아니다</b>: 골든의 상당수가 v5 학습에 포함(train-on-test)되고, 사람서명 실평가정답은 <b>0건</b>(구조적 천장 — 지재원엔 실 고등급 비밀·검수자 없음)이다. 진짜 신호는 <b>학습셋 누출 0</b>인 독립 게이트로 본다: 직전 배포모델(v4_clean)은 f1 <b>0.688</b> · S1 <b>0.43</b> · 공개문서 과분류 <b>79%</b>(raw)이며, 현행 배포본 v5_clean이 각각 0.917 · 0.86 · 4%로 앞선다.</li>
+    <li class="warn">⚠ '최종==골든 380/777(49%)'는 <b>정확도 지표가 아니다</b>: 골든의 상당수가 v5 학습에 포함(train-on-test)되고, 사람서명 실평가정답은 <b>0건</b>(구조적 천장 — 지재원엔 실 고등급 비밀·검수자 없음)이다. 진짜 신호는 <b>학습셋 누출 0</b>인 독립 게이트로 본다: 직전 배포모델(v4_clean)은 f1 <b>0.688</b> · S1 <b>0.43</b> · 공개 판례 과분류 <b>79%</b>(raw)이며, 현행 배포본 v5_clean이 각각 0.917 · 0.86 · 4%로 앞선다.</li>
     <li class="warn">⚠ 고→S3 2건은 전부 공개문서(document_origin=public_real, 기계라벨) 교정이며 사람서명 미탐 0 — 안전 실패가 아니라 판례 프록시 정제 효과다.</li>
   </ul></div>
   <div class="legend"><h3>등급 이동 — 골든 라벨 → 모델 최종 분포</h3><div class="shift">
