@@ -487,6 +487,21 @@ class Settings(BaseSettings):
     # 안 함). 메타데이터 신뢰도에 의존하며 오류/부재는 silent 폴백(기존 동작 보존).
     metadata_floor_enabled: bool = False
 
+    # [요소 모델 섀도] v8 S/V/M 요소 모델을 같은 입력에 나란히 돌려 **계량만** 한다.
+    # 등급·상태를 바꾸지 않는다. 배포본은 등급 우선·요소 후행이고 v8 은 요소 우선이라
+    # 두 구조를 바로 합치면 결정이 바뀌는데, 그 전에 두 모델이 얼마나 다른지를 알아야
+    # 한다. 모르고 거부 조건을 걸면 검수량이 얼마나 늘지 예측할 수 없다.
+    # 기본 OFF — 켜면 문서당 추론이 한 번 더 돈다(지연 증가).
+    factor_shadow_enabled: bool = False
+    factor_model_dir: str = ""
+    factor_model_base: str = "kakaobank/kf-deberta-base"
+    factor_model_max_len: int = 768
+    # 하향 단언 문턱(kappa)과 자동확정 문턱(tau). 같은 값으로 두는 것이 일관된다 —
+    # 자동확정도 하향 단언도 "사람 없이 문서를 통과시키는 결정" 이라 같은 증거 기준을
+    # 요구한다. 판정면 곡선을 보고 고른 값이 아니다.
+    factor_tau: float = 0.99
+    factor_kappa: float = 0.99
+
     # [번들-안전게이트] 하드닝 운영(폐쇄망)에서 안전 게이트(agreement_gate·metadata_floor·
     # storage_encryption) 강제 여부. 기본 False(동작 보존·lite-cloud/dev tier). onprem-local·
     # full-train 프로파일이 True로 켠다. True인데 게이트가 하나라도 꺼져 있으면
@@ -1022,6 +1037,9 @@ apply_profile_defaults(settings)
 _SAFETY_GATES: tuple[tuple[str, str], ...] = (
     ("agreement_gate_enabled", "AGREEMENT_GATE_ENABLED"),
     ("metadata_floor_enabled", "METADATA_FLOOR_ENABLED"),
+    # ⚠ factor_shadow_* 는 여기 넣지 않는다. 안전 게이트가 아니다 — 섀도는 등급도
+    #   status 도 바꾸지 않는 **계량 전용**이라 꺼져 있어도 무음 열화가 없다. 이 집합은
+    #   "꺼지면 조용히 위험해지는 것" 만 담고 CI·startup 이 그것을 강제한다.
     ("storage_encryption_enabled", "STORAGE_ENCRYPTION_ENABLED"),
     ("source_prior_enabled", "SOURCE_PRIOR_ENABLED"),
     ("require_real_embedder", "REQUIRE_REAL_EMBEDDER"),

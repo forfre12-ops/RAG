@@ -418,6 +418,58 @@ class ClassifyService:
             except Exception:  # noqa: BLE001 — 적합성 검사 실패가 분류를 막지 않는다
                 pass
 
+            # [요소 모델 섀도] v8 을 같은 입력에 나란히 돌려 **계량만** 한다.
+            # 등급도 status 도 바꾸지 않는다 — 배포본은 등급 우선·요소 후행이고 v8 은
+            # 요소 우선이라 두 구조를 바로 합치면 결정이 바뀐다. 그 전에 두 모델이
+            # 얼마나 다른지를 알아야 하고, 모르고 거부 조건을 걸면 검수량이 얼마나
+            # 늘지 예측할 수 없다.
+            #
+            # 방향이 중요하다 — v8 이 더 높게 보면 v5 미탐 의심(1차 목표에 직결),
+            # 더 낮게 보면 v5 과분류 의심이다. 경고에 그 방향을 남긴다.
+            factor_shadow = None
+            try:
+                from koipa.config import settings as _fs  # noqa: PLC0415
+                if getattr(_fs, "factor_shadow_enabled", False) and getattr(_fs, "factor_model_dir", ""):
+                    from koipa.modules.m5_inference.pipeline import (  # noqa: PLC0415
+                        _source_prior_is_public as _is_pub,
+                    )
+                    from koipa.modules.m5_inference.factor_model import (  # noqa: PLC0415
+                        apply_serving_gate,
+                        get_factor_inference,
+                        shadow_compare,
+                    )
+
+                    _inf = get_factor_inference(
+                        _fs.factor_model_dir,
+                        base=getattr(_fs, "factor_model_base", "kakaobank/kf-deberta-base"),
+                        max_len=int(getattr(_fs, "factor_model_max_len", 768)),
+                    )
+                    _out = _inf.predict(cleaned)
+                    if _out is not None:
+                        _codes, _probs = _out
+                        _pred = apply_serving_gate(
+                            _codes, _probs,
+                            metadata=getattr(req, "metadata", None),
+                            tau=float(getattr(_fs, "factor_tau", 0.99)),
+                            kappa=float(getattr(_fs, "factor_kappa", 0.99)),
+                            source_is_public=_is_pub(
+                                (getattr(req, "metadata", None) or {}).get("source_type")
+                                if isinstance(getattr(req, "metadata", None), dict) else None
+                            ),
+                        )
+                        _v5 = pred.label.value if hasattr(pred.label, "value") else str(pred.label)
+                        factor_shadow = shadow_compare(_v5, _pred)
+                        warnings_acc.append(
+                            "factor-shadow: v8="
+                            + factor_shadow["factor_grade"]
+                            + " vs v5=" + str(_v5)
+                            + " · " + factor_shadow["direction"]
+                            + " · conf=" + str(factor_shadow["min_confidence"])
+                            + " (계량 전용 — 등급·상태 미변경)"
+                        )
+            except Exception:  # noqa: BLE001 — 섀도 실패가 분류를 막지 않는다
+                factor_shadow = None
+
             # [agreement-gate] 등급차등 + 룰·모델 합의 게이트 (opt-in, 기본 off).
             # conf 단독 자동확정은 신뢰성이 측정으로 부정됨(golden500: AUROC 0.58, 자동확정
             # 정밀도 63%, 고등급 미탐 46). 확신을 conf가 아니라 *독립 신호(룰 합의)*에서 얻는다:
