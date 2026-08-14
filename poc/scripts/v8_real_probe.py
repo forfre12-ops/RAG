@@ -71,10 +71,13 @@ def main(argv: list[str] | None = None) -> int:
     model = _build_model(args.base, torch, args.classes).cuda()
     model.load_state_dict(torch.load(Path(args.model) / "model.pt"))
 
+    # 출처별로 갈라 만든 실문서 판정면(v8_real_surface.py). 섞으면 수치가 어디서 왔는지
+    # 알 수 없다 — 판례는 우리 루브릭으로 S3 가 정답이라 모델이 S3 라 해도 맞다.
     sets = [
-        ("특허 프록시", "datasets/patent_proxy/holdout_eval_clean.jsonl"),
-        ("경화42", "datasets/gold_real/holdout_eval.hardened.jsonl"),
-        ("일상 S3", "datasets/mundane_s3/holdout.jsonl"),
+        ("business(주판정면)", "datasets/v8_real/business.jsonl"),
+        ("finance", "datasets/v8_real/finance.jsonl"),
+        ("court", "datasets/v8_real/court.jsonl"),
+        ("경화42(이전기준)", "datasets/gold_real/holdout_eval.hardened.jsonl"),
     ]
     out: dict = {"model": args.model}
     for name, path in sets:
