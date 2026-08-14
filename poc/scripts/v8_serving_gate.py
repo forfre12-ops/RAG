@@ -78,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
     from transformers import AutoTokenizer
 
     from koipa.modules.m3_labeling.rule_engine import grade_from_svm
+    # [관리성 외부 수용] 매핑을 여기서 재구현하지 않는다 - 배포본과 기준이 갈리면 판정이
+    # 무의미해진다(출처 prior 때 같은 이유로 배포본 함수를 그대로 썼다).
+    from koipa.modules.m3_labeling.rule_engine import management_from_metadata_dict
     from train_factor_model import _build_model
     from v8_judge import cls_to_worst, predict
 
@@ -109,6 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         grade: list[str] = []
         auto: list[int] = []
         why: list[str] = []
+        m_from_meta: list[str] = []
         for i in range(len(rows)):
             if is_public(rows[i]):                                   # 1층
                 grade.append("S3"); auto.append(i); why.append("출처"); continue
@@ -126,6 +130,17 @@ def main(argv: list[str] | None = None) -> int:
                 low = DOWNGRADE if args.kappa_lv1 else (CLS_ABSENT,)
                 if c3[k] in low and probs[i][k][c3[k]] < args.kappa:
                     c3[k] = CLS_UNKNOWN
+            # [2.5층 관리성] 관리성은 본문에서 관측되지 않는다(실문서 관리성 어휘
+            # TS 9/33 · S2 1/17). 고객사 시스템이 접근권한을 주면 **그것이 근거**다.
+            # ICD §3.2·§3.3 매핑이 이미 합의돼 있고 배포본에 M 값으로는 구현이 없었다.
+            m_state, m_lv, m_reason = management_from_metadata_dict(rows[i].get("metadata"))
+            if m_state == "present":
+                c3[2] = m_lv
+            elif m_state == "proven_absent":
+                # 전 임직원 열람 -> 관리성 요건 미충족이 입증됨. **하향 경로**이므로
+                # 모델 추정이 아니라 시스템 확인일 때만 받는다(여기서는 정의상 그렇다).
+                c3[2] = CLS_ABSENT
+            m_from_meta.append(m_state)
             g = grade_from_svm(*[cls_to_worst(c) for c in c3])
             grade.append(g)
             settled = all(c != CLS_UNKNOWN for c in c3)               # 3층
@@ -169,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
                "silent_miss_n": len(miss),
                "silent_miss_95_upper": round(wilson_upper(len(miss), len(auto)), 5),
                "by_source": n_src, "by_conf": n_cnf,
+               "management_from_metadata": dict(Counter(m_from_meta)),
                "auto_exact": len(exact), "auto_over": len(over),
                "binary": {
                    "acc": round(bin_hit / len(rows), 4),

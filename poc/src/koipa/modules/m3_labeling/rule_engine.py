@@ -112,6 +112,85 @@ def svm_levels_for_grade(grade: str) -> tuple[int, int, int]:
     return {"TS": (2, 2, 2), "S1": (2, 2, 0), "S2": (1, 1, 1), "S3": (0, 0, 0)}.get(grade, (1, 1, 1))
 
 
+# ── 비밀관리성(M)을 문서 밖에서 받는다 ────────────────────────────────────────
+#
+# 왜. 관리성은 **본문에서 관측되지 않는다.** 실문서 판정면의 업무문서는 중앙값 167~236자
+# 이고 관리성 어휘를 가진 것이 TS 9/33 · S1 2/22 · S2 1/17 뿐이다(실측 2026-08-14).
+# 200자 문서가 자기 접근통제를 진술할 수는 없다. 비공지성을 본문 대신 **출처**로 판정한
+# 것과 같은 자리이고, 관리성의 증거는 **보관 위치와 접근권한**이다.
+#
+# 그리고 그것이 등급에 미치는 영향이 크다. 정본에서 S1 이 나오는 조합은 (2,2,0) 하나뿐
+# 이라 **M 이 0 으로 확정될 때만** S1 이다. 보수적 완성이 미확인 M 을 2 로 채우므로 M 을
+# 못 받으면 S1 은 구조적으로 도달 불가이고, 실문서 판정면의 28%(18/64)가 어떤 모델에서도
+# TS 가 된다 — 4등급 정확도 상한이 0.719 로 막힌다.
+#
+# 매핑은 새로 만드는 것이 아니라 **KL 과 이미 합의된 ICD §3.2·§3.3 을 구현**하는 것이다
+# (`doc/result/감리정본/KL연동_인터페이스_규약서_ICD.html`). 지금 배포본은 그 표를
+# security_marking 에 대해 **등급 floor 로만** 쓰고(pipeline.py metadata-floor) M 값을
+# 만들지 않으며, access_scope 는 경고만 낸다. all_employees 는 처리되지 않는다.
+#
+# ⚠ all_employees -> M=0 은 **하향 경로**다(s=2 v=1 m=0 -> S3). 부정경쟁방지법상 비밀
+#   관리성 요건 미충족이면 영업비밀이 아니므로 법리상 맞다. 그러나 미탐 방향이므로
+#   호출부가 경고를 남기고 검수로 보낼 수 있게 근거(reason)를 함께 돌려준다.
+
+# ICD §3.2 — 보안표시. 문서에 찍힌 공식 등급 표기.
+_ICD_MARKING_TO_M: dict[str, int] = {
+    "top_secret": 2,      # 극비 · 특급기밀 · Top Secret · Eyes-Only
+    "secret": 2,          # 1급 비밀 · 기밀
+    "confidential": 1,    # 대외비
+}
+# ICD §3.3 — 접근범위. 보안표시가 none 일 때 M 을 정하는 주 입력.
+_ICD_SCOPE_TO_M: dict[str, int] = {
+    "approved_only": 2,   # 승인된 자에 한해 공개(물리·시스템 통제)
+    "designated": 1,      # 지정된 접근자만(NDA·열람 제한)
+    "department": 1,      # 특정 부서·임직원 일부
+    "all_employees": 0,   # 전 임직원 열람 가능 -> 관리성 요건 미충족
+}
+
+
+def management_from_metadata(
+    security_marking: object = None,
+    access_scope: object = None,
+) -> tuple[str, int | None, str]:
+    """ICD §3.2·§3.3 의 M 매핑. **이 함수가 유일한 기준이다.**
+
+    반환 `(state, level, reason)`:
+
+        ("present", 2|1, ...)     관리 수준이 확인됐다
+        ("proven_absent", 0, ...) 전 임직원 열람 -> 관리성 요건 미충족이 **입증**됐다
+        ("unknown", None, ...)    메타데이터가 없다 -> 호출부가 보수적으로 채운다
+
+    state 를 3상태로 돌려주는 이유는 `proven_absent` 와 `unknown` 이 등급을 다르게
+    만들기 때문이다. 전자는 곱을 0 으로 만들고(S1 또는 S3), 후자는 보수적 완성에서
+    최악값으로 채워진다. 둘을 뭉치면 S1 이 사라지거나 미탐이 열린다.
+    """
+    mark = str(security_marking or "").strip().lower()
+    scope = str(access_scope or "").strip().lower()
+
+    if mark in _ICD_MARKING_TO_M:
+        lv = _ICD_MARKING_TO_M[mark]
+        return "present", lv, f"icd_3_2_security_marking:{mark}"
+
+    # 표기가 없으면(none 포함) 접근범위가 주 입력이다 — ICD §3.3.
+    if scope in _ICD_SCOPE_TO_M:
+        lv = _ICD_SCOPE_TO_M[scope]
+        if lv == 0:
+            # 하향 경로. 호출부가 이 reason 을 보고 경고·검수 라우팅을 정한다.
+            return "proven_absent", 0, f"icd_3_3_access_scope:{scope}"
+        return "present", lv, f"icd_3_3_access_scope:{scope}"
+
+    return "unknown", None, "icd_no_management_metadata"
+
+
+def management_from_metadata_dict(metadata: object) -> tuple[str, int | None, str]:
+    """classify 요청의 metadata dict 에서 바로 뽑는 편의 함수."""
+    if not isinstance(metadata, dict):
+        return "unknown", None, "icd_no_management_metadata"
+    return management_from_metadata(
+        metadata.get("security_marking"), metadata.get("access_scope")
+    )
+
+
 @dataclass
 class MatchedKeyword:
     keyword: str

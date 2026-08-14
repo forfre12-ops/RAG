@@ -80,6 +80,11 @@ _S2_STRONG_RISK_RE = re.compile(
 )
 
 
+from koipa.modules.m3_labeling.rule_engine import (  # noqa: E402
+    management_from_metadata_dict as _management_from_metadata_dict,
+)
+
+
 def _source_prior_is_public(src: object) -> bool:
     text = str(src or "").strip().lower()
     if not text:
@@ -773,6 +778,38 @@ class InferencePipeline:
                     if _ORD.get(cur, 99) > _ORD[low_thr]:
                         result.warnings = list(result.warnings) + [
                             f"metadata-access-conflict: access_scope={scope}(제한 접근)인데 예측 {cur} → 검수 라우팅 (ICD §4.4)"
+                        ]
+
+                # [관리성 요소값] ICD §3.2·§3.3 은 M 매핑을 규정하는데 지금까지 배포본은
+                # 그것을 **등급 floor 로만** 썼고 M 값을 만들지 않았다. 그래서 표시되는
+                # 관리성은 등급에서 역산된 값(svm_levels_for_grade)이었다 — 근거가 아니라
+                # 결과의 재구성이다. 고객사 시스템이 접근권한을 주면 그것이 진짜 근거이므로
+                # 그 값으로 채운다.
+                #
+                # ⚠ 여기서 등급은 바꾸지 않는다. 배포본은 **등급 우선·요소 후행** 구조라
+                #   (모델이 등급을 내고 요소를 거기 맞춘다) M 을 등급에 바로 물리면 하향
+                #   경로가 열린다. 요소 우선 경로는 v8 서빙 게이트가 담당한다.
+                m_state, m_lv, m_reason = _management_from_metadata_dict(metadata)
+                if m_state != "unknown" and result.factors is not None:
+                    try:
+                        cur_m = int(float(getattr(result.factors, "management", 0)))
+                    except (TypeError, ValueError):
+                        cur_m = -1
+                    new_m = 0 if m_state == "proven_absent" else int(m_lv or 0)
+                    if new_m != cur_m:
+                        result.factors = EvaluationFactors.from_factor_scores({
+                            "SECRECY": float(getattr(result.factors, "secrecy", 0) or 0),
+                            "VALUE": float(getattr(result.factors, "value", 0) or 0),
+                            "MANAGEMENT": float(new_m),
+                        })
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management: {m_reason} → M={new_m} (시스템 확인 · 등급 미변경)"
+                        ]
+                    # 전 임직원 열람이면 비밀관리성 요건 미충족이다. 등급을 무음으로
+                    # 내리지 않고 **검수 신호**로만 낸다 - 하향은 미탐 방향이라 사람이 본다.
+                    if m_state == "proven_absent" and _ORD.get(cur, 99) < _ORD["S2"]:
+                        result.warnings = list(result.warnings) + [
+                            f"metadata-management-conflict: access_scope=all_employees(M=0)인데 예측 {cur} → 검수 라우팅 (ICD §3.3)"
                         ]
         except Exception:  # noqa: BLE001 — 메타데이터 처리 오류는 분류를 막지 않음(fail-safe)
             # metadata-floor 상향/access-conflict 라우팅이 예외로 미적용 → 비밀이 낮은 등급을
