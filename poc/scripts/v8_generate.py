@@ -43,6 +43,7 @@ from v8_factor_labels import (  # noqa: E402
 # 서로 다른 분할에 넣어 어휘 연상을 최적해로 만들었다.
 from v8_factor_frames import audit as sentence_audit  # noqa: E402
 from v8_factor_frames import near_miss_for, sentences_for  # noqa: E402
+from v8_inline_forms import embed as embed_inline  # noqa: E402
 from v8_registers import LINEAGES  # noqa: E402
 from v8_registers import render as render_register  # noqa: E402
 
@@ -84,6 +85,32 @@ FILLER = {
         "담당자 변경 이력을 함께 기록한다.",
     ],
 }
+
+# 실질 내용 문장. 채움 상투어와 달리 **구체적 사실**을 담는다.
+# 왜(실측 2026-08-14). 무요소 문서를 넣었는데 unknown 이 늘기는커녕 줄었다. 원인은 요소
+# 섹션만 빼고 그 자리를 절차 상투어로 채운 것이었다 — 고유어휘비 0.630 으로 학습셋에서
+# 가장 빈약했고, 모델에게 그것은 "빈 문서" 였다. 빈 문서는 이미 S3(absent) 로 배웠다.
+# 실문서는 "내용이 가득한데 요소만 없는" 문서다. 그 조합을 만들려면 실질 내용이 필요하다.
+CONTENT = [
+    "소성 최고온도 875도에서 42분 유지하고 승온은 3구간으로 나눈다.",
+    "적층 매수 18매, 그린시트 두께 42마이크로미터로 관리한다.",
+    "입고 로트당 시료 5점을 채취해 외관과 치수를 대조한다.",
+    "가압은 610도 도달 시점에 시작해 유지 종료 12분 전에 해제한다.",
+    "바인더 제거 구간은 분당 0.8도로 낮춰 잔류를 억제한다.",
+    "부도 예측 모델은 20개 변수와 부문별 가중치로 산출한다.",
+    "세그먼트 A는 구매 이력 3년치 분석에서 미충족 수요가 확인됐다.",
+    "인수 대상의 재무·기술·인력·법률 리스크를 항목별로 평가했다.",
+    "협력사별 중점 관리 항목은 입고 이력과 불량률을 함께 본다.",
+    "시험은 조건을 바꿔 가며 400회 반복했고 실패 원인을 분류했다.",
+    "전력 소비는 승온 구간에서 전체의 절반 이상을 차지한다.",
+    "설비 2호기 이후 라인에 적용하고 1호기는 별도 사양을 따른다.",
+    "단가는 물량 구간별로 나누고 예외 승인선을 따로 둔다.",
+    "수율은 최근 3분기 평균 대비 상승했고 편차가 줄었다.",
+    "조달 경로는 주 경로와 예비 경로를 나눠 관리한다.",
+    "인증 준비는 서류·시험·실사 순으로 진행하고 일정을 맞춘다.",
+    "회수 대상은 로트 번호로 특정하고 유통 단계까지 추적한다.",
+    "개정 3차에서 승온 곡선과 가압 시점이 이전 차수와 달라졌다.",
+]
 
 NL = chr(10)
 DEPTS = ["소재개발팀", "품질팀", "생산기술팀", "구매팀", "영업기획팀", "설비운영팀"]
@@ -147,7 +174,7 @@ def _factor_label(factor: str, code: int | None, rng: random.Random, *, near_mis
 
 
 def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx: int,
-            lineage: str = "prose") -> str:
+            lineage: str = "prose", inline: bool = False, split: str = "train") -> str:
     """형태 정의에 따라 본문을 조립한다. 섹션 제목은 형태에서 오고 등급을 말하지 않는다."""
     bullet = form["style"] in STYLE_BULLET
     # 분량은 문서마다 다르고 **등급과 무관**하게 뽑는다. rng 는 doc_id 에서만 오므로
@@ -174,13 +201,26 @@ def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx:
             lab = labels[factor]
             # unknown 은 span 이 없다(스키마 계약). 주제만 언급하는 중립 문장을 넣는다 —
             # 섹션을 비우면 '섹션 부재'가 곧 tell 이 된다.
-            body = lab.span or rng.choice(NEUTRAL_FACTOR[factor])
+            if lab.span and inline:
+                # [삽입형] 실문서는 요소를 별도 문장으로 쓰지 않고 내용 문장 안에 짧게
+                # 끼워 넣는다("… 모델 (외부 미공개)"). 경화42 고등급 26건을 100%
+                # 과소분류한 원인이 이 형태를 학습에서 못 봤기 때문이다.
+                # 요소 자리에 채움 서술을 깔고 그 위에 짧은 진술을 붙인다.
+                base = " ".join(rng.sample(CONTENT, k=2))
+                body = embed_inline(base, factor, lab.state, lab.level, rng, split)
+            else:
+                body = lab.span or rng.choice(NEUTRAL_FACTOR[factor])
             # 중립 문장이 unknown 에만 나오면 그 자체가 등급 tell 이 된다(실측: tell 4종).
             # 상태와 무관하게 섞어 넣어 '중립 문장 존재 = unknown' 이라는 신호를 끊는다.
             if lab.span and rng.random() < 0.35:
                 body = f"{body} {rng.choice(NEUTRAL_FACTOR[factor])}"
         else:
-            body = " ".join(rng.sample(FILLER[kind], k=min(verbosity, len(FILLER[kind]))))
+            if kind in ("numbers", "observe", "procedure"):
+                # 실질 내용을 넣는다. 절차 상투어만 깔면 "빈 문서" 가 되고, 모델은 그것을
+                # 이미 S3 로 배웠다(무요소 투입이 실패한 원인).
+                body = " ".join(rng.sample(CONTENT, k=min(2 + verbosity, len(CONTENT))))
+            else:
+                body = " ".join(rng.sample(FILLER[kind], k=min(verbosity, len(FILLER[kind]))))
             # 길이를 등급과 무관하게 흔든다. 고정 길이면 같은 경계·같은 쪽 문서끼리
             # 뭉쳐 1NN 이 등급을 맞힌다(실측: 길이-only 0.637).
             for _ in range(max(0, padding + rng.randint(-2, 2))):
@@ -196,7 +236,7 @@ def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx:
 def _build(doc_id: str, form: dict, svm, *,
            near_miss: bool, idx: int, pair_id: str | None = None,
            varied: str | None = None, rot: int = 0, split: str = "train",
-           lineage: str = "prose") -> dict:
+           lineage: str = "prose", inline: bool = False) -> dict:
     rng = _rng(doc_id)
     labels = {f: _factor_label(f, c, rng, near_miss=near_miss, rot=rot, split=split)
               for f, c in zip(FACTORS, svm)}
@@ -206,7 +246,7 @@ def _build(doc_id: str, form: dict, svm, *,
         "doc_id": doc_id,
         "form_id": form["id"],
         "document_type": form["title"],
-        "text": _render(form, labels, rng, idx, lineage),
+        "text": _render(form, labels, rng, idx, lineage, inline, split),
         "label": doc.grade(),
         "label_source": "derived_from_factor_states",
         "factor_labels": {f: {k: v for k, v in vars(labels[f]).items() if v not in (None, "")}
@@ -217,6 +257,7 @@ def _build(doc_id: str, form: dict, svm, *,
         "pair_id": pair_id,
         "varied_factor": varied,
         "has_language_trap": near_miss,
+        "inline_form": inline,
         "lineage": lineage,
         "schema": "v8-3state-1",
     }
@@ -334,7 +375,7 @@ def generate(forms: list[dict], *, per_boundary: int, split: str,
                 rows.append(_build(f"v8-{split}-{e_i:02d}-{k:03d}{side}", form, svm,
                                    near_miss=trap, idx=slot, pair_id=pair,
                                    varied=varied, rot=slot, split=pool_split,
-                                   lineage=lineage))
+                                   lineage=lineage, inline=(k % 2 == 0)))
     return rows
 
 
