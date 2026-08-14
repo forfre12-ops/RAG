@@ -71,6 +71,7 @@ class ProxyGoldCandidateService:
     def list_candidates(
         self, *, status: str | None = None, grade: str | None = None,
         origin: str | None = None, query: str | None = None,
+        review_batch: str | None = None,
     ) -> dict[str, Any]:
         all_candidates = self._candidates()
         candidates = all_candidates
@@ -80,6 +81,11 @@ class ProxyGoldCandidateService:
             candidates = [c for c in candidates if c["final_grade"] == grade or c["proposed_grade"] == grade]
         if origin:
             candidates = [c for c in candidates if c["document_origin"] == origin]
+        # [검수 배치] 콘솔 전체가 306건인데 이번 검수 대상은 그중 120건이다. 표식이
+        # 없으면 검수자가 어느 문서를 봐야 하는지 알 수 없다(실측 2026-08-14: 적재만
+        # 해 놓고 배포했으면 검수자가 306건 앞에서 멈췄을 자리다).
+        if review_batch:
+            candidates = [c for c in candidates if c.get("review_batch") == review_batch]
         if query:
             needle = query.strip().lower()
             if needle:
@@ -423,6 +429,8 @@ class ProxyGoldCandidateService:
                 "status": decision.get("status") or str(meta.get("candidate_status") or "proposed"),
                 "document_origin": document_origin,
                 "requires_manual_audit": bool(meta.get("requires_manual_audit")),
+                # 검수 배치 표식. 전달본 단위로 묶어 목록을 좁힌다.
+                "review_batch": str(meta.get("review_batch") or "") or None,
                 "claim_scope": str(meta.get("claim_scope") or ""),
                 "document_path": document_path,
                 "content_revision": str(meta.get("content_revision") or "v1"),
