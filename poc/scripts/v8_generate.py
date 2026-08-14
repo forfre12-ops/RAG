@@ -113,7 +113,8 @@ CONTENT = [
     "개정 3차에서 승온 곡선과 가압 시점이 이전 차수와 달라졌다.",
 ]
 
-def content_pool(rng, value_level: int | None, domain: str, split: str) -> list[str]:
+def content_pool(rng, value_level: int | None, domain: str, split: str,
+                 force: bool = False) -> list[str]:
     """문서의 **가치 수준**에 맞는 내용 문장 풀.
 
     왜(실측 2026-08-14). business 판정면에서 모델이 value 를 lv2 49 · lv1 2 로 낸다 -
@@ -127,11 +128,28 @@ def content_pool(rng, value_level: int | None, domain: str, split: str) -> list[
     absent/unknown 은 중립 풀(CONTENT)을 그대로 쓴다. 가치가 없다고 입증된 문서와
     확인되지 않은 문서까지 수준 내용을 주면 라벨과 내용이 어긋난다.
     """
+    # [지름길 차단] 실측 2026-08-14(r16). 수준 내용을 value 가 present 인 **모든** 문서에
+    # 넣었더니 모델이 프레임 문장 대신 "수준 내용이 있는가" 를 지름길로 썼다. 그 결과
+    # 수준 내용이 없는 2차 판정면에서 value 가 3,399/3,680 을 absent 로 냈고 F1 이
+    # 0.909 -> 0.127 로 무너졌다(secrecy·management 는 정상이었다).
+    #
+    # 근거 경로가 둘이면 **어느 하나도 단독으로 충분해서는 안 된다.** 그래서 value 가
+    # present 인 문서의 절반은 중립 내용만 쓴다 - 그 문서에서 근거는 프레임 문장뿐이다.
+    # 나머지 절반은 수준 내용을 쓴다. 내용만 있는 문서(content_only)는 항상 수준 내용을
+    # 쓴다 - 거기서는 내용이 유일한 근거이기 때문이다.
+    if value_level in (1, 2) and not force and rng.random() < 0.5:
+        return CONTENT
     if value_level not in (1, 2):
         return CONTENT
     pool = value_content(domain, value_level, split)
-    # 수준 내용만 쓰면 문서가 짧고 단조로워진다. 중립 문장을 섞어 길이와 어휘를 흔든다.
-    return pool + rng.sample(CONTENT, k=min(4, len(CONTENT)))
+    # [비중] 실측 2026-08-14(r14). 처음에는 `pool + 중립 4문장` 으로 섞었는데 렌더가
+    # 거기서 3~5개만 뽑으므로 **수준 문장이 한 개도 안 들어가는 문서가 생겼다.**
+    # 그 결과 value lv1 이 8건 -> 5건으로 오히려 줄고 이진정확이 0.819 -> 0.750 으로
+    # 후퇴했다. 수준을 가르치려면 수준 문장이 문서에 반드시 있어야 한다.
+    #
+    # 그래서 수준 문장을 두 벌 넣어 비중을 확보하고 중립은 2문장만 섞는다(8:2).
+    # 중립을 아예 빼지는 않는다 - 빼면 문서가 단조로워지고 길이가 수준과 붙는다.
+    return list(pool) * 2 + rng.sample(CONTENT, k=min(2, len(CONTENT)))
 
 
 NL = chr(10)
@@ -219,7 +237,9 @@ def _render(form: dict, labels: dict[str, FactorLabel], rng: random.Random, idx:
     # 관리성만 내용으로 드러나는 문서도 있다. 그때는 관리 수준이 내용을 정한다.
     if vl is None and labels["management"].state == PRESENT and not labels["management"].span:
         vl = labels["management"].level
-    body_pool = content_pool(rng, vl, domain or rng.choice(VALUE_DOMAINS), split)
+    # content_only 문서는 내용이 유일한 근거이므로 수준 내용을 강제한다.
+    forced = any(l.state == PRESENT and not l.span for l in labels.values())
+    body_pool = content_pool(rng, vl, domain or rng.choice(VALUE_DOMAINS), split, force=forced)
     bullet = form["style"] in STYLE_BULLET
     # 분량은 문서마다 다르고 **등급과 무관**하게 뽑는다. rng 는 doc_id 에서만 오므로
     # 등급 정보가 들어갈 경로가 없다.
