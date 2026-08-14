@@ -78,7 +78,7 @@ def judge_doc(expected_grade: str, expected_numbers: list[str], parse_ok: bool,
     }
 
 
-def run_inproc(pack_dir: Path, docs: list[dict]) -> list[dict]:
+def run_inproc(pack_dir: Path, docs: list[dict], send_metadata: bool = False) -> list[dict]:
     os.environ.setdefault("VECTOR_BACKEND", "inmemory")
     os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
     os.environ.setdefault("TESTING", "1")
@@ -107,7 +107,14 @@ def run_inproc(pack_dir: Path, docs: list[dict]) -> list[dict]:
             continue
         model_version = None
         try:
-            resp = svc.classify(ClassifyRequest(doc_id=d["doc_id"], content=text, return_evidence=False))
+            # [ICD 메타데이터] KL ICD §2 의 3필드를 실제로 태운다. 붙이지 않으면 출처
+            # prior · metadata-floor · 관리성 매핑이 **한 번도 실행되지 않는다** — 실측
+            # 2026-08-14: 메타데이터 없이 돌린 인수 실행에서 공개 사업공고문이 TS 로
+            # 나왔는데 출처 prior 가 걸릴 자리가 없었기 때문이다.
+            _meta = d.get("icd_metadata") if send_metadata else None
+            resp = svc.classify(ClassifyRequest(
+                doc_id=d["doc_id"], content=text, return_evidence=False,
+                metadata=_meta if _meta else None))
             pred = resp.label.value if hasattr(resp.label, "value") else str(resp.label)
             status, warnings = resp.status, list(resp.warnings)
             elapsed = getattr(resp, "elapsed_ms", None)
@@ -245,6 +252,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pack", default="datasets/acceptance_pack", help="샘플팩 디렉토리(expected_labels.json 포함)")
     ap.add_argument("--mode", choices=["inproc", "http"], default="inproc")
+    ap.add_argument("--send-metadata", action="store_true",
+                    help="ICD §2 metadata 3필드를 함께 보낸다 — 게이트 배관 검증용")
     ap.add_argument("--base-url", default="http://localhost:8000", help="http 모드 API base URL")
     ap.add_argument("--api-key", default=os.environ.get("API_KEY", "replace_me_api_key"))
     ap.add_argument("--report", default="reports/acceptance_report.md")
@@ -270,7 +279,7 @@ def main() -> int:
     if args.mode == "http":
         results = run_http(args.base_url, args.api_key, pack_dir, docs)
     else:
-        results = run_inproc(pack_dir, docs)
+        results = run_inproc(pack_dir, docs, send_metadata=args.send_metadata)
 
     md, summary = _report(results, args.mode, args.max_latency_ms, require_model=args.require_model)
     out = _POC / args.report if not Path(args.report).is_absolute() else Path(args.report)

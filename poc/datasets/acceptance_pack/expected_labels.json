@@ -20,7 +20,12 @@
         "420868",
         "1262204"
       ],
-      "has_table": true
+      "has_table": true,
+      "icd_metadata": {
+        "source_type": "internal",
+        "security_marking": "top_secret",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "acc-TS-02",
@@ -34,7 +39,12 @@
         "441599",
         "1324397"
       ],
-      "has_table": true
+      "has_table": true,
+      "icd_metadata": {
+        "source_type": "internal",
+        "security_marking": "top_secret",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "acc-S1-03",
@@ -48,7 +58,12 @@
         "462330",
         "1386590"
       ],
-      "has_table": true
+      "has_table": true,
+      "icd_metadata": {
+        "source_type": "internal",
+        "security_marking": "secret",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "acc-S1-04",
@@ -62,7 +77,12 @@
         "483061",
         "1448783"
       ],
-      "has_table": false
+      "has_table": false,
+      "icd_metadata": {
+        "source_type": "internal",
+        "security_marking": "secret",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "acc-S2-05",
@@ -76,7 +96,12 @@
         "503792",
         "1510976"
       ],
-      "has_table": true
+      "has_table": true,
+      "icd_metadata": {
+        "source_type": "internal",
+        "security_marking": "confidential",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "acc-S2-06",
@@ -90,7 +115,12 @@
         "524523",
         "1573169"
       ],
-      "has_table": true
+      "has_table": true,
+      "icd_metadata": {
+        "source_type": "internal",
+        "security_marking": "confidential",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "acc-S3-07",
@@ -104,7 +134,12 @@
         "545254",
         "1635362"
       ],
-      "has_table": false
+      "has_table": false,
+      "icd_metadata": {
+        "source_type": "public",
+        "security_marking": "none",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "acc-S3-08",
@@ -118,7 +153,12 @@
         "565985",
         "1697555"
       ],
-      "has_table": true
+      "has_table": true,
+      "icd_metadata": {
+        "source_type": "internal",
+        "security_marking": "none",
+        "access_scope": "approved_only"
+      }
     },
     {
       "doc_id": "real-S3-ipo-ksensor",
@@ -131,7 +171,12 @@
         "2026"
       ],
       "_numeric_note": "실문서는 PII 마스킹이 전화번호 등 숫자를 정당하게 제거(파싱손실 아님)하므로, 파이프라인 통과 후 살아남는 비-PII 표 셀 숫자(연도 2026)만 무손실 기준으로 삼는다. 파서 실검증의 핵심은 파싱성공(rhwp 표 23셀)+severity floor.",
-      "has_table": true
+      "has_table": true,
+      "icd_metadata": {
+        "source_type": "public",
+        "security_marking": "none",
+        "access_scope": "department"
+      }
     },
     {
       "doc_id": "real-S3-iprd-notice",
@@ -144,15 +189,21 @@
         "1,000",
         "15,000",
         "2200",
-        "2500",
-        "3287"
+        "2500"
       ],
       "has_table": true,
       "expects_needs_review": true,
-      "why": "구형 .hwp(표 포함) 경로 회귀. 표 47개·셀 1,815개가 rhwp 본문에는 없고 unhwp 보강으로만 회수되며, 등급은 그대로 두고 needs_review 로 라우팅되어야 한다(FNR-safe). 표-존재 검출기(rhwp.to_hwpx_bytes)는 rhwp-python 0.8.1 이상에서만 있으므로, 이 건은 파서 버전 하향(예: 0.5.1)으로 표가 조용히 사라지는 회귀도 함께 막는다 — 등록된 숫자 5종이 전부 표 안에만 있어 미회수 시 숫자무손실 게이트가 즉시 FAIL 한다."
+      "why": "구형 .hwp(표 포함) 경로 회귀. 표 47개·셀 1,815개가 rhwp 본문에는 없고 unhwp 보강으로만 회수되며, 등급은 그대로 두고 needs_review 로 라우팅되어야 한다(FNR-safe). 표-존재 검출기(rhwp.to_hwpx_bytes)는 rhwp-python 0.8.1 이상에서만 있으므로, 이 건은 파서 버전 하향(예: 0.5.1)으로 표가 조용히 사라지는 회귀도 함께 막는다 — 등록된 숫자 5종이 전부 표 안에만 있어 미회수 시 숫자무손실 게이트가 즉시 FAIL 한다.",
+      "numeric_tokens_note": "'3287' 을 뺐다(2026-08-14). 문서 데이터가 아니라 전화번호 조각이다 — 원문 2회 출현이 모두 «02-3287-4218» 안이고 전처리가 이를 [PHONE] 으로 마스킹한다. 즉 개인정보 마스킹이 정상 동작한 것을 숫자 유실로 세어 인수검증이 VETO 했다. 표 회수 자체는 정상이다(unhwp 보강으로 표 47개·36,033자 회수, 나머지 숫자 4종 전부 보존). 숫자 무손실 게이트의 대상은 **문서가 담은 값**이지 PII 가 아니다.",
+      "icd_metadata": {
+        "source_type": "public",
+        "security_marking": "none",
+        "access_scope": "all_employees"
+      }
     }
   ],
   "generated": 8,
   "real_fixtures": 1,
-  "skipped_formats": {}
+  "skipped_formats": {},
+  "icd_metadata_note": "2026-08-14 추가. KL ICD §2 가 정의한 metadata 3필드(source_type·security_marking·access_scope)를 배관 검증용으로 붙였다. **값은 문서 사실에서만 가져왔다** — source_type 은 그 문서가 실제 공개문서인지(판결문·보도자료·공고문), security_marking 은 본문에 실제로 찍힌 표시, access_scope 는 본문이 말하는 접근 범위다. 기대 등급을 보고 역산하지 않았다.\n⚠ 다만 이 팩의 문서는 본문에 이미 등급 표시가 찍혀 있다(TS=특급기밀·S1=1급비밀·S2=대외비·S3=표시없음). 따라서 메타데이터 실행은 **추가 정확도를 보여줄 수 없고** 게이트 배관이 동작하는지만 본다. 정확도 주장에 쓰지 말 것."
 }

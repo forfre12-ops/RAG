@@ -80,3 +80,38 @@ def test_all_employees_opens_s1():
     assert s1_combos == [(2, 2, 0)]
     _, lv, _ = management_from_metadata("none", "all_employees")
     assert grade_from_svm(2, 2, lv) == "S1"
+
+
+# ── ICD §3.1 source_type enum — 배포본이 실제로 인식하는지 고정 ────────────────
+#
+# 왜. 실측 2026-08-14(인수 팩 A/B 실행): ICD 대로 source_type="public" 을 보냈는데
+# 출처 prior 가 한 번도 걸리지 않았다. `_PUBLIC_SOURCE_TOKENS` 에 ICD 값이 하나도
+# 없었다 — 합의된 인터페이스를 구현이 지키지 않고 있었고 KL 시험에서 그대로 터질
+# 자리였다. 문서끼리 대조해서는 못 잡는다. 값을 소스에 넣어 봐야 잡힌다.
+@pytest.mark.parametrize(
+    ("source_type", "is_public"),
+    [
+        ("public", True),                 # ICD: S=0 (Gate-1)
+        ("registered_patent", True),      # ICD: S=0 (Gate-1)
+        ("academic", True),               # ICD: S=0 (Gate-1)
+        ("internal", False),              # ICD: 텍스트로 S 산정
+        ("external_confidential", False),  # ICD: 텍스트로 S 산정
+        (None, False),
+        ("", False),
+    ],
+)
+def test_icd_source_type_enum(source_type, is_public):
+    from koipa.modules.m5_inference.pipeline import _source_prior_is_public
+
+    assert _source_prior_is_public(source_type) is is_public
+
+
+@pytest.mark.parametrize(
+    "source_type",
+    ["non-public", "nonpublic", "unpublished", "private", "internal_draft", "미공개", "비공개"],
+)
+def test_public_token_does_not_swallow_negations(source_type):
+    """'public' 을 양성 토큰에 넣어도 부정형이 공개로 새면 안 된다."""
+    from koipa.modules.m5_inference.pipeline import _source_prior_is_public
+
+    assert _source_prior_is_public(source_type) is False

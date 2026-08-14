@@ -16,6 +16,25 @@ from koipa.obs.otel import span  # 수동 span — OTel 미설치/미활성 시 
 logger = logging.getLogger(__name__)
 
 _PUBLIC_SOURCE_TOKENS = {
+    # ── ICD §3.1 이 규정한 source_type enum. **KL 이 실제로 보내는 값이다.**
+    # 실측 2026-08-14(인수 팩 A/B 실행): ICD 대로 source_type="public" 을 보냈는데
+    # 출처 prior 가 한 번도 걸리지 않았다. 목록에 ICD 값이 하나도 없었기 때문이다 -
+    # 합의된 인터페이스를 구현이 지키지 않고 있었고, KL 시험에서 그대로 터질 자리였다.
+    #
+    #   public              공개 웹·보도·공시·뉴스레터   S=0 (Gate-1)
+    #   registered_patent   등록·공개 특허·실용신안      S=0 (Gate-1)
+    #   academic            학술 발표 논문·학위논문      S=0 (Gate-1)
+    #   internal            사내 비공개                 텍스트로 S 산정 (음성 토큰에 있음)
+    #   external_confidential NDA 하 외부 수령           텍스트로 S 산정 (매치 안 됨)
+    #
+    # "public" 추가가 안전한 이유: 음성 토큰(internal · non-public · nonpublic ·
+    # unpublished · private)이 **먼저** 검사되고, 토큰 분리가 하이픈·언더스코어를
+    # 보존하므로 "non-public" · "external_confidential" 은 한 덩어리로 남아 양성
+    # 목록과 안 겹친다.
+    "public",
+    "registered_patent",
+    "academic",
+    # ── 이하 기존 토큰(내부 파이프라인·데이터셋이 쓰는 표기)
     "court_decision",
     "public_disclosure",
     "published_patent",
