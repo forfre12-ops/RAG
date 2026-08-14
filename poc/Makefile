@@ -485,13 +485,17 @@ acceptance-pack-deps: ## 인수팩 PDF/XLS 렌더용 dev-only 의존성(reportla
 acceptance-pack: ## 인수 샘플팩 생성 → datasets/acceptance_pack/ (PDF/XLS 포함하려면 make acceptance-pack-deps 선행)
 	$(PY) scripts/build_acceptance_pack.py
 acceptance-test: ## 인수 샘플팩 채점 (in-proc parse→classify→gate; severity floor veto) — 고객은 bundle 의 run_acceptance.sh
-	$(PY) scripts/run_acceptance.py --mode inproc
+# --require-model 필수. 없으면 가중치 미로드로 rule-fallback 이 돌아도 PASS 가 나온다
+# (실측 2026-08-14: 그 상태로 "운영 경로 통과" 라고 보고할 뻔했다). deploy_cloud.sh 는
+# 이미 이 플래그를 쓰는데 개발자용 진입점만 빠져 있었다.
+# 가중치 경로는 CLASSIFIER_MODEL_DIR 로 준다 — 예: artifacts/classifier_p1_v5_clean/v-fe4b386b
+	$(PY) scripts/run_acceptance.py --mode inproc --require-model
 soak: ## W2 소크: 코퍼스 반복 투입(영속 서빙)로 메모리 누수·고등급 veto·escalation 안정성 검증
 	$(PY) scripts/run_soak.py --cycles 50 --snapshot-every 10
 pilot-scorecard: ## Render pilot scorecard HTML from acceptance/readiness JSON artifacts
 	$(PY) scripts/render_pilot_scorecard.py
 pilot-verify: ## Run pilot acceptance/readiness, always render scorecard, then return final verdict
-	-$(PY) scripts/run_acceptance.py --mode inproc
+	-$(PY) scripts/run_acceptance.py --mode inproc --require-model
 	-$(PY) scripts/build_operational_readiness.py --model-dir $(P1_MODEL) --deployed-model $(DEPLOYED_MODEL) --out reports/operational_readiness.md
 	$(PY) scripts/render_pilot_scorecard.py --fail-on-bad
 

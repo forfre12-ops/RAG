@@ -94,6 +94,15 @@ async def upload_document(
     actor: str = Form(..., description="Actor JSON 문자열 (multipart 제약)"),
     doc_type: Optional[str] = Form(default=None),
     external_ref: Optional[str] = Form(default=None, description="외부 문서 ID (EDMS 등)"),
+    # [ICD §3.1] 서비스는 source_type 을 받아 metadata_ 에 저장하고 분류 때 Gate-1(출처
+    # prior)이 그것을 읽는다. 그런데 이 HTTP 경로에 파라미터가 없어서 **업로드로 들어온
+    # 문서는 출처를 영영 줄 수 없었다** — 서비스 인자가 코드 안에서만 도달 가능했다.
+    # 실측 2026-08-14: 그 결과 공개문서를 업로드해도 출처 cap 이 걸릴 자리가 없다.
+    source_type: Optional[str] = Form(
+        default=None,
+        description="ICD §3.1 출처: public | registered_patent | academic | internal | "
+                    "external_confidential. 공개 출처면 분류 시 S3 로 cap 된다.",
+    ),
     index_for_rag: bool = Form(default=False, description="True면 업로드 문서를 RAG 검색 컬렉션에도 적재"),
     rag_namespace: Optional[str] = Form(default=None, description="RAG 적재 컬렉션(미지정 시 settings.rag_upload_collection)"),
     enqueue_classification: bool = Form(default=False),
@@ -139,6 +148,7 @@ async def upload_document(
         filename=filename,
         content_bytes=body,
         doc_type=doc_type,
+        source_type=source_type,
         external_ref=external_ref,
         created_by=actor_obj.user_id,
     )

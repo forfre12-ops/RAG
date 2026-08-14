@@ -115,3 +115,43 @@ def test_public_token_does_not_swallow_negations(source_type):
     from koipa.modules.m5_inference.pipeline import _source_prior_is_public
 
     assert _source_prior_is_public(source_type) is False
+
+
+# ── ICD §3 규약값 적합성 ──────────────────────────────────────────────────────
+#
+# 왜. 규약 밖의 값이 와도 아무 신호가 없었다. source_type="public" 이 인식되지 않는
+# 상태로 배포돼 있었는데 경고 한 줄 없었고, 인수 팩을 태워 보고서야 발견했다.
+@pytest.mark.parametrize(
+    ("metadata", "n_warn"),
+    [
+        ({"source_type": "public"}, 0),
+        ({"source_type": "PUBLIC  "}, 0),          # 대소문자·공백 허용
+        ({"source_type": "internal", "security_marking": "none",
+          "access_scope": "department"}, 0),
+        ({"source_type": "공개"}, 1),               # 규약 밖
+        ({"security_marking": "top-secret"}, 1),   # 하이픈 오타
+        ({"access_scope": "everyone"}, 1),
+        ({}, 0),
+        (None, 0),
+        ({"source_type": None, "security_marking": ""}, 0),  # 빈값은 미전달과 같다
+    ],
+)
+def test_icd_metadata_validation(metadata, n_warn):
+    from koipa.modules.m3_labeling.rule_engine import validate_icd_metadata
+
+    assert len(validate_icd_metadata(metadata)) == n_warn
+
+
+def test_upward_gate_inputs_are_flagged_as_fnr_risk():
+    """security_marking·access_scope 가 깨지면 상향이 안 걸려 미탐이 된다.
+
+    그 경우에만 검수로 보내야 하므로 경고 문구로 구분이 되어야 한다.
+    """
+    from koipa.modules.m3_labeling.rule_engine import validate_icd_metadata
+
+    for key in ("security_marking", "access_scope"):
+        (w,) = validate_icd_metadata({key: "bogus"})
+        assert "미탐 위험" in w, w
+    # source_type 은 하향(cap) 입력이라 미탐 방향이 아니다.
+    (w,) = validate_icd_metadata({"source_type": "bogus"})
+    assert "미탐 위험" not in w, w

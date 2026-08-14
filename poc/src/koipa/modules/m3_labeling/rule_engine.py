@@ -182,6 +182,56 @@ def management_from_metadata(
     return "unknown", None, "icd_no_management_metadata"
 
 
+# ICD §3.1 — 출처. 값 자체는 pipeline._PUBLIC_SOURCE_TOKENS 가 판정하고, 여기서는
+# **규약에 있는 값인가**만 본다.
+_ICD_SOURCE_TYPES = frozenset({
+    "public", "registered_patent", "academic", "internal", "external_confidential",
+})
+_ICD_MARKINGS = frozenset(set(_ICD_MARKING_TO_M) | {"none"})
+_ICD_SCOPES = frozenset(_ICD_SCOPE_TO_M)
+
+# 규약에 없는 값이 오면 어느 축이 위험한가. security_marking·access_scope 는 **상향
+# 게이트의 입력**이라 못 읽으면 상향이 안 걸려 미탐이 된다. source_type 은 하향(cap)
+# 입력이라 못 읽어도 미탐 방향은 아니다.
+_ICD_FNR_RELEVANT = ("security_marking", "access_scope")
+
+
+def validate_icd_metadata(metadata: object) -> list[str]:
+    """ICD §3 규약값 적합성 검사. **거부하지 않고 경고만 돌려준다.**
+
+    왜 거부하지 않는가. 422 로 막으면 그 문서는 아예 분류되지 않는다 — 값 하나가
+    틀렸다고 분류를 안 하는 것이 더 나쁘다. 그러나 조용히 무시하는 것도 안 된다.
+
+    실측 2026-08-14 이 그 이유다. ICD §3.1 이 규정한 `source_type="public"` 을 배포본이
+    인식하지 못했는데(토큰 목록에 ICD 값이 하나도 없었다) **아무 신호도 나지 않았다.**
+    인수 팩을 실제로 태워 보고서야 공개 사업공고문이 TS 로 나오는 것을 발견했다.
+    값이 규약 밖이면 최소한 눈에 보여야 한다.
+
+    반환은 경고 문자열 목록이다. 호출부(classify_service)가 이것을 응답 warnings 에
+    싣고, 상향 게이트 입력이 깨진 경우에는 needs_review 로 라우팅한다.
+    """
+    if not isinstance(metadata, dict) or not metadata:
+        return []
+    warns: list[str] = []
+    for key, allowed in (
+        ("source_type", _ICD_SOURCE_TYPES),
+        ("security_marking", _ICD_MARKINGS),
+        ("access_scope", _ICD_SCOPES),
+    ):
+        raw = metadata.get(key)
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            continue
+        val = str(raw).strip().lower()
+        if val in allowed:
+            continue
+        risk = " — 상향 게이트 입력이라 미탐 위험" if key in _ICD_FNR_RELEVANT else ""
+        warns.append(
+            f"icd-metadata-unknown: {key}={raw!r} 은 ICD §3 규약값이 아니다"
+            f"(허용: {', '.join(sorted(allowed))}){risk}"
+        )
+    return warns
+
+
 def management_from_metadata_dict(metadata: object) -> tuple[str, int | None, str]:
     """classify 요청의 metadata dict 에서 바로 뽑는 편의 함수."""
     if not isinstance(metadata, dict):

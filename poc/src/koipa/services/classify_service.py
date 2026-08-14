@@ -397,6 +397,27 @@ class ClassifyService:
                     "metadata-access-conflict: restricted access_scope vs low predicted grade — routed to human review"
                 )
 
+            # [ICD 규약값 적합성] 규약 밖의 값은 **거부하지 않고 드러낸다.** 422 로 막으면
+            # 그 문서가 아예 분류되지 않아 더 나쁘다. 그러나 조용히 무시해서도 안 된다 —
+            # 실측 2026-08-14: ICD §3.1 의 source_type="public" 을 배포본이 인식하지
+            # 못했는데 아무 신호도 나지 않았고, 인수 팩을 실제로 태워 보고서야 공개
+            # 사업공고문이 TS 로 나오는 것을 발견했다.
+            #
+            # security_marking·access_scope 는 **상향 게이트의 입력**이라 못 읽으면
+            # 상향이 안 걸려 미탐이 된다. 그 경우에만 검수로 보낸다. source_type 은
+            # 하향(cap) 입력이라 못 읽어도 미탐 방향이 아니므로 경고만 남긴다.
+            try:
+                from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+                    validate_icd_metadata as _validate_icd,
+                )
+                icd_warns = _validate_icd(getattr(req, "metadata", None))
+                if icd_warns:
+                    warnings_acc.extend(icd_warns)
+                    if status != "needs_review" and any("미탐 위험" in w for w in icd_warns):
+                        status = "needs_review"
+            except Exception:  # noqa: BLE001 — 적합성 검사 실패가 분류를 막지 않는다
+                pass
+
             # [agreement-gate] 등급차등 + 룰·모델 합의 게이트 (opt-in, 기본 off).
             # conf 단독 자동확정은 신뢰성이 측정으로 부정됨(golden500: AUROC 0.58, 자동확정
             # 정밀도 63%, 고등급 미탐 46). 확신을 conf가 아니라 *독립 신호(룰 합의)*에서 얻는다:
