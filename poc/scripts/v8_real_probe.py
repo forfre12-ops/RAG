@@ -63,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
     from transformers import AutoTokenizer
 
     from koipa.modules.m3_labeling.rule_engine import grade_from_svm
+    # 배포본의 출처 prior 판정을 **그대로** 쓴다. 재구현하면 배포본과 기준이 갈린다.
+    from koipa.modules.m5_inference.pipeline import _source_prior_is_public
 
     from train_factor_model import _build_model
     from v8_judge import cls_to_score, cls_to_worst, predict
@@ -101,6 +103,21 @@ def main(argv: list[str] | None = None) -> int:
         pred = [grade_from_svm(*[cls_to_score(c) for c in c3]) for c3 in preds]
         pred_serving = [grade_from_svm(*[cls_to_worst(c) for c in c3]) for c3 in preds]
 
+        # [출처 prior] 공개 출처 문서는 비공지성이 이미 실패한 것이라 S3 로 cap 한다.
+        # 실측 2026-08-14: finance(금융 공시)에서 서빙 규칙이 0.7686 -> 0.2533 으로
+        # 나빠졌다. 공시자료는 실제로 공개된 문서인데 모델이 "모른다" 고 답하고 규칙이
+        # 고등급으로 올린 탓이다. 배포본에는 이 게이트가 있고 요소 모델 경로에만 없었다.
+        capped = 0
+        pred_capped = list(pred_serving)
+        for i, r in enumerate(rows):
+            src = (r.get("source") or r.get("label_source") or "")
+            md = r.get("metadata") or {}
+            src = md.get("source_type") or md.get("source") or src
+            if _source_prior_is_public(src) and pred_capped[i] != "S3":
+                pred_capped[i] = "S3"
+                capped += 1
+
+
         hi = [i for i, g in enumerate(truth) if g in ("TS", "S1")]
         under = [i for i in hi if ORDER[pred[i]] > ORDER[truth[i]]]
         to_s3 = [i for i in hi if pred[i] == "S3"]
@@ -108,6 +125,23 @@ def main(argv: list[str] | None = None) -> int:
         # 서빙 규칙 기준 — 이것이 실제 운영에서 사람이 보는 등급이다
         under_s = [i for i in hi if ORDER[pred_serving[i]] > ORDER[truth[i]]]
         acc_s = sum(1 for a, b in zip(truth, pred_serving) if a == b) / len(rows)
+        under_c = [i for i in hi if ORDER[pred_capped[i]] > ORDER[truth[i]]]
+        acc_c = sum(1 for a, b in zip(truth, pred_capped) if a == b) / len(rows)
+        # ⚠ 배포본 토큰이 '판례_공개문서' 와 '금융보고서' 를 못 잡는다. 전자는 이름에
+        # '공개문서' 가 붙었는데도 토큰이 '판례' 정확일치가 아니라 빠지고, 후자는 증권사
+        # 시황 리포트(고객 배포 자료)라 공개 성격인데 목록에 없다.
+        # 여기서 토큰을 임의로 늘리지 않는다 — 배포본과 기준이 갈리면 판정이 무의미해진다.
+        # 대신 "토큰을 넓혔다면" 을 별도로 재서 게이트 개정의 근거로만 남긴다.
+        WIDER = ("판례", "공시", "금융보고서", "보도자료", "공개")
+        capped_wide = 0
+        pred_wide = list(pred_serving)
+        for i, r in enumerate(rows):
+            src = str(r.get("source") or r.get("label_source") or "")
+            if any(t in src for t in WIDER) and pred_wide[i] != "S3":
+                pred_wide[i] = "S3"
+                capped_wide += 1
+        under_w = [i for i in hi if ORDER[pred_wide[i]] > ORDER[truth[i]]]
+        acc_w = sum(1 for a, b in zip(truth, pred_wide) if a == b) / len(rows)
 
         # 자동확정 게이트를 태웠을 때 — 실문서에서 무음 미탐이 나오는가
         auto = []
@@ -134,6 +168,18 @@ def main(argv: list[str] | None = None) -> int:
                 "high_to_s3": len([i for i in hi if pred_serving[i] == "S3"]),
                 "pred_dist": dict(Counter(pred_serving)),
             },
+            "serving_with_source_prior": {
+                "grade_acc": round(acc_c, 4),
+                "under_rate": round(len(under_c) / len(hi), 4) if hi else None,
+                "capped_n": capped,
+                "pred_dist": dict(Counter(pred_capped)),
+            },
+            "serving_wider_prior": {
+                "grade_acc": round(acc_w, 4),
+                "under_rate": round(len(under_w) / len(hi), 4) if hi else None,
+                "capped_n": capped_wide,
+                "note": "배포본 토큰이 아니라 '넓혔다면' 가정치. 게이트 개정 근거용",
+            },
             "factor_pred_dist": {
                 f: dict(Counter(NM[c[k]] for c in preds)) for k, f in enumerate(FACTORS)
             },
@@ -150,6 +196,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  [저술규칙] 등급일치 {blk['grade_acc']:.4f} · 과소분류 {blk['under_rate']} · S3추락 {blk['high_to_s3']}")
         print(f"  [서빙규칙] 등급일치 {sv['grade_acc']:.4f} · 과소분류 {sv['under_rate']} · S3추락 {sv['high_to_s3']}")
         print(f"             예측 {sv['pred_dist']}")
+        cp = blk["serving_with_source_prior"]
+        print(f"  [+출처prior] 등급일치 {cp['grade_acc']:.4f} · 과소분류 {cp['under_rate']} · "
+              f"cap {cp['capped_n']}건")
+        w = blk["serving_wider_prior"]
+        print(f"  [토큰확장가정] 등급일치 {w['grade_acc']:.4f} · 과소분류 {w['under_rate']} · cap {w['capped_n']}건")
         print(f"  정답 {blk['truth_dist']}")
         print(f"  예측 {blk['pred_dist']}")
         for f in FACTORS:
