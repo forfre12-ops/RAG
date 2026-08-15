@@ -23,6 +23,14 @@ set -euo pipefail
 BRANCH="${BRANCH:-fix/design-review-hardening}"
 REPO="${REPO:-https://github.com/forfre12-ops/RAG.git}"
 CF="-f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml"
+# ⚠ docker-compose.expose.yml 은 **저장소에 없고 서버에만 있는 파일**이다(223 에서 직접
+#   만든 것). prod 는 api 를 127.0.0.1:8000 에 묶는데(리버스 프록시 뒤 전제) 223 은 콘솔을
+#   외부에 열어야 해서 0.0.0.0 으로 덮는 파일을 따로 두고 있다.
+#   실측 2026-08-16: 이 파일을 빼고 기동했더니 **외부에서 접속되던 검수 화면이 끊겼다.**
+#   있으면 자동으로 포함한다 - 서버가 정한 노출 방식을 배포가 되돌리지 않게.
+if [ -f docker-compose.expose.yml ]; then
+  CF="$CF -f docker-compose.expose.yml"
+fi
 STAMP="$(date -u +%Y%m%d%H%M)"
 
 b(){ printf '\n\033[1m>> %s\033[0m\n' "$*"; }
@@ -222,6 +230,17 @@ if [ "$N" -gt 0 ]; then
   ok "ICD 필드 계약 노출 확인(security_marking ${N}회)"
 else
   warn "ICD 필드가 OpenAPI 에 없다 - 옛 이미지가 돈다"; FAIL=1
+fi
+
+# 외부 노출 확인 - 콘솔을 외부에서 여는 운영이면 여기서 끊긴 것을 잡는다.
+if [ -f docker-compose.expose.yml ]; then
+  HOSTIP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  BIND="$(docker ps --format '{{.Ports}}' --filter "name=api" | head -1)"
+  echo "    포트 바인딩: ${BIND:-확인 실패}"
+  case "$BIND" in
+    *0.0.0.0*) ok "외부 노출 유지" ;;
+    *) warn "api 가 0.0.0.0 에 안 붙었다 - 외부에서 콘솔에 못 들어온다"; FAIL=1 ;;
+  esac
 fi
 
 b "완료"
