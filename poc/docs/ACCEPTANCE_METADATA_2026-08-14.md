@@ -104,3 +104,58 @@ S3 로 예측한 상태**이고, 그것이 무음 미탐의 모양이다. 게이
 실문서 정확도 주장에는 사람이 라벨링한 문서가 필요하다. 가장 가까운 재료는 이미 포장돼
 있다 — `datasets/golden_review/ff5a822c` 120건(TS/S1/S2/S3 각 30건, `review_status=pending`,
 `reviewer_id=None`). 만드는 비용은 0이고 필요한 것은 검수자뿐이다.
+
+---
+
+## 5. 추가 2026-08-15 — §3 은 **한 경로에 대해서만** 참이었다
+
+위 §3 "메타데이터 경로는 실제로 동작한다" 는 인수 팩이 `POST /classify` 로 돌기 때문에
+나온 결론이다. 사용자가 물었다 — "현재 문서만 업로드되지, 메타값은 주게 되어 있지
+않잖아?" 확인하니 맞았다. **파일 업로드 경로는 끊겨 있었다.**
+
+```
+POST /classify    metadata dict 통째로       3필드 모두 전달 가능   ← 인수 팩이 쓴 길
+POST /documents   source_type 만             관리성 2필드 자리 없음  ← KL EDMS 가 쓸 길
+```
+
+두 번째가 실제 연동 경로다. 그리고 끊긴 곳이 하나 더 있었다.
+
+```python
+# classify_service._effective_metadata (종전)
+if meta.get("source_type") or meta.get("source"):
+    return meta          # ← 여기서 반환하므로 security_marking·access_scope 를
+                         #    DB 에서 영영 안 읽는다. 저장돼 있어도 못 쓴다.
+```
+
+즉 업로드로 들어온 문서는 **관리성 근거를 줄 방법도, 줘도 쓸 방법도 없었다.**
+
+### 왜 이 한 축이 등급을 가르는가
+
+정본에서 S1 은 `(s,v,m) = (2,2,0)` **한 조합뿐**이다. 관리성이 0 으로 확정되지 않으면
+보수적 완성이 2 를 채우므로 S1 이 **구조적으로 도달 불가**다.
+
+```
+management_from_metadata(access_scope="all_employees") -> ('proven_absent', 0)
+   grade_from_svm(2, 2, 0) = S1
+   grade_from_svm(2, 2, 2) = TS      ← 메타 없을 때. 봉인 판정면의 28% 가 여기로 갔다
+```
+
+관리성은 본문에서 관측되지 않는 축이다(실측: 실문서 업무문서 중 관리 표시 보유
+17~21%, 사내 일상문서·금융보고서 0%). 텍스트를 아무리 잘 읽어도 확정할 수 없다.
+
+### 고친 것
+
+```
+POST /documents      security_marking · access_scope Form 필드 추가
+ingest -> _persist    두 필드를 metadata_ 에 저장
+_effective_metadata   조기 반환 제거 · 세 필드를 각각 확인
+                      (요청에 있으면 우선, 빠진 것만 DB 에서 채운다)
+```
+
+`tests/test_icd_metadata_flow.py` 5건으로 고정했다 — 업로드 폼 자리 · 서비스 시그니처 ·
+필드별 하이드레이션 · S1 자물쇠가 실제로 열리는지.
+
+### KL 에 확인해야 할 것
+
+배관은 이제 양쪽 다 뚫려 있다. 남은 것은 **EDMS 가 세 필드를 실어 보내는가** 하나다.
+안 보내면 관리성은 여전히 unknown 이고 S1 은 여전히 안 나온다 — 코드로 풀 수 없다.
