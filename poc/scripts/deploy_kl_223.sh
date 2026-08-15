@@ -166,6 +166,23 @@ done
 HOSTMEM="$(free -g 2>/dev/null | awk 'NR==2{print $2}')"
 [ -n "$HOSTMEM" ] && echo "    (호스트 총 메모리 ${HOSTMEM}GB)"
 
+# --- 4c. 학습 산출물 경로 소유권 ---------------------------------------------
+# 실측 2026-08-16: 223 의 artifacts_out 이 root 소유(drwxr-xr-x)라 컨테이너(uid1000 koipa)가
+# 하위 디렉터리를 못 만든다 -> 재학습이 산출물을 못 쓴다. 마운트는 rw 인데 권한에서 막힌다.
+b "4c. 학습 산출물 경로"
+mkdir -p artifacts_out 2>/dev/null || true
+OWNER="$(stat -c '%u' artifacts_out 2>/dev/null || echo '')"
+if [ "$OWNER" != "1000" ]; then
+  if sudo -n true 2>/dev/null; then
+    sudo chown -R 1000:1000 artifacts_out && ok "artifacts_out 소유권 -> uid1000(컨테이너 계정)"
+  else
+    warn "artifacts_out 이 uid${OWNER} 소유다 - 컨테이너(uid1000)가 학습 산출물을 못 쓴다."
+    warn "  수동 조치: sudo chown -R 1000:1000 ~/poc/artifacts_out"
+  fi
+else
+  ok "artifacts_out 소유권 정합(uid1000)"
+fi
+
 # --- 5. 빌드 ----------------------------------------------------------------
 b "5. 빌드"
 DOCKER_BUILDKIT=1 docker compose $CF build \
@@ -196,6 +213,7 @@ ok "되돌림 태그 :rollback-$STAMP · 새 빌드 :latest"
 b "7. 기동"
 for P in $TARGETS; do
   ENV_FILE="${P_ENV[$P]}" API_HOST_PORT="${P_PORT[$P]:-8000}" \
+  WORKER_MEM_LIMIT="$WORKER_MEM_LIMIT" \
     docker compose -p "$P" $CF up -d --no-build 2>&1 | grep -Ei 'error|started' | sed 's/^/    /' || true
 done
 
