@@ -116,7 +116,17 @@ info "koipa-api:${_tag} 적재됨"
 # ── 3. 모델 배치 확인 (§3) ─────────────────────────────────
 log "3/7  모델 배치 확인 (../models)"
 mdir="$COMPOSE_DIR/../models"
-[ -d "$mdir/classifier-trained" ] || info "[주의] models/classifier-trained 부재 → 룰 폴백(무음 미탐 위험). §3 대로 배치."
+# [fail-closed 2026-08-15] 종전에는 info 로만 알리고 그대로 기동했다. 그 결과 학습 분류기가
+# 없는 번들이 폐쇄망에서 rule-fallback 으로 조용히 떴다 - 등급을 룰이 만들고 무음 미탐이 난다.
+# 번들 빌더도 같은 자리에서 통과시켰다(미동봉을 parity 위반으로 안 봄). 둘 다 막는다.
+# 의도적 rule-fallback 운영이면 ALLOW_RULE_FALLBACK=1 로 명시할 것.
+if [ ! -d "$mdir/classifier-trained" ]; then
+  if [ "${ALLOW_RULE_FALLBACK:-0}" = "1" ]; then
+    info "[주의] models/classifier-trained 부재 - ALLOW_RULE_FALLBACK=1 로 룰 폴백 기동(무음 미탐 위험)."
+  else
+    die "models/classifier-trained 부재 - 룰 폴백으로 뜨면 등급을 룰이 만들고 무음 미탐이 난다. §3 대로 배치하거나 ALLOW_RULE_FALLBACK=1 로 의도를 명시할 것."
+  fi
+fi
 [ -f "$mdir/classifier-trained/temperature.json" ] || info "[주의] temperature.json 부재 → T=1.0 무보정 서빙(과신). CLASSIFIER_TEMPERATURE 대체 또는 재보정 권장."
 [ -d "$mdir/hf" ] || info "[주의] models/hf 부재 → HF_HUB_OFFLINE=1 로 기동 실패 가능(§3)."
 

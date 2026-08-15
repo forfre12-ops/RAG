@@ -322,12 +322,23 @@ def _model_version_id(path_or_name: str) -> str:
 def check_model_parity(bundled_dir: Path | None, release_model: str) -> str | None:
     """번들에 실리는 학습 분류기가 '릴리스 모델' 버전을 담고 있는지 강제.
 
-    반환: 위반 메시지(불일치) 또는 None(일치/미동봉). 문자열 비교라 dry-run(CI)에서도
+    반환: 위반 메시지(불일치) 또는 None(일치). 문자열 비교라 dry-run(CI)에서도
     동작 — 잘못된/구버전 모델이 번들에 실리는 것을 배포 전에 차단한다. F1/FNR 게이트는
     릴리스 모델을 기술하므로, 다른 모델을 실으면 번들이 미검증본이 된다.
+
+    ⚠ 종전에는 `bundled_dir is None`(미동봉)을 **위반이 아니라고 반환**했다. 그래서
+      학습 분류기가 통째로 빠진 번들이 parity 검사를 통과했다. 폐쇄망에서 그 번들은
+      rule-fallback 으로 뜨고(무음 미탐 위험) 아무것도 막지 않는다 — 실측 2026-08-15:
+      dry-run 무경고 · 빌드 [WARN] 만 · parity 통과 · deploy_airgap info 만, 게이트 네
+      개가 연속으로 통과시켰다. 미동봉은 **위반이다.**
     """
     if bundled_dir is None:
-        return None  # 미동봉(베이스 모델만) — 별도 경고가 이미 처리
+        return (
+            "학습 분류기가 번들에 없다(베이스 모델만). 폐쇄망에서 rule-fallback 으로 뜬다 "
+            "- 무음 미탐 위험. --classifier-model-dir 또는 CLASSIFIER_MODEL_DIR 로 릴리스 "
+            f"모델({release_model})을 지정하라. 의도적 rule-fallback 번들이면 "
+            "--allow-base-only-classifier 를 명시할 것."
+        )
     want = _model_version_id(release_model)
     bundled_norm = str(bundled_dir).replace("\\", "/").rstrip("/")
     if want and want not in bundled_norm:
@@ -363,6 +374,23 @@ def check_bundle_hygiene(out_dir: Path, manifest: "BundleManifest") -> list[str]
                     f"foreign image tar: docker-images/{tar.name} "
                     "(매니페스트 컴포넌트/관측성 아님 - 예전 번들 잔존 의심)"
                 )
+    # [stale 분류기] 재빌드는 'already exists' 로 SKIP 하므로 예전 번들의 분류기가 그대로
+    # 남는다. 실측 2026-08-15: dist/ 번들에 **6/2 모델**이 들어 있었다 — 정확도 0.783 ·
+    # 미탐률 0.217 로, 7/29 승격한 배포본(0.953 · 0.047) 대비 미탐이 4.6배다. 지재원 서버가
+    # 이 번들로 설치되면 승격 전 모델이 뜨고 아무것도 막지 않았다.
+    #   dry-run 무경고 -> 빌드 [WARN] 만 -> parity 통과 -> deploy_airgap info 만
+    # 이미지·wheel 은 보면서 정작 등급을 만드는 모델은 안 봤다.
+    trained_entry = next((m for m in (getattr(manifest, "models", None) or [])
+                          if m.role == "classifier_trained"), None)
+    bundled_model = out_dir / "models" / "classifier-trained"
+    if bundled_model.is_dir() and trained_entry is not None and trained_entry.source_path:
+        src = Path(trained_entry.source_path)
+        if src.is_dir() and hash_model_dir(bundled_model) != hash_model_dir(src):
+            violations.append(
+                f"stale classifier: models/classifier-trained 내용이 릴리스 모델({src}) 과 "
+                "다르다 - 예전 번들 잔존. 그 디렉토리를 지우고 재빌드하라."
+            )
+
     for wheels_dir in (out_dir / "wheels", out_dir / "python-deps" / "wheels"):
         if wheels_dir.is_dir():
             for whl in sorted(wheels_dir.glob("*.whl")):
@@ -1386,7 +1414,7 @@ def _copy_trained_classifier(manifest: "BundleManifest", out_dir: Path) -> bool:
     trained = next((m for m in manifest.models if m.role == "classifier_trained"), None)
     if trained is None or not trained.source_path:
         print(
-            "  [WARN] 학습 분류기 미지정 — 베이스 모델만 번들됩니다(폐쇄망에서 rule-fallback). "
+            "  [WARN] 학습 분류기 미지정 - 베이스 모델만 번들됩니다(폐쇄망에서 rule-fallback). "
             "--classifier-model-dir 또는 CLASSIFIER_MODEL_DIR로 학습 가중치를 지정하세요(#40).",
             file=sys.stderr,
         )
@@ -1597,6 +1625,11 @@ def main() -> int:
              "기본은 포함 — 안전 알림 소비자는 폐쇄망 운영 필수.",
     )
     ap.add_argument(
+        "--allow-base-only-classifier", action="store_true",
+        help="학습 분류기 없이(베이스 모델만) 번들을 만든다. 폐쇄망에서 rule-fallback 으로 "
+             "뜨므로 무음 미탐 위험 - 의도적일 때만 명시할 것.",
+    )
+    ap.add_argument(
         "--release-model", default="artifacts/classifier_p1_v5_clean/v-fe4b386b",
         help="이번 릴리스의 검증된 분류기(단일 진실원). 번들에 실리는 분류기가 이 버전을 "
              "담지 않으면 빌드 중단(번들↔prod parity). 릴리스마다 갱신.",
@@ -1657,6 +1690,13 @@ def main() -> int:
 
     # 번들↔릴리스 모델 parity — 잘못된/구버전 분류기 동봉 fail-closed (dry-run 포함).
     parity_violation = check_model_parity(classifier_model_dir, args.release_model)
+    if parity_violation and classifier_model_dir is None and args.allow_base_only_classifier:
+        print(
+            "\n[bundle][WARN] 학습 분류기 없이 번들을 만든다"
+            "(--allow-base-only-classifier). 폐쇄망에서 rule-fallback 으로 뜬다 - 무음 미탐 위험.",
+            file=sys.stderr,
+        )
+        parity_violation = None
     if parity_violation:
         print(f"\n[bundle][FATAL] 모델 parity 위반: {parity_violation}", file=sys.stderr)
         return 2

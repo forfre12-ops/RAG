@@ -518,8 +518,16 @@ def test_model_parity_blocks_wrong_version():
     assert msg is not None and "v-dd3abab9" in msg
 
 
-def test_model_parity_noop_when_not_bundled():
-    assert check_model_parity(None, "artifacts/x/v-dd3abab9") is None
+def test_model_parity_rejects_missing_classifier():
+    """미동봉은 **위반이다.**
+
+    이 테스트는 종전에 `is None`(위반 아님)을 고정하고 있었다. 그 동작이 곧 결함이었다 -
+    학습 분류기가 통째로 빠진 번들이 parity 를 통과했고, 폐쇄망에서 rule-fallback 으로
+    떴다(등급을 룰이 만들고 무음 미탐이 난다). 실측 2026-08-15 에 dist/ 번들이 6/2 모델을
+    싣고 있었던 것이 그 경로다. 상세는 tests/test_bundle_classifier_guard.py.
+    """
+    v = check_model_parity(None, "artifacts/x/v-dd3abab9")
+    assert v and "rule-fallback" in v
 
 
 def _hygiene_manifest(components: list[str], obs: list[str] | None = None):
