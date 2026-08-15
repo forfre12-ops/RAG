@@ -81,7 +81,9 @@ ok "소스 $SHORT"
 # --- 2. 지뢰 1: uv.lock -----------------------------------------------------
 b "2. uv.lock 검사"
 # 리네임 잔재는 uv.lock 만이 아니다 - compose 파일도 본다(지뢰 5, 실측 2026-08-15).
-STALE="$(grep -l 'lloydk' docker-compose*.yml 2>/dev/null | xargs echo)"
+# ⚠ `set -euo pipefail` 아래서 grep 은 **못 찾으면 종료코드 1** 이다. || true 가 없으면
+#   잔재가 없을 때(=정상일 때) 스크립트가 조용히 죽는다 - 223 에서 실제로 그랬다.
+STALE="$(grep -l 'lloydk' docker-compose*.yml 2>/dev/null | xargs echo || true)"
 if [ -n "$STALE" ]; then
   die "compose 에 리네임 전 이름이 남았다: $STALE - 위 git archive 가 덮었어야 한다. 브랜치를 확인할 것."
 fi
@@ -94,7 +96,7 @@ fi
 
 # --- 3. 지뢰 2: 외부 볼륨 ---------------------------------------------------
 b "3. 외부 볼륨"
-NEED="$(grep -ohE '[a-z]+_hf_cache' docker-compose*.yml | sort -u | head -1)"
+NEED="$(grep -ohE '[a-z]+_hf_cache' docker-compose*.yml 2>/dev/null | sort -u | head -1 || true)"
 NEED="${NEED:-koipa_hf_cache}"
 if docker volume inspect "$NEED" >/dev/null 2>&1; then
   ok "$NEED 있음"
@@ -142,7 +144,7 @@ done
 b "4b. 워커 메모리 한도"
 for P in $TARGETS; do
   E="${P_ENV[$P]:-}"; [ -z "$E" ] && continue
-  CUR="$(grep -m1 '^WORKER_MEM_LIMIT=' "$E" 2>/dev/null | cut -d= -f2-)"
+  CUR="$(grep -m1 '^WORKER_MEM_LIMIT=' "$E" 2>/dev/null | cut -d= -f2- || true)"
   WANT="${WORKER_MEM_LIMIT:-16G}"
   if [ "$CUR" != "$WANT" ]; then
     sed -i '/^WORKER_MEM_LIMIT=/d' "$E"
@@ -163,7 +165,7 @@ DOCKER_BUILDKIT=1 docker compose $CF build \
   --build-arg KOIPA_BUILD_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>&1 | tail -6
 # compose 기본 프로젝트명. docker-compose.yml 1행의 `name:` 이 디렉터리명을 이긴다 -
 # 여기서 basename 을 쓰면 이미지 이름을 못 찾는다(실제 값 koipa-poc, 디렉터리는 poc).
-BUILT="$(grep -m1 '^name:' docker-compose.yml 2>/dev/null | awk '{print $2}')"
+BUILT="$(grep -m1 '^name:' docker-compose.yml 2>/dev/null | awk '{print $2}' || true)"
 BUILT="${BUILT:-$(basename "$PWD")}"
 for S in api worker beat; do
   docker image inspect "${BUILT}-${S}:latest" >/dev/null 2>&1 \
@@ -215,7 +217,7 @@ done
 # ICD 필드가 실제로 계약에 노출되는지 - 이 배포의 핵심 변경이다
 P1="$(echo "$PROJECTS" | head -1)"
 PORT1="${P_PORT[$P1]:-8000}"
-N="$(curl -s --max-time 20 "http://localhost:${PORT1}/api/v1/openapi.json" | grep -o 'security_marking' | wc -l)"
+N="$(curl -s --max-time 20 "http://localhost:${PORT1}/api/v1/openapi.json" 2>/dev/null | grep -c 'security_marking' || true)"
 if [ "$N" -gt 0 ]; then
   ok "ICD 필드 계약 노출 확인(security_marking ${N}회)"
 else
