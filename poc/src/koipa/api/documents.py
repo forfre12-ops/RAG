@@ -336,6 +336,23 @@ async def analyze_document(
     file: UploadFile = File(...),
     return_evidence: bool = Form(default=True),
     full_text: bool = Form(default=False),
+    # [ICD §3.1~§3.3] 시연·연동이 실제로 타는 경로가 여기다. 종전에는 메타데이터 자리가
+    # 아예 없어 **콘솔로 올린 문서는 출처도 관리성도 줄 수 없었다** — /classify 는 dict
+    # 로 받는데 이쪽만 빠져 있었다. 관리성은 본문에서 관측되지 않는 축이므로(실측
+    # 2026-08-15: 실문서 업무문서 중 관리 표시 보유 17~21%) 여기서 못 받으면 unknown 이
+    # 남고, 정본에서 S1 은 (2,2,0) 하나뿐이라 **S1 이 구조적으로 도달 불가**가 된다.
+    source_type: Optional[str] = Form(
+        default=None,
+        description="ICD §3.1 출처: public | registered_patent | academic | internal | "
+                    "external_confidential",
+    ),
+    security_marking: Optional[str] = Form(
+        default=None, description="ICD §3.2 보안표시: top_secret | secret | confidential | none",
+    ),
+    access_scope: Optional[str] = Form(
+        default=None,
+        description="ICD §3.3 접근범위: approved_only | designated | department | all_employees",
+    ),
 ):
     """업로드 문서를 파싱→검수게이트→분류까지 한 번에 돌려 단계별 진단 결과를 반환.
 
@@ -491,8 +508,16 @@ async def analyze_document(
     # --- 분류(content 기반, 실제 서빙 게이트 통과) ---
     t0 = time.perf_counter()
     try:
+        # 폼에 실린 ICD 필드만 metadata 로 넘긴다 — 빈 값을 넣으면 "unknown" 과
+        # "명시적으로 없음" 이 구분되지 않아 관리성 판정이 뒤집힌다.
+        _icd = {k: v for k, v in (
+            ("source_type", source_type),
+            ("security_marking", security_marking),
+            ("access_scope", access_scope),
+        ) if v}
         cls = ClassifyService().classify(
-            ClassifyRequest(doc_id=filename, content=pre.text, return_evidence=return_evidence)
+            ClassifyRequest(doc_id=filename, content=pre.text,
+                            metadata=_icd or None, return_evidence=return_evidence)
         )
     except Exception as exc:  # noqa: BLE001
         resp.stages.append(AnalyzeStage(name="분류", status="fail", detail=f"{type(exc).__name__}: {exc}"))

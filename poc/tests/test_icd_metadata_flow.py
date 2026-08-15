@@ -92,3 +92,32 @@ def test_management_mapping_is_reachable_from_metadata():
     assert grade_from_svm(2, 2, level) == "S1"
     # 메타데이터가 없으면 보수적 완성이 2 로 채워 TS 가 된다 — S1 은 안 나온다.
     assert grade_from_svm(2, 2, 2) == "TS"
+
+
+def test_analyze_endpoint_accepts_all_three():
+    """/documents/analyze 는 **시연·연동이 실제로 타는 경로**다.
+
+    여기 자리가 없으면 콘솔로 올린 문서는 출처도 관리성도 줄 수 없다 — /classify 는
+    dict 로 받는데 이쪽만 빠져 있었다.
+    """
+    import inspect
+
+    from koipa.api.documents import analyze_document
+
+    params = set(inspect.signature(analyze_document).parameters)
+    missing = [f for f in ICD_FIELDS if f not in params]
+    assert not missing, f"analyze 에 없는 ICD 필드: {missing}"
+
+
+def test_analyze_does_not_pass_empty_strings_as_metadata():
+    """빈 값을 실어 보내면 'unknown' 과 '명시적으로 없음' 이 구분되지 않는다.
+
+    access_scope="" 가 그대로 흘러가면 관리성 매핑이 미지정 값을 만나 판정이 뒤집힐 수
+    있다. 폼 미입력은 **키 자체가 없어야** 한다.
+    """
+    import inspect
+
+    src = inspect.getsource(
+        __import__("koipa.api.documents", fromlist=["x"]).analyze_document
+    )
+    assert "if v}" in src, "빈 값 필터가 없다 — 미입력 폼이 빈 문자열로 전달된다"
