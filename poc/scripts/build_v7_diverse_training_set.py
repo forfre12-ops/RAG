@@ -25,7 +25,7 @@
 비밀성·관리성과 무관하게 S3** 다 — 즉 "내부 문서이되 경제적 가치 없음"은 S3 이고,
 mundane_s3 의 라벨은 규칙과 일치한다(v5 가 그 80%를 S2 로 본 것이 오류다).
 
-발행 전 lloydk.dataset_leakage 게이트를 통과해야 한다.
+발행 전 koipa.dataset_leakage 게이트를 통과해야 한다.
 No LLM or model is called.
 """
 from __future__ import annotations

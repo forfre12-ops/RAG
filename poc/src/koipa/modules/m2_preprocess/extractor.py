@@ -419,9 +419,29 @@ def _extract_hwp(p: Path) -> ExtractResult:
         # 빈 추출 = 성공 아님. 표/글상자 전용 HWP일 가능성을 경고로 surface.
         return ExtractResult(
             text="", method="rhwp", quality=0.0,
-            error="rhwp가 본문 텍스트를 추출하지 못함 — 표·글상자 전용 문서일 수 있음. "
+            error="rhwp가 본문 텍스트를 추출하지 못함 - 표·글상자 전용 문서일 수 있음. "
                   "표 셀 회수 보강에는 unhwp 필요: pip install '.[hwp-tables]'.",
         )
+
+    # [무음 빈본문] 실측 2026-08-15. 실제 한국 업무 서식 HWP 120건을 태워 보니 **79.2%가
+    # 본문 50자 미만**인데 오류도 경고도 없이 quality 0.95 로 통과했다. 전부 구형 HWP 3.x
+    # 이고 내용이 표 안에만 있다 - rhwp 는 본문만 뽑고 unhwp 보강도 HWP3 표는 못 읽는다
+    # (실측: 회수 0자·표 0개).
+    #
+    # 종전 가드는 `not text.strip()` 뿐이라 객체 placeholder 한 글자(U+FFFC)가 있으면
+    # 빈 문서가 아니라고 판단해 통과시켰다. 그 문서는 내용 없이 분류되어 **전부 S3 로
+    # 떨어진다** - 무음 미탐의 정확한 모양이다.
+    #
+    # ⚠ 여기서 추출을 실패로 만들지는 않는다. 파일은 실제로 읽혔고, 짧지만 정상인 문서도
+    #   있다. 대신 경고를 남겨 **검수로 라우팅**한다 - 내용 없이 자동확정되는 것만 막으면
+    #   된다. 추출 실패로 처리하면 짧은 정상 문서까지 막힌다(단위테스트 3건이 그래서 깨졌다).
+    _subs = "".join(
+        c for c in text
+        if not c.isspace() and c not in ("￼", "﻿", "​")
+    )
+    if len(_subs) < _MIN_SUBSTANTIVE_CHARS:
+        _warn_once(warnings, "body_below_classifiable_threshold")
+
     # 본문은 뽑혔지만 표 셀이 빠졌을 수 있다(rhwp의 조용한 표 미추출) — 커버리지 판정.
     coverage = _hwp_table_coverage(p, doc, text, warnings)
 
@@ -466,6 +486,12 @@ def _extract_hwp(p: Path) -> ExtractResult:
         tables=tables,
         warnings=warnings,
     )
+
+
+# 판정 가능한 최소 실질 문자 수. 이보다 적으면 "추출 성공" 이라 부르지 않는다.
+# 근거(실측 2026-08-15): 정상 추출된 HWP 서식의 본문은 200자 이상이고, 표 전용 문서는
+# 1~5자(객체 placeholder)다. 그 사이에 안전한 경계가 있다.
+_MIN_SUBSTANTIVE_CHARS = 30
 
 
 def _hwp_table_coverage(p: Path, doc, text: str, warnings: list[str] | None = None) -> str | None:

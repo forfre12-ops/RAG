@@ -391,6 +391,18 @@ class ClassifyService:
             # [metadata-access-conflict] ICD 접근범위가 제한적인데 내용 예측이 낮은 경우 — pipeline이
             # 남긴 신호 — confidence와 무관하게 검수 라우팅(ICD §4.4: 관리수준 높은 문서를 낮게
             # 자동확정하지 않음). security_marking 상향 floor는 pipeline에서 이미 등급에 반영됨.
+            # [무음 빈본문] 추출은 됐는데 판정할 만한 본문이 없는 문서는 자동확정하면
+            # 안 된다. 실측 2026-08-15: 구형 HWP 3.x 서식이 본문 1~5자(객체 placeholder)
+            # 로 나오는데 오류가 없어 그대로 S3 로 자동확정됐다 - 무음 미탐의 모양이다.
+            if status != "needs_review" and any(
+                "body_below_classifiable_threshold" in w for w in warnings_acc
+            ):
+                status = "needs_review"
+                warnings_acc.append(
+                    "body-below-threshold: 판정할 만한 본문이 없다(표·글상자 전용이거나 "
+                    "구형 HWP 3.x 가능) - 내용 없이 자동확정하지 않고 검수로 보낸다"
+                )
+
             if status != "needs_review" and any("metadata-access-conflict" in w for w in warnings_acc):
                 status = "needs_review"
                 warnings_acc.append(

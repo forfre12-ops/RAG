@@ -28,10 +28,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POC_SRC = REPO_ROOT / "poc" / "src"
-STATIC_DIR = POC_SRC / "lloydk" / "api" / "static"
+STATIC_DIR = POC_SRC / "koipa" / "api" / "static"
 SAMPLES_JS = STATIC_DIR / "samples.js"
 
-# 런타임 import 경로 등록 — lloydk.* 는 PYTHONPATH=poc/src 환경 또는 본 등록을 통해 해결.
+# 런타임 import 경로 등록 — koipa.* 는 PYTHONPATH=poc/src 환경 또는 본 등록을 통해 해결.
 # IDE 가 import 에러로 표시할 수 있으나 실행 시점에 정상 해결.
 sys.path.insert(0, str(POC_SRC))
 
@@ -1288,8 +1288,8 @@ LEGAL_REFERENCES = {
 def validate_samples(samples: list[dict], strict: bool = True) -> list[str]:
     failures: list[str] = []
     try:
-        from lloydk.schemas.classify import ClassifyRequest  # noqa: PLC0415
-        from lloydk.services.classify_service import ClassifyService  # noqa: PLC0415
+        from koipa.schemas.classify import ClassifyRequest  # noqa: PLC0415
+        from koipa.services.classify_service import ClassifyService  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001
         print(f"  ⚠ ClassifyService import 실패 — 검증 건너뜀: {exc}", file=sys.stderr)
         return failures

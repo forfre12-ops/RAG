@@ -1,7 +1,7 @@
 """Serving-faithful checkpoint selection and proxy calibration primitives.
 
 The normal Hugging Face evaluation loop treats one truncated token sequence as
-one evaluation sample.  LloydK serving does not: it character-splits a document,
+one evaluation sample.  koipa serving does not: it character-splits a document,
 uses fast-tokenizer overflow windows, applies temperature to every window logit,
 and then aggregates probabilities at document level.  This module deliberately
 reuses the model-comparison mirror of that contract and keeps raw window logits
