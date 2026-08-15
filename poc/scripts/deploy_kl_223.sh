@@ -173,11 +173,13 @@ b "4c. 학습 산출물 경로"
 mkdir -p artifacts_out 2>/dev/null || true
 OWNER="$(stat -c '%u' artifacts_out 2>/dev/null || echo '')"
 if [ "$OWNER" != "1000" ]; then
-  if sudo -n true 2>/dev/null; then
-    sudo chown -R 1000:1000 artifacts_out && ok "artifacts_out 소유권 -> uid1000(컨테이너 계정)"
+  # sudo 는 비밀번호를 요구할 수 있다(223 이 그랬다). 도커 컨테이너는 root 로 도니
+  # 그것으로 고친다 - 배포자는 이미 docker 그룹이다.
+  if docker run --rm -v "$PWD/artifacts_out:/x" alpine chown -R 1000:1000 /x 2>/dev/null; then
+    ok "artifacts_out 소유권 -> uid1000(컨테이너 계정) · docker 로 정정"
   else
     warn "artifacts_out 이 uid${OWNER} 소유다 - 컨테이너(uid1000)가 학습 산출물을 못 쓴다."
-    warn "  수동 조치: sudo chown -R 1000:1000 ~/poc/artifacts_out"
+    warn "  수동 조치: docker run --rm -v ~/poc/artifacts_out:/x alpine chown -R 1000:1000 /x"
   fi
 else
   ok "artifacts_out 소유권 정합(uid1000)"
