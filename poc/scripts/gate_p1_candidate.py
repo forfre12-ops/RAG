@@ -76,6 +76,10 @@ def eval_labelset(model_dir: str, path: Path) -> dict:
     pairs = [(t, p) for t, p in zip(y_true, y_pred) if t in LABELS]
     hi_to_s3 = sum(1 for t, p in pairs if t in _HIGH and p == "S3")
     under = sum(1 for t, p in pairs if _SEV.get(p, 0) < _SEV.get(t, 0))
+    # [2026-08-16] severity 가중 하향. 한 단계 내린 것과 세 단계 내린 것을 같게 세면
+    # TS->S1 3건과 TS->S3 1건이 구분되지 않는다. 낮춘 폭을 곱해 더한다.
+    under_sev = sum(_SEV.get(t, 0) - _SEV.get(p, 0)
+                    for t, p in pairs if _SEV.get(p, 0) < _SEV.get(t, 0))
     # per-class recall (S1 관심)
     rec = {}
     for g in LABELS:
@@ -86,6 +90,7 @@ def eval_labelset(model_dir: str, path: Path) -> dict:
         "f1_macro": _f1_macro([t for t, _ in pairs], [p for _, p in pairs]),
         "high_risk_to_s3": hi_to_s3,
         "under_graded": under,
+        "under_graded_severity": under_sev,
         "per_class_recall": rec,
     }
 
@@ -117,6 +122,9 @@ def main() -> int:
     ap.add_argument("--fpr-max-docs", type=int, default=400)
     ap.add_argument("--report", default="reports/v5_gate/gate_verdict.json")
     ap.add_argument("--f1-regression-tol", type=float, default=0.02)
+    # 하향 허용치. 기본 0 = 한 건이라도 늘면 FAIL. 막힌 뒤에 올리면 그것이 곧 기준 이동이다.
+    ap.add_argument("--undergrade-tol", type=int, default=0)
+    ap.add_argument("--undergrade-severity-tol", type=int, default=0)
     args = ap.parse_args()
 
     Path("reports/v5_gate").mkdir(parents=True, exist_ok=True)
@@ -133,10 +141,28 @@ def main() -> int:
     def le(x, y):  # x ≤ y (None 은 무시=통과처리 안 함)
         return x is not None and y is not None and x <= y
 
-    axis1_pass = le(a1_c["high_risk_to_s3"], a1_b["high_risk_to_s3"]) and \
-        (a1_c["f1_macro"] >= a1_b["f1_macro"] - args.f1_regression_tol)
+    # [2026-08-16 보완] 종전 판정은 high_risk_to_s3 와 macro F1 만 봤다. under_graded 를
+    # 계산해 놓고 쓰지 않아 TS->S1 · TS->S2 · S1->S2 같은 미탐이 늘어도 통과했다.
+    # 외부 검토가 지적했고 코드로 확인했다. 하향은 전부 미탐 방향이므로 판정에 넣는다.
+    #
+    #   high_risk_to_s3          고등급이 S3(비밀 아님)로 샌 것. 최악
+    #   under_graded             한 단계라도 내린 것 전부
+    #   under_graded_severity    낮춘 폭을 곱해 더한 것(TS->S3 는 3, S1->S2 는 1)
+    #
+    # per-class recall 은 판정에 넣지 않는다. axis1 은 n=42 라 문서 1건이 2.4%p 이고
+    # "1건 차이로 FAIL" 은 잡음을 판정으로 만든다. 리포트에 남겨 사람이 본다.
+    def _no_worse(c: dict, b: dict) -> bool:
+        return (
+            le(c["high_risk_to_s3"], b["high_risk_to_s3"])
+            and le(c["under_graded"], b["under_graded"] + args.undergrade_tol)
+            and le(c["under_graded_severity"],
+                   b["under_graded_severity"] + args.undergrade_severity_tol)
+        )
+
+    axis1_pass = (_no_worse(a1_c, a1_b)
+                  and a1_c["f1_macro"] >= a1_b["f1_macro"] - args.f1_regression_tol)
     axis2_pass = True if args.skip_fpr else le(a2_c["over_classification_rate"], a2_b["over_classification_rate"])
-    axis3_pass = le(a3_c["high_risk_to_s3"], a3_b["high_risk_to_s3"])
+    axis3_pass = _no_worse(a3_c, a3_b)
     overall = bool(axis1_pass and axis2_pass and axis3_pass)
 
     verdict = {
@@ -155,7 +181,7 @@ def main() -> int:
         print("axis2 public FPR       : (skipped)")
     else:
         print(f"axis2 public FPR       : over-class {a2_c['over_classification_rate']} vs {a2_b['over_classification_rate']}  [{'PASS' if axis2_pass else 'FAIL'}]")
-    print(f"axis3 adversarial      : high→S3 {a3_c['high_risk_to_s3']} vs {a3_b['high_risk_to_s3']} | under-grade {a3_c['under_graded']} vs {a3_b['under_graded']}  [{'PASS' if axis3_pass else 'FAIL'}]")
+    print(f"axis3 adversarial      : high→S3 {a3_c['high_risk_to_s3']} vs {a3_b['high_risk_to_s3']} | under {a3_c['under_graded']} vs {a3_b['under_graded']} (sev {a3_c['under_graded_severity']} vs {a3_b['under_graded_severity']})  [{'PASS' if axis3_pass else 'FAIL'}]")
     print(f"OVERALL: {'PASS' if overall else 'FAIL'}   → {args.report}")
     return 0 if overall else 1
 
