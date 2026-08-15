@@ -142,6 +142,8 @@ def extract(path: str | Path) -> ExtractResult:
         return _extract_excel(p)
     if suffix in SUPPORTED_FORMAT_GROUPS["powerpoint"]:
         return _extract_pptx(p)
+    if suffix == "ppt":
+        return _extract_ppt_legacy(p)
     if suffix == "pdf":
         return _extract_pdf(p)
     if suffix in SUPPORTED_FORMAT_GROUPS["image_ocr"]:
@@ -1205,6 +1207,13 @@ def _extract_doc(p: Path) -> ExtractResult:
 
     exe = shutil.which("antiword")
     if not exe:
+        # [폴백] antiword 는 GPL 이라 배포 이미지에 없다(정책). 그래서 운영에서는 이
+        # 경로가 **항상** 비어 있었고 .doc 이 통째로 미지원이었다 - 실측 2026-08-15 에
+        # 컨테이너에서 확인했다(antiword·catppt·soffice 전부 없음).
+        # 순수 파이썬 경로로 폴백한다. COM 정답 대비 회수율 98~99.5%.
+        legacy = _extract_doc_legacy(p)
+        if legacy.text.strip():
+            return legacy
         return ExtractResult(
             text="", method="antiword", quality=0.0,
             error=".doc 추출에는 antiword 필요 (또는 .docx로 변환)",
@@ -1223,6 +1232,36 @@ def _extract_doc(p: Path) -> ExtractResult:
     err = (out.stderr.decode("utf-8", errors="replace") if out and out.stderr else "")[:200]
     return ExtractResult(text="", method="antiword", quality=0.0,
                          error=err or "antiword: no text extracted")
+
+
+def _extract_ppt_legacy(p: Path) -> ExtractResult:
+    """PowerPoint 97-2003(.ppt). 구현은 legacy_office 모듈 — 왜 직접 파싱하는지도 거기 있다."""
+    from koipa.modules.m2_preprocess.legacy_office import extract_ppt_text  # noqa: PLC0415
+
+    try:
+        text = extract_ppt_text(p)
+    except Exception as exc:  # noqa: BLE001
+        return ExtractResult(text="", method="ppt", quality=0.0, error=str(exc)[:160])
+    if not text.strip():
+        return ExtractResult(
+            text="", method="ppt", quality=0.0,
+            error=".ppt 에서 텍스트를 못 찾음(이미지 전용 슬라이드이거나 손상)",
+        )
+    return ExtractResult(text=text, method="ppt", quality=0.85)
+
+
+def _extract_doc_legacy(p: Path) -> ExtractResult:
+    """Word 97-2003(.doc). antiword(GPL) 없이 동작하는 경로."""
+    from koipa.modules.m2_preprocess.legacy_office import extract_doc_text  # noqa: PLC0415
+
+    try:
+        text = extract_doc_text(p)
+    except Exception as exc:  # noqa: BLE001
+        return ExtractResult(text="", method="doc", quality=0.0, error=str(exc)[:160])
+    if not text.strip():
+        return ExtractResult(text="", method="doc", quality=0.0,
+                             error=".doc 에서 텍스트를 못 찾음(손상 또는 다른 포맷)")
+    return ExtractResult(text=text, method="doc", quality=0.85)
 
 
 def _extract_pptx(p: Path) -> ExtractResult:
