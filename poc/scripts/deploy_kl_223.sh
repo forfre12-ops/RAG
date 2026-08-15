@@ -78,7 +78,9 @@ b "1. 소스 갱신 -> $BRANCH"
 tar czf ~/poc_src_backup_$STAMP.tgz src scripts 2>/dev/null && ok "백업 ~/poc_src_backup_$STAMP.tgz"
 git rev-parse --git-dir >/dev/null 2>&1 || git init -q
 git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REPO"
-git fetch --depth 1 origin "$BRANCH"
+# ⚠ `--depth 1` 은 이미 얕은 저장소에서 **조용히 옛 tip 을 남긴다.** 실측 2026-08-16:
+#   서버가 3df1e1c7 를 받아놓고 원격 tip 은 2caf9330 이었다. 옵션을 빼면 정상 갱신된다.
+git fetch origin "$BRANCH"
 SHA="$(git rev-parse FETCH_HEAD)"; SHORT="${SHA:0:12}"
 git archive FETCH_HEAD poc/src poc/scripts poc/tests poc/uv.lock poc/pyproject.toml \
     poc/Dockerfile.api.prod poc/Dockerfile.worker poc/docker-compose.yml \
@@ -177,6 +179,11 @@ if [ "$OWNER" != "1000" ]; then
   # 그것으로 고친다 - 배포자는 이미 docker 그룹이다.
   if docker run --rm -v "$PWD/artifacts_out:/x" alpine chown -R 1000:1000 /x 2>/dev/null; then
     ok "artifacts_out 소유권 -> uid1000(컨테이너 계정) · docker 로 정정"
+  fi
+  # ⚠ 컨테이너가 만든 model.safetensors 는 -rw------- 로 떨어진다. 호스트 계정(uid 다름)이
+  #   못 읽어 학습 산출물을 회수할 수 없다(실측 2026-08-16). 읽기 권한을 열어둔다.
+  if docker run --rm -v "$PWD/artifacts_out:/x" alpine chmod -R a+rX /x 2>/dev/null; then
+    ok "artifacts_out 읽기 권한 개방(학습 산출물 회수용)"
   else
     warn "artifacts_out 이 uid${OWNER} 소유다 - 컨테이너(uid1000)가 학습 산출물을 못 쓴다."
     warn "  수동 조치: docker run --rm -v ~/poc/artifacts_out:/x alpine chown -R 1000:1000 /x"
