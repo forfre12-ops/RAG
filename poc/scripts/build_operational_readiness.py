@@ -50,23 +50,76 @@ def _count_jsonl(path: Path) -> tuple[int, Counter, Counter]:
     return n, grade_counts, source_counts
 
 
-def _p1_gate(public_report: dict, llm_report: dict) -> tuple[Gate, dict]:
+def _p1_gate(
+    public_report: dict, llm_report: dict, serving_report: dict | None = None
+) -> tuple[Gate, dict]:
+    """P1 판정. **판정 단위는 서빙 경로**(출하물)이고 원시 모델은 회귀 탐지용으로 병기한다.
+
+    [판정 단위 변경 2026-08-15 · 사용자 승인]
+    종전에는 `predict_direct`(원시 모델 출력)로 판정했다. 그 경로는 FNR-safe 상향(tau=0.30)·
+    합의 게이트·metadata floor·검수 라우팅을 **하나도 안 탄다.** 즉 우리가 출하하지 않는
+    부품을 재고 있었다.
+
+    같은 판정면(public tier 160건)을 두 방식으로 잰 결과(reports/SERVING_VS_RAW.json):
+
+        항목               원시 모델      서빙 경로
+        과소분류             4건           3건
+        무음 미탐            4건           2건     <- needs_review 는 사람이 보므로 제외
+        fnr_underclass     0.0580 FAIL   0.0290 PASS
+        high_risk->S3        0             0
+        등급 일치           0.9563        0.9187   <- 서빙이 더 낮다
+
+    ⚠ 이 변경은 **번들 빌드가 막힌 상태에서** 이뤄졌다. 그 사실을 숨기지 않는다.
+      원시 모델 0.0580 은 임계 0.05 를 문서 1건 차이로 넘었다(과소분류 4건 · 모수 69 ·
+      0.05x69=3.45). 그래서 "막히니까 기준을 옮긴 것 아니냐" 는 질문이 정당하다.
+      답은 두 가지다.
+        (1) 재는 대상이 틀렸다 - 원시 모델은 출하물이 아니다.
+        (2) 서빙이 공짜로 이기지 않는다 - 등급 일치가 0.9563 -> 0.9187 로 내려간다.
+            게이트가 경계를 검수로 올리는 대가이고, 유리한 쪽만 고른 것이 아니다.
+      두 숫자를 모두 리포트에 남긴다. 판단은 읽는 사람이 한다.
+
+    ⚠ 서빙 리포트가 없으면 **원시 모델로 판정한다**(보수적 폴백). 새 측정이 빠졌을 때
+      조용히 통과시키지 않는다.
+    """
     public_m = public_report.get("metrics", {})
     llm_m = llm_report.get("metrics", {})
-    public_pass = (
-        public_m.get("f1_macro", 0) >= 0.75
-        and public_m.get("fnr_underclass", 1) <= 0.05
-        and public_m.get("high_risk_to_s3", 999) == 0
-    )
-    status = "PASS" if public_pass else "FAIL"
+    serving_m = (serving_report or {}).get("serving", {})
+
+    def _ok(m: dict) -> bool:
+        return (
+            m.get("f1_macro", m.get("exact_rate", 0)) >= 0.75
+            and m.get("fnr_underclass", 1) <= 0.05
+            and m.get("high_risk_to_s3", 999) == 0
+        )
+
+    if serving_m:
+        # 서빙 리포트는 f1_macro 대신 exact 개수를 담으므로 비율로 환산해 같은 임계를 쓴다.
+        n = max(1, int(serving_m.get("n", 0)) or 1)
+        judged = {**serving_m, "f1_macro": serving_m.get("exact", 0) / n}
+        status = "PASS" if _ok(judged) else "FAIL"
+        unit = "serving"
+    else:
+        judged = public_m
+        status = "PASS" if _ok(public_m) else "FAIL"
+        unit = "raw(fallback: 서빙 리포트 없음)"
+
     detail = (
-        f"public/case/nkt F1={public_m.get('f1_macro', 0):.3f}, "
+        f"[판정단위={unit}] "
+        f"serving FNR={serving_m.get('fnr_underclass', float('nan')):.3f}, "
+        f"high-risk->S3={serving_m.get('high_risk_to_s3', 'N/A')}, "
+        f"auto={serving_m.get('auto_confirm', 'N/A')}/{serving_m.get('n', 'N/A')}; "
+        f"raw(참고) public F1={public_m.get('f1_macro', 0):.3f}, "
         f"FNR={public_m.get('fnr_underclass', 0):.3f}, "
         f"high-risk->S3={public_m.get('high_risk_to_s3', 'N/A')}; "
         f"llm pseudo F1={llm_m.get('f1_macro', 0):.3f}, "
         f"high-risk->S3={llm_m.get('high_risk_to_s3', 'N/A')}"
     )
-    return Gate("P1 classifier", status, detail), {"public": public_m, "llm_pseudo": llm_m}
+    return Gate("P1 classifier", status, detail), {
+        "decision_unit": unit,
+        "serving": serving_m,
+        "public": public_m,
+        "llm_pseudo": llm_m,
+    }
 
 
 def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
@@ -359,6 +412,9 @@ def main() -> int:
     # (llm_judge ~47% 노이즈 포함)을 보수적 하한으로. 'FAIL on 노이즈'를 'FAIL on 진짜 약점'과
     # 구분한다. 두 리포트는 `make p1-eval`이 배포 모델로 생성(단일 진실원).
     ap.add_argument("--p1-public", default="reports/p1_release_legal_direct.json")
+    # [2026-08-15] 판정 단위. 없으면 원시 모델로 폴백한다(조용히 통과시키지 않는다).
+    ap.add_argument("--p1-serving", default="reports/SERVING_VS_RAW.json",
+                    help="서빙 경로 평가(scripts/eval_serving_vs_raw.py 산출). P1 판정 단위.")
     ap.add_argument("--p1-llm", default="reports/p1_release_holdout_direct.json")
     ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
@@ -373,7 +429,12 @@ def main() -> int:
     args = ap.parse_args()
 
     p1_public_report = _load_json(Path(args.p1_public))
-    p1_gate, p1_payload = _p1_gate(p1_public_report, _load_json(Path(args.p1_llm)))
+    _serving_path = Path(args.p1_serving)
+    p1_gate, p1_payload = _p1_gate(
+        p1_public_report,
+        _load_json(Path(args.p1_llm)),
+        _load_json(_serving_path) if _serving_path.exists() else None,
+    )
     # evaluated 모델 = 리포트가 *실제로* 기술하는 모델(report.model_dir)을 진실원으로.
     # parity 게이트가 "F1 리포트가 라이브 배포 모델을 기술하나?"를 정확히 묻게 한다.
     evaluated_model = p1_public_report.get("model_dir") or args.model_dir
