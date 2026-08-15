@@ -19,6 +19,14 @@ import json
 from pathlib import Path
 import sys
 
+# [cp949 2026-08-16] 한국어 Windows 콘솔은 cp949 다. 경고 문구의 em dash 하나에 출력이
+# 통째로 죽어 검사 결과를 못 읽었다. 문자를 쫓는 대신 출구를 고정한다.
+import io as _io
+for _s in ("stdout", "stderr"):
+    _f = getattr(sys, _s)
+    if getattr(_f, "encoding", "") and _f.encoding.lower() not in ("utf-8", "utf-8-sig"):
+        setattr(sys, _s, _io.TextIOWrapper(_f.buffer, encoding="utf-8", errors="replace"))
+
 _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "src"))
 
