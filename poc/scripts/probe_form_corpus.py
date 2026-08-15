@@ -83,9 +83,15 @@ def main(argv: list[str] | None = None) -> int:
         try:
             ex = extract(p)
             text = ex.text or ""
+            subs = "".join(c for c in text
+                           if not c.isspace() and c not in ("￼", "﻿", "​"))
+            warns = list(getattr(ex, "warnings", None) or [])
             rec.update(ok=bool(text.strip()) and not ex.error and ex.quality > 0,
-                       chars=len(text), method=ex.method,
+                       chars=len(text), substantive=len(subs), method=ex.method,
                        quality=round(float(ex.quality or 0), 3),
+                       # [무음 실패] 추출은 성공했다는데 판정할 본문이 없는 경우.
+                       # 이것이 가장 위험하다 - 오류가 없어 그대로 자동확정된다.
+                       thin=any("body_below_classifiable" in w for w in warns),
                        error=(ex.error or "")[:110])
         except Exception as exc:  # noqa: BLE001
             rec.update(ok=False, chars=0, method="EXCEPTION",
@@ -104,8 +110,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {i + 1}/{len(sample)} · {time.perf_counter() - t0:.0f}s")
 
     print(f"\n[done] {len(rows)}건 · {time.perf_counter() - t0:.0f}s\n")
+    print("0) 무음 실패 — 추출 성공인데 판정할 본문이 없다")
+    thin = [r for r in rows if r.get("thin")]
+    okk = [r for r in rows if r["ok"]]
+    print(f"   {len(thin)}/{len(okk)} = {len(thin) / max(1, len(okk)):.1%} (성공 판정분 기준)")
+    if thin:
+        te = Counter(r["ext"] for r in thin)
+        print(f"   확장자별 {dict(te)}")
+
+    print("")
     print("1) 포맷별 파싱")
-    print(f"   {'확장자':<10s}{'표본':>5s}{'성공':>5s}{'성공률':>8s}{'중앙자수':>9s}  주요 실패")
+    print(f"   {'확장자':<10s}{'표본':>5s}{'성공':>5s}{'성공률':>8s}{'중앙자수':>9s}{'무음':>7s}  주요 실패")
     for e in sorted({r["ext"] for r in rows}):
         g = [r for r in rows if r["ext"] == e]
         ok = [r for r in g if r["ok"]]
@@ -113,7 +128,9 @@ def main(argv: list[str] | None = None) -> int:
         med = chars[len(chars) // 2] if chars else 0
         errs = Counter(r.get("error", "").split(":")[0] for r in g if not r["ok"])
         top = errs.most_common(1)[0][0][:34] if errs else ""
-        print(f"   .{e:<9s}{len(g):>5d}{len(ok):>5d}{len(ok) / len(g):>8.0%}{med:>9d}  {top}")
+        nthin = sum(1 for r in g if r.get("thin"))
+        print(f"   .{e:<9s}{len(g):>5d}{len(ok):>5d}{len(ok) / len(g):>8.0%}{med:>9d}"
+              f"{nthin:>7d}  {top}")
 
     if svc is not None:
         graded = [r for r in rows if r.get("grade") and not str(r["grade"]).startswith("ERR")]
