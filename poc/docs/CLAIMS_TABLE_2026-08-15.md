@@ -122,6 +122,19 @@ ICD §3.3 `access_scope=all_employees → M=0` 을 구현해 열었다(2026-08-1
 
 ---
 
+## 5.5 회귀 상태 (2026-08-15)
+
+```
+lite 전체   2,578 passed · 44 skipped · 0 failed · 17분 9초
+            skip 은 전부 Postgres 미가용(로컬 환경) — 코드 사유 아님
+빌드 인자    docker build --build-arg KOIPA_BUILD_SHA=... 가 컨테이너 런타임에서 읽힘(실증)
+```
+
+배포 후 `healthz` 의 `build.git_sha` 가 배포한 커밋을 찍으면 반영 확인이다. 종전에는
+그것을 확인할 방법 자체가 없었다.
+
+---
+
 ## 6. 한 문장으로
 
 > **영업비밀을 놓치지 않는 것은 검증됐고, 얼마나 정확한지는 아직 말할 수 없다.**
