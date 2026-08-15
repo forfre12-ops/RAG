@@ -44,10 +44,15 @@ fi
 echo "  프로젝트: $(echo "$PROJECTS" | tr '\n' ' ')"
 
 # 프로젝트별 env 파일·포트를 되읽는다
+# ⚠ **api 서비스가 있는 프로젝트만** 대상으로 삼는다. 실측 2026-08-16: 223 에는 우리 스택
+#   말고 `lloydk-proxy-gold`(ollama) 가 따로 돈다. 그것까지 대상에 넣으면 6단계에서 엉뚱한
+#   이미지 태그를 만들고 7단계에서 남의 스택을 재기동해 **끊어놓는다.**
 declare -A P_ENV P_PORT
+TARGETS=""
 for P in $PROJECTS; do
   API="$(docker ps --filter "label=com.docker.compose.project=$P" --filter "label=com.docker.compose.service=api" --format '{{.Names}}' | head -1)"
-  if [ -z "$API" ]; then warn "$P: api 컨테이너 없음 - 건너뜀"; continue; fi
+  if [ -z "$API" ]; then warn "$P: api 서비스 없음 - 우리 스택이 아니므로 건드리지 않는다"; continue; fi
+  TARGETS="$TARGETS $P"
   P_PORT[$P]="$(docker port "$API" 2>/dev/null | head -1 | sed 's/.*://')"
   SUF="${P##*-}"
   for CAND in ".env.$SUF" ".env"; do
@@ -56,6 +61,9 @@ for P in $PROJECTS; do
   if [ -z "${P_ENV[$P]:-}" ]; then die "$P 의 env 파일을 못 찾았다 (.env.$SUF · .env 둘 다 없음)"; fi
   echo "    $P  env=${P_ENV[$P]}  port=${P_PORT[$P]:-?}"
 done
+TARGETS="${TARGETS# }"
+if [ -z "$TARGETS" ]; then die "api 서비스를 가진 프로젝트가 없다. 배포 대상이 없다."; fi
+ok "배포 대상: $TARGETS"
 
 # --- 1. 소스 갱신 -----------------------------------------------------------
 b "1. 소스 갱신 -> $BRANCH"
@@ -104,7 +112,7 @@ fi
 
 # --- 4. 지뢰 3: 환경변수 접두 -----------------------------------------------
 b "4. 환경변수 접두(KOIPA_)"
-for P in $PROJECTS; do
+for P in $TARGETS; do
   E="${P_ENV[$P]:-}"
   if [ -z "$E" ]; then continue; fi
   cp -n "$E" "$E.bak_$STAMP" 2>/dev/null || true
@@ -123,6 +131,31 @@ for P in $PROJECTS; do
     || warn "$E 에 KOIPA_AUDIT_CHAIN_SECRET 이 없다 - production 자격증명 누락으로 startup 이 죽는다"
 done
 
+# --- 4b. 워커 메모리 한도 ----------------------------------------------------
+# 실측 2026-08-16: 재학습이 **4GB 상한에서 SIGKILL** 되고 celery 가 다시 집어드는 순환에
+# 빠졌다(3.98GiB/4GiB 도달 시점 사망 · 새 모델 산출 0건 · 8/8 이후 계속). 원인은
+# docker-compose.prod.yml 의 기본값 `${WORKER_MEM_LIMIT:-4G}` 이고, 그 주석은 "워커는 배치
+# 분류·인덱싱이라 CPU 바운드" 라고 적고 있다 - **학습을 염두에 둔 값이 아니다.**
+#
+# ⚠ 182 에서는 .env 에 16G 로 적혀 있는데도 컨테이너가 4GiB 로 떠 있었다. 값을 적는 것만으로
+#   부족하고 **컨테이너 재생성**이 있어야 반영된다(이 스크립트 7단계가 한다).
+b "4b. 워커 메모리 한도"
+for P in $TARGETS; do
+  E="${P_ENV[$P]:-}"; [ -z "$E" ] && continue
+  CUR="$(grep -m1 '^WORKER_MEM_LIMIT=' "$E" 2>/dev/null | cut -d= -f2-)"
+  WANT="${WORKER_MEM_LIMIT:-16G}"
+  if [ "$CUR" != "$WANT" ]; then
+    sed -i '/^WORKER_MEM_LIMIT=/d' "$E"
+    printf 'WORKER_MEM_LIMIT=%s
+' "$WANT" >> "$E"
+    ok "$E: WORKER_MEM_LIMIT ${CUR:-미설정} -> $WANT"
+  else
+    ok "$E: WORKER_MEM_LIMIT $CUR"
+  fi
+done
+HOSTMEM="$(free -g 2>/dev/null | awk 'NR==2{print $2}')"
+[ -n "$HOSTMEM" ] && echo "    (호스트 총 메모리 ${HOSTMEM}GB)"
+
 # --- 5. 빌드 ----------------------------------------------------------------
 b "5. 빌드"
 DOCKER_BUILDKIT=1 docker compose $CF build \
@@ -140,7 +173,7 @@ ok "빌드 산출 ${BUILT}-{api,worker,beat}"
 
 # --- 6. 지뢰 4: 6개 태그(+ 되돌림 태그) -------------------------------------
 b "6. 태그"
-for P in $PROJECTS; do
+for P in $TARGETS; do
   for S in api worker beat; do
     docker image inspect "${P}-${S}:latest" >/dev/null 2>&1 \
       && docker tag "${P}-${S}:latest" "${P}-${S}:rollback-$STAMP"
@@ -151,7 +184,7 @@ ok "되돌림 태그 :rollback-$STAMP · 새 빌드 :latest"
 
 # --- 7. 기동 ----------------------------------------------------------------
 b "7. 기동"
-for P in $PROJECTS; do
+for P in $TARGETS; do
   ENV_FILE="${P_ENV[$P]}" API_HOST_PORT="${P_PORT[$P]:-8000}" \
     docker compose -p "$P" $CF up -d --no-build 2>&1 | grep -Ei 'error|started' | sed 's/^/    /' || true
 done
@@ -159,7 +192,7 @@ done
 # --- 8. 검증: 배포한 커밋이 실제로 도는가 -----------------------------------
 b "8. 검증"
 FAIL=0
-for P in $PROJECTS; do
+for P in $TARGETS; do
   PORT="${P_PORT[$P]:-8000}"
   OUT=""
   for i in $(seq 1 30); do
