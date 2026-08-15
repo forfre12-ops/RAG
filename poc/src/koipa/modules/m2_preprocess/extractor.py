@@ -464,6 +464,26 @@ def _extract_hwp(p: Path) -> ExtractResult:
         # .hwp 한정 표 보강. 합집합이라 rhwp 가 이미 잡은 내용은 중복되지 않는다.
         # coverage 는 그대로 "incomplete" 로 둔다 → 검수 라우팅 유지(설계 의도).
         if not is_hwpx:
+            # [HWP3 표] 실측 2026-08-15: 실제 업무 서식의 79.2%가 구형 HWP 3.x 이고
+            # 내용이 표 안에만 있는데 rhwp 본문은 객체 placeholder 한 글자만 낸다.
+            # unhwp 보강도 HWP3 표는 못 읽는다(회수 0자·표 0개).
+            #
+            # 그런데 rhwp 가 **HWPX 로 변환**할 수 있고 우리에겐 이미 정밀한 HWPX 표
+            # 추출기가 있다. 변환 후 그 경로로 셀을 뽑으면 회수된다 - 실측으로
+            # 거래명세표(1자) -> 374자, 견적서 -> 215자, 금형발주시방서 -> 224자.
+            #
+            # unhwp 보다 먼저 시도한다: HWP3 는 unhwp 가 아예 못 읽으므로 이쪽이 유일한
+            # 경로이고, HWP5 는 아래 unhwp 경로가 이미 잘 동작한다.
+            hx_recovered, hx_tables = _hwp_tables_via_hwpx_convert(p)
+            if hx_recovered:
+                merged = _append_if_missing(text, hx_recovered)
+                if len(merged) > len(text):
+                    text = merged
+                    tables = tables + hx_tables
+                    _warn_once(warnings, "hwp_tables_recovered_by_hwpx_convert")
+                    coverage = "incomplete"
+                    _warn_once(warnings, "hwp_table_cells_may_be_missing")
+
             recovered, unhwp_tables = _hwp_tables_via_unhwp(p)
             if recovered:
                 merged = _append_if_missing(text, recovered)
@@ -494,6 +514,32 @@ def _extract_hwp(p: Path) -> ExtractResult:
 # 근거(실측 2026-08-15): 정상 추출된 HWP 서식의 본문은 200자 이상이고, 표 전용 문서는
 # 1~5자(객체 placeholder)다. 그 사이에 안전한 경계가 있다.
 _MIN_SUBSTANTIVE_CHARS = 30
+
+
+def _hwp_tables_via_hwpx_convert(p: Path) -> tuple[str, list]:
+    """rhwp 로 HWPX 변환한 뒤 HWPX 표 추출기로 셀을 회수한다.
+
+    구형 HWP 3.x 서식은 내용이 전부 표 안에 있는데 rhwp 본문 추출은 객체 placeholder
+    한 글자만 낸다(실측 79.2%). unhwp 는 HWP3 를 아예 못 읽는다. 변환 경로가 유일하다.
+
+    실패는 조용히 빈 결과 — 회수 못 하면 위쪽 얇은-본문 가드가 검수로 라우팅한다.
+    """
+    try:
+        import rhwp  # noqa: PLC0415
+
+        doc = rhwp.parse(str(p))
+        if not hasattr(doc, "to_hwpx_bytes"):
+            return "", []          # rhwp-python < 0.8.1
+        blob = doc.to_hwpx_bytes()
+        if not blob:
+            return "", []
+        tables = _hwpx_tables(blob, source="hwpx_from_hwp")
+        if not tables:
+            return "", []
+        return _tables_to_text(tables), tables
+    except Exception as exc:  # noqa: BLE001 — 변환 실패가 추출 전체를 막지 않는다
+        logger.debug("hwp->hwpx table recovery skipped: %s", exc)
+        return "", []
 
 
 def _hwp_table_coverage(p: Path, doc, text: str, warnings: list[str] | None = None) -> str | None:
