@@ -537,8 +537,9 @@ def _hwp_tables_via_hwpx_convert(p: Path) -> tuple[str, list]:
         if not tables:
             return "", []
         return _tables_to_text(tables), tables
-    except Exception as exc:  # noqa: BLE001 — 변환 실패가 추출 전체를 막지 않는다
-        logger.debug("hwp->hwpx table recovery skipped: %s", exc)
+    except Exception:  # noqa: BLE001 — 변환 실패가 추출 전체를 막지 않는다
+        # ⚠ 여기서 로깅하려다 NameError 를 냈다(이 모듈엔 logger 가 없다). 예외를
+        #   삼키는 자리에서 되레 죽으면 회수 실패가 추출 실패로 번진다.
         return "", []
 
 

@@ -184,6 +184,11 @@ class DocumentIngestionService:
         content_bytes: bytes,
         doc_type: Optional[str] = None,
         source_type: Optional[str] = None,
+        # [ICD §3.2·§3.3] 관리성(M)의 근거. 본문에서 관측되지 않는 축이라 여기서 받지
+        # 않으면 영영 못 받는다. metadata_ 에 저장해 두면 분류 때 _effective_metadata 가
+        # 읽어 Gate 로 넘긴다.
+        security_marking: Optional[str] = None,
+        access_scope: Optional[str] = None,
         external_ref: Optional[str] = None,
         created_by: Optional[str] = None,
         db=None,
@@ -271,6 +276,8 @@ class DocumentIngestionService:
                 pre=pre,
                 doc_type=doc_type,
                 source_type=source_type,
+                security_marking=security_marking,
+                access_scope=access_scope,
                 external_ref=external_ref,
                 created_by=created_by,
                 requires_review=review_decision.requires_review,
@@ -409,8 +416,11 @@ class DocumentIngestionService:
         pre: Optional[PreprocessResult],
         doc_type: Optional[str],
         source_type: Optional[str],
-        external_ref: Optional[str],
-        created_by: Optional[str],
+        # ICD §3.2·§3.3 — metadata_ 에 저장해야 분류 때 _effective_metadata 가 읽는다
+        security_marking: Optional[str] = None,
+        access_scope: Optional[str] = None,
+        external_ref: Optional[str] = None,
+        created_by: Optional[str] = None,
         requires_review: bool = False,
         pages_processed: int | None = None,
         pages_total: int | None = None,
@@ -466,6 +476,9 @@ class DocumentIngestionService:
                         for k, v in {
                             "doc_type": doc_type,
                             "source_type": source_type,
+                            # ICD §3.2·§3.3 — 분류 때 _effective_metadata 가 읽어 게이트로 넘긴다
+                            "security_marking": security_marking,
+                            "access_scope": access_scope,
                             "pages_processed": pages_processed,
                             "pages_total": pages_total,
                             "extraction_complete": extraction_complete,

@@ -103,6 +103,24 @@ async def upload_document(
         description="ICD §3.1 출처: public | registered_patent | academic | internal | "
                     "external_confidential. 공개 출처면 분류 시 S3 로 cap 된다.",
     ),
+    # [ICD §3.2·§3.3] 관리성(M)의 근거. **본문에서 관측되지 않는 축**이라 이 경로가
+    # 없으면 영영 못 받는다 — 실측 2026-08-15: 실문서 업무문서에 관리 표시가 있는 것은
+    # 17~21% 뿐이고 나머지는 unknown 으로 남아 보수적 완성이 고등급으로 올린다.
+    # 그리고 정본에서 S1 은 (2,2,0) 하나뿐이라 M 이 0 으로 확정되지 않으면 **S1 이
+    # 구조적으로 도달 불가**다(봉인 판정면의 28%가 그래서 전부 TS 가 됐다).
+    #
+    # /classify 는 metadata dict 로 이미 받는데 업로드 경로에는 자리가 없었다.
+    # 파일로 들어온 문서는 관리성을 줄 방법이 없어 그 갭이 그대로 남는다.
+    security_marking: Optional[str] = Form(
+        default=None,
+        description="ICD §3.2 보안표시: top_secret | secret | confidential | none. "
+                    "표기가 있으면 접근범위보다 우선한다.",
+    ),
+    access_scope: Optional[str] = Form(
+        default=None,
+        description="ICD §3.3 접근범위: approved_only | designated | department | "
+                    "all_employees. 보안표시가 none 일 때 관리수준(M)을 정하는 주 입력.",
+    ),
     index_for_rag: bool = Form(default=False, description="True면 업로드 문서를 RAG 검색 컬렉션에도 적재"),
     rag_namespace: Optional[str] = Form(default=None, description="RAG 적재 컬렉션(미지정 시 settings.rag_upload_collection)"),
     enqueue_classification: bool = Form(default=False),
@@ -149,6 +167,8 @@ async def upload_document(
         content_bytes=body,
         doc_type=doc_type,
         source_type=source_type,
+        security_marking=security_marking,
+        access_scope=access_scope,
         external_ref=external_ref,
         created_by=actor_obj.user_id,
     )

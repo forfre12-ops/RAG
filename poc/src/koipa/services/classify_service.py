@@ -1438,7 +1438,16 @@ class ClassifyService:
         - best-effort: DB 미가용·문서 부재·content 직접분류(doc_id 없음)면 요청 metadata 그대로.
         """
         meta = dict(req.metadata or {})
-        if meta.get("source_type") or meta.get("source"):
+        # [ICD 3필드] 종전에는 source_type 이 있으면 여기서 바로 반환해 **관리성 두 필드를
+        # DB 에서 영영 안 읽었다.** 업로드 경로로 들어온 문서는 security_marking·access_scope
+        # 가 metadata_ 에 저장돼 있어도 분류 때 못 쓰였다는 뜻이다.
+        #
+        # 관리성은 본문에서 관측되지 않는 축이고(실측: 실문서 17~21% 만 표시 보유), 정본에서
+        # S1 은 (2,2,0) 하나뿐이라 M 이 0 으로 확정되지 않으면 S1 이 구조적으로 도달 불가다.
+        # 그 경로를 막고 있었다.
+        #
+        # 이제 세 필드를 각각 본다 — 요청에 있으면 그것이 우선이고, 없는 것만 DB 에서 채운다.
+        if all(meta.get(k) for k in ("source_type", "security_marking", "access_scope")):
             return meta
         # [FIX-D] 본문 마스트헤드 기반 공개출처 합성 주입 (요청/DB 출처가 없을 때만)
         text_for_masthead = content if content is not None else (req.content or "")
@@ -1448,7 +1457,9 @@ class ClassifyService:
                 "FIX-D: published-patent gazette masthead detected → source_type='공개특허'"
                 " (source-prior cap will apply, doc_id=%s)", req.doc_id,
             )
-            return meta
+            # ⚠ 여기서 반환하지 않는다. 출처를 알아냈다고 관리성까지 아는 것은 아니고,
+            #   업로드 때 저장된 security_marking·access_scope 는 아래 DB 하이드레이션
+            #   에서만 온다. 종전에는 여기서 끊겨 그 두 필드가 유실됐다.
         doc_uuid = self._parse_doc_uuid(req.doc_id)
         if doc_uuid is None:
             return meta
@@ -1462,9 +1473,14 @@ class ClassifyService:
                 doc = DocumentRepo(db).get(doc_uuid)
                 stored = getattr(doc, "metadata_", None) if doc is not None else None
                 if isinstance(stored, dict):
-                    src = stored.get("source_type") or stored.get("source")
-                    if src:
-                        meta["source_type"] = src
+                    if not (meta.get("source_type") or meta.get("source")):
+                        src = stored.get("source_type") or stored.get("source")
+                        if src:
+                            meta["source_type"] = src
+                    # ICD §3.2·§3.3 — 업로드 때 저장된 관리성 근거를 분류로 넘긴다.
+                    for key in ("security_marking", "access_scope"):
+                        if not meta.get(key) and stored.get(key):
+                            meta[key] = stored[key]
         except Exception as exc:  # noqa: BLE001
             logger.debug("_effective_metadata hydrate skipped (non-critical): %s", exc)
         return meta
