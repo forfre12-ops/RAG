@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -35,6 +36,15 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent  # poc/
+
+# [cp949 2026-08-15] 한국어 Windows 콘솔은 cp949 라서 본문의 em dash 하나에 출력이 죽는다.
+# 실측: `--help` 가 UnicodeEncodeError 로 통째로 실패했다 - 도움말조차 못 읽는 상태였다.
+# 기록된 교훈이고 gate_p1_candidate.py 가 쓰는 관용구를 그대로 쓴다. 문자를 하나씩 쫓는
+# 대신 출구를 고정한다 - 새 메시지가 들어와도 다시 죽지 않는다.
+for _s in ("stdout", "stderr"):
+    _f = getattr(sys, _s)
+    if getattr(_f, "encoding", "") and _f.encoding.lower() not in ("utf-8", "utf-8-sig"):
+        setattr(sys, _s, io.TextIOWrapper(_f.buffer, encoding="utf-8", errors="replace"))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1655,11 +1665,11 @@ def main() -> int:
     )
     ap.add_argument(
         "--skip-release-gate", action="store_true",
-        help="release-gate 검사를 건너뛴다(긴급 우회 — GA 비권장·감사대상). 기본은 fail-closed.",
+        help="release-gate 검사를 건너뛴다(긴급 우회 - GA 비권장·감사대상). 기본은 fail-closed.",
     )
     ap.add_argument(
         "--skip-embedder", action="store_true",
-        help="임베딩 모델(KURE-v1) HF 캐시 스테이징을 건너뛴다(비권장 — airgap onprem-local 은 "
+        help="임베딩 모델(KURE-v1) HF 캐시 스테이징을 건너뛴다(비권장 - airgap onprem-local 은 "
              "임베더 없으면 startup 이 죽는다). 임베더를 별도 채널로 공급할 때만.",
     )
     args = ap.parse_args()
