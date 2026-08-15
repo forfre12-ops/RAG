@@ -13,6 +13,13 @@
 #   docker buildx imagetools inspect python:3.11-slim   # → Digest 를 아래에 반영
 FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS base
 
+# [빌드 신원] 배포된 이미지가 어느 커밋에서 나왔는지를 런타임이 말할 수 있어야 한다.
+# 없으면 "서버가 그 SHA 를 실제로 실행 중인가" 를 확인할 방법이 없고, 릴리스 게이트의
+# --expect-git-sha 검증도 공중에 뜬다(실측 2026-08-15: healthz 에 sha 0건).
+ARG KOIPA_BUILD_SHA=unknown
+ARG KOIPA_BUILD_AT=unknown
+ENV KOIPA_BUILD_SHA=${KOIPA_BUILD_SHA} \
+    KOIPA_BUILD_AT=${KOIPA_BUILD_AT}
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \

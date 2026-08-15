@@ -281,6 +281,19 @@ def _check_compute() -> dict:
     }
 
 
+def _build_identity() -> dict:
+    """이미지에 구워진 빌드 신원. 미주입이면 unknown(배포 확인 불가 신호)."""
+    import os as _os
+
+    sha = (_os.environ.get("KOIPA_BUILD_SHA") or "").strip() or "unknown"
+    return {
+        "git_sha": sha,
+        "git_sha_short": sha[:12] if sha != "unknown" else "unknown",
+        "built_at": (_os.environ.get("KOIPA_BUILD_AT") or "").strip() or "unknown",
+        "classifier_model_dir": getattr(settings, "classifier_model_dir", "") or "",
+    }
+
+
 def _operational_config() -> dict:
     return {
         "classifier_model_dir": getattr(settings, "classifier_model_dir", ""),
@@ -390,6 +403,11 @@ def healthz():
     operational_config = _operational_config()
     return {
         "status": overall,
+        # [빌드 신원] 배포된 이미지가 어느 커밋에서 나왔는가. 이미지 빌드 시
+        # --build-arg KOIPA_BUILD_SHA=$(git rev-parse HEAD) 로 굽는다.
+        # 이것이 없으면 "서버가 그 SHA 를 실제로 실행 중인가" 를 확인할 길이 없고
+        # 릴리스 게이트의 --expect-git-sha 검증도 공중에 뜬다.
+        "build": _build_identity(),
         "model_version": "poc",
         "uptime_sec": int(time.time() - _START),
         "deploy_profile": getattr(settings, "deploy_profile", "unknown"),

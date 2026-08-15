@@ -235,6 +235,25 @@ def _norm_model(p: str) -> str:
     return (p or "").replace("\\", "/").strip().rstrip("/")
 
 
+def _git_sha() -> str:
+    """이 리포트를 만든 코드의 커밋. git 이 없으면 빈 문자열(게이트가 그것을 잡는다)."""
+    import subprocess  # noqa: PLC0415
+
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                             text=True, timeout=10)
+        return out.stdout.strip() if out.returncode == 0 else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _deploy_profile() -> str:
+    """리포트를 만든 환경의 배포 프로파일. 다른 프로파일 증거를 재사용하는 것을 막는다."""
+    import os as _os  # noqa: PLC0415
+
+    return (_os.environ.get("DEPLOY_PROFILE") or "").strip()
+
+
 def _deployed_model_default() -> str:
     """배포 모델 단일 진실원 = settings.classifier_model_dir(.env).
 
@@ -295,6 +314,8 @@ def _write_md(payload: dict, out: Path) -> None:
         "",
         f"- Verdict: **{payload['verdict']}**",
         f"- Generated at: `{payload['generated_at']}`",
+        f"- Git sha: `{payload.get('git_sha') or 'unknown'}`",
+        f"- Deploy profile: `{payload.get('deploy_profile') or 'unset'}`",
         f"- Evaluated model: `{payload['evaluated_model']}`",
         f"- Deployed model: `{payload['deployed_model']}`",
         f"- Retrieval config: `{payload['retrieval_config']}`",
@@ -440,6 +461,12 @@ def main() -> int:
         )
     payload = {
         "generated_at": _dt.date.today().isoformat(),
+        # [증거 신원] 이 리포트가 **어느 커밋·어느 프로파일**에서 나왔는지를 함께 남긴다.
+        # 없으면 릴리스 게이트가 "이 빌드에서 나온 증거인가" 를 물을 수 없고, 두 달 반
+        # 묵은 READY 가 다른 빌드에 재사용된다(실측 2026-08-15: manifest 6/1 READY vs
+        # readiness 8/5 FAIL). check_release_gate.py --require-fresh 가 이 필드를 본다.
+        "git_sha": _git_sha(),
+        "deploy_profile": _deploy_profile(),
         "verdict": _overall(gate_objects),
         "evaluated_model": _norm_model(evaluated_model),
         "deployed_model": _norm_model(args.deployed_model) or "unknown",
