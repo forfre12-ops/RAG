@@ -12,6 +12,8 @@
 #   2) 외부 볼륨 이름이 lloydk_hf_cache       compose 는 koipa_hf_cache 를 요구한다
 #   3) .env 가 LLOYDK_ 접두                   코드는 KOIPA_AUDIT_CHAIN_SECRET 을 읽는다 → startup 사망
 #   4) compose 프로젝트명이 lloydk-*          빌드는 기본 프로젝트명으로 이미지를 만든다 → 6개 태그 필요
+#   5) compose 파일이 리네임 전               airgap compose 가 lloydk-api 를 참조해 pull 실패
+#                                            (실측 2026-08-15, 182 에 13곳 잔존)
 #
 # 이 스크립트는 넷 다 **자동 탐지**한다. 이름을 하드코딩하지 않는다 — 223 의 실제
 # 이름을 모르기 때문이고, 모르는 것을 안다고 가정하면 그것이 다섯 번째 지뢰가 된다.
@@ -64,12 +66,18 @@ git fetch --depth 1 origin "$BRANCH"
 SHA="$(git rev-parse FETCH_HEAD)"; SHORT="${SHA:0:12}"
 git archive FETCH_HEAD poc/src poc/scripts poc/tests poc/uv.lock poc/pyproject.toml \
     poc/Dockerfile.api.prod poc/Dockerfile.worker poc/docker-compose.yml \
-    poc/docker-compose.prod.yml poc/docker-compose.dual.yml \
+    poc/docker-compose.prod.yml poc/docker-compose.dual.yml poc/docker-compose.airgap.yml poc/Makefile \
   | tar -x --strip-components=1 -C .
 ok "소스 $SHORT"
 
 # --- 2. 지뢰 1: uv.lock -----------------------------------------------------
 b "2. uv.lock 검사"
+# 리네임 잔재는 uv.lock 만이 아니다 - compose 파일도 본다(지뢰 5, 실측 2026-08-15).
+STALE="$(grep -l 'lloydk' docker-compose*.yml 2>/dev/null | xargs echo)"
+if [ -n "$STALE" ]; then
+  die "compose 에 리네임 전 이름이 남았다: $STALE - 위 git archive 가 덮었어야 한다. 브랜치를 확인할 것."
+fi
+ok "compose 리네임 정합"
 if grep -q 'koipa' uv.lock 2>/dev/null; then
   ok "koipa 워크스페이스 있음"
 else
