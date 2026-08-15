@@ -1233,6 +1233,18 @@ class ClassifyService:
         for w in warnings_acc:
             if "factors aligned to model grade" in w or "chunk severe-agg" in w:
                 return "model_estimated"
+            # [2026-08-15] 룰 경로 자신이 "요소 시드 미검출 · 콘텐츠등급 기반 추정" 이라고
+            # 공시했는데 응답은 그것을 rule_evidenced 라 부르고 있었다. 룰 엔진에서 s_lv·v_lv
+            # 는 content_grade(키워드 argmax 등급)에서 역산되므로(`strong = content_grade in
+            # ("TS","S1")`) 그 값은 법리 근거가 아니라 등급의 재진술이다. M 축에는 같은 공시가
+            # 이미 있었고 S·V 만 빠져 있었다.
+            #
+            # 실측 규모(RULE_EXTRACTOR_DIAGNOSIS 2026-08-12): v3 final_800 에서 secrecy·value
+            # 둘 다 낮게봄 84.6% · 과검출 0.0% · VALUE 누산점수는 300건 전부 0.0.
+            # 시드 보강·semantic·임계탐색이 모두 막혀(같은 문서 §7) 탐지 자체는 못 고친다.
+            # 고칠 수 있는 것은 **탐지 못 한 것을 탐지했다고 말하지 않는 것**이다.
+            if "독립 근거 없음" in w and "콘텐츠등급 기반 추정" in w:
+                return "model_estimated"
         return "rule_evidenced"
 
     @staticmethod

@@ -270,6 +270,11 @@ class RuleLabelResult:
     # 등) 또는 MANAGEMENT 요소 시드가 실제 매치됐으면 True. False면 m_lv 가 콘텐츠등급에서 추정된
     # 것(독립 근거 없음)이라 검수 시 M 확인이 필요하다는 신호. **등급에는 영향 없음**(순수 메타데이터).
     management_evidenced: bool = False
+    # [S·V축 가시화 2026-08-15] 같은 뜻을 S·V 로 넓힌 것. s_lv·v_lv 도 content_grade 에서
+    # 역산되는데(strong = content_grade in ("TS","S1")) M 에만 공시가 있었다.
+    # False 면 그 요소값은 근거가 아니라 등급의 재진술이다. **등급에는 영향 없음.**
+    secrecy_evidenced: bool = False
+    value_evidenced: bool = False
 
 
 def _accumulate_factor(factor_raw: dict[str, float], factor: str, score: float) -> None:
@@ -599,6 +604,7 @@ class LabelRuleEngine:
         # 경우"에만. 기본 floor=1 → 곱셈 붕괴(과소분류) 방지. 곱 결과가 콘텐츠 등급보다 낮으면
         # FNR-safe 콘텐츠 가드(R2)로 끌어올림(silent 하향 차단).
         svm_val = 0
+        secrecy_evidenced = value_evidenced = False
         # B안 곱셈은 영업비밀 4등급 스킴에만 적용 — 커스텀 등급(타 프로젝트 DB 스킴)은 우회(genericity 보존).
         if self.method == "multiplicative" and total > 0 and chosen in ("TS", "S1", "S2", "S3"):
             content_grade = chosen
@@ -649,6 +655,37 @@ class LabelRuleEngine:
                 " (검수 시 M 확인 권장)"
             ]
 
+        # [S·V 축 가시화 2026-08-15] M 에만 있던 공시를 S·V 로 넓힌다.
+        #
+        # 왜. 위 블록에서 s_lv·v_lv 는 **요소 근거가 아니라 content_grade(키워드 argmax
+        # 등급)에서 역산**된다 — `strong = content_grade in ("TS","S1")` 한 줄이 둘을 동시에
+        # 정한다. 그런데 응답의 factors_source 는 그것을 `rule_evidenced` 라 부른다. M 은
+        # 바로 위에서 "콘텐츠등급 기반 추정" 이라고 공시하는데 S·V 는 안 한다. 같은 방식으로
+        # 나온 값인데 하나만 밝히고 있었다.
+        #
+        # 실측(RULE_EXTRACTOR_DIAGNOSIS 2026-08-12)이 그 규모를 이미 재 놓았다.
+        #   v3 final_800   secrecy 낮게봄 84.6% · value 낮게봄 84.6% · 과검출 0.0%
+        #   누산 점수       VALUE 300건 전부 0.0 · SECRECY 전 문서 동일값 1.35
+        # 시드 보강·semantic·임계탐색 세 가지가 전부 막혔고(같은 문서 §7), 남은 정직한
+        # 조치는 **탐지 못 한 것을 탐지했다고 말하지 않는 것**이다.
+        #
+        # ⚠ 등급은 건드리지 않는다. 순수 공시다 - 여기서 등급을 움직이면 판정면이 바뀐다.
+        secrecy_evidenced = any(
+            to_canonical_factor(mm.factor) == "SECRECY" for mm in matches
+        )
+        value_evidenced = any(
+            to_canonical_factor(mm.factor) == "VALUE" for mm in matches
+        )
+        _unevidenced = [
+            name for name, ok in (("비공지성(S)", secrecy_evidenced), ("경제적유용성(V)", value_evidenced))
+            if not ok
+        ]
+        if chosen != "S3" and _unevidenced:
+            warnings = warnings + [
+                f"{' · '.join(_unevidenced)} 독립 근거 없음 — 요소 시드 미검출, "
+                "콘텐츠등급 기반 추정 (검수 시 확인 권장)"
+            ]
+
         return RuleLabelResult(
             grade=chosen,
             confidence=round(conf, 4),
@@ -659,6 +696,8 @@ class LabelRuleEngine:
             svm=svm_val,
             warnings=warnings,
             management_evidenced=management_evidenced,
+            secrecy_evidenced=secrecy_evidenced,
+            value_evidenced=value_evidenced,
         )
 
     def _count(
