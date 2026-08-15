@@ -25,12 +25,45 @@
 |---|---|---|---|
 | **B-1** | 서버가 빌드 sha 를 노출하지 않음 → 배포 확인 불가 | 2026-08-15 수정. **재배포로 반영 필요** | 배포 |
 | **B-2** | ICD §3.1 enum 을 배포본이 인식 못함 | 2026-08-15 수정. **재배포로 반영 필요** | 배포 |
+| **B-2b** | **ICD 메타데이터가 세 경로 중 두 곳에서 끊겨 있었음** | 2026-08-15 수정. **재배포로 반영 필요** | 배포 |
 | **B-3** | `review_batch` 필터 미배포 → 검수자가 306건 중 120건 못 고름 | 2026-08-15 구현. **재배포 필요** | 배포 |
 | **B-4** | 223 서버 `api_key_role=system` → 서명 불가 | `_jwt_auth.py:258` `_resolve_api_key_roles` | 설정 |
 | **B-5** | 서명 잡 미등록 → 검수자에게 서명 대상 없음 | `register_review_signoff_job.py` (재시작마다 재실행) | 절차 |
 | **B-6** | 저장 암호화 키 미주입 | `storage_encryption_enabled` — 하드닝 프로파일은 True, 키는 별도 | 운영 |
 | **B-7** | JWT issuer/audience/JWKS 미설정 | 현재 `auth_mode=api_key`. 검수 권한 분리의 정석 경로 | 운영 |
 | **B-8** | 임베딩 모델 오프라인 미동봉 | 로드 실패 시 HashEmbedding 무음 폴백 | 번들 |
+
+### B-2b 상세 — 사용자가 잡은 것
+
+> "현재 문서만 업로드되지, 메타값은 주게 되어 있지 않잖아?"
+
+맞았다. 확인하니 **끊긴 곳이 세 군데**였다.
+
+```
+POST /classify           metadata dict 통째로              ✅ 인수 팩이 쓴 유일한 길
+POST /documents          source_type 만                    ❌ 관리성 2필드 자리 없음
+POST /documents/analyze  아무것도 없음                      ❌ 콘솔·시연·E2E 하니스가 타는 길
+_effective_metadata      source_type 있으면 조기 반환        ❌ DB 의 관리성 2필드를 영영 안 읽음
+```
+
+인수 실행이 PASS 였던 이유는 팩이 `/classify` 로만 돌기 때문이다. KL 이 실제로 쓸 두
+경로는 검증된 적이 없었다.
+
+실측(같은 본문 · `METADATA_FLOOR_ENABLED=true`):
+
+```
+메타 없음                      S3  needs_review
+access_scope=approved_only    S3  needs_review   metadata-access-conflict · metadata-management
+security_marking=secret       S1  staging        metadata-floor · metadata-management
+source_type=public            S3  needs_review
+```
+
+⚠ **`metadata_floor_enabled` 의 코드 기본값은 False 다.** 켜는 것은 프로파일이고
+  `onprem-local` · `full-train` 둘 다 True 이며 182 의 두 스택이 각각 그것이다
+  (`:8000` full-train · `:8001` onprem-local — 8/15 서버에서 확인). **223 배포 시
+  프로파일을 확인할 것.** 기본값으로 뜨면 메타데이터를 보내도 아무 일도 안 일어난다.
+
+---
 
 ## 2. 🟠 외부의존 (KL·발주처)
 
