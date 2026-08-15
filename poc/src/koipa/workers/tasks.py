@@ -360,10 +360,17 @@ def _mark_training_run(run_id, *, status: str, **fields) -> None:
             if status == "running":
                 repo.mark_started(rid)
             elif status == "completed":
+                _mv = fields.get("model_version")
+                if _mv is not None and not hasattr(_mv, "hex"):
+                    try:
+                        _mv = _uuid.UUID(str(_mv))
+                    except (ValueError, AttributeError, TypeError):
+                        _mv = None      # 형식이 이상하면 연결만 포기한다(완료 기록은 남긴다)
                 repo.mark_completed(
                     rid,
                     final_metrics=fields.get("final_metrics") or {},
                     duration_sec=fields.get("duration_sec"),
+                    model_version=_mv,
                 )
             elif status == "failed":
                 repo.mark_failed(rid, fields.get("error", ""))
@@ -530,9 +537,15 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         out["deploy"] = {"registered": False, "reason": "exception"}
 
     # 학습·게이트 성공 → 상태 completed (소비 성패와 무관 — 소비는 아래 별도 처리).
+    # [2026-08-16] 어느 모델이 나왔는지 학습 작업 기록에 남긴다. 종전에는 이 연결이
+    # 한 방향뿐이라(tb_model_versions.training_run_id 만) `GET /train/jobs` 의
+    # model_version 이 항상 null 이었다 - KL 서버에서 재학습이 완주해 v-24c7c02c 가
+    # 정상 등록됐는데도 화면에서는 "어떤 모델이 나왔는지" 를 볼 수 없었다.
+    _mv = (out.get("deploy") or {}).get("version_id")
     _mark_training_run(
         run_uuid,
         status="completed",
+        model_version=_mv,
         final_metrics={
             "corrections_incorporated": len(incorporated_ids),
             "deploy": out.get("deploy"),
