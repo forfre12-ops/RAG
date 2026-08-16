@@ -20,6 +20,14 @@
 
 ⚠ work_mem 은 **연결 × 정렬 노드마다** 잡히는 값이다. 크게 올리면 동시 접속에서
   메모리가 곱해진다. 이 컨테이너 상한이 2GiB 라 얼마까지 안전한지도 함께 따진다.
+
+⚠ 첫 판(2026-08-16)은 **틀린 값을 냈다.** 연결 하나로 40회를 돌렸더니 여섯 조합이
+  전부 1,415~1,457ms 로 붙어 나왔다. `diag_pg_conn_effect.py` 로 원인을 확인했다:
+  같은 연결에서 11회차부터 PostgreSQL 이 준비구문을 **범용 계획(generic plan)** 으로
+  바꿔 4~8배 느려진다(200ms -> 900~2,100ms). 즉 여섯 조합 모두 범용 계획을 잰 것이라
+  설정 차이가 묻혔다.
+  출하 경로(`search_hybrid`)는 호출마다 연결을 반납해 이 전환이 안 일어난다. 그래서
+  이 스윕도 **회차마다 새 연결**로 바꿨다 - SET 은 세션 단위라 연결마다 다시 건다.
 """
 from __future__ import annotations
 
@@ -111,27 +119,35 @@ def main(argv: list[str] | None = None) -> int:
 
     out: dict = {"collection": args.collection, "n_queries": len(prepared), "runs": []}
     print(f"  {'work_mem':>9s} {'workers':>8s}   {'p50':>8s} {'p95':>8s} {'평균':>8s}   정렬방식")
+    def _set(c) -> None:
+        c.execute(text(f"SET work_mem = '{wm}'"))
+        c.execute(text(f"SET max_parallel_workers_per_gather = {workers}"))
+
     for wm, workers in combos:
-        with vs._engine.connect() as c:
-            c.execute(text(f"SET work_mem = '{wm}'"))
-            c.execute(text(f"SET max_parallel_workers_per_gather = {workers}"))
-            for qt, qv in prepared[:5]:  # 워밍업
+        for qt, qv in prepared[:5]:          # 워밍업 - 시간은 안 잰다
+            with vs._engine.connect() as c:
+                _set(c)
                 c.execute(text(SQL_HYBRID), {"collection": col, "qt": qt, "q": qv,
                                              "cand": _CAND_N, "k": _RRF_K,
                                              "topk": 5}).fetchall()
-            ts: list[float] = []
-            for qt, qv in prepared:
-                p = {"collection": col, "qt": qt, "q": qv, "cand": _CAND_N,
-                     "k": _RRF_K, "topk": 5}
-                t0 = time.perf_counter()
+        ts: list[float] = []
+        for qt, qv in prepared:
+            p = {"collection": col, "qt": qt, "q": qv, "cand": _CAND_N,
+                 "k": _RRF_K, "topk": 5}
+            # 출하 경로와 같게 회차마다 새 연결. SET 은 세션 단위라 매번 다시 건다.
+            with vs._engine.connect() as c:
+                _set(c)
+                t0 = time.perf_counter()     # SET 비용은 재지 않는다
                 c.execute(text(SQL_HYBRID), p).fetchall()
                 ts.append((time.perf_counter() - t0) * 1000)
-            # 정렬이 아직 디스크로 넘치는지 한 번 확인
+        # 정렬이 아직 디스크로 넘치는지 한 번 확인
+        methods: list[str] = []
+        with vs._engine.connect() as c:
+            _set(c)
             plan = c.execute(text(f"EXPLAIN (ANALYZE, FORMAT JSON){SQL_HYBRID}"),
                              {"collection": col, "qt": prepared[0][0], "q": prepared[0][1],
                               "cand": _CAND_N, "k": _RRF_K, "topk": 5}).scalar()
             pj = plan[0] if isinstance(plan, list) else json.loads(plan)[0]
-            methods: list[str] = []
 
             def _walk(n: dict) -> None:
                 if n.get("Sort Method"):
@@ -157,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     Path(args.report).write_text(json.dumps(out, ensure_ascii=False, indent=2), "utf-8")
     print(f"\n[report] {args.report}")
     print("\n⚠ work_mem 은 연결 × 정렬 노드마다 잡힌다. 값을 올릴 때 동시 접속 수를 함께 봐야 한다.")
+    print("⚠ 회차마다 새 연결로 잰다. 연결을 재사용하면 11회차부터 범용 계획으로 바뀌어")
+    print("  4~8배 느려진다(diag_pg_conn_effect.py 실측) - 그러면 설정 차이가 묻힌다.")
     return 0
 
 
