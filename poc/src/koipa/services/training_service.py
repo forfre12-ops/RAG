@@ -337,7 +337,34 @@ def activate_model_manually(
                 locked = {"ready": False, "reason": f"readiness_error:{type(exc).__name__}"}
                 locked_ready = False
             locked_block = manual_require_locked and not locked_ready
-            gate_ok = decision.passed and not locked_block
+            # [3축 연결 2026-08-16] gate_p1_candidate.py 의 판정을 활성화 조건에 넣는다.
+            # 종전에는 그 결과가 reports/v5_gate/*.json 에만 남고 **읽는 코드가 0곳**이었다
+            # (실측: grep -rn "gate_verdict|v5_gate" src/ -> 없음). 즉 3축에서 떨어진 모델도
+            # 활성화 API 로 들어갈 수 있었다.
+            #
+            # deploy_gate 와 겹치지 않는다 - 그쪽은 fnr_high·f1_macro 두 지표를 보고,
+            # 3축은 경화 홀드아웃·공개문서 FPR·적대 셋이라는 **다른 판정면**을 본다.
+            #
+            # ⚠ 기본은 fail-open 이다. 리포트가 없으면 막지 않고 사유에만 남긴다 - 3축은
+            #   사람이 손으로 돌리는 절차라 없다고 막으면 기존 수동 활성이 전부 멈춘다.
+            #   강제하려면 axis_gate_required=True 로 옵트인한다.
+            #   다만 **판정이 있고 미통과면 required 와 무관하게 막는다** - 명시적으로
+            #   떨어진 것을 통과시킬 이유는 없다.
+            try:
+                from koipa.modules.m6_evaluation.axis_gate_link import (  # noqa: PLC0415
+                    axis_gate_blocks,
+                )
+                _axis_block, _axis = axis_gate_blocks(
+                    str(getattr(target, "model_uri", "") or version_label),
+                    required=bool(getattr(settings, "axis_gate_required", False)),
+                )
+            except Exception as exc:  # noqa: BLE001
+                # 조회 실패가 활성화를 막지 않게 한다(관측만) - 게이트가 죽어서 운영이 멈추면
+                # 그것이 더 큰 사고다. 대신 사유에 남는다.
+                logger.warning("axis gate lookup failed (ignored): %s", exc)
+                _axis_block, _axis = False, None
+
+            gate_ok = decision.passed and not locked_block and not _axis_block
 
             # [배포전 하드닝 P0#①-b/c] 하드닝 프로파일에선 force 우회 시 사유(reason)와 **식별된
             # actor** 를 요구한다 — 미검증 모델을 GA로 강제 활성하려면 '왜'와 '누가'를 남긴다
@@ -354,6 +381,8 @@ def activate_model_manually(
                     reasons.append(f"deploy_gate_failed: {decision.reason}")
                 if locked_block:
                     reasons.append(f"locked_eval_not_ready: {locked.get('reason')}")
+                if _axis_block and _axis is not None:
+                    reasons.append(f"axis_gate_blocked: {_axis.reason}")
                 if reason_missing:
                     reasons.append("force_reason_required: force 우회에는 사유(reason) 필수")
                 if actor_missing:
@@ -378,6 +407,11 @@ def activate_model_manually(
                 }
 
             forced = bool(force and not gate_ok)
+            if _axis is not None and not _axis.found:
+                logger.warning(
+                    "manual activate: 3축 게이트 판정 없음 - %s (fail-open 으로 진행)",
+                    _axis.reason,
+                )
             repo.activate_model_version(target.version_id)
             logger.warning(
                 "manual activate: version=%s baseline=%s gate_passed=%s locked_ready=%s "

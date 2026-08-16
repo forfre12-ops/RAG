@@ -520,6 +520,10 @@ class Settings(BaseSettings):
     # warmup 에서 '모델 dir 해석됐는데 미로드' 를 fail-clear 로 차단(require_real_embedder 의 형제).
     # 모델 dir 미설정(rule-fallback 의도)은 대상 아님 — 로드-실패 폴백 경로에서만 작동.
     require_real_classifier: bool = False
+    # [3축 연결 2026-08-16] gate_p1_candidate.py 판정이 없을 때 활성화를 막을지.
+    # 기본 False = fail-open(사유만 기록). 3축은 사람이 손으로 돌리는 절차라 없다고 막으면
+    # 기존 수동 활성이 전부 멈춘다. **판정이 있고 미통과면 이 값과 무관하게 막는다.**
+    axis_gate_required: bool = False
 
     # 검증 라벨 내용해시(file_hash) 재사용 (기본 True). doc_id는 업로드마다 gen_random_uuid라
     # 유니크 → 같은 문서를 *재업로드*하면 새 doc_id가 되어, 기존 doc_id 기반 검증라벨 재사용
@@ -1037,6 +1041,11 @@ apply_profile_defaults(settings)
 _SAFETY_GATES: tuple[tuple[str, str], ...] = (
     ("agreement_gate_enabled", "AGREEMENT_GATE_ENABLED"),
     ("metadata_floor_enabled", "METADATA_FLOOR_ENABLED"),
+    # ⚠ axis_gate_required 도 여기 넣지 않는다(2026-08-16 에 잘못 넣었다가 뺌). 이 집합은
+    #   **하드닝에서 켜져 있어야 하는 것**이고 CI·startup 이 강제한다. axis_gate_required 는
+    #   기본 False 인 옵트인이다 - 3축 게이트는 사람이 손으로 돌리는 절차라 강제하면 기존
+    #   수동 활성이 전부 멈춘다. 판정이 있고 미통과면 이 플래그와 무관하게 막으므로
+    #   "꺼지면 조용히 위험해지는 것" 에 해당하지 않는다.
     # ⚠ factor_shadow_* 는 여기 넣지 않는다. 안전 게이트가 아니다 — 섀도는 등급도
     #   status 도 바꾸지 않는 **계량 전용**이라 꺼져 있어도 무음 열화가 없다. 이 집합은
     #   "꺼지면 조용히 위험해지는 것" 만 담고 CI·startup 이 그것을 강제한다.
