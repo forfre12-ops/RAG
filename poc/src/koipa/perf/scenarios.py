@@ -1305,51 +1305,55 @@ def s12_large_batch(ctx: ScenarioContext) -> None:
 # S14. ES 정전 후 자동 복구 (DR 리허설)
 # ----------------------------------------------------------------
 
-def s14_es_dr(ctx: ScenarioContext) -> None:
-    """dryrun: ES 가용성 확인만. full: docker 정전 시뮬레이션 (PSH_S14_SIMULATE_OUTAGE=1 옵트인).
+def s14_store_dr(ctx: ScenarioContext) -> None:
+    """dryrun: 저장소 가용성 확인만. full: docker 정전 시뮬레이션 (PSH_S14_SIMULATE_OUTAGE=1 옵트인).
 
-    W12+ 블록 6 B3 보강:
-    - 옵트인 시 docker compose pause/unpause 시도 (PSH_S14_DOCKER_BIN 환경변수로 docker 바이너리 지정)
-    - 권한·환경 의존이 강해 dryrun 기본은 비활성, 운영 단계에서 nightly로 1회 실행 권장
+    2026-08-17: 대상을 ES → PostgreSQL 로 바꿨다. 이 배포의 벡터스토어는 pgvector 이고
+    (vector_backend 기본값 pg · 배포 프로파일 전부 pg), ES 어댑터는 레거시라 서버에 없다.
+    ES 를 세워 재는 건 쓰지 않는 구성을 만들어 재는 것이라 배포본 근거가 되지 못한다.
+    권한·환경 의존이 강해 dryrun 기본은 비활성, 운영 단계에서 nightly 1회 실행 권장.
     """
     import os as _os
     import subprocess as _sp
 
-    # 가용성 식별 자체가 KPI — capture_env가 UP/DOWN 양쪽 다 반환하면 True.
-    # dryrun(--no-probe)에서도 False라는 답을 받았다는 사실로 "식별 가능" 의미.
+    # 가용성 식별 자체가 KPI — capture_env 가 UP/DOWN 양쪽 다 반환하면 True.
+    # dryrun(--no-probe)에서도 False 라는 답을 받았다는 사실로 "식별 가능" 의미.
     ctx.record("s14_1", True)
 
-    # 옵트인 옵트아웃 — 환경변수로만 활성화 (자동 무중단 실행 금지)
+    # 옵트인 — 환경변수로만 활성화 (자동 무중단 실행 금지)
     if _os.environ.get("PSH_S14_SIMULATE_OUTAGE", "").lower() not in ("1", "true", "yes"):
+        print("[PSH][S14] 정전 시뮬레이션 미옵트인 — S14.2/S14.3 무측정"
+              " (PSH_S14_SIMULATE_OUTAGE=1 로 활성화, 컨테이너 pause/unpause 를 실제로 수행)")
         return
-    if not ctx.resources.has("es"):
-        ctx.skip("S14 정전 시뮬레이션 옵트인됐으나 ES 미가용 (resources.es=False)")
+    if not ctx.resources.has("pg"):
+        ctx.skip("S14 정전 시뮬레이션 옵트인됐으나 PG 미가용 (resources.pg=False)")
         return
 
     docker_bin = _os.environ.get("PSH_S14_DOCKER_BIN", "docker")
-    container_name = _os.environ.get("PSH_S14_ES_CONTAINER", "koipa-es")
+    container_name = _os.environ.get("PSH_S14_PG_CONTAINER", "koipa-jjw-postgres-1")
 
-    # 1. 정전 → ES 응답 안 됨 확인
+    def _pg_ok() -> bool:
+        try:
+            from sqlalchemy import text  # noqa: PLC0415
+
+            from koipa.db import engine  # noqa: PLC0415
+
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    # 1. 정전 → 응답 안 됨 확인
     try:
         _sp.run([docker_bin, "pause", container_name], check=False, timeout=10, capture_output=True)
     except Exception:  # noqa: BLE001
         ctx.skip(f"docker pause 실패 — bin={docker_bin}, container={container_name}")
         return
 
-    import httpx  # type: ignore
-
-    # error_rate 측정 (정전 중)
     n_attempts = 5
-    n_errors = 0
-    for _ in range(n_attempts):
-        try:
-            r = httpx.get("http://localhost:9200/", timeout=3.0)
-            if r.status_code >= 500 or r.status_code == 0:
-                n_errors += 1
-        except Exception:  # noqa: BLE001
-            n_errors += 1
-    error_rate = n_errors / n_attempts
-    ctx.record("s14_2", error_rate)
+    n_errors = sum(0 if _pg_ok() else 1 for _ in range(n_attempts))
+    ctx.record("s14_2", n_errors / n_attempts)
 
     # 2. 복구 → 정상화까지 polling
     t_resume_start = time.perf_counter()
@@ -1360,27 +1364,15 @@ def s14_es_dr(ctx: ScenarioContext) -> None:
 
     recovery_ms: float | None = None
     for _ in range(60):  # 최대 60초
-        try:
-            r = httpx.get("http://localhost:9200/", timeout=2.0)
-            if r.status_code < 400:
-                recovery_ms = (time.perf_counter() - t_resume_start) * 1000.0
-                break
-        except Exception:  # noqa: BLE001
-            pass
+        if _pg_ok():
+            recovery_ms = (time.perf_counter() - t_resume_start) * 1000.0
+            break
         time.sleep(1.0)
 
     if recovery_ms is not None:
         ctx.record("s14_3", recovery_ms)
-
-    # S14.2 / S14.3은 require=es + 명시 옵트인 환경변수
-    import os as _os
-
-    if _os.environ.get("PSH_S14_SIMULATE_OUTAGE", "").lower() in ("1", "true", "yes") and ctx.resources.has("es"):
-        # 의도적으로 PoC 범위 외 — Docker 컨트롤이 환경 가정. 명시 옵트인 시에만 시도.
-        # 실제 docker stop/start는 권한·환경 의존이라 본 PoC에서는 placeholder.
-        # full 운영 단계 W12+ DR 리허설에서 실측.
-        pass
-    # 미옵트인 시 S14.2/S14.3은 record 없음 → SKIP 처리
+    else:
+        print(f"[PSH][S14] 60초 내 PG 복구 확인 실패 — container={container_name} 상태 확인 필요")
 
 
 # ----------------------------------------------------------------
@@ -1400,13 +1392,16 @@ def s15_backup_restore(ctx: ScenarioContext) -> None:
         ctx.skip(f"dr_restore_check.py not found: {script}")
         return
 
+    proc = None
     try:
         proc = _sp.run(
             # dr_restore_check.py 는 --dry-run 플래그가 없다. 과거 이 잘못된 플래그가
             # argparse 오류(exit 2)를 냈고, 아래 rc 허용에 2 가 포함돼 "배선 파손을 초록으로
             # 삼키는" fake-green 이었다. 실 인프라가 없는 perf/dryrun 맥락이므로 유효 플래그
             # --skip-infra 로 호출한다(백업 recency 만 검사).
-            [_sys.executable, str(script), "--skip-infra"],
+            # --storage-dir: 폐쇄망 배포는 원문을 로컬FS 에 두므로 그 아카이브 신선도까지 본다
+            # (minio 는 이 배포에서 쓰지 않는다 — storage_backend=local).
+            [_sys.executable, str(script), "--skip-infra", "--storage-dir", "backups/storage"],
             cwd=str(poc_root),
             check=False,
             timeout=30,
@@ -1421,7 +1416,23 @@ def s15_backup_restore(ctx: ScenarioContext) -> None:
     # 과거 `rc in (0,1,2)` 는 argparse 오류(2)를 PASS 로 삼켜 배선 파손을 은폐했다(fake-green).
     ctx.record("s15_1", rc in (0, 1))
 
-    # S15.2는 require=pg+es+minio. 미가용 시 자동 SKIP.
+    # S15.2 백업 신선도 — 스크립트가 stdout 으로 내는 JSON 리포트를 읽는다. 이전에는
+    # requires=[pg,es,minio] 로 걸어 두고 기록 코드가 아예 없어 영구 무측정이었다.
+    # 이 배포의 백업 대상은 PG 덤프와 원문 로컬FS 아카이브 둘이다(minio·es 미사용).
+    try:
+        import json as _json  # noqa: PLC0415
+
+        payload = _json.loads((proc.stdout or b"").decode("utf-8", "replace")) if proc else {}
+        wanted = {"pg_backup_recency", "storage_backup_recency"}
+        results = {c["name"]: bool(c["ok"]) for c in payload.get("checks", [])
+                   if c.get("name") in wanted}
+        if results:
+            ctx.record("s15_2", all(results.values()))
+        else:
+            print("[PSH][S15] 백업 신선도 항목이 리포트에 없다 — 검사 구성 확인 필요")
+    except Exception as exc:  # noqa: BLE001
+        # 값을 남기지 않는다 — 무측정은 SKIP 이고, False 로 적으면 파싱 실패가 결함으로 둔갑한다.
+        print(f"[PSH][S15] DR 리포트 파싱 실패(무측정 처리) - {type(exc).__name__}: {exc}")
 
 
 SPECS: list[ScenarioSpec] = [
@@ -1440,6 +1451,6 @@ SPECS: list[ScenarioSpec] = [
     ScenarioSpec("S17", "감사 로그 무결성", s17_audit_log, requires=["pg"]),
     ScenarioSpec("S18", "폐쇄망 번들 무결성", s18_offline_bundle),
     ScenarioSpec("S12", "대용량 일괄 분류 (100/500/1000)", s12_large_batch),
-    ScenarioSpec("S14", "ES DR 리허설", s14_es_dr),
+    ScenarioSpec("S14", "저장소 DR 리허설 (PG)", s14_store_dr),
     ScenarioSpec("S15", "백업·복원 라운드트립", s15_backup_restore),
 ]

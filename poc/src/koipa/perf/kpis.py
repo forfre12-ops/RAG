@@ -198,15 +198,25 @@ KPIS: list[KPI] = [
     KPI("S12.4", "S12", "N=1001 거부 (413)", "bool", "ge", True, "bool_all"),
     KPI("S12.5", "S12", "N=1000 p95 latency", "ms", "le", 60000, "p95"),
 
-    # S14 ES 정전 후 자동 복구 (W12 확장)
-    # dryrun: 가용성 식별만. full: docker 시뮬레이션 (require=es + 명시 실행)
-    KPI("S14.1", "S14", "ES 가용성 확인 가능", "bool", "ge", True, "bool_all"),
-    KPI("S14.2", "S14", "정전 중 error_rate", "ratio", "le", 0.50, "last", requires=["es"]),
-    KPI("S14.3", "S14", "복구까지 시간", "ms", "le", 60000, "max", requires=["es"]),
+    # S14 데이터 저장소 정전 후 자동 복구 (W12 확장)
+    # 2026-08-17: 대상을 ES → PostgreSQL 로 바꾼다. 벡터스토어는 pgvector(설정 기본값
+    # vector_backend=pg, 배포 프로파일 전부 pg)이고 ES 어댑터는 레거시라 배포에 없다.
+    # ES 를 전제한 KPI 는 실측할 수 없는 게 아니라 **측정 대상 자체가 아니었다** —
+    # 없는 구성을 띄워 재면 그 숫자는 배포본 근거가 못 된다.
+    # dryrun: 가용성 식별만. full: docker 시뮬레이션 (require=pg + 명시 옵트인)
+    KPI("S14.1", "S14", "PG 가용성 확인 가능", "bool", "ge", True, "bool_all"),
+    KPI("S14.2", "S14", "정전 중 error_rate", "ratio", "le", 0.50, "last", requires=["pg"]),
+    KPI("S14.3", "S14", "복구까지 시간", "ms", "le", 60000, "max", requires=["pg"]),
 
     # S15 백업·복원 라운드트립 (W12 확장)
     KPI("S15.1", "S15", "dr_restore_check 종료 코드 OK", "bool", "ge", True, "bool_all"),
-    KPI("S15.2", "S15", "백업 3종 최신 (24h)", "bool", "ge", True, "bool_all", requires=["pg", "es", "minio"]),
+    # 폐쇄망 배포의 백업 대상은 PG 덤프 + 원문 로컬FS 아카이브다(storage_backend=local).
+    # es·minio 를 요구하던 이전 정의는 쓰지 않는 백엔드를 전제해 영구 SKIP 이었다.
+    # full_only: 백업 신선도는 운영 중인 배포의 성질이다. 개발 머신·CI clean 체크아웃에는
+    # 최신 덤프가 있을 수 없어(로컬 실측: 2026-05-30 덤프 1개·원문 아카이브 없음) dryrun 에서
+    # 판정하면 상시 FAIL 이고, 그러면 임계를 낮추라는 압력만 생긴다. 값은 기록하고 판정은 full 에서.
+    KPI("S15.2", "S15", "백업 최신 (PG 덤프·원문 아카이브)", "bool", "ge", True, "bool_all",
+        requires=["pg"], full_only=True),
 ]
 
 
@@ -234,7 +244,7 @@ _SCENARIO_MODULES: dict[str, tuple[str, ...]] = {
     "S10": ("src/koipa/rag", "src/koipa/perf/scenarios.py"),
     "S11": ("src/koipa/perf",),
     "S12": ("src/koipa/services/async_classify_service.py", "src/koipa/api/async_classify.py"),
-    "S14": ("src/koipa/adapters/vectorstore", "src/koipa/adapters/storage"),
+    "S14": ("src/koipa/db", "src/koipa/adapters/vectorstore", "src/koipa/adapters/storage"),
     "S15": ("scripts/dr_restore_check.py", "scripts/backup_postgres.py"),
     "S16": ("src/koipa/api/_jwt_auth.py", "src/koipa/api/_rbac.py"),
     "S17": ("src/koipa/api/middleware.py", "src/koipa/repositories/audit_repo.py",
