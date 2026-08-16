@@ -130,17 +130,46 @@ def _p1_gate(
     }
 
 
+# 배포본이 실제로 쓰는 벡터 백엔드. 이것과 다른 구성으로 잰 수치는 릴리스 근거가 못 된다.
+_SHIPPED_BACKENDS = ("pg", "pgvector", "postgres")
+
+
 def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
+    """검색 품질 게이트. **출하 구성으로 잰 것인지 먼저 본다.**
+
+    ⚠ 2026-08-16 발견. 배포본은 `vector_backend=pg`(pgvector)인데 이 게이트가 읽던 리포트는
+      `backend=es`(Elasticsearch)로 2026-06-02 에 생성된 것이었다. **우리가 출하하지 않는
+      구성의 검색 품질이 릴리스 게이트를 통과시키고 있었다.**
+
+      P1 에서 '원시 모델을 재고 있었다' 와 같은 종류의 결함이다 - 게이트가 출하물을 안 잰다.
+      그때는 판정 단위를 서빙 경로로 바꿨고, 여기서는 백엔드 불일치를 BLOCKED 로 표면화한다.
+
+      ⚠ FAIL 이 아니라 BLOCKED 로 둔다. 성능이 나쁜 것이 아니라 **잰 적이 없는 것**이고,
+        둘을 같은 말로 보고하면 원인을 못 찾는다.
+
+      pg 로 재려면: `scripts/p2_compare_embeddings.py --backends pg --hybrid`
+      (2026-08-16 에 pg hybrid 조합을 열었다. pg_store 는 dense+어휘 RRF 를 SQL 에서 융합하며
+       vec-only 폴리필이 아니다.)
+    """
     best = p2_report.get("best_config", {})
     metrics = best.get("retrieval_metrics", {})
     recall = metrics.get("recall_at_k", best.get("recall_at_k", 0))
     latency = best.get("latency_ms_p50", 999999)
-    status = "PASS" if recall >= 0.80 and latency <= 200 else "FAIL"
+    backend = str(best.get("backend", "")).lower()
+
     detail = (
         f"{best.get('label', 'N/A')}: Recall@5={recall:.3f}, "
         f"MRR={metrics.get('mrr', 0):.3f}, nDCG@5={metrics.get('ndcg_at_k', 0):.3f}, "
         f"p50={latency:.0f}ms"
     )
+    if backend and backend not in _SHIPPED_BACKENDS:
+        return Gate(
+            "P2 retrieval", "BLOCKED",
+            f"측정 백엔드({backend}) != 출하 백엔드(pg) - 출하하지 않는 구성의 수치다. "
+            f"pg 로 재측정 필요. 참고값: {detail}",
+        ), {"best_config": best, "backend_mismatch": True}
+
+    status = "PASS" if recall >= 0.80 and latency <= 200 else "FAIL"
     return Gate("P2 retrieval", status, detail), {"best_config": best}
 
 

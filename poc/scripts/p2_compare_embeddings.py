@@ -5,6 +5,10 @@ doc/13_벡터DB_ES_전환_계획서.md §9.2 측정 절차.
 지원 백엔드 (--backends 옵션, 콤마 구분):
   - inmemory : dense-only, dryrun 기본
   - es       : Elasticsearch (dense kNN / 하이브리드 RRF)
+  - pg       : PostgreSQL + pgvector (dense / 하이브리드 RRF)  <- **현행 배포본**
+
+⚠ 배포본은 `vector_backend=pg` 다. ES 로 잰 수치는 우리가 출하하지 않는 구성의 것이다.
+  릴리스 게이트에 넣을 P2 수치는 pg 로 재야 한다.
 
 검색 모드 (--mode 옵션):
   - dryrun       : HashEmbedding + InMemoryStore (모델·서버 불필요)
@@ -544,9 +548,12 @@ def _resolve_combinations(
     for emb in embedders:
         for backend in backends:
             combos.append((emb, backend, "dense"))
-            # hybrid는 ES에서만 의미있음 — 다른 백엔드는 vec-only 폴리필이라 dense와 동일
-            # doc/13 §5.2·§9.1 한계 명시
-            if hybrid and backend == "es":
+            # [2026-08-16] hybrid 는 ES 뿐 아니라 **pg 에서도 실제 융합**이다.
+            # pg_store.search_hybrid 가 dense(pgvector) + 어휘(ts_rank_cd) 후보를 SQL 안에서
+            # RRF 로 융합한다 - vec-only 폴리필이 아니다. 종전 주석이 낡아 pg 가 hybrid 조합에서
+            # 빠져 있었고, 그 결과 **릴리스 게이트의 P2 수치가 우리가 쓰지 않는 ES 구성으로**
+            # 남아 있었다(배포본 vector_backend=pg · P2 리포트 backend=es · 2026-06-02 생성).
+            if hybrid and backend in ("es", "pg", "pgvector", "postgres"):
                 combos.append((emb, backend, "hybrid"))
     return combos
 
@@ -557,12 +564,13 @@ def main() -> int:
     ap.add_argument(
         "--backends",
         default="inmemory",
-        help="콤마 구분 백엔드 목록 (es,inmemory). dryrun은 기본 inmemory.",
+        help="콤마 구분 백엔드 목록 (pg,es,inmemory). dryrun은 기본 inmemory. "
+             "릴리스 게이트용은 pg(현행 배포본).",
     )
     ap.add_argument(
         "--hybrid",
         action="store_true",
-        help="ES 백엔드에서 dense·hybrid 두 모드 모두 측정",
+        help="es·pg 백엔드에서 dense·hybrid 두 모드 모두 측정",
     )
     ap.add_argument("--synth-dir", default="datasets/synthetic")
     ap.add_argument("--chunk-size", type=int, default=settings.rag_index_chunk_size,
