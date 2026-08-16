@@ -1,5 +1,5 @@
 {
-  "verdict": "FAIL",
+  "verdict": "PASS",
   "best_config_mode": true,
   "best_config": {
     "embedder": "nlpai-lab/KURE-v1",
@@ -22,17 +22,17 @@
     "query_count": 80,
     "top_k": 5,
     "recall_at_k": 0.8875,
-    "latency_ms_p50": 222.73,
-    "latency_ms_p95": 276.65,
-    "latency_ms_avg": 220.61,
-    "embed_corpus_ms": 973648.0,
+    "latency_ms_p50": 154.96,
+    "latency_ms_p95": 184.75,
+    "latency_ms_avg": 152.11,
+    "embed_corpus_ms": 955135.5,
     "retrieval_metrics": {
       "sample_count": 80,
       "top_k": 5,
       "recall_at_k": 0.8875,
       "precision_at_k": 0.1775,
-      "mrr": 0.8167,
-      "ndcg_at_k": 0.8351,
+      "mrr": 0.825,
+      "ndcg_at_k": 0.8414,
       "skipped_count": 0
     }
   },
@@ -58,10 +58,10 @@
       "query_count": 80,
       "top_k": 5,
       "recall_at_k": 0.8875,
-      "latency_ms_p50": 222.73,
-      "latency_ms_p95": 276.65,
-      "latency_ms_avg": 220.61,
-      "embed_corpus_ms": 973648.0,
+      "latency_ms_p50": 154.96,
+      "latency_ms_p95": 184.75,
+      "latency_ms_avg": 152.11,
+      "embed_corpus_ms": 955135.5,
       "per_query": [
         {
           "query": "제약회사의 판매비 및 관리비는 2005년 기준으로 매출액의 35.16%에 달하는바, 일반 제조업의 판매관리비 비중(12.18%)에 비해 매우 높다. 이는 제약회사들이 연구·개발을 통한 제품의 질 경쟁보다",
@@ -1181,28 +1181,28 @@
             "63a0778a-08dc-4d72-ab73-62561586a84a"
           ],
           "top_grades": [
-            "S2",
-            "S1",
             "S3",
+            "S1",
+            "S2",
             "TS",
-            "S2"
+            "TS"
           ],
           "top_doc_ids": [
-            "e2b2dd2e-ec7c-4315-8319-32828a794803-c2",
-            "a29e16aa-9361-4ec6-bcd6-2a5329ec9071-c3",
             "63a0778a-08dc-4d72-ab73-62561586a84a-c6",
+            "a29e16aa-9361-4ec6-bcd6-2a5329ec9071-c3",
+            "a23262d9-47d0-4603-86ad-76f6a15310ba-c0",
             "8b46aef9-f92e-4668-bcbb-f8bbcc0a7a15-c6",
-            "a23262d9-47d0-4603-86ad-76f6a15310ba-c0"
+            "7011cbdd-f609-4876-bd35-4ea91ae66550-c3"
           ],
           "top_base_doc_ids": [
-            "e2b2dd2e-ec7c-4315-8319-32828a794803",
-            "a29e16aa-9361-4ec6-bcd6-2a5329ec9071",
             "63a0778a-08dc-4d72-ab73-62561586a84a",
+            "a29e16aa-9361-4ec6-bcd6-2a5329ec9071",
+            "a23262d9-47d0-4603-86ad-76f6a15310ba",
             "8b46aef9-f92e-4668-bcbb-f8bbcc0a7a15",
-            "a23262d9-47d0-4603-86ad-76f6a15310ba"
+            "7011cbdd-f609-4876-bd35-4ea91ae66550"
           ],
           "top_scores": [
-            0.026,
+            0.016,
             0.016,
             0.016,
             0.016,
@@ -3029,8 +3029,8 @@
         "top_k": 5,
         "recall_at_k": 0.8875,
         "precision_at_k": 0.1775,
-        "mrr": 0.8167,
-        "ndcg_at_k": 0.8351,
+        "mrr": 0.825,
+        "ndcg_at_k": 0.8414,
         "skipped_count": 0
       }
     }
