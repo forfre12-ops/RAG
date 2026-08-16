@@ -15,16 +15,19 @@
 
 그리고 서버 실측.
 
-    힙 26MB · 전체 347MB          content 가 TOAST 에 있다
-    쿼리 하나가 읽는 블록 814MB    14,703 행의 content 를 전부 꺼내온다
+    힙 26MB · 전체 347MB           content 가 TOAST 에 있다
     max_parallel_workers 8         그런데 per_gather 는 2 로 묶여 있다
     호스트 CPU 8 · 컨테이너 CPU 무제한
 
 그래서 두 가지를 **동시에** 건다.
 
-    폭     CTE 가 id 와 순위만 들면 14,703 행의 TOAST 를 안 꺼낸다
+    폭     CTE 가 id 와 순위만 들면 정렬을 통과하는 행이 좁아진다
     병렬   parallel_setup_cost·min_parallel_table_scan_size 를 낮춰 병렬을 강제하고
            per_gather 를 늘린다
+
+⚠ 처음에 "쿼리 하나가 814MB 를 읽는다" 고 적었는데 **그 값은 틀렸다.** 실행계획의
+  모든 노드에서 블록 수를 더한 것인데, PostgreSQL 은 각 노드에 자식 몫을 이미 포함해
+  보고한다 - 깊이만큼 곱해진 값이었다. 지금은 루트에서만 읽는다.
 
 ⚠ 랭킹은 안 바뀌어야 한다. 그건 주장이 아니라 확인 대상이라 조합마다 현행 SQL 과
   반환 id·점수를 순서까지 대조한다. 다르면 그 조합은 채택 불가로 표시한다.
@@ -63,17 +66,24 @@ def pct(xs: list[float], p: float) -> float:
     return s[min(len(s) - 1, int(round((len(s) - 1) * p)))] if s else 0.0
 
 
-def _scan(plan: dict, acc: dict | None = None) -> dict:
-    acc = {"sorts": [], "hit": 0, "read": 0, "workers": 0, "seq": 0} if acc is None else acc
+def _scan(plan: dict, acc: dict | None = None, *, root: bool = True) -> dict:
+    """실행계획에서 정렬 방식·워커 수·읽은 블록을 뽑는다.
+
+    ⚠ 블록 수는 **루트에서만** 읽는다. PostgreSQL 은 각 노드의 Shared Hit/Read Blocks 에
+      자식 몫을 이미 포함시켜 보고한다. 모든 노드를 더하면 깊이만큼 곱해진다
+      (첫 판에서 347MB 테이블에 8,197MB 가 찍혔다 - 그 값은 틀린 것이었다).
+    """
+    acc = {"sorts": [], "blocks": 0, "workers": 0, "seq": 0} if acc is None else acc
+    if root:
+        acc["blocks"] = ((plan.get("Shared Hit Blocks", 0) or 0)
+                         + (plan.get("Shared Read Blocks", 0) or 0))
     if plan.get("Sort Method"):
         acc["sorts"].append(f"{plan['Sort Method']} {plan.get('Sort Space Used', 0)}kB")
-    acc["hit"] += plan.get("Shared Hit Blocks", 0) or 0
-    acc["read"] += plan.get("Shared Read Blocks", 0) or 0
     acc["workers"] = max(acc["workers"], plan.get("Workers Launched", 0) or 0)
     if plan.get("Node Type") == "Seq Scan":
         acc["seq"] += 1
     for ch in plan.get("Plans", []) or []:
-        _scan(ch, acc)
+        _scan(ch, acc, root=False)
     return acc
 
 
@@ -159,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
             pj = pj[0] if isinstance(pj, list) else json.loads(pj)[0]
             info = _scan(pj["Plan"])
         same = f"{len(prep) - diff}/{len(prep)}"
-        mb = (info["hit"] + info["read"]) * 8 / 1024
+        mb = info["blocks"] * 8 / 1024
         print(f"  {name:<20s} {pct(ts, 0.5):>8.1f}ms {pct(ts, 0.95):>8.1f}ms "
               f"{st.mean(ts):>8.1f}ms {info['workers']:>4d} {mb:>7.0f}MB  {same:>5s}  "
               f"{' / '.join(info['sorts'])[:34]}")
