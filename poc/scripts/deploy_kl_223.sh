@@ -32,6 +32,12 @@ if [ -f docker-compose.expose.yml ]; then
   CF="$CF -f docker-compose.expose.yml"
 fi
 STAMP="$(date -u +%Y%m%d%H%M)"
+# 실측 2026-08-16: 7단계가 `WORKER_MEM_LIMIT: unbound variable` 로 죽었다.
+# 4b 는 `${WORKER_MEM_LIMIT:-16G}` 를 지역 변수 WANT 에만 담고 정작 변수 자체는 설정하지
+# 않는데, 7단계가 그것을 맨이름으로 참조한다. `set -u` 라 그 순간 종료다.
+# 빌드·태그까지 끝난 뒤 기동 직전에 죽어서 **옛 이미지가 계속 도는 채로** 끝났다.
+# 여기서 한 번 정해 4b·7단계가 같은 값을 쓴다.
+WORKER_MEM_LIMIT="${WORKER_MEM_LIMIT:-16G}"
 
 b(){ printf '\n\033[1m>> %s\033[0m\n' "$*"; }
 ok(){ printf '\033[1;32m  [ok] %s\033[0m\n' "$*"; }
@@ -155,7 +161,7 @@ b "4b. 워커 메모리 한도"
 for P in $TARGETS; do
   E="${P_ENV[$P]:-}"; [ -z "$E" ] && continue
   CUR="$(grep -m1 '^WORKER_MEM_LIMIT=' "$E" 2>/dev/null | cut -d= -f2- || true)"
-  WANT="${WORKER_MEM_LIMIT:-16G}"
+  WANT="$WORKER_MEM_LIMIT"
   if [ "$CUR" != "$WANT" ]; then
     sed -i '/^WORKER_MEM_LIMIT=/d' "$E"
     printf 'WORKER_MEM_LIMIT=%s
@@ -275,7 +281,10 @@ if [ "$FAIL" -eq 0 ]; then
   ok "배포 $SHORT 반영 확인"
 else
   warn "일부 확인 실패. 되돌리려면:"
-  echo "    for P in $(echo $PROJECTS | tr '\n' ' '); do for S in api worker beat; do"
+  # ⚠ $PROJECTS 가 아니라 $TARGETS 다. PROJECTS 에는 우리 스택이 아닌 것도 들어 있어
+  #   (223 의 koipa-proxy-gold=ollama) 그대로 실행하면 없는 이미지에 태그를 만들고
+  #   남의 스택을 우리 compose 로 재기동한다 - 0단계가 일부러 걸러낸 것을 되돌리는 안내였다.
+  echo "    for P in $TARGETS; do for S in api worker beat; do"
   echo "      docker tag \$P-\$S:rollback-$STAMP \$P-\$S:latest; done; done"
   echo "    그 뒤 위 7단계를 다시 실행"
   exit 1
