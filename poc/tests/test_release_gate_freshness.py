@@ -46,11 +46,29 @@ def _report(tmp_path: Path, **over) -> Path:
         "deployed_model": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
         "evaluated_model": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
         "deploy_profile": "onprem-local",
+        # [2026-08-16] 게이트가 **입력 리포트의 신원**도 본다. 리포트 자신이 오늘 날짜여도
+        # 그것이 읽은 P2 리포트가 두 달 반 묵은 ES 리포트일 수 있었고 실제로 그랬다.
+        # 그래서 "신선한 증거" 의 정의에 입력 목록이 들어간다 - 없으면 신선하지 않다.
+        # 여기서는 실제로 존재하는 파일을 가리키게 두되, 나이는 dataset 로 두어
+        # 이 픽스처가 나이 때문에 흔들리지 않게 한다(나이 검사는 별도 테스트가 본다).
+        "evidence_inputs": [{
+            "role": "p2", "kind": "dataset", "path": str(tmp_path / "in.json"),
+            "exists": True, "size": 2, "sha256": _sha_of(tmp_path / "in.json"),
+            "mtime": now.isoformat(timespec="seconds"),
+        }],
     }
     payload.update(over)
     p = tmp_path / "readiness.json"
     p.write_text(json.dumps(payload, ensure_ascii=False), "utf-8")
     return p
+
+
+def _sha_of(path: Path) -> str:
+    """픽스처 입력 파일을 만들고 그 sha 를 돌려준다 - 게이트가 디스크와 대조한다."""
+    import hashlib
+
+    path.write_bytes(b"{}")
+    return hashlib.sha256(b"{}").hexdigest()
 
 
 def _head() -> str:

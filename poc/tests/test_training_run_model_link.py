@@ -34,13 +34,28 @@ def test_worker_passes_model_version_on_completion():
     """워커가 등록 결과의 version_id 를 완료 기록으로 넘겨야 한다."""
     from koipa.workers import tasks
 
-    src = inspect.getsource(tasks)
-    assert 'status="completed"' in src
-    # 완료 호출 근처에 model_version 전달이 있어야 한다.
-    idx = src.index('status="completed"')
-    window = src[max(0, idx - 600):idx + 400]
-    assert "model_version=" in window, "완료 처리에 model_version 을 안 넘긴다"
-    assert "version_id" in window, "등록 결과(version_id)를 참조하지 않는다"
+    import ast as _ast
+
+    # ⚠ 종전에는 소스를 문자열로 잘라 봤다(앞 600자·뒤 400자). 두 번 깨졌다.
+    #     · 사이에 주석이 늘면 창 밖으로 밀려난다
+    #     · 주석 안의 `status="completed"` 를 먼저 잡는다 (2026-08-16 실제로 그랬다)
+    #   그래서 구문 트리에서 **실제 호출**을 찾는다 - 주석은 트리에 없다.
+    tree = _ast.parse(inspect.getsource(tasks))
+    completed_calls = [
+        node for node in _ast.walk(tree)
+        if isinstance(node, _ast.Call)
+        and getattr(node.func, "id", "") == "_mark_training_run"
+        and any(kw.arg == "status" and isinstance(kw.value, _ast.Constant)
+                and kw.value.value == "completed" for kw in node.keywords)
+    ]
+    assert completed_calls, "status=\"completed\" 로 기록하는 호출이 없다"
+    for call in completed_calls:
+        names = {kw.arg for kw in call.keywords}
+        assert "model_version" in names, (
+            f"완료 처리에 model_version 을 안 넘긴다: {sorted(n for n in names if n)}"
+        )
+    # 등록 결과(version_id)에서 온 값이어야 한다.
+    assert "version_id" in inspect.getsource(tasks), "등록 결과(version_id)를 참조하지 않는다"
 
 
 def test_mark_completed_does_not_clear_existing_link():

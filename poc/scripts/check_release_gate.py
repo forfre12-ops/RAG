@@ -119,7 +119,93 @@ def _freshness_problems(payload: dict, args) -> "list[str]":
         elif not got:
             problems.append("readiness report has no deploy_profile")
 
+    problems.extend(_input_problems(payload, args))
     return problems
+
+
+def _input_problems(payload: dict, args) -> "list[str]":
+    """The readiness report is fresh — but is what it *read* fresh?
+
+    Measured 2026-08-16. `generated_at` only says when this summary was written. The
+    reports it summarises are not checked at all:
+
+        shipped build   vector_backend = pg
+        gate input      reports/p2_gold_kure_es_hybrid_v3.json  (ES, written 2026-06-02)
+
+    A retrieval score from a backend we do not ship passed the release gate for two and
+    a half months, and every readiness report along the way carried a same-day
+    `generated_at`. Fixing the path closed that one instance; recording and checking the
+    inputs is what stops the next one.
+
+    `build_operational_readiness.py` now records each input's path, mtime, size and
+    sha256 under `evidence_inputs`. Three questions here:
+
+        1. Did the gate run with an input missing?  Then a gate ran on absent evidence.
+        2. Is a *measurement* input older than the age limit?  It describes older code.
+        3. Has the file changed since it was recorded?  Then the summary is not of it.
+
+    ⚠ `kind` matters. Golden sets are frozen on purpose — `retrieval_gold` dates to
+      2026-06-01 and that is correct. Age is only asked of `measurement` inputs; for
+      `dataset` inputs only the hash is checked. Blanket age limits would block a
+      release over a golden set behaving exactly as designed.
+
+    ⚠ Reports written before this field existed have no `evidence_inputs`. That is
+      itself a gap — such a report cannot show what it read — so it is reported, not
+      silently accepted.
+    """
+    problems: list[str] = []
+    inputs = payload.get("evidence_inputs")
+    if not isinstance(inputs, list) or not inputs:
+        problems.append(
+            "readiness report does not record evidence_inputs; cannot tell which "
+            "reports it read or how old they were (regenerate with the current "
+            "build_operational_readiness.py)"
+        )
+        return problems
+
+    now = dt.datetime.now(dt.timezone.utc)
+    for item in inputs:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "?")
+        path_s = str(item.get("path") or "?")
+        if not item.get("exists", False):
+            problems.append(f"gate input missing: {role} ({path_s})")
+            continue
+
+        if str(item.get("kind") or "") == "measurement" and args.max_age_days > 0:
+            mtime = _parse_ts(str(item.get("mtime") or ""))
+            if mtime is None:
+                problems.append(f"gate input {role} has no parseable mtime ({path_s})")
+            else:
+                age = (now - mtime).days
+                if age > args.max_age_days:
+                    problems.append(
+                        f"gate input {role} is {age}d old (limit {args.max_age_days}d, "
+                        f"{path_s}) - it measures older code than this build"
+                    )
+
+        want_sha = str(item.get("sha256") or "")
+        current = Path(path_s)
+        if want_sha and current.exists():
+            got_sha = _sha256(current)
+            if got_sha != want_sha:
+                problems.append(
+                    f"gate input {role} changed since the readiness report was written "
+                    f"({path_s}: recorded {want_sha[:12]}, on disk {got_sha[:12]})"
+                )
+
+    return problems
+
+
+def _sha256(path: Path) -> str:
+    import hashlib  # noqa: PLC0415
+
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def main() -> int:

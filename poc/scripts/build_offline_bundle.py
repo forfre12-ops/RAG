@@ -1590,18 +1590,35 @@ def build_bundle(
 # ─────────────────────────────────────────────────────────────
 
 
-def enforce_release_gate(readiness: str, allow_conditional: bool) -> int:
+def enforce_release_gate(readiness: str, allow_conditional: bool,
+                         *, require_fresh: bool = True) -> int:
     """실 빌드 직전 release-gate를 fail-closed로 강제한다 (0=통과, !=0=차단→빌드 중단).
 
     check_release_gate.py는 완비·테스트됐으나 종전엔 make 수동 타깃에만 있어, readiness가
     FAIL이어도 이 스크립트로 번들이 그대로 빌드·출하될 수 있었다(도크스트링의 'wired into the
     deploy path' 의도 미이행). 이 함수가 실 build 경로에 게이트를 배선한다 — dry-run(CI manifest
     검증)은 대상이 아니다. 서브프로세스 호출이라 배포 스크립트가 같은 방식으로 재사용 가능하다.
+    
+    [2026-08-16] `--require-fresh` 를 **기본으로 건다.** 종전에는 verdict 만 봤다 - 증거가
+    언제 나왔는지, 이 빌드에서 나온 것인지, 무엇을 읽고 나온 것인지는 안 물었다.
+    `scripts/deploy_checklist.sh` 는 이미 걸고 있었는데 정작 **번들 빌드가 안 걸었다.**
+    번들이 실제 출하물이라 그쪽이 더 중요하다.
+
+    실측으로 확인된 두 가지가 이 검사에 걸린다.
+        · manifest 6/1 READY 를 8/15 빌드에 재사용 (증거 나이·커밋 불일치)
+        · readiness 는 당일 날짜인데 그 입력 P2 리포트가 두 달 반 묵은 ES 리포트
+          (readiness 의 `evidence_inputs` 기록 후 입력 나이까지 검사한다)
+
+    ⚠ **우회 인자를 두지 않았다.** 증거가 낡았으면 다시 뽑는 것이 맞고, 뽑는 데 몇 초다
+      (`build_operational_readiness.py`). 우회로를 열어두면 게이트는 그 길로 죽는다.
+      `require_fresh=False` 는 **테스트에서 verdict 판정만 보려는 경우**를 위한 것이다.
     """
     gate_cmd = [
         sys.executable, str(_HERE / "check_release_gate.py"),
         "--readiness", str(readiness),
     ]
+    if require_fresh:
+        gate_cmd.append("--require-fresh")
     if allow_conditional:
         gate_cmd.append("--allow-conditional")
     print(f"\n[bundle] release-gate 검사 -> {' '.join(gate_cmd)}", file=sys.stderr)

@@ -67,20 +67,53 @@ def test_release_gate_missing_report_blocks(tmp_path: Path):
 
 
 def test_release_gate_pilot_waives_conditional_but_not_fail(tmp_path: Path):
-    """CONDITIONALLY_READY(BLOCKED만)는 --allow-conditional로 통과(0)하되, FAIL은 파일럿도 차단."""
+    """CONDITIONALLY_READY(BLOCKED만)는 --allow-conditional로 통과(0)하되, FAIL은 파일럿도 차단.
+
+    ⚠ 이 테스트의 관심사는 **verdict 판정**뿐이라 require_fresh=False 로 둔다. 픽스처
+      readiness 에는 generated_at·git_sha·evidence_inputs 가 없어 신선도 검사를 켜면
+      그것 때문에 막히고, 그러면 verdict 로직이 맞는지를 못 본다.
+      신선도가 **기본으로 켜져 있다**는 것은 아래 별도 테스트가 잠근다.
+    """
     conditional = _write_readiness(
         tmp_path / "cond.json", "CONDITIONALLY_READY",
         [{"name": "human_review_gold", "status": "BLOCKED", "detail": "1/40"},
          {"name": "p1_classifier", "status": "PASS", "detail": "ok"}],
     )
-    assert enforce_release_gate(str(conditional), allow_conditional=False) != 0   # 파일럿 미허용 = 차단
-    assert enforce_release_gate(str(conditional), allow_conditional=True) == 0    # 파일럿 waive = 통과
+    assert enforce_release_gate(str(conditional), allow_conditional=False,
+                                require_fresh=False) != 0   # 파일럿 미허용 = 차단
+    assert enforce_release_gate(str(conditional), allow_conditional=True,
+                                require_fresh=False) == 0    # 파일럿 waive = 통과
 
     fail = _write_readiness(
         tmp_path / "fail.json", "FAIL",
         [{"name": "p2_retrieval", "status": "FAIL", "detail": "recall drop"}],
     )
-    assert enforce_release_gate(str(fail), allow_conditional=True) != 0           # FAIL은 파일럿도 차단
+    assert enforce_release_gate(str(fail), allow_conditional=True,
+                                require_fresh=False) != 0    # FAIL은 파일럿도 차단
+
+
+def test_release_gate_requires_fresh_evidence_by_default(tmp_path: Path):
+    """번들 빌드는 **기본으로** 증거 신선도를 묻는다.
+
+    2026-08-16 까지 이 경로가 verdict 만 봤다. `deploy_checklist.sh` 는 --require-fresh 를
+    걸고 있었는데 정작 **번들 빌드가 안 걸었다** - 번들이 실제 출하물인데도. 그래서
+    "verdict 는 PASS 인데 증거가 언제·무엇으로 나왔는지는 아무도 모르는" 번들이 나올 수
+    있었다. 실제로 manifest 6/1 READY 가 8/15 빌드에 재사용됐다.
+
+    verdict 가 PASS 여도 신선도 근거가 없으면 막혀야 한다. 파일럿 waiver 는 **데이터 천장**
+    (human_review 부족)을 봐주는 것이지 증거 공백을 봐주는 것이 아니라, 여기서도 막힌다.
+    """
+    clean = _write_readiness(
+        tmp_path / "pass.json", "PASS",
+        [{"name": "p1_classifier", "status": "PASS", "detail": "ok"}],
+    )
+    # 신선도를 끄면 통과한다 - verdict 자체는 문제없다는 뜻
+    assert enforce_release_gate(str(clean), allow_conditional=False,
+                                require_fresh=False) == 0
+    # 기본(신선도 켬)에서는 막힌다 - generated_at·git_sha·evidence_inputs 가 없다
+    assert enforce_release_gate(str(clean), allow_conditional=False) != 0
+    # 파일럿 waiver 로도 안 뚫린다 - 증거 공백은 데이터 천장이 아니다
+    assert enforce_release_gate(str(clean), allow_conditional=True) != 0
 
 
 # ─────────────────────────────────────────────────────────────

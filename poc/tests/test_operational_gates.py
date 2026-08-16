@@ -403,3 +403,110 @@ def test_release_manifest_marks_missing_files(tmp_path, monkeypatch):
     assert payload["status"] == "INCOMPLETE"
     assert payload["missing"] == ["missing.txt"]
     assert payload["artifacts"][0]["sha256"]
+
+
+# ── 게이트 입력의 신선도 (2026-08-16) ────────────────────────────────────────
+# 왜 이 테스트들이 있나: readiness 리포트 자신은 generated_at·git_sha 를 남기고
+# --require-fresh 가 그것을 봤다. 그런데 **그 리포트가 무엇을 읽었는지는 아무도 안 봤다.**
+#
+#     배포본      vector_backend = pg
+#     게이트 입력  reports/p2_gold_kure_es_hybrid_v3.json  (ES · 2026-06-02 생성)
+#
+# 출하하지 않는 구성의 검색 품질이 2개월 반 동안 게이트를 통과했고, 그 사이 readiness 는
+# 매번 당일 날짜로 찍혔다. 경로를 고쳐 그 한 건은 막았지만 기록·검사가 없으면 반복된다.
+import hashlib as _hashlib  # noqa: E402
+import datetime as _dt2  # noqa: E402
+
+
+def _iso_days_ago(n: int) -> str:
+    return (_dt2.datetime.now(_dt2.timezone.utc)
+            - _dt2.timedelta(days=n)).isoformat(timespec="seconds")
+
+
+def _readiness_with_inputs(tmp_path, inputs):
+    readiness = tmp_path / "readiness.json"
+    readiness.write_text(json.dumps({
+        "verdict": "PASS",
+        "gates": [{"name": "P1 classifier", "status": "PASS", "detail": "ok"}],
+        "generated_at": _dt2.date.today().isoformat(),
+        # git sha 는 여기 관심사가 아니다 - _problems 가 넘기는 expect 값과 맞춰
+        # 그 항목이 안 걸리게 둔다(입력 검사만 보려는 것이다).
+        "git_sha": "-",
+        "evidence_inputs": inputs,
+    }), encoding="utf-8")
+    return readiness
+
+
+def _make_input(tmp_path, role, kind, *, days_old=0, body=b"{}", exists=True,
+                wrong_sha=False):
+    p = tmp_path / f"{role}.json"
+    item = {"role": role, "kind": kind, "path": str(p), "exists": exists}
+    if not exists:
+        return item
+    p.write_bytes(body)
+    sha = _hashlib.sha256(body).hexdigest()
+    item.update({"size": len(body), "mtime": _iso_days_ago(days_old),
+                 "sha256": "0" * 64 if wrong_sha else sha})
+    return item
+
+
+def _fresh_argv(readiness):
+    # git sha 검사는 여기 관심사가 아니라 비활성(--expect-git-sha 는 빈 값이면 HEAD 를
+    # 쓰므로, 리포트에 sha 를 안 넣은 이 픽스처에서는 그 항목이 항상 걸린다).
+    return ["check_release_gate.py", "--readiness", str(readiness),
+            "--require-fresh", "--expect-git-sha", "-"]
+
+
+def _problems(readiness, monkeypatch):
+    """--require-fresh 로 돌리고 걸린 사유만 뽑는다."""
+    import argparse
+
+    ns = argparse.Namespace(require_fresh=True, max_age_days=14,
+                            expect_git_sha="-", expect_model_dir="",
+                            expect_profile="")
+    payload = json.loads(Path(readiness).read_text(encoding="utf-8"))
+    return check_release_gate._freshness_problems(payload, ns)
+
+
+def test_input_freshness_stale_measurement_is_caught(tmp_path, monkeypatch):
+    r = _readiness_with_inputs(tmp_path, [
+        _make_input(tmp_path, "p2", "measurement", days_old=76),
+    ])
+    probs = _problems(r, monkeypatch)
+    assert any("p2" in p and "76d old" in p for p in probs), probs
+
+
+def test_input_freshness_frozen_dataset_is_not_aged_out(tmp_path, monkeypatch):
+    """골든셋은 동결이 정상이다 - 오래됐다고 릴리스를 막으면 안 된다."""
+    r = _readiness_with_inputs(tmp_path, [
+        _make_input(tmp_path, "retrieval_gold", "dataset", days_old=400),
+    ])
+    assert _problems(r, monkeypatch) == []
+
+
+def test_input_freshness_missing_input_is_caught(tmp_path, monkeypatch):
+    r = _readiness_with_inputs(tmp_path, [
+        _make_input(tmp_path, "p1_serving", "measurement", exists=False),
+    ])
+    probs = _problems(r, monkeypatch)
+    assert any("missing" in p and "p1_serving" in p for p in probs), probs
+
+
+def test_input_freshness_changed_file_is_caught(tmp_path, monkeypatch):
+    """파일이 그 뒤로 바뀌었으면 이 요약은 그 파일에 대한 것이 아니다."""
+    r = _readiness_with_inputs(tmp_path, [
+        _make_input(tmp_path, "p2", "measurement", wrong_sha=True),
+    ])
+    probs = _problems(r, monkeypatch)
+    assert any("changed since" in p for p in probs), probs
+
+
+def test_input_freshness_report_without_inputs_is_flagged(tmp_path, monkeypatch):
+    """이 필드가 생기기 전 리포트 - 무엇을 읽었는지 못 보여주는 것 자체가 갭이다."""
+    readiness = tmp_path / "readiness.json"
+    readiness.write_text(json.dumps({
+        "verdict": "PASS", "gates": [{"name": "x", "status": "PASS"}],
+        "generated_at": _dt2.date.today().isoformat(), "git_sha": "-",
+    }), encoding="utf-8")
+    probs = _problems(readiness, monkeypatch)
+    assert any("evidence_inputs" in p for p in probs), probs

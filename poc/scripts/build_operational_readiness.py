@@ -29,6 +29,63 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _evidence_identity(paths: dict[str, tuple[str, str]]) -> list[dict[str, Any]]:
+    """게이트가 읽은 **입력 리포트 하나하나의 신원**을 남긴다.
+
+    왜(2026-08-16). 이 리포트 자신은 `generated_at`·`git_sha` 를 남기고
+    `check_release_gate.py --require-fresh` 가 그것을 본다. 그런데 **입력은 아무도 안 본다.**
+    오늘 만든 readiness 가 두 달 묵은 P2 리포트를 요약하고 있어도 generated_at 은 오늘이라
+    통과한다 - 실제로 그랬다.
+
+        배포본        vector_backend = pg
+        게이트 입력    reports/p2_gold_kure_es_hybrid_v3.json  (ES · 2026-06-02 생성)
+
+    **우리가 출하하지 않는 구성의 검색 품질이 2개월 반 동안 릴리스 게이트를 통과시켰다.**
+    경로를 고쳐 그 한 건은 막았지만, 기록이 없으면 같은 일이 다시 나도 아무도 모른다.
+
+    그래서 입력마다 경로·수정시각·크기·sha256 을 남긴다. 릴리스 게이트가 이 목록을 보고
+      · 나이가 한계를 넘은 입력이 있는지
+      · 파일이 그 뒤로 바뀌었는지(sha 불일치)
+    를 묻는다. 없는 파일도 그대로 남긴다 - "없음" 자체가 판단 근거다.
+
+    ⚠ 여기 남기는 것은 **파일시스템의 수정시각**이다. 리포트 자체가 생성 시각을 안 남기면
+      그것밖에 근거가 없다. 파일을 복사하면 시각이 바뀌므로 낙관적일 수 있다 - sha256 을
+      함께 남기는 이유다.
+
+    `kind` 가 둘을 가른다. **나이의 의미가 다르기 때문**이다.
+
+        measurement  코드 동작을 잰 것(p1·p2 리포트). 코드가 바뀌면 낡는다 - 나이가 결함이다.
+        dataset      골든셋. **동결이 정상**이라 오래된 것이 결함이 아니다(retrieval_gold 는
+                     2026-06-01 이고 그게 맞다). 나이는 안 보고 sha 만 본다.
+
+    둘을 뭉뚱그려 나이로 막으면 정상인 동결 골든셋이 릴리스를 막는다.
+    """
+    import hashlib  # noqa: PLC0415
+
+    out: list[dict[str, Any]] = []
+    for role, (raw, kind) in paths.items():
+        path = Path(raw)
+        item: dict[str, Any] = {"role": role, "kind": kind, "path": str(raw)}
+        if not path.exists():
+            item["exists"] = False
+            out.append(item)
+            continue
+        st = path.stat()
+        h = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                h.update(chunk)
+        item.update({
+            "exists": True,
+            "size": st.st_size,
+            "mtime": _dt.datetime.fromtimestamp(
+                st.st_mtime, tz=_dt.timezone.utc).isoformat(timespec="seconds"),
+            "sha256": h.hexdigest(),
+        })
+        out.append(item)
+    return out
+
+
 def _count_jsonl(path: Path) -> tuple[int, Counter, Counter]:
     grade_counts: Counter = Counter()
     source_counts: Counter = Counter()
@@ -590,6 +647,17 @@ def main() -> int:
         # readiness 8/5 FAIL). check_release_gate.py --require-fresh 가 이 필드를 본다.
         "git_sha": _git_sha(),
         "deploy_profile": _deploy_profile(),
+        # [입력 신원] 이 판정이 **어느 파일들을 읽고 나온 것인지**. 위 generated_at 은 이
+        # 리포트를 만든 시각일 뿐이라, 입력이 낡아도 오늘 날짜로 찍힌다. 실제로 P2 입력이
+        # 두 달 반 묵은 ES 리포트였는데 아무도 못 봤다. _evidence_identity 참조.
+        "evidence_inputs": _evidence_identity({
+            "p1_public": (args.p1_public, "measurement"),
+            "p1_serving": (args.p1_serving, "measurement"),
+            "p1_llm": (args.p1_llm, "measurement"),
+            "p2": (args.p2, "measurement"),
+            "classification_gold": (args.gold, "dataset"),
+            "retrieval_gold": (args.retrieval_gold, "dataset"),
+        }),
         "verdict": _overall(gate_objects),
         "evaluated_model": _norm_model(evaluated_model),
         "deployed_model": _norm_model(args.deployed_model) or "unknown",
