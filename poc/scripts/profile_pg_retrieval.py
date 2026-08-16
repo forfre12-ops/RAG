@@ -143,14 +143,14 @@ def main(argv: list[str] | None = None) -> int:
         for q in queries:
             q_or = " | ".join(vs._bigram(q).split()) or "__nomatch__"  # noqa: SLF001
             t0 = time.perf_counter()
+            # ⚠ cand 를 hybrid 와 같은 값으로 둔다. 처음에 200 으로 쟀다가 어휘 단독이
+            #   1,057ms 로 나와 hybrid 전체(194ms)보다 커지는 모순이 생겼다 -
+            #   부분이 전체보다 클 수 없다. pg_store._CAND_N(=50) 이 실제 값이다.
             c.execute(text("""
                 SELECT id FROM tb_rag_vectors
                 WHERE collection = :collection AND tsv @@ to_tsquery('simple', :qt)
                 ORDER BY ts_rank(tsv, to_tsquery('simple', :qt), 1) DESC
                 LIMIT :cand
-            # ⚠ cand 를 hybrid 와 **같은 값**으로 둔다. 처음에 200 으로 쟀다가 어휘 단독이
-            #   1,057ms 로 나와 hybrid 전체(194ms)보다 커지는 모순이 생겼다 - 부분이 전체보다
-            #   클 수 없다. pg_store._CAND_N(=50) 이 실제 값이다.
             """), {"collection": col, "qt": q_or, "cand": _CAND_N}).fetchall()
             t_lex.append((time.perf_counter() - t0) * 1000)
 
