@@ -470,7 +470,12 @@ def main() -> int:
     ap.add_argument("--p1-serving", default="reports/SERVING_VS_RAW.json",
                     help="서빙 경로 평가(scripts/eval_serving_vs_raw.py 산출). P1 판정 단위.")
     ap.add_argument("--p1-llm", default="reports/p1_release_holdout_direct.json")
-    ap.add_argument("--p2", default="reports/p2_gold_kure_es_hybrid_v3.json")
+    # ⚠ 기본값이 출하 백엔드(pg)의 리포트를 가리켜야 한다. 2026-08-16 까지 여기가
+    #   `p2_gold_kure_es_hybrid_v3.json`(ES · 2026-06-02 생성)이었고, 그래서 **우리가
+    #   출하하지 않는 구성의 검색 품질이 릴리스 게이트를 통과시키고 있었다.**
+    #   _p2_gate 가 백엔드 불일치를 BLOCKED 로 잡게 고쳤지만, 기본값 자체가 틀려 있으면
+    #   매번 BLOCKED 를 보고 사람이 경로를 넘겨야 한다 - 기본값을 옳게 둔다.
+    ap.add_argument("--p2", default="reports/p2_gold_kure_pg_hybrid.json")
     ap.add_argument("--gold", default="datasets/gold_real/classification_gold.jsonl")
     ap.add_argument("--retrieval-gold", default="datasets/gold_real/retrieval_gold.jsonl")
     ap.add_argument("--model-dir", default="artifacts/classifier_p1_v5_clean/v-fe4b386b",
