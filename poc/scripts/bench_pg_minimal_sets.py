@@ -17,8 +17,17 @@
 운영 설정을 바꿀 때는 **바꾸는 범위가 작을수록 좋다.** 안 걸어도 되는 것을 걸면
 다른 쿼리까지 영향을 받는다. 그래서 하나씩 빼면서 효과가 유지되는지 본다.
 
-특히 `min_parallel_table_scan_size` 는 기본 8MB 인데 이 테이블 힙이 26MB 라
-**이미 조건을 넘는다** - 안 걸어도 될 가능성이 크다. 확인 대상이다.
+1차 결과(2026-08-16): `min_parallel_table_scan_size = 0` 이 **필수**였다. 빼면 워커가
+2개로 돌아가 효과가 사라진다(124 -> 192ms). 이유는 PostgreSQL 이 **테이블 크기로 워커
+수를 정하기** 때문이다 - 이 값의 3배씩 커질 때마다 워커가 하나씩 는다(8MB=1·24MB=2·
+72MB=3). 이 테이블 힙이 26MB 라 2개에서 멈춘다. 0 으로 두면 그 상한이 풀려
+`max_parallel_workers_per_gather` 가 실제로 듣는다.
+
+⚠ 처음에 "힙이 26MB 라 8MB 조건을 이미 넘으니 안 걸어도 된다" 고 적었는데 **틀렸다.**
+  그 값은 병렬을 켤지 말지의 문턱이 아니라 **워커를 몇 개 줄지의 눈금**이다.
+
+그래서 비용 설정 둘(parallel_setup_cost·parallel_tuple_cost)이 정말 필요한지
+`scan_size + 워커수` 조합으로 마저 확인한다.
 """
 from __future__ import annotations
 
@@ -55,6 +64,11 @@ VARIANTS: list[tuple[str, tuple[str, ...]]] = [
                           "SET max_parallel_workers_per_gather = 4")),
     ("워커수만", ("SET max_parallel_workers_per_gather = 4",)),
     ("setup_cost 만", ("SET parallel_setup_cost = 0",)),
+    # 1차에서 min_parallel_table_scan_size 를 빼면 워커가 2개로 돌아갔다. 그게 필수라는
+    # 뜻이라 그것만 남긴 조합을 마저 잰다 - 비용 설정 둘이 필요 없다면 뺄 수 있다.
+    ("scan_size + 워커수", ("SET min_parallel_table_scan_size = 0",
+                            "SET max_parallel_workers_per_gather = 4")),
+    ("scan_size 만", ("SET min_parallel_table_scan_size = 0",)),
 ]
 
 
