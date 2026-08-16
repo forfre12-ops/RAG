@@ -309,7 +309,51 @@ class PgVectorStore:
             """
         )
         with self._engine.connect() as conn:
+            self._apply_parallel_hint(conn)
             return [self._hit(r) for r in conn.execute(sql, params)]
+
+    # ── 어휘 후보 순차 스캔의 병렬 워커 (2026-08-16 실측) ──
+    @staticmethod
+    def _apply_parallel_hint(conn: Any) -> None:
+        """검색 트랜잭션에만 병렬 워커 수를 건다.
+
+        어휘 후보 조건 `tsv @@ to_tsquery('simple', bigram1 | bigram2 | ...)` 은 코퍼스의
+        99.6%(14,703/14,755)를 매칭한다. 그렇게 넓으면 GIN 인덱스가 순차 스캔보다 비싸서
+        플래너가 인덱스를 안 쓴다 - OR 의미를 택한 설계의 결과다(AND 로 하면 패러프레이즈서
+        0 매치). 그래서 스캔 자체는 못 없애고, **그 스캔의 병렬 워커 수**가 지연을 지배한다.
+
+            KL 서버 실측 · 코퍼스 14,755 청크 · 쿼리 40건 · 단일 클라이언트
+              기본(워커 2)   p50 191.8ms · p95 237.9ms
+              워커 4         p50 124.3ms · p95 151.6ms   반환 id·점수 40/40 동일
+
+        PostgreSQL 은 `min_parallel_table_scan_size`(기본 8MB)를 눈금 삼아 테이블 크기에서
+        워커 수를 정한다(3배마다 +1: 8MB=1·24MB=2·72MB=3). 이 테이블 힙이 26MB 라 2개에서
+        멈춘다 - 그래서 눈금을 0 으로 둬야 `max_parallel_workers_per_gather` 가 실제로 듣는다.
+        둘 다 있어야 하고, 둘이면 충분하다(parallel_setup_cost·parallel_tuple_cost 는
+        빼도 효과가 유지된다 - scripts/bench_pg_minimal_sets.py 실측).
+
+        `SET LOCAL` 이라 이 트랜잭션에서만 유효하다. 연결은 풀에서 재사용되므로 `SET`(세션)
+        으로 걸면 같은 연결의 다른 쿼리까지 영향을 받는다 - 그래서 LOCAL 이다.
+
+        ⚠ 동시 요청이 늘면 이득이 사라진다. 쿼리 하나가 워커 N 개를 잡는데 서버 전체
+          `max_parallel_workers` 는 유한하다. CPU 8개 서버 실측에서 동시 4 이상은 처리량이
+          포화해 설정과 무관해지고, 워커를 6개로 올리면 꼬리(p95)가 되레 나빠졌다.
+          운영 사양·동시 사용자 수가 다르면 `scripts/bench_pg_concurrency.py` 로 다시 잰다.
+
+        ⚠ 실패해도 검색은 진행한다. 이건 속도 조정이지 정확성 조건이 아니다.
+        """
+        from koipa.config import settings  # noqa: PLC0415
+
+        n = int(getattr(settings, "pg_search_parallel_workers", 0) or 0)
+        if n <= 0:
+            return
+        from sqlalchemy import text  # noqa: PLC0415
+
+        try:
+            conn.execute(text("SET LOCAL min_parallel_table_scan_size = 0"))
+            conn.execute(text(f"SET LOCAL max_parallel_workers_per_gather = {n}"))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("병렬 워커 설정 실패 - 서버 기본값으로 진행합니다: %s", exc)
 
     def count(self, collection: str) -> int:
         from sqlalchemy import text  # noqa: PLC0415

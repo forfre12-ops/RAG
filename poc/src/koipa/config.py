@@ -221,6 +221,19 @@ class Settings(BaseSettings):
 
     # 벡터 DB
     vector_backend: str = "pg"  # pg(기본, pgvector dense+ts_rank 하이브리드) | es(레거시) | inmemory
+    # hybrid 검색의 어휘 후보는 tb_rag_vectors 를 순차 스캔한다 - bigram 을 OR 로 묶은
+    # 질의라 코퍼스의 99.6%(14,703/14,755)가 매칭돼 GIN 인덱스가 순차 스캔보다 비싸다.
+    # 그 스캔의 병렬 워커 수가 지연을 지배한다(2026-08-16 KL 서버 실측).
+    #   기본 2워커   p50 191.8ms · p95 237.9ms
+    #   4워커        p50 124.3ms · p95 151.6ms   반환 결과 40/40 동일
+    # PostgreSQL 은 min_parallel_table_scan_size(기본 8MB)를 눈금 삼아 테이블 크기에서
+    # 워커 수를 정한다(3배마다 +1). 이 테이블 힙이 26MB 라 2개에서 멈추므로, 그 눈금을
+    # 0 으로 두어야 아래 값이 실제로 듣는다. 둘 다 검색 트랜잭션 안에서만 건다(SET LOCAL).
+    # 0 이면 아무것도 안 건다(서버 기본값 사용).
+    # ⚠ 동시 요청이 많으면 이득이 사라진다(CPU 8 · 동시 4 이상에서 처리량 포화).
+    #   실측: 동시1 189->125ms · 동시2 214->149ms · 동시4 p50 이득이나 p95 손해.
+    #   운영 사양·동시 사용자 수가 다르면 scripts/bench_pg_concurrency.py 로 다시 잰다.
+    pg_search_parallel_workers: int = 4
     es_url: str = "http://localhost:9200"
     es_username: str = ""
     es_password: str = ""
