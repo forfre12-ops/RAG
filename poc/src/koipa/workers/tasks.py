@@ -373,7 +373,11 @@ def _mark_training_run(run_id, *, status: str, **fields) -> None:
                     model_version=_mv,
                 )
             elif status == "failed":
-                repo.mark_failed(rid, fields.get("error", ""))
+                repo.mark_failed(
+                    rid, fields.get("error", ""),
+                    final_metrics=fields.get("final_metrics"),
+                    duration_sec=fields.get("duration_sec"),
+                )
     except Exception:  # noqa: BLE001
         logger.warning(
             "training run status update skipped (best-effort): run_id=%s status=%s",
@@ -466,6 +470,12 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
             spec_kwargs, total_samples=_train_rows_count(spec_kwargs) or 0
         )
     _mark_training_run(run_uuid, status="running")
+    # [소요시간 2026-08-16] `_mark_training_run(..., "completed")` 이 duration_sec 을
+    # 안 넘겨서 `GET /train/jobs` 의 소요시간이 **항상 null** 이었다(tasks.py 의
+    # `duration_sec=fields.get("duration_sec")` 가 늘 None 을 받았다). 여기서 시작
+    # 시각을 잡아 완료 때 넘긴다. monotonic 이라 시스템 시계 변경에 안 흔들린다.
+    import time as _time  # noqa: PLC0415
+    _run_t0 = _time.monotonic()
 
     # ── 학습 ────────────────────────────────────────────────────────────────────
     # [진행률 배선 2026-08-08] 이 run_id 를 넘기면 트레이너가 HF TrainerState 를 읽어
@@ -536,21 +546,53 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         logger.exception("register_and_gate_model failed — 등록/게이트 생략")
         out["deploy"] = {"registered": False, "reason": "exception"}
 
+    # [상태 정직성 2026-08-16] 종전에는 register_and_gate_model 이 예외로 실패해
+    # `deploy={"registered": False, "reason": "exception"}` 이 돼도 아래에서 그대로
+    # status="completed" 로 적었다. 화면(`GET /train/jobs`)에서는 새 모델이 나온 것처럼
+    # 보이는데 실제로는 등록된 모델이 없다 - 운영자가 그 차이를 알 방법이 없었다.
+    #
+    #   학습이 끝난 것과 모델이 등록된 것은 다른 사건이다. 둘을 한 단어로 적으면 안 된다.
+    #
+    # ⚠ 등급을 바꾸는 게 아니라 **상태 표기**만 가른다. 학습 산출물은 그대로 남고,
+    #   final_metrics.deploy 에 실패 사유가 이미 들어 있다. 여기서는 그것을 상태로
+    #   끌어올려 화면에 보이게 한다.
+    # ⚠ `registered=False` 가 **정상**인 경우가 있다 - 게이트가 자동활성을 막은 것
+    #   (eval_block 등)은 설계대로 동작한 것이라 실패가 아니다. 그래서 예외로 죽은
+    #   경우(reason="exception")만 failed 로 적는다.
+    _deploy = out.get("deploy") or {}
+    _deploy_crashed = (_deploy.get("reason") == "exception")
+
     # 학습·게이트 성공 → 상태 completed (소비 성패와 무관 — 소비는 아래 별도 처리).
     # [2026-08-16] 어느 모델이 나왔는지 학습 작업 기록에 남긴다. 종전에는 이 연결이
     # 한 방향뿐이라(tb_model_versions.training_run_id 만) `GET /train/jobs` 의
     # model_version 이 항상 null 이었다 - KL 서버에서 재학습이 완주해 v-24c7c02c 가
     # 정상 등록됐는데도 화면에서는 "어떤 모델이 나왔는지" 를 볼 수 없었다.
-    _mv = (out.get("deploy") or {}).get("version_id")
-    _mark_training_run(
-        run_uuid,
-        status="completed",
-        model_version=_mv,
-        final_metrics={
-            "corrections_incorporated": len(incorporated_ids),
-            "deploy": out.get("deploy"),
-        },
-    )
+    _mv = _deploy.get("version_id")
+    if _deploy_crashed:
+        _mark_training_run(
+            run_uuid,
+            status="failed",
+            error="학습은 끝났으나 모델 등록/게이트가 예외로 실패했다 "
+                  "(register_and_gate_model). 등록된 모델이 없다 - 워커 로그의 "
+                  "register_and_gate_model failed 스택을 볼 것.",
+            duration_sec=int(_time.monotonic() - _run_t0),
+            # 학습이 모은 것은 버리지 않는다 - 실패해도 무엇을 했는지는 남겨야 한다.
+            final_metrics={
+                "corrections_incorporated": len(incorporated_ids),
+                "deploy": out.get("deploy"),
+            },
+        )
+    else:
+        _mark_training_run(
+            run_uuid,
+            status="completed",
+            model_version=_mv,
+            duration_sec=int(_time.monotonic() - _run_t0),
+            final_metrics={
+                "corrections_incorporated": len(incorporated_ids),
+                "deploy": out.get("deploy"),
+            },
+        )
 
     # ── [A2-①] 소비 — 실제 반영된 교정만, 실제 run_id로 (반영 없으면 소비 안 함=무손실) ──
     out["corrections_run_id"] = str(run_uuid) if run_uuid else None

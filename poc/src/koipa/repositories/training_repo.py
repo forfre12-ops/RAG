@@ -91,13 +91,28 @@ class TrainingRepo:
         if model_version is not None:
             run.model_version = model_version
 
-    def mark_failed(self, run_id: uuid.UUID, error_message: str) -> None:
+    def mark_failed(self, run_id: uuid.UUID, error_message: str, *,
+                    final_metrics: dict | None = None,
+                    duration_sec: int | None = None) -> None:
+        """학습 작업 실패 기록.
+
+        [2026-08-16] `final_metrics`·`duration_sec` 를 받는다. 학습 자체는 끝났는데 모델
+        등록이 실패한 경우가 있다 - 그때 상태는 failed 가 맞지만(등록된 모델이 없다),
+        **그동안 모은 것까지 버릴 이유는 없다.** 종전에는 이 경로가 metrics 를 안 써서
+        교정 반영 건수·deploy 실패 사유가 화면에서 사라졌다.
+
+        None 이면 기존 값을 지우지 않는다 - 재호출로 기록이 날아가지 않게.
+        """
         run = self.db.get(TrainingRun, run_id)
         if run is None:
             return
         run.status = "failed"
         run.completed_at = dt.datetime.now(dt.timezone.utc)
         run.error_message = error_message
+        if final_metrics is not None:
+            run.final_metrics = final_metrics
+        if duration_sec is not None:
+            run.duration_sec = duration_sec
 
     def get_run(self, run_id: uuid.UUID) -> TrainingRun | None:
         return self.db.get(TrainingRun, run_id)
