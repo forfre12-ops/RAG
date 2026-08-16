@@ -38,66 +38,9 @@ for _s in ("stdout", "stderr"):
         import io as _io
         setattr(sys, _s, _io.TextIOWrapper(_f.buffer, encoding="utf-8", errors="replace"))
 
-# 현행 - pg_store.search_hybrid 와 동일
-SQL_NOW = """
-WITH d AS (
-    SELECT id, payload, content,
-           row_number() OVER (ORDER BY embedding <=> (:q)::vector) AS rn
-    FROM tb_rag_vectors
-    WHERE collection = :collection AND embedding IS NOT NULL
-    ORDER BY embedding <=> (:q)::vector
-    LIMIT :cand
-),
-l AS (
-    SELECT id, payload, content,
-           row_number() OVER (
-               ORDER BY ts_rank(tsv, to_tsquery('simple', :qt), 1) DESC
-           ) AS rn
-    FROM tb_rag_vectors
-    WHERE collection = :collection
-      AND tsv @@ to_tsquery('simple', :qt)
-    LIMIT :cand
-),
-fused AS (
-    SELECT COALESCE(d.id, l.id) AS id,
-           COALESCE(d.payload, l.payload) AS payload,
-           COALESCE(d.content, l.content) AS content,
-           COALESCE(1.0 / (:k + d.rn), 0) + COALESCE(1.0 / (:k + l.rn), 0) AS score
-    FROM d FULL OUTER JOIN l ON d.id = l.id
-)
-SELECT id, payload, content, score FROM fused ORDER BY score DESC LIMIT :topk
-"""
-
-# 좁힌 것 - CTE 는 id 와 순위만. payload·content 는 마지막에 기본키로 되받는다.
-SQL_LEAN = """
-WITH d AS (
-    SELECT id, row_number() OVER (ORDER BY embedding <=> (:q)::vector) AS rn
-    FROM tb_rag_vectors
-    WHERE collection = :collection AND embedding IS NOT NULL
-    ORDER BY embedding <=> (:q)::vector
-    LIMIT :cand
-),
-l AS (
-    SELECT id, row_number() OVER (
-               ORDER BY ts_rank(tsv, to_tsquery('simple', :qt), 1) DESC
-           ) AS rn
-    FROM tb_rag_vectors
-    WHERE collection = :collection
-      AND tsv @@ to_tsquery('simple', :qt)
-    LIMIT :cand
-),
-fused AS (
-    SELECT COALESCE(d.id, l.id) AS id,
-           COALESCE(1.0 / (:k + d.rn), 0) + COALESCE(1.0 / (:k + l.rn), 0) AS score
-    FROM d FULL OUTER JOIN l ON d.id = l.id
-    ORDER BY score DESC
-    LIMIT :topk
-)
-SELECT f.id, v.payload, v.content, f.score
-FROM fused f
-JOIN tb_rag_vectors v ON v.collection = :collection AND v.id = f.id
-ORDER BY f.score DESC
-"""
+# SQL 두 판은 koipa_sql_variants 에 모아 둔다 - 스크립트마다 복사해 두면
+# 한쪽만 고쳐져 서로 다른 것을 재게 된다.
+from koipa_sql_variants import SQL_LEAN, SQL_NOW  # noqa: E402
 
 
 def pct(xs: list[float], p: float) -> float:
