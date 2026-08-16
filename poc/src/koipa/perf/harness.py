@@ -242,7 +242,12 @@ class ScenarioRunner:
             if kpi.scenario != scenario_id:
                 continue
             missing = [r for r in kpi.requires if not self.resources.has(r)]
-            if ctx.skipped or (missing and self.mode == "full"):
+            # requires 는 mode 와 무관하게 건다. `and self.mode == "full"` 이던 이전 판은
+            # 정반대로 동작했다 — dryrun 에서 trained_model 이 없는데도 S1.3(F1)·S1.4(FNR)·
+            # S9.2 를 측정해 룰 폴백의 시드 키워드 정답을 "F1 100%" 로 보고서에 실었다.
+            # 자원이 없으면 그 KPI 는 측정한 것이 아니라 SKIP 이다.
+            mode_gated = getattr(kpi, "full_only", False) and self.mode != "full"
+            if ctx.skipped or missing or mode_gated:
                 out.append(
                     KPIResult(
                         kpi_id=kpi.id,
@@ -254,7 +259,11 @@ class ScenarioRunner:
                         compare=kpi.compare,
                         passed=False,
                         status="SKIP",
-                        skip_reason=ctx.skip_reason or f"missing: {','.join(missing)}",
+                        skip_reason=(
+                            ctx.skip_reason
+                            or (f"missing: {','.join(missing)}" if missing else "")
+                            or "full 모드 실측만 판정 대상 (dryrun 값은 판정 근거 아님)"
+                        ),
                         n_samples=0,
                     )
                 )

@@ -33,6 +33,9 @@ class KPI:
     aggregator: Aggregator
     requires: list[str] = field(default_factory=list)
     core: bool = False
+    # full 모드에서만 합격선을 건다. dryrun 값은 기록·추세용이고 판정 근거가 아니다
+    # (예: 자원 사용률은 실서버 uvicorn workers 실측이라야 PER-002 판정이 된다).
+    full_only: bool = False
 
 
 def aggregate(values: list[float | bool], agg: Aggregator) -> float:
@@ -158,8 +161,11 @@ KPIS: list[KPI] = [
     # CPU<90%·MEM<70% (RFP 협의 조절 가능). psutil 부재/미측정이면 harness 가 SKIP 처리
     # (무데이터 false-PASS 아님). dryrun(TestClient)에선 부하가 가벼워 낮게 측정 — 실 판정은
     # full 모드(테스트서버 uvicorn workers) 실측치가 근거.
-    KPI("S11.6", "S11", "CPU 사용률 peak (PER-002)", "%", "le", 90, "max", core=True),
-    KPI("S11.7", "S11", "MEM 사용률 peak (PER-002)", "%", "le", 70, "max", core=True),
+    # full_only: dryrun 은 TestClient in-process 라 부하가 개발 머신·CI 러너의 다른 작업과
+    # 섞인다. 2026-08-16 실측에서 유휴 16코어 노트북조차 peak 100% 를 찍었다 — 이 값으로
+    # CI 를 막으면 임계를 올리라는 압력만 생기고, 그러면 실서버의 진짜 초과를 못 잡는다.
+    KPI("S11.6", "S11", "CPU 사용률 peak (PER-002)", "%", "le", 90, "max", core=True, full_only=True),
+    KPI("S11.7", "S11", "MEM 사용률 peak (PER-002)", "%", "le", 70, "max", core=True, full_only=True),
 
     # S13(멀티 테넌트 격리) 제거: 격리는 KL 포털 전담 — 단일 고객사 엔진이라 시나리오·KPI 불요.
 

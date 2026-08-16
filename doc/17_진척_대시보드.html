@@ -829,7 +829,7 @@
         <div class="step-desc">
           <code>poc/src/koipa/perf/</code> + <code>scripts/run_perf_scenarios.py</code> 신규.
           S1~S11+S13 11 시나리오 × 평균 3.8 KPI = <b>42 KPI</b>(6 core).
-          <a href="20_시나리오_성능_보고서.html">doc/20</a> 단일 HTML + <a href="20a_시나리오_성능_KPI매트릭스.md">doc/20a</a> 매트릭스.
+          <a href="20_시나리오_성능_보고서.html">doc/20</a> 단일 HTML + <code>poc/src/koipa/perf/kpis.py</code> KPI 정의.
           <code>trained_model</code> 게이팅으로 보고 노이즈 제거, poc-ci 잡 통합. PSH 단위 테스트 50+ 추가.
           <code>commit af2a059 → 71327b5</code>
         </div>
@@ -1425,7 +1425,7 @@
         <tr><td>2026-05-28</td><td>v0.9.3</td><td>W11 시나리오 확장 — 보안·운영·배포 시나리오 4종 추가: <b>S10 RAG 인용 충실도</b>(grounded_ratio·환각 방지), <b>S16 권한·인증 거부</b>(401/422 일관성·거부 p95), <b>S17 감사 로그 무결성</b>(actor·role·tenant 정합, PG 의존), <b>S18 폐쇄망 번들 무결성</b>(manifest 결정론·SHA256·30s). 15 시나리오 × 평균 3.7 KPI = <b>55 KPI</b>(7 core). dryrun PASS 39 / FAIL 0 / SKIP 16. doc/19 §2.10 + doc/20a 갱신. 385 → <b>389 PASS</b>.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.2</td><td>W10 확장 — 성능·보안 시나리오 3종 추가: <b>S9 적대적 문서 FNR 스트레스</b>(동의어·OCR 변형 일관성), <b>S11 부하 (Concurrent Stress)</b>(동시 20~50 워커 error_rate·p95·throughput), <b>S13 멀티 테넌트 격리</b>(교차 노출 0회·인덱스 분리). 11 시나리오 × 평균 3.8 KPI = <b>42 KPI</b>(6 core). dryrun PASS 29 / FAIL 0 / SKIP 13. doc/19 §2.9 + doc/20a v1.2 갱신. 385 PASS 유지.</td></tr>
         <tr><td>2026-05-28</td><td>v0.9.1</td><td>W10 PSH 운영 보강 — 임계선 sparkline + 전체 KPI 추세 표(§2.5) + pushgateway 모듈(<code>koipa/perf/pushgateway.py</code>, stdlib urllib) + 회귀 자동 감지(<code>--regression-threshold 30 --fail-on-regression</code>) + CI PR 코멘트 자동(<code>github-script@v7</code>) + GitHub Pages 자동 배포(main push 시). 50+ 신규 단위 테스트.</td></tr>
-        <tr><td>2026-05-28</td><td>v0.9</td><td>W10 PSH — 시나리오 성능 하네스 (<code>poc/src/koipa/perf/</code> + <code>scripts/run_perf_scenarios.py</code>) + 단일 HTML 보고서 (<a href="20_시나리오_성능_보고서.html">doc/20</a>) + KPI 매트릭스 (<a href="20a_시나리오_성능_KPI매트릭스.md">doc/20a</a>, 33 KPI 5 core). S1~S8 × 평균 4.1 KPI, dryrun PASS 22 / FAIL 0 / SKIP 11 (외부 자원 의존). F1·FNR·Recall@5는 <code>trained_model</code> 게이팅으로 보고 노이즈 제거. poc-ci 잡 통합 (dryrun FAIL-ON-MISS). 301 → <b>324 PASS</b> (PSH 단위 테스트 23 추가).</td></tr>
+        <tr><td>2026-05-28</td><td>v0.9</td><td>W10 PSH — 시나리오 성능 하네스 (<code>poc/src/koipa/perf/</code> + <code>scripts/run_perf_scenarios.py</code>) + 단일 HTML 보고서 (<a href="20_시나리오_성능_보고서.html">doc/20</a>) + KPI 매트릭스 (doc/20a, 33 KPI 5 core — 이후 삭제, 정의는 <code>poc/src/koipa/perf/kpis.py</code>). S1~S8 × 평균 4.1 KPI, dryrun PASS 22 / FAIL 0 / SKIP 11 (외부 자원 의존). F1·FNR·Recall@5는 <code>trained_model</code> 게이팅으로 보고 노이즈 제거. poc-ci 잡 통합 (dryrun FAIL-ON-MISS). 301 → <b>324 PASS</b> (PSH 단위 테스트 23 추가).</td></tr>
         <tr><td>2026-05-27</td><td>v0.8</td><td>W9 일반화 — LLM 이중경로(원격 Anthropic/OpenAI ↔ 로컬 vLLM/Ollama/LM Studio, OpenAI 호환 endpoint 통합), 임베딩 로컬화(sentence-transformers + cache_kure_v1.py), 시드 v2(142개, 일반화 도메인), Nori 사전(235항목, 15 카테고리). doc/16 차단 6→3, doc/05 일반화 정직성 노트. 301 PASS. Hero KPI 95%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.7</td><td>W8 종료 — PyMuPDF→pdfminer.six 교체, SBOM CycloneDX CI 자동 산출, doc/19 KL 통합 8시나리오 18 자동 테스트, MinIO 결정 보류+SeaweedFS 부록. 285 PASS. Hero KPI 90%.</td></tr>
         <tr><td>2026-05-27</td><td>v0.6.1</td><td>인프라 정비 — Docker 데이터 볼륨 E드라이브 bind mount 이전(esdata만 named volume 유지) + Qdrant 어댑터·마이그레이션·롤백 경로 완전 제거 (코드·테스트·CI·docs). 267 PASS (의도 22개 제거).</td></tr>
@@ -1449,12 +1449,7 @@
   <div class="footer">
     <p>
       Koipa AI · KOIPA AI 영업비밀관리시스템 · FUN-003·004·005·022·023·024 ·
-      <a href="07_전체설계_통합본_V2.html">전체 설계 통합본 V2</a> ·
-      <a href="15_진척_종합_보고서.md">진척 종합 보고서</a> ·
-      <a href="16_미준비_자원_체크리스트.md">미준비 자원 체크리스트</a> ·
-      <a href="19_KL_통합_8시나리오.md">KL 통합 시나리오</a> ·
-      <a href="20_시나리오_성능_보고서.html">PSH 성능 보고서</a> ·
-      <a href="20a_시나리오_성능_KPI매트릭스.md">KPI 매트릭스 v1.3</a>
+      <a href="20_시나리오_성능_보고서.html">PSH 성능 보고서</a>
     </p>
     <p>2026-05-29 W13 + 33건 + 후속 6+4+3+1+4+1+1+1+1+1+1+1+1+1+<b>1건(P2 reranker 효과 0 확정 + 운영 토글 표준화)</b> 완료 시점 · pytest <b>540 + 신규 141 PASS</b> + 라이브 6시나리오 통과 + P2 실측 dense KURE 0.667/BGE 0.700 + reranker(BGE x4·x10) 효과 0 확정 · ruff 0 위반 · 18 시나리오 <b>67 KPI (47/0/20)</b> · Phase 1 90% (W6 잔여) + Phase 2 100% + Phase 3 차단 3→1 + Phase 4 운영 진입 보강 완료. 누적 61건. 남은 차단: 합격선 도달은 ES 하이브리드(BM25 시그널) + 실 가이드 v2 쿼리 도착 후 + Anthropic API 키 + 실문서(미제공 가정). reranker 단독은 시드 쿼리 환경에서 무익으로 실증.</p>
   </div>

@@ -1,6 +1,6 @@
 """PSH — Performance Scenario Harness.
 
-doc/20a_시나리오_성능_KPI매트릭스.md 1:1 매핑.
+KPI 정의의 진실원은 kpis.py 다(구 doc/20a 매트릭스는 2026-07 삭제).
 
 구성:
 - env.py     환경 캡처 (Python·OS·GPU·docker svc·git SHA)

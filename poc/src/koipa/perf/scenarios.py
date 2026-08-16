@@ -246,57 +246,80 @@ def s2_async_batch(ctx: ScenarioContext) -> None:
 # ----------------------------------------------------------------
 
 def s3_confirm_relabel(ctx: ScenarioContext) -> None:
+    """확정·재라벨 — 지연(S3.1·S3.2)과 실제 반영(S3.3·S3.4)을 나눠 잰다.
+
+    이전 판은 (a) 필수 필드 doc_id 를 안 보내 confirm·relabel 이 전부 422 였고 — 그래서
+    S3.1/S3.2 는 표본 0 으로 SKIP 됐다 —, (b) S3.3/S3.4 를 "없는 문서에 relabel 했더니
+    200 이 오더라"로 판정했다. confirm·relabel 은 DB 미가용·분류 미존재에도 200 을 주고
+    그 사실을 응답 `persisted`·`warnings` 로 알리는 계약(schemas/confirm.py)이라, 200 만
+    보는 판정은 아무것도 검증하지 않는 초록불이었다. 계약이 이미 주는 값으로 바꾼다.
+    """
     make = _client_factory()
     N = 5
     actor = {"user_id": "psh-admin", "role": "admin"}
 
-    import uuid as _uuid  # noqa: PLC0415
-    # 먼저 실제 분류 레코드 생성 — UUID doc_id 사용해야 persist 됨
-    inference_ids: list[str] = []
+    # 분류는 **문서가 tb_documents 에 있을 때만** 영속된다(classify_service._try_persist:
+    # "persistence skipped: doc_id ... not found"). 임의 UUID 를 넣던 이전 판은 그래서
+    # 분류가 안 남았고, 뒤이은 confirm·relabel 은 "classification not found in DB — audit
+    # only" 로 persisted=False 였다. 실제 적재 경로(POST /documents)로 문서를 만들고 그
+    # doc_id 로 분류해야 확정·정정이 진짜로 반영된다.
+    records: list[tuple[str, str]] = []  # (doc_id, inference_id)
     with make() as cli:
-        for i in range(N + 2):
+        for i in range(2 * (N + 1)):
+            body = f"PSH S3 테스트 문서 {i}. 영업비밀 분류 시나리오 검수자 확정. " * 3
+            up = cli.post(
+                "/api/v1/documents",
+                headers=_hdr(role="admin"),
+                data={"actor": json.dumps({"user_id": "psh-admin", "role": "admin"}), "doc_type": "internal"},
+                files={"file": (f"psh-s3-{i}.txt", io.BytesIO(body.encode("utf-8")), "text/plain")},
+            )
+            doc_id = (up.json().get("doc_id") or "") if up.status_code in (200, 201) else ""
+            if not doc_id:
+                continue  # 적재 실패 — 표본을 만들지 않는다(무측정 = SKIP)
             r = cli.post(
                 "/api/v1/classify",
                 headers=_hdr(),
-                json={
-                    "doc_id": str(_uuid.uuid4()),
-                    "content": f"PSH S3 테스트 문서 {i}. 영업비밀 분류 시나리오 검수자 확정.",
-                    "use_rag": False,
-                },
+                json={"doc_id": doc_id, "content": body, "use_rag": False},
             )
-            if r.status_code == 200:
-                iid = r.json().get("inference_id")
-                if iid:
-                    inference_ids.append(iid)
+            if r.status_code == 200 and r.json().get("inference_id"):
+                records.append((doc_id, r.json()["inference_id"]))
 
-        # confirm — 실제 inference_id 사용
-        for i, iid in enumerate(inference_ids[:N + 1]):
+        confirm_set = records[: N + 1]
+        relabel_set = records[N + 1 :]
+
+        confirmed_doc_ids: list[str] = []
+        for i, (doc_id, iid) in enumerate(confirm_set):
             elapsed, r = _time_call(
-                lambda iid=iid: cli.post(
+                lambda d=doc_id, s=iid: cli.post(
                     "/api/v1/confirm",
                     headers=_hdr(role="admin"),
                     json={
-                        "inference_id": iid,
+                        "doc_id": d,
+                        "inference_id": s,
                         "confirmed_label": "S1",
                         "actor": actor,
                         "note": "PSH S3",
                     },
                 )
             )
-            if i == 0:
+            if i == 0:  # warmup — 콜드 시작 배제
                 continue
             if r.status_code == 200:
                 ctx.record("s3_1", elapsed)
+                if r.json().get("persisted"):
+                    confirmed_doc_ids.append(doc_id)
 
-        # relabel — 새 분류 레코드에서 inference_id 사용
-        relabel_ids = inference_ids[N + 1:]
-        for i, iid in enumerate(relabel_ids[:N + 1]):
+        # S3.3 corrections 누적 — relabel 응답의 queue_size(미소비 corrections 수)가 건마다 는다.
+        queue_sizes: list[int] = []
+        relabeled_doc_ids: list[str] = []
+        for i, (doc_id, iid) in enumerate(relabel_set):
             elapsed, r = _time_call(
-                lambda iid=iid: cli.post(
+                lambda d=doc_id, s=iid: cli.post(
                     "/api/v1/relabel",
                     headers=_hdr(role="admin"),
                     json={
-                        "inference_id": iid,
+                        "doc_id": d,
+                        "inference_id": s,
                         "original_label": "S1",
                         "corrected_label": "S2",
                         "reason": "PSH 시나리오",
@@ -304,28 +327,40 @@ def s3_confirm_relabel(ctx: ScenarioContext) -> None:
                     },
                 )
             )
-            if i == 0:
+            if i == 0:  # warmup
                 continue
             if r.status_code == 200:
                 ctx.record("s3_2", elapsed)
+                body = r.json()
+                if body.get("persisted"):
+                    relabeled_doc_ids.append(doc_id)
+                    queue_sizes.append(int(body.get("queue_size") or 0))
 
-    # S3.3/S3.4: relabel API가 200을 반환했는지 확인 (DB persist 여부 무관)
-    relabel_ok = False
-    with make() as cli:
-        r_test = cli.post(
-            "/api/v1/relabel",
-            headers=_hdr(role="admin"),
-            json={
-                "doc_id": "non-existent-doc",
-                "original_label": "S2",
-                "corrected_label": "TS",
-                "reason": "PSH S3 endpoint check",
-                "actor": actor,
-            },
-        )
-        relabel_ok = r_test.status_code == 200
-    ctx.record("s3_3", relabel_ok)
-    ctx.record("s3_4", relabel_ok)
+    if queue_sizes:
+        # 누적이면 단조 증가한다. DB 미영속(persisted=False)이면 표본이 안 쌓여 SKIP 으로 남는다.
+        ctx.record("s3_3", queue_sizes == sorted(queue_sizes) and queue_sizes[-1] > queue_sizes[0])
+
+    # S3.4 status='corrected' 전이 — 응답에 없는 값이라 DB 를 직접 본다(KPI requires=pg).
+    if relabeled_doc_ids:
+        try:
+            import uuid as _uuid2  # noqa: PLC0415
+
+            from sqlalchemy import select  # noqa: PLC0415
+
+            from koipa.db.models import Classification  # noqa: PLC0415
+            from koipa.db.session import SessionLocal  # noqa: PLC0415
+
+            with SessionLocal() as session:
+                for doc_id in relabeled_doc_ids:
+                    rows = session.execute(
+                        select(Classification.status).where(
+                            Classification.doc_id == _uuid2.UUID(doc_id)
+                        )
+                    ).scalars().all()
+                    ctx.record("s3_4", bool(rows) and all(st == "corrected" for st in rows))
+        except Exception as exc:  # noqa: BLE001
+            # 값을 남기지 않는다 — 무측정은 SKIP 이고, False 로 적으면 DB 부재가 결함으로 둔갑한다.
+            print(f"[PSH][S3] status 전이 확인 실패(무측정 처리) - {type(exc).__name__}: {exc}")
 
 
 # ----------------------------------------------------------------
@@ -1083,20 +1118,40 @@ def s18_offline_bundle(ctx: ScenarioContext) -> None:
     out_a = poc_root / "dist" / "psh-s18-a"
     out_b = poc_root / "dist" / "psh-s18-b"
 
+    # 번들 스크립트는 학습 분류기 없이 만든 번들이 폐쇄망에서 rule-fallback 으로 뜨는 것을 막으려고
+    # 모델 parity 가드로 종료한다. 이 인자를 안 주면 스크립트가 시작하자마자 exit 2 로 끝나 manifest
+    # 가 아예 안 만들어지고, S18.1/S18.2 는 "번들이 깨졌다"가 아니라 "호출이 틀렸다"로 FAIL 한다.
+    from koipa.config import settings as _settings  # noqa: PLC0415
+
+    _model_dir = (_settings.classifier_model_dir or "").strip()
+    _candidates = [poc_root / _model_dir, _Path(_model_dir)] if _model_dir else []
+    _resolved = next((c for c in _candidates if c.is_dir()), None)
+    parity_args = (
+        ["--classifier-model-dir", str(_resolved)] if _resolved
+        # 배포 모델이 로컬에 없는 환경(CI clean 체크아웃)에서는 base-only 를 명시한다. manifest
+        # 결정론 검증이 목적이라 가중치 종류는 무관하고, 가드를 무음 우회하지 않고 드러낸다.
+        else ["--allow-base-only-classifier"]
+    )
+    last_error: dict[str, str] = {}
+
     def _run(out: _Path) -> float:
         if out.exists():
             shutil.rmtree(out, ignore_errors=True)
         t0 = time.perf_counter()
         try:
-            _sp.run(
-                [_sys.executable, str(script), "--version", "test-S18", "--dry-run", "--output", str(out)],
+            proc = _sp.run(
+                [_sys.executable, str(script), "--version", "test-S18", "--dry-run",
+                 "--output", str(out), *parity_args],
                 cwd=str(poc_root),
                 check=False,
                 timeout=120,
                 capture_output=True,
             )
-        except Exception:
-            pass
+            if proc.returncode != 0:
+                tail = (proc.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+                last_error["msg"] = tail[-1] if tail else f"rc={proc.returncode}"
+        except Exception as exc:  # noqa: BLE001
+            last_error["msg"] = f"{type(exc).__name__}: {exc}"
         return (time.perf_counter() - t0) * 1000.0
 
     elapsed_a = _run(out_a)
@@ -1104,6 +1159,9 @@ def s18_offline_bundle(ctx: ScenarioContext) -> None:
 
     files_a = {p.name for p in out_a.glob("*") if p.is_file()} if out_a.exists() else set()
     manifest_ok = {"manifest.yaml", "manifest.json", "CHECKSUMS.sha256"}.issubset(files_a)
+    if not manifest_ok and last_error.get("msg"):
+        # 값만 False 로 남기면 원인이 로그에도 안 남아 다음 사람이 번들을 의심한다.
+        print(f"[PSH][S18] build_offline_bundle 실패 - {last_error['msg']}")
     ctx.record("s18_1", manifest_ok)
     ctx.record("s18_3", elapsed_a)
 

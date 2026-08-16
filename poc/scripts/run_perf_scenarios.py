@@ -38,6 +38,31 @@ sys.path.insert(0, str(POC_ROOT / "src"))
 # 사용자가 명시적으로 RATE_LIMIT_DISABLED=0 설정한 경우만 활성 유지.
 os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 
+
+def _requested_mode(argv: list[str]) -> str:
+    """argparse 이전에 --mode 를 읽는다 — 아래 자격증명 기본값이 koipa import 전에 필요하다."""
+    for i, arg in enumerate(argv):
+        if arg == "--mode" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--mode="):
+            return arg.split("=", 1)[1]
+    return "dryrun"
+
+
+# dryrun 전용 자격증명 기본값.
+#
+# settings.api_key 기본값은 빈 문자열이고, 빈 키는 인증 자체가 불가하다(config.py 가드).
+# 그래서 키를 안 준 dryrun 은 전 시나리오가 401 을 받았고, 스키마·폴링·게이트 KPI 가
+# "측정 0.0 ≥ True" 로 FAIL, 지연 KPI 는 값을 못 남겨 SKIP 으로 집계됐다
+# (2026-08-16 실측: 66 KPI 중 PASS 15 = 22.7%. 키·DB 를 주면 PASS 43 = 65.2%).
+# 역할 헤더 신뢰도 같이 켠다 — 시나리오가 admin·reviewer·kl_backend 를 번갈아 자칭하는데
+# 기본값(api_key_role=system)으로는 confirm·relabel·등급체계 API 가 403 이다.
+# 둘 다 setdefault 라 운영자가 준 값이 우선하고, full 모드는 실 자격증명을 쓰므로 건드리지 않는다.
+# 운영(poc_mode=full)에서는 config startup 검사가 이 편의 플래그를 fail-fast 로 막는다.
+if _requested_mode(sys.argv) == "dryrun":
+    os.environ.setdefault("API_KEY", "psh-dryrun-inprocess-key")
+    os.environ.setdefault("API_KEY_TRUST_ACTOR_ROLE_HEADER", "1")
+
 from koipa.perf import capture_env  # noqa: E402
 from koipa.perf.harness import (  # noqa: E402
     AvailableResources,

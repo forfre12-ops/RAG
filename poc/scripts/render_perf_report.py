@@ -413,7 +413,7 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
 make perf-scenarios MODE=full      # 실측 (LLM·GPU·ES·PG 필요)
 make perf-scenarios FAIL_ON_MISS=1 # KPI 미달 시 exit 1 (CI용)</pre>
   <p style="color:var(--text-dim); font-size:12.5px;">
-    상세 명세: <code>doc/20a_시나리오_성능_KPI매트릭스.md</code> · 시나리오 명세: <code>doc/19_KL_통합_8시나리오.md</code>
+    KPI 정의: <code>poc/src/koipa/perf/kpis.py</code> · 시나리오 정의: <code>poc/src/koipa/perf/scenarios.py</code>
   </p>
 </section>
 
