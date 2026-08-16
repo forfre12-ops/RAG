@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
               f"· 후보 95%CI [{lo:.3f}, {hi:.3f}]")
 
     # 폴더별 - 합계 개선이 특정 폴더 악화를 숨기지 않게
-    print(f"\n폴더별 헛경보(TS/S1)")
+    print("\n폴더별 헛경보(TS/S1)")
     byf = defaultdict(lambda: {"n": 0, "b": 0, "c": 0})
     for b, c in both:
         f = b.get("source") or "?"

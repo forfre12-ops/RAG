@@ -77,7 +77,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from koipa.dataset_leakage import _normalize_sentences, check_or_raise  # noqa: E402
+from koipa.dataset_leakage import check_or_raise  # noqa: E402
 from koipa.holdout_independence import assess  # noqa: E402
 from koipa.proxy_corpus import validate_proxy_record  # noqa: E402
 from eval_fact_pools import NEUTRAL_NOTES, POOLS  # noqa: E402

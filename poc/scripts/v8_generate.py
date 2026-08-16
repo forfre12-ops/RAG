@@ -26,7 +26,7 @@ _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
 from v8_document_forms import (  # noqa: E402
-    FORM_BY_ID, HOLDOUT2_FORMS, HOLDOUT_FORMS, NO_FACTOR_FORMS, TRAIN_FORMS,
+    HOLDOUT2_FORMS, HOLDOUT_FORMS, NO_FACTOR_FORMS, TRAIN_FORMS,
     sanity_check,
 )
 from v8_value_levels import DOMAINS as VALUE_DOMAINS, content_for as value_content

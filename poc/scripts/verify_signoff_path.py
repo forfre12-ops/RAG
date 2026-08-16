@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     for rid in (args.reviewer, "ai_assist", "demo-console", "system", "codex", "", None):
         print(f"   {str(rid)!r:22s} 사람 검수자로 인정 = {is_human_reviewer(rid)}")
 
-    print(f"\n=== 2) locked_gold_eval 편입 조건 (is_valid_signoff)\n")
+    print("\n=== 2) locked_gold_eval 편입 조건 (is_valid_signoff)\n")
     base = {
         "label_source": "human_review",
         "reviewer_id": args.reviewer,
