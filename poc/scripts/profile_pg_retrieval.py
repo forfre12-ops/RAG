@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     from sqlalchemy import text  # noqa: PLC0415
 
     from koipa.adapters.embedding import build_embedder  # noqa: PLC0415
-    from koipa.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
+    from koipa.adapters.vectorstore.pg_store import _CAND_N, PgVectorStore  # noqa: PLC0415
 
     vs = PgVectorStore()
     emb = build_embedder()
@@ -132,7 +132,8 @@ def main(argv: list[str] | None = None) -> int:
     t_dense: list[float] = []
     for v in vecs:
         t0 = time.perf_counter()
-        vs.search(args.collection, v, top_k=args.top_k)
+        # dense 도 hybrid 와 같은 후보 수로 재야 비교가 성립한다.
+        vs.search(args.collection, v, top_k=_CAND_N)
         t_dense.append((time.perf_counter() - t0) * 1000)
 
     # --- 3) 어휘만 (같은 SQL 조각을 직접) ---------------------------------------
@@ -147,7 +148,10 @@ def main(argv: list[str] | None = None) -> int:
                 WHERE collection = :collection AND tsv @@ to_tsquery('simple', :qt)
                 ORDER BY ts_rank(tsv, to_tsquery('simple', :qt), 1) DESC
                 LIMIT :cand
-            """), {"collection": col, "qt": q_or, "cand": 200}).fetchall()
+            # ⚠ cand 를 hybrid 와 **같은 값**으로 둔다. 처음에 200 으로 쟀다가 어휘 단독이
+            #   1,057ms 로 나와 hybrid 전체(194ms)보다 커지는 모순이 생겼다 - 부분이 전체보다
+            #   클 수 없다. pg_store._CAND_N(=50) 이 실제 값이다.
+            """), {"collection": col, "qt": q_or, "cand": _CAND_N}).fetchall()
             t_lex.append((time.perf_counter() - t0) * 1000)
 
     # --- 4) hybrid 전체 --------------------------------------------------------
