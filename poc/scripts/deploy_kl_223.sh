@@ -38,6 +38,8 @@ STAMP="$(date -u +%Y%m%d%H%M)"
 # 빌드·태그까지 끝난 뒤 기동 직전에 죽어서 **옛 이미지가 계속 도는 채로** 끝났다.
 # 여기서 한 번 정해 4b·7단계가 같은 값을 쓴다.
 WORKER_MEM_LIMIT="${WORKER_MEM_LIMIT:-16G}"
+# 1단계가 소스를 덮기 **전** 자기 자신의 해시. 덮은 뒤와 다르면 새 판으로 다시 시작한다.
+SELF_SHA_BEFORE="$(sha256sum "$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" 2>/dev/null | cut -d' ' -f1 || true)"
 
 b(){ printf '\n\033[1m>> %s\033[0m\n' "$*"; }
 ok(){ printf '\033[1;32m  [ok] %s\033[0m\n' "$*"; }
@@ -93,6 +95,20 @@ git archive FETCH_HEAD poc/src poc/scripts poc/tests poc/uv.lock poc/pyproject.t
     poc/docker-compose.prod.yml poc/docker-compose.dual.yml poc/docker-compose.airgap.yml poc/Makefile \
   | tar -x --strip-components=1 -C .
 ok "소스 $SHORT"
+
+# ⚠ 이 스크립트는 방금 **자기 자신도** 덮었다(poc/scripts 에 들어 있다). bash 는 실행 중인
+#   파일을 조금씩 읽어가므로, 갱신된 내용은 **이 실행에는 안 먹는다.** 실측 2026-08-16:
+#   7단계 버그를 고쳐 push 하고 배포를 다시 돌렸는데 같은 자리에서 또 죽었다 - 1단계가
+#   고친 판을 받아 디스크에 썼지만 실행 중인 것은 옛 판이었다. 한 번 더 돌려서야 됐다.
+#   갱신 전후 해시를 비교해 바뀌었으면 새 판으로 스스로 다시 시작한다.
+#   KOIPA_DEPLOY_REEXEC 가드로 재시작은 한 번만 한다(무한 루프 방지).
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+NOW_SHA="$(sha256sum "$SELF" 2>/dev/null | cut -d' ' -f1 || true)"
+if [ "${SELF_SHA_BEFORE:-}" != "$NOW_SHA" ] && [ -z "${KOIPA_DEPLOY_REEXEC:-}" ]; then
+  warn "배포 스크립트 자체가 갱신됐다 - 새 판으로 다시 시작한다"
+  export KOIPA_DEPLOY_REEXEC=1
+  exec bash "$SELF" "$@"
+fi
 
 # --- 2. 지뢰 1: uv.lock -----------------------------------------------------
 b "2. uv.lock 검사"
