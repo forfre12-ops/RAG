@@ -119,6 +119,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  index  {str(ix)[:110]}")
     print()
 
+    # --- 0) 워밍업 -------------------------------------------------------------
+    # ⚠ 순서가 결과를 바꾼다. 처음에 어휘 -> hybrid 순으로 쟀더니 어휘 1,062ms ·
+    #   hybrid 197ms 로 **부분이 전체보다 컸다.** 앞선 패스가 PG 캐시를 덥혀 뒤 패스가
+    #   유리해진 것이다. shared_buffers 가 128MB(기본값)인데 코퍼스 벡터만 60MB 를 넘어
+    #   캐시 압력이 실재한다.
+    #   각 경로를 **두 번 돌려 두 번째만 쓴다** - 셋 다 같은 조건(warm)이 된다.
+    def _warm(fn, n: int = 5) -> None:
+        for _ in range(n):
+            try:
+                fn()
+            except Exception:  # noqa: BLE001, S110
+                pass
+
     # --- 1) 쿼리 임베딩 (DB 밖) -------------------------------------------------
     t_embed: list[float] = []
     vecs: list[list[float]] = []
@@ -129,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         vecs.append(v)
 
     # --- 2) dense 만 -----------------------------------------------------------
+    _warm(lambda: [vs.search(args.collection, v, top_k=_CAND_N) for v in vecs[:5]], 2)
     t_dense: list[float] = []
     for v in vecs:
         t0 = time.perf_counter()
@@ -139,22 +153,34 @@ def main(argv: list[str] | None = None) -> int:
     # --- 3) 어휘만 (같은 SQL 조각을 직접) ---------------------------------------
     t_lex: list[float] = []
     col = vs._resolve_collection(args.collection)  # noqa: SLF001
-    with vs._engine.connect() as c:  # noqa: SLF001
-        for q in queries:
-            q_or = " | ".join(vs._bigram(q).split()) or "__nomatch__"  # noqa: SLF001
-            t0 = time.perf_counter()
-            # ⚠ cand 를 hybrid 와 같은 값으로 둔다. 처음에 200 으로 쟀다가 어휘 단독이
-            #   1,057ms 로 나와 hybrid 전체(194ms)보다 커지는 모순이 생겼다 -
-            #   부분이 전체보다 클 수 없다. pg_store._CAND_N(=50) 이 실제 값이다.
-            c.execute(text("""
+    _LEX_SQL = """
                 SELECT id FROM tb_rag_vectors
                 WHERE collection = :collection AND tsv @@ to_tsquery('simple', :qt)
                 ORDER BY ts_rank(tsv, to_tsquery('simple', :qt), 1) DESC
                 LIMIT :cand
-            """), {"collection": col, "qt": q_or, "cand": _CAND_N}).fetchall()
+            """
+    with vs._engine.connect() as c:  # noqa: SLF001
+        # 워밍업 패스 - 아래 본 측정과 같은 쿼리를 먼저 돌린다
+        for q in queries[:10]:
+            qw = " | ".join(vs._bigram(q).split()) or "__nomatch__"  # noqa: SLF001
+            try:
+                c.execute(text(_LEX_SQL), {"collection": col, "qt": qw,
+                                           "cand": _CAND_N}).fetchall()
+            except Exception:  # noqa: BLE001, S110
+                pass
+        for q in queries:
+            q_or = " | ".join(vs._bigram(q).split()) or "__nomatch__"  # noqa: SLF001
+            # ⚠ cand 를 hybrid 와 같은 값으로 둔다. 처음에 200 으로 쟀다가 어휘 단독이
+            #   1,057ms 로 나와 hybrid 전체(194ms)보다 커지는 모순이 생겼다 -
+            #   부분이 전체보다 클 수 없다. pg_store._CAND_N(=50) 이 실제 값이다.
+            t0 = time.perf_counter()
+            c.execute(text(_LEX_SQL),
+                      {"collection": col, "qt": q_or, "cand": _CAND_N}).fetchall()
             t_lex.append((time.perf_counter() - t0) * 1000)
 
     # --- 4) hybrid 전체 --------------------------------------------------------
+    _warm(lambda: [vs.search_hybrid(args.collection, q, v, top_k=args.top_k)
+                   for q, v in list(zip(queries, vecs))[:5]], 2)
     t_hyb: list[float] = []
     for q, v in zip(queries, vecs):
         t0 = time.perf_counter()
