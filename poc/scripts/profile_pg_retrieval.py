@@ -166,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
     }
     rrf = out["hybrid_total"]["p50"] - max(out["dense_only"]["p50"], out["lexical_only"]["p50"])
     print(f"\n  RRF·조인 추정 = hybrid - max(dense, 어휘) = {rrf:.1f}ms")
+    if rrf < 0:
+        print("  ⚠ 음수다. 부분이 전체보다 크게 측정됐다 - 조건이 다르다는 신호다. "
+              "후보 수(cand)·필터가 hybrid 와 같은지 확인할 것.")
     print(f"  P2 게이트가 재는 것: 검색만(임베딩 제외) = hybrid {out['hybrid_total']['p50']:.1f}ms"
           f"   기준 200ms")
 
