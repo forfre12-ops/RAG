@@ -62,6 +62,10 @@ def _requested_mode(argv: list[str]) -> str:
 if _requested_mode(sys.argv) == "dryrun":
     os.environ.setdefault("API_KEY", "psh-dryrun-inprocess-key")
     os.environ.setdefault("API_KEY_TRUST_ACTOR_ROLE_HEADER", "1")
+    # S7(URGENT_RETRAIN)은 /train 을 부르는데, 학습 라우터는 enable_training·
+    # enable_incremental_retrain 일 때만 등록된다(순수 추론 노드엔 없음). 기본 프로파일에서는
+    # 404 라 S7.2/S7.3 이 값 없이 SKIP 됐다. dryrun 은 학습 노드 프로파일로 잰다.
+    os.environ.setdefault("ENABLE_TRAINING", "1")
 
 from koipa.perf import capture_env  # noqa: E402
 from koipa.perf.harness import (  # noqa: E402
@@ -73,7 +77,24 @@ from koipa.perf.recorder import write_report  # noqa: E402
 from koipa.perf.scenarios import SPECS  # noqa: E402
 
 
-def build_report(*, mode: str, probe_services: bool) -> dict:
+def _select_specs(specs: list, only: str, skip: str) -> list:
+    """--only / --skip 로 시나리오를 고른다.
+
+    운영 중인 서버에서 실측할 때 부하(S11)·대량 배치(S12)·학습 트리거(S7)만 빼고 재는
+    경우가 있다. 전부 아니면 전무였던 이전에는 그런 측정을 아예 못 했다.
+    """
+    only_ids = {x.strip().upper() for x in only.split(",") if x.strip()}
+    skip_ids = {x.strip().upper() for x in skip.split(",") if x.strip()}
+    picked = [sp for sp in specs if (not only_ids or sp.id.upper() in only_ids)
+              and sp.id.upper() not in skip_ids]
+    dropped = [sp.id for sp in specs if sp not in picked]
+    if dropped:
+        # 조용히 빼면 보고서가 "전 시나리오 통과" 로 읽힌다 — 뺀 것을 로그에 남긴다.
+        print(f"[PSH] 제외된 시나리오({len(dropped)}): {', '.join(dropped)}")
+    return picked
+
+
+def build_report(*, mode: str, probe_services: bool, only: str = "", skip: str = "") -> dict:
     env = capture_env(
         probe_services=probe_services,
         probe_pytest=False,
@@ -88,8 +109,9 @@ def build_report(*, mode: str, probe_services: bool) -> dict:
         pass
 
     runner = ScenarioRunner(mode=mode, resources=resources)
+    specs = _select_specs(SPECS, only, skip)
     t0 = time.perf_counter()
-    results = runner.run(SPECS)
+    results = runner.run(specs)
     duration = time.perf_counter() - t0
     summary = summarize(results)
 
@@ -114,6 +136,8 @@ def main() -> int:
     )
     ap.add_argument("--no-html", action="store_true", help="HTML 렌더 생략")
     ap.add_argument("--no-probe", action="store_true", help="서비스 핑 생략 (오프라인용)")
+    ap.add_argument("--only", default="", help="이 시나리오만 실행 (쉼표구분, 예: S1,S3,S16)")
+    ap.add_argument("--skip", default="", help="이 시나리오를 제외 (쉼표구분, 예: S7,S11,S12)")
     ap.add_argument("--fail-on-miss", action="store_true", help="KPI 1건이라도 FAIL 시 exit 1")
     ap.add_argument(
         "--push-prom",
@@ -146,7 +170,12 @@ def main() -> int:
     args = ap.parse_args()
 
     print(f"[PSH] mode={args.mode}  out_dir={args.out_dir}")
-    report = build_report(mode=args.mode, probe_services=not args.no_probe)
+    report = build_report(
+        mode=args.mode, probe_services=not args.no_probe, only=args.only, skip=args.skip,
+    )
+    if args.only or args.skip:
+        # 부분 실행분이 전수 실행분과 같은 파일명·추세에 섞이면 회귀 비교가 거짓말을 한다.
+        report["partial_run"] = {"only": args.only, "skip": args.skip}
 
     # 회귀 비교 — 직전 회차 (동일 mode) 1건만 사용
     regressions: list[dict] = []

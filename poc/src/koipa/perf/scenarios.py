@@ -114,9 +114,9 @@ def s1_sync_classify(ctx: ScenarioContext) -> None:
         ("공개 IR 보도자료 분기 실적 발표", "S3"),
         ("공시 정보 분기 매출액 공개 자료", "S3"),
     ]
-    correct = 0
     fn_ts = 0  # TS인데 하위 등급으로 예측 (미탐)
     n_ts = 0
+    pairs: list[tuple[str, str]] = []  # (정답, 예측)
     with make() as cli:
         for content, target in eval_set:
             r = cli.post(
@@ -127,15 +127,29 @@ def s1_sync_classify(ctx: ScenarioContext) -> None:
             if r.status_code != 200:
                 continue
             pred = r.json().get("label", "")
-            if pred == target:
-                correct += 1
+            pairs.append((target, pred))
             if target == "TS":
                 n_ts += 1
                 if pred != "TS":
                     fn_ts += 1
-    f1 = correct / len(eval_set) if eval_set else 0.0
+
+    # KPI 이름이 F1-macro 인데 이전 판은 정확도(correct/전체)를 넣고 있었다. 4등급은
+    # 분포가 치우쳐 정확도가 F1 보다 후하게 나온다 — 이름과 값이 다르면 추세도 비교도 못 쓴다.
+    # 등급별 F1 의 단순평균(등장하지 않은 등급은 평균에서 제외)으로 계산한다.
+    labels = sorted({t for t, _ in pairs} | {p for _, p in pairs if p})
+    f1s: list[float] = []
+    for lab in labels:
+        tp = sum(1 for t, pr in pairs if t == lab and pr == lab)
+        fp = sum(1 for t, pr in pairs if t != lab and pr == lab)
+        fn = sum(1 for t, pr in pairs if t == lab and pr != lab)
+        if tp + fn == 0:  # 정답에 없는 등급 — 평균 대상 아님
+            continue
+        prec = tp / (tp + fp) if (tp + fp) else 0.0
+        rec = tp / (tp + fn)
+        f1s.append(2 * prec * rec / (prec + rec) if (prec + rec) else 0.0)
+    f1_macro = sum(f1s) / len(f1s) if f1s else 0.0
     fnr = (fn_ts / n_ts) if n_ts else 0.0
-    ctx.record("s1_3", f1)
+    ctx.record("s1_3", f1_macro)
     ctx.record("s1_4", fnr)
 
 
@@ -397,6 +411,46 @@ def s4_schema_grades(ctx: ScenarioContext) -> None:
         for lat in latencies:
             ctx.record("s4_4", lat)
 
+        # S4.3 신규 코드 → retrain. PUT 은 실제로 등급체계를 바꾸므로(dry-run 옵션 없음)
+        # dryrun 에서만 임시 코드를 넣었다 즉시 원복한다. full 모드는 살아 있는 배포의
+        # 등급체계라 건드리지 않는다 — 측정값 없이 SKIP 으로 남기는 편이 안전하다.
+        if ctx.mode != "full":
+            probe = list(current["grades"]) + [{
+                "code": "PSHTMP", "name": "PSH 임시코드",
+                "order": max(int(g.get("order") or 0) for g in current["grades"]) + 1,
+                "description": "PSH S4.3 측정용 — 즉시 원복",
+            }]
+            r_new = cli.put(
+                "/api/v1/schema/grades",
+                headers=_hdr(role="admin"),
+                json={"grades": probe, "actor": actor},
+            )
+            if r_new.status_code == 200:
+                ctx.record("s4_3", r_new.json().get("requires_retraining") is True)
+            # PUT 은 추가·갱신만 하고 빠진 코드를 지우지 않는다(실측: 원래 목록으로 다시
+            # PUT 해도 PSHTMP 가 남았다). 측정이 DB 에 흔적을 남기면 안 되므로 직접 지운다.
+            _restore_error = ""
+            try:
+                from sqlalchemy import delete  # noqa: PLC0415
+
+                from koipa.db.models import ClassificationLevel  # noqa: PLC0415
+                from koipa.db.session import SessionLocal  # noqa: PLC0415
+                from koipa.schemas.common import FactorRegistry, GradeRegistry  # noqa: PLC0415
+
+                with SessionLocal() as session:
+                    session.execute(
+                        delete(ClassificationLevel).where(ClassificationLevel.level_code == "PSHTMP")
+                    )
+                    session.commit()
+                GradeRegistry.invalidate()
+                FactorRegistry.invalidate()
+            except Exception as exc:  # noqa: BLE001
+                _restore_error = f"{type(exc).__name__}: {exc}"
+            if _restore_error:
+                print(f"[PSH][S4] 임시 등급코드 PSHTMP 정리 실패 - {_restore_error} — 수동 확인 필요")
+        else:
+            print("[PSH][S4] S4.3 미측정 — full 모드에서는 살아 있는 등급체계를 변경하지 않는다")
+
 
 # ----------------------------------------------------------------
 # S5. guide upload + RAG
@@ -493,7 +547,8 @@ def s6_synth(ctx: ScenarioContext) -> None:
             elapsed, r = _time_call(
                 lambda: cli.post(
                     "/api/v1/synth/generate",
-                    headers=_hdr(role="reviewer"),
+                    # reviewer 는 403 (허용 역할 admin·kl_backend·system) — 표본 0 의 원인이었다
+                    headers=_hdr(role="admin"),
                     json={
                         "target_grade": "S2",
                         "domain": "tech",
@@ -539,6 +594,23 @@ def s6_synth(ctx: ScenarioContext) -> None:
         # 모듈/시그니처 불일치 시 fallback: doc/02 §부록 D 800건 결과(100%)를 보고용으로 차용
         ctx.record("s6_2", 1.00)
 
+    # S6.5 approve 후 dataset 연결 — 승인할 항목이 있어야 잰다. 합성은 워커(celery)가
+    # 생성하는데 dryrun 에는 워커가 없어 큐가 비고, 그래서 지금까지 값도 사유도 없이
+    # 무측정이었다. 큐에 항목이 있으면 승인해 연결을 확인하고, 없으면 사유를 남긴다.
+    with make() as cli:
+        rq = cli.get("/api/v1/synth/queue?status=pending&limit=1", headers=_hdr(role="admin"))
+        items = rq.json().get("items", []) if rq.status_code == 200 else []
+        if items:
+            sid = items[0].get("sample_id") or items[0].get("id")
+            r_ap = cli.post(
+                f"/api/v1/synth/samples/{sid}/approve",
+                headers=_hdr(role="admin"),
+                json={"actor": {"user_id": "psh-reviewer", "role": "reviewer"}},
+            )
+            ctx.record("s6_5", r_ap.status_code in (200, 201))
+        else:
+            print("[PSH][S6] S6.5 미측정 — 합성 검수큐가 비어 있다(워커 부재 시 생성 0건)")
+
     # 비용/건: noop=$0
     ctx.record("s6_3", 0.0)
 
@@ -567,6 +639,12 @@ def s7_urgent_retrain(ctx: ScenarioContext) -> None:
             )
             if i == 0:
                 continue
+            if r.status_code == 404:
+                # 학습 라우터는 enable_training·enable_incremental_retrain 일 때만 등록된다
+                # (순수 추론 노드에는 아예 없다). 무측정으로 흘리면 "왜 SKIP 인지" 가 안 남는다.
+                print("[PSH][S7] /train 404 — 학습 라우터 미등록(enable_training·"
+                      "enable_incremental_retrain 꺼짐). S7.2/S7.3 은 측정 대상 아님")
+                break
             if r.status_code == 202:
                 latencies.append(elapsed)
                 ctx.record("s7_3", True)
