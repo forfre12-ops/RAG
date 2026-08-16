@@ -527,6 +527,7 @@ def _resolve_combinations(
     backends: list[str],
     hybrid: bool,
     models_override: list[str] | None = None,
+    search_modes: tuple[str, ...] = ("dense", "hybrid"),
 ) -> list[tuple[str, str, str]]:
     """(embedder_name, backend, search_mode) 조합 목록 산출.
 
@@ -547,13 +548,20 @@ def _resolve_combinations(
     combos: list[tuple[str, str, str]] = []
     for emb in embedders:
         for backend in backends:
-            combos.append((emb, backend, "dense"))
+            # [2026-08-16] `--search-modes` 로 조합을 좁힐 수 있다. 조합마다 코퍼스를 **다시
+            # 임베딩**하므로(아래 배치 루프) CPU 환경에서는 이것이 지배적 비용이다.
+            # 실측: KURE-v1 · 14,755 청크 · CPU 400% 에서 21.6건/분 = 조합당 약 11시간.
+            # 배포본이 쓰는 것은 hybrid 하나이므로(healthz search_mode=hybrid) 그것만 재면
+            # 시간이 절반이 된다.
+            if "dense" in search_modes:
+                combos.append((emb, backend, "dense"))
             # [2026-08-16] hybrid 는 ES 뿐 아니라 **pg 에서도 실제 융합**이다.
             # pg_store.search_hybrid 가 dense(pgvector) + 어휘(ts_rank_cd) 후보를 SQL 안에서
             # RRF 로 융합한다 - vec-only 폴리필이 아니다. 종전 주석이 낡아 pg 가 hybrid 조합에서
             # 빠져 있었고, 그 결과 **릴리스 게이트의 P2 수치가 우리가 쓰지 않는 ES 구성으로**
             # 남아 있었다(배포본 vector_backend=pg · P2 리포트 backend=es · 2026-06-02 생성).
-            if hybrid and backend in ("es", "pg", "pgvector", "postgres"):
+            if (hybrid and "hybrid" in search_modes
+                    and backend in ("es", "pg", "pgvector", "postgres")):
                 combos.append((emb, backend, "hybrid"))
     return combos
 
@@ -618,6 +626,9 @@ def main() -> int:
             "예: datasets/gold_real/retrieval_gold.jsonl, datasets/oss_eval_queries.json"
         ),
     )
+    ap.add_argument("--search-modes", default="dense,hybrid",
+                    help="측정할 검색 모드(콤마). 조합마다 코퍼스를 다시 임베딩하므로 "
+                         "CPU 환경에서는 배포본이 쓰는 것만 고르는 편이 낫다(기본 dense,hybrid).")
     ap.add_argument("--report", default="reports/p2_embedding_report.md")
     ap.add_argument(
         "--strict-all",
@@ -693,7 +704,9 @@ def main() -> int:
     models_override = None
     if args.models:
         models_override = [m.strip() for m in args.models.split(",") if m.strip()]
-    combos = _resolve_combinations(args.mode, backends, args.hybrid, models_override)
+    _modes = tuple(x.strip() for x in args.search_modes.split(",") if x.strip())
+    combos = _resolve_combinations(args.mode, backends, args.hybrid, models_override,
+                                   search_modes=_modes)
 
     print(f"[p2] mode={args.mode}, combos={len(combos)}, backends={backends}, hybrid={args.hybrid}")
     if models_override:
