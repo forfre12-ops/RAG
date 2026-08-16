@@ -11,15 +11,19 @@
 워커를 못 받으면 그만큼만 쓰고 진행한다 - 실패하지 않는다). 그래서 단일 측정값을
 그대로 운영 수치로 쓰면 과장이다.
 
-여기서는 동시 클라이언트 수를 1·2·4·8 로 올려가며 두 설정을 비교한다.
+여기서는 동시 클라이언트 수를 1·2·4·8 로 올려가며 병렬 정도를 여러 값으로 비교한다.
 
-    기본     지금 서버 설정 그대로
-    강제6    parallel_setup_cost=0 · parallel_tuple_cost=0 ·
-             min_parallel_table_scan_size=0 · max_parallel_workers_per_gather=6
+    기본      지금 서버 설정 그대로(per_gather=2, 실제로 뜨는 워커도 2개)
+    강제 N    parallel_setup_cost=0 · parallel_tuple_cost=0 ·
+              min_parallel_table_scan_size=0 · max_parallel_workers_per_gather=N
 
-보는 값은 두 가지다. **응답시간**(사용자가 겪는 것)과 **처리량**(초당 완료 수).
-워커를 늘리면 한 건은 빨라지지만 전체 처리량은 줄 수 있다 - 같은 일을 더 많은
-프로세스가 나눠 하느라 조율 비용이 붙기 때문이다. 둘 다 봐야 판단이 선다.
+⚠ 1차 측정(강제6만)에서 나온 것: 동시 1~2 에서는 p50 이 절반이 되지만 **꼬리(p95)가
+  나빠진다** - 동시 2 에서 255 -> 317ms, 동시 4 에서 334 -> 551ms. 워커를 6개씩
+  잡으면 먼저 온 쿼리가 다 가져가고 뒤 쿼리는 0개를 받아 편차가 커진다. 그래서
+  중간 값(2·3·4)을 함께 재서 무릎점을 찾는다.
+
+보는 값은 세 가지다. **p50**(보통 겪는 응답)·**p95**(느린 쪽이 얼마나 나쁜지)·
+**처리량**(초당 완료 수). p50 만 보면 꼬리가 나빠지는 것을 놓친다.
 
 ⚠ 연결은 요청마다 새로 연다(출하 경로와 동일). 재사용하면 11회차부터 범용 계획으로
   바뀌어 4~8배 느려진다(diag_pg_conn_effect.py 실측).
@@ -54,6 +58,10 @@ FORCE_SETS = (
     "SET parallel_tuple_cost = 0",
     "SET min_parallel_table_scan_size = 0",
 )
+
+CONCURRENCIES = (1, 2, 4, 8)
+SETTINGS: list[tuple[str, int | None]] = [
+    ("기본", None), ("강제2", 2), ("강제3", 3), ("강제4", 4), ("강제6", 6)]
 
 
 def pct(xs: list[float], p: float) -> float:
@@ -98,31 +106,30 @@ def main(argv: list[str] | None = None) -> int:
     print(f"쿼리 풀 {len(prep)}건 · 클라이언트당 {args.per_client}회 · "
           f"max_parallel_workers={mpw} · max_worker_processes={mwp}\n")
 
-    def one_client(setting: str, n: int, start: threading.Event,
+    def one_client(degree: int | None, n: int, start: threading.Event,
                    out: list[float]) -> None:
         start.wait()
         for i in range(n):
             p = prep[i % len(prep)]
             with vs._engine.connect() as c:
-                if setting == "force6":
+                if degree is not None:
                     for s in FORCE_SETS:
                         c.execute(text(s))
-                    c.execute(text("SET max_parallel_workers_per_gather = 6"))
+                    c.execute(text(f"SET max_parallel_workers_per_gather = {degree}"))
                 t0 = time.perf_counter()
                 c.execute(text(SQL_NOW), p).fetchall()
                 out.append((time.perf_counter() - t0) * 1000)
 
-    def run(setting: str, clients: int) -> dict:
-        # 워밍업
-        w: list[float] = []
+    def run(setting: str, degree: int | None, clients: int) -> dict:
+        w: list[float] = []          # 워밍업
         ev0 = threading.Event()
         ev0.set()
-        one_client(setting, 3, ev0, w)
+        one_client(degree, 3, ev0, w)
 
         buckets: list[list[float]] = [[] for _ in range(clients)]
         ev = threading.Event()
         threads = [threading.Thread(target=one_client,
-                                    args=(setting, args.per_client, ev, buckets[i]))
+                                    args=(degree, args.per_client, ev, buckets[i]))
                    for i in range(clients)]
         for t in threads:
             t.start()
@@ -132,32 +139,53 @@ def main(argv: list[str] | None = None) -> int:
             t.join()
         wall = time.perf_counter() - t0
         allt = [x for b in buckets for x in b]
-        return {"setting": setting, "clients": clients, "n": len(allt),
+        return {"setting": setting, "degree": degree, "clients": clients, "n": len(allt),
                 "p50": round(pct(allt, 0.5), 1), "p95": round(pct(allt, 0.95), 1),
                 "avg": round(st.mean(allt), 1),
                 "qps": round(len(allt) / wall, 2), "wall_s": round(wall, 2)}
 
     out: dict = {"collection": args.collection, "max_parallel_workers": mpw, "runs": []}
-    print(f"  {'설정':<8s} {'동시':>4s} {'p50':>9s} {'p95':>9s} {'평균':>9s} {'처리량':>10s}")
-    for clients in (1, 2, 4, 8):
-        for setting in ("기본", "force6"):
-            r = run(setting, clients)
+    print(f"  {'설정':<7s} {'동시':>4s} {'p50':>9s} {'p95':>9s} {'평균':>9s} {'처리량':>10s}")
+    for clients in CONCURRENCIES:
+        for name, degree in SETTINGS:
+            r = run(name, degree, clients)
             out["runs"].append(r)
-            print(f"  {setting:<8s} {clients:>4d} {r['p50']:>8.1f}ms {r['p95']:>8.1f}ms "
+            print(f"  {name:<7s} {clients:>4d} {r['p50']:>8.1f}ms {r['p95']:>8.1f}ms "
                   f"{r['avg']:>8.1f}ms {r['qps']:>7.2f}건/s")
         print()
 
-    base1 = next(r for r in out["runs"] if r["setting"] == "기본" and r["clients"] == 1)
-    print("판단 근거")
-    for clients in (1, 2, 4, 8):
-        b = next(r for r in out["runs"] if r["setting"] == "기본" and r["clients"] == clients)
-        f = next(r for r in out["runs"] if r["setting"] == "force6" and r["clients"] == clients)
-        d_p50 = f["p50"] - b["p50"]
-        d_qps = f["qps"] - b["qps"]
-        verdict = "이득" if (d_p50 < 0 and d_qps >= -0.5) else (
-            "응답만 이득·처리량 손해" if d_p50 < 0 else "이득 없음")
-        print(f"  동시 {clients}  응답 {d_p50:+7.1f}ms  처리량 {d_qps:+6.2f}건/s   {verdict}")
-    print(f"\n  단일 클라이언트 기준값 p50 {base1['p50']:.1f}ms · 기준 200ms")
+    def pick(name: str, clients: int) -> dict:
+        return next(r for r in out["runs"]
+                    if r["setting"] == name and r["clients"] == clients)
+
+    print("기본 대비 p50/p95/처리량 - p95 가 커지면 꼬리를 잃은 것이다")
+    for clients in CONCURRENCIES:
+        b = pick("기본", clients)
+        line = f"  동시 {clients}  "
+        for name, _ in SETTINGS[1:]:
+            f = pick(name, clients)
+            line += (f"{name} {f['p50'] - b['p50']:+5.0f}/{f['p95'] - b['p95']:+5.0f}"
+                     f"/{f['qps'] - b['qps']:+4.1f}  ")
+        print(line)
+
+    print("\n둘 다 개선(p50·p95 모두 기본보다 낮음)한 조합")
+    safe: dict[str, list[str]] = {}
+    for clients in CONCURRENCIES:
+        b = pick("기본", clients)
+        got = [n for n, _ in SETTINGS[1:]
+               if pick(n, clients)["p50"] < b["p50"] and pick(n, clients)["p95"] < b["p95"]]
+        safe[str(clients)] = got
+        print(f"  동시 {clients}  {', '.join(got) if got else '없음'}")
+
+    # 모든 동시성에서 안전한 값이 있으면 그것이 무조건 채택 가능한 설정이다
+    every = set(safe[str(CONCURRENCIES[0])])
+    for c_ in CONCURRENCIES[1:]:
+        every &= set(safe[str(c_)])
+    out["safe_by_concurrency"] = safe
+    out["safe_everywhere"] = sorted(every)
+    print(f"\n  모든 동시성에서 안전: {', '.join(sorted(every)) if every else '없음'}")
+    print(f"  단일 클라이언트 기본값 p50 {pick('기본', 1)['p50']:.1f}ms · 기준 200ms")
+
     Path(args.report).write_text(json.dumps(out, ensure_ascii=False, indent=2), "utf-8")
     print(f"\n[report] {args.report}")
     print("\n⚠ CPU 8개인 이 서버의 값이다. 운영 사양이 다르면 다시 재야 한다.")
