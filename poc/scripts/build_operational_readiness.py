@@ -87,15 +87,23 @@ def _p1_gate(
 
     def _ok(m: dict) -> bool:
         return (
-            m.get("f1_macro", m.get("exact_rate", 0)) >= 0.75
+            m.get("f1_macro", 0) >= 0.75
             and m.get("fnr_underclass", 1) <= 0.05
             and m.get("high_risk_to_s3", 999) == 0
         )
 
     if serving_m:
-        # 서빙 리포트는 f1_macro 대신 exact 개수를 담으므로 비율로 환산해 같은 임계를 쓴다.
-        n = max(1, int(serving_m.get("n", 0)) or 1)
-        judged = {**serving_m, "f1_macro": serving_m.get("exact", 0) / n}
+        # ⚠ 2026-08-16 버그. 종전에는 `serving_m.get("n", 0)` 로 건수를 찾았는데 n 이
+        #   payload 최상위에 있어 0 이 나왔고, max(1, ...) 가 1 로 바꿔 f1_macro 를
+        #   exact/1 = 147 로 만들었다. 147 >= 0.75 라 **F1 조건이 사실상 없는 조건**이었다.
+        #   그리고 정확도를 f1_macro 라 부른 것 자체가 틀렸다 - 불균형이 있으면 정확도가
+        #   F1 보다 높게 나와 판정이 헐거워진다. 이제 리포트가 둘을 따로 담는다.
+        if "f1_macro" not in serving_m:
+            raise RuntimeError(
+                "서빙 리포트에 f1_macro 가 없다 - eval_serving_vs_raw.py 를 다시 돌려라. "
+                "정확도로 대체하지 않는다(판정이 헐거워진다)."
+            )
+        judged = serving_m
         status = "PASS" if _ok(judged) else "FAIL"
         unit = "serving"
     else:

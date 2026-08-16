@@ -100,8 +100,15 @@ def eval_fpr(model_dir: str, tag: str, max_docs: int) -> dict:
     rep = f"reports/v5_gate/gate_fpr_{tag}"
     cmd = [sys.executable, "scripts/eval_real_public_fpr.py", "--model-dir", model_dir,
            "--report", rep, "--max-docs", str(max_docs)]
-    subprocess.run(cmd, check=False, capture_output=True)
+    # ⚠ 2026-08-16. 종전에는 check=False 로 실패를 무시하고, 파일이 있으면 **이전 실행의
+    #   JSON** 을 그대로 읽었다. 모델이 바뀌어도 옛 수치로 판정한다. 먼저 지우고 돌린다.
     j = Path(rep + ".json")
+    if j.exists():
+        j.unlink()
+    r = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    if r.returncode != 0:
+        return {"over_classification_rate": None,
+                "error": f"eval_real_public_fpr rc={r.returncode}: {(r.stderr or '')[-200:]}"}
     if not j.exists():
         return {"over_classification_rate": None, "error": "no report"}
     d = json.loads(j.read_text(encoding="utf-8"))

@@ -51,6 +51,23 @@ HIGH = ("TS", "S1")
 PUBLIC_TIER = ("koipa_case_based", "nkt_designated", "public_definitive")
 
 
+def f1_macro(pairs: list[tuple[str, str]]) -> float:
+    """등급별 F1 의 단순 평균. **정확도(exact/n)와 다른 값이다.**
+
+    ⚠ 나는 한 번 이 둘을 섞었다(build_operational_readiness 에서 exact/n 을 f1_macro 라
+      부름). 불균형이 있으면 정확도가 F1 보다 훨씬 높게 나와 판정이 헐거워진다.
+    """
+    tot = 0.0
+    for g in ORDER:
+        tp = sum(1 for t, p in pairs if t == g and p == g)
+        fp = sum(1 for t, p in pairs if t != g and p == g)
+        fn = sum(1 for t, p in pairs if t == g and p != g)
+        prec = tp / (tp + fp) if (tp + fp) else 0.0
+        rec = tp / (tp + fn) if (tp + fn) else 0.0
+        tot += (2 * prec * rec / (prec + rec)) if (prec + rec) else 0.0
+    return round(tot / len(ORDER), 4)
+
+
 def wilson_upper(k: int, n: int, z: float = 1.96) -> float:
     if n == 0:
         return 1.0
@@ -134,7 +151,13 @@ def main(argv: list[str] | None = None) -> int:
     payload = {
         "model_dir": args.model_dir, "tier": "public", "n": len(graded),
         "serving": {
-            "exact": exact, "auto_confirm": len(auto),
+            # n 을 여기에도 둔다. 소비자가 payload["n"] 을 못 찾아 0 으로 읽고 f1 을
+            # 147 같은 값으로 계산한 사고가 있었다(2026-08-16).
+            "n": len(graded),
+            "exact": exact,
+            "exact_rate": round(exact / len(graded), 4) if graded else 0.0,
+            "f1_macro": f1_macro([(o["truth"], o["serving"]) for o in graded]),
+            "auto_confirm": len(auto),
             "underclass_all": len(under), "silent_underclass": len(silent),
             "high_n": high_n, "fnr_underclass": round(fnr, 4),
             "high_risk_to_s3": len(to_s3),
