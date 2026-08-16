@@ -134,6 +134,23 @@ def _p1_gate(
 _SHIPPED_BACKENDS = ("pg", "pgvector", "postgres")
 
 
+def _retrieval_config_text(p2_report: dict) -> str:
+    """readiness 문서에 적을 검색 구성 문자열을 **리포트에서** 만든다.
+
+    하드코딩하면 리포트를 바꿔도 설명이 안 따라온다(2026-08-16 실측: 게이트는 pg 수치인데
+    문서는 Elasticsearch 라고 적고 있었다).
+    """
+    best = p2_report.get("best_config") or {}
+    emb = best.get("embedder") or "?"
+    backend = str(best.get("backend") or "?")
+    mode = best.get("search_mode") or "?"
+    name = {"pg": "PostgreSQL+pgvector", "es": "Elasticsearch",
+            "inmemory": "InMemory"}.get(backend, backend)
+    cs = best.get("chunk_size", 1200)
+    co = best.get("chunk_overlap", 100)
+    return f"{emb} + {name} {mode} + chunk={cs}/overlap={co}"
+
+
 def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
     """검색 품질 게이트. **출하 구성으로 잰 것인지 먼저 본다.**
 
@@ -475,7 +492,10 @@ def main() -> int:
     # evaluated 모델 = 리포트가 *실제로* 기술하는 모델(report.model_dir)을 진실원으로.
     # parity 게이트가 "F1 리포트가 라이브 배포 모델을 기술하나?"를 정확히 묻게 한다.
     evaluated_model = p1_public_report.get("model_dir") or args.model_dir
-    p2_gate, p2_payload = _p2_gate(_load_json(Path(args.p2)))
+    # ⚠ 리포트를 변수로 잡아 둔다. 종전에는 _p2_gate 에 바로 넘겨 payload 쪽에서
+    #   같은 리포트를 다시 참조할 방법이 없었다.
+    p2_report = _load_json(Path(args.p2))
+    p2_gate, p2_payload = _p2_gate(p2_report)
     data_gates, data_payload = _data_gates(
         Path(args.gold),
         Path(args.retrieval_gold),
@@ -568,7 +588,10 @@ def main() -> int:
         "verdict": _overall(gate_objects),
         "evaluated_model": _norm_model(evaluated_model),
         "deployed_model": _norm_model(args.deployed_model) or "unknown",
-        "retrieval_config": "KURE-v1 + Elasticsearch hybrid + chunk=1200/overlap=100",
+        # ⚠ 2026-08-16. 종전에는 이 문자열이 "Elasticsearch" 로 **하드코딩**돼 있었다.
+        #   P2 리포트를 pg 로 바꿔도 이 줄이 안 바뀌어 readiness 문서가 계속 ES 라고
+        #   말한다. 게이트 수치는 pg 인데 설명은 ES 인 상태가 된다 - 리포트에서 읽는다.
+        "retrieval_config": _retrieval_config_text(p2_report),
         "release_gate_policy": {
             "min_human_review": args.min_human_review,
             "max_high_risk_underclass": args.max_high_risk_underclass,
