@@ -105,7 +105,10 @@ def eval_fpr(model_dir: str, tag: str, max_docs: int) -> dict:
     j = Path(rep + ".json")
     if j.exists():
         j.unlink()
-    r = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    # ⚠ text=True 만 주면 Windows 가 cp949 로 디코드하려다 죽는다(자식이 utf-8 을 낸다).
+    #   errors="replace" 로 감싸야 오류 문자열을 잃지 않는다.
+    r = subprocess.run(cmd, check=False, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     if r.returncode != 0:
         return {"over_classification_rate": None,
                 "error": f"eval_real_public_fpr rc={r.returncode}: {(r.stderr or '')[-200:]}"}
