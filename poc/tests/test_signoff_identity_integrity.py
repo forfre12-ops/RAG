@@ -140,3 +140,17 @@ def test_every_valid_role_passes_the_actor_schema_pattern():
     """/session 이 돌려줄 수 있는 역할 전부가 본문 스키마를 통과하는지 — 하나라도 어긋나면 422."""
     for r in sorted(VALID_ROLES):
         Actor(user_id="x", role=r)
+
+
+def test_signoff_page_points_at_login_when_there_is_no_session():
+    """링크(?t=)는 화면을 여는 열쇠일 뿐 신원이 아니다.
+
+    실측(223, 2026-08-17): signoff.html?t=... 는 200 으로 열린다. 그런데 로그인 쿠키가
+    없으면 서명은 못 한다 — 화면이 갈 곳을 안 알려주면 검수자는 '열리는데 왜 못 누르나'
+    에서 멈춘다. 그 자리에서 로그인 경로를 준다.
+    """
+    html = _signoff_html()
+    assert "/api/v1/golden/candidates/login.html" in html, "로그인 경로가 화면에 없다"
+    assert "새로고침" in html, "로그인 뒤 무엇을 해야 하는지 안내가 없다"
+    # 401·403 을 구분해 처리해야 '실패' 한 단어로 뭉뚱그려지지 않는다.
+    assert "r.status===401||r.status===403" in html

@@ -458,16 +458,26 @@ document.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',f
 document.getElementById('q').addEventListener('input',function(){q=this.value;render();});
 // [C2 2026-08-17] 서명자는 **로그인 쿠키(JWT)의 sub** 다. 화면이 이름을 받지 않는다.
 var WHO='',WHOROLE='reviewer';
+const LOGIN_URL='/api/v1/golden/candidates/login.html';
+function needLogin(msg){
+  // 링크(?t=)는 화면을 여는 열쇠일 뿐 신원이 아니다. 서명하려면 로그인 쿠키가 있어야 한다.
+  // 갈 곳을 안 알려주면 검수자는 '열리는데 왜 못 누르나' 에서 멈춘다.
+  const el=document.getElementById('who');
+  el.innerHTML=esc(msg)+' — <a href="'+LOGIN_URL+'" target="_blank" rel="noopener" '
+    +'style="color:#fff;text-decoration:underline">로그인</a> 후 이 페이지를 새로고침하세요';
+  document.getElementById('submit').disabled=true;
+}
 (async function(){
-  const el=document.getElementById('who'),btn=document.getElementById('submit');
+  const el=document.getElementById('who');
   try{
     const r=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});
-    if(!r.ok){el.textContent='로그인 필요 ('+r.status+')';btn.disabled=true;return;}
+    if(r.status===401||r.status===403){needLogin('로그인 필요('+r.status+')');return;}
+    if(!r.ok){needLogin('신원 확인 실패('+r.status+')');return;}
     const j=await r.json();
     WHO=j.actor_id||'';WHOROLE=j.actor_role||'reviewer';
-    if(!WHO){el.textContent='신원 없음';btn.disabled=true;return;}
+    if(!WHO){needLogin('신원 없음');return;}
     el.textContent=WHO+' · '+WHOROLE;
-  }catch(e){el.textContent='신원 확인 실패';btn.disabled=true;}
+  }catch(e){needLogin('신원 확인 실패');}
 })();
 document.getElementById('submit').addEventListener('click',async function(){
   const publish=document.getElementById('publish').checked;
