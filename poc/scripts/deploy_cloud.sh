@@ -227,14 +227,14 @@ ${c_dim}  API_KEY = ${APIKEY_OUT}${c_off}
 
   1) 헬스:   curl -fsS http://${API_HOST}:${API_PORT}/api/v1/healthz/ready   # 200
              curl -s   http://${API_HOST}:${API_PORT}/api/v1/healthz/deep    # 컴포넌트 상태
-  2) 데모 콘솔(브라우저): http://<서버>:${API_PORT}/demo/parse_demo.html
+  2) 데모 콘솔(브라우저): http://<서버>:${API_PORT}/demo/index.html#sec-parse
              → 문서 드래그하면 파싱 텍스트·표·등급이 바로 보임
   3) 커맨드 E2E: 문서 하나 올려 파싱+분류 한 번에
      curl -s -X POST http://${API_HOST}:${API_PORT}/api/v1/documents/analyze \\
           -H "X-API-Key: ${APIKEY_OUT}" -F "file=@/경로/문서.pdf" | (jq . 2>/dev/null || cat)
 
 ${c_dim}  ⚠ 외부/브라우저 접근: api 는 127.0.0.1:${API_PORT} 바인딩(하드닝). 원격 브라우저는
-    SSH 터널 권장:  ssh -L ${API_PORT}:127.0.0.1:${API_PORT} <user>@<서버>  → http://localhost:${API_PORT}/demo/parse_demo.html
+    SSH 터널 권장:  ssh -L ${API_PORT}:127.0.0.1:${API_PORT} <user>@<서버>  → http://localhost:${API_PORT}/demo/index.html#sec-parse
   상태:  docker compose --env-file $ENV_FILE ${BASE[*]} ps
   로그:  docker compose --env-file $ENV_FILE ${BASE[*]} logs -f api${c_off}
 EOF

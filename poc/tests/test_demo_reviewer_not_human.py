@@ -1,7 +1,7 @@
 """시연 마커 서명이 사람 검수로 집계되지 않는가 — 평가정답 무결성 회귀 방어.
 
 배경(2026-08-08 실측): 시연 드라이버(scripts/demo_e2e_golden.py)와 화면 경로
-(parse_demo.html)는 actor.user_id 로 'demo-console' 을 쓴다(admin.DEMO_CREATED_BY).
+(분류 콘솔의 #sec-parse 구역)는 actor.user_id 로 'demo-console' 을 쓴다(admin.DEMO_CREATED_BY).
 그 값으로 골든 서명을 하면 label_source='human_review' · reviewer_id='demo-console' 인
 레코드가 나오는데, is_human_reviewer 의 머신 접두 목록에 'demo' 가 없어서 이것이
 사람 서명으로 통과했고 tier 가 locked_gold_eval 로 잡혔다.

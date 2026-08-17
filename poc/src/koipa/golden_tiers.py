@@ -84,7 +84,7 @@ _MACHINE_PREFIXES = (
     "model",
     "machine",
     "public_gold",
-    # 시연·리허설 마커(admin.DEMO_CREATED_BY='demo-console', parse_demo/시연 스크립트가 쓰는
+    # 시연·리허설 마커(admin.DEMO_CREATED_BY='demo-console', 시연 구역/스크립트가 쓰는
     # actor.user_id)로 서명된 것은 사람 검수가 아니다. 이게 빠져 있어 데모 서명 산출물이
     # is_valid_signoff 를 통과하고 tier=locked_gold_eval 로 잡혔다(2026-08-08 실측) —
     # 정본에 병합되면 배포 게이트가 '사람 검증 평가셋이 있다'고 오판한다.

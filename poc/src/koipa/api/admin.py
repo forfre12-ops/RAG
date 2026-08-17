@@ -450,13 +450,16 @@ def dashboard() -> DashboardResponse:
 
 
 # ── [DEMO] 시연 실적재 데이터 초기화 ────────────────────────────────────────────
-# parse_demo/admin 콘솔의 '실적재 시연'(POST /documents → /classify)으로 만든 행만 물리삭제한다.
+# 시연 콘솔(분류 콘솔 #sec-parse · admin)의 '실적재 시연'(POST /documents → /classify)으로
+# 만든 행만 물리삭제한다.
 # 스코프가 created_by='demo-console' + RAG collection='demo' 두 상수로 고정돼, 실 운영 데이터
 # (다른 created_by)는 매칭 자체가 불가하다 — 이 스코프가 1차 안전장치다. FK 순서:
 #   classifications 먼저(evidence·corrections 는 CASCADE 자동) → RESTRICT 참조 테이블 → chunks
 #   → documents(labels·factor_scores 는 CASCADE 자동). rag_vectors 는 별도 best-effort 트랜잭션
 #   (스토어가 pgvector 아니면 tb_rag_vectors 미존재 — 무해 skip). admin 전용.
-DEMO_CREATED_BY = "demo-console"   # 데모 실적재 문서 마커 (parse_demo actor.user_id 와 일치)
+DEMO_CREATED_BY = "demo-console"   # 데모 실적재 문서 마커 (시연 구역 actor.user_id 와 일치)
+# ⚠ 이 값을 바꾸면 「데모 데이터 초기화」가 시연 화면이 만든 문서를 못 지운다.
+#   화면(index.html #sec-parse)이 보내는 actor.user_id 와 반드시 같아야 한다.
 DEMO_RAG_COLLECTION = "demo"       # 데모 업로드 RAG 색인 컬렉션 (평가 'docs' 오염 분리)
 # [SEC-4] blast-radius 안전캡 — 데모는 소수 문서다. 삭제 대상이 이 수를 크게 넘으면 실 데이터가
 # 데모 마커(created_by='demo-console')로 오태깅됐을 신호로 보고 물리삭제를 거부(fail-safe·409).
@@ -480,7 +483,7 @@ class DemoPurgeResponse(BaseModel):
     dependencies=_ADMIN_ONLY,
     summary="[시연] 데모 실적재 데이터 초기화 (created_by='demo-console' 스코프 물리삭제)",
     description=(
-        "parse_demo/admin 콘솔의 '실적재 시연'으로 만든 문서·분류·청크·RAG벡터만 삭제한다. "
+        "시연 콘솔(분류 콘솔 #sec-parse · admin)의 '실적재 시연'으로 만든 문서·분류·청크·RAG벡터만 삭제한다. "
         "스코프가 created_by='demo-console' + RAG collection='demo' 로 고정돼 실 운영 데이터는 "
         "건드리지 않는다(다른 created_by 는 매칭 불가). admin 전용·물리삭제."
     ),

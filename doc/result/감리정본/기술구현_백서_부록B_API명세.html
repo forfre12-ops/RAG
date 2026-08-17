@@ -1062,7 +1062,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">JWT (admin role)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">시연 콘솔(<code>parse_demo</code>/admin)의 '실적재 시연'으로 생성된 문서·분류·청크·RAG벡터만 <strong>물리삭제</strong>한다. 시연 반복 시 데모 데이터가 운영 집계를 오염시키는 것을 막는 용도다.</p>
+        <p class="ep-desc">시연 콘솔(<code>index</code>/admin)의 '실적재 시연'으로 생성된 문서·분류·청크·RAG벡터만 <strong>물리삭제</strong>한다. 시연 반복 시 데모 데이터가 운영 집계를 오염시키는 것을 막는 용도다.</p>
         <div class="callout"><div class="callout-label">파괴적 엔드포인트 — 2중 안전장치</div><p style="font-size:13px;"><b>① 스코프 고정</b> — 삭제 대상이 <code>created_by='demo-console'</code> + RAG <code>collection='demo'</code>로 하드코딩돼 있어 다른 <code>created_by</code>는 매칭 자체가 불가하다. 실 운영 데이터는 구조적으로 지워지지 않는다.<br><b>② 프로파일 차단</b> — <code>demo_console_enabled=false</code>(운영 프로파일 기본)면 <code>404</code>로 거부한다. 즉 <b>납품 운영본에서는 이 엔드포인트가 존재하지 않는다.</b></p></div>
         <h4>Response 200 — DemoPurgeResponse</h4>
         <p style="font-size:13px;"><code>{documents, classifications, chunks, rag_vectors, warnings[]}</code> — 각 항목의 실삭제 건수.</p>

@@ -103,7 +103,7 @@ src/koipa/
 DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_golden.py
 ```
 
-**화면 판**: `/demo/admin.html` (관리자 콘솔) · `/demo/parse_demo.html` (업로드·파싱)
+**화면 판**: `/demo/admin.html` (관리자 콘솔) · `/demo/index.html#sec-parse` (업로드·파싱)
 사용법은 [docs/관리자콘솔_사용설명서.html](docs/관리자콘솔_사용설명서.html).
 
 **시연 되돌리기** — 배포 프로파일에 따라 다릅니다.
@@ -117,7 +117,7 @@ DEMO_BASE_URL=http://<서버>:8000  DEMO_API_KEY=<키>  python scripts/demo_e2e_
 없앱니다**(관리 UI는 `serve_admin_console`로 따로 켜지므로 버튼은 보이지만 호출은 404).
 그래서 실서버 리허설 데이터는 자동으로 지워지지 않습니다 — 다만
 `created_by='demo-console'` + RAG 컬렉션 `demo`로 식별되므로 필요하면 DB 측에서 정리합니다.
-시연 스크립트는 두 마커를 모두 붙여 보냅니다(화면 경로 `parse_demo.html`과 동일).
+시연 스크립트는 두 마커를 모두 붙여 보냅니다(화면 경로 `/demo/index.html#sec-parse` 와 동일).
 
 ---
 

@@ -83,7 +83,7 @@ footer strong{color:var(--text-dim);}
   <div class="meta-row"><span class="badge">DOC-MAN-01</span><span class="badge outline">감리 대응</span><span class="meta-dot">·</span><span class="meta-soft">2026-07-17</span></div>
   <h1 class="title">검수 관리자 사용자매뉴얼 — AI 거버넌스 관제콘솔</h1>
   <p class="lede">한국지식재산보호원/지재원 영업비밀 자동 등급분류·RAG 시스템의 거버넌스 관제콘솔(admin.html) 검수 관리자 조작 절차서. 분류 → 검수(확정·재라벨) → 재학습·활성화 → 실시간 관제 → 골든셋 서명의 폐곡선을 화면 단위로 안내한다. 모든 동작은 기존 /api/v1 엔드포인트를 호출하며, 상태 변경 작업은 Safe Mode 해제 후에만 실행된다.</p>
-  <div class="callout inset"><div class="callout-label">범위 · 기준</div><p>본 매뉴얼은 관제콘솔(admin.html)과 골든셋 서명 화면(signoff.html)의 검수 관리자 조작만 다룬다. KL 포털 인증·격리, 회원사 업로드 화면, 파싱 시연(parse_demo.html)은 범위 외다.</p></div>
+  <div class="callout inset"><div class="callout-label">범위 · 기준</div><p>본 매뉴얼은 관제콘솔(admin.html)과 골든셋 서명 화면(signoff.html)의 검수 관리자 조작만 다룬다. KL 포털 인증·격리, 회원사 업로드 화면, 파싱·분류 시연(분류 콘솔의 #sec-parse 구역)은 범위 외다.</p></div>
   <div class="section-sep" id="sec-01-access"><span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">접속 · 인증 · Safe Mode</span></div>
 <p>관제콘솔(<code>admin.html</code>)은 API 서버가 서빙하는 단일 화면으로, 분류 → 검수 → 재학습 → 모델 리로드 → 메트릭의 거버넌스 폐곡선을 한 곳에서 조작한다. 모든 버튼은 기존 <code>/api/v1</code> 엔드포인트를 호출한다. 운영 배포 호스트 주소는 <span class="ph">[발주처 입력]</span>.</p>
 <div class="kpi-row"><div class="kpi"><div class="n">5</div><div class="l">거버넌스 폐곡선 단계</div></div><div class="kpi"><div class="n">4</div><div class="l">등급 (TS·S1·S2·S3)</div></div><div class="kpi"><div class="n">4</div><div class="l">Actor 역할</div></div></div>

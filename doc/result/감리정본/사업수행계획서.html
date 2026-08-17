@@ -197,7 +197,7 @@ footer strong{color:var(--text-dim);}
 <tr><td class="nowrap">DOC-GOLD-01</td><td>골든셋 종합</td><td>구현·검증</td><td>평가셋</td></tr>
 <tr><td class="nowrap">—</td><td>서빙 운영점 파라미터 명세</td><td>구현·운영</td><td>FUN-005·게이트</td></tr>
 <tr><td class="nowrap">—</td><td>테스트 전략 및 이력</td><td>시험·검증</td><td>품질·검증</td></tr>
-<tr><td class="nowrap">DOC-DEMO-01</td><td>시연 콘솔 소개(3화면)</td><td>시험·검증</td><td>시연</td></tr>
+<tr><td class="nowrap">DOC-DEMO-01</td><td>시연 콘솔 소개(2화면)</td><td>시험·검증</td><td>시연</td></tr>
 <tr><td class="nowrap">DOC-OPS-01</td><td>운영 런북</td><td>운영·배포</td><td>운영</td></tr>
 <tr><td class="nowrap">DOC-INST-01</td><td>폐쇄망 설치·배포 설계서</td><td>운영·배포</td><td>배포</td></tr>
 <tr><td class="nowrap">DOC-UI-01</td><td>화면설계서</td><td>요구·설계</td><td>화면(분류·시연·관제·검수·서명)</td></tr>
@@ -211,7 +211,7 @@ footer strong{color:var(--text-dim);}
 <h3>코드·실행 산출물</h3>
 <ul>
 <li><strong>애플리케이션 소스</strong> — <code>poc/src/koipa</code> 182파일 / 38,699 LOC(api·services·modules M1–M6·repositories·adapters). 테스트 226파일.</li>
-<li><strong>실행 콘솔(3화면)</strong> — <code>index.html</code>(실시간 분류 SSE)·<code>parse_demo.html</code>(파싱 시연)·<code>admin.html</code>(거버넌스 관제) + 골든 검수/서명 화면(<code>review.html</code>·<code>signoff.html</code>).</li>
+<li><strong>실행 콘솔(2화면)</strong> — <code>index.html</code>(실시간 분류 SSE + 파싱·분류 시연 구역 <code>#sec-parse</code>)·<code>admin.html</code>(거버넌스 관제) + 골든 검수/서명 화면(<code>review.html</code>·<code>signoff.html</code>).</li>
 <li><strong>배포 산출물</strong> — 4개 배포 프로파일(lite-noapi·lite-cloud·onprem-local·full-train), 폐쇄망 번들·릴리스 매니페스트(설치/배포 설계서 참조).</li>
 </ul>
 <div class="callout inset">

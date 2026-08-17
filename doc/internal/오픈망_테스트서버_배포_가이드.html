@@ -427,7 +427,7 @@ python scripts/run_acceptance.py --mode http --base-url http://&lt;host&gt;:8000
       <table class="f">
         <thead><tr><th style="width:150px">방법</th><th>어떻게</th></tr></thead>
         <tbody>
-          <tr><td><b>데모 콘솔(브라우저)</b></td><td><code>http://&lt;서버&gt;:8000/demo/parse_demo.html</code> — 문서를 드래그하면 추출 텍스트·표·PII·<b>등급</b>이 바로 보임(가장 직관적)</td></tr>
+          <tr><td><b>데모 콘솔(브라우저)</b></td><td><code>http://&lt;서버&gt;:8000/demo/index.html#sec-parse</code> — 문서를 드래그하면 추출 텍스트·표·PII·<b>등급</b>이 바로 보임(가장 직관적)</td></tr>
           <tr><td><b>커맨드 1건</b></td><td>아래 <code>/documents/analyze</code> — 파일 하나 올려 파싱+분류 한 번에</td></tr>
           <tr><td><b>인수 샘플팩</b></td><td>배포 스모크가 자동 실행(전 포맷 TXT/PDF/DOCX/XLSX/HWPX × 등급, severity floor)</td></tr>
         </tbody>
@@ -440,7 +440,7 @@ python scripts/run_acceptance.py --mode http --base-url http://&lt;host&gt;:8000
       <div class="callout warn">
         <span class="callout-icon">▲</span>
         <div class="callout-body"><b>브라우저 접근</b> — api 는 하드닝상 <code>127.0.0.1:8000</code>에만 바인딩된다. 원격에서 데모 콘솔을 열려면
-        <b>SSH 터널</b>이 가장 간단·안전: <code>ssh -L 8000:127.0.0.1:8000 &lt;user&gt;@&lt;서버&gt;</code> 후 로컬에서 <code>http://localhost:8000/demo/parse_demo.html</code>.
+        <b>SSH 터널</b>이 가장 간단·안전: <code>ssh -L 8000:127.0.0.1:8000 &lt;user&gt;@&lt;서버&gt;</code> 후 로컬에서 <code>http://localhost:8000/demo/index.html#sec-parse</code>.
         서버에서 직접 <code>curl localhost:8000</code>은 터널 없이 바로 된다.</div>
       </div>
 
