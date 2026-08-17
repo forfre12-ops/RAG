@@ -447,7 +447,26 @@ def _job_gate_html(job_id: UUID) -> HTMLResponse | None:
     """
     st = GoldenBuildService().get_status(job_id)
     if st is None:
-        raise HTTPException(status_code=404, detail="golden build job not found")
+        # 여기는 **검수자가 링크를 눌러 도착하는 자리**다. 원시 JSON 404 를 주면 무슨 일이
+        # 일어났는지 알 수 없다. 실제로 흔한 상황이기도 하다 — JobStore 가 in-memory 면
+        # API 재시작에 잡이 사라지고, Redis 라도 TTL 이 있다. 재등록은 멱등이라 관리자가
+        # 스크립트를 한 번 더 돌리면 끝난다. 그 사실을 화면에서 알려 준다.
+        return HTMLResponse(
+            content="<!doctype html><meta charset=utf-8>"
+            "<body style='font-family:sans-serif;padding:40px;line-height:1.7'>"
+            "<h2>이 검수 잡이 서버에 없습니다</h2>"
+            f"<p>job {_html.escape(str(job_id))}</p>"
+            "<p>링크가 잘못된 것이 아닙니다. 골든 빌드 잡은 API 재시작이나 보관 기간 만료로 "
+            "사라질 수 있습니다.</p>"
+            "<p><b>관리자에게 재등록을 요청하세요.</b> 재등록은 멱등이며, 같은 후보 파일이면 "
+            "기존 잡을 재사용합니다 — 검수 내용은 사라지지 않습니다.</p>"
+            "<pre style='background:#f6f6f4;padding:12px;border-radius:4px;white-space:pre-wrap'>"
+            "python3 scripts/register_review_signoff_job.py \\\n"
+            "    --base-url &lt;서버&gt; --actor &lt;실계정&gt; --token &lt;관리자 토큰&gt;</pre>"
+            "<p style='color:#70757a;font-size:13px'>재등록하면 새 주소(?t= 포함)가 인쇄됩니다. "
+            "그 주소를 통째로 받아 여세요.</p></body>",
+            status_code=404,
+        )
     status = getattr(st, "status", None)
     if status in ("queued", "running", "pending"):
         return HTMLResponse(
