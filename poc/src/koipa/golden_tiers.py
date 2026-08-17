@@ -309,6 +309,18 @@ def tier_of(record: dict) -> str:
     human_review는 유효 서명(envelope)까지 요구하고, 못 넘으면 TIER_HELD로 격리한다 —
     SILVER(학습연료)로 흘러들지 않게(역-누수 차단). locked tier(서명 유효)라도 '실문서 출처'까지
     갖춰야 real 평가정답으로 집계된다(is_real_locked_eval; eval_records/eval_readiness가 강제)."""
+    # [B3 2026-08-18] 검수자가 화면에서 **거부한** 후보는 어떤 tier 로도 흘러가지 않는다.
+    #
+    # 종전: 거부는 서명을 안 만들 뿐 아무 파일에도 남지 않았다. 그 후보는 build_<id>.jsonl
+    #       안에 review_status="gold_candidate" 로 그대로 있어 tier_of 가 candidate 를
+    #       돌려주고 TRAIN_TIERS 에 들어가 **계속 학습에 쓰였다.** 사람이 "이건 아니다" 라고
+    #       판단한 문서가 학습 연료로 남는다는 뜻이다.
+    #
+    # 여기서 잡는 이유: train_records·eval_records·partition_by_tier 가 모두 tier_of 를
+    #       거친다. 소비 스크립트 4개(build_p1_holdout_split·build_p1_retrain_dataset·
+    #       build_p1_v5_clean·train_eval_synth_silver)를 각각 고칠 필요가 없다.
+    if record.get("review_status") == REJECTED_BY_REVIEWER or record.get("signoff_rejected"):
+        return TIER_HELD
     src = record.get("label_source")
     if src == "human_review":
         return TIER_LOCKED if is_valid_signoff(record) else TIER_HELD
@@ -345,6 +357,10 @@ def eval_records(
 # 학습 허용 tier(allowlist, fail-closed). LOCKED(평가정답)·HELD(격리)·미래 미지 tier는 기본 제외 —
 # de-locked human_review가 `!= LOCKED` denylist로 학습에 새어들던 역효과를 원천 차단한다.
 TRAIN_TIERS = frozenset({TIER_SILVER, TIER_CANDIDATE, TIER_LEGAL_FLOOR})
+
+# 검수자가 서명 화면에서 거부했음을 나타내는 표식(B3). 레코드에 이 값이 있으면
+# tier_of 가 held 로 격리한다 — 학습에도 평가에도 쓰이지 않는다.
+REJECTED_BY_REVIEWER = "rejected_by_reviewer"
 
 
 def train_records(records: Sequence[dict]) -> list[dict]:

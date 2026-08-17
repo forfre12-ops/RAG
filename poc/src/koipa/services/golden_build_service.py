@@ -21,7 +21,7 @@ from koipa.golden_review_html import (
     render_signoff_html_from_jsonl,
 )
 from koipa.golden_signoff import Signoff, merge_locked_records, promote_to_locked
-from koipa.golden_tiers import eval_readiness
+from koipa.golden_tiers import REJECTED_BY_REVIEWER, eval_readiness
 from koipa.schemas.golden import (
     GoldenBuildRequest,
     GoldenBuildResponse,
@@ -369,6 +369,7 @@ class GoldenBuildService:
 
         signed_at = dt.datetime.now(dt.timezone.utc).isoformat()
         signoffs: list[Signoff] = []
+        rejected_records: list[dict] = []
         decided_ids: set = set()
         for d in decisions:
             cand = by_doc.get(d.doc_id)
@@ -376,7 +377,19 @@ class GoldenBuildService:
                 continue  # 후보에 없는 doc_id 는 서명 불가(팬텀 방지) — 무시
             decided_ids.add(d.doc_id)
             if d.decision == "reject":
-                continue  # 거부 — 서명 없음(promote 에서 no_signoff 로 rejected 집계)
+                # [B3·E2-6] 거부는 서명을 만들지 않지만 **기록은 남긴다.**
+                # 종전에는 아무 파일에도 남지 않아 (a) 다음 세션에서 '미결정'과 구분되지
+                # 않았고 (b) 그 후보가 계속 학습에 쓰였다.
+                rejected_records.append({
+                    **cand,
+                    "review_status": REJECTED_BY_REVIEWER,
+                    "signoff_rejected": {
+                        "reviewer_id": reviewer_id,
+                        "rejected_at": signed_at,
+                        "note": d.note or "",
+                    },
+                })
+                continue
             if d.decision == "change":
                 if not d.grade:
                     continue  # 변경인데 등급 미지정 — 방어적 skip(스키마가 1차 방지)
@@ -401,6 +414,16 @@ class GoldenBuildService:
         _atomic_write_jsonl(
             run_locked_path, merge_locked_records(_read_jsonl(run_locked_path), res.locked)
         )
+
+        # [B3·E2-6] 거부분도 같은 누적 규율로 남긴다. 이게 없으면 다음 세션에서 '아직 안 본
+        # 것'과 '보고 거부한 것'을 구분할 수 없어 남은 건수가 항상 과대값이 된다.
+        run_rejected_path = Path(gold_path).parent / f"rejected_{job_id}.jsonl"
+        locked_ids = {r.get("doc_id") for r in res.locked}
+        rejected_merged = _merge_rejected_records(
+            _read_jsonl(run_rejected_path), rejected_records, locked_ids
+        )
+        if rejected_merged or run_rejected_path.exists():
+            _atomic_write_jsonl(run_rejected_path, rejected_merged)
 
         # 라이브 readiness 읽기경로 — publish 병합 대상 + readiness union 계산.
         from koipa.config import settings  # noqa: PLC0415
@@ -438,6 +461,9 @@ class GoldenBuildService:
             "published": published,
             "publish_note": publish_note,
             "run_locked_path": str(run_locked_path),
+            # 이번 제출까지 누적된 거부 건수 — 화면이 '남은 건수' 를 정확히 낼 수 있게.
+            "rejected_recorded": len(rejected_merged),
+            "run_rejected_path": str(run_rejected_path),
         }
 
     # ------------------------------------------------------------------ helpers
@@ -536,6 +562,23 @@ class GoldenBuildService:
         _write_jsonl(gold_path, [r.to_dict() for r in result.gold])
         _write_jsonl(unc_path, [r.to_dict() for r in result.uncertain])
         return gold_path, unc_path
+
+
+def _merge_rejected_records(
+    existing: list[dict], new: list[dict], locked_ids: set
+) -> list[dict]:
+    """거부 기록 누적 — doc_id 기준 최신 우선, 승격된 것은 뺀다.
+
+    ⚠ 마지막 조건이 핵심이다. 검수자가 거부했다가 마음을 바꿔 승인하면, 거부 기록이 남아
+      있는 한 그 문서는 tier_of 에서 영원히 held 다. 승격 목록에 있는 doc_id 는 거부에서
+      지운다 — 최신 판단이 이긴다.
+    """
+    merged: dict[str, dict] = {}
+    for r in list(existing) + list(new):
+        doc_id = r.get("doc_id")
+        if doc_id:
+            merged[doc_id] = r
+    return [r for doc_id, r in sorted(merged.items()) if doc_id not in locked_ids]
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
