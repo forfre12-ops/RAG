@@ -1164,8 +1164,20 @@ def s17_audit_log(ctx: ScenarioContext) -> None:
     ratio = (n_audit / n_calls) if n_calls else 0.0
     ctx.record("s17_1", ratio)
 
+    # 감사에 남는 역할은 **서버가 결정한다**. api_key 인증에서 X-Actor-Role 헤더는
+    # api_key_trust_actor_role_header=True 일 때만 신뢰되고, 운영에서는 그 플래그가 꺼져 있어
+    # settings.api_key_role 로 고정된다(헤더 위조 차단 — _resolve_api_key_roles).
+    # 이전 판은 클라이언트가 자칭한 역할과 비교해서, 운영 프로파일에서는 반드시 FAIL 이었다
+    # (223 실측 2026-08-17: 자칭 kl_backend vs 서버 확정 admin → 0.0). 검증할 성질은
+    # "자칭이 그대로 남았나" 가 아니라 "서버가 확정한 신원이 남았나" 다.
+    from koipa.config import settings as _settings  # noqa: PLC0415
+
+    trusts_header = bool(getattr(_settings, "api_key_trust_actor_role_header", False))
+    expected_role = actor_role if trusts_header else (
+        getattr(_settings, "api_key_role", "system") or "system"
+    )
     for row in rows:
-        ctx.record("s17_2", getattr(row, "actor_role", None) == actor_role)
+        ctx.record("s17_2", getattr(row, "actor_role", None) == expected_role)
 
     # timestamp 단조 — created_at이 호출 순서대로 정렬 가능한가
     timestamps = [getattr(r, "created_at", None) for r in rows]
