@@ -66,3 +66,37 @@ def test_service_reads_uncertain_candidates_too():
     from koipa.services.golden_build_service import GoldenBuildService
     src = inspect.getsource(GoldenBuildService.render_signoff)
     assert 'job.get("uncertain_path")' in src
+
+
+def test_signable_comes_from_the_source_file_not_the_record_value():
+    """⚠ 2026-08-18 라이브에서 잡힌 오류 — 전건이 보기 전용이 되어 아무것도 서명 못 했다.
+
+    처음에는 `review_status` 값으로 서명 가능 여부를 판정했다. 그런데 실제 전달본 120건은
+    전부 `review_status='pending'` 이라 허용 목록에 없었고, **120건 전부가 잠겼다.**
+
+    옳은 기준은 **어느 파일에서 왔는가** 다. apply_signoff 는 gold_path 의 doc_id 만
+    서명 대상으로 삼고 review_status 는 보지 않는다.
+    """
+    import json
+    import re
+
+    gold = [{"doc_id": "a", "label": "S2", "text": "가" * 60, "review_status": "pending"}]
+    unc = [{"doc_id": "b", "label": "TS", "text": "나" * 60, "review_status": "uncertain"}]
+    html = render_signoff_html(gold, job_id="J", post_url="/p", pending=unc)
+    data = json.loads(
+        re.search(r'<script id="data" type="application/json">(.*?)</script>', html, re.S).group(1))
+    by = {d["id"]: d["signable"] for d in data}
+    assert by == {"a": True, "b": False}, by
+
+
+def test_every_review_status_value_in_gold_is_signable():
+    """gold 파일에 어떤 값이 들어와도 서명 대상이다 — 값으로 거르면 같은 사고가 난다."""
+    import json
+    import re
+
+    rows = [{"doc_id": f"d{i}", "label": "S2", "text": "가" * 60, "review_status": v}
+            for i, v in enumerate(["pending", "gold_candidate", "accepted", "", None, "무엇이든"])]
+    html = render_signoff_html(rows, job_id="J", post_url="/p")
+    data = json.loads(
+        re.search(r'<script id="data" type="application/json">(.*?)</script>', html, re.S).group(1))
+    assert all(d["signable"] for d in data), [d for d in data if not d["signable"]]

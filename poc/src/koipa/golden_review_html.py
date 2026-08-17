@@ -285,7 +285,7 @@ def render_review_html_from_jsonl(
 # render_review(보기 전용)와 달리 각 후보에 승인/등급변경/거부 폼을 붙이고, 제출 시
 # POST /golden/jobs/{id}/signoff 로 결정을 보내 locked_gold_eval 로 승격한다. 검수자가
 # jsonl 을 손으로 편집하는 대신 화면에서 클릭 서명 — 서명 캡처 UI 갭(뷰어만 존재) 해소.
-def _signoff_records(records: Sequence[dict]) -> list[dict]:
+def _signoff_records(records: Sequence[dict], *, signable: bool = True) -> list[dict]:
     out: list[dict] = []
     for r in records:
         grade = r.get("label") or r.get("llm_grade") or "S3"
@@ -299,9 +299,13 @@ def _signoff_records(records: Sequence[dict]) -> list[dict]:
             "conf": round(float(r.get("llm_confidence") or 0.0), 3),
             "domain": str(r.get("domain", "") or r.get("source", "")),
             "text": str(r.get("text") or ""),
-            # 합의 미달(uncertain) 후보는 서명 대상이 아니다 — 결정 폼 없이 보여만 준다.
-            # 종전에는 이걸 보려고 검토본(review.html)이라는 화면이 따로 있었다.
-            "signable": r.get("review_status") in ("accepted", "gold_candidate", None, ""),
+            # 서명 가능 여부는 **어느 파일에서 왔는가** 로 정한다.
+            #
+            # ⚠ 레코드의 review_status 로 판정하면 안 된다(2026-08-18 실측으로 잡힌 오류).
+            #   apply_signoff 는 gold_path 의 doc_id 만 서명 대상으로 삼는다 —
+            #   review_status 는 보지 않는다. 실제 전달본 120건은 전부 'pending' 이라
+            #   값으로 판정했더니 **전건이 보기 전용이 되어 아무것도 서명할 수 없었다.**
+            "signable": signable,
         })
     return out
 
@@ -316,13 +320,17 @@ def render_signoff_html(
     profile: Optional[str] = None,
     review_url: str = "",
     min_per_grade: int = 0,
+    pending: Optional[Sequence[dict]] = None,
 ) -> str:
     """gold 후보를 화면 서명용 인터랙티브 HTML로 렌더(승인/등급변경/거부 → POST signoff).
+
+    pending = 합의 미달(uncertain) 후보. 서명 대상이 아니므로 결정 폼 없이 보기 전용으로
+    같은 목록에 섞는다 — 종전 검토본(review.html)이 하던 일이다.
 
     [C2 2026-08-17] 검수자 이름·API Key 를 받는 인자를 없앴다. 신원은 로그인 쿠키(JWT sub)
     에서만 온다 — 화면이 채워 줄 수 있는 값이 아니다.
     """
-    data = _signoff_records(records)
+    data = _signoff_records(records) + _signoff_records(pending or [], signable=False)
     head = (
         "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
         f"<title>{_html.escape(title)}</title>{css or _DEFAULT_CSS}{_SIGNOFF_CSS}</head>"
@@ -351,18 +359,25 @@ def render_signoff_html_from_jsonl(
     review_url: str = "",
     min_per_grade: int = 0,
 ) -> str:
-    """build_<id>.jsonl(gold 후보)을 읽어 서명 HTML로 렌더."""
-    recs: list[dict] = []
-    for p in paths:
-        pp = Path(p)
+    """build_<id>.jsonl(gold 후보)을 읽어 서명 HTML로 렌더.
+
+    paths[0] = 서명 대상(gold) · paths[1:] = 보기 전용(uncertain).
+    이 순서가 곧 계약이다 — apply_signoff 가 gold_path 만 서명 대상으로 삼기 때문이다.
+    """
+    def _read(path) -> list[dict]:
+        pp = Path(path)
         if not pp.exists():
-            continue
-        for line in pp.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                recs.append(json.loads(line))
-    return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css,
+            return []
+        return [json.loads(ln) for ln in pp.read_text(encoding="utf-8").splitlines() if ln.strip()]
+
+    paths = list(paths)
+    gold = _read(paths[0]) if paths else []
+    pending: list[dict] = []
+    for extra in paths[1:]:
+        pending.extend(_read(extra))
+    return render_signoff_html(gold, job_id=job_id, post_url=post_url, title=title, css=css,
                                profile=profile, review_url=review_url,
-                               min_per_grade=min_per_grade)
+                               min_per_grade=min_per_grade, pending=pending)
 
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
