@@ -97,7 +97,19 @@ def _measure_recall_at_5() -> float | None:
         from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
         from koipa.rag.indexer import build_embedder  # noqa: PLC0415
 
-        store = build_store()
+        # 검색 품질은 **색인이 있는 곳에서만** 잴 수 있다. PSH 는 데이터 오염을 피하려고
+        # 측정 전용 DB 를 쓰는데 거기엔 코퍼스가 없다 — 그대로 재면 Recall 0.000 이 나오고
+        # "검색이 못 찾았다" 로 오독된다(223 실측으로 확인). 색인이 있는 DB 를 따로 지정하면
+        # 그 DB 에는 **읽기 전용 SELECT 만** 나간다.
+        index_url = _os.environ.get("PSH_RETRIEVAL_DATABASE_URL", "").strip()
+        if index_url:
+            from sqlalchemy import create_engine  # noqa: PLC0415
+
+            from koipa.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
+
+            store = PgVectorStore(engine=create_engine(index_url, pool_pre_ping=True))
+        else:
+            store = build_store()
         embedder = build_embedder()
     except Exception as exc:  # noqa: BLE001
         print(f"[PSH][S5] 검색 계층 준비 실패 — Recall@5 무측정 ({type(exc).__name__}: {exc})")
