@@ -277,7 +277,7 @@ details.adv[open]{padding-bottom:12px;}
 .dropzone:hover{background:var(--bg-strong);}
 .dropzone.over{border-color:#0070f3;background:#eff6ff;color:#1d4ed8;}
 .dropzone.over b{color:#1d4ed8;}
-</style>
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}</style>
 <script src="./deploy_badge.js" data-screen="관리자"></script>
 </head>
 <body>
@@ -297,7 +297,7 @@ details.adv[open]{padding-bottom:12px;}
       <span class="brand-sep">/</span>
       <span class="brand-sub">AI 거버넌스 콘솔</span>
     </a>
-    <div class="nav-right">
+    <div class="nav-right"><!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 --><div class="cnav"><a class="cnav-link" href="/api/v1/golden/candidates/manage.html">후보 관리</a><a class="cnav-link" href="/api/v1/golden/candidates/actual-intake.html">실문서 수집</a><span class="cnav-link is-current" aria-current="page">거버넌스</span><a class="cnav-link" href="/console/parse_demo.html">분류 시연</a></div>
       <a class="nav-link" href="./parse_demo.html" style="font-size:12.5px;color:var(--text-dim);text-decoration:none;padding:4px 8px;">파싱·분류 시연 ↗</a>
       <span class="nav-badge">E2E</span>
       <span id="health" class="health-pill" title="헬스체크 — 클릭">

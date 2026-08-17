@@ -167,7 +167,7 @@ mark.kw-hit.flash { animation:kwflash .9s ease-out; }
 .gate-review { border-left:3px solid #ea580c !important; background:#fff7ed !important; }
 .tl-step.review { background:#fff7ed !important; border-color:#fdba74 !important; }
 .tl-step.review .tl-dot { background:#ea580c !important; }
-</style>
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}</style>
 <script src="./deploy_badge.js" data-screen="파싱"></script>
 </head>
 <body>
@@ -176,7 +176,7 @@ mark.kw-hit.flash { animation:kwflash .9s ease-out; }
     <span class="brand-mark"><img src="./koipa_logo_mark.png" alt="Koipa" onerror="this.style.display='none'" /></span>
     <span><span class="brand-name">한국지식재산보호원</span><span class="brand-sep">/</span><span class="brand-sub">문서 파싱·분류 시연</span></span>
   </a>
-  <div class="nav-right">
+  <div class="nav-right"><!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 --><div class="cnav"><a class="cnav-link" href="/api/v1/golden/candidates/manage.html">후보 관리</a><a class="cnav-link" href="/api/v1/golden/candidates/actual-intake.html">실문서 수집</a><a class="cnav-link" href="/console/admin.html">거버넌스</a><span class="cnav-link is-current" aria-current="page">분류 시연</span></div>
     <a class="nav-link" href="./index.html">분류 콘솔</a>
     <a class="nav-link" href="./admin.html">거버넌스 콘솔 ↗</a>
     <span class="nav-badge">Analyze</span>
