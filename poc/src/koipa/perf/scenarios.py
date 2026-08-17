@@ -45,6 +45,94 @@ def _hdr(role: str = "kl_backend") -> dict:
     }
 
 
+def _measure_recall_at_5() -> float | None:
+    """검색 정답셋으로 Recall@5 를 직접 잰다. 못 재면 사유를 남기고 None.
+
+    이전 판은 `reports/p2/recall_at_5.json` 이라는 **미리 계산된 파일**을 읽었다. 그 파일이
+    없으면 값도 사유도 없이 사라져(223 실측 2026-08-17 무측정) RAG 검색 품질은 한 번도
+    보고된 적이 없었다. 여기서는 색인된 벡터스토어에 직접 질의해 잰다 — API 를 거치지 않으므로
+    감사 로그를 남기지 않는다(운영 DB 를 대상으로 해도 읽기 전용).
+
+    ⚠ 색인 doc_id 에는 청크 접미사가 붙는다(`<uuid>-c0`). 정답셋은 접미사 없는 문서 ID 라
+    그대로 비교하면 전건 불일치로 Recall 0.000 이 나온다(실측으로 확인).
+    """
+    import json as _json  # noqa: PLC0415
+    import os as _os  # noqa: PLC0415
+    import re as _re  # noqa: PLC0415
+    from pathlib import Path as _P  # noqa: PLC0415
+
+    from koipa.config import settings as _settings  # noqa: PLC0415
+
+    poc_root = _P(__file__).resolve().parents[3]
+    candidates = [
+        _os.environ.get("PSH_RETRIEVAL_GOLD", "").strip(),
+        "datasets/gold_real/retrieval_gold_nl.jsonl",
+        "datasets/gold_real/retrieval_gold.jsonl",
+    ]
+    rows: list[dict] = []
+    src = ""
+    for cand in candidates:
+        if not cand:
+            continue
+        path = _P(cand) if _P(cand).is_absolute() else poc_root / cand
+        if not path.is_file():
+            continue
+        try:
+            rows = [_json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+        except Exception:  # noqa: BLE001
+            continue
+        if rows:
+            src = path.name
+            break
+    if not rows:
+        print("[PSH][S5] 검색 정답셋 없음 — Recall@5 무측정 (PSH_RETRIEVAL_GOLD 로 지정)")
+        return None
+
+    limit = int(_os.environ.get("PSH_RETRIEVAL_MAX", "50") or 50)
+    collection = (
+        _os.environ.get("PSH_RETRIEVAL_COLLECTION", "").strip()
+        or getattr(_settings, "rag_default_collection", "docs")
+    )
+    try:
+        from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
+        from koipa.rag.indexer import build_embedder  # noqa: PLC0415
+
+        store = build_store()
+        embedder = build_embedder()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[PSH][S5] 검색 계층 준비 실패 — Recall@5 무측정 ({type(exc).__name__}: {exc})")
+        return None
+
+    def _strip_chunk(doc_id: object) -> str:
+        return _re.sub(r"-c[0-9]+$", "", str(doc_id or ""))
+
+    hit, n = 0, 0
+    for rec in rows[:limit]:
+        query = rec.get("text") or ""
+        expected = _strip_chunk(rec.get("expected_doc_id"))
+        if not query or not expected:
+            continue
+        try:
+            vec = embedder.embed([query]).vectors[0]
+            hits = store.search(collection, vec, top_k=5)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[PSH][S5] 검색 실패 — Recall@5 무측정 (collection={collection!r}"
+                  f" {type(exc).__name__}: {exc})")
+            return None
+        ids = [_strip_chunk((h.payload or {}).get("doc_id")) for h in hits]
+        n += 1
+        hit += expected in ids
+    if not n:
+        print("[PSH][S5] 정답셋에 질의·정답ID 쌍이 없다 — Recall@5 무측정")
+        return None
+    if hit == 0:
+        # 전건 실패는 "검색이 못 찾았다" 보다 "정답셋과 색인이 다른 코퍼스" 일 때가 많다.
+        print(f"[PSH][S5] ⚠ Recall@5 0.000 (정답셋 {src} · collection={collection}) —"
+              " 정답셋과 색인 코퍼스가 같은 빌드인지 확인할 것")
+    print(f"[PSH][S5] Recall@5 = {hit / n:.3f} · 정답셋 {src} {n}건 · collection={collection}")
+    return hit / n
+
+
 def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
     """(본문, 정답등급) 목록과 출처 이름. 없으면 ([], "").
 
@@ -594,21 +682,18 @@ def s5_guide_rag(ctx: ScenarioContext) -> None:
         ctx.record("s5_1", lat)
     ctx.record("s5_5", list_ok)
 
-    if ctx.resources.es and ctx.mode == "full":
-        # Recall@5 — P2 평가셋 재활용. ES + 학습 모델 + 평가셋 모두 충족 시에만 측정.
-        # 실측은 scripts/p2_compare_embeddings.py가 별도로 산출하고 PSH는 그 결과를 읽음.
+    if ctx.mode == "full":
+        # Recall@5 — 색인된 벡터스토어에 직접 질의해 잰다.
+        # 이전 판은 `ctx.resources.es` 를 조건으로 걸고 있었다. 이 배포의 벡터스토어는
+        # pgvector 라 ES 는 영원히 False 고, 그래서 이 KPI 는 한 번도 측정된 적이 없었다.
+        # 벡터스토어 종류가 아니라 "정답셋과 색인이 있는가" 가 조건이다 —
+        # 못 재는 경우는 _measure_recall_at_5 가 사유를 남긴다.
         try:
-            from pathlib import Path as _P  # noqa: PLC0415
-
-            p = _P("reports/p2/recall_at_5.json")
-            if p.exists():
-                import json as _json  # noqa: PLC0415
-
-                rec = float(_json.loads(p.read_text(encoding="utf-8")).get("recall_at_5", 0.0))
-                if rec > 0:
-                    ctx.record("s5_4", rec)
-        except Exception:
-            pass
+            rec = _measure_recall_at_5()
+            if rec is not None:
+                ctx.record("s5_4", rec)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[PSH][S5] Recall@5 측정 중 오류 — 무측정 ({type(exc).__name__}: {exc})")
 
 
 # ----------------------------------------------------------------
