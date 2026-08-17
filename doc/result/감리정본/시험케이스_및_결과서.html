@@ -102,13 +102,14 @@ footer strong{color:var(--text-dim);}
 <tr><td>검수 확정 · 재라벨 응답 (p95)</td><td>14.7ms · 13.6ms</td><td>≤ 300ms</td><td><span class="tag pass">통과</span></td></tr>
 <tr><td>가이드 인덱싱 처리량</td><td>70.1 chunks/s</td><td>≥ 0.3</td><td><span class="tag pass">통과</span></td></tr>
 <tr><td>RAG 인용 근거성 (grounded_ratio)</td><td>1.000</td><td>≥ 0.70</td><td><span class="tag pass">통과</span></td></tr>
+<tr><td><strong>RAG 검색 재현율 (Recall@5, 자연어 질의 50건)</strong></td><td><strong>0.900</strong></td><td>≥ 0.80</td><td><span class="tag pass">통과</span></td></tr>
 <tr><td>적대적 변형 미탐률</td><td>0.200</td><td>≤ 0.05</td><td><span class="tag p1">미달</span></td></tr>
 <tr><td>등급–인용 일관성</td><td>0.600</td><td>≥ 0.80</td><td><span class="tag p1">미달</span></td></tr>
 </tbody></table></div>
 <h3>미달 2건의 실체</h3>
 <p><strong>적대적 변형 미탐률 0.200</strong> — 케이스별로 재현한 결과 무너지는 축은 하나다. 원문 5/5 · OCR 띄어쓰기 노이즈 5/5 는 전부 TS 를 지켰고, <strong>한→영 치환("특급기밀"→"Top Secret") 5건 중 3건</strong>만 S1 으로 강등됐다. 학습이 한국어 합성 데이터라 영문 등급 표기가 고등급 신호로 학습돼 있지 않다. 다만 강등된 3건은 <strong>모두 신뢰도가 임계 아래로 떨어져 검수 큐로 라우팅</strong>됐다(응답 <code>status=needs_review</code>). 즉 <strong>무음 미탐은 0</strong> 이며, 사람이 보지 않고 확정되는 경로는 발생하지 않았다.</p>
 <p><strong>등급–인용 일관성 0.600</strong> — 불일치 내역은 <strong>판정 차이 24건 · 인용 결함 0건</strong> 이다. 평가셋이 등급별 시드 키워드 1개로 합성돼 있어, 모델이 다른 등급으로 판정하면 그 등급의 키워드는 본문에 애초에 없다. 인용 자체는 전부 입력 본문의 실제 문장이었다(근거성 1.000). <strong>RAG 인용 품질의 결함이 아니다.</strong></p>
-<div class="callout warn"><div class="callout-label">정직표기</div><p>평가셋 <code>holdout_eval.hardened.jsonl</code> 42건의 라벨 출처는 기계·큐레이션(<code>koipa_case_based</code> 24 · <code>public_definitive</code> 7 · <code>curated_scenario</code> 6 · <code>nkt_designated</code> 5)이며 <strong>사람 서명 정답이 아니다</strong>. 따라서 0.944 는 "사람이 확정한 정답 대비 정확도" 가 아니라 "현 평가셋 기준 서빙 경로 정확도" 다. 자원 사용률(PER-002)·백업 신선도·폐쇄망 번들 무결성은 이 측정 환경에서 판정 대상이 아니어서 미측정으로 남겼고, RAG 검색 재현율(Recall@5)은 검색 정답셋이 없어 측정하지 못했다.</p></div>
+<div class="callout warn"><div class="callout-label">정직표기</div><p>평가셋 <code>holdout_eval.hardened.jsonl</code> 42건의 라벨 출처는 기계·큐레이션(<code>koipa_case_based</code> 24 · <code>public_definitive</code> 7 · <code>curated_scenario</code> 6 · <code>nkt_designated</code> 5)이며 <strong>사람 서명 정답이 아니다</strong>. 따라서 0.944 는 "사람이 확정한 정답 대비 정확도" 가 아니라 "현 평가셋 기준 서빙 경로 정확도" 다. 자원 사용률(PER-002)·백업 신선도·폐쇄망 번들 무결성은 이 측정 환경에서 판정 대상이 아니어서 미측정으로 남겼다. RAG 검색 재현율은 색인된 벡터스토어(14,760 벡터)에 직접 질의해 측정했으며, 질의는 읽기 전용이라 운영 데이터를 바꾸지 않는다 — 자연어 질의셋 50건 <strong>Recall@5 0.900 · Recall@1 0.580</strong>, 원문 기반셋 50건 Recall@5 0.800 · Recall@1 0.560.</p></div>
 <div class="footnote">DOC-TEST-01 · 시험케이스 및 결과서 · 근거: poc/tests/ (286 test_*.py), pyproject.toml 시험 marker, scripts/run_acceptance.py · 실측일 2026-08-16</div>
 </article>
 <aside class="toc-aside"><nav class="toc"><div class="toc-title">목차</div>
