@@ -289,13 +289,15 @@ def render_signoff_html(
     *,
     job_id: str,
     post_url: str,
-    default_reviewer: str = "",
-    default_api_key: str = "",
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
     profile: Optional[str] = None,
 ) -> str:
-    """gold 후보를 화면 서명용 인터랙티브 HTML로 렌더(승인/등급변경/거부 → POST signoff)."""
+    """gold 후보를 화면 서명용 인터랙티브 HTML로 렌더(승인/등급변경/거부 → POST signoff).
+
+    [C2 2026-08-17] 검수자 이름·API Key 를 받는 인자를 없앴다. 신원은 로그인 쿠키(JWT sub)
+    에서만 온다 — 화면이 채워 줄 수 있는 값이 아니다.
+    """
     data = _signoff_records(records)
     head = (
         "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
@@ -307,8 +309,6 @@ def render_signoff_html(
         .replace("__TITLE__", _html.escape(title))
         .replace("__JOB__", _html.escape(job_id))
         .replace("__POST_URL__", _html.escape(post_url))
-        .replace("__REVIEWER_DEFAULT__", _html.escape(default_reviewer or ""))
-        .replace("__APIKEY_DEFAULT__", _html.escape(default_api_key or ""))
         .replace("__TOTAL__", str(len(data)))
         .replace("__DATA__", _embed_json(data))
     )
@@ -319,8 +319,6 @@ def render_signoff_html_from_jsonl(
     *,
     job_id: str,
     post_url: str,
-    default_reviewer: str = "",
-    default_api_key: str = "",
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
     profile: Optional[str] = None,
@@ -335,13 +333,13 @@ def render_signoff_html_from_jsonl(
             if line.strip():
                 recs.append(json.loads(line))
     return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css,
-                               profile=profile, default_reviewer=default_reviewer,
-                               default_api_key=default_api_key)
+                               profile=profile)
 
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
 _SIGNOFF_CSS = """<style>""" + _TOKENS + """
+.who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
 .signbar{position:sticky;top:0;z-index:10;background:var(--accent);color:#e4e4e7;padding:12px 24px;
          display:flex;gap:10px;flex-wrap:wrap;align-items:end;border-bottom:1px solid var(--accent)}
 .signbar .fld{display:flex;flex-direction:column;font-size:11px;gap:3px}
@@ -379,9 +377,7 @@ __NAV__
   <p class="lede">job __JOB__ · gold 후보 __TOTAL__건 — 승인/등급변경/거부 후 서명하면 <b>locked_gold_eval</b>(사람서명 평가정답)로 승격됩니다.</p>
 </div>
 <div class="signbar">
-  <div class="fld"><label>X-API-Key</label><input id="key" type="password" value="__APIKEY_DEFAULT__" placeholder="settings.api_key"></div>
-  <div class="fld"><label>역할(X-Actor-Role)</label><select id="role"><option value="reviewer">reviewer</option><option value="admin">admin</option><option value="kl_backend">kl_backend</option></select></div>
-  <div class="fld"><label>검수자 계정(reviewer_id)</label><input id="reviewer" value="__REVIEWER_DEFAULT__" placeholder="실계정 예: hong.gd"></div>
+  <div class="fld"><label>서명자</label><span id="who" class="who">확인 중…</span></div>
   <div class="fld chk"><input type="checkbox" id="publish"><label for="publish">라이브 반영(publish)</label><!-- 기본 해제: 서버 기본값(GoldenSignoffRequest.publish=False)·사용자매뉴얼과 일치. 체크해야 정본·라이브 경로가 바뀐다. -->
   <div class="fld"><label>&nbsp;</label><button id="submit">서명 제출</button></div>
 </div>
@@ -460,13 +456,23 @@ document.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',f
   document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));this.classList.add('active');g=this.dataset.v;render();
 }));
 document.getElementById('q').addEventListener('input',function(){q=this.value;render();});
+// [C2 2026-08-17] 서명자는 **로그인 쿠키(JWT)의 sub** 다. 화면이 이름을 받지 않는다.
+var WHO='',WHOROLE='reviewer';
+(async function(){
+  const el=document.getElementById('who'),btn=document.getElementById('submit');
+  try{
+    const r=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});
+    if(!r.ok){el.textContent='로그인 필요 ('+r.status+')';btn.disabled=true;return;}
+    const j=await r.json();
+    WHO=j.actor_id||'';WHOROLE=j.actor_role||'reviewer';
+    if(!WHO){el.textContent='신원 없음';btn.disabled=true;return;}
+    el.textContent=WHO+' · '+WHOROLE;
+  }catch(e){el.textContent='신원 확인 실패';btn.disabled=true;}
+})();
 document.getElementById('submit').addEventListener('click',async function(){
-  const key=document.getElementById('key').value.trim();
-  const role=document.getElementById('role').value;
-  const reviewer=document.getElementById('reviewer').value.trim();
   const publish=document.getElementById('publish').checked;
   const box=document.getElementById('result');
-  if(!reviewer){box.className='result err';box.textContent='검수자 계정(reviewer_id)을 입력하세요.';return;}
+  if(!WHO){box.className='result err';box.textContent='로그인이 필요합니다. 콘솔 로그인 후 다시 여세요.';return;}
   const decisions=Object.keys(DEC).filter(id=>DEC[id].decision).map(id=>{
     const o={doc_id:id,decision:DEC[id].decision,note:DEC[id].note||''};
     if(DEC[id].decision==='change')o.grade=DEC[id].grade;return o;
@@ -474,8 +480,9 @@ document.getElementById('submit').addEventListener('click',async function(){
   if(!decisions.length){box.className='result err';box.textContent='결정한 후보가 없습니다.';return;}
   this.disabled=true;this.textContent='제출 중...';
   try{
-    const res=await fetch(POST_URL,{method:'POST',headers:{'X-API-Key':key,'X-Actor-Role':role,'Content-Type':'application/json; charset=utf-8'},
-      body:JSON.stringify({decisions,actor:{user_id:reviewer,role:role},publish})});
+    const res=await fetch(POST_URL,{method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json; charset=utf-8'},
+      body:JSON.stringify({decisions,actor:{user_id:WHO,role:WHOROLE},publish})});
     const j=await res.json();
     if(!res.ok){box.className='result err';box.textContent='실패('+res.status+'): '+(j.detail||JSON.stringify(j));}
     else{const rd=j.readiness||{};

@@ -31,14 +31,25 @@ from koipa.services.golden_build_service import GoldenBuildService
 
 
 def test_screen_is_not_prefilled_with_configured_reviewer():
-    """설정이 켜져 있어도 화면 주입은 빈 문자열이어야 한다."""
-    src = inspect.getsource(GoldenBuildService)
-    assert 'default_reviewer=""' in src, (
-        "기본 검수자를 화면에 주입하고 있다 — 그 이름으로 서명하면 누가 검수했는지 사라진다"
+    """화면 렌더 호출이 검수자 이름을 아예 넘기지 않는다.
+
+    [C2 2026-08-17] 처음에는 `default_reviewer=""` 로 **빈 값을 넘기는지** 검사했다.
+    이제 렌더러에서 인자 자체를 없앴으므로(신원은 로그인 쿠키 sub 에서만 온다) 더 강한
+    성질로 바꾼다 — 호출부에 그 이름이 등장하면 안 된다. 인자가 없으면 되살리는 데
+    한 줄이 아니라 시그니처 변경이 필요하다.
+    """
+    # 주석에 이름이 나오는 것은 허용한다(경위 설명). 막는 것은 **인자로 넘기는 것**이다.
+    code = "".join(
+        ln for ln in inspect.getsource(GoldenBuildService).splitlines(keepends=True)
+        if not ln.lstrip().startswith("#")
     )
-    assert 'default_reviewer=str(getattr(settings, "signoff_default_reviewer"' not in src, (
-        "설정값을 화면에 그대로 넣는 옛 경로가 남아 있다"
+    assert "default_reviewer=" not in code, (
+        "검수자 이름을 화면에 넘기고 있다 — 신원은 로그인 쿠키(JWT sub)에서만 와야 한다"
     )
+    assert "default_api_key=" not in code, (
+        "공유 API Key 를 화면에 넘기고 있다 — 페이지 본문에 관리자 키가 박혀 나간다"
+    )
+    assert "signoff_prefill_api_key" not in code, "프리필 설정을 다시 읽고 있다"
 
 
 def test_config_field_is_kept_for_the_rejection_check():

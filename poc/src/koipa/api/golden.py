@@ -262,10 +262,23 @@ def proxy_gold_candidate_decisions(limit: int = Query(default=100, ge=1, le=500)
     summary="골든셋 관리 콘솔 로그인 신원",
 )
 def proxy_gold_candidate_session(
-    auth: dict = Depends(require_role("admin", "kl_backend")),
+    auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
 ) -> dict:
-    """화면에 표시할 인증된 관리자 정보. 클라이언트가 ID를 제출하지 않는다."""
-    return {"actor_id": _console_actor_id(auth), "auth_mode": auth.get("mode")}
+    """화면에 표시할 인증된 신원. 클라이언트가 ID를 제출하지 않는다.
+
+    [C2 2026-08-17] reviewer 역할을 허용 목록에 넣었다. 서명 API 는 reviewer 를 받는데
+    (golden_job_signoff 의 require_role) 이 신원 조회는 admin·kl_backend 만 받고 있어서,
+    **검수자는 서명은 되는데 자기 이름은 못 읽는** 상태였다. 서명 화면이 이 응답으로
+    서명자를 표시하므로 그대로 두면 검수자 화면이 403 으로 막힌다.
+
+    actor_role 을 함께 돌려준다 — 화면이 요청 본문의 actor.role 을 자칭하지 않고
+    인증된 역할을 그대로 싣게 하기 위해서다(값 범위는 VALID_ROLES = Actor.role 패턴과 동일).
+    """
+    return {
+        "actor_id": _console_actor_id(auth),
+        "auth_mode": auth.get("mode"),
+        "actor_role": auth.get("actor_role") or "",
+    }
 
 
 @router.post(
