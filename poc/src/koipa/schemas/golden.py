@@ -168,6 +168,35 @@ class ProxyGoldCandidateDecisionRequest(BaseModel):
         return self
 
 
+class ProxyGoldCandidateProvenanceRequest(BaseModel):
+    """실문서의 출처를 나중에 기록한다.
+
+    결정(Decision)과 분리한 이유: 결정 API 는 action 마다 status 를 정하는 표를 갖고 있어
+    "등급은 그대로 두고 출처만 기록" 을 표현할 수 없다.
+
+    ⚠ 두 필드가 **모두** 필요하다. 출처만 있고 사용 권한 근거가 없으면 미완(partial)이며,
+      실측 2026-08-17(223) 기준 실문서 74건 중 62건이 정확히 그 상태였다.
+    """
+
+    source_reference: str = Field(min_length=1, max_length=500)
+    authorization_basis: str = Field(min_length=1, max_length=500)
+    reason: str = Field(default="", max_length=4000)
+
+    @model_validator(mode="after")
+    def _not_blank(self) -> "ProxyGoldCandidateProvenanceRequest":
+        if not self.source_reference.strip() or not self.authorization_basis.strip():
+            raise ValueError("원천 위치와 사용 권한 근거를 모두 적어야 한다(공백만은 불가)")
+        return self
+
+
+class ProxyGoldCandidateProvenanceResponse(BaseModel):
+    doc_id: str
+    provenance: dict
+    # 등급·상태는 이 요청으로 바뀌지 않는다. 화면이 확인할 수 있게 함께 돌려준다.
+    status: str
+    final_grade: Optional[str] = None
+
+
 class ProxyGoldCandidateDecisionResponse(BaseModel):
     doc_id: str
     status: str

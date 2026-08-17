@@ -29,6 +29,8 @@ from koipa.schemas.golden import (
     GoldenJobSummary,
     GoldenRegisterRequest,
     ProxyGoldCandidateDecisionRequest,
+    ProxyGoldCandidateProvenanceRequest,
+    ProxyGoldCandidateProvenanceResponse,
     ProxyGoldCandidateDecisionResponse,
     GoldenSignoffRequest,
     GoldenSignoffResponse,
@@ -308,6 +310,48 @@ def proxy_gold_candidate_detail(doc_id: str) -> dict:
     if candidate is None:
         raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
     return candidate
+
+
+@router.post(
+    "/golden/candidates/{doc_id}/provenance",
+    response_model=ProxyGoldCandidateProvenanceResponse,
+    summary="실문서 후보의 출처를 나중에 기록",
+)
+def proxy_gold_candidate_provenance(
+    doc_id: str,
+    req: ProxyGoldCandidateProvenanceRequest,
+    auth: dict = Depends(require_role("admin", "kl_backend")),
+) -> ProxyGoldCandidateProvenanceResponse:
+    """이미 올라간 실문서에 원천 위치·사용 권한 근거를 채운다.
+
+    왜 결정 API 가 아닌가. 결정은 action 마다 status 를 정하는 표를 갖고 있어
+    "등급은 그대로 두고 출처만 기록" 을 표현할 수 없다.
+
+    실측 2026-08-17(223): 실문서 74건 중 62건이 출처는 있고 **사용 권한 근거가 없는**
+    상태였는데(적재 스크립트가 top-level 에만 썼다), 그것을 채울 경로가 화면에도 API 에도
+    없었다. 이 엔드포인트가 그 자리다.
+
+    원장에는 event_kind="provenance" 로 남는다 - 결정 이벤트가 아니므로 등급·상태를 안 덮는다.
+    """
+    actor_id = _console_actor_id(auth)
+    try:
+        candidate = ProxyGoldCandidateService().record_provenance(
+            doc_id=doc_id,
+            source_reference=req.source_reference,
+            authorization_basis=req.authorization_basis,
+            reason=req.reason,
+            actor_id=actor_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="proxy-gold candidate not found")
+    return ProxyGoldCandidateProvenanceResponse(
+        doc_id=doc_id,
+        provenance=candidate.get("provenance") or {},
+        status=candidate["status"],
+        final_grade=candidate.get("final_grade"),
+    )
 
 
 @router.post(

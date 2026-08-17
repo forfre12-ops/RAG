@@ -271,6 +271,80 @@ class ProxyGoldCandidateService:
                 os.fsync(handle.fileno())
         return self.get_candidate(doc_id)
 
+    def record_provenance(
+        self,
+        *,
+        doc_id: str,
+        source_reference: str,
+        authorization_basis: str,
+        actor_id: str,
+        reason: str = "",
+    ) -> dict[str, Any] | None:
+        """이미 올라간 실문서에 **출처를 나중에 기록한다.**
+
+        왜 결정 API 와 분리했나. `decide()` 는 action 마다 status 를 정하는 표를 갖고 있어
+        (approve→approved_proxy, change→grade_fixed_unlocked …), 결정에 출처를 얹으면
+        **"등급은 그대로 두고 출처만 기록" 을 표현할 수 없다.** 별도 경로로 둔다.
+
+        실측 2026-08-17(223): 실문서 74건 중 62건이 출처를 갖고 있었으나 적재 스크립트가
+        metadata top-level 에 써서 화면에서 사라졌고, 그 62건에는 **사용 권한 근거가 없다.**
+        그 62건을 완결하려면 사람이 권한 근거를 채워야 하는데 그 경로가 없었다.
+
+        ⚠ 원장에 event_kind="provenance" 로 남긴다. 결정 이벤트가 아니므로
+          `_latest_decisions` 가 걸러낸다 - 안 걸러내면 등급 확정이 이 줄로 덮인다.
+        ⚠ 합성 후보는 대상이 아니다. 출처·권한 근거는 실문서에만 뜻이 있다.
+        """
+        source_reference = (source_reference or "").strip()
+        authorization_basis = (authorization_basis or "").strip()
+        if not source_reference or not authorization_basis:
+            raise ValueError("source_reference and authorization_basis are both required")
+        candidate = self.get_candidate(doc_id)
+        if candidate is None:
+            return None
+        if not candidate.get("is_actual_document"):
+            raise ValueError("provenance is recorded for actual documents only")
+
+        meta_path = self.root / f"{doc_id}.metadata.json"
+        if not meta_path.is_file():
+            raise ValueError("candidate metadata not found")
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        prev = dict(meta.get("provenance") or {})
+        meta["provenance"] = {
+            "source_reference": source_reference,
+            "authorization_basis": authorization_basis,
+            "status": "recorded",
+            "origin": "console_record",
+            "recorded_by": actor_id,
+            "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        }
+        event = {
+            "schema_version": 1,
+            "event_kind": "provenance",
+            "event_id": str(uuid4()),
+            "doc_id": doc_id,
+            # 결정 이벤트와 같은 자리에 쌓이므로 결정 필드(final_grade·status)는 넣지 않는다.
+            # 넣으면 나중에 누가 이 줄을 결정으로 읽을 수 있다.
+            "action": "record_provenance",
+            "reason": reason.strip(),
+            "actor_id": actor_id,
+            "decided_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "document_sha256": candidate["document_sha256"],
+            "document_origin": candidate["document_origin"],
+            # 무엇이 어떻게 바뀌었는지 - 감사에서 되짚을 수 있게 이전 값도 남긴다.
+            "provenance_before": prev,
+            "provenance_after": meta["provenance"],
+        }
+        self.root.mkdir(parents=True, exist_ok=True)
+        with _exclusive_ledger_lock(self.lock_path):
+            meta_path.write_text(
+                json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            with self.ledger_path.open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        return self.get_candidate(doc_id)
+
     def create_uploaded_candidate(
         self, *, filename: str, content: bytes, actor_id: str,
         document_origin: str = "uploaded_document", source_reference: str = "",
@@ -528,8 +602,17 @@ class ProxyGoldCandidateService:
             except json.JSONDecodeError:
                 continue
             doc_id = str(row.get("doc_id") or "")
-            if doc_id:
-                latest[doc_id] = row
+            if not doc_id:
+                continue
+            # [E3a-2 2026-08-17] **결정 이벤트만** 현재 상태로 친다.
+            # 종전에는 doc_id 별 마지막 줄을 무조건 썼다. 그 줄에서 final_grade·status·
+            # grade_fixed 를 뽑아 목록·KPI 를 만들기 때문에, 결정이 아닌 이벤트(출처 기록 등)를
+            # 원장에 남기면 **등급 확정이 통째로 지워진다** - 화면의 '확정' 수가 줄어든다.
+            # 원장은 append-only 라 이벤트 종류가 늘어난다. 종류를 안 가리면 마지막 줄의
+            # 성격에 따라 상태가 오락가락한다.
+            if str(row.get("event_kind") or "decision") != "decision":
+                continue
+            latest[doc_id] = row
         return latest
 
     def _history(self, doc_id: str) -> list[dict[str, Any]]:
