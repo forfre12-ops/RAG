@@ -79,12 +79,19 @@ def test_renderer_no_longer_accepts_identity_prefill(kw):
 def test_signoff_page_never_embeds_the_shared_api_key(monkeypatch):
     """공유 키가 페이지 본문에 박혀 나가면 서명 링크를 받은 사람 모두가 관리자 키를 얻는다.
 
-    실측(223, 2026-08-17): .env.jjw 에 SIGNOFF_PREFILL_API_KEY=1 이 켜져 있었다.
+    실측(223, 2026-08-17): .env.jjw:27 에 SIGNOFF_PREFILL_API_KEY=1 이 켜져 있었다.
+    노출 범위는 전면이 아니었다 — GOLDEN_HTML_URL_SECRET(64자)이 설정돼 있어 무토큰 접근은
+    403 이다. 즉 **서명 링크를 받은 사람**에게 관리자 키가 함께 건네지던 상태다.
     """
     from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "api_key", "SUPER-SECRET-SHARED-KEY", raising=False)
-    monkeypatch.setattr(cfg.settings, "signoff_prefill_api_key", True, raising=False)
     assert "SUPER-SECRET-SHARED-KEY" not in _signoff_html()
+
+
+def test_prefill_switch_is_gone_from_settings():
+    """설정 항목이 남아 있으면 '켜면 되는 기능' 으로 읽힌다 — 켤 수 있는 자리를 없앤다."""
+    from koipa.config import Settings
+    assert "signoff_prefill_api_key" not in Settings.model_fields
 
 
 # ── 3·4. 서버가 신원을 확정하는 규칙 ──────────────────────────────────────────
