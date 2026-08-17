@@ -118,6 +118,44 @@ def _configured_default_reviewer() -> str:
         return ""
 
 
+_PREFILL_SUB_CACHE: dict[str, str] = {}
+
+
+def _prefill_login_subject() -> str:
+    """login.html 에 미리 채워지는 토큰의 sub — 그 주소를 여는 누구나 얻는 **공용** 신원이다.
+
+    실측(223, 2026-08-17): 콘솔이 0.0.0.0:8000 으로 열려 있고 login.html 은 무인증이라,
+    접속 가능한 누구나 sub=kl-admin-test·roles=[admin] 토큰을 그대로 받아 간다. 그 신원으로
+    한 서명은 '누가 검수했나' 를 말해 주지 않는다 — signoff_default_reviewer 와 같은 이유다.
+
+    서명 검증은 하지 않는다. 판별하려는 것은 토큰의 진위가 아니라 **우리가 화면에 뿌리고
+    있는 이름이 무엇인가** 이고, 그 값은 우리 설정에서 온다.
+    """
+    try:
+        from koipa.config import settings  # noqa: PLC0415
+
+        tok = str(getattr(settings, "console_login_prefill_token", "") or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+    if not tok or tok.count(".") != 2:
+        return ""
+    hit = _PREFILL_SUB_CACHE.get(tok)
+    if hit is not None:
+        return hit
+    try:
+        import base64  # noqa: PLC0415
+        import json  # noqa: PLC0415
+
+        body = tok.split(".")[1]
+        body += "=" * (-len(body) % 4)
+        sub = json.loads(base64.urlsafe_b64decode(body)).get("sub")
+        out = str(sub or "").strip().lower()
+    except Exception:  # noqa: BLE001 — 형식이 깨졌으면 거부 대상이 없는 것으로 본다
+        out = ""
+    _PREFILL_SUB_CACHE[tok] = out
+    return out
+
+
 def is_human_reviewer(reviewer_id: object) -> bool:
     """실계정 사람 검수자인가 — 엄격(placeholder·머신ID 모두 거부, fail-closed).
 
@@ -135,6 +173,11 @@ def is_human_reviewer(reviewer_id: object) -> bool:
         return False
     default_rid = _configured_default_reviewer()
     if default_rid and rid == default_rid:
+        return False
+    # 로그인 화면이 나눠 주는 공용 신원도 같은 이유로 거부한다 — 화면이 준 이름은
+    # 개별 검수 행위가 아니다. 설정이 비어 있으면(운영 배포) 이 검사는 작동하지 않는다.
+    prefill_rid = _prefill_login_subject()
+    if prefill_rid and rid == prefill_rid:
         return False
     return not any(rid.startswith(p) for p in _MACHINE_PREFIXES)
 
