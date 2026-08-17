@@ -20,12 +20,12 @@
       <span class="brand-sep">/</span>
       <span class="brand-url">KOIPA AI 콘솔</span>
     </a>
-    <div class="nav-actions"><!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 --><div class="cnav"><a class="cnav-link" href="/api/v1/golden/candidates/manage.html">후보 관리</a><a class="cnav-link" href="/console/admin.html">거버넌스</a><a class="cnav-link" href="/console/parse_demo.html">분류 시연</a></div>
+    <div class="nav-actions"><!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 --><div class="cnav"><a class="cnav-link" href="/api/v1/golden/candidates/manage.html">후보 관리</a><a class="cnav-link" href="/console/admin.html">거버넌스</a><span class="cnav-link is-current" aria-current="page">분류 시연</span></div>
       <span id="nav-status" class="nav-status warming"><span class="dot"></span><span>warmup…</span></span>
       <a class="nav-link" href="#s1">시연</a>
       <a class="nav-link" href="#sec-ops">운영·반영</a>
       <a class="nav-link" href="#s3">법령</a>
-      <a class="nav-link" href="./parse_demo.html">파싱·분류 시연 ↗</a>
+      <a class="nav-link" href="#sec-parse">파싱·분류</a>
       <a class="nav-link" href="./admin.html">거버넌스 콘솔 ↗</a>
     </div>
   </div>
@@ -192,6 +192,112 @@
 
 </div>
 
+
+<!-- ===== [D3 2026-08-18] 파싱·분류 시연 — parse_demo.html 을 흡수한 구역 =====
+     CSS 는 styles.css 에서 #sec-parse 로 한정돼 있다. 이 id 를 바꾸면 스타일이 통째로
+     빠지므로 함께 고칠 것. 스크립트는 아래 별도 <script> 블록(모듈 아님 — 인라인
+     onclick 이 전역 함수를 부른다). -->
+<section id="sec-parse">
+<div class="wrap">
+  <h1 class="h1">문서 업로드 → 파싱 → 검수 → 등급 시연</h1>
+  <p class="lede">실제 업무 문서(HWP·PDF·DOCX·XLSX 등)를 올리면 <b>추출 → 정규화·PII마스킹 → 청킹 → 검수 게이트 → 등급 분류</b>까지
+    전 구간이 어떻게 처리됐는지 단계별로 보여줍니다. 실제 서빙 파이프라인(<code>POST /documents/analyze</code>)을 그대로 호출합니다.</p>
+
+  <!-- 연결 -->
+  <div class="card">
+    <div class="card-title">연결</div>
+    <div class="row">
+      <label class="fld">API Base<input type="text" id="base" value="/api/v1" /></label>
+      <label class="fld">X-API-Key<input type="text" id="apikey" value="demo-secret-key" placeholder="시연 서버 API 키 입력" /></label>
+      <label class="fld">Actor-Role<select id="role"><option>admin</option><option>reviewer</option><option>viewer</option></select></label>
+      <label class="fld">근거 표시<select id="ev"><option value="true">on</option><option value="false">off</option></select></label>
+      <!-- [D3 2026-08-18] 헬스 배지. 옛 화면에서는 nav 에 있었는데 nav 는 흡수 대상이
+           아니라서 딸려오지 않았다. 바로 아래 안내문이 "헬스 배지를 눌러" 라고 하고
+           checkHealth() 가 이 두 id 를 만지므로(없으면 null 참조로 죽는다) 여기 둔다. -->
+      <span id="health" class="health-pill" onclick="checkHealth()" title="서버 연결 확인"><span class="dot"></span><span id="health-txt">health</span></span>
+    </div>
+    <div class="hint">폐쇄망 데모는 API Base를 <code>/api/v1</code>(같은 호스트) 그대로 두면 됩니다. 헬스 배지를 눌러 연결을 확인하세요.</div>
+  </div>
+
+  <!-- 업로드 -->
+  <div class="card">
+    <div class="card-title">1 · 문서 업로드</div>
+    <div class="drop" id="drop">
+      <div class="big">파일을 끌어다 놓거나 클릭해 선택</div>
+      <div class="sub">HWP · HWPX · PDF · DOCX · XLSX · XLS · PPTX · TXT · 이미지(OCR)</div>
+      <div class="fname" id="fname"></div>
+      <input type="file" id="file" class="hidden" />
+    </div>
+    <div class="samples-row">
+      <span class="samples-label">시연 문서 원클릭</span>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/01_TS_semiconductor_euv.docx','반도체 EUV 공정 레시피(극비).docx')">TS 특급 · 반도체 EUV (DOCX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/02_S1_recsys_source_license.docx','추천엔진 소스·라이선스(영업비밀).docx')">S1 1급 · 소스·라이선스 (DOCX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">S2 대외비 · 납품단가표 (XLSX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/04_S3_press_release.docx','신제품 출시 보도자료(공개).docx')">S3 공개 · 보도자료 (DOCX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/07_HYBRID_semantic_secret.docx','비공개 추진 메모(키워드無).docx')">★ 하이브리드 · 룰 놓침→모델 포착 (DOCX)</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">⚠ 검수 · PDF 표 불완전</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
+    </div>
+    <div class="hint">위 4종(TS·S1·S2·S3)은 <b>깨끗한 문서가 자동 확정</b>되는 경로. 아래 2종은 파싱 이상(PDF 표 불완전·얇은 본문)을 <b>조용히 오분류하지 않고 검수로 라우팅</b>하는 안전장치 시연. 직접 업무 문서를 끌어다 놓아도 됩니다.</div>
+    <div class="row" style="margin-top:14px;align-items:center;">
+      <button class="btn" id="go" onclick="analyze()" disabled>분석 실행</button>
+      <button class="btn ghost" onclick="reset()">초기화</button>
+      <label class="fld" style="flex-direction:row;align-items:center;gap:7px;margin:0;font-weight:600;white-space:nowrap;">
+        <input type="checkbox" id="persist-demo" style="width:auto;" />
+        실적재(검수 큐 전송)
+      </label>
+      <span class="hint" id="busy"></span>
+    </div>
+    <div class="hint" style="margin-top:6px;">
+      <b>실적재</b>를 켜면 분석과 별개로 문서를 <b>실제 적재</b>(<code>POST /documents</code> → <code>/classify</code>)합니다 —
+      needs_review 건은 <b>거버넌스 콘솔의 DB 검수 큐</b>에 나타나고, 본문은 RAG <code>demo</code> 컬렉션에 색인됩니다.
+      적재 문서는 <code>created_by=demo-console</code> 로만 태깅되어 admin의 <b>「데모 데이터 초기화」</b>로 한 번에 지웁니다.
+    </div>
+    <div id="persist-box" style="margin-top:8px;"></div>
+  </div>
+
+  <!-- 결과 -->
+  <div id="result" class="hidden">
+    <div class="card" id="summary-card">
+      <div class="card-title">추출된 문서</div>
+      <div id="pd-doc-title" style="font-size:17px;font-weight:700;line-height:1.4;margin-bottom:4px;"></div>
+      <div id="pd-doc-file" class="hint"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">2 · 처리 단계 (파싱 → 검수 → 분류)</div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">3 · 파싱 결과</div>
+        <dl class="kv" id="parse-kv"></dl>
+      </div>
+      <div class="card">
+        <div class="card-title">4 · 검수 게이트</div>
+        <div id="gate-box"></div>
+        <div class="hint">FNR-안전 설계: 표 미추출·OCR·저품질·손상은 등급을 바꾸지 않고 <b>검수로 라우팅</b>합니다.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">5 · 최종 분류</div>
+      <div id="cls-box"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">근거 키워드</div>
+        <div id="evidence-box"><span class="hint">없음</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">추출 본문 미리보기 (정규화·PII 마스킹 후)</div>
+        <div class="preview" id="preview"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <footer>
   <div>KOIPA AI 영업비밀관리시스템 · Powered by <b>Koipa</b></div>
   <div class="mono">한국지식재산보호원 · www.koipa.re.kr · 2026-07-17</div>
@@ -209,5 +315,237 @@
 function toggleDemoLog(){var d=document.getElementById('logdock'),t=document.getElementById('logdock-toggle');if(!d)return;var c=d.classList.toggle('collapsed');if(t)t.textContent=c?'펼치기 ▴':'접기 ▾';document.body.style.paddingBottom=c?'52px':'232px';}
 </script>
 <script type="module" src="./app.js"></script>
+<script>
+/* [D3] 파싱·분류 시연 스크립트 — parse_demo.html 에서 옮겨 왔다.
+   type=module 로 바꾸지 말 것: 위 구역의 인라인 onclick 이 여기 전역 함수를 부른다.
+   로그 출력은 index 의 #live-log(하단 고정 콘솔)로 합류시켰다. */
+const $ = (id)=>document.getElementById(id);
+let picked = null;
+function base(){ return $('base').value.replace(/\/$/,''); }
+function hdr(){ return { 'X-API-Key': $('apikey').value, 'X-Actor-Role': $('role').value }; }
+function log(m){ const el=$('live-log'); if(!el) return; el.textContent = '['+new Date().toLocaleTimeString()+'] '+m+'\n'+el.textContent; }
+
+async function checkHealth(){
+  const pill=$('health');
+  try{
+    const r = await fetch(base()+'/healthz', {headers:hdr()});
+    const j = await r.json().catch(()=>({}));
+    if(r.ok){ pill.className='health-pill ok'; $('health-txt').textContent = (j.profile||'ok'); }
+    else { pill.className='health-pill bad'; $('health-txt').textContent='HTTP '+r.status; }
+  }catch(e){ pill.className='health-pill bad'; $('health-txt').textContent='offline'; }
+}
+
+// dropzone
+const drop=$('drop'), fileInput=$('file');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=(e)=>setFile(e.target.files[0]);
+;['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.add('over');}));
+;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,(e)=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',(e)=>{ if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+function setFile(f){ if(!f) return; picked=f; $('fname').textContent = f.name+'  ('+f.size.toLocaleString()+' bytes)'; $('go').disabled=false; }
+function reset(){ picked=null; fileInput.value=''; $('fname').textContent=''; $('go').disabled=true; $('result').classList.add('hidden'); }
+
+// 원클릭 시연 샘플 — 정적 자산을 가져와 업로드처럼 분석
+async function loadSample(url, name){
+  $('busy').textContent='샘플 불러오는 중…';
+  try{
+    const r = await fetch(url);
+    if(!r.ok){ $('busy').textContent='샘플 로드 실패: HTTP '+r.status; log('샘플 로드 실패 '+name+' HTTP '+r.status); return; }
+    const blob = await r.blob();
+    const f = new File([blob], name, { type: blob.type || 'application/octet-stream' });
+    setFile(f);
+    log('시연 샘플 로드: '+name+' ('+f.size.toLocaleString()+'B) → 분석 실행');
+    analyze();
+  }catch(e){ $('busy').textContent='샘플 로드 오류: '+e.message; }
+}
+
+async function analyze(){
+  if(!picked) return;
+  $('go').disabled=true; $('busy').textContent='분석 중… (첫 요청은 모델 로드로 지연될 수 있습니다)';
+  const fd = new FormData();
+  fd.append('file', picked);
+  fd.append('return_evidence', $('ev').value);
+  const t0=performance.now();
+  try{
+    const r = await fetch(base()+'/documents/analyze', { method:'POST', headers:hdr(), body:fd });
+    const ms=Math.round(performance.now()-t0);
+    const j = await r.json();
+    if(!r.ok){ log('HTTP '+r.status+'  '+JSON.stringify(j).slice(0,240)); $('busy').textContent='실패: HTTP '+r.status; $('go').disabled=false; return; }
+    log('analyze OK '+ms+'ms  '+picked.name+' → '+(j.classification? j.classification.label : ((j.stages||[]).some(s=>s.name==='분류'&&s.status==='fail')?'(분류 오류)':'(빈본문)')));
+    render(j);
+    $('busy').textContent='완료 ('+ms+'ms)';
+    if($('persist-demo') && $('persist-demo').checked && window._reviewVerdict){ await persistToQueue(j); }
+  }catch(e){ log('오류: '+e.message); $('busy').textContent='오류: '+e.message; }
+  $('go').disabled=false;
+}
+
+// 실적재 — 분석과 별개로 실제 서빙 경로(POST /documents → /classify)로 적재해
+// needs_review 건이 거버넌스 콘솔 DB 검수 큐에 나타나게 한다. created_by=demo-console 마커라
+// admin의 「데모 데이터 초기화」로 스코프 삭제 가능. RAG 는 'demo' 컬렉션(평가 'docs' 분리)에 색인.
+async function persistToQueue(analysis){
+  const box=$('persist-box');
+  if(!picked || !box) return;
+  box.innerHTML='<span class="hint">실적재 중… (POST /documents → /classify)</span>';
+  try{
+    // 1) 실제 적재 — documents/chunks 저장 + RAG demo 색인, created_by=demo-console 마커
+    const fd=new FormData();
+    fd.append('actor', JSON.stringify({user_id:'demo-console', role:$('role').value||'admin'}));
+    fd.append('index_for_rag','true');
+    fd.append('rag_namespace','demo');
+    fd.append('file', picked);
+    const up=await fetch(base()+'/documents', {method:'POST', headers:hdr(), body:fd});
+    const uj=await up.json().catch(()=>({}));
+    if(!up.ok || !uj.doc_id){
+      box.innerHTML=`<div class="gate-review"><b>실적재 실패(업로드)</b>: HTTP ${up.status} ${esc(JSON.stringify(uj).slice(0,180))}</div>`;
+      log('실적재 업로드 실패 HTTP '+up.status); return;
+    }
+    log('적재 OK doc_id='+uj.doc_id+' (검수필요='+uj.requires_review+' · RAG색인='+uj.rag_indexed+')');
+    // 2) 실제 서빙 경로 분류 — 본문을 직접 전달(LocalStorage 재읽기 우회). 적재 시 ingestion
+    //    needs_review 격리는 서버가 존중(_ingestion_flagged_for_doc)해 검수 큐에 실린다.
+    const content=(analysis && analysis.text_preview) || '';
+    const cl=await fetch(base()+'/classify', {
+      method:'POST',
+      headers:Object.assign({'Content-Type':'application/json'}, hdr()),
+      body:JSON.stringify(content ? {doc_id:uj.doc_id, content:content} : {doc_id:uj.doc_id}),
+    });
+    const cj=await cl.json().catch(()=>({}));
+    if(!cl.ok){
+      box.innerHTML=`<div class="gate-review"><b>실적재 분류 실패</b>: HTTP ${cl.status} ${esc(JSON.stringify(cj).slice(0,180))}</div>`;
+      log('실적재 분류 실패 HTTP '+cl.status); return;
+    }
+    const st=cj.status||'?';
+    const routed=(st==='needs_review');
+    box.innerHTML=`<div class="${routed?'gate-review':'gate-ok'}">
+      <b>실적재 완료</b> — doc_id <code>${esc(uj.doc_id)}</code> · 등급 <b>${esc(cj.label||'?')}</b> · 상태 <b>${esc(st)}</b>
+      <div style="margin-top:4px">${routed
+        ? '→ <b>거버넌스 콘솔 → 「DB 검수 큐 불러오기」</b> 하면 이 문서가 검수 대기로 나타납니다.'
+        : '자동 확정(staging) — needs_review 가 아니라 검수 큐에는 나타나지 않습니다.'}</div></div>`;
+    log('실적재 분류 OK '+(cj.label||'?')+' status='+st);
+  }catch(e){
+    box.innerHTML=`<div class="gate-review"><b>실적재 오류</b>: ${esc(e.message)}</div>`;
+    log('실적재 오류: '+e.message);
+  }
+}
+
+function render(j){
+  window._lastAnalysis = j;   // 「검수 큐로 전송」 버튼이 참조하는 최근 분석 결과
+  window._reviewVerdict = false;   // needs_review 판정 여부(전송 대상 게이트) — 아래 분기에서 설정
+  $('result').classList.remove('hidden');
+  // 타임라인
+  $('timeline').innerHTML = (j.stages||[]).map(s=>`
+    <div class="tl-step ${s.status}">
+      <div class="tl-name"><span class="tl-dot"></span>${esc(s.name)}</div>
+      <div class="tl-detail">${esc(s.detail)}</div>
+    </div>`).join('');
+  // 파싱
+  const p=j.parse||{};
+  // 추출된 제목(본문 첫 유효행) + 파일 정보
+  window._previewRaw = (j.text_preview || '');
+  const firstLine = (window._previewRaw.split('\n').map(s=>s.trim()).filter(Boolean)[0]) || j.filename || '(제목 미검출)';
+  $('pd-doc-title').textContent = firstLine;
+  $('pd-doc-file').textContent = (j.filename||'') + '  ·  ' + (p.source_format||'?') + '  ·  ' + (p.char_count||0).toLocaleString() + '자 추출  ·  청크 ' + (p.chunk_count||0);
+  $('parse-kv').innerHTML = kv([
+    ['파일', j.filename+' ('+(j.file_size_bytes||0).toLocaleString()+'B)'],
+    ['포맷', p.source_format],
+    ['추출기', p.extraction_method + (p.ocr_used?' (OCR)':'')],
+    ['추출 품질', fmt(p.extraction_quality)+' / 콘텐츠 '+fmt(p.content_quality)],
+    ['추출 글자수', (p.char_count||0).toLocaleString()],
+    ['청크', p.chunk_count],
+    ['표 커버리지', p.table_coverage || '—'],
+    ['구조화 표', (p.table_count||0).toLocaleString()+'개 / 셀 '+(p.table_cell_count||0).toLocaleString()+'개'],
+    ['파싱 경고', (p.warnings||[]).length ? (p.warnings||[]).join(', ') : '없음'],
+    ['PII 마스킹', (p.pii_masked_count||0)+'건'],
+    ['추출 오류', p.extract_error || '없음'],
+  ]);
+  // 게이트
+  const g=j.gate||{};
+  $('gate-box').innerHTML = g.requires_review
+    ? `<div class="gate-review"><b>검수 필요</b> — 자동 확정하지 않고 사람 검수로 라우팅됩니다.<div>${(g.reasons||[]).map(r=>`<span class="reason-chip">${esc(r)}</span>`).join('')}</div></div>`
+    : `<div class="gate-ok"><b>자동 경로 통과</b> — 추출 품질·표·OCR 이상 없음(무오탐).</div>`;
+  // 분류
+  const c=j.classification;
+  if(!c){
+    const failStage=(j.stages||[]).find(s=>s.name==='분류' && s.status==='fail');
+    const clsCard=$('cls-box').closest('.card'); if(clsCard) clsCard.classList.add('review-hot');
+    window._reviewVerdict = true;   // 분류 실패/빈본문 = 검수 필요
+    const rb=`<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — ${failStage?'분류 오류로 자동 확정 불가':'본문 추출 0자로 분류 불가'}</span></span></div>`;
+    $('cls-box').innerHTML = rb + (failStage
+      ? `<div class="gate-review"><b>분류 오류</b><div class="warn">${esc(failStage.detail||'분류 실패')}</div></div>`
+      : '<span class="hint">본문 추출 0자 — 사람 검수로 라우팅됩니다.</span>');
+  }
+  else{
+    const f=c.factors||{};
+    const fbars = ['secrecy','value','management'].map(k=>{
+      const v=Number(f[k]||0); const pct=Math.max(0,Math.min(100,v<=1?v*100:v));
+      const ko={secrecy:'비공지성(S)',value:'경제적 유용성(V)',management:'비밀관리성(M)'}[k];
+      return `<div class="factor"><div class="flabel"><span>${ko}</span><span>${v.toFixed(2)}</span></div><div class="fbar"><div class="ffill" style="width:${pct}%"></div></div></div>`;
+    }).join('');
+    const isReview = c.status !== 'staging';
+    window._reviewVerdict = isReview;   // needs_review 일 때만 전송 대상
+    const verdictBanner = isReview
+      ? `<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — 자동 확정하지 않고 사람 검수로 라우팅</span></span></div>`
+      : `<div class="verdict-banner verdict-auto"><span>자동 확정<span class="vb-sub"> — 게이트 통과(무오탐)</span></span></div>`;
+    const clsCard = $('cls-box').closest('.card'); if(clsCard) clsCard.classList.toggle('review-hot', isReview);
+    $('cls-box').innerHTML = verdictBanner + `
+      <div class="row" style="align-items:flex-start;gap:24px;">
+        <div>
+          <span class="grade-badge g-${esc(c.label)}">${esc(c.label)}</span>
+          <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">신뢰도 ${fmt(c.confidence)}</div>
+          <div class="conf-bar" style="width:160px"><div class="conf-fill" style="width:${(c.confidence*100).toFixed(0)}%"></div></div>
+          <div style="margin-top:12px"><span class="status-pill status-${esc(c.status)}">${c.status==='staging'?'자동 확정':'검수 필요'}</span></div>
+          <div style="margin-top:12px;font-size:11.5px;color:var(--text-soft);line-height:1.7;border-top:1px solid var(--border-mid);padding-top:10px">
+            <b>두 엔진 판정</b> · 룰 <b>${esc(c.rule_grade||'—')}</b> · 분류기(BERT) <b>${esc(c.model_grade||'미로드')}</b> · 최종 <b>${esc(c.label)}</b>
+            ${c.decision_path?`<div style="margin-top:4px;color:var(--text-dim)">${esc(c.decision_path)}</div>`:''}
+          </div>
+          <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')}</div>
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:4px">평가요소 (가이드 3요건 S×V×M)</div>
+          ${fbars}
+        </div>
+      </div>
+      ${(c.warnings&&c.warnings.length)?`<div style="margin-top:12px">${c.warnings.map(w=>`<div class="warn">⚠ ${esc(w)}</div>`).join('')}</div>`:''}`;
+  }
+  // 근거 키워드 — 클릭 시 본문 하이라이트 토글
+  const ev=j.evidence||[];
+  $('evidence-box').innerHTML = ev.length
+    ? '<div class="hint" style="margin-bottom:6px">키워드를 클릭하면 아래 본문에서 위치가 하이라이트됩니다.</div>'
+      + ev.map(e=>`<span class="chip kw-chip" data-kw="${esc(e.text||'')}" onclick="toggleKw(this)">${esc(e.text||'')} ${e.weight?('· '+Number(e.weight).toFixed(2)):''}</span>`).join('')
+    : '<span class="hint">없음</span>';
+  // 미리보기 (하이라이트 상태 초기화)
+  renderPreviewHighlights();
+  // 실적재 버튼 — needs_review 판정일 때만 노출(자동 확정 건은 검수 불요라 전송 대상 아님).
+  if($('persist-box')){
+    $('persist-box').innerHTML = window._reviewVerdict
+      ? `<button class="btn" style="background:var(--red);border-color:var(--red)" onclick="persistToQueue(window._lastAnalysis)">이 문서 검수 큐로 전송 (실적재)</button>`
+        + `<span class="hint" style="margin-left:10px">needs_review 판정 → 거버넌스 콘솔 DB 검수 큐로 등록 · <code>created_by=demo-console</code> 태깅</span>`
+      : `<span class="hint">자동 확정(staging) — 검수 불요라 <b>검수 큐 전송 대상이 아닙니다</b>. needs_review 건만 큐로 보냅니다.</span>`;
+  }
+}
+
+// 키워드 칩 토글 → 본문 하이라이트
+function toggleKw(el){ const on = !el.classList.contains('active'); el.classList.toggle('active'); renderPreviewHighlights(on ? el.dataset.kw : null); }
+function renderPreviewHighlights(flashKw){
+  const raw = window._previewRaw || '';
+  if(!raw){ $('preview').textContent = '(없음)'; return; }
+  const active = Array.prototype.slice.call(document.querySelectorAll('.kw-chip.active')).map(c=>c.dataset.kw).filter(Boolean);
+  if(!active.length){ $('preview').textContent = raw; return; }
+  let html = esc(raw);
+  active.forEach(kw=>{
+    const cls = (kw===flashKw) ? 'kw-hit flash' : 'kw-hit';
+    const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g');
+    html = html.replace(re, m=>`<mark class="${cls}">${m}</mark>`);
+  });
+  $('preview').innerHTML = html;
+  // 클릭한 키워드의 첫 매치로 스크롤 이동 → 눈에 확 띄게
+  if(flashKw){ const first = $('preview').querySelector('mark.kw-hit.flash'); if(first){ first.scrollIntoView({block:'center', behavior:'smooth'}); } }
+}
+
+function kv(pairs){ return pairs.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(String(v==null?'—':v))}</dd>`).join(''); }
+function fmt(x){ return (x==null)?'—':Number(x).toFixed(3); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+checkHealth();
+</script>
 </body>
 </html>

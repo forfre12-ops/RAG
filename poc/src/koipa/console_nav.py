@@ -38,7 +38,9 @@ CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     # [D1 2026-08-17] '실문서 수집' 은 별도 화면이 아니라 후보 관리의 업로드 모달이 됐다.
     # 두 화면이 같은 API(/golden/candidates/upload)·같은 필드를 쓰는데 화면만 둘이었다.
     ("admin", "거버넌스", "/console/admin.html"),
-    ("demo", "분류 시연", "/console/parse_demo.html"),
+    # [D3 2026-08-18] 시연은 별도 화면이 아니라 분류 콘솔 안의 구역이 됐다.
+    # parse_demo.html 은 그 구역으로 보내는 스텁으로만 남는다(인쇄된 주소 보호).
+    ("demo", "분류 시연", "/console/index.html#sec-parse"),
 )
 
 

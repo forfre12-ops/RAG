@@ -26,7 +26,9 @@ import pytest
 from koipa.console_nav import CONSOLE_LINKS, nav_bar_html
 
 _STATIC = Path(__file__).resolve().parents[1] / "src" / "koipa" / "api" / "static"
-_STATIC_PAGES = ("admin.html", "index.html", "parse_demo.html")
+# [D3 2026-08-18] parse_demo.html 은 리다이렉트 스텁이 됐다 — 네비를 넣을 화면이 아니다.
+# 파일은 남는다: 그 주소가 KL 사용설명서·배포 스크립트·가이드에 인쇄돼 있다.
+_STATIC_PAGES = ("admin.html", "index.html")
 
 
 def _hrefs(html: str) -> list[str]:
@@ -95,3 +97,11 @@ def test_current_screen_is_marked_and_not_a_link():
     assert 'is-current' in html
     manage_href = dict((k, h) for k, _, h in CONSOLE_LINKS)["manage"]
     assert f'href="{manage_href}"' not in html, "현재 화면이 자기 자신 링크를 갖고 있다"
+
+
+def test_parse_demo_is_a_stub_that_points_at_the_merged_section():
+    """스텁이 제 일을 하는지 — 인쇄된 주소를 따라온 사람이 막히면 안 된다."""
+    html = (_STATIC / "parse_demo.html").read_text(encoding="utf-8")
+    assert "http-equiv" in html and "refresh" in html
+    assert "./index.html#sec-parse" in html
+    assert "console-nav" not in html, "스텁에 네비를 넣으면 목록을 두 곳에서 관리하게 된다"
