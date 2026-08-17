@@ -100,9 +100,24 @@ def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
     return [], ""
 
 
+_RATE_LIMITED = {"n": 0}
+
+
+def _note_status(resp: object) -> object:
+    """429 를 세어 둔다 — 레이트리밋이 값을 깎았는데 보고서엔 '미달' 로만 남는 것을 막는다."""
+    code = getattr(resp, "status_code", None)
+    if code == 429:
+        _RATE_LIMITED["n"] += 1
+    return resp
+
+
+def rate_limited_count() -> int:
+    return _RATE_LIMITED["n"]
+
+
 def _time_call(fn: Callable) -> tuple[float, object]:
     t0 = time.perf_counter()
-    out = fn()
+    out = _note_status(fn())
     return (time.perf_counter() - t0) * 1000.0, out
 
 

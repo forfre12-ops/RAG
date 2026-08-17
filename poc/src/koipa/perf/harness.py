@@ -191,10 +191,19 @@ class ScenarioRunner:
         self.kpis = kpis or KPIS
 
     def run(self, specs: list[ScenarioSpec]) -> list[ScenarioResult]:
+        import os
         import time
 
+        # 시나리오 사이 간격(초). 서빙 레이트리밋은 분 단위 창이라(분류 60/min) 전 시나리오를
+        # 붙여 돌리면 뒤쪽이 429 를 맞고 그 값이 "미달" 로 집계된다 — 223 실측 2026-08-17:
+        # 27초 안에 분류 ~56건이 몰려 S16.4 가 0.0 이었고, 단독 실행하면 1.0 이었다.
+        # 운영 프로파일에서는 레이트리밋을 끌 수 없으므로(config fail-clear) 간격으로 푼다.
+        pace = float(os.environ.get("PSH_PACE_SEC", "0") or 0)
+
         results: list[ScenarioResult] = []
-        for spec in specs:
+        for idx, spec in enumerate(specs):
+            if pace > 0 and idx > 0:
+                time.sleep(pace)
             t0 = time.perf_counter()
             ctx = ScenarioContext(spec.id, self.resources, self.mode)
 

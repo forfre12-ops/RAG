@@ -217,6 +217,15 @@ def main() -> int:
     json_path = write_report(report, out_dir=args.out_dir)
     print(f"[PSH] JSON → {json_path}")
 
+    from koipa.perf.scenarios import rate_limited_count  # noqa: PLC0415
+
+    n_429 = rate_limited_count()
+    if n_429:
+        print(
+            f"[PSH] 경고 — 429(레이트리밋) 응답 {n_429}건. 그만큼 KPI 가 실제보다 낮게 잡힌다. "
+            "PSH_PACE_SEC=60 으로 시나리오 간격을 주거나 --only 로 나눠 실행할 것."
+        )
+
     summ = report["summary"]
     print(
         f"[PSH] KPI: PASS={summ['pass']}  FAIL={summ['fail']}  SKIP={summ['skip']}  "
