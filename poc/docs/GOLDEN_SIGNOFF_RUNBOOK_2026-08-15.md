@@ -120,13 +120,87 @@ synthetic_per_grade TS 5 · S1 0 · S2 3 · S3 0
 
 ---
 
+## 7-1. 함정 — 검수자에게 준 링크가 안 열렸다 (2026-08-17 실측·수정)
+
+```
+GOLDEN_HTML_URL_SECRET 설정됨(223, 64자)
+.../signoff.html            -> 403      ← 종전에 인쇄되던 주소
+.../signoff.html?t=<토큰>   -> 200
+```
+
+`?t=` 는 **job_id 를 서명한 HMAC** 이다. 없으면 화면이 안 열린다. 종전
+`register_review_signoff_job.py` 는 경로를 직접 조립해 토큰 없는 주소를 인쇄했다.
+사람 검수가 시작되지 않던 진짜 이유였고, 원인이 화면이 아니라 링크라 콘솔을 봐도 안 보인다.
+
+지금은 서버가 응답에 담아 주는 `signoff_url`·`review_url` 을 그대로 인쇄한다.
+**주소를 직접 조립하지 말 것.** 검수자에게 전달할 때 `?t=` 뒤를 잘라내도 403 이다.
+
+⚠ 이 토큰은 **신원이 아니다.** 링크를 가진 사람은 누구나 화면을 열 수 있다.
+  누가 서명했는지는 아래 7-2 가 정한다.
+
+---
+
+## 7-2. 서명자는 로그인 쿠키(JWT sub)로만 정해진다 (2026-08-17 변경)
+
+종전 서명 화면은 **검수자 이름·API Key·역할을 사람이 타이핑**하게 했다. 그리고 서버는
+`auth_mode=both` 에서 공유 API Key 가 먼저 통과하면 클라이언트가 보낸 이름을 그대로 쓴다
+(`confirm.py` `resolve_actor_user_id` — jwt sub 가 없으면 덮어쓰지 않는다). 두 사실이
+만나면 원장에 남는 서명자는 자칭이다.
+
+실제로 그렇게 됐다 — `locked_gold_eval` 20건이 전원 같은 이름, 그중 19건이 같은
+마이크로초 서명이었다. 사람이 한 것이 아니다.
+
+지금은 그 입력칸들이 없다. 화면은 `/golden/candidates/session` 이 준 신원을 **표시만** 하고,
+본문 `actor` 에도 그 값을 싣는다. 로그인하지 않았으면 제출 버튼이 잠기고 로그인 링크가 뜬다.
+
+**사람 검수자로 인정되지 않는 이름**(제출하면 403):
+
+```
+ai_assist · demo-console · system · codex · 빈값        머신·플레이스홀더
+SIGNOFF_DEFAULT_REVIEWER 와 같은 이름                    화면이 채워 주던 이름
+CONSOLE_LOGIN_PREFILL_TOKEN 의 sub (예: kl-admin-test)   로그인 화면이 나눠 주는 공용 신원
+```
+
+마지막 줄이 중요하다. 223 은 콘솔이 외부에 열려 있고 `login.html` 은 무인증이라, **접속
+가능한 누구나 그 토큰을 받아 간다**(실측: HTTP 200 · roles=[admin]). 그 신원으로 한 서명은
+검수 기록이 되지 않는다.
+
+---
+
+## 7-3. 검수자별 토큰 발급
+
+```
+python3 scripts/setup_console_test_login.py \
+    --sub <실계정> --roles reviewer --until 2026-12-31
+```
+
+```
+산출  secrets/console_jwt/tokens/<실계정>.txt      사람마다 따로 남는다
+만료  --until 로 날짜를 못 박는다 — 노출 기한이 지나면 토큰이 스스로 죽는다
+```
+
+⛔ **`--regenerate-key` 를 쓰지 말 것.** 223 에 배포된 jwks 가 `kid=console-test-1` 이라
+   키를 새로 만들면 **이전에 발급한 토큰이 전부 무효**가 된다.
+
+⛔ **한 토큰을 여러 명이 쓰지 말 것.** 원장에 같은 이름만 남아 검수 기록이 성립하지 않는다.
+
+역할은 `reviewer` 로 충분하다(§3 — 등록은 admin 이 하고 서명만 검수자가 한다).
+
+---
+
 ## 8. 배포 후 순서
 
 ```
-1. 후보 파일 동기화        datasets/golden_review/ff5a822c/ 를 서버에 올린다
-2. 등록                   register_review_signoff_job.py --base-url ... --actor ... --api-key ...
-3. 화면 확인               signoff.html 이 200 인지 (스크립트가 자동 확인한다)
-4. 검수 계정 발급          admin 또는 kl_backend · 실계정 이름
-5. 서명                   publish=true · 등급별 5건 이상
-6. readiness 확인          ready=True 와 real/synthetic 비율을 함께 본다
+1. 후보 파일 동기화     datasets/golden_review/ff5a822c/ 를 서버에 올린다
+2. 등록                register_review_signoff_job.py --base-url ... --actor ... --token ...
+                       (등록은 admin·kl_backend 만 — §3)
+3. 링크 확보            스크립트가 인쇄하는 ?t= 포함 주소 두 개(검토본·서명)
+                       스크립트가 signoff.html 200 까지 스스로 확인한다
+4. 검수자 토큰 발급      §7-3 — 사람마다 --sub 로 따로. 역할 reviewer 로 충분
+5. 검수자에게 전달       ① 로그인 화면 ② 본인 토큰 파일 ③ ?t= 포함 링크 (셋 다)
+6. 서명                publish=true · 등급별 5건 이상
+7. readiness 확인       ready=True 와 real/synthetic 비율을 함께 본다
 ```
+
+⚠ 5번에서 셋 중 하나만 빠져도 검수자가 막힌다 — 링크만 주면 열리기는 하나 제출이 잠기고,
+  토큰만 주면 어디로 갈지 모른다.
