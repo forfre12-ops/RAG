@@ -143,6 +143,11 @@ KPIS: list[KPI] = [
     # 적대적 FNR도 실 학습 모델 전제 — 룰 fallback에서는 무의미
     KPI("S9.2", "S9", "적대적 FNR (TS→하위)", "ratio", "le", 0.05, "last", requires=["trained_model"], core=True),
     KPI("S9.3", "S9", "confidence 변동 stdev", "ratio", "le", 0.20, "last"),
+    # 계약이 말하는 최악 오류는 "고등급을 낮게 보고 **그대로 확정**" 이다. S9.2 는 원시 예측만 보고
+    # 검수 라우팅을 세지 않아, 검수로 전부 걸린 경우에도 미탐으로 보고된다(223 실측: 강등 3/15 =
+    # 0.20 이었으나 3건 모두 needs_review). 무음 미탐은 0 이어야 한다 — 그 성질을 따로 잠근다.
+    KPI("S9.4", "S9", "무음 미탐 (강등+자동확정)", "ratio", "le", 0.0, "last",
+        requires=["trained_model"], core=True),
 
     # S11 부하 시나리오 (W10 확장 + W12+ 블록 6 단계 상향)
     # error_rate는 모든 단계 누적 — 0.01 유지

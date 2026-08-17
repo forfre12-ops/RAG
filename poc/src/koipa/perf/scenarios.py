@@ -751,12 +751,14 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
     confidence_diffs: list[float] = []
     ts_total = 0
     ts_fn = 0
+    ts_silent_fn = 0  # 강등됐는데 검수로도 안 빠진 건 = 무음 미탐
 
     with make() as cli:
         for content, target in base_cases:
             variants = _variants(content)
             labels: list[str] = []
             confs: list[float] = []
+            statuses: list[str] = []
             for v in variants:
                 r = cli.post(
                     "/api/v1/classify",
@@ -767,6 +769,7 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
                     continue
                 b = r.json()
                 labels.append(b.get("label", ""))
+                statuses.append(str(b.get("status") or ""))
                 try:
                     confs.append(float(b.get("confidence", 0)))
                 except (TypeError, ValueError):
@@ -783,16 +786,24 @@ def s9_adversarial(ctx: ScenarioContext) -> None:
 
             # FNR (full only — trained_model 의존, 자동 SKIP)
             if target == "TS":
-                for lbl in labels:
+                for lbl, st in zip(labels, statuses):
                     ts_total += 1
                     if lbl != "TS":
                         ts_fn += 1
+                        # 계약상 최악 오류는 "고등급을 낮게 보고 **그대로 확정되는 것**" 이다.
+                        # 강등돼도 검수 큐(needs_review)로 빠지면 사람이 본다 — 무음이 아니다.
+                        # 223 실측(2026-08-17): 강등 3건 전부 needs_review 로 라우팅됐다.
+                        if st != "needs_review":
+                            ts_silent_fn += 1
 
     consistency = (matches / total_pairs) if total_pairs else 0.0
     ctx.record("s9_1", consistency)
 
     if ts_total and ctx.resources.has("trained_model"):
         ctx.record("s9_2", ts_fn / ts_total)
+        ctx.record("s9_4", ts_silent_fn / ts_total)
+        if ts_fn and not ts_silent_fn:
+            print(f"[PSH][S9] 고등급 강등 {ts_fn}/{ts_total} 건 — 전부 검수 큐로 라우팅(무음 미탐 0)")
 
     if confidence_diffs:
         ctx.record("s9_3", _stats.mean(confidence_diffs))
