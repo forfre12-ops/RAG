@@ -308,9 +308,18 @@ class GoldenBuildService:
             post_url=f"/api/v1/golden/jobs/{job_id}/signoff",
             title=title,
             profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
-            # 시연·반복 검수에서 매번 타이핑하지 않도록 기본 검수자를 미리 채운다(사람이 화면에서
-            # 수정 가능). 운영 기본값은 빈 문자열이라 강제되지 않는다 — .env 로 켜는 편의 기능.
-            default_reviewer=str(getattr(settings, "signoff_default_reviewer", "") or ""),
+            # [C1 2026-08-17] 기본 검수자 **주입을 끊는다.** 설정값(signoff_default_reviewer)은
+            # 지우지 않는다 — golden_tiers.is_human_reviewer 가 그 값과 같은 이름을 거부하는 데
+            # 쓰기 때문이다(DEF-2026-53). 설정을 비우면 `if default_rid and ...` 의 앞 조건이
+            # 거짓이 되어 **거부 자체가 사라진다.**
+            #
+            # 실측(223, 2026-08-17): SIGNOFF_DEFAULT_REVIEWER=hong.gildong 이 켜져 있고
+            # locked_gold_eval 20건이 전원 그 이름 · 19건이 같은 마이크로초(…T14:42:14.904855)
+            # 서명이었다. 화면이 채워 준 이름을 그대로 제출한 결과다 — 개별 검수 행위가 아니다.
+            #
+            # 즉 이 편의 기능은 "누가 검수했나" 를 지우는 방향으로만 작동했다. 화면은 빈칸으로
+            # 뜨고, 신원은 포털 JWT 로그인(sub)에서 온다.
+            default_reviewer="",
             default_api_key=(str(getattr(settings, "api_key", "") or "")
                              if getattr(settings, "signoff_prefill_api_key", False) else ""),
         )
