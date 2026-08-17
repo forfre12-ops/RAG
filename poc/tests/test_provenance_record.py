@@ -110,3 +110,37 @@ def test_endpoint_is_exposed_and_guarded():
     assert path.replace(DOC, "{doc_id}") in app.openapi()["paths"]
     r = c.post(path, json={"source_reference": "a", "authorization_basis": "b"})
     assert r.status_code == 401, f"무인증인데 {r.status_code}"
+
+
+# ── 화면 배선 (E3a-4 · E3a-6) ────────────────────────────────────────────────
+# 서비스가 내보내는 값이 화면에 안 붙어 있으면 검수자는 여전히 아무것도 못 한다.
+# 실측 2026-08-17: actual_document_intake·actual_provenance_recorded 는 이미 응답에
+# 있었는데 **유일한 소비처가 테스트**였다 — 화면 어디에도 없었다.
+def test_manage_screen_shows_provenance_and_form():
+    from koipa.api.golden import _render_specledger_gold_console_html
+
+    html = _render_specledger_gold_console_html()
+    # 사후 기록 폼
+    for el in ("provBox", "provSrc", "provBasis", "provReason", "provSave", "provStatus"):
+        assert f'id="{el}"' in html, f"{el} 입력 요소가 없다"
+    # 제출 경로
+    assert "/provenance" in html, "화면이 출처 기록 엔드포인트를 안 부른다"
+    assert "saveProv" in html and "renderProv" in html
+
+
+def test_manage_screen_shows_provenance_kpis():
+    from koipa.api.golden import _render_specledger_gold_console_html
+
+    html = _render_specledger_gold_console_html()
+    for key in ("actual_document_intake", "actual_provenance_recorded",
+                "actual_provenance_partial", "actual_provenance_legacy"):
+        assert key in html, f"KPI {key} 가 화면에 없다"
+
+
+def test_partial_is_shown_not_hidden():
+    """미완(partial)을 안 보여주면 '기록 12건'만 보고 나머지가 빈 줄 안다."""
+    from koipa.api.golden import _render_specledger_gold_console_html
+
+    html = _render_specledger_gold_console_html()
+    assert "actual_provenance_partial" in html
+    assert "미완" in html, "미완 건수에 이름표가 없다"
