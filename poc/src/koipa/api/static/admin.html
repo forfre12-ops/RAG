@@ -781,29 +781,19 @@ details.adv[open]{padding-bottom:12px;}
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
-        <!-- 1클릭 시작 — 아래 고급 설정의 기본값(데모 샘플 · noop · 8건 · require_evidence)이
-             이미 표준 시연 조합이다. 처음 쓰는 관리자가 첫 클릭 전에 4가지를 먼저
-             결정해야 했던 것을 없앤다. 값을 바꾸고 싶으면 고급 설정을 펼치면 된다. -->
-        <div class="quickstart">
-          <div class="qs-txt">
-            <b>처음이라면 이 버튼 하나로 시작합니다.</b><br />
-            데모 샘플을 8건 라벨링해 골든셋 후보를 만들고, 이어서 검수 화면으로 넘어갑니다.
-            <span style="color:var(--text-faint)">기본 provider <code>noop</code>은 연결 점검용이라 gold 후보가 0건으로 나옵니다 —
-            LLM이 있는 서버면 고급 설정에서 provider를 바꾸고, 없으면 아래 <b>기존 슬레이트 등록</b>을 쓰십시오.</span>
-          </div>
-          <button class="btn" id="gold-quick" onclick="startGoldenQuick()">기본값으로 시작</button>
-        </div>
+        
 
         <details class="adv">
           <summary>고급 설정 — 후보 소스 · provider · 생성 건수 바꾸기</summary>
         <div class="row3">
           <div class="field">
             <label class="fld">후보 소스</label>
+            <!-- [2026-08-18] '데모 샘플'·'파일 업로드' 제거.
+                 샘플은 시연용이라 운영 콘솔에 있을 자리가 아니고, 파일 업로드는
+                 골든셋 후보 관리 화면(manage.html)과 하는 일이 같았다. -->
             <select id="gold-source" onchange="syncGoldenSource()">
-              <option value="samples">데모 샘플 12종</option>
-              <option value="editor">1 분류 패널 본문</option>
-              <option value="upload">파일 업로드(다중)</option>
               <option value="corpus">서버 코퍼스 경로</option>
+              <option value="editor">1 분류 패널 본문</option>
             </select>
           </div>
           <div class="field">
@@ -821,12 +811,7 @@ details.adv[open]{padding-bottom:12px;}
             <input id="gold-n" type="number" min="1" max="50" value="8" />
           </div>
         </div>
-        <div id="gold-src-upload" class="field" style="display:none;margin-top:8px;">
-          <label class="fld">문서 파일 — HWP · PDF · DOCX · XLSX · PPTX · TXT (다중 선택)</label>
-          <input id="gold-files" type="file" multiple
-                 accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.txt" />
-          <p class="sec-note" style="margin-top:4px;">각 파일을 <code>POST /documents/analyze</code>(전체 본문)로 추출해 후보 본문으로 씁니다 — 시연 콘솔과 같은 파싱 경로입니다.</p>
-        </div>
+        
         <div id="gold-src-corpus" class="field" style="display:none;margin-top:8px;">
           <label class="fld">코퍼스 경로 — <code>datasets/</code> 하위 jsonl 파일 또는 *.json 디렉터리</label>
           <input id="gold-corpus-dir" type="text" placeholder="datasets/gold_real/candidates.jsonl" />
@@ -1225,7 +1210,7 @@ async function classifyOne(doc_id, title, content){
 }
 
 /* 업로드 파일 → 본문 추출 → 분류 패널 채움 (→ 옵션으로 바로 분류).
- * G1 카드의 goldenDocsFromFiles 와 같은 경로(/documents/analyze · full_text=true)를 쓴다.
+ * /documents/analyze · full_text=true 경로를 쓴다.
  * full_text 를 주는 이유는 그쪽과 같다 — 기본 응답의 text_preview 는 8K 절단이라 그대로
  * 쓰면 등급 판단이 잘린 본문 기준이 된다. 추출은 저장하지 않는다(분류해야 큐에 적재). */
 function syncWriteGate(){
@@ -1981,38 +1966,15 @@ async function loadDashboard(){
  * 요약 카드와 검수/서명 버튼을 스스로 활성화한다(사람 클릭 3회 → 1회). */
 function syncGoldenSource(){
   const v=($('gold-source')||{}).value;
-  const up=$('gold-src-upload'), co=$('gold-src-corpus');
-  if(up) up.style.display = v==='upload' ? '' : 'none';
+  const co=$('gold-src-corpus');
   if(co) co.style.display = v==='corpus' ? '' : 'none';
 }
-/* 업로드 파일 → 기존 파싱 경로(/documents/analyze)로 전체 본문 추출 → inline 후보.
- * full_text=true 를 주는 이유: 기본 응답의 text_preview 는 8K 절단이라 그대로 후보로 쓰면
- * 라벨은 전문 기준인데 저장 본문만 잘린 오염된 골든이 만들어진다. */
-async function goldenDocsFromFiles(){
-  const files=Array.from(($('gold-files')||{}).files || []);
-  if(!files.length) return [];
-  const c=cfg(), out=[];
-  for(let i=0;i<files.length;i++){
-    const f=files[i];
-    goldenProgress(`본문 추출 ${i+1}/${files.length} — ${f.name}`);
-    const fd=new FormData();
-    fd.append('file', f);
-    fd.append('full_text','true');
-    const r=await fetch(`${c.base}/documents/analyze`,
-      {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
-    if(!r.ok) throw Object.assign(new Error(`추출 실패: ${f.name}`), {status:r.status});
-    const d=await r.json();
-    const text=(d.text || d.text_preview || '').trim();
-    if(!text){ log(`빈 본문 — 후보에서 제외: ${f.name}`,'err'); continue; }
-    out.push({doc_id:`upload-${Date.now()}-${i}`, title:f.name, text, source:'console_upload'});
-  }
-  return out;
-}
+
 function goldenDocs(){
   const n = Math.max(1, Math.min(50, Number($('gold-n').value || 8)));
   if(($('gold-source')||{}).value === 'editor'){
     // [운영 탭] 1 분류 패널에 지금 들어 있는 본문을 그대로 후보로 — 방금 다룬 문서를 골든 후보로
-    // 올리는 게 데모 샘플 고정보다 실사용에 가깝다.
+    // 올리는 게 고정 샘플보다 실사용에 가깝다.
     const body = ($('cl-body').value||'').trim();
     if(!body) return [];
     return [{
@@ -2103,11 +2065,9 @@ async function startGoldenBuild(){
       if(!dir){ goldenProgress('코퍼스 경로를 입력하세요 (datasets/ 하위).'); return; }
       body.source_type='corpus'; body.corpus_dir=dir; body.docs=[];
     }else{
-      const docs = src==='upload' ? await goldenDocsFromFiles() : goldenDocs();
+      const docs = goldenDocs();
       if(!docs.length){
-        goldenProgress(src==='upload'
-          ? '추출된 본문이 없습니다 — 파일을 선택했는지, 빈 문서가 아닌지 확인하세요.'
-          : '후보로 보낼 본문이 비어 있습니다 — [운영] 탭의 "1 분류 실행" 카드에 본문을 넣거나, 후보 소스를 "데모 샘플"로 바꾸세요.');
+        goldenProgress('후보로 보낼 본문이 비어 있습니다 — [운영] 탭 「1 분류 실행」에 본문을 넣거나, 후보 소스를 "서버 코퍼스 경로"로 바꾸세요. 파일로 넣으려면 골든셋 후보 관리 화면을 쓰십시오.');
         return;
       }
       body.source_type='inline'; body.docs=docs;
@@ -2195,18 +2155,8 @@ async function openGoldenHtml(kind){
 function openGoldenReview(){ SIGNOFF_TAB_OPENED=true; return openGoldenHtml('review'); }
 function openGoldenSignoff(){ SIGNOFF_TAB_OPENED=true; return openGoldenHtml('signoff'); }
 
-/* 기본값으로 시작 — 표준 시연 조합(데모 샘플 · noop · 8건 · require_evidence)으로 고정하고
- * 곧바로 G1 을 실행한다. 고급 설정을 펼쳐 본 적 없는 관리자도 첫 클릭이 가능해야 한다. */
-async function startGoldenQuick(){
-  const set=(id,v)=>{ const el=$(id); if(el) el.value=v; };
-  set('gold-source','samples');
-  set('gold-provider','noop');
-  set('gold-n','8');
-  const ev=$('gold-require-evidence'); if(ev) ev.checked=true;
-  if(typeof syncGoldenSource==='function') syncGoldenSource();
-  log('골든셋 후보 생성(G1) — 기본값: 데모 샘플 · noop · 8건 · require_evidence','info');
-  return startGoldenBuild();
-}
+
+
 
 /* ---- 실시간 관제 (auto-refresh · 읽기 전용 폴링) ----
  * 이 콘솔은 원래 수동 새로고침만 있었다(웹소켓/폴링 0). 여기서 읽기 전용 조회
