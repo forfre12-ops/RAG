@@ -17,6 +17,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
 from koipa.console_nav import NAV_CSS, nav_bar_html
+from koipa.console_shell import SHELL_CSS
 
 # 콘솔(static/styles.css)과 동일한 NovaX 토큰 — 골든 화면이 /demo 콘솔과 한 시스템으로 보이게
 # 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
@@ -375,7 +376,7 @@ def render_signoff_html_from_jsonl(
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
-_SIGNOFF_CSS = """<style>""" + _TOKENS + """
+_SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + """
 /* [디자인 정렬 2026-08-18] 후보 관리 화면(manage.html)과 같은 브랜드 바.
    검수자가 오가는 두 화면이라 같은 옷을 입어야 한다. 값은 manage 쪽에서 그대로 가져왔다. */
 .top{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:18px;background:var(--paper)}
@@ -384,6 +385,31 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + """
 .top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:var(--ink)}
 .top .divider{height:23px;border-left:1px solid var(--border-strong)}
 .top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1}
+
+/* [껍데기 정렬 2026-08-18] 사이드바·히어로 — manage 와 같은 자리·같은 톤.
+   골격 규칙(frame/side/main/hero/section/list/btn)은 console_shell.SHELL_CSS 에 있다.
+   여기 있는 것은 이 화면에만 필요한 나머지다. */
+.side .workname{font-size:18px;font-weight:900;margin:14px 0 6px}
+.side .workdesc{font-size:12.5px;color:#82898f;line-height:1.5}
+.side .branch{margin-top:12px;font:700 11.5px ui-monospace,monospace;color:#92999f}
+.sidenav{margin-top:34px;display:flex;flex-direction:column;gap:2px}
+.sidenav a{display:flex;gap:12px;align-items:center;padding:9px 10px;font-size:13.5px;color:#6d757b;text-decoration:none;border-left:2px solid transparent}
+.sidenav a span{font:700 11px ui-monospace,monospace;color:#a9b0b5}
+.sidenav a.active{color:#111;font-weight:800;border-left-color:var(--red);background:#fafaf8}
+.side .ledger{margin-top:auto;padding-top:26px;border-top:1px solid var(--line);font-size:12px;color:#828a90}
+.side .ledger b{display:block;margin:8px 0 4px;font-size:14px;color:#111}
+.hero h1{font-size:34px;line-height:1.24;margin:14px 0 16px;font-weight:900}
+.hero h1 em{font-style:normal;color:var(--red)}
+.hero p{color:#5f676d;font-size:14px;line-height:1.7;margin:0;max-width:640px}
+.gate strong{display:block;font-size:20px;font-weight:900;margin:8px 0 10px}
+.gate p{font-size:12.5px;color:#6f777d;line-height:1.6;margin:0 0 12px}
+.gate .gchk{display:flex;gap:8px;align-items:center;font-size:12.5px;color:#444}
+.gate .actions{margin-top:14px}
+.gate .actions .btn{width:100%}
+.sechead{display:inline-block;margin:0;font-size:21px}
+.secdesc{margin:8px 0 0;color:#727c84;font-size:13px}
+.main .rubric{margin-top:22px}
+.main .filters{margin-top:18px}
 
 .who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
 .scard.pending{opacity:.72;background:#fafaf9}
@@ -431,16 +457,46 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + """
 _SIGNOFF_BODY = r"""
 <body>
 __NAV__
-<div class="lede-row">
-  <h1 class="h1">__TITLE__</h1>
-  <p class="lede">job __JOB__ · gold 후보 __TOTAL__건 — 승인/등급변경/거부 후 서명하면 <b>locked_gold_eval</b>(사람서명 평가정답)로 승격됩니다.</p>
-</div>
-<div class="signbar">
-  <div class="fld"><label>서명자</label><span id="who" class="who">확인 중…</span></div>
-  <div class="fld chk"><input type="checkbox" id="publish"><label for="publish">라이브 반영(publish)</label><!-- 기본 해제: 서버 기본값(GoldenSignoffRequest.publish=False)·사용자매뉴얼과 일치. 체크해야 정본·라이브 경로가 바뀐다. -->
-  <div class="fld"><label>&nbsp;</label><button id="submit">서명 제출</button></div>
-</div>
-<div class="container">
+<div class="frame">
+  <aside class="side">
+    <div class="cap">CURRENT WORKSPACE</div>
+    <div class="workname">koipa-ai</div>
+    <div class="workdesc">Koipa AI Engine for KOIPA Trade-Secret System (PoC)</div>
+    <div class="branch">goldset/signoff</div>
+    <nav class="sidenav">
+      <a href="#s-overview" class="active"><span>01</span>개요</a>
+      <a href="#s-list"><span>02</span>후보 검수</a>
+    </nav>
+    <div class="ledger">
+      <div class="cap">SIGN-OFF IDENTITY</div>
+      <b id="who" class="who">확인 중…</b>
+      <div>이 계정으로 기록됩니다</div>
+    </div>
+  </aside>
+  <main class="main">
+    <section id="s-overview" class="hero">
+      <div>
+        <div class="eyebrow">GOLDEN SET SIGN-OFF</div>
+        <h1>검수한 것만<br><em>평가 정답</em>이 됩니다.</h1>
+        <p>job __JOB__ · 후보 __TOTAL__건. 승인·등급변경·거부를 고르고 서명하면
+           <b>locked_gold_eval</b>(사람 서명 평가정답)로 승격됩니다. 고르지 않은 후보는 제출에서 빠집니다.</p>
+      </div>
+      <aside class="gate">
+        <div class="glabel">서명 진행</div>
+        <strong id="deccount">–</strong>
+        <p>등급별 최소 건수를 채워야 배포 게이트가 열립니다. 라이브에 반영하려면 아래를 체크하고 제출하십시오.</p>
+        <label class="gchk"><input type="checkbox" id="publish"> 라이브 반영(publish)</label>
+        <div class="actions"><button id="submit" class="btn black">서명 제출</button></div>
+      </aside>
+    </section>
+    <div class="preflight" id="preflight"></div>
+    <div class="restored" id="restored"></div>
+    <div class="result" id="result"></div>
+    <section id="s-list" class="section">
+      <div class="sectionTop">
+        <div><span class="secNum">02</span><h2 class="sechead">후보 검수</h2>
+        <p class="secdesc">문서 전문을 읽고 결정하십시오. 결정은 이 브라우저에 남아 창을 닫아도 사라지지 않습니다.</p></div>
+      </div>
   <div class="rubric">
     <b>판정</b> S×V×M → <b>8=TS</b>·<b>4=S1</b>·<b>1·2=S2</b>·<b>0=S3</b> (S=0이면 무조건 S3).
     핵심 분기 <b>S1 vs TS = M</b>: S2·V2에서 <b>M=0→S1</b>(관리 미공식화)·<b>M≥1→TS</b>. 확신 없으면 <b>거부</b>(미탐 안전).
@@ -461,6 +517,8 @@ __NAV__
   <div class="restored" id="restored"></div>
   <div class="result" id="result"></div>
   <div id="grid"></div>
+    </section>
+  </main>
 </div>
 <script id="data" type="application/json">__DATA__</script>
 <script>
