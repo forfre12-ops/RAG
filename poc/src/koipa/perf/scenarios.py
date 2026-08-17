@@ -45,6 +45,51 @@ def _hdr(role: str = "kl_backend") -> dict:
     }
 
 
+def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
+    """(본문, 정답등급) 목록과 출처 이름. 없으면 ([], "").
+
+    우선순위: PSH_EVAL_JSONL(명시) → settings.locked_eval_jsonl(봉인 평가셋) →
+    datasets/gold_real/holdout_eval.hardened.jsonl(제출본 대표값 F1 0.917 의 근거셋).
+    PSH_EVAL_MAX 로 건수를 제한한다(기본 42 — 분류 레이트리밋 60/min 안에 들어가야 한다).
+    """
+    import json as _json  # noqa: PLC0415
+    import os as _os  # noqa: PLC0415
+    from pathlib import Path as _Path  # noqa: PLC0415
+
+    from koipa.config import settings as _settings  # noqa: PLC0415
+
+    poc_root = _Path(__file__).resolve().parents[3]
+    candidates = [
+        _os.environ.get("PSH_EVAL_JSONL", "").strip(),
+        (getattr(_settings, "locked_eval_jsonl", "") or "").strip(),
+        "datasets/gold_real/holdout_eval.hardened.jsonl",
+    ]
+    limit = int(_os.environ.get("PSH_EVAL_MAX", "42") or 42)
+    for cand in candidates:
+        if not cand:
+            continue
+        path = _Path(cand)
+        if not path.is_absolute():
+            path = poc_root / cand
+        if not path.is_file():
+            continue
+        rows: list[tuple[str, str]] = []
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                rec = _json.loads(line)
+                text = rec.get("text") or rec.get("content") or ""
+                label = rec.get("label") or rec.get("grade") or rec.get("intended_label") or ""
+                if text and label:
+                    rows.append((text, label))
+        except Exception:  # noqa: BLE001
+            continue
+        if rows:
+            return rows[:limit], path.name
+    return [], ""
+
+
 def _time_call(fn: Callable) -> tuple[float, object]:
     t0 = time.perf_counter()
     out = fn()
@@ -98,22 +143,19 @@ def s1_sync_classify(ctx: ScenarioContext) -> None:
         ctx.record("s1_2", lat)  # p95
     ctx.record("s1_5", schema_ok)
 
-    # F1·FNR (간이 평가): target_grade ↔ predicted_grade
-    # 룰 라벨러 키워드 시드와 정렬된 코퍼스 — dryrun 합격선 판정 로직 검증용.
-    # 각 등급에 시드 v2 명시 키워드(seeds.py)만 사용해 라벨러 자체 작동 검증.
-    # 실측 F1·FNR은 P1 풀 학습 (KF-DeBERTa) 결과를 별도로 참조.
-    eval_set = [
-        ("특급기밀 자료 — 본 문서는 특급기밀에 해당함", "TS"),
-        ("Top Secret 특급기밀 문서", "TS"),
-        ("TS등급 특급기밀 자료 보관 안내", "TS"),
-        ("극비 자료 — 회사 존립과 직결된 특급기밀", "TS"),
-        ("특급기밀 보호 가이드 — TS등급 문서", "TS"),
-        ("1급 비밀 임원 인사 자료 비공개 평가", "S1"),
-        ("대외비 사내 규정 직원 평가 가이드", "S2"),
-        ("공개 자료 회사 비전 선언문 미션 선언", "S3"),
-        ("공개 IR 보도자료 분기 실적 발표", "S3"),
-        ("공시 정보 분기 매출액 공개 자료", "S3"),
-    ]
+    # F1·FNR — 실 평가셋으로 잰다.
+    #
+    # 이전 판은 시나리오에 박아 둔 키워드 시드 10건으로 쟀다. 그 셋은 룰 라벨러 시드와
+    # 정렬돼 있어 룰 폴백이 macro-F1 1.0 을 내고 실 모델은 0.60 이 나온다(223 실측
+    # 2026-08-17). 즉 모델을 판정할 수 없는 셋이었고, 그 값이 보고서 핵심 KPI 로 실렸다.
+    # 평가셋이 없으면 값을 만들지 않는다 — 무측정(SKIP)이 가짜 숫자보다 낫다.
+    eval_set, eval_source = _load_eval_set()
+    if not eval_set:
+        print("[PSH][S1] 실 평가셋 없음 — S1.3/S1.4 무측정"
+              " (PSH_EVAL_JSONL 또는 LOCKED_EVAL_JSONL 로 지정)")
+        return
+    print(f"[PSH][S1] 평가셋 {eval_source} · {len(eval_set)}건으로 F1·FNR 측정")
+
     fn_ts = 0  # TS인데 하위 등급으로 예측 (미탐)
     n_ts = 0
     pairs: list[tuple[str, str]] = []  # (정답, 예측)
