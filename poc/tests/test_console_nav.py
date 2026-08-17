@@ -3,7 +3,7 @@
 왜(2026-08-17). 살아 있는 콘솔 화면이 9면인데 서로 오갈 방법이 거의 없었다.
 
     manage.html         nav 5개가 전부 같은 페이지 앵커(#overview 등)
-    actual-intake.html  헤더에 <a> 가 아예 없었다
+    actual-intake.html  헤더에 <a> 가 아예 없었다 (D1 로 manage 모달에 흡수돼 화면 자체가 사라짐)
     review/signoff      _nav_html 에 링크 0개
     정적 3면            자기들끼리만 링크, 골든 콘솔로는 0개(역방향도 0개)
 
@@ -66,16 +66,15 @@ def test_static_page_hrefs_match(page):
 def test_dynamic_screens_carry_nav():
     """golden.py 의 세 화면과 review/signoff 의 _nav_html 에 링크가 들어갔는지."""
     from koipa.api.golden import (
-        _render_actual_document_intake_html,
         _render_console_login_html,
         _render_specledger_gold_console_html,
     )
     from koipa.golden_review_html import _nav_html
 
+    # [D1 2026-08-17] actual-intake 는 후보 관리의 업로드 모달로 흡수돼 화면이 사라졌다.
     for name, html in (
         ("manage", _render_specledger_gold_console_html()),
         ("login", _render_console_login_html()),
-        ("intake", _render_actual_document_intake_html()),
         ("review", _nav_html("검수", "full-train", "review")),
     ):
         got = _hrefs(html)

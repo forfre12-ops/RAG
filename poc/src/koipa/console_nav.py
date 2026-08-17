@@ -35,7 +35,8 @@ import html as _html
 # 상대경로로는 양쪽에서 같은 문자열을 쓸 수 없다.
 CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     ("manage", "후보 관리", "/api/v1/golden/candidates/manage.html"),
-    ("intake", "실문서 수집", "/api/v1/golden/candidates/actual-intake.html"),
+    # [D1 2026-08-17] '실문서 수집' 은 별도 화면이 아니라 후보 관리의 업로드 모달이 됐다.
+    # 두 화면이 같은 API(/golden/candidates/upload)·같은 필드를 쓰는데 화면만 둘이었다.
     ("admin", "거버넌스", "/console/admin.html"),
     ("demo", "분류 시연", "/console/parse_demo.html"),
 )
