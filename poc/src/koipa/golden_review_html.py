@@ -312,6 +312,7 @@ def render_signoff_html(
     css: Optional[str] = None,
     profile: Optional[str] = None,
     review_url: str = "",
+    min_per_grade: int = 0,
 ) -> str:
     """gold 후보를 화면 서명용 인터랙티브 HTML로 렌더(승인/등급변경/거부 → POST signoff).
 
@@ -331,6 +332,7 @@ def render_signoff_html(
         .replace("__JOB__", _html.escape(job_id))
         .replace("__POST_URL__", _html.escape(post_url))
         .replace("__TOTAL__", str(len(data)))
+        .replace("__MINPG__", str(int(min_per_grade or 0)))
         .replace("__DATA__", _embed_json(data))
     )
 
@@ -344,6 +346,7 @@ def render_signoff_html_from_jsonl(
     css: Optional[str] = None,
     profile: Optional[str] = None,
     review_url: str = "",
+    min_per_grade: int = 0,
 ) -> str:
     """build_<id>.jsonl(gold 후보)을 읽어 서명 HTML로 렌더."""
     recs: list[dict] = []
@@ -355,13 +358,16 @@ def render_signoff_html_from_jsonl(
             if line.strip():
                 recs.append(json.loads(line))
     return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css,
-                               profile=profile, review_url=review_url)
+                               profile=profile, review_url=review_url,
+                               min_per_grade=min_per_grade)
 
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
 _SIGNOFF_CSS = """<style>""" + _TOKENS + """
 .who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
+.pg-lack{color:#b45309;font-weight:700}
+.pg-note{color:var(--text-dim)}
 .restored{display:none;margin:12px 0;padding:10px 14px;font-size:13px;background:#fffbeb;
   border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:2px;color:#78350f}
 .restored button{margin-left:10px;font-size:12px;padding:3px 10px;cursor:pointer;
@@ -432,6 +438,10 @@ __NAV__
 <script>
 const DATA=JSON.parse(document.getElementById('data').textContent);
 const POST_URL="__POST_URL__";
+// 배포 게이트가 요구하는 등급별 최소 서명 수(settings.deploy_gate_min_locked_per_grade).
+// 화면에 박지 않고 서버 값을 받는다 — 둘이 어긋나면 '다 했는데 안 열린다' 가 된다.
+const MIN_PG=__MINPG__;
+const BYID={};DATA.forEach(function(r){BYID[r.id]=r;});
 const DEC={};       // id -> {decision, grade, note}
 let g='all',q='';
 
@@ -477,7 +487,26 @@ function card(r){
     +'<input class="note" data-id="'+esc(r.id)+'" placeholder="메모(선택)" value="'+esc(d.note||'')+'">'
     +'</div>';
 }
-function decCount(){const n=Object.keys(DEC).length;document.getElementById('deccount').textContent='결정 '+n+' / 후보 '+DATA.length+'건';}
+function decCount(){
+  // 승격 예정만 센다 — 거부는 정답지에서 빠지고, 등급변경은 **바꾼 등급**으로 들어간다.
+  // 이 셈이 서버의 locked_by_grade 와 같은 규칙이라, 화면 숫자가 결과와 어긋나지 않는다.
+  var n=0, by={TS:0,S1:0,S2:0,S3:0};
+  Object.keys(DEC).forEach(function(id){
+    var d=DEC[id]; if(!d||!d.decision) return;
+    n++;
+    if(d.decision==='reject') return;
+    var r=BYID[id]; if(!r) return;
+    var gr=(d.decision==='change')?(d.grade||r.grade):r.grade;
+    if(by[gr]!==undefined) by[gr]++;
+  });
+  var parts=['TS','S1','S2','S3'].map(function(k){
+    var lack=MIN_PG>0&&by[k]<MIN_PG;
+    return '<span'+(lack?' class="pg-lack"':'')+'>'+k+' '+by[k]+'</span>';
+  }).join(' · ');
+  var tail=(MIN_PG>0)?' <span class="pg-note">(등급별 '+MIN_PG+'건 필요)</span>':'';
+  document.getElementById('deccount').innerHTML=
+    '결정 '+n+' / 후보 '+DATA.length+'건 &nbsp; 승격 예정 '+parts+tail;
+}
 function render(){
   const ql=q.toLowerCase();
   const f=DATA.filter(r=>{

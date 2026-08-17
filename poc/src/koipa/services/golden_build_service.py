@@ -313,6 +313,8 @@ class GoldenBuildService:
             title=title,
             profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
             review_url=review_url,
+            # 화면이 '등급별 몇 건 남았나' 를 정확히 말하려면 게이트와 같은 값을 써야 한다.
+            min_per_grade=int(getattr(settings, "deploy_gate_min_locked_per_grade", 5) or 0),
         )
 
     # 신원 관련 인자가 이 호출에서 사라진 경위 — 지우면 같은 실수가 되돌아온다.
