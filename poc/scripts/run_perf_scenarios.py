@@ -34,9 +34,6 @@ POC_ROOT = HERE.parent
 REPO_ROOT = POC_ROOT.parent
 sys.path.insert(0, str(POC_ROOT / "src"))
 
-# PSH는 TestClient inprocess로 분당 수십 호출 — slowapi rate-limit 자동 비활성.
-# 사용자가 명시적으로 RATE_LIMIT_DISABLED=0 설정한 경우만 활성 유지.
-os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 
 
 def _requested_mode(argv: list[str]) -> str:
@@ -66,6 +63,11 @@ if _requested_mode(sys.argv) == "dryrun":
     # enable_incremental_retrain 일 때만 등록된다(순수 추론 노드엔 없음). 기본 프로파일에서는
     # 404 라 S7.2/S7.3 이 값 없이 SKIP 됐다. dryrun 은 학습 노드 프로파일로 잰다.
     os.environ.setdefault("ENABLE_TRAINING", "1")
+    # PSH 는 TestClient in-process 로 분당 수십 호출이라 slowapi rate-limit(분류 60/min)에 걸린다.
+    # 단 이 플래그는 운영 프로파일(poc_mode=full)에서 config 가 fail-clear 로 막는다
+    # ("RATE_LIMIT_DISABLED=1 은 운영 모드에서 허용되지 않습니다") — 그래서 dryrun 에서만 켠다.
+    # full 실측은 운영 설정을 그대로 쓰되, 레이트리밋을 낮춰야 하면 실행자가 명시적으로 준다.
+    os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 
 from koipa.perf import capture_env  # noqa: E402
 from koipa.perf.harness import (  # noqa: E402

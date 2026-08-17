@@ -1192,6 +1192,14 @@ def s18_offline_bundle(ctx: ScenarioContext) -> None:
     if not script.exists():
         ctx.skip(f"build_offline_bundle.py not found: {script}")
         return
+    # 번들 빌더는 docker-compose.airgap.yml 의 image: 를 파싱해 코어 서비스를 채운다.
+    # 런타임 이미지에는 이 빌드용 파일이 없어(실측 2026-08-17, 배포 이미지에 미포함)
+    # 코어 이미지 0건 → FATAL 로 끝난다. 그건 번들 결함이 아니라 "여기서 잴 수 없다" 이므로
+    # 값을 남기지 않고 사유를 남긴다. 번들 무결성은 빌드 환경(리포 체크아웃)에서 잰다.
+    compose = poc_root / "docker-compose.airgap.yml"
+    if not compose.exists():
+        ctx.skip(f"docker-compose.airgap.yml 없음 ({compose}) — 번들 무결성은 빌드 환경에서 측정")
+        return
 
     out_a = poc_root / "dist" / "psh-s18-a"
     out_b = poc_root / "dist" / "psh-s18-b"
@@ -1426,8 +1434,14 @@ def s15_backup_restore(ctx: ScenarioContext) -> None:
         wanted = {"pg_backup_recency", "storage_backup_recency"}
         results = {c["name"]: bool(c["ok"]) for c in payload.get("checks", [])
                    if c.get("name") in wanted}
-        if results:
+        backup_dirs_present = (poc_root / "backups" / "pg").exists()
+        if results and backup_dirs_present:
             ctx.record("s15_2", all(results.values()))
+        elif results:
+            # 백업 경로가 아예 없는 환경(런타임 컨테이너 등)에서 False 로 적으면 "백업 미수행"
+            # 이라는 운영 결함으로 읽힌다. 판정 대상 환경인지부터 구분한다.
+            print("[PSH][S15] backups/ 경로 부재 — 백업 신선도 무측정"
+                  " (백업이 실재하는 운영 호스트에서 판정할 것)")
         else:
             print("[PSH][S15] 백업 신선도 항목이 리포트에 없다 — 검사 구성 확인 필요")
     except Exception as exc:  # noqa: BLE001
