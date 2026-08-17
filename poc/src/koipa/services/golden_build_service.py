@@ -21,7 +21,11 @@ from koipa.golden_review_html import (
     render_signoff_html_from_jsonl,
 )
 from koipa.golden_signoff import Signoff, merge_locked_records, promote_to_locked
-from koipa.golden_tiers import REJECTED_BY_REVIEWER, eval_readiness
+from koipa.golden_tiers import (
+    REJECTED_BY_REVIEWER,
+    eval_readiness,
+    human_reviewer_rejection_reason,
+)
 from koipa.schemas.golden import (
     GoldenBuildRequest,
     GoldenBuildResponse,
@@ -268,6 +272,115 @@ class GoldenBuildService:
             error=job.get("error"),
         )
 
+    def signoff_preflight(
+        self, job_id: uuid.UUID, *, reviewer_id: str = "", publish: bool = False
+    ) -> dict | None:
+        """서명하기 **전에** 무엇이 막을지 알려준다. 부작용 0.
+
+        왜 필요한가 — 종전에는 실패가 **제출한 뒤에야** 드러났다. 검수자가 120건을 다 고르고
+        제출을 눌러야 "이 이름으로는 서명할 수 없습니다" 나 "publish 경로가 없습니다" 를
+        봤다. 결정이 화면에 남으니 다시 하지는 않지만, 그 시점에 알 이유가 없다.
+
+        blocking 은 **실제로 POST 를 실패시키는 것만** 담는다. 경고를 blocking 에 섞으면
+        제출 버튼이 근거 없이 잠긴다.
+
+        ⚠ 서버는 브라우저의 미제출 결정을 볼 수 없다. 여기 담는 것은 '서버가 아는 상태'
+          뿐이고, 화면이 자기 미결정 수를 더해 보여준다.
+        """
+        st = self.get_status(job_id)
+        if st is None:
+            return None
+
+        blocking: list[dict] = []
+        warnings: list[dict] = []
+
+        status = getattr(st, "status", None)
+        if status != "done":
+            blocking.append({
+                "code": "job_not_done",
+                "message": f"골든 빌드가 아직 끝나지 않았습니다(status={status}).",
+                "detail": getattr(st, "error", None) or "",
+            })
+
+        job = self.jobs.get(job_id) or {}
+        gold_path = job.get("gold_path") or ""
+        candidates: list[dict] = []
+        if not gold_path or not Path(gold_path).exists():
+            blocking.append({
+                "code": "gold_path_missing",
+                "message": "서명할 후보 파일이 없습니다. 잡을 다시 등록해야 합니다.",
+                "detail": gold_path,
+            })
+        else:
+            candidates = _read_jsonl(Path(gold_path))
+            if not candidates:
+                blocking.append({
+                    "code": "no_candidates",
+                    "message": "후보가 0건입니다 — 서명할 대상이 없습니다.",
+                    "detail": gold_path,
+                })
+
+        # 이미 처리된 것 — 남은 건수를 정확히 내려면 '거부' 도 빼야 한다(B3 에서 남기기 시작).
+        base = Path(gold_path).parent if gold_path else None
+        locked_ids = {
+            r.get("doc_id")
+            for r in (_read_jsonl(base / f"locked_{job_id}.jsonl") if base else [])
+        }
+        rejected_ids = {
+            r.get("doc_id")
+            for r in (_read_jsonl(base / f"rejected_{job_id}.jsonl") if base else [])
+        }
+        done_ids = locked_ids | rejected_ids
+        remaining = sum(1 for c in candidates if c.get("doc_id") not in done_ids)
+
+        # 서명자 — 오늘부터 신원은 로그인 쿠키(JWT sub)에서 온다. '화면에 미리 채워진 이름'
+        # 이 아니라 **실제로 서명할 사람**을 검사한다.
+        reject_reason = human_reviewer_rejection_reason(reviewer_id) if reviewer_id else ""
+        if reviewer_id and reject_reason:
+            blocking.append({
+                "code": "reviewer_rejected",
+                "message": "이 계정으로는 서명할 수 없습니다.",
+                "detail": reject_reason,
+            })
+
+        from koipa.config import settings  # noqa: PLC0415
+        live_path = str(getattr(settings, "locked_eval_jsonl", "") or "")
+        if publish and not live_path:
+            warnings.append({
+                "code": "publish_path_missing",
+                "message": "라이브 반영을 요청해도 반영되지 않습니다.",
+                "detail": "LOCKED_EVAL_JSONL 미설정 — 배포 게이트가 읽는 경로가 없습니다.",
+            })
+        if remaining == 0 and candidates:
+            warnings.append({
+                "code": "nothing_remaining",
+                "message": "이 잡에서 아직 판단하지 않은 후보가 없습니다.",
+                "detail": f"승격 {len(locked_ids)}건 · 거부 {len(rejected_ids)}건",
+            })
+
+        existing_live = (
+            _read_jsonl(Path(live_path)) if live_path and Path(live_path).exists() else []
+        )
+        return {
+            "job_id": str(job_id),
+            "ok": not blocking,
+            "blocking": blocking,
+            "warnings": warnings,
+            "candidates": {
+                "total": len(candidates),
+                "already_locked": len(locked_ids),
+                "already_rejected": len(rejected_ids),
+                "remaining": remaining,
+            },
+            "reviewer": {
+                "reviewer_id": reviewer_id,
+                "will_be_rejected": bool(reject_reason),
+                "reason": reject_reason,
+            },
+            "publish": {"live_path": live_path, "configured": bool(live_path)},
+            "readiness": eval_readiness(existing_live),
+        }
+
     def render_review(
         self, job_id: uuid.UUID, *, title: str = "골든셋 후보 검토본", signoff_url: str = ""
     ) -> Optional[str]:
@@ -343,6 +456,7 @@ class GoldenBuildService:
         *,
         reviewer_id: str,
         publish: bool = False,
+        dry_run: bool = False,
     ) -> Optional[dict]:
         """검수 결정(승인/변경/거부)을 골든 후보에 적용해 locked_gold_eval 로 승격.
 
@@ -410,10 +524,13 @@ class GoldenBuildService:
         # run-스코프 감사 기록(정본·라이브 무변경) — 항상. 같은 잡을 여러 세션에 나눠 서명하는 게
         # 정상 흐름(대량 후보)이므로 덮어쓰기 대신 기존 승격분과 doc_id dedup 누적(라이브 경로와 동일
         # 규율) — 세션1 서명이 세션2 제출로 유실되지 않게.
+        # [E2-5] dry_run 은 **쓰기만** 건너뛴다. 판정·집계는 그대로 돌려, 검수자가 실제로
+        # 고른 결정이 무엇을 만들지 제출 전에 같은 응답 모양으로 볼 수 있게 한다.
         run_locked_path = Path(gold_path).parent / f"locked_{job_id}.jsonl"
-        _atomic_write_jsonl(
-            run_locked_path, merge_locked_records(_read_jsonl(run_locked_path), res.locked)
-        )
+        if not dry_run:
+            _atomic_write_jsonl(
+                run_locked_path, merge_locked_records(_read_jsonl(run_locked_path), res.locked)
+            )
 
         # [B3·E2-6] 거부분도 같은 누적 규율로 남긴다. 이게 없으면 다음 세션에서 '아직 안 본
         # 것'과 '보고 거부한 것'을 구분할 수 없어 남은 건수가 항상 과대값이 된다.
@@ -422,7 +539,7 @@ class GoldenBuildService:
         rejected_merged = _merge_rejected_records(
             _read_jsonl(run_rejected_path), rejected_records, locked_ids
         )
-        if rejected_merged or run_rejected_path.exists():
+        if not dry_run and (rejected_merged or run_rejected_path.exists()):
             _atomic_write_jsonl(run_rejected_path, rejected_merged)
 
         # 라이브 readiness 읽기경로 — publish 병합 대상 + readiness union 계산.
@@ -447,6 +564,8 @@ class GoldenBuildService:
                     "publish 요청됐으나 LOCKED_EVAL_JSONL 미설정 — 배포 게이트 미반영. "
                     "프로파일 env 에 locked_eval_jsonl 경로를 설정하세요"
                 )
+            elif dry_run:
+                publish_note = "dry_run — 라이브 경로에 쓰지 않았습니다(미리보기)"
             else:
                 _atomic_write_jsonl(Path(live_path), merged)
                 published = True
@@ -464,6 +583,7 @@ class GoldenBuildService:
             # 이번 제출까지 누적된 거부 건수 — 화면이 '남은 건수' 를 정확히 낼 수 있게.
             "rejected_recorded": len(rejected_merged),
             "run_rejected_path": str(run_rejected_path),
+            "dry_run": dry_run,
         }
 
     # ------------------------------------------------------------------ helpers

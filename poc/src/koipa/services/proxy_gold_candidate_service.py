@@ -98,6 +98,32 @@ OUT_OF_SCOPE_STATUS = "out_of_scope"      # 검수 대상 아님(B2)
 # 검수가 끝나 큐에서 빠지는 집합. deferred(보류)는 여기 없다 — 다시 볼 것이기 때문이다.
 QUEUE_EXCLUDED_STATUSES = frozenset({DISCARDED_STATUS, OUT_OF_SCOPE_STATUS})
 
+# [E1-2] 배치가 "끝났나" 를 판정하는 집합 — 코드에 녹여 두면 세는 곳마다 달라진다.
+#
+# ⚠ deferred(보류)를 **종결에 넣는다.** 보류는 사유를 적어야 하는 결정이고, 검수자가 그
+#   문서에 대해 할 수 있는 판단을 이미 한 상태다. 미완료로 세면 보류가 1건이라도 남는 순간
+#   그 배치는 영원히 100% 가 되지 않아 검수 회차를 닫을 수 없다.
+#   대신 batch_summary 에 deferred 수를 따로 실어, '보류를 안고 닫았다' 가 보이게 한다.
+TERMINAL_REVIEW_STATUSES = frozenset({
+    "approved_proxy", "grade_fixed_unlocked", "deferred",
+    DISCARDED_STATUS, OUT_OF_SCOPE_STATUS,
+})
+
+
+def normalize_doc_id(doc_id: str) -> str:
+    """전달본 doc_id 를 콘솔 doc_id 로 맞춘다.
+
+    전달본  GOLD-CAND-TS-ENG-053_적층공정_공정조건표
+    콘솔    GOLD-CAND-TS-ENG-053
+
+    ⚠ 무조건 첫 '_' 앞을 취하면 안 된다. 'GOLD-' 로 시작하는 것만 잘라 낸다 —
+      업로드 문서(GOLD-UPL-* 이외의 형식)까지 자르면 서로 다른 문서가 한 id 로 뭉친다.
+    이 규칙이 시험 파일에만 있어서(test_review_batch_filter.py) 배치 집계·preflight 가
+    같은 규칙 위에 설 수 없었다. 운영 코드로 올린다.
+    """
+    doc_id = str(doc_id or "").strip()
+    return doc_id.split("_")[0] if doc_id.startswith("GOLD-") else doc_id
+
 
 class ProxyGoldCandidateService:
     """Read synthetic candidates and record append-only manager decisions."""
@@ -149,6 +175,10 @@ class ProxyGoldCandidateService:
             "total": len(candidates),
             "listed_excludes_discarded": status is None,
             "summary": embedded,
+            # [E1-1] 필터된 집합 기준 집계 — **새 키**로 둔다. 기존 summary 는 화면 KPI
+            # 카드가 쓰고 있어 의미를 바꾸면 상단 숫자가 필터마다 흔들린다.
+            # 추가 디렉터리 스캔 없이 이미 읽은 리스트에서 센다.
+            "batch_summary": self._batch_summary(candidates),
             "candidates": [{k: v for k, v in c.items() if k != "text"} for c in candidates],
         }
 
@@ -627,6 +657,31 @@ class ProxyGoldCandidateService:
                 1 for c in actual if c["status"] == "grade_fixed_unlocked"
             ),
         }
+
+    @staticmethod
+    def _batch_summary(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        """이 목록(=이번 검수 배치) 기준 진행률.
+
+        종전에는 집계가 항상 전량 기준이라, 120건짜리 회차만 걸러 봐도 진행률은 306건
+        기준으로 나왔다. 검수자가 "내 회차가 끝났나" 를 화면에서 알 수 없었다.
+        """
+        terminal = sum(1 for c in candidates if c["status"] in TERMINAL_REVIEW_STATUSES)
+        return {
+            "total": len(candidates),
+            "terminal": terminal,
+            "pending": len(candidates) - terminal,
+            # 보류는 종결로 세지만, 안고 닫았다는 사실이 보여야 한다.
+            "deferred": sum(1 for c in candidates if c["status"] == "deferred"),
+            "by_status": dict(sorted(Counter(c["status"] for c in candidates).items())),
+            "by_final_grade": dict(sorted(
+                Counter(c["final_grade"] for c in candidates if c["final_grade"]).items())),
+        }
+
+    def find_by_doc_id(self, doc_id: str) -> dict[str, Any] | None:
+        """정규화한 id 로 후보를 찾는다 — 전달본 id 를 그대로 넣어도 찾히게."""
+        wanted = normalize_doc_id(doc_id)
+        return next((c for c in self._candidates()
+                     if normalize_doc_id(c["doc_id"]) == wanted), None)
 
     def _latest_decisions(self) -> dict[str, dict[str, Any]]:
         if not self.ledger_path.exists():

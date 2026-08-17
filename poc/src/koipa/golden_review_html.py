@@ -368,6 +368,11 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + """
 .who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
 .pg-lack{color:#b45309;font-weight:700}
 .pg-note{color:var(--text-dim)}
+.preflight{display:none;margin:12px 0;padding:10px 14px;font-size:13px;border-radius:2px;line-height:1.6}
+.preflight.block{background:#fef2f2;border:1px solid #fca5a5;border-left:3px solid #dc2626;color:#991b1b}
+.preflight.warn{background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #f59e0b;color:#78350f}
+.preflight.okv{background:#f6f6f4;border:1px solid #dededb;border-left:3px solid #6b7280;color:#3f3f46}
+.preflight b{font-weight:700}
 .restored{display:none;margin:12px 0;padding:10px 14px;font-size:13px;background:#fffbeb;
   border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:2px;color:#78350f}
 .restored button{margin-left:10px;font-size:12px;padding:3px 10px;cursor:pointer;
@@ -430,6 +435,7 @@ __NAV__
     <input class="search-box" id="q" placeholder="id·본문 검색...">
     <span id="deccount" style="font-size:12px;color:var(--text-dim)"></span>
   </div>
+  <div class="preflight" id="preflight"></div>
   <div class="restored" id="restored"></div>
   <div class="result" id="result"></div>
   <div id="grid"></div>
@@ -559,12 +565,46 @@ function needLogin(msg){
     WHO=j.actor_id||'';WHOROLE=j.actor_role||'reviewer';
     if(!WHO){needLogin('신원 없음');return;}
     el.textContent=WHO+' · '+WHOROLE;
+    loadPreflight();
   }catch(e){needLogin('신원 확인 실패');}
 })();
+
+// [E2] 서명 전 점검 — 종전에는 실패가 **제출한 뒤에야** 드러났다.
+// blocking 은 실제로 POST 를 실패시키는 것만이다. 경고로 버튼을 잠그지 않는다.
+var PF_BLOCKED=false;
+async function loadPreflight(){
+  const box=document.getElementById('preflight');
+  try{
+    const r=await fetch(POST_URL+'/preflight',{credentials:'same-origin'});
+    if(!r.ok) return;                       // 점검이 안 되는 것으로 검수를 막지 않는다
+    const j=await r.json();
+    PF_BLOCKED=!j.ok;
+    const c=j.candidates||{};
+    let cls='okv', html='';
+    if((j.blocking||[]).length){
+      cls='block';
+      html='<b>제출할 수 없습니다.</b><br>'+j.blocking.map(function(b){
+        return '· '+esc(b.message)+(b.detail?' <span style="opacity:.75">'+esc(b.detail)+'</span>':'');
+      }).join('<br>');
+      document.getElementById('submit').disabled=true;
+    }else{
+      html='<b>서버 기준</b> 후보 '+(c.total||0)+'건 · 승격 '+(c.already_locked||0)
+        +'건 · 거부 '+(c.already_rejected||0)+'건 · <b>남은 '+(c.remaining||0)+'건</b>';
+      if((j.warnings||[]).length){
+        cls='warn';
+        html+='<br>'+j.warnings.map(function(w){
+          return '⚠ '+esc(w.message)+(w.detail?' <span style="opacity:.75">'+esc(w.detail)+'</span>':'');
+        }).join('<br>');
+      }
+    }
+    box.className='preflight '+cls; box.innerHTML=html; box.style.display='block';
+  }catch(e){ /* 점검 실패는 조용히 넘긴다 — 검수 자체를 막을 이유가 없다 */ }
+}
 document.getElementById('submit').addEventListener('click',async function(){
   const publish=document.getElementById('publish').checked;
   const box=document.getElementById('result');
   if(!WHO){box.className='result err';box.textContent='로그인이 필요합니다. 콘솔 로그인 후 다시 여세요.';return;}
+  if(PF_BLOCKED){box.className='result err';box.textContent='서명 전 점검에서 막힌 항목이 있습니다. 위 안내를 확인하세요.';return;}
   const decisions=Object.keys(DEC).filter(id=>DEC[id].decision).map(id=>{
     const o={doc_id:id,decision:DEC[id].decision,note:DEC[id].note||''};
     if(DEC[id].decision==='change')o.grade=DEC[id].grade;return o;
@@ -589,13 +629,15 @@ document.getElementById('submit').addEventListener('click',async function(){
                               + '체크하고 <b>다시 제출</b>하세요. <b>결정은 그대로 남아 있습니다.</b>');
       var rr = (j.rejected_reasons && Object.keys(j.rejected_reasons).length)
                  ? '<br>거부 사유: '+esc(JSON.stringify(j.rejected_reasons)) : '';
-      box.innerHTML='서명 완료 — locked <b>'+j.locked+'</b>건 승격 (거부/미서명 '+j.rejected+') · 등급별 '+esc(JSON.stringify(j.locked_by_grade))
+      var undecided=DATA.length-Object.keys(DEC).length;
+      box.innerHTML='서명 완료 — locked <b>'+j.locked+'</b>건 승격 · 거부 '+j.rejected+'건 · 이번에 결정하지 않은 후보 '+undecided+'건 · 등급별 '+esc(JSON.stringify(j.locked_by_grade))
         +rr
         +'<br>readiness: ready=<b>'+rd.ready+'</b> per_grade='+esc(JSON.stringify(rd.per_grade))+' '+pubTxt
         +'<br>서명자: '+esc(j.reviewer_id)+(j.overridden?' (클라 값이 인증 신원으로 교정됨)':'');
     }
   }catch(e){box.className='result err';box.textContent='요청 오류: '+e;}
   this.disabled=false;this.textContent='서명 제출';
+  loadPreflight();
 });
 (function(){
   var n=decRestore();

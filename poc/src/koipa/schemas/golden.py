@@ -94,6 +94,32 @@ class GoldenSignoffRequest(BaseModel):
     # True 면 승격 locked 를 운영 readiness 읽기경로(settings.locked_eval_jsonl)에 dedup 병합
     # (배포 게이트가 즉시 소비). 기본 False = run-스코프 미리보기만(정본·라이브 경로 무변경).
     publish: bool = False
+    # [E2-5] 쓰기만 건너뛰고 같은 응답을 낸다. GET preflight 는 '서버가 아는 상태' 만 보므로
+    # 검수자가 실제로 고른 결정(팬텀 doc_id·change 인데 grade 없음)은 여기서만 검증된다.
+    dry_run: bool = False
+
+
+class GoldenSignoffPreflightIssue(BaseModel):
+    code: str
+    message: str
+    detail: str = ""
+
+
+class GoldenSignoffPreflightResponse(BaseModel):
+    """서명 전 점검 결과.
+
+    blocking 은 **실제로 POST 를 실패시키는 것만** 담는다 — 경고를 섞으면 제출 버튼이
+    근거 없이 잠긴다. 서버는 브라우저의 미제출 결정을 볼 수 없으므로 여기 담기는 것은
+    '서버가 아는 상태' 뿐이고, 화면이 자기 미결정 수를 더해 보여준다.
+    """
+    job_id: str
+    ok: bool
+    blocking: list[GoldenSignoffPreflightIssue] = Field(default_factory=list)
+    warnings: list[GoldenSignoffPreflightIssue] = Field(default_factory=list)
+    candidates: dict
+    reviewer: dict
+    publish: dict
+    readiness: dict
 
 
 class GoldenSignoffResponse(BaseModel):
@@ -107,6 +133,8 @@ class GoldenSignoffResponse(BaseModel):
     overridden: bool           # 클라 actor.user_id 가 인증 sub 로 덮어써졌나(위조 시도/클라 버그 신호)
     # publish 요청이 라이브 경로에 반영되지 못한 이유(경로 미설정·승격 0건). 정상 반영/미요청이면 None.
     publish_note: Optional[str] = None
+    # True 면 판정만 하고 아무 파일도 쓰지 않았다(E2-5).
+    dry_run: bool = False
 
 
 class GoldenCorpusSummary(BaseModel):
