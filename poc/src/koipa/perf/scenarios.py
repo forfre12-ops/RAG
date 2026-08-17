@@ -76,6 +76,7 @@ def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
         rows: list[tuple[str, str]] = []
         sources: dict[str, int] = {}
         reviewers: dict[str, int] = {}
+        signed_at: dict[str, int] = {}
         try:
             for line in path.read_text(encoding="utf-8").splitlines():
                 if not line.strip():
@@ -89,6 +90,9 @@ def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
                     rid = str(rec.get("reviewer_id") or "?")
                     sources[src] = sources.get(src, 0) + 1
                     reviewers[rid] = reviewers.get(rid, 0) + 1
+                    ts = str(rec.get("signed_at") or "")
+                    if ts:
+                        signed_at[ts] = signed_at.get(ts, 0) + 1
         except Exception:  # noqa: BLE001
             continue
         if rows:
@@ -96,6 +100,15 @@ def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
             # 서명자)를 같이 남긴다 — 서명자가 한 명뿐이거나 시연 계정이면 그 숫자의 무게가
             # 달라진다(223 실측 2026-08-17: locked_gold_eval 20건 전원 reviewer_id 동일).
             print(f"[PSH][eval] {path.name} · label_source={sources} · reviewer_id={reviewers}")
+            # 사람이 N건을 같은 마이크로초에 서명할 수는 없다. 동일 타임스탬프가 겹치면
+            # 그 서명은 개별 검수 행위가 아니라 일괄 처리다 — "사람이 서명한 평가 정답"
+            # 이라는 tier 이름이 실제와 다를 수 있다(223 실측 2026-08-17: 20건 중 19건이
+            # 동일 타임스탬프). 값을 막지는 않고 사실만 드러낸다.
+            batch = {t: n for t, n in signed_at.items() if n > 1}
+            if batch:
+                worst = max(batch.values())
+                print(f"[PSH][eval] ⚠ 동일 signed_at 로 묶인 서명 {worst}건"
+                      f" — 개별 사람 검수가 아닐 수 있다 {batch}")
             return rows[:limit], path.name
     return [], ""
 
