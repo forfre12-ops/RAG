@@ -69,3 +69,44 @@ def test_real_signoff_still_becomes_locked_eval():
     rec = _signed_record("admin@koipa")
     assert is_valid_signoff(rec) is True
     assert tier_of(rec) != TIER_HELD
+
+
+# ── 2026-08-17: 설정 기본 검수자 · 일괄 서명 ────────────────────────────────
+#
+# KL 서버 실측에서 SIGNOFF_DEFAULT_REVIEWER=hong.gildong 이 설정돼 있었고,
+# locked_gold_eval 20건이 전원 그 이름 · 19건이 동일 마이크로초 서명이었다.
+# 화면에 자동으로 채워지는 이름은 사람이 바꾸지 않으면 누가 검수했든 같은 값이 남는다.
+# 이름의 실존 여부와 무관하게 "기본값이 만든 서명"은 개별 검수 행위가 아니다.
+
+
+def test_configured_default_reviewer_is_not_a_human_reviewer(monkeypatch):
+    from koipa.config import settings
+
+    monkeypatch.setattr(settings, "signoff_default_reviewer", "hong.gildong", raising=False)
+    assert is_human_reviewer("hong.gildong") is False
+    assert is_human_reviewer("HONG.GILDONG") is False  # 대소문자 무관
+    # 기본값이 아닌 다른 실계정은 그대로 통과해야 한다(오탐 방지)
+    assert is_human_reviewer("reviewer-kim") is True
+
+
+def test_default_reviewer_unset_keeps_previous_behavior(monkeypatch):
+    from koipa.config import settings
+
+    monkeypatch.setattr(settings, "signoff_default_reviewer", "", raising=False)
+    assert is_human_reviewer("hong.gildong") is True
+
+
+def test_batch_signed_groups_flags_identical_timestamps():
+    from koipa.golden_tiers import batch_signed_groups
+
+    ts = "2026-08-06T14:42:14.904855+00:00"
+    records = [{"signed_at": ts} for _ in range(19)] + [{"signed_at": "2026-08-07T14:41:06+00:00"}]
+    groups = batch_signed_groups(records)
+    assert groups == {ts: 19}, "동일 마이크로초 19건이 일괄 서명으로 잡혀야 한다"
+
+
+def test_batch_signed_groups_clean_when_each_signature_is_distinct():
+    from koipa.golden_tiers import batch_signed_groups
+
+    records = [{"signed_at": f"2026-08-06T14:4{i}:14.90{i}855+00:00"} for i in range(5)]
+    assert batch_signed_groups(records) == {}

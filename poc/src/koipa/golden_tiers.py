@@ -108,14 +108,50 @@ _PLACEHOLDER_REVIEWERS = frozenset(
 _MACHINE_REVIEWER_PREFIX = re.compile(r"^(ai|llm|gpt|claude|bot|auto)[_\-]")
 
 
+def _configured_default_reviewer() -> str:
+    """화면에 미리 채워지는 기본 검수자 이름(설정값). 없으면 빈 문자열."""
+    try:
+        from koipa.config import settings  # noqa: PLC0415
+
+        return str(getattr(settings, "signoff_default_reviewer", "") or "").strip().lower()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def is_human_reviewer(reviewer_id: object) -> bool:
-    """실계정 사람 검수자인가 — 엄격(placeholder·머신ID 모두 거부, fail-closed)."""
+    """실계정 사람 검수자인가 — 엄격(placeholder·머신ID 모두 거부, fail-closed).
+
+    [2026-08-17] 설정 기본값(signoff_default_reviewer)과 같은 이름도 거부한다.
+    그 값은 서명 화면에 **자동으로 채워지는** 이름이라, 사람이 바꾸지 않으면 누가 검수했든
+    같은 이름이 남는다. 이름의 실존 여부와 무관하게 **기본값이 만든 서명은 개별 검수 행위가
+    아니다**. 실측 근거(KL 서버): SIGNOFF_DEFAULT_REVIEWER=hong.gildong 이 설정돼 있고,
+    locked_gold_eval 20건이 전원 그 이름·19건이 동일 마이크로초 서명이었다.
+    실계정으로 서명하려면 그 이름을 기본값에서 빼거나 포털 JWT 로그인(sub)을 쓰면 된다.
+    """
     rid = str(reviewer_id or "").strip().lower()
     if not rid or rid in _PLACEHOLDER_REVIEWERS:
         return False
     if "assist" in rid or _MACHINE_REVIEWER_PREFIX.match(rid):
         return False
+    default_rid = _configured_default_reviewer()
+    if default_rid and rid == default_rid:
+        return False
     return not any(rid.startswith(p) for p in _MACHINE_PREFIXES)
+
+
+def batch_signed_groups(records: "list[dict]", *, min_group: int = 2) -> dict[str, int]:
+    """동일 signed_at 으로 묶인 서명 그룹 — {타임스탬프: 건수}. 사람 검수의 반증 신호다.
+
+    사람이 N건을 같은 마이크로초에 서명할 수는 없다. is_valid_signoff 는 레코드 하나만 보므로
+    이 성질을 볼 수 없어, 집합 단위 검사로 따로 제공한다(차단이 아니라 드러내기 — 어떤 셋이
+    일괄 서명인지 호출자가 판단하고 기록할 수 있게 한다).
+    """
+    counts: dict[str, int] = {}
+    for rec in records:
+        ts = str(rec.get("signed_at") or "").strip()
+        if ts:
+            counts[ts] = counts.get(ts, 0) + 1
+    return {ts: n for ts, n in counts.items() if n >= min_group}
 
 
 def is_external_authority(record: dict) -> bool:
