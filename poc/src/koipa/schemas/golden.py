@@ -153,7 +153,7 @@ class GoldenJobListResponse(BaseModel):
 # 고객/실문서 골든과 분리된 후보 인벤토리다. 여기의 승인 상태는 approved_proxy일 뿐
 # locked_gold_eval 승격이나 실운영 정확도 주장 근거가 될 수 없다.
 class ProxyGoldCandidateDecisionRequest(BaseModel):
-    action: str = Field(pattern=r"^(approve|change|defer|reject|discard|reopen)$")
+    action: str = Field(pattern=r"^(approve|change|defer|reject|discard|reopen|exclude)$")
     grade: Optional[str] = Field(default=None, pattern=r"^(TS|S1|S2|S3)$")
     reason: str = Field(default="", max_length=4000)
 
@@ -163,8 +163,8 @@ class ProxyGoldCandidateDecisionRequest(BaseModel):
             raise ValueError("action=change 인데 grade 미지정")
         if self.action != "change" and self.grade is not None:
             raise ValueError("grade 는 action=change 에서만 지정")
-        if self.action in {"change", "defer", "reject", "discard"} and not self.reason.strip():
-            raise ValueError("change/defer/reject/discard 에는 사유가 필요")
+        if self.action in {"change", "defer", "reject", "discard", "exclude"} and not self.reason.strip():
+            raise ValueError("change/defer/reject/discard/exclude 에는 사유가 필요")
         return self
 
 

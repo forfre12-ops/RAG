@@ -27,7 +27,11 @@ _LEDGER_NAME = "candidate_decisions.jsonl"
 # 바뀌면 자동 무효화된다. 캐시가 없으면 매 요청 30MB 본문을 다시 읽고 해시한다.
 _CANDIDATE_CACHE: dict[tuple, list[dict[str, Any]]] = {}
 _VALID_GRADES = {"TS", "S1", "S2", "S3"}
-_VALID_ACTIONS = {"approve", "change", "defer", "reject", "discard", "reopen"}
+# [B2 2026-08-18] exclude = '검수 대상 아님'. deferred(나중에 볼 것)·discarded(폐기)와
+# 다른 제3의 종결이다 — 등급을 정하지도, 문서를 버리지도 않고 이번 검수 범위에서만 뺀다.
+# ⚠ 이 상태는 학습에 대해 아무 말도 하지 않는다. 콘솔 status 를 읽는 학습 경로가 아직
+#   없기 때문이다(B3). 화면 문구에서 '학습 제외' 라고 쓰면 근거 없는 주장이 된다.
+_VALID_ACTIONS = {"approve", "change", "defer", "reject", "discard", "reopen", "exclude"}
 # 본문에 등급 문자열이 그대로 남아 있으면 검수자가 읽기 전에 답을 본다.
 _GRADE_TOKEN = re.compile(r"\b(TS|S1|S2|S3)\b")
 _DOCUMENT_ORIGINS = {"uploaded_document", "public_real", "organization_real"}
@@ -87,6 +91,14 @@ def _merged_provenance(meta: dict) -> dict:
     return prov
 
 
+# 검수 큐에서 빠지는 상태들 — 목록 기본 조회·품질 집계에서 뺀다(B1·B2).
+# 문자열을 여기저기 박아 두면 한 곳만 고쳐도 나머지가 어긋난다.
+DISCARDED_STATUS = "discarded"
+OUT_OF_SCOPE_STATUS = "out_of_scope"      # 검수 대상 아님(B2)
+# 검수가 끝나 큐에서 빠지는 집합. deferred(보류)는 여기 없다 — 다시 볼 것이기 때문이다.
+QUEUE_EXCLUDED_STATUSES = frozenset({DISCARDED_STATUS, OUT_OF_SCOPE_STATUS})
+
+
 class ProxyGoldCandidateService:
     """Read synthetic candidates and record append-only manager decisions."""
 
@@ -101,9 +113,16 @@ class ProxyGoldCandidateService:
         review_batch: str | None = None,
     ) -> dict[str, Any]:
         all_candidates = self._candidates()
-        candidates = all_candidates
+        # [B1-1] 기본 조회에서 폐기(discarded)를 뺀다. 폐기는 검수가 끝난 항목인데 목록에
+        # 남아 있으면 검수자에게 계속 할 일로 보인다.
+        # ⚠ 원장은 그대로다 — status="discarded" 로 명시하면 전부 나온다(조회 가능 = 보존).
+        # 부수효과 하나: 종전에는 필터가 하나도 없으면 candidates 가 캐시 리스트 **그 자체**라
+        # 아래 sort 가 캐시를 제자리에서 뒤집었다. 이제 항상 새 리스트라 그 일이 없다.
         if status:
-            candidates = [c for c in candidates if c["status"] == status]
+            candidates = [c for c in all_candidates if c["status"] == status]
+        else:
+            candidates = [c for c in all_candidates
+                          if c["status"] not in QUEUE_EXCLUDED_STATUSES]
         if grade:
             candidates = [c for c in candidates if c["final_grade"] == grade or c["proposed_grade"] == grade]
         if origin:
@@ -122,8 +141,13 @@ class ProxyGoldCandidateService:
         # quality 를 여기 빼먹으면 품질 패널이 "지표를 낼 수 없습니다"로만 뜬다(실측).
         embedded = self._summary(all_candidates)
         embedded["quality"] = self._quality(all_candidates)
+        # [B1-3] KPI(summary)는 **원장 전량** 기준으로 둔다 — 화면 상단 숫자가 필터마다
+        # 흔들리면 무엇을 세는 값인지 알 수 없다. 대신 목록 건수(total)와 다르다는 사실을
+        # 응답에 적어, 화면이 "전체 306 / 목록 300 (폐기 6 제외)" 처럼 읽히게 한다.
+        embedded["scope"] = "all"
         return {
             "total": len(candidates),
+            "listed_excludes_discarded": status is None,
             "summary": embedded,
             "candidates": [{k: v for k, v in c.items() if k != "text"} for c in candidates],
         }
@@ -164,9 +188,14 @@ class ProxyGoldCandidateService:
         · grade_token_exposed: 본문에 자기 등급 문자열이 남아 있는 건수. 검수자가 문서를 읽기
           전에 답을 보면 검수가 검증이 아니라 확인 절차가 된다.
         """
+        # [B1-2] 폐기한 문서를 품질 모수에서 뺀다.
+        # discard 는 final_grade 만 None 으로 되돌리고 proposed_grade(intended_label)는 남긴다.
+        # 그래서 종전에는 폐기 문서가 길이누출·등급노출·등급균형·실문서비율에 계속 잡혔다 —
+        # 골든셋에서 뺀 문서가 그 골든셋의 건강도를 계속 좌우한 셈이다.
+        live = [c for c in candidates if c.get("status") not in QUEUE_EXCLUDED_STATUSES]
         graded = [
             (len(c.get("text") or ""), c.get("final_grade") or c.get("proposed_grade"), c)
-            for c in candidates
+            for c in live
         ]
         graded = [(ln, g, c) for ln, g, c in graded if g in _VALID_GRADES and ln > 0]
         if not graded:
@@ -224,8 +253,8 @@ class ProxyGoldCandidateService:
         if action not in _VALID_ACTIONS:
             raise ValueError("unsupported decision action")
         reason = reason.strip()
-        if action in {"change", "defer", "reject", "discard"} and not reason:
-            raise ValueError("reason is required for change, defer, reject, and discard")
+        if action in {"change", "defer", "reject", "discard", "exclude"} and not reason:
+            raise ValueError("reason is required for change, defer, reject, discard, and exclude")
         if action == "change" and grade not in _VALID_GRADES:
             raise ValueError("grade is required for change")
         if action != "change" and grade is not None:
@@ -245,8 +274,11 @@ class ProxyGoldCandidateService:
             "reject": "discarded",        # legacy API action retained
             "discard": "discarded",
             "reopen": "proposed" if is_synthetic else "under_review",
+            "exclude": OUT_OF_SCOPE_STATUS,
         }[action]
-        if action in {"defer", "reject", "discard", "reopen"}:
+        # 등급을 확정하지 않는 전이는 final_grade 를 반드시 비운다 — 남겨 두면 '확정 아님'
+        # 인데 등급이 있는 레코드가 생겨 집계가 어긋난다.
+        if action in {"defer", "reject", "discard", "reopen", "exclude"}:
             final_grade = None
         event = {
             "schema_version": 1,
@@ -566,9 +598,13 @@ class ProxyGoldCandidateService:
         return {
             "total": len(candidates),
             "fixed": sum(1 for c in candidates if c["grade_fixed"]),
-            "unfixed": sum(1 for c in candidates if not c["grade_fixed"] and c["status"] != "discarded"),
+            # [B2] 검수가 끝난 것은 '미확정' 에서 뺀다. 남겨 두면 화면 상단 '등급 미확정 N건'
+            # 이 영원히 안 줄어 검수자에게 끝나지 않는 할 일로 보인다.
+            "unfixed": sum(1 for c in candidates
+                           if not c["grade_fixed"] and c["status"] not in QUEUE_EXCLUDED_STATUSES),
             "deferred": sum(1 for c in candidates if c["status"] == "deferred"),
-            "discarded": sum(1 for c in candidates if c["status"] == "discarded"),
+            "discarded": sum(1 for c in candidates if c["status"] == DISCARDED_STATUS),
+            "out_of_scope": sum(1 for c in candidates if c["status"] == OUT_OF_SCOPE_STATUS),
             "by_status": dict(sorted(Counter(c["status"] for c in candidates).items())),
             "by_origin": dict(sorted(Counter(c["document_origin"] for c in candidates).items())),
             "by_final_grade": dict(sorted(Counter(c["final_grade"] for c in candidates if c["final_grade"]).items())),
