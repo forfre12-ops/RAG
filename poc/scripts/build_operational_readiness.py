@@ -208,6 +208,17 @@ def _retrieval_config_text(p2_report: dict) -> str:
     return f"{emb} + {name} {mode} + chunk={cs}/overlap={co}"
 
 
+def _settings_for_gate():
+    """게이트가 출하 설정을 읽는다. 실패해도 게이트가 죽으면 안 되므로 빈 껍데기를 준다."""
+    try:
+        from koipa.config import settings  # noqa: PLC0415
+        return settings
+    except Exception:  # noqa: BLE001
+        class _Empty:
+            pass
+        return _Empty()
+
+
 def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
     """검색 품질 게이트. **출하 구성으로 잰 것인지 먼저 본다.**
 
@@ -242,6 +253,27 @@ def _p2_gate(p2_report: dict) -> tuple[Gate, dict]:
             f"측정 백엔드({backend}) != 출하 백엔드(pg) - 출하하지 않는 구성의 수치다. "
             f"pg 로 재측정 필요. 참고값: {detail}",
         ), {"best_config": best, "backend_mismatch": True}
+
+    # [임베더 정합] 백엔드만 맞으면 되는 게 아니다 - **어느 모델로 임베딩했는지**도
+    # 같아야 이 수치가 출하물을 설명한다.
+    #
+    # 실측 2026-08-17(KL 223): 배포본 api 는 BAAI/bge-m3, worker 는 nlpai-lab/KURE-v1 로
+    # 떠 있었다(compose 기본값이 파일마다 달랐다). 두 모델 다 1024 차원이라 차원 검사에
+    # 안 걸리고 예외도 안 난다 - 색인과 질의가 다른 공간이라 **조용히 오검색**이 난다.
+    # 그때 게이트는 KURE-v1 로 잰 Recall 0.887 을 통과시키고 있었다.
+    #
+    # ⚠ BLOCKED 이지 FAIL 이 아니다. 성능이 나쁜 게 아니라 **그 구성을 잰 적이 없는 것**이고,
+    #   둘을 같은 말로 보고하면 원인을 못 찾는다(백엔드 불일치와 같은 취급).
+    shipped_emb = str(getattr(_settings_for_gate(), "embedding_model", "") or "").strip()
+    measured_emb = str(best.get("embedder", "") or "").strip()
+    if shipped_emb and measured_emb and measured_emb != shipped_emb:
+        return Gate(
+            "P2 retrieval", "BLOCKED",
+            f"측정 임베더({measured_emb}) != 출하 임베더({shipped_emb}) - 색인과 질의가 "
+            f"다른 모델이면 차원이 같아 오류 없이 오검색이 난다. 같은 모델로 재측정 필요. "
+            f"참고값: {detail}",
+        ), {"best_config": best, "embedder_mismatch": True,
+            "shipped_embedder": shipped_emb, "measured_embedder": measured_emb}
 
     status = "PASS" if recall >= 0.80 and latency <= 200 else "FAIL"
     return Gate("P2 retrieval", status, detail), {"best_config": best}

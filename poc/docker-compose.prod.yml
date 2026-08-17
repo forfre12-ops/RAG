@@ -27,7 +27,20 @@ services:
       # 워커별 stale 가능 — 초기엔 1 권장(재기동으로 갱신).
       WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
       EMBEDDING_PROVIDER: hf
-      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-BAAI/bge-m3}"
+      # ⚠ 기본값이 **다른 파일과 달라 색인과 질의가 갈렸다**(실측 2026-08-17, KL 223).
+      #     api    BAAI/bge-m3        <- 여기 기본값. 질의를 임베딩한다.
+      #     worker nlpai-lab/KURE-v1  <- 다른 compose 의 기본값. 문서를 색인한다.
+      #   두 모델 모두 1024 차원이라 **오류가 안 난다** - 차원 검사에 안 걸리고 그냥
+      #   엉뚱한 이웃이 나온다. 조용한 오검색이다.
+      #
+      #   .env 에 EMBEDDING_MODEL 을 적어도 안 고쳐진다. `environment: !override` 는
+      #   env_file 을 덮고, compose 치환 `${...}` 은 **셸과 프로젝트 .env 만** 본다 -
+      #   env_file(.env.jjw)은 컨테이너로만 들어가고 치환에는 안 쓰인다.
+      #   실제로 .env.jjw 에 nlpai-lab/KURE-v1 이 적혀 있었는데도 api 는 bge-m3 였다.
+      #
+      #   기본값을 다른 compose(airgap·dr-staging)·config.py 기본값·§04 결정과 맞춘다.
+      #   한국어 실측에서 KURE-v1 이 BGE-M3 보다 @1 기준 5~7pp 높다.
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}"
       CORS_ALLOW_ORIGINS: '["${ALLOWED_ORIGIN:-https://app.example.com}"]'
       HF_HOME: /home/koipa/.cache/huggingface
       # [스레드 정합] torch 는 cgroup CPU 한도를 못 본다 — 호스트 코어 수만큼 스레드를 띄운다.
