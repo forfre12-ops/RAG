@@ -764,9 +764,12 @@ def golden_job_review_html(
     gate = _job_gate_html(job_id)
     if gate is not None:
         return gate
-    # 검토본에서 서명 화면으로 바로 갈 수 있게 — 같은 job 의 서명된 주소를 넘긴다.
-    _review_url, _signoff_url = _signed_html_urls(job_id)
-    html = GoldenBuildService().render_review(job_id, signoff_url=_signoff_url)
+    # [통합 2026-08-18] 검토본과 서명은 **같은 화면**이다. 같은 job 의 같은 후보를 보는데
+    # 화면이 둘이라 검수자가 같은 목록을 두 번 봤다.
+    # ⚠ 이 주소는 없앨 수 없다 — 감리정본 화면설계서 UI-04 이고 build_offline_bundle·
+    #   demo_e2e_golden·register_review_signoff_job·OPERATION.md·사용설명서가 참조한다.
+    #   주소는 남기고 같은 화면을 준다.
+    html = GoldenBuildService().render_signoff(job_id, title="골든셋 검수 · 서명")
     if html is None:
         raise HTTPException(status_code=404, detail="golden build review not found (후보 없음)")
     return HTMLResponse(content=html)
@@ -787,8 +790,7 @@ def golden_job_signoff_html(
     gate = _job_gate_html(job_id)
     if gate is not None:
         return gate
-    _review_url, _signoff_url = _signed_html_urls(job_id)
-    html = GoldenBuildService().render_signoff(job_id, review_url=_review_url)
+    html = GoldenBuildService().render_signoff(job_id)
     if html is None:
         raise HTTPException(status_code=404, detail="golden build signoff view not found (gold 후보 없음)")
     return HTMLResponse(content=html)

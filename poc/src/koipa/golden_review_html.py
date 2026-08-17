@@ -299,6 +299,9 @@ def _signoff_records(records: Sequence[dict]) -> list[dict]:
             "conf": round(float(r.get("llm_confidence") or 0.0), 3),
             "domain": str(r.get("domain", "") or r.get("source", "")),
             "text": str(r.get("text") or ""),
+            # 합의 미달(uncertain) 후보는 서명 대상이 아니다 — 결정 폼 없이 보여만 준다.
+            # 종전에는 이걸 보려고 검토본(review.html)이라는 화면이 따로 있었다.
+            "signable": r.get("review_status") in ("accepted", "gold_candidate", None, ""),
         })
     return out
 
@@ -366,6 +369,8 @@ def render_signoff_html_from_jsonl(
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
 _SIGNOFF_CSS = """<style>""" + _TOKENS + """
 .who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
+.scard.pending{opacity:.72;background:#fafaf9}
+.pendnote{margin-top:10px;padding:8px 11px;font-size:12.5px;line-height:1.55;color:#78350f;background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:2px}
 .pg-lack{color:#b45309;font-weight:700}
 .pg-note{color:var(--text-dim)}
 .preflight{display:none;margin:12px 0;padding:10px 14px;font-size:13px;border-radius:2px;line-height:1.6}
@@ -480,6 +485,7 @@ function decClear(){
 function esc(t){const d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function gopts(sel){return ['TS','S1','S2','S3'].map(x=>'<option value="'+x+'"'+(x===sel?' selected':'')+'>'+x+'</option>').join('');}
 function card(r){
+  if(!r.signable) return pendingCard(r);
   const d=DEC[r.id]||{};
   const cls=d.decision==='reject'?'scard rejected':(d.decision?'scard decided':'scard');
   return '<div class="'+cls+'" data-id="'+esc(r.id)+'">'
@@ -493,12 +499,26 @@ function card(r){
     +'<input class="note" data-id="'+esc(r.id)+'" placeholder="메모(선택)" value="'+esc(d.note||'')+'">'
     +'</div>';
 }
+// 서명 대상이 아닌 후보 — 같은 목록에 두되 결정 폼을 주지 않는다.
+// 폼이 있으면 "왜 눌러도 안 되나" 가 되고, 빼 놓으면 "왜 안 보이나" 가 된다. 보여주되 잠근다.
+function pendingCard(r){
+  return '<div class="scard pending" data-id="'+esc(r.id)+'">'
+    +'<div class="card-meta"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> '
+    +'<span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> '
+    +'<span style="color:var(--text-dim)">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)
+    +' conf '+r.conf.toFixed(2)+'</span></div>'
+    +'<div class="stext">'+esc(r.text)+'</div>'
+    +'<div class="pendnote">서명 대상이 아닙니다 — 룰과 LLM 이 등급에 합의하지 못한 후보입니다. '
+    +'여기서는 내용만 확인하고, 확정은 후보 관리 화면에서 합니다.</div>'
+    +'</div>';
+}
 function decCount(){
   // 승격 예정만 센다 — 거부는 정답지에서 빠지고, 등급변경은 **바꾼 등급**으로 들어간다.
   // 이 셈이 서버의 locked_by_grade 와 같은 규칙이라, 화면 숫자가 결과와 어긋나지 않는다.
   var n=0, by={TS:0,S1:0,S2:0,S3:0};
   Object.keys(DEC).forEach(function(id){
     var d=DEC[id]; if(!d||!d.decision) return;
+    if(BYID[id]&&BYID[id].signable===false) return;
     n++;
     if(d.decision==='reject') return;
     var r=BYID[id]; if(!r) return;
@@ -510,8 +530,12 @@ function decCount(){
     return '<span'+(lack?' class="pg-lack"':'')+'>'+k+' '+by[k]+'</span>';
   }).join(' · ');
   var tail=(MIN_PG>0)?' <span class="pg-note">(등급별 '+MIN_PG+'건 필요)</span>':'';
+  var signable=DATA.filter(function(x){return x.signable;}).length;
+  var pend=DATA.length-signable;
   document.getElementById('deccount').innerHTML=
-    '결정 '+n+' / 후보 '+DATA.length+'건 &nbsp; 승격 예정 '+parts+tail;
+    '결정 '+n+' / 서명 대상 '+signable+'건'
+    +(pend?' <span class="pg-note">(합의 미달 '+pend+'건 보기 전용)</span>':'')
+    +' &nbsp; 승격 예정 '+parts+tail;
 }
 function render(){
   const ql=q.toLowerCase();

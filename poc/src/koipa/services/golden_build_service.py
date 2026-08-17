@@ -418,9 +418,13 @@ class GoldenBuildService:
         gold_path = job.get("gold_path")
         if not gold_path:
             return None
+        # [통합 2026-08-18] 합의 미달(uncertain) 후보도 함께 읽는다. 종전에는 이걸 보려고
+        # 검토본(review.html)이라는 화면이 따로 있었다. 서명 대상이 아니므로 렌더러가
+        # 결정 폼 없이 보기 전용으로 그린다.
+        paths = [p for p in (gold_path, job.get("uncertain_path")) if p]
         from koipa.config import settings  # noqa: PLC0415
         return render_signoff_html_from_jsonl(
-            [gold_path],
+            paths,
             job_id=str(job_id),
             post_url=f"/api/v1/golden/jobs/{job_id}/signoff",
             title=title,
