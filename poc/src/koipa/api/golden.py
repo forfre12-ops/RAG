@@ -18,7 +18,7 @@ from koipa.api._jwt_auth import require_auth
 from koipa.api._rbac import require_role
 from koipa.api.confirm import bind_authenticated_actor, resolve_actor_user_id
 from koipa.config import settings
-from koipa.golden_tiers import is_human_reviewer
+from koipa.golden_tiers import human_reviewer_rejection_reason, is_human_reviewer
 from koipa.services.job_store import get_default_store
 from koipa.schemas.golden import (
     GoldenBuildRequest,
@@ -809,10 +809,13 @@ def golden_job_signoff(
     readiness 반영은 publish=True 일 때만(기본 미리보기).
     """
     reviewer_id, overridden = resolve_actor_user_id(req.actor.user_id, auth)
-    if not is_human_reviewer(reviewer_id):
+    # 사유를 함께 준다 — 거부 조건이 다섯 갈래인데 뒤 둘은 이름이 아니라 **설정** 때문에
+    # 막히는 것이라, 이유가 없으면 이름만 계속 바꿔 보게 된다.
+    reject = human_reviewer_rejection_reason(reviewer_id)
+    if reject:
         raise HTTPException(
             status_code=403,
-            detail=f"reviewer_id는 실계정이어야 합니다(머신/플레이스홀더 거부): {reviewer_id!r}",
+            detail=f"reviewer_id는 실계정이어야 합니다: {reject}",
         )
     result = GoldenBuildService().apply_signoff(
         job_id,

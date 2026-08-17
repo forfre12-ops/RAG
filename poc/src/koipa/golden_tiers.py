@@ -166,20 +166,39 @@ def is_human_reviewer(reviewer_id: object) -> bool:
     locked_gold_eval 20건이 전원 그 이름·19건이 동일 마이크로초 서명이었다.
     실계정으로 서명하려면 그 이름을 기본값에서 빼거나 포털 JWT 로그인(sub)을 쓰면 된다.
     """
+    return not human_reviewer_rejection_reason(reviewer_id)
+
+
+def human_reviewer_rejection_reason(reviewer_id: object) -> str:
+    """거부 사유(사람이 읽는 한 줄). 통과하면 빈 문자열.
+
+    왜 사유가 필요한가 — 거부 조건이 다섯 갈래인데 응답은 "실계정이어야 합니다" 한 문장이라,
+    막힌 사람이 **무엇을 바꿔야 하는지** 알 수 없다. 특히 뒤 두 갈래는 이름 자체에는 아무
+    문제가 없고 **설정 때문에** 막히는 것이라, 이유를 안 알려주면 이름만 계속 바꿔 보게 된다.
+
+    실제 함정: 검수자 토큰을 CONSOLE_LOGIN_PREFILL_TOKEN 에 넣으면 그 순간 그 이름이
+    '로그인 화면이 나눠 주는 공용 신원' 으로 분류돼 그 사람의 모든 서명이 403 이 된다.
+    """
     rid = str(reviewer_id or "").strip().lower()
-    if not rid or rid in _PLACEHOLDER_REVIEWERS:
-        return False
+    if not rid:
+        return "검수자 이름이 비어 있다"
+    if rid in _PLACEHOLDER_REVIEWERS:
+        return f"자리표시 이름이다({rid!r}) — 실계정 이름을 쓸 것"
     if "assist" in rid or _MACHINE_REVIEWER_PREFIX.match(rid):
-        return False
+        return f"기계 보조 계정 형식이다({rid!r})"
     default_rid = _configured_default_reviewer()
     if default_rid and rid == default_rid:
-        return False
-    # 로그인 화면이 나눠 주는 공용 신원도 같은 이유로 거부한다 — 화면이 준 이름은
-    # 개별 검수 행위가 아니다. 설정이 비어 있으면(운영 배포) 이 검사는 작동하지 않는다.
+        return (f"서명 화면 기본값과 같은 이름이다({rid!r}) — 설정 SIGNOFF_DEFAULT_REVIEWER 가 "
+                "이 이름이라, 누가 검수했든 같은 이름이 남으므로 개별 검수로 인정하지 않는다")
     prefill_rid = _prefill_login_subject()
     if prefill_rid and rid == prefill_rid:
-        return False
-    return not any(rid.startswith(p) for p in _MACHINE_PREFIXES)
+        return (f"로그인 화면이 나눠 주는 공용 신원이다({rid!r}) — 설정 "
+                "CONSOLE_LOGIN_PREFILL_TOKEN 의 sub 가 이 이름이라 그 화면을 여는 누구나 "
+                "이 신원을 얻는다. 검수자 토큰은 프리필에 넣지 말고 사람마다 따로 발급할 것")
+    hit = next((p for p in _MACHINE_PREFIXES if rid.startswith(p)), "")
+    if hit:
+        return f"기계·시연 예약 접두사로 시작한다({rid!r} — {hit!r})"
+    return ""
 
 
 def batch_signed_groups(records: "list[dict]", *, min_group: int = 2) -> dict[str, int]:

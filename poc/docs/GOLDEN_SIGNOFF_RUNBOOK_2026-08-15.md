@@ -182,9 +182,52 @@ python3 scripts/setup_console_test_login.py \
 ⛔ **`--regenerate-key` 를 쓰지 말 것.** 223 에 배포된 jwks 가 `kid=console-test-1` 이라
    키를 새로 만들면 **이전에 발급한 토큰이 전부 무효**가 된다.
 
+⛔ **검수자 토큰을 `CONSOLE_LOGIN_PREFILL_TOKEN` 에 넣지 말 것.** 넣는 순간 그 이름이
+   "로그인 화면이 나눠 주는 공용 신원" 으로 분류되어 **그 사람의 모든 서명이 403** 이 된다
+   (§7-2 표의 세 번째 줄). 프리필은 둘러보기용 신원(`kl-admin-test`)으로만 두고, 검수자
+   토큰은 파일로 따로 건넨다.
+
 ⛔ **한 토큰을 여러 명이 쓰지 말 것.** 원장에 같은 이름만 남아 검수 기록이 성립하지 않는다.
 
 역할은 `reviewer` 로 충분하다(§3 — 등록은 admin 이 하고 서명만 검수자가 한다).
+한 사람이 후보 관리(manage.html)까지 하면 `--roles admin,reviewer` 로 준다 — 후보
+등급 결정은 admin 이어야 한다.
+
+### 실서비스 전 검수 신원 (사용자 지정 2026-08-17)
+
+```
+--sub 지재원관리자 --roles admin,reviewer --until 2026-12-31
+```
+
+223 실측 확인:
+
+```
+/golden/candidates/session   {"actor_id":"지재원관리자","auth_mode":"jwt","actor_role":"admin"}
+manage.html                  200
+signoff.html?t=...           200
+is_human_reviewer            True   (배포된 규칙으로 확인)
+```
+
+한글 이름은 JWT payload 에서 `\uXXXX` 로 인코딩되어 그대로 되돌아온다 — 원장에 제 이름이
+남는다. 파일명도 그대로 쓸 수 있다(`secrets/console_jwt/tokens/지재원관리자.txt`).
+
+⚠ **이것은 역할 이름이지 사람 이름이 아니다.** 여러 명이 나눠 쓰면 원장에 같은 이름만
+남아, 오늘 막은 것(같은 이름 20건·같은 마이크로초 19건)과 같은 상태가 된다. 실서비스에서는
+사람마다 실계정으로 발급할 것.
+
+### 서명이 403 이면 사유를 읽는다
+
+응답이 무엇 때문에 막혔는지 말해 준다(2026-08-17 추가). 거부 조건이 다섯 갈래인데
+뒤 둘은 **이름이 아니라 설정** 때문에 막히는 것이라, 사유 없이는 이름만 계속 바꿔 보게 된다.
+
+```
+검수자 이름이 비어 있다
+자리표시 이름이다('reviewer') — 실계정 이름을 쓸 것
+기계 보조 계정 형식이다('ai_assist')
+기계·시연 예약 접두사로 시작한다('demo-console' — 'demo')
+서명 화면 기본값과 같은 이름이다(...) — 설정 SIGNOFF_DEFAULT_REVIEWER 가 이 이름이라 ...
+로그인 화면이 나눠 주는 공용 신원이다(...) — 설정 CONSOLE_LOGIN_PREFILL_TOKEN 의 sub 가 ...
+```
 
 ---
 
