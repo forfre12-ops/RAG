@@ -362,6 +362,10 @@ def render_signoff_html_from_jsonl(
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
 _SIGNOFF_CSS = """<style>""" + _TOKENS + """
 .who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
+.restored{display:none;margin:12px 0;padding:10px 14px;font-size:13px;background:#fffbeb;
+  border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:2px;color:#78350f}
+.restored button{margin-left:10px;font-size:12px;padding:3px 10px;cursor:pointer;
+  border:1px solid #d6d3d1;background:#fff;border-radius:2px}
 .signbar{position:sticky;top:0;z-index:10;background:var(--accent);color:#e4e4e7;padding:12px 24px;
          display:flex;gap:10px;flex-wrap:wrap;align-items:end;border-bottom:1px solid var(--accent)}
 .signbar .fld{display:flex;flex-direction:column;font-size:11px;gap:3px}
@@ -420,6 +424,7 @@ __NAV__
     <input class="search-box" id="q" placeholder="id·본문 검색...">
     <span id="deccount" style="font-size:12px;color:var(--text-dim)"></span>
   </div>
+  <div class="restored" id="restored"></div>
   <div class="result" id="result"></div>
   <div id="grid"></div>
 </div>
@@ -429,6 +434,32 @@ const DATA=JSON.parse(document.getElementById('data').textContent);
 const POST_URL="__POST_URL__";
 const DEC={};       // id -> {decision, grade, note}
 let g='all',q='';
+
+// 중간 결정 보존 — DEC 는 메모리에만 있어서 탭을 닫거나 새로고침하면 사라졌다.
+// 120건짜리 회차에서 60건 하다 창을 닫으면 60건을 다시 눌러야 한다는 뜻이다.
+// 잡 단위로 브라우저에 남긴다(서버로 보내지 않는다 — 제출 전 결정은 아직 서명이 아니다).
+const DEC_KEY='koipa.signoff.'+POST_URL;
+function decSave(){
+  try{ localStorage.setItem(DEC_KEY, JSON.stringify(DEC)); }
+  catch(e){ /* 사생활 보호 모드 등 — 저장 못 해도 검수는 계속돼야 한다 */ }
+}
+function decRestore(){
+  var raw=null;
+  try{ raw=localStorage.getItem(DEC_KEY); }catch(e){ return 0; }
+  if(!raw) return 0;
+  var n=0;
+  try{
+    var o=JSON.parse(raw);
+    Object.keys(o||{}).forEach(function(k){ if(o[k]&&o[k].decision){ DEC[k]=o[k]; n++; } });
+  }catch(e){ return 0; }
+  return n;
+}
+function decClear(){
+  Object.keys(DEC).forEach(function(k){ delete DEC[k]; });
+  try{ localStorage.removeItem(DEC_KEY); }catch(e){}
+  document.getElementById('restored').style.display='none';
+  render();
+}
 // 텍스트+속성(name=/data-id=/value=) 양쪽에 쓰이므로 따옴표도 이스케이프(속성 컨텍스트 주입 차단).
 function esc(t){const d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function gopts(sel){return ['TS','S1','S2','S3'].map(x=>'<option value="'+x+'"'+(x===sel?' selected':'')+'>'+x+'</option>').join('');}
@@ -465,14 +496,14 @@ document.getElementById('grid').addEventListener('change',function(e){
     if(t.value==='change'){const s=document.querySelector('.gsel[data-id="'+CSS.escape(id)+'"]');DEC[id].grade=s?s.value:null;}
     else delete DEC[id].grade;
     const cd=t.closest('.scard');cd.className=t.value==='reject'?'scard rejected':'scard decided';
-    decCount();
+    decCount();decSave();
   } else if(t.matches('.gsel')){
     const id=t.dataset.id;DEC[id]=DEC[id]||{decision:'change'};DEC[id].grade=t.value;
-    const rc=document.querySelector('input[name="dec-'+CSS.escape(id)+'"][value=change]');if(rc)rc.checked=true;DEC[id].decision='change';
+    const rc=document.querySelector('input[name="dec-'+CSS.escape(id)+'"][value=change]');if(rc)rc.checked=true;DEC[id].decision='change';decSave();
   }
 });
 document.getElementById('grid').addEventListener('input',function(e){
-  if(e.target.matches('.note')){const id=e.target.dataset.id;DEC[id]=DEC[id]||{};DEC[id].note=e.target.value;}
+  if(e.target.matches('.note')){const id=e.target.dataset.id;DEC[id]=DEC[id]||{};DEC[id].note=e.target.value;decSave();}
 });
 document.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',function(){
   document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));this.classList.add('active');g=this.dataset.v;render();
@@ -537,6 +568,15 @@ document.getElementById('submit').addEventListener('click',async function(){
   }catch(e){box.className='result err';box.textContent='요청 오류: '+e;}
   this.disabled=false;this.textContent='서명 제출';
 });
+(function(){
+  var n=decRestore();
+  if(!n) return;
+  var el=document.getElementById('restored');
+  el.innerHTML='이 잡에서 하던 <b>결정 '+n+'건</b>을 이 브라우저에서 복원했습니다. '
+    +'이어서 하시면 됩니다. <button type="button" id="decclear">지우고 새로 시작</button>';
+  el.style.display='block';
+  document.getElementById('decclear').addEventListener('click',decClear);
+})();
 render();
 </script>
 </body></html>
