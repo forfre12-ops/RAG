@@ -268,7 +268,9 @@ class GoldenBuildService:
             error=job.get("error"),
         )
 
-    def render_review(self, job_id: uuid.UUID, *, title: str = "골든셋 후보 검토본") -> Optional[str]:
+    def render_review(
+        self, job_id: uuid.UUID, *, title: str = "골든셋 후보 검토본", signoff_url: str = ""
+    ) -> Optional[str]:
         """완료된 빌드 잡의 후보(build·uncertain)를 지재원 관리자 검수용 HTML로 렌더.
 
         JobStore에서 잡의 출력 경로를 찾아 render_review_html_from_jsonl로 렌더.
@@ -284,10 +286,12 @@ class GoldenBuildService:
         return render_review_html_from_jsonl(
             paths, title=title, subtitle=f"job {job_id}",
             profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
+            # 서명된 형제 주소는 **API 층이 계산해서 넘긴다** — ?t= 비밀키를 아는 곳이 거기다.
+            signoff_url=signoff_url,
         )
 
     def render_signoff(
-        self, job_id: uuid.UUID, *, title: str = "골든셋 검수 · 서명"
+        self, job_id: uuid.UUID, *, title: str = "골든셋 검수 · 서명", review_url: str = ""
     ) -> Optional[str]:
         """빌드 잡의 gold 후보(gold_candidate)를 화면 서명용 인터랙티브 HTML로 렌더.
 
@@ -308,6 +312,7 @@ class GoldenBuildService:
             post_url=f"/api/v1/golden/jobs/{job_id}/signoff",
             title=title,
             profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
+            review_url=review_url,
         )
 
     # 신원 관련 인자가 이 호출에서 사라진 경위 — 지우면 같은 실수가 되돌아온다.

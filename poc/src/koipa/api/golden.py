@@ -743,7 +743,9 @@ def golden_job_review_html(
     gate = _job_gate_html(job_id)
     if gate is not None:
         return gate
-    html = GoldenBuildService().render_review(job_id)
+    # 검토본에서 서명 화면으로 바로 갈 수 있게 — 같은 job 의 서명된 주소를 넘긴다.
+    _review_url, _signoff_url = _signed_html_urls(job_id)
+    html = GoldenBuildService().render_review(job_id, signoff_url=_signoff_url)
     if html is None:
         raise HTTPException(status_code=404, detail="golden build review not found (후보 없음)")
     return HTMLResponse(content=html)
@@ -764,7 +766,8 @@ def golden_job_signoff_html(
     gate = _job_gate_html(job_id)
     if gate is not None:
         return gate
-    html = GoldenBuildService().render_signoff(job_id)
+    _review_url, _signoff_url = _signed_html_urls(job_id)
+    html = GoldenBuildService().render_signoff(job_id, review_url=_review_url)
     if html is None:
         raise HTTPException(status_code=404, detail="golden build signoff view not found (gold 후보 없음)")
     return HTMLResponse(content=html)

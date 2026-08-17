@@ -153,7 +153,21 @@ def _site_badge_html(profile: Optional[str], screen: str) -> str:
     )
 
 
-def _nav_html(sub: str, profile: Optional[str], screen: str) -> str:
+def _sibling_link_html(url: str, label: str) -> str:
+    """같은 job 의 상대 화면으로 가는 링크.
+
+    전역 네비에는 넣을 수 없다 — review/signoff 는 job_id 와 ?t= HMAC 토큰이 있어야 열리고
+    (golden.py:741·762), 고정 링크로 걸면 403 이다. 그런데 **같은 job 안에서는** 서버가
+    형제 주소를 서명해 줄 수 있다. 검수자가 검토본과 서명 화면을 오가려고 주소를 다시
+    받아야 하던 것을 없앤다.
+    """
+    if not url:
+        return ""
+    safe = _html.escape(url, quote=True)
+    return f'<a class="cnav-link" href="{safe}">{_html.escape(label)} \u2197</a>'
+
+
+def _nav_html(sub: str, profile: Optional[str], screen: str, sibling: str = "") -> str:
     """콘솔(static/*.html)과 같은 브랜드 바."""
     logo = _logo_data_uri()
     mark = f'<span class="brand-mark"><img src="{logo}" alt="Koipa"/></span>' if logo else ""
@@ -166,6 +180,7 @@ def _nav_html(sub: str, profile: Optional[str], screen: str) -> str:
         # [A3] 화면 간 이동. review/signoff 는 job_id·HMAC 토큰이 필요해 **네비 대상이 못 되므로**
         # 여기서는 나가는 링크만 둔다(현재 화면 표시 없음 = current 를 넘기지 않는다).
         + '<span style="flex:1"></span>'
+        + sibling
         + nav_bar_html()
         + _site_badge_html(profile, screen)
         + "</div></nav>"
@@ -217,6 +232,7 @@ def render_review_html(
     subtitle: str = "",
     css: Optional[str] = None,
     profile: Optional[str] = None,
+    signoff_url: str = "",
 ) -> str:
     """빌더 후보 레코드(dict)들을 지재원 관리자 검수용 인터랙티브 HTML로 렌더.
 
@@ -231,7 +247,8 @@ def render_review_html(
     )
     return head + (
         _BODY_TEMPLATE
-        .replace("__NAV__", _nav_html("골든셋 후보 검토본", profile, "검수"))
+        .replace("__NAV__", _nav_html("골든셋 후보 검토본", profile, "검수",
+                                      _sibling_link_html(signoff_url, "서명 화면")))
         .replace("__TITLE__", _html.escape(title))
         .replace("__SUBTITLE__", _html.escape(subtitle))
         .replace("__REVIEWER__", _html.escape(_reviewer_label(profile)))
@@ -249,6 +266,7 @@ def render_review_html_from_jsonl(
     subtitle: str = "",
     css: Optional[str] = None,
     profile: Optional[str] = None,
+    signoff_url: str = "",
 ) -> str:
     """build_<id>.jsonl·uncertain_<id>.jsonl 등을 읽어 검토본 HTML로 렌더."""
     recs: list[dict] = []
@@ -259,7 +277,8 @@ def render_review_html_from_jsonl(
         for line in pp.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 recs.append(json.loads(line))
-    return render_review_html(recs, title=title, subtitle=subtitle, css=css, profile=profile)
+    return render_review_html(recs, title=title, subtitle=subtitle, css=css, profile=profile,
+                              signoff_url=signoff_url)
 
 
 # ── 골든셋 검수 · 화면 서명(signoff) 인터랙티브 렌더 ──────────────────────────────
@@ -292,6 +311,7 @@ def render_signoff_html(
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
     profile: Optional[str] = None,
+    review_url: str = "",
 ) -> str:
     """gold 후보를 화면 서명용 인터랙티브 HTML로 렌더(승인/등급변경/거부 → POST signoff).
 
@@ -305,7 +325,8 @@ def render_signoff_html(
     )
     return head + (
         _SIGNOFF_BODY
-        .replace("__NAV__", _nav_html("골든셋 검수 · 서명", profile, "서명"))
+        .replace("__NAV__", _nav_html("골든셋 검수 · 서명", profile, "서명",
+                                      _sibling_link_html(review_url, "검토본")))
         .replace("__TITLE__", _html.escape(title))
         .replace("__JOB__", _html.escape(job_id))
         .replace("__POST_URL__", _html.escape(post_url))
@@ -322,6 +343,7 @@ def render_signoff_html_from_jsonl(
     title: str = "골든셋 검수 · 서명",
     css: Optional[str] = None,
     profile: Optional[str] = None,
+    review_url: str = "",
 ) -> str:
     """build_<id>.jsonl(gold 후보)을 읽어 서명 HTML로 렌더."""
     recs: list[dict] = []
@@ -333,7 +355,7 @@ def render_signoff_html_from_jsonl(
             if line.strip():
                 recs.append(json.loads(line))
     return render_signoff_html(recs, job_id=job_id, post_url=post_url, title=title, css=css,
-                               profile=profile)
+                               profile=profile, review_url=review_url)
 
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
