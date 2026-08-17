@@ -305,6 +305,23 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
     # core KPI 위젯 5개 (PASS 비율 + 4개 핵심 KPI)
     core_widgets = _build_core_widgets(scenarios, summ)
 
+    # 측정 조건 — 값만 있고 "무엇으로 어디서 쟀는지" 가 없으면 감리 근거로 못 쓴다.
+    # report["measurement_note"] 에 줄 목록을 넣으면 §0 아래에 그대로 실린다.
+    note_lines = report.get("measurement_note") or []
+    partial = report.get("partial_run") or {}
+    if partial:
+        note_lines = list(note_lines) + [
+            f"부분 실행 — only={partial.get('only') or '-'} · skip={partial.get('skip') or '-'}"
+        ]
+    if note_lines:
+        items = "".join(f"<li>{html.escape(str(x))}</li>" for x in note_lines)
+        measurement_note_html = (
+            '<div class="note"><div class="note-label">측정 조건</div>'
+            f'<ul style="margin:6px 0 0 18px; padding:0; font-size:13px; line-height:1.7">{items}</ul></div>'
+        )
+    else:
+        measurement_note_html = ""
+
     # 시나리오 표
     rows = _build_matrix_rows(scenarios, prev_runs)
 
@@ -352,6 +369,7 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
 <section id="summary">
   <h2><span class="num">§0</span> 요약</h2>
   <div class="widgets">{core_widgets}</div>
+  {measurement_note_html}
 </section>
 
 <section id="matrix">
