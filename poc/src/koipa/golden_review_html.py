@@ -17,6 +17,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
 from koipa.console_nav import NAV_CSS, nav_bar_html
+from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS
 
 # 콘솔(static/styles.css)과 동일한 NovaX 토큰 — 골든 화면이 /demo 콘솔과 한 시스템으로 보이게
@@ -249,6 +250,7 @@ def render_review_html(
         .replace("__TOTAL__", str(len(data)))
         .replace("__GOLD__", str(n_gold))
         .replace("__UNCERTAIN__", str(len(data) - n_gold))
+        .replace("__DOC_RENDER_JS__", DOC_RENDER_JS)
         .replace("__DATA__", _embed_json(data))
     )
 
@@ -338,6 +340,7 @@ def render_signoff_html(
         .replace("__POST_URL__", _html.escape(post_url))
         .replace("__TOTAL__", str(len(data)))
         .replace("__MINPG__", str(int(min_per_grade or 0)))
+        .replace("__DOC_RENDER_JS__", DOC_RENDER_JS)
         .replace("__DATA__", _embed_json(data))
     )
 
@@ -376,7 +379,7 @@ def render_signoff_html_from_jsonl(
 
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
-_SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + """
+_SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
 /* [디자인 정렬 2026-08-18] 후보 관리 화면(manage.html)과 같은 브랜드 바.
    검수자가 오가는 두 화면이라 같은 옷을 입어야 한다. 값은 manage 쪽에서 그대로 가져왔다. */
 .top{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:18px;background:var(--paper)}
@@ -406,6 +409,14 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + """
 .gate .gchk{display:flex;gap:8px;align-items:center;font-size:12.5px;color:#444}
 .gate .actions{margin-top:14px}
 .gate .actions .btn{width:100%}
+/* 카드 안 문서 보기 — 후보 관리 화면과 같은 모양 */
+.docwrap{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.viewbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.viewbar .btn.sm{padding:4px 9px;font-size:11.5px}
+.viewbar .vbtn.active{background:#111;color:#fff;border-color:#111}
+.viewnote{font-size:11.5px;color:#8a9299}
+.scard .docbody{max-height:320px}
+
 .sechead{display:inline-block;margin:0;font-size:21px}
 .secdesc{margin:8px 0 0;color:#727c84;font-size:13px}
 .main .rubric{margin-top:22px}
@@ -522,6 +533,17 @@ __NAV__
 </div>
 <script id="data" type="application/json">__DATA__</script>
 <script>
+__DOC_RENDER_JS__
+// 카드마다 '읽기 좋게 / 원문 그대로' — 후보 관리 화면과 같은 규율.
+// 판단 근거는 원문이 정본이라, 렌더링은 서식만 입히고 내용을 바꾸지 않는다.
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('.vbtn'); if(!b) return;
+  var id=b.dataset.id, want=b.dataset.view;
+  document.querySelectorAll('.vbtn[data-id="'+CSS.escape(id)+'"]').forEach(function(x){
+    x.classList.toggle('active', x.dataset.view===want); });
+  document.querySelectorAll('[data-doc][data-id="'+CSS.escape(id)+'"]').forEach(function(x){
+    x.style.display = x.dataset.doc===want ? '' : 'none'; });
+});
 const DATA=JSON.parse(document.getElementById('data').textContent);
 const POST_URL="__POST_URL__";
 // 배포 게이트가 요구하는 등급별 최소 서명 수(settings.deploy_gate_min_locked_per_grade).
@@ -565,7 +587,14 @@ function card(r){
   const cls=d.decision==='reject'?'scard rejected':(d.decision?'scard decided':'scard');
   return '<div class="'+cls+'" data-id="'+esc(r.id)+'">'
     +'<div class="card-meta"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> <span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> <span style="color:var(--text-dim)">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)+' conf '+r.conf.toFixed(2)+'</span></div>'
-    +'<div class="stext">'+esc(r.text)+'</div>'
+    +'<div class="docwrap"><div class="viewbar">'
+      +'<button type="button" class="btn sm vbtn active" data-view="md" data-id="'+esc(r.id)+'">읽기 좋게</button>'
+      +'<button type="button" class="btn sm vbtn" data-view="raw" data-id="'+esc(r.id)+'">원문 그대로</button>'
+      +'<span class="viewnote">판단 근거는 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span>'
+    +'</div>'
+    +'<div class="docbody md" data-doc="md" data-id="'+esc(r.id)+'">'+mdToHtml(r.text)+'</div>'
+    +'<pre class="docbody" data-doc="raw" data-id="'+esc(r.id)+'" style="display:none">'+esc(r.text)+'</pre>'
+    +'</div>'
     +'<div class="decrow">'
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="approve"'+(d.decision==='approve'?' checked':'')+'> 승인 ('+r.grade+' 유지)</label>'
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="change"'+(d.decision==='change'?' checked':'')+'> 등급변경 <select class="gsel" data-id="'+esc(r.id)+'">'+gopts(d.grade||r.grade)+'</select></label>'
@@ -582,7 +611,7 @@ function pendingCard(r){
     +'<span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> '
     +'<span style="color:var(--text-dim)">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)
     +' conf '+r.conf.toFixed(2)+'</span></div>'
-    +'<div class="stext">'+esc(r.text)+'</div>'
+    +'<div class="docbody md">'+mdToHtml(r.text)+'</div>'
     +'<div class="pendnote">서명 대상이 아닙니다 — 룰과 LLM 이 등급에 합의하지 못한 후보입니다. '
     +'여기서는 내용만 확인하고, 확정은 후보 관리 화면에서 합니다.</div>'
     +'</div>';
