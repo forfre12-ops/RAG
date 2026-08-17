@@ -25,11 +25,19 @@ dry-run:
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import re
 import subprocess
 import sys
 from collections import Counter
+
+# [cp949 대비] 한국어 콘솔(cp949)에서 한글·기호를 stderr 로 쓰면 UnicodeEncodeError 로 죽는다.
+# 이 스크립트는 판정 사유를 한국어로 적어서 그 경로에 걸린다 - 프로젝트에서 여러 번 겪었다.
+for _s in ("stdout", "stderr"):
+    _f = getattr(sys, _s)
+    if getattr(_f, "encoding", "") and _f.encoding.lower() not in ("utf-8", "utf-8-sig"):
+        setattr(sys, _s, io.TextIOWrapper(_f.buffer, encoding="utf-8", errors="replace"))
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
@@ -55,16 +63,22 @@ PERMISSIVE_PATTERNS = [
 ]
 
 # Weak Copyleft — 동적 링킹 시 안전
+# ⚠ 끝 단어경계(\b)를 쓰면 안 된다. 실측 2026-08-17: `\bLGPL\b` 가
+#   "GNU Lesser General Public License v3 (LGPLv3)" 를 **놓쳤다** - LGPL 뒤에 v 가 붙어
+#   단어경계가 없기 때문이다. kiwipiepy(LGPLv3) 가 weak 이 아니라 unknown 으로 떨어졌다.
+#   같은 이유로 "AGPLv3"·"GPLv3" 도 strong 이 아니라 unknown 이 된다 - 위험한 쪽 누락이다.
 WEAK_COPYLEFT_PATTERNS = [
-    r"\bLGPL\b",
+    r"\bLGPL",
     r"Mozilla Public License|\bMPL\b",
 ]
 
 # Strong Copyleft — 주의 필요
+# ⚠ LGPL 을 잘못 삼키지 않는다: "LGPLv3" 에서 GPL 앞 글자가 L(단어문자)라 \bGPL 이 안 걸린다.
+#   STRONG 을 WEAK 보다 먼저 보므로 순서를 바꾸면 LGPL 이 strong 으로 오분류된다.
 STRONG_COPYLEFT_PATTERNS = [
-    r"\bAGPL\b",
+    r"\bAGPL",
     r"GNU Affero",
-    r"\bGPL[-\s]?[23]",
+    r"\bGPL[-\s]?v?[23]",
     r"GNU General Public",
 ]
 
@@ -310,6 +324,12 @@ KNOWN_RISKS_ALLOWLIST = {
 }
 
 
+# unknown 이 이 비율을 넘으면 산출물을 근거로 쓸 수 없다고 본다.
+# 0 이 아닌 이유: 자기 자신(koipa-ai) 등 일부는 메타데이터에 라이선스가 없어 소수는 정상이다.
+# 실측 2026-08-17 배포본: 178개 중 unknown 4개(2.2%) - huey·skops·koipa-ai(2회).
+_MAX_UNKNOWN_RATIO = 0.10
+
+
 def check_licenses(packages: list[dict], *, allow_known: bool = True) -> tuple[bool, list[dict]]:
     """strong copyleft 또는 unknown 발견 시 fail.
 
@@ -487,6 +507,12 @@ def main() -> int:
         help="strong copyleft 또는 unknown 발견 시 비-0 종료 (CI용)",
     )
     ap.add_argument(
+        "--allow-degraded",
+        action="store_true",
+        help="unknown 비율이 한계를 넘어도 통과시킨다(오프라인 드라이런 전용). "
+             "이 산출물은 제출 근거로 쓸 수 없다.",
+    )
+    ap.add_argument(
         "--strict", action="store_true",
         help="--check 시 KNOWN_RISKS_ALLOWLIST(PyMuPDF 등) 무시 — 전체 검사",
     )
@@ -533,12 +559,40 @@ def main() -> int:
         written.append(target)
         print(f"[licenses] {fmt:10s} -> {target} ({len(text)} bytes)", file=sys.stderr)
 
-    print(
-        f"\n[licenses] OK — {len(packages)} packages, "
-        f"tiers: {dict(Counter(p['tier'] for p in packages))}",
-        file=sys.stderr,
+    # [무음 통과 차단 2026-08-17] 종전에는 tier 구성과 무관하게 무조건 "OK" 를 찍었다.
+    # 실측: 배포 이미지에 pip-licenses 가 없어 30개 **전부 unknown** 인 산출물을 만들고도
+    #   [licenses] OK - 30 packages, tiers: {'unknown': 30}
+    # 이라고 보고했다. 그대로 발주처에 제출하면 라이선스 근거가 없는 문서가 나간다.
+    # "만들어졌다" 와 "근거로 쓸 수 있다" 는 다른 말이어야 한다.
+    tiers = dict(Counter(p["tier"] for p in packages))
+    unknown_n = tiers.get("unknown", 0)
+    # strong 은 --check 와 같은 판정을 쓴다 - 한쪽만 허용목록을 보면 두 경로가 다른 말을 한다.
+    # (KNOWN_RISKS_ALLOWLIST 는 PyMuPDF 처럼 듀얼 라이선스로 이미 검토된 것이다)
+    strong_n = sum(
+        1 for x in packages
+        if x["tier"] == "strong" and x["name"] not in KNOWN_RISKS_ALLOWLIST
     )
-    return 0
+    ratio = unknown_n / (len(packages) or 1)
+    print("", file=sys.stderr)
+    if ratio <= _MAX_UNKNOWN_RATIO and not strong_n:
+        print(f"[licenses] OK - {len(packages)} packages, tiers: {tiers}", file=sys.stderr)
+        return 0
+
+    print(f"[licenses] 산출은 됐으나 **근거로 쓸 수 없다** - {len(packages)} packages, "
+          f"tiers: {tiers}", file=sys.stderr)
+    if ratio > _MAX_UNKNOWN_RATIO:
+        print(f"  - unknown {unknown_n}/{len(packages)} ({ratio:.0%} > 한계 "
+              f"{_MAX_UNKNOWN_RATIO:.0%}) - pip-licenses 가 없으면 전 패키지가 unknown 이 된다",
+              file=sys.stderr)
+    if strong_n:
+        print(f"  - strong copyleft {strong_n}건", file=sys.stderr)
+    if getattr(args, "allow_degraded", False):
+        print("  --allow-degraded 로 통과시킨다(드라이런). 이 산출물을 제출 근거로 쓰지 말 것.",
+              file=sys.stderr)
+        return 0
+    print("  해결: pip install pip-licenses cyclonedx-bom 후 재실행. "
+          "의도한 드라이런이면 --allow-degraded 를 준다.", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
