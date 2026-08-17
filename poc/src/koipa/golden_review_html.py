@@ -22,14 +22,7 @@ from koipa.console_nav import NAV_CSS, nav_bar_html
 # 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
 # 감리 증적으로 단독 저장·전달될 수 있어 self-contained 여야 한다(정적 마운트 의존 금지).
 _TOKENS = """
-:root{
-  --bg:#ffffff;--bg-surface:#fafafa;--text:#0a0a0a;--text-soft:#525252;--text-dim:#737373;
-  --border:rgba(0,0,0,0.08);--border-strong:rgba(0,0,0,0.16);--accent:#0a0a0a;--accent-soft:#f4f4f4;
-  --radius:0;
-  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
-  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
-  --c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;
-}
+:root{--bg:#ffffff;--bg-surface:#f7f7f5;--text:#111111;--text-soft:#555555;--text-dim:#8f9498;--border:#e1e1de;--border-strong:#cfcfcb;--accent:#111111;--accent-soft:#f7f7f5;--radius:0;--font-sans:Arial,"Noto Sans KR",sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--c-ts:#e72d44;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;--ink:#111111;--red:#e72d44;--paper:#fff;--soft:#f7f7f5;--line:#e1e1de;--mute:#8f9498}
 """
 
 _DEFAULT_CSS = """<style>""" + _TOKENS + """
@@ -172,18 +165,18 @@ def _nav_html(sub: str, profile: Optional[str], screen: str, sibling: str = "") 
     logo = _logo_data_uri()
     mark = f'<span class="brand-mark"><img src="{logo}" alt="Koipa"/></span>' if logo else ""
     return (
-        '<nav class="nav"><div class="nav-inner">'
-        f'<span class="brand">{mark}'
-        '<span class="brand-name">한국지식재산보호원</span>'
-        '<span class="brand-sep">/</span>'
-        f'<span class="brand-sub">{_html.escape(sub)}</span></span>'
+        '<header class="top">'
+        f'<span class="mark">{mark}</span>'
+        '<span class="brand">한국지식재산보호원</span>'
+        '<span class="divider"></span>'
+        f'<span class="product">{_html.escape(sub)}</span>'
         # [A3] 화면 간 이동. review/signoff 는 job_id·HMAC 토큰이 필요해 **네비 대상이 못 되므로**
         # 여기서는 나가는 링크만 둔다(현재 화면 표시 없음 = current 를 넘기지 않는다).
         + '<span style="flex:1"></span>'
         + sibling
         + nav_bar_html()
         + _site_badge_html(profile, screen)
-        + "</div></nav>"
+        + "</header>"
     )
 
 
@@ -383,6 +376,15 @@ def render_signoff_html_from_jsonl(
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
 _SIGNOFF_CSS = """<style>""" + _TOKENS + """
+/* [디자인 정렬 2026-08-18] 후보 관리 화면(manage.html)과 같은 브랜드 바.
+   검수자가 오가는 두 화면이라 같은 옷을 입어야 한다. 값은 manage 쪽에서 그대로 가져왔다. */
+.top{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:18px;background:var(--paper)}
+.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}
+.top .mark img{width:100%;height:100%;object-fit:contain}
+.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:var(--ink)}
+.top .divider{height:23px;border-left:1px solid var(--border-strong)}
+.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1}
+
 .who{font-size:13px;font-weight:700;color:#fff;padding:5px 0;display:inline-block}
 .scard.pending{opacity:.72;background:#fafaf9}
 .pendnote{margin-top:10px;padding:8px 11px;font-size:12.5px;line-height:1.55;color:#78350f;background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:2px}
