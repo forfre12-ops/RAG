@@ -60,6 +60,33 @@ def _exclusive_ledger_lock(lock_path: Path) -> Iterator[None]:
             handle.close()
 
 
+def _merged_provenance(meta: dict) -> dict:
+    """metadata 의 출처 정보를 한 모양으로 합친다.
+
+    provenance dict 가 정본이다. 없거나 비어 있으면 top-level 의 옛 키를 끌어올린다.
+    끌어올린 것은 `origin="legacy_top_level"` 로 표시해, 어디서 온 값인지 화면·감사에서
+    구분할 수 있게 한다. **status 는 함부로 'recorded' 로 올리지 않는다** - 사용 권한
+    근거(authorization_basis)가 없으면 출처만 있는 상태이기 때문이다.
+    """
+    prov = dict(meta.get("provenance") or {})
+    if prov.get("status") == "recorded":
+        return prov
+    legacy_src = str(meta.get("source_reference") or "").strip()
+    legacy_basis = str(meta.get("authorization_basis") or "").strip()
+    if not (legacy_src or legacy_basis):
+        return prov
+    prov.setdefault("source_reference", legacy_src)
+    if legacy_basis:
+        prov.setdefault("authorization_basis", legacy_basis)
+    prov.setdefault("origin", "legacy_top_level")
+    # 둘 다 있어야 기록으로 친다 - 출처만 있고 권한 근거가 없으면 미완이다.
+    if prov.get("source_reference") and prov.get("authorization_basis"):
+        prov.setdefault("status", "recorded")
+    else:
+        prov.setdefault("status", "partial")
+    return prov
+
+
 class ProxyGoldCandidateService:
     """Read synthetic candidates and record append-only manager decisions."""
 
@@ -439,7 +466,15 @@ class ProxyGoldCandidateService:
                 "latest_decision": decision or None,
                 "grade_fixed": bool(decision.get("final_grade")),
                 "extraction": meta.get("extraction"),
-                "provenance": meta.get("provenance") or {},
+                # [E3a-5 2026-08-17] 출처가 **두 자리**에 있다. 읽는 쪽이 한 자리만 봐서
+                # 실제로는 기록된 것이 "없음" 으로 보였다.
+                #   provenance dict          업로드 API 경로가 쓰는 자리 (12건)
+                #   metadata top-level       적재 스크립트가 쓴 자리 (62건)
+                #     load_kl_review_pool_to_console.py:205 `"source_reference": r.get("source")`
+                # 실측(223, 2026-08-17): 실문서 74건 중 62건이 top-level 에만 있었고
+                # 전부 실제 값이 있었다("판례(2000+)" 등). 데이터가 없던 것이 아니다.
+                # 자리를 합쳐서 읽는다 - 원본 파일은 안 건드린다(적재 스크립트는 E3a-7 에서 고친다).
+                "provenance": _merged_provenance(meta),
                 "source_file_sha256": str(meta.get("source_file_sha256") or "") or None,
                 "is_actual_document": document_origin in {"public_real", "organization_real"},
                 "text": text,
@@ -467,6 +502,16 @@ class ProxyGoldCandidateService:
             "actual_document_intake": len(actual),
             "actual_provenance_recorded": sum(
                 1 for c in actual if c.get("provenance", {}).get("status") == "recorded"
+            ),
+            # [E3a-5] 출처는 있는데 사용 권한 근거가 비어 완결되지 않은 것. 이 수가 보이지
+            # 않으면 "기록 12건" 만 보고 나머지 62건에 아무 정보도 없다고 오해한다.
+            "actual_provenance_partial": sum(
+                1 for c in actual if c.get("provenance", {}).get("status") == "partial"
+            ),
+            # 옛 자리(metadata top-level)에서 끌어올린 것 — 적재 스크립트 교정(E3a-7) 전에
+            # 들어온 분량이라, 이 수가 0 이 되면 이관이 끝난 것이다.
+            "actual_provenance_legacy": sum(
+                1 for c in actual if c.get("provenance", {}).get("origin") == "legacy_top_level"
             ),
             "actual_grade_fixed_unlocked": sum(
                 1 for c in actual if c["status"] == "grade_fixed_unlocked"

@@ -202,7 +202,21 @@ def main(argv=None) -> int:
             "authoring_method": "gold_real_import",
             "requires_manual_audit": True,
             "candidate_status": "under_review",
+            # [E3a-7 2026-08-17] 출처를 **provenance dict 에** 넣는다.
+            # 종전에는 metadata top-level 의 source_reference 에만 넣었는데, 읽는 쪽
+            # (proxy_gold_candidate_service._candidates)은 provenance 키만 본다.
+            # 그 결과 실문서 74건 중 62건이 화면에서 "출처 기록 없음" 으로 보였다 -
+            # 값은 전부 있었다("판례(2000+)" 등). 자리가 어긋난 것이 원인이다.
+            # top-level 은 되돌림·호환을 위해 남긴다(읽는 쪽이 둘 다 본다).
             "source_reference": r.get("source") or "",
+            "provenance": {
+                "source_reference": r.get("source") or "",
+                # 사용 권한 근거는 적재 시점에 알 수 없다. 비워 두면 읽는 쪽이
+                # status="partial" 로 판정한다 - 사람이 채워야 recorded 가 된다.
+                "authorization_basis": "",
+                "status": "partial",
+                "origin": "kl_review_pool_import",
+            },
             "domain": r.get("domain") or "",
             "claim_scope": (
                 "검수 전 후보. 승인되어도 Proxy Gold 이며 Locked Gold·실운영 정확도 근거가 아니다."
