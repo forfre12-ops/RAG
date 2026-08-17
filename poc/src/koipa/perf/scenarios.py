@@ -74,6 +74,8 @@ def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
         if not path.is_file():
             continue
         rows: list[tuple[str, str]] = []
+        sources: dict[str, int] = {}
+        reviewers: dict[str, int] = {}
         try:
             for line in path.read_text(encoding="utf-8").splitlines():
                 if not line.strip():
@@ -83,9 +85,17 @@ def _load_eval_set() -> tuple[list[tuple[str, str]], str]:
                 label = rec.get("label") or rec.get("grade") or rec.get("intended_label") or ""
                 if text and label:
                     rows.append((text, label))
+                    src = str(rec.get("label_source") or "?")
+                    rid = str(rec.get("reviewer_id") or "?")
+                    sources[src] = sources.get(src, 0) + 1
+                    reviewers[rid] = reviewers.get(rid, 0) + 1
         except Exception:  # noqa: BLE001
             continue
         if rows:
+            # 값만 있고 근거가 없으면 감리에서 쓸 수 없다. 정답이 어디서 왔는지(라벨 출처·
+            # 서명자)를 같이 남긴다 — 서명자가 한 명뿐이거나 시연 계정이면 그 숫자의 무게가
+            # 달라진다(223 실측 2026-08-17: locked_gold_eval 20건 전원 reviewer_id 동일).
+            print(f"[PSH][eval] {path.name} · label_source={sources} · reviewer_id={reviewers}")
             return rows[:limit], path.name
     return [], ""
 
