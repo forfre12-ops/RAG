@@ -417,8 +417,16 @@ _STATIC_DIR = Path(__file__).parent / "static"
 _console_on = settings.demo_console_enabled or settings.serve_admin_console
 if _STATIC_DIR.is_dir() and _console_on:
     app.mount("/demo", StaticFiles(directory=str(_STATIC_DIR), html=True), name="demo")
+    # [A4] /console 별칭 — 운영에서 "데모"라는 경로명이 관리 콘솔을 가리키는 것이 오해를 부른다
+    # (프로덕션 조합은 demo_console_enabled=False · serve_admin_console=True 다 — config.py:122·131).
+    # ⚠ /demo 를 없애지 않는다. 유지해야 하는 하드 제약이 두 곳에 있다:
+    #     tests/test_deploy_profile.py:203  assert "/demo" in mount_paths
+    #     tests/test_demo_page.py           /demo/ 경로 직접 요청
+    # 정적 자산은 깨지지 않는다 — 세 화면의 링크·스크립트가 전부 상대경로이고
+    # 절대 /demo 를 쓰는 참조가 0건임을 확인했다(grep).
+    app.mount("/console", StaticFiles(directory=str(_STATIC_DIR), html=True), name="console")
     logger.info(
-        "console mounted at /demo/ (dir=%s, demo=%s, admin=%s)",
+        "console mounted at /demo/ and /console/ (dir=%s, demo=%s, admin=%s)",
         _STATIC_DIR, settings.demo_console_enabled, settings.serve_admin_console,
     )
 elif not _console_on:

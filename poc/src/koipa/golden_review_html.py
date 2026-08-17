@@ -16,6 +16,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
+from koipa.console_nav import NAV_CSS, nav_bar_html
 
 # 콘솔(static/styles.css)과 동일한 NovaX 토큰 — 골든 화면이 /demo 콘솔과 한 시스템으로 보이게
 # 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
@@ -91,6 +92,7 @@ body{font-family:var(--font-sans);margin:0;background:var(--bg);color:var(--text
 .status-txt.uncertain{border-color:var(--c-ts);color:var(--c-ts)}
 .preview{font-size:11.5px;color:var(--text-soft);margin-top:8px;line-height:1.5}
 .no-results{padding:30px;text-align:center;color:var(--text-dim)}
+""" + NAV_CSS + """
 </style>"""
 
 _GRADES = ("TS", "S1", "S2", "S3")
@@ -161,6 +163,10 @@ def _nav_html(sub: str, profile: Optional[str], screen: str) -> str:
         '<span class="brand-name">한국지식재산보호원</span>'
         '<span class="brand-sep">/</span>'
         f'<span class="brand-sub">{_html.escape(sub)}</span></span>'
+        # [A3] 화면 간 이동. review/signoff 는 job_id·HMAC 토큰이 필요해 **네비 대상이 못 되므로**
+        # 여기서는 나가는 링크만 둔다(현재 화면 표시 없음 = current 를 넘기지 않는다).
+        + '<span style="flex:1"></span>'
+        + nav_bar_html()
         + _site_badge_html(profile, screen)
         + "</div></nav>"
     )
@@ -362,6 +368,7 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + """
 .result{margin:14px 0;padding:12px 16px;border-radius:var(--radius);font-size:13px;display:none}
 .result.ok{background:#f0fdf4;border:1px solid var(--c-s3);border-left:3px solid var(--c-s3);color:#166534;display:block}
 .result.err{background:#fef2f2;border:1px solid var(--c-ts);border-left:3px solid var(--c-ts);color:#991b1b;display:block}
+""" + NAV_CSS + """
 </style>"""
 
 _SIGNOFF_BODY = r"""
@@ -375,7 +382,7 @@ __NAV__
   <div class="fld"><label>X-API-Key</label><input id="key" type="password" value="__APIKEY_DEFAULT__" placeholder="settings.api_key"></div>
   <div class="fld"><label>역할(X-Actor-Role)</label><select id="role"><option value="reviewer">reviewer</option><option value="admin">admin</option><option value="kl_backend">kl_backend</option></select></div>
   <div class="fld"><label>검수자 계정(reviewer_id)</label><input id="reviewer" value="__REVIEWER_DEFAULT__" placeholder="실계정 예: hong.gd"></div>
-  <div class="fld chk"><input type="checkbox" id="publish" checked><label for="publish">라이브 반영(publish)</label></div>
+  <div class="fld chk"><input type="checkbox" id="publish"><label for="publish">라이브 반영(publish)</label><!-- 기본 해제: 서버 기본값(GoldenSignoffRequest.publish=False)·사용자매뉴얼과 일치. 체크해야 정본·라이브 경로가 바뀐다. -->
   <div class="fld"><label>&nbsp;</label><button id="submit">서명 제출</button></div>
 </div>
 <div class="container">

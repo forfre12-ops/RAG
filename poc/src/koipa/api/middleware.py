@@ -91,6 +91,7 @@ _EXCLUDED_PREFIXES: tuple[str, ...] = (
     "/api/v1/healthz",   # /ready · /live · /deep — 프로브, 상태 변경 없음
     "/healthz",          # 루트 프로브(옛 경로)
     "/demo/",            # 콘솔 정적 자산(html·js·png)
+    "/console/",         # 같은 디렉터리의 별칭 마운트(app.py) — 빼면 감사가 정적 자산으로 다시 덮인다
     "/static/",
     "/favicon",
     "/api/v1/metrics-prom",   # Prometheus 스크랩(주기 호출, 읽기 전용)
