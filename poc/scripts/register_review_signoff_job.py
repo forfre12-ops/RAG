@@ -49,6 +49,14 @@ def _headers(api_key: str, token: str) -> dict:
     return h
 
 
+def _abs(api: str, url: str) -> str:
+    """서버가 주는 review_url/signoff_url 은 절대경로(/api/v1/...)다 — 호스트를 붙인다."""
+    if url.startswith(("http://", "https://")):
+        return url
+    root = api[: -len("/api/v1")] if api.endswith("/api/v1") else api.rstrip("/")
+    return root + url
+
+
 def main(argv: list[str] | None = None) -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description="검수 전달본을 서명 잡으로 등록(HTTP)")
@@ -130,14 +138,28 @@ def main(argv: list[str] | None = None) -> int:
         info = r.json()
         print(f"[verify] status={info.get('status')} · "
               f"gold_count={info.get('gold_count')} · error={info.get('error')}")
-        # 서명 화면이 실제로 열리는지까지 본다 — 여기까지 200 이어야 검수자가 쓸 수 있다.
-        r2 = cli.get(f"{api}/golden/jobs/{job_id}/signoff.html", headers=hdr)
+        # 서명 URL 은 **서버가 준 것**을 쓴다. 직접 조립하면 안 된다 —
+        # GOLDEN_HTML_URL_SECRET 이 설정된 서버에서는 ?t= HMAC 토큰이 없는 링크가 403 이다
+        # (golden.py:762). 223 은 실제로 설정돼 있어서(실측 64자), 종전 출력은 검수자에게
+        # **열리지 않는 링크**를 주고 있었다. 응답의 signoff_url 은 golden.py:187 이 채운다.
+        signoff_url = info.get("signoff_url") or f"/api/v1/golden/jobs/{job_id}/signoff.html"
+        review_url = info.get("review_url") or f"/api/v1/golden/jobs/{job_id}/review.html"
+        signed = "?t=" in signoff_url
+        if not signed:
+            print("[verify] ⚠ 서명 URL 에 ?t= 가 없다 — 서버에 GOLDEN_HTML_URL_SECRET 이 "
+                  "설정돼 있으면 검수자가 403 을 본다")
+
+        # 화면이 실제로 열리는지까지 본다 — 여기까지 200 이어야 검수자가 쓸 수 있다.
+        r2 = cli.get(_abs(api, signoff_url), headers=hdr)
         print(f"[verify] signoff.html -> {r2.status_code}"
               + ("" if r2.status_code == 200 else "  ⚠ 검수자가 못 연다"))
 
     print("\n검수자에게 줄 것")
-    print(f"  서명 화면   {api}/golden/jobs/{job_id}/signoff.html")
+    print(f"  서명 화면   {_abs(api, signoff_url)}")
+    print(f"  검토 화면   {_abs(api, review_url)}")
     print(f"  서명 API    POST {api}/golden/jobs/{job_id}/signoff")
+    if signed:
+        print("  ⚠ 주소의 ?t= 까지 통째로 전달할 것 — 잘라내면 403 이다(job 단위 서명 토큰)")
     print("\n반드시 확인할 것")
     print("  1. 검수 계정이 **실계정** 이어야 한다. ai_assist · system · demo-console 은 거부된다")
     print("     (거부되면 응답에 rejected_reasons={'machine_reviewer': N} 이 뜬다)")
