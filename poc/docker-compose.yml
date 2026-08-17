@@ -3,7 +3,9 @@ name: koipa-poc
 services:
   postgres:
     # ES 제거(의사결정_대장 §03 ⓑ) — pgvector dense + ts_rank 하이브리드. (stock pgvector 이미지, pg_bigm 불요)
-    image: pgvector/pgvector:pg16
+    # [공급망] digest 고정 — 태그는 가변이라 같은 pg16 이 다른 바이트를 가리킬 수 있다.
+    # 갱신 시: docker pull <tag> 후 `docker images --digests` 값을 옮겨 적고 doc/14 재평가.
+    image: pgvector/pgvector:pg16@sha256:131dcf7ff6a900545df8e7e092c270aa8c6db2f2c818e408cb45ec21316b74e6
     environment:
       POSTGRES_DB: koipa
       POSTGRES_USER: koipa
@@ -20,7 +22,8 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # [공급망] latest 는 매번 다른 이미지를 뜻한다 — digest 로 고정한다.
+    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-koipa}
@@ -34,7 +37,7 @@ services:
   redis:
     # BSD-3-Clause 시점(7.2.x)으로 고정 — Redis 7.4+는 RSALv2/SSPL 듀얼 (doc/14 §6.3).
     # 본 사업은 OSS 적합성 위해 BSD 시점 유지. 운영 갱신 시 doc/14 라이선스 재평가.
-    image: redis:7.2-alpine
+    image: redis:7.2-alpine@sha256:dfa18828cbc07b3ae6a95ec7343f6c214fdee2d836197b4be8e9904420762cd8
     command: redis-server --appendonly yes
     volumes:
       - ../docker-data/redis:/data
@@ -149,7 +152,7 @@ services:
   # 운영: ./infra/mtls/certs를 PKI/cert-manager 산출물로 교체.
   nginx-mtls:
     profiles: ["mtls"]
-    image: nginx:1.27-alpine
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     depends_on:
       - api
     ports:

@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tok = AutoTokenizer.from_pretrained(args.base)
     model = _build_model(args.base, torch, args.classes).cuda()
-    model.load_state_dict(torch.load(Path(args.model) / "model.pt"))
+    model.load_state_dict(torch.load(Path(args.model) / "model.pt", weights_only=True))
 
     # 출처별로 갈라 만든 실문서 판정면(v8_real_surface.py). 섞으면 수치가 어디서 왔는지
     # 알 수 없다 — 판례는 우리 루브릭으로 S3 가 정답이라 모델이 S3 라 해도 맞다.

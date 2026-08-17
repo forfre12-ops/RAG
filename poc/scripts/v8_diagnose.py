@@ -40,7 +40,7 @@ def main() -> int:
 
     tok = AutoTokenizer.from_pretrained("kakaobank/kf-deberta-base")
     model = _build_model("kakaobank/kf-deberta-base", torch, 4).cuda()
-    model.load_state_dict(torch.load(f"{args.model}/model.pt"))
+    model.load_state_dict(torch.load(f"{args.model}/model.pt", weights_only=True))
     print(f"[model] {args.model}")
 
     out: dict = {}

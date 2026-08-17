@@ -89,6 +89,45 @@ jobs:
         # --locked: 락을 재생성하지 않고 pyproject 와 일치하는지만 검사(불일치 시 exit 1).
         run: uv lock --locked
 
+  dependency-cve:
+    # [공급망] 락파일 기준 의존성 CVE 검사. 지금까지 CI 에는 SAST(bandit·semgrep)만 있고
+    # "우리가 쓰는 패키지에 알려진 취약점이 있는가" 를 보는 단계가 없었다 — 락을 고정해도
+    # 그 고정본이 안전한지는 별개 축이다.
+    #
+    # 정책: 새 CVE 는 우리 커밋과 무관하게 아무 때나 공개된다. 그래서 이 잡은 **보고까지는
+    # 항상 하고**, 차단은 취약점 무시 목록(.pip-audit-ignore)으로 명시 관리한다.
+    # 무시하려면 이유를 파일에 적어야 한다 — 조용히 통과하는 경로를 만들지 않는다.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit + uv
+        run: pip install pip-audit uv
+
+      - name: Export locked requirements
+        # 락파일 기준으로 검사해야 "실제 배포되는 버전" 의 취약점을 본다.
+        run: uv export --frozen --no-dev --format requirements-txt > /tmp/req.locked.txt
+
+      - name: pip-audit (locked deps)
+        run: |
+          IGNORE=""
+          if [ -f .pip-audit-ignore ]; then
+            # 형식: 한 줄에 "GHSA-xxxx  # 사유". 주석·빈 줄 무시.
+            while read -r line; do
+              id="$(echo "$line" | sed 's/#.*//' | tr -d '[:space:]')"
+              [ -n "$id" ] && IGNORE="$IGNORE --ignore-vuln $id"
+            done < .pip-audit-ignore
+          fi
+          echo "무시 목록: ${IGNORE:-(없음)}"
+          pip-audit --requirement /tmp/req.locked.txt --strict --progress-spinner off $IGNORE
+
   security-scan:
     # C8: OWASP ASVS L2 셀프스캔 — bandit(SAST) + semgrep(rule-based)
     # 결과는 SARIF로 업로드. 신규 HIGH/CRITICAL 발견 시 fail.

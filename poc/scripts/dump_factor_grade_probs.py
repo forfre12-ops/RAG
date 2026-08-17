@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     meta = json.loads((mdir / "meta.json").read_text("utf-8"))
     tok = AutoTokenizer.from_pretrained(str(mdir))
     model = _build_model(meta["base_model"], torch)
-    model.load_state_dict(torch.load(mdir / "model.pt", map_location="cuda"))
+    model.load_state_dict(torch.load(mdir / "model.pt", map_location="cuda", weights_only=True))
     model.cuda().eval()
 
     # 27 조합 -> 등급 대응표를 미리 만든다(매 문서 재계산 방지).

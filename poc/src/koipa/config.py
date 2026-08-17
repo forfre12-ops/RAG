@@ -392,6 +392,10 @@ class Settings(BaseSettings):
     # .env: CLASSIFIER_MODEL_DIR=artifacts/classifier-1ep/v-ae3f5371 형식.
     classifier_model_dir: str = ""
 
+    # 허브에서 내려받는 모델(기반 백본 등)의 고정 리비전. 빈 값이면 미고정 — 같은 이름이
+    # 다른 가중치를 가리킬 수 있다(공급망). 로컬 디렉터리 로드에는 해당 없음.
+    hf_model_revision: str = ""
+
     # 서빙 모델 선택 (C-ver 폐곡선 마감) — True면 ClassifyService가 **활성 ModelVersion**
     # (register_and_gate/rollback이 활성화한 버전)의 model_uri를 우선 로드하고, 없거나 로컬
     # 디렉토리가 아니면 classifier_model_dir(env)로 폴백한다. 이로써 activate/rollback이 실제
@@ -1197,6 +1201,18 @@ def assert_production_credentials() -> None:
         raise RuntimeError(
             f"production 모드인데 필수 자격증명 누락: {', '.join(missing)}. "
             ".env / 환경변수 / secrets_manager(Vault·AWS SM)로 설정 필요."
+        )
+
+    # [공급망] 운영에서 모델을 허브에서 즉석으로 받아오면, 같은 이름이 다른 가중치를 가리켜도
+    # 알 수 없다. 폐쇄망 compose 는 HF_HUB_OFFLINE=1 로 허브 접근을 아예 막지만 클라우드
+    # 배포 환경에는 그 변수가 없다(2026-08-17 실측: KL 테스트서버 환경변수 38개에 부재).
+    # 둘 중 하나는 있어야 한다 — 오프라인 고정이거나, 리비전 고정이거나.
+    _offline = os.environ.get("HF_HUB_OFFLINE", "").strip().lower() in {"1", "true", "yes", "on"}
+    if not _offline and not (settings.hf_model_revision or "").strip():
+        logger.warning(
+            "운영 모드인데 HF_HUB_OFFLINE 도, HF_MODEL_REVISION 도 없다 — 모델을 허브에서 "
+            "미고정 상태로 받아올 수 있다(공급망 위험). 폐쇄망은 HF_HUB_OFFLINE=1, 그 외에는 "
+            "HF_MODEL_REVISION 으로 커밋 해시를 고정할 것."
         )
 
     # [번들-안전게이트] 하드닝 운영(require_safety_gates=True)은 룰·모델 합의 게이트·메타데이터

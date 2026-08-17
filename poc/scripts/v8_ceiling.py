@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tok = AutoTokenizer.from_pretrained(args.base)
     model = _build_model(args.base, torch, 4).cuda()
-    model.load_state_dict(torch.load(Path(args.model) / "model.pt"))
+    model.load_state_dict(torch.load(Path(args.model) / "model.pt", weights_only=True))
 
     rows = [json.loads(l) for l in Path(args.data).read_text("utf-8").splitlines() if l.strip()]
     rows = [r for r in rows if (r.get("text") or r.get("content")) and r.get("label") in ORDER]

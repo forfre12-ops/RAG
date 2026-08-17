@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tok = AutoTokenizer.from_pretrained(args.base)
     model = _build_model(args.base, torch, 4).cuda()
-    model.load_state_dict(torch.load(Path(args.model) / "model.pt"))
+    model.load_state_dict(torch.load(Path(args.model) / "model.pt", weights_only=True))
 
     sets = [("business_work", "datasets/v8_real/business_work.jsonl"),
             ("finance", "datasets/v8_real/finance.jsonl"),

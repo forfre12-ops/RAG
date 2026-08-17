@@ -134,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(args.base)
     model = _build_model(args.base, torch, args.classes).to(device)
-    model.load_state_dict(torch.load(Path(args.model) / "model.pt", map_location=device))
+    model.load_state_dict(torch.load(Path(args.model) / "model.pt", map_location=device, weights_only=True))
 
     preds, probs = predict(model, tok, [r["text"] for r in rows], device,
                            args.max_len, args.batch, want_probs=True)

@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(str(mdir))
     model = _build_model(meta["base_model"], torch)
-    model.load_state_dict(torch.load(mdir / "model.pt", map_location=device))
+    model.load_state_dict(torch.load(mdir / "model.pt", map_location=device, weights_only=True))
     model.to(device).eval()
 
     report: dict = {"model": str(mdir), "sets": {}}

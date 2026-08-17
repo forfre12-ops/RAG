@@ -89,6 +89,18 @@ def _build_model(base: str, torch, n_classes: int = 4):
 class FactorInference:
     """요소 모델 추론기. 로드 실패는 조용히 비활성(분류를 막지 않는다)."""
 
+    @staticmethod
+    def _hub_kwargs() -> dict:
+        """허브에서 받는 로드에만 붙는 인자. 로컬 디렉터리 로드에는 의미가 없다.
+
+        revision 은 설정으로 받는다 — 값을 지어내지 않는다. 폐쇄망은 HF_HUB_OFFLINE=1 로
+        허브 접근 자체가 막히지만, 클라우드 배포에는 그 변수가 없어 허브가 열려 있다.
+        """
+        from koipa.config import settings  # noqa: PLC0415
+
+        rev = (getattr(settings, "hf_model_revision", "") or "").strip()
+        return {"revision": rev} if rev else {}
+
     def __init__(self, model_dir, base: str = "kakaobank/kf-deberta-base",
                  max_len: int = 768) -> None:
         self.model_dir = Path(model_dir) if model_dir else None
@@ -115,9 +127,13 @@ class FactorInference:
             import torch
             from transformers import AutoTokenizer
 
-            self._tokenizer = AutoTokenizer.from_pretrained(self.base)
+            self._tokenizer = AutoTokenizer.from_pretrained(self.base, **self._hub_kwargs())
             model = _build_model(self.base, torch, 4)
-            model.load_state_dict(torch.load(self.model_dir / "model.pt", map_location="cpu"))
+            # weights_only=True: model.pt 는 pickle 이라 임의 코드 실행 경로가 열린다.
+            # state_dict 만 필요하므로 텐서 외 객체는 아예 역직렬화하지 않는다.
+            model.load_state_dict(
+                torch.load(self.model_dir / "model.pt", map_location="cpu", weights_only=True)
+            )
             model.eval()
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
             model.to(self._device)

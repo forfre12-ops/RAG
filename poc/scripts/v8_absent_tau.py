@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tok = AutoTokenizer.from_pretrained(args.base)
     model = _build_model(args.base, torch, 4).cuda()
-    model.load_state_dict(torch.load(Path(args.model) / "model.pt"))
+    model.load_state_dict(torch.load(Path(args.model) / "model.pt", weights_only=True))
 
     KAPPAS = (0.0, 0.50, 0.70, 0.80, 0.90, 0.95, 0.99, 1.01)
     out: dict = {"model": args.model, "kappas": list(KAPPAS)}
