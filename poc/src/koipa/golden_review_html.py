@@ -523,7 +523,10 @@ document.getElementById('submit').addEventListener('click',async function(){
       // publish 를 체크했는데 실제 미반영(경로 미설정/승격 0)이면 명시 — 조용한 미리보기 강등 방지.
       var pubTxt = j.published ? '· 라이브 반영됨'
                  : (publish ? '· ⚠ 라이브 반영 요청됨—미반영 '+esc(j.publish_note||'(locked_eval 경로 미설정 또는 승격 0)')
-                            : '· 미리보기(라이브 무변경)');
+                            // 결정은 화면에 남아 있다(DEC 를 비우지 않고 다시 그리지도 않는다).
+                            // 그 사실을 말해 주지 않으면 처음부터 다시 하려고 한다.
+                            : '· <b>미리보기</b>(라이브 무변경) — 반영하려면 위 <b>[라이브 반영]</b>을 '
+                              + '체크하고 <b>다시 제출</b>하세요. <b>결정은 그대로 남아 있습니다.</b>');
       var rr = (j.rejected_reasons && Object.keys(j.rejected_reasons).length)
                  ? '<br>거부 사유: '+esc(JSON.stringify(j.rejected_reasons)) : '';
       box.innerHTML='서명 완료 — locked <b>'+j.locked+'</b>건 승격 (거부/미서명 '+j.rejected+') · 등급별 '+esc(JSON.stringify(j.locked_by_grade))
