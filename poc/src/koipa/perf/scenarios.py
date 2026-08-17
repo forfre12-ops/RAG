@@ -1048,6 +1048,9 @@ def s10_rag_evidence(ctx: ScenarioContext) -> None:
             ("DELTA-NUM 대외비 사내 규정 직원 평가", "S2"),
             ("ECHO-TAG 공개 IR 보도자료 분기 실적", "S3"),
         ]
+    dropped = 0          # 응답 실패로 평가셋에서 빠진 건수(레이트리밋 등)
+    mismatch_label = 0   # 인용에 예측등급 키워드가 없는데 예측등급 자체가 시드와 다른 경우
+    mismatch_cite = 0    # 예측등급은 시드와 같은데 인용에 그 등급 신호가 없는 경우
     with make() as cli:
         for content, target in cases:
             r = cli.post(
@@ -1061,6 +1064,9 @@ def s10_rag_evidence(ctx: ScenarioContext) -> None:
                 },
             )
             if r.status_code != 200:
+                # 조용히 빠지면 100건 평가셋이 60건으로 줄어도 보고서엔 안 보인다
+                # (223 실측: 분류 60/min 레이트리밋에 걸려 40건이 이렇게 사라졌다).
+                dropped += 1
                 continue
             body = r.json()
             label = body.get("label", "")
@@ -1076,7 +1082,25 @@ def s10_rag_evidence(ctx: ScenarioContext) -> None:
 
             kws = _LABEL_KEYWORDS.get(label, ())
             evidence_blob = " ".join(ev_texts)
-            ctx.record("s10_3", any(kw in evidence_blob for kw in kws) if kws else False)
+            consistent = any(kw in evidence_blob for kw in kws) if kws else False
+            ctx.record("s10_3", consistent)
+            if not consistent:
+                # 이 KPI 는 "부여한 등급의 근거가 인용에 보이는가" 다. 평가셋은 등급별 시드
+                # 키워드 1개로 합성돼 있어, 모델이 다른 등급으로 판정하면 그 등급의 키워드는
+                # 본문에 애초에 없다 — 인용 결함이 아니라 판정 차이다. 두 원인을 갈라 적어야
+                # 0.6 을 "인용이 40% 망가졌다" 로 오독하지 않는다
+                # (223 실측 2026-08-17: 불일치 15건 전부 판정 차이, 인용 결함 0건).
+                if label != target:
+                    mismatch_label += 1
+                else:
+                    mismatch_cite += 1
+
+    if dropped:
+        print(f"[PSH][S10] 평가셋 {len(cases)}건 중 {dropped}건이 응답 실패로 빠졌다"
+              " — 분류 레이트리밋(60/min) 확인 필요")
+    if mismatch_label or mismatch_cite:
+        print(f"[PSH][S10] label-evidence 불일치 내역 — 판정 차이 {mismatch_label}건 ·"
+              f" 인용 결함 {mismatch_cite}건 (인용 결함만이 RAG 품질 문제다)")
 
 
 # ----------------------------------------------------------------
