@@ -30,7 +30,13 @@ DOC_CSS = """.docbody{white-space:pre-wrap;word-break:break-word;max-height:410p
 .docbody.md strong{font-weight:800;color:#111}
 .docbody.md .lbl{display:inline-block;color:#1b4ea8;font-weight:800;margin-right:5px}"""
 
-DOC_RENDER_JS = r"""function mdToHtml(src){
+DOC_RENDER_JS = r"""/* 이스케이프 두 줄이 렌더러와 **같이** 실려야 한다.
+   mdToHtml -> mdInline -> mdEsc 로 이어지므로 하나만 빠져도 첫 문단에서 던진다.
+   2026-08-18 실측: mdToHtml 만 이 모듈로 뽑았더니 검수 화면이
+   `ReferenceError: mdInline is not defined` 로 후보 목록을 통째로 못 그렸다. */
+function mdEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function mdInline(s){return mdEsc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>')}
+function mdToHtml(src){
   const lines=String(src||'').replace(/\r\n/g,'\n').split('\n');
   let out=[],i=0,para=[];
   /* 실문서(판례·공시)는 마크다운이 없고 본문이 한 줄로 몇천 자다 — 실측 272건 중 58건이

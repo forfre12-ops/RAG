@@ -67,3 +67,12 @@ def test_view_toggle_is_wired_per_document(signoff):
     """카드가 여럿이라 전환이 문서 단위여야 한다 — 전역이면 다른 카드까지 바뀐다."""
     assert "data-id=" in signoff and "CSS.escape(id)" in signoff
     assert "data-doc" in signoff
+def test_the_renderer_ships_with_its_escape_helpers(signoff):
+    """mdToHtml -> mdInline -> mdEsc 로 이어진다 — 하나만 빠져도 첫 문단에서 던진다.
+
+    2026-08-18 실측 사고: mdToHtml 만 공용 모듈로 뽑고 두 도우미를 두고 와서, 검수 화면이
+    `ReferenceError: mdInline is not defined` 로 후보 목록을 **한 건도 못 그렸다.**
+    그동안 문자열 존재만 보던 시험 423건은 전부 통과했다. 그래서 셋을 다 확인한다.
+    """
+    for fn in ("function mdEsc", "function mdInline", "function mdToHtml"):
+        assert fn in signoff, f"{fn} 이 화면에 실리지 않았다"

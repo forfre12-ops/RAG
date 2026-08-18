@@ -73,3 +73,12 @@ def test_markup_is_balanced(signoff):
     assert signoff.count("<div") == signoff.count("</div>")
     assert signoff.count("<section") == signoff.count("</section>")
     assert signoff.count("<aside") == signoff.count("</aside>")
+@pytest.mark.parametrize("eid", ["preflight", "restored", "result", "deccount", "grid", "submit"])
+def test_ids_are_unique(signoff, eid):
+    """같은 id 가 둘이면 getElementById 가 첫 것만 잡아 뒤엣것은 죽은 마크업이 된다.
+
+    2026-08-18: 껍데기를 갈면서 새 자리에 넣고 옛 자리를 안 지워 네 쌍이 겹쳤다.
+    deccount 는 그 탓에 gate 의 큰 글씨(20px/900)로 등급별 내역이 쏟아지고 있었다.
+    """
+    marker = 'id="%s"' % eid
+    assert signoff.count(marker) == 1, "%s 가 %d회 나온다" % (marker, signoff.count(marker))

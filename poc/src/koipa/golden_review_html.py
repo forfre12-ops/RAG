@@ -522,11 +522,8 @@ __NAV__
     <button class="filter-btn" data-v="S3">S3</button>
     <span class="filter-sep"></span>
     <input class="search-box" id="q" placeholder="id·본문 검색...">
-    <span id="deccount" style="font-size:12px;color:var(--text-dim)"></span>
+    <span id="decbreak" style="font-size:12px;color:var(--text-dim)"></span>
   </div>
-  <div class="preflight" id="preflight"></div>
-  <div class="restored" id="restored"></div>
-  <div class="result" id="result"></div>
   <div id="grid"></div>
     </section>
   </main>
@@ -616,14 +613,20 @@ function pendingCard(r){
     +'여기서는 내용만 확인하고, 확정은 후보 관리 화면에서 합니다.</div>'
     +'</div>';
 }
+// 결정 건수는 **서명 대상만** 센다 — 보기 전용(합의 미달) 후보는 결정 폼이 아예 없어
+// 결정될 수 없다. 화면 숫자와 제출 완료 문구가 따로 세면 어긋나므로 규칙을 여기 한 곳에 둔다.
+function decidedIds(){
+  return Object.keys(DEC).filter(function(id){
+    return DEC[id]&&DEC[id].decision&&!(BYID[id]&&BYID[id].signable===false);
+  });
+}
+function signableCount(){ return DATA.filter(function(x){return x.signable;}).length; }
 function decCount(){
   // 승격 예정만 센다 — 거부는 정답지에서 빠지고, 등급변경은 **바꾼 등급**으로 들어간다.
   // 이 셈이 서버의 locked_by_grade 와 같은 규칙이라, 화면 숫자가 결과와 어긋나지 않는다.
-  var n=0, by={TS:0,S1:0,S2:0,S3:0};
-  Object.keys(DEC).forEach(function(id){
-    var d=DEC[id]; if(!d||!d.decision) return;
-    if(BYID[id]&&BYID[id].signable===false) return;
-    n++;
+  var by={TS:0,S1:0,S2:0,S3:0}, ids=decidedIds();
+  ids.forEach(function(id){
+    var d=DEC[id];
     if(d.decision==='reject') return;
     var r=BYID[id]; if(!r) return;
     var gr=(d.decision==='change')?(d.grade||r.grade):r.grade;
@@ -634,10 +637,12 @@ function decCount(){
     return '<span'+(lack?' class="pg-lack"':'')+'>'+k+' '+by[k]+'</span>';
   }).join(' · ');
   var tail=(MIN_PG>0)?' <span class="pg-note">(등급별 '+MIN_PG+'건 필요)</span>':'';
-  var signable=DATA.filter(function(x){return x.signable;}).length;
-  var pend=DATA.length-signable;
-  document.getElementById('deccount').innerHTML=
-    '결정 '+n+' / 서명 대상 '+signable+'건'
+  var signable=signableCount(), pend=DATA.length-signable;
+  // gate 의 큰 글씨(.gate strong = 20px/900, 폭 300px)에는 **진행 숫자만** 넣는다.
+  // 등급별 내역까지 밀어 넣으면 제목 자리에 여러 줄로 쏟아진다 — 그것은 목록 옆으로 내린다.
+  document.getElementById('deccount').textContent=ids.length+' / '+signable;
+  document.getElementById('decbreak').innerHTML=
+    '서명 대상 '+signable+'건'
     +(pend?' <span class="pg-note">(합의 미달 '+pend+'건 보기 전용)</span>':'')
     +' &nbsp; 승격 예정 '+parts+tail;
 }
@@ -733,7 +738,8 @@ document.getElementById('submit').addEventListener('click',async function(){
   const box=document.getElementById('result');
   if(!WHO){box.className='result err';box.textContent='로그인이 필요합니다. 콘솔 로그인 후 다시 여세요.';return;}
   if(PF_BLOCKED){box.className='result err';box.textContent='서명 전 점검에서 막힌 항목이 있습니다. 위 안내를 확인하세요.';return;}
-  const decisions=Object.keys(DEC).filter(id=>DEC[id].decision).map(id=>{
+  // 서명 대상만 보낸다 — 화면 숫자(decCount)와 같은 규칙을 쓴다.
+  const decisions=decidedIds().map(id=>{
     const o={doc_id:id,decision:DEC[id].decision,note:DEC[id].note||''};
     if(DEC[id].decision==='change')o.grade=DEC[id].grade;return o;
   });
@@ -757,7 +763,8 @@ document.getElementById('submit').addEventListener('click',async function(){
                               + '체크하고 <b>다시 제출</b>하세요. <b>결정은 그대로 남아 있습니다.</b>');
       var rr = (j.rejected_reasons && Object.keys(j.rejected_reasons).length)
                  ? '<br>거부 사유: '+esc(JSON.stringify(j.rejected_reasons)) : '';
-      var undecided=DATA.length-Object.keys(DEC).length;
+      // 보기 전용(합의 미달) 후보는 결정될 수 없다 — 서명 대상 기준으로 센다.
+      var undecided=signableCount()-decidedIds().length;
       box.innerHTML='서명 완료 — locked <b>'+j.locked+'</b>건 승격 · 거부 '+j.rejected+'건 · 이번에 결정하지 않은 후보 '+undecided+'건 · 등급별 '+esc(JSON.stringify(j.locked_by_grade))
         +rr
         +'<br>readiness: ready=<b>'+rd.ready+'</b> per_grade='+esc(JSON.stringify(rd.per_grade))+' '+pubTxt
