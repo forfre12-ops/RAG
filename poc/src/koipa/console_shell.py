@@ -51,6 +51,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Noto S
 .rowhead{padding:13px 12px;background:#f7f7f5;color:#899199;font:11px ui-monospace,monospace}
 .btn{border:1px solid #d8d8d5;background:#fff;padding:11px 14px;font-weight:800;font-size:13px;cursor:pointer}
 .btn.black{background:#111;color:#fff;border-color:#111}
+.btn:focus-visible{outline:2px solid #0070f3;outline-offset:2px}
 .viewbar .btn.sm{padding:6px 11px;font-size:12px}
 .summary{margin-top:40px;border-top:3px solid #111;background:#fafaf8;display:grid;grid-template-columns:1.18fr repeat(4,1fr)}
 .summaryIntro,.metric{padding:29px;border-right:1px solid var(--line);min-height:154px}

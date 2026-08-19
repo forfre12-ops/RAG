@@ -105,3 +105,34 @@ def test_media_rules_come_after_the_base_rules_they_override(manage):
     media_at = css.index("@media(max-width:700px)")
     for base in (".rowhead,.candidate{", ".filters input{width:170px}"):
         assert css.index(base) < media_at, f"{base} 가 미디어 규칙보다 뒤에 있다"
+
+
+# ── 접근성 (2026-08-19) ─────────────────────────────────────────────────────────
+@pytest.mark.parametrize("attr", ['aria-pressed', 'aria-live="polite"', "aria-label"])
+def test_both_screens_carry_the_basic_a11y_hooks(signoff, manage, attr):
+    """키보드·보조기기로 쓰는 사람이 화면 상태를 알 수 있어야 한다.
+
+    2026-08-19 이전에는 검수 화면에 aria-* 가 0개였다 — 보기 전환 버튼의 눌림 상태도,
+    서명 결과 배너가 떴다는 사실도 소리로 전달되지 않았다.
+    """
+    for name, html in (("검수 화면", signoff), ("후보 관리", manage)):
+        assert attr in html, f"{name} 에 {attr} 가 없다"
+
+
+def test_view_toggle_reports_pressed_state(signoff, manage):
+    """「읽기 좋게 / 원문 그대로」는 토글이다 — 어느 쪽이 켜졌는지 알려야 한다."""
+    assert 'aria-pressed="true"' in signoff and 'aria-pressed="false"' in signoff
+    assert "setAttribute('aria-pressed'" in signoff, "토글할 때 갱신하지 않는다"
+    assert 'aria-pressed="true"' in manage and 'aria-pressed="false"' in manage
+    assert "setAttribute('aria-pressed'" in manage
+
+
+def test_keyboard_focus_is_visible(signoff, manage):
+    """초점 표시가 없으면 키보드로 다닐 때 어디 있는지 안 보인다."""
+    for name, html in (("검수 화면", signoff), ("후보 관리", manage)):
+        assert ":focus-visible" in html, f"{name} 에 초점 표시가 없다"
+
+
+def test_dropzone_counts_enter_and_leave(manage):
+    """dragleave 는 자식 요소로 옮겨갈 때도 난다 — 세지 않으면 강조가 깜빡인다."""
+    assert "if(--over<=0)" in manage, "드롭존이 enter/leave 를 세지 않는다"

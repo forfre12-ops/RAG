@@ -64,6 +64,7 @@ body{font-family:var(--font-sans);margin:0;background:var(--bg);color:var(--text
             border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 .filter-btn:hover{background:var(--accent-soft)}
 .filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.filter-btn:focus-visible,.search-box:focus-visible{outline:2px solid var(--c-s2);outline-offset:2px}
 .filter-sep{width:1px;height:20px;background:var(--border-strong);margin:0 4px}
 .search-box{border:1px solid var(--border-strong);border-radius:var(--radius);padding:5px 10px;
             font-size:12px;flex:1;min-width:140px;font-family:inherit}
@@ -378,9 +379,9 @@ __NAV__
         <div class="actions"><button id="submit" class="btn black">서명 제출</button></div>
       </aside>
     </section>
-    <div class="preflight" id="preflight"></div>
-    <div class="restored" id="restored"></div>
-    <div class="result" id="result"></div>
+    <div class="preflight" id="preflight" role="status" aria-live="polite"></div>
+    <div class="restored" id="restored" role="status" aria-live="polite"></div>
+    <div class="result" id="result" role="status" aria-live="polite"></div>
     <section id="s-list" class="section">
       <div class="sectionTop">
         <div><span class="secNum">02</span><h2 class="sechead">후보 검수</h2>
@@ -404,7 +405,7 @@ __NAV__
     <button class="filter-btn" data-f="state" data-v="todo" id="fTodo">미결정</button>
     <button class="filter-btn" data-f="state" data-v="done">결정함</button>
     <span class="filter-sep"></span>
-    <input class="search-box" id="q" placeholder="id·본문 검색...">
+    <input class="search-box" id="q" placeholder="id·본문 검색..." aria-label="문서 ID 또는 본문 검색">
     <span id="decbreak" style="font-size:12px;color:var(--text-dim)"></span>
   </div>
   <div id="grid"></div>
@@ -420,7 +421,8 @@ document.addEventListener('click',function(e){
   var b=e.target.closest&&e.target.closest('.vbtn'); if(!b) return;
   var id=b.dataset.id, want=b.dataset.view;
   document.querySelectorAll('.vbtn[data-id="'+CSS.escape(id)+'"]').forEach(function(x){
-    x.classList.toggle('active', x.dataset.view===want); });
+    x.classList.toggle('active', x.dataset.view===want);
+    x.setAttribute('aria-pressed', x.dataset.view===want ? 'true' : 'false'); });
   document.querySelectorAll('[data-doc][data-id="'+CSS.escape(id)+'"]').forEach(function(x){
     x.style.display = x.dataset.doc===want ? '' : 'none'; });
 });
@@ -473,14 +475,14 @@ function card(r){
   return '<div class="'+cls+'" data-id="'+esc(r.id)+'">'
     +'<div class="card-meta"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> <span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> <span style="color:var(--text-dim)">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)+' conf '+r.conf.toFixed(2)+'</span></div>'
     +'<div class="docwrap"><div class="viewbar">'
-      +'<button type="button" class="btn sm vbtn active" data-view="md" data-id="'+esc(r.id)+'">읽기 좋게</button>'
-      +'<button type="button" class="btn sm vbtn" data-view="raw" data-id="'+esc(r.id)+'">원문 그대로</button>'
+      +'<button type="button" class="btn sm vbtn active" aria-pressed="true" data-view="md" data-id="'+esc(r.id)+'">읽기 좋게</button>'
+      +'<button type="button" class="btn sm vbtn" aria-pressed="false" data-view="raw" data-id="'+esc(r.id)+'">원문 그대로</button>'
       +'<span class="viewnote">판단 근거는 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span>'
     +'</div>'
     +'<div class="docbody md" data-doc="md" data-id="'+esc(r.id)+'">'+mdOnce(r)+'</div>'
     +'<pre class="docbody" data-doc="raw" data-id="'+esc(r.id)+'" style="display:none">'+esc(r.text)+'</pre>'
     +'</div>'
-    +'<div class="decrow">'
+    +'<div class="decrow" role="group" aria-label="'+esc(r.id)+' 등급 결정">'
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="approve"'+(d.decision==='approve'?' checked':'')+'> 승인 ('+r.grade+' 유지)</label>'
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="change"'+(d.decision==='change'?' checked':'')+'> 등급변경 <select class="gsel" data-id="'+esc(r.id)+'">'+gopts(d.grade||r.grade)+'</select></label>'
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="reject"'+(d.decision==='reject'?' checked':'')+'> 거부</label>'
