@@ -23,14 +23,6 @@ set -euo pipefail
 BRANCH="${BRANCH:-fix/design-review-hardening}"
 REPO="${REPO:-https://github.com/forfre12-ops/RAG.git}"
 CF="-f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.dual.yml"
-# ⚠ docker-compose.expose.yml 은 **저장소에 없고 서버에만 있는 파일**이다(223 에서 직접
-#   만든 것). prod 는 api 를 127.0.0.1:8000 에 묶는데(리버스 프록시 뒤 전제) 223 은 콘솔을
-#   외부에 열어야 해서 0.0.0.0 으로 덮는 파일을 따로 두고 있다.
-#   실측 2026-08-16: 이 파일을 빼고 기동했더니 **외부에서 접속되던 검수 화면이 끊겼다.**
-#   있으면 자동으로 포함한다 - 서버가 정한 노출 방식을 배포가 되돌리지 않게.
-if [ -f docker-compose.expose.yml ]; then
-  CF="$CF -f docker-compose.expose.yml"
-fi
 STAMP="$(date -u +%Y%m%d%H%M)"
 # 실측 2026-08-16: 7단계가 `WORKER_MEM_LIMIT: unbound variable` 로 죽었다.
 # 4b 는 `${WORKER_MEM_LIMIT:-16G}` 를 지역 변수 WANT 에만 담고 정작 변수 자체는 설정하지
@@ -47,6 +39,24 @@ warn(){ printf '\033[1;33m  [!]  %s\033[0m\n' "$*"; }
 die(){ printf '\033[1;31m  [X]  %s\033[0m\n' "$*" >&2; exit 1; }
 
 cd "$(dirname "$0")/.." 2>/dev/null || cd ~/poc
+
+# ⚠ docker-compose.expose.yml 은 **저장소에 없고 서버에만 있는 파일**이다(223 에서 직접
+#   만든 것). prod 는 api 를 127.0.0.1:8000 에 묶는데(리버스 프록시 뒤 전제) 223 은 콘솔을
+#   외부에 열어야 해서 0.0.0.0 으로 덮는 파일을 따로 두고 있다.
+#   실측 2026-08-16: 이 파일을 빼고 기동했더니 **외부에서 접속되던 검수 화면이 끊겼다.**
+#   있으면 자동으로 포함한다 - 서버가 정한 노출 방식을 배포가 되돌리지 않게.
+#
+# ⚠⚠ 이 검사는 **위 cd 뒤에** 있어야 한다. 2026-08-20 에 여기가 cd 앞에 있어서 그대로
+#    당했다 — `bash ~/poc/scripts/deploy_kl_223.sh` 처럼 홈에서 부르면 검사가 `~` 에서
+#    돌아 파일을 못 찾고, 오버라이드 없이 기동해 **api 가 127.0.0.1 에 묶였다.**
+#    8단계가 "0.0.0.0 에 안 붙었다" 로 잡았지만 그때는 이미 외부 접속이 끊긴 뒤였다
+#    (실측: 밖에서 curl 연결 거부). 호출 위치에 따라 결과가 달라지면 안 된다.
+if [ -f docker-compose.expose.yml ]; then
+  CF="$CF -f docker-compose.expose.yml"
+  echo "  [i] docker-compose.expose.yml 포함 - api 를 0.0.0.0 에 연다"
+else
+  echo "  [!] docker-compose.expose.yml 없음 - api 가 127.0.0.1 에만 묶인다(외부 접속 불가)"
+fi
 
 # --- 0. 현재 상태를 먼저 기록한다 - 되돌릴 곳을 모르면 되돌릴 수 없다 --------
 b "0. 현재 상태"
