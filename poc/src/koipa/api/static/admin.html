@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KOIPA AI 거버넌스 콘솔 — 폐곡선 E2E | Koipa</title>
+<title>한국지식재산보호원 | 관리자 콘솔</title>
 <meta name="description" content="루프 A(분류 → 검수·확정)와 루프 B(골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭)를 탭으로 나눈 운영·E2E 검증 콘솔. 기존 /api/v1 엔드포인트를 그대로 호출합니다." />
 <style>
 :root{
@@ -271,35 +271,20 @@ details.adv[open]{padding-bottom:12px;}
 .dropzone:hover{background:var(--bg-strong);}
 .dropzone.over{border-color:#0070f3;background:#eff6ff;color:#1d4ed8;}
 .dropzone.over b{color:#1d4ed8;}
-.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}</style>
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+/* console-header:css:start — koipa/console_nav.py HEADER_CSS. 손으로 고치지 말 것 */
+.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider,.top .nav-link{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+/* console-header:css:end */
+</style>
 <script src="./deploy_badge.js" data-screen="관리자"></script>
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a class="brand" href="./index.html">
-      <!-- 기관 심볼 — 폐쇄망이라 외부 이미지를 못 쓰고 원본 파일이 리포에 없어 벡터 근사본이다.
-           원본 PNG/SVG 가 들어오면 이 svg 만 갈아끼운다. golden.py 의 _KOIPA_MARK_SVG 와 동일 도안. -->
-      <span class="brand-mark" style="display:inline-flex;align-items:center;color:#1b4ea8">
-        <svg viewBox="0 0 40 40" width="26" height="26" role="img" aria-label="한국지식재산보호원" fill="currentColor">
-          <rect x="2" y="11" width="6" height="18" rx="1"/><rect x="11" y="4" width="6" height="32" rx="1"/>
-          <rect x="20" y="15" width="6" height="11" rx="1"/><rect x="29" y="8" width="6" height="24" rx="1"/>
-        </svg>
-      </span>
-      <span class="brand-name">한국지식재산보호원</span>
-      <span class="brand-sep">/</span>
-      <span class="brand-sub">AI 거버넌스 콘솔</span>
-    </a>
-    <div class="nav-right"><!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 --><div class="cnav"><a class="cnav-link" href="/api/v1/golden/candidates/manage.html">후보 관리</a><span class="cnav-link is-current" aria-current="page">거버넌스</span><a class="cnav-link" href="/console/index.html#sec-parse">분류 시연</a></div>
-      <a class="nav-link" href="./index.html#sec-parse" style="font-size:12.5px;color:var(--text-dim);text-decoration:none;padding:4px 8px;">파싱·분류 시연 ↗</a>
-      <span class="nav-badge">E2E</span>
-      <span id="health" class="health-pill" title="헬스체크 — 클릭">
-        <span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span>
-      </span>
-    </div>
-  </div>
-</nav>
+<!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
+<!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">관리자 콘솔</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">골든셋 검수</a><a class="cnav-link" href="/api/v1/golden/candidates/manage.html#candidates">골든셋 등록</a><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
+<!-- console-header:end -->
 
 <div class="wrap">
 
@@ -1048,7 +1033,25 @@ function initPane(){
   let saved='ops';
   try{ saved=sessionStorage.getItem('koipa_admin_pane')||'ops'; }catch(e){}
   showPane(saved);
+  gotoHash();
 }
+/* 주소의 #앵커로 **탭까지** 열어 준다.
+ * 왜(2026-08-20). 공용 메뉴의 「골든셋 검수」가 이 화면의 골든 잡 목록(#gold-jobs-card)을
+ * 가리킨다. 그런데 그 카드는 data-pane="model" 이고 기본 탭은 'ops' 라, 링크만 걸면
+ * 대상이 display:none 인 채로 도착해 **아무 일도 안 일어난 것처럼 보인다**(실측).
+ * 이 화면에는 location.hash 를 읽는 코드가 한 줄도 없었다.
+ * 카드는 golden_jobs.js 가 런타임에 넣으므로, 그쪽 mount() 끝에서도 이 함수를 부른다. */
+function gotoHash(){
+  const h = (location.hash||'').slice(1);
+  if(!h) return;
+  const el = document.getElementById(h);
+  if(!el) return;                                   // 아직 안 그려졌으면 나중에 다시 부른다
+  const box = el.closest('[data-pane]');            // closest 는 자기 자신도 본다
+  const pane = box && box.dataset ? box.dataset.pane : '';
+  if(pane && pane!=='always') showPane(pane);
+  el.scrollIntoView({block:'start'});
+}
+window.addEventListener('hashchange', gotoHash);
 
 /* ---- G2 서명 복귀 감지 -------------------------------------------------------
  * 골든 검수·서명은 새 탭(review.html / signoff.html)에서 끝나고, 서버는 그 결과를

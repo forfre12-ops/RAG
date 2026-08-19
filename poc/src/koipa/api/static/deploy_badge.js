@@ -72,8 +72,13 @@
   }
 
   function mount(badge) {
-    // nav 구조가 페이지마다 달라(브랜드가 <a> 이거나 <span>) 브랜드 요소 뒤에 붙이고,
-    // 못 찾으면 nav-inner 선두 → 최후에는 body 선두로 폴백한다.
+    // [2026-08-20] 상단이 header.top 으로 통일되면서 종전 셀렉터(.nav-inner 계열)가 전부
+    // 빗나갔다. 그러면 마지막 폴백이 걸려 배지가 **헤더 밖 body 맨 위**에 떨어진다.
+    // header.top 을 먼저 본다 — 서버 렌더 화면(golden_review_html)은 같은 자리에 서버가
+    // 넣으므로, 여기 순서는 정적 2면(admin.html·index.html)을 위한 것이다.
+    var top = document.querySelector('header.top');
+    if (top) { top.appendChild(badge); return; }
+    // 옛 골격이 남아 있는 화면을 위한 경로. 브랜드가 <a> 이거나 <span> 이라 셋을 본다.
     var anchor = document.querySelector('.nav-inner .brand, .nav-inner > a, .nav-inner > span');
     if (anchor && anchor.parentNode) {
       anchor.parentNode.insertBefore(badge, anchor.nextSibling);

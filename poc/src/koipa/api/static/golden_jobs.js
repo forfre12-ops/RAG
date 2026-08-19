@@ -56,6 +56,9 @@
       try { cur = sessionStorage.getItem('koipa_admin_pane') || 'ops'; } catch (e) {}
       window.showPane(cur);
     }
+    // 이제야 #gold-jobs-card 가 문서에 있다 — 주소에 그 앵커가 실려 왔다면 지금 처리한다
+    // (공용 메뉴의 「골든셋 검수」가 이 카드를 가리킨다).
+    if (typeof window.gotoHash === 'function') window.gotoHash();
   }
 
   function fmtTime(iso) {

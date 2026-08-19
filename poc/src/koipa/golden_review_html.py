@@ -23,7 +23,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
-from koipa.console_nav import NAV_CSS, nav_bar_html
+from koipa.console_nav import BRAND_NAME, HEADER_CSS, NAV_CSS, header_html, nav_bar_html
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 
@@ -133,22 +133,18 @@ def _sibling_link_html(url: str, label: str) -> str:
 
 
 def _nav_html(sub: str, profile: Optional[str], screen: str, sibling: str = "") -> str:
-    """콘솔(static/*.html)과 같은 브랜드 바."""
-    logo = _logo_data_uri()
-    mark = f'<span class="brand-mark"><img src="{logo}" alt="Koipa"/></span>' if logo else ""
-    return (
-        '<header class="top">'
-        f'<span class="mark">{mark}</span>'
-        '<span class="brand">한국지식재산보호원</span>'
-        '<span class="divider"></span>'
-        f'<span class="product">{_html.escape(sub)}</span>'
-        # [A3] 화면 간 이동. review/signoff 는 job_id·HMAC 토큰이 필요해 **네비 대상이 못 되므로**
-        # 여기서는 나가는 링크만 둔다(현재 화면 표시 없음 = current 를 넘기지 않는다).
-        + '<span style="flex:1"></span>'
-        + sibling
-        + nav_bar_html()
-        + _site_badge_html(profile, screen)
-        + "</header>"
+    """콘솔 5면이 공유하는 상단 바 — 마크업·CSS 는 console_nav 한 곳에 있다.
+
+    [2026-08-20] 종전에는 이 함수가 헤더를 직접 조립했고, 후보 관리·로그인·거버넌스·
+    등급 시연이 각자 다른 헤더를 갖고 있었다. 사용자 지시로 **이 화면의 모양을 기준**으로
+    다섯 화면을 합치면서, 값의 출처를 console_nav.header_html 로 옮겼다.
+
+    current="signoff" 를 넘기는 이유: 메뉴의 「골든셋 검수」가 이 화면이다. 다만 그 메뉴의
+    링크는 잡 목록으로 간다 — 이 화면은 job_id 와 ?t= 토큰이 있어야 열려서 고정 링크를
+    걸 수 없기 때문이다(golden.py:701·727 에서 403).
+    """
+    return header_html(
+        sub, "signoff", trailing=sibling + _site_badge_html(profile, screen)
     )
 
 
@@ -220,7 +216,10 @@ def render_signoff_html(
     data = _signoff_records(records) + _signoff_records(pending or [], signable=False)
     head = (
         "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
-        f"<title>{_html.escape(title)}</title>{css or _DEFAULT_CSS}{_SIGNOFF_CSS}</head>"
+        # [2026-08-20] 브라우저 탭 제목도 다섯 화면이 같은 꼴이어야 한다 —
+        # `한국지식재산보호원 | 화면이름`. 종전에는 이 화면만 기관명이 없었다.
+        f"<title>{BRAND_NAME} | {_html.escape(title)}</title>"
+        f"{css or _DEFAULT_CSS}{_SIGNOFF_CSS}</head>"
     )
     return head + (
         _SIGNOFF_BODY
@@ -271,14 +270,9 @@ def render_signoff_html_from_jsonl(
 # 토큰 재선언 — render_signoff_html(css=...) 로 커스텀 CSS 를 주입해도 서명 화면이
 # 토큰 미정의로 무너지지 않게 self-sufficient 하게 둔다(중복 선언은 무해).
 _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
-/* [디자인 정렬 2026-08-18] 후보 관리 화면(manage.html)과 같은 브랜드 바.
-   검수자가 오가는 두 화면이라 같은 옷을 입어야 한다. 값은 manage 쪽에서 그대로 가져왔다. */
-.top{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:18px;background:var(--paper)}
-.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}
-.top .mark img{width:100%;height:100%;object-fit:contain}
-.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:var(--ink)}
-.top .divider{height:23px;border-left:1px solid var(--border-strong)}
-.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1}
+/* [2026-08-20] 브랜드 바 CSS 는 console_nav.HEADER_CSS 로 옮겼다(아래 NAV_CSS 앞에서
+   붙는다). 정적 화면(admin.html·index.html)이 같은 문자열을 손으로 박아 쓰기 때문에,
+   여기서 값을 따로 갖고 있으면 다섯 화면이 다시 갈라진다. */
 
 /* [껍데기 정렬 2026-08-18] 사이드바·히어로 — manage 와 같은 자리·같은 톤.
    골격 규칙(frame/side/main/hero/section/list/btn)은 console_shell.SHELL_CSS 에 있다.
@@ -341,7 +335,7 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
 .result{margin:14px 0;padding:12px 16px;border-radius:var(--radius);font-size:13px;display:none}
 .result.ok{background:#f0fdf4;border:1px solid var(--c-s3);border-left:3px solid var(--c-s3);color:#166534;display:block}
 .result.err{background:#fef2f2;border:1px solid var(--c-ts);border-left:3px solid var(--c-ts);color:#991b1b;display:block}
-""" + NAV_CSS + SHELL_MEDIA_CSS + """
+""" + HEADER_CSS + NAV_CSS + SHELL_MEDIA_CSS + """
 </style>"""
 
 _SIGNOFF_BODY = r"""

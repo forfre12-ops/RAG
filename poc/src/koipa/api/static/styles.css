@@ -1137,3 +1137,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 #sec-parse .cnav-link:hover{color:#111;border-color:#dededb}
 }
 
+/* console-header:css:start — koipa/console_nav.py HEADER_CSS. 손으로 고치지 말 것 */
+.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider,.top .nav-link{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+/* console-header:css:end */

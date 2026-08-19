@@ -181,23 +181,26 @@ def human_reviewer_rejection_reason(reviewer_id: object) -> str:
     """
     rid = str(reviewer_id or "").strip().lower()
     if not rid:
-        return "검수자 이름이 비어 있다"
+        return "로그인이 되어 있지 않습니다. 콘솔에 로그인한 뒤 다시 여십시오."
     if rid in _PLACEHOLDER_REVIEWERS:
-        return f"자리표시 이름이다({rid!r}) — 실계정 이름을 쓸 것"
+        return (f"자리표시 이름입니다({rid!r}). 본인 계정으로 로그인하십시오.")
     if "assist" in rid or _MACHINE_REVIEWER_PREFIX.match(rid):
-        return f"기계 보조 계정 형식이다({rid!r})"
+        return (f"기계 보조 계정입니다({rid!r}). 사람 계정으로 로그인하십시오.")
     default_rid = _configured_default_reviewer()
     if default_rid and rid == default_rid:
-        return (f"서명 화면 기본값과 같은 이름이다({rid!r}) — 설정 SIGNOFF_DEFAULT_REVIEWER 가 "
-                "이 이름이라, 누가 검수했든 같은 이름이 남으므로 개별 검수로 인정하지 않는다")
+        return (f"서명 화면에 기본으로 채워지는 이름입니다({rid!r}). 누가 검수했든 같은 이름이 "
+                "남기 때문에 개별 검수로 인정하지 않습니다. 관리자에게 본인 계정 토큰을 "
+                "요청하십시오. (운영자: 설정 SIGNOFF_DEFAULT_REVIEWER 에서 이 이름을 빼십시오.)")
     prefill_rid = _prefill_login_subject()
     if prefill_rid and rid == prefill_rid:
-        return (f"로그인 화면이 나눠 주는 공용 신원이다({rid!r}) — 설정 "
-                "CONSOLE_LOGIN_PREFILL_TOKEN 의 sub 가 이 이름이라 그 화면을 여는 누구나 "
-                "이 신원을 얻는다. 검수자 토큰은 프리필에 넣지 말고 사람마다 따로 발급할 것")
+        return (f"로그인 화면이 모두에게 나눠 주는 공용 이름입니다({rid!r}). 이 화면을 여는 "
+                "누구나 같은 이름을 받기 때문에 누가 검수했는지 남지 않습니다. 관리자에게 "
+                "본인 계정 토큰을 요청하십시오. (운영자: 검수자 토큰은 설정 "
+                "CONSOLE_LOGIN_PREFILL_TOKEN 프리필에 넣지 말고 사람마다 따로 발급하십시오.)")
     hit = next((p for p in _MACHINE_PREFIXES if rid.startswith(p)), "")
     if hit:
-        return f"기계·시연 예약 접두사로 시작한다({rid!r} — {hit!r})"
+        return (f"기계·시연 전용으로 예약된 이름입니다({rid!r} — {hit!r} 로 시작). "
+                "사람 계정으로 로그인하십시오.")
     return ""
 
 

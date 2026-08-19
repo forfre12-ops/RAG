@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KOIPA AI 영업비밀관리시스템 — 실시간 등급분류 콘솔 | Koipa</title>
+<title>한국지식재산보호원 | 등급 시연</title>
 <meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·신뢰도·평가요소·법령 근거를 확인합니다." />
 
 <link rel="stylesheet" href="./styles.css" />
@@ -11,25 +11,10 @@
 </head>
 <body>
 
-<!-- ============ NAVBAR ============ -->
-<header class="nav">
-  <div class="nav-inner">
-    <a href="#top" class="brand">
-      <span class="brand-mark"><img src="./koipa_logo_mark.png" alt="한국지식재산보호원" onerror="this.style.display='none'"/></span>
-      <span class="brand-name">한국지식재산보호원</span>
-      <span class="brand-sep">/</span>
-      <span class="brand-url">KOIPA AI 콘솔</span>
-    </a>
-    <div class="nav-actions"><!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 --><div class="cnav"><a class="cnav-link" href="/api/v1/golden/candidates/manage.html">후보 관리</a><a class="cnav-link" href="/console/admin.html">거버넌스</a><span class="cnav-link is-current" aria-current="page">분류 시연</span></div>
-      <span id="nav-status" class="nav-status warming"><span class="dot"></span><span>warmup…</span></span>
-      <a class="nav-link" href="#s1">시연</a>
-      <a class="nav-link" href="#sec-ops">운영·반영</a>
-      <a class="nav-link" href="#s3">법령</a>
-      <a class="nav-link" href="#sec-parse">파싱·분류</a>
-      <a class="nav-link" href="./admin.html">거버넌스 콘솔 ↗</a>
-    </div>
-  </div>
-</header>
+<!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
+<!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">등급 시연</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">골든셋 검수</a><a class="cnav-link" href="/api/v1/golden/candidates/manage.html#candidates">골든셋 등록</a><a class="cnav-link" href="/console/admin.html">관리자 콘솔</a><span class="cnav-link is-current" aria-current="page">등급 시연</span></div><span class="spacer"></span><span id="nav-status" class="nav-status warming"><span class="dot"></span><span>warmup…</span></span><a class="nav-link" href="#s1">시연</a><a class="nav-link" href="#sec-ops">운영·반영</a><a class="nav-link" href="#s3">법령</a><a class="nav-link" href="#sec-parse">파싱·분류</a></header>
+<!-- console-header:end -->
 
 <div class="hero-bg"></div>
 
