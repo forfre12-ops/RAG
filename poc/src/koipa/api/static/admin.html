@@ -247,11 +247,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
         background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;}
 .reqtag.out{background:#f4f4f5;color:#52525b;border-color:#d4d4d8;}
 
-/* 1클릭 시작 · 고급설정 접기 · 다음단계 배너 */
-.quickstart{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-            background:var(--bg-mid);border:1px solid var(--border-strong);padding:13px 15px;margin-bottom:12px;}
-.qs-txt{font-size:12.5px;color:var(--text-soft);line-height:1.55;flex:1;min-width:240px;}
-.qs-txt b{color:var(--text);}
+/* 고급설정 접기 · 다음단계 배너 */
 details.adv{margin-bottom:6px;border:1px solid var(--border-mid);padding:0 12px;}
 details.adv>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-dim);
                     padding:9px 0;list-style:none;}
@@ -781,8 +777,6 @@ details.adv[open]{padding-bottom:12px;}
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
-        
-
         <details class="adv">
           <summary>고급 설정 — 후보 소스 · provider · 생성 건수 바꾸기</summary>
         <div class="row3">
@@ -811,7 +805,6 @@ details.adv[open]{padding-bottom:12px;}
             <input id="gold-n" type="number" min="1" max="50" value="8" />
           </div>
         </div>
-        
         <div id="gold-src-corpus" class="field" style="display:none;margin-top:8px;">
           <label class="fld">코퍼스 경로 — <code>datasets/</code> 하위 jsonl 파일 또는 *.json 디렉터리</label>
           <input id="gold-corpus-dir" type="text" placeholder="datasets/gold_real/candidates.jsonl" />

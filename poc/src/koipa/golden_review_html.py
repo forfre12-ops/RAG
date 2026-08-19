@@ -31,20 +31,14 @@ _DEFAULT_CSS = """<style>""" + _TOKENS + """
 *{box-sizing:border-box}
 body{font-family:var(--font-sans);margin:0;background:var(--bg);color:var(--text);
      -webkit-font-smoothing:antialiased}
-/* ── 콘솔(static/styles.css)과 동일한 nav·브랜드 크롬 ─────────────────────────── */
-.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,0.72);
-     backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);
-     border-bottom:1px solid var(--border)}
-.nav-inner{max-width:1320px;margin:0 auto;padding:14px 32px;display:flex;align-items:center;
-           gap:10px;min-width:0}
+/* 브랜드 크롬 — 헤더는 header.top 이고 .brand/.brand-mark 만 쓴다.
+   [2026-08-19] 옛 sticky nav(.nav·.nav-inner)와 .brand-name/.brand-sep/.brand-sub 는
+   _nav_html 이 더 이상 내보내지 않아 삭제했다(렌더 결과 실측 0회). */
 .brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;
        white-space:nowrap;min-width:0;line-height:1}
 .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;
             border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}
 .brand-mark img{max-width:100%;max-height:100%;display:block}
-.brand-name{font-weight:600;font-size:15px;letter-spacing:-.02em;color:var(--text)}
-.brand-sep{color:var(--text-dim);font-size:14px;margin:0 6px;font-weight:400}
-.brand-sub{font-size:12.5px;color:var(--text-dim)}
 /* 배포 주체 배지 — 콘솔 deploy_badge.js 와 동일 폼(골든 화면은 서버 렌더라 값도 서버가 넣는다) */
 .site-badge{display:inline-flex;align-items:center;gap:0;font-size:11.5px;font-weight:600;
             line-height:1;white-space:nowrap}
@@ -436,24 +430,12 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
   border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:2px;color:#78350f}
 .restored button{margin-left:10px;font-size:12px;padding:3px 10px;cursor:pointer;
   border:1px solid #d6d3d1;background:#fff;border-radius:2px}
-.signbar{position:sticky;top:0;z-index:10;background:var(--accent);color:#e4e4e7;padding:12px 24px;
-         display:flex;gap:10px;flex-wrap:wrap;align-items:end;border-bottom:1px solid var(--accent)}
-.signbar .fld{display:flex;flex-direction:column;font-size:11px;gap:3px}
-.signbar input,.signbar select{padding:5px 8px;border:1px solid #3f3f46;border-radius:var(--radius);
-                               background:#18181b;color:#f4f4f5;font-size:12px;font-family:inherit}
-.signbar .chk{flex-direction:row;align-items:center;gap:4px}
-.signbar button{padding:8px 18px;border:0;border-radius:var(--radius);background:var(--c-s3);color:#fff;
-                font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
-.signbar button:disabled{background:#52525b;cursor:not-allowed}
 .rubric{background:var(--accent-soft);border:1px solid var(--border-strong);border-left:3px solid var(--c-s1);
         border-radius:var(--radius);padding:10px 14px;margin:14px 0;font-size:12px;line-height:1.6}
 .rubric b{color:var(--text)}
 .scard{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px}
 .scard.decided{border-color:var(--c-s3);box-shadow:0 0 0 1px var(--c-s3) inset}
 .scard.rejected{border-color:var(--c-ts);box-shadow:0 0 0 1px var(--c-ts) inset;opacity:.75}
-.stext{font-size:12.5px;color:var(--text-soft);white-space:pre-wrap;max-height:220px;overflow:auto;
-       background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);
-       padding:10px;margin:8px 0;line-height:1.55;font-family:var(--font-mono)}
 .decrow{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:13px}
 .decrow label{display:flex;gap:5px;align-items:center;cursor:pointer}
 .decrow select{padding:3px 6px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit}
