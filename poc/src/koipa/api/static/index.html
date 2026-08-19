@@ -90,7 +90,7 @@
       <div class="form-row" style="align-items:center;">
         <label for="cfg-apikey">API 키</label>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <input id="cfg-apikey" type="text" value="demo-secret-key" placeholder="시연 서버 API 키" style="font-family:var(--font-mono);font-size:13px;min-width:220px;padding:6px 10px;" />
+          <input id="cfg-apikey" type="text" value="demo-secret-key" placeholder="시연 서버 API 키" aria-label="시연 서버 API 키" style="font-family:var(--font-mono);font-size:13px;min-width:220px;padding:6px 10px;" />
           <span id="apikey-status" class="toggle-hint" style="margin:0;">기본 <code>demo-secret-key</code></span>
         </div>
       </div>
@@ -105,15 +105,15 @@
       </div>
       <div class="form-row">
         <label for="sample-select">샘플 문서</label>
-        <select id="sample-select"></select>
+        <select id="sample-select" aria-label="예시 문서 선택"></select>
       </div>
       <div class="form-row">
         <label for="doc-title">제목</label>
-        <input id="doc-title" type="text" placeholder="문서 제목 (선택)" />
+        <input id="doc-title" type="text" placeholder="문서 제목 (선택)" aria-label="문서 제목(선택)" />
       </div>
       <div class="form-row">
         <label for="doc-body">본문</label>
-        <textarea id="doc-body" placeholder="여기에 한국어 문서 본문을 붙여넣거나 위에서 샘플을 선택하세요."></textarea>
+        <textarea id="doc-body" aria-label="분류할 문서 본문" placeholder="여기에 한국어 문서 본문을 붙여넣거나 위에서 샘플을 선택하세요."></textarea>
       </div>
 
       <div style="margin-top:8px">
@@ -135,7 +135,7 @@
     <h2><span class="num">§2</span>결과 — 왜 이 등급인가</h2>
     <p class="h2-sub">등급·신뢰도·자연어 판단(양성+음성 근거)·3 평가요소(S·V·M)·근거 키워드. 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
 
-    <div class="result" id="result-card">
+    <div class="result" id="result-card" role="status" aria-live="polite">
       <h3 style="font-size:13px;margin:0 0 12px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">진행 단계 — SSE 실시간 점등</h3>
       <div id="stage-seq" class="seq" style="margin-bottom:18px;"></div>
 
@@ -207,14 +207,14 @@
   <div class="card">
     <div class="card-title">연결</div>
     <div class="row">
-      <label class="fld">API Base<input type="text" id="base" value="/api/v1" /></label>
-      <label class="fld">X-API-Key<input type="text" id="apikey" value="demo-secret-key" placeholder="시연 서버 API 키 입력" /></label>
+      <label class="fld">API Base<input type="text" id="base" value="/api/v1" aria-label="API 기본 주소" /></label>
+      <label class="fld">X-API-Key<input type="text" id="apikey" value="demo-secret-key" placeholder="시연 서버 API 키 입력" aria-label="시연 서버 API 키" /></label>
       <label class="fld">Actor-Role<select id="role"><option>admin</option><option>reviewer</option><option>viewer</option></select></label>
       <label class="fld">근거 표시<select id="ev"><option value="true">on</option><option value="false">off</option></select></label>
       <!-- [D3 2026-08-18] 헬스 배지. 옛 화면에서는 nav 에 있었는데 nav 는 흡수 대상이
            아니라서 딸려오지 않았다. 바로 아래 안내문이 "헬스 배지를 눌러" 라고 하고
            checkHealth() 가 이 두 id 를 만지므로(없으면 null 참조로 죽는다) 여기 둔다. -->
-      <span id="health" class="health-pill" onclick="checkHealth()" title="서버 연결 확인"><span class="dot"></span><span id="health-txt">health</span></span>
+      <span id="health" class="health-pill" onclick="checkHealth()" title="서버 연결 확인"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">health</span></span>
     </div>
     <div class="hint">폐쇄망 데모는 API Base를 <code>/api/v1</code>(같은 호스트) 그대로 두면 됩니다. 헬스 배지를 눌러 연결을 확인하세요.</div>
   </div>
@@ -246,7 +246,7 @@
         <input type="checkbox" id="persist-demo" style="width:auto;" />
         실적재(검수 큐 전송)
       </label>
-      <span class="hint" id="busy"></span>
+      <span class="hint" id="busy" role="status" aria-live="polite"></span>
     </div>
     <div class="hint" style="margin-top:6px;">
       <b>실적재</b>를 켜면 분석과 별개로 문서를 <b>실제 적재</b>(<code>POST /documents</code> → <code>/classify</code>)합니다 —
@@ -257,7 +257,7 @@
   </div>
 
   <!-- 결과 -->
-  <div id="result" class="hidden">
+  <div id="result" class="hidden" role="status" aria-live="polite">
     <div class="card" id="summary-card">
       <div class="card-title">추출된 문서</div>
       <div id="pd-doc-title" style="font-size:17px;font-weight:700;line-height:1.4;margin-bottom:4px;"></div>
@@ -265,7 +265,7 @@
     </div>
     <div class="card">
       <div class="card-title">2 · 처리 단계 (파싱 → 검수 → 분류)</div>
-      <div class="timeline" id="timeline"></div>
+      <div class="timeline" id="timeline" role="status" aria-live="polite" aria-label="분류 단계 진행"></div>
     </div>
 
     <div class="grid2">
@@ -309,7 +309,7 @@
     <b>실시간 요청 로그 <span class="src-tag src-measured" style="vertical-align:middle;">위조 아님</span> <span class="logdock-hint">— 이 페이지가 실제 보낸 HTTP 요청/응답 · 서버 uvicorn 로그와 대조 가능</span></b>
     <span id="logdock-toggle">접기 ▾</span>
   </div>
-  <div id="live-log" class="live-log"><div class="ll-empty">요청이 여기에 실시간으로 기록됩니다.</div></div>
+  <div id="live-log" class="live-log" role="log" aria-live="polite" aria-label="실시간 처리 로그"><div class="ll-empty">요청이 여기에 실시간으로 기록됩니다.</div></div>
 </div>
 <script>
 function toggleDemoLog(){var d=document.getElementById('logdock'),t=document.getElementById('logdock-toggle');if(!d)return;var c=d.classList.toggle('collapsed');if(t)t.textContent=c?'펼치기 ▴':'접기 ▾';document.body.style.paddingBottom=c?'52px':'232px';}

@@ -84,8 +84,7 @@ textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
 .btn:hover{opacity:.88;} .btn:active{transform:translateY(1px);} .btn:disabled{opacity:.4;cursor:not-allowed;}
 .btn.sec{background:#fff;color:var(--text);border-color:var(--border-strong);}
 .btn.red{background:var(--red);border-color:var(--red);}
-.btn.ghost{background:transparent;color:var(--text-dim);border-color:transparent;}
-.btn.sm{font-size:12px;padding:5px 11px;}
+.btn.btn.sm{font-size:12px;padding:5px 11px;}
 .btn-row{display:flex;flex-wrap:wrap;gap:8px;}
 
 /* TAGS / GRADES */
@@ -245,8 +244,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .reqtag{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.01em;
         padding:2px 6px;margin-left:7px;vertical-align:middle;white-space:nowrap;
         background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;}
-.reqtag.out{background:#f4f4f5;color:#52525b;border-color:#d4d4d8;}
-
+.reqtag
 /* 고급설정 접기 · 다음단계 배너 */
 details.adv{margin-bottom:6px;border:1px solid var(--border-mid);padding:0 12px;}
 details.adv>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-dim);
@@ -297,7 +295,7 @@ details.adv[open]{padding-bottom:12px;}
       <a class="nav-link" href="./index.html#sec-parse" style="font-size:12.5px;color:var(--text-dim);text-decoration:none;padding:4px 8px;">파싱·분류 시연 ↗</a>
       <span class="nav-badge">E2E</span>
       <span id="health" class="health-pill" title="헬스체크 — 클릭">
-        <span class="dot"></span><span id="health-txt">연결 확인</span>
+        <span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span>
       </span>
     </div>
   </div>
@@ -370,7 +368,7 @@ details.adv[open]{padding-bottom:12px;}
         <option value="30">30초</option>
       </select>
     </label>
-    <span id="auto-status" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);">정지</span>
+    <span id="auto-status" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);" role="status" aria-live="polite">정지</span>
     <span id="auto-stamp" style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-left:auto;"></span>
     <span class="hint" style="margin:0;flex-basis:100%;">관제 대시보드와 검수 큐를 주기적으로 <b>읽기 전용</b>으로 조회합니다.</span>
   </div>
@@ -486,7 +484,7 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn sec" id="btn-batch" onclick="runBatch()">골든셋 8건 일괄 분류</button>
         </div>
         <p class="hint">샘플은 운영 골든셋에서 등급별 2건씩 뽑은 것입니다. <b>일괄 분류</b>는 8건을 순차 분류해 검수 큐에 넣습니다.</p>
-        <div id="cl-result"></div>
+        <div id="cl-result" role="status" aria-live="polite"></div>
       </div>
     </section>
 
@@ -693,14 +691,14 @@ details.adv[open]{padding-bottom:12px;}
             <button class="btn" onclick="activateModel()" style="flex:1">활성화 (배포)</button>
           </div>
         </div>
-        <div id="activate-result"></div>
+        <div id="activate-result" role="status" aria-live="polite"></div>
         <div class="btn-row" style="margin-top:2px">
           <button class="btn red" onclick="reloadModel()">활성 모델 핫리로드</button>
           <!-- 롤백 — 종전에는 이 카드에 결과 표시용 div 만 있고 되돌리는 수단이 없었다.
                활성화는 되는데 웹에서 되돌릴 방법이 없어 사고 시 서버 접속이 필요했다. -->
           <button class="btn sec sm" onclick="rollbackModel()">직전 모델로 롤백</button>
         </div>
-        <div id="reload-result"></div>
+        <div id="reload-result" role="status" aria-live="polite"></div>
         <div class="warnbox" style="display:none" id="rollback-note"></div>
         <p class="sec-note">배포는 <b>회귀 게이트</b>(고등급 미탐·F1)를 통과해야 하며, 미통과 시 <code>force</code>로만 우회됩니다(감사 기록). <b>핫리로드</b>는 재기동 없이 활성 모델을 서빙에 반영합니다.
         <b>롤백</b>은 직전 활성본으로 되돌립니다 — 게이트를 적용하지 않습니다(회귀를 되돌리는 방향이라 막으면 사고 시 복구가 불가능해집니다). 사유는 감사에 남습니다.</p>
@@ -830,7 +828,7 @@ details.adv[open]{padding-bottom:12px;}
           <p class="sec-note" style="margin-top:4px;">이미 만들어둔 <code>build_*.jsonl</code>을 그대로 잡으로 올립니다. LLM 재라벨링을 하지 않아 큐레이트된 슬레이트 라벨이 보존됩니다.</p>
         </div>
 
-        <div id="gold-progress" class="sec-note" style="margin-top:10px;">아직 생성된 골든셋 후보 잡이 없습니다.</div>
+        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 생성된 골든셋 후보 잡이 없습니다.</div>
 
         <div id="gold-summary" style="display:none;margin-top:10px;">
           <div class="dash-panel">
@@ -862,7 +860,7 @@ details.adv[open]{padding-bottom:12px;}
 
         <details style="margin-top:10px;">
           <summary style="font-size:12px;color:var(--text-dim);cursor:pointer;">원시 응답(JSON)</summary>
-          <div id="gold-result" class="json" style="margin-top:6px;">-</div>
+          <div id="gold-result" class="json" style="margin-top:6px;" role="status" aria-live="polite">-</div>
         </details>
 
         <p class="sec-note">정본 골든셋은 건드리지 않고 <b>후보만</b> 만듭니다. 정본 승격은 별도 절차입니다.</p>
@@ -888,7 +886,7 @@ details.adv[open]{padding-bottom:12px;}
             <tbody id="grade-body"><tr><td colspan="6" style="color:var(--text-faint)">「현재 등급체계 불러오기」를 눌러 시작하세요.</td></tr></tbody>
           </table>
         </div>
-        <div id="grade-result" style="margin-top:10px;"></div>
+        <div id="grade-result" style="margin-top:10px;" role="status" aria-live="polite"></div>
         <p class="sec-note">표에서 <b>삭제한 등급은 비활성 처리</b>되고 기존 이력은 보존됩니다. 등급을 바꾸면 <b>재학습이 필요</b>하며, 그 전까지 배포 모델은 기존 라벨로 추론합니다.</p>
       </div>
     </section>
@@ -980,7 +978,7 @@ details.adv[open]{padding-bottom:12px;}
     <b>요청 로그</b>
     <span id="log-toggle" style="color:#71717a">접기 ▾</span>
   </div>
-  <div class="logbar-body" id="logbody"></div>
+  <div class="logbar-body" id="logbody" role="log" aria-live="polite" aria-label="작업 로그"></div>
 </div>
 
 <script>
