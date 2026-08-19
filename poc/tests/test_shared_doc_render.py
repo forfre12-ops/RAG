@@ -50,7 +50,7 @@ def test_manage_and_signoff_use_the_same_function(signoff):
 
 def test_both_card_kinds_are_rendered(signoff):
     """서명 카드와 보기 전용 카드 둘 다 — 한쪽만 하면 목록 안에서 모양이 갈린다."""
-    assert signoff.count("mdToHtml(r.text)") == 2
+    assert signoff.count("+mdOnce(r)+") == 2, "두 카드가 같은 변환 경로를 안 쓴다"
 
 
 def test_raw_view_is_available_and_named_as_the_source_of_truth(signoff):

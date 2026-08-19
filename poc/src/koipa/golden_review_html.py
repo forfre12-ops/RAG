@@ -393,11 +393,16 @@ __NAV__
   </div>
   <div class="filters">
     <span style="font-size:12px">등급</span>
-    <button class="filter-btn active" data-v="all">전체</button>
-    <button class="filter-btn" data-v="TS">TS</button>
-    <button class="filter-btn" data-v="S1">S1</button>
-    <button class="filter-btn" data-v="S2">S2</button>
-    <button class="filter-btn" data-v="S3">S3</button>
+    <button class="filter-btn active" data-f="grade" data-v="all">전체</button>
+    <button class="filter-btn" data-f="grade" data-v="TS">TS</button>
+    <button class="filter-btn" data-f="grade" data-v="S1">S1</button>
+    <button class="filter-btn" data-f="grade" data-v="S2">S2</button>
+    <button class="filter-btn" data-f="grade" data-v="S3">S3</button>
+    <span class="filter-sep"></span>
+    <span style="font-size:12px">진행</span>
+    <button class="filter-btn active" data-f="state" data-v="all">전체</button>
+    <button class="filter-btn" data-f="state" data-v="todo" id="fTodo">미결정</button>
+    <button class="filter-btn" data-f="state" data-v="done">결정함</button>
     <span class="filter-sep"></span>
     <input class="search-box" id="q" placeholder="id·본문 검색...">
     <span id="decbreak" style="font-size:12px;color:var(--text-dim)"></span>
@@ -426,7 +431,7 @@ const POST_URL="__POST_URL__";
 const MIN_PG=__MINPG__;
 const BYID={};DATA.forEach(function(r){BYID[r.id]=r;});
 const DEC={};       // id -> {decision, grade, note}
-let g='all',q='';
+let g='all',st='all',q='';
 
 // 중간 결정 보존 — DEC 는 메모리에만 있어서 탭을 닫거나 새로고침하면 사라졌다.
 // 120건짜리 회차에서 60건 하다 창을 닫으면 60건을 다시 눌러야 한다는 뜻이다.
@@ -454,6 +459,11 @@ function decClear(){
   render();
 }
 // 텍스트+속성(name=/data-id=/value=) 양쪽에 쓰이므로 따옴표도 이스케이프(속성 컨텍스트 주입 차단).
+// 같은 문서를 다시 그릴 때 mdToHtml 을 다시 돌리지 않는다.
+// 실측(후보 120건·각 2,100자): render() 1회 32.4ms 이고 그 대부분이 이 변환이다.
+// 필터를 누르거나 검색어를 칠 때마다 120번씩 다시 돌던 것을 문서당 1번으로 줄인다.
+const MDC={};
+function mdOnce(r){ return MDC[r.id] || (MDC[r.id] = mdToHtml(r.text)); }
 function esc(t){const d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function gopts(sel){return ['TS','S1','S2','S3'].map(x=>'<option value="'+x+'"'+(x===sel?' selected':'')+'>'+x+'</option>').join('');}
 function card(r){
@@ -467,7 +477,7 @@ function card(r){
       +'<button type="button" class="btn sm vbtn" data-view="raw" data-id="'+esc(r.id)+'">원문 그대로</button>'
       +'<span class="viewnote">판단 근거는 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span>'
     +'</div>'
-    +'<div class="docbody md" data-doc="md" data-id="'+esc(r.id)+'">'+mdToHtml(r.text)+'</div>'
+    +'<div class="docbody md" data-doc="md" data-id="'+esc(r.id)+'">'+mdOnce(r)+'</div>'
     +'<pre class="docbody" data-doc="raw" data-id="'+esc(r.id)+'" style="display:none">'+esc(r.text)+'</pre>'
     +'</div>'
     +'<div class="decrow">'
@@ -486,7 +496,7 @@ function pendingCard(r){
     +'<span>'+esc(r.id)+'</span> <span>'+esc(r.domain)+'</span> '
     +'<span style="color:var(--text-dim)">룰 '+esc(r.rule)+' · LLM '+esc(r.llm)
     +' conf '+r.conf.toFixed(2)+'</span></div>'
-    +'<div class="docbody md">'+mdToHtml(r.text)+'</div>'
+    +'<div class="docbody md">'+mdOnce(r)+'</div>'
     +'<div class="pendnote">서명 대상이 아닙니다 — 룰과 LLM 이 등급에 합의하지 못한 후보입니다. '
     +'여기서는 내용만 확인하고, 확정은 후보 관리 화면에서 합니다.</div>'
     +'</div>';
@@ -519,6 +529,9 @@ function decCount(){
   // gate 의 큰 글씨(.gate strong = 20px/900, 폭 300px)에는 **진행 숫자만** 넣는다.
   // 등급별 내역까지 밀어 넣으면 제목 자리에 여러 줄로 쏟아진다 — 그것은 목록 옆으로 내린다.
   document.getElementById('deccount').textContent=ids.length+' / '+signable;
+  // 「미결정」 버튼에 잔여를 달아 둔다 — 얼마나 남았는지 보려고 세지 않아도 되게.
+  var todo=document.getElementById('fTodo');
+  if(todo) todo.textContent='미결정 '+Math.max(0, signable-ids.length);
   document.getElementById('decbreak').innerHTML=
     '서명 대상 '+signable+'건'
     +(pend?' <span class="pg-note">(합의 미달 '+pend+'건 보기 전용)</span>':'')
@@ -528,6 +541,13 @@ function render(){
   const ql=q.toLowerCase();
   const f=DATA.filter(r=>{
     if(g!=='all'&&r.grade!==g)return false;
+    if(st!=='all'){
+      // 보기 전용(합의 미달) 후보는 결정될 수 없으니 '미결정' 에도 넣지 않는다 —
+      // 넣으면 아무리 눌러도 줄지 않는 잔여가 생긴다.
+      const decided=!!(DEC[r.id]&&DEC[r.id].decision);
+      if(st==='todo'&&(decided||!r.signable))return false;
+      if(st==='done'&&!decided)return false;
+    }
     if(ql&&!((r.id+' '+r.text).toLowerCase().includes(ql)))return false;
     return true;
   });
@@ -551,10 +571,24 @@ document.getElementById('grid').addEventListener('change',function(e){
 document.getElementById('grid').addEventListener('input',function(e){
   if(e.target.matches('.note')){const id=e.target.dataset.id;DEC[id]=DEC[id]||{};DEC[id].note=e.target.value;decSave();}
 });
+// 필터는 두 그룹(등급·진행)이라 그룹 안에서만 active 를 옮긴다.
+// 120건짜리 회차를 나눠 하면 「결정 N건 복원」 뒤에 남은 것을 찾아 스크롤해야 했다 —
+// 「미결정」 하나로 목록을 좁힌다.
 document.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',function(){
-  document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));this.classList.add('active');g=this.dataset.v;render();
+  const grp=this.dataset.f;
+  document.querySelectorAll('.filter-btn[data-f="'+grp+'"]').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active');
+  if(grp==='grade') g=this.dataset.v; else st=this.dataset.v;
+  render();
 }));
-document.getElementById('q').addEventListener('input',function(){q=this.value;render();});
+// 한 글자마다 카드 120장을 새로 만들면 타이핑이 끊긴다(실측 render() 1회 32.4ms).
+// 입력이 멎은 뒤에 한 번만 그린다.
+var qTimer;
+document.getElementById('q').addEventListener('input',function(){
+  const v=this.value;
+  clearTimeout(qTimer);
+  qTimer=setTimeout(function(){ q=v; render(); }, 150);
+});
 // [C2 2026-08-17] 서명자는 **로그인 쿠키(JWT)의 sub** 다. 화면이 이름을 받지 않는다.
 var WHO='',WHOROLE='reviewer';
 const LOGIN_URL='/api/v1/golden/candidates/login.html';
