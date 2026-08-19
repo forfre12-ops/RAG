@@ -11,10 +11,12 @@
 값의 출처는 manage.html(GET /api/v1/golden/candidates/manage.html)이다 — 골격을 그쪽에서
 그대로 옮겨 왔고, 검수·서명 화면이 그 모양을 따라간다.
 
-⚠ 지금 이 모듈을 쓰는 곳은 **검수·서명 화면 하나뿐이다**(golden_review_html.py).
-  manage 화면은 golden.py 안에 같은 값의 사본을 그대로 갖고 있어, 여기서 값을 바꿔도
-  그쪽은 바뀌지 않는다. 두 벌을 한 벌로 합치는 일은 아직 남아 있다(golden.py 가 이 모듈을
-  import 하도록). 그때까지는 **두 곳을 같이 고쳐야 한다.**
+⚠ 선택자는 **manage 원문 그대로** 쓴다. 2026-08-19 실측에서 이 모듈이 manage 의 정확한
+  사본이 아니었다 — `.glabel`/`.status`/`.btn.sm` 을 bare 로 적어 놓았고,
+  `.summaryIntro,.metric` 결합 규칙을 둘로 쪼개면서 `.summaryIntro` 에 `grid-column:1/-1`
+  을 상시로 줘 버렸다(manage 는 @media(1050px) 안에서만). 그대로 합쳤으면 요약 카드가
+  padding·border·min-height 를 잃고 전폭으로 퍼졌다. 값을 바꿀 때 **manage 화면 렌더를
+  대조**하는 이유가 이것이다.
 
 ⛔ 종전 주석의 "manage.html 이 감리 정본 화면설계서 UI-01/UI-04 에 실린 화면" 은 사실이
   아니었다(2026-08-19 확인). 화면설계서에 manage.html 은 없고, UI-01=/demo/index.html ·
@@ -39,8 +41,8 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Noto S
 .eyebrow{font:800 12px ui-monospace,monospace;letter-spacing:.8px;color:#8a9298}
 .hero{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:35px;padding-bottom:56px;border-bottom:1px solid var(--line)}
 .gate{border:1px solid var(--line);border-left:5px solid var(--red);align-self:center;padding:25px 24px;min-height:218px}
-.glabel{font:12px ui-monospace,monospace;color:#8a949a}
-.status{display:inline-block;border-radius:20px;background:var(--green);color:#087341;padding:5px 10px;font-size:11px;font-weight:800}
+.gate .glabel{font:12px ui-monospace,monospace;color:#8a949a}
+.gate .status{display:inline-block;border-radius:20px;background:var(--green);color:#087341;padding:5px 10px;font-size:11px;font-weight:800}
 .actions{display:flex;gap:9px;margin-top:20px}
 .section{margin-top:76px}
 .sectionTop{display:flex;align-items:end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding-bottom:23px}
@@ -49,10 +51,9 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Noto S
 .rowhead{padding:13px 12px;background:#f7f7f5;color:#899199;font:11px ui-monospace,monospace}
 .btn{border:1px solid #d8d8d5;background:#fff;padding:11px 14px;font-weight:800;font-size:13px;cursor:pointer}
 .btn.black{background:#111;color:#fff;border-color:#111}
-.btn.sm{padding:6px 11px;font-size:12px}
+.viewbar .btn.sm{padding:6px 11px;font-size:12px}
 .summary{margin-top:40px;border-top:3px solid #111;background:#fafaf8;display:grid;grid-template-columns:1.18fr repeat(4,1fr)}
-.summaryIntro{grid-column:1/-1}
-.metric{padding:29px;border-right:1px solid var(--line);min-height:154px}
+.summaryIntro,.metric{padding:29px;border-right:1px solid var(--line);min-height:154px}
 .metric:last-child{border-right:0}
 .metric .mcap{font-size:12px;color:#8a9299}
 .flash{min-height:20px;color:#087341;font-size:13px;margin:14px 0}
