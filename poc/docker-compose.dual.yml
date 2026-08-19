@@ -31,6 +31,13 @@ services:
       - ./datasets:/app/datasets                            # 골든 후보 — 아래 [골든] 주석 참조(api↔worker 공유·rw 필수)
       - koipa_hf_cache:/home/koipa/.cache/huggingface     # KURE 임베더 캐시 — 두 스택 공유(external)
       - storagedata:/app/.storage                           # [#4] 원문 저장(암호화 at-rest) — api↔worker 공유·영속(볼륨無 시 원문소실·미공유→빈문서 분류)
+      # [준비도] /healthz 의 readiness 는 reports/operational_readiness.json 을 읽는다.
+      # 이 바인드가 없으면 호스트에서 `make operational-readiness` 로 **이미 만들어 둔** 리포트가
+      # 있어도 컨테이너에는 /app/reports 자체가 없어 healthz 가 영원히 "missing" 을 답한다.
+      # 실측 2026-08-19(223): 호스트 ~/poc/reports/operational_readiness.json 8,789 bytes 존재,
+      # 컨테이너 /app/reports = No such file or directory, healthz readiness.status = missing.
+      # 읽기 전용 — 리포트는 호스트의 make 타깃이 만들고 컨테이너는 보기만 한다.
+      - ./reports:/app/reports:ro
   worker:
     depends_on: !override
       postgres:
