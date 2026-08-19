@@ -231,10 +231,17 @@ figure.shot figcaption b{color:var(--ink)}
 
   <h3>방법 ①  이미 만들어둔 문서로 검수하기 <span class="tag on">권장</span></h3>
   <p>우리가 이미 만들어놓은 골든셋 후보 파일을 <b>그대로 올려서</b> 검수만 합니다. <b>AI 재라벨링을 하지 않아</b> 기존 라벨이 보존되고, 로컬 LLM이 없어도 됩니다.</p>
+  <p style="border-left:4px solid #e72d44;padding:12px 16px;background:#fafafa;margin:14px 0">
+    <b>경로 정정(2026-08-20).</b> 종전에는
+    <code>datasets/gold_real/builds/regate_gold_20260702_013914.jsonl</code>(229건)을 적어
+    두었습니다. 그 파일은 실재하지만 <b>KL 에 전달한 검수 묶음이 아닙니다.</b> 그대로 따라
+    하면 전달본이 아닌 다른 229건을 검수하게 되고, 전달본은 서명되지 않은 채 남습니다.
+    실제 전달본은 위 경로의 <b>120건</b>(등급 TS·S1·S2·S3 각 30건, 파일 실측)입니다.
+  </p>
   <ol class="steps">
     <li>골든셋 빌더 카드의 <b>「기존 슬레이트 등록」</b> 칸에 파일 경로를 입력<br />
-        <code>datasets/gold_real/builds/regate_gold_20260702_013914.jsonl</code></li>
-    <li><b>[등록]</b> 클릭 → 잡이 만들어집니다 (실제로 <b>229건</b>이 올라갑니다)</li>
+        <code>datasets/golden_review/ff5a822c/candidates.jsonl</code></li>
+    <li><b>[등록]</b> 클릭 → 잡이 만들어집니다 (실제로 <b>120건</b>이 올라갑니다)</li>
     <li>아래 <b>골든 잡 목록</b>에서 방금 만든 잡을 선택</li>
     <li><b>[검수 HTML 열기]</b>로 훑어보고, <b>[서명 HTML 열기]</b>로 결정합니다</li>
   </ol>
