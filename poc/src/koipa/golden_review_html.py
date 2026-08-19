@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 from koipa.console_nav import NAV_CSS, nav_bar_html
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
-from koipa.console_shell import SHELL_CSS
+from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 
 # 콘솔(static/styles.css)과 동일한 NovaX 토큰 — 골든 화면이 /demo 콘솔과 한 시스템으로 보이게
 # 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
@@ -340,7 +340,7 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
 .result{margin:14px 0;padding:12px 16px;border-radius:var(--radius);font-size:13px;display:none}
 .result.ok{background:#f0fdf4;border:1px solid var(--c-s3);border-left:3px solid var(--c-s3);color:#166534;display:block}
 .result.err{background:#fef2f2;border:1px solid var(--c-ts);border-left:3px solid var(--c-ts);color:#991b1b;display:block}
-""" + NAV_CSS + """
+""" + NAV_CSS + SHELL_MEDIA_CSS + """
 </style>"""
 
 _SIGNOFF_BODY = r"""

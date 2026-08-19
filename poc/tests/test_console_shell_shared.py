@@ -82,3 +82,26 @@ def test_ids_are_unique(signoff, eid):
     """
     marker = 'id="%s"' % eid
     assert signoff.count(marker) == 1, "%s 가 %d회 나온다" % (marker, signoff.count(marker))
+
+
+@pytest.mark.parametrize("bp", ["max-width:1050px", "max-width:700px"])
+def test_both_screens_collapse_at_the_same_breakpoints(signoff, manage, bp):
+    """반응형이 한쪽에만 있으면 좁은 화면에서 두 화면이 다시 갈라진다.
+
+    2026-08-19 실측: 껍데기를 공용 모듈로 뽑을 때 @media 를 빠뜨려, manage 는 1050px 에서
+    사이드바가 접히는데 검수 화면은 326px 사이드바를 그대로 둔 채 본문만 눌렸다.
+    """
+    for name, html in (("검수 화면", signoff), ("후보 관리", manage)):
+        assert bp in html.replace(" ", ""), f"{name} 에 {bp} 중단점이 없다"
+
+
+def test_media_rules_come_after_the_base_rules_they_override(manage):
+    """반응형은 스타일시트 **맨 뒤**여야 한다 — 앞에 두면 뒤의 기본 규칙이 덮는다.
+
+    실측으로 확인한 두 곳: `.rowhead{display:none}` 은 뒤의 `.rowhead,.candidate{display:grid}`
+    에, `.filters input{width:100%}` 는 뒤의 `.filters input{width:170px}` 에 진다.
+    """
+    css = manage[manage.index("<style>"):manage.index("</style>")]
+    media_at = css.index("@media(max-width:700px)")
+    for base in (".rowhead,.candidate{", ".filters input{width:170px}"):
+        assert css.index(base) < media_at, f"{base} 가 미디어 규칙보다 뒤에 있다"

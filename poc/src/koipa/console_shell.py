@@ -61,3 +61,15 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Noto S
 .empty{padding:45px 14px;color:#8a9299}
 .pill{display:inline-block;border-radius:18px;padding:5px 9px;font-size:11px;font-weight:800}
 """
+
+
+# 반응형 규칙은 **스타일시트 맨 뒤**에 붙여야 한다.
+# 앞쪽(SHELL_CSS 자리)에 두면 뒤에 오는 기본 규칙이 덮어 버린다 — 실측으로 확인한 두 곳:
+#   .rowhead{display:none}      <- 뒤의 `.rowhead,.candidate{display:grid}` 가 이긴다
+#   .filters input{width:100%}  <- 뒤의 `.filters input{width:170px}` 가 이긴다
+# 그래서 SHELL_CSS 와 분리해 두고, 각 화면이 자기 스타일 끝에 이어 붙인다.
+# 화면 고유 반응형(manage 의 .detail·.candidate 등)은 각자 파일에 남긴다.
+SHELL_MEDIA_CSS = """
+@media(max-width:1050px){.frame{grid-template-columns:1fr}.side{display:none}.main{padding:45px 30px}.hero{grid-template-columns:1fr}.summary{grid-template-columns:repeat(3,1fr)}.summaryIntro{grid-column:1/-1}}
+@media(max-width:700px){.top{padding:0 16px}.topmid,.workspace{display:none}.main{padding:35px 18px}.hero h1{letter-spacing:-2.5px}.summary{grid-template-columns:repeat(2,1fr)}.rowhead{display:none}.section h2{font-size:31px}.sectionTop{align-items:start;flex-direction:column}.sectionTop p{margin-left:0}.filters{width:100%}.filters input{width:100%}}
+"""
