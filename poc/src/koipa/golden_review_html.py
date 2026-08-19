@@ -1,12 +1,19 @@
-"""골든 빌더 후보 검토본 HTML 렌더 (G4-html).
+"""골든셋 검수 · 서명 화면 HTML 렌더 (G4-html).
 
-빌더 출력(build_<id>.jsonl / GoldenRecord.to_dict())을 지재원 관리자 검수용 인터랙티브
-HTML로 렌더한다.
+빌더 출력(build_<id>.jsonl / GoldenRecord.to_dict())을 검수자가 클릭 서명하는 인터랙티브
+HTML로 렌더한다. gold 후보에는 승인/등급변경/거부 폼을 붙이고, 룰·LLM 합의 미달 후보는
+같은 목록에 보기 전용으로 섞는다.
+
+주소는 둘이지만 화면은 하나다 — `review.html` 과 `signoff.html` 이 모두 이 렌더러를 쓴다
+(2026-08-18 통합). 같은 잡의 같은 후보를 보는데 화면이 둘이라 검수자가 같은 목록을 두 번 봤다.
+[2026-08-19] 옛 검토본 렌더러(render_review_html · _BODY_TEMPLATE, 미리보기 150자)는
+HTTP 경로에서 쓰이지 않은 지 오래라 삭제했다. review.html **주소는 유지**한다 —
+build_offline_bundle·demo_e2e_golden·register_review_signoff_job·OPERATION.md 가 참조한다.
 
 주의 — golden100_분류근거_보고서(regen_golden100_report.build_body)는 '평가 리포트'(정답
-target 대조·정오답·미탐)다. 빌더 검토본은 정답이 아직 없는 '후보 검수'이므로 target/미탐 대신
-**후보 등급(llm)·룰 등급·합의 상태·신뢰도**를 보여준다. 시각 폼(등급/상태 필터·카드)만 같은
-계열을 따른다. (순수 렌더 — 무거운 의존 없음, HTML 문자열 반환)
+target 대조·정오답·미탐)다. 이 화면은 정답이 아직 없는 '후보 검수'이므로 target/미탐 대신
+**후보 등급(llm)·룰 등급·합의 상태·신뢰도**를 보여준다.
+(순수 렌더 — 무거운 의존 없음, HTML 문자열 반환)
 """
 from __future__ import annotations
 
@@ -52,15 +59,6 @@ body{font-family:var(--font-sans);margin:0;background:var(--bg);color:var(--text
 .site-badge.dev .site-name{background:#737373}
 .site-badge.unknown .site-name{background:#fff;color:var(--text-dim);border-color:var(--border-strong)}
 @media (max-width:720px){.site-badge .site-role{display:none}}
-.lede-row{max-width:1320px;margin:0 auto;padding:28px 32px 0}
-.h1{font-size:30px;font-weight:600;letter-spacing:-.03em;margin:0 0 10px;line-height:1.2}
-.lede{font-size:15px;font-weight:300;color:var(--text-soft);line-height:1.55;margin:0;
-      letter-spacing:-.012em;max-width:820px}
-.container{max-width:1320px;margin:0 auto;padding:24px 32px 48px}
-.stats-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.stat-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;min-width:80px;text-align:center}
-.stat-card .num{font-size:20px;font-weight:700;font-family:var(--font-mono)}
-.stat-card .lbl{font-size:11px;color:var(--text-dim)}
 .filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .filter-btn{border:1px solid var(--border-strong);background:var(--bg);color:var(--text);
             border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit}
@@ -69,17 +67,9 @@ body{font-family:var(--font-sans);margin:0;background:var(--bg);color:var(--text
 .filter-sep{width:1px;height:20px;background:var(--border-strong);margin:0 4px}
 .search-box{border:1px solid var(--border-strong);border-radius:var(--radius);padding:5px 10px;
             font-size:12px;flex:1;min-width:140px;font-family:inherit}
-.result-count{font-size:12px;color:var(--text-dim);margin-bottom:8px}
-.records-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
-.card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
 .card-meta{font-size:11px;color:var(--text-dim);display:flex;gap:8px;font-family:var(--font-mono)}
-.card-title{font-weight:600;font-size:13px;margin:6px 0 8px;display:flex;align-items:center;gap:8px}
 .grade-mark{font-weight:700;border-radius:var(--radius);padding:2px 8px;color:#fff;font-size:12px}
 .g-TS{background:var(--c-ts)}.g-S1{background:var(--c-s1)}.g-S2{background:var(--c-s2)}.g-S3{background:var(--c-s3)}
-.row{font-size:12px;margin:6px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.status-txt{font-size:11px;border:1px solid var(--border-strong);border-radius:var(--radius);padding:1px 6px}
-.status-txt.uncertain{border-color:var(--c-ts);color:var(--c-ts)}
-.preview{font-size:11.5px;color:var(--text-soft);margin-top:8px;line-height:1.5}
 .no-results{padding:30px;text-align:center;color:var(--text-dim)}
 """ + NAV_CSS + """
 </style>"""
@@ -109,21 +99,6 @@ _SITES = {
     "lite-cloud": ("오픈망 파일럿", "경량", "pilot"),
     "lite-noapi": ("로컬·개발", "dryrun", "dev"),
 }
-
-
-def _reviewer_label(profile: Optional[str]) -> str:
-    """검수 주체 문구 — 배포처에 따라 달라진다.
-
-    종전엔 "지재원 관리자 검수용"이 템플릿에 박혀 있어, **고객사 폐쇄망에 배포된 화면에서도**
-    발주처 검수자에게 '지재원'이 표시됐다(제출문서 `발주처_골든셋_생성갱신_지원` §2 의 설명과
-    화면이 어긋나는 지점). 배지와 같은 프로파일 근거로 문구도 맞춘다.
-    """
-    site = _SITES.get(profile or "", ("", "", ""))[0]
-    if site == "고객사":
-        return "발주처 검수자"
-    if site == "지재원":
-        return "지재원 관리자"
-    return "검수자"
 
 
 def _site_badge_html(profile: Optional[str], screen: str) -> str:
@@ -176,28 +151,6 @@ def _nav_html(sub: str, profile: Optional[str], screen: str, sibling: str = "") 
     )
 
 
-def _display_records(records: Sequence[dict]) -> list[dict]:
-    out: list[dict] = []
-    for r in records:
-        grade = r.get("label") or r.get("llm_grade") or "S3"
-        if grade not in _GRADES:
-            grade = "S3"
-        text = str(r.get("text") or "")
-        out.append({
-            "id": str(r.get("doc_id", "")),
-            "grade": grade,                                   # 후보 등급 (gold=label, uncertain=llm 제안)
-            "rule": str(r.get("rule_grade", "")),
-            "llm": str(r.get("llm_grade", "")),
-            "conf": round(float(r.get("llm_confidence") or 0.0), 3),
-            "status": str(r.get("status", "")),
-            "is_gold": r.get("review_status") in ("accepted", "gold_candidate"),
-            "agree": bool(r.get("agreement")),
-            "domain": str(r.get("domain", "") or r.get("source", "")),
-            "preview": text[:150].replace("\n", " "),
-        })
-    return out
-
-
 def _embed_json(data: object) -> str:
     """<script> 블록 임베드용 JSON 직렬화 — </script> breakout·HTML 컨텍스트 탈출 차단.
 
@@ -214,65 +167,8 @@ def _embed_json(data: object) -> str:
     )
 
 
-def render_review_html(
-    records: Sequence[dict],
-    *,
-    title: str = "골든셋 후보 검토본",
-    subtitle: str = "",
-    css: Optional[str] = None,
-    profile: Optional[str] = None,
-    signoff_url: str = "",
-) -> str:
-    """빌더 후보 레코드(dict)들을 지재원 관리자 검수용 인터랙티브 HTML로 렌더.
-
-    profile = settings.deploy_profile. 주면 콘솔과 같은 배포 주체 배지(지재원/고객사)를
-    nav 에 박는다 — 이중배포에서 어느 스택의 후보를 보는지 화면만으로 구분된다.
-    """
-    data = _display_records(records)
-    n_gold = sum(1 for d in data if d["is_gold"])
-    head = (
-        "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
-        f"<title>{_html.escape(title)}</title>{css or _DEFAULT_CSS}</head>"
-    )
-    return head + (
-        _BODY_TEMPLATE
-        .replace("__NAV__", _nav_html("골든셋 후보 검토본", profile, "검수",
-                                      _sibling_link_html(signoff_url, "서명 화면")))
-        .replace("__TITLE__", _html.escape(title))
-        .replace("__SUBTITLE__", _html.escape(subtitle))
-        .replace("__REVIEWER__", _html.escape(_reviewer_label(profile)))
-        .replace("__TOTAL__", str(len(data)))
-        .replace("__GOLD__", str(n_gold))
-        .replace("__UNCERTAIN__", str(len(data) - n_gold))
-        .replace("__DOC_RENDER_JS__", DOC_RENDER_JS)
-        .replace("__DATA__", _embed_json(data))
-    )
-
-
-def render_review_html_from_jsonl(
-    paths: Sequence[str | Path],
-    *,
-    title: str = "골든셋 후보 검토본",
-    subtitle: str = "",
-    css: Optional[str] = None,
-    profile: Optional[str] = None,
-    signoff_url: str = "",
-) -> str:
-    """build_<id>.jsonl·uncertain_<id>.jsonl 등을 읽어 검토본 HTML로 렌더."""
-    recs: list[dict] = []
-    for p in paths:
-        pp = Path(p)
-        if not pp.exists():
-            continue
-        for line in pp.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                recs.append(json.loads(line))
-    return render_review_html(recs, title=title, subtitle=subtitle, css=css, profile=profile,
-                              signoff_url=signoff_url)
-
-
 # ── 골든셋 검수 · 화면 서명(signoff) 인터랙티브 렌더 ──────────────────────────────
-# render_review(보기 전용)와 달리 각 후보에 승인/등급변경/거부 폼을 붙이고, 제출 시
+# 각 후보에 승인/등급변경/거부 폼을 붙이고, 제출 시
 # POST /golden/jobs/{id}/signoff 로 결정을 보내 locked_gold_eval 로 승격한다. 검수자가
 # jsonl 을 손으로 편집하는 대신 화면에서 클릭 서명 — 서명 캡처 UI 갭(뷰어만 존재) 해소.
 def _signoff_records(records: Sequence[dict], *, signable: bool = True) -> list[dict]:
@@ -766,86 +662,6 @@ document.getElementById('submit').addEventListener('click',async function(){
   document.getElementById('decclear').addEventListener('click',decClear);
 })();
 render();
-</script>
-</body></html>
-"""
-
-
-_BODY_TEMPLATE = r"""
-<body>
-__NAV__
-<div class="lede-row">
-  <h1 class="h1">__TITLE__</h1>
-  <p class="lede">__SUBTITLE__ · 후보 __TOTAL__건 (gold __GOLD__ / 검수대상 __UNCERTAIN__) — __REVIEWER__ 검수용. <b>정답이 아니라 검토 후보</b>입니다.</p>
-</div>
-<div class="container">
-  <div class="stats-bar" id="stats"></div>
-  <div class="filters">
-    <span style="font-size:12px">등급</span>
-    <button class="filter-btn active" data-f="grade" data-v="all">전체</button>
-    <button class="filter-btn" data-f="grade" data-v="TS">TS</button>
-    <button class="filter-btn" data-f="grade" data-v="S1">S1</button>
-    <button class="filter-btn" data-f="grade" data-v="S2">S2</button>
-    <button class="filter-btn" data-f="grade" data-v="S3">S3</button>
-    <span class="filter-sep"></span>
-    <span style="font-size:12px">상태</span>
-    <button class="filter-btn active" data-f="status" data-v="all">전체</button>
-    <button class="filter-btn" data-f="status" data-v="gold">gold 후보</button>
-    <button class="filter-btn" data-f="status" data-v="uncertain">검수대상</button>
-    <span class="filter-sep"></span>
-    <input class="search-box" id="q" placeholder="id·요약 검색...">
-  </div>
-  <div class="result-count" id="cnt"></div>
-  <div class="records-grid" id="grid"></div>
-</div>
-<script id="data" type="application/json">__DATA__</script>
-<script>
-const DATA=JSON.parse(document.getElementById('data').textContent);
-let g='all',s='all',q='';
-function esc(t){const d=document.createElement('div');d.textContent=t==null?'':t;return d.innerHTML;}
-function card(r){
-  const st=r.is_gold?'<span class="status-txt">'+esc(r.status)+'</span>':'<span class="status-txt uncertain">검수대상 · '+esc(r.status)+'</span>';
-  const ag=r.agree?'룰·LLM 일치':'룰·LLM 불일치';
-  return '<div class="card">'
-    +'<div class="card-meta"><span>'+esc(r.id)+'</span><span>'+esc(r.domain)+'</span></div>'
-    +'<div class="card-title"><span class="grade-mark g-'+r.grade+'">'+r.grade+'</span> 후보 등급</div>'
-    +'<div class="row">룰 <b>'+esc(r.rule)+'</b> · LLM <b>'+esc(r.llm)+'</b> <span style="color:var(--text-dim)">conf '+r.conf.toFixed(2)+'</span> '+st+'</div>'
-    +'<div class="row" style="font-size:11px;color:var(--text-dim)">'+ag+'</div>'
-    +'<div class="preview">'+esc(r.preview)+'</div>'
-    +'</div>';
-}
-function stats(){
-  const bg={TS:0,S1:0,S2:0,S3:0};let gold=0;
-  DATA.forEach(r=>{bg[r.grade]=(bg[r.grade]||0)+1;if(r.is_gold)gold++;});
-  document.getElementById('stats').innerHTML=
-    '<div class="stat-card"><div class="num">'+DATA.length+'</div><div class="lbl">전체</div></div>'
-    +'<div class="stat-card"><div class="num">'+bg.TS+'</div><div class="lbl">TS</div></div>'
-    +'<div class="stat-card"><div class="num">'+bg.S1+'</div><div class="lbl">S1</div></div>'
-    +'<div class="stat-card"><div class="num">'+bg.S2+'</div><div class="lbl">S2</div></div>'
-    +'<div class="stat-card"><div class="num">'+bg.S3+'</div><div class="lbl">S3</div></div>'
-    +'<div class="stat-card"><div class="num">'+gold+'</div><div class="lbl">gold 후보</div></div>'
-    +'<div class="stat-card"><div class="num">'+(DATA.length-gold)+'</div><div class="lbl">검수대상</div></div>';
-}
-function apply(){
-  const ql=q.toLowerCase();
-  const f=DATA.filter(r=>{
-    if(g!=='all'&&r.grade!==g)return false;
-    if(s==='gold'&&!r.is_gold)return false;
-    if(s==='uncertain'&&r.is_gold)return false;
-    if(ql&&!((r.id+' '+r.preview).toLowerCase().includes(ql)))return false;
-    return true;
-  });
-  document.getElementById('cnt').textContent=f.length+'건 표시 (전체 '+DATA.length+'건)';
-  document.getElementById('grid').innerHTML=f.length?f.map(card).join(''):'<div class="no-results">조건에 맞는 후보가 없습니다.</div>';
-}
-document.querySelectorAll('.filter-btn').forEach(b=>b.addEventListener('click',function(){
-  const f=this.dataset.f,v=this.dataset.v;
-  document.querySelectorAll('.filter-btn[data-f="'+f+'"]').forEach(x=>x.classList.remove('active'));
-  this.classList.add('active');
-  if(f==='grade')g=v;else s=v;apply();
-}));
-document.getElementById('q').addEventListener('input',function(){q=this.value;apply();});
-stats();apply();
 </script>
 </body></html>
 """

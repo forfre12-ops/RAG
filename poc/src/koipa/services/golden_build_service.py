@@ -16,10 +16,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from koipa.golden_builder import GoldenBuildResult, build_golden_set, make_label_fn
-from koipa.golden_review_html import (
-    render_review_html_from_jsonl,
-    render_signoff_html_from_jsonl,
-)
+from koipa.golden_review_html import render_signoff_html_from_jsonl
 from koipa.golden_signoff import Signoff, merge_locked_records, promote_to_locked
 from koipa.golden_tiers import (
     REJECTED_BY_REVIEWER,
@@ -381,34 +378,12 @@ class GoldenBuildService:
             "readiness": eval_readiness(existing_live),
         }
 
-    def render_review(
-        self, job_id: uuid.UUID, *, title: str = "골든셋 후보 검토본", signoff_url: str = ""
-    ) -> Optional[str]:
-        """완료된 빌드 잡의 후보(build·uncertain)를 지재원 관리자 검수용 HTML로 렌더.
-
-        JobStore에서 잡의 출력 경로를 찾아 render_review_html_from_jsonl로 렌더.
-        잡이 없거나 출력 경로가 없으면 None. (지재원 관리자가 URL로 바로 검수)
-        """
-        job = self.jobs.get(job_id)
-        if job is None:
-            return None
-        paths = [p for p in (job.get("gold_path"), job.get("uncertain_path")) if p]
-        if not paths:
-            return None
-        from koipa.config import settings  # noqa: PLC0415 — 모듈 상단 미임포트(지연 로드 관례)
-        return render_review_html_from_jsonl(
-            paths, title=title, subtitle=f"job {job_id}",
-            profile=getattr(settings, "deploy_profile", None),   # nav 배포 주체 배지
-            # 서명된 형제 주소는 **API 층이 계산해서 넘긴다** — ?t= 비밀키를 아는 곳이 거기다.
-            signoff_url=signoff_url,
-        )
-
     def render_signoff(
         self, job_id: uuid.UUID, *, title: str = "골든셋 검수 · 서명", review_url: str = ""
     ) -> Optional[str]:
         """빌드 잡의 gold 후보(gold_candidate)를 화면 서명용 인터랙티브 HTML로 렌더.
 
-        render_review(보기 전용)와 달리 각 후보에 승인/등급변경/거부 폼을 붙이고, 제출 시
+        각 후보에 승인/등급변경/거부 폼을 붙이고, 제출 시
         POST /golden/jobs/{id}/signoff 로 결정을 보낸다. gold 후보만 대상(uncertain 은
         아직 승격 후보가 아님). 잡/경로 없으면 None.
         """

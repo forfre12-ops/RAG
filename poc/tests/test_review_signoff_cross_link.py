@@ -27,7 +27,6 @@ _TOKENED = "/api/v1/golden/jobs/J/{}.html?t=55f85adf91ebee29acc2bacd"
 
 def test_service_accepts_the_url_but_does_not_compute_it():
     """서명 토큰을 아는 곳은 API 층 하나여야 한다 — 서비스가 비밀키를 만지면 안 된다."""
-    assert "signoff_url" in inspect.signature(GoldenBuildService.render_review).parameters
     assert "review_url" in inspect.signature(GoldenBuildService.render_signoff).parameters
     src = inspect.getsource(GoldenBuildService)
     assert "golden_html_url_secret" not in src
@@ -43,7 +42,7 @@ def test_both_urls_serve_the_same_screen():
     """
     src = inspect.getsource(golden_api)
     assert "render_signoff(job_id, title=" in src, "review 라우트가 서명 화면을 안 준다"
-    assert "render_review(job_id" not in src, "옛 검토본 렌더러를 아직 부른다"
+    assert "render_review" not in src, "옛 검토본 렌더러를 아직 부른다"
 
 
 def test_uncertain_candidates_are_shown_read_only():
