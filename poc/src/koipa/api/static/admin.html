@@ -803,12 +803,25 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn sec sm" onclick="loadGoldenJob()">상태 새로고침</button>
         </div>
 
-        <div class="field" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-          <label class="fld">기존 슬레이트 등록 — 재라벨링 없이 검수·서명만 (<code>POST /golden/jobs/register</code>)</label>
+        <!-- [2026-08-20] 이 아래는 위(AI 가 후보를 새로 만든다)와 **정반대** 기능이다 —
+             이미 있는 문서 묶음을 그대로 검수에 올린다. 한 상자 안에서 구분이 약해
+             사용자가 무엇을 누르는지 몰랐다. 제목으로 갈라 놓는다. -->
+        <div class="field" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--border);">
+          <div class="fld" style="font-weight:700;color:var(--text);margin-bottom:2px;">
+            이미 있는 문서 묶음으로 검수 시작하기
+          </div>
+          <p class="sec-note" style="margin:0 0 8px;">
+            AI 가 등급을 다시 매기지 않습니다. 파일에 적힌 등급이 그대로 검수 화면에 올라갑니다.
+          </p>
           <div style="display:flex;gap:6px;align-items:center;">
-            <input id="gold-build-path" type="text" style="flex:1"
-                   placeholder="datasets/gold_real/builds/build_xxxx.jsonl" />
-            <button class="btn sec sm" id="gold-reg" onclick="registerGoldenBuild()">등록</button>
+            <!-- 종전에는 자유 입력 칸이었고 placeholder 가 **채워진 값처럼 보였다.**
+                 실제로는 빈 칸이라 [등록]을 누르면 "경로를 입력하세요" 가 떴다(사용자 실측).
+                 이제 서버에 실제로 있는 파일을 골라 쓴다. -->
+            <select id="gold-build-path" style="flex:1">
+              <option value="">불러오는 중…</option>
+            </select>
+            <button class="btn sec sm" onclick="loadGoldenBuilds()" title="목록 다시 읽기">↻</button>
+            <button class="btn sec sm" id="gold-reg" onclick="registerGoldenBuild()">검수 시작</button>
           </div>
           <p class="sec-note" style="margin-top:4px;">이미 만들어둔 <code>build_*.jsonl</code>을 그대로 잡으로 올립니다. LLM 재라벨링을 하지 않아 큐레이트된 슬레이트 라벨이 보존됩니다.</p>
         </div>
@@ -2048,7 +2061,11 @@ function renderGoldenSummary(d){
 async function startGoldenBuild(){
   if(!guardWrite('골든셋 후보 생성')) return;
   const src=($('gold-source')||{}).value;
-  const btn=$('gold-go'); if(btn) btn.disabled=true;
+  // [2026-08-20] 눌린 티를 낸다. 종전에는 버튼만 잠기고 문구가 응답 **뒤에야** 떠서,
+  // LLM 이 도는 몇 초 동안 화면이 멈춘 것처럼 보였다(분류 실행·등급 시연은 이미 이렇게 한다).
+  const btn=$('gold-go');
+  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='생성 중…'; }
+  goldenProgress('후보를 만들고 있습니다 — AI 가 문서를 읽고 등급을 매기는 중입니다. 몇 초 걸립니다.');
   try{
     const body={
       n:Number($('gold-n').value || 8),
@@ -2078,15 +2095,39 @@ async function startGoldenBuild(){
   }catch(e){
     goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
     $('gold-result').textContent=`골든셋 후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
-  }finally{ if(btn) btn.disabled=false; }
+  }finally{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
 }
 /* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
  * /golden/build 와 달리 즉시 done 이라 폴링 없이 상태를 한 번만 읽는다. */
+/* 등록할 수 있는 문서 묶음 목록을 서버에서 받아 고르게 한다.
+ * 왜(2026-08-20 사용자 지적): 종전에는 자유 입력 칸이었고 placeholder 가 채워진 값처럼
+ * 보여, 그대로 [등록]을 누르면 "경로를 입력하세요" 가 떴다. 서버에 무슨 파일이 있는지
+ * 화면이 알려주지 않으니 경로를 외워 쳐야 했다. */
+async function loadGoldenBuilds(){
+  const sel=$('gold-build-path'); if(!sel) return;
+  sel.innerHTML='<option value="">불러오는 중…</option>';
+  try{
+    const d=await api('GET','/golden/builds');
+    const list=(d&&d.builds)||[];
+    if(!list.length){ sel.innerHTML='<option value="">등록할 수 있는 문서 묶음이 없습니다</option>'; return; }
+    sel.innerHTML='<option value="">문서 묶음을 고르세요 ('+list.length+'개)</option>'
+      + list.map(function(b){
+          var n=(b.records_exact?'':'≥')+b.records;
+          var when=(b.modified||'').slice(0,10);
+          return '<option value="'+esc(b.path)+'">'+esc(b.path)+' — '+n+'건 · '+when+'</option>';
+        }).join('');
+  }catch(e){
+    sel.innerHTML='<option value="">목록을 못 읽었습니다 — 로그인 상태를 확인하세요</option>';
+  }
+}
+
 async function registerGoldenBuild(){
   if(!guardWrite('골든 슬레이트 등록')) return;
   const path=($('gold-build-path').value||'').trim();
-  if(!path){ goldenProgress('등록할 build 파일 경로를 입력하세요 (datasets/ 하위).'); return; }
-  const btn=$('gold-reg'); if(btn) btn.disabled=true;
+  if(!path){ goldenProgress('위 목록에서 문서 묶음을 하나 고르세요.'); return; }
+  const btn=$('gold-reg');
+  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='여는 중…'; }
+  goldenProgress('문서 묶음을 검수 화면에 올리는 중입니다.');
   try{
     const d=await api('POST','/golden/jobs/register',{build_path:path, actor:actor()});
     LAST_GOLDEN_JOB_ID=d.golden_job_id;
@@ -2098,7 +2139,7 @@ async function registerGoldenBuild(){
     const detail=e.data?.detail||e.message||'';
     goldenProgress(`등록 실패: ${e.status||''} ${detail}${e.status===404?' — 경로가 없거나 datasets/ 밖입니다.':''}`);
     $('gold-result').textContent=`골든 슬레이트 등록 실패: ${e.status||''} ${detail}`;
-  }finally{ if(btn) btn.disabled=false; }
+  }finally{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label||'검수 시작'; } }
 }
 /* 완료(done/failed)까지 자동 폴링. 상한 40회×1.5s=60s — 넘으면 수동 새로고침으로 넘긴다. */
 async function pollGoldenJob(id){
@@ -2492,7 +2533,8 @@ function syncActiveGrades(codes){
 })();
 
 /* init */
-initPane();          // 탭 초기 표시 — 카드 12장 상시 노출 대신 루프별로 나눈다
+initPane();          // 탭 초기 표시 — 검수 탭이 기본, 탭마다 카드 4장 이하
+loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸을 대체)
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncWriteGate();
 populateSamples();

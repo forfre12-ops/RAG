@@ -460,15 +460,47 @@ function render(j){
   }
   else{
     const f=c.factors||{};
+    /* [2026-08-20] 룰이 실제로 관측한 S/V/M 을 같이 보여준다.
+       왜: 룰과 모델이 갈리면 서버가 표시용 S/V/M 을 **모델 등급에 맞춰 역산**해 덮는다
+       (pipeline [A3]). 그러면 "S2·V2·M2 인데 룰은 S1" 처럼 판정식으로 설명되지 않는 조합이
+       뜬다(사용자 지적). 룰 관측값을 옆에 적어 왜 갈렸는지 그 자리에서 읽히게 한다. */
+    const rf = c.rule_factors || null;
+    const KO = {secrecy:'비공지성(S)', value:'경제적 유용성(V)', management:'비밀관리성(M)'};
     const fbars = ['secrecy','value','management'].map(k=>{
       const v=Number(f[k]||0); const pct=Math.max(0,Math.min(100,v<=1?v*100:v));
-      const ko={secrecy:'비공지성(S)',value:'경제적 유용성(V)',management:'비밀관리성(M)'}[k];
-      return `<div class="factor"><div class="flabel"><span>${ko}</span><span>${v.toFixed(2)}</span></div><div class="fbar"><div class="ffill" style="width:${pct}%"></div></div></div>`;
-    }).join('');
+      const ko=KO[k];
+      const side = rf ? `<span style="color:var(--text-dim);font-weight:400"> · 룰 ${Number(rf[k]||0).toFixed(2)}</span>` : '';
+      return `<div class="factor"><div class="flabel"><span>${ko}</span><span>${v.toFixed(2)}${side}</span></div><div class="fbar"><div class="ffill" style="width:${pct}%"></div></div></div>`;
+    }).join('') + (rf ? `<div class="hint" style="margin-top:6px;line-height:1.6">
+        앞의 숫자는 <b>모델 등급에 맞춰 역산한 추정치</b>이고, 「룰」은 룰 엔진이 본문에서
+        실제로 관측한 값입니다. 두 값이 다르면 룰이 근거를 덜 찾았다는 뜻이며, 그래서 두
+        엔진의 등급이 갈립니다.</div>` : '');
     const isReview = c.status !== 'staging';
     window._reviewVerdict = isReview;   // needs_review 일 때만 전송 대상
+    /* [2026-08-20] 검수로 보낸 **실제 사유**를 배너에 적는다.
+       종전에는 "자동 확정하지 않고 사람 검수로 라우팅" 이라고만 떠서, 검수자가 아래 결합경로
+       문구("escalation (룰 S1 · 모델 TS …)")를 원인으로 읽었다. 그것은 원인이 아니다 —
+       게이트 조건에 룰↔모델 불일치는 없다. 실측 2026-08-20: 검수 대상 120건 중 검수로 간
+       67건이 전부 low-confidence 하나로 걸렸다. 사유는 warnings 에만 있었다. */
+    const GATE_REASONS = [
+      [/low-confidence: confidence=([\d.]+) < ([\d.]+)/,
+        m=>`신뢰도 ${m[1]} 이 기준 ${m[2]} 에 못 미칩니다`],
+      [/document flagged at ingestion/, ()=>'추출 품질이 낮은 문서입니다(스캔·OCR 등)'],
+      [/body_below_classifiable_threshold/, ()=>'판정할 본문이 사실상 없습니다'],
+      [/cap-conflict/, ()=>'출처 기준 하향과 내용 기준 상향이 충돌합니다'],
+      [/sparse-evidence/, ()=>'룰 판정이 약한 근거 하나에 기대고 있습니다'],
+      [/abbrev-only-escalation/, ()=>'영문 약어 밀도만으로 높은 등급이 나왔습니다'],
+      [/metadata-access-conflict/, ()=>'접근 제한 표기에 비해 내용 예측이 낮습니다'],
+    ];
+    function gateReason(ws){
+      for(const w of (ws||[])){
+        for(const [re,fn] of GATE_REASONS){ const m=w.match(re); if(m) return fn(m); }
+      }
+      return '';
+    }
+    const why = isReview ? gateReason(c.warnings) : '';
     const verdictBanner = isReview
-      ? `<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — 자동 확정하지 않고 사람 검수로 라우팅</span></span></div>`
+      ? `<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — ${why?esc(why):'자동 확정하지 않고 사람 검수로 라우팅'}</span></span></div>`
       : `<div class="verdict-banner verdict-auto"><span>자동 확정<span class="vb-sub"> — 게이트 통과(무오탐)</span></span></div>`;
     const clsCard = $('cls-box').closest('.card'); if(clsCard) clsCard.classList.toggle('review-hot', isReview);
     $('cls-box').innerHTML = verdictBanner + `

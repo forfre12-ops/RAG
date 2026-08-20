@@ -148,6 +148,25 @@ def golden_build(
     return resp
 
 
+@router.get(
+    "/golden/builds",
+    summary="등록할 수 있는 슬레이트 파일 목록 — 화면이 고르게 한다",
+)
+def golden_list_builds(
+    auth: dict = Depends(require_role("admin", "kl_backend", "system")),
+) -> dict:
+    """`POST /golden/jobs/register` 에 넣을 수 있는 파일을 화면에 내려 준다.
+
+    왜(2026-08-20 사용자 지적). 등록 칸이 자유 입력이라 서버에 어떤 파일이 있는지 알 방법이
+    없었고, placeholder 가 채워진 값처럼 보여 [등록]을 누르면 "경로를 입력하세요" 가 떴다.
+    고르게 하면 그 함정이 사라진다.
+
+    읽기 전용이고 목록은 datasets/ 하위로 한정된다(register 와 같은 샌드박스).
+    """
+    items = GoldenBuildService().list_registerable_builds()
+    return {"total": len(items), "builds": items}
+
+
 @router.post(
     "/golden/jobs/register",
     response_model=GoldenBuildResponse,
@@ -540,7 +559,7 @@ async function show(id){try{let c=await req(api+'/'+encodeURIComponent(id));sele
   $('viewRendered').setAttribute('aria-pressed', rendered?'true':'false');
   $('viewRaw').setAttribute('aria-pressed', rendered?'false':'true');
 }
-async function upload(){try{let file=$('file').files[0];if(!file)throw new Error('업로드할 파일을 선택하세요.');let src=$('upSource').value.trim();let selv=($('upBasisSel')||{}).value||'';let bas=(selv&&selv!=='__custom__')?selv:$('upBasis').value.trim();if(!src||!bas)throw new Error('원천 위치와 사용 권한 근거를 채우세요. 이 기록이 없으면 나중에 평가셋으로 쓸 수 없습니다.');let form=new FormData();form.append('file',file);form.append('document_origin',$('upOrigin').value);form.append('source_reference',src);form.append('authorization_basis',bas);let out=await req(api+'/upload',{method:'POST',body:form,json:false});$('modal').classList.remove('show');$('upSource').value='';$('upBasis').value='';if($('upBasisSel')){$('upBasisSel').value='';$('upBasis').style.display='none';}$('file').value='';if($('dropName'))$('dropName').textContent='여기로 파일을 끌어다 놓거나 위에서 선택하세요';msg('업로드 완료: '+out.doc_id+' · 검토 대기 상태입니다.');await load();await show(out.doc_id)}catch(e){msg('업로드 실패: '+e.message,true)}}
+async function upload(){try{let file=$('file').files[0];if(!file)throw new Error('업로드할 파일을 선택하세요.');let src=$('upSource').value.trim();let selv=($('upBasisSel')||{}).value||'';let bas=(selv&&selv!=='__custom__')?selv:$('upBasis').value.trim();if(!src||!bas)throw new Error('원천 위치와 사용 권한 근거를 채우세요. 이 기록이 없으면 나중에 평가셋으로 쓸 수 없습니다.');let form=new FormData();form.append('file',file);form.append('document_origin',$('upOrigin').value);form.append('source_reference',src);form.append('authorization_basis',bas);let ub=$('upload');if(ub){ub.disabled=true;ub.dataset.label=ub.textContent;ub.textContent='분석 중…';}msg('문서를 분석하고 있습니다 — '+file.name+' 에서 글자를 뽑는 중입니다. 파일이 크면 몇 초 걸립니다.');let out=await req(api+'/upload',{method:'POST',body:form,json:false});$('modal').classList.remove('show');$('upSource').value='';$('upBasis').value='';if($('upBasisSel')){$('upBasisSel').value='';$('upBasis').style.display='none';}$('file').value='';if($('dropName'))$('dropName').textContent='여기로 파일을 끌어다 놓거나 위에서 선택하세요';msg('업로드 완료: '+out.doc_id+' · 검토 대기 상태입니다.');await load();await show(out.doc_id)}catch(e){msg('업로드 실패: '+e.message,true)}finally{let b=$('upload');if(b){b.disabled=false;b.textContent=b.dataset.label||'업로드 및 추출';}}}
 function qcard(label,value,note,bad){let d=document.createElement('div');d.className='metric';d.innerHTML='<div class="mcap">'+label+'</div><b'+(bad?' style="color:#bf2337"':'')+'>'+value+'</b><small>'+note+'</small>';return d}
 // 품질 카드. 부제는 **기준값**만 준다 - 판단은 숫자로 하게 한다.
 // ⚠ 종전 부제가 "높을수록 길이가 정답을 흘림" 이었다. 두 가지가 문제였다.

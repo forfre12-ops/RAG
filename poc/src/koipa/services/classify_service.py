@@ -568,6 +568,7 @@ class ClassifyService:
                 scores=pred.scores,
                 evaluation_factors=pred.factors,
                 factors_source=self._factors_source(warnings_acc),
+                rule_evaluation_factors=getattr(pred, "rule_factors", None),
                 evidence=pred.evidence,
                 rag_context_used=pred.rag_context,
                 model_version=pred.model_version,
@@ -602,7 +603,13 @@ class ClassifyService:
         if rule == model == final:
             return f"agreement (룰·모델 모두 {final} 일치 → 자동 확정)"
         if status == "needs_review":
-            return f"escalation (룰 {rule} · 모델 {model} → 검수 라우팅)"
+            # [2026-08-20] 종전 문구는 "escalation (룰 X · 모델 Y → 검수 라우팅)" 이었다.
+            # **불일치가 검수 라우팅의 원인이라고 읽힌다.** 사실이 아니다 — 이 함수는 status 가
+            # 이미 needs_review 로 정해진 뒤에 불리고, 게이트 조건(classify_service:328~470)에
+            # 룰↔모델 불일치는 들어 있지 않다. 실측 2026-08-20: 검수 대상 120건 중 검수로 간
+            # 67건이 **전부 low-confidence 하나**로 걸렸다(나머지 여섯 조건 0건).
+            # 원인은 warnings 가 말한다. 여기서는 두 엔진이 갈렸다는 **사실만** 적는다.
+            return f"룰 {rule} · 모델 {model} 불일치 (검수 사유는 아래 경고 참조)"
         return f"combined (룰 {rule} · 모델 {model} → 최종 {final})"
 
     @staticmethod

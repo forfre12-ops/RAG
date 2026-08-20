@@ -309,6 +309,8 @@ class AnalyzeClassification(BaseModel):
     model_version: str
     factors: dict                   # 평가요소 S/V/M (+ scores)
     factors_source: Optional[str] = None
+    # 역산이 있었을 때만 채워진다 — 화면이 '룰 관측' 과 '모델 역산' 을 나란히 보이게 한다.
+    rule_factors: Optional[dict] = None
     warnings: list[str] = []
     elapsed_ms: int = 0
     # [투명성/시연] 하이브리드 각 엔진 원시 판정 + 결합경로
@@ -525,6 +527,11 @@ async def analyze_document(
     elapsed = int((time.perf_counter() - t0) * 1000)
     label = cls.label.value if hasattr(cls.label, "value") else str(cls.label)
     factors = cls.evaluation_factors.model_dump() if getattr(cls, "evaluation_factors", None) else {}
+    # [2026-08-20] 룰이 실제로 관측한 S/V/M. factors 가 모델 등급으로 역산된 경우에만 채워진다.
+    rule_factors = (
+        cls.rule_evaluation_factors.model_dump()
+        if getattr(cls, "rule_evaluation_factors", None) else None
+    )
     # 추출 검수게이트(표누락/OCR/저품질/추출오류)를 최종 status 로 조정 — content 경로 분류는
     # review_flagged 를 안 태우므로, 게이트가 검수를 요구하면 여기서 needs_review 로 승격해
     # box4('검수 필요')와 box5(최종 status)가 모순되지 않게 하고 실 doc_id 서빙과 일치시킨다.
@@ -543,6 +550,7 @@ async def analyze_document(
         model_version=cls.model_version,
         factors=factors,
         factors_source=getattr(cls, "factors_source", None),
+        rule_factors=rule_factors,
         warnings=cls_warnings,
         elapsed_ms=cls.elapsed_ms or elapsed,
         rule_grade=getattr(cls, "rule_grade", None),

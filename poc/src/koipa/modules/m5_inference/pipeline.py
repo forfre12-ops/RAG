@@ -210,6 +210,11 @@ class InferenceResult:
     # [transparency] 원시 모델 판정(override/cap/floor 적용 이전 _run_model argmax).
     # 모델 미로드(rule-fallback) 시 None. label과 별개(label은 최종 결합 결과).
     model_grade: Optional[str] = None
+    # [2026-08-20] 룰이 **실제로 관측한** S/V/M. `factors` 는 룰과 모델이 갈릴 때 모델 등급에
+    # 맞춰 역산한 값으로 덮이는데(아래 [A3]), 그러면 화면에 "S2·V2·M2 인데 룰은 S1" 처럼
+    # 판정식으로 설명되지 않는 조합이 뜬다(사용자 지적). 덮기 전 값을 따로 남겨 두 벌을
+    # 나란히 보여줄 수 있게 한다. 역산이 없었으면 None(= factors 가 곧 룰 관측값).
+    rule_factors: Optional[EvaluationFactors] = None
 
 
 _LABELS = [Grade.TS, Grade.S1, Grade.S2, Grade.S3]
@@ -682,6 +687,7 @@ class InferencePipeline:
                                     f"fnr-safe override: rule {override_grade.value} score={override_score:.1f}"
                                 ],
                                 rule_grade=result.rule_grade,
+            rule_factors=result.rule_factors,
                             )
                 except Exception:  # noqa: BLE001
                     # FNR-safe 상향이 예외로 미적용 → 모델의 낮은 등급 유지(무음 미탐 위험). 가시화.
@@ -750,6 +756,7 @@ class InferencePipeline:
                             model_version=result.model_version,
                             warnings=result.warnings,
                             rule_grade=result.rule_grade,
+            rule_factors=result.rule_factors,
                         )
         except Exception:  # noqa: BLE001
             # source-prior cap(하향)이 예외로 미적용 → 공개출처 문서가 상위등급 유지. 가시화.
@@ -791,6 +798,7 @@ class InferencePipeline:
                             f"metadata-floor: security_marking={mark} → grade raised {cur}→{floor_code} (ICD §4.2 명시표기 우선)"
                         ],
                         rule_grade=result.rule_grade,
+            rule_factors=result.rule_factors,
                     )
                 elif mark in ("", "none") and scope in ("approved_only", "designated", "department"):
                     low_thr = "S1" if scope == "approved_only" else "S2"
@@ -917,6 +925,7 @@ class InferencePipeline:
                 f"(TS={ts:.4f}, S1={s1:.4f}, margin={margin})"
             ],
             rule_grade=result.rule_grade,
+            rule_factors=result.rule_factors,
             model_grade=result.model_grade,
         )
 
@@ -1280,6 +1289,7 @@ class InferencePipeline:
         # [A3] 모델 등급 ↔ 룰 factors 정합. 룰이 미탐(곱=0/낮음)인데 모델이 고등급이면
         # 표시 S/V/M을 모델 등급에 정합화(+경고) — 'S0·V0·M0인데 TS' 모순 표기 방지.
         factors = lab.factors
+        rule_factors: Optional[EvaluationFactors] = None
         a3_warn: list[str] = []
         pred_code = pred.value if hasattr(pred, "value") else str(pred)
         if factors is not None and pred_code in ("TS", "S1", "S2", "S3"):
@@ -1289,6 +1299,10 @@ class InferencePipeline:
                 fvv = int(float(getattr(factors, "value", 0)))
                 fmv = int(float(getattr(factors, "management", 0)))
                 if grade_from_svm(fsv, fvv, fmv) != pred_code:
+                    # [2026-08-20] 덮기 **전** 값을 남긴다. 종전에는 버려서, 화면에 역산값만
+                    # 남고 "S2·V2·M2 인데 룰은 S1" 처럼 판정식으로 설명이 안 되는 조합이
+                    # 보였다(사용자 지적). 두 벌을 나란히 보여야 왜 갈렸는지 읽힌다.
+                    rule_factors = factors
                     s2, v2, m2 = svm_levels_for_grade(pred_code)
                     factors = EvaluationFactors.from_factor_scores(
                         {"SECRECY": float(s2), "VALUE": float(v2), "MANAGEMENT": float(m2)}
@@ -1296,6 +1310,7 @@ class InferencePipeline:
                     a3_warn = [f"factors aligned to model grade {pred_code} (rule under-detected S/V/M)"]
             except Exception:  # noqa: BLE001
                 factors = lab.factors
+                rule_factors = None
         return InferenceResult(
             label=pred,
             confidence=conf,
@@ -1305,6 +1320,7 @@ class InferencePipeline:
             model_version=str(self.model_dir.name) if self.model_dir else "model",
             warnings=a3_warn,
             rule_grade=getattr(lab.rule_result, "grade", None),
+            rule_factors=rule_factors,
         )
 
     # ------------------------------------------------------------

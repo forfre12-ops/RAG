@@ -140,6 +140,58 @@ class GoldenBuildService:
         )
         return job_id
 
+    def list_registerable_builds(self, *, limit: int = 60) -> "list[dict]":
+        """등록할 수 있는 슬레이트 파일 목록 — 화면이 고르게 하려고 만든다.
+
+        왜(2026-08-20 사용자 지적). 등록 칸이 자유 입력이었고 placeholder 로
+        `datasets/gold_real/builds/build_xxxx.jsonl` 이 **채워진 값처럼 보였다.** 실제로는
+        빈 칸이라 [등록]을 누르면 "경로를 입력하세요" 가 떴다. 서버에 어떤 파일이 있는지
+        화면이 알려주지 않으니, 검수자는 존재하지도 않는 경로를 외워 쳐야 했다.
+
+        슬레이트 판별은 **첫 줄을 읽어** 한다 — 파일명 규칙(build_*.jsonl)에 기대면 실제
+        전달본(`golden_review/ff5a822c/candidates.jsonl`)이 목록에서 빠진다(2026-08-20 실측:
+        그 파일이 KL 전달본인데 이름이 build_ 로 시작하지 않는다).
+
+        읽는 범위는 `_safe_path` 와 같은 datasets/ 하위뿐이다. 전량을 세면 느리므로 줄 수는
+        상한(limit)까지만 세고, 그 위는 ">=" 로 표시한다.
+        """
+        root = (_POC_ROOT / "datasets").resolve()
+        if not root.is_dir():
+            return []
+        out: list[dict] = []
+        for p in sorted(root.rglob("*.jsonl")):
+            if len(out) >= limit:
+                break
+            try:
+                if p.stat().st_size == 0:
+                    continue
+                with p.open(encoding="utf-8") as fh:
+                    head = fh.readline()
+                    first = json.loads(head)
+                    if not isinstance(first, dict):
+                        continue
+                    # 후보 슬레이트로 쓸 수 있는 최소 조건 — 본문과 등급이 있어야 검수가 된다.
+                    if not first.get("text") or not (first.get("label") or first.get("grade")):
+                        continue
+                    n = 1
+                    for _ in fh:
+                        n += 1
+                        if n > 5000:      # 아주 큰 파일에서 전량 세기를 멈춘다
+                            break
+            except (OSError, ValueError):
+                continue
+            out.append({
+                "path": p.relative_to(_POC_ROOT).as_posix(),
+                "records": n,
+                "records_exact": n <= 5000,
+                "size": p.stat().st_size,
+                "modified": dt.datetime.fromtimestamp(
+                    p.stat().st_mtime, dt.timezone.utc
+                ).isoformat(),
+            })
+        out.sort(key=lambda r: r["modified"], reverse=True)
+        return out
+
     def corpus_summary(self, corpus_path: str) -> "Optional[dict]":
         """정본 골든셋의 구성 집계 — 읽기 전용.
 
