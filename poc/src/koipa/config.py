@@ -779,7 +779,7 @@ class Settings(BaseSettings):
     answer_enforce_citations: bool = False
 
     # --- 업로드 한도 (DoS 차단) ---
-    # R3: guide upload·classify content 본문 크기 한도. 환경변수 KOIPA_MAX_UPLOAD_MB로 조정.
+    # R3: guide upload·classify content 본문 크기 한도. 환경변수 MAX_UPLOAD_MB 로 조정(접두사 없음 — config.py:185).
     # 운영 기본 20MB — 대부분 가이드 PDF·DOCX 커버. 초과 시 413 Payload Too Large 반환.
     max_upload_mb: int = 20
 
@@ -788,7 +788,7 @@ class Settings(BaseSettings):
     # 413이 떠서 인증된 호출자가 대용량 body(예: 1000×1MB)로 OOM을 유발할 수 있다.
     # app.py의 미들웨어가 **파싱 전에** Content-Length(또는 스트리밍 누적 크기)를 검사해
     # 이 한도를 넘으면 413을 반환한다. 업로드 멀티파트보다 충분히 크게 잡아(기본 25MB)
-    # 정상 JSON 요청·dryrun/테스트는 통과하게 한다. 환경변수 KOIPA_MAX_REQUEST_BODY_MB로 조정.
+    # 정상 JSON 요청·dryrun/테스트는 통과하게 한다. 환경변수 MAX_REQUEST_BODY_MB 로 조정(접두사 없음).
     max_request_body_mb: int = 25
 
     # --- 동기 분석 경로 청크 상한 (워커 타임아웃 차단) ---

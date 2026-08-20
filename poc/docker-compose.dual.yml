@@ -34,7 +34,10 @@ services:
     environment:
       WEB_CONCURRENCY: "${WEB_CONCURRENCY:-3}"
       GUNICORN_TIMEOUT: "${GUNICORN_TIMEOUT:-600}"
-      KOIPA_ANALYZE_SYNC_MAX_CHUNKS: "${KOIPA_ANALYZE_SYNC_MAX_CHUNKS:-400}"
+      # ⚠ 접두사 없음. Settings 는 env_prefix 를 안 쓴다(config.py:185) — 필드명 그대로다.
+      #   실측 2026-08-21: KOIPA_ 를 붙였더니 무시돼 상한이 34 그대로였다.
+      #   KOIPA_ 가 붙는 것은 필드 이름 자체가 koipa_* 인 경우뿐이다.
+      ANALYZE_SYNC_MAX_CHUNKS: "${ANALYZE_SYNC_MAX_CHUNKS:-400}"
     deploy:
       resources:
         limits:

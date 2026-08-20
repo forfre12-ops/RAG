@@ -457,7 +457,7 @@ async def analyze_document(
                 f"청크가 많으면 워커 타임아웃으로 무응답이 된다. "
                 f"대용량 문서는 적재 후 비동기 분류(POST /documents → POST /classify/async)를 쓰거나, "
                 f"배포 처리량을 재고(scripts/probe_ingest_capacity.py) "
-                f"KOIPA_ANALYZE_SYNC_MAX_CHUNKS 를 조정할 것."
+                f"ANALYZE_SYNC_MAX_CHUNKS 를 조정할 것(접두사 없음)."
             ),
         )
     stages.append(AnalyzeStage(
