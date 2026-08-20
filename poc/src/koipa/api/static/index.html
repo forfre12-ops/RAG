@@ -355,7 +355,38 @@ async function analyze(){
     const r = await fetch(base()+'/documents/analyze', { method:'POST', headers:hdr(), body:fd });
     const ms=Math.round(performance.now()-t0);
     const j = await r.json();
-    if(!r.ok){ log('HTTP '+r.status+'  '+JSON.stringify(j).slice(0,240)); $('busy').textContent='실패: HTTP '+r.status; $('go').disabled=false; return; }
+    if(!r.ok){
+      /* [2026-08-21] 서버가 보내 주는 이유를 화면에 띄운다.
+         종전에는 'HTTP 413' 한 줄만 뜨고 상세는 아래 로그창에만 남아서, 큰 문서를 올린
+         사람은 "인식을 못 한다" 고 읽었다(사용자 지적). 실제로는 **거절**이고 이유가 있다:
+         이 화면은 업로드→추출→분류를 한 요청에서 끝내는 진단 경로라 청크 34개(≈9쪽)를
+         넘으면 워커 타임아웃으로 무응답이 된다. 그래서 미리 막는다(config.py:793~810 실측). */
+      const detail = (j && (j.detail || j.message)) || '';
+      let human = 'HTTP ' + r.status;
+      const cap = String(detail).match(/(\d+) chunks > (\d+)/);
+      if(r.status===413 && cap){
+        const chars = (String(detail).match(/([\d,]+) chars/)||[])[1] || '';
+        human = `문서가 이 화면에서 처리하기에 큽니다 — 조각 ${cap[1]}개(한도 ${cap[2]}개, 약 9쪽)`
+              + (chars?` · 본문 ${chars}자`:'');
+      } else if(r.status===413){
+        human = '문서가 너무 큽니다 (업로드 한도 초과)';
+      } else if(r.status===401 || r.status===403){
+        human = '로그인이 필요합니다';
+      }
+      $('busy').textContent = '분석하지 않았습니다 — ' + human;
+      $('result').classList.remove('hidden');
+      $('cls-box').innerHTML =
+        `<div class="verdict-banner verdict-review"><span>분석 중단<span class="vb-sub"> — ${esc(human)}</span></span></div>`
+        + (r.status===413 && cap ? `<div class="hint" style="margin-top:10px;line-height:1.7">
+             이 화면은 업로드·추출·분류를 <b>한 번에</b> 끝내는 진단용이라, 조각이 많으면
+             응답이 끊깁니다. 그래서 미리 막고 이유를 알려 드립니다.<br>
+             큰 문서는 <b>「골든셋 등록」 화면의 문서 업로드</b>를 쓰십시오 — 적재 후
+             비동기로 분류하므로 쪽수 제한이 없습니다.</div>` : '')
+        + `<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">서버 응답 원문</summary>
+             <pre style="white-space:pre-wrap;font-size:11.5px;margin:6px 0 0">${esc(String(detail))}</pre></details>`;
+      log('HTTP '+r.status+'  '+JSON.stringify(j).slice(0,240));
+      $('go').disabled=false; return;
+    }
     log('analyze OK '+ms+'ms  '+picked.name+' → '+(j.classification? j.classification.label : ((j.stages||[]).some(s=>s.name==='분류'&&s.status==='fail')?'(분류 오류)':'(빈본문)')));
     render(j);
     $('busy').textContent='완료 ('+ms+'ms)';
