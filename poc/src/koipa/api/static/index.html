@@ -215,15 +215,25 @@
     </div>
     <div class="samples-row">
       <span class="samples-label">시연 문서 원클릭</span>
+      <!-- [2026-08-21] 버튼 배치를 **실측대로** 고쳤다. 종전 배치는 화면 설명과 실제 동작이
+           어긋나 시연 중에 드러난다(223 실측):
+             03 S2 납품단가표  자동확정으로 광고 → 실제 conf 0.596 로 검수
+             05 S1 기술이전PDF 검수로 광고      → 실제 conf 0.841 로 자동확정
+             07 하이브리드      자동확정으로 광고 → 룰 S3/모델 S2 불일치라 검수(설계대로)
+           문서를 손봐 광고에 맞추는 것은 시연용 조작이라 하지 않는다. 설명을 사실에 맞춘다. -->
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/01_TS_semiconductor_euv.docx','반도체 EUV 공정 레시피(극비).docx')">TS 특급 · 반도체 EUV (DOCX)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/02_S1_recsys_source_license.docx','추천엔진 소스·라이선스(영업비밀).docx')">S1 1급 · 소스·라이선스 (DOCX)</button>
-      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">S2 대외비 · 납품단가표 (XLSX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">S1 1급 · 기술이전 계약초안 (PDF)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/04_S3_press_release.docx','신제품 출시 보도자료(공개).docx')">S3 공개 · 보도자료 (DOCX)</button>
-      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/07_HYBRID_semantic_secret.docx','비공개 추진 메모(키워드無).docx')">★ 하이브리드 · 룰 놓침→모델 포착 (DOCX)</button>
-      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">⚠ 검수 · PDF 표 불완전</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/07_HYBRID_semantic_secret.docx','비공개 추진 메모(키워드無).docx')">★ 검수 · 룰 놓침→모델 포착(두 엔진 불일치)</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">⚠ 검수 · 납품단가표 — 확신 부족 (XLSX)</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
     </div>
-    <div class="hint">위 4종(TS·S1·S2·S3)은 <b>깨끗한 문서가 자동 확정</b>되는 경로. 아래 2종은 파싱 이상(PDF 표 불완전·얇은 본문)을 <b>조용히 오분류하지 않고 검수로 라우팅</b>하는 안전장치 시연. 직접 업무 문서를 끌어다 놓아도 됩니다.</div>
+    <div class="hint">위 4종(TS·S1·S1·S3)은 <b>자동 확정</b>되는 경로입니다(2026-08-21 실측 신뢰도 0.82~0.90).
+      아래 3종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
+      ★는 룰이 못 잡은 것을 모델이 잡아 <b>두 엔진이 갈린</b> 경우, ⚠는 두 엔진이 같은 등급인데
+      <b>확신이 기준(0.70)에 못 미치는</b> 경우, ✕는 본문이 사실상 없는 경우입니다.
+      직접 업무 문서를 끌어다 놓아도 됩니다.</div>
     <div class="row" style="margin-top:14px;align-items:center;">
       <button class="btn" id="go" onclick="analyze()" disabled>분석 실행</button>
       <button class="btn ghost" onclick="reset()">초기화</button>
