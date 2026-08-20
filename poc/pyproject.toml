@@ -56,6 +56,12 @@ dependencies = [
   "python-docx>=1.1",
   "openpyxl>=3.1",            # W8 Excel(.xlsx/.xlsm) 추출 (MIT). 구형 .xls는 xlrd 필요(선택).
   "python-pptx>=0.6",         # W8 PowerPoint(.pptx/.pptm) 추출 (MIT).
+  # 구형 Office(.doc/.ppt, OLE2 복합문서) 본문 추출 (BSD-2). legacy_office.py 가 이걸로
+  # 스트림을 연다. ⚠ base 의존성이어야 한다 — 선택 extra 로 두면 배포 이미지에서 빠져
+  # `.doc`·`.ppt` 가 통째로 0자가 된다. 실측 2026-08-21(223): "No module named olefile"
+  # 로 두 포맷 전부 미추출. 로컬 venv 에는 다른 패키지가 끌고 와서 있어 개발 중에는
+  # 드러나지 않았다(소스 존재 ≠ 배포본 존재).
+  "olefile>=0.47",            # .doc/.ppt OLE2 스트림 리더 (BSD-2)
   # 구형 .doc(Word 97-2003)은 시스템 antiword CLI 필요(pip 아님). 없으면 .docx 변환 안내.
 
   # 유틸
