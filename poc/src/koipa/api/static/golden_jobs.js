@@ -17,9 +17,9 @@
   var PANEL_HTML = [
     // data-pane/order — 이 카드는 런타임에 삽입되므로 admin.html 의 탭 전환 규칙을
     // 직접 달아 준다(없으면 어느 탭에서나 항상 떠서 탭 분리가 무의미해진다).
-    '<section class="card col-span" id="gold-jobs-card" data-pane="model" style="order:3">',
+    '<section class="card col-span" id="gold-jobs-card" data-pane="review" style="order:3">',
     '  <div class="card-head">',
-    '    <div class="ttl"><span class="step-no">G+</span> 골든 잡 목록</div>',
+    '    <div class="ttl"><span class="step-no">3</span> 골든 잡 목록</div>',
     '    <span class="ep">GET /golden/jobs</span>',
     '  </div>',
     '  <div class="card-body">',
@@ -52,8 +52,8 @@
     // 이 스크립트는 인라인 초기화(initPane) 이후에 로드된다. 방금 삽입한 카드에는
     // 탭 표시 규칙이 아직 적용되지 않았으므로 현재 탭 기준으로 한 번 다시 적용한다.
     if (typeof window.showPane === 'function') {
-      var cur = 'ops';
-      try { cur = sessionStorage.getItem('koipa_admin_pane') || 'ops'; } catch (e) {}
+      var cur = 'review';
+      try { cur = sessionStorage.getItem('koipa_admin_pane') || 'review'; } catch (e) {}
       window.showPane(cur);
     }
     // 이제야 #gold-jobs-card 가 문서에 있다 — 주소에 그 앵커가 실려 왔다면 지금 처리한다

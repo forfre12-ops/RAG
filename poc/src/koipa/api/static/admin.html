@@ -327,10 +327,13 @@ details.adv[open]{padding-bottom:12px;}
   <div id="profile-banner" class="profile-banner" style="display:none"></div>
 
   <div class="tabbar" role="tablist">
-    <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">분류 · 검수</span></button>
-    <button class="tab"        data-tab="model"   role="tab" onclick="showPane('model')">모델<span class="tab-sub">골든셋 · 학습 · 배포</span></button>
+    <!-- [2026-08-20] 탭을 **사람 축**으로 다시 갈랐다. 종전 축은 기능(운영·모델·설정·관제)
+         이라 "내가 뭘 눌러야 하나" 에 답하지 못했고, model 탭 하나에 카드 6개·조작 36개가
+         몰려 있었다. 지금은 탭마다 4개 이하다(검수 3 · 학습배포 4 · 운영 4 · 설정 2). -->
+    <button class="tab active" data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">골든셋 후보 · 서명</span></button>
+    <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">재학습 · 게이트 · 성적</span></button>
+    <button class="tab"        data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">분류 · 관제 · 감사</span></button>
     <button class="tab"        data-tab="config"  role="tab" onclick="showPane('config')">설정<span class="tab-sub">등급 · 태깅규칙</span></button>
-    <button class="tab"        data-tab="monitor" role="tab" onclick="showPane('monitor')">관제<span class="tab-sub">대시보드</span></button>
   </div>
   <p class="pane-note" id="pane-note"></p>
 
@@ -412,7 +415,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 1. 분류 ===== -->
-    <section class="card" data-pane="ops" style="order:2">
+    <section class="card" data-pane="ops" style="order:1">
       <div class="card-head">
         <div class="ttl"><span class="step-no">1</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
         <span class="ep">POST /documents/analyze · POST /classify</span>
@@ -471,7 +474,7 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 2. 검수 큐 ===== -->
-    <section class="card" data-pane="ops" style="order:3">
+    <section class="card" data-pane="ops" style="order:2">
       <div class="card-head">
         <div class="ttl"><span class="step-no">2</span> 분류 검수 큐 · 확정/재라벨 <span class="reqtag">FUN-024</span></div>
         <span class="ep">POST /confirm · /relabel</span>
@@ -511,9 +514,9 @@ details.adv[open]{padding-bottom:12px;}
          같은 수치가 [관제] 탭 대시보드에도 '배포 readiness'라는 이름으로 있었지만, 골든 검수를
          하는 사람이 자기 작업의 현황으로 알아보기 어려웠다(다른 탭 · 다른 이름). 엔드포인트는
          동일하다 — GET /admin/locked-readiness. -->
-    <section class="card col-span" data-pane="model" style="order:4">
+    <section class="card col-span" data-pane="review" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">G3</span> 골든셋 현황 — 구성 · 서명 확정 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no">2</span> 골든셋 현황 — 구성 · 서명 확정 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
       </div>
       <div class="card-body">
@@ -541,9 +544,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== N. 합성 샘플 생성 · 검수 (FUN-003) ===== -->
-    <section class="card col-span" data-pane="model" style="order:5" data-profile="full-train">
+    <section class="card col-span" data-pane="train" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">N</span> 합성 샘플 생성 · 검수 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no">1</span> 합성 샘플 생성 · 검수 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
@@ -603,9 +606,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 3. 재학습 ===== -->
-        <section class="card" data-pane="model" style="order:6">
+        <section class="card" data-pane="train" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">3</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
+        <div class="ttl"><span class="step-no">2</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
         <span class="ep">POST /train · GET /train/jobs</span>
       </div>
       <div class="card-body">
@@ -655,9 +658,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 4. 모델 서빙/리로드 ===== -->
-        <section class="card" data-pane="model" style="order:7">
+        <section class="card" data-pane="train" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">4</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
+        <div class="ttl"><span class="step-no">3</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
         <span class="ep">POST /admin/model/activate · /reload</span>
       </div>
       <div class="card-body">
@@ -688,9 +691,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 5. 메트릭 ===== -->
-    <section class="card col-span" data-pane="model" style="order:8">
+    <section class="card col-span" data-pane="train" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">5</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no">4</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /metrics/latest · /history · /confusion-matrix</span>
       </div>
       <div class="card-body">
@@ -707,9 +710,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 6. 운영 관제 대시보드 ===== -->
-    <section class="card col-span" data-pane="monitor" style="order:2">
+    <section class="card col-span" data-pane="ops" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">◎</span> 운영 관제 대시보드</div>
+        <div class="ttl"><span class="step-no">3</span> 운영 관제 대시보드</div>
         <span class="ep">GET /admin/dashboard</span>
       </div>
       <div class="card-body">
@@ -724,9 +727,9 @@ details.adv[open]{padding-bottom:12px;}
 
     <!-- ===== 감사 로그 ===== 미들웨어가 쓰기만 하고 읽는 경로가 없어, 35,000행이 쌓여도
          화면에서 "누가 언제 무엇을 했는가"를 볼 수 없었다. -->
-    <section class="card col-span" data-pane="monitor" style="order:3">
+    <section class="card col-span" data-pane="ops" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">A</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
+        <div class="ttl"><span class="step-no">4</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
         <span class="ep">GET /admin/audit-log</span>
       </div>
       <div class="card-body">
@@ -751,9 +754,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 7. 골든셋 후보 빌더 ===== 루프 B 의 시작점(G1) -->
-    <section class="card col-span" data-pane="model" style="order:2" data-profile="full-train">
+    <section class="card col-span" data-pane="review" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">G1</span> 골든셋 후보 빌더 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no">1</span> 골든셋 후보 빌더 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
@@ -850,9 +853,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
-    <section class="card col-span" data-pane="config" style="order:2">
+    <section class="card col-span" data-pane="config" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">E</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
+        <div class="ttl"><span class="step-no">1</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
         <span class="ep">GET · PUT /schema/grades</span>
       </div>
       <div class="card-body">
@@ -874,9 +877,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== T. 태깅 키워드 관리 (FUN-023-④) ===== -->
-    <section class="card col-span" data-pane="config" style="order:3">
+    <section class="card col-span" data-pane="config" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">T</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
+        <div class="ttl"><span class="step-no">2</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
         <span class="ep">GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
       </div>
       <div class="card-body">
@@ -1011,13 +1014,14 @@ function markStep(id){
  * data-pane="always"(연결·인증)는 모든 탭에 남는다. 전 작업의 전제라서다.
  * -------------------------------------------------------------------------- */
 const PANE_NOTE={
-  ops:     '루프 A · 일상 운영 — 문서를 분류하고, AI가 자신 없어 한 건을 사람이 확정합니다. 매일 도는 루프입니다.',
-  model:   '루프 B · 모델 갱신 — 골든셋(정답지)을 만들어 서명하고, 그것으로 재학습한 뒤 배포하고 성적을 확인합니다. 주기적으로 도는 루프입니다.',
-  config:  '사전 설정 — 등급 체계와 태깅 규칙입니다. 보통 도입 시 한 번 정하고 이후에는 거의 바꾸지 않습니다.',
-  monitor: '관제 — 두 루프의 현재 상태를 한 화면에서 조회합니다. 읽기 전용이라 여기서는 아무것도 바뀌지 않습니다.',
+  review: '검수 — 골든셋(정답지) 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다.',
+  train:  '학습 · 배포 — 서명된 골든셋으로 재학습하고, 게이트를 통과한 모델만 배포한 뒤 성적을 확인합니다.',
+  ops:    '운영 — 문서를 분류하고, AI가 자신 없어 한 건을 사람이 확정합니다. 매일 도는 일과이고, 현재 상태와 감사 기록도 여기서 봅니다.',
+  config: '설정 — 등급 체계와 태깅 규칙입니다. 보통 도입 시 한 번 정하고 이후에는 거의 바꾸지 않습니다.',
 };
 function showPane(name){
-  if(!PANE_NOTE[name]) name='ops';
+  // 종전 탭 이름(model·monitor)이 sessionStorage 에 남아 있어도 여기서 걸러져 기본 탭이 된다.
+  if(!PANE_NOTE[name]) name='review';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
   document.querySelectorAll('[data-pane]').forEach(s=>{
     const p=s.dataset.pane;
@@ -1027,15 +1031,17 @@ function showPane(name){
   try{ sessionStorage.setItem('koipa_admin_pane', name); }catch(e){/* 프라이빗 모드 등 */}
 }
 function initPane(){
-  let saved='ops';
-  try{ saved=sessionStorage.getItem('koipa_admin_pane')||'ops'; }catch(e){}
+  // 기본 탭은 **검수**다. 종전 기본값은 'ops' 라, 검수하러 들어온 사람에게 첫 화면이
+  // 「분류 실행」이었다(2026-08-20 사용자 지적: 화면이 복잡하다).
+  let saved='review';
+  try{ saved=sessionStorage.getItem('koipa_admin_pane')||'review'; }catch(e){}
   showPane(saved);
   gotoHash();
 }
 /* 주소의 #앵커로 **탭까지** 열어 준다.
  * 왜(2026-08-20). 공용 메뉴의 「골든셋 검수」가 이 화면의 골든 잡 목록(#gold-jobs-card)을
- * 가리킨다. 그런데 그 카드는 data-pane="model" 이고 기본 탭은 'ops' 라, 링크만 걸면
- * 대상이 display:none 인 채로 도착해 **아무 일도 안 일어난 것처럼 보인다**(실측).
+ * 가리킨다. 그 카드는 data-pane="review" 라 기본 탭에 있지만, 세션에 다른 탭이 저장돼
+ * 있으면 대상이 display:none 인 채로 도착해 **아무 일도 안 일어난 것처럼 보인다**(실측).
  * 이 화면에는 location.hash 를 읽는 코드가 한 줄도 없었다.
  * 카드는 golden_jobs.js 가 런타임에 넣으므로, 그쪽 mount() 끝에서도 이 함수를 부른다. */
 function gotoHash(){
