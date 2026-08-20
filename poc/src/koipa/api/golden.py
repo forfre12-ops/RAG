@@ -653,17 +653,28 @@ def _render_console_login_html() -> str:
         + _login_prefill_block()
         + '<button id="go">로그인</button><div class="msg" id="m"></div></main><script>'
         "var $=function(x){return document.getElementById(x)};"
-        "$('go').onclick=async function(){"
-        "var v=$('t').value.trim();"
-        "if(v.split('.').length!==3){$('m').style.display='block';"
-        "$('m').textContent='토큰 형식이 아닙니다. 점(.)으로 구분된 3부분이어야 합니다.';return}"
-        "document.cookie='koipa_access_token='+v+'; path=/; SameSite=Lax';"
+        # [2026-08-20] 쿠키를 **토큰 만료까지** 살린다.
+        # 종전에는 Max-Age 가 없어 세션 쿠키였다 — 브라우저를 닫으면 로그인이 풀려서
+        # 검수자가 매번 다시 붙여넣어야 했다. 토큰 payload 의 exp 를 읽어 그 시각까지
+        # 준다(읽지 못하면 12시간). 토큰보다 오래 살리지 않는 것이 요점이다.
+        "function maxAge(v){try{var p=v.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');"
+        "p+='='.repeat((4-p.length%4)%4);var e=JSON.parse(atob(p)).exp;"
+        "var s=Math.floor(e-Date.now()/1000);return s>60?s:0}catch(err){return 43200}}"
+        "async function login(v,quiet){"
+        "if(v.split('.').length!==3){if(!quiet){$('m').style.display='block';"
+        "$('m').textContent='토큰 형식이 아닙니다. 점(.)으로 구분된 3부분이어야 합니다.'}return false}"
+        "document.cookie='koipa_access_token='+v+'; path=/; SameSite=Lax; Max-Age='+maxAge(v);"
         "var r=await fetch('/api/v1/golden/candidates/session',{credentials:'same-origin'});"
         "if(!r.ok){document.cookie='koipa_access_token=; path=/; Max-Age=0';"
-        "$('m').style.display='block';"
-        "$('m').textContent='로그인 실패('+r.status+'). 토큰이 만료됐거나 권한이 없습니다.';return}"
-        "location.href='/api/v1/golden/candidates/manage.html'};"
+        "if(!quiet){$('m').style.display='block';"
+        "$('m').textContent='로그인 실패('+r.status+'). 토큰이 만료됐거나 권한이 없습니다.'}return false}"
+        "location.href='/api/v1/golden/candidates/manage.html';return true}"
+        "$('go').onclick=function(){login($('t').value.trim(),false)};"
         "$('t').addEventListener('keydown',function(e){if(e.key==='Enter'&&e.ctrlKey)$('go').click()});"
+        # 토큰이 미리 채워져 있으면 **버튼을 누르지 않아도** 들어간다.
+        # 사용자 지시(2026-08-20): 시연 중에 로그인이 막히면 안 된다. 주소만 열면 끝이어야
+        # 한다. 실패하면 조용히 화면에 남아 손으로 붙여넣을 수 있게 둔다(quiet=true).
+        "(function(){var v=$('t').value.trim();if(v)login(v,true)})();"
         "</script></body></html>"
     )
 

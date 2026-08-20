@@ -37,13 +37,23 @@ def _settings(monkeypatch):
 # ── 사유가 원인을 짚는다 ──────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("name,must_mention", [
-    ("kl-admin-test", "CONSOLE_LOGIN_PREFILL_TOKEN"),
     ("hong.gildong", "SIGNOFF_DEFAULT_REVIEWER"),
 ])
 def test_config_driven_rejections_name_the_setting(name, must_mention):
     """이름이 아니라 설정 때문에 막힌 경우 — 어느 설정인지 말해야 고칠 수 있다."""
     r = why(name)
     assert r and must_mention in r
+
+
+def test_prefill_identity_is_allowed_to_sign():
+    """[2026-08-20 사용자 결정] 로그인은 항상 되어야 한다 — 프리필 신원 거부를 뺐다.
+
+    종전에는 `kl-admin-test`(프리필 sub)를 막았고, 그 때문에 223 에서 후보 120건이
+    한 건도 서명되지 않았다. 잃는 것은 원장의 사람별 구분이다 —
+    [[test_prefill_login_identity_not_human]] 에 경위를 적어 뒀다.
+    """
+    assert why("kl-admin-test") == ""
+    assert is_human_reviewer("kl-admin-test") is True
 
 
 @pytest.mark.parametrize("name", ["", "reviewer", "ai_assist", "demo-console", "llm_judge_1"])
@@ -89,11 +99,16 @@ def test_interim_name_is_safe_as_a_token_filename():
     assert mod._safe_name(INTERIM) == INTERIM
 
 
-def test_putting_the_reviewer_token_in_the_prefill_would_break_them(monkeypatch):
-    """이 조합을 만들면 안 된다 — 시험이 그 결과를 눈에 보이게 남긴다."""
+def test_reviewer_name_in_the_prefill_now_works(monkeypatch):
+    """이 조합이 **정상 경로**가 됐다(2026-08-20).
+
+    종전에는 검수자 이름을 프리필에 넣으면 그 사람의 모든 서명이 403 이었다. 지금은
+    그 방식이 기본이다 — URL 만 열면 로그인되고 그대로 서명된다. 잃는 것(원장의 사람별
+    구분)은 [[test_prefill_login_identity_not_human]] 에 적었다.
+    """
     def _tok(sub: str) -> str:
         b = base64.urlsafe_b64encode(json.dumps({"sub": sub}).encode()).rstrip(b"=").decode()
         return f"h.{b}.s"
     monkeypatch.setattr(settings, "console_login_prefill_token", _tok(INTERIM), raising=False)
-    r = why(INTERIM)
-    assert r and "프리필에 넣지 말고" in r
+    assert why(INTERIM) == ""
+    assert is_human_reviewer(INTERIM) is True
