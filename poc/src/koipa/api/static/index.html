@@ -429,19 +429,37 @@ function render(j){
   const firstLine = (window._previewRaw.split('\n').map(s=>s.trim()).filter(Boolean)[0]) || j.filename || '(제목 미검출)';
   $('pd-doc-title').textContent = firstLine;
   $('pd-doc-file').textContent = (j.filename||'') + '  ·  ' + (p.source_format||'?') + '  ·  ' + (p.char_count||0).toLocaleString() + '자 추출  ·  청크 ' + (p.chunk_count||0);
-  $('parse-kv').innerHTML = kv([
-    ['파일', j.filename+' ('+(j.file_size_bytes||0).toLocaleString()+'B)'],
-    ['포맷', p.source_format],
-    ['추출기', p.extraction_method + (p.ocr_used?' (OCR)':'')],
-    ['추출 품질', fmt(p.extraction_quality)+' / 콘텐츠 '+fmt(p.content_quality)],
-    ['추출 글자수', (p.char_count||0).toLocaleString()],
-    ['청크', p.chunk_count],
-    ['표 커버리지', p.table_coverage || '—'],
-    ['구조화 표', (p.table_count||0).toLocaleString()+'개 / 셀 '+(p.table_cell_count||0).toLocaleString()+'개'],
-    ['파싱 경고', (p.warnings||[]).length ? (p.warnings||[]).join(', ') : '없음'],
-    ['PII 마스킹', (p.pii_masked_count||0)+'건'],
-    ['추출 오류', p.extract_error || '없음'],
-  ]);
+  /* [2026-08-21] 파싱 결과를 이름/값 11줄로 세워 놓으니 세로로만 길고 읽기 나빴다
+     (사용자 지적). 숫자는 타일로 묶고 나머지는 한 줄짜리 메모로 내린다.
+     ⚠ 스타일을 인라인으로 준다 — styles.css 가 브라우저에 캐시돼 있어도 모양이 유지된다. */
+  const tile = (cap, val, sub, warn) => `
+    <div style="border:1px solid var(--border,#e1e1de);padding:9px 11px;min-width:0">
+      <div style="font-size:11px;color:var(--text-dim,#8f9498);letter-spacing:.02em">${esc(cap)}</div>
+      <div style="font:700 17px/1.25 var(--font-sans,sans-serif);margin-top:2px;color:${warn?'#bf2337':'inherit'};word-break:break-all">${esc(val)}</div>
+      ${sub?`<div style="font-size:11px;color:var(--text-dim,#8f9498);margin-top:1px">${esc(sub)}</div>`:''}
+    </div>`;
+  const note = (cap, val, warn) => `
+    <div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--border,#e1e1de);font-size:12.5px">
+      <span style="flex:0 0 92px;color:var(--text-dim,#8f9498)">${esc(cap)}</span>
+      <span style="flex:1;min-width:0;word-break:break-all;color:${warn?'#bf2337':'inherit'}">${esc(val)}</span>
+    </div>`;
+  const q = Number(p.extraction_quality||0);
+  $('parse-kv').innerHTML = `
+    <div style="font:600 13.5px/1.45 var(--font-sans,sans-serif);word-break:break-all">${esc(j.filename||'')}</div>
+    <div style="font-size:12px;color:var(--text-dim,#8f9498);margin:2px 0 12px">
+      ${esc((p.source_format||'?').toUpperCase())} · ${(j.file_size_bytes||0).toLocaleString()}B ·
+      추출기 ${esc(p.extraction_method||'—')}${p.ocr_used?' (OCR)':''}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px">
+      ${tile('추출 품질', fmt(p.extraction_quality), '콘텐츠 '+fmt(p.content_quality), q>0 && q<0.8)}
+      ${tile('글자수', (p.char_count||0).toLocaleString(), '청크 '+(p.chunk_count||0)+'개')}
+      ${tile('구조화 표', (p.table_count||0)+'개', '셀 '+(p.table_cell_count||0)+'개')}
+      ${tile('PII 마스킹', (p.pii_masked_count||0)+'건', p.table_coverage?('표 커버리지 '+p.table_coverage):'')}
+    </div>
+    <div style="margin-top:12px">
+      ${note('추출 오류', p.extract_error || '없음', !!p.extract_error)}
+      ${(p.warnings||[]).length ? note('파싱 경고', (p.warnings||[]).join(', ')) : ''}
+    </div>`;
   // 게이트
   const g=j.gate||{};
   $('gate-box').innerHTML = g.requires_review
