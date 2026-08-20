@@ -132,6 +132,8 @@ class MetricsService:
             fnr_overall=m.get("fnr_overall"),
             fnr_by_grade=m.get("fnr_by_grade", {}),
             sample_count=MetricsService._eval_sample_count(mv, m),
+            eval_source=m.get("eval_source"),
+            fnr_high=m.get("fnr_high"),
         )
 
     @staticmethod

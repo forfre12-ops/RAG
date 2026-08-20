@@ -1858,6 +1858,21 @@ async function loadMetrics(){
       ${metricCard('F1 (macro)', pct(d.f1_macro))}
       ${metricCard('FNR 전체', pct(d.fnr_overall), d.fnr_overall>0.05)}
       ${metricCard('표본', d.sample_count??'—')}`;
+    /* [2026-08-21] 이 숫자가 **어느 평가셋**에서 나왔는지 화면이 스스로 말한다.
+       종전에는 정확도만 크게 뜨고 근거 셋이 없어, 감리·시연 Q&A 에서 "그 숫자는 무슨
+       셋이냐" 를 물으면 그 자리에서 답할 수 없었다. eval_source 는 DB 에 이미 저장돼
+       있었는데 API 가 안 내보내고 있었다(2026-08-21 확인). */
+    if(d.eval_source){
+      const src=document.createElement('p');
+      src.className='sec-note';
+      src.style.cssText='margin-top:10px;line-height:1.7';
+      src.innerHTML='<b>이 수치의 출처</b> — <code>'+esc(d.eval_source)+'</code>'
+        + (d.sample_count?(' · 표본 '+d.sample_count+'건'):'')
+        + (d.fnr_high!=null?(' · 고등급 FNR '+(d.fnr_high*100).toFixed(1)+'%'):'')
+        + '<br>이 셋은 학습에 쓰인 데이터에서 떼어 낸 홀드아웃입니다. '
+        + '<b>제출 문서의 대표값과 다른 셋일 수 있으므로 두 수치를 섞어 인용하지 마십시오.</b>';
+      cards.parentNode.insertBefore(src, cards.nextSibling);
+    }
     const byg=d.fnr_by_grade||{};
     $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 FNR · 모델 ${d.model_version} (측정 ${d.measured_at||'-'})</label>
       <div class="kv" style="margin-top:4px">${GRADES.map(g=>byg[g]!=null?`<div><span>${g}</span> <b style="color:${byg[g]>0.05?'var(--red)':'var(--green)'}">${(byg[g]*100).toFixed(1)}%</b></div>`:'').join('')||'<span style="color:var(--text-faint)">등급별 데이터 없음</span>'}</div></div>`;
