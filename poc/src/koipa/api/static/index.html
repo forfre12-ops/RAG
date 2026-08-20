@@ -466,15 +466,23 @@ function render(j){
        뜬다(사용자 지적). 룰 관측값을 옆에 적어 왜 갈렸는지 그 자리에서 읽히게 한다. */
     const rf = c.rule_factors || null;
     const KO = {secrecy:'비공지성(S)', value:'경제적 유용성(V)', management:'비밀관리성(M)'};
+    /* [2026-08-21] 역산값을 **대표 자리에서 뺀다.**
+       서버는 룰과 모델이 갈리면 표시용 S/V/M 을 모델 등급으로 역산해 덮는다(pipeline [A3]).
+       그 숫자는 **어느 엔진도 실제로 재지 않은 값**이다. 그걸 평가요소로 내걸면 화면이
+       거짓말을 한다 — 「0·0·0 인데 룰은 S2」처럼 판정식으로 설명되지 않는 조합이 뜬다
+       (사용자 지적 2026-08-20·21, 두 번). 나란히 보여 주는 것으로도 부족하다: 큰 숫자가
+       틀린 값이면 사람은 그걸 읽는다.
+       그래서 역산이 있었으면 **룰이 실제로 관측한 값만** 내건다. 등급이 왜 그것과 다른지는
+       바로 아래 한 줄로 말한다. */
+    const shown = rf || f;
     const fbars = ['secrecy','value','management'].map(k=>{
-      const v=Number(f[k]||0); const pct=Math.max(0,Math.min(100,v<=1?v*100:v));
-      const ko=KO[k];
-      const side = rf ? `<span style="color:var(--text-dim);font-weight:400"> · 룰 ${Number(rf[k]||0).toFixed(2)}</span>` : '';
-      return `<div class="factor"><div class="flabel"><span>${ko}</span><span>${v.toFixed(2)}${side}</span></div><div class="fbar"><div class="ffill" style="width:${pct}%"></div></div></div>`;
-    }).join('') + (rf ? `<div class="hint" style="margin-top:6px;line-height:1.6">
-        앞의 숫자는 <b>모델 등급에 맞춰 역산한 추정치</b>이고, 「룰」은 룰 엔진이 본문에서
-        실제로 관측한 값입니다. 두 값이 다르면 룰이 근거를 덜 찾았다는 뜻이며, 그래서 두
-        엔진의 등급이 갈립니다.</div>` : '');
+      const v=Number(shown[k]||0); const pct=Math.max(0,Math.min(100,v<=1?v*100:v));
+      return `<div class="factor"><div class="flabel"><span>${KO[k]}</span><span>${v.toFixed(2)}</span></div><div class="fbar"><div class="ffill" style="width:${pct}%"></div></div></div>`;
+    }).join('') + (rf ? `<div class="hint" style="margin-top:8px;line-height:1.65">
+        이 점수는 <b>룰 엔진이 본문에서 실제로 관측한 값</b>입니다 —
+        이대로면 등급은 <b>${esc(c.rule_grade||'—')}</b> 입니다.
+        최종 등급 <b>${esc(c.label)}</b> 은 분류기(BERT)가 낸 것이라 다릅니다.
+        <b>둘이 갈렸기 때문에 사람 검수로 보냅니다.</b></div>` : '');
     const isReview = c.status !== 'staging';
     window._reviewVerdict = isReview;   // needs_review 일 때만 전송 대상
     /* [2026-08-20] 검수로 보낸 **실제 사유**를 배너에 적는다.
