@@ -17,6 +17,28 @@ services:
     # 스택별 호스트 포트. 리버스 프록시/SSH 터널 전제라 127.0.0.1 바인드 유지.
     ports: !override
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    # ── [2026-08-21] 큰 문서를 한 요청에서 끝낼 수 있게 한다 (사용자 지시: 100쪽 가능하게) ──
+    # 종전 값으로는 34청크(≈9쪽)에서 413 으로 거절했다. 그 상한은 임의값이 아니라
+    # `타임아웃 60초 · 워커 1개` 에서 역산한 것이다(config.py:793~810).
+    # 실측 2026-08-21(223, 컨테이너 6 CPU): 14청크 6.2초 → 고정비 제외 약 0.4초/청크.
+    #   100쪽 ≈ 238청크 ≈ 100초.  400청크면 약 170초.
+    # 그래서 타임아웃을 600초로 두고(4배 여유) 상한을 400청크로 올린다.
+    #
+    # ⚠ 워커를 늘리는 데는 문서화된 대가가 있다(prod 오버레이 주석·NFR-OPS-01):
+    #   모델 승격 후 `/admin/model/reload` 팬아웃이 미구현이라 **워커별로 옛 모델이 남을 수
+    #   있다.** 재기동하면 전부 갱신되므로, 승격 뒤에는 반드시 재배포/재기동할 것.
+    #   그럼에도 늘리는 이유: 워커가 1개면 100쪽 한 건이 도는 3분 동안 **콘솔 전체가 멈춘다.**
+    # ⚠ 메모리 — 워커마다 분류 모델이 한 벌씩 올라간다. 실측 2026-08-21: 워커 1개에
+    #   1.08GiB(한도 4GiB). 3워커면 약 3.3GiB 로 한도에 붙으므로 한도도 10G 로 올린다
+    #   (호스트 47GB 중 43GB 여유 확인).
+    environment:
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-3}"
+      GUNICORN_TIMEOUT: "${GUNICORN_TIMEOUT:-600}"
+      KOIPA_ANALYZE_SYNC_MAX_CHUNKS: "${KOIPA_ANALYZE_SYNC_MAX_CHUNKS:-400}"
+    deploy:
+      resources:
+        limits:
+          memory: "${API_MEM_LIMIT:-10G}"
     # minio 미사용(storage=local) → 의존 제거해 minio 미기동.
     depends_on: !override
       postgres:
