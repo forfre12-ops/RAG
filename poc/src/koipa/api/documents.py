@@ -535,7 +535,17 @@ async def analyze_document(
     # 추출 검수게이트(표누락/OCR/저품질/추출오류)를 최종 status 로 조정 — content 경로 분류는
     # review_flagged 를 안 태우므로, 게이트가 검수를 요구하면 여기서 needs_review 로 승격해
     # box4('검수 필요')와 box5(최종 status)가 모순되지 않게 하고 실 doc_id 서빙과 일치시킨다.
-    cls_warnings = list(cls.warnings or [])
+    # [2026-08-21] `persistence skipped: doc_id=... is not a UUID` 를 화면 경고에서 뺀다.
+    # 이 엔드포인트는 **설계상 저장하지 않는다**(위 주석: DB/스토리지 없이 in-process,
+    # 운영 적재 경로 POST /documents → /classify?doc_id 와 별개인 read-only 진단).
+    # doc_id 로 파일명을 넘기는 것도 의도된 것이고, 영속화 가드가 그것을 정상 거절한다.
+    # 그런데 그 문구가 실제 문제(저신뢰·열화추출 등)와 같은 ⚠ 줄로 나란히 떠서, 사용자가
+    # 무언가 실패한 것으로 읽었다(2026-08-21 지적). 설계대로 동작한 것을 경고로 알리지 않는다.
+    # ⚠ `db unavailable` 등 **다른** persistence 경고는 남긴다 — 그건 진짜 이상 신호다.
+    cls_warnings = [
+        w for w in (cls.warnings or [])
+        if "persistence skipped" not in w or "is not a UUID" not in w
+    ]
     eff_status = cls.status
     if dec.requires_review and cls.status != "needs_review":
         eff_status = "needs_review"

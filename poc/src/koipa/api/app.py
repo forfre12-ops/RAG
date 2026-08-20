@@ -326,7 +326,7 @@ app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     allow_credentials=False,
 )
@@ -415,8 +415,29 @@ prom_metrics_api.register_background_refresh(app)
 # demo_console_enabled 게이트로 404. 모든 상태변경 API 는 RBAC 보호. OpenAPI 미노출(StaticFiles).
 _STATIC_DIR = Path(__file__).parent / "static"
 _console_on = settings.demo_console_enabled or settings.serve_admin_console
+
+
+class _NoCacheStatic(StaticFiles):
+    """콘솔 정적 파일은 **매번 서버에 물어보게** 한다.
+
+    왜(2026-08-21 실측). StaticFiles 는 Cache-Control 을 안 붙인다. 그러면 브라우저가
+    Last-Modified/ETag 로 휴리스틱 캐싱을 하고, 탭에 이미 떠 있던 화면은 재검증 없이
+    메모리 캐시에서 다시 그려진다. 그 결과 **재배포를 해도 화면이 안 바뀐다** — 서버에는
+    새 코드가 있는데 사용자는 옛 화면을 보고 "안 고쳐졌다" 고 판단하게 된다(실제로 그렇게 됐다).
+
+    `no-cache` 는 캐시 금지가 아니라 **쓰기 전에 재검증**이다. ETag 가 그대로면 304 라
+    본문 전송은 없다 — 대역폭 손해 없이 옛 화면만 막는다. 콘솔은 파일 몇 개짜리라
+    재검증 요청 비용도 무시할 만하다.
+    """
+
+    def file_response(self, *args, **kwargs):  # type: ignore[override]
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return resp
+
+
 if _STATIC_DIR.is_dir() and _console_on:
-    app.mount("/demo", StaticFiles(directory=str(_STATIC_DIR), html=True), name="demo")
+    app.mount("/demo", _NoCacheStatic(directory=str(_STATIC_DIR), html=True), name="demo")
     # [A4] /console 별칭 — 운영에서 "데모"라는 경로명이 관리 콘솔을 가리키는 것이 오해를 부른다
     # (프로덕션 조합은 demo_console_enabled=False · serve_admin_console=True 다 — config.py:122·131).
     # ⚠ /demo 를 없애지 않는다. 유지해야 하는 하드 제약이 두 곳에 있다:
@@ -424,7 +445,7 @@ if _STATIC_DIR.is_dir() and _console_on:
     #     tests/test_demo_page.py           /demo/ 경로 직접 요청
     # 정적 자산은 깨지지 않는다 — 세 화면의 링크·스크립트가 전부 상대경로이고
     # 절대 /demo 를 쓰는 참조가 0건임을 확인했다(grep).
-    app.mount("/console", StaticFiles(directory=str(_STATIC_DIR), html=True), name="console")
+    app.mount("/console", _NoCacheStatic(directory=str(_STATIC_DIR), html=True), name="console")
     logger.info(
         "console mounted at /demo/ and /console/ (dir=%s, demo=%s, admin=%s)",
         _STATIC_DIR, settings.demo_console_enabled, settings.serve_admin_console,

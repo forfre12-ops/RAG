@@ -483,6 +483,10 @@ function render(j){
        게이트 조건에 룰↔모델 불일치는 없다. 실측 2026-08-20: 검수 대상 120건 중 검수로 간
        67건이 전부 low-confidence 하나로 걸렸다. 사유는 warnings 에만 있었다. */
     const GATE_REASONS = [
+      /* agreement-gate 를 먼저 본다 — 신뢰도가 임계를 넘겨도 이 조건이면 검수로 간다.
+         실측 2026-08-21: 신뢰도 0.744(>0.70)인데 룰 S3·모델 TS 불일치로 라우팅된 문서가 있다. */
+      [/agreement-gate: model=(\S+) vs rule=(\S+)/,
+        m=>`두 엔진이 갈립니다 — 분류기 ${m[1]} · 룰 ${m[2]} (신뢰도만으로는 확정하지 않습니다)`],
       [/low-confidence: confidence=([\d.]+) < ([\d.]+)/,
         m=>`신뢰도 ${m[1]} 이 기준 ${m[2]} 에 못 미칩니다`],
       [/document flagged at ingestion/, ()=>'추출 품질이 낮은 문서입니다(스캔·OCR 등)'],
