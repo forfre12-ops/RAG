@@ -408,7 +408,16 @@ def healthz():
         # 이것이 없으면 "서버가 그 SHA 를 실제로 실행 중인가" 를 확인할 길이 없고
         # 릴리스 게이트의 --expect-git-sha 검증도 공중에 뜬다.
         "build": _build_identity(),
-        "model_version": "poc",
+        # [2026-08-21] 리터럴 "poc" 였다. 같은 응답의 classifier_model_dir 은
+        #   artifacts/classifier_p1_v5_clean/v-fe4b386b 를 답하는데 이 필드만 "poc" 라,
+        #   한 응답 안에서 두 값이 어긋났다. 이 엔드포인트는 규약서
+        #   (doc/03_openapi_koipa_kl.yaml, security:[])에 무인증으로 실려 있어 발주처가
+        #   직접 호출한다 — "지금 무슨 모델이 도느냐" 에 틀린 답을 주면 안 된다.
+        #   모델 디렉터리의 마지막 조각(=버전 라벨)을 쓰고, 없으면 종전 값을 유지한다.
+        "model_version": (
+            str(operational_config["classifier_model_dir"]).replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+            if operational_config.get("classifier_model_dir") else "poc"
+        ),
         "uptime_sec": int(time.time() - _START),
         "deploy_profile": getattr(settings, "deploy_profile", "unknown"),
         "embedding_provider": getattr(settings, "embedding_provider", "unknown"),

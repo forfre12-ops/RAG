@@ -601,6 +601,13 @@ class ClassifyService:
         if "source-prior" in w:
             return f"source-cap (공개 출처 → {final}로 하향; 모델 {model})"
         if rule == model == final:
+            # [2026-08-21] status 를 읽는다. 종전에는 이 분기가 status 검사보다 **먼저** 평가돼,
+            # 두 엔진이 일치하는데 신뢰도가 임계에 못 미치는 문서에서 한 카드 안에 「검수 필요」
+            # 배너와 「…→ 자동 확정」 설명이 **동시에** 떴다. 실측 2026-08-21(223,
+            # demo_docs/03_S2_supplier_price.xlsx): status=needs_review · conf 0.596 ·
+            # 룰=모델=S2 · decision_path="agreement (…자동 확정)". 시연·감리에서 바로 걸린다.
+            if status == "needs_review":
+                return f"룰·모델 모두 {final} 로 일치 (검수 사유는 아래 경고 참조)"
             return f"agreement (룰·모델 모두 {final} 일치 → 자동 확정)"
         if status == "needs_review":
             # [2026-08-20] 종전 문구는 "escalation (룰 X · 모델 Y → 검수 라우팅)" 이었다.
