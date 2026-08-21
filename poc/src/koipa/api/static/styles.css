@@ -432,6 +432,12 @@ section h3 {
   transition: opacity .15s;
 }
 .btn:hover { opacity: 0.85; }
+/* [2026-08-21] 다섯 화면 공통 버튼 어휘. `.btn` 의 기본 뜻이 화면마다 달라서
+   (여기는 검정=주요, 골든 2면은 흰=보조) 같은 역할 버튼이 다른 이름을 써 왔다.
+   기본값은 건드리지 않고 **별칭만** 추가한다 — 어느 화면에서 어느 이름을 써도
+   같은 모양이 나오게. 주요=btn black/btn primary, 보조=btn sec/btn ghost. */
+.btn.sec { background: #fff; color: var(--text); border-color: var(--border-strong); }
+.btn.black, .btn.primary { background: var(--text); color: #fff; border-color: var(--text); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn.secondary {
   background: transparent; color: var(--text);

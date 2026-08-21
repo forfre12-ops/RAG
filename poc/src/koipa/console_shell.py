@@ -54,6 +54,14 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system
 .rowhead{padding:13px 12px;background:#f7f7f5;color:#899199;font:11px ui-monospace,monospace}
 .btn{border:1px solid #d8d8d5;background:#fff;padding:11px 14px;font-weight:800;font-size:13px;cursor:pointer}
 .btn.black{background:#111;color:#fff;border-color:#111}
+/* [2026-08-21] `.btn` 한 이름이 화면마다 정반대를 뜻했다 —
+   여기(골든 2면)는 흰 테두리=보조인데 admin.html:75·styles.css:423 은 검정 채움=주요다.
+   그래서 이 두 화면만 주요동작을 `btn black` 으로 따로 써 왔다.
+   다수 규약(주요=검정)에 맞추되 **CSS 기본값은 뒤집지 않는다** — 이 파일의
+   `class="btn"` 5개가 한꺼번에 검정이 되어 버린다. 대신 보조동작 별칭을 추가해
+   세 화면이 같은 이름을 쓸 수 있게 한다: 주요=`btn black`, 보조=`btn sec`/`btn ghost`. */
+.btn.sec,.btn.ghost{background:#fff;color:#111;border-color:#d8d8d5}
+.btn.primary{background:#111;color:#fff;border-color:#111}
 .btn:focus-visible{outline:2px solid #0070f3;outline-offset:2px}
 .viewbar .btn.sm{padding:6px 11px;font-size:12px}
 .summary{margin-top:40px;border-top:3px solid #111;background:#fafaf8;display:grid;grid-template-columns:1.18fr repeat(4,1fr)}
