@@ -51,6 +51,11 @@ CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     # [D3 2026-08-18] 시연은 별도 화면이 아니라 분류 콘솔 안의 구역이 됐다.
     # parse_demo.html 은 그 구역으로 보내는 스텁으로만 남는다(인쇄된 주소 보호).
     ("demo", "등급 시연", "/console/index.html#sec-parse"),
+    # [2026-08-21] 로그인을 **메뉴에** 둔다. 쿠키가 없는 브라우저(시크릿 창·새 노트북)로
+    # 열면 화면은 200 으로 뜨는데 분석·등록·현황이 전부 401 이고, 어느 화면에도
+    # login.html 주소가 없었다(2026-08-21 실측: index.html 안 login.html 0건).
+    # 시연장에서 "왜 안 되지" 로 멈추는 자리라 한 번에 갈 수 있게 한다.
+    ("login", "로그인", "/api/v1/golden/candidates/login.html"),
 )
 
 
