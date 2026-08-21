@@ -565,8 +565,15 @@ document.getElementById('grid').addEventListener('change',function(e){
     const cd=t.closest('.scard');cd.className=t.value==='reject'?'scard rejected':'scard decided';
     decCount();decSave();
   } else if(t.matches('.gsel')){
+    /* [2026-08-21] 카드 강조·카운터 갱신 두 줄이 빠져 있었다(라디오 분기에는 있다).
+       그래서 드롭다운으로 등급만 바꾸면 **결정은 저장되는데 화면이 하나도 안 움직였다** —
+       상단 "0 / 120" 그대로, 카드도 안 강조된다. 검수자는 안 눌린 줄 알고 다시 누른다.
+       rc.checked=true 는 프로퍼티 대입이라 change 이벤트가 안 나므로 라디오 분기로도
+       넘어가지 않는다(2026-08-21 감사에서 jsdom 재현). 여기서 직접 갱신한다. */
     const id=t.dataset.id;DEC[id]=DEC[id]||{decision:'change'};DEC[id].grade=t.value;
-    const rc=document.querySelector('input[name="dec-'+CSS.escape(id)+'"][value=change]');if(rc)rc.checked=true;DEC[id].decision='change';decSave();
+    const rc=document.querySelector('input[name="dec-'+CSS.escape(id)+'"][value=change]');if(rc)rc.checked=true;DEC[id].decision='change';
+    const cd=t.closest('.scard');if(cd)cd.className='scard decided';
+    decCount();decSave();
   }
 });
 document.getElementById('grid').addEventListener('input',function(e){

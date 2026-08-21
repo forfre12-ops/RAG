@@ -1082,10 +1082,15 @@ function confirmSignoffDone(){
   markStep('g1'); markStep('g2');
   dismissSignoffReturn();
   log('골든 검수·서명 완료로 표시 — 다음 단계는 3 재학습','ok');
-  showPane('model');
+  // [2026-08-21] 'model' 은 2026-08-20 탭 개편으로 없어진 이름이다. showPane 가드에 걸려
+  // 검수 탭으로 되돌아왔고, 재학습 카드는 끝까지 안 나왔다. 재학습은 '학습·배포' 탭에 있다.
+  showPane('train');
   // 서명 직후에는 "얼마나 찼는지"가 가장 궁금하다 — 현황을 자동으로 갱신해 준다.
   if(typeof loadGoldenStatus==='function') loadGoldenStatus();
-  const t=$('tr-kind') || $('gold-progress');
+  // [2026-08-21] 'tr-kind' 는 저장소 어디에도 정의가 없어(이 줄이 유일한 참조) 항상
+  // 폴백으로 떨어졌고, 그 폴백은 검수 탭의 카드라 학습·배포 탭에서는 보이지도 않았다.
+  // 재학습 카드에 실재하는 id 로 바꾼다(admin.html:621 select#tr-preset).
+  const t=$('tr-preset') || $('gold-progress');
   if(t) t.scrollIntoView({behavior:'smooth', block:'center'});
 }
 window.addEventListener('focus', ()=>{
