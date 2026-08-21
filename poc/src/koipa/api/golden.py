@@ -646,7 +646,8 @@ def _render_console_login_html() -> str:
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<title>한국지식재산보호원 | 골든셋 검수 로그인</title><style>"
         ":root{--ink:#111;--red:#e72d44;--line:#dededb;--mute:#70757a}"
-        "*{box-sizing:border-box}body{margin:0;color:var(--ink);font:15px Arial,sans-serif}"
+        # [2026-08-21] 로그인 화면만 Arial 이었다 — 다섯 화면 한 벌로 맞춘다.
+        '*{box-sizing:border-box}body{margin:0;color:var(--ink);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}'
         # [2026-08-20] .top/.mark/.brand/.product 를 여기서 따로 갖고 있었고 값이 검수
         # 화면과 달랐다(높이 86 vs 84 · padding 40 vs 34 · 자간 2 vs 1px). 다섯 화면을
         # 합치면서 console_nav.HEADER_CSS 한 곳으로 옮겼다.

@@ -31,7 +31,7 @@ from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 # 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
 # 감리 증적으로 단독 저장·전달될 수 있어 self-contained 여야 한다(정적 마운트 의존 금지).
 _TOKENS = """
-:root{--bg:#ffffff;--bg-surface:#f7f7f5;--text:#111111;--text-soft:#555555;--text-dim:#8f9498;--border:#e1e1de;--border-strong:#cfcfcb;--accent:#111111;--accent-soft:#f7f7f5;--radius:0;--font-sans:Arial,"Noto Sans KR",sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--c-ts:#e72d44;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;--ink:#111111;--red:#e72d44;--paper:#fff;--soft:#f7f7f5;--line:#e1e1de;--mute:#8f9498}
+:root{--bg:#ffffff;--bg-surface:#f7f7f5;--text:#111111;--text-soft:#555555;--text-dim:#8f9498;--border:#e1e1de;--border-strong:#cfcfcb;--accent:#111111;--accent-soft:#f7f7f5;--radius:0;--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;--ink:#111111;--red:#e72d44;--paper:#fff;--soft:#f7f7f5;--line:#e1e1de;--mute:#8f9498}
 """
 
 _DEFAULT_CSS = """<style>""" + _TOKENS + """

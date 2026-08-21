@@ -24,7 +24,10 @@
 """
 
 SHELL_CSS = """
-body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Noto Sans KR",sans-serif;line-height:1.45}
+/* [2026-08-21] 본문 글꼴을 다섯 화면 한 벌로. 종전에는 이 두 곳만 Arial 계열이라
+   같은 한글 문서를 보는데 화면마다 글자 모양이 달랐다(관리자 콘솔·등급 시연은
+   Pretendard 계열). 시스템 폰트를 앞세우고 한글 폴백을 뒤에 둔다. */
+body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.45}
 .top{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:18px}
 .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}
 .brand{font-size:17px;font-weight:900;letter-spacing:1px}
