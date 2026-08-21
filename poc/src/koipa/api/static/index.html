@@ -244,6 +244,45 @@
       ★는 룰이 못 잡은 것을 모델이 잡아 <b>두 엔진이 갈린</b> 경우, ⚠는 두 엔진이 같은 등급인데
       <b>확신이 기준(0.70)에 못 미치는</b> 경우, ✕는 본문이 사실상 없는 경우입니다.
       직접 업무 문서를 끌어다 놓아도 됩니다.</div>
+    <!-- [2026-08-21] ICD 문서 속성 입력. API 는 진작부터 받는데(documents.py:101-123 Form 필드)
+         세 화면 어디에도 입력칸이 없어 아무도 쓸 수 없었다. 관리성(M)은 본문에서 관측되지
+         않으므로(200자 문서가 자기 접근통제를 진술하지 않는다) 이 값이 유일한 근거다.
+         실측 2026-08-21(223): security_marking=secret + access_scope=approved_only 를 주면
+         같은 문서가 S2 → S1 로 올라간다(metadata-floor 발동). -->
+    <details class="icd-box" style="margin-top:12px;border:1px solid var(--border,#e1e1de);padding:10px 12px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:600">문서 속성 (ICD) — 출처 · 보안표시 · 접근범위 <span style="font-weight:400;color:var(--text-dim,#8f9498)">· 선택. 넣으면 등급 판정에 반영됩니다</span></summary>
+      <div class="row" style="margin-top:10px">
+        <label class="fld">출처<select id="icd-source">
+          <option value="">— 미지정 —</option>
+          <option value="public">공개 자료 (S3 로 상한)</option>
+          <option value="registered_patent">등록 특허 (공개)</option>
+          <option value="academic">학술 자료 (공개)</option>
+          <option value="internal">내부 문서</option>
+          <option value="external_confidential">외부 기밀 (NDA)</option>
+        </select></label>
+        <label class="fld">보안표시<select id="icd-marking">
+          <option value="">— 미지정 —</option>
+          <option value="top_secret">극비 — 등급 TS 이상</option>
+          <option value="secret">기밀 — 등급 S1 이상</option>
+          <option value="confidential">대외비 — 등급 S2 이상</option>
+          <option value="none">표기 없음</option>
+        </select></label>
+        <label class="fld">접근범위<select id="icd-scope">
+          <option value="">— 미지정 —</option>
+          <option value="approved_only">승인자 한정 — 관리성 M=2</option>
+          <option value="designated">지정 접근자 — M=1</option>
+          <option value="department">특정 부서 — M=1</option>
+          <option value="all_employees">전 직원 열람 — M=0</option>
+        </select></label>
+      </div>
+      <div class="hint" style="margin-top:8px;line-height:1.7">
+        <b>보안표시</b>가 있으면 그 등급 아래로는 안 내려갑니다(명시 표기 우선, ICD §4.2).
+        <b>접근범위</b>는 표시가 없을 때 <b>관리성(M)</b>을 정합니다 — 본문에서 관측되지 않는 축이라
+        이 값이 유일한 근거입니다.
+        ⚠ <b>전 직원 열람</b>은 비밀관리성 요건 미충족이라 등급을 <b>내리는</b> 방향입니다
+        (법리상 영업비밀 아님). 미탐 방향이므로 시스템이 경고를 남기고 사람 검수로 보냅니다.
+      </div>
+    </details>
     <div class="row" style="margin-top:14px;align-items:center;">
       <button class="btn" id="go" onclick="analyze()" disabled>분석 실행</button>
       <button class="btn ghost" onclick="reset()">초기화</button>
@@ -435,6 +474,11 @@ async function analyze(){
   const fd = new FormData();
   fd.append('file', picked);
   fd.append('return_evidence', $('ev').value);
+  /* [2026-08-21] ICD 문서 속성을 함께 보낸다.
+     ⚠ **빈 값은 보내지 않는다.** documents.py:513-515 주석 — 빈 값을 넣으면 "unknown" 과
+        "명시적으로 없음" 이 구분되지 않아 관리성 판정이 뒤집힌다. 고른 것만 싣는다. */
+  [['source_type','icd-source'],['security_marking','icd-marking'],['access_scope','icd-scope']]
+    .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
   const t0=performance.now();
   try{
     const r = await fetch(base()+'/documents/analyze', { method:'POST', headers:hdr(), body:fd });
