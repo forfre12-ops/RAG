@@ -76,3 +76,33 @@ def test_demo_reflect_marker_is_preserved():
     """
     page = (STATIC / "index.html").read_text(encoding="utf-8")
     assert "demo-console" in page
+
+
+def test_demo_button_grouping_matches_measured_expectations():
+    """시연 버튼의 자동확정/검수 묶음이 점검기(check_demo_docs.py)의 기대와 같은가.
+
+    왜(2026-08-22). 이 화면의 버튼 묶음은 실측으로 두 번 어긋났다 - 처음은 배치가 낡아서,
+    두 번째는 서빙 설정이 바뀌어서(온도 3.0→2.03 · 룰 무근거 abstain). 화면과 점검기가
+    따로 놀면 "점검은 통과했는데 화면은 거짓말"이 된다. 둘을 한 자리에서 묶어 둔다.
+    실제 판정과 맞는지는 scripts/check_demo_docs.py 가 문서를 태워서 본다(모델 필요).
+    """
+    import sys
+
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from check_demo_docs import DEMO_EXPECTATIONS
+
+    page = (STATIC / "index.html").read_text(encoding="utf-8")
+    wrong = []
+    for exp in DEMO_EXPECTATIONS:
+        line = next((ln for ln in page.splitlines()
+                     if exp["file"] in ln and "sample-btn" in ln), None)
+        if line is None:
+            wrong.append(f"{exp['file']}: 버튼이 없다")
+            continue
+        # ok = 자동확정으로 광고, bad = 검수로 광고
+        advertised = "staging" if "sample-btn ok" in line else "needs_review"
+        if advertised != exp["status"]:
+            wrong.append(f"{exp['file']}: 화면은 {advertised} 인데 기대는 {exp['status']}")
+    assert not wrong, "시연 버튼 묶음이 점검기 기대와 다르다: " + "; ".join(wrong)

@@ -225,24 +225,27 @@
     </div>
     <div class="samples-row">
       <span class="samples-label">시연 문서 원클릭</span>
-      <!-- [2026-08-21] 버튼 배치를 **실측대로** 고쳤다. 종전 배치는 화면 설명과 실제 동작이
-           어긋나 시연 중에 드러난다(223 실측):
-             03 S2 납품단가표  자동확정으로 광고 → 실제 conf 0.596 로 검수
-             05 S1 기술이전PDF 검수로 광고      → 실제 conf 0.841 로 자동확정
-             07 하이브리드      자동확정으로 광고 → 룰 S3/모델 S2 불일치라 검수(설계대로)
-           문서를 손봐 광고에 맞추는 것은 시연용 조작이라 하지 않는다. 설명을 사실에 맞춘다. -->
+      <!-- [2026-08-22] 배치를 **다시** 실측대로 고쳤다. 8/21 실측 뒤 서빙 판정이 두 번 바뀌었고
+           (온도 3.0→2.03 · 합의 게이트의 룰 무근거 abstain), 그래서 8/21 배치가 또 어긋났다.
+           재실측(같은 파일 · 3회 반복 동일 · scripts/check_demo_docs.py):
+             03 S2 납품단가표  검수로 광고    → 실제 자동확정(conf 0.596 → 0.714, 임계 0.70)
+             05 S1 기술이전PDF 자동확정 광고  → 실제 검수(표 추출 불완전 = extraction_gate)
+             07 하이브리드      검수로 광고    → 실제 자동확정(룰 근거 0건이라 불일치로 안 침)
+           문서를 손봐 광고에 맞추는 것은 시연용 조작이라 하지 않는다. 설명을 사실에 맞춘다.
+           주의: 03 은 0.714 로 임계(0.70) 바로 위다 - 모델이나 온도를 건드리면 검수로 되돌아간다.
+           시연 전에 scripts/check_demo_docs.py 를 **배포 서버에 대고** 한 번 돌릴 것. -->
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/01_TS_semiconductor_euv.docx','반도체 EUV 공정 레시피(극비).docx')">TS 특급 · 반도체 EUV (DOCX)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/02_S1_recsys_source_license.docx','추천엔진 소스·라이선스(영업비밀).docx')">S1 1급 · 소스·라이선스 (DOCX)</button>
-      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">S1 1급 · 기술이전 계약초안 (PDF)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/04_S3_press_release.docx','신제품 출시 보도자료(공개).docx')">S3 공개 · 보도자료 (DOCX)</button>
-      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/07_HYBRID_semantic_secret.docx','비공개 추진 메모(키워드無).docx')">★ 검수 · 룰 놓침→모델 포착(두 엔진 불일치)</button>
-      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">⚠ 검수 · 납품단가표 — 확신 부족 (XLSX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">S2 2급 · 납품단가표 (XLSX)</button>
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/07_HYBRID_semantic_secret.docx','비공개 추진 메모(키워드無).docx')">S2 2급 · 키워드 없는 메모 (DOCX)</button>
+      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">⚠ 검수 · 기술이전 PDF — 표 추출 불완전</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
     </div>
-    <div class="hint">위 4종(TS·S1·S1·S3)은 <b>자동 확정</b>되는 경로입니다(2026-08-21 실측 신뢰도 0.82~0.90).
-      아래 3종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
-      ★는 룰이 못 잡은 것을 모델이 잡아 <b>두 엔진이 갈린</b> 경우, ⚠는 두 엔진이 같은 등급인데
-      <b>확신이 기준(0.70)에 못 미치는</b> 경우, ✕는 본문이 사실상 없는 경우입니다.
+    <div class="hint">위 5종(TS·S1·S3·S2·S2)은 <b>자동 확정</b>되는 경로입니다(2026-08-22 실측 신뢰도 0.71~0.98).
+      아래 2종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
+      ⚠는 등급(S1)은 나왔지만 <b>PDF 표 추출이 불완전</b>해 자동확정하지 않는 경우,
+      ✕는 본문이 사실상 없어 <b>확신이 기준(0.70)에 못 미치는</b> 경우입니다.
       직접 업무 문서를 끌어다 놓아도 됩니다.</div>
     <!-- [2026-08-21] ICD 문서 속성 입력. API 는 진작부터 받는데(documents.py:101-123 Form 필드)
          세 화면 어디에도 입력칸이 없어 아무도 쓸 수 없었다. 관리성(M)은 본문에서 관측되지
