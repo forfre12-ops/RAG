@@ -27,8 +27,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import sys
 from pathlib import Path
+
+try:  # [2026-08-22] cp949 콘솔에서 아래 경고 한 줄이 UnicodeEncodeError 로 죽었다.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001
+    pass
 
 GRADES = ("TS", "S1", "S2", "S3")
 ORDER = {g: i for i, g in enumerate(GRADES)}
@@ -89,18 +96,25 @@ def main(argv: list[str] | None = None) -> int:
               f"자동확정률 {best['auto_confirm_rate']:.1%} · "
               f"정밀도 {best['auto_precision']}")
     else:
-        print("  ⚠ 어떤 임계에서도 무음 미탐이 0 이 아니다 — 임계 조정으로 풀 문제가 아니다")
+        print("  [경고] 어떤 임계에서도 무음 미탐이 0 이 아니다 - 임계 조정으로 풀 문제가 아니다")
 
     report = {
         "records": args.records,
+        # [2026-08-22] 입력 파일 해시를 같이 남긴다. 종전엔 경로만 적었는데, 뒤 실행이 같은
+        # 이름으로 레코드를 덮어써서 **이 리포트가 가리키는 파일의 내용이 스윕 수치와 달라진**
+        # 일이 있었다(hardened42 t203: 21/21 로 계산한 곡선이 27/15 짜리 파일을 가리켰다).
+        # 해시가 있으면 포인터가 어긋난 것을 읽는 쪽이 바로 안다.
+        "records_sha256": hashlib.sha256(Path(args.records).read_bytes()).hexdigest(),
         "current_threshold": args.current,
         "confidence_range": [confs[0], confs[-1]],
         "sweep": results,
         "recommended": best,
         "criterion": "무음 미탐 0 을 유지하는 최소 임계. 정밀도·자동확정률로 고르지 않는다 "
                      "- 본 사업 1차 목표가 미탐 최소화이기 때문이다.",
-        "caveat": "이 곡선은 v3 final_800(합성) 기준이다. 실 운영 분포에서는 다르게 나온다. "
-                  "임계를 운영에 반영하기 전에 회원사 분포에서 다시 재야 한다.",
+        # [2026-08-22] 종전엔 "v3 final_800 기준"이 문자열로 박혀 있었다 - 다른 셋으로 돌려도
+        # 그 문구가 그대로 나가서 리포트가 자기 입력을 잘못 설명했다(hardened42 스윕이 그랬다).
+        "caveat": f"이 곡선은 {args.records} 한 셋(합성 평가셋) 기준이다. 실 운영 분포에서는 "
+                  "다르게 나온다. 임계를 운영에 반영하기 전에 회원사 분포에서 다시 재야 한다.",
     }
     if args.out:
         out = Path(args.out)

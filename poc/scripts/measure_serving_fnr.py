@@ -28,11 +28,29 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import hashlib
 import json
+import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+_SRC = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+try:  # [2026-08-22] cp949 콘솔에서 --help 조차 UnicodeEncodeError 로 죽었다.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:  # noqa: BLE001
+    pass
+
+# [2026-08-22] 사유 집계를 여기서 직접 문자열 파싱하지 않는다 - 게이트 순서는 한 곳에만 둔다.
+from koipa.services.review_reasons import (  # noqa: E402
+    causal_review_reason,
+    count_causal_reasons,
+    gate_hits,
+)
 
 GRADES = ("TS", "S1", "S2", "S3")
 ORDER = {g: i for i, g in enumerate(GRADES)}      # TS=0 이 가장 높다
@@ -96,12 +114,24 @@ def main(argv: list[str] | None = None) -> int:
             continue
         predicted = str(result.get("predicted_level") or result.get("label") or "")
         status = str(result.get("status") or "")
+        warnings = result.get("warnings") or []
+        # [2026-08-22] 종전 레코드는 5필드뿐이라 **어느 문서인지 알 수 없었다** - 오분류를
+        # 다시 열어 보거나 시연 문서를 고르는 데 쓸 수 없었다. 평가셋의 doc_id 와 본문 해시를
+        # 같이 남긴다(요청 doc_id 는 persist 를 건너뛰려고 일부러 비-UUID 로 준 값이라 별도).
+        text = str(row.get("text") or "")
         records.append({
+            "doc_id": str(row.get("doc_id") or f"idx-{index:05d}"),
+            "request_doc_id": f"servingfnr-{index:05d}",
             "truth": truth,
+            "model_grade": result.get("model_grade"),
             "predicted": predicted,
             "status": status,
             "confidence": result.get("confidence"),
-            "warnings": result.get("warnings") or [],
+            "warnings": warnings,
+            "causal_review_reason": causal_review_reason(warnings, status),
+            "review_gate_hits": gate_hits(warnings),
+            "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "text_len": len(text),
         })
         if (index + 1) % 25 == 0:
             print(f"  {index+1}/{len(rows)} · {time.time()-started:.0f}s", flush=True)
@@ -125,21 +155,27 @@ def main(argv: list[str] | None = None) -> int:
         "high_grade_documents": len(high),
         "underclassified": len(underclassified),
         "silent_miss": len(silent),
+        # doc_id 를 같이 남긴다 - 종전엔 건수만 있어서 "어느 문서가 샜나"를 다시 찾을 수 없었다.
+        "silent_miss_detail": [
+            {k: r[k] for k in ("doc_id", "truth", "predicted", "confidence", "status", "warnings")}
+            for r in silent
+        ],
         "caught_by_review": len(caught),
         "silent_miss_rate": round(len(silent) / len(high), 4) if high else 0.0,
         "underclass_rate_before_guards": round(len(underclassified) / len(high), 4) if high else 0.0,
         "status_distribution": dict(sorted(Counter(r["status"] for r in records).items())),
         # 어느 게이트가 검수로 보냈나. 자동확정률이 낮을 때 **무엇을 고쳐야 하는지**는
-        # 이 분포가 정한다 — 라우팅 경로가 12종이라 합계만 봐서는 알 수 없다.
-        "review_reason_counts": dict(
-            sorted(
-                Counter(
-                    w.split(":")[0]
-                    for r in records if r["status"] == "needs_review"
-                    for w in r["warnings"] if ":" in w
-                ).items(),
-                key=lambda kv: -kv[1],
-            )
+        # 이 분포가 정한다 - 라우팅 경로가 15종이라 합계만 봐서는 알 수 없다.
+        #
+        # [정정 2026-08-22] 종전엔 경고를 ':' 로 잘라 앞부분을 셌다. 그러면 상태 판정과
+        # 무관한 경고까지 사유로 올라간다 - hardened42 42건에서 `persistence skipped`(비-UUID
+        # doc_id 라 DB 미기록) 가 15건으로 1위였다. 문서 하나당 **상태를 정한 게이트 하나**만
+        # 센다(koipa.services.review_reasons). 같은 42건 정정 결과: low-confidence 13 ·
+        # agreement-gate 2 = needs_review 15 와 일치.
+        "causal_review_reason_counts": count_causal_reasons(records),
+        # 표에 없는 게이트가 생기면 여기 잡힌다(0 이 아니면 review_reasons 를 갱신할 것).
+        "unmapped_review_reasons": sum(
+            1 for r in records if r.get("causal_review_reason") == "unmapped"
         ),
         "auto_confirm_rate": round(
             sum(1 for r in records if r["status"] != "needs_review") / max(len(records), 1), 4

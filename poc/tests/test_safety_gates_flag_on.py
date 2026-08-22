@@ -27,11 +27,14 @@ def _stub_grades(monkeypatch):
 
 # ── agreement_gate (model vs rule 합의) ───────────────────────────────────────
 
-def _agreement(pred_label, rule_grade):
+def _agreement(pred_label, rule_grade, has_evidence=None):
     from koipa.services.classify_service import ClassifyService
 
     # pred.rule_grade 를 주면 self.inference 경로(룰엔진 재계산)는 타지 않으므로 self 는 스텁.
-    pred = SimpleNamespace(label=pred_label, rule_grade=rule_grade)
+    # has_evidence=None 은 run() 이 그 값을 안 실어 준 옛 경로(=판단 보류 없이 기존 동작).
+    pred = SimpleNamespace(
+        label=pred_label, rule_grade=rule_grade, rule_has_evidence=has_evidence
+    )
     return ClassifyService._agreement_gate(SimpleNamespace(inference=None), pred, "본문")
 
 
@@ -55,6 +58,39 @@ def test_agreement_gate_off_default_no_route(monkeypatch, _stub_grades):
 
     monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", False, raising=False)
     assert _agreement(Grade.S1, Grade.S2) is None   # 기본 OFF → 비파괴(불일치여도 라우팅 안 함)
+
+
+# ── agreement_gate 의 룰 무근거 abstain (커밋 5367c896) ────────────────────────
+# 룰엔진은 시드 매칭이 하나도 없으면 **의견이 없는 것**인데 default 로 S3 를 돌려준다.
+# 그 S3 를 '불일치'로 읽으면, 근거가 0 건인 쪽 때문에 모델의 정상 판정이 검수로 밀린다.
+# hardened42 실측(2026-08-22): 이 구분을 넣자 자동확정 50.00% → 64.29%, 무음 미탐은 1건으로
+# 불변이었다(reports/serving_records_hardened42_t203_abstain.json). 수치를 되돌리는 회귀가
+# 나면 여기서 먼저 깨져야 한다.
+
+def test_agreement_gate_abstains_when_rule_has_no_evidence(monkeypatch, _stub_grades):
+    from koipa import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", True, raising=False)
+    # 룰이 S3(=default) 를 냈지만 실 근거 0건 → 불일치로 치지 않는다(자동확정 유지).
+    assert _agreement(Grade.S1, Grade.S3, has_evidence=False) is None
+
+
+def test_agreement_gate_routes_when_rule_has_evidence(monkeypatch, _stub_grades):
+    from koipa import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", True, raising=False)
+    # 같은 등급쌍이라도 룰이 실 근거를 들고 S3 라고 하면 그건 진짜 불일치 → 검수 라우팅.
+    reason = _agreement(Grade.S1, Grade.S3, has_evidence=True)
+    assert reason and "agreement-gate" in reason
+
+
+def test_agreement_gate_unknown_evidence_keeps_old_behavior(monkeypatch, _stub_grades):
+    from koipa import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", True, raising=False)
+    # 근거 여부를 모르면(None) 라우팅을 유지한다 - abstain 은 False 로 **확인된** 경우만.
+    reason = _agreement(Grade.S1, Grade.S3, has_evidence=None)
+    assert reason and "agreement-gate" in reason
 
 
 # ── llm_second_opinion (모델 비-TS 자동확정에 대한 LLM 2차의견) ───────────────
