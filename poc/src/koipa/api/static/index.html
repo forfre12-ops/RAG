@@ -233,16 +233,21 @@
              07 하이브리드      검수로 광고    → 실제 자동확정(룰 근거 0건이라 불일치로 안 침)
            문서를 손봐 광고에 맞추는 것은 시연용 조작이라 하지 않는다. 설명을 사실에 맞춘다.
            주의: 03 은 0.714 로 임계(0.70) 바로 위다 - 모델이나 온도를 건드리면 검수로 되돌아간다.
-           시연 전에 scripts/check_demo_docs.py 를 **배포 서버에 대고** 한 번 돌릴 것. -->
+           시연 전에 scripts/check_demo_docs.py 를 **배포 서버에 대고** 한 번 돌릴 것.
+
+           07 은 화면에서 뺐다(파일·점검은 유지). 그 문서는 비공개 M&A 메모인데 모델이 S2
+           (2급 대외비)로 본다 - 본문이 "관계자 외 열람 제한"·"주가와 협상이 무너진다"를
+           말하고 있어 요소로 읽으면 더 높은 등급이 나온다(코드의 grade_from_svm(2,2,2)=TS).
+           지금은 합의 게이트가 검수로 보내지만, 화면에서 등급을 말해 주는 자리에 두면
+           그 S2 가 먼저 읽힌다. 사용자 결정(2026-08-22)으로 목록에서 제외한다. -->
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/01_TS_semiconductor_euv.docx','반도체 EUV 공정 레시피(극비).docx')">TS 특급 · 반도체 EUV (DOCX)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/02_S1_recsys_source_license.docx','추천엔진 소스·라이선스(영업비밀).docx')">S1 1급 · 소스·라이선스 (DOCX)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/04_S3_press_release.docx','신제품 출시 보도자료(공개).docx')">S3 공개 · 보도자료 (DOCX)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">S2 2급 · 납품단가표 (XLSX)</button>
-      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/07_HYBRID_semantic_secret.docx','비공개 추진 메모(키워드無).docx')">S2 2급 · 키워드 없는 메모 (DOCX)</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">⚠ 검수 · 기술이전 PDF — 표 추출 불완전</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
     </div>
-    <div class="hint">위 5종(TS·S1·S3·S2·S2)은 <b>자동 확정</b>되는 경로입니다(2026-08-22 실측 신뢰도 0.71~0.98).
+    <div class="hint">위 4종(TS·S1·S3·S2)은 <b>자동 확정</b>되는 경로입니다(2026-08-22 실측 신뢰도 0.71~0.98).
       아래 2종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
       ⚠는 등급(S1)은 나왔지만 <b>PDF 표 추출이 불완전</b>해 자동확정하지 않는 경우,
       ✕는 본문이 사실상 없어 <b>확신이 기준(0.70)에 못 미치는</b> 경우입니다.

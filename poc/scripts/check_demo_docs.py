@@ -58,8 +58,11 @@ DEMO_EXPECTATIONS: tuple[dict, ...] = (
      "reason": None, "shown_as": "S3 공개 · 보도자료 - 자동확정"},
     {"file": "03_S2_supplier_price.xlsx", "grade": "S2", "status": "staging",
      "reason": None, "shown_as": "S2 2급 · 납품단가표 - 자동확정"},
-    {"file": "07_HYBRID_semantic_secret.docx", "grade": "S2", "status": "staging",
-     "reason": None, "shown_as": "S2 2급 · 키워드 없는 메모 - 자동확정"},
+    # [2026-08-22] 화면에서는 뺐지만(사용자 결정) 파일과 판정은 계속 확인한다 - 이 문서가
+    # 합의 게이트로 검수행인지가 abstain 범위 조정의 회귀 신호다(gate 가 풀리면 자동확정된다).
+    {"file": "07_HYBRID_semantic_secret.docx", "grade": "S2", "status": "needs_review",
+     "reason": "agreement-gate", "on_screen": False,
+     "shown_as": "(화면 제외) 비공개 M&A 메모 - 룰 무근거지만 관리표시 있어 검수"},
     {"file": "05_S1_tech_transfer.pdf", "grade": "S1", "status": "needs_review",
      "reason": "extraction-gate", "shown_as": "검수 · 기술이전 PDF - 표 추출 불완전"},
     {"file": "06_FAIL_thin_text.txt", "grade": None, "status": "needs_review",

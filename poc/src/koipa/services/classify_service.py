@@ -696,7 +696,18 @@ class ClassifyService:
                 rule_g = rule_result.grade
                 has_evidence = has_real_evidence(rule_result)
             if has_evidence is False:
-                return None  # 룰 무의견(실 근거 0건) — 불일치로 취급하지 않음, conf 단독 신뢰
+                # [2026-08-22 정정] 시드 0건이라고 다 '무의견'은 아니다. 룰 추출기가 못 잡은
+                # 것일 수도 있고, 그때 abstain 은 **확신에 찬 과소분류를 그냥 통과**시킨다.
+                # 실측: 시연 문서 07(비공개 M&A 메모)은 "관계자 외 열람을 제한합니다"를 달고도
+                # 시드 매칭 0건이었고, abstain 이 들어오면서 모델 S2·conf 0.959 로 자동확정됐다
+                # (그 전에는 이 게이트가 검수로 보냈다). 본문에 형식적 관리표시가 있으면 룰은
+                # '아무 의견 없음'이 아니므로 abstain 하지 않고 아래 불일치 판정을 계속한다.
+                # 관리표시 탐지는 등급에 개입하지 않는 목록이다(rule_engine:375 주석).
+                from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+                    detect_management_marking,
+                )
+                if not detect_management_marking(text or ""):
+                    return None  # 룰 무의견(실 근거 0건) — 불일치로 안 침, conf 단독 신뢰
             rule_code = rule_g.value if hasattr(rule_g, "value") else str(rule_g)
             if rule_code != model_code:
                 return (

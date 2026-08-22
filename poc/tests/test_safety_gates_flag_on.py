@@ -27,7 +27,7 @@ def _stub_grades(monkeypatch):
 
 # ── agreement_gate (model vs rule 합의) ───────────────────────────────────────
 
-def _agreement(pred_label, rule_grade, has_evidence=None):
+def _agreement(pred_label, rule_grade, has_evidence=None, text="본문"):
     from koipa.services.classify_service import ClassifyService
 
     # pred.rule_grade 를 주면 self.inference 경로(룰엔진 재계산)는 타지 않으므로 self 는 스텁.
@@ -35,7 +35,7 @@ def _agreement(pred_label, rule_grade, has_evidence=None):
     pred = SimpleNamespace(
         label=pred_label, rule_grade=rule_grade, rule_has_evidence=has_evidence
     )
-    return ClassifyService._agreement_gate(SimpleNamespace(inference=None), pred, "본문")
+    return ClassifyService._agreement_gate(SimpleNamespace(inference=None), pred, text)
 
 
 def test_agreement_gate_on_disagreement_routes_review(monkeypatch, _stub_grades):
@@ -179,3 +179,22 @@ def test_metadata_floor_off_default_no_change(monkeypatch, _stub_pipeline_db):
     res = pipe.run("내부 문서", metadata={"security_marking": "secret"})
     assert res.label == Grade.S2   # 기본 OFF → 상향 없음(비파괴)
     assert not any("metadata-floor" in w for w in res.warnings)
+
+
+def test_agreement_gate_does_not_abstain_when_text_carries_management_marking(
+    monkeypatch, _stub_grades
+):
+    """시드 0건이어도 본문에 형식적 관리표시가 있으면 룰은 '무의견'이 아니다.
+
+    실측 2026-08-22: 시연 문서 07(비공개 M&A 메모)은 "관계자 외 열람을 제한합니다"를 달고도
+    룰 시드 매칭이 0건이었다 - 룰 추출기가 못 잡은 것이지 문서에 신호가 없는 게 아니다.
+    그 상태로 abstain 하면 모델 S2 · conf 0.959 가 그대로 자동확정된다(과소분류 방향).
+    """
+    from koipa import config as cfg
+
+    monkeypatch.setattr(cfg.settings, "agreement_gate_enabled", True, raising=False)
+    marked = "본 메모는 관계자 외 열람을 제한합니다. 발표 전까지 외부에 알리지 않는다."
+    reason = _agreement(Grade.S2, Grade.S3, has_evidence=False, text=marked)
+    assert reason and "agreement-gate" in reason
+    # 관리표시가 없는 같은 조건은 종전대로 abstain(자동확정 유지).
+    assert _agreement(Grade.S2, Grade.S3, has_evidence=False, text="분기 매출 계획 공유") is None

@@ -43,13 +43,19 @@ _DEMO_SAMPLES = (
     "07_HYBRID_semantic_secret.docx",
 )
 
+# [2026-08-22] 07 은 화면 목록에서 뺐다(사용자 결정) - 비공개 M&A 메모라 모델의 S2 판정을
+# 화면이 먼저 말해 주는 자리에 두지 않는다. 파일은 남기고 판정은 scripts/check_demo_docs.py
+# 가 계속 확인한다(합의 게이트로 검수행인지가 abstain 범위 회귀 신호).
+_DEMO_SAMPLES_OFF_SCREEN = ("07_HYBRID_semantic_secret.docx",)
+_DEMO_SAMPLES_ON_SCREEN = tuple(s for s in _DEMO_SAMPLES if s not in _DEMO_SAMPLES_OFF_SCREEN)
+
 
 def test_merged_demo_section_kept_every_sample():
-    """통합하다 샘플을 흘리면 시연 대본이 어긋난다 — 7개가 다 왔는지 본다."""
+    """통합하다 샘플을 흘리면 시연 대본이 어긋난다 — 화면 목록과 파일을 따로 본다."""
     page = (STATIC / "index.html").read_text(encoding="utf-8")
-    missing = [s for s in _DEMO_SAMPLES if s not in page]
+    missing = [s for s in _DEMO_SAMPLES_ON_SCREEN if s not in page]
     assert not missing, f"흡수 과정에서 빠진 샘플: {missing}"
-    for name in _DEMO_SAMPLES:
+    for name in _DEMO_SAMPLES:      # 화면에서 뺀 것도 파일은 있어야 한다(점검기가 태운다)
         assert (STATIC / "demo_docs" / name).exists(), name
 
 
@@ -98,6 +104,10 @@ def test_demo_button_grouping_matches_measured_expectations():
     for exp in DEMO_EXPECTATIONS:
         line = next((ln for ln in page.splitlines()
                      if exp["file"] in ln and "sample-btn" in ln), None)
+        if exp.get("on_screen") is False:
+            if line is not None:
+                wrong.append(f"{exp['file']}: 화면에서 빼기로 한 문서인데 버튼이 있다")
+            continue
         if line is None:
             wrong.append(f"{exp['file']}: 버튼이 없다")
             continue
