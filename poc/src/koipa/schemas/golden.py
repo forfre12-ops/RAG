@@ -78,6 +78,10 @@ class GoldenSignoffDecision(BaseModel):
     decision: str = Field(pattern=r"^(approve|change|reject)$")
     grade: Optional[str] = Field(default=None, pattern=r"^(TS|S1|S2|S3)$")  # change 시 필수
     note: str = ""
+    # [2026-08-22 최소구현] 이 문서를 평가정답(locked_eval)으로 쓸지 학습후보(train)로 쓸지 검수자
+    # 표시. 기본 locked_eval = 기존 동작 그대로(모든 유효서명은 여전히 tier=locked_gold_eval).
+    # train을 실제 학습 tier로 편입하는 로직은 아직 없음 — 표시를 기록만 해 두는 단계.
+    intended_use: str = Field(default="locked_eval", pattern=r"^(locked_eval|train)$")
 
     @model_validator(mode="after")
     def _grade_required_for_change(self) -> "GoldenSignoffDecision":

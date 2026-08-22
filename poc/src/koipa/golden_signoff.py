@@ -37,6 +37,11 @@ class Signoff:
     grade: str
     signed_at: str = ""
     note: str = ""
+    # [2026-08-22 최소구현] 검수자가 이 문서를 평가정답(locked_eval)으로 쓸지, 학습후보(train)로
+    # 쓸지 표시. 기본값은 기존 동작과 동일(locked_eval) — 값 저장만 하고 tier_of()/train_records()
+    # 로직 변경은 하지 않는다(그건 별도 작업). 값 자체가 사람 검수 시점의 의도를 기록해 두면,
+    # 나중에 학습 편입 경로를 설계할 때 이 표시부터 다시 만들 필요가 없다.
+    intended_use: str = "locked_eval"
 
 
 @dataclass
@@ -98,6 +103,8 @@ def promote_to_locked(
                 gate_version=SIGNOFF_GATE_VERSION,
                 tier=TIER_LOCKED,
                 note=next((s.note for s in sl if s.note), ""),  # [#3] 검수자 메모 영속(사후 감사·이의제기 근거)
+                # [2026-08-22 최소구현] 표시만 영속화 — tier는 여전히 TIER_LOCKED 그대로다.
+                intended_use=next((s.intended_use for s in sl if s.intended_use), "locked_eval"),
             )
             locked.append(rec)
         else:

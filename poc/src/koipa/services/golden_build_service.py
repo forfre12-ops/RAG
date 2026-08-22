@@ -545,6 +545,7 @@ class GoldenBuildService:
                 Signoff(
                     doc_id=d.doc_id, reviewer_id=reviewer_id, grade=grade,
                     signed_at=signed_at, note=d.note,
+                    intended_use=d.intended_use,
                 )
             )
 

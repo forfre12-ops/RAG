@@ -486,6 +486,13 @@ function card(r){
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="change"'+(d.decision==='change'?' checked':'')+'> 등급변경 <select class="gsel" data-id="'+esc(r.id)+'">'+gopts(d.grade||r.grade)+'</select></label>'
       +'<label><input type="radio" name="dec-'+esc(r.id)+'" value="reject"'+(d.decision==='reject'?' checked':'')+'> 거부</label>'
     +'</div>'
+    // [2026-08-22 최소구현] 용도 표시 — 저장만 함(tier 로직 무변경). 기본 locked_eval.
+    +'<div class="decrow" role="group" aria-label="'+esc(r.id)+' 용도">'
+      +'<label style="color:var(--text-dim)">용도: <select class="usel" data-id="'+esc(r.id)+'">'
+        +'<option value="locked_eval"'+((d.intended_use||'locked_eval')==='locked_eval'?' selected':'')+'>골든셋(평가정답)</option>'
+        +'<option value="train"'+(d.intended_use==='train'?' selected':'')+'>학습후보</option>'
+      +'</select></label>'
+    +'</div>'
     +'<input class="note" data-id="'+esc(r.id)+'" placeholder="메모(선택)" value="'+esc(d.note||'')+'">'
     +'</div>';
 }
@@ -564,6 +571,9 @@ document.getElementById('grid').addEventListener('change',function(e){
     else delete DEC[id].grade;
     const cd=t.closest('.scard');cd.className=t.value==='reject'?'scard rejected':'scard decided';
     decCount();decSave();
+  } else if(t.matches('.usel')){
+    // [2026-08-22 최소구현] 용도 선택은 결정 상태를 바꾸지 않는다 — 카운터·강조 로직은 그대로 둔다.
+    const id=t.dataset.id;DEC[id]=DEC[id]||{};DEC[id].intended_use=t.value;decSave();
   } else if(t.matches('.gsel')){
     /* [2026-08-21] 카드 강조·카운터 갱신 두 줄이 빠져 있었다(라디오 분기에는 있다).
        그래서 드롭다운으로 등급만 바꾸면 **결정은 저장되는데 화면이 하나도 안 움직였다** —
@@ -660,7 +670,8 @@ document.getElementById('submit').addEventListener('click',async function(){
   if(PF_BLOCKED){box.className='result err';box.textContent='서명 전 점검에서 막힌 항목이 있습니다. 위 안내를 확인하세요.';return;}
   // 서명 대상만 보낸다 — 화면 숫자(decCount)와 같은 규칙을 쓴다.
   const decisions=decidedIds().map(id=>{
-    const o={doc_id:id,decision:DEC[id].decision,note:DEC[id].note||''};
+    const o={doc_id:id,decision:DEC[id].decision,note:DEC[id].note||'',
+             intended_use:DEC[id].intended_use||'locked_eval'};
     if(DEC[id].decision==='change')o.grade=DEC[id].grade;return o;
   });
   if(!decisions.length){box.className='result err';box.textContent='결정한 후보가 없습니다.';return;}

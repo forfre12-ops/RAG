@@ -32,6 +32,22 @@ def test_upper_grade_single_signoff_promotes_by_default():
     assert res.locked[0]["label"] == "TS" and res.locked[0]["label_source"] == "human_review"
 
 
+def test_intended_use_defaults_to_locked_eval():
+    # [2026-08-22 최소구현] 기존 호출부(positional Signoff(...))는 intended_use를 안 넘긴다 —
+    # 기본값이 기존 동작(locked_eval)과 같아야 회귀가 없다.
+    res = promote_to_locked([_cand("d1", "S2")], [Signoff("d1", "admin_kim", "S2", "2026-09-10")])
+    assert res.locked[0]["intended_use"] == "locked_eval"
+
+
+def test_intended_use_train_is_recorded_but_tier_unchanged():
+    # 표시만 저장한다 — tier 로직은 아직 손대지 않았으므로 유효서명은 여전히 TIER_LOCKED다.
+    signoff = Signoff("d1", "admin_kim", "S2", "2026-09-10", intended_use="train")
+    res = promote_to_locked([_cand("d1", "S2")], [signoff])
+    rec = res.locked[0]
+    assert rec["intended_use"] == "train"
+    assert tier_of(rec) == TIER_LOCKED
+
+
 def test_grade_disagreement_rejected():
     res = promote_to_locked(
         [_cand("d1", "TS")],
