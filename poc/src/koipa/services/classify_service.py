@@ -644,15 +644,24 @@ class ClassifyService:
     def _agreement_gate(self, pred, text: str) -> str | None:
         """등급차등 + 룰·모델 합의 게이트. 자동확정 부적격이면 검수 사유 문자열, 적격이면 None.
 
-        반환 None = 라우팅 변경 없음(게이트 비활성 · 공개등급 예측 · 룰==모델 합의 · 룰산출 실패).
+        반환 None = 라우팅 변경 없음(게이트 비활성 · 공개등급 예측 · 룰 무의견 · 룰==모델 합의
+        · 룰산출 실패).
         - 공개등급(level_order 최하, 보통 S3) 예측: conf 단독 신뢰(정밀도 94%) → 합의 불요(None).
-        - 그 외 등급(TS/S1/S2): 룰엔진 등급 != 모델 등급이면 검수 라우팅(불일치=확신 부족).
+        - [2026-08-22] 룰이 실제 근거(has_real_evidence)를 못 찾았으면 합의 불요(None). 근거
+          없이 나온 rule_grade는 항상 default S3(rule_engine.label: "no keyword matched →
+          default S3")라 "룰이 공개라고 판단"이 아니라 "룰이 무의견"이다. 이걸 model_code와
+          그대로 비교하면 OOD 어휘 문서가 근거 없는 불일치로 몰려 검수행 — RULE_EXTRACTOR_
+          DIAGNOSIS_2026-08-12가 실측한 자동확정 0%(사유 99.4% rule under-detected)의 원인.
+          rule_grade가 실제 근거로 나온 등급과 모델이 갈릴 때만 아래 불일치 검수를 적용한다.
+        - 그 외 등급(TS/S1/S2) + 룰 근거 있음: 룰엔진 등급 != 모델 등급이면 검수 라우팅(불일치
+          =확신 부족).
         rule==model로 자동확정된 TS/S1은 등급은 유지하되 운영상 표본감사 대상(별도 프로세스).
         모든 예외는 None으로 흡수 — 룰엔진이 죽어도 분류·기존 자동확정을 막지 않는다(fail-safe).
 
-        룰등급은 pred.rule_grade(run()이 이미 산출한 **원시** 룰등급)를 재사용해 룰엔진 2회
-        실행을 피한다(특히 semantic 시드 시 문서 임베딩 중복 방지). 미설정 시에만 text로 폴백
-        재계산한다. 비교 기준은 보고서 'rule열'(eng.label(text).grade, 원시 룰등급)과 동일.
+        룰등급/근거여부는 pred.rule_grade·pred.rule_has_evidence(run()이 이미 산출)를 재사용해
+        룰엔진 2회 실행을 피한다(특히 semantic 시드 시 문서 임베딩 중복 방지). 미설정 시에만
+        text로 폴백 재계산한다. 비교 기준은 보고서 'rule열'(eng.label(text).grade, 원시
+        룰등급)과 동일.
         """
         try:
             from koipa.config import settings  # noqa: PLC0415
@@ -665,10 +674,16 @@ class ClassifyService:
             model_code = model_label.value if hasattr(model_label, "value") else str(model_label)
             if model_code == public_code:
                 return None  # 공개등급: conf 단독으로 신뢰(과소분류 위험 없는 최하등급)
-            # run()이 노출한 원시 룰등급 재사용 — 없으면 폴백 재계산(룰엔진 1회).
+            # run()이 노출한 원시 룰등급/근거여부 재사용 — 없으면 폴백 재계산(룰엔진 1회).
             rule_g = getattr(pred, "rule_grade", None)
+            has_evidence = getattr(pred, "rule_has_evidence", None)
             if rule_g is None:
-                rule_g = self.inference.labeling.engine.label(text).grade
+                from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: PLC0415
+                rule_result = self.inference.labeling.engine.label(text)
+                rule_g = rule_result.grade
+                has_evidence = has_real_evidence(rule_result)
+            if has_evidence is False:
+                return None  # 룰 무의견(실 근거 0건) — 불일치로 취급하지 않음, conf 단독 신뢰
             rule_code = rule_g.value if hasattr(rule_g, "value") else str(rule_g)
             if rule_code != model_code:
                 return (

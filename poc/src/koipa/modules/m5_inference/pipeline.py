@@ -207,6 +207,12 @@ class InferenceResult:
     # 게이트가 룰엔진을 두 번 돌리지 않게 노출. label과 별개(label은 모델/청크집계/override
     # 결과, rule_grade는 단일패스 raw 룰등급). None이면 호출부가 폴백 재계산.
     rule_grade: Optional[str] = None
+    # [agreement-gate 2026-08-22] 룰이 **실제 한국어 시드**를 매치했는가(has_real_evidence,
+    # 영어 약어 단독 부스트는 제외). None=아직 미계산(호출부가 폴백 재계산), False=룰 무근거
+    # (매치 0개 → grade_scores 전부 0 → default S3) — 이 경우 rule_grade=S3는 "룰이 공개라고
+    # 판단"이 아니라 "룰이 무의견"이므로 합의 게이트가 model_code와 그대로 비교하면 근거 없는
+    # 불일치로 오판한다(RULE_EXTRACTOR_DIAGNOSIS_2026-08-12: OOD 문서 자동확정 0%의 실측 원인).
+    rule_has_evidence: Optional[bool] = None
     # [transparency] 원시 모델 판정(override/cap/floor 적용 이전 _run_model argmax).
     # 모델 미로드(rule-fallback) 시 None. label과 별개(label은 최종 결합 결과).
     model_grade: Optional[str] = None
@@ -687,6 +693,7 @@ class InferencePipeline:
                                     f"fnr-safe override: rule {override_grade.value} score={override_score:.1f}"
                                 ],
                                 rule_grade=result.rule_grade,
+                                rule_has_evidence=result.rule_has_evidence,
             rule_factors=result.rule_factors,
                             )
                 except Exception:  # noqa: BLE001
@@ -756,6 +763,7 @@ class InferencePipeline:
                             model_version=result.model_version,
                             warnings=result.warnings,
                             rule_grade=result.rule_grade,
+                            rule_has_evidence=result.rule_has_evidence,
             rule_factors=result.rule_factors,
                         )
         except Exception:  # noqa: BLE001
@@ -798,6 +806,7 @@ class InferencePipeline:
                             f"metadata-floor: security_marking={mark} → grade raised {cur}→{floor_code} (ICD §4.2 명시표기 우선)"
                         ],
                         rule_grade=result.rule_grade,
+                        rule_has_evidence=result.rule_has_evidence,
             rule_factors=result.rule_factors,
                     )
                 elif mark in ("", "none") and scope in ("approved_only", "designated", "department"):
@@ -925,6 +934,7 @@ class InferencePipeline:
                 f"(TS={ts:.4f}, S1={s1:.4f}, margin={margin})"
             ],
             rule_grade=result.rule_grade,
+            rule_has_evidence=result.rule_has_evidence,
             rule_factors=result.rule_factors,
             model_grade=result.model_grade,
         )
@@ -1003,6 +1013,10 @@ class InferencePipeline:
         # evidence/factors는 전체 문서 기준 룰 라벨링에서 가져온다(표시 정합 보존).
         lab = self.labeling.label(text)
         warnings = ["model weights not loaded — using rule-based fallback"]
+        from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: PLC0415
+        rule_has_evidence = (
+            has_real_evidence(lab.rule_result) if lab.rule_result is not None else None
+        )
 
         # [sparse-evidence gate] rule confidence(top/total)는 단일·저가중 키워드 1개만 매칭돼도
         # 한 등급에 전 질량이 몰리면 1.0이 된다. 즉 '단 하나의 약한 매치'가 conf=1.0으로 자동확정돼
@@ -1080,6 +1094,7 @@ class InferencePipeline:
                 model_version="rule-fallback-v0",
                 warnings=warnings,
                 rule_grade=getattr(lab.rule_result, "grade", None),
+                rule_has_evidence=rule_has_evidence,
             )
 
         # [#23] 청크 집계로 선택한 등급이 단일패스(lab.grade)보다 높으면(승격) 경고를 남겨
@@ -1127,6 +1142,7 @@ class InferencePipeline:
             model_version="rule-fallback-v0",
             warnings=warnings,
             rule_grade=getattr(lab.rule_result, "grade", None),
+            rule_has_evidence=rule_has_evidence,
         )
 
     @staticmethod
@@ -1311,6 +1327,7 @@ class InferencePipeline:
             except Exception:  # noqa: BLE001
                 factors = lab.factors
                 rule_factors = None
+        from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: PLC0415
         return InferenceResult(
             label=pred,
             confidence=conf,
@@ -1320,6 +1337,9 @@ class InferencePipeline:
             model_version=str(self.model_dir.name) if self.model_dir else "model",
             warnings=a3_warn,
             rule_grade=getattr(lab.rule_result, "grade", None),
+            rule_has_evidence=(
+                has_real_evidence(lab.rule_result) if lab.rule_result is not None else None
+            ),
             rule_factors=rule_factors,
         )
 

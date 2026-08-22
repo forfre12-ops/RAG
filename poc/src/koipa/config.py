@@ -86,11 +86,17 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         #   더 낮추면(0.10~0.12) FNR≤0.05이나 검토부담 0.80+. 운영 검수역량에 맞춰 .env로 조정 가능.
         # agreement_gate: 룰·모델 불일치만 needs_review 라우팅(등급 무변경·FNR-monotone·실패 시 silent 폴백).
         "classifier_escalation_tau": 0.30,
-        # [배포전 P0#④] 서빙 temperature 보정 — 미보정(T=1.0) 서빙은 OOD 과신으로 고등급(TS) 무음
-        # 미탐 위험(model serving needs calibration, T≈3). lite-cloud(데모)는 이미 3.0인데 정작
-        # 안전이 중요한 하드닝(GA) 프로파일이 누락돼 있던 드리프트를 정합. 모델 동봉 temperature.json
-        # 이 있거나 재보정하면 .env(CLASSIFIER_TEMPERATURE)로 override.
-        "classifier_temperature": 3.0,
+        # [배포전 P0#④, 2026-08-22 재조정] 서빙 temperature 보정 — 미보정(T=1.0) 서빙은 OOD 과신으로
+        # 고등급(TS) 무음 미탐 위험. 종전 3.0은 model serving needs calibration(T≈3) 일반 추정치였는데,
+        # 현재 배포 모델(v-fe4b386b)이 자체 동봉한 temperature.json(trainer-auto 실측, 256건 보정셋
+        # 기준 ece 0.0592→0.0196)이 있어 그 값 2.03으로 맞춘다. pipeline.py는 .env/프로파일에 명시된
+        # 값(1.0이 아닌 값)을 동봉 temperature.json보다 우선하므로, 3.0을 그대로 두면 모델 실측값이
+        # 무시된 채 서빙됐다(실측: settings.classifier_temperature 우선순위, pipeline.py:627-639).
+        # ⚠ 임시조치: 모델을 교체하면 이 값도 그 모델의 temperature.json에 맞춰 다시 맞추거나, 프로파일
+        # 오버라이드를 지우고 자동연결([A1])에 맡기거나, operating_point.json 잠금 경로로 옮겨야 한다
+        # — 그러지 않으면 같은 종류의 불일치가 재발한다. review_confidence_threshold(0.70)는 T=3.0
+        # 기준으로 검증된 값이라 이 변경과 함께 재검증이 필요하다(별도 작업, 아직 안 함).
+        "classifier_temperature": 2.03,
         "agreement_gate_enabled": True,
         # metadata_floor: KL ICD 보안표시·접근범위 상향 게이트 ON. 실데이터 0 환경에선 모델보다
         # 메타데이터가 더 믿을 만하다 — security_marking이 예측보다 높으면 상향(FNR-safe·하향 안 함),
@@ -142,8 +148,10 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "poc_mode": "full",
         # FNR-safe 서빙 운영점 ON (onprem-local과 동일 — 위 주석 참조).
         "classifier_escalation_tau": 0.30,
-        # [배포전 P0#④] 서빙 temperature 보정 T≈3 (onprem-local과 동일 — 미보정 T=1.0 OOD 과신 방지).
-        "classifier_temperature": 3.0,
+        # [배포전 P0#④, 2026-08-22 재조정] 서빙 temperature 보정 — onprem-local과 동일 사유·동일 값
+        # (모델 동봉 temperature.json=2.03 실측에 맞춤; 위 onprem-local 주석 참조). ⚠임시조치 — 모델
+        # 교체 시 재조정 필요.
+        "classifier_temperature": 2.03,
         "agreement_gate_enabled": True,
         # metadata_floor ON (onprem-local과 동일 — 위 주석 참조).
         "metadata_floor_enabled": True,

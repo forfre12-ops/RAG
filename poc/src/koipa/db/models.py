@@ -265,6 +265,9 @@ class Classification(Base):
     rag_top_k: Mapped[int | None] = mapped_column(SmallInteger)
     rag_agreement: Mapped[bool | None] = mapped_column(Boolean)
     status: Mapped[str] = mapped_column(String(20), default="staging", server_default=text("'staging'::character varying"))
+    # 게이트 최종 결정을 생성 시점에 동결(status와 달리 이후 confirm/correction이 건드리지 않음).
+    # nullable: 이 컬럼 도입 이전 행은 최초값을 복원할 수 없어 NULL로 남는다.
+    initial_status: Mapped[str | None] = mapped_column(String(20))
     inference_ms: Mapped[int | None] = mapped_column(Integer)
     classified_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -272,6 +275,7 @@ class Classification(Base):
         Index("idx_cls_doc", "doc_id", desc("classified_at")),
         # idx_cls_status — tenant 제거로 idx_cls_tenant_status 의 status 컬럼만 잔존.
         Index("idx_cls_status", "status"),
+        Index("idx_cls_initial_status", "initial_status"),
         Index("idx_cls_model_level", "model_version", "predicted_level_id", "status"),
         # init.sql 보유 — ORM 동기화 (drift 방지)
         Index(

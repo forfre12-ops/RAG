@@ -89,6 +89,9 @@ class ClassifyRepo:
             rag_top_k=rag_top_k,
             aggregation_method=aggregation_method,
             status=status,
+            # 생성 시점 status = 게이트의 최종 판정 그 자체. 이후 confirm/correction이
+            # status를 바꿔도 initial_status는 update_status()가 손대지 않아 동결 보존된다.
+            initial_status=status,
             inference_ms=inference_ms,
         )
         self.db.add(cls)

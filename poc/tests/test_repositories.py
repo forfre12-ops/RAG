@@ -107,7 +107,31 @@ class TestClassifyRepo:
         )
         assert cls.classification_id is not None
         assert cls.status == "staging"
+        assert cls.initial_status == "staging"
         assert float(cls.confidence) == pytest.approx(0.92, abs=1e-4)
+
+    def test_initial_status_frozen_after_status_update(self, db, document, levels):
+        """initial_status는 최초 게이트 판정을 동결 — 이후 status 변경(확정/교정)에 안 따라간다.
+
+        회귀 대상: 대시보드 auto_confirmed가 status='staging'만 세면 사람이 확인할수록
+        (staging→confirmed) 분자가 줄어드는 결함이 있었다. initial_status는 그 확인
+        이후에도 최초 판정 그대로 남아야 집계가 정확해진다.
+        """
+        repo = ClassifyRepo(db)
+        cls = repo.create_classification(
+            doc_id=document.doc_id,
+            model_version="v-test",
+            predicted_level_id=levels["S1"],
+            confidence=0.92,
+            alternatives=[],
+            status="staging",
+        )
+        assert cls.initial_status == "staging"
+        repo.update_status(cls.classification_id, "confirmed")
+        db.flush()
+        refetched = repo.get(cls.classification_id)
+        assert refetched.status == "confirmed"
+        assert refetched.initial_status == "staging"
 
     def test_evidence_round_trip_from_spans(self, db, document, levels):
         from koipa.schemas.classify import EvidenceSpan
