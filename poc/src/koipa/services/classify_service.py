@@ -409,6 +409,19 @@ class ClassifyService:
                     "metadata-access-conflict: restricted access_scope vs low predicted grade — routed to human review"
                 )
 
+            # [metadata-management-conflict, 2026-08-22] pipeline이 M=0(비밀관리성 부재 입증,
+            # access_scope=all_employees)인데 예측이 TS/S1/S2인 경우 남기는 신호 — 지금까지
+            # 응답 텍스트에만 남고 라우팅에 안 걸려 있었다(실측: TS/S1 문서에 all_employees를
+            # 주입해도 status=staging 그대로 자동확정됨). access-conflict와 같은 이유로 검수행.
+            if status != "needs_review" and any(
+                "metadata-management-conflict" in w for w in warnings_acc
+            ):
+                status = "needs_review"
+                warnings_acc.append(
+                    "metadata-management-conflict: proven-absent management vs non-public "
+                    "predicted grade — routed to human review"
+                )
+
             # [ICD 규약값 적합성] 규약 밖의 값은 **거부하지 않고 드러낸다.** 422 로 막으면
             # 그 문서가 아예 분류되지 않아 더 나쁘다. 그러나 조용히 무시해서도 안 된다 —
             # 실측 2026-08-14: ICD §3.1 의 source_type="public" 을 배포본이 인식하지
@@ -596,7 +609,7 @@ class ClassifyService:
             return f"rule-override (룰이 {rule} 강하게 잡아 모델 {model}을 안전 상향 → {final})"
         if "metadata-floor" in w:
             return f"metadata-floor (ICD 보안표기로 {model}→{final} 상향)"
-        if "cap-conflict" in w or "metadata-access-conflict" in w:
+        if "cap-conflict" in w or "metadata-access-conflict" in w or "metadata-management-conflict" in w:
             return f"escalation (신호 충돌 → 검수 라우팅; 룰 {rule} · 모델 {model})"
         if "source-prior" in w:
             return f"source-cap (공개 출처 → {final}로 하향; 모델 {model})"
@@ -1227,6 +1240,8 @@ class ClassifyService:
                 _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="raised").inc()
             if "metadata-access-conflict" in joined:
                 _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="access_conflict").inc()
+            if "metadata-management-conflict" in joined:
+                _pm.METADATA_FLOOR_APPLIED_TOTAL.labels(action="management_conflict").inc()
             if "source-prior:" in joined:
                 _pm.SOURCE_PRIOR_APPLIED_TOTAL.labels(action="capped").inc()
             if "cap-conflict" in joined:

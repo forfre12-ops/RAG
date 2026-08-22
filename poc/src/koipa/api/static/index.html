@@ -702,6 +702,7 @@ function render(j){
       [/sparse-evidence/, ()=>'룰 판정이 약한 근거 하나에 기대고 있습니다'],
       [/abbrev-only-escalation/, ()=>'영문 약어 밀도만으로 높은 등급이 나왔습니다'],
       [/metadata-access-conflict/, ()=>'접근 제한 표기에 비해 내용 예측이 낮습니다'],
+      [/metadata-management-conflict/, ()=>'관리성 부재 표기인데 내용 예측이 비공개 등급입니다'],
     ];
     function gateReason(ws){
       for(const w of (ws||[])){

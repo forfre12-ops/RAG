@@ -382,8 +382,8 @@ SAME_DOC_RESURFACE_TOTAL = Counter(
 # 메타데이터 floor 게이트 발동(ICD §4.2/§4.4): security_marking 상향 floor / access_scope 충돌.
 METADATA_FLOOR_APPLIED_TOTAL = Counter(
     "koipa_metadata_floor_applied_total",
-    "ICD metadata-floor gate firings (security_marking raised grade / access_scope conflict routed to review)",
-    ["action"],  # raised | access_conflict
+    "ICD metadata-floor gate firings (security_marking raised grade / access_scope or management conflict routed to review)",
+    ["action"],  # raised | access_conflict | management_conflict
     registry=registry,
 )
 # source-prior(비공지성) 게이트 발동: 공개출처 등급 cap / cap-conflict 검수 라우팅.
