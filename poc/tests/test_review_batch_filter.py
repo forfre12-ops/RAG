@@ -64,3 +64,22 @@ def test_unknown_batch_returns_empty_not_everything():
     """오타난 배치명이 전체 목록으로 새면 검수자가 잘못된 집합을 검수한다."""
     svc = ProxyGoldCandidateService()
     assert svc.list_candidates(review_batch="no-such-batch")["total"] == 0
+
+
+def test_available_batches_lists_what_actually_exists():
+    """화면이 배치 목록을 **데이터에서** 받는다.
+
+    왜 (2026-08-24). 후보 관리 화면의 배치 칸은 자유입력이었고, 툴팁에 "지금 서버의 후보에는
+    배치 값이 들어 있지 않아, 무엇을 넣어도 0건이 됩니다" 가 글자로 박혀 있었다. 그 문장은
+    사실이 아니었다 — 같은 서버의 후보 120건(223 은 115건)이 표식을 달고 있다. 화면이 서버
+    상태를 문장으로 단정하면 데이터가 바뀌어도 문장은 안 바뀐다.
+    """
+    svc = ProxyGoldCandidateService()
+    batches = svc.list_candidates()["available_batches"]
+    assert batches, "원장에 배치 표식이 있는데 목록이 비었다"
+    row = next((b for b in batches if b["review_batch"] == BATCH), None)
+    assert row is not None, f"{BATCH} 가 선택지에 없다: {batches}"
+    # 선택지에 적힌 건수와 그 배치를 실제로 고른 결과가 다르면 화면이 거짓말을 한다.
+    assert row["total"] == svc.list_candidates(review_batch=BATCH)["total"]
+    # 표식 없는 후보를 "(없음)" 항목으로 만들면 그것이 배치인 줄 알고 고른다.
+    assert all(b["review_batch"] for b in batches), batches

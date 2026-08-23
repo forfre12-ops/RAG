@@ -51,6 +51,37 @@ class SignoffResult:
     stats: dict
 
 
+# 실문서 인테이크 표식(ICD/콘솔 업로드가 붙인다). 이 표식이 **없는** 레코드는 게이트
+# 대상이 아니다 — 합성·공개코퍼스 파생 후보에는 반출 근거라는 개념이 없다.
+_INTAKE_ORIGINS = frozenset({"public_real", "organization_real"})
+
+
+def _provenance_ok(candidate: dict) -> bool:
+    """실문서라면 원천 위치·사용 권한 근거가 둘 다 기록됐는가.
+
+    왜 여기에 두는가. 화면은 "출처와 권한을 남기지 않으면 나중에 평가셋으로 쓸 수
+    없습니다" 라고 오래 전부터 적어 놨는데, 강제하는 코드는 **업로드 폼에만** 있었고
+    정작 승격 경로에는 없었다. 그 결과 실제로 일어난 일은 평가셋 보호가 아니라 등록
+    실패였다(실측 2026-08-17 · 223: 실문서 74건 중 62건이 권한 근거 없이 미완).
+    강제를 현관에서 걷고 여기로 옮긴다.
+
+    ⚠ **표식이 없으면 통과시킨다(fail-open).** 실측 2026-08-23: 기존 검수 전달본 5종
+      (777·200·120·106·120건)에는 document_origin 도 provenance 도 없다. 무조건 막으면
+      KL 검수 전달본 전량이 승격 거부가 된다. 막아야 할 대상은 "실문서인데 근거가 없는
+      것" 이지 "실문서 표식이 없는 합성 후보" 가 아니다.
+    """
+    origin = str(candidate.get("document_origin") or "")
+    if origin not in _INTAKE_ORIGINS:
+        return True
+    prov = candidate.get("provenance")
+    if not isinstance(prov, dict):
+        return False
+    return bool(
+        str(prov.get("source_reference") or "").strip()
+        and str(prov.get("authorization_basis") or "").strip()
+    )
+
+
 def _evaluate(signoffs: list[Signoff]):
     """서명 묶음을 평가 → (확정등급|None, 사유, 독립reviewer목록)."""
     if not signoffs:
@@ -91,6 +122,9 @@ def promote_to_locked(
         doc_id = c.get("doc_id")
         sl = by_doc.get(doc_id, [])
         grade, reason, reviewers = _evaluate(sl)
+        # 서명이 유효해도 실문서에 반출 근거가 없으면 평가 정답지로 올리지 않는다.
+        if grade is not None and not _provenance_ok(c):
+            grade, reason = None, "missing_provenance"
         if grade is not None:
             rec = dict(c)
             rec.update(

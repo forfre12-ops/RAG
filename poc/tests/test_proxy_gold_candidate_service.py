@@ -96,11 +96,24 @@ def test_actual_s2_s3_intake_requires_provenance_and_stays_unlocked(tmp_path):
     svc = ProxyGoldCandidateService(tmp_path)
     payload = ("실제 조직 운영 문서이며 S2 또는 S3 분류 검토를 위한 근거를 포함합니다. " * 20).encode("utf-8")
 
-    with pytest.raises(ValueError, match="source reference"):
-        svc.create_uploaded_candidate(
-            filename="operations.txt", content=payload, actor_id="admin",
-            document_origin="organization_real", authorization_basis="소유부서 승인",
+    # [2026-08-23] 업로드는 더 이상 출처를 강제하지 않는다 — 게이트가 등급 확정으로 옮겨졌다.
+    # 근거 없이 올라간 실문서는 **등록은 되고 등급 확정만 막힌다.**
+    partial = svc.create_uploaded_candidate(
+        filename="operations_partial.txt", content=payload, actor_id="admin",
+        document_origin="organization_real", authorization_basis="소유부서 승인",
+    )
+    assert partial["provenance"]["status"] == "partial"   # 권한만 있고 원천 위치 없음
+    with pytest.raises(ValueError, match="missing_provenance"):
+        svc.decide(
+            doc_id=partial["doc_id"], action="change", grade="S2",
+            reason="등급 확정 시도", actor_id="admin",
         )
+    # 확정이 아닌 결정은 막지 않는다 — 막으면 검수 큐가 닫히지 않는다.
+    deferred = svc.decide(
+        doc_id=partial["doc_id"], action="defer",
+        reason="출처 확인 후 재검토", actor_id="admin",
+    )
+    assert deferred and deferred["status"] == "deferred"
 
     actual = svc.create_uploaded_candidate(
         filename="operations.txt", content=payload, actor_id="admin",
@@ -120,7 +133,7 @@ def test_actual_s2_s3_intake_requires_provenance_and_stays_unlocked(tmp_path):
     assert changed and changed["status"] == "grade_fixed_unlocked"
     assert changed["status"] != "locked_gold_eval"
     summary = svc.summary()
-    assert summary["actual_document_intake"] == 1
+    assert summary["actual_document_intake"] == 2          # 근거 미완 1 + 완비 1
     assert summary["actual_provenance_recorded"] == 1
     assert summary["actual_grade_fixed_unlocked"] == 1
 

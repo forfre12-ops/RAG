@@ -222,17 +222,35 @@ for g, want in PER_GRADE.items():
         })
     for d in take_syn:
         m = d.get("meta") or {}
-        rows.append({
+        # [2026-08-23] 이 폴더(single_document_candidates)는 **콘솔 업로드 자리와 같은
+        # 곳**이다(ProxyGoldCandidateService._DEFAULT_ROOT). 그래서 관리자가 화면에서 올린
+        # 실문서가 여기 섞여 들어온다. 종전에는 그것까지 "합성 저작 후보 — 외부 권위 근거
+        # 없음" 으로 찍어 내보냈고, 출처·관리성 표식이 통째로 떨어져 나갔다.
+        #
+        # 표식이 떨어지면 두 가지가 깨진다.
+        #   ① 발행문에 **사실과 다른 문구**가 붙는다(실문서인데 합성 저작이라고 적힌다)
+        #   ② promote_to_locked 의 반출근거 게이트가 document_origin 을 못 봐서 통과시킨다
+        #      (표식 없는 레코드는 fail-open 이다 — 기존 전달본을 깨지 않기 위한 설계)
+        origin = str(m.get("document_origin") or "")
+        is_intake = origin in {"public_real", "organization_real"}
+        row = {
             "doc_id": d["doc_id"],
             "text": d["text"],
             "label": g,
-            "label_source": "proxy_gold_authored",
-            "source": "proxy_gold_authored",
+            "label_source": "operator_upload" if is_intake else "proxy_gold_authored",
+            "source": origin if is_intake else "proxy_gold_authored",
             "domain": str(m.get("industry") or m.get("domain") or "합성저작"),
             "review_status": "pending",
             "reviewer_id": None,
-            "authoring_note": "합성 저작 후보 — 검수 스캐폴딩 제거본. 외부 권위 근거 없음.",
-        })
+        }
+        if is_intake:
+            # 승격 게이트가 읽는 두 키. 값이 없으면 없는 대로 실어 보낸다 —
+            # 비어 있다는 사실 자체가 게이트의 판단 근거다.
+            row["document_origin"] = origin
+            row["provenance"] = m.get("provenance") or {}
+        else:
+            row["authoring_note"] = "합성 저작 후보 — 검수 스캐폴딩 제거본. 외부 권위 근거 없음."
+        rows.append(row)
 
 # ── 누출 게이트 ────────────────────────────────────────────────────────────
 # 사람이 읽고 등급을 정할 후보다. 본문에 답이 적혀 있거나 길이가 등급을 알려주면

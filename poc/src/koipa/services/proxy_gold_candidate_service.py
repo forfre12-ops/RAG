@@ -91,6 +91,46 @@ def _merged_provenance(meta: dict) -> dict:
     return prov
 
 
+def _management_view(meta: dict) -> dict[str, Any]:
+    """저장된 M 입력 + 그것이 만드는 상태를 한 모양으로. 판정은 rule_engine 이 유일 기준."""
+    from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+        management_from_metadata,
+    )
+    mgmt = dict(meta.get("management") or {})
+    marking = mgmt.get("security_marking")
+    scope = mgmt.get("access_scope")
+    state, level, reason = management_from_metadata(marking, scope)
+    return {
+        "security_marking": marking,
+        "access_scope": scope,
+        "state": state,        # present | proven_absent | unknown
+        "level": level,        # 2 | 1 | 0 | None
+        "reason": reason,
+        "recorded_by": mgmt.get("recorded_by"),
+        "recorded_at": mgmt.get("recorded_at"),
+    }
+
+
+PROVENANCE_RECORDED = "recorded"
+
+
+def _provenance_status(is_actual_intake: bool, source_reference: str, authorization_basis: str) -> str:
+    """출처 기록 상태. 한 자리에서만 정한다 — 세는 곳마다 다르면 게이트가 어긋난다.
+
+        not_declared  실문서 인테이크가 아니다(합성·일반 업로드) → 출처 개념이 없다
+        recorded      원천 위치·사용 권한 근거가 **둘 다** 있다 → 등급 확정 가능
+        partial       하나만 있다
+        pending       둘 다 없다
+    """
+    if not is_actual_intake:
+        return "not_declared"
+    if source_reference and authorization_basis:
+        return PROVENANCE_RECORDED
+    if source_reference or authorization_basis:
+        return "partial"
+    return "pending"
+
+
 # 검수 큐에서 빠지는 상태들 — 목록 기본 조회·품질 집계에서 뺀다(B1·B2).
 # 문자열을 여기저기 박아 두면 한 곳만 고쳐도 나머지가 어긋난다.
 DISCARDED_STATUS = "discarded"
@@ -179,8 +219,28 @@ class ProxyGoldCandidateService:
             # 카드가 쓰고 있어 의미를 바꾸면 상단 숫자가 필터마다 흔들린다.
             # 추가 디렉터리 스캔 없이 이미 읽은 리스트에서 센다.
             "batch_summary": self._batch_summary(candidates),
+            # [2026-08-24] 화면이 배치 표식을 **데이터에서** 알게 한다. 종전에는 화면이
+            # 자유입력 칸 하나였고, 툴팁에 "지금 서버의 후보에는 배치 값이 들어 있지 않아
+            # 무엇을 넣어도 0건" 이라는 문장이 박혀 있었다. 그 문장은 사실이 아니었다 —
+            # 실측 2026-08-24(223): 후보 115건이 review_batch="kl-ff5a822c" 를 달고 있다.
+            # 화면이 서버 상태를 **문장으로 단정하면** 데이터가 바뀌어도 문장은 안 바뀐다.
+            # 원장 전량 기준으로 세므로 상태·등급 필터를 어떻게 걸어도 목록이 흔들리지 않는다.
+            "available_batches": self._available_batches(all_candidates),
             "candidates": [{k: v for k, v in c.items() if k != "text"} for c in candidates],
         }
+
+    @staticmethod
+    def _available_batches(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """원장에 실제로 존재하는 검수 배치 표식과 그 후보 수(배치명 오름차순).
+
+        배치 표식이 없는 후보는 세지 않는다 — 목록에 "(없음)" 항목을 만들면 그것이
+        배치인 줄 알고 고르게 된다. 표식이 하나도 없으면 빈 목록이고, 그때는 화면이
+        "이 서버에는 배치 표식이 없습니다" 를 **이 응답을 근거로** 말한다.
+        """
+        counter = Counter(
+            b for c in candidates if (b := str(c.get("review_batch") or "").strip())
+        )
+        return [{"review_batch": b, "total": n} for b, n in sorted(counter.items())]
 
     def summary(self) -> dict[str, Any]:
         candidates = self._candidates()
@@ -279,9 +339,27 @@ class ProxyGoldCandidateService:
         actor_id: str,
         grade: str | None = None,
         reason: str = "",
+        security_marking: str | None = None,
+        access_scope: str | None = None,
     ) -> dict[str, Any] | None:
+        """검수 결정을 원장에 남긴다. 비밀관리성(M) 입력도 여기서 함께 받는다.
+
+        M 을 결정과 같은 이벤트에 싣는 이유 — M 은 등급 결정의 **입력**이지 부수 기록이
+        아니다. 사유(reason)와 같은 줄에 있어야 "왜 이 등급인지" 가 나중에 재구성된다.
+        출처(provenance)를 별도 경로로 뺀 것과는 반대 이유다 — 그쪽은 "등급은 그대로
+        두고 출처만 기록" 을 표현해야 해서 분리했다(record_provenance docstring).
+        """
         if action not in _VALID_ACTIONS:
             raise ValueError("unsupported decision action")
+        # ICD §3.2·§3.3 의 허용값인가. 목록은 rule_engine 한 곳에서만 정한다 — 여기에
+        # 따로 적어 두면 규약이 바뀔 때 두 곳이 조용히 어긋난다.
+        from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+            _ICD_MARKINGS, _ICD_SCOPES, management_from_metadata,
+        )
+        if security_marking is not None and security_marking not in _ICD_MARKINGS:
+            raise ValueError(f"unsupported security_marking: {security_marking}")
+        if access_scope is not None and access_scope not in _ICD_SCOPES:
+            raise ValueError(f"unsupported access_scope: {access_scope}")
         reason = reason.strip()
         if action in {"change", "defer", "reject", "discard", "exclude"} and not reason:
             raise ValueError("reason is required for change, defer, reject, discard, and exclude")
@@ -295,6 +373,22 @@ class ProxyGoldCandidateService:
         is_synthetic = candidate["document_origin"] == "synthetic"
         if action == "approve" and (not is_synthetic or candidate["proposed_grade"] not in _VALID_GRADES):
             raise ValueError("approve is allowed only for a synthetic candidate with a proposed grade")
+
+        # [2026-08-23] 등급 확정 게이트 — 업로드에서 옮겨 온 자리다.
+        #
+        # 실문서는 원천 위치와 사용 권한 근거가 **둘 다** 기록돼야 등급을 확정할 수 있다.
+        # 화면은 오래 전부터 "출처와 권한을 남기지 않으면 나중에 평가셋으로 쓸 수 없습니다"
+        # 라고 적어 놓고도 강제하는 코드가 어디에도 없었다. 그 약속을 여기서 실제로 지킨다.
+        #
+        # 확정하지 않는 결정(보류·폐기·대상 아님·재검토)은 막지 않는다 — 출처가 없다고
+        # 폐기조차 못 하면 검수 큐가 영영 닫히지 않는다.
+        if action == "change" and candidate.get("is_actual_document"):
+            prov = candidate.get("provenance") or {}
+            if prov.get("status") != PROVENANCE_RECORDED:
+                raise ValueError(
+                    "missing_provenance: 실문서는 원천 위치와 사용 권한 근거를 모두 기록해야 "
+                    "등급을 확정할 수 있습니다 — 문서 상세의 「출처 기록」에서 채우십시오"
+                )
 
         final_grade = candidate["proposed_grade"] if action == "approve" else grade
         status = {
@@ -325,8 +419,39 @@ class ProxyGoldCandidateService:
             "document_origin": candidate["document_origin"],
             "claim_scope": candidate["claim_scope"],
         }
+
+        # 비밀관리성(M). 이번 결정에서 준 값만 덮고 나머지는 이전 값을 잇는다 — 한 칸만
+        # 고치러 들어온 검수자가 다른 칸을 지우게 되면 M 이 조용히 바뀐다.
+        meta_path = self.root / f"{doc_id}.metadata.json"
+        meta: dict[str, Any] = {}
+        mgmt_after: dict[str, Any] | None = None
+        if (security_marking is not None or access_scope is not None) and meta_path.is_file():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            prev_mgmt = dict(meta.get("management") or {})
+            mgmt_after = dict(prev_mgmt)
+            if security_marking is not None:
+                mgmt_after["security_marking"] = security_marking
+            if access_scope is not None:
+                mgmt_after["access_scope"] = access_scope
+            m_state, m_level, m_reason = management_from_metadata(
+                mgmt_after.get("security_marking"), mgmt_after.get("access_scope")
+            )
+            mgmt_after.update(
+                state=m_state, level=m_level, reason=m_reason,
+                recorded_by=actor_id,
+                recorded_at=dt.datetime.now(dt.timezone.utc).isoformat(),
+            )
+            meta["management"] = mgmt_after
+            # 감사에서 되짚을 수 있게 이전 값도 남긴다(record_provenance 와 같은 규칙).
+            event["management_before"] = prev_mgmt
+            event["management_after"] = mgmt_after
+
         self.root.mkdir(parents=True, exist_ok=True)
         with _exclusive_ledger_lock(self.lock_path):
+            if mgmt_after is not None:
+                meta_path.write_text(
+                    json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+                )
             with self.ledger_path.open("a", encoding="utf-8", newline="\n") as handle:
                 handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
                 handle.flush()
@@ -427,10 +552,19 @@ class ProxyGoldCandidateService:
         source_reference = source_reference.strip()
         authorization_basis = authorization_basis.strip()
         is_actual_intake = document_origin in {"public_real", "organization_real"}
-        if is_actual_intake and not source_reference:
-            raise ValueError("source reference is required for an actual-document intake")
-        if is_actual_intake and not authorization_basis:
-            raise ValueError("usage authorization is required for an actual-document intake")
+        # [2026-08-23] 출처·권한 근거를 **업로드에서 강제하지 않는다.** 게이트를 등급 확정
+        # 자리로 옮겼다(decide()).
+        #
+        # 왜. 강제가 현관에만 있고 정작 목적지에는 없었다. 화면은 "출처와 권한을 남기지
+        # 않으면 나중에 평가셋으로 쓸 수 없습니다" 라고 적어 놨는데 promote_to_locked 는
+        # provenance 를 보지 않았다(golden_signoff.py 에 해당 문자열 0건). 그래서 실제로
+        # 일어난 일은 "평가셋 보호" 가 아니라 **등록이 안 되는 것**이었다 — 실측
+        # 2026-08-17(223): 실문서 74건 중 62건이 권한 근거 없이 미완으로 남았다.
+        #
+        # 후보 등록 자체는 해가 없다. 후보는 평가 정답지가 아니고(claim_scope 참조),
+        # locked 승격은 사람 서명이라는 별도 절차다. 막아야 할 자리는 **등급 확정과 승격**
+        # 이며 거기에는 게이트를 새로 넣었다(decide() 의 missing_provenance ·
+        # promote_to_locked 의 missing_provenance).
         safe_name = Path(filename or "uploaded_document").name
         suffix = Path(safe_name).suffix.lower()
         if not suffix:
@@ -474,7 +608,12 @@ class ProxyGoldCandidateService:
                 "authorization_basis": authorization_basis or None,
                 "recorded_by": actor_id,
                 "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-                "status": "recorded" if is_actual_intake else "not_declared",
+                # 업로드가 두 칸을 강제하지 않게 되었으므로 status 를 **실제 입력으로**
+                # 정한다. 종전에는 intake 이기만 하면 무조건 "recorded" 를 적었다 - 빈
+                # 값에도 기록됐다고 적히면 등급 확정 게이트가 그냥 통과한다.
+                "status": _provenance_status(
+                    is_actual_intake, source_reference, authorization_basis
+                ),
             },
             "extraction": {
                 "method": extracted.method,
@@ -612,6 +751,11 @@ class ProxyGoldCandidateService:
                 # 자리를 합쳐서 읽는다 - 원본 파일은 안 건드린다(적재 스크립트는 E3a-7 에서 고친다).
                 "provenance": _merged_provenance(meta),
                 "source_file_sha256": str(meta.get("source_file_sha256") or "") or None,
+                # [2026-08-23] 비밀관리성(M) — 검수 화면이 현재 값과 그 결과를 함께 보여준다.
+                # state 를 같이 싣는 이유: "확인 안 됨(unknown)" 과 "전 임직원 열람
+                # (proven_absent)" 은 M 을 정반대로 만드는데, 값만 보내면 화면이 그 차이를
+                # 다시 계산해야 하고 그러면 판정식이 두 곳에 생긴다.
+                "management": _management_view(meta),
                 "is_actual_document": document_origin in {"public_real", "organization_real"},
                 "text": text,
             })

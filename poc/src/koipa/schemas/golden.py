@@ -188,6 +188,23 @@ class ProxyGoldCandidateDecisionRequest(BaseModel):
     action: str = Field(pattern=r"^(approve|change|defer|reject|discard|reopen|exclude)$")
     grade: Optional[str] = Field(default=None, pattern=r"^(TS|S1|S2|S3)$")
     reason: str = Field(default="", max_length=4000)
+    # [2026-08-23] 비밀관리성(M)을 검수 화면에서 받는다.
+    #
+    # 왜 여기인가. M 은 **본문에서 관측되지 않는다**(rule_engine.py:115 — "200자 문서가
+    # 자기 접근통제를 진술할 수는 없다"). 보안표시는 검수자가 원문에서 확인할 수 있고,
+    # 접근범위는 문서를 가져온 쪽이 아는 값이다. 둘 다 등급 결정의 입력이므로 결정과
+    # 같은 이벤트에 실어 "왜 이 등급인지" 를 한 줄로 되짚을 수 있게 한다.
+    #
+    # ⚠ None(확인 안 됨)과 access_scope="all_employees"(전 임직원 열람)를 **절대 뭉치지
+    #   않는다.** 전자는 보수적 완성으로 M 이 채워지고, 후자는 M=0 으로 곱을 0 으로 만든다
+    #   (management_from_metadata docstring: "둘을 뭉치면 S1 이 사라지거나 미탐이 열린다").
+    #   그래서 기본값은 빈 값이며 화면도 「확인 안 됨」을 기본으로 둔다.
+    security_marking: Optional[str] = Field(
+        default=None, pattern=r"^(none|confidential|secret|top_secret)$"
+    )
+    access_scope: Optional[str] = Field(
+        default=None, pattern=r"^(all_employees|department|designated|approved_only)$"
+    )
 
     @model_validator(mode="after")
     def _decision_contract(self) -> "ProxyGoldCandidateDecisionRequest":

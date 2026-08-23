@@ -55,12 +55,24 @@ def test_record_completes_it(tmp_path):
 
 
 def test_recording_does_not_overwrite_the_grade(tmp_path):
-    """가장 중요한 성질 — 출처 기록이 등급 확정을 지우면 안 된다."""
+    """가장 중요한 성질 — 출처 기록이 등급 확정을 지우면 안 된다.
+
+    [2026-08-23] 순서가 바뀌었다. 실문서는 출처가 **먼저** 기록돼야 등급을 확정할 수 있다
+    (decide 의 missing_provenance 게이트). 지키려는 성질은 그대로다 — 등급을 확정한 뒤에
+    출처를 **다시** 기록해도 등급·상태가 살아 있어야 한다.
+    """
     svc = _svc(tmp_path)
+    # 게이트: 출처가 미완(partial)인 동안에는 확정이 막힌다.
+    with pytest.raises(ValueError, match="missing_provenance"):
+        svc.decide(doc_id=DOC, action="change", grade="S3", actor_id="kim.cs", reason="확정")
+
+    svc.record_provenance(doc_id=DOC, source_reference="출처", authorization_basis="근거",
+                          actor_id="kim.cs")
     svc.decide(doc_id=DOC, action="change", grade="S3", actor_id="kim.cs", reason="확정")
     assert svc.summary()["fixed"] == 1
 
-    svc.record_provenance(doc_id=DOC, source_reference="출처", authorization_basis="근거",
+    # 확정 뒤에 출처를 고쳐 적어도 등급이 살아 있어야 한다.
+    svc.record_provenance(doc_id=DOC, source_reference="출처(정정)", authorization_basis="근거",
                           actor_id="kim.cs")
     c = svc.get_candidate(DOC)
     assert c["status"] == "grade_fixed_unlocked", "출처 기록이 상태를 덮었다"
