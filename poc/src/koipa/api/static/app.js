@@ -317,7 +317,7 @@ async function runClassify() {
         } else if (event === "partial") {
           // 임시 등급
           if (data && data.grade) {
-            showPartial(data.grade, data.confidence);
+            showPartial(data.grade);
           }
         } else if (event === "result") {
           STAGES.forEach((s) => { stageMap[s.key] = "done"; });
@@ -353,7 +353,7 @@ async function runClassify() {
   }
 }
 
-function showPartial(grade, conf) {
+function showPartial(grade) {
   const head = $("#result-head");
   if (!head) return;
   // [2026-08-24] 중간 스트림 값에 "신뢰도 63%" 라고 이름 붙이지 않는다. 이 값은 게이트를
@@ -374,7 +374,6 @@ function showPartial(grade, conf) {
 function renderResult(data, elapsedMs) {
   const head = $("#result-head");
   const grade = data.label;
-  const conf = data.confidence || 0;
   const elapsed = elapsedMs || data.elapsed_ms || 0;
 
   // [2026-08-24] 머리에 두는 것은 신뢰도 숫자가 아니라 **결정**이다.
@@ -666,7 +665,6 @@ function showResultToast(grade, elapsedMs) {
 
 function renderSummary(data) {
   const grade = data.label;
-  const conf = data.confidence || 0;
   const ev = data.evidence || [];
   const matched = ev.slice(0, 3).map((e) => e.text);
   const factors = data.evaluation_factors || {};
@@ -714,34 +712,21 @@ function renderSummary(data) {
     ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다.`
     : `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 판정되었습니다.`;
 
-  // [2026-08-24] 신뢰도 수치는 지우지 않고 **접어서** 남긴다.
-  //   지우면 안 되는 이유: FUN-024 의 '심층지표' 근거이고, 감리·디버깅에서 판정 재구성에 쓴다.
-  //   펴 두면 안 되는 이유: 이 값은 정답확률이 아니라 softmax 파생값이고(골든500 ECE 0.18 ·
-  //   AUROC 0.58) 자동확정을 혼자 가르지도 않는다. 크기가 곧 설명력으로 읽히면 화면이 거짓말한다.
-  const scores = data.scores && typeof data.scores === "object" ? data.scores : null;
-  const scoreTxt = scores
-    ? Object.entries(scores)
-        .sort((a, b) => b[1] - a[1])
-        .map(([k, v]) => `${escapeHtml(k)} ${(Number(v) * 100).toFixed(1)}%`)
-        .join(" · ")
-    : "";
-  const detail = `
-    <details class="result-detail" style="margin-top:10px">
-      <summary style="cursor:pointer;font-size:12px;color:var(--text-dim)">상세 — 신뢰도·등급별 점수</summary>
-      <div style="font-size:12px;color:var(--text-dim);line-height:1.9;margin-top:6px">
-        신뢰도(softmax 파생값) <b style="color:var(--text)">${(conf * 100).toFixed(1)}%</b>
-        ${scoreTxt ? `<br/>등급별 점수 ${scoreTxt}` : ""}
-        <br/><span style="font-size:11.5px">이 값은 정답확률이 아니라 예측 등급의 확률 질량입니다. 자동확정 판정은 이 숫자 단독이 아니라 합의 게이트를 포함한 다단 게이트로 결정됩니다.</span>
-      </div>
-    </details>`;
-
+  // [2026-08-24] 화면에서는 신뢰도 수치를 **보여주지 않는다**(사용자 지시).
+  //   근거: 화면 표시는 요건이 아니다 - RTM FUN-024 의 구현범위는 "검수자 큐 배분·심층지표"
+  //   이고 "신뢰도를 화면에 표시" 라는 요건은 없다. 그리고 이 값은 정답확률이 아니라
+  //   softmax 파생값이라(골든500 AUROC 0.58 · ECE 0.18) 화면에 숫자로 서면 실제보다
+  //   확정적으로 읽힌다. 자동확정을 가르는 것도 이 값 단독이 아니다.
+  //
+  //   ⚠ 지운 것은 **화면뿐**이다. confidence 는 API 응답(openapi_koipa_kl.yaml 에서
+  //   required) · DB(tb_classifications) · 감사로그 · reports 에 그대로 남는다. 감리에서
+  //   "왜 이 판정인가" 를 재구성할 근거는 없어지지 않는다.
   const wrap = $("#result-summary");
   wrap.innerHTML = `
     ${banner}
     <p class="pos">${verdictTxt}</p>
     <p class="pos">${matchedTxt} ${factorTxt}</p>
     <p class="neg">${negEvidence}</p>
-    ${detail}
   `;
 }
 

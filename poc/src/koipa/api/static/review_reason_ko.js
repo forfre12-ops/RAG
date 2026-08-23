@@ -18,8 +18,10 @@
   var GATE_REASONS = [
     [/agreement-gate: model=(\S+) vs rule=(\S+)/,
       function (m) { return "두 엔진이 갈립니다 — 분류기 " + m[1] + " · 룰 " + m[2] + " (신뢰도만으로는 확정하지 않습니다)"; }],
-    [/low-confidence: confidence=([\d.]+) < ([\d.]+)/,
-      function (m) { return "판정 근거가 임계에 못 미칩니다 (" + m[1] + " < " + m[2] + ")"; }],
+    /* 수치를 문구에 넣지 않는다(2026-08-24 지시). 검수자가 알아야 하는 것은 "왜 검수인가"
+       이지 softmax 파생값의 소수점이 아니다. 원 수치는 API 응답·DB·감사로그에 그대로 있다. */
+    [/low-confidence: confidence=[\d.]+ < [\d.]+/,
+      function () { return "판정 근거가 자동 확정 기준에 못 미칩니다"; }],
     [/document flagged at ingestion/, function () { return "추출 품질이 낮은 문서입니다(스캔·OCR 등)"; }],
     [/body_below_classifiable_threshold/, function () { return "판정할 본문이 사실상 없습니다"; }],
     [/cap-conflict/, function () { return "출처 기준 하향과 내용 기준 상향이 충돌합니다"; }],

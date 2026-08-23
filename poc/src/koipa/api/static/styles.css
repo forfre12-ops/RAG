@@ -515,21 +515,6 @@ section h3 {
 .result-confidence {
   flex: 1; min-width: 240px;
 }
-.confidence-bar {
-  position: relative;
-  height: 8px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  margin-top: 6px;
-}
-.confidence-bar > div {
-  position: absolute; top: 0; left: 0; bottom: 0;
-  background: var(--text);
-  border-radius: var(--radius-pill);
-  transition: width .4s;
-}
 .result-time {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -1042,8 +1027,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 #sec-parse .g-S1{color:var(--amber);border-color:var(--amber);background:var(--amber-soft);}
 #sec-parse .g-S2{color:var(--blue);border-color:var(--blue);background:var(--blue-soft);}
 #sec-parse .g-S3{color:var(--green);border-color:var(--green);background:var(--green-soft);}
-#sec-parse .conf-bar{height:8px;border-radius:5px;background:var(--bg-strong);overflow:hidden;margin-top:8px;}
-#sec-parse .conf-fill{height:100%;background:var(--bg-inverse);border-radius:5px;}
 #sec-parse .status-pill{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;}
 #sec-parse .status-staging{background:var(--green-soft);color:var(--green);border:1px solid var(--green-border);}
 #sec-parse .status-needs_review{background:var(--red);color:#fff;border:1px solid var(--red);}

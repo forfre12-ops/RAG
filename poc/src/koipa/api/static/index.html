@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>한국지식재산보호원 | 등급 시연</title>
-<meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·신뢰도·평가요소·법령 근거를 확인합니다." />
+<meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·자동확정 여부와 사유·평가요소·법령 근거를 확인합니다." />
 
 <link rel="stylesheet" href="./styles.css" />
 <script src="./deploy_badge.js" data-screen="시연"></script>
@@ -122,7 +122,7 @@
   <!-- ===== §2 결과 — 진행바를 카드 맨 위로 이동해 한 시야에 표시 ===== -->
   <section id="sec-result">
     <h2><span class="num">§2</span>결과 — 왜 이 등급인가</h2>
-    <p class="h2-sub">등급·자동확정 여부와 그 사유·자연어 판단(양성+음성 근거)·3 평가요소(S·V·M)·근거 키워드. 신뢰도 수치는 「상세」에 접어 두었습니다 — 자동확정은 이 값 단독이 아니라 다단 게이트로 결정되기 때문입니다. 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
+    <p class="h2-sub">등급·자동확정 여부와 그 사유·자연어 판단(양성+음성 근거)·3 평가요소(S·V·M)·근거 키워드. 신뢰도 수치는 화면에 띄우지 않습니다 — 자동확정은 이 값 단독이 아니라 다단 게이트로 결정되기 때문입니다(수치는 API 응답·감사기록에 그대로 남습니다). 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
 
     <div class="result" id="result-card" role="status" aria-live="polite">
       <h3 style="font-size:13px;margin:0 0 12px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">진행 단계 — SSE 실시간 점등</h3>
@@ -682,7 +682,7 @@ async function analyzeLargeAsync(file, cap){
     const sk=(j.stages||[]).find(s=>s.name==='분류');
     if(sk){
       sk.status='done';
-      sk.detail=res.label+' · 신뢰도 '+(res.confidence||0).toFixed(2)+' · '+res.model_version+' (비동기 워커 · DB 미적재)';
+      sk.detail=res.label+' · '+res.model_version+' (비동기 워커 · DB 미적재)';
       sk.ms=res.elapsed_ms||null;
     }
     (j.stages||[]).push({name:'결과', status:(status==='needs_review'?'review':'done'),
@@ -871,7 +871,7 @@ function render(j){
             <b>두 엔진 판정</b> · 룰 <b>${esc(c.rule_grade||'—')}</b> · 분류기(BERT) <b>${esc(c.model_grade||'미로드')}</b> · 최종 <b>${esc(c.label)}</b>
             ${c.decision_path?`<div style="margin-top:4px;color:var(--text-dim)">${esc(c.decision_path)}</div>`:''}
           </div>
-          <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')} · 신뢰도 ${fmt(c.confidence)}<span style="color:var(--text-soft)"> (softmax 파생값 — 자동확정은 이 값 단독으로 나지 않습니다)</span></div>
+          <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')}</div>
         </div>
         <div style="flex:1;min-width:220px">
           <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:4px">평가요소 (가이드 3요건 S×V×M)</div>

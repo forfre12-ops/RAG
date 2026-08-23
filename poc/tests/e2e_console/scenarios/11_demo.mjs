@@ -39,7 +39,17 @@ export const scenarios = [
       check.ok(seq.length > 0, '단계 표시가 그려졌다');
       check.matches(page.text('stage-seq'), /본문 추출|정규화|임베딩/, '단계 이름이 보인다');
       check.includes(page.text('result-head'), 'S1', '최종 등급이 표시된다');
-      check.matches(page.text('result-head') + page.text('result-summary'), /81|0\.81/, '신뢰도가 표시된다');
+      // [2026-08-24] 계약이 바뀌었다. 화면 머리에 서는 것은 신뢰도 숫자가 아니라 **결정**이다.
+      // 종전 시험은 /81|0.81/ 로 숫자가 뜨는지를 봤는데, 그 숫자를 크게 띄우던 것이 화면이
+      // 설명하는 판정 논리와 실제 판정 논리를 어긋나게 하던 원인이었다(자동확정은 conf 단독이
+      // 아니라 다단 게이트로 난다). 이제는 반대로 **숫자가 안 뜨는 것**까지 시험이 지킨다.
+      check.matches(page.text('result-head'), /자동 확정|검수 필요/, '자동확정·검수 결정이 표시된다');
+      check.ok(
+        !/(^|[^\d])0\.81([^\d]|$)/.test(page.text('result-head') + page.text('result-summary'))
+        && !/81(\.0)?%/.test(page.text('result-head') + page.text('result-summary')),
+        '신뢰도 수치는 화면에 뜨지 않는다',
+        page.text('result-head') + ' | ' + page.text('result-summary'),
+      );
       check.includes(page.html('result-dual'), 'S1', '룰·모델 두 판정이 나란히 보인다');
       check.ok(page.html('result-factors').length > 0, 'S·V·M 3요소가 그려졌다');
       check.eq(page.$('btn-classify')?.disabled, false, '끝나고 버튼이 다시 눌린다');
