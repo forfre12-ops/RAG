@@ -55,3 +55,7 @@ datasets/proxy_gold/aihub_71813_extracted/
 
 # 콘솔 테스트 로그인 키 — 배포본·리포에 넣지 않는다
 secrets/
+
+# 콘솔 e2e 하니스(jsdom) 의존성 — 리포에 넣지 않는다.
+# 준비: cd poc/tests/e2e_console && npm install  (없으면 파이썬 시험이 skip 된다)
+tests/e2e_console/node_modules/

@@ -459,6 +459,20 @@ test-slow: ## slow marker tests only
 test-e2e-parse: ## 실문서 파싱→검수게이트→분류 E2E 회귀 (slow)
 	$(PY) -m pytest -q tests/test_e2e_parse_classify.py
 
+test-console-e2e: ## 관리자 콘솔 e2e 시나리오 (jsdom·node 필요 — 없으면 skip)
+	$(PY) -m pytest -q tests/test_e2e_console_scenarios.py tests/test_e2e_console_api_contract.py
+
+console-e2e-setup: ## 콘솔 e2e 하니스 의존성 설치 (한 번만)
+	cd tests/e2e_console && npm install
+
+# 실서버 모드는 읽기 전용이 기본이다(상태를 바꾸는 시나리오·고장 주입은 자동 제외).
+# ⚠ API 키를 안 주면 콘솔 기본값(demo-secret-key)으로 전부 401 이 난다.
+#   예: KOIPA_E2E_API_KEY=$$(ssh -i ~/.ssh/kipai_testserver kopia@223.130.156.134 \
+#         'docker exec koipa-jjw-api-1 printenv API_KEY') \
+#       make console-e2e-live BASE=http://223.130.156.134:8000
+console-e2e-live: ## 실서버 상대 콘솔 e2e (BASE=... · KOIPA_E2E_API_KEY 필요 · 읽기 전용)
+	cd tests/e2e_console && node run.mjs --base $(BASE) $(ARGS)
+
 parse-probe: ## 실문서 파싱→게이트→분류 프로브 (예: make parse-probe ARGS="--gold")
 	PYTHONPATH=src $(PY) scripts/parse_probe.py $(ARGS)
 
