@@ -148,6 +148,7 @@ def list_review_queue(
                 .offset(offset)
             ).all()
             for cls, filename, preview in rows:
+                assessment = cls.automation_assessment or {}
                 items.append(
                     ReviewQueueItem(
                         classification_id=str(cls.classification_id),
@@ -159,6 +160,8 @@ def list_review_queue(
                         status=cls.status,
                         classified_at=cls.classified_at.isoformat() if cls.classified_at else None,
                         text_preview=((preview or "")[:300] or None),
+                        review_reason=assessment.get("causal_review_reason"),
+                        score_margin=assessment.get("score_margin"),
                     )
                 )
             return items, total, []
@@ -482,6 +485,7 @@ def load_review_evidence(classification_id) -> dict:
                 "model_version": cls.model_version,
                 "classified_at": cls.classified_at.isoformat() if cls.classified_at else None,
                 "alternatives": list(cls.alternatives or []),
+                "automation_assessment": cls.automation_assessment,
                 "rag_used": bool(cls.rag_used),
             }
             evs = db.execute(

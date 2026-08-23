@@ -25,6 +25,7 @@ from koipa.obs.otel import span  # #29: 비즈니스(수동) span 헬퍼 — 미
 from koipa.repositories.chunk_repo import ChunkRepo
 from koipa.repositories.classify_repo import ClassifyRepo
 from koipa.schemas.classify import ClassifyRequest, ClassifyResponse
+from koipa.services.automation_assessment import build_automation_assessment
 
 # A3: SSE/스트리밍에서 진척 단계를 실제로 노출하기 위한 콜백 시그니처.
 # 호출 측이 None을 넘기면 기존 동작과 동일(no-op).
@@ -561,8 +562,12 @@ class ClassifyService:
             # 게이트가 확정한 최종 status로 영속화(원자적). needs_review 는 여기서 DB 행에
             # 실제 기록되어 GET /review-queue 검수 큐에 노출된다(예전엔 항상 staging 이었음).
             notify("persist")
+            automation_assessment = build_automation_assessment(
+                pred, status=status, warnings=warnings_acc,
+            )
             inference_id, persist_warnings = self._try_persist(
                 req, pred, chunks=chunks, status=status,
+                automation_assessment=automation_assessment.model_dump(),
             )
             warnings_acc.extend(persist_warnings)
             notify("finalize")
@@ -591,6 +596,7 @@ class ClassifyService:
                 rule_grade=getattr(pred, "rule_grade", None),
                 model_grade=getattr(pred, "model_grade", None),
                 decision_path=self._decision_path(pred, status, warnings_acc),
+                automation_assessment=automation_assessment,
             )
 
     @staticmethod
@@ -943,6 +949,7 @@ class ClassifyService:
         *,
         chunks: list[_PreprocessChunk] | None = None,
         status: str = "staging",
+        automation_assessment: dict | None = None,
     ) -> tuple[uuid.UUID, list[str]]:
         """Best-effort 영속화.
 
@@ -1025,6 +1032,7 @@ class ClassifyService:
                     predicted_level_id=level_id,
                     confidence=float(pred.confidence),
                     alternatives=alternatives,
+                    automation_assessment=automation_assessment,
                     chunk_count=chunk_count,
                     rag_used=bool(pred.rag_context),
                     rag_top_k=len(pred.rag_context) or None,

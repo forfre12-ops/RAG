@@ -82,6 +82,35 @@ class RagContextHit(BaseModel):
     text: str = ""  # 검색된 청크 본문 — 답변 합성 프롬프트에 실제 근거로 투입
 
 
+class AutomationAssessment(BaseModel):
+    """자동확정 정책을 검증하기 위해 동결하는 비민감 판단 근거.
+
+    이 객체는 그림자 모드 관측치다. ``selected_confidence``를 임의로 변환한 새
+    confidence나 즉시 적용되는 자동확정 결정은 포함하지 않는다.
+    """
+
+    schema_version: str
+    shadow_mode: str = "collect_only"
+    selected_label: str
+    selected_confidence: float
+    selected_rank: Optional[int] = None
+    top_label: Optional[str] = None
+    top_score: Optional[float] = None
+    runner_up_label: Optional[str] = None
+    runner_up_score: Optional[float] = None
+    score_margin: Optional[float] = None
+    rule_grade: Optional[str] = None
+    model_grade: Optional[str] = None
+    rule_agrees: Optional[bool] = None
+    rule_has_evidence: Optional[bool] = None
+    evidence_count: int = 0
+    rag_context_count: int = 0
+    current_policy_status: str
+    current_policy_eligible: bool
+    causal_review_reason: Optional[str] = None
+    review_gate_hits: list[str] = Field(default_factory=list)
+
+
 class ClassifyResponse(BaseModel):
     inference_id: UUID
     doc_id: str
@@ -114,3 +143,5 @@ class ClassifyResponse(BaseModel):
     rule_grade: Optional[str] = None
     model_grade: Optional[str] = None
     decision_path: Optional[str] = None
+    # 자동확정 위험도 보정 전의 그림자 관측치. 정책을 바꾸지 않고 검수 결과와 연결한다.
+    automation_assessment: Optional[AutomationAssessment] = None

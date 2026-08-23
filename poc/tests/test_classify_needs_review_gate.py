@@ -45,6 +45,10 @@ def test_flagged_doc_routes_to_needs_review(monkeypatch):
     res = _classify_with_status(monkeypatch, "needs_review")
     assert res.status == "needs_review"
     assert any(_FLAG_WARN in w for w in res.warnings)
+    assert res.automation_assessment is not None
+    # low-confidence가 먼저 성립하면 인과 사유는 그 게이트 하나지만, 적재 격리 신호도 보존한다.
+    assert "ingestion-degraded" in res.automation_assessment.review_gate_hits
+    assert res.automation_assessment.current_policy_eligible is False
 
 
 def test_failed_doc_routes_to_needs_review(monkeypatch):

@@ -259,6 +259,8 @@ class Classification(Base):
     predicted_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
     alternatives: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    # 자동확정 정책 학습용 결정 시점 스냅샷. 기존 행은 원본 신호를 복원할 수 없어 NULL 유지.
+    automation_assessment: Mapped[dict | None] = mapped_column(JSONB)
     aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid", server_default=text("'hybrid'::character varying"))
     chunk_count: Mapped[int | None] = mapped_column(SmallInteger)
     rag_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))

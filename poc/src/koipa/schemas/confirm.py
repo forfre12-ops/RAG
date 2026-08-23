@@ -50,6 +50,8 @@ class ReviewQueueItem(BaseModel):
     status: str                      # needs_review | needs_second_review
     classified_at: Optional[str] = None  # ISO-8601
     text_preview: Optional[str] = None
+    review_reason: Optional[str] = None
+    score_margin: Optional[float] = None
 
 
 class ReviewQueueResponse(BaseModel):
