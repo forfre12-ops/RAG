@@ -81,7 +81,7 @@ api/training.py                    POST /train · GET /train/jobs/{id}
 `workers/tasks.py` → `m4_training/trainer.py`로 가십시오.
 
 `chunk_expand.py`가 **TRAIN 분할만** chunk 확장하는 것은 누수 차단입니다.
-val/test까지 확장하면 같은 문서의 조각이 학습·평가 양쪽에 들어가 지표가 부풀려집니다.
+val/test까지 확장하면 같은 문서의 청크가 학습·평가 양쪽에 들어가 지표가 부풀려집니다.
 
 ---
 

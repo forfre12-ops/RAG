@@ -487,7 +487,7 @@ const analyzeProgress = (function(){
       const chunks=Math.max(1, Math.round(bytes/700));
       est=Math.max(3, Math.round(0.5 + chunks*0.4));
       document.getElementById('ap-file').textContent=
-        (file?file.name:'') + (bytes?('  ·  '+bytes.toLocaleString()+'B  ·  조각 약 '+chunks.toLocaleString()+'개'):'');
+        (file?file.name:'') + (bytes?('  ·  '+bytes.toLocaleString()+'B  ·  청크 약 '+chunks.toLocaleString()+'개'):'');
       document.getElementById('ap-est').textContent=fmtSec(est);
       document.getElementById('ap-note').textContent = chunks>60
         ? '큰 문서라 몇 분 걸릴 수 있습니다. 창을 닫지 마십시오 — 끝나면 결과가 바로 나옵니다.'
@@ -551,7 +551,7 @@ async function analyze(){
         /* 폴백 자체가 실패했을 때만 도달한다. 종전 문구의 「약 9쪽」은 하드코딩이라
            서버 한도가 400 인 지금은 "한도 400개, 약 9쪽" 이라는 모순이 떴다 — 뺀다. */
         const chars = (String(detail).match(/([\d,]+) chars/)||[])[1] || '';
-        human = `문서가 이 화면에서 처리하기에 큽니다 — 조각 ${cap[1]}개(동기 경로 한도 ${cap[2]}개)`
+        human = `문서가 이 화면에서 처리하기에 큽니다 — 청크 ${cap[1]}개(동기 경로 한도 ${cap[2]}개)`
               + (chars?` · 본문 ${chars}자`:'');
       } else if(r.status===413){
         human = '문서가 너무 큽니다 (업로드 한도 초과)';
@@ -576,7 +576,7 @@ async function analyze(){
       $('cls-box').innerHTML =
         `<div class="verdict-banner verdict-review"><span>분석 중단<span class="vb-sub"> — ${esc(human)}</span></span></div>`
         + (r.status===413 && cap ? `<div class="hint" style="margin-top:10px;line-height:1.7">
-             이 화면은 업로드·추출·분류를 <b>한 번에</b> 끝내는 진단용이라, 조각이 많으면
+             이 화면은 업로드·추출·분류를 <b>한 번에</b> 끝내는 진단용이라, 청크가 많으면
              응답이 끊깁니다. 그래서 미리 막고 이유를 알려 드립니다.<br>
              큰 문서는 <b>「골든셋 등록」 화면의 문서 업로드</b>를 쓰십시오 — 적재 후
              비동기로 분류하므로 쪽수 제한이 없습니다.</div>` : '')
@@ -605,7 +605,7 @@ async function analyze(){
 async function analyzeLargeAsync(file, cap){
   const t0=performance.now();
   $('busy').textContent='큰 문서 — 본문을 추출한 뒤 비동기 분류로 넘깁니다…';
-  log('대용량 전환: 조각 '+cap[1]+'개 > 동기 한도 '+cap[2]+'개 → classify=false 추출 + /classify/async (DB 적재 없음)');
+  log('대용량 전환: 청크 '+cap[1]+'개 > 동기 한도 '+cap[2]+'개 → classify=false 추출 + /classify/async (DB 적재 없음)');
   const icd=[['source_type','icd-source'],['security_marking','icd-marking'],['access_scope','icd-scope']];
   try{
     // (1) 추출만 — 청크 상한 게이트를 타지 않는다(상한은 분류 비용 때문에 있는 것이다).
