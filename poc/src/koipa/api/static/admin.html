@@ -821,6 +821,12 @@ details.adv[open]{padding-bottom:12px;}
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
+        <!-- [2026-08-23] 이 카드는 두 가지를 한 상자에 담고 있다 —
+             (가) AI 가 등급을 매겨 후보를 새로 만든다  (나) 이미 있는 문서 묶음을 검수에 올린다.
+             (가)는 등급 판정 LLM 이 있어야 되는데 이 서버(llm_provider=noop)에서는 되지 않는다.
+             그래서 누르기 전에 잠그고 (나)를 위로 올린다 — applyGoldenAiAvailability(). -->
+        <div id="gold-ai-block">
+        <div id="gold-ai-blocked" class="warnbox" style="display:none;margin-bottom:10px;line-height:1.6;"></div>
         <details class="adv">
           <summary>고급 설정 — 후보 소스 · 판정기 · 생성 건수 바꾸기</summary>
         <div class="row3">
@@ -837,10 +843,11 @@ details.adv[open]{padding-bottom:12px;}
           <div class="field">
             <label class="fld">등급 판정기</label>
             <!-- [2026-08-23] 두 가지를 고쳤다.
-                 ① noop 을 「규칙 엔진만 사용」으로 옮겼던 것을 정정한다. noop 은 규칙 엔진이
-                    아니라 **미리 정해 둔 중립 문장을 돌려주는 더미**다(noop_provider.py:1
-                    "API 키 없이 결정론적 응답 — 파이프라인 검증·CI용 · 품질 측정용 아님").
-                    문서를 실제로 만들지 않는다. 그렇게 적어야 결과를 오해하지 않는다.
+                 ① noop 은 규칙 엔진이 아니라 **합성 문서 생성용 더미 응답**이다
+                    (noop_provider.py:1 "API 키 없이 결정론적 응답 — 파이프라인 검증·CI용 ·
+                    품질 측정용 아님"). 응답 JSON 에 grade 키가 없어 등급 판정기로 쓰면
+                    LLMLabeler 가 기본값 S3 로 떨어뜨린다 — 실측(223 배포 이미지 2026-08-23):
+                    어떤 본문을 넣어도 S3 · 신뢰도 0.5. 이 항목으로는 등급이 매겨지지 않는다.
                  ② 내부 제공자 이름(local_openai·vllm_qwen·anthropic·openai)을 그대로 보여
                     주고 있었다. 폐쇄망에서 못 쓰는 것(외부 API — 인터넷·키 필요)과 품질
                     판정이 끝난 것(Qwen 14B: reports/llm_quality_comparison_20260808.md 에서
@@ -850,7 +857,7 @@ details.adv[open]{padding-bottom:12px;}
                  아래 항목은 서버 설정(healthz.llm_provider)에 따라 applyServerConfig 가
                  쓸 수 없는 것을 잠근다. -->
             <select id="gold-provider">
-              <option value="noop">파이프라인 점검용 더미 — 문서를 실제로 만들지 않습니다</option>
+              <option value="noop">등급을 매기지 않는 더미 — 모든 문서에 S3 만 돌려줍니다 (파이프라인 점검용)</option>
               <option value="local_openai">사내 LLM 서버 (OpenAI 호환) — 서버에 주소 설정 필요</option>
               <option value="vllm_qwen">사내 LLM 서버 (vLLM Qwen) — 문서 생성 품질 미달 기록 있음</option>
               <option value="anthropic">외부 API (Anthropic) — 인터넷·API 키 필요 · 폐쇄망 불가</option>
@@ -877,11 +884,12 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" id="gold-go" onclick="startGoldenBuild()">후보 생성 → 검수</button>
           <button class="btn sec sm" onclick="loadGoldenJob()">상태 새로고침</button>
         </div>
+        </div><!-- /gold-ai-block -->
 
         <!-- [2026-08-20] 이 아래는 위(AI 가 후보를 새로 만든다)와 **정반대** 기능이다 —
              이미 있는 문서 묶음을 그대로 검수에 올린다. 한 상자 안에서 구분이 약해
              사용자가 무엇을 누르는지 몰랐다. 제목으로 갈라 놓는다. -->
-        <div class="field" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--border);">
+        <div class="field" id="gold-register-block" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--border);">
           <div class="fld" style="font-weight:700;color:var(--text);margin-bottom:2px;">
             이미 있는 문서 묶음으로 검수 시작하기
           </div>
@@ -1299,6 +1307,48 @@ function applyProviderAvailability(d){
       : '서버 설정을 읽지 못했습니다 — 제공자 선택이 실제와 다를 수 있습니다.';
   }
   if(!enabled) sel.disabled=true;
+  applyGoldenAiAvailability(active);
+}
+/* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「후보 생성 → 검수」는 눌러도 소용이 없다.
+ *
+ * 실측(223 배포 이미지 · docker exec koipa-jjw-api-1 · 2026-08-23):
+ *   - llm_provider=noop 이면 판정기가 **어떤 본문에도 S3 · 신뢰도 0.5** 만 돌려준다.
+ *   - 그 상태로 hardened 42건을 돌리면 gold 2 / 보류 40 이고, gold 2 건의 등급도 전부 S3 다.
+ *     룰이 S3 라고 한 것에 더미가 겹친 것뿐이라 **합의 게이트가 룰 단독 판정으로 바뀐다.**
+ *   - 「근거 문장이 있는 것만」을 끄면 gold 15/42 인데 15건 전부 S3 라 더 나쁘다.
+ * 그러니 결과를 보고 나서 실망하게 두지 말고 누르기 전에 잠근다. 카드를 감추지는 않는다 —
+ * 감추면 "그 기능이 없다"로 읽힌다(applyProfileVisibility 의 2026-08-09 판단과 같은 이유).
+ * 대신 이 서버에서 **실제로 되는 경로**(이미 있는 문서 묶음 검수)를 위로 올린다. */
+var GOLD_AI_BLOCKED=false;
+function applyGoldenAiAvailability(active){
+  const blocked = (String(active||'').toLowerCase()==='noop');
+  GOLD_AI_BLOCKED = blocked;
+  const go=$('gold-go'); if(go) go.disabled=blocked;
+  const box=$('gold-ai-blocked');
+  if(box){
+    box.style.display = blocked ? '' : 'none';
+    box.innerHTML = blocked
+      ? '<b>이 서버에서는 AI 후보 생성을 할 수 없습니다 — 등급을 매길 LLM 이 없습니다.</b><br/>'
+        + '서버 설정이 <code>llm_provider=noop</code> 이라 판정기가 모든 문서에 <b>S3 · 신뢰도 0.5</b> 만 '
+        + '돌려줍니다. 눌러도 등급이 매겨지지 않으므로 잠가 두었습니다.<br/>'
+        + '· 검수·서명을 진행하려면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 를 쓰십시오 — 이 경로는 이 서버에서 그대로 됩니다.<br/>'
+        + '· AI 로 후보를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하거나, 서버 설정(.env)의 <code>LLM_PROVIDER</code> 를 바꿔야 합니다.'
+      : '';
+  }
+  // 되는 것을 먼저 보여준다 — 잠긴 블록이 맨 위에 있으면 카드 전체가 막힌 것으로 읽힌다.
+  const ai=$('gold-ai-block'), reg=$('gold-register-block');
+  if(ai && reg && ai.parentNode===reg.parentNode){
+    const regFirst = !!(reg.compareDocumentPosition(ai) & Node.DOCUMENT_POSITION_FOLLOWING);
+    if(blocked && !regFirst) ai.parentNode.insertBefore(reg, ai);
+    if(!blocked && regFirst) ai.parentNode.insertBefore(ai, reg);
+    // 구분선은 늘 아래쪽 블록이 갖는다.
+    reg.style.borderTop = blocked ? 'none' : '2px solid var(--border)';
+    reg.style.marginTop = blocked ? '0' : '16px';
+    reg.style.paddingTop = blocked ? '0' : '14px';
+    ai.style.borderTop = blocked ? '2px solid var(--border)' : '';
+    ai.style.marginTop = blocked ? '16px' : '';
+    ai.style.paddingTop = blocked ? '14px' : '';
+  }
 }
 function applyServerConfig(d){
   applyProfileVisibility(d);
@@ -1611,6 +1661,7 @@ function renderWhy(d){
   if(d.error==='not_found') return '<div class="sec-note">이 분류를 찾을 수 없습니다.</div>';
   if(d.error) return `<div class="warnbox">근거 조회 실패: ${esc(d.error)}</div>`;
   const r=d.recorded||{};
+  const a=r.automation_assessment||{};
   const alts=(r.alternatives||[]).map(a=>
     `${esc(a.level_code||'?')} ${((a.confidence||0)*100).toFixed(1)}%`).join(' · ');
   const warn=(d.warnings||[]).map(w=>`<div class="sec-note">· ${esc(w)}</div>`).join('');
@@ -1618,6 +1669,11 @@ function renderWhy(d){
     '<div class="sec-note">표시할 근거 항목이 없습니다.</div>';
   const byType=Object.entries(d.by_type||{}).map(([k,v])=>
     `<span class="pill">${esc(k)} ${Number(v).toFixed(2)}</span>`).join(' ');
+  const automation=(a.selected_confidence!=null)
+    ? `<div class="sec-note" style="margin-top:6px">자동확정 관측 · 선택 등급 ${esc(a.selected_label||'-')} ${(Number(a.selected_confidence)*100).toFixed(1)}%`
+      + (a.score_margin!=null?` · 1·2위 차 ${(Number(a.score_margin)*100).toFixed(1)}%`:'')
+      + (a.causal_review_reason?` · 검수 사유 ${esc(a.causal_review_reason)}`:'')
+      + `</div>` : '';
   return `<div class="why-head">판정 <b>${esc(r.grade||'-')}</b>`
        + (r.confidence!=null?` · 신뢰도 ${(r.confidence*100).toFixed(1)}%`:'')
        + ` · 모델 <code>${esc(r.model_version||'-')}</code>`
@@ -1625,6 +1681,7 @@ function renderWhy(d){
        + (byType?`<div class="why-agg">${byType}</div>`:'')
        + evs
        + (alts?`<div class="sec-note" style="margin-top:6px">차순위: ${esc(alts)}</div>`:'')
+       + automation
        + warn;
 }
 async function toggleWhy(i){
@@ -2218,10 +2275,11 @@ function renderGoldenSummary(d){
     else{
       zeroBox.style.display='';
       zeroBox.innerHTML = (prov==='noop')
-        ? '<b>gold 후보가 0건입니다 — provider가 <code>noop</code>이기 때문입니다.</b><br/>'
-          + 'noop은 등급을 매기는 라벨러가 아니라 합성 문서 생성기라, 룰 판정과 합의가 되지 않아 전건이 보류로 갑니다.<br/>'
-          + '· LLM이 있는 서버(지재원 GPU)라면 위 <b>고급 설정</b>에서 provider를 <code>vllm_qwen</code> 등으로 바꿔 다시 실행하세요.<br/>'
-          + '· LLM이 없는 환경이라면 아래 <b>기존 문서 묶음 등록</b>으로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
+        ? '<b>gold 후보가 0건입니다 — 등급 판정기가 <code>noop</code>(더미)이기 때문입니다.</b><br/>'
+          + 'noop 은 합성 문서 생성용 더미라 응답에 등급 자리가 없고, 판정이 늘 <b>S3 · 신뢰도 0.5</b> 로 떨어집니다. '
+          + '룰이 S3 라고 한 문서에만 우연히 합의가 되므로 사실상 전건이 보류로 갑니다.<br/>'
+          + '· LLM 이 있는 서버(지재원 GPU)에서 다시 실행하세요. 제공자는 화면이 아니라 서버 설정(.env)에서 바꿉니다.<br/>'
+          + '· LLM 이 없는 환경이라면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
         : '<b>gold 후보가 0건입니다.</b><br/>'
           + '룰과 LLM 이 합의하지 못했거나 근거 문장이 없어 전건이 보류로 갔습니다. 고급 설정의 <b>근거 문장이 있는 것만 후보로</b> 를 끄거나 '
           + '후보 수를 늘려 보고, 그래도 0건이면 아래 <b>기존 문서 묶음 등록</b>으로 검수·서명만 진행하세요.';
@@ -2231,6 +2289,11 @@ function renderGoldenSummary(d){
 }
 async function startGoldenBuild(){
   if(!guardWrite('검증 기준문서 생성')) return;
+  // 버튼은 잠겨 있지만(applyGoldenAiAvailability) healthz 실패로 잠금이 안 걸릴 수 있다.
+  if(GOLD_AI_BLOCKED){
+    goldenProgress('이 서버에는 등급을 매길 LLM 이 없습니다(llm_provider=noop) — 아래 「이미 있는 문서 묶음으로 검수 시작하기」를 쓰십시오.');
+    return;
+  }
   const src=($('gold-source')||{}).value;
   // [2026-08-20] 눌린 티를 낸다. 종전에는 버튼만 잠기고 문구가 응답 **뒤에야** 떠서,
   // LLM 이 도는 몇 초 동안 화면이 멈춘 것처럼 보였다(분류 실행·등급 시연은 이미 이렇게 한다).
@@ -2266,7 +2329,7 @@ async function startGoldenBuild(){
   }catch(e){
     goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
     $('gold-result').textContent=`검증 기준문서 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
-  }finally{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
+  }finally{ if(btn){ btn.disabled=GOLD_AI_BLOCKED; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
 }
 /* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
  * /golden/build 와 달리 즉시 done 이라 폴링 없이 상태를 한 번만 읽는다. */
@@ -2705,6 +2768,11 @@ function syncActiveGrades(codes){
 
 /* init */
 initPane();          // 탭 초기 표시 — 검수 탭이 기본, 탭마다 카드 4장 이하
+/* [2026-08-23] 후보 소스 기본값은 '서버 코퍼스 경로'인데 경로 입력칸(#gold-src-corpus)은
+   display:none 으로 시작하고 onchange 에서만 열렸다. 드롭다운을 다른 값으로 바꿨다 되돌리기
+   전에는 칸이 보이지 않아, 「후보 생성 → 검수」가 늘 "코퍼스 경로를 입력하세요" 로 끝났다.
+   초기 1회 동기화해 기본값과 화면을 맞춘다. */
+syncGoldenSource();
 loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸을 대체)
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncWriteGate();
