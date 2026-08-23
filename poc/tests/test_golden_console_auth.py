@@ -59,7 +59,9 @@ def test_real_document_intake_requires_provenance_fields_in_ui():
     assert 'id="upOrigin"' in html
     assert 'id="upSource"' in html and 'id="upBasis"' in html
     assert "organization_real" in html and "public_real" in html
-    assert "Locked Gold" in html
+    # [2026-08-23] 화면 표기를 「평가 정답지」로 옮겼다(Locked Gold 는 개발 용어).
+    # 잠그는 것은 그대로다 — **여기 등록이 승격이 아니라는 사실**이 화면에 있어야 한다.
+    assert "여기 등록은 평가 정답지 승격이 아닙니다" in html
     # 흡수한 등록 기준 4블록이 실제로 왔는지
     for block in ("S3 · 공개·일반", "S2 · 조직 내부", "제외", "다음 단계"):
         assert block in html, f"등록 기준 '{block}' 이 모달에 없다"
