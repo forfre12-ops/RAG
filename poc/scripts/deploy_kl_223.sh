@@ -107,17 +107,31 @@ ok "여유 ${AVAIL_GB:-?}GB"
 
 b "1. 소스 갱신 -> $BRANCH"
 tar czf ~/poc_src_backup_$STAMP.tgz src scripts 2>/dev/null && ok "백업 ~/poc_src_backup_$STAMP.tgz"
-git rev-parse --git-dir >/dev/null 2>&1 || git init -q
-git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REPO"
-# ⚠ `--depth 1` 은 이미 얕은 저장소에서 **조용히 옛 tip 을 남긴다.** 실측 2026-08-16:
-#   서버가 3df1e1c7 를 받아놓고 원격 tip 은 2caf9330 이었다. 옵션을 빼면 정상 갱신된다.
-git fetch origin "$BRANCH"
-SHA="$(git rev-parse FETCH_HEAD)"; SHORT="${SHA:0:12}"
-git archive FETCH_HEAD poc/src poc/scripts poc/tests poc/uv.lock poc/pyproject.toml \
-    poc/Dockerfile.api.prod poc/Dockerfile.worker poc/docker-compose.yml \
-    poc/docker-compose.prod.yml poc/docker-compose.dual.yml poc/docker-compose.airgap.yml poc/Makefile \
-  | tar -x --strip-components=1 -C .
-ok "소스 $SHORT"
+# [2026-08-23] DIRECT_SRC_TAR — GitHub 왕복 없이 로컬에서 만든 tar를 그대로 반영하는 경로.
+# push 가 막힌 세션(auto-mode 정책)에서도 배포자가 로컬 HEAD를 scp로 올려두면 그것으로
+# 진행할 수 있게 한다. tar는 `git archive HEAD <같은 경로들>`로 만들어 이 스크립트가
+# git fetch로 뽑던 것과 **동일한 파일 집합·동일한 strip-components=1 레이아웃**을 낸다.
+# 짝 파일 `${DIRECT_SRC_TAR}.sha`에 12자 short SHA를 담아 오며, 8단계 검증(이미지에 구운
+# KOIPA_BUILD_SHA 대조)이 여기서도 그대로 의미를 가진다 — "빌드가 진짜 이 판을 썼는가".
+if [ -n "${DIRECT_SRC_TAR:-}" ]; then
+  [ -f "$DIRECT_SRC_TAR" ] || die "DIRECT_SRC_TAR=$DIRECT_SRC_TAR 파일이 없다"
+  [ -f "$DIRECT_SRC_TAR.sha" ] || die "$DIRECT_SRC_TAR.sha 가 없다 (short SHA 짝 파일)"
+  SHORT="$(cat "$DIRECT_SRC_TAR.sha")"
+  tar -x --strip-components=1 -C . < "$DIRECT_SRC_TAR"
+  ok "소스 $SHORT (direct tar, GitHub 왕복 없음)"
+else
+  git rev-parse --git-dir >/dev/null 2>&1 || git init -q
+  git remote get-url origin >/dev/null 2>&1 || git remote add origin "$REPO"
+  # ⚠ `--depth 1` 은 이미 얕은 저장소에서 **조용히 옛 tip 을 남긴다.** 실측 2026-08-16:
+  #   서버가 3df1e1c7 를 받아놓고 원격 tip 은 2caf9330 이었다. 옵션을 빼면 정상 갱신된다.
+  git fetch origin "$BRANCH"
+  SHA="$(git rev-parse FETCH_HEAD)"; SHORT="${SHA:0:12}"
+  git archive FETCH_HEAD poc/src poc/scripts poc/tests poc/uv.lock poc/pyproject.toml \
+      poc/Dockerfile.api.prod poc/Dockerfile.worker poc/docker-compose.yml \
+      poc/docker-compose.prod.yml poc/docker-compose.dual.yml poc/docker-compose.airgap.yml poc/Makefile \
+    | tar -x --strip-components=1 -C .
+  ok "소스 $SHORT"
+fi
 
 # ⚠ 이 스크립트는 방금 **자기 자신도** 덮었다(poc/scripts 에 들어 있다). bash 는 실행 중인
 #   파일을 조금씩 읽어가므로, 갱신된 내용은 **이 실행에는 안 먹는다.** 실측 2026-08-16:
