@@ -8,10 +8,19 @@
 
 ---
 
-## 0. 지금 서버가 무엇을 실행 중인지 모른다
+## 0. 서버 상태 — 확인함 (2026-08-23 06:20 UTC)
 
-이번 세션에서 223에 접속하지 않았다. 아래 커밋 6건이 로컬에만 있고, 그중 3건은 **분류 판정을
-바꾼다.**
+```
+GET /api/v1/healthz →  git_sha 36a627226f68 · built_at 2026-08-23T06:16:54Z
+                       deploy_profile full-train · model v-fe4b386b · threshold 0.7
+git ls-remote origin fix/design-review-hardening → 36a627226f68
+로컬 HEAD                                        → 90f6d197ba56 (+8 커밋)
+```
+
+**원격 브랜치가 아직 옛 커밋이라, 배포를 돌려도 같은 코드를 다시 빌드한다**(2026-08-23 06:16
+배포가 실제로 그랬다 — 재빌드는 됐고 git_sha 는 그대로다). `git push` 가 먼저다.
+
+아래 커밋 8건이 로컬에만 있고, 그중 6건이 **분류 판정 또는 화면을 바꾼다.**
 
 ```
 63d77414  룰 무근거 abstain 을 관리표시로 좁힘        ← 판정 변경
@@ -90,15 +99,31 @@ bash ~/poc/scripts/deploy_kl_223.sh        # 서버에서
 ### 1-4. 배포 검증 (10분)
 
 ```bash
-# 로컬에서 배포 서버를 향해
+# 로컬에서 배포 서버를 향해 — 시연 대본이 쓰는 세트
 .venv/Scripts/python.exe scripts/check_demo_docs.py \
-  --api http://223.130.156.134:8000 --api-key "$API_KEY" --repeat 3 \
-  --out reports/check_demo_docs_223.json
+  --api http://223.130.156.134:8000 --api-key "$API_KEY" --set upload --repeat 3 \
+  --out reports/check_demo_upload_223.json
+
+# 접어 둔 참고 샘플도 한 번(비상 경로가 살아 있는지)
+.venv/Scripts/python.exe scripts/check_demo_docs.py \
+  --api http://223.130.156.134:8000 --api-key "$API_KEY" --set oneclick --repeat 1
 ```
 
-**통과 기준 — 아래 표와 정확히 같아야 한다.**
+**통과 기준 — 아래 표와 정확히 같아야 한다(로컬 실측, T=2.03).**
 
-| 문서 | 등급 | 상태 | conf(로컬 실측) |
+시연 대본 세트 (`--set upload`, poc/demo_formats):
+
+| 문서 | 등급 | 상태 | conf |
+|---|---|---|---|
+| 분기 보도자료·공시 본문 초안 **.docx** | S3 | staging | 0.946 |
+| 분기 보도자료·공시 본문 초안 **.hwpx** | S3 | staging | 0.946 |
+| 분기 보도자료·공시 본문 초안 **.xlsx** | S3 | staging | 0.946 |
+| 차세대 메모리 공정 핵심기술 검토 보고서 .docx | TS | **needs_review** (low-confidence) | 0.668 |
+| 핵심 알고리즘·모듈 소스 분리 보관 정책 .docx | TS | **needs_review** (low-confidence) | 0.465 |
+
+참고 샘플 (`--set oneclick`, static/demo_docs):
+
+| 문서 | 등급 | 상태 | conf |
 |---|---|---|---|
 | 01_TS_semiconductor_euv.docx | TS | staging | 0.976 |
 | 02_S1_recsys_source_license.docx | S1 | staging | 0.937 |
@@ -146,7 +171,7 @@ curl -s http://223.130.156.134:8000/api/v1/healthz | python -m json.tool | head 
 
 ---
 
-## 3. 시연 대본 — **구성 미확정(결정 대기)**
+## 3. 시연 대본 — **안 (A) 실업로드 노선으로 확정** (2026-08-22)
 
 2026-08-22 저녁에 문서 풀 세 개를 전수 측정했고, 그 결과가 대본 선택을 바꾼다.
 
@@ -177,7 +202,10 @@ golden500 전부 0%) — docx/pdf 로 만들 때 생성기가 머리말을 붙�
 **자동확정한 것은 하나도 틀리지 않았고, 틀린 것은 하나도 새어나가지 않았다.**
 RFP 1차 목표(미탐 최소화)에 정확히 부합한다.
 
-### 3-3. 안 (A) 실업무문서 노선 — 권장
+### 3-3. 안 (A) 실업무문서 노선 — **채택**
+
+화면의 원클릭 버튼 줄은 `<details>` 로 **접었다**(index.html). 첫 화면에 안 보이고, 네트워크·
+파일 사고 때만 펼쳐 쓴다. 점검기 기본 세트도 이 노선으로 바꿨다(`--set upload`).
 
 원클릭 버튼을 쓰지 않고 파일을 직접 업로드한다. 파일명에 등급이 없다.
 
@@ -257,10 +285,18 @@ RFP 1차 목표(미탐 최소화)에 정확히 부합한다.
 ## 7. 오늘 밤 체크리스트
 
 ```
-[ ] 1-1  deploy_checklist.sh 로 서버 sha·profile·model 확인
-[ ] 1-2  ruff --fix → 0건 → 점검기 로컬 통과 → 커밋
-[ ] 1-3  git push → 223 에서 deploy_kl_223.sh
-[ ] 1-4  check_demo_docs.py --api ... --repeat 3 → 종료코드 0
+[x] 1-1  서버 상태 확인            → 36a62722 · full-train · v-fe4b386b (§0)
+[x] 1-2  ruff --fix → 0건          → 커밋 e5e0923a · 관련 459건 통과
+[x] 1-2b 시연 구성 확정            → 안 (A) 실업로드. 화면 원클릭 줄은 접음
+[x] 1-2c 점검기 두 세트 로컬 통과   → upload 5건 · oneclick 7건, 종료코드 0
+[ ] 1-3  git push                  ← **사용자 실행 필요**(auto-mode 분류기가 차단)
+[ ] 1-3b 223 에서 deploy_kl_223.sh  (push 후에 의미가 있다)
+[ ] 1-4  check_demo_docs.py --api ... --set upload --repeat 3 → 종료코드 0
 [ ] 1-4b 통과 화면 캡처 4장 확보(비상 백업)
 [ ] 2    (내일 아침) 같은 명령 재실행 → 같은 결과
 ```
+
+`git push` 와 **서버 자격증명 읽기**(`grep ^API_KEY= ~/poc/.env.jjw`)는 auto-mode 권한
+분류기가 막는다(2026-08-22 각각 2회 확인). 명령 모양을 바꿔 통과시키지 말 것 — 사용자가
+`/config` 로 허용하거나 직접 실행해야 한다. 활성 env 파일은 **`.env.jjw`**(배포 로그의
+`env=.env.jjw`), compose 프로젝트는 `koipa-jjw`.

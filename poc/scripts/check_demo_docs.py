@@ -1,4 +1,10 @@
-"""시연 문서 7건이 **화면에 적힌 대로** 나오는지 업로드 경로로 확인한다.
+"""시연 문서가 **대본·화면에 적힌 대로** 나오는지 업로드 경로로 확인한다.
+
+두 세트를 검사한다(`--set`):
+
+    upload   (기본) poc/demo_formats - **실제 시연 대본이 쓰는 실업로드 세트**
+    oneclick        static/demo_docs - 화면에 접어 둔 참고 샘플(짧은 예시 문서)
+
 
 왜 필요한가. 등급 시연 화면(index.html)의 버튼 설명은 2026-08-21 에 223 실측으로 한 번
 고쳐졌다 - 그때도 "자동확정으로 광고했는데 실제로는 검수"가 셋 중 둘이었다. 그 실측 이후
@@ -74,6 +80,25 @@ DEMO_EXPECTATIONS: tuple[dict, ...] = (
 # 온도 변경 하나로 0.596 -> 0.714 가 되며 검수에서 자동확정으로 넘어왔다 - 그 폭이 0.014 다.
 NEAR_THRESHOLD_MARGIN = 0.05
 
+# [2026-08-22] **실업로드 시연 세트**(poc/demo_formats). 원클릭 버튼 대신 파일을 직접 끌어다
+# 놓는 대본이라(DEMO_RUNBOOK_2026-08-23 §3-3) 이쪽이 실제 시연 대상이다. 파일명에 등급이
+# 없고 같은 문서가 4포맷으로 있어 "포맷 무관 동일 판정"을 그 자리에서 보여줄 수 있다.
+UPLOAD_DEMO_DIR = _POC / "demo_formats"
+UPLOAD_DEMO_EXPECTATIONS: tuple[dict, ...] = (
+    {"file": "분기 보도자료·공시 본문 초안.docx", "grade": "S3", "status": "staging",
+     "reason": None, "shown_as": "공개 보도자료 - 자동확정(대본 1)"},
+    {"file": "분기 보도자료·공시 본문 초안.hwpx", "grade": "S3", "status": "staging",
+     "reason": None, "shown_as": "같은 문서 한/글 - 같은 판정(대본 1)"},
+    {"file": "분기 보도자료·공시 본문 초안.xlsx", "grade": "S3", "status": "staging",
+     "reason": None, "shown_as": "같은 문서 엑셀 - 같은 판정(대본 1)"},
+    {"file": "차세대 메모리 공정 핵심기술 검토 보고서.docx", "grade": "TS",
+     "status": "needs_review", "reason": "low-confidence",
+     "shown_as": "TS 로 봤지만 확신 미달 - 검수(대본 2)"},
+    {"file": "핵심 알고리즘·모듈 소스 분리 보관 정책.docx", "grade": "TS",
+     "status": "needs_review", "reason": "low-confidence",
+     "shown_as": "의도 S1인데 TS - 안전 방향 과분류(대본 3)"},
+)
+
 _MIME = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -96,8 +121,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--api-key", default=None)
     ap.add_argument("--model-dir", default=None, help="in-process 모드에서 분류기 경로")
     ap.add_argument("--profile", default="onprem-local", choices=("onprem-local", "full-train"))
+    ap.add_argument("--set", dest="doc_set", default="upload", choices=("upload", "oneclick"),
+                    help="검사할 세트. upload=실업로드 시연 세트(기본·demo_formats), "
+                         "oneclick=화면 참고 샘플(static/demo_docs)")
     ap.add_argument("--dir", default=None,
-                    help="측정할 문서 폴더(기본: 시연 원클릭 세트). --measure 와 같이 쓴다")
+                    help="측정할 문서 폴더(기본: --set 이 정한 폴더). --measure 와 같이 쓴다")
     ap.add_argument("--measure", action="store_true",
                     help="기대값 없이 폴더의 모든 문서를 태워 판정만 표로 낸다(실업로드 후보 선별용)")
     # [2026-08-22] ICD §3.1~3.3 문서 속성. 운영에서는 KL 포털이 이 값을 함께 보낸다
@@ -172,7 +200,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # [2026-08-22] 실업로드 시연 후보를 고르려면 "이 폴더의 문서들이 지금 어떻게 나오나"를
     # 먼저 봐야 한다. 기대값 표는 원클릭 세트에만 있으므로, 다른 폴더는 측정만 한다.
-    doc_dir = Path(args.dir) if args.dir else DEMO_DIR
+    default_dir = UPLOAD_DEMO_DIR if args.doc_set == "upload" else DEMO_DIR
+    default_exp = UPLOAD_DEMO_EXPECTATIONS if args.doc_set == "upload" else DEMO_EXPECTATIONS
+    doc_dir = Path(args.dir) if args.dir else default_dir
     if args.measure or args.dir:
         if not doc_dir.is_dir():
             raise SystemExit(f"폴더가 없다: {doc_dir}")
@@ -185,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
         if not targets:
             raise SystemExit(f"태울 문서가 없다: {doc_dir} (지원 확장자 {sorted(_MIME)})")
     else:
-        targets = list(DEMO_EXPECTATIONS)
+        targets = list(default_exp)
 
     rows: list[dict] = []
     failures: list[str] = []
@@ -291,7 +321,7 @@ def main(argv: list[str] | None = None) -> int:
         for f in failures:
             print(f"  - {f}")
     else:
-        print("[일치] 시연 문서 7건이 화면 문구대로 나온다")
+        print(f"[일치] 문서 {len(rows)}건이 기대대로 나온다")
 
     if args.out:
         out = Path(args.out)
