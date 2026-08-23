@@ -609,7 +609,15 @@ paths:
                 properties:
                   synth_id: { type: string, format: uuid }
                   final_status: { type: string, enum: [approved, rejected] }
+                  applied_grade:
+                    allOf: [{ $ref: '#/components/schemas/Grade' }]
+                    nullable: true
+                    description: >-
+                      이 건이 학습행으로 만들어질 때 쓰일 등급. corrected_grade 를 보냈으면
+                      그 값, 아니면 생성 시 목표 등급. 반려면 학습에 들어가지 않으므로 참고값.
                   added_to_dataset_version: { type: string, nullable: true }
+        '400':
+          description: corrected_grade 가 현재 등급체계에 없는 코드
 
   /documents:
     post:
@@ -1009,6 +1017,28 @@ paths:
           content:
             text/html:
               schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /golden/jobs/{job_id}/signoff/preflight:
+    get:
+      tags: [golden]
+      summary: Preview Golden-set signoff blockers without changing state
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: publish
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Preflight result containing blocking issues and warnings
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /golden/jobs/{job_id}/signoff:
@@ -1491,6 +1521,36 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { description: "사유 필수인 결정에 reason 미기입" }
 
+  /golden/candidates/{doc_id}/provenance:
+    post:
+      tags: [golden]
+      summary: Record source and authorization evidence for an existing candidate
+      parameters:
+        - in: path
+          name: doc_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_reference, authorization_basis]
+              properties:
+                source_reference: { type: string }
+                authorization_basis: { type: string }
+                reason: { type: string }
+      responses:
+        '200':
+          description: Saved provenance record without changing candidate grade or status
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { description: Required provenance fields are missing or blank }
+
   /golden/candidates/login.html:
     get:
       tags: [golden]
@@ -1513,18 +1573,6 @@ paths:
       responses:
         '200':
           description: 관리 HTML
-          content:
-            text/html:
-              schema: { type: string }
-        '401': { description: "포털 JWT 쿠키 필요 — login.html 경유" }
-
-  /golden/candidates/actual-intake.html:
-    get:
-      tags: [golden]
-      summary: 실문서 인테이크 화면
-      responses:
-        '200':
-          description: 인테이크 HTML
           content:
             text/html:
               schema: { type: string }

@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="specledger-document-status" content="superseded" />
+<meta name="specledger-canonical-contract" content="doc/03_openapi_koipa_kl.yaml" />
 <title>KOIPA AI 영업비밀관리시스템 — KL 통합 가이드 | Koipa AI</title>
 <meta name="description" content="KL ↔ Koipa AI API 통합 명세: 21개 엔드포인트 상세, 인증, 상태값, 오류 코드, 통합 체크리스트. 2026-05-29 기준 (POST /answer RAG 답안 합성 라이브 검증 완료 포함)." />
 
@@ -434,6 +436,7 @@
   <span class="meta-category">Koipa AI → KL</span>
 </div>
 <h1 class="title" id="top">KL 통합 가이드</h1>
+<div class="callout warn"><strong>보관본 — 현행 연동 계약으로 사용하지 마십시오.</strong><br>이 문서는 2026-05 PoC v1의 21개 endpoint 설명을 보존합니다. 현행 KL 연동 계약의 정본은 <code>doc/03_openapi_koipa_kl.yaml</code>이며, 코드와의 정합성 검사를 통과한 62개 외부 API operation을 정의합니다.</div>
 <p class="lede">KL 시스템이 Koipa AI API를 연동하기 위한 인증·엔드포인트·상태값·오류 처리 레퍼런스. 21개 엔드포인트, 실제 구현 기준 작성.</p>
 
 <div class="callout warn">

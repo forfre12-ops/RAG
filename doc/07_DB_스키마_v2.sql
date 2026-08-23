@@ -1,3 +1,7 @@
+-- specledger-document-status: superseded
+-- canonical-schema: poc/alembic/versions (alembic upgrade head)
+-- 이 v2 SQL은 2026-05 설계 보관본입니다. 현행 운영 스키마의 정본은 Alembic head이며,
+-- pgvector 및 tb_ 물리명은 최신 DB 부록과 migration을 따릅니다.
 -- ============================================================
 -- 한국지식재산보호원 AI 영업비밀 등급분류 시스템
 -- Koipa AI 파이프라인 DB 스키마 v2 (PostgreSQL 15+)

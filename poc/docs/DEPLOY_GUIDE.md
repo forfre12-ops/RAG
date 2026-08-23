@@ -23,7 +23,7 @@ bash deploy.sh                                      # 자동감지 → 배포, �
 
 | | 고객사 (폐쇄망) | 지재원 (연결망) |
 |---|---|---|
-| `.env` | `DEPLOY_PROFILE=onprem-local`<br>(CPU면 `LLM_PROVIDER=none` + A5 GPU블록 주석) | `DEPLOY_PROFILE=full-train` · `ANTHROPIC_API_KEY=…`<br>(GPU블록 유지) |
+| `.env` | `DEPLOY_PROFILE=onprem-local`<br>(CPU면 `LLM_PROVIDER=noop` + A5 GPU블록 주석) | `DEPLOY_PROFILE=full-train` · `ANTHROPIC_API_KEY=…`<br>(GPU블록 유지) |
 | 학습 | ✅ **야간 CPU 증분재학습**<br>(`enable_incremental_retrain` — 번들에 포함) | ✅ **전체 재학습·합성·골든**<br>(`enable_training`, GPU) + 증분 |
 | 번들 밖(별도) | — | 전체학습용 **CUDA torch·대형 LLM**은 인터넷 조달(배포와 분리된 운영 워크플로) |
 
@@ -190,7 +190,7 @@ LOCAL_LLM_API_KEY=EMPTY
 ```
 🅲 **CPU·LLM 없음(로컬 LLM 미기동)**: 분류·검색은 LLM 없이 동작. `/answer`(2차의견)만 비활성:
 ```ini
-LLM_PROVIDER=none                    # 로컬 LLM 생략 (분류는 LLM-free 핫패스)
+LLM_PROVIDER=noop                    # 로컬 LLM 생략 (분류는 LLM-free 핫패스)
 HF_HUB_OFFLINE=0                     # 임베딩 캐시 없으면 온라인 다운로드
 ```
 - GPU 고객사면 위 ollama/vLLM 사용 + A5 건너뜀(GPU 블록 유지).
@@ -270,5 +270,5 @@ $OBS up -d ; curl -s http://localhost:9090/-/ready
 
 ## 부록 — CPU·연결망 테스트 서버 빠른 참고 (예: kip-ai)
 CPU 전용 + 인터넷 되는 테스트 서버(고객사 프로파일 검증용): A0(도커 설치) → A1(scp) → A2(load+online
-pull) → A3(모델) → A4+B-고객사(🅲: `LLM_PROVIDER=none`·`HF_HUB_OFFLINE=0`) → A5(nvidia 주석) →
+pull) → A3(모델) → A4+B-고객사(🅲: `LLM_PROVIDER=noop`·`HF_HUB_OFFLINE=0`) → A5(nvidia 주석) →
 A6~A7 → PART C. 외부 테스트는 SSH 터널(8000).

@@ -111,7 +111,7 @@ bash deploy.sh                                      # 자동감지 → 배포, �
   <div class="table-wrap"><table>
     <thead><tr><th>&nbsp;</th><th>고객사 (폐쇄망)</th><th>지재원 (연결망)</th></tr></thead>
     <tbody>
-      <tr><td><code>.env</code></td><td><code>DEPLOY_PROFILE=onprem-local</code><br>(CPU면 <code>LLM_PROVIDER=none</code> + A5 GPU블록 주석)</td><td><code>DEPLOY_PROFILE=full-train</code> · <code>ANTHROPIC_API_KEY=…</code><br>(GPU블록 유지)</td></tr>
+      <tr><td><code>.env</code></td><td><code>DEPLOY_PROFILE=onprem-local</code><br>(CPU면 <code>LLM_PROVIDER=noop</code> + A5 GPU블록 주석)</td><td><code>DEPLOY_PROFILE=full-train</code> · <code>ANTHROPIC_API_KEY=…</code><br>(GPU블록 유지)</td></tr>
       <tr><td>학습</td><td>✅ <strong>야간 CPU 증분재학습</strong><br>(<code>enable_incremental_retrain</code> — 번들 포함)</td><td>✅ <strong>전체 재학습·합성·골든</strong><br>(<code>enable_training</code>, GPU) + 증분</td></tr>
       <tr><td>번들 밖(별도)</td><td>—</td><td>전체학습용 <strong>CUDA torch·대형 LLM</strong>은 인터넷 조달(배포와 분리)</td></tr>
     </tbody>
@@ -228,7 +228,7 @@ LOCAL_LLM_BASE_URL=http://host.docker.internal:11434/v1
 LOCAL_LLM_MODEL=Qwen/Qwen3-14B
 LOCAL_LLM_API_KEY=EMPTY
 # enable_incremental_retrain=True 는 프로파일이 자동 설정(야간 CPU 증분재학습)</code></pre>
-  <div class="callout inset"><div class="callout-label">🅲 CPU · 로컬 LLM 미기동</div><p>분류·검색은 LLM 없이 동작(LLM-free 핫패스). <code>/answer</code>(2차의견)만 비활성:<br><code>LLM_PROVIDER=none</code> · <code>HF_HUB_OFFLINE=0</code> (임베딩 캐시 없으면 온라인 다운로드).<br>GPU 고객사면 ollama/vLLM 사용 + A5 건너뜀(GPU 블록 유지). 로컬 LLM은 별도 기동: <code>ollama serve &amp;&amp; ollama run qwen3:14b</code>.</p></div>
+  <div class="callout inset"><div class="callout-label">🅲 CPU · 로컬 LLM 미기동</div><p>분류·검색은 LLM 없이 동작(LLM-free 핫패스). <code>/answer</code>(2차의견)는 결정론적 응답으로 동작:<br><code>LLM_PROVIDER=noop</code> · <code>HF_HUB_OFFLINE=0</code> (임베딩 캐시 없으면 온라인 다운로드).<br>GPU 고객사면 ollama/vLLM 사용 + A5 건너뜀(GPU 블록 유지). 로컬 LLM은 별도 기동: <code>ollama serve &amp;&amp; ollama run qwen3:14b</code>.</p></div>
 
   <h3>B-지재원 (full-train)</h3>
   <pre><code>DEPLOY_PROFILE=full-train            # 학습 활성 + 안전 하드닝 자동
@@ -281,7 +281,7 @@ API_KEY="$API_KEY" BASE_URL=http://localhost:8000 bash acceptance/run_acceptance
   <h3>책임 경계 (R&amp;R)</h3>
   <p><span class="tag kl">발주처/KL</span> 서버·폐쇄망·(GPU 시)드라이버/CUDA/Container Toolkit·Docker·매체 반입 승인 · <span class="tag lk">한국지식재산보호원</span> PART A~C 전 과정(반입·적재·구성·마이그레이션·기동·검증)</p>
   <h3>CPU·연결망 테스트 서버 빠른 참고</h3>
-  <p>CPU 전용 + 인터넷 되는 테스트 서버(고객사 프로파일 검증용) 순서: A0(도커) → A1(scp) → A2(load+online pull) → A3(모델) → A4+B-고객사(🅲: <code>LLM_PROVIDER=none</code>·<code>HF_HUB_OFFLINE=0</code>) → A5(nvidia 주석) → A6~A7 → PART C. 외부 테스트는 SSH 터널(8000).</p>
+  <p>CPU 전용 + 인터넷 되는 테스트 서버(고객사 프로파일 검증용) 순서: A0(도커) → A1(scp) → A2(load+online pull) → A3(모델) → A4+B-고객사(🅲: <code>LLM_PROVIDER=noop</code>·<code>HF_HUB_OFFLINE=0</code>) → A5(nvidia 주석) → A6~A7 → PART C. 외부 테스트는 SSH 터널(8000).</p>
 
   <p class="footnote">본 절차서는 배포 번들 동결값·<code>config.py</code> 프로파일 정의 기준이다. 실서버 최초 배포 시 사소한 조정(CPU LLM 프로브·HF 첫 다운로드)이 나올 수 있어 해당 지점은 "verify/조정"으로 표기했다.</p>
   <div class="footnote">관련: <em>폐쇄망 설치·배포 설계서</em> · <em>운영 런북</em> · <code>docs/DEPLOY_GUIDE.md</code>(원문) · <code>docs/TROUBLESHOOTING.md</code></div>

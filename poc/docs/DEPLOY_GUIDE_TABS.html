@@ -165,7 +165,7 @@ bash install.sh       # 이미지 적재(docker load)
 cp infra-config/.env.template .env
 python3 -c "import secrets;print('STORAGE_ENCRYPTION_KEY='+secrets.token_hex(32))"
 nano .env             # DEPLOY_PROFILE=onprem-local · API_KEY · POSTGRES_PASSWORD · STORAGE_ENCRYPTION_KEY
-                      #   (CPU 서버면 LLM_PROVIDER=none)
+                      #   (CPU 서버면 LLM_PROVIDER=noop)
 
 bash deploy.sh        # 폐쇄망 자동감지 → 마이그레이션+기동+스모크 (인터넷 0)</code></pre>
     <div class="callout warn"><div class="cl">CPU 서버면</div>GPU 없으면 compose 의 <code>nvidia</code> 블록을 주석(<code>grep -n nvidia infra-config/docker-compose.airgap.yml</code>). 분류·검색·OCR 전부 CPU로 동작(추론만 느림).</div>
