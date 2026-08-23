@@ -750,6 +750,13 @@ class InferencePipeline:
                         result.warnings = list(result.warnings) + cap_warnings
                         # [M-renorm] cap 등급을 strict argmax로 만들고 재정규화. cap은 하향이라
                         # confidence는 그 의미(불확실성↑)를 보존해 0.7 상한을 추가로 적용.
+                        #
+                        # [2026-08-22 실측 후 되돌림] 이 상한이 자동확정률을 누르고 있는지
+                        # public-300(T0-1, reports/t0_1_public300_source_type_public_no_cap.json)
+                        # 으로 실측했다 — 상한을 빼도 auto_confirm_rate·review_reason_counts가
+                        # **전부 동일**했다(자연 confidence가 이미 전 건 ≤0.7). 즉 이 상한은 이
+                        # 코퍼스에서 한 번도 실제로 작동(binding)한 적이 없다 — 이득 없는 변경을
+                        # 남겨 둘 이유가 없어 원복한다.
                         new_scores, new_conf = self._enforce_label_consistency(
                             result.scores, cap_code, floor=0.6
                         )
