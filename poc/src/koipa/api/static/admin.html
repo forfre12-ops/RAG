@@ -774,7 +774,7 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" onclick="loadDashboard()">관제 종합 새로고침</button>
           <span id="dash-meta" class="hint"></span>
         </div>
-        <div id="dash-grid" class="dash-grid"><div class="q-empty">“관제 종합 새로고침”으로 보류큐·배포 readiness·재학습 backlog·kill-gate·드리프트를 한 번에 조회합니다 (admin 전용).</div></div>
+        <div id="dash-grid" class="dash-grid"><div class="q-empty">「관제 종합 새로고침」을 누르면 이중검토 보류·배포 준비 상태·재학습 대기·안전 정지·입력 분포 변화를 한 번에 조회합니다.</div></div>
         <p class="sec-note">읽기 전용 종합 화면입니다. 일부 소스를 못 읽으면 그 칸만 <span class="pill warn">degraded</span>로 표시되고 나머지는 정상 표시됩니다.</p>
       </div>
     </section>
@@ -2058,14 +2058,29 @@ function alStatusPill(s){
   if(s==='RETRAIN_RECOMMENDED') return '<span class="pill warn">재학습 권고</span>';
   return '<span class="pill ok">정상</span>';
 }
+/* [2026-08-23] 서버 사유 코드를 화면 말로 옮긴다. 관리자에게 no_locked_records 는 뜻이 없다.
+   모르는 값은 **원문 그대로** 둔다 — 감추면 원인을 못 찾는다. */
+function dashReason(raw){
+  const t=String(raw||'');
+  if(!t) return '';
+  const MAP={
+    'no_locked_records':'승인된 검증문서가 아직 없습니다',
+    'locked_eval_not_ready':'평가 정답지가 아직 기준을 채우지 못했습니다',
+  };
+  if(MAP[t]) return MAP[t];
+  if(/under urgent\/recommended thresholds/i.test(t))
+    return '재학습 기준에 못 미칩니다 — 지금 조치할 것은 없습니다';
+  return t;
+}
 function renderDashboard(d){
-  $('dash-meta').textContent = `생성 ${d.generated_at||'-'}` + ((d.degraded&&d.degraded.length)?` · degraded: ${d.degraded.join(', ')}`:'');
+  $('dash-meta').textContent = `생성 ${d.generated_at||'-'}` + ((d.degraded&&d.degraded.length)?` · 조회 실패: ${d.degraded.join(', ')}`:'');
   const eh=d.escalation_held||{}, lr=d.locked_readiness||{}, al=d.active_learning||{}, kg=d.kill_gate||{}, dr=d.drift||{};
   const byg=eh.by_grade||{};
   // 1) 이중검토 보류
   const p1=`<div class="dash-panel">
     <div class="dp-h"><span>이중검토 보류</span>${(eh.total>0)?'<span class="pill warn">보류</span>':'<span class="pill ok">없음</span>'}${dpDegraded(d,'escalation_held')}</div>
-    <div class="dp-big">${eh.total??0}</div>
+    <div class="dp-big" style="color:${(eh.total>0)?'var(--red)':'var(--green)'}">${eh.total??0}</div>
+    <div class="dp-note">${(eh.total>0)?'사람이 한 번 더 봐야 할 건입니다':'추가 검토 대기 없음'}</div>
     <div class="dp-row">${GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')}</div>
   </div>`;
   // 2) 배포 readiness (locked_gold_eval)
@@ -2076,33 +2091,34 @@ function renderDashboard(d){
   const pg=lr.per_grade||{}, rpg=lr.real_per_grade||{}, spg=lr.synthetic_per_grade||{};
   const realZero=GRADES.filter(g=>pg[g]!=null && (rpg[g]||0)===0);
   const p2=`<div class="dash-panel">
-    <div class="dp-h"><span>배포 readiness</span>${lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>'}${realZero.length?'<span class="pill warn">실문서 0 등급 있음</span>':''}${dpDegraded(d,'locked_readiness')}</div>
+    <div class="dp-h"><span>배포 준비 상태</span>${lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>'}${realZero.length?'<span class="pill warn">실문서 0 등급 있음</span>':''}${dpDegraded(d,'locked_readiness')}</div>
     <div class="dp-row">${GRADES.map(g=>pg[g]!=null?`<div><span>${g}</span> <b>${pg[g]}</b><small style="color:var(--text-faint)"> 실${rpg[g]??0}/합${spg[g]??0}</small></div>`:'').join('')||'<span style="color:var(--text-faint)">등급별 데이터 없음</span>'}</div>
     ${lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족: ${lr.missing.join(', ')}`:''}</div>`:''}
-    ${realZero.length?`<div class="dp-note" style="color:var(--red)">${realZero.join(', ')} 는 서명분이 전부 합성입니다 — 합성 본문으로 잰 정확도는 실세계 성능이 아닙니다. 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:''}
-    ${lr.reason?`<div class="dp-note">${esc(lr.reason)}</div>`:''}
+    ${realZero.length?`<div class="warnbox" style="margin-top:8px">${realZero.join(', ')} 는 서명분이 <b>전부 합성</b>입니다 — 합성 본문으로 잰 정확도는 실세계 성능이 아닙니다. 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:''}
+    ${lr.reason?`<div class="dp-note">${esc(dashReason(lr.reason))}</div>`:''}
   </div>`;
   // 3) 재학습 backlog (active-learning)
   const p3=`<div class="dash-panel">
-    <div class="dp-h"><span>재학습 backlog</span>${alStatusPill(al.retrain_status)}${dpDegraded(d,'active_learning')}</div>
-    <div class="dp-big">${al.unconsumed_total??0}</div>
+    <div class="dp-h"><span>재학습 대기</span>${alStatusPill(al.retrain_status)}${dpDegraded(d,'active_learning')}</div>
+    <div class="dp-big" style="color:${(al.unconsumed_total>0)?'var(--red)':'var(--green)'}">${al.unconsumed_total??0}</div>
+    <div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>
     <div class="dp-row"><div><span>과소</span> <b style="color:${al.pending_underclass>0?'var(--red)':'inherit'}">${al.pending_underclass??0}</b></div><div><span>과대</span> <b>${al.pending_overclass??0}</b></div><div><span>측면</span> <b>${al.pending_lateral??0}</b></div></div>
-    ${al.reason?`<div class="dp-note">${esc(al.reason)}</div>`:''}
+    ${al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''}
   </div>`;
   // 4) kill-gate
   const kgReasons=(kg.reasons||[]);
   const p4=`<div class="dash-panel">
-    <div class="dp-h"><span>kill-gate</span>${kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>'}${dpDegraded(d,'kill_gate')}</div>
-    <div class="dp-big" style="color:${kg.tripped?'var(--red)':'var(--green)'}">${kg.tripped?'STOP':'OK'}</div>
+    <div class="dp-h"><span>안전 정지</span>${kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>'}${dpDegraded(d,'kill_gate')}</div>
+    <div class="dp-big" style="color:${kg.tripped?'var(--red)':'var(--green)'}">${kg.tripped?'정지':'정상'}</div>
     <div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'발동 사유 없음'}</div>
   </div>`;
   // 5) 임베딩 드리프트 (마지막 게이지 — 표본 0이면 데이터 없음)
   const noSample=!(dr.sample_size>0);
   const p5=`<div class="dash-panel">
-    <div class="dp-h"><span>임베딩 드리프트</span>${noSample?'<span class="pill">데이터 없음</span>':(dr.alert>0.5?'<span class="pill err">경보</span>':'<span class="pill ok">정상</span>')}${dpDegraded(d,'drift')}</div>
+    <div class="dp-h"><span>입력 분포 변화</span>${noSample?'<span class="pill">데이터 없음</span>':(dr.alert>0.5?'<span class="pill err">경보</span>':'<span class="pill ok">정상</span>')}${dpDegraded(d,'drift')}</div>
     <div class="dp-row">
-      <div><span>KL</span> <b>${noSample?'—':(+dr.kl_divergence).toFixed(4)}</b></div>
-      <div><span>cos</span> <b>${noSample?'—':(+dr.cosine_mean).toFixed(4)}</b></div>
+      <div><span>분포 차이</span> <b>${noSample?'—':(+dr.kl_divergence).toFixed(4)}</b></div>
+      <div><span>유사도</span> <b>${noSample?'—':(+dr.cosine_mean).toFixed(4)}</b></div>
       <div><span>표본</span> <b>${dr.sample_size??0}</b></div>
     </div>
     ${noSample?'<div class="dp-note">드리프트 refresh 표본이 없어 값은 미측정(0.0은 실측 아님).</div>':''}
