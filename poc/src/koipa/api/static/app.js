@@ -406,8 +406,11 @@ function renderResult(data, elapsedMs) {
 
   // 룰·분류기·최종 이중판정 (운영 하이브리드 그대로)
   renderDualVerdict(data);
-  // 자연어 요약 3단 (양성·음성 근거) + 서버 status/warnings 반영
+  // 자연어 요약 3단 (양성·음성 근거) + 서버 status 반영
   renderSummary(data);
+  // 원문 경고는 화면 카드가 아니라 실시간 로그로 보낸다 — 감리·디버깅에서 서버 응답과
+  // 대조할 수 있어야 하지만, 판정 카드에 영어 원문과 수치가 섞이면 화면이 읽히지 않는다.
+  (data.warnings || []).forEach((w) => logLine("info", `warning: ${w}`));
   // 평가요소 stats (factors_source=model_estimated 는 '모델 추정'으로 구분)
   renderFactors(data.evaluation_factors || {}, data.factors_source);
   // 키워드 칩 (weight 진하기)
@@ -701,13 +704,22 @@ function renderSummary(data) {
         .join("·")}가 ${estimated ? "가장 높게 <b>추정</b>되었습니다 (모델 역산 — 법리 근거 아님)" : "가장 높게 측정되었습니다"}.`
     : "";
 
-  // 서버가 계산한 라우팅 status·warnings 를 반드시 노출 — needs_review 를 확정처럼 보이지 않게.
+  // 서버가 계산한 라우팅 status 를 반드시 노출 — needs_review 를 확정처럼 보이지 않게.
+  //
+  // [2026-08-24] 종전엔 여기서 warnings 를 **원문 그대로** 이어 붙였다. 그 결과
+  //   "사유: low-confidence: confidence=0.46 < 0.50 — review recommended ·
+  //    persistence skipped: doc_id='S1-기술-SW' is not a UUID"
+  // 가 화면에 떴다. 두 가지가 잘못이다 — ① 화면에서 뺐다고 한 신뢰도 수치가 여기로 샜고,
+  // ② persistence skipped 처럼 판정과 무관한 내부 사정이 '검수 사유' 자리에 섞였다
+  // (비-UUID doc_id 라 저장을 건너뛴 것은 설계대로다).
+  // 사유는 review_reason_ko.js 가 옮긴 한 줄만 쓴다. 원문 경고는 아래 실시간 로그로 보낸다.
   const needsReview = data.status === "needs_review";
   const warns = Array.isArray(data.warnings) ? data.warnings : [];
-  const warnTxt = warns.map((w) => escapeHtml(String(w))).join(" · ");
+  const whyKo = (typeof window !== "undefined" && window.KOIPA_GATE_REASON)
+    ? window.KOIPA_GATE_REASON(warns) : "";
   const banner = needsReview
-    ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:0;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨${warnTxt ? `<br><span style="font-weight:500;font-size:12px;">사유: ${warnTxt}</span>` : ""}</p>`
-    : warnTxt ? `<p class="neg" style="font-size:12px;">⚠ ${warnTxt}</p>` : "";
+    ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:0;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨<br><span style="font-weight:500;font-size:12px;">사유: ${escapeHtml(whyKo || "자동 확정하지 않고 사람 검수로 라우팅")}</span></p>`
+    : "";
   const verdictTxt = needsReview
     ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다.`
     : `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 판정되었습니다.`;
