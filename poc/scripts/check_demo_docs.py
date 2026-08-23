@@ -77,8 +77,15 @@ NEAR_THRESHOLD_MARGIN = 0.05
 _MIME = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xls": "application/vnd.ms-excel",
     ".pdf": "application/pdf",
     ".txt": "text/plain",
+    # [2026-08-22] 한/글 계열이 빠져 있어 demo_formats 16개 중 hwpx 4개가 조용히 건너뛰어졌다.
+    # 실업로드 시연은 한/글이 핵심 포맷이라 없으면 안 된다.
+    ".hwpx": "application/hwp+zip",
+    ".hwp": "application/x-hwp",
+    ".doc": "application/msword",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 
 
@@ -89,6 +96,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--api-key", default=None)
     ap.add_argument("--model-dir", default=None, help="in-process 모드에서 분류기 경로")
     ap.add_argument("--profile", default="onprem-local", choices=("onprem-local", "full-train"))
+    ap.add_argument("--dir", default=None,
+                    help="측정할 문서 폴더(기본: 시연 원클릭 세트). --measure 와 같이 쓴다")
+    ap.add_argument("--measure", action="store_true",
+                    help="기대값 없이 폴더의 모든 문서를 태워 판정만 표로 낸다(실업로드 후보 선별용)")
+    # [2026-08-22] ICD §3.1~3.3 문서 속성. 운영에서는 KL 포털이 이 값을 함께 보낸다
+    # (documents.py:346-357 Form 필드). 본문만으로는 관리성(M)이 관측되지 않으므로
+    # 같은 문서라도 이 값이 붙으면 판정이 달라진다 - 그 차이를 재려면 조건을 줄 수 있어야 한다.
+    ap.add_argument("--icd-source-type", default=None,
+                    help="public | registered_patent | academic | internal | external_confidential")
+    ap.add_argument("--icd-security-marking", default=None,
+                    help="top_secret | secret | confidential | none")
+    ap.add_argument("--icd-access-scope", default=None,
+                    help="approved_only | designated | department | all_employees")
     ap.add_argument("--repeat", type=int, default=1,
                     help="같은 문서를 N 회 반복해 판정이 흔들리지 않는지 본다(리허설 권장 3)")
     ap.add_argument("--out", default=None, help="결과 JSON 경로")
@@ -139,16 +159,38 @@ def main(argv: list[str] | None = None) -> int:
     def analyze(path: Path) -> dict:
         with path.open("rb") as fh:
             files = {"file": (path.name, fh.read(), _MIME.get(path.suffix.lower(), "application/octet-stream"))}
-        r = client.post("/api/v1/documents/analyze", headers=headers, files=files,
-                        data={"return_evidence": "false"})
+        form = {"return_evidence": "false"}
+        for key, val in (("source_type", args.icd_source_type),
+                         ("security_marking", args.icd_security_marking),
+                         ("access_scope", args.icd_access_scope)):
+            if val:
+                form[key] = val
+        r = client.post("/api/v1/documents/analyze", headers=headers, files=files, data=form)
         if r.status_code != 200:
             return {"http_error": f"{r.status_code}: {r.text[:200]}"}
         return r.json()
 
+    # [2026-08-22] 실업로드 시연 후보를 고르려면 "이 폴더의 문서들이 지금 어떻게 나오나"를
+    # 먼저 봐야 한다. 기대값 표는 원클릭 세트에만 있으므로, 다른 폴더는 측정만 한다.
+    doc_dir = Path(args.dir) if args.dir else DEMO_DIR
+    if args.measure or args.dir:
+        if not doc_dir.is_dir():
+            raise SystemExit(f"폴더가 없다: {doc_dir}")
+        targets = [
+            {"file": p.name, "grade": None, "status": None, "reason": None,
+             "shown_as": "(측정 전용)", "measure_only": True}
+            for p in sorted(doc_dir.iterdir())
+            if p.is_file() and p.suffix.lower() in _MIME
+        ]
+        if not targets:
+            raise SystemExit(f"태울 문서가 없다: {doc_dir} (지원 확장자 {sorted(_MIME)})")
+    else:
+        targets = list(DEMO_EXPECTATIONS)
+
     rows: list[dict] = []
     failures: list[str] = []
-    for exp in DEMO_EXPECTATIONS:
-        path = DEMO_DIR / exp["file"]
+    for exp in targets:
+        path = doc_dir / exp["file"]
         if not path.is_file():
             failures.append(f"{exp['file']}: 파일이 없다 ({path})")
             continue
@@ -180,6 +222,18 @@ def main(argv: list[str] | None = None) -> int:
             for o in observations[1:]
         )
         verdict = []
+        if exp.get("measure_only"):
+            if first.get("error"):
+                verdict.append(f"오류: {first['error']}")
+            if first.get("extract_error"):
+                verdict.append(f"추출 오류: {first['extract_error']}")
+            if unstable:
+                verdict.append("반복 실행에서 판정이 흔들림")
+            rows.append({**exp, "observed": first, "repeats": len(observations),
+                         "unstable": unstable, "mismatch": verdict})
+            if verdict:
+                failures.append(f"{exp['file']}: " + " · ".join(verdict))
+            continue
         if first.get("error"):
             verdict.append(f"오류: {first['error']}")
         else:
