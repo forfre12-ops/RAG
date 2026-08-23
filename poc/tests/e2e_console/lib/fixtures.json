@@ -448,11 +448,11 @@
   },
 
   "GET /golden/builds": {
+    "total": 2,
     "builds": [
-      {"path": "datasets/proxy_gold/build_ff5a822c.jsonl", "records": 120, "records_exact": true, "modified": "2026-08-09T12:00:00Z", "size_bytes": 480000},
-      {"path": "datasets/proxy_gold/build_20260815.jsonl", "records": 256, "records_exact": true, "modified": "2026-08-15T09:00:00Z", "size_bytes": 910000}
-    ],
-    "root": "datasets"
+      {"path": "datasets/proxy_gold/build_ff5a822c.jsonl", "records": 120, "records_exact": true, "size": 480000, "modified": "2026-08-09T12:00:00+00:00"},
+      {"path": "datasets/proxy_gold/build_20260815.jsonl", "records": 256, "records_exact": true, "size": 910000, "modified": "2026-08-15T09:00:00+00:00"}
+    ]
   },
 
   "POST /golden/jobs/register": {

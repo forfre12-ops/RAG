@@ -922,6 +922,42 @@ paths:
               schema: { type: string }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /golden/builds:
+    get:
+      tags: [golden]
+      summary: 등록할 수 있는 슬레이트 파일 목록 (admin/kl_backend/system)
+      description: >-
+        아래 POST /golden/jobs/register 에 넣을 수 있는 파일을 내려 준다 — 화면이 경로를
+        직접 치게 하지 않고 고르게 하기 위한 읽기 전용 조회다.
+        범위는 register 와 같은 datasets/ 하위 샌드박스뿐이다.
+        슬레이트 판별은 파일명 규칙이 아니라 첫 줄을 읽어서 한다(text 와 label 또는 grade 가
+        있어야 후보로 본다) — 이름이 build_ 로 시작하지 않는 실제 전달본이 목록에서 빠지는 것을
+        막기 위해서다. 줄 수는 5,000 까지만 세고, 그 위는 records_exact=false 로 알린다
+        (그때 records 는 하한값이다).
+      responses:
+        '200':
+          description: 등록 가능한 슬레이트 목록 (최신 수정순)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, builds]
+                properties:
+                  total: { type: integer, description: builds 개수 }
+                  builds:
+                    type: array
+                    items:
+                      type: object
+                      required: [path, records, records_exact, size, modified]
+                      properties:
+                        path: { type: string, description: 'poc 기준 상대경로(datasets/ 하위)', example: 'datasets/proxy_gold/build_ff5a822c.jsonl' }
+                        records: { type: integer, description: 줄 수 = 검수 후보 건수 }
+                        records_exact: { type: boolean, description: 'false 면 5,000 초과라 records 는 하한값' }
+                        size: { type: integer, description: 파일 크기(바이트) }
+                        modified: { type: string, format: date-time, description: 파일 수정 시각(UTC) }
+                additionalProperties: true
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /golden/jobs/register:
     post:
       tags: [golden]
