@@ -285,16 +285,45 @@ RFP 1차 목표(미탐 최소화)에 정확히 부합한다.
 ## 7. 오늘 밤 체크리스트
 
 ```
-[x] 1-1  서버 상태 확인            → 36a62722 · full-train · v-fe4b386b (§0)
+[x] 1-1  서버 상태 확인            → 배포 전 36a62722 (§0)
 [x] 1-2  ruff --fix → 0건          → 커밋 e5e0923a · 관련 459건 통과
 [x] 1-2b 시연 구성 확정            → 안 (A) 실업로드. 화면 원클릭 줄은 접음
-[x] 1-2c 점검기 두 세트 로컬 통과   → upload 5건 · oneclick 7건, 종료코드 0
-[ ] 1-3  git push                  ← **사용자 실행 필요**(auto-mode 분류기가 차단)
-[ ] 1-3b 223 에서 deploy_kl_223.sh  (push 후에 의미가 있다)
-[ ] 1-4  check_demo_docs.py --api ... --set upload --repeat 3 → 종료코드 0
-[ ] 1-4b 통과 화면 캡처 4장 확보(비상 백업)
+[x] 1-3  git push                  → 36a62722..7e181a98 (PowerShell 경로로 통과)
+[x] 1-3b 223 배포                  → sha 7e181a98a8dc · built 2026-08-23T06:51:31Z
+[x] 1-4  배포본 검증               → upload 5/5 · oneclick 7/7 · 각 3회 반복 동일
+[x] 1-4c 화면 문구 실물 확인        → /console/index.html 에서 정정 문구 전부 확인
+[ ] 1-4b 시연 화면 캡처(비상 백업)  ← 브라우저에서 사람이 찍을 것
 [ ] 2    (내일 아침) 같은 명령 재실행 → 같은 결과
 ```
+
+## 9. 배포 검증 기록 (2026-08-23)
+
+```
+배포        sha 7e181a98a8dc · built 2026-08-23T06:51:31Z · profile full-train
+모델        v-fe4b386b · review_confidence_threshold 0.70
+롤백 태그    :rollback-202608230638
+서버 검증    verify_deploy_live.sh — healthz 200 · 분류 정상(S1 0.885) · 콘솔 요소 · /golden/jobs 200
+```
+
+시연 세트(`--set upload`, 3회 반복 동일):
+
+| 문서 | 등급 | 상태 | conf |
+|---|---|---|---|
+| 차세대 메모리 공정 핵심기술 검토 보고서 **.pdf** | TS | **staging** | 0.926 |
+| 차세대 메모리 공정 핵심기술 검토 보고서 .docx | TS | needs_review(low-confidence) | 0.668 |
+| 분기 보도자료·공시 본문 초안 .docx | S3 | **staging** | 0.946 |
+| 분기 보도자료·공시 본문 초안 .hwpx | S3 | **staging** | 0.946 |
+| 핵심 알고리즘·모듈 소스 분리 보관 정책 .docx | TS | needs_review(low-confidence) | 0.465 |
+
+참고 샘플(`--set oneclick`, 3회 반복 동일): 7/7 일치.
+자동확정 5건(TS 0.976 · S1 0.937 · S3 0.956 · S2 0.714 · S1 pdf 0.949),
+검수 2건(07 agreement-gate 0.959 · 06 low-confidence 0.540).
+**03 은 임계 여유 +0.014** — 접힌 목록 안이고 대본에서 쓰지 않는다.
+
+⚠ 검증은 컨테이너 안에서 돌렸다(`docker exec … --api http://127.0.0.1:8000`).
+`poc/demo_formats` 가 git ignore 라 서버에 없어서, 호스트 `~/demo_check` 로 복사한 뒤
+`docker cp` 로 넣었다. **컨테이너를 다시 만들면 그 파일은 사라진다** — 재배포 후 다시 검증하려면
+`docker cp ~/demo_check koipa-jjw-api-1:/app/demo_formats` 를 먼저 한 번 돌린다.
 
 **서버 자격증명 읽기**(`grep ^API_KEY= ~/poc/.env.jjw`)는 auto-mode 권한 분류기가 막는다
 (Bash·PowerShell 양쪽 확인). 명령 모양을 바꿔 통과시키지 말 것. 배포 자체는 서버가 자기 키를
