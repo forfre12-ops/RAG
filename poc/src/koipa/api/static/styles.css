@@ -614,36 +614,6 @@ section h3 {
 .legal-keywords { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 5px; }
 .legal-keywords .kw-chip { font-size: 11.5px; }
 
-/* ===== Source tags — 실측/명세/참고 정직성 표기 ===== */
-.src-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1.6;
-  white-space: nowrap;
-}
-.src-measured {
-  background: rgba(22,163,74,0.10);
-  color: #16a34a;
-  border: 1px solid rgba(22,163,74,0.30);
-}
-.src-spec {
-  background: rgba(0,112,243,0.08);
-  color: #0070f3;
-  border: 1px solid rgba(0,112,243,0.30);
-}
-.src-ref {
-  background: rgba(217,119,6,0.08);
-  color: #b45309;
-  border: 1px solid rgba(217,119,6,0.30);
-}
-
 /* ===== Animations ===== */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -875,13 +845,6 @@ body { padding-bottom: 232px; }
 .seq-step.active { background: var(--accent-soft); border-color: var(--border-strong); }
 .seq-step.done  { background: var(--bg-surface); border-color: var(--border-strong); }
 .seq-step.danger{ background: var(--accent-soft); border-color: var(--text-soft); }
-
-/* 출처 태그 3종 → 모노 */
-.src-measured, .src-spec, .src-ref {
-  background: var(--accent-soft) !important;
-  color: var(--text-soft) !important;
-  border-color: var(--border-strong) !important;
-}
 
 /* 상태 점(네비/히어로) → 모노 */
 .nav-status .dot, .nav-status.warming .dot { background: var(--text-faint) !important; }

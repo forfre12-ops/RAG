@@ -6,7 +6,7 @@
 3. GET /demo/app.js — 200 + js + ES module import 확인
 4. GET /demo/samples.js — 200 + 자동 빌드 export 존재
 5. GET /demo/legal — samples.js 안에 legal 데이터 존재 확인 (별 파일 분리 X)
-6. GET /demo/incident.js — 200 + INCIDENT export
+6. incident.js 부재 — 화면이 안 그리는 예시 시나리오 데이터는 배포에서 뺐다
 7. /healthz 에 데모 콘솔용 필드 노출 (deploy_profile·warmup_done 등 8개)
 8. /demo/ 가 OpenAPI 스키마에 노출되지 않음 (StaticFiles 자동 제외)
 9. 빌드된 샘플 13건이 의도 등급으로 분류되는지 (회귀 보장)
@@ -122,14 +122,14 @@ def test_demo_samples_js(client):
     assert len(b["toggle_keywords"]) == 4
 
 
-def test_demo_incident_js(client):
-    r = client.get("/demo/incident.js")
-    assert r.status_code == 200
-    assert "INCIDENT" in r.text
-    assert "fnr_sequence" in r.text
-    assert "prevention_sequence" in r.text
-    # JS 객체 리터럴: step: 6 + 5 = 11 (key 뒤에 콜론)
-    assert r.text.count("step:") >= 11, f"step 카운트 부족: {r.text.count('step:')}"
+def test_demo_incident_js_removed(client):
+    """사고 시뮬(와우 D) 데이터는 렌더러가 사라진 뒤로 아무 화면도 안 그렸다.
+
+    손해액은 예시 시나리오(미실측)라 화면에 남을 근거가 없다. 되살아나지 않도록
+    부재를 단언한다 — app.js 의 import 도 함께 사라졌는지 본다.
+    """
+    assert client.get("/demo/incident.js").status_code == 404
+    assert "incident.js" not in client.get("/demo/app.js").text
 
 
 def test_demo_sse_and_highlight_js(client):

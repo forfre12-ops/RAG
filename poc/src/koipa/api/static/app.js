@@ -2,7 +2,6 @@
 // V2 디자인 시스템 위에서 동작. 외부 의존 0.
 
 import { DEMO_DATA } from "./samples.js";
-import { INCIDENT } from "./incident.js";
 import { postSSE } from "./sse.js";
 import { translateError } from "./errors_ko.js";
 import {
@@ -83,6 +82,9 @@ async function pollHealth() {
 }
 
 function renderHealthBadge() {
+  // 임계 표시는 배지와 독립이다 — 배지 자리(#nav-status)가 없다고 임계까지 '확인 중…' 으로
+  // 굳으면 안 된다. 아래 early return 앞에 둔다.
+  renderConfThreshold();
   const el = $("#nav-status");
   if (!el) return;
   const h = state.health || {};
@@ -98,6 +100,25 @@ function renderHealthBadge() {
   const txt = document.createElement("span");
   txt.textContent = `${profile} · LLM ${provider} · emb ${embedder}`;
   el.appendChild(txt);
+}
+
+// [2026-08-24] 검수 라우팅 임계를 **서버에서** 받아 적는다.
+// 종전에는 index.html 본문에 임계 숫자가 글자로 박혀 있었다. 8/24 에 그 값을 0.50 으로
+// 내렸는데(config.py) 그 문장은 그대로 남아, 화면이 서버와 다른 값을 말하고 있었다
+// (실측 2026-08-24 223 /api/v1/healthz: review_confidence_threshold=0.5).
+// healthz 의 operational_config 가 실제 라우팅을 정하는 그 값이므로 그것만 쓴다.
+// 공개등급 전용 임계(review_confidence_threshold_public)는 null 이 아닐 때만 덧붙인다 —
+// 손잡이가 살아 있어서, 켜졌는데 화면이 한 숫자만 보이면 오독한다.
+function renderConfThreshold() {
+  const el = $("#conf-threshold");
+  if (!el) return;
+  const oc = (state.health || {}).operational_config || {};
+  const t = oc.review_confidence_threshold;
+  if (typeof t !== "number") { el.textContent = "서버 확인 실패"; return; }
+  const pub = oc.review_confidence_threshold_public;
+  el.textContent = (typeof pub === "number")
+    ? `${t.toFixed(2)} · 공개등급 예측은 ${pub.toFixed(2)}`
+    : t.toFixed(2);
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -1270,179 +1291,6 @@ function renderLegal() {
       kwWrap.appendChild(chip);
     });
     wrap.appendChild(card);
-  });
-}
-
-// ──────────────────────────────────────────────────────────────────────
-// 사고 시뮬레이션 (와우 D)
-// ──────────────────────────────────────────────────────────────────────
-function renderIncident() {
-  const fnrWrap = $("#fnr-sequence");
-  const prevWrap = $("#prevention-sequence");
-  if (fnrWrap) {
-    fnrWrap.innerHTML = "";
-    INCIDENT.fnr_sequence.forEach((s, i) => {
-      const step = document.createElement("div");
-      step.className = "seq-step danger";
-      step.innerHTML = `
-        <div class="seq-num">${s.step}</div>
-        <div class="seq-body">
-          <div class="seq-title">${escapeHtml(s.title)}</div>
-          <div class="seq-detail">${escapeHtml(s.detail)}</div>
-        </div>
-        <div class="seq-sla">${escapeHtml(s.tag)}</div>
-      `;
-      fnrWrap.appendChild(step);
-      if (i < INCIDENT.fnr_sequence.length - 1) {
-        const a = document.createElement("div");
-        a.className = "seq-arrow";
-        fnrWrap.appendChild(a);
-      }
-    });
-  }
-  if (prevWrap) {
-    prevWrap.innerHTML = "";
-    INCIDENT.prevention_sequence.forEach((s, i) => {
-      const step = document.createElement("div");
-      step.className = "seq-step done";
-      step.innerHTML = `
-        <div class="seq-num">${s.step}</div>
-        <div class="seq-body">
-          <div class="seq-title">${escapeHtml(s.title)}</div>
-          <div class="seq-detail">${escapeHtml(s.detail)}</div>
-        </div>
-        <div class="seq-sla">${escapeHtml(s.tag)}</div>
-      `;
-      prevWrap.appendChild(step);
-      if (i < INCIDENT.prevention_sequence.length - 1) {
-        const a = document.createElement("div");
-        a.className = "seq-arrow";
-        prevWrap.appendChild(a);
-      }
-    });
-  }
-  const stWrap = $("#incident-stats");
-  if (stWrap) {
-    stWrap.innerHTML = "";
-    INCIDENT.estimates.forEach((e) => {
-      const s = document.createElement("div");
-      s.className = "stat";
-      const flagClass = {
-        "예시": "src-ref",
-        "목표": "src-spec",
-        "법령": "src-spec",
-        "실측": "src-measured",
-      }[e.flag] || "src-ref";
-      const flag = e.flag
-        ? `<span class="src-tag ${flagClass}">${escapeHtml(e.flag)}</span>`
-        : "";
-      s.innerHTML = `
-        <div class="v">${escapeHtml(e.value)}</div>
-        <div class="l">${escapeHtml(e.label)}</div>
-        <div style="margin-top:6px;">${flag}</div>
-        <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">${escapeHtml(e.note)}</div>
-      `;
-      s.title = e.note;
-      stWrap.appendChild(s);
-    });
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────
-// 시스템 능력 stats (§5 — 와우 E)
-// ──────────────────────────────────────────────────────────────────────
-function renderCapabilityStats() {
-  const wrap = $("#capability-stats");
-  if (!wrap) return;
-  // src: "measured" 실측 / "spec" 명세·합격선·코드 사실 / "ref" V2 통합본 참고값.
-  const items = [
-    // [정직 대표지표] 안전 veto — 고등급 미탐 최소화가 대표 성능(RFP 성능목표 "미탐 최소화"와 일치)
-    { v: "파국 미탐 0", l: "고등급(TS)→공개 무음미탐 0건 · TS recall 0.92 (정직 홀드아웃 N42)", src: "measured" },
-    { v: "0.69", l: "정직 홀드아웃 macro-F1 (경화 consensus, KF-DeBERTa 계열·합성프록시 추세용)", src: "measured" },
-    // Phase 3 실측 (2026-05-30): KF-DeBERTa labeled_5k 1ep 학습 + RTX 5070 Ti
-    { v: "1.18s", l: "BERT 추론 (KF-DeBERTa 학습 모델, 5070 Ti 실측·별도 GPU 벤치)", src: "measured" },
-    { v: "25.8s", l: "LLM /answer(RAG 생성) latency (Qwen3 14B, Phase 1 실측·분류 아님)", src: "measured" },
-    { v: "33s", l: "BERT 학습 1 epoch (5070 Ti labeled 3500건, 실측)", src: "measured" },
-    { v: "F1=1.0", l: "labeled_5k test 752건 (학습분포 상한·실문서 정확도 아님, 실측)", src: "measured" },
-    { v: "10/12", l: "데모 12 샘플 학습모델 실호출 정합 (학습 외 분포, FNR 16.7%, 실측)", src: "measured" },
-    { v: "9.2s", l: "P5 E2E RAG ON (5070 Ti 풀스택 실측, V2 §14.2 ≤30s)", src: "measured" },
-    // Phase 5 실측 (2026-05-30 02:35): Qwen3 vs Solar 각 200건 합성 비교
-    { v: "100%", l: "P3 Qwen3 라벨 일치도 (200건, V2 §14.2 ≥90% PASS)", src: "measured" },
-    { v: "81%", l: "P3 Solar 라벨 일치도 (200건, FNR 27% JSON 76.5% 실패 — Qwen3 채택)", src: "measured" },
-    // Phase 8 실측 (2026-05-30 야간 후속): 고도화 측정 일괄
-    { v: "5,200", l: "ES docs 영구 인덱싱 (BGE-M3, /answer citations 0→3 실측)", src: "measured" },
-    { v: "0.746", l: "Qwen3+5K 학습 모델 평균 confidence (Phase 3 0.632 → +0.114)", src: "measured" },
-    { v: "F1=1.0", l: "KoBigBird-large 비교 (학습분포 상한, KF-DeBERTa 동등)", src: "measured" },
-    { v: "34%", l: "Qwen3 thinking OFF 속도 우위 (29→39 tps, 구조화 출력 권장)", src: "measured" },
-    { v: "0.6667", l: "Recall@5 KURE-v1 (P2 3-way ES dense, 실측·합성 천장)", src: "measured" },
-    { v: "≤ 5%", l: "FNR 핵심 KPI 목표 (V2 §9, 합성 한계로 미달)", src: "spec" },
-    { v: "404", l: "시드 v4 키워드 (seeds.py 카운트)", src: "measured" },
-    { v: "5,000", l: "합성 코퍼스 (datasets/legacy_synthetic/labeled_5k)", src: "measured" },
-    // Phase 2 실측 (2026-05-30): BGE-M3 / KURE / dragonkue 3-way
-    { v: "0.7222", l: "Recall@5 BGE-M3 dense ES (P2 3-way 실측, 합성 천장)", src: "measured" },
-    { v: "111ms", l: "검색 latency p50 (BGE-M3 dense ES, 실측)", src: "measured" },
-    { v: "1,900+", l: "단위 테스트 PASS (회귀 기준)", src: "measured" },
-    { v: "4", l: "배포 프로파일 (lite-noapi 외 3)", src: "measured" },
-    { v: "≤ 30s", l: "E2E 합격선 (V2 §14.2 목표)", src: "spec" },
-    { v: "$0", l: "온프레미스 추론 비용 (자체 GPU 가정)", src: "spec" },
-  ];
-  wrap.innerHTML = "";
-  items.forEach((it) => {
-    const s = document.createElement("div");
-    s.className = "stat";
-    const tag = it.src === "measured" ? `<span class="src-tag src-measured">실측</span>`
-      : it.src === "spec" ? `<span class="src-tag src-spec">명세</span>`
-      : `<span class="src-tag src-ref">참고</span>`;
-    s.innerHTML = `
-      <div class="v">${it.v}</div>
-      <div class="l">${it.l}</div>
-      <div style="margin-top:6px;">${tag}</div>
-    `;
-    wrap.appendChild(s);
-  });
-}
-
-// ──────────────────────────────────────────────────────────────────────
-// 배포 프로파일 카드 (§6)
-// ──────────────────────────────────────────────────────────────────────
-function renderProfiles() {
-  const wrap = $("#profile-grid");
-  if (!wrap) return;
-  const profiles = [
-    {
-      name: "lite-noapi", title: "외부 의존 0",
-      detail: "GPU·LLM API·DB 없이 즉시 시연. 본 데모가 이 프로파일 — 실시간 판정은 시드 키워드 룰 분류기(rule-fallback-v0), 학습 KF-DeBERTa 미탑재.",
-      cmd: "DEPLOY_PROFILE=lite-noapi",
-      current: true,
-    },
-    {
-      name: "lite-cloud", title: "LLM API만 활성",
-      detail: "Anthropic/OpenAI 상용 키 추가. RAG·답안 합성 정상.",
-      cmd: "DEPLOY_PROFILE=lite-cloud",
-    },
-    {
-      name: "onprem-local", title: "온프레미스 GPU + vLLM",
-      detail: "Qwen3-14B 로컬 추론. 폐쇄망 운영 표준.",
-      cmd: "DEPLOY_PROFILE=onprem-local",
-    },
-    {
-      name: "full-train", title: "학습 라우터 활성",
-      detail: "/train·/train/jobs 활성, FUN-004 풀 사이클.",
-      cmd: "DEPLOY_PROFILE=full-train",
-    },
-  ];
-  wrap.innerHTML = "";
-  profiles.forEach((p) => {
-    const c = document.createElement("div");
-    c.className = "card" + (p.current ? " risk" : "");
-    c.innerHTML = `
-      <div class="eyebrow">${p.current ? "현재 데모" : "선택 가능"}</div>
-      <div class="ctitle">${p.name}</div>
-      <p>${p.title}</p>
-      <p style="margin-top:8px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);"><code>${p.cmd}</code></p>
-      <p style="margin-top:8px;font-size:13px;">${p.detail}</p>
-    `;
-    wrap.appendChild(c);
   });
 }
 
