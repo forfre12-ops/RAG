@@ -92,6 +92,19 @@ if [ -z "$TARGETS" ]; then die "api 서비스를 가진 프로젝트가 없다. 
 ok "배포 대상: $TARGETS"
 
 # --- 1. 소스 갱신 -----------------------------------------------------------
+# [2026-08-23] 디스크부터 본다. 98% 상태에서 빌드가 죽었고, 그 실패가 조용히 지나갔다.
+# 빌드 이미지 한 판이 수 GB 라 여유가 이보다 적으면 시작하지 않는 편이 낫다 —
+# 중간에 죽으면 옛 컨테이너가 돌면서 "배포됐다"로 보인다.
+b "0. 디스크 여유"
+AVAIL_GB="$(df -BG --output=avail / 2>/dev/null | tail -1 | tr -dc '0-9')"
+if [ -n "$AVAIL_GB" ] && [ "$AVAIL_GB" -lt 15 ]; then
+  warn "여유 ${AVAIL_GB}GB — 빌드 캐시를 비운다(이미지·롤백 태그는 건드리지 않는다)"
+  docker builder prune -f 2>&1 | tail -2
+  AVAIL_GB="$(df -BG --output=avail / 2>/dev/null | tail -1 | tr -dc '0-9')"
+  [ "$AVAIL_GB" -ge 8 ] || die "여유 ${AVAIL_GB}GB — 빌드가 실패한다. 옛 이미지를 지워 확보할 것: docker image prune -a"
+fi
+ok "여유 ${AVAIL_GB:-?}GB"
+
 b "1. 소스 갱신 -> $BRANCH"
 tar czf ~/poc_src_backup_$STAMP.tgz src scripts 2>/dev/null && ok "백업 ~/poc_src_backup_$STAMP.tgz"
 git rev-parse --git-dir >/dev/null 2>&1 || git init -q
@@ -226,9 +239,18 @@ fi
 
 # --- 5. 빌드 ----------------------------------------------------------------
 b "5. 빌드"
+# ⚠ [2026-08-23] 빌드 실패가 **조용히 지나갔다.** 실측: 디스크가 98% 라 5단계가
+#   `no space left on device` 로 죽었는데 스크립트는 exit 0 으로 끝났고, 8단계 검증까지
+#   통과했다. 옛 컨테이너가 그대로 돌고 있어서 git_sha 가 맞아 보였기 때문이다.
+#   가려진 곳이 둘이다:
+#     ① `docker compose build ... | tail -6` — 파이프의 종료코드는 tail 것이다(항상 0).
+#     ② `docker image inspect ...:latest` — 빌드가 죽어도 **옛 :latest 가 남아 있어** 통과.
+#   ①은 PIPESTATUS 로, ②는 이미지에 구운 KOIPA_BUILD_SHA 가 이번 SHORT 와 같은지로 잡는다.
 DOCKER_BUILDKIT=1 docker compose $CF build \
   --build-arg KOIPA_BUILD_SHA="$SHORT" \
   --build-arg KOIPA_BUILD_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>&1 | tail -6
+BUILD_RC="${PIPESTATUS[0]}"
+[ "$BUILD_RC" = "0" ] || die "빌드 실패(exit $BUILD_RC) — 위 로그 확인. 디스크 여유부터 볼 것: df -h /"
 # compose 기본 프로젝트명. docker-compose.yml 1행의 `name:` 이 디렉터리명을 이긴다 -
 # 여기서 basename 을 쓰면 이미지 이름을 못 찾는다(실제 값 koipa-poc, 디렉터리는 poc).
 BUILT="$(grep -m1 '^name:' docker-compose.yml 2>/dev/null | awk '{print $2}' || true)"
@@ -236,8 +258,14 @@ BUILT="${BUILT:-$(basename "$PWD")}"
 for S in api worker beat; do
   docker image inspect "${BUILT}-${S}:latest" >/dev/null 2>&1 \
     || die "빌드 산출 이미지 ${BUILT}-${S}:latest 를 못 찾았다"
+  # 이미지에 구운 SHA 가 이번 판인지 — 옛 이미지가 남아 통과하는 것을 막는다.
+  IMG_SHA="$(docker image inspect "${BUILT}-${S}:latest" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+    | sed -n 's/^KOIPA_BUILD_SHA=//p' | head -1)"
+  [ "$IMG_SHA" = "$SHORT" ] \
+    || die "${BUILT}-${S}:latest 가 옛 판이다(구운 sha=${IMG_SHA:-없음} · 기대 $SHORT). 빌드가 실제로 실패했다"
 done
-ok "빌드 산출 ${BUILT}-{api,worker,beat}"
+ok "빌드 산출 ${BUILT}-{api,worker,beat} · sha=$SHORT"
 
 # --- 6. 지뢰 4: 6개 태그(+ 되돌림 태그) -------------------------------------
 b "6. 태그"
