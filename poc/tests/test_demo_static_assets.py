@@ -66,13 +66,22 @@ def test_merged_demo_section_exists_and_is_linked():
     assert 'href="#sec-parse"' in page, "구역으로 가는 내부 링크가 없다"
 
 
-def test_merged_demo_script_stays_classic_not_module():
-    """인라인 onclick 이 전역 함수를 부른다 — type=module 로 바꾸면 전부 죽는다."""
+def test_merged_demo_wiring_lives_in_the_module():
+    """[2026-08-24] 파싱·분류 시연을 §1·§2 로 합치면서 인라인 전역 스크립트를 없앴다.
+
+    합치기 전에는 같은 엔드포인트(POST /documents/analyze)를 두 코드가 각각 호출하고
+    등급 결과 카드를 두 벌 그렸다. 지금은 배선이 app.js(ES module) 한 곳이다.
+    다시 인라인 스크립트가 생기면 그 이중 구조가 되살아난 것이므로 여기서 막는다.
+    """
     page = (STATIC / "index.html").read_text(encoding="utf-8")
-    i = page.index("[D3] 파싱·분류 시연 스크립트")
-    head = page.rindex("<script", 0, i)
-    assert "type=" not in page[head:i], "시연 스크립트가 module 로 바뀌었다"
-    assert "onclick=" in page, "인라인 onclick 이 사라졌다면 배선을 다시 확인할 것"
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "파싱·분류 시연 스크립트" not in page, "인라인 시연 스크립트가 되살아났다"
+    assert 'type="module" src="./app.js"' in page, "모듈 배선이 없다"
+    for fn in ("analyzeFile", "analyzeLargeAsync", "persistToQueue", "renderParseDetail"):
+        assert fn in app, f"app.js 로 옮긴 기능이 없다: {fn}"
+    # 파일 샘플은 인라인 onclick 이 아니라 data 속성 + 리스너로 배선한다(모듈엔 전역이 없다).
+    assert "loadSample(" not in page, "옛 전역 함수 호출이 남아 있다"
+    assert page.count("data-doc=") >= 6, "참고 샘플 배선(data-doc)이 빠졌다"
 
 
 def test_demo_reflect_marker_is_preserved():
@@ -81,7 +90,9 @@ def test_demo_reflect_marker_is_preserved():
     admin.py 의 DEMO_CREATED_BY='demo-console' 하나로 물리삭제 범위가 고정돼 있다.
     """
     page = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert "demo-console" in page
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "demo-console" in page, "화면 안내에서 마커가 빠졌다"
+    assert "demo-console" in app, "실적재 요청에서 마커가 빠졌다"
 
 
 def test_demo_button_grouping_matches_measured_expectations():

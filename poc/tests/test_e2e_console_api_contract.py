@@ -78,7 +78,9 @@ _FETCH = re.compile(
     r"""fetch\(\s*(?:`([^`]*)`|'([^']*)'|"([^"]*)")\s*(?:,\s*(\{.{0,240}))?""",
     re.S,
 )
-_APIURL = re.compile(r"""apiUrl\(\s*["']([^"']+)["']""")
+# apiUrl 은 따옴표 문자열과 템플릿 리터럴 둘 다 받는다 — 후자를 못 읽으면
+# `/classify/jobs/${id}` 같은 호출이 스캔에서 통째로 빠진다.
+_APIURL = re.compile(r"""apiUrl\(\s*(?:["']([^"']+)["']|`([^`]+)`)""")
 
 
 def _clean(raw: str) -> str | None:
@@ -117,7 +119,7 @@ def _console_calls() -> set[tuple[str, str]]:
             mm = re.search(r"method\s*:\s*['\"](GET|POST|PUT|PATCH|DELETE)['\"]", opts)
             found.add(((mm.group(1) if mm else "GET"), p))
         for m in _APIURL.finditer(src):
-            p = _clean(m.group(1))
+            p = _clean(m.group(1) or m.group(2) or "")
             if p:
                 # app.js 의 apiUrl 은 호출부에서 method 를 준다 — 주변에서 찾는다.
                 head = src[max(0, m.start() - 40): m.start()]

@@ -275,6 +275,7 @@ async function runClassify() {
   }
   $("#btn-classify").disabled = true;
   clearResult();
+  hideParseDetail();
   const stageMap = {};
   STAGES.forEach((s) => { stageMap[s.key] = "pending"; });
   renderStages(stageMap);
@@ -488,12 +489,196 @@ function renderStagesFromAnalyze(stages) {
   });
 }
 
+// ──────────────────────────────────────────────────────────────────────
+// 파일 분석 — 파싱 → 검수 게이트 → 등급까지 한 번에
+//   [2026-08-24] 별도 구역(#sec-parse, 구 parse_demo.html)의 인라인 스크립트를 여기로
+//   합쳤다. 같은 엔드포인트를 두 코드가 각각 호출하고 등급 결과 카드를 두 벌 그리고
+//   있었다(사용자 지적). 결과 렌더는 §2 한 곳(renderResult)으로 모으고, 파싱 세부와
+//   검수 게이트만 §2 안의 접이식 「파싱 상세」로 내린다.
+// ──────────────────────────────────────────────────────────────────────
+
+// ICD 문서 속성 — API 는 진작부터 받는데 입력칸이 없어 아무도 쓸 수 없던 세 필드.
+// 관리성(M)은 본문에서 관측되지 않으므로(짧은 문서가 자기 접근통제를 진술하지 않는다)
+// 이 값이 유일한 근거다. ⚠ 빈 값은 보내지 않는다 — documents.py 주석: 빈 값을 넣으면
+// "unknown" 과 "명시적으로 없음" 이 구분되지 않아 관리성 판정이 뒤집힌다.
+const ICD_FIELDS = [
+  ["source_type", "#icd-source"],
+  ["security_marking", "#icd-marking"],
+  ["access_scope", "#icd-scope"],
+];
+function icdEntries() {
+  const out = [];
+  ICD_FIELDS.forEach(([field, sel]) => {
+    const el = $(sel);
+    const v = el && el.value ? el.value.trim() : "";
+    if (v) out.push([field, v]);
+  });
+  return out;
+}
+
+/* 분석 진행 팝업 — 큰 문서는 몇 분이 걸린다.
+ * 서버가 진행률을 주지 않으므로 **경과 시간**과 **예상 시간**만 보여 준다.
+ * 예상은 223 실측(2026-08-21)에서 나온 계수다: 14청크 6.2초 → 고정비 약 0.5초 + 0.4초/청크.
+ * 청크 수는 서버가 파싱해야 알 수 있으므로 파일 크기로 어림한다(1청크 ≈ 350자 ≈ 700바이트).
+ * 어림이라는 것을 화면에 그대로 적는다 — 정확한 척하지 않는다. */
+const analyzeProgress = (function () {
+  let box = null, t0 = 0, timer = null, est = 0;
+  function ensure() {
+    if (box) return box;
+    box = document.createElement("div");
+    box.id = "analyze-progress";
+    box.style.cssText = "position:fixed;inset:0;background:rgba(17,17,17,.72);display:flex;"
+      + "align-items:center;justify-content:center;z-index:300;padding:20px";
+    box.innerHTML = '<div style="background:#fff;max-width:420px;width:100%;padding:26px 28px;'
+      + 'box-shadow:0 12px 40px rgba(0,0,0,.28)">'
+      + '<div style="display:flex;align-items:center;gap:10px">'
+      + '<span id="ap-spin" style="display:inline-block;width:15px;height:15px;border:2px solid #d9d9d6;'
+      + 'border-top-color:#111;border-radius:50%;animation:ap-rot .8s linear infinite"></span>'
+      + '<b style="font-size:15px">문서를 분석하고 있습니다</b></div>'
+      + '<div id="ap-file" style="margin-top:10px;font-size:12.5px;color:#70757a;word-break:break-all"></div>'
+      + '<div style="display:flex;gap:22px;margin-top:16px">'
+      + '<div><div style="font-size:11px;color:#8f9498">경과</div>'
+      + '<b id="ap-el" style="font:700 22px/1.2 Arial,sans-serif">0초</b></div>'
+      + '<div><div style="font-size:11px;color:#8f9498">예상(어림)</div>'
+      + '<b id="ap-est" style="font:700 22px/1.2 Arial,sans-serif;color:#70757a">–</b></div></div>'
+      + '<div style="height:4px;background:#eceae7;margin-top:14px;overflow:hidden">'
+      + '<div id="ap-bar" style="height:100%;width:0;background:#111;transition:width .4s linear"></div></div>'
+      + '<div id="ap-note" style="margin-top:12px;font-size:12px;color:#70757a;line-height:1.6"></div></div>';
+    const st = document.createElement("style");
+    st.textContent = "@keyframes ap-rot{to{transform:rotate(360deg)}}";
+    document.body.appendChild(st);
+    document.body.appendChild(box);
+    return box;
+  }
+  function fmtSec(s) { return s < 60 ? s + "초" : Math.floor(s / 60) + "분 " + String(s % 60).padStart(2, "0") + "초"; }
+  return {
+    start(file) {
+      ensure().style.display = "flex";
+      const bytes = (file && file.size) || 0;
+      const chunks = Math.max(1, Math.round(bytes / 700));
+      est = Math.max(3, Math.round(0.5 + chunks * 0.4));
+      document.getElementById("ap-file").textContent =
+        (file ? file.name : "") + (bytes ? ("  ·  " + bytes.toLocaleString() + "B  ·  청크 약 " + chunks.toLocaleString() + "개") : "");
+      document.getElementById("ap-est").textContent = fmtSec(est);
+      document.getElementById("ap-note").textContent = chunks > 60
+        ? "큰 문서라 몇 분 걸릴 수 있습니다. 창을 닫지 마십시오 — 끝나면 결과가 바로 나옵니다."
+        : "첫 요청은 모델을 올리느라 조금 더 걸립니다.";
+      t0 = Date.now();
+      clearInterval(timer);
+      timer = setInterval(() => {
+        const el = Math.round((Date.now() - t0) / 1000);
+        document.getElementById("ap-el").textContent = fmtSec(el);
+        /* 예상을 넘기면 막대를 95%에서 멈춘다 — 100%로 채워 놓고 안 끝나면 그게 거짓말이다. */
+        const pct = Math.min(95, Math.round(el / Math.max(est, 1) * 100));
+        document.getElementById("ap-bar").style.width = pct + "%";
+        if (el > est) document.getElementById("ap-est").textContent = fmtSec(est) + " 초과";
+      }, 1000);
+    },
+    note(msg) {
+      const el = box && document.getElementById("ap-note");
+      if (el) el.textContent = msg;
+    },
+    stop() { clearInterval(timer); if (box) box.style.display = "none"; },
+  };
+})();
+
+function _pdFmt(x) { return (x == null) ? "—" : Number(x).toFixed(3); }
+
+// 파싱 상세 — 추출기·품질·글자수·청크·표·PII·오류 + 검수 게이트.
+// 파일 분석에만 있는 정보라 텍스트 분류에서는 접이식 자체를 숨긴다.
+function renderParseDetail(j) {
+  const fold = $("#parse-detail");
+  const kvBox = $("#parse-kv");
+  const gateBox = $("#gate-box");
+  if (!fold || !kvBox || !gateBox) return;
+  const p = j.parse || {};
+  /* [2026-08-21] 파싱 결과를 이름/값 11줄로 세워 놓으니 세로로만 길고 읽기 나빴다
+     (사용자 지적). 숫자는 타일로 묶고 나머지는 한 줄짜리 메모로 내린다. */
+  const tile = (cap, val, sub, warn) => `
+    <div style="border:1px solid var(--border,#e1e1de);padding:9px 11px;min-width:0">
+      <div style="font-size:11px;color:var(--text-dim,#8f9498);letter-spacing:.02em">${escapeHtml(cap)}</div>
+      <div style="font:700 17px/1.25 var(--font-sans,sans-serif);margin-top:2px;color:${warn ? "#bf2337" : "inherit"};word-break:break-all">${escapeHtml(val)}</div>
+      ${sub ? `<div style="font-size:11px;color:var(--text-dim,#8f9498);margin-top:1px">${escapeHtml(sub)}</div>` : ""}
+    </div>`;
+  const note = (cap, val, warn) => `
+    <div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--border,#e1e1de);font-size:12.5px">
+      <span style="flex:0 0 92px;color:var(--text-dim,#8f9498)">${escapeHtml(cap)}</span>
+      <span style="flex:1;min-width:0;word-break:break-all;color:${warn ? "#bf2337" : "inherit"}">${escapeHtml(val)}</span>
+    </div>`;
+  const q = Number(p.extraction_quality || 0);
+  kvBox.innerHTML = `
+    <div style="font:600 13.5px/1.45 var(--font-sans,sans-serif);word-break:break-all">${escapeHtml(j.filename || "")}</div>
+    <div style="font-size:12px;color:var(--text-dim,#8f9498);margin:2px 0 12px">
+      ${escapeHtml((p.source_format || "?").toUpperCase())} · ${(j.file_size_bytes || 0).toLocaleString()}B ·
+      추출기 ${escapeHtml(p.extraction_method || "—")}${p.ocr_used ? " (OCR)" : ""}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px">
+      ${tile("추출 품질", _pdFmt(p.extraction_quality), "콘텐츠 " + _pdFmt(p.content_quality), q > 0 && q < 0.8)}
+      ${tile("글자수", (p.char_count || 0).toLocaleString(), "청크 " + (p.chunk_count || 0) + "개")}
+      ${tile("구조화 표", (p.table_count || 0) + "개", "셀 " + (p.table_cell_count || 0) + "개")}
+      ${tile("PII 마스킹", (p.pii_masked_count || 0) + "건", p.table_coverage ? ("표 커버리지 " + p.table_coverage) : "")}
+    </div>
+    <div style="margin-top:12px">
+      ${note("추출 오류", p.extract_error || "없음", !!p.extract_error)}
+      ${(p.warnings || []).length ? note("파싱 경고", (p.warnings || []).join(", ")) : ""}
+    </div>`;
+  const g = j.gate || {};
+  gateBox.innerHTML = g.requires_review
+    ? `<div class="gate-review"><b>검수 필요</b> — 자동 확정하지 않고 사람 검수로 라우팅됩니다.<div>${(g.reasons || []).map((r) => `<span class="reason-chip">${escapeHtml(r)}</span>`).join("")}</div></div>`
+    : `<div class="gate-ok"><b>자동 경로 통과</b> — 추출 품질·표·OCR 이상 없음(무오탐).</div>`;
+  fold.open = true;
+}
+
+// 텍스트 분류에는 파싱 단계가 없다 — 접이식은 남기되 내용을 안내로 되돌린다.
+// (숨기지 않는 이유: #sec-parse 앵커가 사용설명서·배포 가이드에 인쇄돼 있어
+//  그 주소로 온 사람이 빈 자리에 떨어지면 안 된다.)
+function hideParseDetail() {
+  const fold = $("#parse-detail");
+  if (fold) fold.open = false;
+  const kv = $("#parse-kv");
+  if (kv) kv.innerHTML = '<span class="hint">파일을 올리면 추출기·추출 품질·글자수·청크 수·구조화 표·PII 마스킹 건수가 여기에 표시됩니다.</span>';
+  const gate = $("#gate-box");
+  if (gate) gate.innerHTML = "";
+  const pb = $("#persist-box");
+  if (pb) pb.innerHTML = "";
+}
+
+// analyze 응답 → §2 결과 렌더 (동기·비동기 경로 공통)
+function renderAnalyzeResult(j, ms, file) {
+  const c = j.classification;
+  renderStagesFromAnalyze(j.stages);
+  renderParseDetail(j);
+  if (!c) {
+    logLine("err", "← 200 그러나 분류 없음 (본문 0자/게이트) — 검수 필요");
+    showError("본문 추출 0자 또는 안전 게이트 → 검수 필요");
+    return null;
+  }
+  const data = {
+    label: c.label, confidence: c.confidence, scores: c.scores,
+    evaluation_factors: c.factors, factors_source: c.factors_source,
+    evidence: (j.evidence || []), model_version: c.model_version, elapsed_ms: c.elapsed_ms,
+    warnings: c.warnings || [], status: c.status,
+    rule_grade: c.rule_grade, model_grade: c.model_grade, decision_path: c.decision_path,
+  };
+  state.currentSampleId = null;
+  state.lastResult = data;
+  $("#doc-title").value = file.name;
+  $("#doc-body").value = j.text_preview || "";
+  renderResult(data, ms);
+  // 본문 하이라이트 명시적 재호출(업로드 경로 확실히 반영)
+  renderBodyPreview($("#doc-body").value);
+  const g = j.gate || {};
+  logLine("ok", `← 200  최종 ${data.label}  (룰 ${data.rule_grade} · 모델 ${data.model_grade})  ${ms}ms · 파싱 ${(j.parse && j.parse.char_count) || 0}자${g.requires_review ? " · 게이트:검수" : ""}`);
+  return data;
+}
+
 async function analyzeFile(file) {
   if (!ensureReady()) return;
   if (!file) return;
   $("#btn-classify").disabled = true;
   const _dz = $("#doc-drop"); if (_dz) _dz.classList.add("busy");
   clearResult();
+  hideParseDetail();
   // 이전 샘플 잔재 초기화 — '지금 분석 중 = 이 파일'만 명확히 보이게
   const _sel = $("#sample-select"); if (_sel) _sel.value = "";
   const _tr = $("#toggle-row"); if (_tr) _tr.innerHTML = "";
@@ -506,46 +691,231 @@ async function analyzeFile(file) {
   STAGES.forEach((s) => { stageMap[s.key] = "pending"; });
   renderStages(stageMap);
   scrollToResult();
+  analyzeProgress.start(file);
   const fd = new FormData();
   fd.append("file", file);
   fd.append("return_evidence", "true");
+  icdEntries().forEach(([field, v]) => fd.append(field, v));
   const t0 = performance.now();
+  // 대용량 비동기 경로로 넘어갔는가 — 그 경로에서는 실적재를 하지 않는다.
+  let wentAsync = false;
   logLine("ev", `POST /api/v1/documents/analyze  ← ${file.name} (${file.size.toLocaleString()} bytes)`);
   try {
     const resp = await fetch(apiUrl("/api/v1/documents/analyze"), { method: "POST", headers: authHeaders(), body: fd });
-    const ms = Math.round(performance.now() - t0);
-    const j = await resp.json();
-    if (!resp.ok) { logLine("err", `HTTP ${resp.status}  ${JSON.stringify(j).slice(0, 160)}`); showError(`HTTP ${resp.status}: ${JSON.stringify(j).slice(0, 200)}`); return; }
-    const c = j.classification;
-    if (!c) {
-      renderStagesFromAnalyze(j.stages);
-      logLine("err", `← 200 그러나 분류 없음 (본문 0자/게이트) — 검수 필요`);
-      showError("본문 추출 0자 또는 안전 게이트 → 검수 필요");
-      return;
+    let ms = Math.round(performance.now() - t0);
+    let j = await resp.json();
+    if (!resp.ok) {
+      const detail = (j && (j.detail || j.message)) || "";
+      /* [2026-08-23] 대용량 자동 전환. 상한(analyze_sync_max_chunks)이 있는 이유는 이 경로가
+         추출부터 분류까지 한 요청 안에서 끝내기 때문이지 문서를 처리할 수 없어서가 아니다.
+         classify=false 로 본문만 회수해 POST /classify/async 로 넘기면 워커에서 분류된다.
+         DB 적재는 하지 않는다 — doc_id 를 비-UUID 로 보내 서버 영속화 가드가 건너뛰게 한다. */
+      const cap = String(detail).match(/(\d+) chunks > (\d+)/);
+      if (resp.status === 413 && cap) {
+        j = await analyzeLargeAsync(file, cap);
+        if (!j) return;
+        ms = Math.round(performance.now() - t0);
+        wentAsync = true;
+      } else {
+        logLine("err", `HTTP ${resp.status}  ${JSON.stringify(j).slice(0, 160)}`);
+        showError(`HTTP ${resp.status}: ${JSON.stringify(j).slice(0, 200)}`);
+        return;
+      }
     }
-    const data = {
-      label: c.label, confidence: c.confidence, scores: c.scores,
-      evaluation_factors: c.factors, factors_source: c.factors_source,
-      evidence: (j.evidence || []), model_version: c.model_version, elapsed_ms: c.elapsed_ms,
-      warnings: c.warnings || [], status: c.status,
-      rule_grade: c.rule_grade, model_grade: c.model_grade, decision_path: c.decision_path,
-    };
-    renderStagesFromAnalyze(j.stages);
-    state.currentSampleId = null;
-    state.lastResult = data;
-    $("#doc-title").value = file.name;
-    $("#doc-body").value = j.text_preview || "";
-    renderResult(data, ms);
-    // 본문 하이라이트 명시적 재호출(업로드 경로 확실히 반영)
-    renderBodyPreview($("#doc-body").value);
-    const g = j.gate || {};
-    logLine("ok", `← 200  최종 ${data.label}  (룰 ${data.rule_grade} · 모델 ${data.model_grade})  ${ms}ms · 파싱 ${(j.parse && j.parse.char_count) || 0}자${g.requires_review ? " · 게이트:검수" : ""}`);
+    const data = renderAnalyzeResult(j, ms, file);
+    // 실적재 — 검수 대상일 때만. 자동 확정 건까지 큐에 넣으면 큐가 데모로 오염된다.
+    // 대용량 비동기 경로는 제외한다 — 큰 문서를 조용히 적재하지 않는다(원 구역과 같은 규칙).
+    const persist = $("#persist-demo");
+    if (persist && persist.checked && !wentAsync && (!data || data.status === "needs_review")) {
+      await persistToQueue(j, file);
+    } else if (persist && persist.checked && wentAsync) {
+      logLine("info", "실적재 건너뜀 — 대용량 비동기 경로는 적재하지 않습니다.");
+    }
   } catch (e) {
     logLine("err", `오류: ${e.message}`);
     showError(e.message);
   } finally {
+    analyzeProgress.stop();
     $("#btn-classify").disabled = false;
     const dz = $("#doc-drop"); if (dz) dz.classList.remove("busy");
+  }
+}
+
+/* 대용량 자동 전환 — 적재 없이 비동기로 분류한다.
+   (1) POST /documents/analyze (classify=false) — 추출·정규화·PII·청킹까지만. 이 엔드포인트는
+       설계상 read-only 라 documents/chunks 를 쓰지 않는다(documents.py docstring).
+   (2) POST /classify/async {doc_id:"demo-nopersist-<ts>", content} — 브로커가 살아 있으면
+       Celery 워커에서 돈다(gunicorn 요청 타임아웃 밖). doc_id 가 UUID 가 아니라서 서버의
+       영속화 가드가 저장을 건너뛴다 → documents·classifications 어디에도 행이 생기지 않는다.
+   (3) GET /classify/jobs/{id} 폴링 → 결과를 (1)의 응답에 합쳐 평소와 같은 화면으로 그린다.
+   주의: 「실적재」는 이 경로에서 동작하지 않는다 — 대용량 건을 조용히 적재하지 않는다. */
+async function analyzeLargeAsync(file, cap) {
+  analyzeProgress.note("큰 문서 — 본문을 추출한 뒤 비동기 분류로 넘깁니다…");
+  logLine("info", `대용량 전환: 청크 ${cap[1]}개 > 동기 한도 ${cap[2]}개 → classify=false 추출 + /classify/async (DB 적재 없음)`);
+  try {
+    // (1) 추출만 — 청크 상한 게이트를 타지 않는다(상한은 분류 비용 때문에 있는 것이다).
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("return_evidence", "true");
+    fd.append("full_text", "true");
+    fd.append("classify", "false");
+    icdEntries().forEach(([field, v]) => fd.append(field, v));
+    const r = await fetch(apiUrl("/api/v1/documents/analyze"), { method: "POST", headers: authHeaders(), body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(`추출 실패 HTTP ${r.status} ${String((j && j.detail) || "").slice(0, 200)}`);
+    const text = (j.text || j.text_preview || "").trim();
+    if (!text) {
+      renderStagesFromAnalyze(j.stages);
+      renderParseDetail(j);
+      showError("본문 추출 0자 — 분류하지 않았습니다.");
+      return null;
+    }
+    // ClassifyRequest.content 의 max_length. 넘기면 422 가 나므로 먼저 이유를 말한다.
+    const MAX = 1048576;
+    if (text.length > MAX) throw new Error(`본문 ${text.length.toLocaleString()}자 — 비동기 분류 본문 상한 ${MAX.toLocaleString()}자 초과`);
+    logLine("info", `추출 완료 ${text.length.toLocaleString()}자 · 청크 ${(j.parse || {}).chunk_count || "?"} — 비동기 분류 제출`);
+
+    // (2) 제출. doc_id 를 비-UUID 로 보내 서버가 저장을 건너뛰게 한다.
+    const meta = {};
+    icdEntries().forEach(([field, v]) => { meta[field] = v; });
+    const sub = await fetch(apiUrl("/api/v1/classify/async"), {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: JSON.stringify({
+        doc_id: "demo-nopersist-" + Date.now(),
+        title: file.name,
+        content: text,
+        metadata: Object.keys(meta).length ? meta : null,
+        return_evidence: true,
+      }),
+    });
+    const sj = await sub.json().catch(() => ({}));
+    if (!sub.ok || !sj.job_id) throw new Error(`분류 제출 실패 HTTP ${sub.status} ${JSON.stringify(sj).slice(0, 200)}`);
+    logLine("info", `비동기 분류 job ${sj.job_id} (${sj.status || "?"})`);
+
+    // (3) 폴링. 서버 작업 상한(celery soft 900초)보다 길게 기다리지 않는다.
+    let res = null;
+    for (let i = 0; i < 450; i++) {
+      await new Promise((z) => setTimeout(z, 2000));
+      const st = await fetch(apiUrl(`/api/v1/classify/jobs/${encodeURIComponent(sj.job_id)}`), { headers: authHeaders() });
+      const sd = await st.json().catch(() => ({}));
+      if (!st.ok) throw new Error(`잡 조회 실패 HTTP ${st.status}`);
+      analyzeProgress.note(`비동기 분류 중 — ${sd.status || "?"} (${(i + 1) * 2}초)`);
+      if (sd.status === "done" || sd.status === "partial") { res = (sd.results || [])[0]; break; }
+      if (sd.status === "failed") throw new Error(`분류 실패: ${sd.error || "사유 미상"}`);
+    }
+    if (!res) throw new Error("900초 안에 끝나지 않았습니다 — 서버 작업 시간 상한(celery soft 900초) 확인 필요");
+
+    /* ClassifyResponse → AnalyzeClassification 모양으로 맞춘다(같은 렌더를 쓴다).
+       'persistence skipped: ... is not a UUID' 는 **설계대로 저장을 건너뛴 것**이라 경고에서
+       뺀다 — 동기 경로도 같은 이유로 뺀다(documents.py). 다른 persistence 경고는 남긴다. */
+    const warns = (res.warnings || []).filter((w) => !(String(w).indexOf("persistence skipped") >= 0 && String(w).indexOf("is not a UUID") >= 0));
+    const gate = j.gate || {};
+    let status = res.status;
+    // 동기 경로와 같은 승격 규칙 — 추출 게이트가 검수를 요구하면 needs_review 로 올린다.
+    if (gate.requires_review && status !== "needs_review") {
+      status = "needs_review";
+      warns.push(`extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (${(gate.reasons || []).join(", ")})`);
+    }
+    j.classification = {
+      label: res.label, confidence: Math.round((res.confidence || 0) * 1000) / 1000,
+      scores: res.scores || {}, status: status, model_version: res.model_version,
+      factors: res.evaluation_factors || {}, factors_source: res.factors_source || null,
+      rule_factors: res.rule_evaluation_factors || null,
+      warnings: warns, elapsed_ms: res.elapsed_ms || 0,
+      rule_grade: res.rule_grade || null, model_grade: res.model_grade || null,
+      decision_path: res.decision_path || null,
+    };
+    j.evidence = res.evidence || [];
+    const sk = (j.stages || []).find((s) => s.name === "분류");
+    if (sk) {
+      sk.status = "done";
+      sk.detail = `${res.label} · ${res.model_version} (비동기 워커 · DB 미적재)`;
+      sk.ms = res.elapsed_ms || null;
+    }
+    (j.stages || []).push({
+      name: "결과",
+      status: (status === "needs_review" ? "review" : "done"),
+      detail: (status === "needs_review" ? "검수 필요(needs_review)" : "자동 확정(staging)") + " — 비동기 경로, 데이터베이스에 저장하지 않았습니다",
+    });
+    logLine("ok", `비동기 분류 OK ${res.label} status=${status}`);
+    return j;
+  } catch (e) {
+    logLine("err", `비동기 분류 오류: ${e.message}`);
+    showError(`비동기 분류 중단 — ${e.message}`);
+    return null;
+  }
+}
+
+// 실적재 — 분석과 별개로 실제 서빙 경로(POST /documents → /classify)로 적재해
+// needs_review 건이 거버넌스 콘솔 DB 검수 큐에 나타나게 한다. created_by=demo-console 마커라
+// admin의 「데모 데이터 초기화」로 스코프 삭제 가능. RAG 는 'demo' 컬렉션(평가 'docs' 분리)에 색인.
+async function persistToQueue(analysis, file) {
+  const box = $("#persist-box");
+  if (!file || !box) return;
+  box.innerHTML = '<span class="hint">실적재 중… (POST /documents → /classify)</span>';
+  const hdrRole = Object.assign({ "X-Actor-Role": "admin" }, authHeaders());
+  try {
+    // 1) 실제 적재 — documents/chunks 저장 + RAG demo 색인, created_by=demo-console 마커
+    const fd = new FormData();
+    fd.append("actor", JSON.stringify({ user_id: "demo-console", role: "admin" }));
+    fd.append("index_for_rag", "true");
+    fd.append("rag_namespace", "demo");
+    fd.append("file", file);
+    /* [2026-08-21] 분석과 **같은 ICD 값**을 실적재에도 싣는다.
+       종전에는 이 경로가 세 필드를 안 보내서, 화면에는 S1 로 분석돼 있는데 검수 큐에 들어간
+       문서는 S2 가 되는 모순이 났다(같은 파일·같은 화면인데 등급이 다르다). */
+    icdEntries().forEach(([field, v]) => fd.append(field, v));
+    const up = await fetch(apiUrl("/api/v1/documents"), { method: "POST", headers: hdrRole, body: fd });
+    const uj = await up.json().catch(() => ({}));
+    if (!up.ok || !uj.doc_id) {
+      box.innerHTML = `<div class="gate-review"><b>실적재 실패(업로드)</b>: HTTP ${up.status} ${escapeHtml(JSON.stringify(uj).slice(0, 180))}</div>`;
+      logLine("err", `실적재 업로드 실패 HTTP ${up.status}`);
+      return;
+    }
+    logLine("ok", `적재 OK doc_id=${uj.doc_id} (검수필요=${uj.requires_review} · RAG색인=${uj.rag_indexed})`);
+    // 2) 실제 서빙 경로 분류 — 본문을 직접 전달. 적재 시 ingestion needs_review 격리는
+    //    서버가 존중(_ingestion_flagged_for_doc)해 검수 큐에 실린다.
+    const content = (analysis && analysis.text_preview) || "";
+    const cl = await fetch(apiUrl("/api/v1/classify"), {
+      method: "POST",
+      headers: Object.assign({ "Content-Type": "application/json" }, hdrRole),
+      body: JSON.stringify(content ? { doc_id: uj.doc_id, content: content } : { doc_id: uj.doc_id }),
+    });
+    const cj = await cl.json().catch(() => ({}));
+    if (!cl.ok) {
+      box.innerHTML = `<div class="gate-review"><b>실적재 분류 실패</b>: HTTP ${cl.status} ${escapeHtml(JSON.stringify(cj).slice(0, 180))}</div>`;
+      logLine("err", `실적재 분류 실패 HTTP ${cl.status}`);
+      return;
+    }
+    const st = cj.status || "?";
+    const routed = (st === "needs_review");
+    box.innerHTML = `<div class="${routed ? "gate-review" : "gate-ok"}">
+      <b>실적재 완료</b> — doc_id <code>${escapeHtml(uj.doc_id)}</code> · 등급 <b>${escapeHtml(cj.label || "?")}</b> · 상태 <b>${escapeHtml(st)}</b>
+      <div style="margin-top:4px">${routed
+        ? "→ <b>거버넌스 콘솔 → 「DB 검수 큐 불러오기」</b> 하면 이 문서가 검수 대기로 나타납니다."
+        : "자동 확정(staging) — needs_review 가 아니라 검수 큐에는 나타나지 않습니다."}</div></div>`;
+    logLine("ok", `실적재 분류 OK ${cj.label || "?"} status=${st}`);
+  } catch (e) {
+    box.innerHTML = `<div class="gate-review"><b>실적재 오류</b>: ${escapeHtml(e.message)}</div>`;
+    logLine("err", `실적재 오류: ${e.message}`);
+  }
+}
+
+// 참고 샘플 6종 — 정적 자산을 받아 업로드와 **같은 경로**로 분석한다(별도 분기 없음).
+async function loadFileSample(url, name) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) { logLine("err", `샘플 로드 실패 ${name} HTTP ${r.status}`); showError(`샘플 로드 실패: HTTP ${r.status}`); return; }
+    const blob = await r.blob();
+    const f = new File([blob], name, { type: blob.type || "application/octet-stream" });
+    logLine("ev", `시연 샘플 로드: ${name} (${f.size.toLocaleString()}B) → 분석 실행`);
+    const nameBox = $("#doc-file-name");
+    if (nameBox) nameBox.textContent = `${f.name} (${f.size.toLocaleString()} bytes)`;
+    await analyzeFile(f);
+  } catch (e) {
+    logLine("err", `샘플 로드 오류: ${e.message}`);
+    showError(e.message);
   }
 }
 
@@ -810,6 +1180,7 @@ function renderKeywordChips(evidence) {
 }
 
 function clearResult() {
+  hideParseDetail();
   $("#result-head").innerHTML = "";
   $("#result-summary").innerHTML = "";
   $("#result-factors").innerHTML = "";
@@ -1149,6 +1520,10 @@ async function init() {
       handleFile(e.dataTransfer.files && e.dataTransfer.files[0]);
     });
   }
+  // 참고 샘플 6종 — 인라인 onclick 대신 data 속성으로 바인딩(모듈이라 전역이 없다)
+  $$("[data-doc]").forEach((btn) => {
+    btn.addEventListener("click", () => loadFileSample(btn.dataset.doc, btn.dataset.name || btn.dataset.doc));
+  });
   $("#btn-reset").addEventListener("click", () => {
     $("#doc-title").value = "";
     $("#doc-body").value = "";

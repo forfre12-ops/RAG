@@ -142,6 +142,108 @@ export const scenarios = [
   },
 
   {
+    // [2026-08-24] 합친 화면 — 파싱 세부는 별도 구역이 아니라 §2 결과 안의 접이식이다.
+    // 종전에는 이 값들을 그리는 코드가 인라인 스크립트에 따로 있었고 시험이 없었다.
+    id: 'demo.upload.parse-detail',
+    needsData: true,
+    title: '파일을 올리면 파싱 상세(추출기·청크·PII·게이트)가 결과 안에 채워진다',
+    async run({ server, check }) {
+      const page = await demo(server);
+      page.attachFile('doc-file', { name: '기술이전 계약초안.pdf' });
+      await page.until(() => page.text('result-head').includes('S1'), 8000);
+      await page.settle();
+
+      const kv = page.text('parse-kv');
+      check.ok(page.$('parse-detail'), '파싱 상세 접이식이 있다');
+      check.includes(kv, 'pdfminer', '추출기가 표시된다');
+      check.includes(kv, '5,230', '추출 글자수가 표시된다');
+      check.includes(kv, '7', '청크 수가 표시된다');
+      check.includes(kv, 'PII', 'PII 마스킹 건수 칸이 있다');
+      check.matches(page.text('gate-box'), /자동 경로 통과|검수 필요/, '검수 게이트 판정이 표시된다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    // ICD 3필드는 API 가 진작부터 받는데 입력칸이 어느 화면에도 없던 것을 2026-08-21 에
+    // 붙였다. 합치면서 §1 로 옮겼다 — 고른 값만 실려 나가는지(빈 값은 안 나가는지) 지킨다.
+    id: 'demo.upload.icd-fields',
+    needsData: true,
+    title: '문서 속성(ICD)을 고르면 분석 요청에 함께 실려 나간다',
+    async run({ server, check }) {
+      const page = await demo(server);
+      page.set('icd-marking', 'secret');
+      page.set('icd-scope', 'approved_only');
+      page.attachFile('doc-file', { name: '기술이전 계약초안.pdf' });
+      await page.until(() => page.text('result-head').includes('S1'), 8000);
+      await page.settle();
+
+      const call = server.lastCall('POST', '/documents/analyze');
+      check.ok(call, 'POST /documents/analyze 가 나갔다');
+      check.includes(call?.raw || '', 'security_marking', '보안표시 필드가 실려 나갔다');
+      check.includes(call?.raw || '', 'secret', '보안표시 값이 실려 나갔다');
+      check.includes(call?.raw || '', 'approved_only', '접근범위 값이 실려 나갔다');
+      // 고르지 않은 출처는 보내지 않는다 — 빈 값을 넣으면 '미상'과 '명시적으로 없음'이 섞인다.
+      check.ok(!(call?.raw || '').includes('source_type'), '고르지 않은 출처는 보내지 않는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    // 실적재 — 이 화면에서 DB 검수 큐로 문서를 넣는 유일한 경로. 기본은 꺼져 있고,
+    // 켜도 needs_review 건만 넣는다(자동확정 건까지 넣으면 큐가 데모로 오염된다).
+    // ⚠ countCalls 는 접두 일치라 '/documents' 로 세면 '/documents/analyze' 까지 센다.
+    //    적재 여부는 exactCall 로만 판정한다.
+    id: 'demo.upload.persist-queue',
+    needsData: true,
+    title: '실적재는 기본 꺼짐이고, 켜면 검수 대상만 실제 적재 경로로 나간다',
+    async run({ server, check }) {
+      const page = await demo(server);
+      const box = page.$('persist-demo');
+      check.ok(box, '실적재 체크박스가 있다');
+      check.eq(box.checked, false, '기본은 꺼져 있다');
+
+      page.attachFile('doc-file', { name: '기술이전 계약초안.pdf' });
+      await page.until(() => page.text('result-head').includes('S1'), 8000);
+      await page.settle();
+      check.ok(!server.exactCall('POST', '/documents'), '꺼진 상태에서는 적재하지 않는다');
+
+      // 픽스처 분류는 staging(자동확정) — 켜도 큐에 넣지 않는다.
+      box.checked = true;
+      page.attachFile('doc-file', { name: '기술이전 계약초안.pdf' });
+      await page.settle(6000);
+      check.ok(!server.exactCall('POST', '/documents'), '자동확정 건은 켜도 적재하지 않는다');
+
+      // 검수 대상(needs_review)이면 적재 → 분류까지 실제 서빙 경로로 나간다.
+      server.overrides['POST /documents/analyze'] = {
+        filename: '설계 초안.docx',
+        file_size_bytes: 4096,
+        parse: { source_format: 'docx', extraction_method: 'python-docx', extraction_quality: 0.72, content_quality: 0.7, ocr_used: false, char_count: 900, chunk_count: 2, warnings: [], pii_masked_count: 1, extract_error: null },
+        gate: { requires_review: true, reasons: ['low_extraction_quality'] },
+        classification: {
+          label: 'S1', confidence: 0.42, scores: { TS: 0.1, S1: 0.42, S2: 0.3, S3: 0.18 },
+          status: 'needs_review', model_version: 'v-fe4b386b',
+          factors: { secrecy: 2, value: 1, management: 1 }, factors_source: 'rule_evidenced',
+          rule_factors: null, warnings: ['low_confidence'], elapsed_ms: 180,
+          rule_grade: 'S1', model_grade: 'S2', decision_path: 'disagreement',
+        },
+        evidence: [], text_preview: '설계 초안 본문', text: '설계 초안 본문', stages: [],
+      };
+      page.attachFile('doc-file', { name: '설계 초안.docx' });
+      await page.settle(8000);
+      const up = server.exactCall('POST', '/documents');
+      check.ok(up, '검수 대상은 POST /documents 로 적재된다');
+      check.includes(up?.raw || '', 'demo-console', '데모 마커(created_by)로 태깅해 보낸다');
+      check.ok(server.exactCall('POST', '/classify'), '적재 뒤 실제 서빙 경로로 분류한다');
+      check.includes(page.text('persist-box'), '실적재', '실적재 결과가 화면에 남는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'demo.upload.failure-visible',
     title: '업로드가 실패하면 사유가 화면에 보인다',
     needsMock: true,
@@ -239,14 +341,15 @@ export const scenarios = [
   {
     id: 'demo.health.pill',
     title: '연결 확인이 서버 프로파일을 표시한다',
+    // [2026-08-24] 클릭식 헬스 배지(#health)는 파싱·분류 구역과 함께 없어졌다.
+    // 합친 화면에서는 머리말 배지(#nav-status)를 app.js 가 기동 때 스스로 채운다.
     async run({ server, check }) {
       const page = await demo(server);
-      const pill = page.$('health');
+      const pill = page.$('nav-status');
       check.ok(pill, '헬스 표시가 있다');
-      pill.click();
       await page.settle();
       check.gte(server.countCalls('GET', '/healthz'), 1, 'healthz 를 불렀다');
-      check.includes(page.text('health-txt'), 'full-train', '서버 프로파일이 표시된다');
+      check.includes(page.text('nav-status'), 'full-train', '서버 프로파일이 표시된다');
       return page;
     },
   },

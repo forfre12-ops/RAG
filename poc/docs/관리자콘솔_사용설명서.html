@@ -194,7 +194,7 @@ figure.shot figcaption b{color:var(--ink)}
   <div class="note warn"><b>❓ 파일을 직접 올리는 곳은 어디인가</b><br />
   <b>이 카드에는 파일 업로드가 없습니다.</b> 본문을 붙여넣는 방식입니다. 파일(HWP·PDF·DOCX·XLSX 등)을 올리려면 두 곳 중 하나를 씁니다.
   <ol style="margin-top:8px">
-    <li><b>파싱·분류 시연 페이지</b> — <code>http://223.130.156.134:8000/demo/index.html#sec-parse</code><br />
+    <li><b>문서 업로드·파싱 확인</b> — <code>http://223.130.156.134:8000/demo/index.html#sec-parse</code> (분류 콘솔의 「파일 직접 업로드」 자리. 2026-08-24 통합)<br />
         파일을 끌어다 놓으면 <b>추출 → 정규화 → 청킹 → 분류</b> 전 과정을 단계별로 보여줍니다. 시연에 가장 좋습니다.</li>
     <li><b>골든셋 후보 관리 화면의 [문서 업로드]</b> — 아래 6-2에서 설명합니다. 올린 문서를 <b>정답지 후보 원장</b>에 넣을 때 씁니다.<br />
         (2026-08-18부터 골든셋 빌더 카드에는 파일 선택이 없습니다 — 같은 기능이 두 곳에 있어 후보 관리 화면으로 모았습니다.)</li>
@@ -202,7 +202,7 @@ figure.shot figcaption b{color:var(--ink)}
   </div>
 
   <div class="note tip"><b>중요 — 검수 큐에 쌓이게 하려면</b><br />
-  본문을 붙여넣어 분류하면 결과가 화면에만 나오고 <b>DB 검수 큐에는 안 들어갑니다</b>(문서가 서버에 저장되지 않았기 때문). 검수 큐에 넣으려면 <b>파일을 업로드해서 적재한 뒤 분류</b>해야 합니다. 시연에서는 분류 콘솔의 <b>파싱·분류 시연</b> 구역(<code>/demo/index.html#sec-parse</code>)에서 파일을 올리는 방법을 쓰세요.</div>
+  본문을 붙여넣어 분류하면 결과가 화면에만 나오고 <b>DB 검수 큐에는 안 들어갑니다</b>(문서가 서버에 저장되지 않았기 때문). 검수 큐에 넣으려면 <b>파일을 업로드해서 적재한 뒤 분류</b>해야 합니다. 시연에서는 분류 콘솔의 <b>「파일 직접 업로드」</b>(<code>/demo/index.html#sec-parse</code>)에서 파일을 올리는 방법을 쓰세요.</div>
 
   <h2>5. 검수하기 — AI가 자신 없어 한 문서 고치기</h2>
 
@@ -410,7 +410,7 @@ figure.shot figcaption b{color:var(--ink)}
 
   <p><b>루프 A · 일상 운영 — [운영] 탭</b></p>
   <ol class="steps">
-    <li><b>1 분류</b> — <code>/demo/index.html#sec-parse</code> 에서 파일 업로드 → 파싱·분류 확인, 또는 [운영] 탭 「1 분류 실행」 (10분)</li>
+    <li><b>1 분류</b> — <code>/demo/index.html#sec-parse</code> 에서 파일 업로드 → 등급과 「파싱 상세」 확인, 또는 [운영] 탭 「1 분류 실행」 (10분)</li>
     <li><b>2 검수·확정</b> — [DB 검수 큐 불러오기] → 확정 / 재라벨 (7분)</li>
   </ol>
 

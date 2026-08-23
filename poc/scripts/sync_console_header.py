@@ -51,13 +51,15 @@ TRAILING = {
     ),
     # 구역 이동 링크는 이 화면 안에서만 쓰는 목차다 — 공용 메뉴 4개 뒤에 둔다.
     # href="#sec-parse" 는 tests/test_demo_static_assets.py 가 존재를 잠근다.
+    # [2026-08-24] 파싱·분류 시연을 이 화면의 입력·결과로 합치면서 앵커가 「파일 직접 업로드」
+    # 자리로 옮겨갔다 — 메뉴 이름도 그 자리 이름으로 바꾼다(옛 이름은 없는 구역을 가리켰다).
     "index.html": (
         '<span id="nav-status" class="nav-status warming">'
         '<span class="dot"></span><span>warmup…</span></span>'
         '<a class="nav-link" href="#s1">시연</a>'
         '<a class="nav-link" href="#sec-ops">운영·반영</a>'
         '<a class="nav-link" href="#s3">법령</a>'
-        '<a class="nav-link" href="#sec-parse">파싱·분류</a>'
+        '<a class="nav-link" href="#sec-parse">문서 업로드</a>'
     ),
 }
 

@@ -204,6 +204,9 @@ export async function startServer({ upstream = null } = {}) {
       path: apiPath,
       headers: req.headers,
       body: parsed,
+      // multipart 는 JSON 이 아니라 body 가 '<non-json body>' 로만 남는다.
+      // 어떤 폼 필드를 실어 보냈는지(ICD 3필드 등) 시험이 확인할 수 있게 원문도 남긴다.
+      raw: raw.length ? raw.toString('utf8').slice(0, 8192) : '',
       bytes: raw.length,
       at: state.calls.length,
     };
