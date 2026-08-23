@@ -18,6 +18,50 @@ async function demo(server, opts = {}) {
 
 export const scenarios = [
   {
+    id: 'demo.classify.escalation-explained',
+    writes: true,
+    title: '안전 규칙이 올려 잡은 등급이면 화면이 그 사실을 말한다',
+    why: '실측 2026-08-24: 「룰·모델 모두 TS 로 일치」라고 떠 있는데 검수로 간 카드가 있었다. '
+       + '실제로는 모델 최고점이 S1(0.52)인데 escalation 이 TS(0.46)를 채택했고 그 확률이 임계에 '
+       + '못 미쳐 검수로 간 것이다. 화면이 그걸 말해 주지 않으면 검수자는 이유를 찾을 수 없다.',
+    async run({ server, check }) {
+      // 실제로 났던 판정을 그대로 심는다 — argmax 는 S1 인데 안전 규칙이 TS 를 채택했고,
+      // 채택 등급의 확률이 임계에 못 미쳐 검수로 간 경우.
+      const result = {
+        inference_id: '44444444-4444-4444-8444-444444444444',
+        doc_id: 'demo-input', label: 'TS', confidence: 0.46,
+        scores: { TS: 0.46, S1: 0.52, S2: 0.01, S3: 0.01 },
+        rule_grade: 'TS', model_grade: 'TS', decision_path: '룰·모델 모두 TS 로 일치',
+        status: 'needs_review', model_version: 'v-fe4b386b', elapsed_ms: 12,
+        warnings: ['low-confidence: confidence=0.46 < 0.50 — review recommended'],
+        evidence: [], evaluation_factors: { secrecy: 2, value: 2, management: 2 },
+        factors_source: 'rule_evidenced', rag_context_used: [],
+      };
+      server.overrides['POST /classify/stream'] = {
+        _sse: [
+          { event: 'progress', data: { stage: 'extract', elapsed_ms: 12 } },
+          { event: 'progress', data: { stage: 'finalize', elapsed_ms: 150 } },
+          { event: 'result', data: result },
+        ],
+      };
+      server.overrides['POST /classify'] = result;
+      const page = await demo(server);
+      page.set('doc-body', '본 문서는 당사의 영업비밀에 해당하며 대외 반출을 금한다.');
+      page.click('btn-classify');
+      await page.until(() => page.text('result-head').includes('TS'), 8000);
+      await page.settle();
+
+      const all = page.text('result-head') + page.text('result-summary') + page.text('result-dual');
+      check.includes(all, '검수 필요', '검수 결정이 표시된다');
+      check.matches(all, /안전 규칙이 더 높은 TS/, '올려 잡았다는 사실이 설명된다', all);
+      check.matches(all, /가장 높게 본 등급은 S1/, '모델 최고점 등급이 무엇인지 밝힌다', all);
+      // 화면에서 신뢰도 수치를 뺀 결정은 여기서도 지켜져야 한다.
+      check.ok(!/0\.46|46(\.0)?%|0\.52|52(\.0)?%/.test(all), '확률 수치는 뜨지 않는다', all);
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+  {
     id: 'demo.classify.sse-stages',
     writes: true,
     title: '본문을 넣고 분류하면 SSE 로 단계가 점등되고 최종 등급이 나온다',

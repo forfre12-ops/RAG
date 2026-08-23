@@ -244,28 +244,38 @@ export async function startServer({ upstream = null } = {}) {
       const m = toMatcher(k);
       return m.method === req.method && m.rx.test(apiPath.split('?')[0]);
     });
-    if (ovKey) {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(state.overrides[ovKey]));
-      return;
-    }
-
-    const hit = lookupFixture(req.method, apiPath);
-    /* 스트리밍 응답(SSE) — 본보기가 {_sse:[{event,data},…]} 면 그대로 흘려보낸다.
-     * 시연 화면의 단계 점등이 이 이벤트로 도므로, JSON 한 번으로는 그 경로를 못 본다. */
-    if (hit && hit.body && Array.isArray(hit.body._sse)) {
+    /* [2026-08-24] SSE 송출을 한 함수로 모은다. 종전엔 이 처리가 **본보기 경로에만** 있어서
+     * 덮어쓰기(overrides)는 무조건 JSON 으로 끝났다 - 시나리오가 스트리밍 응답을 바꿔 심을
+     * 방법이 자체가 없었고, 심어도 조용히 JSON 으로 나가 화면이 아무것도 안 그렸다
+     * (실측: 안전규칙 설명 시나리오가 여기서 막혔다). 두 경로가 같은 함수를 쓴다. */
+    async function sendSse(events) {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
       });
-      for (const ev of hit.body._sse) {
-        res.write(`event: ${ev.event}\ndata: ${JSON.stringify(ev.data)}\n\n`);
+      for (const ev of events) {
+        res.write(`event: ${ev.event}
+data: ${JSON.stringify(ev.data)}
+
+`);
         await new Promise((r) => setTimeout(r, ev.delayMs ?? 5));
       }
       res.end();
+    }
+
+    if (ovKey) {
+      const ov = state.overrides[ovKey];
+      if (ov && Array.isArray(ov._sse)) { await sendSse(ov._sse); return; }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(ov));
       return;
     }
+
+    const hit = lookupFixture(req.method, apiPath);
+    /* 스트리밍 응답(SSE) - 본보기가 {_sse:[{event,data},…]} 면 그대로 흘려보낸다.
+     * 시연 화면의 단계 점등이 이 이벤트로 도므로, JSON 한 번으로는 그 경로를 못 본다. */
+    if (hit && hit.body && Array.isArray(hit.body._sse)) { await sendSse(hit.body._sse); return; }
     if (!hit) {
       // 본보기에 없는 경로 = 콘솔이 부르는데 우리가 모르는 경로. 조용히 넘기지 않는다.
       state.calls[state.calls.length - 1].unknown = true;

@@ -433,6 +433,8 @@ function renderDualVerdict(data) {
   const model = data.model_grade || null;
   const final = data.label;
   const decision = data.decision_path || "";
+  const adjustNote = (typeof window !== "undefined" && window.KOIPA_ADJUSTMENT_NOTE)
+    ? window.KOIPA_ADJUSTMENT_NOTE(data) : "";
   const modelCard = model
     ? `<div class="dual-card"><div class="dual-label">② 분류기 (BERT)</div><span class="dual-grade ${_gradeCls(model)}">${_escLog(model)}</span><div class="dual-sub">학습 모델 단독 판정</div></div>`
     : `<div class="dual-card"><div class="dual-label">② 분류기 (BERT)</div><span class="dual-grade g-na">미로드</span><div class="dual-sub">모델 미로드 — 룰 단독</div></div>`;
@@ -440,7 +442,8 @@ function renderDualVerdict(data) {
     `<div class="dual-card"><div class="dual-label">① 룰 엔진</div><span class="dual-grade ${_gradeCls(rule)}">${_escLog(rule || "—")}</span><div class="dual-sub">시드 키워드 S×V×M</div></div>`
     + modelCard
     + `<div class="dual-card final"><div class="dual-label">③ 최종 (결합)</div><span class="dual-grade ${_gradeCls(final)}">${_escLog(final)}</span><div class="dual-sub">안전 규칙 결합 결과</div></div>`
-    + (decision ? `<div class="dual-decision"><b>결합:</b> ${_escLog(decision)}</div>` : "");
+    + (decision ? `<div class="dual-decision"><b>결합:</b> ${_escLog(decision)}</div>` : "")
+    + (adjustNote ? `<div class="dual-decision"><b>안전 규칙:</b> ${_escLog(adjustNote)}</div>` : "");
 }
 
 // 실시간 요청 로그 — 실제 fetch/SSE 기록(위조 아님, 서버 터미널과 대조 가능)
@@ -717,8 +720,12 @@ function renderSummary(data) {
   const warns = Array.isArray(data.warnings) ? data.warnings : [];
   const whyKo = (typeof window !== "undefined" && window.KOIPA_GATE_REASON)
     ? window.KOIPA_GATE_REASON(warns) : "";
+  // 안전 규칙이 모델 최고점과 다른 등급을 채택했으면 그 사실을 같이 적는다 — 「룰·모델 모두
+  // TS 로 일치」 인데 검수로 가는 카드가 검수자에게 설명되지 않던 자리(2026-08-24 사용자 지적).
+  const adjNote = (typeof window !== "undefined" && window.KOIPA_ADJUSTMENT_NOTE)
+    ? window.KOIPA_ADJUSTMENT_NOTE(data) : "";
   const banner = needsReview
-    ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:0;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨<br><span style="font-weight:500;font-size:12px;">사유: ${escapeHtml(whyKo || "자동 확정하지 않고 사람 검수로 라우팅")}</span></p>`
+    ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:0;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨<br><span style="font-weight:500;font-size:12px;">사유: ${escapeHtml(whyKo || "자동 확정하지 않고 사람 검수로 라우팅")}</span>${adjNote ? `<br><span style="font-weight:500;font-size:12px;">${escapeHtml(adjNote)}</span>` : ""}</p>`
     : "";
   const verdictTxt = needsReview
     ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다.`

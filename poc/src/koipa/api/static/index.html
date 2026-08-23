@@ -858,6 +858,8 @@ function render(j){
        같은 표가 두 벌 있어서, 게이트가 늘 때 한쪽만 고치면 화면마다 사유가 달라졌다. */
     const gateReason = (ws) => (window.KOIPA_GATE_REASON ? window.KOIPA_GATE_REASON(ws) : '');
     const why = isReview ? gateReason(c.warnings) : '';
+    // 안전 규칙이 모델 최고점과 다른 등급을 채택했으면 그 사실을 같이 적는다(app.js 와 동일).
+    const adjNote = window.KOIPA_ADJUSTMENT_NOTE ? window.KOIPA_ADJUSTMENT_NOTE(c) : '';
     const verdictBanner = isReview
       ? `<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — ${why?esc(why):'자동 확정하지 않고 사람 검수로 라우팅'}</span></span></div>`
       : `<div class="verdict-banner verdict-auto"><span>자동 확정<span class="vb-sub"> — 게이트 통과(무오탐)</span></span></div>`;
@@ -870,6 +872,7 @@ function render(j){
           <div style="margin-top:12px;font-size:11.5px;color:var(--text-soft);line-height:1.7;border-top:1px solid var(--border-mid);padding-top:10px">
             <b>두 엔진 판정</b> · 룰 <b>${esc(c.rule_grade||'—')}</b> · 분류기(BERT) <b>${esc(c.model_grade||'미로드')}</b> · 최종 <b>${esc(c.label)}</b>
             ${c.decision_path?`<div style="margin-top:4px;color:var(--text-dim)">${esc(c.decision_path)}</div>`:''}
+            ${adjNote?`<div style="margin-top:4px;color:var(--text-dim)"><b>안전 규칙:</b> ${esc(adjNote)}</div>`:''}
           </div>
           <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')}</div>
         </div>
