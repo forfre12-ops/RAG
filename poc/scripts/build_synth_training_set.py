@@ -57,6 +57,7 @@ def main(argv=None) -> int:
         "included": result["included"],
         "excluded_noise": result["excluded_noise"],
         "excluded_empty": result["excluded_empty"],
+        "grade_corrected": result["grade_corrected"],
     }
     print(json.dumps(summary))
     return 0

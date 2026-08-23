@@ -19,6 +19,7 @@ def _fake_sample(status: str) -> SimpleNamespace:
     return SimpleNamespace(
         sample_id=uuid.uuid4(),
         target_level_id=2,
+        corrected_level_id=None,   # 교정 없음 — queue 응답의 corrected_grade 가 None 이어야 한다
         doc_type="인사",
         llm_provider="anthropic",
         llm_model="claude",

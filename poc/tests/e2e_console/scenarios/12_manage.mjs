@@ -428,4 +428,49 @@ export const scenarios = [
       return page;
     },
   },
+
+  {
+    id: 'manage.batch.options-come-from-server',
+    title: '검수 배치 목록은 서버 응답에서 채워진다 — 화면이 배치 유무를 단정하지 않는다',
+    why: '실측 2026-08-24: 이 칸은 자유입력이었고 툴팁에 「지금 서버의 후보에는 배치 값이 들어 '
+       + '있지 않아, 무엇을 넣어도 0건이 됩니다」 가 박혀 있었다. 그런데 223 후보 115건이 '
+       + 'review_batch="kl-ff5a822c" 를 달고 있다. 화면이 검수자에게 되는 기능을 말렸다.',
+    async run({ server, check }) {
+      const page = await openPage(server, URL);
+      await page.settle();
+
+      const sel = page.$('review_batch');
+      check.eq(sel?.tagName, 'SELECT', '배치 칸이 목록 선택이다');
+      const labels = Array.from(sel?.options || []).map((o) => o.textContent);
+      check.includes(labels.join(' | '), '2026-08-A', '서버가 준 배치가 선택지로 뜬다');
+      check.includes(labels.join(' | '), '3건', '그 배치의 후보 수가 함께 뜬다');
+      check.ok(!page.bodyText().includes('무엇을 넣어도 0건'),
+        '배치가 없다고 단정하던 문장이 사라졌다');
+      check.ok(!(page.html('review_batch') + (sel?.title || '')).includes('무엇을 넣어도 0건'),
+        '툴팁에도 그 단정이 남아 있지 않다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.batch.empty-is-reported-not-assumed',
+    title: '배치 표식이 정말 없으면 그때 화면이 그렇게 말한다',
+    needsMock: true,
+    why: '"없다" 는 말은 응답을 근거로만 해야 한다. 서버가 빈 목록을 주면 칸이 잠기고 '
+       + '「배치 표식 없음」 이 뜬다 — 값이 생기면 자동으로 풀린다.',
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const base = FIXTURES['GET /golden/candidates'];
+      server.overrides['GET /golden/candidates'] = { ...base, available_batches: [] };
+      const page = await openPage(server, URL);
+      await page.settle();
+
+      const sel = page.$('review_batch');
+      check.includes(page.text('review_batch'), '배치 표식 없음', '없다는 사실을 화면이 말한다');
+      check.ok(sel?.disabled, '고를 것이 없으니 칸이 잠긴다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
 ];

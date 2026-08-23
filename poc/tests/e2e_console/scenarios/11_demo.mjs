@@ -367,4 +367,49 @@ export const scenarios = [
       return page;
     },
   },
+
+  {
+    id: 'demo.threshold.comes-from-server',
+    title: '검수 임계는 서버가 보고한 값으로 뜬다 — 화면에 숫자를 박지 않는다',
+    why: '실측 2026-08-24: 본문에 「기준(0.70)」 이 글자로 박혀 있었는데 223 healthz 는 '
+       + 'review_confidence_threshold=0.5 였다. 8/24 에 임계를 내렸는데 문장이 안 따라온 것이다. '
+       + '화면이 서버와 다른 값을 말하면 시연·감리에서 그 자리로 질문이 들어온다.',
+    async run({ server, check }) {
+      const page = await demo(server);
+      check.includes(page.text('conf-threshold'), '0.50', '서버 임계(0.50)가 화면에 뜬다');
+      // 본문 전체가 아니라 그 문장이 든 칸만 본다 — 하니스는 번들한 app.js 소스까지
+      // bodyText 에 넣기 때문에, 이 시험을 설명하는 주석 자체가 걸린다.
+      check.ok(!page.text('conf-gate-note').includes('0.70'),
+        '그 문장 자리에 옛 고정값이 남아 있지 않다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'demo.threshold.follows-server-change',
+    title: '서버가 다른 임계를 보고하면 화면도 그 값으로 바뀐다',
+    why: '고정값을 지웠는지, 아니면 마침 같은 숫자를 다시 박은 것인지를 가른다. '
+       + '픽스처와 다른 값을 보고하게 해서 화면이 정말 응답을 읽는지 본다.',
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const base = FIXTURES['GET /healthz'];
+      server.overrides['GET /healthz'] = {
+        ...base,
+        operational_config: {
+          ...base.operational_config,
+          review_confidence_threshold: 0.42,
+          review_confidence_threshold_public: 0.66,
+        },
+      };
+      const page = await demo(server);
+      const shown = page.text('conf-threshold');
+      check.includes(shown, '0.42', '서버가 바꾼 임계를 그대로 읽는다');
+      // 공개등급 전용 임계는 살아 있는 손잡이다(config: review_confidence_threshold_public).
+      // 켜졌는데 화면이 한 숫자만 보이면 "전 등급 0.42" 로 오독한다.
+      check.includes(shown, '0.66', '공개등급 전용 임계가 켜지면 그 값도 함께 보인다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
 ];

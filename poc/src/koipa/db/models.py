@@ -480,6 +480,11 @@ class SampleDocument(Base):
     sample_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id"))
     target_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
+    # 검수자가 승인하면서 고친 등급. NULL=교정 없음(target_level_id 그대로).
+    # target_level_id 를 덮어쓰지 않는 이유: "생성 때 요구한 등급"과 "사람이 고친 등급"이
+    # 한 칸에 뭉개지면 교정이 있었다는 사실 자체가 사라진다. 학습행 라벨은 이 값을 우선한다
+    # (synthesis_service.build_training_rows).
+    corrected_level_id: Mapped[int | None] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"))
     doc_type: Mapped[str | None] = mapped_column(String(50))
     outline_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))
     body_prompt_version: Mapped[str | None] = mapped_column(ForeignKey("tb_prompt_versions.prompt_version"))

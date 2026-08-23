@@ -28,6 +28,11 @@ from koipa.services.job_store import get_default_store
 
 logger = logging.getLogger(__name__)
 
+
+def _grade_code(grade) -> str:
+    """Grade 열거형/문자열 어느 쪽이 와도 코드 문자열로 — 로그·오류 메시지용."""
+    return getattr(grade, "value", grade)
+
 # 추정 비용 (development phase, USD/문서) — Claude Sonnet 4.6 기준
 COST_PER_DOC_USD = {
     "anthropic": 0.012,
@@ -133,6 +138,10 @@ class SynthesisService:
                         llm_model=s.llm_model,
                         quality_score=float(s.quality_score) if s.quality_score is not None else None,
                         review_status=s.review_status,
+                        corrected_grade=(
+                            self._level_id_to_code(db, s.corrected_level_id)
+                            if s.corrected_level_id else None
+                        ),
                         preview=(s.generated_content or "")[:2000],
                         created_at=s.created_at.isoformat() if s.created_at else None,
                     )
@@ -152,22 +161,42 @@ class SynthesisService:
             with session_scope() as db:
                 repo = SynthRepo(db)
                 approved = req.decision == "approve"
+
+                # [2026-08-24] corrected_grade 를 실제로 적용한다. 종전에는 요청으로 받고도
+                # 아무 데도 쓰지 않아, 검수자가 등급을 고쳐 승인해도 학습행은 원래 목표
+                # 등급으로 만들어졌다(사람 교정이 조용히 버려지는 경로).
+                corrected_level_id: int | None = None
+                if approved and req.corrected_grade is not None:
+                    corrected_level_id = ClassifyRepo(db).level_id_by_code(req.corrected_grade)
+                    if corrected_level_id is None:
+                        # 등급체계에서 비활성화된 코드로 교정하려는 경우. 조용히 무시하면
+                        # 예전 결함을 이름만 바꿔 되풀이하는 것이라 호출부에 알린다.
+                        raise ValueError(
+                            f"corrected_grade '{_grade_code(req.corrected_grade)}' 는 "
+                            "현재 등급체계에 없습니다"
+                        )
+
                 sd = repo.review(
                     synth_id,
                     approved=approved,
                     reviewed_by=req.actor.user_id,
                     rejection_reason=req.comment if not approved else None,
+                    corrected_level_id=corrected_level_id,
                 )
                 if sd is None:
                     logger.info("synth review: sample not found — synth_id=%s", synth_id)
                     return None
+                applied_level_id = sd.corrected_level_id or sd.target_level_id
+                applied_grade = self._level_id_to_code(db, applied_level_id)
                 logger.info(
-                    "synth review done: synth_id=%s final_status=%s",
-                    synth_id, sd.review_status,
+                    "synth review done: synth_id=%s final_status=%s applied_grade=%s corrected=%s",
+                    synth_id, sd.review_status, applied_grade,
+                    sd.corrected_level_id is not None,
                 )
                 return SynthReviewResponse(
                     synth_id=synth_id,
                     final_status=sd.review_status,
+                    applied_grade=applied_grade,
                     added_to_dataset_version=None,  # W6 학습 데이터셋 빌드 시 연결
                 )
         except SQLAlchemyError as exc:
@@ -223,21 +252,27 @@ class SynthesisService:
                     if not text:
                         excluded_empty += 1  # 빈 본문 방어(무음 드롭 금지·카운트 노출)
                         continue
+                    # 검수자가 고친 등급이 있으면 그것이 라벨이다. 사람이 승인 단계에서
+                    # 내린 판단이 생성 요청 시점의 목표 등급보다 뒤이고 더 정확하다.
+                    label_level_id = s.corrected_level_id or s.target_level_id
                     rows.append({
                         "doc_id": str(s.sample_id),
                         "text": text,
-                        "label": code_by_level.get(s.target_level_id, "S3"),
+                        "label": code_by_level.get(label_level_id, "S3"),
                         "source": "synthetic",
                         "domain": s.doc_type,
                         "label_source": s.label_source,
+                        "grade_corrected": s.corrected_level_id is not None,
                     })
                     if limit is not None and len(rows) >= limit:
                         break
 
+                grade_corrected = sum(1 for r in rows if r["grade_corrected"])
                 logger.info(
                     "synth training rows built: approved=%d included=%d "
-                    "excluded_noise=%d excluded_empty=%d",
+                    "excluded_noise=%d excluded_empty=%d grade_corrected=%d",
                     approved_total, len(rows), excluded_noise, excluded_empty,
+                    grade_corrected,
                 )
                 return {
                     "rows": rows,
@@ -245,6 +280,9 @@ class SynthesisService:
                     "included": len(rows),
                     "excluded_noise": excluded_noise,
                     "excluded_empty": excluded_empty,
+                    # 검수자가 등급을 고친 건수. 카운트로 내보내야 "교정이 반영됐다"를
+                    # 학습셋을 열어 보지 않고도 확인할 수 있다.
+                    "grade_corrected": grade_corrected,
                 }
         except SQLAlchemyError as exc:
             logger.warning("build_training_rows skipped: %s", exc)
@@ -254,6 +292,7 @@ class SynthesisService:
                 "included": 0,
                 "excluded_noise": 0,
                 "excluded_empty": 0,
+                "grade_corrected": 0,
             }
 
     @staticmethod

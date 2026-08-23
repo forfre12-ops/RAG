@@ -203,6 +203,47 @@ export const scenarios = [
     },
   },
 
+  // [2026-08-24] 승인분 조회에서 **검수자가 고친 등급**이 보이는가.
+  // 서버는 corrected_grade 를 돌려주는데 화면이 target_grade 만 그리면, TS 로 고쳐 승인한
+  // 건이 목록에는 생성 시 등급으로 보인다 — 데이터는 맞고 화면만 다른 말을 하는 상태다.
+  // 이 시나리오가 그 회귀를 막는다.
+  {
+    id: 'monitor.synth.corrected-grade-is-shown',
+    title: '교정 승인된 합성 문서는 목록에 고친 등급으로 보인다',
+    async run({ server, check }) {
+      server.overrides['GET /synth/queue'] = {
+        total: 1,
+        items: [{
+          synth_id: '14141414-1414-4141-8141-141414141414',
+          target_grade: 'S3',          // 생성 시 요구한 등급
+          corrected_grade: 'TS',       // 검수자가 고친 등급 = 학습 라벨
+          domain: '반도체',
+          llm_provider: 'local',
+          llm_model: 'qwen3-14b',
+          quality_score: 0.77,
+          review_status: 'approved',
+          preview: '공정 레시피 원본 — 검수자가 등급을 올렸다.',
+          created_at: '2026-08-24T02:00:00Z',
+        }],
+      };
+      const page = await openPage(server, '/console/admin.html');
+      await page.settle();
+      page.click(page.q('.tab[data-tab="train"]'));
+      page.set('sy-status', 'approved');
+      page.click(page.q('button[onclick="loadSynthQueue()"]'));
+      await page.settle();
+
+      const html = page.html('sy-queue');
+      const text = page.text('sy-queue');
+      check.eq(page.qa('#sy-queue .q-item').length, 1, '1건이 그려졌다');
+      check.includes(html, 'TS', '고친 등급이 보인다');
+      check.includes(text, '교정됨', '교정됐다는 표시가 있다');
+      check.includes(text, '생성 시 S3', '원래 목표 등급도 함께 밝힌다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
   {
     id: 'monitor.synth.generate',
     writes: true,

@@ -60,7 +60,12 @@ def synth_review(
 ):
     # [#13] reviewed_by 감사 신원 = 인증 principal(body 자칭 위조 차단; JWT sub 우선).
     bind_authenticated_actor(req.actor, auth)
-    res = SynthesisService().review(synth_id, req)
+    try:
+        res = SynthesisService().review(synth_id, req)
+    except ValueError as exc:
+        # corrected_grade 가 현재 등급체계에 없는 코드(비활성화 등). 조용히 무시하면
+        # 검수자는 고친 줄 알고 넘어가는데 학습행은 원래 등급으로 만들어진다.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if res is None:
         raise HTTPException(status_code=404, detail="synth_id not found")
     return res

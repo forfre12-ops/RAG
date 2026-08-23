@@ -36,6 +36,8 @@ class SyntheticDocItem(BaseModel):
     llm_model: str
     quality_score: Optional[float] = None
     review_status: str
+    # 검수자가 승인하면서 고친 등급. None=교정 없음(target_grade 가 그대로 학습 라벨).
+    corrected_grade: Optional[Grade] = None
     preview: Optional[str] = Field(default=None, max_length=2000)
     created_at: Optional[str] = None
 
@@ -55,4 +57,7 @@ class SynthReviewRequest(BaseModel):
 class SynthReviewResponse(BaseModel):
     synth_id: UUID
     final_status: str
+    # 이 건이 학습행으로 만들어질 때 쓰일 등급. corrected_grade 를 보냈으면 그 값,
+    # 아니면 생성 시 목표 등급. 반려면 학습에 들어가지 않으므로 참고값이다.
+    applied_grade: Optional[Grade] = None
     added_to_dataset_version: Optional[str] = None

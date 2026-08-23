@@ -98,6 +98,7 @@ class SynthRepo:
         reviewed_by: str,
         rejection_reason: str | None = None,
         promoted_doc_id: uuid.UUID | None = None,
+        corrected_level_id: int | None = None,
     ) -> SampleDocument | None:
         sd = self.db.get(SampleDocument, sample_id)
         if sd is None:
@@ -109,6 +110,15 @@ class SynthRepo:
             sd.rejection_reason = rejection_reason
         if approved and promoted_doc_id is not None:
             sd.doc_id = promoted_doc_id
+        # 승인분에만 교정을 남긴다. 반려는 학습에 들어가지 않으므로 등급을 고칠 자리가 없다.
+        # 목표등급과 같은 값이면 교정이 아니므로 NULL 로 지운다 — "고쳤다"는 기록이 실제로
+        # 고친 건에만 남아야 감사에서 세었을 때 숫자가 맞는다.
+        if approved:
+            sd.corrected_level_id = (
+                corrected_level_id
+                if corrected_level_id is not None and corrected_level_id != sd.target_level_id
+                else None
+            )
         return sd
 
     def get(self, sample_id: uuid.UUID) -> SampleDocument | None:

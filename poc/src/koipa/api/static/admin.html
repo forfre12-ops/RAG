@@ -2678,7 +2678,7 @@ function renderSynthQueue(){
     <div class="q-item">
       <div class="q-top">
         <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain?` · <span class="q-title">${esc(it.domain)}</span>`:''}</div>
-        <div>${gradeTag(it.target_grade)}
+        <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습행은 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
           ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
           <span class="pill">${esc(it.review_status)}</span></div>
@@ -2687,7 +2687,7 @@ function renderSynthQueue(){
       ${reviewable?`
       <div class="q-actions">
         <span style="font-size:11px;color:var(--text-dim)">확정 등급</span>
-        <select id="sy-g-${i}">${ACTIVE_GRADES.map(g=>`<option value="${esc(g)}" ${g===it.target_grade?'selected':''}>${esc(g)}</option>`).join('')}</select>
+        <select id="sy-g-${i}">${ACTIVE_GRADES.map(g=>`<option value="${esc(g)}" ${g===(it.corrected_grade||it.target_grade)?'selected':''}>${esc(g)}</option>`).join('')}</select>
         <button class="btn sm" onclick="synthReview(${i},'approve')">승인 → 학습셋</button>
         <button class="btn sec sm" onclick="synthReview(${i},'reject')">반려</button>
       </div>`:''}
@@ -2697,7 +2697,7 @@ function renderSynthQueue(){
 async function synthReview(i, decision){
   if(!guardWrite('합성 검수')) return;
   const it=SYNTH[i]; if(!it) return;
-  const chosen=$('sy-g-'+i) ? $('sy-g-'+i).value : it.target_grade;
+  const chosen=$('sy-g-'+i) ? $('sy-g-'+i).value : (it.corrected_grade||it.target_grade);
   const body={decision, comment:'console synth review', actor:actor()};
   // 목표등급과 다른 등급으로 승인하면 corrected_grade 로 전송 — 그 등급으로 학습행이 만들어진다.
   // [2026-08-24] 이 화면은 진작부터 값을 보내고 있었는데 서버가 버리고 있었다. 서버가

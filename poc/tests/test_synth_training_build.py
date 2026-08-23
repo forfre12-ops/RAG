@@ -47,10 +47,12 @@ def _fake_scope():
     yield object()
 
 
-def _sample(level_code, *, label_source=None, content="가상 사내 문서 본문", status="approved", domain="finance"):
+def _sample(level_code, *, label_source=None, content="가상 사내 문서 본문", status="approved",
+            domain="finance", corrected=None):
     return SimpleNamespace(
         sample_id=uuid.uuid4(),
         target_level_id=_LEVELS[level_code],
+        corrected_level_id=_LEVELS[corrected] if corrected else None,
         generated_content=content,
         doc_type=domain,
         label_source=label_source,
@@ -113,3 +115,38 @@ def test_limit_caps_rows(monkeypatch) -> None:
     _patch(monkeypatch, [_sample("TS"), _sample("S1"), _sample("S3")])
     res = SynthesisService().build_training_rows(limit=1)
     assert res["included"] == 1
+
+
+# ---------------------------------------------------------------------------
+# [2026-08-24] 검수자가 고친 등급이 학습 라벨이 되는가.
+# 종전에는 corrected_grade 를 요청으로 받고도 버려서, 등급을 고쳐 승인해도 학습행은
+# 원래 목표 등급으로 만들어졌다. 사람 교정이 조용히 사라지는 경로였다.
+# ---------------------------------------------------------------------------
+
+def test_corrected_grade_becomes_the_training_label(monkeypatch) -> None:
+    _patch(monkeypatch, [_sample("S3", corrected="TS")])
+    res = SynthesisService().build_training_rows()
+    assert res["included"] == 1
+    row = res["rows"][0]
+    assert row["label"] == "TS", "검수자가 고친 등급이 라벨이어야 한다"
+    assert row["grade_corrected"] is True
+
+
+def test_uncorrected_sample_keeps_target_grade(monkeypatch) -> None:
+    _patch(monkeypatch, [_sample("S2")])
+    res = SynthesisService().build_training_rows()
+    row = res["rows"][0]
+    assert row["label"] == "S2"
+    assert row["grade_corrected"] is False
+
+
+def test_correction_does_not_leak_across_samples(monkeypatch) -> None:
+    """교정분과 비교정분이 섞여 있어도 각자 제 등급으로 간다."""
+    _patch(monkeypatch, [
+        _sample("S3", corrected="TS"),
+        _sample("S3"),
+        _sample("S1", corrected="S2"),
+    ])
+    res = SynthesisService().build_training_rows()
+    assert sorted(r["label"] for r in res["rows"]) == ["S2", "S3", "TS"]
+    assert sum(1 for r in res["rows"] if r["grade_corrected"]) == 2
