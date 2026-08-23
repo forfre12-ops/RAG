@@ -19,13 +19,13 @@
     // 직접 달아 준다(없으면 어느 탭에서나 항상 떠서 탭 분리가 무의미해진다).
     '<section class="card col-span" id="gold-jobs-card" data-pane="review" style="order:3">',
     '  <div class="card-head">',
-    '    <div class="ttl"><span class="step-no">3</span> 골든 잡 목록</div>',
+    '    <div class="ttl"><span class="step-no">3</span> 검증문서 검수 목록</div>',
     '    <span class="ep">GET /golden/jobs</span>',
     '  </div>',
     '  <div class="card-body">',
     '    <div class="btn-row">',
     '      <span class="sec-note" style="margin-right:auto;" id="gold-jobs-note">',
-    '        생성·등록한 골든 잡을 골라 검수/서명으로 이동합니다. 새로고침 후에도 남습니다.',
+    '        준비된 검수 묶음을 골라 검수·승인 화면으로 이동합니다. 새로고침 후에도 남습니다.',
     '      </span>',
     '      <button class="btn sec sm" onclick="loadGoldenJobList()">목록 새로고침</button>',
     '    </div>',
@@ -91,14 +91,24 @@
       });
       if (!jobs.length) {
         box.innerHTML = '<span style="color:var(--text-faint);font-size:12px;">'
-          + '골든 잡이 없습니다 — 위에서 후보를 생성하거나 슬레이트를 등록하세요.</span>';
+          + '검수 묶음이 없습니다 — 위에서 후보를 생성하거나 문서 묶음을 등록하세요.</span>';
         return;
       }
       var rows = jobs.map(function (j) {
         var cur = (j.job_id === LAST_GOLDEN_JOB_ID) ? ' style="background:var(--accent-soft)"' : '';
         var gold = (j.gold_count == null) ? '—' : String(j.gold_count);
         var unc = (j.uncertain_count == null) ? '—' : String(j.uncertain_count);
-        var kind = (j.kind === 'golden_register') ? '슬레이트 등록' : '후보 빌드';
+        var kind = (j.kind === 'golden_register') ? '문서 묶음 등록' : '후보 생성';
+        /* [2026-08-23] 행에서 **검수 화면을 바로 연다.**
+           종전에는 「선택」 → 화면을 스크롤해 다른 카드의 버튼 → 새 탭, 이렇게 2단계였다.
+           그래서 상단 메뉴 「검수 목록」을 눌러도 검수를 시작할 수 없었고, 실제 검수 화면은
+           메뉴 어디에도 없었다(사용자 지적 2026-08-23).
+           서버가 잡마다 signoff_url 을 ?t= 서명 토큰까지 붙여 내려주므로 그대로 쓴다 —
+           토큰이 없으면 403 이라 화면에서 주소를 조립하면 안 된다. */
+        var open = j.signoff_url
+          ? '<a class="btn sm" style="text-decoration:none" target="_blank" rel="noopener"'
+            + ' href="' + esc(j.signoff_url) + '">검수 열기 ↗</a>'
+          : '<span class="hint" style="margin:0">준비 중</span>';
         return '<tr' + cur + '>'
           + '<td><code>' + esc(j.job_id.slice(0, 8)) + '</code></td>'
           + '<td>' + esc(kind) + '</td>'
@@ -106,15 +116,16 @@
           + '<td style="text-align:right">' + esc(gold) + '</td>'
           + '<td style="text-align:right">' + esc(unc) + '</td>'
           + '<td style="font-size:11px;color:var(--text-dim)">' + esc(fmtTime(j.submitted_at)) + '</td>'
-          + '<td><button class="btn sec sm" onclick="pickGoldenJob(\'' + esc(j.job_id) + '\')">선택</button></td>'
+          + '<td style="white-space:nowrap">' + open
+          + ' <button class="btn sec sm" onclick="pickGoldenJob(\'' + esc(j.job_id) + '\')">선택</button></td>'
           + '</tr>';
       }).join('');
       box.innerHTML =
         '<div class="table-wrap"><table style="width:100%;font-size:12px;border-collapse:collapse">'
         + '<thead><tr>'
-        + '<th style="text-align:left">job</th><th style="text-align:left">종류</th>'
-        + '<th style="text-align:left">상태</th><th style="text-align:right">gold</th>'
-        + '<th style="text-align:right">uncertain</th><th style="text-align:left">생성</th><th></th>'
+        + '<th style="text-align:left">묶음</th><th style="text-align:left">종류</th>'
+        + '<th style="text-align:left">상태</th><th style="text-align:right">검수 대상</th>'
+        + '<th style="text-align:right">보류</th><th style="text-align:left">생성</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         // 서버 정렬은 best-effort(Redis SCAN 순서)라, 화면에서 생성 시각으로 다시 정렬해 놓았다.
         // 그 사실을 밝혀 둔다 — "서버가 준 순서"와 "화면 순서"가 다르다는 것을 감춰선 안 된다.
