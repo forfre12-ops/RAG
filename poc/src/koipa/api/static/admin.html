@@ -56,6 +56,8 @@ a{color:var(--text);}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 17px;border-bottom:1px solid var(--border);background:var(--bg-surface);}
 .card-head .ttl{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px;}
 .card-head .step-no{font-family:var(--font-sans);font-size:10.5px;font-weight:700;letter-spacing:-.01em;color:#fff;background:var(--bg-inverse);min-width:20px;height:20px;padding:0 7px;display:inline-grid;place-items:center;border-radius:5px;white-space:nowrap;flex-shrink:0;}
+/* 흐름 밖 화면(상시 조회·설정) — 순서가 없으므로 숫자를 주지 않는다. 진한 배지와 구별되게 외곽선만. */
+.card-head .step-no.aux{background:transparent;color:var(--text-dim);border:1px solid var(--border-strong);font-weight:600;}
 .card-head .ep{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
 .card-body{padding:16px 17px;display:flex;flex-direction:column;gap:11px;}
 
@@ -356,6 +358,10 @@ details.adv[open]{padding-bottom:12px;}
       <span class="flow-step" data-step="5"><b>5</b> 메트릭</span>
       <span class="loop-note">주기적 · 관리자</span>
     </div>
+    <!-- [2026-08-23] 카드 배지와 이 흐름도가 서로 다른 번호를 쓰고 있었다(흐름도 1=분류인데
+         운영 탭 첫 카드도 1번이었다 — 그 카드는 검토다). 카드 배지를 이 흐름도의 단계 id 로
+         맞췄으므로, 같은 번호라는 사실을 한 줄로 밝힌다. -->
+    <p class="hint" style="margin:6px 2px 0;">아래 카드의 <b>진한 번호 배지</b>가 여기 단계와 같은 번호입니다. 흐름에 속하지 않는 화면(조회 · 설정 · 데이터)은 번호 대신 성격을 적었습니다.</p>
   </div>
 
   <!-- 탭 — 카드 12장을 상시 노출하는 대신 루프별로 나눈다.
@@ -429,7 +435,7 @@ details.adv[open]{padding-bottom:12px;}
       <details>
       <summary style="cursor:pointer;list-style:none">
       <div class="card-head" style="border:0;padding-bottom:0">
-        <div class="ttl"><span class="step-no">공통</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
+        <div class="ttl"><span class="step-no aux">공통</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
         <span class="ep">X-API-Key · X-Actor-Role</span>
       </div>
       </summary>
@@ -488,7 +494,7 @@ details.adv[open]{padding-bottom:12px;}
          자기 일이 두 번째에 있다. KL 이 관리자 화면을 보고 "잘 모르겠다"고 한 원인 중 하나다. -->
     <section class="card" data-pane="ops" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">운영 2</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 1단계">1</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
         <span class="ep">POST /documents/analyze · POST /classify</span>
       </div>
       <div class="card-body">
@@ -554,7 +560,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 2. 검수 큐 ===== -->
     <section class="card" data-pane="ops" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">운영 1</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 2단계">2</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag">FUN-024</span></div>
         <span class="ep">POST /confirm · /relabel</span>
       </div>
       <div class="card-body">
@@ -601,7 +607,7 @@ details.adv[open]{padding-bottom:12px;}
          동일하다 — GET /admin/locked-readiness. -->
     <section class="card col-span" data-pane="review" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">검수 2</span> 모델 검증 문서 현황 — 구성 · 승인 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no aux">조회</span> 모델 검증 문서 현황 — 구성 · 승인 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
       </div>
       <div class="card-body">
@@ -631,7 +637,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
     <section class="card col-span" data-pane="train" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">학습 1</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no aux">데이터</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
@@ -700,7 +706,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 3. 재학습 ===== -->
         <section class="card" data-pane="train" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">학습 2</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 3단계">3</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
         <span class="ep">POST /train · GET /train/jobs</span>
       </div>
       <div class="card-body">
@@ -752,7 +758,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 4. 모델 서빙/리로드 ===== -->
         <section class="card" data-pane="train" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">학습 3</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 4단계">4</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
         <span class="ep">POST /admin/model/activate · /reload</span>
       </div>
       <div class="card-body">
@@ -785,7 +791,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 5. 메트릭 ===== -->
     <section class="card col-span" data-pane="train" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">학습 4</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 5단계">5</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /metrics/latest · /history · /confusion-matrix</span>
       </div>
       <div class="card-body">
@@ -804,7 +810,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 6. 운영 관제 대시보드 ===== -->
     <section class="card col-span" data-pane="ops" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">운영 3</span> 운영 관제 대시보드</div>
+        <div class="ttl"><span class="step-no aux">조회</span> 운영 관제 대시보드</div>
         <span class="ep">GET /admin/dashboard</span>
       </div>
       <div class="card-body">
@@ -821,7 +827,7 @@ details.adv[open]{padding-bottom:12px;}
          화면에서 "누가 언제 무엇을 했는가"를 볼 수 없었다. -->
     <section class="card col-span" data-pane="ops" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">운영 4</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
+        <div class="ttl"><span class="step-no aux">조회</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
         <span class="ep">GET /admin/audit-log</span>
       </div>
       <div class="card-body">
@@ -848,7 +854,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 7. 검증 기준문서 준비 ===== 루프 B 의 시작점(G1) -->
     <section class="card col-span" data-pane="review" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">검수 1</span> 검증 기준문서 준비 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G1·G2 단계 — 후보 생성과 서명 화면 열기를 이 카드에서 합니다">G1 · G2</span> 검증 기준문서 준비 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
@@ -982,7 +988,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
     <section class="card col-span" data-pane="config" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">설정 1</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
+        <div class="ttl"><span class="step-no aux">설정</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
         <span class="ep">GET · PUT /schema/grades</span>
       </div>
       <div class="card-body">
@@ -1006,7 +1012,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== T. 태깅 키워드 관리 (FUN-023-④) ===== -->
     <section class="card col-span" data-pane="config" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">설정 2</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
+        <div class="ttl"><span class="step-no aux">설정</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
         <span class="ep">GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
       </div>
       <div class="card-body">
