@@ -354,7 +354,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
             <tr><td>4</td><td>룰 상향 안전장치</td><td><b>FNR-safe override</b> <code>fnr_rule_ts/s1/s2_threshold</code> — 룰 고등급 신호가 강하면 상향</td><td>핫패스</td></tr>
             <tr><td>5</td><td>출처 하향</td><td><b>비공지성 cap</b> <code>source_prior_enabled</code> — 공개출처면 S3로 cap(충돌 시 검수)</td><td>핫패스</td></tr>
             <tr><td>6</td><td>메타데이터 보정</td><td><b>metadata floor</b> <code>metadata_floor_enabled</code> — 보안표시 상향 / 접근범위 충돌 검수</td><td>핫패스</td></tr>
-            <tr><td>7</td><td>자동확정 판정</td><td><b>conf 게이트</b> <code>review_confidence_threshold</code> · <b>희소근거</b> <code>rule_fallback_min_evidence</code> · <b>합의 게이트</b> <code>agreement_gate_enabled</code> → 자동확정 또는 needs_review</td><td>판정</td></tr>
+            <tr><td>7</td><td>자동확정 판정</td><td><b>conf 게이트</b> <code>review_confidence_threshold</code>(예측이 공개등급이면 <code>review_confidence_threshold_public</code>) · <b>희소근거</b> <code>rule_fallback_min_evidence</code> · <b>합의 게이트</b> <code>agreement_gate_enabled</code> → 자동확정 또는 needs_review</td><td>판정</td></tr>
           </tbody>
         </table>
       </div>
@@ -369,9 +369,10 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th style="width:9%;">분류</th><th style="width:15%;">항목</th><th style="width:24%;">설정 키</th><th style="width:13%;">기본값(base)</th><th style="width:12%;">운영(onprem)</th><th>효과·방향</th></tr></thead>
           <tbody>
-            <tr><td>보정</td><td>온도보정</td><td class="td-code">classifier_temperature</td><td>1.0 (무보정)</td><td>3.0 (onprem-local·full-train baking)</td><td>T&gt;1=과신↓(conf 신뢰성↑) — 하드닝 프로파일이 3.0 강제(§04)</td></tr>
+            <tr><td>보정</td><td>온도보정</td><td class="td-code">classifier_temperature</td><td>1.0 (무보정)</td><td>2.03 (onprem-local·full-train baking)</td><td>T&gt;1=과신↓(conf 신뢰성↑) — 하드닝 프로파일이 2.03 강제(§04). 값의 출처는 배포 모델 <code>v-fe4b386b</code> 동봉 <code>temperature.json</code>(trainer-auto 실측, 보정셋 256건, ECE 0.0592→0.0196)이다. 2026-08-22 이전에는 일반 추정치 3.0 이 이 실측값을 덮어쓰고 있었다.</td></tr>
             <tr><td>신뢰도</td><td>confidence</td><td class="td-code">(산출값, 설정 아님)</td><td>scores[pred]</td><td>—</td><td>높을수록 확신(단, 단독 신뢰 불가)</td></tr>
-            <tr><td>게이트</td><td>conf 게이트</td><td class="td-code">review_confidence_threshold</td><td>0.7</td><td>—</td><td>미만이면 검수(↑=검수↑·안전↑)</td></tr>
+            <tr><td>게이트</td><td>conf 게이트(일반)</td><td class="td-code">review_confidence_threshold</td><td>0.7</td><td class="td-pass">0.50</td><td>미만이면 검수(↑=검수↑·안전↑). 2026-08-23 재검증으로 0.70→0.50(§6.2)</td></tr>
+            <tr><td>게이트</td><td>conf 게이트(공개등급 예측)</td><td class="td-code">review_confidence_threshold_public</td><td>None(=일반값)</td><td class="td-pass">0.70</td><td>예측이 최하등급(S3)일 때만 적용. 과소분류 자동확정이 실측상 전부 S3 예측이라 이쪽 바만 유지(§6.2)</td></tr>
             <tr><td>게이트</td><td>escalation τ</td><td class="td-code">classifier_escalation_tau</td><td>None (argmax)</td><td class="td-pass">0.30</td><td>τ↓=고등급 적극채택(FNR↓·과분류↑)</td></tr>
             <tr><td>게이트</td><td>희소근거</td><td class="td-code">rule_fallback_min_evidence</td><td>0.9</td><td>—</td><td>약한 단일매치 자동확정 차단(FNR↓)</td></tr>
             <tr><td>게이트</td><td>합의 게이트</td><td class="td-code">agreement_gate_enabled</td><td>False</td><td class="td-pass">True</td><td>룰==모델일 때만 자동확정(정밀도↑·미탐↓)</td></tr>
@@ -393,7 +394,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="card-grid col4" style="margin:16px 0;">
         <div class="card"><div class="card-label">설정 키</div><div class="card-value sm">classifier_<br>temperature</div><div class="card-desc">float, 양수만</div></div>
         <div class="card"><div class="card-label">기본값</div><div class="card-value sm">1.0</div><div class="card-desc">무보정(동작 보존)</div></div>
-        <div class="card"><div class="card-label">온도 보정 T</div><div class="card-value sm">운영 3.0</div><div class="card-desc">측정 최적 2.0(ECE 0.045) 대비 FNR-보수 마진</div></div>
+        <div class="card"><div class="card-label">온도 보정 T</div><div class="card-value sm">운영 2.03</div><div class="card-desc">배포 모델 동봉 temperature.json 실측(ECE 0.0592→0.0196)</div></div>
         <div class="card card-warn"><div class="card-label">OOD 잔존</div><div class="card-value sm">ECE 0.184</div><div class="card-desc">구 후보셋 golden500 — 전이 안 됨</div></div>
       </div>
       <p><b>무엇:</b> softmax 직전 logit을 T로 나눠 분포를 평탄화한다 — <code>temp = self._temperature; if temp != 1.0: logits = logits / temp</code> (<code>m5_inference/pipeline.py</code> <code>_run_model</code>). T&gt;1이면 과신(overconfident)이 완화된다.</p>
@@ -430,11 +431,24 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <tr><td>측정</td><td>τ=0.30: clean 77행 미탐 FNR 0.174→0.087(절반)·검토 +5pp·TS recall 0.91→1.0(저regret). <b>τ=0.35</b>면 고등급(TS·S1) 미탐 전부 0(F1 −2.8%p). <b>τ≤0.25는 과분류 급증으로 비권장.</b></td></tr>
       </tbody></table></div>
 
-      <h3>6.2 conf 게이트 — <code>review_confidence_threshold</code></h3>
+      <h3>6.2 conf 게이트 — <code>review_confidence_threshold</code> · <code>review_confidence_threshold_public</code></h3>
       <div class="tbl-wrap"><table><tbody>
-        <tr><td style="width:18%;">기본값</td><td>0.7</td></tr>
-        <tr><td>동작</td><td>confidence가 이 값 미만이면 자동확정 안 하고 needs_review 큐로. 거부가 아니라 사람 검수 라우팅.</td></tr>
+        <tr><td style="width:18%;">기본값</td><td>일반 <b>0.50</b> · 공개등급(S3) 예측 <b>0.70</b> (하드닝 프로파일 onprem-local·full-train). base 설정 기본값은 0.70 단일 — 등급차등은 프로파일에서만 켠다.</td></tr>
+        <tr><td>동작</td><td>confidence가 <b>예측 등급에 해당하는</b> 임계 미만이면 자동확정 안 하고 needs_review 큐로. 거부가 아니라 사람 검수 라우팅.</td></tr>
         <tr><td>효과·방향</td><td>↑ → 검수 증가·안전 증가. 단 §5대로 conf 자체가 약신호라 이 값만 올려도 정밀도는 거의 안 오른다(0.7→0.9: 63→69%).</td></tr>
+        <tr><td>왜 갈랐나</td><td>종전 단일 0.70은 온도 T=3.0 기준으로 잡힌 값인데 배포 온도가 <b>T=2.03</b>으로 바뀐 뒤(2026-08-22) 재검증되지 않았다. 2026-08-23 두 홀드아웃을 서빙 경로 전체로 다시 재 보니 <b>무음 미탐(정답 TS·S1이 더 낮게 자동확정)은 0.45~0.70 전 구간에서 변하지 않았다</b>. 0.70이 실제로 잡고 있던 것은 정답 S2가 S3(공개)로 자동확정되는 2건이었고, <b>과소분류 자동확정 6건이 전부 예측=S3</b>였다. 합의 게이트는 공개등급 예측을 conf 단독으로 통과시키므로(§6.4) 공개등급 쪽 바를 같이 내리면 방어가 남지 않는다 — 그래서 공개등급만 0.70을 유지하고 나머지를 0.50으로 내렸다.</td></tr>
+        <tr><td>측정</td><td>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>임계(일반/공개)</th><th>hardened42 자동확정</th><th>holdout109 자동확정</th><th>무음 미탐(TS·S1)</th><th>공개 오태깅</th></tr></thead>
+            <tbody>
+              <tr><td>0.70 단일 (종전)</td><td>64.3%</td><td>58.7%</td><td>1 · 1</td><td>0 · 4</td></tr>
+              <tr><td>0.50 단일</td><td>81.0%</td><td>75.2%</td><td>1 · 1</td><td>0 · <b>6</b></td></tr>
+              <tr><td class="td-pass"><b>0.50 / 0.70 (채택)</b></td><td><b>78.6%</b></td><td><b>70.6%</b></td><td>1 · 1</td><td>0 · 4</td></tr>
+            </tbody>
+          </table></div>
+          <p style="margin:8px 0 0;font-size:13px;">채택 조합으로 새로 자동확정되는 문서는 두 셋 합계 19건이고 <b>정답 13 · 과분류(안전방향) 6 · 과소분류 0</b>이다. 재현: <code>scripts/measure_serving_records.py --profile full-train</code> → <code>scripts/analyze_threshold_grid.py</code>, 레코드·리포트는 <code>poc/reports/thresh_revalidation/</code>.</p>
+        </td></tr>
+        <tr><td>한계</td><td>두 홀드아웃 모두 <b>합성 평가셋</b>이다. 회원사 운영 분포에서는 다르게 나오므로, 운영 확정 라벨이 쌓이면 같은 절차로 다시 재야 한다.</td></tr>
       </tbody></table></div>
 
       <h3>6.3 희소근거 게이트 — <code>rule_fallback_min_evidence</code></h3>

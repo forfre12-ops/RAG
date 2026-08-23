@@ -338,7 +338,10 @@ class ClassifyService:
             # 저신뢰 검수 라우팅: confidence가 임계 미만이면 needs_review로 표시(거부 아님).
             # 데모 콘솔이 광고하는 'low-confidence 게이트'의 서버측 구현 — 검수자 큐 노출 근거.
             status = "staging"
-            threshold = self._review_confidence_threshold()
+            _pred_label = getattr(pred, "label", None)
+            _pred_code = (_pred_label.value if hasattr(_pred_label, "value")
+                          else (str(_pred_label) if _pred_label is not None else None))
+            threshold = self._review_confidence_threshold(_pred_code)
             if float(pred.confidence) < threshold:
                 status = "needs_review"
                 warnings_acc.append(
@@ -792,10 +795,39 @@ class ClassifyService:
         return None
 
     @staticmethod
-    def _review_confidence_threshold() -> float:
+    def _public_grade_code() -> str:
+        """GradeRegistry 최하등급(=공개) 코드. 조회 실패 시 "S3"."""
+        try:
+            from koipa.schemas.common import GradeRegistry  # noqa: PLC0415
+            codes = GradeRegistry.get_codes()  # level_order asc(비밀이 선두) → [-1]=최하(공개)
+            return codes[-1] if codes else "S3"
+        except Exception:  # noqa: BLE001
+            return "S3"
+
+    @classmethod
+    def _review_confidence_threshold(cls, predicted_code: str | None = None) -> float:
+        """검수 라우팅 confidence 임계 — **예측 등급별**.
+
+        예측이 공개등급(최하)이면 review_confidence_threshold_public, 그 외는
+        review_confidence_threshold. public 미설정(None)이면 둘 다 후자를 쓴다(동작 보존).
+
+        왜 갈랐는지는 config.review_confidence_threshold_public 주석 참조 — 요약하면,
+        과소분류 자동확정은 실측상 **전부 공개등급 예측**에서 나왔고(2026-08-23 두 홀드아웃),
+        합의 게이트는 공개등급 예측을 conf 단독으로 통과시키므로 그쪽 바만 높게 유지한다.
+        """
         try:
             from koipa.config import settings as _settings  # noqa: PLC0415
-            return float(getattr(_settings, "review_confidence_threshold", 0.7))
+            base = float(getattr(_settings, "review_confidence_threshold", 0.7))
+            pub = getattr(_settings, "review_confidence_threshold_public", None)
+            if pub is None:
+                return base
+            if predicted_code is None:
+                # 예측 등급을 모르면 **엄격한 쪽**을 쓴다 - 모르는 채로 느슨한 바를 적용하면
+                # 공개등급 예측이 낮은 임계로 새 나간다(무음 과소분류 방향).
+                return max(base, float(pub))
+            if str(predicted_code) == cls._public_grade_code():
+                return float(pub)
+            return base
         except Exception:  # noqa: BLE001
             return 0.7
 

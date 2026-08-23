@@ -1,0 +1,81 @@
+{
+  "compare_to": [],
+  "conditions": {
+    "no_metadata": {
+      "auto_confirm_precision": 0.7922,
+      "auto_confirm_rate": 0.7064,
+      "caught_by_review": 1,
+      "causal_review_reason_counts": {
+        "agreement-gate": 9,
+        "low-confidence": 23
+      },
+      "empty_text_documents": 0,
+      "errors": 0,
+      "high_grade_documents": 36,
+      "model_grade_distribution": {
+        "S1": 21,
+        "S2": 20,
+        "S3": 42,
+        "TS": 26
+      },
+      "n": 109,
+      "predicted_distribution": {
+        "S1": 23,
+        "S2": 20,
+        "S3": 37,
+        "TS": 29
+      },
+      "records_file": "reports\\thresh_revalidation\\holdout109_ADOPTED.records.jsonl",
+      "silent_miss": 1,
+      "silent_miss_detail": [
+        {
+          "confidence": 0.7675153613090515,
+          "doc_id": "3e2a0a53a221fc9b",
+          "predicted": "S3",
+          "status": "staging",
+          "truth": "S1",
+          "warnings": [
+            "persistence skipped: doc_id='holdout109_ADOPTED-no_metadata-0063' is not a UUID"
+          ]
+        }
+      ],
+      "silent_miss_rate": 0.0278,
+      "status_distribution": {
+        "needs_review": 32,
+        "staging": 77
+      },
+      "underclassified": 2,
+      "unmapped_review_reasons": 0
+    }
+  },
+  "eval_rows": 109,
+  "eval_set": "datasets\\gold_real\\holdout_eval.jsonl",
+  "eval_sha256": "7c7bf51c7e11ec2cf695afb52bf17ba4644105756f207e35b3648a0b817a9dfd",
+  "git_commit": "9343727a8e7a9ee97c2adea6e9f9fe47856b0343",
+  "git_dirty": true,
+  "measured_at": "2026-08-23",
+  "model_dir": "F:\\antigravity\\rag\\poc\\artifacts\\classifier_p1_v5_clean\\v-fe4b386b",
+  "model_versions_seen": [
+    "v-fe4b386b"
+  ],
+  "note": "silent_miss 만이 운영상 놓친 것이다. needs_review 로 간 것은 사람이 본다. 이 값을 모델 단독 FNR(score_model_on_eval)과 나란히 놓지 말 것 - 다른 경로다.",
+  "purpose": "채택본 확인: 프로파일 기본값(등급차등 0.50/0.70)으로 --set 없이 재측정 2026-08-23",
+  "record_schema_version": 2,
+  "scoring_path": "FULL serving path via in-process POST /api/v1/classify (post-model guards INCLUDED: FNR-safe override, source-prior cap, metadata floor, escalation tau, agreement gate)",
+  "script": "scripts/measure_serving_records.py",
+  "settings_effective": {
+    "agreement_gate_enabled": true,
+    "classifier_escalation_tau": 0.3,
+    "classifier_temperature": 2.03,
+    "metadata_floor_enabled": true,
+    "review_confidence_threshold": 0.5,
+    "review_confidence_threshold_public": 0.7,
+    "source_prior_cap_grade": "S3",
+    "source_prior_enabled": true
+  },
+  "settings_overrides": {},
+  "settings_profile": "full-train",
+  "settings_profile_drift": {},
+  "temperature_json_sha256": "becdb72c79a6b38a652ba0db2ebd42ece3359a3da75252063cd361b6f82ecd03",
+  "temperature_json_value": 2.03
+}

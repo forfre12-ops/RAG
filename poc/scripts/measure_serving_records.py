@@ -69,6 +69,7 @@ PARITY_KEYS = (
     "classifier_temperature",
     "classifier_escalation_tau",
     "review_confidence_threshold",
+    "review_confidence_threshold_public",
     "agreement_gate_enabled",
     "metadata_floor_enabled",
     "source_prior_enabled",
@@ -119,6 +120,26 @@ def _profile_expected(profile: str, keys: tuple[str, ...]) -> dict[str, object]:
     return json.loads(proc.stdout.strip().splitlines()[-1])
 
 
+def _parse_overrides(items: list[str] | None) -> dict[str, str]:
+    """--set KEY=VALUE 를 dict 로. 판정 관련 키(PARITY_KEYS)만 허용한다.
+
+    아무 설정이나 덮어쓰게 두면 '무엇을 바꿔서 잰 수치인지' 가 리포트에서 사라진다.
+    PARITY_KEYS 로 제한하면 덮어쓴 값이 반드시 settings_profile_drift 에도 나타난다.
+    """
+    out: dict[str, str] = {}
+    for item in items or []:
+        if "=" not in item:
+            raise SystemExit(f"--set 은 KEY=VALUE 형식이다: {item!r}")
+        key, _, value = item.partition("=")
+        key = key.strip().lower()
+        if key not in PARITY_KEYS:
+            raise SystemExit(
+                f"--set 은 판정 관련 키만 허용한다: {key!r} (가능: {', '.join(PARITY_KEYS)})"
+            )
+        out[key] = value.strip()
+    return out
+
+
 def _load_rows(path: Path, limit: int) -> list[dict]:
     rows = []
     for line in path.read_text("utf-8").splitlines():
@@ -157,6 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--purpose", default="")
     ap.add_argument("--compare-to", action="append", default=None)
     ap.add_argument("--id-prefix", default=None, help="요청 doc_id 접두어(기본 out 파일 이름)")
+    ap.add_argument("--set", action="append", default=None, metavar="KEY=VALUE",
+                    help="프로파일 값을 **의도적으로** 덮어쓴다(판정 관련 키만). 반복 가능. "
+                         "임계 스윕처럼 '한 값만 바꾼 같은 경로'를 재려고 쓴다. 덮어쓴 값은 "
+                         "프로파일과 달라지므로 --allow-drift 가 함께 필요하고, 리포트의 "
+                         "settings_profile_drift·settings_overrides 에 그대로 남는다.")
     ap.add_argument("--allow-drift", action="store_true",
                     help="유효 설정이 프로파일과 달라도 진행(권장하지 않음 - 리포트에 그대로 기록된다)")
     ap.add_argument("--allow-rule-fallback", action="store_true",
@@ -171,13 +197,30 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── 설정: 프로파일 표에서 끌어와 env 로 내보낸다(손으로 적은 값 금지) ──────────
     os.environ["TESTING"] = "1"   # in-process TestClient. 하드닝 프로파일과 겸용 불가(config.py:1172)
+    # [2026-08-23] 레이트리밋을 끈다. 켜 두면 60건/분을 넘는 순간부터 429 가 나고, 그 문서들은
+    # 레코드에서 **조용히 빠진 채** 리포트가 n=67 로 나온다(실측: holdout109 109건 중 42건 유실).
+    # 유실된 줄이 화면에는 뜨지만 스윕 표에는 '자동확정률 61.7%' 처럼 정상값처럼 보인다.
+    # 이건 측정 하니스이지 서비스가 아니므로 한도를 둘 이유가 없다(rate_limit.py 가 이 용도로
+    # 두고 있는 스위치다). 운영 프로세스에는 config.py:1311 가 별도로 fail-fast 를 건다.
+    os.environ["RATE_LIMIT_DISABLED"] = "1"
     os.environ.setdefault("API_KEY", "measure-serving-records")
     if args.model_dir:
         os.environ["CLASSIFIER_MODEL_DIR"] = str(Path(args.model_dir).resolve())
 
     expected = _profile_expected(args.profile, PARITY_KEYS)
     for key in PARITY_KEYS:
+        # None(미설정)은 env 로 표현할 수 없다 - "None" 문자열을 넣으면 float|None 파싱이 깨진다.
+        # 미설정은 env 를 아예 지워서 Settings 기본값(None)이 그대로 서게 한다.
+        if expected[key] is None:
+            os.environ.pop(key.upper(), None)
+            continue
         os.environ[key.upper()] = _env_value(expected[key])
+
+    # 프로파일 export **뒤에** 적용한다 - 위 루프가 나중에 돌면 덮어쓰기가 조용히 무시된다
+    # (실측 2026-08-23: REVIEW_CONFIDENCE_THRESHOLD 를 env 로 줬는데 유효값이 0.7 그대로였다).
+    overrides = _parse_overrides(args.set)
+    for key, raw in overrides.items():
+        os.environ[key.upper()] = raw
 
     from fastapi.testclient import TestClient  # noqa: PLC0415
     from koipa.api.app import app  # noqa: PLC0415
@@ -308,6 +351,14 @@ def main(argv: list[str] | None = None) -> int:
         records, errors = run_condition(name, metadata)
         if not records:
             raise SystemExit(f"[{name}] 성공한 레코드가 0건이다 - 설정/모델을 먼저 확인하라")
+        # [2026-08-23] 일부 실패는 **멈춘다**. 종전엔 실패분을 빼고 그대로 집계해서, 429 로 42건이
+        # 빠진 런이 n=67 짜리 리포트로 나왔고 스윕 표에서는 정상 수치처럼 읽혔다. 평가셋 전건이
+        # 안 돌았으면 그 수치는 다른 셋의 수치다.
+        if errors:
+            raise SystemExit(
+                f"[{name}] {len(rows)}건 중 {errors}건 실패 - 부분 집계는 다른 평가셋의 수치가 된다. "
+                "위 실패 줄의 사유를 먼저 해결하라"
+            )
         # 모델 미로드면 model_grade 가 None 이다(schemas/classify.py:112). 그 수치는 룰 폴백이라
         # 모델 성능으로 읽으면 안 된다 - 기본은 여기서 멈춘다.
         if all(r["model_grade"] is None for r in records) and not args.allow_rule_fallback:
@@ -344,6 +395,7 @@ def main(argv: list[str] | None = None) -> int:
         "settings_profile": args.profile,
         "settings_effective": {k: effective[k] for k in PARITY_KEYS},
         "settings_profile_drift": drift,
+        "settings_overrides": overrides,
         "conditions": results,
         "note": "silent_miss 만이 운영상 놓친 것이다. needs_review 로 간 것은 사람이 본다. "
                 "이 값을 모델 단독 FNR(score_model_on_eval)과 나란히 놓지 말 것 - 다른 경로다.",

@@ -305,6 +305,13 @@ def _operational_config() -> dict:
         "review_confidence_threshold": float(
             getattr(settings, "review_confidence_threshold", 0.7)
         ),
+        # [2026-08-23 등급차등] 예측이 공개등급(최하)일 때만 적용되는 별도 임계. null 이면
+        # 위 값 하나만 쓴다. 둘을 같이 노출하지 않으면 콘솔·감리가 "임계 0.50" 한 줄만 보고
+        # 공개등급도 0.50 으로 통과한다고 오독한다.
+        "review_confidence_threshold_public": (
+            None if getattr(settings, "review_confidence_threshold_public", None) is None
+            else float(settings.review_confidence_threshold_public)
+        ),
         "rag": {
             "collection": getattr(settings, "rag_default_collection", "docs"),
             "embedding_model": getattr(settings, "rag_operational_embedding_model", ""),

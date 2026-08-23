@@ -52,7 +52,7 @@ export const INCIDENT = {
     {
       step: 1,
       title: "신뢰도 검사",
-      detail: "분류 결과의 confidence < 0.7 → 자동 검수자 큐 적재",
+      detail: "분류 결과의 confidence < 임계(일반 0.50 · 공개등급 예측 0.70) → 자동 검수자 큐 적재",
       tag: "low-confidence 게이트",
     },
     {

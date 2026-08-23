@@ -165,6 +165,70 @@ class TestGateEscalationRouting:
         assert not any("low-confidence" in w for w in resp.warnings), resp.warnings
 
 
+class TestGradeDifferentiatedConfidenceThreshold:
+    """[2026-08-23] 공개등급 예측만 높은 conf 바를 유지한다.
+
+    실측 근거(reports/thresh_revalidation/): 두 홀드아웃에서 과소분류 자동확정 6건이
+    **전부 예측=S3**이었다. 합의 게이트는 공개등급 예측을 conf 단독으로 통과시키므로,
+    공개등급 쪽 바를 같이 내리면 방어가 하나도 안 남는다.
+    """
+
+    @staticmethod
+    def _set(monkeypatch, base, public):
+        from koipa import config as cfg
+        monkeypatch.setattr(cfg.settings, "review_confidence_threshold", base, raising=False)
+        monkeypatch.setattr(cfg.settings, "review_confidence_threshold_public", public,
+                            raising=False)
+
+    def test_public_prediction_uses_strict_threshold(self, monkeypatch, _no_db):
+        from koipa.schemas.classify import ClassifyRequest
+
+        svc = _service(monkeypatch)
+        self._set(monkeypatch, 0.50, 0.70)
+        monkeypatch.setattr(
+            svc.inference, "run",
+            lambda *a, **k: _fake_pred(label=Grade.S3, confidence=0.60),  # 0.50<=0.60<0.70
+        )
+        resp = svc.classify(ClassifyRequest(doc_id="not-a-uuid", content="본문 텍스트"))
+        assert resp.status == "needs_review"
+        assert any("low-confidence" in w for w in resp.warnings), resp.warnings
+
+    def test_non_public_prediction_uses_relaxed_threshold(self, monkeypatch, _no_db):
+        from koipa.schemas.classify import ClassifyRequest
+
+        svc = _service(monkeypatch)
+        self._set(monkeypatch, 0.50, 0.70)
+        monkeypatch.setattr(
+            svc.inference, "run",
+            lambda *a, **k: _fake_pred(label=Grade.S2, confidence=0.60),  # 0.60 >= 0.50
+        )
+        resp = svc.classify(ClassifyRequest(doc_id="not-a-uuid", content="본문 텍스트"))
+        assert not any("low-confidence" in w for w in resp.warnings), resp.warnings
+
+    def test_public_threshold_unset_preserves_single_threshold(self, monkeypatch, _no_db):
+        """public=None 이면 종전 동작 그대로 — 한 임계만 쓴다."""
+        from koipa.schemas.classify import ClassifyRequest
+
+        svc = _service(monkeypatch)
+        self._set(monkeypatch, 0.50, None)
+        monkeypatch.setattr(
+            svc.inference, "run",
+            lambda *a, **k: _fake_pred(label=Grade.S3, confidence=0.60),
+        )
+        resp = svc.classify(ClassifyRequest(doc_id="not-a-uuid", content="본문 텍스트"))
+        assert not any("low-confidence" in w for w in resp.warnings), resp.warnings
+
+    def test_unknown_prediction_falls_back_to_stricter(self, monkeypatch):
+        """예측 등급을 모르면 둘 중 엄격한 쪽(=미탐 방향 안전)을 쓴다."""
+        from koipa import config as cfg
+        from koipa.services.classify_service import ClassifyService
+
+        monkeypatch.setattr(cfg.settings, "review_confidence_threshold", 0.50, raising=False)
+        monkeypatch.setattr(cfg.settings, "review_confidence_threshold_public", 0.70,
+                            raising=False)
+        assert ClassifyService._review_confidence_threshold(None) == 0.70
+
+
 class TestS2UnderclassRiskRouting:
     def test_s2_underclass_risk_routes_to_review(self, monkeypatch, _no_db):
         from koipa.schemas.classify import ClassifyRequest

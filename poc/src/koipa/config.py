@@ -97,6 +97,24 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # — 그러지 않으면 같은 종류의 불일치가 재발한다. review_confidence_threshold(0.70)는 T=3.0
         # 기준으로 검증된 값이라 이 변경과 함께 재검증이 필요하다(별도 작업, 아직 안 함).
         "classifier_temperature": 2.03,
+        # [2026-08-23 임계 재검증] 검수 라우팅 conf 임계를 **등급차등**으로 나눈다.
+        # 종전 단일 0.70 은 T=3.0 시절 값이고 T=2.03 전환(2026-08-22) 뒤 재검증된 적이 없었다.
+        # 두 홀드아웃에서 0.45~0.70 을 서빙 경로 전체로 다시 재 봤다
+        # (reports/thresh_revalidation/, scripts/measure_serving_records.py --set 로 재현 가능):
+        #
+        #   임계        hardened42 자동확정   holdout109 자동확정   무음미탐   공개 오태깅
+        #   0.70(종전)      64.3%               58.7%             1 · 1      0 · 4
+        #   0.50 단일       81.0%               75.2%             1 · 1      0 · 6  <- 공개오태깅 +2
+        #   0.50/0.70      78.6%               70.6%             1 · 1      0 · 4  <- 채택
+        #
+        # 무음 미탐(정답 TS·S1 이 더 낮게 자동확정)은 0.45~0.70 전 구간에서 변하지 않았다 —
+        # 임계가 잡고 있던 것은 그게 아니었다. 실제로 잡고 있던 것은 정답 S2 가 S3(공개)로
+        # 자동확정되는 2 건이었고, 과소분류 자동확정 6 건 전부가 **예측=S3** 였다.
+        # 그래서 공개등급 예측만 0.70 을 유지하고 나머지를 0.50 으로 내린다. 이 조합으로
+        # 새로 자동확정된 19 건(두 셋 합계)은 정답 13 · 과분류(안전방향) 6 이고 과소분류는 0 이다.
+        # ⚠ 두 셋 모두 합성 평가셋이다. 회원사 운영 분포에서 다시 재야 한다.
+        "review_confidence_threshold": 0.50,
+        "review_confidence_threshold_public": 0.70,
         "agreement_gate_enabled": True,
         # metadata_floor: KL ICD 보안표시·접근범위 상향 게이트 ON. 실데이터 0 환경에선 모델보다
         # 메타데이터가 더 믿을 만하다 — security_marking이 예측보다 높으면 상향(FNR-safe·하향 안 함),
@@ -152,6 +170,24 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # (모델 동봉 temperature.json=2.03 실측에 맞춤; 위 onprem-local 주석 참조). ⚠임시조치 — 모델
         # 교체 시 재조정 필요.
         "classifier_temperature": 2.03,
+        # [2026-08-23 임계 재검증] 검수 라우팅 conf 임계를 **등급차등**으로 나눈다.
+        # 종전 단일 0.70 은 T=3.0 시절 값이고 T=2.03 전환(2026-08-22) 뒤 재검증된 적이 없었다.
+        # 두 홀드아웃에서 0.45~0.70 을 서빙 경로 전체로 다시 재 봤다
+        # (reports/thresh_revalidation/, scripts/measure_serving_records.py --set 로 재현 가능):
+        #
+        #   임계        hardened42 자동확정   holdout109 자동확정   무음미탐   공개 오태깅
+        #   0.70(종전)      64.3%               58.7%             1 · 1      0 · 4
+        #   0.50 단일       81.0%               75.2%             1 · 1      0 · 6  <- 공개오태깅 +2
+        #   0.50/0.70      78.6%               70.6%             1 · 1      0 · 4  <- 채택
+        #
+        # 무음 미탐(정답 TS·S1 이 더 낮게 자동확정)은 0.45~0.70 전 구간에서 변하지 않았다 —
+        # 임계가 잡고 있던 것은 그게 아니었다. 실제로 잡고 있던 것은 정답 S2 가 S3(공개)로
+        # 자동확정되는 2 건이었고, 과소분류 자동확정 6 건 전부가 **예측=S3** 였다.
+        # 그래서 공개등급 예측만 0.70 을 유지하고 나머지를 0.50 으로 내린다. 이 조합으로
+        # 새로 자동확정된 19 건(두 셋 합계)은 정답 13 · 과분류(안전방향) 6 이고 과소분류는 0 이다.
+        # ⚠ 두 셋 모두 합성 평가셋이다. 회원사 운영 분포에서 다시 재야 한다.
+        "review_confidence_threshold": 0.50,
+        "review_confidence_threshold_public": 0.70,
         "agreement_gate_enabled": True,
         # metadata_floor ON (onprem-local과 동일 — 위 주석 참조).
         "metadata_floor_enabled": True,
@@ -469,9 +505,24 @@ class Settings(BaseSettings):
     # 저신뢰 검수 라우팅 임계값. 모델 confidence가 이 값 미만이면 응답을
     # status="needs_review"로 표시하고 warning에 검수 권고를 남긴다. **거부(reject)는
     # 하지 않음** — 고위험 도메인에서 저신뢰라고 응답을 막으면 FNR이 악화되므로
-    # '플래그+검수권고'까지만. 데모 콘솔(api/static/incident.js)이 광고하는 0.7과 일치.
+    # '플래그+검수권고'까지만. 데모 콘솔(api/static/incident.js)이 광고하는 값과 일치시킬 것.
     # 임계 수치 자체의 정밀 튜닝은 운영 human_review 라벨 누적 후 PR곡선으로 조정.
     review_confidence_threshold: float = 0.7
+
+    # [2026-08-23 등급차등] 예측이 **공개등급**(GradeRegistry 최하, 보통 S3)일 때만 쓰는 별도 임계.
+    # None이면 위 review_confidence_threshold를 그대로 쓴다(동작 보존).
+    #
+    # 왜 갈랐나(실측 2026-08-23, reports/thresh_revalidation/). 임계 0.70은 T=3.0 시절 값이고
+    # T=2.03 전환(2026-08-22) 뒤 재검증된 적이 없었다. 두 홀드아웃에서 0.45~0.70을 재 보니
+    # **계약 지표(무음 미탐 = 정답 TS·S1이 더 낮게 자동확정)는 전 구간 불변**이었다
+    # (hardened42 1건 고정 · holdout109 1건 고정). 0.70이 실제로 잡고 있던 것은 정답 S2가
+    # S3(공개)로 자동확정되는 2건뿐이었고, **그 2건을 포함해 과소분류 자동확정 6건 전부가
+    # 예측=S3**이었다(conf 0.613~0.775). 즉 위험은 등급 전반이 아니라 공개등급 예측에 몰려 있다.
+    #
+    # 합의 게이트가 공개등급 예측을 conf 단독으로 통과시키기 때문에(_agreement_gate: 최하등급은
+    # 과분류 위험이 없다는 이유) 공개등급 쪽 conf 바를 낮추면 방어가 하나도 안 남는다. 그래서
+    # 공개등급만 0.70을 유지하고 나머지를 내린다 — 미탐 방어는 그대로 두고 검수부담만 던다.
+    review_confidence_threshold_public: float | None = None
 
     # 룰-폴백 자동확정 최소 증거량 (Gate: sparse-evidence → 검수 라우팅).
     # rule 엔진 confidence는 top_score/total이라, 단일·저가중 키워드 1개가 한 등급에 전 질량을
@@ -852,6 +903,20 @@ class Settings(BaseSettings):
             return v
         if not (0.0 <= v <= 1.0):
             raise ValueError(f"{info.field_name}는 0~1 범위여야 합니다 (got {v}).")
+        return v
+
+    # 공개등급 전용 conf 임계: None(등급차등 미적용) 허용, 값이면 0~1.
+    # 일반 임계와 같은 범위 검사를 받아야 한다 — 이 값이 조용히 범위를 벗어나면 공개등급
+    # 예측이 전건 자동확정(0 이하)되거나 전건 검수(1 초과)로 무음 전환된다.
+    @field_validator("review_confidence_threshold_public")
+    @classmethod
+    def _check_review_threshold_public(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if not (0.0 <= v <= 1.0):
+            raise ValueError(
+                f"review_confidence_threshold_public는 None이거나 0~1 범위여야 합니다 (got {v})."
+            )
         return v
 
     # escalation τ: None(순수 argmax) 허용, 값이면 0<τ<1 (양 끝 배제 — 0/1은 의미 없음).

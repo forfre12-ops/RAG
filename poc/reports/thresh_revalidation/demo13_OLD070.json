@@ -1,0 +1,78 @@
+{
+  "compare_to": [],
+  "conditions": {
+    "no_metadata": {
+      "auto_confirm_precision": 1.0,
+      "auto_confirm_rate": 0.2308,
+      "caught_by_review": 1,
+      "causal_review_reason_counts": {
+        "agreement-gate": 1,
+        "low-confidence": 9
+      },
+      "empty_text_documents": 0,
+      "errors": 0,
+      "high_grade_documents": 7,
+      "model_grade_distribution": {
+        "S1": 2,
+        "S2": 3,
+        "S3": 2,
+        "TS": 6
+      },
+      "n": 13,
+      "predicted_distribution": {
+        "S1": 2,
+        "S2": 2,
+        "S3": 2,
+        "TS": 7
+      },
+      "records_file": "reports\\thresh_revalidation\\demo13_OLD070.records.jsonl",
+      "silent_miss": 0,
+      "silent_miss_detail": [],
+      "silent_miss_rate": 0.0,
+      "status_distribution": {
+        "needs_review": 10,
+        "staging": 3
+      },
+      "underclassified": 1,
+      "unmapped_review_reasons": 0
+    }
+  },
+  "eval_rows": 13,
+  "eval_set": "datasets\\demo_console_samples13.jsonl",
+  "eval_sha256": "9b40b206f51136dae230740d5100dc78d5a8e7d3919982a04b71add0cca63aa6",
+  "git_commit": "9343727a8e7a9ee97c2adea6e9f9fe47856b0343",
+  "git_dirty": true,
+  "measured_at": "2026-08-23",
+  "model_dir": "F:\\antigravity\\rag\\poc\\artifacts\\classifier_p1_v5_clean\\v-fe4b386b",
+  "model_versions_seen": [
+    "v-fe4b386b"
+  ],
+  "note": "silent_miss 만이 운영상 놓친 것이다. needs_review 로 간 것은 사람이 본다. 이 값을 모델 단독 FNR(score_model_on_eval)과 나란히 놓지 말 것 - 다른 경로다.",
+  "purpose": "데모 콘솔 13샘플 (OLD070) 2026-08-23",
+  "record_schema_version": 2,
+  "scoring_path": "FULL serving path via in-process POST /api/v1/classify (post-model guards INCLUDED: FNR-safe override, source-prior cap, metadata floor, escalation tau, agreement gate)",
+  "script": "scripts/measure_serving_records.py",
+  "settings_effective": {
+    "agreement_gate_enabled": true,
+    "classifier_escalation_tau": 0.3,
+    "classifier_temperature": 2.03,
+    "metadata_floor_enabled": true,
+    "review_confidence_threshold": 0.7,
+    "review_confidence_threshold_public": 0.7,
+    "source_prior_cap_grade": "S3",
+    "source_prior_enabled": true
+  },
+  "settings_overrides": {
+    "review_confidence_threshold": "0.70",
+    "review_confidence_threshold_public": "0.70"
+  },
+  "settings_profile": "full-train",
+  "settings_profile_drift": {
+    "review_confidence_threshold": {
+      "effective": 0.7,
+      "expected": 0.5
+    }
+  },
+  "temperature_json_sha256": "becdb72c79a6b38a652ba0db2ebd42ece3359a3da75252063cd361b6f82ecd03",
+  "temperature_json_value": 2.03
+}
