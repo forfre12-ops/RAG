@@ -43,10 +43,13 @@ CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     # 검수 화면 자체(review/signoff)는 job_id 와 ?t= HMAC 토큰이 있어야 열려 고정 링크를
     # 걸 수 없다(golden.py:701·727 에서 403). 그래서 **잡 목록**으로 보낸다 — 거기서 잡을
     # 고르면 서버가 서명한 주소로 들어간다.
-    ("signoff", "골든셋 검수", "/console/admin.html#gold-jobs-card"),
+    # [2026-08-23] 이름을 실제 도착지에 맞췄다. 종전 「골든셋 검수」는 눌러도 검수를 할 수
+    # 없었다 — 잡 목록으로 갈 뿐이고 진짜 검수는 거기서 잡을 골라 한 번 더 들어가야 한다.
+    # 이름이 하는 일과 다르면 관리자는 "눌렀는데 왜 아무것도 없지"로 헤맨다.
+    ("signoff", "검증문서 검수 목록", "/console/admin.html#gold-jobs-card"),
     # [D1 2026-08-17] '실문서 수집' 은 별도 화면이 아니라 이 화면의 업로드 모달이 됐다.
     # 두 화면이 같은 API(/golden/candidates/upload)·같은 필드를 쓰는데 화면만 둘이었다.
-    ("manage", "골든셋 등록", "/api/v1/golden/candidates/manage.html#candidates"),
+    ("manage", "검증문서 후보 관리", "/api/v1/golden/candidates/manage.html#candidates"),
     ("admin", "관리자 콘솔", "/console/admin.html"),
     # [D3 2026-08-18] 시연은 별도 화면이 아니라 분류 콘솔 안의 구역이 됐다.
     # parse_demo.html 은 그 구역으로 보내는 스텁으로만 남는다(인쇄된 주소 보호).

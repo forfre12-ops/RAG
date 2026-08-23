@@ -233,6 +233,11 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .tab.active{color:var(--text);background:#fff;border-color:var(--border-strong);
             border-bottom:2px solid #fff;}
 .tab-sub{font-size:11px;font-weight:500;color:var(--text-faint);}
+/* [2026-08-23] 탭 묶음 표시 — 왼쪽=매일 하는 일, 오른쪽=모델 담당자 일. */
+.tab-group-label{align-self:flex-end;padding:0 10px 9px 2px;font-size:11px;font-weight:700;
+  letter-spacing:.02em;color:var(--text-faint);white-space:nowrap;}
+.tab-divider{align-self:stretch;width:1px;margin:6px 14px 0;background:var(--border-strong);}
+@media (max-width:720px){.tab-divider{display:none;} .tab-group-label{width:100%;padding-bottom:2px;}}
 .tab.active .tab-sub{color:var(--text-soft);}
 .pane-note{font-size:12px;color:var(--text-soft);margin:11px 0 4px;line-height:1.5;}
 
@@ -286,7 +291,7 @@ details.adv[open]{padding-bottom:12px;}
 
 <!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
 <!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
-<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">관리자 콘솔</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">골든셋 검수</a><a class="cnav-link" href="/api/v1/golden/candidates/manage.html#candidates">골든셋 등록</a><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a><a class="cnav-link" href="/api/v1/golden/candidates/login.html">로그인</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">관리자 콘솔</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">검증문서 검수 목록</a><a class="cnav-link" href="/api/v1/golden/candidates/manage.html#candidates">검증문서 후보 관리</a><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a><a class="cnav-link" href="/api/v1/golden/candidates/login.html">로그인</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
 <!-- console-header:end -->
 
 <div class="wrap">
@@ -336,10 +341,18 @@ details.adv[open]{padding-bottom:12px;}
     <!-- [2026-08-20] 탭을 **사람 축**으로 다시 갈랐다. 종전 축은 기능(운영·모델·설정·관제)
          이라 "내가 뭘 눌러야 하나" 에 답하지 못했고, model 탭 하나에 카드 6개·조작 36개가
          몰려 있었다. 지금은 탭마다 4개 이하다(검수 3 · 학습배포 4 · 운영 4 · 설정 2). -->
-    <button class="tab active" data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">골든셋 후보 · 서명</span></button>
-    <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">재학습 · 게이트 · 성적</span></button>
-    <button class="tab"        data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">분류 · 관제 · 감사</span></button>
+    <!-- [2026-08-23] 탭을 **두 묶음**으로 갈라 보여준다. 종전에는 넷이 나란히 있어서 검수와
+         운영이 동등한 메뉴로 보였고, 사용자가 "어느 쪽이 내 일인가"를 스스로 판단해야 했다.
+         왼쪽=매일 하는 일, 오른쪽=모델 담당자가 가끔 하는 일. 순서도 그에 맞춰 바꿨다.
+         검수(골든셋)를 학습·배포 옆에 붙인 이유: 이름이 「분류 검수 큐」와 겹쳐 일상 업무로
+         오해되는데, 실제로는 모델 평가 기준문서를 승인하는 일이라 모델 관리 쪽이 맞다. -->
+    <span class="tab-group-label">일상 운영</span>
+    <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제</span></button>
     <button class="tab"        data-tab="config"  role="tab" onclick="showPane('config')">설정<span class="tab-sub">등급 · 태깅규칙</span></button>
+    <span class="tab-divider" aria-hidden="true"></span>
+    <span class="tab-group-label">모델 관리</span>
+    <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">골든셋 후보 · 서명</span></button>
+    <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">재학습 · 게이트 · 성적</span></button>
   </div>
   <p class="pane-note" id="pane-note"></p>
 
@@ -367,11 +380,19 @@ details.adv[open]{padding-bottom:12px;}
   <div class="grid">
 
     <!-- ===== 연결/인증 ===== (모든 탭에서 상시 노출 — 인증 컨텍스트는 전 작업의 전제) -->
+    <!-- [2026-08-23] 접어 둔다(제거 아님). 이 카드가 첫 화면 맨 위에 펼쳐져 있으면 관리자는
+         "작업 시작 전에 시스템 설정을 해야 하나"로 읽는다 — API Base·API Key·역할 헤더가
+         먼저 보이기 때문이다. 실제로는 이미 접속된 상태이고 손댈 일이 없다.
+         ⚠ 지우지는 않는다. 시연·리허설이 이 카드로 서버와 키를 바꿔 가며 돌아가고,
+         문제가 생겼을 때 손댈 곳이 여기뿐이다. 접되 한 번 누르면 나오게 둔다. -->
     <section class="card col-span" data-pane="always" style="order:0">
-      <div class="card-head">
-        <div class="ttl"><span class="step-no">0</span> 연결 · 인증 컨텍스트</div>
+      <details>
+      <summary style="cursor:pointer;list-style:none">
+      <div class="card-head" style="border:0;padding-bottom:0">
+        <div class="ttl"><span class="step-no">0</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
         <span class="ep">X-API-Key · X-Actor-Role</span>
       </div>
+      </summary>
       <div class="card-body">
         <div class="row3">
           <div class="field">
@@ -418,12 +439,16 @@ details.adv[open]{padding-bottom:12px;}
           <span id="purge-result" class="hint" style="margin:0;">시연으로 쌓인 데이터만 삭제합니다. 운영 데이터는 대상이 아닙니다.</span>
         </div>
       </div>
+      </details>
     </section>
 
     <!-- ===== 1. 분류 ===== -->
-    <section class="card" data-pane="ops" style="order:1">
+    <!-- [2026-08-23] 운영 탭 카드 순서를 뒤집었다. 현장 관리자는 새 문서를 직접 분류하는
+         사람이 아니라 **이미 들어온 문서를 확정하는 사람**이다. 첫 카드가 「분류 실행」이면
+         자기 일이 두 번째에 있다. KL 이 관리자 화면을 보고 "잘 모르겠다"고 한 원인 중 하나다. -->
+    <section class="card" data-pane="ops" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">1</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
+        <div class="ttl"><span class="step-no">2</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
         <span class="ep">POST /documents/analyze · POST /classify</span>
       </div>
       <div class="card-body">
@@ -472,7 +497,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div class="btn-row">
           <button class="btn" id="btn-classify" onclick="runClassify()">분류하기</button>
-          <button class="btn sec" id="btn-batch" onclick="runBatch()">골든셋 8건 일괄 분류</button>
+          <button class="btn sec" id="btn-batch" onclick="runBatch()">샘플 8건 일괄 분류</button>
         </div>
         <p class="hint">샘플은 운영 골든셋에서 등급별 2건씩 뽑은 것입니다. <b>일괄 분류</b>는 8건을 순차 분류해 검수 큐에 넣습니다.</p>
         <div id="cl-result" role="status" aria-live="polite"></div>
@@ -480,9 +505,9 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 2. 검수 큐 ===== -->
-    <section class="card" data-pane="ops" style="order:2">
+    <section class="card" data-pane="ops" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">2</span> 분류 검수 큐 · 확정/재라벨 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no">1</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag">FUN-024</span></div>
         <span class="ep">POST /confirm · /relabel</span>
       </div>
       <div class="card-body">
@@ -522,7 +547,7 @@ details.adv[open]{padding-bottom:12px;}
          동일하다 — GET /admin/locked-readiness. -->
     <section class="card col-span" data-pane="review" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">2</span> 골든셋 현황 — 구성 · 서명 확정 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no">2</span> 모델 검증 문서 현황 — 구성 · 승인 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
       </div>
       <div class="card-body">
@@ -549,10 +574,10 @@ details.adv[open]{padding-bottom:12px;}
       </div>
     </section>
 
-    <!-- ===== N. 합성 샘플 생성 · 검수 (FUN-003) ===== -->
+    <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
     <section class="card col-span" data-pane="train" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">1</span> 합성 샘플 생성 · 검수 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no">1</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
@@ -759,15 +784,15 @@ details.adv[open]{padding-bottom:12px;}
       </div>
     </section>
 
-    <!-- ===== 7. 골든셋 후보 빌더 ===== 루프 B 의 시작점(G1) -->
+    <!-- ===== 7. 검증 기준문서 준비 ===== 루프 B 의 시작점(G1) -->
     <section class="card col-span" data-pane="review" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">1</span> 골든셋 후보 빌더 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no">1</span> 검증 기준문서 준비 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
         <details class="adv">
-          <summary>고급 설정 — 후보 소스 · provider · 생성 건수 바꾸기</summary>
+          <summary>고급 설정 — 후보 소스 · 판정기 · 생성 건수 바꾸기</summary>
         <div class="row3">
           <div class="field">
             <label class="fld">후보 소스</label>
@@ -780,7 +805,7 @@ details.adv[open]{padding-bottom:12px;}
             </select>
           </div>
           <div class="field">
-            <label class="fld">provider</label>
+            <label class="fld">등급 판정기</label>
             <select id="gold-provider">
               <option value="noop">noop (룰 단독 · 외부 LLM 없이)</option>
               <option value="local_openai">local_openai</option>
@@ -790,7 +815,7 @@ details.adv[open]{padding-bottom:12px;}
             </select>
           </div>
           <div class="field">
-            <label class="fld">n</label>
+            <label class="fld">생성 건수</label>
             <input id="gold-n" type="number" min="1" max="50" value="8" />
           </div>
         </div>
@@ -803,7 +828,7 @@ details.adv[open]{padding-bottom:12px;}
 
         <div class="btn-row">
           <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;margin-right:auto;">
-            <input id="gold-require-evidence" type="checkbox" style="width:auto" checked /> require_evidence
+            <input id="gold-require-evidence" type="checkbox" style="width:auto" checked /> 근거 문장이 있는 것만 후보로
           </label>
           <button class="btn" id="gold-go" onclick="startGoldenBuild()">후보 생성 → 검수</button>
           <button class="btn sec sm" onclick="loadGoldenJob()">상태 새로고침</button>
@@ -829,10 +854,10 @@ details.adv[open]{padding-bottom:12px;}
             <button class="btn sec sm" onclick="loadGoldenBuilds()" title="목록 다시 읽기">↻</button>
             <button class="btn sec sm" id="gold-reg" onclick="registerGoldenBuild()">검수 시작</button>
           </div>
-          <p class="sec-note" style="margin-top:4px;">이미 만들어둔 <code>build_*.jsonl</code>을 그대로 잡으로 올립니다. LLM 재라벨링을 하지 않아 큐레이트된 슬레이트 라벨이 보존됩니다.</p>
+          <p class="sec-note" style="margin-top:4px;">이미 만들어 둔 검수 묶음 파일을 그대로 올립니다. 등급을 다시 매기지 않으므로 <b>파일에 적힌 등급이 그대로 보존</b>됩니다.</p>
         </div>
 
-        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 생성된 골든셋 후보 잡이 없습니다.</div>
+        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 생성된 검증문서 준비 작업이 없습니다.</div>
 
         <div id="gold-summary" style="display:none;margin-top:10px;">
           <div class="dash-panel">
@@ -1033,7 +1058,7 @@ function markStep(id){
  * data-pane="always"(연결·인증)는 모든 탭에 남는다. 전 작업의 전제라서다.
  * -------------------------------------------------------------------------- */
 const PANE_NOTE={
-  review: '검수 — 골든셋(정답지) 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다.',
+  review: '검수 — 모델 검증 기준문서(정답지) 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다.',
   train:  '학습 · 배포 — 서명된 골든셋으로 재학습하고, 게이트를 통과한 모델만 배포한 뒤 성적을 확인합니다.',
   ops:    '운영 — 문서를 분류하고, AI가 자신 없어 한 건을 사람이 확정합니다. 매일 도는 일과이고, 현재 상태와 감사 기록도 여기서 봅니다.',
   config: '설정 — 등급 체계와 태깅 규칙입니다. 보통 도입 시 한 번 정하고 이후에는 거의 바꾸지 않습니다.',
@@ -1050,15 +1075,23 @@ function showPane(name){
   try{ sessionStorage.setItem('koipa_admin_pane', name); }catch(e){/* 프라이빗 모드 등 */}
 }
 function initPane(){
-  // 기본 탭은 **검수**다. 종전 기본값은 'ops' 라, 검수하러 들어온 사람에게 첫 화면이
-  // 「분류 실행」이었다(2026-08-20 사용자 지적: 화면이 복잡하다).
-  let saved='review';
-  try{ saved=sessionStorage.getItem('koipa_admin_pane')||'review'; }catch(e){}
+  /* 기본 탭은 **운영**이다.
+   *
+   * 이력. 2026-08-20 에 'ops' → 'review' 로 바꿨었다. 이유는 "검수하러 들어온 사람에게 첫
+   * 화면이 「분류 실행」이었다" 였다 — 즉 **문제는 탭이 아니라 운영 탭의 첫 카드**였다.
+   * 2026-08-23 에 그 전제를 없앴다(운영 탭 첫 카드를 「분류 검수 큐」로 올림). 그래서 기본을
+   * 운영으로 되돌린다. 이제 콘솔을 열면 현장 관리자가 매일 하는 일이 첫 화면에 나온다.
+   *
+   * 왜 프로파일별로 안 나누나. 프로파일은 healthz 응답을 기다려야 알 수 있어 탭이 한 번
+   * 바뀌는 게 눈에 보인다. 지재원도 콘솔을 열자마자 운영 상태를 보는 것이 부자연스럽지 않다.
+   * 검증문서 검수는 상단 메뉴에서 한 번에 간다. */
+  let saved='ops';
+  try{ saved=sessionStorage.getItem('koipa_admin_pane')||'ops'; }catch(e){}
   showPane(saved);
   gotoHash();
 }
 /* 주소의 #앵커로 **탭까지** 열어 준다.
- * 왜(2026-08-20). 공용 메뉴의 「골든셋 검수」가 이 화면의 골든 잡 목록(#gold-jobs-card)을
+ * 왜(2026-08-20). 공용 메뉴의 「검증문서 검수」가 이 화면의 검증문서 검수 목록(#gold-jobs-card)을
  * 가리킨다. 그 카드는 data-pane="review" 라 기본 탭에 있지만, 세션에 다른 탭이 저장돼
  * 있으면 대상이 display:none 인 채로 도착해 **아무 일도 안 일어난 것처럼 보인다**(실측).
  * 이 화면에는 location.hash 를 읽는 코드가 한 줄도 없었다.
@@ -1156,10 +1189,10 @@ async function checkHealth(){
  *
  * 기준은 **deploy_profile** 이다(llm_provider 가 아니다). 처음엔 "LLM 이 없으면 무의미하니
  * llm_provider=noop 이면 숨기자"로 짰는데, 테스트 환경은 지재원도 noop 이라 **감리 시연의 핵심인
- * 골든셋 후보 빌더가 지재원에서도 사라졌다**. 제공자 설정은 환경마다 달라 화면 구성의 기준이
+ * 검증 기준문서 준비가 지재원에서도 사라졌다**. 제공자 설정은 환경마다 달라 화면 구성의 기준이
  * 될 수 없다 — 이 서버가 무엇을 하는 시스템인지(프로파일)가 기준이어야 한다.
  *
- * 대상은 모델 공장 전용 기능만: 골든셋 후보 빌더 · 합성 샘플 생성.
+ * 대상은 모델 공장 전용 기능만: 검증 기준문서 준비 · 학습 후보 생성.
  * 골든 현황·잡 목록은 숨기지 않는다 — 고객사도 검수·서명 경로가 살아 있다
  * (onprem-local 은 deploy_gate_manual_require_locked_eval=True 를 유지한다).
  * 그리고 조용히 감추지 않는다 — 어느 시스템에 접속했는지 배너로 항상 밝힌다. */
@@ -2078,14 +2111,14 @@ function renderGoldenSummary(d){
           + '· LLM이 있는 서버(지재원 GPU)라면 위 <b>고급 설정</b>에서 provider를 <code>vllm_qwen</code> 등으로 바꿔 다시 실행하세요.<br/>'
           + '· LLM이 없는 환경이라면 아래 <b>기존 슬레이트 등록</b>으로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
         : '<b>gold 후보가 0건입니다.</b><br/>'
-          + '룰↔LLM 합의 또는 근거 요건에서 전건이 보류로 갔습니다. 고급 설정의 <code>require_evidence</code>를 끄거나 '
+          + '룰과 LLM 이 합의하지 못했거나 근거 문장이 없어 전건이 보류로 갔습니다. 고급 설정의 <b>근거 문장이 있는 것만 후보로</b> 를 끄거나 '
           + '후보 수를 늘려 보고, 그래도 0건이면 아래 <b>기존 슬레이트 등록</b>으로 검수·서명만 진행하세요.';
     }
   }
   goldenButtons(d.status, gold);
 }
 async function startGoldenBuild(){
-  if(!guardWrite('골든셋 후보 생성')) return;
+  if(!guardWrite('검증 기준문서 생성')) return;
   const src=($('gold-source')||{}).value;
   // [2026-08-20] 눌린 티를 낸다. 종전에는 버튼만 잠기고 문구가 응답 **뒤에야** 떠서,
   // LLM 이 도는 몇 초 동안 화면이 멈춘 것처럼 보였다(분류 실행·등급 시연은 이미 이렇게 한다).
@@ -2115,12 +2148,12 @@ async function startGoldenBuild(){
     const d=await api('POST','/golden/build',body);
     LAST_GOLDEN_JOB_ID=d.golden_job_id;
     $('gold-result').textContent=JSON.stringify(d,null,2);
-    log(`골든셋 후보 생성 시작: ${LAST_GOLDEN_JOB_ID}`,'ok');
+    log(`검증 기준문서 생성 시작: ${LAST_GOLDEN_JOB_ID}`,'ok');
     goldenProgress(`job ${LAST_GOLDEN_JOB_ID} 생성됨 — 완료 대기 중…`);
     await pollGoldenJob(LAST_GOLDEN_JOB_ID);
   }catch(e){
     goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
-    $('gold-result').textContent=`골든셋 후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+    $('gold-result').textContent=`검증 기준문서 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
   }finally{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
 }
 /* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
@@ -2179,8 +2212,8 @@ async function pollGoldenJob(id){
       const gold=d.gold_count??0;
       goldenProgress(d.error ? `실패: ${d.error}`
         : (gold>0 ? `완료 — gold 후보 ${gold}건. 아래에서 검수/서명 화면을 여세요.`
-                  : '완료 — 승격 가능한 gold 후보가 0건입니다(admission 게이트 탈락). provider·require_evidence를 확인하세요.'));
-      log(`골든셋 후보 잡 ${d.status}: ${id} · gold ${gold}`, d.error?'err':'ok');
+                  : '완료 — 검수로 올릴 후보가 0건입니다(채택 기준 미달). 판정기와 근거 요건 설정을 확인하세요.'));
+      log(`검증문서 준비 작업 ${d.status}: ${id} · gold ${gold}`, d.error?'err':'ok');
       return;
     }
     goldenProgress(`job ${id} · ${d.status||'진행중'} — 대기 ${((i+1)*1.5).toFixed(0)}s`);
@@ -2196,10 +2229,10 @@ async function loadGoldenJob(){
     $('gold-result').textContent=JSON.stringify(d,null,2);
     renderGoldenSummary(d);
     goldenProgress(`job ${id} · ${d.status||'-'}`);
-    log(`골든셋 후보 잡 상태: ${id} → ${d.status}`,'ok');
+    log(`검증문서 준비 작업 상태: ${id} → ${d.status}`,'ok');
   }catch(e){
     goldenProgress(`상태 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
-    $('gold-result').textContent=`골든셋 후보 잡 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+    $('gold-result').textContent=`검증문서 준비 작업 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
   }
 }
 /* [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문). */
@@ -2263,7 +2296,7 @@ function onAutoChange(){
   }
 }
 
-/* ---- N. 합성 샘플 생성 · 검수 (FUN-003-①⑤⑦) ---- */
+/* ---- N. 학습 후보 생성 · 검수 (FUN-003-①⑤⑦) ---- */
 let SYNTH = [];   // /synth/queue 응답 items
 
 async function synthGenerate(){
@@ -2570,7 +2603,7 @@ setAutoStatus('paused');
 log('거버넌스 콘솔 준비 완료.','info');
 </script>
 
-<!-- 골든 잡 목록 패널 — 본체는 별도 파일(위 인라인 스크립트의 cfg/api/log/esc 재사용). -->
+<!-- 검증문서 검수 목록 패널 — 본체는 별도 파일(위 인라인 스크립트의 cfg/api/log/esc 재사용). -->
 <script src="./golden_jobs.js"></script>
 
 </body>

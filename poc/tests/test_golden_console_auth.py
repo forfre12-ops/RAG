@@ -44,7 +44,7 @@ def test_console_has_no_manual_key_or_actor_inputs():
     assert "window.__GOLDEN_PREVIEW__" in html
     # 브랜드는 발주기관 기준이다. 검수자가 여는 화면이라 공급사명이 앞에 서면 안 된다.
     assert "한국지식재산보호원" in html
-    assert "골든셋 검수" in html
+    assert "검증문서 검수 목록" in html
 
 
 def test_real_document_intake_requires_provenance_fields_in_ui():
