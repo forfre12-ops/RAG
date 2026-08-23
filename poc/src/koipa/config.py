@@ -441,7 +441,10 @@ class Settings(BaseSettings):
 
     # --- ConsensusJudge (골든 게이트 self-consistency + Qwen 섀도) ---
     # 주 판정자=상용 택일(anthropic|gemini|openai), 미연동/민감문서면 airgap(Qwen 주판정).
-    judge_primary_provider: str = "anthropic"
+    # [2026-08-24] 기본값을 상용에서 온프렘으로 뒤집는다. 종전 기본값이 "anthropic"
+    # 이라, 상용 키가 꽂힌 서버에서 provider 를 명시하지 않은 호출은 아무도 그렇게
+    # 지시한 적 없는데 공개 클라우드로 나갔다. 상용은 **명시할 때만** 쓴다.
+    judge_primary_provider: str = "vllm"
     judge_shadow_provider: str = "vllm"        # 섀도=배포급 Qwen3-14B (production_suspect 탐지)
     judge_shadow_enabled: bool = True
     judge_k_min: int = 3                        # self-consistency 최소 샘플(만장일치면 여기서 멈춤)

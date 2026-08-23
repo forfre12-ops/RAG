@@ -298,8 +298,10 @@ def build_consensus_judge(
     if settings is None:
         from koipa.config import settings as _s  # noqa: PLC0415
         settings = _s
-    primary_name = (primary_name or getattr(settings, "judge_primary_provider", "anthropic")).lower()
     onprem = getattr(settings, "judge_shadow_provider", "vllm") or "vllm"
+    # 미지정 시 기본은 **온프렘**이다. 하드코딩 기본값이 "anthropic" 이던 동안에는
+    # 설정을 비워 둔 것이 곧 "상용으로 보내라"는 뜻이 됐다 — 비워 둔 것은 지시가 아니다.
+    primary_name = (primary_name or getattr(settings, "judge_primary_provider", onprem) or onprem).lower()
     temperature = float(getattr(settings, "judge_temperature", 0.7))
 
     if primary_name == "noop":

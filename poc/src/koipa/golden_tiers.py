@@ -292,6 +292,30 @@ def is_real_text_origin(record: dict) -> bool:
     return document_origin(record) in _REAL_TEXT_ORIGINS
 
 
+# ── 공개 클라우드(상용 LLM) 반출 게이트 ────────────────────────────────────────
+# 허용목록이다. 차단목록이 아니다 — 출처 어휘가 두 벌이라(golden_tiers 는 customer_real,
+# proxy_gold_candidate_service 는 organization_real) 차단목록을 쓰면 한쪽 어휘가 그물을
+# 그냥 빠져나간다. 모르는 값은 document_origin 이 unknown 으로 떨어뜨리므로 자동 차단된다.
+_CLOUD_ELIGIBLE_ORIGINS = frozenset({ORIGIN_PUBLIC_REAL, ORIGIN_SYNTHETIC})
+
+
+def may_send_to_commercial_llm(record: dict) -> bool:
+    """이 문서를 공개 클라우드(Anthropic/Gemini/OpenAI)로 보내도 되는가 — fail-closed.
+
+    보내도 되는 것은 둘뿐이다:
+      · public_real  이미 공개된 실문서(판례·공시)
+      · synthetic    우리가 지어낸 본문 — 실제 비밀이 아니다
+
+    나머지는 전부 False 다. customer_real/organization_real(조직·고객사 실문서)은 물론,
+    출처를 **모르는** 것도 False 다. 출처가 확인되지 않은 문서를 밖으로 내보내는 것은
+    "괜찮을 것"이라는 추측이지 근거가 아니다.
+
+    ⚠ 이 술어를 등급(TS/S1/S2/S3)으로 대신하지 말 것. 등급은 모델이 매기는 값이라
+      "등급이 낮으니 보내도 된다"는 순환논리가 된다. 반출 판단의 근거는 출처다.
+    """
+    return document_origin(record) in _CLOUD_ELIGIBLE_ORIGINS
+
+
 def is_real_locked_eval(record: dict) -> bool:
     """유효 서명 + **실문서 출처**. 평가셋 구성 보고(실문서 몇 건인지)에 쓴다.
 

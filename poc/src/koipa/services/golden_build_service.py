@@ -281,6 +281,49 @@ class GoldenBuildService:
             "real_locked_eval": real_locked,
         }
 
+    @staticmethod
+    def _egress_decision(docs: list, req: GoldenBuildRequest) -> tuple[bool, dict]:
+        """이 실행분을 상용 LLM 으로 보내도 되는지 **문서 출처로** 판정한다.
+
+        종전에는 요청 본문의 ``sensitive`` 플래그 하나가 유일한 잠금장치였다. 기본값이
+        False 이고 콘솔은 그 값을 아예 보내지 않아, 상용 키를 꽂는 순간 출처를 모르는
+        문서가 공개 클라우드로 나갈 수 있었다(fail-open). 이제 판단 근거는 출처다
+        (golden_tiers.may_send_to_commercial_llm — 허용목록·fail-closed).
+
+        한 건이라도 반출 불가 문서가 섞이면 **실행분 전체**를 airgap 으로 돌린다.
+        label_fn 은 실행 단위로 한 번 만들어져 문서별 라우팅이 불가능하고, 섞였을 때
+        "일부만 보낸다"는 선택지는 안전한 쪽이 아니다.
+
+        자칭 ``sensitive`` 는 더 잠그는 방향으로만 작동한다 — 켜면 airgap, 꺼도 출처가
+        허용하지 않으면 여전히 airgap.
+
+        Returns: (airgap_required, 감사기록dict)
+        """
+        from collections import Counter  # noqa: PLC0415
+
+        from koipa.golden_tiers import (  # noqa: PLC0415
+            document_origin,
+            may_send_to_commercial_llm,
+        )
+
+        blocked: Counter[str] = Counter()
+        for d in docs:
+            if not may_send_to_commercial_llm(d):
+                blocked[document_origin(d)] += 1
+
+        origin_blocked = bool(blocked)
+        airgap_required = origin_blocked or bool(req.sensitive)
+        return airgap_required, {
+            "airgap": airgap_required,
+            "reason": (
+                "origin_not_cloud_eligible" if origin_blocked
+                else "caller_declared_sensitive" if req.sensitive
+                else "allowed"
+            ),
+            "blocked_by_origin": dict(blocked),
+            "caller_declared_sensitive": bool(req.sensitive),
+        }
+
     def run_build(
         self,
         req: GoldenBuildRequest,
@@ -294,7 +337,8 @@ class GoldenBuildService:
             self._dropped_no_text = 0
             docs = self._load_docs(req)
             holdout = self._load_holdout(req)
-            lf = label_fn or make_label_fn(req.llm_provider, sensitive=req.sensitive)
+            airgap_required, egress = self._egress_decision(docs, req)
+            lf = label_fn or make_label_fn(req.llm_provider, sensitive=airgap_required)
             result = build_golden_set(
                 docs,
                 label_fn=lf,
@@ -306,6 +350,9 @@ class GoldenBuildService:
             # 본문 없어 제외된 입력을 stats 에 노출 — 무음 소멸 방지(입력 수가 안 맞는 이유가 보이게).
             if self._dropped_no_text:
                 result.stats["dropped_no_text"] = self._dropped_no_text
+            # 어디로 보냈는지를 실행 기록에 남긴다 — 사후에 "그때 상용으로 나갔나"를
+            # 물었을 때 답할 수 있어야 한다(감사).
+            result.stats["commercial_egress"] = egress
             # 도메인→등급 shortcut 누출 가시화(플래그+로그 전용, 하드-드롭 없음, 실패-안전).
             # gold(=학습 silver 후보)가 '도메인이 등급을 결정'하는 shortcut을 얼마나 담는지
             # stats에 verdict로 남겨 승격/검수 판단에 노출한다(무음 통과 방지).
