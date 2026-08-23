@@ -116,3 +116,38 @@ def test_demo_button_grouping_matches_measured_expectations():
         if advertised != exp["status"]:
             wrong.append(f"{exp['file']}: 화면은 {advertised} 인데 기대는 {exp['status']}")
     assert not wrong, "시연 버튼 묶음이 점검기 기대와 다르다: " + "; ".join(wrong)
+
+
+def test_init_functions_do_not_reference_removed_elements():
+    """init 이 부르는 함수가 없는 요소를 만지면 **그 뒤 초기화가 통째로 멈춘다.**
+
+    실측 2026-08-23. 「분류 실행」의 샘플 드롭다운을 화면에서 뺐는데 populateSamples() 초기화는
+    남겨 두었다. init 순서가 populateSamples() → checkHealth() 라, 여기서 TypeError 가 나며
+    checkHealth 가 실행되지 않았다 — 서버 검수 임계가 '—' 로 남고 프로파일 배너도 안 떴다.
+    화면 절반이 죽는데 원인은 지운 요소 하나였고, 화면에는 오류 표시가 없었다.
+    """
+    import re
+
+    page = (STATIC / "admin.html").read_text(encoding="utf-8")
+    ids = set(re.findall(r'id="([\w-]+)"', page))
+    init = re.search(r"/\* init \*/(.*?)</script>", page, re.S)
+    assert init, "init 블록을 찾지 못했다 — 이 테스트의 전제가 깨졌다"
+    called = re.findall(r"^\s*(\w+)\(\);", init.group(1), re.M)
+    assert called, "init 에서 호출하는 함수를 찾지 못했다"
+
+    missing = []
+    for fn in called:
+        body = re.search(r"function %s\s*\([^)]*\)\s*\{(.*?)\n\}" % re.escape(fn), page, re.S)
+        if not body:
+            continue
+        src = body.group(1)
+        for ref in sorted(set(re.findall(r"\$\('([\w-]+)'\)", src))):
+            if ref in ids:
+                continue
+            # 요소가 없어도 되는 경우 — 그 변수에 null 가드가 있으면 안전하다.
+            var = re.search(r"(?:const|let|var)\s+(\w+)\s*=\s*\$\('%s'\)" % re.escape(ref), src)
+            guarded = bool(var) and re.search(
+                r"if\s*\(\s*!\s*%s\s*\)\s*return" % re.escape(var.group(1)), src)
+            if not guarded:
+                missing.append(f"{fn}() → #{ref}")
+    assert not missing, "init 함수가 없는 요소를 가드 없이 만진다: " + ", ".join(missing)

@@ -1281,8 +1281,13 @@ function applyProviderAvailability(d){
   }
   const note=$('gold-provider-note');
   if(note){
-    note.innerHTML = active
-      ? '이 서버는 <b>' + esc(active) + '</b> 로 설정돼 있어 그 항목만 고를 수 있습니다. '
+    // ⚠ esc() 는 이 파일에 없다(golden_jobs.js 가 admin.html 에 있다고 가정한 것과 달리
+    //   실제로는 정의돼 있지 않다). 종전 판이 esc(active) 를 부르는 바람에 ReferenceError 가
+    //   나고 **applyServerConfig 의 뒤 코드가 통째로 멈췄다** — 서버 검수 임계가 '—' 로
+    //   남고 대시보드 초기화도 안 됐다(실측 2026-08-23). textContent 로 넣어 이스케이프
+    //   자체를 없앤다.
+    note.textContent = active
+      ? '이 서버는 ' + active + ' 로 설정돼 있어 그 항목만 고를 수 있습니다. '
         + '다른 제공자를 쓰려면 서버 설정(.env)에서 바꿔야 합니다.'
       : '서버 설정을 읽지 못했습니다 — 제공자 선택이 실제와 다를 수 있습니다.';
   }
@@ -1290,7 +1295,9 @@ function applyProviderAvailability(d){
 }
 function applyServerConfig(d){
   applyProfileVisibility(d);
-  applyProviderAvailability(d);
+  // 새로 붙인 게이팅이 죽어도 **뒤 초기화(검수 임계·대시보드)는 살아야 한다.**
+  // 2026-08-23 에 정확히 그 반대가 됐다 — 함수 하나가 던지자 화면 절반이 비었다.
+  try{ applyProviderAvailability(d); }catch(e){ console && console.warn && console.warn('provider gating skipped', e); }
   const oc=(d&&d.operational_config)||{};
   const t=oc.review_confidence_threshold;
   const el=$('srv-gate-v');
@@ -1319,6 +1326,12 @@ const SAMPLES=[
 ];
 function populateSamples(){
   const sel=$('sample-select');
+  /* ⚠ [2026-08-23] 요소가 없으면 조용히 끝낸다.
+     2026-08-23 에 「분류 실행」의 샘플 드롭다운을 화면에서 뺐는데 이 초기화는 남겨 두었다.
+     init 순서가 populateSamples() → checkHealth() 라, 여기서 TypeError 가 나면서
+     **checkHealth 가 아예 실행되지 않았다** — 서버 검수 임계가 '—' 로 남고 프로파일 배너도
+     안 떴다. 화면 절반이 죽는데 원인은 지운 요소 하나였다. */
+  if(!sel) return;
   /* [2026-08-23] 두 가지를 고쳤다.
      ① 옵션 이름에서 기대 등급 `[TS]` 를 뺐다 — 시스템이 판정하기 전에 화면이 답을 말하고
         있었다. 등급 판정을 보여주는 화면에서 정답을 먼저 노출하면 시연이 성립하지 않는다.
