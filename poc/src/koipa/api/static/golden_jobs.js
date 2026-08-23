@@ -134,16 +134,16 @@
               + '<b>best-effort</b>(최근순 보장 아님)라, <b>생성 시각으로 최신순 재정렬</b>해 표시합니다. '
               + '목록이 20건으로 잘리므로 그보다 오래된 잡은 여기 없을 수 있습니다.</p>'
             : '');
-      log('골든 잡 목록 ' + jobs.length + '건 조회', 'ok');
+      log('검수 목록 ' + jobs.length + '건 조회', 'ok');
     } catch (e) {
-      box.innerHTML = '<div class="warnbox">골든 잡 목록 조회 실패: '
+      box.innerHTML = '<div class="warnbox">검수 목록 조회 실패: '
         + esc(String(e.status || '')) + ' ' + esc((e.data && e.data.detail) || e.message || '') + '</div>';
     }
   };
 
   window.pickGoldenJob = function pickGoldenJob(id) {
     LAST_GOLDEN_JOB_ID = id;
-    log('골든 잡 선택: ' + id, 'ok');
+    log('검수 묶음 선택: ' + id, 'ok');
     if (typeof loadGoldenJob === 'function') loadGoldenJob();   // 요약 카드·검수/서명 버튼 갱신
     loadGoldenJobList();                                         // 현재 선택 행 하이라이트
     var card = document.getElementById('gold-summary');
