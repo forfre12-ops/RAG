@@ -5,15 +5,13 @@ ES 경로는 하위호환용 레거시로만 잔존(core/prod/airgap compose 에
 
 backend 결정 우선순위:
   1. 명시적 인자 `backend=...`
-  2. 환경변수 `VECTOR_BACKEND`
-  3. 기본값 "pg" (pgvector dense + ts_rank 하이브리드)
+  2. 검증·프로필 적용이 끝난 `settings.vector_backend`
 
 `force_memory=True`는 테스트용 강제 inmemory.
 """
 
 from __future__ import annotations
 
-import os
 import warnings
 
 from koipa.adapters.vectorstore.base import HybridVectorStore, SearchHit, VectorStore
@@ -33,7 +31,13 @@ def build_store(
     if force_memory:
         return InMemoryStore()
 
-    backend = (backend or os.getenv("VECTOR_BACKEND", "pg")).lower()
+    # Settings is the single source of truth for runtime configuration.  It
+    # includes profile defaults and validation, unlike a late raw env lookup.
+    if backend is None:
+        from koipa.config import settings  # noqa: PLC0415
+
+        backend = settings.vector_backend
+    backend = backend.lower()
 
     if backend == "inmemory":
         return InMemoryStore()

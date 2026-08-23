@@ -112,7 +112,10 @@ def build_embedder(model_name: str | None = None, *, force_hash: bool = False) -
     from koipa.config import settings
 
     name = model_name or settings.embedding_model
-    if force_hash or name == "hash":
+    # Deploy profiles select the provider; the model name only chooses which
+    # Hugging Face model that provider loads.  Reading the model name alone
+    # made lite-noapi advertise hash while silently loading HF.
+    if force_hash or settings.embedding_provider.lower() == "hash" or name == "hash":
         return HashEmbedding(dim=1024)
 
     if name in _EMBEDDER_CACHE:

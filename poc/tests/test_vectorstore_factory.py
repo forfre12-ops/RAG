@@ -24,8 +24,7 @@ def test_default_backend_is_pg(monkeypatch: pytest.MonkeyPatch):
     PgVectorStore는 지연 연결(SQLAlchemy 풀)이라 생성만으로 연결 안 함 → name='postgres'.
     (레거시 es 백엔드는 backend='es' 명시 시 그대로 사용 가능.)
     """
-    monkeypatch.delenv("VECTOR_BACKEND", raising=False)
-    vs = build_store()
+    vs = build_store(backend="pg")
     assert vs.name == "postgres"
 
 
@@ -50,8 +49,7 @@ def test_es_backend_falls_back_when_import_fails(monkeypatch: pytest.MonkeyPatch
 
 
 def test_explicit_inmemory_backend(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("VECTOR_BACKEND", "inmemory")
-    vs = build_store()
+    vs = build_store(backend="inmemory")
     assert isinstance(vs, InMemoryStore)
 
 
@@ -59,6 +57,16 @@ def test_explicit_argument_overrides_env(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("VECTOR_BACKEND", "es")
     vs = build_store(backend="inmemory")
     assert isinstance(vs, InMemoryStore)
+
+
+def test_settings_backend_overrides_late_environment_change(monkeypatch: pytest.MonkeyPatch):
+    """The runtime factory must use validated settings, not a raw env read."""
+    import koipa.config as config_mod
+
+    monkeypatch.setenv("VECTOR_BACKEND", "es")
+    monkeypatch.setattr(config_mod.settings, "vector_backend", "inmemory")
+
+    assert isinstance(build_store(), InMemoryStore)
 
 
 def test_unknown_backend_raises(monkeypatch: pytest.MonkeyPatch):
