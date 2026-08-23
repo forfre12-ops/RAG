@@ -73,11 +73,6 @@ def test_explicit_hash_allowed_even_when_required(_real_provider, monkeypatch):
     assert isinstance(emb.build_embedder("hash"), HashEmbedding)
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="provider 게이트가 아직 HEAD 에 없다(병행 작업 중) — 그 커밋이 들어오면 XPASS 로 바뀐다. "
-           "그때 이 마크를 지울 것.",
-)
 def test_hash_provider_never_touches_hf(_break_hf, monkeypatch):
     """provider=hash 프로파일(lite-noapi)은 모델 이름이 무엇이든 HF 를 건드리지 않는다.
 
