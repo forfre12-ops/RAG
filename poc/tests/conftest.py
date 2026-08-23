@@ -41,6 +41,28 @@ os.environ.setdefault("ENABLE_TRAINING", "true")
 # 실 백엔드 테스트(test_default_backend_is_pg 등)는 자체 delenv/setenv로 override.
 os.environ.setdefault("VECTOR_BACKEND", "inmemory")
 
+# 실 임베더 필수(require_real_embedder)는 운영 프로파일(onprem-local·full-train, 커밋된 .env)에서
+# True다. 테스트/CI는 실 HF 모델을 항상 받지 못하므로(model_download 미표시 테스트) hash 폴백이
+# 필요 — 이 프로덕션 하드닝을 중화(poc_mode fail-fast·VECTOR_BACKEND와 동일 패턴). 게이트 자체
+# 검증(test_embedding_fallback_gate)은 monkeypatch로 명시 활성해 독립 검사한다.
+os.environ.setdefault("REQUIRE_REAL_EMBEDDER", "false")
+
+# 실 분류기 필수(require_real_classifier)도 하드닝 프로파일(onprem-local·full-train) 기본 True.
+# 테스트/CI는 학습 가중치 없이 rule-fallback 으로 도는 경우가 많아(무실데이터) 이게 켜지면 warmup
+# 이 차단된다 — REQUIRE_REAL_EMBEDDER 와 동일 패턴으로 중화. 게이트 자체 검증은 전용 테스트가
+# monkeypatch 로 명시 활성해 독립 수행한다(test_classifier_fallback_gate).
+os.environ.setdefault("REQUIRE_REAL_CLASSIFIER", "false")
+
+# 수동 GA 활성 locked-eval 하드블록(deploy_gate_manual_require_locked_eval)은 하드닝 프로파일
+# (onprem-local·full-train) 기본 True. 테스트는 무실데이터(locked_gold_eval 비어있음)라 이게 켜지면
+# 모든 수동 활성이 막힌다 — REQUIRE_REAL_EMBEDDER와 동일하게 중화. 게이트 자체 검증은
+# test_manual_activate.py의 전용 테스트가 monkeypatch로 명시 활성해 독립 수행한다.
+os.environ.setdefault("DEPLOY_GATE_MANUAL_REQUIRE_LOCKED_EVAL", "false")
+
+# force 우회 사유 필수(manual_activate_force_requires_reason)도 하드닝 프로파일 기본 True.
+# 테스트의 기존 force=True(사유 없음) 경로를 깨지 않도록 중화(전용 테스트가 monkeypatch로 검증).
+os.environ.setdefault("MANUAL_ACTIVATE_FORCE_REQUIRES_REASON", "false")
+
 _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
@@ -93,7 +115,7 @@ def _restore_settings():
 
     각 테스트 전후로 settings의 주요 필드를 저장/복원해 테스트 간 상태 오염을 차단.
     """
-    from lloydk import config as config_mod
+    from koipa import config as config_mod
 
     saved = {
         "api_key": config_mod.settings.api_key,

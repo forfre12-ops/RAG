@@ -28,10 +28,10 @@ except (AttributeError, ValueError):
     pass
 
 from eval_p1_model_gold import predict_direct  # noqa: E402  (src를 sys.path에 추가)
-from lloydk.config import settings as _settings  # noqa: E402
+from koipa.config import settings as _settings  # noqa: E402
 
 HIGH = {"TS", "S1", "S2"}
-_DEPLOYED = _settings.classifier_model_dir or "artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb"
+_DEPLOYED = _settings.classifier_model_dir or "artifacts/classifier_p1_v5_clean/v-fe4b386b"
 
 
 def _load(path: Path) -> list[dict]:

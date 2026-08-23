@@ -1,0 +1,3038 @@
+{
+  "verdict": "PASS",
+  "best_config_mode": true,
+  "best_config": {
+    "embedder": "nlpai-lab/KURE-v1",
+    "backend": "pg",
+    "search_mode": "hybrid",
+    "reranker": null,
+    "oversample_factor": null,
+    "label": "nlpai-lab/KURE-v1 / pg / hybrid",
+    "status": "OK",
+    "dim": 1024,
+    "embedder_digest": {
+      "requested": "nlpai-lab/KURE-v1",
+      "effective": "nlpai-lab/KURE-v1",
+      "dim": 1024,
+      "cached": true,
+      "degraded": false,
+      "provider_class": "CachedEmbedding"
+    },
+    "corpus_size": 14755,
+    "query_count": 80,
+    "top_k": 5,
+    "recall_at_k": 0.8875,
+    "latency_ms_p50": 154.96,
+    "latency_ms_p95": 184.75,
+    "latency_ms_avg": 152.11,
+    "embed_corpus_ms": 955135.5,
+    "retrieval_metrics": {
+      "sample_count": 80,
+      "top_k": 5,
+      "recall_at_k": 0.8875,
+      "precision_at_k": 0.1775,
+      "mrr": 0.825,
+      "ndcg_at_k": 0.8414,
+      "skipped_count": 0
+    }
+  },
+  "rows": [
+    {
+      "embedder": "nlpai-lab/KURE-v1",
+      "backend": "pg",
+      "search_mode": "hybrid",
+      "reranker": null,
+      "oversample_factor": null,
+      "label": "nlpai-lab/KURE-v1 / pg / hybrid",
+      "status": "OK",
+      "dim": 1024,
+      "embedder_digest": {
+        "requested": "nlpai-lab/KURE-v1",
+        "effective": "nlpai-lab/KURE-v1",
+        "dim": 1024,
+        "cached": true,
+        "degraded": false,
+        "provider_class": "CachedEmbedding"
+      },
+      "corpus_size": 14755,
+      "query_count": 80,
+      "top_k": 5,
+      "recall_at_k": 0.8875,
+      "latency_ms_p50": 154.96,
+      "latency_ms_p95": 184.75,
+      "latency_ms_avg": 152.11,
+      "embed_corpus_ms": 955135.5,
+      "per_query": [
+        {
+          "query": "제약회사의 판매비 및 관리비는 2005년 기준으로 매출액의 35.16%에 달하는바, 일반 제조업의 판매관리비 비중(12.18%)에 비해 매우 높다. 이는 제약회사들이 연구·개발을 통한 제품의 질 경쟁보다",
+          "expected_grade": "S1",
+          "expected_doc_id": "0b7a1e77-2484-4bc7-8296-ebca0a1e1010",
+          "relevant_doc_ids": [
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010-c2",
+            "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a-c3",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010-c3",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010-c1",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010-c6"
+          ],
+          "top_base_doc_ids": [
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010",
+            "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010"
+          ],
+          "top_scores": [
+            0.032,
+            0.032,
+            0.032,
+            0.03,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "우수한 자동차연료의 연구, 개발, 판매 등이 위 규정에 의하여 제한받도록 하여서는 아니될 것이라고 하여 그 해석기준을 위와 같이 제시하면서, (3) 피고인들이 제조·판매한 세녹스는 휘발유에 40%를 혼합하도록 되어 있어 단순히 첨가제로 보기는 어렵다",
+          "expected_grade": "S2",
+          "expected_doc_id": "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6",
+          "relevant_doc_ids": [
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S3",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6-c5",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6-c3",
+            "966447e7-8eb5-4f79-b172-6c2292849d22-c5",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6-c4",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6-c0"
+          ],
+          "top_base_doc_ids": [
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6",
+            "966447e7-8eb5-4f79-b172-6c2292849d22",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6"
+          ],
+          "top_scores": [
+            0.032,
+            0.031,
+            0.03,
+            0.03,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "큰 쾌락과 경제적 이익을 얻기 위하여 타인(병정)을 이용하여 베팅상한 금액을 회피하면서까지 게임에 참가한 자로서, 원고의 청구를 받아들이는 것은 베팅한도를 적극적으로 회피하기 위해 규칙을 어긴 자로 하여금 게임을 통해서 딴 돈은 다",
+          "expected_grade": "S3",
+          "expected_doc_id": "322173f6-670b-4ddc-930b-2ec045f7cee5",
+          "relevant_doc_ids": [
+            "322173f6-670b-4ddc-930b-2ec045f7cee5"
+          ],
+          "top_grades": [
+            "S2",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae-c4",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c6",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c4",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c2"
+          ],
+          "top_base_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지는 연 20%의 각 비율로 계산한 돈을 지급하라. ㉯ 피고(반소원고) 주식회사 한국씨티은행(이하 ‘피고 씨티은행’이라 한다)은 원고에게 1,579,600,000원 및 이에 대하여 2008. 11. 21.부터 2009. 12. 24.자 청구취지 및 원인 변경 신청서 부본 송달일까지는 연 5%, 그 다음날부터 다",
+          "expected_grade": "TS",
+          "expected_doc_id": "e0c56939-09d5-440f-a50d-8b83112b2503",
+          "relevant_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c0",
+            "aaa80363-9336-4ca6-b6e3-57b59e532484-c0",
+            "1fcfaa64-9ebb-4365-b0be-46eb9cfe2d38-c0"
+          ],
+          "top_base_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "aaa80363-9336-4ca6-b6e3-57b59e532484",
+            "1fcfaa64-9ebb-4365-b0be-46eb9cfe2d38"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.03,
+            0.028,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지는 연 20%의 각 비율로 계산한 금원을 지급하라. 나. 피고 대한적십자사는 원고 39에게 [별지 2] ‘청구취지 및 인용액’ 표의 위 원고에 해당하는 ‘인용액 합계’란 기재 금원과 이에 대하여 2004. 8. 10.부터 2013. 2. 13.까지는 연 5%, 그 다음날부터 다",
+          "expected_grade": "S1",
+          "expected_doc_id": "8287b434-89bc-44c0-a665-6dceda22870f",
+          "relevant_doc_ids": [
+            "8287b434-89bc-44c0-a665-6dceda22870f"
+          ],
+          "top_grades": [
+            "S1",
+            "TS",
+            "S1",
+            "S1",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "8287b434-89bc-44c0-a665-6dceda22870f-c1",
+            "2532b7ac-b6fb-47a4-a7c5-d9c1eb4c72c8-c0",
+            "8287b434-89bc-44c0-a665-6dceda22870f-c2",
+            "8287b434-89bc-44c0-a665-6dceda22870f-c0",
+            "3993c8cd-8084-4f82-8e59-90e9738ce33b-c0"
+          ],
+          "top_base_doc_ids": [
+            "8287b434-89bc-44c0-a665-6dceda22870f",
+            "2532b7ac-b6fb-47a4-a7c5-d9c1eb4c72c8",
+            "8287b434-89bc-44c0-a665-6dceda22870f",
+            "8287b434-89bc-44c0-a665-6dceda22870f",
+            "3993c8cd-8084-4f82-8e59-90e9738ce33b"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.031,
+            0.03,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "우수한 자동차연료의 연구, 개발, 판매 등이 위 규정에 의하여 제한받도록 하여서는 아니될 것이라고 하여 그 해석기준을 위와 같이 제시하면서, (3) 피고인들이 제조·판매한 엘피파워는 휘발유에 40%를 혼합하도록 되어 있어 단순히 첨가제로 보기는 어렵다",
+          "expected_grade": "S2",
+          "expected_doc_id": "7ee49f05-5211-470e-908e-d12c53c526eb",
+          "relevant_doc_ids": [
+            "7ee49f05-5211-470e-908e-d12c53c526eb"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "7ee49f05-5211-470e-908e-d12c53c526eb-c4",
+            "7ee49f05-5211-470e-908e-d12c53c526eb-c3",
+            "7ee49f05-5211-470e-908e-d12c53c526eb-c6",
+            "7ee49f05-5211-470e-908e-d12c53c526eb-c2",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6-c5"
+          ],
+          "top_base_doc_ids": [
+            "7ee49f05-5211-470e-908e-d12c53c526eb",
+            "7ee49f05-5211-470e-908e-d12c53c526eb",
+            "7ee49f05-5211-470e-908e-d12c53c526eb",
+            "7ee49f05-5211-470e-908e-d12c53c526eb",
+            "a3b5b8cc-8951-4fb3-9d72-45cecd27d4d6"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "하더라도 위법행위가 되는 것이 아니다. 다) 피고 소속 직원이 소외 1 명의의 출입제한 요청서를 반송하는 과정에 카지노출입관리지침을 위반한 사정이 있고 그 행위에 위법성이 인정된다",
+          "expected_grade": "S3",
+          "expected_doc_id": "322173f6-670b-4ddc-930b-2ec045f7cee5",
+          "relevant_doc_ids": [
+            "322173f6-670b-4ddc-930b-2ec045f7cee5"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S2",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c6",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c3",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14-c3",
+            "af7356aa-fd38-462f-a74d-6c29899268ae-c5",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14-c2"
+          ],
+          "top_base_doc_ids": [
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14",
+            "af7356aa-fd38-462f-a74d-6c29899268ae",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "높은 경우에는 기업이 환차익을 볼 수 있다는 점에서 단순선물환계약에 비해 유리하다. (다) 레버리지(leverage) 조건 행사환율을 높이기 위하여 은행의 콜옵션 계약금액을 기업의 풋옵션 계약금액보다",
+          "expected_grade": "TS",
+          "expected_doc_id": "e0c56939-09d5-440f-a50d-8b83112b2503",
+          "relevant_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c2",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe-c1",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe-c2",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe-c3",
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c4"
+          ],
+          "top_base_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe",
+            "e0c56939-09d5-440f-a50d-8b83112b2503"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지는 연 20%의 각 비율에 의한 금원을 지급하라. 4. 원고의 나머지 청구를 기각한다. 5. 소송비용 중 1/3은 원고가, 나머지는 피고가 각 부담한다. 6. 제1 내지 3항은 가집행할 수 있다. 【청구취지】 주문 제1, 2항 및 피고는 원고에게 8,832,370,000원 및 이에 대하여 이 사건 소장 부본이 피고에게 송달된 다음날부터 다",
+          "expected_grade": "S1",
+          "expected_doc_id": "07a49be2-e2cf-4ada-95f8-67f4abbe5274",
+          "relevant_doc_ids": [
+            "07a49be2-e2cf-4ada-95f8-67f4abbe5274"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306-c0",
+            "04f5e0ed-488e-40f2-8adc-1c261337c585-c0",
+            "279142a0-f7fe-4303-8a0b-7abd89cf715f-c0",
+            "afe6f292-89ed-4a5d-80dd-8e745288bbcb-c0",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a-c0"
+          ],
+          "top_base_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306",
+            "04f5e0ed-488e-40f2-8adc-1c261337c585",
+            "279142a0-f7fe-4303-8a0b-7abd89cf715f",
+            "afe6f292-89ed-4a5d-80dd-8e745288bbcb",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a"
+          ],
+          "top_scores": [
+            0.029,
+            0.028,
+            0.026,
+            0.026,
+            0.025
+          ],
+          "hit": false
+        },
+        {
+          "query": "낮은 가격에 위 주식을 재매입하기로 마음먹었다. 이에 피고인 1은 2010. 4. 28. 위 ‘○○○ ○○’ 게시판에 ‘7월말까지는 상기 ▲소장 방법으로 3개월간 현금 최대한 확보하십시오. 7월말까지는 주식장을 아예 들여다",
+          "expected_grade": "S2",
+          "expected_doc_id": "ee86d934-3094-4e14-95d0-a60c36d2ae7e",
+          "relevant_doc_ids": [
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e-c4",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e-c1",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e-c2",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e-c3",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e-c0"
+          ],
+          "top_base_doc_ids": [
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e",
+            "ee86d934-3094-4e14-95d0-a60c36d2ae7e"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.03,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 것이다. (2) 이 사건 공소사실에 관하여 보건대, 검사는 당심에 이르러 위에서 본 바와 같이 정범들 5명의 성명, 각 소리바다",
+          "expected_grade": "S3",
+          "expected_doc_id": "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+          "relevant_doc_ids": [
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S1",
+            "S3",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c3",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c2",
+            "201527d5-0091-465f-b196-40ee1b6b3c86-c7",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c0",
+            "410b492a-7985-460b-ba91-8f508c0eacec-c7"
+          ],
+          "top_base_doc_ids": [
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "201527d5-0091-465f-b196-40ee1b6b3c86",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "410b492a-7985-460b-ba91-8f508c0eacec"
+          ],
+          "top_scores": [
+            0.033,
+            0.028,
+            0.016,
+            0.016,
+            0.016
+          ],
+          "hit": true
+        },
+        {
+          "query": "우리은행과 하나은행에서 대출을 추진하면 대출 받을 수 있도록 도와주겠다’는 취지로 답변하였다. 이에 공소외 2는 2010. 2.~3.경 피고인에게 전화로 ‘우리은행 ▽▽지점에서 350억 원 신용대출을 추진 중에 있으니",
+          "expected_grade": "TS",
+          "expected_doc_id": "f6550259-977a-4fb5-bf08-4e261e3848d5",
+          "relevant_doc_ids": [
+            "f6550259-977a-4fb5-bf08-4e261e3848d5"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "S3",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "f6550259-977a-4fb5-bf08-4e261e3848d5-c5",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5-c4",
+            "54405d39-2fe2-4be6-bf57-b3f8da8ebc75-c4",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c4",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5-c2"
+          ],
+          "top_base_doc_ids": [
+            "f6550259-977a-4fb5-bf08-4e261e3848d5",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5",
+            "54405d39-2fe2-4be6-bf57-b3f8da8ebc75",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.03,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원고, 피항소인】 캐논가부시키가이샤(소송대리인 변호사 장수길외 2인) 【피고, 항소인】 주식회사 파캔오피씨(소송대리인 변호사 이수완외 2인) 【피고 보조참가인】 제너럴 플라스틱 인더스터리얼 컴퍼니",
+          "expected_grade": "S1",
+          "expected_doc_id": "42711900-6ccd-4552-af29-6c6e53066588",
+          "relevant_doc_ids": [
+            "42711900-6ccd-4552-af29-6c6e53066588"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "42711900-6ccd-4552-af29-6c6e53066588-c0",
+            "63d975f3-362d-4f28-a123-ec7fb4f432cb-c0",
+            "3d965996-b464-47a0-8e06-f73b7865a7ec-c0",
+            "6293a6e7-0df0-498c-872a-1ca5f423ec4a-c0",
+            "eb5657f8-d1eb-4d4b-aff5-b853a437837b-c0"
+          ],
+          "top_base_doc_ids": [
+            "42711900-6ccd-4552-af29-6c6e53066588",
+            "63d975f3-362d-4f28-a123-ec7fb4f432cb",
+            "3d965996-b464-47a0-8e06-f73b7865a7ec",
+            "6293a6e7-0df0-498c-872a-1ca5f423ec4a",
+            "eb5657f8-d1eb-4d4b-aff5-b853a437837b"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.029,
+            0.029,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 【피 고】 주식회사 강원랜드 (소송대리인 법무법인 화우 담당변호사 이재기 외 2인) 【변론종결】 2008. 7. 9. 【주 문】 1. 피고는 원고에게 금 2,841,240,176원 및 이에 대하여 2006. 10. 19.부터 2008. 11. 5.까지는 연 5%의, 그 다음날부터 다",
+          "expected_grade": "S2",
+          "expected_doc_id": "af7356aa-fd38-462f-a74d-6c29899268ae",
+          "relevant_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae"
+          ],
+          "top_grades": [
+            "S2",
+            "TS",
+            "TS",
+            "TS",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c0",
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c0",
+            "41506ed8-b473-4f91-ab93-f7278f31c9f9-c0"
+          ],
+          "top_base_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "41506ed8-b473-4f91-ab93-f7278f31c9f9"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.03,
+            0.03,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "프로그램의 설치 및 mp3 파일을 다운로드 받은 시기와 장소, 구체적인 행위태양, 공유폴더에 위와 같이 다운로드 받은 mp3 파일을 저장한 채 다시 소리바다",
+          "expected_grade": "S3",
+          "expected_doc_id": "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+          "relevant_doc_ids": [
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0-c3",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0-c4",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c3",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c2",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c6"
+          ],
+          "top_base_doc_ids": [
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "우리은행 ▤▤▤ 관계자에게 부탁하여 대출이 성사될 수 있도록 도와달라’는 취지로 부탁하였고, 피고인은 공소외 2의 부탁을 승낙하고, 우리은행 고위 임원에게 전화하여 공소외 8 주식회사가 대출을 받을 수 있도록 해달라고 영향력을 행사하였다. 한편, 공소외 2는 그 무렵 ‘하나은행 창원 ♡♡♡♡에서 150억 원 신용대출을 추진하고 있으니",
+          "expected_grade": "TS",
+          "expected_doc_id": "f6550259-977a-4fb5-bf08-4e261e3848d5",
+          "relevant_doc_ids": [
+            "f6550259-977a-4fb5-bf08-4e261e3848d5"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "S3",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "f6550259-977a-4fb5-bf08-4e261e3848d5-c5",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5-c4",
+            "efe91540-9323-4b97-9c4e-09750471be91-c3",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5-c1",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5-c0"
+          ],
+          "top_base_doc_ids": [
+            "f6550259-977a-4fb5-bf08-4e261e3848d5",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5",
+            "efe91540-9323-4b97-9c4e-09750471be91",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5",
+            "f6550259-977a-4fb5-bf08-4e261e3848d5"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "의료인에 대한 판촉활동에 치중하고 있기 때문이다. 라. 의약품 마케팅에 대한 규제 제약산업은 생명관련 산업으로서 다른 업종보다",
+          "expected_grade": "S1",
+          "expected_doc_id": "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a",
+          "relevant_doc_ids": [
+            "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a-c3",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010-c2",
+            "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a-c1",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010-c1",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010-c3"
+          ],
+          "top_base_doc_ids": [
+            "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010",
+            "7ad04a93-e6e0-49d2-be6d-aedfb8570d2a",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010",
+            "0b7a1e77-2484-4bc7-8296-ebca0a1e1010"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "큰 쾌락과 경제적 이익을 얻기 위하여 타인을 고용하여 베팅상한금액을 회피하면서까지 게임에 참가한 자로서, 원고의 청구를 받아들이는 것은 베팅상한제를 적극적으로 회피하기 위해 규칙을 어긴 자로 하여금 게임을 통해서 딴 돈은 다",
+          "expected_grade": "S2",
+          "expected_doc_id": "af7356aa-fd38-462f-a74d-6c29899268ae",
+          "relevant_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae"
+          ],
+          "top_grades": [
+            "S2",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae-c4",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c6",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c2",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c4"
+          ],
+          "top_base_doc_ids": [
+            "af7356aa-fd38-462f-a74d-6c29899268ae",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "되며(같은 조 제5항), 카지노종사원은 영업준칙에서 정한 규칙에 어긋나는 게임을 하여서는 아니",
+          "expected_grade": "S3",
+          "expected_doc_id": "4b02b6c2-1cef-48bb-a298-dcf385e32d14",
+          "relevant_doc_ids": [
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S3",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14-c5",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14-c1",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5-c2",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14-c2",
+            "af7356aa-fd38-462f-a74d-6c29899268ae-c3"
+          ],
+          "top_base_doc_ids": [
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14",
+            "322173f6-670b-4ddc-930b-2ec045f7cee5",
+            "4b02b6c2-1cef-48bb-a298-dcf385e32d14",
+            "af7356aa-fd38-462f-a74d-6c29899268ae"
+          ],
+          "top_scores": [
+            0.032,
+            0.032,
+            0.031,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 것이어서, 피고인에게 배임의 고의가 없다. (2) 배임의 공동정범 내지 방조범이 아니라는 주장 가사 상피고인 1의 행위가 공소외 1 주식회사에 대한 배임행위가 된다",
+          "expected_grade": "TS",
+          "expected_doc_id": "f989c731-17ba-404f-9802-2b346753b368",
+          "relevant_doc_ids": [
+            "f989c731-17ba-404f-9802-2b346753b368"
+          ],
+          "top_grades": [
+            "TS",
+            "S3",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "f989c731-17ba-404f-9802-2b346753b368-c5",
+            "5ce38736-ce40-4f6d-ba42-139568da7871-c1",
+            "7375df62-5393-4e6b-8db4-3a576ab82790-c4",
+            "2bfebf24-13bf-43de-a8db-fddba6d7255e-c1",
+            "925b94ee-92a8-4de9-a896-fdcf17d2c7a9-c2"
+          ],
+          "top_base_doc_ids": [
+            "f989c731-17ba-404f-9802-2b346753b368",
+            "5ce38736-ce40-4f6d-ba42-139568da7871",
+            "7375df62-5393-4e6b-8db4-3a576ab82790",
+            "2bfebf24-13bf-43de-a8db-fddba6d7255e",
+            "925b94ee-92a8-4de9-a896-fdcf17d2c7a9"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.029,
+            0.028,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 것이고, 총사업비 산정에 관하여 다툼이 있어 무상사용기간이 확정되지 아니하여 공물에 대한 사용권이 불안정한 상태에 있다면 그로 인한 공권의 침해는 행정소송의 방법에 의하여 구제받을 수 있다",
+          "expected_grade": "S1",
+          "expected_doc_id": "8955fe38-d1bb-4a50-8b1c-b01c57959db5",
+          "relevant_doc_ids": [
+            "8955fe38-d1bb-4a50-8b1c-b01c57959db5"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de-c1",
+            "8955fe38-d1bb-4a50-8b1c-b01c57959db5-c2",
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de-c6",
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de-c5",
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de-c0"
+          ],
+          "top_base_doc_ids": [
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de",
+            "8955fe38-d1bb-4a50-8b1c-b01c57959db5",
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de",
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de",
+            "4a6518e5-9ab7-4e3e-8cf5-6e851fd2f5de"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "되고, ㈏ 별지1 목록 1, 2, 3 기재 표장을 유전자검사업에 관한 광고, 검사결과지, 거래서류, 간판 또는 명함에 표시, 전시 또는 반포하여서는 아니",
+          "expected_grade": "S2",
+          "expected_doc_id": "9ed9f45b-9872-46a1-baba-bfd80861b223",
+          "relevant_doc_ids": [
+            "9ed9f45b-9872-46a1-baba-bfd80861b223"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S1",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "9ed9f45b-9872-46a1-baba-bfd80861b223-c0",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5-c7",
+            "fe33058d-8540-40a9-af31-c6847520e5a9-c0",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5-c0",
+            "7faac451-00b1-48b1-a8d4-c0ca54a6b013-c2"
+          ],
+          "top_base_doc_ids": [
+            "9ed9f45b-9872-46a1-baba-bfd80861b223",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5",
+            "fe33058d-8540-40a9-af31-c6847520e5a9",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5",
+            "7faac451-00b1-48b1-a8d4-c0ca54a6b013"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.029,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "된다. 2. 집행관은 위 명령의 취지를 적당한 방법으로 공시하여야 한다. [예비적] 1. 피신청인들은 별지 3. 인터넷 사이트 목록 기재 각 인터넷 사이트를 통해 그 이용자들이 별지 2. 영화 목록 기재 각 영화가 들어있는 일체의 디지털 파일을 업로드 또는 다운로드하도록 하여서는 아니",
+          "expected_grade": "S3",
+          "expected_doc_id": "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+          "relevant_doc_ids": [
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "TS",
+            "S3",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3-c1",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3-c0",
+            "6ee71784-9eac-4709-b401-92773071a883-c1",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3-c6",
+            "6ee71784-9eac-4709-b401-92773071a883-c0"
+          ],
+          "top_base_doc_ids": [
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+            "6ee71784-9eac-4709-b401-92773071a883",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+            "6ee71784-9eac-4709-b401-92773071a883"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.03,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "라. 원고 12는 망 소외 2의 배우자이고, 원고 13, 14, 15, 16은 소외 2의 아들들이다",
+          "expected_grade": "TS",
+          "expected_doc_id": "4c4f7bfc-5236-47c3-83db-05d4c6816aa1",
+          "relevant_doc_ids": [
+            "4c4f7bfc-5236-47c3-83db-05d4c6816aa1"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "4c4f7bfc-5236-47c3-83db-05d4c6816aa1-c0",
+            "4c4f7bfc-5236-47c3-83db-05d4c6816aa1-c1",
+            "e6bbcc10-9c51-43c9-bd8f-baf38e8e3bb5-c1",
+            "18d44f3a-d8ca-4ddf-be74-9dc5d663ad6a-c2",
+            "74b3333e-8e1c-4ecf-a198-b8ac6f9edf9c-c5"
+          ],
+          "top_base_doc_ids": [
+            "4c4f7bfc-5236-47c3-83db-05d4c6816aa1",
+            "4c4f7bfc-5236-47c3-83db-05d4c6816aa1",
+            "e6bbcc10-9c51-43c9-bd8f-baf38e8e3bb5",
+            "18d44f3a-d8ca-4ddf-be74-9dc5d663ad6a",
+            "74b3333e-8e1c-4ecf-a198-b8ac6f9edf9c"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.029,
+            0.026,
+            0.016
+          ],
+          "hit": true
+        },
+        {
+          "query": "두 개의 판정수단 중 어느 것을 이용할지 매번 정해야 하기 때문에 별도로 또 하나의 ‘모드 판정수단’까지 필요로 하는 것이고, 기본적으로 모드확인을 위한 판정과 현재 모드에 대한 어절 판정을 수행한 후 필요한 경우에는 대응모드 어절에 대한 판정까지 더 거치게 되므로 총 2~3회의 판정절차를 거쳐야 하는 것이어서, 피고 실시방법은 이 사건 제6항 특허발명보다",
+          "expected_grade": "S1",
+          "expected_doc_id": "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+          "relevant_doc_ids": [
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3-c6",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c6",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c4",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c5",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c7"
+          ],
+          "top_base_doc_ids": [
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "된다. 피고 크라운진은 별지1 목록 기재 표장을 별지2 목록 기재 서비스업에 관한 광고, 검사결과지, 거래서류, 간판 또는 명함에 표시, 전시 또는 반포하여서는 아니",
+          "expected_grade": "S2",
+          "expected_doc_id": "9ed9f45b-9872-46a1-baba-bfd80861b223",
+          "relevant_doc_ids": [
+            "9ed9f45b-9872-46a1-baba-bfd80861b223"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "9ed9f45b-9872-46a1-baba-bfd80861b223-c0",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5-c7",
+            "9ed9f45b-9872-46a1-baba-bfd80861b223-c1",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5-c0",
+            "fe33058d-8540-40a9-af31-c6847520e5a9-c5"
+          ],
+          "top_base_doc_ids": [
+            "9ed9f45b-9872-46a1-baba-bfd80861b223",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5",
+            "9ed9f45b-9872-46a1-baba-bfd80861b223",
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5",
+            "fe33058d-8540-40a9-af31-c6847520e5a9"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.029,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "된다. 2. 피신청인들은 별지 3. 인터넷 사이트 목록 기재 각 인터넷 사이트를 통해 그 이용자들이 영화가 들어있는 일체의 디지털 파일을 복제, 배포, 전송 및 기타의 방법으로 공유하는 서비스를 제공하여서는 아니",
+          "expected_grade": "S3",
+          "expected_doc_id": "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+          "relevant_doc_ids": [
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S2",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3-c1",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3-c0",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3-c6",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0-c1",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3-c4"
+          ],
+          "top_base_doc_ids": [
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+            "fd5d3ebc-1369-4927-b9be-60254720f4b3"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.029,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "퇴사하고, 2007. 6. 4.경 공소외 2 주식회사에 입사하여 산업플랜트사업부 사장으로 근무하는 자이고, 피고인 2는 1982. 12월경부터 2007. 7. 12.경까지 공소외 1 주식회사에서 발전 BG 내 화력설비기술실 부장, 암만(Amman)/다하르키(Daharki) 엔지니어링 메니지먼트 팀장으로 각 근무하다",
+          "expected_grade": "TS",
+          "expected_doc_id": "fb38bab1-1383-4d52-8592-08d2ad6653bc",
+          "relevant_doc_ids": [
+            "fb38bab1-1383-4d52-8592-08d2ad6653bc"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "S2",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "fb38bab1-1383-4d52-8592-08d2ad6653bc-c1",
+            "fb38bab1-1383-4d52-8592-08d2ad6653bc-c0",
+            "c4030dc8-ab31-4c3f-8532-63ae7dda0e1d-c4",
+            "6813f11f-2a65-4304-a059-d603d0d6d937-c2",
+            "fb38bab1-1383-4d52-8592-08d2ad6653bc-c2"
+          ],
+          "top_base_doc_ids": [
+            "fb38bab1-1383-4d52-8592-08d2ad6653bc",
+            "fb38bab1-1383-4d52-8592-08d2ad6653bc",
+            "c4030dc8-ab31-4c3f-8532-63ae7dda0e1d",
+            "6813f11f-2a65-4304-a059-d603d0d6d937",
+            "fb38bab1-1383-4d52-8592-08d2ad6653bc"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.03,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "작용효과의 면에서 열등한 기술이라는 취지로도 주장한다. 살피건대, ① 피고 실시방법이 이 사건 제6항 특허발명과는 달리 먼저 입력모드를 확인하여 입력모드에 따른 어절만을 생성한 다음, 생성된 어절이 입력모드의 조건에 맞는",
+          "expected_grade": "S1",
+          "expected_doc_id": "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+          "relevant_doc_ids": [
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c7",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3-c6",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c5",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c6",
+            "5116fce2-3693-4bd6-a18f-7724b4ec7b23-c2"
+          ],
+          "top_base_doc_ids": [
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+            "5116fce2-3693-4bd6-a18f-7724b4ec7b23"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 한국수자원공사 (소송대리인 법무법인 세종 담당변호사 임병일외 2인) 【피 고】 서울특별시 (소송대리인 법무법인 한길 담당변호사 안원모) 【변론종결】 2006. 9. 21. 【주 문】 1. 피고는 원고에게 11,479,959,130원 및 이에 대하여 2005. 9. 8.부터 다",
+          "expected_grade": "S2",
+          "expected_doc_id": "1afde9b3-60cc-4825-a78f-c160482ae21f",
+          "relevant_doc_ids": [
+            "1afde9b3-60cc-4825-a78f-c160482ae21f"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "1afde9b3-60cc-4825-a78f-c160482ae21f-c0",
+            "0a73d663-5da2-4b9d-83af-c4b70213bb45-c0",
+            "1324634e-1be0-4cd5-a707-e81cabbb89a6-c0",
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0"
+          ],
+          "top_base_doc_ids": [
+            "1afde9b3-60cc-4825-a78f-c160482ae21f",
+            "0a73d663-5da2-4b9d-83af-c4b70213bb45",
+            "1324634e-1be0-4cd5-a707-e81cabbb89a6",
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.031,
+            0.031,
+            0.026
+          ],
+          "hit": true
+        },
+        {
+          "query": "상봉동 주민들의 경우에 호흡기계통의 질병을 호소하는 사람이 두드러지게 많았으며(호흡기 질환자수가 동숭동 지역주민들은 1,000명당 53.1명이었는데 반하여 상봉동 지역주민들은 1,000명당 76.4명이었다)보다",
+          "expected_grade": "S3",
+          "expected_doc_id": "63a0778a-08dc-4d72-ab73-62561586a84a",
+          "relevant_doc_ids": [
+            "63a0778a-08dc-4d72-ab73-62561586a84a"
+          ],
+          "top_grades": [
+            "S3",
+            "S1",
+            "S2",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "63a0778a-08dc-4d72-ab73-62561586a84a-c6",
+            "a29e16aa-9361-4ec6-bcd6-2a5329ec9071-c3",
+            "a23262d9-47d0-4603-86ad-76f6a15310ba-c0",
+            "8b46aef9-f92e-4668-bcbb-f8bbcc0a7a15-c6",
+            "7011cbdd-f609-4876-bd35-4ea91ae66550-c3"
+          ],
+          "top_base_doc_ids": [
+            "63a0778a-08dc-4d72-ab73-62561586a84a",
+            "a29e16aa-9361-4ec6-bcd6-2a5329ec9071",
+            "a23262d9-47d0-4603-86ad-76f6a15310ba",
+            "8b46aef9-f92e-4668-bcbb-f8bbcc0a7a15",
+            "7011cbdd-f609-4876-bd35-4ea91ae66550"
+          ],
+          "top_scores": [
+            0.016,
+            0.016,
+            0.016,
+            0.016,
+            0.016
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지 연 20%의 각 비율로 계산한 돈을 지급하라. 2. 원고들의 각 나머지 청구를 기각한다. 3. 소송비용 중 60%는 원고들이, 나머지 40%는 피고가 각 부담한다. 4. 제1항은 가집행할 수 있다. 【청구취지】 피고는 원고들에게 각 1억 원 및 이에 대하여 1978. 1. 1.부터 이 판결 선고일까지 연 5%, 그 다음날부터 다",
+          "expected_grade": "TS",
+          "expected_doc_id": "377d3cec-ba36-4094-8929-64e1a93edcf5",
+          "relevant_doc_ids": [
+            "377d3cec-ba36-4094-8929-64e1a93edcf5"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "S3",
+            "S2",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0",
+            "b74e0e61-514d-4811-b37a-1d14f3d93306-c0",
+            "b6154021-c17f-4dc1-a6c6-82016105d6f7-c0",
+            "3e45b22d-b7c7-4c6e-8580-f60f66a7ffb4-c0",
+            "7a23e14e-0f79-4fa3-a92f-11749fbe9dd3-c0"
+          ],
+          "top_base_doc_ids": [
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e",
+            "b74e0e61-514d-4811-b37a-1d14f3d93306",
+            "b6154021-c17f-4dc1-a6c6-82016105d6f7",
+            "3e45b22d-b7c7-4c6e-8580-f60f66a7ffb4",
+            "7a23e14e-0f79-4fa3-a92f-11749fbe9dd3"
+          ],
+          "top_scores": [
+            0.031,
+            0.029,
+            0.028,
+            0.027,
+            0.027
+          ],
+          "hit": false
+        },
+        {
+          "query": "두 개의 판정수단 중 어느 것을 이용할지 매번 정해야 하기 때문에 별도로 또 하나의 ‘모드 판정수단’까지 필요로 하는 것이고, 기본적으로 모드확인을 위한 판정과 현재 모드에 대한 어절 판정을 수행한 후 필요한 경우에는 대응모드 어절에 대한 판정까지 더 거치게 되므로 총 2~3회의 판정절차를 거쳐야 하는 것이어서, 확인대상발명은 이 사건 제6항 특허발명보다",
+          "expected_grade": "S1",
+          "expected_doc_id": "a30337e4-0361-47a6-8cc6-650677f4d3a3",
+          "relevant_doc_ids": [
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3-c6",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92-c6",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3-c4",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3-c5",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3-c2"
+          ],
+          "top_base_doc_ids": [
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3",
+            "10a149cf-af4e-4d66-8735-e67cf0a2cd92",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3",
+            "a30337e4-0361-47a6-8cc6-650677f4d3a3"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.03,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "프로그램은 그 자체가 광고료 등 영리를 목적으로 음반을 무단으로 복제·배포하는 것을 목적으로 개발된 것이고 소리바다",
+          "expected_grade": "S2",
+          "expected_doc_id": "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+          "relevant_doc_ids": [
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0"
+          ],
+          "top_grades": [
+            "S3",
+            "S2",
+            "S3",
+            "S2",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c0",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0-c5",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c1",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0-c6",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c6"
+          ],
+          "top_base_doc_ids": [
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "하여 그와 합의할 아무런 이유가 없었으므로, 공소외 1이 공소외 10에게 공소외 2와 공소외 6으로부터 편취한 금원 중 일부를 지급하고 그와 합의한 사실이 있다",
+          "expected_grade": "S3",
+          "expected_doc_id": "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+          "relevant_doc_ids": [
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c0",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c1",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c5",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c2",
+            "fb0b63b6-b43c-4f59-a842-a12060bf5569-c4"
+          ],
+          "top_base_doc_ids": [
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "fb0b63b6-b43c-4f59-a842-a12060bf5569"
+          ],
+          "top_scores": [
+            0.032,
+            0.032,
+            0.03,
+            0.029,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "신생리 의료 주임이 소록도에 살려면 강제로 낙태를 강요하여 주사를 맞고 낙태를 당한 후, 그해 연말 다시 임신되어 또 낙태를 할 수 없어 △△농원으로 정착하여 퇴원함2조3호라목2011.8.30.11. 원고 11(생년월일 11 생략)1962.부산에서 단속반에 잡혀 소록도에 강송되어 감금실에서 20일간 감금폭행을 당하고 1967. 21세경 임신을 하니",
+          "expected_grade": "TS",
+          "expected_doc_id": "377d3cec-ba36-4094-8929-64e1a93edcf5",
+          "relevant_doc_ids": [
+            "377d3cec-ba36-4094-8929-64e1a93edcf5"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "377d3cec-ba36-4094-8929-64e1a93edcf5-c2",
+            "377d3cec-ba36-4094-8929-64e1a93edcf5-c1",
+            "377d3cec-ba36-4094-8929-64e1a93edcf5-c3",
+            "377d3cec-ba36-4094-8929-64e1a93edcf5-c0",
+            "db247670-210d-4851-9244-afb2d3817d0f-c5"
+          ],
+          "top_base_doc_ids": [
+            "377d3cec-ba36-4094-8929-64e1a93edcf5",
+            "377d3cec-ba36-4094-8929-64e1a93edcf5",
+            "377d3cec-ba36-4094-8929-64e1a93edcf5",
+            "377d3cec-ba36-4094-8929-64e1a93edcf5",
+            "db247670-210d-4851-9244-afb2d3817d0f"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "사실상 더욱 유연한 층상 연마 패드에 관한 것이고, 제21항 발명은 비표면층 또는 비표면층들이 표면층보다",
+          "expected_grade": "S1",
+          "expected_doc_id": "fea5e75c-5139-471c-a5c8-bf4f18e02dc9",
+          "relevant_doc_ids": [
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9-c6",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9-c2",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9-c4",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9-c7",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9-c3"
+          ],
+          "top_base_doc_ids": [
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9",
+            "fea5e75c-5139-471c-a5c8-bf4f18e02dc9"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "이용자들의 업로드 및 다운로드 행위가 이 사건 음반제작자들의 저작인접권을 침해하고 있음을 전제로 하여, 채무자들이 이용자들과 공동으로 또는 방조의 방법으로 저작인접권을 침해하고 있다고 주장하고 있으므로, 먼저 소리바다",
+          "expected_grade": "S2",
+          "expected_doc_id": "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+          "relevant_doc_ids": [
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0"
+          ],
+          "top_grades": [
+            "S2",
+            "S3",
+            "S2",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0-c6",
+            "5c84b32d-36c6-46c5-b1ca-95529cb2bea7-c0",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0-c5",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf-c4",
+            "5c84b32d-36c6-46c5-b1ca-95529cb2bea7-c2"
+          ],
+          "top_base_doc_ids": [
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+            "5c84b32d-36c6-46c5-b1ca-95529cb2bea7",
+            "8b622a2a-5f75-4733-b569-e0137e5b23a0",
+            "add09e74-c90f-4557-b46d-2c4cc2d446cf",
+            "5c84b32d-36c6-46c5-b1ca-95529cb2bea7"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "하면서 사업약정서에 날인하였다. 2006. 9. 27. 공소외 5 주식회사 사무실에서 공소외 1에게 5억 원을 건네면서 ‘5억 원을 건네주면 추석 전이라도 물건이 나온다고 들었는데, 언제 물건을 받을 수 있느냐’고 물었더니",
+          "expected_grade": "S3",
+          "expected_doc_id": "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+          "relevant_doc_ids": [
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c7",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c4",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c6",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c3",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2-c5"
+          ],
+          "top_base_doc_ids": [
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2",
+            "c370ffbe-86a4-4250-aed6-0329ead90ed2"
+          ],
+          "top_scores": [
+            0.032,
+            0.032,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "되고, 나. 별지 4. 프로그램 목록 기재의 컴퓨터프로그램을 생산, 판매, 양도, 대여, 수출, 수입하거나 또는 양도나 판매 및 대여를 위한 청약(판매나 대여를 위한 전시 포함)을 하여서는 아니",
+          "expected_grade": "TS",
+          "expected_doc_id": "038dd636-3378-4f0a-95ab-f03bce188354",
+          "relevant_doc_ids": [
+            "038dd636-3378-4f0a-95ab-f03bce188354"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "S2",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "8b371028-5141-4089-9fbd-1d5a3b6dcec7-c1",
+            "038dd636-3378-4f0a-95ab-f03bce188354-c0",
+            "8b371028-5141-4089-9fbd-1d5a3b6dcec7-c5",
+            "190bcccb-b7b9-4557-94cc-9afb4eafaa5a-c2",
+            "8b371028-5141-4089-9fbd-1d5a3b6dcec7-c0"
+          ],
+          "top_base_doc_ids": [
+            "8b371028-5141-4089-9fbd-1d5a3b6dcec7",
+            "038dd636-3378-4f0a-95ab-f03bce188354",
+            "8b371028-5141-4089-9fbd-1d5a3b6dcec7",
+            "190bcccb-b7b9-4557-94cc-9afb4eafaa5a",
+            "8b371028-5141-4089-9fbd-1d5a3b6dcec7"
+          ],
+          "top_scores": [
+            0.03,
+            0.03,
+            0.029,
+            0.028,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 한미약품 주식회사 (소송대리인 특허법인 AIP 담당변리사 이재웅 외 1인) 【피 고】 일라이 릴리 앤드 컴퍼니",
+          "expected_grade": "S1",
+          "expected_doc_id": "4e45b129-fe30-4a97-80f7-d24d3004ff49",
+          "relevant_doc_ids": [
+            "4e45b129-fe30-4a97-80f7-d24d3004ff49"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S2",
+            "TS",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "4e45b129-fe30-4a97-80f7-d24d3004ff49-c0",
+            "78cfcb0e-8b36-4d41-b55d-99fa2434aa0b-c0",
+            "6686dd40-f862-405c-a9f0-4e7b44b4136b-c0",
+            "91156439-2687-4ecb-b182-04897aa1f80f-c0",
+            "52aefd22-3672-499a-a6e1-d2a18e97780e-c0"
+          ],
+          "top_base_doc_ids": [
+            "4e45b129-fe30-4a97-80f7-d24d3004ff49",
+            "78cfcb0e-8b36-4d41-b55d-99fa2434aa0b",
+            "6686dd40-f862-405c-a9f0-4e7b44b4136b",
+            "91156439-2687-4ecb-b182-04897aa1f80f",
+            "52aefd22-3672-499a-a6e1-d2a18e97780e"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.027,
+            0.025,
+            0.025
+          ],
+          "hit": true
+        },
+        {
+          "query": "상위직급자인 소외 4가 있었고, 실무연구반들은 소외 1, 5, 12 등이 있었는데 제제에 대한 연구를 담당하던 소외 1이 1995. 8. 퇴직함에 따라 소외 2, 6이 제제개발에 참여하였다. (나) 피리벤족심은 피고 회사 연구진이 원고 입사 전인 1991.경 일본 쿠미아이화학공업에서 그보다",
+          "expected_grade": "S2",
+          "expected_doc_id": "2360f6ad-2805-4e44-88f8-bc9d8ca2f600",
+          "relevant_doc_ids": [
+            "2360f6ad-2805-4e44-88f8-bc9d8ca2f600"
+          ],
+          "top_grades": [
+            "S2",
+            "S1",
+            "S2",
+            "S2",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "2360f6ad-2805-4e44-88f8-bc9d8ca2f600-c2",
+            "3f729520-279e-4fbb-a27e-57a1b45e803d-c1",
+            "2360f6ad-2805-4e44-88f8-bc9d8ca2f600-c4",
+            "2360f6ad-2805-4e44-88f8-bc9d8ca2f600-c3",
+            "3f729520-279e-4fbb-a27e-57a1b45e803d-c0"
+          ],
+          "top_base_doc_ids": [
+            "2360f6ad-2805-4e44-88f8-bc9d8ca2f600",
+            "3f729520-279e-4fbb-a27e-57a1b45e803d",
+            "2360f6ad-2805-4e44-88f8-bc9d8ca2f600",
+            "2360f6ad-2805-4e44-88f8-bc9d8ca2f600",
+            "3f729520-279e-4fbb-a27e-57a1b45e803d"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 【피 고】 한국건설기술연구원 (소송대리인 변호사 주한일 외 2인) 【변론종결】 2011. 7. 1. 【주 문】 1. 피고가 원고들에 대하여 한 2010. 1. 1.자 해고는 무효임을 확인한다. 2. 피고는 가. 원고 1에게 51,824,065원 및 이에 대한 2011. 7. 2.부터 다",
+          "expected_grade": "S3",
+          "expected_doc_id": "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+          "relevant_doc_ids": [
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "TS",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b-c0",
+            "1486d0f2-f112-4284-beaa-18f3807eec6e-c0",
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c0",
+            "229f35e9-e81f-404c-9e2c-77303ea753ae-c0",
+            "ef19cd7c-b1d9-4115-a3b9-8f086c095afb-c0"
+          ],
+          "top_base_doc_ids": [
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+            "1486d0f2-f112-4284-beaa-18f3807eec6e",
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "229f35e9-e81f-404c-9e2c-77303ea753ae",
+            "ef19cd7c-b1d9-4115-a3b9-8f086c095afb"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.03,
+            0.029,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 【피 고】 삼성전자 주식회사 (소송대리인 변호사 강동세 외 1인) 【변론종결】 2013. 6. 27. 【주 문】 1. 피고는 원고에게 10,925,589원 및 이에 대하여 2012. 1. 31.부터 2013. 7. 18.까지는 연 5%의, 그 다음날부터 다",
+          "expected_grade": "TS",
+          "expected_doc_id": "85c8f848-278c-4294-80d8-2629489513a2",
+          "relevant_doc_ids": [
+            "85c8f848-278c-4294-80d8-2629489513a2"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "S2",
+            "S2",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "85c8f848-278c-4294-80d8-2629489513a2-c0",
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c0",
+            "41506ed8-b473-4f91-ab93-f7278f31c9f9-c0",
+            "3e45b22d-b7c7-4c6e-8580-f60f66a7ffb4-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0"
+          ],
+          "top_base_doc_ids": [
+            "85c8f848-278c-4294-80d8-2629489513a2",
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "41506ed8-b473-4f91-ab93-f7278f31c9f9",
+            "3e45b22d-b7c7-4c6e-8580-f60f66a7ffb4",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.029,
+            0.028,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "구체적으로 한정하여 특허청구범위를 감축하였지만 특허청구범위를 실질적으로 확장하거나 변경하는 것이 아닌 것 또는 다른 청구항의 내용을 부가하여 한정한 것으로 적법한 정정에 해당한다",
+          "expected_grade": "S1",
+          "expected_doc_id": "b7e783f6-9e9b-42be-a861-510dbf5556da",
+          "relevant_doc_ids": [
+            "b7e783f6-9e9b-42be-a861-510dbf5556da"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "TS",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "4f4a217e-c472-48fc-9c45-5e8c7b7d6d48-c0",
+            "8f24745f-ed2f-45ce-86c1-cc334e79202c-c0",
+            "681062b8-b8bf-48b3-b9b8-dc39254e41c6-c1",
+            "d8577dc8-43ae-4512-a3e7-6a9ce8598cc8-c4",
+            "dafec8c6-a86e-4362-b94e-ccee82299e83-c1"
+          ],
+          "top_base_doc_ids": [
+            "4f4a217e-c472-48fc-9c45-5e8c7b7d6d48",
+            "8f24745f-ed2f-45ce-86c1-cc334e79202c",
+            "681062b8-b8bf-48b3-b9b8-dc39254e41c6",
+            "d8577dc8-43ae-4512-a3e7-6a9ce8598cc8",
+            "dafec8c6-a86e-4362-b94e-ccee82299e83"
+          ],
+          "top_scores": [
+            0.032,
+            0.03,
+            0.029,
+            0.028,
+            0.028
+          ],
+          "hit": false
+        },
+        {
+          "query": "위 공소외 4 등을 신용정보의이용및보호에관한법률위반죄로 처벌하여 달라.”는 취지로 부산지방검찰청에 제출한 고소장의 내용은 허위의 사실이 아니어서 무고죄가 성립하지 않는데도, 원심은 위 공소사실을 유죄로 인정하였으니",
+          "expected_grade": "S2",
+          "expected_doc_id": "6fc6cf95-0e7d-475d-8ccc-b1e635c56682",
+          "relevant_doc_ids": [
+            "6fc6cf95-0e7d-475d-8ccc-b1e635c56682"
+          ],
+          "top_grades": [
+            "S2",
+            "TS",
+            "TS",
+            "TS",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "6fc6cf95-0e7d-475d-8ccc-b1e635c56682-c0",
+            "ee1f6c7f-d81e-4561-b639-ca9d572bce95-c0",
+            "24037e2e-71df-450e-b159-abf6a2f29b48-c7",
+            "ee1f6c7f-d81e-4561-b639-ca9d572bce95-c3",
+            "65eb9c59-c3f4-47ea-8c1b-4bc4178e3a5d-c2"
+          ],
+          "top_base_doc_ids": [
+            "6fc6cf95-0e7d-475d-8ccc-b1e635c56682",
+            "ee1f6c7f-d81e-4561-b639-ca9d572bce95",
+            "24037e2e-71df-450e-b159-abf6a2f29b48",
+            "ee1f6c7f-d81e-4561-b639-ca9d572bce95",
+            "65eb9c59-c3f4-47ea-8c1b-4bc4178e3a5d"
+          ],
+          "top_scores": [
+            0.033,
+            0.028,
+            0.027,
+            0.026,
+            0.025
+          ],
+          "hit": true
+        },
+        {
+          "query": "11회에 걸쳐 근로계약을 갱신하였다. 또한 원고 2는 2000. 1. 1. 계약기간을 1년으로 정한 근로계약을 체결하고 위촉 연구원으로 근무하면서 계약기간 만료 시마다",
+          "expected_grade": "S3",
+          "expected_doc_id": "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+          "relevant_doc_ids": [
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b-c3",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b-c4",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b-c0",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b-c5",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b-c1"
+          ],
+          "top_base_doc_ids": [
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지는 연 20%의 각 비율에 의한 금원을 지급하라. 2. 원고의 나머지 청구를 기각한다. 3. 소송비용 중 9/10는 원고가, 나머지는 피고가 각 부담한다. 4. 제1항은 가집행할 수 있다. 【청구취지】 피고는 원고에게 110,000,000원 및 이에 대하여 이 사건 소장부본 송달 다음날부터 다",
+          "expected_grade": "TS",
+          "expected_doc_id": "85c8f848-278c-4294-80d8-2629489513a2",
+          "relevant_doc_ids": [
+            "85c8f848-278c-4294-80d8-2629489513a2"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306-c0",
+            "04f5e0ed-488e-40f2-8adc-1c261337c585-c0",
+            "279142a0-f7fe-4303-8a0b-7abd89cf715f-c0",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0"
+          ],
+          "top_base_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306",
+            "04f5e0ed-488e-40f2-8adc-1c261337c585",
+            "279142a0-f7fe-4303-8a0b-7abd89cf715f",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e"
+          ],
+          "top_scores": [
+            0.028,
+            0.028,
+            0.024,
+            0.024,
+            0.024
+          ],
+          "hit": false
+        },
+        {
+          "query": "되고, 별지 2 목록 기재 물질의 항암제 및 사람 또는 동식물에 대한 의약품으로서의 사용에 대한 연구개발을 직접 또는 제3자를 통해서 수행하여서는 아니",
+          "expected_grade": "S1",
+          "expected_doc_id": "a16e41ef-d81d-41cd-9786-aee25abaf7ea",
+          "relevant_doc_ids": [
+            "a16e41ef-d81d-41cd-9786-aee25abaf7ea"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "a16e41ef-d81d-41cd-9786-aee25abaf7ea-c2",
+            "a16e41ef-d81d-41cd-9786-aee25abaf7ea-c3",
+            "db6fa739-f184-43a9-801b-9bd34733e5e7-c5",
+            "0a0ce4be-e219-464c-a0f2-ca1760ead658-c5",
+            "215ee204-a49f-42f9-a211-906c147a3436-c2"
+          ],
+          "top_base_doc_ids": [
+            "a16e41ef-d81d-41cd-9786-aee25abaf7ea",
+            "a16e41ef-d81d-41cd-9786-aee25abaf7ea",
+            "db6fa739-f184-43a9-801b-9bd34733e5e7",
+            "0a0ce4be-e219-464c-a0f2-ca1760ead658",
+            "215ee204-a49f-42f9-a211-906c147a3436"
+          ],
+          "top_scores": [
+            0.029,
+            0.026,
+            0.026,
+            0.026,
+            0.024
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 주식회사 두산 (소송대리인 법무법인 대륙아주 담당변호사 김원지) 【피 고】 【변론종결】 2009. 3. 11. 【주 문】 1. 원고의 청구를 기각한다. 2. 소송비용은 원고가 부담한다. 【청구취지】 피고는 원고에게 500,000,000원 및 이에 대한 이 사건 소장 부본 송달 다음날부터 다",
+          "expected_grade": "S2",
+          "expected_doc_id": "3ad0bc1d-1add-4d5c-a92f-20baa6a4d768",
+          "relevant_doc_ids": [
+            "3ad0bc1d-1add-4d5c-a92f-20baa6a4d768"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "S3",
+            "S2",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0",
+            "3993c8cd-8084-4f82-8e59-90e9738ce33b-c0",
+            "19c22430-904f-436a-80db-ba95dc549e38-c0",
+            "b6154021-c17f-4dc1-a6c6-82016105d6f7-c0"
+          ],
+          "top_base_doc_ids": [
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e",
+            "3993c8cd-8084-4f82-8e59-90e9738ce33b",
+            "19c22430-904f-436a-80db-ba95dc549e38",
+            "b6154021-c17f-4dc1-a6c6-82016105d6f7"
+          ],
+          "top_scores": [
+            0.032,
+            0.028,
+            0.026,
+            0.025,
+            0.025
+          ],
+          "hit": false
+        },
+        {
+          "query": "【원 고】 전국공공연구노동조합 (소송대리인 변호사 오윤식) 【피 고】 한국건설기술연구원 (소송대리인 법무법인 바른 담당변호사 주경진) 【변론종결】 2012. 1. 13. 【주 문】 1. 피고는 다음 각 행위를 하여서는 아니",
+          "expected_grade": "S3",
+          "expected_doc_id": "1486d0f2-f112-4284-beaa-18f3807eec6e",
+          "relevant_doc_ids": [
+            "1486d0f2-f112-4284-beaa-18f3807eec6e"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "1486d0f2-f112-4284-beaa-18f3807eec6e-c0",
+            "8c51d852-60ba-4f3e-b02a-3bef760aad08-c0",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b-c0",
+            "229f35e9-e81f-404c-9e2c-77303ea753ae-c0",
+            "01a15e54-c569-4aaf-83cc-7c5bcd4c5bf4-c0"
+          ],
+          "top_base_doc_ids": [
+            "1486d0f2-f112-4284-beaa-18f3807eec6e",
+            "8c51d852-60ba-4f3e-b02a-3bef760aad08",
+            "488add3d-8afe-4018-8bac-ef231a9b1e6b",
+            "229f35e9-e81f-404c-9e2c-77303ea753ae",
+            "01a15e54-c569-4aaf-83cc-7c5bcd4c5bf4"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.028,
+            0.026,
+            0.026
+          ],
+          "hit": true
+        },
+        {
+          "query": "하더라도 행위자가 그것을 진실이라고 믿었고 또 그렇게 믿을 상당한 이유가 있으면 위법성이 없다고 보아야 할 것이나, 그에 대한 입증책임은 어디까지나 명예훼손행위를 한 언론매체에 있다",
+          "expected_grade": "TS",
+          "expected_doc_id": "8e171de6-0a61-45f4-83d2-9976b7c42384",
+          "relevant_doc_ids": [
+            "8e171de6-0a61-45f4-83d2-9976b7c42384"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "8e171de6-0a61-45f4-83d2-9976b7c42384-c3",
+            "ab0c3796-a8a7-4c63-8eb1-bf4a6db5b8f1-c4",
+            "129e0e81-2de2-4e4e-86a4-ca4d35cf076e-c0",
+            "ab0c3796-a8a7-4c63-8eb1-bf4a6db5b8f1-c0",
+            "6a90f47e-56ae-4f12-9c66-d6c32dddd5cb-c4"
+          ],
+          "top_base_doc_ids": [
+            "8e171de6-0a61-45f4-83d2-9976b7c42384",
+            "ab0c3796-a8a7-4c63-8eb1-bf4a6db5b8f1",
+            "129e0e81-2de2-4e4e-86a4-ca4d35cf076e",
+            "ab0c3796-a8a7-4c63-8eb1-bf4a6db5b8f1",
+            "6a90f47e-56ae-4f12-9c66-d6c32dddd5cb"
+          ],
+          "top_scores": [
+            0.031,
+            0.031,
+            0.031,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지는 연 20%의 각 비율에 의한 금액을, 148,597,000원에 대하여는 2003. 12. 31.부터, 31,298,000원에 대하여는 2004. 1. 31.부터, 56,472,000원에 대하여는 2004. 2. 21.부터 각 이 사건 2004. 2. 21.자 청구취지확장준비서면 송달일까지는 연 5%, 각 그 다음날부터 다",
+          "expected_grade": "S1",
+          "expected_doc_id": "f6d12283-070f-4b52-8d11-9139a206988c",
+          "relevant_doc_ids": [
+            "f6d12283-070f-4b52-8d11-9139a206988c"
+          ],
+          "top_grades": [
+            "TS",
+            "S1",
+            "S1",
+            "TS",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c0",
+            "f6d12283-070f-4b52-8d11-9139a206988c-c1",
+            "f6d12283-070f-4b52-8d11-9139a206988c-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0",
+            "7e400d56-c6c2-432e-a433-fcbc45aa65b8-c0"
+          ],
+          "top_base_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "f6d12283-070f-4b52-8d11-9139a206988c",
+            "f6d12283-070f-4b52-8d11-9139a206988c",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e",
+            "7e400d56-c6c2-432e-a433-fcbc45aa65b8"
+          ],
+          "top_scores": [
+            0.029,
+            0.029,
+            0.028,
+            0.028,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 것인데, 실사용상표들과 대상상표들이 문자 부분(sisley)의 영어식 발음에 따라 ‘시슬리’로 불리는 경우 양자는 그 호칭에 있어서 같게 된다. ⑶ 따라서 실사용상표들과 대상상표들은 같이 사용되는 경우 일반 수요자나 거래자들에게 상품출처의 혼동을 일으킬 수 있을 만큼 비교적 높은 정도로 근사한 표장들에 해당한다",
+          "expected_grade": "S2",
+          "expected_doc_id": "15d2e828-a5d0-415f-ad22-b0e8f70ce63d",
+          "relevant_doc_ids": [
+            "15d2e828-a5d0-415f-ad22-b0e8f70ce63d"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "15d2e828-a5d0-415f-ad22-b0e8f70ce63d-c4",
+            "15d2e828-a5d0-415f-ad22-b0e8f70ce63d-c3",
+            "6f330a0e-6c23-48c7-9985-34b7c60d913f-c1",
+            "81b54cb1-c636-4bdd-9bdf-ccebd21d7605-c3",
+            "6f330a0e-6c23-48c7-9985-34b7c60d913f-c5"
+          ],
+          "top_base_doc_ids": [
+            "15d2e828-a5d0-415f-ad22-b0e8f70ce63d",
+            "15d2e828-a5d0-415f-ad22-b0e8f70ce63d",
+            "6f330a0e-6c23-48c7-9985-34b7c60d913f",
+            "81b54cb1-c636-4bdd-9bdf-ccebd21d7605",
+            "6f330a0e-6c23-48c7-9985-34b7c60d913f"
+          ],
+          "top_scores": [
+            0.033,
+            0.033,
+            0.031,
+            0.03,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 【피 고】 【변론종결】 2009. 6. 2. 【주 문】 1. 피고 1 주식회사는 원고 1에게 157,957,393원, 원고 2에게 22,325,012원, 원고 3에게 196,459,156원, 원고 4에게 140,221,471원 및 위 각 금원에 대하여 2007. 2. 10.부터 2009. 6. 30.까지 연 5%, 각 그 다음날부터 다",
+          "expected_grade": "S3",
+          "expected_doc_id": "3c5bd27b-dac8-4613-9f43-44f0504b1ed1",
+          "relevant_doc_ids": [
+            "3c5bd27b-dac8-4613-9f43-44f0504b1ed1"
+          ],
+          "top_grades": [
+            "S3",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "3c5bd27b-dac8-4613-9f43-44f0504b1ed1-c0",
+            "2fc55b71-8d07-4215-b743-a32c7bc7a10e-c0",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a-c0",
+            "d05715d3-8852-470f-8923-ceab0acf59e5-c0",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c0"
+          ],
+          "top_base_doc_ids": [
+            "3c5bd27b-dac8-4613-9f43-44f0504b1ed1",
+            "2fc55b71-8d07-4215-b743-a32c7bc7a10e",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a",
+            "d05715d3-8852-470f-8923-ceab0acf59e5",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23"
+          ],
+          "top_scores": [
+            0.032,
+            0.031,
+            0.029,
+            0.029,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "엄격한 자체 내부 기준을 적용하고 있는바, 식약청은 황토팩 제품에 대하여 현재의 화장품 원료 기준보다",
+          "expected_grade": "TS",
+          "expected_doc_id": "8e171de6-0a61-45f4-83d2-9976b7c42384",
+          "relevant_doc_ids": [
+            "8e171de6-0a61-45f4-83d2-9976b7c42384"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "8e171de6-0a61-45f4-83d2-9976b7c42384-c5",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384-c6",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384-c2",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384-c4",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384-c1"
+          ],
+          "top_base_doc_ids": [
+            "8e171de6-0a61-45f4-83d2-9976b7c42384",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384",
+            "8e171de6-0a61-45f4-83d2-9976b7c42384"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "배합물로 투여되는 경우 더욱 적은 용량의 각 성분을 사용하여도 유사한 정도로 혈압은 저하될 수 있다. 예상외로 각개의 화학식(I)의 화합물 또는 그의 약제학적으로 허용가능한 염을 더욱 많은 용량으로 단독 투여하는 경우보다",
+          "expected_grade": "S1",
+          "expected_doc_id": "8b2103a2-8b05-44f1-84b0-75cf2e7a945a",
+          "relevant_doc_ids": [
+            "8b2103a2-8b05-44f1-84b0-75cf2e7a945a"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "TS",
+            "S1",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "8b2103a2-8b05-44f1-84b0-75cf2e7a945a-c3",
+            "56011bc6-c123-40ca-aa18-31fe1571fa53-c1",
+            "1bc2b320-8ab8-48b3-8ed8-999705f62b5d-c2",
+            "8b2103a2-8b05-44f1-84b0-75cf2e7a945a-c2",
+            "21564951-d473-4002-8eb1-4ece72a33309-c1"
+          ],
+          "top_base_doc_ids": [
+            "8b2103a2-8b05-44f1-84b0-75cf2e7a945a",
+            "56011bc6-c123-40ca-aa18-31fe1571fa53",
+            "1bc2b320-8ab8-48b3-8ed8-999705f62b5d",
+            "8b2103a2-8b05-44f1-84b0-75cf2e7a945a",
+            "21564951-d473-4002-8eb1-4ece72a33309"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.03,
+            0.029,
+            0.026
+          ],
+          "hit": true
+        },
+        {
+          "query": "하고, 원고는 한국갈서에게 동 상표의 사용을 허락한 자로서 부정경쟁방지법 제2조 소정의 '타인'에 해당한다",
+          "expected_grade": "S2",
+          "expected_doc_id": "5442f9d5-5371-4f9f-a5a4-3b0bab2d6f4e",
+          "relevant_doc_ids": [
+            "5442f9d5-5371-4f9f-a5a4-3b0bab2d6f4e"
+          ],
+          "top_grades": [
+            "TS",
+            "S2",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "aedbd6b5-e903-4055-bace-e4530f46cb57-c7",
+            "5442f9d5-5371-4f9f-a5a4-3b0bab2d6f4e-c6",
+            "aedbd6b5-e903-4055-bace-e4530f46cb57-c0",
+            "ca9924c4-a92f-4f18-98b8-414faa09041c-c2",
+            "7cd439f6-8f55-4d6d-9e1c-c847ba912227-c1"
+          ],
+          "top_base_doc_ids": [
+            "aedbd6b5-e903-4055-bace-e4530f46cb57",
+            "5442f9d5-5371-4f9f-a5a4-3b0bab2d6f4e",
+            "aedbd6b5-e903-4055-bace-e4530f46cb57",
+            "ca9924c4-a92f-4f18-98b8-414faa09041c",
+            "7cd439f6-8f55-4d6d-9e1c-c847ba912227"
+          ],
+          "top_scores": [
+            0.033,
+            0.033,
+            0.031,
+            0.024,
+            0.023
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 것이다. 2. 나머지 부분에 관하여 가. 이 사건 시정명령의 내용이 불명확한지 여부 독점규제및공정거래에관한법률(이하 '공정거래법'이라 한다)에 의한 시정명령이 지나치게 구체적인 경우 매일 매일 다소간의 변형을 거치면서 행해지는 수많은 거래에서 정합성이 떨어져 결국 무의미한 시정명령이 되므로 그 본질적인 속성상 다소간의 포괄성·추상성을 띨 수밖에 없다",
+          "expected_grade": "S3",
+          "expected_doc_id": "735a441b-e888-4815-8e9b-652acc6bb3c8",
+          "relevant_doc_ids": [
+            "735a441b-e888-4815-8e9b-652acc6bb3c8"
+          ],
+          "top_grades": [
+            "S3",
+            "TS",
+            "S2",
+            "TS",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "735a441b-e888-4815-8e9b-652acc6bb3c8-c0",
+            "99b52e51-a2ae-4288-af39-07bbdec8514a-c2",
+            "a2be995f-f714-4168-8e31-81790a57b505-c1",
+            "43b7ea9c-4b8e-4ee8-a2d6-c8bc2a923970-c2",
+            "2d505c40-7655-4389-9aff-7b5e34ba7c71-c6"
+          ],
+          "top_base_doc_ids": [
+            "735a441b-e888-4815-8e9b-652acc6bb3c8",
+            "99b52e51-a2ae-4288-af39-07bbdec8514a",
+            "a2be995f-f714-4168-8e31-81790a57b505",
+            "43b7ea9c-4b8e-4ee8-a2d6-c8bc2a923970",
+            "2d505c40-7655-4389-9aff-7b5e34ba7c71"
+          ],
+          "top_scores": [
+            0.033,
+            0.03,
+            0.029,
+            0.029,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원고(선정당사자), 상고인 겸 피상고인】 【피고, 피상고인 겸 상고인】 다우 케미칼 컴퍼니",
+          "expected_grade": "TS",
+          "expected_doc_id": "700eea97-c81f-4ff0-a0b4-73cbfe868232",
+          "relevant_doc_ids": [
+            "700eea97-c81f-4ff0-a0b4-73cbfe868232"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "S2",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "ae89aa12-b6cb-4018-9521-12c5d00075e5-c0",
+            "700eea97-c81f-4ff0-a0b4-73cbfe868232-c0",
+            "5b40e08a-86cb-4dc6-9287-3d863cc5bc78-c0",
+            "7e800cab-89f3-4e70-ae08-0973fadedc8d-c0",
+            "ab4fe844-c5ba-456d-b49e-4b6b58da17bc-c0"
+          ],
+          "top_base_doc_ids": [
+            "ae89aa12-b6cb-4018-9521-12c5d00075e5",
+            "700eea97-c81f-4ff0-a0b4-73cbfe868232",
+            "5b40e08a-86cb-4dc6-9287-3d863cc5bc78",
+            "7e800cab-89f3-4e70-ae08-0973fadedc8d",
+            "ab4fe844-c5ba-456d-b49e-4b6b58da17bc"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.027,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지 연 20%의 비율에 따른 금원을 지급하라는 판결. 항소취지 제1심판결 중 다음에서 지급을 명하는 원고 패소 부분을 취소한다. 피고는 원고에게 10억 원 및 이에 대한 이 사건 소장 부본이 송달된 다음날부터 다",
+          "expected_grade": "S1",
+          "expected_doc_id": "af099a70-ab57-4cee-8dc2-fd702fa8551b",
+          "relevant_doc_ids": [
+            "af099a70-ab57-4cee-8dc2-fd702fa8551b"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306-c0",
+            "04f5e0ed-488e-40f2-8adc-1c261337c585-c0",
+            "2532b7ac-b6fb-47a4-a7c5-d9c1eb4c72c8-c0",
+            "dafd821d-33f1-45b9-9998-74acebacdd56-c0",
+            "b26b0e79-41bc-48a1-81e6-59f332f27d53-c0"
+          ],
+          "top_base_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306",
+            "04f5e0ed-488e-40f2-8adc-1c261337c585",
+            "2532b7ac-b6fb-47a4-a7c5-d9c1eb4c72c8",
+            "dafd821d-33f1-45b9-9998-74acebacdd56",
+            "b26b0e79-41bc-48a1-81e6-59f332f27d53"
+          ],
+          "top_scores": [
+            0.03,
+            0.03,
+            0.029,
+            0.028,
+            0.028
+          ],
+          "hit": false
+        },
+        {
+          "query": "가격은 〈표4〉에서 보는 바와 같이 평균 13.6% 상승하는 결과를 가져왔다. (표 4 생략) (2) 2003. 4. 가격인상 원고 등은 각 수요처에 가격인상 공문을 통하여 통지하는 방법으로 모두 같은 날짜인 2003. 4. 1.자로 가격을 인상하였고, 그 결과 시장에 나타난 국내 50% 가성소다",
+          "expected_grade": "S2",
+          "expected_doc_id": "6ca1c366-4eed-4412-9368-041aeec34f6f",
+          "relevant_doc_ids": [
+            "6ca1c366-4eed-4412-9368-041aeec34f6f"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "6ca1c366-4eed-4412-9368-041aeec34f6f-c2",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f-c1",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f-c6",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f-c3",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f-c7"
+          ],
+          "top_base_doc_ids": [
+            "6ca1c366-4eed-4412-9368-041aeec34f6f",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f",
+            "6ca1c366-4eed-4412-9368-041aeec34f6f"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "원심판결에는 신의칙의 법리를 오해하여 판결에 영향을 미쳤음이 명백하다. 따라서 원심판결 중 위 원고들에 대한 부분을 파기하여 사건을 다시 심리·판단하게 하기 위하여 원심법원에 환송함이 상당하다고 할 것이다. 이상의 이유로 다수의견에 반대하는 것이다. 대법관 최종영, 대법관 신성택의 다수의견에 대한 보충의견은 다음과 같다. 1. 반대의견은 원고 2, 원고",
+          "expected_grade": "S3",
+          "expected_doc_id": "d04fa3bb-9ccc-436d-b90c-326f4842a618",
+          "relevant_doc_ids": [
+            "d04fa3bb-9ccc-436d-b90c-326f4842a618"
+          ],
+          "top_grades": [
+            "S3",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "d04fa3bb-9ccc-436d-b90c-326f4842a618-c7",
+            "fa03a7e3-d4d6-440a-a75b-8ad291b54357-c3",
+            "c7c63a4b-ed93-44a7-b474-2467bd33bc03-c2",
+            "d15f1989-ab3a-45da-875e-a5378e7d6d92-c5",
+            "df333b05-8530-432e-a6e0-cc5c89adcd3e-c4"
+          ],
+          "top_base_doc_ids": [
+            "d04fa3bb-9ccc-436d-b90c-326f4842a618",
+            "fa03a7e3-d4d6-440a-a75b-8ad291b54357",
+            "c7c63a4b-ed93-44a7-b474-2467bd33bc03",
+            "d15f1989-ab3a-45da-875e-a5378e7d6d92",
+            "df333b05-8530-432e-a6e0-cc5c89adcd3e"
+          ],
+          "top_scores": [
+            0.033,
+            0.016,
+            0.016,
+            0.016,
+            0.016
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지 연 20%의 각 비율에 의한 금원을, 피고 주식회사 신한은행은 원고 주식회사 세신정밀에 3,129,790,000원 및 그 중 [별지3] 제3항 기재 2회차 내지 12회차 각 지연이자 대상 원본 금액에 대하여 각 결제일 란 기재 날부터 위 청구취지변경신청서부본 송달일까지 연 5%, 그 다음날부터 다",
+          "expected_grade": "TS",
+          "expected_doc_id": "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+          "relevant_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c1",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c0",
+            "df998fc3-e171-4ada-b71c-254cc84ea79d-c0",
+            "0befa4c7-e3fb-46ba-bb20-7bfa8f2df08a-c0",
+            "3202f795-73a7-4547-abf0-323d872c0d1e-c0"
+          ],
+          "top_base_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "df998fc3-e171-4ada-b71c-254cc84ea79d",
+            "0befa4c7-e3fb-46ba-bb20-7bfa8f2df08a",
+            "3202f795-73a7-4547-abf0-323d872c0d1e"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.027,
+            0.027,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원 고】 【피 고】 【변론종결】 2009. 10. 23. 【주 문】 1. 피고는 원고에게 46,900,000원 및 이에 대하여 2009. 7. 22.부터 다",
+          "expected_grade": "S1",
+          "expected_doc_id": "0fe55898-5397-44ee-9666-ea9d3d308e08",
+          "relevant_doc_ids": [
+            "0fe55898-5397-44ee-9666-ea9d3d308e08"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "S2",
+            "TS",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "2fc55b71-8d07-4215-b743-a32c7bc7a10e-c0",
+            "1fcfaa64-9ebb-4365-b0be-46eb9cfe2d38-c0",
+            "41506ed8-b473-4f91-ab93-f7278f31c9f9-c0",
+            "e0c56939-09d5-440f-a50d-8b83112b2503-c0",
+            "7c003d12-bead-4c2d-bbdc-b1fe2f1806b7-c0"
+          ],
+          "top_base_doc_ids": [
+            "2fc55b71-8d07-4215-b743-a32c7bc7a10e",
+            "1fcfaa64-9ebb-4365-b0be-46eb9cfe2d38",
+            "41506ed8-b473-4f91-ab93-f7278f31c9f9",
+            "e0c56939-09d5-440f-a50d-8b83112b2503",
+            "7c003d12-bead-4c2d-bbdc-b1fe2f1806b7"
+          ],
+          "top_scores": [
+            0.03,
+            0.03,
+            0.03,
+            0.029,
+            0.029
+          ],
+          "hit": false
+        },
+        {
+          "query": "할 것이며, 일반 수요자나 거래자들은 “롯데제과에서 만든 초코파이”, “오리온제과에서 만든 초코파이”, “크라운제과에서 만든 초코파이” 등으로 인식한다",
+          "expected_grade": "S2",
+          "expected_doc_id": "06bbbf6b-9cd2-4b71-99b9-86fd721f1540",
+          "relevant_doc_ids": [
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540-c5",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540-c1",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540-c3",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540-c6",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540-c0"
+          ],
+          "top_base_doc_ids": [
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540",
+            "06bbbf6b-9cd2-4b71-99b9-86fd721f1540"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.031,
+            0.03
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 것이다. (3) 이 사건으로 돌아와 살피건대, 비록 이 사건 특허발명의 출원일이 1994. 6. 27.로서 위 특허법 제133조의2가 신설되어 시행되기 전이기는 하나, 위와 같은 특허법의 부칙 규정에 따라 이 사건 특허발명과 관련된 무효심판절차 중의 정정청구에 관하여는 새로운 규정이 적용된다",
+          "expected_grade": "S3",
+          "expected_doc_id": "66f753a2-2990-424c-ad34-232286362d9b",
+          "relevant_doc_ids": [
+            "66f753a2-2990-424c-ad34-232286362d9b"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "66f753a2-2990-424c-ad34-232286362d9b-c5",
+            "66f753a2-2990-424c-ad34-232286362d9b-c6",
+            "52a4aec2-453c-4771-ab14-6387a49eaa46-c6",
+            "52a4aec2-453c-4771-ab14-6387a49eaa46-c4",
+            "52a4aec2-453c-4771-ab14-6387a49eaa46-c5"
+          ],
+          "top_base_doc_ids": [
+            "66f753a2-2990-424c-ad34-232286362d9b",
+            "66f753a2-2990-424c-ad34-232286362d9b",
+            "52a4aec2-453c-4771-ab14-6387a49eaa46",
+            "52a4aec2-453c-4771-ab14-6387a49eaa46",
+            "52a4aec2-453c-4771-ab14-6387a49eaa46"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.029,
+            0.028,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "여부에 관한 원고들의 주장에 대하여 아래 2)항과 같은 판단을 추가하는 외에는 제1심판결 ‘3. 이 사건 각 통화옵션계약의 환위험 회피(hedge) 적합 여부에 관한 판단’과 같으므로, 민사소송법 제420조 본문에 의하여 이를 그대로 인용한다. 2) 수수료의 과다",
+          "expected_grade": "TS",
+          "expected_doc_id": "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+          "relevant_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c3",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c6",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe-c0",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c2",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23-c5"
+          ],
+          "top_base_doc_ids": [
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "c9db32c2-abc5-4445-84af-4ebdee69e3fe",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23",
+            "2d6adc27-46ee-46b2-9c2a-46ddc8eeaf23"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.031,
+            0.029
+          ],
+          "hit": true
+        },
+        {
+          "query": "갚는 날까지 연 20%의 비율에 의한 금원을 지급하라. 2. 원고의 나머지 청구를 기각한다. 3. 소송비용 중 1/2은 원고가, 나머지는 피고가 각 부담한다. 4. 제1항은 가집행할 수 있다. 【청구취지】 피고는 원고에게 134,478,500원 및 이에 대하여 이 사건 청구취지 및 원인변경서 송달일 다음날부터 다",
+          "expected_grade": "S1",
+          "expected_doc_id": "0fe55898-5397-44ee-9666-ea9d3d308e08",
+          "relevant_doc_ids": [
+            "0fe55898-5397-44ee-9666-ea9d3d308e08"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "04f5e0ed-488e-40f2-8adc-1c261337c585-c0",
+            "279142a0-f7fe-4303-8a0b-7abd89cf715f-c0",
+            "b74e0e61-514d-4811-b37a-1d14f3d93306-c0",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0"
+          ],
+          "top_base_doc_ids": [
+            "04f5e0ed-488e-40f2-8adc-1c261337c585",
+            "279142a0-f7fe-4303-8a0b-7abd89cf715f",
+            "b74e0e61-514d-4811-b37a-1d14f3d93306",
+            "4e70b3d3-9e09-4eff-8ea1-4aea9a18253a",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e"
+          ],
+          "top_scores": [
+            0.03,
+            0.03,
+            0.028,
+            0.027,
+            0.027
+          ],
+          "hit": false
+        },
+        {
+          "query": "부각되어 있으므로, 악어 도형 부분이 그 요부에 해당하여 이 부분으로 호칭 및 관념된다고 할 것이고, 악어 도형만으로 이루어진 이 사건 대상상표는 그 악어 도형으로 호칭 및 관념된다고 할 것이다. 그런데 이 사건 실사용상표 중 요부인 악어 도형과 이 사건 대상상표의 악어 도형은 둘 다",
+          "expected_grade": "S2",
+          "expected_doc_id": "578ab0e7-134f-4f97-bff1-2770090ccd5c",
+          "relevant_doc_ids": [
+            "578ab0e7-134f-4f97-bff1-2770090ccd5c"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "S2"
+          ],
+          "top_doc_ids": [
+            "578ab0e7-134f-4f97-bff1-2770090ccd5c-c5",
+            "578ab0e7-134f-4f97-bff1-2770090ccd5c-c4",
+            "bef0c6f6-6506-4175-b207-e237c2f44146-c2",
+            "cfaa42ee-34d4-47f8-a15a-f7c7a5fa6fc8-c2",
+            "e675c355-2dfe-41f8-b336-aeda237b965c-c2"
+          ],
+          "top_base_doc_ids": [
+            "578ab0e7-134f-4f97-bff1-2770090ccd5c",
+            "578ab0e7-134f-4f97-bff1-2770090ccd5c",
+            "bef0c6f6-6506-4175-b207-e237c2f44146",
+            "cfaa42ee-34d4-47f8-a15a-f7c7a5fa6fc8",
+            "e675c355-2dfe-41f8-b336-aeda237b965c"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.03,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 수 없으므로, 원고의 위 주장은 이유 없다. 다. 정정 후 이 사건 특허발명이 비교대상발명들에 비하여 진보성이 있는지 여부 (1) 목적의 대비 정정 후 이 사건 특허발명은 종래의 규격화된 유로폼패널(1)과 모서리패널(2) 간의 간격을 메워줄 수 있는 스페이서(11)를 제공하여 건축 도중에 건물의 상층부와 하층부 간에 있어서 옹벽의 두께가 달라진다",
+          "expected_grade": "S3",
+          "expected_doc_id": "66f753a2-2990-424c-ad34-232286362d9b",
+          "relevant_doc_ids": [
+            "66f753a2-2990-424c-ad34-232286362d9b"
+          ],
+          "top_grades": [
+            "S3",
+            "S3",
+            "S3",
+            "S3",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "66f753a2-2990-424c-ad34-232286362d9b-c6",
+            "66f753a2-2990-424c-ad34-232286362d9b-c4",
+            "66f753a2-2990-424c-ad34-232286362d9b-c3",
+            "66f753a2-2990-424c-ad34-232286362d9b-c1",
+            "05f9efe5-d8fa-45d7-b4ef-348b28b30034-c2"
+          ],
+          "top_base_doc_ids": [
+            "66f753a2-2990-424c-ad34-232286362d9b",
+            "66f753a2-2990-424c-ad34-232286362d9b",
+            "66f753a2-2990-424c-ad34-232286362d9b",
+            "66f753a2-2990-424c-ad34-232286362d9b",
+            "05f9efe5-d8fa-45d7-b4ef-348b28b30034"
+          ],
+          "top_scores": [
+            0.033,
+            0.033,
+            0.032,
+            0.03,
+            0.026
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원고(선정당사자), 피상고인 겸 상고인】 【피고, 상고인 겸 피상고인】 다우 케미칼 컴퍼니",
+          "expected_grade": "TS",
+          "expected_doc_id": "ae89aa12-b6cb-4018-9521-12c5d00075e5",
+          "relevant_doc_ids": [
+            "ae89aa12-b6cb-4018-9521-12c5d00075e5"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "S2",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "ae89aa12-b6cb-4018-9521-12c5d00075e5-c0",
+            "700eea97-c81f-4ff0-a0b4-73cbfe868232-c0",
+            "5b40e08a-86cb-4dc6-9287-3d863cc5bc78-c0",
+            "7e800cab-89f3-4e70-ae08-0973fadedc8d-c0",
+            "ab4fe844-c5ba-456d-b49e-4b6b58da17bc-c0"
+          ],
+          "top_base_doc_ids": [
+            "ae89aa12-b6cb-4018-9521-12c5d00075e5",
+            "700eea97-c81f-4ff0-a0b4-73cbfe868232",
+            "5b40e08a-86cb-4dc6-9287-3d863cc5bc78",
+            "7e800cab-89f3-4e70-ae08-0973fadedc8d",
+            "ab4fe844-c5ba-456d-b49e-4b6b58da17bc"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.026,
+            0.026
+          ],
+          "hit": true
+        },
+        {
+          "query": "낮은 1,450rpm으로 하더라도 위 각 발명의 목적 및 효과를 달성함에 있어서 앞서 본 바와 같이 아무런 차이가 없으므로, 임펠라의 회전속도를 위와 같이 치환하는 것은 그 기술분야에서 통상의 지식을 가진 사람이라면 임펠라의 모양과 크기, 시설을 운영함에 있어서의 경제성 등을 고려하여 누구나 용이하게 생각해 낼 수 있는 정도로 자명하다",
+          "expected_grade": "S1",
+          "expected_doc_id": "82348282-9884-47dc-9417-0c1978ddcac7",
+          "relevant_doc_ids": [
+            "82348282-9884-47dc-9417-0c1978ddcac7"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "82348282-9884-47dc-9417-0c1978ddcac7-c4",
+            "82348282-9884-47dc-9417-0c1978ddcac7-c5",
+            "82348282-9884-47dc-9417-0c1978ddcac7-c2",
+            "82348282-9884-47dc-9417-0c1978ddcac7-c3",
+            "d1a2fa71-5a3e-416b-912d-8342699f7e0c-c2"
+          ],
+          "top_base_doc_ids": [
+            "82348282-9884-47dc-9417-0c1978ddcac7",
+            "82348282-9884-47dc-9417-0c1978ddcac7",
+            "82348282-9884-47dc-9417-0c1978ddcac7",
+            "82348282-9884-47dc-9417-0c1978ddcac7",
+            "d1a2fa71-5a3e-416b-912d-8342699f7e0c"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.025,
+            0.019
+          ],
+          "hit": true
+        },
+        {
+          "query": "할 것이므로 이 사건 등록상표는 상표법 제6조 제1항 제3호에 해당한다. 이에 대하여 원고는 이 사건 등록상표는 '정기간행물의 제호는 기술적 표장에 해당하지 않는다.'고 규정하고 있던 개정 전의 상표심사기준(2001년 개정되기 전의 것)에 따라 등록된 것이므로 그 후 상표심사기준이 개정되었다",
+          "expected_grade": "S2",
+          "expected_doc_id": "6f597c94-9b3f-464c-92ef-bb4d304b8ee1",
+          "relevant_doc_ids": [
+            "6f597c94-9b3f-464c-92ef-bb4d304b8ee1"
+          ],
+          "top_grades": [
+            "S2",
+            "S2",
+            "S2",
+            "S2",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "6f597c94-9b3f-464c-92ef-bb4d304b8ee1-c5",
+            "6f597c94-9b3f-464c-92ef-bb4d304b8ee1-c1",
+            "6f597c94-9b3f-464c-92ef-bb4d304b8ee1-c6",
+            "0318ea73-7d57-4547-acad-642341600fb9-c1",
+            "00bcc7a7-6131-4433-9df8-907faf2bd860-c1"
+          ],
+          "top_base_doc_ids": [
+            "6f597c94-9b3f-464c-92ef-bb4d304b8ee1",
+            "6f597c94-9b3f-464c-92ef-bb4d304b8ee1",
+            "6f597c94-9b3f-464c-92ef-bb4d304b8ee1",
+            "0318ea73-7d57-4547-acad-642341600fb9",
+            "00bcc7a7-6131-4433-9df8-907faf2bd860"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.032,
+            0.03,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "【원고(선정당사자)】 원고(선정당사자) (소송대리인 법무법인 일촌 담당변호사 이백수) 【피 고】 주식회사 로마켓아시아 (소송대리인 법무법인 길상 외 6인) 【변론종결】 2007. 6. 15. 【주 문】 1. 피고는 인터넷 홈페이지 “(인터넷 주소 생략)”에서 원고(선정당사자) 및 선정자들에 관한 별지 목록 제1항 자료를 이용하여 아래 서비스를 하여서는 아니",
+          "expected_grade": "S3",
+          "expected_doc_id": "3eb36f60-f6a0-4a92-a564-c69598fd5eec",
+          "relevant_doc_ids": [
+            "3eb36f60-f6a0-4a92-a564-c69598fd5eec"
+          ],
+          "top_grades": [
+            "S3",
+            "TS",
+            "S2",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "3eb36f60-f6a0-4a92-a564-c69598fd5eec-c0",
+            "9a7b9624-0c00-45de-b1f7-9cae4c1a94ff-c0",
+            "3f49b080-40c4-4036-b270-f1467929a05f-c0",
+            "2635446c-27f2-4f65-b422-f0a8212360be-c0",
+            "2ebbf72b-77f3-45fc-8299-f6e852c4330e-c0"
+          ],
+          "top_base_doc_ids": [
+            "3eb36f60-f6a0-4a92-a564-c69598fd5eec",
+            "9a7b9624-0c00-45de-b1f7-9cae4c1a94ff",
+            "3f49b080-40c4-4036-b270-f1467929a05f",
+            "2635446c-27f2-4f65-b422-f0a8212360be",
+            "2ebbf72b-77f3-45fc-8299-f6e852c4330e"
+          ],
+          "top_scores": [
+            0.033,
+            0.031,
+            0.031,
+            0.028,
+            0.027
+          ],
+          "hit": true
+        },
+        {
+          "query": "6.9%~9.0% 높은 95.8%의 평균낙찰률로, 고속도로정보통신에 대하여는 같은 기간 동종·유사 용역의 평균낙찰률 87.1~89.8%보다",
+          "expected_grade": "TS",
+          "expected_doc_id": "5023476d-385b-416a-a465-e69a26acd6e9",
+          "relevant_doc_ids": [
+            "5023476d-385b-416a-a465-e69a26acd6e9"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "5023476d-385b-416a-a465-e69a26acd6e9-c3",
+            "5023476d-385b-416a-a465-e69a26acd6e9-c2",
+            "5023476d-385b-416a-a465-e69a26acd6e9-c5",
+            "5023476d-385b-416a-a465-e69a26acd6e9-c4",
+            "5023476d-385b-416a-a465-e69a26acd6e9-c1"
+          ],
+          "top_base_doc_ids": [
+            "5023476d-385b-416a-a465-e69a26acd6e9",
+            "5023476d-385b-416a-a465-e69a26acd6e9",
+            "5023476d-385b-416a-a465-e69a26acd6e9",
+            "5023476d-385b-416a-a465-e69a26acd6e9",
+            "5023476d-385b-416a-a465-e69a26acd6e9"
+          ],
+          "top_scores": [
+            0.033,
+            0.033,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "선택의 폭을 확대시킨 진일보한 것이고, ② 이 건 등록고안의 지지구(6)는 Century Products Company가 발행한 제품 카탈로그에 기재되어 있는 자동차용 유아 보호 시트의 지지구와는 그 기술구성이 상이할 뿐 아니라, 그렇지 않다",
+          "expected_grade": "S1",
+          "expected_doc_id": "5cd639ec-8bd8-4335-b5c1-b93a6fe52609",
+          "relevant_doc_ids": [
+            "5cd639ec-8bd8-4335-b5c1-b93a6fe52609"
+          ],
+          "top_grades": [
+            "S1",
+            "S1",
+            "S1",
+            "S1",
+            "S1"
+          ],
+          "top_doc_ids": [
+            "ad7a1d39-f30b-4f4b-8a38-5d6055a0bb32-c4",
+            "5cd639ec-8bd8-4335-b5c1-b93a6fe52609-c3",
+            "5cd639ec-8bd8-4335-b5c1-b93a6fe52609-c4",
+            "5cd639ec-8bd8-4335-b5c1-b93a6fe52609-c2",
+            "ad7a1d39-f30b-4f4b-8a38-5d6055a0bb32-c3"
+          ],
+          "top_base_doc_ids": [
+            "ad7a1d39-f30b-4f4b-8a38-5d6055a0bb32",
+            "5cd639ec-8bd8-4335-b5c1-b93a6fe52609",
+            "5cd639ec-8bd8-4335-b5c1-b93a6fe52609",
+            "5cd639ec-8bd8-4335-b5c1-b93a6fe52609",
+            "ad7a1d39-f30b-4f4b-8a38-5d6055a0bb32"
+          ],
+          "top_scores": [
+            0.033,
+            0.033,
+            0.031,
+            0.031,
+            0.031
+          ],
+          "hit": true
+        },
+        {
+          "query": "된다. 나. 원고에게, 피고 주식회사 다사소는 34,196,465원, 피고 2, 피고 3은 각자 99,164,110원 및 위 각 금원에 대하여 피고 주식회사 다사소는 2013. 12. 3.부터, 피고 2, 피고 3은 각 2014. 1. 21.부터 각 2014. 6. 19.까지는 연 5%의, 그 다음 날부터 다",
+          "expected_grade": "S2",
+          "expected_doc_id": "903becc3-ae4c-4993-9e4c-2b121dc330d5",
+          "relevant_doc_ids": [
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5"
+          ],
+          "top_grades": [
+            "S2",
+            "S1",
+            "TS",
+            "TS",
+            "TS"
+          ],
+          "top_doc_ids": [
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5-c0",
+            "8287b434-89bc-44c0-a665-6dceda22870f-c1",
+            "1a90f359-b507-4143-8ba7-ea1ab8388dfb-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0",
+            "2532b7ac-b6fb-47a4-a7c5-d9c1eb4c72c8-c0"
+          ],
+          "top_base_doc_ids": [
+            "903becc3-ae4c-4993-9e4c-2b121dc330d5",
+            "8287b434-89bc-44c0-a665-6dceda22870f",
+            "1a90f359-b507-4143-8ba7-ea1ab8388dfb",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e",
+            "2532b7ac-b6fb-47a4-a7c5-d9c1eb4c72c8"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.03,
+            0.028
+          ],
+          "hit": true
+        },
+        {
+          "query": "된다. 2. 피고는 원고(선정당사자) 및 선정자들에게 각 1,000,000원 및 이에 대하여 소장 송달 다음날부터 다",
+          "expected_grade": "S3",
+          "expected_doc_id": "3eb36f60-f6a0-4a92-a564-c69598fd5eec",
+          "relevant_doc_ids": [
+            "3eb36f60-f6a0-4a92-a564-c69598fd5eec"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "e11a5cb6-9b9d-488e-9045-cc164999352b-c0",
+            "5b40e08a-86cb-4dc6-9287-3d863cc5bc78-c0",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e-c0",
+            "801abad1-9973-4468-ab0c-0334cf818dca-c5",
+            "5f34d7a6-2664-4f48-a180-718f055e653a-c0"
+          ],
+          "top_base_doc_ids": [
+            "e11a5cb6-9b9d-488e-9045-cc164999352b",
+            "5b40e08a-86cb-4dc6-9287-3d863cc5bc78",
+            "f45e718c-4a59-4c2e-b7c2-b6fac121676e",
+            "801abad1-9973-4468-ab0c-0334cf818dca",
+            "5f34d7a6-2664-4f48-a180-718f055e653a"
+          ],
+          "top_scores": [
+            0.032,
+            0.032,
+            0.028,
+            0.025,
+            0.025
+          ],
+          "hit": false
+        },
+        {
+          "query": "갚는 날까지 연 20%의 각 비율에 의한 금원을 지급하라. (2) 별지 제2 목록 기재 각 제품을 제조, 사용, 판매 또는 전시하여서는 아니",
+          "expected_grade": "TS",
+          "expected_doc_id": "b74e0e61-514d-4811-b37a-1d14f3d93306",
+          "relevant_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306"
+          ],
+          "top_grades": [
+            "TS",
+            "TS",
+            "TS",
+            "TS",
+            "S3"
+          ],
+          "top_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306-c0",
+            "7354e5b6-4e62-4408-9703-9c5b8a437b2f-c0",
+            "1a90f359-b507-4143-8ba7-ea1ab8388dfb-c0",
+            "3356dc7d-45ef-4cab-9d73-19e43185ac34-c0",
+            "32d8523c-455a-40a6-980c-4b955990c313-c0"
+          ],
+          "top_base_doc_ids": [
+            "b74e0e61-514d-4811-b37a-1d14f3d93306",
+            "7354e5b6-4e62-4408-9703-9c5b8a437b2f",
+            "1a90f359-b507-4143-8ba7-ea1ab8388dfb",
+            "3356dc7d-45ef-4cab-9d73-19e43185ac34",
+            "32d8523c-455a-40a6-980c-4b955990c313"
+          ],
+          "top_scores": [
+            0.033,
+            0.032,
+            0.031,
+            0.03,
+            0.03
+          ],
+          "hit": true
+        }
+      ],
+      "retrieval_metrics": {
+        "sample_count": 80,
+        "top_k": 5,
+        "recall_at_k": 0.8875,
+        "precision_at_k": 0.1775,
+        "mrr": 0.825,
+        "ndcg_at_k": 0.8414,
+        "skipped_count": 0
+      }
+    }
+  ]
+}

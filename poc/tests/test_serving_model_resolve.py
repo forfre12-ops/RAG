@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import lloydk.services.classify_service as cs
+import koipa.services.classify_service as cs
 
 
 @contextmanager
@@ -20,8 +20,8 @@ def _cm():
 
 
 def _patch_active(monkeypatch, model_uri):
-    import lloydk.db as dbmod
-    import lloydk.repositories as repomod
+    import koipa.db as dbmod
+    import koipa.repositories as repomod
     monkeypatch.setattr(dbmod, "session_scope", _cm)
     active = SimpleNamespace(model_uri=model_uri) if model_uri is not None else None
     monkeypatch.setattr(repomod, "TrainingRepo", lambda db: SimpleNamespace(get_active=lambda: active))
@@ -46,7 +46,7 @@ def test_active_dir_none_when_no_active(monkeypatch):
 
 
 def test_active_dir_none_on_db_error(monkeypatch):
-    import lloydk.db as dbmod
+    import koipa.db as dbmod
 
     class _Boom:
         def __enter__(self):
@@ -63,14 +63,14 @@ def test_active_dir_none_on_db_error(monkeypatch):
 
 
 def test_resolve_env_when_testing(monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.setenv("TESTING", "1")
     monkeypatch.setattr(settings, "classifier_model_dir", "envdir")
     assert cs._resolve_serving_model_dir() == "envdir"
 
 
 def test_resolve_prefers_active(tmp_path, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setattr(settings, "serving_prefer_active_model", True)
     monkeypatch.setattr(settings, "classifier_model_dir", "envdir")
@@ -79,7 +79,7 @@ def test_resolve_prefers_active(tmp_path, monkeypatch):
 
 
 def test_resolve_falls_back_to_env_when_no_active(monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setattr(settings, "serving_prefer_active_model", True)
     monkeypatch.setattr(settings, "classifier_model_dir", "envdir")
@@ -88,7 +88,7 @@ def test_resolve_falls_back_to_env_when_no_active(monkeypatch):
 
 
 def test_resolve_disabled_uses_env(monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.delenv("TESTING", raising=False)
     monkeypatch.setattr(settings, "serving_prefer_active_model", False)
     monkeypatch.setattr(settings, "classifier_model_dir", "envdir")
@@ -122,8 +122,8 @@ def test_reload_model_reports_fallback_when_no_dir(monkeypatch):
 def test_admin_reload_endpoint_requires_admin_and_reloads():
     from fastapi.testclient import TestClient
 
-    from lloydk.api.app import app
-    from lloydk.config import settings
+    from koipa.api.app import app
+    from koipa.config import settings
 
     with TestClient(app) as cli:
         # 비admin은 거부

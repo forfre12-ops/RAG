@@ -1,9 +1,9 @@
-"""lloydk.golden_builder.build_golden_set 코어 파이프라인 단위 테스트 (P1 v2 게이트).
+"""koipa.golden_builder.build_golden_set 코어 파이프라인 단위 테스트 (P1 v2 게이트).
 
 라벨러를 주입(label_fn)해 DB/Celery/LLM 없이 위생(중복·누출)·합의·조립을 검증한다.
 게이트: 합의(rule==llm) + 실제 근거(has_real_evidence) + self-consistency. gold_candidate만 자동 생성.
 """
-from lloydk.golden_builder import LabelPair, build_golden_set
+from koipa.golden_builder import LabelPair, build_golden_set
 
 # 합의+근거 → gold_candidate / 불일치(근거 있음) → needs_review_disagree
 _CONSENSUS = LabelPair("S1", 0.8, "S1", 0.9, has_real_evidence=True)

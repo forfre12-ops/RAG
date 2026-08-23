@@ -12,9 +12,9 @@ import time
 
 import pytest
 
-from lloydk.adapters.embedding import HashEmbedding
-from lloydk.adapters.vectorstore import InMemoryStore
-from lloydk.modules.m4_training.rag_indexer import (
+from koipa.adapters.embedding import HashEmbedding
+from koipa.adapters.vectorstore import InMemoryStore
+from koipa.modules.m4_training.rag_indexer import (
     IndexResult,
     RagIndexer,
     _safe_token,
@@ -153,7 +153,7 @@ class TestEsFlow:
         _purge_test_prefix("secrets-guides-hash-")
 
     def test_full_index_and_alias_swap(self):
-        from lloydk.adapters.vectorstore import build_store
+        from koipa.adapters.vectorstore import build_store
 
         store = build_store(backend="es")
         idx = RagIndexer(store=store, embedder=HashEmbedding(dim=1024))
@@ -192,7 +192,7 @@ class TestEsFlow:
 
     def test_second_version_replaces_alias(self):
         """v1 → v2 인덱싱 시 alias가 v2 인덱스로 스왑되는지."""
-        from lloydk.adapters.vectorstore import build_store
+        from koipa.adapters.vectorstore import build_store
 
         store = build_store(backend="es")
         idx = RagIndexer(store=store, embedder=HashEmbedding(dim=1024))
@@ -234,16 +234,16 @@ class TestGuideServiceBinding:
     pytestmark = pytest.mark.slow
 
     def setup_method(self):
-        from lloydk.services.guide_service import GuideService
+        from koipa.services.guide_service import GuideService
         # 각 테스트마다 fresh singleton + InMemory 인덱서
         GuideService.reset_singleton()
 
     def teardown_method(self):
-        from lloydk.services.guide_service import GuideService
+        from koipa.services.guide_service import GuideService
         GuideService.reset_singleton()
 
     def test_upload_uses_injected_indexer(self):
-        from lloydk.services.guide_service import GuideService
+        from koipa.services.guide_service import GuideService
         idx = RagIndexer(store=InMemoryStore(), embedder=HashEmbedding(dim=1024))
         svc = GuideService(indexer=idx)
         res = svc.upload(
@@ -257,7 +257,7 @@ class TestGuideServiceBinding:
         assert res.triggers_retraining is False
 
     def test_list_versions_after_upload(self):
-        from lloydk.services.guide_service import GuideService
+        from koipa.services.guide_service import GuideService
         idx = RagIndexer(store=InMemoryStore(), embedder=HashEmbedding(dim=1024))
         svc = GuideService(indexer=idx)
         for v in ("v1.0", "v1.1"):
@@ -272,7 +272,7 @@ class TestGuideServiceBinding:
         assert [v.version for v in vl.versions] == ["v1.0", "v1.1"]
 
     def test_decoding_handles_cp949(self):
-        from lloydk.services.guide_service import GuideService
+        from koipa.services.guide_service import GuideService
         idx = RagIndexer(store=InMemoryStore(), embedder=HashEmbedding(dim=1024))
         svc = GuideService(indexer=idx)
         # CP949로 인코딩된 한글 — 운영에서 종종 들어옴

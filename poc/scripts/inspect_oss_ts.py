@@ -1,5 +1,6 @@
 """PSH 결과 비교 파싱."""
-import json, sys
+import json
+import sys
 from pathlib import Path
 
 report_dir = sys.argv[1] if len(sys.argv) > 1 else "reports/psh_full_2026-06-01b"

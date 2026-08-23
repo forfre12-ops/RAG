@@ -22,7 +22,7 @@ PG 네이티브 아님"을 지적 → 본 스크립트로 **실 PG 연산자**�
   - retrieval_gold(발췌)는 1차 sanity(프록시와 대조)용 — gate 판정은 NL 쿼리로.
 
 usage:
-  VECTOR_BACKEND=pg DATABASE_URL=postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk \
+  VECTOR_BACKEND=pg DATABASE_URL=postgresql+psycopg://koipa:koipa_dev@localhost:5433/koipa \
     python scripts/revalidate_pg_lexical.py [--queries datasets/gold_real/retrieval_gold.jsonl] [--limit-corpus N]
 """
 from __future__ import annotations
@@ -33,7 +33,6 @@ import io
 import json
 import os
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
@@ -109,7 +108,7 @@ def main() -> int:
         print("ERROR: VECTOR_BACKEND=pg 로 설정하고 DATABASE_URL 을 :5433 PG 로 지정하세요.", file=sys.stderr)
         return 2
 
-    from lloydk.adapters.vectorstore import build_store  # noqa: PLC0415
+    from koipa.adapters.vectorstore import build_store  # noqa: PLC0415
     from sqlalchemy import text  # noqa: PLC0415
 
     store = build_store()

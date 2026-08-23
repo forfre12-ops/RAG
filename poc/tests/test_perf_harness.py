@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # #33: 인프라 비의존 순수함수 테스트 — fullstack 오마킹 제거(기본 pytest에서 수집·실행).
-from lloydk.perf.harness import AvailableResources, _detect_trained_model
-from lloydk.perf.kpis import KPIS, aggregate, kpi_by_id, passes
+from koipa.perf.harness import AvailableResources, _detect_trained_model
+from koipa.perf.kpis import KPIS, aggregate, kpi_by_id, passes
 
 
 class TestAggregate:
@@ -107,7 +107,7 @@ class TestAvailableResources:
         env.services.minio = "UNKNOWN"
         env.gpu = "N/A"
 
-        with patch("lloydk.perf.harness._detect_trained_model", return_value=False):
+        with patch("koipa.perf.harness._detect_trained_model", return_value=False):
             r = AvailableResources.from_env_snapshot(env, "noop")
         assert r.pg is True
         assert r.es is False
@@ -124,33 +124,33 @@ class TestAvailableResources:
         env.services.redis = "DOWN"
         env.services.minio = "DOWN"
         env.gpu = "N/A"
-        with patch("lloydk.perf.harness._detect_trained_model", return_value=False):
+        with patch("koipa.perf.harness._detect_trained_model", return_value=False):
             r = AvailableResources.from_env_snapshot(env, "anthropic")
         assert r.llm is True
 
 
 class TestDetectTrainedModel:
     def test_env_flag_force_true(self, monkeypatch):
-        monkeypatch.setenv("LLOYDK_TRAINED_MODEL", "true")
+        monkeypatch.setenv("KOIPA_TRAINED_MODEL", "true")
         assert _detect_trained_model() is True
 
     def test_env_flag_force_false(self, monkeypatch):
-        monkeypatch.setenv("LLOYDK_TRAINED_MODEL", "false")
+        monkeypatch.setenv("KOIPA_TRAINED_MODEL", "false")
         assert _detect_trained_model() is False
 
     def test_no_env_no_db_returns_false(self, monkeypatch):
         """DB 미가용 + env 미설정 → False (dryrun 환경 안전)."""
-        monkeypatch.delenv("LLOYDK_TRAINED_MODEL", raising=False)
+        monkeypatch.delenv("KOIPA_TRAINED_MODEL", raising=False)
         # session_scope import에서 예외 발생하도록 mock
         with patch(
-            "lloydk.db.session_scope",
+            "koipa.db.session_scope",
             side_effect=RuntimeError("db not available"),
         ):
             assert _detect_trained_model() is False
 
     def test_env_flag_yes_no(self, monkeypatch):
         for v, expected in [("1", True), ("0", False), ("yes", True), ("no", False)]:
-            monkeypatch.setenv("LLOYDK_TRAINED_MODEL", v)
+            monkeypatch.setenv("KOIPA_TRAINED_MODEL", v)
             assert _detect_trained_model() is expected, f"value={v!r}"
 
 

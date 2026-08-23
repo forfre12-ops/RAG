@@ -13,9 +13,9 @@ import pytest
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
-from lloydk.api.app import app
-from lloydk.api.rate_limit import limiter
-from lloydk.config import settings
+from koipa.api.app import app
+from koipa.api.rate_limit import limiter
+from koipa.config import settings
 
 
 HDR = {"X-API-Key": settings.api_key}
@@ -75,7 +75,7 @@ def test_rate_limit_exceeds_returns_429(enable_limiter):
         assert last_status == 429, f"expected 429 within 11 calls, last={last_status}"
         assert "retry-after" in {k.lower() for k in r.headers}
         body = r.json()
-        assert body["code"] == "LLOYDK_RATE_LIMIT"
+        assert body["code"] == "KOIPA_RATE_LIMIT"
         assert body["retry_after_sec"] >= 0
 
 

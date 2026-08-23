@@ -27,15 +27,15 @@ _TEST_API_KEY = "test-key-answer-hist"
 def client() -> TestClient:
     # 다른 테스트가 settings.api_key를 reload·monkeypatch로 갱신했을 수 있으므로
     # 본 픽스처에서 명시적으로 동기화 (격리 안전망).
-    from lloydk.api.app import app
-    from lloydk.config import settings
+    from koipa.api.app import app
+    from koipa.config import settings
     settings.api_key = _TEST_API_KEY
     return TestClient(app)
 
 
 def _stub_synthesize(query, hits, grade=None):
     """LLM 부재 환경에서 deterministic_fallback 응답 모사."""
-    from lloydk.schemas.rag_answer import RagAnswerResult, RagCitation
+    from koipa.schemas.rag_answer import RagAnswerResult, RagCitation
     return RagAnswerResult(
         answer="stub answer",
         citations=[RagCitation(source_doc="d1", chunk_id="c1", score=0.9, rank=1)],
@@ -47,7 +47,7 @@ def _stub_synthesize(query, hits, grade=None):
 
 def _phase_count(phase: str) -> float:
     """ANSWER_PHASE_DURATION의 phase 라벨별 누적 _count sample."""
-    from lloydk.api import prom_metrics
+    from koipa.api import prom_metrics
     for m in prom_metrics.ANSWER_PHASE_DURATION.collect():
         for s in m.samples:
             if s.name.endswith("_count") and s.labels.get("phase") == phase:
@@ -60,8 +60,8 @@ def test_answer_records_retrieve_and_synthesize_phases(client: TestClient) -> No
     retrieve_before = _phase_count("retrieve")
     synth_before = _phase_count("synthesize")
 
-    with patch("lloydk.api.answer.synthesize_answer", side_effect=_stub_synthesize), \
-         patch("lloydk.api.answer._fetch_hits", return_value=[]):
+    with patch("koipa.api.answer.synthesize_answer", side_effect=_stub_synthesize), \
+         patch("koipa.api.answer._fetch_hits", return_value=[]):
         resp = client.post(
             "/api/v1/answer",
             headers={"X-API-Key": _TEST_API_KEY},
@@ -75,24 +75,24 @@ def test_answer_records_retrieve_and_synthesize_phases(client: TestClient) -> No
 
 def test_answer_phase_metric_registered_in_registry() -> None:
     """ANSWER_PHASE_DURATION이 prom registry에 정상 등록됐는지."""
-    from lloydk.api import prom_metrics
+    from koipa.api import prom_metrics
     from prometheus_client import generate_latest
     text = generate_latest(prom_metrics.registry).decode()
-    assert "lloydk_answer_phase_duration_seconds" in text
+    assert "koipa_answer_phase_duration_seconds" in text
 
 
 def test_answer_logs_phase_breakdown(client: TestClient, caplog) -> None:
     """로그 라인에 retrieve_ms / synth_ms 둘 다 노출."""
     import logging
-    caplog.set_level(logging.INFO, logger="lloydk.api.answer")
+    caplog.set_level(logging.INFO, logger="koipa.api.answer")
 
-    with patch("lloydk.api.answer.synthesize_answer", side_effect=_stub_synthesize), \
-         patch("lloydk.api.answer._fetch_hits", return_value=[]):
+    with patch("koipa.api.answer.synthesize_answer", side_effect=_stub_synthesize), \
+         patch("koipa.api.answer._fetch_hits", return_value=[]):
         resp = client.post(
             "/api/v1/answer",
             headers={"X-API-Key": _TEST_API_KEY},
             json={"query": "phase log", "top_k": 3, "grade": "S3"},
         )
     assert resp.status_code == 200
-    msgs = [r.message for r in caplog.records if r.name == "lloydk.api.answer"]
+    msgs = [r.message for r in caplog.records if r.name == "koipa.api.answer"]
     assert any("retrieve_ms=" in m and "synth_ms=" in m for m in msgs), msgs

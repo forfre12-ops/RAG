@@ -24,7 +24,7 @@ _SRC = _HERE.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lloydk.modules.m2_preprocess import (  # noqa: E402
+from koipa.modules.m2_preprocess import (  # noqa: E402
     ExtractResult,
     PreprocessPipeline,
     extract,

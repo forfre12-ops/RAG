@@ -12,7 +12,7 @@ ts_rank≈87%, morph≈85%)와 대조. ±5pp 이내면 **ⓑ 확정**, 크게 �
 
 전제: stock Postgres 16 가동. usage:
   python scripts/revalidate_pg_tsrank_crux.py \
-    --db postgresql://lloydk:lloydk_dev@localhost:5432/lloydk \
+    --db postgresql://koipa:koipa_dev@localhost:5432/koipa \
     --queries datasets/gold_real/retrieval_gold_nl.jsonl
 (make revalidate-tsrank-crux 로도 실행)
 
@@ -26,7 +26,6 @@ import io
 import json
 import os
 import sys
-from collections import Counter
 from pathlib import Path
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
@@ -43,7 +42,7 @@ def san(s):
 
 
 def load_corpus(limit=None):
-    from lloydk.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
+    from koipa.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
     ids, bigrams, grades = [], [], []
     files = sorted(glob.glob(str(CORPUS_DIR / "*.json")))
     if limit:
@@ -73,14 +72,14 @@ def recall_by_grade(hits, q_gold, q_grade, k):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default=os.getenv("DATABASE_URL", "postgresql://lloydk:lloydk_dev@localhost:5432/lloydk"))
+    ap.add_argument("--db", default=os.getenv("DATABASE_URL", "postgresql://koipa:koipa_dev@localhost:5432/koipa"))
     ap.add_argument("--queries", default=str(ROOT / "datasets/gold_real/retrieval_gold_nl.jsonl"))
     ap.add_argument("--limit-corpus", type=int, default=None)
     cli = ap.parse_args()
     dsn = cli.db.replace("postgresql+psycopg://", "postgresql://")
 
     import psycopg  # noqa: PLC0415
-    from lloydk.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
+    from koipa.adapters.vectorstore.pg_store import PgVectorStore  # noqa: PLC0415
 
     ids, bigrams, grades = load_corpus(cli.limit_corpus)
     print(f"[corpus] {len(ids)} docs bigram-tokenized")
@@ -142,7 +141,7 @@ def main() -> int:
         if ov > best:
             best_name, best = name, ov
         print(f"  {name:16s} 전체={ov*100:>3.0f}%  " + "  ".join(f"{g}={by[g]*100:>3.0f}%" for g in GRADES))
-    print(f"\n[프록시 NL@5] bigram ts_rank(idf=1 근사)≈87% · morph≈85%")
+    print("\n[프록시 NL@5] bigram ts_rank(idf=1 근사)≈87% · morph≈85%")
     print(f"[실 PG 최선] {best_name} = {best*100:.0f}%   Δ(실−프록시)={best*100-87:+.0f}pp")
     print("[해석] PG 코어 ts_rank 는 IDF 부재 → 어떤 변형도 IDF 프록시를 못 따라감이 확인되면")
     print("       어휘 nori-동급엔 ⓒ(BM25 확장) 또는 앱사이드 BM25 필요. (dense 결합은 별도 측정)")

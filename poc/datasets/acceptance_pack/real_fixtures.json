@@ -1,0 +1,16 @@
+{
+  "note": "발주처 제공 실문서 픽스처(수기 드롭인). build_acceptance_pack.py 가 expected_labels.json 에 병합하며, docs/real-* 는 재생성 시 지우지 않는다. expected_numeric_tokens 는 파싱 무손실 검증용(실제 문서 내 숫자, 표 셀 포함). 실 .hwp(바이너리)/.hwpx 를 여기 등록하면 mock 아닌 실파일로 파서를 인수검증한다.",
+  "docs": [
+    {
+      "doc_id": "real-S3-ipo-ksensor",
+      "file": "docs/real-S3-ipo-ksensor.hwpx",
+      "format": "hwpx",
+      "expected_grade": "S3",
+      "source_kind": "public",
+      "legal_basis": "지식재산처 보도자료('K-센서' 산·관·학 MOU) — 공개 정보, 비공지성 상실 → S3",
+      "expected_numeric_tokens": ["2026"],
+      "_numeric_note": "실문서는 PII 마스킹이 전화번호 등 숫자를 정당하게 제거(파싱손실 아님)하므로, 파이프라인 통과 후 살아남는 비-PII 표 셀 숫자(연도 2026)만 무손실 기준으로 삼는다. 파서 실검증의 핵심은 파싱성공(rhwp 표 23셀)+severity floor.",
+      "has_table": true
+    }
+  ]
+}

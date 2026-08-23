@@ -12,13 +12,13 @@ import asyncio
 
 import pytest
 
-from lloydk.api import _jwt_auth
-from lloydk.api._jwt_auth import (
+from koipa.api import _jwt_auth
+from koipa.api._jwt_auth import (
     JWTClaims,
     _highest_role,
     _resolve_api_key_roles,
 )
-from lloydk.api._rbac import require_role
+from koipa.api._rbac import require_role
 
 
 class _FakeRequest:

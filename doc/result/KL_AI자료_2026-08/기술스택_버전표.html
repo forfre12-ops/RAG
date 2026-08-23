@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>기술스택 버전표 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#0a0a0a;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">전체 기술 스택 · 버전 · 라이선스</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">STACK</span></div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 2</div>
+    <h1>전체 기술 스택 · 버전 · 라이선스</h1>
+    <div class="meta">Python 3.11 · 폐쇄망(온프레미스) 배포 구성 · 2026-08-02 · <b>실제 설치·동봉된 구성요소만 기재</b></div>
+  </div>
+
+  <div class="note"><b>기재 기준 — 실측만.</b> 아래는 전부 <b>실제 설치·동봉되는 구성요소</b>입니다. 버전은 리포 잠금파일(<code>uv.lock</code>) 해석 결과, 이미지 태그는 배포 compose, 모델은 가중치 실물 존재 여부로 확인했습니다. <b>표에 없는 것은 설치되지 않습니다</b>(AGPL/GPL 등 제외 상세는 오픈소스 라이선스 검토서 참조). 폐쇄망 번들은 빌드 시점에 <code>python-deps/_requirements_freeze.txt</code>로 설치 버전이 재확정되며, 그것이 해당 납품본의 최종 정본입니다.</div>
+
+  <h2>1. 인프라 — 컨테이너 이미지</h2>
+  <table>
+    <thead><tr><th style="width:210px">구성요소</th><th style="width:150px">이미지 태그</th><th style="width:130px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><b>PostgreSQL + pgvector</b></td><td><code>pgvector/pgvector:pg16</code></td><td>PostgreSQL License</td><td>메타데이터·감사장부·모델버전 + <b>벡터검색(내장)</b></td></tr>
+      <tr><td>Redis</td><td><code>redis:7.2-alpine</code></td><td>BSD-3</td><td>캐시 · 작업 큐 브로커</td></tr>
+      <tr><td>nginx (mTLS)</td><td><code>nginx:1.27-alpine</code></td><td>BSD-2</td><td>mTLS 종료 — 인증서는 발주처/KL PKI</td></tr>
+      <tr><td>API 서버</td><td><code>koipa-api</code></td><td>자체</td><td>FastAPI 애플리케이션 (포트 8000)</td></tr>
+      <tr><td>워커 · 스케줄러</td><td><code>koipa-worker</code></td><td>자체</td><td>Celery worker + beat(야간 배치)</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:#71717a">※ 폐쇄망 배포 서비스는 위 구성요소가 전부입니다 — <code>docker-compose.airgap.yml</code> 기준 <b>서비스 6개</b>(<code>postgres</code>·<code>redis</code>·<code>api</code>·<code>worker</code>·<code>beat</code>·<code>nginx-mtls</code>)이며, 위 표는 <code>worker</code>와 <code>beat</code>가 <b>같은 <code>koipa-worker</code> 이미지</b>를 공유하므로 한 행으로 묶어 5행으로 표기했습니다(이미지 종류 5 · 실행 서비스 6). 이미지는 <code>docker load</code>로 복원하며 인터넷 접속이 필요 없습니다.</p>
+
+  <h2>2. 애플리케이션 — Python 패키지</h2>
+  <table>
+    <thead><tr><th style="width:210px">패키지</th><th style="width:110px">버전</th><th style="width:130px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td>FastAPI</td><td>0.139.0</td><td>MIT</td><td>API 프레임워크</td></tr>
+      <tr><td>Uvicorn · Gunicorn</td><td>0.50.0 · 26.0.0</td><td>BSD-3 · MIT</td><td>ASGI 서버 · 프로세스 매니저</td></tr>
+      <tr><td>Celery</td><td>5.6.3</td><td>BSD-3</td><td>비동기 작업 · 스케줄(beat)</td></tr>
+      <tr><td>SQLAlchemy · Alembic</td><td>2.0.51 · 1.18.5</td><td>MIT</td><td>ORM · DB 마이그레이션</td></tr>
+      <tr><td>psycopg 3 <span style="color:#71717a">(binary)</span></td><td>3.3.4</td><td>LGPL-3.0</td><td>PostgreSQL 드라이버 — 동적 링크·재배포 자유(고지 필요)</td></tr>
+      <tr><td>redis-py</td><td>6.4.0</td><td>MIT</td><td>Redis 클라이언트</td></tr>
+      <tr><td>Pydantic · pydantic-settings</td><td>2.13.4 · 2.14.2</td><td>MIT</td><td>스키마 검증 · 설정 로딩</td></tr>
+      <tr><td>httpx · python-multipart</td><td>0.28.1 · 0.0.32</td><td>BSD-3 · Apache-2.0</td><td>HTTP 클라이언트 · 업로드 처리</td></tr>
+      <tr><td>slowapi</td><td>0.1.10</td><td>MIT</td><td>API 호출량 제한(429 · Retry-After)</td></tr>
+      <tr><td>PyYAML</td><td>6.0.3</td><td>MIT</td><td>설정·시드 파일 파싱</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. 벡터 · 검색</h2>
+  <table>
+    <thead><tr><th style="width:210px">구성요소</th><th style="width:110px">버전</th><th style="width:130px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><b>pgvector</b> (dense)</td><td>PG16 확장</td><td>PostgreSQL License</td><td>의미 벡터 유사도 검색 — 벡터 차원 1024</td></tr>
+      <tr><td><b>bigram tsvector + ts_rank</b></td><td>PG 내장</td><td>PostgreSQL License</td><td>한국어 어휘 검색 랭커</td></tr>
+      <tr><td>RRF 하이브리드</td><td>자체 구현</td><td>—</td><td>dense + 어휘 융합. <b>별도 검색엔진 없이 DB 통합</b></td></tr>
+    </tbody>
+  </table>
+  
+
+  <h2>4. 모델 — 가중치 실물 기준</h2>
+  <table>
+    <thead><tr><th style="width:130px">구분</th><th style="width:250px">모델</th><th style="width:120px">라이선스</th><th>역할 · 확인</th></tr></thead>
+    <tbody>
+      <tr><td><b>분류기 (기반)</b></td><td>KF-DeBERTa <span style="color:#71717a">(kakaobank/kf-deberta-base, 110M)</span></td><td>MIT</td><td>한국어 사전학습 인코더 — 파인튜닝 기반</td></tr>
+      <tr><td><b>분류기 (배포본)</b></td><td>사내 파인튜닝 <code>v-fe4b386b</code> <span style="color:#71717a">(v5_clean)</span></td><td>자체</td><td><b>실제 서빙되는 모델.</b> DeBERTa-v2 4클래스(TS·S1·S2·S3) · 2026-07-29 게이트 3축 PASS로 승격</td></tr>
+      <tr><td><b>임베딩</b></td><td>KURE-v1 <span style="color:#71717a">(nlpai-lab/KURE-v1)</span></td><td>MIT</td><td>한국어 검색 임베딩(1024차원) — 폐쇄망 번들에 가중치 동봉, 오프라인 로드</td></tr>
+      <tr><td>ML 런타임</td><td>transformers 5.13.0 · torch 2.12.1 · sentence-transformers 5.6.0 · scikit-learn 1.9.0 · accelerate 1.14.0 · datasets 5.0.0</td><td>Apache-2.0 / BSD-3</td><td>학습(지재원 GPU) · 추론(운영 CPU)</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>등급 결정 경로에 LLM은 쓰이지 않습니다.</b> 분류는 위 분류기 + 룰 엔진으로만 결정되므로, 운영 서버에 LLM이 없어도 등급 분류 전 기능이 동작합니다. 로컬 LLM(Qwen3-14B)은 <b>합성문서 생성·서술형 질의응답 같은 부가 기능</b>에서만 쓰이며, <b>본 납품 번들에 가중치를 포함하지 않습니다</b> — GPU를 보유한 고객사가 vLLM/Ollama로 직접 기동한 엔드포인트를 <code>LLM_PROVIDER</code> 설정으로 연결하는 방식입니다(미연결 시 해당 부가 기능만 비활성).</div>
+
+  <h2>5. 문서 추출 — 배포 이미지에 설치되는 것</h2>
+  <table>
+    <thead><tr><th style="width:130px">포맷</th><th style="width:210px">라이브러리</th><th style="width:110px">버전</th><th style="width:100px">라이선스</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>PDF</td><td>pdfminer.six</td><td>20260107</td><td>MIT</td><td>기본 추출기</td></tr>
+      <tr><td>DOCX</td><td>python-docx</td><td>1.2.0</td><td>MIT</td><td>머리글·바닥글·표·글상자 포함</td></tr>
+      <tr><td>PPTX</td><td>python-pptx</td><td>1.0.2</td><td>MIT</td><td>슬라이드 본문·표</td></tr>
+      <tr><td>XLSX</td><td>openpyxl</td><td>3.1.5</td><td>MIT</td><td>병합셀 세로 전파</td></tr>
+      <tr><td>XLS (구형)</td><td>xlrd</td><td>2.0.2</td><td>BSD-3</td><td>extras <code>[xls]</code> — 배포 이미지 포함</td></tr>
+      <tr><td>HWP · HWPX</td><td>rhwp-python</td><td>0.8.0</td><td>MIT</td><td>본문 추출. extras <code>[hwp]</code> — 배포 이미지 포함</td></tr>
+      <tr><td>HWP 표 셀</td><td>unhwp</td><td>0.8.0</td><td>MIT</td><td>.hwp 표 셀 회수. extras <code>[hwp-tables]</code> — 배포 이미지 포함. .hwpx 표는 원본 XML에서 직접 복원</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12.5px;color:#71717a">※ 운영 이미지는 <code>[psh, otel, jwt, hwp, hwp-tables, xls]</code> extras로 빌드됩니다. 구형 .doc(Word 97-2003)은 시스템 <code>antiword</code> CLI에 의존하며 미설치 시 .docx 변환을 안내합니다.</p>
+
+  <h2>6. 보안 · 관측성</h2>
+  <table>
+    <thead><tr><th style="width:210px">구성요소</th><th style="width:110px">버전</th><th style="width:130px">라이선스</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td>bcrypt</td><td>5.0.0</td><td>Apache-2.0</td><td>API 키 해시</td></tr>
+      <tr><td>PyJWT</td><td>2.13.0</td><td>MIT</td><td>JWT 인증 — extras <code>[jwt]</code></td></tr>
+      <tr><td>cryptography</td><td>48.0.1</td><td>Apache-2.0 / BSD-3</td><td>저장 암호화(AES-256-GCM)</td></tr>
+      <tr><td>prometheus-client</td><td>0.25.0</td><td>Apache-2.0</td><td>메트릭 노출</td></tr>
+      <tr><td>OpenTelemetry SDK</td><td>1.43.0</td><td>Apache-2.0</td><td>분산 트레이싱 — extras <code>[otel]</code></td></tr>
+      <tr><td>matplotlib</td><td>3.11.0</td><td>PSF 계열(BSD 호환)</td><td>혼동행렬 PNG 렌더</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">한국지식재산보호원(AI 코어) · 기술스택 버전표 · 2026-08-02 · 버전 출처 = <code>uv.lock</code> 해석값 · 이미지 = 배포 compose · 모델 = 가중치 실물 확인. 납품 시점 최종 버전은 번들 <code>python-deps/_requirements_freeze.txt</code>로 확정</div>
+
+</div>
+</body>
+</html>

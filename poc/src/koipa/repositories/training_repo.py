@@ -1,0 +1,279 @@
+"""Training/Model 도메인 — TrainingRun · TrainingEpoch · TrainingDataset · ModelVersion."""
+
+from __future__ import annotations
+
+import datetime as dt
+import uuid
+from typing import Iterable
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from koipa.db.models import (
+    ModelVersion,
+    TrainingDataset,
+    TrainingEpoch,
+    TrainingRun,
+)
+
+
+class TrainingRepo:
+    def __init__(self, db: Session):
+        self.db = db
+
+    # ------------------------------------------------------------
+    # TrainingRun
+    # ------------------------------------------------------------
+
+    def create_run(
+        self,
+        *,
+        total_samples: int,
+        train_count: int | None = None,
+        val_count: int | None = None,
+        test_count: int | None = None,
+        hyperparameters: dict | None = None,
+        trigger_type: str = "manual",
+        trigger_ref: str | None = None,
+        created_by: str | None = None,
+    ) -> TrainingRun:
+        run = TrainingRun(
+            total_samples=total_samples,
+            train_count=train_count,
+            val_count=val_count,
+            test_count=test_count,
+            hyperparameters=hyperparameters or {},
+            trigger_type=trigger_type,
+            trigger_ref=trigger_ref,
+            created_by=created_by,
+        )
+        self.db.add(run)
+        self.db.flush()
+        return run
+
+    def mark_started(self, run_id: uuid.UUID) -> None:
+        run = self.db.get(TrainingRun, run_id)
+        if run is None:
+            return
+        run.status = "running"
+        run.started_at = dt.datetime.now(dt.timezone.utc)
+
+    def mark_completed(
+        self,
+        run_id: uuid.UUID,
+        *,
+        final_metrics: dict,
+        duration_sec: int | None = None,
+        model_version: uuid.UUID | None = None,
+    ) -> None:
+        """학습 완료 기록. **어느 모델이 나왔는지도 같이 남긴다.**
+
+        왜(실측 2026-08-16, KL 서버). 재학습이 처음으로 완주해 모델 v-24c7c02c 가 나왔고
+        tb_model_versions 에 정상 등록됐는데, `GET /train/jobs` 응답의 model_version 은
+        여전히 null 이었다. DB 를 열어 보니 연결이 **한 방향뿐**이었다.
+
+            tb_model_versions.training_run_id   기록됨   (모델 -> 학습작업)
+            tb_training_runs.model_version      비어 있음 (학습작업 -> 모델)
+
+        컬럼은 있는데(FK 로 tb_model_versions 참조) 아무도 채우지 않았다. 그래서 화면과
+        API 에서 "이 학습이 무슨 모델을 만들었는가" 를 볼 수 없었다. 데이터가 없는 게
+        아니라 반대편에서 뒤져야만 알 수 있는 상태였다.
+
+        model_version 이 None 이면 기존 값을 지우지 않는다 - 재호출로 연결이 끊기지 않게.
+        """
+        run = self.db.get(TrainingRun, run_id)
+        if run is None:
+            return
+        run.status = "completed"
+        run.completed_at = dt.datetime.now(dt.timezone.utc)
+        run.final_metrics = final_metrics
+        run.duration_sec = duration_sec
+        if model_version is not None:
+            run.model_version = model_version
+
+    def mark_failed(self, run_id: uuid.UUID, error_message: str, *,
+                    final_metrics: dict | None = None,
+                    duration_sec: int | None = None) -> None:
+        """학습 작업 실패 기록.
+
+        [2026-08-16] `final_metrics`·`duration_sec` 를 받는다. 학습 자체는 끝났는데 모델
+        등록이 실패한 경우가 있다 - 그때 상태는 failed 가 맞지만(등록된 모델이 없다),
+        **그동안 모은 것까지 버릴 이유는 없다.** 종전에는 이 경로가 metrics 를 안 써서
+        교정 반영 건수·deploy 실패 사유가 화면에서 사라졌다.
+
+        None 이면 기존 값을 지우지 않는다 - 재호출로 기록이 날아가지 않게.
+        """
+        run = self.db.get(TrainingRun, run_id)
+        if run is None:
+            return
+        run.status = "failed"
+        run.completed_at = dt.datetime.now(dt.timezone.utc)
+        run.error_message = error_message
+        if final_metrics is not None:
+            run.final_metrics = final_metrics
+        if duration_sec is not None:
+            run.duration_sec = duration_sec
+
+    def get_run(self, run_id: uuid.UUID) -> TrainingRun | None:
+        return self.db.get(TrainingRun, run_id)
+
+    def list_recent_runs(
+        self, *, limit: int = 20, offset: int = 0, status_filter: str | None = None
+    ) -> list[TrainingRun]:
+        stmt = select(TrainingRun)
+        if status_filter:
+            stmt = stmt.where(TrainingRun.status == status_filter)
+        return list(
+            self.db.execute(
+                stmt.order_by(TrainingRun.created_at.desc()).limit(limit).offset(offset)
+            ).scalars()
+        )
+
+    def count_runs(self, *, status_filter: str | None = None) -> int:
+        """페이지네이션 total — limit/offset과 무관한 전체 학습 작업 수."""
+        stmt = select(func.count()).select_from(TrainingRun)
+        if status_filter:
+            stmt = stmt.where(TrainingRun.status == status_filter)
+        return int(self.db.execute(stmt).scalar_one())
+
+    # ------------------------------------------------------------
+    # TrainingEpoch
+    # ------------------------------------------------------------
+
+    def log_epoch(
+        self,
+        run_id: uuid.UUID,
+        epoch: int,
+        *,
+        train_loss: float | None = None,
+        val_loss: float | None = None,
+        val_metrics: dict | None = None,
+        learning_rate: float | None = None,
+    ) -> TrainingEpoch:
+        ep = TrainingEpoch(
+            run_id=run_id,
+            epoch=epoch,
+            train_loss=train_loss,
+            val_loss=val_loss,
+            val_metrics=val_metrics or {},
+            learning_rate=learning_rate,
+        )
+        self.db.add(ep)
+        return ep
+
+    def epochs_for_run(self, run_id: uuid.UUID) -> list[TrainingEpoch]:
+        return list(
+            self.db.execute(
+                select(TrainingEpoch)
+                .where(TrainingEpoch.run_id == run_id)
+                .order_by(TrainingEpoch.epoch)
+            ).scalars()
+        )
+
+    # ------------------------------------------------------------
+    # TrainingDataset
+    # ------------------------------------------------------------
+
+    def register_dataset_rows(
+        self,
+        run_id: uuid.UUID,
+        rows: Iterable[tuple[uuid.UUID, str, int]],
+    ) -> int:
+        """rows: iterable of (doc_id, split_type, level_id)."""
+        count = 0
+        for doc_id, split_type, level_id in rows:
+            self.db.add(
+                TrainingDataset(
+                    run_id=run_id,
+                    doc_id=doc_id,
+                    split_type=split_type,
+                    level_id=level_id,
+                )
+            )
+            count += 1
+        return count
+
+    # ------------------------------------------------------------
+    # ModelVersion
+    # ------------------------------------------------------------
+
+    def register_model_version(
+        self,
+        *,
+        version_label: str,
+        base_model: str,
+        metrics: dict,
+        training_run_id: uuid.UUID | None = None,
+        mlflow_run_id: str | None = None,
+        model_uri: str | None = None,
+        level_snapshot: dict | None = None,
+    ) -> ModelVersion:
+        mv = ModelVersion(
+            version_label=version_label,
+            base_model=base_model,
+            metrics=metrics,
+            training_run_id=training_run_id,
+            mlflow_run_id=mlflow_run_id,
+            model_uri=model_uri,
+            level_snapshot=level_snapshot,
+            trained_at=dt.datetime.now(dt.timezone.utc),
+        )
+        self.db.add(mv)
+        self.db.flush()
+        return mv
+
+    def activate_model_version(self, version_id: uuid.UUID) -> None:
+        """이전 활성 모델을 비활성화하고, 지정된 버전을 활성화."""
+        now = dt.datetime.now(dt.timezone.utc)
+        # is_active=TRUE 부분 인덱스 위반 방지: 먼저 모든 활성 모델 비활성화
+        active_rows = (
+            self.db.execute(select(ModelVersion).where(ModelVersion.is_active.is_(True)))
+            .scalars()
+            .all()
+        )
+        for mv in active_rows:
+            mv.is_active = False
+            mv.deactivated_at = now
+        self.db.flush()  # UNIQUE WHERE is_active=TRUE 인덱스 충돌 방지
+        target = self.db.get(ModelVersion, version_id)
+        if target is not None:
+            target.is_active = True
+            target.activated_at = now
+
+    def get_active(self) -> ModelVersion | None:
+        return self.db.execute(
+            select(ModelVersion).where(ModelVersion.is_active.is_(True))
+        ).scalar_one_or_none()
+
+    def rollback_to_previous(self, *, reason: str) -> ModelVersion | None:
+        """현재 활성 모델을 비활성화하고 **직전에 활성이던 모델**로 복귀 (C-ver 롤백).
+
+        직전 활성 = deactivated_at이 가장 최근인(=가장 마지막에 내려간) 버전, 현재 활성 제외.
+        복귀 대상에 `rolled_back_from`(어느 버전에서 되돌렸는지)·`rollback_reason`을 기록한다.
+        복귀 후보가 없으면(이력 1개뿐) None 반환 — 호출부는 '롤백 불가'로 처리.
+
+        용도: 게이트 통과 모델이 운영에서 미탐 회귀를 보이거나 잘못 활성된 경우 직전으로 즉시 복귀.
+        """
+        current = self.get_active()
+        prev = self.db.execute(
+            select(ModelVersion)
+            .where(
+                ModelVersion.is_active.is_(False),
+                ModelVersion.deactivated_at.is_not(None),
+                *( [ModelVersion.version_id != current.version_id] if current else [] ),
+            )
+            .order_by(ModelVersion.deactivated_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if prev is None:
+            return None
+        # activate_model_version이 기존 활성 전부 비활성화 + prev 활성화를 원자적으로 처리.
+        self.activate_model_version(prev.version_id)
+        prev.rolled_back_from = current.version_id if current else None
+        prev.rollback_reason = reason
+        return prev
+
+    def get_by_label(self, version_label: str) -> ModelVersion | None:
+        return self.db.execute(
+            select(ModelVersion).where(ModelVersion.version_label == version_label)
+        ).scalar_one_or_none()

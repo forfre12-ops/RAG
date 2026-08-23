@@ -1,0 +1,14 @@
+{
+  "name": "koipa-console-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "관리자 콘솔 e2e 시나리오 — 실제 DOM 을 띄우고 사람이 누르는 순서대로 눌러 본다.",
+  "scripts": {
+    "test": "node run.mjs",
+    "list": "node run.mjs --list"
+  },
+  "dependencies": {
+    "jsdom": "^30.0.1"
+  }
+}

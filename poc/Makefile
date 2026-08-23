@@ -1,4 +1,4 @@
-# Lloydk PoC — make targets
+# Koipa PoC — make targets
 # 사용:
 #   make venv                 # 의존성 설치
 #   make poc-all              # PoC 5종 일괄 실행 (dryrun)
@@ -8,16 +8,18 @@
 PY ?= python
 VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
+# uv — 의존성 락(uv.lock, 해시핀·유니버설) 생성/검사. 미설치 시 `pip install uv`.
+UV ?= $(PY) -m uv
 
-.PHONY: help venv install env infra-up infra-down infra-verify api worker beat \
+.PHONY: help venv install env lock lock-check infra-up infra-down infra-verify api worker beat \
         revalidate-pg-up revalidate-pg-migrate revalidate-pg-bench revalidate-pg-down revalidate-tsrank-crux \
         p2 p2-full bundle-dry licenses licenses-check sbom-publish analyze-synth verify-all \
-        p3 p3-800 p4 p1 p5 poc-all clean clean-data reports \
+        p3 p3-800 p4 p1 p5 acceptance-pack acceptance-pack-deps acceptance-test pilot-scorecard pilot-verify poc-all clean clean-data reports test-lite-cov \
         perf-scenarios perf-scenarios-full perf-clean-run \
-        gold-set retrieval-gold check-data check-gold check-manifest human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-manifest \
+        gold-set retrieval-gold check-data check-gold check-leakage check-release-evidence check-parser-support openapi-consistency check-manifest metamorphic-report human-review-queue eval-gold eval-p2-gold p1-retrain-dataset p1-eval-v3 p1-boundary p2-full-gold operational-readiness release-gate release-gate-recalculate release-manifest \
         recover-llm-judge \
-        eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers \
-        test-lite test-slow test-fullstack test-model-download test-full
+        eval-synthetic eval-llm-gold eval-human-gold eval-all-tiers eval-trusted-ci \
+        test-lite test-slow test-fullstack test-kl-integration test-model-download test-full
 
 help:
 	@echo "Targets:"
@@ -69,6 +71,15 @@ venv:
 install:
 	pip install -e .[dev]
 
+# ── 의존성 락 (P1: 폐쇄망 번들 재현성·공급망 감사) ──────────────────────────
+# uv.lock = 해시핀·유니버설(py3.11+ 전 플랫폼) 락. pyproject 를 바꾸면 `make lock` 재생성.
+# CI 는 `make lock-check` 로 락이 pyproject 와 어긋나지 않았는지 강제(drift 시 fail).
+lock: ## uv.lock 재생성 (pyproject 변경 후 실행)
+	$(UV) lock
+
+lock-check: ## uv.lock 이 pyproject 와 일치하는지 검사 (CI용, drift 시 exit 1)
+	$(UV) lock --locked
+
 env:
 	@[ -f .env ] || cp .env.example .env
 
@@ -83,7 +94,7 @@ infra-verify:
 
 # ── ES→PG 단일화 재검증 (의사결정_대장 §03 게이트; infra/postgres/README.md) ──
 # 기본 dev 스택과 격리된 pgvector+pg_bigm PG(:5433). ES 스택 비건드림.
-REVALID_DB ?= postgresql+psycopg://lloydk:lloydk_dev@localhost:5433/lloydk
+REVALID_DB ?= postgresql+psycopg://koipa:koipa_dev@localhost:5433/koipa
 
 revalidate-pg-up:
 	docker compose -f docker-compose.pgvector.yml up -d --build
@@ -104,13 +115,13 @@ revalidate-tsrank-crux:
 	$(PY) scripts/revalidate_pg_tsrank_crux.py
 
 api:
-	uvicorn lloydk.api.app:app --reload --host 0.0.0.0 --port 8000
+	uvicorn koipa.api.app:app --reload --host 0.0.0.0 --port 8000
 
 worker:
-	celery -A lloydk.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
+	celery -A koipa.workers.celery_app worker -l info -Q classify,index,synthesis,learning,celery
 
 beat:
-	celery -A lloydk.workers.celery_app beat -l info
+	celery -A koipa.workers.celery_app beat -l info
 
 p4:
 	$(PY) scripts/build_p4_corpus.py
@@ -133,7 +144,7 @@ p2-full:
 
 bundle-dry:
 	$(PY) scripts/build_offline_bundle.py --version 1.0.0-rc1 --dry-run \
-	    --output dist/lloydk-airgap-bundle
+	    --output dist/koipa-airgap-bundle
 
 licenses:
 	$(PY) scripts/dump_licenses.py --output licenses/
@@ -190,19 +201,25 @@ calibrate: ## 학습된 모델의 val_logits 로 temperature.json 재산출 (CAL
 
 p1-boundary: ## Build focused P1 boundary report from the latest llm gold eval
 	$(PY) scripts/build_p1_boundary_report.py \
-	    --report reports/p1_v3_llm_gold_direct.json \
+	    --report reports/p1_release_holdout_direct.json \
 	    --out reports/p1_boundary_report.md
 
 # 운영 P1 평가 — 배포 모델(.env CLASSIFIER_MODEL_DIR과 일치해야 하며 readiness parity
 # 게이트가 검증)을 두 티어로 평가해 operational-readiness가 읽는 리포트를 생성(단일 진실원).
 # 법적근거 티어 = 신뢰 신호(게이트 판정), 전체 홀드아웃 = 노이즈 포함 보수적 하한.
-P1_MODEL ?= artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb
+# [2026-08-05] 기본값을 배포본(v5)으로 정정. 종전엔 v4(v-dd3abab9)를 가리켜, `make readiness` 를
+# 그냥 돌리면 **배포하지 않는 모델의 리포트**가 생성되고 그게 번들 release-gate 입력이 됐다
+# (실측: 번들은 v-fe4b386b 인데 readiness 는 v-dd3abab9 · 2026-07-06). 롤백 평가는 인자로 지정한다:
+#   make p1-eval P1_MODEL=artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9
+P1_MODEL ?= artifacts/classifier_p1_v5_clean/v-fe4b386b
+DEPLOYED_MODEL ?= $(or $(CLASSIFIER_MODEL_DIR),$(P1_MODEL))
 p1-eval: ## 배포 P1 모델을 gold 티어(법적근거+전체)로 평가 → readiness 입력 생성
 	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \
+	    --source-prior-cap S3 \
 	    --label-source-filter public_definitive,koipa_case_based,nkt_designated \
-	    --report reports/p1_step3_legal_direct.md
+	    --report reports/p1_release_legal_direct.md
 	$(PY) scripts/eval_p1_model_gold.py --model-dir $(P1_MODEL) --mode direct \
-	    --report reports/p1_step3_holdout_direct.md
+	    --report reports/p1_release_holdout_direct.md
 
 p1-eval-v3: ## [legacy] v3 모델 gold 티어 평가 — 운영 경로 아님(역사 비교용)
 	$(PY) scripts/eval_p1_model_gold.py \
@@ -222,10 +239,25 @@ check-data: ## 데이터 품질 검사 — synthetic split + synthetic masked ev
 	    --test  datasets/gold/classification_gold.jsonl
 
 check-leakage: ## holdout↔train 텍스트해시 누출 게이트 (exit 1 on FAIL; 데이터 위생)
+	# 커밋된 해시 매니페스트(train_subset.jsonl 은 gitignore=CI 부재)로 실제 누출검사 수행 +
+	# --strict-coverage 로 소스 부재 시 fake-green(무음 PASS) 대신 honest FAIL. 로컬은 원본 풀 fallback.
 	$(PY) scripts/check_data_quality.py \
+	    --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
 	    --train-pool datasets/gold_real/train_subset.jsonl \
-	    --holdout datasets/gold_real/holdout_eval.jsonl,datasets/gold_real/holdout_business.jsonl \
+	    --holdout datasets/gold_real/holdout_eval.clean.jsonl,datasets/gold_real/holdout_business.clean.jsonl \
+	    --strict-coverage \
 	    --report reports/leakage_report.json
+
+leakage-manifest: ## train 풀 → 누출 게이트용 텍스트해시 매니페스트(커밋 대상) 재생성
+	$(PY) scripts/build_leakage_manifest.py \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --out datasets/gold_real/train_subset.hashes.txt
+
+check-parser-support: ## Parser support matrix must match extractor routes and optional extras
+	$(PY) scripts/check_parser_support_matrix.py
+
+openapi-consistency: ## OpenAPI yaml must match active FastAPI router paths
+	$(PY) scripts/openapi_consistency.py --strict
 
 llm-judge-dry: ## LLM judge 비용 추정 (실제 호출 없음)
 	$(PY) scripts/make_llm_judge_gold.py --dry-run --n 200
@@ -236,11 +268,54 @@ llm-judge: ## LLM-as-judge gold set 생성 (ANTHROPIC_API_KEY 필요)
 llm-judge-local: ## LLM-as-judge (로컬 Qwen3/Ollama, 무료)
 	$(PY) scripts/make_llm_judge_gold.py --provider local_openai --n 300
 
+metamorphic-report: ## 후보 모델 대상 메타모픽 회귀 리포트 생성 → deploy_gate 경로에 물릴 JSON (로컬 Qwen/Ollama)
+	## MODEL_DIR=<후보 모델> 로 후보를 지정. 산출 reports/metamorphic_pairs.json 을
+	## KOIPA_DEPLOY_GATE_METAMORPHIC_REPORT_PATH 로 게이트에 연결(계약: 로더가 report 키 언랩).
+	$(PY) scripts/gen_metamorphic_pairs.py \
+	    --provider $(or $(PROVIDER),ollama) \
+	    --model-dir $(or $(MODEL_DIR),artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9) \
+	    --report reports/metamorphic_pairs.md
+
+# Release 메타모픽 게이트: 커밋된 패러프레이즈 픽스처를 배포 모델로 재분류(live LLM 불요·결정적) →
+# forward 미탐 회귀 OR 측정불가(표본<min_n) 시 fail-closed. deploy_gate 의 opt-in 가시적-skip 과 달리
+# "리포트 미생성=조용한 green"을 막는다(배포전 ④). 배포 프로파일(onprem-local: T=3.0·escalation)에서 실행.
+metamorphic-gate: ## Release 메타모픽 게이트 — 커밋 픽스처 재분류 → forward 회귀/측정불가 fail-closed (live LLM 불요)
+	# 배포 모델(DEPLOYED_MODEL = CLASSIFIER_MODEL_DIR→P1_MODEL)로 재분류해 adversarial-gate·
+	# readiness parity 와 동일 모델을 평가한다(다른 후보를 배포하며 v-dd3abab9 로 green 나는 구멍 차단).
+	$(PY) scripts/gen_metamorphic_pairs.py \
+	    --from-samples datasets/metamorphic/anchor_pairs.fixture.jsonl \
+	    --model-dir $(or $(MODEL_DIR),$(DEPLOYED_MODEL)) \
+	    --report reports/metamorphic_pairs.md
+	$(PY) scripts/check_metamorphic_gate.py --report reports/metamorphic_pairs.json
+
 check-gold: ## gold_real 강화 검사 — label_source 3층 분리 리포트 포함 (exit 1 on FAIL)
 	$(PY) scripts/check_data_quality.py \
 	    --train datasets/labeled_v2_balanced/train.jsonl \
 	    --gold  datasets/gold_real/classification_gold.jsonl \
+	    --gold-train-overlap-policy warn \
 	    --report reports/gold_real_quality_report.json
+
+check-release-evidence: ## Release eval evidence must be leakage-free and provenance-clean
+	# 누출/overlap 은 커밋된 해시 매니페스트로 CI에서 실제 수행(원본 train_subset 은 gitignore) +
+	# --strict-coverage 로 fake-green 차단. 원본 --train split 은 로컬에만 있으면 SKIP(비파괴).
+	$(PY) scripts/check_data_quality.py \
+	    --train datasets/gold_real/train_subset.jsonl \
+	    --test datasets/gold_real/nohuman_proxy/proxy_eval_nohuman.jsonl \
+	    --gold datasets/gold_real/nohuman_proxy/proxy_eval_nohuman.jsonl \
+	    --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --holdout datasets/gold_real/nohuman_proxy/proxy_eval_nohuman.jsonl \
+	    --strict-coverage \
+	    --report reports/nohuman_proxy_quality_report.json
+	$(PY) scripts/check_data_quality.py \
+	    --train datasets/gold_real/train_subset.jsonl \
+	    --test datasets/gold_real/holdout_eval.hardened.jsonl \
+	    --gold datasets/gold_real/holdout_eval.hardened.jsonl \
+	    --train-hash-manifest datasets/gold_real/train_subset.hashes.txt \
+	    --train-pool datasets/gold_real/train_subset.jsonl \
+	    --holdout datasets/gold_real/holdout_eval.hardened.jsonl \
+	    --strict-coverage \
+	    --report reports/hardened_holdout_quality_report.json
 
 check-manifest: ## dataset_v1.0.yaml count/lineage consistency
 	$(PY) scripts/check_dataset_manifest.py
@@ -295,6 +370,10 @@ tiers = [ \
  if (p := pathlib.Path(f)) and p.exists() and (d := json.loads(p.read_text(encoding=\"utf-8\"))) else print(f'  {label}: N/A (미실행)') \
  for label, f in tiers]"
 
+eval-trusted-ci: ## 정직 홀드아웃 평가 — legally_grounded tier + bootstrap CI (소표본 과대해석 차단)
+	## 배포 headline(FNR/F1)이 LLM심판 라벨 다수 위에 측정된 것을 티어별로 분리·CI로 노출.
+	$(PY) scripts/eval_trusted_ci.py
+
 active-learning: ## active learning 트리거 — corrections 현황 + 재학습 권고
 	$(PY) scripts/check_active_learning.py --threshold 30
 
@@ -306,11 +385,10 @@ recover-llm-judge: ## uncertain_cases → llm_judge_primary 회수 (S3→S2/S1 +
 	@$(MAKE) -s check-gold
 
 import-review: ## 검수 CSV/JSONL → corrections/ + gold_real + DB document_labels
-	@[ -n "$(INPUT)" ] || (echo "usage: make import-review INPUT=corrections.csv [TENANT=default]"; exit 1)
+	@[ -n "$(INPUT)" ] || (echo "usage: make import-review INPUT=corrections.csv"; exit 1)
 	$(PY) scripts/import_review_corrections.py $(INPUT) \
 	    --merge-gold \
-	    --write-db \
-	    --tenant-id $${TENANT:-default}
+	    --write-db
 	@$(MAKE) -s check-gold
 
 import-review-dry: ## 검수 import dry-run (파일/DB 수정 없음)
@@ -337,17 +415,31 @@ p2-full-gold: ## KURE-v1 + ES dense/hybrid full eval on retrieval_gold
 
 operational-readiness: ## Build combined P1/P2/data readiness report (reads existing eval JSONs)
 	$(PY) scripts/build_operational_readiness.py \
+	    --model-dir $(P1_MODEL) \
+	    --deployed-model $(DEPLOYED_MODEL) \
 	    --out reports/operational_readiness.md
 
 readiness: p1-eval operational-readiness ## 배포 모델 재평가 + readiness 빌드 (권장 진입점)
 
 adversarial-gate: ## 적대 회귀 게이트 — golden_100 위험 미탐(고비밀→S3) baseline 초과 시 FAIL
-	$(PY) scripts/eval_adversarial.py
+	$(PY) scripts/eval_adversarial.py --model-dir $(or $(MODEL_DIR),$(DEPLOYED_MODEL))
 
-release-gate: operational-readiness adversarial-gate ## Strict release gate; requires every readiness gate to PASS
+release-gate: operational-readiness adversarial-gate metamorphic-gate ## Strict release gate (GA); requires every readiness gate to PASS
 	$(PY) scripts/check_release_gate.py
 
-release-manifest: operational-readiness p1-boundary ## Hash release evidence artifacts
+# metamorphic-gate 는 pilot 에서도 prereq: forward 미탐 회귀(스타일 패러프레이즈에 고등급 강등)는
+# 데이터천장(BLOCKED, waive 가능)이 아니라 안전 회귀(FAIL)이므로 pilot 도 통과 못한다.
+release-gate-pilot: operational-readiness adversarial-gate metamorphic-gate ## Pilot release gate; blocks on FAIL (regression) but waives data-ceiling BLOCKED gates (human_review/parity) with an audited waiver
+	$(PY) scripts/check_release_gate.py --allow-conditional
+
+release-gate-recalculate: p1-eval p2-full-gold operational-readiness adversarial-gate metamorphic-gate ## Nightly/local strict gate with model + ES eval recomputed
+	$(PY) scripts/check_release_gate.py
+
+# 배포 경로 배선: 릴리스 산출물(매니페스트) 생성 전에 게이트를 강제한다. 하드 FAIL(진짜 회귀)은
+# 차단하고, CONDITIONALLY_READY(human_review 데이터천장·model parity 대기)는 감사된 파일럿 waiver로
+# 통과시킨다. GA용 strict 차단은 별도 `make release-gate`(--allow-conditional 없음).
+release-manifest: operational-readiness p1-boundary metamorphic-gate ## Hash release evidence artifacts (blocked by the pilot release gate on a hard FAIL)
+	$(PY) scripts/check_release_gate.py --allow-conditional
 	$(PY) scripts/build_release_manifest.py \
 	    --out reports/release_artifact_manifest.json
 
@@ -357,11 +449,43 @@ p1:
 test-lite: ## 빠른 테스트 suite (2분 이내 목표, CI 기본 — slow/fullstack/model_download 제외)
 	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow"
 
+test-lite-cov: ## test-lite + coverage 측정·리포트 (CI용 — 소프트, 하드 게이트 없음)
+	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow" \
+	    --cov=koipa --cov-report=term-missing:skip-covered --cov-report=xml
+
 test-slow: ## slow marker tests only
 	$(PY) -m pytest -q -m slow
 
+test-e2e-parse: ## 실문서 파싱→검수게이트→분류 E2E 회귀 (slow)
+	$(PY) -m pytest -q tests/test_e2e_parse_classify.py
+
+test-console-e2e: ## 관리자 콘솔 e2e 시나리오 (jsdom·node 필요 — 없으면 skip)
+	$(PY) -m pytest -q tests/test_e2e_console_scenarios.py tests/test_e2e_console_api_contract.py
+
+console-e2e-setup: ## 콘솔 e2e 하니스 의존성 설치 (한 번만)
+	cd tests/e2e_console && npm install
+
+# 서버가 파이썬으로 렌더해 내려 주는 화면(manage.html)을 하니스가 띄울 수 있게 파일로 뜬다.
+# pytest 는 매번 임시 폴더에 새로 뜨므로 이 명령은 `node run.mjs` 단독 실행용 편의본이다.
+console-e2e-snapshot: ## 서버 렌더 콘솔 화면을 다시 떠 둔다 (렌더러를 고쳤으면 실행)
+	PYTHONPATH=src $(PY) scripts/dump_console_html.py
+
+# 실서버 모드는 읽기 전용이 기본이다(상태를 바꾸는 시나리오·고장 주입은 자동 제외).
+# ⚠ API 키를 안 주면 콘솔 기본값(demo-secret-key)으로 전부 401 이 난다.
+#   예: KOIPA_E2E_API_KEY=$$(ssh -i ~/.ssh/kipai_testserver kopia@223.130.156.134 \
+#         'docker exec koipa-jjw-api-1 printenv API_KEY') \
+#       make console-e2e-live BASE=http://223.130.156.134:8000
+console-e2e-live: ## 실서버 상대 콘솔 e2e (BASE=... · KOIPA_E2E_API_KEY 필요 · 읽기 전용)
+	cd tests/e2e_console && node run.mjs --base $(BASE) $(ARGS)
+
+parse-probe: ## 실문서 파싱→게이트→분류 프로브 (예: make parse-probe ARGS="--gold")
+	PYTHONPATH=src $(PY) scripts/parse_probe.py $(ARGS)
+
 test-fullstack: ## fullstack marker tests only
 	$(PY) -m pytest -q -m fullstack
+
+test-kl-integration: ## KL 연동 계약(doc/19) + W3 라우터 + audit 통합 테스트 (slow·PG 필요)
+	$(PY) -m pytest -q tests/test_kl_integration.py tests/test_api_routers_w3.py tests/test_audit_middleware.py
 
 test-model-download: ## model_download marker tests only
 	$(PY) -m pytest -q -m model_download
@@ -371,6 +495,28 @@ test-full: ## 전체 테스트 suite (인프라 + GPU 필요)
 
 p5:
 	$(PY) scripts/p5_e2e_smoke.py --mode inproc
+
+# 고객 인수(acceptance) 샘플팩 — 상용 운영 포장. 전 포맷(TXT/PDF/DOCX/XLSX/XLS/PPTX/HWPX) × 등급,
+# 공개+합성 혼합. acceptance-pack=생성(dev, 커밋 대상; PDF/XLS 는 reportlab/xlwt 설치 시), acceptance-test=
+# in-proc 채점(severity floor veto: 파싱실패/숫자유실/고등급 미탐이면 exit 1; 정확도는 보고만).
+acceptance-pack-deps: ## 인수팩 PDF/XLS 렌더용 dev-only 의존성(reportlab/xlwt) 설치 — 런타임/번들 불요
+	$(PY) -m pip install -r scripts/requirements-docgen.txt
+acceptance-pack: ## 인수 샘플팩 생성 → datasets/acceptance_pack/ (PDF/XLS 포함하려면 make acceptance-pack-deps 선행)
+	$(PY) scripts/build_acceptance_pack.py
+acceptance-test: ## 인수 샘플팩 채점 (in-proc parse→classify→gate; severity floor veto) — 고객은 bundle 의 run_acceptance.sh
+# --require-model 필수. 없으면 가중치 미로드로 rule-fallback 이 돌아도 PASS 가 나온다
+# (실측 2026-08-14: 그 상태로 "운영 경로 통과" 라고 보고할 뻔했다). deploy_cloud.sh 는
+# 이미 이 플래그를 쓰는데 개발자용 진입점만 빠져 있었다.
+# 가중치 경로는 CLASSIFIER_MODEL_DIR 로 준다 — 예: artifacts/classifier_p1_v5_clean/v-fe4b386b
+	$(PY) scripts/run_acceptance.py --mode inproc --require-model
+soak: ## W2 소크: 코퍼스 반복 투입(영속 서빙)로 메모리 누수·고등급 veto·escalation 안정성 검증
+	$(PY) scripts/run_soak.py --cycles 50 --snapshot-every 10
+pilot-scorecard: ## Render pilot scorecard HTML from acceptance/readiness JSON artifacts
+	$(PY) scripts/render_pilot_scorecard.py
+pilot-verify: ## Run pilot acceptance/readiness, always render scorecard, then return final verdict
+	-$(PY) scripts/run_acceptance.py --mode inproc --require-model
+	-$(PY) scripts/build_operational_readiness.py --model-dir $(P1_MODEL) --deployed-model $(DEPLOYED_MODEL) --out reports/operational_readiness.md
+	$(PY) scripts/render_pilot_scorecard.py --fail-on-bad
 
 poc-all: p4 p3 p2 p1 p5
 	@echo "\nAll PoCs completed. See reports/"
@@ -409,18 +555,20 @@ incident-api-down:
 	@docker compose logs api --tail 200 || true
 	@docker compose restart api || true
 	@sleep 10
-	@curl -fsS http://localhost:8000/api/v1/health || echo "[FAIL] /health still down — escalate to AI팀"
+	@# 실제 엔드포인트는 /api/v1/healthz/live (프로세스 생존). 과거 /api/v1/health 는 존재하지
+	@# 않아 재기동 성공 시에도 항상 curl 실패→오탐 에스컬레이션이었다.
+	@curl -fsS http://localhost:8000/api/v1/healthz/live || echo "[FAIL] /healthz/live still down — escalate to AI팀"
 
 incident-queue-backlog:
 	@echo "[incident] Celery 큐 적체 1차 대응"
-	@celery -A lloydk.workers.celery_app inspect active || true
-	@celery -A lloydk.workers.celery_app inspect reserved || true
+	@celery -A koipa.workers.celery_app inspect active || true
+	@celery -A koipa.workers.celery_app inspect reserved || true
 	@echo "[hint] worker 스케일 아웃: docker compose up -d --scale worker=8"
 
 incident-drift:
 	@echo "[incident] 모델 드리프트 점검"
-	$(PY) -c "from lloydk.services.drift_monitor import compute_drift; print('drift_monitor 모듈 OK — 실 임베딩 표본 필요')"
+	$(PY) -c "from koipa.services.drift_monitor import compute_drift; print('drift_monitor 모듈 OK — 실 임베딩 표본 필요')"
 
 incident-audit-verify:
 	@echo "[incident] 감사 로그 hash chain 검증"
-	$(PY) -c "from lloydk.services.audit_chain import verify_chain; r = verify_chain(); print('verified', r.verified, 'broken', r.broken, 'first_break', r.first_break_audit_id)"
+	$(PY) -c "from koipa.services.audit_chain import verify_chain; r = verify_chain(); print('verified', r.verified, 'broken', r.broken, 'first_break', r.first_break_audit_id)"

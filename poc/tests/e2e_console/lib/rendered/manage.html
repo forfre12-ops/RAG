@@ -1,0 +1,259 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>한국지식재산보호원 | 골든셋 등록</title>
+<style>
+:root{--ink:#111111;--red:#e72d44;--paper:#fff;--soft:#f7f7f5;--line:#e1e1de;--mute:#8f9498;--green:#e8f7ef;--orange:#fff0dc}*{box-sizing:border-box}html{scroll-behavior:smooth}
+/* [2026-08-21] 본문 글꼴을 다섯 화면 한 벌로. 종전에는 이 두 곳만 Arial 계열이라
+   같은 한글 문서를 보는데 화면마다 글자 모양이 달랐다(관리자 콘솔·등급 시연은
+   Pretendard 계열). 시스템 폰트를 앞세우고 한글 폴백을 뒤에 둔다. */
+body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.45}
+.top{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 34px;gap:18px}
+.mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}
+.brand{font-size:17px;font-weight:900;letter-spacing:1px}
+.divider{height:23px;border-left:1px solid #cfcfcb}
+.product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1}
+.topmid{margin:auto;color:#777;font-size:14px}
+.revision{margin-left:14px;padding:7px 11px;border:1px solid var(--line);border-radius:6px;font:700 12px ui-monospace,monospace;color:#555}
+.dot{display:inline-block;width:10px;height:10px;background:#bf6c00;border-radius:50%;margin-right:8px;box-shadow:0 0 0 4px #fff4df}
+.workspace{font-size:11px;font-weight:800;color:#949494;letter-spacing:.5px}
+.frame{display:grid;grid-template-columns:326px minmax(0,1fr);min-height:calc(100vh - 84px)}
+.side{border-right:1px solid var(--line);padding:42px 28px;display:flex;flex-direction:column}
+.main{padding:68px min(6.5vw,110px) 90px;max-width:1500px}
+.cap{font:800 12px ui-monospace,monospace;letter-spacing:.7px;color:#969da3}
+.eyebrow{font:800 12px ui-monospace,monospace;letter-spacing:.8px;color:#8a9298}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:35px;padding-bottom:56px;border-bottom:1px solid var(--line)}
+.gate{border:1px solid var(--line);border-left:5px solid var(--red);align-self:center;padding:25px 24px;min-height:218px}
+.gate .glabel{font:12px ui-monospace,monospace;color:#8a949a}
+.gate .status{display:inline-block;border-radius:20px;background:var(--green);color:#087341;padding:5px 10px;font-size:11px;font-weight:800}
+.actions{display:flex;gap:9px;margin-top:20px}
+.section{margin-top:76px}
+.sectionTop{display:flex;align-items:end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding-bottom:23px}
+.secNum{display:inline-block;border:1px solid #dadad7;padding:5px 8px;border-radius:4px;color:#92999f;font:12px ui-monospace,monospace;margin-right:13px;vertical-align:8px}
+.list{width:100%}
+.rowhead{padding:13px 12px;background:#f7f7f5;color:#899199;font:11px ui-monospace,monospace}
+.btn{border:1px solid #d8d8d5;background:#fff;padding:11px 14px;font-weight:800;font-size:13px;cursor:pointer}
+.btn.black{background:#111;color:#fff;border-color:#111}
+/* [2026-08-21] `.btn` 한 이름이 화면마다 정반대를 뜻했다 —
+   여기(골든 2면)는 흰 테두리=보조인데 admin.html:75·styles.css:423 은 검정 채움=주요다.
+   그래서 이 두 화면만 주요동작을 `btn black` 으로 따로 써 왔다.
+   다수 규약(주요=검정)에 맞추되 **CSS 기본값은 뒤집지 않는다** — 이 파일의
+   `class="btn"` 5개가 한꺼번에 검정이 되어 버린다. 대신 보조동작 별칭을 추가해
+   세 화면이 같은 이름을 쓸 수 있게 한다: 주요=`btn black`, 보조=`btn sec`/`btn ghost`. */
+.btn.sec,.btn.ghost{background:#fff;color:#111;border-color:#d8d8d5}
+.btn.primary{background:#111;color:#fff;border-color:#111}
+.btn:focus-visible{outline:2px solid #0070f3;outline-offset:2px}
+.viewbar .btn.sm{padding:6px 11px;font-size:12px}
+.summary{margin-top:40px;border-top:3px solid #111;background:#fafaf8;display:grid;grid-template-columns:1.18fr repeat(4,1fr)}
+.summaryIntro,.metric{padding:29px;border-right:1px solid var(--line);min-height:154px}
+.metric:last-child{border-right:0}
+.metric .mcap{font-size:12px;color:#8a9299}
+.flash{min-height:20px;color:#087341;font-size:13px;margin:14px 0}
+.flash.error{color:#bf2337}
+.empty{padding:45px 14px;color:#8a9299}
+.pill{display:inline-block;border-radius:18px;padding:5px 9px;font-size:11px;font-weight:800}
+.workspace b{margin-left:10px;color:#222;font-size:12px;border:1px solid #d9d9d6;padding:9px 14px;border-radius:6px}.workname{margin-top:18px;font-size:22px;font-weight:850;letter-spacing:-.7px}.workdesc{margin-top:11px;color:#6b737b;font-size:14px;max-width:230px}.branch{margin-top:22px;color:#969da3;font:12px ui-monospace,monospace}.nav{margin-top:36px;border-top:1px solid var(--line);padding-top:26px}.nav a{display:flex;text-decoration:none;color:#68717a;gap:20px;padding:13px 14px;margin:2px -14px;font-size:16px}.nav a span{font:12px ui-monospace,monospace;color:#9aa1a6;padding-top:3px}.nav a.active{background:linear-gradient(90deg,#fafaf8 0%,#fff 100%);color:#161616;font-weight:800;border-left:3px solid #161616;padding-left:11px}.ledger{margin-top:auto;border-top:1px solid var(--line);padding-top:24px;font-size:12px;color:#8c949a}.ledger b{display:block;color:#50575d;margin:8px 0}.hero h1{font-size:clamp(41px,5.1vw,76px);line-height:1.06;letter-spacing:-4px;margin:22px 0 20px;font-weight:850}.hero h1 em{font-style:normal;color:var(--red)}.hero p{color:#667079;font-size:17px;max-width:720px;margin:0}.flow{display:flex;gap:10px;align-items:center;margin-top:28px;color:#7c858c;font:12px ui-monospace,monospace}.flow i{color:var(--red);font-style:normal;font-size:20px}.flow span{border:1px solid var(--line);padding:8px 11px;background:#fff}.gate strong{font:800 43px ui-monospace,monospace;letter-spacing:-2px;color:var(--red);display:block;margin:26px 0 8px}.gate p{font-size:13px;color:#879097}.btn.red{background:var(--red);border-color:var(--red);color:#fff}.summaryIntro h2{margin:12px 0 5px;font-size:25px;letter-spacing:-1px}.summaryIntro p{margin:0;color:#68727a;font-size:13px}.metric b{font:800 40px ui-monospace,monospace;letter-spacing:-2px;display:block;margin:12px 0 2px}.metric small{color:#8a9299}.section h2{display:inline;font-size:42px;letter-spacing:-2px;margin:0}.sectionTop p{color:#727c84;margin:10px 0 0 48px;font-size:15px}.filters{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.filters input,.filters select{border:1px solid var(--line);background:#fff;padding:10px;font-size:12px;min-width:110px}.filters input{width:170px}.rowhead,.candidate{display:grid;grid-template-columns:110px minmax(180px,1.2fr) minmax(160px,1.4fr) 130px 86px;gap:16px;align-items:center}.candidate{width:100%;border:0;border-bottom:1px solid #e8e8e5;background:#fff;padding:18px 12px;text-align:left;cursor:pointer;color:inherit}.candidate:hover,.candidate.selected{background:#fff8f8}.candidate.selected{box-shadow:inset 3px 0 0 var(--red)}.docid{font:12px ui-monospace,monospace;color:#929aa1}.doctitle{font-size:17px;font-weight:850;letter-spacing:-.5px}.docsub{font-size:12px;color:#778088;margin-top:3px}.grade{font:700 15px ui-monospace,monospace}.origin{font-size:12px;color:#737b82}.pill.proposed,.pill.review{background:#eef1f4;color:#56616b}.pill.fixed{background:var(--green);color:#087341}.pill.defer{background:var(--orange);color:#b25c00}.pill.discard{background:#ffe8ea;color:#c72c40}.chars{text-align:right;color:#7f878d;font:12px ui-monospace,monospace}.detail{margin-top:38px;display:none;border-top:3px solid #111}.detail.show{display:grid;grid-template-columns:minmax(0,1fr) 315px}.detailMain{padding:31px 34px 38px;border-right:1px solid var(--line)}.detailMain h3{font-size:27px;margin:10px 0 5px;letter-spacing:-1px}.metas{display:flex;gap:7px;flex-wrap:wrap;margin:15px 0}.metas span{font:11px ui-monospace,monospace;background:#f5f5f3;border:1px solid #e8e8e5;padding:5px 7px;color:#656d74}.scope{border-left:3px solid var(--red);padding:9px 12px;color:#69727a;background:#fcfcfa;font-size:13px}
+.viewbar{display:flex;align-items:center;gap:7px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+
+.viewbar .btn.on{background:#111;color:#fff;border-color:#111}
+.viewnote{margin-left:auto;font-size:11.5px;color:#8a9299}
+.docbody{white-space:pre-wrap;word-break:break-word;max-height:410px;overflow:auto;padding:20px 0 0;font-size:14px;color:#333}
+.docbody.md{white-space:normal;line-height:1.62}
+.docbody.md h1,.docbody.md h2,.docbody.md h3{letter-spacing:-.5px;margin:22px 0 8px;line-height:1.3}
+.docbody.md h1{font-size:22px;border-bottom:2px solid #111;padding-bottom:6px}
+.docbody.md h2{font-size:18px;border-bottom:1px solid var(--line);padding-bottom:5px}
+.docbody.md h3{font-size:15px;color:#3c454c}
+.docbody.md p{margin:9px 0}
+.docbody.md ul,.docbody.md ol{margin:9px 0;padding-left:22px}
+.docbody.md li{margin:3px 0}
+.docbody.md table{border-collapse:collapse;margin:12px 0;font-size:13px;width:100%}
+.docbody.md th,.docbody.md td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+.docbody.md th{background:#f6f6f4;font-weight:800}
+.docbody.md code{background:#f4f4f2;border:1px solid #e6e6e3;padding:1px 4px;font:12.5px ui-monospace,monospace}
+.docbody.md hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.docbody.md strong{font-weight:800;color:#111}
+.docbody.md .lbl{display:inline-block;color:#1b4ea8;font-weight:800;margin-right:5px}.sideDetail{background:#fafaf8;padding:25px}.sideDetail h4{font:800 12px ui-monospace,monospace;color:#8b949b;margin:0 0 14px}.action label{display:block;font-size:12px;color:#6b7378;margin:12px 0 4px}.action select,.action textarea{width:100%;border:1px solid var(--line);padding:9px;background:#fff}.action textarea{height:95px;resize:vertical}.history{border-top:1px solid var(--line);margin-top:24px;padding-top:18px}.event{border-left:3px solid var(--red);padding:4px 0 4px 10px;margin:10px 0;font-size:12px}.event .when{color:#8b949b;margin-top:3px}.modal{position:fixed;inset:0;background:#111b;display:none;align-items:center;justify-content:center;padding:20px;z-index:200}.modal.show{display:flex}.dialog{background:#fff;border:1px solid #ddd;max-width:540px;width:100%;padding:28px;box-shadow:10px 10px 0 #111}.dialog h3{font-size:25px;margin:0 0 8px}.drop{border:1px dashed #aab0b3;padding:24px;margin:20px 0;background:#fafaf8}.drop input{width:100%}.dialogActions{display:flex;justify-content:flex-end;gap:8px}
+@media(max-width:1050px){.frame{grid-template-columns:1fr}.side{display:none}.main{padding:45px 30px}.hero{grid-template-columns:1fr}.summary{grid-template-columns:repeat(3,1fr)}.summaryIntro{grid-column:1/-1}}
+@media(max-width:700px){.top{padding:0 16px}.topmid,.workspace{display:none}.main{padding:35px 18px}.hero h1{letter-spacing:-2.5px}.summary{grid-template-columns:repeat(2,1fr)}.rowhead{display:none}.section h2{font-size:31px}.sectionTop{align-items:start;flex-direction:column}.sectionTop p{margin-left:0}.filters{width:100%}.filters input{width:100%}}
+@media(max-width:1050px){.detail.show{grid-template-columns:1fr}.detailMain{border-right:0}.sideDetail{border-top:1px solid var(--line)}}@media(max-width:700px){.candidate{grid-template-columns:1fr 70px}.candidate .origin,.candidate .chars{display:none}}
+.drop.over{border-color:#111;background:#f4f4f2}
+.rule{border-top:1px solid #eceae7;padding:10px 0}.rule b{display:block;margin-bottom:4px;font-size:12.5px}.rule span{color:#70757a;font-size:12px;line-height:1.5}.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider,.top .nav-link{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}</style></head><body><header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">골든셋 등록</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">검증문서 검수 목록</a><span class="cnav-link is-current" aria-current="page">검증문서 후보 관리</span><a class="cnav-link" href="/console/admin.html">관리자 콘솔</a><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a><a class="cnav-link" href="/api/v1/golden/candidates/login.html">로그인</a></div><span class="spacer"></span><div class="topmid"><span class="dot"></span>등급 미확정 <span id="topCount">–</span>건 <span class="revision">GOLDEN-v1</span></div><div class="workspace">WORKSPACE <b>지식재산보호원 AI 영업비밀</b></div></header><div class="frame"><aside class="side"><div class="cap">CURRENT WORKSPACE</div><div class="workname">koipa-ai</div><div class="workdesc">Koipa AI Engine for KOIPA Trade-Secret System (PoC)</div><div class="branch">goldset/console-review</div><nav class="nav"><a href="#overview" class="active"><span>01</span>개요</a><a href="#candidates"><span>02</span>골든셋 후보</a><a href="#detail"><span>03</span>문서 상세·결정</a><a href="#ledgerAll"><span>04</span>보류·폐기 이력</a><a href="#quality"><span>05</span>품질 지표</a></nav><div class="ledger"><div class="cap">SNAPSHOT LEDGER</div><b id="session">포털 로그인 확인 중</b><div>origin · audit · decision</div></div></aside><main class="main"><section id="overview" class="hero"><div><div class="eyebrow">GOLDEN SET REVIEW CONSOLE</div><h1>검수 가능한<br><em>골든셋</em>을 관리합니다.</h1><p>합성 후보와 실문서를 한 곳에서 검수하고, 등급 확정·보류·폐기를 누가 왜 그렇게 정했는지와 함께 남깁니다. 기록은 덮어쓰지 않고 계속 쌓입니다.</p><div class="flow"><span>문서 수집</span><i>→</i><span>후보·검토</span><i>→</i><span>등급 확정</span><i>→</i><span>이력 보존</span></div></div><aside class="gate"><div class="glabel">등급 확정 진행</div><strong id="readiness">–</strong><div id="readinessNote" style="font-size:11.5px;color:#8d949b;margin:2px 0 6px"></div><p>확정된 후보 수 / 전체 후보 수입니다. 여기서 확정해도 <b>평가 정답지로 승격되지는 않습니다</b> — 승격은 사람 서명을 거치는 별도 절차입니다.</p><span class="status">● 후보 단계</span><div class="actions"><button class="btn black" id="openUpload">문서 업로드</button><button class="btn" id="refresh">새로고침</button></div></aside></section><section class="summary" id="kpis"><div class="summaryIntro"><div class="cap">현황 요약</div><h2>골든셋 현황</h2><p>현재 워크스페이스의 검수 상태와 등급 분포입니다.</p></div></section><div id="flash" class="flash" role="status" aria-live="polite"></div><section id="candidates" class="section"><div class="sectionTop"><div><span class="secNum">02</span><h2>골든셋 후보</h2><p>문서를 선택하면 전문과 등급 결정 이력이 열립니다.</p></div><div class="filters"><select id="review_batch" aria-label="검수 배치" title="검수 전달본 단위로 목록을 좁힙니다. 비우면 전체 후보가 보입니다. 목록에 뜨는 배치는 이 서버 원장에 실제로 있는 것뿐입니다(응답의 available_batches)."><option value="">전체 배치</option></select><input id="query" placeholder="문서 ID 또는 제목" aria-label="문서 ID 또는 제목 검색"><select id="status"><option value="">전체 상태</option><option value="proposed">제안</option><option value="under_review">검토중</option><option value="approved_proxy">Proxy 확정</option><option value="grade_fixed_unlocked">등급 확정</option><option value="deferred">보류</option><option value="discarded">폐기</option><option value="out_of_scope">검수 대상 아님</option></select><select id="grade"><option value="">전체 등급</option><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select><select id="origin"><option value="">전체 출처</option><option value="synthetic">합성 후보</option><option value="public_real">공개 실문서</option><option value="organization_real">조직 보유 실문서</option></select><button id="filter" class="btn">필터</button></div></div><div class="list"><div class="rowhead"><div>DOCUMENT ID</div><div>DOCUMENT</div><div>GRADE / ORIGIN</div><div>STATUS</div><div>SIZE</div></div><div id="rows"><div class="empty">문서 목록을 불러오는 중입니다.</div></div></div></section><section id="detail" class="detail"><div class="detailMain"><div class="eyebrow">DOCUMENT EVIDENCE</div><h3 id="detailTitle">문서 상세</h3><div id="metas" class="metas"></div><div id="scope" class="scope"></div><div class="viewbar"><button class="btn sm" id="viewRendered" aria-pressed="true">읽기 좋게</button><button class="btn sm" id="viewRaw" aria-pressed="false">원문 그대로</button><span class="viewnote">검수 판단은 원문 기준입니다. 읽기 좋게 보기는 서식만 입힌 같은 내용입니다.</span></div><div id="documentRendered" class="docbody md"></div><pre id="document" class="docbody" style="display:none"></pre></div><aside class="sideDetail"><h4>등급 결정</h4><div class="action"><label>결정</label><select id="action"></select><div id="gradeWrap"><label>확정 등급</label><select id="finalGrade"><option>TS</option><option>S1</option><option>S2</option><option>S3</option></select></div><div id="mgmtWrap" style="margin-top:12px;border-top:1px dashed #dededb;padding-top:12px"><h4 style="margin:0 0 6px">비밀관리성 (M)</h4><p style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px">이 두 가지는 <b>본문에 적혀 있지 않습니다.</b> 문서에 찍힌 표기는 원문에서 확인하고, 접근범위는 아는 경우에만 고르십시오. <b>모르면 「확인 안 됨」으로 두십시오</b> — 추측해서 고르면 등급이 바뀝니다.</p><label>보안표시 — 문서에 찍힌 표기</label><select id="secMarking"><option value="">확인 안 됨</option><option value="none">표기 없음</option><option value="confidential">대외비</option><option value="secret">기밀 · 1급 비밀</option><option value="top_secret">극비 · 특급기밀</option></select><label>접근범위 — 누가 열람할 수 있나</label><select id="accScope"><option value="">확인 안 됨</option><option value="approved_only">승인된 자에 한해 공개</option><option value="designated">지정된 접근자만 (NDA·열람 제한)</option><option value="department">특정 부서 · 임직원 일부</option><option value="all_employees">전 임직원 열람 가능</option></select><div id="mgmtState" style="font-size:11.5px;line-height:1.5;margin-top:8px"></div></div><label>사유 / 메모</label><textarea id="reason" placeholder="등급 지정·보류·폐기에는 사유가 필요합니다."></textarea><button id="save" class="btn black" style="width:100%;margin-top:12px">결정 저장</button></div><div id="provBox" class="action" style="display:none;margin-top:18px;border-top:1px solid #dededb;padding-top:16px"><h4 style="margin:0 0 8px">출처 기록 <span id="provStatus" style="font-weight:400;color:#70757a;font-size:12.5px"></span></h4><p style="font-size:12px;color:#70757a;line-height:1.5;margin:0 0 10px">실문서는 원천 위치와 사용 권한 근거가 둘 다 있어야 기록으로 칩니다. 등급·상태는 바뀌지 않습니다.</p><label>원천 위치 / 식별 정보</label><input id="provSrc" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL"><label>사용 권한 또는 공개 근거</label><input id="provBasis" placeholder="예: 소유부서 검수용 사용 승인 / 공개 라이선스"><label>메모(선택)</label><input id="provReason" placeholder="사후 기록 사유"><div id="provOrigin" style="font-size:11.5px;color:#8d949b;margin-top:6px"></div><button id="provSave" class="btn" style="width:100%;margin-top:10px">출처 저장</button></div><div class="history"><h4>결정 이력</h4><div id="history" class="empty">결정 이력이 없습니다.</div></div></aside></section><section id="ledgerAll" class="section"><div class="sectionTop"><div><span class="secNum">04</span><h2>보류 · 폐기 이력</h2><p>문서를 열지 않고 전체 결정 기록을 최신순으로 봅니다. 기록은 덧붙이기만 하며 지워지지 않습니다.</p></div><div class="filters"><select id="ledgerFilter"><option value="">전체 결정</option><option value="defer">보류</option><option value="discard">폐기</option><option value="exclude">검수 대상 아님</option><option value="change">등급 변경</option><option value="approve">승인</option><option value="reopen">재검토</option></select><button id="ledgerReload" class="btn">불러오기</button></div></div><div class="list"><div class="rowhead" style="grid-template-columns:150px 110px 120px minmax(180px,1.6fr) 150px"><div>DOCUMENT ID</div><div>ACTION</div><div>GRADE</div><div>REASON</div><div>WHO / WHEN</div></div><div id="ledgerRows"><div class="empty">결정 기록이 없습니다.</div></div></div></section><section id="quality" class="section"><div class="sectionTop"><div><span class="secNum">05</span><h2>품질 지표</h2><p>등급을 맞히는 데 본문 말고 다른 단서가 섞였는지 봅니다. 여기가 나쁘면 이 골든셋으로 잰 정확도는 부풀려집니다.</p></div></div><div id="qualityBody"><div class="empty">지표를 불러오는 중입니다.</div></div></section></main></div><div id="modal" class="modal"><section class="dialog"><div class="eyebrow">문서 등록</div><h3>문서 업로드</h3><p>업로드 문서는 검토 대기 상태로만 저장됩니다. 자동 골든 승격이나 외부 LLM 전송은 하지 않습니다.</p><div class="drop" id="drop"><input id="file" type="file" accept=".txt,.md,.csv,.pdf,.doc,.docx,.hwp,.hwpx,.xlsx,.xls,.pptx"><p><b id="dropName">여기로 파일을 끌어다 놓거나 위에서 선택하세요</b><br>TXT · PDF · Word · HWP/HWPX · Excel · PPTX<br><span style="color:#8a9299">스캔 이미지는 지원하지 않습니다 — 본문 텍스트가 있는 파일만 등록됩니다.</span></p></div><div class="action"><label>문서 출처</label><select id="upOrigin"><option value="organization_real">조직 보유 실문서 — S2/S3</option><option value="public_real">공개 실문서 — S3 우선</option></select><label>원천 위치 / 식별 정보 <span style="color:#8a9299;font-weight:400">(선택)</span></label><input id="upSource" placeholder="예: 품질관리/운영절차/2026 또는 공개기관 URL" style="width:100%;border:1px solid var(--line);padding:9px"><label>사용 권한 또는 공개 근거 <span style="color:#8a9299;font-weight:400">(선택)</span></label><select id="upBasisSel"><option value="">선택하세요</option><option value="소유부서 검수용 사용 승인">소유부서 검수용 사용 승인</option><option value="기관 공개자료(공개 라이선스)">기관 공개자료(공개 라이선스)</option><option value="공공누리 등 공공저작물 이용허락">공공누리 등 공공저작물 이용허락</option><option value="사내 교육·배포용 승인">사내 교육·배포용 승인</option><option value="__custom__">직접 입력…</option></select><input id="upBasis" placeholder="근거를 직접 적으십시오" style="width:100%;border:1px solid var(--line);padding:9px;display:none;margin-top:6px"><p style="font-size:12px;color:#8a9299;margin:10px 0 0">지금 몰라도 등록됩니다 — 문서 상세의 「출처 기록」에서 나중에 채울 수 있습니다. 다만 <b>둘 다 채우기 전에는 등급을 확정할 수 없습니다</b>(보류·폐기는 됩니다). 고객사 원문·반출 승인이 없는 문서는 등록하지 마십시오.</p></div><div class="rules" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px"><div class="eyebrow" style="margin-bottom:8px">등록 기준 · 등록 기준</div><div class="rule"><b>S3 · 공개·일반</b><span>공식 공지, 공개 매뉴얼, 일반 안내. 기관·버전·공개 위치를 기록합니다.</span></div><div class="rule"><b>S2 · 조직 내부</b><span>운영 절차, 품질 이력, 교육 자료, 변경·장애 후속조치 등. 소유부서의 검수·사용 근거를 기록합니다.</span></div><div class="rule"><b>제외</b><span>고객사 원문, 반출 승인이 없는 문서, 권한이 불명확한 파일은 등록하지 않습니다.</span></div><div class="rule"><b>다음 단계</b><span>여기 등록은 평가 정답지 승격이 아닙니다. 등급을 잠정 지정하고, 사람 검수 완료 뒤에만 별도 승격 절차를 사용합니다.</span></div></div><div id="upMsg" class="flash" style="display:none;margin:14px 0 0"></div><div class="dialogActions"><button id="cancelUpload" class="btn">취소</button><button id="upload" class="btn black">업로드 및 추출</button></div></section></div><script>
+let selected=null;const $=id=>document.getElementById(id);const api='/api/v1/golden/candidates';function msg(v,bad=false){const e=$('flash');e.textContent=v;e.className=bad?'flash error':'flash';const m=$('upMsg'),md=$('modal');if(m){if(md&&md.classList.contains('show')){m.textContent=v;m.className=bad?'flash error':'flash';m.style.display='';}else{m.style.display='none';}}}function hdr(json=true){let h={};if(json)h['Content-Type']='application/json';return h}function qurl(){let q=new URLSearchParams();['status','grade','origin','query','review_batch'].forEach(id=>{let v=$(id).value.trim();if(v)q.set(id,v)});return api+(q.size?'?'+q:'')}async function req(url,opt={}){if(window.__GOLDEN_PREVIEW__){const p=window.__GOLDEN_PREVIEW__;if(opt.method)throw new Error('로컬 미리보기는 읽기 전용입니다. 업로드·등급 변경·폐기는 KL 콘솔 배포 후 사용할 수 있습니다.');if(url.endsWith('/session'))return {actor_id:'로컬 미리보기 · 읽기 전용'};const id=url.split('?')[0].slice((api+'/').length);if(id&&p.by_id[id])return p.by_id[id];return p.list}const r=await fetch(url,{...opt,credentials:'same-origin',headers:{...hdr(opt.json!==false),...(opt.headers||{})}});if(!r.ok)throw new Error((await r.text())||r.status);return r.json()}function metric(label,value,hint){let d=document.createElement('div');d.className='metric';d.innerHTML='<div class="mcap"></div><b></b><small></small>';d.children[0].textContent=label;d.children[1].textContent=value;d.children[2].textContent=hint;return d}function renderSummary(s,b){$('kpis').replaceChildren();let intro=document.createElement('div');intro.className='summaryIntro';intro.innerHTML='<div class="cap">현황 요약</div><h2>골든셋 현황</h2><p>현재 워크스페이스의 검수 상태와 등급 분포입니다.</p>';$('kpis').append(intro,metric('전체 후보',s.total+'건','원장 전량 · 폐기 '+(s.discarded||0)+'건 포함'),metric('등급 확정',s.fixed+'건','Proxy / Unlocked'),metric('미확정',s.unfixed+'건','검토 필요'),metric('보류 · 폐기',(s.deferred+s.discarded)+'건','감사 이력 보존'),metric('검수 대상 아님',(s.out_of_scope||0)+'건','범위 밖 · 되돌릴 수 있음'),metric('실문서',(s.actual_document_intake||0)+'건','출처 기록 대상'),metric('출처 기록',(s.actual_provenance_recorded||0)+'건','미완 '+(s.actual_provenance_partial||0)+'건 · 옛 자리 '+(s.actual_provenance_legacy||0)+'건'));var scoped=b&&b.total!==s.total;$('readiness').textContent=scoped?(b.terminal+'/'+b.total):(s.fixed+'/'+s.total);$('readinessNote').textContent=scoped?('이 배치 기준 · 남은 '+b.pending+'건'+(b.deferred?' · 보류 '+b.deferred+'건 포함':'')):'전체 후보 기준';$('topCount').textContent=scoped?b.pending:s.unfixed;renderQuality(s.quality);loadLedger()}function pill(status){let e=document.createElement('span');e.className='pill '+(status==='discarded'?'discard':status==='out_of_scope'?'discard':status==='deferred'?'defer':status.includes('fixed')||status==='approved_proxy'?'fixed':status==='under_review'?'review':'proposed');e.textContent={proposed:'제안',under_review:'검토중',approved_proxy:'Proxy 확정',grade_fixed_unlocked:'등급 확정',deferred:'보류',discarded:'폐기',out_of_scope:'검수 대상 아님'}[status]||status;return e}function renderBatches(list){let sel=$('review_batch');if(!sel)return;let keep=sel.value;sel.replaceChildren();let items=Array.isArray(list)?list:[];sel.append(option('',items.length?'전체 배치':'배치 표식 없음'));items.forEach(b=>sel.append(option(b.review_batch,b.review_batch+' · '+b.total+'건')));sel.disabled=!items.length;if(keep&&items.some(b=>b.review_batch===keep))sel.value=keep;}function renderRows(data){let box=$('rows');box.replaceChildren();renderSummary(data.summary,data.batch_summary);renderBatches(data.available_batches);if(!data.candidates.length){box.innerHTML='<div class="empty">조건에 맞는 문서가 없습니다.</div>';return}data.candidates.forEach(c=>{let row=document.createElement('button');row.className='candidate'+(selected&&selected.doc_id===c.doc_id?' selected':'');let grade=(c.proposed_grade||'–')+(c.final_grade?' → '+c.final_grade:'');row.innerHTML='<div class="docid"></div><div><div class="doctitle"></div><div class="docsub"></div></div><div><div class="grade"></div><div class="origin"></div></div><div></div><div class="chars"></div>';row.children[0].textContent=c.doc_id;row.children[1].children[0].textContent=c.title;row.children[1].children[1].textContent=({synthetic:'합성 후보',public_real:'공개 실문서',organization_real:'조직 보유 실문서'}[c.document_origin]||c.document_origin);row.children[2].children[0].textContent=grade;row.children[2].children[1].textContent=c.document_origin;row.children[3].append(pill(c.status));row.children[4].textContent=c.characters.toLocaleString();row.onclick=()=>show(c.doc_id);box.append(row)})}function option(v,t){let o=document.createElement('option');o.value=v;o.textContent=t;return o}function setActions(c){let a=$('action');a.replaceChildren();if(c.document_origin==='synthetic'&&c.proposed_grade)a.append(option('approve','승인 (제안 등급 그대로 확정)'));a.append(option('change','등급 지정/변경'),option('defer','보류'),option('discard','폐기'),option('exclude','검수 대상 아님'));if(c.status==='deferred'||c.status==='discarded'||c.status==='out_of_scope')a.append(option('reopen','재검토로 되돌림'));toggleGrade()}function toggleGrade(){$('gradeWrap').style.display=$('action').value==='change'?'block':'none'}function history(events){let box=$('history');box.replaceChildren();if(!events.length){box.textContent='결정 이력이 없습니다.';return}events.slice().reverse().forEach(e=>{let d=document.createElement('div');d.className='event';let a=document.createElement('b');a.textContent=(e.action||'결정')+' · '+(e.status||'');let w=document.createElement('div');w.className='when';w.textContent=(e.decided_at||'')+' · '+(e.actor_id||'');let r=document.createElement('div');r.textContent=e.reason||'사유 없음';d.append(a,w,r);box.append(d)})}async function load(){try{let session=await req(api+'/session');$('session').textContent='로그인 관리자 · '+session.actor_id;let data=await req(qurl());renderRows(data);msg(data.total+'건을 불러왔습니다.'+(data.listed_excludes_discarded&&data.summary.discarded?' (폐기 '+data.summary.discarded+'건은 목록에서 뺐습니다 — 상태 필터를 폐기로 두면 보입니다)':''))}catch(e){msg('불러오기 실패: '+e.message,true)}}function provLabel(c){if(!c.is_actual_document)return '해당 없음(합성)';
+const p=c.provenance||{};const st=p.status||'';
+if(st==='recorded')return '기록됨';
+if(st==='partial')return '미완 — 사용 권한 근거 없음';
+return '없음'}
+// [E3a-4] 출처 사후 기록. 실측 2026-08-17(223): 실문서 74건 중 62건이 출처는 있는데
+// 사용 권한 근거가 없었고, 화면에 그것을 채울 칸이 없어 영원히 미완이었다.
+function renderProv(c){const box=$('provBox');if(!box)return;
+if(!c.is_actual_document){box.style.display='none';return}
+const p=c.provenance||{};box.style.display='';
+$('provStatus').textContent=provLabel(c);
+$('provSrc').value=p.source_reference||'';
+$('provBasis').value=p.authorization_basis||'';
+$('provReason').value='';
+$('provOrigin').textContent=p.origin?('기록 방식: '+(({legacy_top_level:'초기 일괄 등록분에서 승계',manual:'화면에서 직접 입력',upload:'파일 업로드 때 함께 기록'})[p.origin]||p.origin)):'';
+$('provSave').disabled=(p.status==='recorded');}
+// [2026-08-23] 비밀관리성(M) 표시. 판정은 서버(rule_engine)가 하고 화면은 그 결과만
+// 보여준다 - 여기서 다시 계산하면 판정식이 두 곳에 생긴다.
+function renderMgmt(c){const w=$('mgmtWrap');if(!w)return;const m=c.management||{};
+$('secMarking').value=m.security_marking||'';$('accScope').value=m.access_scope||'';
+const box=$('mgmtState');const st=m.state||'unknown';
+if(st==='present'){box.style.color='#3f6212';
+ box.innerHTML='현재 <b>M='+m.level+'</b> — 관리 수준이 확인됐습니다.';}
+else if(st==='proven_absent'){box.style.color='#9a3412';
+ box.innerHTML='현재 <b>M=0</b> — 전 임직원 열람이므로 비밀관리성 요건 미충족이 <b>입증</b>됐습니다. 곱이 0이 되어 등급이 내려갑니다.';}
+else{box.style.color='#8d949b';
+ box.innerHTML='현재 <b>M 확인 안 됨</b> — 보수적으로 2로 채웁니다. 이 상태에서는 <b>S1이 나올 수 없습니다</b>(S1은 M=0으로 확정될 때만 나오는 조합입니다).';}}
+async function saveProv(){try{if(!selected)throw new Error('문서를 먼저 선택하세요.');
+const src=$('provSrc').value.trim(),basis=$('provBasis').value.trim();
+if(!src||!basis)throw new Error('원천 위치와 사용 권한 근거를 모두 적어야 합니다.');
+const r=await req(api+'/'+encodeURIComponent(selected.doc_id)+'/provenance',
+ {method:'POST',body:JSON.stringify({source_reference:src,authorization_basis:basis,reason:$('provReason').value.trim()})});
+msg('출처를 기록했습니다. 등급·상태는 바뀌지 않습니다.');await show(selected.doc_id)}
+catch(e){msg('출처 기록 실패: '+e.message,true)}}
+async function show(id){try{let c=await req(api+'/'+encodeURIComponent(id));selected=c;$('detailTitle').textContent=c.doc_id+' · '+c.title;$('metas').replaceChildren();[['상태',c.status],['출처',c.document_origin],['제안',c.proposed_grade||'없음'],['확정',c.final_grade||'미확정'],['글자 수',c.characters.toLocaleString()],['SHA-256',c.document_sha256.slice(0,14)+'…'],['출처 기록',provLabel(c)]].forEach(x=>{let m=document.createElement('span');m.textContent=x[0]+': '+x[1];$('metas').append(m)});$('scope').textContent=c.claim_scope;$('document').textContent=c.text;$('documentRendered').innerHTML=mdToHtml(c.text);$('finalGrade').value=c.final_grade||c.proposed_grade||'S3';$('reason').value='';setActions(c);renderProv(c);renderMgmt(c);history(c.decision_history||[]);$('detail').classList.add('show');$('detail').scrollIntoView({behavior:'smooth',block:'start'});await load()}catch(e){msg('상세 조회 실패: '+e.message,true)}}async function save(){try{if(!selected)throw new Error('문서를 먼저 선택하세요.');const action=$('action').value,reason=$('reason').value.trim();if(['change','defer','discard','exclude'].includes(action)&&!reason)throw new Error('등급 지정·보류·폐기·검수 대상 아님에는 사유가 필요합니다.');let body={action,reason};if(action==='change')body.grade=$('finalGrade').value;const sm=$('secMarking').value,asc=$('accScope').value;if(sm)body.security_marking=sm;if(asc)body.access_scope=asc;let out=await req(api+'/'+encodeURIComponent(selected.doc_id)+'/decision',{method:'POST',body:JSON.stringify(body)});msg('저장 완료: '+out.status);await show(selected.doc_id)}catch(e){let t=e.message||'';if(t.indexOf('missing_provenance')>=0){t='실문서는 원천 위치와 사용 권한 근거를 모두 기록해야 등급을 확정할 수 있습니다 — 아래 「출처 기록」에서 채운 뒤 다시 저장하십시오. (보류·폐기는 지금도 됩니다)';const f=$('provSrc');if(f&&f.focus)f.focus();}msg('저장 실패: '+t,true)}}/* 이스케이프 두 줄이 렌더러와 **같이** 실려야 한다.
+   mdToHtml -> mdInline -> mdEsc 로 이어지므로 하나만 빠져도 첫 문단에서 던진다.
+   2026-08-18 실측: mdToHtml 만 이 모듈로 뽑았더니 검수 화면이
+   `ReferenceError: mdInline is not defined` 로 후보 목록을 통째로 못 그렸다. */
+function mdEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function mdInline(s){return mdEsc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>')}
+function mdToHtml(src){
+  const lines=String(src||'').replace(/\r\n/g,'\n').split('\n');
+  let out=[],i=0,para=[];
+  /* 실문서(판례·공시)는 마크다운이 없고 본문이 한 줄로 몇천 자다 — 실측 272건 중 58건이
+     그렇고 그중 56건에 【주문】【이유】 같은 구획 표시가 있다. 그 표시에서 문단을 끊으면
+     내용을 바꾸지 않고도 읽을 수 있게 된다. 표시가 없으면 종전대로 한 문단이다. */
+  /* 구획 표시에서 문단을 끊는다. 실측 272건 중 실문서 70건에는 마크다운이 없지만
+     68건이 아래 표시 중 하나를 갖고 있다 — 【…】 57 · 번호 항목 51 · 가나다 26 · □○※▶ 13.
+     내용은 건드리지 않고 끊기만 하며, 라벨만 눈에 띄게 한다. */
+  /* 원문자는 ①-⑳(U+2460~) · ❶-❿(U+2776~) · ➀-➉ · ➊-➓(~U+2793) 네 블록에 흩어져 있다.
+     한 블록만 잡으면 ➌ 같은 문자를 놓친다(실측). */
+  const CIRC='\\u2460-\\u2473\\u2776-\\u2793';
+  const SECT=new RegExp('(?=【|<['+CIRC+']|[□○※▶◆■]\\s)');
+  /* 라벨 강조는 **이스케이프된 뒤** 적용된다 — `<` 는 이미 `&lt;` 다.
+     원문 형태로 매칭하면 각괄호 제목이 통째로 안 잡힌다(실측: 라벨 1개만 붙었다). */
+  const LBL=new RegExp('^(【[^】]{1,24}】|&lt;['+CIRC+'][^&]{0,60}&gt;|[□○※▶◆■])');
+  /* 표시가 아예 없는 문서(실측 2건)와 표시 사이 구간이 너무 길 때는 문장 단위로 나눈다.
+     원문을 바꾸는 게 아니라 읽기 위한 줄바꿈이고, 판단 근거는 '원문 그대로' 가 정본이다. */
+  /* 문장마다 줄을 바꾼다. 단, **마침표 전부에서 끊으면 안 된다** — 실측 실문서 70건의
+     마침표 3,208개 중 한글 종결어미(다/요/함/임/음) 뒤는 32%뿐이고 68%는 숫자 뒤다.
+     `구 특허법시행령(1983.11.5. 대통령령 제11254호)` 같은 법령 인용이 세 줄로 깨진다.
+     그래서 종결어미 뒤에서만 끊고, 영문 문장은 `. ` 처럼 뒤에 공백이 있을 때만 끊는다. */
+  const sentenceLines=(s)=>{
+    /* 앞이 한글인 종결어미 뒤 + 공백에서만 끊는다. 두 가지를 동시에 피하기 위해서다:
+         · 숫자 뒤 마침표 — `1983.11.5. 대통령령` 이 두 줄로 깨진다(앞 글자가 숫자라 제외됨)
+         · 항목 표시 `가.` `나.` `다.` — 앞이 공백이라 제외됨. `다.` 는 종결어미와 글자가 같아
+           앞 글자를 안 보면 항목 표시가 문장 끝으로 오인된다(실측). */
+    const parts=s.split(/(?<=[가-힣][다요함임음]\.)\s+/).filter(x=>x&&x.trim());
+    const out=[];
+    parts.forEach(g=>{
+      g=g.trim();
+      /* 인용·법조문이 이어져 종결어미가 없는 구간이 있다(실측 최장 3,381자).
+         그런 덩어리는 마지막 수단으로 공백에서 끊는다 — 벽으로 남기는 것보다 낫다. */
+      while(g.length>900){
+        let cut=g.lastIndexOf(' ',700);
+        if(cut<300) cut=700;
+        out.push(g.slice(0,cut)); g=g.slice(cut).trim();
+      }
+      if(g) out.push(g);
+    });
+    return out.length?out:[s];
+  };
+  const flush=()=>{
+    if(!para.length) return;
+    const joined=para.join(' ');
+    joined.split(SECT).forEach(seg=>{
+      seg=seg.trim(); if(!seg) return;
+      let html=sentenceLines(seg).map(mdInline).join('<br>');
+      html=html.replace(LBL,'<b class="lbl">$1</b>');
+      out.push('<p>'+html+'</p>');
+    });
+    para=[];
+  };
+  while(i<lines.length){
+    const ln=lines[i];
+    if(!ln.trim()){flush();i++;continue}
+    let m=ln.match(/^(#{1,3})\s+(.*)$/);
+    if(m){flush();const lv=m[1].length;out.push(`<h${lv}>`+mdInline(m[2])+`</h${lv}>`);i++;continue}
+    if(/^\s*(-{3,}|\*{3,})\s*$/.test(ln)){flush();out.push('<hr>');i++;continue}
+    if(/^\s*\|.*\|\s*$/.test(ln)&&i+1<lines.length&&/^\s*\|[\s:|-]+\|\s*$/.test(lines[i+1])){
+      flush();
+      const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>mdInline(c.trim()));
+      let html='<table><thead><tr>'+cells(ln).map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>';
+      i+=2;
+      while(i<lines.length&&/^\s*\|.*\|\s*$/.test(lines[i])){
+        html+='<tr>'+cells(lines[i]).map(c=>'<td>'+c+'</td>').join('')+'</tr>';i++;
+      }
+      out.push(html+'</tbody></table>');continue;
+    }
+    m=ln.match(/^\s*(?:[-*+]|\d+\.)\s+/);
+    if(m){
+      flush();
+      const ordered=/^\s*\d+\./.test(ln);
+      let html=ordered?'<ol>':'<ul>';
+      while(i<lines.length&&/^\s*(?:[-*+]|\d+\.)\s+/.test(lines[i])){
+        html+='<li>'+mdInline(lines[i].replace(/^\s*(?:[-*+]|\d+\.)\s+/,''))+'</li>';i++;
+      }
+      out.push(html+(ordered?'</ol>':'</ul>'));continue;
+    }
+    para.push(ln.trim());i++;
+  }
+  flush();
+  return out.join('')||'<p style="color:#8a9299">본문이 없습니다.</p>';
+}function setDocView(rendered){
+  $('documentRendered').style.display=rendered?'':'none';
+  $('document').style.display=rendered?'none':'';
+  $('viewRendered').classList.toggle('on',rendered);
+  $('viewRaw').classList.toggle('on',!rendered);
+  $('viewRendered').setAttribute('aria-pressed', rendered?'true':'false');
+  $('viewRaw').setAttribute('aria-pressed', rendered?'false':'true');
+}
+async function upload(){try{let file=$('file').files[0];if(!file)throw new Error('업로드할 파일을 선택하세요.');let src=$('upSource').value.trim();let selv=($('upBasisSel')||{}).value||'';let bas=(selv&&selv!=='__custom__')?selv:$('upBasis').value.trim();/* [2026-08-23] 두 칸의 필수 강제를 뺐다 — 게이트는 등급 확정(decide)과 승격(promote_to_locked)으로 옮겼다. 현관에서 막으니 평가셋이 보호된 게 아니라 등록 자체가 안 됐다(실측 2026-08-17 223: 실문서 74건 중 62건 미완). */let form=new FormData();form.append('file',file);form.append('document_origin',$('upOrigin').value);form.append('source_reference',src);form.append('authorization_basis',bas);let ub=$('upload');if(ub){ub.disabled=true;ub.dataset.label=ub.textContent;ub.textContent='분석 중…';}msg('문서를 분석하고 있습니다 — '+file.name+' 에서 글자를 뽑는 중입니다. 파일이 크면 몇 초 걸립니다.');let out=await req(api+'/upload',{method:'POST',body:form,json:false});$('modal').classList.remove('show');$('upSource').value='';$('upBasis').value='';if($('upBasisSel')){$('upBasisSel').value='';$('upBasis').style.display='none';}$('file').value='';if($('dropName'))$('dropName').textContent='여기로 파일을 끌어다 놓거나 위에서 선택하세요';msg('업로드 완료: '+out.doc_id+' · 검토 대기 상태입니다.');await load();await show(out.doc_id)}catch(e){msg('업로드 실패: '+e.message,true)}finally{let b=$('upload');if(b){b.disabled=false;b.textContent=b.dataset.label||'업로드 및 추출';}}}
+function qcard(label,value,note,bad){let d=document.createElement('div');d.className='metric';d.innerHTML='<div class="mcap">'+label+'</div><b'+(bad?' style="color:#bf2337"':'')+'>'+value+'</b><small>'+note+'</small>';return d}
+// 품질 카드. 부제는 **기준값**만 준다 - 판단은 숫자로 하게 한다.
+// ⚠ 종전 부제가 "높을수록 길이가 정답을 흘림" 이었다. 두 가지가 문제였다.
+//   1) "흘림" 은 비유인데다 한국어에서 흘림체(글씨체)로 먼저 읽힌다 - 학습 데이터에
+//      실제로 `흘림 한글(가).HWP` 같은 서식이 있다.
+//   2) 경고선(0.40)이 코드에만 있어 화면의 0.301 이 좋은 값인지 알 수 없었다.
+// 무엇이 나쁜지는 카드 아래 설명이 이미 평이하게 말한다("모델이 내용 대신 길이를 외웁니다").
+function renderQuality(q){let box=$('qualityBody');box.replaceChildren();if(!q||!q.documents){box.className='empty';box.textContent='등급이 있는 문서가 없어 지표를 낼 수 없습니다.';return}box.className='';let grid=document.createElement('div');grid.className='summary';grid.style.marginTop='0';grid.style.gridTemplateColumns='repeat(auto-fit,minmax(200px,1fr))';const LEAK_MAX=0.40;let leakBad=q.length_only_1nn>LEAK_MAX,expBad=q.grade_token_exposed>0;grid.append(qcard('길이가 등급을 알려주는 정도',q.length_only_1nn.toFixed(3),'무작위 '+q.length_only_random+' · <b>낮을수록 좋습니다</b>. 높으면 모델이 내용 대신 길이를 외운 것이라, 이 셋으로 잰 정확도는 부풀려집니다. '+LEAK_MAX.toFixed(2)+' 초과면 경고.',leakBad),qcard('본문에 등급 노출',q.grade_token_exposed+'건','문서에 답이 적혀 있으면 검수가 무의미',expBad),qcard('실문서 비율',(q.real_ratio*100).toFixed(0)+'%',q.real_documents+' / '+q.documents+'건'),qcard('등급 균형',q.grade_balance_ratio+'x','최다등급 ÷ 최소등급 (1에 가까울수록 균형)'),qcard('본문 길이',q.length.p50.toLocaleString()+'자',q.length.min.toLocaleString()+' ~ '+q.length.max.toLocaleString()+'자 (중앙값)'));box.append(grid);let t=document.createElement('div');t.className='list';t.style.marginTop='26px';let head=document.createElement('div');head.className='rowhead';head.style.gridTemplateColumns='90px 90px repeat(3,1fr)';head.innerHTML='<div>GRADE</div><div>N</div><div>MIN</div><div>P50</div><div>MAX</div>';t.append(head);['TS','S1','S2','S3'].forEach(g=>{let v=q.length_by_grade[g];if(!v)return;let r=document.createElement('div');r.className='candidate';r.style.gridTemplateColumns='90px 90px repeat(3,1fr)';r.style.cursor='default';r.innerHTML='<div class="grade">'+g+'</div><div class="chars" style="text-align:left">'+v.n+'</div><div class="chars" style="text-align:left">'+v.min.toLocaleString()+'</div><div class="chars" style="text-align:left">'+v.p50.toLocaleString()+'</div><div class="chars" style="text-align:left">'+v.max.toLocaleString()+'</div>';t.append(r)});box.append(t);let note=document.createElement('p');note.style.cssText='color:#727c84;font-size:13px;margin-top:16px';note.textContent='등급마다 길이 분포가 겹칠수록 좋습니다. 특정 등급만 길거나 짧으면 모델이 내용 대신 길이를 외웁니다.';box.append(note)}
+async function loadLedger(){try{let out=await req(api+'/decisions?limit=300');let f=$('ledgerFilter').value;let ev=out.events.filter(e=>!f||e.action===f);let box=$('ledgerRows');box.replaceChildren();if(!ev.length){box.className='empty';box.textContent='해당하는 결정 기록이 없습니다.';return}box.className='';ev.forEach(e=>{let r=document.createElement('div');r.className='candidate';r.style.gridTemplateColumns='150px 110px 120px minmax(180px,1.6fr) 150px';r.style.cursor='pointer';r.onclick=()=>show(e.doc_id);let lbl={approve:'승인',change:'등급 변경',defer:'보류',discard:'폐기',reject:'반려',reopen:'재검토',exclude:'검수 대상 아님'}[e.action]||e.action;r.innerHTML='<div class="docid">'+e.doc_id+'</div><div><span class="pill '+(e.action==='discard'||e.action==='reject'?'discard':e.action==='defer'?'defer':e.action==='reopen'?'proposed':'fixed')+'">'+lbl+'</span></div><div class="grade">'+(e.proposed_grade||'–')+' → '+(e.final_grade||'–')+'</div><div class="docsub" style="margin:0">'+(e.reason||'사유 없음')+'</div><div class="docsub" style="margin:0">'+(e.actor_id||'')+'<br>'+String(e.decided_at||'').slice(0,19).replace('T',' ')+'</div>';box.append(r)})}catch(e){msg('결정 이력 조회 실패: '+e.message,true)}}
+$('refresh').onclick=load;$('filter').onclick=load;$('action').onchange=toggleGrade;$('provSave').onclick=saveProv;$('save').onclick=save;$('openUpload').onclick=()=>$('modal').classList.add('show');// [2026-08-18] 드롭존을 실제로 배선한다. 종전에는 class="drop" 로 **생긴 것만**
+// 드롭존이고 dragover/drop 처리가 0건이라, 끌어다 놓으면 브라우저가 그 파일로 이동해
+// 검수 화면을 벗어났다.
+(function(){
+  var dz=$('drop'); if(!dz) return;
+  function name(){ var f=$('file').files[0];
+    $('dropName').textContent=f?('선택됨 · '+f.name):'여기로 파일을 끌어다 놓거나 위에서 선택하세요'; }
+  // [2026-08-19] dragleave 는 **자식 요소로 커서가 옮겨갈 때도** 발생한다.
+  // 드롭존 안에 <input>·<p>·<b> 가 있어서, 그 위를 지나갈 때마다 강조가 깜빡였다.
+  // enter/leave 를 세어 0 이 될 때만 강조를 끈다.
+  var over=0;
+  dz.addEventListener('dragenter',function(e){
+    e.preventDefault();e.stopPropagation();over++;dz.classList.add('over');});
+  dz.addEventListener('dragover',function(e){e.preventDefault();e.stopPropagation();});
+  dz.addEventListener('dragleave',function(e){
+    e.preventDefault();e.stopPropagation();
+    if(--over<=0){over=0;dz.classList.remove('over');}});
+  dz.addEventListener('drop',function(e){
+    e.preventDefault();e.stopPropagation();over=0;dz.classList.remove('over');
+    var f=e.dataTransfer&&e.dataTransfer.files; if(!f||!f.length) return;
+    $('file').files=f; name();
+  });
+  $('file').addEventListener('change',name);
+  // 페이지 밖으로 끌어다 놓아 브라우저가 파일을 열어 버리는 것을 막는다.
+  ['dragover','drop'].forEach(function(ev){
+    window.addEventListener(ev,function(e){ if(!dz.contains(e.target)) e.preventDefault(); });
+  });
+})();
+// 권한 근거 — 목록에 없으면 직접 입력.
+(function(){
+  var sel=$('upBasisSel'); if(!sel) return;
+  sel.addEventListener('change',function(){
+    var custom=sel.value==='__custom__';
+    $('upBasis').style.display=custom?'block':'none';
+    if(custom) $('upBasis').focus();
+  });
+})();
+$('cancelUpload').onclick=()=>{const m=$('upMsg');if(m)m.style.display='none';$('modal').classList.remove('show');};$('upload').onclick=upload;$('ledgerReload').onclick=loadLedger;$('ledgerFilter').onchange=loadLedger;
+$('viewRendered').onclick=()=>setDocView(true);$('viewRaw').onclick=()=>setDocView(false);setDocView(true);
+load();
+</script></body></html>

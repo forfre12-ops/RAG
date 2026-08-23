@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.db.models import Chunk, Document
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.db.models import Chunk, Document
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 pytestmark = pytest.mark.slow
 
@@ -73,6 +73,10 @@ class _StubSession:
     def execute(self, _stmt):
         class _R:
             rowcount = 0
+
+            def scalar_one_or_none(self):
+                # 멱등 file_hash 조회 — stub 은 '기존 문서 없음'으로 응답(→ create 경로 진행).
+                return None
 
         return _R()
 
@@ -260,10 +264,64 @@ class TestPersistence:
         assert doc.extraction_method == "plain"
         assert doc.processing_status == "ready"
         assert doc.created_by == "u1"
-        assert doc.metadata_ == {"doc_type": "가이드"}
+        # extraction_complete 는 추출이 중간에 잘렸는지를 소비자가 볼 수 있게 항상 남긴다
+        # (OCR 상한·페이지 절단 감지). txt 는 페이지 개념이 없어 pages_* 는 기록되지 않는다.
+        assert doc.metadata_ == {"doc_type": "가이드", "extraction_complete": True}
         # chunks 적재
         assert len(chunks) >= 1
         assert all(c.doc_id == doc.doc_id for c in chunks)
+
+    def test_idempotent_returns_existing_doc_on_hash_hit(self, tmp_path):
+        """동일 file_hash 가 이미 있으면 새 Document 를 만들지 않고 기존 doc_id 를 반환(멱등 적재)."""
+        storage = _storage(tmp_path)
+        svc = DocumentIngestionService(storage=storage)
+        existing_id = uuid.uuid4()
+
+        class _HitSession(_StubSession):
+            def execute(self, _stmt):
+                class _R:
+                    rowcount = 1
+
+                    def scalar_one_or_none(self):
+                        return existing_id
+
+                return _R()
+
+        sess = _HitSession()
+        body = ("동일 바이트 재업로드 본문 한국어 " * 30).encode("utf-8")
+        res = svc.ingest(filename="dup.txt", content_bytes=body, db=sess, persist=True)
+
+        assert res.persisted is True
+        assert res.doc_id == existing_id
+        # 기존 재사용 → 새 Document add 안 함(멱등)
+        assert not [o for o in sess.added if isinstance(o, Document)]
+
+    def test_idempotent_lookup_failure_falls_back_to_create(self, tmp_path):
+        """멱등 조회가 실패해도(불완전 Result 등) persist 전체를 죽이지 않고 create 로 진행 —
+        무음 적재실패(persisted=False·doc_id=None) 방지(TEST-3 회귀 가드). chunk upsert 는
+        rowcount 만 쓰므로 정상, 오직 멱등 조회의 scalar_one_or_none 만 깨뜨려 재현한다."""
+        storage = _storage(tmp_path)
+        svc = DocumentIngestionService(storage=storage)
+
+        class _BrokenLookupSession(_StubSession):
+            def execute(self, _stmt):
+                class _R:
+                    rowcount = 0
+
+                    def scalar_one_or_none(self):
+                        raise AttributeError("'_R' object has no attribute (불완전 Result 재현)")
+
+                return _R()
+
+        sess = _BrokenLookupSession()
+        body = ("조회 실패해도 반드시 적재되어야 하는 본문 " * 30).encode("utf-8")
+        res = svc.ingest(
+            filename="b.txt", content_bytes=body, created_by="u1", db=sess, persist=True
+        )
+
+        assert res.persisted is True, "멱등 조회 실패가 무음 적재실패로 번지면 안 됨"
+        assert res.doc_id is not None
+        assert len([o for o in sess.added if isinstance(o, Document)]) == 1
 
     def test_unsupported_format_degrades_gracefully(self, tmp_path):
         storage = _storage(tmp_path)

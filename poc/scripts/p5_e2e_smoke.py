@@ -57,8 +57,8 @@ def via_http(url: str, api_key: str) -> list[dict]:
 def via_inproc() -> list[dict]:
     from fastapi.testclient import TestClient
 
-    from lloydk.api.app import app
-    from lloydk.config import settings
+    from koipa.api.app import app
+    from koipa.config import settings
 
     out: list[dict] = []
     with TestClient(app) as cli:
@@ -117,7 +117,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["http", "inproc"], default="inproc")
     ap.add_argument("--url", default="http://localhost:8000")
-    ap.add_argument("--api-key", default="lloydk_dev_apikey")
+    ap.add_argument("--api-key", default="koipa_dev_apikey")
     ap.add_argument("--report", default="reports/p5_e2e_report.md")
     args = ap.parse_args()
 

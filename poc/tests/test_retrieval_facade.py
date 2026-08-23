@@ -9,9 +9,9 @@ import math
 
 import pytest
 
-from lloydk.adapters.vectorstore.inmemory_store import InMemoryStore
-from lloydk.services.retrieval import _rrf_combine, expand_then_search
-from lloydk.adapters.vectorstore.base import SearchHit
+from koipa.adapters.vectorstore.inmemory_store import InMemoryStore
+from koipa.services.retrieval import _rrf_combine, expand_then_search
+from koipa.adapters.vectorstore.base import SearchHit
 
 
 @pytest.fixture

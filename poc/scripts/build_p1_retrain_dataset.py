@@ -14,6 +14,12 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from koipa.golden_tiers import TRAIN_TIERS, tier_of  # noqa: E402
+
 LABELS = {"TS", "S1", "S2", "S3"}
 
 
@@ -55,6 +61,8 @@ def _rag_rows(corpus_dir: Path) -> tuple[list[dict], int]:
 def _gold_rows(path: Path, repeat: int) -> list[dict]:
     rows = []
     for r in _jsonl(path):
+        if tier_of(r) not in TRAIN_TIERS:  # locked=평가정답·held=격리 → 학습 금지(train-on-test·역누수 차단)
+            continue
         text = (r.get("text") or "").strip()
         label = r.get("label") or r.get("expected_grade")
         if not text or label not in LABELS:

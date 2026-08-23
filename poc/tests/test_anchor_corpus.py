@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from lloydk.modules.m6_evaluation.anchor_corpus import (
+from koipa.modules.m6_evaluation.anchor_corpus import (
     AnchorSource,
     extract_body_fact_tokens,
     extract_required_tokens,

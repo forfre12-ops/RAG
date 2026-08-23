@@ -24,7 +24,6 @@ GRADE_NAME = {"TS": "특급기밀", "S1": "1급비밀", "S2": "2급대외비", "
 
 def make_docx(rec: dict, path: Path) -> None:
     from docx import Document
-    from docx.shared import Pt
     doc = Document()
     grade = rec.get("target", rec.get("label", "S3"))
     gname = GRADE_NAME.get(grade, grade)

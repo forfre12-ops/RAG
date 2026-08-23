@@ -1,0 +1,394 @@
+"""HWP/HWPX 표 셀 미추출(조용한 표 흘림) → 검수 라우팅 안전장치.
+
+배경: rhwp가 본문 단락은 뽑지만 표·글상자 셀을 거의 전부 흘린다(실측 noori.hwp 29/31 누락).
+영업비밀 문서는 등급·원가·임원보상이 표에 들어가는 일이 많아, 본문만 분류기에 들어가면
+표 속 비밀이 '조용히' 미탐(FNR)된다. 메서드 고정 quality(0.95)로는 안 잡히는 사각이라
+별도 table_coverage 신호로 검수 라우팅한다(등급 불변 — FNR-safe).
+
+이 파일은 감지 헬퍼(원문 대조)와 검수 판정 배선을 결정적으로 검증한다. 실물 .hwp 픽스처가
+없어 rhwp 실동작 대신, 감지 로직(원문 XML 직접 읽기)과 review 배선을 단위/통합 검증한다.
+"""
+from __future__ import annotations
+
+import io
+import zipfile
+from pathlib import Path
+
+from koipa.modules.m2_preprocess.extractor import (
+    ExtractResult,
+    _hwp_table_coverage,
+    _hwp_tables_via_unhwp,
+    _hwpx_bytes_has_table,
+    _hwpx_tables,
+    _hwpx_uncaptured_table_cells,
+)
+from koipa.services.document_ingestion_service import extraction_review_decision
+
+
+def _make_hwpx(section_xml: str) -> bytes:
+    """최소 HWPX(zip) 바이트 — section0.xml만 채운다(감지는 원문 XML 직접 읽기)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("mimetype", "application/hwp+zip")
+        z.writestr("Contents/section0.xml", section_xml)
+    return buf.getvalue()
+
+
+# 본문 단락 + 표(셀에 고유 비밀 문자열). 실 Hancom OWPML의 hp: 스키마 형태.
+_SECTION_WITH_TABLE = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<hs:sec xmlns:hs="urn:sec" xmlns:hp="urn:para">'
+    "<hp:p><hp:run><hp:t>BODY_VISIBLE_본문단락</hp:t></hp:run></hp:p>"
+    "<hp:tbl><hp:tr><hp:tc><hp:subList>"
+    "<hp:p><hp:run><hp:t>SECRET_CELL_원가구조_99</hp:t></hp:run></hp:p>"
+    "</hp:subList></hp:tc></hp:tr></hp:tbl>"
+    "</hs:sec>"
+)
+_SECTION_NO_TABLE = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<hs:sec xmlns:hp="urn:para">'
+    "<hp:p><hp:run><hp:t>BODY_VISIBLE_본문단락</hp:t></hp:run></hp:p>"
+    "</hs:sec>"
+)
+
+
+class TestUncapturedTableCells:
+    """.hwpx 원문 표 셀 vs 추출본 대조(정밀 감지)."""
+
+    def test_cell_missing_from_text_flags_true(self):
+        data = _make_hwpx(_SECTION_WITH_TABLE)
+        # 추출본은 본문만(표 셀 SECRET_CELL_원가구조_99 빠짐) — 조용한 표 미추출 상황
+        assert _hwpx_uncaptured_table_cells(data, "BODY_VISIBLE_본문단락") is True
+
+    def test_hwpx_table_rows_are_structured(self):
+        data = _make_hwpx(
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<hs:sec xmlns:hs="urn:sec" xmlns:hp="urn:para">'
+            "<hp:tbl><hp:tr>"
+            "<hp:tc><hp:p><hp:run><hp:t>item</hp:t></hp:run></hp:p></hp:tc>"
+            "<hp:tc><hp:p><hp:run><hp:t>amount</hp:t></hp:run></hp:p></hp:tc>"
+            "</hp:tr><hp:tr>"
+            "<hp:tc><hp:p><hp:run><hp:t>secret</hp:t></hp:run></hp:p></hp:tc>"
+            "<hp:tc><hp:p><hp:run><hp:t>12000</hp:t></hp:run></hp:p></hp:tc>"
+            "</hp:tr></hp:tbl></hs:sec>"
+        )
+        tables = _hwpx_tables(data)
+        assert tables
+        assert tables[0].rows == [["item", "amount"], ["secret", "12000"]]
+
+    def test_cell_present_in_text_no_flag(self):
+        data = _make_hwpx(_SECTION_WITH_TABLE)
+        # 셀 텍스트가 추출본에 이미 있으면(회수됨) flag 안 함 — 오탐 방지
+        text = "BODY_VISIBLE_본문단락\nSECRET_CELL_원가구조_99"
+        assert _hwpx_uncaptured_table_cells(data, text) is False
+
+    def test_cell_present_ignoring_whitespace(self):
+        """공백 차이는 무시 — 셀이 공백만 다르게 회수돼도 오탐 안 함."""
+        data = _make_hwpx(_SECTION_WITH_TABLE)
+        text = "BODY_VISIBLE_본문단락 SECRET_CELL_ 원가구조_99"  # 공백 삽입
+        assert _hwpx_uncaptured_table_cells(data, text) is False
+
+    def test_no_table_no_flag(self):
+        data = _make_hwpx(_SECTION_NO_TABLE)
+        assert _hwpx_uncaptured_table_cells(data, "BODY_VISIBLE_본문단락") is False
+
+    def test_garbage_bytes_graceful_false(self):
+        assert _hwpx_uncaptured_table_cells(b"not a zip", "anything") is False
+
+    def test_body_text_outside_table_not_treated_as_cell(self):
+        """표 밖 <hp:t>(본문)은 셀로 오인하지 않는다 — 본문이 빠져도 여기선 flag 안 함."""
+        data = _make_hwpx(_SECTION_NO_TABLE)
+        # 본문 텍스트를 일부러 빈 추출본과 대조해도, 표가 없으니 셀 후보가 없어 False
+        assert _hwpx_uncaptured_table_cells(data, "") is False
+
+
+class TestHwpxHasTable:
+    def test_has_table_true(self):
+        assert _hwpx_bytes_has_table(_make_hwpx(_SECTION_WITH_TABLE)) is True
+
+    def test_has_table_false(self):
+        assert _hwpx_bytes_has_table(_make_hwpx(_SECTION_NO_TABLE)) is False
+
+    def test_garbage_bytes_false(self):
+        assert _hwpx_bytes_has_table(b"xxx") is False
+
+
+class TestHwpTableCoverageRouting:
+    """_hwp_table_coverage: .hwpx는 원문 대조, .hwp는 표 구조 존재(rhwp 변환)로 판정."""
+
+    def test_hwpx_incomplete_when_cell_dropped(self, tmp_path: Path):
+        p = tmp_path / "secret.hwpx"
+        p.write_bytes(_make_hwpx(_SECTION_WITH_TABLE))
+        # doc은 .hwpx 경로에서 안 쓰이므로 None 전달, 추출본은 본문만
+        assert _hwp_table_coverage(p, None, "BODY_VISIBLE_본문단락") == "incomplete"
+
+    def test_hwpx_ok_when_cell_captured(self, tmp_path: Path):
+        p = tmp_path / "recovered.hwpx"
+        p.write_bytes(_make_hwpx(_SECTION_WITH_TABLE))
+        text = "BODY_VISIBLE_본문단락 SECRET_CELL_원가구조_99"
+        assert _hwp_table_coverage(p, None, text) is None
+
+    def test_hwpx_none_when_no_table(self, tmp_path: Path):
+        p = tmp_path / "plain.hwpx"
+        p.write_bytes(_make_hwpx(_SECTION_NO_TABLE))
+        assert _hwp_table_coverage(p, None, "BODY_VISIBLE_본문단락") is None
+
+    def test_hwp_binary_incomplete_when_export_has_table(self, tmp_path: Path):
+        """.hwp: 셀 텍스트는 변환에도 빠지므로 표 '구조' 존재만으로 incomplete(보수적)."""
+        p = tmp_path / "secret.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0dummy-ole")  # 내용 무관 — doc.to_hwpx_bytes 사용
+
+        class _FakeDoc:
+            def to_hwpx_bytes(self):
+                return _make_hwpx(_SECTION_WITH_TABLE)
+
+        assert _hwp_table_coverage(p, _FakeDoc(), "본문만") == "incomplete"
+
+    def test_hwp_binary_none_when_no_table(self, tmp_path: Path):
+        p = tmp_path / "plain.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0dummy-ole")
+
+        class _FakeDoc:
+            def to_hwpx_bytes(self):
+                return _make_hwpx(_SECTION_NO_TABLE)
+
+        assert _hwp_table_coverage(p, _FakeDoc(), "본문") is None
+
+    def test_hwp_binary_graceful_when_export_unavailable(self, tmp_path: Path):
+        """to_hwpx_bytes가 없거나 예외면 None(과라우팅 회피)."""
+        p = tmp_path / "x.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        class _BrokenDoc:
+            def to_hwpx_bytes(self):
+                raise RuntimeError("no export")
+
+        assert _hwp_table_coverage(p, _BrokenDoc(), "본문") is None
+
+
+class TestExtractionReviewWiring:
+    """table_coverage="incomplete" → requires_review + reason 'table_incomplete'."""
+
+    def _base(self, **kw):
+        args = dict(
+            quality=0.95, ocr_used=False, error=None,
+            min_quality=0.6, ocr_requires_review=True, content_quality=1.0,
+        )
+        args.update(kw)
+        return extraction_review_decision(**args)
+
+    def test_incomplete_routes_to_review(self):
+        d = self._base(table_coverage="incomplete")
+        assert d.requires_review is True
+        assert "table_incomplete" in d.reasons
+
+    def test_clean_extraction_not_routed(self):
+        d = self._base(table_coverage=None)
+        assert d.requires_review is False
+        assert "table_incomplete" not in d.reasons
+
+    def test_grade_unchanged_signal_is_review_only(self):
+        """표 미추출은 등급을 바꾸지 않고 검수로만 보낸다(FNR-safe) — reason만 추가."""
+        d = self._base(table_coverage="incomplete", quality=0.95)
+        # 표 신호 외 다른 저하 사유가 없으면 reason은 table_incomplete 단독
+        assert d.reasons == ["table_incomplete"]
+
+    def test_combines_with_other_reasons(self):
+        d = self._base(table_coverage="incomplete", ocr_used=True, error="boom")
+        assert set(d.reasons) >= {"extract_error", "ocr", "table_incomplete"}
+
+
+class TestExtractResultField:
+    def test_default_table_coverage_none(self):
+        r = ExtractResult(text="x", method="plain", quality=1.0)
+        assert r.table_coverage is None
+
+
+def _fake_unhwp(monkeypatch, markdown: str | None, *, raises: bool = False):
+    """`import unhwp` 를 가짜 모듈로 대체. markdown=None + raises=False → 미설치 시뮬레이션."""
+    import sys
+    from types import SimpleNamespace
+
+    if markdown is None and not raises:
+        monkeypatch.setitem(sys.modules, "unhwp", None)  # import 시 ImportError
+        return
+
+    def to_markdown(_path):
+        if raises:
+            raise RuntimeError("parse failed")
+        return markdown
+
+    monkeypatch.setitem(sys.modules, "unhwp", SimpleNamespace(to_markdown=to_markdown))
+
+
+_MD = (
+    "본문 단락\n\n"
+    "| item | amount |\n"
+    "| :--- | ---: |\n"
+    "| secret | 12000 |\n"
+    "| 담당<br>부서 | 연구소 |\n"
+    "|  |  |\n"
+)
+
+
+class TestMarkdownTableParsing:
+    """unhwp 마크다운 → ExtractedTable 파싱 (구분선·빈행 제거, <br> 환원)."""
+
+    def test_separator_and_empty_rows_dropped(self):
+        from koipa.modules.m2_preprocess.extractor import _markdown_tables
+
+        tables = _markdown_tables(_MD, source="hwp", name_prefix="x.hwp")
+        assert len(tables) == 1
+        assert tables[0].rows == [
+            ["item", "amount"],
+            ["secret", "12000"],
+            ["담당 부서", "연구소"],   # <br> → 공백
+        ]
+
+    def test_no_tables_returns_empty(self):
+        from koipa.modules.m2_preprocess.extractor import _markdown_tables
+
+        assert _markdown_tables("표 없는 본문뿐", source="hwp", name_prefix="x") == []
+
+
+class TestUnhwpTableRecovery:
+    """.hwp 표 보강 — 형식 가드·graceful degrade·셀 회수."""
+
+    def test_recovers_table_cells_from_hwp(self, tmp_path: Path, monkeypatch):
+        _fake_unhwp(monkeypatch, _MD)
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        text, tables = _hwp_tables_via_unhwp(p)
+        assert "secret | 12000" in text
+        assert tables and tables[0].rows[1] == ["secret", "12000"]
+
+    def test_hwpx_is_never_touched(self, tmp_path: Path, monkeypatch):
+        # .hwpx 는 rhwp+_hwpx_tables 가 정확하고 unhwp 는 표를 통째로 누락한 실측
+        # 사례가 있다(acc-S1-03.hwpx 표 5행→0행) → 형식으로 차단해야 한다.
+        _fake_unhwp(monkeypatch, _MD)
+        p = tmp_path / "sample.hwpx"
+        p.write_bytes(b"PK\x03\x04")
+
+        assert _hwp_tables_via_unhwp(p) == (None, [])
+
+    def test_missing_package_is_graceful(self, tmp_path: Path, monkeypatch):
+        _fake_unhwp(monkeypatch, None)
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        assert _hwp_tables_via_unhwp(p) == (None, [])
+
+    def test_parse_failure_is_graceful(self, tmp_path: Path, monkeypatch):
+        _fake_unhwp(monkeypatch, "", raises=True)
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        assert _hwp_tables_via_unhwp(p) == (None, [])
+
+
+class TestAugmentationKeepsReviewRouting:
+    """보강에 성공해도 table_coverage 는 incomplete 유지 → 검수 라우팅 불변.
+
+    표 내용을 분류기에 넣는 이득(미탐 감소)과 검수 라우팅 완화는 별개 결정이며,
+    후자는 현장 데이터 확보 후 판단한다. 여기서 완화되면 확실한 사람 검수를
+    신규 파서 신뢰와 맞바꾸는 셈이라 회귀로 본다.
+    """
+
+    def test_coverage_stays_incomplete_after_recovery(self, tmp_path: Path, monkeypatch):
+        import koipa.modules.m2_preprocess.extractor as ex
+
+        p = tmp_path / "sample.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        class _Doc:
+            def extract_text(self):
+                return "본문 단락"
+
+        monkeypatch.setitem(__import__("sys").modules, "rhwp",
+                            __import__("types").SimpleNamespace(parse=lambda _p: _Doc()))
+        monkeypatch.setattr(ex, "_hwp_table_coverage", lambda *a, **k: "incomplete")
+        _fake_unhwp(monkeypatch, _MD)
+
+        r = ex._extract_hwp(p)
+        assert r.table_coverage == "incomplete"          # 라우팅 유지
+        assert "hwp_table_cells_may_be_missing" in r.warnings
+        assert "hwp_tables_recovered_by_unhwp" in r.warnings
+        assert "secret | 12000" in r.text                # 표 내용은 분류기에 도달
+        assert "본문 단락" in r.text                       # 합집합 — 본문 보존
+
+
+class TestCoverageUnknownStillRecovers:
+    """표 검출기가 실패해 '판정 불가'인 .hwp 도 보강·검수 라우팅 대상이다.
+
+    fail-open 잠재 경로다(2026-08-02). 종전 코드는 보강을 coverage=="incomplete" 안에만
+    두어서, 유일한 표-존재 검출기(rhwp.to_hwpx_bytes)가 실패하면 "표가 있는지 모른다"는
+    이유로 보강도 라우팅도 건너뛰었다.
+
+    실측 — 공개 공고문 .hwp 를 rhwp-python 0.5.1(to_hwpx_bytes 부재) 환경에서 돌리면
+    본문 10,439자·표 0개로 자동확정된다. 같은 파일이 0.8.1(배포 이미지 버전)에서는
+    46,473자·표 47개·셀 1,815개로 정상 회수·검수 라우팅된다. 즉 배포본의 현재 동작이
+    아니라 rhwp 버전·파일에 따라 열리는 경로이며, 여기서는 검출기 실패를 monkeypatch 로
+    강제해 버전과 무관하게 그 분기를 고정한다.
+
+    규율: 검출기가 '모른다'고 답할수록 더 봐야 한다. 모름을 안전으로 읽지 않는다.
+    """
+
+    @staticmethod
+    def _hwp_with_unknown_coverage(tmp_path: Path, monkeypatch):
+        import koipa.modules.m2_preprocess.extractor as ex
+
+        p = tmp_path / "unknown.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0")
+
+        class _Doc:
+            def extract_text(self):
+                return "본문 단락"
+
+            def to_hwpx_bytes(self):  # 유일한 표-존재 검출기가 실패하는 실제 상황
+                raise RuntimeError("to_hwpx_bytes failed")
+
+        monkeypatch.setitem(__import__("sys").modules, "rhwp",
+                            __import__("types").SimpleNamespace(parse=lambda _p: _Doc()))
+        return ex, p
+
+    def test_unknown_coverage_triggers_recovery_and_routing(self, tmp_path: Path, monkeypatch):
+        ex, p = self._hwp_with_unknown_coverage(tmp_path, monkeypatch)
+        _fake_unhwp(monkeypatch, _MD)
+
+        r = ex._extract_hwp(p)
+
+        assert "hwp_table_check_unavailable" in r.warnings   # 판정 불가는 그대로 가시화
+        assert "hwp_tables_recovered_by_unhwp" in r.warnings  # 그럼에도 보강은 시도됐다
+        assert "secret | 12000" in r.text                     # 표 내용이 분류기에 도달
+        assert "본문 단락" in r.text                            # 합집합 — 본문 보존
+        # 회수됐다 = rhwp 가 실제로 표를 흘렸다 → 유실이 확인됐으므로 검수로 보낸다.
+        assert r.table_coverage == "incomplete"
+        assert "hwp_table_cells_may_be_missing" in r.warnings
+
+    def test_unknown_coverage_without_unhwp_routes_to_review(self, tmp_path: Path, monkeypatch):
+        """보강도 못 하면 '유실 없음'을 입증할 수 없다 → 무음 통과 대신 검수."""
+        ex, p = self._hwp_with_unknown_coverage(tmp_path, monkeypatch)
+        _fake_unhwp(monkeypatch, None)  # 미설치
+
+        r = ex._extract_hwp(p)
+
+        assert r.text.strip() == "본문 단락"          # 본문은 살아 있고
+        assert r.table_coverage == "incomplete"      # 등급 불변, 라우팅만 발동
+        assert "hwp_table_cells_may_be_missing" in r.warnings
+
+    def test_review_gate_actually_routes_on_unknown(self, tmp_path: Path, monkeypatch):
+        """추출기 판정이 실제 적재 게이트까지 배선돼 있는가(경고만 남고 끝나던 회귀)."""
+        from koipa.services.document_ingestion_service import extraction_review_decision
+
+        ex, p = self._hwp_with_unknown_coverage(tmp_path, monkeypatch)
+        _fake_unhwp(monkeypatch, None)
+        r = ex._extract_hwp(p)
+
+        d = extraction_review_decision(
+            quality=float(r.quality), ocr_used=False, error=r.error, min_quality=0.6,
+            ocr_requires_review=True, content_quality=None,
+            table_coverage=r.table_coverage, warnings=r.warnings,
+        )
+        assert d.requires_review is True
+        assert "table_incomplete" in d.reasons

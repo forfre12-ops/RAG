@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>한국지식재산보호원 | 등급 시연</title>
+<meta name="description" content="한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정하는 라이브 데모. FUN-005 실가동 라우터에 본문을 보내 등급·자동확정 여부와 사유·평가요소·법령 근거를 확인합니다." />
+
+<link rel="stylesheet" href="./styles.css" />
+<script src="./deploy_badge.js" data-screen="시연"></script>
+</head>
+<body>
+
+<!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
+<!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">등급 시연</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">검증문서 검수 목록</a><a class="cnav-link" href="/api/v1/golden/candidates/manage.html#candidates">검증문서 후보 관리</a><a class="cnav-link" href="/console/admin.html">관리자 콘솔</a><span class="cnav-link is-current" aria-current="page">등급 시연</span><a class="cnav-link" href="/api/v1/golden/candidates/login.html">로그인</a></div><span class="spacer"></span><span id="nav-status" class="nav-status warming"><span class="dot"></span><span>warmup…</span></span><a class="nav-link" href="#s1">시연</a><a class="nav-link" href="#sec-ops">운영·반영</a><a class="nav-link" href="#s3">법령</a><a class="nav-link" href="#sec-parse">문서 업로드</a></header>
+<!-- console-header:end -->
+
+<div class="hero-bg"></div>
+
+<div class="container" id="top">
+
+  <!-- ============ HERO ============ -->
+  <div class="meta-row">
+    <span class="badge">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Live Demo
+    </span>
+    <span class="meta-dot">•</span>
+    <span class="meta-category">KOIPA AI 영업비밀관리</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">FUN-005 라이브</span>
+    <span class="meta-dot">•</span>
+    <span class="meta-soft">2026-07-17</span>
+  </div>
+
+  <h1 class="title">KOIPA AI 영업비밀관리시스템<br/>실시간 등급분류 콘솔</h1>
+
+  <p class="lede">
+    한국어 문서를 받아 4단계 보안등급(특급·1급·2급·3급)을 자동 판정합니다.
+    시드 v4 404개 키워드 · 부정경쟁방지법 §2조 2호 · KOIPA 가이드 v1 기반으로
+    분류 근거와 3 평가요소(S·V·M)를 함께 반환합니다.
+  </p>
+
+  <div class="hero-kpis">
+    <!-- [2026-08-21] 은퇴 모델(v-dd3abab9) 값이 남아 있었다. 현 배포본 v-fe4b386b 를
+         같은 콘솔의 GET /api/v1/metrics/confusion-matrix/v-fe4b386b 로 재면
+         TS 행 [45,2,0,3] — 50건 중 45건(recall 0.90)이고 **TS→S3(공개) 3건**이다.
+         "파국 미탐 0" 은 사실이 아니다. 감리·질의응답에서 혼동행렬을 열면 바로 걸린다. -->
+    <span class="hero-kpi"><span class="dot"></span>TS recall <b>0.90</b> · TS→S3 <b>3건</b> <span style="opacity:.75">(v-fe4b386b 홀드아웃 256건)</span></span>
+    <span class="hero-kpi"><span class="dot"></span>FNR <b>≤ 5%</b> 핵심 KPI 목표 (미탐 최소화)</span>
+    <span class="hero-kpi"><span class="dot"></span>시드 v4 <b>404</b>개 키워드 <span style="opacity:.75">(seeds.py 카운트)</span></span>
+  </div>
+
+  <hr class="hero-sep" />
+
+  <!-- ===== §1 시연 ===== -->
+  <section id="s1">
+    <h2><span class="num">§1</span>시연 — 30초 안에 4단계가 갈리는 순간</h2>
+    <p class="h2-sub">업무 문서를 올리거나(HWP·PDF·DOCX·XLSX 등 — 추출 → 정규화·PII마스킹 → 청킹 → 검수 게이트 → 등급까지 한 번에), 샘플 12종(시드 v4 빌드 + 의도 등급 검증 통과)을 고르거나, 본문을 직접 붙여넣으십시오. 본문 입력은 SSE 7단계 점등으로 분류 과정이 실시간으로 보이고, 파일은 서버가 돌려준 실제 처리 단계가 표시됩니다. 파싱 세부(추출기·품질·청크·PII·검수 게이트)는 아래 §2 결과 안의 <b>「파싱 상세」</b>에 있습니다.</p>
+
+    <div class="card" style="padding: 20px 24px;">
+      <div class="form-row" style="align-items:center;">
+        <label for="cfg-apikey">API 키</label>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input id="cfg-apikey" type="text" value="demo-secret-key" placeholder="시연 서버 API 키" aria-label="시연 서버 API 키" style="font-family:var(--font-mono);font-size:13px;min-width:220px;padding:6px 10px;" />
+          <span id="apikey-status" class="toggle-hint" style="margin:0;">기본 <code>demo-secret-key</code></span>
+        </div>
+      </div>
+      <!-- 앵커 id="sec-parse" — 옛 파싱·분류 시연 화면의 주소가 사용설명서·배포 가이드·
+           console_nav 에 인쇄돼 있다. 그 주소로 온 사람이 떨어져야 하는 자리는
+           「파일을 올리는 곳」이므로 업로드 칸에 둔다(파싱 세부는 §2 결과 안에 있다). -->
+      <div class="form-row" id="sec-parse">
+        <label>파일 직접 업로드</label>
+        <div class="upload-drop" id="doc-drop" role="button" tabindex="0">
+          <div class="upload-big">📄 파일을 여기로 끌어다 놓거나 <u>클릭해 선택</u></div>
+          <div class="upload-sub">HWP · HWPX · PDF · DOCX · DOC · XLSX · XLS · PPTX · PPT · TXT — 본문 텍스트가 있는 파일만. 스캔 이미지는 지원하지 않습니다.</div>
+          <div class="upload-fname" id="doc-file-name"></div>
+          <input id="doc-file" type="file" accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.ppt,.txt" style="display:none" />
+        </div>
+      </div>
+    <div class="sec-parse">
+    <div class="hint" style="margin-top:8px;line-height:1.7">
+      <b>이 화면의 분석은 데이터베이스에 저장하지 않습니다.</b>
+      올린 문서도 판정 결과도 남지 않습니다 — 문서 크기와 무관합니다
+      (큰 문서는 비동기로 분류하지만, 저장 경로를 타지 않는 것은 같습니다).
+      아래 <b>「실적재(검수 큐 전송)」</b>를 직접 켰을 때만 적재됩니다.
+    </div>
+    <div class="hint" id="conf-gate-note" style="margin-top:10px"><b>업무 문서를 직접 끌어다 놓으십시오.</b>
+      실측(실업무문서 형태 29건): 자동 확정 5건이 <b>전부 정답</b>이었고,
+      정답보다 낮게 본 것은 1건인데 그 1건도 <b>검수로 격리</b>됐습니다 —
+      <b>사람 없이 새어나간 미탐 0건</b>입니다. 확신이 기준(<b id="conf-threshold">확인 중…</b>)에
+      못 미치면 등급은 산출하되 자동 확정하지 않고 검수 큐로 보냅니다.</div>
+    <!-- [2026-08-24] 임계를 화면에 박아 두지 않는다. 여기에 0.70 이 박혀 있었는데 서버는
+         이미 0.50 이었다(8/24 에 내렸다 — config.py review_confidence_threshold). 실측
+         2026-08-24 223: /api/v1/healthz 의 operational_config.review_confidence_threshold=0.5.
+         숫자를 본문에 쓰면 값이 바뀌어도 문장은 안 바뀐다. 서버가 healthz 로 자기 값을
+         보고하고 있으므로(그 값이 실제 라우팅을 정한다) 화면은 그것을 그대로 받아 적는다. -->
+    </div>
+    <div class="sec-parse">
+    <!-- [2026-08-22] 원클릭 버튼을 **접었다**(사용자 지시). 버튼이 앞에 나와 있으면 "미리 심어
+         둔 문서만 잘 되는 것 아니냐"로 읽힌다. 실제로 그 의심에는 근거가 있다 - 이 세트는 본문이
+         267~448자로 짧고, 확신도는 길이와 반대로 움직인다:
+
+           원클릭 세트(267~448자)                      conf 0.94~0.98 · 자동확정 4/7
+           demo_formats·demo_samples(2,346~4,975자)   conf 0.38~0.95 · 자동확정 5/29
+           datasets/gold/formats(72건)                 본문 첫 줄에 "보안등급: [특급기밀]" - 사용불가
+
+         그래서 시연은 **파일을 직접 끌어다 놓는 실업로드**로 한다(poc/docs/DEMO_RUNBOOK_2026-08-23.md).
+         이 버튼은 네트워크·파일 사고 때 쓰는 비상 경로로만 남기고 접어 둔다. -->
+    <details class="samples-fold" style="margin-top:10px">
+      <summary style="cursor:pointer;font-size:13px;color:var(--text-dim,#8f9498)">참고 샘플 — 짧은 예시 문서 6종 (자동확정 5 · 검수 1)</summary>
+    <div class="samples-row" style="margin-top:8px">
+      <span class="samples-label">참고 샘플</span>
+      <!-- [2026-08-22] 배치를 **다시** 실측대로 고쳤다. 8/21 실측 뒤 서빙 판정이 두 번 바뀌었고
+           (온도 3.0→2.03 · 합의 게이트의 룰 무근거 abstain), 그래서 8/21 배치가 또 어긋났다.
+           재실측(같은 파일 · 3회 반복 동일 · scripts/check_demo_docs.py):
+             03 S2 납품단가표  검수로 광고    → 실제 자동확정(conf 0.596 → 0.714, 임계 0.70)
+             05 S1 기술이전PDF 자동확정 광고  → 실제 검수(표 추출 불완전 = extraction_gate)
+             07 하이브리드      검수로 광고    → 실제 자동확정(룰 근거 0건이라 불일치로 안 침)
+           문서를 손봐 광고에 맞추는 것은 시연용 조작이라 하지 않는다. 설명을 사실에 맞춘다.
+           주의: 03 은 0.714 로 임계(0.70) 바로 위다 - 모델이나 온도를 건드리면 검수로 되돌아간다.
+           시연 전에 scripts/check_demo_docs.py 를 **배포 서버에 대고** 한 번 돌릴 것.
+
+           07 은 화면에서 뺐다(파일·점검은 유지). 그 문서는 비공개 M&A 메모인데 모델이 S2
+           (2급 대외비)로 본다 - 본문이 "관계자 외 열람 제한"·"주가와 협상이 무너진다"를
+           말하고 있어 요소로 읽으면 더 높은 등급이 나온다(코드의 grade_from_svm(2,2,2)=TS).
+           지금은 합의 게이트가 검수로 보내지만, 화면에서 등급을 말해 주는 자리에 두면
+           그 S2 가 먼저 읽힌다. 사용자 결정(2026-08-22)으로 목록에서 제외한다. -->
+      <button class="btn ghost sample-btn ok" data-doc="./demo_docs/01_TS_semiconductor_euv.docx" data-name="반도체 EUV 공정 레시피(극비).docx">TS 특급 · 반도체 EUV (DOCX)</button>
+      <button class="btn ghost sample-btn ok" data-doc="./demo_docs/02_S1_recsys_source_license.docx" data-name="추천엔진 소스·라이선스(영업비밀).docx">S1 1급 · 소스·라이선스 (DOCX)</button>
+      <button class="btn ghost sample-btn ok" data-doc="./demo_docs/04_S3_press_release.docx" data-name="신제품 출시 보도자료(공개).docx">S3 공개 · 보도자료 (DOCX)</button>
+      <button class="btn ghost sample-btn ok" data-doc="./demo_docs/03_S2_supplier_price.xlsx" data-name="협력사 납품단가표(대외비).xlsx">S2 2급 · 납품단가표 (XLSX)</button>
+      <!-- [2026-08-23 정정] 05 를 자동확정 쪽으로 되돌렸다. 8/22 에 "표 추출 불완전으로 검수"로
+           적었는데 그건 **로컬 개발환경 실측**이었고, 배포본에서는 자동확정(0.949)이다.
+           원인: 배포 이미지에는 pdfplumber 가 있고 로컬 venv 에는 없다(로컬은 fitz 만).
+           표를 못 뽑으니 로컬에서만 열화로 잡혔다. 배포본 실측이 정본이다. -->
+      <button class="btn ghost sample-btn ok" data-doc="./demo_docs/05_S1_tech_transfer.pdf" data-name="기술이전 계약초안(기밀).pdf">S1 1급 · 기술이전 계약초안 (PDF)</button>
+      <button class="btn ghost sample-btn bad" data-doc="./demo_docs/06_FAIL_thin_text.txt" data-name="얇은 본문.txt">✕ 검수 · 얇은 본문 (TXT)</button>
+    </div>
+    <div class="hint">위 5종(TS·S1·S3·S2·S1)은 <b>자동 확정</b>되는 경로입니다(2026-08-24 배포본 실측 · scripts/check_demo_docs.py --set oneclick).
+      아래 1종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
+      <b>본문이 사실상 없어 추출 게이트가 잡는</b> 경우입니다(확신도 때문이 아닙니다 — 실측 사유 extraction-gate).
+      <b>이 6종은 본문이 267~448자로 짧습니다</b> — 확신도는 본문이 길수록 낮아지므로,
+      실제 업무문서(2,000자 이상)에서는 자동 확정 비율이 이보다 낮습니다.</div>
+    </details>
+    </div>
+    <div class="sec-parse">
+    <!-- [2026-08-21] ICD 문서 속성 입력. API 는 진작부터 받는데(documents.py:101-123 Form 필드)
+         세 화면 어디에도 입력칸이 없어 아무도 쓸 수 없었다. 관리성(M)은 본문에서 관측되지
+         않으므로(200자 문서가 자기 접근통제를 진술하지 않는다) 이 값이 유일한 근거다.
+         실측 2026-08-21(223): security_marking=secret + access_scope=approved_only 를 주면
+         같은 문서가 S2 → S1 로 올라간다(metadata-floor 발동). -->
+    <details class="icd-box" style="margin-top:12px;border:1px solid var(--border,#e1e1de);padding:10px 12px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:600">문서 속성 (ICD) — 출처 · 보안표시 · 접근범위 <span style="font-weight:400;color:var(--text-dim,#8f9498)">· 선택. 넣으면 등급 판정에 반영됩니다</span></summary>
+      <div class="row" style="margin-top:10px">
+        <label class="fld">출처<select id="icd-source">
+          <option value="">— 미지정 —</option>
+          <option value="public">공개 자료 (S3 로 상한)</option>
+          <option value="registered_patent">등록 특허 (공개)</option>
+          <option value="academic">학술 자료 (공개)</option>
+          <option value="internal">내부 문서</option>
+          <option value="external_confidential">외부 기밀 (NDA)</option>
+        </select></label>
+        <label class="fld">보안표시<select id="icd-marking">
+          <option value="">— 미지정 —</option>
+          <option value="top_secret">극비 — 등급 TS 이상</option>
+          <option value="secret">기밀 — 등급 S1 이상</option>
+          <option value="confidential">대외비 — 등급 S2 이상</option>
+          <option value="none">표기 없음</option>
+        </select></label>
+        <label class="fld">접근범위<select id="icd-scope">
+          <option value="">— 미지정 —</option>
+          <option value="approved_only">승인자 한정 — 관리성 M=2</option>
+          <option value="designated">지정 접근자 — M=1</option>
+          <option value="department">특정 부서 — M=1</option>
+          <option value="all_employees">전 직원 열람 — M=0</option>
+        </select></label>
+      </div>
+      <div class="hint" style="margin-top:8px;line-height:1.7">
+        <b>보안표시</b>가 있으면 그 등급 아래로는 안 내려갑니다(명시 표기 우선, ICD §4.2).
+        <b>접근범위</b>는 표시가 없을 때 <b>관리성(M)</b>을 정합니다 — 본문에서 관측되지 않는 축이라
+        이 값이 유일한 근거입니다.
+        ⚠ <b>전 직원 열람</b>은 비밀관리성 요건 미충족이라 등급을 <b>내리는</b> 방향입니다
+        (법리상 영업비밀 아님). 미탐 방향이므로 시스템이 경고를 남기고 사람 검수로 보냅니다.
+      </div>
+    </details>
+    </div>
+      <div class="form-row">
+        <label for="sample-select">샘플 문서</label>
+        <select id="sample-select" aria-label="예시 문서 선택"></select>
+      </div>
+      <div class="form-row">
+        <label for="doc-title">제목</label>
+        <input id="doc-title" type="text" placeholder="문서 제목 (선택)" aria-label="문서 제목(선택)" />
+      </div>
+      <div class="form-row">
+        <label for="doc-body">본문</label>
+        <textarea id="doc-body" aria-label="분류할 문서 본문" placeholder="여기에 한국어 문서 본문을 붙여넣거나 위에서 샘플을 선택하세요."></textarea>
+      </div>
+
+      <div style="margin-top:8px">
+        <label style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">키워드 토글</label>
+        <p class="toggle-hint">아래 키워드의 체크를 해제하면 본문에서 해당 단어가 일반어로 치환됩니다. 다시 <b>「분류하기」</b>를 눌러 등급 변화를 확인하세요. <b>「영업팀 주간 업무 공유 초안」</b> 샘플에서는 체크 해제만으로 <b>S1 → S2 → S3</b>로 등급이 실제로 내려갑니다. (특급·1급 문서는 비밀 신호가 촘촘해 몇 개를 꺼도 등급이 유지되는데, 이는 <b>미탐 0을 지향하는 안전 설계</b>입니다.)</p>
+        <div class="toggle-row" id="toggle-row"></div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-classify" class="btn">분류하기</button>
+        <button id="btn-print" class="btn secondary">PDF 인쇄</button>
+        <button id="btn-reset" class="btn ghost">초기화</button>
+    <div class="sec-parse">
+      <label class="fld" style="flex-direction:row;align-items:center;gap:7px;margin:0;font-weight:600;white-space:nowrap;">
+        <input type="checkbox" id="persist-demo" style="width:auto;" />
+        실적재(검수 큐 전송)
+      </label>
+    </div>
+      </div>
+    <div class="sec-parse">
+    <div class="hint" style="margin-top:6px;">
+      <b>실적재</b>를 켜면 분석과 별개로 문서를 <b>실제 적재</b>(<code>POST /documents</code> → <code>/classify</code>)합니다 —
+      needs_review 건은 <b>거버넌스 콘솔의 DB 검수 큐</b>에 나타나고, 본문은 RAG <code>demo</code> 컬렉션에 색인됩니다.
+      적재 문서는 <code>created_by=demo-console</code> 로만 태깅되어 admin의 <b>「데모 데이터 초기화」</b>로 한 번에 지웁니다.
+    </div>
+    <div id="persist-box" style="margin-top:8px;"></div>
+    </div>
+    </div>
+  </section>
+
+  <!-- ===== §2 결과 — 진행바를 카드 맨 위로 이동해 한 시야에 표시 ===== -->
+  <section id="sec-result">
+    <h2><span class="num">§2</span>결과 — 왜 이 등급인가</h2>
+    <p class="h2-sub">등급·자동확정 여부와 그 사유·자연어 판단(양성+음성 근거)·3 평가요소(S·V·M)·근거 키워드. 자동확정 여부는 신뢰도 한 값이 아니라 다단 게이트로 정해지므로, 화면은 수치 대신 결정과 사유를 적습니다(수치는 API 응답·감사기록에 그대로 남습니다). 등급 배지를 클릭하면 §3 법령 카드로 이동합니다. 파일을 올린 경우에는 <b>「파싱 상세」</b>에 추출기·추출 품질·글자수·청크 수·구조화 표·PII 마스킹 건수와 검수 게이트 판정이 함께 표시됩니다.</p>
+
+    <div class="result" id="result-card" role="status" aria-live="polite">
+      <h3 style="font-size:13px;margin:0 0 12px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">진행 단계 — SSE 실시간 점등</h3>
+      <div id="stage-seq" class="seq" style="margin-bottom:18px;"></div>
+
+      <div id="result-head" class="result-head">
+        <div style="font-size:14px;color:var(--text-dim);">샘플을 선택하고 "분류하기"를 누르세요.</div>
+      </div>
+
+      <h3 style="font-size:14px;margin-top:18px;">두 엔진의 판정 — 룰 · 분류기 · 최종 결합</h3>
+      <p class="toggle-hint" style="margin-top:-4px;">운영과 동일하게 <b>룰 엔진</b>과 <b>학습 분류기(BERT)</b>가 각각 독립 판정하고, 안전 규칙으로 결합해 최종 등급을 냅니다.</p>
+      <div id="result-dual" class="dual-wrap"><div class="dual-empty">분류 후 표시됩니다.</div></div>
+
+      <div id="result-summary" class="summary"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">3 평가요소 S·V·M (KOIPA 가이드 v1)</h3>
+      <div id="result-factors" class="stats"></div>
+
+      <h3 style="font-size:14px;margin-top:18px;">근거 키워드 — 클릭 시 본문 하이라이트</h3>
+      <div id="result-keywords" class="kw-chips"></div>
+
+
+      <!-- [2026-08-24] 파싱 상세 — 별도 구역이던 「문서 업로드 → 파싱 → 검수 → 등급 시연」을
+           여기로 합쳤다. 같은 페이지에 등급 결과 카드가 두 벌 있었고(§2 와 그 구역), 같은
+           엔드포인트(POST /documents/analyze)를 두 코드가 각각 호출하고 있었다(사용자 지적).
+           id="sec-parse" 는 남긴다 — 사용설명서·배포 가이드·console_nav 가 이 앵커를 쓴다.
+           파일 분석일 때만 펼쳐 보인다(텍스트 입력에는 파싱 단계가 없다). -->
+      <details id="parse-detail" style="margin-top:18px;">
+        <summary style="cursor:pointer;font-size:14px;font-weight:700;">파싱 상세 — 추출 · 정규화 · PII 마스킹 · 청킹 · 검수 게이트</summary>
+        <div class="sec-parse" style="background:transparent;margin-top:12px;">
+          <dl class="kv" id="parse-kv"><span class="hint">파일을 올리면 추출기·추출 품질·글자수·청크 수·구조화 표·PII 마스킹 건수가 여기에 표시됩니다.</span></dl>
+          <div id="gate-box" style="margin-top:14px;"></div>
+          <p class="hint">FNR-안전 설계: 표 미추출·저품질·손상은 등급을 바꾸지 않고 <b>검수로 라우팅</b>합니다.</p>
+        </div>
+      </details>
+      <h3 style="font-size:14px;margin-top:18px;">본문 미리보기 (시드 키워드 매칭)</h3>
+      <div id="body-preview" class="body-render"></div>
+
+      <!-- 실시간 요청 로그는 하단 고정 콘솔(#logdock)로 이동됨 — 스크롤과 무관하게 항상 보임 -->
+      <p class="toggle-hint" style="margin-top:14px;">실시간 요청 로그는 화면 <b>하단 고정 콘솔</b>에 표시됩니다(스크롤과 무관하게 항상 보임). 서버 uvicorn 로그와 대조하면 위조가 아님을 확인할 수 있습니다.</p>
+    </div>
+  </section>
+
+  <!-- ===== §2.5 운영 대시보드 + 실시간 반영 ===== -->
+  <section id="sec-ops">
+    <h2><span class="num">§2.5</span>운영 현황 · 검수 반영</h2>
+    <p class="h2-sub">아래 수치는 모두 DB 실측 카운트(가공 없음)입니다. "실시간 반영 시연"은 등록→분류→검수 교정→재분류를 <b>실제로 호출</b>하며, 교정 결과가 다음 분류에 반영되는 것을 보여줍니다.</p>
+    <div class="ops-tiles" id="ops-tiles"></div>
+    <div class="card" style="margin-top:14px;padding:16px 18px;">
+      <div class="btn-row" style="margin-bottom:10px;">
+        <button id="btn-reflect" class="btn">▶ 실시간 반영 시연 (등록→분류→교정→재분류)</button>
+        <button id="btn-dash-refresh" class="btn ghost">대시보드 새로고침</button>
+        <span class="hint" id="reflect-busy"></span>
+      </div>
+      <div id="reflect-steps" class="reflect-steps"><div class="hint">버튼을 누르면 실제 문서를 등록·분류하고, 검수자가 등급을 교정한 뒤 같은 문서를 재분류합니다. 각 단계는 서버 실호출이며 위 카운터가 실시간으로 바뀝니다.</div></div>
+    </div>
+  </section>
+
+  <!-- ===== §3 법령 ===== -->
+  <section id="s3">
+    <h2><span class="num">§3</span>법령 근거 — 부정경쟁방지 및 영업비밀보호에 관한 법률 §2조 2호</h2>
+    <p class="h2-sub">등급별 법령 출처 + KOIPA 가이드 v1 §번호 + 시드 키워드. 카드의 키워드를 클릭하면 §2 본문에서 해당 단어가 깜빡입니다.</p>
+    <div id="legal-grid" class="card-grid"></div>
+  </section>
+
+  <!-- §4~§7(미탐 설명·벤치·배포·신뢰)은 발표 멘트/제안서로 이관 — 데모 페이지는 분류 흐름에 집중 -->
+  <div class="print-watermark">
+    KOIPA AI 영업비밀관리시스템 · 실시간 등급분류 콘솔 · 한국지식재산보호원
+  </div>
+
+</div>
+
+
+
+<footer>
+  <div>KOIPA AI 영업비밀관리시스템 · Powered by <b>Koipa</b></div>
+  <div class="mono">한국지식재산보호원 · www.koipa.re.kr · 2026-07-17</div>
+</footer>
+
+<!-- ===== 실시간 요청 로그 — 하단 고정 콘솔 (항상 보임) ===== -->
+<div class="logdock" id="logdock">
+  <div class="logdock-head" onclick="toggleDemoLog()">
+    <b>실시간 요청 로그 <span class="logdock-hint">— 이 페이지가 실제 보낸 HTTP 요청/응답 · 서버 uvicorn 로그와 대조 가능</span></b>
+    <span id="logdock-toggle">접기 ▾</span>
+  </div>
+  <div id="live-log" class="live-log" role="log" aria-live="polite" aria-label="실시간 처리 로그"><div class="ll-empty">요청이 여기에 실시간으로 기록됩니다.</div></div>
+</div>
+<script>
+function toggleDemoLog(){var d=document.getElementById('logdock'),t=document.getElementById('logdock-toggle');if(!d)return;var c=d.classList.toggle('collapsed');if(t)t.textContent=c?'펼치기 ▴':'접기 ▾';document.body.style.paddingBottom=c?'52px':'232px';}
+</script>
+<!-- 검수 사유 한글표 — app.js(모듈)와 아래 인라인 스크립트가 같은 표를 쓴다. app.js 앞에 둔다. -->
+<script src="./review_reason_ko.js"></script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

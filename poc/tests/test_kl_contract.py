@@ -1,7 +1,7 @@
 """P1-E2: KL 통합 contract test — Mock KL 서버 + 라운드트립.
 
 KL 측 명세 회신 전에도 OpenAPI(doc/03)를 진실 소스로 사용해
-Lloydk API가 어떤 KL 콜백/요청 페이로드와 호환되는지 사전 검증.
+Koipa API가 어떤 KL 콜백/요청 페이로드와 호환되는지 사전 검증.
 
 전략:
 - doc/03 OpenAPI spec을 로드
@@ -18,7 +18,7 @@ import pytest
 
 pytestmark = pytest.mark.slow
 
-OPENAPI_PATH = Path(__file__).resolve().parents[2] / "doc" / "03_openapi_lloydk_kl.yaml"
+OPENAPI_PATH = Path(__file__).resolve().parents[2] / "doc" / "03_openapi_koipa_kl.yaml"
 
 
 @pytest.fixture(scope="module")
@@ -36,7 +36,7 @@ def test_spec_loaded(openapi_spec):
 
 def test_required_endpoints_present(openapi_spec):
     paths = openapi_spec["paths"]
-    # KL ↔ Lloydk 핵심 endpoint들이 명세에 존재해야
+    # KL ↔ Koipa 핵심 endpoint들이 명세에 존재해야
     required_substrings = [
         "/classify",
         "/healthz",
@@ -48,7 +48,7 @@ def test_required_endpoints_present(openapi_spec):
 
 def test_classify_request_schema_roundtrip(openapi_spec):
     """ClassifyRequest schema에 따라 만든 dummy body를 우리 pydantic 모델로 round-trip."""
-    from lloydk.schemas.classify import ClassifyRequest
+    from koipa.schemas.classify import ClassifyRequest
 
     dummy = {
         "doc_id": "test-doc",
@@ -61,8 +61,8 @@ def test_classify_request_schema_roundtrip(openapi_spec):
 
 def test_classify_response_schema_roundtrip():
     from uuid import uuid4
-    from lloydk.schemas.classify import ClassifyResponse, EvaluationFactors
-    from lloydk.schemas.common import Grade
+    from koipa.schemas.classify import ClassifyResponse, EvaluationFactors
+    from koipa.schemas.common import Grade
 
     dummy = {
         "inference_id": uuid4(),
@@ -89,12 +89,12 @@ def test_classify_response_schema_roundtrip():
 
 def test_error_response_envelope():
     """공통 에러 envelope: code/message/request_id."""
-    from lloydk.schemas.common import Error
+    from koipa.schemas.common import Error
 
-    e = Error(code="LLOYDK_TEST", message="sample", request_id="abcd")
+    e = Error(code="KOIPA_TEST", message="sample", request_id="abcd")
     s = e.model_dump_json()
     loaded = json.loads(s)
-    assert loaded["code"] == "LLOYDK_TEST"
+    assert loaded["code"] == "KOIPA_TEST"
     assert loaded["request_id"] == "abcd"
 
 
@@ -104,7 +104,7 @@ def test_health_endpoint_shape():
     # 환경 의존 이슈라 starlette config import 실패 시 skip.
     try:
         from fastapi.testclient import TestClient
-        from lloydk.api.app import app
+        from koipa.api.app import app
     except UnicodeDecodeError:
         pytest.skip(".env cp949 디코딩 실패 환경 — 운영 PYTHONIOENCODING=utf-8 권장")
 

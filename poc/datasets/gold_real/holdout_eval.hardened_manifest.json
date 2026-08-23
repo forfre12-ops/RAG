@@ -1,0 +1,30 @@
+{
+  "source": "holdout_eval.clean.jsonl (n=42)",
+  "method": "dual-labeler agreement (18) + rubric 3-judge blind adjudication (24 disputed)",
+  "truth_level": "machine_adjudicated_silver — NOT human-signed; cannot be terminal eval gold",
+  "trust_tiers": {
+    "anchor": 38,
+    "adjudicated": 4
+  },
+  "consensus_set": {
+    "n": 42,
+    "grade_dist": {
+      "S3": 7,
+      "S2": 9,
+      "S1": 14,
+      "TS": 12
+    },
+    "note": "권장 평가 골든. per-grade N이 작고 S2=0(coverage gap) 임에 유의."
+  },
+  "quarantine_set": {
+    "n": 0,
+    "grade_dist": {},
+    "reason": "잔존 격리분(있다면). S2 dead-zone 9건은 floor 원칙(§3.6)으로 S2 복원되어 consensus로 이동 — 격리 아님."
+  },
+  "key_findings": [
+    "분쟁 24건의 Claude 일괄 TS 상향은 22/23 기각 → '57% 라벨 불신뢰'는 LLM 재심판 TS 과신 아티팩트(폐기).",
+    "S2 의도 12건이 심판에서 S3로 보였던 건 grade_from_svm 버그가 아니라 심판 프롬프트가 floor 원칙(§3.6: 미입증 요소는 0 아닌 floor=1)을 위반(M 미언급→0)한 탓. grade_from_svm(1,1,0)=S3은 공식 가이드 워크드 예시(사무실배치도)라 불변.",
+    "floor 적용(grade_from_svm_floored) 재도출 + 배포모델(S2 8/9)·설계자 의도 일치 → 9건 S2 anchor 복원, S2 커버리지 갭 해소.",
+    "경화 후 신뢰 평가셋 per-grade N = {\"S3\": 7, \"S2\": 9, \"S1\": 14, \"TS\": 12}"
+  ]
+}

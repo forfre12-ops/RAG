@@ -23,11 +23,11 @@ from sqlalchemy.exc import OperationalError
 
 
 # ============================================================
-# OpenAPI spec 로드 — doc/03_openapi_lloydk_kl.yaml
+# OpenAPI spec 로드 — doc/03_openapi_koipa_kl.yaml
 # ============================================================
 
 _DOC_ROOT = pathlib.Path(__file__).resolve().parents[2] / "doc"
-_OPENAPI_YAML = _DOC_ROOT / "03_openapi_lloydk_kl.yaml"
+_OPENAPI_YAML = _DOC_ROOT / "03_openapi_koipa_kl.yaml"
 
 
 def _load_openapi() -> dict | None:
@@ -38,7 +38,7 @@ def _load_openapi() -> dict | None:
 
 def _pg_ok() -> bool:
     try:
-        from lloydk.db import engine
+        from koipa.db import engine
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return True
@@ -58,7 +58,7 @@ _OPENAPI = _load_openapi()
 class TestOpenAPIResponseCodes:
     """doc/19 §4 — 8 시나리오 라우터 응답코드가 OpenAPI와 1:1 일치."""
 
-    # doc/03 OpenAPI는 path prefix 없이 정의 (KL ↔ Lloydk 계약). FastAPI 라우터는 /api/v1 prefix.
+    # doc/03 OpenAPI는 path prefix 없이 정의 (KL ↔ Koipa 계약). FastAPI 라우터는 /api/v1 prefix.
     EXPECTED = {
         ("/classify", "post"): {"200"},
         ("/classify/async", "post"): {"202"},
@@ -101,7 +101,7 @@ class TestGuideAliasSwap:
     """rag_indexer가 새 인덱스 생성 + alias 스왑 계약을 보유했는지."""
 
     def test_rag_indexer_alias_swap_contract(self):
-        from lloydk.modules.m4_training import rag_indexer
+        from koipa.modules.m4_training import rag_indexer
 
         # 핵심 계약 — 스왑 함수가 존재하고 새 인덱스 → 인덱싱 → alias 스왑 순서
         attrs = [a for a in dir(rag_indexer) if not a.startswith("_")]
@@ -124,8 +124,8 @@ class TestSchemaGradesCascade:
             pytest.skip("PG unavailable")
         from fastapi.testclient import TestClient
 
-        from lloydk.api.app import app
-        from lloydk.config import settings
+        from koipa.api.app import app
+        from koipa.config import settings
 
         hdr = {
             "X-API-Key": settings.api_key,
@@ -145,7 +145,7 @@ class TestSchemaGradesCascade:
 
         # 의도: TS·S1·S2만 유지, S3 누락 → cascade로 is_active=false 기대
         # 라우터 측에서 누락 등급 보호(is_active=false 강등) 정책이 코드에 살아있는지 검증
-        from lloydk.services import schema_admin_service as svc
+        from koipa.services import schema_admin_service as svc
         import inspect
 
         # 정책: PUT에서 빠진 등급을 is_active=False로 강등. 모듈 소스에 is_active 처리 라인 존재.
@@ -168,7 +168,7 @@ class TestCorrectionsConsumed:
 
     def test_consumed_in_run_field_exists(self):
         """corrections 모델에 consumed_in_run / consumed_at 추적이 존재."""
-        from lloydk.db import models as db_models
+        from koipa.db import models as db_models
         import inspect
 
         # corrections 테이블에 해당하는 ORM 클래스 찾기 (__tablename__ = 'corrections')
@@ -190,7 +190,7 @@ class TestCorrectionsConsumed:
 
     def test_active_learning_module_consumes_corrections(self):
         """m6_evaluation.active_learning에 unconsumed → consumed 사이클이 존재."""
-        from lloydk.modules.m6_evaluation import active_learning as svc
+        from koipa.modules.m6_evaluation import active_learning as svc
         import inspect
 
         src = inspect.getsource(svc)

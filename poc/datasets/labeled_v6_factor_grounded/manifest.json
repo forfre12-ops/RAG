@@ -1,0 +1,47 @@
+{
+  "family_overlap": 0,
+  "ratios": {
+    "test": 0.15,
+    "train": 0.7,
+    "val": 0.15
+  },
+  "schema": "v6-training-split-v1",
+  "source": "direct_authored_catalog_training.v6.jsonl",
+  "source_sha256": "7643f7f86c95ab72433567e56fd8329ea52e4a1c6e296781ef542e2490cc93cf",
+  "split_policy": "family-disjoint, deterministic by sha256(document_family_id)",
+  "splits": {
+    "test": {
+      "documents": 412,
+      "families": 35,
+      "grades": {
+        "S1": 114,
+        "S2": 114,
+        "S3": 70,
+        "TS": 114
+      },
+      "sha256": "cd1cfc4d8699b2fe8884d103e8b5394a8d4251bb51ae7fd18f0b307320784ba2"
+    },
+    "train": {
+      "documents": 1833,
+      "families": 153,
+      "grades": {
+        "S1": 509,
+        "S2": 509,
+        "S3": 306,
+        "TS": 509
+      },
+      "sha256": "36c043003f64d4b191e16ba8f428d9769d1bcb0db025dbfd2c7e0fc9766d1632"
+    },
+    "val": {
+      "documents": 455,
+      "families": 37,
+      "grades": {
+        "S1": 127,
+        "S2": 127,
+        "S3": 74,
+        "TS": 127
+      },
+      "sha256": "d50ae74f074fc474254102f9e7e654837202bafbc264d19bf81ba7fef84ca852"
+    }
+  }
+}

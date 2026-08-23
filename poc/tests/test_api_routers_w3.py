@@ -21,9 +21,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.db import engine
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.db import engine
 
 
 def _pg_ok() -> bool:
@@ -282,11 +282,13 @@ class TestSchemaAdminRouter:
 # ============================================================
 
 class TestMetricsRouter:
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_latest_no_active_model_404(self):
-        """현재 활성 모델 없음 → 404 (DB 미가용 시에도 동일)."""
+        """현재 활성 모델 없음 → 404. 세팅(활성 모델 비활성화)이 session_scope 를 쓰므로
+        형제 테스트(라인 127·267)와 동일하게 PG 필요 — 무PG 환경 30s 행+ConnectionTimeout 방지."""
         # 공유 DB 오염(타 테스트가 활성화한 모델 잔존) 방지 — 활성 모델 비활성화 후 검증
-        from lloydk.db import session_scope
-        from lloydk.db.models import ModelVersion
+        from koipa.db import session_scope
+        from koipa.db.models import ModelVersion
         with session_scope() as s:
             s.query(ModelVersion).filter_by(is_active=True).update(
                 {"is_active": False}, synchronize_session=False

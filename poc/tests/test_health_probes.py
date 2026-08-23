@@ -5,8 +5,8 @@ DB/모델 불필요(probe는 import-가능성·캐시만 조회) — 빠르게 �
 
 from __future__ import annotations
 
-import lloydk.config as cfg
-from lloydk.api import health
+import koipa.config as cfg
+from koipa.api import health
 
 
 def test_check_extractors_contract() -> None:
@@ -16,12 +16,13 @@ def test_check_extractors_contract() -> None:
     assert isinstance(out["unavailable"], list)
     expected = {
         "hwp_body(rhwp)",
-        "hwp_table(pyhwp/hwp5html)",
+        "hwp_table(unhwp)",
         "xls(xlrd)",
         "xlsx(openpyxl)",
         "docx(python-docx)",
         "pptx(python-pptx)",
         "pdf_text(pdfminer)",
+        "pdf_table(pdfplumber)",
         "pdf_render(fitz/pdf2image)",
         "pdf_scan(poppler)",
         "ocr(tesseract)",
@@ -35,7 +36,7 @@ def test_check_extractors_contract() -> None:
 
 
 def test_check_reranker_not_initialized(monkeypatch) -> None:
-    from lloydk.adapters.reranker import _RERANKER_CACHE
+    from koipa.adapters.reranker import _RERANKER_CACHE
 
     monkeypatch.setattr(cfg.settings, "reranker_provider", "bge", raising=False)
     saved = dict(_RERANKER_CACHE)
@@ -52,7 +53,7 @@ def test_check_reranker_not_initialized(monkeypatch) -> None:
 
 def test_check_reranker_detects_bge_fallback(monkeypatch) -> None:
     """configured=bge인데 캐시에 NoopReranker → 폴백 가시화(종전 /healthz는 못 봤음)."""
-    from lloydk.adapters.reranker import _RERANKER_CACHE, NoopReranker
+    from koipa.adapters.reranker import _RERANKER_CACHE, NoopReranker
 
     monkeypatch.setattr(cfg.settings, "reranker_provider", "bge", raising=False)
     saved = dict(_RERANKER_CACHE)
@@ -70,7 +71,7 @@ def test_check_reranker_detects_bge_fallback(monkeypatch) -> None:
 
 
 def test_check_reranker_noop_configured_is_ok(monkeypatch) -> None:
-    from lloydk.adapters.reranker import _RERANKER_CACHE, NoopReranker
+    from koipa.adapters.reranker import _RERANKER_CACHE, NoopReranker
 
     monkeypatch.setattr(cfg.settings, "reranker_provider", "noop", raising=False)
     saved = dict(_RERANKER_CACHE)

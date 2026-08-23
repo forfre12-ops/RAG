@@ -23,8 +23,8 @@ os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from lloydk.api.app import app  # noqa: E402
-from lloydk.config import settings  # noqa: E402
+from koipa.api.app import app  # noqa: E402
+from koipa.config import settings  # noqa: E402
 
 
 def _api_key() -> str:

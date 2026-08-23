@@ -39,10 +39,10 @@ if str(_SRC) not in sys.path:
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf-8-sig"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from lloydk.modules.m3_labeling import LabelingPipeline  # noqa: E402
-from lloydk.modules.m3_labeling.consensus import evaluate_consensus  # noqa: E402
-from lloydk.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: E402
-from lloydk.golden_tiers import tier_of  # noqa: E402
+from koipa.modules.m3_labeling import LabelingPipeline  # noqa: E402
+from koipa.modules.m3_labeling.consensus import evaluate_consensus  # noqa: E402
+from koipa.modules.m3_labeling.rule_engine import has_real_evidence  # noqa: E402
+from koipa.golden_tiers import tier_of  # noqa: E402
 
 DEFAULT_GOLD = Path("datasets/gold_real/classification_gold.jsonl")
 # 이 게이트로 재평가할 라벨 출처(LLM-판정 경로). 나머지는 게이트 밖(보존).

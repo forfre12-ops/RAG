@@ -1,0 +1,23 @@
+{
+  "change_summary": "Added S2 middle-grade anchor notes only; high-grade and low-grade records unchanged from v3.9.",
+  "evaluation_case_ledger": "v2_1_development_used_for_direction_only; v2_1_final_retired_for_future_claims",
+  "grade_counts": {
+    "S1": 750,
+    "S2": 750,
+    "S3": 450,
+    "TS": 750
+  },
+  "no_llm_generation": true,
+  "records": 2700,
+  "records_sha256": "1adb34a9d0ada66c821a7eb28567ac96e808821a9c7aeac01b3c2ca8e8063eac",
+  "schema": "direct-authored-catalog-training-v3_10",
+  "source_corpus": "datasets\\proxy_gold\\direct_authored_catalog_training.v3_9.jsonl",
+  "source_manifest_sha256": "2583b59c51357c2f9521192b1e83850412246cb787933c7766bdf2f97aaf85b6",
+  "source_records_sha256": "5759f15269e896a2821543d695c6329d6735821a3471294cecc0bee1275397f8",
+  "text_length": {
+    "max": 2985,
+    "mean": 2799.25,
+    "min": 2578
+  },
+  "training_only": true
+}

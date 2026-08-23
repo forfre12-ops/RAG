@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.adapters.reranker import NoopReranker, get_reranker
-from lloydk.adapters.reranker.base import RerankResult
+from koipa.adapters.reranker import NoopReranker, get_reranker
+from koipa.adapters.reranker.base import RerankResult
 
 
 def test_noop_preserves_order():
@@ -33,7 +33,7 @@ def test_noop_empty_candidates():
 
 def test_get_reranker_default_is_noop(monkeypatch):
     # .env의 RERANKER_PROVIDER 값에 무관하게 no-arg 호출 시 noop fallback 검증.
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.setattr(settings, "reranker_provider", "")
     r = get_reranker()
     assert r.name == "noop"
@@ -46,7 +46,7 @@ def test_get_reranker_explicit_noop():
 
 def test_bge_reranker_module_importable():
     # 모듈은 import 가능해야 함(실제 모델 로드는 lazy)
-    from lloydk.adapters.reranker.bge_reranker import BgeReranker  # noqa: F401
+    from koipa.adapters.reranker.bge_reranker import BgeReranker  # noqa: F401
 
 
 def test_get_reranker_bge_lazy_does_not_load_model():
@@ -60,7 +60,7 @@ def test_get_reranker_bge_lazy_does_not_load_model():
 
 def test_get_reranker_bge_import_failure_falls_back_to_noop(monkeypatch):
     # F: bge import/초기화 실패 시 raise 대신 noop 폴백(다른 팩토리와 동일 정책).
-    import lloydk.adapters.reranker as rr_mod
+    import koipa.adapters.reranker as rr_mod
 
     # 캐시 비워서 폴백 경로를 강제(이전 테스트가 'bge'를 캐시했을 수 있음).
     monkeypatch.setattr(rr_mod, "_RERANKER_CACHE", {})
@@ -70,7 +70,7 @@ def test_get_reranker_bge_import_failure_falls_back_to_noop(monkeypatch):
 
     # BgeReranker 생성 자체가 터지는 상황을 모사.
     monkeypatch.setattr(
-        "lloydk.adapters.reranker.bge_reranker.BgeReranker", _boom, raising=True
+        "koipa.adapters.reranker.bge_reranker.BgeReranker", _boom, raising=True
     )
     r = get_reranker("bge")
     assert r.name == "noop"

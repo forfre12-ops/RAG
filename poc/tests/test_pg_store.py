@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.adapters.vectorstore.base import HybridVectorStore, VectorStore
-from lloydk.adapters.vectorstore.pg_store import PgVectorStore
+from koipa.adapters.vectorstore.base import HybridVectorStore, VectorStore
+from koipa.adapters.vectorstore.pg_store import PgVectorStore
 
 
 def test_vec_lit_format():
@@ -37,6 +37,12 @@ def test_filter_sql_column_vs_payload():
     assert "payload ->> 'doc_type' = :f1" in clause    # 그 외는 payload JSONB
     assert params["f0"] == "d-001" and params["f1"] == "legal"
     assert store._filter_sql(None, {}) == ""           # 빈 필터는 빈 절
+
+
+def test_filter_sql_rejects_unsafe_payload_key():
+    store = PgVectorStore(engine=object())
+    with pytest.raises(ValueError):
+        store._filter_sql({"x' OR '1'='1": "boom"}, {})
 
 
 def test_protocol_conformance():
@@ -99,6 +105,44 @@ class _FakeEngine:
         return self.conn
 
 
+class _ScalarResult:
+    def __init__(self, value):
+        self.value = value
+
+    def scalar(self):
+        return self.value
+
+
+class _AliasConn:
+    def __init__(self, target):
+        self.target = target
+        self.captured = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def execute(self, sql, params=None):
+        self.captured = (str(sql), params)
+        return _ScalarResult(self.target)
+
+
+class _AliasEngine:
+    def __init__(self, target):
+        self.conn = _AliasConn(target)
+
+    def connect(self):
+        return self.conn
+
+
+def test_resolve_collection_uses_pg_alias_table():
+    store = PgVectorStore(engine=_AliasEngine("secrets-guides-kure-v2"))
+    assert store._resolve_collection("secrets-guides") == "secrets-guides-kure-v2"
+    assert store._engine.conn.captured[1] == {"a": "secrets-guides"}
+
+
 def test_sample_vectors_parses_rows():
     store = PgVectorStore(engine=_FakeEngine([("[0.1,0.2]",), ("[0.3,0.4]",)]))
     assert store.sample_vectors(limit=10) == [[0.1, 0.2], [0.3, 0.4]]
@@ -120,3 +164,59 @@ def test_sample_vectors_db_error_returns_empty():
 
     # best-effort — PG 미가용 시 drift 표본은 빈 리스트(예외 전파 금지)
     assert PgVectorStore(engine=_BoomEngine()).sample_vectors(limit=3) == []
+
+
+# ── 어휘 후보 순차 스캔의 병렬 워커 (2026-08-16) ──────────────────────────────
+# 왜 이 테스트가 있나: hybrid 지연의 지배 요인이 어휘 후보 순차 스캔의 병렬 워커 수였다
+# (KL 서버 실측 p50 191.8 -> 124.3ms, 반환 결과 40/40 동일). 두 가지가 조용히 깨질 수 있어
+# 잠근다.
+#   1  `SET LOCAL` 이 아니면 풀에서 재사용되는 연결의 **다른 쿼리까지** 영향을 받는다
+#   2  `min_parallel_table_scan_size` 를 빼면 워커가 2개로 돌아가 효과가 사라진다
+#      (PostgreSQL 이 그 값을 눈금 삼아 테이블 크기에서 워커 수를 정한다)
+class _RecordingConn:
+    """execute 로 들어온 SQL 문자열만 모은다."""
+
+    def __init__(self) -> None:
+        self.sqls: list[str] = []
+
+    def execute(self, stmt, *_a, **_k):  # noqa: ANN001, ANN202
+        self.sqls.append(str(stmt))
+        return None
+
+
+def test_parallel_hint_uses_set_local_and_both_knobs(monkeypatch):
+    from koipa.config import settings
+
+    monkeypatch.setattr(settings, "pg_search_parallel_workers", 4, raising=False)
+    conn = _RecordingConn()
+    PgVectorStore._apply_parallel_hint(conn)
+
+    joined = " ".join(conn.sqls)
+    # SET LOCAL 이어야 한다 - 세션 SET 이면 같은 연결의 다른 쿼리로 샌다
+    assert conn.sqls, "설정이 하나도 안 걸렸다"
+    assert all(s.strip().upper().startswith("SET LOCAL") for s in conn.sqls), conn.sqls
+    # 둘 다 있어야 효과가 난다 - 하나만 걸면 워커가 2개로 돌아간다(실측)
+    assert "min_parallel_table_scan_size = 0" in joined
+    assert "max_parallel_workers_per_gather = 4" in joined
+
+
+def test_parallel_hint_disabled_when_zero(monkeypatch):
+    from koipa.config import settings
+
+    monkeypatch.setattr(settings, "pg_search_parallel_workers", 0, raising=False)
+    conn = _RecordingConn()
+    PgVectorStore._apply_parallel_hint(conn)
+    assert conn.sqls == [], "0 이면 아무것도 안 걸어야 한다(서버 기본값 사용)"
+
+
+def test_parallel_hint_failure_does_not_break_search(monkeypatch):
+    """속도 조정이지 정확성 조건이 아니다 - 실패해도 검색은 진행해야 한다."""
+    from koipa.config import settings
+
+    monkeypatch.setattr(settings, "pg_search_parallel_workers", 4, raising=False)
+
+    class _Boom:
+        def execute(self, *_a, **_k):  # noqa: ANN002, ANN003, ANN202
+            raise RuntimeError("권한 없음")
+
+    PgVectorStore._apply_parallel_hint(_Boom())  # 예외가 밖으로 나오면 실패

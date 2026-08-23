@@ -9,10 +9,10 @@ sys.path.insert(0, "src")
 from dotenv import load_dotenv
 load_dotenv(".env")
 
-from lloydk.adapters.embedding import build_embedder
-from lloydk.adapters.vectorstore import build_store
-from lloydk.config import settings
-from lloydk.modules.m2_preprocess.pipeline import PreprocessPipeline
+from koipa.adapters.embedding import build_embedder
+from koipa.adapters.vectorstore import build_store
+from koipa.config import settings
+from koipa.modules.m2_preprocess.pipeline import PreprocessPipeline
 
 COLLECTION = "docs"
 BATCH_SIZE = 16

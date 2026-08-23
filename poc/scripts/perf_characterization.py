@@ -62,7 +62,7 @@ def make_bert_predictor(model_dir: str):
 
 
 def make_rule_predictor():
-    from lloydk.modules.m3_labeling.pipeline import LabelingPipeline
+    from koipa.modules.m3_labeling.pipeline import LabelingPipeline
     p = LabelingPipeline()
 
     def predict(text: str) -> str:

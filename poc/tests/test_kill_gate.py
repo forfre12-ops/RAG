@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from prometheus_client import generate_latest
 
-from lloydk.api.prom_metrics import KILL_GATE_TRIPPED, registry
-from lloydk.modules.m6_evaluation.kill_gate import evaluate_kill_gate
+from koipa.api.prom_metrics import KILL_GATE_TRIPPED, registry
+from koipa.modules.m6_evaluation.kill_gate import evaluate_kill_gate
 
 
 def test_not_tripped_when_clean():
@@ -78,4 +78,4 @@ def test_multiple_reasons_accumulate():
 def test_kill_gate_gauge_defined_and_exposed():
     KILL_GATE_TRIPPED.set(0)
     expo = generate_latest(registry).decode()
-    assert "lloydk_kill_gate_tripped" in expo
+    assert "koipa_kill_gate_tripped" in expo

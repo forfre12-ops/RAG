@@ -1,36 +1,85 @@
-# docker-compose.prod.yml — 운영 환경 오버라이드
-# 사용: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+# docker-compose.prod.yml — 운영(immutable) 오버라이드
+# 사용(canonical): docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   - --env-file 은 ${} 치환용(이게 없으면 프로젝트 .env=dev 값이 치환에 새어듦).
+#   - 서비스 env_file 은 ${ENV_FILE:-.env.prod} → --env-file 과 같은 파일을 가리키게 할 것.
+#     (lite-cloud 테스트: ENV_FILE=.env.cloud docker compose --env-file .env.cloud -f ... up -d)
+#   - override.yml 은 -f 명시라 자동 제외 → GPU/Ollama 강제 회피.
 #
-# 차이점(dev vs prod):
-#   - GPU passthrough 없음 (임베딩 CPU 모드 또는 외부 서비스)
-#   - LLM: Ollama 로컬 대신 Anthropic/OpenAI 원격 API
-#   - 볼륨: src/ hot-reload 마운트 없음 (불변 이미지)
-#   - CORS: 명시적 origin만 허용
-#   - 헬스체크: 더 엄격한 interval/threshold
+# dev 대비 하드닝(상용 릴리스 기준):
+#   - env_file: base 의 .env(개발용) 상속을 !override 로 끊고 ${ENV_FILE:-.env.prod} 만 로드
+#     (dev .env 의 API_KEY_ROLE=admin·ENABLE_TRAINING=true·실키 주입 차단)
+#   - volumes: ./src·./scripts hot-reload bind 제거(불변 이미지). 모델은 external volume(ro)로만
+#   - ports: api 만 127.0.0.1:8000(리버스 프록시 뒤). pg/redis/minio/mlflow 는 미노출(내부 네트워크)
+#   - 이미지: Dockerfile.api.prod(non-root uid1000·gunicorn), CPU 임베딩, 원격 LLM
+#   - HF 캐시: non-root 경로(/home/koipa)에 named volume — 매 기동 재다운로드 방지
 services:
   api:
-    environment:
-      # 원격 LLM (API 키는 .env.prod.secrets 또는 secrets manager에서 주입)
-      LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
-      LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
-      # 임베딩: CPU 모드 (GPU 없음)
+    # 재기동 정책 — 호스트 재부팅/도커 데몬 재시작 후 자동 복구. deploy.restart_policy 는
+    # `docker compose up`(비-swarm)에서 무시되므로 compose 단축형 restart 를 명시해야 실효.
+    restart: unless-stopped
+    build:
+      dockerfile: Dockerfile.api.prod
+    # dev .env 상속 차단 — 운영 자격/설정은 ENV_FILE 로만. 초기 클라우드 테스트는 ENV_FILE=.env.cloud.
+    env_file: !override
+      - "${ENV_FILE:-.env.prod}"
+    environment: !override
+      # WEB_CONCURRENCY 멀티워커는 프로모션 후 /admin/model/reload 팬아웃 미구현[NFR-OPS-01]이라
+      # 워커별 stale 가능 — 초기엔 1 권장(재기동으로 갱신).
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
       EMBEDDING_PROVIDER: hf
-      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-BAAI/bge-m3}"
-      # 운영 CORS — 명시적 origin
+      # ⚠ 기본값이 **다른 파일과 달라 색인과 질의가 갈렸다**(실측 2026-08-17, KL 223).
+      #     api    BAAI/bge-m3        <- 여기 기본값. 질의를 임베딩한다.
+      #     worker nlpai-lab/KURE-v1  <- 다른 compose 의 기본값. 문서를 색인한다.
+      #   두 모델 모두 1024 차원이라 **오류가 안 난다** - 차원 검사에 안 걸리고 그냥
+      #   엉뚱한 이웃이 나온다. 조용한 오검색이다.
+      #
+      #   .env 에 EMBEDDING_MODEL 을 적어도 안 고쳐진다. `environment: !override` 는
+      #   env_file 을 덮고, compose 치환 `${...}` 은 **셸과 프로젝트 .env 만** 본다 -
+      #   env_file(.env.jjw)은 컨테이너로만 들어가고 치환에는 안 쓰인다.
+      #   실제로 .env.jjw 에 nlpai-lab/KURE-v1 이 적혀 있었는데도 api 는 bge-m3 였다.
+      #
+      #   기본값을 다른 compose(airgap·dr-staging)·config.py 기본값·§04 결정과 맞춘다.
+      #   한국어 실측에서 KURE-v1 이 BGE-M3 보다 @1 기준 5~7pp 높다.
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-nlpai-lab/KURE-v1}"
       CORS_ALLOW_ORIGINS: '["${ALLOWED_ORIGIN:-https://app.example.com}"]'
-    volumes:
-      # 불변 이미지 — src hot-reload 마운트 없음
-      # artifacts는 external volume 또는 공유 스토리지로 대체
+      HF_HOME: /home/koipa/.cache/huggingface
+      # [스레드 정합] torch 는 cgroup CPU 한도를 못 본다 — 호스트 코어 수만큼 스레드를 띄운다.
+      # 실측: 2 CPU 컨테이너에서 torch.get_num_threads()=8 로 오버서브스크립션 상태였다.
+      # 스레드 수를 CPU 한도와 같은 값으로 묶어 둔다(한쪽만 바꾸면 다시 어긋난다).
+      OMP_NUM_THREADS: "${API_CPU_LIMIT:-6}"
+      MKL_NUM_THREADS: "${API_CPU_LIMIT:-6}"
+    # 불변 — dev 코드 bind 제거. 모델은 ro external volume, HF 캐시는 non-root named volume.
+    volumes: !override
       - prod_artifacts:/app/artifacts:ro
+      # [학습 산출] artifacts 는 ro(서빙 모델 보호) → 재학습 산출 전용 rw 볼륨을 분리.
+      - prod_artifacts_out:/app/artifacts_out
+      - hf_cache_api:/home/koipa/.cache/huggingface
+      # [저장 영속·공유] 원본 문서(암호화 at-rest)는 named 볼륨에. 볼륨이 없으면 컨테이너 임시레이어에
+      # 써서 재생성 시 원문 소실 + api↔worker 미공유 → 원문 read-back miss 로 빈문서 분류(무음). 운영 필수.
+      - app_storage:/app/.storage
+      # [골든] 골든 후보 산출물(datasets/gold_real/builds). datasets 는 .dockerignore 라 이미지에
+      # 없다 — 이 볼륨이 없으면 /golden/build 를 실행한 worker 가 자기 컨테이너 FS 에 쓰고,
+      # review.html/signoff.html 을 렌더하는 api 는 그 파일을 못 읽어 검수 화면이 영원히 빈다.
+      # 재생성 시 산출물도 소실. api↔worker 공유 필수(2026-08-02 실측 결함).
+      - golden_data:/app/datasets
+    # 리버스 프록시(nginx-mtls 등) 뒤 — 외부 직노출 금지.
+    ports: !override
+      - "127.0.0.1:8000:8000"
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
         max_attempts: 3
-      # OOM 방어 — 컨테이너별 상한. 값은 운영 인스턴스 사양에 맞춰 .env로 조정.
       resources:
         limits:
-          cpus: "${API_CPU_LIMIT:-2}"
+          # [실측 2026-08-02] 종전 기본값 2 는 분류 처리량을 그대로 3배 깎고 있었다.
+          # 8코어 호스트에서 API 컨테이너만 2 CPU 로 묶여 1페이지(1,800자) 분류에 12.7초,
+          # 5페이지 45.3초가 걸렸다. gunicorn --timeout 60 이라 6~7페이지에서 워커가 죽는다
+          # (구형 .hwp 업로드 시 보고된 WORKER TIMEOUT 의 실제 원인). 호스트는 부하 0.28 로
+          # 놀고 있었다 — 하드웨어가 아니라 이 기본값이 병목이었다.
+          # 6 은 단일 고객사 배포(CPU 전용 런타임) 기준. 한 호스트에 여러 스택을 올리면
+          # .env 에서 낮춰 잡을 것 — 합이 코어 수를 넘으면 서로 뺏는다.
+          cpus: "${API_CPU_LIMIT:-6}"
           memory: "${API_MEM_LIMIT:-4G}"
         reservations:
           memory: "${API_MEM_RESERVATION:-1G}"
@@ -42,39 +91,86 @@ services:
       start_period: 90s
 
   worker:
-    environment:
-      LLM_PROVIDER: "${LLM_PROVIDER:-anthropic}"
-      LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-6}"
+    restart: unless-stopped
+    # 하드닝: dev Dockerfile.api(root)가 아니라 non-root(uid1000) 이미지로 빌드 — api 와 동일.
+    # Dockerfile.api.prod 는 앱+운영/파싱 extras(hwp/hwp-tables/xls/jwt/psh/otel) 포함이라 워커
+    # 파싱 태스크에도 충분. OCR([ocr])은 요건 외 + poppler=GPL 이라 전 이미지에서 제외.
+    # (compose command 오버라이드가 gunicorn CMD 를 celery worker 로 대체.)
+    build:
+      dockerfile: Dockerfile.api.prod
+    env_file: !override
+      - "${ENV_FILE:-.env.prod}"
+    environment: !override
+      # [스레드 정합] api 와 동일 — torch 가 cgroup 한도를 못 봐 오버서브스크립션이 난다.
+      OMP_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
+      MKL_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
+    # dev 코드 bind 제거. 워커도 모델 접근 필요(classify/index 태스크) → ro external volume.
+    # HF 캐시는 non-root 홈(/home/koipa) — root 캐시(/root)는 uid1000 이 쓸 수 없어 재다운로드 유발.
+    volumes: !override
+      - prod_artifacts:/app/artifacts:ro
+      # [학습 산출] artifacts 는 ro(서빙 모델 보호) → 재학습 산출 전용 rw 볼륨을 분리.
+      - prod_artifacts_out:/app/artifacts_out
+      - hf_cache_worker:/home/koipa/.cache/huggingface
+      - app_storage:/app/.storage                 # api 와 동일 저장 볼륨 공유(원문 read-back)
+      - golden_data:/app/datasets                 # [골든] api 와 동일 — 빌드 산출물을 api 가 읽어 검수 HTML 렌더
     deploy:
       restart_policy:
         condition: on-failure
         max_attempts: 3
       resources:
         limits:
-          cpus: "${WORKER_CPU_LIMIT:-2}"
+          # api 와 같은 이유(위 주석). 워커는 배치 분류·인덱싱이라 역시 CPU 바운드다.
+          # api(6)보다 낮게 잡는 것은 대화형 응답을 배치가 밀어내지 않게 하려는 것.
+          cpus: "${WORKER_CPU_LIMIT:-4}"
           memory: "${WORKER_MEM_LIMIT:-4G}"
         reservations:
           memory: "${WORKER_MEM_RESERVATION:-1G}"
 
+  beat:
+    restart: unless-stopped
+    # 하드닝: worker 와 동일 non-root 이미지(uid1000)로 빌드(dev Dockerfile.api=root 상속 차단).
+    build:
+      dockerfile: Dockerfile.api.prod
+    env_file: !override
+      - "${ENV_FILE:-.env.prod}"
+    environment: !override {}
+    # beat 는 스케줄만 발행 — 코드/모델 bind 불요.
+    volumes: !override []
+
   postgres:
-    ports:
-      # 운영: localhost에서만 접근 (외부 노출 차단)
-      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    # 내부 네트워크만 — 호스트 노출 없음(dev 의 0.0.0.0:5432 상속 차단).
+    ports: !override []
     deploy:
       resources:
         limits:
           memory: "${POSTGRES_MEM_LIMIT:-2G}"
 
+  redis:
+    restart: unless-stopped
+    ports: !override []
+
   minio:
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+    ports: !override []
     deploy:
       resources:
         limits:
           memory: "${MINIO_MEM_LIMIT:-2G}"
 
+  mlflow:
+    ports: !override []
+
 volumes:
+  prod_artifacts_out:
+    name: "${PROD_ARTIFACTS_OUT_VOLUME:-koipa_prod_artifacts_out}"
   prod_artifacts:
     external: true
-    name: "${PROD_ARTIFACTS_VOLUME:-lloydk_prod_artifacts}"
+    name: "${PROD_ARTIFACTS_VOLUME:-koipa_prod_artifacts}"
+  # 원본 문서 저장(암호화 at-rest) — 안정적 이름으로 백업/복구 대상. api·worker 공유·재생성 영속.
+  app_storage:
+    name: "${APP_STORAGE_VOLUME:-koipa_app_storage}"
+  # 골든 후보·정본(datasets/) — api·worker 공유. 사람서명 산출물이 들어가므로 백업 대상.
+  golden_data:
+    name: "${GOLDEN_DATA_VOLUME:-koipa_golden_data}"
+  hf_cache_api:
+  hf_cache_worker:

@@ -1,7 +1,7 @@
-name: lloydk-observability
+name: koipa-observability
 
 # 관측성 스택 — Prometheus + Grafana + Loki + Promtail.
-# 기본 lloydk-poc 스택과 동일 docker network에 합류해서 api·postgres·redis를 스크랩.
+# 기본 koipa-poc 스택과 동일 docker network에 합류해서 api·postgres·redis를 스크랩.
 # (ES→PG 단일화로 elasticsearch-exporter 제거 — §03)
 # 사용: docker compose -f docker-compose.yml -f infra/observability/docker-compose.observability.yml up -d
 
@@ -10,6 +10,11 @@ services:
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # prometheus.yml 의 rule_files 가 찾는 경로(설정파일과 동일 디렉토리)에 alert_rules.yml 마운트.
+      # 이 줄이 없으면 안전 알림 29종(FnrSpike·KillGateTripped·HighGradeReviewBacklog 등)이
+      # 로드조차 안 돼 무음이었다 — airgap overlay 만 교정돼 있고 오픈망(dev) overlay 는 누락됐던
+      # 갭. Alertmanager 미기동이어도 Prometheus /alerts 에서 발화는 보인다(파일럿 GO 조건 충족).
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - promdata:/prometheus
     command:
       # P1-D6: 회귀 추세 분석을 위해 retention 30d → 90d, size 10GB → 30GB.
@@ -25,7 +30,7 @@ services:
     image: grafana/grafana:11.3.0
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-lloydk_dev_grafana}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-koipa_dev_grafana}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafanadata:/var/lib/grafana
@@ -59,7 +64,7 @@ services:
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.16.0
     environment:
-      DATA_SOURCE_NAME: "postgresql://lloydk:${POSTGRES_PASSWORD:-lloydk_dev}@postgres:5432/lloydk?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa?sslmode=disable"
     ports:
       - "9187:9187"
     networks: [default]
@@ -79,5 +84,5 @@ volumes:
 
 networks:
   default:
-    name: lloydk-poc_default
+    name: koipa-poc_default
     external: true

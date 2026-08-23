@@ -14,10 +14,10 @@ from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.slow
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.api.app import app
-from lloydk.api.documents import _get_ingestion_service
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.api.app import app
+from koipa.api.documents import _get_ingestion_service
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def client_with_storage(tmp_path):
 
 
 def _hdr():
-    from lloydk.config import settings
+    from koipa.config import settings
     return {"X-API-Key": settings.api_key or "test-key"}
 
 

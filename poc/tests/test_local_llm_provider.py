@@ -19,7 +19,7 @@ pytestmark = pytest.mark.model_download
 # ---- 어댑터 존재 확인 (없으면 skip) ---------------------------------------
 
 try:
-    from lloydk.adapters.llm.local_openai_provider import (  # noqa: F401
+    from koipa.adapters.llm.local_openai_provider import (  # noqa: F401
         LocalOpenAIProvider,
         lm_studio_provider,
         ollama_provider,
@@ -32,7 +32,9 @@ except ImportError as exc:  # pragma: no cover - W9 일반화 미적용 환경 �
 # ---- helper: OpenAI SDK mock 빌더 ----------------------------------------
 
 
-def _fake_chat_completion(content: str = "안녕하세요", in_tok: int = 11, out_tok: int = 7):
+def _fake_chat_completion(
+    content: str = "안녕하세요", in_tok: int = 11, out_tok: int = 7
+):
     """openai.types.chat.ChatCompletion과 같은 형태의 가짜 응답."""
     return SimpleNamespace(
         choices=[
@@ -42,16 +44,24 @@ def _fake_chat_completion(content: str = "안녕하세요", in_tok: int = 11, ou
                 index=0,
             )
         ],
-        usage=SimpleNamespace(prompt_tokens=in_tok, completion_tokens=out_tok, total_tokens=in_tok + out_tok),
+        usage=SimpleNamespace(
+            prompt_tokens=in_tok,
+            completion_tokens=out_tok,
+            total_tokens=in_tok + out_tok,
+        ),
         model="dummy",
         id="chatcmpl-mock-1",
     )
 
 
-def _build_mock_openai_client(content: str = "안녕하세요", in_tok: int = 11, out_tok: int = 7):
+def _build_mock_openai_client(
+    content: str = "안녕하세요", in_tok: int = 11, out_tok: int = 7
+):
     """openai.OpenAI() 호출을 가로채는 MagicMock + chat.completions.create mock 반환."""
     client = MagicMock(name="OpenAIClient")
-    client.chat.completions.create.return_value = _fake_chat_completion(content, in_tok, out_tok)
+    client.chat.completions.create.return_value = _fake_chat_completion(
+        content, in_tok, out_tok
+    )
     # base_url은 어댑터가 인자로 받은 값을 그대로 client.base_url에 저장하도록 흉내
     return client
 
@@ -180,7 +190,9 @@ class TestRequestParameters:
 
 class TestResponseParsing:
     def test_parses_choices_message_content(self):
-        mock_client = _build_mock_openai_client(content="분류: TS — 특급기밀", in_tok=42, out_tok=15)
+        mock_client = _build_mock_openai_client(
+            content="분류: TS — 특급기밀", in_tok=42, out_tok=15
+        )
         with patch("openai.OpenAI", return_value=mock_client):
             p = LocalOpenAIProvider(
                 base_url="http://x/v1",
@@ -198,6 +210,7 @@ class TestResponseParsing:
         assert resp.usage.provider == "test"
         assert resp.usage.model == "test-model"
         assert resp.usage.latency_ms >= 0
+        assert resp.meta["finish_reason"] == "stop"
 
     def test_handles_empty_content_gracefully(self):
         """choices[0].message.content가 None이어도 빈 문자열로 안전 처리."""

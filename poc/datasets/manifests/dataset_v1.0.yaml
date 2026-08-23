@@ -1,16 +1,16 @@
 version: "1.0"
-generated_at: "2026-06-05"
+generated_at: "2026-07-06"
 purpose: |
   KOIPA AI 영업비밀관리시스템 학습·평가 데이터셋 정본 매니페스트.
   P1(분류) · P2(임베딩) · P3(합성) · P4(추출) PoC 5종 + Phase 8 고도화 산출물.
   자체결정으로 발주처 실문서 미제공 가정. 합성·공개·골든셋 3중 구성.
 
-owner: lloydk
+owner: koipa
 contact: forfre12@gmail.com
 
 # 운영 현황 (2026-06-05) — readiness/배포 모델 정합 (reports/operational_readiness.json)
 current_status:
-  deployed_model: artifacts/classifier_p1_retrain_v4_step3/v-f9b5cedb   # step3 (.env CLASSIFIER_MODEL_DIR)
+  deployed_model: artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9   # v4_clean — .env CLASSIFIER_MODEL_DIR 과 일치(v-f9b5cedb 오기 정정 2026-07-22)
   p1_classifier:
     legal_tier_f1: 0.889       # 법적근거 티어(진짜 라벨) — high-risk->S3 = 0 (위험 미탐 없음)
     full_holdout_f1: 0.635     # 전체 홀드아웃 — llm_judge ~47% 오라벨 노이즈 포함 보수적 하한
@@ -18,9 +18,9 @@ current_status:
   p2_retrieval:
     recall_at_5: 0.925         # KURE-v1 + ES hybrid, chunk 1200/100
     gate: PASS
-  human_review_gold: "0/40"    # 외부 의존(발주처 사람 라벨) — 유일한 진짜 릴리즈 블로커
+  human_review_gold: "1/40"    # external reviewed samples still required for strict GA
   model_parity: PASS
-  readiness_verdict: FAIL
+  readiness_verdict: CONDITIONALLY_READY
 
 datasets:
 
@@ -38,7 +38,7 @@ datasets:
       P3 dryrun + P2 임베딩 천장 측정용. noop 결정론적 생성이라
       본문 단조성으로 Recall@5 천장 0.7222 정량 입증의 입력.
     grades: { TS: 1250, S1: 1250, S2: 1250, S3: 1250 }
-    license: MIT (LloydK 자체 생성)
+    license: MIT (사업단 자체 생성)
     indexed_in_es: true
     es_index: docs
 
@@ -95,7 +95,7 @@ datasets:
     purpose: |
       Phase 3 KF-DeBERTa 1ep 학습 입력. 학습 분포 F1=1.0 / FNR=0.0% PASS.
       학습 외 분포 정합 83.3% (합성 데이터 한계 정량 입증).
-    license: MIT (LloydK 자체 생성)
+    license: MIT (사업단 자체 생성)
 
   labeled_5k_plus_qwen3:
     path: poc/datasets/labeled_5k_plus_qwen3/
@@ -138,7 +138,7 @@ datasets:
     purpose: |
       S9 적대적 FNR 게이트 100건. P1-B3 (2026-05-29 P1 묶음).
       attack_type: 동음이의어·약어 치환·문맥 분산·rule keyword 누락.
-    license: MIT (LloydK 자체 큐레이션)
+    license: MIT (사업단 자체 큐레이션)
 
   # ------------------------------------------------------------
   # P4 추출 코퍼스 (HWP/PDF/DOCX)
@@ -151,9 +151,9 @@ datasets:
     format: 다양 (HWP / DOCX / PDF / TXT)
     purpose: P4 추출 PoC 입력. 누락 ≤ 5% · 품질 ≥ 0.7 합격선 측정.
     note: |
-      현재 30파일은 LloydK 자체 작성 보일러플레이트. 발주처 실문서 도착 시
+      현재 30파일은 사업단 자체 작성 보일러플레이트. 발주처 실문서 도착 시
       datasets/raw/koipa/로 적재 + P4 재측정.
-    license: MIT (LloydK 자체 생성)
+    license: MIT (사업단 자체 생성)
 
 # ------------------------------------------------------------
 # ES 영구 인덱싱 (Phase 8 B1-2)
@@ -193,13 +193,16 @@ acceptance:
   # -------------------------------------------------------
   p1_classification:
     pass_criteria: { F1_macro: ">= 0.75", FNR_underclass: "<= 5%" }
-    current_model: artifacts/classifier_p1_retrain_v3/v-3443785f
-    model_spec: KF-DeBERTa-base, max_seq=512, bf16, 5ep, labeled_p1_retrain_v3
+    deployed_model: artifacts/classifier_p1_retrain_v4_clean/v-dd3abab9   # 실제 배포본(current_status.deployed_model 과 일치). 구 v3 오기 정정 2026-07-26
+    candidate_model: artifacts/classifier_p1_v5_clean/v-fe4b386b          # v5_clean 재빌드 후보 — 게이트 양축 PASS(datasets/labeled_p1_v5_clean/GATE_RESULTS.md). 배포 스왑은 사람 결정
+    model_spec: KF-DeBERTa-base, max_seq=512, bf16, 5ep
     model_history:
       v-1ac43d0f: "OSS only, gold_real F1=0.322"
       v-37d130b7: "mixed v1, gold_real F1=0.545, S1_R=0.20"
       v-44384f0c: "mixed v2, gold_real F1=0.487, S1_R=0.68, FNR=0.000"
-      v-3443785f: "p1_retrain_v3 current, OSS test F1=0.794; public/case/nkt direct F1=0.830, TS/S1/S2->S3=0"
+      v-3443785f: "p1_retrain_v3, OSS test F1=0.794; public/case/nkt direct F1=0.830 (train-on-test 오염)"
+      v-dd3abab9: "p1_retrain_v4_clean 배포본. clean holdout f1 0.688, S1_R 0.43, 공개문서 과분류 raw 79%(운영 게이트가 캡)"
+      v-fe4b386b: "labeled_p1_v5_clean 후보(2026-07-26). hardened holdout f1 0.917·S1_R 0.86·high_risk_to_s3 0; 공개문서 과분류 4%; adversarial high->S3 무회귀"
     eval_tiers:
       synthetic_masked_eval:
         eval_type: synthetic_masked
@@ -210,7 +213,7 @@ acceptance:
         eval_type: llm_judge_pseudo_gold
         source: gold_real/classification_gold.jsonl (777 total; 610 llm_judge/codex eval records)
         filter: llm_judge_primary, llm_judge_consensus, codex_review
-        measured_rule_labeler:  { F1: 0.498, FNR: 0.367, n: 610, note: "2026-06-01 high-risk pattern guard" }
+        measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "legacy proxy metric before 2026-07-06 distribution refresh" }
         measured_ml_v3_direct:  { F1: 0.487, FNR: 0.441, n: 710, note: "S1_R=0.68, S2_R=0.49" }
         measured_ml_v3_api:     { F1: 0.487, FNR: 0.000, n: 710, note: "FNR-safe 오버라이드, TS/S1/S2 R=1.00" }
         measured_ml_retrain_v3_direct: { F1: 0.547, FNR_TS_S1: 0.000, n: 610, TS_S1_S2_to_S3: 17, note: "S2->S3 remains on pseudo tier" }
@@ -220,12 +223,12 @@ acceptance:
         source: gold_real/classification_gold.jsonl
         filter: human_review, public_definitive, koipa_case_based, nkt_designated
         gold_breakdown:
-          human_review: 0건          # 발주처 실문서 (미입수)
+          human_review: 1           # external reviewed sample
           public_definitive: 50      # public definitive S3
-          koipa_case_based: 81       # KOIPA/case-based S1/S2
-          nkt_designated: 36         # national-core/high-risk TS
-          total: 167
-        measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "TS recall=0.972; S1/S2 still below target" }
+          koipa_case_based: 80       # KOIPA/case-based S1/S2
+          nkt_designated: 30         # national-core/high-risk TS
+          total: 161
+        measured_rule_labeler: { F1: 0.561, FNR: 0.368, n: 167, note: "legacy proxy metric before 2026-07-06 distribution refresh" }
         measured_ml_v3_api:    { F1: 0.561, FNR: 0.000, n: 100, note: "TS/S1/S2 R=1.00, S3 과분류" }
         measured_ml_retrain_v3_direct: { F1: 0.830, FNR_TS_S1: 0.000, n: 167, TS_S1_S2_to_S3: 0, note: "TS/S1/S2 recall all 1.00; S3 recall 0.46" }
         note: |
@@ -354,21 +357,22 @@ gold:
       구 generator 기반 합성 문서. 등급명 마스킹 처리했으나 내용 자체가
       등급 시맨틱 반영 → 룰 라벨러 F1=1.0. 운영 성능 근거 불가.
       보고 시 반드시 synthetic_masked_eval_f1 로 표기.
-    generated_at: "2026-06-01"
+    generated_at: "2026-07-06"
 
   classification_gold_real:
     path: poc/datasets/gold_real/classification_gold.jsonl
     use: eval_only
     lines: 777
-    grade_distribution: { S3: 420, S2: 232, S1: 70, TS: 55 }
+    grade_distribution: { S3: 577, S2: 89, S1: 56, TS: 55 }   # 2026-07-22 판례-프록시 디오염 후(scripts/depollute_court_proxy_gold.py)
     label_source_distribution:
       llm_judge_primary: 524
       llm_judge_consensus: 67
       codex_review: 19
-      human_review: 0
+      human_review: 1
       public_definitive: 50
-      koipa_case_based: 81
-      nkt_designated: 36
+      koipa_case_based: 80
+      nkt_designated: 30
+      curated_scenario: 6
     source: oss_corpus + public_scenario + synthetic_grounded
     eval_results:
       synthetic_masked_f1: 1.000
@@ -385,8 +389,12 @@ gold:
       위 llm_judge_gold_f1 / public_case_nkt_gold_f1 는 평가 독립성 없음(암기). 운영 근거 금지.
       디오염 측정은 acceptance.p1_classification.eval_tiers.clean_holdout 참조.
       release 판단은 운영 파이프라인 기준 system FNR 2.8%(≤5% 통과, TS 100%) — 과분류 트레이드오프.
-      777 records after high-risk boundary supplement. human_review=0 remains.
-    updated_at: "2026-06-02"
+      777 records after high-risk boundary supplement. human_review=1/40; strict GA remains externally blocked.
+      2026-07-22 판례-프록시 디오염: 공개 판례를 LLM 프록시가 과상향한 157건(S2 143·S1 14)을 S3로 정정
+      (scripts/depollute_court_proxy_gold.py, 결정론적·멱등, corrected 스탬프). 대상은 전부 llm_judge_primary
+      = golden_tiers TIER_SILVER(학습분포)이라 평가 정답(locked/is_real_locked_eval)에는 영향 없음.
+      ⚠ 위 eval_results F1/FNR 블록은 디오염 이전 값 — 재산출(make p1-eval) 필요.
+    updated_at: "2026-07-22"
   retrieval_gold:
     path: poc/datasets/gold_real/retrieval_gold.jsonl
     eval_type: oss_eval_doc_id
@@ -395,6 +403,8 @@ gold:
     note: expected_doc_id/relevant_doc_ids based Recall/MRR/nDCG evaluation set generated on 2026-06-01.
 
 changelog:
+  - { date: "2026-07-26", version: "1.6", note: "v5_clean 원천 재빌드(scripts/build_p1_v5_clean.py, 결정론): 라벨정합·출처보존·공개판결 S3 결정규칙·판례 15%캡·균형영어120·누출0 split → 2554행. 후보 v-fe4b386b 게이트 양축 PASS(hardened holdout f1 0.688→0.917·S1 0.43→0.86, 공개문서 FPR 79%→4%, adversarial high→S3 무회귀). p1_classification.current_model v3 오기→deployed v-dd3abab9/candidate v-fe4b386b 정정. 배포 스왑은 사람 결정." }
+  - { date: "2026-07-06", version: "1.4", note: "classification_gold_real manifest refreshed to match current label_source distribution; human_review=1/40, strict GA still externally blocked." }
   - { date: "2026-05-30", version: "1.0", note: "정본 매니페스트 신설 (B3 정본화)" }
   - { date: "2026-06-01", version: "1.1", note: "데이터 품질 복구: labeled_5k/rag_corpus_qa deprecated, gold set 신설, generator V2 프롬프트 교체" }
   - { date: "2026-06-02", version: "1.2", note: "P1 retrain v3 and P2 KURE-v1 ES hybrid gold metrics reflected; release remains blocked on human_review=0." }

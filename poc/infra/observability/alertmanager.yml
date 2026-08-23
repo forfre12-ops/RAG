@@ -1,0 +1,36 @@
+# Alertmanager — Prometheus 알림(alert_rules.yml 29종: FnrSpike·AuditChainBroken·
+# KillGateTripped·ServingRuleFallbackActive·ClassifyPersistFailure 등)을 그룹·중복제거해
+# 통지 채널로 라우팅한다. 이게 없으면 규칙이 발화해도 Prometheus /alerts 에만 뜨고 아무도
+# 능동적으로 통지받지 못한다("안전하게 틀리고 빨리 배운다"의 통지 절반이 비어 있음).
+#
+# 폐쇄망 통지 싱크(사내 SMTP 메일 / 메신저 webhook)는 고객사 환경마다 달라 미리 못 박지
+# 않는다. 기본 receiver 는 채널 미설정 상태 = 알림이 Alertmanager UI(:9093)에는 그룹핑되어
+# 보이되 외부로 push 되지 않는다(정직한 중간 상태). 고객사 채널이 결정되면 아래 receivers 에
+# email_configs / webhook_configs 를 추가하면 즉시 능동 통지된다.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # 안전 핵심(critical)은 더 자주 재알림.
+    - matchers: ['severity="critical"']
+      receiver: default
+      repeat_interval: 1h
+
+receivers:
+  # (통지 채널 미결) — 알림은 Alertmanager UI(:9093)에서 확인. 사내 채널 연결 예시:
+  #   email_configs:
+  #     - to: 'ai-ops@사내메일'
+  #       from: 'koipa-alert@사내메일'
+  #       smarthost: 'smtp.사내:25'
+  #       require_tls: false
+  #   webhook_configs:
+  #     - url: 'http://사내-webhook/alerts'
+  #       send_resolved: true
+  - name: default

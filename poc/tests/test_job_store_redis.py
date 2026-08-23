@@ -12,7 +12,7 @@ import uuid
 
 import pytest
 
-from lloydk.services.job_store import (
+from koipa.services.job_store import (
     InMemoryJobStore,
     JobStore,
     RedisJobStore,

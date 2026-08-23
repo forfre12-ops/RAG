@@ -17,11 +17,11 @@ from __future__ import annotations
 
 import time
 
-from lloydk.adapters.llm.base import LLMResponse, UsageRecord
-from lloydk.adapters.llm.noop_provider import NoopProvider
-from lloydk.schemas.classify import RagContextHit
-from lloydk.schemas.common import Grade
-from lloydk.services.rag_answer_service import (
+from koipa.adapters.llm.base import LLMResponse, UsageRecord
+from koipa.adapters.llm.noop_provider import NoopProvider
+from koipa.schemas.classify import RagContextHit
+from koipa.schemas.common import Grade
+from koipa.services.rag_answer_service import (
     build_answer_prompt,
     synthesize_answer,
 )
@@ -247,7 +247,7 @@ def test_to_dict_serializable():
 
 def test_answer_enforce_citations_field_defaults_off():
     """answer_enforce_citations가 Settings 정식 필드이고 기본값 False인지 확인."""
-    from lloydk.config import Settings
+    from koipa.config import Settings
 
     s = Settings()
     assert hasattr(s, "answer_enforce_citations")

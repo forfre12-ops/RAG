@@ -1,0 +1,2963 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>한국지식재산보호원 | 관리자 콘솔</title>
+<meta name="description" content="루프 A(분류 → 검수·확정)와 루프 B(검증문서 → 검수·서명 → 재학습 → 배포 → 메트릭)를 탭으로 나눈 관리자 콘솔. 기존 /api/v1 엔드포인트를 그대로 호출합니다." />
+<style>
+:root{
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --red:#e11d2e; --red-soft:#fef2f2; --red-border:#fecaca;
+  --green:#16a34a; --green-soft:#f0fdf4; --amber:#d97706; --amber-soft:#fffbeb;
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.6;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;}
+::selection{background:var(--text);color:var(--bg);}
+a{color:var(--text);}
+
+/* NAV */
+.brand{display:inline-flex;align-items:center;gap:9px;text-decoration:none;color:var(--text);}
+.brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:3px;}
+.health-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--border-mid);color:var(--text-dim);background:var(--bg-surface);cursor:pointer;}
+.health-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+.health-pill.ok .dot{background:var(--green);}
+.health-pill.ok{color:var(--green);border-color:var(--green);background:var(--green-soft);}
+.health-pill.bad .dot{background:var(--red);}
+.health-pill.bad{color:var(--red);border-color:var(--red-border);}
+
+/* LAYOUT */
+.wrap{max-width:1280px;margin:0 auto;padding:24px 22px 100px;}
+.lede-row{margin:6px 0 22px;}
+.h1{font-size:clamp(22px,3.2vw,30px);font-weight:800;letter-spacing:-.035em;margin:0 0 8px;}
+.lede{color:var(--text-soft);font-size:14px;max-width:760px;margin:0;}
+
+/* FLOW STEPPER */
+.flow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:18px 0 26px;padding:14px 16px;border:1px solid var(--border-mid);border-radius:10px;background:var(--bg-surface);}
+.flow-step{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--text-dim);padding:5px 11px;border:1px solid var(--border-mid);border-radius:7px;background:#fff;}
+.flow-step b{font-family:var(--font-mono);font-size:11px;background:var(--bg-strong);color:var(--text);width:18px;height:18px;display:grid;place-items:center;border-radius:5px;}
+.flow-step.done{border-color:var(--green);color:var(--green);background:var(--green-soft);}
+.flow-step.done b{background:var(--green);color:#fff;}
+.flow-arrow{color:var(--text-faint);font-size:14px;}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.col-span{grid-column:1 / -1;}
+@media(max-width:900px){.grid{grid-template-columns:1fr;}}
+
+/* CARD */
+.card{border:1px solid var(--border-mid);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 17px;border-bottom:1px solid var(--border);background:var(--bg-surface);}
+.card-head .ttl{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.card-head .step-no{font-family:var(--font-sans);font-size:10.5px;font-weight:700;letter-spacing:-.01em;color:#fff;background:var(--bg-inverse);min-width:20px;height:20px;padding:0 7px;display:inline-grid;place-items:center;border-radius:5px;white-space:nowrap;flex-shrink:0;}
+/* 흐름 밖 화면(상시 조회·설정) — 순서가 없으므로 숫자를 주지 않는다. 진한 배지와 구별되게 외곽선만. */
+.card-head .step-no.aux{background:transparent;color:var(--text-dim);border:1px solid var(--border-strong);font-weight:600;}
+.card-head .ep{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
+.card-body{padding:16px 17px;display:flex;flex-direction:column;gap:11px;}
+
+/* FORM */
+label.fld{display:block;font-size:11px;font-weight:700;font-family:var(--font-mono);letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;}
+input[type=text],input[type=password],input[type=number],select,textarea{
+  width:100%;font-family:var(--font-sans);font-size:13px;color:var(--text);background:#fff;
+  border:1px solid var(--border-strong);border-radius:7px;padding:8px 10px;outline:none;transition:border-color .12s,box-shadow .12s;}
+input:focus,select:focus,textarea:focus{border-color:var(--text);box-shadow:0 0 0 3px rgba(0,0,0,.05);}
+textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.field{min-width:0;}
+.hint{font-size:11.5px;color:var(--text-faint);margin:2px 0 0;line-height:1.45;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font-sans);font-size:13px;font-weight:600;
+  padding:8px 15px;border-radius:7px;border:1px solid var(--bg-inverse);background:var(--bg-inverse);color:#fff;cursor:pointer;transition:opacity .12s,transform .04s;}
+.btn:hover{opacity:.88;} .btn:active{transform:translateY(1px);} .btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn.sec{background:#fff;color:var(--text);border-color:var(--border-strong);}
+/* [2026-08-21] 다섯 화면 공통 버튼 어휘. `.btn` 의 기본 뜻이 화면마다 달라서
+   (여기는 검정=주요, 골든 2면은 흰=보조) 같은 역할 버튼이 다른 이름을 써 왔다.
+   기본값은 건드리지 않고 **별칭만** 추가한다 — 어느 화면에서 어느 이름을 써도
+   같은 모양이 나오게. 주요=btn black/btn primary, 보조=btn sec/btn ghost. */
+.btn.ghost{background:#fff;color:var(--text);border-color:var(--border-strong);}
+.btn.black,.btn.primary{background:var(--bg-inverse,#111);color:#fff;border-color:var(--bg-inverse,#111);}
+.btn.red{background:var(--red);border-color:var(--red);}
+.btn.btn.sm{font-size:12px;padding:5px 11px;}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;}
+
+/* TAGS / GRADES */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;}
+.g-TS{background:var(--bg-inverse);color:#fff;} .g-S1{background:#3f3f46;color:#fff;}
+.g-S2{background:#a1a1aa;color:#fff;} .g-S3{background:var(--bg-strong);color:var(--text);}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;font-family:var(--font-mono);padding:3px 9px;border-radius:999px;border:1px solid var(--border-mid);}
+.pill.warn{background:var(--amber-soft);color:var(--amber);border-color:#fcd34d;}
+.pill.ok{background:var(--green-soft);color:var(--green);border-color:#86efac;}
+.pill.err{background:var(--red-soft);color:var(--red);border-color:var(--red-border);}
+
+/* RESULT BLOCK */
+.kv{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;}
+.kv div{display:flex;gap:6px;} .kv b{color:var(--text);} .kv span{color:var(--text-dim);}
+.factors{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.factor{border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--bg-surface);}
+.factor .fl{font-size:10px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);}
+.factor .fv{font-size:20px;font-weight:800;letter-spacing:-.03em;}
+.meter{height:6px;border-radius:3px;background:var(--bg-strong);overflow:hidden;margin-top:8px;}
+.meter > i{display:block;height:100%;background:var(--text);}
+.evi{display:flex;flex-wrap:wrap;gap:5px;}
+.evi .chip{font-family:var(--font-mono);font-size:10.5px;background:var(--bg-mid);border:1px solid var(--border-mid);border-radius:5px;padding:2px 7px;color:var(--text-soft);}
+
+/* QUEUE */
+.queue{display:flex;flex-direction:column;gap:9px;}
+.q-empty{font-size:12.5px;color:var(--text-faint);text-align:center;padding:18px 0;}
+.q-item{border:1px solid var(--border-mid);border-radius:9px;padding:11px 13px;display:flex;flex-direction:column;gap:8px;}
+.q-item.flagged{border-color:var(--amber);background:var(--amber-soft);}
+.q-item.resolved{opacity:.6;}
+.q-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.q-id{font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);}
+.q-title{font-size:13px;font-weight:600;}
+.q-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.q-actions select{width:auto;padding:5px 8px;font-size:12px;}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border-mid);border-radius:9px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{text-align:left;font-size:10px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);padding:8px 11px;border-bottom:1px solid var(--border-mid);background:var(--bg-surface);white-space:nowrap;}
+td{padding:8px 11px;border-bottom:1px solid var(--border);color:var(--text-soft);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td.mono,th.mono{font-family:var(--font-mono);}
+
+/* JSON / LOG */
+.json{font-family:var(--font-mono);font-size:11px;line-height:1.55;background:var(--bg-mid);border:1px solid var(--border-mid);border-radius:8px;padding:11px 13px;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:var(--text-soft);}
+details{border:1px solid var(--border);border-radius:8px;}
+details summary{cursor:pointer;font-size:11.5px;font-weight:600;color:var(--text-dim);padding:7px 11px;font-family:var(--font-mono);}
+details[open] summary{border-bottom:1px solid var(--border);}
+details .json{border:none;border-radius:0;margin:0;max-height:300px;}
+
+/* LOG CONSOLE */
+.logbar{position:fixed;bottom:0;left:0;right:0;z-index:90;background:var(--bg-inverse);color:#e4e4e7;font-family:var(--font-mono);font-size:11px;border-top:1px solid #27272a;}
+.logbar-head{display:flex;align-items:center;justify-content:space-between;padding:6px 16px;border-bottom:1px solid #27272a;cursor:pointer;}
+.logbar-head b{color:#fff;letter-spacing:.04em;}
+.logbar-body{max-height:150px;overflow:auto;padding:8px 16px;}
+.logbar-body.collapsed{display:none;}
+.logline{display:flex;gap:9px;padding:1px 0;}
+.logline .t{color:#71717a;flex-shrink:0;}
+.logline .m{white-space:pre-wrap;word-break:break-word;}
+.logline.ok .m{color:#86efac;} .logline.err .m{color:#fca5a5;} .logline.info .m{color:#e4e4e7;} .logline.req .m{color:#93c5fd;}
+
+.sec-note{font-size:11.5px;color:var(--text-faint);line-height:1.5;border-left:2px solid var(--border-strong);padding-left:10px;}
+.warnbox{font-size:12px;color:var(--amber);background:var(--amber-soft);border:1px solid #fcd34d;border-radius:8px;padding:9px 12px;}
+
+/* DASHBOARD (관제 종합) */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(206px,1fr));gap:12px;}
+/* 검수 근거 펼침 — 클릭한 행에서만 조회한다(lazy). */
+.q-why{margin-top:2px;}
+.why-box{margin-top:8px;border:1px solid var(--border-mid);border-radius:8px;padding:9px 11px;background:var(--bg-surface);}
+.why-head{font-size:12px;margin-bottom:7px;}
+.why-agg{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.why-ev{display:flex;align-items:baseline;gap:8px;font-size:12px;padding:4px 0;border-top:1px solid var(--border);}
+.why-ev:first-of-type{border-top:0;}
+.why-t{font-size:10.5px;color:var(--text-faint);white-space:nowrap;min-width:118px;}
+.why-x{flex:1;word-break:break-all;}
+.why-w{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);white-space:nowrap;}
+/* 프로파일에 맞지 않는 카드 — showPane 의 인라인 display 보다 우선해야 하므로 !important. */
+.pf-hidden{display:none !important;}
+.profile-banner{margin:10px 0 4px;padding:9px 13px;border-radius:8px;font-size:12.5px;font-weight:600;border-left:4px solid;}
+.profile-banner.jjw{background:var(--bg-surface);border-color:var(--accent);}
+.profile-banner.cust{background:var(--bg-surface);border-color:#b8860b;}
+.dash-panel{border:1px solid var(--border-mid);border-left:3px solid var(--border-strong);padding:13px 14px;background:var(--bg-surface);display:flex;flex-direction:column;gap:9px;min-width:0;}
+/* 좌측 색선 하나로 칸 상태를 먼저 읽게 한다 — 배지를 다 읽지 않아도 정상/주의가 구분된다. */
+.dash-panel.st-ok{border-left-color:#16a34a;}
+.dash-panel.st-warn{border-left-color:#d97706;}
+.dash-panel.st-err{border-left-color:#dc2626;}
+.dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+/* 제목이 「배포 준 / 비 상태」로 쪼개지고 배지가 세로로 무너지던 것 — 제목은 줄바꿈 금지,
+   배지는 자리가 모자라면 통째로 다음 줄로 내린다. */
+.dash-panel .dp-h>span:first-child{white-space:nowrap;}
+.dash-panel .dp-t{font-family:var(--font-sans);font-size:12.5px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:-.01em;white-space:nowrap;}
+.dash-panel .dp-tags{margin-left:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;}
+.dash-panel .dp-tags .pill{white-space:nowrap;font-family:var(--font-sans);letter-spacing:0;text-transform:none;font-size:11px;}
+.dash-panel .dp-big{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;}
+.dash-panel .dp-big .u{font-size:12px;font-weight:600;color:var(--text-faint);letter-spacing:0;margin-left:3px;}
+.dash-panel .dp-row{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-soft);}
+.dash-panel .dp-row b{color:var(--text);font-variant-numeric:tabular-nums;}
+.dash-panel .dp-note{font-size:11.5px;color:var(--text-faint);line-height:1.45;}
+/* 하위 수치 3~4개 — 라벨 위, 값 아래로 세워 좁은 칸에서도 짝이 안 흐트러진다. */
+.dash-panel .dp-h + .dp-stat{border-top:0;padding-top:0;}
+.dash-panel .dp-stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(36px,1fr));gap:6px;border-top:1px solid var(--border);padding-top:8px;}
+.dash-panel .dp-stat>div{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.dash-panel .dp-stat span{font-size:10.5px;color:var(--text-faint);}
+.dash-panel .dp-stat b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2;}
+/* 등급별 서명 건수 — flex 로 흘리면 「TS 0 실0/합0  S1 0 …」이 제멋대로 접힌다. 한 줄 = 한 등급. */
+.dash-panel .dp-tab{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:5px 12px;}
+.dash-panel .dp-tab>div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-soft);min-width:0;}
+.dash-panel .dp-tab .gk{font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--text);background:var(--bg-strong);padding:1px 5px;}
+.dash-panel .dp-tab .n{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:20px;text-align:right;}
+.dash-panel .dp-tab small{color:var(--text-faint);font-size:10.5px;font-family:var(--font-mono);white-space:nowrap;}
+.dash-panel .warnbox{font-size:11.5px;line-height:1.5;padding:8px 10px;}
+.dp-degraded{font-size:10.5px;color:var(--amber);font-family:var(--font-mono);}
+
+/* ============================================================
+   직선형 + 모노 전환 — 등급 배지(g-TS/S1/S2/S3) 4색만 포인트로 유지,
+   나머지 상태/장식 색(빨강·초록·주황)은 전부 흑백·그레이로.
+   (소스 순서상 마지막이라 위 규칙을 덮는다)
+   ============================================================ */
+*{border-radius:0 !important;}
+:root{
+  --red:#0a0a0a;   --red-soft:#f4f4f4;   --red-border:rgba(0,0,0,.16);
+  --green:#525252; --green-soft:#f4f4f4;
+  --amber:#737373; --amber-soft:#f4f4f4;
+}
+.g-TS{background:#dc2626 !important;color:#fff !important;}
+.g-S1{background:#d97706 !important;color:#fff !important;}
+.g-S2{background:#0070f3 !important;color:#fff !important;}
+.g-S3{background:#16a34a !important;color:#fff !important;}
+/* 하드코딩 유채색(변수 밖) → 모노 */
+.pill.warn, .pill.ok { border-color:var(--border-strong) !important; }
+.warnbox { border-color:var(--border-strong) !important; }
+.logline.req .m { color:#e4e4e7 !important; }
+
+/* ============================================================
+   상태 의미색 복원 — 위 모노 전환이 성공/경고/실패 배경을 모두 #f4f4f4 로,
+   --red 를 #0a0a0a 로 덮어 "지금 성공한 건가"를 화면에서 판별할 수 없었다.
+   장식색은 모노 유지하고, 의미를 가진 색(성공·경고·실패·파괴적 동작)만 예외.
+   ============================================================ */
+.pill.ok        { background:#f0fdf4 !important; color:#15803d !important; border-color:#86efac !important; }
+.pill.warn      { background:#fffbeb !important; color:#b45309 !important; border-color:#fcd34d !important; }
+.pill.err       { background:#fef2f2 !important; color:#b91c1c !important; border-color:#fecaca !important; }
+.health-pill.ok      { background:#f0fdf4 !important; color:#15803d !important; border-color:#86efac !important; }
+.health-pill.ok .dot { background:#16a34a !important; }
+.health-pill.bad     { background:#fef2f2 !important; color:#b91c1c !important; border-color:#fecaca !important; }
+.health-pill.bad .dot{ background:#dc2626 !important; }
+.warnbox        { background:#fffbeb !important; color:#b45309 !important; border-color:#fcd34d !important; }
+.flow-step.done   { background:#f0fdf4 !important; color:#15803d !important; border-color:#86efac !important; }
+.flow-step.done b { background:#16a34a !important; color:#fff !important; }
+.logline.ok .m  { color:#86efac !important; }
+.logline.err .m { color:#fca5a5 !important; }
+/* 파괴적 동작 버튼은 평범한 버튼과 반드시 구별되어야 한다 */
+.btn.red        { background:#dc2626 !important; border-color:#dc2626 !important; color:#fff !important; }
+.btn.red:hover  { background:#b91c1c !important; border-color:#b91c1c !important; }
+
+/* ============================================================
+   2-루프 스테퍼 · 탭 · 요건 배지
+   ============================================================ */
+.loopwrap{display:flex;flex-direction:column;gap:8px;margin:18px 0 14px;}
+.flow.loop{margin:0;}
+.loop-tag{font-size:11px;font-weight:800;letter-spacing:.02em;color:#fff;background:#0a0a0a;
+          padding:4px 9px;margin-right:4px;white-space:nowrap;}
+.loop-note{font-size:11px;color:var(--text-faint);margin-left:auto;white-space:nowrap;}
+
+.tabbar{display:flex;gap:0;border-bottom:2px solid var(--border-strong);margin:18px 0 0;flex-wrap:wrap;}
+.tab{appearance:none;cursor:pointer;background:transparent;border:1px solid transparent;border-bottom:none;
+     padding:9px 16px 8px;font-size:13.5px;font-weight:700;color:var(--text-dim);
+     display:inline-flex;align-items:baseline;gap:7px;margin-bottom:-2px;}
+.tab:hover{color:var(--text);background:var(--bg-mid);}
+.tab.active{color:var(--text);background:#fff;border-color:var(--border-strong);
+            border-bottom:2px solid #fff;}
+.tab-sub{font-size:11px;font-weight:500;color:var(--text-faint);}
+/* [2026-08-23] 탭 묶음 표시 — 왼쪽=매일 하는 일, 오른쪽=모델 담당자 일. */
+.tab-group-label{align-self:flex-end;padding:0 10px 9px 2px;font-size:11px;font-weight:700;
+  letter-spacing:.02em;color:var(--text-faint);white-space:nowrap;}
+.tab-divider{align-self:stretch;width:1px;margin:6px 14px 0;background:var(--border-strong);}
+/* 설정은 매일 쓰는 업무가 아니라 톱니로 뺐다 — 오른쪽 끝에 아이콘만 둔다. */
+.tab.tab-icon{margin-left:auto;padding:9px 12px;color:var(--text-faint);}
+.tab.tab-icon:hover{color:var(--text);}
+.tab.tab-icon.active{color:var(--text);}
+@media (max-width:720px){.tab-divider{display:none;} .tab-group-label{width:100%;padding-bottom:2px;}}
+.tab.active .tab-sub{color:var(--text-soft);}
+.pane-note{font-size:12px;color:var(--text-soft);margin:11px 0 4px;line-height:1.5;}
+
+/* 요건 배지 — 어느 카드가 어느 RFP 요건을 이행하는지 화면에서 바로 보이게 한다.
+   감리에서 "구현했는가"를 화면으로 답할 수 있어야 하므로 숨기지 않는다.
+   클래스명 주의: 요청 로그 줄이 이미 `logline req` 를 쓰고 있어(log(msg,'req'))
+   `.req` 를 쓰면 로그 줄에도 배지 스타일이 먹는다. 그래서 `.reqtag` 로 분리한다. */
+.reqtag{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.01em;
+        padding:2px 6px;margin-left:7px;vertical-align:middle;white-space:nowrap;
+        background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;}
+.reqtag
+/* 고급설정 접기 · 다음단계 배너 */
+details.adv{margin-bottom:6px;border:1px solid var(--border-mid);padding:0 12px;}
+details.adv>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-dim);
+                    padding:9px 0;list-style:none;}
+details.adv>summary::-webkit-details-marker{display:none;}
+details.adv>summary::before{content:'▸ ';font-size:11px;}
+details.adv[open]>summary::before{content:'▾ ';}
+details.adv[open]{padding-bottom:12px;}
+.nextbox{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+         margin-top:12px;padding:13px 15px;font-size:12.5px;line-height:1.55;
+         background:#f0fdf4;border:1px solid #86efac;color:#14532d;}
+
+/* 쓰기 게이트 — 허용(기본)일 땐 조용히, 해제했을 때만 경고색으로 */
+.writegate{padding:9px 12px;border:1px solid var(--border-mid);background:var(--bg-mid);}
+.writegate.off{background:#fffbeb !important;border-color:#fcd34d !important;color:#b45309 !important;}
+.writegate.off #write-gate-msg{color:#b45309 !important;}
+
+/* 드래그&드롭 업로드 */
+.dropzone{border:2px dashed var(--border-strong);background:var(--bg-mid);cursor:pointer;
+          padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;
+          font-size:12.5px;color:var(--text-soft);transition:background .12s,border-color .12s;}
+.dropzone b{font-size:13px;color:var(--text);}
+.dropzone span{font-size:11.5px;color:var(--text-faint);}
+.dropzone:hover{background:var(--bg-strong);}
+.dropzone.over{border-color:#0070f3;background:#eff6ff;color:#1d4ed8;}
+.dropzone.over b{color:#1d4ed8;}
+/* [2026-08-20] 옛 상단(nav.nav) 전용 규칙 7개 삭제 — 상단이 header.top 으로 바뀌어
+   매칭 대상이 0 이 됐다(class="nav"·nav-inner·brand-name·brand-sep·brand-sub·
+   nav-right·nav-badge 전부 마크업 0건). .brand/.brand-mark/.health-pill/.dot 은
+   지금 상단이 쓰므로 남긴다. */
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+/* console-header:css:start — koipa/console_nav.py HEADER_CSS. 손으로 고치지 말 것 */
+.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider,.top .nav-link{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+/* console-header:css:end */
+</style>
+<script src="./review_reason_ko.js"></script>
+<script src="./deploy_badge.js" data-screen="관리자"></script>
+</head>
+<body>
+
+<!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
+<!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">관리자 콘솔</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">검증문서 검수 목록</a><a class="cnav-link" href="/api/v1/golden/candidates/manage.html#candidates">검증문서 후보 관리</a><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a><a class="cnav-link" href="/api/v1/golden/candidates/login.html">로그인</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
+<!-- console-header:end -->
+
+<div class="wrap">
+
+  <div class="lede-row">
+    <h1 class="h1">관리자 콘솔</h1>
+    <p class="lede">이 콘솔에는 <b>두 개의 루프</b>가 있습니다 —
+    <b>루프 A(일상 운영)</b> 분류 → 검수·확정, <b>루프 B(모델 갱신)</b> 검증문서 → 검수·서명 → 재학습 → 배포 → 메트릭.
+    <b>운영</b> 탭이 루프 A, <b>검수</b>와 <b>학습 · 배포</b> 탭이 루프 B 입니다(설정은 어느 쪽도 아닙니다).
+    찾는 기능이 안 보이면 다른 탭에 있습니다.
+    모든 동작은 기존 <code>/api/v1</code> 엔드포인트를 그대로 호출합니다.</p>
+  </div>
+
+  <!-- FLOW STEPPER (2-loop) — 이 콘솔에는 성격이 다른 두 개의 루프가 있다.
+       종전 1줄 스테퍼(분류→검수→재학습→리로드→메트릭)에는 골든셋이 아예 없어서
+       "골든셋은 어디서 시작하나"가 화면에서 답이 되지 않았다. 루프를 나눠 그린다. -->
+  <div class="loopwrap">
+    <div class="flow loop" id="flow-a">
+      <span class="loop-tag">루프 A · 일상 운영</span>
+      <span class="flow-step" data-step="1"><b>1</b> 분류</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" data-step="2"><b>2</b> 검수 · 확정</span>
+      <span class="loop-note">매일 · 현업 담당자</span>
+    </div>
+    <div class="flow loop" id="flow-b">
+      <span class="loop-tag">루프 B · 모델 갱신</span>
+      <span class="flow-step" data-step="g1"><b>G1</b> 검증문서 후보</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" data-step="g2"><b>G2</b> 검수 · 서명</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" data-step="3"><b>3</b> 재학습</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" data-step="4"><b>4</b> 배포 · 리로드</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" data-step="5"><b>5</b> 메트릭</span>
+      <span class="loop-note">주기적 · 관리자</span>
+    </div>
+    <!-- [2026-08-23] 카드 배지와 이 흐름도가 서로 다른 번호를 쓰고 있었다(흐름도 1=분류인데
+         운영 탭 첫 카드도 1번이었다 — 그 카드는 검토다). 카드 배지를 이 흐름도의 단계 id 로
+         맞췄으므로, 같은 번호라는 사실을 한 줄로 밝힌다. -->
+    <p class="hint" style="margin:6px 2px 0;">아래 카드의 <b>진한 번호 배지</b>가 여기 단계와 같은 번호입니다. 흐름에 속하지 않는 화면(공통 · 조회 · 설정 · 데이터)은 번호 대신 성격을 적었습니다. <b>운영</b> 탭은 매일 하는 일을 먼저 두느라 <b>2 검토</b> 카드가 <b>1 분류</b> 카드보다 위에 있습니다.</p>
+  </div>
+
+  <!-- 탭 — 카드 12장을 상시 노출하는 대신 루프별로 나눈다.
+       DOM 에서 제거하지 않고 display 만 전환하므로, 요건 이행 증빙(해당 기능이
+       화면에 존재한다는 사실)은 그대로 유지된다. 삭제·비활성이 아니라 이동이다. -->
+  <!-- 어느 시스템에 접속했는지 항상 밝힌다 — 지재원과 고객사가 같은 화면을 쓰므로,
+       배너가 없으면 운영자가 어느 서버에서 무엇을 누르는지 구분할 근거가 화면에 없다. -->
+  <div id="profile-banner" class="profile-banner" style="display:none"></div>
+
+  <div class="tabbar" role="tablist">
+    <!-- [2026-08-20] 탭을 **사람 축**으로 다시 갈랐다. 종전 축은 기능(운영·모델·설정·관제)
+         이라 "내가 뭘 눌러야 하나" 에 답하지 못했고, model 탭 하나에 카드 6개·조작 36개가
+         몰려 있었다. 지금은 탭마다 4개 이하다(검수 3 · 학습배포 4 · 운영 4 · 설정 2). -->
+    <!-- [2026-08-23] 탭을 **두 묶음**으로 갈라 보여준다. 종전에는 넷이 나란히 있어서 검수와
+         운영이 동등한 메뉴로 보였고, 사용자가 "어느 쪽이 내 일인가"를 스스로 판단해야 했다.
+         왼쪽=매일 하는 일, 오른쪽=모델 담당자가 가끔 하는 일. 순서도 그에 맞춰 바꿨다.
+         검수(골든셋)를 학습·배포 옆에 붙인 이유: 이름이 「분류 검수 큐」와 겹쳐 일상 업무로
+         오해되는데, 실제로는 모델 평가 기준문서를 승인하는 일이라 모델 관리 쪽이 맞다. -->
+    <!-- [2026-08-23] 「설정」을 탭에서 빼고 오른쪽 끝 톱니로 옮겼다. 등급 체계·태깅 규칙은
+         도입할 때 한 번 정하고 이후 거의 바꾸지 않는데, 매일 쓰는 탭과 나란히 있으면 같은
+         빈도의 업무로 보인다. 기능·카드·요건 증빙은 그대로다 — 진입점만 옮겼다. -->
+    <!-- [2026-08-23] 묶음 이름(일상 운영 / 모델 관리)을 뺐다. 회색 글씨가 **비활성 탭처럼**
+         보여서 오히려 헷갈렸다. 설정을 톱니로 뺀 뒤 왼쪽에 「운영」 하나만 남아, 구분선만으로
+         "이건 성격이 다르다"가 전달된다. 무엇이 무엇인지는 탭 아래 한 줄 설명이 말한다. -->
+    <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제 · 감사</span></button>
+    <span class="tab-divider" aria-hidden="true"></span>
+    <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">검증문서 후보 · 서명</span></button>
+    <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">학습 후보 · 재학습 · 게이트 · 메트릭</span></button>
+    <button class="tab tab-icon" data-tab="config" role="tab" onclick="showPane('config')"
+            title="설정 — 등급 체계 · 태깅 규칙 (도입 시 한 번 정하고 이후 거의 바꾸지 않습니다)"
+            aria-label="설정">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+  </div>
+  <p class="pane-note" id="pane-note"></p>
+
+  <!-- 실시간 관제 컨트롤 (읽기 전용 자동 폴링) -->
+  <div class="flow" style="justify-content:flex-start;gap:12px;">
+    <span style="display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;">
+      <span id="auto-dot" style="width:9px;height:9px;border-radius:50%;background:var(--text-faint);display:inline-block;"></span>
+      실시간 관제
+    </span>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-soft);margin:0;">
+      자동 갱신
+      <select id="auto-interval" onchange="onAutoChange()" style="width:auto;padding:5px 9px;font-size:12.5px;">
+        <option value="0">끄기</option>
+        <option value="3">3초</option>
+        <option value="5">5초</option>
+        <option value="10">10초</option>
+        <option value="30">30초</option>
+      </select>
+    </label>
+    <span id="auto-status" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);" role="status" aria-live="polite">정지</span>
+    <span id="auto-stamp" style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-left:auto;"></span>
+    <span class="hint" style="margin:0;flex-basis:100%;">관제 대시보드와 검수 큐를 주기적으로 <b>읽기 전용</b>으로 조회합니다.</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- ===== 연결/인증 ===== (모든 탭에서 상시 노출 — 인증 컨텍스트는 전 작업의 전제) -->
+    <!-- [2026-08-23] 접어 둔다(제거 아님). 이 카드가 첫 화면 맨 위에 펼쳐져 있으면 관리자는
+         "작업 시작 전에 시스템 설정을 해야 하나"로 읽는다 — API Base·API Key·역할 헤더가
+         먼저 보이기 때문이다. 실제로는 이미 접속된 상태이고 손댈 일이 없다.
+         ⚠ 지우지는 않는다. 시연·리허설이 이 카드로 서버와 키를 바꿔 가며 돌아가고,
+         문제가 생겼을 때 손댈 곳이 여기뿐이다. 접되 한 번 누르면 나오게 둔다. -->
+    <section class="card col-span" data-pane="always" style="order:0">
+      <details>
+      <summary style="cursor:pointer;list-style:none">
+      <div class="card-head" style="border:0;padding-bottom:0">
+        <div class="ttl"><span class="step-no aux">공통</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
+        <span class="ep">X-API-Key · X-Actor-Role</span>
+      </div>
+      </summary>
+      <div class="card-body">
+        <div class="row3">
+          <div class="field">
+            <label class="fld">API Base</label>
+            <input id="cfg-base" type="text" value="/api/v1" />
+            <p class="hint">기본은 이 페이지를 서빙하는 서버. 다른 호스트면 전체 URL.</p>
+          </div>
+          <div class="field">
+            <label class="fld">X-API-Key</label>
+            <input id="cfg-key" type="text" value="demo-secret-key" placeholder="시연 서버 API 키 입력" />
+            <p class="hint">settings.api_key (.env API_KEY). 기본 <code>demo-secret-key</code> — 비어 있으면 모든 호출이 401.</p>
+          </div>
+          <div class="field">
+            <label class="fld">Actor Role</label>
+            <select id="cfg-role">
+              <option value="admin">admin</option>
+              <option value="reviewer">reviewer</option>
+              <option value="kl_backend">kl_backend</option>
+              <option value="system">system</option>
+            </select>
+            <p class="hint">기록에 남는 이름표입니다. 권한은 서버의 <code>API_KEY_ROLE</code>이 정합니다.</p>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label class="fld">User ID (actor)</label>
+            <input id="cfg-user" type="text" value="지재원관리자" />
+          </div>
+          <div class="field">
+            <label class="fld" aria-hidden="true">&nbsp;</label>
+            <button class="btn sec" onclick="checkHealth()" style="width:100%;height:38px">헬스체크 실행</button>
+          </div>
+        </div>
+        <!-- 기본 상태(허용)에서는 조용히 있고, 해제했을 때만 눈에 띈다 —
+             "눌렀는데 아무 일도 안 일어나는" 이유가 화면에 보여야 하는 쪽은 해제 상태다. -->
+        <div id="write-gate" class="writegate">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:0;">
+            <input id="cfg-write-enable" type="checkbox" style="width:auto" checked onchange="syncWriteGate()" />
+            <b>쓰기 작업 허용</b>
+            <span id="write-gate-msg" style="font-size:11.5px;color:var(--text-faint);"></span>
+          </label>
+        </div>
+      </div>
+      </details>
+    </section>
+
+    <!-- ===== 1. 분류 ===== -->
+    <!-- [2026-08-23] 운영 탭 카드 순서를 뒤집었다. 현장 관리자는 새 문서를 직접 분류하는
+         사람이 아니라 **이미 들어온 문서를 확정하는 사람**이다. 첫 카드가 「분류 실행」이면
+         자기 일이 두 번째에 있다. KL 이 관리자 화면을 보고 "잘 모르겠다"고 한 원인 중 하나다. -->
+    <section class="card" data-pane="ops" style="order:2">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 1단계">1</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
+        <span class="ep">POST /documents/analyze · POST /classify</span>
+      </div>
+      <div class="card-body">
+        <!-- 문서 업로드 — 종전에는 본문을 붙여넣거나 샘플을 고르는 길뿐이었고, 파일 업로드는
+             별도 화면(parse_demo.html)에만 있었다. 그래서 이 콘솔만 보면 "문서를 올려서
+             분류한다"는 실제 업무 흐름이 보이지 않고, 요건 FUN-022(전자문서 텍스트 추출)를
+             이행하는 화면도 콘솔에 없었다. G1 카드가 쓰는 것과 같은 추출 경로를 재사용한다. -->
+        <div class="field upload-row">
+          <label class="fld">문서 업로드 — HWP · PDF · DOCX · XLSX · PPTX · TXT <span class="reqtag">FUN-022</span></label>
+          <div id="cl-drop" class="dropzone"
+               ondragover="dzOver(event,true)" ondragleave="dzOver(event,false)" ondrop="dzDrop(event)"
+               onclick="document.getElementById('cl-file').click()">
+            <b>파일을 여기로 끌어다 놓으세요</b><span>또는 클릭해 선택</span>
+            <input id="cl-file" type="file" style="display:none"
+                   accept=".docx,.doc,.hwp,.hwpx,.pdf,.xlsx,.xls,.pptx,.txt"
+                   onchange="onPickFile()" />
+          </div>
+          <div class="btn-row" style="margin:8px 0 0;">
+            <span id="cl-file-name" class="hint" style="margin:0 auto 0 0;">선택된 파일 없음</span>
+            <button class="btn sec sm" id="btn-extract" onclick="classifyFromFile(false)">본문 추출</button>
+            <button class="btn sm" id="btn-extract-classify" onclick="classifyFromFile(true)">추출 → 분류</button>
+          </div>
+          <p class="sec-note" style="margin-top:4px;">
+            <b>[본문 추출]</b>은 저장하지 않고 아래 입력란만 채웁니다. <b>[추출 → 분류]</b>는 분류까지 실행해 검수 큐에 넣습니다.
+            동기 처리 상한을 넘는 큰 문서는 자동으로 백그라운드 분류로 전환되며 진행 상태가 아래에 표시됩니다.
+          </p>
+          <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
+          <!-- [2026-08-23] index.html(등급 시연 화면)에는 있고 관리자 콘솔에는 없던 ICD 메타데이터
+               입력칸. 서버(documents.py analyze_document)는 진작부터 source_type 등을 Form
+               필드로 받고 있었다 — 이 화면만 안 보냈다. 안 보내면 출처(Gate-1 source-prior
+               cap)·관리성(metadata-floor)이 unknown 으로 남아, 공개 문서를 올려도 상한이
+               걸릴 자리가 없다(severe-max 청크 부스트가 공개문서를 과탐할 때 이게 유일한
+               방어선 — 2026-08-23 실측 공개문서 300건 중 79건 과탐). 값은 전부 선택사항이며
+               비우면 지금처럼 unknown 으로 간다(동작 불변). -->
+          <details class="icd-box" style="margin-top:10px;border:1px solid var(--border,#e1e1de);padding:10px 12px;border-radius:6px">
+            <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-dim)">문서 속성 (ICD) — 출처 · 보안표시 · 접근범위 <span style="font-weight:400">· 선택. 넣으면 등급 판정에 반영됩니다</span></summary>
+            <div class="btn-row" style="margin-top:10px;gap:16px;flex-wrap:wrap">
+              <div class="field" style="min-width:200px">
+                <label class="fld">출처</label>
+                <select id="cl-icd-source">
+                  <option value="">— 미지정 —</option>
+                  <option value="public">공개 자료 (S3 로 상한)</option>
+                  <option value="registered_patent">등록 특허 (공개)</option>
+                  <option value="academic">학술 자료 (공개)</option>
+                  <option value="internal">내부 문서</option>
+                  <option value="external_confidential">외부 기밀 (NDA)</option>
+                </select>
+              </div>
+              <div class="field" style="min-width:200px">
+                <label class="fld">보안표시</label>
+                <select id="cl-icd-marking">
+                  <option value="">— 미지정 —</option>
+                  <option value="top_secret">극비 — 등급 TS 이상</option>
+                  <option value="secret">기밀 — 등급 S1 이상</option>
+                  <option value="confidential">대외비 — 등급 S2 이상</option>
+                  <option value="none">표기 없음</option>
+                </select>
+              </div>
+              <div class="field" style="min-width:200px">
+                <label class="fld">접근범위</label>
+                <select id="cl-icd-scope">
+                  <option value="">— 미지정 —</option>
+                  <option value="approved_only">승인자 한정 — 관리성 M=2</option>
+                  <option value="designated">지정자 한정</option>
+                  <option value="department">부서 한정</option>
+                  <option value="all_employees">전사 공개</option>
+                </select>
+              </div>
+            </div>
+          </details>
+        </div>
+        <!-- [2026-08-23] 샘플 문서 고르기·일괄 분류를 **뺐다.**
+             ① 그 샘플은 평가 정답지(검증문서)에 들어 있는 문서다. 화면을 열면 본문이 이미
+                채워져 있어서, 「분류하기」를 누르면 AI 가 아는 문서로 판정이 나왔다.
+             ② 「샘플 8건 일괄 분류」는 그 8건을 **실제 검수 큐에 적재**하고 `기대등급 일치
+                8/8` 로 채점까지 했다. 운영 큐에 평가용 문서가 섞이고, 화면이 정답을 알고
+                채점하는 모양이 된다.
+             ③ 현장 관리자가 샘플 문서를 분류할 일이 없다. 개발·시연용 기능이 매일 쓰는
+                카드에 들어와 있었다.
+             샘플로 분류를 보여주는 것은 등급 시연 화면(index.html)의 역할이고 거기 이미 있다.
+             SAMPLES 배열과 pickSample/runBatch 는 지우지 않고 남긴다 — 진단·회귀 확인에 쓰고,
+             다시 붙일 때 만들 필요가 없게 한다. 화면에서만 뺀다. -->
+        <div class="row2">
+          <div class="field">
+            <label class="fld">doc_id</label>
+            <input id="cl-docid" type="text" value="" placeholder="예: DOC-2026-0001" />
+          </div>
+          <div class="field">
+            <label class="fld">제목 (선택)</label>
+            <input id="cl-title" type="text" value="" placeholder="문서 제목" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="fld">본문</label>
+          <textarea id="cl-body" placeholder="분류할 문서 본문을 붙여넣거나, 위에서 파일을 끌어다 놓으십시오."></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="btn-classify" onclick="runClassify()">분류하기</button>
+        </div>
+        <p class="hint">분류 결과는 검수 큐에 쌓입니다. 확신이 기준에 못 미치면 자동 확정하지 않고
+          위 <b>「문서 검토 대기」</b> 로 넘어갑니다.</p>
+        <div id="cl-result" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- ===== 2. 검수 큐 ===== -->
+    <section class="card" data-pane="ops" style="order:1">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 2단계">2</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag">FUN-024</span></div>
+        <span class="ep">POST /confirm · /relabel</span>
+      </div>
+      <div class="card-body">
+        <!-- [정합 2026-08-09] 종전에는 이 자리에 "신뢰도 게이트(검수 라우팅 임계)"라는 입력이
+             하나뿐이었는데, 값을 바꿔도 API 호출이 0건이라 **서버 라우팅과 무관**했다. 관리자가
+             0.5로 내리고 "임계를 조정했다"고 믿게 되는 화면이었다. 둘을 명확히 분리한다:
+               · 서버 임계 = 실제로 needs_review 를 결정하는 값(읽기 전용, healthz 에서 조회)
+               · 목록 필터 = 이 화면에서 강조 표시할 기준(클라이언트 전용) -->
+        <!-- [2026-08-23] 순서를 뒤집었다. 이 카드는 관리자가 콘솔을 열면 처음 보는 화면인데,
+             종전에는 임계값 두 칸이 먼저 나오고 정작 할 일(검토할 문서 목록)은 그 아래
+             버튼을 눌러야 나왔다. 게다가 임계값이 두 개 나란히 있고 둘 다 0.70 이라
+             "어느 걸 바꿔야 하나"로 헷갈렸다 — 하나는 읽기 전용 서버 값, 하나는 색칠만 하는
+             화면 설정이다. 목록을 먼저, 설정은 접어 둔다. -->
+        <div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">
+          <button class="btn" onclick="loadReviewQueue()">검토할 문서 보기</button>
+          <span id="rq-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div id="queue" class="queue"><div class="q-empty">「검토할 문서 보기」를 누르면 승인 대기 중인 문서가 나옵니다. 분류를 실행해도 결과가 여기 쌓입니다. 확정·수정한 내용은 재학습 큐에 반영됩니다.</div></div>
+        <!-- [2026-08-24] 「표시 설정 — 확신도 기준 보기」 두 칸을 뺐다. 관리자가 볼 이유가
+             없었을 뿐 아니라, 아래 칸이 실제로 목록의 판정 배지를 뒤집고 있었다.
+               · 서버 검수 임계: 읽기 전용 표시였다. 배포 설정으로만 바뀌는 값이라 화면에서
+                 할 수 있는 일이 없다. 값은 healthz 응답에 그대로 있다.
+               · 목록 강조 기준: 「색칠만, 판정 무관」이라 적어 두고 실제로는
+                 `confidence < 이 값` 으로 검수/자동 배지를 계산했다. 서버의 검수 라우팅은
+                 게이트가 14개인데(services/review_reasons.py) 그중 신뢰도 게이트 하나만
+                 흉내 낸 것이라, agreement-gate·cap-conflict 로 검수에 간 문서가 화면에는
+                 「자동」으로 떴다. 이제 서버가 준 status 를 그대로 쓴다. -->
+      </div>
+    </section>
+
+    <!-- ===== 2.5 유사 문서 검색 (RAG) ===== 요건 아님(RAG=선택 보완). 시연 대본에서 제외. -->
+    
+
+    <!-- ===== G3. 골든셋 현황 ===== 서명 결과가 "얼마나 찼는지"를 루프 B 안에서 보여준다.
+         같은 수치가 [관제] 탭 대시보드에도 '배포 readiness'라는 이름으로 있었지만, 골든 검수를
+         하는 사람이 자기 작업의 현황으로 알아보기 어려웠다(다른 탭 · 다른 이름). 엔드포인트는
+         동일하다 — GET /admin/locked-readiness. -->
+    <section class="card col-span" data-pane="review" style="order:2">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">조회</span> 검증문서 현황 — 구성 · 서명 <span class="reqtag">FUN-024</span></div>
+        <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row" style="margin:0 0 10px;">
+          <span class="sec-note" style="margin-right:auto;">
+            검증문서가 지금 어떤 단계·등급·출처로 구성돼 있는지, 서명으로 확정된 평가 정답지가 얼마나 찼는지 봅니다.
+          </span>
+          <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
+        </div>
+        <!-- 후보 관리·실문서 인테이크 — 별도 화면이라 URL 을 아는 사람만 들어갈 수 있었다.
+             콘솔 어디에도 링크가 없어 "그 화면이 있다는 사실" 자체가 화면에 없었다.
+             두 화면은 포털 JWT 쿠키를 요구하므로 로그인 화면을 거쳐 들어간다
+             (토큰을 URL 에 싣지 않는 설계 — 액세스로그·브라우저 히스토리 잔존 방지). -->
+        <div class="btn-row" style="margin:0 0 10px;flex-wrap:wrap;">
+          <span class="sec-note" style="margin-right:auto;">
+            후보를 개별로 열어 등급을 지정하거나, 실문서를 새로 넣으려면 아래 화면을 씁니다.
+          </span>
+          <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
+        </div>
+        <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
+        <p class="sec-note" style="margin-top:8px;">
+          읽기 전용입니다. 정본 승격은 별도 절차이며, 서명 화면에서 <b>publish 를 켜지 않으면</b> 확정 수치는 오르지 않습니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
+    <section class="card col-span" data-pane="train" style="order:1" data-profile="full-train">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">데이터</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
+        <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
+      </div>
+      <div class="card-body">
+        <div class="row3">
+          <div class="field">
+            <label class="fld">목표 등급</label>
+            <select id="sy-grade"></select>
+          </div>
+          <div class="field">
+            <label class="fld">도메인</label>
+            <select id="sy-domain">
+              <option value="mixed">mixed (혼합)</option>
+              <option value="tech">tech (기술)</option>
+              <option value="business">business (영업)</option>
+              <option value="hr">hr (인사)</option>
+              <option value="finance">finance (재무)</option>
+              <option value="legal">legal (법무)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">생성 건수</label>
+            <input id="sy-count" type="number" min="1" max="500" value="5" />
+          </div>
+        </div>
+        <div class="row3" style="margin-top:8px;">
+          <div class="field">
+            <!-- [2026-08-23] 이 칸은 **생성기를 고르지 않는다.** submit() 은 이 값을 비용
+                 추정(COST_PER_DOC_USD)에만 쓰고, 워커에 넘기는 인자는 등급·건수·도메인뿐이다
+                 (synthesis_service.py:81-87). 실제 생성기는 워커가 서버 설정으로 만든다
+                 (generator.py:284 build_provider() → settings.llm_provider). 이름을 그대로
+                 두면 "여기서 anthropic 을 고르면 Claude 가 쓴다"로 읽힌다 — 아니다. -->
+            <label class="fld">비용 추정용 제공자</label>
+            <select id="sy-provider">
+              <option value="noop">noop (결정론 · 외부 API 없이)</option>
+              <option value="anthropic">anthropic (Claude)</option>
+              <option value="openai">openai (GPT)</option>
+              <option value="google">google (Gemini)</option>
+              <option value="vllm_qwen">vllm_qwen (온프렘)</option>
+              <option value="vllm_exaone">vllm_exaone (온프렘)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">검수 큐 상태</label>
+            <select id="sy-status" onchange="loadSynthQueue()">
+              <option value="pending">pending (검수 대기)</option>
+              <option value="approved">approved (승인됨)</option>
+              <option value="rejected">rejected (반려됨)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">&nbsp;</label>
+            <div class="btn-row" style="margin:0;">
+              <button class="btn" id="sy-gen" onclick="synthGenerate()">생성 요청</button>
+              <button class="btn sec sm" onclick="loadSynthQueue()">검수 큐 새로고침</button>
+            </div>
+          </div>
+        </div>
+        <p class="hint" id="sy-provider-note" style="margin-top:2px"></p>
+        <div id="sy-noop-note" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
+        <div id="sy-info" class="hint"></div>
+        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검수 큐 새로고침」으로 생성된 합성 문서의 검수 대기분을 조회합니다. 학습행으로 만들 수 있는 것은 승인한 건뿐이며, 실제 편입은 관리자가 학습셋 생성 절차를 돌릴 때 이뤄집니다.</div></div>
+        <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 3. 재학습 ===== -->
+        <section class="card" data-pane="train" style="order:2">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 3단계">3</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
+        <span class="ep">POST /train · GET /train/jobs</span>
+      </div>
+      <div class="card-body">
+        <!-- 학습 규모 preset — 자유 입력란을 열지 않는다. 임의 값이 들어가면 얼마나 걸릴지
+             예측이 안 되고 되돌리는 절차도 없다. 두 조합만 고정한다.
+             라벨에 절대 소요 시간을 적지 않는 이유는 아래 TRAIN_PRESETS 주석 참조 —
+             CPU 의 AVX 지원 여부만으로 수 배가 갈려, 어느 숫자를 적어도 다른 환경에서는 틀린다. -->
+        <div class="field">
+          <label class="fld">학습 규모</label>
+          <select id="tr-preset" onchange="onTrainPresetChange()">
+            <option value="full">정식 학습 — 기본값 (5에폭 · seq512 · batch8)</option>
+            <option value="demo">시연용 빠른 학습 — 1에폭 · seq128 · batch16 (정식의 약 1/20 분량)</option>
+          </select>
+          <p class="sec-note" id="tr-preset-note" style="margin-top:4px;"></p>
+        </div>
+        <div class="row3">
+          <div class="field">
+            <label class="fld">training_type</label>
+            <select id="tr-type">
+              <option value="incremental">incremental</option>
+              <option value="full">full</option>
+              <option value="hyperparam_search">hyperparam_search</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">base_model</label>
+            <input id="tr-base" type="text" value="kf-deberta-base" />
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;gap:6px;">
+            <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;">
+              <input id="tr-rag" type="checkbox" style="width:auto" /> use_rag
+            </label>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="submitTrain()">재학습 제출</button>
+          <button class="btn sec sm" onclick="loadJobs()">작업 목록 새로고침</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>job</th><th>status</th><th>model_version</th><th>trigger</th></tr></thead>
+            <tbody id="jobs-body"><tr><td colspan="4" style="color:var(--text-faint)">목록 없음 — "작업 목록 새로고침"</td></tr></tbody>
+          </table>
+        </div>
+        <p class="sec-note">재학습본은 <b>후보로만 등록</b>되고 자동 서빙되지 않습니다 — 배포는 아래 4번에서 별도로 합니다. 학습 노드가 아닌 배포에서는 404가 정상입니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 4. 모델 서빙/리로드 ===== -->
+        <section class="card" data-pane="train" style="order:3">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 4단계">4</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
+        <span class="ep">POST /admin/model/activate · /reload</span>
+      </div>
+      <div class="card-body">
+        <div class="row2">
+          <div class="field">
+            <label class="fld">활성화할 version_label (G1 수동 배포)</label>
+            <input id="act-ver" type="text" placeholder="예: v-dd3abab9" />
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;gap:10px;">
+            <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;white-space:nowrap;">
+              <input id="act-force" type="checkbox" style="width:auto" /> force (게이트 우회)
+            </label>
+            <button class="btn" onclick="activateModel()" style="flex:1">활성화 (배포)</button>
+          </div>
+        </div>
+        <div id="activate-result" role="status" aria-live="polite"></div>
+        <div class="btn-row" style="margin-top:2px">
+          <button class="btn red" onclick="reloadModel()">활성 모델 핫리로드</button>
+          <!-- 롤백 — 종전에는 이 카드에 결과 표시용 div 만 있고 되돌리는 수단이 없었다.
+               활성화는 되는데 웹에서 되돌릴 방법이 없어 사고 시 서버 접속이 필요했다. -->
+          <button class="btn sec sm" onclick="rollbackModel()">직전 모델로 롤백</button>
+        </div>
+        <div id="reload-result" role="status" aria-live="polite"></div>
+        <div class="warnbox" style="display:none" id="rollback-note"></div>
+        <p class="sec-note">배포는 <b>회귀 게이트</b>(고등급 미탐·F1)를 통과해야 하며, 미통과 시 <code>force</code>로만 우회됩니다(감사 기록). <b>핫리로드</b>는 재기동 없이 활성 모델을 서빙에 반영합니다.
+        <b>롤백</b>은 직전 활성본으로 되돌립니다 — 게이트를 적용하지 않습니다(회귀를 되돌리는 방향이라 막으면 사고 시 복구가 불가능해집니다). 사유는 감사에 남습니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 5. 메트릭 ===== -->
+    <section class="card col-span" data-pane="train" style="order:4">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 5단계">5</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
+        <span class="ep">GET /metrics/latest · /history · /confusion-matrix</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row">
+          <button class="btn" onclick="loadMetrics()">최신 메트릭</button>
+          <button class="btn sec sm" onclick="loadHistory()">이력</button>
+          <button class="btn sec sm" onclick="loadConfusionMatrix()">혼동행렬</button>
+          <button class="btn sec sm" onclick="loadSchema()">등급체계 조회</button>
+        </div>
+        <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(3,1fr)"></div>
+        <div id="metrics-extra"></div>
+        <p class="sec-note">여기 FNR은 <b>안전층을 적용하기 전</b> 분류기 raw 수치입니다 — 실제 서빙 미탐은 이보다 낮습니다. 평가셋이 학습셋과 겹치면 정확도가 과대평가될 수 있습니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 6. 운영 관제 대시보드 ===== -->
+    <section class="card col-span" data-pane="ops" style="order:3">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">조회</span> 운영 관제 대시보드</div>
+        <span class="ep">GET /admin/dashboard</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row" style="align-items:center">
+          <button class="btn" onclick="loadDashboard()">관제 종합 새로고침</button>
+          <span id="dash-meta" class="hint"></span>
+        </div>
+        <div id="dash-grid" class="dash-grid"><div class="q-empty">「관제 종합 새로고침」을 누르면 이중검토 보류·배포 준비 상태·재학습 대기·안전 정지·입력 분포 변화를 한 번에 조회합니다.</div></div>
+        <p class="sec-note">읽기 전용 종합 화면입니다. 일부 소스를 못 읽으면 그 칸만 <span class="pill warn">degraded</span>로 표시되고 나머지는 정상 표시됩니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== 감사 로그 ===== 미들웨어가 쓰기만 하고 읽는 경로가 없어, 35,000행이 쌓여도
+         화면에서 "누가 언제 무엇을 했는가"를 볼 수 없었다. -->
+    <section class="card col-span" data-pane="ops" style="order:4">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">조회</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
+        <span class="ep">GET /admin/audit-log</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">
+          <input id="au-action" type="text" placeholder="action 검색 (예: train, confirm, activate)" style="flex:1;min-width:180px" />
+          <select id="au-success" style="width:auto">
+            <option value="">전체</option>
+            <option value="true">성공만</option>
+            <option value="false">실패만</option>
+          </select>
+          <button class="btn sm" onclick="loadAuditLog()">조회</button>
+        </div>
+        <p class="sec-note" id="au-info" style="margin-top:6px;">헬스체크·정적 자산·Prometheus 스크랩은 기록 대상에서 제외됩니다. 그 밖의 요청은 조회를 포함해 모두 남습니다.</p>
+        <div id="au-warn"></div>
+        <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
+          <table>
+            <thead><tr><th>시각</th><th>action</th><th>행위자</th><th>대상</th><th>결과</th></tr></thead>
+            <tbody id="au-body"><tr><td colspan="5" style="color:var(--text-faint)">「조회」를 누르세요.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 7. 검증 기준문서 준비 ===== 루프 B 의 시작점(G1) -->
+    <section class="card col-span" data-pane="review" style="order:1" data-profile="full-train">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G1·G2 단계 — 후보 생성과 서명 화면 열기를 이 카드에서 합니다">G1 · G2</span> 검증문서 준비 <span class="reqtag">FUN-003</span></div>
+        <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
+      </div>
+      <div class="card-body">
+        <!-- [2026-08-23] 이 카드는 두 가지를 한 상자에 담고 있다 —
+             (가) AI 가 등급을 매겨 후보를 새로 만든다  (나) 이미 있는 문서 묶음을 검수에 올린다.
+             (가)는 등급 판정 LLM 이 있어야 되는데 이 서버(llm_provider=noop)에서는 되지 않는다.
+             그래서 누르기 전에 잠그고 (나)를 위로 올린다 — applyGoldenAiAvailability(). -->
+        <div id="gold-ai-block">
+        <div id="gold-ai-blocked" class="warnbox" style="display:none;margin-bottom:10px;line-height:1.6;"></div>
+        <details class="adv">
+          <summary>고급 설정 — 후보 소스 · 판정기 · 생성 건수 바꾸기</summary>
+        <div class="row3">
+          <div class="field">
+            <label class="fld">후보 소스</label>
+            <!-- [2026-08-18] '데모 샘플'·'파일 업로드' 제거.
+                 샘플은 시연용이라 운영 콘솔에 있을 자리가 아니고, 파일 업로드는
+                 골든셋 후보 관리 화면(manage.html)과 하는 일이 같았다. -->
+            <select id="gold-source" onchange="syncGoldenSource()">
+              <option value="corpus">서버 코퍼스 경로</option>
+              <option value="editor">「분류 실행」 카드에 입력한 본문</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">등급 판정기</label>
+            <!-- [2026-08-23] 두 가지를 고쳤다.
+                 ① noop 은 규칙 엔진이 아니라 **합성 문서 생성용 더미 응답**이다
+                    (noop_provider.py:1 "API 키 없이 결정론적 응답 — 파이프라인 검증·CI용 ·
+                    품질 측정용 아님"). 응답 JSON 에 grade 키가 없어 등급 판정기로 쓰면
+                    LLMLabeler 가 기본값 S3 로 떨어뜨린다 — 실측(223 배포 이미지 2026-08-23):
+                    어떤 본문을 넣어도 S3 · 신뢰도 0.5. 이 항목으로는 등급이 매겨지지 않는다.
+                 ② 내부 제공자 이름(local_openai·vllm_qwen·anthropic·openai)을 그대로 보여
+                    주고 있었다. 폐쇄망에서 못 쓰는 것(외부 API — 인터넷·키 필요)과 품질
+                    판정이 끝난 것(Qwen 14B: reports/llm_quality_comparison_20260808.md 에서
+                    사실 충실성 0/5·제약 준수 0/5 로 탈락)이 아무 표시 없이 선택 가능했다.
+                 API 키는 화면에서 받지 않는다 — 브라우저에 외부 키를 넣으면 유출 경로가
+                 생긴다. 서버 .env(ANTHROPIC_API_KEY·OPENAI_API_KEY)로만 설정한다.
+                 아래 항목은 서버 설정(healthz.llm_provider)에 따라 applyServerConfig 가
+                 쓸 수 없는 것을 잠근다. -->
+            <select id="gold-provider">
+              <option value="noop">등급을 매기지 않는 더미 — 모든 문서에 S3 만 돌려줍니다 (파이프라인 점검용)</option>
+              <option value="local_openai">사내 LLM 서버 (OpenAI 호환) — 서버에 주소 설정 필요</option>
+              <option value="vllm_qwen">사내 LLM 서버 (vLLM Qwen) — 문서 생성 품질 미달 기록 있음</option>
+              <option value="anthropic">외부 API (Anthropic) — 인터넷·API 키 필요 · 폐쇄망 불가</option>
+              <option value="openai">외부 API (OpenAI) — 인터넷·API 키 필요 · 폐쇄망 불가</option>
+            </select>
+            <p class="hint" id="gold-provider-note" style="margin-top:4px"></p>
+          </div>
+          <div class="field">
+            <label class="fld">생성 건수</label>
+            <input id="gold-n" type="number" min="1" max="50" value="8" />
+          </div>
+        </div>
+        <div id="gold-src-corpus" class="field" style="display:none;margin-top:8px;">
+          <label class="fld">코퍼스 경로 — <code>datasets/</code> 하위 jsonl 파일 또는 *.json 디렉터리</label>
+          <input id="gold-corpus-dir" type="text" placeholder="datasets/gold_real/candidates.jsonl" />
+          <p class="sec-note" style="margin-top:4px;">서버 파일시스템 경로입니다. <code>datasets/</code> 밖은 샌드박스가 거부합니다.</p>
+        </div>
+        </details>
+
+        <div class="btn-row">
+          <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;margin-right:auto;">
+            <input id="gold-require-evidence" type="checkbox" style="width:auto" checked /> 근거 문장이 있는 것만 후보로
+          </label>
+          <button class="btn" id="gold-go" onclick="startGoldenBuild()">후보 생성 → 검수</button>
+          <button class="btn sec sm" onclick="loadGoldenJob()">상태 새로고침</button>
+        </div>
+        </div><!-- /gold-ai-block -->
+
+        <!-- [2026-08-20] 이 아래는 위(AI 가 후보를 새로 만든다)와 **정반대** 기능이다 —
+             이미 있는 문서 묶음을 그대로 검수에 올린다. 한 상자 안에서 구분이 약해
+             사용자가 무엇을 누르는지 몰랐다. 제목으로 갈라 놓는다. -->
+        <div class="field" id="gold-register-block" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--border);">
+          <div class="fld" style="font-weight:700;color:var(--text);margin-bottom:2px;">
+            이미 있는 문서 묶음으로 검수 시작하기
+          </div>
+          <p class="sec-note" style="margin:0 0 8px;">
+            AI 가 등급을 다시 매기지 않습니다. 파일에 적힌 등급이 그대로 검수 화면에 올라갑니다.
+          </p>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <!-- 종전에는 자유 입력 칸이었고 placeholder 가 **채워진 값처럼 보였다.**
+                 실제로는 빈 칸이라 [등록]을 누르면 "경로를 입력하세요" 가 떴다(사용자 실측).
+                 이제 서버에 실제로 있는 파일을 골라 쓴다. -->
+            <select id="gold-build-path" style="flex:1">
+              <option value="">불러오는 중…</option>
+            </select>
+            <button class="btn sec sm" onclick="loadGoldenBuilds()" title="목록 다시 읽기">↻</button>
+            <button class="btn sec sm" id="gold-reg" onclick="registerGoldenBuild()">검수 시작</button>
+          </div>
+          <p class="sec-note" style="margin-top:4px;">이미 만들어 둔 검수 묶음 파일을 그대로 올립니다. 등급을 다시 매기지 않으므로 <b>파일에 적힌 등급이 그대로 보존</b>됩니다.</p>
+        </div>
+
+        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 생성된 검증문서 준비 작업이 없습니다.</div>
+
+        <div id="gold-summary" style="display:none;margin-top:10px;">
+          <div class="dash-panel">
+            <div class="dp-h"><span>후보 생성 결과</span><span id="gold-verdict" class="pill">-</span></div>
+            <div class="dp-row" id="gold-counts"></div>
+            <div class="dp-row" id="gold-grades" style="margin-top:6px;"></div>
+          </div>
+          <div id="gold-zero-hint" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn sec sm" id="gold-btn-review" onclick="openGoldenReview()" disabled>검수 HTML 열기 (G2)</button>
+            <button class="btn sec sm" id="gold-btn-signoff" onclick="openGoldenSignoff()" disabled>서명 HTML 열기 (G2)</button>
+          </div>
+        </div>
+
+        <!-- G2 서명 복귀 배너 — 검수·서명은 새 탭에서 끝나고 서버가 그 결과를 빌드 잡에
+             되쓰지 않는다(apply_signoff 는 job_store 를 갱신하지 않음). 그래서 탭을 닫고
+             돌아와도 콘솔은 그대로였고, "다음은 재학습"이라는 연결이 끊겨 있었다.
+             자동 감지가 불가능하므로 복귀 시 한 번 확인받아 다음 단계로 연결한다. -->
+        <div id="signoff-return" class="nextbox" style="display:none;">
+          <div>
+            <b>서명 탭에서 돌아오셨습니다.</b><br />
+            검수·서명을 마치셨다면 다음 단계는 <b>3 재학습</b>입니다. 서명한 검증문서가 학습·평가 정답으로 쓰입니다.
+          </div>
+          <div class="btn-row" style="margin:0;">
+            <button class="btn sm" onclick="confirmSignoffDone()">서명 완료 · 재학습으로</button>
+            <button class="btn sec sm" onclick="dismissSignoffReturn()">아직입니다</button>
+          </div>
+        </div>
+
+        <details style="margin-top:10px;">
+          <summary style="font-size:12px;color:var(--text-dim);cursor:pointer;">서버 응답 원문 (기술 진단용)</summary>
+          <div id="gold-result" class="json" style="margin-top:6px;" role="status" aria-live="polite">-</div>
+        </details>
+
+        <p class="sec-note">정본 검증문서는 건드리지 않고 <b>후보만</b> 만듭니다. 정본 승격은 별도 절차입니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
+    <section class="card col-span" data-pane="config" style="order:1">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">설정</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
+        <span class="ep">GET · PUT /schema/grades</span>
+      </div>
+      <div class="card-body">
+        <div class="btn-row">
+          <button class="btn sec sm" onclick="loadGradeEditor()">현재 등급체계 불러오기</button>
+          <button class="btn sec sm" onclick="addGradeRow()">등급 행 추가</button>
+          <button class="btn" id="grade-save" onclick="saveGrades()">변경 저장 (PUT)</button>
+          <span id="grade-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div class="tbl-wrap" style="margin-top:10px;">
+          <table>
+            <thead><tr><th>코드</th><th>명칭</th><th>순서</th><th>설명</th><th>색상</th><th></th></tr></thead>
+            <tbody id="grade-body"><tr><td colspan="6" style="color:var(--text-faint)">「현재 등급체계 불러오기」를 눌러 시작하세요.</td></tr></tbody>
+          </table>
+        </div>
+        <div id="grade-result" style="margin-top:10px;" role="status" aria-live="polite"></div>
+        <p class="sec-note">표에서 <b>삭제한 등급은 비활성 처리</b>되고 기존 이력은 보존됩니다. 등급을 바꾸면 <b>재학습이 필요</b>하며, 그 전까지 배포 모델은 기존 라벨로 추론합니다.</p>
+      </div>
+    </section>
+
+    <!-- ===== T. 태깅 키워드 관리 (FUN-023-④) ===== -->
+    <section class="card col-span" data-pane="config" style="order:2">
+      <div class="card-head">
+        <div class="ttl"><span class="step-no aux">설정</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
+        <span class="ep">GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
+      </div>
+      <div class="card-body">
+        <div class="row3">
+          <div class="field">
+            <label class="fld">등급 필터</label>
+            <select id="kw-f-grade"><option value="">전체</option></select>
+          </div>
+          <div class="field">
+            <label class="fld">평가요소 필터</label>
+            <select id="kw-f-factor">
+              <option value="">전체</option>
+              <option value="SECRECY">SECRECY — 비공지성(S)</option>
+              <option value="VALUE">VALUE — 경제적 유용성(V)</option>
+              <option value="MANAGEMENT">MANAGEMENT — 비밀관리성(M)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="fld">표시 범위</label>
+            <select id="kw-f-active">
+              <option value="true">활성만</option>
+              <option value="false">비활성 포함</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn sec sm" onclick="loadKeywords()">키워드 조회</button>
+          <span id="kw-info" class="hint" style="margin:0;"></span>
+        </div>
+        <div id="kw-warn"></div>
+
+        <div class="field" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <label class="fld">키워드 추가 (POST)</label>
+          <div class="row3">
+            <div class="field"><select id="kw-n-grade"></select></div>
+            <div class="field"><input id="kw-n-keyword" type="text" placeholder="키워드 또는 정규식" /></div>
+            <div class="field">
+              <select id="kw-n-pattern">
+                <option value="exact">exact — 부분문자열</option>
+                <option value="regex">regex — 정규식</option>
+                <option value="semantic">semantic — 임베딩 유사</option>
+              </select>
+            </div>
+          </div>
+          <div class="row3" style="margin-top:8px;">
+            <div class="field">
+              <select id="kw-n-factor">
+                <option value="">요소 없음(NULL)</option>
+                <option value="SECRECY">SECRECY — 비공지성(S)</option>
+                <option value="VALUE">VALUE — 경제적 유용성(V)</option>
+                <option value="MANAGEMENT">MANAGEMENT — 비밀관리성(M)</option>
+              </select>
+            </div>
+            <div class="field"><input id="kw-n-weight" type="number" min="0" max="9.99" step="0.05" value="1.0" title="가중치 0 ~ 9.99" /></div>
+            <div class="field"><button class="btn" onclick="createKeyword()">키워드 추가</button></div>
+          </div>
+        </div>
+
+        <div class="tbl-wrap" style="margin-top:10px;">
+          <table>
+            <thead><tr><th>ID</th><th>등급</th><th>키워드</th><th>매칭</th><th>요소</th><th>가중치</th><th>상태</th><th></th></tr></thead>
+            <tbody id="kw-body"><tr><td colspan="8" style="color:var(--text-faint)">「키워드 조회」로 현재 태깅 규칙을 불러옵니다.</td></tr></tbody>
+          </table>
+        </div>
+        <p class="sec-note">변경은 <b>서빙 룰엔진 핫리로드</b>로 재기동 없이 반영됩니다 — 응답의 <code>serving_reloaded</code>가 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code>를 워커 수만큼 호출하거나 롤링 재기동하세요. <b>삭제는 소프트 삭제</b>(<code>is_active=false</code>)이며 FK·감사 이력이 보존됩니다. 가중치 상한은 9.99(<code>Numeric(3,2)</code>)입니다.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <details style="margin-top:16px">
+    <summary>최근 응답 원본 (raw JSON)</summary>
+    <div id="raw-json" class="json">— 아직 호출 없음 —</div>
+  </details>
+
+</div>
+
+<!-- LOG CONSOLE -->
+<div class="logbar">
+  <div class="logbar-head" onclick="toggleLog()">
+    <b>요청 로그</b>
+    <span id="log-toggle" style="color:#71717a">접기 ▾</span>
+  </div>
+  <div class="logbar-body" id="logbody" role="log" aria-live="polite" aria-label="작업 로그"></div>
+</div>
+
+<script>
+const GRADES = ["TS","S1","S2","S3"];
+const GRADE_KR = {TS:"특급기밀", S1:"1등급 비밀", S2:"2등급 대외비", S3:"3급 공개"};
+let QUEUE = [];   // {inference_id, doc_id, title, label, confidence, model_version, flagged, resolved}
+let lastFlow = 0;
+let LAST_MODEL_VERSION = null;   // 최신 메트릭에서 세팅 — 혼동행렬 조회에 사용
+let LAST_GOLDEN_JOB_ID = null;
+// 실시간 관제(auto-refresh) 상태 — 아래 "실시간 관제" 섹션 참조.
+let AUTO_TIMER=null, AUTO_SILENT=false, AUTO_INFLIGHT=false, AUTO_TICK_OK=true;
+
+const $ = id => document.getElementById(id);
+const cfg = () => ({
+  base: $('cfg-base').value.replace(/\/$/,''),
+  key: $('cfg-key').value,
+  role: $('cfg-role').value,
+  user: $('cfg-user').value.trim() || 'console',
+});
+const actor = () => { const c=cfg(); return {user_id:c.user, role:c.role}; };
+function writesEnabled(){ return $('cfg-write-enable') && $('cfg-write-enable').checked; }
+function guardWrite(action){
+  if(writesEnabled()) return true;
+  const msg = `Safe Mode: ${action} 작업은 차단됐습니다. 실행하려면 상단의 "쓰기 작업 허용"을 체크하세요.`;
+  log(msg, 'err');
+  alert(msg);
+  return false;
+}
+
+// XSS 방어 — 문서 본문 유래(근거 text/tag) 및 사용자 입력(title/doc_id)을 innerHTML에
+// 넣기 전 이스케이프. 실데이터 문서/제목에 HTML이 섞이면 운영 콘솔에서 실행될 수 있다.
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function markFlow(n){
+  for(let i=1;i<=n;i++){ const el=document.querySelector(`.flow-step[data-step="${i}"]`); if(el) el.classList.add('done'); }
+  lastFlow = Math.max(lastFlow, n);
+}
+// 루프 B 앞단(G1 후보생성 · G2 검수·서명)은 숫자 단계가 아니라 문자 id 라 별도로 표시한다.
+function markStep(id){
+  const el=document.querySelector(`.flow-step[data-step="${id}"]`);
+  if(el) el.classList.add('done');
+}
+
+/* ---- 탭 전환 ----------------------------------------------------------------
+ * 카드 12장을 한 화면에 모두 세우면 처음 쓰는 관리자는 어디부터 손대야 할지 알 수 없다.
+ * 그렇다고 기능을 지우면 감리에서 "구현하지 않았다"로 읽힌다. 그래서 삭제·비활성이
+ * 아니라 이동 — DOM 에는 그대로 두고 display 만 전환한다.
+ * data-pane="always"(연결·인증)는 모든 탭에 남는다. 전 작업의 전제라서다.
+ * -------------------------------------------------------------------------- */
+const PANE_NOTE={
+  review: '검수 — 검증문서(모델 평가 정답지) 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다.',
+  train:  '학습 · 배포 — 서명한 검증문서로 재학습하고, 게이트를 통과한 모델만 배포한 뒤 성적을 확인합니다.',
+  ops:    '운영 — 문서를 분류하고, AI가 자신 없어 한 건을 사람이 확정합니다. 매일 도는 일과이고, 현재 상태와 감사 기록도 여기서 봅니다.',
+  config: '설정 — 등급 체계와 태깅 규칙입니다. 보통 도입 시 한 번 정하고 이후에는 거의 바꾸지 않습니다.',
+};
+function showPane(name){
+  // 종전 탭 이름(model·monitor)이 sessionStorage 에 남아 있어도 여기서 걸러져 기본 탭이 된다.
+  if(!PANE_NOTE[name]) name='review';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('[data-pane]').forEach(s=>{
+    const p=s.dataset.pane;
+    s.style.display = (p===name || p==='always') ? '' : 'none';
+  });
+  const n=$('pane-note'); if(n) n.textContent=PANE_NOTE[name];
+  try{ sessionStorage.setItem('koipa_admin_pane', name); }catch(e){/* 프라이빗 모드 등 */}
+}
+function initPane(){
+  /* 기본 탭은 **운영**이다.
+   *
+   * 이력. 2026-08-20 에 'ops' → 'review' 로 바꿨었다. 이유는 "검수하러 들어온 사람에게 첫
+   * 화면이 「분류 실행」이었다" 였다 — 즉 **문제는 탭이 아니라 운영 탭의 첫 카드**였다.
+   * 2026-08-23 에 그 전제를 없앴다(운영 탭 첫 카드를 「분류 검수 큐」로 올림). 그래서 기본을
+   * 운영으로 되돌린다. 이제 콘솔을 열면 현장 관리자가 매일 하는 일이 첫 화면에 나온다.
+   *
+   * 왜 프로파일별로 안 나누나. 프로파일은 healthz 응답을 기다려야 알 수 있어 탭이 한 번
+   * 바뀌는 게 눈에 보인다. 지재원도 콘솔을 열자마자 운영 상태를 보는 것이 부자연스럽지 않다.
+   * 검증문서 검수는 상단 메뉴에서 한 번에 간다. */
+  let saved='ops';
+  try{ saved=sessionStorage.getItem('koipa_admin_pane')||'ops'; }catch(e){}
+  showPane(saved);
+  gotoHash();
+}
+/* 주소의 #앵커로 **탭까지** 열어 준다.
+ * 왜(2026-08-20). 공용 메뉴의 「검증문서 검수」가 이 화면의 검증문서 검수 목록(#gold-jobs-card)을
+ * 가리킨다. 그 카드는 data-pane="review" 라 기본 탭에 있지만, 세션에 다른 탭이 저장돼
+ * 있으면 대상이 display:none 인 채로 도착해 **아무 일도 안 일어난 것처럼 보인다**(실측).
+ * 이 화면에는 location.hash 를 읽는 코드가 한 줄도 없었다.
+ * 카드는 golden_jobs.js 가 런타임에 넣으므로, 그쪽 mount() 끝에서도 이 함수를 부른다. */
+function gotoHash(){
+  const h = (location.hash||'').slice(1);
+  if(!h) return;
+  const el = document.getElementById(h);
+  if(!el) return;                                   // 아직 안 그려졌으면 나중에 다시 부른다
+  const box = el.closest('[data-pane]');            // closest 는 자기 자신도 본다
+  const pane = box && box.dataset ? box.dataset.pane : '';
+  if(pane && pane!=='always') showPane(pane);
+  el.scrollIntoView({block:'start'});
+}
+window.addEventListener('hashchange', gotoHash);
+
+/* ---- G2 서명 복귀 감지 -------------------------------------------------------
+ * 골든 검수·서명은 새 탭(review.html / signoff.html)에서 끝나고, 서버는 그 결과를
+ * 빌드 잡에 되쓰지 않는다(golden_build_service.apply_signoff 는 job_store 를 갱신하지
+ * 않음). 따라서 콘솔이 서명 완료를 자동으로 알 방법이 없고, 종전에는 탭을 닫고 돌아와도
+ * 화면이 그대로여서 "다음은 재학습"이라는 연결이 끊겨 있었다.
+ * 없는 정보를 추측하는 대신, 서명 탭을 연 사실만 기억했다가 복귀 시 한 번 확인받는다.
+ * -------------------------------------------------------------------------- */
+let SIGNOFF_TAB_OPENED=false;
+function dismissSignoffReturn(){ const b=$('signoff-return'); if(b) b.style.display='none'; }
+function confirmSignoffDone(){
+  markStep('g1'); markStep('g2');
+  dismissSignoffReturn();
+  log('골든 검수·서명 완료로 표시 — 다음 단계는 3 재학습','ok');
+  // [2026-08-21] 'model' 은 2026-08-20 탭 개편으로 없어진 이름이다. showPane 가드에 걸려
+  // 검수 탭으로 되돌아왔고, 재학습 카드는 끝까지 안 나왔다. 재학습은 '학습·배포' 탭에 있다.
+  showPane('train');
+  // 서명 직후에는 "얼마나 찼는지"가 가장 궁금하다 — 현황을 자동으로 갱신해 준다.
+  if(typeof loadGoldenStatus==='function') loadGoldenStatus();
+  // [2026-08-21] 'tr-kind' 는 저장소 어디에도 정의가 없어(이 줄이 유일한 참조) 항상
+  // 폴백으로 떨어졌고, 그 폴백은 검수 탭의 카드라 학습·배포 탭에서는 보이지도 않았다.
+  // 재학습 카드에 실재하는 id 로 바꾼다(admin.html:621 select#tr-preset).
+  const t=$('tr-preset') || $('gold-progress');
+  if(t) t.scrollIntoView({behavior:'smooth', block:'center'});
+}
+window.addEventListener('focus', ()=>{
+  if(!SIGNOFF_TAB_OPENED) return;
+  SIGNOFF_TAB_OPENED=false;
+  const b=$('signoff-return'); if(b) b.style.display='';
+});
+function ts(){ const d=new Date(); return d.toTimeString().slice(0,8); }
+function log(msg, kind='info'){
+  if(AUTO_SILENT) return;   // 실시간 관제 폴링 tick 은 로그를 남기지 않는다(스팸 방지).
+  const b=$('logbody'); const line=document.createElement('div');
+  line.className='logline '+kind;
+  line.innerHTML=`<span class="t">${ts()}</span><span class="m"></span>`;
+  line.querySelector('.m').textContent=msg;
+  b.appendChild(line); b.scrollTop=b.scrollHeight;
+}
+function toggleLog(){ const b=$('logbody'); b.classList.toggle('collapsed'); $('log-toggle').textContent=b.classList.contains('collapsed')?'펼치기 ▴':'접기 ▾'; }
+function showRaw(obj){ if(AUTO_SILENT) return; $('raw-json').textContent = typeof obj==='string'?obj:JSON.stringify(obj,null,2); }
+function gradeTag(g){ return `<span class="tag g-${g}">${g}</span>`; }
+
+async function api(method, path, body){
+  const c=cfg();
+  const headers={'X-API-Key':c.key, 'X-Actor-Role':c.role};
+  // tenant 제거: 격리는 KL 포털 전담. 단일 KL 인증(API키+서명 JWT)만 사용한다.
+  if(body) headers['Content-Type']='application/json; charset=utf-8';
+  const url=c.base+path;
+  log(`${method} ${path}`, 'req');
+  let res, text;
+  try{
+    res=await fetch(url,{method, headers, body: body?JSON.stringify(body):undefined});
+    text=await res.text();
+  }catch(e){ AUTO_TICK_OK=false; log(`네트워크 오류: ${e.message}`,'err'); throw e; }
+  let data; try{ data=text?JSON.parse(text):null; }catch{ data=text; }
+  showRaw(data ?? text);
+  if(!res.ok){ AUTO_TICK_OK=false; log(`← ${res.status} ${path} :: ${typeof data==='object'?(data.detail||data.message||JSON.stringify(data)):text}`,'err'); const err=new Error(res.status); err.data=data; err.status=res.status; throw err; }
+  log(`← ${res.status} ${path}`, 'ok');
+  return data;
+}
+
+/* ---- HEALTH ---- */
+async function checkHealth(){
+  const pill=$('health'), txt=$('health-txt');
+  try{
+    const d=await api('GET','/healthz');
+    pill.className='health-pill ok'; txt.textContent='정상 · '+(d.status||'ok');
+    applyServerConfig(d);
+  }catch(e){ pill.className='health-pill bad'; txt.textContent='실패 '+(e.status||''); }
+}
+/* healthz 가 실어 보내는 서버 실제 설정을 화면에 반영한다.
+ * [정합 2026-08-09] 검수 임계는 **서버 값이 진실**이다. 종전 콘솔은 0.70 슬라이더를 두고
+ * "검수 라우팅 임계"라 적었지만 API 호출이 0건이라 서버와 무관했다 — 화면이 사실과 달랐다.
+ * 이제 서버 값을 읽어 읽기 전용으로 보여주고, 화면 필터는 별도 입력으로 분리했다. */
+/* [프로파일 정합 2026-08-09] 한 벌의 콘솔을 지재원(full-train)과 고객사(onprem-local)에 그대로
+ * 서빙하고 있었다. 콘솔이 deploy_profile 을 한 번도 읽지 않아(grep 0건) 카드 14장이 두 곳에서
+ * 글자 하나 다르지 않았다. 회원사 관리자에게 지재원 전용 기능이 그대로 보였고, 누르면
+ * llm_provider=noop 이라 결과가 0건으로 나왔다.
+ *
+ * 기준은 **deploy_profile** 이다(llm_provider 가 아니다). 처음엔 "LLM 이 없으면 무의미하니
+ * llm_provider=noop 이면 숨기자"로 짰는데, 테스트 환경은 지재원도 noop 이라 **감리 시연의 핵심인
+ * 검증 기준문서 준비가 지재원에서도 사라졌다**. 제공자 설정은 환경마다 달라 화면 구성의 기준이
+ * 될 수 없다 — 이 서버가 무엇을 하는 시스템인지(프로파일)가 기준이어야 한다.
+ *
+ * 대상은 모델 공장 전용 기능만: 검증 기준문서 준비 · 학습 후보 생성.
+ * 골든 현황·잡 목록은 숨기지 않는다 — 고객사도 검수·서명 경로가 살아 있다
+ * (onprem-local 은 deploy_gate_manual_require_locked_eval=True 를 유지한다).
+ * 그리고 조용히 감추지 않는다 — 어느 시스템에 접속했는지 배너로 항상 밝힌다. */
+function applyProfileVisibility(d){
+  const profile=String((d&&d.deploy_profile)||'');
+  const llm=String((d&&d.llm_provider)||'');
+  const llmOff = !llm || llm==='noop';
+  // 프로파일을 모르면(healthz 실패 등) 숨기지 않는다 — 판단 근거가 없을 때 기능을 감추면
+  // "왜 안 보이지"로 헤매게 된다. fail-open.
+  const hideFactory = (profile === 'onprem-local');
+  // ⚠ 인라인 style 로 숨기면 showPane() 이 탭 전환 때 [data-pane] 전체의 display 를 다시
+  //   써서 숨김이 지워진다(실측: 탭을 한 번 누르면 숨긴 카드가 되살아났다).
+  //   클래스 + !important 로 두어 두 로직이 서로 간섭하지 않게 한다.
+  document.querySelectorAll('[data-profile="full-train"]').forEach(el=>{
+    el.classList.toggle('pf-hidden', hideFactory);
+  });
+  const b=$('profile-banner');
+  if(b && profile){
+    const isCust = hideFactory;
+    b.textContent = isCust
+      ? `고객사 운영 시스템(${profile}) — 문서 분류·검수·모델 운영 화면입니다.`
+        + ' 검증문서 후보 구성·학습 후보 생성은 지재원 모델 공장에서 수행하므로 표시하지 않습니다.'
+      : `지재원 모델 공장(${profile}) — 검증문서 구성·학습·배포까지 전 구간 화면입니다.`
+        + (llmOff ? ' (현재 LLM 제공자가 noop 이라 합성·자동 라벨링 결과는 0건으로 나옵니다.)' : '');
+    b.className = 'profile-banner ' + (isCust ? 'cust' : 'jjw');
+    b.style.display='';
+  }
+}
+/* [2026-08-23] 서버가 실제로 쓸 수 있는 등급 판정기만 고를 수 있게 한다.
+ *
+ * 왜. 드롭다운이 다섯 개를 다 열어 두는데, 서버는 llm_provider 하나로 고정돼 있다. 다른 것을
+ * 골라 「후보 생성」을 누르면 실패하거나 0건이 나오고, 화면은 그 이유를 말하지 않는다.
+ * 실측 2026-08-23(223): llm_provider=noop 인데 화면에서는 openai 가 선택돼 있었다.
+ *
+ * 지우지 않고 **잠근다** — 어떤 선택지가 있고 왜 지금 못 쓰는지가 보여야 운영자가 설정을
+ * 바꿀 판단을 한다. 감추면 "그 기능이 없다"로 읽힌다. */
+function applyProviderAvailability(d){
+  const sel=$('gold-provider'); if(!sel) return;
+  const active=String((d&&d.llm_provider)||'').toLowerCase();
+  let enabled=0;
+  Array.prototype.forEach.call(sel.options, function(o){
+    const usable = (o.value===active) || (o.value==='noop' && !active);
+    o.disabled = !usable;
+    if(usable) enabled++;
+  });
+  if(active){
+    const cur=Array.prototype.find.call(sel.options, function(o){return o.value===active;});
+    if(cur) sel.value=active;
+  }
+  const note=$('gold-provider-note');
+  if(note){
+    // ⚠ esc() 는 이 파일에 없다(golden_jobs.js 가 admin.html 에 있다고 가정한 것과 달리
+    //   실제로는 정의돼 있지 않다). 종전 판이 esc(active) 를 부르는 바람에 ReferenceError 가
+    //   나고 **applyServerConfig 의 뒤 코드가 통째로 멈췄다** — 서버 검수 임계가 '—' 로
+    //   남고 대시보드 초기화도 안 됐다(실측 2026-08-23). textContent 로 넣어 이스케이프
+    //   자체를 없앤다.
+    note.textContent = active
+      ? '이 서버는 ' + active + ' 로 설정돼 있어 그 항목만 고를 수 있습니다. '
+        + '다른 제공자를 쓰려면 서버 설정(.env)에서 바꿔야 합니다.'
+      : '서버 설정을 읽지 못했습니다 — 제공자 선택이 실제와 다를 수 있습니다.';
+  }
+  if(!enabled) sel.disabled=true;
+  applyGoldenAiAvailability(active);
+}
+/* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「후보 생성 → 검수」는 눌러도 소용이 없다.
+ *
+ * 실측(223 배포 이미지 · docker exec koipa-jjw-api-1 · 2026-08-23):
+ *   - llm_provider=noop 이면 판정기가 **어떤 본문에도 S3 · 신뢰도 0.5** 만 돌려준다.
+ *   - 그 상태로 hardened 42건을 돌리면 gold 2 / 보류 40 이고, gold 2 건의 등급도 전부 S3 다.
+ *     룰이 S3 라고 한 것에 더미가 겹친 것뿐이라 **합의 게이트가 룰 단독 판정으로 바뀐다.**
+ *   - 「근거 문장이 있는 것만」을 끄면 gold 15/42 인데 15건 전부 S3 라 더 나쁘다.
+ * 그러니 결과를 보고 나서 실망하게 두지 말고 누르기 전에 잠근다. 카드를 감추지는 않는다 —
+ * 감추면 "그 기능이 없다"로 읽힌다(applyProfileVisibility 의 2026-08-09 판단과 같은 이유).
+ * 대신 이 서버에서 **실제로 되는 경로**(이미 있는 문서 묶음 검수)를 위로 올린다. */
+var GOLD_AI_BLOCKED=false;
+function applyGoldenAiAvailability(active){
+  const blocked = (String(active||'').toLowerCase()==='noop');
+  GOLD_AI_BLOCKED = blocked;
+  const go=$('gold-go'); if(go) go.disabled=blocked;
+  const box=$('gold-ai-blocked');
+  if(box){
+    box.style.display = blocked ? '' : 'none';
+    box.innerHTML = blocked
+      ? '<b>이 서버에서는 AI 후보 생성을 할 수 없습니다 — 등급을 매길 LLM 이 없습니다.</b><br/>'
+        + '서버 설정이 <code>llm_provider=noop</code> 이라 판정기가 <b>모든 문서를 S3 으로</b>만 '
+        + '돌려줍니다. 눌러도 등급이 매겨지지 않으므로 잠가 두었습니다.<br/>'
+        + '· 검수·서명을 진행하려면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 를 쓰십시오 — 이 경로는 이 서버에서 그대로 됩니다.<br/>'
+        + '· AI 로 후보를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하거나, 서버 설정(.env)의 <code>LLM_PROVIDER</code> 를 바꿔야 합니다.'
+      : '';
+  }
+  // 되는 것을 먼저 보여준다 — 잠긴 블록이 맨 위에 있으면 카드 전체가 막힌 것으로 읽힌다.
+  const ai=$('gold-ai-block'), reg=$('gold-register-block');
+  if(ai && reg && ai.parentNode===reg.parentNode){
+    const regFirst = !!(reg.compareDocumentPosition(ai) & Node.DOCUMENT_POSITION_FOLLOWING);
+    if(blocked && !regFirst) ai.parentNode.insertBefore(reg, ai);
+    if(!blocked && regFirst) ai.parentNode.insertBefore(ai, reg);
+    // 구분선은 늘 아래쪽 블록이 갖는다.
+    reg.style.borderTop = blocked ? 'none' : '2px solid var(--border)';
+    reg.style.marginTop = blocked ? '0' : '16px';
+    reg.style.paddingTop = blocked ? '0' : '14px';
+    ai.style.borderTop = blocked ? '2px solid var(--border)' : '';
+    ai.style.marginTop = blocked ? '16px' : '';
+    ai.style.paddingTop = blocked ? '14px' : '';
+  }
+}
+/* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「생성 요청」을 누르면 무슨 일이 벌어지는가.
+ *
+ * 근거(코드):
+ *   - noop 이면 생성기가 placeholder 본문을 쓰고 label_source="noop_fallback" 를 찍는다
+ *     (m1_synthesis/generator.py:455-459).
+ *   - 그 문서는 검수에서 승인해도 build_training_rows() 가 배제한다
+ *     (services/synthesis_service.py:41-52 TRAINING_EXCLUDED_LABEL_SOURCES, :177).
+ *   → 큐에는 쌓이지만 **학습행은 0건**이다. 화면에 그 말이 없어서 「승인했는데 왜 학습에
+ *     안 들어가는가」를 결과를 보고 나서야 알게 된다.
+ *
+ * 검증 기준문서 카드와 달리 버튼은 잠그지 않는다 — 여기서의 생성은 파이프라인(생성→큐→검수)
+ * 이 도는지 보는 용도로는 그대로 유효하고, 학습 유입은 서버가 자동으로 막기 때문이다. */
+function applySynthAvailability(active){
+  const a=String(active||'').toLowerCase();
+  const note=$('sy-provider-note');
+  if(note){
+    note.textContent = a
+      ? '이 칸은 예상 비용 계산에만 쓰입니다. 실제 생성기는 서버 설정(' + a + ')을 씁니다 — 여기서 다른 것을 골라도 생성기는 바뀌지 않습니다.'
+      : '이 칸은 예상 비용 계산에만 쓰입니다. 실제 생성기는 서버 설정을 씁니다(설정을 읽지 못했습니다).';
+  }
+  // 서버가 실제로 쓰는 제공자가 목록에 있으면 그것으로 맞춰 둔다 — 비용 추정이 현실과 맞게.
+  const sel=$('sy-provider');
+  if(sel && a){
+    const cur=Array.prototype.find.call(sel.options, function(o){return o.value===a;});
+    if(cur) sel.value=a;
+  }
+  const box=$('sy-noop-note');
+  if(box){
+    const blocked=(a==='noop');
+    box.style.display = blocked ? '' : 'none';
+    box.innerHTML = blocked
+      ? '<b>이 서버에서 생성한 문서는 학습에 쓰이지 않습니다 — 본문을 쓸 LLM 이 없습니다.</b><br/>'
+        + '서버 설정이 <code>llm_provider=noop</code> 이라 생성기가 <b>자리표시용 본문</b>을 만들고 '
+        + '<code>label_source=noop_fallback</code> 를 찍습니다. 검수에서 승인해도 '
+        + '<code>build_training_rows</code> 가 이 표시를 보고 배제하므로 <b>학습행은 0건</b>입니다.<br/>'
+        + '· 눌러도 됩니다 — 생성→검수 큐 경로가 도는지 확인하는 용도로는 그대로 유효합니다.<br/>'
+        + '· 학습에 쓸 문서를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하거나, 서버 설정(.env)의 <code>LLM_PROVIDER</code> 를 바꿔야 합니다.'
+      : '';
+  }
+}
+function applyServerConfig(d){
+  applyProfileVisibility(d);
+  // 새로 붙인 게이팅이 죽어도 **뒤 초기화(검수 임계·대시보드)는 살아야 한다.**
+  // 2026-08-23 에 정확히 그 반대가 됐다 — 함수 하나가 던지자 화면 절반이 비었다.
+  try{ applyProviderAvailability(d); }catch(e){ console && console.warn && console.warn('provider gating skipped', e); }
+  try{ applySynthAvailability(d&&d.llm_provider); }catch(e){ console && console.warn && console.warn('synth note skipped', e); }
+}
+
+/* ---- 1. CLASSIFY ---- */
+// 운영 골든셋(golden100_labeled_v2.jsonl)에서 등급별 2건 선별 — doc_id로 보고서·메트릭과 추적 연결.
+// exp = 골든셋 공식 정답 라벨. body는 합성 텍스트(발주처 실문서 도착 전 기준), [가상기업N]→당사 치환.
+const SAMPLES=[
+  {id:'G50-TS-21', exp:'TS', t:'초전도 양자컴퓨터 큐비트 결맞음 시간 최적화 실험 데이터셋', b:'당사 양자컴퓨팅연구소의 127큐비트 초전도 양자프로세서 결맞음 시간(T1=420μs, T2=310μs) 최적화 실험 원시 데이터와 오류 보정 코드(Surface Code, d=5) 성능 지표(논리 오류율 0.12%). 업계 최고 수준이며 미공개 상태. 연구소장·DARPA 협력 계약자(NDA) 이외 공유 금지.'},
+  {id:'G50-TS-18', exp:'TS', t:'5G-Advanced 빔포밍 코드북 설계 원본 및 시뮬레이션 결과', b:'당사 통신연구소가 개발한 5G-Advanced 대규모 MIMO 빔포밍 코드북 전체 설계 문서 및 채널 시뮬레이션 원시 결과. 안테나 간격(λ/2.3), 전파 이득(23.7dBi), 지연 확산 보상 계수(τ_rms=18ns) 등 핵심 파라미터 포함. 3GPP 표준 선점을 위한 특허 출원 전 단계. 연구소장·표준화팀장 이외 접근 금지.'},
+  {id:'G50-S1-14', exp:'S1', t:'프리미엄 발효 소스 핵심 배합비 및 제조 공정 명세서', b:'당사 식품R&D센터의 프리미엄 발효 소스 제품 핵심 배합비(재료 15종, 비율 0.01% 단위 기재)와 숙성 공정 상세 조건(온도 12°C, 습도 68%, 기간 180일). 독자 개발 비법으로 외부 유출 시 유사 제품 복제 가능. 시장 내 20% 점유율 기여 제품. R&D팀장·생산팀장 이외 접근 금지.'},
+  {id:'G50-S1-16', exp:'S1', t:'의료 AI 예후 예측 모델 내부 검증 보고서 (IRB 승인 전)', b:'당사 헬스케어AI팀이 개발한 패혈증 예후 예측 AI 모델의 내부 검증 보고서. 검증 코호트 1,240명, AUROC=0.93, 민감도 89%, 특이도 91%, 임상 도입 시 조기 사망 감소 추정치(14.2%) 등 포함. IRB 승인 전 단계로 미공개 상태. 임상팀·CMO·데이터과학팀장 외 열람 금지.'},
+  {id:'G50-S2-13', exp:'S2', t:'2025년 상반기 인력 구조 재편 계획 (대외비)', b:'당사 인사기획팀의 2025년 상반기 조직 개편 계획안. 사업부 3개 통폐합, 희망퇴직 대상 인원 약 120명, 신규 채용 계획 80명, 인건비 절감 목표 연 45억 원. 공식 발표 전 내부 검토 단계. 조기 유출 시 구성원 불안 및 노사 갈등 위험. 인사팀·임원진 열람, 대외비 분류.'},
+  {id:'G50-S2-21', exp:'S2', t:'본사 이전 계획 초안 — 후보지 3곳 비교 및 비용 분석', b:'당사 총무팀의 본사 이전 계획 초안. 후보지 3곳(강남구 A빌딩, 마포구 B빌딩, 판교 C타워) 임차 조건·비용 비교(보증금 50~80억, 월세 1.2~1.8억), 이전 비용 추산(22억), 예정 시기(2025.09) 포함. 발표 전 임대인·부동산 협상 중. 총무팀·경영지원팀·C-level 이외 대외비.'},
+  {id:'G50-S3-18', exp:'S3', t:'AI 기반 제조 혁신 웨비나 발표 자료 — 외부 공개용 (2025.02)', b:'당사 기술마케팅팀이 외부 고객 대상 웨비나(2025.02.20)에서 발표한 AI 기반 제조 혁신 슬라이드 자료 공개본. AI 예지보전 도입 사례(A社: 설비 고장률 -32%), ROI 산출 방법론, 도입 로드맵 6단계 등 포함. 웨비나 등록 참석자 전원에게 배포된 공개 자료.'},
+  {id:'G50-S3-21', exp:'S3', t:'당사 2024 사회공헌 활동 결과 보고서 (공개본)', b:'당사 CSR팀이 발간한 2024년 사회공헌 활동 결과 공개 보고서. 소외계층 디지털 교육 지원(수혜자 1,240명), 환경 정화 캠페인 참여(임직원 820명), 지역 사회 장학금 지급(3억 2천만 원), 협력사 상생 펀드 조성(15억 원). 사내외 공개 배포.'},
+];
+function populateSamples(){
+  const sel=$('sample-select');
+  /* ⚠ [2026-08-23] 요소가 없으면 조용히 끝낸다.
+     2026-08-23 에 「분류 실행」의 샘플 드롭다운을 화면에서 뺐는데 이 초기화는 남겨 두었다.
+     init 순서가 populateSamples() → checkHealth() 라, 여기서 TypeError 가 나면서
+     **checkHealth 가 아예 실행되지 않았다** — 서버 검수 임계가 '—' 로 남고 프로파일 배너도
+     안 떴다. 화면 절반이 죽는데 원인은 지운 요소 하나였다. */
+  if(!sel) return;
+  /* [2026-08-23] 두 가지를 고쳤다.
+     ① 옵션 이름에서 기대 등급 `[TS]` 를 뺐다 — 시스템이 판정하기 전에 화면이 답을 말하고
+        있었다. 등급 판정을 보여주는 화면에서 정답을 먼저 노출하면 시연이 성립하지 않는다.
+     ② 아무것도 고르지 않은 상태로 시작한다(sel.value=0 제거 + 첫 옵션을 안내문으로).
+        종전에는 첫 샘플이 선택된 채로 열려 본문이 미리 채워져 있었다. */
+  sel.innerHTML = '<option value="">— 직접 입력 (샘플을 쓰려면 고르세요) —</option>'
+    + SAMPLES.map((s,i)=>`<option value="${i}">${s.id} · ${s.t}</option>`).join('');
+  sel.value='';
+}
+function pickSample(i){ const s=SAMPLES[+i]; if(!s) return; $('cl-docid').value=s.id; $('cl-title').value=s.t; $('cl-body').value=s.b; $('cl-result').innerHTML=''; }
+
+async function classifyOne(doc_id, title, content){
+  const body={doc_id, title, content, return_evidence:true};
+  const d=await api('POST','/classify',body);
+  enqueue(d, title); markFlow(1);
+  return d;
+}
+
+/* 업로드 파일 → 본문 추출 → 분류 패널 채움 (→ 옵션으로 바로 분류).
+ * /documents/analyze · full_text=true 경로를 쓴다.
+ * full_text 를 주는 이유는 그쪽과 같다 — 기본 응답의 text_preview 는 8K 절단이라 그대로
+ * 쓰면 등급 판단이 잘린 본문 기준이 된다. 추출은 저장하지 않는다(분류해야 큐에 적재). */
+function syncWriteGate(){
+  const on=($('cfg-write-enable')||{}).checked;
+  const box=$('write-gate'), msg=$('write-gate-msg');
+  if(box) box.classList.toggle('off', !on);
+  if(msg) msg.textContent = on
+    ? '해제하면 읽기 전용이 됩니다.'
+    : '읽기 전용 — 확정·재라벨·재학습·활성화 같은 상태 변경은 실행되지 않습니다.';
+}
+
+/* 드래그&드롭 — 파일 선택 대화상자를 열지 않고도 올릴 수 있어야 한다. */
+function dzOver(ev, on){ ev.preventDefault(); const z=$('cl-drop'); if(z) z.classList.toggle('over', !!on); }
+function dzDrop(ev){
+  ev.preventDefault();
+  const z=$('cl-drop'); if(z) z.classList.remove('over');
+  const files=(ev.dataTransfer && ev.dataTransfer.files) || [];
+  if(!files.length) return;
+  // input.files 는 읽기 전용이라 DataTransfer 로 옮겨 담는다(그래야 이후 로직이 동일하다).
+  const dt=new DataTransfer(); dt.items.add(files[0]);
+  $('cl-file').files = dt.files;
+  onPickFile();
+}
+function onPickFile(){
+  const f=(($('cl-file')||{}).files||[])[0];
+  const n=$('cl-file-name');
+  if(n) n.textContent = f ? `${f.name} · ${(f.size/1024).toFixed(0)}KB` : '선택된 파일 없음';
+}
+
+/* 대용량 폴백 — /documents/analyze 는 요청 안에서 분류까지 끝내는 동기 진단 경로라
+ * analyze_sync_max_chunks(기본 34 ≈ 9페이지)를 넘으면 413 으로 거절한다. 그때 서버가
+ * 안내하는 경로 그대로 POST /documents(적재) → POST /classify/async → 잡 폴링으로 넘긴다.
+ * 이 경로는 문서를 실제로 적재하므로 데모 마커(created_by · rag_namespace)를 화면 경로와
+ * 동일하게 달아 정리 절차(OPERATION.md §8)가 걷어갈 수 있게 한다. */
+async function ingestLargeDocument(f, info){
+  const c=cfg();
+  if(info) info.innerHTML='<span class="pill warn">대용량</span> 동기 경로 상한 초과 — 적재 후 비동기 분류로 전환합니다…';
+  const fd=new FormData();
+  fd.append('file', f);
+  fd.append('actor', JSON.stringify({user_id:'demo-console', role:c.role||'admin'}));
+  // index_for_rag 는 반드시 false. 색인은 청크마다 임베딩을 돌리는데 그걸 요청 안에서 하면
+  // 대용량에서 gunicorn 워커가 타임아웃으로 SIGKILL 된다(실측 2026-08-08: 75K자·401청크에서
+  // 워커 2회 사망). --workers 1 이면 동시에 처리 중이던 다른 요청까지 함께 끊긴다.
+  // 같은 문서를 index_for_rag=false 로 보내면 0.6초에 201 로 끝난다 — 분류에는 색인이 필요 없다.
+  fd.append('index_for_rag','false');
+  // [2026-08-23] ICD 메타데이터 — 소용량 경로(classifyFromFile)와 동일 규칙, 대용량 폴백에서만 빠지면
+  // 문서 크기에 따라 등급 판정 근거가 달라지는 비일관성이 생긴다.
+  [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
+    .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
+  const r=await fetch(`${c.base}/documents`,
+    {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+  if(!r.ok){
+    const t=await r.text();
+    throw Object.assign(new Error(t.slice(0,300)), {status:r.status});
+  }
+  const up=await r.json();
+  log(`대용량 적재: doc_id=${up.doc_id} · ${up.char_count}자 · 청크 ${up.chunk_count} (RAG 색인 생략 — 분류에는 불필요)`,'ok');
+  $('cl-docid').value = up.doc_id;
+  $('cl-title').value = f.name;
+  $('cl-body').value  = `(적재 완료 — 본문은 서버에 저장되어 있습니다. doc_id ${up.doc_id} 기준으로 비동기 분류 중)`;
+  if(info) info.innerHTML=`<span class="pill ok">적재됨</span> ${esc(f.name)} · ${up.char_count}자 · 청크 ${up.chunk_count} · 비동기 분류 요청 중…`;
+
+  const a=await api('POST','/classify/async',{doc_id:up.doc_id, return_evidence:true});
+  const jid=a.job_id;
+  log(`비동기 분류 제출: job ${jid}`,'ok');
+  for(let i=0;i<120;i++){
+    await new Promise(r2=>setTimeout(r2,2000));
+    const st=await api('GET',`/classify/jobs/${encodeURIComponent(jid)}`);
+    if(info) info.innerHTML=`<span class="pill warn">분류 중</span> ${esc(f.name)} · job ${esc(String(jid)).slice(0,8)} · ${esc(st.status)} (${(i+1)*2}s)`;
+    if(st.status==='done' || st.status==='partial'){
+      const res=(st.results||[])[0];
+      if(res){ renderClassify(res); enqueue(res, f.name); markFlow(1); }
+      if(info) info.innerHTML=`<span class="pill ok">분류 완료</span> ${esc(f.name)} · 청크 ${up.chunk_count} · 비동기 경로`;
+      return;
+    }
+    if(st.status==='failed'){
+      throw Object.assign(new Error(st.error||'분류 실패'), {status:0});
+    }
+  }
+  if(info) info.innerHTML=`<span class="pill warn">대기 중</span> 240초 내에 끝나지 않았습니다 — 「검토할 문서 보기」로 확인하세요.`;
+}
+
+async function classifyFromFile(alsoClassify){
+  const el=$('cl-file');
+  const f=(el && el.files && el.files[0]) || null;
+  const info=$('cl-file-info');
+  if(!f){ if(info) info.textContent='파일을 선택하거나 위 영역에 끌어다 놓으세요.'; return; }
+  const btns=['btn-extract','btn-extract-classify'].map($).filter(Boolean);
+  btns.forEach(b=>b.disabled=true);
+  if(info) info.textContent=`본문 추출 중 — ${f.name}`;
+  try{
+    const c=cfg();
+    const fd=new FormData();
+    fd.append('file', f);
+    fd.append('full_text','true');
+    // [2026-08-23] ICD 메타데이터 — 빈 값은 보내지 않는다(index.html 과 동일 규칙).
+    // 빈 값을 보내면 "unknown" 과 "명시적으로 없음" 이 구분되지 않아 관리성 판정이 뒤집힌다.
+    [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
+      .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
+    const r=await fetch(`${c.base}/documents/analyze`,
+      {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+    if(r.status===413){
+      // 동기 경로 상한 초과 — 서버가 안내한 대용량 경로로 자동 전환한다.
+      if(!guardWrite('대용량 문서 적재')) {
+        if(info) info.innerHTML='<span class="pill warn">대용량</span> 이 문서는 적재가 필요합니다 — 위 <b>쓰기 작업 허용</b>을 켠 뒤 다시 시도하세요.';
+        return;
+      }
+      await ingestLargeDocument(f, info);
+      return;
+    }
+    if(!r.ok){
+      const t=await r.text();
+      throw Object.assign(new Error(t.slice(0,200)), {status:r.status});
+    }
+    const d=await r.json();
+    const text=(d.text || d.text_preview || '').trim();
+    if(!text){ if(info) info.textContent='추출된 본문이 비어 있습니다 — 스캔본이면 텍스트 레이어가 없을 수 있습니다.'; return; }
+    $('cl-docid').value = `upload-${Date.now()}`;
+    $('cl-title').value = f.name;
+    $('cl-body').value  = text;
+    // 파싱 메타는 최상위가 아니라 parse 아래에 중첩돼 있다(DocumentAnalysisResponse).
+    const pi=d.parse||{}, gate=d.gate||{};
+    const meta=[];
+    if(pi.source_format) meta.push(esc(pi.source_format));
+    if(pi.extraction_method) meta.push(`추출 ${esc(pi.extraction_method)}`);
+    if(pi.extraction_quality!=null) meta.push(`품질 ${pi.extraction_quality}`);
+    if(pi.ocr_used!=null) meta.push(`OCR ${pi.ocr_used?'사용':'미사용'}`);
+    if(pi.table_count) meta.push(`표 ${pi.table_count}`);
+    if(pi.pii_masked_count) meta.push(`PII 마스킹 ${pi.pii_masked_count}`);
+    meta.push(`${text.length}자`);
+    // 검수 게이트가 이미 "사람이 봐야 한다"고 판정했으면 그 사유를 여기서 보여준다 —
+    // 분류 결과만 보고 넘어가면 왜 검수 큐로 가는지 알 수 없다.
+    const gateLine = gate.requires_review
+      ? `<br/><span class="pill warn">검수 필요</span> ${esc((gate.reasons||[]).join(', ')||'게이트 판정')}`
+      : '';
+    const warnLine = (pi.warnings && pi.warnings.length)
+      ? `<br/><span class="pill warn">추출 경고</span> ${esc(pi.warnings.join(', '))}` : '';
+    if(info) info.innerHTML=`<span class="pill ok">추출됨</span> ${esc(f.name)} · ${meta.join(' · ')}${gateLine}${warnLine}`;
+    log(`문서 추출: ${f.name} · ${text.length}자`,'ok');
+    if(alsoClassify) await runClassify();
+  }catch(e){
+    if(info) info.innerHTML=`<span class="pill err">추출 실패</span> ${e.status||''} ${esc(String(e.message||''))}`;
+    log('문서 추출 실패: '+(e.status||e.message),'err');
+  }finally{
+    btns.forEach(b=>b.disabled=false);
+  }
+}
+
+async function runClassify(){
+  const btn=$('btn-classify'); btn.disabled=true; btn.textContent='분류 중…';
+  try{
+    const d=await classifyOne($('cl-docid').value, $('cl-title').value, $('cl-body').value);
+    renderClassify(d);
+  }catch(e){ $('cl-result').innerHTML=`<div class="warnbox">분류 실패: ${e.status||''} ${e.data?.detail||e.message||''}</div>`; }
+  finally{ btn.disabled=false; btn.textContent='분류하기'; }
+}
+
+async function runBatch(){
+  // [2026-08-23] 버튼은 화면에서 뺐다(정답지 문서를 검수 큐에 적재하던 경로).
+  // 함수는 진단·회귀 확인용으로 남기되, 버튼이 없어도 죽지 않게 방어한다.
+  const btn=$('btn-batch')||{}; btn.disabled=true; const orig=btn.textContent;
+  let hit=0;
+  for(let i=0;i<SAMPLES.length;i++){
+    const s=SAMPLES[i]; btn.textContent=`일괄 분류 ${i+1}/${SAMPLES.length}…`;
+    try{
+      const d=await classifyOne(s.id, s.t, s.b);
+      if(i===0||i===SAMPLES.length-1) renderClassify(d);
+      const match=(d.label===s.exp);
+      if(match) hit++;
+      log(`[batch] ${s.id} → ${d.label} (기대 ${s.exp}) ${match?'✓':'·'}`, match?'ok':'info');
+    }catch(e){ log(`[batch] ${s.id} 실패: ${e.status||e.message}`,'err'); }
+  }
+  log(`일괄 분류 완료 — ${SAMPLES.length}건 검수 큐 적재, 기대등급 일치 ${hit}/${SAMPLES.length}`, 'ok');
+  btn.disabled=false; btn.textContent=orig;
+}
+/* [2026-08-24] 이 카드에서 신뢰도 수치를 뺐다 — 등급 시연 화면(app.js)과 같은 규율이다.
+ *   ① 화면 표시는 요건이 아니다(RTM FUN-024 의 구현범위는 검수자 큐 배분·심층지표).
+ *   ② 이 값은 정답확률이 아니라 softmax 파생값이라(골든500 AUROC 0.58 · ECE 0.18) 숫자로
+ *      서면 실제보다 확정적으로 읽힌다. 자동확정을 가르는 것도 이 값 단독이 아니다.
+ *   ⚠ 지운 것은 화면뿐이다 — confidence 는 API 응답(ICD required)·DB·감사로그에 그대로 남는다.
+ * 대신 관리자가 실제로 알아야 하는 것을 적는다: 검수인가 자동인가, 그리고 **왜 검수인가**.
+ * 사유 문구는 공용 표(review_reason_ko.js) 한 곳에서 가져온다 — 등급 시연 화면과 같은 말이 뜬다. */
+function renderClassify(d){
+  const f=d.evaluation_factors||{};
+  // 검수 여부는 서버가 정한다(ClassifyResponse.status). 화면이 신뢰도로 다시 계산하면
+  // 신뢰도 게이트 하나만 재현하고 나머지 13개(agreement-gate·cap-conflict 등)를 놓친다.
+  const flagged = d.status==='needs_review';
+  const warns = Array.isArray(d.warnings) ? d.warnings : [];
+  const whyKo = (window.KOIPA_GATE_REASON ? window.KOIPA_GATE_REASON(warns) : '')
+    || '자동 확정하지 않고 사람 검수로 라우팅';
+  const adjNote = window.KOIPA_ADJUSTMENT_NOTE ? window.KOIPA_ADJUSTMENT_NOTE(d) : '';
+  const evi=(d.evidence||[]).slice(0,8).map(e=>`<span class="chip">${esc((e.text||'').slice(0,18))}${e.tag?' · '+esc(e.tag):''}</span>`).join('');
+  $('cl-result').innerHTML=`
+    <div class="kv" style="margin-top:4px">
+      <div><span>등급</span> ${gradeTag(d.label)} <b>${GRADE_KR[d.label]||''}</b></div>
+      <div><span>모델</span> <b class="mono" style="font-family:var(--font-mono);font-size:11.5px">${esc(d.model_version||'-')}</b></div>
+      <div><span>${d.elapsed_ms}ms</span></div>
+      ${flagged?'<span class="pill warn">검수 필요</span>':'<span class="pill ok">자동 확정</span>'}
+    </div>
+    ${flagged?`<div class="warnbox" style="margin-top:8px">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨<br/>사유: ${esc(whyKo)}${adjNote?`<br/>${esc(adjNote)}`:''}</div>`:''}
+    <div class="factors" style="margin-top:10px">
+      ${factorCard('S 비공지성', f.secrecy)}
+      ${factorCard('V 경제유용성', f.value)}
+      ${factorCard('M 비밀관리성', f.management)}
+    </div>
+    ${evi?`<div style="margin-top:10px"><label class="fld">근거 키워드</label><div class="evi">${evi}</div></div>`:''}
+  `;
+  // 원문 경고는 화면 카드가 아니라 실시간 로그로 보낸다 — 'persistence skipped' 처럼 판정과
+  // 무관한 내부 사정이 '검수 사유' 자리에 섞이던 것을 막는다(app.js 와 같은 처리).
+  if(warns.length) log(`[classify] ${d.doc_id||''} 경고: ${warns.join(' · ')}`, flagged?'info':'info');
+}
+function factorCard(label,v){ v=v??0; const pct=Math.min(100,(v/2)*100); return `<div class="factor"><div class="fl">${label}</div><div class="fv">${(+v).toFixed(v%1?1:0)}</div><div class="meter"><i style="width:${pct}%"></i></div></div>`; }
+
+/* ---- 2. QUEUE / CONFIRM / RELABEL ---- */
+async function loadReviewQueue(){
+  try{
+    const d=await api('GET','/review-queue?limit=50');
+    QUEUE = (d.items||[]).map(it=>({
+      inference_id:it.classification_id, doc_id:it.doc_id,
+      title:it.filename||it.doc_id, label:it.grade, confidence:it.confidence,
+      model_version:it.model_version, text_preview:it.text_preview, status:it.status,
+      flagged:true, resolved:false
+    }));
+    renderQueue(); markFlow(2);
+    const info=$('rq-info');
+    if(info) info.textContent = `대기 ${d.total||0}건 (표시 ${QUEUE.length})`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(', ')}`:'');
+    log(`검수 큐 로드: ${QUEUE.length}건 (전체 ${d.total||0})`, 'ok');
+  }catch(e){
+    /* [2026-08-23] 실패를 로그창에만 남기던 자리다. 로그바는 접혀 있을 수 있고, 그러면
+       화면에는 처음의 안내문("「검토할 문서 보기」를 누르면 …")이 그대로 남아 **대기 0건과
+       구별되지 않았다** — 사용자에게는 "눌렀는데 아무 일도 안 일어난다"로 보인다.
+       실측: 키가 틀린 서버(401)에서 이 버튼만 아무 반응이 없었다(e2e 시나리오
+       review.queue.load-failure-visible · fault.auth.401-everywhere-visible). */
+    const detail=(e.data&&(e.data.detail||e.data.message))||e.message||'';
+    const info=$('rq-info');
+    if(info) info.textContent=`조회 실패: ${e.status||''} ${detail}`
+      +(e.status===401?' — API 키를 확인하세요.':(e.status===403?' — admin 또는 reviewer 역할이 필요합니다.':''));
+    // 이미 그려 둔 목록은 지우지 않는다 — 실시간 관제 tick 이 한 번 실패했다고 화면이
+    // 비면 오히려 정보가 준다. 아직 아무것도 없을 때만 그 자리에 사유를 적는다.
+    const q=$('queue');
+    if(q && !QUEUE.length) q.innerHTML=`<div class="warnbox">검수 큐를 읽지 못했습니다: ${esc(String(e.status||''))} ${esc(String(detail))}</div>`;
+    log(`검수 큐 로드 실패: ${e.status||e.message}`,'err');
+  }
+}
+function enqueue(d, title){
+  const flagged = d.status==='needs_review';   // 서버 판정 그대로 — renderClassify 와 같은 기준
+  QUEUE.unshift({inference_id:d.inference_id, doc_id:d.doc_id, title:title||$('cl-title').value||d.doc_id, label:d.label, confidence:d.confidence, model_version:d.model_version, flagged, resolved:false});
+  renderQueue();
+}
+function renderQueue(){
+  const q=$('queue');
+  if(!QUEUE.length){ q.innerHTML='<div class="q-empty">분류를 실행하면 결과가 검수 큐에 적재됩니다.</div>'; return; }
+  q.innerHTML=QUEUE.map((it,i)=>`
+    <div class="q-item ${it.flagged?'flagged':''} ${it.resolved?'resolved':''}">
+      <div class="q-top">
+        <div><span class="q-id">${esc(it.doc_id)}</span> · <span class="q-title">${esc(it.title)}</span>${it.status?` <span class="pill" style="font-size:10px">${esc(it.status)}</span>`:''}</div>
+        <div>${gradeTag(it.label)} ${it.flagged?'<span class="pill warn">검수</span>':'<span class="pill ok">자동</span>'} ${it.resolved?'<span class="pill ok">완료</span>':(it.pending_second?'<span class="pill warn">2차 검수 필요</span>':'')}</div>
+      </div>
+      ${it.text_preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:96px;overflow:auto;white-space:pre-wrap;">${esc(it.text_preview)}</div>`:''}
+      ${it.inference_id?`
+      <div class="q-why">
+        <button class="btn sec sm" onclick="toggleWhy(${i})" id="why-btn-${i}">왜 이 등급인가?</button>
+        <div id="why-${i}" class="why-box" style="display:none"></div>
+      </div>`:''}
+      ${(it.resolved||it.pending_second)?'':`
+      <div class="q-actions">
+        <button class="btn sm" onclick="doConfirm(${i})">확정 (현 등급)</button>
+        <span style="font-size:11px;color:var(--text-dim)">또는 재라벨 →</span>
+        <select id="rl-${i}">${GRADES.map(g=>`<option value="${g}" ${g===it.label?'selected':''}>${g}</option>`).join('')}</select>
+        <button class="btn sec sm" onclick="doRelabel(${i})">재라벨 전송</button>
+      </div>`}
+    </div>
+  `).join('');
+}
+/* ── 검수 근거: "왜 이 등급인가" (FUN-023 근거 출력 · FUN-024 검수자 UI) ──────────
+ * 큐 목록에는 등급과 검수/자동 결정만 있어 검수자가 판단 근거를 볼 수 없었다.
+ * 클릭한 행에서만 조회한다(lazy) — 목록 전체를 미리 불러오면 대기건이 많을 때 낭비다.
+ * 조회 대상은 GET /review-queue/{id}/evidence 로, **분류 시점에 저장된 근거**를 그대로 읽는다.
+ * (/classify/explain 은 쓰지 않는다 — 문서를 다시 분류하므로 큐가 가진 300자 미리보기로는
+ *  원문과 다른 결과가 나오고, 그 사이 모델이 바뀌면 화면 등급과 근거가 어긋난다.) */
+const WHY_CACHE = {};
+function whyRow(e){
+  const w=(e.contribution==null)?'':`<span class="why-w">${Number(e.contribution).toFixed(2)}</span>`;
+  return `<div class="why-ev"><span class="why-t">${esc(e.type||'-')}</span>`
+       + `<span class="why-x">${esc(e.excerpt||'')}</span>${w}</div>`;
+}
+function renderWhy(d){
+  if(d.error==='not_found') return '<div class="sec-note">이 분류를 찾을 수 없습니다.</div>';
+  if(d.error) return `<div class="warnbox">근거 조회 실패: ${esc(d.error)}</div>`;
+  const r=d.recorded||{};
+  const a=r.automation_assessment||{};
+  // 차순위는 **어느 등급이 다음이었나**만 적는다 — 확률 수치는 화면에서 뺀 값이다(원값은 DB).
+  const alts=(r.alternatives||[]).map(a=>esc(a.level_code||'?')).join(' · ');
+  const warn=(d.warnings||[]).map(w=>`<div class="sec-note">· ${esc(w)}</div>`).join('');
+  const evs=(d.evidence||[]).map(whyRow).join('') ||
+    '<div class="sec-note">표시할 근거 항목이 없습니다.</div>';
+  const byType=Object.entries(d.by_type||{}).map(([k,v])=>
+    `<span class="pill">${esc(k)} ${Number(v).toFixed(2)}</span>`).join(' ');
+  // 서버가 하나로 줄여 준 검수 사유 태그(causal_review_reason)를 한글로 옮겨 적는다.
+  // 종전에는 'agreement-gate' 같은 영문 태그를 그대로 찍었고, 옆에 확률 수치가 붙어 있었다.
+  const reasonKo = a.causal_review_reason && window.KOIPA_GATE_REASON_BY_TAG
+    ? window.KOIPA_GATE_REASON_BY_TAG(a.causal_review_reason) : (a.causal_review_reason||'');
+  const automation = reasonKo
+    ? `<div class="sec-note" style="margin-top:6px">검수 사유 — ${esc(reasonKo)}</div>`
+    : (a.selected_label
+        ? `<div class="sec-note" style="margin-top:6px">자동 확정 · 선택 등급 ${esc(a.selected_label)}</div>` : '');
+  return `<div class="why-head">판정 <b>${esc(r.grade||'-')}</b>`
+       + ` · 모델 <code>${esc(r.model_version||'-')}</code>`
+       + (r.rag_used?' · RAG 사용':'')+'</div>'
+       + (byType?`<div class="why-agg">${byType}</div>`:'')
+       + evs
+       + (alts?`<div class="sec-note" style="margin-top:6px">차순위: ${esc(alts)}</div>`:'')
+       + automation
+       + warn;
+}
+async function toggleWhy(i){
+  const it=QUEUE[i]; if(!it||!it.inference_id) return;
+  const box=$(`why-${i}`), btn=$(`why-btn-${i}`);
+  if(!box) return;
+  if(box.style.display!=='none'){ box.style.display='none'; btn.textContent='왜 이 등급인가?'; return; }
+  box.style.display=''; btn.textContent='근거 접기';
+  const id=it.inference_id;
+  if(WHY_CACHE[id]){ box.innerHTML=renderWhy(WHY_CACHE[id]); return; }
+  box.innerHTML='<div class="sec-note">근거를 불러오는 중…</div>';
+  try{
+    const d=await api('GET',`/review-queue/${encodeURIComponent(id)}/evidence`);
+    WHY_CACHE[id]=d; box.innerHTML=renderWhy(d);
+  }catch(e){
+    box.innerHTML=`<div class="warnbox">근거 조회 실패: ${esc(String(e.status||''))} `
+      + `${esc(e.data?.detail||e.message||'')}</div>`;
+  }
+}
+// 검수 큐 최상단 문서 기준 유사문서 자동 조회(검수 보조). 수동 「검토할 문서 보기」 때만
+// 발화하고, 실시간 관제 폴링 tick(AUTO_SILENT)에서는 스킵한다 — 임베딩 비용·로그 스팸 방지.
+/* 지금 분류 패널에 들어 있는 본문을 질의로 가져온다 — 검수 중인 문서를 다시 붙여넣지 않아도 되게. */
+
+async function doConfirm(i){
+  if(!guardWrite('확정')) return;
+  const it=QUEUE[i];
+  try{
+    const body={doc_id:it.doc_id, confirmed_label:it.label, model_version:it.model_version, actor:actor(), note:'console confirm'};
+    if(it.inference_id) body.inference_id=it.inference_id;
+    const d=await api('POST','/confirm',body);
+    if(d.persisted===false){                              // DB미가용/분류 미존재 → 감사-only(무음 성공 아님)
+      it.flagged=true; renderQueue();
+      log(`⚠ 확정 미영속(감사-only): ${it.doc_id} — ${(d.warnings&&d.warnings.length?d.warnings:['DB 미가용 또는 분류 미존재']).join(' · ')}. 항목을 큐에 유지.`,'err');
+      return;
+    }
+    if(d.second_review_required){                         // 고등급 이중검토 보류 → '완료' 아님
+      it.pending_second=true; renderQueue();
+      log(`2차 검수 필요: ${it.doc_id} → ${it.label} — 고등급 이중검토 보류(두 번째 검수자 필요).`,'info');
+      return;
+    }
+    it.resolved=true; renderQueue(); markFlow(2);
+    log(`확정 완료: ${it.doc_id} → ${it.label} (confirmation ${d.confirmation_id})`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(' · ')}`:''),'ok');
+  }catch(e){ alert('확정 실패: '+(e.data?.detail||e.message)); }
+}
+async function doRelabel(i){
+  if(!guardWrite('재라벨')) return;
+  const it=QUEUE[i]; const corrected=$('rl-'+i).value;
+  if(corrected===it.label && !confirm('원 등급과 동일합니다. 그래도 재라벨로 전송할까요?')) return;
+  try{
+    const body={doc_id:it.doc_id, original_label:it.label, corrected_label:corrected, reason:'console relabel', actor:actor()};
+    if(it.inference_id) body.inference_id=it.inference_id;
+    const d=await api('POST','/relabel',body);
+    if(d.persisted===false){                              // DB미가용/분류 미존재 → 감사-only(무음 성공 아님)
+      it.flagged=true; renderQueue();
+      log(`⚠ 재라벨 미영속(감사-only): ${it.doc_id} — ${(d.warnings&&d.warnings.length?d.warnings:['DB 미가용 또는 분류 미존재']).join(' · ')}. 항목을 큐에 유지.`,'err');
+      return;
+    }
+    if(d.second_review_required){                         // 고등급 이중검토 보류 → '완료' 아님
+      it.label=corrected; it.pending_second=true; renderQueue();
+      log(`2차 검수 필요: ${it.doc_id} → ${corrected} — 고등급 이중검토 보류(두 번째 검수자 필요).`,'info');
+      return;
+    }
+    it.resolved=true; it.label=corrected; renderQueue(); markFlow(2);
+    log(`재라벨 완료: ${it.doc_id} → ${corrected} · 큐 ${d.queue_size}/${d.retrain_threshold} (재학습 임계)`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(' · ')}`:''),'ok');
+    if(d.queue_size>=d.retrain_threshold) log(`재학습 임계 도달 (${d.queue_size}≥${d.retrain_threshold}) — 3번 재학습 트리거 권장`,'info');
+  }catch(e){ alert('재라벨 실패: '+(e.data?.detail||e.message)); }
+}
+
+/* ---- 3. TRAIN ---- */
+/* 학습 규모 preset — 자유 입력란을 열지 않는다. 임의 값이 들어가면 학습이 얼마나 걸릴지
+ * 예측이 안 되고 되돌리는 절차도 없다. 두 조합만 고정한다.
+ *
+ * ⚠ 소요 시간을 라벨에 고정 숫자로 적지 않는다. CPU 의 SIMD 지원 여부에 따라 **한 자릿수 배**로
+ * 갈리기 때문이다. 실측 2026-08-08:
+ *     테스트서버  QEMU Virtual CPU · AVX 전무(torch capability=DEFAULT) · 4스레드
+ *                 → 37초/스텝 · 정식 학습 약 13시간
+ *     일반 PC     AMD Zen4 · AVX-512 · 8스레드
+ *                 → 같은 작업이 약 6배 빠름(≈1시간/1,000행 → 정식 약 2시간)
+ * 같은 코드·같은 데이터인데 하드웨어만으로 13시간 ↔ 2시간이 된다. 화면에 절대 시간을 박아 두면
+ * 회원사 환경에서 그대로 틀린 숫자가 된다. 규모(정식 대비 배수)만 밝히고, 실제 예상 시간은
+ * 진행률 배선(estimated_finish_at)이 첫 스텝 몇 개로 그 서버에서 직접 계산해 보여 준다. */
+const TRAIN_PRESETS = {
+  full: { hyperparams: null,
+          note: '정본 학습셋 전체를 기본 하이퍼파라미터로 학습합니다. 실제 소요는 서버 CPU 에 따라 '
+              + '크게 달라지므로(AVX 지원 여부로 수 배 차이), 시작 후 진행률의 예상 완료 시각을 '
+              + '확인하십시오. 업무시간 외 실행을 권장합니다.' },
+  demo: { hyperparams: { epochs: 1, max_seq_len: 128, batch_size: 16, use_mlflow: false },
+          note: '파이프라인 시연용입니다 — 학습→등록→게이트→배포 경로를 확인하는 용도이고, '
+              + '이 설정으로 나온 모델은 품질 기준(고등급 미탐 floor)을 통과하지 못할 수 있습니다.' },
+};
+function onTrainPresetChange(){
+  const p=TRAIN_PRESETS[$('tr-preset')?.value] || TRAIN_PRESETS.full;
+  const el=$('tr-preset-note'); if(el) el.textContent=p.note;
+}
+async function submitTrain(){
+  if(!guardWrite('재학습 제출')) return;
+  // Safe Mode 기본값을 '허용'으로 바꾸면서(오조작 방지를 체크박스 대신 확인창으로 옮김)
+  // 재학습이 무확인 1클릭으로 나가지 않도록 여기서 한 번 확인받는다. 학습은 시작하면
+  // 되돌리는 절차가 없고 GPU/CPU 를 길게 점유한다.
+  const _tt=$('tr-type').value;
+  const _pk=$('tr-preset')?.value || 'full';
+  const _p=TRAIN_PRESETS[_pk] || TRAIN_PRESETS.full;
+  // 확인창에 절대 시간을 적지 않는다 — 서버 CPU(AVX 지원)에 따라 수 배로 갈려 어느 숫자를
+  // 적어도 다른 환경에서는 틀린다. 대신 "무엇을 눌렀는지"와 "시간은 진행률에서 확인"을 알린다.
+  if(!confirm(`재학습을 제출합니다 (training_type=${_tt}).\n\n`
+    + `학습 규모: ${_pk==='demo'?'시연용 빠른 학습(1에폭·seq128 — 정식의 약 1/20)':'정식 학습(기본값 5에폭·seq512)'}\n`
+    + `예상 소요는 서버 CPU 에 따라 크게 다릅니다 — 시작 후 진행률의 예상 완료 시각을 확인하십시오.\n\n`
+    + '학습이 시작되면 중간에 되돌리는 절차가 없고, 완료까지 자원을 점유합니다.\n'
+    + '산출 모델은 후보로 등록되며 배포는 별도 활성화 단계에서 게이트를 통과해야 합니다. 진행할까요?')) return;
+  try{
+    const body={training_type:$('tr-type').value, base_model:$('tr-base').value, use_rag:$('tr-rag').checked, actor:actor()};
+    // hyperparams 가 null 이면 넣지 않는다 — 서버 기본값(TrainSpec)이 그대로 쓰이게.
+    if(_p.hyperparams) body.hyperparams=_p.hyperparams;
+    const d=await api('POST','/train',body);
+    log(`재학습 제출: job ${d.train_job_id} · status_url ${d.status_url}`,'ok'); markFlow(3);
+    loadJobs();
+  }catch(e){
+    if(e.status===404) alert('재학습 라우터 비활성 (순수 추론 프로파일). 학습 노드(지재원 full-train 또는 고객사 onprem-local 증분 재학습)에서만 동작합니다.');
+    else alert('재학습 제출 실패: '+(e.data?.detail||e.message));
+  }
+}
+async function loadJobs(){
+  try{
+    const d=await api('GET','/train/jobs?limit=15');
+    const items=d.items||[];
+    // 실패 잡은 status 만 보여선 아무것도 못 한다 — 사유를 같은 줄에 붙인다.
+    // "skipped: retrain topology unavailable" 은 마운트 문제처럼 읽히지만 실제로는
+    // 학습셋 경로가 틀린 신호다(2026-08-08 실측). 원문을 그대로 보여줘야 판단이 선다.
+    $('jobs-body').innerHTML=items.length? items.map(j=>`<tr>
+      <td class="mono">${(j.train_job_id||'').slice(0,8)}</td>
+      <!-- 성공 상태는 'completed' 다(TrainingRepo.mark_completed). 'done' 은 문서처리 잡의
+           값이라 여기선 절대 맞지 않았고, 성공한 학습 잡이 회색 pill 로 떴다. -->
+      <td><span class="pill ${j.status==='completed'?'ok':(j.status==='failed'?'err':'')}">${j.status}</span>${
+        j.error?`<div style="color:var(--red);font-size:11.5px;margin-top:4px;word-break:break-all">${esc(j.error)}</div>`:''}</td>
+      <td class="mono">${j.model_version||'-'}</td>
+      <td>${j.trigger_type||'-'}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--text-faint)">작업 없음</td></tr>';
+    markFlow(3);
+  }catch(e){ $('jobs-body').innerHTML=`<tr><td colspan="4" style="color:var(--red)">조회 실패 ${e.status||''} ${e.status===404?'(라우터 비활성)':''}</td></tr>`; }
+}
+
+/* ---- 4. MODEL RELOAD ---- */
+async function reloadModel(){
+  if(!guardWrite('모델 핫리로드')) return;
+  // 서빙 모델 교체는 되돌리는 절차가 따로 없다(직전 버전을 다시 활성화해야 함).
+  // Safe Mode 해제 상태에서 1클릭으로 나가지 않도록 확인 단계를 둔다.
+  if(!confirm('서빙 중인 분류 모델을 디스크의 활성 버전으로 다시 읽어들입니다.\n\n이후 들어오는 분류 요청은 새로 로드된 모델로 응답합니다. 진행할까요?')) return;
+  try{
+    const d=await api('POST','/admin/model/reload');
+    $('reload-result').innerHTML=`<div class="kv" style="margin-top:8px">
+      <div><span>reloaded</span> <b>${d.reloaded?'예':'아니오'}</b></div>
+      <div><span>version</span> <b class="mono" style="font-family:var(--font-mono);font-size:11.5px">${d.model_version}</b></div>
+      <div><span>loaded</span> ${d.model_loaded?'<span class="pill ok">로드됨</span>':'<span class="pill err">미로드</span>'}</div>
+      <div><span>dir</span> <span style="font-family:var(--font-mono);font-size:11px">${d.model_dir||'(env fallback)'}</span></div>
+    </div>`;
+    markFlow(4); loadMetrics();
+  }catch(e){ $('reload-result').innerHTML=`<div class="warnbox">리로드 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`; }
+}
+// tenant 제거: 테넌트 API 키 교체(rotateKey)는 단일 KL 인증 모델에서 불필요 — KL이 cred 발급/회전 전담.
+
+// [G1] 특정 ModelVersion 수동 활성화(배포) — deploy gate 적용, force로만 우회(감사 기록).
+async function activateModel(){
+  if(!guardWrite('모델 활성화')) return;
+  const ver=$('act-ver').value.trim();
+  if(!ver){ alert('활성화할 version_label을 입력하세요.'); return; }
+  const force=$('act-force').checked;
+  if(force && !confirm('force=true는 deploy gate(고등급 미탐 FNR·F1 회귀)를 우회합니다.\n감사에 기록됩니다. 진행할까요?')) return;
+  // force 가 아니어도 배포 모델 교체 자체가 서빙에 즉시 반영되는 비가역 동작이다.
+  if(!force && !confirm(`배포 모델을 "${ver}" 로 교체합니다.\n\ndeploy gate(고등급 미탐 FNR·F1 회귀)를 통과하면 즉시 서빙에 반영됩니다.\n문제가 있으면 [직전 모델로 롤백]으로 되돌릴 수 있습니다. 진행할까요?`)) return;
+  try{
+    const d=await api('POST','/admin/model/activate',{version_label:ver, force});
+    const badge = d.activated ? '<span class="pill ok">활성화됨</span>'
+                : d.blocked  ? '<span class="pill err">게이트 차단</span>'
+                :              '<span class="pill warn">미활성</span>';
+    $('activate-result').innerHTML=`<div class="${d.activated?'kv':'warnbox'}" style="margin-top:8px">
+      ${badge} <span style="font-size:12px;color:var(--text-soft)">${esc(d.reason||'')}</span>
+      ${d.reloaded?` · <span class="pill ok">리로드됨</span> <b class="mono" style="font-family:var(--font-mono);font-size:11.5px">${esc(d.model_version||'')}</b>`:''}
+    </div>`;
+    if(d.activated){ markFlow(4); loadMetrics(); }
+    else if(d.blocked){ log(`활성 차단(deploy gate): ${d.reason} — 회귀 확인 후 force로만 우회`,'err'); }
+  }catch(e){ $('activate-result').innerHTML=`<div class="warnbox">활성화 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`; }
+}
+
+/* [G2] 직전 활성본으로 롤백 — 활성화의 반대 방향.
+ * 게이트를 적용하지 않는다: 회귀를 되돌리는 조치라 막을 이유가 없고, 막으면 정작 사고 시
+ * 복구가 불가능해진다. 대신 사유를 필수로 받아 감사에 남긴다(활성화의 force reason 과 같은 취지).
+ * 서버가 활성 전환과 같은 advisory lock 으로 직렬화하므로 동시 activate/rollback 은 엇갈리지 않는다. */
+async function rollbackModel(){
+  if(!guardWrite('모델 롤백')) return;
+  const reason=prompt('직전 활성본으로 되돌립니다.\n\n사유를 입력하세요 (감사에 기록됩니다):','운영 회귀 확인 — 직전 버전으로 복귀');
+  if(reason===null) return;                       // 취소
+  if(!String(reason).trim()){ alert('사유는 필수입니다.'); return; }
+  const box=$('rollback-note');
+  try{
+    const d=await api('POST','/admin/model/rollback',{reason:String(reason).trim()});
+    if(box) box.style.display='';
+    if(d.rolled_back){
+      if(box) box.className='kv';
+      if(box) box.innerHTML=`<span class="pill ok">롤백됨</span> `
+        + `<b class="mono">${esc(d.from_version||'-')}</b> → <b class="mono">${esc(d.to_version||'-')}</b>`
+        + (d.reloaded?` · <span class="pill ok">리로드됨</span> <b class="mono">${esc(d.model_version||'')}</b>`:'');
+      log(`모델 롤백: ${d.from_version||'-'} → ${d.to_version||'-'}`,'ok');
+      loadMetrics();
+    }else{
+      if(box) box.className='warnbox';
+      // 복귀 후보가 없는 경우가 가장 흔하다 — 활성 이력이 1개뿐이면 되돌릴 곳이 없다.
+      const msg = d.reason==='no_previous_version'
+        ? '되돌릴 직전 활성본이 없습니다 — 활성 이력이 하나뿐입니다.'
+        : `롤백되지 않았습니다: ${esc(d.reason||'')}`;
+      if(box) box.innerHTML=msg;
+      log(`롤백 불가: ${d.reason||''}`,'err');
+    }
+  }catch(e){
+    if(box){ box.style.display=''; box.className='warnbox';
+      box.innerHTML=`롤백 실패: ${esc(String(e.status||''))} ${esc(e.data?.detail||e.message||'')}`
+        + (e.status===403?' — admin 역할 필요':''); }
+  }
+}
+
+/* ---- 감사 로그 조회 ----
+ * 미들웨어는 tb_audit_log 에 쓰기만 했고 읽는 경로가 없었다(라우트 0건). 35,000행이 쌓여도
+ * "누가 언제 무엇을 했는가"를 화면에서 볼 수 없었다 — 영업비밀 분류 시스템에서 감리가 반드시
+ * 묻는 항목이다. 응답의 actorless_ratio 를 함께 보여 준다: 공유 API 키 모드에서는 행위자
+ * 신원이 남지 않으므로, 감사 추적이 실제로 성립하는지를 화면이 스스로 드러내야 한다. */
+async function loadAuditLog(){
+  const body=$('au-body'), warn=$('au-warn'), info=$('au-info');
+  body.innerHTML='<tr><td colspan="5" style="color:var(--text-faint)">조회 중…</td></tr>';
+  if(warn) warn.innerHTML='';
+  try{
+    const q=new URLSearchParams({limit:'50'});
+    const a=$('au-action')?.value.trim(); if(a) q.set('action',a);
+    const sc=$('au-success')?.value; if(sc) q.set('success',sc);
+    const d=await api('GET',`/admin/audit-log?${q.toString()}`);
+    const items=d.items||[];
+    if(!items.length){
+      body.innerHTML='<tr><td colspan="5" style="color:var(--text-faint)">해당 기록이 없습니다.</td></tr>';
+    }else{
+      body.innerHTML=items.map(it=>{
+        const t=String(it.occurred_at||'').replace('T',' ').replace(/\.\d+/,'').replace('Z','').slice(0,19);
+        const who=it.actor_id ? esc(it.actor_id)+(it.actor_role?` <span class="hint">(${esc(it.actor_role)})</span>`:'')
+                              : '<span class="hint">신원 없음</span>';
+        const tgt=[it.target_type,it.target_id].filter(Boolean).map(esc).join(' / ') || '<span class="hint">-</span>';
+        const ok=it.success ? '<span class="pill ok">성공</span>'
+                            : `<span class="pill err">실패</span> <span class="hint">${esc(it.error_code||'')}</span>`;
+        return `<tr><td class="mono" style="white-space:nowrap">${esc(t)}</td>`
+             + `<td>${esc(it.action||'')}</td><td>${who}</td><td>${tgt}</td><td>${ok}</td></tr>`;
+      }).join('');
+    }
+    if(info) info.textContent=`전체 ${d.total??0}건 중 최근 ${items.length}건 · 헬스체크·정적 자산·Prometheus 스크랩만 제외됩니다.`;
+    (d.warnings||[]).forEach(w=>{ if(warn) warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">${esc(w)}</div>`; });
+    log(`감사 로그 ${items.length}건 조회 (전체 ${d.total??0})`,'ok');
+  }catch(e){
+    body.innerHTML=`<tr><td colspan="5">조회 실패: ${esc(String(e.status||''))} ${esc(e.data?.detail||e.message||'')}`
+      + (e.status===403?' — admin 역할 필요':'')+'</td></tr>';
+  }
+}
+
+/* ---- 데모 데이터 초기화 (시연 반복용) ---- */
+// 실적재 시연으로 쌓인 created_by=demo-console 문서·분류·RAG벡터만 스코프 물리삭제.
+// Safe Mode 가드 + 확인 팝업. 운영 데이터(다른 created_by)는 서버 스코프상 대상이 아님.
+
+/* ---- G3. 골든셋 현황 ----
+ * GET /admin/locked-readiness — 사람이 서명해 확정된 평가정답이 등급별로 얼마나 찼는지.
+ * 같은 수치가 [관제] 대시보드의 '배포 readiness' 패널에도 있지만, 골든 검수를 하는 사람이
+ * 다른 탭의 다른 이름으로 자기 작업 현황을 찾기는 어렵다. 루프 B 안에서도 보이게 한다. */
+// tier 이름은 코드 값 그대로 두면 운영자가 못 읽는다 — 무엇에 쓰이는지로 옮긴다.
+const TIER_LABEL={
+  locked_gold_eval: ['평가 정답', '사람이 서명해 확정 — 학습에는 쓰지 않음'],
+  gold_candidate:   ['승격 대기', '자동 게이트 통과 · 사람 서명 대기'],
+  legal_floor:      ['법적 근거', '판례·고시 기반 — 회귀 차단용'],
+  silver_train:     ['학습 시드', '학습에만 사용 · 평가 금지'],
+  held_review:      ['보류', '서명이 요건을 못 갖춰 격리 — 평가·학습 모두 제외'],
+};
+const ORIGIN_LABEL={ public_real:'공개 실문서', customer_real:'고객사 실문서', synthetic:'합성', unknown:'미상' };
+
+async function loadGoldenStatus(){
+  const box=$('gs-body'); if(!box) return;
+  box.innerHTML='<span style="color:var(--text-faint);font-size:12px;">조회 중…</span>';
+  let corpus=null;
+  try{ corpus=await api('GET','/golden/summary'); }
+  catch(e){ corpus={__err:`${e.status||''} ${e.data?.detail||e.message||''}`}; }
+  try{
+    const d=await api('GET','/admin/locked-readiness');
+    // ── 정본 구성 ────────────────────────────────────────────────────────────
+    let corpusHtml='';
+    if(corpus && !corpus.__err){
+      const tiers=Object.entries(corpus.by_tier||{}).sort((a,b)=>b[1]-a[1]);
+      const tot=corpus.total||0;
+      corpusHtml=`
+        <div class="dash-panel" style="margin-bottom:10px;">
+          <div class="dp-h"><span>정본 구성</span><span class="pill">${tot}건</span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>단계</th><th>건수</th><th>비중</th><th>쓰임</th></tr></thead>
+            <tbody>${tiers.map(([k,v])=>{
+              const L=TIER_LABEL[k]||[k,''];
+              return `<tr><td><b>${esc(L[0])}</b></td><td class="mono">${v}</td>`
+                + `<td class="mono">${tot?((v/tot)*100).toFixed(1):0}%</td>`
+                + `<td style="color:var(--text-faint);font-size:11.5px;">${esc(L[1])}</td></tr>`;
+            }).join('')}</tbody>
+          </table></div>
+          <div class="dp-row" style="margin-top:8px;">
+            ${GRADES.map(g=>`<div><span>${g}</span> <b>${(corpus.by_grade||{})[g]??0}</b></div>`).join('')}
+          </div>
+          <div class="dp-row">
+            ${Object.entries(corpus.by_origin||{}).map(([k,v])=>
+              `<div><span>${esc(ORIGIN_LABEL[k]||k)}</span> <b>${v}</b></div>`).join('')}
+          </div>
+        </div>`;
+    }else if(corpus && corpus.__err){
+      corpusHtml=`<div class="warnbox" style="margin-bottom:10px;">정본 구성 조회 실패: ${esc(corpus.__err)}</div>`;
+    }
+    const min=d.min_per_grade ?? 0;
+    const pg=d.per_grade||{}, rp=d.real_per_grade||{}, sp=d.synthetic_per_grade||{};
+    const missing=d.missing||[];
+    // 등급별로 "확정 / 목표"와 남은 건수를 같이 보여준다 — 남은 것을 세는 게 이 카드의 목적이다.
+    const rows=GRADES.map(g=>{
+      const have=pg[g]??0, need=Math.max(0, min-have), ok=have>=min;
+      const compo=[];
+      if(rp[g]!=null) compo.push(`실문서 ${rp[g]}`);
+      if(sp[g]!=null) compo.push(`합성 ${sp[g]}`);
+      return `<tr>
+        <td>${gradeTag(g)}</td>
+        <td class="mono"><b>${have}</b> / ${min}</td>
+        <td>${ok?'<span class="pill ok">충족</span>':`<span class="pill warn">${need}건 남음</span>`}</td>
+        <td style="color:var(--text-faint);font-size:11.5px;">${compo.join(' · ')||'—'}</td>
+      </tr>`;
+    }).join('');
+    // ready 만 크게 보이면 "평가 준비 끝"으로 읽힌다. 실측 2026-08-09: TS 5건이 전부 합성인데
+    // ready=true 였다. 합성 본문에 서명이 붙어도 실세계 성능 근거가 되지 못하므로
+    // (자체 실측 합성학습→실문서 F1 0.26) 실문서가 0인 등급을 배지 옆에 함께 적는다.
+    const realZeroGrades = GRADES.filter(g =>
+      (d.per_grade||{})[g] != null && ((d.real_per_grade||{})[g]||0) === 0);
+    const badge = (d.ready
+      ? '<span class="pill ok">배포 가능</span>'
+      : '<span class="pill warn">미충족</span>')
+      + (realZeroGrades.length
+        ? `<span class="pill warn">${realZeroGrades.join(', ')} 실문서 0</span>` : '');
+    box.innerHTML=corpusHtml+`
+      <div class="dash-panel">
+        <div class="dp-h"><span>서명 확정 평가정답</span>${badge}</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>등급</th><th>확정 / 목표</th><th>남은 것</th><th>구성</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+        <div class="dp-row" style="margin-top:8px;">
+          <div><span>실문서</span> <b>${d.real_total??0}</b></div>
+          <div><span>합성</span> <b>${d.synthetic_total??0}</b></div>
+          <div><span>배포 게이트</span> <b>${d.deploy_locked_gate_passed?'통과':'미통과'}</b></div>
+        </div>
+        ${missing.length?`<div class="dp-note">부족 등급: ${missing.join(', ')}</div>`:''}
+        ${realZeroGrades.length?`<div class="dp-note" style="color:var(--red)">${realZeroGrades.join(', ')} 는 서명분이 전부 합성입니다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로, 수치를 인용할 때 실문서/합성 구성을 함께 밝히십시오.</div>`:''}
+        ${d.reason?`<div class="dp-note">사유: ${esc(d.reason)}</div>`:''}
+      </div>`;
+    log(`검증문서 현황: ready=${d.ready} · 부족 ${missing.join(',')||'없음'}`,'ok');
+  }catch(e){
+    box.innerHTML=`<div class="warnbox">현황 조회 실패: ${e.status||''} ${esc(String(e.data?.detail||e.message||''))} ${e.status===403?'— admin 역할 필요':''}</div>`;
+  }
+}
+
+/* ---- 5. METRICS ---- */
+async function loadMetrics(){
+  try{
+    const d=await api('GET','/metrics/latest');
+    LAST_MODEL_VERSION = d.model_version || LAST_MODEL_VERSION;
+    const cards=$('metrics-cards');
+    const pct = v => v!=null ? (v*100).toFixed(1)+'%' : '—';
+    cards.innerHTML=`
+      ${metricCard('정확도 Accuracy', pct(d.accuracy))}
+      ${metricCard('정밀도 Precision (macro)', pct(d.precision_macro))}
+      ${metricCard('재현율 Recall (macro)', pct(d.recall_macro))}
+      ${metricCard('F1 (macro)', pct(d.f1_macro))}
+      ${metricCard('FNR 전체', pct(d.fnr_overall), d.fnr_overall>0.05)}
+      ${metricCard('표본', d.sample_count??'—')}`;
+    /* [2026-08-21] 이 숫자가 **어느 평가셋**에서 나왔는지 화면이 스스로 말한다.
+       종전에는 정확도만 크게 뜨고 근거 셋이 없어, 감리·시연 Q&A 에서 "그 숫자는 무슨
+       셋이냐" 를 물으면 그 자리에서 답할 수 없었다. eval_source 는 DB 에 이미 저장돼
+       있었는데 API 가 안 내보내고 있었다(2026-08-21 확인). */
+    if(d.eval_source){
+      const src=document.createElement('p');
+      src.className='sec-note';
+      src.style.cssText='margin-top:10px;line-height:1.7';
+      src.innerHTML='<b>이 수치의 출처</b> — <code>'+esc(d.eval_source)+'</code>'
+        + (d.sample_count?(' · 표본 '+d.sample_count+'건'):'')
+        + (d.fnr_high!=null?(' · 고등급 FNR '+(d.fnr_high*100).toFixed(1)+'%'):'')
+        + '<br>이 셋은 학습에 쓰인 데이터에서 떼어 낸 홀드아웃입니다. '
+        + '<b>제출 문서의 대표값과 다른 셋일 수 있으므로 두 수치를 섞어 인용하지 마십시오.</b>';
+      cards.parentNode.insertBefore(src, cards.nextSibling);
+    }
+    const byg=d.fnr_by_grade||{};
+    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 FNR · 모델 ${d.model_version} (측정 ${d.measured_at||'-'})</label>
+      <div class="kv" style="margin-top:4px">${GRADES.map(g=>byg[g]!=null?`<div><span>${g}</span> <b style="color:${byg[g]>0.05?'var(--red)':'var(--green)'}">${(byg[g]*100).toFixed(1)}%</b></div>`:'').join('')||'<span style="color:var(--text-faint)">등급별 데이터 없음</span>'}</div></div>`;
+    markFlow(5);
+  }catch(e){ $('metrics-cards').innerHTML=''; $('metrics-extra').innerHTML=`<div class="warnbox">메트릭 조회 실패: ${e.status||''} — 평가 실행 이력이 없거나 DB 미가용일 수 있습니다.</div>`; }
+}
+function metricCard(label,val,bad){ return `<div class="factor"><div class="fl">${label}</div><div class="fv" style="${bad?'color:var(--red)':''}">${val}</div></div>`; }
+async function loadHistory(){
+  try{
+    const d=await api('GET','/metrics/history');
+    const items=d.items||[];
+    $('metrics-extra').innerHTML=`<div class="tbl-wrap" style="margin-top:12px"><table>
+      <thead><tr><th>모델</th><th>측정</th><th>정확도</th><th>정밀도</th><th>재현율</th><th>F1</th><th>FNR</th><th>표본</th></tr></thead>
+      <tbody>${items.length?items.map(m=>`<tr>
+        <td class="mono">${m.model_version}</td><td>${m.measured_at||'-'}</td>
+        <td>${m.accuracy!=null?(m.accuracy*100).toFixed(1)+'%':'-'}</td>
+        <td>${m.precision_macro!=null?(m.precision_macro*100).toFixed(1)+'%':'-'}</td>
+        <td>${m.recall_macro!=null?(m.recall_macro*100).toFixed(1)+'%':'-'}</td>
+        <td>${m.f1_macro!=null?(m.f1_macro*100).toFixed(1)+'%':'-'}</td>
+        <td style="color:${m.fnr_overall>0.05?'var(--red)':'inherit'}">${m.fnr_overall!=null?(m.fnr_overall*100).toFixed(1)+'%':'-'}</td>
+        <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="8" style="color:var(--text-faint)">이력 없음</td></tr>'}</tbody></table></div>`;
+  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${e.status||''}</div>`; }
+}
+async function loadConfusionMatrix(){
+  if(!LAST_MODEL_VERSION){ alert('먼저 "최신 메트릭"을 조회해 활성 모델 버전을 확인하세요.'); return; }
+  try{
+    const d=await api('GET',`/metrics/confusion-matrix/${encodeURIComponent(LAST_MODEL_VERSION)}`);
+    const labels=d.labels||[], m=d.matrix||[];
+    const head=`<tr><th class="mono">실제 \\ 예측</th>${labels.map(l=>`<th class="mono" style="text-align:center">${esc(l)}</th>`).join('')}</tr>`;
+    const rows=m.map((row,i)=>`<tr><td class="mono"><b>${esc(labels[i]??i)}</b></td>${row.map((v,j)=>`<td style="text-align:center;${i===j?'font-weight:700;background:var(--green-soft);color:var(--green)':''}">${v}</td>`).join('')}</tr>`).join('');
+    const fnr=d.fnr_by_grade||{};
+    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">혼동행렬 — 모델 ${esc(d.model_version||LAST_MODEL_VERSION)} <span style="color:var(--text-faint)">(대각선=정분류)</span></label>
+      <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${rows||'<tr><td style="color:var(--text-faint)">데이터 없음</td></tr>'}</tbody></table></div>
+      ${Object.keys(fnr).length?`<div class="kv" style="margin-top:8px">${Object.entries(fnr).map(([g,v])=>`<div><span>FNR ${esc(g)}</span> <b style="color:${v>0.05?'var(--red)':'var(--green)'}">${(v*100).toFixed(1)}%</b></div>`).join('')}</div>`:''}</div>`;
+  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">혼동행렬 조회 실패: ${e.status||''} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 혼동행렬 이력이 없을 수 있습니다.</div>`; }
+}
+async function loadSchema(){
+  try{
+    const d=await api('GET','/schema/grades');
+    const list=d.grades||[];
+    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">활성 등급체계 — version ${d.version||'-'} (DB 주도)</label>
+      <div class="kv" style="margin-top:4px">${list.length?list.map(g=>`<div>${gradeTag(g.code)} <span>${g.name||GRADE_KR[g.code]||''}${g.order!=null?' · #'+g.order:''}</span></div>`).join(''):'<span style="color:var(--text-faint)">응답 형태 확인 — raw JSON 참조</span>'}</div></div>`;
+  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">등급체계 조회 실패: ${e.status||''}</div>`; }
+}
+
+/* ---- 6. 운영 관제 대시보드 ---- */
+function dpDegraded(d, name){ return (d.degraded||[]).includes(name) ? '<span class="dp-degraded">degraded</span>' : ''; }
+function alStatusPill(s){
+  if(s==='URGENT_RETRAIN') return '<span class="pill err">긴급 재학습</span>';
+  if(s==='RETRAIN_RECOMMENDED') return '<span class="pill warn">재학습 권고</span>';
+  return '<span class="pill ok">정상</span>';
+}
+/* [2026-08-23] 서버 사유 코드를 화면 말로 옮긴다. 관리자에게 no_locked_records 는 뜻이 없다.
+   모르는 값은 **원문 그대로** 둔다 — 감추면 원인을 못 찾는다. */
+function dashReason(raw){
+  const t=String(raw||'');
+  if(!t) return '';
+  const MAP={
+    'no_locked_records':'서명된 검증문서가 아직 없습니다',
+    'locked_eval_not_ready':'평가 정답지가 아직 기준을 채우지 못했습니다',
+  };
+  if(MAP[t]) return MAP[t];
+  if(/under urgent\/recommended thresholds/i.test(t))
+    return '재학습 기준에 못 미칩니다 — 지금 조치할 것은 없습니다';
+  return t;
+}
+/* [2026-08-23] 칸이 좁아지면 제목이 「배포 준 / 비 상태」로 쪼개지고 배지가 글자 단위로
+   무너졌다. 머리글(제목+배지)·큰 수치·하위 수치를 헬퍼로 모아 다섯 칸을 같은 골격으로 찍고,
+   칸 상태는 좌측 색선으로 먼저 읽히게 한다. 표시만 바꾼다 — 판정은 서버 값 그대로. */
+function dpPanel(state, title, tags, body){
+  return `<div class="dash-panel st-${state}">`
+    + `<div class="dp-h"><span class="dp-t">${title}</span><span class="dp-tags">${tags}</span></div>`
+    + body + `</div>`;
+}
+function dpBig(v, unit, color){
+  return `<div class="dp-big"${color?` style="color:${color}"`:''}>${v}${unit?`<span class="u">${unit}</span>`:''}</div>`;
+}
+function dpStat(items){
+  return `<div class="dp-stat">${items.map(([k,v,c])=>
+    `<div><span>${esc(k)}</span><b${c?` style="color:${c}"`:''}>${v}</b></div>`).join('')}</div>`;
+}
+function dashTime(t){
+  const raw=String(t||'');
+  if(!raw) return '-';
+  const dt=new Date(raw);
+  if(isNaN(dt.getTime())) return raw;
+  const z=n=>String(n).padStart(2,'0');
+  return `${dt.getFullYear()}-${z(dt.getMonth()+1)}-${z(dt.getDate())} ${z(dt.getHours())}:${z(dt.getMinutes())}:${z(dt.getSeconds())}`;
+}
+function renderDashboard(d){
+  const meta=$('dash-meta');
+  meta.textContent = `생성 ${dashTime(d.generated_at)}` + ((d.degraded&&d.degraded.length)?` · 조회 실패: ${d.degraded.join(', ')}`:'');
+  meta.title = d.generated_at ? `서버 원본 시각 ${d.generated_at}` : '';
+  const eh=d.escalation_held||{}, lr=d.locked_readiness||{}, al=d.active_learning||{}, kg=d.kill_gate||{}, dr=d.drift||{};
+  const byg=eh.by_grade||{};
+  // 1) 이중검토 보류
+  const p1=dpPanel(eh.total>0?'warn':'ok', '이중검토 보류',
+    ((eh.total>0)?'<span class="pill warn">보류</span>':'<span class="pill ok">없음</span>')+dpDegraded(d,'escalation_held'),
+    dpBig(eh.total??0, '건', (eh.total>0)?'var(--red)':'var(--green)')
+    + `<div class="dp-note">${(eh.total>0)?'사람이 한 번 더 봐야 할 건입니다':'추가 검토 대기 없음'}</div>`
+    + dpStat(GRADES.map(g=>[g, byg[g]??0])));
+  // 2) 배포 readiness (locked_gold_eval)
+  // per_grade 만 보여주면 합성 서명분이 실문서와 섞여 "준비됨"으로 읽힌다. 실측 2026-08-09:
+  // TS 5건이 전부 합성인데 ready=true 였다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로
+  // (자체 실측 합성학습→실문서 F1 0.26) 등급별로 실문서/합성을 갈라 보이고, 실문서가 0인
+  // 등급이 있으면 그 사실을 배지 옆에 적는다. 게이트 판정 자체는 서버 계약 그대로 둔다.
+  const pg=lr.per_grade||{}, rpg=lr.real_per_grade||{}, spg=lr.synthetic_per_grade||{};
+  const realZero=GRADES.filter(g=>pg[g]!=null && (rpg[g]||0)===0);
+  const gradeRows=GRADES.filter(g=>pg[g]!=null).map(g=>
+    `<div><span class="gk">${g}</span><span class="n">${pg[g]}</span><small>실 ${rpg[g]??0} · 합 ${spg[g]??0}</small></div>`).join('');
+  const p2=dpPanel(lr.ready&&!realZero.length?'ok':'warn', '배포 준비 상태',
+    (lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>')
+    + (realZero.length?'<span class="pill warn">실문서 0</span>':'') + dpDegraded(d,'locked_readiness'),
+    (gradeRows?`<div class="dp-tab">${gradeRows}</div>`:'<div class="dp-note">등급별 데이터 없음</div>')
+    + (lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족 ${lr.missing.join(' · ')}`:''}</div>`:'')
+    + (realZero.length?`<div class="warnbox"><b>${realZero.join(', ')}</b> 는 서명분이 전부 합성입니다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로, 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:'')
+    + (lr.reason?`<div class="dp-note">${esc(dashReason(lr.reason))}</div>`:''));
+  // 3) 재학습 backlog (active-learning)
+  const alState = al.retrain_status==='URGENT_RETRAIN' ? 'err' : (al.retrain_status==='RETRAIN_RECOMMENDED' ? 'warn' : 'ok');
+  const p3=dpPanel(alState, '재학습 대기',
+    alStatusPill(al.retrain_status)+dpDegraded(d,'active_learning'),
+    dpBig(al.unconsumed_total??0, '건', (al.unconsumed_total>0)?'var(--red)':'var(--green)')
+    + `<div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>`
+    + dpStat([['과소', al.pending_underclass??0, al.pending_underclass>0?'var(--red)':''],
+              ['과대', al.pending_overclass??0, ''],
+              ['측면', al.pending_lateral??0, '']])
+    + (al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''));
+  // 4) kill-gate
+  const kgReasons=(kg.reasons||[]);
+  const p4=dpPanel(kg.tripped?'err':'ok', '안전 정지',
+    (kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>')+dpDegraded(d,'kill_gate'),
+    dpBig(kg.tripped?'정지':'정상', '', kg.tripped?'var(--red)':'var(--green)')
+    + `<div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'발동 사유 없음'}</div>`);
+  // 5) 임베딩 드리프트 (마지막 게이지 — 표본 0이면 데이터 없음)
+  const noSample=!(dr.sample_size>0);
+  const p5=dpPanel(noSample?'':(dr.alert>0.5?'err':'ok'), '입력 분포 변화',
+    (noSample?'<span class="pill">데이터 없음</span>':(dr.alert>0.5?'<span class="pill err">경보</span>':'<span class="pill ok">정상</span>'))+dpDegraded(d,'drift'),
+    dpStat([['분포 차이', noSample?'—':(+dr.kl_divergence).toFixed(4)],
+            ['유사도', noSample?'—':(+dr.cosine_mean).toFixed(4)],
+            ['표본', dr.sample_size??0]])
+    + (noSample?'<div class="dp-note">드리프트 refresh 표본이 없어 값은 미측정입니다(0.0은 실측이 아닙니다).</div>':''));
+  $('dash-grid').innerHTML = p1+p2+p3+p4+p5;
+}
+async function loadDashboard(){
+  try{
+    const d=await api('GET','/admin/dashboard');
+    renderDashboard(d);
+  }catch(e){
+    $('dash-grid').innerHTML=`<div class="warnbox">관제 대시보드 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`;
+  }
+}
+
+/* ---- 7. GOLDEN BUILD ----
+ * 종전에는 [생성]→[상태 조회]→[리뷰 열기] 3버튼을 사람이 순서대로 눌러야 했고, job_id 를
+ * prompt() 로 되묻는 경로까지 있었다. 여기서는 생성 후 완료까지 자동 폴링하고, 끝나면
+ * 요약 카드와 검수/서명 버튼을 스스로 활성화한다(사람 클릭 3회 → 1회). */
+function syncGoldenSource(){
+  const v=($('gold-source')||{}).value;
+  const co=$('gold-src-corpus');
+  if(co) co.style.display = v==='corpus' ? '' : 'none';
+}
+
+function goldenDocs(){
+  const n = Math.max(1, Math.min(50, Number($('gold-n').value || 8)));
+  if(($('gold-source')||{}).value === 'editor'){
+    // [운영 탭] 1 분류 패널에 지금 들어 있는 본문을 그대로 후보로 — 방금 다룬 문서를 골든 후보로
+    // 올리는 게 고정 샘플보다 실사용에 가깝다.
+    const body = ($('cl-body').value||'').trim();
+    if(!body) return [];
+    return [{
+      doc_id: ($('cl-docid').value||'').trim() || `console-${Date.now()}`,
+      title: ($('cl-title').value||'').trim() || '분류 패널 입력',
+      text: body,
+      source: 'demo_console_editor'
+    }];
+  }
+  return SAMPLES.slice(0, Math.min(8, n)).map(s=>({
+    doc_id: s.id, title: s.t, text: s.b, label_hint: s.exp, source: 'demo_console'
+  }));
+}
+function goldenProgress(msg){ const el=$('gold-progress'); if(el) el.textContent=msg; }
+function goldenButtons(status, goldCount){
+  const rv=$('gold-btn-review'), sg=$('gold-btn-signoff');
+  const done = status==='done';
+  if(rv) rv.disabled = !done;                       // 검토본은 uncertain 만 있어도 볼 값이 있다
+  if(sg) sg.disabled = !done || !(goldCount>0);     // 서명은 gold 후보가 있어야 의미가 있다
+  if(done) markStep('g1');                          // 루프 B 1단계(후보 생성) 완료 표시
+}
+function renderGoldenSummary(d){
+  const box=$('gold-summary'); if(!box) return;
+  box.style.display='';
+  const st=d.stats||{}, gold=d.gold_count??st.gold??0, unc=d.uncertain_count??st.uncertain??0;
+  const pill=$('gold-verdict');
+  if(pill){
+    const ok = d.status==='done' && gold>0;
+    pill.className = 'pill ' + (d.status==='failed'||d.error ? 'warn' : (ok?'ok':'warn'));
+    pill.textContent = d.status==='failed'||d.error ? '실패'
+                     : (d.status!=='done' ? d.status||'진행중' : (gold>0?'후보 확보':'후보 0건'));
+  }
+  $('gold-counts').innerHTML =
+    `<div><span>입력</span> <b>${st.input??'-'}</b></div>`+
+    `<div><span>gold</span> <b>${gold}</b></div>`+
+    `<div><span>uncertain</span> <b>${unc}</b></div>`+
+    `<div><span>중복 제외</span> <b>${st.dropped_duplicate??0}</b></div>`+
+    `<div><span>누출 제외</span> <b>${st.dropped_leaked??0}</b></div>`+
+    // 본문 없어 빠진 입력 — 0이면 감춰서 평시 노이즈를 만들지 않는다.
+    (st.dropped_no_text ? `<div><span>본문없음 제외</span> <b>${st.dropped_no_text}</b></div>` : '');
+  const byg=st.gold_by_grade||{};
+  // 도메인→등급 shortcut 누출 판정은 서버가 stats 에 남기지만 화면에 없으면 아무도 못 본다.
+  // 하드-드롭이 아닌 경고라 더더욱 노출이 필요하다(무음 통과 방지).
+  const dl=st.domain_leakage_gate;
+  const leakLine = dl && dl.blocked
+    ? `<div class="warnbox" style="margin-top:8px;">도메인→등급 누출 의심 — ${esc(dl.reason||'')} · 승격 전 검수 필요(드롭은 하지 않음)</div>`
+    : '';
+  $('gold-grades').innerHTML = (GRADES.some(g=>byg[g])
+    ? GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')
+    : '<span style="color:var(--text-faint)">등급 분포 없음 — gold 후보 0건</span>') + leakLine;
+
+  // gold 0건이면 "왜 0건인지"를 화면에서 답해야 한다. 특히 provider=noop 은 등급 라벨러가
+  // 아니라 합성 문서 생성기라, 라벨 파싱이 S3/0.5 로 떨어져 룰과 합의되지 않고 전건이
+  // needs_review 로 간다(2026-08-08 실측: 8건 중 gold 0 · uncertain 8). 이걸 모르면
+  // [기본값으로 시작]을 누른 사람은 원인 없이 막힌다.
+  const zeroBox=$('gold-zero-hint');
+  if(zeroBox){
+    const prov=($('gold-provider')||{}).value;
+    if(gold>0 || d.status!=='done'){ zeroBox.style.display='none'; zeroBox.innerHTML=''; }
+    else{
+      zeroBox.style.display='';
+      zeroBox.innerHTML = (prov==='noop')
+        ? '<b>gold 후보가 0건입니다 — 등급 판정기가 <code>noop</code>(더미)이기 때문입니다.</b><br/>'
+          + 'noop 은 합성 문서 생성용 더미라 응답에 등급 자리가 없고, 판정이 늘 <b>S3</b> 으로 떨어집니다. '
+          + '룰이 S3 라고 한 문서에만 우연히 합의가 되므로 사실상 전건이 보류로 갑니다.<br/>'
+          + '· LLM 이 있는 서버(지재원 GPU)에서 다시 실행하세요. 제공자는 화면이 아니라 서버 설정(.env)에서 바꿉니다.<br/>'
+          + '· LLM 이 없는 환경이라면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
+        : '<b>gold 후보가 0건입니다.</b><br/>'
+          + '룰과 LLM 이 합의하지 못했거나 근거 문장이 없어 전건이 보류로 갔습니다. 고급 설정의 <b>근거 문장이 있는 것만 후보로</b> 를 끄거나 '
+          + '후보 수를 늘려 보고, 그래도 0건이면 아래 <b>기존 문서 묶음 등록</b>으로 검수·서명만 진행하세요.';
+    }
+  }
+  goldenButtons(d.status, gold);
+}
+async function startGoldenBuild(){
+  if(!guardWrite('검증문서 생성')) return;
+  // 버튼은 잠겨 있지만(applyGoldenAiAvailability) healthz 실패로 잠금이 안 걸릴 수 있다.
+  if(GOLD_AI_BLOCKED){
+    goldenProgress('이 서버에는 등급을 매길 LLM 이 없습니다(llm_provider=noop) — 아래 「이미 있는 문서 묶음으로 검수 시작하기」를 쓰십시오.');
+    return;
+  }
+  const src=($('gold-source')||{}).value;
+  // [2026-08-20] 눌린 티를 낸다. 종전에는 버튼만 잠기고 문구가 응답 **뒤에야** 떠서,
+  // LLM 이 도는 몇 초 동안 화면이 멈춘 것처럼 보였다(분류 실행·등급 시연은 이미 이렇게 한다).
+  const btn=$('gold-go');
+  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='생성 중…'; }
+  goldenProgress('후보를 만들고 있습니다 — AI 가 문서를 읽고 등급을 매기는 중입니다. 몇 초 걸립니다.');
+  try{
+    const body={
+      n:Number($('gold-n').value || 8),
+      llm_provider:$('gold-provider').value,
+      require_evidence:$('gold-require-evidence').checked,
+      out_dir:'datasets/gold_real/builds',
+      actor:actor()
+    };
+    if(src==='corpus'){
+      const dir=($('gold-corpus-dir').value||'').trim();
+      if(!dir){ goldenProgress('코퍼스 경로를 입력하세요 (datasets/ 하위).'); return; }
+      body.source_type='corpus'; body.corpus_dir=dir; body.docs=[];
+    }else{
+      const docs = goldenDocs();
+      if(!docs.length){
+        goldenProgress('후보로 보낼 본문이 비어 있습니다 — [운영] 탭 「1 분류 실행」에 본문을 넣거나, 후보 소스를 "서버 코퍼스 경로"로 바꾸세요. 파일로 넣으려면 검증문서 후보 관리 화면을 쓰십시오.');
+        return;
+      }
+      body.source_type='inline'; body.docs=docs;
+    }
+    const d=await api('POST','/golden/build',body);
+    LAST_GOLDEN_JOB_ID=d.golden_job_id;
+    $('gold-result').textContent=JSON.stringify(d,null,2);
+    log(`검증문서 생성 시작: ${LAST_GOLDEN_JOB_ID}`,'ok');
+    goldenProgress(`job ${LAST_GOLDEN_JOB_ID} 생성됨 — 완료 대기 중…`);
+    await pollGoldenJob(LAST_GOLDEN_JOB_ID);
+  }catch(e){
+    goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
+    $('gold-result').textContent=`검증문서 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+  }finally{ if(btn){ btn.disabled=GOLD_AI_BLOCKED; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
+}
+/* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
+ * /golden/build 와 달리 즉시 done 이라 폴링 없이 상태를 한 번만 읽는다. */
+/* 등록할 수 있는 문서 묶음 목록을 서버에서 받아 고르게 한다.
+ * 왜(2026-08-20 사용자 지적): 종전에는 자유 입력 칸이었고 placeholder 가 채워진 값처럼
+ * 보여, 그대로 [등록]을 누르면 "경로를 입력하세요" 가 떴다. 서버에 무슨 파일이 있는지
+ * 화면이 알려주지 않으니 경로를 외워 쳐야 했다. */
+async function loadGoldenBuilds(){
+  const sel=$('gold-build-path'); if(!sel) return;
+  sel.innerHTML='<option value="">불러오는 중…</option>';
+  try{
+    const d=await api('GET','/golden/builds');
+    const list=(d&&d.builds)||[];
+    if(!list.length){ sel.innerHTML='<option value="">등록할 수 있는 문서 묶음이 없습니다</option>'; return; }
+    sel.innerHTML='<option value="">문서 묶음을 고르세요 ('+list.length+'개)</option>'
+      + list.map(function(b){
+          var n=(b.records_exact?'':'≥')+b.records;
+          var when=(b.modified||'').slice(0,10);
+          return '<option value="'+esc(b.path)+'">'+esc(b.path)+' — '+n+'건 · '+when+'</option>';
+        }).join('');
+  }catch(e){
+    sel.innerHTML='<option value="">목록을 못 읽었습니다 — 로그인 상태를 확인하세요</option>';
+  }
+}
+
+async function registerGoldenBuild(){
+  if(!guardWrite('골든 문서 묶음 등록')) return;
+  const path=($('gold-build-path').value||'').trim();
+  if(!path){ goldenProgress('위 목록에서 문서 묶음을 하나 고르세요.'); return; }
+  const btn=$('gold-reg');
+  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='여는 중…'; }
+  goldenProgress('문서 묶음을 검수 화면에 올리는 중입니다.');
+  try{
+    const d=await api('POST','/golden/jobs/register',{build_path:path, actor:actor()});
+    LAST_GOLDEN_JOB_ID=d.golden_job_id;
+    $('gold-result').textContent=JSON.stringify(d,null,2);
+    log(`골든 문서 묶음 등록: ${LAST_GOLDEN_JOB_ID} ← ${path}`,'ok');
+    goldenProgress(`등록됨 — job ${LAST_GOLDEN_JOB_ID}`);
+    await loadGoldenJob();
+  }catch(e){
+    const detail=e.data?.detail||e.message||'';
+    goldenProgress(`등록 실패: ${e.status||''} ${detail}${e.status===404?' — 경로가 없거나 datasets/ 밖입니다.':''}`);
+    $('gold-result').textContent=`골든 문서 묶음 등록 실패: ${e.status||''} ${detail}`;
+  }finally{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label||'검수 시작'; } }
+}
+/* 완료(done/failed)까지 자동 폴링. 상한 40회×1.5s=60s — 넘으면 수동 새로고침으로 넘긴다. */
+async function pollGoldenJob(id){
+  for(let i=0;i<40;i++){
+    let d;
+    try{ d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`); }
+    catch(e){ goldenProgress(`상태 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`); return; }
+    $('gold-result').textContent=JSON.stringify(d,null,2);
+    if(d.status==='done'||d.status==='failed'||d.error){
+      renderGoldenSummary(d);
+      const gold=d.gold_count??0;
+      goldenProgress(d.error ? `실패: ${d.error}`
+        : (gold>0 ? `완료 — gold 후보 ${gold}건. 아래에서 검수/서명 화면을 여세요.`
+                  : '완료 — 검수로 올릴 후보가 0건입니다(채택 기준 미달). 판정기와 근거 요건 설정을 확인하세요.'));
+      log(`검증문서 준비 작업 ${d.status}: ${id} · gold ${gold}`, d.error?'err':'ok');
+      return;
+    }
+    goldenProgress(`job ${id} · ${d.status||'진행중'} — 대기 ${((i+1)*1.5).toFixed(0)}s`);
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  goldenProgress('60초 내 완료되지 않았습니다 — [상태 새로고침]으로 확인하세요.');
+}
+async function loadGoldenJob(){
+  const id=LAST_GOLDEN_JOB_ID;
+  if(!id){ goldenProgress('조회할 잡이 없습니다 — 먼저 [후보 생성 → 검수]를 실행하세요.'); return; }
+  try{
+    const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
+    $('gold-result').textContent=JSON.stringify(d,null,2);
+    renderGoldenSummary(d);
+    goldenProgress(`job ${id} · ${d.status||'-'}`);
+    log(`검증문서 준비 작업 상태: ${id} → ${d.status}`,'ok');
+  }catch(e){
+    goldenProgress(`상태 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
+    $('gold-result').textContent=`검증문서 준비 작업 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+  }
+}
+/* [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문). */
+async function openGoldenHtml(kind){
+  const id=LAST_GOLDEN_JOB_ID;
+  if(!id){ goldenProgress('열 잡이 없습니다 — 먼저 [후보 생성 → 검수]를 실행하세요.'); return; }
+  let url=`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/${kind}.html`;
+  try{
+    const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
+    const src = kind==='signoff' ? d.signoff_url : d.review_url;
+    const m = src ? String(src).match(/[?&]t=([^&]+)/) : null;
+    if(m) url+=`?t=${m[1]}`;
+  }catch(e){/* 조회 실패 시 평문 폴백 */}
+  window.open(url, '_blank', 'noopener');
+}
+// 검수·서명 모두 G2 단계다. 새 탭으로 나가는 사실을 기억해 두었다가 복귀 시 다음 단계로 잇는다.
+function openGoldenReview(){ SIGNOFF_TAB_OPENED=true; return openGoldenHtml('review'); }
+function openGoldenSignoff(){ SIGNOFF_TAB_OPENED=true; return openGoldenHtml('signoff'); }
+
+
+
+
+/* ---- 실시간 관제 (auto-refresh · 읽기 전용 폴링) ----
+ * 이 콘솔은 원래 수동 새로고침만 있었다(웹소켓/폴링 0). 여기서 읽기 전용 조회
+ * (관제 대시보드 + 검수 큐)만 주기 폴링해 "켜두면 저절로 도는" 실시간 관제를 준다.
+ * 확정/재라벨/재학습/활성화 같은 쓰기는 절대 폴링하지 않는다(Safe Mode 와 무관).
+ * 메트릭/혼동행렬은 재학습 때만 바뀌고 수동으로 띄운 행렬을 덮어쓸 수 있어 제외한다. */
+function setAutoStatus(state){
+  const dot=$('auto-dot'), txt=$('auto-status'), stamp=$('auto-stamp');
+  if(!dot||!txt) return;
+  if(state==='live'){ dot.style.background='var(--green)'; txt.textContent='실시간 갱신 중'; txt.style.color='var(--green)'; if(stamp) stamp.textContent='마지막 갱신 '+ts(); }
+  else if(state==='error'){ dot.style.background='var(--red)'; txt.textContent='갱신 오류 · 재시도 중'; txt.style.color='var(--red)'; }
+  else { dot.style.background='var(--text-faint)'; txt.textContent='정지'; txt.style.color='var(--text-dim)'; }
+}
+// 검수 큐에서 사용자가 상호작용(등급 select/버튼 포커스) 중이면 재렌더가 그 조작을
+// 날려버리므로 그 tick 은 큐 갱신을 건너뛴다(대시보드는 계속 갱신).
+function queueBusy(){ const el=document.activeElement, q=$('queue'); return !!(el && q && el!==document.body && q.contains(el)); }
+async function autoTick(){
+  if(document.hidden) return;      // 백그라운드 탭이면 스킵(타이머는 유지)
+  if(AUTO_INFLIGHT) return;        // 이전 tick 진행 중이면 중첩 방지
+  AUTO_INFLIGHT=true; AUTO_SILENT=true; AUTO_TICK_OK=true;
+  try{
+    await loadDashboard();
+    if(!queueBusy()) await loadReviewQueue();
+  }catch(e){ AUTO_TICK_OK=false; }
+  AUTO_SILENT=false; AUTO_INFLIGHT=false;
+  /* [2026-08-23] 그냥 setAutoStatus(live) 였다. 응답이 느린 tick 이 도는 동안 사용자가
+     자동 갱신을 끄면, 그 tick 이 **나중에 끝나면서 '정지'를 '실시간 갱신 중'으로 되돌렸다.**
+     폴링은 멈췄는데 표시만 켜져 있어 화면이 사실과 다른 말을 했다(e2e 시나리오
+     fault.autorefresh.stop-during-inflight). 타이머가 아직 살아 있을 때만 갱신한다. */
+  if(!AUTO_TIMER) return;
+  setAutoStatus(AUTO_TICK_OK ? 'live' : 'error');
+}
+function stopAuto(){ if(AUTO_TIMER){ clearInterval(AUTO_TIMER); AUTO_TIMER=null; } }
+function onAutoChange(){
+  const secs=+($('auto-interval').value||0);
+  stopAuto();
+  if(secs>0){
+    setAutoStatus('live');
+    log(`실시간 관제 ON — ${secs}s 주기 (관제 대시보드·검수 큐 읽기 전용 조회)`, 'ok');
+    autoTick();                                // 즉시 1회
+    AUTO_TIMER=setInterval(autoTick, secs*1000);
+  } else {
+    setAutoStatus('paused');
+    log('실시간 관제 OFF (수동 새로고침만)', 'info');
+  }
+}
+
+/* ---- N. 학습 후보 생성 · 검수 (FUN-003-①⑤⑦) ---- */
+let SYNTH = [];   // /synth/queue 응답 items
+
+async function synthGenerate(){
+  if(!guardWrite('합성 생성')) return;
+  const btn=$('sy-gen'); btn.disabled=true; btn.textContent='요청 중…';
+  try{
+    const body={
+      target_grade: $('sy-grade').value,
+      domain: $('sy-domain').value,
+      count: Math.max(1, Math.min(500, parseInt($('sy-count').value||'5',10)||5)),
+      llm_provider: $('sy-provider').value,
+      actor: actor(),
+    };
+    const d=await api('POST','/synth/generate',body);
+    $('sy-info').textContent=`생성 작업 접수 — job ${d.synth_job_id} · 예상 ${d.expected_count}건 · 예상비용 $${Number(d.estimated_cost_usd||0).toFixed(4)}`;
+    log(`합성 생성 요청: ${body.target_grade}/${body.domain} ${body.count}건 (${body.llm_provider}) → job ${d.synth_job_id}`,'ok');
+  }catch(e){ $('sy-info').textContent=`생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`; }
+  finally{ btn.disabled=false; btn.textContent='생성 요청'; }
+}
+
+async function loadSynthQueue(){
+  const status=$('sy-status').value;
+  try{
+    const d=await api('GET',`/synth/queue?status=${encodeURIComponent(status)}&limit=50`);
+    SYNTH=d.items||[];
+    $('sy-info').textContent=`${status} ${d.total??SYNTH.length}건 (표시 ${SYNTH.length})`;
+    renderSynthQueue();
+  }catch(e){ $('sy-info').textContent=`검수 큐 조회 실패: ${e.status||''}`; }
+}
+
+function renderSynthQueue(){
+  const box=$('sy-queue');
+  const reviewable = $('sy-status').value==='pending';
+  if(!SYNTH.length){ box.innerHTML='<div class="q-empty">해당 상태의 합성 문서가 없습니다. 생성 직후라면 워커 처리까지 잠시 걸립니다.</div>'; return; }
+  box.innerHTML=SYNTH.map((it,i)=>`
+    <div class="q-item">
+      <div class="q-top">
+        <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain?` · <span class="q-title">${esc(it.domain)}</span>`:''}</div>
+        <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습행은 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
+          ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
+          <span class="pill">${esc(it.review_status)}</span></div>
+      </div>
+      ${it.preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:110px;overflow:auto;white-space:pre-wrap;">${esc(it.preview)}</div>`:''}
+      ${reviewable?`
+      <div class="q-actions">
+        <span style="font-size:11px;color:var(--text-dim)">확정 등급</span>
+        <select id="sy-g-${i}">${ACTIVE_GRADES.map(g=>`<option value="${esc(g)}" ${g===(it.corrected_grade||it.target_grade)?'selected':''}>${esc(g)}</option>`).join('')}</select>
+        <button class="btn sm" onclick="synthReview(${i},'approve')">승인 → 학습셋</button>
+        <button class="btn sec sm" onclick="synthReview(${i},'reject')">반려</button>
+      </div>`:''}
+    </div>`).join('');
+}
+
+async function synthReview(i, decision){
+  if(!guardWrite('합성 검수')) return;
+  const it=SYNTH[i]; if(!it) return;
+  const chosen=$('sy-g-'+i) ? $('sy-g-'+i).value : (it.corrected_grade||it.target_grade);
+  const body={decision, comment:'console synth review', actor:actor()};
+  // 목표등급과 다른 등급으로 승인하면 corrected_grade 로 전송 — 그 등급으로 학습행이 만들어진다.
+  // [2026-08-24] 이 화면은 진작부터 값을 보내고 있었는데 서버가 버리고 있었다. 서버가
+  // corrected_level_id 로 받아 학습 라벨에 쓰도록 고쳤다(마이그레이션 f0a1b2c3d4e5).
+  // 응답의 applied_grade 가 **실제로 쓰일 등급**이므로 로그에 그대로 남긴다 — 화면이 무엇을
+  // 보냈는가가 아니라 서버가 무엇을 적용했는가를 봐야 같은 결함을 다시 안 만든다.
+  if(decision==='approve' && chosen && chosen!==it.target_grade) body.corrected_grade=chosen;
+  try{
+    const d=await api('POST',`/synth/${encodeURIComponent(it.synth_id)}/review`,body);
+    log(`합성 검수 ${decision}: ${it.synth_id} → ${d.final_status}`+(d.applied_grade?` · 학습 등급 ${d.applied_grade}`:'')+(d.added_to_dataset_version?` · dataset ${d.added_to_dataset_version}`:''),'ok');
+    SYNTH.splice(i,1); renderSynthQueue();
+  }catch(e){ alert('합성 검수 실패: '+(e.data?.detail||e.message)); }
+}
+
+/* ---- E. 등급체계 관리 (FUN-005-①) ---- */
+let GRADE_ROWS = [];        // 편집 중인 행 [{code,name,order,description,color}]
+let GRADE_LOADED_CODES = [];// GET 시점의 활성 코드 — 삭제(비활성) 감지용
+
+async function loadGradeEditor(){
+  try{
+    const d=await api('GET','/schema/grades');
+    GRADE_ROWS=(d.grades||[]).map(g=>({
+      code:g.code||'', name:g.name||'', order:g.order??0,
+      description:g.description||'', color:g.color||'#888888',
+    }));
+    GRADE_LOADED_CODES=GRADE_ROWS.map(g=>g.code);
+    syncActiveGrades(GRADE_LOADED_CODES);
+    $('grade-info').textContent=`활성 ${GRADE_ROWS.length}개 · version ${d.version||'-'}`;
+    $('grade-result').innerHTML='';
+    renderGradeEditor();
+  }catch(e){ $('grade-info').textContent=`조회 실패: ${e.status||''}`; }
+}
+
+function renderGradeEditor(){
+  const body=$('grade-body');
+  if(!GRADE_ROWS.length){ body.innerHTML='<tr><td colspan="6" style="color:var(--text-faint)">등급이 없습니다 — 「등급 행 추가」로 새 체계를 만들 수 있습니다.</td></tr>'; return; }
+  body.innerHTML=GRADE_ROWS.map((g,i)=>`
+    <tr>
+      <td><input class="mono" id="ge-code-${i}" type="text" value="${esc(g.code)}" style="width:88px" placeholder="TS" /></td>
+      <td><input id="ge-name-${i}" type="text" value="${esc(g.name)}" placeholder="특급기밀" /></td>
+      <td><input id="ge-order-${i}" type="number" value="${Number(g.order)||0}" style="width:74px" /></td>
+      <td><input id="ge-desc-${i}" type="text" value="${esc(g.description)}" placeholder="(선택)" /></td>
+      <td><input id="ge-color-${i}" type="text" value="${esc(g.color)}" style="width:96px" placeholder="#7B1FA2" /></td>
+      <td><button class="btn sec sm" onclick="removeGradeRow(${i})">행 삭제</button></td>
+    </tr>`).join('');
+}
+
+function readGradeEditor(){
+  return GRADE_ROWS.map((_,i)=>({
+    code:($('ge-code-'+i).value||'').trim(),
+    name:($('ge-name-'+i).value||'').trim(),
+    order:parseInt($('ge-order-'+i).value||'0',10)||0,
+    description:($('ge-desc-'+i).value||'').trim() || null,
+    color:($('ge-color-'+i).value||'').trim() || null,
+  }));
+}
+
+function addGradeRow(){
+  if(GRADE_ROWS.length) GRADE_ROWS=readGradeEditor();   // 입력 중 값 보존
+  const nextOrder=GRADE_ROWS.reduce((m,g)=>Math.max(m, Number(g.order)||0), 0)+1;
+  GRADE_ROWS.push({code:'', name:'', order:nextOrder, description:'', color:'#888888'});
+  renderGradeEditor();
+}
+
+function removeGradeRow(i){
+  GRADE_ROWS=readGradeEditor();
+  const gone=GRADE_ROWS[i];
+  GRADE_ROWS.splice(i,1);
+  renderGradeEditor();
+  if(gone && gone.code && GRADE_LOADED_CODES.includes(gone.code)){
+    $('grade-info').textContent=`표에서 ${gone.code} 제거됨 — 저장하면 비활성(소프트 삭제) 처리됩니다.`;
+  }
+}
+
+async function saveGrades(){
+  if(!guardWrite('등급체계 변경')) return;
+  const rows=readGradeEditor();
+  // 클라이언트 선검증 — 서버 400 왕복 전에 명확히 알린다.
+  const codes=rows.map(r=>r.code);
+  if(rows.some(r=>!r.code || !r.name)){ alert('코드와 명칭은 모두 필수입니다.'); return; }
+  const dup=codes.find((c,i)=>codes.indexOf(c)!==i);
+  if(dup){ alert(`등급 코드가 중복됩니다: ${dup}`); return; }
+  if(!rows.length){ alert('등급을 0개로 저장할 수 없습니다.'); return; }
+  const removed=GRADE_LOADED_CODES.filter(c=>!codes.includes(c));
+  const added=codes.filter(c=>!GRADE_LOADED_CODES.includes(c));
+  let msg='등급체계를 저장합니다.';
+  if(removed.length) msg+=`\n\n비활성(소프트 삭제)될 등급: ${removed.join(', ')}\n기존 분류 이력은 보존되지만 신규 분류에서 해당 등급은 사라집니다.`;
+  if(added.length) msg+=`\n\n추가될 등급: ${added.join(', ')}\n학습 라벨 공간이 바뀌므로 재학습이 필요합니다.`;
+  if(!confirm(msg)) return;
+
+  const btn=$('grade-save'); btn.disabled=true; btn.textContent='저장 중…';
+  try{
+    const d=await api('PUT','/schema/grades',{grades:rows, actor:actor()});
+    GRADE_ROWS=rows; GRADE_LOADED_CODES=codes;
+    syncActiveGrades(codes);
+    $('grade-result').innerHTML = d.requires_retraining
+      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>등급 구조가 바뀌었습니다. 배포 모델은 <b>재학습 전까지 기존 라벨</b>로 추론합니다. [모델] 탭에서 <b>3 재학습 트리거 → 4 모델 서빙·배포</b> 순서로 진행하세요.</div>`
+      : `<div class="kv"><div><span>저장됨</span> <b>version ${esc(d.version)}</b></div><div><span>재학습</span> <b>불필요</b></div><div><span>사유</span> <b>${esc(d.reason)}</b></div></div>`;
+    $('grade-info').textContent=`저장 완료 · 활성 ${rows.length}개`;
+    log(`등급체계 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
+  }catch(e){ $('grade-result').innerHTML=`<div class="warnbox">저장 실패: ${e.status||''} ${esc(String(e.data?.detail||e.message||''))}</div>`; }
+  finally{ btn.disabled=false; btn.textContent='변경 저장 (PUT)'; }
+}
+
+/* ---- T. 태깅 키워드 관리 (FUN-023-④) ---- */
+let KEYWORDS = [];
+
+async function loadKeywords(){
+  const g=$('kw-f-grade').value, f=$('kw-f-factor').value, act=$('kw-f-active').value;
+  const qs=new URLSearchParams({active_only:act, limit:'500'});
+  if(g) qs.set('grade', g);
+  if(f) qs.set('factor', f);
+  try{
+    const d=await api('GET','/admin/keywords?'+qs.toString());
+    KEYWORDS=d.keywords||[];
+    $('kw-info').textContent=`${d.count??KEYWORDS.length}건`;
+    // DB 미시드/DB 미가용 등 상태 경고는 접어두지 않고 배너로 노출한다(0건을 '규칙 없음'으로 오독 방지).
+    $('kw-warn').innerHTML=(d.warnings&&d.warnings.length)
+      ? `<div class="warnbox" style="margin-top:8px">${d.warnings.map(esc).join('<br/>')}</div>` : '';
+    renderKeywords();
+  }catch(e){ $('kw-info').textContent=`조회 실패: ${e.status||''}`; $('kw-warn').innerHTML=''; }
+}
+
+function renderKeywords(){
+  const body=$('kw-body');
+  if(!KEYWORDS.length){ body.innerHTML='<tr><td colspan="8" style="color:var(--text-faint)">조건에 맞는 키워드가 없습니다.</td></tr>'; return; }
+  body.innerHTML=KEYWORDS.map((k,i)=>`
+    <tr style="${k.is_active?'':'opacity:.55'}">
+      <td class="mono">${k.keyword_id}</td>
+      <td>${gradeTag(k.grade)}</td>
+      <td><input id="kw-k-${i}" type="text" value="${esc(k.keyword)}" /></td>
+      <td><select id="kw-p-${i}">${['exact','regex','semantic'].map(p=>`<option value="${p}" ${p===k.pattern_type?'selected':''}>${p}</option>`).join('')}</select></td>
+      <td><select id="kw-fa-${i}">${['','SECRECY','VALUE','MANAGEMENT'].map(f=>`<option value="${f}" ${f===(k.factor||'')?'selected':''}>${f||'(없음)'}</option>`).join('')}</select></td>
+      <td><input id="kw-w-${i}" type="number" min="0" max="9.99" step="0.05" value="${Number(k.weight)}" style="width:82px" /></td>
+      <td>${k.is_active?'<span class="pill ok">활성</span>':'<span class="pill">비활성</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn sec sm" onclick="patchKeyword(${i})">수정</button>
+        <button class="btn sec sm" onclick="toggleKeyword(${i})">${k.is_active?'비활성':'활성화'}</button>
+      </td>
+    </tr>`).join('');
+}
+
+function noteKeywordReload(d, what){
+  const seed=(d.seed_count!=null)?` · 시드 ${d.seed_count}건`:'';
+  const reload=d.serving_reloaded
+    ? '룰엔진 핫리로드 반영(이 요청을 처리한 워커)'
+    : '⚠ 핫리로드 미반영 — 서빙 반영까지 재기동/다음 리로드 필요';
+  log(`키워드 ${what}: id=${d.keyword_id} action=${d.action} · ${reload}${seed}`, d.serving_reloaded?'ok':'info');
+  $('kw-info').textContent=`${what} 완료 — ${reload}${seed}`;
+}
+
+async function createKeyword(){
+  if(!guardWrite('키워드 추가')) return;
+  const kw=($('kw-n-keyword').value||'').trim();
+  if(!kw){ alert('키워드를 입력하세요.'); return; }
+  const body={
+    grade:$('kw-n-grade').value,
+    keyword:kw,
+    pattern_type:$('kw-n-pattern').value,
+    weight:Math.max(0, Math.min(9.99, parseFloat($('kw-n-weight').value||'1')||1)),
+    actor:actor(),
+  };
+  const f=$('kw-n-factor').value; if(f) body.factor=f;
+  try{
+    const d=await api('POST','/admin/keywords',body);
+    noteKeywordReload(d,'추가');
+    $('kw-n-keyword').value='';
+    loadKeywords();
+  }catch(e){ alert('키워드 추가 실패: '+(e.data?.detail||e.message)); }
+}
+
+async function patchKeyword(i){
+  if(!guardWrite('키워드 수정')) return;
+  const k=KEYWORDS[i]; if(!k) return;
+  const body={
+    keyword:($('kw-k-'+i).value||'').trim(),
+    pattern_type:$('kw-p-'+i).value,
+    factor:$('kw-fa-'+i).value || null,
+    weight:Math.max(0, Math.min(9.99, parseFloat($('kw-w-'+i).value||'1')||0)),
+    actor:actor(),
+  };
+  if(!body.keyword){ alert('키워드는 비울 수 없습니다.'); return; }
+  try{
+    const d=await api('PATCH',`/admin/keywords/${k.keyword_id}`,body);
+    noteKeywordReload(d,'수정');
+    loadKeywords();
+  }catch(e){ alert('키워드 수정 실패: '+(e.data?.detail||e.message)); }
+}
+
+async function toggleKeyword(i){
+  const k=KEYWORDS[i]; if(!k) return;
+  const turningOff=k.is_active;
+  if(!guardWrite(turningOff?'키워드 비활성':'키워드 활성화')) return;
+  if(turningOff && !confirm(`키워드 "${k.keyword}"(id=${k.keyword_id})를 비활성합니다.\n\n하드 삭제가 아니라 소프트 삭제(is_active=false)이며, 감사·FK 이력은 보존됩니다. 룰엔진에서는 즉시 제외됩니다.`)) return;
+  try{
+    const d=await api('PATCH',`/admin/keywords/${k.keyword_id}`,{is_active:!k.is_active, actor:actor()});
+    noteKeywordReload(d, turningOff?'비활성':'활성화');
+    loadKeywords();
+  }catch(e){ alert('상태 변경 실패: '+(e.data?.detail||e.message)); }
+}
+
+/* ---- 등급 목록 동기화 — 등급체계가 DB 주도이므로 셀렉트를 실제 활성 등급으로 채운다 ---- */
+let ACTIVE_GRADES = GRADES.slice();
+function syncActiveGrades(codes){
+  if(Array.isArray(codes) && codes.length) ACTIVE_GRADES=codes.slice();
+  [['sy-grade',false],['kw-f-grade',true],['kw-n-grade',false]].forEach(([id, withAll])=>{
+    const sel=$(id); if(!sel) return;
+    const prev=sel.value;
+    sel.innerHTML=(withAll?'<option value="">전체</option>':'')
+      + ACTIVE_GRADES.map(g=>`<option value="${esc(g)}">${esc(g)}${GRADE_KR[g]?' — '+esc(GRADE_KR[g]):''}</option>`).join('');
+    if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value=prev;
+  });
+}
+
+/* ---- API 키 자동 채움 ----
+ * 콘솔은 정적 파일이라 서버가 키를 심어줄 수 없다. 그래서 기본값(demo-secret-key)이 박혀 있었는데,
+ * 실배포 서버는 키가 다르므로 열자마자 모든 버튼이 `invalid api key` 로 실패했다(2026-08-07 KL 서버 실측).
+ * 두 경로로 채운다 — 둘 다 서버에 키를 노출하지 않는다(주소를 아는 사람만 전달받는 구조):
+ *   1) 주소에 ?key=... 를 붙여 열면 그 값을 쓰고 이 브라우저에 저장한다(다음부터는 주소 없이도 됨)
+ *   2) 저장된 값이 있으면 그걸 쓴다
+ * 저장을 원치 않으면 ?key=...&nosave=1 로 연다. 키를 지우려면 ?key= (빈 값)으로 연다. */
+(function initApiKey(){
+  try{
+    const q = new URLSearchParams(location.search);
+    const el = $('cfg-key');
+    if(!el) return;
+    if(q.has('key')){
+      const k = (q.get('key')||'').trim();
+      el.value = k;
+      if(k && q.get('nosave')!=='1') localStorage.setItem('koipa_api_key', k);
+      if(!k) localStorage.removeItem('koipa_api_key');
+      // 주소창에서 키를 지운다(어깨너머 노출·히스토리 잔류 방지). 값은 이미 입력란에 들어갔다.
+      history.replaceState(null, '', location.pathname);
+      return;
+    }
+    const saved = localStorage.getItem('koipa_api_key');
+    if(saved) el.value = saved;
+  }catch(e){/* localStorage 차단 환경 — 기본값 유지 */}
+})();
+
+/* init */
+initPane();          // 탭 초기 표시 — 검수 탭이 기본, 탭마다 카드 4장 이하
+/* [2026-08-23] 후보 소스 기본값은 '서버 코퍼스 경로'인데 경로 입력칸(#gold-src-corpus)은
+   display:none 으로 시작하고 onchange 에서만 열렸다. 드롭다운을 다른 값으로 바꿨다 되돌리기
+   전에는 칸이 보이지 않아, 「후보 생성 → 검수」가 늘 "코퍼스 경로를 입력하세요" 로 끝났다.
+   초기 1회 동기화해 기본값과 화면을 맞춘다. */
+syncGoldenSource();
+loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸을 대체)
+onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
+syncWriteGate();
+populateSamples();
+syncActiveGrades();
+checkHealth();
+setAutoStatus('paused');
+log('거버넌스 콘솔 준비 완료.','info');
+</script>
+
+<!-- 검증문서 검수 목록 패널 — 본체는 별도 파일(위 인라인 스크립트의 cfg/api/log/esc 재사용). -->
+<script src="./golden_jobs.js"></script>
+
+</body>
+</html>

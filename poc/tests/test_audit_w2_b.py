@@ -43,7 +43,7 @@ class _FakeRequest:
 # M-schema-perm — PUT /schema/grades 는 admin 전용, GET 은 broad 역할 허용
 # ===========================================================================
 def _run_rbac(method: str, auth_context: dict) -> dict:
-    from lloydk.api.app import _schema_grades_rbac
+    from koipa.api.app import _schema_grades_rbac
 
     req = _FakeRequest(method=method)
     return asyncio.run(_schema_grades_rbac(request=req, auth_context=auth_context))
@@ -92,7 +92,7 @@ def test_schema_put_admin_in_multi_role_passes():
 # (tenant 제거: 단일 KL 인증이라 버킷은 actor/IP 기준; 격리는 KL 포털 전담)
 # ===========================================================================
 def test_key_uses_auth_actor():
-    from lloydk.api.rate_limit import cred_or_ip_key
+    from koipa.api.rate_limit import cred_or_ip_key
 
     req = _FakeRequest(auth_actor="user-7")
     assert cred_or_ip_key(req) == "actor:user-7"
@@ -104,7 +104,7 @@ def test_key_ignores_unverified_header():
     auth_actor가 비면(미검증) IP 폴백으로만 키가 결정돼야 한다 —
     헤더값 'forged'가 키에 절대 반영되면 안 됨.
     """
-    from lloydk.api.rate_limit import cred_or_ip_key
+    from koipa.api.rate_limit import cred_or_ip_key
 
     req = _FakeRequest(
         headers={"X-Tenant-Id": "forged"},
@@ -118,7 +118,7 @@ def test_key_ignores_unverified_header():
 
 def test_key_distinct_verified_actors_get_distinct_buckets():
     """검증된 서로 다른 actor는 독립 키(=독립 버킷)를 받는다."""
-    from lloydk.api.rate_limit import cred_or_ip_key
+    from koipa.api.rate_limit import cred_or_ip_key
 
     a = cred_or_ip_key(_FakeRequest(auth_actor="a-1"))
     b = cred_or_ip_key(_FakeRequest(auth_actor="a-2"))
@@ -130,8 +130,8 @@ def test_key_distinct_verified_actors_get_distinct_buckets():
 # ===========================================================================
 def test_grade_registry_reloads_after_ttl(monkeypatch):
     """TTL 만료 후 다음 조회는 캐시를 버리고 재계산한다(다른 워커도 새 등급 반영)."""
-    from lloydk.schemas import common as common_mod
-    from lloydk.schemas.common import GradeRegistry
+    from koipa.schemas import common as common_mod
+    from koipa.schemas.common import GradeRegistry
 
     GradeRegistry.invalidate()
     # TTL 짧게 — 매우 작은 값으로 만료 강제
@@ -156,8 +156,8 @@ def test_grade_registry_reloads_after_ttl(monkeypatch):
 
 def test_ttl_zero_disables_expiry(monkeypatch):
     """TTL<=0이면 명시 invalidate에만 의존(과거 동작)."""
-    from lloydk.schemas import common as common_mod
-    from lloydk.schemas.common import GradeRegistry
+    from koipa.schemas import common as common_mod
+    from koipa.schemas.common import GradeRegistry
 
     GradeRegistry.invalidate()
     monkeypatch.setattr(common_mod, "_registry_ttl_sec", lambda: 0.0)
@@ -169,8 +169,8 @@ def test_ttl_zero_disables_expiry(monkeypatch):
 
 
 def test_factor_registry_invalidate_resets_ts(monkeypatch):
-    from lloydk.schemas import common as common_mod
-    from lloydk.schemas.common import FactorRegistry
+    from koipa.schemas import common as common_mod
+    from koipa.schemas.common import FactorRegistry
 
     monkeypatch.setattr(common_mod, "_registry_ttl_sec", lambda: 30.0)
     FactorRegistry.invalidate()
@@ -183,13 +183,13 @@ def test_factor_registry_invalidate_resets_ts(monkeypatch):
 
 
 def test_registry_ttl_env_parsing(monkeypatch):
-    from lloydk.schemas.common import _registry_ttl_sec
+    from koipa.schemas.common import _registry_ttl_sec
 
-    monkeypatch.setenv("LLOYDK_REGISTRY_CACHE_TTL_SEC", "5")
+    monkeypatch.setenv("KOIPA_REGISTRY_CACHE_TTL_SEC", "5")
     assert _registry_ttl_sec() == 5.0
-    monkeypatch.setenv("LLOYDK_REGISTRY_CACHE_TTL_SEC", "not-a-number")
+    monkeypatch.setenv("KOIPA_REGISTRY_CACHE_TTL_SEC", "not-a-number")
     assert _registry_ttl_sec() == 30.0  # 파싱 실패 → 기본값
-    monkeypatch.delenv("LLOYDK_REGISTRY_CACHE_TTL_SEC", raising=False)
+    monkeypatch.delenv("KOIPA_REGISTRY_CACHE_TTL_SEC", raising=False)
     assert _registry_ttl_sec() == 30.0
 
 
@@ -221,7 +221,7 @@ class _StubIndexer:
 
 
 def _svc_with_stub():
-    from lloydk.services.guide_service import GuideService
+    from koipa.services.guide_service import GuideService
 
     return GuideService(indexer=_StubIndexer())
 
@@ -267,7 +267,7 @@ def test_list_versions_unknown_guide_returns_none():
 
 def test_guide_record_fields():
     """_GuideRecord 기본 생성 — tenant 필드 없음(전역 네임스페이스)."""
-    from lloydk.services.guide_service import _GuideRecord
+    from koipa.services.guide_service import _GuideRecord
 
     rec = _GuideRecord(
         guide_id="g", version="v", effective_date=None, change_summary=None,

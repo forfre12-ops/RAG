@@ -1,0 +1,10 @@
+{
+  "catalog_sha256": "9a19cad62f04a2ee51b4a84222ef447d4743c4b2d62dd36aeafc58c21fdfd803",
+  "catalog_version": "proxy-training-scenarios-v2",
+  "factor_profiles": 21,
+  "records": 2700,
+  "records_sha256": "16c04202183378ac1478a52494ce5bedd31e7d4a7ba5c3bca5c83d467cb90311",
+  "scenarios": 315,
+  "schema": "direct-authored-catalog-training-v1",
+  "training_only": true
+}

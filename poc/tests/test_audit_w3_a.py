@@ -20,8 +20,8 @@ import uuid
 
 import pytest
 
-from lloydk.services import outbox as outbox_mod
-from lloydk.services.outbox import (
+from koipa.services import outbox as outbox_mod
+from koipa.services.outbox import (
     InMemoryOutboxStore,
     deliver_once,
     publish,
@@ -134,14 +134,14 @@ def fresh_memory_outbox(monkeypatch):
 @pytest.fixture(autouse=True)
 def _reset_classify_singleton():
     yield
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.services.classify_service import ClassifyService
     ClassifyService._instance = None
 
 
 @pytest.mark.slow
 def test_callback_url_publishes_to_outbox_on_async_done(fresh_memory_outbox):
-    from lloydk.schemas.classify_async import ClassifyAsyncRequest
-    from lloydk.services.async_classify_service import AsyncClassifyService
+    from koipa.schemas.classify_async import ClassifyAsyncRequest
+    from koipa.services.async_classify_service import AsyncClassifyService
 
     svc = AsyncClassifyService(sleep_fn=lambda _s: None)
     req = ClassifyAsyncRequest(
@@ -161,8 +161,8 @@ def test_callback_url_publishes_to_outbox_on_async_done(fresh_memory_outbox):
 
 @pytest.mark.slow
 def test_no_callback_url_does_not_publish(fresh_memory_outbox):
-    from lloydk.schemas.classify_async import ClassifyAsyncRequest
-    from lloydk.services.async_classify_service import AsyncClassifyService
+    from koipa.schemas.classify_async import ClassifyAsyncRequest
+    from koipa.services.async_classify_service import AsyncClassifyService
 
     svc = AsyncClassifyService(sleep_fn=lambda _s: None)
     svc.submit_async(ClassifyAsyncRequest(doc_id="cb-2", content="내용"))
@@ -173,8 +173,8 @@ def test_no_callback_url_does_not_publish(fresh_memory_outbox):
 
 @pytest.mark.slow
 def test_callback_published_on_async_failure(fresh_memory_outbox):
-    from lloydk.schemas.classify_async import ClassifyAsyncRequest
-    from lloydk.services.async_classify_service import AsyncClassifyService
+    from koipa.schemas.classify_async import ClassifyAsyncRequest
+    from koipa.services.async_classify_service import AsyncClassifyService
 
     svc = AsyncClassifyService(sleep_fn=lambda _s: None)
 
@@ -195,9 +195,9 @@ def test_callback_published_on_async_failure(fresh_memory_outbox):
 
 @pytest.mark.slow
 def test_callback_published_on_batch(fresh_memory_outbox):
-    from lloydk.schemas.classify import ClassifyRequest
-    from lloydk.schemas.classify_async import ClassifyBatchRequest
-    from lloydk.services.async_classify_service import AsyncClassifyService
+    from koipa.schemas.classify import ClassifyRequest
+    from koipa.schemas.classify_async import ClassifyBatchRequest
+    from koipa.services.async_classify_service import AsyncClassifyService
 
     svc = AsyncClassifyService(sleep_fn=lambda _s: None)
     req = ClassifyBatchRequest(
@@ -217,7 +217,7 @@ def test_callback_published_on_batch(fresh_memory_outbox):
 
 def test_publish_callback_swallows_outbox_errors(monkeypatch):
     """outbox publish 실패가 호출자를 깨뜨리지 않는다 (best-effort)."""
-    from lloydk.services.async_classify_service import AsyncClassifyService
+    from koipa.services.async_classify_service import AsyncClassifyService
 
     def _broken_publish(*a, **kw):
         raise RuntimeError("outbox down")
@@ -271,19 +271,23 @@ def test_evidence_failure_does_not_discard_classification(monkeypatch):
     """
     from contextlib import contextmanager
 
-    from lloydk.schemas.classify import EvidenceSpan
-    from lloydk.schemas.common import Grade
-    from lloydk.services import classify_service as cs_mod
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.schemas.classify import EvidenceSpan
+    from koipa.schemas.common import Grade
+    from koipa.services import classify_service as cs_mod
+    from koipa.services.classify_service import ClassifyService
 
     # session_scope 를 no-op stub 으로 — 실제 DB 불필요.
     @contextmanager
     def _stub_scope():
         yield object()
 
-    import lloydk.db as db_mod
+    import koipa.db as db_mod
     monkeypatch.setattr(db_mod, "session_scope", _stub_scope)
     monkeypatch.setattr(cs_mod, "ClassifyRepo", _RecordingClassifyRepo)
+    # 36ff17d 가 _try_persist 에 추가한 optional-DB skip 가드(TESTING+DB미연결→persist skip)는 이
+    # 테스트가 session_scope/ClassifyRepo 를 stub 으로 주입해 DB 타임아웃 위험이 없으므로, 실 영속
+    # 경로(create_classification→classification_id 반환)를 검증하도록 꺼 준다.
+    monkeypatch.setattr(cs_mod, "_skip_optional_db_work", lambda: False)
 
     svc = ClassifyService.__new__(ClassifyService)  # __init__(모델 로드) 우회
 
@@ -311,17 +315,21 @@ def test_classification_returned_when_no_evidence(monkeypatch):
     """evidence/rag 가 없으면 Step 2 를 건너뛰고 classification_id 반환."""
     from contextlib import contextmanager
 
-    from lloydk.schemas.common import Grade
-    from lloydk.services import classify_service as cs_mod
-    from lloydk.services.classify_service import ClassifyService
+    from koipa.schemas.common import Grade
+    from koipa.services import classify_service as cs_mod
+    from koipa.services.classify_service import ClassifyService
 
     @contextmanager
     def _stub_scope():
         yield object()
 
-    import lloydk.db as db_mod
+    import koipa.db as db_mod
     monkeypatch.setattr(db_mod, "session_scope", _stub_scope)
     monkeypatch.setattr(cs_mod, "ClassifyRepo", _RecordingClassifyRepo)
+    # 36ff17d 가 _try_persist 에 추가한 optional-DB skip 가드(TESTING+DB미연결→persist skip)는 이
+    # 테스트가 session_scope/ClassifyRepo 를 stub 으로 주입해 DB 타임아웃 위험이 없으므로, 실 영속
+    # 경로(create_classification→classification_id 반환)를 검증하도록 꺼 준다.
+    monkeypatch.setattr(cs_mod, "_skip_optional_db_work", lambda: False)
 
     svc = ClassifyService.__new__(ClassifyService)
 

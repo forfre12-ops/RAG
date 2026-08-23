@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 
-from lloydk.perf.env import (
+from koipa.perf.env import (
     EnvSnapshot,
     ServiceStatus,
     capture_env,

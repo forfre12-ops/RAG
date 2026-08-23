@@ -19,8 +19,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lloydk.adapters.vectorstore.base import SearchHit
-from lloydk.adapters.vectorstore.es_store import EsStore
+from koipa.adapters.vectorstore.base import SearchHit
+from koipa.adapters.vectorstore.es_store import EsStore
 
 
 # ─────────────────────────────────────────────────────────────
@@ -161,12 +161,12 @@ class _HybridFailsStore:
 
 
 def test_hybrid_degrade_logs_warning_and_increments_counter(caplog):
-    from lloydk.api.prom_metrics import RAG_CONTEXT_FAILURE_TOTAL
-    from lloydk.rag import retrieval
+    from koipa.api.prom_metrics import RAG_CONTEXT_FAILURE_TOTAL
+    from koipa.rag import retrieval
 
     before = RAG_CONTEXT_FAILURE_TOTAL.labels(stage="hybrid_degrade")._value.get()
 
-    with caplog.at_level(logging.WARNING, logger="lloydk.rag.retrieval"):
+    with caplog.at_level(logging.WARNING, logger="koipa.rag.retrieval"):
         hits = retrieval.expand_then_search(
             store=_HybridFailsStore(),
             collection="col",
@@ -188,9 +188,9 @@ def test_hybrid_degrade_logs_warning_and_increments_counter(caplog):
 
 def test_record_hybrid_degrade_is_best_effort():
     """prom import가 실패해도 _record_hybrid_degrade는 raise하지 않는다."""
-    from lloydk.rag import retrieval
+    from koipa.rag import retrieval
 
-    with patch.dict("sys.modules", {"lloydk.api.prom_metrics": None}):
+    with patch.dict("sys.modules", {"koipa.api.prom_metrics": None}):
         retrieval._record_hybrid_degrade()  # 예외 없이 통과해야 함
 
 
@@ -198,21 +198,21 @@ def test_record_hybrid_degrade_is_best_effort():
 # [M-storage-factory] build_storage가 storage_backend로 분기 + 오타 수정
 # ─────────────────────────────────────────────────────────────
 def test_build_storage_force_local_returns_localstorage(tmp_path):
-    from lloydk.adapters.storage import LocalStorage, build_storage
+    from koipa.adapters.storage import LocalStorage, build_storage
 
     st = build_storage(force_local=True, local_root=str(tmp_path))
     assert isinstance(st, LocalStorage)
 
 
 def test_build_storage_local_backend(tmp_path):
-    from lloydk.adapters.storage import LocalStorage, build_storage
+    from koipa.adapters.storage import LocalStorage, build_storage
 
     st = build_storage(backend="local", local_root=str(tmp_path))
     assert isinstance(st, LocalStorage)
 
 
 def test_build_storage_unknown_backend_falls_back_local(tmp_path):
-    from lloydk.adapters.storage import LocalStorage, build_storage
+    from koipa.adapters.storage import LocalStorage, build_storage
 
     st = build_storage(backend="bogus-backend", local_root=str(tmp_path))
     assert isinstance(st, LocalStorage)
@@ -220,8 +220,8 @@ def test_build_storage_unknown_backend_falls_back_local(tmp_path):
 
 def test_build_storage_minio_failure_falls_back_local(tmp_path):
     """minio 백엔드 초기화 실패 시 RuntimeWarning + LocalStorage 폴백(비파괴)."""
-    from lloydk.adapters import storage as storage_mod
-    from lloydk.adapters.storage import LocalStorage, build_storage
+    from koipa.adapters import storage as storage_mod
+    from koipa.adapters.storage import LocalStorage, build_storage
 
     with patch.object(storage_mod, "_build_minio", side_effect=RuntimeError("no minio")):
         with warnings.catch_warnings(record=True) as caught:
@@ -231,10 +231,20 @@ def test_build_storage_minio_failure_falls_back_local(tmp_path):
     assert any(issubclass(w.category, RuntimeWarning) for w in caught)
 
 
+def test_build_storage_minio_failure_raises_in_full_mode(monkeypatch, tmp_path):
+    from koipa.adapters import storage as storage_mod
+    from koipa.adapters.storage import build_storage
+
+    monkeypatch.setattr(storage_mod, "_strict_remote_storage_required", lambda: True)
+    with patch.object(storage_mod, "_build_minio", side_effect=RuntimeError("no minio")):
+        with pytest.raises(RuntimeError, match="full mode"):
+            build_storage(backend="minio", local_root=str(tmp_path))
+
+
 def test_build_storage_seaweedfs_backend_constructs_seaweed():
     """seaweedfs 백엔드는 SeaweedFSStore를 생성(boto3 lazy라 생성 자체는 성공)."""
-    from lloydk.adapters.storage import build_storage
-    from lloydk.adapters.storage.seaweedfs_store import SeaweedFSStore
+    from koipa.adapters.storage import build_storage
+    from koipa.adapters.storage.seaweedfs_store import SeaweedFSStore
 
     st = build_storage(backend="seaweedfs")
     assert isinstance(st, SeaweedFSStore)
@@ -242,8 +252,8 @@ def test_build_storage_seaweedfs_backend_constructs_seaweed():
 
 def test_get_storage_local_typo_fixed():
     """seaweedfs_store.get_storage('local')이 더 이상 ImportError(LocalStore 오타) 안 냄."""
-    from lloydk.adapters.storage.local_store import LocalStorage
-    from lloydk.adapters.storage.seaweedfs_store import get_storage
+    from koipa.adapters.storage.local_store import LocalStorage
+    from koipa.adapters.storage.seaweedfs_store import get_storage
 
     st = get_storage("local")
     assert isinstance(st, LocalStorage)
@@ -270,7 +280,7 @@ class APITimeoutError(Exception):
 
 def _make_provider(monkeypatch):
     """anthropic 미설치 환경에서 AnthropicProvider를 생성(client만 mock)."""
-    from lloydk.adapters.llm import anthropic_provider as ap
+    from koipa.adapters.llm import anthropic_provider as ap
 
     prov = ap.AnthropicProvider.__new__(ap.AnthropicProvider)
     prov._client = MagicMock()
@@ -293,7 +303,7 @@ def _ok_message():
 
 
 def test_retry_classifier():
-    from lloydk.adapters.llm.anthropic_provider import _is_retryable
+    from koipa.adapters.llm.anthropic_provider import _is_retryable
 
     assert _is_retryable(_Status429()) is True
     assert _is_retryable(_Status500()) is True

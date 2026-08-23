@@ -10,7 +10,7 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 
 import httpx
 
-from lloydk.modules.m6_evaluation.answer_metrics import (  # noqa: E402
+from koipa.modules.m6_evaluation.answer_metrics import (  # noqa: E402
     citation_metrics,
     grounding_signals,
 )

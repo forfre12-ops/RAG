@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.modules.m5_inference.pipeline import InferencePipeline
-from lloydk.schemas.common import Grade
+from koipa.modules.m5_inference.pipeline import InferencePipeline
+from koipa.schemas.common import Grade
 
 
 @pytest.fixture
@@ -27,35 +27,35 @@ def _probs(ts, s1, s2, s3):
 
 
 def test_tau_none_is_argmax(pipe, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.setattr(settings, "classifier_escalation_tau", None)
     # S3가 최대 → argmax = idx3
     assert pipe._select_pred_idx(_probs(0.30, 0.05, 0.15, 0.50)) == 3
 
 
 def test_tau_escalates_to_most_severe_above_threshold(pipe, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.setattr(settings, "classifier_escalation_tau", 0.25)
     # TS=0.30 ≥ 0.25 → 가장 심각한 등급 TS(idx0)로 승격 (argmax는 S3였음)
     assert pipe._select_pred_idx(_probs(0.30, 0.05, 0.15, 0.50)) == 0
 
 
 def test_tau_skips_below_threshold_picks_next_severe(pipe, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.setattr(settings, "classifier_escalation_tau", 0.25)
     # TS=0.10(<τ) skip, S1=0.30(≥τ) → S1(idx1)
     assert pipe._select_pred_idx(_probs(0.10, 0.30, 0.10, 0.50)) == 1
 
 
 def test_tau_none_match_falls_back_to_argmax(pipe, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.setattr(settings, "classifier_escalation_tau", 0.6)
     # 아무 등급도 0.6 못 넘음 → argmax(S3, idx3)
     assert pipe._select_pred_idx(_probs(0.30, 0.05, 0.15, 0.50)) == 3
 
 
 def test_invalid_tau_treated_as_none(pipe, monkeypatch):
-    from lloydk.config import settings
+    from koipa.config import settings
     monkeypatch.setattr(settings, "classifier_escalation_tau", 1.5)  # 범위 밖 → None 취급
     assert pipe._escalation_tau is None
     assert pipe._select_pred_idx(_probs(0.30, 0.05, 0.15, 0.50)) == 3

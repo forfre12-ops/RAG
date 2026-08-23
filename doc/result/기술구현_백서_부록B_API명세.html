@@ -4,9 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>부록 B — API 명세 | KOIPA AI 기술 구현 백서</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700;800&display=swap" />
 <style>
 :root {
   --bg:#ffffff; --bg-surface:#fafafa; --bg-code:#f4f4f4;
@@ -176,10 +173,10 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
 <header class="nav">
   <div class="nav-inner">
     <a href="#top" class="brand">
-      <span class="brand-mark"><img src="data:image/png;base64,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" alt="Lloydk" /></span>
-      <span class="brand-name">로이드케이</span>
+      <span class="brand-mark"><img src="data:image/png;base64,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" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
       <span class="brand-sep">·</span>
-      <span class="brand-url">lloydk.co.kr</span>
+      <span class="brand-url">www.koipa.re.kr</span>
     </a>
     <div class="nav-actions">
       <div class="nav-search" role="search" aria-label="Search">
@@ -217,7 +214,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
     <a class="toc-item" href="#ep-schema-get"><span class="toc-method get">GET</span> /schema/grades</a>
     <a class="toc-item" href="#ep-schema-put"><span class="toc-method put" style="background:var(--put)">PUT</span> /schema/grades</a>
     <a class="toc-item" href="#ep-model-reload"><span class="toc-method post">POST</span> /admin/model/reload</a>
-    <a class="toc-item" href="#ep-rotate-key"><span class="toc-method post">POST</span> /admin/…/rotate-api-key</a>
     <a class="toc-item" href="#ep-metrics-latest"><span class="toc-method get">GET</span> /metrics/latest</a>
     <a class="toc-item" href="#ep-metrics-history"><span class="toc-method get">GET</span> /metrics/history</a>
     <a class="toc-item" href="#ep-metrics-cm"><span class="toc-method get">GET</span> /metrics/confusion-matrix/{ver}</a>
@@ -234,7 +230,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
       <span style="color:var(--text-dim);font-size:12px;">· FastAPI · OpenAPI 3.0 · Base URL: /api/v1</span>
     </div>
     <h1 class="title">API 명세</h1>
-    <p class="lede">31개 라우트(full-train 프로파일 · 고유 경로 기준; lite-noapi는 학습 3종 제외 28개) 전체 명세 (2026-06-20 기준). KL ↔ Lloydk 서버 간 통신 기준. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)으로 전환됨 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다. 능동학습 폐곡선(relabel → tb_corrections → 재학습 → 모델 핫리로드)이 배선됨.</p>
+    <p class="lede">30개 라우트(full-train 프로파일 · 고유 경로 기준; lite-noapi는 학습 3종 제외 27개) 전체 명세 (2026-06-20 기준). KL ↔ Koipa 서버 간 통신 기준. 등급 산정은 <strong>비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</strong> 곱셈식(각 0·1·2점)으로 전환됨 — 분류 응답의 <code>evaluation_factors</code>는 3요건(secrecy·value·management)을 노출한다. 능동학습 폐곡선(relabel → tb_corrections → 재학습 → 모델 핫리로드)이 배선됨.</p>
     <hr class="hero-sep">
 
     <!-- Global -->
@@ -245,23 +241,21 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
           <thead><tr><th>헤더</th><th>값</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
             <tr><td class="f-name">X-API-Key</td><td><code>&lt;키&gt;</code></td><td class="f-req">apikey 모드(기본)</td><td><strong>기본 인증 모드</strong>(AUTH_MODE=apikey). 역할은 서버 설정 <code>API_KEY_ROLE</code>로 결정(개발 환경은 <code>X-Actor-Role</code> 헤더 허용)</td></tr>
-            <tr><td class="f-name">Authorization</td><td><code>Bearer &lt;JWT&gt;</code></td><td class="f-req">jwt 모드</td><td>RS256 서명 JWT(AUTH_MODE=jwt|both). <code>sub</code>=actor_id, <code>tenant_id</code>·<code>roles</code> claim 포함</td></tr>
+            <tr><td class="f-name">Authorization</td><td><code>Bearer &lt;JWT&gt;</code></td><td class="f-req">jwt 모드</td><td>RS256 서명 JWT(AUTH_MODE=jwt|both). <code>sub</code>=actor_id, <code>roles</code> claim 포함</td></tr>
             <tr><td class="f-name">X-Request-ID</td><td>UUID v4</td><td></td><td>요청 추적 ID. 없으면 서버가 생성. tb_audit_log에 기록</td></tr>
             <tr><td class="f-name">Content-Type</td><td><code>application/json</code></td><td class="f-req yes">●</td><td>파일 업로드는 <code>multipart/form-data</code></td></tr>
           </tbody>
         </table>
         <h3 style="margin-top:16px;">인증 모드</h3>
-        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>apikey</code>(API 키 전용) · <code>both</code>(둘 다 허용). 모든 라우터가 <code>require_auth</code>로 통일되어 설정이 실제 적용된다. <code>X-Tenant-Id</code> 헤더와 JWT claim의 tenant 불일치 시 401 반환 (하위호환: 헤더 없으면 JWT claim 신뢰). API 키 검증은 <strong>상수시간 비교</strong>(<code>hmac.compare_digest</code>)로 수행되어 바이트 단위 early-exit 타이밍 사이드채널을 차단한다(동작 동일, 보안 강화).</p>
-        <h3 style="margin-top:16px;">객체 수준 권한 (테넌트 격리 · IDOR/BOLA 차단)</h3>
-        <p style="font-size:13px;">인증 신원이 <code>request.state</code>에 저장되고, 요청 body의 <code>tenant_id</code>는 인증된 tenant에 <strong>결속</strong>된다(<code>resolve_effective_tenant</code>). body tenant_id가 인증 tenant와 불일치하면 <code>403</code> 반환. JWT에 tenant claim이 없는데 tenant_id를 주장해도 <code>403</code>. 모든 doc 조회(본문 fetch · 검증 등급 · 최근 분류 결과)는 이 유효 tenant로 스코프되어 <strong>타 tenant의 doc_id로 본문·등급·분류 결과를 열람할 수 없다</strong>(앱 레이어 enforcement, DB 스키마 변경 없음). 감사 로그의 actor_id/tenant_id도 위조 가능 헤더 대신 인증 컨텍스트에서 도출된다.</p>
+        <p style="font-size:13px;"><code>AUTH_MODE</code> 설정: <code>jwt</code>(JWT 전용) · <code>apikey</code>(API 키 전용) · <code>both</code>(둘 다 허용). 모든 라우터가 <code>require_auth</code>로 통일되어 설정이 실제 적용된다. API 키 검증은 <strong>상수시간 비교</strong>(<code>hmac.compare_digest</code>)로 수행되어 바이트 단위 early-exit 타이밍 사이드채널을 차단한다(동작 동일, 보안 강화).</p>
         <h3 style="margin-top:16px;">Rate Limit</h3>
-        <p style="font-size:13px;">SlowAPI 기반. 기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/stream <strong>30/분</strong> · /classify/explain 30/분 · /answer 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 키는 <strong>검증된 신원</strong>(인증 tenant→actor) 우선, 미인증 시 IP 폴백 — 위조 가능한 원시 <code>X-Tenant-Id</code> 헤더는 키로 쓰지 않는다(한도 우회·버킷 고갈 차단). 초과 시 <code>429</code> + <code>Retry-After</code> 헤더. <code>RATE_LIMIT_DISABLED=1</code>로 비활성(테스트·dryrun).</p>
+        <p style="font-size:13px;">SlowAPI 기반. 기본 <strong>120 req/min</strong>, 라우터별 별도 한도 (분류 동기 60/분 · /classify/stream <strong>30/분</strong> · /classify/explain 30/분 · /answer 30/분 · /synth/generate 10/분 · /train <strong>10/시간</strong>). 키는 <strong>검증된 신원</strong>(actor) 우선, 미인증 시 IP 폴백. 초과 시 <code>429</code> + <code>Retry-After</code> 헤더. <code>RATE_LIMIT_DISABLED=1</code>로 비활성(테스트·dryrun).</p>
         <h3 style="margin-top:16px;">미들웨어</h3>
         <p style="font-size:13px;">모든 요청은 <code>api/middleware.py</code>를 통해 감사 로그(tb_audit_log)에 기록되고, OTel span이 생성된다.</p>
         <h3 style="margin-top:16px;">요청 본문 크기 한도 (DoS 가드)</h3>
-        <p style="font-size:13px;">전역 ASGI 가드(<code>BodySizeLimitMiddleware</code>)가 <strong>본문 파싱 전</strong>에 요청 본문 크기를 검사한다. <code>Content-Length</code> 헤더가 한도를 초과하면 본문을 읽기도 전에 즉시 <code>413</code>, <code>Content-Length</code> 없는 chunked 요청은 누적 바이트가 한도를 넘는 순간 <code>413</code>을 반환한다(대용량 JSON body OOM 차단). 한도는 설정 <code>max_request_body_mb</code>(기본 <strong>25MB</strong>, 환경변수 <code>LLOYDK_MAX_REQUEST_BODY_MB</code>)로 조정한다. 응답 바디: <code>{"detail":"request body too large","code":"LLOYDK_BODY_TOO_LARGE"}</code>. 멀티파트 업로드(<code>/documents</code>·<code>/guide/documents</code>)는 라우터의 <code>max_upload_mb</code>(기본 20MB)로 별도 처리되므로 이 한도는 일반 JSON 본문에 적용된다. 스택 최외곽에 등록되어 다른 미들웨어·핸들러보다 먼저 차단한다.</p>
+        <p style="font-size:13px;">전역 ASGI 가드(<code>BodySizeLimitMiddleware</code>)가 <strong>본문 파싱 전</strong>에 요청 본문 크기를 검사한다. <code>Content-Length</code> 헤더가 한도를 초과하면 본문을 읽기도 전에 즉시 <code>413</code>, <code>Content-Length</code> 없는 chunked 요청은 누적 바이트가 한도를 넘는 순간 <code>413</code>을 반환한다(대용량 JSON body OOM 차단). 한도는 설정 <code>max_request_body_mb</code>(기본 <strong>25MB</strong>, 환경변수 <code>KOIPA_MAX_REQUEST_BODY_MB</code>)로 조정한다. 응답 바디: <code>{"detail":"request body too large","code":"KOIPA_BODY_TOO_LARGE"}</code>. 멀티파트 업로드(<code>/documents</code>·<code>/guide/documents</code>)는 라우터의 <code>max_upload_mb</code>(기본 20MB)로 별도 처리되므로 이 한도는 일반 JSON 본문에 적용된다. 스택 최외곽에 등록되어 다른 미들웨어·핸들러보다 먼저 차단한다.</p>
         <h3 style="margin-top:16px;">멱등성 (Idempotency-Key) <span style="font-size:11px;color:var(--text-dim);font-weight:400;">— 선택 헤더 · 발주처 요건 외 운영 강화</span></h3>
-        <p style="font-size:13px;">변경성 요청(POST/PUT/PATCH)에 <code>Idempotency-Key</code> 헤더를 붙이면 동일 키 재요청을 <strong>1회만 처리</strong>하고 저장된 응답을 재현한다(응답에 <code>X-Idempotent-Replay: true</code>). 처리 중 동일 키 재요청은 <code>409</code>. 네트워크 타임아웃 재시도로 인한 <code>confirm·relabel·train</code> 중복 실행을 방지한다. <strong>헤더 미전달 시 무영향</strong>(기존 동작 유지). 저장소는 redis(미가용 시 in-memory 폴백, TTL 24h). 멱등성 키는 <strong>주체(자격증명·테넌트)별 네임스페이스로 격리</strong>된다 — 가용한 자격증명 헤더(<code>Authorization</code>/<code>X-API-Key</code>) + <code>X-Tenant-Id</code>를 SHA-256으로 해시해 키 prefix로 사용하므로, 같은 키 값이라도 다른 주체는 다른 네임스페이스로 분리되어 <strong>교차테넌트 응답 replay가 차단</strong>된다(원시 비밀은 키에 노출하지 않음). <em>요건에 명시된 기능은 아니며, 변경성 API 재시도 안전을 위한 운영 강화로 본개발 정식 채택을 전제로 한다.</em></p>
+        <p style="font-size:13px;">변경성 요청(POST/PUT/PATCH)에 <code>Idempotency-Key</code> 헤더를 붙이면 동일 키 재요청을 <strong>1회만 처리</strong>하고 저장된 응답을 재현한다(응답에 <code>X-Idempotent-Replay: true</code>). 처리 중 동일 키 재요청은 <code>409</code>. 네트워크 타임아웃 재시도로 인한 <code>confirm·relabel·train</code> 중복 실행을 방지한다. <strong>헤더 미전달 시 무영향</strong>(기존 동작 유지). 저장소는 redis(미가용 시 in-memory 폴백, TTL 24h). 멱등성 키는 <strong>주체(자격증명)별 네임스페이스로 격리</strong>된다 — 가용한 자격증명 헤더(<code>Authorization</code>/<code>X-API-Key</code>)를 SHA-256으로 해시해 키 prefix로 사용하므로, 같은 키 값이라도 다른 주체는 다른 네임스페이스로 분리되어 <strong>교차 주체 응답 replay가 차단</strong>된다(원시 비밀은 키에 노출하지 않음). <em>요건에 명시된 기능은 아니며, 변경성 API 재시도 안전을 위한 운영 강화로 본개발 정식 채택을 전제로 한다.</em></p>
       </div>
     </section>
 
@@ -276,14 +270,14 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">문서 텍스트를 4등급(TS/S1/S2/S3)으로 분류한다. M2 전처리 → M5 추론 순서로 실행. confidence가 임계값(<code>review_confidence_threshold</code>=0.7) 미만이면 응답 <code>status="needs_review"</code>로 표시하고 warning에 검수 권고를 남긴다(<strong>거부 아님</strong> — 고위험 FNR 보호). 검수자 큐는 동률 시 저신뢰를 우선 정렬한다. body의 <code>tenant_id</code>는 인증 tenant에 결속되며 불일치 시 <code>403</code>.</p>
+        <p class="ep-desc">문서 텍스트를 4등급(TS/S1/S2/S3)으로 분류한다. M2 전처리 → M5 추론 순서로 실행. confidence가 임계값(<code>review_confidence_threshold</code>=0.7) 미만이면 응답 <code>status="needs_review"</code>로 표시하고 warning에 검수 권고를 남긴다(<strong>거부 아님</strong> — 고위험 FNR 보호). 검수자 큐는 동률 시 저신뢰를 우선 정렬한다.</p>
         <h4>Request Body</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
             <tr><td class="f-name">doc_id</td><td class="f-type">string (UUID)</td><td class="f-req yes">●</td><td>이미 업로드된 문서 ID</td></tr>
             <tr><td class="f-name">text</td><td class="f-type">string</td><td></td><td>직접 텍스트 전달 (doc_id 없을 때)</td></tr>
-            <tr><td class="f-name">rag_enabled</td><td class="f-type">boolean</td><td></td><td>RAG 컨텍스트 사용 여부 (기본 테넌트 설정 따름)</td></tr>
+            <tr><td class="f-name">rag_enabled</td><td class="f-type">boolean</td><td></td><td>RAG 컨텍스트 사용 여부 (기본 설정 따름)</td></tr>
             <tr><td class="f-name">model_version</td><td class="f-type">string</td><td></td><td>특정 모델 버전 강제 지정 (기본: 활성 버전)</td></tr>
             <tr><td class="f-name">metadata.source_type</td><td class="f-type">string</td><td></td><td>출처 provenance(선택). 미전달 시 doc_id의 저장 출처를 hydrate. 공개 출처면 Gate-1이 S3로 cap(비공지성).</td></tr>
           </tbody>
@@ -309,7 +303,6 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <div class="status-chips">
           <span class="sc s2xx">200 분류 완료</span>
           <span class="sc s4xx">400 텍스트/doc_id 누락</span>
-          <span class="sc s4xx">403 tenant_id 불일치</span>
           <span class="sc s4xx">404 문서 없음</span>
           <span class="sc s4xx">429 Rate Limit</span>
           <span class="sc s5xx">503 모델 워밍업 중</span>
@@ -325,7 +318,7 @@ footer{border-top:1px solid var(--border);padding:24px 32px;font-size:12px;color
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">Server-Sent Events 방식으로 분류 단계별 진행 상황을 실시간 스트림으로 반환한다. 가짜 progress가 아니라 <code>ClassifyService.classify(on_stage=...)</code> 콜백을 큐로 받아 <strong>실제 단계 진입 시점</strong>에 이벤트를 송신한다. 6단계: <code>extract → normalize → embed → retrieve → llm → persist → finalize</code>. 이벤트 종류: <code>progress</code>(stage 진입) · <code>partial</code>(top-1 grade/confidence) · <code>result</code>(최종 ClassifyResponse) · <code>error</code> · <code>done</code>(종료). 스트림 시작 전에 body의 <code>tenant_id</code>가 인증 컨텍스트에 결속되며 불일치 시 <code>403</code>. 스트림은 요청당 워커 스레드를 점유하므로 한도를 <strong>분당 30회</strong>로 명시 강화했다(기존 default 120/분 → 강화). 또한 클라이언트 disconnect를 주기적으로 폴링해 연결이 끊기면 진행 중 작업을 협조적으로 취소하고 스트림을 조기 종료한다(점유 축소).</p>
+        <p class="ep-desc">Server-Sent Events 방식으로 분류 단계별 진행 상황을 실시간 스트림으로 반환한다. 가짜 progress가 아니라 <code>ClassifyService.classify(on_stage=...)</code> 콜백을 큐로 받아 <strong>실제 단계 진입 시점</strong>에 이벤트를 송신한다. 6단계: <code>extract → normalize → embed → retrieve → llm → persist → finalize</code>. 이벤트 종류: <code>progress</code>(stage 진입) · <code>partial</code>(top-1 grade/confidence) · <code>result</code>(최종 ClassifyResponse) · <code>error</code> · <code>done</code>(종료). 스트림은 요청당 워커 스레드를 점유하므로 한도를 <strong>분당 30회</strong>로 명시 강화했다(기존 default 120/분 → 강화). 또한 클라이언트 disconnect를 주기적으로 폴링해 연결이 끊기면 진행 중 작업을 협조적으로 취소하고 스트림을 조기 종료한다(점유 축소).</p>
         <h4>Request Body</h4>
         <p style="font-size:13px;">/classify 와 동일 (<code>ClassifyRequest</code>)</p>
         <h4>Response (SSE)</h4>
@@ -351,7 +344,6 @@ data: {"elapsed_ms":380}</pre>
         <div class="status-chips">
           <span class="sc s2xx">200 스트림 시작</span>
           <span class="sc s4xx">400 Bad Request</span>
-          <span class="sc s4xx">403 tenant_id 불일치</span>
           <span class="sc s4xx">429 Rate Limit (30/분)</span>
         </div>
       </div>
@@ -365,7 +357,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">Celery 워커에 분류 작업을 위임하고 job_id를 즉시 반환한다. 단건 대용량 문서에 사용. 분당 60 한도. 작업도 인증 tenant에 결속된다.</p>
+        <p class="ep-desc">Celery 워커에 분류 작업을 위임하고 job_id를 즉시 반환한다. 단건 대용량 문서에 사용. 분당 60 한도.</p>
         <h4>Request / Response</h4>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>타입</th><th>설명</th></tr></thead>
@@ -388,7 +380,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">여러 문서를 한 번에 제출한다. 빈 배열은 <code>400</code>, 1000건 초과는 <code>413</code>으로 거부한다(M1 경계값 가드). 배치 내 각 문서의 tenant_id가 인증 컨텍스트에 결속되고, job 자체도 호출자 effective tenant에 결속된다. 분당 60 한도.</p>
+        <p class="ep-desc">여러 문서를 한 번에 제출한다. 빈 배열은 <code>400</code>, 1000건 초과는 <code>413</code>으로 거부한다(M1 경계값 가드). 분당 60 한도.</p>
         <h4>Request / Response</h4>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>타입</th><th>설명</th></tr></thead>
@@ -412,7 +404,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">/classify/async·/classify/batch로 제출한 작업의 상태 및 결과를 조회한다. <strong>job_id만으로 결과를 주지 않는다</strong> — 호출자 effective tenant가 job에 보존된 tenant와 일치할 때만 반환하고, 불일치/미검증이면 존재 노출 차단을 위해 <code>404</code>(H9 IDOR 차단).</p>
+        <p class="ep-desc">/classify/async·/classify/batch로 제출한 작업의 상태 및 결과를 <code>job_id</code>로 조회한다.</p>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
           <tbody>
@@ -424,9 +416,9 @@ data: {"elapsed_ms":380}</pre>
             <tr><td class="f-name">error</td><td class="f-type">string | null</td><td>failed 시 오류 메시지</td></tr>
           </tbody>
         </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">404 job 없음/타테넌트</span></div>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">404 job 없음</span></div>
         <h4>관련: GET /classify/{doc_id}</h4>
-        <p style="font-size:13px;"><code>GET /api/v1/classify/{doc_id}</code>는 해당 doc_id의 최근 분류 결과 1건(DB 진실 소스)을 반환한다. 인증 tenant로 스코프되어 <strong>타 tenant의 doc_id 분류 결과·등급은 열람할 수 없다</strong>(교차테넌트 시 <code>404</code>). doc_id가 UUID가 아니면 <code>422</code>.</p>
+        <p style="font-size:13px;"><code>GET /api/v1/classify/{doc_id}</code>는 해당 doc_id의 최근 분류 결과 1건(DB 진실 소스)을 반환한다. doc_id가 UUID가 아니면 <code>422</code>.</p>
       </div>
     </div>
 
@@ -441,7 +433,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">RAG 질의응답. 검색 facade(<code>expand_then_search</code>: 쿼리 확장 → RRF 융합 → reranker)로 관련 청크를 수집하고 LLM(Qwen3/Claude)으로 한국어 답변을 합성한다. 검색·LLM 어느 쪽이 실패해도 <code>200</code> + <code>warnings</code>에 사유, <code>deterministic_fallback=true</code>로 처리(5xx는 진짜 예외만). 검색은 인증 tenant로만 스코프되고, 결과를 payload.tenant_id로 사후 필터해 교차테넌트 누출을 fail-CLOSED로 차단한다. 분당 30 한도. 본 엔드포인트는 등급 분류를 하지 않으며, <code>grade</code>는 호출자가 별도 단계에서 전달할 수 있다.</p>
+        <p class="ep-desc">RAG 질의응답. 검색 facade(<code>expand_then_search</code>: 쿼리 확장 → RRF 융합 → reranker)로 관련 청크를 수집하고 LLM(Qwen3/Claude)으로 한국어 답변을 합성한다. 검색·LLM 어느 쪽이 실패해도 <code>200</code> + <code>warnings</code>에 사유, <code>deterministic_fallback=true</code>로 처리(5xx는 진짜 예외만). 분당 30 한도. 본 엔드포인트는 등급 분류를 하지 않으며, <code>grade</code>는 호출자가 별도 단계에서 전달할 수 있다.</p>
         <p style="font-size:13px;"><strong>인용 정합성 관측·집행</strong>: LLM 답변의 인용 번호를 검색된 근거(hits) 범위와 대조해, 존재하지 않는 근거 번호(out-of-range = 환각 인용)나 무인용 경고를 <code>warnings</code>에 남기고, 환각 인용 개수를 기계 판독용 마커 <code>hallucination_risk:&lt;n&gt;</code>로 노출한다. 설정 <code>answer_enforce_citations=true</code>(opt-in, <strong>기본 off=기존 동작</strong>)이면 out-of-range 인용이 1건 이상일 때 답변을 <strong>deterministic 답변으로 강등</strong>(<code>deterministic_fallback=true</code>)하고 강등 사유를 <code>warnings</code>에 기록한다.</p>
         <h4>Request Body — RagAnswerRequest</h4>
         <table class="ftbl">
@@ -452,7 +444,7 @@ data: {"elapsed_ms":380}</pre>
             <tr><td class="f-name">top_k</td><td class="f-type">integer</td><td></td><td>검색 청크 수 (1~20, 기본 5)</td></tr>
             <tr><td class="f-name">grade</td><td class="f-type">string</td><td></td><td>분류 결과 등급(TS/S1/S2/S3) — 합성 프롬프트에 전달</td></tr>
             <tr><td class="f-name">use_reranker</td><td class="f-type">boolean</td><td></td><td>reranker 사용 (기본 true)</td></tr>
-            <tr><td class="f-name">tenant_id / metadata</td><td class="f-type">string / object</td><td></td><td>tenant 결속·추가 filter (인증 컨텍스트에 결속됨)</td></tr>
+            <tr><td class="f-name">metadata</td><td class="f-type">object</td><td></td><td>추가 filter (선택)</td></tr>
           </tbody>
         </table>
         <h4>Response 200 — RagAnswerResult</h4>
@@ -479,7 +471,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">특정 분류 결과의 근거를 자연어로 설명한다. tb_classification_evidence 테이블의 excerpt와 contribution을 LLM으로 요약. factor는 정본 3요건(SECRECY·VALUE·MANAGEMENT)으로 귀속된다(레거시 4요소는 LEGACY_FACTOR_ALIAS로 3요건에 자동 폴딩). body의 <code>tenant_id</code>는 인증 컨텍스트에 결속되며 불일치 시 <code>403</code>(IDOR 차단 — 위조한 tenant_id로 타 테넌트 문서·검증라벨·근거 토큰 노출 방지).</p>
+        <p class="ep-desc">특정 분류 결과의 근거를 자연어로 설명한다. tb_classification_evidence 테이블의 excerpt와 contribution을 LLM으로 요약. factor는 정본 3요건(SECRECY·VALUE·MANAGEMENT)으로 귀속된다(레거시 4요소는 LEGACY_FACTOR_ALIAS로 3요건에 자동 폴딩).</p>
         <h4>Request / Response 핵심 필드</h4>
         <table class="ftbl">
           <thead><tr><th>방향</th><th>필드</th><th>설명</th></tr></thead>
@@ -490,7 +482,7 @@ data: {"elapsed_ms":380}</pre>
             <tr><td>RES</td><td class="f-name">confidence_analysis</td><td>confidence 높은/낮은 이유 분석</td></tr>
           </tbody>
         </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 tenant_id 불일치</span><span class="sc s4xx">404 classification 없음</span></div>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">404 classification 없음</span></div>
       </div>
     </div>
 
@@ -505,14 +497,14 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">JWT (admin · reviewer · kl_backend)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">AI 예측 등급을 검수자가 확정한다. confirmed_label이 예측과 다르면 사실상 relabel로 간주되어 tb_corrections로 기록되고 Active Learning 재학습에 사용된다. actor.tenant_id가 인증 컨텍스트에 결속되어(IDOR/BOLA 차단) 교차테넌트 분류 확정 시 <code>403</code>.</p>
+        <p class="ep-desc">AI 예측 등급을 검수자가 확정한다. confirmed_label이 예측과 다르면 사실상 relabel로 간주되어 tb_corrections로 기록되고 Active Learning 재학습에 사용된다.</p>
         <h4>Request Body — ConfirmRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
             <tr><td class="f-name">doc_id</td><td class="f-type">string</td><td class="f-req yes">●</td><td>확정 대상 문서 ID</td></tr>
             <tr><td class="f-name">confirmed_label</td><td class="f-type">string</td><td class="f-req yes">●</td><td>TS / S1 / S2 / S3</td></tr>
-            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role, tenant_id}</td></tr>
+            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
             <tr><td class="f-name">inference_id</td><td class="f-type">UUID</td><td></td><td>대상 분류 결과 ID (미지정 시 doc_id 최근 분류)</td></tr>
             <tr><td class="f-name">model_version</td><td class="f-type">string</td><td></td><td>대상 모델 버전(선택)</td></tr>
             <tr><td class="f-name">note</td><td class="f-type">string</td><td></td><td>확정 메모 (최대 1000자)</td></tr>
@@ -526,7 +518,7 @@ data: {"elapsed_ms":380}</pre>
             <tr><td class="f-name">confirmed_at</td><td>확정 시각 (ISO-8601)</td></tr>
           </tbody>
         </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 권한·tenant 불일치</span><span class="sc s4xx">404 분류 없음</span></div>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 권한 부족</span><span class="sc s4xx">404 분류 없음</span></div>
       </div>
     </div>
 
@@ -538,7 +530,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">JWT (admin · reviewer)</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">검수자가 분류 등급을 교정한다. 결과는 tb_corrections 테이블에 1건으로 적재되어 <strong>능동학습 폐곡선</strong>(tb_corrections 재빌드 → 학습셋 병합 → 재학습 → 모델 등록 → 배포게이트 → 핫리로드)의 입력이 된다. direction(underclass/overclass/lateral)은 등급 order로 자동 산출. 동일 분류·라벨·actor의 중복 relabel은 idempotent 처리. 교차테넌트 relabel은 tenant 결속으로 차단(<code>403</code>).</p>
+        <p class="ep-desc">검수자가 분류 등급을 교정한다. 결과는 tb_corrections 테이블에 1건으로 적재되어 <strong>능동학습 폐곡선</strong>(tb_corrections 재빌드 → 학습셋 병합 → 재학습 → 모델 등록 → 배포게이트 → 핫리로드)의 입력이 된다. direction(underclass/overclass/lateral)은 등급 order로 자동 산출. 동일 분류·라벨·actor의 중복 relabel은 idempotent 처리.</p>
         <h4>Request Body — RelabelRequest</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
@@ -546,7 +538,7 @@ data: {"elapsed_ms":380}</pre>
             <tr><td class="f-name">doc_id</td><td class="f-type">string</td><td class="f-req yes">●</td><td>재라벨 대상 문서 ID</td></tr>
             <tr><td class="f-name">original_label</td><td class="f-type">string</td><td class="f-req yes">●</td><td>기존(예측) 등급 TS/S1/S2/S3</td></tr>
             <tr><td class="f-name">corrected_label</td><td class="f-type">string</td><td class="f-req yes">●</td><td>교정 등급 TS/S1/S2/S3</td></tr>
-            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role, tenant_id}</td></tr>
+            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
             <tr><td class="f-name">inference_id</td><td class="f-type">UUID</td><td></td><td>대상 분류 결과 ID(선택)</td></tr>
             <tr><td class="f-name">reason</td><td class="f-type">string</td><td></td><td>교정 사유 (최대 2000자)</td></tr>
           </tbody>
@@ -560,7 +552,7 @@ data: {"elapsed_ms":380}</pre>
             <tr><td class="f-name">retrain_threshold</td><td>재학습 자동 트리거 임계 (교정 누적 기준)</td></tr>
           </tbody>
         </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 권한·tenant 불일치</span></div>
+        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 권한 부족</span></div>
       </div>
     </div>
 
@@ -606,7 +598,7 @@ data: {"elapsed_ms":380}</pre>
         <span class="ep-auth">API Key</span>
       </div>
       <div class="ep-body">
-        <p class="ep-desc">특정 guide_id의 등록된 버전 이력을 조회한다. 인증 tenant로 스코프된다(쓰기와 동일 tenant 격리).</p>
+        <p class="ep-desc">특정 guide_id의 등록된 버전 이력을 조회한다.</p>
         <h4>Response 200 — GuideVersionList</h4>
         <table class="ftbl">
           <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
@@ -634,7 +626,7 @@ data: {"elapsed_ms":380}</pre>
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
             <tr><td class="f-name">training_type</td><td class="f-type">string</td><td class="f-req yes">●</td><td>full / incremental / hyperparam_search</td></tr>
-            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role, tenant_id}</td></tr>
+            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
             <tr><td class="f-name">base_model</td><td class="f-type">string</td><td></td><td>기본 kf-deberta-base</td></tr>
             <tr><td class="f-name">dataset_version</td><td class="f-type">string</td><td></td><td>학습 데이터셋 버전(예: labeled_clean_nolegal)</td></tr>
             <tr><td class="f-name">hyperparams</td><td class="f-type">object</td><td></td><td>epochs·batch_size·learning_rate 등 자유 dict</td></tr>
@@ -780,7 +772,7 @@ data: {"elapsed_ms":380}</pre>
           <thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead>
           <tbody>
             <tr><td class="f-name">grades</td><td class="f-type">GradeDefinition[]</td><td class="f-req yes">●</td><td>[{code, name, order, description?, color?}]</td></tr>
-            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{actor_id, tenant_id, role}</td></tr>
+            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{actor_id, role}</td></tr>
           </tbody>
         </table>
         <h4>Response 200</h4>
@@ -822,35 +814,6 @@ data: {"elapsed_ms":380}</pre>
       </div>
     </div>
 
-    <div class="ep" id="ep-rotate-key">
-      <div class="ep-header">
-        <span class="method post">POST</span>
-        <span class="ep-path">/api/v1/admin/tenants/{tenant_id}/rotate-api-key</span>
-        <span class="ep-summary">테넌트 API 키 발급·교체</span>
-        <span class="ep-auth">JWT (admin role)</span>
-      </div>
-      <div class="ep-body">
-        <p class="ep-desc">새 API 키(<code>lk_</code> + 48자, 288비트)를 생성하고 bcrypt hash를 DB(<code>tenants.api_key_hash</code>)에 저장한다. raw key는 <strong>이 응답에서 한 번만 노출</strong>되며 재조회 불가.</p>
-        <h4>Path Parameter</h4>
-        <table class="ftbl">
-          <thead><tr><th>파라미터</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">tenant_id</td><td class="f-type">string</td><td>키를 교체할 테넌트 ID</td></tr>
-          </tbody>
-        </table>
-        <h4>Response 200 — RotateApiKeyResponse</h4>
-        <table class="ftbl">
-          <thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead>
-          <tbody>
-            <tr><td class="f-name">tenant_id</td><td class="f-type">string</td><td></td></tr>
-            <tr><td class="f-name">api_key</td><td class="f-type">string</td><td>raw key — 이 응답에서만 노출, 재조회 불가</td></tr>
-            <tr><td class="f-name">message</td><td class="f-type">string</td><td>안전 보관 안내 메시지</td></tr>
-          </tbody>
-        </table>
-        <div class="status-chips"><span class="sc s2xx">200 OK</span><span class="sc s4xx">403 admin 권한 필요</span><span class="sc s4xx">404 tenant 없음</span><span class="sc s5xx">503 DB 미가용</span></div>
-      </div>
-    </div>
-
     <!-- ===== 합성 ===== -->
     <div class="cat-divider"><div class="cat-line"></div><span class="cat-label">합성 · 운영</span><div class="cat-line"></div></div>
 
@@ -869,7 +832,7 @@ data: {"elapsed_ms":380}</pre>
           <tbody>
             <tr><td class="f-name">target_grade</td><td class="f-type">string</td><td class="f-req yes">●</td><td>TS / S1 / S2 / S3</td></tr>
             <tr><td class="f-name">count</td><td class="f-type">integer</td><td class="f-req yes">●</td><td>생성 건수 (1~500)</td></tr>
-            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role, tenant_id}</td></tr>
+            <tr><td class="f-name">actor</td><td class="f-type">Actor</td><td class="f-req yes">●</td><td>{user_id, role}</td></tr>
             <tr><td class="f-name">domain</td><td class="f-type">string</td><td></td><td>tech / business / hr / finance / legal / mixed (기본 mixed)</td></tr>
             <tr><td class="f-name">llm_provider</td><td class="f-type">string</td><td></td><td>anthropic / openai / google / vllm_qwen / vllm_exaone / noop (기본 anthropic)</td></tr>
             <tr><td class="f-name">seed_documents</td><td class="f-type">string[]</td><td></td><td>시드 문서 ID(선택)</td></tr>
@@ -922,7 +885,7 @@ data: {"elapsed_ms":380}</pre>
     "warmup": {"status": "complete", "ok": true}
   }
 }</pre>
-        <p style="font-size:12.5px;color:var(--text-dim);">모델 경로 설정됐지만 미로드 시 <code>status=degraded</code>, <code>lloydk_rule_fallback_total</code> 카운터 증가.</p>
+        <p style="font-size:12.5px;color:var(--text-dim);">모델 경로 설정됐지만 미로드 시 <code>status=degraded</code>, <code>koipa_rule_fallback_total</code> 카운터 증가.</p>
         <div class="status-chips"><span class="sc s2xx">200 ok/degraded</span><span class="sc s5xx">503 not_ready (readiness 전용)</span></div>
       </div>
     </div>
@@ -1003,24 +966,24 @@ data: {"elapsed_ms":380}</pre>
       <div class="ep-body">
         <p class="ep-desc">Prometheus text format으로 게이지·카운터·히스토그램을 노출한다. 자체 <code>CollectorRegistry</code> 사용 (테스트 격리). Scrape interval은 Prometheus 설정에 따름.</p>
         <pre># 비즈니스 게이지
-lloydk_drift_kl_divergence               # 학습 centroid vs 최근 prod KL divergence
-lloydk_fnr{model="..."}                  # False Negative Rate
-lloydk_recall_at5{backend,mode}          # Retrieval Recall@5
-lloydk_active_learning_pending_total     # 미소비 tb_corrections 수
+koipa_drift_kl_divergence               # 학습 centroid vs 최근 prod KL divergence
+koipa_fnr{model="..."}                  # False Negative Rate
+koipa_recall_at5{backend,mode}          # Retrieval Recall@5
+koipa_active_learning_pending_total     # 미소비 tb_corrections 수
 
 # 운영 경보 카운터
-lloydk_rule_fallback_total               # 모델 미로드 → rule-fallback 처리 횟수
-lloydk_classify_persist_failure_total{reason}  # DB 영속화 실패 (db_error 등)
-lloydk_rag_context_failure_total{stage}  # RAG context 빌드 실패 (build_rag_context|fetch_hits)
-lloydk_embedding_fallback_total{original_provider}  # 임베딩 fallback → HashEmbedding
+koipa_rule_fallback_total               # 모델 미로드 → rule-fallback 처리 횟수
+koipa_classify_persist_failure_total{reason}  # DB 영속화 실패 (db_error 등)
+koipa_rag_context_failure_total{stage}  # RAG context 빌드 실패 (build_rag_context|fetch_hits)
+koipa_embedding_fallback_total{original_provider}  # 임베딩 fallback → HashEmbedding
 
 # 성능 히스토그램
-lloydk_answer_phase_duration_seconds{phase}   # retrieve vs synthesize 단계별 latency
-lloydk_request_duration_seconds{method,route} # 전체 HTTP 요청 latency
+koipa_answer_phase_duration_seconds{phase}   # retrieve vs synthesize 단계별 latency
+koipa_request_duration_seconds{method,route} # 전체 HTTP 요청 latency
 
 # 캐시
-lloydk_embedding_cache_hit_total{layer}  # lru | redis | disk
-lloydk_embedding_cache_miss_total</pre>
+koipa_embedding_cache_hit_total{layer}  # lru | redis | disk
+koipa_embedding_cache_miss_total</pre>
         <div class="status-chips"><span class="sc s2xx">200 text/plain (Prometheus exposition format)</span></div>
       </div>
     </div>
@@ -1037,14 +1000,13 @@ lloydk_embedding_cache_miss_total</pre>
           <tr><td>401</td><td><code>AUTH_REQUIRED</code></td><td>토큰 없음</td><td>Authorization 헤더 확인</td></tr>
           <tr><td>401</td><td><code>TOKEN_EXPIRED</code></td><td>JWT 만료</td><td>토큰 갱신</td></tr>
           <tr><td>403</td><td><code>INSUFFICIENT_ROLE</code></td><td>권한 부족</td><td>admin 역할 필요</td></tr>
-          <tr><td>403</td><td><code>TENANT_MISMATCH</code></td><td>tenant_id가 인증 tenant와 불일치 (객체 수준 권한)</td><td>인증 신원과 동일 tenant_id 사용</td></tr>
           <tr><td>404</td><td><code>DOC_NOT_FOUND</code></td><td>문서 없음</td><td>doc_id 확인</td></tr>
           <tr><td>404</td><td><code>CLASSIFICATION_NOT_FOUND</code></td><td>분류 결과 없음</td><td>classification_id 확인</td></tr>
-          <tr><td>409</td><td><code>DUPLICATE_DOC</code></td><td>동일 해시 문서 존재</td><td>file_hash 중복 (테넌트 내)</td></tr>
+          <tr><td>409</td><td><code>DUPLICATE_DOC</code></td><td>동일 해시 문서 존재</td><td>file_hash 중복</td></tr>
           <tr><td>413</td><td><code>FILE_TOO_LARGE</code></td><td>파일 크기 초과 (멀티파트 업로드)</td><td>20MB 이하 업로드 (max_upload_mb)</td></tr>
-          <tr><td>413</td><td><code>LLOYDK_BODY_TOO_LARGE</code></td><td>요청 본문 크기 초과 (일반 JSON, 전역 ASGI 가드)</td><td>본문 25MB 이하로 (max_request_body_mb)</td></tr>
+          <tr><td>413</td><td><code>KOIPA_BODY_TOO_LARGE</code></td><td>요청 본문 크기 초과 (일반 JSON, 전역 ASGI 가드)</td><td>본문 25MB 이하로 (max_request_body_mb)</td></tr>
           <tr><td>422</td><td><code>VALIDATION_ERROR</code></td><td>Pydantic 검증 실패</td><td>detail 배열에서 필드별 오류 확인</td></tr>
-          <tr><td>429</td><td><code>LLOYDK_RATE_LIMIT</code></td><td>요청 한도 초과</td><td>라우터별 한도(기본 120/분, /train 10/시간 등). Retry-After 헤더 이후 재시도</td></tr>
+          <tr><td>429</td><td><code>KOIPA_RATE_LIMIT</code></td><td>요청 한도 초과</td><td>라우터별 한도(기본 120/분, /train 10/시간 등). Retry-After 헤더 이후 재시도</td></tr>
           <tr><td>503</td><td><code>MODEL_WARMING_UP</code></td><td>모델 로딩 중</td><td>warmup_done=true 확인 후 재시도 (최대 82초)</td></tr>
           <tr><td>503</td><td><code>LLM_UNAVAILABLE</code></td><td>LLM 비응답</td><td>Ollama 프로세스·API 키 상태 확인</td></tr>
           <tr><td>503</td><td><code>ES_UNAVAILABLE</code></td><td>Elasticsearch 비응답</td><td>9200 포트 · 클러스터 상태 확인</td></tr>
@@ -1052,14 +1014,14 @@ lloydk_embedding_cache_miss_total</pre>
       </table>
     </div>
 
-    <p style="margin-top:32px;font-size:13px;color:var(--text-dim);">한국어 오류 메시지는 <code>poc/src/lloydk/api/static/errors_ko.js</code> (50항목) 참고. 응답 바디 예시: <code>{"error_code":"DOC_NOT_FOUND","message":"문서를 찾을 수 없습니다.","detail":null}</code></p>
+    <p style="margin-top:32px;font-size:13px;color:var(--text-dim);">한국어 오류 메시지는 <code>poc/src/koipa/api/static/errors_ko.js</code> (50항목) 참고. 응답 바디 예시: <code>{"error_code":"DOC_NOT_FOUND","message":"문서를 찾을 수 없습니다.","detail":null}</code></p>
 
   </article>
 </div>
 
 <footer>
   <span>부록 B — API 명세 · KOIPA AI 기술 구현 백서 v5.0 · 2026-06-20 갱신</span>
-  <span>FastAPI · 31개 라우트 · OpenAPI 3.0 · 등급 = S×V×M 곱셈 · 능동학습 폐곡선</span>
+  <span>FastAPI · 30개 라우트 · OpenAPI 3.0 · 등급 = S×V×M 곱셈 · 능동학습 폐곡선</span>
 </footer>
 
 <script>

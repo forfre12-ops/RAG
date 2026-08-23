@@ -22,10 +22,10 @@ import json
 import sys
 import time
 
-from lloydk.adapters.embedding import build_embedder
-from lloydk.adapters.vectorstore import build_store
-from lloydk.config import settings
-from lloydk.modules.m2_preprocess import split as chunk_split
+from koipa.adapters.embedding import build_embedder
+from koipa.adapters.vectorstore import build_store
+from koipa.config import settings
+from koipa.modules.m2_preprocess import split as chunk_split
 
 
 def _load_docs(dataset_dir: str, limit: int) -> list[dict]:

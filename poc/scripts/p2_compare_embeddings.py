@@ -5,6 +5,10 @@ doc/13_벡터DB_ES_전환_계획서.md §9.2 측정 절차.
 지원 백엔드 (--backends 옵션, 콤마 구분):
   - inmemory : dense-only, dryrun 기본
   - es       : Elasticsearch (dense kNN / 하이브리드 RRF)
+  - pg       : PostgreSQL + pgvector (dense / 하이브리드 RRF)  <- **현행 배포본**
+
+⚠ 배포본은 `vector_backend=pg` 다. ES 로 잰 수치는 우리가 출하하지 않는 구성의 것이다.
+  릴리스 게이트에 넣을 P2 수치는 pg 로 재야 한다.
 
 검색 모드 (--mode 옵션):
   - dryrun       : HashEmbedding + InMemoryStore (모델·서버 불필요)
@@ -33,7 +37,7 @@ if str(_SRC) not in sys.path:
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from lloydk.config import settings
+from koipa.config import settings
 
 
 # ─────────────────────────────────────────────────────────────
@@ -131,7 +135,7 @@ def make_queries(
             "python scripts/p2_oss_corpus_builder.py 먼저 실행"
         )
 
-    from lloydk.modules.m3_labeling.seeds import KEYWORD_SEEDS
+    from koipa.modules.m3_labeling.seeds import KEYWORD_SEEDS
 
     grade_kws: dict[str, list[str]] = {"TS": [], "S1": [], "S2": [], "S3": []}
     for s in KEYWORD_SEEDS:
@@ -165,8 +169,8 @@ def evaluate(
     reranker_provider: None이면 reranker 미적용. "noop"/"bge"/"qwen3" 지정 시
         1차 dense에서 top_k*oversample_factor만큼 가져온 뒤 cross-encoder로 재정렬.
     """
-    from lloydk.adapters.embedding import build_embedder
-    from lloydk.adapters.vectorstore import build_store
+    from koipa.adapters.embedding import build_embedder, embedder_digest
+    from koipa.adapters.vectorstore import build_store
 
     emb = build_embedder(embedder_name, force_hash=(embedder_name == "hash"))
 
@@ -176,10 +180,22 @@ def evaluate(
     rr_label = f" + rr={reranker_provider}" if reranker_provider else ""
     label = f"{display_name} / {backend} / {search_mode}{rr_label}"
 
+    # [embedder digest] 실 모델을 요청했는데 HashEmbedding 이 돌아왔는지를 **결과에 박는다.**
+    # 실서빙은 require_real_embedder 가 기동을 거부하지만(api/app.py) 이 평가 스크립트 경로에는
+    # 무음 폴백이 남아 있다. 그 자체를 막을 이유는 없다(오프라인 드라이런은 정당한 작업) —
+    # 문제는 그렇게 나온 recall 수치가 나중에 실 임베더 수치와 구분되지 않는 것이다.
+    digest = embedder_digest(emb, requested=embedder_name)
+    if digest["degraded"]:
+        print(
+            f"[p2] WARNING {label}: 실 임베더 {embedder_name!r} 를 요청했으나 hash 로 열화됐다 — "
+            "이 행의 recall 은 검색품질 근거로 인용하지 말 것(embedder_digest.degraded=true).",
+            file=sys.stderr,
+        )
+
     # reranker lazy 빌드 — 첫 쿼리에서 모델 다운로드/로드 비용 발생
     reranker = None
     if reranker_provider:
-        from lloydk.adapters.reranker import get_reranker
+        from koipa.adapters.reranker import get_reranker
         reranker = get_reranker(reranker_provider)
     try:
         vs = build_store(backend=backend)
@@ -194,6 +210,7 @@ def evaluate(
             "search_mode": search_mode,
             "label": label,
             "dim": emb.dim,
+            "embedder_digest": digest,
             "status": "SKIP",
             "skip_reason": f"{type(exc).__name__}: {exc}",
             "recall_at_k": 0.0,
@@ -229,7 +246,7 @@ def evaluate(
             print(f"[p2] SKIP {label}: upsert failed — {exc}", file=sys.stderr)
             return {
                 "embedder": display_name, "backend": backend, "search_mode": search_mode,
-                "label": label, "dim": emb.dim, "status": "SKIP",
+                "label": label, "dim": emb.dim, "embedder_digest": digest, "status": "SKIP",
                 "skip_reason": f"upsert: {exc}",
                 "recall_at_k": 0.0, "latency_ms_p50": 0.0, "latency_ms_p95": 0.0,
                 "latency_ms_avg": 0.0, "embed_corpus_ms": 0.0,
@@ -344,6 +361,7 @@ def evaluate(
         "label": label,
         "status": "OK",
         "dim": emb.dim,
+        "embedder_digest": digest,
         "corpus_size": len(docs),
         "query_count": len(queries),
         "top_k": top_k,
@@ -363,7 +381,7 @@ def evaluate(
 
 def write_report(rows: list[dict], out: Path, *, best_config_mode: bool = True) -> str:
     """4-way 비교 리포트. baseline 행과 △ 컬럼 포함. SKIP 행은 따로 표시."""
-    from lloydk.modules.m6_evaluation.retrieval_metrics import (
+    from koipa.modules.m6_evaluation.retrieval_metrics import (
         compute_retrieval_metrics_from_arrays,
     )
 
@@ -509,6 +527,7 @@ def _resolve_combinations(
     backends: list[str],
     hybrid: bool,
     models_override: list[str] | None = None,
+    search_modes: tuple[str, ...] = ("dense", "hybrid"),
 ) -> list[tuple[str, str, str]]:
     """(embedder_name, backend, search_mode) 조합 목록 산출.
 
@@ -529,10 +548,20 @@ def _resolve_combinations(
     combos: list[tuple[str, str, str]] = []
     for emb in embedders:
         for backend in backends:
-            combos.append((emb, backend, "dense"))
-            # hybrid는 ES에서만 의미있음 — 다른 백엔드는 vec-only 폴리필이라 dense와 동일
-            # doc/13 §5.2·§9.1 한계 명시
-            if hybrid and backend == "es":
+            # [2026-08-16] `--search-modes` 로 조합을 좁힐 수 있다. 조합마다 코퍼스를 **다시
+            # 임베딩**하므로(아래 배치 루프) CPU 환경에서는 이것이 지배적 비용이다.
+            # 실측: KURE-v1 · 14,755 청크 · CPU 400% 에서 21.6건/분 = 조합당 약 11시간.
+            # 배포본이 쓰는 것은 hybrid 하나이므로(healthz search_mode=hybrid) 그것만 재면
+            # 시간이 절반이 된다.
+            if "dense" in search_modes:
+                combos.append((emb, backend, "dense"))
+            # [2026-08-16] hybrid 는 ES 뿐 아니라 **pg 에서도 실제 융합**이다.
+            # pg_store.search_hybrid 가 dense(pgvector) + 어휘(ts_rank_cd) 후보를 SQL 안에서
+            # RRF 로 융합한다 - vec-only 폴리필이 아니다. 종전 주석이 낡아 pg 가 hybrid 조합에서
+            # 빠져 있었고, 그 결과 **릴리스 게이트의 P2 수치가 우리가 쓰지 않는 ES 구성으로**
+            # 남아 있었다(배포본 vector_backend=pg · P2 리포트 backend=es · 2026-06-02 생성).
+            if (hybrid and "hybrid" in search_modes
+                    and backend in ("es", "pg", "pgvector", "postgres")):
                 combos.append((emb, backend, "hybrid"))
     return combos
 
@@ -543,12 +572,13 @@ def main() -> int:
     ap.add_argument(
         "--backends",
         default="inmemory",
-        help="콤마 구분 백엔드 목록 (es,inmemory). dryrun은 기본 inmemory.",
+        help="콤마 구분 백엔드 목록 (pg,es,inmemory). dryrun은 기본 inmemory. "
+             "릴리스 게이트용은 pg(현행 배포본).",
     )
     ap.add_argument(
         "--hybrid",
         action="store_true",
-        help="ES 백엔드에서 dense·hybrid 두 모드 모두 측정",
+        help="es·pg 백엔드에서 dense·hybrid 두 모드 모두 측정",
     )
     ap.add_argument("--synth-dir", default="datasets/synthetic")
     ap.add_argument("--chunk-size", type=int, default=settings.rag_index_chunk_size,
@@ -596,6 +626,9 @@ def main() -> int:
             "예: datasets/gold_real/retrieval_gold.jsonl, datasets/oss_eval_queries.json"
         ),
     )
+    ap.add_argument("--search-modes", default="dense,hybrid",
+                    help="측정할 검색 모드(콤마). 조합마다 코퍼스를 다시 임베딩하므로 "
+                         "CPU 환경에서는 배포본이 쓰는 것만 고르는 편이 낫다(기본 dense,hybrid).")
     ap.add_argument("--report", default="reports/p2_embedding_report.md")
     ap.add_argument(
         "--strict-all",
@@ -671,7 +704,9 @@ def main() -> int:
     models_override = None
     if args.models:
         models_override = [m.strip() for m in args.models.split(",") if m.strip()]
-    combos = _resolve_combinations(args.mode, backends, args.hybrid, models_override)
+    _modes = tuple(x.strip() for x in args.search_modes.split(",") if x.strip())
+    combos = _resolve_combinations(args.mode, backends, args.hybrid, models_override,
+                                   search_modes=_modes)
 
     print(f"[p2] mode={args.mode}, combos={len(combos)}, backends={backends}, hybrid={args.hybrid}")
     if models_override:

@@ -16,8 +16,8 @@ import pytest
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.db import Base, SessionLocal, engine, session_scope
-from lloydk.db.models import (
+from koipa.db import Base, SessionLocal, engine, session_scope
+from koipa.db.models import (
     AuditLog,
     Classification,
     ClassificationEvidence,

@@ -24,10 +24,10 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
-from lloydk.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
-from lloydk.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
-from lloydk.modules.m3_labeling.seeds import to_canonical_factor  # noqa: E402
+from koipa.modules.m3_labeling.llm_labeler import LLMLabeler  # noqa: E402
+from koipa.modules.m3_labeling.pipeline import LabelingPipeline  # noqa: E402
+from koipa.modules.m3_labeling.rule_engine import grade_from_svm  # noqa: E402
+from koipa.modules.m3_labeling.seeds import to_canonical_factor  # noqa: E402
 
 GRADE_NAME = {"TS": "특급기밀", "S1": "1급비밀", "S2": "2급대외비", "S3": "3급공개"}
 FACTOR_KO = {"SECRECY": "비공지성(S)", "VALUE": "경제유용성(V)", "MANAGEMENT": "비밀관리성(M)"}
@@ -81,7 +81,7 @@ for i, r in enumerate(rows):
 
     md.append(f"\n## {r['doc_id']} · {GRADE_NAME[target]}({target}) · {r['domain']}")
     md.append(f"**제목**: {r['title']}  (본문 {len(body)}자)")
-    md.append(f"\n**등급 근거 (독립 판독 S×V×M)**:")
+    md.append("\n**등급 근거 (독립 판독 S×V×M)**:")
     md.append(f"- 비공지성 S={s} · 경제유용성 V={v} · 비밀관리성 M={m}")
     md.append(f"- → {s}×{v}×{m} = **{prod} → {derived}({GRADE_NAME.get(derived,derived)})**"
               + ("  ✓ 곱↔등급 정합" if consistent else f"  (LLM최종={lr.grade})"))
@@ -90,7 +90,7 @@ for i, r in enumerate(rows):
     if anyk:
         md.append("**룰 매치 키워드(보조)**: " + " / ".join(
             f"{FACTOR_KO[f]}: {', '.join(ks)}" for f, ks in kws.items() if ks))
-    md.append(f"**가이드 조항**: 정본 가이드 §등급=S×V×M (p.11 요소기준 · p.12 산정표)")
+    md.append("**가이드 조항**: 정본 가이드 §등급=S×V×M (p.11 요소기준 · p.12 산정표)")
     md.append(f"**목표={target} / 룰={rule_g} / LLM판독={derived} → {status}**")
     out_rows.append({**r, "llm_s": s, "llm_v": v, "llm_m": m, "llm_prod": prod, "llm_derived": derived,
                      "review_status": "auto" if status.startswith("✅") else "review"})

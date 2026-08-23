@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>오픈소스 라이선스 · 다중배포 검토서 — AI 파트</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5;--warn:#7a1f1f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:940px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--mid);border:1px solid var(--line);padding:1px 5px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13.5px}
+.warn{border-left-color:var(--warn)}
+ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+a{color:#0a0a0a}
+.tag{font-size:10.5px;font-weight:700;font-family:ui-monospace,monospace;padding:1px 6px;white-space:nowrap}
+.perm{background:#0a0a0a;color:#fff}
+.copyleft{background:#fff;color:#7a1f1f;border:1px solid #7a1f1f}
+
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:940px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#0a0a0a;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">오픈소스 라이선스 · 다중배포 검토</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">OSS</span></div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">KL 감리 대응 · 요청 6 (확인)</div>
+    <h1>오픈소스 라이선스 · 다중배포 검토서</h1>
+    <div class="meta">다수 기업(폐쇄망) 배포 관점 · 2026-08-02 · 권위 목록은 SBOM(CycloneDX) 산출</div>
+  </div>
+
+  <div class="note"><b>결론 — 다중배포 라이선스 리스크 없음.</b> 배포 스택은 <b>permissive 중심</b>이며(배포 이미지 실측 199개 중 <b>189개 permissive</b>), 약한 copyleft는 <b>LGPL 2건</b>(DB 드라이버 <code>psycopg</code>·문자셋 판별 <code>chardet</code>)과 <b>MPL-2.0 소수</b>(certifi·tqdm·fqdn)뿐입니다. 모두 <b>미수정·동적 링크 사용</b>이라 <b>재배포는 자유</b>이고 라이선스 고지만 하면 됩니다. 강한 copyleft(AGPL·GPL·SSPL) 구성요소는 <b>배포 이미지에 설치되지 않습니다</b>(§2 · 이미지 내 <code>poppler</code>·<code>tesseract</code> 바이너리 부재 실측 확인).</div>
+  <div class="note" style="border-left-color:#3f3f46"><b>산출 근거.</b> 위 수치는 <b>실제 배포 이미지(<code>koipa-api</code>) 안에서 <code>scripts/dump_licenses.py</code>를 돌려</b> 얻은 것이며, 그 결과물(<code>third-party-licenses.txt</code> · <code>sbom.cyclonedx.json</code>, CycloneDX)이 <b>폐쇄망 번들 <code>licenses/</code>에 동봉</b>됩니다. 문서와 번들이 같은 산출물을 가리킵니다.</div>
+
+  <h2>1. 배포 구성요소 라이선스 (permissive 중심 · LGPL 2건)</h2>
+  <table>
+    <thead><tr><th>구성요소</th><th style="width:130px">라이선스</th><th style="width:70px">유형</th></tr></thead>
+    <tbody>
+      <tr><td>PostgreSQL + pgvector</td><td>PostgreSQL License</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>psycopg 3 · psycopg-binary (PostgreSQL 드라이버) — 재배포 자유·고지만 필요</td><td>LGPL-3.0</td><td><span class="tag copyleft">LGPL</span></td></tr>
+      <tr><td>chardet (문자셋 판별 — 문서 인코딩 추정) — 미수정·동적 링크, 재배포 자유·고지만 필요</td><td>LGPL-2.1+</td><td><span class="tag copyleft">LGPL</span></td></tr>
+      <tr><td>Redis 7.2 · nginx</td><td>BSD-3 · BSD-2</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>FastAPI · SQLAlchemy · openpyxl · python-pptx · PyJWT · pdfminer.six</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>Uvicorn · Celery · xlrd · torch</td><td>BSD-3</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>transformers · MLflow<span style="color:#71717a"> (지재원 학습서버 전용·고객사 운영 번들 미포함)</span> · bcrypt · cryptography · prometheus · OpenTelemetry</td><td>Apache-2.0</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>HWP/HWPX 파서: rhwp-python(본문) · unhwp(.hwp 표 셀)</td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>모델(동봉): KF-DeBERTa <span style="color:#71717a">(분류 기반)</span> · KURE-v1 <span style="color:#71717a">(임베딩)</span></td><td>MIT</td><td><span class="tag perm">permissive</span></td></tr>
+      <tr><td>모델(고객사 기동, 번들 미동봉): Qwen3-14B <span style="color:#71717a">— GPU 보유 시 부가기능용</span></td><td>Apache-2.0</td><td><span class="tag perm">permissive</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. 배포 범위 고정 — 카피레프트 반출 경로 없음</h2>
+  <div class="note">배포 이미지가 설치하는 extras는 <code>[psh, otel, jwt, hwp, hwp-tables, xls]</code>로 고정돼 있습니다(<code>Dockerfile.api.prod</code>). 이 범위 밖의 선택 구성 — <b>PyMuPDF</b>(AGPL-3.0) · <b>MinIO 서버</b>(AGPL-3.0) · <b>poppler-utils</b>(GPL-2/3, OCR용) — 과 레거시 <b>Elasticsearch</b>(SSPL) 어댑터는 <b>소스에 옵션으로만 존재하고 배포본에 설치되지 않아</b> AGPL·GPL·SSPL 반출 경로가 없습니다. 배포되는 copyleft는 <b>LGPL 2건</b>(psycopg·chardet)과 MPL-2.0 소수뿐이며, 모두 동적 링크·미수정 사용이라 다중배포에 지장 없습니다. <b>권위 목록은 번들 <code>licenses/sbom.cyclonedx.json</code>(배포 이미지에서 직접 산출)</b>입니다.</div>
+
+  <h2>3. 상용 LLM · 외부 API</h2>
+  <ul>
+    <li>등급 결정 핫패스는 <b>LLM-free</b> — 분류기 + 룰 엔진만 사용하므로 운영 서버에 LLM이 없어도 등급 분류가 동작한다.</li>
+    <li>로컬 LLM(Qwen3-14B, Apache-2.0)은 합성문서 생성·서술형 질의응답 등 <b>부가 기능 전용</b>이며 <b>본 번들에 가중치를 동봉하지 않는다</b>. GPU 보유 고객사가 vLLM/Ollama로 기동한 <b>망 내 엔드포인트</b>를 설정으로 연결하는 방식이라 외부 전송이 없다.</li>
+    <li>원격 상용 API(anthropic·openai)는 <b>클라우드 티어 옵션</b>이며 폐쇄망 기본 구성에 미포함. 상용 LLM 활용은 <b>공개출처 문서에 한정</b>.</li>
+  </ul>
+
+  <h2>4. 산출물 · 실측 검증</h2>
+  <ul>
+    <li>의존성 라이선스 표: <code>scripts/dump_licenses.py</code> (pip-licenses)</li>
+    <li>SBOM(CycloneDX): <code>cyclonedx-bom</code> — <b>권위 확정본은 배포 이미지(Dockerfile.api.prod) 내에서 생성·첨부</b>(운영 전환 시)</li>
+    <li><b>실측 전수(2026-08-02, 배포 이미지 내 산출 · 199개)</b>: permissive <b>189</b> · 약한 copyleft <b>5</b>(psycopg·psycopg-binary LGPL-3.0, chardet LGPL-2.1+, certifi·fqdn·tqdm MPL-2.0) · 분류 미상 <b>5</b>(자사 패키지 2건 포함). <b>AGPL·GPL·SSPL 0건.</b></li>
+    <li><b>스팟체크(Trove classifier 기준)</b>: psycopg=<b>LGPL-3.0</b> · torch=<b>BSD-3</b> · transformers/mlflow(지재원 학습서버 전용·고객사 미포함)/bcrypt=Apache-2.0 · SQLAlchemy/openpyxl/python-docx/python-pptx/redis=MIT · xlrd=BSD · PyMuPDF(AGPL)은 <b>배포 미포함 확인</b>. 그 외 <b>MPL-2.0 소수</b>(certifi·tqdm·pathspec 등)는 파일단위 약카피레프트·미수정 사용이라 <b>재배포 자유</b>(배포 포함 무방).</li>
+  </ul>
+
+  <div class="foot">한국지식재산보호원(AI 코어) · 오픈소스 라이선스·다중배포 검토서 · 2026-08-02 · 라이선스 값은 번들 동결 기준, 운영 전환 시 SBOM으로 재확정</div>
+</div>
+</body>
+</html>

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lloydk.modules.m2_preprocess.extractor import ExtractResult, extract
+from koipa.modules.m2_preprocess.extractor import ExtractResult, extract
 
 pytestmark = pytest.mark.slow
 
@@ -73,32 +73,63 @@ class TestHwpCodePath:
         assert result.quality == 0.0
         assert result.error and "표" in result.error
 
-    def test_hwp_prefers_pyhwp_when_richer(self, tmp_path):
-        """pyhwp([hwp-tables])가 표 셀까지 더 많이 뽑으면 extract()가 그 결과를 채택.
+    def test_hwp_merges_unhwp_tables_without_replacing_body(self, tmp_path):
+        """unhwp([hwp-tables])가 회수한 표를 rhwp 본문에 '합집합'으로 덧붙인다.
 
-        rhwp는 표 셀을 흘리므로(실측 noori.hwp 29/31 누락), pyhwp가 표 텍스트를
-        회수해 더 길면 method=pyhwp로 채택한다.
+        교체가 아니다 — unhwp 는 rhwp 의 상위집합이 아니므로 본문을 갈아끼우면
+        회귀한다(실측: acc-S1-03.hwpx 에서 unhwp 가 표를 통째로 누락). method 는
+        rhwp 그대로 유지되고 표 내용만 더해진다.
         """
-        import lloydk.modules.m2_preprocess.extractor as ex
+        import koipa.modules.m2_preprocess.extractor as ex
 
         p = tmp_path / "withtable.hwp"
         p.write_bytes(b"\xd0\xcf\x11\xe0" + b"\x00" * 512)
 
         mock_doc = MagicMock()
         mock_doc.extract_text.return_value = "본문 단락만"  # rhwp: 표 누락
-        pyhwp_text = "본문 단락만\n담당부서 | 거대공공연구정책과\n담당과장 | 장인숙"
+        table_text = "담당부서 | 거대공공연구정책과\n담당과장 | 장인숙"
 
         with patch.dict(sys.modules, {"rhwp": MagicMock(parse=MagicMock(return_value=mock_doc))}), \
-                patch.object(ex, "_hwp_text_via_pyhwp", return_value=pyhwp_text):
+                patch.object(ex, "_hwp_table_coverage", return_value="incomplete"), \
+                patch.object(ex, "_hwp_tables_via_unhwp", return_value=(table_text, [])):
             result = extract(p)
 
-        assert result.method == "pyhwp"
-        assert result.quality == 0.9
-        assert "담당부서" in result.text  # 표 셀 회수됨
+        assert result.method == "rhwp"        # 본문 대체 아님
+        assert result.quality == 0.95
+        assert "본문 단락만" in result.text     # 본문 보존
+        assert "담당부서" in result.text        # 표 셀 회수됨
+        assert result.table_coverage == "incomplete"   # 검수 라우팅 유지
 
-    def test_hwp_keeps_rhwp_when_pyhwp_absent(self, tmp_path):
-        """pyhwp 미설치([hwp-tables] 없음)면 rhwp 본문 결과를 그대로 사용."""
-        import lloydk.modules.m2_preprocess.extractor as ex
+    def test_hwp_skips_unhwp_when_coverage_ok(self, tmp_path):
+        """표 누락 의심이 없으면(coverage=None) 보강을 시도하지 않는다.
+
+        무조건 보강하면 표가 온전한 문서에까지 다른 파서의 출력이 섞여 분포가 흔들린다.
+        트리거는 어디까지나 '표 누락 의심'이다.
+        """
+        import koipa.modules.m2_preprocess.extractor as ex
+
+        p = tmp_path / "clean.hwp"
+        p.write_bytes(b"\xd0\xcf\x11\xe0" + b"\x00" * 512)
+
+        mock_doc = MagicMock()
+        mock_doc.extract_text.return_value = "본문 영업비밀 내용"
+        called = []
+
+        def _should_not_run(_p):
+            called.append(_p)
+            return ("표 텍스트", [])
+
+        with patch.dict(sys.modules, {"rhwp": MagicMock(parse=MagicMock(return_value=mock_doc))}), \
+                patch.object(ex, "_hwp_table_coverage", return_value=None), \
+                patch.object(ex, "_hwp_tables_via_unhwp", side_effect=_should_not_run):
+            result = extract(p)
+
+        assert not called
+        assert result.text == "본문 영업비밀 내용"
+
+    def test_hwp_keeps_rhwp_when_unhwp_absent(self, tmp_path):
+        """unhwp 미설치([hwp-tables] 없음)면 rhwp 본문 결과를 그대로 사용."""
+        import koipa.modules.m2_preprocess.extractor as ex
 
         p = tmp_path / "bodyonly.hwp"
         p.write_bytes(b"\xd0\xcf\x11\xe0" + b"\x00" * 512)
@@ -107,7 +138,8 @@ class TestHwpCodePath:
         mock_doc.extract_text.return_value = "본문 영업비밀 내용"
 
         with patch.dict(sys.modules, {"rhwp": MagicMock(parse=MagicMock(return_value=mock_doc))}), \
-                patch.object(ex, "_hwp_text_via_pyhwp", return_value=None):
+                patch.object(ex, "_hwp_table_coverage", return_value="incomplete"), \
+                patch.object(ex, "_hwp_tables_via_unhwp", return_value=(None, [])):
             result = extract(p)
 
         assert result.method == "rhwp"
@@ -130,8 +162,8 @@ class TestHwpCodePath:
 
     def test_hwp_ingestion_pipeline(self, tmp_path):
         """ingestion 서비스가 HWP를 받으면 rhwp를 타는지 end-to-end."""
-        from lloydk.adapters.storage import LocalStorage
-        from lloydk.services.document_ingestion_service import DocumentIngestionService
+        from koipa.adapters.storage import LocalStorage
+        from koipa.services.document_ingestion_service import DocumentIngestionService
 
         storage = LocalStorage(root=str(tmp_path / "store"))
         svc = DocumentIngestionService(storage=storage)
@@ -175,8 +207,8 @@ class TestHwpRealFixture:
         assert result.quality > 0
 
         # ingestion 전 구간
-        from lloydk.adapters.storage import LocalStorage
-        from lloydk.services.document_ingestion_service import DocumentIngestionService
+        from koipa.adapters.storage import LocalStorage
+        from koipa.services.document_ingestion_service import DocumentIngestionService
 
         storage = LocalStorage(root=str(tmp_path / "store"))
         svc = DocumentIngestionService(storage=storage)

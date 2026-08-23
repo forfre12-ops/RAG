@@ -1,0 +1,253 @@
+"""Golden builder 도메인 스키마 (/golden/*) — G3b."""
+
+from __future__ import annotations
+
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field, model_validator
+
+from .common import Actor
+
+
+class GoldenBuildRequest(BaseModel):
+    source_type: str = Field(default="inline", pattern=r"^(inline|corpus)$")
+    docs: list[dict] = Field(default_factory=list)          # source_type=inline
+    corpus_dir: Optional[str] = None                         # source_type=corpus (jsonl 파일 또는 *.json 디렉토리)
+    n: int = Field(default=200, ge=1, le=5000)
+    llm_provider: str = Field(
+        default="noop",
+        pattern=r"^(anthropic|openai|google|gemini|vllm_qwen|vllm_exaone|local_openai|noop)$",
+    )
+    sensitive: bool = Field(default=False)  # True=실고객 비밀 → airgap(Qwen), 공개 클라우드 금지
+    min_rule_conf: float = Field(default=0.5, ge=0.0, le=1.0)        # 레거시(게이트 미사용)
+    min_llm_conf: float = Field(default=0.7, ge=0.0, le=1.0)         # 레거시(게이트 미사용)
+    min_self_consistency: float = Field(default=0.67, ge=0.0, le=1.0)
+    # False=합성 빌드 모드 — 룰 시드 근거(has_real_evidence) 미요구, rule==llm 합의+self-consistency만으로
+    # admission(leakage-free 합성이 no_evidence로 무더기 탈락하던 문제 완화·레버3). 운영 기본=True.
+    require_evidence: bool = Field(default=True)
+    holdout_path: Optional[str] = None                       # 누출 차단용 홀드아웃 jsonl
+    # run-스코프 후보 출력 위치. 정본(datasets/gold_real/classification_gold.jsonl)과 산출물이
+    # 섞이지 않게 builds/ 하위로 분리(run-스코프 파일명이라 덮어쓰진 않으나 위생). 승격은
+    # scripts/promote_golden_candidates.py 로 명시적 게이트 통과 후 정본에 병합.
+    out_dir: str = Field(default="datasets/gold_real/builds")
+    actor: Actor
+
+
+class GoldenBuildResponse(BaseModel):
+    golden_job_id: UUID
+    status_url: str
+    # [#14a] 서명 URL(HMAC 토큰 ?t=) — 비밀키 설정 시 채워지며, 브라우저로 바로 열 수 있는
+    # 검수/서명 HTML 링크. 미설정(dev/test)이면 토큰 없는 평문 경로.
+    review_url: Optional[str] = None
+    signoff_url: Optional[str] = None
+
+
+class GoldenRegisterRequest(BaseModel):
+    """이미 만들어진 build_*.jsonl(gold 후보)을 재라벨링 없이 골든 잡으로 등록.
+
+    /golden/build 는 LLM 재라벨링을 하므로 큐레이트된 슬레이트(예: 실서명 스프린트 34건)의
+    라벨이 바뀐다. 이 경로는 기존 build 파일을 그대로 잡으로 올려 signoff.html 이 그 후보를
+    가리키게 한다(검수자 화면 서명 대상 연결). 경로는 datasets/ 하위로 샌드박스된다.
+    """
+    build_path: str
+    actor: Actor
+
+
+class GoldenBuildStatus(BaseModel):
+    status: str                                  # queued | running | done | failed
+    stats: Optional[dict] = None
+    gold_count: Optional[int] = None
+    uncertain_count: Optional[int] = None
+    gold_path: Optional[str] = None
+    uncertain_path: Optional[str] = None
+    error: Optional[str] = None
+    # [#14a] 서명 URL(HMAC ?t=) — 콘솔이 이 값으로 review/signoff HTML 을 연다(인증 경로에서
+    # 발급). 비밀키 미설정이면 토큰 없는 평문 경로.
+    review_url: Optional[str] = None
+    signoff_url: Optional[str] = None
+
+
+# ── 골든셋 검수 서명(locked_gold_eval 승격) — POST /golden/jobs/{id}/signoff ──────
+# 지재원 관리자가 빌드 잡의 후보를 화면에서 승인/등급변경/거부하면 그 결정이 golden_signoff.
+# promote_to_locked 로 흘러 사람서명(label_source=human_review) 평가정답을 만든다. 운영 교정
+# 루프(/confirm)와 별개인 '골든셋 검수' 경로 — golden_signoff.py 계약 그대로.
+class GoldenSignoffDecision(BaseModel):
+    doc_id: str
+    # approve=제안등급 유지 / change=grade 로 변경 / reject=서명 안 함(승격 제외).
+    decision: str = Field(pattern=r"^(approve|change|reject)$")
+    grade: Optional[str] = Field(default=None, pattern=r"^(TS|S1|S2|S3)$")  # change 시 필수
+    note: str = ""
+    # [2026-08-22 최소구현] 이 문서를 평가정답(locked_eval)으로 쓸지 학습후보(train)로 쓸지 검수자
+    # 표시. 기본 locked_eval = 기존 동작 그대로(모든 유효서명은 여전히 tier=locked_gold_eval).
+    # train을 실제 학습 tier로 편입하는 로직은 아직 없음 — 표시를 기록만 해 두는 단계.
+    intended_use: str = Field(default="locked_eval", pattern=r"^(locked_eval|train)$")
+
+    @model_validator(mode="after")
+    def _grade_required_for_change(self) -> "GoldenSignoffDecision":
+        # change 인데 grade 미지정이면 서비스가 조용히 no_signoff 로 흘리는 대신 여기서 422 로 거부
+        # (검수자 실수를 즉시 피드백 — golden_build_service 의 방어적 skip 은 벨트-서스펜더로 유지).
+        if self.decision == "change" and not self.grade:
+            raise ValueError("decision=change 인데 grade 미지정")
+        return self
+
+
+class GoldenSignoffRequest(BaseModel):
+    decisions: list[GoldenSignoffDecision] = Field(default_factory=list)
+    actor: Actor
+    # True 면 승격 locked 를 운영 readiness 읽기경로(settings.locked_eval_jsonl)에 dedup 병합
+    # (배포 게이트가 즉시 소비). 기본 False = run-스코프 미리보기만(정본·라이브 경로 무변경).
+    publish: bool = False
+    # [E2-5] 쓰기만 건너뛰고 같은 응답을 낸다. GET preflight 는 '서버가 아는 상태' 만 보므로
+    # 검수자가 실제로 고른 결정(팬텀 doc_id·change 인데 grade 없음)은 여기서만 검증된다.
+    dry_run: bool = False
+
+
+class GoldenSignoffPreflightIssue(BaseModel):
+    code: str
+    message: str
+    detail: str = ""
+
+
+class GoldenSignoffPreflightResponse(BaseModel):
+    """서명 전 점검 결과.
+
+    blocking 은 **실제로 POST 를 실패시키는 것만** 담는다 — 경고를 섞으면 제출 버튼이
+    근거 없이 잠긴다. 서버는 브라우저의 미제출 결정을 볼 수 없으므로 여기 담기는 것은
+    '서버가 아는 상태' 뿐이고, 화면이 자기 미결정 수를 더해 보여준다.
+    """
+    job_id: str
+    ok: bool
+    blocking: list[GoldenSignoffPreflightIssue] = Field(default_factory=list)
+    warnings: list[GoldenSignoffPreflightIssue] = Field(default_factory=list)
+    candidates: dict
+    reviewer: dict
+    publish: dict
+    readiness: dict
+
+
+class GoldenSignoffResponse(BaseModel):
+    locked: int
+    rejected: int
+    locked_by_grade: dict
+    rejected_reasons: dict
+    readiness: dict            # 라이브+이번 승격 union 기준(published=False 면 '미리보기')
+    published: bool
+    reviewer_id: str           # 실제 기록된 서명자(인증 신원)
+    overridden: bool           # 클라 actor.user_id 가 인증 sub 로 덮어써졌나(위조 시도/클라 버그 신호)
+    # publish 요청이 라이브 경로에 반영되지 못한 이유(경로 미설정·승격 0건). 정상 반영/미요청이면 None.
+    publish_note: Optional[str] = None
+    # True 면 판정만 하고 아무 파일도 쓰지 않았다(E2-5).
+    dry_run: bool = False
+
+
+class GoldenCorpusSummary(BaseModel):
+    """정본 골든셋 구성 집계 — GET /golden/summary.
+
+    tier 는 저장 컬럼이 아니라 golden_tiers.tier_of 로 파생되는 값이라(드리프트 방지)
+    이 응답도 그 함수 결과를 그대로 집계한다.
+    """
+    path: str
+    total: int
+    by_tier: dict = {}              # locked_gold_eval / held_review / legal_floor / gold_candidate / silver_train
+    by_grade: dict = {}             # TS / S1 / S2 / S3
+    by_origin: dict = {}            # synthetic / public_real / customer_real / unknown
+    by_label_source: dict = {}
+    tier_by_grade: dict = {}        # tier → {grade: n}
+    # locked 중 실문서 출처까지 갖춘 것(= real 평가정답으로 집계되는 수). 합성 본문에 서명이
+    # 붙어도 일반화 근거가 되지 못하므로 locked 총수와 구분해서 낸다.
+    real_locked_eval: int = 0
+
+
+class GoldenJobSummary(BaseModel):
+    """잡 목록 1행 — 목록에서 개별 잡(검수/서명)으로 진입하기 위한 최소 정보."""
+    job_id: str
+    kind: str = ""                      # golden_build | golden_register
+    status: str = ""
+    actor: str = ""
+    submitted_at: Optional[str] = None
+    source_type: Optional[str] = None
+    gold_count: Optional[int] = None
+    uncertain_count: Optional[int] = None
+    error: Optional[str] = None
+    review_url: Optional[str] = None    # 서명 URL(비밀키 설정 시 ?t= 포함)
+    signoff_url: Optional[str] = None
+
+
+class GoldenJobListResponse(BaseModel):
+    jobs: list[GoldenJobSummary]
+    # 정렬 신뢰도 고지 — Redis 백엔드의 list_recent 는 SCAN 순서라 최근순을 보장하지 않는다.
+    # 화면이 "최신 목록"이라고 단정하지 않도록 응답에 실어 보낸다(무음 오도 방지).
+    ordering: str = "best_effort"
+
+
+# ── 합성 Proxy Gold 후보 관리 ────────────────────────────────────────────────
+# 고객/실문서 골든과 분리된 후보 인벤토리다. 여기의 승인 상태는 approved_proxy일 뿐
+# locked_gold_eval 승격이나 실운영 정확도 주장 근거가 될 수 없다.
+class ProxyGoldCandidateDecisionRequest(BaseModel):
+    action: str = Field(pattern=r"^(approve|change|defer|reject|discard|reopen|exclude)$")
+    grade: Optional[str] = Field(default=None, pattern=r"^(TS|S1|S2|S3)$")
+    reason: str = Field(default="", max_length=4000)
+    # [2026-08-23] 비밀관리성(M)을 검수 화면에서 받는다.
+    #
+    # 왜 여기인가. M 은 **본문에서 관측되지 않는다**(rule_engine.py:115 — "200자 문서가
+    # 자기 접근통제를 진술할 수는 없다"). 보안표시는 검수자가 원문에서 확인할 수 있고,
+    # 접근범위는 문서를 가져온 쪽이 아는 값이다. 둘 다 등급 결정의 입력이므로 결정과
+    # 같은 이벤트에 실어 "왜 이 등급인지" 를 한 줄로 되짚을 수 있게 한다.
+    #
+    # ⚠ None(확인 안 됨)과 access_scope="all_employees"(전 임직원 열람)를 **절대 뭉치지
+    #   않는다.** 전자는 보수적 완성으로 M 이 채워지고, 후자는 M=0 으로 곱을 0 으로 만든다
+    #   (management_from_metadata docstring: "둘을 뭉치면 S1 이 사라지거나 미탐이 열린다").
+    #   그래서 기본값은 빈 값이며 화면도 「확인 안 됨」을 기본으로 둔다.
+    security_marking: Optional[str] = Field(
+        default=None, pattern=r"^(none|confidential|secret|top_secret)$"
+    )
+    access_scope: Optional[str] = Field(
+        default=None, pattern=r"^(all_employees|department|designated|approved_only)$"
+    )
+
+    @model_validator(mode="after")
+    def _decision_contract(self) -> "ProxyGoldCandidateDecisionRequest":
+        if self.action == "change" and not self.grade:
+            raise ValueError("action=change 인데 grade 미지정")
+        if self.action != "change" and self.grade is not None:
+            raise ValueError("grade 는 action=change 에서만 지정")
+        if self.action in {"change", "defer", "reject", "discard", "exclude"} and not self.reason.strip():
+            raise ValueError("change/defer/reject/discard/exclude 에는 사유가 필요")
+        return self
+
+
+class ProxyGoldCandidateProvenanceRequest(BaseModel):
+    """실문서의 출처를 나중에 기록한다.
+
+    결정(Decision)과 분리한 이유: 결정 API 는 action 마다 status 를 정하는 표를 갖고 있어
+    "등급은 그대로 두고 출처만 기록" 을 표현할 수 없다.
+
+    ⚠ 두 필드가 **모두** 필요하다. 출처만 있고 사용 권한 근거가 없으면 미완(partial)이며,
+      실측 2026-08-17(223) 기준 실문서 74건 중 62건이 정확히 그 상태였다.
+    """
+
+    source_reference: str = Field(min_length=1, max_length=500)
+    authorization_basis: str = Field(min_length=1, max_length=500)
+    reason: str = Field(default="", max_length=4000)
+
+    @model_validator(mode="after")
+    def _not_blank(self) -> "ProxyGoldCandidateProvenanceRequest":
+        if not self.source_reference.strip() or not self.authorization_basis.strip():
+            raise ValueError("원천 위치와 사용 권한 근거를 모두 적어야 한다(공백만은 불가)")
+        return self
+
+
+class ProxyGoldCandidateProvenanceResponse(BaseModel):
+    doc_id: str
+    provenance: dict
+    # 등급·상태는 이 요청으로 바뀌지 않는다. 화면이 확인할 수 있게 함께 돌려준다.
+    status: str
+    final_grade: Optional[str] = None
+
+
+class ProxyGoldCandidateDecisionResponse(BaseModel):
+    doc_id: str
+    status: str
+    final_grade: Optional[str] = None
+    latest_decision: Optional[dict] = None

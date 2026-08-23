@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from lloydk.services.outbox import (
+from koipa.services.outbox import (
     InMemoryOutboxStore,
     RedisOutboxStore,
     _select_backend,

@@ -12,7 +12,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from lloydk.api.app import _warmup_models
+from koipa.api.app import _warmup_models
 
 
 def _settings(*, poc_mode: str = "full", reranker: str = "noop",
@@ -26,7 +26,7 @@ def _settings(*, poc_mode: str = "full", reranker: str = "noop",
 
 def test_warmup_skipped_in_dryrun() -> None:
     """dryrun에서는 build_embedder() 호출하지 않음."""
-    with patch("lloydk.adapters.embedding.build_embedder") as mock_build:
+    with patch("koipa.adapters.embedding.build_embedder") as mock_build:
         _warmup_models(_settings(poc_mode="dryrun"))
     assert mock_build.call_count == 0
 
@@ -34,7 +34,7 @@ def test_warmup_skipped_in_dryrun() -> None:
 def test_warmup_runs_embedder_in_full_mode() -> None:
     """full 모드에서는 build_embedder().embed(['warmup']) 1회 호출."""
     mock_emb = MagicMock()
-    with patch("lloydk.adapters.embedding.build_embedder",
+    with patch("koipa.adapters.embedding.build_embedder",
                return_value=mock_emb) as mock_build:
         _warmup_models(_settings(poc_mode="full"))
     assert mock_build.call_count == 1
@@ -44,8 +44,8 @@ def test_warmup_runs_embedder_in_full_mode() -> None:
 def test_warmup_skips_reranker_when_noop() -> None:
     """reranker_provider=noop이면 get_reranker() 호출 안 함."""
     mock_emb = MagicMock()
-    with patch("lloydk.adapters.embedding.build_embedder", return_value=mock_emb), \
-         patch("lloydk.adapters.reranker.get_reranker") as mock_get_rr:
+    with patch("koipa.adapters.embedding.build_embedder", return_value=mock_emb), \
+         patch("koipa.adapters.reranker.get_reranker") as mock_get_rr:
         _warmup_models(_settings(poc_mode="full", reranker="noop"))
     assert mock_get_rr.call_count == 0
 
@@ -54,8 +54,8 @@ def test_warmup_runs_reranker_when_bge() -> None:
     """reranker_provider=bge면 get_reranker().rerank() 1회 호출."""
     mock_emb = MagicMock()
     mock_rr = MagicMock()
-    with patch("lloydk.adapters.embedding.build_embedder", return_value=mock_emb), \
-         patch("lloydk.adapters.reranker.get_reranker",
+    with patch("koipa.adapters.embedding.build_embedder", return_value=mock_emb), \
+         patch("koipa.adapters.reranker.get_reranker",
                return_value=mock_rr) as mock_get_rr:
         _warmup_models(_settings(poc_mode="full", reranker="bge"))
     assert mock_get_rr.call_count == 1
@@ -65,7 +65,7 @@ def test_warmup_runs_reranker_when_bge() -> None:
 def test_warmup_failure_does_not_block_boot() -> None:
     """build_embedder 실패해도 예외 전파 없음 — silent warn."""
     with patch(
-        "lloydk.adapters.embedding.build_embedder",
+        "koipa.adapters.embedding.build_embedder",
         side_effect=RuntimeError("hf rate limit"),
     ):
         _warmup_models(_settings(poc_mode="full"))  # 예외 안 던지면 PASS
@@ -73,9 +73,9 @@ def test_warmup_failure_does_not_block_boot() -> None:
 
 def test_warmup_reranker_failure_does_not_block_boot() -> None:
     mock_emb = MagicMock()
-    with patch("lloydk.adapters.embedding.build_embedder", return_value=mock_emb), \
+    with patch("koipa.adapters.embedding.build_embedder", return_value=mock_emb), \
          patch(
-             "lloydk.adapters.reranker.get_reranker",
+             "koipa.adapters.reranker.get_reranker",
              side_effect=RuntimeError("model not found"),
          ):
         _warmup_models(_settings(poc_mode="full", reranker="bge"))
@@ -84,7 +84,7 @@ def test_warmup_reranker_failure_does_not_block_boot() -> None:
 def test_warmup_empty_reranker_treated_as_noop() -> None:
     """reranker_provider=''도 noop과 동일하게 skip."""
     mock_emb = MagicMock()
-    with patch("lloydk.adapters.embedding.build_embedder", return_value=mock_emb), \
-         patch("lloydk.adapters.reranker.get_reranker") as mock_get_rr:
+    with patch("koipa.adapters.embedding.build_embedder", return_value=mock_emb), \
+         patch("koipa.adapters.reranker.get_reranker") as mock_get_rr:
         _warmup_models(_settings(poc_mode="full", reranker=""))
     assert mock_get_rr.call_count == 0

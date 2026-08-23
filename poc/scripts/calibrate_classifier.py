@@ -25,7 +25,7 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
 # [중복 제거] 온도 스케일링 핵심은 m6_evaluation.temperature 로 일원화 — trainer 자동연결과 공유.
-from lloydk.modules.m6_evaluation.temperature import (  # noqa: E402
+from koipa.modules.m6_evaluation.temperature import (  # noqa: E402
     expected_calibration_error,
     find_best_temperature,
     neg_log_likelihood,

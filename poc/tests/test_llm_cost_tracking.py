@@ -7,9 +7,11 @@ query_expansion 등 실제 호출지점에서 purpose 라벨로 분리 집계되
 
 from __future__ import annotations
 
-from lloydk.adapters.llm.base import LLMResponse, UsageRecord
-from lloydk.api import prom_metrics as pm
-from lloydk.services.llm_usage_service import LLMUsageService, record_llm_usage
+import json
+
+from koipa.adapters.llm.base import LLMResponse, UsageRecord
+from koipa.api import prom_metrics as pm
+from koipa.services.llm_usage_service import LLMUsageService, record_llm_usage
 
 
 def _usage(*, cost=0.01, provider="anthropic", model="claude-opus-4-8", it=100, ot=50):
@@ -48,8 +50,23 @@ def test_record_noop_on_text_only_or_none(tmp_path):
     record_llm_usage(None, purpose="answer", service=svc)
 
 
+def test_isolated_runner_can_skip_db_but_keeps_jsonl_audit(tmp_path, monkeypatch):
+    svc = LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl"))
+    called = False
+
+    def no_db(*args, **kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(svc, "_insert_db", no_db)
+    monkeypatch.setenv("KOIPA_LLM_USAGE_DB_ENABLED", "false")
+    record_llm_usage(_usage(), purpose="synthesis", service=svc)
+    assert called is False
+    assert (tmp_path / "u.jsonl").is_file()
+
+
 def test_billing_phase_from_settings(tmp_path, monkeypatch):
-    from lloydk import config as cfg
+    from koipa import config as cfg
     monkeypatch.setattr(cfg.settings, "llm_billing_phase", "production", raising=False)
     svc = LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl"))
     # billing_phase 미지정 → settings 사용. JSONL에 production 기록 확인.
@@ -58,9 +75,18 @@ def test_billing_phase_from_settings(tmp_path, monkeypatch):
     assert '"billing_phase": "production"' in content
 
 
+def test_usage_jsonl_records_concrete_build_sha(tmp_path, monkeypatch):
+    monkeypatch.setenv("KOIPA_BUILD_SHA", "4d4c012898ba")
+    monkeypatch.setenv("KOIPA_LLM_USAGE_DB_ENABLED", "false")
+    svc = LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl"))
+    record_llm_usage(_usage(), purpose="synthesis", service=svc)
+    row = json.loads((tmp_path / "u.jsonl").read_text(encoding="utf-8"))
+    assert row["build_sha"] == "4d4c012898ba"
+
+
 def test_expand_llm_records_query_expansion_usage(tmp_path, monkeypatch):
-    import lloydk.services.llm_usage_service as us
-    from lloydk.rag import query_expansion as qe
+    import koipa.services.llm_usage_service as us
+    from koipa.rag import query_expansion as qe
     monkeypatch.setattr(us, "_default_service", us.LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl")))
 
     class _Stub:
@@ -88,8 +114,8 @@ def _labeler_stub(cost=0.003):
 
 
 def test_llm_labeler_records_default_purpose(tmp_path, monkeypatch):
-    import lloydk.services.llm_usage_service as us
-    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+    import koipa.services.llm_usage_service as us
+    from koipa.modules.m3_labeling.llm_labeler import LLMLabeler
     monkeypatch.setattr(us, "_default_service", us.LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl")))
     c0 = _calls("anthropic", "claude-opus-4-8", "llm_labeling")
     LLMLabeler(provider=_labeler_stub()).label("문서 내용")
@@ -97,8 +123,8 @@ def test_llm_labeler_records_default_purpose(tmp_path, monkeypatch):
 
 
 def test_llm_labeler_records_custom_purpose(tmp_path, monkeypatch):
-    import lloydk.services.llm_usage_service as us
-    from lloydk.modules.m3_labeling.llm_labeler import LLMLabeler
+    import koipa.services.llm_usage_service as us
+    from koipa.modules.m3_labeling.llm_labeler import LLMLabeler
     monkeypatch.setattr(us, "_default_service", us.LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl")))
     c0 = _calls("anthropic", "claude-opus-4-8", "second_opinion")
     LLMLabeler(provider=_labeler_stub()).label("문서 내용", purpose="second_opinion")

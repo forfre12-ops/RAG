@@ -10,11 +10,11 @@ from typing import Sequence
 
 import pytest
 
-from lloydk.adapters.reranker.base import RerankResult
-from lloydk.adapters.reranker.noop_reranker import NoopReranker
-from lloydk.adapters.vectorstore.base import SearchHit
-from lloydk.adapters.vectorstore.inmemory_store import InMemoryStore
-from lloydk.services.retrieval import _rerank_hits, expand_then_search
+from koipa.adapters.reranker.base import RerankResult
+from koipa.adapters.reranker.noop_reranker import NoopReranker
+from koipa.adapters.vectorstore.base import SearchHit
+from koipa.adapters.vectorstore.inmemory_store import InMemoryStore
+from koipa.services.retrieval import _rerank_hits, expand_then_search
 
 
 def _encode_keyword(text: str):

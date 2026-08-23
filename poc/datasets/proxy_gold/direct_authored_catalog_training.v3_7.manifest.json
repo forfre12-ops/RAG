@@ -1,0 +1,23 @@
+{
+  "change_summary": "Front-loaded high-grade evidence blocks for S1/TS only; preserved catalog quotas, factor profiles, and public S3 separation.",
+  "evaluation_case_ledger": "disjoint_from_direct_authored_proxy_eval_v2_1",
+  "grade_counts": {
+    "S1": 750,
+    "S2": 750,
+    "S3": 450,
+    "TS": 750
+  },
+  "no_llm_generation": true,
+  "records": 2700,
+  "records_sha256": "0fb4777e9366adacb7aaaf0b909c6da9ab64bcd5c3a5d7f23c74d97140e0dcdc",
+  "schema": "direct-authored-catalog-training-v3_7",
+  "source_corpus": "datasets\\proxy_gold\\direct_authored_catalog_training.v3_6.jsonl",
+  "source_manifest_sha256": "1faaea3c1cfc7543327966d6dbc50a781b87592af5fde4a1598a36d6ab41e31c",
+  "source_records_sha256": "fad0b9208e9ad6e70379ad569b7f5a6c15dae64a0888e11b829eb45c56500e36",
+  "text_length": {
+    "max": 2669,
+    "mean": 2508.53,
+    "min": 2318
+  },
+  "training_only": true
+}

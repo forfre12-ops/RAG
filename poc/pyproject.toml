@@ -1,7 +1,7 @@
 [project]
-name = "lloydk-ai"
+name = "koipa-ai"
 version = "0.1.0"
-description = "Lloydk AI Engine for KOIPA Trade-Secret System (PoC)"
+description = "Koipa AI Engine for KOIPA Trade-Secret System (PoC)"
 requires-python = ">=3.11"
 # 기본 dependencies — CI · 핵심 학습/추론 파이프라인 필수
 # 무거운/선택적 의존성은 모두 [project.optional-dependencies]로 분리됨
@@ -28,7 +28,13 @@ dependencies = [
   "alembic>=1.13",
   "celery[redis]>=5.4",
   "redis>=5.0",
-  "minio>=7.2",
+
+  # 스토리지: 폐쇄망 운영 기본은 로컬FS(file://, LocalStorage) — 별도 패키지 불요.
+  # S3 호환 객체 스토리지(minio/seaweedfs/AWS S3·NCP 등) 백엔드는 optional extra `[minio]`로
+  # 옵트인한다. 어댑터(minio_store.py)·팩토리·docker-compose·config는 이미 완비돼 있어,
+  # `pip install -e ".[minio]"` + storage_backend=minio(또는 lite-cloud 프로파일)면 즉시 사용.
+  # (ES 백엔드가 `elasticsearch`를 별도 설치하는 것과 동일 패턴 — 미사용 백엔드 패키지를
+  # 폐쇄망 base 설치·감사 대상에서 제외해 슬림/공격표면 축소.)
 
   # 벡터 DB: pgvector(psycopg 경유, 별도 패키지 불요) — ES 제거(의사결정_대장 §03 ⓑ).
   # 레거시 es 백엔드(es_store.py)가 필요하면 `elasticsearch>=8.15,<9.0`를 별도 설치.
@@ -40,6 +46,7 @@ dependencies = [
   "datasets>=2.20",
   "evaluate>=0.4",
   "scikit-learn>=1.5",
+  "scipy>=1.14",                 # exact joint scenario/family/shape MILP selector
   "mlflow>=2.16",
   "matplotlib>=3.9",  # M6 평가 — confusion-matrix PNG 렌더 (report.py)
 
@@ -49,6 +56,12 @@ dependencies = [
   "python-docx>=1.1",
   "openpyxl>=3.1",            # W8 Excel(.xlsx/.xlsm) 추출 (MIT). 구형 .xls는 xlrd 필요(선택).
   "python-pptx>=0.6",         # W8 PowerPoint(.pptx/.pptm) 추출 (MIT).
+  # 구형 Office(.doc/.ppt, OLE2 복합문서) 본문 추출 (BSD-2). legacy_office.py 가 이걸로
+  # 스트림을 연다. ⚠ base 의존성이어야 한다 — 선택 extra 로 두면 배포 이미지에서 빠져
+  # `.doc`·`.ppt` 가 통째로 0자가 된다. 실측 2026-08-21(223): "No module named olefile"
+  # 로 두 포맷 전부 미추출. 로컬 venv 에는 다른 패키지가 끌고 와서 있어 개발 중에는
+  # 드러나지 않았다(소스 존재 ≠ 배포본 존재).
+  "olefile>=0.47",            # .doc/.ppt OLE2 스트림 리더 (BSD-2)
   # 구형 .doc(Word 97-2003)은 시스템 antiword CLI 필요(pip 아님). 없으면 .docx 변환 안내.
 
   # 유틸
@@ -62,7 +75,12 @@ dependencies = [
 # HWP/HWPX 추출 (한국 공공문서). extractor.py가 try/except로 graceful 처리.
 # 활성: pip install -e ".[hwp]"
 hwp = [
-  "rhwp-python>=0.5.1",            # 최신 PyPI 0.5.1, 모든 플랫폼 wheel
+  # [하한 중요] 0.8.1 미만에는 Document.to_hwpx_bytes 가 없다. 그 메서드가 .hwp 의
+  # 유일한 표-존재 검출기라, 없으면 표 커버리지 판정이 실패하고 표 셀 회수가
+  # 통째로 생략된다(공고문 .hwp 실측: 46,473자·표 47개 → 10,439자·표 0개).
+  # 배포 이미지는 0.8.1 이므로 개발 환경도 같은 하한으로 맞춘다 — 하한이 낮으면
+  # 새 venv 가 조용히 구버전을 받아 로컬 실측이 배포본과 어긋난다(2026-08-02 실제 발생).
+  "rhwp-python>=0.8.1",           # 모든 플랫폼 wheel
 ]
 
 # 구형 .xls(Excel 97-2003 BIFF) 추출. .xlsx/.xlsm은 base openpyxl로 충분하나
@@ -72,21 +90,26 @@ xls = [
   "xlrd>=2.0",                     # BIFF .xls 리더 (BSD). 2.0+는 .xls 전용(.xlsx 미지원)
 ]
 
-# HWP 표·글상자 셀 텍스트 회수 (AGPL 옵트인). 기본 rhwp([hwp])는 본문만 뽑고 표 셀을
-# 흘린다(실측: 보도자료 표셀 29/31 누락). pyhwp의 HWP5→XHTML 변환이 표 셀까지 렌더해
-# extractor.py가 rhwp보다 많이 뽑히면 채택. pyhwp는 AGPLv3+ — PyMuPDF([pdf-agpl])와
-# 동일하게 기본 제외, 라이선스 수용 환경에서만 옵트인. HWP5(.hwp) 전용(.hwpx 미지원).
-# AGPL 격리: extractor.py는 pyhwp를 import하지 않고 hwp5html 콘솔 스크립트를 별도
-# 프로세스로 호출(arm's length) → AGPL 경계가 pyhwp 실행파일에 국한.
+# HWP 표 셀 회수. 기본 rhwp([hwp])는 .hwp 바이너리에서 본문만 뽑고 표 셀을 통째로
+# 흘린다(실측: 공고문 표 0행 → unhwp 593행, 숫자 7/7 보존 + 21개 추가 회수).
+# 2026-08-01 구 pyhwp(AGPLv3+) → unhwp(MIT) 교체. AGPL 옵트인 경로 자체를 없앴다.
+#   - 라이선스 검증: unhwp 네이티브는 Rust, 동봉 크레이트 29종 전수가 MIT/Apache-2.0/
+#     Unlicense/Zlib. 카피레프트 문자열 0건, pyhwp/hwp.js/hwplib 파생 흔적 0건
+#     (바이너리 문자열 + crates.io 전수 조회).
+#   - 적용 범위는 .hwp 한정. .hwpx 는 rhwp 가 이미 정확하고 unhwp 가 오히려 표를
+#     누락한 사례가 있다(acc-S1-03.hwpx: 표 5행→0행) → extractor 가 형식으로 차단.
+#   - 배포 이미지에 포함된다(Dockerfile extras). 미설치여도 graceful degrade.
 # 활성: pip install -e ".[hwp-tables]"
 hwp-tables = [
-  "pyhwp>=0.1b15",                 # HWP5 파서 (AGPLv3+). hwp5html CLI로 표 셀 추출
+  "unhwp>=0.8",                    # HWP5 파서 (MIT). to_markdown()으로 표 셀 회수
 ]
 
-# OCR — Tesseract 5.x + 한국어팩 (Apache 2.0, 무료).
+# OCR — 요건 외(FUN-022 는 전자문서 텍스트추출뿐)이며 어떤 배포 이미지·에어갭 번들에도
+# 포함하지 않는다(2026-08-02). 아래 파이썬 패키지는 MIT/HPND 로 라이선스 문제가 없으나,
+# 실동작에 필요한 OS 바이너리 poppler 가 GPL 이라 반출 경로를 통째로 없앴다.
+# extra 정의만 남겨 둔 것은 향후 OCR 이 요건화될 때 재활성하기 위함이다(로컬 개발 한정).
 # 시스템 선설치 필요: winget install UB-Mannheim.TesseractOCR 후 kor.traineddata 복사.
-# 스캔 PDF는 pdf2image + poppler 추가 필요 (poppler Windows 바이너리 별도).
-# 활성: pip install -e ".[ocr]"
+# 활성(로컬 전용): pip install -e ".[ocr]"
 ocr = [
   "pytesseract>=0.3.10",           # Tesseract Python 래퍼 (MIT)
   "Pillow>=10.0",                   # 이미지 처리 (PIL 대체, HPND)
@@ -98,6 +121,13 @@ ocr = [
 # 활성: pip install -e ".[pdf-agpl]"
 pdf-agpl = [
   "pymupdf>=1.24",
+]
+
+# PDF 표 행/열 구조화. 미설치 시 extractor.py는 텍스트 추출은 계속하고
+# pdf_table_extractor_unavailable 경고를 남긴다.
+# 활성: pip install -e ".[pdf-tables]"
+pdf-tables = [
+  "pdfplumber>=0.11",
 ]
 
 # 한국어 형태소 분석·정규화 (Mecab 의존, Java JDK 필요할 수 있음)
@@ -119,6 +149,15 @@ embedding = [
 reranker = [
   "FlagEmbedding>=1.2",
   "sentence-transformers>=3.0",
+]
+
+# S3 호환 객체 스토리지 백엔드 (minio/seaweedfs/AWS S3·NCP Object Storage 등).
+# 폐쇄망 운영 기본은 로컬FS(file://)라 미사용 — 클라우드 티어(CSAP)·객체 스토리지 배포에서만
+# 옵트인. 어댑터(minio_store.py)·팩토리·docker-compose 완비 → storage_backend=minio + 이 extra
+# 설치면 즉시 사용(코드 변경 0). 미설치 상태로 minio backend 선택 시 RuntimeWarning 후 LocalStorage
+# 폴백. 활성: pip install -e ".[minio]"
+minio = [
+  "minio>=7.2",
 ]
 
 # 상용 LLM API (P3 합성 실측, 운영 옵션)
@@ -148,8 +187,9 @@ lint = [
 # 모든 옵션 한 번에 설치 (운영 환경용)
 # 활성: pip install -e ".[full]"
 full = [
-  "rhwp-python>=0.5.1",
+  "rhwp-python>=0.8.1",
   "xlrd>=2.0",
+  "pdfplumber>=0.11",
   "soynlp>=0.0.493",
   "konlpy>=0.6",
   "FlagEmbedding>=1.2",
@@ -160,6 +200,7 @@ full = [
   "langchain-anthropic>=0.2",
   "langchain-openai>=0.2",
   "langgraph>=0.2",
+  "minio>=7.2",                    # S3 호환 객체 스토리지 백엔드(옵션 [minio])
 ]
 
 # PSH (Performance Scenario Harness) 보조 — Prometheus push, 그래프 렌더
@@ -194,6 +235,17 @@ evaluation = [
   "seaborn>=0.13",                  # 분포 시각화 (선택)
 ]
 
+# 서빙 노브(온도·게이트 임계) 자동 탐색 — 지재원 오프라인 CLI 전용.
+# 활성: pip install -e ".[tuning]" · 실행: scripts/optuna_tune_gates.py
+# base 에 넣지 않는 이유: 운영 서빙 경로는 optuna 를 import 하지 않는다(튜너가 lazy import).
+#   폐쇄망 런타임 이미지에 불필요한 의존을 넣지 않고 공격표면·감사대상을 줄인다.
+# 그럼에도 extra 로 선언하는 이유: 설계도 §06·서빙 파라미터 명세가 이 튜너를 산출물로
+#   기술하는데 pyproject 어디에도 없으면 문서만 있고 설치 경로가 없는 유령 의존이 된다
+#   (폐쇄망은 wheel vendoring 필요). 2026-08-02 문서↔코드 대조에서 확인.
+tuning = [
+  "optuna>=3.6",                    # Apache-2.0
+]
+
 # 개발 (테스트·린트·노트북)
 dev = [
   "pytest>=8.0",
@@ -202,6 +254,7 @@ dev = [
   "ruff>=0.6",
   "ipykernel>=6.29",
   "fakeredis>=2.20",                # B3 — redis 미가용 환경에서 R1·outbox 테스트 통과
+  "minio>=7.2",                    # base에서 optional [minio]로 분리 — 테스트/CI는 minio 백엔드 검증 위해 유지
 ]
 
 [build-system]
@@ -210,6 +263,26 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.bandit]
+# C8: 보안 SAST — 운영 진입 직전 OWASP ASVS L2 스캔.
+# 구 `.bandit`(INI) 에서 이관. INI 는 configparser 가 시스템 기본 인코딩으로 읽어
+# 한글 주석이 있으면 비-UTF8 로캘(예: Windows cp949)에서 UnicodeDecodeError 로 죽는다.
+# TOML 은 사양상 UTF-8 고정이라 인코딩 무관하게 안전하다.
+# CI 호출: bandit -r src/ -ll -c pyproject.toml
+exclude_dirs = ["tests", "migrations", "scripts/legacy", "build", "dist", ".venv"]
+skips = [
+  "B101",  # assert_used — pytest assert 는 정상
+  "B404",  # subprocess import — backup·DR 스크립트에서 의도적 사용
+  "B603",  # subprocess call without shell — 신뢰 가능 인자에만 사용
+  "B607",  # start process with partial path — 컨테이너 고정 PATH 전제
+]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = ["E402", "E701", "E702", "E731", "E741", "F841"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

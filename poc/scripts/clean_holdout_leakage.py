@@ -11,7 +11,11 @@ usage:
       --holdout datasets/gold_real/holdout_eval.jsonl,datasets/gold_real/holdout_business.jsonl
 """
 from __future__ import annotations
-import argparse, hashlib, io, json, sys
+import argparse
+import hashlib
+import io
+import json
+import sys
 from collections import Counter
 from pathlib import Path
 

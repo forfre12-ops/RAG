@@ -64,6 +64,8 @@ poc/logs/
 
 # 생성된 혼합 학습 subset
 poc/datasets/gold_real/train_subset.jsonl
+poc/datasets/gold_real/*.v1_bak_*
+poc/datasets/gold_real/*.pre_depollution.bak
 poc/datasets/corrections/
 # 대용량 실험 데이터(ab_s1 선례) — git 히스토리 부담 방지. 데이터는 별도 보관.
 poc/datasets/labeled_p1_bilingual_exp/
@@ -76,6 +78,9 @@ poc/.coverage
 
 # Doc backups / 외부 회신용 통합본 (별도 트래킹 안 함)
 doc/bak/
+doc/archive/**
+!doc/archive/
+!doc/archive/ARCHIVE_INDEX.md
 
 # Notebooks
 .ipynb_checkpoints/
@@ -87,6 +92,7 @@ doc/bak/
 .DS_Store
 Thumbs.db
 ~$*
+doc/**/~$*
 poc/backups/
 poc/datasets/synthetic_qwen3_1200/
 
@@ -98,14 +104,21 @@ poc/reports/p2_oss*.json
 
 # Generated certs / trained model weights
 poc/certs/
+poc/infra/mtls/certs/
 poc/models/
 
 # doc 검증 스크린샷·스크립트 (작업산출물, 트래킹 불필요)
-# 단, doc/result/open/*.html 는 공유 정본이라 추적(아카이브 하위폴더는 제외)
 doc/result/*
-!doc/result/open/
-doc/result/open/*
-!doc/result/open/*.html
+# [2026-08-02 정본 이전] doc/result/open/ → doc/result/감리정본/.
+# 감리 산출물 정본은 폴더째 추적한다 — 종전 open/ 규칙은 *.html 만 허용해서
+# 정식 산출물인 WBS .xlsx 와 사업관리보고 .docx 가 규칙상 무시 대상이었고
+# -f 로만 들어와 있었다. 새 파일이 조용히 누락되므로 의도대로 적는다.
+!doc/result/감리정본/
+# KL 발주처 제출 묶음은 자체 원본이라 폴더째 추적(엑셀 기입본 포함).
+# 파일들은 과거 -f 로 들어와 추적 중이었을 뿐 규칙상으론 무시 대상이었다 —
+# 새 파일이 조용히 누락되므로(README 가 실제로 그랬다) 규칙을 의도대로 적는다.
+!doc/result/KL_AI자료_2026-08/
+!doc/result/KL_AI자료_2026-08_미첨부문서/
 doc/temp_pptx.zip
 doc/temp_pptx/
 doc/temp_xlsx.zip
@@ -128,6 +141,8 @@ poc/datasets/labeled_bpilot/
 poc/datasets/demo_retrain/
 # A/B S1 합성 실험 중간데이터 (16MB, ab_qwen_gemma_s1 산출물 — git 비대화 회피)
 poc/datasets/ab_s1/
+# P1 재학습 파생 출력 (39MB, legacy·gold_real x3 오염) — build_p1_retrain_dataset.py로 oss_v1+gold_real서 재생성. 2026-07-06 untrack.
+poc/datasets/labeled_p1_retrain_v3/
 poc/datasets/drift_train_centroid.json
 poc/datasets/drift_state.json
 # 임시 작업 산출물 / 일회성 스크래치 (_ 접두사 = throwaway 컨벤션)
@@ -136,3 +151,106 @@ poc/scripts/_*.py
 poc/scripts/_*.json
 # 참고용 클라이언트 PDF (기밀 — 트래킹 금지)
 doc/*.pdf
+
+# ── 배포 전 위생 하드닝 (2026-07-22) ──────────────────────────────
+# 루트 로컬스토리지: 운영 문서 원본(documents-raw 평문)+정규화본+codex 운영점검 산출물.
+# `git add -A` 한 번에 고객 영업비밀 원본이 커밋·푸시되는 유출 벡터 차단. (poc/.storage/ 는 이미 위 30행)
+/.storage/
+# 골든 빌더 run-스코프 출력(build_*/uncertain_*) — 정본 아님·재생성 가능. 정본 regate_* 는 계속 추적.
+poc/datasets/gold_real/builds/build_*.jsonl
+poc/datasets/gold_real/builds/uncertain_*.jsonl
+# 서명 run 산출물. build_*/uncertain_* 은 막아 두었으나 locked_* 만 빠져 있어 시연 서명
+# 결과가 커밋 후보로 올라왔다(2026-08-08). datasets/signoff_slate/locked_*.jsonl 과 같은 취지 —
+# 정본은 LOCKED_EVAL_JSONL 경로이고 이건 per-run 출력이다.
+poc/datasets/gold_real/builds/locked_*.jsonl
+# 일회성 실험 학습셋 (_exp_ 접두 = throwaway 컨벤션, 정본 아님)
+poc/datasets/_exp_*.jsonl
+
+# ── 프록시 골든 파이프라인 산출물 (2026-08-08) ──────────────────────────────
+# 수집·생성 run 출력. 규모(korea_policy_runs 721MB/6,514파일, _artifacts 92MB)도 문제지만
+# records.jsonl·raw_html 이 **문서 전문**을 싣는다 — 위 golden_review/locked_gold_eval 와
+# 같은 취지로 커밋 경로 자체를 막는다. 재현은 각 run 의 manifest.json + 수집 스크립트로.
+# 정본은 proxy_gold 루트의 카탈로그·레지스트리 json 과 정책 md 이며 그쪽은 계속 추적한다.
+poc/datasets/proxy_gold/korea_policy_runs/
+poc/datasets/proxy_gold/public_s3_challenges/*/
+poc/datasets/proxy_gold/public_s3_training/*/
+poc/datasets/public_eval_negatives/
+# [2026-08-11] 같은 취지인데 규칙이 빠져 있던 run 산출물. 실측 미추적 규모:
+#   training_runs 579M · training_pool_runs 247M · single_document_candidates 30M
+#   (그 외 frozen_candidates·review_queues·training_generation_runs·real_public_s3 각 <1M)
+# 전부 run 스코프 재생성물이고 본문을 싣는다 — 재현은 각 run 의 manifest + 빌드 스크립트로.
+poc/datasets/proxy_gold/training_runs/
+poc/datasets/proxy_gold/training_pool_runs/
+poc/datasets/proxy_gold/training_generation_runs/
+poc/datasets/proxy_gold/single_document_candidates/
+poc/datasets/proxy_gold/frozen_candidates/
+poc/datasets/proxy_gold/review_queues/
+poc/datasets/proxy_gold/real_public_s3/
+# 코퍼스 **본문**(proxy_gold 루트 639M · proxy_eval 소스 33M)은 막고 매니페스트(해시 증적,
+# 각 1KB)는 계속 추적한다 — signoff_slate 와 같은 취지(정본 슬레이트만 tracked).
+# ⚠ 본문 정본을 git 에 둘지 별도 불변 아티팩트 저장소에 둘지는 **미확정**이다. 그 결정 전까지
+# 부주의 커밋만 막는 것이고, 확정되면 이 두 줄을 다시 판단할 것. curated_master/ 는 정책상
+# 추적 대상이라 글롭(최상위 한 단계)에 걸리지 않는다.
+poc/datasets/proxy_gold/*.jsonl
+poc/datasets/proxy_eval/*.jsonl
+!poc/datasets/proxy_gold/*.manifest.json
+!poc/datasets/proxy_eval/*.manifest.json
+# 위 글롭은 최상위 한 단계만 잡는다 — 봉인 평가셋 split 은 하위 디렉터리라 안 걸렸다
+# (direct_authored_proxy_eval_split.v*/ 3벌 25M). 같은 취지로 본문만 막고 봉인 증적
+# (manifest.json · COMPLETE.json)은 추적한다. 봉인 여부는 해시로 증명하는 것이지
+# 본문을 저장소에 두어 증명하는 것이 아니다.
+poc/datasets/proxy_eval/**/*.jsonl
+!poc/datasets/proxy_eval/**/manifest.json
+!poc/datasets/proxy_eval/**/COMPLETE.json
+# 실행 로그·릴리스 tarball·감사 산출물 — 전부 재생성물(_ 접두 throwaway 컨벤션과 동일 취지).
+# deploy/proxy_gold_runtime/ 은 배포 '소스'(compose·model-lock·prefetch)라 추적 대상이다.
+poc/_artifacts/
+poc/.release-build/
+# 파일럿 화면(HTML) — .md/.json 원본에서 build_{blind_quality,case_pilot,single_candidate}_html.py
+# 가 다시 만든다. 원본과 manifest·지침은 계속 추적한다(정본은 그쪽).
+poc/datasets/proxy_gold/**/*_view.v*.html
+poc/datasets/proxy_gold/**/case_view.v*.html
+poc/datasets/proxy_gold/blind_quality_pilot/review_form.v*.html
+# 블라인드 검수 정답키 — 저장소에 두면 검수자가 볼 수 있어 블라인드가 성립하지 않는다.
+# 검수 팩(review_pack)도 배포용 워크북이라 datasets/golden_review/ 와 같은 취지로 제외한다.
+poc/datasets/proxy_gold/blind_quality_pilot/blind_key.v*.json
+poc/datasets/proxy_gold/blind_quality_pilot/review_pack.v*.jsonl
+# 데모 파서 샘플용 실 정부문서(KOGL 공고·제안요청서 HWP/HWPX/PDF, 대용량). 웹서빙 static 트리라
+# 부주의 커밋·서빙 노출 차단 — 필요 시 개별 `git add -f`. 추적 픽스처는 success_*.docx/.xlsx 뿐이라
+# 확장자 글롭이 안전(그 외 pdf/hwp/hwpx는 전부 커밋 대상 아닌 실문서).
+poc/src/koipa/api/static/samples/*.hwp
+poc/src/koipa/api/static/samples/*.hwpx
+poc/src/koipa/api/static/samples/*.pdf
+# 재생성 가능 데모 산출물·목업 (배포 비필수·scripts/build_demo_samples.py로 재생성) — 2026-07-24
+poc/demo_samples/
+poc/demo_formats/
+doc/mockups/
+# ── 배포 아카이브·임시 덤프 (2026-07-30 배포감사) ──────────────────
+# 릴리스 tar 는 poc/scripts/ship_to_testserver.sh 로 커밋본에서 재생성되는 빌드 산출물이다.
+# 리포에 두면 소스와 어긋난 stale 아카이브가 남아 "어느 게 배포본인가"가 흐려진다.
+# 릴리스 tarball. **옛 이름도 함께 막는다** — 2026-08-12 koipa 리네임 때 이 줄이
+# /lloydk-*.tar.gz 에서 바뀌면서 기존 lloydk-testserver.tar.gz(636MB)가 제외 대상에서
+# 빠져 커밋될 뻔했다. 이름을 바꿀 때는 옛 패턴을 지우지 말고 남겨야 한다.
+/koipa-*.tar.gz
+/lloydk-*.tar.gz
+# 분석 중 생성된 일회성 텍스트 덤프 — 산출물 아님.
+/scratch_*.txt
+
+# HWP 평가용 임시 가상환경 (재현 불요)
+.tmp_hwp_eval_venv/
+
+# 시안·임시 산출물 — 배포 트리에 들어가면 안 되는 작업물.
+# admin_preview.html 은 manage.html 통일안 시안(192K)이고 어디서도 참조하지 않는다.
+poc/src/koipa/api/static/admin_preview.html
+poc/tmp_*.pdf
+
+# v6 요인근거 학습셋 분할 — 코퍼스 **본문**은 추적하지 않는다(proxy_gold/proxy_eval 과 같은
+# 취지). 재현은 manifest.json 의 해시 + split_v6_training_corpus.py 로 한다.
+poc/datasets/labeled_v6_factor_grounded/*.jsonl
+!poc/datasets/labeled_v6_factor_grounded/manifest.json
+
+# v7 다양화 학습셋 — 코퍼스 본문은 추적하지 않는다(매니페스트 해시로 재현).
+poc/datasets/labeled_v7_diverse/*.jsonl
+!poc/datasets/labeled_v7_diverse/manifest.json
+# 채점용 정규화 사본(doc_id·family 부여). 원본 raw.jsonl 에서 재생성된다.
+poc/datasets/mundane_s3/raw.scored.jsonl

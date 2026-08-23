@@ -1,4 +1,4 @@
-"""KL ↔ Lloydk 통합 8시나리오 — doc/19 명세 자동화.
+"""KL ↔ Koipa 통합 8시나리오 — doc/19 명세 자동화.
 
 설계:
 - 8 시나리오 (S1~S8) 1:1 매핑된 테스트 클래스
@@ -20,9 +20,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
-from lloydk.api.app import app
-from lloydk.config import settings
-from lloydk.db import engine
+from koipa.api.app import app
+from koipa.config import settings
+from koipa.db import engine
 
 pytestmark = pytest.mark.slow
 
@@ -289,7 +289,7 @@ class TestS7ActiveLearningUrgent:
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_underclass_accumulates_then_urgent_active_learning(self):
         """corrections 10건 누적 → evaluate_retraining_need → URGENT_RETRAIN."""
-        from lloydk.modules.m6_evaluation.active_learning import evaluate_retraining_need
+        from koipa.modules.m6_evaluation.active_learning import evaluate_retraining_need
 
         status = evaluate_retraining_need(urgent_underclass_threshold=10)
         assert status.retrain_status in {"OK", "RETRAIN_RECOMMENDED", "URGENT_RETRAIN"}
@@ -329,8 +329,8 @@ class TestCrossCutting:
     @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_kl_scenarios_recorded_in_audit_log(self):
         """KL 시나리오 호출 시 audit_log에 actor_role=kl_backend로 기록되는지."""
-        from lloydk.db import session_scope
-        from lloydk.repositories import AuditRepo
+        from koipa.db import session_scope
+        from koipa.repositories import AuditRepo
 
         unique_actor = f"kl-audit-{uuid.uuid4().hex[:8]}"
         with TestClient(app) as cli:
@@ -349,12 +349,15 @@ class TestCrossCutting:
         assert len(rows) >= 1
         assert any(r.actor_role == "kl_backend" for r in rows)
 
+    # /metrics-prom 은 DB 게이지를 동기 수집하므로 PG 미가용 시 커넥션 타임아웃으로 실패한다.
+    # 같은 클래스의 형제 테스트와 동일하게 가드 — 미기동 환경에서 fail 이 아니라 skip 이어야 한다.
+    @pytest.mark.skipif(not _PG, reason="Postgres not reachable")
     def test_prometheus_endpoint_records_kl_calls(self):
-        """KL 시나리오 호출이 lloydk_requests_total에 카운트되는지."""
+        """KL 시나리오 호출이 koipa_requests_total에 카운트되는지."""
         with TestClient(app) as cli:
             cli.get("/api/v1/schema/grades", headers=_hdr())
             r = cli.get("/api/v1/metrics-prom")
         assert r.status_code == 200
         body = r.text
-        # schema/grades 호출이 lloydk_requests_total에 잡혔는지
+        # schema/grades 호출이 koipa_requests_total에 잡혔는지
         assert "/api/v1/schema/grades" in body

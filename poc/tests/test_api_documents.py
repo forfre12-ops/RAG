@@ -14,11 +14,11 @@ import pytest
 pytestmark = pytest.mark.slow
 from fastapi.testclient import TestClient
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.api.app import app
-from lloydk.api.documents import _get_ingestion_service
-from lloydk.config import settings
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.api.app import app
+from koipa.api.documents import _get_ingestion_service
+from koipa.config import settings
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 
 @pytest.fixture

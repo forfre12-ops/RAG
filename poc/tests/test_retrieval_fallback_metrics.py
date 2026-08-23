@@ -6,14 +6,14 @@ reranker 실패→RRF, encode 실패→skip, 쿼리확장 LLM 실패→룰. 전�
 
 from __future__ import annotations
 
-from lloydk.api import prom_metrics as pm
-from lloydk.rag import query_expansion as qe
-from lloydk.rag.retrieval import _record_fallback
+from koipa.api import prom_metrics as pm
+from koipa.rag import query_expansion as qe
+from koipa.rag.retrieval import _record_fallback
 
 
 def _stage_val(stage) -> float:
     v = pm.registry.get_sample_value(
-        "lloydk_rag_context_failure_total", {"stage": stage}
+        "koipa_rag_context_failure_total", {"stage": stage}
     )
     return 0.0 if v is None else v
 
@@ -31,7 +31,7 @@ def test_record_fallback_best_effort_on_bad_registry(monkeypatch):
     real_import = builtins.__import__
 
     def _boom(name, *a, **k):
-        if name == "lloydk.api.prom_metrics":
+        if name == "koipa.api.prom_metrics":
             raise ImportError("boom")
         return real_import(name, *a, **k)
 
@@ -41,7 +41,7 @@ def test_record_fallback_best_effort_on_bad_registry(monkeypatch):
 
 def test_expand_llm_provider_load_failure_records_fallback(monkeypatch):
     # provider=None → build_provider 강제 실패 → 룰 폴백 + 메트릭.
-    import lloydk.adapters.llm as llm_mod
+    import koipa.adapters.llm as llm_mod
 
     def _boom():
         raise RuntimeError("no provider")

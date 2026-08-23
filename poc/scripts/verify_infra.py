@@ -1,10 +1,10 @@
 """인프라 헬스 체크. docker compose up 후 실행.
 
-검증:
-- PostgreSQL 연결 + 핵심 테이블 (벡터스토어 = pgvector dense, 의사결정_대장 §03 ⓑ)
-- MinIO 버킷 존재
+검증(배포 프로파일 인지 — 없는 인프라는 skip 하여 오탐 방지):
+- PostgreSQL 연결 + 핵심 테이블(tb_documents/tb_classifications/tb_model_versions/tb_audit_log)
+- MinIO 버킷 존재 — STORAGE_BACKEND=minio 일 때만(폐쇄망 로컬FS 는 skip)
 - Redis PING
-- MLflow API
+- MLflow API — MLFLOW_TRACKING_URI 설정 시에만(폐쇄망 추론전용 배포는 skip)
 """
 
 from __future__ import annotations
@@ -35,27 +35,35 @@ def _http_ok(url: str, timeout: float = 3.0) -> tuple[bool, str]:
 
 
 def check_postgres() -> CheckResult:
-    url = os.environ.get("DATABASE_URL", "postgresql+psycopg://lloydk:lloydk_dev@localhost:5432/lloydk")
+    url = os.environ.get("DATABASE_URL", "postgresql+psycopg://koipa:koipa_dev@localhost:5432/koipa")
     try:
-        from sqlalchemy import create_engine, text
+        from sqlalchemy import bindparam, create_engine, text
     except ImportError:
         return CheckResult("postgres", False, "sqlalchemy not installed")
+    # 실제 스키마 테이블명은 tb_ 접두어다(예: tb_documents). 과거의 'documents'/'classifications'/
+    # 'model_versions' 는 존재하지 않는 이름이었고 'tenants' 는 테넌트 전면 제거로 드롭됐다 —
+    # 그래서 이 검사가 정상 배포에서도 항상 0/4 로 FAIL 했다(무의미한 alarm).
+    core = ("tb_documents", "tb_classifications", "tb_model_versions", "tb_audit_log")
     try:
         engine = create_engine(url, pool_pre_ping=True)
         with engine.connect() as conn:
-            tables = conn.execute(
-                text(
-                    "SELECT tablename FROM pg_tables WHERE schemaname='public' "
-                    "AND tablename IN ('tenants','documents','classifications','model_versions')"
-                )
-            ).scalars().all()
-        ok = len(tables) == 4
-        return CheckResult("postgres", ok, f"tables={sorted(tables)}")
+            stmt = text(
+                "SELECT tablename FROM pg_tables WHERE schemaname='public' "
+                "AND tablename IN :names"
+            ).bindparams(bindparam("names", expanding=True))
+            tables = conn.execute(stmt, {"names": list(core)}).scalars().all()
+        missing = sorted(set(core) - set(tables))
+        return CheckResult("postgres", not missing, f"present={sorted(tables)} missing={missing}")
     except Exception as exc:  # noqa: BLE001
         return CheckResult("postgres", False, f"error: {exc}")
 
 
 def check_minio() -> CheckResult:
+    # 폐쇄망/기본 배포는 로컬FS(storage_backend=local)라 MinIO 를 쓰지 않는다 → 검사 건너뜀(정상).
+    # 과거엔 무조건 검사해 MinIO 없는 정상 배포에서도 verify_infra 가 항상 FAIL 했다.
+    backend = os.environ.get("STORAGE_BACKEND", "local").lower()
+    if backend != "minio":
+        return CheckResult("minio", True, f"skipped (storage_backend={backend})")
     try:
         from minio import Minio
     except ImportError:
@@ -64,11 +72,11 @@ def check_minio() -> CheckResult:
     try:
         client = Minio(
             endpoint,
-            access_key=os.environ.get("MINIO_ROOT_USER", "lloydk"),
-            secret_key=os.environ.get("MINIO_ROOT_PASSWORD", "lloydk_dev_minio"),
+            access_key=os.environ.get("MINIO_ROOT_USER", "koipa"),
+            secret_key=os.environ.get("MINIO_ROOT_PASSWORD", "koipa_dev_minio"),
             secure=False,
         )
-        needed = {"lloydk-docs", "lloydk-models", "mlflow"}
+        needed = {"koipa-docs", "koipa-models", "mlflow"}
         present = {b.name for b in client.list_buckets()}
         missing = needed - present
         return CheckResult("minio", not missing, f"present={sorted(present)}, missing={sorted(missing)}")
@@ -91,7 +99,12 @@ def check_redis() -> CheckResult:
 
 
 def check_mlflow() -> CheckResult:
-    base = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    # MLflow 는 지재원 full-train 환경 전용. 폐쇄망/운영 배포는 추론 전용이라 MLFLOW_TRACKING_URI
+    # 를 설정하지 않는다 → 미설정이면 검사 건너뜀(정상). 과거엔 기본값 localhost:5000 을 무조건
+    # 찔러 MLflow 없는 정상 배포에서도 FAIL 했다.
+    base = os.environ.get("MLFLOW_TRACKING_URI")
+    if not base:
+        return CheckResult("mlflow", True, "skipped (no MLFLOW_TRACKING_URI)")
     ok, detail = _http_ok(f"{base}/api/2.0/mlflow/experiments/list")
     if not ok:
         ok, detail = _http_ok(f"{base}/")

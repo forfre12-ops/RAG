@@ -13,9 +13,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lloydk.perf.kpis import core_kpis  # type: ignore
-from lloydk.perf.recorder import load_history  # type: ignore
-from lloydk.perf.regression import (  # type: ignore
+from koipa.perf.kpis import core_kpis  # type: ignore
+from koipa.perf.recorder import load_history  # type: ignore
+from koipa.perf.regression import (  # type: ignore
     detect_regression_trend,
     summarize_skip_reasons,
 )
@@ -305,6 +305,23 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
     # core KPI 위젯 5개 (PASS 비율 + 4개 핵심 KPI)
     core_widgets = _build_core_widgets(scenarios, summ)
 
+    # 측정 조건 — 값만 있고 "무엇으로 어디서 쟀는지" 가 없으면 감리 근거로 못 쓴다.
+    # report["measurement_note"] 에 줄 목록을 넣으면 §0 아래에 그대로 실린다.
+    note_lines = report.get("measurement_note") or []
+    partial = report.get("partial_run") or {}
+    if partial:
+        note_lines = list(note_lines) + [
+            f"부분 실행 — only={partial.get('only') or '-'} · skip={partial.get('skip') or '-'}"
+        ]
+    if note_lines:
+        items = "".join(f"<li>{html.escape(str(x))}</li>" for x in note_lines)
+        measurement_note_html = (
+            '<div class="note"><div class="note-label">측정 조건</div>'
+            f'<ul style="margin:6px 0 0 18px; padding:0; font-size:13px; line-height:1.7">{items}</ul></div>'
+        )
+    else:
+        measurement_note_html = ""
+
     # 시나리오 표
     rows = _build_matrix_rows(scenarios, prev_runs)
 
@@ -331,8 +348,8 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KOIPA AI 시나리오 성능 보고서 — Lloydk AI</title>
-<meta name="generator" content="lloydk.perf PSH v1.0" />
+<title>KOIPA AI 시나리오 성능 보고서 — Koipa AI</title>
+<meta name="generator" content="koipa.perf PSH v1.0" />
 <style>{CSS}</style>
 </head>
 <body>
@@ -352,6 +369,7 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
 <section id="summary">
   <h2><span class="num">§0</span> 요약</h2>
   <div class="widgets">{core_widgets}</div>
+  {measurement_note_html}
 </section>
 
 <section id="matrix">
@@ -413,12 +431,12 @@ def render_html(report: dict[str, Any], *, out_path: Path, history_dir: Path, mo
 make perf-scenarios MODE=full      # 실측 (LLM·GPU·ES·PG 필요)
 make perf-scenarios FAIL_ON_MISS=1 # KPI 미달 시 exit 1 (CI용)</pre>
   <p style="color:var(--text-dim); font-size:12.5px;">
-    상세 명세: <code>doc/20a_시나리오_성능_KPI매트릭스.md</code> · 시나리오 명세: <code>doc/19_KL_통합_8시나리오.md</code>
+    KPI 정의: <code>poc/src/koipa/perf/kpis.py</code> · 시나리오 정의: <code>poc/src/koipa/perf/scenarios.py</code>
   </p>
 </section>
 
 <div class="foot">
-  생성: lloydk.perf PSH v1.0 · 외부 의존 0 (CSS·JS 인라인) · 폐쇄망 호환
+  생성: koipa.perf PSH v1.0 · 외부 의존 0 (CSS·JS 인라인) · 폐쇄망 호환
 </div>
 
 </div>

@@ -19,9 +19,9 @@ from unittest import mock
 
 import pytest
 
-from lloydk.adapters.storage import LocalStorage
-from lloydk.modules.m2_preprocess.pii_masker import mask_pii
-from lloydk.services.document_ingestion_service import DocumentIngestionService
+from koipa.adapters.storage import LocalStorage
+from koipa.modules.m2_preprocess.pii_masker import mask_pii
+from koipa.services.document_ingestion_service import DocumentIngestionService
 
 
 def _storage(tmp_path) -> LocalStorage:
@@ -64,9 +64,14 @@ class TestPathTraversal:
             filename=evil, content_bytes=b"secret-bytes", persist=False
         )
         root = (tmp_path / "store").resolve()
-        # 1) raw_uri 의 실제 경로가 루트 하위
-        path_part = res.raw_text_uri.replace("file://", "")
-        written = Path(path_part).resolve()
+        # 1) 기록된 실제 경로가 루트 하위
+        # [2026-08-02] URI 는 이제 `file://<bucket>/<key>` 논리 경로다 — 저장 루트를 담지
+        # 않는다(s3/minio 와 동일 형식). 종전엔 URI 에서 실경로를 잘라 썼는데, 그 형식은
+        # 읽기 쪽 파싱과 어긋나 read-back 이 상시 실패하는 원인이었다(P0). 여기서는
+        # URI 문자열이 아니라 백엔드가 실제로 쓴 경로를 확인한다 — 검사 대상은 같다.
+        bucket, key = res.raw_text_uri.replace("file://", "").split("/", 1)
+        written = (root / bucket / key).resolve()
+        assert written.exists(), f"기록 파일 없음: {written}"
         written.relative_to(root)  # ValueError 면 테스트 실패
         # 2) 루트 밖 어디에도 유출 파일이 없음
         for leaked_name in ("evil.txt", "passwd", "leak.txt", "sys.txt"):
@@ -99,11 +104,17 @@ class TestPathTraversal:
 
 
 def _key_of(res) -> str:
-    """raw_text_uri 에서 (bucket 이후) 스토리지 key 복원."""
+    """raw_text_uri 에서 (bucket 이후) 스토리지 key 복원.
+
+    [2026-08-02] URI 형식이 `file://<bucket>/<key>` 로 바뀌었다(저장 루트 미포함 —
+    s3/minio 와 동일). 종전 형식(`file://<root>/<bucket>/<key>`)도 DB 에 남아 있으므로
+    둘 다 받는다. 버킷명 앞을 전부 버리면 두 형식이 같은 key 로 수렴한다.
+    """
     p = res.raw_text_uri.replace("file://", "")
-    # .../store/documents-raw/<hash>/<name>
-    parts = p.split("/documents-raw/")
-    return parts[1]
+    marker = "documents-raw/"
+    i = p.find(marker)
+    assert i >= 0, f"버킷 성분 없음: {res.raw_text_uri}"
+    return p[i + len(marker):]
 
 
 # ===========================================================================
@@ -172,7 +183,7 @@ class TestPiiNoHyphenBypass:
 # ===========================================================================
 class TestHealthReady503:
     def _patch_checks(self, model_ok, db_ok=True, es_ok=True, st_ok=True):
-        import lloydk.api.health as h
+        import koipa.api.health as h
 
         return [
             mock.patch.object(h, "_check_model", return_value={"status": "m", "ok": model_ok}),
@@ -184,7 +195,7 @@ class TestHealthReady503:
     def test_returns_503_when_unhealthy(self):
         import json
 
-        import lloydk.api.health as h
+        import koipa.api.health as h
         from fastapi.responses import JSONResponse
 
         patches = self._patch_checks(model_ok=False)
@@ -198,7 +209,7 @@ class TestHealthReady503:
         assert body["checks"]["model"]["ok"] is False
 
     def test_returns_200_when_healthy(self):
-        import lloydk.api.health as h
+        import koipa.api.health as h
         from fastapi.responses import JSONResponse
 
         patches = self._patch_checks(model_ok=True)
@@ -210,7 +221,7 @@ class TestHealthReady503:
 
     def test_503_when_warmup_pending(self):
         """모든 probe ok 라도 warmup 미완이면 not_ready(503)."""
-        import lloydk.api.health as h
+        import koipa.api.health as h
 
         patches = self._patch_checks(model_ok=True)
         with patches[0], patches[1], patches[2], patches[3]:

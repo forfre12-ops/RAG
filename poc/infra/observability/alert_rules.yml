@@ -1,17 +1,17 @@
-# Lloydk 운영 알람 규칙 — doc/11 §2 P0/P1 매핑.
+# Koipa 운영 알람 규칙 — doc/11 §2 P0/P1 매핑.
 # 알람 채널은 Grafana Alerting 또는 별도 Alertmanager 설정 (회신 후 확정).
 
 groups:
-  - name: lloydk-availability
+  - name: koipa-availability
     interval: 30s
     rules:
       - alert: ApiDown
-        expr: up{job="lloydk-api"} == 0
+        expr: up{job="koipa-api"} == 0
         for: 2m
         labels:
           severity: P0
         annotations:
-          summary: "Lloydk API 인스턴스 다운 (>2m)"
+          summary: "Koipa API 인스턴스 다운 (>2m)"
           runbook: "doc/11 §2.2 P0 대응"
 
       - alert: PostgresDown
@@ -25,13 +25,13 @@ groups:
 
       # ElasticsearchDown 제거 — ES→PG 단일화(§03). 벡터스토어 장애는 PostgresDown(P0)이 커버.
 
-  - name: lloydk-performance
+  - name: koipa-performance
     interval: 1m
     rules:
       - alert: ApiLatencyP95High
         expr: |
           histogram_quantile(0.95,
-            sum(rate(lloydk_request_duration_seconds_bucket[5m])) by (le, route)
+            sum(rate(koipa_request_duration_seconds_bucket[5m])) by (le, route)
           ) > 30
         for: 5m
         labels:
@@ -42,19 +42,19 @@ groups:
 
       - alert: ApiErrorRateHigh
         expr: |
-          sum(rate(lloydk_requests_total{status=~"5.."}[5m]))
-            / sum(rate(lloydk_requests_total[5m])) > 0.05
+          sum(rate(koipa_requests_total{status=~"5.."}[5m]))
+            / sum(rate(koipa_requests_total[5m])) > 0.05
         for: 5m
         labels:
           severity: P1
         annotations:
           summary: "API 5xx 비율 > 5%"
 
-  - name: lloydk-business
+  - name: koipa-business
     interval: 5m
     rules:
       - alert: ActiveLearningUrgent
-        expr: lloydk_active_learning_pending_underclass >= 10
+        expr: koipa_active_learning_pending_underclass >= 10
         for: 0m
         labels:
           severity: P1
@@ -63,23 +63,24 @@ groups:
           runbook: "doc/11 §3 모델 재학습"
 
       - alert: ActiveLearningRecommended
-        expr: lloydk_active_learning_pending_total >= 50
+        expr: koipa_active_learning_pending_total >= 50
         for: 5m
         labels:
           severity: P2
         annotations:
           summary: "능동학습 미소비 corrections >= 50 — 재학습 권장"
 
-  - name: lloydk-p1-f2-boost
+  - name: koipa-p1-f2-boost
     interval: 1m
     rules:
       - alert: FnrSpikeOverall
         # P1-F2: 일별 FNR이 5%를 5분 평균으로 초과하면 알람
-        # NEW-H2 주의: lloydk_classify_correct_total/total 은 prom_metrics 에 정의됐으나
-        # 아직 증가 배선 전(정탐 판정에 정답 필요 — corrections/confirm 경로에서 동반 증가 예정).
-        # 둘 다 0이면 expr=0/0=NaN 으로 무발화(안전). 운영 1차 미탐 신호는 ActiveLearningUrgent 사용.
+        # koipa_classify_correct_total/total 은 confirm_service._record_live_fnr 가 사람 검수
+        # 확정(신규 교정, 멱등 재클릭 제외)마다 동반 증가한다(배선됨). 확정 신호 없으면 둘 다 0 →
+        # expr=0/0=NaN 으로 무발화(안전). ⚠️ 검수 선택편향 모집단의 정탐율이므로 실분포 미탐이 아님
+        # (실분포는 연합평가). 운영 1차 미탐 신호는 ActiveLearningUrgent 를 계속 사용.
         expr: |
-          100 * (1 - sum(rate(lloydk_classify_correct_total[5m])) / sum(rate(lloydk_classify_total[5m]))) > 5
+          100 * (1 - sum(rate(koipa_classify_correct_total[5m])) / sum(rate(koipa_classify_total[5m]))) > 5
         for: 10m
         labels:
           severity: P1
@@ -89,7 +90,7 @@ groups:
 
       - alert: CeleryQueueBacklog
         # 큐 적체 1,000 초과
-        expr: sum by (queue) (lloydk_celery_queue_length) > 1000
+        expr: sum by (queue) (koipa_celery_queue_length) > 1000
         for: 5m
         labels:
           severity: P2
@@ -98,8 +99,10 @@ groups:
           runbook: "doc/23 §6.5 worker scaling"
 
       - alert: OutboxDlqGrowing
-        # outbox DLQ 누적 변화율 양수 (실패 누적)
-        expr: increase(lloydk_outbox_dlq_total[15m]) > 0
+        # outbox DLQ 백로그 > 0 (배송 실패로 죽은 메시지 잔존).
+        # 워커-프로세스 카운터(koipa_outbox_dlq_total)는 API 스크랩에 안 보여 영구 no-data 였다
+        # → API 가 공유 Redis stats 로 재노출하는 현재-상태 게이지로 전환(_refresh_outbox_gauges).
+        expr: koipa_outbox_dlq_pending > 0
         for: 0m
         labels:
           severity: P2
@@ -107,9 +110,48 @@ groups:
           summary: "Webhook outbox DLQ 신규 진입 발생"
           runbook: "doc/25 §9 사고 대응"
 
+      - alert: OutboxPendingStuck
+        # outbox pending 이 오래 안 빠짐 → 배송 beat/워커 정지로 KL 콜백이 무음 미배송. 전송 시도조차
+        # 안 되면 attempts 가 안 늘어 DLQ 로도 안 가 OutboxDlqGrowing 이 못 잡는 사각지대. 지속 창(15m)
+        # 으로 정상 in-flight/backoff churn 과 '빠지지 않는 적체'를 구분.
+        expr: koipa_outbox_pending > 0
+        for: 15m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Webhook outbox pending {{ $value }}건 15분 이상 미배송 — 배송 워커/beat 점검"
+          runbook: "doc/25 §9 사고 대응"
+
+      - alert: BeatHeartbeatStale
+        # celery beat 스케줄러 생존 — heartbeat 노후 임계 초과면 beat 사망. beat 가 멈추면 감사체인
+        # 검증·drift·파티션롤오버·outbox 배송이 모두 정지하는데 그 게이지들은 마지막 안전값(0)에 무음
+        # 동결돼 어떤 알람도 안 울린다 → beat-down 자체를 페이지해 그 사각지대를 봉합(P0 무결성 tick 포함).
+        expr: koipa_beat_heartbeat_age_seconds > 300
+        for: 2m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Celery beat heartbeat 정지({{ $value }}s) — 주기 안전작업(감사검증·drift·파티션·outbox) 무음 중단"
+          runbook: "doc/23 §6.5 worker/beat 재기동"
+
+      - alert: PartitionEnsureFailed
+        # 월별 파티션 롤오버 실패 > 0 → _default 비대화·프루닝 무력화 무음열화.
+        # 워커 ensure_partitions_tick 이 Redis 게시 → API 가 현재-실패건수 게이지로 재노출.
+        # 롤오버 지연은 수동 detach/move 런북 필요(default 에 해당 월 행이 이미 쌓임).
+        expr: koipa_partition_ensure_failed > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "월별 파티션 롤오버 실패 {{ $value }}건 — 프루닝 무력화 위험"
+          runbook: "doc/25 §9 파티션 detach/move"
+
       - alert: DriftKlDivergenceHigh
         # B4 drift KL 임계 초과
-        expr: lloydk_drift_kl_divergence >= 0.5
+        # [스코프 2026-08-08] 드리프트 감지는 요건이 아니라 기본 OFF(settings.drift_detection_enabled).
+        # 꺼진 상태에선 게이지가 갱신되지 않아 이 룰은 발화하지 않는다(시계열 부재 → 오탐 없음).
+        # 룰은 남겨 둔다 — 플래그를 켜면 그대로 동작한다.
+        expr: koipa_drift_kl_divergence >= 0.5
         for: 30m
         labels:
           severity: P2
@@ -119,7 +161,7 @@ groups:
 
       - alert: PiiMaskingMissRate
         # PII가 ingest 단계에서 자주 노출되면 SRE 알람
-        expr: rate(lloydk_pii_masked_total{pii_type="rrn"}[10m]) == 0 and rate(lloydk_documents_ingested_total[10m]) > 10
+        expr: rate(koipa_pii_masked_total{pii_type="rrn"}[10m]) == 0 and rate(koipa_documents_ingested_total[10m]) > 10
         for: 30m
         labels:
           severity: P3
@@ -128,11 +170,156 @@ groups:
           runbook: "doc/25 §5.3 PII 마스킹"
 
       - alert: AuditChainBroken
-        # C4 hash chain verification 실패
-        expr: lloydk_audit_chain_broken_total > 0
+        # C4 hash chain verification 실패 (변조 의심). 워커 tick(verify_audit_chain_tick)이
+        # authoritative full-scan → Redis 게시 → API 가 현재-상태 게이지로 재노출한다.
+        # (이전 koipa_audit_chain_broken_total 카운터는 워커 레지스트리라 API 스크랩에서 영구 0.)
+        expr: koipa_audit_chain_broken_rows > 0
         for: 0m
         labels:
           severity: P0
         annotations:
           summary: "감사 로그 hash chain 변조 의심 — 즉시 보안팀 통지"
           runbook: "doc/25 §9 사고 대응 (Critical)"
+
+  # ── 안전 게이트 실패·무결성 신호 (번들 A–F) ──────────────────────────────────
+  # 원칙: "게이트=가시성 한 몸". 안전 액추에이터(serving gate fail-open · kill-gate ·
+  # 감사체인 nil-hash · 멱등 폴백 · 검수 감사누락)는 메트릭으로 노출돼 있었으나 능동 경보 룰이
+  # 없어 '수동 대시보드에만 머무는 무인 미탐'이었다. 아래 룰이 안전실패를 알람으로 승격한다.
+  # 대응 매핑: doc/11 §2 안전 사고. 발동률/발동 자체가 저강도라도 신호 → 검토 라우팅.
+  - name: koipa-safety-gates
+    interval: 1m
+    rules:
+      - alert: ServingGateFailOpen
+        # 서빙 게이트가 예외로 fail-open → 종전 판정이 게이트 없이 통과.
+        # fail-safe 설계지만 발생 자체가 검토 신호다.
+        # gate 라벨 9종의 정본은 koipa.api.prom_metrics.SERVING_FAIL_OPEN_GATES 이고,
+        # 두 계열로 갈린다:
+        #   검수 라우팅  agreement · llm_second_opinion · similarity_escalation · kill_gate
+        #                s2_underclass_risk        → 자동확정을 막지 못하고 통과
+        #   등급 판정    fnr_safe_override · source_prior_cap · metadata_floor · ts_tie_break
+        #                                          → 상향/하향 보정이 미적용
+        # 상향 계열(fnr_safe_override·metadata_floor·ts_tie_break)의 fail-open 은 곧 미탐
+        # 방향이므로 우선 확인한다.
+        # expr 은 라벨을 열거하지 않으므로 게이트를 새로 추가해도 자동으로 잡힌다.
+        expr: sum by (gate) (increase(koipa_serving_gate_fail_open_total[15m])) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "서빙 검수 게이트 fail-open 발생 ({{ $labels.gate }}) — 자동확정 무게이트 통과"
+          runbook: "doc/11 §2 안전 게이트 — 룰/LLM 오류 원인 확인 후 재기동"
+
+      - alert: AuditChainNilHash
+        # payload_hash NULL/빈값 — 감사 미들웨어 우회(직접 DB 삽입) 또는 데이터 손실.
+        # AuditChainBroken(체인 단절)과 별개의 무결성 신호. nil 근원 행은 break로 무음화될 수 있음.
+        # 워커 tick 이 Redis 게시 → API 현재-상태 게이지로 재노출(워커 카운터는 API 무가시였음).
+        expr: koipa_audit_chain_nil_hash_rows > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "감사 nil payload_hash 발생 — 미들웨어 우회/데이터 손실 의심"
+          runbook: "doc/25 §9 사고 대응 — 무결성 조회로 근원 행 스캔"
+
+      - alert: VerifiedLabelAuditSkip
+        # 사람검수 완료 라벨(결정론 경로)의 컴플라이언스 감사 기록이 best-effort로 무음 누락됨.
+        expr: increase(koipa_classify_verified_label_audit_skip_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "verified_label 감사기록 누락 — 컴플라이언스 감사 갭 (NFR-SEC-01)"
+          runbook: "doc/25 §5 감사 추적 — DB 쓰기 실패 원인 확인"
+
+      - alert: KillGateTripped
+        # 죽음의 나선/품질붕괴 조건(TS·S1 미탐 / 검수 과부하 / overturn율) 중 하나 이상 충족.
+        # 경보-only(자동 중단 없음). 지속되면 관리자 안전브레이크(억제) 판단 근거.
+        expr: koipa_kill_gate_tripped == 1
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Kill-gate 발동(5m 지속) — 모델 품질붕괴/미탐 조건, 관리자 검토 필요"
+          runbook: "doc/11 §3 모델 재학습 / kill-gate 조건 진단"
+
+      - alert: KillGateAutoconfirmSuppressed
+        # 안전브레이크가 실제로 고등급 자동확정을 needs_review로 억제 중 = 열화 조건 지속 신호.
+        expr: sum by (grade) (increase(koipa_kill_gate_autoconfirm_suppressed_total[15m])) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Kill-gate 안전브레이크 작동 중 ({{ $labels.grade }} 자동확정 억제)"
+          runbook: "doc/11 §3 — 억제 조건 해소까지 검수 인원 확인"
+
+      - alert: IdempotencyBackendFallback
+        # idempotency 저장소가 redis 미가용으로 in-memory(프로세스-로컬) 폴백 → 멀티워커 멱등성 붕괴.
+        # (운영 startup은 assert_multiworker_idempotency_safe로 차단하나, 런타임 열화 신호를 별도 노출.)
+        expr: increase(koipa_idempotency_backend_fallback_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "멱등 저장소 in-memory 폴백 — 멀티워커 중복처리 위험 (redis 확인)"
+          runbook: "doc/23 §6.5 — redis 가용성/URL 배선 확인"
+
+      - alert: HighGradeReviewBacklog
+        # 고등급(TS·S1) needs_second_review 보류가 누적. 1인 운영 데드락/검수 병목 신호.
+        expr: sum(koipa_escalation_held{grade=~"TS|S1"}) > 20
+        for: 30m
+        labels:
+          severity: P2
+        annotations:
+          summary: "고등급 이중검토 보류 > 20 (30m 지속) — 검수 병목/인원 확인"
+          runbook: "doc/11 §2.4 — 보류큐 소진/검수자 배치"
+
+  # ── 서빙 열화·게이트 발동 신호 (게이트=가시성) ──────────────────────────────────
+  # 아래 메트릭들은 prom_metrics 에 정의·계측돼 있으나 alert 도 대시보드도 없어, 운영자가
+  # 존재를 알고 직접 쿼리해야만 보이는 '수동 상태'였다(감사 지적: ~30종 미노출). 고신호·저오탐
+  # 항목만 능동 경보로 승격한다(예상되는 정상 발동 — OCR 검수·locked 미충족·escalation 라우팅 —
+  # 은 대시보드 소관이라 여기서 제외해 알람 노이즈를 만들지 않는다).
+  - name: koipa-degrade-visibility
+    interval: 1m
+    rules:
+      - alert: ServingRuleFallbackActive
+        # 학습 가중치 미로드 → rule-fallback-v0 로 서빙 = ML 분류가 실질 비활성(전부 룰 판정).
+        # 모델 로딩 실패/경로 미설정의 강한 신호(운영 full 모드에선 정상 발생 없음).
+        expr: increase(koipa_rule_fallback_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "서빙이 rule-fallback-v0 로 열화 — 모델 가중치 미로드 의심 (분류 품질 급락)"
+          runbook: "doc/23 §6.6 — 모델 로딩/경로(classifier_model_dir) 확인"
+
+      - alert: ClassifyPersistFailure
+        # classify 결과 DB 영속화 실패 → inference_id 가 임시 UUID 로 대체(감사/교정 추적 단절).
+        expr: sum by (reason) (increase(koipa_classify_persist_failure_total[15m])) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "분류 결과 영속화 실패 ({{ $labels.reason }}) — DB 연결/정합성 확인"
+          runbook: "doc/25 §9 — DB 가용성 점검"
+
+      - alert: SourcePriorCapConflict
+        # 공개출처인데 예측 등급이 S3 cap 과 충돌 = 비공지성 위반 의심(검수 라우팅).
+        # capped(정상 cap)는 제외하고 cap_conflict(충돌)만 경보 — 오탐 최소.
+        expr: increase(koipa_source_prior_applied_total{action="cap_conflict"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "비공지성(source-prior) cap 충돌 — 공개출처가 고등급 예측됨, 라벨/출처 확인"
+          runbook: "doc/11 §2 안전 게이트 — 출처·등급 재확인"
+
+      - alert: MetadataFloorAccessConflict
+        # ICD access_scope 와 예측 등급이 충돌해 검수 라우팅됨(메타데이터 floor 게이트).
+        # raised(정상 floor 상향)는 제외, access_conflict(충돌)만 경보.
+        expr: increase(koipa_metadata_floor_applied_total{action="access_conflict"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: P2
+        annotations:
+          summary: "ICD access_scope 충돌 — 접근범위와 예측 등급 불일치 검수 라우팅"
+          runbook: "doc/11 §2 안전 게이트 — ICD 메타데이터 확인"

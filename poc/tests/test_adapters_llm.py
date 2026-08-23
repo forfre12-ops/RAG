@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from lloydk.adapters.llm import NoopProvider, build_provider
-from lloydk.adapters.llm.base import estimate_cost_usd
+from koipa.adapters.llm import NoopProvider, build_provider
+from koipa.adapters.llm.base import estimate_cost_usd
 
 
 def test_noop_provider_is_deterministic():

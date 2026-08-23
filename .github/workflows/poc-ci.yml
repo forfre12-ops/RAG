@@ -4,7 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       run_release_gate:
-        description: 'Run strict release gate (requires local evaluation reports/artifacts)'
+        description: 'Run the release gate job (requires local evaluation reports/artifacts)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      release_gate_strict:
+        description: 'STRICT (GA): every gate must PASS. Default = PILOT: blocks on regression FAIL, waives human_review/parity data ceiling with an audited waiver.'
         required: false
         default: 'false'
         type: choice
@@ -15,12 +23,12 @@ on:
     branches: [main]
     paths:
       - 'poc/**'
-      - 'doc/03_openapi_lloydk_kl.yaml'
+      - 'doc/03_openapi_koipa_kl.yaml'
       - '.github/workflows/poc-ci.yml'
   pull_request:
     paths:
       - 'poc/**'
-      - 'doc/03_openapi_lloydk_kl.yaml'
+      - 'doc/03_openapi_koipa_kl.yaml'
       - '.github/workflows/poc-ci.yml'
 
 jobs:
@@ -59,6 +67,67 @@ jobs:
       - name: Lint src + scripts
         run: ruff check src/ scripts/
 
+  deps-lock-check:
+    # P1: 의존성 락(uv.lock, 해시핀·유니버설) 신선도 강제.
+    # pyproject.toml 을 바꾸고 `make lock`(uv lock)을 안 돌리면 여기서 fail →
+    # 폐쇄망 번들이 "부동 >=" 로 재현·감사 불가해지는 회귀를 사전 차단.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Verify uv.lock is in sync with pyproject.toml
+        # --locked: 락을 재생성하지 않고 pyproject 와 일치하는지만 검사(불일치 시 exit 1).
+        run: uv lock --locked
+
+  dependency-cve:
+    # [공급망] 락파일 기준 의존성 CVE 검사. 지금까지 CI 에는 SAST(bandit·semgrep)만 있고
+    # "우리가 쓰는 패키지에 알려진 취약점이 있는가" 를 보는 단계가 없었다 — 락을 고정해도
+    # 그 고정본이 안전한지는 별개 축이다.
+    #
+    # 정책: 새 CVE 는 우리 커밋과 무관하게 아무 때나 공개된다. 그래서 이 잡은 **보고까지는
+    # 항상 하고**, 차단은 취약점 무시 목록(.pip-audit-ignore)으로 명시 관리한다.
+    # 무시하려면 이유를 파일에 적어야 한다 — 조용히 통과하는 경로를 만들지 않는다.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit + uv
+        run: pip install pip-audit uv
+
+      - name: Export locked requirements
+        # 락파일 기준으로 검사해야 "실제 배포되는 버전" 의 취약점을 본다.
+        run: uv export --frozen --no-dev --format requirements-txt > /tmp/req.locked.txt
+
+      - name: pip-audit (locked deps)
+        run: |
+          IGNORE=""
+          if [ -f .pip-audit-ignore ]; then
+            # 형식: 한 줄에 "GHSA-xxxx  # 사유". 주석·빈 줄 무시.
+            while read -r line; do
+              id="$(echo "$line" | sed 's/#.*//' | tr -d '[:space:]')"
+              [ -n "$id" ] && IGNORE="$IGNORE --ignore-vuln $id"
+            done < .pip-audit-ignore
+          fi
+          echo "무시 목록: ${IGNORE:-(없음)}"
+          pip-audit --requirement /tmp/req.locked.txt --strict --progress-spinner off $IGNORE
+
   security-scan:
     # C8: OWASP ASVS L2 셀프스캔 — bandit(SAST) + semgrep(rule-based)
     # 결과는 SARIF로 업로드. 신규 HIGH/CRITICAL 발견 시 fail.
@@ -78,7 +147,12 @@ jobs:
 
       - name: Bandit SAST (HIGH only fails build)
         run: |
-          bandit -r src/ -ll -f json -o bandit-report.json || true
+          # -c 를 명시해야 설정(exclude_dirs·skips)이 실제로 적용된다. 플래그 없이 호출하면
+          # 설정이 로드되지 않아 의도한 스캔 범위와 어긋난다(배포감사 지적).
+          # 설정은 pyproject.toml [tool.bandit] — 구 .bandit(INI)는 한글 주석 + 비-UTF8 로캘에서
+          # configparser 가 죽어 스캔 자체가 실패했다. TOML 은 UTF-8 고정이라 안전.
+          bandit -r src/ -ll -c pyproject.toml -f json -o bandit-report.json || true
+          test -f bandit-report.json || { echo "::error::bandit 이 리포트를 생성하지 못했다(설정 로드 실패 등)"; exit 1; }
           # exit code 1 if any HIGH severity finding
           python -c "
           import json, sys
@@ -127,8 +201,21 @@ jobs:
       - name: Install openapi-spec-validator
         run: pip install "openapi-spec-validator>=0.7"
 
-      - name: Validate OpenAPI spec (doc/03_openapi_lloydk_kl.yaml)
-        run: openapi-spec-validator doc/03_openapi_lloydk_kl.yaml
+      - name: Validate OpenAPI spec (doc/03_openapi_koipa_kl.yaml)
+        run: openapi-spec-validator doc/03_openapi_koipa_kl.yaml
+
+      # [2026-08-11] 스펙이 well-formed 한지만 보고 **라우터와 맞는지는 안 보고 있었다.**
+      # 실측: 라우터 58 · 스펙 43 → 15경로가 명세에 없는 채로 통과하고 있었다(콘솔·감사로그·
+      # 롤백 등 8/8~8/9 신설분 전부). scripts/openapi_consistency.py --strict 가 이미 있었고
+      # Makefile 에도 걸려 있었으나 CI 에서 부르지 않아 아무도 몰랐다.
+      - name: Install poc deps for router import
+        working-directory: poc
+        run: pip install -e ".[jwt]"
+      - name: OpenAPI ↔ FastAPI router drift (strict)
+        working-directory: poc
+        env:
+          TESTING: '1'
+        run: python scripts/openapi_consistency.py --strict
 
   openapi-artifacts:
     # P1-E1·E4: OpenAPI → Postman 컬렉션 + 클라이언트 SDK 자동 생성.
@@ -150,9 +237,9 @@ jobs:
         run: |
           mkdir -p dist
           python poc/scripts/generate_postman_collection.py \
-            --spec doc/03_openapi_lloydk_kl.yaml \
-            --output dist/lloydk_kl_postman.json \
-            --base-url "https://api.lloydk.example.com"
+            --spec doc/03_openapi_koipa_kl.yaml \
+            --output dist/koipa_kl_postman.json \
+            --base-url "https://api.koipa.example.com"
 
       - name: Install openapi-generator (E4)
         run: |
@@ -163,7 +250,7 @@ jobs:
       - name: Generate Python SDK (E4)
         run: |
           java -jar /tmp/openapi-generator-cli.jar generate \
-            -i doc/03_openapi_lloydk_kl.yaml \
+            -i doc/03_openapi_koipa_kl.yaml \
             -g python \
             -o dist/sdk-python \
             --skip-validate-spec || echo "SDK generation soft-failed"
@@ -171,7 +258,7 @@ jobs:
       - name: Generate TypeScript SDK (E4)
         run: |
           java -jar /tmp/openapi-generator-cli.jar generate \
-            -i doc/03_openapi_lloydk_kl.yaml \
+            -i doc/03_openapi_koipa_kl.yaml \
             -g typescript-fetch \
             -o dist/sdk-typescript \
             --skip-validate-spec || echo "SDK generation soft-failed"
@@ -181,7 +268,7 @@ jobs:
         with:
           name: openapi-artifacts-${{ github.sha }}
           path: |
-            dist/lloydk_kl_postman.json
+            dist/koipa_kl_postman.json
             dist/sdk-python/
             dist/sdk-typescript/
           retention-days: 90
@@ -240,6 +327,48 @@ jobs:
             doc/21_OSS_SBOM_보고서.html
           retention-days: 90  # doc/14 운영 전환 시 발주처 검수 첨부용
 
+  safety-gates:
+    # P0#5: 하드닝 운영 안전 게이트 강제(require_safety_gates)와 airgap 번들이 회귀하지 않는지
+    # CI 로 영속화. 이전엔 evaluate_safety_gates/assert_production_credentials 가 배선만 되고
+    # CI 검증 0건 → 하드닝 스프린트(338e3b6 등)가 조용히 되돌려져도 무방비였다.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./poc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'poc/pyproject.toml'
+
+      - name: Install base package (no heavy extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Safety-gate enforcement check (하드닝 프로파일 게이트ON + 강제로직 양/음성)
+        # 양성: onprem-local·full-train 기본값에 안전 게이트 OFF 0건.
+        # 음성: 게이트 하나를 env override(=0)로 끄면 반드시 startup 차단(must_raise=True).
+        run: python scripts/ci_check_safety_gates.py
+
+      - name: Compose config validation (airgap · observability · prod)
+        # airgap 번들 + 관측성 overlay(alertmanager/healthcheck) + prod overlay 가 문법·참조
+        # 정합한지 검사(변수/서비스 해석). config 는 구조만 검사(external network/volume 존재는
+        # up-time 검사라 무관). 던져쓰기 .env 로 ${VAR:?} 필수변수 충족. .env 부재가 CI 정상.
+        run: |
+          if [ -f .env ]; then echo "::error::unexpected .env present in CI checkout"; exit 1; fi
+          printf 'POSTGRES_PASSWORD=ci_placeholder_not_a_secret\nIMAGE_TAG=ci\nGRAFANA_PASSWORD=ci_placeholder\n' > .env
+          docker compose --env-file .env -f docker-compose.airgap.yml config --quiet
+          docker compose --env-file .env -f infra/observability/docker-compose.observability.airgap.yml config --quiet
+          ENV_FILE=.env docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+          rm -f .env
+
+      - name: Build production API image
+        run: docker build -f Dockerfile.api.prod -t koipa-api:ci .
+
   test-lite:
     runs-on: ubuntu-latest
     defaults:
@@ -249,15 +378,15 @@ jobs:
     # B1·B2 (2026-05-29): Redis(R1·outbox) + Elasticsearch(RAG indexer·DR) 추가.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: lloydk
-          POSTGRES_PASSWORD: lloydk_dev_pg
-          POSTGRES_DB: lloydk
+          POSTGRES_USER: koipa
+          POSTGRES_PASSWORD: koipa_dev_pg
+          POSTGRES_DB: koipa
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U lloydk -d lloydk"
+          --health-cmd "pg_isready -U koipa -d koipa"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -285,8 +414,8 @@ jobs:
           --health-retries 20
     env:
       # pydantic-settings는 case-insensitive로 DATABASE_URL → settings.database_url 매핑
-      DATABASE_URL: postgresql+psycopg://lloydk:lloydk_dev_pg@localhost:5432/lloydk
-      PGPASSWORD: lloydk_dev_pg
+      DATABASE_URL: postgresql+psycopg://koipa:koipa_dev_pg@localhost:5432/koipa
+      PGPASSWORD: koipa_dev_pg
       # B1: R1·outbox redis 백엔드 테스트가 실 Redis로 동작 (fakeredis 폴백 아님)
       REDIS_URL_TEST: redis://localhost:6379/15
       # B2: ES skipif 해제 — _ES 가용 시 RAG indexer/DR 실측
@@ -318,14 +447,51 @@ jobs:
         # alembic baseline + N4 인덱스까지 upgrade head 된 상태에서 ORM 메타데이터와 비교.
         run: bash scripts/ci_alembic_drift_check.sh
 
-      - name: Run pytest lite (slow/fullstack/model_download excluded)
-        run: make test-lite
+      - name: Run pytest lite + coverage (slow/fullstack/model_download excluded)
+        # P3: coverage 측정·리포트 배선(과거엔 pytest-cov 설치·'80% 목표' 주석만 있고 --cov 미실행).
+        # 소프트 — 하드 임계 게이트는 아직 없음(현 커버리지 확인 후 도입 예정). coverage.xml 업로드.
+        run: make test-lite-cov
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: poc/coverage.xml
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Run fullstack DB tests (PG-backed — repositories·db_models·cascade·idempotency)
+        # test-lite 타깃은 로컬(PG 없는 dev) 친화를 위해 fullstack 제외가 의도적이다. 이 CI 잡엔
+        # postgres 컨테이너 + alembic upgrade head 가 이미 있으므로, 여기서 별도 스텝으로 fullstack
+        # DB 테스트를 실행해 영속화/캐스케이드/멱등/리포지토리 커버리지를 매 push에서 확보한다
+        # (과거엔 workflow_dispatch 전용이라 자동 검증 밖이었다 — 완성도 감사 CI 갭).
+        run: make test-fullstack
+
+      - name: Run KL contract + W3 router + audit integration (slow, PG-backed)
+        # doc/19 KL 8-시나리오 연동 계약·W3 라우터·audit 미들웨어는 slow 마커라 test-lite에서
+        # 제외되고, 유일 실행 잡(test-slow)은 workflow_dispatch 전용 + PG 서비스 부재라 dispatch
+        # 해도 _pg_ok()=False로 전부 skip → KL 연동 계약 회귀가 어떤 자동 게이트로도 보호 안 됐다.
+        # 이 잡엔 postgres+alembic이 이미 있으므로 여기서 명시 실행해 매 push/PR에서 보호한다.
+        run: make test-kl-integration
 
       - name: Validate dataset manifest
         run: make check-manifest
 
       - name: Data quality — gold_real 강화 검사 (누수·합성마커·금지source, exit 1 on FAIL)
         run: make check-gold
+
+      - name: Release eval evidence gate
+        run: make check-release-evidence
+
+      - name: Parser support matrix gate
+        run: make check-parser-support
+
+      - name: OpenAPI router consistency gate
+        run: make openapi-consistency
+
+      - name: Leakage gate - train/holdout text hash
+        run: make check-leakage
 
       - name: Run PoC dryrun suite (P4 -> P3 -> P2 -> P1 -> P5)
         run: python scripts/run_all_pocs.py
@@ -499,7 +665,7 @@ jobs:
           python scripts/build_offline_bundle.py \
             --version "ci-${{ github.sha }}" \
             --dry-run \
-            --output dist/lloydk-airgap-bundle
+            --output dist/koipa-airgap-bundle
 
       - name: Upload PoC reports
         if: always()
@@ -515,9 +681,9 @@ jobs:
         with:
           name: bundle-manifest
           path: |
-            poc/dist/lloydk-airgap-bundle/manifest.yaml
-            poc/dist/lloydk-airgap-bundle/manifest.json
-            poc/dist/lloydk-airgap-bundle/CHECKSUMS.sha256
+            poc/dist/koipa-airgap-bundle/manifest.yaml
+            poc/dist/koipa-airgap-bundle/manifest.json
+            poc/dist/koipa-airgap-bundle/CHECKSUMS.sha256
           retention-days: 14
           if-no-files-found: warn
 
@@ -586,15 +752,15 @@ jobs:
         working-directory: ./poc
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: lloydk
-          POSTGRES_PASSWORD: lloydk_dev_pg
-          POSTGRES_DB: lloydk
+          POSTGRES_USER: koipa
+          POSTGRES_PASSWORD: koipa_dev_pg
+          POSTGRES_DB: koipa
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U lloydk -d lloydk"
+          --health-cmd "pg_isready -U koipa -d koipa"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -621,8 +787,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DATABASE_URL: postgresql+psycopg://lloydk:lloydk_dev_pg@localhost:5432/lloydk
-      PGPASSWORD: lloydk_dev_pg
+      DATABASE_URL: postgresql+psycopg://koipa:koipa_dev_pg@localhost:5432/koipa
+      PGPASSWORD: koipa_dev_pg
       REDIS_URL_TEST: redis://localhost:6379/15
       ES_URL: http://localhost:9200
     steps:
@@ -665,8 +831,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Validate manifest and strict release gate
+      - name: Validate manifest and release gate
         run: |
           make check-manifest
-          make operational-readiness
-          make release-gate
+          make check-release-evidence
+          make check-parser-support
+          if [ "${{ github.event.inputs.release_gate_strict }}" = "true" ]; then
+            echo "::notice::release-gate STRICT (GA) — every readiness gate must PASS"
+            make release-gate
+          else
+            echo "::notice::release-gate PILOT — blocks on regression FAIL; human_review/parity data ceiling waived with audit"
+            make release-gate-pilot
+          fi

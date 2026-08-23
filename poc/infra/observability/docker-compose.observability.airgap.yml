@@ -1,0 +1,111 @@
+name: koipa-obs
+
+# 관측성 스택 (폐쇄망/airgap 전용) — Prometheus + Grafana + Loki + Promtail + exporters.
+# ─────────────────────────────────────────────────────────────────────────────
+# dev용 docker-compose.observability.yml 과의 차이:
+#   1) external network 를 koipa-airgap_default 로 조인(dev 는 koipa-poc_default).
+#      → 반드시 메인 스택(docker-compose.airgap.yml)이 먼저 기동돼 네트워크가 존재해야 함.
+#   2) prometheus 에 alert_rules.yml 을 추가 마운트 — dev compose 는 rule_files 가 참조하는
+#      alert_rules.yml 을 마운트하지 않아 안전 알림 29종이 실제로 로드되지 않았다(무음 갭 교정).
+#   3) 이미지 태그 고정(재현성). POSTGRES_PASSWORD 는 .env 필수.
+#
+# 기동(메인 스택 up 이후, 번들 루트에서):
+#   docker compose --env-file .env -f observability/docker-compose.observability.airgap.yml up -d
+#   → Prometheus :9090 (/alerts 에서 발화 알림 확인), Grafana :3000 (대시보드)
+#
+# 알림 라우팅(email/webhook)은 Alertmanager 를 추가해야 완성된다 — 현 단계는 Prometheus UI
+# 발화 가시화까지(고객사 폐쇄망 통지 채널이 결정되면 alertmanager 서비스 추가).
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # alert_rules.yml 을 rule_files 가 찾는 경로(설정파일과 동일 디렉토리)에 마운트.
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - promdata:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=90d
+      - --storage.tsdb.retention.size=30GB
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks: [default]
+    depends_on: [alertmanager]
+
+  alertmanager:
+    # 발화 알림 그룹·중복제거·통지 라우팅. 통지 채널(SMTP/webhook)은 alertmanager.yml 에서
+    # 고객사 환경에 맞춰 설정. 미설정 시 알림은 Alertmanager UI(:9093)에서 확인.
+    image: prom/alertmanager:v0.27.0
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanagerdata:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks: [default]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks: [default]
+    depends_on: [prometheus, loki]
+
+  loki:
+    image: grafana/loki:3.2.1
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - lokidata:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks: [default]
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [default]
+    depends_on: [loki]
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    environment:
+      DATA_SOURCE_NAME: "postgresql://koipa:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/koipa?sslmode=disable"
+    ports:
+      - "127.0.0.1:9187:9187"
+    networks: [default]
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    command:
+      - --redis.addr=redis://redis:6379
+    ports:
+      - "127.0.0.1:9121:9121"
+    networks: [default]
+
+volumes:
+  promdata:
+  grafanadata:
+  lokidata:
+  alertmanagerdata:
+
+networks:
+  default:
+    # 메인 airgap 스택(name: koipa-airgap)이 만든 기본 네트워크에 조인.
+    name: koipa-airgap_default
+    external: true
