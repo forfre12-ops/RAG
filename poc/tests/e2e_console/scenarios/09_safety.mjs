@@ -150,27 +150,39 @@ export const scenarios = [
   },
 
   {
-    id: 'safety.server-config.threshold-is-server-truth',
-    title: '검수 임계는 서버 값을 읽어 표시하고, 화면 필터와 구분한다',
-    why: '화면에만 있는 슬라이더를 "임계 조정"으로 믿게 두면 서버는 그대로인데 조정했다고 오해한다',
+    id: 'safety.server-config.no-client-side-threshold',
+    title: '검수 여부는 서버 판정만 쓴다 — 화면에 임계 입력칸이 없다',
+    why: [
+      '종전 화면에는 「목록 강조 기준」 입력칸이 있었고 「색칠만, 판정 무관」이라 적혀 있었지만,',
+      '실제로는 confidence < 그 값 으로 검수/자동 배지를 계산했다. 서버 라우팅 게이트는 14개인데',
+      '(services/review_reasons.py) 그중 신뢰도 게이트 하나만 흉내 낸 것이라, agreement-gate 로',
+      '검수에 간 문서가 화면에는 「자동」으로 떴다. 칸을 다시 넣으면 그 거짓말이 돌아온다.',
+    ].join(' '),
     needsMock: true,
     async run({ server, check }) {
-      const { FIXTURES } = await import('../lib/server.mjs');
-      const h = JSON.parse(JSON.stringify(FIXTURES['GET /healthz']));
-      h.operational_config.review_confidence_threshold = 0.55;
-      server.overrides['GET /healthz'] = h;
-
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      check.eq(page.text('srv-gate-v'), '0.55', '서버 값이 그대로 표시된다');
-      check.eq(page.$('gate')?.value, '0.55', '화면 필터 초기값도 서버 값에 맞춘다');
 
-      // 화면 필터를 만져도 서버로 나가는 요청은 없다(표시 기준일 뿐)
-      const before = server.calls.length;
-      page.set('gate', '0.9');
+      check.ok(!page.$('gate'), '화면 임계 입력칸이 없다');
+      check.ok(!page.$('srv-gate-v'), '읽기 전용 서버 임계 표시도 없다');
+
+      // 신뢰도가 높아도 서버가 needs_review 라고 하면 화면은 「검수」로 말해야 한다.
+      server.overrides['POST /classify'] = {
+        inference_id: '00000000-0000-4000-8000-0000000000aa',
+        doc_id: 'gate-test-1', label: 'S2', confidence: 0.98, scores: {},
+        model_version: 'v-test', elapsed_ms: 12,
+        status: 'needs_review',
+        warnings: ['agreement-gate: rule S1 vs model S2'],
+      };
+      page.click(page.q('.tab[data-tab="ops"]'));
+      page.set('cl-docid', 'gate-test-1');
+      page.set('cl-body', '판정 대상 본문');
+      page.click(page.$('btn-classify'));
       await page.settle();
-      check.eq(server.calls.length, before, '필터를 만져도 서버 설정을 바꾸지 않는다');
-      check.eq(page.text('srv-gate-v'), '0.55', '서버 값 표시는 그대로다');
+
+      check.includes(page.text('cl-result'), '검수 필요',
+        '신뢰도 98% 여도 서버가 needs_review 면 「검수 필요」로 말한다');
+      check.includes(page.text('queue'), '검수', '큐 배지도 서버 판정을 따른다');
       return page;
     },
   },

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from koipa.services.review_reasons import (
     REVIEW_GATES,
+    REVIEW_GATE_TAGS,
     UNMAPPED,
     causal_review_reason,
     count_causal_reasons,
@@ -111,3 +112,21 @@ def test_upload_path_extraction_gate_is_mapped():
     warn = "extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (table_incomplete)"
     assert causal_review_reason([warn], "needs_review") == "extraction-gate"
     assert causal_review_reason([_LOWCONF, warn], "needs_review") == "low-confidence"
+
+
+def test_every_gate_tag_has_korean_text():
+    """화면 사유표(review_reason_ko.js)가 서버 게이트 태그를 전부 덮는지 고정한다.
+
+    왜 필요한가(2026-08-24). 관리자 콘솔의 「근거」 패널은 warnings 원문이 아니라 서버가
+    하나로 줄여 준 태그(automation_assessment.causal_review_reason)를 받는다. 종전에는 그
+    태그를 'agreement-gate' 처럼 **영문 그대로** 화면에 찍었다. 한글표를 화면 쪽에 두면
+    게이트를 추가·개명했을 때 조용히 뒤처져 다시 영문이 뜬다 — 여기서 먼저 깨뜨린다.
+    """
+    js = (
+        Path(__file__).resolve().parent.parent
+        / "src" / "koipa" / "api" / "static" / "review_reason_ko.js"
+    ).read_text("utf-8")
+    table = js.split("var TAG_TEXT = {", 1)[1].split("};", 1)[0]
+    missing = [t for t in REVIEW_GATE_TAGS if f'"{t}":' not in table]
+    assert not missing, f"화면 사유표에 한글 문구가 없는 게이트: {missing}"
+    assert f'"{UNMAPPED}":' in table, "unmapped 도 사람 말로 옮겨 둬야 한다"

@@ -167,8 +167,6 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .profile-banner{margin:10px 0 4px;padding:9px 13px;border-radius:8px;font-size:12.5px;font-weight:600;border-left:4px solid;}
 .profile-banner.jjw{background:var(--bg-surface);border-color:var(--accent);}
 .profile-banner.cust{background:var(--bg-surface);border-color:#b8860b;}
-.srv-gate{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg-surface);}
-.srv-gate>b{font-size:17px;font-family:var(--font-mono);}
 .dash-panel{border:1px solid var(--border-mid);border-left:3px solid var(--border-strong);padding:13px 14px;background:var(--bg-surface);display:flex;flex-direction:column;gap:9px;min-width:0;}
 /* 좌측 색선 하나로 칸 상태를 먼저 읽게 한다 — 배지를 다 읽지 않아도 정상/주의가 구분된다. */
 .dash-panel.st-ok{border-left-color:#16a34a;}
@@ -315,6 +313,7 @@ details.adv[open]{padding-bottom:12px;}
 .cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
 /* console-header:css:end */
 </style>
+<script src="./review_reason_ko.js"></script>
 <script src="./deploy_badge.js" data-screen="관리자"></script>
 </head>
 <body>
@@ -481,9 +480,6 @@ details.adv[open]{padding-bottom:12px;}
             <span id="write-gate-msg" style="font-size:11.5px;color:var(--text-faint);"></span>
           </label>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span id="purge-result" class="hint" style="margin:0;">시연으로 쌓인 데이터만 삭제합니다. 운영 데이터는 대상이 아닙니다.</span>
-        </div>
       </div>
       </details>
     </section>
@@ -519,9 +515,52 @@ details.adv[open]{padding-bottom:12px;}
           </div>
           <p class="sec-note" style="margin-top:4px;">
             <b>[본문 추출]</b>은 저장하지 않고 아래 입력란만 채웁니다. <b>[추출 → 분류]</b>는 분류까지 실행해 검수 큐에 넣습니다.
-            큰 문서(약 9쪽 이상)는 자동으로 백그라운드 분류로 전환되며 진행 상태가 아래에 표시됩니다.
+            동기 처리 상한을 넘는 큰 문서는 자동으로 백그라운드 분류로 전환되며 진행 상태가 아래에 표시됩니다.
           </p>
           <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
+          <!-- [2026-08-23] index.html(등급 시연 화면)에는 있고 관리자 콘솔에는 없던 ICD 메타데이터
+               입력칸. 서버(documents.py analyze_document)는 진작부터 source_type 등을 Form
+               필드로 받고 있었다 — 이 화면만 안 보냈다. 안 보내면 출처(Gate-1 source-prior
+               cap)·관리성(metadata-floor)이 unknown 으로 남아, 공개 문서를 올려도 상한이
+               걸릴 자리가 없다(severe-max 청크 부스트가 공개문서를 과탐할 때 이게 유일한
+               방어선 — 2026-08-23 실측 공개문서 300건 중 79건 과탐). 값은 전부 선택사항이며
+               비우면 지금처럼 unknown 으로 간다(동작 불변). -->
+          <details class="icd-box" style="margin-top:10px;border:1px solid var(--border,#e1e1de);padding:10px 12px;border-radius:6px">
+            <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-dim)">문서 속성 (ICD) — 출처 · 보안표시 · 접근범위 <span style="font-weight:400">· 선택. 넣으면 등급 판정에 반영됩니다</span></summary>
+            <div class="btn-row" style="margin-top:10px;gap:16px;flex-wrap:wrap">
+              <div class="field" style="min-width:200px">
+                <label class="fld">출처</label>
+                <select id="cl-icd-source">
+                  <option value="">— 미지정 —</option>
+                  <option value="public">공개 자료 (S3 로 상한)</option>
+                  <option value="registered_patent">등록 특허 (공개)</option>
+                  <option value="academic">학술 자료 (공개)</option>
+                  <option value="internal">내부 문서</option>
+                  <option value="external_confidential">외부 기밀 (NDA)</option>
+                </select>
+              </div>
+              <div class="field" style="min-width:200px">
+                <label class="fld">보안표시</label>
+                <select id="cl-icd-marking">
+                  <option value="">— 미지정 —</option>
+                  <option value="top_secret">극비 — 등급 TS 이상</option>
+                  <option value="secret">기밀 — 등급 S1 이상</option>
+                  <option value="confidential">대외비 — 등급 S2 이상</option>
+                  <option value="none">표기 없음</option>
+                </select>
+              </div>
+              <div class="field" style="min-width:200px">
+                <label class="fld">접근범위</label>
+                <select id="cl-icd-scope">
+                  <option value="">— 미지정 —</option>
+                  <option value="approved_only">승인자 한정 — 관리성 M=2</option>
+                  <option value="designated">지정자 한정</option>
+                  <option value="department">부서 한정</option>
+                  <option value="all_employees">전사 공개</option>
+                </select>
+              </div>
+            </div>
+          </details>
         </div>
         <!-- [2026-08-23] 샘플 문서 고르기·일괄 분류를 **뺐다.**
              ① 그 샘플은 평가 정답지(검증문서)에 들어 있는 문서다. 화면을 열면 본문이 이미
@@ -579,22 +618,15 @@ details.adv[open]{padding-bottom:12px;}
           <span id="rq-info" class="hint" style="margin:0;"></span>
         </div>
         <div id="queue" class="queue"><div class="q-empty">「검토할 문서 보기」를 누르면 승인 대기 중인 문서가 나옵니다. 분류를 실행해도 결과가 여기 쌓입니다. 확정·수정한 내용은 재학습 큐에 반영됩니다.</div></div>
-        <details style="margin-top:12px">
-          <summary style="cursor:pointer;font-size:12.5px;color:var(--text-dim)">표시 설정 — 확신도 기준 보기</summary>
-          <div class="row2" style="margin-top:10px">
-            <div class="field">
-              <label class="fld">서버 검수 임계 <span class="pill">읽기 전용</span></label>
-              <div class="srv-gate"><b id="srv-gate-v">—</b>
-                <span class="hint" style="margin:0">확신도가 이 값보다 낮으면 서버가 <span class="pill warn">검수 필요</span>로 보냅니다. 화면에서는 바꿀 수 없고 배포 설정으로만 바뀝니다.</span>
-              </div>
-            </div>
-            <div class="field">
-              <label class="fld">목록 강조 기준 — 색칠만, 판정 무관</label>
-              <input id="gate" type="number" min="0" max="1" step="0.05" value="0.70" oninput="this.dataset.touched=1;document.getElementById('gate-v').textContent=(+this.value).toFixed(2)" />
-              <p class="hint">아래 목록에서 확신도가 <b id="gate-v">0.70</b> 보다 낮은 건을 색으로 강조만 합니다. <b>서버 판정에는 영향이 없습니다.</b></p>
-            </div>
-          </div>
-        </details>
+        <!-- [2026-08-24] 「표시 설정 — 확신도 기준 보기」 두 칸을 뺐다. 관리자가 볼 이유가
+             없었을 뿐 아니라, 아래 칸이 실제로 목록의 판정 배지를 뒤집고 있었다.
+               · 서버 검수 임계: 읽기 전용 표시였다. 배포 설정으로만 바뀌는 값이라 화면에서
+                 할 수 있는 일이 없다. 값은 healthz 응답에 그대로 있다.
+               · 목록 강조 기준: 「색칠만, 판정 무관」이라 적어 두고 실제로는
+                 `confidence < 이 값` 으로 검수/자동 배지를 계산했다. 서버의 검수 라우팅은
+                 게이트가 14개인데(services/review_reasons.py) 그중 신뢰도 게이트 하나만
+                 흉내 낸 것이라, agreement-gate·cap-conflict 로 검수에 간 문서가 화면에는
+                 「자동」으로 떴다. 이제 서버가 준 status 를 그대로 쓴다. -->
       </div>
     </section>
 
@@ -698,8 +730,8 @@ details.adv[open]{padding-bottom:12px;}
         <p class="hint" id="sy-provider-note" style="margin-top:2px"></p>
         <div id="sy-noop-note" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
-        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검수 큐 새로고침」으로 생성된 합성 문서의 검수 대기분을 조회합니다. 승인한 건만 <code>build_training_rows</code>가 학습행으로 편입합니다.</div></div>
-        <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 등급을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
+        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검수 큐 새로고침」으로 생성된 합성 문서의 검수 대기분을 조회합니다. 학습행으로 만들 수 있는 것은 승인한 건뿐이며, 실제 편입은 관리자가 학습셋 생성 절차를 돌릴 때 이뤄집니다.</div></div>
+        <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
       </div>
     </section>
 
@@ -840,7 +872,7 @@ details.adv[open]{padding-bottom:12px;}
           </select>
           <button class="btn sm" onclick="loadAuditLog()">조회</button>
         </div>
-        <p class="sec-note" id="au-info" style="margin-top:6px;">헬스체크·정적 자산은 기록 대상에서 제외됩니다 — 상태를 바꾸는 행위만 남습니다.</p>
+        <p class="sec-note" id="au-info" style="margin-top:6px;">헬스체크·정적 자산·Prometheus 스크랩은 기록 대상에서 제외됩니다. 그 밖의 요청은 조회를 포함해 모두 남습니다.</p>
         <div id="au-warn"></div>
         <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
           <table>
@@ -1433,17 +1465,6 @@ function applyServerConfig(d){
   // 2026-08-23 에 정확히 그 반대가 됐다 — 함수 하나가 던지자 화면 절반이 비었다.
   try{ applyProviderAvailability(d); }catch(e){ console && console.warn && console.warn('provider gating skipped', e); }
   try{ applySynthAvailability(d&&d.llm_provider); }catch(e){ console && console.warn && console.warn('synth note skipped', e); }
-  const oc=(d&&d.operational_config)||{};
-  const t=oc.review_confidence_threshold;
-  const el=$('srv-gate-v');
-  if(el) el.textContent = (typeof t==='number') ? t.toFixed(2) : '—';
-  // 목록 강조 기준의 초기값을 서버 임계에 맞춰 둔다 — 처음 열었을 때 화면과 서버가 같은
-  // 기준을 보게 해, 사용자가 굳이 만지지 않으면 오해가 생기지 않는다.
-  const g=$('gate');
-  if(g && typeof t==='number' && !g.dataset.touched){
-    g.value=t.toFixed(2);
-    const gv=$('gate-v'); if(gv) gv.textContent=t.toFixed(2);
-  }
 }
 
 /* ---- 1. CLASSIFY ---- */
@@ -1532,6 +1553,10 @@ async function ingestLargeDocument(f, info){
   // 워커 2회 사망). --workers 1 이면 동시에 처리 중이던 다른 요청까지 함께 끊긴다.
   // 같은 문서를 index_for_rag=false 로 보내면 0.6초에 201 로 끝난다 — 분류에는 색인이 필요 없다.
   fd.append('index_for_rag','false');
+  // [2026-08-23] ICD 메타데이터 — 소용량 경로(classifyFromFile)와 동일 규칙, 대용량 폴백에서만 빠지면
+  // 문서 크기에 따라 등급 판정 근거가 달라지는 비일관성이 생긴다.
+  [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
+    .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
   const r=await fetch(`${c.base}/documents`,
     {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
   if(!r.ok){
@@ -1578,6 +1603,10 @@ async function classifyFromFile(alsoClassify){
     const fd=new FormData();
     fd.append('file', f);
     fd.append('full_text','true');
+    // [2026-08-23] ICD 메타데이터 — 빈 값은 보내지 않는다(index.html 과 동일 규칙).
+    // 빈 값을 보내면 "unknown" 과 "명시적으로 없음" 이 구분되지 않아 관리성 판정이 뒤집힌다.
+    [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
+      .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
     const r=await fetch(`${c.base}/documents/analyze`,
       {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
     if(r.status===413){
@@ -1654,26 +1683,41 @@ async function runBatch(){
   log(`일괄 분류 완료 — ${SAMPLES.length}건 검수 큐 적재, 기대등급 일치 ${hit}/${SAMPLES.length}`, 'ok');
   btn.disabled=false; btn.textContent=orig;
 }
+/* [2026-08-24] 이 카드에서 신뢰도 수치를 뺐다 — 등급 시연 화면(app.js)과 같은 규율이다.
+ *   ① 화면 표시는 요건이 아니다(RTM FUN-024 의 구현범위는 검수자 큐 배분·심층지표).
+ *   ② 이 값은 정답확률이 아니라 softmax 파생값이라(골든500 AUROC 0.58 · ECE 0.18) 숫자로
+ *      서면 실제보다 확정적으로 읽힌다. 자동확정을 가르는 것도 이 값 단독이 아니다.
+ *   ⚠ 지운 것은 화면뿐이다 — confidence 는 API 응답(ICD required)·DB·감사로그에 그대로 남는다.
+ * 대신 관리자가 실제로 알아야 하는 것을 적는다: 검수인가 자동인가, 그리고 **왜 검수인가**.
+ * 사유 문구는 공용 표(review_reason_ko.js) 한 곳에서 가져온다 — 등급 시연 화면과 같은 말이 뜬다. */
 function renderClassify(d){
-  const f=d.evaluation_factors||{}; const conf=(d.confidence*100).toFixed(1);
-  const gate=+$('gate').value; const flagged=d.confidence<gate || (d.warnings&&d.warnings.length);
+  const f=d.evaluation_factors||{};
+  // 검수 여부는 서버가 정한다(ClassifyResponse.status). 화면이 신뢰도로 다시 계산하면
+  // 신뢰도 게이트 하나만 재현하고 나머지 13개(agreement-gate·cap-conflict 등)를 놓친다.
+  const flagged = d.status==='needs_review';
+  const warns = Array.isArray(d.warnings) ? d.warnings : [];
+  const whyKo = (window.KOIPA_GATE_REASON ? window.KOIPA_GATE_REASON(warns) : '')
+    || '자동 확정하지 않고 사람 검수로 라우팅';
+  const adjNote = window.KOIPA_ADJUSTMENT_NOTE ? window.KOIPA_ADJUSTMENT_NOTE(d) : '';
   const evi=(d.evidence||[]).slice(0,8).map(e=>`<span class="chip">${esc((e.text||'').slice(0,18))}${e.tag?' · '+esc(e.tag):''}</span>`).join('');
   $('cl-result').innerHTML=`
     <div class="kv" style="margin-top:4px">
       <div><span>등급</span> ${gradeTag(d.label)} <b>${GRADE_KR[d.label]||''}</b></div>
-      <div><span>신뢰도</span> <b>${conf}%</b></div>
       <div><span>모델</span> <b class="mono" style="font-family:var(--font-mono);font-size:11.5px">${esc(d.model_version||'-')}</b></div>
       <div><span>${d.elapsed_ms}ms</span></div>
-      ${flagged?'<span class="pill warn">검수 필요</span>':'<span class="pill ok">게이트 통과</span>'}
+      ${flagged?'<span class="pill warn">검수 필요</span>':'<span class="pill ok">자동 확정</span>'}
     </div>
+    ${flagged?`<div class="warnbox" style="margin-top:8px">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨<br/>사유: ${esc(whyKo)}${adjNote?`<br/>${esc(adjNote)}`:''}</div>`:''}
     <div class="factors" style="margin-top:10px">
       ${factorCard('S 비공지성', f.secrecy)}
       ${factorCard('V 경제유용성', f.value)}
       ${factorCard('M 비밀관리성', f.management)}
     </div>
     ${evi?`<div style="margin-top:10px"><label class="fld">근거 키워드</label><div class="evi">${evi}</div></div>`:''}
-    ${(d.warnings&&d.warnings.length)?`<div class="warnbox" style="margin-top:8px">⚠ ${d.warnings.join(' · ')}</div>`:''}
   `;
+  // 원문 경고는 화면 카드가 아니라 실시간 로그로 보낸다 — 'persistence skipped' 처럼 판정과
+  // 무관한 내부 사정이 '검수 사유' 자리에 섞이던 것을 막는다(app.js 와 같은 처리).
+  if(warns.length) log(`[classify] ${d.doc_id||''} 경고: ${warns.join(' · ')}`, flagged?'info':'info');
 }
 function factorCard(label,v){ v=v??0; const pct=Math.min(100,(v/2)*100); return `<div class="factor"><div class="fl">${label}</div><div class="fv">${(+v).toFixed(v%1?1:0)}</div><div class="meter"><i style="width:${pct}%"></i></div></div>`; }
 
@@ -1709,7 +1753,7 @@ async function loadReviewQueue(){
   }
 }
 function enqueue(d, title){
-  const gate=+$('gate').value; const flagged=d.confidence<gate || (d.warnings&&d.warnings.length);
+  const flagged = d.status==='needs_review';   // 서버 판정 그대로 — renderClassify 와 같은 기준
   QUEUE.unshift({inference_id:d.inference_id, doc_id:d.doc_id, title:title||$('cl-title').value||d.doc_id, label:d.label, confidence:d.confidence, model_version:d.model_version, flagged, resolved:false});
   renderQueue();
 }
@@ -1720,7 +1764,7 @@ function renderQueue(){
     <div class="q-item ${it.flagged?'flagged':''} ${it.resolved?'resolved':''}">
       <div class="q-top">
         <div><span class="q-id">${esc(it.doc_id)}</span> · <span class="q-title">${esc(it.title)}</span>${it.status?` <span class="pill" style="font-size:10px">${esc(it.status)}</span>`:''}</div>
-        <div>${gradeTag(it.label)} <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${(it.confidence*100).toFixed(0)}%</span> ${it.flagged?'<span class="pill warn">검수</span>':'<span class="pill ok">자동</span>'} ${it.resolved?'<span class="pill ok">완료</span>':(it.pending_second?'<span class="pill warn">2차 검수 필요</span>':'')}</div>
+        <div>${gradeTag(it.label)} ${it.flagged?'<span class="pill warn">검수</span>':'<span class="pill ok">자동</span>'} ${it.resolved?'<span class="pill ok">완료</span>':(it.pending_second?'<span class="pill warn">2차 검수 필요</span>':'')}</div>
       </div>
       ${it.text_preview?`<div style="font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;max-height:96px;overflow:auto;white-space:pre-wrap;">${esc(it.text_preview)}</div>`:''}
       ${it.inference_id?`
@@ -1739,7 +1783,7 @@ function renderQueue(){
   `).join('');
 }
 /* ── 검수 근거: "왜 이 등급인가" (FUN-023 근거 출력 · FUN-024 검수자 UI) ──────────
- * 큐 목록에는 등급·신뢰도만 있어 검수자가 판단 근거를 볼 수 없었다.
+ * 큐 목록에는 등급과 검수/자동 결정만 있어 검수자가 판단 근거를 볼 수 없었다.
  * 클릭한 행에서만 조회한다(lazy) — 목록 전체를 미리 불러오면 대기건이 많을 때 낭비다.
  * 조회 대상은 GET /review-queue/{id}/evidence 로, **분류 시점에 저장된 근거**를 그대로 읽는다.
  * (/classify/explain 은 쓰지 않는다 — 문서를 다시 분류하므로 큐가 가진 300자 미리보기로는
@@ -1755,20 +1799,22 @@ function renderWhy(d){
   if(d.error) return `<div class="warnbox">근거 조회 실패: ${esc(d.error)}</div>`;
   const r=d.recorded||{};
   const a=r.automation_assessment||{};
-  const alts=(r.alternatives||[]).map(a=>
-    `${esc(a.level_code||'?')} ${((a.confidence||0)*100).toFixed(1)}%`).join(' · ');
+  // 차순위는 **어느 등급이 다음이었나**만 적는다 — 확률 수치는 화면에서 뺀 값이다(원값은 DB).
+  const alts=(r.alternatives||[]).map(a=>esc(a.level_code||'?')).join(' · ');
   const warn=(d.warnings||[]).map(w=>`<div class="sec-note">· ${esc(w)}</div>`).join('');
   const evs=(d.evidence||[]).map(whyRow).join('') ||
     '<div class="sec-note">표시할 근거 항목이 없습니다.</div>';
   const byType=Object.entries(d.by_type||{}).map(([k,v])=>
     `<span class="pill">${esc(k)} ${Number(v).toFixed(2)}</span>`).join(' ');
-  const automation=(a.selected_confidence!=null)
-    ? `<div class="sec-note" style="margin-top:6px">자동확정 관측 · 선택 등급 ${esc(a.selected_label||'-')} ${(Number(a.selected_confidence)*100).toFixed(1)}%`
-      + (a.score_margin!=null?` · 1·2위 차 ${(Number(a.score_margin)*100).toFixed(1)}%`:'')
-      + (a.causal_review_reason?` · 검수 사유 ${esc(a.causal_review_reason)}`:'')
-      + `</div>` : '';
+  // 서버가 하나로 줄여 준 검수 사유 태그(causal_review_reason)를 한글로 옮겨 적는다.
+  // 종전에는 'agreement-gate' 같은 영문 태그를 그대로 찍었고, 옆에 확률 수치가 붙어 있었다.
+  const reasonKo = a.causal_review_reason && window.KOIPA_GATE_REASON_BY_TAG
+    ? window.KOIPA_GATE_REASON_BY_TAG(a.causal_review_reason) : (a.causal_review_reason||'');
+  const automation = reasonKo
+    ? `<div class="sec-note" style="margin-top:6px">검수 사유 — ${esc(reasonKo)}</div>`
+    : (a.selected_label
+        ? `<div class="sec-note" style="margin-top:6px">자동 확정 · 선택 등급 ${esc(a.selected_label)}</div>` : '');
   return `<div class="why-head">판정 <b>${esc(r.grade||'-')}</b>`
-       + (r.confidence!=null?` · 신뢰도 ${(r.confidence*100).toFixed(1)}%`:'')
        + ` · 모델 <code>${esc(r.model_version||'-')}</code>`
        + (r.rag_used?' · RAG 사용':'')+'</div>'
        + (byType?`<div class="why-agg">${byType}</div>`:'')
@@ -2023,7 +2069,7 @@ async function loadAuditLog(){
              + `<td>${esc(it.action||'')}</td><td>${who}</td><td>${tgt}</td><td>${ok}</td></tr>`;
       }).join('');
     }
-    if(info) info.textContent=`전체 ${d.total??0}건 중 최근 ${items.length}건 · 헬스체크·정적 자산은 기록 대상에서 제외됩니다.`;
+    if(info) info.textContent=`전체 ${d.total??0}건 중 최근 ${items.length}건 · 헬스체크·정적 자산·Prometheus 스크랩만 제외됩니다.`;
     (d.warnings||[]).forEach(w=>{ if(warn) warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">${esc(w)}</div>`; });
     log(`감사 로그 ${items.length}건 조회 (전체 ${d.total??0})`,'ok');
   }catch(e){
@@ -2654,10 +2700,14 @@ async function synthReview(i, decision){
   const chosen=$('sy-g-'+i) ? $('sy-g-'+i).value : it.target_grade;
   const body={decision, comment:'console synth review', actor:actor()};
   // 목표등급과 다른 등급으로 승인하면 corrected_grade 로 전송 — 그 등급으로 학습행이 만들어진다.
+  // [2026-08-24] 이 화면은 진작부터 값을 보내고 있었는데 서버가 버리고 있었다. 서버가
+  // corrected_level_id 로 받아 학습 라벨에 쓰도록 고쳤다(마이그레이션 f0a1b2c3d4e5).
+  // 응답의 applied_grade 가 **실제로 쓰일 등급**이므로 로그에 그대로 남긴다 — 화면이 무엇을
+  // 보냈는가가 아니라 서버가 무엇을 적용했는가를 봐야 같은 결함을 다시 안 만든다.
   if(decision==='approve' && chosen && chosen!==it.target_grade) body.corrected_grade=chosen;
   try{
     const d=await api('POST',`/synth/${encodeURIComponent(it.synth_id)}/review`,body);
-    log(`합성 검수 ${decision}: ${it.synth_id} → ${d.final_status}`+(d.added_to_dataset_version?` · dataset ${d.added_to_dataset_version}`:''),'ok');
+    log(`합성 검수 ${decision}: ${it.synth_id} → ${d.final_status}`+(d.applied_grade?` · 학습 등급 ${d.applied_grade}`:'')+(d.added_to_dataset_version?` · dataset ${d.added_to_dataset_version}`:''),'ok');
     SYNTH.splice(i,1); renderSynthQueue();
   }catch(e){ alert('합성 검수 실패: '+(e.data?.detail||e.message)); }
 }

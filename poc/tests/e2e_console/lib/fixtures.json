@@ -29,7 +29,8 @@
     },
     "operational_config": {
       "classifier_model_dir": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
-      "review_confidence_threshold": 0.7,
+      "review_confidence_threshold": 0.5,
+      "review_confidence_threshold_public": null,
       "rag": {
         "collection": "docs",
         "embedding_model": "nlpai-lab/KURE-v1",
@@ -117,7 +118,7 @@
         "selected_label": "TS",
         "selected_confidence": 0.42,
         "score_margin": 0.03,
-        "causal_review_reason": "low_confidence"
+        "causal_review_reason": "low-confidence"
       }
     },
     "evidence": [
@@ -1044,6 +1045,12 @@
       "pending": 2,
       "deferred": 1
     },
+    "available_batches": [
+      {
+        "review_batch": "2026-08-A",
+        "total": 3
+      }
+    ],
     "candidates": [
       {
         "doc_id": "PGC-0001",

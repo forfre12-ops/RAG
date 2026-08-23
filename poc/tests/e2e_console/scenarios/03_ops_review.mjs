@@ -30,6 +30,10 @@ export const scenarios = [
       check.includes(page.html('queue'), 'E2E-DOC-001', '문서 id 가 보인다');
       check.includes(page.html('queue'), '차세대 공정 레시피.docx', '파일명이 보인다');
       check.includes(page.text('queue'), '당사 양자컴퓨팅연구소', '본문 미리보기가 보인다');
+      // [2026-08-24] 큐 배지에서 신뢰도 %(예: 「TS 42% 검수」)를 뺐다. 검수자가 봐야 하는 것은
+      // 등급과 결정이지 softmax 파생값이 아니다(원값은 API·DB·감사로그에 그대로 남는다).
+      check.ok(!/\d+%/.test(page.text('queue')), '큐 목록에 신뢰도 수치가 없다');
+      check.ok(/검수|자동/.test(page.text('queue')), '대신 검수·자동 결정이 배지로 남는다');
 
       // 근거 열기 — 지연 조회(lazy)라 여기서 처음 요청이 나가야 한다
       check.eq(server.countCalls('GET', '/review-queue/'), 0, '목록만으로는 근거를 미리 안 가져온다');
@@ -42,7 +46,13 @@ export const scenarios = [
       check.includes(why, '대외 반출을 금한다', '근거 인용문이 보인다');
       check.includes(why, 'secrecy', '근거 유형이 보인다');
       check.includes(why, '차순위', '차순위 등급이 보인다');
-      check.includes(why, '자동확정 관측', '자동확정 관측치가 보인다');
+      // [2026-08-24] 종전에는 '자동확정 관측 · 선택 등급 TS 42.0% · 1·2위 차 3.0% ·
+      // 검수 사유 low-confidence' 였다. 확률 수치를 빼고, 영문 태그는 공용 표
+      // (review_reason_ko.js)로 옮겨 적는다.
+      check.includes(why, '검수 사유', '검수 사유 줄이 있다');
+      check.includes(why, '자동 확정 기준에 못 미칩니다', '영문 태그가 아니라 한글 사유가 보인다');
+      check.ok(!/low-confidence/.test(why), '게이트 태그 원문이 화면에 새지 않는다');
+      check.ok(!/\d+\.\d%/.test(why), '근거 패널에도 확률 수치가 없다');
       check.eq(page.text('why-btn-0'), '근거 접기', '버튼 문구가 접기로 바뀌었다');
 
       // 두 번 눌러도 다시 요청하지 않는다(캐시)

@@ -42,8 +42,12 @@ export const scenarios = [
       check.includes(page.text('health-txt'), '정상', 'checkHealth: 헬스 표시가 정상으로 바뀌었다');
       check.eq(page.$('health')?.className, 'health-pill ok', 'checkHealth: 헬스 pill 이 ok');
 
-      // ⑦ applyServerConfig — 서버가 준 검수 임계가 화면에 반영됐다(2026-08-23 회귀 지점)
-      check.eq(page.text('srv-gate-v'), '0.70', 'applyServerConfig: 서버 검수 임계가 화면에 찍혔다');
+      // ⑦ applyServerConfig — **끝까지 돌았다**(2026-08-23 회귀 지점: 앞 함수 하나가 던지면
+      // 뒤 초기화가 통째로 멈춘다). 종전에는 검수 임계 표시로 이걸 확인했는데, 2026-08-24 에
+      // 그 칸을 화면에서 뺐다. 마지막 호출인 applySynthAvailability 의 결과로 바꾼다 —
+      // 잠그는 대상은 숫자가 아니라 "뒤 코드가 살아 있다" 는 사실이다.
+      check.includes(page.text('sy-provider-note'), '서버 설정',
+        'applyServerConfig: 마지막 초기화(applySynthAvailability)까지 실행됐다');
 
       check.includes(page.bodyText(), '거버넌스 콘솔 준비 완료', '초기화 완료 로그가 남았다');
       return page;

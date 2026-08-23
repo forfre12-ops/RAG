@@ -88,6 +88,46 @@
       + " 로 내려 잡았습니다 — 사람이 확인합니다.";
   }
 
+  /* ── 게이트 태그 → 사람 말 ─────────────────────────────────────────────
+   *
+   * 위 GATE_REASONS 는 warnings **원문**에서 사유를 찾는다. 그런데 관리자 콘솔의
+   * 「근거」 패널은 원문이 아니라 서버가 이미 하나로 줄여 준 태그를 받는다
+   * (ClassifyResponse.automation_assessment.causal_review_reason —
+   *  services/review_reasons.py 의 REVIEW_GATE_TAGS 중 하나, 또는 'unmapped').
+   * 종전에는 그 태그를 영문 그대로 화면에 찍었다. 표는 여기 한 곳에 둔다.
+   *
+   * ⚠ 서버의 REVIEW_GATE_TAGS 와 키가 일치해야 한다 —
+   *   tests/test_review_reasons.py::test_every_gate_tag_has_korean_text 가 확인한다.
+   *   게이트를 추가·개명하면 그 시험이 먼저 깨진다.
+   */
+  var TAG_TEXT = {
+    "low-confidence": "판정 근거가 자동 확정 기준에 못 미칩니다",
+    "ingestion-degraded": "추출 품질이 낮은 문서입니다(스캔·OCR 등)",
+    "cap-conflict": "출처 기준 하향과 내용 기준 상향이 충돌합니다",
+    "sparse-evidence": "룰 판정이 약한 근거 하나에 기대고 있습니다",
+    "abbrev-only-escalation": "영문 약어 밀도만으로 높은 등급이 나왔습니다",
+    "body-below-threshold": "판정할 본문이 사실상 없습니다",
+    "metadata-access-conflict": "접근 제한 표기에 비해 내용 예측이 낮습니다",
+    "metadata-management-conflict": "관리성 부재 표기인데 내용 예측이 비공개 등급입니다",
+    "icd-metadata-fnr-risk": "연동 메타데이터에 규약 밖 값이 있어 미탐 위험이 있습니다",
+    "s2-underclass-risk": "내부 문서 신호가 있는데 공개 등급으로 예측되었습니다",
+    "gate-fail-open": "안전 게이트 하나가 적용되지 못했습니다",
+    "agreement-gate": "두 엔진(분류기·룰)의 판정이 갈립니다",
+    "llm-secondopinion": "LLM 2차 의견이 더 높은 등급을 제시했습니다",
+    "kill-gate-brake": "품질 경보(kill-gate) 중이라 높은 등급을 자동 확정하지 않습니다",
+    "similarity-escalation": "사람이 검증한 유사 문서가 더 높은 등급입니다",
+    "extraction-gate": "추출 검수 게이트에 걸렸습니다(표 누락·저품질 등)",
+    "unmapped": "서버가 검수로 보냈으나 화면 표가 아직 그 사유를 모릅니다",
+  };
+
+  /* 태그 한 개 → 한 줄. 모르는 태그는 원문을 그대로 돌려준다(조용히 사라지지 않게). */
+  function gateReasonByTag(tag) {
+    var t = String(tag || "");
+    if (!t) return "";
+    return TAG_TEXT[t] || t;
+  }
+
   global.KOIPA_GATE_REASON = gateReason;
+  global.KOIPA_GATE_REASON_BY_TAG = gateReasonByTag;
   global.KOIPA_ADJUSTMENT_NOTE = adjustmentNote;
 })(typeof window !== "undefined" ? window : globalThis);

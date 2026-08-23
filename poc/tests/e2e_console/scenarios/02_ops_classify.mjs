@@ -34,7 +34,10 @@ export const scenarios = [
 
       const res = page.html('cl-result');
       check.includes(res, 'S1', '결과 카드에 등급이 찍혔다');
-      check.includes(res, '81.0%', '신뢰도가 찍혔다');
+      // [2026-08-24] 종전에는 '81.0%' 가 찍히는지 봤다. 화면에서 신뢰도 수치를 빼기로 했으므로
+      // 이제 **숫자가 없다는 것**과 그 자리에 결정이 있다는 것을 잠근다.
+      check.ok(!/\d+\.\d%/.test(res), '결과 카드에 신뢰도 수치가 없다');
+      check.ok(/자동 확정|검수 필요/.test(res), '숫자 대신 결정(자동 확정·검수 필요)이 찍혔다');
       check.includes(res, 'v-fe4b386b', '모델 버전이 찍혔다');
       check.includes(page.html('queue'), 'E2E-DOC-010', '검수 큐에 적재됐다');
       check.eq(page.$('btn-classify')?.disabled, false, '끝나고 버튼이 다시 눌린다');
