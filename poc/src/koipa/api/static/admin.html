@@ -55,7 +55,7 @@ a{color:var(--text);}
 .card{border:1px solid var(--border-mid);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 17px;border-bottom:1px solid var(--border);background:var(--bg-surface);}
 .card-head .ttl{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px;}
-.card-head .step-no{font-family:var(--font-mono);font-size:10px;font-weight:700;color:#fff;background:var(--bg-inverse);width:20px;height:20px;display:grid;place-items:center;border-radius:5px;}
+.card-head .step-no{font-family:var(--font-sans);font-size:10.5px;font-weight:700;letter-spacing:-.01em;color:#fff;background:var(--bg-inverse);min-width:20px;height:20px;padding:0 7px;display:inline-grid;place-items:center;border-radius:5px;white-space:nowrap;flex-shrink:0;}
 .card-head .ep{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
 .card-body{padding:16px 17px;display:flex;flex-direction:column;gap:11px;}
 
@@ -429,7 +429,7 @@ details.adv[open]{padding-bottom:12px;}
       <details>
       <summary style="cursor:pointer;list-style:none">
       <div class="card-head" style="border:0;padding-bottom:0">
-        <div class="ttl"><span class="step-no">0</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
+        <div class="ttl"><span class="step-no">공통</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
         <span class="ep">X-API-Key · X-Actor-Role</span>
       </div>
       </summary>
@@ -488,7 +488,7 @@ details.adv[open]{padding-bottom:12px;}
          자기 일이 두 번째에 있다. KL 이 관리자 화면을 보고 "잘 모르겠다"고 한 원인 중 하나다. -->
     <section class="card" data-pane="ops" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">2</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
+        <div class="ttl"><span class="step-no">운영 2</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
         <span class="ep">POST /documents/analyze · POST /classify</span>
       </div>
       <div class="card-body">
@@ -554,7 +554,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 2. 검수 큐 ===== -->
     <section class="card" data-pane="ops" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">1</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no">운영 1</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag">FUN-024</span></div>
         <span class="ep">POST /confirm · /relabel</span>
       </div>
       <div class="card-body">
@@ -601,7 +601,7 @@ details.adv[open]{padding-bottom:12px;}
          동일하다 — GET /admin/locked-readiness. -->
     <section class="card col-span" data-pane="review" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">2</span> 모델 검증 문서 현황 — 구성 · 승인 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no">검수 2</span> 모델 검증 문서 현황 — 구성 · 승인 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
       </div>
       <div class="card-body">
@@ -631,7 +631,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
     <section class="card col-span" data-pane="train" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">1</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no">학습 1</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
@@ -658,7 +658,12 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div class="row3" style="margin-top:8px;">
           <div class="field">
-            <label class="fld">LLM provider</label>
+            <!-- [2026-08-23] 이 칸은 **생성기를 고르지 않는다.** submit() 은 이 값을 비용
+                 추정(COST_PER_DOC_USD)에만 쓰고, 워커에 넘기는 인자는 등급·건수·도메인뿐이다
+                 (synthesis_service.py:81-87). 실제 생성기는 워커가 서버 설정으로 만든다
+                 (generator.py:284 build_provider() → settings.llm_provider). 이름을 그대로
+                 두면 "여기서 anthropic 을 고르면 Claude 가 쓴다"로 읽힌다 — 아니다. -->
+            <label class="fld">비용 추정용 제공자</label>
             <select id="sy-provider">
               <option value="noop">noop (결정론 · 외부 API 없이)</option>
               <option value="anthropic">anthropic (Claude)</option>
@@ -684,6 +689,8 @@ details.adv[open]{padding-bottom:12px;}
             </div>
           </div>
         </div>
+        <p class="hint" id="sy-provider-note" style="margin-top:2px"></p>
+        <div id="sy-noop-note" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
         <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검수 큐 새로고침」으로 생성된 합성 문서의 검수 대기분을 조회합니다. 승인한 건만 <code>build_training_rows</code>가 학습행으로 편입합니다.</div></div>
         <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 등급을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
@@ -693,7 +700,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 3. 재학습 ===== -->
         <section class="card" data-pane="train" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">2</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
+        <div class="ttl"><span class="step-no">학습 2</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
         <span class="ep">POST /train · GET /train/jobs</span>
       </div>
       <div class="card-body">
@@ -745,7 +752,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 4. 모델 서빙/리로드 ===== -->
         <section class="card" data-pane="train" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">3</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
+        <div class="ttl"><span class="step-no">학습 3</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
         <span class="ep">POST /admin/model/activate · /reload</span>
       </div>
       <div class="card-body">
@@ -778,7 +785,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 5. 메트릭 ===== -->
     <section class="card col-span" data-pane="train" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">4</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no">학습 4</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /metrics/latest · /history · /confusion-matrix</span>
       </div>
       <div class="card-body">
@@ -797,7 +804,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 6. 운영 관제 대시보드 ===== -->
     <section class="card col-span" data-pane="ops" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">3</span> 운영 관제 대시보드</div>
+        <div class="ttl"><span class="step-no">운영 3</span> 운영 관제 대시보드</div>
         <span class="ep">GET /admin/dashboard</span>
       </div>
       <div class="card-body">
@@ -814,7 +821,7 @@ details.adv[open]{padding-bottom:12px;}
          화면에서 "누가 언제 무엇을 했는가"를 볼 수 없었다. -->
     <section class="card col-span" data-pane="ops" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">4</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
+        <div class="ttl"><span class="step-no">운영 4</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
         <span class="ep">GET /admin/audit-log</span>
       </div>
       <div class="card-body">
@@ -841,7 +848,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 7. 검증 기준문서 준비 ===== 루프 B 의 시작점(G1) -->
     <section class="card col-span" data-pane="review" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">1</span> 검증 기준문서 준비 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no">검수 1</span> 검증 기준문서 준비 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
@@ -975,7 +982,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
     <section class="card col-span" data-pane="config" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">1</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
+        <div class="ttl"><span class="step-no">설정 1</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
         <span class="ep">GET · PUT /schema/grades</span>
       </div>
       <div class="card-body">
@@ -999,7 +1006,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== T. 태깅 키워드 관리 (FUN-023-④) ===== -->
     <section class="card col-span" data-pane="config" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no">2</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
+        <div class="ttl"><span class="step-no">설정 2</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
         <span class="ep">GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
       </div>
       <div class="card-body">
@@ -1374,11 +1381,52 @@ function applyGoldenAiAvailability(active){
     ai.style.paddingTop = blocked ? '14px' : '';
   }
 }
+/* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「생성 요청」을 누르면 무슨 일이 벌어지는가.
+ *
+ * 근거(코드):
+ *   - noop 이면 생성기가 placeholder 본문을 쓰고 label_source="noop_fallback" 를 찍는다
+ *     (m1_synthesis/generator.py:455-459).
+ *   - 그 문서는 검수에서 승인해도 build_training_rows() 가 배제한다
+ *     (services/synthesis_service.py:41-52 TRAINING_EXCLUDED_LABEL_SOURCES, :177).
+ *   → 큐에는 쌓이지만 **학습행은 0건**이다. 화면에 그 말이 없어서 「승인했는데 왜 학습에
+ *     안 들어가는가」를 결과를 보고 나서야 알게 된다.
+ *
+ * 검증 기준문서 카드와 달리 버튼은 잠그지 않는다 — 여기서의 생성은 파이프라인(생성→큐→검수)
+ * 이 도는지 보는 용도로는 그대로 유효하고, 학습 유입은 서버가 자동으로 막기 때문이다. */
+function applySynthAvailability(active){
+  const a=String(active||'').toLowerCase();
+  const note=$('sy-provider-note');
+  if(note){
+    note.textContent = a
+      ? '이 칸은 예상 비용 계산에만 쓰입니다. 실제 생성기는 서버 설정(' + a + ')을 씁니다 — 여기서 다른 것을 골라도 생성기는 바뀌지 않습니다.'
+      : '이 칸은 예상 비용 계산에만 쓰입니다. 실제 생성기는 서버 설정을 씁니다(설정을 읽지 못했습니다).';
+  }
+  // 서버가 실제로 쓰는 제공자가 목록에 있으면 그것으로 맞춰 둔다 — 비용 추정이 현실과 맞게.
+  const sel=$('sy-provider');
+  if(sel && a){
+    const cur=Array.prototype.find.call(sel.options, function(o){return o.value===a;});
+    if(cur) sel.value=a;
+  }
+  const box=$('sy-noop-note');
+  if(box){
+    const blocked=(a==='noop');
+    box.style.display = blocked ? '' : 'none';
+    box.innerHTML = blocked
+      ? '<b>이 서버에서 생성한 문서는 학습에 쓰이지 않습니다 — 본문을 쓸 LLM 이 없습니다.</b><br/>'
+        + '서버 설정이 <code>llm_provider=noop</code> 이라 생성기가 <b>자리표시용 본문</b>을 만들고 '
+        + '<code>label_source=noop_fallback</code> 를 찍습니다. 검수에서 승인해도 '
+        + '<code>build_training_rows</code> 가 이 표시를 보고 배제하므로 <b>학습행은 0건</b>입니다.<br/>'
+        + '· 눌러도 됩니다 — 생성→검수 큐 경로가 도는지 확인하는 용도로는 그대로 유효합니다.<br/>'
+        + '· 학습에 쓸 문서를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하거나, 서버 설정(.env)의 <code>LLM_PROVIDER</code> 를 바꿔야 합니다.'
+      : '';
+  }
+}
 function applyServerConfig(d){
   applyProfileVisibility(d);
   // 새로 붙인 게이팅이 죽어도 **뒤 초기화(검수 임계·대시보드)는 살아야 한다.**
   // 2026-08-23 에 정확히 그 반대가 됐다 — 함수 하나가 던지자 화면 절반이 비었다.
   try{ applyProviderAvailability(d); }catch(e){ console && console.warn && console.warn('provider gating skipped', e); }
+  try{ applySynthAvailability(d&&d.llm_provider); }catch(e){ console && console.warn && console.warn('synth note skipped', e); }
   const oc=(d&&d.operational_config)||{};
   const t=oc.review_confidence_threshold;
   const el=$('srv-gate-v');
