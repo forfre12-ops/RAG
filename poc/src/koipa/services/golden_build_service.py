@@ -47,6 +47,30 @@ _ALLOWED_PATH_ROOTS = (
     Path(tempfile.gettempdir()).resolve(),
 )
 
+# [2026-08-23] 검수 목록에 올릴 폴더를 **허용 목록으로 좁힌다.**
+#
+# 왜. 종전에는 datasets/ 전체를 훑어 "본문+등급이 있는 jsonl" 을 전부 올렸다. 실측하니 60건
+# 안에 평가 홀드아웃(holdout_eval.hardened.jsonl — 시연 근거로 쓴 42건)·학습 전용·누출
+# 격리본·v8 실험 분할(dev/calib)이 섞여 있었다. 관리자가 그중 하나를 골라 검수·서명하면
+# 그 문서들이 locked_gold_eval(평가 정답지)로 승격되고, 그 순간 **"모델이 좋아졌다"는 판단
+# 근거가 무너진다** — 평가셋이 정답지 안으로 들어가기 때문이다.
+#
+# 처음에는 이름으로 걸러 봤는데(holdout·eval·train…) 실험 폴더가 계속 새 이름으로 생겨
+# 따라잡히지 않았다. **무엇을 뺄지가 아니라 무엇을 넣을지**로 정의한다.
+#
+# 이건 목록(화면이 고르게 하는 것)만 좁히는 것이다. POST /golden/jobs/register 의 샌드박스
+# (datasets/ 하위)는 그대로다 — 다른 경로가 꼭 필요하면 API 로 명시해서 넣을 수 있다.
+_REVIEW_SOURCE_DIRS = (
+    "datasets/golden_review",      # KL 전달본 등 검수 대상 묶음
+    "datasets/gold_real/builds",   # 골든 빌더가 만든 후보
+)
+
+
+def _is_review_source(rel_path: str) -> bool:
+    """검수 목록에 올릴 파일인가 — 허용 폴더 아래에 있어야 한다."""
+    low = rel_path.replace("\\", "/").lower()
+    return any(low.startswith(d + "/") for d in _REVIEW_SOURCE_DIRS)
+
 
 def _safe_path(raw: str | None) -> Path:
     """요청 경로를 허용 루트 하위로 제한. 벗어나면 ValueError(작업 자체를 거부)."""
@@ -162,6 +186,8 @@ class GoldenBuildService:
         for p in sorted(root.rglob("*.jsonl")):
             if len(out) >= limit:
                 break
+            if not _is_review_source(p.relative_to(_POC_ROOT).as_posix()):
+                continue
             try:
                 if p.stat().st_size == 0:
                     continue

@@ -353,10 +353,11 @@ details.adv[open]{padding-bottom:12px;}
     <!-- [2026-08-23] 「설정」을 탭에서 빼고 오른쪽 끝 톱니로 옮겼다. 등급 체계·태깅 규칙은
          도입할 때 한 번 정하고 이후 거의 바꾸지 않는데, 매일 쓰는 탭과 나란히 있으면 같은
          빈도의 업무로 보인다. 기능·카드·요건 증빙은 그대로다 — 진입점만 옮겼다. -->
-    <span class="tab-group-label">일상 운영</span>
+    <!-- [2026-08-23] 묶음 이름(일상 운영 / 모델 관리)을 뺐다. 회색 글씨가 **비활성 탭처럼**
+         보여서 오히려 헷갈렸다. 설정을 톱니로 뺀 뒤 왼쪽에 「운영」 하나만 남아, 구분선만으로
+         "이건 성격이 다르다"가 전달된다. 무엇이 무엇인지는 탭 아래 한 줄 설명이 말한다. -->
     <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제</span></button>
     <span class="tab-divider" aria-hidden="true"></span>
-    <span class="tab-group-label">모델 관리</span>
     <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">검증문서 후보 · 승인</span></button>
     <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">재학습 · 게이트 · 성적</span></button>
     <button class="tab tab-icon" data-tab="config" role="tab" onclick="showPane('config')"
@@ -492,16 +493,17 @@ details.adv[open]{padding-bottom:12px;}
           </p>
           <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
         </div>
-        <!-- [2026-08-23] 샘플을 **미리 채우지 않는다.**
-             종전에는 doc_id·제목·본문이 HTML 에 하드코딩돼 있어, 화면을 열면 이미 문서 하나가
-             입력된 상태였다. 그 문서는 **평가 정답지(검증문서)에 들어 있는 문서**다.
-             즉 관리자가 「분류하기」를 누르면 AI 가 이미 아는 문서로 판정이 나온다 —
-             발주처가 보면 시연 조작으로 읽힌다. 빈 칸으로 시작하고, 샘플은 드롭다운에서
-             **명시적으로 고를 때만** 채운다. -->
-        <div class="field">
-          <label class="fld">샘플 문서 — 선택하면 아래 칸이 채워집니다 <span style="font-weight:400;color:var(--text-faint)">(평가 정답지 문서라 판정이 쉽습니다)</span></label>
-          <select id="sample-select" onchange="pickSample(this.value)"></select>
-        </div>
+        <!-- [2026-08-23] 샘플 문서 고르기·일괄 분류를 **뺐다.**
+             ① 그 샘플은 평가 정답지(검증문서)에 들어 있는 문서다. 화면을 열면 본문이 이미
+                채워져 있어서, 「분류하기」를 누르면 AI 가 아는 문서로 판정이 나왔다.
+             ② 「샘플 8건 일괄 분류」는 그 8건을 **실제 검수 큐에 적재**하고 `기대등급 일치
+                8/8` 로 채점까지 했다. 운영 큐에 평가용 문서가 섞이고, 화면이 정답을 알고
+                채점하는 모양이 된다.
+             ③ 현장 관리자가 샘플 문서를 분류할 일이 없다. 개발·시연용 기능이 매일 쓰는
+                카드에 들어와 있었다.
+             샘플로 분류를 보여주는 것은 등급 시연 화면(index.html)의 역할이고 거기 이미 있다.
+             SAMPLES 배열과 pickSample/runBatch 는 지우지 않고 남긴다 — 진단·회귀 확인에 쓰고,
+             다시 붙일 때 만들 필요가 없게 한다. 화면에서만 뺀다. -->
         <div class="row2">
           <div class="field">
             <label class="fld">doc_id</label>
@@ -545,16 +547,16 @@ details.adv[open]{padding-bottom:12px;}
             </div>
           </div>
           <div class="field">
-            <label class="fld">목록 강조 기준 (이 화면에서만)</label>
+            <label class="fld">목록 강조 기준 — 색칠만, 판정 무관</label>
             <input id="gate" type="number" min="0" max="1" step="0.05" value="0.70" oninput="this.dataset.touched=1;document.getElementById('gate-v').textContent=(+this.value).toFixed(2)" />
             <p class="hint">아래 목록에서 confidence &lt; <b id="gate-v">0.70</b> 인 건을 강조합니다. <b>서버 판정에는 영향이 없습니다.</b></p>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin:2px 0 8px;">
-          <button class="btn sm" onclick="loadReviewQueue()">DB 검수 큐 불러오기</button>
+          <button class="btn sm" onclick="loadReviewQueue()">검토할 문서 보기</button>
           <span id="rq-info" class="hint" style="margin:0;"></span>
         </div>
-        <div id="queue" class="queue"><div class="q-empty">「DB 검수 큐 불러오기」로 서버의 승인 대기 건을 조회하거나, 분류를 실행하면 결과가 적재됩니다.</div></div>
+        <div id="queue" class="queue"><div class="q-empty">「검토할 문서 보기」로 서버의 승인 대기 건을 조회하거나, 분류를 실행하면 결과가 적재됩니다.</div></div>
         <p class="sec-note">서버의 실제 대기 목록을 불러옵니다. 확정·재라벨 결과는 재학습 큐에 반영됩니다.</p>
       </div>
     </section>
@@ -822,18 +824,32 @@ details.adv[open]{padding-bottom:12px;}
                  골든셋 후보 관리 화면(manage.html)과 하는 일이 같았다. -->
             <select id="gold-source" onchange="syncGoldenSource()">
               <option value="corpus">서버 코퍼스 경로</option>
-              <option value="editor">1 분류 패널 본문</option>
+              <option value="editor">「분류 실행」 카드에 입력한 본문</option>
             </select>
           </div>
           <div class="field">
             <label class="fld">등급 판정기</label>
+            <!-- [2026-08-23] 두 가지를 고쳤다.
+                 ① noop 을 「규칙 엔진만 사용」으로 옮겼던 것을 정정한다. noop 은 규칙 엔진이
+                    아니라 **미리 정해 둔 중립 문장을 돌려주는 더미**다(noop_provider.py:1
+                    "API 키 없이 결정론적 응답 — 파이프라인 검증·CI용 · 품질 측정용 아님").
+                    문서를 실제로 만들지 않는다. 그렇게 적어야 결과를 오해하지 않는다.
+                 ② 내부 제공자 이름(local_openai·vllm_qwen·anthropic·openai)을 그대로 보여
+                    주고 있었다. 폐쇄망에서 못 쓰는 것(외부 API — 인터넷·키 필요)과 품질
+                    판정이 끝난 것(Qwen 14B: reports/llm_quality_comparison_20260808.md 에서
+                    사실 충실성 0/5·제약 준수 0/5 로 탈락)이 아무 표시 없이 선택 가능했다.
+                 API 키는 화면에서 받지 않는다 — 브라우저에 외부 키를 넣으면 유출 경로가
+                 생긴다. 서버 .env(ANTHROPIC_API_KEY·OPENAI_API_KEY)로만 설정한다.
+                 아래 항목은 서버 설정(healthz.llm_provider)에 따라 applyServerConfig 가
+                 쓸 수 없는 것을 잠근다. -->
             <select id="gold-provider">
-              <option value="noop">noop (룰 단독 · 외부 LLM 없이)</option>
-              <option value="local_openai">local_openai</option>
-              <option value="vllm_qwen">vllm_qwen</option>
-              <option value="anthropic">anthropic</option>
-              <option value="openai">openai</option>
+              <option value="noop">파이프라인 점검용 더미 — 문서를 실제로 만들지 않습니다</option>
+              <option value="local_openai">사내 LLM 서버 (OpenAI 호환) — 서버에 주소 설정 필요</option>
+              <option value="vllm_qwen">사내 LLM 서버 (vLLM Qwen) — 문서 생성 품질 미달 기록 있음</option>
+              <option value="anthropic">외부 API (Anthropic) — 인터넷·API 키 필요 · 폐쇄망 불가</option>
+              <option value="openai">외부 API (OpenAI) — 인터넷·API 키 필요 · 폐쇄망 불가</option>
             </select>
+            <p class="hint" id="gold-provider-note" style="margin-top:4px"></p>
           </div>
           <div class="field">
             <label class="fld">생성 건수</label>
@@ -909,7 +925,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
 
         <details style="margin-top:10px;">
-          <summary style="font-size:12px;color:var(--text-dim);cursor:pointer;">원시 응답(JSON)</summary>
+          <summary style="font-size:12px;color:var(--text-dim);cursor:pointer;">서버 응답 원문 (기술 진단용)</summary>
           <div id="gold-result" class="json" style="margin-top:6px;" role="status" aria-live="polite">-</div>
         </details>
 
@@ -1242,8 +1258,39 @@ function applyProfileVisibility(d){
     b.style.display='';
   }
 }
+/* [2026-08-23] 서버가 실제로 쓸 수 있는 등급 판정기만 고를 수 있게 한다.
+ *
+ * 왜. 드롭다운이 다섯 개를 다 열어 두는데, 서버는 llm_provider 하나로 고정돼 있다. 다른 것을
+ * 골라 「후보 생성」을 누르면 실패하거나 0건이 나오고, 화면은 그 이유를 말하지 않는다.
+ * 실측 2026-08-23(223): llm_provider=noop 인데 화면에서는 openai 가 선택돼 있었다.
+ *
+ * 지우지 않고 **잠근다** — 어떤 선택지가 있고 왜 지금 못 쓰는지가 보여야 운영자가 설정을
+ * 바꿀 판단을 한다. 감추면 "그 기능이 없다"로 읽힌다. */
+function applyProviderAvailability(d){
+  const sel=$('gold-provider'); if(!sel) return;
+  const active=String((d&&d.llm_provider)||'').toLowerCase();
+  let enabled=0;
+  Array.prototype.forEach.call(sel.options, function(o){
+    const usable = (o.value===active) || (o.value==='noop' && !active);
+    o.disabled = !usable;
+    if(usable) enabled++;
+  });
+  if(active){
+    const cur=Array.prototype.find.call(sel.options, function(o){return o.value===active;});
+    if(cur) sel.value=active;
+  }
+  const note=$('gold-provider-note');
+  if(note){
+    note.innerHTML = active
+      ? '이 서버는 <b>' + esc(active) + '</b> 로 설정돼 있어 그 항목만 고를 수 있습니다. '
+        + '다른 제공자를 쓰려면 서버 설정(.env)에서 바꿔야 합니다.'
+      : '서버 설정을 읽지 못했습니다 — 제공자 선택이 실제와 다를 수 있습니다.';
+  }
+  if(!enabled) sel.disabled=true;
+}
 function applyServerConfig(d){
   applyProfileVisibility(d);
+  applyProviderAvailability(d);
   const oc=(d&&d.operational_config)||{};
   const t=oc.review_confidence_threshold;
   const el=$('srv-gate-v');
@@ -1367,7 +1414,7 @@ async function ingestLargeDocument(f, info){
       throw Object.assign(new Error(st.error||'분류 실패'), {status:0});
     }
   }
-  if(info) info.innerHTML=`<span class="pill warn">대기 중</span> 240초 내에 끝나지 않았습니다 — 「DB 검수 큐 불러오기」로 확인하세요.`;
+  if(info) info.innerHTML=`<span class="pill warn">대기 중</span> 240초 내에 끝나지 않았습니다 — 「검토할 문서 보기」로 확인하세요.`;
 }
 
 async function classifyFromFile(alsoClassify){
@@ -1575,7 +1622,7 @@ async function toggleWhy(i){
       + `${esc(e.data?.detail||e.message||'')}</div>`;
   }
 }
-// 검수 큐 최상단 문서 기준 유사문서 자동 조회(검수 보조). 수동 「DB 검수 큐 불러오기」 때만
+// 검수 큐 최상단 문서 기준 유사문서 자동 조회(검수 보조). 수동 「검토할 문서 보기」 때만
 // 발화하고, 실시간 관제 폴링 tick(AUTO_SILENT)에서는 스킵한다 — 임베딩 비용·로그 스팸 방지.
 /* 지금 분류 패널에 들어 있는 본문을 질의로 가져온다 — 검수 중인 문서를 다시 붙여넣지 않아도 되게. */
 

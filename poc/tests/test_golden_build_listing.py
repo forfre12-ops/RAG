@@ -47,44 +47,46 @@ def test_slate_is_found_by_content_not_by_filename(datasets):
 
 def test_non_slate_files_are_skipped(datasets):
     """본문이나 등급이 없는 jsonl 은 검수에 올릴 수 없다 — 목록에 넣으면 골라 놓고 실패한다."""
-    _write(datasets / "logs.jsonl", [{"event": "x"}])                 # text·label 없음
-    _write(datasets / "text_only.jsonl", [{"text": "본문"}])           # 등급 없음
-    _write(datasets / "label_only.jsonl", [{"label": "S1"}])           # 본문 없음
-    (datasets / "empty.jsonl").write_text("", encoding="utf-8")
-    (datasets / "broken.jsonl").write_text("{not json", encoding="utf-8")
+    gr = datasets / "golden_review"
+    _write(gr / "logs.jsonl", [{"event": "x"}])                 # text·label 없음
+    _write(gr / "text_only.jsonl", [{"text": "본문"}])           # 등급 없음
+    _write(gr / "label_only.jsonl", [{"label": "S1"}])           # 본문 없음
+    (gr / "empty.jsonl").write_text("", encoding="utf-8")
+    (gr / "broken.jsonl").write_text("{not json", encoding="utf-8")
     assert svc.GoldenBuildService().list_registerable_builds() == []
 
 
 def test_grade_key_also_counts_as_a_slate(datasets):
     """등급 필드 이름이 label 이 아니라 grade 인 묶음도 있다."""
-    _write(datasets / "g.jsonl", [{"text": "본문", "grade": "S3"}])
+    _write(datasets / "golden_review" / "g.jsonl", [{"text": "본문", "grade": "S3"}])
     assert len(svc.GoldenBuildService().list_registerable_builds()) == 1
 
 
 def test_newest_first(datasets):
     import os
     import time
-    _write(datasets / "old.jsonl", SLATE)
-    _write(datasets / "new.jsonl", SLATE)
+    _write(datasets / "golden_review" / "old.jsonl", SLATE)
+    _write(datasets / "golden_review" / "new.jsonl", SLATE)
     now = time.time()
-    os.utime(datasets / "old.jsonl", (now - 86400, now - 86400))
-    os.utime(datasets / "new.jsonl", (now, now))
+    os.utime(datasets / "golden_review" / "old.jsonl", (now - 86400, now - 86400))
+    os.utime(datasets / "golden_review" / "new.jsonl", (now, now))
     got = svc.GoldenBuildService().list_registerable_builds()
-    assert [b["path"] for b in got] == ["datasets/new.jsonl", "datasets/old.jsonl"]
+    assert [b["path"] for b in got] == [
+        "datasets/golden_review/new.jsonl", "datasets/golden_review/old.jsonl"]
 
 
 def test_limit_is_respected(datasets):
     for i in range(5):
-        _write(datasets / f"s{i}.jsonl", SLATE)
+        _write(datasets / "golden_review" / f"s{i}.jsonl", SLATE)
     assert len(svc.GoldenBuildService().list_registerable_builds(limit=3)) == 3
 
 
 def test_listing_stays_inside_the_datasets_sandbox(datasets, tmp_path):
     """등록(register)과 같은 경계여야 한다 — 고를 수 있는데 못 올리면 화면이 거짓말을 한다."""
     _write(tmp_path / "outside.jsonl", SLATE)
-    _write(datasets / "inside.jsonl", SLATE)
+    _write(datasets / "golden_review" / "inside.jsonl", SLATE)
     got = svc.GoldenBuildService().list_registerable_builds()
-    assert [b["path"] for b in got] == ["datasets/inside.jsonl"]
+    assert [b["path"] for b in got] == ["datasets/golden_review/inside.jsonl"]
 
 
 def test_listed_paths_are_actually_registerable(datasets):
@@ -94,3 +96,29 @@ def test_listed_paths_are_actually_registerable(datasets):
     path = s.list_registerable_builds()[0]["path"]
     job_id = s.register_build(path, actor_user_id="지재원관리자")
     assert job_id is not None
+
+
+def test_evaluation_and_training_sets_are_not_listed(datasets):
+    """평가셋·학습셋·실험 분할은 목록에 뜨면 안 된다.
+
+    왜(2026-08-23 실측). 목록이 datasets/ 전체를 훑던 시절, 60건 안에 평가 홀드아웃
+    (holdout_eval.hardened.jsonl — 시연 근거로 쓴 42건)·누출 격리본·v8 실험 분할
+    (dev/calib)이 섞여 있었다. 관리자가 그중 하나를 골라 검수·서명하면 그 문서들이
+    locked_gold_eval(평가 정답지)로 승격되고, 그 순간 "모델이 좋아졌다"는 판단 근거가
+    무너진다 — 평가셋이 정답지 안으로 들어가기 때문이다.
+
+    이름으로 걸러 봤더니 실험 폴더가 계속 새 이름으로 생겨 따라잡히지 않았다.
+    **무엇을 뺄지가 아니라 무엇을 넣을지**로 정의한다(_REVIEW_SOURCE_DIRS).
+    """
+    _write(datasets / "gold_real" / "holdout_eval.hardened.jsonl", SLATE)
+    _write(datasets / "gold_real" / "nohuman_proxy" / "train_leak_nohuman.jsonl", SLATE)
+    _write(datasets / "v8" / "dev.jsonl", SLATE)
+    _write(datasets / "v8_r14" / "calib.jsonl", SLATE)
+    _write(datasets / "golden_review" / "ff5a822c" / "candidates.jsonl", SLATE)
+    _write(datasets / "gold_real" / "builds" / "demo_slate_v1.jsonl", SLATE)
+
+    got = [b["path"] for b in svc.GoldenBuildService().list_registerable_builds()]
+    assert sorted(got) == [
+        "datasets/gold_real/builds/demo_slate_v1.jsonl",
+        "datasets/golden_review/ff5a822c/candidates.jsonl",
+    ], got
