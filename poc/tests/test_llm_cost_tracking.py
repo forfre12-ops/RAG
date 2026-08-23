@@ -7,6 +7,8 @@ query_expansion 등 실제 호출지점에서 purpose 라벨로 분리 집계되
 
 from __future__ import annotations
 
+import json
+
 from koipa.adapters.llm.base import LLMResponse, UsageRecord
 from koipa.api import prom_metrics as pm
 from koipa.services.llm_usage_service import LLMUsageService, record_llm_usage
@@ -71,6 +73,15 @@ def test_billing_phase_from_settings(tmp_path, monkeypatch):
     record_llm_usage(_usage(provider="openai", model="gpt-4o"), purpose="answer", service=svc)
     content = (tmp_path / "u.jsonl").read_text(encoding="utf-8")
     assert '"billing_phase": "production"' in content
+
+
+def test_usage_jsonl_records_concrete_build_sha(tmp_path, monkeypatch):
+    monkeypatch.setenv("KOIPA_BUILD_SHA", "4d4c012898ba")
+    monkeypatch.setenv("KOIPA_LLM_USAGE_DB_ENABLED", "false")
+    svc = LLMUsageService(jsonl_path=str(tmp_path / "u.jsonl"))
+    record_llm_usage(_usage(), purpose="synthesis", service=svc)
+    row = json.loads((tmp_path / "u.jsonl").read_text(encoding="utf-8"))
+    assert row["build_sha"] == "4d4c012898ba"
 
 
 def test_expand_llm_records_query_expansion_usage(tmp_path, monkeypatch):

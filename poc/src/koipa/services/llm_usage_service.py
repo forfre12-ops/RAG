@@ -46,8 +46,12 @@ class LLMUsageService:
             purpose,
         )
         called_at = datetime.now(timezone.utc)
+        # 배포 이미지가 실제 실행한 커밋을 비용 증적에도 남긴다. 값이 없거나 unknown이면
+        # 집계기가 운영 revision 비용으로 승인하지 않도록 null로 기록한다.
+        build_sha = (os.getenv("KOIPA_BUILD_SHA") or "").strip()
         row = {
             **asdict(usage),
+            "build_sha": build_sha if build_sha and build_sha.lower() != "unknown" else None,
             "purpose": purpose,
             "reference_type": reference_type,
             "reference_id": reference_id,
