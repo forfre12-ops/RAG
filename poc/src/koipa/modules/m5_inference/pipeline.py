@@ -665,14 +665,24 @@ class InferencePipeline:
                     s2_score = rule_res.grade_scores.get("S2", 0.0)
                     from koipa.modules.m3_labeling.seeds import GRADE_ORDER  # noqa: PLC0415
 
+                    # [2026-08-24] 발동시킨 **임계값**도 함께 들고 나간다.
+                    # 왜: 이 상향은 룰의 최종 등급이 아니라 **등급별 점수**로 결정된다.
+                    # 룰 최종등급이 S2 인 문서에서도 S1 점수가 임계를 넘으면 S1 로 올라간다
+                    # (실측 2026-08-24: grade_scores={TS 0.00, S1 2.35, S2 8.65} · 룰 최종 S2 ·
+                    #  모델 S2 → 최종 S1). 화면이 이유를 설명하려면 어느 등급의 점수가 어느
+                    # 임계를 넘었는지를 알아야 한다 — 종전 경고에는 임계가 없었다.
                     override_grade = None
                     override_score = 0.0
+                    override_threshold = 0.0
                     if ts_score >= self._FNR_RULE_TS_THRESHOLD:
                         override_grade, override_score = Grade.TS, ts_score
+                        override_threshold = self._FNR_RULE_TS_THRESHOLD
                     elif s1_score >= self._FNR_RULE_S1_THRESHOLD:
                         override_grade, override_score = Grade.S1, s1_score
+                        override_threshold = self._FNR_RULE_S1_THRESHOLD
                     elif s2_score >= self._FNR_RULE_S2_THRESHOLD:
                         override_grade, override_score = Grade.S2, s2_score
+                        override_threshold = self._FNR_RULE_S2_THRESHOLD
 
                     if override_grade is not None:
                         if GRADE_ORDER.get(override_grade.value, 99) < GRADE_ORDER.get(result.label.value, 99):
@@ -690,7 +700,11 @@ class InferencePipeline:
                                 rag_context=result.rag_context,
                                 model_version=result.model_version,
                                 warnings=result.warnings + [
-                                    f"fnr-safe override: rule {override_grade.value} score={override_score:.1f}"
+                                    # 소수 2자리 — 임계와의 차가 0.05 단위로 갈리는데
+                                    # 1자리로 자르면 화면에서 "2.2 >= 2.2" 처럼 보인다.
+                                    f"fnr-safe override: rule {override_grade.value} "
+                                    f"score={override_score:.2f} >= threshold {override_threshold:.2f} "
+                                    f"(model {_model_raw_grade} -> {override_grade.value})"
                                 ],
                                 rule_grade=result.rule_grade,
                                 rule_has_evidence=result.rule_has_evidence,
