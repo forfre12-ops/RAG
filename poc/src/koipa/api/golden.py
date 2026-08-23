@@ -36,7 +36,10 @@ from koipa.schemas.golden import (
     GoldenSignoffPreflightResponse,
     GoldenSignoffResponse,
 )
-from koipa.services.golden_build_service import GoldenBuildService
+from koipa.services.golden_build_service import (
+    GoldenBuildService,
+    GoldenSignoffStorageError,
+)
 from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
@@ -809,13 +812,21 @@ def golden_job_signoff(
             status_code=403,
             detail=f"reviewer_id는 실계정이어야 합니다: {reject}",
         )
-    result = GoldenBuildService().apply_signoff(
-        job_id,
-        req.decisions,
-        reviewer_id=reviewer_id,
-        publish=req.publish,
-        dry_run=req.dry_run,
-    )
+    # 저장 실패만 사유를 그대로 내려보낸다. 전역 핸들러(app.py)는 J2 정책대로 상세를 지우고
+    # "internal server error" 만 주는데, 이 실패는 화면 앞에 있는 사람이 바로 고칠 수 있는
+    # 종류(폴더 권한·경로 없음)라 원인을 감추면 request_id 를 들고 서버 로그를 찾아가야 한다.
+    # 실측 2026-08-23(223): 후보 폴더가 호스트 계정 소유라 컨테이너가 못 써서 500 이 났고,
+    # 검수자 화면에는 KOIPA_INTERNAL 만 떴다.
+    try:
+        result = GoldenBuildService().apply_signoff(
+            job_id,
+            req.decisions,
+            reviewer_id=reviewer_id,
+            publish=req.publish,
+            dry_run=req.dry_run,
+        )
+    except GoldenSignoffStorageError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     if result is None:
         raise HTTPException(
             status_code=404, detail="golden build job not found (or no gold candidates)"

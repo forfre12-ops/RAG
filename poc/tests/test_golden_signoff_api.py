@@ -339,3 +339,36 @@ def test_register_build_requires_admin(tmp_path):
         json={"build_path": build, "actor": {"user_id": "rev", "role": "reviewer"}},
     )
     assert r.status_code == 403, r.text
+
+
+def test_signoff_endpoint_says_why_it_could_not_save(tmp_path, monkeypatch):
+    """저장 실패는 사유를 그대로 내려보낸다 — 화면 앞의 사람이 고칠 수 있는 종류라서.
+
+    2026-08-23(223): 후보 폴더가 호스트 계정(uid 1001) 소유라 API 컨테이너(uid 1000)가
+    locked_<job>.jsonl.tmp 를 못 만들었다. 전역 핸들러(app.py)가 J2 정책대로 상세를 지워
+    화면에는 KOIPA_INTERNAL / internal server error 와 request_id 만 떴고, 서버 로그를 볼 수
+    있는 사람이 붙기 전까지 원인을 알 수 없었다.
+    """
+    from koipa.services.golden_build_service import GoldenSignoffStorageError
+
+    job_id = _make_job(tmp_path, [{"doc_id": "a", "text": "ts문서"}])
+
+    def _boom(*a, **kw):
+        raise GoldenSignoffStorageError(
+            "서명 결과를 저장하지 못했습니다: /app/datasets/golden_review/x/locked_1.jsonl "
+            "(Permission denied)"
+        )
+
+    monkeypatch.setattr(GoldenBuildService, "apply_signoff", _boom)
+    r = client.post(
+        f"{API}/golden/jobs/{job_id}/signoff",
+        headers=_h(role="reviewer"),
+        json={
+            "decisions": [{"doc_id": "a", "decision": "approve"}],
+            "actor": {"user_id": "reviewer_kim", "role": "reviewer"},
+        },
+    )
+    assert r.status_code == 500, r.text
+    detail = r.json().get("detail", "")
+    assert "저장하지 못했습니다" in detail and "Permission denied" in detail
+    assert "internal server error" not in r.text

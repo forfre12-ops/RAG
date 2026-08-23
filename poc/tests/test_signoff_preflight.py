@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -177,3 +178,84 @@ def test_preflight_failure_does_not_block_review():
                                job_id="J", post_url="/p")
     seg = html[html.index("async function loadPreflight"):html.index("document.getElementById('submit').addEventListener")]
     assert "if(!r.ok) return;" in seg and "catch(e)" in seg
+
+
+# ── E2-6: 저장 경로 (2026-08-23) ───────────────────────────────────────────
+#
+# 왜 늘렸나. 실제로 제출을 막은 것이 이 점검에 **없던** 항목이었다. 223 실측: 후보 폴더
+# datasets/golden_review/ff5a822c 가 호스트 계정(uid 1001) 소유라 API 컨테이너(uid 1000)가
+# locked_<job>.jsonl.tmp 를 만들지 못했다. preflight 는 ok 를 냈고, 검수자는 120건을 다 고르고
+# 제출한 뒤에야 KOIPA_INTERNAL 500 을 봤다 — 이 파일 첫머리에 적힌 목적이 그대로 뚫린 것이다.
+
+def test_writability_probe_passes_on_a_normal_dir(tmp_path):
+    from koipa.services.golden_build_service import _unwritable_reason
+    assert _unwritable_reason(tmp_path / "locked_x.jsonl") == ""
+
+
+def test_writability_probe_names_a_parent_that_is_not_a_dir(tmp_path):
+    """부모 자리에 파일이 있으면 기록은 반드시 실패한다 — 사유가 비어 있으면 안 된다."""
+    from koipa.services.golden_build_service import _unwritable_reason
+    blocker = tmp_path / "notadir"
+    blocker.write_text("x", encoding="utf-8")
+    reason = _unwritable_reason(blocker / "locked_x.jsonl")
+    assert reason and "notadir" in reason
+
+
+def test_write_failure_becomes_a_named_storage_error(tmp_path):
+    """OSError 그대로 올리면 전역 핸들러가 사유를 지운다(J2) — 화면엔 500 만 남는다."""
+    import pytest as _pytest
+    from koipa.services.golden_build_service import (
+        GoldenSignoffStorageError,
+        _atomic_write_jsonl,
+    )
+    blocker = tmp_path / "notadir"
+    blocker.write_text("x", encoding="utf-8")
+    with _pytest.raises(GoldenSignoffStorageError) as e:
+        _atomic_write_jsonl(blocker / "locked_x.jsonl", [{"doc_id": "a"}])
+    assert "저장하지 못했습니다" in str(e.value)
+
+
+def test_preflight_blocks_when_the_signoff_store_is_unwritable(tmp_path, monkeypatch):
+    """쓸 수 없으면 blocking — 경고가 아니다. 제출하면 확실히 실패하는 조건이다."""
+    import koipa.services.golden_build_service as mod
+    job_id = _job(tmp_path)
+    monkeypatch.setattr(mod, "_unwritable_reason", lambda p: "쓰기 권한이 없습니다: /x")
+    out = mod.GoldenBuildService().signoff_preflight(job_id, reviewer_id="지재원관리자")
+    assert out["ok"] is False
+    codes = [b["code"] for b in out["blocking"]]
+    assert "signoff_store_unwritable" in codes
+    assert codes.count("signoff_store_unwritable") == 1   # 같은 폴더 사유를 두 번 세지 않는다
+
+
+def test_preflight_blocks_an_unwritable_publish_path(tmp_path, monkeypatch):
+    import koipa.services.golden_build_service as mod
+    from koipa.config import settings
+    job_id = _job(tmp_path)
+    live = tmp_path / "notadir"
+    live.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(settings, "locked_eval_jsonl", str(live / "locked_gold_eval.jsonl"))
+    out = mod.GoldenBuildService().signoff_preflight(
+        job_id, reviewer_id="지재원관리자", publish=True
+    )
+    assert "publish_path_unwritable" in [b["code"] for b in out["blocking"]]
+    # publish 를 안 걸면 라이브 경로는 볼 이유가 없다 — 근거 없이 버튼을 잠그지 않는다.
+    out2 = mod.GoldenBuildService().signoff_preflight(job_id, reviewer_id="지재원관리자")
+    assert "publish_path_unwritable" not in [b["code"] for b in out2["blocking"]]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX 권한 비트가 있어야 재현된다")
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0,
+                    reason="root 는 권한 비트를 무시한다 — 223 의 uid 1000 상황이 아니다")
+def test_real_permission_failure_is_caught_before_submit(tmp_path):
+    """223 에서 난 실패 그대로: 폴더에 쓰기 비트가 없다 → preflight 가 먼저 잡는다."""
+    from koipa.services.golden_build_service import GoldenBuildService
+    job_id = _job(tmp_path)
+    svc = GoldenBuildService()
+    gold_dir = Path(svc.jobs.get(job_id)["gold_path"]).parent
+    mode = gold_dir.stat().st_mode
+    gold_dir.chmod(0o555)
+    try:
+        out = svc.signoff_preflight(job_id, reviewer_id="지재원관리자")
+        assert "signoff_store_unwritable" in [b["code"] for b in out["blocking"]]
+    finally:
+        gold_dir.chmod(mode)

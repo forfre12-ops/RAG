@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import os
 import tempfile
 import uuid
 from pathlib import Path
@@ -430,6 +431,37 @@ class GoldenBuildService:
                 "message": "라이브 반영을 요청해도 반영되지 않습니다.",
                 "detail": "LOCKED_EVAL_JSONL 미설정 — 배포 게이트가 읽는 경로가 없습니다.",
             })
+
+        # [2026-08-23] 저장 경로에 **쓸 수 있는지**를 여기서 본다.
+        #
+        # 이 점검의 목적이 "제출하기 전에 무엇이 막을지 안다" 인데, 정작 실제로 막은 것은
+        # 여기 없던 항목이었다. 223 실측: 후보 폴더 datasets/golden_review/ff5a822c 가
+        # 호스트 계정(uid 1001) 소유로 만들어져 있어 API 컨테이너(uid 1000)가 감사기록
+        # locked_<job>.jsonl 을 쓰지 못했다. preflight 는 ok 를 냈고, 검수자는 120건을 다
+        # 고르고 제출한 뒤에야 KOIPA_INTERNAL 500 을 봤다.
+        #
+        # blocking 에 넣는다 — 경고가 아니라 POST 를 확실히 실패시키는 조건이다.
+        if base is not None:
+            for path, code, what in (
+                (base / f"locked_{job_id}.jsonl", "signoff_store_unwritable", "승격 기록"),
+                (base / f"rejected_{job_id}.jsonl", "signoff_store_unwritable", "거부 기록"),
+            ):
+                reason = _unwritable_reason(path)
+                if reason:
+                    blocking.append({
+                        "code": code,
+                        "message": f"서명을 저장할 수 없습니다({what}).",
+                        "detail": reason,
+                    })
+                    break   # 두 파일이 같은 폴더라 사유가 겹친다
+        if publish and live_path:
+            reason = _unwritable_reason(Path(live_path))
+            if reason:
+                blocking.append({
+                    "code": "publish_path_unwritable",
+                    "message": "라이브 반영(publish)을 저장할 수 없습니다.",
+                    "detail": reason,
+                })
         if remaining == 0 and candidates:
             warnings.append({
                 "code": "nothing_remaining",
@@ -780,15 +812,55 @@ def _read_jsonl(path: Path) -> list[dict]:
     ]
 
 
+class GoldenSignoffStorageError(RuntimeError):
+    """서명 결과를 파일로 남기지 못했다 — 원인이 검수자 화면에 그대로 보여야 한다.
+
+    왜 전용 예외인가(2026-08-23 실측, 223). 후보 폴더가 호스트 계정(uid 1001) 소유로 만들어져
+    있어 API 컨테이너(uid 1000)가 locked_<job>.jsonl.tmp 를 만들지 못했다. 그대로 OSError 로
+    올라가면 app.py 의 전역 핸들러가 J2 정책대로 상세를 지우고 KOIPA_INTERNAL / internal
+    server error 만 돌려준다. 검수자 화면에 남는 건 "실패(500)" 과 request_id 뿐이라, 서버
+    로그를 볼 수 있는 사람이 붙기 전에는 **무엇을 고쳐야 하는지 알 길이 없다.** 라우터가 이
+    예외만 잡아 사유를 그대로 내려보낸다.
+    """
+
+
+def _unwritable_reason(path: Path) -> str:
+    """이 경로에 _atomic_write_jsonl 이 가능한가 — 불가하면 사람이 읽을 사유, 가능하면 빈 문자열.
+
+    검사 대상은 **파일이 아니라 부모 디렉터리**다. 원자적 기록은 부모에 .tmp 를 만들고
+    replace 하므로, 기존 파일에 쓰기 비트가 없어도 되고 반대로 부모에 쓰기 비트가 없으면
+    파일 권한과 무관하게 실패한다(위 예외의 실제 사례가 후자다).
+
+    부작용 0 — os.access 만 본다(preflight 가 부작용 없이 호출한다).
+    """
+    probe = path.parent
+    while not probe.exists():
+        if probe.parent == probe:
+            return f"경로를 만들 수 없습니다: {path.parent}"
+        probe = probe.parent
+    if not probe.is_dir():
+        return f"디렉터리가 아닙니다: {probe}"
+    if not os.access(probe, os.W_OK | os.X_OK):
+        return f"서버가 이 폴더에 쓸 수 없습니다(권한): {probe}"
+    return ""
+
+
 def _atomic_write_jsonl(path: Path, rows: list[dict]) -> None:
     """원자적 jsonl 기록(tmp→replace) — 라이브 readiness 읽기경로가 부분기록으로 깨지지 않게.
 
     배포 게이트/readiness 게이지가 이 파일을 읽으므로 (run_golden_split_signoff._write_jsonl
     과 동일 규율) 원자적 교체로 반쪽 상태 노출을 막는다.
+
+    쓰기 실패는 GoldenSignoffStorageError 로 바꿔 올린다 — 이유는 그 클래스 주석 참조.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    tmp.replace(path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            for r in rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        tmp.replace(path)
+    except OSError as exc:
+        raise GoldenSignoffStorageError(
+            f"서명 결과를 저장하지 못했습니다: {path} ({exc.strerror or exc})"
+        ) from exc
