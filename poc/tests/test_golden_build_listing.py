@@ -122,3 +122,15 @@ def test_evaluation_and_training_sets_are_not_listed(datasets):
         "datasets/gold_real/builds/demo_slate_v1.jsonl",
         "datasets/golden_review/ff5a822c/candidates.jsonl",
     ], got
+
+
+def test_already_promoted_records_are_not_listed(datasets):
+    """서명이 끝나 승격된 정본(locked_*.jsonl)은 다시 검수 대상이 아니다.
+
+    실측 2026-08-23(223): 허용 폴더로 좁힌 뒤에도 gold_real/builds 안의 locked_*.jsonl 2건이
+    목록에 남아 있었다. 그대로 두면 같은 문서를 두 번 서명하게 된다.
+    """
+    _write(datasets / "gold_real" / "builds" / "locked_94f310b2.jsonl", SLATE)
+    _write(datasets / "gold_real" / "builds" / "demo_slate_v1.jsonl", SLATE)
+    got = [b["path"] for b in svc.GoldenBuildService().list_registerable_builds()]
+    assert got == ["datasets/gold_real/builds/demo_slate_v1.jsonl"], got

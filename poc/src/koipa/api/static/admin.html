@@ -520,9 +520,9 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div class="btn-row">
           <button class="btn" id="btn-classify" onclick="runClassify()">분류하기</button>
-          <button class="btn sec" id="btn-batch" onclick="runBatch()">샘플 8건 일괄 분류</button>
         </div>
-        <p class="hint">샘플은 운영 검증문서에서 등급별 2건씩 뽑은 것입니다. <b>일괄 분류</b>는 8건을 순차 분류해 검수 큐에 넣습니다.</p>
+        <p class="hint">분류 결과는 검수 큐에 쌓입니다. 확신이 기준에 못 미치면 자동 확정하지 않고
+          위 <b>「문서 검토 대기」</b> 로 넘어갑니다.</p>
         <div id="cl-result" role="status" aria-live="polite"></div>
       </div>
     </section>
@@ -1489,7 +1489,9 @@ async function runClassify(){
 }
 
 async function runBatch(){
-  const btn=$('btn-batch'); btn.disabled=true; const orig=btn.textContent;
+  // [2026-08-23] 버튼은 화면에서 뺐다(정답지 문서를 검수 큐에 적재하던 경로).
+  // 함수는 진단·회귀 확인용으로 남기되, 버튼이 없어도 죽지 않게 방어한다.
+  const btn=$('btn-batch')||{}; btn.disabled=true; const orig=btn.textContent;
   let hit=0;
   for(let i=0;i<SAMPLES.length;i++){
     const s=SAMPLES[i]; btn.textContent=`일괄 분류 ${i+1}/${SAMPLES.length}…`;

@@ -67,9 +67,13 @@ _REVIEW_SOURCE_DIRS = (
 
 
 def _is_review_source(rel_path: str) -> bool:
-    """검수 목록에 올릴 파일인가 — 허용 폴더 아래에 있어야 한다."""
+    """검수 목록에 올릴 파일인가 — 허용 폴더 아래이면서 승격 정본이 아니어야 한다."""
     low = rel_path.replace("\\", "/").lower()
-    return any(low.startswith(d + "/") for d in _REVIEW_SOURCE_DIRS)
+    if not any(low.startswith(d + "/") for d in _REVIEW_SOURCE_DIRS):
+        return False
+    # locked_*.jsonl 은 서명이 끝나 locked_gold_eval 로 승격된 정본이다. 다시 검수 대상으로
+    # 올리면 같은 문서를 두 번 서명하게 된다(실측 2026-08-23: 목록에 2건 떠 있었다).
+    return not Path(low).name.startswith("locked_")
 
 
 def _safe_path(raw: str | None) -> Path:
