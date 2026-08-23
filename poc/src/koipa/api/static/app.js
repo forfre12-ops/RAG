@@ -356,11 +356,13 @@ async function runClassify() {
 function showPartial(grade, conf) {
   const head = $("#result-head");
   if (!head) return;
+  // [2026-08-24] 중간 스트림 값에 "신뢰도 63%" 라고 이름 붙이지 않는다. 이 값은 게이트를
+  // 아직 안 지난 softmax 파생값이고, 최종 판정(자동확정/검수)은 이 숫자 단독으로 나지 않는다.
+  // 숫자를 먼저 크게 보여주면 화면이 설명하는 판정 논리가 실제 판정 논리와 어긋난다.
   head.innerHTML = `
     <span class="result-grade g-${grade}">${grade}</span>
     <div class="result-confidence">
-      <div style="font-size:12px;color:var(--text-dim)">임시 신뢰도 ${(conf * 100).toFixed(0)}%</div>
-      <div class="confidence-bar"><div style="width:${conf * 100}%"></div></div>
+      <div style="font-size:12px;color:var(--text-dim)">잠정 등급 — 게이트 판정 전</div>
     </div>
     <div class="result-time"><span class="pulse-dot"></span>최종 결과 대기 중…</div>
   `;
@@ -375,12 +377,24 @@ function renderResult(data, elapsedMs) {
   const conf = data.confidence || 0;
   const elapsed = elapsedMs || data.elapsed_ms || 0;
 
+  // [2026-08-24] 머리에 두는 것은 신뢰도 숫자가 아니라 **결정**이다.
+  //   왜: 자동확정은 conf 단독이 아니라 다단 게이트로 난다(합의 게이트·희소근거·메타데이터 floor).
+  //   숫자를 머리에 두면 화면이 설명하는 판정 논리가 실제와 어긋난다 — 실측 2026-08-21(223,
+  //   demo_docs/03_S2_supplier_price.xlsx)에서 룰=모델=S2 로 일치하는데 conf 0.596 이라
+  //   검수로 간 카드에 「검수 필요」 배너와 「…자동 확정」 설명이 동시에 떴다.
+  //   게다가 conf 는 정답/오답 판별력이 약하다(골든500 AUROC 0.58) — 크게 띄울 값이 아니다.
+  //   숫자는 없애지 않고 renderSummary 의 접힌 상세로 내린다(FUN-024 심층지표·감리 추적).
+  const needsReview = data.status === "needs_review";
+  const why = (typeof window !== "undefined" && window.KOIPA_GATE_REASON)
+    ? window.KOIPA_GATE_REASON(data.warnings) : "";
+  const verdict = needsReview
+    ? `<div style="font-size:13px;font-weight:700;color:#e11d2e">검수 필요</div>
+       <div style="font-size:12px;color:var(--text-dim);margin-top:2px">${escapeHtml(why || "자동 확정하지 않고 사람 검수로 라우팅")}</div>`
+    : `<div style="font-size:13px;font-weight:700;color:#0a7f3f">자동 확정</div>
+       <div style="font-size:12px;color:var(--text-dim);margin-top:2px">게이트 통과 — 사람 검수 없이 확정 경로</div>`;
   head.innerHTML = `
     <span class="result-grade g-${grade}" data-grade="${grade}" role="button" title="법령 근거 보기">${grade}</span>
-    <div class="result-confidence">
-      <div style="font-size:13px;color:var(--text-dim)">신뢰도 <b style="color:var(--text)">${(conf * 100).toFixed(0)}%</b></div>
-      <div class="confidence-bar"><div style="width:${conf * 100}%"></div></div>
-    </div>
+    <div class="result-confidence">${verdict}</div>
     <div class="result-time">응답 <b>${elapsed} ms</b><br/>model_version ${data.model_version || "poc"}</div>
   `;
 
@@ -697,8 +711,29 @@ function renderSummary(data) {
     ? `<p class="neg" style="font-weight:700;border:1px solid #e11d2e;border-radius:0;padding:8px 12px;background:rgba(225,29,46,.06);">⚠ 자동 확정 아님 — <b>검수 필요</b>로 라우팅됨${warnTxt ? `<br><span style="font-weight:500;font-size:12px;">사유: ${warnTxt}</span>` : ""}</p>`
     : warnTxt ? `<p class="neg" style="font-size:12px;">⚠ ${warnTxt}</p>` : "";
   const verdictTxt = needsReview
-    ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다. (신뢰도 ${(conf * 100).toFixed(0)}%)`
-    : `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 판정되었습니다. (신뢰도 ${(conf * 100).toFixed(0)}%)`;
+    ? `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 <b>잠정 분류</b>되었으나 자동 확정되지 않고 검수로 라우팅되었습니다.`
+    : `본 문서는 <b>${grade} (${gradeLabel(grade)})</b>로 판정되었습니다.`;
+
+  // [2026-08-24] 신뢰도 수치는 지우지 않고 **접어서** 남긴다.
+  //   지우면 안 되는 이유: FUN-024 의 '심층지표' 근거이고, 감리·디버깅에서 판정 재구성에 쓴다.
+  //   펴 두면 안 되는 이유: 이 값은 정답확률이 아니라 softmax 파생값이고(골든500 ECE 0.18 ·
+  //   AUROC 0.58) 자동확정을 혼자 가르지도 않는다. 크기가 곧 설명력으로 읽히면 화면이 거짓말한다.
+  const scores = data.scores && typeof data.scores === "object" ? data.scores : null;
+  const scoreTxt = scores
+    ? Object.entries(scores)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, v]) => `${escapeHtml(k)} ${(Number(v) * 100).toFixed(1)}%`)
+        .join(" · ")
+    : "";
+  const detail = `
+    <details class="result-detail" style="margin-top:10px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-dim)">상세 — 신뢰도·등급별 점수</summary>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.9;margin-top:6px">
+        신뢰도(softmax 파생값) <b style="color:var(--text)">${(conf * 100).toFixed(1)}%</b>
+        ${scoreTxt ? `<br/>등급별 점수 ${scoreTxt}` : ""}
+        <br/><span style="font-size:11.5px">이 값은 정답확률이 아니라 예측 등급의 확률 질량입니다. 자동확정 판정은 이 숫자 단독이 아니라 합의 게이트를 포함한 다단 게이트로 결정됩니다.</span>
+      </div>
+    </details>`;
 
   const wrap = $("#result-summary");
   wrap.innerHTML = `
@@ -706,6 +741,7 @@ function renderSummary(data) {
     <p class="pos">${verdictTxt}</p>
     <p class="pos">${matchedTxt} ${factorTxt}</p>
     <p class="neg">${negEvidence}</p>
+    ${detail}
   `;
 }
 

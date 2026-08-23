@@ -122,7 +122,7 @@
   <!-- ===== §2 결과 — 진행바를 카드 맨 위로 이동해 한 시야에 표시 ===== -->
   <section id="sec-result">
     <h2><span class="num">§2</span>결과 — 왜 이 등급인가</h2>
-    <p class="h2-sub">등급·신뢰도·자연어 판단(양성+음성 근거)·3 평가요소(S·V·M)·근거 키워드. 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
+    <p class="h2-sub">등급·자동확정 여부와 그 사유·자연어 판단(양성+음성 근거)·3 평가요소(S·V·M)·근거 키워드. 신뢰도 수치는 「상세」에 접어 두었습니다 — 자동확정은 이 값 단독이 아니라 다단 게이트로 결정되기 때문입니다. 등급 배지를 클릭하면 §3 법령 카드로 이동합니다.</p>
 
     <div class="result" id="result-card" role="status" aria-live="polite">
       <h3 style="font-size:13px;margin:0 0 12px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:0.06em;text-transform:uppercase;">진행 단계 — SSE 실시간 점등</h3>
@@ -273,9 +273,9 @@
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">S1 1급 · 기술이전 계약초안 (PDF)</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
     </div>
-    <div class="hint">위 5종(TS·S1·S3·S2·S1)은 <b>자동 확정</b>되는 경로입니다(2026-08-23 배포본 실측 신뢰도 0.71~0.98).
+    <div class="hint">위 5종(TS·S1·S3·S2·S1)은 <b>자동 확정</b>되는 경로입니다(2026-08-24 배포본 실측 · scripts/check_demo_docs.py --set oneclick).
       아래 1종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
-      본문이 사실상 없어 <b>확신이 기준(0.70)에 못 미치는</b> 경우입니다.
+      <b>본문이 사실상 없어 추출 게이트가 잡는</b> 경우입니다(확신도 때문이 아닙니다 — 실측 사유 extraction-gate).
       <b>이 6종은 본문이 267~448자로 짧습니다</b> — 확신도는 본문이 길수록 낮아지므로,
       실제 업무문서(2,000자 이상)에서는 자동 확정 비율이 이보다 낮습니다.</div>
     </details>
@@ -398,6 +398,8 @@
 <script>
 function toggleDemoLog(){var d=document.getElementById('logdock'),t=document.getElementById('logdock-toggle');if(!d)return;var c=d.classList.toggle('collapsed');if(t)t.textContent=c?'펼치기 ▴':'접기 ▾';document.body.style.paddingBottom=c?'52px':'232px';}
 </script>
+<!-- 검수 사유 한글표 — app.js(모듈)와 아래 인라인 스크립트가 같은 표를 쓴다. app.js 앞에 둔다. -->
+<script src="./review_reason_ko.js"></script>
 <script type="module" src="./app.js"></script>
 <script>
 /* [D3] 파싱·분류 시연 스크립트 — parse_demo.html 에서 옮겨 왔다.
@@ -849,27 +851,12 @@ function render(j){
        문구("escalation (룰 S1 · 모델 TS …)")를 원인으로 읽었다. 그것은 원인이 아니다 —
        게이트 조건에 룰↔모델 불일치는 없다. 실측 2026-08-20: 검수 대상 120건 중 검수로 간
        67건이 전부 low-confidence 하나로 걸렸다. 사유는 warnings 에만 있었다. */
-    const GATE_REASONS = [
-      /* agreement-gate 를 먼저 본다 — 신뢰도가 임계를 넘겨도 이 조건이면 검수로 간다.
-         실측 2026-08-21: 신뢰도 0.744(>0.70)인데 룰 S3·모델 TS 불일치로 라우팅된 문서가 있다. */
-      [/agreement-gate: model=(\S+) vs rule=(\S+)/,
-        m=>`두 엔진이 갈립니다 — 분류기 ${m[1]} · 룰 ${m[2]} (신뢰도만으로는 확정하지 않습니다)`],
-      [/low-confidence: confidence=([\d.]+) < ([\d.]+)/,
-        m=>`신뢰도 ${m[1]} 이 기준 ${m[2]} 에 못 미칩니다`],
-      [/document flagged at ingestion/, ()=>'추출 품질이 낮은 문서입니다(스캔·OCR 등)'],
-      [/body_below_classifiable_threshold/, ()=>'판정할 본문이 사실상 없습니다'],
-      [/cap-conflict/, ()=>'출처 기준 하향과 내용 기준 상향이 충돌합니다'],
-      [/sparse-evidence/, ()=>'룰 판정이 약한 근거 하나에 기대고 있습니다'],
-      [/abbrev-only-escalation/, ()=>'영문 약어 밀도만으로 높은 등급이 나왔습니다'],
-      [/metadata-access-conflict/, ()=>'접근 제한 표기에 비해 내용 예측이 낮습니다'],
-      [/metadata-management-conflict/, ()=>'관리성 부재 표기인데 내용 예측이 비공개 등급입니다'],
-    ];
-    function gateReason(ws){
-      for(const w of (ws||[])){
-        for(const [re,fn] of GATE_REASONS){ const m=w.match(re); if(m) return fn(m); }
-      }
-      return '';
-    }
+    /* [2026-08-20] 검수로 보낸 **실제 사유**를 배너에 적는다. 종전에는 "자동 확정하지 않고
+       사람 검수로 라우팅" 이라고만 떠서, 검수자가 아래 결합경로 문구를 원인으로 읽었다.
+       그것은 원인이 아니다 — 게이트 조건에 룰↔모델 불일치는 없다.
+       [2026-08-24] 표 자체는 review_reason_ko.js 한 곳으로 옮겼다. 여기와 app.js 에
+       같은 표가 두 벌 있어서, 게이트가 늘 때 한쪽만 고치면 화면마다 사유가 달라졌다. */
+    const gateReason = (ws) => (window.KOIPA_GATE_REASON ? window.KOIPA_GATE_REASON(ws) : '');
     const why = isReview ? gateReason(c.warnings) : '';
     const verdictBanner = isReview
       ? `<div class="verdict-banner verdict-review"><span>검수 필요<span class="vb-sub"> — ${why?esc(why):'자동 확정하지 않고 사람 검수로 라우팅'}</span></span></div>`
@@ -879,14 +866,12 @@ function render(j){
       <div class="row" style="align-items:flex-start;gap:24px;">
         <div>
           <span class="grade-badge g-${esc(c.label)}">${esc(c.label)}</span>
-          <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">신뢰도 ${fmt(c.confidence)}</div>
-          <div class="conf-bar" style="width:160px"><div class="conf-fill" style="width:${(c.confidence*100).toFixed(0)}%"></div></div>
-          <div style="margin-top:12px"><span class="status-pill status-${esc(c.status)}">${c.status==='staging'?'자동 확정':'검수 필요'}</span></div>
+          <div style="margin-top:10px"><span class="status-pill status-${esc(c.status)}">${c.status==='staging'?'자동 확정':'검수 필요'}</span></div>
           <div style="margin-top:12px;font-size:11.5px;color:var(--text-soft);line-height:1.7;border-top:1px solid var(--border-mid);padding-top:10px">
             <b>두 엔진 판정</b> · 룰 <b>${esc(c.rule_grade||'—')}</b> · 분류기(BERT) <b>${esc(c.model_grade||'미로드')}</b> · 최종 <b>${esc(c.label)}</b>
             ${c.decision_path?`<div style="margin-top:4px;color:var(--text-dim)">${esc(c.decision_path)}</div>`:''}
           </div>
-          <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')}</div>
+          <div class="hint" style="margin-top:8px">모델 ${esc(c.model_version)} · ${c.elapsed_ms}ms · 요소출처 ${esc(c.factors_source||'—')} · 신뢰도 ${fmt(c.confidence)}<span style="color:var(--text-soft)"> (softmax 파생값 — 자동확정은 이 값 단독으로 나지 않습니다)</span></div>
         </div>
         <div style="flex:1;min-width:220px">
           <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:4px">평가요소 (가이드 3요건 S×V×M)</div>
