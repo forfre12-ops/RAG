@@ -20,7 +20,7 @@ def test_demo_safe_mode_and_golden_builder_are_visible():
     assert "Safe Mode" in admin
     assert "POST /golden/build" in admin
     assert "function startGoldenBuild" in admin
-    assert "guardWrite('검증 기준문서 생성')" in admin
+    assert "guardWrite('검증문서 생성')" in admin
 
 
 def test_parser_demo_has_table_sample_pack():

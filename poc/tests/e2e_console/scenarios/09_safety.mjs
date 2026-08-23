@@ -49,7 +49,7 @@ const WRITES = [
     press: (p) => p.q('button[onclick="createKeyword()"]'),
   },
   {
-    name: '검증 기준문서 등록', pane: 'review', endpoint: 'POST /golden/jobs/register',
+    name: '검증문서 등록', pane: 'review', endpoint: 'POST /golden/jobs/register',
     async setup(page) { page.set('gold-build-path', 'datasets/proxy_gold/build_ff5a822c.jsonl'); },
     press: (p) => p.$('gold-reg'),
   },

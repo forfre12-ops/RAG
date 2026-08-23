@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>한국지식재산보호원 | 관리자 콘솔</title>
-<meta name="description" content="루프 A(분류 → 검수·확정)와 루프 B(골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭)를 탭으로 나눈 운영·E2E 검증 콘솔. 기존 /api/v1 엔드포인트를 그대로 호출합니다." />
+<meta name="description" content="루프 A(분류 → 검수·확정)와 루프 B(검증문서 → 검수·서명 → 재학습 → 배포 → 메트릭)를 탭으로 나눈 관리자 콘솔. 기존 /api/v1 엔드포인트를 그대로 호출합니다." />
 <style>
 :root{
   --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
@@ -326,10 +326,11 @@ details.adv[open]{padding-bottom:12px;}
 <div class="wrap">
 
   <div class="lede-row">
-    <h1 class="h1">AI 거버넌스 폐곡선 콘솔</h1>
+    <h1 class="h1">관리자 콘솔</h1>
     <p class="lede">이 콘솔에는 <b>두 개의 루프</b>가 있습니다 —
-    <b>루프 A(일상 운영)</b> 분류 → 검수·확정, <b>루프 B(모델 갱신)</b> 골든셋 → 검수·서명 → 재학습 → 배포 → 메트릭.
-    아래 탭이 그 두 루프로 나뉘어 있고, 찾는 기능이 안 보이면 다른 탭에 있습니다.
+    <b>루프 A(일상 운영)</b> 분류 → 검수·확정, <b>루프 B(모델 갱신)</b> 검증문서 → 검수·서명 → 재학습 → 배포 → 메트릭.
+    <b>운영</b> 탭이 루프 A, <b>검수</b>와 <b>학습 · 배포</b> 탭이 루프 B 입니다(설정은 어느 쪽도 아닙니다).
+    찾는 기능이 안 보이면 다른 탭에 있습니다.
     모든 동작은 기존 <code>/api/v1</code> 엔드포인트를 그대로 호출합니다.</p>
   </div>
 
@@ -346,7 +347,7 @@ details.adv[open]{padding-bottom:12px;}
     </div>
     <div class="flow loop" id="flow-b">
       <span class="loop-tag">루프 B · 모델 갱신</span>
-      <span class="flow-step" data-step="g1"><b>G1</b> 골든 후보</span>
+      <span class="flow-step" data-step="g1"><b>G1</b> 검증문서 후보</span>
       <span class="flow-arrow">→</span>
       <span class="flow-step" data-step="g2"><b>G2</b> 검수 · 서명</span>
       <span class="flow-arrow">→</span>
@@ -360,7 +361,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- [2026-08-23] 카드 배지와 이 흐름도가 서로 다른 번호를 쓰고 있었다(흐름도 1=분류인데
          운영 탭 첫 카드도 1번이었다 — 그 카드는 검토다). 카드 배지를 이 흐름도의 단계 id 로
          맞췄으므로, 같은 번호라는 사실을 한 줄로 밝힌다. -->
-    <p class="hint" style="margin:6px 2px 0;">아래 카드의 <b>진한 번호 배지</b>가 여기 단계와 같은 번호입니다. 흐름에 속하지 않는 화면(조회 · 설정 · 데이터)은 번호 대신 성격을 적었습니다.</p>
+    <p class="hint" style="margin:6px 2px 0;">아래 카드의 <b>진한 번호 배지</b>가 여기 단계와 같은 번호입니다. 흐름에 속하지 않는 화면(공통 · 조회 · 설정 · 데이터)은 번호 대신 성격을 적었습니다. <b>운영</b> 탭은 매일 하는 일을 먼저 두느라 <b>2 검토</b> 카드가 <b>1 분류</b> 카드보다 위에 있습니다.</p>
   </div>
 
   <!-- 탭 — 카드 12장을 상시 노출하는 대신 루프별로 나눈다.
@@ -385,10 +386,10 @@ details.adv[open]{padding-bottom:12px;}
     <!-- [2026-08-23] 묶음 이름(일상 운영 / 모델 관리)을 뺐다. 회색 글씨가 **비활성 탭처럼**
          보여서 오히려 헷갈렸다. 설정을 톱니로 뺀 뒤 왼쪽에 「운영」 하나만 남아, 구분선만으로
          "이건 성격이 다르다"가 전달된다. 무엇이 무엇인지는 탭 아래 한 줄 설명이 말한다. -->
-    <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제</span></button>
+    <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제 · 감사</span></button>
     <span class="tab-divider" aria-hidden="true"></span>
-    <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">검증문서 후보 · 승인</span></button>
-    <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">재학습 · 게이트 · 성적</span></button>
+    <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">검증문서 후보 · 서명</span></button>
+    <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">학습 후보 · 재학습 · 게이트 · 메트릭</span></button>
     <button class="tab tab-icon" data-tab="config" role="tab" onclick="showPane('config')"
             title="설정 — 등급 체계 · 태깅 규칙 (도입 시 한 번 정하고 이후 거의 바꾸지 않습니다)"
             aria-label="설정">
@@ -639,13 +640,13 @@ details.adv[open]{padding-bottom:12px;}
          동일하다 — GET /admin/locked-readiness. -->
     <section class="card col-span" data-pane="review" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">조회</span> 모델 검증 문서 현황 — 구성 · 승인 <span class="reqtag">FUN-024</span></div>
+        <div class="ttl"><span class="step-no aux">조회</span> 검증문서 현황 — 구성 · 서명 <span class="reqtag">FUN-024</span></div>
         <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
       </div>
       <div class="card-body">
         <div class="btn-row" style="margin:0 0 10px;">
           <span class="sec-note" style="margin-right:auto;">
-            검증 기준문서가 지금 어떤 단계·등급·출처로 구성돼 있는지, 승인으로 확정된 평가정답이 얼마나 찼는지 봅니다.
+            검증문서가 지금 어떤 단계·등급·출처로 구성돼 있는지, 서명으로 확정된 평가 정답지가 얼마나 찼는지 봅니다.
           </span>
           <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
         </div>
@@ -655,7 +656,7 @@ details.adv[open]{padding-bottom:12px;}
              (토큰을 URL 에 싣지 않는 설계 — 액세스로그·브라우저 히스토리 잔존 방지). -->
         <div class="btn-row" style="margin:0 0 10px;flex-wrap:wrap;">
           <span class="sec-note" style="margin-right:auto;">
-            후보를 개별로 열어 등급을 판정·승인하거나, 실문서를 새로 넣으려면 아래 화면을 씁니다.
+            후보를 개별로 열어 등급을 지정하거나, 실문서를 새로 넣으려면 아래 화면을 씁니다.
           </span>
           <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
         </div>
@@ -886,7 +887,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 7. 검증 기준문서 준비 ===== 루프 B 의 시작점(G1) -->
     <section class="card col-span" data-pane="review" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G1·G2 단계 — 후보 생성과 서명 화면 열기를 이 카드에서 합니다">G1 · G2</span> 검증 기준문서 준비 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G1·G2 단계 — 후보 생성과 서명 화면 열기를 이 카드에서 합니다">G1 · G2</span> 검증문서 준비 <span class="reqtag">FUN-003</span></div>
         <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
       </div>
       <div class="card-body">
@@ -1000,7 +1001,7 @@ details.adv[open]{padding-bottom:12px;}
         <div id="signoff-return" class="nextbox" style="display:none;">
           <div>
             <b>서명 탭에서 돌아오셨습니다.</b><br />
-            검수·서명을 마치셨다면 다음 단계는 <b>3 재학습</b>입니다. 승인한 검증문서가 학습·평가 정답으로 쓰입니다.
+            검수·서명을 마치셨다면 다음 단계는 <b>3 재학습</b>입니다. 서명한 검증문서가 학습·평가 정답으로 쓰입니다.
           </div>
           <div class="btn-row" style="margin:0;">
             <button class="btn sm" onclick="confirmSignoffDone()">서명 완료 · 재학습으로</button>
@@ -1179,8 +1180,8 @@ function markStep(id){
  * data-pane="always"(연결·인증)는 모든 탭에 남는다. 전 작업의 전제라서다.
  * -------------------------------------------------------------------------- */
 const PANE_NOTE={
-  review: '검수 — 모델 검증 기준문서(정답지) 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다.',
-  train:  '학습 · 배포 — 승인된 검증문서로 재학습하고, 게이트를 통과한 모델만 배포한 뒤 성적을 확인합니다.',
+  review: '검수 — 검증문서(모델 평가 정답지) 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다.',
+  train:  '학습 · 배포 — 서명한 검증문서로 재학습하고, 게이트를 통과한 모델만 배포한 뒤 성적을 확인합니다.',
   ops:    '운영 — 문서를 분류하고, AI가 자신 없어 한 건을 사람이 확정합니다. 매일 도는 일과이고, 현재 상태와 감사 기록도 여기서 봅니다.',
   config: '설정 — 등급 체계와 태깅 규칙입니다. 보통 도입 시 한 번 정하고 이후에는 거의 바꾸지 않습니다.',
 };
@@ -1398,7 +1399,7 @@ function applyGoldenAiAvailability(active){
     box.style.display = blocked ? '' : 'none';
     box.innerHTML = blocked
       ? '<b>이 서버에서는 AI 후보 생성을 할 수 없습니다 — 등급을 매길 LLM 이 없습니다.</b><br/>'
-        + '서버 설정이 <code>llm_provider=noop</code> 이라 판정기가 모든 문서에 <b>S3 · 신뢰도 0.5</b> 만 '
+        + '서버 설정이 <code>llm_provider=noop</code> 이라 판정기가 <b>모든 문서를 S3 으로</b>만 '
         + '돌려줍니다. 눌러도 등급이 매겨지지 않으므로 잠가 두었습니다.<br/>'
         + '· 검수·서명을 진행하려면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 를 쓰십시오 — 이 경로는 이 서버에서 그대로 됩니다.<br/>'
         + '· AI 로 후보를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하거나, 서버 설정(.env)의 <code>LLM_PROVIDER</code> 를 바꿔야 합니다.'
@@ -1677,7 +1678,7 @@ async function runBatch(){
       if(i===0||i===SAMPLES.length-1) renderClassify(d);
       const match=(d.label===s.exp);
       if(match) hit++;
-      log(`[batch] ${s.id} → ${d.label} (기대 ${s.exp}) ${match?'✓':'·'} conf ${(d.confidence*100).toFixed(0)}%`, match?'ok':'info');
+      log(`[batch] ${s.id} → ${d.label} (기대 ${s.exp}) ${match?'✓':'·'}`, match?'ok':'info');
     }catch(e){ log(`[batch] ${s.id} 실패: ${e.status||e.message}`,'err'); }
   }
   log(`일괄 분류 완료 — ${SAMPLES.length}건 검수 큐 적재, 기대등급 일치 ${hit}/${SAMPLES.length}`, 'ok');
@@ -2267,7 +2268,7 @@ function dashReason(raw){
   const t=String(raw||'');
   if(!t) return '';
   const MAP={
-    'no_locked_records':'승인된 검증문서가 아직 없습니다',
+    'no_locked_records':'서명된 검증문서가 아직 없습니다',
     'locked_eval_not_ready':'평가 정답지가 아직 기준을 채우지 못했습니다',
   };
   if(MAP[t]) return MAP[t];
@@ -2439,7 +2440,7 @@ function renderGoldenSummary(d){
       zeroBox.style.display='';
       zeroBox.innerHTML = (prov==='noop')
         ? '<b>gold 후보가 0건입니다 — 등급 판정기가 <code>noop</code>(더미)이기 때문입니다.</b><br/>'
-          + 'noop 은 합성 문서 생성용 더미라 응답에 등급 자리가 없고, 판정이 늘 <b>S3 · 신뢰도 0.5</b> 로 떨어집니다. '
+          + 'noop 은 합성 문서 생성용 더미라 응답에 등급 자리가 없고, 판정이 늘 <b>S3</b> 으로 떨어집니다. '
           + '룰이 S3 라고 한 문서에만 우연히 합의가 되므로 사실상 전건이 보류로 갑니다.<br/>'
           + '· LLM 이 있는 서버(지재원 GPU)에서 다시 실행하세요. 제공자는 화면이 아니라 서버 설정(.env)에서 바꿉니다.<br/>'
           + '· LLM 이 없는 환경이라면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
@@ -2451,7 +2452,7 @@ function renderGoldenSummary(d){
   goldenButtons(d.status, gold);
 }
 async function startGoldenBuild(){
-  if(!guardWrite('검증 기준문서 생성')) return;
+  if(!guardWrite('검증문서 생성')) return;
   // 버튼은 잠겨 있지만(applyGoldenAiAvailability) healthz 실패로 잠금이 안 걸릴 수 있다.
   if(GOLD_AI_BLOCKED){
     goldenProgress('이 서버에는 등급을 매길 LLM 이 없습니다(llm_provider=noop) — 아래 「이미 있는 문서 묶음으로 검수 시작하기」를 쓰십시오.');
@@ -2486,12 +2487,12 @@ async function startGoldenBuild(){
     const d=await api('POST','/golden/build',body);
     LAST_GOLDEN_JOB_ID=d.golden_job_id;
     $('gold-result').textContent=JSON.stringify(d,null,2);
-    log(`검증 기준문서 생성 시작: ${LAST_GOLDEN_JOB_ID}`,'ok');
+    log(`검증문서 생성 시작: ${LAST_GOLDEN_JOB_ID}`,'ok');
     goldenProgress(`job ${LAST_GOLDEN_JOB_ID} 생성됨 — 완료 대기 중…`);
     await pollGoldenJob(LAST_GOLDEN_JOB_ID);
   }catch(e){
     goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
-    $('gold-result').textContent=`검증 기준문서 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+    $('gold-result').textContent=`검증문서 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
   }finally{ if(btn){ btn.disabled=GOLD_AI_BLOCKED; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
 }
 /* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
