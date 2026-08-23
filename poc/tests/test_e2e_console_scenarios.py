@@ -41,7 +41,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _run_node(args: list[str], timeout: int) -> subprocess.CompletedProcess:
+def _run_node(args: list[str], timeout: int, env_extra: dict | None = None) -> subprocess.CompletedProcess:
+    import os
+
+    env = {**os.environ, **(env_extra or {})}
     return subprocess.run(
         [_NODE, str(_RUNNER), *args],
         cwd=str(_HARNESS),
@@ -50,6 +53,7 @@ def _run_node(args: list[str], timeout: int) -> subprocess.CompletedProcess:
         encoding="utf-8",
         errors="replace",
         timeout=timeout,
+        env=env,
     )
 
 
@@ -70,9 +74,28 @@ _IDS = _scenario_ids()
 
 
 @pytest.fixture(scope="module")
-def results() -> dict[str, dict]:
+def rendered_dir(tmp_path_factory) -> str:
+    """서버 렌더 화면(manage.html)을 **그 자리에서 다시 떠서** 하니스에 넘긴다.
+
+    커밋된 판을 그대로 쓰면 렌더러를 고친 직후 시험이 낡은 화면을 보게 된다 —
+    "시험은 초록인데 실제 화면은 다른" 최악의 상태다. 매번 새로 뜨면 그 위험이 0 이다.
+    """
+    out = tmp_path_factory.mktemp("rendered")
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_dump_console_html", _HARNESS.parents[1] / "scripts" / "dump_console_html.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.main(["--out", str(out)])
+    return str(out)
+
+
+@pytest.fixture(scope="module")
+def results(rendered_dir: str) -> dict[str, dict]:
     """전 시나리오를 한 번 실행하고 id → 결과로 돌려준다."""
-    proc = _run_node(["--json"], timeout=900)
+    proc = _run_node(["--json"], timeout=900, env_extra={"KOIPA_E2E_RENDERED_DIR": rendered_dir})
     if not proc.stdout.strip():
         pytest.fail(f"하니스가 아무것도 출력하지 않았다.\nstderr:\n{proc.stderr[-4000:]}")
     try:

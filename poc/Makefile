@@ -465,6 +465,11 @@ test-console-e2e: ## 관리자 콘솔 e2e 시나리오 (jsdom·node 필요 — �
 console-e2e-setup: ## 콘솔 e2e 하니스 의존성 설치 (한 번만)
 	cd tests/e2e_console && npm install
 
+# 서버가 파이썬으로 렌더해 내려 주는 화면(manage.html)을 하니스가 띄울 수 있게 파일로 뜬다.
+# pytest 는 매번 임시 폴더에 새로 뜨므로 이 명령은 `node run.mjs` 단독 실행용 편의본이다.
+console-e2e-snapshot: ## 서버 렌더 콘솔 화면을 다시 떠 둔다 (렌더러를 고쳤으면 실행)
+	PYTHONPATH=src $(PY) scripts/dump_console_html.py
+
 # 실서버 모드는 읽기 전용이 기본이다(상태를 바꾸는 시나리오·고장 주입은 자동 제외).
 # ⚠ API 키를 안 주면 콘솔 기본값(demo-secret-key)으로 전부 401 이 난다.
 #   예: KOIPA_E2E_API_KEY=$$(ssh -i ~/.ssh/kipai_testserver kopia@223.130.156.134 \

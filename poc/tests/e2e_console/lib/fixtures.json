@@ -6,10 +6,12 @@
     "두 가지를 잠근다. 그래서 이 본보기가 실제 서버와 어긋나면 시험이 깨진다.",
     "키는 'METHOD /경로템플릿' 이고, 경로 변수는 FastAPI 와 같은 {이름} 표기를 쓴다."
   ],
-
   "GET /healthz": {
     "status": "ok",
-    "build": {"git_sha": "e2e0000000000000000000000000000000000000", "built_at": "2026-08-23T00:00:00Z"},
+    "build": {
+      "git_sha": "e2e0000000000000000000000000000000000000",
+      "built_at": "2026-08-23T00:00:00Z"
+    },
     "model_version": "v-fe4b386b",
     "uptime_sec": 1234,
     "deploy_profile": "full-train",
@@ -18,17 +20,33 @@
     "vector_backend": "pg",
     "reranker_provider": "noop",
     "classifier_model_dir": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
-    "rag": {"collection": "docs", "embedding_model": "nlpai-lab/KURE-v1", "search_mode": "hybrid", "chunk_size": 800, "chunk_overlap": 120},
+    "rag": {
+      "collection": "docs",
+      "embedding_model": "nlpai-lab/KURE-v1",
+      "search_mode": "hybrid",
+      "chunk_size": 800,
+      "chunk_overlap": 120
+    },
     "operational_config": {
       "classifier_model_dir": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
       "review_confidence_threshold": 0.7,
-      "rag": {"collection": "docs", "embedding_model": "nlpai-lab/KURE-v1", "search_mode": "hybrid", "chunk_size": 800, "chunk_overlap": 120}
+      "rag": {
+        "collection": "docs",
+        "embedding_model": "nlpai-lab/KURE-v1",
+        "search_mode": "hybrid",
+        "chunk_size": 800,
+        "chunk_overlap": 120
+      }
     },
-    "readiness": {"locked_eval_ready": false, "reason": "locked_gold_eval 0건"},
+    "readiness": {
+      "locked_eval_ready": false,
+      "reason": "locked_gold_eval 0건"
+    },
     "warmup_done": true,
-    "checks": {"model": "ok"}
+    "checks": {
+      "model": "ok"
+    }
   },
-
   "GET /review-queue": {
     "items": [
       {
@@ -76,7 +94,6 @@
     "offset": 0,
     "warnings": []
   },
-
   "GET /review-queue/{classification_id}/evidence": {
     "classification_id": "11111111-1111-4111-8111-111111111111",
     "doc_id": "E2E-DOC-001",
@@ -86,7 +103,16 @@
       "model_version": "v-fe4b386b",
       "classified_at": "2026-08-23T01:00:00Z",
       "rag_used": false,
-      "alternatives": [{"level_code": "S1", "confidence": 0.39}, {"level_code": "S2", "confidence": 0.12}],
+      "alternatives": [
+        {
+          "level_code": "S1",
+          "confidence": 0.39
+        },
+        {
+          "level_code": "S2",
+          "confidence": 0.12
+        }
+      ],
       "automation_assessment": {
         "selected_label": "TS",
         "selected_confidence": 0.42,
@@ -95,23 +121,56 @@
       }
     },
     "evidence": [
-      {"type": "secrecy", "excerpt": "대외 반출을 금한다", "contribution": 0.82, "start": 10, "end": 20, "rag_similarity": null},
-      {"type": "value", "excerpt": "결맞음 시간 T1=420us", "contribution": 0.41, "start": 30, "end": 48, "rag_similarity": null}
+      {
+        "type": "secrecy",
+        "excerpt": "대외 반출을 금한다",
+        "contribution": 0.82,
+        "start": 10,
+        "end": 20,
+        "rag_similarity": null
+      },
+      {
+        "type": "value",
+        "excerpt": "결맞음 시간 T1=420us",
+        "contribution": 0.41,
+        "start": 30,
+        "end": 48,
+        "rag_similarity": null
+      }
     ],
-    "by_type": {"secrecy": 0.82, "value": 0.41},
+    "by_type": {
+      "secrecy": 0.82,
+      "value": 0.41
+    },
     "warnings": []
   },
-
   "POST /classify": {
     "inference_id": "44444444-4444-4444-8444-444444444444",
     "doc_id": "E2E-DOC-010",
     "label": "S1",
     "confidence": 0.81,
-    "scores": {"TS": 0.09, "S1": 0.81, "S2": 0.07, "S3": 0.03},
-    "evaluation_factors": {"secrecy": 2, "value": 2, "management": 2},
+    "scores": {
+      "TS": 0.09,
+      "S1": 0.81,
+      "S2": 0.07,
+      "S3": 0.03
+    },
+    "evaluation_factors": {
+      "secrecy": 2,
+      "value": 2,
+      "management": 2
+    },
     "factors_source": "rule_evidenced",
     "rule_evaluation_factors": null,
-    "evidence": [{"text": "영업비밀", "evidence_type": "secrecy", "weight": 0.7, "start": 0, "end": 4}],
+    "evidence": [
+      {
+        "text": "영업비밀",
+        "evidence_type": "secrecy",
+        "weight": 0.7,
+        "start": 0,
+        "end": 4
+      }
+    ],
     "rag_context_used": [],
     "model_version": "v-fe4b386b",
     "elapsed_ms": 137,
@@ -122,43 +181,101 @@
     "decision_path": "agreement",
     "automation_assessment": null
   },
-
   "POST /classify/stream": {
     "_sse": [
-      {"event": "progress", "data": {"stage": "extract", "elapsed_ms": 12}},
-      {"event": "progress", "data": {"stage": "normalize", "elapsed_ms": 25}},
-      {"event": "progress", "data": {"stage": "embed", "elapsed_ms": 60}},
-      {"event": "progress", "data": {"stage": "llm", "elapsed_ms": 130}},
-      {"event": "progress", "data": {"stage": "finalize", "elapsed_ms": 150}},
-      {"event": "partial", "data": {"grade": "S1", "confidence": 0.81}},
-      {"event": "result", "data": {
-        "inference_id": "44444444-4444-4444-8444-444444444444",
-        "doc_id": "demo-input",
-        "label": "S1",
-        "confidence": 0.81,
-        "scores": {"TS": 0.09, "S1": 0.81, "S2": 0.07, "S3": 0.03},
-        "evaluation_factors": {"secrecy": 2, "value": 2, "management": 2},
-        "factors_source": "rule_evidenced",
-        "evidence": [{"text": "영업비밀", "evidence_type": "secrecy", "weight": 0.7, "start": 0, "end": 4}],
-        "rag_context_used": [],
-        "model_version": "v-fe4b386b",
-        "elapsed_ms": 158,
-        "status": "staging",
-        "warnings": [],
-        "rule_grade": "S1",
-        "model_grade": "S1",
-        "decision_path": "agreement"
-      }},
-      {"event": "done", "data": {"elapsed_ms": 158}}
+      {
+        "event": "progress",
+        "data": {
+          "stage": "extract",
+          "elapsed_ms": 12
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "stage": "normalize",
+          "elapsed_ms": 25
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "stage": "embed",
+          "elapsed_ms": 60
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "stage": "llm",
+          "elapsed_ms": 130
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "stage": "finalize",
+          "elapsed_ms": 150
+        }
+      },
+      {
+        "event": "partial",
+        "data": {
+          "grade": "S1",
+          "confidence": 0.81
+        }
+      },
+      {
+        "event": "result",
+        "data": {
+          "inference_id": "44444444-4444-4444-8444-444444444444",
+          "doc_id": "demo-input",
+          "label": "S1",
+          "confidence": 0.81,
+          "scores": {
+            "TS": 0.09,
+            "S1": 0.81,
+            "S2": 0.07,
+            "S3": 0.03
+          },
+          "evaluation_factors": {
+            "secrecy": 2,
+            "value": 2,
+            "management": 2
+          },
+          "factors_source": "rule_evidenced",
+          "evidence": [
+            {
+              "text": "영업비밀",
+              "evidence_type": "secrecy",
+              "weight": 0.7,
+              "start": 0,
+              "end": 4
+            }
+          ],
+          "rag_context_used": [],
+          "model_version": "v-fe4b386b",
+          "elapsed_ms": 158,
+          "status": "staging",
+          "warnings": [],
+          "rule_grade": "S1",
+          "model_grade": "S1",
+          "decision_path": "agreement"
+        }
+      },
+      {
+        "event": "done",
+        "data": {
+          "elapsed_ms": 158
+        }
+      }
     ]
   },
-
   "POST /classify/async": {
     "job_id": "55555555-5555-4555-8555-555555555555",
     "status": "queued",
     "status_url": "/api/v1/classify/jobs/55555555-5555-4555-8555-555555555555"
   },
-
   "GET /classify/jobs/{job_id}": {
     "job_id": "55555555-5555-4555-8555-555555555555",
     "status": "done",
@@ -173,7 +290,12 @@
         "doc_id": "E2E-BIG-001",
         "label": "S2",
         "confidence": 0.74,
-        "scores": {"TS": 0.05, "S1": 0.14, "S2": 0.74, "S3": 0.07},
+        "scores": {
+          "TS": 0.05,
+          "S1": 0.14,
+          "S2": 0.74,
+          "S3": 0.07
+        },
         "evidence": [],
         "rag_context_used": [],
         "model_version": "v-fe4b386b",
@@ -184,7 +306,6 @@
     ],
     "error": null
   },
-
   "POST /confirm": {
     "confirmation_id": "77777777-7777-4777-8777-777777777777",
     "confirmed_at": "2026-08-23T02:00:00Z",
@@ -192,7 +313,6 @@
     "warnings": [],
     "second_review_required": false
   },
-
   "POST /relabel": {
     "relabel_id": "88888888-8888-4888-8888-888888888888",
     "queue_size": 12,
@@ -201,7 +321,6 @@
     "warnings": [],
     "second_review_required": false
   },
-
   "POST /documents": {
     "doc_id": "99999999-9999-4999-8999-999999999999",
     "filename": "대용량_기술문서.pdf",
@@ -227,7 +346,6 @@
     "rag_collection": null,
     "rag_vector_count": 0
   },
-
   "POST /documents/analyze": {
     "filename": "기술이전 계약초안.pdf",
     "file_size_bytes": 240000,
@@ -249,14 +367,26 @@
       "pii_masked_count": 0,
       "extract_error": null
     },
-    "gate": {"requires_review": false, "reasons": []},
+    "gate": {
+      "requires_review": false,
+      "reasons": []
+    },
     "classification": {
       "label": "S1",
       "confidence": 0.78,
-      "scores": {"TS": 0.08, "S1": 0.78, "S2": 0.1, "S3": 0.04},
+      "scores": {
+        "TS": 0.08,
+        "S1": 0.78,
+        "S2": 0.1,
+        "S3": 0.04
+      },
       "status": "staging",
       "model_version": "v-fe4b386b",
-      "factors": {"secrecy": 2, "value": 2, "management": 2},
+      "factors": {
+        "secrecy": 2,
+        "value": 2,
+        "management": 2
+      },
       "factors_source": "rule_evidenced",
       "rule_factors": null,
       "warnings": [],
@@ -265,21 +395,37 @@
       "model_grade": "S1",
       "decision_path": "agreement"
     },
-    "evidence": [{"text": "기술이전 대가", "evidence_type": "value", "weight": 0.55, "start": 3, "end": 10}],
+    "evidence": [
+      {
+        "text": "기술이전 대가",
+        "evidence_type": "value",
+        "weight": 0.55,
+        "start": 3,
+        "end": 10
+      }
+    ],
     "text_preview": "기술이전 계약초안 — 대상 기술, 실시료율, 기밀유지 조항을 정한다.",
     "text": "기술이전 계약초안 — 대상 기술, 실시료율, 기밀유지 조항을 정한다. 본 계약의 내용은 대외 반출을 금한다.",
     "stages": [
-      {"name": "extract", "status": "ok", "detail": "pdfminer", "ms": 120},
-      {"name": "classify", "status": "ok", "detail": "v-fe4b386b", "ms": 210}
+      {
+        "name": "extract",
+        "status": "ok",
+        "detail": "pdfminer",
+        "ms": 120
+      },
+      {
+        "name": "classify",
+        "status": "ok",
+        "detail": "v-fe4b386b",
+        "ms": 210
+      }
     ]
   },
-
   "POST /train": {
     "train_job_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     "status_url": "/api/v1/train/jobs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     "websocket_url": null
   },
-
   "GET /train/jobs": {
     "total": 2,
     "items": [
@@ -305,14 +451,12 @@
       }
     ]
   },
-
   "POST /admin/model/reload": {
     "reloaded": true,
     "model_dir": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
     "model_version": "v-fe4b386b",
     "model_loaded": true
   },
-
   "POST /admin/model/activate": {
     "activated": false,
     "blocked": true,
@@ -320,13 +464,24 @@
     "version_label": "v-cccccccc",
     "version_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     "reason": "게이트 차단 — fnr_high 가 현행보다 악화(0.031 → 0.058)",
-    "gate": {"passed": false, "checks": {"fnr_high": {"passed": false, "value": 0.058, "baseline": 0.031}}},
-    "locked_readiness": {"ready": false, "reason": "locked_gold_eval 0건"},
+    "gate": {
+      "passed": false,
+      "checks": {
+        "fnr_high": {
+          "passed": false,
+          "value": 0.058,
+          "baseline": 0.031
+        }
+      }
+    },
+    "locked_readiness": {
+      "ready": false,
+      "reason": "locked_gold_eval 0건"
+    },
     "reloaded": false,
     "model_version": "v-fe4b386b",
     "model_loaded": true
   },
-
   "POST /admin/model/rollback": {
     "rolled_back": true,
     "from_version": "v-cccccccc",
@@ -336,32 +491,71 @@
     "model_version": "v-fe4b386b",
     "model_loaded": true
   },
-
   "GET /golden/summary": {
     "path": "datasets/golden/gold_real.jsonl",
     "total": 777,
-    "by_tier": {"silver_train": 540, "gold_candidate": 237, "locked_gold_eval": 0},
-    "by_grade": {"TS": 88, "S1": 190, "S2": 240, "S3": 259},
-    "by_origin": {"synthetic": 777, "real": 0},
-    "by_label_source": {"machine_silver": 777, "human_review": 0},
-    "tier_by_grade": {"locked_gold_eval": {"TS": 0, "S1": 0, "S2": 0, "S3": 0}},
+    "by_tier": {
+      "silver_train": 540,
+      "gold_candidate": 237,
+      "locked_gold_eval": 0
+    },
+    "by_grade": {
+      "TS": 88,
+      "S1": 190,
+      "S2": 240,
+      "S3": 259
+    },
+    "by_origin": {
+      "synthetic": 777,
+      "real": 0
+    },
+    "by_label_source": {
+      "machine_silver": 777,
+      "human_review": 0
+    },
+    "tier_by_grade": {
+      "locked_gold_eval": {
+        "TS": 0,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0
+      }
+    },
     "real_locked_eval": 0
   },
-
   "GET /admin/locked-readiness": {
     "ready": false,
-    "per_grade": {"TS": 0, "S1": 0, "S2": 0, "S3": 0},
-    "real_per_grade": {"TS": 0, "S1": 0, "S2": 0, "S3": 0},
-    "synthetic_per_grade": {"TS": 0, "S1": 0, "S2": 0, "S3": 0},
+    "per_grade": {
+      "TS": 0,
+      "S1": 0,
+      "S2": 0,
+      "S3": 0
+    },
+    "real_per_grade": {
+      "TS": 0,
+      "S1": 0,
+      "S2": 0,
+      "S3": 0
+    },
+    "synthetic_per_grade": {
+      "TS": 0,
+      "S1": 0,
+      "S2": 0,
+      "S3": 0
+    },
     "real_total": 0,
     "synthetic_total": 0,
-    "missing": ["TS", "S1", "S2", "S3"],
+    "missing": [
+      "TS",
+      "S1",
+      "S2",
+      "S3"
+    ],
     "min_per_grade": 25,
     "require_locked_eval": true,
     "deploy_locked_gate_passed": false,
     "reason": "locked_gold_eval 이 비어 있습니다 — 사람 서명 검수가 아직 없습니다"
   },
-
   "GET /metrics/latest": {
     "model_version": "v-fe4b386b",
     "measured_at": "2026-08-22T10:00:00Z",
@@ -370,68 +564,212 @@
     "recall_macro": 0.914,
     "f1_macro": 0.917,
     "fnr_overall": 0.043,
-    "fnr_by_grade": {"TS": 0.0, "S1": 0.08, "S2": 0.05, "S3": 0.02},
+    "fnr_by_grade": {
+      "TS": 0.0,
+      "S1": 0.08,
+      "S2": 0.05,
+      "S3": 0.02
+    },
     "sample_count": 42,
     "eval_source": "hardened42",
     "fnr_high": 0.031
   },
-
   "GET /metrics/history": {
     "items": [
-      {"model_version": "v-fe4b386b", "measured_at": "2026-08-22T10:00:00Z", "accuracy": 0.917, "precision_macro": 0.921, "recall_macro": 0.914, "f1_macro": 0.917, "fnr_overall": 0.043, "fnr_high": 0.031, "sample_count": 42, "eval_source": "hardened42", "fnr_by_grade": {}},
-      {"model_version": "v-d2b4d2e1", "measured_at": "2026-08-15T10:00:00Z", "accuracy": 0.933, "precision_macro": 0.935, "recall_macro": 0.931, "f1_macro": 0.9338, "fnr_overall": 0.061, "fnr_high": 0.052, "sample_count": 42, "eval_source": "hardened42", "fnr_by_grade": {}}
+      {
+        "model_version": "v-fe4b386b",
+        "measured_at": "2026-08-22T10:00:00Z",
+        "accuracy": 0.917,
+        "precision_macro": 0.921,
+        "recall_macro": 0.914,
+        "f1_macro": 0.917,
+        "fnr_overall": 0.043,
+        "fnr_high": 0.031,
+        "sample_count": 42,
+        "eval_source": "hardened42",
+        "fnr_by_grade": {}
+      },
+      {
+        "model_version": "v-d2b4d2e1",
+        "measured_at": "2026-08-15T10:00:00Z",
+        "accuracy": 0.933,
+        "precision_macro": 0.935,
+        "recall_macro": 0.931,
+        "f1_macro": 0.9338,
+        "fnr_overall": 0.061,
+        "fnr_high": 0.052,
+        "sample_count": 42,
+        "eval_source": "hardened42",
+        "fnr_by_grade": {}
+      }
     ]
   },
-
   "GET /metrics/confusion-matrix/{model_version}": {
     "model_version": "v-fe4b386b",
-    "labels": ["TS", "S1", "S2", "S3"],
-    "matrix": [[6, 1, 0, 0], [0, 10, 1, 0], [0, 1, 12, 1], [0, 0, 1, 9]],
-    "fnr_by_grade": {"TS": 0.0, "S1": 0.08, "S2": 0.05, "S3": 0.02}
+    "labels": [
+      "TS",
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "matrix": [
+      [
+        6,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        10,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        12,
+        1
+      ],
+      [
+        0,
+        0,
+        1,
+        9
+      ]
+    ],
+    "fnr_by_grade": {
+      "TS": 0.0,
+      "S1": 0.08,
+      "S2": 0.05,
+      "S3": 0.02
+    }
   },
-
   "GET /schema/grades": {
     "version": "v1",
     "grades": [
-      {"code": "TS", "name": "특급기밀", "order": 1, "description": "유출 시 존립이 위태로운 정보", "color": "#b3261e"},
-      {"code": "S1", "name": "1등급 비밀", "order": 2, "description": "핵심 기술·사업 정보", "color": "#c77700"},
-      {"code": "S2", "name": "2등급 대외비", "order": 3, "description": "내부 한정 정보", "color": "#1a73e8"},
-      {"code": "S3", "name": "3급 공개", "order": 4, "description": "대외 공개 가능", "color": "#188038"}
+      {
+        "code": "TS",
+        "name": "특급기밀",
+        "order": 1,
+        "description": "유출 시 존립이 위태로운 정보",
+        "color": "#b3261e"
+      },
+      {
+        "code": "S1",
+        "name": "1등급 비밀",
+        "order": 2,
+        "description": "핵심 기술·사업 정보",
+        "color": "#c77700"
+      },
+      {
+        "code": "S2",
+        "name": "2등급 대외비",
+        "order": 3,
+        "description": "내부 한정 정보",
+        "color": "#1a73e8"
+      },
+      {
+        "code": "S3",
+        "name": "3급 공개",
+        "order": 4,
+        "description": "대외 공개 가능",
+        "color": "#188038"
+      }
     ]
   },
-
   "PUT /schema/grades": {
     "version": "v2",
     "requires_retraining": true,
     "reason": "등급 코드가 바뀌었습니다 — 기존 분류기 라벨 공간과 어긋나므로 재학습이 필요합니다"
   },
-
   "GET /admin/dashboard": {
     "generated_at": "2026-08-23T02:30:00Z",
-    "escalation_held": {"by_grade": {"TS": 1, "S1": 3, "S2": 0, "S3": 0}, "total": 4},
+    "escalation_held": {
+      "by_grade": {
+        "TS": 1,
+        "S1": 3,
+        "S2": 0,
+        "S3": 0
+      },
+      "total": 4
+    },
     "locked_readiness": {
       "ready": false,
-      "per_grade": {"TS": 3, "S1": 5, "S2": 0, "S3": 0},
-      "real_per_grade": {"TS": 0, "S1": 0, "S2": 0, "S3": 0},
-      "synthetic_per_grade": {"TS": 3, "S1": 5, "S2": 0, "S3": 0},
+      "per_grade": {
+        "TS": 3,
+        "S1": 5,
+        "S2": 0,
+        "S3": 0
+      },
+      "real_per_grade": {
+        "TS": 0,
+        "S1": 0,
+        "S2": 0,
+        "S3": 0
+      },
+      "synthetic_per_grade": {
+        "TS": 3,
+        "S1": 5,
+        "S2": 0,
+        "S3": 0
+      },
       "real_total": 0,
       "synthetic_total": 8,
-      "missing": ["TS", "S1", "S2", "S3"],
+      "missing": [
+        "TS",
+        "S1",
+        "S2",
+        "S3"
+      ],
       "min_per_grade": 25,
       "require_locked_eval": true,
       "deploy_locked_gate_passed": false,
       "reason": "locked_gold_eval 0건"
     },
-    "active_learning": {"pending": 12, "threshold": 50, "last_retrain_at": null},
-    "kill_gate": {"tripped": false, "reason": "", "checked_at": "2026-08-23T02:30:00Z"},
-    "drift": {"status": "ok", "psi": 0.07, "window_days": 7},
+    "active_learning": {
+      "pending": 12,
+      "threshold": 50,
+      "last_retrain_at": null
+    },
+    "kill_gate": {
+      "tripped": false,
+      "reason": "",
+      "checked_at": "2026-08-23T02:30:00Z"
+    },
+    "drift": {
+      "status": "ok",
+      "psi": 0.07,
+      "window_days": 7
+    },
     "degraded": []
   },
-
   "GET /admin/audit-log": {
     "items": [
-      {"occurred_at": "2026-08-23T02:29:00Z", "action": "model.activate", "actor_id": "console", "actor_role": "admin", "target_type": "model", "target_id": "v-cccccccc", "success": false, "error_code": "gate_blocked", "ip_address": "127.0.0.1", "request_id": "req-1"},
-      {"occurred_at": "2026-08-23T02:20:00Z", "action": "confirm", "actor_id": "console", "actor_role": "admin", "target_type": "document", "target_id": "E2E-DOC-001", "success": true, "error_code": null, "ip_address": "127.0.0.1", "request_id": "req-2"}
+      {
+        "occurred_at": "2026-08-23T02:29:00Z",
+        "action": "model.activate",
+        "actor_id": "console",
+        "actor_role": "admin",
+        "target_type": "model",
+        "target_id": "v-cccccccc",
+        "success": false,
+        "error_code": "gate_blocked",
+        "ip_address": "127.0.0.1",
+        "request_id": "req-1"
+      },
+      {
+        "occurred_at": "2026-08-23T02:20:00Z",
+        "action": "confirm",
+        "actor_id": "console",
+        "actor_role": "admin",
+        "target_type": "document",
+        "target_id": "E2E-DOC-001",
+        "success": true,
+        "error_code": null,
+        "ip_address": "127.0.0.1",
+        "request_id": "req-2"
+      }
     ],
     "total": 2,
     "limit": 50,
@@ -439,40 +777,75 @@
     "actorless_ratio": 0.0,
     "warnings": []
   },
-
   "POST /golden/build": {
     "golden_job_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     "status_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     "review_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/review.html",
     "signoff_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/signoff.html"
   },
-
   "GET /golden/builds": {
     "total": 2,
     "builds": [
-      {"path": "datasets/proxy_gold/build_ff5a822c.jsonl", "records": 120, "records_exact": true, "size": 480000, "modified": "2026-08-09T12:00:00+00:00"},
-      {"path": "datasets/proxy_gold/build_20260815.jsonl", "records": 256, "records_exact": true, "size": 910000, "modified": "2026-08-15T09:00:00+00:00"}
+      {
+        "path": "datasets/proxy_gold/build_ff5a822c.jsonl",
+        "records": 120,
+        "records_exact": true,
+        "size": 480000,
+        "modified": "2026-08-09T12:00:00+00:00"
+      },
+      {
+        "path": "datasets/proxy_gold/build_20260815.jsonl",
+        "records": 256,
+        "records_exact": true,
+        "size": 910000,
+        "modified": "2026-08-15T09:00:00+00:00"
+      }
     ]
   },
-
   "POST /golden/jobs/register": {
     "golden_job_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     "status_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html",
     "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html"
   },
-
   "GET /golden/jobs": {
     "jobs": [
-      {"job_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "kind": "register", "status": "done", "actor": "console", "submitted_at": "2026-08-23T02:00:00Z", "source_type": "curated", "gold_count": 120, "uncertain_count": 8, "error": null, "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html", "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html"},
-      {"job_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd", "kind": "build", "status": "running", "actor": "console", "submitted_at": "2026-08-23T02:25:00Z", "source_type": "synthetic", "gold_count": null, "uncertain_count": null, "error": null, "review_url": null, "signoff_url": null}
+      {
+        "job_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        "kind": "register",
+        "status": "done",
+        "actor": "console",
+        "submitted_at": "2026-08-23T02:00:00Z",
+        "source_type": "curated",
+        "gold_count": 120,
+        "uncertain_count": 8,
+        "error": null,
+        "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html",
+        "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html"
+      },
+      {
+        "job_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "kind": "build",
+        "status": "running",
+        "actor": "console",
+        "submitted_at": "2026-08-23T02:25:00Z",
+        "source_type": "synthetic",
+        "gold_count": null,
+        "uncertain_count": null,
+        "error": null,
+        "review_url": null,
+        "signoff_url": null
+      }
     ],
     "ordering": "submitted_at desc"
   },
-
   "GET /golden/jobs/{job_id}": {
     "status": "done",
-    "stats": {"scanned": 400, "adopted": 120, "rejected": 280},
+    "stats": {
+      "scanned": 400,
+      "adopted": 120,
+      "rejected": 280
+    },
     "gold_count": 120,
     "uncertain_count": 8,
     "gold_path": "datasets/proxy_gold/gold_dddddddd.jsonl",
@@ -481,55 +854,108 @@
     "review_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/review.html",
     "signoff_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/signoff.html"
   },
-
   "POST /synth/generate": {
     "synth_job_id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
     "expected_count": 20,
     "estimated_cost_usd": 0.42
   },
-
   "GET /synth/queue": {
     "total": 2,
     "items": [
-      {"synth_id": "12121212-1212-4121-8121-121212121212", "target_grade": "TS", "domain": "반도체", "llm_provider": "local", "llm_model": "qwen3-14b", "quality_score": 0.81, "review_status": "pending", "preview": "당사 EUV 공정 레시피 원본 — 대외 반출 금지.", "created_at": "2026-08-23T01:40:00Z"},
-      {"synth_id": "13131313-1313-4131-8131-131313131313", "target_grade": "S2", "domain": "인사", "llm_provider": "local", "llm_model": "qwen3-14b", "quality_score": 0.66, "review_status": "pending", "preview": "조직 개편 계획 초안 — 대외비.", "created_at": "2026-08-23T01:41:00Z"}
+      {
+        "synth_id": "12121212-1212-4121-8121-121212121212",
+        "target_grade": "TS",
+        "domain": "반도체",
+        "llm_provider": "local",
+        "llm_model": "qwen3-14b",
+        "quality_score": 0.81,
+        "review_status": "pending",
+        "preview": "당사 EUV 공정 레시피 원본 — 대외 반출 금지.",
+        "created_at": "2026-08-23T01:40:00Z"
+      },
+      {
+        "synth_id": "13131313-1313-4131-8131-131313131313",
+        "target_grade": "S2",
+        "domain": "인사",
+        "llm_provider": "local",
+        "llm_model": "qwen3-14b",
+        "quality_score": 0.66,
+        "review_status": "pending",
+        "preview": "조직 개편 계획 초안 — 대외비.",
+        "created_at": "2026-08-23T01:41:00Z"
+      }
     ]
   },
-
   "POST /synth/{synth_id}/review": {
     "synth_id": "12121212-1212-4121-8121-121212121212",
     "final_status": "approved",
     "added_to_dataset_version": "silver_train_v7"
   },
-
   "GET /admin/keywords": {
     "keywords": [
-      {"keyword_id": 1, "grade": "TS", "keyword": "대외 반출 금지", "pattern_type": "phrase", "factor": "secrecy", "weight": 2.5, "is_active": true},
-      {"keyword_id": 2, "grade": "S1", "keyword": "영업비밀", "pattern_type": "exact", "factor": "secrecy", "weight": 1.8, "is_active": true},
-      {"keyword_id": 3, "grade": "S3", "keyword": "보도자료", "pattern_type": "exact", "factor": null, "weight": 1.0, "is_active": false}
+      {
+        "keyword_id": 1,
+        "grade": "TS",
+        "keyword": "대외 반출 금지",
+        "pattern_type": "phrase",
+        "factor": "secrecy",
+        "weight": 2.5,
+        "is_active": true
+      },
+      {
+        "keyword_id": 2,
+        "grade": "S1",
+        "keyword": "영업비밀",
+        "pattern_type": "exact",
+        "factor": "secrecy",
+        "weight": 1.8,
+        "is_active": true
+      },
+      {
+        "keyword_id": 3,
+        "grade": "S3",
+        "keyword": "보도자료",
+        "pattern_type": "exact",
+        "factor": null,
+        "weight": 1.0,
+        "is_active": false
+      }
     ],
     "count": 3,
     "warnings": []
   },
-
   "POST /admin/keywords": {
     "keyword_id": 4,
     "action": "created",
-    "item": {"keyword_id": 4, "grade": "S2", "keyword": "대외비", "pattern_type": "exact", "factor": "secrecy", "weight": 1.2, "is_active": true},
+    "item": {
+      "keyword_id": 4,
+      "grade": "S2",
+      "keyword": "대외비",
+      "pattern_type": "exact",
+      "factor": "secrecy",
+      "weight": 1.2,
+      "is_active": true
+    },
     "serving_reloaded": true,
     "seed_count": 4,
     "note": "룰엔진 시드가 즉시 갱신됐습니다"
   },
-
   "PATCH /admin/keywords/{keyword_id}": {
     "keyword_id": 3,
     "action": "updated",
-    "item": {"keyword_id": 3, "grade": "S3", "keyword": "보도자료", "pattern_type": "exact", "factor": null, "weight": 1.0, "is_active": true},
+    "item": {
+      "keyword_id": 3,
+      "grade": "S3",
+      "keyword": "보도자료",
+      "pattern_type": "exact",
+      "factor": null,
+      "weight": 1.0,
+      "is_active": true
+    },
     "serving_reloaded": true,
     "seed_count": 4,
     "note": "룰엔진 시드가 즉시 갱신됐습니다"
   },
-
   "POST /promotions/promote": {
     "doc_id": "E2E-DOC-001",
     "status": "promoted",
@@ -538,11 +964,241 @@
     "labeler_id": "console",
     "warnings": []
   },
-
+  "GET /golden/candidates/session": {
+    "actor_id": "지재원관리자",
+    "actor_role": "admin"
+  },
+  "GET /golden/candidates": {
+    "total": 3,
+    "listed_excludes_discarded": true,
+    "summary": {
+      "total": 4,
+      "fixed": 1,
+      "unfixed": 2,
+      "deferred": 1,
+      "discarded": 1,
+      "out_of_scope": 0,
+      "by_status": {
+        "deferred": 1,
+        "discarded": 1,
+        "grade_fixed_unlocked": 1,
+        "proposed": 1
+      },
+      "by_origin": {
+        "organization_real": 1,
+        "public_real": 1,
+        "synthetic": 2
+      },
+      "by_final_grade": {
+        "S2": 1
+      },
+      "by_proposed_grade": {
+        "S2": 1,
+        "S3": 1,
+        "TS": 1,
+        "unassigned": 1
+      },
+      "actual_document_intake": 2,
+      "actual_provenance_recorded": 1,
+      "actual_provenance_partial": 1,
+      "actual_provenance_legacy": 0,
+      "scope": "all",
+      "quality": {
+        "documents": 4,
+        "real_documents": 2,
+        "real_ratio": 0.5,
+        "length_only_1nn": 0.208,
+        "length_only_random": 0.25,
+        "grade_token_exposed": 0,
+        "grade_balance_ratio": 1.5,
+        "length": {
+          "min": 320,
+          "p50": 1180,
+          "max": 3020
+        },
+        "length_by_grade": {
+          "TS": {
+            "n": 1,
+            "min": 3020,
+            "p50": 3020,
+            "max": 3020
+          },
+          "S2": {
+            "n": 2,
+            "min": 900,
+            "p50": 1180,
+            "max": 1460
+          },
+          "S3": {
+            "n": 1,
+            "min": 320,
+            "p50": 320,
+            "max": 320
+          }
+        }
+      }
+    },
+    "batch_summary": {
+      "total": 3,
+      "terminal": 1,
+      "pending": 2,
+      "deferred": 1
+    },
+    "candidates": [
+      {
+        "doc_id": "PGC-0001",
+        "title": "EUV 공정 레시피 원본",
+        "document_origin": "synthetic",
+        "proposed_grade": "TS",
+        "final_grade": null,
+        "status": "proposed",
+        "characters": 3020,
+        "grade_fixed": false,
+        "is_actual_document": false,
+        "document_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "claim_scope": "연구소장·표준화팀장 이외 접근 금지",
+        "review_batch": "2026-08-A"
+      },
+      {
+        "doc_id": "PGC-0002",
+        "title": "운영절차서 2026 개정본",
+        "document_origin": "organization_real",
+        "proposed_grade": "S2",
+        "final_grade": "S2",
+        "status": "grade_fixed_unlocked",
+        "characters": 1460,
+        "grade_fixed": true,
+        "is_actual_document": true,
+        "document_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "claim_scope": "품질관리 부서 내부 한정",
+        "review_batch": "2026-08-A",
+        "provenance": {
+          "status": "recorded",
+          "source_reference": "품질관리/운영절차/2026",
+          "usage_basis": "소유부서 검수용 사용 승인",
+          "origin": "console"
+        }
+      },
+      {
+        "doc_id": "PGC-0003",
+        "title": "공개 보도자료 모음",
+        "document_origin": "public_real",
+        "proposed_grade": "S3",
+        "final_grade": null,
+        "status": "deferred",
+        "characters": 320,
+        "grade_fixed": false,
+        "is_actual_document": true,
+        "document_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "claim_scope": "대외 공개 자료",
+        "review_batch": "2026-08-A",
+        "provenance": {
+          "status": "partial",
+          "source_reference": "기관 공개 게시판",
+          "usage_basis": "",
+          "origin": "console"
+        }
+      }
+    ]
+  },
+  "GET /golden/candidates/decisions": {
+    "total": 2,
+    "by_action": {
+      "change": 1,
+      "defer": 1
+    },
+    "events": [
+      {
+        "doc_id": "PGC-0003",
+        "action": "defer",
+        "status": "deferred",
+        "grade": null,
+        "reason": "출처 권한 근거 확인 필요",
+        "actor_id": "지재원관리자",
+        "decided_at": "2026-08-23T01:20:00Z"
+      },
+      {
+        "doc_id": "PGC-0002",
+        "action": "change",
+        "status": "grade_fixed_unlocked",
+        "grade": "S2",
+        "reason": "부서 내부 한정 문서로 확인",
+        "actor_id": "지재원관리자",
+        "decided_at": "2026-08-23T01:10:00Z"
+      }
+    ]
+  },
+  "GET /golden/candidates/{doc_id}": {
+    "doc_id": "PGC-0001",
+    "title": "EUV 공정 레시피 원본",
+    "document_origin": "synthetic",
+    "proposed_grade": "TS",
+    "final_grade": null,
+    "status": "proposed",
+    "characters": 3020,
+    "grade_fixed": false,
+    "is_actual_document": false,
+    "document_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "claim_scope": "연구소장·표준화팀장 이외 접근 금지",
+    "review_batch": "2026-08-A",
+    "text": "# EUV 공정 레시피\n\n당사 반도체연구소의 EUV 노광 공정 레시피 원본이다.\n\n- 노광량 32 mJ/cm2\n- 대외 반출을 금한다.",
+    "decision_history": [
+      {
+        "action": "reopen",
+        "status": "proposed",
+        "reason": "재검토 요청",
+        "actor_id": "지재원관리자",
+        "decided_at": "2026-08-22T10:00:00Z"
+      }
+    ]
+  },
+  "POST /golden/candidates/{doc_id}/decision": {
+    "doc_id": "PGC-0001",
+    "status": "grade_fixed_unlocked",
+    "final_grade": "S1",
+    "latest_decision": {
+      "action": "change",
+      "status": "grade_fixed_unlocked",
+      "grade": "S1",
+      "reason": "본문 기준 핵심 기술정보로 판단",
+      "actor_id": "지재원관리자",
+      "decided_at": "2026-08-23T02:40:00Z"
+    }
+  },
+  "POST /golden/candidates/{doc_id}/provenance": {
+    "doc_id": "PGC-0003",
+    "provenance": {
+      "status": "recorded",
+      "source_reference": "기관 공개 게시판",
+      "usage_basis": "공공누리 등 공공저작물 이용허락",
+      "origin": "console",
+      "recorded_at": "2026-08-23T02:45:00Z"
+    },
+    "status": "deferred",
+    "final_grade": null
+  },
+  "POST /golden/candidates/upload": {
+    "doc_id": "PGC-0004",
+    "title": "신규 등록 문서.docx",
+    "status": "proposed",
+    "characters": 880,
+    "document_origin": "organization_real",
+    "extracted": true,
+    "warnings": []
+  },
   "GET /dashboard/summary": {
     "total_classifications": 120,
-    "by_grade": {"TS": 9, "S1": 24, "S2": 41, "S3": 46},
-    "by_status": {"staging": 46, "needs_review": 8, "confirmed": 66},
+    "by_grade": {
+      "TS": 9,
+      "S1": 24,
+      "S2": 41,
+      "S3": 46
+    },
+    "by_status": {
+      "staging": 46,
+      "needs_review": 8,
+      "confirmed": 66
+    },
     "review_queue": 8,
     "auto_confirmed": 46,
     "reviewed": 66,

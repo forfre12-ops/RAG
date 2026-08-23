@@ -126,6 +126,63 @@ export const scenarios = [
   },
 
   {
+    id: 'demo.reflect.correction-flows-into-next-classify',
+    writes: true,
+    title: '「실시간 반영 시연」이 등록→분류→교정·승급→재분류 4단계를 실제로 돈다',
+    why: '검수 교정이 다음 분류에 반영된다는 주장을 화면이 서버 실호출로 보여 주는 자리다 '
+       + '(POST /promotions/promote 는 콘솔에서 여기서만 나간다)',
+    async run({ server, check }) {
+      const page = await demo(server);
+      const btn = page.$('btn-reflect');
+      check.ok(btn, '시연 버튼이 있다');
+      btn.click();
+      const done = await page.until(() => page.text('reflect-busy').includes('완료')
+        || page.text('reflect-busy').includes('오류'), 12000);
+      await page.settle();
+
+      check.ok(done, '끝까지 돌았다', page.text('reflect-busy'));
+      check.excludes(page.text('reflect-busy'), '오류', '중간에 끊기지 않았다');
+
+      // 네 단계가 실제 요청으로 나갔는가
+      check.ok(server.lastCall('POST', '/documents'), '① 문서를 등록했다');
+      check.gte(server.countCalls('POST', '/classify'), 2, '②·④ 분류를 두 번 했다(최초·재분류)');
+      check.ok(server.lastCall('POST', '/relabel'), '③ 교정을 보냈다');
+      const promote = server.lastCall('POST', '/promotions/promote');
+      check.ok(promote, '③ 승급을 보냈다');
+      check.eq(promote?.body?.actor?.role, 'reviewer', '승급 요청에 검수자 신원이 실렸다');
+      check.ok(promote?.body?.expected_label, '어느 등급으로 승급하는지 실렸다');
+
+      // 화면에 4단계가 남았는가
+      const steps = page.text('reflect-steps');
+      for (const t of ['등록', '최초 분류', '검수 교정', '재분류']) {
+        check.includes(steps, t, `${t} 단계가 화면에 남았다`);
+      }
+      check.gte(server.countCalls('GET', '/dashboard/summary'), 2, '단계마다 운영 현황을 다시 읽는다');
+      check.eq(page.$('btn-reflect')?.disabled, false, '끝나고 버튼이 다시 눌린다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'demo.reflect.failure-visible',
+    title: '시연 도중 실패하면 어디서 멈췄는지 화면에 남는다',
+    needsMock: true,
+    async run({ server, check }) {
+      const page = await demo(server);
+      server.faults.push({ path: '/documents', status: 500, body: { detail: '스토리지 오류' } });
+      page.$('btn-reflect').click();
+      const shown = await page.until(() => page.text('reflect-busy').includes('오류'), 8000);
+      await page.settle();
+
+      check.ok(shown, '오류라고 화면이 말한다', page.text('reflect-busy'));
+      check.eq(server.countCalls('POST', '/promotions/promote'), 0, '앞 단계가 깨지면 뒤로 진행하지 않는다');
+      check.eq(page.$('btn-reflect')?.disabled, false, '버튼이 잠긴 채 남지 않는다');
+      return page;
+    },
+  },
+
+  {
     id: 'demo.health.pill',
     title: '연결 확인이 서버 프로파일을 표시한다',
     async run({ server, check }) {

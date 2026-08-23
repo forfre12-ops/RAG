@@ -20,6 +20,17 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const STATIC_DIR = path.resolve(HERE, '../../../src/koipa/api/static');
 export const FIXTURES = JSON.parse(fs.readFileSync(path.join(HERE, 'fixtures.json'), 'utf8'));
 
+/* 서버가 파이썬으로 렌더해 내려 주는 화면은 정적 파일이 아니라, 떠 둔 판을 서빙한다.
+ *
+ * pytest 로 돌 때는 `KOIPA_E2E_RENDERED_DIR` 로 **그 자리에서 새로 뜬** 판을 가리킨다 —
+ * 그래야 렌더러를 고친 직후에도 시험이 실제 화면을 본다(낡은 판을 볼 위험이 0).
+ * 그 변수가 없으면(=`node run.mjs` 단독 실행) 아래 커밋된 판을 쓴다. 렌더러를 고쳤으면
+ * `make console-e2e-snapshot` 으로 다시 떠 둘 것. */
+export const RENDERED_DIR = process.env.KOIPA_E2E_RENDERED_DIR || path.join(HERE, 'rendered');
+const RENDERED = {
+  '/api/v1/golden/candidates/manage.html': 'manage.html',
+};
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -156,6 +167,19 @@ export async function startServer({ upstream = null } = {}) {
       return;
     }
 
+    if (!upstream && RENDERED[urlPath]) {
+      const p = path.join(RENDERED_DIR, RENDERED[urlPath]);
+      if (!fs.existsSync(p)) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(`떠 둔 화면이 없다: ${RENDERED[urlPath]} — make console-e2e-snapshot 을 먼저 돌릴 것`);
+        return;
+      }
+      state.calls.push({ method: req.method, path: urlPath, headers: req.headers, body: null, bytes: 0, at: state.calls.length });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(fs.readFileSync(p));
+      return;
+    }
+
     if (!urlPath.startsWith('/api/v1')) {
       if (upstream) {
         await proxyTo(upstream, req, res, Buffer.alloc(0));
@@ -272,6 +296,12 @@ export async function startServer({ upstream = null } = {}) {
     },
     lastCall(method, pathPart) {
       return [...state.calls].reverse().find((c) => c.method === method && c.path.startsWith(pathPart)) || null;
+    },
+    /** 경로가 **정확히** 그것인 마지막 요청. `/golden/candidates` 처럼 하위 경로
+     *  (`/golden/candidates/decisions`)가 따로 있는 자리에서 lastCall 은 엉뚱한 것을 집는다. */
+    exactCall(method, exactPath) {
+      return [...state.calls].reverse()
+        .find((c) => c.method === method && c.path.split('?')[0] === exactPath) || null;
     },
     /** 조건에 맞는 요청이 하나라도 있었나 — 같은 경로를 여러 주체가 부를 때 쓴다
      *  (예: /healthz 는 콘솔 본체와 배포 배지가 각각 부르고, 배지는 키를 안 싣는다). */

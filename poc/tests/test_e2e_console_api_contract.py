@@ -209,7 +209,10 @@ def test_fixtures_without_response_model_are_listed(fixtures, routes):
         if not (isinstance(model, type) and issubclass(model, BaseModel))
     )
     # 자동 검증이 안 되는 것은 지금 이만큼이다. 늘어나면 이 시험이 알려 준다.
-    assert len(unbound) <= 6, (
+    # (2026-08-23: 후보 관리 화면 시나리오를 붙이며 /golden/candidates 계열 5개가 늘었다.
+    #  전부 dict 반환이라 본보기를 손으로 맞춰야 한다 — 실제로 그때 provenance 응답의
+    #  필수 필드를 빠뜨렸고 이 파일의 다른 시험이 그것을 잡았다.)
+    assert len(unbound) <= 11, (
         "response_model 없이 dict 를 돌려주는 엔드포인트가 늘었다 — 본보기 드리프트를"
         f" 자동으로 못 잡는다:\n  " + "\n  ".join(unbound)
     )
