@@ -149,7 +149,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .warnbox{font-size:12px;color:var(--amber);background:var(--amber-soft);border:1px solid #fcd34d;border-radius:8px;padding:9px 12px;}
 
 /* DASHBOARD (관제 종합) */
-.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(206px,1fr));gap:12px;}
 /* 검수 근거 펼침 — 클릭한 행에서만 조회한다(lazy). */
 .q-why{margin-top:2px;}
 .why-box{margin-top:8px;border:1px solid var(--border-mid);border-radius:8px;padding:9px 11px;background:var(--bg-surface);}
@@ -167,12 +167,36 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .profile-banner.cust{background:var(--bg-surface);border-color:#b8860b;}
 .srv-gate{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--border-mid);border-radius:8px;background:var(--bg-surface);}
 .srv-gate>b{font-size:17px;font-family:var(--font-mono);}
-.dash-panel{border:1px solid var(--border-mid);border-radius:10px;padding:12px 13px;background:var(--bg-surface);display:flex;flex-direction:column;gap:8px;}
-.dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.dash-panel .dp-big{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1;}
+.dash-panel{border:1px solid var(--border-mid);border-left:3px solid var(--border-strong);padding:13px 14px;background:var(--bg-surface);display:flex;flex-direction:column;gap:9px;min-width:0;}
+/* 좌측 색선 하나로 칸 상태를 먼저 읽게 한다 — 배지를 다 읽지 않아도 정상/주의가 구분된다. */
+.dash-panel.st-ok{border-left-color:#16a34a;}
+.dash-panel.st-warn{border-left-color:#d97706;}
+.dash-panel.st-err{border-left-color:#dc2626;}
+.dash-panel .dp-h{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+/* 제목이 「배포 준 / 비 상태」로 쪼개지고 배지가 세로로 무너지던 것 — 제목은 줄바꿈 금지,
+   배지는 자리가 모자라면 통째로 다음 줄로 내린다. */
+.dash-panel .dp-h>span:first-child{white-space:nowrap;}
+.dash-panel .dp-t{font-family:var(--font-sans);font-size:12.5px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:-.01em;white-space:nowrap;}
+.dash-panel .dp-tags{margin-left:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;}
+.dash-panel .dp-tags .pill{white-space:nowrap;font-family:var(--font-sans);letter-spacing:0;text-transform:none;font-size:11px;}
+.dash-panel .dp-big{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;}
+.dash-panel .dp-big .u{font-size:12px;font-weight:600;color:var(--text-faint);letter-spacing:0;margin-left:3px;}
 .dash-panel .dp-row{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-soft);}
-.dash-panel .dp-row b{color:var(--text);}
+.dash-panel .dp-row b{color:var(--text);font-variant-numeric:tabular-nums;}
 .dash-panel .dp-note{font-size:11.5px;color:var(--text-faint);line-height:1.45;}
+/* 하위 수치 3~4개 — 라벨 위, 값 아래로 세워 좁은 칸에서도 짝이 안 흐트러진다. */
+.dash-panel .dp-h + .dp-stat{border-top:0;padding-top:0;}
+.dash-panel .dp-stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(36px,1fr));gap:6px;border-top:1px solid var(--border);padding-top:8px;}
+.dash-panel .dp-stat>div{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.dash-panel .dp-stat span{font-size:10.5px;color:var(--text-faint);}
+.dash-panel .dp-stat b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2;}
+/* 등급별 서명 건수 — flex 로 흘리면 「TS 0 실0/합0  S1 0 …」이 제멋대로 접힌다. 한 줄 = 한 등급. */
+.dash-panel .dp-tab{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:5px 12px;}
+.dash-panel .dp-tab>div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-soft);min-width:0;}
+.dash-panel .dp-tab .gk{font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--text);background:var(--bg-strong);padding:1px 5px;}
+.dash-panel .dp-tab .n{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:20px;text-align:right;}
+.dash-panel .dp-tab small{color:var(--text-faint);font-size:10.5px;font-family:var(--font-mono);white-space:nowrap;}
+.dash-panel .warnbox{font-size:11.5px;line-height:1.5;padding:8px 10px;}
 .dp-degraded{font-size:10.5px;color:var(--amber);font-family:var(--font-mono);}
 
 /* ============================================================
@@ -1613,7 +1637,22 @@ async function loadReviewQueue(){
     const info=$('rq-info');
     if(info) info.textContent = `대기 ${d.total||0}건 (표시 ${QUEUE.length})`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(', ')}`:'');
     log(`검수 큐 로드: ${QUEUE.length}건 (전체 ${d.total||0})`, 'ok');
-  }catch(e){ log(`검수 큐 로드 실패: ${e.status||e.message}`,'err'); }
+  }catch(e){
+    /* [2026-08-23] 실패를 로그창에만 남기던 자리다. 로그바는 접혀 있을 수 있고, 그러면
+       화면에는 처음의 안내문("「검토할 문서 보기」를 누르면 …")이 그대로 남아 **대기 0건과
+       구별되지 않았다** — 사용자에게는 "눌렀는데 아무 일도 안 일어난다"로 보인다.
+       실측: 키가 틀린 서버(401)에서 이 버튼만 아무 반응이 없었다(e2e 시나리오
+       review.queue.load-failure-visible · fault.auth.401-everywhere-visible). */
+    const detail=(e.data&&(e.data.detail||e.data.message))||e.message||'';
+    const info=$('rq-info');
+    if(info) info.textContent=`조회 실패: ${e.status||''} ${detail}`
+      +(e.status===401?' — API 키를 확인하세요.':(e.status===403?' — admin 또는 reviewer 역할이 필요합니다.':''));
+    // 이미 그려 둔 목록은 지우지 않는다 — 실시간 관제 tick 이 한 번 실패했다고 화면이
+    // 비면 오히려 정보가 준다. 아직 아무것도 없을 때만 그 자리에 사유를 적는다.
+    const q=$('queue');
+    if(q && !QUEUE.length) q.innerHTML=`<div class="warnbox">검수 큐를 읽지 못했습니다: ${esc(String(e.status||''))} ${esc(String(detail))}</div>`;
+    log(`검수 큐 로드 실패: ${e.status||e.message}`,'err');
+  }
 }
 function enqueue(d, title){
   const gate=+$('gate').value; const flagged=d.confidence<gate || (d.warnings&&d.warnings.length);
@@ -2136,17 +2175,41 @@ function dashReason(raw){
     return '재학습 기준에 못 미칩니다 — 지금 조치할 것은 없습니다';
   return t;
 }
+/* [2026-08-23] 칸이 좁아지면 제목이 「배포 준 / 비 상태」로 쪼개지고 배지가 글자 단위로
+   무너졌다. 머리글(제목+배지)·큰 수치·하위 수치를 헬퍼로 모아 다섯 칸을 같은 골격으로 찍고,
+   칸 상태는 좌측 색선으로 먼저 읽히게 한다. 표시만 바꾼다 — 판정은 서버 값 그대로. */
+function dpPanel(state, title, tags, body){
+  return `<div class="dash-panel st-${state}">`
+    + `<div class="dp-h"><span class="dp-t">${title}</span><span class="dp-tags">${tags}</span></div>`
+    + body + `</div>`;
+}
+function dpBig(v, unit, color){
+  return `<div class="dp-big"${color?` style="color:${color}"`:''}>${v}${unit?`<span class="u">${unit}</span>`:''}</div>`;
+}
+function dpStat(items){
+  return `<div class="dp-stat">${items.map(([k,v,c])=>
+    `<div><span>${esc(k)}</span><b${c?` style="color:${c}"`:''}>${v}</b></div>`).join('')}</div>`;
+}
+function dashTime(t){
+  const raw=String(t||'');
+  if(!raw) return '-';
+  const dt=new Date(raw);
+  if(isNaN(dt.getTime())) return raw;
+  const z=n=>String(n).padStart(2,'0');
+  return `${dt.getFullYear()}-${z(dt.getMonth()+1)}-${z(dt.getDate())} ${z(dt.getHours())}:${z(dt.getMinutes())}:${z(dt.getSeconds())}`;
+}
 function renderDashboard(d){
-  $('dash-meta').textContent = `생성 ${d.generated_at||'-'}` + ((d.degraded&&d.degraded.length)?` · 조회 실패: ${d.degraded.join(', ')}`:'');
+  const meta=$('dash-meta');
+  meta.textContent = `생성 ${dashTime(d.generated_at)}` + ((d.degraded&&d.degraded.length)?` · 조회 실패: ${d.degraded.join(', ')}`:'');
+  meta.title = d.generated_at ? `서버 원본 시각 ${d.generated_at}` : '';
   const eh=d.escalation_held||{}, lr=d.locked_readiness||{}, al=d.active_learning||{}, kg=d.kill_gate||{}, dr=d.drift||{};
   const byg=eh.by_grade||{};
   // 1) 이중검토 보류
-  const p1=`<div class="dash-panel">
-    <div class="dp-h"><span>이중검토 보류</span>${(eh.total>0)?'<span class="pill warn">보류</span>':'<span class="pill ok">없음</span>'}${dpDegraded(d,'escalation_held')}</div>
-    <div class="dp-big" style="color:${(eh.total>0)?'var(--red)':'var(--green)'}">${eh.total??0}</div>
-    <div class="dp-note">${(eh.total>0)?'사람이 한 번 더 봐야 할 건입니다':'추가 검토 대기 없음'}</div>
-    <div class="dp-row">${GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')}</div>
-  </div>`;
+  const p1=dpPanel(eh.total>0?'warn':'ok', '이중검토 보류',
+    ((eh.total>0)?'<span class="pill warn">보류</span>':'<span class="pill ok">없음</span>')+dpDegraded(d,'escalation_held'),
+    dpBig(eh.total??0, '건', (eh.total>0)?'var(--red)':'var(--green)')
+    + `<div class="dp-note">${(eh.total>0)?'사람이 한 번 더 봐야 할 건입니다':'추가 검토 대기 없음'}</div>`
+    + dpStat(GRADES.map(g=>[g, byg[g]??0])));
   // 2) 배포 readiness (locked_gold_eval)
   // per_grade 만 보여주면 합성 서명분이 실문서와 섞여 "준비됨"으로 읽힌다. 실측 2026-08-09:
   // TS 5건이 전부 합성인데 ready=true 였다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로
@@ -2154,39 +2217,39 @@ function renderDashboard(d){
   // 등급이 있으면 그 사실을 배지 옆에 적는다. 게이트 판정 자체는 서버 계약 그대로 둔다.
   const pg=lr.per_grade||{}, rpg=lr.real_per_grade||{}, spg=lr.synthetic_per_grade||{};
   const realZero=GRADES.filter(g=>pg[g]!=null && (rpg[g]||0)===0);
-  const p2=`<div class="dash-panel">
-    <div class="dp-h"><span>배포 준비 상태</span>${lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>'}${realZero.length?'<span class="pill warn">실문서 0 등급 있음</span>':''}${dpDegraded(d,'locked_readiness')}</div>
-    <div class="dp-row">${GRADES.map(g=>pg[g]!=null?`<div><span>${g}</span> <b>${pg[g]}</b><small style="color:var(--text-faint)"> 실${rpg[g]??0}/합${spg[g]??0}</small></div>`:'').join('')||'<span style="color:var(--text-faint)">등급별 데이터 없음</span>'}</div>
-    ${lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족: ${lr.missing.join(', ')}`:''}</div>`:''}
-    ${realZero.length?`<div class="warnbox" style="margin-top:8px">${realZero.join(', ')} 는 서명분이 <b>전부 합성</b>입니다 — 합성 본문으로 잰 정확도는 실세계 성능이 아닙니다. 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:''}
-    ${lr.reason?`<div class="dp-note">${esc(dashReason(lr.reason))}</div>`:''}
-  </div>`;
+  const gradeRows=GRADES.filter(g=>pg[g]!=null).map(g=>
+    `<div><span class="gk">${g}</span><span class="n">${pg[g]}</span><small>실 ${rpg[g]??0} · 합 ${spg[g]??0}</small></div>`).join('');
+  const p2=dpPanel(lr.ready&&!realZero.length?'ok':'warn', '배포 준비 상태',
+    (lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>')
+    + (realZero.length?'<span class="pill warn">실문서 0</span>':'') + dpDegraded(d,'locked_readiness'),
+    (gradeRows?`<div class="dp-tab">${gradeRows}</div>`:'<div class="dp-note">등급별 데이터 없음</div>')
+    + (lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족 ${lr.missing.join(' · ')}`:''}</div>`:'')
+    + (realZero.length?`<div class="warnbox"><b>${realZero.join(', ')}</b> 는 서명분이 전부 합성입니다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로, 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:'')
+    + (lr.reason?`<div class="dp-note">${esc(dashReason(lr.reason))}</div>`:''));
   // 3) 재학습 backlog (active-learning)
-  const p3=`<div class="dash-panel">
-    <div class="dp-h"><span>재학습 대기</span>${alStatusPill(al.retrain_status)}${dpDegraded(d,'active_learning')}</div>
-    <div class="dp-big" style="color:${(al.unconsumed_total>0)?'var(--red)':'var(--green)'}">${al.unconsumed_total??0}</div>
-    <div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>
-    <div class="dp-row"><div><span>과소</span> <b style="color:${al.pending_underclass>0?'var(--red)':'inherit'}">${al.pending_underclass??0}</b></div><div><span>과대</span> <b>${al.pending_overclass??0}</b></div><div><span>측면</span> <b>${al.pending_lateral??0}</b></div></div>
-    ${al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''}
-  </div>`;
+  const alState = al.retrain_status==='URGENT_RETRAIN' ? 'err' : (al.retrain_status==='RETRAIN_RECOMMENDED' ? 'warn' : 'ok');
+  const p3=dpPanel(alState, '재학습 대기',
+    alStatusPill(al.retrain_status)+dpDegraded(d,'active_learning'),
+    dpBig(al.unconsumed_total??0, '건', (al.unconsumed_total>0)?'var(--red)':'var(--green)')
+    + `<div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>`
+    + dpStat([['과소', al.pending_underclass??0, al.pending_underclass>0?'var(--red)':''],
+              ['과대', al.pending_overclass??0, ''],
+              ['측면', al.pending_lateral??0, '']])
+    + (al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''));
   // 4) kill-gate
   const kgReasons=(kg.reasons||[]);
-  const p4=`<div class="dash-panel">
-    <div class="dp-h"><span>안전 정지</span>${kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>'}${dpDegraded(d,'kill_gate')}</div>
-    <div class="dp-big" style="color:${kg.tripped?'var(--red)':'var(--green)'}">${kg.tripped?'정지':'정상'}</div>
-    <div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'발동 사유 없음'}</div>
-  </div>`;
+  const p4=dpPanel(kg.tripped?'err':'ok', '안전 정지',
+    (kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>')+dpDegraded(d,'kill_gate'),
+    dpBig(kg.tripped?'정지':'정상', '', kg.tripped?'var(--red)':'var(--green)')
+    + `<div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'발동 사유 없음'}</div>`);
   // 5) 임베딩 드리프트 (마지막 게이지 — 표본 0이면 데이터 없음)
   const noSample=!(dr.sample_size>0);
-  const p5=`<div class="dash-panel">
-    <div class="dp-h"><span>입력 분포 변화</span>${noSample?'<span class="pill">데이터 없음</span>':(dr.alert>0.5?'<span class="pill err">경보</span>':'<span class="pill ok">정상</span>')}${dpDegraded(d,'drift')}</div>
-    <div class="dp-row">
-      <div><span>분포 차이</span> <b>${noSample?'—':(+dr.kl_divergence).toFixed(4)}</b></div>
-      <div><span>유사도</span> <b>${noSample?'—':(+dr.cosine_mean).toFixed(4)}</b></div>
-      <div><span>표본</span> <b>${dr.sample_size??0}</b></div>
-    </div>
-    ${noSample?'<div class="dp-note">드리프트 refresh 표본이 없어 값은 미측정(0.0은 실측 아님).</div>':''}
-  </div>`;
+  const p5=dpPanel(noSample?'':(dr.alert>0.5?'err':'ok'), '입력 분포 변화',
+    (noSample?'<span class="pill">데이터 없음</span>':(dr.alert>0.5?'<span class="pill err">경보</span>':'<span class="pill ok">정상</span>'))+dpDegraded(d,'drift'),
+    dpStat([['분포 차이', noSample?'—':(+dr.kl_divergence).toFixed(4)],
+            ['유사도', noSample?'—':(+dr.cosine_mean).toFixed(4)],
+            ['표본', dr.sample_size??0]])
+    + (noSample?'<div class="dp-note">드리프트 refresh 표본이 없어 값은 미측정입니다(0.0은 실측이 아닙니다).</div>':''));
   $('dash-grid').innerHTML = p1+p2+p3+p4+p5;
 }
 async function loadDashboard(){
@@ -2454,6 +2517,11 @@ async function autoTick(){
     if(!queueBusy()) await loadReviewQueue();
   }catch(e){ AUTO_TICK_OK=false; }
   AUTO_SILENT=false; AUTO_INFLIGHT=false;
+  /* [2026-08-23] 그냥 setAutoStatus(live) 였다. 응답이 느린 tick 이 도는 동안 사용자가
+     자동 갱신을 끄면, 그 tick 이 **나중에 끝나면서 '정지'를 '실시간 갱신 중'으로 되돌렸다.**
+     폴링은 멈췄는데 표시만 켜져 있어 화면이 사실과 다른 말을 했다(e2e 시나리오
+     fault.autorefresh.stop-during-inflight). 타이머가 아직 살아 있을 때만 갱신한다. */
+  if(!AUTO_TIMER) return;
   setAutoStatus(AUTO_TICK_OK ? 'live' : 'error');
 }
 function stopAuto(){ if(AUTO_TIMER){ clearInterval(AUTO_TIMER); AUTO_TIMER=null; } }
