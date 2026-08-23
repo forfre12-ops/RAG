@@ -18,7 +18,7 @@ from koipa.api._jwt_auth import require_auth
 from koipa.api._rbac import require_role
 from koipa.api.confirm import bind_authenticated_actor, resolve_actor_user_id
 from koipa.config import settings
-from koipa.golden_tiers import human_reviewer_rejection_reason, is_human_reviewer
+from koipa.golden_tiers import human_reviewer_rejection_reason
 from koipa.services.job_store import get_default_store
 from koipa.schemas.golden import (
     GoldenBuildRequest,
@@ -40,7 +40,7 @@ from koipa.services.golden_build_service import GoldenBuildService
 from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
-from koipa.console_nav import HEADER_CSS, NAV_CSS, header_html, nav_bar_html
+from koipa.console_nav import HEADER_CSS, NAV_CSS, header_html
 
 # 한국지식재산보호원 심볼 — 폐쇄망이라 외부 이미지를 못 쓰고, 원본 파일도 리포에 없어
 # (있는 것은 Koipa 로고 3종뿐) 제공받은 도안을 보고 벡터로 옮긴 **근사본**이다.

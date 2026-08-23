@@ -23,7 +23,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
-from koipa.console_nav import BRAND_NAME, HEADER_CSS, NAV_CSS, header_html, nav_bar_html
+from koipa.console_nav import BRAND_NAME, HEADER_CSS, NAV_CSS, header_html
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
 from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 

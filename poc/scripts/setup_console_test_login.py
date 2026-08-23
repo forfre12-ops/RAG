@@ -179,10 +179,10 @@ def main(argv=None) -> int:
     print(f"  JWT_ISSUER={args.iss}")
     print(f"  JWT_AUDIENCE={args.aud}")
     print("\n이 사람에게 줄 것")
-    print(f"  1) 로그인 화면   <서버주소>/api/v1/golden/candidates/login.html")
+    print("  1) 로그인 화면   <서버주소>/api/v1/golden/candidates/login.html")
     print(f"  2) 붙여넣을 토큰  {per_person}")
     print("     (로그인하면 토큰이 쿠키로만 저장된다 — 주소창에 남지 않는다)")
-    print(f"  3) 검수·서명 링크  register_review_signoff_job.py 가 출력하는 ?t= 포함 주소")
+    print("  3) 검수·서명 링크  register_review_signoff_job.py 가 출력하는 ?t= 포함 주소")
     print("\n⚠ 서명자는 이 토큰의 sub 로 기록된다. 사람마다 따로 발급할 것 —")
     print("   한 토큰을 여러 명이 쓰면 원장에 같은 이름만 남아 검수 기록이 성립하지 않는다.")
     return 0
