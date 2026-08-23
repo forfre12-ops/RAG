@@ -73,7 +73,11 @@ class TestSparseEvidenceEmission:
                 raise RuntimeError("no engine — force single-pass")
 
         lab = SimpleNamespace(
-            rule_result=SimpleNamespace(grade_scores={"S2": total}, grade=Grade.S2),
+            # [2026-08-22] matched_keywords 는 5367c896 이 rule_has_evidence 를 배선하면서
+            # 필수가 됐다(pipeline 이 has_real_evidence(lab.rule_result) 를 호출한다).
+            # 빈 목록 = 시드 매칭 0건 = 이 시나리오(빈약한 근거)와 맞는 상태다.
+            rule_result=SimpleNamespace(grade_scores={"S2": total}, grade=Grade.S2,
+                                        matched_keywords=[]),
             grade=Grade.S2, confidence=1.0, factors=None, evidence=[],
         )
 

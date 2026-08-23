@@ -256,13 +256,16 @@
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/02_S1_recsys_source_license.docx','추천엔진 소스·라이선스(영업비밀).docx')">S1 1급 · 소스·라이선스 (DOCX)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/04_S3_press_release.docx','신제품 출시 보도자료(공개).docx')">S3 공개 · 보도자료 (DOCX)</button>
       <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/03_S2_supplier_price.xlsx','협력사 납품단가표(대외비).xlsx')">S2 2급 · 납품단가표 (XLSX)</button>
-      <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">⚠ 검수 · 기술이전 PDF — 표 추출 불완전</button>
+      <!-- [2026-08-23 정정] 05 를 자동확정 쪽으로 되돌렸다. 8/22 에 "표 추출 불완전으로 검수"로
+           적었는데 그건 **로컬 개발환경 실측**이었고, 배포본에서는 자동확정(0.949)이다.
+           원인: 배포 이미지에는 pdfplumber 가 있고 로컬 venv 에는 없다(로컬은 fitz 만).
+           표를 못 뽑으니 로컬에서만 열화로 잡혔다. 배포본 실측이 정본이다. -->
+      <button class="btn ghost sample-btn ok" onclick="loadSample('./demo_docs/05_S1_tech_transfer.pdf','기술이전 계약초안(기밀).pdf')">S1 1급 · 기술이전 계약초안 (PDF)</button>
       <button class="btn ghost sample-btn bad" onclick="loadSample('./demo_docs/06_FAIL_thin_text.txt','얇은 본문.txt')">✕ 검수 · 얇은 본문 (TXT)</button>
     </div>
-    <div class="hint">위 4종(TS·S1·S3·S2)은 <b>자동 확정</b>되는 경로입니다(2026-08-22 실측 신뢰도 0.71~0.98).
-      아래 2종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
-      ⚠는 등급(S1)은 나왔지만 <b>PDF 표 추출이 불완전</b>해 자동확정하지 않는 경우,
-      ✕는 본문이 사실상 없어 <b>확신이 기준(0.70)에 못 미치는</b> 경우입니다.
+    <div class="hint">위 5종(TS·S1·S3·S2·S1)은 <b>자동 확정</b>되는 경로입니다(2026-08-23 배포본 실측 신뢰도 0.71~0.98).
+      아래 1종은 <b>조용히 오분류하지 않고 검수로 넘기는</b> 안전장치를 보여 줍니다 —
+      본문이 사실상 없어 <b>확신이 기준(0.70)에 못 미치는</b> 경우입니다.
       <b>이 6종은 본문이 267~448자로 짧습니다</b> — 확신도는 본문이 길수록 낮아지므로,
       실제 업무문서(2,000자 이상)에서는 자동 확정 비율이 이보다 낮습니다.</div>
     </details>

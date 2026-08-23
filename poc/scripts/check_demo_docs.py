@@ -69,8 +69,10 @@ DEMO_EXPECTATIONS: tuple[dict, ...] = (
     {"file": "07_HYBRID_semantic_secret.docx", "grade": "S2", "status": "needs_review",
      "reason": "agreement-gate", "on_screen": False,
      "shown_as": "(화면 제외) 비공개 M&A 메모 - 룰 무근거지만 관리표시 있어 검수"},
-    {"file": "05_S1_tech_transfer.pdf", "grade": "S1", "status": "needs_review",
-     "reason": "extraction-gate", "shown_as": "검수 · 기술이전 PDF - 표 추출 불완전"},
+    # [2026-08-23 정정] 배포본에서는 **자동확정**이다(0.949). 로컬 in-process 는 pdfplumber 가
+    # 없어 표 추출이 열화로 잡혀 검수로 갔다 - 로컬 쪽이 틀린 것이다.
+    {"file": "05_S1_tech_transfer.pdf", "grade": "S1", "status": "staging",
+     "reason": None, "shown_as": "S1 1급 · 기술이전 PDF - 자동확정"},
     {"file": "06_FAIL_thin_text.txt", "grade": None, "status": "needs_review",
      "reason": "low-confidence", "allow_no_classification": True,
      "shown_as": "검수 · 얇은 본문 - 확신 부족"},
@@ -84,19 +86,25 @@ NEAR_THRESHOLD_MARGIN = 0.05
 # 놓는 대본이라(DEMO_RUNBOOK_2026-08-23 §3-3) 이쪽이 실제 시연 대상이다. 파일명에 등급이
 # 없고 같은 문서가 4포맷으로 있어 "포맷 무관 동일 판정"을 그 자리에서 보여줄 수 있다.
 UPLOAD_DEMO_DIR = _POC / "demo_formats"
+
+# ⚠ 기대값은 **배포본(223) 실측 기준**이다. 로컬 in-process 로 돌리면 PDF 두 건이 다르게
+# 나온다 - 추출기 구성이 다르기 때문이다(실측 2026-08-23):
+#     배포 이미지  pdfplumber 있음 · fitz 없음   → PDF 표까지 추출 → 근거 많아 확신 높음
+#     로컬 venv    pdfplumber 없음 · fitz 있음   → 표 추출 실패 → extraction_gate → 검수
+# 즉 **로컬 결과로 배포본을 진단하면 틀린다.** 리허설은 반드시 --api 로 배포 서버에 대고 한다.
 UPLOAD_DEMO_EXPECTATIONS: tuple[dict, ...] = (
-    {"file": "분기 보도자료·공시 본문 초안.docx", "grade": "S3", "status": "staging",
-     "reason": None, "shown_as": "공개 보도자료 - 자동확정(대본 1)"},
-    {"file": "분기 보도자료·공시 본문 초안.hwpx", "grade": "S3", "status": "staging",
-     "reason": None, "shown_as": "같은 문서 한/글 - 같은 판정(대본 1)"},
-    {"file": "분기 보도자료·공시 본문 초안.xlsx", "grade": "S3", "status": "staging",
-     "reason": None, "shown_as": "같은 문서 엑셀 - 같은 판정(대본 1)"},
+    {"file": "차세대 메모리 공정 핵심기술 검토 보고서.pdf", "grade": "TS", "status": "staging",
+     "reason": None, "shown_as": "TS 최고등급 자동확정(대본 1) · 서버 0.926"},
     {"file": "차세대 메모리 공정 핵심기술 검토 보고서.docx", "grade": "TS",
      "status": "needs_review", "reason": "low-confidence",
-     "shown_as": "TS 로 봤지만 확신 미달 - 검수(대본 2)"},
+     "shown_as": "같은 문서 docx - 등급은 같은 TS, 확신 미달로 검수(대본 2) · 서버 0.668"},
+    {"file": "분기 보도자료·공시 본문 초안.docx", "grade": "S3", "status": "staging",
+     "reason": None, "shown_as": "공개 보도자료 자동확정(대본 3) · 서버 0.946"},
+    {"file": "분기 보도자료·공시 본문 초안.hwpx", "grade": "S3", "status": "staging",
+     "reason": None, "shown_as": "같은 문서 한/글 - 같은 판정(대본 3) · 서버 0.946"},
     {"file": "핵심 알고리즘·모듈 소스 분리 보관 정책.docx", "grade": "TS",
      "status": "needs_review", "reason": "low-confidence",
-     "shown_as": "의도 S1인데 TS - 안전 방향 과분류(대본 3)"},
+     "shown_as": "의도 S1인데 TS - 안전 방향 과분류(대본 4) · 서버 0.465"},
 )
 
 _MIME = {
