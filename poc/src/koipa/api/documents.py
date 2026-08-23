@@ -338,6 +338,14 @@ async def analyze_document(
     file: UploadFile = File(...),
     return_evidence: bool = Form(default=True),
     full_text: bool = Form(default=False),
+    # [2026-08-23] 분류만 건너뛰는 opt-in 스위치. 기본 True — 기존 호출자 동작 불변.
+    # False 면 아래 청크 상한 게이트(analyze_sync_max_chunks)도 함께 건너뛰고 추출·정규화·
+    # PII·청킹까지만 돌려준다. 상한을 둔 이유는 **분류가 청크 수에 비례**하기 때문이고
+    # (config.py 실측 고정비 2.9s + 0.82s/청크), 추출만 하면 그 비용이 없다.
+    # 시연 콘솔이 413 을 받았을 때 이 스위치로 본문을 회수해 POST /classify/async 로 넘긴다.
+    # 그 경로는 doc_id 가 비-UUID 면 영속화를 건너뛰므로(classify_service.py `_try_persist`)
+    # 이 화면 전체에서 DB 적재가 발생하지 않는다 — POST /documents 를 타지 않는다.
+    classify: bool = Form(default=True),
     # [ICD §3.1~§3.3] 시연·연동이 실제로 타는 경로가 여기다. 종전에는 메타데이터 자리가
     # 아예 없어 **콘솔로 올린 문서는 출처도 관리성도 줄 수 없었다** — /classify 는 dict
     # 로 받는데 이쪽만 빠져 있었다. 관리성은 본문에서 관측되지 않는 축이므로(실측
@@ -446,7 +454,7 @@ async def analyze_document(
     # 조용히 죽는 것보다 즉시 이유를 말하고 거절하는 편이 낫다. 추출 결과는 이미
     # 나왔으므로 무엇이 얼마나 컸는지 숫자로 알려준다(문제 진단이 가능해야 한다).
     _chunk_cap = int(getattr(settings, "analyze_sync_max_chunks", 0) or 0)
-    if _chunk_cap > 0 and len(pre.chunks) > _chunk_cap:
+    if classify and _chunk_cap > 0 and len(pre.chunks) > _chunk_cap:
         raise HTTPException(
             status_code=413,
             detail=(
@@ -505,6 +513,15 @@ async def analyze_document(
     if len(pre.text.strip()) == 0:
         resp.stages.append(AnalyzeStage(name="분류", status="skipped", detail="본문 추출 0자 — 분류 불가(failed)"))
         resp.stages.append(AnalyzeStage(name="결과", status="review", detail="본문 없음 → 검수 필요"))
+        return resp
+
+    # [2026-08-23] classify=false — 추출 결과만 돌려주고 분류는 호출자가 비동기로 돌린다.
+    # 청크 상한에 걸린 문서를 시연 콘솔이 이 경로로 다시 불러 본문을 받아간다.
+    if not classify:
+        resp.stages.append(AnalyzeStage(
+            name="분류", status="skipped",
+            detail=f"동기 분류 생략(classify=false) · 청크 {len(pre.chunks)}개 — 호출자가 비동기 분류",
+        ))
         return resp
 
     # --- 분류(content 기반, 실제 서빙 게이트 통과) ---

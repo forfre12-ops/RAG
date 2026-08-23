@@ -223,6 +223,16 @@
       <div class="fname" id="fname"></div>
       <input type="file" id="file" class="hidden" />
     </div>
+    <!-- [2026-08-23] 적재 여부를 화면에 못박는다(사용자 지시). 이 화면의 분석 경로는 DB 를
+         쓰지 않는다 — POST /documents/analyze 는 read-only 이고(documents.py docstring),
+         큰 문서가 타는 비동기 분류도 doc_id 를 비-UUID 로 보내 서버 영속화 가드가 저장을
+         건너뛴다. 유일한 예외가 아래 「실적재」 체크박스이고 그건 사용자가 직접 켜야 한다. -->
+    <div class="hint" style="margin-top:8px;line-height:1.7">
+      <b>이 화면의 분석은 데이터베이스에 저장하지 않습니다.</b>
+      올린 문서도 판정 결과도 남지 않습니다 — 문서 크기와 무관합니다
+      (큰 문서는 비동기로 분류하지만, 저장 경로를 타지 않는 것은 같습니다).
+      아래 <b>「실적재(검수 큐 전송)」</b>를 직접 켰을 때만 적재됩니다.
+    </div>
     <!-- [2026-08-22] 원클릭 버튼을 **접었다**(사용자 지시). 버튼이 앞에 나와 있으면 "미리 심어
          둔 문서만 잘 되는 것 아니냐"로 읽힌다. 실제로 그 의심에는 근거가 있다 - 이 세트는 본문이
          267~448자로 짧고, 확신도는 길이와 반대로 움직인다:
@@ -404,7 +414,10 @@ async function checkHealth(){
   try{
     const r = await fetch(base()+'/healthz', {headers:hdr()});
     const j = await r.json().catch(()=>({}));
-    if(r.ok){ pill.className='health-pill ok'; $('health-txt').textContent = (j.profile||'ok'); }
+    /* [2026-08-23] `j.profile` 은 /healthz 응답에 없는 키다(health.py 는 deploy_profile 로
+       내보낸다). 그래서 어떤 서버에 붙어도 이 자리는 항상 'ok' 로만 떴고, 지재원/고객사를
+       화면에서 구분할 수 없었다(e2e 시나리오 demo.health.pill). 옛 키도 함께 본다. */
+    if(r.ok){ pill.className='health-pill ok'; $('health-txt').textContent = (j.deploy_profile||j.profile||'ok'); }
     else { pill.className='health-pill bad'; $('health-txt').textContent='HTTP '+r.status; }
   }catch(e){ pill.className='health-pill bad'; $('health-txt').textContent='offline'; }
 }
@@ -524,9 +537,21 @@ async function analyze(){
       let needLoginLink = false;
       let human = 'HTTP ' + r.status;
       const cap = String(detail).match(/(\d+) chunks > (\d+)/);
+      /* [2026-08-23] 대용량 자동 전환. 종전에는 여기서 거절 배너만 띄우고 끝났고, 화면에는
+         「쪽수 제한」으로 읽혔다(사용자 지적). 상한(analyze_sync_max_chunks)이 있는 이유는
+         **이 경로가 분류까지 한 요청 안에서 끝내기 때문**이지 문서를 처리할 수 없어서가 아니다.
+         classify=false 로 본문만 회수해 POST /classify/async 로 넘기면 워커에서 분류된다.
+         DB 적재는 하지 않는다 — POST /documents 를 타지 않고, doc_id 를 비-UUID 로 보내
+         서버 영속화 가드가 저장을 건너뛰게 한다. */
       if(r.status===413 && cap){
+        await analyzeLargeAsync(picked, cap);
+        $('go').disabled=false; return;
+      }
+      if(r.status===413 && cap){
+        /* 폴백 자체가 실패했을 때만 도달한다. 종전 문구의 「약 9쪽」은 하드코딩이라
+           서버 한도가 400 인 지금은 "한도 400개, 약 9쪽" 이라는 모순이 떴다 — 뺀다. */
         const chars = (String(detail).match(/([\d,]+) chars/)||[])[1] || '';
-        human = `문서가 이 화면에서 처리하기에 큽니다 — 조각 ${cap[1]}개(한도 ${cap[2]}개, 약 9쪽)`
+        human = `문서가 이 화면에서 처리하기에 큽니다 — 조각 ${cap[1]}개(동기 경로 한도 ${cap[2]}개)`
               + (chars?` · 본문 ${chars}자`:'');
       } else if(r.status===413){
         human = '문서가 너무 큽니다 (업로드 한도 초과)';
@@ -568,6 +593,111 @@ async function analyze(){
   }catch(e){ analyzeProgress.stop(); log('오류: '+e.message); $('busy').textContent='오류: '+e.message; }
   $('go').disabled=false;
 }
+
+/* 대용량 자동 전환 — 적재 없이 비동기로 분류한다.
+   (1) POST /documents/analyze (classify=false) — 추출·정규화·PII·청킹까지만. 이 엔드포인트는
+       설계상 read-only 라 documents/chunks 를 쓰지 않는다(documents.py docstring).
+   (2) POST /classify/async {doc_id:"demo-nopersist-<ts>", content} — 브로커가 살아 있으면
+       Celery 워커에서 돈다(gunicorn 요청 타임아웃 밖). doc_id 가 UUID 가 아니라서 서버의
+       영속화 가드가 저장을 건너뛴다 → documents·classifications 어디에도 행이 생기지 않는다.
+   (3) GET /classify/jobs/{id} 폴링 → 결과를 (1)의 응답에 합쳐 평소와 같은 화면으로 그린다.
+   주의: 「실적재」 체크박스는 이 경로에서 동작하지 않는다 — 대용량 건을 조용히 적재하지 않는다. */
+async function analyzeLargeAsync(file, cap){
+  const t0=performance.now();
+  $('busy').textContent='큰 문서 — 본문을 추출한 뒤 비동기 분류로 넘깁니다…';
+  log('대용량 전환: 조각 '+cap[1]+'개 > 동기 한도 '+cap[2]+'개 → classify=false 추출 + /classify/async (DB 적재 없음)');
+  const icd=[['source_type','icd-source'],['security_marking','icd-marking'],['access_scope','icd-scope']];
+  try{
+    // (1) 추출만 — 청크 상한 게이트를 타지 않는다(상한은 분류 비용 때문에 있는 것이다).
+    const fd=new FormData();
+    fd.append('file', file);
+    fd.append('return_evidence', $('ev').value);
+    fd.append('full_text','true');
+    fd.append('classify','false');
+    icd.forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
+    const r=await fetch(base()+'/documents/analyze', {method:'POST', headers:hdr(), body:fd});
+    const j=await r.json();
+    if(!r.ok) throw new Error('추출 실패 HTTP '+r.status+' '+String((j&&j.detail)||'').slice(0,200));
+    const text=(j.text || j.text_preview || '').trim();
+    if(!text){ render(j); analyzeProgress.stop(); $('busy').textContent='본문 추출 0자 — 분류하지 않았습니다.'; return; }
+    // ClassifyRequest.content 의 max_length. 넘기면 422 가 나므로 먼저 이유를 말한다.
+    const MAX=1048576;
+    if(text.length>MAX) throw new Error('본문 '+text.length.toLocaleString()+'자 — 비동기 분류 본문 상한 '+MAX.toLocaleString()+'자 초과');
+    log('추출 완료 '+text.length.toLocaleString()+'자 · 청크 '+((j.parse||{}).chunk_count||'?')+' — 비동기 분류 제출');
+
+    // (2) 제출. doc_id 를 비-UUID 로 보내 서버가 저장을 건너뛰게 한다.
+    const meta={};
+    icd.forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) meta[field]=v; });
+    const sub=await fetch(base()+'/classify/async', {
+      method:'POST',
+      headers:Object.assign({'Content-Type':'application/json'}, hdr()),
+      body:JSON.stringify({
+        doc_id:'demo-nopersist-'+Date.now(),
+        title:file.name,
+        content:text,
+        metadata:Object.keys(meta).length?meta:null,
+        return_evidence:$('ev').value==='true',
+      }),
+    });
+    const sj=await sub.json().catch(()=>({}));
+    if(!sub.ok || !sj.job_id) throw new Error('분류 제출 실패 HTTP '+sub.status+' '+JSON.stringify(sj).slice(0,200));
+    log('비동기 분류 job '+sj.job_id+' ('+(sj.status||'?')+')');
+
+    // (3) 폴링. 서버 작업 상한(celery soft 900초)보다 길게 기다리지 않는다.
+    let res=null;
+    for(let i=0;i<450;i++){
+      await new Promise(z=>setTimeout(z,2000));
+      const st=await fetch(base()+'/classify/jobs/'+encodeURIComponent(sj.job_id), {headers:hdr()});
+      const sd=await st.json().catch(()=>({}));
+      if(!st.ok) throw new Error('잡 조회 실패 HTTP '+st.status);
+      $('busy').textContent='비동기 분류 중 — '+(sd.status||'?')+' ('+((i+1)*2)+'초)';
+      if(sd.status==='done' || sd.status==='partial'){ res=(sd.results||[])[0]; break; }
+      if(sd.status==='failed') throw new Error('분류 실패: '+(sd.error||'사유 미상'));
+    }
+    if(!res) throw new Error('900초 안에 끝나지 않았습니다 — 서버 작업 시간 상한(celery soft 900초) 확인 필요');
+
+    /* ClassifyResponse → AnalyzeClassification 모양으로 맞춘다(같은 render 를 쓴다).
+       'persistence skipped: ... is not a UUID' 는 **설계대로 저장을 건너뛴 것**이라 경고에서
+       뺀다 — 동기 경로도 같은 이유로 뺀다(documents.py). 다른 persistence 경고는 남긴다. */
+    const warns=(res.warnings||[]).filter(w=>!(String(w).indexOf('persistence skipped')>=0 && String(w).indexOf('is not a UUID')>=0));
+    const gate=j.gate||{};
+    let status=res.status;
+    // 동기 경로와 같은 승격 규칙 — 추출 게이트가 검수를 요구하면 needs_review 로 올린다.
+    if(gate.requires_review && status!=='needs_review'){
+      status='needs_review';
+      warns.push('extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 ('+(gate.reasons||[]).join(', ')+')');
+    }
+    j.classification={
+      label:res.label, confidence:Math.round((res.confidence||0)*1000)/1000,
+      scores:res.scores||{}, status:status, model_version:res.model_version,
+      factors:res.evaluation_factors||{}, factors_source:res.factors_source||null,
+      rule_factors:res.rule_evaluation_factors||null,
+      warnings:warns, elapsed_ms:res.elapsed_ms||0,
+      rule_grade:res.rule_grade||null, model_grade:res.model_grade||null,
+      decision_path:res.decision_path||null,
+    };
+    j.evidence=res.evidence||[];
+    const sk=(j.stages||[]).find(s=>s.name==='분류');
+    if(sk){
+      sk.status='done';
+      sk.detail=res.label+' · 신뢰도 '+(res.confidence||0).toFixed(2)+' · '+res.model_version+' (비동기 워커 · DB 미적재)';
+      sk.ms=res.elapsed_ms||null;
+    }
+    (j.stages||[]).push({name:'결과', status:(status==='needs_review'?'review':'done'),
+      detail:(status==='needs_review'?'검수 필요(needs_review)':'자동 확정(staging)')+' — 비동기 경로, 데이터베이스에 저장하지 않았습니다'});
+    render(j);
+    analyzeProgress.stop();
+    $('busy').textContent='완료 ('+Math.round(performance.now()-t0)+'ms · 비동기 · DB 적재 없음)';
+    log('비동기 분류 OK '+res.label+' status='+status);
+  }catch(e){
+    analyzeProgress.stop();
+    $('busy').textContent='분석하지 않았습니다 — '+e.message;
+    $('result').classList.remove('hidden');
+    $('cls-box').innerHTML='<div class="verdict-banner verdict-review"><span>비동기 분류 중단<span class="vb-sub"> — '+esc(String(e.message||''))+'</span></span></div>';
+    log('비동기 분류 오류: '+e.message);
+  }
+}
+
 
 // 실적재 — 분석과 별개로 실제 서빙 경로(POST /documents → /classify)로 적재해
 // needs_review 건이 거버넌스 콘솔 DB 검수 큐에 나타나게 한다. created_by=demo-console 마커라
