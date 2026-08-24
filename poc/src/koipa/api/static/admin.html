@@ -1498,13 +1498,80 @@ function populateSamples(){
     + SAMPLES.map((s,i)=>`<option value="${i}">${s.id} · ${s.t}</option>`).join('');
   sel.value='';
 }
-function pickSample(i){ const s=SAMPLES[+i]; if(!s) return; $('cl-docid').value=s.id; $('cl-title').value=s.t; $('cl-body').value=s.b; $('cl-result').innerHTML=''; }
+function pickSample(i){ const s=SAMPLES[+i]; if(!s) return; PENDING_FILE=null; $('cl-docid').value=s.id; $('cl-title').value=s.t; $('cl-body').value=s.b; $('cl-result').innerHTML=''; }
 
 async function classifyOne(doc_id, title, content){
   const body={doc_id, title, content, return_evidence:true};
   const d=await api('POST','/classify',body);
   enqueue(d, title); markFlow(1);
   return d;
+}
+
+/* ── 확정·재라벨이 붙을 자리를 분류 **전에** 만든다 ────────────────────────────────
+ * 서버는 doc_id 가 **실재하는 documents 행의 UUID** 일 때만 분류를 DB 에 남긴다
+ * (classify_service.py `_try_persist`: 비-UUID 면 "persistence skipped: … is not a UUID",
+ *  없는 UUID 면 "persistence skipped: … not found"). 저장이 안 된 분류는 교정을 매달 행이
+ * 없어서 POST /confirm·/relabel 이 감사 로그만 남기고 "classification not found in DB" 로
+ * 되돌아온다 — 화면에서는 확정을 눌렀는데 아무것도 안 남는 것으로 보인다.
+ * 실측 2026-08-24: 파일 추출 경로가 doc_id 를 `upload-<ts>` 로 만들어서(비-UUID) 업로드한
+ * 문서는 확정도 재라벨도 전부 이 오류로 끝났다.
+ * 그래서 **올린 파일**은 분류 전에 POST /documents 로 적재해 진짜 doc_id 를 받아 둔다.
+ * 붙여넣은 본문·샘플은 적재하지 않는다 — 대신 큐에서 「미저장」으로 표시해 확정 버튼을
+ * 아예 내보내지 않는다(누르면 실패하는 버튼을 두지 않는다). */
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let PENDING_FILE=null;   // 방금 추출한 원본 파일 — 적재할 때 이 파일 그대로 올린다
+
+/* POST /documents — 문서를 실제로 적재하고 doc_id(UUID)를 받는다.
+ * index_for_rag=false 고정: 색인은 청크마다 임베딩을 돌리는데 그걸 요청 안에서 하면 워커가
+ * 타임아웃으로 죽는다(대용량 폴백 주석 참조). 분류에는 색인이 필요 없다.
+ * ICD 세 필드는 화면 값 그대로 싣는다 — 분석과 적재가 다른 값을 쓰면 같은 파일인데 등급이 갈린다. */
+async function postDocument(f){
+  const c=cfg();
+  const fd=new FormData();
+  fd.append('file', f);
+  fd.append('actor', JSON.stringify(actor()));
+  fd.append('index_for_rag','false');
+  [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
+    .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
+  log('POST /documents','req');
+  const r=await fetch(`${c.base}/documents`,
+    {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+  const t=await r.text();
+  let d; try{ d=t?JSON.parse(t):null; }catch{ d=t; }
+  if(!r.ok){
+    log(`← ${r.status} /documents :: ${String(t).slice(0,200)}`,'err');
+    throw Object.assign(new Error((d&&(d.detail||d.message))||String(t).slice(0,200)),
+                        {status:r.status, data:d});
+  }
+  log(`← ${r.status} /documents`,'ok');
+  return d;
+}
+
+/* 분류에 쓸 doc_id 를 확정한다. 이미 UUID 면 그대로 쓰고, 올린 파일이 있으면 적재해 UUID 를
+ * 받는다. 적재하지 못한 경우(읽기 전용·적재 실패·붙여넣은 본문)는 현재 값을 그대로 돌려주고,
+ * 그 분류는 큐에서 「미저장」으로 표시된다. */
+async function ensurePersistableDoc(){
+  const cur=($('cl-docid').value||'').trim();
+  if(UUID_RE.test(cur)) return cur;          // 이미 적재된 문서(대용량 경로·재분류)
+  if(!PENDING_FILE) return cur;              // 붙여넣은 본문·샘플 — 적재 대상이 아니다
+  if(!writesEnabled()){
+    log('읽기 전용 — 파일을 적재하지 않습니다. 이 분류는 저장되지 않아 확정·재라벨을 남길 수 없습니다.','info');
+    return cur;
+  }
+  try{
+    const up=await postDocument(PENDING_FILE);
+    if(!up || !up.doc_id){
+      log(`문서 적재 응답에 doc_id 가 없습니다(persisted=${up&&up.persisted}) — 이 분류는 저장되지 않습니다.`,'err');
+      return cur;
+    }
+    $('cl-docid').value=up.doc_id;
+    log(`문서 적재: doc_id=${up.doc_id} · ${up.char_count}자 · 청크 ${up.chunk_count}`
+        +' — 확정·재라벨이 이 문서에 기록됩니다.','ok');
+    return up.doc_id;
+  }catch(e){
+    log(`문서 적재 실패: ${e.status||''} ${e.message||''} — 분류는 계속하지만 저장되지 않습니다.`,'err');
+    return cur;
+  }
 }
 
 /* 업로드 파일 → 본문 추출 → 분류 패널 채움 (→ 옵션으로 바로 분류).
@@ -1534,6 +1601,8 @@ function dzDrop(ev){
 }
 function onPickFile(){
   const f=(($('cl-file')||{}).files||[])[0];
+  // 아직 추출 전이다 — 추출이 끝나야 적재 대상으로 잡는다(ensurePersistableDoc).
+  PENDING_FILE=null;
   const n=$('cl-file-name');
   if(n) n.textContent = f ? `${f.name} · ${(f.size/1024).toFixed(0)}KB` : '선택된 파일 없음';
 }
@@ -1566,6 +1635,7 @@ async function ingestLargeDocument(f, info){
   }
   const up=await r.json();
   log(`대용량 적재: doc_id=${up.doc_id} · ${up.char_count}자 · 청크 ${up.chunk_count} (RAG 색인 생략 — 분류에는 불필요)`,'ok');
+  PENDING_FILE = null;   // 이미 적재됐다 — 다시 올리지 않는다
   $('cl-docid').value = up.doc_id;
   $('cl-title').value = f.name;
   $('cl-body').value  = `(적재 완료 — 본문은 서버에 저장되어 있습니다. doc_id ${up.doc_id} 기준으로 비동기 분류 중)`;
@@ -1626,6 +1696,10 @@ async function classifyFromFile(alsoClassify){
     const d=await r.json();
     const text=(d.text || d.text_preview || '').trim();
     if(!text){ if(info) info.textContent='추출된 본문이 비어 있습니다 — 스캔본이면 텍스트 레이어가 없을 수 있습니다.'; return; }
+    /* 추출만으로는 아무것도 저장하지 않는다(/documents/analyze 는 read-only 진단 경로).
+       그래서 doc_id 는 아직 임시값이다. 분류를 실행할 때 ensurePersistableDoc() 이 이 파일을
+       POST /documents 로 적재하고 진짜 UUID 로 바꿔 준다 — 그래야 확정·재라벨이 남는다. */
+    PENDING_FILE = f;
     $('cl-docid').value = `upload-${Date.now()}`;
     $('cl-title').value = f.name;
     $('cl-body').value  = text;
@@ -1660,7 +1734,9 @@ async function classifyFromFile(alsoClassify){
 async function runClassify(){
   const btn=$('btn-classify'); btn.disabled=true; btn.textContent='분류 중…';
   try{
-    const d=await classifyOne($('cl-docid').value, $('cl-title').value, $('cl-body').value);
+    // 적재 먼저 — 그래야 서버가 분류를 DB 에 남기고 확정·재라벨이 붙을 수 있다.
+    const doc_id=await ensurePersistableDoc();
+    const d=await classifyOne(doc_id, $('cl-title').value, $('cl-body').value);
     renderClassify(d);
   }catch(e){ $('cl-result').innerHTML=`<div class="warnbox">분류 실패: ${e.status||''} ${e.data?.detail||e.message||''}</div>`; }
   finally{ btn.disabled=false; btn.textContent='분류하기'; }
@@ -1730,6 +1806,7 @@ async function loadReviewQueue(){
       inference_id:it.classification_id, doc_id:it.doc_id,
       title:it.filename||it.doc_id, label:it.grade, confidence:it.confidence,
       model_version:it.model_version, text_preview:it.text_preview, status:it.status,
+      persisted:true,   // DB 큐에서 온 항목은 정의상 저장돼 있다
       flagged:true, resolved:false
     }));
     renderQueue(); markFlow(2);
@@ -1755,7 +1832,14 @@ async function loadReviewQueue(){
 }
 function enqueue(d, title){
   const flagged = d.status==='needs_review';   // 서버 판정 그대로 — renderClassify 와 같은 기준
-  QUEUE.unshift({inference_id:d.inference_id, doc_id:d.doc_id, title:title||$('cl-title').value||d.doc_id, label:d.label, confidence:d.confidence, model_version:d.model_version, flagged, resolved:false});
+  /* 이 분류가 DB 에 남았는가. 안 남았으면 확정·재라벨을 매달 행이 없다(그 항목에는 버튼 대신
+     사유를 적는다). 판정은 **서버가 준 경고 그대로** 쓴다 — 화면이 doc_id 모양 따위로 다시
+     추측하면 서버가 실제로 저장한 건까지 「미저장」으로 가려 버릴 수 있다.
+     `persistence skipped: …` 는 classify_service._try_persist 가 영속화를 건너뛴 모든 경로에
+     붙이는 문구다(비-UUID·문서 없음·DB 오류). 저장에 성공하면 붙지 않는다.
+     (`evidence persist failed (classification kept)` 는 분류 자체는 남은 경우라 걸리지 않는다.) */
+  const persisted = !(d.warnings||[]).some(w=>String(w).indexOf('persistence skipped')>=0);
+  QUEUE.unshift({inference_id:d.inference_id, doc_id:d.doc_id, title:title||$('cl-title').value||d.doc_id, label:d.label, confidence:d.confidence, model_version:d.model_version, persisted, flagged, resolved:false});
   renderQueue();
 }
 function renderQueue(){
@@ -1773,13 +1857,19 @@ function renderQueue(){
         <button class="btn sec sm" onclick="toggleWhy(${i})" id="why-btn-${i}">왜 이 등급인가?</button>
         <div id="why-${i}" class="why-box" style="display:none"></div>
       </div>`:''}
-      ${(it.resolved||it.pending_second)?'':`
+      ${(it.resolved||it.pending_second)?'':(it.persisted===false?`
+      <div class="warnbox">저장되지 않은 분류 — 확정·재라벨을 기록할 수 없습니다.
+        서버에 이 분류의 행이 없어 교정을 매달 자리가 없습니다.
+        <div style="margin-top:4px">${writesEnabled()
+          ? '파일을 올려 「본문 추출 + 분류」로 다시 실행하면 문서가 적재되면서 확정·재라벨이 가능해집니다(붙여넣은 본문·샘플은 적재하지 않습니다).'
+          : '상단 「쓰기 작업 허용」을 켠 뒤 파일을 다시 분류하면 문서가 적재되면서 확정·재라벨이 가능해집니다.'}</div>
+      </div>`:`
       <div class="q-actions">
         <button class="btn sm" onclick="doConfirm(${i})">확정 (현 등급)</button>
         <span style="font-size:11px;color:var(--text-dim)">또는 재라벨 →</span>
         <select id="rl-${i}">${GRADES.map(g=>`<option value="${g}" ${g===it.label?'selected':''}>${g}</option>`).join('')}</select>
         <button class="btn sec sm" onclick="doRelabel(${i})">재라벨 전송</button>
-      </div>`}
+      </div>`)}
     </div>
   `).join('');
 }
@@ -1845,6 +1935,27 @@ async function toggleWhy(i){
 // 발화하고, 실시간 관제 폴링 tick(AUTO_SILENT)에서는 스킵한다 — 임베딩 비용·로그 스팸 방지.
 /* 지금 분류 패널에 들어 있는 본문을 질의로 가져온다 — 검수 중인 문서를 다시 붙여넣지 않아도 되게. */
 
+/* persisted=false 로 되돌아온 이유를 한 줄로 적는다. 서버 경고는 영문 한 줄이라
+ * ("classification not found in DB — confirmation recorded in audit only") 그것만 보면
+ * 무엇을 해야 하는지 알 수 없다. 두 경우를 구분한다:
+ *   ① 분류가 애초에 저장되지 않았다(비-UUID doc_id → classify 가 영속화를 건너뜀) — 재시도해도 같다.
+ *   ② DB 를 못 썼다(가용성·오류) — 상태를 고친 뒤 같은 항목으로 다시 시도하면 된다.
+ * 반환: {ko, unpersistable} — unpersistable 이면 큐 항목의 버튼을 사유로 바꾼다. */
+function persistFailHint(d, it){
+  const ws=((d&&d.warnings)||[]).join(' ');
+  const missing = ws.indexOf('not found in DB')>=0;
+  const unpersistable = missing && !UUID_RE.test(String((it&&it.doc_id)||''));
+  if(unpersistable) return {
+    ko:'이 분류는 서버에 저장돼 있지 않습니다(문서가 적재되지 않은 채 분류됨) — 교정을 매달 행이 없어 감사 로그에만 남습니다. '
+      +'파일을 올려 「본문 추출 + 분류」로 다시 실행하면 문서가 적재되면서 확정·재라벨이 기록됩니다.',
+    unpersistable:true };
+  if(missing) return {
+    ko:'서버가 이 분류 행을 찾지 못했습니다 — doc_id·inference_id 가 현재 DB 와 맞는지 확인하세요(「검토할 문서 보기」로 목록을 다시 읽으면 최신 id 로 갱신됩니다).',
+    unpersistable:false };
+  return { ko:'DB 에 기록하지 못했습니다 — 감사 로그만 남았습니다. DB 상태를 확인한 뒤 같은 항목으로 다시 시도하세요.',
+           unpersistable:false };
+}
+
 async function doConfirm(i){
   if(!guardWrite('확정')) return;
   const it=QUEUE[i];
@@ -1853,8 +1964,10 @@ async function doConfirm(i){
     if(it.inference_id) body.inference_id=it.inference_id;
     const d=await api('POST','/confirm',body);
     if(d.persisted===false){                              // DB미가용/분류 미존재 → 감사-only(무음 성공 아님)
-      it.flagged=true; renderQueue();
+      const h=persistFailHint(d, it);
+      it.flagged=true; if(h.unpersistable) it.persisted=false; renderQueue();
       log(`⚠ 확정 미영속(감사-only): ${it.doc_id} — ${(d.warnings&&d.warnings.length?d.warnings:['DB 미가용 또는 분류 미존재']).join(' · ')}. 항목을 큐에 유지.`,'err');
+      log(h.ko,'err');
       return;
     }
     if(d.second_review_required){                         // 고등급 이중검토 보류 → '완료' 아님
@@ -1875,8 +1988,10 @@ async function doRelabel(i){
     if(it.inference_id) body.inference_id=it.inference_id;
     const d=await api('POST','/relabel',body);
     if(d.persisted===false){                              // DB미가용/분류 미존재 → 감사-only(무음 성공 아님)
-      it.flagged=true; renderQueue();
+      const h=persistFailHint(d, it);
+      it.flagged=true; if(h.unpersistable) it.persisted=false; renderQueue();
       log(`⚠ 재라벨 미영속(감사-only): ${it.doc_id} — ${(d.warnings&&d.warnings.length?d.warnings:['DB 미가용 또는 분류 미존재']).join(' · ')}. 항목을 큐에 유지.`,'err');
+      log(h.ko,'err');
       return;
     }
     if(d.second_review_required){                         // 고등급 이중검토 보류 → '완료' 아님

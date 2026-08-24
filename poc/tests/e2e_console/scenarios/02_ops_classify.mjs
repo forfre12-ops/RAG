@@ -40,6 +40,8 @@ export const scenarios = [
       check.ok(/자동 확정|검수 필요/.test(res), '숫자 대신 결정(자동 확정·검수 필요)이 찍혔다');
       check.includes(res, 'v-fe4b386b', '모델 버전이 찍혔다');
       check.includes(page.html('queue'), 'E2E-DOC-010', '검수 큐에 적재됐다');
+      // 붙여넣은 본문은 문서로 적재하지 않는다 — 올린 파일만 적재한다(아래 upload 시나리오).
+      check.ok(!server.exactCall('POST', '/documents'), '붙여넣은 본문을 문서로 적재하지는 않는다');
       check.eq(page.$('btn-classify')?.disabled, false, '끝나고 버튼이 다시 눌린다');
       assertNoScriptErrors(check, page);
       return page;
@@ -90,6 +92,85 @@ export const scenarios = [
       check.includes(page.html('cl-file-info'), 'pdfminer', '추출기 이름이 보인다');
       check.ok(server.lastCall('POST', '/classify'), '이어서 분류까지 갔다');
       check.includes(page.html('cl-result'), 'S1', '분류 결과가 그려졌다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'ops.upload.ingest-before-classify',
+    writes: true,
+    title: '올린 파일은 분류 **전에** 적재된다 — 그래야 확정·재라벨이 남는다',
+    why: '2026-08-24 실측: doc_id 를 upload-<ts>(비-UUID)로 만들어 분류해서 서버가 영속화를 '
+       + '건너뛰었고, 확정·재라벨은 전부 "classification not found in DB" 로만 끝났다',
+    async run({ server, check }) {
+      const page = await admin(server);
+      page.attachFile('cl-file', { name: '공사지명원.xls' });
+      page.click('btn-extract-classify');
+      await page.settle();
+
+      check.ok(server.exactCall('POST', '/documents'), '분류 전에 적재 요청이 나갔다');
+      const cl = server.lastCall('POST', '/classify');
+      check.eq(cl?.body?.doc_id, '99999999-9999-4999-8999-999999999999',
+               '서버가 준 실제 doc_id(UUID)로 분류했다');
+      check.ok(!/^upload-/.test(cl?.body?.doc_id || ''), '임시 doc_id 로 분류하지 않는다');
+      check.eq(page.$('cl-docid')?.value, '99999999-9999-4999-8999-999999999999',
+               '화면 doc_id 도 실제 문서로 바뀌었다');
+      check.ok(page.q('#queue button[onclick="doConfirm(0)"]'), '큐 항목에 확정 버튼이 있다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'ops.upload.readonly-does-not-ingest',
+    title: '읽기 전용이면 파일을 적재하지 않고, 저장되지 않는다고 말한다',
+    why: '쓰기 잠금은 지켜야 하고, 대신 왜 확정이 안 되는지는 그 자리에서 알려야 한다',
+    async run({ server, check }) {
+      const page = await admin(server);
+      const gate = page.$('cfg-write-enable');
+      check.ok(gate, '쓰기 작업 허용 스위치가 있다');
+      gate.checked = false;
+
+      page.attachFile('cl-file', { name: '공사지명원.xls' });
+      page.click('btn-extract-classify');
+      await page.settle();
+
+      check.ok(!server.exactCall('POST', '/documents'), '읽기 전용에서는 적재하지 않는다');
+      const cl = server.lastCall('POST', '/classify');
+      check.ok(/^upload-/.test(cl?.body?.doc_id || ''), '적재 없이 임시 doc_id 로 분류만 한다');
+      check.includes(page.logLines('info').join(' '), '저장되지 않아',
+                     '이 분류로는 확정·재라벨을 남길 수 없다고 로그가 말한다');
+      return page;
+    },
+  },
+
+  {
+    id: 'ops.classify.not-persisted-shows-reason',
+    writes: true,
+    title: '서버가 저장을 건너뛴 분류에는 확정 버튼 대신 사유가 뜬다',
+    why: '누르면 반드시 실패하는 버튼을 두지 않는다 — 종전에는 눌러야 "not found in DB" 를 봤다',
+    needsMock: true,
+    async run({ server, check }) {
+      const page = await admin(server);
+      server.overrides['POST /classify'] = {
+        inference_id: '44444444-4444-4444-8444-444444444444',
+        doc_id: 'E2E-DOC-011',
+        label: 'S1', confidence: 0.81, scores: { TS: 0.05, S1: 0.81, S2: 0.1, S3: 0.04 },
+        evaluation_factors: { secrecy: 2, value: 2, management: 1 },
+        factors_source: 'rule_evidenced', evidence: [], rag_context_used: [],
+        model_version: 'v-fe4b386b', elapsed_ms: 120, status: 'staging',
+        warnings: ["persistence skipped: doc_id='E2E-DOC-011' is not a UUID"],
+      };
+      page.set('cl-docid', 'E2E-DOC-011');
+      page.set('cl-body', '본 계약의 대상 기술은 영업비밀에 해당한다.');
+      page.click('btn-classify');
+      await page.settle();
+
+      check.ok(!page.q('#queue button[onclick="doConfirm(0)"]'), '확정 버튼을 내보내지 않는다');
+      check.ok(!page.q('#queue button[onclick="doRelabel(0)"]'), '재라벨 버튼도 내보내지 않는다');
+      check.includes(page.text('queue'), '저장되지 않은 분류', '왜 안 되는지 그 자리에 적힌다');
+      check.includes(page.text('queue'), '확정·재라벨을 기록할 수 없습니다', '무엇이 안 되는지 말한다');
       assertNoScriptErrors(check, page);
       return page;
     },
