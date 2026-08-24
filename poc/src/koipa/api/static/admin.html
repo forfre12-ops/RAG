@@ -744,7 +744,10 @@ details.adv[open]{padding-bottom:12px;}
           </div>
         </div>
         <p class="hint" id="sy-provider-note" style="margin-top:2px"></p>
-        <div id="sy-noop-note" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
+        <!-- [2026-08-24] warnbox(노랑) → sec-note(회색). 이 카드는 제출본이 §N 으로 지목한
+             **요건 증빙 화면**이다(FUN-003-①⑦). 다섯 줄짜리 노란 경고가 카드를 덮고 있으면
+             감리에서 "이 기능 고장났다"로 읽힌다. 알려야 할 사실은 그대로 두고 색과 분량만 줄인다. -->
+        <div id="sy-noop-note" class="sec-note" style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
         <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검토 큐 새로고침」으로 생성된 합성 문서의 검토 대기분을 조회합니다. 학습행으로 만들 수 있는 것은 승인한 건뿐이며, 실제 편입은 관리자가 학습셋 생성 절차를 돌릴 때 이뤄집니다.</div></div>
         <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
@@ -1402,17 +1405,20 @@ function applySynthAvailability(active){
   if(box){
     const blocked=(a==='noop');
     box.style.display = blocked ? '' : 'none';
+    /* [2026-08-24] 문구를 다시 썼다. 셋을 고쳤다.
+       ① **결함이 아니라 구성이다.** 종전은 "본문을 쓸 LLM 이 없습니다"라 부족해서 못 하는 것처럼
+          읽혔다. 실제로는 등급 판정 LLM 을 쓰지 않기로 한 구성이고, 합성 문서를 새로 만들지
+          않기로 한 방침이다(2026-08-24).
+       ② **못 고치는 것을 안내하지 않는다.** `LLM_PROVIDER`·`.env` 를 지웠다 — 이 화면을 보는
+          사람은 서버 설정을 바꿀 권한이 없다. 검증문서 카드에서 같은 이유로 이미 뺐던 것이다.
+       ③ **내 조어를 뺐다.** "생성→검수 큐 경로가 도는지"는 표준어가 아니다(사용자 지적).
+          무슨 일이 일어나고 무엇이 안 되는지만 적는다. */
     box.innerHTML = blocked
-      ? '<b>이 서버에서 생성한 문서는 학습에 쓰이지 않습니다 — 본문을 쓸 LLM 이 없습니다.</b><br/>'
-        + '서버 설정이 <code>llm_provider=noop</code> 이라 생성기가 <b>자리표시용 본문</b>을 만들고 '
-        + '<code>label_source=noop_fallback</code> 를 찍습니다. 검수에서 승인해도 '
-        + '<code>build_training_rows</code> 가 이 표시를 보고 배제하므로 <b>학습행은 0건</b>입니다.<br/>'
-        + '· 눌러도 됩니다 — 생성→검수 큐 경로가 도는지 확인하는 용도로는 그대로 유효합니다.<br/>'
-        // [2026-08-24] 「지재원 GPU」를 뺐다. 원인을 GPU 로 지목했는데 사실이 아니다 —
-        // 이 서버(223)에는 NVIDIA L4 23GB 가 있고 실측 사용량 0 MiB 다. 막힌 것은 GPU 가
-        // 아니라 **등급 판정 LLM 을 붙이지 않은 구성**이고 그것은 의도한 것이다.
-        // 발주처가 준 GPU 서버 화면에서 "GPU 있는 데서 하십시오"라고 읽히면 안 된다.
-        + '· 학습에 쓸 문서를 만들려면 등급 판정 LLM 이 연결된 환경에서 실행해야 합니다(서버 설정 <code>LLM_PROVIDER</code>).'
+      ? '이 시스템은 <b>합성 문서를 새로 만들지 않는 구성</b>입니다. '
+        + '「생성 요청」을 누르면 문서가 만들어져 검수 큐까지 올라오지만, '
+        + '<b>본문이 자리표시용이라 승인해도 학습에는 들어가지 않습니다</b>(학습행 0건). '
+        + '생성기가 <code>label_source=noop_fallback</code> 을 찍고 학습셋을 만들 때 '
+        + '<code>build_training_rows</code> 가 그 표시를 보고 걸러냅니다.'
       : '';
   }
 }
