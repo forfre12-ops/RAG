@@ -60,10 +60,18 @@ def test_merged_demo_section_kept_every_sample():
 
 
 def test_merged_demo_section_exists_and_is_linked():
+    """[2026-08-24] 앵커는 그대로 잠그되, 링크는 **다른 화면에서 오는 것**으로 옮겼다.
+
+    종전에는 index.html 안에 `href="#sec-parse"` 가 있어야 통과했는데, 그 링크는 상단 바의
+    구역 이동 메뉴 4개 중 하나였고 사용자 지시로 그 메뉴를 뺐다(scripts/sync_console_header.py).
+    앵커가 살아 있어야 한다는 취지는 남는다 — 사용설명서·배포 가이드가 이 주소를 쓴다. 그래서
+    ① index.html 에 앵커가 있고 ② 관리자 콘솔이 그 앵커로 오는 링크를 가진다는 두 조건을 잠근다.
+    """
     page = (STATIC / "index.html").read_text(encoding="utf-8")
     assert 'id="sec-parse"' in page, "흡수한 구역이 없다"
     assert 'href="./parse_demo.html"' not in page, "같은 페이지 안에서 옛 화면으로 나간다"
-    assert 'href="#sec-parse"' in page, "구역으로 가는 내부 링크가 없다"
+    admin = (STATIC / "admin.html").read_text(encoding="utf-8")
+    assert "#sec-parse" in admin, "관리자 콘솔에서 이 구역으로 가는 링크가 없다"
 
 
 def test_merged_demo_wiring_lives_in_the_module():

@@ -115,8 +115,12 @@ def test_screen_specific_widgets_survived():
     assert 'id="nav-status"' not in _header_of(s["index.html"])
     # golden.py 의 인라인 JS 가 무가드로 잡는다 — 없으면 KPI·품질·원장 렌더가 통째로 멈춘다.
     assert 'id="topCount"' in _header_of(s["manage"])
-    # tests/test_demo_static_assets.py 가 잠그는 앵커.
-    assert 'href="#sec-parse"' in s["index.html"]
+    # [2026-08-24] 앵커 **대상**만 잠근다. 종전에는 `href="#sec-parse"` 를 찾았는데, 그 링크는
+    # 상단 바의 구역 이동 메뉴 4개 중 하나였고 사용자 지시로 그 메뉴가 빠졌다
+    # (scripts/sync_console_header.py). 주소가 살아 있어야 한다는 취지는 그대로다 —
+    # 사용설명서·배포 가이드·parse_demo.html 스텁이 이 주소를 쓴다. 들어오는 링크가 있는지는
+    # tests/test_demo_static_assets.py 가 admin.html 쪽에서 따로 잠근다.
+    assert 'id="sec-parse"' in s["index.html"]
 
 
 # ── 정적 2면이 console_nav 와 어긋나지 않는가 ────────────────────────────────

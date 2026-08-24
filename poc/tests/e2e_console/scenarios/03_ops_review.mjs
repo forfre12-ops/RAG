@@ -18,6 +18,28 @@ async function withQueue(server, opts = {}) {
 
 export const scenarios = [
   {
+    id: 'review.queue.loads-on-open',
+    needsData: true,
+    title: '화면을 열면(새로고침 포함) 검토 목록을 스스로 읽는다',
+    why: '2026-08-24 사용자 지적: 새로고침하면 목록이 안내문으로 초기화됐다. QUEUE 는 메모리 '
+       + '변수인데 init 이 loadReviewQueue 를 부르지 않아, DB 에 대기건이 있어도 화면은 빈 '
+       + '상태로 돌아가 관리자가 버튼을 다시 눌러야 했다',
+    async run({ server, check }) {
+      // 버튼을 **누르지 않는다** — 화면을 여는 것만으로 목록이 와야 한다.
+      const page = await openPage(server, '/console/admin.html');
+      await page.settle();
+
+      check.ok(server.lastCall('GET', '/review-queue'), '열자마자 GET /review-queue 를 불렀다');
+      check.eq(page.qa('#queue .q-item').length, 3, '버튼을 누르지 않았는데 목록이 그려졌다');
+      check.includes(page.text('rq-info'), '대기 3건', '대기 건수도 함께 표시된다');
+      check.ok(!/검토할 문서 보기」를 누르면/.test(page.text('queue')),
+               '누르라는 안내문이 목록 자리에 남지 않는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'review.queue.list-and-why',
     needsData: true,
     title: '「검토할 문서 보기」 → 목록이 그려지고 「왜 이 등급인가」로 근거가 열린다',

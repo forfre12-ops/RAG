@@ -35,6 +35,9 @@ class ActiveLearningStatus:
     pending_underclass: int = 0
     pending_overclass: int = 0
     pending_lateral: int = 0
+    # [2026-08-24] direction='confirm'(등급 그대로 확정)도 unconsumed_total 에 들어가는데 방향별
+    # 필드가 없어, 콘솔이 '합계 3 · 과소0 과대0 측면0' 처럼 내역이 비는 표를 그렸다(사용자 지적).
+    pending_confirm: int = 0
     last_correction_at: Optional[str] = None
     retrain_status: str = "OK"  # OK / RETRAIN_RECOMMENDED / URGENT_RETRAIN
     reason: str = ""
@@ -48,6 +51,7 @@ class ActiveLearningStatus:
             "pending_underclass": self.pending_underclass,
             "pending_overclass": self.pending_overclass,
             "pending_lateral": self.pending_lateral,
+            "pending_confirm": self.pending_confirm,
             "last_correction_at": self.last_correction_at,
             "retrain_status": self.retrain_status,
             "reason": self.reason,
@@ -131,6 +135,7 @@ def evaluate_retraining_need(
         pending_underclass=underclass,
         pending_overclass=overclass,
         pending_lateral=lateral,
+        pending_confirm=confirm,
         last_correction_at=last_at.isoformat() if last_at else None,
         retrain_status=status,
         reason=reason,

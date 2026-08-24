@@ -105,3 +105,17 @@ def test_parse_demo_is_a_stub_that_points_at_the_merged_section():
     assert "http-equiv" in html and "refresh" in html
     assert "./index.html#sec-parse" in html
     assert "console-nav" not in html, "스텁에 네비를 넣으면 목록을 두 곳에서 관리하게 된다"
+
+
+def test_static_pages_have_no_section_jump_menu_in_the_header():
+    """[2026-08-24 사용자 지시] 상단 바에 **같은 화면 안 구역 이동** 링크를 두지 않는다.
+
+    종전 index.html 헤더에는 cnav 4개(화면 사이 이동) 바로 뒤에 `nav-link` 4개
+    (시연·운영·반영·법령·문서 업로드 = 같은 페이지 앵커)가 붙어 있었다. 생김새가 같은데
+    한쪽은 화면을 바꾸고 한쪽은 스크롤만 하니, 어느 것이 화면 이동인지 구별되지 않았다.
+    되살아나면(sync_console_header.TRAILING 에 다시 넣으면) 이 시험이 잡는다.
+    """
+    for name in _STATIC_PAGES:
+        html = (_STATIC / name).read_text(encoding="utf-8")
+        header = html.split("<header", 1)[1].split("</header>", 1)[0]
+        assert 'class="nav-link"' not in header, f"{name}: 상단 바에 구역 이동 링크가 되살아났다"

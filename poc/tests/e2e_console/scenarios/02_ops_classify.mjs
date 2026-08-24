@@ -98,6 +98,39 @@ export const scenarios = [
   },
 
   {
+    id: 'ops.upload.clears-previous-verdict',
+    writes: true,
+    title: '새 파일을 올리면 직전 문서의 등급 카드가 남지 않는다',
+    why: '2026-08-24 사용자 지적: 새 문서를 올렸는데 화면에는 앞 문서의 등급·S·V·M 이 그대로 '
+       + '있었다. 본문만 갈아 끼우고 결과 카드를 비우지 않았기 때문이다 — 보는 사람은 그것을 '
+       + '새 문서의 판정으로 읽는다',
+    async run({ server, check }) {
+      const page = await admin(server);
+      // (1) 먼저 붙여넣은 본문으로 한 번 분류해 결과 카드를 만든다.
+      page.set('cl-docid', 'E2E-DOC-STALE');
+      page.set('cl-title', '앞 문서');
+      page.set('cl-body', '본 계약의 대상 기술은 영업비밀에 해당하며 대외 반출을 금한다.');
+      page.click('btn-classify');
+      await page.settle();
+      const before = page.html('cl-result');
+      check.includes(before, '등급', '앞 문서의 결과 카드가 만들어졌다');
+      check.ok(/자동 확정|검수 필요/.test(before), '앞 문서의 결정이 카드에 찍혔다');
+
+      // (2) 이제 새 파일을 올려 **추출만** 한다(분류는 누르지 않는다).
+      page.attachFile('cl-file', { name: '공사지명원.xls' });
+      page.click('btn-extract');
+      await page.settle();
+
+      const after = page.html('cl-result');
+      check.ok(!/자동 확정|검수 필요/.test(after), '앞 문서의 판정이 화면에 남지 않는다');
+      check.ok(!/비공지성/.test(after), '앞 문서의 S·V·M 칸도 지워졌다');
+      check.eq(page.$('cl-title')?.value, '공사지명원.xls', '입력은 새 문서로 바뀌었다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'ops.upload.ingest-before-classify',
     writes: true,
     title: '올린 파일은 분류 **전에** 적재된다 — 그래야 확정·재라벨이 남는다',

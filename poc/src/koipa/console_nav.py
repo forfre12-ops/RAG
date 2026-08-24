@@ -163,10 +163,14 @@ HEADER_CSS = (
     ".top .topmid{margin:0}"
     # 메뉴가 3→4 로 늘어 좁은 폭에서 기관명과 부딪힌다. 기관명·화면이름을 먼저 접는다 —
     # 메뉴는 마지막까지 남긴다(사용자 지시: 4개 메뉴가 최상단에 있어야 한다).
-    # `.nav-link` 는 등급 시연 화면의 구역 이동 목차다. 좁은 폭에서 이것부터 접어야
-    # 공용 메뉴 4개가 화면 밖으로 밀리지 않는다(다른 화면에는 없으므로 무해하다).
+    # [2026-08-24] `.top .nav-link` 를 뺐다. 등급 시연 화면의 구역 이동 목차를 가리키던
+    # 규칙인데, 그 목차 자체가 상단에서 빠졌다(sync_console_header.py, 사용자 지시).
+    # 다섯 화면 어디에도 그 클래스를 쓰는 요소가 없어 죽은 선택자로만 남아 있었다
+    # (실측 2026-08-24: static/*.html · golden.py 에 `class="nav-link"` 0건).
+    # 목차를 되살리면 이 선택자도 같이 되살릴 것 — 좁은 폭에서 그것부터 접어야
+    # 공용 메뉴 4개가 화면 밖으로 밀리지 않는다.
     "@media(max-width:900px){.top{padding:0 16px;gap:10px}"
-    ".top .brand,.top .divider,.top .nav-link{display:none}}"
+    ".top .brand,.top .divider{display:none}}"
     "@media(max-width:640px){.top .product{display:none}}"
     "@media print{.top{display:none}}"
 )
