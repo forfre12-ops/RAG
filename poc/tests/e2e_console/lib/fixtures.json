@@ -872,6 +872,52 @@
     "review_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/review.html",
     "signoff_url": "/api/v1/golden/jobs/dddddddd-dddd-4ddd-8ddd-dddddddddddd/signoff.html"
   },
+  "GET /golden/jobs/{job_id}/signoff/preflight": {
+    "job_id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    "ok": true,
+    "blocking": [],
+    "warnings": [],
+    "candidates": {
+      "total": 5,
+      "already_locked": 1,
+      "already_rejected": 0,
+      "remaining": 4
+    },
+    "reviewer": {
+      "reviewer_id": "kl-admin-test",
+      "will_be_rejected": false,
+      "reason": ""
+    },
+    "publish": {
+      "live_path": "datasets/golden/locked_gold_eval.jsonl",
+      "configured": true
+    },
+    "readiness": {
+      "ready": false,
+      "per_grade": { "TS": 1, "S1": 0, "S2": 0, "S3": 0 },
+      "missing": ["S1", "S2", "S3"],
+      "reason": "per-grade minimum not met",
+      "real_per_grade": { "TS": 0, "S1": 0, "S2": 0, "S3": 0 },
+      "synthetic_per_grade": { "TS": 1, "S1": 0, "S2": 0, "S3": 0 }
+    }
+  },
+  "POST /golden/jobs/{job_id}/signoff": {
+    "locked": 2,
+    "rejected": 1,
+    "locked_by_grade": { "TS": 1, "S1": 0, "S2": 1, "S3": 0 },
+    "rejected_reasons": {},
+    "readiness": {
+      "ready": false,
+      "per_grade": { "TS": 2, "S1": 0, "S2": 1, "S3": 0 },
+      "missing": ["S1", "S2", "S3"],
+      "reason": "per-grade minimum not met"
+    },
+    "published": false,
+    "reviewer_id": "kl-admin-test",
+    "overridden": false,
+    "publish_note": null,
+    "dry_run": false
+  },
   "POST /synth/generate": {
     "synth_job_id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
     "expected_count": 20,

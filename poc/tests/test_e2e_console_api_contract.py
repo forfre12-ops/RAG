@@ -37,6 +37,15 @@ _CONSOLE_SOURCES = [
     "app.js",
 ]
 
+# 서버가 파이썬으로 그려 내려 주는 화면(후보 관리·검수 서명)은 static 파일이 아니다.
+# 종전에는 이 셋이 스캔 밖이어서, 그 화면이 없는 경로를 부르거나 본보기가 빠져도
+# A·B 축이 잡지 못했다. 뜨는 스크립트가 쓰는 렌더러를 그대로 불러 같이 본다.
+_RENDERED_SCREENS = ["render_manage_html", "render_signoff_html_sample"]
+
+# 본보기 화면의 주소에는 실제 잡 id 가 박혀 있다(/golden/jobs/ffffffff-…/signoff).
+# 라우트 표는 그 자리를 경로 변수로 들고 있으므로 UUID 꼴 조각은 변수로 본다.
+_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
 # 화면 이동용 주소(브라우저가 직접 여는 HTML)는 fetch 계약이 아니라 링크다 — 별도 시험이 본다.
 _HTML_SUFFIX = re.compile(r"\.html$")
 
@@ -89,6 +98,7 @@ def _clean(raw: str) -> str | None:
     p = p.split("?")[0].split("#")[0]
     p = p.replace("${c.base}", "").replace("${cfg().base}", "")
     p = re.sub(r"\$\{[^}]*\}", "{}", p)
+    p = _UUID.sub("{}", p)
     if p.startswith(_PREFIX):
         p = p[len(_PREFIX):]
     if not p.startswith("/"):
@@ -96,6 +106,99 @@ def _clean(raw: str) -> str | None:
     if p.endswith("+"):                  # `'/admin/keywords?'+qs` 형태의 잔재
         p = p[:-1]
     return _norm(p)
+
+
+# ── 서버 렌더 화면의 호출 뽑기 ────────────────────────────────────────────────
+# 이 화면들은 주소를 상수와 이어 붙여 만든다(`req(api+'/'+encodeURIComponent(id)+'/decision')`).
+# 정규식 하나로는 못 읽으므로, 상수를 먼저 모으고 인자식을 괄호 균형을 지키며 떼어 낸 뒤
+# 항 단위로 풀어 준다. 풀리지 않는 항이 하나라도 있으면 그 호출은 버린다(오탐 금지).
+_CONST = re.compile(r"""(?:const|var|let)\s+([A-Za-z_$][\w$]*)\s*=\s*["']([^"']*)["']""")
+_STRING_TERM = re.compile(r"""^["'](.*)["']$""", re.S)
+# 주소를 만들어 돌려주는 무인자 도우미 — 이름을 상수 이름으로 바꿔 읽는다.
+_URL_HELPERS = {"qurl()": "api"}
+
+
+def _balanced(src: str, open_idx: int) -> tuple[str, str]:
+    """`(` 위치에서 시작해 첫 인자식과 나머지 인자들을 통째로 돌려준다."""
+    depth, quote, first_end = 0, "", -1
+    i = open_idx
+    while i < len(src):
+        ch = src[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+        elif ch in "\"'`":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                head = src[open_idx + 1: first_end if first_end > 0 else i]
+                tail = src[first_end + 1: i] if first_end > 0 else ""
+                return head, tail
+        elif ch == "," and depth == 1 and first_end < 0:
+            first_end = i
+        i += 1
+    return "", ""
+
+
+def _strip_encode(expr: str) -> str:
+    """encodeURIComponent(무엇이든) → '{}' (경로 변수 한 조각)."""
+    while True:
+        i = expr.find("encodeURIComponent(")
+        if i < 0:
+            return expr
+        inner, _ = _balanced(expr, i + len("encodeURIComponent") )
+        end = i + len("encodeURIComponent(") + len(inner) + 1
+        expr = expr[:i] + "'{}'" + expr[end:]
+
+
+def _resolve(expr: str, consts: dict[str, str]) -> str | None:
+    """`api+'/'+encodeURIComponent(id)+'/decision'` → `/api/v1/golden/candidates/{}/decision`"""
+    expr = _strip_encode(expr).strip()
+    for helper, name in _URL_HELPERS.items():
+        expr = expr.replace(helper, name)
+    out = []
+    for term in expr.split("+"):
+        term = term.strip()
+        m = _STRING_TERM.match(term)
+        if m:
+            out.append(m.group(1))
+        elif term in consts:
+            out.append(consts[term])
+        else:
+            return None                  # 런타임 값 — 이 호출은 읽을 수 없다
+    return "".join(out)
+
+
+def _rendered_calls() -> set[tuple[str, str]]:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_dump_console_html", _ROOT / "scripts" / "dump_console_html.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    found: set[tuple[str, str]] = set()
+    for fn_name in _RENDERED_SCREENS:
+        src = getattr(mod, fn_name)()
+        consts = {k: v for k, v in _CONST.findall(src)}
+        for m in re.finditer(r"\b(?:fetch|req)\(", src):
+            head, tail = _balanced(src, m.end() - 1)
+            raw = _resolve(head, consts)
+            if not raw:
+                continue
+            p = _clean(raw)
+            if not p or _HTML_SUFFIX.search(p):
+                continue
+            mm = re.search(r"method\s*:\s*['\"](GET|POST|PUT|PATCH|DELETE)['\"]", tail[:240])
+            found.add(((mm.group(1) if mm else "GET"), p))
+    return found
 
 
 def _console_calls() -> set[tuple[str, str]]:
@@ -135,9 +238,18 @@ def _console_calls() -> set[tuple[str, str]]:
 
 @pytest.fixture(scope="module")
 def console_calls() -> set[tuple[str, str]]:
-    calls = _console_calls()
+    calls = _console_calls() | _rendered_calls()
     assert len(calls) >= 25, f"콘솔 호출을 제대로 못 뽑았다({len(calls)}건): {sorted(calls)}"
     return calls
+
+
+def test_rendered_screens_are_scanned():
+    """서버 렌더 화면에서 실제로 호출을 뽑았는지부터 본다 — 0건이면 A·B 축이 조용히 빈다."""
+    calls = _rendered_calls()
+    # 후보 관리 7개(세션·목록·상세·결정·출처·원장·업로드) + 서명 3개(세션·점검·제출).
+    assert len(calls) >= 9, f"서버 렌더 화면에서 뽑은 호출이 너무 적다({len(calls)}건): {sorted(calls)}"
+    assert ("POST", "/golden/candidates/{}/decision") in calls, sorted(calls)
+    assert ("POST", "/golden/jobs/{}/signoff") in calls, sorted(calls)
 
 
 @pytest.fixture(scope="module")

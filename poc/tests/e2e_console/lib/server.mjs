@@ -27,9 +27,14 @@ export const FIXTURES = JSON.parse(fs.readFileSync(path.join(HERE, 'fixtures.jso
  * 그 변수가 없으면(=`node run.mjs` 단독 실행) 아래 커밋된 판을 쓴다. 렌더러를 고쳤으면
  * `make console-e2e-snapshot` 으로 다시 떠 둘 것. */
 export const RENDERED_DIR = process.env.KOIPA_E2E_RENDERED_DIR || path.join(HERE, 'rendered');
-const RENDERED = {
-  '/api/v1/golden/candidates/manage.html': 'manage.html',
-};
+/* 주소는 정규식이다 — 서명 화면 주소에는 잡 id 가 들어간다.
+ * review.html 과 signoff.html 은 **같은 화면**이라(2026-08-18 통합, 파이썬
+ * test_review_signoff_cross_link 가 같음을 잠근다) 한 판으로 둘 다 서빙한다. */
+const RENDERED = [
+  { rx: /^\/api\/v1\/golden\/candidates\/manage\.html$/, file: 'manage.html' },
+  { rx: /^\/api\/v1\/golden\/jobs\/[^/]+\/(?:signoff|review)\.html$/, file: 'signoff.html' },
+];
+const renderedFor = (urlPath) => (RENDERED.find((r) => r.rx.test(urlPath)) || {}).file || null;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -167,11 +172,12 @@ export async function startServer({ upstream = null } = {}) {
       return;
     }
 
-    if (!upstream && RENDERED[urlPath]) {
-      const p = path.join(RENDERED_DIR, RENDERED[urlPath]);
+    const renderedFile = upstream ? null : renderedFor(urlPath);
+    if (renderedFile) {
+      const p = path.join(RENDERED_DIR, renderedFile);
       if (!fs.existsSync(p)) {
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end(`떠 둔 화면이 없다: ${RENDERED[urlPath]} — make console-e2e-snapshot 을 먼저 돌릴 것`);
+        res.end(`떠 둔 화면이 없다: ${renderedFile} — make console-e2e-snapshot 을 먼저 돌릴 것`);
         return;
       }
       state.calls.push({ method: req.method, path: urlPath, headers: req.headers, body: null, bytes: 0, at: state.calls.length });

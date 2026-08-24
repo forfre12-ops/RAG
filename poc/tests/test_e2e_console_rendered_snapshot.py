@@ -23,16 +23,29 @@ _ROOT = Path(__file__).resolve().parents[1]
 _RENDERED = _ROOT / "tests" / "e2e_console" / "lib" / "rendered"
 
 # (떠 둔 파일, 렌더 함수 이름) — scripts/dump_console_html.py 의 TARGETS 와 같아야 한다.
-_TARGETS = [("manage.html", "_render_specledger_gold_console_html")]
+_TARGETS = [
+    ("manage.html", "render_manage_html"),
+    ("signoff.html", "render_signoff_html_sample"),
+]
+
+
+def _dump_module():
+    """뜨는 스크립트를 모듈로 읽는다 — 렌더는 그쪽 한 곳에서만 정의한다."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_dump_console_html", _ROOT / "scripts" / "dump_console_html.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 @pytest.mark.parametrize(("filename", "fn_name"), _TARGETS)
 def test_renderer_exists_and_produces_a_screen(filename: str, fn_name: str):
     """렌더 함수 이름이 바뀌거나 빈 문자열을 내면 하니스가 그 화면을 통째로 못 띄운다."""
-    from koipa.api import golden as golden_api
-
-    fn = getattr(golden_api, fn_name, None)
-    assert callable(fn), f"렌더 함수가 없다: golden.{fn_name} (하니스가 {filename} 을 못 띄운다)"
+    fn = getattr(_dump_module(), fn_name, None)
+    assert callable(fn), f"렌더 함수가 없다: dump_console_html.{fn_name} (하니스가 {filename} 을 못 띄운다)"
     html = fn()
     assert isinstance(html, str) and len(html) > 5000, f"{filename}: 렌더 결과가 너무 짧다({len(html)})"
     assert "<script" in html and "</body>" in html, f"{filename}: 화면 골격이 아니다"
