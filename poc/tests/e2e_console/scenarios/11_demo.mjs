@@ -192,6 +192,42 @@ export const scenarios = [
   },
 
   {
+    /* [2026-08-24 사용자 지적] "비공지성 0 · 경제유용성 0인데 뭐가 가장 높게 측정됐다는 거야?"
+       종전에는 S·V·M 세 값을 정렬해 무조건 상위 2개를 집어 「가장 높게 측정되었습니다」라고
+       적었다. 셋 다 0.00 이어도 앞의 둘을 골라 그렇게 말했다 — 0점을 "가장 높다"고 하는 것은
+       사실이 아니다. 같은 점수일 때도 성립하지 않는다. */
+    id: 'demo.result.zero-factors-are-not-called-highest',
+    needsMock: true,
+    title: '평가요소가 전부 0이면 「가장 높게 측정」이라고 말하지 않는다',
+    why: '0점을 최고점이라고 말하던 문장 — 화면이 사실과 다른 말을 했다',
+    async run({ server, check }) {
+      // SSE 픽스처는 {_sse:[{event,data}…]} 구조다 — 마지막 result 이벤트의 data 를 바꾼다.
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const base = JSON.parse(JSON.stringify(FIXTURES['POST /classify/stream']));
+      for (const ev of base._sse) {
+        if (ev.event === 'result') {
+          ev.data.evaluation_factors = { secrecy: 0, value: 0, management: 0 };
+          ev.data.evidence = [];
+        }
+      }
+      server.overrides['POST /classify/stream'] = base;
+
+      const page = await demo(server);
+      page.set('doc-body', '다음 주 회의 일정과 점심 메뉴를 안내합니다.');
+      page.click('btn-classify');
+      await page.until(() => page.text('result-summary').includes('3요건'), 8000);
+      await page.settle();
+
+      const t = page.text('result-summary');
+      check.includes(t, '모두 0점', '전부 0이면 그렇게 말한다');
+      check.includes(t, '등급을 올릴 근거가 검출되지 않았습니다', '왜 0인지 적는다');
+      check.ok(!/가장 높게 측정/.test(t), '0점을 「가장 높게 측정」이라 말하지 않는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     /* [2026-08-24 사용자 실측] 파일을 올려 분류했더니 사유 자리에 기본 문구만 떴다.
        경고에는 사유가 있었다 — `extraction_gate: … (table_incomplete, content_dropped)`.
        이 게이트는 업로드 경로 전용(api/documents.py)이라 화면 사유표에만 빠져 있었다. */

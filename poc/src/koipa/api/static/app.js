@@ -1059,10 +1059,17 @@ function renderSummary(data) {
   const ev = data.evidence || [];
   const matched = ev.slice(0, 3).map((e) => e.text);
   const factors = data.evaluation_factors || {};
-  const topFactors = Object.entries(factors)
+  /* [2026-08-24 사용자 지적] "비공지성 0 · 경제유용성 0인데 뭐가 가장 높게 측정됐다는 거야?"
+     맞는 지적이다. 종전에는 세 값을 정렬해 **무조건 상위 2개**를 집어 "가장 높게 측정되었습니다"
+     라고 적었다. 셋 다 0.00 이어도 앞의 둘(S·V)을 골라 그렇게 말했다 — 0점을 "가장 높다"고
+     하는 것은 사실이 아니다. 같은 점수일 때도 "가장 높게"는 성립하지 않는다.
+     그래서 세 경우를 가른다: 전부 0 / 전부 같은 점수 / 실제로 높은 것이 있음. */
+  const allFactors = Object.entries(factors)
     .filter(([k]) => k !== "" && typeof factors[k] === "number")
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2);
+    .sort((a, b) => b[1] - a[1]);
+  const topFactors = allFactors.slice(0, 2);
+  const maxFactor = allFactors.length ? allFactors[0][1] : 0;
+  const allSame = allFactors.length > 1 && allFactors.every(([, v]) => v === maxFactor);
 
   const factorLabels = {
     secrecy: "비공지성(S)",
@@ -1086,11 +1093,20 @@ function renderSummary(data) {
     : "본문에서 시드 키워드 매칭이 없어 기본 등급으로 판정되었습니다.";
   // factors_source=model_estimated 는 룰 미탐으로 등급에 맞춰 역산한 추정치(법리 근거 아님).
   const estimated = data.factors_source === "model_estimated";
-  const factorTxt = topFactors.length > 0
-    ? `3요건(S·V·M) 중 ${topFactors
-        .map(([k, v]) => `<b>${factorLabels[k] || k}(${v.toFixed(2)})</b>`)
-        .join("·")}가 ${estimated ? "가장 높게 <b>추정</b>되었습니다 (모델 역산 — 법리 근거 아님)" : "가장 높게 측정되었습니다"}.`
-    : "";
+  const estimatedTail = estimated ? " (모델 역산 — 법리 근거 아님)" : "";
+  let factorTxt = "";
+  if (allFactors.length === 0) {
+    factorTxt = "";
+  } else if (maxFactor <= 0) {
+    // 셋 다 0 — 무엇이 "가장 높다"고 말할 수 없다. 왜 0인지를 적는다.
+    factorTxt = `3요건(S·V·M)이 <b>모두 0점</b>입니다 — 본문에서 등급을 올릴 근거가 검출되지 않았습니다${estimatedTail}.`;
+  } else if (allSame) {
+    factorTxt = `3요건(S·V·M)이 <b>모두 같은 점수(${maxFactor.toFixed(2)})</b>입니다${estimatedTail}.`;
+  } else {
+    factorTxt = `3요건(S·V·M) 중 ${topFactors
+      .map(([k, v]) => `<b>${factorLabels[k] || k}(${v.toFixed(2)})</b>`)
+      .join("·")}가 ${estimated ? "가장 높게 <b>추정</b>되었습니다 (모델 역산 — 법리 근거 아님)" : "가장 높게 측정되었습니다"}.`;
+  }
 
   // 서버가 계산한 라우팅 status 를 반드시 노출 — needs_review 를 확정처럼 보이지 않게.
   //
