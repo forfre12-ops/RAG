@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>제품 핵심 요약 — 코드 기준 한 장 | Koipa</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
+  --bg-nav:rgba(255,255,255,.88);
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
+  --font-sans:"Geist",-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sidebar:230px; --article-max:920px; --container:968px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:15px;line-height:1.7;letter-spacing:-.011em;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+::selection{background:var(--text);color:var(--bg);}
+img{max-width:100%;}
+ul{padding-left:1.4em;color:var(--text-soft);} li{margin-bottom:4px;font-size:14px;}
+.nav{position:sticky;top:0;z-index:100;background:var(--bg-nav);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid var(--border-strong);}
+.nav-inner{max-width:var(--container);margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.brand{display:inline-flex;align-items:center;gap:8px;color:var(--text);text-decoration:none;min-width:0;}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--border-mid);}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px;}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap;}
+.brand-sep{color:var(--text-faint);font-size:13px;margin:0 4px;flex-shrink:0;}
+.brand-sub{font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.nav-badge{background:var(--bg-inverse);color:var(--bg);font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:0;white-space:nowrap;}
+.article-layout{position:relative;max-width:var(--container);margin:0 auto;padding:36px 24px 120px;}
+article{min-width:0;}
+.toc-aside{position:absolute;left:100%;top:36px;width:var(--sidebar);margin-left:36px;}
+.toc{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow-y:auto;padding:2px 0;}
+.toc-title{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;padding:0 10px;}
+.toc a{display:block;padding:5px 10px;color:var(--text-dim);text-decoration:none;font-size:12px;border-radius:0;transition:all .12s;line-height:1.45;border-left:2px solid transparent;}
+.toc a:hover{color:var(--text);background:var(--bg-surface);}
+.toc a.active{color:var(--text);font-weight:600;border-left-color:var(--text);}
+.meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:0;background:var(--text);color:var(--bg);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);white-space:nowrap;}
+.badge.outline{background:transparent;color:var(--text);border:1px solid var(--border-strong);}
+.meta-dot{color:var(--text-faint);} .meta-soft{color:var(--text-dim);}
+h1.title{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 20px;color:var(--text);}
+.lede{font-size:clamp(14px,1.8vw,16px);line-height:1.65;color:var(--text-soft);margin:0 0 36px;max-width:680px;}
+h2{font-size:clamp(19px,2.6vw,24px);font-weight:700;letter-spacing:-.03em;margin:46px 0 12px;color:var(--text);}
+h3{font-size:15.5px;font-weight:700;letter-spacing:-.02em;margin:30px 0 8px;color:var(--text);}
+p{margin:0 0 14px;color:var(--text-soft);font-size:14.5px;}
+strong{color:var(--text);font-weight:600;}
+hr{border:none;border-top:1px solid var(--border);margin:40px 0;}
+.section-sep{display:flex;align-items:center;gap:14px;margin:52px 0 22px;}
+.section-sep-num{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);flex-shrink:0;}
+.section-sep-line{flex:1;height:1px;background:var(--border);}
+.section-sep-title{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);flex-shrink:0;}
+.callout{border-radius:0;padding:14px 18px;margin:20px 0;border:1px solid var(--border-mid);background:var(--bg-surface);}
+.callout.inset{background:var(--bg-mid);border-left:3px solid var(--text);}
+.callout-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:5px;color:var(--text);}
+.callout p{margin:0;font-size:13.5px;line-height:1.65;color:var(--text-soft);}
+.callout p + p{margin-top:9px;}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--border-mid);}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:640px;}
+thead tr{background:var(--bg-surface);}
+th{padding:9px 12px;text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border-mid);white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-soft);line-height:1.5;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);}
+td.center,th.center{text-align:center;}
+td.num,th.num{text-align:right;font-family:var(--font-mono);white-space:nowrap;}
+code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-mid);border:1px solid var(--border-mid);padding:1px 4px;color:var(--text);}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:0;font-size:9.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;white-space:nowrap;}
+.tag.on{background:var(--text);color:var(--bg);}
+.tag.off{background:var(--bg-strong);color:var(--text-dim);border:1px solid var(--border-mid);}
+.tag.grade{background:#27272a;color:#fff;}
+.tag.req{background:transparent;color:var(--text-dim);border:1px solid var(--border-strong);}
+.src{font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-top:-8px;}
+.flow{margin:22px 0;border:1px solid var(--border-mid);background:var(--bg-surface);padding:18px;overflow-x:auto;}
+.flow-row{display:flex;align-items:stretch;gap:0;min-width:600px;}
+.flow-box{flex:1;border:1px solid var(--border-strong);background:#fff;padding:10px 12px;min-width:0;}
+.flow-box + .flow-box{border-left:none;}
+.flow-box .k{font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.07em;color:var(--text-faint);text-transform:uppercase;display:block;margin-bottom:3px;}
+.flow-box .t{font-size:12.5px;font-weight:600;color:var(--text);line-height:1.35;display:block;}
+.flow-box .d{font-size:11.5px;color:var(--text-dim);line-height:1.45;display:block;margin-top:3px;}
+.flow-note{font-size:11.5px;color:var(--text-dim);margin-top:10px;line-height:1.55;}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:20px 0;border:1px solid var(--border-mid);}
+.split > div{padding:16px 18px;}
+.split > div + div{border-left:1px solid var(--border-mid);}
+.split h4{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--text);letter-spacing:-.02em;}
+.split p{font-size:13px;margin:0 0 8px;}
+.split ul{margin:0;padding-left:1.2em;} .split li{font-size:12.5px;}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:20px 0;border:1px solid var(--border-mid);}
+.kpi > div{padding:14px 16px;border-left:1px solid var(--border-mid);}
+.kpi > div:first-child{border-left:none;}
+.kpi .kv{font-family:var(--font-mono);font-size:21px;font-weight:700;color:var(--text);letter-spacing:-.03em;line-height:1.1;}
+.kpi .kl{font-size:11px;color:var(--text-dim);margin-top:5px;line-height:1.4;}
+.footnote{font-size:12px;color:var(--text-faint);border-top:1px solid var(--border);padding-top:20px;margin-top:48px;line-height:1.6;}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-faint);}
+footer strong{color:var(--text-dim);}
+@media(max-width:1500px){.toc-aside{display:none;}}
+@media(max-width:860px){.article-layout{padding:24px 16px 80px;}.split,.kpi{grid-template-columns:1fr;}.split > div + div{border-left:none;border-top:1px solid var(--border-mid);}.kpi > div{border-left:none;border-top:1px solid var(--border-mid);}.kpi > div:first-child{border-top:none;}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">제품 핵심 요약</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">CORE</span></div>
+  </div>
+</nav>
+
+<div class="article-layout">
+<article>
+
+  <div class="meta-row">
+    <span class="badge">DOC-CORE-01</span>
+    <span class="badge outline">코드 기준</span>
+    <span class="meta-dot">·</span>
+    <span class="meta-soft">2026-08-24 · 커밋 db81a793 기준</span>
+  </div>
+
+  <h1 class="title">제품 핵심 요약</h1>
+  <p class="lede">이 엔진이 무엇을 맡았고, 문서 한 건이 어떤 길을 지나 등급이 정해지며, 학습 데이터는 어디서 오고, 사람이 고친 결과가 어떻게 모델로 돌아오는지 — <strong>이 한 장이면 전체 그림이 선다.</strong> 모든 수치와 기본값은 현재 소스에서 직접 읽었고, 어느 파일의 몇 번째 줄인지 함께 적었다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">읽는 법</div>
+    <p><strong>1~4절</strong>이 제품 그 자체다 — 무엇을 맡았고 어떻게 판정하나. <strong>5~7절</strong>은 모델이 만들어지고 갱신되는 길. <strong>8~12절</strong>은 운영에서 이것을 어떻게 지키고 누가 쓰나. <strong>13절</strong>은 하지 않는 것 — 오해를 막는다. 모르는 말이 나오면 <strong>14절</strong>에 뜻이 있다.</p>
+    <p>시간이 5분뿐이면 <strong>2절(요건) · 4절(판정) · 8절(실측)</strong>만 보면 된다.</p>
+  </div>
+
+  <hr/>
+
+  <div class="section-sep" id="s1">
+    <span class="section-sep-num">01</span><span class="section-sep-line"></span><span class="section-sep-title">한 문장 · 규모</span>
+  </div>
+  <h2>문서를 읽어 영업비밀 4등급으로 나누고, 사람이 고친 결과로 다시 학습한다</h2>
+
+  <p>입력은 업로드된 전자문서, 출력은 <strong>등급 · 근거 · 처리 상태</strong>(자동 확정 / 검수 필요) 세 가지다. 등급을 정하는 경로에는 대규모 언어모델(LLM)이 들어가지 않는다 — 고객사 대부분이 GPU 없는 CPU 런타임이기 때문이다.</p>
+
+  <div class="kpi">
+    <div><div class="kv">4</div><div class="kl">등급 — TS · S1 · S2 · S3</div></div>
+    <div><div class="kv">6</div><div class="kl">파이프라인 모듈 m1~m6</div></div>
+    <div><div class="kv">55,217</div><div class="kl">소스 줄 수 (204개 .py)</div></div>
+    <div><div class="kv">58,548</div><div class="kl">테스트 줄 수 (329개 파일)</div></div>
+  </div>
+  <p class="src">규모 = find src/koipa -name '*.py' · find tests -name 'test_*.py' 각각의 파일 수와 줄 수 (2026-08-24 측정, __pycache__ 제외)</p>
+
+  <div class="section-sep" id="s2">
+    <span class="section-sep-num">02</span><span class="section-sep-line"></span><span class="section-sep-title">계약 범위</span>
+  </div>
+  <h2>우리가 맡은 요건 — 여섯 개의 기능 요건이 곧 여섯 개의 모듈</h2>
+
+  <p>요건 번호와 모듈 번호가 1:1로 붙어 있다. 이것이 이 제품의 골격이다 — 요건 하나를 확인하려면 그 행 하나만 따라 내려가면 된다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:88px">요건</th><th style="width:52px">모듈</th><th>내용</th><th style="width:150px">진입점</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="tag req">FUN-003</span></td><td class="center">M1</td>
+        <td><strong>합성문서 생성</strong> — LLM 프롬프트 체인으로 문서 생성 → 등급 라벨 자동 부여 → 검수 후 학습셋 편입</td>
+        <td><code>/synth/generate</code><br/><code>/golden/build</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag req">FUN-022</span></td><td class="center">M2</td>
+        <td><strong>전자문서 텍스트 추출</strong> — HWP·DOCX·PDF·XLSX·PPTX. 정규화·청킹·개인정보 마스킹 포함</td>
+        <td><code>/documents</code><br/><code>/documents/analyze</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag req">FUN-023</span></td><td class="center">M3</td>
+        <td><strong>가이드 기반 라벨링</strong> — 3요건(S·V·M)을 각각 0·1·2로 독립 판독 → 곱셈 등급 + 근거(키워드·문맥) 출력</td>
+        <td><code>/admin/keywords</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag req">FUN-004</span></td><td class="center">M4</td>
+        <td><strong>분류 모델 학습</strong> — KF-DeBERTa 기반, Train/Val/Test 자동 분리, 온프렘 GPU. RAG는 증거 제공까지이고 판정 투입은 선택(기본 OFF)</td>
+        <td><code>/train</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag req">FUN-005</span></td><td class="center">M5</td>
+        <td><strong>문서 분류 추론</strong> — 출처 + 콘텐츠 2단계 판정, 임시저장 → 관리자 최종확정</td>
+        <td><code>/classify</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag req">FUN-005a</span></td><td class="center">M5</td>
+        <td><strong>등급체계 관리</strong> — 관리자가 등급을 추가·변경·삭제(설정화)</td>
+        <td><code>/schema/grades</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag req">FUN-024</span></td><td class="center">M6</td>
+        <td><strong>산출·리포트</strong> — 평가지표, 검수자 큐 배분, 검수 라우팅. 자동확정은 신뢰도 단독이 아니라 <strong>다단 게이트</strong>로 결정</td>
+        <td><code>/confirm</code> · <code>/review-queue</code><br/><code>/metrics/latest</code></td>
+      </tr>
+      <tr>
+        <td><span class="tag req">PER-002</span></td><td class="center">—</td>
+        <td><strong>응답 성능</strong> — 분류 ≤ 3초 · 색인 ≤ 30초, 자원 임계(CPU·MEM). 협의로 조절</td>
+        <td><code>perf/</code> 하니스</td>
+      </tr>
+      <tr>
+        <td><span class="tag req">PMR-002</span></td><td class="center">—</td>
+        <td><strong>운영 확정 기반 성능 기준</strong> — 자동확정 확대 게이트</td>
+        <td>운영 단계</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">출처: 요구사항 추적표(RTM) 기능요건 표. 가이드 문서 업로드·버전관리는 코드에서 FUN-002로 표기돼 있다(services/guide_service.py) — RTM 담당 요건 표에는 별도 행이 없다.</p>
+
+  <div class="callout">
+    <div class="callout-label">FUN-023에서 놓치기 쉬운 것</div>
+    <p>S·V·M 세 요건은 <strong>라벨링·결정·설명 계층</strong>에서 쓰이고, 모델 파인튜닝 자체는 <strong>등급 단일 지도학습</strong>이다. 즉 분류기가 S·V·M을 각각 예측하는 구조가 아니다 — 룰 엔진이 요소를 판독하고, 분류기는 등급을 학습한다.</p>
+  </div>
+
+  <div class="section-sep" id="s3">
+    <span class="section-sep-num">03</span><span class="section-sep-line"></span><span class="section-sep-title">구조</span>
+  </div>
+  <h2>루프가 두 개다 — 이것만 알면 나머지는 세부사항</h2>
+
+  <div class="split">
+    <div>
+      <h4>루프 A · 일상 운영 (매일 · 현업)</h4>
+      <p>문서 업로드 → 등급 분류 → 사람 검수·확정</p>
+      <ul>
+        <li>교정 결과가 <code>tb_corrections</code>에 쌓인다</li>
+        <li>고객사 폐쇄망에서 도는 쪽</li>
+        <li>진입점 <code>POST /classify</code> · <code>/confirm</code></li>
+      </ul>
+    </div>
+    <div>
+      <h4>루프 B · 모델 갱신 (주기적 · 관리자)</h4>
+      <p>골든셋 후보 생성 → 검수·서명 → 재학습 → 배포 게이트 → 활성화</p>
+      <ul>
+        <li>평가 정답지(<code>locked_gold_eval</code>)를 만드는 쪽</li>
+        <li>지식재산보호원(모델공장)에서 도는 쪽</li>
+        <li>진입점 <code>/golden/build</code> · <code>/train</code> · <code>/model/activate</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">헷갈리기 쉬운 지점</div>
+    <p>이름이 비슷한 <strong>검수가 두 개</strong>다. 골든 검수(<code>/golden/jobs/{id}/signoff</code>)는 <strong>평가 정답</strong>을 만들고, 운영 검수(<code>/confirm</code>)는 <strong>재학습 교정</strong>을 쌓는다. 서로 다른 루프이고 데이터도 섞이지 않는다.</p>
+  </div>
+
+  <h3>계층 — 읽는 순서는 언제나 같다</h3>
+  <div class="flow">
+    <div class="flow-row">
+      <div class="flow-box"><span class="k">api/</span><span class="t">HTTP 라우터</span><span class="d">계약·권한만. 로직 없음</span></div>
+      <div class="flow-box"><span class="k">services/</span><span class="t">유스케이스 조율</span><span class="d">트랜잭션 경계</span></div>
+      <div class="flow-box"><span class="k">modules/</span><span class="t">m1~m6 알고리즘</span><span class="d">HTTP 의존 없음</span></div>
+      <div class="flow-box"><span class="k">repositories/ · adapters/</span><span class="t">DB · 외부 경계</span><span class="d">임베딩·벡터·저장소·LLM</span></div>
+    </div>
+    <div class="flow-note">라우터에 로직이 없고 모듈에 HTTP가 없다. 루트의 <code>golden_signoff.py</code> 같은 파일은 계층 밖 순수 함수다 — 시계·DB에 의존하지 않아 감사에서 같은 입력에 같은 결과를 재현할 수 있다.</div>
+  </div>
+
+  <div class="section-sep" id="s4">
+    <span class="section-sep-num">04</span><span class="section-sep-line"></span><span class="section-sep-title">판정</span>
+  </div>
+  <h2>등급 넷과, 등급을 만드는 곱셈식</h2>
+
+  <p>등급 코드는 <code>Grade</code> 열거형에 고정돼 있고(<code>schemas/common.py:39</code>), 런타임에는 DB <code>tb_classification_levels</code>에서 다시 읽는다. 다른 등급체계를 쓰는 기관에도 등급을 등록해 대응할 수 있다(<code>GradeRegistry</code>).</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:70px">등급</th><th>뜻</th><th class="num">S · V · M 표준형</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag grade">TS</span></td><td>최고 등급 영업비밀</td><td class="num">2 · 2 · 2</td></tr>
+      <tr><td><span class="tag grade">S1</span></td><td>고가치 영업비밀 — 비밀관리성이 아직 공식화되지 않은 경우 포함</td><td class="num">2 · 2 · 0</td></tr>
+      <tr><td><span class="tag grade">S2</span></td><td>일반 내부문서</td><td class="num">1 · 1 · 1</td></tr>
+      <tr><td><span class="tag grade">S3</span></td><td>공개 가능</td><td class="num">0 · 0 · 0</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>판정식 — 등급 = 비공지성(S) × 경제적 유용성(V) × 비밀관리성(M)</h3>
+  <p>발주처 정본 가이드 B안 v2.2를 그대로 코드로 옮긴 것이다(<code>modules/m3_labeling/rule_engine.py:56</code>, 함수 <code>grade_from_svm</code>).</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>조건</th><th style="width:70px">결과</th><th>이유</th></tr></thead>
+    <tbody>
+      <tr><td>S=2 이고 V=2 · 곱 ≥ 4</td><td><strong>TS</strong></td><td>세 요소가 모두 성립</td></tr>
+      <tr><td>S=2 이고 V=2 · 곱 &lt; 4</td><td><strong>S1</strong></td><td>관리가 공식화되지 않아 M=0이면 곱이 0이 되어 S3로 떨어진다 — 그 미탐을 막으려고 v2.2에서 명문화한 분기</td></tr>
+      <tr><td>그 외 · 곱 ≥ 1</td><td><strong>S2</strong></td><td>비공지성이나 경제가치가 불완전하면 최고 S2</td></tr>
+      <tr><td>그 외 · 곱 = 0</td><td><strong>S3</strong></td><td>공개</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">요소값 0의 뜻</div>
+    <p>0은 "근거를 못 찾았다"가 아니라 <strong>공개·무가치·무관리임이 입증됐다</strong>일 때만 쓴다. 단지 본문에 언급이 없을 뿐이면 1로 올린다(<code>grade_from_svm_floored</code>). 이 구분이 없으면 곱셈이 무너져 S2 문서가 S3로 떨어진다.</p>
+  </div>
+
+  <h3>4-1. 본문을 어떻게 얻나 — 추출과 전처리 (M2)</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:120px">단계</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><strong>추출</strong></td><td>txt · md · log · csv · <strong>hwp · hwpx</strong> · docx · doc · xlsx · xlsm · xls · pptx · pptm · pdf. 표 셀 회수까지 포함한다. HWP는 표가 통째로 누락되는 사례가 있어 별도 경로로 표를 보강한다 <span class="src">(extractor.py:41)</span></td></tr>
+      <tr><td><strong>정규화</strong></td><td>공백·제어문자·인코딩 정리</td></tr>
+      <tr><td><strong>개인정보 마스킹</strong></td><td>주민·외국인등록번호 · 계좌번호 · 휴대전화 · 일반전화 · 이메일. 주민번호는 하이픈 없는 표기도 잡는다 <span class="src">(pii_masker.py:23)</span></td></tr>
+      <tr><td><strong>청킹</strong></td><td>기본 512자 · 겹침 64자, 문장 경계에 맞춰 자른다. RAG 색인은 별도로 1,200자 · 겹침 100자 <span class="src">(config.py:819 · 853)</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>추출이 열화된 문서(본문이 거의 안 나온 문서)는 이 단계에서 <code>needs_review</code>로 격리되고, 서빙이 그 상태를 읽어 자동 확정을 막는다.</p>
+
+  <h3>4-2. 판정기가 둘이다 — 분류기와 룰 엔진</h3>
+
+  <div class="split">
+    <div>
+      <h4>학습 분류기 (M5)</h4>
+      <p>KF-DeBERTa(<code>kakaobank/kf-deberta-base</code>)를 4등급 분류로 미세조정한 모델. 청크별 확률을 내고 문서 단위로 집계한다.</p>
+      <ul>
+        <li>확률은 temperature로 보정(현재 2.03)</li>
+        <li>TS·S1은 평균이 아니라 최댓값으로 집계</li>
+        <li>모델 로드 실패 시 기동 자체를 막는다(무음 열화 금지)</li>
+      </ul>
+    </div>
+    <div>
+      <h4>룰 엔진 (M3)</h4>
+      <p>DB에 등록된 키워드 시드를 본문에 매칭해 요소별 점수를 쌓고, S·V·M을 판독해 곱셈식으로 등급을 낸다.</p>
+      <ul>
+        <li>레거시 4요소를 정본 3요건(S·V·M)으로 폴딩 — 유출영향도는 V로 흡수</li>
+        <li>임베딩 기반 의미 매칭도 지원(표기가 달라도 매칭)</li>
+        <li>키워드를 고치면 <strong>재기동 없이 핫리로드</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <p>두 판정기는 서로를 검증한다. 룰이 근거를 못 찾았을 때는 "룰이 무의견"으로 보고 모델을 그대로 쓰고, 둘 다 근거를 갖고 갈리면 사람에게 보낸다. 이 비교 결과가 응답의 <code>decision_path</code>에 한 줄로 나간다.</p>
+
+  <h3>4-3. 등급을 바꾸는 보정 — 방향이 거의 전부 "높은 쪽"</h3>
+  <p>설계의 중심 개념 하나: 이 엔진의 목표는 정확도 극대화가 아니라 <strong>미탐 최소화</strong>다. 애매하면 높은 등급으로 올린다. 낮게 잡아 비밀을 공개로 흘리는 쪽이, 높게 잡아 사람이 한 번 더 보는 쪽보다 훨씬 위험하기 때문이다. 지표에서 고등급 미탐율(<code>high_grade_fnr</code>)을 F1보다 먼저 보는 이유도 같다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:170px">보정</th><th style="width:56px">방향</th><th>동작</th><th class="center" style="width:80px">배포 기본</th></tr></thead>
+    <tbody>
+      <tr><td><strong>severe-agg</strong></td><td>상향</td><td>청크 집계에서 TS·S1은 평균이 아니라 <strong>가장 강한 청크</strong>로 잡는다 — 한 단락의 비밀 신호가 문서 평균에 희석되는 것을 막는다</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td><strong>escalation τ</strong></td><td>상향</td><td>최댓값(argmax)이 아니라, 가장 심각한 등급 중 확률이 τ 이상인 것을 택한다. <strong>τ = 0.30</strong></td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td><strong>룰 오버라이드</strong></td><td>상향</td><td>룰의 등급별 점수가 임계를 넘으면 모델 등급을 올린다. 임계 TS 3.0 · S1 2.2 · S2 1.6</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td><strong>metadata floor</strong></td><td>상향</td><td>연동 메타데이터의 보안표시가 예측보다 높은 등급을 가리키면 그 등급으로 올린다 — 내리지는 않는다</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td><strong>source-prior cap</strong></td><td>하향</td><td>출처가 공개 문서면 S3로 제한. 단 고등급 신호와 충돌하면 등급을 내리는 대신 검수로 보낸다</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td><strong>TS/S1 동점 브레이크</strong></td><td>상향</td><td>TS와 S1이 사실상 동점이면 TS를 택한다</td><td class="center"><span class="tag off">OFF</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">기본값 출처: config.py _PROFILE_DEFAULTS(50~240행) · fnr_rule_*_threshold(513~518행) · severe_agg_codes(524행) · ts_tie_break_enabled(674행)</p>
+
+  <h3>4-4. 상태만 바꾸는 검수 라우팅 — 등급은 손대지 않는다</h3>
+  <p>아래 조건 중 <strong>하나라도 걸리면</strong> 자동 확정을 멈추고 <code>needs_review</code>로 보낸다. 위에서부터 차례로 검사하고 먼저 걸린 곳에서 멈춘다(<code>services/classify_service.py:339~563</code>). 등급 자체는 바꾸지 않으므로, 어느 게이트가 발동해도 미탐이 늘지 않는다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:215px">게이트</th><th>무엇을 막나</th><th class="center" style="width:80px">배포 기본</th></tr></thead>
+    <tbody>
+      <tr><td>low-confidence</td><td>모델 신뢰도가 임계 <strong>0.50</strong> 미만</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>ingestion 격리</td><td>추출이 열화된 문서가 그대로 자동 분류되는 것</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>cap-conflict</td><td>출처는 공개인데 본문은 고등급 신호 — 공개 오태깅으로 비밀이 새는 것</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>sparse-evidence</td><td>약한 키워드 하나로 신뢰도 1.0이 나오는 룰 폴백 자동확정 (증거 하한 0.9)</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>abbrev-only-escalation</td><td>영문 공정 약어(CVD·EUV 등) 밀도만으로 최고등급이 되는 과분류</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>본문 부족</td><td>추출은 성공했는데 판정할 본문이 사실상 없는 문서가 조용히 S3로 확정되는 것</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>metadata-access-conflict</td><td>접근범위가 제한적인데 예측 등급이 낮은 경우</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>metadata-management-conflict</td><td>비밀관리성 부재가 입증됐는데(전직원 열람) 예측이 TS·S1·S2인 경우</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>ICD 미탐 위험</td><td>연동 메타데이터 검증이 지목한 미탐 위험</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>s2-underclass-risk</td><td>S2로 과소분류되기 쉬운 문서 유형</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>gate-fail-open</td><td>게이트 자체가 실패해 무방비로 통과하는 것</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>agreement-gate</td><td>룰과 모델의 등급이 갈리는 경우. 단 <strong>룰이 근거를 하나도 못 찾았으면 "무의견"</strong>으로 보고 통과시킨다 — 근거 없는 불일치로 전건이 검수행이 되는 것을 막는다. 공개등급 예측은 신뢰도 단독 허용</td><td class="center"><span class="tag on">ON</span></td></tr>
+      <tr><td>llm-secondopinion</td><td>모델이 TS 아닌 등급을 자동확정하려 할 때 LLM 2차 의견을 받아, 더 높은 등급이면 검수행</td><td class="center"><span class="tag off">OFF</span></td></tr>
+      <tr><td>kill-gate 브레이크</td><td>평가 신호 이상 시 고등급 자동확정 억제</td><td class="center"><span class="tag off">OFF</span></td></tr>
+      <tr><td>similarity escalation</td><td>사람이 더 높게 확정한 문서와 매우 유사한 경우 (가장 비싼 게이트라 맨 마지막)</td><td class="center"><span class="tag off">OFF</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout inset">
+    <div class="callout-label">왜 신뢰도 하나로 자동확정하지 않나</div>
+    <p>신뢰도만으로는 맞고 틀림이 갈리지 않는다 — 골든셋 500건에서 AUROC 0.58, 자동확정 정밀도 63%, 고등급 미탐 46건이었다. 룰·모델 합의 게이트를 붙이자 정밀도 63→81%, 미탐 46→8건이 됐다. 대가는 자동확정 비율이 떨어지는 것, 즉 검수 부담 증가다(<code>config.py:576~583</code>).</p>
+  </div>
+
+  <h3>4-5. 응답이 실제로 담는 것</h3>
+  <p><code>POST /classify</code>의 응답 계약이다(<code>schemas/classify.py:114</code>). <strong>등급 하나만 주지 않는다</strong> — 룰과 모델의 판정을 나란히 주고, 최종 등급이 어떻게 나왔는지를 한 줄로 설명한다. 설명가능성이 화면과 감사에 그대로 쓰이는 지점이다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:210px">필드</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><code>label</code> · <code>confidence</code> · <code>scores</code></td><td>최종 등급, 신뢰도, 등급별 점수 전체</td></tr>
+      <tr><td><code>evaluation_factors</code></td><td>S·V·M 요소값</td></tr>
+      <tr><td><code>factors_source</code></td><td>요소값이 <strong>룰이 본문에서 실제로 관측한 것</strong>(<code>rule_evidenced</code>)인지, <strong>등급에서 역산한 추정치</strong>(<code>model_estimated</code>)인지. 후자는 법리 근거로 쓸 수 없다 — 화면이 이를 구분해 표시한다</td></tr>
+      <tr><td><code>rule_evaluation_factors</code></td><td>역산이 일어났을 때 룰이 원래 관측한 값. 두 벌을 나란히 보여 주면 룰과 모델이 왜 갈렸는지가 그 자리에서 읽힌다</td></tr>
+      <tr><td><code>evidence</code></td><td>근거 구간 목록 — 본문 위치(start·end) · 텍스트 · 가중치 · 태그</td></tr>
+      <tr><td><code>rule_grade</code> · <code>model_grade</code></td><td>보정 전 각 엔진의 단독 판정</td></tr>
+      <tr><td><code>decision_path</code></td><td>최종 등급이 나온 경로를 사람 말로 한 줄. 예: "룰의 S1 점수 2.35 ≥ 임계 2.2 → 모델 S2를 S1로 안전 상향"</td></tr>
+      <tr><td><code>status</code> · <code>warnings</code></td><td><code>staging</code>(자동 확정) 또는 <code>needs_review</code>, 그리고 그 사유</td></tr>
+      <tr><td><code>model_version</code> · <code>elapsed_ms</code></td><td>어느 모델이 얼마 만에 판정했나 — 감사 추적의 기준점</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s5">
+    <span class="section-sep-num">05</span><span class="section-sep-line"></span><span class="section-sep-title">학습 데이터</span>
+  </div>
+  <h2>학습 데이터가 어디서 오나 — 합성 생성과 골든셋</h2>
+
+  <p>이 제품에서 가장 특이한 제약이 여기 있다. <strong>지식재산보호원 단계에는 실제 영업비밀 문서가 없다</strong> — 실문서·검수자·반출이 구조적으로 0인 것이 확정된 운영 전제다. 그래서 학습 데이터를 합성으로 만들고, 실데이터 학습은 고객사 폐쇄망 운영 단계에서 일어난다.</p>
+
+  <h3>5-1. 합성 문서 생성 (M1 · FUN-003)</h3>
+  <div class="flow">
+    <div class="flow-row">
+      <div class="flow-box"><span class="k">1</span><span class="t">시나리오 지정</span><span class="d">등급 · 업종 · 문서 유형</span></div>
+      <div class="flow-box"><span class="k">2</span><span class="t">LLM 생성</span><span class="d">한국 사내 문서체로 본문 작성</span></div>
+      <div class="flow-box"><span class="k">3</span><span class="t">개인정보 검사</span><span class="d">패턴 검사 결과를 기록</span></div>
+      <div class="flow-box"><span class="k">4</span><span class="t">검수 큐</span><span class="d">승인 / 반려</span></div>
+    </div>
+    <div class="flow-note"><strong>생성 프롬프트가 금지하는 것</strong> — ① 실재 기업명·인명·주민번호·연락처·이메일 등 개인정보, ② <strong>등급명</strong>(비밀·기밀·TS·S1·S2·S3·대외비·극비). 등급명이 본문에 있으면 모델이 내용이 아니라 그 단어를 외워 버려서, 실제 문서에서는 전혀 작동하지 않는 분류기가 된다. <span class="src">(generator.py:90 · 159)</span><br/>
+    ⚠ 3단계의 개인정보 검사는 <strong>결과를 문서에 기록할 뿐 자동 폐기하지 않는다</strong> — 그 값을 읽는 곳이 아직 없다(<code>pii_violations</code> 소비자 0). 합성 본문의 개인정보 방어는 현재 프롬프트 금지와 사람 검수 두 가지다.</div>
+  </div>
+
+  <p>합성 문서는 <code>tb_sample_documents</code>에 <code>pending_review</code> 상태로 쌓이고, 콘솔에서 승인·반려한다. 다만 <strong>학습셋 편입은 파일 기반</strong>이다 — 학습은 <code>datasets/…/train.jsonl</code>을 읽고, 승인 플래그가 학습 파이프라인을 직접 발화시키지는 않는다(코드에서 <code>SampleDocument</code>를 읽는 곳은 합성 서비스 밖에 없다).</p>
+
+  <h3>5-2. 골든셋 — 같은 파일 안에서 다섯 등위로 갈린다</h3>
+  <p>골든셋은 물리 파일을 쪼개지 않는다. 정본 파일 하나를 두고, 각 행의 <strong>라벨 출처·검수 상태·서명자</strong>로부터 등위(tier)를 파생시킨다(<code>golden_tiers.py</code>). 파일을 쪼개면 스키마가 어긋나기 때문이다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:150px">등위</th><th>조건</th><th class="center" style="width:60px">학습</th><th class="center" style="width:60px">평가</th></tr></thead>
+    <tbody>
+      <tr><td><code>locked_gold_eval</code></td><td>유효한 <strong>사람 서명</strong>(실계정 검수자 · 서명 시각 · 게이트 버전이 갖춰진 인증 봉투). 실문서 출처까지 갖춰야 실평가 정답으로 집계된다</td><td class="center">금지</td><td class="center"><strong>유일</strong></td></tr>
+      <tr><td><code>held_review</code></td><td>사람 검수 라벨인데 서명이 무효이거나 본문이 합성인 것 — 격리</td><td class="center">금지</td><td class="center">아님</td></tr>
+      <tr><td><code>legal_floor</code></td><td>법적 근거·시나리오. 고등급이 S3로 떨어지는 회귀를 막는 하한선</td><td class="center">허용</td><td class="center">임시</td></tr>
+      <tr><td><code>gold_candidate</code></td><td>룰과 LLM이 합의해 자동 통과 — 사람 서명 대기</td><td class="center">허용</td><td class="center">아님</td></tr>
+      <tr><td><code>silver_train</code></td><td>그 외 — <strong>학습 시드 전용</strong></td><td class="center">허용</td><td class="center">금지</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout inset">
+    <div class="callout-label">이 표에서 가장 중요한 칸</div>
+    <p><code>locked_gold_eval</code>은 <strong>학습에 절대 쓰지 않는다.</strong> 평가 정답을 학습에 넣으면 시험지를 미리 보고 시험을 치는 것과 같아서, 모든 지표가 부풀려진다. 반대로 <code>silver_train</code>은 평가에 쓸 수 없다 — 기계가 붙인 라벨이라 정답이 아니기 때문이다.</p>
+    <p>서명은 순수 함수로 검증한다(<code>golden_signoff.py</code> — 시계·DB 의존 없음). 같은 입력에 같은 결과가 나와야 감사에서 재현할 수 있어서다.</p>
+  </div>
+
+  <div class="section-sep" id="s6">
+    <span class="section-sep-num">06</span><span class="section-sep-line"></span><span class="section-sep-title">재학습</span>
+  </div>
+  <h2>사람이 고친 것이 모델로 돌아오는 길</h2>
+
+  <p>루프 A와 루프 B가 만나는 지점이다. 현업이 검수 화면에서 등급을 고치면 <code>tb_corrections</code>에 남고, 그것이 다음 학습셋에 섞인다.</p>
+
+  <div class="flow">
+    <div class="flow-row">
+      <div class="flow-box"><span class="k">1</span><span class="t">검수·교정</span><span class="d">POST /confirm · /relabel<br/>tb_corrections 적재</span></div>
+      <div class="flow-box"><span class="k">2</span><span class="t">교정 → 학습행 복원</span><span class="d">아직 학습에 안 쓴 교정만<br/>{본문, 라벨}로 되살린다</span></div>
+      <div class="flow-box"><span class="k">3</span><span class="t">기존 학습셋과 병합</span><span class="d">홀드아웃과 겹치는 행은 제외</span></div>
+      <div class="flow-box"><span class="k">4</span><span class="t">학습 실행</span><span class="d">Celery 워커<br/>TRAIN 분할만 청크 확장</span></div>
+    </div>
+    <div class="flow-note">2~3단계는 <code>modules/m6_evaluation/corrections_rebuild.py</code>. <strong>홀드아웃 누수 차단</strong>이 여기 들어 있다 — 평가에 쓰는 문서가 교정을 통해 학습셋으로 새어 들어가면 지표가 부풀려지므로, 겹치는 행을 세어서 로그에 남기고 제외한다.</div>
+  </div>
+
+  <p><strong>학습 본체는 API 프로세스가 아니라 Celery 워커에서 돈다.</strong> <code>training_service</code>는 요청을 받아 게이트를 판정하고 잡을 등록할 뿐이다. 학습 코드를 찾는다면 <code>workers/tasks.py</code> → <code>modules/m4_training/trainer.py</code>로 가야 한다.</p>
+
+  <div class="callout">
+    <div class="callout-label">청크 확장을 TRAIN 분할에만 하는 이유</div>
+    <p>긴 문서를 청크로 쪼개 학습량을 늘리는데, 이것을 val·test까지 하면 <strong>같은 문서의 다른 조각이 학습과 평가 양쪽에 들어간다.</strong> 그러면 모델은 이미 본 문서를 평가받게 되고 지표가 부풀려진다. 그래서 확장은 TRAIN 분할에만 한다(<code>chunk_expand.py</code>).</p>
+  </div>
+
+  <p>고객사 폐쇄망에서도 이 경로가 그대로 돈다. 다만 <strong>기본은 관리자가 버튼을 눌러 시작하는 수동 트리거</strong>이고, 어느 경우든 결과는 <strong>후보로만 등록</strong>된다 — 자동으로 서빙에 올라가지 않는다.</p>
+
+  <div class="callout">
+    <div class="callout-label">야간 무인 재학습을 기본으로 켜지 않는 이유</div>
+    <p>새벽 2시 자동 발화가 걸려 있었으나 2026-08-08 실측이 전제를 부정해 껐다. ① 이 경로가 태우는 것은 5에폭 풀 파인튜닝이고 CPU에서 <strong>약 13시간</strong>이 걸렸다(2,042행) — 02시에 시작하면 15시에 끝나 업무시간 내내 고객사 CPU를 점유한다. ② 고객사 워커 메모리 4GiB에서 같은 작업을 발화하니 <strong>40초 만에 강제 종료</strong>됐다(2.805GiB 시점). 메모리는 CPU 속도와 무관하므로 하드웨어가 빨라져도 그대로 죽는다. ③ 새벽에 죽으면 화면에 아무 신호가 없다.</p>
+    <p>야간 배치의 원래 목적은 "고객사 교정을 <strong>반출하지 않고</strong> 현장에서 반영"인데, 그 목적은 사람이 버튼을 눌러도 똑같이 달성된다 — 반출은 여전히 0이다. 기능은 그대로 남아 있어 사양이 충분한 회원사는 설정 하나(<code>enable_nightly_retrain_schedule</code>)만 켜면 복원된다.</p>
+  </div>
+
+  <div class="section-sep" id="s7">
+    <span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">배포 게이트</span>
+  </div>
+  <h2>새 모델이 현행을 대체하려면 통과해야 하는 것</h2>
+
+  <p>학습이 끝났다고 서빙에 올라가지 않는다. <code>modules/m6_evaluation/deploy_gate.py</code>의 <code>evaluate_deploy_gate()</code>가 <strong>전부 통과할 때만</strong> 활성화를 권고한다. 판단할 수 없으면 막는 쪽으로 기운다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:250px">검사</th><th>기준</th></tr></thead>
+    <tbody>
+      <tr><td>degenerate</td><td>한 등급으로 쏠린 퇴화 모델이 아닐 것</td></tr>
+      <tr><td>fnr_high_present</td><td>고등급 미탐율 지표가 실제로 산출됐을 것 — 없으면 통과시키지 않는다</td></tr>
+      <tr><td>fnr_high_regression</td><td>후보 미탐율 ≤ 현행 + 허용치</td></tr>
+      <tr><td>f1_regression</td><td>후보 macro-F1 ≥ 현행 − 허용치</td></tr>
+      <tr><td>first_deploy_fnr_floor</td><td>비교 대상이 없는 최초 배포도 미탐율 ≤ <strong>0.10</strong></td></tr>
+      <tr><td>anchor_high_grade_miss</td><td>외부 사실 앵커 코퍼스에서 TS·S1 미탐이 확정되면 차단</td></tr>
+      <tr><td>metamorphic_forward_regression</td><td>사실은 그대로 두고 문체만 바꿨을 때 등급이 내려가는 회귀가 있으면 차단</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>게이트를 우회하는 <strong>수동 활성</strong>에는 사유가 필수다 — 강제로 올리려면 "왜"가 감사 로그에 남는다.</p>
+
+  <h3>모델의 일생 — 후보에서 활성, 그리고 롤백</h3>
+  <div class="flow">
+    <div class="flow-row">
+      <div class="flow-box"><span class="k">1</span><span class="t">후보 등록</span><span class="d">학습이 끝나면 여기까지<br/>서빙에 영향 없음</span></div>
+      <div class="flow-box"><span class="k">2</span><span class="t">배포 게이트</span><span class="d">위 7개 검사 전부 통과</span></div>
+      <div class="flow-box"><span class="k">3</span><span class="t">활성화</span><span class="d">활성 모델은 한 번에 하나<br/>DB 제약으로 강제</span></div>
+      <div class="flow-box"><span class="k">4</span><span class="t">롤백</span><span class="d">되돌린 대상과 사유를 남긴다</span></div>
+    </div>
+    <div class="flow-note"><code>tb_model_versions</code>가 각 단계를 기록한다 — 활성 여부·활성 시각·비활성 시각·되돌린 원본(<code>rolled_back_from</code>)·롤백 사유. <strong>등급체계 스냅샷</strong>(<code>level_snapshot</code>)도 함께 저장하므로, 나중에 등급체계가 바뀌어도 그 모델이 어느 체계로 학습됐는지 남는다.</div>
+  </div>
+
+  <h3>올린 뒤에도 감시한다 — 자동 롤백</h3>
+  <p>활성 모델이 운영에서 내는 실제 고등급 미탐율을 직전 기준과 비교해, 회귀가 확인되면 직전 활성 모델로 되돌린다(<code>auto_rollback_tick</code>, 1시간 주기). <strong>기본은 판정만 하고 롤백은 실행하지 않는다</strong> — 켜는 것은 운영 결정이다.</p>
+
+  <div class="section-sep" id="s8">
+    <span class="section-sep-num">08</span><span class="section-sep-line"></span><span class="section-sep-title">실측</span>
+  </div>
+  <h2>지금 배포본이 실제로 내는 숫자</h2>
+
+  <p>모델 <code>v-fe4b386b</code>, 프로파일 <code>full-train</code>, 서빙 경로 전체(보정·게이트 포함)를 통과시켜 잰 값이다. 모델 단독 지표가 아니다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>평가셋</th><th class="num">N</th><th class="num">자동확정률</th><th class="num">자동확정 정밀도</th><th class="num">무음 미탐</th><th>검수 사유 내역</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>hardened42</strong><br/><span class="src">누출 제거 홀드아웃</span></td>
+        <td class="num">42</td><td class="num">81.0%</td><td class="num">0.971</td><td class="num">1 (2.4%)</td>
+        <td>low-confidence 6 · agreement-gate 2</td>
+      </tr>
+      <tr>
+        <td><strong>final_800</strong><br/><span class="src">학습 분포 밖(OOD)</span></td>
+        <td class="num">800</td><td class="num">0.0%</td><td class="num">—</td><td class="num">0 (0%)</td>
+        <td>low-confidence 563 · agreement-gate 237</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">근거: reports/thresh_revalidation/hardened42_ADOPTED.json · final800_ADOPTED.json (2026-08-24 측정, scripts/measure_serving_records.py)</p>
+
+  <p><strong>이 표에서 읽어야 할 것.</strong> 학습 분포 안의 문서는 81%가 자동으로 끝나고 그중 97%가 맞다. 학습에 없던 문체(OOD 800건)는 <strong>단 한 건도 자동확정되지 않고 전부 사람에게 간다</strong> — 게이트가 의도대로 작동한다는 뜻이다. 무음 미탐(사람 눈에 띄지 않은 채 낮게 확정된 건)은 두 셋을 합쳐 1건이다.</p>
+
+  <div class="callout">
+    <div class="callout-label">이 숫자의 한계 — 반드시 함께 말할 것</div>
+    <p>두 평가셋 모두 <strong>합성·기계 라벨</strong>이고 사람이 서명한 정답은 0건이다. 위 5절의 <code>locked_gold_eval</code>이 비어 있다는 뜻이다. 지식재산보호원 단계에 실문서·검수자·반출이 없기 때문이고, 사람 서명 평가는 고객사 폐쇄망 운영 단계에서 일어난다.</p>
+    <p>따라서 위 수치는 <strong>회귀 감시와 추세</strong>로 쓰고, 현장 정확도의 보증으로 쓰지 않는다.</p>
+  </div>
+
+  <h3>성능 기준 (PER-002)</h3>
+  <p>계약 성능 요건은 <strong>속도와 자원</strong>이다 — 분류 3초 이내, 색인 30초 이내, CPU·메모리 임계. 정확도 수치 목표는 요건에 없다. 성능 하니스(<code>perf/</code>)는 이 밖에 내부 합격선도 함께 검사한다: 분류 p50 500ms · p95 5초, 검수 확정 p95 300ms, 배치 5건/초 이상.</p>
+
+  <div class="section-sep" id="s9">
+    <span class="section-sep-num">09</span><span class="section-sep-line"></span><span class="section-sep-title">배포</span>
+  </div>
+  <h2>같은 코드, 두 자리 — 프로파일이 차이를 만든다</h2>
+
+  <p>배포 프로파일은 넷이고(<code>lite-noapi</code> · <code>lite-cloud</code> · <code>onprem-local</code> · <code>full-train</code>), 실제 운영에 쓰는 것은 아래 둘이다. 프로파일은 <code>.env</code>에 명시되지 않은 값만 채우고, 명시값이 언제나 우선한다(<code>config.py:46~240</code>).</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:170px"></th><th>full-train — 지식재산보호원</th><th>onprem-local — 고객사 폐쇄망</th></tr></thead>
+    <tbody>
+      <tr><td><strong>역할</strong></td><td>모델공장 — 합성·골든셋·학습</td><td>운영 — 분류·검수·현장 증분 재학습</td></tr>
+      <tr><td><strong>하드웨어</strong></td><td>학습용 GPU</td><td>대부분 CPU 전용</td></tr>
+      <tr><td><strong>LLM</strong></td><td>원격 — 합성·라벨링에만</td><td>로컬 ollama — 등급 결정에는 미사용</td></tr>
+      <tr><td><strong>학습</strong></td><td>상시 학습 경로 활성</td><td>증분 재학습 가드만 열려 있다 — 발화는 관리자 수동 트리거, 결과는 후보 등록까지</td></tr>
+      <tr><td><strong>수동 활성 시<br/>사람서명 평가 요구</strong></td><td><span class="tag off">OFF</span> — 서명 주체가 구조적으로 없다</td><td><span class="tag on">ON</span> — 현장에 실제 검수자가 있다</td></tr>
+      <tr><td colspan="3" style="background:var(--bg-surface);font-weight:600;color:var(--text)">아래는 두 프로파일이 동일하다</td></tr>
+      <tr><td><strong>서빙 운영점</strong></td><td colspan="2">temperature 2.03 · escalation τ 0.30 · 검수 임계 0.50 · 합의 게이트 ON · 메타데이터 floor ON</td></tr>
+      <tr><td><strong>저장</strong></td><td colspan="2">로컬 파일시스템 + 원본 AES-256-GCM 암호화 (키 미설정이면 기동 거부)</td></tr>
+      <tr><td><strong>안전 게이트</strong></td><td colspan="2">실 임베더 필수 · 실 분류기 필수 — 무음 열화로 뜨느니 기동 자체를 막는다</td></tr>
+      <tr><td><strong>데모 표면</strong></td><td colspan="2">데모 콘솔·물리삭제 엔드포인트 비활성 (관리 콘솔만 노출)</td></tr>
+      <tr><td><strong>벡터 검색</strong></td><td colspan="2">PostgreSQL + pgvector · 임베딩 KURE-v1</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s10">
+    <span class="section-sep-num">10</span><span class="section-sep-line"></span><span class="section-sep-title">사람</span>
+  </div>
+  <h2>사람이 실제로 쓰는 화면 — 관리자 콘솔</h2>
+
+  <p><code>/console/admin.html</code> 한 화면이고, 두 루프가 네 개 탭으로 나뉜다. 각 카드 제목에 해당 요건 번호가 배지로 붙어 있어 화면과 요건이 눈으로 대조된다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:110px">탭</th><th>카드</th><th style="width:88px">요건</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="5"><strong>운영</strong></td><td>1 분류 실행</td><td><span class="tag req">FUN-005</span></td></tr>
+      <tr><td>2 문서 검토 대기 · 등급 확정/수정</td><td><span class="tag req">FUN-024</span></td></tr>
+      <tr><td>운영 관제 대시보드</td><td>—</td></tr>
+      <tr><td>감사 로그 — 누가 · 언제 · 무엇을</td><td>—</td></tr>
+      <tr><td>공통 연결 · 인증</td><td>—</td></tr>
+      <tr><td rowspan="3"><strong>검증문서</strong></td><td>검증문서 현황 — 구성 · 서명</td><td><span class="tag req">FUN-024</span></td></tr>
+      <tr><td>학습 후보 생성 · 검토 → 학습셋 편입</td><td><span class="tag req">FUN-003</span></td></tr>
+      <tr><td>G2 검증문서 검수 준비</td><td>—</td></tr>
+      <tr><td rowspan="3"><strong>학습 · 배포</strong></td><td>3 재학습 트리거</td><td><span class="tag req">FUN-004</span></td></tr>
+      <tr><td>4 모델 서빙 · 배포 게이트 · 핫리로드</td><td>—</td></tr>
+      <tr><td>5 모델 메트릭 · FNR 게이트</td><td><span class="tag req">FUN-024</span></td></tr>
+      <tr><td rowspan="2"><strong>설정</strong></td><td>등급체계 관리 — 추가 · 변경 · 삭제</td><td><span class="tag req">FUN-005a</span></td></tr>
+      <tr><td>라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴</td><td><span class="tag req">FUN-023</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>설정 탭의 두 카드가 <strong>재학습 없이 즉시 반영되는 유일한 축</strong>이다. 키워드를 고치면 룰 엔진이 재기동 없이 DB 기준으로 재구성된다(<code>ClassifyService.reload_rules</code>). 반대로 등급체계를 바꾸면 학습 라벨 공간 자체가 바뀌므로 재학습이 필요하고, 저장 시 화면이 그것을 알린다(<code>requires_retraining</code>).</p>
+
+  <div class="callout">
+    <div class="callout-label">다중 워커에서의 한계</div>
+    <p>핫리로드는 <strong>그 요청을 처리한 워커에만 즉시 반영된다.</strong> 워커를 여러 개 띄운 배포에서는 나머지 워커가 재기동이나 다음 리로드까지 옛 키워드를 쓴다. 등급체계 쪽은 같은 문제를 짧은 캐시 만료(기본 30초)로 완화해 두었지만, 키워드 쪽에는 그 장치가 없다 — 즉시 전파가 필요하면 워커를 순차 재기동해야 한다.</p>
+  </div>
+
+  <div class="section-sep" id="s11">
+    <span class="section-sep-num">11</span><span class="section-sep-line"></span><span class="section-sep-title">시스템</span>
+  </div>
+  <h2>API · 데이터 · 감사 · 비동기</h2>
+
+  <div class="split">
+    <div>
+      <h4>API — 전부 /api/v1 아래</h4>
+      <ul>
+        <li><strong>분류</strong> <code>/classify</code> · <code>/classify/async</code> · <code>/classify/batch</code> · <code>/classify/stream</code> · <code>/classify/explain</code></li>
+        <li><strong>문서</strong> <code>/documents</code> · <code>/documents/analyze</code></li>
+        <li><strong>검수</strong> <code>/confirm</code> · <code>/review-queue</code> · <code>/relabel</code></li>
+        <li><strong>골든셋</strong> <code>/golden/build</code> · <code>/golden/candidates</code> · <code>/golden/jobs/{id}/signoff</code></li>
+        <li><strong>학습·배포</strong> <code>/train</code> · <code>/model/activate</code> · <code>/model/rollback</code></li>
+        <li><strong>관리</strong> <code>/schema/grades</code> · <code>/admin/keywords</code> · <code>/admin/audit-log</code> · <code>/admin/dashboard</code></li>
+        <li><strong>검색</strong> <code>/rag/search</code> · <code>/guide/documents</code></li>
+        <li><strong>상태</strong> <code>/healthz</code> · <code>/healthz/ready</code> · <code>/healthz/deep</code> · <code>/metrics-prom</code></li>
+      </ul>
+      <p class="src">오류 계약은 HTTP 상태 코드다 — 심볼릭 오류코드 체계는 두지 않았다.</p>
+    </div>
+    <div>
+      <h4>데이터 — 테이블 19개</h4>
+      <ul>
+        <li><strong>문서</strong> <code>tb_documents</code> · <code>tb_chunks</code> · <code>tb_sample_documents</code></li>
+        <li><strong>판정</strong> <code>tb_classifications</code> · <code>tb_classification_evidence</code> · <code>tb_document_labels</code> · <code>tb_document_factor_scores</code></li>
+        <li><strong>기준</strong> <code>tb_classification_levels</code> · <code>tb_level_keywords</code> · <code>tb_evaluation_factors</code> · <code>tb_guides</code></li>
+        <li><strong>학습</strong> <code>tb_training_runs</code> · <code>tb_training_datasets</code> · <code>tb_training_epochs</code> · <code>tb_model_versions</code></li>
+        <li><strong>운영</strong> <code>tb_corrections</code> · <code>tb_audit_log</code> · <code>tb_llm_usage</code> · <code>tb_prompt_versions</code></li>
+      </ul>
+      <h4 style="margin-top:18px">감사 로그는 해시 체인</h4>
+      <p>각 행이 직전 행의 해시를 물고 있어(HMAC-SHA256, 운영에서는 키 필수) 과거 행의 삭제·삽입·재배열이 검출된다. 매일 새벽 3시 30분에 체인 전체를 자동 검증한다.</p>
+    </div>
+  </div>
+
+  <h3>주기 작업 — 무엇이 저절로 도나</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:200px">작업</th><th style="width:110px">주기</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td>능동학습 선별</td><td>30분</td><td>다음에 사람이 봐야 할 문서를 고른다</td></tr>
+      <tr><td>능동학습 일일 스냅샷</td><td>매일 03:00</td><td>선별 결과 적재</td></tr>
+      <tr><td>자동 롤백 점검</td><td>1시간</td><td>운영 미탐율 회귀 판정 (실행은 기본 OFF)</td></tr>
+      <tr><td>연동 발송 큐</td><td>60초</td><td>외부 시스템 전달 대기분 발송</td></tr>
+      <tr><td>스케줄러 심박</td><td>60초</td><td>주기 작업 자체가 살아 있는지 확인</td></tr>
+      <tr><td>파티션 확보</td><td>매일 02:10</td><td>3개월치 테이블 파티션 미리 생성</td></tr>
+      <tr><td>감사 체인 검증</td><td>매일 03:30</td><td>변조 검출</td></tr>
+      <tr><td>야간 증분 재학습</td><td>매일 02:00</td><td><strong>기본 미등록</strong> — 별도 설정을 켠 경우에만 등록된다(6절 참조). 기본은 수동 트리거</td></tr>
+      <tr><td>임베딩 드리프트 점검</td><td>15분</td><td>기본 OFF — 학습마다 30분이 더 붙고, 표본이 적으면 의미 없는 경보가 뜬다</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">출처: workers/celery_app.py:123~200</p>
+
+  <h3>검색과 가이드 문서</h3>
+  <p>가이드 문서(등급 판단 기준 문서)를 업로드하면 버전 이력이 남고 RAG 색인에 들어간다. 검색은 <strong>키워드 검색과 벡터 검색을 함께 돌려 RRF로 융합</strong>하고, 필요하면 재정렬한다. 키워드 절반이 조용히 사라지는 것을 막기 위해, 하이브리드가 실패해 벡터 단독으로 내려가면 경고 로그와 지표로 드러낸다.</p>
+
+  <h3>인증과 권한</h3>
+  <p>인증 모드는 셋이다(<code>api_key</code> · <code>jwt</code> · <code>both</code>). API 키 모드에서 역할은 <strong>서버가 고정</strong>하고 <code>X-Actor-Role</code> 헤더는 무시한다 — 클라이언트가 자기 역할을 자칭할 수 없다(<code>config.py:337~353</code>).</p>
+
+  <p>역할은 넷이고, 엔드포인트마다 허용 역할이 선언돼 있다(<code>api/_rbac.py</code>).</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:110px">역할</th><th class="num" style="width:90px">허용 엔드포인트</th><th>무엇을 하나</th></tr></thead>
+    <tbody>
+      <tr><td><code>admin</code></td><td class="num">33</td><td>전 범위 — 학습·활성화·롤백·등급체계·키워드까지</td></tr>
+      <tr><td><code>kl_backend</code></td><td class="num">24</td><td>발주처 연동 시스템이 부르는 경로</td></tr>
+      <tr><td><code>reviewer</code></td><td class="num">18</td><td>검수·확정·승급 — 모델과 기준은 못 바꾼다</td></tr>
+      <tr><td><code>system</code></td><td class="num">12</td><td>기계 호출(분류·조회) 기본 역할</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">집계 = grep 'require_role(' src/koipa/api/*.py 의 역할별 등장 수 (2026-08-24)</p>
+
+  <div class="callout">
+    <div class="callout-label">여기서 자주 막힌다</div>
+    <p>API 키 모드의 기본 역할은 <code>system</code>이다. 관리자 콘솔은 <code>confirm</code>·<code>relabel</code>(admin·reviewer)과 <code>train</code>·<code>model/reload</code>·<code>keywords</code>(admin)를 부르므로, 서버 역할이 <code>system</code>이면 이 호출들이 전부 <strong>403</strong>이 된다. 화면은 뜨는데 버튼만 안 먹는 모양으로 나타난다.</p>
+  </div>
+
+  <div class="section-sep" id="s12">
+    <span class="section-sep-num">12</span><span class="section-sep-line"></span><span class="section-sep-title">보안 · 실패</span>
+  </div>
+  <h2>비밀이 밖으로 나가지 않는 근거</h2>
+
+  <p>영업비밀을 다루는 제품이므로 "문서가 어디까지 갈 수 있나"가 기능만큼 중요하다. 반출 판단의 근거는 <strong>등급이 아니라 출처</strong>다.</p>
+
+  <div class="callout inset">
+    <div class="callout-label">등급으로 판단하지 않는 이유</div>
+    <p>등급은 <strong>모델이 매기는 값</strong>이다. "등급이 낮으니 보내도 된다"고 하면, 모델이 낮게 잘못 매긴 비밀 문서가 그 판단 때문에 밖으로 나간다 — 순환논리다. 그래서 게이트가 보는 것은 문서의 출처(<code>document_origin</code>)다.</p>
+  </div>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:150px">출처</th><th>공개 클라우드 LLM 전송</th></tr></thead>
+    <tbody>
+      <tr><td><code>public_real</code></td><td><strong>허용</strong> — 이미 공개된 실문서(판례·공시)</td></tr>
+      <tr><td><code>synthetic</code></td><td><strong>허용</strong> — 우리가 지어낸 본문. 실제 비밀이 아니다</td></tr>
+      <tr><td><code>customer_real</code> · <code>organization_real</code></td><td>차단</td></tr>
+      <tr><td>출처를 <strong>모르는</strong> 문서</td><td>차단 — 확인되지 않은 것을 내보내는 것은 근거가 아니라 추측이다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>동작 방식은 세 가지가 더 있다.</p>
+  <ul>
+    <li><strong>한 건이라도 섞이면 실행분 전체를 차단한다.</strong> 판정자는 실행 단위로 한 번 만들어져 문서별 라우팅이 불가능한데, 섞였을 때 "일부만 보낸다"는 안전한 선택지가 아니다</li>
+    <li><strong>호출자가 자칭한 "민감" 플래그는 더 잠그는 방향으로만 작동한다.</strong> 켜면 차단, 꺼도 출처가 허용하지 않으면 여전히 차단</li>
+    <li><strong>차단되면 온프렘 모델(Qwen)로 돌린다.</strong> 기능이 멈추는 것이 아니라 판정자가 바뀐다. 차단 사유와 건수는 감사 기록으로 남는다</li>
+  </ul>
+  <p class="src">근거: golden_tiers.py:302 may_send_to_commercial_llm · golden_build_service.py:310 _egress_decision (커밋 b15c40d8)</p>
+
+  <p>이와 별개로, <strong>고객사 폐쇄망 프로파일은 애초에 로컬 ollama만 쓴다</strong> — 외부 호출 경로 자체가 없다. 원본 문서는 저장 시점에 AES-256-GCM으로 암호화되고, 키가 없으면 서버가 뜨지 않는다(평문 저장을 막는 쪽으로 실패한다).</p>
+
+  <h3>무엇이 실패하면 어떻게 되나</h3>
+  <p>설계 원칙은 하나다 — <strong>안전한 쪽으로 실패한다.</strong> 다만 "안전한 쪽"이 상황마다 다르다. 사람을 위험에 빠뜨릴 수 있는 실패는 아예 막고(fail-secure), 기능만 잃는 실패는 조용히 넘긴다(fail-safe).</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:210px">실패</th><th style="width:110px">어떻게 되나</th><th>이유</th></tr></thead>
+    <tbody>
+      <tr><td>원본 암호화 키 미설정</td><td><strong>기동 거부</strong></td><td>평문 저장을 조용히 시작하느니 뜨지 않는 편이 낫다</td></tr>
+      <tr><td>안전 게이트가 꺼져 있음</td><td><strong>기동 거부</strong></td><td>게이트가 켜져 있다고 믿는 채로 도는 것이 가장 위험하다</td></tr>
+      <tr><td>임베더 · 분류기 로드 실패</td><td><strong>기동 거부</strong></td><td>해시 임베딩·룰 폴백으로 무음 열화하면 품질이 떨어진 줄 아무도 모른다</td></tr>
+      <tr><td>배포 게이트가 지표를 못 구함</td><td><strong>활성화 거부</strong></td><td>판단할 수 없다는 것은 통과가 아니다</td></tr>
+      <tr><td>문서 출처를 모름</td><td><strong>외부 전송 차단</strong></td><td>위 표 참조</td></tr>
+      <tr><td>검수 게이트 자체가 예외</td><td>검수 라우팅</td><td>게이트가 죽었으면 자동확정도 멈춘다(<code>gate-fail-open</code> 경고)</td></tr>
+      <tr><td>룰 엔진 예외</td><td>분류 계속</td><td>룰이 죽어도 분류는 서야 한다. 합의 게이트만 건너뛴다</td></tr>
+      <tr><td>LLM 미가용 · 오류</td><td>기존 판정 유지</td><td>보조 게이트가 죽었다고 본 기능을 멈추지 않는다</td></tr>
+      <tr><td>하이브리드 검색 실패</td><td>벡터 단독 폴백</td><td>단 <strong>조용히 넘기지 않는다</strong> — 경고 로그와 지표로 드러낸다(키워드 절반이 사라진 상태이므로)</td></tr>
+      <tr><td>활성 모델이 운영에서 회귀</td><td>롤백 판정</td><td>실행 여부는 운영 결정(기본 판정만)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s13">
+    <span class="section-sep-num">13</span><span class="section-sep-line"></span><span class="section-sep-title">경계</span>
+  </div>
+  <h2>이 제품이 하지 않는 것</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:270px">하지 않는 것</th><th>이유</th></tr></thead>
+    <tbody>
+      <tr><td><strong>등급 결정에 LLM을 쓰지 않는다</strong></td><td>고객사 대부분이 GPU 없는 CPU 런타임이다. LLM은 합성 문서 생성과 라벨링 보조에만 쓴다</td></tr>
+      <tr><td><strong>분류기가 S·V·M을 예측하지 않는다</strong></td><td>파인튜닝은 등급 단일 지도학습이다. 요소 판독은 룰 엔진 몫이고, 설명 계층에서 합쳐진다</td></tr>
+      <tr><td><strong>스캔 이미지 OCR은 요건이 아니다</strong></td><td>FUN-022는 전자문서 텍스트 추출까지다. 이미지 경로 코드는 있으나 요건 밖 부가 기능이다</td></tr>
+      <tr><td><strong>등급을 무인으로 내리지 않는다</strong></td><td>보정은 상향, 게이트는 상태 변경만 한다. 유일한 하향인 출처 cap도 고등급 신호와 충돌하면 검수로 보낸다</td></tr>
+      <tr><td><strong>평가 정답을 학습에 넣지 않는다</strong></td><td><code>locked_gold_eval</code>은 학습 금지, <code>silver_train</code>은 평가 금지. 청크 확장도 TRAIN 분할에만 한다</td></tr>
+      <tr><td><strong>지식재산보호원 단계에서 실문서를 다루지 않는다</strong></td><td>실문서·검수자·반출 0이 확정된 운영 전제다. 실데이터는 고객사 폐쇄망에만 있다</td></tr>
+      <tr><td><strong>RAG 질의응답은 산출물 범위 밖이다</strong></td><td><code>/answer</code> 코드는 존치하되 휴면이다. 검색(<code>/rag/search</code>)은 근거 제공까지만 쓴다</td></tr>
+      <tr><td><strong>MinIO·Elasticsearch를 기본으로 쓰지 않는다</strong></td><td>폐쇄망 기본은 로컬 파일시스템과 PostgreSQL/pgvector다. 두 백엔드 어댑터는 남아 있으나 선택 설치다</td></tr>
+      <tr><td><strong>운영 프로파일에 물리삭제 엔드포인트를 노출하지 않는다</strong></td><td>데모용 초기화는 운영에서 404로 막는다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s14">
+    <span class="section-sep-num">14</span><span class="section-sep-line"></span><span class="section-sep-title">용어</span>
+  </div>
+  <h2>이 문서에서 쓴 말</h2>
+
+  <p>이 분야에서 뜻이 정해진 표준 용어들이다. 자주 오해되는 것만 골랐다.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:180px">용어</th><th>뜻</th></tr></thead>
+    <tbody>
+      <tr><td><strong>미탐</strong> (FNR)</td><td>비밀 문서를 더 낮은 등급으로 잘못 판정하는 것. 이 제품이 가장 먼저 보는 지표이고, 반대 방향(과분류)은 의도적으로 덜 본다</td></tr>
+      <tr><td><strong>무음 미탐</strong></td><td>미탐인데 <strong>사람에게 가지도 않은 것.</strong> 검수로 라우팅된 미탐은 사람이 잡을 기회가 있으므로 이것과 구분해서 센다 — 8절 표의 "무음 미탐" 열이 실제로 놓친 건수다</td></tr>
+      <tr><td><strong>자동 확정</strong></td><td>사람 검수 없이 등급이 정해지는 것(<code>staging</code>). 반대는 검수 라우팅(<code>needs_review</code>)</td></tr>
+      <tr><td><strong>홀드아웃</strong></td><td>학습에 쓰지 않고 떼어 둔 평가용 문서 묶음. 학습에 섞이면 시험지를 미리 본 셈이 되므로 6절의 누수 차단이 필요하다</td></tr>
+      <tr><td><strong>OOD</strong> (분포 밖)</td><td>학습 데이터에 없던 문체·주제의 문서. 모델이 근거 없이 확신하기 쉬운 구간이라, 게이트가 제 몫을 하는지 보는 시험대다</td></tr>
+      <tr><td><strong>골든셋</strong></td><td>정답이 붙은 기준 문서 묶음. 5절처럼 등위에 따라 학습용과 평가용이 갈린다</td></tr>
+      <tr><td><strong>temperature 보정</strong></td><td>모델이 낸 확률의 과신을 눕히는 후처리. 보정하지 않으면 틀린 답에도 높은 신뢰도가 붙어 검수 임계를 그대로 통과한다</td></tr>
+      <tr><td><strong>escalation τ</strong></td><td>가장 높은 확률(argmax)이 아니라, 심각한 등급부터 훑어 확률이 τ 이상이면 그것을 택하는 규칙. 낮출수록 미탐은 줄고 검수량은 는다</td></tr>
+      <tr><td><strong>합의 게이트</strong></td><td>룰 엔진과 분류기가 같은 등급을 말할 때만 자동 확정하는 규칙</td></tr>
+      <tr><td><strong>핫리로드</strong></td><td>서버를 다시 띄우지 않고 설정을 반영하는 것. 키워드 변경이 이 경로다</td></tr>
+      <tr><td><strong>폐쇄망</strong></td><td>인터넷이 끊긴 망. 설치에 필요한 도커 이미지·모델·패키지를 전부 담은 묶음을 미리 만들어 반입한다</td></tr>
+      <tr><td><strong>fail-secure / fail-safe</strong></td><td>실패했을 때 <strong>막는 쪽</strong>으로 도는 것 / <strong>기능을 잃되 계속 도는</strong> 것. 12절 표가 어느 실패가 어느 쪽인지 정리한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="section-sep" id="s15">
+    <span class="section-sep-num">15</span><span class="section-sep-line"></span><span class="section-sep-title">다음</span>
+  </div>
+  <h2>더 볼 곳</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th style="width:290px">알고 싶은 것</th><th>파일</th></tr></thead>
+    <tbody>
+      <tr><td>요건에서 파일 경로까지 — 호출 경로 전체</td><td><code>poc/docs/CODE_MAP.md</code></td></tr>
+      <tr><td>개발 환경에서 띄우기</td><td><code>poc/README.md</code> 5절 — <code>TESTING=1</code> 없으면 기동 실패</td></tr>
+      <tr><td>서빙 운영점 파라미터 전체</td><td><code>poc/src/koipa/config.py</code> · 제출본 「서빙 운영점 파라미터 명세」</td></tr>
+      <tr><td>등급 기준 원문 대조</td><td>제출본 「영업비밀 등급분류 기준 적용서 v2.2」</td></tr>
+      <tr><td>DB 스키마 · API 명세 상세</td><td>제출본 「기술구현 백서 부록 A · B」</td></tr>
+      <tr><td>폐쇄망 설치</td><td><code>poc/docs/INSTALL.md</code> · <code>DEPLOY_GUIDE.md</code></td></tr>
+      <tr><td>망 사이 반출·반입</td><td><code>poc/docs/EXPORT_IMPORT_RUNBOOK.md</code></td></tr>
+      <tr><td>운영·장애 대응</td><td><code>poc/docs/OPERATION.md</code> · <code>TROUBLESHOOTING.md</code></td></tr>
+      <tr><td>화면으로 확인</td><td><code>/console/admin.html</code>(관리자) · <code>/console/index.html#sec-parse</code>(등급 시연)</td></tr>
+      <tr><td>두 루프를 끝까지 돌려보기</td><td><code>scripts/demo_e2e_8010.py</code>(루프 A) · <code>scripts/demo_e2e_golden.py</code>(루프 B)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="footnote">
+    이 문서의 기본값과 수치는 2026-08-24에 현재 작업 트리의 소스를 직접 읽어 적었다.
+    요건 범위는 요구사항 추적표(RTM), 설정값은 poc/src/koipa/config.py,
+    판정 로직은 services/classify_service.py · modules/m5_inference/pipeline.py · modules/m3_labeling/rule_engine.py,
+    학습 데이터 등위는 src/koipa/golden_tiers.py, 실측치는 poc/reports/thresh_revalidation/ 이 출처다.
+    설정은 프로파일 기본값 기준이며 서버 .env 와 컨테이너 환경변수로 덮어쓸 수 있다 —
+    특정 서버의 실제 값은 docker inspect 로 확인해야 한다.
+  </div>
+
+</article>
+
+<aside class="toc-aside">
+  <nav class="toc">
+    <div class="toc-title">목차</div>
+    <a href="#s1">01 한 문장 · 규모</a>
+    <a href="#s2">02 계약 범위 — 요건</a>
+    <a href="#s3">03 루프 두 개 · 계층</a>
+    <a href="#s4">04 판정 — 등급 · 보정 · 게이트 · 응답</a>
+    <a href="#s5">05 학습 데이터 — 합성과 골든셋</a>
+    <a href="#s6">06 재학습 배선</a>
+    <a href="#s7">07 배포 게이트 · 자동 롤백</a>
+    <a href="#s8">08 실측 · 성능 기준</a>
+    <a href="#s9">09 배포 프로파일</a>
+    <a href="#s10">10 사람이 쓰는 화면</a>
+    <a href="#s11">11 API · 데이터 · 감사 · 권한</a>
+    <a href="#s12">12 보안 경계 · 실패 시 동작</a>
+    <a href="#s13">13 하지 않는 것</a>
+    <a href="#s14">14 용어</a>
+    <a href="#s15">15 더 볼 곳</a>
+  </nav>
+</aside>
+</div>
+
+<footer>
+  <strong>KOIPA AI 영업비밀 관리시스템</strong> — 제품 핵심 요약 · 2026-08-24<br>
+  현재 소스코드(커밋 db81a793) 기준
+</footer>
+
+<script>
+(function(){
+  const links=document.querySelectorAll('.toc a[href^="#"]');
+  const headings=Array.from(links).map(l=>{const id=l.getAttribute('href').slice(1);return{link:l,el:document.getElementById(id)};}).filter(x=>x.el);
+  if(!headings.length)return;
+  function onScroll(){
+    let cur=headings[0];
+    for(const h of headings){ if(h.el.getBoundingClientRect().top<=120) cur=h; }
+    links.forEach(l=>l.classList.remove('active'));
+    cur.link.classList.add('active');
+  }
+  window.addEventListener('scroll',onScroll,{passive:true});
+  onScroll();
+})();
+</script>
+
+</body>
+</html>
