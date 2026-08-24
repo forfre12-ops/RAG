@@ -31,7 +31,37 @@
     [/metadata-management-conflict/, function () { return "관리성 부재 표기인데 내용 예측이 비공개 등급입니다"; }],
     [/gate-fail-open/, function () { return "안전 게이트 하나가 적용되지 못했습니다"; }],
     [/s2-underclass-risk/, function () { return "내부 문서 신호가 있는데 공개 등급으로 예측되었습니다"; }],
+    /* [2026-08-24 사용자 실측] 파일을 올려 분류했는데 사유 자리에 기본 문구
+       ("자동 확정하지 않고 사람 검수로 라우팅")만 떴다. 경고에는 사유가 있었다:
+           extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (table_incomplete, content_dropped)
+       이 게이트는 **업로드 경로 전용**이고(api/documents.py — classify 뒤에 status 를 올린다)
+       이 표에만 빠져 있었다. 서버측 표(services/review_reasons.py:69)에는 진작 있었다.
+       ⚠ 자리는 **맨 끝**이다 — 앞의 게이트가 걸렸으면 그게 원인이고, 이것은 분류가 끝난
+       뒤에 붙는 마지막 관문이다(서버 표와 같은 순서). */
+    /* 탐욕 `.*` 로 **마지막** 괄호를 잡는다. 경고 문구에는 괄호가 둘이다 —
+       앞의 "(표누락/OCR/저품질)" 은 게이트 이름 설명이고, 실제 사유 코드는 맨 끝
+       "(table_incomplete, content_dropped)" 다. 앞을 잡으면 사유가 아니라 게이트 설명이 뜬다. */
+    [/extraction_gate:.*\(([^()]*)\)\s*$/,
+      function (m) { return "본문 추출이 온전하지 않습니다 — " + _extractionReasons(m[1]); }],
+    [/extraction_gate:/, function () { return "본문 추출이 온전하지 않습니다"; }],
   ];
+
+  /* 추출 게이트 사유 코드 → 사람 말. 코드는 document_ingestion_service.py:118~129 가 만든다.
+     모르는 코드는 **지우지 않고 그대로 붙인다** — 새 코드가 생겼을 때 사유가 조용히
+     사라지는 것보다 영문이라도 보이는 편이 낫다. */
+  var EXTRACTION_REASON_KO = {
+    extract_error: "추출 오류",
+    ocr: "OCR 로 읽은 문서",
+    low_quality: "추출 품질이 낮음",
+    table_incomplete: "표 일부가 안 읽힘",
+    content_dropped: "차트·이미지 등 본문 일부가 빠짐"
+  };
+  function _extractionReasons(codes) {
+    return String(codes || "").split(",").map(function (c) {
+      var k = c.trim();
+      return EXTRACTION_REASON_KO[k] || k;
+    }).filter(Boolean).join(" · ");
+  }
 
   /* warnings 배열에서 **검수로 보낸 사유** 한 줄을 찾는다. 못 찾으면 빈 문자열.
      빈 문자열을 부르는 쪽이 "자동 확정하지 않고 사람 검수로 라우팅" 같은 기본 문구로 받는다. */

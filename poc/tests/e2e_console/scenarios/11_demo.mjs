@@ -192,6 +192,82 @@ export const scenarios = [
   },
 
   {
+    /* [2026-08-24 사용자 실측] 파일을 올려 분류했더니 사유 자리에 기본 문구만 떴다.
+       경고에는 사유가 있었다 — `extraction_gate: … (table_incomplete, content_dropped)`.
+       이 게이트는 업로드 경로 전용(api/documents.py)이라 화면 사유표에만 빠져 있었다. */
+    id: 'demo.upload.extraction-gate-reason-is-korean',
+    needsMock: true,
+    title: '추출 게이트로 검수에 가면 왜 그런지 한국어로 적힌다',
+    why: '사유가 표에 없어 "자동 확정하지 않고 사람 검수로 라우팅" 기본 문구만 떴다',
+    async run({ server, check }) {
+      const page = await demo(server);
+      server.overrides['POST /documents/analyze'] = {
+        filename: '공사지명원.xls', file_size_bytes: 18432,
+        parse: { source_format: 'xls', extraction_method: 'xlrd', extraction_quality: 0.9,
+                 content_quality: 0.7, ocr_used: false, char_count: 421, chunk_count: 1,
+                 warnings: [], pii_masked_count: 0, extract_error: null, table_count: 1 },
+        gate: { requires_review: true, reasons: ['table_incomplete', 'content_dropped'] },
+        classification: {
+          label: 'S3', confidence: 0.93, scores: { S3: 0.93 }, status: 'needs_review',
+          model_version: 'v-fe4b386b', factors: { secrecy: 0, value: 0, management: 0 },
+          factors_source: 'rule_evidenced', rule_factors: null,
+          warnings: ['extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (table_incomplete, content_dropped)'],
+          elapsed_ms: 845, rule_grade: 'S3', model_grade: 'S3',
+          decision_path: '룰·모델 모두 S3 로 일치 (검수 사유는 아래 경고 참조)',
+        },
+        evidence: [], text_preview: '공 사 지 명 원', text: '공 사 지 명 원', stages: [],
+      };
+      page.attachFile('doc-file', { name: '공사지명원.xls' });
+      await page.until(() => page.bodyText().includes('본문 추출이 온전하지'), 8000);
+      await page.settle();
+
+      const body = page.bodyText();
+      check.includes(body, '본문 추출이 온전하지 않습니다', '왜 검수로 갔는지 한국어로 적는다');
+      check.includes(body, '표 일부가 안 읽힘', '사유 코드를 사람 말로 옮긴다');
+      // 기본 문구 검사는 **결정 머리**에만 건다 — 아래 게이트 상자는 원래 그 문장으로
+      // 게이트 자체를 설명하고 사유는 칩으로 따로 붙인다(app.js gateBox). 거기까지 금지하면
+      // 관계없는 자리를 잡는다.
+      const head = page.text('result-head');
+      check.includes(head, '본문 추출이 온전하지 않습니다', '결정 바로 옆에 사유가 붙는다');
+      check.ok(!/자동 확정하지 않고 사람 검수로 라우팅/.test(head),
+               '사유를 아는데 기본 문구로 때우지 않는다');
+      check.ok(!/→ 자동 확정/.test(body), '검수로 보내 놓고 자동 확정이라 말하지 않는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    /* [2026-08-24 사용자 지적] "시연 페이지에서 문서 속성을 지정해도 반영이 안 되네".
+       맞았다. 파일 업로드 경로 셋은 icdEntries() 를 실어 보내는데(위 시나리오가 지킨다),
+       붙여넣은 본문·샘플을 분류하는 「분류하기」만 doc_id·title·content 만 보냈다.
+       그 자리에 "넣으면 등급 판정에 반영됩니다"라고 적혀 있었으니 화면이 거짓말을 한 것이다. */
+    id: 'demo.classify.icd-fields-on-pasted-text',
+    needsData: true,
+    title: '붙여넣은 본문을 분류할 때도 문서 속성(ICD)이 함께 실려 나간다',
+    why: '고른 값이 조용히 버려져 등급 판정에 안 들어갔다',
+    async run({ server, check }) {
+      const page = await demo(server);
+      page.set('icd-marking', 'secret');
+      page.set('icd-scope', 'approved_only');
+      page.set('doc-body', '본 문서는 당사의 영업비밀에 해당하며 대외 반출을 금한다.');
+      page.click('btn-classify');
+      await page.until(() => page.text('result-head').includes('S1'), 8000);
+      await page.settle();
+
+      const call = server.lastCall('POST', '/classify/stream');
+      check.ok(call, 'POST /classify/stream 이 나갔다');
+      const md = (call && call.body && call.body.metadata) || {};
+      check.eq(md.security_marking, 'secret', '보안표시가 metadata 로 실려 나갔다');
+      check.eq(md.access_scope, 'approved_only', '접근범위가 metadata 로 실려 나갔다');
+      // 고르지 않은 출처는 보내지 않는다 — 빈 값을 넣으면 '미상'과 '명시적으로 없음'이 섞인다.
+      check.ok(!('source_type' in md), '고르지 않은 출처는 보내지 않는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     // 실적재 — 이 화면에서 DB 검수 큐로 문서를 넣는 유일한 경로. 기본은 꺼져 있고,
     // 켜도 needs_review 건만 넣는다(자동확정 건까지 넣으면 큐가 데모로 오염된다).
     // ⚠ countCalls 는 접두 일치라 '/documents' 로 세면 '/documents/analyze' 까지 센다.

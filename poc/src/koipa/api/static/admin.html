@@ -630,7 +630,7 @@ details.adv[open]{padding-bottom:12px;}
              "어느 걸 바꿔야 하나"로 헷갈렸다 — 하나는 읽기 전용 서버 값, 하나는 색칠만 하는
              화면 설정이다. 목록을 먼저, 설정은 접어 둔다. -->
         <div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">
-          <button class="btn" onclick="loadReviewQueue()">검토할 문서 보기</button>
+          <button class="btn" id="btn-review-queue" onclick="loadReviewQueue()">검토할 문서 보기</button>
           <span id="rq-info" class="hint" style="margin:0;"></span>
         </div>
         <div id="queue" class="queue"><div class="q-empty">대기 목록을 읽고 있습니다… 화면을 열면 자동으로 조회하며, 「검토할 문서 보기」로 다시 읽을 수 있습니다. 분류를 실행해도 결과가 여기 쌓입니다. 확정·수정한 내용은 재학습 큐에 반영됩니다.</div></div>
@@ -1892,17 +1892,33 @@ function factorCard(label,v){ v=v??0; const pct=Math.min(100,(v/2)*100); return 
 async function loadReviewQueue(){
   try{
     const d=await api('GET','/review-queue?limit=50');
-    QUEUE = (d.items||[]).map(it=>({
+    const server = (d.items||[]).map(it=>({
       inference_id:it.classification_id, doc_id:it.doc_id,
       title:it.filename||it.doc_id, label:it.grade, confidence:it.confidence,
       model_version:it.model_version, text_preview:it.text_preview, status:it.status,
       persisted:true,   // DB 큐에서 온 항목은 정의상 저장돼 있다
+      fromServer:true,  // 아래 병합에서 세션 항목과 가른다
       flagged:true, resolved:false
     }));
+    /* [2026-08-24] 서버 목록으로 **덮어쓰지 않는다**. 종전에는 `QUEUE = server` 였다.
+       그런데 이 화면의 목록에는 두 가지가 섞여 있다:
+         (가) 방금 분류한 것 — enqueue() 가 status 와 무관하게 넣는다(자동 확정도 들어간다)
+         (나) 서버의 **검수 대기** 목록 — /review-queue 는 needs_review·needs_second_review
+              만 돌려준다(confirm_service.py:86). 자동 확정(status='staging')은 안 온다.
+       그래서 자동 확정된 문서를 분류한 직후 「검토할 문서 보기」를 누르면 방금 본 항목이
+       **말없이 사라졌다**(사용자 실측 2026-08-24: 공사지명원.xls S3 자동 확정). 사용자에게는
+       "버튼이 목록을 지웠다"로 읽힌다. 서버 것을 앞에 놓고, 서버에 없는 세션 항목은 뒤에 남긴다.
+       세션 항목(fromServer 아님)만 남긴다 — 이전에 서버에서 받아 온 것은 이번 응답이 진실이다
+       (확정돼 큐에서 빠진 건이 화면에 계속 남으면 안 된다). */
+    const ids = new Set(server.map(x=>String(x.doc_id)));
+    const kept = QUEUE.filter(it => !it.fromServer && !ids.has(String(it.doc_id)));
+    QUEUE = server.concat(kept);
     renderQueue(); markFlow(2);
     const info=$('rq-info');
-    if(info) info.textContent = `대기 ${d.total||0}건 (표시 ${QUEUE.length})`+((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(', ')}`:'');
-    log(`검수 큐 로드: ${QUEUE.length}건 (전체 ${d.total||0})`, 'ok');
+    if(info) info.textContent = `검수 대기 ${d.total||0}건 (표시 ${server.length})`
+      + (kept.length ? ` · 이 세션에서 분류한 ${kept.length}건은 자동 확정이라 대기 목록에 없습니다 — 아래에 그대로 둡니다` : '')
+      + ((d.warnings&&d.warnings.length)?` · ⚠ ${d.warnings.join(', ')}`:'');
+    log(`검수 큐 로드: 대기 ${server.length}건 (전체 ${d.total||0})`+(kept.length?` · 세션 항목 ${kept.length}건 유지`:''), 'ok');
   }catch(e){
     /* [2026-08-23] 실패를 로그창에만 남기던 자리다. 로그바는 접혀 있을 수 있고, 그러면
        화면에는 처음의 안내문("「검토할 문서 보기」를 누르면 …")이 그대로 남아 **대기 0건과
@@ -1934,7 +1950,9 @@ function enqueue(d, title){
 }
 function renderQueue(){
   const q=$('queue');
-  if(!QUEUE.length){ q.innerHTML='<div class="q-empty">분류를 실행하면 결과가 검수 큐에 적재됩니다.</div>'; return; }
+  // [2026-08-24] 빈 목록 문구를 사실에 맞춘다. 종전 "분류를 실행하면 결과가 검수 큐에
+  // 적재됩니다."는 분류했는데도 비어 있는 상황(자동 확정)에서 화면이 거짓말을 했다.
+  if(!QUEUE.length){ q.innerHTML='<div class="q-empty">검수가 필요한 문서가 없습니다. 이 목록에는 <b>확신이 기준에 못 미쳐 사람 판정을 기다리는 건</b>만 쌓입니다 — 자동 확정된 분류는 오지 않습니다.</div>'; return; }
   q.innerHTML=QUEUE.map((it,i)=>`
     <div class="q-item ${it.flagged?'flagged':''} ${it.resolved?'resolved':''}">
       <div class="q-top">

@@ -40,6 +40,40 @@ export const scenarios = [
   },
 
   {
+    /* [2026-08-24 사용자 실측] 공사지명원.xls 를 분류하니 S3 **자동 확정**으로 목록에 떴는데,
+       「검토할 문서 보기」를 누르니 아무것도 안 남았다. 이 목록에는 두 가지가 섞인다 —
+       enqueue() 가 넣는 **방금 분류한 것**(자동 확정 포함)과, /review-queue 가 주는
+       **검수 대기**(needs_review·needs_second_review 뿐, confirm_service.py:86)다.
+       종전 loadReviewQueue 는 `QUEUE = 서버응답` 으로 덮어써서 앞의 것을 말없이 지웠다. */
+    id: 'review.queue.auto-confirmed-item-is-not-wiped',
+    needsMock: true,
+    title: '자동 확정된 분류는 「검토할 문서 보기」를 눌러도 사라지지 않고, 왜 대기 목록에 없는지 적힌다',
+    why: '분류 직후 보이던 항목이 버튼 한 번에 사라져 "버튼이 목록을 지웠다"로 읽혔다',
+    async run({ server, check }) {
+      // 서버 검수 대기 큐는 비어 있다 — 자동 확정 건은 애초에 여기 오지 않는다.
+      server.faults.push({ path: '/review-queue', body: { items: [], total: 0, limit: 50, offset: 0, warnings: [] } });
+      const page = await openPage(server, '/console/admin.html');
+      await page.settle();
+
+      // 픽스처 분류는 status='staging'(자동 확정) 이다.
+      page.set('cl-docid', 'AUTO-CONFIRMED-1');
+      page.set('cl-body', '다음 주 회의 일정과 점심 메뉴를 안내합니다.');
+      page.click('btn-classify');
+      await page.settle();
+      check.eq(page.qa('#queue .q-item').length, 1, '분류하면 목록에 뜬다');
+
+      page.click('btn-review-queue');
+      await page.settle();
+
+      check.eq(page.qa('#queue .q-item').length, 1, '눌러도 방금 분류한 항목이 남아 있다');
+      check.includes(page.text('rq-info'), '자동 확정', '왜 대기 목록에 없는지 그 자리에 적는다');
+      check.includes(page.text('rq-info'), '검수 대기 0건', '서버 대기 건수는 0 으로 정직하게 적는다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'review.queue.list-and-why',
     needsData: true,
     title: '「검토할 문서 보기」 → 목록이 그려지고 「왜 이 등급인가」로 근거가 열린다',
@@ -205,7 +239,12 @@ export const scenarios = [
       page.click(page.q('button[onclick="loadReviewQueue()"]'));
       await page.settle();
       check.includes(page.text('rq-info'), '대기 0건', '0건이라고 알려준다');
-      check.includes(page.text('queue'), '검수 큐에 적재됩니다', '빈 목록 안내가 뜬다');
+      // [2026-08-24] 빈 목록 문구를 사실에 맞췄다. 종전 "분류를 실행하면 결과가 검수 큐에
+      // 적재됩니다."는 **분류를 했는데도** 비어 있는 상황(자동 확정)에서 화면이 거짓말을 했다.
+      const empty = page.text('queue');
+      check.includes(empty, '사람 판정을 기다리는', '무엇이 여기 쌓이는지 적는다');
+      check.includes(empty, '자동 확정된 분류는 오지 않습니다', '왜 비어 있을 수 있는지 적는다');
+      check.ok(!/분류를 실행하면 결과가 검수 큐에 적재됩니다/.test(empty), '사실과 다른 옛 문구가 없다');
       assertNoScriptErrors(check, page);
       return page;
     },

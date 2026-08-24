@@ -342,6 +342,20 @@ async function runClassify() {
   let lastStageT = t0;
   logLine("ev", "POST /api/v1/classify/stream  (SSE 실시간 스트림 시작)");
 
+  /* [2026-08-24 사용자 지적] 「문서 속성(ICD)」을 골라도 이 버튼에는 반영되지 않았다.
+     파일 업로드 경로 세 곳(analyzeFile · 비동기 제출 · 대용량 적재)은 icdEntries() 를 실어
+     보내는데, 붙여넣은 본문·샘플을 분류하는 이 경로만 doc_id·title·content 만 보냈다.
+     화면은 그 자리에서 "넣으면 등급 판정에 반영됩니다"라고 말하고 있었다 — 화면이 하지 않는
+     일을 한다고 적은 것이다. 서버는 metadata 로 받는다(classify_service.py:1327 ·
+     schemas/classify.py:11 DocumentInput.metadata). 빈 값은 보내지 않는다 —
+     icdEntries() 가 이미 걸러 낸다("unknown" 과 "명시적으로 없음" 이 섞이면 관리성 판정이
+     뒤집힌다는 documents.py 주석과 같은 이유). */
+  const icdMeta = {};
+  icdEntries().forEach(([field, v]) => { icdMeta[field] = v; });
+  if (Object.keys(icdMeta).length) {
+    logLine("info", `문서 속성(ICD) 함께 전송: ${Object.keys(icdMeta).join(" · ")}`);
+  }
+
   try {
     await postSSE(apiUrl("/api/v1/classify/stream"), {
       headers: authHeaders(),
@@ -349,6 +363,7 @@ async function runClassify() {
         doc_id: state.currentSampleId || "demo-input",
         title: title || "demo",
         content: body,
+        metadata: Object.keys(icdMeta).length ? icdMeta : null,
         use_rag: false,
         return_evidence: true,
       },

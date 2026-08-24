@@ -124,6 +124,51 @@ class TestAnalyzeContract:
         assert gate_fired or empty_body, f"손상 문서 미격리: {j['gate']}, chars={j['parse']['char_count']}"
 
 
+class TestGateOverrideKeepsDecisionPathHonest:
+    """[2026-08-24 사용자 실측] 한 카드 안에서 화면이 서로 다른 말을 했다.
+
+        머리:  검수 필요 — 자동 확정하지 않고 사람 검수로 라우팅
+        결합:  agreement (룰·모델 모두 S3 일치 → 자동 확정)
+        경고:  extraction_gate: 열화 추출(…) (table_incomplete, content_dropped)
+
+    추출 게이트는 classify **뒤**에 status 를 needs_review 로 올리는데, decision_path 는
+    분류기 단계에서 만든 문장 그대로 내려갔다. classify_service._decision_path 는 status 를
+    읽어 같은 모순을 이미 막고 있었지만(classify_service.py:652) 이 경로는 그 뒤였다.
+    """
+
+    def test_needs_review_never_says_auto_confirm(self, client, monkeypatch):
+        from koipa.api import documents as documents_api
+        from koipa.schemas.classify import ClassifyResponse
+        from koipa.services import classify_service as cs
+        from koipa.services.document_ingestion_service import ExtractionReviewDecision
+
+        # 어떤 문서를 올려도 게이트가 발동하게 한다 — 사용자가 본 그 조합을 만든다.
+        monkeypatch.setattr(
+            documents_api, "extraction_review_decision",
+            lambda *a, **k: ExtractionReviewDecision(
+                requires_review=True, reasons=["table_incomplete", "content_dropped"]),
+        )
+        # 분류기는 **자동 확정(staging)** 을 돌려준다 — 시험 환경은 가중치가 없어 늘
+        # 저신뢰 needs_review 가 되므로, 그대로 두면 이 경로를 한 번도 밟지 못한다.
+        canned = ClassifyResponse(
+            inference_id="11111111-1111-4111-8111-111111111111",
+            doc_id="x", label="S3", confidence=0.93, scores={"S3": 0.93},
+            model_version="v-test", status="staging", warnings=[], elapsed_ms=12,
+            rule_grade="S3", model_grade="S3",
+            decision_path="agreement (룰·모델 모두 S3 일치 → 자동 확정)",
+        )
+        monkeypatch.setattr(cs.ClassifyService, "classify", lambda self, req: canned)
+        r = _upload(client, _GOLD_DOCX)
+        assert r.status_code == 200, r.text
+        c = r.json().get("classification")
+        assert c, "분류가 없으면 이 시험은 아무것도 지키지 못한다"
+        assert c["status"] == "needs_review", c["status"]
+        assert "자동 확정" not in (c.get("decision_path") or ""), (
+            f"검수로 보내 놓고 결합 설명은 자동 확정이라고 말한다: {c.get('decision_path')!r}"
+        )
+        assert any("extraction_gate:" in w for w in (c.get("warnings") or [])), c.get("warnings")
+
+
 class TestSyncChunkCap:
     """[용량 게이트] 청크 상한 초과 시 조용히 죽지 말고 즉시 이유를 말하고 거절한다.
 
