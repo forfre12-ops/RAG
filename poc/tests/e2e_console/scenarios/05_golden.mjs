@@ -199,6 +199,43 @@ export const scenarios = [
   },
 
   {
+    id: 'golden.jobs.folded-duplicates-are-declared',
+    needsMock: true,
+    title: '중복 묶음을 접었으면 몇 개를 접었는지, 어느 행이 진행 중인지 말한다',
+    why: '조용히 감추면 "목록이 왜 줄었나"를 화면에서 알 수 없다 — 감추되 감췄다고 적는다',
+    async run({ server, check }) {
+      const page = await reviewTab(server);
+      server.faults.push({
+        path: '/golden/jobs',
+        method: 'GET',
+        body: {
+          ordering: 'best_effort',
+          folded_duplicates: 5,
+          jobs: [{
+            job_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            kind: 'golden_register', status: 'done', actor: 'kl-admin-test',
+            submitted_at: '2026-08-24T03:01:30+00:00',
+            gold_count: 120, uncertain_count: 0,
+            source_path: 'datasets/golden_review/ff5a822c/candidates.jsonl',
+            signoff_url: '/api/v1/golden/jobs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/signoff.html?t=x',
+            folded_duplicates: 1, decided_count: 2,
+          }],
+        },
+      });
+      page.click(page.q('button[onclick="loadGoldenJobList()"]'));
+      await page.settle();
+
+      const body = page.text('gold-jobs-body');
+      check.includes(body, '중복 묶음 5건', '몇 개를 접었는지 총계를 밝힌다');
+      check.includes(body, '검수 결정이 남아 있는 묶음은 접지 않습니다', '무엇을 접지 않는지 밝힌다');
+      check.includes(body, '재등록 1건', '이 행이 몇 개를 흡수했는지 행에 적는다');
+      check.includes(body, '결정 2건', '이 행에 진행분이 있다는 것을 보여준다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'golden.open-review-html',
     writes: true,
     title: '검수/서명 화면 열기는 잡 id 가 있어야 하고, 서명 토큰을 붙여 연다',

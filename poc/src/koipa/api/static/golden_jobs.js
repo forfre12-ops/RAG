@@ -112,6 +112,18 @@
         var srcCell = src
           ? '<span title="' + esc(src) + '">' + esc(srcShort) + '</span>'
           : '<span style="color:var(--text-dim)">—</span>';
+        /* [2026-08-25] 같은 파일을 여러 번 등록해 생긴 빈 쌍둥이 행은 서버가 이 행으로
+           접어서 내려준다. 몇 개를 접었는지 밝힌다 — 조용히 감추면 "목록이 왜 줄었나"를
+           화면에서 알 길이 없다. 진행분(결정 수)도 같이 보여, 검수자가 이어서 할 행인지
+           처음 여는 행인지 구분하게 한다. */
+        if (j.folded_duplicates > 0) {
+          srcCell += '<br><span class="hint" style="margin:0">같은 파일 재등록 '
+            + esc(String(j.folded_duplicates)) + '건을 이 행으로 접었습니다</span>';
+        }
+        if (j.decided_count > 0) {
+          srcCell += '<br><span class="hint" style="margin:0">검수 진행 중 — 결정 '
+            + esc(String(j.decided_count)) + '건 기록됨</span>';
+        }
         /* [2026-08-23] 행에서 **검수 화면을 바로 연다.**
            종전에는 「선택」 → 화면을 스크롤해 다른 카드의 버튼 → 새 탭, 이렇게 2단계였다.
            그래서 상단 메뉴 「검수 목록」을 눌러도 검수를 시작할 수 없었고, 실제 검수 화면은
@@ -148,6 +160,11 @@
             ? '<p class="sec-note" style="margin-top:6px;">서버 정렬은 잡 저장소 기준 '
               + '<b>best-effort</b>(최근순 보장 아님)라, <b>생성 시각으로 최신순 재정렬</b>해 표시합니다. '
               + '목록이 20건으로 잘리므로 그보다 오래된 잡은 여기 없을 수 있습니다.</p>'
+            : '')
+        + (d.folded_duplicates > 0
+            ? '<p class="sec-note" style="margin-top:4px;">같은 파일을 다시 등록해 생긴 '
+              + '<b>중복 묶음 ' + esc(String(d.folded_duplicates)) + '건</b>은 목록에서 접었습니다 — '
+              + '검수 결정이 남아 있는 묶음은 접지 않습니다.</p>'
             : '');
       log('검수 목록 ' + jobs.length + '건 조회', 'ok');
     } catch (e) {

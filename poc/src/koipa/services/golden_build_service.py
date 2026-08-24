@@ -167,6 +167,18 @@ class GoldenBuildService:
 
         return GoldenBuildResponse(golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}")
 
+    @staticmethod
+    def decided_count(gold_path: "str | None", job_id: uuid.UUID) -> int:
+        """이 잡에 이미 쌓인 검수 결정 수(승격 + 거부). 원장이 없으면 0.
+
+        '어느 행이 작업분을 들고 있는가' 를 값 하나로 답한다 — 쌍둥이 행 중 빈 쪽으로
+        검수자를 보내지 않으려면 목록이 이것을 알아야 한다.
+        """
+        if not gold_path:
+            return 0
+        locked, rejected = _ledger_paths(gold_path, job_id)
+        return len(_read_jsonl(locked)) + len(_read_jsonl(rejected))
+
     def find_registered_job(self, build_path: str) -> "Optional[uuid.UUID]":
         """같은 후보 파일로 **이미 등록된** 검수 잡을 찾는다. 없으면 None.
 
@@ -195,8 +207,7 @@ class GoldenBuildService:
                 jid = uuid.UUID(str(j.get("job_id") or ""))
             except ValueError:
                 continue
-            locked, rejected = _ledger_paths(target, jid)
-            progressed = int(bool(_read_jsonl(locked) or _read_jsonl(rejected)))
+            progressed = int(bool(self.decided_count(target, jid)))
             key = (progressed, str(j.get("submitted_at") or ""), jid)
             if best is None or key[:2] > best[:2]:
                 best = key

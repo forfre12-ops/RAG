@@ -445,6 +445,7 @@ def golden_job_list(limit: int = 20) -> GoldenJobListResponse:
     limit = max(1, min(100, limit))
     # 필터로 걸러지는 만큼 여유 있게 읽고 자른다(골든 잡이 뒤로 밀려 안 보이는 것 방지).
     raw = get_default_store().list_recent(limit=limit * 5)
+    svc = GoldenBuildService()
     jobs: list[GoldenJobSummary] = []
     for j in raw:
         if j.get("kind") not in ("golden_build", "golden_register"):
@@ -453,9 +454,12 @@ def golden_job_list(limit: int = 20) -> GoldenJobListResponse:
         if not jid:
             continue
         try:
-            review_url, signoff_url = _signed_html_urls(UUID(jid))
+            uid = UUID(jid)
+            review_url, signoff_url = _signed_html_urls(uid)
+            decided = svc.decided_count(j.get("gold_path"), uid)
         except ValueError:      # job_id 형식 이상 — 목록에서 제외하지 않고 링크만 생략
             review_url = signoff_url = None
+            decided = 0
         jobs.append(GoldenJobSummary(
             job_id=jid,
             kind=str(j.get("kind") or ""),
@@ -470,8 +474,55 @@ def golden_job_list(limit: int = 20) -> GoldenJobListResponse:
             source_path=display_source_path(j.get("gold_path")),
             review_url=review_url,
             signoff_url=signoff_url,
+            decided_count=decided,
         ))
-    return GoldenJobListResponse(jobs=jobs[:limit])
+    jobs, folded = _fold_duplicate_registrations(jobs)
+    return GoldenJobListResponse(jobs=jobs[:limit], folded_duplicates=folded)
+
+
+def _fold_duplicate_registrations(
+    jobs: list[GoldenJobSummary],
+) -> tuple[list[GoldenJobSummary], int]:
+    """같은 원본 파일로 여러 번 등록된 행을 한 행으로 접는다.
+
+    왜(2026-08-25). 등록 쪽에 중복 가드를 넣어 **새로** 생기는 것은 막았지만, 가드 이전에
+    쌓인 행은 저장소에 그대로 남아 화면에서 계속 쌍둥이로 보인다(223 실측: 8행이 실제로는
+    파일 3개). 목록을 저장소 정리에 의존시키지 않는다 — 화면이 스스로 접는다.
+
+    ⚠ **결정이 쌓인 행은 접지 않는다.** 접는 것은 진행분 0 인 빈 쌍둥이뿐이다. 두 행 모두에
+      서명이 남아 있는 경우가 실제로 가능한데(가드 이전 상태), 그때 한쪽을 감추면 그 원장에
+      든 사람 서명이 화면에서 사라진다. 그런 행은 둘 다 남겨 검수자가 보고 판단하게 한다.
+
+    대표 행은 **결정이 많은 쪽**, 같으면 최근 등록순. 접은 수는 감추지 않고 행·응답에 싣는다.
+    """
+    by_source: dict[str, list[GoldenJobSummary]] = {}
+    for j in jobs:
+        # 후보 생성(golden_build)은 잡마다 파일이 따로 생기므로 접을 일이 없다.
+        # 원본 파일을 모르는 행도 근거 없이 묶지 않는다.
+        if j.kind == "golden_register" and j.source_path:
+            by_source.setdefault(j.source_path, []).append(j)
+
+    hidden: set[int] = set()        # 목록에서 뺄 행(id() 로 식별 — job_id 는 중복이 없다)
+    for group in by_source.values():
+        if len(group) == 1:
+            continue
+        decided = [g for g in group if g.decided_count > 0]
+        empties = [g for g in group if g.decided_count == 0]
+        if len(decided) > 1:
+            # 서명이 두 곳에 갈라져 있다 — 그 행들은 감추지 않고 전부 보여준다(사람이 정리할
+            # 일이다). 빈 쌍둥이만 접고, 접었다는 사실은 결정이 가장 많은 행에 적는다.
+            rep = max(decided, key=lambda g: g.decided_count)
+        else:
+            rep = decided[0] if decided else max(
+                empties, key=lambda g: str(g.submitted_at or "")
+            )
+        for g in group:
+            if g is not rep and g.decided_count == 0:
+                hidden.add(id(g))
+        rep.folded_duplicates = sum(1 for g in group if id(g) in hidden)
+
+    kept = [j for j in jobs if id(j) not in hidden]   # 원래 순서 그대로
+    return kept, len(hidden)
 
 
 def _job_gate_html(job_id: UUID) -> HTMLResponse | None:

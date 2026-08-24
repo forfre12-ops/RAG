@@ -180,6 +180,12 @@ class GoldenJobSummary(BaseModel):
     source_path: Optional[str] = None   # datasets/ 기준 상대경로
     review_url: Optional[str] = None    # 서명 URL(비밀키 설정 시 ?t= 포함)
     signoff_url: Optional[str] = None
+    # [2026-08-25] 같은 파일을 여러 번 등록해 생긴 **진행분 없는 쌍둥이 행**을 이 행으로
+    # 접었을 때 그 수(자기 자신 제외). 0 이면 접은 것이 없다. 조용히 감추지 않으려고 센다.
+    folded_duplicates: int = 0
+    # 이 잡에 이미 쌓인 검수 결정 수(승격+거부). 어느 행이 작업분을 들고 있는지 화면이
+    # 알아야 쌍둥이 중 빈 행으로 검수자를 보내지 않는다.
+    decided_count: int = 0
 
 
 class GoldenJobListResponse(BaseModel):
@@ -187,6 +193,8 @@ class GoldenJobListResponse(BaseModel):
     # 정렬 신뢰도 고지 — Redis 백엔드의 list_recent 는 SCAN 순서라 최근순을 보장하지 않는다.
     # 화면이 "최신 목록"이라고 단정하지 않도록 응답에 실어 보낸다(무음 오도 방지).
     ordering: str = "best_effort"
+    # 접어서 목록에 안 보이는 중복 등록 행의 총 수 — 화면이 그 사실을 밝힌다.
+    folded_duplicates: int = 0
 
 
 # ── 합성 Proxy Gold 후보 관리 ────────────────────────────────────────────────

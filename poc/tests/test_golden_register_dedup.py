@@ -109,3 +109,63 @@ def test_job_list_has_one_row_per_file(tmp_path, monkeypatch):
     rows = client.get(f"{API}/golden/jobs?limit=100", headers=_AUTH).json()["jobs"]
     mine = [j for j in rows if (j.get("source_path") or "").endswith("dup.jsonl")]
     assert len(mine) == 1, mine
+
+
+# ── 이미 쌓여 있던 중복 행 — 목록이 스스로 접는다 ────────────────────────────
+# 등록 가드는 **새로** 생기는 것만 막는다. 가드 이전에 만들어진 행은 저장소에 그대로
+# 남아 화면에서 계속 쌍둥이로 보인다(223 이 그 상태였다). 목록을 저장소 정리에
+# 의존시키지 않는다 — 화면이 접는다.
+
+def _register_twins(svc, p, times, *, decided_on=()):
+    """가드를 우회해 옛날처럼 쌍둥이 잡을 직접 만든다(가드 이전 저장소 재현)."""
+    made = []
+    for i in range(times):
+        jid = uuid.uuid4()
+        svc.jobs.create(jid, payload={
+            "kind": "golden_register", "actor": "r",
+            "submitted_at": f"2026-08-{10 + i:02d}T00:00:00+00:00",
+        })
+        svc.jobs.update(jid, status="done", gold_path=str(p), gold_count=3)
+        made.append(jid)
+    for idx, n in decided_on:
+        locked, _r = _ledger_paths(str(p), made[idx])
+        locked.write_text(
+            "\n".join(json.dumps({"doc_id": f"d{k}", "label": "S2"}) for k in range(n)),
+            encoding="utf-8",
+        )
+    return made
+
+
+def _rows_for(name, monkeypatch):
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    rows = client.get(f"{API}/golden/jobs?limit=100", headers=_AUTH).json()
+    return rows, [j for j in rows["jobs"] if (j.get("source_path") or "").endswith(name)]
+
+
+def test_existing_duplicate_rows_are_folded(tmp_path, monkeypatch):
+    """가드 이전에 쌓인 쌍둥이 3행이 한 행으로 접히고, 접었다는 사실이 응답에 남는다."""
+    p = _slate(tmp_path, "old_dup.jsonl")
+    _register_twins(GoldenBuildService(), p, 3)
+    body, mine = _rows_for("old_dup.jsonl", monkeypatch)
+    assert len(mine) == 1, mine
+    assert mine[0]["folded_duplicates"] == 2      # 감추되 감췄다고 말한다
+    assert body["folded_duplicates"] >= 2
+
+
+def test_folded_row_is_the_one_holding_the_work(tmp_path, monkeypatch):
+    """대표 행은 **진행분이 있는 쪽**이다 — 최신 행이 빈 잡이던 223 실측 때문."""
+    p = _slate(tmp_path, "work_dup.jsonl")
+    made = _register_twins(GoldenBuildService(), p, 3, decided_on=[(0, 2)])
+    _body, mine = _rows_for("work_dup.jsonl", monkeypatch)
+    assert len(mine) == 1
+    assert mine[0]["job_id"] == str(made[0]), "가장 오래됐지만 결정이 쌓인 행이 남아야 한다"
+    assert mine[0]["decided_count"] == 2
+
+
+def test_two_rows_with_signatures_are_both_kept(tmp_path, monkeypatch):
+    """서명이 두 곳에 갈라져 있으면 접지 않는다 — 감추면 사람 서명이 화면에서 사라진다."""
+    p = _slate(tmp_path, "split_dup.jsonl")
+    _register_twins(GoldenBuildService(), p, 3, decided_on=[(0, 2), (1, 1)])
+    _body, mine = _rows_for("split_dup.jsonl", monkeypatch)
+    assert len(mine) == 2, mine
+    assert sorted(j["decided_count"] for j in mine) == [1, 2]
