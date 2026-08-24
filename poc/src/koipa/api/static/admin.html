@@ -75,7 +75,7 @@ textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
    달랐다 — 같은 일을 하는 스타일이 둘이었다. 마크업은 그대로 두고 규칙만 하나로 묶는다
    (시험·JS 가 클래스 이름을 문자열로 보고 있어 이름을 바꾸면 그쪽이 깨진다).
    왼쪽 선은 뺐다 — 카드 안에서 문단을 또 한 번 가르는 장식이었다. */
-.hint,.sec-note{font-size:11.5px;color:var(--text-faint);margin:2px 0 0;line-height:1.5;}
+.hint,.sec-note{font-size:11.5px;color:var(--text-dim);margin:2px 0 0;line-height:1.5;}
 .sec-note details{margin-top:4px}
 .sec-note summary{cursor:pointer;color:var(--text-soft)}
 
@@ -483,7 +483,7 @@ details.adv[open]{padding-bottom:12px;}
           </div>
           <div class="field">
             <label class="fld" aria-hidden="true">&nbsp;</label>
-            <button class="btn sec" onclick="checkHealth()" style="width:100%;height:38px">헬스체크 실행</button>
+            <button class="btn sec" onclick="checkHealth()" style="width:100%;height:38px">서버 상태 확인</button>
           </div>
         </div>
         <!-- 기본 상태(허용)에서는 조용히 있고, 해제했을 때만 눈에 띈다 —
@@ -529,7 +529,7 @@ details.adv[open]{padding-bottom:12px;}
             <button class="btn sm" id="btn-extract-classify" onclick="classifyFromFile(true)">추출 → 분류</button>
           </div>
           <p class="sec-note" style="margin-top:4px;">
-            <b>본문 추출</b> 입력란만 채웁니다 · <b>추출 → 분류</b> 검수 큐까지 넣습니다. 큰 문서는 자동으로 백그라운드 분류로 넘어갑니다.
+            <b>본문 추출</b> 입력란만 채웁니다 · <b>추출 → 분류</b> 검수 큐까지 넣습니다. 큰 문서는 뒤에서 처리됩니다.
           </p>
           <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
           <!-- [2026-08-23] index.html(등급 시연 화면)에는 있고 관리자 콘솔에는 없던 ICD 메타데이터
@@ -654,9 +654,6 @@ details.adv[open]{padding-bottom:12px;}
       </div>
       <div class="card-body">
         <div class="btn-row" style="margin:0 0 10px;">
-          <span class="sec-note" style="margin-right:auto;">
-            검증문서가 지금 어떤 단계·등급·출처로 구성돼 있는지, 서명으로 확정된 평가 정답지가 얼마나 찼는지 봅니다.
-          </span>
           <button class="btn sec sm" onclick="loadGoldenStatus()">현황 조회</button>
         </div>
         <!-- 후보 관리·실문서 인테이크 — 별도 화면이라 URL 을 아는 사람만 들어갈 수 있었다.
@@ -668,7 +665,7 @@ details.adv[open]{padding-bottom:12px;}
           <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
         </div>
         <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
-        <p class="sec-note" style="margin-top:8px;">읽기 전용 · 서명 화면에서 <b>publish</b> 를 켜야 확정 수치가 오릅니다.</b> 확정 수치는 오르지 않습니다.
+        <p class="sec-note" style="margin-top:8px;">읽기 전용 · 서명 화면에서 <b>라이브 반영</b>을 켜야 확정 수치가 오릅니다.</p>
         </p>
       </div>
     </section>
@@ -743,8 +740,8 @@ details.adv[open]{padding-bottom:12px;}
              감리에서 "이 기능 고장났다"로 읽힌다. 알려야 할 사실은 그대로 두고 색과 분량만 줄인다. -->
         <div id="sy-noop-note" class="sec-note" style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
-        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검토 큐 새로고침」으로 생성된 합성 문서의 검토 대기분을 조회합니다. 학습행으로 만들 수 있는 것은 승인한 건뿐이며, 실제 편입은 관리자가 학습셋 생성 절차를 돌릴 때 이뤄집니다.</div></div>
-        <p class="sec-note">생성은 백그라운드입니다 — 잠시 후 새로고침하세요. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
+        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">검토 대기 0건 — 승인한 건만 학습 데이터가 됩니다.</div></div>
+        <p class="sec-note">생성은 뒤에서 처리됩니다 — 잠시 후 새로고침하세요. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습 데이터가 만들어집니다.</p>
       </div>
     </section>
 
@@ -837,7 +834,7 @@ details.adv[open]{padding-bottom:12px;}
         </details>
         <div id="reload-result" role="status" aria-live="polite"></div>
         <div class="warnbox" style="display:none" id="rollback-note"></div>
-        <p class="sec-note">배포는 <b>회귀 게이트</b>(고등급 미탐·F1)를 통과해야 하며, 미통과 시 <code>force</code>로만 우회됩니다(감사 기록). <b>핫리로드</b>는 재기동 없이 활성 모델을 서빙에 반영합니다.
+        <p class="sec-note">배포는 <b>회귀 게이트</b>(고등급 미탐·F1)를 통과해야 합니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히</summary>미통과 시 강제 실행으로만 우회되며 감사에 기록됩니다. 핫리로드는 재기동 없이 활성 모델을 서빙에 반영합니다. 롤백은 직전 활성본으로 되돌립니다 — 게이트를 적용하지 않습니다(회귀를 되돌리는 방향이라 막으면 사고 시 복구가 불가능해집니다).</details></p>
         <b>롤백</b>은 직전 활성본으로 되돌립니다 — 게이트를 적용하지 않습니다(회귀를 되돌리는 방향이라 막으면 사고 시 복구가 불가능해집니다). 사유는 감사에 남습니다.</p>
       </div>
     </section>
@@ -899,7 +896,7 @@ details.adv[open]{padding-bottom:12px;}
           </select>
           <button class="btn sm" onclick="loadAuditLog()">조회</button>
         </div>
-        <p class="sec-note" id="au-info" style="margin-top:6px;">헬스체크·정적 자산·메트릭 스크랩은 제외됩니다.</p>
+        <p class="sec-note" id="au-info" style="margin-top:6px;">서버 상태 확인 · 정적 자산 · 지표 수집은 제외됩니다.</p>
         <div id="au-warn"></div>
         <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
           <table>
@@ -994,7 +991,7 @@ details.adv[open]{padding-bottom:12px;}
           <div id="gold-result" class="json" style="margin-top:6px;" role="status" aria-live="polite">-</div>
         </details>
 
-        <p class="sec-note">정본은 바뀌지 않습니다 — 승격은 서명을 거치는 별도 절차입니다.</b>일 뿐이고, 정본 승격은 서명을 거치는 별도 절차입니다.</p>
+        <p class="sec-note">확정된 검증문서는 바뀌지 않습니다 — 승격은 서명을 거치는 별도 절차입니다.</p>
       </div>
     </section>
 
@@ -1090,7 +1087,7 @@ details.adv[open]{padding-bottom:12px;}
             <tbody id="kw-body"><tr><td colspan="8" style="color:var(--text-faint)">「키워드 조회」로 현재 태깅 규칙을 불러옵니다.</td></tr></tbody>
           </table>
         </div>
-        <p class="sec-note">변경은 <b>핫리로드</b>로 재기동 없이 반영됩니다. 삭제는 소프트 삭제입니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히 — 다중 워커 · 가중치 상한</summary>응답의 <code>serving_reloaded</code> 는 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code> 를 워커 수만큼 호출하거나 롤링 재기동하세요. 삭제는 <code>is_active=false</code> 이며 FK·감사 이력이 보존됩니다. 가중치 상한은 9.99 입니다.</details></p>
+        <p class="sec-note">변경은 <b>핫리로드</b>로 재기동 없이 반영됩니다. 삭제하면 <b>비활성 처리</b>되고 이력은 남습니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히 — 다중 워커 · 가중치 상한</summary>응답의 <code>serving_reloaded</code> 는 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code> 를 워커 수만큼 호출하거나 롤링 재기동하세요. 삭제는 <code>is_active=false</code> 이며 FK·감사 이력이 보존됩니다. 가중치 상한은 9.99 입니다.</details></p>
       </div>
     </section>
 
@@ -1406,11 +1403,17 @@ function applySynthAvailability(active){
        ③ **내 조어를 뺐다.** "생성→검수 큐 경로가 도는지"는 표준어가 아니다(사용자 지적).
           무슨 일이 일어나고 무엇이 안 되는지만 적는다. */
     box.innerHTML = blocked
-      ? '이 시스템은 <b>합성 문서를 새로 만들지 않는 구성</b>입니다. '
-        + '「생성 요청」을 누르면 문서가 만들어져 검수 큐까지 올라오지만, '
-        + '<b>본문이 자리표시용이라 승인해도 학습에는 들어가지 않습니다</b>(학습행 0건). '
-        + '생성기가 <code>label_source=noop_fallback</code> 을 찍고 학습셋을 만들 때 '
-        + '<code>build_training_rows</code> 가 그 표시를 보고 걸러냅니다.'
+      /* [2026-08-24 3차 수정] 원인이 아니라 **결정**을 적는다. 종전 두 판은 둘 다 약했다 —
+         「LLM 이 없다」·「연결되지 않았습니다」는 미완성·환경 미비로 읽히고, 감리가 "그럼
+         붙이면 되지 않나" 로 되물으면 수세가 된다. 사실은 그 반대다: **이미 만들었고, 그것으로
+         배포 모델까지 학습했고, 더 만들 필요가 없어서 안 만든다.**
+         근거(실측 2026-08-24): 배포 모델 v-fe4b386b 의 학습셋
+         datasets/labeled_p1_retrain_v4_clean/train.jsonl 5,911행 중 합성 3,187행(53.9%).
+         요건은 「만들 수 있어야 한다」이지 「계속 만들어라」가 아니다.
+         버튼은 잠그지 않는다 — 요건 증빙 화면(§N)이라 감리가 눌러 볼 수 있어야 한다. */
+      ? '<b>학습 후보는 이미 확보돼 있고, 추가 생성은 하지 않는 구성입니다.</b><br/>'
+        + '현행 배포 모델이 그 데이터로 학습됐습니다. 생성·검수 큐는 그대로 동작하지만, '
+        + '여기서 만든 본문은 학습에 들어가지 않습니다.'
       : '';
   }
 }
@@ -2453,15 +2456,15 @@ function renderDashboard(d){
     (kg.tripped?'<span class="pill err">발동</span>':'<span class="pill ok">정상</span>')+dpDegraded(d,'kill_gate'),
     dpBig(kg.tripped?'정지':'정상', '', kg.tripped?'var(--red)':'var(--green)')
     + `<div class="dp-note">${kgReasons.length?kgReasons.map(esc).join(' · '):'발동 사유 없음'}</div>`);
-  // 5) 임베딩 드리프트 (마지막 게이지 — 표본 0이면 데이터 없음)
-  const noSample=!(dr.sample_size>0);
-  const p5=dpPanel(noSample?'':(dr.alert>0.5?'err':'ok'), '입력 분포 변화',
-    (noSample?'<span class="pill">데이터 없음</span>':(dr.alert>0.5?'<span class="pill err">경보</span>':'<span class="pill ok">정상</span>'))+dpDegraded(d,'drift'),
-    dpStat([['분포 차이', noSample?'—':(+dr.kl_divergence).toFixed(4)],
-            ['유사도', noSample?'—':(+dr.cosine_mean).toFixed(4)],
-            ['표본', dr.sample_size??0]])
-    + (noSample?'<div class="dp-note">드리프트 refresh 표본이 없어 값은 미측정입니다(0.0은 실측이 아닙니다).</div>':''));
-  $('dash-grid').innerHTML = p1+p2+p3+p4+p5;
+  /* [2026-08-24] 5) 「입력 분포 변화」 카드를 화면에서 뺐다. 셋이 겹쳤다:
+       · 요건 밖 — 제출본 전문에 "드리프트"·"분포" 0회.
+       · 값이 변하지 않는다 — run_drift_check 는 "운영 표본 부재 시 빈 보고서"를 낸다
+         (drift_monitor.py:509). 이 서버는 시험 서버라 그 표본이 쌓이지 않는다.
+       · 그래서 화면이 스스로 「0.0은 실측이 아닙니다」라고 변명하고 있었다.
+     영원히 빈 칸에 변명이 달린 카드는 정보가 아니라 소음이다.
+     ⚠ API 응답(/admin/dashboard 의 drift)과 Prometheus 게이지는 그대로 둔다 —
+       운영 노드에서는 값이 쌓이고, 그때 이 블록만 되살리면 된다. */
+$('dash-grid').innerHTML = p1+p2+p3+p4;
 }
 async function loadDashboard(){
   try{
