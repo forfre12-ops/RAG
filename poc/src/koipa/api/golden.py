@@ -696,6 +696,13 @@ def _render_console_login_html() -> str:
         # 종전에는 Max-Age 가 없어 세션 쿠키였다 — 브라우저를 닫으면 로그인이 풀려서
         # 검수자가 매번 다시 붙여넣어야 했다. 토큰 payload 의 exp 를 읽어 그 시각까지
         # 준다(읽지 못하면 12시간). 토큰보다 오래 살리지 않는 것이 요점이다.
+        # [2026-08-24] 로그인 뒤 돌아갈 곳. 기본은 검수 화면이지만 `?next=` 가 붙어 오면
+        # 그리로 되돌린다 — 시연 화면에서 401 을 만나 여기로 튕겨 온 사람이 검수 화면에
+        # 떨어지면 시연 대본이 끊긴다. 열린 리다이렉트를 막으려고 **같은 오리진의
+        # 절대경로 한 종류만** 받는다(`/` 로 시작하고 `//` 도 역슬래시도 아닌 것).
+        "function dest(){try{var n=new URLSearchParams(location.search).get('next');"
+        "if(n&&n.charAt(0)==='/'&&n.charAt(1)!=='/'&&n.indexOf(String.fromCharCode(92))===-1)return n}catch(e){}"
+        "return '/api/v1/golden/candidates/manage.html'+(location.hash||'')}"
         "function maxAge(v){try{var p=v.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');"
         "p+='='.repeat((4-p.length%4)%4);var e=JSON.parse(atob(p)).exp;"
         "var s=Math.floor(e-Date.now()/1000);return s>60?s:0}catch(err){return 43200}}"
@@ -707,15 +714,14 @@ def _render_console_login_html() -> str:
         "if(!r.ok){document.cookie='koipa_access_token=; path=/; Max-Age=0';"
         "if(!quiet){$('m').style.display='block';"
         "$('m').textContent='로그인 실패('+r.status+'). 토큰이 만료됐거나 권한이 없습니다.'}return false}"
-        "location.href='/api/v1/golden/candidates/manage.html'+(location.hash||'');return true}"
+        "location.href=dest();return true}"
         "$('go').onclick=function(){login($('t').value.trim(),false)};"
         "$('t').addEventListener('keydown',function(e){if(e.key==='Enter'&&e.ctrlKey)$('go').click()});"
         # 이미 쿠키가 살아 있으면 로그인 화면을 거치지 않는다 — 이 화면이 공용 메뉴의
         # 「검증문서 후보 관리」 목적지라, 붙여넣을 것이 없는 사람에게는 한 단계 군더더기다.
         # 쿠키가 없거나 만료면 그대로 아래 폼으로 남는다.
         "(async function(){try{var r=await fetch('/api/v1/golden/candidates/session',"
-        "{credentials:'same-origin'});if(r.ok){location.href="
-        "'/api/v1/golden/candidates/manage.html'+(location.hash||'');return}}catch(e){}"
+        "{credentials:'same-origin'});if(r.ok){location.href=dest();return}}catch(e){}"
         # 토큰이 미리 채워져 있으면 **버튼을 누르지 않아도** 들어간다.
         # 사용자 지시(2026-08-20): 시연 중에 로그인이 막히면 안 된다. 주소만 열면 끝이어야
         # 한다. 실패하면 조용히 화면에 남아 손으로 붙여넣을 수 있게 둔다(quiet=true).

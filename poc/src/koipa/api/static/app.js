@@ -14,7 +14,6 @@ import {
 // ──────────────────────────────────────────────────────────────────────
 const state = {
   endpoint: window.location.origin,
-  apiKey: window.localStorage?.getItem("koipa_api_key") || "",
   currentSampleId: null,
   currentSample: null,
   toggledOff: new Set(), // 와우 A — off 된 키워드들
@@ -32,20 +31,48 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 function apiUrl(path) {
   return state.endpoint.replace(/\/+$/, "") + path;
 }
-function ensureApiKey() {
-  if (state.apiKey) return;
-  const entered = window.prompt("시연 서버 API 키를 입력하세요. 입력값은 이 브라우저의 localStorage에만 저장됩니다.");
-  if (entered) {
-    state.apiKey = entered.trim();
-    window.localStorage?.setItem("koipa_api_key", state.apiKey);
-  }
-}
+// [2026-08-24] 이 화면은 **키도 토큰도 받지 않는다**(사용자 지시).
+// 종전에는 화면을 열자마자 window.prompt 로 API 키를 물었다. 두 가지가 틀렸다.
+//   ① 맨 처음 나가는 호출이 /healthz 인데 그건 인증이 필요 없다 — 필요하지도 않은 것을
+//      시연 시작 화면에서 물었다(실측 2026-08-24 223: 자격증명 없이 GET /healthz → 200).
+//   ② 배포 서버는 auth_mode=jwt 라 X-API-Key 를 보지도 않는다 — 무엇을 넣든 판정은
+//      401 이었다(실측: 자격증명 없는 POST /classify → {"detail":"missing authorization"}).
+// 인증은 같은 오리진 HttpOnly 쿠키(koipa_access_token)가 대신한다. fetch 는 same-origin
+// 이면 쿠키를 자동으로 싣는다(credentials 기본값). 쿠키가 없거나 만료면 401 이 오고,
+// bounceToLogin() 이 로그인 화면으로 한 번 보낸다 — 그 화면이 스스로 로그인하고 돌아온다.
 function authHeaders() {
-  ensureApiKey();
-  return { "X-API-Key": state.apiKey };
+  return {};
+}
+
+const LOGIN_URL = "/api/v1/golden/candidates/login.html";
+const BOUNCE_FLAG = "koipa_login_bounced";
+
+// 401 을 만나면 로그인 화면으로 한 번만 보낸다. 한 번인 이유: 로그인이 실패하는 상황에서
+// 무한 왕복이 되면 화면이 아예 안 뜬다. 두 번째부터는 화면에 띠로 알린다.
+// 표식은 이 탭이 닫힐 때까지 남긴다 — 성공 응답으로 지우지 않는다. 지웠더니 401 직후에
+// 따라 들어온 다른 호출의 200 이 표식을 없애 왕복 방지가 무력해졌다(하니스 실측 2026-08-24:
+// [set koipa_login_bounced] 바로 뒤에 [rm koipa_login_bounced] 가 찍혔다).
+function bounceToLogin() {
+  try {
+    if (window.sessionStorage?.getItem(BOUNCE_FLAG) === "1") { showAuthBanner(); return; }
+    window.sessionStorage?.setItem(BOUNCE_FLAG, "1");
+  } catch (_) { showAuthBanner(); return; }
+  const next = window.location.pathname + window.location.search + window.location.hash;
+  window.location.href = `${LOGIN_URL}?next=${encodeURIComponent(next)}`;
+}
+
+function showAuthBanner() {
+  if (document.getElementById("auth-banner")) return;
+  const el = document.createElement("div");
+  el.id = "auth-banner";
+  el.setAttribute("role", "alert");
+  el.style.cssText = "padding:12px 16px;margin:12px 0;border-left:4px solid #e72d44;background:#fff0f1;color:#a31429;font-size:13px;";
+  el.innerHTML = '접속 권한이 없어 판정을 실행할 수 없습니다. <a href="' + LOGIN_URL + '">로그인 화면 열기</a>';
+  document.body.insertBefore(el, document.body.firstChild);
 }
 async function apiGet(path) {
-  const resp = await fetch(apiUrl(path), { headers: authHeaders() });
+  const resp = await fetch(apiUrl(path), { headers: authHeaders(), credentials: "same-origin" });
+  if (resp.status === 401) bounceToLogin();
   const text = await resp.text();
   let data = null;
   try { data = JSON.parse(text); } catch { data = text; }
@@ -56,7 +83,9 @@ async function apiPost(path, body) {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
+    credentials: "same-origin",
   });
+  if (resp.status === 401) bounceToLogin();
   const text = await resp.text();
   let data = null;
   try { data = JSON.parse(text); } catch { data = text; }
@@ -1330,25 +1359,8 @@ function bindConfig() {
   // 개발자가 직접 추가했을 때만 바인딩 (null-safe).
   // tenant 제거: 격리는 KL 포털 전담. cfg-tenant 바인딩 없음.
   const ep = $("#cfg-endpoint");
-  const ak = $("#cfg-apikey");
   if (ep) { ep.value = state.endpoint; ep.addEventListener("change", (e) => { state.endpoint = e.target.value || window.location.origin; }); }
-  if (ak) {
-    // localStorage 저장키가 있으면 그것을, 없으면 HTML에 미리 채운 값(기본 시연키)을 채택.
-    if (state.apiKey) {
-      ak.value = state.apiKey;
-    } else if (ak.value && ak.value.trim()) {
-      state.apiKey = ak.value.trim();
-      window.localStorage?.setItem("koipa_api_key", state.apiKey);
-    }
-    const _apply = (v) => {
-      state.apiKey = (v || "").trim();
-      window.localStorage?.setItem("koipa_api_key", state.apiKey);
-      const st = $("#apikey-status");
-      if (st) st.textContent = state.apiKey ? "키 설정됨 ✓ — 이 브라우저에만 저장됩니다." : "키를 입력하세요.";
-    };
-    ak.addEventListener("change", (e) => _apply(e.target.value));
-    ak.addEventListener("input", (e) => { state.apiKey = (e.target.value || "").trim(); });
-  }
+  // API 키 입력칸은 없앴다(2026-08-24). 인증은 서버가 심는 쿠키가 맡는다 — 위 authHeaders 주석 참조.
 }
 
 // ──────────────────────────────────────────────────────────────────────

@@ -526,4 +526,40 @@ export const scenarios = [
       return page;
     },
   },
+
+  {
+    id: 'demo.auth.no-credential-prompt',
+    title: '화면을 열어도 키·토큰을 묻지 않고, 요청에 키를 붙이지도 않는다',
+    why: '실측 2026-08-24: 시연 화면을 열자마자 브라우저 프롬프트가 「API 키를 입력하세요」로 떴다. '
+       + '맨 처음 나가는 호출은 /healthz 인데 그건 인증이 필요 없고, 배포 서버는 auth_mode=jwt 라 '
+       + 'X-API-Key 를 보지도 않는다 — 필요하지도 않고 통하지도 않는 것을 발주처 앞에서 물었다.',
+    async run({ server, check }) {
+      const page = await demo(server);
+      check.eq(page.dialogs.filter((d) => d.kind === 'prompt').length, 0,
+        '프롬프트 창이 뜨지 않는다', JSON.stringify(page.dialogs));
+      check.ok(!server.calls.some((c) => c.headers['x-api-key']),
+        '어떤 요청에도 X-API-Key 가 붙지 않는다',
+        JSON.stringify(server.calls.map((c) => [c.path, c.headers['x-api-key']])));
+      check.ok(server.anyCall('GET', '/healthz'), '그래도 상태 조회는 나갔다');
+      check.ok(!page.$('cfg-apikey'), '키 입력칸 자체가 화면에 없다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'demo.auth.401-goes-to-login-not-a-prompt',
+    title: '권한이 없으면 프롬프트가 아니라 로그인 화면으로 보낸다',
+    why: '쿠키가 없거나 만료됐을 때 화면이 다시 키를 묻기 시작하면 같은 결함으로 되돌아간다. '
+       + '그 자리에서 사람이 타이핑할 것은 없어야 한다.',
+    async run({ server, check }) {
+      server.faults.push({ path: '/healthz', status: 401, body: { detail: 'missing authorization' } });
+      const page = await demo(server);
+      check.eq(page.dialogs.filter((d) => d.kind === 'prompt').length, 0,
+        '401 을 만나도 프롬프트는 없다', JSON.stringify(page.dialogs));
+      check.eq(page.win.sessionStorage.getItem('koipa_login_bounced'), '1',
+        '로그인 화면으로 한 번 보냈다는 표식이 남는다');
+      return page;
+    },
+  },
 ];
