@@ -1364,11 +1364,19 @@ function applyProfileVisibility(d){
   const b=$('profile-banner');
   if(b && profile){
     const isCust = hideFactory;
-    b.textContent = isCust
-      ? `고객사 운영 시스템(${profile}) — 문서 분류·검수·모델 운영 화면입니다.`
-        + ' 학습 후보 생성(합성)은 지재원 모델 공장에서 수행하므로 표시하지 않습니다.'
-      : `지재원 모델 공장(${profile}) — 검증문서 구성·학습·배포까지 전 구간 화면입니다.`
-        + (llmOff ? ' (이 서버는 등급 판정 LLM 을 쓰지 않는 구성이라 합성 생성 결과는 0건으로 나옵니다.)' : '');
+    /* [2026-08-24] 두 가지를 뺐다.
+       ① 「모델 공장」 — 우리가 만든 비유다. 제출본·사용매뉴얼에 0회이고, 배지에서도 같은
+          이유로 걷어냈다(deploy_badge.js). 화면 문구에만 남아 있었다.
+       ② 프로파일명(full-train·onprem-local) — 사용자가 쓰는 말이 아니다. 기술 담당자가
+          볼 자리는 [기술 상세]다. textContent 로는 그 구분을 못 주므로 innerHTML 로
+          바꾸고 프로파일명만 [data-tech] 로 감싼다. */
+    const techTag = ' <span class="techbar" data-tech>' + esc(profile) + '</span>';
+    b.innerHTML = (isCust
+      ? '<b>고객사 운영 시스템</b> — 문서 분류·검수·모델 운영 화면입니다.'
+        + ' 학습 후보 생성(합성)은 지재원에서 수행하므로 표시하지 않습니다.'
+      : '<b>지재원 시스템</b> — 검증문서 구성·학습·배포까지 전 구간 화면입니다.'
+        + (llmOff ? ' (이 서버는 등급 판정 LLM 을 쓰지 않는 구성이라 합성 생성 결과는 0건으로 나옵니다.)' : ''))
+      + techTag;
     b.className = 'profile-banner ' + (isCust ? 'cust' : 'jjw');
     b.style.display='';
   }
@@ -2557,7 +2565,13 @@ async function loadGoldenBuilds(){
       + list.map(function(b){
           var n=(b.records_exact?'':'≥')+b.records;
           var when=(b.modified||'').slice(0,10);
-          return '<option value="'+esc(b.path)+'">'+esc(b.path)+' — '+n+'건 · '+when+'</option>';
+          /* [2026-08-24] 표시에서 **파일 경로를 뺐다.** 검수자는 서버 파일 구조를 모르고,
+             경로가 화면에 뜨면 그것이 곧 구현 정보 노출이다. 고를 때 필요한 것은
+             "어느 묶음이고 몇 건이며 언제 만들었나" 다. 값(value)은 경로 그대로라
+             서버로는 종전과 같은 것이 나간다. 경로는 title 로 남겨 마우스를 올리면 보인다. */
+          const nm = String(b.path||'').split('/').pop().replace(/\.[^.]+$/, '');
+          return '<option value="'+esc(b.path)+'" title="'+esc(b.path)+'">'
+               + esc(nm)+' — '+n+'건 · '+when+'</option>';
         }).join('');
   }catch(e){
     sel.innerHTML='<option value="">목록을 못 읽었습니다 — 로그인 상태를 확인하세요</option>';

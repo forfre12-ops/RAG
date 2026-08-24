@@ -140,7 +140,9 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      check.includes(page.text('profile-banner'), '모델 공장', '지재원 모델 공장이라고 말한다');
+      // [2026-08-24] 「모델 공장」은 우리가 만든 비유라 화면에서 뺐다(제출본·매뉴얼 0회).
+      // 지키려던 것은 그 표현이 아니라 **어느 시스템에 접속했는지 배너가 밝히는가** 다.
+      check.includes(page.text('profile-banner'), '지재원', '어느 시스템인지 말한다');
       // [2026-08-24] 문구에서 설정값 이름(noop)을 뺐다 — 화면 문구에 서버 설정 이름을 쓰지
       // 않는다는 기존 판단과 같은 축이다. 시험은 이름이 아니라 **뜻**을 본다.
       check.matches(page.text('profile-banner'), /판정 LLM.*0건|0건.*판정 LLM/,
