@@ -413,11 +413,20 @@ app.include_router(keyword_admin_api.router, prefix="/api/v1")
 prom_metrics_api.register_background_refresh(app)
 
 # 정적 콘솔 마운트 — /demo/ 경로. 두 축이 마운트를 요구할 수 있다:
-#   demo_console_enabled : 데모 SPA(index) + 파괴적 purge UI (데모/파일럿 전용).
+#   demo_console_enabled : 파괴적 purge UI · 시연용 쓰기 (데모/파일럿 전용).
 #   serve_admin_console  : 거버넌스 관리 콘솔(admin.html — 검수→재학습→활성화) (프로덕션 관리자용).
 # 프로덕션(onprem-local·full-train)은 serve_admin_console=True·demo_console_enabled=False 조합 —
 # 관리 UI 는 서빙하되 파괴적 purge 엔드포인트(POST /admin/demo/purge)는 admin.py 에서 여전히
 # demo_console_enabled 게이트로 404. 모든 상태변경 API 는 RBAC 보호. OpenAPI 미노출(StaticFiles).
+#
+# ⚠ [2026-08-24 정정] 마운트 조건은 **OR** 다(아래 _console_on). 그래서 이 조합에서도
+#   정적 디렉터리 한 벌이 통째로 나가고 **시연 화면(index.html)도 200 으로 서빙된다**
+#   (실측 2026-08-24 223: deploy_profile=full-train · demo_console_enabled=false ·
+#   GET /console/index.html → 200). 종전 주석은 "데모 SPA(index)"가 demo_console_enabled
+#   축이라고 적었는데 그렇지 않다 — 파일은 나가고, 그 화면의 쓰기 표면(실시간 반영 시연 ·
+#   실적재)은 화면이 healthz 의 demo_console_enabled 를 읽어 스스로 감춘다(static/app.js
+#   applyDemoSurface · demoWritesOff). 마운트를 AND 로 바꾸지 말 것 — admin.html 이 같은
+#   디렉터리에 있어 관리 콘솔이 함께 사라진다.
 _STATIC_DIR = Path(__file__).parent / "static"
 _console_on = settings.demo_console_enabled or settings.serve_admin_console
 

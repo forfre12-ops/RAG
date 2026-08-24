@@ -209,7 +209,10 @@
         <button id="btn-classify" class="btn">분류하기</button>
         <button id="btn-print" class="btn secondary">PDF 인쇄</button>
         <button id="btn-reset" class="btn ghost">초기화</button>
-    <div class="sec-parse">
+    <!-- [2026-08-24] id 를 붙였다. 운영 설정(demo_console_enabled=false)에서 이 쓰기 표면을
+         감추려면 app.js 가 체크박스뿐 아니라 **묶음과 설명문**까지 집어야 한다 —
+         체크박스만 감추면 "실적재를 켜면…" 설명이 남아 없는 기능을 안내하게 된다. -->
+    <div class="sec-parse" id="persist-wrap">
       <label class="fld" style="flex-direction:row;align-items:center;gap:7px;margin:0;font-weight:600;white-space:nowrap;">
         <input type="checkbox" id="persist-demo" style="width:auto;" />
         실적재(검수 큐 전송)
@@ -217,7 +220,7 @@
     </div>
       </div>
     <div class="sec-parse">
-    <div class="hint" style="margin-top:6px;">
+    <div class="hint" id="persist-hint" style="margin-top:6px;">
       <b>실적재</b>를 켜면 분석과 별개로 문서를 <b>실제 적재</b>(<code>POST /documents</code> → <code>/classify</code>)합니다 —
       needs_review 건은 <b>거버넌스 콘솔의 DB 검수 큐</b>에 나타나고, 본문은 RAG <code>demo</code> 컬렉션에 색인됩니다.
       적재 문서는 <code>created_by=demo-console</code> 로만 태깅되어 admin의 <b>「데모 데이터 초기화」</b>로 한 번에 지웁니다.
@@ -323,6 +326,7 @@ function toggleDemoLog(){var d=document.getElementById('logdock'),t=document.get
 </script>
 <!-- 검수 사유 한글표 — app.js(모듈)와 아래 인라인 스크립트가 같은 표를 쓴다. app.js 앞에 둔다. -->
 <script src="./review_reason_ko.js"></script>
+<script src="./errors_ko.js"></script>
 <script src="./upload_progress.js"></script>
 <script type="module" src="./app.js"></script>
 </body>

@@ -3,7 +3,6 @@
 
 import { DEMO_DATA } from "./samples.js";
 import { postSSE } from "./sse.js";
-import { translateError } from "./errors_ko.js";
 import {
   renderBodyWithHighlights,
   flashKeywordInBody,
@@ -95,16 +94,45 @@ function renderHealthBadge() {
    reviewer-demo 고정이다. 프로덕션에서 이 버튼이 남아 있으면 운영 원장에 시연 행이 섞인다.
    요건 근거도 없다(RFP 구현현황에 /promotions 인용 0건). 서버가 시연 표면을 껐다고
    말하면(demo_console_enabled=false) 감추고, 왜 없는지는 그 자리에 적는다. */
-function applyDemoSurface() {
-  const btn = $("#btn-reflect");
-  if (!btn) return;
+/* [2026-08-24 2차] 「실적재」도 같은 축이다 — 켜면 POST /documents → /classify 로 문서가
+   **운영 검수 큐**에 들어간다(analyzeFile 아래). 1차에서 「실시간 반영 시연」만 막았더니,
+   서버가 demo_console_enabled=false 로 "시연용 쓰기를 하지 않는다"고 선언한 223 에서도 이
+   체크박스는 그대로 남아 있었다(실측 2026-08-24: btn-reflect 감춰짐 · persist-demo 보임).
+   같은 선언을 두 경로가 다르게 따르면 그것은 선언이 아니다.
+
+   화면에서 감추는 것으로 끝내지 않고 **쓰기 직전에도** 막는다 — 감춘 요소는 콘솔에서 다시
+   켤 수 있지만 이 판정은 healthz 값만 본다. 기능을 없애는 것이 아니라, 시연 서버가 아닌
+   곳에서 시연 쓰기를 하지 않는 것이다(demo_console_enabled=true 면 전부 그대로다). */
+function demoWritesOff() {
   const oc = (state.health || {}).operational_config || {};
-  if (oc.demo_console_enabled !== false) return;
-  btn.style.display = "none";
-  const busy = $("#reflect-busy");
-  if (busy && !busy.dataset.demoOff) {
-    busy.dataset.demoOff = "1";
-    busy.textContent = "이 서버는 운영 설정이라 시연용 쓰기(등록·교정·승급)를 하지 않습니다.";
+  return oc.demo_console_enabled === false;
+}
+
+function applyDemoSurface() {
+  if (!demoWritesOff()) return;
+
+  const btn = $("#btn-reflect");
+  if (btn) {
+    btn.style.display = "none";
+    const busy = $("#reflect-busy");
+    if (busy && !busy.dataset.demoOff) {
+      busy.dataset.demoOff = "1";
+      busy.textContent = "이 서버는 운영 설정이라 시연용 쓰기(등록·교정·승급)를 하지 않습니다.";
+    }
+  }
+
+  const persist = $("#persist-demo");
+  if (persist) {
+    // healthz 가 늦게 오는 사이에 켜 뒀을 수 있다. 감추기 전에 끈다 — 감추기만 하면
+    // checked=true 인 요소가 화면 밖에 남아 다음 업로드에서 적재된다.
+    persist.checked = false;
+    const wrap = $("#persist-wrap");
+    if (wrap) wrap.style.display = "none";
+    const hint = $("#persist-hint");
+    if (hint && !hint.dataset.demoOff) {
+      hint.dataset.demoOff = "1";
+      hint.textContent = "이 서버는 운영 설정이라 분석 결과를 검수 큐에 적재하지 않습니다 — 위 분석은 저장 없이 화면에만 남습니다.";
+    }
   }
 }
 
@@ -691,7 +719,10 @@ async function analyzeFile(file) {
     // 실적재 — 검수 대상일 때만. 자동 확정 건까지 큐에 넣으면 큐가 데모로 오염된다.
     // 대용량 비동기 경로는 제외한다 — 큰 문서를 조용히 적재하지 않는다(원 구역과 같은 규칙).
     const persist = $("#persist-demo");
-    if (persist && persist.checked && !wentAsync && (!data || data.status === "needs_review")) {
+    if (persist && persist.checked && demoWritesOff()) {
+      // 화면에서 감췄어도 여기서 한 번 더 막는다(applyDemoSurface 주석 참조).
+      logLine("info", "실적재 건너뜀 — 이 서버는 운영 설정이라 시연 화면에서 적재하지 않습니다.");
+    } else if (persist && persist.checked && !wentAsync && (!data || data.status === "needs_review")) {
       await persistToQueue(j, file);
     } else if (persist && persist.checked && wentAsync) {
       logLine("info", "실적재 건너뜀 — 대용량 비동기 경로는 적재하지 않습니다.");
@@ -911,6 +942,10 @@ async function refreshDashboard() {
 // 원클릭 "실시간 반영 시연" — 등록→분류→교정→승급→재분류, 전부 서버 실호출
 async function runReflectDemo() {
   if (!ensureReady()) return;
+  if (demoWritesOff()) {   // 버튼은 감춰져 있지만 함수는 부를 수 있다.
+    logLine("info", "이 서버는 운영 설정이라 시연용 쓰기(등록·교정·승급)를 하지 않습니다.");
+    return;
+  }
   const btn = $("#btn-reflect");
   if (btn) btn.disabled = true;
   const stepsBox = $("#reflect-steps");
@@ -1153,8 +1188,8 @@ function clearResult() {
 }
 
 function showError(msg) {
-  // B3-3 (2026-05-30): 영문 detail 을 한국어로 매핑 (errors_ko.js 50항목).
-  const ko = translateError(msg);
+  // 영문 detail 을 한국어로 (errors_ko.js 50항목 · 두 콘솔 공용).
+  const ko = window.translateError(msg);
   const wrap = $("#result-summary");
   wrap.innerHTML = `
     <div class="callout danger">
