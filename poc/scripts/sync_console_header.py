@@ -15,9 +15,9 @@
     python scripts/sync_console_header.py          # 다시 박는다
     python scripts/sync_console_header.py --check  # 어긋나면 1 로 종료(시험·CI 용)
 
-⚠ 이 스크립트는 **화면별 부속**(admin 의 헬스 표시, index 의 준비상태·구역 이동 링크)을
-  헤더 오른쪽에 그대로 유지한다. 그 요소들은 JS 가 id 로 잡고 있어 없어지면 화면이 죽는다
-  (admin.html 의 #health/#health-txt → checkHealth, index 의 #nav-status → app.js).
+⚠ 이 스크립트는 **화면별 부속**(admin 의 헬스 표시, index 의 구역 이동 링크)을 헤더
+  오른쪽에 그대로 유지한다. admin.html 의 #health/#health-txt 는 checkHealth 가 id 로
+  잡고 있어 없어지면 화면이 죽는다.
 """
 from __future__ import annotations
 
@@ -53,9 +53,12 @@ TRAILING = {
     # href="#sec-parse" 는 tests/test_demo_static_assets.py 가 존재를 잠근다.
     # [2026-08-24] 파싱·분류 시연을 이 화면의 입력·결과로 합치면서 앵커가 「파일 직접 업로드」
     # 자리로 옮겨갔다 — 메뉴 이름도 그 자리 이름으로 바꾼다(옛 이름은 없는 구역을 가리켰다).
+    # [2026-08-24] 프로파일 칩(#nav-status, "full-train · LLM noop · emb hf")을 뺐다
+    # (사용자 지시). 이 화면에만 있던 요소이고, 배포 주체·화면 종류는 이미 deploy_badge.js
+    # 배지가 두 화면 모두에 같은 모양으로 붙인다 — 같은 자리에서 같은 값을 두 번 말했다.
+    # warmup 은 이 칩이 유일한 통로가 아니다: 준비 전에 분류를 누르면 app.js 가
+    # "시스템 준비 중입니다 (warmup)" 로 막고, 기동 폴링도 따로 돈다(app.js:1236·1334).
     "index.html": (
-        '<span id="nav-status" class="nav-status warming">'
-        '<span class="dot"></span><span>warmup…</span></span>'
         '<a class="nav-link" href="#s1">시연</a>'
         '<a class="nav-link" href="#sec-ops">운영·반영</a>'
         '<a class="nav-link" href="#s3">법령</a>'

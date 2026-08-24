@@ -339,17 +339,18 @@ export const scenarios = [
   },
 
   {
-    id: 'demo.health.pill',
-    title: '연결 확인이 서버 프로파일을 표시한다',
-    // [2026-08-24] 클릭식 헬스 배지(#health)는 파싱·분류 구역과 함께 없어졌다.
-    // 합친 화면에서는 머리말 배지(#nav-status)를 app.js 가 기동 때 스스로 채운다.
+    id: 'demo.health.polls',
+    title: '머리말 프로파일 칩은 없고, healthz 는 그대로 부른다',
+    // [2026-08-24] 프로파일 칩(#nav-status)을 뺐다(사용자 지시) — 이 화면에만 있던
+    // 요소였고 배포 주체·화면 종류는 deploy_badge.js 가 두 콘솔에 같이 붙인다.
+    // 칩이 없어도 healthz 폴링은 살아 있어야 한다: 임계 표시(#conf-threshold)와
+    // warmup 차단이 그 응답을 쓴다. 칩만 지우고 폴링까지 죽이는 회귀를 막는다.
     async run({ server, check }) {
       const page = await demo(server);
-      const pill = page.$('nav-status');
-      check.ok(pill, '헬스 표시가 있다');
+      check.eq(page.$('nav-status'), null, '프로파일 칩이 없다');
       await page.settle();
       check.gte(server.countCalls('GET', '/healthz'), 1, 'healthz 를 불렀다');
-      check.includes(page.text('nav-status'), 'full-train', '서버 프로파일이 표시된다');
+      check.includes(page.text('conf-threshold'), '0.5', '임계는 서버 값으로 채워진다');
       return page;
     },
   },

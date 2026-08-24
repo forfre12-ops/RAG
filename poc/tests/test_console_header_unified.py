@@ -30,7 +30,10 @@ STATIC = _POC / "src" / "koipa" / "api" / "static"
 
 # [2026-08-21] 「로그인」 추가 — 쿠키 없는 브라우저에서 콘솔 전 기능이 401 인데
 # 어느 화면에도 login.html 주소가 없었다(시연장에서 멈추는 자리).
-LABELS = ["검증문서 검수 목록", "검증문서 후보 관리", "관리자 콘솔", "등급 시연", "로그인"]
+# [2026-08-24] 「로그인」을 뺐다(사용자 지시). login.html 화면은 살아 있고 주소로 열린다 —
+# 메뉴에서만 뺀 것이다. 목록의 정본은 console_nav.CONSOLE_LINKS 이고 이 상수는 그 사본이라,
+# 아래 test_menu_labels_match_the_single_source 가 둘이 어긋나면 잡는다.
+LABELS = ["검증문서 검수 목록", "검증문서 후보 관리", "관리자 콘솔", "등급 시연"]
 
 
 def _screens() -> dict[str, str]:
@@ -107,8 +110,9 @@ def test_screen_specific_widgets_survived():
     # admin.html:checkHealth 가 이 둘을 id 로 잡는다. 없으면 배포 프로파일 배너까지 죽는다.
     assert 'id="health"' in _header_of(s["admin.html"])
     assert 'id="health-txt"' in _header_of(s["admin.html"])
-    # app.js:renderHealthBadge 가 잡는다.
-    assert 'id="nav-status"' in _header_of(s["index.html"])
+    # [2026-08-24] index 의 프로파일 칩(#nav-status)은 뺐다 — 이 화면에만 있던 요소이고
+    # 배포 주체·화면 종류는 deploy_badge.js 가 두 콘솔에 같은 모양으로 붙인다.
+    assert 'id="nav-status"' not in _header_of(s["index.html"])
     # golden.py 의 인라인 JS 가 무가드로 잡는다 — 없으면 KPI·품질·원장 렌더가 통째로 멈춘다.
     assert 'id="topCount"' in _header_of(s["manage"])
     # tests/test_demo_static_assets.py 가 잠그는 앵커.

@@ -81,25 +81,12 @@ async function pollHealth() {
   renderHealthBadge();
 }
 
+// [2026-08-24] 머리말 프로파일 칩(#nav-status)을 뺐다 — 이 화면에만 있던 요소이고,
+// 배포 주체·화면 종류는 deploy_badge.js 배지가 두 콘솔에 같은 모양으로 이미 붙인다.
+// healthz 폴링 자체는 남긴다: state.health 를 임계 표시(#conf-threshold)가 읽고,
+// state.warmupDone 은 준비 전 분류를 막는 데 쓴다(아래 classify 경로).
 function renderHealthBadge() {
-  // 임계 표시는 배지와 독립이다 — 배지 자리(#nav-status)가 없다고 임계까지 '확인 중…' 으로
-  // 굳으면 안 된다. 아래 early return 앞에 둔다.
   renderConfThreshold();
-  const el = $("#nav-status");
-  if (!el) return;
-  const h = state.health || {};
-  const profile = h.deploy_profile || "unknown";
-  const provider = h.llm_provider || "—";
-  const embedder = h.embedding_provider || "—";
-  const cls = state.warmupDone ? "ok" : "warming";   // 정상 = 녹색 배지
-  el.className = `nav-status ${cls}`;
-  el.innerHTML = "";
-  const dot = document.createElement("span");
-  dot.className = "dot";
-  el.appendChild(dot);
-  const txt = document.createElement("span");
-  txt.textContent = `${profile} · LLM ${provider} · emb ${embedder}`;
-  el.appendChild(txt);
 }
 
 // [2026-08-24] 검수 라우팅 임계를 **서버에서** 받아 적는다.
