@@ -117,8 +117,11 @@ export const scenarios = [
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
 
+      // [2026-08-24] 2 → 1. 검증문서 카드가 게이트에서 빠졌다 — 그 카드에서 지재원 전용이던
+      // AI 후보 생성이 화면에서 제거됐고, 남은 검수 시작·서명 열기는 고객사에도 필요하다
+      // (onprem-local 은 활성화에 사람 서명 평가셋을 요구한다). 남은 대상은 합성 생성 카드다.
       const factory = page.qa('[data-profile="full-train"]');
-      check.gte(factory.length, 2, '모델 공장 전용 카드가 존재는 한다');
+      check.gte(factory.length, 1, '모델 공장 전용 카드가 존재는 한다');
       for (const el of factory) check.ok(!page.visible(el), `숨겨졌다: ${el.querySelector('.ttl')?.textContent?.trim() || el.id}`);
       check.ok(page.visible('profile-banner'), '어떤 서버인지 배너가 뜬다');
       check.includes(page.text('profile-banner'), '고객사', '고객사 시스템이라고 말한다');
@@ -138,7 +141,10 @@ export const scenarios = [
       const page = await openPage(server, '/console/admin.html');
       await page.settle();
       check.includes(page.text('profile-banner'), '모델 공장', '지재원 모델 공장이라고 말한다');
-      check.includes(page.text('profile-banner'), 'noop', 'LLM 이 noop 이면 그 결과가 0건이라고 미리 알린다');
+      // [2026-08-24] 문구에서 설정값 이름(noop)을 뺐다 — 화면 문구에 서버 설정 이름을 쓰지
+      // 않는다는 기존 판단과 같은 축이다. 시험은 이름이 아니라 **뜻**을 본다.
+      check.matches(page.text('profile-banner'), /판정 LLM.*0건|0건.*판정 LLM/,
+                    '판정 LLM 을 안 쓰면 그 결과가 0건이라고 미리 알린다');
       // 프로파일 숨김과 탭 숨김을 섞지 않으려고, 각 카드를 자기 탭에서 확인한다.
       for (const el of page.qa('[data-profile="full-train"]')) {
         page.click(page.q(`.tab[data-tab="${el.dataset.pane}"]`));

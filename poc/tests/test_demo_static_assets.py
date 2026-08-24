@@ -15,12 +15,21 @@ def test_demo_pages_are_airgap_safe_static_assets():
 
 
 def test_demo_safe_mode_and_golden_builder_are_visible():
+    """[2026-08-24] 확인 대상을 AI 후보 생성 → **묶음 등록**으로 바꿨다.
+
+    AI 후보 생성(`POST /golden/build` · startGoldenBuild)을 화면에서 뺐다 — 요건이 아니고
+    (제출본 RFP_구현현황에 "골든"·"검증문서" 0회 · 이 카드에 secmark 없음), 등급 판정 LLM 을
+    붙이지 않기로 했으며, 검수 묶음은 이미 준비돼 있다. API 는 그대로 살아 있다.
+    화면에 남아 있어야 하는 것은 이 서버에서 실제로 쓰는 경로다.
+    """
     admin = (STATIC / "admin.html").read_text(encoding="utf-8")
     assert 'id="cfg-write-enable"' in admin
     assert "Safe Mode" in admin
-    assert "POST /golden/build" in admin
-    assert "function startGoldenBuild" in admin
-    assert "guardWrite('검증문서 생성')" in admin
+    assert "POST /golden/jobs/register" in admin
+    assert "function registerGoldenBuild" in admin
+    assert "guardWrite('골든 문서 묶음 등록')" in admin
+    # 되살아나면 여기서 먼저 걸린다(콘솔 e2e golden.build.ai-generation-is-not-on-screen 과 같은 축).
+    assert "function startGoldenBuild" not in admin
 
 
 def test_parser_demo_has_table_sample_pack():

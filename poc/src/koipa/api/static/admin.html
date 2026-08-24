@@ -646,9 +646,6 @@ details.adv[open]{padding-bottom:12px;}
       </div>
     </section>
 
-    <!-- ===== 2.5 유사 문서 검색 (RAG) ===== 요건 아님(RAG=선택 보완). 시연 대본에서 제외. -->
-    
-
     <!-- ===== G3. 골든셋 현황 ===== 서명 결과가 "얼마나 찼는지"를 루프 B 안에서 보여준다.
          같은 수치가 [관제] 탭 대시보드에도 '배포 readiness'라는 이름으로 있었지만, 골든 검수를
          하는 사람이 자기 작업의 현황으로 알아보기 어려웠다(다른 탭 · 다른 이름). 엔드포인트는
@@ -916,87 +913,32 @@ details.adv[open]{padding-bottom:12px;}
       </div>
     </section>
 
-    <!-- ===== 7. 검증 기준문서 준비 ===== 루프 B 의 시작점(G1) -->
-    <!-- [2026-08-24] order 1 → 3. 「검증문서」 탭에 오는 사람이 매번 하는 일은 새 후보를
-         만드는 것이 아니라 **이미 준비된 묶음을 검수하는 것**이다. 검수 목록 카드
-         (golden_jobs.js, order:1)를 맨 위로 올리고 이 카드를 뒤로 보낸다 — 공용 메뉴에서
-         「검증문서 검수 목록」이 빠져(console_nav.py) 검수 목록으로 오는 길이 이 탭 하나가
-         됐기 때문이다. 탭 순서: 1 검수 목록 · 2 현황·서명 상태 · 3 새 후보 준비. -->
-    <section class="card col-span" data-pane="review" style="order:3" data-profile="full-train">
+    <!-- ===== 7. 검증문서 검수 준비 ===== 루프 B 의 G2 -->
+    <!-- [2026-08-24 order] 「검증문서」 탭에 오는 사람이 매번 하는 일은 새 후보를 만드는 것이
+         아니라 **이미 준비된 묶음을 검수하는 것**이다. 검수 목록 카드(golden_jobs.js, order:1)가
+         맨 위, 이 카드는 뒤다. 탭 순서: 1 검수 목록 · 2 현황·서명 상태 · 3 검수 시작.
+
+         [2026-08-24 AI 후보 생성 제거] 이 카드에는 성격이 반대인 둘이 있었다 —
+         (가) AI 가 등급을 매겨 후보를 새로 만든다  (나) 이미 있는 묶음을 검수에 올린다.
+         (가)를 뺐다. 사유는 셋이고 전부 확인한 것이다:
+           · **요건이 아니다.** 제출본 RFP_구현현황 전문에 "골든"·"검증문서"·"평가 정답" 0회.
+             요건 증빙으로 지목된 카드에는 secmark(§N·§E·§T)가 붙는데 이 카드에는 없다.
+             FUN-003 은 **합성 문서**이고 그 증빙은 688 행 카드(§N)다 — 이 카드의 reqtag 는 오기였다.
+           · **쓰지 않기로 결론이 났다.** 판정 LLM 을 붙이지 않는 구성이고(지재원·고객사 모두),
+             상용 LLM 이 로컬보다 낫다는 근거도 없었다(591건 실측 일치율 64.6%, 상용은 S1 을 0건 냈다).
+           · **필요한 묶음은 이미 있다.** 223 에 검수 후보 120건이 준비돼 있다.
+         기능을 지운 것이 아니다 — `POST /golden/build` API·서비스·시험은 그대로다.
+         판정 LLM 을 붙이기로 하면 이 블록만 되살리면 된다(이력: 912f688b 이전 판). -->
+    <section class="card col-span" data-pane="review" style="order:3">
       <div class="card-head">
-        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G1·G2 단계 — 후보 생성과 서명 화면 열기를 이 카드에서 합니다">G1 · G2</span> 검증문서 준비 <span class="reqtag">FUN-003</span></div>
-        <span class="ep">POST /golden/build · GET /golden/jobs/{id}/review.html</span>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G2 — 준비된 묶음을 검수·서명 화면으로 올립니다">G2</span> 검증문서 검수 준비</div>
+        <span class="ep">POST /golden/jobs/register · GET /golden/jobs/{id}/signoff.html</span>
       </div>
       <div class="card-body">
-        <!-- [2026-08-23] 이 카드는 두 가지를 한 상자에 담고 있다 —
-             (가) AI 가 등급을 매겨 후보를 새로 만든다  (나) 이미 있는 문서 묶음을 검수에 올린다.
-             (가)는 등급 판정 LLM 이 있어야 되는데 이 서버(llm_provider=noop)에서는 되지 않는다.
-             그래서 누르기 전에 잠그고 (나)를 위로 올린다 — applyGoldenAiAvailability(). -->
-        <div id="gold-ai-block">
-        <div id="gold-ai-blocked" class="warnbox" style="display:none;margin-bottom:10px;line-height:1.6;"></div>
-        <details class="adv">
-          <summary>고급 설정 — 후보 소스 · 판정기 · 생성 건수 바꾸기</summary>
-        <div class="row3">
-          <div class="field">
-            <label class="fld">후보 소스</label>
-            <!-- [2026-08-18] '데모 샘플'·'파일 업로드' 제거.
-                 샘플은 시연용이라 운영 콘솔에 있을 자리가 아니고, 파일 업로드는
-                 골든셋 후보 관리 화면(manage.html)과 하는 일이 같았다. -->
-            <select id="gold-source" onchange="syncGoldenSource()">
-              <option value="corpus">서버 코퍼스 경로</option>
-              <option value="editor">「분류 실행」 카드에 입력한 본문</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="fld">등급 판정기</label>
-            <!-- [2026-08-23] 두 가지를 고쳤다.
-                 ① noop 은 규칙 엔진이 아니라 **합성 문서 생성용 더미 응답**이다
-                    (noop_provider.py:1 "API 키 없이 결정론적 응답 — 파이프라인 검증·CI용 ·
-                    품질 측정용 아님"). 응답 JSON 에 grade 키가 없어 등급 판정기로 쓰면
-                    LLMLabeler 가 기본값 S3 로 떨어뜨린다 — 실측(223 배포 이미지 2026-08-23):
-                    어떤 본문을 넣어도 S3 · 신뢰도 0.5. 이 항목으로는 등급이 매겨지지 않는다.
-                 ② 내부 제공자 이름(local_openai·vllm_qwen·anthropic·openai)을 그대로 보여
-                    주고 있었다. 폐쇄망에서 못 쓰는 것(외부 API — 인터넷·키 필요)과 품질
-                    판정이 끝난 것(Qwen 14B: reports/llm_quality_comparison_20260808.md 에서
-                    사실 충실성 0/5·제약 준수 0/5 로 탈락)이 아무 표시 없이 선택 가능했다.
-                 API 키는 화면에서 받지 않는다 — 브라우저에 외부 키를 넣으면 유출 경로가
-                 생긴다. 서버 .env(ANTHROPIC_API_KEY·OPENAI_API_KEY)로만 설정한다.
-                 아래 항목은 서버 설정(healthz.llm_provider)에 따라 applyServerConfig 가
-                 쓸 수 없는 것을 잠근다. -->
-            <select id="gold-provider">
-              <option value="noop">등급을 매기지 않는 더미 — 모든 문서에 S3 만 돌려줍니다 (파이프라인 점검용)</option>
-              <option value="local_openai">사내 LLM 서버 (OpenAI 호환) — 서버에 주소 설정 필요</option>
-              <option value="vllm_qwen">사내 LLM 서버 (vLLM Qwen) — 문서 생성 품질 미달 기록 있음</option>
-              <option value="anthropic">외부 API (Anthropic) — 인터넷·API 키 필요 · 폐쇄망 불가</option>
-              <option value="openai">외부 API (OpenAI) — 인터넷·API 키 필요 · 폐쇄망 불가</option>
-            </select>
-            <p class="hint" id="gold-provider-note" style="margin-top:4px"></p>
-          </div>
-          <div class="field">
-            <label class="fld">생성 건수</label>
-            <input id="gold-n" type="number" min="1" max="50" value="8" />
-          </div>
-        </div>
-        <div id="gold-src-corpus" class="field" style="display:none;margin-top:8px;">
-          <label class="fld">코퍼스 경로 — <code>datasets/</code> 하위 jsonl 파일 또는 *.json 디렉터리</label>
-          <input id="gold-corpus-dir" type="text" placeholder="datasets/gold_real/candidates.jsonl" />
-          <p class="sec-note" style="margin-top:4px;">서버 파일시스템 경로입니다. <code>datasets/</code> 밖은 샌드박스가 거부합니다.</p>
-        </div>
-        </details>
 
-        <div class="btn-row">
-          <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;margin-right:auto;">
-            <input id="gold-require-evidence" type="checkbox" style="width:auto" checked /> 근거 문장이 있는 것만 후보로
-          </label>
-          <button class="btn" id="gold-go" onclick="startGoldenBuild()">후보 생성 → 검수</button>
-          <button class="btn sec sm" onclick="loadGoldenJob()">상태 새로고침</button>
-        </div>
-        </div><!-- /gold-ai-block -->
-
-        <!-- [2026-08-20] 이 아래는 위(AI 가 후보를 새로 만든다)와 **정반대** 기능이다 —
-             이미 있는 문서 묶음을 그대로 검수에 올린다. 한 상자 안에서 구분이 약해
-             사용자가 무엇을 누르는지 몰랐다. 제목으로 갈라 놓는다. -->
-        <div class="field" id="gold-register-block" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--border);">
+        <!-- [2026-08-24] AI 후보 생성이 빠져 이 블록이 카드의 유일한 동작이 됐다. 위와
+             가르던 구분선(border-top)·여백을 뗀다 — 가를 상대가 없다. -->
+        <div class="field" id="gold-register-block">
           <div class="fld" style="font-weight:700;color:var(--text);margin-bottom:2px;">
             이미 있는 문서 묶음으로 검수 시작하기
           </div>
@@ -1012,15 +954,18 @@ details.adv[open]{padding-bottom:12px;}
             </select>
             <button class="btn sec sm" onclick="loadGoldenBuilds()" title="목록 다시 읽기">↻</button>
             <button class="btn sec sm" id="gold-reg" onclick="registerGoldenBuild()">검수 시작</button>
+            <!-- [2026-08-24] 이 버튼은 지워진 AI 블록 안에 있었다. 잡 상태 조회는 검수 시작
+                 경로도 쓰므로(registerGoldenBuild → loadGoldenJob) 여기로 옮긴다. -->
+            <button class="btn sec sm" onclick="loadGoldenJob()" title="올린 묶음의 처리 상태를 다시 읽습니다">상태 새로고침</button>
           </div>
           <p class="sec-note" style="margin-top:4px;">이미 만들어 둔 검수 묶음 파일을 그대로 올립니다. 등급을 다시 매기지 않으므로 <b>파일에 적힌 등급이 그대로 보존</b>됩니다.</p>
         </div>
 
-        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 생성된 검증문서 준비 작업이 없습니다.</div>
+        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 검수에 올린 묶음이 없습니다.</div>
 
         <div id="gold-summary" style="display:none;margin-top:10px;">
           <div class="dash-panel">
-            <div class="dp-h"><span>후보 생성 결과</span><span id="gold-verdict" class="pill">-</span></div>
+            <div class="dp-h"><span>검수 묶음 상태</span><span id="gold-verdict" class="pill">-</span></div>
             <div class="dp-row" id="gold-counts"></div>
             <div class="dp-row" id="gold-grades" style="margin-top:6px;"></div>
           </div>
@@ -1054,7 +999,7 @@ details.adv[open]{padding-bottom:12px;}
           <div id="gold-result" class="json" style="margin-top:6px;" role="status" aria-live="polite">-</div>
         </details>
 
-        <p class="sec-note">정본 검증문서는 건드리지 않고 <b>후보만</b> 만듭니다. 정본 승격은 별도 절차입니다.</p>
+        <p class="sec-note">정본 검증문서는 건드리지 않습니다. 여기서 올린 묶음은 <b>검수 대상</b>일 뿐이고, 정본 승격은 서명을 거치는 별도 절차입니다.</p>
       </div>
     </section>
 
@@ -1394,9 +1339,13 @@ async function checkHealth(){
  * 검증 기준문서 준비가 지재원에서도 사라졌다**. 제공자 설정은 환경마다 달라 화면 구성의 기준이
  * 될 수 없다 — 이 서버가 무엇을 하는 시스템인지(프로파일)가 기준이어야 한다.
  *
- * 대상은 모델 공장 전용 기능만: 검증 기준문서 준비 · 학습 후보 생성.
- * 골든 현황·잡 목록은 숨기지 않는다 — 고객사도 검수·서명 경로가 살아 있다
- * (onprem-local 은 deploy_gate_manual_require_locked_eval=True 를 유지한다).
+ * 대상은 모델 공장 전용 기능만: **학습 후보 생성(합성)** 하나다.
+ * [2026-08-24] 검증문서 카드가 대상에서 빠졌다. 그 카드에서 지재원 전용이던 것은 AI 후보
+ * 생성이었고 그것을 화면에서 뺐다. 남은 「검수 시작」·「검수·서명 화면 열기」는 **고객사에도
+ * 필요한 경로**다 — onprem-local 은 deploy_gate_manual_require_locked_eval=True 라, 야간
+ * 증분 재학습본을 현장에서 켜려면 사람이 서명한 평가셋이 있어야 한다. 카드를 숨겨 두면
+ * 고객사는 그 평가셋을 만들 화면이 없어 매번 force 우회를 쓰게 된다.
+ * 골든 현황·잡 목록도 숨기지 않는다(같은 이유).
  * 그리고 조용히 감추지 않는다 — 어느 시스템에 접속했는지 배너로 항상 밝힌다. */
 function applyProfileVisibility(d){
   const profile=String((d&&d.deploy_profile)||'');
@@ -1416,91 +1365,11 @@ function applyProfileVisibility(d){
     const isCust = hideFactory;
     b.textContent = isCust
       ? `고객사 운영 시스템(${profile}) — 문서 분류·검수·모델 운영 화면입니다.`
-        + ' 검증문서 후보 구성·학습 후보 생성은 지재원 모델 공장에서 수행하므로 표시하지 않습니다.'
+        + ' 학습 후보 생성(합성)은 지재원 모델 공장에서 수행하므로 표시하지 않습니다.'
       : `지재원 모델 공장(${profile}) — 검증문서 구성·학습·배포까지 전 구간 화면입니다.`
-        + (llmOff ? ' (현재 LLM 제공자가 noop 이라 합성·자동 라벨링 결과는 0건으로 나옵니다.)' : '');
+        + (llmOff ? ' (이 서버는 등급 판정 LLM 을 쓰지 않는 구성이라 합성 생성 결과는 0건으로 나옵니다.)' : '');
     b.className = 'profile-banner ' + (isCust ? 'cust' : 'jjw');
     b.style.display='';
-  }
-}
-/* [2026-08-23] 서버가 실제로 쓸 수 있는 등급 판정기만 고를 수 있게 한다.
- *
- * 왜. 드롭다운이 다섯 개를 다 열어 두는데, 서버는 llm_provider 하나로 고정돼 있다. 다른 것을
- * 골라 「후보 생성」을 누르면 실패하거나 0건이 나오고, 화면은 그 이유를 말하지 않는다.
- * 실측 2026-08-23(223): llm_provider=noop 인데 화면에서는 openai 가 선택돼 있었다.
- *
- * 지우지 않고 **잠근다** — 어떤 선택지가 있고 왜 지금 못 쓰는지가 보여야 운영자가 설정을
- * 바꿀 판단을 한다. 감추면 "그 기능이 없다"로 읽힌다. */
-function applyProviderAvailability(d){
-  const sel=$('gold-provider'); if(!sel) return;
-  const active=String((d&&d.llm_provider)||'').toLowerCase();
-  let enabled=0;
-  Array.prototype.forEach.call(sel.options, function(o){
-    const usable = (o.value===active) || (o.value==='noop' && !active);
-    o.disabled = !usable;
-    if(usable) enabled++;
-  });
-  if(active){
-    const cur=Array.prototype.find.call(sel.options, function(o){return o.value===active;});
-    if(cur) sel.value=active;
-  }
-  const note=$('gold-provider-note');
-  if(note){
-    // ⚠ esc() 는 이 파일에 없다(golden_jobs.js 가 admin.html 에 있다고 가정한 것과 달리
-    //   실제로는 정의돼 있지 않다). 종전 판이 esc(active) 를 부르는 바람에 ReferenceError 가
-    //   나고 **applyServerConfig 의 뒤 코드가 통째로 멈췄다** — 서버 검수 임계가 '—' 로
-    //   남고 대시보드 초기화도 안 됐다(실측 2026-08-23). textContent 로 넣어 이스케이프
-    //   자체를 없앤다.
-    note.textContent = active
-      ? '이 서버는 ' + active + ' 로 설정돼 있어 그 항목만 고를 수 있습니다. '
-        + '다른 제공자를 쓰려면 서버 설정(.env)에서 바꿔야 합니다.'
-      : '서버 설정을 읽지 못했습니다 — 제공자 선택이 실제와 다를 수 있습니다.';
-  }
-  if(!enabled) sel.disabled=true;
-  applyGoldenAiAvailability(active);
-}
-/* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「후보 생성 → 검수」는 눌러도 소용이 없다.
- *
- * 실측(223 배포 이미지 · docker exec koipa-jjw-api-1 · 2026-08-23):
- *   - llm_provider=noop 이면 판정기가 **어떤 본문에도 S3 · 신뢰도 0.5** 만 돌려준다.
- *   - 그 상태로 hardened 42건을 돌리면 gold 2 / 보류 40 이고, gold 2 건의 등급도 전부 S3 다.
- *     룰이 S3 라고 한 것에 더미가 겹친 것뿐이라 **합의 게이트가 룰 단독 판정으로 바뀐다.**
- *   - 「근거 문장이 있는 것만」을 끄면 gold 15/42 인데 15건 전부 S3 라 더 나쁘다.
- * 그러니 결과를 보고 나서 실망하게 두지 말고 누르기 전에 잠근다. 카드를 감추지는 않는다 —
- * 감추면 "그 기능이 없다"로 읽힌다(applyProfileVisibility 의 2026-08-09 판단과 같은 이유).
- * 대신 이 서버에서 **실제로 되는 경로**(이미 있는 문서 묶음 검수)를 위로 올린다. */
-var GOLD_AI_BLOCKED=false;
-function applyGoldenAiAvailability(active){
-  const blocked = (String(active||'').toLowerCase()==='noop');
-  GOLD_AI_BLOCKED = blocked;
-  const go=$('gold-go'); if(go) go.disabled=blocked;
-  const box=$('gold-ai-blocked');
-  if(box){
-    box.style.display = blocked ? '' : 'none';
-    // [2026-08-24] 문구에서 서버 설정 이름(llm_provider=noop · .env · LLM_PROVIDER)을 뺐다.
-    // 이 화면을 보는 사람은 검수자이고 그 파일을 고칠 권한이 없다 — 고칠 수 없는 것을
-    // 알려 주면 안내가 아니라 막다른 길이다. 설정 이름은 아래 「고급 설정」 안(등급 판정기
-    // 선택칸)에 그대로 있다. 거기가 서버를 다루는 사람이 보는 자리다.
-    box.innerHTML = blocked
-      ? '<b>이 서버에서는 AI 후보 생성을 할 수 없습니다.</b><br/>'
-        + '등급을 매기는 LLM 이 연결돼 있지 않아, 눌러도 <b>모든 문서가 S3 하나로만</b> 나옵니다. 그래서 잠가 두었습니다.<br/>'
-        + '· 검수·서명은 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 로 그대로 진행하면 됩니다.<br/>'
-        + '· AI 로 후보를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하십시오.'
-      : '';
-  }
-  // 되는 것을 먼저 보여준다 — 잠긴 블록이 맨 위에 있으면 카드 전체가 막힌 것으로 읽힌다.
-  const ai=$('gold-ai-block'), reg=$('gold-register-block');
-  if(ai && reg && ai.parentNode===reg.parentNode){
-    const regFirst = !!(reg.compareDocumentPosition(ai) & Node.DOCUMENT_POSITION_FOLLOWING);
-    if(blocked && !regFirst) ai.parentNode.insertBefore(reg, ai);
-    if(!blocked && regFirst) ai.parentNode.insertBefore(ai, reg);
-    // 구분선은 늘 아래쪽 블록이 갖는다.
-    reg.style.borderTop = blocked ? 'none' : '2px solid var(--border)';
-    reg.style.marginTop = blocked ? '0' : '16px';
-    reg.style.paddingTop = blocked ? '0' : '14px';
-    ai.style.borderTop = blocked ? '2px solid var(--border)' : '';
-    ai.style.marginTop = blocked ? '16px' : '';
-    ai.style.paddingTop = blocked ? '14px' : '';
   }
 }
 /* [2026-08-23] 등급 판정 LLM 이 없는 서버에서 「생성 요청」을 누르면 무슨 일이 벌어지는가.
@@ -1547,7 +1416,6 @@ function applyServerConfig(d){
   applyProfileVisibility(d);
   // 새로 붙인 게이팅이 죽어도 **뒤 초기화(검수 임계·대시보드)는 살아야 한다.**
   // 2026-08-23 에 정확히 그 반대가 됐다 — 함수 하나가 던지자 화면 절반이 비었다.
-  try{ applyProviderAvailability(d); }catch(e){ console && console.warn && console.warn('provider gating skipped', e); }
   try{ applySynthAvailability(d&&d.llm_provider); }catch(e){ console && console.warn && console.warn('synth note skipped', e); }
 }
 
@@ -2047,10 +1915,6 @@ async function toggleWhy(i){
       + `${esc(e.data?.detail||e.message||'')}</div>`;
   }
 }
-// 검수 큐 최상단 문서 기준 유사문서 자동 조회(검수 보조). 수동 「검토할 문서 보기」 때만
-// 발화하고, 실시간 관제 폴링 tick(AUTO_SILENT)에서는 스킵한다 — 임베딩 비용·로그 스팸 방지.
-/* 지금 분류 패널에 들어 있는 본문을 질의로 가져온다 — 검수 중인 문서를 다시 붙여넣지 않아도 되게. */
-
 /* persisted=false 로 되돌아온 이유를 한 줄로 적는다. 서버 경고는 영문 한 줄이라
  * ("classification not found in DB — confirmation recorded in audit only") 그것만 보면
  * 무엇을 해야 하는지 알 수 없다. 두 경우를 구분한다:
@@ -2610,30 +2474,7 @@ async function loadDashboard(){
  * 종전에는 [생성]→[상태 조회]→[리뷰 열기] 3버튼을 사람이 순서대로 눌러야 했고, job_id 를
  * prompt() 로 되묻는 경로까지 있었다. 여기서는 생성 후 완료까지 자동 폴링하고, 끝나면
  * 요약 카드와 검수/서명 버튼을 스스로 활성화한다(사람 클릭 3회 → 1회). */
-function syncGoldenSource(){
-  const v=($('gold-source')||{}).value;
-  const co=$('gold-src-corpus');
-  if(co) co.style.display = v==='corpus' ? '' : 'none';
-}
 
-function goldenDocs(){
-  const n = Math.max(1, Math.min(50, Number($('gold-n').value || 8)));
-  if(($('gold-source')||{}).value === 'editor'){
-    // [운영 탭] 1 분류 패널에 지금 들어 있는 본문을 그대로 후보로 — 방금 다룬 문서를 골든 후보로
-    // 올리는 게 고정 샘플보다 실사용에 가깝다.
-    const body = ($('cl-body').value||'').trim();
-    if(!body) return [];
-    return [{
-      doc_id: ($('cl-docid').value||'').trim() || `console-${Date.now()}`,
-      title: ($('cl-title').value||'').trim() || '분류 패널 입력',
-      text: body,
-      source: 'demo_console_editor'
-    }];
-  }
-  return SAMPLES.slice(0, Math.min(8, n)).map(s=>({
-    doc_id: s.id, title: s.t, text: s.b, label_hint: s.exp, source: 'demo_console'
-  }));
-}
 function goldenProgress(msg){ const el=$('gold-progress'); if(el) el.textContent=msg; }
 function goldenButtons(status, goldCount, uncertainCount){
   // [2026-08-24] 검수·서명이 한 화면이라 버튼도 하나다. 여는 조건은 **둘 중 넓은 쪽**을
@@ -2675,79 +2516,22 @@ function renderGoldenSummary(d){
     ? GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')
     : '<span style="color:var(--text-faint)">등급 분포 없음 — gold 후보 0건</span>') + leakLine;
 
-  // gold 0건이면 "왜 0건인지"를 화면에서 답해야 한다. 특히 provider=noop 은 등급 라벨러가
-  // 아니라 합성 문서 생성기라, 라벨 파싱이 S3/0.5 로 떨어져 룰과 합의되지 않고 전건이
-  // needs_review 로 간다(2026-08-08 실측: 8건 중 gold 0 · uncertain 8). 이걸 모르면
-  // [기본값으로 시작]을 누른 사람은 원인 없이 막힌다.
+  /* [2026-08-24] gold 0건 안내를 등록 경로 기준으로 다시 썼다. 종전 문구는 판정기 선택
+     (noop 더미·근거 요건·후보 수)을 원인으로 지목했는데, AI 후보 생성이 화면에서 빠지면서
+     그 손잡이가 없어졌다. 이제 이 카드로 들어오는 길은 **이미 등급이 적힌 묶음을 올리는 것**
+     하나뿐이라, 0건이면 원인은 파일 쪽이다. */
   const zeroBox=$('gold-zero-hint');
   if(zeroBox){
-    const prov=($('gold-provider')||{}).value;
     if(gold>0 || d.status!=='done'){ zeroBox.style.display='none'; zeroBox.innerHTML=''; }
     else{
       zeroBox.style.display='';
-      zeroBox.innerHTML = (prov==='noop')
-        ? '<b>gold 후보가 0건입니다 — 등급을 매기지 않는 더미를 판정기로 골랐기 때문입니다.</b><br/>'
-          + '그 항목은 합성 문서를 만드는 더미라 응답에 등급 자리가 없고, 판정이 늘 <b>S3</b> 으로 떨어집니다. '
-          + '룰이 S3 라고 한 문서에만 우연히 합의가 되므로 사실상 전건이 보류로 갑니다.<br/>'
-          + '· LLM 이 연결된 서버(지재원 GPU)에서 다시 실행하세요.<br/>'
-          + '· LLM 이 없는 환경이라면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
-        : '<b>gold 후보가 0건입니다.</b><br/>'
-          + '룰과 LLM 이 합의하지 못했거나 근거 문장이 없어 전건이 보류로 갔습니다. 고급 설정의 <b>근거 문장이 있는 것만 후보로</b> 를 끄거나 '
-          + '후보 수를 늘려 보고, 그래도 0건이면 아래 <b>기존 문서 묶음 등록</b>으로 검수·서명만 진행하세요.';
+      zeroBox.innerHTML = '<b>검수로 올릴 후보가 0건입니다.</b><br/>'
+        + '고른 묶음 파일에 검수 대상 기록이 없거나, 전건이 보류 상태로 적혀 있습니다. '
+        + '위 목록에서 다른 묶음을 고르거나, 파일 내용을 확인하세요.';
     }
   }
   goldenButtons(d.status, gold, unc);
 }
-async function startGoldenBuild(){
-  if(!guardWrite('검증문서 생성')) return;
-  // 버튼은 잠겨 있지만(applyGoldenAiAvailability) healthz 실패로 잠금이 안 걸릴 수 있다.
-  if(GOLD_AI_BLOCKED){
-    goldenProgress('이 서버에는 등급을 매기는 LLM 이 연결돼 있지 않습니다 — 아래 「이미 있는 문서 묶음으로 검수 시작하기」를 쓰십시오.');
-    return;
-  }
-  const src=($('gold-source')||{}).value;
-  // [2026-08-20] 눌린 티를 낸다. 종전에는 버튼만 잠기고 문구가 응답 **뒤에야** 떠서,
-  // LLM 이 도는 몇 초 동안 화면이 멈춘 것처럼 보였다(분류 실행·등급 시연은 이미 이렇게 한다).
-  const btn=$('gold-go');
-  if(btn){ btn.disabled=true; btn.dataset.label=btn.textContent; btn.textContent='생성 중…'; }
-  goldenProgress('후보를 만들고 있습니다 — AI 가 문서를 읽고 등급을 매기는 중입니다. 몇 초 걸립니다.');
-  try{
-    const body={
-      n:Number($('gold-n').value || 8),
-      llm_provider:$('gold-provider').value,
-      require_evidence:$('gold-require-evidence').checked,
-      out_dir:'datasets/gold_real/builds',
-      actor:actor()
-    };
-    if(src==='corpus'){
-      const dir=($('gold-corpus-dir').value||'').trim();
-      if(!dir){ goldenProgress('코퍼스 경로를 입력하세요 (datasets/ 하위).'); return; }
-      body.source_type='corpus'; body.corpus_dir=dir; body.docs=[];
-    }else{
-      const docs = goldenDocs();
-      if(!docs.length){
-        goldenProgress('후보로 보낼 본문이 비어 있습니다 — [운영] 탭 「1 분류 실행」에 본문을 넣거나, 후보 소스를 "서버 코퍼스 경로"로 바꾸세요. 파일로 넣으려면 검증문서 후보 관리 화면을 쓰십시오.');
-        return;
-      }
-      body.source_type='inline'; body.docs=docs;
-    }
-    const d=await api('POST','/golden/build',body);
-    LAST_GOLDEN_JOB_ID=d.golden_job_id;
-    $('gold-result').textContent=JSON.stringify(d,null,2);
-    log(`검증문서 생성 시작: ${LAST_GOLDEN_JOB_ID}`,'ok');
-    goldenProgress(`job ${LAST_GOLDEN_JOB_ID} 생성됨 — 완료 대기 중…`);
-    await pollGoldenJob(LAST_GOLDEN_JOB_ID);
-  }catch(e){
-    goldenProgress(`후보 생성 실패: ${errKo(e)}`);
-    $('gold-result').textContent=`검증문서 생성 실패: ${errKo(e)}`;
-  }finally{ if(btn){ btn.disabled=GOLD_AI_BLOCKED; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
-}
-/* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
- * /golden/build 와 달리 즉시 done 이라 폴링 없이 상태를 한 번만 읽는다. */
-/* 등록할 수 있는 문서 묶음 목록을 서버에서 받아 고르게 한다.
- * 왜(2026-08-20 사용자 지적): 종전에는 자유 입력 칸이었고 placeholder 가 채워진 값처럼
- * 보여, 그대로 [등록]을 누르면 "경로를 입력하세요" 가 떴다. 서버에 무슨 파일이 있는지
- * 화면이 알려주지 않으니 경로를 외워 쳐야 했다. */
 async function loadGoldenBuilds(){
   const sel=$('gold-build-path'); if(!sel) return;
   sel.innerHTML='<option value="">불러오는 중…</option>';
@@ -2765,7 +2549,6 @@ async function loadGoldenBuilds(){
     sel.innerHTML='<option value="">목록을 못 읽었습니다 — 로그인 상태를 확인하세요</option>';
   }
 }
-
 async function registerGoldenBuild(){
   if(!guardWrite('골든 문서 묶음 등록')) return;
   const path=($('gold-build-path').value||'').trim();
@@ -2785,30 +2568,9 @@ async function registerGoldenBuild(){
     $('gold-result').textContent=`골든 문서 묶음 등록 실패: ${errKoText(e)}`;
   }finally{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label||'검수 시작'; } }
 }
-/* 완료(done/failed)까지 자동 폴링. 상한 40회×1.5s=60s — 넘으면 수동 새로고침으로 넘긴다. */
-async function pollGoldenJob(id){
-  for(let i=0;i<40;i++){
-    let d;
-    try{ d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`); }
-    catch(e){ goldenProgress(`상태 조회 실패: ${errKo(e)}`); return; }
-    $('gold-result').textContent=JSON.stringify(d,null,2);
-    if(d.status==='done'||d.status==='failed'||d.error){
-      renderGoldenSummary(d);
-      const gold=d.gold_count??0;
-      goldenProgress(d.error ? `실패: ${d.error}`
-        : (gold>0 ? `완료 — gold 후보 ${gold}건. 아래에서 검수/서명 화면을 여세요.`
-                  : '완료 — 검수로 올릴 후보가 0건입니다(채택 기준 미달). 판정기와 근거 요건 설정을 확인하세요.'));
-      log(`검증문서 준비 작업 ${d.status}: ${id} · gold ${gold}`, d.error?'err':'ok');
-      return;
-    }
-    goldenProgress(`job ${id} · ${d.status||'진행중'} — 대기 ${((i+1)*1.5).toFixed(0)}s`);
-    await new Promise(r=>setTimeout(r,1500));
-  }
-  goldenProgress('60초 내 완료되지 않았습니다 — [상태 새로고침]으로 확인하세요.');
-}
 async function loadGoldenJob(){
   const id=LAST_GOLDEN_JOB_ID;
-  if(!id){ goldenProgress('조회할 잡이 없습니다 — 먼저 [후보 생성 → 검수]를 실행하세요.'); return; }
+  if(!id){ goldenProgress('조회할 작업이 없습니다 — 먼저 [검수 시작]으로 묶음을 올리세요.'); return; }
   try{
     const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
     $('gold-result').textContent=JSON.stringify(d,null,2);
@@ -2823,7 +2585,7 @@ async function loadGoldenJob(){
 /* [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문). */
 async function openGoldenHtml(kind){
   const id=LAST_GOLDEN_JOB_ID;
-  if(!id){ goldenProgress('열 잡이 없습니다 — 먼저 [후보 생성 → 검수]를 실행하세요.'); return; }
+  if(!id){ goldenProgress('열 작업이 없습니다 — 먼저 [검수 시작]으로 묶음을 올리세요.'); return; }
   let url=`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/${kind}.html`;
   try{
     const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
@@ -3189,11 +2951,6 @@ function syncActiveGrades(codes){
 
 /* init */
 initPane();          // 탭 초기 표시 — 검수 탭이 기본, 탭마다 카드 4장 이하
-/* [2026-08-23] 후보 소스 기본값은 '서버 코퍼스 경로'인데 경로 입력칸(#gold-src-corpus)은
-   display:none 으로 시작하고 onchange 에서만 열렸다. 드롭다운을 다른 값으로 바꿨다 되돌리기
-   전에는 칸이 보이지 않아, 「후보 생성 → 검수」가 늘 "코퍼스 경로를 입력하세요" 로 끝났다.
-   초기 1회 동기화해 기본값과 화면을 맞춘다. */
-syncGoldenSource();
 loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸을 대체)
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncWriteGate();

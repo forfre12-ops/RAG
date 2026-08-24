@@ -42,76 +42,37 @@ export const scenarios = [
   },
 
   {
-    id: 'golden.build.blocked-without-llm',
-    title: 'LLM 이 없는 서버에서는 「후보 생성」이 잠기고 대신 되는 경로를 알려준다',
+    /* [2026-08-24] AI 후보 생성 시나리오 3건(blocked-without-llm · runs-when-llm-available ·
+       empty-body-guarded)을 지웠다. 그 기능이 화면에서 빠졌기 때문이다 —
+       요건이 아니고(제출본에 "골든"·"검증문서" 0회 · 이 카드에 secmark 없음), 판정 LLM 을
+       붙이지 않기로 했고, 필요한 검수 묶음은 이미 준비돼 있다.
+       API(POST /golden/build)는 그대로 살아 있고 서버측 시험이 따로 지킨다.
+       여기서는 **화면에 되살아나지 않는지**만 잠근다 — 되살리려면 이 시나리오를 먼저 지워야
+       하므로, 무심코 돌아오는 것을 막는다. */
+    id: 'golden.build.ai-generation-is-not-on-screen',
+    title: '화면에 AI 후보 생성이 없다',
+    why: '요건 아님 · 판정 LLM 미사용 결정. 되살아나면 이 시험이 먼저 걸린다',
     async run({ server, check }) {
-      const page = await reviewTab(server);
-      check.eq(page.$('gold-go')?.disabled, true, '후보 생성 버튼이 잠겼다');
-      check.ok(page.visible('gold-ai-blocked'), '왜 잠겼는지 안내가 보인다');
-      check.includes(page.text('gold-ai-blocked'), 'LLM', '등급을 매길 LLM 이 없다고 말한다');
-      check.ok(page.visible('gold-build-path'), '대신 쓸 수 있는 문서 묶음 목록이 보인다');
-
-      // 잠긴 버튼을 강제로 실행해도 요청이 나가면 안 된다
-      page.win.startGoldenBuild();
+      const page = await openPage(server, '/console/admin.html');
       await page.settle();
-      check.eq(server.countCalls('POST', '/golden/build'), 0, '잠긴 경로로는 요청이 나가지 않는다');
-      check.includes(page.text('gold-progress'), 'LLM', '눌렀을 때도 같은 사유를 말한다');
-      return page;
-    },
-  },
 
-  {
-    id: 'golden.build.runs-when-llm-available',
-    writes: true,
-    title: 'LLM 이 있으면 후보 생성 → 완료 폴링 → 검수/서명 버튼 활성화까지 간다',
-    needsMock: true,
-    async run({ server, check }) {
-      const health = JSON.parse(JSON.stringify(server.overrides));
-      void health;
-      const { FIXTURES } = await import('../lib/server.mjs');
-      server.overrides['GET /healthz'] = LLM_ON(FIXTURES['GET /healthz']);
-
-      const page = await reviewTab(server);
-      check.eq(page.$('gold-go')?.disabled, false, 'LLM 이 있으면 버튼이 열린다');
-
-      page.set('gold-source', 'editor');
-      page.set('cl-body', '당사 EUV 공정 레시피 원본 — 대외 반출 금지.');
-      page.click('gold-go');
-      await page.settle(6000);
-
-      const call = server.lastCall('POST', '/golden/build');
-      check.ok(call, 'POST /golden/build 가 나갔다');
-      check.eq(call?.body?.source_type, 'inline', '분류 패널 본문을 후보로 보냈다');
-      check.gte((call?.body?.docs || []).length, 1, '본문이 실제로 실렸다');
-      check.ok(server.lastCall('GET', '/golden/jobs/'), '완료까지 상태를 폴링했다');
-      check.includes(page.text('gold-progress'), '완료', '완료했다고 말한다');
-      check.includes(page.text('gold-progress'), '120', '몇 건이 후보가 됐는지 말한다');
-      // [2026-08-24] 검수·서명은 한 화면이라 버튼도 하나다(옛 gold-btn-review 는 없앴다).
-      check.eq(page.$('gold-btn-signoff')?.disabled, false, '검수·서명 화면 버튼이 열렸다');
-      check.eq(page.$('gold-btn-review'), null, '같은 화면을 여는 두 번째 버튼은 없다');
+      for (const id of ['gold-go', 'gold-ai-block', 'gold-ai-blocked', 'gold-provider',
+                        'gold-source', 'gold-n', 'gold-corpus-dir', 'gold-require-evidence']) {
+        check.ok(!page.$(id), `${id} 이 화면에 없다`);
+      }
+      check.ok(!page.win.startGoldenBuild, 'startGoldenBuild 배선이 없다');
+      // 「후보 생성」이라는 말 자체는 다른 카드(학습 후보 생성·합성, FUN-003 §N)에 남아 있다.
+      // 이 카드 안에만 없으면 된다.
+      const card = page.$('gold-reg').closest('section.card');
+      check.ok(!/후보 생성/.test(card.textContent), '이 카드에는 「후보 생성」이 없다');
+      // 대신 실제로 쓰는 경로는 그대로 있어야 한다.
+      check.ok(page.$('gold-reg'), '「검수 시작」은 그대로 있다');
+      check.ok(page.$('gold-build-path'), '문서 묶음 선택칸은 그대로 있다');
       assertNoScriptErrors(check, page);
       return page;
     },
   },
 
-  {
-    id: 'golden.build.empty-body-guarded',
-    title: '보낼 본문이 비어 있으면 무엇을 해야 하는지 알려주고 요청은 안 보낸다',
-    needsMock: true,
-    async run({ server, check }) {
-      const { FIXTURES } = await import('../lib/server.mjs');
-      server.overrides['GET /healthz'] = LLM_ON(FIXTURES['GET /healthz']);
-      const page = await reviewTab(server);
-      page.set('gold-source', 'editor');
-      page.set('cl-body', '');
-      page.click('gold-go');
-      await page.settle();
-      check.includes(page.text('gold-progress'), '비어 있', '본문이 비었다고 말한다');
-      check.includes(page.text('gold-progress'), '분류 실행', '어디에 넣으라고 짚어 준다');
-      check.eq(server.countCalls('POST', '/golden/build'), 0, '요청이 나가지 않는다');
-      return page;
-    },
-  },
 
   {
     id: 'golden.register.existing-bundle',
@@ -217,7 +178,7 @@ export const scenarios = [
       // 잡이 없을 때
       page.win.openGoldenSignoff();
       await page.settle();
-      check.includes(page.text('gold-progress'), '열 잡이 없습니다', '먼저 무엇을 하라고 말한다');
+      check.includes(page.text('gold-progress'), '열 작업이 없습니다', '먼저 무엇을 하라고 말한다');
       check.eq(page.opened.length, 0, '빈 주소로 창을 열지 않는다');
 
       // 잡을 만든 뒤
