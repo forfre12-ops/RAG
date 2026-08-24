@@ -110,35 +110,38 @@ export const scenarios = [
   },
 
   {
-    id: 'boot.admin.api-key-from-query',
-    title: '?key= 로 열면 키가 입력란에 들어가고 저장되며 주소에서 지워진다',
-    why: '실배포 서버는 키가 달라 기본값 그대로면 모든 버튼이 401 로 죽는다',
+    id: 'boot.admin.no-credential-entry',
+    title: '관리자 콘솔도 키를 묻지 않고, 입력칸도 주소 경로도 없다',
+    why: '2026-08-24 사용자 지시 — 웹 화면에서 키·토큰을 입력받지 않는다. 종전에는 입력칸에 '
+       + '기본값이 박혀 있었고 ?key= 로 주소에 실어 여는 경로가 있었다. 인증은 같은 오리진 '
+       + 'HttpOnly 쿠키가 맡는다.',
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html', { query: '?key=e2e-real-key' });
       await page.settle();
-      check.eq(page.$('cfg-key')?.value, 'e2e-real-key', '키가 입력란에 들어갔다');
-      check.eq(page.win.localStorage.getItem('koipa_api_key'), 'e2e-real-key', '다음 방문을 위해 저장됐다');
-      check.excludes(page.win.location.search, 'key=', '주소창에서 키가 지워졌다');
-      check.ok(
-        server.anyCall('GET', '/healthz', (c) => c.headers['x-api-key'] === 'e2e-real-key'),
-        '그 키로 실제 요청이 나갔다',
-        JSON.stringify(server.calls.map((c) => [c.path, c.headers['x-api-key']])),
-      );
+      check.ok(!page.$('cfg-key'), '키 입력칸이 화면에 없다');
+      check.eq(page.dialogs.filter((d) => d.kind === 'prompt').length, 0, '키를 묻는 창도 없다');
+      check.eq(page.win.localStorage.getItem('koipa_api_key'), null,
+        '주소에 실려 온 값을 저장하지 않는다');
+      check.ok(!server.calls.some((c) => c.headers['x-api-key']),
+        '그 값으로 요청이 나가지 않는다',
+        JSON.stringify(server.calls.map((c) => [c.path, c.headers['x-api-key']])));
       return page;
     },
   },
 
   {
-    id: 'boot.admin.saved-key-reused',
-    title: '저장된 키가 있으면 주소 없이도 그 키로 요청한다',
-    why: '한 번 넣은 키를 매번 다시 넣게 하면 현장에서 안 쓴다',
+    id: 'boot.admin.legacy-saved-key-still-sent',
+    title: '예전에 이 브라우저에 저장돼 있던 값이면 조용히 그대로 보낸다',
+    why: 'api_key 모드로 도는 다른 설치본에서 쓰던 콘솔이 이 판올림으로 죽지 않게 한다. '
+       + '새로 넣을 경로는 없앴으므로 사람이 타이핑할 자리는 여전히 없다.',
     async run({ server, check }) {
       const page = await openPage(server, '/console/admin.html', { storage: { koipa_api_key: 'saved-key-1' } });
       await page.settle();
-      check.eq(page.$('cfg-key')?.value, 'saved-key-1', '저장된 키가 입력란에 들어갔다');
+      check.ok(!page.$('cfg-key'), '그래도 입력칸은 없다');
       check.ok(
         server.anyCall('GET', '/healthz', (c) => c.headers['x-api-key'] === 'saved-key-1'),
-        '그 키로 요청했다',
+        '저장돼 있던 값으로 요청했다',
+        JSON.stringify(server.calls.map((c) => [c.path, c.headers['x-api-key']])),
       );
       return page;
     },

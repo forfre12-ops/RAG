@@ -8,7 +8,11 @@
 <style>
 :root{
   --bg:#ffffff; --bg-surface:#fafafa; --bg-mid:#f4f4f5; --bg-strong:#e4e4e7; --bg-inverse:#09090b;
-  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a; --text-faint:#a1a1aa;
+  --text:#09090b; --text-soft:#52525b; --text-dim:#71717a;
+  /* --text-faint 는 **글자에 쓰지 않는다** — 점·표식 배경 전용.
+     빈 상태·표 안내처럼 정보를 전달하는 글자는 최소 --text-dim(#71717a).
+     tests/test_console_contrast.py 가 이 규칙을 잠근다. */
+  --text-faint:#a1a1aa;
   --border:rgba(0,0,0,.08); --border-mid:rgba(0,0,0,.12); --border-strong:rgba(0,0,0,.18);
   --red:#e11d2e; --red-soft:#fef2f2; --red-border:#fecaca;
   --green:#16a34a; --green-soft:#f0fdf4; --amber:#d97706; --amber-soft:#fffbeb;
@@ -44,7 +48,7 @@ a{color:var(--text);}
 .flow-step b{font-family:var(--font-mono);font-size:11px;background:var(--bg-strong);color:var(--text);width:18px;height:18px;display:grid;place-items:center;border-radius:5px;}
 .flow-step.done{border-color:var(--green);color:var(--green);background:var(--green-soft);}
 .flow-step.done b{background:var(--green);color:#fff;}
-.flow-arrow{color:var(--text-faint);font-size:14px;}
+.flow-arrow{color:var(--text-dim);font-size:14px;}
 
 /* GRID */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
@@ -58,7 +62,7 @@ a{color:var(--text);}
 .card-head .step-no{font-family:var(--font-sans);font-size:10.5px;font-weight:700;letter-spacing:-.01em;color:#fff;background:var(--bg-inverse);min-width:20px;height:20px;padding:0 7px;display:inline-grid;place-items:center;border-radius:5px;white-space:nowrap;flex-shrink:0;}
 /* 흐름 밖 화면(상시 조회·설정) — 순서가 없으므로 숫자를 주지 않는다. 진한 배지와 구별되게 외곽선만. */
 .card-head .step-no.aux{background:transparent;color:var(--text-dim);border:1px solid var(--border-strong);font-weight:600;}
-.card-head .ep{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
+.card-head .ep{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);}
 .card-body{padding:16px 17px;display:flex;flex-direction:column;gap:11px;}
 
 /* FORM */
@@ -125,7 +129,7 @@ body.tech [data-tech]{display:revert !important;}
 
 /* QUEUE */
 .queue{display:flex;flex-direction:column;gap:9px;}
-.q-empty{font-size:12.5px;color:var(--text-faint);text-align:center;padding:18px 0;}
+.q-empty{font-size:12.5px;color:var(--text-dim);text-align:center;padding:18px 0;}
 .q-item{border:1px solid var(--border-mid);border-radius:9px;padding:11px 13px;display:flex;flex-direction:column;gap:8px;}
 .q-item.flagged{border-color:var(--amber);background:var(--amber-soft);}
 .q-item.resolved{opacity:.6;}
@@ -172,7 +176,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .why-agg{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
 .why-ev{display:flex;align-items:baseline;gap:8px;font-size:12px;padding:4px 0;border-top:1px solid var(--border);}
 .why-ev:first-of-type{border-top:0;}
-.why-t{font-size:10.5px;color:var(--text-faint);white-space:nowrap;min-width:118px;}
+.why-t{font-size:10.5px;color:var(--text-dim);white-space:nowrap;min-width:118px;}
 .why-x{flex:1;word-break:break-all;}
 .why-w{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);white-space:nowrap;}
 /* 프로파일에 맞지 않는 카드 — showPane 의 인라인 display 보다 우선해야 하므로 !important. */
@@ -193,22 +197,22 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .dash-panel .dp-tags{margin-left:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;}
 .dash-panel .dp-tags .pill{white-space:nowrap;font-family:var(--font-sans);letter-spacing:0;text-transform:none;font-size:11px;}
 .dash-panel .dp-big{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;}
-.dash-panel .dp-big .u{font-size:12px;font-weight:600;color:var(--text-faint);letter-spacing:0;margin-left:3px;}
+.dash-panel .dp-big .u{font-size:12px;font-weight:600;color:var(--text-dim);letter-spacing:0;margin-left:3px;}
 .dash-panel .dp-row{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-soft);}
 .dash-panel .dp-row b{color:var(--text);font-variant-numeric:tabular-nums;}
-.dash-panel .dp-note{font-size:11.5px;color:var(--text-faint);line-height:1.45;}
+.dash-panel .dp-note{font-size:11.5px;color:var(--text-dim);line-height:1.45;}
 /* 하위 수치 3~4개 — 라벨 위, 값 아래로 세워 좁은 칸에서도 짝이 안 흐트러진다. */
 .dash-panel .dp-h + .dp-stat{border-top:0;padding-top:0;}
 .dash-panel .dp-stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(36px,1fr));gap:6px;border-top:1px solid var(--border);padding-top:8px;}
 .dash-panel .dp-stat>div{display:flex;flex-direction:column;gap:1px;min-width:0;}
-.dash-panel .dp-stat span{font-size:10.5px;color:var(--text-faint);}
+.dash-panel .dp-stat span{font-size:10.5px;color:var(--text-dim);}
 .dash-panel .dp-stat b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2;}
 /* 등급별 서명 건수 — flex 로 흘리면 「TS 0 실0/합0  S1 0 …」이 제멋대로 접힌다. 한 줄 = 한 등급. */
 .dash-panel .dp-tab{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:5px 12px;}
 .dash-panel .dp-tab>div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-soft);min-width:0;}
 .dash-panel .dp-tab .gk{font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--text);background:var(--bg-strong);padding:1px 5px;}
 .dash-panel .dp-tab .n{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;min-width:20px;text-align:right;}
-.dash-panel .dp-tab small{color:var(--text-faint);font-size:10.5px;font-family:var(--font-mono);white-space:nowrap;}
+.dash-panel .dp-tab small{color:var(--text-dim);font-size:10.5px;font-family:var(--font-mono);white-space:nowrap;}
 .dash-panel .warnbox{font-size:11.5px;line-height:1.5;padding:8px 10px;}
 .dp-degraded{font-size:10.5px;color:var(--amber);font-family:var(--font-mono);}
 
@@ -221,7 +225,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 :root{
   --red:#0a0a0a;   --red-soft:#f4f4f4;   --red-border:rgba(0,0,0,.16);
   --green:#525252; --green-soft:#f4f4f4;
-  --amber:#737373; --amber-soft:#f4f4f4;
+  --amber:#71717a; --amber-soft:#f4f4f4;
 }
 .g-TS{background:#dc2626 !important;color:#fff !important;}
 .g-S1{background:#d97706 !important;color:#fff !important;}
@@ -260,7 +264,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .flow.loop{margin:0;}
 .loop-tag{font-size:11px;font-weight:800;letter-spacing:.02em;color:#fff;background:#0a0a0a;
           padding:4px 9px;margin-right:4px;white-space:nowrap;}
-.loop-note{font-size:11px;color:var(--text-faint);margin-left:auto;white-space:nowrap;}
+.loop-note{font-size:11px;color:var(--text-dim);margin-left:auto;white-space:nowrap;}
 
 .tabbar{display:flex;gap:0;border-bottom:2px solid var(--border-strong);margin:18px 0 0;flex-wrap:wrap;}
 .tab{appearance:none;cursor:pointer;background:transparent;border:1px solid transparent;border-bottom:none;
@@ -269,7 +273,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .tab:hover{color:var(--text);background:var(--bg-mid);}
 .tab.active{color:var(--text);background:#fff;border-color:var(--border-strong);
             border-bottom:2px solid #fff;}
-.tab-sub{font-size:11px;font-weight:500;color:var(--text-faint);}
+.tab-sub{font-size:11px;font-weight:500;color:var(--text-dim);}
 /* [2026-08-23] 탭 묶음 표시 — 왼쪽=매일 하는 일, 오른쪽=모델 담당자 일.
    [2026-08-24] 묶음 **이름**(.tab-group-label)의 규칙을 지웠다. 같은 날 넣었다가 뺀
    것인데(회색 글씨가 비활성 탭처럼 보였다 — 마크업 쪽 주석 참조) CSS 만 남아 있어
@@ -277,7 +281,7 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
    구분선 하나로만 가른다. */
 .tab-divider{align-self:stretch;width:1px;margin:6px 14px 0;background:var(--border-strong);}
 /* 설정은 매일 쓰는 업무가 아니라 톱니로 뺐다 — 오른쪽 끝에 아이콘만 둔다. */
-.tab.tab-icon{margin-left:auto;padding:9px 12px;color:var(--text-faint);}
+.tab.tab-icon{margin-left:auto;padding:9px 12px;color:var(--text-dim);}
 .tab.tab-icon:hover{color:var(--text);}
 .tab.tab-icon.active{color:var(--text);}
 @media (max-width:720px){.tab-divider{display:none;}}
@@ -317,7 +321,7 @@ details.adv[open]{padding-bottom:12px;}
           padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;
           font-size:12.5px;color:var(--text-soft);transition:background .12s,border-color .12s;}
 .dropzone b{font-size:13px;color:var(--text);}
-.dropzone span{font-size:11.5px;color:var(--text-faint);}
+.dropzone span{font-size:11.5px;color:var(--text-dim);}
 .dropzone:hover{background:var(--bg-strong);}
 .dropzone.over{border-color:#0070f3;background:#eff6ff;color:#1d4ed8;}
 .dropzone.over b{color:#1d4ed8;}
@@ -325,10 +329,9 @@ details.adv[open]{padding-bottom:12px;}
    매칭 대상이 0 이 됐다(class="nav"·nav-inner·brand-name·brand-sep·brand-sub·
    nav-right·nav-badge 전부 마크업 0건). .brand/.brand-mark/.health-pill/.dot 은
    지금 상단이 쓰므로 남긴다. */
-.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
 /* console-header:css:start — koipa/console_nav.py HEADER_CSS. 손으로 고치지 말 것 */
-.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
-.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#71717a;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#71717a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
 /* console-header:css:end */
 </style>
 <script src="./review_reason_ko.js"></script>
@@ -441,7 +444,7 @@ details.adv[open]{padding-bottom:12px;}
       </select>
     </label>
     <span id="auto-status" style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim);" role="status" aria-live="polite">정지</span>
-    <span id="auto-stamp" style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-left:auto;"></span>
+    <span id="auto-stamp" style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);margin-left:auto;"></span>
     <span class="hint" style="margin:0;flex-basis:100%;">관제 대시보드와 검수 큐를 주기적으로 <b>읽기 전용</b>으로 조회합니다.</span>
   </div>
 
@@ -457,8 +460,8 @@ details.adv[open]{padding-bottom:12px;}
       <details>
       <summary style="cursor:pointer;list-style:none">
       <div class="card-head" style="border:0;padding-bottom:0">
-        <div class="ttl"><span class="step-no aux">공통</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
-        <span class="ep" data-tech>X-API-Key · X-Actor-Role</span>
+        <div class="ttl"><span class="step-no aux">공통</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-dim)">— 접속 정보 · 보통 손대지 않습니다</span></div>
+        <span class="ep" data-tech>X-Actor-Role</span>
       </div>
       </summary>
       <div class="card-body">
@@ -467,11 +470,6 @@ details.adv[open]{padding-bottom:12px;}
             <label class="fld">API Base</label>
             <input id="cfg-base" type="text" value="/api/v1" />
             <p class="hint">기본은 이 페이지를 서빙하는 서버. 다른 호스트면 전체 URL.</p>
-          </div>
-          <div class="field">
-            <label class="fld">X-API-Key</label>
-            <input id="cfg-key" type="text" value="demo-secret-key" placeholder="시연 서버 API 키 입력" />
-            <p class="hint">비어 있으면 모든 호출이 401 입니다.</p>
           </div>
           <div class="field">
             <label class="fld">Actor Role</label>
@@ -500,7 +498,7 @@ details.adv[open]{padding-bottom:12px;}
           <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin:0;">
             <input id="cfg-write-enable" type="checkbox" style="width:auto" checked onchange="syncWriteGate()" />
             <b>쓰기 작업 허용</b>
-            <span id="write-gate-msg" style="font-size:11.5px;color:var(--text-faint);"></span>
+            <span id="write-gate-msg" style="font-size:11.5px;color:var(--text-dim);"></span>
           </label>
         </div>
       </div>
@@ -672,7 +670,7 @@ details.adv[open]{padding-bottom:12px;}
           
           <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
         </div>
-        <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
+        <div id="gs-body"><span style="color:var(--text-dim);font-size:12px;">「현황 조회」를 누르면 현재 상태가 나옵니다</span></div>
         <p class="sec-note" style="margin-top:8px;">읽기 전용 · 서명 화면에서 <b>라이브 반영</b>을 켜야 확정 수치가 오릅니다.</p>
         </p>
       </div>
@@ -799,7 +797,7 @@ details.adv[open]{padding-bottom:12px;}
         <div class="tbl-wrap">
           <table>
             <thead><tr><th>job</th><th>status</th><th>model_version</th><th>trigger</th></tr></thead>
-            <tbody id="jobs-body"><tr><td colspan="4" style="color:var(--text-faint)">목록 없음 — "작업 목록 새로고침"</td></tr></tbody>
+            <tbody id="jobs-body"><tr><td colspan="4" style="color:var(--text-dim)">「작업 목록 새로고침」을 누르면 학습 작업이 나옵니다</td></tr></tbody>
           </table>
         </div>
         <p class="sec-note">재학습본은 <b>후보로만</b> 등록됩니다 — 배포는 아래 4번에서 합니다.</p>
@@ -910,7 +908,7 @@ details.adv[open]{padding-bottom:12px;}
         <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
           <table>
             <thead><tr><th>시각</th><th>action</th><th>행위자</th><th>대상</th><th>결과</th></tr></thead>
-            <tbody id="au-body"><tr><td colspan="5" style="color:var(--text-faint)">「조회」를 누르세요.</td></tr></tbody>
+            <tbody id="au-body"><tr><td colspan="5" style="color:var(--text-dim)">「조회」를 누르면 감사 기록이 나옵니다</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -962,7 +960,7 @@ details.adv[open]{padding-bottom:12px;}
           
         </div>
 
-        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 검수에 올린 묶음이 없습니다.</div>
+        <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">검수에 올린 묶음이 없습니다</div>
 
         <div id="gold-summary" style="display:none;margin-top:10px;">
           <div class="dash-panel">
@@ -1020,7 +1018,7 @@ details.adv[open]{padding-bottom:12px;}
         <div class="tbl-wrap" style="margin-top:10px;">
           <table>
             <thead><tr><th>코드</th><th>명칭</th><th>순서</th><th>설명</th><th>색상</th><th></th></tr></thead>
-            <tbody id="grade-body"><tr><td colspan="6" style="color:var(--text-faint)">「현재 등급체계 불러오기」를 눌러 시작하세요.</td></tr></tbody>
+            <tbody id="grade-body"><tr><td colspan="6" style="color:var(--text-dim)">「현재 등급체계 불러오기」를 누르면 등급 목록이 나옵니다</td></tr></tbody>
           </table>
         </div>
         <div id="grade-result" style="margin-top:10px;" role="status" aria-live="polite"></div>
@@ -1093,7 +1091,7 @@ details.adv[open]{padding-bottom:12px;}
         <div class="tbl-wrap" style="margin-top:10px;">
           <table>
             <thead><tr><th>ID</th><th>등급</th><th>키워드</th><th>매칭</th><th>요소</th><th>가중치</th><th>상태</th><th></th></tr></thead>
-            <tbody id="kw-body"><tr><td colspan="8" style="color:var(--text-faint)">「키워드 조회」로 현재 태깅 규칙을 불러옵니다.</td></tr></tbody>
+            <tbody id="kw-body"><tr><td colspan="8" style="color:var(--text-dim)">「키워드 조회」를 누르면 태깅 규칙이 나옵니다</td></tr></tbody>
           </table>
         </div>
         <p class="sec-note">변경은 <b>핫리로드</b>로 재기동 없이 반영됩니다. 삭제하면 <b>비활성 처리</b>되고 이력은 남습니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히 — 다중 워커 · 가중치 상한</summary>응답의 <code>serving_reloaded</code> 는 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code> 를 워커 수만큼 호출하거나 롤링 재기동하세요. 삭제는 <code>is_active=false</code> 이며 FK·감사 이력이 보존됩니다. 가중치 상한은 9.99 입니다.</details></p>
@@ -1133,7 +1131,11 @@ let AUTO_TIMER=null, AUTO_SILENT=false, AUTO_INFLIGHT=false, AUTO_TICK_OK=true;
 const $ = id => document.getElementById(id);
 const cfg = () => ({
   base: $('cfg-base').value.replace(/\/$/,''),
-  key: $('cfg-key').value,
+  // [2026-08-24] 화면에서 키를 받지 않는다(사용자 지시). 인증은 같은 오리진 HttpOnly
+  // 쿠키(koipa_access_token)가 맡는다 — fetch 가 자동으로 싣는다. 이 값은 예전에
+  // 이 브라우저에 저장돼 있던 것을 그대로 쓸 때만 채워진다(api_key 모드로 도는 다른
+  // 설치본 호환). 새로 넣을 경로는 없앴다 — 입력칸도 ?key= 주소도 없다.
+  key: (()=>{ try{ return localStorage.getItem('koipa_api_key')||''; }catch(e){ return ''; } })(),
   role: $('cfg-role').value,
   user: $('cfg-user').value.trim() || 'console',
 });
@@ -1298,16 +1300,32 @@ function toggleLog(){ const b=$('logbody'); b.classList.toggle('collapsed'); $('
 function showRaw(obj){ if(AUTO_SILENT) return; $('raw-json').textContent = typeof obj==='string'?obj:JSON.stringify(obj,null,2); }
 function gradeTag(g){ return `<span class="tag g-${g}">${g}</span>`; }
 
+// [2026-08-24] 이 콘솔도 키·토큰을 화면에서 받지 않는다. 401 이면 로그인 화면으로
+// 한 번 보낸다 — 그 화면이 스스로 로그인하고 여기로 돌아온다. 표식은 이 탭이 닫힐
+// 때까지 남긴다(성공 응답으로 지우면 401 직후 들어온 다른 호출의 200 이 표식을 없앤다).
+const LOGIN_URL = '/api/v1/golden/candidates/login.html';
+const BOUNCE_FLAG = 'koipa_login_bounced';
+function authHeaders(c){ const h={'X-Actor-Role':c.role}; if(c.key) h['X-API-Key']=c.key; return h; }
+function bounceToLogin(){
+  try{
+    if(sessionStorage.getItem(BOUNCE_FLAG)==='1') return;
+    sessionStorage.setItem(BOUNCE_FLAG,'1');
+  }catch(e){ return; }
+  const next = location.pathname + location.search + location.hash;
+  location.href = LOGIN_URL + '?next=' + encodeURIComponent(next);
+}
+
 async function api(method, path, body){
   const c=cfg();
-  const headers={'X-API-Key':c.key, 'X-Actor-Role':c.role};
+  const headers=authHeaders(c);
   // tenant 제거: 격리는 KL 포털 전담. 단일 KL 인증(API키+서명 JWT)만 사용한다.
   if(body) headers['Content-Type']='application/json; charset=utf-8';
   const url=c.base+path;
   log(`${method} ${path}`, 'req');
   let res, text;
   try{
-    res=await fetch(url,{method, headers, body: body?JSON.stringify(body):undefined});
+    res=await fetch(url,{method, headers, body: body?JSON.stringify(body):undefined, credentials:'same-origin'});
+    if(res.status===401) bounceToLogin();
     text=await res.text();
   }catch(e){ AUTO_TICK_OK=false; log(`네트워크 오류: ${e.message}`,'err'); throw e; }
   let data; try{ data=text?JSON.parse(text):null; }catch{ data=text; }
@@ -1508,7 +1526,7 @@ async function postDocument(f){
     .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
   log('POST /documents','req');
   const r=await fetch(`${c.base}/documents`,
-    {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+    {method:'POST', headers:authHeaders(c), body:fd, credentials:'same-origin'});
   const t=await r.text();
   let d; try{ d=t?JSON.parse(t):null; }catch{ d=t; }
   if(!r.ok){
@@ -1601,7 +1619,7 @@ async function ingestLargeDocument(f, info){
   [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
     .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
   const r=await fetch(`${c.base}/documents`,
-    {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+    {method:'POST', headers:authHeaders(c), body:fd, credentials:'same-origin'});
   if(!r.ok){
     const t=await r.text();
     throw Object.assign(new Error(t.slice(0,300)), {status:r.status});
@@ -1656,7 +1674,7 @@ async function classifyFromFile(alsoClassify){
     [['source_type','cl-icd-source'],['security_marking','cl-icd-marking'],['access_scope','cl-icd-scope']]
       .forEach(([field,id])=>{ const el=$(id); const v=el&&el.value?el.value.trim():''; if(v) fd.append(field,v); });
     const r=await fetch(`${c.base}/documents/analyze`,
-      {method:'POST', headers:{'X-API-Key':c.key,'X-Actor-Role':c.role}, body:fd});
+      {method:'POST', headers:authHeaders(c), body:fd, credentials:'same-origin'});
     if(r.status===413){
       // 동기 경로 상한 초과 — 서버가 안내한 대용량 경로로 자동 전환한다.
       if(!guardWrite('대용량 문서 적재')) {
@@ -1673,7 +1691,7 @@ async function classifyFromFile(alsoClassify){
     }
     const d=await r.json();
     const text=(d.text || d.text_preview || '').trim();
-    if(!text){ if(info) info.textContent='추출된 본문이 비어 있습니다 — 스캔본이면 텍스트 레이어가 없을 수 있습니다.'; return; }
+    if(!text){ if(info) info.textContent='추출된 본문이 비어 있습니다 — 스캔본이면 텍스트 층이 없습니다'; return; }
     /* 추출만으로는 아무것도 저장하지 않는다(/documents/analyze 는 read-only 진단 경로).
        그래서 doc_id 는 아직 임시값이다. 분류를 실행할 때 ensurePersistableDoc() 이 이 파일을
        POST /documents 로 적재하고 진짜 UUID 로 바꿔 준다 — 그래야 확정·재라벨이 남는다. */
@@ -1850,7 +1868,7 @@ function renderQueue(){
   const q=$('queue');
   // [2026-08-24] 빈 목록 문구를 사실에 맞춘다. 종전 "분류를 실행하면 결과가 검수 큐에
   // 적재됩니다."는 분류했는데도 비어 있는 상황(자동 확정)에서 화면이 거짓말을 했다.
-  if(!QUEUE.length){ q.innerHTML='<div class="q-empty">검수가 필요한 문서가 없습니다. 이 목록에는 <b>확신이 기준에 못 미쳐 사람 판정을 기다리는 건</b>만 쌓입니다 — 자동 확정된 분류는 오지 않습니다.</div>'; return; }
+  if(!QUEUE.length){ q.innerHTML='<div class="q-empty">검수가 필요한 문서가 없습니다 — <b>자동 확정된 분류는 오지 않습니다.</b> 확신이 기준에 못 미쳐 사람 판정을 기다리는 건만 쌓입니다</div>'; return; }
   q.innerHTML=QUEUE.map((it,i)=>`
     <div class="q-item ${it.flagged?'flagged':''} ${it.resolved?'resolved':''}">
       <div class="q-top">
@@ -1892,7 +1910,7 @@ function whyRow(e){
        + `<span class="why-x">${esc(e.excerpt||'')}</span>${w}</div>`;
 }
 function renderWhy(d){
-  if(d.error==='not_found') return '<div class="sec-note">이 분류를 찾을 수 없습니다.</div>';
+  if(d.error==='not_found') return '<div class="sec-note">이 분류를 찾을 수 없습니다</div>';
   if(d.error) return `<div class="warnbox">근거 조회 실패: ${esc(d.error)}</div>`;
   const r=d.recorded||{};
   const a=r.automation_assessment||{};
@@ -1900,7 +1918,7 @@ function renderWhy(d){
   const alts=(r.alternatives||[]).map(a=>esc(a.level_code||'?')).join(' · ');
   const warn=(d.warnings||[]).map(w=>`<div class="sec-note">· ${esc(w)}</div>`).join('');
   const evs=(d.evidence||[]).map(whyRow).join('') ||
-    '<div class="sec-note">표시할 근거 항목이 없습니다.</div>';
+    '<div class="sec-note">표시할 근거 항목이 없습니다</div>';
   const byType=Object.entries(d.by_type||{}).map(([k,v])=>
     `<span class="pill">${esc(k)} ${Number(v).toFixed(2)}</span>`).join(' ');
   // 서버가 하나로 줄여 준 검수 사유 태그(causal_review_reason)를 한글로 옮겨 적는다.
@@ -2076,7 +2094,7 @@ async function loadJobs(){
         j.error?`<div style="color:var(--red);font-size:11.5px;margin-top:4px;word-break:break-all">${esc(j.error)}</div>`:''}</td>
       <td class="mono">${j.model_version||'-'}</td>
       <td>${j.trigger_type||'-'}</td></tr>`).join('')
-      : '<tr><td colspan="4" style="color:var(--text-faint)">작업 없음</td></tr>';
+      : '<tr><td colspan="4" style="color:var(--text-dim)">작업 없음</td></tr>';
     markFlow(3);
   }catch(e){ $('jobs-body').innerHTML=`<tr><td colspan="4" style="color:var(--red)">조회 실패 ${errKo(e)}${e.status===404?' — 학습 라우터가 꺼진 서버입니다':''}</td></tr>`; }
 }
@@ -2108,7 +2126,7 @@ async function activateModel(){
   const force=$('act-force').checked;
   if(force && !confirm('force=true는 deploy gate(고등급 미탐 FNR·F1 회귀)를 우회합니다.\n감사에 기록됩니다. 진행할까요?')) return;
   // force 가 아니어도 배포 모델 교체 자체가 서빙에 즉시 반영되는 비가역 동작이다.
-  if(!force && !confirm(`배포 모델을 "${ver}" 로 교체합니다.\n\ndeploy gate(고등급 미탐 FNR·F1 회귀)를 통과하면 즉시 서빙에 반영됩니다.\n문제가 있으면 [복구 · 고급] 안의 [직전 모델로 롤백]으로 되돌릴 수 있습니다. 진행할까요?`)) return;
+  if(!force && !confirm(`배포 모델을 "${ver}" 로 교체합니다.\n\ndeploy gate(고등급 미탐 FNR·F1 회귀)를 통과하면 즉시 서빙에 반영됩니다.\n문제가 있으면 「복구 · 고급」 안의 「직전 모델로 롤백」으로 되돌릴 수 있습니다. 진행할까요?`)) return;
   try{
     const d=await api('POST','/admin/model/activate',{version_label:ver, force});
     const badge = d.activated ? '<span class="pill ok">활성화됨</span>'
@@ -2152,7 +2170,7 @@ async function rollbackModel(){
       if(box) box.className='warnbox';
       // 복귀 후보가 없는 경우가 가장 흔하다 — 활성 이력이 1개뿐이면 되돌릴 곳이 없다.
       const msg = d.reason==='no_previous_version'
-        ? '되돌릴 직전 활성본이 없습니다 — 활성 이력이 하나뿐입니다.'
+        ? '되돌릴 직전 활성본이 없습니다 — 활성 이력이 하나뿐입니다'
         : `롤백되지 않았습니다: ${esc(d.reason||'')}`;
       if(box) box.innerHTML=msg;
       log(`롤백 불가: ${d.reason||''}`,'err');
@@ -2171,7 +2189,7 @@ async function rollbackModel(){
  * 신원이 남지 않으므로, 감사 추적이 실제로 성립하는지를 화면이 스스로 드러내야 한다. */
 async function loadAuditLog(){
   const body=$('au-body'), warn=$('au-warn'), info=$('au-info');
-  body.innerHTML='<tr><td colspan="5" style="color:var(--text-faint)">조회 중…</td></tr>';
+  body.innerHTML='<tr><td colspan="5" style="color:var(--text-dim)">불러오는 중…</td></tr>';
   if(warn) warn.innerHTML='';
   try{
     const q=new URLSearchParams({limit:'50'});
@@ -2180,7 +2198,7 @@ async function loadAuditLog(){
     const d=await api('GET',`/admin/audit-log?${q.toString()}`);
     const items=d.items||[];
     if(!items.length){
-      body.innerHTML='<tr><td colspan="5" style="color:var(--text-faint)">해당 기록이 없습니다.</td></tr>';
+      body.innerHTML='<tr><td colspan="5" style="color:var(--text-dim)">해당 기록이 없습니다 — 기간이나 조건을 넓혀 보세요</td></tr>';
     }else{
       body.innerHTML=items.map(it=>{
         const t=String(it.occurred_at||'').replace('T',' ').replace(/\.\d+/,'').replace('Z','').slice(0,19);
@@ -2222,7 +2240,7 @@ const ORIGIN_LABEL={ public_real:'공개 실문서', customer_real:'고객사 �
 
 async function loadGoldenStatus(){
   const box=$('gs-body'); if(!box) return;
-  box.innerHTML='<span style="color:var(--text-faint);font-size:12px;">조회 중…</span>';
+  box.innerHTML='<span style="color:var(--text-dim);font-size:12px;">불러오는 중…</span>';
   let corpus=null;
   try{ corpus=await api('GET','/golden/summary'); }
   catch(e){ corpus={__err:`${errKo(e)}`}; }
@@ -2242,7 +2260,7 @@ async function loadGoldenStatus(){
               const L=TIER_LABEL[k]||[k,''];
               return `<tr><td><b>${esc(L[0])}</b></td><td class="mono">${v}</td>`
                 + `<td class="mono">${tot?((v/tot)*100).toFixed(1):0}%</td>`
-                + `<td style="color:var(--text-faint);font-size:11.5px;">${esc(L[1])}</td></tr>`;
+                + `<td style="color:var(--text-dim);font-size:11.5px;">${esc(L[1])}</td></tr>`;
             }).join('')}</tbody>
           </table></div>
           <div class="dp-row" style="margin-top:8px;">
@@ -2269,7 +2287,7 @@ async function loadGoldenStatus(){
         <td>${gradeTag(g)}</td>
         <td class="mono"><b>${have}</b> / ${min}</td>
         <td>${ok?'<span class="pill ok">충족</span>':`<span class="pill warn">${need}건 남음</span>`}</td>
-        <td style="color:var(--text-faint);font-size:11.5px;">${compo.join(' · ')||'—'}</td>
+        <td style="color:var(--text-dim);font-size:11.5px;">${compo.join(' · ')||'—'}</td>
       </tr>`;
     }).join('');
     // ready 만 크게 보이면 "평가 준비 끝"으로 읽힌다. 실측 2026-08-09: TS 5건이 전부 합성인데
@@ -2339,7 +2357,7 @@ async function loadMetrics(){
     }
     const byg=d.fnr_by_grade||{};
     $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 FNR · 모델 ${d.model_version} (측정 ${d.measured_at||'-'})</label>
-      <div class="kv" style="margin-top:4px">${GRADES.map(g=>byg[g]!=null?`<div><span>${g}</span> <b style="color:${byg[g]>0.05?'var(--red)':'var(--green)'}">${(byg[g]*100).toFixed(1)}%</b></div>`:'').join('')||'<span style="color:var(--text-faint)">등급별 데이터 없음</span>'}</div></div>`;
+      <div class="kv" style="margin-top:4px">${GRADES.map(g=>byg[g]!=null?`<div><span>${g}</span> <b style="color:${byg[g]>0.05?'var(--red)':'var(--green)'}">${(byg[g]*100).toFixed(1)}%</b></div>`:'').join('')||'<span style="color:var(--text-dim)">등급별 데이터 없음</span>'}</div></div>`;
     markFlow(5);
   }catch(e){ $('metrics-cards').innerHTML=''; $('metrics-extra').innerHTML=`<div class="warnbox">메트릭 조회 실패: ${errKo(e)} — 평가 실행 이력이 없거나 DB 미가용일 수 있습니다.</div>`; }
 }
@@ -2357,7 +2375,7 @@ async function loadHistory(){
         <td>${m.recall_macro!=null?(m.recall_macro*100).toFixed(1)+'%':'-'}</td>
         <td>${m.f1_macro!=null?(m.f1_macro*100).toFixed(1)+'%':'-'}</td>
         <td style="color:${m.fnr_overall>0.05?'var(--red)':'inherit'}">${m.fnr_overall!=null?(m.fnr_overall*100).toFixed(1)+'%':'-'}</td>
-        <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="8" style="color:var(--text-faint)">이력 없음</td></tr>'}</tbody></table></div>`;
+        <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="8" style="color:var(--text-dim)">이력 없음</td></tr>'}</tbody></table></div>`;
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${errKo(e)}</div>`; }
 }
 async function loadConfusionMatrix(){
@@ -2368,8 +2386,8 @@ async function loadConfusionMatrix(){
     const head=`<tr><th class="mono">실제 \\ 예측</th>${labels.map(l=>`<th class="mono" style="text-align:center">${esc(l)}</th>`).join('')}</tr>`;
     const rows=m.map((row,i)=>`<tr><td class="mono"><b>${esc(labels[i]??i)}</b></td>${row.map((v,j)=>`<td style="text-align:center;${i===j?'font-weight:700;background:var(--green-soft);color:var(--green)':''}">${v}</td>`).join('')}</tr>`).join('');
     const fnr=d.fnr_by_grade||{};
-    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">혼동행렬 — 모델 ${esc(d.model_version||LAST_MODEL_VERSION)} <span style="color:var(--text-faint)">(대각선=정분류)</span></label>
-      <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${rows||'<tr><td style="color:var(--text-faint)">데이터 없음</td></tr>'}</tbody></table></div>
+    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">혼동행렬 — 모델 ${esc(d.model_version||LAST_MODEL_VERSION)} <span style="color:var(--text-dim)">(대각선=정분류)</span></label>
+      <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${rows||'<tr><td style="color:var(--text-dim)">데이터 없음</td></tr>'}</tbody></table></div>
       ${Object.keys(fnr).length?`<div class="kv" style="margin-top:8px">${Object.entries(fnr).map(([g,v])=>`<div><span>FNR ${esc(g)}</span> <b style="color:${v>0.05?'var(--red)':'var(--green)'}">${(v*100).toFixed(1)}%</b></div>`).join('')}</div>`:''}</div>`;
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">혼동행렬 조회 실패: ${errKo(e)} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 혼동행렬 이력이 없을 수 있습니다.</div>`; }
 }
@@ -2541,7 +2559,7 @@ function renderGoldenSummary(d){
     : '';
   $('gold-grades').innerHTML = (GRADES.some(g=>byg[g])
     ? GRADES.map(g=>`<div><span>${g}</span> <b>${byg[g]??0}</b></div>`).join('')
-    : '<span style="color:var(--text-faint)">등급 분포 없음 — gold 후보 0건</span>') + leakLine;
+    : '<span style="color:var(--text-dim)">등급 분포 없음 — gold 후보 0건</span>') + leakLine;
 
   /* [2026-08-24] gold 0건 안내를 등록 경로 기준으로 다시 썼다. 종전 문구는 판정기 선택
      (noop 더미·근거 요건·후보 수)을 원인으로 지목했는데, AI 후보 생성이 화면에서 빠지면서
@@ -2603,7 +2621,7 @@ async function registerGoldenBuild(){
 }
 async function loadGoldenJob(){
   const id=LAST_GOLDEN_JOB_ID;
-  if(!id){ goldenProgress('조회할 작업이 없습니다 — 먼저 [검수 시작]으로 묶음을 올리세요.'); return; }
+  if(!id){ goldenProgress('조회할 작업이 없습니다 — 먼저 「검수 시작」으로 묶음을 올리세요'); return; }
   try{
     const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
     $('gold-result').textContent=JSON.stringify(d,null,2);
@@ -2618,7 +2636,7 @@ async function loadGoldenJob(){
 /* [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문). */
 async function openGoldenHtml(kind){
   const id=LAST_GOLDEN_JOB_ID;
-  if(!id){ goldenProgress('열 작업이 없습니다 — 먼저 [검수 시작]으로 묶음을 올리세요.'); return; }
+  if(!id){ goldenProgress('열 작업이 없습니다 — 먼저 「검수 시작」으로 묶음을 올리세요'); return; }
   let url=`${cfg().base}/golden/jobs/${encodeURIComponent(id)}/${kind}.html`;
   try{
     const d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`);
@@ -2717,7 +2735,7 @@ async function loadSynthQueue(){
 function renderSynthQueue(){
   const box=$('sy-queue');
   const reviewable = $('sy-status').value==='pending';
-  if(!SYNTH.length){ box.innerHTML='<div class="q-empty">해당 상태의 합성 문서가 없습니다. 생성 직후라면 워커 처리까지 잠시 걸립니다.</div>'; return; }
+  if(!SYNTH.length){ box.innerHTML='<div class="q-empty">해당 상태의 합성 문서가 없습니다 — 생성 직후라면 잠시 뒤 다시 조회하세요</div>'; return; }
   box.innerHTML=SYNTH.map((it,i)=>`
     <div class="q-item">
       <div class="q-top">
@@ -2777,7 +2795,7 @@ async function loadGradeEditor(){
 
 function renderGradeEditor(){
   const body=$('grade-body');
-  if(!GRADE_ROWS.length){ body.innerHTML='<tr><td colspan="6" style="color:var(--text-faint)">등급이 없습니다 — 「등급 행 추가」로 새 체계를 만들 수 있습니다.</td></tr>'; return; }
+  if(!GRADE_ROWS.length){ body.innerHTML='<tr><td colspan="6" style="color:var(--text-dim)">등급이 없습니다 — 「등급 행 추가」로 새 체계를 만드세요</td></tr>'; return; }
   body.innerHTML=GRADE_ROWS.map((g,i)=>`
     <tr>
       <td><input class="mono" id="ge-code-${i}" type="text" value="${esc(g.code)}" style="width:88px" placeholder="TS" /></td>
@@ -2838,7 +2856,7 @@ async function saveGrades(){
     GRADE_ROWS=rows; GRADE_LOADED_CODES=codes;
     syncActiveGrades(codes);
     $('grade-result').innerHTML = d.requires_retraining
-      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>등급 구조가 바뀌었습니다. 배포 모델은 <b>재학습 전까지 기존 라벨</b>로 추론합니다. [모델] 탭에서 <b>3 재학습 트리거 → 4 모델 서빙·배포</b> 순서로 진행하세요.</div>`
+      ? `<div class="warnbox"><b>재학습 필요</b> — version ${esc(d.version)} · 사유: ${esc(d.reason)}<br/>등급 구조가 바뀌었습니다. 배포 모델은 <b>재학습 전까지 기존 라벨</b>로 추론합니다. 「모델」 탭에서 <b>3 재학습 트리거 → 4 모델 서빙·배포</b> 순서로 진행하세요.</div>`
       : `<div class="kv"><div><span>저장됨</span> <b>version ${esc(d.version)}</b></div><div><span>재학습</span> <b>불필요</b></div><div><span>사유</span> <b>${esc(d.reason)}</b></div></div>`;
     $('grade-info').textContent=`저장 완료 · 활성 ${rows.length}개`;
     log(`등급체계 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
@@ -2867,7 +2885,7 @@ async function loadKeywords(){
 
 function renderKeywords(){
   const body=$('kw-body');
-  if(!KEYWORDS.length){ body.innerHTML='<tr><td colspan="8" style="color:var(--text-faint)">조건에 맞는 키워드가 없습니다.</td></tr>'; return; }
+  if(!KEYWORDS.length){ body.innerHTML='<tr><td colspan="8" style="color:var(--text-dim)">조건에 맞는 키워드가 없습니다 — 필터를 지우면 전체가 나옵니다</td></tr>'; return; }
   body.innerHTML=KEYWORDS.map((k,i)=>`
     <tr style="${k.is_active?'':'opacity:.55'}">
       <td class="mono">${k.keyword_id}</td>
@@ -2956,31 +2974,9 @@ function syncActiveGrades(codes){
   });
 }
 
-/* ---- API 키 자동 채움 ----
- * 콘솔은 정적 파일이라 서버가 키를 심어줄 수 없다. 그래서 기본값(demo-secret-key)이 박혀 있었는데,
- * 실배포 서버는 키가 다르므로 열자마자 모든 버튼이 `invalid api key` 로 실패했다(2026-08-07 KL 서버 실측).
- * 두 경로로 채운다 — 둘 다 서버에 키를 노출하지 않는다(주소를 아는 사람만 전달받는 구조):
- *   1) 주소에 ?key=... 를 붙여 열면 그 값을 쓰고 이 브라우저에 저장한다(다음부터는 주소 없이도 됨)
- *   2) 저장된 값이 있으면 그걸 쓴다
- * 저장을 원치 않으면 ?key=...&nosave=1 로 연다. 키를 지우려면 ?key= (빈 값)으로 연다. */
-(function initApiKey(){
-  try{
-    const q = new URLSearchParams(location.search);
-    const el = $('cfg-key');
-    if(!el) return;
-    if(q.has('key')){
-      const k = (q.get('key')||'').trim();
-      el.value = k;
-      if(k && q.get('nosave')!=='1') localStorage.setItem('koipa_api_key', k);
-      if(!k) localStorage.removeItem('koipa_api_key');
-      // 주소창에서 키를 지운다(어깨너머 노출·히스토리 잔류 방지). 값은 이미 입력란에 들어갔다.
-      history.replaceState(null, '', location.pathname);
-      return;
-    }
-    const saved = localStorage.getItem('koipa_api_key');
-    if(saved) el.value = saved;
-  }catch(e){/* localStorage 차단 환경 — 기본값 유지 */}
-})();
+/* [2026-08-24] 「API 키 자동 채움」 블록을 없앴다. 주소에 ?key= 를 붙여 여는 경로였는데,
+ * 사용자 지시로 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 HttpOnly 쿠키가
+ * 맡고, 없으면 401 → 로그인 화면으로 보낸다(위 bounceToLogin). */
 
 /* init */
 /* [2026-08-24] 기술 상세 스위치. 주소에 `?tech=1` 이 있으면 켠다.
