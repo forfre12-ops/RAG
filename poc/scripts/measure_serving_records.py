@@ -81,7 +81,20 @@ def _sha256_file(path: Path) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
-def _env_value(v: object) -> str:
+def _env_value(v: object) -> str | None:
+    """설정값 → 환경변수 문자열. **None 은 None 을 돌려준다(넣지 않는다는 뜻).**
+
+    [2026-08-24] 종전에는 str(None) == "None" 을 그대로 환경변수에 넣었다. pydantic 은 그
+    문자열을 float 로 파싱하려다 죽는다 — 실측: check_demo_docs.py 가
+    review_confidence_threshold_public='None' 로 Settings() 구성에 실패해 **스크립트가 아예
+    안 돌았다**(223 배포 이미지·로컬 양쪽). 설정 자체는 정상인데 스크립트만 죽는 형태라
+    원인을 찾기 어려웠다.
+
+    None 은 "그 손잡이를 쓰지 않는다"는 뜻이고, 환경변수에는 그런 표현이 없다. 넣지 않는 것이
+    그 뜻이다 — 호출부가 None 을 받으면 건너뛴다.
+    """
+    if v is None:
+        return None
     if isinstance(v, bool):
         return "1" if v else "0"
     return str(v)
@@ -214,7 +227,11 @@ def main(argv: list[str] | None = None) -> int:
         if expected[key] is None:
             os.environ.pop(key.upper(), None)
             continue
-        os.environ[key.upper()] = _env_value(expected[key])
+        _v = _env_value(expected[key])
+        if _v is None:
+            os.environ.pop(key.upper(), None)   # None = 그 손잡이를 쓰지 않는다
+        else:
+            os.environ[key.upper()] = _v
 
     # 프로파일 export **뒤에** 적용한다 - 위 루프가 나중에 돌면 덮어쓰기가 조용히 무시된다
     # (실측 2026-08-23: REVIEW_CONFIDENCE_THRESHOLD 를 env 로 줬는데 유효값이 0.7 그대로였다).

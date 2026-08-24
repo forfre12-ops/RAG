@@ -73,9 +73,13 @@ DEMO_EXPECTATIONS: tuple[dict, ...] = (
     # 없어 표 추출이 열화로 잡혀 검수로 갔다 - 로컬 쪽이 틀린 것이다.
     {"file": "05_S1_tech_transfer.pdf", "grade": "S1", "status": "staging",
      "reason": None, "shown_as": "S1 1급 · 기술이전 PDF - 자동확정"},
+    # [2026-08-24 정정] 기대 사유를 low-confidence → extraction-gate 로. 8/24 에 검수 임계를
+    # 0.70 → 0.50 으로 내리면서(config.py full-train) conf 0.540 이 더 이상 저신뢰에 걸리지
+    # 않는다. 대신 얇은 본문을 잡는 추출 게이트가 라우팅한다 — **결과(검수행)는 같고 사유만
+    # 바뀌었다.** 기대값이 임계 변경을 따라가지 못한 것이라 화면·코드가 아니라 여기가 낡았다.
     {"file": "06_FAIL_thin_text.txt", "grade": None, "status": "needs_review",
-     "reason": "low-confidence", "allow_no_classification": True,
-     "shown_as": "검수 · 얇은 본문 - 확신 부족"},
+     "reason": "extraction-gate", "allow_no_classification": True,
+     "shown_as": "검수 · 얇은 본문 - 판정할 본문이 부족"},
 )
 
 # 자동확정 문서의 confidence 가 임계에 이만큼 이내면 경고한다(실패는 아님). 03 납품단가표가
@@ -169,7 +173,13 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["CLASSIFIER_MODEL_DIR"] = str(Path(args.model_dir).resolve())
         expected_settings = msr._profile_expected(args.profile, msr.PARITY_KEYS)
         for key in msr.PARITY_KEYS:
-            os.environ[key.upper()] = msr._env_value(expected_settings[key])
+            # [2026-08-24] None 은 환경변수에 넣지 않는다 — 넣으면 "None" 문자열이 되어
+            # pydantic 이 float 파싱에 실패하고 스크립트가 아예 안 돈다(실측).
+            _v = msr._env_value(expected_settings[key])
+            if _v is None:
+                os.environ.pop(key.upper(), None)
+            else:
+                os.environ[key.upper()] = _v
 
         from fastapi.testclient import TestClient  # noqa: PLC0415
         from koipa.api.app import app  # noqa: PLC0415
