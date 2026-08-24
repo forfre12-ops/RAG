@@ -107,6 +107,46 @@ export const scenarios = [
   },
 
   {
+    id: 'deploy.danger-controls-are-folded',
+    title: 'force · 롤백 · 핫리로드는 「복구 · 고급」 안에 접혀 있고, 기본 화면에는 활성화만 있다',
+    why: 'force 체크박스가 활성화 버튼 바로 옆에 있어 평소 조작 중에 잘못 눌릴 수 있었다',
+    async run({ server, check }) {
+      const page = await trainTab(server);
+      const adv = page.$('deploy-adv');
+      check.ok(adv, '「복구 · 고급」 접기 영역이 있다');
+      check.eq(adv?.open, false, '기본은 접혀 있다');
+      for (const [name, sel] of [
+        ['force 체크박스', '#act-force'],
+        ['롤백', 'button[onclick="rollbackModel()"]'],
+        ['핫리로드', 'button[onclick="reloadModel()"]'],
+      ]) {
+        const el = page.q(sel);
+        check.ok(el, `${name} 이 남아 있다(삭제가 아니라 이동)`);
+        check.ok(el && adv.contains(el), `${name} 이 접기 영역 안에 있다`);
+      }
+      check.ok(!adv.contains(page.q('button[onclick="activateModel()"]')), '평소 조작(활성화)은 접히지 않는다');
+      return page;
+    },
+  },
+
+  {
+    id: 'deploy.activate.blocked-opens-advanced',
+    writes: true,
+    title: '게이트가 막으면 force 가 있는 접기 영역을 열어 준다',
+    why: '우회 수단을 접어 두면, 막혔을 때 어디를 눌러야 하는지 화면이 말해 줘야 한다',
+    async run({ server, check }) {
+      // v-cccccccc 는 본보기가 게이트 차단으로 답하는 버전이다(위 gate-blocked-visible 과 같은 길).
+      const page = await trainTab(server);
+      page.set('act-ver', 'v-cccccccc');
+      page.click(page.q('button[onclick="activateModel()"]'));
+      await page.settle();
+      check.includes(page.html('activate-result'), '게이트 차단', '차단됐다고 화면이 말한다');
+      check.eq(page.$('deploy-adv')?.open, true, '접기 영역이 열렸다');
+      return page;
+    },
+  },
+
+  {
     id: 'deploy.activate.force-double-confirm',
     writes: true,
     title: 'force 우회는 게이트를 건너뛴다고 따로 경고한다',

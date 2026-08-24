@@ -257,15 +257,17 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .tab.active{color:var(--text);background:#fff;border-color:var(--border-strong);
             border-bottom:2px solid #fff;}
 .tab-sub{font-size:11px;font-weight:500;color:var(--text-faint);}
-/* [2026-08-23] 탭 묶음 표시 — 왼쪽=매일 하는 일, 오른쪽=모델 담당자 일. */
-.tab-group-label{align-self:flex-end;padding:0 10px 9px 2px;font-size:11px;font-weight:700;
-  letter-spacing:.02em;color:var(--text-faint);white-space:nowrap;}
+/* [2026-08-23] 탭 묶음 표시 — 왼쪽=매일 하는 일, 오른쪽=모델 담당자 일.
+   [2026-08-24] 묶음 **이름**(.tab-group-label)의 규칙을 지웠다. 같은 날 넣었다가 뺀
+   것인데(회색 글씨가 비활성 탭처럼 보였다 — 마크업 쪽 주석 참조) CSS 만 남아 있어
+   "의도만 있고 미구현"으로 읽혔다. 되살릴 거면 색·위치부터 다시 정할 것. 지금은
+   구분선 하나로만 가른다. */
 .tab-divider{align-self:stretch;width:1px;margin:6px 14px 0;background:var(--border-strong);}
 /* 설정은 매일 쓰는 업무가 아니라 톱니로 뺐다 — 오른쪽 끝에 아이콘만 둔다. */
 .tab.tab-icon{margin-left:auto;padding:9px 12px;color:var(--text-faint);}
 .tab.tab-icon:hover{color:var(--text);}
 .tab.tab-icon.active{color:var(--text);}
-@media (max-width:720px){.tab-divider{display:none;} .tab-group-label{width:100%;padding-bottom:2px;}}
+@media (max-width:720px){.tab-divider{display:none;}}
 .tab.active .tab-sub{color:var(--text-soft);}
 .pane-note{font-size:12px;color:var(--text-soft);margin:11px 0 4px;line-height:1.5;}
 
@@ -329,7 +331,7 @@ details.adv[open]{padding-bottom:12px;}
     <h1 class="h1">관리자 콘솔</h1>
     <p class="lede">이 콘솔에는 <b>두 개의 루프</b>가 있습니다 —
     <b>루프 A(일상 운영)</b> 분류 → 검수·확정, <b>루프 B(모델 갱신)</b> 검증문서 → 검수·서명 → 재학습 → 배포 → 메트릭.
-    <b>운영</b> 탭이 루프 A, <b>검수</b>와 <b>학습 · 배포</b> 탭이 루프 B 입니다(설정은 어느 쪽도 아닙니다).
+    <b>운영</b> 탭이 루프 A, <b>검증문서</b>와 <b>학습 · 배포</b> 탭이 루프 B 입니다(설정은 어느 쪽도 아닙니다).
     찾는 기능이 안 보이면 다른 탭에 있습니다.
     모든 동작은 기존 <code>/api/v1</code> 엔드포인트를 그대로 호출합니다.</p>
   </div>
@@ -388,7 +390,13 @@ details.adv[open]{padding-bottom:12px;}
          "이건 성격이 다르다"가 전달된다. 무엇이 무엇인지는 탭 아래 한 줄 설명이 말한다. -->
     <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제 · 감사</span></button>
     <span class="tab-divider" aria-hidden="true"></span>
-    <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검수<span class="tab-sub">검증문서 후보 · 서명</span></button>
+    <!-- [2026-08-24] 탭 이름을 「검수」 → 「검증문서」로. 위 2026-08-23 주석이 적어 둔 문제
+         ("이름이 「분류 검수 큐」와 겹친다")를 자리 이동으로만 눌러 뒀는데, 이름 자체가
+         같으면 옆에 옮겨도 같은 말로 읽힌다. 운영 탭의 「검수」는 요건·API 어휘(FUN-024 ·
+         needs_review)라 못 바꾸므로, 바꿀 수 있는 이쪽을 대상 이름으로 부른다.
+         이제 화면에서 「검수」는 두 곳뿐이고 서로 다른 대상이다 — 운영 탭=분류 결과 검수,
+         이 탭=검증문서 검수. -->
+    <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검증문서<span class="tab-sub">후보 구성 · 검수 · 서명</span></button>
     <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">학습 후보 · 재학습 · 게이트 · 메트릭</span></button>
     <button class="tab tab-icon" data-tab="config" role="tab" onclick="showPane('config')"
             title="설정 — 등급 체계 · 태깅 규칙 (도입 시 한 번 정하고 이후 거의 바꾸지 않습니다)"
@@ -713,9 +721,12 @@ details.adv[open]{padding-bottom:12px;}
             </select>
           </div>
           <div class="field">
-            <label class="fld">검수 큐 상태</label>
+            <!-- [2026-08-24] 「검수 큐」 → 「학습 후보 검토 큐」. 운영 탭의 검수 큐(분류 결과)와
+                 글자가 같아 같은 목록으로 읽혔다. 여기 있는 것은 아직 문서가 아니라 학습용
+                 합성 후보다. 서버 상태값(pending/approved/rejected)은 그대로 둔다. -->
+            <label class="fld">학습 후보 검토 큐 — 상태</label>
             <select id="sy-status" onchange="loadSynthQueue()">
-              <option value="pending">pending (검수 대기)</option>
+              <option value="pending">pending (검토 대기)</option>
               <option value="approved">approved (승인됨)</option>
               <option value="rejected">rejected (반려됨)</option>
             </select>
@@ -724,14 +735,14 @@ details.adv[open]{padding-bottom:12px;}
             <label class="fld">&nbsp;</label>
             <div class="btn-row" style="margin:0;">
               <button class="btn" id="sy-gen" onclick="synthGenerate()">생성 요청</button>
-              <button class="btn sec sm" onclick="loadSynthQueue()">검수 큐 새로고침</button>
+              <button class="btn sec sm" onclick="loadSynthQueue()">검토 큐 새로고침</button>
             </div>
           </div>
         </div>
         <p class="hint" id="sy-provider-note" style="margin-top:2px"></p>
         <div id="sy-noop-note" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
-        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검수 큐 새로고침」으로 생성된 합성 문서의 검수 대기분을 조회합니다. 학습행으로 만들 수 있는 것은 승인한 건뿐이며, 실제 편입은 관리자가 학습셋 생성 절차를 돌릴 때 이뤄집니다.</div></div>
+        <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검토 큐 새로고침」으로 생성된 합성 문서의 검토 대기분을 조회합니다. 학습행으로 만들 수 있는 것은 승인한 건뿐이며, 실제 편입은 관리자가 학습셋 생성 절차를 돌릴 때 이뤄집니다.</div></div>
         <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
       </div>
     </section>
@@ -801,19 +812,28 @@ details.adv[open]{padding-bottom:12px;}
             <input id="act-ver" type="text" placeholder="예: v-dd3abab9" />
           </div>
           <div class="field" style="display:flex;align-items:flex-end;gap:10px;">
-            <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;white-space:nowrap;">
-              <input id="act-force" type="checkbox" style="width:auto" /> force (게이트 우회)
-            </label>
             <button class="btn" onclick="activateModel()" style="flex:1">활성화 (배포)</button>
           </div>
         </div>
         <div id="activate-result" role="status" aria-live="polite"></div>
-        <div class="btn-row" style="margin-top:2px">
-          <button class="btn red" onclick="reloadModel()">활성 모델 핫리로드</button>
-          <!-- 롤백 — 종전에는 이 카드에 결과 표시용 div 만 있고 되돌리는 수단이 없었다.
-               활성화는 되는데 웹에서 되돌릴 방법이 없어 사고 시 서버 접속이 필요했다. -->
-          <button class="btn sec sm" onclick="rollbackModel()">직전 모델로 롤백</button>
-        </div>
+        <!-- [2026-08-24] 기본 화면에는 **평소 하는 것 하나**(활성화)만 둔다. force 우회·롤백·
+             핫리로드는 접어 둔다 — 셋 다 기능은 남기되(롤백은 사고 시 유일한 웹 복구 수단이고,
+             force 는 게이트 우회 감사 경로다) 평소 조작 옆에 나란히 있으면 잘못 눌린다.
+             특히 force 는 활성화 버튼 바로 옆 체크박스였다. 삭제가 아니라 한 단계 뒤로. -->
+        <details id="deploy-adv" style="margin-top:8px">
+          <summary style="font-size:12px;color:var(--text-soft);cursor:pointer">복구 · 고급 — force 우회 · 롤백 · 핫리로드</summary>
+          <div style="margin-top:8px">
+            <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;white-space:nowrap;">
+              <input id="act-force" type="checkbox" style="width:auto" /> force (게이트 우회 — 감사에 기록됩니다)
+            </label>
+            <div class="btn-row" style="margin-top:8px">
+              <button class="btn red" onclick="reloadModel()">활성 모델 핫리로드</button>
+              <!-- 롤백 — 종전에는 이 카드에 결과 표시용 div 만 있고 되돌리는 수단이 없었다.
+                   활성화는 되는데 웹에서 되돌릴 방법이 없어 사고 시 서버 접속이 필요했다. -->
+              <button class="btn sec sm" onclick="rollbackModel()">직전 모델로 롤백</button>
+            </div>
+          </div>
+        </details>
         <div id="reload-result" role="status" aria-live="polite"></div>
         <div class="warnbox" style="display:none" id="rollback-note"></div>
         <p class="sec-note">배포는 <b>회귀 게이트</b>(고등급 미탐·F1)를 통과해야 하며, 미통과 시 <code>force</code>로만 우회됩니다(감사 기록). <b>핫리로드</b>는 재기동 없이 활성 모델을 서빙에 반영합니다.
@@ -832,7 +852,12 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" onclick="loadMetrics()">최신 메트릭</button>
           <button class="btn sec sm" onclick="loadHistory()">이력</button>
           <button class="btn sec sm" onclick="loadConfusionMatrix()">혼동행렬</button>
-          <button class="btn sec sm" onclick="loadSchema()">등급체계 조회</button>
+          <!-- [2026-08-24] 「등급체계 조회」 버튼을 뺐다. 같은 등급체계를 설정 탭에서 편집하는데
+               여기서는 조회만 되어 두 벌로 보였다. 그리고 이 버튼이 보여 주던 것은 **지금 활성인**
+               등급체계이지 이 성적을 낼 때 쓰인 등급체계가 아니다 — /metrics/latest 응답
+               (schemas/metrics.py MetricsReport)에 taxonomy 버전 필드가 없어 그것은 알 수 없다.
+               측정 시점 등급체계를 보여 주는 것처럼 읽히던 자리라 없애고 설정 탭으로 보낸다. -->
+          <button class="btn sec sm" onclick="showPane('config')" title="등급체계는 설정 탭에서 봅니다">등급체계 (설정 탭)</button>
         </div>
         <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(3,1fr)"></div>
         <div id="metrics-extra"></div>
@@ -1180,7 +1205,7 @@ function markStep(id){
  * data-pane="always"(연결·인증)는 모든 탭에 남는다. 전 작업의 전제라서다.
  * -------------------------------------------------------------------------- */
 const PANE_NOTE={
-  review: '검수 — 검증문서(모델 평가 정답지) 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다.',
+  review: '검증문서 — 모델 평가 정답지 후보를 만들고, 사람이 등급을 확정해 서명합니다. 여기서 서명한 것만 평가 정답지로 올라갑니다(운영 탭의 분류 결과 검수와는 다른 일입니다).',
   train:  '학습 · 배포 — 서명한 검증문서로 재학습하고, 게이트를 통과한 모델만 배포한 뒤 성적을 확인합니다.',
   ops:    '운영 — 문서를 분류하고, AI가 자신 없어 한 건을 사람이 확정합니다. 매일 도는 일과이고, 현재 상태와 감사 기록도 여기서 봅니다.',
   config: '설정 — 등급 체계와 태깅 규칙입니다. 보통 도입 시 한 번 정하고 이후에는 거의 바꾸지 않습니다.',
@@ -2105,7 +2130,7 @@ async function activateModel(){
   const force=$('act-force').checked;
   if(force && !confirm('force=true는 deploy gate(고등급 미탐 FNR·F1 회귀)를 우회합니다.\n감사에 기록됩니다. 진행할까요?')) return;
   // force 가 아니어도 배포 모델 교체 자체가 서빙에 즉시 반영되는 비가역 동작이다.
-  if(!force && !confirm(`배포 모델을 "${ver}" 로 교체합니다.\n\ndeploy gate(고등급 미탐 FNR·F1 회귀)를 통과하면 즉시 서빙에 반영됩니다.\n문제가 있으면 [직전 모델로 롤백]으로 되돌릴 수 있습니다. 진행할까요?`)) return;
+  if(!force && !confirm(`배포 모델을 "${ver}" 로 교체합니다.\n\ndeploy gate(고등급 미탐 FNR·F1 회귀)를 통과하면 즉시 서빙에 반영됩니다.\n문제가 있으면 [복구 · 고급] 안의 [직전 모델로 롤백]으로 되돌릴 수 있습니다. 진행할까요?`)) return;
   try{
     const d=await api('POST','/admin/model/activate',{version_label:ver, force});
     const badge = d.activated ? '<span class="pill ok">활성화됨</span>'
@@ -2116,7 +2141,12 @@ async function activateModel(){
       ${d.reloaded?` · <span class="pill ok">리로드됨</span> <b class="mono" style="font-family:var(--font-mono);font-size:11.5px">${esc(d.model_version||'')}</b>`:''}
     </div>`;
     if(d.activated){ markFlow(4); loadMetrics(); }
-    else if(d.blocked){ log(`활성 차단(deploy gate): ${d.reason} — 회귀 확인 후 force로만 우회`,'err'); }
+    else if(d.blocked){
+      log(`활성 차단(deploy gate): ${d.reason} — 회귀 확인 후 force로만 우회`,'err');
+      // force 는 [복구 · 고급] 안에 접혀 있다. 차단됐을 때만 그 자리를 열어 준다 —
+      // "우회하려면 어디를 눌러야 하나"를 찾아 헤매지 않게. 평소에는 계속 접힌 채로 둔다.
+      const adv=$('deploy-adv'); if(adv) adv.open=true;
+    }
   }catch(e){ $('activate-result').innerHTML=`<div class="warnbox">활성화 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`; }
 }
 
@@ -2361,14 +2391,8 @@ async function loadConfusionMatrix(){
       ${Object.keys(fnr).length?`<div class="kv" style="margin-top:8px">${Object.entries(fnr).map(([g,v])=>`<div><span>FNR ${esc(g)}</span> <b style="color:${v>0.05?'var(--red)':'var(--green)'}">${(v*100).toFixed(1)}%</b></div>`).join('')}</div>`:''}</div>`;
   }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">혼동행렬 조회 실패: ${e.status||''} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 혼동행렬 이력이 없을 수 있습니다.</div>`; }
 }
-async function loadSchema(){
-  try{
-    const d=await api('GET','/schema/grades');
-    const list=d.grades||[];
-    $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">활성 등급체계 — version ${d.version||'-'} (DB 주도)</label>
-      <div class="kv" style="margin-top:4px">${list.length?list.map(g=>`<div>${gradeTag(g.code)} <span>${g.name||GRADE_KR[g.code]||''}${g.order!=null?' · #'+g.order:''}</span></div>`).join(''):'<span style="color:var(--text-faint)">응답 형태 확인 — raw JSON 참조</span>'}</div></div>`;
-  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">등급체계 조회 실패: ${e.status||''}</div>`; }
-}
+/* [2026-08-24] loadSchema() 를 지웠다 — 메트릭 카드의 「등급체계 조회」 버튼이 유일한 호출처였고,
+ * 그 버튼을 없앴다(설정 탭이 같은 것을 편집한다). 등급체계 조회·편집은 loadGradeEditor() 한 곳. */
 
 /* ---- 6. 운영 관제 대시보드 ---- */
 function dpDegraded(d, name){ return (d.degraded||[]).includes(name) ? '<span class="dp-degraded">degraded</span>' : ''; }
