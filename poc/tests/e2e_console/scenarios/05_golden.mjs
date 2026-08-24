@@ -36,6 +36,15 @@ export const scenarios = [
       check.data.includes(box, '25건 남음', '등급별로 몇 건 남았는지 보인다');
       check.includes(box, '부족 등급', '어느 등급이 부족한지 적는다');
       check.includes(page.text('gs-body'), '학습 시드', 'tier 이름을 업무 말로 옮겨 보여준다');
+
+      /* [2026-08-25] 서명이 **0건**인 등급을 "서명분이 전부 합성"이라고 적지 않는다.
+         본보기는 네 등급 다 0/0 이다. 같은 결함을 2026-08-24 에 운영 대시보드에서 고쳤는데
+         이 카드가 안 따라와, 223 화면에 TS·S1·S2 가 0건인 채로 그 문장이 떠 있었다.
+         없는 서명을 합성이라고 말하면 화면이 사실이 아닌 것을 말하는 것이다. */
+      check.excludes(page.text('gs-body'), '서명분이 전부 합성',
+        '서명 0건인 등급을 합성이라고 말하지 않는다');
+      check.includes(page.text('gs-body'), '서명이 0건입니다',
+        '대신 아직 서명하지 않았다고 말한다');
       assertNoScriptErrors(check, page);
       return page;
     },
