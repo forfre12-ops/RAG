@@ -71,8 +71,12 @@ def test_console_shows_precision_and_recall(console: str):
 
 
 def test_console_warns_before_grade_deactivation(console: str):
-    """PUT /schema/grades 는 목록 치환이라 행 삭제 = 비활성이다. 무경고 저장은 사고 경로."""
-    assert "비활성(소프트 삭제)될 등급" in console
+    """PUT /schema/grades 는 목록 치환이라 행 삭제 = 비활성이다. 무경고 저장은 사고 경로.
+
+    [2026-08-24] 문구에서 「소프트 삭제」를 뺐다 — 우리가 만든 말이고 제출본·사용매뉴얼에
+    0회다. 지키는 것은 문구가 아니라 **경고가 무엇을 말하는가**다: 어느 등급이 비활성되는지.
+    """
+    assert "비활성될 등급" in console
 
 
 # ── B. 계약 축 ────────────────────────────────────────────────────────────────

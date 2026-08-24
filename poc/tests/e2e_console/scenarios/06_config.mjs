@@ -88,7 +88,9 @@ export const scenarios = [
       check.includes(page.text('grade-info'), '비활성', '비활성(소프트 삭제)이라고 알린다');
       page.click('grade-save');
       await page.settle();
-      check.includes(page.dialogs.map((d) => d.message).join(' '), '비활성(소프트 삭제)될 등급: S3', '무엇이 사라지는지 되묻는다');
+      // [2026-08-24] 「소프트 삭제」는 우리가 만든 말이라 화면에서 뺐다(제출본·매뉴얼 0회).
+      // 시험은 문구 고정이 아니라 **뜻**을 본다 — 무엇이 어떻게 되는지.
+      check.matches(page.dialogs.map((d) => d.message).join(' '), /비활성될 등급: S3/, '무엇이 사라지는지 되묻는다');
       check.eq((server.lastCall('PUT', '/schema/grades')?.body?.grades || []).length, 3, '3개만 저장된다');
       return page;
     },
@@ -175,7 +177,10 @@ export const scenarios = [
 
       page.click(page.q('#kw-body button[onclick="toggleKeyword(0)"]'));
       await page.settle();
-      check.ok(page.dialogs.some((d) => d.kind === 'confirm' && d.message.includes('소프트 삭제')), '비활성은 되묻고 하드 삭제가 아님을 밝힌다');
+      // [2026-08-24] 「소프트 삭제」·「하드 삭제」는 우리가 만든 말이라 화면에서 뺐다.
+      // 시험은 뜻을 본다 — 되묻는가, 그리고 지워지는 게 아니라는 것을 밝히는가.
+      check.ok(page.dialogs.some((d) => d.kind === 'confirm' && /완전 삭제가 아니라/.test(d.message)),
+               '비활성은 되묻고 완전 삭제가 아님을 밝힌다');
       call = server.lastCall('PATCH', '/admin/keywords/');
       check.eq(call?.body?.is_active, false, '비활성으로 나갔다');
       return page;

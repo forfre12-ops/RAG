@@ -2175,7 +2175,7 @@ async function loadAuditLog(){
              + `<td>${esc(it.action||'')}</td><td>${who}</td><td>${tgt}</td><td>${ok}</td></tr>`;
       }).join('');
     }
-    if(info) info.textContent=`전체 ${d.total??0}건 중 최근 ${items.length}건 · 헬스체크·정적 자산·Prometheus 스크랩만 제외됩니다.`;
+    if(info) info.textContent=`전체 ${d.total??0}건 중 최근 ${items.length}건 · 서버 상태 확인·정적 자산·지표 수집만 제외됩니다.`;
     (d.warnings||[]).forEach(w=>{ if(warn) warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">${esc(w)}</div>`; });
     log(`감사 로그 ${items.length}건 조회 (전체 ${d.total??0})`,'ok');
   }catch(e){
@@ -2694,7 +2694,7 @@ function renderSynthQueue(){
     <div class="q-item">
       <div class="q-top">
         <div><span class="q-id">${esc(it.synth_id)}</span>${it.domain?` · <span class="q-title">${esc(it.domain)}</span>`:''}</div>
-        <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습행은 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
+        <div>${gradeTag(it.corrected_grade||it.target_grade)}${it.corrected_grade?`<span class="pill" title="검수자가 승인하면서 등급을 고쳤습니다. 학습 데이터는 이 등급으로 만들어집니다.">교정됨 · 생성 시 ${esc(it.target_grade)}</span>`:''}
           <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">${esc(it.llm_provider)}/${esc(it.llm_model||'-')}</span>
           ${it.quality_score!=null?`<span class="pill ${it.quality_score>=0.7?'ok':'warn'}">품질 ${Number(it.quality_score).toFixed(2)}</span>`:''}
           <span class="pill">${esc(it.review_status)}</span></div>
@@ -2784,7 +2784,7 @@ function removeGradeRow(i){
   GRADE_ROWS.splice(i,1);
   renderGradeEditor();
   if(gone && gone.code && GRADE_LOADED_CODES.includes(gone.code)){
-    $('grade-info').textContent=`표에서 ${gone.code} 제거됨 — 저장하면 비활성(소프트 삭제) 처리됩니다.`;
+    $('grade-info').textContent=`표에서 ${gone.code} 제거됨 — 저장하면 비활성 처리됩니다.`;
   }
 }
 
@@ -2800,7 +2800,7 @@ async function saveGrades(){
   const removed=GRADE_LOADED_CODES.filter(c=>!codes.includes(c));
   const added=codes.filter(c=>!GRADE_LOADED_CODES.includes(c));
   let msg='등급체계를 저장합니다.';
-  if(removed.length) msg+=`\n\n비활성(소프트 삭제)될 등급: ${removed.join(', ')}\n기존 분류 이력은 보존되지만 신규 분류에서 해당 등급은 사라집니다.`;
+  if(removed.length) msg+=`\n\n비활성될 등급: ${removed.join(', ')}\n기존 분류 이력은 보존되지만 신규 분류에서 해당 등급은 사라집니다.`;
   if(added.length) msg+=`\n\n추가될 등급: ${added.join(', ')}\n학습 라벨 공간이 바뀌므로 재학습이 필요합니다.`;
   if(!confirm(msg)) return;
 
@@ -2907,7 +2907,7 @@ async function toggleKeyword(i){
   const k=KEYWORDS[i]; if(!k) return;
   const turningOff=k.is_active;
   if(!guardWrite(turningOff?'키워드 비활성':'키워드 활성화')) return;
-  if(turningOff && !confirm(`키워드 "${k.keyword}"(id=${k.keyword_id})를 비활성합니다.\n\n하드 삭제가 아니라 소프트 삭제(is_active=false)이며, 감사·FK 이력은 보존됩니다. 룰엔진에서는 즉시 제외됩니다.`)) return;
+  if(turningOff && !confirm(`키워드 "${k.keyword}"(id=${k.keyword_id})를 비활성합니다.\n\n완전 삭제가 아니라 **비활성 처리**이며, 감사 이력은 보존됩니다. 룰엔진에서는 즉시 제외됩니다.`)) return;
   try{
     const d=await api('PATCH',`/admin/keywords/${k.keyword_id}`,{is_active:!k.is_active, actor:actor()});
     noteKeywordReload(d, turningOff?'비활성':'활성화');
