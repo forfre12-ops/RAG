@@ -109,9 +109,14 @@ UPLOAD_DEMO_DIR = _POC / "demo_formats"
 UPLOAD_DEMO_EXPECTATIONS: tuple[dict, ...] = (
     {"file": "차세대 메모리 공정 핵심기술 검토 보고서.pdf", "grade": "TS", "status": "staging",
      "reason": None, "shown_as": "TS 최고등급 자동확정(대본 1) · 서버 0.926"},
-    {"file": "차세대 메모리 공정 핵심기술 검토 보고서.docx", "grade": "TS",
-     "status": "needs_review", "reason": "low-confidence",
-     "shown_as": "같은 문서 docx - 등급은 같은 TS, 확신 미달로 검수(대본 2) · 서버 0.668"},
+    # [2026-08-24] needs_review/low-confidence 로 걸려 있던 것을 실측대로 고쳤다.
+    # 기대값을 뜬 8/22~23 에는 서빙 임계가 **0.70** 이었다. conf 0.668 은 그 아래라
+    # 검수였는데, 8/24 에 임계가 0.50 으로 내려가면서(재검증·배포 완료) 자동확정이 됐다.
+    # 같은 폴더의 「핵심 알고리즘…」 0.465 는 여전히 0.50 미만이라 검수 그대로다 —
+    # 즉 문서가 달라진 것이 아니라 **손잡이가 움직였고 기대값이 안 따라온 것**이다.
+    {"file": "차세대 메모리 공정 핵심기술 검토 보고서.docx", "grade": "TS", "status": "staging",
+     "reason": None,
+     "shown_as": "같은 문서 docx - 같은 TS 자동확정(대본 2) · 서버 0.668"},
     {"file": "분기 보도자료·공시 본문 초안.docx", "grade": "S3", "status": "staging",
      "reason": None, "shown_as": "공개 보도자료 자동확정(대본 3) · 서버 0.946"},
     {"file": "분기 보도자료·공시 본문 초안.hwpx", "grade": "S3", "status": "staging",
@@ -370,7 +375,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.doc_set == "paste":
         return _check_paste_set(client, headers, args)
 
-    print(f"[target] {client_desc} · 문서 {len(DEMO_EXPECTATIONS)}건 × {args.repeat}회")
+    _n = len(UPLOAD_DEMO_EXPECTATIONS if args.doc_set == "upload" else DEMO_EXPECTATIONS)
+    print(f"[target] {client_desc} · 문서 {_n}건 × {args.repeat}회")
 
     def analyze(path: Path) -> dict:
         with path.open("rb") as fh:
