@@ -220,6 +220,52 @@ def test_fixtures_without_response_model_are_listed(fixtures, routes):
     )
 
 
+# ── D. 본보기의 **값**이 서버가 실제로 내는 값인가 ────────────────────────────
+# 왜(2026-08-24). 위 C 는 필드 **이름**만 본다. 타입이 str 이면 글자 내용은 아무거나
+# 통과한다. 실제로 `/golden/jobs` 본보기가 `kind:"register"` 였는데 서버는
+# `golden_register` 를 낸다. 화면은 그 값으로 분기하므로(golden_jobs.js) 하니스에서는
+# 등록 잡이 "후보 생성" 으로 잘못 그려졌고, 시나리오는 통과했다. 값이 곧 계약인 자리를
+# 여기서 못 박는다 — 열거형처럼 쓰이는 문자열과 서버가 정한 기본값.
+
+
+def test_job_kind_values_match_what_the_server_emits(fixtures):
+    """잡 종류 문자열 — 화면이 이 값으로 「문서 묶음 등록 / 후보 생성」을 가른다."""
+    from koipa.api.golden import golden_job_list  # noqa: F401 — 라우트 로딩 확인용
+
+    allowed = {"golden_build", "golden_register"}
+    jobs = fixtures["GET /golden/jobs"]["jobs"]
+    bad = [j.get("kind") for j in jobs if j.get("kind") not in allowed]
+    assert not bad, (
+        f"서버가 내지 않는 kind 값이 본보기에 있다: {bad} — 허용: {sorted(allowed)}"
+        " (golden.py 의 필터·golden_build_service 의 payload 와 같은 글자여야 한다)"
+    )
+
+
+def test_job_list_ordering_default_matches_the_schema(fixtures):
+    """`ordering` 은 서버가 고정으로 내려주는 값이다 — 본보기가 다른 값이면 화면의
+    '재정렬했다' 안내 분기가 시험에서 한 번도 안 켜진다."""
+    from koipa.schemas.golden import GoldenJobListResponse
+
+    server_default = GoldenJobListResponse(jobs=[]).ordering
+    assert fixtures["GET /golden/jobs"]["ordering"] == server_default
+
+
+def test_registerable_build_paths_are_actually_listable(fixtures):
+    """목록 본보기의 경로가 실서버 목록 규칙을 통과하는가.
+
+    종전 본보기는 `datasets/proxy_gold/build_*.jsonl` 이었다 — 실서버 목록이 절대 낼 수
+    없는 경로다(허용 폴더 밖). 그 경로로 등록 흐름 전체를 시험하고 있었다.
+    """
+    from koipa.services.golden_build_service import _is_review_source
+
+    bad = [b["path"] for b in fixtures["GET /golden/builds"]["builds"]
+           if not _is_review_source(b["path"])]
+    assert not bad, (
+        f"실서버 목록이 낼 수 없는 경로가 본보기에 있다: {bad}"
+        " (golden_build_service._REVIEW_SOURCE_DIRS 아래여야 한다)"
+    )
+
+
 # ── 화면 이동 링크 ───────────────────────────────────────────────────────────
 def test_console_html_links_point_at_real_routes(routes):
     """공용 메뉴가 가리키는 서버 렌더 화면(.html)이 실재하는 라우트인가."""

@@ -39,6 +39,7 @@ from koipa.schemas.golden import (
 from koipa.services.golden_build_service import (
     GoldenBuildService,
     GoldenSignoffStorageError,
+    display_source_path,
 )
 from koipa.services.proxy_gold_candidate_service import ProxyGoldCandidateService
 from koipa.console_doc import DOC_CSS, DOC_RENDER_JS
@@ -462,6 +463,8 @@ def golden_job_list(limit: int = 20) -> GoldenJobListResponse:
             gold_count=j.get("gold_count"),
             uncertain_count=j.get("uncertain_count"),
             error=j.get("error"),
+            # 어느 파일에서 온 묶음인지 — 없으면 같은 파일을 두 번 등록한 행을 구분할 수 없다.
+            source_path=display_source_path(j.get("gold_path")),
             review_url=review_url,
             signoff_url=signoff_url,
         ))
@@ -760,8 +763,12 @@ def golden_job_signoff_html(
 ) -> HTMLResponse:
     """빌드 잡의 gold 후보를 화면 서명용 인터랙티브 HTML로 반환(골든셋 검수·브라우저 직접 접속).
 
-    review.html(보기 전용)과 달리 승인/등급변경/거부 폼 + 제출 버튼을 붙여, 제출 시
-    POST /golden/jobs/{id}/signoff 로 서명을 보낸다(그 POST 는 require_role 로 보호).
+    승인/등급변경/거부 폼 + 제출 버튼이 붙어 있고, 제출 시 POST /golden/jobs/{id}/signoff 로
+    서명을 보낸다(그 POST 는 require_role 로 보호).
+
+    ⚠ review.html 은 **이 화면과 같은 것**이다(2026-08-18 통합). 종전 이 자리에 "review.html
+      (보기 전용)과 달리" 라고 적혀 있었는데, 통합 뒤에도 남아 틀린 서술이 됐다 —
+      test_review_signoff_cross_link.test_both_urls_serve_the_same_screen 이 같음을 잠근다.
     """
     # [#14a] 비밀키 설정 시 서명 URL 토큰(?t=)을 강제 — 무인증 full-text 노출 차단.
     if not _verify_html_token(job_id, t):

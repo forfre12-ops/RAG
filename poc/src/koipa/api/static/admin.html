@@ -1014,8 +1014,11 @@ details.adv[open]{padding-bottom:12px;}
           </div>
           <div id="gold-zero-hint" class="warnbox" style="display:none;margin-top:10px;line-height:1.6;"></div>
           <div class="btn-row" style="margin-top:10px;">
-            <button class="btn sec sm" id="gold-btn-review" onclick="openGoldenReview()" disabled>검수 HTML 열기 (G2)</button>
-            <button class="btn sec sm" id="gold-btn-signoff" onclick="openGoldenSignoff()" disabled>서명 HTML 열기 (G2)</button>
+            <!-- [2026-08-24] 버튼을 하나로. 「검수 HTML」과 「서명 HTML」은 **같은 화면**이다 —
+                 2026-08-18 에 서버에서 합쳐졌고(golden.py: review.html 도 render_signoff 를 준다,
+                 test_review_signoff_cross_link 가 잠근다) 화면에만 버튼 두 개가 남아 있었다.
+                 검수자는 무엇이 다른지 알 수 없는 선택을 강요받았다. -->
+            <button class="btn sec sm" id="gold-btn-signoff" onclick="openGoldenSignoff()" disabled>검수 · 서명 화면 열기 (G2)</button>
           </div>
         </div>
 
@@ -1422,12 +1425,15 @@ function applyGoldenAiAvailability(active){
   const box=$('gold-ai-blocked');
   if(box){
     box.style.display = blocked ? '' : 'none';
+    // [2026-08-24] 문구에서 서버 설정 이름(llm_provider=noop · .env · LLM_PROVIDER)을 뺐다.
+    // 이 화면을 보는 사람은 검수자이고 그 파일을 고칠 권한이 없다 — 고칠 수 없는 것을
+    // 알려 주면 안내가 아니라 막다른 길이다. 설정 이름은 아래 「고급 설정」 안(등급 판정기
+    // 선택칸)에 그대로 있다. 거기가 서버를 다루는 사람이 보는 자리다.
     box.innerHTML = blocked
-      ? '<b>이 서버에서는 AI 후보 생성을 할 수 없습니다 — 등급을 매길 LLM 이 없습니다.</b><br/>'
-        + '서버 설정이 <code>llm_provider=noop</code> 이라 판정기가 <b>모든 문서를 S3 으로</b>만 '
-        + '돌려줍니다. 눌러도 등급이 매겨지지 않으므로 잠가 두었습니다.<br/>'
-        + '· 검수·서명을 진행하려면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 를 쓰십시오 — 이 경로는 이 서버에서 그대로 됩니다.<br/>'
-        + '· AI 로 후보를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하거나, 서버 설정(.env)의 <code>LLM_PROVIDER</code> 를 바꿔야 합니다.'
+      ? '<b>이 서버에서는 AI 후보 생성을 할 수 없습니다.</b><br/>'
+        + '등급을 매기는 LLM 이 연결돼 있지 않아, 눌러도 <b>모든 문서가 S3 하나로만</b> 나옵니다. 그래서 잠가 두었습니다.<br/>'
+        + '· 검수·서명은 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 로 그대로 진행하면 됩니다.<br/>'
+        + '· AI 로 후보를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하십시오.'
       : '';
   }
   // 되는 것을 먼저 보여준다 — 잠긴 블록이 맨 위에 있으면 카드 전체가 막힌 것으로 읽힌다.
@@ -2530,11 +2536,14 @@ function goldenDocs(){
   }));
 }
 function goldenProgress(msg){ const el=$('gold-progress'); if(el) el.textContent=msg; }
-function goldenButtons(status, goldCount){
-  const rv=$('gold-btn-review'), sg=$('gold-btn-signoff');
+function goldenButtons(status, goldCount, uncertainCount){
+  // [2026-08-24] 검수·서명이 한 화면이라 버튼도 하나다. 여는 조건은 **둘 중 넓은 쪽**을
+  // 따른다 — gold 가 0 이어도 보류 후보가 있으면 그 화면은 보여 줄 것이 있다(서명 폼 없이
+  // 읽기 전용으로 나온다: render_signoff_html 의 "서명 대상이 아닙니다" 카드).
+  // 옛 규칙대로 gold>0 만 보면, 보류만 남은 잡에서 화면으로 갈 길이 사라진다.
+  const sg=$('gold-btn-signoff');
   const done = status==='done';
-  if(rv) rv.disabled = !done;                       // 검토본은 uncertain 만 있어도 볼 값이 있다
-  if(sg) sg.disabled = !done || !(goldCount>0);     // 서명은 gold 후보가 있어야 의미가 있다
+  if(sg) sg.disabled = !done || !((goldCount>0) || (uncertainCount>0));
   if(done) markStep('g1');                          // 루프 B 1단계(후보 생성) 완료 표시
 }
 function renderGoldenSummary(d){
@@ -2578,23 +2587,23 @@ function renderGoldenSummary(d){
     else{
       zeroBox.style.display='';
       zeroBox.innerHTML = (prov==='noop')
-        ? '<b>gold 후보가 0건입니다 — 등급 판정기가 <code>noop</code>(더미)이기 때문입니다.</b><br/>'
-          + 'noop 은 합성 문서 생성용 더미라 응답에 등급 자리가 없고, 판정이 늘 <b>S3</b> 으로 떨어집니다. '
+        ? '<b>gold 후보가 0건입니다 — 등급을 매기지 않는 더미를 판정기로 골랐기 때문입니다.</b><br/>'
+          + '그 항목은 합성 문서를 만드는 더미라 응답에 등급 자리가 없고, 판정이 늘 <b>S3</b> 으로 떨어집니다. '
           + '룰이 S3 라고 한 문서에만 우연히 합의가 되므로 사실상 전건이 보류로 갑니다.<br/>'
-          + '· LLM 이 있는 서버(지재원 GPU)에서 다시 실행하세요. 제공자는 화면이 아니라 서버 설정(.env)에서 바꿉니다.<br/>'
+          + '· LLM 이 연결된 서버(지재원 GPU)에서 다시 실행하세요.<br/>'
           + '· LLM 이 없는 환경이라면 아래 <b>이미 있는 문서 묶음으로 검수 시작하기</b> 로 재라벨링 없이 검수·서명만 진행하면 됩니다.'
         : '<b>gold 후보가 0건입니다.</b><br/>'
           + '룰과 LLM 이 합의하지 못했거나 근거 문장이 없어 전건이 보류로 갔습니다. 고급 설정의 <b>근거 문장이 있는 것만 후보로</b> 를 끄거나 '
           + '후보 수를 늘려 보고, 그래도 0건이면 아래 <b>기존 문서 묶음 등록</b>으로 검수·서명만 진행하세요.';
     }
   }
-  goldenButtons(d.status, gold);
+  goldenButtons(d.status, gold, unc);
 }
 async function startGoldenBuild(){
   if(!guardWrite('검증문서 생성')) return;
   // 버튼은 잠겨 있지만(applyGoldenAiAvailability) healthz 실패로 잠금이 안 걸릴 수 있다.
   if(GOLD_AI_BLOCKED){
-    goldenProgress('이 서버에는 등급을 매길 LLM 이 없습니다(llm_provider=noop) — 아래 「이미 있는 문서 묶음으로 검수 시작하기」를 쓰십시오.');
+    goldenProgress('이 서버에는 등급을 매기는 LLM 이 연결돼 있지 않습니다 — 아래 「이미 있는 문서 묶음으로 검수 시작하기」를 쓰십시오.');
     return;
   }
   const src=($('gold-source')||{}).value;
@@ -2726,8 +2735,10 @@ async function openGoldenHtml(kind){
   }catch(e){/* 조회 실패 시 평문 폴백 */}
   window.open(url, '_blank', 'noopener');
 }
-// 검수·서명 모두 G2 단계다. 새 탭으로 나가는 사실을 기억해 두었다가 복귀 시 다음 단계로 잇는다.
-function openGoldenReview(){ SIGNOFF_TAB_OPENED=true; return openGoldenHtml('review'); }
+// 검수·서명은 한 화면·한 버튼이다(2026-08-24). 새 탭으로 나가는 사실을 기억해 두었다가
+// 복귀 시 다음 단계로 잇는다.
+// ⚠ review.html 주소 자체는 서버에 그대로 있다 — 감리정본 화면설계서 UI-04 이고 스크립트·
+//   문서가 참조한다. 콘솔이 그 주소로 여는 두 번째 버튼만 없앴다.
 function openGoldenSignoff(){ SIGNOFF_TAB_OPENED=true; return openGoldenHtml('signoff'); }
 
 

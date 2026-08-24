@@ -77,6 +77,32 @@ def _is_review_source(rel_path: str) -> bool:
     return not Path(low).name.startswith("locked_")
 
 
+def display_source_path(raw: str | None) -> str | None:
+    """잡이 읽은 파일을 화면에 보일 형태로 — poc/ 기준 상대경로.
+
+    왜. 잡 목록은 job_id 앞 8자·건수·시각만 보여줬다. 같은 파일을 두 번 등록하면 세 값이
+    전부 같거나 비슷해서 **여섯 행이 같은 것으로 보인다**(실측 2026-08-24 223: 120·229·8
+    이 각각 두 번). 저장소에는 경로가 이미 있는데(gold_path) 목록 응답에만 없었다.
+
+    저장된 값은 절대경로다(_safe_path 가 resolve 한다). 그대로 내보내면 서버 파일시스템
+    구조가 화면에 실리므로 poc/ 아래로 잘라 준다 — 밖이면 파일 이름만 준다.
+
+    ⚠ `Path.is_absolute()` 로 갈라선 안 된다. 윈도우에서 "/srv/poc/x.jsonl" 은 드라이브가
+      없어 **절대경로가 아니다** — 그 분기로 짰더니 개발 장비에서 전체 경로가 그대로
+      새어 나왔다(실측 2026-08-24). 뿌리에서 시작하는지를 글자로 본다.
+    """
+    if not raw:
+        return None
+    p = Path(raw)
+    try:
+        return p.relative_to(_POC_ROOT).as_posix()
+    except ValueError:
+        pass
+    posix = p.as_posix()
+    rooted = posix.startswith("/") or (len(posix) > 1 and posix[1] == ":")
+    return p.name if rooted else posix
+
+
 def _safe_path(raw: str | None) -> Path:
     """요청 경로를 허용 루트 하위로 제한. 벗어나면 ValueError(작업 자체를 거부)."""
     if not raw:

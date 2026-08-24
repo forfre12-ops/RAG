@@ -50,7 +50,7 @@ const WRITES = [
   },
   {
     name: '검증문서 등록', pane: 'review', endpoint: 'POST /golden/jobs/register',
-    async setup(page) { page.set('gold-build-path', 'datasets/proxy_gold/build_ff5a822c.jsonl'); },
+    async setup(page) { page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl'); },
     press: (p) => p.$('gold-reg'),
   },
 ];

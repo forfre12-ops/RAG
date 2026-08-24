@@ -99,6 +99,16 @@
         var gold = (j.gold_count == null) ? '—' : String(j.gold_count);
         var unc = (j.uncertain_count == null) ? '—' : String(j.uncertain_count);
         var kind = (j.kind === 'golden_register') ? '문서 묶음 등록' : '후보 생성';
+        /* [2026-08-24] 원본 파일을 보여준다.
+           종전 열은 id 앞 8자·종류·상태·건수·시각뿐이었다. 같은 파일을 두 번 등록하면
+           종류도 건수도 같아서 **여섯 행이 같은 것으로 보인다**(실측 223: 120·229·8 이
+           각각 두 번). 서버는 잡마다 읽은 파일을 들고 있었는데 목록 응답에만 없었다.
+           긴 경로는 폴더/파일만 남겨 좁은 열에서도 읽히게 한다(전체는 title 로). */
+        var src = j.source_path || '';
+        var srcShort = src ? src.split('/').slice(-2).join('/') : '—';
+        var srcCell = src
+          ? '<span title="' + esc(src) + '">' + esc(srcShort) + '</span>'
+          : '<span style="color:var(--text-faint)">—</span>';
         /* [2026-08-23] 행에서 **검수 화면을 바로 연다.**
            종전에는 「선택」 → 화면을 스크롤해 다른 카드의 버튼 → 새 탭, 이렇게 2단계였다.
            그래서 상단 메뉴 「검수 목록」을 눌러도 검수를 시작할 수 없었고, 실제 검수 화면은
@@ -112,6 +122,7 @@
         return '<tr' + cur + '>'
           + '<td><code>' + esc(j.job_id.slice(0, 8)) + '</code></td>'
           + '<td>' + esc(kind) + '</td>'
+          + '<td style="font-size:11px;word-break:break-all">' + srcCell + '</td>'
           + '<td>' + statusPill(j.status, j.error) + '</td>'
           + '<td style="text-align:right">' + esc(gold) + '</td>'
           + '<td style="text-align:right">' + esc(unc) + '</td>'
@@ -124,6 +135,7 @@
         '<div class="table-wrap"><table style="width:100%;font-size:12px;border-collapse:collapse">'
         + '<thead><tr>'
         + '<th style="text-align:left">묶음</th><th style="text-align:left">종류</th>'
+        + '<th style="text-align:left">원본 파일</th>'
         + '<th style="text-align:left">상태</th><th style="text-align:right">검수 대상</th>'
         + '<th style="text-align:right">보류</th><th style="text-align:left">생성</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'

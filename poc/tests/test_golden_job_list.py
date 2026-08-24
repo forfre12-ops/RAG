@@ -95,3 +95,43 @@ def test_signed_urls_present_when_secret_set(tmp_path, monkeypatch):
     body = client.get(f"{API}/golden/jobs", headers=_AUTH).json()
     row = next(j for j in body["jobs"] if j["job_id"] == job_id)
     assert "?t=" in row["review_url"] and "?t=" in row["signoff_url"]
+
+
+def test_row_says_which_file_the_bundle_came_from(tmp_path, monkeypatch):
+    """행마다 원본 파일이 실린다 — 같은 파일을 두 번 등록한 행을 구분할 유일한 값이다.
+
+    왜(2026-08-24 실측 223). 목록 열은 id 앞 8자·종류·상태·건수·시각뿐이었다. 같은 묶음을
+    두 번 등록하면 그 값들이 사실상 같아 **여섯 행이 같은 것으로 보였다.** 저장소에는
+    경로가 이미 있었는데(gold_path) 목록 응답에만 없었다.
+    """
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    job_id = _make_job(tmp_path)
+    body = client.get(f"{API}/golden/jobs", headers=_AUTH).json()
+    row = next(j for j in body["jobs"] if j["job_id"] == job_id)
+    assert row["source_path"], "어느 파일에서 온 잡인지 목록이 말하지 않는다"
+    assert row["source_path"].endswith(".jsonl")
+    # 서버 파일시스템 구조를 그대로 싣지 않는다(절대경로 금지).
+    assert not row["source_path"].startswith("/")
+    assert ":" not in row["source_path"][:3]
+
+
+def test_two_registrations_of_different_files_are_distinguishable(tmp_path, monkeypatch):
+    """건수·종류·상태가 모두 같아도 원본 파일로 갈린다."""
+    import json
+
+    monkeypatch.setattr(settings, "api_key", "test-key")
+    rows = [{"doc_id": "a", "text": "본문 내용", "label": "S2"}]
+    made = []
+    for name in ("bundle_one.jsonl", "bundle_two.jsonl"):
+        f = tmp_path / name
+        f.write_text(json.dumps(rows[0], ensure_ascii=False), encoding="utf-8")
+        jid = GoldenBuildService().register_build(str(f), actor_user_id="reviewer1")
+        assert jid is not None
+        made.append(str(jid))
+
+    body = client.get(f"{API}/golden/jobs", headers=_AUTH).json()
+    got = {j["job_id"]: j for j in body["jobs"] if j["job_id"] in made}
+    assert len(got) == 2
+    a, b = (got[j] for j in made)
+    assert a["gold_count"] == b["gold_count"] and a["kind"] == b["kind"]   # 이 값들로는 못 가른다
+    assert a["source_path"] != b["source_path"]                            # 이 값이 가른다

@@ -134,3 +134,41 @@ def test_already_promoted_records_are_not_listed(datasets):
     _write(datasets / "gold_real" / "builds" / "demo_slate_v1.jsonl", SLATE)
     got = [b["path"] for b in svc.GoldenBuildService().list_registerable_builds()]
     assert got == ["datasets/gold_real/builds/demo_slate_v1.jsonl"], got
+
+
+# ── 목록 행이 "어느 파일에서 왔는지" 를 말하는가 ──────────────────────────────
+# 왜(2026-08-24 실측 223). 잡 목록 열은 id 앞 8자·종류·상태·건수·시각뿐이었다. 같은 파일을
+# 두 번 등록하면 다섯 값이 사실상 같아 **여섯 행이 같은 것으로 보인다.** 저장소에는 경로가
+# 이미 있었는데(gold_path) 목록 응답에만 없었다.
+
+
+def test_display_source_path_is_relative_to_poc_root():
+    from koipa.services.golden_build_service import _POC_ROOT, display_source_path
+
+    raw = str(_POC_ROOT / "datasets" / "golden_review" / "ff5a822c" / "candidates.jsonl")
+    assert display_source_path(raw) == "datasets/golden_review/ff5a822c/candidates.jsonl"
+
+
+def test_display_source_path_does_not_leak_paths_outside_the_project():
+    """서버 파일시스템 구조를 화면에 싣지 않는다 — 밖이면 파일 이름만.
+
+    ⚠ Path.is_absolute() 로 가르면 안 된다. 윈도우에서 "/srv/x.jsonl" 은 드라이브가 없어
+      절대경로가 아니라서, 그 분기로 짜면 전체 경로가 그대로 새어 나온다.
+    """
+    from koipa.services.golden_build_service import display_source_path
+
+    assert display_source_path("/srv/other/secret_layout/x.jsonl") == "x.jsonl"
+    assert display_source_path("C:/elsewhere/y.jsonl") == "y.jsonl"
+    assert display_source_path(None) is None
+
+
+def test_job_list_rows_carry_the_source_file(datasets):
+    """등록한 잡의 목록 행에 원본 파일이 실린다 — 두 행을 구분하는 유일한 값이다."""
+    from koipa.services.golden_build_service import GoldenBuildService, display_source_path
+
+    _write(datasets / "golden_review" / "b1" / "candidates.jsonl", SLATE)
+    svc = GoldenBuildService()
+    job_id = svc.register_build("datasets/golden_review/b1/candidates.jsonl", actor_user_id="t")
+    assert job_id is not None
+    job = svc.jobs.get(job_id)
+    assert display_source_path(job.get("gold_path")) == "datasets/golden_review/b1/candidates.jsonl"

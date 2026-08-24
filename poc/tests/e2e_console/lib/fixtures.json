@@ -788,14 +788,14 @@
     "total": 2,
     "builds": [
       {
-        "path": "datasets/proxy_gold/build_ff5a822c.jsonl",
+        "path": "datasets/golden_review/ff5a822c/candidates.jsonl",
         "records": 120,
         "records_exact": true,
         "size": 480000,
         "modified": "2026-08-09T12:00:00+00:00"
       },
       {
-        "path": "datasets/proxy_gold/build_20260815.jsonl",
+        "path": "datasets/gold_real/builds/build_20260815.jsonl",
         "records": 256,
         "records_exact": true,
         "size": 910000,
@@ -806,14 +806,14 @@
   "POST /golden/jobs/register": {
     "golden_job_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     "status_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-    "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html",
-    "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html"
+    "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html?t=abc123",
+    "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html?t=def456"
   },
   "GET /golden/jobs": {
     "jobs": [
       {
         "job_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
-        "kind": "register",
+        "kind": "golden_register",
         "status": "done",
         "actor": "console",
         "submitted_at": "2026-08-23T02:00:00Z",
@@ -821,12 +821,27 @@
         "gold_count": 120,
         "uncertain_count": 8,
         "error": null,
-        "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html",
-        "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html"
+        "source_path": "datasets/golden_review/ff5a822c/candidates.jsonl",
+        "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html?t=abc123",
+        "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html?t=def456"
+      },
+      {
+        "job_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "kind": "golden_register",
+        "status": "done",
+        "actor": "console",
+        "submitted_at": "2026-08-22T02:00:00Z",
+        "source_type": "curated",
+        "gold_count": 120,
+        "uncertain_count": 8,
+        "error": null,
+        "source_path": "datasets/golden_review/16d04096/candidates.jsonl",
+        "review_url": "/api/v1/golden/jobs/cccccccc-cccc-4ccc-8ccc-cccccccccccc/review.html?t=abc789",
+        "signoff_url": "/api/v1/golden/jobs/cccccccc-cccc-4ccc-8ccc-cccccccccccc/signoff.html?t=def789"
       },
       {
         "job_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-        "kind": "build",
+        "kind": "golden_build",
         "status": "running",
         "actor": "console",
         "submitted_at": "2026-08-23T02:25:00Z",
@@ -834,11 +849,12 @@
         "gold_count": null,
         "uncertain_count": null,
         "error": null,
+        "source_path": null,
         "review_url": null,
         "signoff_url": null
       }
     ],
-    "ordering": "submitted_at desc"
+    "ordering": "best_effort"
   },
   "GET /golden/jobs/{job_id}": {
     "status": "done",

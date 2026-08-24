@@ -170,6 +170,10 @@ class GoldenJobSummary(BaseModel):
     gold_count: Optional[int] = None
     uncertain_count: Optional[int] = None
     error: Optional[str] = None
+    # 어느 파일에서 온 묶음인가 — 없으면 목록의 여러 행이 서로 구분되지 않는다.
+    # (실측 2026-08-24 223: 같은 파일을 두 번씩 등록한 6행이 건수까지 같아 화면에서
+    #  분간이 안 됐다. job_id 앞 8자만으로는 "무엇을 검수하는 묶음인지" 를 못 읽는다.)
+    source_path: Optional[str] = None   # datasets/ 기준 상대경로
     review_url: Optional[str] = None    # 서명 URL(비밀키 설정 시 ?t= 포함)
     signoff_url: Optional[str] = None
 

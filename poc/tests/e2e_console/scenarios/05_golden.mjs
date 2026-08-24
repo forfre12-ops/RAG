@@ -86,8 +86,9 @@ export const scenarios = [
       check.ok(server.lastCall('GET', '/golden/jobs/'), '완료까지 상태를 폴링했다');
       check.includes(page.text('gold-progress'), '완료', '완료했다고 말한다');
       check.includes(page.text('gold-progress'), '120', '몇 건이 후보가 됐는지 말한다');
-      check.eq(page.$('gold-btn-review')?.disabled, false, '검수 화면 버튼이 열렸다');
-      check.eq(page.$('gold-btn-signoff')?.disabled, false, '서명 화면 버튼이 열렸다');
+      // [2026-08-24] 검수·서명은 한 화면이라 버튼도 하나다(옛 gold-btn-review 는 없앴다).
+      check.eq(page.$('gold-btn-signoff')?.disabled, false, '검수·서명 화면 버튼이 열렸다');
+      check.eq(page.$('gold-btn-review'), null, '같은 화면을 여는 두 번째 버튼은 없다');
       assertNoScriptErrors(check, page);
       return page;
     },
@@ -123,12 +124,12 @@ export const scenarios = [
       check.data.gte(sel?.options.length, 3, '고를 수 있는 묶음이 목록으로 나온다');
       check.data.includes(page.html('gold-build-path'), '120건', '건수와 날짜가 함께 보인다');
 
-      page.set('gold-build-path', 'datasets/proxy_gold/build_ff5a822c.jsonl');
+      page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl');
       page.click('gold-reg');
       await page.settle();
 
       const call = server.lastCall('POST', '/golden/jobs/register');
-      check.eq(call?.body?.build_path, 'datasets/proxy_gold/build_ff5a822c.jsonl', '고른 경로가 그대로 실렸다');
+      check.eq(call?.body?.build_path, 'datasets/golden_review/ff5a822c/candidates.jsonl', '고른 경로가 그대로 실렸다');
       check.includes(page.logLines('ok').join(' '), '문서 묶음 등록', '등록됐다고 로그가 말한다');
       check.ok(server.lastCall('GET', '/golden/jobs/'), '등록 직후 상태를 읽는다');
       check.includes(page.text('gold-progress'), 'done', '이어서 그 잡의 상태를 화면에 보여준다');
@@ -160,7 +161,7 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await reviewTab(server);
       server.faults.push({ path: '/golden/jobs/register', status: 404, body: { detail: '경로를 찾을 수 없습니다' } });
-      page.set('gold-build-path', 'datasets/proxy_gold/build_ff5a822c.jsonl');
+      page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl');
       page.click('gold-reg');
       await page.settle();
       check.includes(page.text('gold-progress'), '등록 실패', '실패했다고 말한다');
@@ -183,6 +184,22 @@ export const scenarios = [
       check.data.includes(body, 'eeeeeeee', '완료된 잡이 보인다');
       check.data.includes(body, 'dddddddd', '진행 중인 잡도 보인다');
       check.matches(body, /signoff|서명/, '서명 화면으로 가는 길이 있다');
+
+      /* [2026-08-24] 여기까지가 종전 단언이었다 — id 두 개가 보이는지만 봤다.
+         그래서 본보기의 kind 가 실서버(golden_register)와 달라 등록 잡이 "후보 생성" 으로
+         잘못 그려지는데도 통과했다(실측: 두 행 다 "후보 생성"). 칸을 직접 읽는다. */
+      const rows = [...page.$('gold-jobs-body').querySelectorAll('tbody tr')]
+        .map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
+      const reg = rows.filter((r) => r[1] === '문서 묶음 등록');
+      check.data.gte(reg.length, 2, '등록한 묶음이 「문서 묶음 등록」으로 적힌다');
+      check.ok(rows.some((r) => r[1] === '후보 생성'), 'AI 가 만든 잡은 「후보 생성」으로 적힌다');
+
+      /* 같은 건수의 등록 잡이 둘 있어도 서로 구분돼야 한다 — 223 에서 같은 파일을 두 번씩
+         등록한 여섯 행이 전부 같아 보였다. 원본 파일 열이 그 답이다. */
+      // 위 단언이 깨진 뒤에도 읽을 수 있는 실패를 남긴다(빈 배열 인덱싱으로 죽지 않게).
+      check.eq(reg[0]?.[3], reg[1]?.[3], '건수만으로는 두 행이 같다(구분 근거가 못 된다)');
+      check.ok(!!reg[0] && !!reg[1] && reg[0][2] !== reg[1][2], '원본 파일이 달라 두 행을 구분할 수 있다');
+      check.includes(body, 'candidates.jsonl', '어느 파일에서 온 묶음인지 보인다');
       assertNoScriptErrors(check, page);
       return page;
     },
@@ -197,13 +214,13 @@ export const scenarios = [
     async run({ server, check }) {
       const page = await reviewTab(server);
       // 잡이 없을 때
-      page.win.openGoldenReview();
+      page.win.openGoldenSignoff();
       await page.settle();
       check.includes(page.text('gold-progress'), '열 잡이 없습니다', '먼저 무엇을 하라고 말한다');
       check.eq(page.opened.length, 0, '빈 주소로 창을 열지 않는다');
 
       // 잡을 만든 뒤
-      page.set('gold-build-path', 'datasets/proxy_gold/build_ff5a822c.jsonl');
+      page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl');
       page.click('gold-reg');
       await page.settle();
 
@@ -228,7 +245,7 @@ export const scenarios = [
     title: '서명 탭을 열었다가 돌아오면 다음 단계로 이어 준다',
     async run({ server, check }) {
       const page = await reviewTab(server);
-      page.set('gold-build-path', 'datasets/proxy_gold/build_ff5a822c.jsonl');
+      page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl');
       page.click('gold-reg');
       await page.settle();
       page.click('gold-btn-signoff');
