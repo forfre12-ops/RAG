@@ -218,26 +218,40 @@ def _check_paste_set(client, headers: dict, args) -> int:
         off_all = body
         for kw in kws:
             off_all = off_all.replace(kw, repl.get(kw, "관련 자료"))
+        # 화면(index.html toggle-hint)이 광고하는 것 두 가지를 그대로 건다:
+        #   ① 룰 엔진 등급은 S1 -> S2 -> S3 로 내려간다(치환어가 시드로 회귀하면 깨진다)
+        #   ② 분류기는 움직이지 않아 **최종 등급은 S2 에 머문다**
+        # ②를 거는 이유: 화면이 "단어 몇 개로 등급을 낮출 수 없다"고 말하기 때문이다.
+        # 모델이 바뀌어 그 말이 깨지면 여기서 먼저 빨개져야 한다 — 화면이 조용히
+        # 거짓말하게 두지 않는다(2026-08-24 이전에는 정반대로 걸려 있었고, 그 기대가
+        # 배포본에서 틀린 상태로 남아 있었다).
         steps = (
-            ("전부 켬", body, "S1"),
-            (f"첫 토글 해제", body.replace(kws[0], repl.get(kws[0], "관련 자료")), "S2"),
-            ("전부 해제", off_all, "S3"),
+            ("전부 켬", body, "S1", "S2"),
+            ("첫 토글 해제", body.replace(kws[0], repl.get(kws[0], "관련 자료")), "S2", "S2"),
+            ("전부 해제", off_all, "S3", "S2"),
         )
         print()
-        print("토글 시연 (화면이 광고하는 것 — 등급이 내려가야 한다)")
+        print("토글 시연 (화면이 광고하는 것 — 룰은 내려가고 최종은 유지된다)")
         print("-" * 96)
-        for tag, text, want in steps:
+        for tag, text, want_rule, want_final in steps:
             j = classify(text, borderline["id"], borderline["title"])
-            got = j.get("label") if "error" not in j else f"오류 {j['error']}"
-            ok = got == want
-            toggle_rows.append({"step": tag, "expected": want, "observed": got,
-                                "model_grade": j.get("model_grade"),
-                                "rule_grade": j.get("rule_grade"), "ok": ok})
-            print(f"  {tag:<14} 대본 {want} -> 실제 {str(got):<5} "
-                  f"(룰 {j.get('rule_grade')} · 모델 {j.get('model_grade')})"
-                  f"{'' if ok else '   <<< 불일치'}")
-            if not ok:
-                failures.append(f"토글 {tag}: 대본 {want} -> 실제 {got}")
+            if "error" in j:
+                failures.append(f"토글 {tag}: {j['error']}")
+                print(f"  {tag:<14} 오류 {j['error']}")
+                continue
+            got_rule, got_final = j.get("rule_grade"), j.get("label")
+            bad = []
+            if got_rule != want_rule:
+                bad.append(f"룰 {want_rule} 광고 -> 실제 {got_rule}")
+            if got_final != want_final:
+                bad.append(f"최종 {want_final} 광고 -> 실제 {got_final}")
+            toggle_rows.append({"step": tag, "expected_rule": want_rule, "rule_grade": got_rule,
+                                "expected_final": want_final, "label": got_final,
+                                "model_grade": j.get("model_grade"), "ok": not bad})
+            print(f"  {tag:<14} 룰 {want_rule}->{str(got_rule):<3} · 최종 {want_final}->{str(got_final):<3} "
+                  f"(모델 {j.get('model_grade')})" + ("" if not bad else "   <<< 불일치"))
+            for b_ in bad:
+                failures.append(f"토글 {tag}: {b_}")
 
     if args.out:
         Path(args.out).write_text(json.dumps(

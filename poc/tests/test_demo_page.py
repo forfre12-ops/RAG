@@ -10,7 +10,8 @@
 7. /healthz 에 데모 콘솔용 필드 노출 (deploy_profile·warmup_done 등 8개)
 8. /demo/ 가 OpenAPI 스키마에 노출되지 않음 (StaticFiles 자동 제외)
 9. 빌드된 샘플 13건이 의도 등급으로 분류되는지 (회귀 보장)
-10. 경계 데모 샘플: 토글 해제 → 등급이 실제로 S1→S2→S3로 하향되는지 (와우 회귀)
+10. 경계 데모 샘플: 토글 해제 → **룰 엔진** 등급이 S1→S2→S3로 하향되는지
+   (최종 등급은 분류기가 잡고 있어 안 내려간다 — 그쪽은 check_demo_docs.py --set paste)
 """
 
 from __future__ import annotations
@@ -208,12 +209,28 @@ _NO_MODEL_SKIP = (
 
 
 @pytest.mark.slow
-def test_borderline_sample_toggle_actually_changes_grade():
-    """경계 샘플에서 토글 해제(→일반어 치환) 시 등급이 실제로 S1→S2→S3 하향되는지.
+def test_borderline_sample_toggle_lowers_rule_grade():
+    """경계 샘플에서 토글 해제(→일반어 치환) 시 **룰 엔진** 등급이 S1→S2→S3 하향되는지.
 
-    데모의 '키워드 토글 와우'가 작동함을 보증한다(프론트가 보내는 것과 동일하게
-    본문을 치환해 실 ClassifyService 로 분류). 또한 치환어가 시드로 회귀해 등급이
-    안 내려가는 사고를 차단한다(치환어=비-시드 계약).
+    지키는 것은 하나다 — **치환어가 시드로 회귀하지 않는다**(치환어=비-시드 계약).
+    그것이 깨지면 단어를 껐는데 룰 점수가 그대로여서 화면의 ① 카드가 안 움직인다.
+
+    ⛔ **최종 등급은 단언하지 않는다.** 종전 이름은 ..._actually_changes_grade 였고
+    최종 등급이 S1→S2→S3 로 내려가는 것을 단언했다. 배포본에서는 그렇게 되지 않는다
+    (실측 2026-08-24 · 223 build 5c572ad31c11):
+
+        단계        최종   룰   모델   모델의 S2 확률
+        전부 켬      S2    S1   S2    0.970
+        1개 해제     S2    S2   S2    0.970
+        전부 해제    S2    S3   S2    0.965
+
+    분류기는 929자 중 20자가 바뀐 것으로는 움직이지 않고(치환어도 뜻이 거의 같다),
+    결합이 더 심각한 쪽을 택하므로 최종은 S2 에 머문다. 이 시험이 초록이었던 이유는
+    로컬에 분류기가 안 실려 룰 등급이 곧 최종 등급이었기 때문이다 — 즉 **모델 경로를
+    한 번도 안 본 채 "와우가 작동한다"고 보증하고 있었다.**
+
+    화면 문구는 사실에 맞게 고쳤다(index.html — 룰은 내려가고 분류기는 유지된다).
+    최종 등급 쪽 회귀는 배포본에 대고 본다: scripts/check_demo_docs.py --set paste
     """
     samples_path = STATIC / "samples.js"
     app_js_path = STATIC / "app.js"
@@ -228,15 +245,8 @@ def test_borderline_sample_toggle_actually_changes_grade():
     body = b["body"]
     toggles = b["toggle_keywords"]
 
-    # [2026-08-24] 모델이 안 실려 있으면 **건너뛴다**. 종전에는 그대로 통과했다 —
-    # 룰 엔진만으로도 S1→S2→S3 가 나오기 때문이다. 그런데 배포본(223 · v-fe4b386b)에서
-    # 같은 세 입력을 재면 **S2 · S2 · S2** 로 등급이 전혀 안 움직인다(모델이 셋 다 S2 로
-    # 본다). 즉 이 시험은 초록인데 시연은 안 되는 상태였다. 조용한 통과를 막는다.
-    from koipa.services.classify_service import ClassifyService  # noqa: PLC0415
-    if not _classifier_loaded(ClassifyService.get_instance()):
-        pytest.skip(_NO_MODEL_SKIP)
 
-    def classify_with_off(off_keywords):
+    def rule_grade_with_off(off_keywords):
         text = body
         for kw in off_keywords:
             text = text.replace(kw, repl.get(kw, "관련 자료"))
@@ -248,14 +258,15 @@ def test_borderline_sample_toggle_actually_changes_grade():
                 use_rag=False, return_evidence=False,
             )
         )
-        return res.label.value if hasattr(res.label, "value") else str(res.label)
+        rg = getattr(res, "rule_grade", None)
+        return rg.value if hasattr(rg, "value") else (str(rg) if rg else None)
 
-    # ALL ON → S1 (고객DB·원가구조 = 영업비밀)
-    assert classify_with_off([]) == "S1"
-    # 첫 토글(고객 데이터베이스) 하나만 해제 → S1 신호 소멸 → S2 (즉시 하향)
-    assert classify_with_off([toggles[0]]) == "S2"
-    # 전부 해제 → 콘텐츠 신호 전무 → S3 (공개)
-    assert classify_with_off(toggles) == "S3"
+    # ALL ON → 룰 S1 (고객DB·원가구조 = 영업비밀 시드)
+    assert rule_grade_with_off([]) == "S1"
+    # 첫 토글(고객 데이터베이스) 하나만 해제 → S1 시드 소멸 → 룰 S2
+    assert rule_grade_with_off([toggles[0]]) == "S2"
+    # 전부 해제 → 시드 전무 → 룰 S3. 여기가 깨지면 치환어가 시드로 회귀한 것이다.
+    assert rule_grade_with_off(toggles) == "S3"
 
 
 # --------------------------------------------------------------------
