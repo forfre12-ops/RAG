@@ -76,6 +76,14 @@ textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
    (시험·JS 가 클래스 이름을 문자열로 보고 있어 이름을 바꾸면 그쪽이 깨진다).
    왼쪽 선은 뺐다 — 카드 안에서 문단을 또 한 번 가르는 장식이었다. */
 .hint,.sec-note{font-size:11.5px;color:var(--text-dim);margin:2px 0 0;line-height:1.5;}
+/* [2026-08-24] 기술 상세 스위치. 일반 관리자에게는 구현 정보를 보이지 않고, 기술 담당자는
+   필요할 때 원래 식별자를 본다(운영·개발 대조). 켜는 방법은 주소 `?tech=1` 하나다 —
+   체크박스로 두면 상태가 남아 다음 시연에서 켜진 채로 열린다.
+   ⚠ DOM 에서 지우지 않는다. 제출본이 지목하는 요건 표식(§N·§E·§T)과 엔드포인트가
+   화면에 **존재**해야 한다는 시험이 있다(test_admin_console_screens). 감추되 남긴다. */
+[data-tech]{display:none !important;}
+body.tech [data-tech]{display:revert !important;}
+.techbar{font-size:11px;color:var(--text-dim);padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--bg-surface);}
 .sec-note details{margin-top:4px}
 .sec-note summary{cursor:pointer;color:var(--text-soft)}
 
@@ -450,7 +458,7 @@ details.adv[open]{padding-bottom:12px;}
       <summary style="cursor:pointer;list-style:none">
       <div class="card-head" style="border:0;padding-bottom:0">
         <div class="ttl"><span class="step-no aux">공통</span> 연결 · 인증 <span style="font-weight:400;font-size:12px;color:var(--text-faint)">— 접속 정보 · 보통 손대지 않습니다</span></div>
-        <span class="ep">X-API-Key · X-Actor-Role</span>
+        <span class="ep" data-tech>X-API-Key · X-Actor-Role</span>
       </div>
       </summary>
       <div class="card-body">
@@ -505,8 +513,8 @@ details.adv[open]{padding-bottom:12px;}
          자기 일이 두 번째에 있다. KL 이 관리자 화면을 보고 "잘 모르겠다"고 한 원인 중 하나다. -->
     <section class="card" data-pane="ops" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 1단계">1</span> 분류 실행 <span class="reqtag">FUN-005</span></div>
-        <span class="ep">POST /documents/analyze · POST /classify</span>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 1단계">1</span> 분류 실행 <span class="reqtag" data-tech>FUN-005</span></div>
+        <span class="ep" data-tech>POST /documents/analyze · POST /classify</span>
       </div>
       <div class="card-body">
         <!-- 문서 업로드 — 종전에는 본문을 붙여넣거나 샘플을 고르는 길뿐이었고, 파일 업로드는
@@ -514,7 +522,7 @@ details.adv[open]{padding-bottom:12px;}
              분류한다"는 실제 업무 흐름이 보이지 않고, 요건 FUN-022(전자문서 텍스트 추출)를
              이행하는 화면도 콘솔에 없었다. G1 카드가 쓰는 것과 같은 추출 경로를 재사용한다. -->
         <div class="field upload-row">
-          <label class="fld">문서 업로드 — HWP · PDF · DOCX · XLSX · PPTX · TXT <span class="reqtag">FUN-022</span></label>
+          <label class="fld">문서 업로드 — HWP · PDF · DOCX · XLSX · PPTX · TXT <span class="reqtag" data-tech>FUN-022</span></label>
           <div id="cl-drop" class="dropzone"
                ondragover="dzOver(event,true)" ondragleave="dzOver(event,false)" ondrop="dzDrop(event)"
                onclick="document.getElementById('cl-file').click()">
@@ -612,8 +620,8 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 2. 검수 큐 ===== -->
     <section class="card" data-pane="ops" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 2단계">2</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag">FUN-024</span></div>
-        <span class="ep">POST /confirm · /relabel</span>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 A 의 2단계">2</span> 문서 검토 대기 · 등급 확정/수정 <span class="reqtag" data-tech>FUN-024</span></div>
+        <span class="ep" data-tech>POST /confirm · /relabel</span>
       </div>
       <div class="card-body">
         <!-- [정합 2026-08-09] 종전에는 이 자리에 "신뢰도 게이트(검수 라우팅 임계)"라는 입력이
@@ -649,8 +657,8 @@ details.adv[open]{padding-bottom:12px;}
          동일하다 — GET /admin/locked-readiness. -->
     <section class="card col-span" data-pane="review" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">조회</span> 검증문서 현황 — 구성 · 서명 <span class="reqtag">FUN-024</span></div>
-        <span class="ep">GET /golden/summary · /admin/locked-readiness</span>
+        <div class="ttl"><span class="step-no aux">조회</span> 검증문서 현황 — 구성 · 서명 <span class="reqtag" data-tech>FUN-024</span></div>
+        <span class="ep" data-tech>GET /golden/summary · /admin/locked-readiness</span>
       </div>
       <div class="card-body">
         <div class="btn-row" style="margin:0 0 10px;">
@@ -673,8 +681,8 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
     <section class="card col-span" data-pane="train" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">데이터</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span><span class="secmark" title="제출본 RFP 구현현황이 이 카드를 §N 으로 지목한다">§N</span></div>
-        <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
+        <div class="ttl"><span class="step-no aux">데이터</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag" data-tech>FUN-003</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §N 으로 지목한다">§N</span></div>
+        <span class="ep" data-tech>POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
         <div class="row3">
@@ -748,8 +756,8 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 3. 재학습 ===== -->
         <section class="card" data-pane="train" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 3단계">3</span> 재학습 트리거 <span class="reqtag">FUN-004</span></div>
-        <span class="ep">POST /train · GET /train/jobs</span>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 3단계">3</span> 재학습 트리거 <span class="reqtag" data-tech>FUN-004</span></div>
+        <span class="ep" data-tech>POST /train · GET /train/jobs</span>
       </div>
       <div class="card-body">
         <!-- 학습 규모 preset — 자유 입력란을 열지 않는다. 임의 값이 들어가면 얼마나 걸릴지
@@ -766,7 +774,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div class="row3">
           <div class="field">
-            <label class="fld">training_type</label>
+            <label class="fld">학습 방식 <span class="techbar" data-tech>training_type</span></label>
             <select id="tr-type">
               <option value="incremental">incremental</option>
               <option value="full">full</option>
@@ -774,12 +782,12 @@ details.adv[open]{padding-bottom:12px;}
             </select>
           </div>
           <div class="field">
-            <label class="fld">base_model</label>
+            <label class="fld">기본 모델 <span class="techbar" data-tech>base_model</span></label>
             <input id="tr-base" type="text" value="kf-deberta-base" />
           </div>
           <div class="field" style="display:flex;align-items:flex-end;gap:6px;">
             <label style="font-size:12px;color:var(--text-soft);display:flex;align-items:center;gap:5px;">
-              <input id="tr-rag" type="checkbox" style="width:auto" /> use_rag
+              <input id="tr-rag" type="checkbox" style="width:auto" /> 검색 보강 <span class="techbar" data-tech>use_rag</span>
             </label>
           </div>
         </div>
@@ -801,12 +809,12 @@ details.adv[open]{padding-bottom:12px;}
         <section class="card" data-pane="train" style="order:3">
       <div class="card-head">
         <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 4단계">4</span> 모델 서빙 · 배포 게이트 · 핫리로드</div>
-        <span class="ep">POST /admin/model/activate · /reload</span>
+        <span class="ep" data-tech>POST /admin/model/activate · /reload</span>
       </div>
       <div class="card-body">
         <div class="row2">
           <div class="field">
-            <label class="fld">활성화할 version_label (G1 수동 배포)</label>
+            <label class="fld">배포할 모델 <span class="techbar" data-tech>version_label</span></label>
             <input id="act-ver" type="text" placeholder="예: v-dd3abab9" />
           </div>
           <div class="field" style="display:flex;align-items:flex-end;gap:10px;">
@@ -842,8 +850,8 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== 5. 메트릭 ===== -->
     <section class="card col-span" data-pane="train" style="order:4">
       <div class="card-head">
-        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 5단계">5</span> 모델 메트릭 · FNR 게이트 <span class="reqtag">FUN-024</span></div>
-        <span class="ep">GET /metrics/latest · /history · /confusion-matrix</span>
+        <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 5단계">5</span> 모델 메트릭 · FNR 게이트 <span class="reqtag" data-tech>FUN-024</span></div>
+        <span class="ep" data-tech>GET /metrics/latest · /history · /confusion-matrix</span>
       </div>
       <div class="card-body">
         <div class="btn-row">
@@ -867,7 +875,7 @@ details.adv[open]{padding-bottom:12px;}
     <section class="card col-span" data-pane="ops" style="order:3">
       <div class="card-head">
         <div class="ttl"><span class="step-no aux">조회</span> 운영 관제 대시보드</div>
-        <span class="ep">GET /admin/dashboard</span>
+        <span class="ep" data-tech>GET /admin/dashboard</span>
       </div>
       <div class="card-body">
         <div class="btn-row" style="align-items:center">
@@ -884,7 +892,7 @@ details.adv[open]{padding-bottom:12px;}
     <section class="card col-span" data-pane="ops" style="order:4">
       <div class="card-head">
         <div class="ttl"><span class="step-no aux">조회</span> 감사 로그 — 누가 · 언제 · 무엇을</div>
-        <span class="ep">GET /admin/audit-log</span>
+        <span class="ep" data-tech>GET /admin/audit-log</span>
       </div>
       <div class="card-body">
         <div class="btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">
@@ -926,7 +934,7 @@ details.adv[open]{padding-bottom:12px;}
     <section class="card col-span" data-pane="review" style="order:3">
       <div class="card-head">
         <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G2 — 준비된 묶음을 검수·서명 화면으로 올립니다">G2</span> 검증문서 검수 준비</div>
-        <span class="ep">POST /golden/jobs/register · GET /golden/jobs/{id}/signoff.html</span>
+        <span class="ep" data-tech>POST /golden/jobs/register · GET /golden/jobs/{id}/signoff.html</span>
       </div>
       <div class="card-body">
 
@@ -987,7 +995,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
 
         <details style="margin-top:10px;">
-          <summary style="font-size:12px;color:var(--text-dim);cursor:pointer;">서버 응답 원문 (기술 진단용)</summary>
+          <summary style="font-size:12px;color:var(--text-dim);cursor:pointer;">원시 응답 (기술 진단용)</summary>
           <div id="gold-result" class="json" style="margin-top:6px;" role="status" aria-live="polite">-</div>
         </details>
 
@@ -998,8 +1006,8 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
     <section class="card col-span" data-pane="config" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">설정</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span><span class="secmark" title="제출본 RFP 구현현황이 이 카드를 §E 로 지목한다">§E</span></div>
-        <span class="ep">GET · PUT /schema/grades</span>
+        <div class="ttl"><span class="step-no aux">설정</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag" data-tech>FUN-005-①</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §E 로 지목한다">§E</span></div>
+        <span class="ep" data-tech>GET · PUT /schema/grades</span>
       </div>
       <div class="card-body">
         <div class="btn-row">
@@ -1022,8 +1030,8 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== T. 태깅 키워드 관리 (FUN-023-④) ===== -->
     <section class="card col-span" data-pane="config" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">설정</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span><span class="secmark" title="제출본 RFP 구현현황이 이 카드를 §T 로 지목한다">§T</span></div>
-        <span class="ep">GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
+        <div class="ttl"><span class="step-no aux">설정</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag" data-tech>FUN-023-④</span><span class="secmark" data-tech title="제출본 RFP 구현현황이 이 카드를 §T 로 지목한다">§T</span></div>
+        <span class="ep" data-tech>GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
       </div>
       <div class="card-body">
         <div class="row3">
@@ -2955,6 +2963,20 @@ function syncActiveGrades(codes){
 })();
 
 /* init */
+/* [2026-08-24] 기술 상세 스위치. 주소에 `?tech=1` 이 있으면 켠다.
+   왜 주소인가: 체크박스는 상태가 남아 다음 시연에서 켜진 채로 열린다. 주소는 그 자리에서
+   끝나고, 시연 대본에 안 적히면 켜지지 않는다. 켜져 있으면 오른쪽 위에 표시를 남긴다 —
+   켠 줄 모르고 감리 화면을 열면 그게 더 나쁘다. */
+(function(){
+  try{
+    if(new URLSearchParams(location.search).get('tech')!=='1') return;
+    document.body.classList.add('tech');
+    var b=document.createElement('span');
+    b.className='techbar'; b.style.marginLeft='8px'; b.textContent='기술 상세 켜짐';
+    var h=document.querySelector('header.top .spacer');
+    if(h && h.parentNode) h.parentNode.insertBefore(b, h.nextSibling);
+  }catch(e){}
+})();
 initPane();          // 탭 초기 표시 — 검수 탭이 기본, 탭마다 카드 4장 이하
 loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸을 대체)
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)

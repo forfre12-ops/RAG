@@ -60,13 +60,20 @@
     <p class="h2-sub">업무 문서를 올리거나(HWP·PDF·DOCX·XLSX 등 — 추출 → 정규화·PII마스킹 → 청킹 → 검수 게이트 → 등급까지 한 번에), 샘플 12종(시드 v4 빌드 + 의도 등급 검증 통과)을 고르거나, 본문을 직접 붙여넣으십시오. 본문 입력은 SSE 7단계 점등으로 분류 과정이 실시간으로 보이고, 파일은 서버가 돌려준 실제 처리 단계가 표시됩니다. 파싱 세부(추출기·품질·청크·PII·검수 게이트)는 아래 §2 결과 안의 <b>「파싱 상세」</b>에 있습니다.</p>
 
     <div class="card" style="padding: 20px 24px;">
-      <div class="form-row" style="align-items:center;">
-        <label for="cfg-apikey">API 키</label>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <input id="cfg-apikey" type="text" value="demo-secret-key" placeholder="시연 서버 API 키" aria-label="시연 서버 API 키" style="font-family:var(--font-mono);font-size:13px;min-width:220px;padding:6px 10px;" />
-          <span id="apikey-status" class="toggle-hint" style="margin:0;">기본 <code>demo-secret-key</code></span>
+      <!-- [2026-08-24] API 키를 화면 맨 위에서 뺐다. 두 가지가 겹쳤다:
+           ① 기본값이 **틀렸다** — 이 서버의 실제 키와 달라 그대로 두면 모든 호출이 401 이다
+             (실측 2026-08-24: 프리필 값으로 /classify 호출 시 401).
+           ② 시연·촬영 자료에 키 입력칸이 그대로 남는다.
+           지우지 않고 접어 둔다 — 다른 서버를 상대로 시연할 때 손댈 곳이 여기뿐이다.
+           기본값 칩(기본 demo-secret-key)은 없앴다. 틀린 값을 권하는 표시였다. -->
+      <details style="margin-bottom:14px;">
+        <summary style="cursor:pointer;font-size:12px;color:var(--text-dim,#71717a);">연결 설정 — 보통 손대지 않습니다</summary>
+        <div class="form-row" style="align-items:center;margin-top:8px;">
+          <label for="cfg-apikey">API 키</label>
+          <input id="cfg-apikey" type="text" value="" placeholder="서버 API 키" aria-label="서버 API 키" style="font-family:var(--font-mono);font-size:13px;min-width:220px;padding:6px 10px;" />
+          <span id="apikey-status" class="toggle-hint" style="margin:0;"></span>
         </div>
-      </div>
+      </details>
       <!-- 앵커 id="sec-parse" — 옛 파싱·분류 시연 화면의 주소가 사용설명서·배포 가이드·
            console_nav 에 인쇄돼 있다. 그 주소로 온 사람이 떨어져야 하는 자리는
            「파일을 올리는 곳」이므로 업로드 칸에 둔다(파싱 세부는 §2 결과 안에 있다). -->

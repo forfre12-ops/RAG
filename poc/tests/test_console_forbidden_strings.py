@@ -61,7 +61,7 @@ FORBIDDEN: tuple[tuple[str, str], ...] = (
 )
 
 # 0차 시점 잔여 건수. 차수를 진행하며 줄인다. 늘면 실패한다.
-# 0차 **시작** 시점 10건 → **완료** 시점 6건. 아래 BASELINE 은 현재값이고, 늘면 실패한다.
+# 진행: 0차 시작 10건 → 0차 완료 6건 → **0.5·2차 완료 0건**. BASELINE 은 현재값이고 늘면 실패한다.
 # 0차에서 지운 4건: 학습행 · 소프트 삭제 · 헬스체크 · 메트릭 스크랩(전부 우리가 만든 말).
 # 남은 6건과 처리 차수:
 #   version_label · training_type · base_model · use_rag  → 0.5차([기술 상세] 토글 뒤로)
@@ -75,7 +75,7 @@ FORBIDDEN: tuple[tuple[str, str], ...] = (
 # ⚠ 이 시험은 **정적 마크업만** 본다. 실행 중 만들어지는 문구(insufficient_per_grade ·
 #   locked_gold_eval · artifacts/… 같은 JS 문자열)는 여기서 안 걸린다 — 콘솔 e2e 하니스가
 #   실제로 렌더해서 잡아야 한다(1차에서 추가). 그때 이 숫자는 다시 올라간다.
-BASELINE = 6
+BASELINE = 0
 
 _DETAILS = re.compile(r"<details.*?</details>", re.S)
 _TECH = re.compile(r"<[^>]*data-tech[^>]*>.*?</[a-zA-Z]+>", re.S)
@@ -122,16 +122,11 @@ def collect_hits() -> list[tuple[str, str, str]]:
     return out
 
 
-@pytest.mark.xfail(
-    reason="0차 완료 시점 잔여 6건 — 0.5차([기술 상세] 토글·API 키 제거)와 2차(배지)에서 0 이 된다. "
-           "0 이 되면 이 표시를 떼고 회귀 방지 시험으로 전환할 것.",
-    strict=False,
-)
 def test_no_forbidden_strings_on_default_screens():
     """기본 화면에 구현 정보가 없어야 한다 — 0 이 될 때까지 잔여 건수를 줄여 간다.
 
-    ⚠ 지금은 xfail 이다. **줄어드는 것을 지키는 것은 아래 test_hit_count_does_not_grow** 이고,
-    그쪽이 진짜 잠금장치다(BASELINE 을 넘으면 실패). 이 시험은 목표 상태를 문서로 남긴다.
+    [2026-08-24] **0 달성** — 0차(지어낸 말)·0.5차([기술 상세] 토글 · API 키 접기)·
+    2차(배지 역할 칸 제거)를 거쳐 xfail 표시를 뗐다. 이제 회귀 방지 시험이다.
     """
     hits = collect_hits()
     report = "\n".join(f"  {n:12} {s:24} {w}" for n, s, w in hits)

@@ -94,11 +94,14 @@ def _logo_data_uri() -> str:
 
 
 # deploy_profile → 배포 주체. static/deploy_badge.js 의 표와 동일하게 유지할 것.
+# [2026-08-24] 역할 칸을 없앴다(사용자 지시). 「모델 공장」은 우리가 만든 비유이고
+# 제출본·사용매뉴얼에 0회다. 「폐쇄망 운영」·「dryrun」도 사용자 업무 역할이 아니라 배포 구성
+# 설명이다. 배지는 **소속 하나**만 말하고, 화면 이름은 상단이 말한다. 프로파일명은 title 로만.
 _SITES = {
-    "full-train": ("지재원", "모델 공장", "jjw"),
-    "onprem-local": ("고객사", "폐쇄망 운영", "cust"),
-    "lite-cloud": ("오픈망 파일럿", "경량", "pilot"),
-    "lite-noapi": ("로컬·개발", "dryrun", "dev"),
+    "full-train": ("지재원", "jjw"),
+    "onprem-local": ("고객사", "cust"),
+    "lite-cloud": ("오픈망 파일럿", "pilot"),
+    "lite-noapi": ("로컬·개발", "dev"),
 }
 
 
@@ -106,10 +109,8 @@ def _site_badge_html(profile: Optional[str], screen: str) -> str:
     """배포 주체·화면 배지. profile 미지정/미등록이면 단정하지 않고 원시값을 회색으로 표기."""
     if not profile:
         return ""
-    site, role, cls = _SITES.get(profile, (profile, "", "unknown"))
+    site, cls = _SITES.get(profile, (profile, "unknown"))
     parts = [f'<span class="site-name">{_html.escape(site)}</span>']
-    if role:
-        parts.append(f'<span class="site-role">{_html.escape(role)}</span>')
     parts.append(f'<span class="site-kind">{_html.escape(screen)}</span>')
     return (
         f'<span class="site-badge {cls}" title="deploy_profile={_html.escape(profile)}">'
