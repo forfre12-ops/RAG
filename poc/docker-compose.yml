@@ -21,18 +21,13 @@ services:
       interval: 5s
       retries: 10
 
-  minio:
-    # [공급망] latest 는 매번 다른 이미지를 뜻한다 — digest 로 고정한다.
-    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-koipa}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-koipa_dev_minio}
-    volumes:
-      - ../docker-data/minio:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+  # [2026-08-24] minio 서비스를 뺐다. 어디서도 쓰지 않는데 매 배포마다 떠 있었다.
+  #   - 실배포 프로파일은 전부 storage_backend=local 이다(config.py:81 onprem-local · 173 full-train).
+  #   - 223 실측: api/worker env 에 MINIO_* 없음, 컨테이너 /data 에 버킷 0개(.minio.sys 뿐).
+  #   - 제출본도 "MinIO 미사용"으로 적혀 있다(기술구현_백서_v7 §2.1 인프라 표 + 각주).
+  # 그런데도 떴던 이유: deploy_kl_223.sh 가 서비스명 없이 `up -d` 를 부르고 여기 정의가 남아
+  # 있었다. dev 도 로컬FS 로 통일한다 — dev 만 다른 백엔드를 쓰면 재현되지 않는 차이가 생긴다.
+  # S3 호환 스토리지가 필요해지면 어댑터·[minio] extra 가 그대로 있다(코드 변경 0).
 
   redis:
     # BSD-3-Clause 시점(7.2.x)으로 고정 — Redis 7.4+는 RSALv2/SSPL 듀얼 (doc/14 §6.3).
@@ -57,19 +52,16 @@ services:
     command: >
       mlflow server
       --backend-store-uri sqlite:////mlflow-data/mlflow.db
-      --default-artifact-root s3://mlflow/
+      --default-artifact-root /mlflow-data/artifacts
       --host 0.0.0.0
     volumes:
       - mlflow_data:/mlflow-data
-    environment:
-      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-koipa}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-koipa_dev_minio}
+    # [2026-08-24] 아티팩트 저장을 s3://mlflow/(minio) 에서 같은 볼륨 안 로컬 경로로 옮겼다.
+    # minio 를 뺄 수 있게 하는 지점이다 — 이 의존을 안 끊으면 mlflow 가 기동하지 못한다.
+    # backend-store 가 이미 같은 볼륨의 SQLite 라 저장 위치가 한곳으로 모이는 셈이다.
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
     ports:
       - "5000:5000"
 
@@ -81,11 +73,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
-      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-koipa}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-koipa_dev_minio}
+      # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio). 실배포 프로파일이 전부 local 이라
+      # dev 만 다른 백엔드면 여기서 통과한 것이 배포에서 다르게 도는 경로가 생긴다.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       REDIS_URL: redis://redis:6379/0
       MLFLOW_TRACKING_URI: http://mlflow:5000
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
@@ -94,8 +84,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
       redis:
         condition: service_started
     volumes:
@@ -117,8 +105,8 @@ services:
       DATABASE_URL: postgresql+psycopg://koipa:${POSTGRES_PASSWORD:-koipa_dev}@postgres:5432/koipa
       REDIS_URL: redis://redis:6379/0
       VECTOR_BACKEND: ${VECTOR_BACKEND:-pg}
-      # dev 는 minio 서비스를 띄우므로 명시 고정 (config base 기본값은 폐쇄망용 local).
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-minio}
+      # [2026-08-24] dev 도 로컬FS 로 통일 (종전 기본값 minio) — api 쪽 주석 참조.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:

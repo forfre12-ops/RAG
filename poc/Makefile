@@ -25,7 +25,7 @@ help:
 	@echo "Targets:"
 	@echo "  venv         create venv ($(VENV_DIR)) and install -e .[dev]"
 	@echo "  env          copy .env.example -> .env if missing"
-	@echo "  infra-up     docker compose up -d (postgres/minio/redis/mlflow)"
+	@echo "  infra-up     docker compose up -d (postgres/redis/mlflow)"
 	@echo "  infra-down   docker compose down"
 	@echo "  infra-verify python scripts/verify_infra.py"
 	@echo "  api          run FastAPI locally (uvicorn)"
@@ -84,7 +84,7 @@ env:
 	@[ -f .env ] || cp .env.example .env
 
 infra-up:
-	docker compose up -d postgres minio redis mlflow
+	docker compose up -d postgres redis mlflow
 
 infra-down:
 	docker compose down

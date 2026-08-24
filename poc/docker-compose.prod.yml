@@ -150,13 +150,7 @@ services:
     restart: unless-stopped
     ports: !override []
 
-  minio:
-    ports: !override []
-    deploy:
-      resources:
-        limits:
-          memory: "${MINIO_MEM_LIMIT:-2G}"
-
+  # [2026-08-24] minio 오버라이드를 뺐다 — base 에서 서비스 자체를 제거했다(그쪽 주석 참조).
   mlflow:
     ports: !override []
 
