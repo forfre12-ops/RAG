@@ -366,6 +366,59 @@ export const scenarios = [
   },
 
   {
+    id: 'manage.provenance.note-follows-decision',
+    title: '등급을 정하지 않는 결정에서는 비밀관리성 칸이 사라지고, 출처 안내는 흔들리지 않는다',
+    why: '결정 폼 바로 아래 붙어 있어 "폐기하려면 출처도 채워야 하나"로 읽혔다 — 출처를 요구하는 결정은 등급 지정/변경뿐이다',
+    needsMock: true,
+    needsData: true,
+    writes: true,
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const real = FIXTURES['GET /golden/candidates'].candidates[2];
+      server.overrides['GET /golden/candidates/{doc_id}'] = { ...real, text: '기관 게시판에 공개된 자료다.' };
+
+      const page = await manage(server);
+      page.click(page.qa('#rows .candidate')[2]);   // 3번째 = 공개 실문서
+      await page.settle();
+
+      check.includes(page.text('provNote'), '등급을 확정할 때만 필요합니다', '출처 칸이 언제 필요한지 못박는다');
+      check.includes(page.text('provNote'), '보류·폐기에는 필요 없고', '폐기에는 필요 없다고 같은 줄에 적는다');
+      check.includes(page.$('provBox')?.className || '', 'apartBox', '등급 결정과 별개인 블록으로 떼어 보인다');
+
+      page.set('action', 'discard');
+      check.ok(!page.visible('mgmtWrap'), '폐기에는 비밀관리성 칸이 아예 안 보인다');
+      check.eq(page.$('secMarking')?.disabled, true, '감춘 칸은 잠겨 있다');
+      check.includes(page.text('provNote'), '등급을 확정할 때만 필요합니다', '출처 안내는 결정에 따라 흔들리지 않는다');
+
+      page.set('action', 'change');
+      check.ok(page.visible('mgmtWrap'), '등급을 정할 때는 비밀관리성 칸이 나온다');
+      check.eq(page.$('secMarking')?.disabled, false, '그때는 열려 있다');
+
+      // 사유 누락 안내도 결정 넷을 나열하지 않고 고른 것만 말한다
+      page.set('action', 'discard');
+      page.set('reason', '');
+      page.click('save');
+      await page.settle();
+      check.includes(page.text('saveMsg'), '「폐기」에는 사유가 필요합니다', '막힌 이유가 고른 결정으로 나온다');
+      check.eq(server.countCalls('POST', '/golden/candidates/PGC-0003/decision'), 0, '사유 없이는 보내지 않는다');
+
+      // 잠근 칸의 값은 실려 나가지 않는다 — 폐기가 문서의 M 을 조용히 덮어쓰면 안 된다
+      page.set('action', 'change');
+      page.set('secMarking', 'confidential');
+      page.set('action', 'discard');
+      page.set('reason', '중복 문서');
+      page.click('save');
+      await page.settle();
+      const sent = server.lastCall('POST', '/golden/candidates/PGC-0003/decision');
+      check.eq(sent?.body?.action, 'discard', '폐기가 나갔다');
+      check.eq(sent?.body?.security_marking, undefined, '잠긴 보안표시는 실리지 않았다');
+      check.eq(sent?.body?.access_scope, undefined, '잠긴 접근범위도 실리지 않았다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'manage.provenance.basis-required-is-marked-and-answered',
     title: '사용 권한 근거는 필수라고 적혀 있고, 비우고 누르면 그 자리에서 말해 준다',
     why: '화면(2026-08-24)에서 근거 칸이 비어 있는 채로 「출처 저장」을 누르면 fetch 도 '
