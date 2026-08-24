@@ -774,18 +774,52 @@ class InferencePipeline:
                         new_scores, new_conf = self._enforce_label_consistency(
                             result.scores, cap_code, floor=0.6
                         )
+                        # [2026-08-24] cap 뒤 표시 요소 재정합. A3(1326행대)와 같은 방식이다 —
+                        # 새로 만들지 않고 그 패턴을 재사용한다.
+                        #
+                        # 종전에는 factors 를 그대로 통과시켜, 등급은 S3 로 내려가는데 화면의
+                        # S·V·M 은 상위 등급 조합(예: S2·V2·M2)으로 남았다. 검수자가 보면
+                        # 판정식으로 설명이 안 되는 조합이다 — "S3 인데 요소는 S2 조합".
+                        # 관측치는 버리지 않고 rule_factors 로 보존한다(두 벌을 나란히 보여야
+                        # 왜 갈렸는지 읽힌다). 등급·게이트는 건드리지 않는다 — **표시만**이다.
+                        cap_factors = result.factors
+                        cap_rule_factors = result.rule_factors
+                        try:
+                            from koipa.modules.m3_labeling.rule_engine import (  # noqa: PLC0415
+                                grade_from_svm,
+                                svm_levels_for_grade,
+                            )
+                            if cap_factors is not None:
+                                _fs = int(float(getattr(cap_factors, "secrecy", 0)))
+                                _fv = int(float(getattr(cap_factors, "value", 0)))
+                                _fm = int(float(getattr(cap_factors, "management", 0)))
+                                if grade_from_svm(_fs, _fv, _fm) != cap_code:
+                                    if cap_rule_factors is None:
+                                        cap_rule_factors = cap_factors
+                                    _s2, _v2, _m2 = svm_levels_for_grade(cap_code)
+                                    cap_factors = EvaluationFactors.from_factor_scores(
+                                        {"SECRECY": float(_s2), "VALUE": float(_v2),
+                                         "MANAGEMENT": float(_m2)}
+                                    )
+                                    result.warnings = list(result.warnings) + [
+                                        f"factors aligned to capped grade {cap_code} "
+                                        f"(source-prior; observed kept as rule_factors)"
+                                    ]
+                        except Exception:  # noqa: BLE001 — 표시 정합 실패가 판정을 막지 않는다
+                            cap_factors = result.factors
+                            cap_rule_factors = result.rule_factors
                         result = InferenceResult(
                             label=Grade[cap_code],
                             confidence=min(new_conf, 0.7),
                             scores=new_scores,
-                            factors=result.factors,
+                            factors=cap_factors,
                             evidence=result.evidence,
                             rag_context=result.rag_context,
                             model_version=result.model_version,
                             warnings=result.warnings,
                             rule_grade=result.rule_grade,
                             rule_has_evidence=result.rule_has_evidence,
-            rule_factors=result.rule_factors,
+                            rule_factors=cap_rule_factors,
                         )
         except Exception:  # noqa: BLE001
             # source-prior cap(하향)이 예외로 미적용 → 공개출처 문서가 상위등급 유지. 가시화.

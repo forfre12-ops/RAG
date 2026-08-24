@@ -311,7 +311,14 @@ class ClassifyService:
 
             # InferencePipeline 내부에서 embed → retrieve → llm을 거치므로,
             # 진입/종료 양쪽에 신호를 보내 클라이언트가 long-stage 감지 가능.
-            notify("embed")
+            #
+            # [2026-08-24] `embed` 를 use_rag 안으로 옮겼다. 종전에는 무조건 보냈는데,
+            # **RAG 임베딩은 use_rag=True 일 때만 돈다**(pipeline.py:887 `if use_rag:` 안의
+            # _build_rag_context). use_rag=False 인 기본 경로에서는 임베더를 부르지 않는다 —
+            # 분류기가 하는 토큰 인코딩(_encode_windows)은 추론의 일부이지 별도 단계가 아니다.
+            # 그런데 화면은 「임베딩」 칸을 점등해 하지 않은 일을 한다고 말하고 있었다.
+            if req.use_rag:
+                notify("embed")
             notify("retrieve" if req.use_rag else "llm")
             eff_meta = self._effective_metadata(req, content=cleaned)
             pred = self.inference.run(

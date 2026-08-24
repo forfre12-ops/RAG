@@ -278,11 +278,13 @@ function renderBodyPreview(text) {
 // 분류 호출 (와우 2 — SSE 7단계 점등)
 // ──────────────────────────────────────────────────────────────────────
 // 서버 ClassifyService 가 실제 emit 하는 stage 이름과 1:1 매칭.
-// 서버 SSE 검증 결과: extract / normalize / embed / llm / persist / finalize.
+// [2026-08-24] 「임베딩」을 뺐다(6단계 → 5단계). RAG 임베딩은 use_rag=True 일 때만 돌고
+// (pipeline.py:887), 이 화면은 use_rag=false 로 보낸다 — 즉 그 칸은 **하지 않은 일**을
+// 점등하고 있었다. 서버도 이제 그 신호를 use_rag 안에서만 보낸다(classify_service.py:314).
+// 분류기의 토큰 인코딩은 추론의 일부이지 별도 단계가 아니라 「분류 추론」에 포함된다.
 const STAGES = [
   { key: "extract", label: "본문 추출" },
   { key: "normalize", label: "정규화" },
-  { key: "embed", label: "임베딩" },
   { key: "llm", label: "분류 추론" },
   { key: "persist", label: "저장" },
   { key: "finalize", label: "결과 합성" },
@@ -483,7 +485,7 @@ function renderResult(data, elapsedMs) {
   // 대조할 수 있어야 하지만, 판정 카드에 영어 원문과 수치가 섞이면 화면이 읽히지 않는다.
   (data.warnings || []).forEach((w) => logLine("info", `warning: ${w}`));
   // 평가요소 stats (factors_source=model_estimated 는 '모델 추정'으로 구분)
-  renderFactors(data.evaluation_factors || {}, data.factors_source);
+  renderFactors(data.evaluation_factors || {}, data.factors_source, data.rule_evaluation_factors);
   // 키워드 칩 (weight 진하기)
   renderKeywordChips(data.evidence || []);
   // 본문 하이라이트
@@ -1154,7 +1156,11 @@ function gradeLabel(g) {
   return ({ TS: "특급기밀", S1: "1급 비밀", S2: "2급 대외비", S3: "3급 공개" })[g] || g;
 }
 
-function renderFactors(f, factorsSource) {
+/* [2026-08-24] 세 번째 인자 `observed` 추가. 서버가 표시 요소를 등급에 맞춰 재정합할 때
+   (A3 상향 정합 · 출처 cap 하향 정합) **관측치를 rule_factors 로 보존**한다. 그 값이 있으면
+   두 줄로 그린다 — 어느 것이 판정에 쓰인 값이고 어느 것이 본문에서 관측된 값인지 갈라야
+   검수자가 왜 갈렸는지 읽는다. 없으면 종전과 같이 한 줄이다. */
+function renderFactors(f, factorsSource, observed) {
   const wrap = $("#result-factors");
   const labels = {
     secrecy: "비공지성(S)",
@@ -1171,6 +1177,13 @@ function renderFactors(f, factorsSource) {
     note.textContent = "⚠ 모델 추정치 — 룰이 근거를 못 찾아 등급에 맞춰 역산(법리 근거 아님)";
     wrap.appendChild(note);
   }
+  // 관측치가 따로 있으면 위 숫자가 무엇인지 먼저 밝힌다 — 두 벌이 섞여 보이면 안 된다.
+  if (observed && Object.keys(labels).some((k) => typeof observed[k] === "number" && observed[k] !== f[k])) {
+    const src = document.createElement("div");
+    src.style.cssText = "grid-column:1/-1;font-size:12px;color:var(--text-dim,#71717a);margin-bottom:4px;";
+    src.textContent = "위 숫자는 판정 등급에 맞춘 값입니다. 아래 「본문 관측」이 본문에서 실제로 읽은 값입니다.";
+    wrap.appendChild(src);
+  }
   const values = Object.keys(labels).map((k) => (typeof f[k] === "number" ? f[k] : 0));
   const maxV = Math.max(1, ...values);
   Object.entries(labels).forEach(([k, l], i) => {
@@ -1178,9 +1191,14 @@ function renderFactors(f, factorsSource) {
     const norm = maxV > 0 ? v / maxV : 0;
     const stat = document.createElement("div");
     stat.className = "stat";
+    const ov = observed && typeof observed[k] === "number" ? observed[k] : null;
+    const ovRow = ov !== null && ov !== v
+      ? `<div class="l" style="margin-top:4px;color:var(--text-dim,#71717a);">본문 관측 ${ov.toFixed(2)}</div>`
+      : "";
     stat.innerHTML = `
       <div class="v">${v.toFixed(2)}</div>
       <div class="l">${l}</div>
+      ${ovRow}
       <div style="margin-top:8px;height:4px;background:var(--bg);border-radius:0;overflow:hidden;">
         <div style="width:${(norm * 100).toFixed(0)}%;height:100%;background:var(--text);"></div>
       </div>
