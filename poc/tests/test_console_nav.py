@@ -40,7 +40,10 @@ def _labels(html: str) -> list[str]:
 
 
 def test_link_list_is_not_empty():
-    assert len(CONSOLE_LINKS) >= 3, CONSOLE_LINKS
+    # [2026-08-24] 3 → 2. 「검증문서 후보 관리」를 메뉴에서 뺐다(console_nav 주석 참조).
+    # 하한을 2 로 둔다 — 남은 둘(관리자 콘솔·등급 시연)은 화면의 종류를 가르는 축이라
+    # 그보다 줄면 메뉴가 화면 사이 이동 수단으로서 뜻을 잃는다.
+    assert len(CONSOLE_LINKS) >= 2, CONSOLE_LINKS
     for key, label, href in CONSOLE_LINKS:
         assert key and label and href.startswith("/"), (key, label, href)
 
@@ -93,10 +96,16 @@ def test_review_and_signoff_are_not_nav_targets():
 
 
 def test_current_screen_is_marked_and_not_a_link():
-    html = nav_bar_html("manage")
+    """[2026-08-24] 대상을 manage → admin 으로 바꿨다.
+
+    「검증문서 후보 관리」가 메뉴에서 빠져 CONSOLE_LINKS 에 'manage' 키가 없다. 종전 판은
+    그 키를 dict 로 꺼내 써서 **문자열 grep 에 안 걸리고 돌려야 KeyError 로 나왔다.**
+    지금은 목록에 실제로 있는 키를 쓴다.
+    """
+    key, _, href = CONSOLE_LINKS[0]
+    html = nav_bar_html(key)
     assert 'is-current' in html
-    manage_href = dict((k, h) for k, _, h in CONSOLE_LINKS)["manage"]
-    assert f'href="{manage_href}"' not in html, "현재 화면이 자기 자신 링크를 갖고 있다"
+    assert f'href="{href}"' not in html, "현재 화면이 자기 자신 링크를 갖고 있다"
 
 
 def test_parse_demo_is_a_stub_that_points_at_the_merged_section():

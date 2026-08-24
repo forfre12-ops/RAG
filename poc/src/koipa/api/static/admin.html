@@ -71,7 +71,13 @@ textarea{resize:vertical;min-height:90px;font-size:12.5px;line-height:1.55;}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
 .field{min-width:0;}
-.hint{font-size:11.5px;color:var(--text-faint);margin:2px 0 0;line-height:1.45;}
+/* [2026-08-24] 안내문 스타일 통일. `.hint` 와 `.sec-note` 는 크기·색이 같고 왼쪽 선만
+   달랐다 — 같은 일을 하는 스타일이 둘이었다. 마크업은 그대로 두고 규칙만 하나로 묶는다
+   (시험·JS 가 클래스 이름을 문자열로 보고 있어 이름을 바꾸면 그쪽이 깨진다).
+   왼쪽 선은 뺐다 — 카드 안에서 문단을 또 한 번 가르는 장식이었다. */
+.hint,.sec-note{font-size:11.5px;color:var(--text-faint);margin:2px 0 0;line-height:1.5;}
+.sec-note details{margin-top:4px}
+.sec-note summary{cursor:pointer;color:var(--text-soft)}
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font-sans);font-size:13px;font-weight:600;
@@ -147,7 +153,6 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .logline .m{white-space:pre-wrap;word-break:break-word;}
 .logline.ok .m{color:#86efac;} .logline.err .m{color:#fca5a5;} .logline.info .m{color:#e4e4e7;} .logline.req .m{color:#93c5fd;}
 
-.sec-note{font-size:11.5px;color:var(--text-faint);line-height:1.5;border-left:2px solid var(--border-strong);padding-left:10px;}
 .warnbox{font-size:12px;color:var(--amber);background:var(--amber-soft);border:1px solid #fcd34d;border-radius:8px;padding:9px 12px;}
 
 /* DASHBOARD (관제 종합) */
@@ -327,18 +332,13 @@ details.adv[open]{padding-bottom:12px;}
 
 <!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
 <!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
-<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">관리자 콘솔</span><div class="cnav"><a class="cnav-link" href="/api/v1/golden/candidates/login.html#candidates">검증문서 후보 관리</a><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><div class="cnav"><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
 <!-- console-header:end -->
 
 <div class="wrap">
 
   <div class="lede-row">
     <h1 class="h1">관리자 콘솔</h1>
-    <p class="lede">이 콘솔에는 <b>두 개의 루프</b>가 있습니다 —
-    <b>루프 A(일상 운영)</b> 분류 → 검수·확정, <b>루프 B(모델 갱신)</b> 검증문서 → 검수·서명 → 재학습 → 배포 → 메트릭.
-    <b>운영</b> 탭이 루프 A, <b>검증문서</b>와 <b>학습 · 배포</b> 탭이 루프 B 입니다(설정은 어느 쪽도 아닙니다).
-    찾는 기능이 안 보이면 다른 탭에 있습니다.
-    모든 동작은 기존 <code>/api/v1</code> 엔드포인트를 그대로 호출합니다.</p>
   </div>
 
   <!-- FLOW STEPPER (2-loop) — 이 콘솔에는 성격이 다른 두 개의 루프가 있다.
@@ -368,7 +368,6 @@ details.adv[open]{padding-bottom:12px;}
     <!-- [2026-08-23] 카드 배지와 이 흐름도가 서로 다른 번호를 쓰고 있었다(흐름도 1=분류인데
          운영 탭 첫 카드도 1번이었다 — 그 카드는 검토다). 카드 배지를 이 흐름도의 단계 id 로
          맞췄으므로, 같은 번호라는 사실을 한 줄로 밝힌다. -->
-    <p class="hint" style="margin:6px 2px 0;">아래 카드의 <b>진한 번호 배지</b>가 여기 단계와 같은 번호입니다. 흐름에 속하지 않는 화면(공통 · 조회 · 설정 · 데이터)은 번호 대신 성격을 적었습니다. <b>운영</b> 탭은 매일 하는 일을 먼저 두느라 <b>2 검토</b> 카드가 <b>1 분류</b> 카드보다 위에 있습니다.</p>
   </div>
 
   <!-- 탭 — 카드 12장을 상시 노출하는 대신 루프별로 나눈다.
@@ -464,7 +463,7 @@ details.adv[open]{padding-bottom:12px;}
           <div class="field">
             <label class="fld">X-API-Key</label>
             <input id="cfg-key" type="text" value="demo-secret-key" placeholder="시연 서버 API 키 입력" />
-            <p class="hint">settings.api_key (.env API_KEY). 기본 <code>demo-secret-key</code> — 비어 있으면 모든 호출이 401.</p>
+            <p class="hint">비어 있으면 모든 호출이 401 입니다.</p>
           </div>
           <div class="field">
             <label class="fld">Actor Role</label>
@@ -474,7 +473,7 @@ details.adv[open]{padding-bottom:12px;}
               <option value="kl_backend">kl_backend</option>
               <option value="system">system</option>
             </select>
-            <p class="hint">기록에 남는 이름표입니다. 권한은 서버의 <code>API_KEY_ROLE</code>이 정합니다.</p>
+            <p class="hint">기록용 이름표입니다. 권한은 서버가 정합니다.</p>
           </div>
         </div>
         <div class="row2">
@@ -530,8 +529,7 @@ details.adv[open]{padding-bottom:12px;}
             <button class="btn sm" id="btn-extract-classify" onclick="classifyFromFile(true)">추출 → 분류</button>
           </div>
           <p class="sec-note" style="margin-top:4px;">
-            <b>[본문 추출]</b>은 저장하지 않고 아래 입력란만 채웁니다. <b>[추출 → 분류]</b>는 분류까지 실행해 검수 큐에 넣습니다.
-            동기 처리 상한을 넘는 큰 문서는 자동으로 백그라운드 분류로 전환되며 진행 상태가 아래에 표시됩니다.
+            <b>본문 추출</b> 입력란만 채웁니다 · <b>추출 → 분류</b> 검수 큐까지 넣습니다. 큰 문서는 자동으로 백그라운드 분류로 넘어갑니다.
           </p>
           <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
           <!-- [2026-08-23] index.html(등급 시연 화면)에는 있고 관리자 콘솔에는 없던 ICD 메타데이터
@@ -606,8 +604,7 @@ details.adv[open]{padding-bottom:12px;}
         <div class="btn-row">
           <button class="btn" id="btn-classify" onclick="runClassify()">분류하기</button>
         </div>
-        <p class="hint">분류 결과는 검수 큐에 쌓입니다. 확신이 기준에 못 미치면 자동 확정하지 않고
-          위 <b>「문서 검토 대기」</b> 로 넘어갑니다.</p>
+        
         <div id="cl-result" role="status" aria-live="polite"></div>
       </div>
     </section>
@@ -633,7 +630,7 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" id="btn-review-queue" onclick="loadReviewQueue()">검토할 문서 보기</button>
           <span id="rq-info" class="hint" style="margin:0;"></span>
         </div>
-        <div id="queue" class="queue"><div class="q-empty">대기 목록을 읽고 있습니다… 화면을 열면 자동으로 조회하며, 「검토할 문서 보기」로 다시 읽을 수 있습니다. 분류를 실행해도 결과가 여기 쌓입니다. 확정·수정한 내용은 재학습 큐에 반영됩니다.</div></div>
+        <div id="queue" class="queue"><div class="q-empty">대기 목록을 읽고 있습니다…</div></div>
         <!-- [2026-08-24] 「표시 설정 — 확신도 기준 보기」 두 칸을 뺐다. 관리자가 볼 이유가
              없었을 뿐 아니라, 아래 칸이 실제로 목록의 판정 배지를 뒤집고 있었다.
                · 서버 검수 임계: 읽기 전용 표시였다. 배포 설정으로만 바뀌는 값이라 화면에서
@@ -667,14 +664,11 @@ details.adv[open]{padding-bottom:12px;}
              두 화면은 포털 JWT 쿠키를 요구하므로 로그인 화면을 거쳐 들어간다
              (토큰을 URL 에 싣지 않는 설계 — 액세스로그·브라우저 히스토리 잔존 방지). -->
         <div class="btn-row" style="margin:0 0 10px;flex-wrap:wrap;">
-          <span class="sec-note" style="margin-right:auto;">
-            후보를 개별로 열어 등급을 지정하거나, 실문서를 새로 넣으려면 아래 화면을 씁니다.
-          </span>
+          
           <a class="btn sec sm" href="../api/v1/golden/candidates/login.html" target="_blank" rel="noopener">후보 관리 화면 열기 ↗</a>
         </div>
         <div id="gs-body"><span style="color:var(--text-faint);font-size:12px;">「현황 조회」를 눌러 시작하세요.</span></div>
-        <p class="sec-note" style="margin-top:8px;">
-          읽기 전용입니다. 정본 승격은 별도 절차이며, 서명 화면에서 <b>publish 를 켜지 않으면</b> 확정 수치는 오르지 않습니다.
+        <p class="sec-note" style="margin-top:8px;">읽기 전용 · 서명 화면에서 <b>publish</b> 를 켜야 확정 수치가 오릅니다.</b> 확정 수치는 오르지 않습니다.
         </p>
       </div>
     </section>
@@ -750,7 +744,7 @@ details.adv[open]{padding-bottom:12px;}
         <div id="sy-noop-note" class="sec-note" style="display:none;margin-top:10px;line-height:1.6;"></div>
         <div id="sy-info" class="hint"></div>
         <div id="sy-queue" class="queue" style="margin-top:10px;"><div class="q-empty">「검토 큐 새로고침」으로 생성된 합성 문서의 검토 대기분을 조회합니다. 학습행으로 만들 수 있는 것은 승인한 건뿐이며, 실제 편입은 관리자가 학습셋 생성 절차를 돌릴 때 이뤄집니다.</div></div>
-        <p class="sec-note">생성은 백그라운드 작업이라 <b>잠시 후 새로고침</b>해야 큐에 나타납니다. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
+        <p class="sec-note">생성은 백그라운드입니다 — 잠시 후 새로고침하세요. 승인 시 <b>확정 등급</b>을 바꾸면 그 등급으로 학습행이 만들어집니다.</p>
       </div>
     </section>
 
@@ -802,7 +796,7 @@ details.adv[open]{padding-bottom:12px;}
             <tbody id="jobs-body"><tr><td colspan="4" style="color:var(--text-faint)">목록 없음 — "작업 목록 새로고침"</td></tr></tbody>
           </table>
         </div>
-        <p class="sec-note">재학습본은 <b>후보로만 등록</b>되고 자동 서빙되지 않습니다 — 배포는 아래 4번에서 별도로 합니다. 학습 노드가 아닌 배포에서는 404가 정상입니다.</p>
+        <p class="sec-note">재학습본은 <b>후보로만</b> 등록됩니다 — 배포는 아래 4번에서 합니다.</p>
       </div>
     </section>
 
@@ -868,7 +862,7 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(3,1fr)"></div>
         <div id="metrics-extra"></div>
-        <p class="sec-note">여기 FNR은 <b>안전층을 적용하기 전</b> 분류기 raw 수치입니다 — 실제 서빙 미탐은 이보다 낮습니다. 평가셋이 학습셋과 겹치면 정확도가 과대평가될 수 있습니다.</p>
+        <p class="sec-note"><b>안전층 적용 전</b> 분류기 raw 수치입니다 — 실제 서빙 미탐은 더 낮습니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히</summary>평가셋이 학습셋과 겹치면 정확도가 과대평가될 수 있습니다.</details></p>
       </div>
     </section>
 
@@ -883,8 +877,8 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" onclick="loadDashboard()">관제 종합 새로고침</button>
           <span id="dash-meta" class="hint"></span>
         </div>
-        <div id="dash-grid" class="dash-grid"><div class="q-empty">「관제 종합 새로고침」을 누르면 이중검토 보류·배포 준비 상태·재학습 대기·안전 정지·입력 분포 변화를 한 번에 조회합니다.</div></div>
-        <p class="sec-note">읽기 전용 종합 화면입니다. 일부 소스를 못 읽으면 그 칸만 <span class="pill warn">degraded</span>로 표시되고 나머지는 정상 표시됩니다.</p>
+        <div id="dash-grid" class="dash-grid"><div class="q-empty">「관제 종합 새로고침」으로 조회합니다.</div></div>
+        
       </div>
     </section>
 
@@ -905,7 +899,7 @@ details.adv[open]{padding-bottom:12px;}
           </select>
           <button class="btn sm" onclick="loadAuditLog()">조회</button>
         </div>
-        <p class="sec-note" id="au-info" style="margin-top:6px;">헬스체크·정적 자산·Prometheus 스크랩은 기록 대상에서 제외됩니다. 그 밖의 요청은 조회를 포함해 모두 남습니다.</p>
+        <p class="sec-note" id="au-info" style="margin-top:6px;">헬스체크·정적 자산·메트릭 스크랩은 제외됩니다.</p>
         <div id="au-warn"></div>
         <div class="tbl-wrap" style="margin-top:8px;max-height:340px;overflow:auto">
           <table>
@@ -945,9 +939,7 @@ details.adv[open]{padding-bottom:12px;}
           <div class="fld" style="font-weight:700;color:var(--text);margin-bottom:2px;">
             이미 있는 문서 묶음으로 검수 시작하기
           </div>
-          <p class="sec-note" style="margin:0 0 8px;">
-            AI 가 등급을 다시 매기지 않습니다. 파일에 적힌 등급이 그대로 검수 화면에 올라갑니다.
-          </p>
+          <p class="sec-note" style="margin:0 0 8px;">파일에 적힌 등급이 그대로 검수 화면에 올라갑니다.</p>
           <div style="display:flex;gap:6px;align-items:center;">
             <!-- 종전에는 자유 입력 칸이었고 placeholder 가 **채워진 값처럼 보였다.**
                  실제로는 빈 칸이라 [등록]을 누르면 "경로를 입력하세요" 가 떴다(사용자 실측).
@@ -961,7 +953,7 @@ details.adv[open]{padding-bottom:12px;}
                  경로도 쓰므로(registerGoldenBuild → loadGoldenJob) 여기로 옮긴다. -->
             <button class="btn sec sm" onclick="loadGoldenJob()" title="올린 묶음의 처리 상태를 다시 읽습니다">상태 새로고침</button>
           </div>
-          <p class="sec-note" style="margin-top:4px;">이미 만들어 둔 검수 묶음 파일을 그대로 올립니다. 등급을 다시 매기지 않으므로 <b>파일에 적힌 등급이 그대로 보존</b>됩니다.</p>
+          
         </div>
 
         <div id="gold-progress" class="sec-note" style="margin-top:10px;" role="status" aria-live="polite">아직 검수에 올린 묶음이 없습니다.</div>
@@ -1002,7 +994,7 @@ details.adv[open]{padding-bottom:12px;}
           <div id="gold-result" class="json" style="margin-top:6px;" role="status" aria-live="polite">-</div>
         </details>
 
-        <p class="sec-note">정본 검증문서는 건드리지 않습니다. 여기서 올린 묶음은 <b>검수 대상</b>일 뿐이고, 정본 승격은 서명을 거치는 별도 절차입니다.</p>
+        <p class="sec-note">정본은 바뀌지 않습니다 — 승격은 서명을 거치는 별도 절차입니다.</b>일 뿐이고, 정본 승격은 서명을 거치는 별도 절차입니다.</p>
       </div>
     </section>
 
@@ -1026,7 +1018,7 @@ details.adv[open]{padding-bottom:12px;}
           </table>
         </div>
         <div id="grade-result" style="margin-top:10px;" role="status" aria-live="polite"></div>
-        <p class="sec-note">표에서 <b>삭제한 등급은 비활성 처리</b>되고 기존 이력은 보존됩니다. 등급을 바꾸면 <b>재학습이 필요</b>하며, 그 전까지 배포 모델은 기존 라벨로 추론합니다.</p>
+        <p class="sec-note">삭제는 <b>비활성 처리</b>이고 이력은 보존됩니다. 등급을 바꾸면 재학습이 필요합니다.</p>
       </div>
     </section>
 
@@ -1098,7 +1090,7 @@ details.adv[open]{padding-bottom:12px;}
             <tbody id="kw-body"><tr><td colspan="8" style="color:var(--text-faint)">「키워드 조회」로 현재 태깅 규칙을 불러옵니다.</td></tr></tbody>
           </table>
         </div>
-        <p class="sec-note">변경은 <b>서빙 룰엔진 핫리로드</b>로 재기동 없이 반영됩니다 — 응답의 <code>serving_reloaded</code>가 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code>를 워커 수만큼 호출하거나 롤링 재기동하세요. <b>삭제는 소프트 삭제</b>(<code>is_active=false</code>)이며 FK·감사 이력이 보존됩니다. 가중치 상한은 9.99(<code>Numeric(3,2)</code>)입니다.</p>
+        <p class="sec-note">변경은 <b>핫리로드</b>로 재기동 없이 반영됩니다. 삭제는 소프트 삭제입니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히 — 다중 워커 · 가중치 상한</summary>응답의 <code>serving_reloaded</code> 는 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code> 를 워커 수만큼 호출하거나 롤링 재기동하세요. 삭제는 <code>is_active=false</code> 이며 FK·감사 이력이 보존됩니다. 가중치 상한은 9.99 입니다.</details></p>
       </div>
     </section>
 

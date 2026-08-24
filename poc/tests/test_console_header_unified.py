@@ -37,7 +37,10 @@ STATIC = _POC / "src" / "koipa" / "api" / "static"
 # 다른 화면이 아니라 「관리자 콘솔」과 **같은 화면의 내부 앵커**(#gold-jobs-card)여서, 이
 # 메뉴가 지키는 원칙("메뉴 하나 = 서로 다른 화면 하나", 61f1a94f)을 깨는 유일한 항목이었다.
 # 검수 목록은 이제 관리자 콘솔 「검증문서」 탭의 첫 카드다(golden_jobs.js order:1).
-LABELS = ["검증문서 후보 관리", "관리자 콘솔", "등급 시연"]
+# [2026-08-24] 「검증문서 후보 관리」도 뺐다(3항목 → 2항목, 사용자 판단). 그 항목만
+# 포털 로그인을 거쳐야 열리고(다른 둘은 그냥 열린다) 특정 업무 화면이라 층위가 달랐다.
+# 진입은 관리자 콘솔 「검증문서 현황」 카드의 [후보 관리 화면 열기 ↗] 버튼이 맡는다.
+LABELS = ["관리자 콘솔", "등급 시연"]
 
 
 def _screens() -> dict[str, str]:
@@ -65,12 +68,19 @@ def test_every_screen_has_the_same_header_skeleton(name):
     for frag in (
         '<span class="mark"><span class="brand-mark"><img src="data:image/png;base64,',
         '<span class="brand">한국지식재산보호원</span>',
-        '<span class="divider"></span>',
-        '<span class="product">',
         '<div class="cnav">',
         '<span class="spacer"></span>',
     ):
         assert frag in head, f"{name}: {frag!r} 이 상단에 없다"
+    # [2026-08-24] `.divider`·`.product` 를 공통 골격에서 뺐다. 메뉴가 현재 화면을 진하게
+    # 표시하므로 왼쪽에 같은 이름을 또 적는 것은 중복이다(console_nav.header_html).
+    # 메뉴에 **없는** 화면(검수·서명, 로그인)만 자기 이름을 밝힌다 — 아래 시험이 그것을 잡는다.
+    # manage 는 메뉴에서 빠졌으므로(console_nav 3→2) 자기 이름을 밝히는 쪽이다.
+    in_menu = name in {"admin.html", "index.html"}
+    if in_menu:
+        assert '<span class="product">' not in head, f"{name}: 메뉴에 있는 화면인데 이름을 또 적는다"
+    else:
+        assert '<span class="product">' in head, f"{name}: 메뉴에 없는 화면인데 이름이 없다"
 
 
 @pytest.mark.parametrize("name", list(_screens()))

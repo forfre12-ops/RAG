@@ -40,6 +40,8 @@ from pathlib import Path
 # 어느 화면인지 눌러 봐야 알 수 있었다.
 # [2026-08-24] 그중 한 항목을 뺐다(4 → 3, 사유는 바로 아래). 8/20 의 원칙("메뉴 이름 =
 # 화면 이름")은 그대로다 — 뺀 항목이 그 원칙을 지키지 못하는 유일한 항목이었다.
+# [2026-08-24 두 번째] 하나 더 뺐다(3 → 2, 사유는 manage 자리 주석). 남은 둘은 **화면의
+# 종류**로 갈린다 — 운영자가 일하는 곳(관리자 콘솔) · 제품을 보여주는 곳(등급 시연).
 CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     # [2026-08-24] 「검증문서 검수 목록」을 뺐다(4항목 → 3항목). 사용자 지적:
     # "골든셋 후보관리, 골든셋 검수는 메뉴를 하나로 빼야하는거 아니야? 여기저기 들어가있으니
@@ -66,7 +68,24 @@ CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     # [2026-08-24] 목적지를 login.html 로 바꿨다. manage.html 을 쿠키 없이 열면 401 JSON 한
     # 줄이라 되돌아갈 길이 없었고, 관리자 콘솔 카드는 이미 login.html 을 가리켜 진입점이
     # 두 갈래였다. login.html 은 세션이 살아 있으면 앵커까지 들고 그대로 통과한다.
-    ("manage", "검증문서 후보 관리", "/api/v1/golden/candidates/login.html#candidates"),
+    # [2026-08-24] 「검증문서 후보 관리」를 뺐다(3항목 → 2항목, 사용자 판단).
+    #
+    # 셋 중 이 항목만 성격이 달랐다. 두 가지다:
+    #   ① **로그인을 거쳐야 하는 화면이다.** 포털 JWT 쿠키를 요구해 세션이 없으면 로그인
+    #      화면이 뜬다. 나머지 둘은 그냥 열린다. 같은 줄에 있으면서 누를 때 일어나는 일이
+    #      다르면 관리자는 "메뉴를 눌렀는데 로그인?"으로 읽는다.
+    #   ② **특정 업무 화면이다.** 남은 둘은 "운영자가 일하는 곳 / 제품을 보여주는 곳"이라
+    #      화면의 종류로 갈리는데, 이 항목만 그 층위 아래에 있었다.
+    #
+    # 길이 끊기지 않는다 — 진입 버튼이 **쓸 자리에 이미 있다**:
+    #     static/admin.html 「검증문서 현황」 카드 안 [후보 관리 화면 열기 ↗]
+    #     ("후보를 개별로 열어 등급을 지정하거나, 실문서를 새로 넣으려면 아래 화면을 씁니다")
+    # 돌아오는 길도 그대로다 — 후보 관리·로그인 화면의 상단 바는 이 목록으로 그려지므로
+    # 거기서 「관리자 콘솔」이 보인다. 메뉴에서 빠지는 것은 **그리로 가는 길**뿐이고 그건
+    # 위 버튼이 맡는다.
+    #
+    # 되살릴 때는 이 줄을 다시 넣으면 된다:
+    #     ("manage", "검증문서 후보 관리", "/api/v1/golden/candidates/login.html#candidates"),
     ("admin", "관리자 콘솔", "/console/admin.html"),
     # [D3 2026-08-18] 시연은 별도 화면이 아니라 분류 콘솔 안의 구역이 됐다.
     # parse_demo.html 은 그 구역으로 보내는 스텁으로만 남는다(인쇄된 주소 보호).
@@ -194,10 +213,16 @@ BRAND_NAME = "한국지식재산보호원"
 
 
 def header_html(product: str, current: str = "", *, trailing: str = "") -> str:
-    """화면 5면이 공유하는 상단 바.
+    """화면 다섯 면이 공유하는 상단 바.
 
-    `product` 는 기관명 옆 화면 이름, `current` 는 CONSOLE_LINKS 의 키(현재 화면 표시),
-    `trailing` 은 화면별 부속(헬스 표시·배포 배지·건수 등)이며 오른쪽 끝에 붙는다.
+    `product` 는 화면 이름, `current` 는 CONSOLE_LINKS 의 키(현재 화면 표시),
+    `trailing` 은 화면별 부속(상태 표시 등)이며 오른쪽 끝에 붙는다.
+
+    [2026-08-24] **메뉴에 있는 화면이면 화면 이름을 적지 않는다.** 종전에는 왼쪽 `product`
+    와 메뉴의 현재 항목이 **같은 글자를 두 번** 보여 줬다(관리자 콘솔·등급 시연). 메뉴가
+    현재 화면을 진하게 표시하므로 왼쪽 이름은 중복이다. 메뉴에 없는 화면(검수·서명,
+    로그인)만 이름을 적는다 — 그 화면들은 메뉴에 걸 수 없어(job_id·?t= 토큰) 자기 이름을
+    스스로 밝혀야 한다.
 
     메뉴를 화면 이름 **바로 뒤**(왼쪽)에 두는 이유: 오른쪽 끝에 두면 부속 위젯에 밀려
     화면마다 위치가 달라진다. 왼쪽 고정이면 다섯 화면에서 눈이 같은 자리를 본다.
@@ -209,12 +234,17 @@ def header_html(product: str, current: str = "", *, trailing: str = "") -> str:
         if logo
         else '<span class="mark"></span>'
     )
+    in_menu = any(key == current for key, _, _ in CONSOLE_LINKS)
+    name = (
+        ""
+        if (in_menu or not product)
+        else f'<span class="divider"></span><span class="product">{_html.escape(product)}</span>'
+    )
     return (
         '<header class="top">'
         + mark
         + f'<span class="brand">{BRAND_NAME}</span>'
-        + '<span class="divider"></span>'
-        + f'<span class="product">{_html.escape(product)}</span>'
+        + name
         + nav_bar_html(current)
         + '<span class="spacer"></span>'
         + trailing
