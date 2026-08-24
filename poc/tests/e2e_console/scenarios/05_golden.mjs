@@ -173,6 +173,7 @@ export const scenarios = [
 
   {
     id: 'golden.jobs.panel-lists-and-links',
+    needsData: true,   // 「후보 생성」 잡이 원장에 있어야 한다(223 에는 등록 잡만 있다)
     title: '검수 목록 패널이 잡을 나열하고 검수·서명으로 이어진다',
     why: 'job_id 를 JS 변수로만 들고 있으면 새로고침 한 번에 진행 중이던 검수로 못 돌아간다',
     async run({ server, check }) {

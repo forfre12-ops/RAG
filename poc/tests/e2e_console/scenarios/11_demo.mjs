@@ -389,6 +389,7 @@ export const scenarios = [
 
   {
     id: 'demo.threshold.follows-server-change',
+    needsMock: true,   // server.overrides 로 가짜 healthz 를 주입한다 — 실서버에는 안 먹는다
     title: '서버가 다른 임계를 보고하면 화면도 그 값으로 바뀐다',
     why: '고정값을 지웠는지, 아니면 마침 같은 숫자를 다시 박은 것인지를 가른다. '
        + '픽스처와 다른 값을 보고하게 해서 화면이 정말 응답을 읽는지 본다.',

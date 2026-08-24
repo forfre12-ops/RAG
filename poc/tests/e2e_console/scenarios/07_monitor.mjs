@@ -209,6 +209,7 @@ export const scenarios = [
   // 이 시나리오가 그 회귀를 막는다.
   {
     id: 'monitor.synth.corrected-grade-is-shown',
+    needsMock: true,   // server.overrides 로 합성 큐를 주입한다 — 실서버에는 안 먹는다
     title: '교정 승인된 합성 문서는 목록에 고친 등급으로 보인다',
     async run({ server, check }) {
       server.overrides['GET /synth/queue'] = {

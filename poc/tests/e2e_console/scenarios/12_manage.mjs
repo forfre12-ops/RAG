@@ -7,6 +7,10 @@
  *
  * 이 화면은 포털 JWT 세션으로만 열리므로(require_role) 브라우저는 쿠키를 싣는다 —
  * 하니스는 화면 동작을 보는 것이 목적이라 인증은 서버 쪽 시험에 맡긴다.
+ *
+ * ⚠ 그래서 이 파일은 전건 needsMock 이다. 실서버 모드(--base)에는 쿠키가 없어 화면이
+ *   401 로 오고, 요소를 못 찾아 전부 깨진다(실측 2026-08-24 223: 6건 FAIL/CRASH).
+ *   표시가 없으면 실서버 결과에 거짓 실패가 섞여 진짜 실패와 구분되지 않는다.
  */
 
 import { openPage } from '../lib/page.mjs';
@@ -23,6 +27,7 @@ async function manage(server, opts = {}) {
 export const scenarios = [
   {
     id: 'manage.boot.renders-everything',
+    needsMock: true,
     title: '후보 관리 화면이 오류 없이 뜨고 목록·요약·품질·원장이 모두 그려진다',
     why: '이 화면은 실행 시험이 하나도 없어, 통째로 죽어도 아무도 몰랐다',
     async run({ server, check }) {
@@ -50,6 +55,7 @@ export const scenarios = [
 
   {
     id: 'manage.list.filters-go-to-server',
+    needsMock: true,
     title: '필터를 넣고 누르면 그 조건이 그대로 질의로 나간다',
     async run({ server, check }) {
       const page = await manage(server);
@@ -74,6 +80,7 @@ export const scenarios = [
 
   {
     id: 'manage.detail.opens-with-text-and-history',
+    needsMock: true,
     title: '후보를 클릭하면 상세가 열리고 본문·메타·결정 이력이 나온다',
     needsData: true,
     async run({ server, check }) {
@@ -99,6 +106,7 @@ export const scenarios = [
 
   {
     id: 'manage.detail.doc-view-toggle',
+    needsMock: true,
     title: '「읽기 좋게」와 「원문 그대로」가 서로 전환된다',
     why: '검수 판단은 원문 기준이라 두 보기가 실제로 갈려야 한다',
     needsData: true,
@@ -124,6 +132,7 @@ export const scenarios = [
 
   {
     id: 'manage.decision.reason-required',
+    needsMock: true,
     title: '등급 변경·보류·폐기에는 사유가 없으면 저장되지 않는다',
     why: '사유 없는 결정은 원장에 남아도 감사에서 근거가 되지 못한다',
     needsData: true,
@@ -147,6 +156,7 @@ export const scenarios = [
 
   {
     id: 'manage.decision.saves-with-grade-and-reason',
+    needsMock: true,
     title: '등급과 사유를 넣고 저장하면 그대로 서버로 나가고 화면이 갱신된다',
     needsData: true,
     writes: true,
@@ -177,6 +187,7 @@ export const scenarios = [
 
   {
     id: 'manage.decision.result-shows-next-to-button',
+    needsMock: true,
     title: '결정 저장의 성공·실패가 버튼 옆에 남는다',
     why: '종전에는 결과가 페이지 맨 위 #flash 로만 갔다. 버튼은 상세 사이드바 한참 아래라 '
        + '눌러도 화면이 조용했고, 게다가 저장 뒤 load() 가 그 문구를 목록 안내로 덮어썼다',
@@ -218,6 +229,7 @@ export const scenarios = [
 
   {
     id: 'manage.management.defaults-to-unknown',
+    needsMock: true,
     title: '비밀관리성(M) 칸이 상세에 있고, 기본이 「확인 안 됨」이다',
     why: '「확인 안 됨」과 「전 임직원 열람」은 M 을 정반대로 만든다 — 뭉치면 S1 이 사라지거나 미탐이 열린다',
     needsData: true,
@@ -239,6 +251,7 @@ export const scenarios = [
 
   {
     id: 'manage.management.sends-marking-and-scope',
+    needsMock: true,
     title: '보안표시·접근범위를 고르면 결정과 함께 전송된다',
     why: 'M 은 등급 결정의 입력이라 사유와 같은 이벤트에 실려야 근거가 재구성된다',
     needsData: true,
@@ -266,6 +279,7 @@ export const scenarios = [
 
   {
     id: 'manage.management.unknown-is-not-sent',
+    needsMock: true,
     title: '「확인 안 됨」으로 두면 그 값을 보내지 않는다',
     why: '빈 값을 보내면 서버가 그것을 입력으로 읽어 M 을 덮어쓸 수 있다 — 모름은 침묵이어야 한다',
     needsData: true,
@@ -382,6 +396,7 @@ export const scenarios = [
 
   {
     id: 'manage.upload.modal-and-validation',
+    needsMock: true,
     title: '업로드 모달이 열리고, 파일이 없으면 보내지 않는다',
     why: '파일이 없는데 요청을 보내면 서버가 422 로 되돌려 준다 — 화면에서 먼저 잡는다',
     async run({ server, check }) {
@@ -412,6 +427,7 @@ export const scenarios = [
 
   {
     id: 'manage.upload.sends-without-provenance',
+    needsMock: true,
     title: '출처를 비워도 업로드는 나간다 — 막히는 자리는 등급 확정이다',
     why: '현관에서 막으니 평가셋이 보호된 게 아니라 등록 자체가 안 됐다(실측 2026-08-17 · 223: 실문서 74건 중 62건 미완)',
     writes: true,
@@ -432,6 +448,7 @@ export const scenarios = [
 
   {
     id: 'manage.upload.sends-origin-and-basis',
+    needsMock: true,
     title: '출처·근거를 채워 업로드하면 그 값이 함께 전송된다',
     writes: true,
     async run({ server, check }) {
@@ -455,6 +472,7 @@ export const scenarios = [
 
   {
     id: 'manage.upload.custom-basis-toggle',
+    needsMock: true,
     title: '근거를 「직접 입력」으로 고르면 입력칸이 나타난다',
     async run({ server, check }) {
       const page = await manage(server);
@@ -468,6 +486,7 @@ export const scenarios = [
 
   {
     id: 'manage.ledger.filter',
+    needsMock: true,
     title: '결정 원장을 종류로 걸러 다시 읽는다',
     async run({ server, check }) {
       const page = await manage(server);
@@ -502,6 +521,7 @@ export const scenarios = [
 
   {
     id: 'manage.batch.options-come-from-server',
+    needsMock: true,
     title: '검수 배치 목록은 서버 응답에서 채워진다 — 화면이 배치 유무를 단정하지 않는다',
     why: '실측 2026-08-24: 이 칸은 자유입력이었고 툴팁에 「지금 서버의 후보에는 배치 값이 들어 '
        + '있지 않아, 무엇을 넣어도 0건이 됩니다」 가 박혀 있었다. 그런데 223 후보 115건이 '

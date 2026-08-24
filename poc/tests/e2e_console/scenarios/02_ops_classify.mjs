@@ -124,6 +124,10 @@ export const scenarios = [
 
   {
     id: 'ops.upload.readonly-does-not-ingest',
+    // 하니스가 만드는 파일은 'A' 로 채운 껍데기다. 실서버는 그것을 못 읽어 본문 0자를 주고
+    // (실측 2026-08-24 223: extract_error "Expected BOF record; found b'AAAAAAAA'"),
+    // 본문이 없으면 분류로 넘어가지 않아 이 시나리오가 보려는 로그가 아예 안 남는다.
+    needsMock: true,
     title: '읽기 전용이면 파일을 적재하지 않고, 저장되지 않는다고 말한다',
     why: '쓰기 잠금은 지켜야 하고, 대신 왜 확정이 안 되는지는 그 자리에서 알려야 한다',
     async run({ server, check }) {
