@@ -1,29 +1,17 @@
 """콘솔 화면 간 이동 링크 — 한 곳에서 정한다.
 
-왜(2026-08-17). 화면끼리 오갈 방법이 거의 없어 검수자가 주소를 직접 쳐야 했다.
-
 살아 있는 화면 (2026-08-24 실측 6면):
-
     동적 4면 (golden.py html_router)
-      /api/v1/golden/candidates/login.html
-      /api/v1/golden/candidates/manage.html
-      /api/v1/golden/jobs/{job_id}/review.html      signoff 와 같은 화면을 준다
-      /api/v1/golden/jobs/{job_id}/signoff.html
-
+        candidates/login.html · candidates/manage.html
+        jobs/{job_id}/review.html · jobs/{job_id}/signoff.html   (같은 화면을 준다)
     정적 2면 (/demo · /console StaticFiles)
-      admin.html · index.html
-      (parse_demo.html 은 index.html#sec-parse 로 보내는 리다이렉트 스텁이다)
+        admin.html · index.html   (parse_demo.html 은 index.html#sec-parse 리다이렉트 스텁)
 
-⚠ review/signoff 는 **네비 대상이 될 수 없다.** job_id 가 필요하고, golden_html_url_secret
-  이 설정돼 있으면 ?t= HMAC 토큰까지 있어야 열린다(golden.py:742-748·759-765). 고정 링크로
-  걸면 403 이 난다. 그래서 그 두 화면에서는 **나가는 링크만** 둔다.
-
-⚠ manage.html 은 포털 JWT 쿠키로 열린다(공유 API Key 거부).
-  쿠키가 없는 상태에서 누르면 401 이 나는 것이 정상이다. 링크가 있다고 권한이 생기지 않는다.
-
-정적 파일(admin/index/parse_demo)은 파이썬을 못 부르므로 같은 목록을 손으로 넣는다.
-**여기 목록을 고치면 그 세 파일도 같이 고쳐야 한다** — 그것을 시험이 잠근다
-(tests/test_console_nav.py).
+⚠ review/signoff 는 네비 대상이 될 수 없다 — job_id 와 ?t= HMAC 토큰이 있어야 열려
+  고정 링크는 403 이다(golden.py:742-748·759-765). 그 두 화면에는 나가는 링크만 둔다.
+⚠ manage.html 은 포털 JWT 쿠키로 열린다(공유 API Key 거부). 쿠키 없이 누르면 401 이 정상이다.
+⚠ 정적 화면은 파이썬을 못 부르므로 같은 목록을 손으로 넣는다 — 여기를 고치면 그 파일들도
+  같이 고쳐야 한다(tests/test_console_nav.py 가 잠근다).
 """
 from __future__ import annotations
 
@@ -32,70 +20,23 @@ import html as _html
 from functools import lru_cache
 from pathlib import Path
 
-# (키, 표시이름, 절대경로)
-# 절대경로인 이유: 동적 화면(/api/v1/...)과 정적 화면(/console/...)의 깊이가 달라
-# 상대경로로는 양쪽에서 같은 문자열을 쓸 수 없다.
-# [2026-08-20] 사용자 지시로 4항목이 됐다 — 검수자가 오가는 화면 이름을 그대로 쓴다.
-# 종전 3항목(후보 관리 / 거버넌스 / 분류 시연)은 화면 이름과 메뉴 이름이 달라 어느 메뉴가
-# 어느 화면인지 눌러 봐야 알 수 있었다.
-# [2026-08-24] 그중 한 항목을 뺐다(4 → 3, 사유는 바로 아래). 8/20 의 원칙("메뉴 이름 =
-# 화면 이름")은 그대로다 — 뺀 항목이 그 원칙을 지키지 못하는 유일한 항목이었다.
-# [2026-08-24 두 번째] 하나 더 뺐다(3 → 2, 사유는 manage 자리 주석). 남은 둘은 **화면의
-# 종류**로 갈린다 — 운영자가 일하는 곳(관리자 콘솔) · 제품을 보여주는 곳(등급 시연).
+# (키, 표시이름, 절대경로) — 절대경로인 이유: 동적(/api/v1/...)·정적(/console/...) 화면의
+# 깊이가 달라 상대경로로는 양쪽에서 같은 문자열을 쓸 수 없다.
+# 규칙: 메뉴 이름 = 화면 이름. 각 항목은 서로 다른 화면 하나를 가리킨다(같은 화면의 내부 앵커 금지).
 CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
-    # [2026-08-24] 「검증문서 검수 목록」을 뺐다(4항목 → 3항목). 사용자 지적:
-    # "골든셋 후보관리, 골든셋 검수는 메뉴를 하나로 빼야하는거 아니야? 여기저기 들어가있으니
-    # 찾기도 힘드네."
-    #
-    # 이 메뉴는 **화면 사이 이동**이다(그래서 화면 이름과 같은 이름을 쓴다 — 61f1a94f).
-    # 그런데 이 항목만 목적지가 `/console/admin.html#gold-jobs-card` 로, 다른 화면이 아니라
-    # 「관리자 콘솔」과 **같은 화면의 내부 앵커**였다. 메뉴 4개 중 2개가 같은 화면을 가리키니
-    # 관리자는 검수 목록을 찾을 때마다 둘 중 어느 것을 눌러야 하는지 판단해야 했다.
-    #
-    # 이름이 하는 일과 다른 문제는 8/23 에 이미 손봤다 — 종전 「골든셋 검수」는 눌러도 검수를
-    # 할 수 없었고(잡 목록으로 갈 뿐), 그래서 「검증문서 검수 목록」으로 고쳤다. 그때 고친 것은
-    # 이름이고, 전역 메뉴에 화면 내부 이동이 들어와 있는 구조는 그대로였다. 이제 그 구조를
-    # 없앤다 — 검수 목록은 관리자 콘솔 「검증문서」 탭의 **첫 카드**다(golden_jobs.js order:1).
-    #
-    # 남은 3항목은 각각 서로 다른 화면 하나를 가리킨다(manage=포털 화면 · admin · demo).
-    # 검수·서명 화면(review/signoff)은 여전히 메뉴에 걸 수 없다 — job_id 와 ?t= HMAC 토큰이
-    # 있어야 열리고 고정 링크는 403 이다(golden.py:750·780). 되살릴 때는 이 줄을 다시 넣되,
-    # 그때는 같은 화면을 두 번 가리키는 문제를 어떻게 풀지 함께 정할 것:
-    #     ("signoff", "검증문서 검수 목록", "/console/admin.html#gold-jobs-card"),
-    #
-    # [D1 2026-08-17] '실문서 수집' 은 별도 화면이 아니라 이 화면의 업로드 모달이 됐다.
-    # 두 화면이 같은 API(/golden/candidates/upload)·같은 필드를 쓰는데 화면만 둘이었다.
-    # [2026-08-24] 목적지를 login.html 로 바꿨다. manage.html 을 쿠키 없이 열면 401 JSON 한
-    # 줄이라 되돌아갈 길이 없었고, 관리자 콘솔 카드는 이미 login.html 을 가리켜 진입점이
-    # 두 갈래였다. login.html 은 세션이 살아 있으면 앵커까지 들고 그대로 통과한다.
-    # [2026-08-24] 「검증문서 후보 관리」를 뺐다(3항목 → 2항목, 사용자 판단).
-    #
-    # 셋 중 이 항목만 성격이 달랐다. 두 가지다:
-    #   ① **로그인을 거쳐야 하는 화면이다.** 포털 JWT 쿠키를 요구해 세션이 없으면 로그인
-    #      화면이 뜬다. 나머지 둘은 그냥 열린다. 같은 줄에 있으면서 누를 때 일어나는 일이
-    #      다르면 관리자는 "메뉴를 눌렀는데 로그인?"으로 읽는다.
-    #   ② **특정 업무 화면이다.** 남은 둘은 "운영자가 일하는 곳 / 제품을 보여주는 곳"이라
-    #      화면의 종류로 갈리는데, 이 항목만 그 층위 아래에 있었다.
-    #
-    # 길이 끊기지 않는다 — 진입 버튼이 **쓸 자리에 이미 있다**:
-    #     static/admin.html 「검증문서 현황」 카드 안 [후보 관리 화면 열기 ↗]
-    #     ("후보를 개별로 열어 등급을 지정하거나, 실문서를 새로 넣으려면 아래 화면을 씁니다")
-    # 돌아오는 길도 그대로다 — 후보 관리·로그인 화면의 상단 바는 이 목록으로 그려지므로
-    # 거기서 「관리자 콘솔」이 보인다. 메뉴에서 빠지는 것은 **그리로 가는 길**뿐이고 그건
-    # 위 버튼이 맡는다.
-    #
-    # 되살릴 때는 이 줄을 다시 넣으면 된다:
-    #     ("manage", "검증문서 후보 관리", "/api/v1/golden/candidates/login.html#candidates"),
+    # 뺀 항목 — 되살리려면 그 줄을 다시 넣는다:
+    #   ("signoff", "검증문서 검수 목록", "/console/admin.html#gold-jobs-card")
+    #       같은 화면의 내부 앵커여서 뺐다. 검수 목록은 관리자 콘솔 「검증문서」 탭 첫 카드다
+    #       (golden_jobs.js order:1).
+    #   ("manage", "검증문서 후보 관리", "/api/v1/golden/candidates/login.html#candidates")
+    #       로그인이 필요한 업무 화면이라 층위가 달랐다. 진입은 admin.html 「검증문서 현황」 카드의
+    #       [후보 관리 화면 열기 ↗] 버튼이 맡는다.
     ("admin", "관리자 콘솔", "/console/admin.html"),
     # [D3 2026-08-18] 시연은 별도 화면이 아니라 분류 콘솔 안의 구역이 됐다.
     # parse_demo.html 은 그 구역으로 보내는 스텁으로만 남는다(인쇄된 주소 보호).
     ("demo", "등급 시연", "/console/index.html#sec-parse"),
-    # [2026-08-24] 로그인을 메뉴에서 뺐다(사용자 지시). 8/21 에 넣었던 이유는 "쿠키 없는
-    # 브라우저로 열면 화면은 뜨는데 전부 401 인데 login.html 주소가 어디에도 없다" 였다.
-    # 그 사정은 그대로다 — 화면(login.html)은 살아 있고 주소로 직접 열린다. 다만 223 콘솔은
-    # 토큰이 프리필돼 있어 시연 동선에서 이 메뉴를 쓸 일이 없고, 메뉴에 있으면 관리자가
-    # "로그인부터 해야 하나" 로 읽는다. 되살릴 때는 이 줄을 다시 넣으면 된다:
-    #     ("login", "로그인", "/api/v1/golden/candidates/login.html"),
+    # 뺀 항목: ("login", "로그인", "/api/v1/golden/candidates/login.html")
+    #   화면은 살아 있고 주소로 직접 열린다. 223 콘솔은 토큰이 프리필돼 시연 동선에 필요 없다.
 )
 
 
@@ -126,15 +67,9 @@ def nav_bar_html(current: str = "") -> str:
 
 
 # ── 상단 바 ───────────────────────────────────────────────────────────────────
-# [2026-08-20] 화면 5면의 상단이 세 갈래로 갈라져 있었다(실측):
-#     header.top   골든셋 검수·서명 · 후보 관리 · 로그인   로고 3종(base64 PNG / 인라인 SVG)
-#     nav.nav      거버넌스(admin.html) · 등급 시연(index.html)
-# 기관명 옆 표기도 `.product` / `.brand-sub` / `.brand-url` 셋이었다. 사용자 지시로
-# **검수·서명 화면의 header.top 을 기준**으로 합치고, 그 값을 여기 한 곳에 둔다.
-#
-# ⚠ 정적 화면(static/admin.html·index.html)은 파이썬을 못 부르므로 `header_html()` 의
-#   출력을 **손으로 박아 넣는다.** 그 두 파일과 여기가 어긋나면 tests/test_console_nav.py
-#   가 잡는다. 값을 고치면 `scripts/sync_console_header.py` 를 다시 돌릴 것.
+# 갈라져 있던 5면의 상단을 검수·서명 화면 header.top 기준으로 합치고, 값을 여기 한 곳에 둔다.
+# ⚠ 정적 화면(static/admin.html·index.html)은 header_html() 출력을 손으로 박아 넣는다.
+#   어긋나면 tests/test_console_nav.py 가 잡는다. 고친 뒤 scripts/sync_console_header.py 재실행.
 
 _LOGO_PATH = Path(__file__).with_name("api") / "static" / "koipa_logo_mark.png"
 

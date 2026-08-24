@@ -570,15 +570,10 @@ async def analyze_document(
             "extraction_gate: 열화 추출(표누락/OCR/저품질)→검수 라우팅 (" + ", ".join(dec.reasons) + ")"
         )
 
-    # [2026-08-24 사용자 실측] 위에서 status 를 올려 놓고 decision_path 는 **분류기 단계의
-    # 문장 그대로** 내려보내고 있었다. 그래서 한 카드 안에 「검수 필요」 배너와
-    # 「agreement (룰·모델 모두 S3 일치 → 자동 확정)」 이 동시에 떴다
-    # (경고: extraction_gate: … (table_incomplete, content_dropped)).
-    # classify_service 는 같은 모순을 이미 막고 있다 — `_decision_path` 가 status 를 읽어
-    # needs_review 면 "…일치 (검수 사유는 아래 경고 참조)" 로 바꾼다(classify_service.py:652).
-    # 이 게이트는 classify **뒤**에 오므로 그 판단이 반영되지 않았다. 문구를 새로 만들지 않고
-    # 같은 함수를 **바뀐 status·경고로 다시 부른다** — 두 화면이 같은 말을 해야 한다.
-    # 표시용 문자열이라 실패해도 응답을 막지 않는다(원래 값으로 남는다).
+    # [2026-08-24] 이 게이트는 classify 뒤에 와서 status 만 올리고 decision_path 는 분류기
+    # 단계의 문장 그대로 내려보냈다 — 한 카드에 「검수 필요」와 「…자동 확정」이 같이 떴다.
+    # 문구를 새로 만들지 않고 _decision_path 를 바뀐 status·경고로 다시 부른다
+    # (classify_service.py:652 와 같은 말을 하게 한다). 표시용이라 실패해도 응답은 막지 않는다.
     decision_path = getattr(cls, "decision_path", None)
     if eff_status != cls.status:
         try:

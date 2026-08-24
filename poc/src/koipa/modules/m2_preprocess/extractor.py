@@ -425,18 +425,12 @@ def _extract_hwp(p: Path) -> ExtractResult:
                   "표 셀 회수 보강에는 unhwp 필요: pip install '.[hwp-tables]'.",
         )
 
-    # [무음 빈본문] 실측 2026-08-15. 실제 한국 업무 서식 HWP 120건을 태워 보니 **79.2%가
-    # 본문 50자 미만**인데 오류도 경고도 없이 quality 0.95 로 통과했다. 전부 구형 HWP 3.x
-    # 이고 내용이 표 안에만 있다 - rhwp 는 본문만 뽑고 unhwp 보강도 HWP3 표는 못 읽는다
-    # (실측: 회수 0자·표 0개).
-    #
-    # 종전 가드는 `not text.strip()` 뿐이라 객체 placeholder 한 글자(U+FFFC)가 있으면
-    # 빈 문서가 아니라고 판단해 통과시켰다. 그 문서는 내용 없이 분류되어 **전부 S3 로
-    # 떨어진다** - 무음 미탐의 정확한 모양이다.
-    #
-    # ⚠ 여기서 추출을 실패로 만들지는 않는다. 파일은 실제로 읽혔고, 짧지만 정상인 문서도
-    #   있다. 대신 경고를 남겨 **검수로 라우팅**한다 - 내용 없이 자동확정되는 것만 막으면
-    #   된다. 추출 실패로 처리하면 짧은 정상 문서까지 막힌다(단위테스트 3건이 그래서 깨졌다).
+    # [무음 빈본문] 실질 문자가 _MIN_SUBSTANTIVE_CHARS 미만이면 경고를 남겨 검수로 보낸다.
+    # 실측 2026-08-15: 업무 서식 HWP 120건 중 79.2%가 본문 50자 미만인데 오류·경고 없이
+    # quality 0.95 로 통과했다(구형 HWP 3.x · 내용이 표 안에만 있음). 종전 가드는
+    # `not text.strip()` 뿐이라 객체 placeholder 한 글자(U+FFFC)에 속았고, 그런 문서는 내용
+    # 없이 전부 S3 로 떨어진다 = 무음 미탐.
+    # ⚠ 추출 실패로는 만들지 않는다 — 짧지만 정상인 문서까지 막힌다. 검수 라우팅까지만 한다.
     _subs = "".join(
         c for c in text
         if not c.isspace() and c not in ("￼", "﻿", "​")
@@ -448,15 +442,10 @@ def _extract_hwp(p: Path) -> ExtractResult:
     coverage = _hwp_table_coverage(p, doc, text, warnings)
 
     # [FNR] 판정 불가(None + hwp_table_check_unavailable)도 보강 대상이다.
-    # 종전엔 보강이 coverage=="incomplete" 안에만 있어서, 표 검출기(to_hwpx_bytes)가
+    # 종전엔 보강이 coverage=="incomplete" 안에만 있어서, 표 검출기(to_hwpx_bytes)가 없거나
     # 실패하면 "표가 있는지 모른다"는 이유로 보강도 검수 라우팅도 건너뛰었다 — fail-open.
-    #
-    # 실측(공고문 .hwp · 2026-08-02): rhwp-python 0.5.1 처럼 to_hwpx_bytes 가 없는
-    # 환경에서 본문 10,439자·표 0개로 자동확정됐다. 같은 파일이 0.8.1(배포 이미지)에서는
-    # 검출기가 동작해 46,473자·표 47개·셀 1,815개로 정상 회수·검수 라우팅된다.
-    # 즉 이 분기는 배포본의 현재 동작이 아니라 rhwp 버전·파일에 따라 열리는 잠재 경로다.
-    # 그래도 닫는 이유: 검출기가 "모른다"고 답할 때 무음 통과시키면 표 속 비밀이 그대로
-    # 미탐이 된다. 모름을 안전으로 읽지 않는다.
+    # 모름을 안전으로 읽지 않는다. (배포 이미지의 rhwp 0.8.1 은 검출기가 동작하므로 이 분기는
+    # rhwp 버전·파일에 따라 열리는 잠재 경로다.)
     unknown = coverage is None and "hwp_table_check_unavailable" in (warnings or [])
     if coverage == "incomplete" or unknown:
         if coverage == "incomplete":
@@ -464,16 +453,10 @@ def _extract_hwp(p: Path) -> ExtractResult:
         # .hwp 한정 표 보강. 합집합이라 rhwp 가 이미 잡은 내용은 중복되지 않는다.
         # coverage 는 그대로 "incomplete" 로 둔다 → 검수 라우팅 유지(설계 의도).
         if not is_hwpx:
-            # [HWP3 표] 실측 2026-08-15: 실제 업무 서식의 79.2%가 구형 HWP 3.x 이고
-            # 내용이 표 안에만 있는데 rhwp 본문은 객체 placeholder 한 글자만 낸다.
-            # unhwp 보강도 HWP3 표는 못 읽는다(회수 0자·표 0개).
-            #
-            # 그런데 rhwp 가 **HWPX 로 변환**할 수 있고 우리에겐 이미 정밀한 HWPX 표
-            # 추출기가 있다. 변환 후 그 경로로 셀을 뽑으면 회수된다 - 실측으로
-            # 거래명세표(1자) -> 374자, 견적서 -> 215자, 금형발주시방서 -> 224자.
-            #
-            # unhwp 보다 먼저 시도한다: HWP3 는 unhwp 가 아예 못 읽으므로 이쪽이 유일한
-            # 경로이고, HWP5 는 아래 unhwp 경로가 이미 잘 동작한다.
+            # [HWP3 표] 구형 HWP 3.x 는 rhwp 본문이 객체 placeholder 한 글자만 내고 unhwp 보강도
+            # 표를 못 읽는다(회수 0자·표 0개). 대신 rhwp 의 HWPX 변환을 태워 기존 HWPX 표 추출기로
+            # 셀을 뽑는다 — 실측 거래명세표 1자→374자 · 견적서 →215자 · 금형발주시방서 →224자.
+            # unhwp 보다 먼저 시도한다: HWP3 는 이 경로가 유일하고, HWP5 는 아래 unhwp 가 잘 동작한다.
             hx_recovered, hx_tables, hx_blob = _hwp_tables_via_hwpx_convert(p)
             if hx_recovered:
                 merged = _append_if_missing(text, hx_recovered)
@@ -481,25 +464,13 @@ def _extract_hwp(p: Path) -> ExtractResult:
                     text = merged
                     tables = tables + hx_tables
                     _warn_once(warnings, "hwp_tables_recovered_by_hwpx_convert")
-                    # [2026-08-24] 회수 뒤 **정밀 대조**를 한 번 더 돌린다.
-                    #
-                    # 종전에는 회수에 성공해도 coverage 를 무조건 "incomplete" 로 되돌렸다.
-                    # 근거는 이 파일 _hwp_table_coverage 의 전제 — ".hwp 는 셀 텍스트가 HWPX
-                    # 변환에도 빠지므로 대조 불가" 였다. **그 전제가 지금은 틀리다.**
-                    # 실측(223 배포 이미지 2026-08-24, 관공서 서식 3건):
-                    #   실종선고신고서.HWP  본문 679자 · 표 2개 · hwp_tables_recovered_by_hwpx_convert
-                    #   국적회복신고서.HWP  본문 872자 · 표 2개 · 동일
-                    #   등록변경신고서.HWP  본문 388자 · 표 1개 · 동일
-                    # 회수 경고가 떴다 = rhwp 0.8.1 변환에서 셀 텍스트가 실제로 나온다.
-                    # 그러면 .hwpx 와 같은 정밀 대조를 .hwp 에도 돌릴 수 있다.
-                    #
-                    # 한국 관공서 서식은 내용이 전부 표 안에 있어, 종전 규칙에서는 HWP 서식이
-                    # **전건 검수행**이었다. 화면은 "표가 빠졌을 수 있다"고 말하는데 실제로는
-                    # 안 빠졌다 — 오탐이다.
-                    #
-                    # ⚠ 신뢰가 아니라 **근거**로 푼다. 남은 미회수 셀이 하나라도 있으면 그대로
-                    #   incomplete 다. 회수 실패·변환 실패·표 유무 판정 불가는 아래 분기에서
-                    #   지금과 똑같이 검수로 간다. 미탐 안전성은 유지된다.
+                    # [2026-08-24] 회수에 성공하면 정밀 대조를 한 번 더 돌린다.
+                    # 종전에는 회수해도 coverage 를 무조건 incomplete 로 되돌렸다(".hwp 는 대조 불가" 전제).
+                    # rhwp 0.8.1 변환은 셀 텍스트를 실제로 내놓으므로 그 전제가 틀리다(223 실측 2026-08-24,
+                    # 관공서 서식 3건 전건 회수). 내용이 전부 표 안에 있는 관공서 서식이 종전 규칙에서는
+                    # 전건 검수행이었다 — 오탐이다.
+                    # ⚠ 신뢰가 아니라 근거로 푼다. 미회수 셀이 하나라도 남으면 그대로 incomplete 이고,
+                    #   회수·변환 실패나 표 유무 판정 불가는 아래 분기에서 지금과 같이 검수로 간다.
                     if hx_blob and not _hwpx_uncaptured_table_cells(hx_blob, text):
                         coverage = None
                         # 위 461행에서 미리 붙여 둔 경고도 걷는다. coverage 를 풀어 놓고

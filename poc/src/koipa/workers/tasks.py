@@ -546,19 +546,12 @@ def train_classifier_task(spec_kwargs: dict | None = None, run_id: str | None = 
         logger.exception("register_and_gate_model failed — 등록/게이트 생략")
         out["deploy"] = {"registered": False, "reason": "exception"}
 
-    # [상태 정직성 2026-08-16] 종전에는 register_and_gate_model 이 예외로 실패해
-    # `deploy={"registered": False, "reason": "exception"}` 이 돼도 아래에서 그대로
-    # status="completed" 로 적었다. 화면(`GET /train/jobs`)에서는 새 모델이 나온 것처럼
-    # 보이는데 실제로는 등록된 모델이 없다 - 운영자가 그 차이를 알 방법이 없었다.
-    #
-    #   학습이 끝난 것과 모델이 등록된 것은 다른 사건이다. 둘을 한 단어로 적으면 안 된다.
-    #
-    # ⚠ 등급을 바꾸는 게 아니라 **상태 표기**만 가른다. 학습 산출물은 그대로 남고,
-    #   final_metrics.deploy 에 실패 사유가 이미 들어 있다. 여기서는 그것을 상태로
-    #   끌어올려 화면에 보이게 한다.
-    # ⚠ `registered=False` 가 **정상**인 경우가 있다 - 게이트가 자동활성을 막은 것
-    #   (eval_block 등)은 설계대로 동작한 것이라 실패가 아니다. 그래서 예외로 죽은
-    #   경우(reason="exception")만 failed 로 적는다.
+    # [상태 정직성 2026-08-16] 학습이 끝난 것과 모델이 등록된 것은 다른 사건이다.
+    # 종전에는 register_and_gate_model 이 예외로 죽어도 status="completed" 로 적어
+    # 화면(GET /train/jobs)에는 새 모델이 나온 것처럼 보였다.
+    # ⚠ 상태 표기만 가른다 — 학습 산출물은 그대로 남고 실패 사유는 final_metrics.deploy 에 있다.
+    # ⚠ registered=False 가 정상인 경우가 있다(게이트가 자동활성을 막은 eval_block 등).
+    #   그래서 예외로 죽은 경우(reason="exception")만 failed 로 적는다.
     _deploy = out.get("deploy") or {}
     _deploy_crashed = (_deploy.get("reason") == "exception")
 

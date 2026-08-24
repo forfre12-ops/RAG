@@ -86,43 +86,20 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         #   더 낮추면(0.10~0.12) FNR≤0.05이나 검토부담 0.80+. 운영 검수역량에 맞춰 .env로 조정 가능.
         # agreement_gate: 룰·모델 불일치만 needs_review 라우팅(등급 무변경·FNR-monotone·실패 시 silent 폴백).
         "classifier_escalation_tau": 0.30,
-        # [배포전 P0#④, 2026-08-22 재조정] 서빙 temperature 보정 — 미보정(T=1.0) 서빙은 OOD 과신으로
-        # 고등급(TS) 무음 미탐 위험. 종전 3.0은 model serving needs calibration(T≈3) 일반 추정치였는데,
-        # 현재 배포 모델(v-fe4b386b)이 자체 동봉한 temperature.json(trainer-auto 실측, 256건 보정셋
-        # 기준 ece 0.0592→0.0196)이 있어 그 값 2.03으로 맞춘다. pipeline.py는 .env/프로파일에 명시된
-        # 값(1.0이 아닌 값)을 동봉 temperature.json보다 우선하므로, 3.0을 그대로 두면 모델 실측값이
-        # 무시된 채 서빙됐다(실측: settings.classifier_temperature 우선순위, pipeline.py:627-639).
-        # ⚠ 임시조치: 모델을 교체하면 이 값도 그 모델의 temperature.json에 맞춰 다시 맞추거나, 프로파일
-        # 오버라이드를 지우고 자동연결([A1])에 맡기거나, operating_point.json 잠금 경로로 옮겨야 한다
-        # — 그러지 않으면 같은 종류의 불일치가 재발한다. review_confidence_threshold(0.70)는 T=3.0
-        # 기준으로 검증된 값이라 이 변경과 함께 재검증이 필요하다(별도 작업, 아직 안 함).
+        # 서빙 temperature 2.03 — 배포 모델(v-fe4b386b) 동봉 temperature.json 실측값
+        # (256건 보정셋 ece 0.0592→0.0196). 미보정(1.0)은 OOD 과신으로 고등급 무음 미탐 위험.
+        # ⚠ pipeline.py 는 프로파일 값을 동봉값보다 우선한다(pipeline.py:627-639) — 모델을 바꾸면
+        #   이 값도 그 모델의 temperature.json 에 맞춰 다시 맞출 것.
         "classifier_temperature": 2.03,
-        # [2026-08-23 재검증 · 2026-08-24 정정] 검수 라우팅 conf 임계 0.70 -> 0.50.
-        #
-        # 재검증 이유. 0.70 은 온도 T=3.0 시절 값인데 배포 온도가 2.03 으로 바뀐 뒤
-        # (2026-08-22) 재검증된 적이 없었다. 두 홀드아웃을 서빙 경로 전체로 0.45~0.70 재 봤다
-        # (reports/thresh_revalidation/, scripts/measure_serving_records.py --set 로 재현).
-        #
-        #   임계        hardened42 자동확정   holdout109 자동확정   무음미탐(TS·S1)
-        #   0.70(종전)      64.3%               58.7%              1 · 1
-        #   0.50(채택)      81.0%               75.2%              1 · 1
-        #
-        # 무음 미탐은 0.45~0.70 전 구간에서 한 건도 변하지 않았다. OOD 셋(final_800 800건)은
-        # 0.70 이든 0.50 이든 자동확정 0.0% 로 동일하다 — 학습에 없던 문체는 합의 게이트가
-        # 전부 잡는다. 즉 이 임계는 미탐을 가르는 손잡이가 아니었고, 분포 안 문서의 검수부담만
-        # 늘리고 있었다.
-        #
-        # ⚠ 한때 "공개등급(S3) 예측만 0.70 유지" 하는 등급차등을 넣었다가 **뺐다**. 근거였던
-        #   "0.50 으로 내리면 S2 문서 2건이 공개로 자동확정된다" 가 라벨 오류였기 때문이다.
-        #   그 2건을 열어 보니 둘 다 **공개 판례**이고, 라벨은 사람이 아니라 LLM 이 붙였다
-        #   (label_source=llm_judge_primary · reviewer_id=llm_judge_local_openai). 룰도 S3,
-        #   모델도 S3 라고 했는데 LLM 라벨만 S2 였다. holdout109 의 판례 19건 중 12건이
-        #   비공개등급 라벨을 달고 있어 같은 성질의 오류가 셋 전반에 있다.
-        #   → 등급차등은 실제 유출이 아니라 **라벨 오류**를 막고 있었다. 그래서 뺀다.
-        #
-        # ⚠ 두 홀드아웃 모두 합성·기계라벨 평가셋이다(사람 서명 0건). 회원사 운영 분포에서
-        #   다시 재야 한다. review_confidence_threshold_public 손잡이는 남겨 뒀다(기본 None) —
-        #   운영 분포에서 공개등급 쪽만 조여야 할 근거가 나오면 그때 쓰라고 둔 것이다.
+        # 검수 라우팅 conf 임계 0.50 (재검증 2026-08-24, reports/thresh_revalidation/ ·
+        # scripts/measure_serving_records.py --set 로 재현).
+        #   0.70 → 0.50 : 자동확정 64.3%→81.0%(hardened42) · 58.7%→75.2%(holdout109)
+        #   무음 미탐(TS·S1)은 0.45~0.70 전 구간 불변, OOD 셋은 어느 값에서도 자동확정 0%
+        #   → 이 임계는 미탐이 아니라 검수부담만 가른다.
+        # ⚠ 공개등급만 0.70 을 남기는 등급차등을 넣었다가 걷었다 — 근거 2건이 유출이 아니라
+        #   LLM 라벨 오류였다(label_source=llm_judge_primary). 손잡이는 남아 있다:
+        #   review_confidence_threshold_public.
+        # ⚠ 두 홀드아웃 모두 기계라벨(사람 서명 0건) — 회원사 운영 분포에서 재측정 필요.
         "review_confidence_threshold": 0.50,
         "agreement_gate_enabled": True,
         # metadata_floor: KL ICD 보안표시·접근범위 상향 게이트 ON. 실데이터 0 환경에선 모델보다
@@ -179,32 +156,7 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         # (모델 동봉 temperature.json=2.03 실측에 맞춤; 위 onprem-local 주석 참조). ⚠임시조치 — 모델
         # 교체 시 재조정 필요.
         "classifier_temperature": 2.03,
-        # [2026-08-23 재검증 · 2026-08-24 정정] 검수 라우팅 conf 임계 0.70 -> 0.50.
-        #
-        # 재검증 이유. 0.70 은 온도 T=3.0 시절 값인데 배포 온도가 2.03 으로 바뀐 뒤
-        # (2026-08-22) 재검증된 적이 없었다. 두 홀드아웃을 서빙 경로 전체로 0.45~0.70 재 봤다
-        # (reports/thresh_revalidation/, scripts/measure_serving_records.py --set 로 재현).
-        #
-        #   임계        hardened42 자동확정   holdout109 자동확정   무음미탐(TS·S1)
-        #   0.70(종전)      64.3%               58.7%              1 · 1
-        #   0.50(채택)      81.0%               75.2%              1 · 1
-        #
-        # 무음 미탐은 0.45~0.70 전 구간에서 한 건도 변하지 않았다. OOD 셋(final_800 800건)은
-        # 0.70 이든 0.50 이든 자동확정 0.0% 로 동일하다 — 학습에 없던 문체는 합의 게이트가
-        # 전부 잡는다. 즉 이 임계는 미탐을 가르는 손잡이가 아니었고, 분포 안 문서의 검수부담만
-        # 늘리고 있었다.
-        #
-        # ⚠ 한때 "공개등급(S3) 예측만 0.70 유지" 하는 등급차등을 넣었다가 **뺐다**. 근거였던
-        #   "0.50 으로 내리면 S2 문서 2건이 공개로 자동확정된다" 가 라벨 오류였기 때문이다.
-        #   그 2건을 열어 보니 둘 다 **공개 판례**이고, 라벨은 사람이 아니라 LLM 이 붙였다
-        #   (label_source=llm_judge_primary · reviewer_id=llm_judge_local_openai). 룰도 S3,
-        #   모델도 S3 라고 했는데 LLM 라벨만 S2 였다. holdout109 의 판례 19건 중 12건이
-        #   비공개등급 라벨을 달고 있어 같은 성질의 오류가 셋 전반에 있다.
-        #   → 등급차등은 실제 유출이 아니라 **라벨 오류**를 막고 있었다. 그래서 뺀다.
-        #
-        # ⚠ 두 홀드아웃 모두 합성·기계라벨 평가셋이다(사람 서명 0건). 회원사 운영 분포에서
-        #   다시 재야 한다. review_confidence_threshold_public 손잡이는 남겨 뒀다(기본 None) —
-        #   운영 분포에서 공개등급 쪽만 조여야 할 근거가 나오면 그때 쓰라고 둔 것이다.
+        # 검수 라우팅 conf 임계 0.50 (onprem-local 과 동일 — 위 주석 참조).
         "review_confidence_threshold": 0.50,
         "agreement_gate_enabled": True,
         # metadata_floor ON (onprem-local과 동일 — 위 주석 참조).
@@ -217,18 +169,11 @@ _PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
         "require_real_embedder": True,
         # [obs] 실 분류기 필수(onprem-local과 동일) — 모델 dir 로드 실패 시 rule-fallback 무음 열화 거부.
         "require_real_classifier": True,
-        # [정정 2026-08-08] 수동 GA 활성의 사람서명 locked-eval 요구는 **끈다** — onprem-local 에서
-        # 복사해 온 값이었는데, 그 프로파일의 근거(현장에 실제 검수자가 있다)가 지재원엔 성립하지 않는다.
-        # 지재원은 합성 모델공장이라 실문서·검수자·반출이 구조적으로 0 이고, 따라서 locked_gold_eval 을
-        # 채울 서명 주체 자체가 없다. 실측으로 막다른 길이 확인됐다(실서버 2026-08-08):
-        #   1) 자동 deploy gate 는 **통과**한다 — 배포본 v-fe4b386b: degenerate 아님 ·
-        #      fnr_high=0.0625 ≤ floor 0.10 · "all gate checks passed"
-        #   2) 그런데 수동 활성이 locked_eval_not_ready(no_locked_records)로 거부
-        #   3) 설계상 탈출구인 force 는 식별된 actor(JWT)를 요구하는데 배포 인증은 auth_mode=api_key
-        # → 세 설정이 각각은 합리적인데 조합하면 **어떤 경로로도 활성화가 불가능**했고,
-        #   /metrics/latest 가 영구히 "no active model" 이었다(관제·거버넌스 화면이 빈 상태).
-        # 지재원의 실 게이트는 자동 축(degenerate·fnr_high·first_deploy_fnr_floor·회귀)이며 그건 그대로
-        # 살아 있다. 사람 검수는 고객사 현장에서 일어나므로 onprem-local 은 True 를 유지한다(위 참조).
+        # 수동 GA 활성의 사람서명 locked-eval 요구는 끈다(지재원 한정).
+        # 지재원은 합성 모델공장이라 실문서·검수자·반출이 0 = locked_gold_eval 을 채울 서명 주체가 없다.
+        # 켜 두면 자동 게이트를 통과한 모델도 locked_eval_not_ready 로 영구 활성 불가였다(실측 2026-08-08).
+        # 실 게이트는 자동 축(degenerate·fnr_high·first_deploy_fnr_floor·회귀)이며 그대로 살아 있다.
+        # 사람 검수는 고객사 현장에서 일어나므로 onprem-local 은 True 유지.
         "deploy_gate_manual_require_locked_eval": False,
         # [P0#①-b] force 우회 시 사유 필수(onprem-local과 동일).
         "manual_activate_force_requires_reason": True,
@@ -523,33 +468,15 @@ class Settings(BaseSettings):
     # 미탐보다 저위험, S2까지 max하면 과분류↑). 도메인에 따라 .env로 조정.
     severe_agg_codes: list[str] = ["TS", "S1"]
 
-    # 저신뢰 검수 라우팅 임계값. 모델 confidence가 이 값 미만이면 응답을
-    # status="needs_review"로 표시하고 warning에 검수 권고를 남긴다. **거부(reject)는
-    # 하지 않음** — 고위험 도메인에서 저신뢰라고 응답을 막으면 FNR이 악화되므로
-    # '플래그+검수권고'까지만. 데모 콘솔(api/static/incident.js)이 광고하는 값과 일치시킬 것.
-    # 임계 수치 자체의 정밀 튜닝은 운영 human_review 라벨 누적 후 PR곡선으로 조정.
+    # 저신뢰 검수 라우팅 임계. 모델 confidence 가 이 값 미만이면 status="needs_review" 로
+    # 표시하고 warning 에 검수 권고를 남긴다 — 거부하지 않는다(막으면 FNR 이 악화된다).
     review_confidence_threshold: float = 0.7
 
-    # [2026-08-23 등급차등] 예측이 **공개등급**(GradeRegistry 최하, 보통 S3)일 때만 쓰는 별도 임계.
-    # None이면 위 review_confidence_threshold를 그대로 쓴다(동작 보존).
-    #
-    # 왜 갈랐나(실측 2026-08-23, reports/thresh_revalidation/). 임계 0.70은 T=3.0 시절 값이고
-    # T=2.03 전환(2026-08-22) 뒤 재검증된 적이 없었다. 두 홀드아웃에서 0.45~0.70을 재 보니
-    # **계약 지표(무음 미탐 = 정답 TS·S1이 더 낮게 자동확정)는 전 구간 불변**이었다
-    # (hardened42 1건 고정 · holdout109 1건 고정). 0.70이 실제로 잡고 있던 것은 정답 S2가
-    # S3(공개)로 자동확정되는 2건뿐이었고, **그 2건을 포함해 과소분류 자동확정 6건 전부가
-    # 예측=S3**이었다(conf 0.613~0.775). 즉 위험은 등급 전반이 아니라 공개등급 예측에 몰려 있다.
-    #
-    # 합의 게이트가 공개등급 예측을 conf 단독으로 통과시키기 때문에(_agreement_gate: 최하등급은
-    # 과분류 위험이 없다는 이유) 공개등급 쪽 conf 바를 낮추면 방어가 하나도 안 남는다. 그래서
-    # 공개등급만 0.70을 유지하고 나머지를 내린다 — 미탐 방어는 그대로 두고 검수부담만 던다.
-    #
-    # [2026-08-24 실측] "합의 게이트의 공개등급 면제를 끄면 이 conf 바 없이도 잡히지 않겠나"를
-    # 구현해서 재 봤다 — 안 잡힌다. 문제의 2건은 룰이 시드를 **하나도** 못 잡아
-    # (rule_has_evidence=False) 합의 게이트가 '룰 무의견'으로 통과시킨다. 룰도 모델도 S3라고
-    # 하고 둘 다 틀린 경우라, 현재 설계에서 그 2건을 잡는 것은 이 conf 바 하나뿐이다.
-    # 근본 원인은 룰 추출기의 S·V 과소검출(별건 미해결)이다. 실험용 스위치는 이득이 없어
-    # 코드에 남기지 않았다 — 되돌렸고, 결론만 여기 남긴다.
+    # [등급차등] 예측이 공개등급(GradeRegistry 최하, 보통 S3)일 때만 쓰는 별도 임계.
+    # None 이면 위 review_confidence_threshold 를 그대로 쓴다(기본·현행).
+    # 과소분류 자동확정은 전부 예측=S3 에 몰려 있고, 합의 게이트는 최하등급 예측을 conf 단독으로
+    # 통과시킨다 — 공개등급만 조여야 할 근거가 운영 분포에서 나오면 이 손잡이를 쓴다.
+    # ⚠ 2026-08-23 에 0.70 으로 켰다가 걷었다: 근거 2건이 유출이 아니라 LLM 라벨 오류였다.
     review_confidence_threshold_public: float | None = None
 
     # 룰-폴백 자동확정 최소 증거량 (Gate: sparse-evidence → 검수 라우팅).

@@ -392,11 +392,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- [2026-08-20] 탭을 **사람 축**으로 다시 갈랐다. 종전 축은 기능(운영·모델·설정·관제)
          이라 "내가 뭘 눌러야 하나" 에 답하지 못했고, model 탭 하나에 카드 6개·조작 36개가
          몰려 있었다. 지금은 탭마다 4개 이하다(검수 3 · 학습배포 4 · 운영 4 · 설정 2). -->
-    <!-- [2026-08-23] 탭을 **두 묶음**으로 갈라 보여준다. 종전에는 넷이 나란히 있어서 검수와
-         운영이 동등한 메뉴로 보였고, 사용자가 "어느 쪽이 내 일인가"를 스스로 판단해야 했다.
-         왼쪽=매일 하는 일, 오른쪽=모델 담당자가 가끔 하는 일. 순서도 그에 맞춰 바꿨다.
-         검수(골든셋)를 학습·배포 옆에 붙인 이유: 이름이 「분류 검수 큐」와 겹쳐 일상 업무로
-         오해되는데, 실제로는 모델 평가 기준문서를 승인하는 일이라 모델 관리 쪽이 맞다. -->
+    <!-- 탭은 두 묶음: 왼쪽=매일 하는 일 · 오른쪽=모델 담당자가 가끔 하는 일. -->
     <!-- [2026-08-23] 「설정」을 탭에서 빼고 오른쪽 끝 톱니로 옮겼다. 등급 체계·태깅 규칙은
          도입할 때 한 번 정하고 이후 거의 바꾸지 않는데, 매일 쓰는 탭과 나란히 있으면 같은
          빈도의 업무로 보인다. 기능·카드·요건 증빙은 그대로다 — 진입점만 옮겼다. -->
@@ -405,12 +401,7 @@ details.adv[open]{padding-bottom:12px;}
          "이건 성격이 다르다"가 전달된다. 무엇이 무엇인지는 탭 아래 한 줄 설명이 말한다. -->
     <button class="tab active" data-tab="ops"     role="tab" onclick="showPane('ops')">운영<span class="tab-sub">문서 검토 · 분류 · 관제 · 감사</span></button>
     <span class="tab-divider" aria-hidden="true"></span>
-    <!-- [2026-08-24] 탭 이름을 「검수」 → 「검증문서」로. 위 2026-08-23 주석이 적어 둔 문제
-         ("이름이 「분류 검수 큐」와 겹친다")를 자리 이동으로만 눌러 뒀는데, 이름 자체가
-         같으면 옆에 옮겨도 같은 말로 읽힌다. 운영 탭의 「검수」는 요건·API 어휘(FUN-024 ·
-         needs_review)라 못 바꾸므로, 바꿀 수 있는 이쪽을 대상 이름으로 부른다.
-         이제 화면에서 「검수」는 두 곳뿐이고 서로 다른 대상이다 — 운영 탭=분류 결과 검수,
-         이 탭=검증문서 검수. -->
+    <!-- 「검증문서」 = 모델 평가 기준문서. 운영 탭의 「검수」(FUN-024·needs_review)와 대상이 다르다. -->
     <button class="tab"        data-tab="review"  role="tab" onclick="showPane('review')">검증문서<span class="tab-sub">후보 구성 · 검수 · 서명</span></button>
     <button class="tab"        data-tab="train"   role="tab" onclick="showPane('train')">학습 · 배포<span class="tab-sub">학습 후보 · 재학습 · 게이트 · 메트릭</span></button>
     <button class="tab tab-icon" data-tab="config" role="tab" onclick="showPane('config')"
@@ -451,11 +442,7 @@ details.adv[open]{padding-bottom:12px;}
   <div class="grid">
 
     <!-- ===== 연결/인증 ===== (모든 탭에서 상시 노출 — 인증 컨텍스트는 전 작업의 전제) -->
-    <!-- [2026-08-23] 접어 둔다(제거 아님). 이 카드가 첫 화면 맨 위에 펼쳐져 있으면 관리자는
-         "작업 시작 전에 시스템 설정을 해야 하나"로 읽는다 — API Base·API Key·역할 헤더가
-         먼저 보이기 때문이다. 실제로는 이미 접속된 상태이고 손댈 일이 없다.
-         ⚠ 지우지는 않는다. 시연·리허설이 이 카드로 서버와 키를 바꿔 가며 돌아가고,
-         문제가 생겼을 때 손댈 곳이 여기뿐이다. 접되 한 번 누르면 나오게 둔다. -->
+    <!-- 접어 둔다(제거 아님) — 이미 접속된 상태라 손댈 일이 없다. 시연·리허설은 이 카드로 서버를 바꾼다. -->
     <section class="card col-span" data-pane="always" style="order:0">
       <details>
       <summary style="cursor:pointer;list-style:none">
@@ -538,13 +525,8 @@ details.adv[open]{padding-bottom:12px;}
             <b>본문 추출</b> 입력란만 채웁니다 · <b>추출 → 분류</b> 검수 큐까지 넣습니다. 큰 문서는 뒤에서 처리됩니다.
           </p>
           <div id="cl-file-info" class="hint" style="margin-top:4px;"></div>
-          <!-- [2026-08-23] index.html(등급 시연 화면)에는 있고 관리자 콘솔에는 없던 ICD 메타데이터
-               입력칸. 서버(documents.py analyze_document)는 진작부터 source_type 등을 Form
-               필드로 받고 있었다 — 이 화면만 안 보냈다. 안 보내면 출처(Gate-1 source-prior
-               cap)·관리성(metadata-floor)이 unknown 으로 남아, 공개 문서를 올려도 상한이
-               걸릴 자리가 없다(severe-max 청크 부스트가 공개문서를 과탐할 때 이게 유일한
-               방어선 — 2026-08-23 실측 공개문서 300건 중 79건 과탐). 값은 전부 선택사항이며
-               비우면 지금처럼 unknown 으로 간다(동작 불변). -->
+          <!-- ICD 메타데이터 입력칸. 안 보내면 출처(source-prior cap)·관리성(metadata-floor)이 unknown 으로
+               남아 공개문서 과탐을 막을 자리가 없다. 전부 선택사항 — 비우면 unknown(동작 불변). -->
           <details class="icd-box" style="margin-top:10px;border:1px solid var(--border,#e1e1de);padding:10px 12px;border-radius:6px">
             <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-dim)">문서 속성 (ICD) — 출처 · 보안표시 · 접근범위 <span style="font-weight:400">· 선택. 넣으면 등급 판정에 반영됩니다</span></summary>
             <div class="btn-row" style="margin-top:10px;gap:16px;flex-wrap:wrap">
@@ -582,17 +564,9 @@ details.adv[open]{padding-bottom:12px;}
             </div>
           </details>
         </div>
-        <!-- [2026-08-23] 샘플 문서 고르기·일괄 분류를 **뺐다.**
-             ① 그 샘플은 평가 정답지(검증문서)에 들어 있는 문서다. 화면을 열면 본문이 이미
-                채워져 있어서, 「분류하기」를 누르면 AI 가 아는 문서로 판정이 나왔다.
-             ② 「샘플 8건 일괄 분류」는 그 8건을 **실제 검수 큐에 적재**하고 `기대등급 일치
-                8/8` 로 채점까지 했다. 운영 큐에 평가용 문서가 섞이고, 화면이 정답을 알고
-                채점하는 모양이 된다.
-             ③ 현장 관리자가 샘플 문서를 분류할 일이 없다. 개발·시연용 기능이 매일 쓰는
-                카드에 들어와 있었다.
-             샘플로 분류를 보여주는 것은 등급 시연 화면(index.html)의 역할이고 거기 이미 있다.
-             SAMPLES 배열과 pickSample/runBatch 는 지우지 않고 남긴다 — 진단·회귀 확인에 쓰고,
-             다시 붙일 때 만들 필요가 없게 한다. 화면에서만 뺀다. -->
+        <!-- 샘플 고르기·일괄 분류를 화면에서 뺐다 — 그 샘플은 평가 정답지 문서이고, 일괄 분류가
+             그 8건을 운영 검수 큐에 적재하며 정답을 아는 채로 채점했다. 샘플 시연은 index.html 담당.
+             [2026-08-24] 남겨 두었던 SAMPLES·pickSample·runBatch 도 제거했다(호출부 0건). -->
         <div class="row2">
           <div class="field">
             <label class="fld">doc_id</label>
@@ -622,30 +596,18 @@ details.adv[open]{padding-bottom:12px;}
         <span class="ep" data-tech>POST /confirm · /relabel</span>
       </div>
       <div class="card-body">
-        <!-- [정합 2026-08-09] 종전에는 이 자리에 "신뢰도 게이트(검수 라우팅 임계)"라는 입력이
-             하나뿐이었는데, 값을 바꿔도 API 호출이 0건이라 **서버 라우팅과 무관**했다. 관리자가
-             0.5로 내리고 "임계를 조정했다"고 믿게 되는 화면이었다. 둘을 명확히 분리한다:
-               · 서버 임계 = 실제로 needs_review 를 결정하는 값(읽기 전용, healthz 에서 조회)
-               · 목록 필터 = 이 화면에서 강조 표시할 기준(클라이언트 전용) -->
-        <!-- [2026-08-23] 순서를 뒤집었다. 이 카드는 관리자가 콘솔을 열면 처음 보는 화면인데,
-             종전에는 임계값 두 칸이 먼저 나오고 정작 할 일(검토할 문서 목록)은 그 아래
-             버튼을 눌러야 나왔다. 게다가 임계값이 두 개 나란히 있고 둘 다 0.70 이라
-             "어느 걸 바꿔야 하나"로 헷갈렸다 — 하나는 읽기 전용 서버 값, 하나는 색칠만 하는
-             화면 설정이다. 목록을 먼저, 설정은 접어 둔다. -->
+        <!-- 서버 임계(읽기 전용·healthz)와 목록 필터(클라이언트 표시)는 다른 값이다 — 한 칸으로 두면
+             화면에서 서버 라우팅을 바꾼 것처럼 읽힌다. -->
+        <!-- 목록을 먼저, 설정은 접어 둔다(콘솔을 열면 처음 보는 카드다). -->
         <div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">
           <button class="btn" id="btn-review-queue" onclick="loadReviewQueue()">검토할 문서 보기</button>
           <span id="rq-info" class="hint" style="margin:0;"></span>
         </div>
         <div id="queue" class="queue"><div class="q-empty">대기 목록을 읽고 있습니다…</div></div>
-        <!-- [2026-08-24] 「표시 설정 — 확신도 기준 보기」 두 칸을 뺐다. 관리자가 볼 이유가
-             없었을 뿐 아니라, 아래 칸이 실제로 목록의 판정 배지를 뒤집고 있었다.
-               · 서버 검수 임계: 읽기 전용 표시였다. 배포 설정으로만 바뀌는 값이라 화면에서
-                 할 수 있는 일이 없다. 값은 healthz 응답에 그대로 있다.
-               · 목록 강조 기준: 「색칠만, 판정 무관」이라 적어 두고 실제로는
-                 `confidence < 이 값` 으로 검수/자동 배지를 계산했다. 서버의 검수 라우팅은
-                 게이트가 14개인데(services/review_reasons.py) 그중 신뢰도 게이트 하나만
-                 흉내 낸 것이라, agreement-gate·cap-conflict 로 검수에 간 문서가 화면에는
-                 「자동」으로 떴다. 이제 서버가 준 status 를 그대로 쓴다. -->
+        <!-- 「표시 설정 — 확신도 기준 보기」 두 칸을 뺐다. 「목록 강조 기준」이 실제로는
+             `confidence < 값` 으로 판정 배지를 계산해, 서버의 14개 게이트(services/review_reasons.py)
+             중 하나만 흉내 냈다 — agreement-gate 로 검수 간 문서가 「자동」으로 떴다.
+             이제 서버가 준 status 를 그대로 쓴다. -->
       </div>
     </section>
 
@@ -706,11 +668,8 @@ details.adv[open]{padding-bottom:12px;}
         </div>
         <div class="row3" style="margin-top:8px;">
           <div class="field">
-            <!-- [2026-08-23] 이 칸은 **생성기를 고르지 않는다.** submit() 은 이 값을 비용
-                 추정(COST_PER_DOC_USD)에만 쓰고, 워커에 넘기는 인자는 등급·건수·도메인뿐이다
-                 (synthesis_service.py:81-87). 실제 생성기는 워커가 서버 설정으로 만든다
-                 (generator.py:284 build_provider() → settings.llm_provider). 이름을 그대로
-                 두면 "여기서 anthropic 을 고르면 Claude 가 쓴다"로 읽힌다 — 아니다. -->
+            <!-- 이 칸은 생성기를 고르지 않는다 — submit() 은 비용 추정에만 쓴다. 실제 생성기는 워커가
+                 서버 설정으로 만든다(settings.llm_provider). -->
             <label class="fld">비용 추정용 제공자</label>
             <select id="sy-provider">
               <option value="noop">noop (결정론 · 외부 API 없이)</option>
@@ -783,12 +742,8 @@ details.adv[open]{padding-bottom:12px;}
             <label class="fld">기본 모델 <span class="techbar" data-tech>base_model</span></label>
             <input id="tr-base" type="text" value="kf-deberta-base" />
           </div>
-          <!-- [2026-08-24] 「검색 보강(use_rag)」 체크박스를 뺐다. 학습 경로에 **소비처가
-               없다** — schemas/training.py:18 에 필드 선언만 있고 training_service·TrainSpec·
-               trainer 어디에서도 읽지 않는다(grep 0건). 켜도 학습이 달라지지 않는데 화면은
-               고를 수 있게 두어 "켜면 뭔가 된다"고 말하고 있었다.
-               ⚠ /classify 의 use_rag 는 실동작이라 그대로 둔다 — 여기서 뺀 것은 **학습 폼**뿐이다.
-               되살릴 때는 학습 경로가 그 값을 실제로 쓰게 된 뒤에 넣을 것. -->
+          <!-- 학습 폼의 「검색 보강(use_rag)」을 뺐다 — 학습 경로에 소비처가 없다(선언만 있고 grep 0건).
+               ⚠ /classify 의 use_rag 는 실동작이라 그대로 둔다. -->
         </div>
         <div class="btn-row">
           <button class="btn" onclick="submitTrain()">재학습 제출</button>
@@ -857,11 +812,8 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" onclick="loadMetrics()">최신 메트릭</button>
           <button class="btn sec sm" onclick="loadHistory()">이력</button>
           <button class="btn sec sm" onclick="loadConfusionMatrix()">혼동행렬</button>
-          <!-- [2026-08-24] 「등급체계 조회」 버튼을 뺐다. 같은 등급체계를 설정 탭에서 편집하는데
-               여기서는 조회만 되어 두 벌로 보였다. 그리고 이 버튼이 보여 주던 것은 **지금 활성인**
-               등급체계이지 이 성적을 낼 때 쓰인 등급체계가 아니다 — /metrics/latest 응답
-               (schemas/metrics.py MetricsReport)에 taxonomy 버전 필드가 없어 그것은 알 수 없다.
-               측정 시점 등급체계를 보여 주는 것처럼 읽히던 자리라 없애고 설정 탭으로 보낸다. -->
+          <!-- 「등급체계 조회」를 뺐다 — 보여 주던 것은 지금 활성인 등급체계이지 이 성적을 낼 때 쓰인
+               등급체계가 아니다(/metrics/latest 에 taxonomy 버전 필드가 없다). 편집은 설정 탭. -->
           <button class="btn sec sm" onclick="showPane('config')" title="등급체계는 설정 탭에서 봅니다">등급체계 (설정 탭)</button>
         </div>
         <div id="metrics-cards" class="factors" style="grid-template-columns:repeat(3,1fr)"></div>
@@ -915,21 +867,11 @@ details.adv[open]{padding-bottom:12px;}
     </section>
 
     <!-- ===== 7. 검증문서 검수 준비 ===== 루프 B 의 G2 -->
-    <!-- [2026-08-24 order] 「검증문서」 탭에 오는 사람이 매번 하는 일은 새 후보를 만드는 것이
-         아니라 **이미 준비된 묶음을 검수하는 것**이다. 검수 목록 카드(golden_jobs.js, order:1)가
-         맨 위, 이 카드는 뒤다. 탭 순서: 1 검수 목록 · 2 현황·서명 상태 · 3 검수 시작.
-
-         [2026-08-24 AI 후보 생성 제거] 이 카드에는 성격이 반대인 둘이 있었다 —
-         (가) AI 가 등급을 매겨 후보를 새로 만든다  (나) 이미 있는 묶음을 검수에 올린다.
-         (가)를 뺐다. 사유는 셋이고 전부 확인한 것이다:
-           · **요건이 아니다.** 제출본 RFP_구현현황 전문에 "골든"·"검증문서"·"평가 정답" 0회.
-             요건 증빙으로 지목된 카드에는 secmark(§N·§E·§T)가 붙는데 이 카드에는 없다.
-             FUN-003 은 **합성 문서**이고 그 증빙은 688 행 카드(§N)다 — 이 카드의 reqtag 는 오기였다.
-           · **쓰지 않기로 결론이 났다.** 판정 LLM 을 붙이지 않는 구성이고(지재원·고객사 모두),
-             상용 LLM 이 로컬보다 낫다는 근거도 없었다(591건 실측 일치율 64.6%, 상용은 S1 을 0건 냈다).
-           · **필요한 묶음은 이미 있다.** 223 에 검수 후보 120건이 준비돼 있다.
-         기능을 지운 것이 아니다 — `POST /golden/build` API·서비스·시험은 그대로다.
-         판정 LLM 을 붙이기로 하면 이 블록만 되살리면 된다(이력: 912f688b 이전 판). -->
+    <!-- 카드 순서: 1 검수 목록(golden_jobs.js order:1) · 2 현황·서명 상태 · 3 검수 시작.
+         [AI 후보 생성 제거] 이 카드에 있던 "AI 가 등급을 매겨 후보를 새로 만든다"를 뺐다 —
+         요건이 아니고(제출본에 「골든」 0회·secmark 없음), 판정 LLM 을 붙이지 않기로 했고,
+         223 에 검수 후보 120건이 이미 있다. API·서비스·시험(POST /golden/build)은 그대로다.
+         되살리려면 이 블록만 복원한다(이력: 912f688b 이전 판). -->
     <section class="card col-span" data-pane="review" style="order:3">
       <div class="card-head">
         <div class="ttl"><span class="step-no" title="위 흐름도 루프 B 의 G2 — 준비된 묶음을 검수·서명 화면으로 올립니다">G2</span> 검증문서 검수 준비</div>
@@ -1460,36 +1402,6 @@ function applyServerConfig(d){
 }
 
 /* ---- 1. CLASSIFY ---- */
-// 운영 골든셋(golden100_labeled_v2.jsonl)에서 등급별 2건 선별 — doc_id로 보고서·메트릭과 추적 연결.
-// exp = 골든셋 공식 정답 라벨. body는 합성 텍스트(발주처 실문서 도착 전 기준), [가상기업N]→당사 치환.
-const SAMPLES=[
-  {id:'G50-TS-21', exp:'TS', t:'초전도 양자컴퓨터 큐비트 결맞음 시간 최적화 실험 데이터셋', b:'당사 양자컴퓨팅연구소의 127큐비트 초전도 양자프로세서 결맞음 시간(T1=420μs, T2=310μs) 최적화 실험 원시 데이터와 오류 보정 코드(Surface Code, d=5) 성능 지표(논리 오류율 0.12%). 업계 최고 수준이며 미공개 상태. 연구소장·DARPA 협력 계약자(NDA) 이외 공유 금지.'},
-  {id:'G50-TS-18', exp:'TS', t:'5G-Advanced 빔포밍 코드북 설계 원본 및 시뮬레이션 결과', b:'당사 통신연구소가 개발한 5G-Advanced 대규모 MIMO 빔포밍 코드북 전체 설계 문서 및 채널 시뮬레이션 원시 결과. 안테나 간격(λ/2.3), 전파 이득(23.7dBi), 지연 확산 보상 계수(τ_rms=18ns) 등 핵심 파라미터 포함. 3GPP 표준 선점을 위한 특허 출원 전 단계. 연구소장·표준화팀장 이외 접근 금지.'},
-  {id:'G50-S1-14', exp:'S1', t:'프리미엄 발효 소스 핵심 배합비 및 제조 공정 명세서', b:'당사 식품R&D센터의 프리미엄 발효 소스 제품 핵심 배합비(재료 15종, 비율 0.01% 단위 기재)와 숙성 공정 상세 조건(온도 12°C, 습도 68%, 기간 180일). 독자 개발 비법으로 외부 유출 시 유사 제품 복제 가능. 시장 내 20% 점유율 기여 제품. R&D팀장·생산팀장 이외 접근 금지.'},
-  {id:'G50-S1-16', exp:'S1', t:'의료 AI 예후 예측 모델 내부 검증 보고서 (IRB 승인 전)', b:'당사 헬스케어AI팀이 개발한 패혈증 예후 예측 AI 모델의 내부 검증 보고서. 검증 코호트 1,240명, AUROC=0.93, 민감도 89%, 특이도 91%, 임상 도입 시 조기 사망 감소 추정치(14.2%) 등 포함. IRB 승인 전 단계로 미공개 상태. 임상팀·CMO·데이터과학팀장 외 열람 금지.'},
-  {id:'G50-S2-13', exp:'S2', t:'2025년 상반기 인력 구조 재편 계획 (대외비)', b:'당사 인사기획팀의 2025년 상반기 조직 개편 계획안. 사업부 3개 통폐합, 희망퇴직 대상 인원 약 120명, 신규 채용 계획 80명, 인건비 절감 목표 연 45억 원. 공식 발표 전 내부 검토 단계. 조기 유출 시 구성원 불안 및 노사 갈등 위험. 인사팀·임원진 열람, 대외비 분류.'},
-  {id:'G50-S2-21', exp:'S2', t:'본사 이전 계획 초안 — 후보지 3곳 비교 및 비용 분석', b:'당사 총무팀의 본사 이전 계획 초안. 후보지 3곳(강남구 A빌딩, 마포구 B빌딩, 판교 C타워) 임차 조건·비용 비교(보증금 50~80억, 월세 1.2~1.8억), 이전 비용 추산(22억), 예정 시기(2025.09) 포함. 발표 전 임대인·부동산 협상 중. 총무팀·경영지원팀·C-level 이외 대외비.'},
-  {id:'G50-S3-18', exp:'S3', t:'AI 기반 제조 혁신 웨비나 발표 자료 — 외부 공개용 (2025.02)', b:'당사 기술마케팅팀이 외부 고객 대상 웨비나(2025.02.20)에서 발표한 AI 기반 제조 혁신 슬라이드 자료 공개본. AI 예지보전 도입 사례(A社: 설비 고장률 -32%), ROI 산출 방법론, 도입 로드맵 6단계 등 포함. 웨비나 등록 참석자 전원에게 배포된 공개 자료.'},
-  {id:'G50-S3-21', exp:'S3', t:'당사 2024 사회공헌 활동 결과 보고서 (공개본)', b:'당사 CSR팀이 발간한 2024년 사회공헌 활동 결과 공개 보고서. 소외계층 디지털 교육 지원(수혜자 1,240명), 환경 정화 캠페인 참여(임직원 820명), 지역 사회 장학금 지급(3억 2천만 원), 협력사 상생 펀드 조성(15억 원). 사내외 공개 배포.'},
-];
-function populateSamples(){
-  const sel=$('sample-select');
-  /* ⚠ [2026-08-23] 요소가 없으면 조용히 끝낸다.
-     2026-08-23 에 「분류 실행」의 샘플 드롭다운을 화면에서 뺐는데 이 초기화는 남겨 두었다.
-     init 순서가 populateSamples() → checkHealth() 라, 여기서 TypeError 가 나면서
-     **checkHealth 가 아예 실행되지 않았다** — 서버 검수 임계가 '—' 로 남고 프로파일 배너도
-     안 떴다. 화면 절반이 죽는데 원인은 지운 요소 하나였다. */
-  if(!sel) return;
-  /* [2026-08-23] 두 가지를 고쳤다.
-     ① 옵션 이름에서 기대 등급 `[TS]` 를 뺐다 — 시스템이 판정하기 전에 화면이 답을 말하고
-        있었다. 등급 판정을 보여주는 화면에서 정답을 먼저 노출하면 시연이 성립하지 않는다.
-     ② 아무것도 고르지 않은 상태로 시작한다(sel.value=0 제거 + 첫 옵션을 안내문으로).
-        종전에는 첫 샘플이 선택된 채로 열려 본문이 미리 채워져 있었다. */
-  sel.innerHTML = '<option value="">— 직접 입력 (샘플을 쓰려면 고르세요) —</option>'
-    + SAMPLES.map((s,i)=>`<option value="${i}">${s.id} · ${s.t}</option>`).join('');
-  sel.value='';
-}
-function pickSample(i){ const s=SAMPLES[+i]; if(!s) return; PENDING_FILE=null; $('cl-docid').value=s.id; $('cl-title').value=s.t; $('cl-body').value=s.b; $('cl-result').innerHTML=''; }
 
 async function classifyOne(doc_id, title, content){
   const body={doc_id, title, content, return_evidence:true};
@@ -1740,24 +1652,6 @@ async function runClassify(){
   finally{ btn.disabled=false; btn.textContent='분류하기'; }
 }
 
-async function runBatch(){
-  // [2026-08-23] 버튼은 화면에서 뺐다(정답지 문서를 검수 큐에 적재하던 경로).
-  // 함수는 진단·회귀 확인용으로 남기되, 버튼이 없어도 죽지 않게 방어한다.
-  const btn=$('btn-batch')||{}; btn.disabled=true; const orig=btn.textContent;
-  let hit=0;
-  for(let i=0;i<SAMPLES.length;i++){
-    const s=SAMPLES[i]; btn.textContent=`일괄 분류 ${i+1}/${SAMPLES.length}…`;
-    try{
-      const d=await classifyOne(s.id, s.t, s.b);
-      if(i===0||i===SAMPLES.length-1) renderClassify(d);
-      const match=(d.label===s.exp);
-      if(match) hit++;
-      log(`[batch] ${s.id} → ${d.label} (기대 ${s.exp}) ${match?'✓':'·'}`, match?'ok':'info');
-    }catch(e){ log(`[batch] ${s.id} 실패: ${errKo(e)}`,'err'); }
-  }
-  log(`일괄 분류 완료 — ${SAMPLES.length}건 검수 큐 적재, 기대등급 일치 ${hit}/${SAMPLES.length}`, 'ok');
-  btn.disabled=false; btn.textContent=orig;
-}
 /* [2026-08-24] 이 카드에서 신뢰도 수치를 뺐다 — 등급 시연 화면(app.js)과 같은 규율이다.
  *   ① 화면 표시는 요건이 아니다(RTM FUN-024 의 구현범위는 검수자 큐 배분·심층지표).
  *   ② 이 값은 정답확률이 아니라 softmax 파생값이라(골든500 AUROC 0.58 · ECE 0.18) 숫자로
@@ -2997,7 +2891,6 @@ initPane();          // 탭 초기 표시 — 검수 탭이 기본, 탭마다 �
 loadGoldenBuilds();  // 등록 가능한 문서 묶음 목록(자유 입력 칸을 대체)
 onTrainPresetChange();   // 학습 규모 preset 설명 채우기(기본=정식 학습)
 syncWriteGate();
-populateSamples();
 syncActiveGrades();
 checkHealth();
 /* [2026-08-24] 새로고침하면 검토 목록이 빈 화면으로 돌아가던 것을 고친다(사용자 지적).

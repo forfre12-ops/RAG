@@ -15,12 +15,9 @@
   'use strict';
 
   var PANEL_HTML = [
-    // data-pane/order — 이 카드는 런타임에 삽입되므로 admin.html 의 탭 전환 규칙을
-    // 직접 달아 준다(없으면 어느 탭에서나 항상 떠서 탭 분리가 무의미해진다).
-    // [2026-08-24] order 3 → 1. 「검증문서 검수 목록」이 공용 메뉴에서 빠지면서
-    // (console_nav.py — 그 항목은 다른 화면이 아니라 이 카드의 앵커였다) 검수 목록으로
-    // 오는 길이 「검증문서」 탭 하나가 됐다. 탭을 누르면 맨 위에서 바로 보여야 한다.
-    // order:0 은 쓰지 않는다 — 상시노출 「연결·인증」 카드(admin.html:449)가 그 값이다.
+    // data-pane/order — 런타임에 삽입되는 카드라 admin.html 탭 전환 규칙을 직접 달아 준다
+    // (없으면 어느 탭에서나 뜬다). order:1 = 「검증문서」 탭 맨 위(검수 목록으로 오는 유일한 길).
+    // order:0 은 상시노출 「연결·인증」 카드가 쓴다.
     '<section class="card col-span" id="gold-jobs-card" data-pane="review" style="order:1">',
     '  <div class="card-head">',
     // [2026-08-24] 배지를 "3"에서 aux "조회"로. 흐름도(루프 B)의 3단계는 "재학습"이고
@@ -89,12 +86,9 @@
     try {
       var d = await api('GET', '/golden/jobs?limit=20');
       var jobs = (d && d.jobs) || [];
-      // [실측 2026-08-08] 서버는 ordering:"best_effort" 로 정직하게 고지하지만(Redis SCAN 순서라
-      // 최근순 보장 없음), 화면이 그 순서를 그대로 그리면 방금 만든 잡이 목록 중간에 박힌다.
-      // 실서버 응답이 실제로 07:02 → 07:05 오름차순으로 왔다. 고지만으로는 부족하다 —
-      // 감리 시연 중 "방금 만든 잡"을 눈으로 찾아야 하는 상황이 나온다.
-      // submitted_at(ISO8601·UTC)은 문자열 비교로 시간순이 성립하므로 여기서 내림차순 정렬한다.
-      // 값이 없는 행은 뒤로 보낸다(빈 문자열이 항상 작다).
+      // 서버 ordering 은 best_effort(Redis SCAN 순서)라 최근순이 아니다 — 실측 2026-08-08 응답이
+      // 오름차순으로 와 방금 만든 잡이 목록 중간에 박혔다. submitted_at(ISO8601·UTC)은 문자열
+      // 비교로 시간순이 성립하므로 여기서 내림차순 정렬한다(값 없는 행은 뒤로).
       jobs = jobs.slice().sort(function (a, b) {
         return String(b.submitted_at || '').localeCompare(String(a.submitted_at || ''));
       });

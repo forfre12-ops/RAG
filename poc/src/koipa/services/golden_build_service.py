@@ -597,23 +597,12 @@ class GoldenBuildService:
         )
 
     # 신원 관련 인자가 이 호출에서 사라진 경위 — 지우면 같은 실수가 되돌아온다.
-    #
-    # [C1 2026-08-17] 기본 검수자 주입을 끊었다. 설정값(signoff_default_reviewer)은 지우지
-    #   않는다 — golden_tiers.is_human_reviewer 가 그 값과 같은 이름을 거부하는 데 쓰기
-    #   때문이다(DEF-2026-53). 설정을 비우면 `if default_rid and ...` 의 앞 조건이 거짓이
-    #   되어 거부 자체가 사라진다.
-    #
-    #   실측(223, 2026-08-17): SIGNOFF_DEFAULT_REVIEWER=hong.gildong 이 켜져 있고
-    #   locked_gold_eval 20건이 전원 그 이름 · 19건이 같은 마이크로초(…T14:42:14.904855)
-    #   서명이었다. 화면이 채워 준 이름을 그대로 제출한 결과다 — 개별 검수 행위가 아니다.
-    #
-    # [C2 2026-08-17] 이어서 입력칸 자체를 없앴다. 이름을 손으로 적을 수 있는 한 원장에
-    #   남는 서명자는 자칭이다 — auth_mode=both 에서 공유 API Key 가 먼저 통과하면
-    #   resolve_actor_user_id 가 클라이언트 값을 그대로 돌려주기 때문이다(confirm.py:53).
-    #   이제 신원은 로그인 쿠키(JWT sub)에서만 온다.
-    #
-    #   공유 키 프리필(signoff_prefill_api_key)도 함께 제거했다. 켜져 있으면 공유 관리자
-    #   키가 서명 페이지 HTML 본문에 박혀 나간다 — 223 의 .env.jjw:27 에 켜져 있었다.
+    # [C1 2026-08-17] 기본 검수자 주입을 끊었다. 설정값(signoff_default_reviewer)은 남긴다 —
+    #   golden_tiers.is_human_reviewer 가 그 이름을 거부하는 데 쓴다(DEF-2026-53). 비우면 거부가 사라진다.
+    #   실측(223): 그 이름으로 locked_gold_eval 20건 전원 서명 · 19건이 같은 마이크로초였다.
+    # [C2 2026-08-17] 이름 입력칸 자체를 없앴다. 손으로 적을 수 있으면 서명자는 자칭이다
+    #   (auth_mode=both 에서 공유 API Key 가 먼저 통과하면 클라이언트 값이 그대로 actor 가 된다,
+    #   confirm.py:53). 신원은 로그인 쿠키(JWT sub)에서만 온다. 공유 키 프리필도 함께 제거했다.
 
     def apply_signoff(
         self,

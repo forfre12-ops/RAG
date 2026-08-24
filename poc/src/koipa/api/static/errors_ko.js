@@ -1,9 +1,6 @@
-// 한국어 에러 매핑 — 콘솔이 422/4xx/5xx 영문 detail 을 한국어로 표시.
-// Phase 후속 B3-3 (2026-05-30): 25 → 50 항목 확장.
-//
-// [2026-08-24] ES 모듈에서 **클래식 스크립트**로 바꿨다. 시연 화면(모듈)만 쓰고 관리자
-// 콘솔(인라인 script)은 영문·상태코드를 그대로 뿌리고 있었는데, 모듈은 인라인 script 에서
-// import 할 수 없다. upload_progress.js 와 같은 방식으로 window 에 얹어 두 화면이 같이 쓴다.
+// 한국어 에러 매핑 — 콘솔이 422/4xx/5xx 영문 detail 을 한국어로 표시(50항목).
+// 클래식 스크립트다(ES 모듈 아님) — 관리자 콘솔의 인라인 script 는 import 를 못 쓴다.
+// upload_progress.js 와 같이 window 에 얹어 시연·관리자 두 화면이 같이 쓴다.
 (function () {
 const ERROR_KO = {
   // ---- 422 Pydantic validation ----

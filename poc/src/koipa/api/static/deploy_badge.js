@@ -16,14 +16,9 @@
   var SELF = document.currentScript;
   var SCREEN = (SELF && SELF.getAttribute('data-screen')) || '';
 
-  // deploy_profile → 배포 주체. 프로파일은 "역량 tier"라 소속을 직접 담지 않지만,
-  // 본 사업 토폴로지에서 1:1로 대응한다.
-  //
-  // [2026-08-24] role 칸을 없앴다(사용자 지시). 「모델 공장」은 우리가 만든 비유이고
-  // 제출본·사용매뉴얼 어디에도 없다. 「폐쇄망 운영」·「dryrun」도 사용자 업무 역할이 아니라
-  // 배포 구성 설명이다. 배지는 **소속 하나**만 말하고, 화면 이름은 상단 메뉴가 말한다
-  // (console_nav.header_html — 메뉴에 있는 화면은 이름을 따로 적지 않는다).
-  // 프로파일명(full-train 등)은 title 속성으로만 남긴다 — 기술 담당자가 확인할 자리다.
+  // deploy_profile → 배포 주체. 프로파일은 역량 tier 지만 본 사업 토폴로지에서 1:1 대응한다.
+  // 배지는 소속 하나만 말한다 — 화면 이름은 상단 메뉴(console_nav.header_html)가 말하고,
+  // 프로파일명(full-train 등)은 title 속성으로만 남긴다.
   var PROFILES = {
     'full-train':   { site: '지재원',       cls: 'jjw' },
     'onprem-local': { site: '고객사',       cls: 'cust' },

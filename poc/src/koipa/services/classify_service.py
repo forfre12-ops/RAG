@@ -623,15 +623,10 @@ class ClassifyService:
         if model is None:
             return "rule-only (모델 미로드 — 룰 엔진 단독 판정)"
         if "fnr-safe override" in w:
-            # [2026-08-24] 종전 문구는 `rule`(룰의 **최종** 등급)을 찍어서 앞뒤가 안 맞았다.
-            #   실측 2026-08-24: 룰 S2 · 모델 S2 · 최종 S1 인 화면에
-            #   "룰이 S2 강하게 잡아 모델 S2을 안전 상향 → S1" 이 떴다(사용자 지적).
-            #   S2 가 강해서 S1 이 될 수는 없다.
-            # 이 상향을 실제로 발동시키는 것은 룰의 최종 등급이 아니라 **등급별 점수**다
-            # (pipeline.py: grade_scores 의 TS/S1/S2 를 각각 임계와 비교). 위 사례의
-            # grade_scores 는 {TS 0.00, S1 2.35, S2 8.65} 였고, argmax 는 S2 지만
-            # S1 2.35 가 임계 2.2 를 넘어 S1 로 올라갔다.
-            # 그래서 경고에 실린 **발동 등급·점수·임계**를 그대로 읽어 적는다.
+            # [2026-08-24] 이 상향을 발동시키는 것은 룰의 최종 등급이 아니라 등급별 점수다
+            # (pipeline.py 의 grade_scores 를 등급마다 임계와 비교). 종전 문구는 최종 등급을 찍어
+            # "룰이 S2 를 강하게 잡아 → S1" 처럼 앞뒤가 안 맞았다(실측: grade_scores S1 2.35 가
+            # 임계 2.2 를 넘어 S1). 그래서 경고에 실린 발동 등급·점수·임계를 그대로 읽어 적는다.
             m = re.search(
                 r"fnr-safe override: rule (\w+) score=([\d.]+) >= threshold ([\d.]+)", w
             )

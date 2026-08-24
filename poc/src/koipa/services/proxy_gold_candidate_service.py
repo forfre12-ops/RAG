@@ -552,19 +552,11 @@ class ProxyGoldCandidateService:
         source_reference = source_reference.strip()
         authorization_basis = authorization_basis.strip()
         is_actual_intake = document_origin in {"public_real", "organization_real"}
-        # [2026-08-23] 출처·권한 근거를 **업로드에서 강제하지 않는다.** 게이트를 등급 확정
-        # 자리로 옮겼다(decide()).
-        #
-        # 왜. 강제가 현관에만 있고 정작 목적지에는 없었다. 화면은 "출처와 권한을 남기지
-        # 않으면 나중에 평가셋으로 쓸 수 없습니다" 라고 적어 놨는데 promote_to_locked 는
-        # provenance 를 보지 않았다(golden_signoff.py 에 해당 문자열 0건). 그래서 실제로
-        # 일어난 일은 "평가셋 보호" 가 아니라 **등록이 안 되는 것**이었다 — 실측
-        # 2026-08-17(223): 실문서 74건 중 62건이 권한 근거 없이 미완으로 남았다.
-        #
-        # 후보 등록 자체는 해가 없다. 후보는 평가 정답지가 아니고(claim_scope 참조),
-        # locked 승격은 사람 서명이라는 별도 절차다. 막아야 할 자리는 **등급 확정과 승격**
-        # 이며 거기에는 게이트를 새로 넣었다(decide() 의 missing_provenance ·
-        # promote_to_locked 의 missing_provenance).
+        # [2026-08-23] 출처·권한 근거는 업로드에서 강제하지 않는다 — 게이트를 등급 확정·승격
+        # 자리로 옮겼다(decide() · promote_to_locked 의 missing_provenance).
+        # 강제가 현관에만 있고 목적지에는 없어서, 실제로 일어난 일은 평가셋 보호가 아니라 등록
+        # 실패였다 — 223 실측 2026-08-17: 실문서 74건 중 62건이 권한 근거 없이 미완으로 남았다.
+        # 후보 등록 자체는 해가 없다(후보는 평가 정답지가 아니고, locked 승격은 사람 서명이다).
         safe_name = Path(filename or "uploaded_document").name
         suffix = Path(safe_name).suffix.lower()
         if not suffix:
