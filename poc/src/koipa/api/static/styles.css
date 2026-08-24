@@ -11,7 +11,7 @@
   --bg-nav:       rgba(255,255,255,0.72);
   --text:         #0a0a0a;
   --text-soft:    #525252;
-  --text-dim:     #737373;
+  --text-dim:     #71717a;
   --text-faint:   #a3a3a3;
   --border:       rgba(0,0,0,0.08);
   --border-strong:rgba(0,0,0,0.16);
@@ -119,7 +119,7 @@ body {
   letter-spacing: 0.08em; text-transform: uppercase;
   font-family: var(--font-mono);
 }
-.meta-dot { color: var(--text-faint); }
+.meta-dot { color:var(--text-dim); }
 .meta-soft { color: var(--text-dim); }
 .meta-category { color: var(--text); font-weight: 600; }
 
@@ -456,7 +456,7 @@ section h3 {
 }
 .kw-toggle.off {
   text-decoration: line-through;
-  color: var(--text-faint);
+  color:var(--text-dim);
   background: var(--accent-soft);
 }
 .toggle-hint {
@@ -738,7 +738,7 @@ code {
   text-align: center;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: #888;
+  color:var(--text-dim);
   border-top: 1px solid #ddd;
   padding-top: 16px;
 }
@@ -789,7 +789,7 @@ code {
 
 .live-log { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.65; background: #0b1020; color: #cbd5e1; border-radius: 0; padding: 10px 12px; max-height: 220px; overflow: auto; border: 1px solid #1e293b; }
 .live-log .ll { white-space: pre-wrap; word-break: break-all; }
-.live-log .ll-time { color: #64748b; }
+.live-log .ll-time { color: #7c8a9e; }
 .live-log .ll-ok { color: #4ade80; }
 .live-log .ll-err { color: #f87171; }
 
@@ -797,14 +797,14 @@ code {
 .logdock { position: fixed; bottom: 0; left: 0; right: 0; z-index: 90; background: #0b1020; color: #cbd5e1; border-top: 1px solid #1e293b; box-shadow: 0 -2px 14px rgba(0,0,0,.22); }
 .logdock-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 20px; border-bottom: 1px solid #1e293b; cursor: pointer; }
 .logdock-head b { color: #e2e8f0; font-weight: 600; font-family: var(--font-sans); font-size: 12.5px; }
-.logdock-hint { color: #64748b; font-size: 10.5px; font-weight: 400; }
+.logdock-hint { color: #7c8a9e; font-size: 10.5px; font-weight: 400; }
 .logdock-head #logdock-toggle { color: #94a3b8; font-size: 11px; flex-shrink: 0; font-family: var(--font-mono); }
 .logdock .live-log { border: none; margin: 0; max-height: 170px; background: transparent; box-shadow: none; padding: 8px 20px; }
 .logdock.collapsed .live-log { display: none; }
 body { padding-bottom: 232px; }
 @media (max-width: 700px) { .logdock-hint { display: none; } }
 .live-log .ll-ev { color: #38bdf8; }
-.live-log .ll-empty { color: #64748b; }
+.live-log .ll-empty { color: #7c8a9e; }
 
 /* ============================================================
    직선형 + 모노 전환 — 등급색 4종(--c-ts/s1/s2/s3, .g-TS/S1/S2/S3)만
@@ -857,12 +857,12 @@ body { padding-bottom: 232px; }
 .live-log, .logdock, .logdock .live-log { background: #141416 !important; }
 .live-log { color: #d4d4d8 !important; border-color: #2a2a2e !important; }
 .logdock, .logdock-head { border-color: #2a2a2e !important; }
-.live-log .ll-time, .live-log .ll-empty, .logdock-hint, .logdock-head #logdock-toggle { color: #8a8a92 !important; }
+.live-log .ll-time, .live-log .ll-empty, .logdock-hint, .logdock-head #logdock-toggle { color:var(--text-dim) !important; }
 .logdock-head b { color: #e4e4e7 !important; }
 .dual-grade.g-na { background: #a1a1aa !important; }
 
 /* 콘솔 화면 간 이동 — koipa/console_nav.py 의 NAV_CSS 와 같은 규칙 */
-.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#71717a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
 
 
 /* ===== 파싱·분류 시연에서 옮겨온 마크업 전용 규칙 =====
@@ -895,7 +895,7 @@ body { padding-bottom: 232px; }
 .sec-parse .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid var(--border-mid);}
 .sec-parse .brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:3px;}
 .sec-parse .brand-name{font-weight:700;font-size:14px;letter-spacing:-.02em;}
-.sec-parse .brand-sep{color:var(--text-faint);margin:0 3px;}
+.sec-parse .brand-sep{color:var(--text-dim);margin:0 3px;}
 .sec-parse .brand-sub{font-size:12.5px;color:var(--text-dim);}
 .sec-parse .nav-right{display:flex;align-items:center;gap:10px;}
 .sec-parse .nav-link{font-size:12.5px;color:var(--text-dim);text-decoration:none;padding:4px 8px;border-radius:6px;}
@@ -997,14 +997,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .sec-parse .warn{font-size:12px;color:var(--amber);font-family:var(--font-mono);margin-top:4px;}
 .sec-parse .preview{font-family:var(--font-mono);font-size:12px;color:var(--text-soft);background:var(--bg-surface);border:1px solid var(--border-mid);border-radius:8px;padding:12px;max-height:180px;overflow:auto;white-space:pre-wrap;}
 .sec-parse .log{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);background:var(--bg-inverse);color:#d4d4d8;border-radius:8px;padding:12px;max-height:150px;overflow:auto;white-space:pre-wrap;}
-.sec-parse .hint{font-size:12px;color:var(--text-faint);margin-top:6px;}
+.sec-parse .hint{font-size:12px;color:var(--text-dim);margin-top:6px;}
 .sec-parse .hidden{display:none;}
 .sec-parse /* 요청 로그 — 하단 고정 콘솔 (스크롤과 무관하게 항상 보임) */
 .logdock{position:fixed;left:0;right:0;bottom:0;z-index:120;background:var(--bg-inverse);border-top:1px solid #2a2a2e;box-shadow:0 -2px 14px rgba(0,0,0,.22);}
 .sec-parse .logdock-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 22px;border-bottom:1px solid #2a2a2e;cursor:pointer;}
 .sec-parse .logdock-head b{color:#e4e4e7;font-weight:600;font-size:12.5px;font-family:var(--font-sans);}
-.sec-parse .logdock-hint{color:#8a8a92;font-size:10.5px;font-weight:400;}
-.sec-parse .logdock #logdock-toggle{color:#a1a1aa;font-size:11px;font-family:var(--font-mono);flex-shrink:0;}
+.sec-parse .logdock-hint{color:var(--text-dim);font-size:10.5px;font-weight:400;}
+.sec-parse .logdock #logdock-toggle{color:var(--text-dim);font-size:11px;font-family:var(--font-mono);flex-shrink:0;}
 .sec-parse .logdock .log{margin:0;border:none;max-height:150px;background:transparent;padding:8px 22px;}
 .sec-parse .logdock.collapsed .log{display:none;}
 }
@@ -1018,7 +1018,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .sec-parse{
   --red:#0a0a0a;   --red-soft:#f4f4f4;   --red-border:rgba(0,0,0,.16);
   --green:#525252; --green-soft:#f4f4f4; --green-border:rgba(0,0,0,.16);
-  --amber:#737373; --amber-soft:#f4f4f4; --amber-border:rgba(0,0,0,.16);
+  --amber:#71717a; --amber-soft:#f4f4f4; --amber-border:rgba(0,0,0,.16);
   --blue:#0a0a0a;  --blue-soft:#f4f4f4;  --blue-border:rgba(0,0,0,.16);
 }
 .sec-parse .g-TS{color:#dc2626 !important;border-color:#dc2626 !important;background:#fef2f2 !important;}
@@ -1042,11 +1042,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .sec-parse .tl-step.review{ background:#fff7ed !important; border-color:#fdba74 !important; }
 .sec-parse .tl-step.review .tl-dot{ background:#ea580c !important; }
 .sec-parse .cnav{display:flex;gap:2px;align-items:center}
-.sec-parse .cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}
+.sec-parse .cnav-link{font-size:12.5px;color:#71717a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}
 .sec-parse .cnav-link:hover{color:#111;border-color:#dededb}
 }
 
 /* console-header:css:start — koipa/console_nav.py HEADER_CSS. 손으로 고치지 말 것 */
-.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
-.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
+.top{height:84px;border-bottom:1px solid #e1e1de;display:flex;align-items:center;padding:0 34px;gap:18px;background:#fff;position:sticky;top:0;z-index:50}.top .mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center;color:#1b4ea8}.top .mark img{width:100%;height:100%;object-fit:contain}.top .brand-mark{width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:7px;padding:4px;border:1px solid rgba(0,0,0,.08)}.top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;display:inline;text-decoration:none;white-space:nowrap}.top .divider{height:23px;border-left:1px solid #cfcfcb}.top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#71717a;white-space:nowrap}.top .spacer{flex:1}.top .topmid{margin:0}@media(max-width:900px){.top{padding:0 16px;gap:10px}.top .brand,.top .divider{display:none}}@media(max-width:640px){.top .product{display:none}}@media print{.top{display:none}}
+.cnav{display:flex;gap:2px;align-items:center}.cnav-link{font-size:12.5px;color:#71717a;text-decoration:none;padding:4px 9px;border:1px solid transparent;border-radius:2px;white-space:nowrap}.cnav-link:hover{color:#111;border-color:#dededb}.cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}
 /* console-header:css:end */

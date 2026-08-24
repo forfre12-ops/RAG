@@ -113,7 +113,7 @@ def nav_links_html(current: str = "", *, css_class: str = "cnav-link") -> str:
 
 NAV_CSS = (
     ".cnav{display:flex;gap:2px;align-items:center}"
-    ".cnav-link{font-size:12.5px;color:#70757a;text-decoration:none;padding:4px 9px;"
+    ".cnav-link{font-size:12.5px;color:#71717a;text-decoration:none;padding:4px 9px;"
     "border:1px solid transparent;border-radius:2px;white-space:nowrap}"
     ".cnav-link:hover{color:#111;border-color:#dededb}"
     ".cnav-link.is-current{color:#111;font-weight:700;border-color:#dededb;background:#fafafa}"
@@ -188,7 +188,7 @@ HEADER_CSS = (
     ".top .brand{font-size:17px;font-weight:900;letter-spacing:1px;color:#111;"
     "display:inline;text-decoration:none;white-space:nowrap}"
     ".top .divider{height:23px;border-left:1px solid #cfcfcb}"
-    ".top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#9da0a1;"
+    ".top .product{font-size:14px;font-weight:800;letter-spacing:.8px;color:#71717a;"
     "white-space:nowrap}"
     ".top .spacer{flex:1}"
     # 후보 관리 화면의 건수 표시는 SHELL_CSS 에서 `margin:auto` 다. flex 에서 auto

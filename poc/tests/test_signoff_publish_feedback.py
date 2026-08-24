@@ -32,7 +32,8 @@ def _submit_handler(html: str) -> str:
 def test_preview_result_tells_the_reviewer_the_next_step():
     html = _html()
     assert "미리보기" in html
-    assert "[라이브 반영]" in html and "다시 제출" in html
+    # [2026-08-24] 화면의 버튼 표기를 「」 하나로 모았다(종전 [] · "" 혼용).
+    assert "「라이브 반영」" in html and "다시 제출" in html
 
 
 def test_preview_result_says_the_decisions_are_still_there():

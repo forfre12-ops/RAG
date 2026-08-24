@@ -31,7 +31,7 @@ from koipa.console_shell import SHELL_CSS, SHELL_MEDIA_CSS
 # 맞춘다(radius 0·동일 폰트스택·동일 등급색). 외부 CSS 링크를 쓰지 않는 이유: 이 HTML 은
 # 감리 증적으로 단독 저장·전달될 수 있어 self-contained 여야 한다(정적 마운트 의존 금지).
 _TOKENS = """
-:root{--bg:#ffffff;--bg-surface:#f7f7f5;--text:#111111;--text-soft:#555555;--text-dim:#8f9498;--border:#e1e1de;--border-strong:#cfcfcb;--accent:#111111;--accent-soft:#f7f7f5;--radius:0;--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;--ink:#111111;--red:#e72d44;--paper:#fff;--soft:#f7f7f5;--line:#e1e1de;--mute:#8f9498}
+:root{--bg:#ffffff;--bg-surface:#f7f7f5;--text:#111111;--text-soft:#555555;--text-dim:#6a7076;--border:#e1e1de;--border-strong:#cfcfcb;--accent:#111111;--accent-soft:#f7f7f5;--radius:0;--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--c-ts:#dc2626;--c-s1:#d97706;--c-s2:#0070f3;--c-s3:#16a34a;--ink:#111111;--red:#e72d44;--paper:#fff;--soft:#f7f7f5;--line:#e1e1de;--mute:#6a7076}
 """
 
 _DEFAULT_CSS = """<style>""" + _TOKENS + """
@@ -280,19 +280,19 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
    골격 규칙(frame/side/main/hero/section/list/btn)은 console_shell.SHELL_CSS 에 있다.
    여기 있는 것은 이 화면에만 필요한 나머지다. */
 .side .workname{font-size:18px;font-weight:900;margin:14px 0 6px}
-.side .workdesc{font-size:12.5px;color:#82898f;line-height:1.5}
-.side .branch{margin-top:12px;font:700 11.5px ui-monospace,monospace;color:#92999f}
+.side .workdesc{font-size:12.5px;color:var(--text-dim);line-height:1.5}
+.side .branch{margin-top:12px;font:700 11.5px ui-monospace,monospace;color:var(--text-dim)}
 .sidenav{margin-top:34px;display:flex;flex-direction:column;gap:2px}
-.sidenav a{display:flex;gap:12px;align-items:center;padding:9px 10px;font-size:13.5px;color:#6d757b;text-decoration:none;border-left:2px solid transparent}
-.sidenav a span{font:700 11px ui-monospace,monospace;color:#a9b0b5}
+.sidenav a{display:flex;gap:12px;align-items:center;padding:9px 10px;font-size:13.5px;color:var(--text-dim);text-decoration:none;border-left:2px solid transparent}
+.sidenav a span{font:700 11px ui-monospace,monospace;color:var(--text-dim)}
 .sidenav a.active{color:#111;font-weight:800;border-left-color:var(--red);background:#fafaf8}
-.side .ledger{margin-top:auto;padding-top:26px;border-top:1px solid var(--line);font-size:12px;color:#828a90}
+.side .ledger{margin-top:auto;padding-top:26px;border-top:1px solid var(--line);font-size:12px;color:var(--text-dim)}
 .side .ledger b{display:block;margin:8px 0 4px;font-size:14px;color:#111}
 .hero h1{font-size:34px;line-height:1.24;margin:14px 0 16px;font-weight:900}
 .hero h1 em{font-style:normal;color:var(--red)}
 .hero p{color:#5f676d;font-size:14px;line-height:1.7;margin:0;max-width:640px}
 .gate strong{display:block;font-size:20px;font-weight:900;margin:8px 0 10px}
-.gate p{font-size:12.5px;color:#6f777d;line-height:1.6;margin:0 0 12px}
+.gate p{font-size:12.5px;color:var(--text-dim);line-height:1.6;margin:0 0 12px}
 .gate .gchk{display:flex;gap:8px;align-items:center;font-size:12.5px;color:#444}
 .gate .actions{margin-top:14px}
 .gate .actions .btn{width:100%}
@@ -301,11 +301,11 @@ _SIGNOFF_CSS = """<style>""" + _TOKENS + SHELL_CSS + DOC_CSS + """
 .viewbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
 .viewbar .btn.sm{padding:4px 9px;font-size:11.5px}
 .viewbar .vbtn.active{background:#111;color:#fff;border-color:#111}
-.viewnote{font-size:11.5px;color:#8a9299}
+.viewnote{font-size:11.5px;color:var(--text-dim)}
 .scard .docbody{max-height:320px}
 
 .sechead{display:inline-block;margin:0;font-size:21px}
-.secdesc{margin:8px 0 0;color:#727c84;font-size:13px}
+.secdesc{margin:8px 0 0;color:var(--text-dim);font-size:13px}
 .main .rubric{margin-top:22px}
 .main .filters{margin-top:18px}
 
@@ -699,7 +699,7 @@ document.getElementById('submit').addEventListener('click',async function(){
                  : (publish ? '· ⚠ 라이브 반영 요청됨—미반영 '+esc(j.publish_note||'(locked_eval 경로 미설정 또는 승격 0)')
                             // 결정은 화면에 남아 있다(DEC 를 비우지 않고 다시 그리지도 않는다).
                             // 그 사실을 말해 주지 않으면 처음부터 다시 하려고 한다.
-                            : '· <b>미리보기</b>(라이브 무변경) — 반영하려면 위 <b>[라이브 반영]</b>을 '
+                            : '· <b>미리보기</b>(라이브 무변경) — 반영하려면 위 <b>「라이브 반영」</b>을 '
                               + '체크하고 <b>다시 제출</b>하세요. <b>결정은 그대로 남아 있습니다.</b>');
       var rr = (j.rejected_reasons && Object.keys(j.rejected_reasons).length)
                  ? '<br>거부 사유: '+esc(JSON.stringify(j.rejected_reasons)) : '';

@@ -42,7 +42,7 @@
     '.site-badge.cust  .site-name{background:#0070f3;}',
     '.site-badge.pilot .site-name{background:#d97706;}',
     '.site-badge.dev   .site-name{background:#737373;}',
-    '.site-badge.unknown .site-name{background:#fff;color:#737373;border-color:rgba(0,0,0,.16);}',
+    '.site-badge.unknown .site-name{background:#fff;color:#71717a;border-color:rgba(0,0,0,.16);}',
     '@media (max-width:720px){.site-badge .site-role{display:none;}}'
   ].join('\n');
 

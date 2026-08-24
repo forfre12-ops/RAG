@@ -27,15 +27,15 @@
       + '<span id="ap-spin" style="display:inline-block;width:15px;height:15px;border:2px solid #d9d9d6;'
       + 'border-top-color:#111;border-radius:50%;animation:ap-rot .8s linear infinite"></span>'
       + '<b id="ap-title" style="font-size:15px">문서를 분석하고 있습니다</b></div>'
-      + '<div id="ap-file" style="margin-top:10px;font-size:12.5px;color:#70757a;word-break:break-all"></div>'
+      + '<div id="ap-file" style="margin-top:10px;font-size:12.5px;color:#71717a;word-break:break-all"></div>'
       + '<div style="display:flex;gap:22px;margin-top:16px">'
-      + '<div><div style="font-size:11px;color:#8f9498">경과</div>'
+      + '<div><div style="font-size:11px;color:#71717a">경과</div>'
       + '<b id="ap-el" style="font:700 22px/1.2 Arial,sans-serif">0초</b></div>'
-      + '<div><div style="font-size:11px;color:#8f9498">예상(어림)</div>'
-      + '<b id="ap-est" style="font:700 22px/1.2 Arial,sans-serif;color:#70757a">–</b></div></div>'
+      + '<div><div style="font-size:11px;color:#71717a">예상(어림)</div>'
+      + '<b id="ap-est" style="font:700 22px/1.2 Arial,sans-serif;color:#71717a">–</b></div></div>'
       + '<div style="height:4px;background:#eceae7;margin-top:14px;overflow:hidden">'
       + '<div id="ap-bar" style="height:100%;width:0;background:#111;transition:width .4s linear"></div></div>'
-      + '<div id="ap-note" style="margin-top:12px;font-size:12px;color:#70757a;line-height:1.6"></div></div>';
+      + '<div id="ap-note" style="margin-top:12px;font-size:12px;color:#71717a;line-height:1.6"></div></div>';
     var st = document.createElement('style');
     st.textContent = '@keyframes ap-rot{to{transform:rotate(360deg)}}';
     document.body.appendChild(st);

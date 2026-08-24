@@ -39,7 +39,7 @@
     '      <button class="btn sec sm" onclick="loadGoldenJobList()">목록 새로고침</button>',
     '    </div>',
     '    <div id="gold-jobs-body" style="margin-top:10px;">',
-    '      <span style="color:var(--text-faint);font-size:12px;">[목록 새로고침]을 눌러 조회하세요.</span>',
+    '      <span style="color:var(--text-dim);font-size:12px;">「목록 새로고침」을 누르면 검수 작업이 나옵니다</span>',
     '    </div>',
     '  </div>',
     '</section>'
@@ -85,7 +85,7 @@
   window.loadGoldenJobList = async function loadGoldenJobList() {
     var box = document.getElementById('gold-jobs-body');
     if (!box) return;
-    box.innerHTML = '<span style="color:var(--text-faint);font-size:12px;">조회 중…</span>';
+    box.innerHTML = '<span style="color:var(--text-dim);font-size:12px;">불러오는 중…</span>';
     try {
       var d = await api('GET', '/golden/jobs?limit=20');
       var jobs = (d && d.jobs) || [];
@@ -99,8 +99,8 @@
         return String(b.submitted_at || '').localeCompare(String(a.submitted_at || ''));
       });
       if (!jobs.length) {
-        box.innerHTML = '<span style="color:var(--text-faint);font-size:12px;">'
-          + '검수 묶음이 없습니다 — 위에서 후보를 생성하거나 문서 묶음을 등록하세요.</span>';
+        box.innerHTML = '<span style="color:var(--text-dim);font-size:12px;">'
+          + '검수 묶음이 없습니다 — 「검수 시작」으로 문서 묶음을 등록하세요</span>';
         return;
       }
       var rows = jobs.map(function (j) {
@@ -117,7 +117,7 @@
         var srcShort = src ? src.split('/').slice(-2).join('/') : '—';
         var srcCell = src
           ? '<span title="' + esc(src) + '">' + esc(srcShort) + '</span>'
-          : '<span style="color:var(--text-faint)">—</span>';
+          : '<span style="color:var(--text-dim)">—</span>';
         /* [2026-08-23] 행에서 **검수 화면을 바로 연다.**
            종전에는 「선택」 → 화면을 스크롤해 다른 카드의 버튼 → 새 탭, 이렇게 2단계였다.
            그래서 상단 메뉴 「검수 목록」을 눌러도 검수를 시작할 수 없었고, 실제 검수 화면은
