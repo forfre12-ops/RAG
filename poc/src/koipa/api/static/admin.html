@@ -1408,7 +1408,11 @@ function applySynthAvailability(active){
         + '<code>label_source=noop_fallback</code> 를 찍습니다. 검수에서 승인해도 '
         + '<code>build_training_rows</code> 가 이 표시를 보고 배제하므로 <b>학습행은 0건</b>입니다.<br/>'
         + '· 눌러도 됩니다 — 생성→검수 큐 경로가 도는지 확인하는 용도로는 그대로 유효합니다.<br/>'
-        + '· 학습에 쓸 문서를 만들려면 LLM 이 연결된 서버(지재원 GPU)에서 하거나, 서버 설정(.env)의 <code>LLM_PROVIDER</code> 를 바꿔야 합니다.'
+        // [2026-08-24] 「지재원 GPU」를 뺐다. 원인을 GPU 로 지목했는데 사실이 아니다 —
+        // 이 서버(223)에는 NVIDIA L4 23GB 가 있고 실측 사용량 0 MiB 다. 막힌 것은 GPU 가
+        // 아니라 **등급 판정 LLM 을 붙이지 않은 구성**이고 그것은 의도한 것이다.
+        // 발주처가 준 GPU 서버 화면에서 "GPU 있는 데서 하십시오"라고 읽히면 안 된다.
+        + '· 학습에 쓸 문서를 만들려면 등급 판정 LLM 이 연결된 환경에서 실행해야 합니다(서버 설정 <code>LLM_PROVIDER</code>).'
       : '';
   }
 }
