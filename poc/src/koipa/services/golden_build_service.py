@@ -116,6 +116,17 @@ def _safe_path(raw: str | None) -> Path:
     return resolved
 
 
+def _ledger_paths(gold_path: "str | Path", job_id: uuid.UUID) -> "tuple[Path, Path]":
+    """잡 단위 검수 원장(승격·거부) 경로 — 후보 파일과 같은 폴더에 job_id 로 갈라 둔다.
+
+    **이 원장이 잡 단위라는 것이 중복 등록을 단순한 목록 지저분함이 아니게 만든다.** 같은
+    후보 파일을 두 잡으로 등록하면 원장도 둘로 갈라져, 한쪽에서 서명한 건이 다른 쪽에서는
+    '아직 안 본 것'으로 다시 나온다(find_registered_job 이 그래서 있다).
+    """
+    base = Path(gold_path).parent
+    return base / f"locked_{job_id}.jsonl", base / f"rejected_{job_id}.jsonl"
+
+
 class GoldenBuildService:
     def __init__(self):
         self.jobs = get_default_store()
@@ -156,6 +167,41 @@ class GoldenBuildService:
 
         return GoldenBuildResponse(golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}")
 
+    def find_registered_job(self, build_path: str) -> "Optional[uuid.UUID]":
+        """같은 후보 파일로 **이미 등록된** 검수 잡을 찾는다. 없으면 None.
+
+        왜(2026-08-25 사용자 지적). 등록에 중복 검사가 없어 같은 파일을 다시 올릴 때마다 새
+        job_id 가 생겼다 — 실측 223: 목록 8행이 실제로는 파일 3개였다(demo_slate 4행·regate
+        2행·ff5a822c 2행). 목록이 지저분한 것으로 끝나지 않는다. 검수 진행분은 잡 단위
+        원장(_ledger_paths)에 쌓이므로 **쌍둥이 행을 열면 이미 서명한 건이 '남은 건수'로 다시
+        나온다** — 같은 문서를 두 번 검수하게 된다.
+
+        이미 여러 개가 있으면 **진행분(승격·거부 원장)이 있는 잡을 먼저** 고른다. 최근 등록순이
+        아니다 — 223 실측에서 목록 맨 위(최신) 행이 정작 진행분 0인 빈 잡이었고, 작업분은 아래
+        행에 있었다. 진행분이 어디에도 없으면 그때 최근 등록순.
+        """
+        try:
+            p = _safe_path(build_path)
+        except ValueError:
+            return None
+        target = str(p)
+        best: tuple[int, str, uuid.UUID] | None = None
+        for j in self.jobs.list_recent(limit=200):
+            if j.get("kind") != "golden_register" or j.get("status") != "done":
+                continue
+            if str(j.get("gold_path") or "") != target:
+                continue
+            try:
+                jid = uuid.UUID(str(j.get("job_id") or ""))
+            except ValueError:
+                continue
+            locked, rejected = _ledger_paths(target, jid)
+            progressed = int(bool(_read_jsonl(locked) or _read_jsonl(rejected)))
+            key = (progressed, str(j.get("submitted_at") or ""), jid)
+            if best is None or key[:2] > best[:2]:
+                best = key
+        return best[2] if best else None
+
     def register_build(
         self, build_path: str, *, actor_user_id: str
     ) -> "Optional[uuid.UUID]":
@@ -165,6 +211,9 @@ class GoldenBuildService:
         바뀐다. 이 경로는 파일을 그대로 잡의 gold_path 로 올려 signoff.html/POST signoff 가 그
         후보를 검수 화면에 연결하게 한다. 경로는 datasets/ 하위로 샌드박스(_safe_path). 파일
         없음/샌드박스 밖이면 None(호출부 404). LLM·게이트 미실행 — 순수 등록.
+
+        **같은 파일이 이미 등록돼 있으면 새로 만들지 않고 그 잡을 돌려준다**(find_registered_job).
+        검수 진행분이 잡 단위 원장에 쌓이기 때문이다 — 새 job_id 를 발급하면 진행분과 갈라진다.
         """
         try:
             p = _safe_path(build_path)
@@ -176,6 +225,22 @@ class GoldenBuildService:
 
         rows = _read_jsonl(p)
         by_grade = Counter(r.get("label") for r in rows if r.get("label"))
+        stats = {"gold_by_grade": dict(by_grade), "source": "register"}
+
+        existing = self.find_registered_job(build_path)
+        if existing is not None:
+            # 건수·등급분포는 지금 파일 내용으로 갱신한다 — 등록 사이에 파일이 바뀌었을 수
+            # 있고, 서명 시점에 읽는 것도 파일 쪽이라 목록 숫자만 옛 값으로 남으면 어긋난다.
+            self.jobs.update(
+                existing, status="done", gold_path=str(p),
+                gold_count=len(rows), uncertain_count=0, stats=stats,
+            )
+            logger.info(
+                "golden_register 재사용: job_id=%s path=%s (중복 등록 방지 — 검수 진행분 보존)",
+                existing, p,
+            )
+            return existing
+
         job_id = uuid.uuid4()
         self.jobs.create(
             job_id,
@@ -191,7 +256,7 @@ class GoldenBuildService:
             gold_path=str(p),
             gold_count=len(rows),
             uncertain_count=0,
-            stats={"gold_by_grade": dict(by_grade), "source": "register"},
+            stats=stats,
         )
         return job_id
 
@@ -474,14 +539,14 @@ class GoldenBuildService:
                 })
 
         # 이미 처리된 것 — 남은 건수를 정확히 내려면 '거부' 도 빼야 한다(B3 에서 남기기 시작).
-        base = Path(gold_path).parent if gold_path else None
+        locked_path, rejected_path = (
+            _ledger_paths(gold_path, job_id) if gold_path else (None, None)
+        )
         locked_ids = {
-            r.get("doc_id")
-            for r in (_read_jsonl(base / f"locked_{job_id}.jsonl") if base else [])
+            r.get("doc_id") for r in (_read_jsonl(locked_path) if locked_path else [])
         }
         rejected_ids = {
-            r.get("doc_id")
-            for r in (_read_jsonl(base / f"rejected_{job_id}.jsonl") if base else [])
+            r.get("doc_id") for r in (_read_jsonl(rejected_path) if rejected_path else [])
         }
         done_ids = locked_ids | rejected_ids
         remaining = sum(1 for c in candidates if c.get("doc_id") not in done_ids)
@@ -514,10 +579,10 @@ class GoldenBuildService:
         # 고르고 제출한 뒤에야 KOIPA_INTERNAL 500 을 봤다.
         #
         # blocking 에 넣는다 — 경고가 아니라 POST 를 확실히 실패시키는 조건이다.
-        if base is not None:
+        if locked_path is not None and rejected_path is not None:
             for path, code, what in (
-                (base / f"locked_{job_id}.jsonl", "signoff_store_unwritable", "승격 기록"),
-                (base / f"rejected_{job_id}.jsonl", "signoff_store_unwritable", "거부 기록"),
+                (locked_path, "signoff_store_unwritable", "승격 기록"),
+                (rejected_path, "signoff_store_unwritable", "거부 기록"),
             ):
                 reason = _unwritable_reason(path)
                 if reason:
@@ -682,7 +747,7 @@ class GoldenBuildService:
         # 규율) — 세션1 서명이 세션2 제출로 유실되지 않게.
         # [E2-5] dry_run 은 **쓰기만** 건너뛴다. 판정·집계는 그대로 돌려, 검수자가 실제로
         # 고른 결정이 무엇을 만들지 제출 전에 같은 응답 모양으로 볼 수 있게 한다.
-        run_locked_path = Path(gold_path).parent / f"locked_{job_id}.jsonl"
+        run_locked_path, run_rejected_path = _ledger_paths(gold_path, job_id)
         if not dry_run:
             _atomic_write_jsonl(
                 run_locked_path, merge_locked_records(_read_jsonl(run_locked_path), res.locked)
@@ -690,7 +755,6 @@ class GoldenBuildService:
 
         # [B3·E2-6] 거부분도 같은 누적 규율로 남긴다. 이게 없으면 다음 세션에서 '아직 안 본
         # 것'과 '보고 거부한 것'을 구분할 수 없어 남은 건수가 항상 과대값이 된다.
-        run_rejected_path = Path(gold_path).parent / f"rejected_{job_id}.jsonl"
         locked_ids = {r.get("doc_id") for r in res.locked}
         rejected_merged = _merge_rejected_records(
             _read_jsonl(run_rejected_path), rejected_records, locked_ids

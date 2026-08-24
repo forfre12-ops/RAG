@@ -2505,9 +2505,18 @@ async function registerGoldenBuild(){
     const d=await api('POST','/golden/jobs/register',{build_path:path, actor:actor()});
     LAST_GOLDEN_JOB_ID=d.golden_job_id;
     $('gold-result').textContent=JSON.stringify(d,null,2);
-    log(`골든 문서 묶음 등록: ${LAST_GOLDEN_JOB_ID} ← ${path}`,'ok');
+    log(`골든 문서 묶음 등록: ${LAST_GOLDEN_JOB_ID} ← ${path}${d.reused?' (기존 묶음 재사용)':''}`,'ok');
     goldenProgress(`등록됨 — job ${LAST_GOLDEN_JOB_ID}`);
     await loadGoldenJob();
+    /* [2026-08-25] 같은 파일을 다시 올리면 서버가 **기존 묶음을 그대로 돌려준다.**
+       종전에는 누를 때마다 새 묶음이 생겨 목록에 쌍둥이 행이 쌓였고, 검수 진행분은 묶음
+       단위로 갈라져 이미 서명한 건이 다른 행에서 '남은 건'으로 다시 나왔다. 이어서 하는
+       것이 정상 동작이므로 그 사실을 화면에 밝힌다.
+       loadGoldenJob 이 이 자리를 상태 문구로 덮으므로 **그 뒤에** 덧붙인다. */
+    if(d.reused){
+      const el=$('gold-progress');
+      if(el) el.textContent=`이미 올라와 있는 묶음입니다 — 새로 만들지 않고 검수하던 묶음으로 이어서 합니다. (${el.textContent})`;
+    }
   }catch(e){
     goldenProgress(`등록 실패: ${errKoText(e)}${e.status===404?' — 경로가 없거나 datasets/ 밖입니다.':''}`);
     $('gold-result').textContent=`골든 문서 묶음 등록 실패: ${errKoText(e)}`;

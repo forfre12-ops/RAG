@@ -41,6 +41,10 @@ class GoldenBuildResponse(BaseModel):
     # 검수/서명 HTML 링크. 미설정(dev/test)이면 토큰 없는 평문 경로.
     review_url: Optional[str] = None
     signoff_url: Optional[str] = None
+    # [2026-08-25] 이미 등록된 파일이라 **기존 잡을 그대로 돌려준** 경우 True(register 전용).
+    # 화면이 "새로 만들었다"와 "이어서 한다"를 구분해 말할 수 있어야 한다 — 검수 진행분이
+    # 잡 단위 원장에 쌓이므로 이어 붙이는 것이 정상이고, 그 사실을 감추면 안 된다.
+    reused: bool = False
 
 
 class GoldenRegisterRequest(BaseModel):

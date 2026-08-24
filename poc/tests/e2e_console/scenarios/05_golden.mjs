@@ -101,6 +101,37 @@ export const scenarios = [
   },
 
   {
+    id: 'golden.register.reuse-continues-existing-bundle',
+    writes: true,
+    needsMock: true,
+    title: '이미 올라와 있는 묶음을 다시 고르면 새로 만들지 않고 하던 묶음으로 이어 간다',
+    why: '중복 등록이 목록에 쌍둥이 행을 만들고, 검수 진행분이 묶음 단위로 갈라져 이미 서명한 건이 다시 남은 건으로 나왔다(2026-08-25 223 실측: 8행이 실제로는 파일 3개)',
+    async run({ server, check }) {
+      const page = await reviewTab(server);
+      server.faults.push({
+        path: '/golden/jobs/register',
+        body: {
+          golden_job_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          status_url: '/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          review_url: '/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html?t=abc123',
+          signoff_url: '/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html?t=def456',
+          reused: true,
+        },
+      });
+      page.set('gold-build-path', 'datasets/golden_review/ff5a822c/candidates.jsonl');
+      page.click('gold-reg');
+      await page.settle();
+
+      const msg = page.text('gold-progress');
+      check.includes(msg, '이미 올라와', '새로 만든 것이 아니라는 사실을 말한다');
+      check.includes(msg, '이어서', '하던 묶음으로 이어 간다고 말한다');
+      check.includes(msg, 'eeeeeeee', '어느 묶음으로 이어 가는지 id 를 보여준다');
+      check.excludes(msg, '등록됨', '새로 등록했다고 잘못 말하지 않는다');
+      return page;
+    },
+  },
+
+  {
     id: 'golden.register.nothing-selected',
     title: '아무것도 안 고르고 검수 시작을 누르면 고르라고 말한다',
     async run({ server, check }) {

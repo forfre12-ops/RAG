@@ -808,7 +808,8 @@
     "golden_job_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     "status_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
     "review_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/review.html?t=abc123",
-    "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html?t=def456"
+    "signoff_url": "/api/v1/golden/jobs/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/signoff.html?t=def456",
+    "reused": false
   },
   "GET /golden/jobs": {
     "jobs": [

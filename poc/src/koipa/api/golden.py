@@ -186,9 +186,11 @@ def golden_register_build(
     검수자가 화면 서명한다.
     """
     bind_authenticated_actor(req.actor, auth)  # [#13] 감사 신원 = 인증 principal
-    job_id = GoldenBuildService().register_build(
-        req.build_path, actor_user_id=req.actor.user_id
-    )
+    svc = GoldenBuildService()
+    # 같은 파일이 이미 올라와 있으면 register_build 가 그 잡을 돌려준다(중복 행 방지).
+    # 먼저 조회해 두는 것은 화면에 "새로 열었다/이어서 한다"를 정확히 말하기 위해서다.
+    existing = svc.find_registered_job(req.build_path)
+    job_id = svc.register_build(req.build_path, actor_user_id=req.actor.user_id)
     if job_id is None:
         raise HTTPException(
             status_code=404, detail="build_path 없음 또는 datasets/ 밖(샌드박스 거부)"
@@ -197,6 +199,7 @@ def golden_register_build(
     return GoldenBuildResponse(
         golden_job_id=job_id, status_url=f"/golden/jobs/{job_id}",
         review_url=review_url, signoff_url=signoff_url,
+        reused=(existing is not None and job_id == existing),
     )
 
 
