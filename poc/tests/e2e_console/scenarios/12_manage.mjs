@@ -176,6 +176,47 @@ export const scenarios = [
   },
 
   {
+    id: 'manage.decision.result-shows-next-to-button',
+    title: '결정 저장의 성공·실패가 버튼 옆에 남는다',
+    why: '종전에는 결과가 페이지 맨 위 #flash 로만 갔다. 버튼은 상세 사이드바 한참 아래라 '
+       + '눌러도 화면이 조용했고, 게다가 저장 뒤 load() 가 그 문구를 목록 안내로 덮어썼다',
+    needsData: true,
+    writes: true,
+    async run({ server, check }) {
+      const page = await manage(server);
+      page.click(page.q('#rows .candidate'));
+      await page.settle();
+
+      check.ok(page.$('saveMsg'), '결정 저장 버튼 옆에 알림 자리가 있다');
+      check.eq(page.text('saveMsg'), '', '문서를 막 열었을 때는 비어 있다');
+
+      // (1) 화면에서 막히는 경우 - 요청은 나가지 않는다
+      page.set('action', 'change');
+      page.set('reason', '   ');
+      page.click('save');
+      await page.settle();
+      check.eq(server.countCalls('POST', '/golden/candidates/PGC-0001/decision'), 0, '사유가 없으면 보내지 않는다');
+      check.includes(page.text('saveMsg'), '사유가 필요', '왜 막혔는지가 버튼 옆에 뜬다');
+      check.includes(page.$('saveMsg')?.className || '', 'error', '오류 표시로 뜬다');
+
+      // (2) 성공 - show() → load() 가 #flash 를 덮어써도 버튼 옆 문구는 남는다
+      page.set('reason', '본문 기준 핵심 기술정보로 판단');
+      page.click('save');
+      await page.settle();
+      check.includes(page.text('saveMsg'), '저장했습니다', '저장됐다고 버튼 옆에서 말한다');
+      check.ok(!(page.$('saveMsg')?.className || '').includes('error'), '성공은 오류 표시가 아니다');
+      check.ok(!page.text('flash').includes('저장'), '위쪽 #flash 는 목록 안내로 덮인다 - 그래서 버튼 옆이 필요하다');
+
+      // (3) 다른 문서를 열면 앞 문서의 결과가 남지 않는다
+      page.click(page.qa('#rows .candidate')[1]);
+      await page.settle();
+      check.eq(page.text('saveMsg'), '', '문서를 바꾸면 앞 결과 문구가 지워진다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
     id: 'manage.management.defaults-to-unknown',
     title: '비밀관리성(M) 칸이 상세에 있고, 기본이 「확인 안 됨」이다',
     why: '「확인 안 됨」과 「전 임직원 열람」은 M 을 정반대로 만든다 — 뭉치면 S1 이 사라지거나 미탐이 열린다',
@@ -304,6 +345,36 @@ export const scenarios = [
       const call = server.lastCall('POST', '/golden/candidates/PGC-0003/provenance');
       check.ok(call, '출처 기록이 서버로 나갔다');
       check.includes(JSON.stringify(call?.body || {}), '공공누리', '채운 근거가 실려 나갔다');
+      check.includes(page.text('provMsg'), '출처를 기록했습니다', '기록됐다고 버튼 옆에서 말한다');
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+
+  {
+    id: 'manage.provenance.basis-required-is-marked-and-answered',
+    title: '사용 권한 근거는 필수라고 적혀 있고, 비우고 누르면 그 자리에서 말해 준다',
+    why: '화면(2026-08-24)에서 근거 칸이 비어 있는 채로 「출처 저장」을 누르면 fetch 도 '
+       + '가지 않고 throw 하는데, 그 말이 페이지 맨 위에만 찍혀 무반응으로 보였다',
+    needsMock: true,
+    needsData: true,
+    async run({ server, check }) {
+      const { FIXTURES } = await import('../lib/server.mjs');
+      const real = FIXTURES['GET /golden/candidates'].candidates[2];
+      server.overrides['GET /golden/candidates/{doc_id}'] = { ...real, text: '공개 보도자료 모음.' };
+
+      const page = await manage(server);
+      page.click(page.qa('#rows .candidate')[2]);
+      await page.settle();
+
+      check.includes(page.html('provBox'), '필수', '두 칸이 필수라고 화면에 적혀 있다');
+      check.eq(page.$('provBasis')?.value, '', '근거 칸은 비어 있다');
+
+      page.click('provSave');
+      await page.settle();
+      check.eq(server.countCalls('POST', '/golden/candidates/PGC-0003/provenance'), 0, '비어 있으면 보내지 않는다');
+      check.includes(page.text('provMsg'), '사용 권한 근거', '무엇이 없어서 막혔는지 버튼 옆에서 말한다');
+      check.includes(page.$('provMsg')?.className || '', 'error', '오류 표시로 뜬다');
       assertNoScriptErrors(check, page);
       return page;
     },
