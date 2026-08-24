@@ -33,7 +33,11 @@ STATIC = _POC / "src" / "koipa" / "api" / "static"
 # [2026-08-24] 「로그인」을 뺐다(사용자 지시). login.html 화면은 살아 있고 주소로 열린다 —
 # 메뉴에서만 뺀 것이다. 목록의 정본은 console_nav.CONSOLE_LINKS 이고 이 상수는 그 사본이라,
 # 아래 test_menu_labels_match_the_single_source 가 둘이 어긋나면 잡는다.
-LABELS = ["검증문서 검수 목록", "검증문서 후보 관리", "관리자 콘솔", "등급 시연"]
+# [2026-08-24] 「검증문서 검수 목록」도 뺐다(사용자 지시, 4항목 → 3항목). 그 항목만 목적지가
+# 다른 화면이 아니라 「관리자 콘솔」과 **같은 화면의 내부 앵커**(#gold-jobs-card)여서, 이
+# 메뉴가 지키는 원칙("메뉴 하나 = 서로 다른 화면 하나", 61f1a94f)을 깨는 유일한 항목이었다.
+# 검수 목록은 이제 관리자 콘솔 「검증문서」 탭의 첫 카드다(golden_jobs.js order:1).
+LABELS = ["검증문서 후보 관리", "관리자 콘솔", "등급 시연"]
 
 
 def _screens() -> dict[str, str]:
@@ -85,8 +89,14 @@ def test_old_header_skeletons_are_gone(name):
 
 
 @pytest.mark.parametrize("name", list(_screens()))
-def test_four_menu_items_are_in_the_top_bar(name):
-    """사용자 지시: 4개 메뉴가 최상단에 있어야 한다."""
+def test_every_menu_item_is_in_the_top_bar(name):
+    """사용자 지시: 공용 메뉴가 다섯 화면 전부의 최상단에 있어야 한다.
+
+    [2026-08-24] 종전 이름은 test_four_menu_items_are_in_the_top_bar 였다. 개수(4)를 이름에
+    박아 두면 항목이 바뀔 때마다 이름이 거짓이 된다 — 이 시험이 실제로 잠그는 것은 개수가
+    아니라 "LABELS 전부가 상단에 있다"이고, LABELS 는 아래
+    test_menu_labels_match_the_single_source 가 console_nav.CONSOLE_LINKS 와 묶어 둔다.
+    """
     head = _header_of(_screens()[name])
     for label in LABELS:
         assert label in head, f"{name}: 메뉴 「{label}」 이 상단에 없다"
@@ -162,16 +172,23 @@ def test_deploy_badge_mounts_into_the_unified_header():
 
 
 def test_admin_console_opens_the_tab_for_a_hash_anchor():
-    """메뉴 「골든셋 검수」가 가리키는 카드는 기본 탭에 없다 — 해시 처리가 있어야 열린다."""
+    """검수 목록 카드는 기본 탭에 없다 — 주소에 해시를 달고 오면 해시 처리가 탭을 열어야 한다.
+
+    [2026-08-24] 종전에는 앵커 이름을 CONSOLE_LINKS["signoff"] 에서 뽑아 썼다. 그 메뉴 항목이
+    없어졌으므로(4항목 → 3항목: 그 항목만 다른 화면이 아니라 이 화면의 내부 앵커를 가리켰다)
+    이름을 직접 적는다. **잠그는 것은 그대로다** — 이 기계장치는 메뉴가 없어져도 필요하다:
+    이 카드는 기본 탭(ops)이 아닌 「검증문서」 탭(review)에 있어서, 인쇄물·북마크·화면 안
+    링크가 이 주소를 달고 오면 대상이 display:none 인 채로 도착한다(2026-08-20 실측).
+    """
     admin = (STATIC / "admin.html").read_text(encoding="utf-8")
     jobs = (STATIC / "golden_jobs.js").read_text(encoding="utf-8")
     assert "function gotoHash()" in admin
     assert "hashchange" in admin
     assert "window.gotoHash" in jobs, "런타임 삽입 카드라 mount 뒤에 한 번 더 불러야 한다"
 
-    target = dict((k, h) for k, _, h in CONSOLE_LINKS)["signoff"]
-    anchor = target.split("#", 1)[1]
-    assert f'id="{anchor}"' in jobs, f"메뉴가 가리키는 #{anchor} 를 만드는 곳이 없다"
+    anchor = "gold-jobs-card"
+    assert f'id="{anchor}"' in jobs, f"#{anchor} 를 만드는 곳이 없다"
+    assert 'data-pane="review"' in jobs, f"#{anchor} 가 기본 탭에 있으면 이 시험의 전제가 깨진다"
 
 
 def test_signoff_screen_is_not_a_fixed_link_target():

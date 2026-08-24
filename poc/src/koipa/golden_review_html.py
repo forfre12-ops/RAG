@@ -139,13 +139,14 @@ def _nav_html(sub: str, profile: Optional[str], screen: str, sibling: str = "") 
     등급 시연이 각자 다른 헤더를 갖고 있었다. 사용자 지시로 **이 화면의 모양을 기준**으로
     다섯 화면을 합치면서, 값의 출처를 console_nav.header_html 로 옮겼다.
 
-    current="signoff" 를 넘기는 이유: 메뉴의 「골든셋 검수」가 이 화면이다. 다만 그 메뉴의
-    링크는 잡 목록으로 간다 — 이 화면은 job_id 와 ?t= 토큰이 있어야 열려서 고정 링크를
-    걸 수 없기 때문이다(golden.py:701·727 에서 403).
+    [2026-08-24] current 를 넘기지 않는다. 종전에는 "signoff" 를 넘겼는데, 그 키가 가리키던
+    메뉴 항목(「검증문서 검수 목록」)이 이 화면이 아니라 **관리자 콘솔의 잡 목록 카드**로 가는
+    것이었다 — 이 화면에서 그 항목이 "현재 화면"으로 표시되면 검수자는 자기가 잡 목록에 있는
+    것으로 읽는다. 그 항목 자체가 메뉴에서 빠졌으므로(console_nav.py, 4항목 → 3항목) 이제
+    넘길 키가 없다. 이 화면은 메뉴에 걸 수 없다 — job_id 와 ?t= 토큰이 있어야 열려서 고정
+    링크는 403 이다(golden.py:750·780). 남은 3항목은 여기서 전부 살아 있는 링크로 뜬다.
     """
-    return header_html(
-        sub, "signoff", trailing=sibling + _site_badge_html(profile, screen)
-    )
+    return header_html(sub, trailing=sibling + _site_badge_html(profile, screen))
 
 
 def _embed_json(data: object) -> str:

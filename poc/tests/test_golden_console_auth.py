@@ -44,7 +44,11 @@ def test_console_has_no_manual_key_or_actor_inputs():
     assert "window.__GOLDEN_PREVIEW__" in html
     # 브랜드는 발주기관 기준이다. 검수자가 여는 화면이라 공급사명이 앞에 서면 안 된다.
     assert "한국지식재산보호원" in html
-    assert "검증문서 검수 목록" in html
+    # [2026-08-24] 「검증문서 검수 목록」 확인을 뺐다 — 그 메뉴 항목 자체가 없어졌다
+    # (console_nav.py, 4항목 → 3항목: 그 항목만 다른 화면이 아니라 관리자 콘솔의 내부
+    # 앵커였다). 이 화면에 공용 메뉴가 붙어 있다는 사실은 test_console_header_unified.py
+    # 가 LABELS 로 잠그므로, 여기서 특정 항목 이름을 또 박아 둘 필요가 없다.
+    assert "검증문서 후보 관리" in html
 
 
 def test_real_document_intake_requires_provenance_fields_in_ui():

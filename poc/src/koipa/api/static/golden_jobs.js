@@ -17,9 +17,18 @@
   var PANEL_HTML = [
     // data-pane/order — 이 카드는 런타임에 삽입되므로 admin.html 의 탭 전환 규칙을
     // 직접 달아 준다(없으면 어느 탭에서나 항상 떠서 탭 분리가 무의미해진다).
-    '<section class="card col-span" id="gold-jobs-card" data-pane="review" style="order:3">',
+    // [2026-08-24] order 3 → 1. 「검증문서 검수 목록」이 공용 메뉴에서 빠지면서
+    // (console_nav.py — 그 항목은 다른 화면이 아니라 이 카드의 앵커였다) 검수 목록으로
+    // 오는 길이 「검증문서」 탭 하나가 됐다. 탭을 누르면 맨 위에서 바로 보여야 한다.
+    // order:0 은 쓰지 않는다 — 상시노출 「연결·인증」 카드(admin.html:449)가 그 값이다.
+    '<section class="card col-span" id="gold-jobs-card" data-pane="review" style="order:1">',
     '  <div class="card-head">',
-    '    <div class="ttl"><span class="step-no">3</span> 검증문서 검수 목록</div>',
+    // [2026-08-24] 배지를 "3"에서 aux "조회"로. 흐름도(루프 B)의 3단계는 "재학습"이고
+    // admin.html 730줄대 재학습 카드가 이미 그 번호를 쓴다. 이 카드는 런타임에 별도
+    // 파일에서 삽입되다 보니 08-23 배지 정리(줄 368 주석) 때 함께 안 맞춰졌다 —
+    // 화면 안내("카드 배지=흐름도 번호")를 따라가면 검증문서 탭의 이 카드가 아니라
+    // 학습·배포 탭의 재학습 카드로 가야 하는데 번호가 같아 헷갈렸다.
+    '    <div class="ttl"><span class="step-no aux">조회</span> 검증문서 검수 목록</div>',
     '    <span class="ep">GET /golden/jobs</span>',
     '  </div>',
     '  <div class="card-body">',
