@@ -474,15 +474,42 @@ def _extract_hwp(p: Path) -> ExtractResult:
             #
             # unhwp 보다 먼저 시도한다: HWP3 는 unhwp 가 아예 못 읽으므로 이쪽이 유일한
             # 경로이고, HWP5 는 아래 unhwp 경로가 이미 잘 동작한다.
-            hx_recovered, hx_tables = _hwp_tables_via_hwpx_convert(p)
+            hx_recovered, hx_tables, hx_blob = _hwp_tables_via_hwpx_convert(p)
             if hx_recovered:
                 merged = _append_if_missing(text, hx_recovered)
                 if len(merged) > len(text):
                     text = merged
                     tables = tables + hx_tables
                     _warn_once(warnings, "hwp_tables_recovered_by_hwpx_convert")
-                    coverage = "incomplete"
-                    _warn_once(warnings, "hwp_table_cells_may_be_missing")
+                    # [2026-08-24] 회수 뒤 **정밀 대조**를 한 번 더 돌린다.
+                    #
+                    # 종전에는 회수에 성공해도 coverage 를 무조건 "incomplete" 로 되돌렸다.
+                    # 근거는 이 파일 _hwp_table_coverage 의 전제 — ".hwp 는 셀 텍스트가 HWPX
+                    # 변환에도 빠지므로 대조 불가" 였다. **그 전제가 지금은 틀리다.**
+                    # 실측(223 배포 이미지 2026-08-24, 관공서 서식 3건):
+                    #   실종선고신고서.HWP  본문 679자 · 표 2개 · hwp_tables_recovered_by_hwpx_convert
+                    #   국적회복신고서.HWP  본문 872자 · 표 2개 · 동일
+                    #   등록변경신고서.HWP  본문 388자 · 표 1개 · 동일
+                    # 회수 경고가 떴다 = rhwp 0.8.1 변환에서 셀 텍스트가 실제로 나온다.
+                    # 그러면 .hwpx 와 같은 정밀 대조를 .hwp 에도 돌릴 수 있다.
+                    #
+                    # 한국 관공서 서식은 내용이 전부 표 안에 있어, 종전 규칙에서는 HWP 서식이
+                    # **전건 검수행**이었다. 화면은 "표가 빠졌을 수 있다"고 말하는데 실제로는
+                    # 안 빠졌다 — 오탐이다.
+                    #
+                    # ⚠ 신뢰가 아니라 **근거**로 푼다. 남은 미회수 셀이 하나라도 있으면 그대로
+                    #   incomplete 다. 회수 실패·변환 실패·표 유무 판정 불가는 아래 분기에서
+                    #   지금과 똑같이 검수로 간다. 미탐 안전성은 유지된다.
+                    if hx_blob and not _hwpx_uncaptured_table_cells(hx_blob, text):
+                        coverage = None
+                        # 위 461행에서 미리 붙여 둔 경고도 걷는다. coverage 를 풀어 놓고
+                        # "표 셀이 빠졌을 수 있다"는 문구를 남기면 화면이 서로 다른 말을 한다.
+                        if warnings and "hwp_table_cells_may_be_missing" in warnings:
+                            warnings.remove("hwp_table_cells_may_be_missing")
+                        _warn_once(warnings, "hwp_table_cells_recovered_complete")
+                    else:
+                        coverage = "incomplete"
+                        _warn_once(warnings, "hwp_table_cells_may_be_missing")
 
             recovered, unhwp_tables = _hwp_tables_via_unhwp(p)
             if recovered:
@@ -516,7 +543,7 @@ def _extract_hwp(p: Path) -> ExtractResult:
 _MIN_SUBSTANTIVE_CHARS = 30
 
 
-def _hwp_tables_via_hwpx_convert(p: Path) -> tuple[str, list]:
+def _hwp_tables_via_hwpx_convert(p: Path) -> tuple[str, list, bytes]:
     """rhwp 로 HWPX 변환한 뒤 HWPX 표 추출기로 셀을 회수한다.
 
     구형 HWP 3.x 서식은 내용이 전부 표 안에 있는데 rhwp 본문 추출은 객체 placeholder
@@ -529,18 +556,20 @@ def _hwp_tables_via_hwpx_convert(p: Path) -> tuple[str, list]:
 
         doc = rhwp.parse(str(p))
         if not hasattr(doc, "to_hwpx_bytes"):
-            return "", []          # rhwp-python < 0.8.1
+            return "", [], b""     # rhwp-python < 0.8.1
         blob = doc.to_hwpx_bytes()
         if not blob:
-            return "", []
+            return "", [], b""
         tables = _hwpx_tables(blob, source="hwpx_from_hwp")
         if not tables:
-            return "", []
-        return _tables_to_text(tables), tables
+            return "", [], blob
+        # blob 을 함께 돌려준다 — 회수 뒤 남은 미회수 셀이 있는지 **같은 바이트로** 다시
+        # 대조해야 한다(호출부 참조). 다시 변환하면 비용도 들고 결과가 달라질 수 있다.
+        return _tables_to_text(tables), tables, blob
     except Exception:  # noqa: BLE001 — 변환 실패가 추출 전체를 막지 않는다
         # ⚠ 여기서 로깅하려다 NameError 를 냈다(이 모듈엔 logger 가 없다). 예외를
         #   삼키는 자리에서 되레 죽으면 회수 실패가 추출 실패로 번진다.
-        return "", []
+        return "", [], b""
 
 
 def _hwp_table_coverage(p: Path, doc, text: str, warnings: list[str] | None = None) -> str | None:

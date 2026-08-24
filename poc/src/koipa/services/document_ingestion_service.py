@@ -61,7 +61,14 @@ _THIN_CONTENT_QUALITY = 0.3
 _CONTENT_LOSS_WARNING_MARKERS = (
     "not_ocrd",              # {docx,pptx,excel}_media_not_ocrd
     "not_extracted",         # {docx,pptx,excel}_charts_not_extracted, *_embedded_objects_not_extracted
-    "may_be_missing",        # excel_drawings_text_may_be_missing, hwp_table_cells_may_be_missing
+    # [2026-08-24] "may_be_missing" → "excel_drawings_text_may_be_missing" 으로 좁혔다.
+    # 종전에는 hwp_table_cells_may_be_missing 이 여기에도 걸려 **같은 신호 하나가 사유 둘**을
+    # 만들었다: 그 경고가 table_incomplete 를 만들고(위 table_coverage 분기), 동시에
+    # content_dropped 까지 만들었다. 화면의 「(table_incomplete, content_dropped)」는
+    # 서로 다른 두 문제가 아니라 표 하나였다 — 검수자가 원인을 두 개로 읽는다.
+    # 표 셀 미회수는 table_incomplete 가 이미 말한다. 여기서는 빼고, 엑셀 도형 텍스트처럼
+    # **표 경로가 못 잡는 손실**만 남긴다.
+    "excel_drawings_text_may_be_missing",
     "media_ocr_unavailable", # OCR 라이브러리/엔진 미설치로 미디어 미처리
     "media_ocr_error",       # OCR 처리 중 예외
     "media_ocr_truncated",   # OCR 상한 절단

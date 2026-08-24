@@ -248,3 +248,33 @@ def test_complete_100_page_text_extraction_reports_full_coverage():
     assert res.pages_total == 100
     assert res.extraction_complete is True
     assert res.requires_review is False
+
+
+# ── [2026-08-24] HWP 표 오탐 두 건 ─────────────────────────────────────────────
+def test_hwp_table_warning_does_not_double_count():
+    """같은 신호 하나가 사유 둘을 만들면 안 된다.
+
+    실측(223, 관공서 서식 3건): 화면에 「(table_incomplete, content_dropped)」가 떴는데
+    서로 다른 두 문제가 아니라 **표 하나**였다. `hwp_table_cells_may_be_missing` 이
+    table_incomplete 를 만들고, 같은 문자열이 content_dropped 마커("may_be_missing")에도
+    걸렸기 때문이다. 검수자는 원인을 두 개로 읽는다.
+
+    표 셀 미회수는 table_incomplete 가 이미 말한다 — content_dropped 는 붙지 않아야 한다.
+    """
+    d = extraction_review_decision(
+        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
+        table_coverage="incomplete", warnings=["hwp_table_cells_may_be_missing"],
+    )
+    assert d.reasons == ["table_incomplete"], d.reasons
+
+
+def test_excel_drawing_loss_still_routes_as_content_dropped():
+    """좁힌 마커가 **엑셀 도형 텍스트 손실**은 그대로 잡아야 한다.
+
+    표 경로(table_coverage)가 못 보는 손실이라 여기서 빠지면 무음 미탐이 된다.
+    """
+    d = extraction_review_decision(
+        quality=0.95, ocr_used=False, error=None, min_quality=0.6, ocr_requires_review=True,
+        warnings=["excel_drawings_text_may_be_missing"],
+    )
+    assert d.reasons == ["content_dropped"], d.reasons

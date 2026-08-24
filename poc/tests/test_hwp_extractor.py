@@ -100,6 +100,52 @@ class TestHwpCodePath:
         assert "담당부서" in result.text        # 표 셀 회수됨
         assert result.table_coverage == "incomplete"   # 검수 라우팅 유지
 
+    def test_hwp_recovered_cells_clear_coverage_when_nothing_left(self, tmp_path):
+        """[2026-08-24] HWPX 변환으로 셀을 **전부** 회수했으면 검수 라우팅을 걸지 않는다.
+
+        종전에는 회수에 성공해도 coverage 를 무조건 "incomplete" 로 되돌렸다. 근거는
+        "\.hwp 는 셀 텍스트가 HWPX 변환에도 빠지므로 대조 불가" 였는데, 실측이 그 전제를
+        뒤집었다 — 223 배포 이미지에서 관공서 서식 3건 모두 hwp_tables_recovered_by_hwpx_convert
+        가 떴다(= 변환에서 셀이 나온다). 한국 관공서 서식은 내용이 전부 표 안에 있어서
+        종전 규칙에서는 HWP 서식이 전건 검수행이었다 — 화면은 "표가 빠졌을 수 있다"고 말하는데
+        실제로는 안 빠졌다. 오탐이다.
+
+        신뢰가 아니라 **근거**로 푼다: 회수 뒤 남은 미회수 셀을 다시 대조해 0일 때만 푼다.
+        """
+        import koipa.modules.m2_preprocess.extractor as ex
+
+        p = tmp_path / "form.hwp"
+        p.write_bytes(bytes.fromhex("d0cf11e0") + bytes(512))
+
+        mock_doc = MagicMock()
+        mock_doc.extract_text.return_value = "신고서"      # rhwp 본문은 표를 흘렸다
+        cells = "성명 | 홍길동 / 주민등록번호 | 900101-1234567"
+
+        with patch.dict(sys.modules, {"rhwp": MagicMock(parse=MagicMock(return_value=mock_doc))}),                 patch.object(ex, "_hwp_table_coverage", return_value="incomplete"),                 patch.object(ex, "_hwp_tables_via_hwpx_convert", return_value=(cells, [], b"PK-fake")),                 patch.object(ex, "_hwpx_uncaptured_table_cells", return_value=False),                 patch.object(ex, "_hwp_tables_via_unhwp", return_value=("", [])):
+            result = extract(p)
+
+        assert "홍길동" in result.text, "회수된 셀이 본문에 들어가야 한다"
+        assert result.table_coverage is None, "남은 미회수 셀이 0이면 검수 라우팅을 걸지 않는다"
+        assert "hwp_table_cells_may_be_missing" not in result.warnings, result.warnings
+        assert "hwp_tables_recovered_by_hwpx_convert" in result.warnings
+        assert "hwp_table_cells_recovered_complete" in result.warnings, result.warnings
+
+    def test_hwp_partial_recovery_keeps_review_routing(self, tmp_path):
+        """회수했지만 **남은 셀이 있으면** 그대로 검수행이다 — 미탐 안전성 유지."""
+        import koipa.modules.m2_preprocess.extractor as ex
+
+        p = tmp_path / "form2.hwp"
+        p.write_bytes(bytes.fromhex("d0cf11e0") + bytes(512))
+
+        mock_doc = MagicMock()
+        mock_doc.extract_text.return_value = "신고서"
+
+        with patch.dict(sys.modules, {"rhwp": MagicMock(parse=MagicMock(return_value=mock_doc))}),                 patch.object(ex, "_hwp_table_coverage", return_value="incomplete"),                 patch.object(ex, "_hwp_tables_via_hwpx_convert", return_value=("일부 셀", [], b"PK-fake")),                 patch.object(ex, "_hwpx_uncaptured_table_cells", return_value=True),                 patch.object(ex, "_hwp_tables_via_unhwp", return_value=("", [])):
+            result = extract(p)
+
+        assert result.table_coverage == "incomplete"
+        assert "hwp_table_cells_may_be_missing" in result.warnings
+
     def test_hwp_skips_unhwp_when_coverage_ok(self, tmp_path):
         """표 누락 의심이 없으면(coverage=None) 보강을 시도하지 않는다.
 
