@@ -31,6 +31,7 @@
       "classifier_model_dir": "artifacts/classifier_p1_v5_clean/v-fe4b386b",
       "review_confidence_threshold": 0.5,
       "review_confidence_threshold_public": null,
+      "demo_console_enabled": true,
       "rag": {
         "collection": "docs",
         "embedding_model": "nlpai-lab/KURE-v1",

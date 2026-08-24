@@ -177,6 +177,48 @@ def test_training_router_visibility(
         importlib.reload(app_mod)
 
 
+@pytest.mark.parametrize(
+    "profile,en_train,en_incr,synth_expected",
+    [
+        ("lite-noapi", False, False, False),    # 순수 추론 — 합성 노드 아님
+        ("lite-cloud", False, False, False),
+        ("onprem-local", False, True, False),   # 고객사 증분 재학습 노드여도 합성은 열지 않는다
+        ("full-train", True, False, True),      # 지재원 모델공장 → 등록
+    ],
+)
+def test_synthesis_router_visibility(
+    profile: str, en_train: bool, en_incr: bool, synth_expected: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """/api/v1/synth* 등록 계약 — enable_training **단독**.
+
+    학습 라우터(OR 계약)와 다르다. 합성 문서 생성은 지재원 모델공장 전용이라, 고객사 야간
+    증분 재학습 노드(enable_incremental_retrain)에서도 열리면 안 된다.
+    """
+    monkeypatch.setenv("SLOWAPI_SKIP_DOTENV", "1")
+    monkeypatch.setenv("DEPLOY_PROFILE", profile)
+    monkeypatch.setenv("ENABLE_TRAINING", "true" if en_train else "false")
+    monkeypatch.setenv("ENABLE_INCREMENTAL_RETRAIN", "true" if en_incr else "false")
+
+    import koipa.config as cfg_mod
+    _orig_settings = cfg_mod.settings
+    importlib.reload(cfg_mod)
+    import koipa.api.app as app_mod
+    importlib.reload(app_mod)
+
+    try:
+        paths = set(app_mod.app.openapi().get("paths", {}))
+        synth_paths = {p for p in paths if p.startswith("/api/v1/synth")}
+        if synth_expected:
+            assert synth_paths, f"{profile}: 합성 라우터가 등록되어야 함"
+        else:
+            assert not synth_paths, f"{profile}: 합성 라우터가 노출되면 안됨 — {synth_paths}"
+    finally:
+        monkeypatch.delenv("DEPLOY_PROFILE", raising=False)
+        cfg_mod.settings = _orig_settings
+        importlib.reload(app_mod)
+
+
 def test_admin_console_mounts_without_enabling_purge(monkeypatch: pytest.MonkeyPatch) -> None:
     """[하드닝 콘솔] serve_admin_console=True + demo_console_enabled=False → /demo 마운트되되
     파괴적 purge 는 계속 OFF. 관리 UI(검수→재학습→활성화)만 노출하고 데모/물리삭제 표면은 닫는다.

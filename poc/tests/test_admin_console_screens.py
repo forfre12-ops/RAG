@@ -52,6 +52,18 @@ def test_console_wires_endpoint(console: str, requirement: str, needle: str):
     assert needle in console, f"{requirement}: 관리자 콘솔에 {needle} 호출이 없습니다(화면 미구현/회귀)."
 
 
+@pytest.mark.parametrize(
+    ("mark", "requirement"),
+    [("§N", "FUN-003-⑦"), ("§E", "FUN-005-①"), ("§T", "FUN-023-④")],
+)
+def test_console_carries_submitted_section_marks(console: str, mark: str, requirement: str):
+    """제출본(RFP 구현현황)이 근거란에서 카드를 `admin.html §N`·`§E`·`§T` 로 지목한다.
+
+    2026-08-24 실측: 그 표기가 화면에 0건이라 감리에서 "§N 이 어디냐"에 짚을 수 없었다.
+    """
+    assert f'>{mark}<' in console, f"{requirement}: 제출본이 지목하는 {mark} 좌표가 화면에 없습니다."
+
+
 def test_console_shows_precision_and_recall(console: str):
     """FUN-024-① — 정밀도·재현율은 API에만 있으면 안 되고 화면 지표 카드에 떠야 한다."""
     assert "precision_macro" in console and "recall_macro" in console

@@ -312,6 +312,9 @@ def _operational_config() -> dict:
             None if getattr(settings, "review_confidence_threshold_public", None) is None
             else float(settings.review_confidence_threshold_public)
         ),
+        # 시연 전용 표면이 켜져 있는가. 시연 화면이 상태를 바꾸는 버튼(실시간 반영 시연)을
+        # 이 값으로 감춘다 — 프로덕션(onprem-local·full-train)은 False 다.
+        "demo_console_enabled": bool(getattr(settings, "demo_console_enabled", False)),
         "rag": {
             "collection": getattr(settings, "rag_default_collection", "docs"),
             "embedding_model": getattr(settings, "rag_operational_embedding_model", ""),

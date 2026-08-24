@@ -278,7 +278,10 @@ details .json{border:none;border-radius:0;margin:0;max-height:300px;}
 .reqtag{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.01em;
         padding:2px 6px;margin-left:7px;vertical-align:middle;white-space:nowrap;
         background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;}
-.reqtag
+/* 화면설계 좌표 — 제출본(RFP 구현현황)이 카드를 §N·§E·§T 로 지목한다. */
+.secmark{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 6px;
+         margin-left:7px;vertical-align:middle;white-space:nowrap;
+         background:var(--surface-2,#f4f4f5);color:#52525b;border:1px solid var(--border,#d4d4d8);}
 /* 고급설정 접기 · 다음단계 배너 */
 details.adv{margin-bottom:6px;border:1px solid var(--border-mid);padding:0 12px;}
 details.adv>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-dim);
@@ -316,13 +319,14 @@ details.adv[open]{padding-bottom:12px;}
 /* console-header:css:end */
 </style>
 <script src="./review_reason_ko.js"></script>
+<script src="./upload_progress.js"></script>
 <script src="./deploy_badge.js" data-screen="관리자"></script>
 </head>
 <body>
 
 <!-- console-header:start — koipa/console_nav.py 가 만든다. 손으로 고치지 말 것 (scripts/sync_console_header.py) -->
 <!-- console-nav: koipa/console_nav.py 와 같은 목록. 한쪽만 고치면 시험이 잡는다 -->
-<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">관리자 콘솔</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">검증문서 검수 목록</a><a class="cnav-link" href="/api/v1/golden/candidates/manage.html#candidates">검증문서 후보 관리</a><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
+<header class="top"><span class="mark"><span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="한국지식재산보호원"></span></span><span class="brand">한국지식재산보호원</span><span class="divider"></span><span class="product">관리자 콘솔</span><div class="cnav"><a class="cnav-link" href="/console/admin.html#gold-jobs-card">검증문서 검수 목록</a><a class="cnav-link" href="/api/v1/golden/candidates/login.html#candidates">검증문서 후보 관리</a><span class="cnav-link is-current" aria-current="page">관리자 콘솔</span><a class="cnav-link" href="/console/index.html#sec-parse">등급 시연</a></div><span class="spacer"></span><span id="health" class="health-pill" title="서버 연결 상태"><span class="dot"></span><span id="health-txt" role="status" aria-live="polite">연결 확인</span></span></header>
 <!-- console-header:end -->
 
 <div class="wrap">
@@ -410,8 +414,10 @@ details.adv[open]{padding-bottom:12px;}
   </div>
   <p class="pane-note" id="pane-note"></p>
 
-  <!-- 실시간 관제 컨트롤 (읽기 전용 자동 폴링) -->
-  <div class="flow" style="justify-content:flex-start;gap:12px;">
+  <!-- 실시간 관제 컨트롤 (읽기 전용 자동 폴링)
+       data-pane="ops" — 이 컨트롤이 갱신하는 것은 운영 탭의 관제 대시보드·검수 큐 두 장뿐이다
+       (autoTick). 탭 밖에 두면 다른 탭에서 안 보이는 카드를 켜 두고 폴링하게 된다. -->
+  <div class="flow" data-pane="ops" style="justify-content:flex-start;gap:12px;">
     <span style="display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;">
       <span id="auto-dot" style="width:9px;height:9px;border-radius:50%;background:var(--text-faint);display:inline-block;"></span>
       실시간 관제
@@ -678,7 +684,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== N. 학습 후보 생성 · 검수 (FUN-003) ===== -->
     <section class="card col-span" data-pane="train" style="order:1" data-profile="full-train">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">데이터</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span></div>
+        <div class="ttl"><span class="step-no aux">데이터</span> 학습 후보 생성 · 검토 → 학습셋 편입 <span class="reqtag">FUN-003</span><span class="secmark" title="제출본 RFP 구현현황이 이 카드를 §N 으로 지목한다">§N</span></div>
         <span class="ep">POST /synth/generate · GET /synth/queue · POST /synth/{id}/review</span>
       </div>
       <div class="card-body">
@@ -1049,7 +1055,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== E. 등급체계 관리 (FUN-005-①) ===== -->
     <section class="card col-span" data-pane="config" style="order:1">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">설정</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span></div>
+        <div class="ttl"><span class="step-no aux">설정</span> 등급체계 관리 — 추가 · 변경 · 삭제 <span class="reqtag">FUN-005-①</span><span class="secmark" title="제출본 RFP 구현현황이 이 카드를 §E 로 지목한다">§E</span></div>
         <span class="ep">GET · PUT /schema/grades</span>
       </div>
       <div class="card-body">
@@ -1073,7 +1079,7 @@ details.adv[open]{padding-bottom:12px;}
     <!-- ===== T. 태깅 키워드 관리 (FUN-023-④) ===== -->
     <section class="card col-span" data-pane="config" style="order:2">
       <div class="card-head">
-        <div class="ttl"><span class="step-no aux">설정</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span></div>
+        <div class="ttl"><span class="step-no aux">설정</span> 라벨링 · 태깅 규칙 관리 — 키워드 · 표현패턴 <span class="reqtag">FUN-023-④</span><span class="secmark" title="제출본 RFP 구현현황이 이 카드를 §T 로 지목한다">§T</span></div>
         <span class="ep">GET · POST /admin/keywords · PATCH /admin/keywords/{id}</span>
       </div>
       <div class="card-body">
@@ -1161,6 +1167,8 @@ details.adv[open]{padding-bottom:12px;}
 </div>
 
 <script>
+// 업로드 진행 오버레이(upload_progress.js). 스크립트가 못 올라와도 업로드 자체는 되게 무해한 대체를 둔다.
+const UP = window.UploadProgress || {start(){}, note(){}, stop(){}, isOpen(){return false;}};
 const GRADES = ["TS","S1","S2","S3"];
 const GRADE_KR = {TS:"특급기밀", S1:"1등급 비밀", S2:"2등급 대외비", S3:"3급 공개"};
 let QUEUE = [];   // {inference_id, doc_id, title, label, confidence, model_version, flagged, resolved}
@@ -1700,6 +1708,8 @@ async function classifyFromFile(alsoClassify){
   const btns=['btn-extract','btn-extract-classify'].map($).filter(Boolean);
   btns.forEach(b=>b.disabled=true);
   if(info) info.textContent=`본문 추출 중 — ${f.name}`;
+  // 큰 문서는 수 분이 걸린다. 인라인 글씨만으로는 멈춘 것과 구분이 안 됐다.
+  UP.start(f, alsoClassify ? '문서를 추출하고 분류하고 있습니다' : '문서에서 본문을 뽑고 있습니다');
   try{
     const c=cfg();
     const fd=new FormData();
@@ -1717,6 +1727,7 @@ async function classifyFromFile(alsoClassify){
         if(info) info.innerHTML='<span class="pill warn">대용량</span> 이 문서는 적재가 필요합니다 — 위 <b>쓰기 작업 허용</b>을 켠 뒤 다시 시도하세요.';
         return;
       }
+      UP.note('대용량 문서 — 적재 후 비동기 분류로 넘깁니다…');
       await ingestLargeDocument(f, info);
       return;
     }
@@ -1753,11 +1764,12 @@ async function classifyFromFile(alsoClassify){
       ? `<br/><span class="pill warn">추출 경고</span> ${esc(pi.warnings.join(', '))}` : '';
     if(info) info.innerHTML=`<span class="pill ok">추출됨</span> ${esc(f.name)} · ${meta.join(' · ')}${gateLine}${warnLine}`;
     log(`문서 추출: ${f.name} · ${text.length}자`,'ok');
-    if(alsoClassify) await runClassify();
+    if(alsoClassify){ UP.note('본문 추출 완료 — 분류하는 중입니다…'); await runClassify(); }
   }catch(e){
     if(info) info.innerHTML=`<span class="pill err">추출 실패</span> ${e.status||''} ${esc(String(e.message||''))}`;
     log('문서 추출 실패: '+(e.status||e.message),'err');
   }finally{
+    UP.stop();
     btns.forEach(b=>b.disabled=false);
   }
 }

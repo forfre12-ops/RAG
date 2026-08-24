@@ -383,7 +383,12 @@ if settings.enable_training or settings.enable_incremental_retrain:
     )
 else:
     logger.info("training router disabled (deploy_profile=%s)", settings.deploy_profile)
-app.include_router(synthesis_api.router, prefix="/api/v1")
+# 합성 생성은 지재원 모델공장 전용 — 학습 라우터와 같은 축에서 막는다.
+# enable_incremental_retrain 은 포함하지 않는다(고객사 야간 증분 노드에는 열지 않음).
+if settings.enable_training:
+    app.include_router(synthesis_api.router, prefix="/api/v1")
+else:
+    logger.info("synthesis router disabled (deploy_profile=%s)", settings.deploy_profile)
 # 골든 검수·서명 HTML 뷰 — 브라우저 window.open/직접 URL 로 열리게 별도 라우터로 분리.
 # (require_auth 라우터에 있으면 브라우저 네비게이션이 헤더를 못 붙여 401. POST signoff 는 보호 유지.)
 #

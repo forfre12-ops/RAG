@@ -1,25 +1,24 @@
 """콘솔 화면 간 이동 링크 — 한 곳에서 정한다.
 
-왜(2026-08-17). 살아 있는 콘솔 화면이 **9면**인데 서로 오갈 방법이 거의 없었다.
+왜(2026-08-17). 화면끼리 오갈 방법이 거의 없어 검수자가 주소를 직접 쳐야 했다.
 
-    동적 5면 (golden.py html_router)
-      /api/v1/golden/candidates/login.html          링크 0개 (location.href 로만 이동)
-      /api/v1/golden/candidates/manage.html         nav 5개가 **전부 같은 페이지 앵커**(#overview 등)
-      /api/v1/golden/candidates/actual-intake.html  헤더에 <a> 가 아예 없다
-      /api/v1/golden/jobs/{job_id}/review.html      _nav_html 에 링크 없음
-      /api/v1/golden/jobs/{job_id}/signoff.html     동상
+살아 있는 화면 (2026-08-24 실측 6면):
 
-    정적 4면 (/demo · /console StaticFiles)
-      admin.html · index.html · parse_demo.html      자기들끼리는 링크가 있으나
-      admin_preview.html                              골든 콘솔 5면으로는 0개 (역방향도 0개)
+    동적 4면 (golden.py html_router)
+      /api/v1/golden/candidates/login.html
+      /api/v1/golden/candidates/manage.html
+      /api/v1/golden/jobs/{job_id}/review.html      signoff 와 같은 화면을 준다
+      /api/v1/golden/jobs/{job_id}/signoff.html
 
-즉 검수자가 관리 화면에서 실문서 수집으로 가려면 **주소를 직접 쳐야** 했다.
+    정적 2면 (/demo · /console StaticFiles)
+      admin.html · index.html
+      (parse_demo.html 은 index.html#sec-parse 로 보내는 리다이렉트 스텁이다)
 
 ⚠ review/signoff 는 **네비 대상이 될 수 없다.** job_id 가 필요하고, golden_html_url_secret
   이 설정돼 있으면 ?t= HMAC 토큰까지 있어야 열린다(golden.py:742-748·759-765). 고정 링크로
   걸면 403 이 난다. 그래서 그 두 화면에서는 **나가는 링크만** 둔다.
 
-⚠ manage/actual-intake 는 포털 JWT 쿠키로 열린다(공유 API Key 거부 — golden.py:726·735).
+⚠ manage.html 은 포털 JWT 쿠키로 열린다(공유 API Key 거부).
   쿠키가 없는 상태에서 누르면 401 이 나는 것이 정상이다. 링크가 있다고 권한이 생기지 않는다.
 
 정적 파일(admin/index/parse_demo)은 파이썬을 못 부르므로 같은 목록을 손으로 넣는다.
@@ -49,7 +48,10 @@ CONSOLE_LINKS: tuple[tuple[str, str, str], ...] = (
     ("signoff", "검증문서 검수 목록", "/console/admin.html#gold-jobs-card"),
     # [D1 2026-08-17] '실문서 수집' 은 별도 화면이 아니라 이 화면의 업로드 모달이 됐다.
     # 두 화면이 같은 API(/golden/candidates/upload)·같은 필드를 쓰는데 화면만 둘이었다.
-    ("manage", "검증문서 후보 관리", "/api/v1/golden/candidates/manage.html#candidates"),
+    # [2026-08-24] 목적지를 login.html 로 바꿨다. manage.html 을 쿠키 없이 열면 401 JSON 한
+    # 줄이라 되돌아갈 길이 없었고, 관리자 콘솔 카드는 이미 login.html 을 가리켜 진입점이
+    # 두 갈래였다. login.html 은 세션이 살아 있으면 앵커까지 들고 그대로 통과한다.
+    ("manage", "검증문서 후보 관리", "/api/v1/golden/candidates/login.html#candidates"),
     ("admin", "관리자 콘솔", "/console/admin.html"),
     # [D3 2026-08-18] 시연은 별도 화면이 아니라 분류 콘솔 안의 구역이 됐다.
     # parse_demo.html 은 그 구역으로 보내는 스텁으로만 남는다(인쇄된 주소 보호).
@@ -113,6 +115,22 @@ def logo_data_uri() -> str:
     """
     try:
         return "data:image/png;base64," + base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+
+
+_UPLOAD_PROGRESS_PATH = Path(__file__).with_name("api") / "static" / "upload_progress.js"
+
+
+@lru_cache(maxsize=1)
+def upload_progress_js() -> str:
+    """업로드 진행 오버레이 소스. 파이썬이 렌더하는 화면에 그대로 인라인한다.
+
+    링크(<script src>)로 걸지 않는 이유: 그 화면들은 /api/v1/... 아래라 정적 마운트와 경로
+    깊이가 다르고, 콘솔 마운트가 꺼진 프로파일에서는 404 가 된다. 원본은 정적 파일 한 벌이다.
+    """
+    try:
+        return _UPLOAD_PROGRESS_PATH.read_text(encoding="utf-8")
     except OSError:
         return ""
 
