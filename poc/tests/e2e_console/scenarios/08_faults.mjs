@@ -75,11 +75,11 @@ export const scenarios = [
       page.click(page.q('.tab[data-tab="ops"]'));
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
-      check.includes(page.text('dash-grid'), 'admin 역할 필요', '무슨 역할이 필요한지 말한다');
+      check.matches(page.text('dash-grid'), /admin 역할.*필요/, '무슨 역할이 필요한지 말한다');
 
       page.click(page.q('button[onclick="loadAuditLog()"]'));
       await page.settle();
-      check.includes(page.text('au-body'), 'admin 역할 필요', '감사 로그에서도 같은 안내를 준다');
+      check.matches(page.text('au-body'), /admin 역할.*필요/, '감사 로그에서도 같은 안내를 준다');
       check.eq(server.lastCall('GET', '/admin/')?.headers['x-actor-role'], 'reviewer', '고른 역할이 실제로 헤더에 실린다');
       return page;
     },

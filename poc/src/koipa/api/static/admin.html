@@ -319,6 +319,7 @@ details.adv[open]{padding-bottom:12px;}
 /* console-header:css:end */
 </style>
 <script src="./review_reason_ko.js"></script>
+<script src="./errors_ko.js"></script>
 <script src="./upload_progress.js"></script>
 <script src="./deploy_badge.js" data-screen="관리자"></script>
 </head>
@@ -632,7 +633,7 @@ details.adv[open]{padding-bottom:12px;}
           <button class="btn" onclick="loadReviewQueue()">검토할 문서 보기</button>
           <span id="rq-info" class="hint" style="margin:0;"></span>
         </div>
-        <div id="queue" class="queue"><div class="q-empty">「검토할 문서 보기」를 누르면 승인 대기 중인 문서가 나옵니다. 분류를 실행해도 결과가 여기 쌓입니다. 확정·수정한 내용은 재학습 큐에 반영됩니다.</div></div>
+        <div id="queue" class="queue"><div class="q-empty">대기 목록을 읽고 있습니다… 화면을 열면 자동으로 조회하며, 「검토할 문서 보기」로 다시 읽을 수 있습니다. 분류를 실행해도 결과가 여기 쌓입니다. 확정·수정한 내용은 재학습 큐에 반영됩니다.</div></div>
         <!-- [2026-08-24] 「표시 설정 — 확신도 기준 보기」 두 칸을 뺐다. 관리자가 볼 이유가
              없었을 뿐 아니라, 아래 칸이 실제로 목록의 판정 배지를 뒤집고 있었다.
                · 서버 검수 임계: 읽기 전용 표시였다. 배포 설정으로만 바뀌는 값이라 화면에서
@@ -1199,6 +1200,41 @@ function guardWrite(action){
 // 넣기 전 이스케이프. 실데이터 문서/제목에 HTML이 섞이면 운영 콘솔에서 실행될 수 있다.
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+/* 오류 한 줄 — 상태코드 숫자와 영문 detail 대신 사람이 읽을 말로 바꾼다.
+   시연 화면과 같은 표(errors_ko.js)를 쓴다. 반환값은 이미 이스케이프돼 있다. */
+const HTTP_KO = {
+  400:'요청이 올바르지 않습니다', 401:'인증이 필요합니다 — API 키를 확인하세요',
+  403:'권한이 없습니다 — admin 역할이 필요합니다', 404:'대상을 찾지 못했습니다',
+  409:'지금 상태에서는 할 수 없습니다', 413:'문서가 한 번에 처리할 수 있는 크기를 넘습니다',
+  422:'입력값이 올바르지 않습니다', 429:'요청이 너무 잦습니다 — 잠시 뒤 다시 하세요',
+  500:'서버 오류입니다', 502:'서버에 연결하지 못했습니다', 503:'서버가 아직 준비되지 않았습니다',
+};
+function errDetail(e){
+  const d = e && e.data;
+  let raw = (d && (d.detail ?? d.message)) ?? (e && e.message) ?? '';
+  // 422 는 detail 이 배열/객체다. 첫 항목의 msg 만 뽑는다 — 전문을 뿌리면 화면이 JSON 이 된다.
+  if(Array.isArray(raw)) raw = (raw[0] && (raw[0].msg || raw[0].type)) || '';
+  else if(raw && typeof raw === 'object') raw = raw.msg || raw.detail || '';
+  return String(raw || '');
+}
+/* textContent·log() 용 평문. innerHTML 에는 errKo() 를 쓸 것. */
+/* 서버 detail 이 상태코드 문장을 되풀이하기만 하는 경우 — 붙이면 같은 말이 두 번 나온다. */
+const GENERIC_DETAIL = ['권한 없음','권한이 없습니다','forbidden','not authenticated',
+                        '인증되지 않았습니다','admin role required','unauthorized'];
+function errKoText(e){
+  const st = e && e.status;
+  const raw = errDetail(e);
+  const ko = raw ? (window.translateError ? window.translateError(raw) : raw) : '';
+  const head = HTTP_KO[st];
+  const suffix = st ? ' (HTTP ' + st + ')' : '';
+  if(!head) return (ko || (st ? '요청이 실패했습니다' : '요청을 보내지 못했습니다')) + suffix;
+  const dup = !ko
+    || head.includes(ko.replace(/[.]$/,''))
+    || GENERIC_DETAIL.some(g => ko.toLowerCase().includes(g));
+  return head + (dup ? '' : ' — ' + ko) + suffix;
+}
+function errKo(e){ return esc(errKoText(e)); }
+
 function markFlow(n){
   for(let i=1;i<=n;i++){ const el=document.querySelector(`.flow-step[data-step="${i}"]`); if(el) el.classList.add('done'); }
   lastFlow = Math.max(lastFlow, n);
@@ -1608,7 +1644,7 @@ async function ensurePersistableDoc(){
         +' — 확정·재라벨이 이 문서에 기록됩니다.','ok');
     return up.doc_id;
   }catch(e){
-    log(`문서 적재 실패: ${e.status||''} ${e.message||''} — 분류는 계속하지만 저장되지 않습니다.`,'err');
+    log(`문서 적재 실패: ${errKoText(e)} — 분류는 계속하지만 저장되지 않습니다.`,'err');
     return cur;
   }
 }
@@ -1708,6 +1744,8 @@ async function classifyFromFile(alsoClassify){
   const btns=['btn-extract','btn-extract-classify'].map($).filter(Boolean);
   btns.forEach(b=>b.disabled=true);
   if(info) info.textContent=`본문 추출 중 — ${f.name}`;
+  // 직전 문서의 등급 카드를 남기지 않는다 — 새 파일이 들어온 순간 옛 판정은 무효다.
+  clearClassifyResult('새 문서를 읽고 있습니다 — 직전 판정은 지웠습니다.');
   // 큰 문서는 수 분이 걸린다. 인라인 글씨만으로는 멈춘 것과 구분이 안 됐다.
   UP.start(f, alsoClassify ? '문서를 추출하고 분류하고 있습니다' : '문서에서 본문을 뽑고 있습니다');
   try{
@@ -1766,8 +1804,8 @@ async function classifyFromFile(alsoClassify){
     log(`문서 추출: ${f.name} · ${text.length}자`,'ok');
     if(alsoClassify){ UP.note('본문 추출 완료 — 분류하는 중입니다…'); await runClassify(); }
   }catch(e){
-    if(info) info.innerHTML=`<span class="pill err">추출 실패</span> ${e.status||''} ${esc(String(e.message||''))}`;
-    log('문서 추출 실패: '+(e.status||e.message),'err');
+    if(info) info.innerHTML=`<span class="pill err">추출 실패</span> ${errKo(e)}`;
+    log('문서 추출 실패: '+errKoText(e),'err');
   }finally{
     UP.stop();
     btns.forEach(b=>b.disabled=false);
@@ -1776,12 +1814,13 @@ async function classifyFromFile(alsoClassify){
 
 async function runClassify(){
   const btn=$('btn-classify'); btn.disabled=true; btn.textContent='분류 중…';
+  clearClassifyResult('분류 중입니다…');
   try{
     // 적재 먼저 — 그래야 서버가 분류를 DB 에 남기고 확정·재라벨이 붙을 수 있다.
     const doc_id=await ensurePersistableDoc();
     const d=await classifyOne(doc_id, $('cl-title').value, $('cl-body').value);
     renderClassify(d);
-  }catch(e){ $('cl-result').innerHTML=`<div class="warnbox">분류 실패: ${e.status||''} ${e.data?.detail||e.message||''}</div>`; }
+  }catch(e){ $('cl-result').innerHTML=`<div class="warnbox">분류 실패: ${errKo(e)}</div>`; }
   finally{ btn.disabled=false; btn.textContent='분류하기'; }
 }
 
@@ -1798,7 +1837,7 @@ async function runBatch(){
       const match=(d.label===s.exp);
       if(match) hit++;
       log(`[batch] ${s.id} → ${d.label} (기대 ${s.exp}) ${match?'✓':'·'}`, match?'ok':'info');
-    }catch(e){ log(`[batch] ${s.id} 실패: ${e.status||e.message}`,'err'); }
+    }catch(e){ log(`[batch] ${s.id} 실패: ${errKo(e)}`,'err'); }
   }
   log(`일괄 분류 완료 — ${SAMPLES.length}건 검수 큐 적재, 기대등급 일치 ${hit}/${SAMPLES.length}`, 'ok');
   btn.disabled=false; btn.textContent=orig;
@@ -1810,6 +1849,14 @@ async function runBatch(){
  *   ⚠ 지운 것은 화면뿐이다 — confidence 는 API 응답(ICD required)·DB·감사로그에 그대로 남는다.
  * 대신 관리자가 실제로 알아야 하는 것을 적는다: 검수인가 자동인가, 그리고 **왜 검수인가**.
  * 사유 문구는 공용 표(review_reason_ko.js) 한 곳에서 가져온다 — 등급 시연 화면과 같은 말이 뜬다. */
+/* [2026-08-24] 새 문서를 올리면 **직전 문서의 판정 카드가 그대로 남아 있었다**(사용자 지적).
+   classifyFromFile 은 본문·doc_id·제목만 갈아 끼우고 #cl-result 는 건드리지 않았으므로,
+   「본문 추출」만 눌렀거나 분류가 실패하면 화면에는 새 문서 본문 + 옛 등급이 나란히 놓였다 —
+   보는 사람은 그것을 새 문서의 등급으로 읽는다. 입력이 바뀌는 순간 결과를 비운다. */
+function clearClassifyResult(note){
+  const el=$('cl-result');
+  if(el) el.innerHTML = note ? `<div class="hint">${esc(note)}</div>` : '';
+}
 function renderClassify(d){
   const f=d.evaluation_factors||{};
   // 검수 여부는 서버가 정한다(ClassifyResponse.status). 화면이 신뢰도로 다시 계산하면
@@ -1864,13 +1911,13 @@ async function loadReviewQueue(){
        review.queue.load-failure-visible · fault.auth.401-everywhere-visible). */
     const detail=(e.data&&(e.data.detail||e.data.message))||e.message||'';
     const info=$('rq-info');
-    if(info) info.textContent=`조회 실패: ${e.status||''} ${detail}`
+    if(info) info.textContent=`조회 실패: ${errKoText(e)}`
       +(e.status===401?' — API 키를 확인하세요.':(e.status===403?' — admin 또는 reviewer 역할이 필요합니다.':''));
     // 이미 그려 둔 목록은 지우지 않는다 — 실시간 관제 tick 이 한 번 실패했다고 화면이
     // 비면 오히려 정보가 준다. 아직 아무것도 없을 때만 그 자리에 사유를 적는다.
     const q=$('queue');
-    if(q && !QUEUE.length) q.innerHTML=`<div class="warnbox">검수 큐를 읽지 못했습니다: ${esc(String(e.status||''))} ${esc(String(detail))}</div>`;
-    log(`검수 큐 로드 실패: ${e.status||e.message}`,'err');
+    if(q && !QUEUE.length) q.innerHTML=`<div class="warnbox">검수 큐를 읽지 못했습니다: ${errKo(e)} ${esc(String(detail))}</div>`;
+    log(`검수 큐 로드 실패: ${errKo(e)}`,'err');
   }
 }
 function enqueue(d, title){
@@ -1970,7 +2017,7 @@ async function toggleWhy(i){
     const d=await api('GET',`/review-queue/${encodeURIComponent(id)}/evidence`);
     WHY_CACHE[id]=d; box.innerHTML=renderWhy(d);
   }catch(e){
-    box.innerHTML=`<div class="warnbox">근거 조회 실패: ${esc(String(e.status||''))} `
+    box.innerHTML=`<div class="warnbox">근거 조회 실패: ${errKo(e)} `
       + `${esc(e.data?.detail||e.message||'')}</div>`;
   }
 }
@@ -2118,7 +2165,7 @@ async function loadJobs(){
       <td>${j.trigger_type||'-'}</td></tr>`).join('')
       : '<tr><td colspan="4" style="color:var(--text-faint)">작업 없음</td></tr>';
     markFlow(3);
-  }catch(e){ $('jobs-body').innerHTML=`<tr><td colspan="4" style="color:var(--red)">조회 실패 ${e.status||''} ${e.status===404?'(라우터 비활성)':''}</td></tr>`; }
+  }catch(e){ $('jobs-body').innerHTML=`<tr><td colspan="4" style="color:var(--red)">조회 실패 ${errKo(e)}${e.status===404?' — 학습 라우터가 꺼진 서버입니다':''}</td></tr>`; }
 }
 
 /* ---- 4. MODEL RELOAD ---- */
@@ -2136,7 +2183,7 @@ async function reloadModel(){
       <div><span>dir</span> <span style="font-family:var(--font-mono);font-size:11px">${d.model_dir||'(env fallback)'}</span></div>
     </div>`;
     markFlow(4); loadMetrics();
-  }catch(e){ $('reload-result').innerHTML=`<div class="warnbox">리로드 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`; }
+  }catch(e){ $('reload-result').innerHTML=`<div class="warnbox">리로드 실패: ${errKo(e)}</div>`; }
 }
 // tenant 제거: 테넌트 API 키 교체(rotateKey)는 단일 KL 인증 모델에서 불필요 — KL이 cred 발급/회전 전담.
 
@@ -2165,7 +2212,7 @@ async function activateModel(){
       // "우회하려면 어디를 눌러야 하나"를 찾아 헤매지 않게. 평소에는 계속 접힌 채로 둔다.
       const adv=$('deploy-adv'); if(adv) adv.open=true;
     }
-  }catch(e){ $('activate-result').innerHTML=`<div class="warnbox">활성화 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`; }
+  }catch(e){ $('activate-result').innerHTML=`<div class="warnbox">활성화 실패: ${errKo(e)}</div>`; }
 }
 
 /* [G2] 직전 활성본으로 롤백 — 활성화의 반대 방향.
@@ -2199,7 +2246,7 @@ async function rollbackModel(){
     }
   }catch(e){
     if(box){ box.style.display=''; box.className='warnbox';
-      box.innerHTML=`롤백 실패: ${esc(String(e.status||''))} ${esc(e.data?.detail||e.message||'')}`
+      box.innerHTML=`롤백 실패: ${errKo(e)} ${esc(e.data?.detail||e.message||'')}`
         + (e.status===403?' — admin 역할 필요':''); }
   }
 }
@@ -2237,7 +2284,7 @@ async function loadAuditLog(){
     (d.warnings||[]).forEach(w=>{ if(warn) warn.innerHTML+=`<div class="warnbox" style="margin-top:8px">${esc(w)}</div>`; });
     log(`감사 로그 ${items.length}건 조회 (전체 ${d.total??0})`,'ok');
   }catch(e){
-    body.innerHTML=`<tr><td colspan="5">조회 실패: ${esc(String(e.status||''))} ${esc(e.data?.detail||e.message||'')}`
+    body.innerHTML=`<tr><td colspan="5">조회 실패: ${errKo(e)} ${esc(e.data?.detail||e.message||'')}`
       + (e.status===403?' — admin 역할 필요':'')+'</td></tr>';
   }
 }
@@ -2265,7 +2312,7 @@ async function loadGoldenStatus(){
   box.innerHTML='<span style="color:var(--text-faint);font-size:12px;">조회 중…</span>';
   let corpus=null;
   try{ corpus=await api('GET','/golden/summary'); }
-  catch(e){ corpus={__err:`${e.status||''} ${e.data?.detail||e.message||''}`}; }
+  catch(e){ corpus={__err:`${errKo(e)}`}; }
   try{
     const d=await api('GET','/admin/locked-readiness');
     // ── 정본 구성 ────────────────────────────────────────────────────────────
@@ -2340,7 +2387,7 @@ async function loadGoldenStatus(){
       </div>`;
     log(`검증문서 현황: ready=${d.ready} · 부족 ${missing.join(',')||'없음'}`,'ok');
   }catch(e){
-    box.innerHTML=`<div class="warnbox">현황 조회 실패: ${e.status||''} ${esc(String(e.data?.detail||e.message||''))} ${e.status===403?'— admin 역할 필요':''}</div>`;
+    box.innerHTML=`<div class="warnbox">현황 조회 실패: ${errKo(e)}</div>`;
   }
 }
 
@@ -2377,7 +2424,7 @@ async function loadMetrics(){
     $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">등급별 FNR · 모델 ${d.model_version} (측정 ${d.measured_at||'-'})</label>
       <div class="kv" style="margin-top:4px">${GRADES.map(g=>byg[g]!=null?`<div><span>${g}</span> <b style="color:${byg[g]>0.05?'var(--red)':'var(--green)'}">${(byg[g]*100).toFixed(1)}%</b></div>`:'').join('')||'<span style="color:var(--text-faint)">등급별 데이터 없음</span>'}</div></div>`;
     markFlow(5);
-  }catch(e){ $('metrics-cards').innerHTML=''; $('metrics-extra').innerHTML=`<div class="warnbox">메트릭 조회 실패: ${e.status||''} — 평가 실행 이력이 없거나 DB 미가용일 수 있습니다.</div>`; }
+  }catch(e){ $('metrics-cards').innerHTML=''; $('metrics-extra').innerHTML=`<div class="warnbox">메트릭 조회 실패: ${errKo(e)} — 평가 실행 이력이 없거나 DB 미가용일 수 있습니다.</div>`; }
 }
 function metricCard(label,val,bad){ return `<div class="factor"><div class="fl">${label}</div><div class="fv" style="${bad?'color:var(--red)':''}">${val}</div></div>`; }
 async function loadHistory(){
@@ -2394,7 +2441,7 @@ async function loadHistory(){
         <td>${m.f1_macro!=null?(m.f1_macro*100).toFixed(1)+'%':'-'}</td>
         <td style="color:${m.fnr_overall>0.05?'var(--red)':'inherit'}">${m.fnr_overall!=null?(m.fnr_overall*100).toFixed(1)+'%':'-'}</td>
         <td>${m.sample_count??'-'}</td></tr>`).join(''):'<tr><td colspan="8" style="color:var(--text-faint)">이력 없음</td></tr>'}</tbody></table></div>`;
-  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${e.status||''}</div>`; }
+  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">이력 조회 실패: ${errKo(e)}</div>`; }
 }
 async function loadConfusionMatrix(){
   if(!LAST_MODEL_VERSION){ alert('먼저 "최신 메트릭"을 조회해 활성 모델 버전을 확인하세요.'); return; }
@@ -2407,7 +2454,7 @@ async function loadConfusionMatrix(){
     $('metrics-extra').innerHTML=`<div style="margin-top:12px"><label class="fld">혼동행렬 — 모델 ${esc(d.model_version||LAST_MODEL_VERSION)} <span style="color:var(--text-faint)">(대각선=정분류)</span></label>
       <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${rows||'<tr><td style="color:var(--text-faint)">데이터 없음</td></tr>'}</tbody></table></div>
       ${Object.keys(fnr).length?`<div class="kv" style="margin-top:8px">${Object.entries(fnr).map(([g,v])=>`<div><span>FNR ${esc(g)}</span> <b style="color:${v>0.05?'var(--red)':'var(--green)'}">${(v*100).toFixed(1)}%</b></div>`).join('')}</div>`:''}</div>`;
-  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">혼동행렬 조회 실패: ${e.status||''} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 혼동행렬 이력이 없을 수 있습니다.</div>`; }
+  }catch(e){ $('metrics-extra').innerHTML=`<div class="warnbox">혼동행렬 조회 실패: ${errKo(e)} — 활성 모델(${esc(LAST_MODEL_VERSION)})의 혼동행렬 이력이 없을 수 있습니다.</div>`; }
 }
 /* [2026-08-24] loadSchema() 를 지웠다 — 메트릭 카드의 「등급체계 조회」 버튼이 유일한 호출처였고,
  * 그 버튼을 없앴다(설정 탭이 같은 것을 편집한다). 등급체계 조회·편집은 loadGradeEditor() 한 곳. */
@@ -2474,15 +2521,25 @@ function renderDashboard(d){
   // (자체 실측 합성학습→실문서 F1 0.26) 등급별로 실문서/합성을 갈라 보이고, 실문서가 0인
   // 등급이 있으면 그 사실을 배지 옆에 적는다. 게이트 판정 자체는 서버 계약 그대로 둔다.
   const pg=lr.per_grade||{}, rpg=lr.real_per_grade||{}, spg=lr.synthetic_per_grade||{};
-  const realZero=GRADES.filter(g=>pg[g]!=null && (rpg[g]||0)===0);
-  const gradeRows=GRADES.filter(g=>pg[g]!=null).map(g=>
+  /* [2026-08-24] 종전에는 '실문서 0' 한 덩어리로 묶어, **서명이 아예 0건인 등급까지**
+     "서명분이 전부 합성입니다"라고 적었다(사용자 지적 — TS·S1·S2 가 0/0 인데 그 문장이 떴다).
+     없는 서명을 합성이라고 말하는 것은 사실과 다르다. 두 경우를 갈라 적는다:
+       · 서명 0건        → 아직 서명한 것이 없다(구성을 말할 대상 자체가 없다)
+       · 서명>0·실문서 0 → 서명은 있는데 본문이 전부 합성이다(수치 인용 시 한정 필요) */
+  const gradesWith=GRADES.filter(g=>pg[g]!=null);
+  const noSign=gradesWith.filter(g=>(pg[g]||0)===0);
+  const allSynth=gradesWith.filter(g=>(pg[g]||0)>0 && (rpg[g]||0)===0);
+  const gradeRows=gradesWith.map(g=>
     `<div><span class="gk">${g}</span><span class="n">${pg[g]}</span><small>실 ${rpg[g]??0} · 합 ${spg[g]??0}</small></div>`).join('');
-  const p2=dpPanel(lr.ready&&!realZero.length?'ok':'warn', '배포 준비 상태',
+  const p2=dpPanel(lr.ready&&!allSynth.length?'ok':'warn', '배포 준비 상태',
     (lr.ready?'<span class="pill ok">준비됨</span>':'<span class="pill warn">미충족</span>')
-    + (realZero.length?'<span class="pill warn">실문서 0</span>':'') + dpDegraded(d,'locked_readiness'),
-    (gradeRows?`<div class="dp-tab">${gradeRows}</div>`:'<div class="dp-note">등급별 데이터 없음</div>')
+    + (allSynth.length?'<span class="pill warn">실문서 0</span>':'') + dpDegraded(d,'locked_readiness'),
+    // 이 패널이 무엇을 세는지 한 줄로 밝힌다 — 업로드·분류 건수와 무관한 값이다(사용자 질문).
+    `<div class="dp-note">사람이 서명해 <b>평가 정답</b>으로 잠근 검증문서(locked_gold_eval) 수입니다. 이 수가 등급별 기준을 채워야 재학습 모델을 <b>자동 활성</b>할 수 있습니다. 업로드·분류 건수와는 무관합니다.</div>`
+    + (gradeRows?`<div class="dp-tab">${gradeRows}</div>`:'<div class="dp-note">등급별 데이터 없음</div>')
     + (lr.min_per_grade!=null?`<div class="dp-note">등급별 최소 ${lr.min_per_grade}건 필요${(lr.missing&&lr.missing.length)?` · 부족 ${lr.missing.join(' · ')}`:''}</div>`:'')
-    + (realZero.length?`<div class="warnbox"><b>${realZero.join(', ')}</b> 는 서명분이 전부 합성입니다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로, 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:'')
+    + (noSign.length?`<div class="dp-note"><b>${noSign.join(', ')}</b> 는 서명이 0건입니다 — 검수·서명을 아직 하지 않았습니다.</div>`:'')
+    + (allSynth.length?`<div class="warnbox"><b>${allSynth.join(', ')}</b> 는 서명분이 전부 합성입니다. 합성 본문으로 잰 정확도는 실세계 성능이 아니므로, 수치를 인용할 때 구성을 함께 밝히십시오.</div>`:'')
     + (lr.reason?`<div class="dp-note">${esc(dashReason(lr.reason))}</div>`:''));
   // 3) 재학습 backlog (active-learning)
   const alState = al.retrain_status==='URGENT_RETRAIN' ? 'err' : (al.retrain_status==='RETRAIN_RECOMMENDED' ? 'warn' : 'ok');
@@ -2490,7 +2547,11 @@ function renderDashboard(d){
     alStatusPill(al.retrain_status)+dpDegraded(d,'active_learning'),
     dpBig(al.unconsumed_total??0, '건', (al.unconsumed_total>0)?'var(--red)':'var(--green)')
     + `<div class="dp-note">${(al.unconsumed_total>0)?'재학습에 반영되지 않은 교정입니다':'밀린 교정 없음'}</div>`
-    + dpStat([['과소', al.pending_underclass??0, al.pending_underclass>0?'var(--red)':''],
+    /* [2026-08-24] '확정' 칸을 넣었다(사용자 지적 — 3건인데 과소·과대·측면이 전부 0 이었다).
+       unconsumed_total 은 direction 이 confirm(등급 그대로 확정)인 교정까지 세는데 세부 칸에는
+       그 방향이 없어서, 화면이 합계와 내역이 안 맞는 표를 보여 주고 있었다. */
+    + dpStat([['확정', al.pending_confirm??0, ''],
+              ['과소', al.pending_underclass??0, al.pending_underclass>0?'var(--red)':''],
               ['과대', al.pending_overclass??0, ''],
               ['측면', al.pending_lateral??0, '']])
     + (al.reason?`<div class="dp-note">${esc(dashReason(al.reason))}</div>`:''));
@@ -2515,7 +2576,7 @@ async function loadDashboard(){
     const d=await api('GET','/admin/dashboard');
     renderDashboard(d);
   }catch(e){
-    $('dash-grid').innerHTML=`<div class="warnbox">관제 대시보드 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''} ${e.status===403?'— admin 역할 필요':''}</div>`;
+    $('dash-grid').innerHTML=`<div class="warnbox">관제 대시보드 조회 실패: ${errKo(e)}</div>`;
   }
 }
 
@@ -2651,8 +2712,8 @@ async function startGoldenBuild(){
     goldenProgress(`job ${LAST_GOLDEN_JOB_ID} 생성됨 — 완료 대기 중…`);
     await pollGoldenJob(LAST_GOLDEN_JOB_ID);
   }catch(e){
-    goldenProgress(`후보 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
-    $('gold-result').textContent=`검증문서 생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+    goldenProgress(`후보 생성 실패: ${errKo(e)}`);
+    $('gold-result').textContent=`검증문서 생성 실패: ${errKo(e)}`;
   }finally{ if(btn){ btn.disabled=GOLD_AI_BLOCKED; btn.textContent=btn.dataset.label||'후보 생성 → 검수'; } }
 }
 /* 기존 build_*.jsonl 등록 — 재라벨링 없이 잡으로 올려 검수·서명 화면에 연결.
@@ -2694,9 +2755,8 @@ async function registerGoldenBuild(){
     goldenProgress(`등록됨 — job ${LAST_GOLDEN_JOB_ID}`);
     await loadGoldenJob();
   }catch(e){
-    const detail=e.data?.detail||e.message||'';
-    goldenProgress(`등록 실패: ${e.status||''} ${detail}${e.status===404?' — 경로가 없거나 datasets/ 밖입니다.':''}`);
-    $('gold-result').textContent=`골든 문서 묶음 등록 실패: ${e.status||''} ${detail}`;
+    goldenProgress(`등록 실패: ${errKoText(e)}${e.status===404?' — 경로가 없거나 datasets/ 밖입니다.':''}`);
+    $('gold-result').textContent=`골든 문서 묶음 등록 실패: ${errKoText(e)}`;
   }finally{ if(btn){ btn.disabled=false; btn.textContent=btn.dataset.label||'검수 시작'; } }
 }
 /* 완료(done/failed)까지 자동 폴링. 상한 40회×1.5s=60s — 넘으면 수동 새로고침으로 넘긴다. */
@@ -2704,7 +2764,7 @@ async function pollGoldenJob(id){
   for(let i=0;i<40;i++){
     let d;
     try{ d=await api('GET',`/golden/jobs/${encodeURIComponent(id)}`); }
-    catch(e){ goldenProgress(`상태 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`); return; }
+    catch(e){ goldenProgress(`상태 조회 실패: ${errKo(e)}`); return; }
     $('gold-result').textContent=JSON.stringify(d,null,2);
     if(d.status==='done'||d.status==='failed'||d.error){
       renderGoldenSummary(d);
@@ -2730,8 +2790,8 @@ async function loadGoldenJob(){
     goldenProgress(`job ${id} · ${d.status||'-'}`);
     log(`검증문서 준비 작업 상태: ${id} → ${d.status}`,'ok');
   }catch(e){
-    goldenProgress(`상태 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`);
-    $('gold-result').textContent=`검증문서 준비 작업 조회 실패: ${e.status||''} ${e.data?.detail||e.message||''}`;
+    goldenProgress(`상태 조회 실패: ${errKo(e)}`);
+    $('gold-result').textContent=`검증문서 준비 작업 조회 실패: ${errKo(e)}`;
   }
 }
 /* [#14a] 서명 URL 비밀키가 켜져 있으면 인증 상태조회로 ?t= 토큰을 받아 덧붙인다(꺼져 있으면 평문). */
@@ -2819,7 +2879,7 @@ async function synthGenerate(){
     const d=await api('POST','/synth/generate',body);
     $('sy-info').textContent=`생성 작업 접수 — job ${d.synth_job_id} · 예상 ${d.expected_count}건 · 예상비용 $${Number(d.estimated_cost_usd||0).toFixed(4)}`;
     log(`합성 생성 요청: ${body.target_grade}/${body.domain} ${body.count}건 (${body.llm_provider}) → job ${d.synth_job_id}`,'ok');
-  }catch(e){ $('sy-info').textContent=`생성 실패: ${e.status||''} ${e.data?.detail||e.message||''}`; }
+  }catch(e){ $('sy-info').textContent=`생성 실패: ${errKo(e)}`; }
   finally{ btn.disabled=false; btn.textContent='생성 요청'; }
 }
 
@@ -2830,7 +2890,7 @@ async function loadSynthQueue(){
     SYNTH=d.items||[];
     $('sy-info').textContent=`${status} ${d.total??SYNTH.length}건 (표시 ${SYNTH.length})`;
     renderSynthQueue();
-  }catch(e){ $('sy-info').textContent=`검수 큐 조회 실패: ${e.status||''}`; }
+  }catch(e){ $('sy-info').textContent=`검수 큐 조회 실패: ${errKoText(e)}`; }
 }
 
 function renderSynthQueue(){
@@ -2891,7 +2951,7 @@ async function loadGradeEditor(){
     $('grade-info').textContent=`활성 ${GRADE_ROWS.length}개 · version ${d.version||'-'}`;
     $('grade-result').innerHTML='';
     renderGradeEditor();
-  }catch(e){ $('grade-info').textContent=`조회 실패: ${e.status||''}`; }
+  }catch(e){ $('grade-info').textContent=`조회 실패: ${errKoText(e)}`; }
 }
 
 function renderGradeEditor(){
@@ -2961,7 +3021,7 @@ async function saveGrades(){
       : `<div class="kv"><div><span>저장됨</span> <b>version ${esc(d.version)}</b></div><div><span>재학습</span> <b>불필요</b></div><div><span>사유</span> <b>${esc(d.reason)}</b></div></div>`;
     $('grade-info').textContent=`저장 완료 · 활성 ${rows.length}개`;
     log(`등급체계 저장: ${codes.join(', ')} · requires_retraining=${d.requires_retraining}`, d.requires_retraining?'info':'ok');
-  }catch(e){ $('grade-result').innerHTML=`<div class="warnbox">저장 실패: ${e.status||''} ${esc(String(e.data?.detail||e.message||''))}</div>`; }
+  }catch(e){ $('grade-result').innerHTML=`<div class="warnbox">저장 실패: ${errKo(e)}</div>`; }
   finally{ btn.disabled=false; btn.textContent='변경 저장 (PUT)'; }
 }
 
@@ -2981,7 +3041,7 @@ async function loadKeywords(){
     $('kw-warn').innerHTML=(d.warnings&&d.warnings.length)
       ? `<div class="warnbox" style="margin-top:8px">${d.warnings.map(esc).join('<br/>')}</div>` : '';
     renderKeywords();
-  }catch(e){ $('kw-info').textContent=`조회 실패: ${e.status||''}`; $('kw-warn').innerHTML=''; }
+  }catch(e){ $('kw-info').textContent=`조회 실패: ${errKoText(e)}`; $('kw-warn').innerHTML=''; }
 }
 
 function renderKeywords(){
@@ -3114,6 +3174,12 @@ syncWriteGate();
 populateSamples();
 syncActiveGrades();
 checkHealth();
+/* [2026-08-24] 새로고침하면 검토 목록이 빈 화면으로 돌아가던 것을 고친다(사용자 지적).
+   QUEUE 는 메모리 변수라 새로고침에 사라지는데 init 이 loadReviewQueue 를 부르지 않아,
+   실제로는 DB 에 대기건이 있어도 화면은 "「검토할 문서 보기」를 누르면…" 안내문으로 돌아갔다.
+   목록은 이 화면의 첫 할 일이므로 열 때 한 번 읽는다(GET /review-queue, 읽기 전용).
+   키가 틀리면 loadReviewQueue 가 #rq-info 에 사유를 적는다 — 조용히 비지 않는다. */
+loadReviewQueue();
 setAutoStatus('paused');
 log('거버넌스 콘솔 준비 완료.','info');
 </script>

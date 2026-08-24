@@ -71,7 +71,8 @@ export const scenarios = [
       page.click(page.q('button[onclick="loadDashboard()"]'));
       await page.settle();
       check.includes(page.text('dash-grid'), '조회 실패', '실패했다고 말한다');
-      check.includes(page.text('dash-grid'), 'admin 역할 필요', '403 일 때 무엇이 필요한지 짚어 준다');
+      check.matches(page.text('dash-grid'), /admin 역할.*필요/, '403 일 때 무엇이 필요한지 짚어 준다');
+      check.includes(page.text('dash-grid'), '403', '어떤 실패인지도 남긴다');
       return page;
     },
   },

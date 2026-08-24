@@ -1,8 +1,11 @@
-// 한국어 에러 매핑 — 데모 콘솔이 422/4xx/5xx 영문 detail 을 한국어로 표시.
+// 한국어 에러 매핑 — 콘솔이 422/4xx/5xx 영문 detail 을 한국어로 표시.
 // Phase 후속 B3-3 (2026-05-30): 25 → 50 항목 확장.
-// 시연 시 발주처에 영문 에러가 그대로 노출되는 사고 차단.
-
-export const ERROR_KO = {
+//
+// [2026-08-24] ES 모듈에서 **클래식 스크립트**로 바꿨다. 시연 화면(모듈)만 쓰고 관리자
+// 콘솔(인라인 script)은 영문·상태코드를 그대로 뿌리고 있었는데, 모듈은 인라인 script 에서
+// import 할 수 없다. upload_progress.js 와 같은 방식으로 window 에 얹어 두 화면이 같이 쓴다.
+(function () {
+const ERROR_KO = {
   // ---- 422 Pydantic validation ----
   "field required": "필수 필드가 누락되었습니다.",
   "value is not a valid uuid": "올바른 UUID 형식이 아닙니다.",
@@ -59,10 +62,8 @@ export const ERROR_KO = {
   "KOIPA_RATE_LIMIT": "요청 한도 초과 (Retry-After 헤더 참조).",
 };
 
-/**
- * 영문 에러 메시지를 한국어로 매핑. 정확 일치 → 부분 일치 → 원문 폴백.
- */
-export function translateError(msg) {
+/** 영문 에러 메시지를 한국어로 매핑. 정확 일치 → 부분 일치 → 원문 폴백. */
+function translateError(msg) {
   if (!msg) return "(에러 메시지 없음)";
   const m = String(msg).trim();
   if (ERROR_KO[m]) return ERROR_KO[m];
@@ -72,3 +73,7 @@ export function translateError(msg) {
   }
   return m;  // 원문 폴백
 }
+
+window.ERROR_KO = ERROR_KO;
+window.translateError = translateError;
+})();
