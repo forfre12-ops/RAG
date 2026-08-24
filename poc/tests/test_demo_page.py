@@ -194,6 +194,19 @@ def _parse_neutral_replacements(app_js: str) -> dict:
     return dict(pairs)
 
 
+def _classifier_loaded(svc) -> bool:
+    """서빙 분류기가 실제로 실려 있는지. 안 실려 있으면 룰 엔진 단독 경로다."""
+    return getattr(getattr(svc, "inference", None), "_model", None) is not None
+
+
+_NO_MODEL_SKIP = (
+    "분류기 미로드 — 룰 엔진 단독 경로다. 이 시험이 약속하는 것(배포본이 내는 등급)은 "
+    "여기서 확인할 수 없다. TESTING=1 이면 settings.classifier_model_dir 로 직행하는데"
+    "(classify_service.py:125) 로컬은 그 값이 비어 있어 model_grade 가 None 이다. "
+    "배포본 확인은 scripts/check_demo_docs.py --api <서버> 로 한다."
+)
+
+
 @pytest.mark.slow
 def test_borderline_sample_toggle_actually_changes_grade():
     """경계 샘플에서 토글 해제(→일반어 치환) 시 등급이 실제로 S1→S2→S3 하향되는지.
@@ -214,6 +227,14 @@ def test_borderline_sample_toggle_actually_changes_grade():
     repl = _parse_neutral_replacements(app_js_path.read_text(encoding="utf-8"))
     body = b["body"]
     toggles = b["toggle_keywords"]
+
+    # [2026-08-24] 모델이 안 실려 있으면 **건너뛴다**. 종전에는 그대로 통과했다 —
+    # 룰 엔진만으로도 S1→S2→S3 가 나오기 때문이다. 그런데 배포본(223 · v-fe4b386b)에서
+    # 같은 세 입력을 재면 **S2 · S2 · S2** 로 등급이 전혀 안 움직인다(모델이 셋 다 S2 로
+    # 본다). 즉 이 시험은 초록인데 시연은 안 되는 상태였다. 조용한 통과를 막는다.
+    from koipa.services.classify_service import ClassifyService  # noqa: PLC0415
+    if not _classifier_loaded(ClassifyService.get_instance()):
+        pytest.skip(_NO_MODEL_SKIP)
 
     def classify_with_off(off_keywords):
         text = body
@@ -259,6 +280,11 @@ def test_built_samples_classify_to_intended_grade():
     from koipa.services.classify_service import ClassifyService
 
     svc = ClassifyService.get_instance()
+    # [2026-08-24] 위와 같은 이유로 건너뛴다. 이 시험은 3.6초에 통과하고 있었는데,
+    # 그 시간에 BERT 가 실릴 리 없다 — 룰 엔진만 돌고 있었다는 뜻이다. 그 사이 배포본은
+    # 13건 중 8건을 라벨과 다른 등급으로 내고 있었다(7건 상향 · 1건 하향).
+    if not _classifier_loaded(svc):
+        pytest.skip(_NO_MODEL_SKIP)
     misses = []
     for s in data["samples"]:
         req = ClassifyRequest(

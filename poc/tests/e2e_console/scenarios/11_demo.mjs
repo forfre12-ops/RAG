@@ -53,10 +53,68 @@ export const scenarios = [
 
       const all = page.text('result-head') + page.text('result-summary') + page.text('result-dual');
       check.includes(all, '검수 필요', '검수 결정이 표시된다');
-      check.matches(all, /안전 규칙이 더 높은 TS/, '올려 잡았다는 사실이 설명된다', all);
-      check.matches(all, /가장 높게 본 등급은 S1/, '모델 최고점 등급이 무엇인지 밝힌다', all);
+      check.matches(all, /안전 규칙이 더 심각한 TS를 채택/, '올려 잡았다는 사실이 설명된다', all);
+      check.matches(all, /등급별 확률은 S1이 가장 높았는데/, '모델 최고점 등급이 무엇인지 밝힌다', all);
+      // ② 분류기 카드가 「안전 규칙」 문구와 다른 등급을 말하던 것(2026-08-24 실측 3건).
+      // model_grade 는 escalation 적용 후 · scores 는 적용 전이라 둘 다 맞는 말인데,
+      // 화면이 같은 이름으로 나란히 놓아 검수자에게는 모순으로 읽혔다.
+      check.matches(all, /확률 최고점 S1 · 안전 규칙이 TS 채택/, '분류기 카드가 두 값을 같이 적는다', all);
+      check.ok(!/학습 모델 단독 판정/.test(all), '최고점이 다른데 「단독 판정」이라고 하지 않는다', all);
       // 화면에서 신뢰도 수치를 뺀 결정은 여기서도 지켜져야 한다.
       check.ok(!/0\.46|46(\.0)?%|0\.52|52(\.0)?%/.test(all), '확률 수치는 뜨지 않는다', all);
+      assertNoScriptErrors(check, page);
+      return page;
+    },
+  },
+  {
+    id: 'demo.classify.rule-override-explained',
+    writes: true,
+    title: '룰이 안전 상향해서 검수로 갔으면 화면이 그 사실을 말한다',
+    why: [
+      '실측(223 build 5c572ad31c11 · 시연 샘플 13건 중 2건: S1-재무-고객 · S2-재무-영업)에서',
+      '화면에 「판정 근거가 자동 확정 기준에 못 미칩니다」 한 줄만 뜨고 **왜 확신이 낮은지**가',
+      '빠졌다. 원인은 서버가 상향할 때 채택 등급 점수에 원래 최고점을 그대로 복사해',
+      '두 등급이 **동점**이 되는 것이다 — 화면의 최고점 스캔이 동점에서 최종 등급을 집어',
+      '"설명할 것 없음"으로 조용히 빠졌다. 그 침묵을 여기서 잠근다.',
+    ].join(' '),
+    async run({ server, check }) {
+      // 동점을 그대로 재현한다(실측값: TS 0.4780 · S1 0.4780).
+      const result = {
+        inference_id: '55555555-5555-4555-8555-555555555555',
+        doc_id: 'demo-input', label: 'TS', confidence: 0.478,
+        scores: { TS: 0.478, S1: 0.478, S2: 0.039, S3: 0.005 },
+        rule_grade: 'S1', model_grade: 'S1',
+        decision_path: 'rule-override (룰의 TS 점수 7.00 ≥ 임계 3.00 → 모델 S1 를 TS 로 안전 상향)',
+        status: 'needs_review', model_version: 'v-fe4b386b', elapsed_ms: 12,
+        warnings: [
+          'fnr-safe override: rule TS score=7.00 >= threshold 3.00 (model S1 -> TS)',
+          'low-confidence: confidence=0.48 < 0.50 — review recommended',
+        ],
+        evidence: [], evaluation_factors: { secrecy: 2, value: 2, management: 0 },
+        factors_source: 'rule_evidenced', rag_context_used: [],
+      };
+      server.overrides['POST /classify/stream'] = {
+        _sse: [
+          { event: 'progress', data: { stage: 'extract', elapsed_ms: 12 } },
+          { event: 'result', data: result },
+        ],
+      };
+      server.overrides['POST /classify'] = result;
+      const page = await demo(server);
+      page.set('doc-body', '본 문서는 주요 고객사 계약 단가와 재계약 조건을 담고 있다.');
+      page.click('btn-classify');
+      await page.until(() => page.text('result-head').includes('TS'), 8000);
+      await page.settle();
+
+      const all = page.text('result-head') + page.text('result-summary') + page.text('result-dual');
+      check.includes(all, '검수 필요', '검수 결정이 표시된다');
+      check.matches(all, /룰 엔진이 근거를 잡아 분류기의 S1 판정을 TS로 올렸습니다/,
+        '룰이 올려 잡았다는 사실이 사유 자리에 적힌다', all);
+      // 동점일 때는 「② 분류기」 카드가 아무 말도 덧붙이지 않아야 한다 — 모델은 정말로
+      // 자기 등급(S1)을 말한 것이라, 최고점이 다르다고 하면 그것이 거짓말이 된다.
+      check.includes(all, '학습 모델 단독 판정', '동점이면 분류기 카드가 덧말을 하지 않는다');
+      check.ok(!/확률 최고점/.test(all), '동점을 최고점 차이로 말하지 않는다', all);
+      check.ok(!/0\.478|47(\.8)?%/.test(all), '확률 수치는 뜨지 않는다', all);
       assertNoScriptErrors(check, page);
       return page;
     },

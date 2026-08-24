@@ -194,7 +194,12 @@ function populateSamples() {
   DEMO_DATA.samples.forEach((s) => {
     const opt = document.createElement("option");
     opt.value = s.id;
-    opt.textContent = `[${s.grade_label}] ${s.domain}`;
+    /* [2026-08-24] 등급 라벨(`[S1 · 1급]`)을 뺐다. 화면이 **정답을 먼저 말하고** 있었는데,
+       223 실측 13건 중 8건이 그 라벨과 다른 등급으로 나온다(7건은 상향 = 안전 방향).
+       고르는 사람이 S1 을 골라 TS 를 받으면 "틀렸다"로 읽힌다. 라벨을 실측값으로 고치는
+       쪽은 택하지 않았다 — 모델이 바뀔 때마다 또 어긋나고(8/21·8/22 에 두 번 겪었다),
+       "S1 문서를 TS 로 자동확정" 을 정답처럼 굳혀 버린다. 등급은 분류 결과가 말한다. */
+    opt.textContent = `[${s.domain}] ${s.title}`;
     sel.appendChild(opt);
   });
   sel.addEventListener("change", (e) => loadSample(e.target.value));
@@ -527,6 +532,20 @@ function renderResult(data, elapsedMs) {
 function _escLog(s) { return String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 function _gradeCls(g) { return g && ["TS", "S1", "S2", "S3"].includes(g) ? "g-" + g : "g-na"; }
 
+// scores 에서 확률 최고점 등급을 고른다. 동점이면 null — 안전 규칙이 개입했다고
+// 단정할 수 없기 때문이다(룰 상향 시 서버가 채택 등급에 원래 최고점을 복사한다).
+function _topScoreGrade(data) {
+  const scores = data && data.scores;
+  if (!scores || typeof scores !== "object") return null;
+  let top = null;
+  for (const k of Object.keys(scores)) {
+    if (top === null || Number(scores[k]) > Number(scores[top])) top = k;
+  }
+  if (!top) return null;
+  const tied = Object.keys(scores).filter((k) => Number(scores[k]) === Number(scores[top]));
+  return tied.length > 1 ? null : top;
+}
+
 // 룰·분류기·최종 이중판정 렌더 (운영 하이브리드와 동일 데이터)
 function renderDualVerdict(data) {
   const wrap = $("#result-dual");
@@ -537,8 +556,29 @@ function renderDualVerdict(data) {
   const decision = data.decision_path || "";
   const adjustNote = (typeof window !== "undefined" && window.KOIPA_ADJUSTMENT_NOTE)
     ? window.KOIPA_ADJUSTMENT_NOTE(data) : "";
+  /* [2026-08-24] 이 카드가 「안전 규칙」 줄과 서로 다른 말을 하고 있었다.
+     실측(223 build 5c572ad31c11 · 시연 샘플 13건 중 3건):
+
+         샘플            ② 분류기 카드     안전 규칙 문구
+         S1-기술-SW      TS                "확률이 가장 높았던 것은 S1"
+         S2-운영-IT      S1                "…S2"
+         S3-회사 소개    S2                "…S3"
+
+     둘 다 맞는 말이다. `model_grade` 는 **escalation 을 적용한 뒤** 값이고
+     (m5_inference/pipeline.py:595 — 심각한 등급부터 prob ≥ τ 를 채택),
+     `scores` 는 적용 전 확률 벡터다. 그런데 화면은 둘을 같은 "분류기"라는 이름으로
+     나란히 놓아, 검수자가 읽으면 둘 중 하나가 틀린 것처럼 보였다.
+     등급은 그대로 두고(최종 결합이 쓰는 값이므로) **밑줄에 두 값을 같이 적는다.**
+
+     동점은 말하지 않는다 — 룰이 상향할 때 서버가 채택 등급 점수에 원래 최고점을
+     그대로 복사해 두 등급이 같은 값이 되기 때문이다(review_reason_ko.js 의 OVERRIDE_RE
+     주석 참조). 그 경우 모델은 정말로 자기 등급을 말한 것이라 덧붙일 말이 없다. */
+  const topScore = _topScoreGrade(data);
+  const modelSub = (model && topScore && topScore !== model)
+    ? `확률 최고점 ${_escLog(topScore)} · 안전 규칙이 ${_escLog(model)} 채택`
+    : "학습 모델 단독 판정";
   const modelCard = model
-    ? `<div class="dual-card"><div class="dual-label">② 분류기 (BERT)</div><span class="dual-grade ${_gradeCls(model)}">${_escLog(model)}</span><div class="dual-sub">학습 모델 단독 판정</div></div>`
+    ? `<div class="dual-card"><div class="dual-label">② 분류기 (BERT)</div><span class="dual-grade ${_gradeCls(model)}">${_escLog(model)}</span><div class="dual-sub">${modelSub}</div></div>`
     : `<div class="dual-card"><div class="dual-label">② 분류기 (BERT)</div><span class="dual-grade g-na">미로드</span><div class="dual-sub">모델 미로드 — 룰 단독</div></div>`;
   wrap.innerHTML =
     `<div class="dual-card"><div class="dual-label">① 룰 엔진</div><span class="dual-grade ${_gradeCls(rule)}">${_escLog(rule || "—")}</span><div class="dual-sub">시드 키워드 S×V×M</div></div>`
@@ -662,8 +702,15 @@ function renderParseDetail(j) {
       ${(p.warnings || []).length ? note("파싱 경고", (p.warnings || []).join(", ")) : ""}
     </div>`;
   const g = j.gate || {};
+  /* [2026-08-24] 사유 칩이 **영문 코드 그대로**였다 — table_incomplete · content_dropped.
+     서버가 그렇게 준다(document_ingestion_service.py:123). 한국어 표는 이미 있는데
+     (review_reason_ko.js 의 EXTRACTION_REASON_KO) 그 파일 안에서만 쓰이고 밖으로 나오지
+     않아 이 자리에서 못 썼다. 표를 export 해서 같은 것을 쓴다 — 모르는 코드는 그대로
+     보이므로 새 코드가 생겨도 사유가 조용히 사라지지 않는다. */
+  const _reasonKo = (typeof window !== "undefined" && window.KOIPA_EXTRACTION_REASONS)
+    ? window.KOIPA_EXTRACTION_REASONS : (r) => r;
   gateBox.innerHTML = g.requires_review
-    ? `<div class="gate-review"><b>검수 필요</b> — 자동 확정하지 않고 사람 검수로 라우팅됩니다.<div>${(g.reasons || []).map((r) => `<span class="reason-chip">${escapeHtml(r)}</span>`).join("")}</div></div>`
+    ? `<div class="gate-review"><b>검수 필요</b> — 자동 확정하지 않고 사람 검수로 라우팅됩니다.<div>${(g.reasons || []).map((r) => `<span class="reason-chip">${escapeHtml(_reasonKo(r))}</span>`).join("")}</div></div>`
     : `<div class="gate-ok"><b>자동 경로 통과</b> — 추출 품질·표·OCR 이상 없음(무오탐).</div>`;
   fold.open = true;
 }

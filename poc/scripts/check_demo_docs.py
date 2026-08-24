@@ -4,6 +4,13 @@
 
     upload   (기본) poc/demo_formats - **실제 시연 대본이 쓰는 실업로드 세트**
     oneclick        static/demo_docs - 화면에 접어 둔 참고 샘플(짧은 예시 문서)
+    paste           static/samples.js - 「샘플 문서」 드롭다운의 붙여넣기 샘플 13건
+
+    [2026-08-24] paste 를 늘렸다. 종전 두 세트는 **파일 업로드 경로**만 봤고, 화면에서
+    가장 먼저 눌리는 붙여넣기 샘플 13건은 아무도 안 보고 있었다. 그 사각지대에서
+    토글 시연(S1->S2->S3)이 배포본에서는 S2·S2·S2 로 **등급이 전혀 안 움직이는** 상태로
+    남아 있었다(실측 223 build 5c572ad31c11). 로컬 pytest 는 분류기가 안 실려 룰 등급만
+    보고 초록이었다 - tests/test_demo_page.py 는 이제 모델이 없으면 건너뛴다.
 
 
 왜 필요한가. 등급 시연 화면(index.html)의 버튼 설명은 2026-08-21 에 223 실측으로 한 번
@@ -28,7 +35,9 @@
     python scripts/check_demo_docs.py --model-dir artifacts/classifier_p1_v5_clean/v-fe4b386b
 
     # 배포 서버로(리허설 - 시연할 그 서버에 대고 돌린다)
-    python scripts/check_demo_docs.py --api http://223.130.156.134:8000 --api-key ... --repeat 3
+    # 배포 서버가 jwt 모드면 X-API-Key 는 안 통한다. 콘솔과 같은 세션 쿠키로 들어간다.
+    python scripts/check_demo_docs.py --api http://223.130.156.134:8000 --cookie-from-login --repeat 3
+    python scripts/check_demo_docs.py --api http://223.130.156.134:8000 --cookie-from-login --set paste
 """
 
 from __future__ import annotations
@@ -36,6 +45,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re as _re
 import sys
 from datetime import date
 from pathlib import Path
@@ -126,6 +136,127 @@ _MIME = {
 }
 
 
+SAMPLES_JS = _POC / "src" / "koipa" / "api" / "static" / "samples.js"
+APP_JS = _POC / "src" / "koipa" / "api" / "static" / "app.js"
+
+
+def _load_samples() -> list[dict]:
+    raw = SAMPLES_JS.read_text(encoding="utf-8")
+    m = _re.search(r"DEMO_DATA = (\{.*?\});\s*$", raw, _re.S)
+    if not m:
+        raise SystemExit(f"samples.js 에서 DEMO_DATA 를 못 찾았다: {SAMPLES_JS}")
+    return json.loads(m.group(1))["samples"]
+
+
+def _neutral_replacements() -> dict:
+    """토글을 끄면 화면이 본문에서 무엇으로 바꾸는지 — app.js 가 단일 출처다."""
+    blk = _re.search(r"NEUTRAL_REPLACEMENTS\s*=\s*\{(.*?)\};", APP_JS.read_text(encoding="utf-8"), _re.S)
+    if not blk:
+        raise SystemExit("app.js 에서 NEUTRAL_REPLACEMENTS 를 못 찾았다")
+    return dict(_re.findall(r'"([^"]+)"\s*:\s*"([^"]+)"', blk.group(1)))
+
+
+def _check_paste_set(client, headers: dict, args) -> int:
+    """붙여넣기 샘플 13건 — 화면(#sec-parse)의 「샘플 문서」 드롭다운이 쓰는 그 본문.
+
+    ⚠ 이 세트에는 **등급 기대값이 없다.** 화면이 등급을 광고하지 않기 때문이다 —
+    드롭다운에서 의도 등급 라벨을 뺐다(app.js · 2026-08-24). 화면이 말하지 않는 것을
+    스크립트가 고정하면 그게 새 거짓말이 된다. 그래서 여기서는 두 가지만 한다:
+
+        ① 13건이 지금 어떤 등급·상태·사유로 나오는지 표로 낸다(대본 준비용).
+        ② **토글 시연은 기대값을 건다.** 그건 화면이 광고하는 것이다 —
+           index.html 의 「체크를 해제하면 … 등급 변화를 확인」.
+
+    ②가 필요한 이유(실측 2026-08-24 · 223 build 5c572ad31c11): 대본은 S1→S2→S3 인데
+    배포본은 **S2·S2·S2** 로 등급이 전혀 안 움직였다. 룰만 내려가고 모델은 셋 다 S2 로
+    본다. 로컬 pytest 는 분류기가 안 실려 룰 등급만 보고 초록이었다.
+    """
+    samples = _load_samples()
+    print(f"[target] {client.base_url if hasattr(client, 'base_url') else 'in-process'} "
+          f"· 붙여넣기 샘플 {len(samples)}건")
+
+    def classify(content: str, doc_id: str, title: str) -> dict:
+        r = client.post("/api/v1/classify", headers={**headers, "Content-Type": "application/json"},
+                        json={"doc_id": doc_id, "title": title, "content": content,
+                              "use_rag": False, "return_evidence": False})
+        if r.status_code != 200:
+            return {"error": f"{r.status_code}: {r.text[:200]}"}
+        return r.json()
+
+    from koipa.services.review_reasons import causal_review_reason  # noqa: PLC0415
+
+    rows: list[dict] = []
+    failures: list[str] = []
+    print()
+    print(f"{'샘플':<24} {'등급':<5} {'상태':<13} {'룰':<4} {'모델':<5} 사유")
+    print("-" * 96)
+    for smp in samples:
+        j = classify(smp["body"], smp["id"], smp["title"])
+        if "error" in j:
+            failures.append(f"{smp['id']}: {j['error']}")
+            print(f"{smp['id']:<24} 오류 {j['error']}")
+            continue
+        reason = causal_review_reason(j.get("warnings") or [], j.get("status"))
+        rows.append({"id": smp["id"], "label": j.get("label"), "status": j.get("status"),
+                     "rule_grade": j.get("rule_grade"), "model_grade": j.get("model_grade"),
+                     "causal_review_reason": reason})
+        print(f"{smp['id']:<24} {str(j.get('label')):<5} {str(j.get('status')):<13} "
+              f"{str(j.get('rule_grade')):<4} {str(j.get('model_grade')):<5} {reason or '-'}")
+
+    auto = sum(1 for r in rows if r["status"] != "needs_review")
+    print(f"\n자동확정 {auto} · 검수 {len(rows) - auto}")
+
+    # ── 토글 시연 — 여기만 기대값이 있다 ──────────────────────────────
+    borderline = next((x for x in samples if x["id"] == "경계-영업-주간공유"), None)
+    toggle_rows: list[dict] = []
+    if borderline is None:
+        failures.append("경계 샘플(경계-영업-주간공유)이 samples.js 에 없다")
+    else:
+        repl = _neutral_replacements()
+        kws = borderline["toggle_keywords"]
+        body = borderline["body"]
+        off_all = body
+        for kw in kws:
+            off_all = off_all.replace(kw, repl.get(kw, "관련 자료"))
+        steps = (
+            ("전부 켬", body, "S1"),
+            (f"첫 토글 해제", body.replace(kws[0], repl.get(kws[0], "관련 자료")), "S2"),
+            ("전부 해제", off_all, "S3"),
+        )
+        print()
+        print("토글 시연 (화면이 광고하는 것 — 등급이 내려가야 한다)")
+        print("-" * 96)
+        for tag, text, want in steps:
+            j = classify(text, borderline["id"], borderline["title"])
+            got = j.get("label") if "error" not in j else f"오류 {j['error']}"
+            ok = got == want
+            toggle_rows.append({"step": tag, "expected": want, "observed": got,
+                                "model_grade": j.get("model_grade"),
+                                "rule_grade": j.get("rule_grade"), "ok": ok})
+            print(f"  {tag:<14} 대본 {want} -> 실제 {str(got):<5} "
+                  f"(룰 {j.get('rule_grade')} · 모델 {j.get('model_grade')})"
+                  f"{'' if ok else '   <<< 불일치'}")
+            if not ok:
+                failures.append(f"토글 {tag}: 대본 {want} -> 실제 {got}")
+
+    if args.out:
+        Path(args.out).write_text(json.dumps(
+            {"checked_at": date.today().isoformat(), "set": "paste",
+             "samples": rows, "toggle": toggle_rows, "failures": failures},
+            ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"\n[out] {args.out}")
+
+    if failures:
+        print(f"\n[불일치 {len(failures)}건]", file=sys.stderr)
+        for f in failures:
+            print(f"  · {f}", file=sys.stderr)
+        print("\n정책: 문서를 손보지 않는다(시연용 조작). 화면 문구를 사실에 맞추거나 "
+              "대본을 바꾼다.", file=sys.stderr)
+        return 1
+    print("\n[OK] 화면이 광고하는 것과 실제 판정이 일치한다")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="시연 문서 화면 문구 대 실제 판정 대조")
     ap.add_argument("--api", default=None,
@@ -133,9 +264,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--api-key", default=None)
     ap.add_argument("--model-dir", default=None, help="in-process 모드에서 분류기 경로")
     ap.add_argument("--profile", default="onprem-local", choices=("onprem-local", "full-train"))
-    ap.add_argument("--set", dest="doc_set", default="upload", choices=("upload", "oneclick"),
+    ap.add_argument("--set", dest="doc_set", default="upload",
+                    choices=("upload", "oneclick", "paste"),
                     help="검사할 세트. upload=실업로드 시연 세트(기본·demo_formats), "
-                         "oneclick=화면 참고 샘플(static/demo_docs)")
+                         "oneclick=화면 참고 샘플(static/demo_docs), "
+                         "paste=붙여넣기 샘플 13건(static/samples.js)")
+    # [2026-08-24] 배포 서버가 auth_mode=jwt 면 X-API-Key 는 보지도 않는다(실측 223:
+    # 자격증명 없는 POST /classify → {"detail":"missing authorization"}). 콘솔은 같은
+    # 오리진 HttpOnly 쿠키로 들어간다 — 스크립트도 같은 문으로 들어가야 리허설이 된다.
+    ap.add_argument("--cookie", default=None,
+                    help="세션 쿠키 값(koipa_access_token). jwt 모드 서버에서 필요하다")
+    ap.add_argument("--cookie-from-login", action="store_true",
+                    help="서버 로그인 화면에 세션 값이 미리 채워져 있으면 그것을 그대로 쓴다"
+                         "(시연 서버 설정 — CONSOLE_LOGIN_PREFILL_TOKEN)")
     ap.add_argument("--dir", default=None,
                     help="측정할 문서 폴더(기본: --set 이 정한 폴더). --measure 와 같이 쓴다")
     ap.add_argument("--measure", action="store_true",
@@ -199,8 +340,23 @@ def main(argv: list[str] | None = None) -> int:
 
     from koipa.services.review_reasons import causal_review_reason  # noqa: PLC0415
 
-    print(f"[target] {client_desc} · 문서 {len(DEMO_EXPECTATIONS)}건 × {args.repeat}회")
     headers = {"X-API-Key": api_key} if api_key else {}
+    cookie = args.cookie
+    if args.cookie_from_login and not cookie:
+        r = client.get("/api/v1/golden/candidates/login.html", headers=headers)
+        m = _re.search(r'<textarea id="t"[^>]*>([^<]+)</textarea>', r.text)
+        if not m:
+            print("[중단] 로그인 화면에 미리 채워진 값이 없다 — --cookie 로 직접 주십시오",
+                  file=sys.stderr)
+            return 2
+        cookie = m.group(1).strip()
+    if cookie:
+        headers["Cookie"] = f"koipa_access_token={cookie}"
+
+    if args.doc_set == "paste":
+        return _check_paste_set(client, headers, args)
+
+    print(f"[target] {client_desc} · 문서 {len(DEMO_EXPECTATIONS)}건 × {args.repeat}회")
 
     def analyze(path: Path) -> dict:
         with path.open("rb") as fh:
@@ -318,7 +474,20 @@ def main(argv: list[str] | None = None) -> int:
               f"{conf:<7} {o.get('causal_review_reason') or '-'}{mark}")
 
     # 임계 근접 경고 - 실패로 치지 않되 시연 전에 알고 있어야 한다.
-    threshold = float(effective.get("review_confidence_threshold") or 0.70)
+    # [2026-08-24] --api 모드에서는 effective 가 비어 있어 **0.70 으로 고정**돼 있었다.
+    # 그 값은 8/24 에 0.50 으로 내려간 뒤였다(config.py full-train · 실측 223 healthz).
+    # 임계를 틀리게 잡으면 "임계 근접" 경고가 엉뚱한 문서를 가리킨다 — 서버에 물어본다.
+    threshold = effective.get("review_confidence_threshold")
+    if threshold is None:
+        try:
+            hz = client.get("/api/v1/healthz", headers=headers).json()
+            threshold = (hz.get("operational_config") or {}).get("review_confidence_threshold")
+        except Exception:  # noqa: BLE001
+            threshold = None
+    if threshold is None:
+        print("[주의] 검수 임계를 확인하지 못했다 — 임계 근접 경고를 건너뛴다", file=sys.stderr)
+        threshold = float("nan")
+    threshold = float(threshold)
     near = [
         (r["file"], r["observed"]["confidence"])
         for r in rows

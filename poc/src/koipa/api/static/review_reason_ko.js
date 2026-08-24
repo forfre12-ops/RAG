@@ -88,17 +88,65 @@
    * 즉 "두 엔진이 갈려서" 가 아니라 "올려 잡은 등급이라 확신이 낮아서" 다. 화면이 그걸
    * 말해 주지 않으면 검수자는 이유를 찾을 수 없다.
    *
-   * scores 가 응답에 있으므로 **서버를 바꾸지 않고** 화면에서 판별한다 — 최고점 등급과
-   * 최종 등급이 다르면 안전 규칙이 개입한 것이다. 어느 규칙인지(escalation · 룰 상향 ·
-   * 메타데이터 floor · 출처 cap)는 구분하지 않는다. 구분하려면 서버가 알려 줘야 하고,
-   * 지금 화면이 못 하고 있는 것은 "규칙 이름" 이 아니라 "왜 갈렸는가" 이기 때문이다.
+   * 서버를 바꾸지 않고 응답만으로 판별한다. 두 갈래다 —
+   *   ① warnings 에 `fnr-safe override` 가 있으면 **룰 엔진이 올려 잡은 것**이다.
+   *   ② 없으면 scores 최고점과 최종 등급을 견준다(모델 안 escalation).
+   * ①을 먼저 보는 이유는 아래 OVERRIDE_RE 주석에 적었다 — 그 경우 scores 가 동점이라
+   * ②만으로는 아무 말도 못 한다. 메타데이터 floor · 출처 cap 은 아직 구분하지 않는다.
    *
    * ⛔ 확률 수치는 문구에 넣지 않는다 - 화면에서 신뢰도 수치를 빼기로 한 결정과 같은 이유.
    */
   var SEVERITY = { TS: 0, S1: 1, S2: 2, S3: 3 };
 
+  /* 룰이 안전 상향한 경우를 warnings 원문에서 찾는다.
+   *
+   * ⚠ scores 로는 못 잡는다(실측 2026-08-24 · 223 build 5c572ad31c11). 서버가 상향할 때
+   *   **채택 등급 점수에 원래 최고점을 그대로 복사**해 두 등급이 동점이 된다:
+   *       S1-재무-고객   TS 0.4780 · S1 0.4780   (모델 S1 → 룰이 TS 로 상향)
+   *       S2-재무-영업   S1 0.4924 · S2 0.4924   (모델 S2 → 룰이 S1 로 상향)
+   *   아래 adjustmentNote 의 최고점 스캔은 동점이면 앞의 키를 잡고, 그것이 최종 등급과
+   *   같아 "설명할 것 없음"으로 조용히 빠졌다. 그래서 이 두 건은 화면에 "판정 근거가
+   *   자동 확정 기준에 못 미칩니다" 한 줄만 뜨고, **왜 확신이 낮은지**(룰이 올려 잡아서)는
+   *   ③ 「결합」 줄에만 남았다 — 검수 사유를 묻는 자리에서는 빠져 있었다.
+   */
+  /* 등급 코드에 붙는 조사. 코드를 소리 내어 읽었을 때 받침이 있는지로 갈린다 —
+     S1(에스원)만 받침 ㄴ 이라 '이·을·으로' 를 쓰고, TS(티에스)·S2(에스투)·S3(에스쓰리)는
+     모음으로 끝나 '가·를·로' 를 쓴다. 종전에는 전부 '가·를·로' 로 붙여 "S1 가 가장
+     높았는데" 처럼 나왔다. */
+  var JOSA = {
+    TS: { i: "가", eul: "를", ro: "로" },
+    S1: { i: "이", eul: "을", ro: "으로" },
+    S2: { i: "가", eul: "를", ro: "로" },
+    S3: { i: "가", eul: "를", ro: "로" }
+  };
+  function _j(code, kind) {
+    var t = JOSA[String(code || "").toUpperCase()];
+    return t ? t[kind] : { i: "가", eul: "를", ro: "로" }[kind];
+  }
+
+  var OVERRIDE_RE = /fnr-safe override: rule \S+ score=[\d.]+ >= threshold [\d.]+ \(model (\S+) -> (\S+)\)/;
+
+  function _ruleOverride(warnings) {
+    var ws = warnings || [];
+    for (var i = 0; i < ws.length; i++) {
+      var m = String(ws[i]).match(OVERRIDE_RE);
+      if (m) return { from: m[1], to: m[2] };
+    }
+    return null;
+  }
+
   function adjustmentNote(data) {
     var d = data || {};
+    // ① 룰 엔진이 올려 잡은 경우 — 가장 확실한 근거는 warnings 원문이다.
+    var ov = _ruleOverride(d.warnings);
+    if (ov) {
+      return "룰 엔진이 근거를 잡아 분류기의 " + ov.from + " 판정을 " + ov.to
+        + _j(ov.to, "ro") + " 올렸습니다 — 미탐을 줄이려는 설계입니다. 올려 잡은 등급이라 확신이 낮아 사람이 확인합니다.";
+    }
+    // ② 모델 안에서 안전 규칙(escalation)이 최고점이 아닌 등급을 채택한 경우.
+    //    scores 는 **확률 벡터**이고 model_grade 는 **escalation 을 적용한 뒤** 값이다
+    //    (m5_inference/pipeline.py:595 _select_index — 심각한 등급부터 prob ≥ τ 를 채택).
+    //    그래서 둘이 다를 수 있다. 여기서 말하는 것은 확률 최고점 쪽이다.
     var scores = d.scores;
     var label = d.label;
     if (!scores || !label || typeof scores !== "object") return "";
@@ -108,14 +156,16 @@
       if (top === null || Number(scores[k]) > Number(scores[top])) top = k;
     }
     if (!top || top === label) return "";
+    // 동점이면 안전 규칙이 개입했다고 단정할 수 없다 — 말하지 않는다.
+    if (Number(scores[top]) === Number(scores[label])) return "";
     var a = SEVERITY[label], b = SEVERITY[top];
     if (a === undefined || b === undefined) return "";
     if (a < b) {
-      return "모델이 가장 높게 본 등급은 " + top + " 인데, 안전 규칙이 더 높은 " + label
-        + " 로 올려 잡았습니다 — 미탐을 줄이려는 설계입니다. 올려 잡은 등급이라 확신이 낮아 사람이 확인합니다.";
+      return "분류기의 등급별 확률은 " + top + _j(top, "i") + " 가장 높았는데, 안전 규칙이 더 심각한 " + label
+        + _j(label, "eul") + " 채택했습니다 — 미탐을 줄이려는 설계입니다. 올려 잡은 등급이라 확신이 낮아 사람이 확인합니다.";
     }
-    return "모델이 가장 높게 본 등급은 " + top + " 인데, 출처·메타데이터 규칙이 " + label
-      + " 로 내려 잡았습니다 — 사람이 확인합니다.";
+    return "분류기의 등급별 확률은 " + top + _j(top, "i") + " 가장 높았는데, 출처·메타데이터 규칙이 " + label
+      + _j(label, "ro") + " 내려 잡았습니다 — 사람이 확인합니다.";
   }
 
   /* ── 게이트 태그 → 사람 말 ─────────────────────────────────────────────
@@ -157,6 +207,10 @@
     return TAG_TEXT[t] || t;
   }
 
+  /* 추출 게이트 사유 코드 → 사람 말. 업로드 경로의 「파싱 상세」 칩이 같은 표를 쓴다
+     (app.js — 종전에는 서버가 준 영문 코드 table_incomplete·content_dropped 를 그대로
+     찍었다). 위 GATE_REASONS 가 warnings 원문에서 쓰는 것과 **같은 함수**다. */
+  global.KOIPA_EXTRACTION_REASONS = _extractionReasons;
   global.KOIPA_GATE_REASON = gateReason;
   global.KOIPA_GATE_REASON_BY_TAG = gateReasonByTag;
   global.KOIPA_ADJUSTMENT_NOTE = adjustmentNote;
