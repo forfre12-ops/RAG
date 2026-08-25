@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>감리문서 대장</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">감리문서 대장</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물 관리</span></div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 관리 · 대장</div>
+    <h1>감리문서 대장</h1>
+    <div class="meta">제안요청서 산출물 요구 ↔ 현행 보유 문서 대조 · 8/31 설계감리 · 11/23 종료감리 대비 · 2026-08-26</div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>관리 폴더</th><td><code>doc/감리문서/</code> (본 대장과 신규 감리 산출물)</td></tr>
+      <tr><th>근거</th><td>제안요청서 요구사항 60 건 가운데 산출 정보 항목 50 블록, <code>doc/releases/2026-08-사전진단-r12/manifest.yaml</code> 의 보유 문서 35 종</td></tr>
+      <tr><th>대조 대상</th><td><code>doc/result/감리정본/</code> · <code>doc/result/KL_AI자료_2026-08/</code> · <code>doc/releases/2026-08-사전진단-r12/</code></td></tr>
+      <tr><th>작성일</th><td>2026-08-26</td></tr>
+      <tr><th>근거 커밋</th><td><code>d3fe51c3</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    감리 산출물은 어느 요구사항이 어떤 문서를 요구했고 그 문서가 현재 어디에 있는지로 관리한다.
+    아래 표의 <b>RFP 근거</b> 열이 요구사항과의 연결이고, <b>상태</b> 열은 현재 제출 가능 여부를 나타낸다.
+    상태는 <span class="ok">보유</span>, <span class="part">보완</span>(문서는 있으나 독립 산출물이 아니거나 감리 트랙 밖에 있음),
+    <span class="gap">부재</span> 세 가지다.
+  </div>
+
+  <h2>1. 이 폴더의 규칙</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:20%">항목</th><th>규칙</th></tr></thead>
+    <tbody>
+      <tr><td>형식</td><td>HTML 단일 파일. 외부 CSS·스크립트·폰트 참조 없음(폐쇄망·오프라인 열람 보장). 로고는 base64 인라인</td></tr>
+      <tr><td>골격</td><td><code>nav</code>(로고·문서명·배지) → <code>.top</code>(문서 성격 · 제목 · 한 줄 요약) → <code>.docinfo</code>(문서정보) → 번호 붙은 <code>h2</code> 절 → 개정 이력 → <code>.foot</code>(근거 파일)</td></tr>
+      <tr><td>서술</td><td>표 중심. 주장·근거·판단을 같은 행에 둔다. 서술 문단은 표가 설명 못 하는 것만</td></tr>
+      <tr><td>문서정보</td><td>대상 · 작성일 · 근거 커밋 · 재현 명령(측정 문서인 경우) 필수</td></tr>
+      <tr><td>개정 이력</td><td>판 · 일자 · 근거 커밋 · 내용. 파일명에 <code>_v2</code>·<code>최종</code> 붙이지 않는다</td></tr>
+      <tr><td>인쇄</td><td><code>@page</code> A4 + <code>@media print</code> 필수 — 제안요청서 PMR-003 완료보고 산출물이 “인쇄본 및 관련 원본파일”이다</td></tr>
+      <tr><td>수치</td><td>어느 파일·어느 명령의 결과인지 함께 적는다. 미측정은 “확인 필요”로 명시</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>2. 제안요청서가 요구한 산출물</h2>
+  <p>제안요청서는 요구사항 블록마다 산출 정보 항목을 명시한다. 아래는 50 개 블록에서 중복을 제거한 목록이며, 각 산출물을 제출하는 근거가 된다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">요구사항</th><th>산출 정보 (제안요청서 원문)</th></tr></thead>
+    <tbody>
+      <tr><td><code>FUN-001~024</code> (23블록)</td><td>사업수행 결과 보고서</td></tr>
+      <tr><td><code>TER-001·002·003</code></td><td>사업수행 결과 보고서</td></tr>
+      <tr><td><code>PER-001</code> · <code>QUR-001</code></td><td>품질관리계획서, 품질관리결과서</td></tr>
+      <tr><td><code>PER-002</code> · <code>QUR-002</code></td><td>하자보수 처리 결과 보고서</td></tr>
+      <tr><td><code>INT-001</code></td><td>사용자인터페이스 설계서, 사용자매뉴얼, <b>인터페이스 정의서</b></td></tr>
+      <tr><td><code>INT-002</code> · <code>INT-003</code></td><td>화면설계서</td></tr>
+      <tr><td><code>DAR-001</code></td><td>데이터(표준, 구조, 값) 관리 매뉴얼, 연계 데이터 관리 매뉴얼</td></tr>
+      <tr><td><code>DAR-002</code> · <code>DAR-005</code> · <code>DAR-006</code></td><td>데이터 표준관리 방안 / 데이터 구조관리 방안<br>※ <code>DAR-005</code> 본문: “관련 산출물 : <b>데이터 사전, 테이블 정의서</b> 등”</td></tr>
+      <tr><td><code>DAR-003</code></td><td>현황 분석서, 개선방안 및 과제 정의서</td></tr>
+      <tr><td><code>SER-001</code> · <code>QUR-003</code> · <code>PMR-001~003</code></td><td>사업수행 계획서</td></tr>
+      <tr><td><code>SER-003</code></td><td><b>보안 취약점 점검 결과, 보안취약점 조치 이행 결과</b></td></tr>
+      <tr><td><code>SER-004</code></td><td>영업비밀관리 시스템 보안 기능</td></tr>
+      <tr><td><code>SER-006</code></td><td>소프트웨어 개발보안 적용 내역, 보안 교육 자료 및 참석자 명단</td></tr>
+      <tr><td><code>PMR-004</code></td><td><b>자료 인수인계 대장(또는 자료관리대장), 완전삭제 확인서(사진 등)</b></td></tr>
+      <tr><td><code>PMR-005</code></td><td>SW사업수행계획서 및 실적 정보</td></tr>
+      <tr><td><code>PSR-004</code></td><td>운영 매뉴얼(<b>관리자용·사용자용</b>), 시나리오별 문제 해결 가이드 문서</td></tr>
+      <tr><td>완료보고 (PMR-003 본문)</td><td>“사업 종료 후 1개월 이내에 Source, DB 백업 자료 등 … <b>인쇄본 및 관련 원본파일</b>”<br>— 데이터베이스 스키마 및 <b>개체관계도</b> · 개발보고서(<b>프로그램 개발명세서, 메뉴구성도</b>) · 보안확약서 · S/W라이센스 인증서</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>3. 감리 기본 문서 목록</h2>
+
+  <h3>3-1. 계획 · 관리</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:26%">문서</th><th style="width:16%">RFP 근거</th><th style="width:20%">현행 위치</th><th style="width:9%">상태</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>사업수행계획서</td><td><code>PMR-001~003</code> <code>SER-001</code> <code>QUR-003</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>착수 시 제출한 세부 추진계획서</td></tr>
+      <tr><td class="c">2</td><td>품질보증계획서 / 품질보증 결과서</td><td><code>PER-001</code> <code>QUR-001</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>제안요청서상 명칭은 품질관리계획서·품질관리결과서다</td></tr>
+      <tr><td class="c">3</td><td>WBS 작업분해구조 (+ xlsx · 기능해설서)</td><td><code>PMR-001</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>발주처 양식 xlsx 와 HTML 해설서로 구성</td></tr>
+      <tr><td class="c">4</td><td>의사결정 대장 / 발주처 의사결정 안건서</td><td>—</td><td>감리정본 · r12</td><td class="c ok">보유</td><td>제안요청서에 명시되지 않았으나 감리 추적을 위한 관리 문서다</td></tr>
+      <tr><td class="c">5</td><td>개인정보영향평가 적용성 판정서</td><td>개인정보보호 조항</td><td>감리정본 · r12</td><td class="c ok">보유</td><td>영향평가 대상 여부 판정 근거</td></tr>
+      <tr><td class="c">6</td><td>자료 인수인계 대장 · 완전삭제 확인서</td><td><code>PMR-004</code></td><td>—</td><td class="c gap">부재</td><td>종료감리(11/23) 대상. 계약 종료 시 제출한다</td></tr>
+      <tr><td class="c">7</td><td>SW사업정보 제출 실적</td><td><code>PMR-005</code></td><td>—</td><td class="c gap">확인 필요</td><td>SW사업정보 저장소 제출 대상 여부를 확인하지 않았다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3-2. 요구 · 설계</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:26%">문서</th><th style="width:16%">RFP 근거</th><th style="width:20%">현행 위치</th><th style="width:9%">상태</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="c">8</td><td>요구사항 추적표 (RTM)</td><td>요구사항 상세화</td><td>감리정본 · r12 · KL첨부</td><td class="c ok">보유</td><td>감리 검토의 진입점이 되는 문서다</td></tr>
+      <tr><td class="c">9</td><td>기능분해도 · 데이터흐름도</td><td><code>FUN</code> 전반</td><td>감리정본 · r12</td><td class="c ok">보유</td><td>요건과 처리 흐름의 대응 관계</td></tr>
+      <tr><td class="c">10</td><td><b>시스템 설계도 (서버 구조 · 아키텍처)</b></td><td>완료보고 “메뉴구성도”</td><td>감리정본 · r12 · KL묶음</td><td class="c part">보완</td><td>v4 가 현행이나 <code>시스템_설계도.html</code>, <code>_v2</code>, <code>_v3</code> 등 이전 판 3 개가 같은 폴더에 남아 있어 정리가 필요하다</td></tr>
+      <tr><td class="c">11</td><td>화면설계서</td><td><code>INT-002</code> <code>INT-003</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>검수 콘솔 화면 구성</td></tr>
+      <tr><td class="c">12</td><td>사용자인터페이스 설계서</td><td><code>INT-001</code></td><td>화면설계서에 포함 추정</td><td class="c gap">확인 필요</td><td>별도 문서를 요구하는지 화면설계서로 갈음되는지 확인하지 않았다</td></tr>
+      <tr><td class="c">13</td><td><b>인터페이스 정의서 (API 정의서)</b></td><td><code>INT-001</code></td><td>백서 부록B + ICD</td><td class="c part">보완</td><td>백서 부록에서 <code>API_정의서</code> 로 승격했고, 연동 절차는 <code>KL_연동_규약</code> 이 규정한다. ICD 는 메타데이터 값 목록 정의로 존치한다</td></tr>
+      <tr><td class="c">14</td><td>보안 설계서</td><td><code>SER-004</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>인증·권한·암호화·감사 로그 설계</td></tr>
+      <tr><td class="c">15</td><td><b>영업비밀 등급분류 기준 적용서 (등급 산정 알고리즘)</b></td><td><code>FUN-023</code></td><td>감리정본 · r12 · KL첨부</td><td class="c part">보완</td><td>기준서는 있으나 연산 알고리즘 서술이 구현과 다르다. 연산 절차는 <code>등급분류_알고리즘_명세서</code> §4 에 정리했다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3-3. 데이터</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:26%">문서</th><th style="width:16%">RFP 근거</th><th style="width:20%">현행 위치</th><th style="width:9%">상태</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="c">16</td><td>데이터 표준 · 구조 관리 매뉴얼</td><td><code>DAR-001·002·006</code></td><td>데이터_거버넌스_계획 (감리정본 · r12)</td><td class="c part">보완</td><td>데이터 거버넌스 계획이 표준·구조 관리 매뉴얼을 대신할 수 있는지 대응 관계를 확인해야 한다</td></tr>
+      <tr><td class="c">17</td><td><b>테이블 정의서 · 데이터 사전</b></td><td><code>DAR-005</code> 명시</td><td><b>KL묶음에만</b> (<code>테이블정의서_ERD.html</code>)</td><td class="c gap">감리 트랙 부재</td><td>감리정본과 r12 어디에도 없다. 제안요청서가 산출물 이름을 명시해 요구한 항목이다</td></tr>
+      <tr><td class="c">18</td><td><b>ERD (개체관계도)</b></td><td>완료보고 명시</td><td>위와 같은 파일</td><td class="c gap">감리 트랙 부재</td><td>17 번과 한 파일에 합쳐져 있어 분리 여부를 판단해야 한다</td></tr>
+      <tr><td class="c">19</td><td>DB 스키마</td><td>완료보고 명시</td><td>백서 부록A (감리정본 · r12)</td><td class="c part">보완</td><td>13 번과 같이 백서 부록에 종속되어 있다</td></tr>
+      <tr><td class="c">20</td><td>데이터 전환 적용제외 근거서</td><td><code>DAR-003</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>기존 데이터 이관 대상이 없음을 정리</td></tr>
+      <tr><td class="c">21</td><td>골든셋 종합 (학습·평가 데이터 정의)</td><td><code>FUN-003</code></td><td>감리정본 · r12 · KL묶음</td><td class="c ok">보유</td><td>AI 사업 특성상 필요한 산출물이다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3-4. 구현</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:26%">문서</th><th style="width:16%">RFP 근거</th><th style="width:20%">현행 위치</th><th style="width:9%">상태</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="c">22</td><td>애플리케이션 모듈 명세서 (프로그램 개발명세서)</td><td>완료보고 명시</td><td>감리정본 · r12</td><td class="c ok">보유</td><td>모듈 구성과 책임 범위</td></tr>
+      <tr><td class="c">23</td><td>소프트웨어 개발보안 적용 내역</td><td><code>SER-006</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>보안 교육 자료와 참석자 명단은 별도로 확인해야 한다</td></tr>
+      <tr><td class="c">24</td><td>기술구현 백서</td><td><code>FUN</code> 전반</td><td>감리정본 · r12 · KL묶음</td><td class="c part">보완</td><td>부록 A·B·C 를 독립 산출물로 승격하면 백서는 본문만 남는다</td></tr>
+      <tr><td class="c">25</td><td>모델 카드 · 서빙 운영점 파라미터 명세</td><td><code>FUN-004</code> <code>FUN-024</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>AI 사업 특성상 필요한 산출물이다</td></tr>
+      <tr><td class="c">26</td><td><b>오픈소스 라이선스 검토서 · 기술스택 버전표</b></td><td><code>COR-002</code> 저작권 · 완료보고 “S/W라이센스 인증서”</td><td><b>KL묶음에만</b></td><td class="c gap">감리 트랙 부재</td><td>감리정본과 r12 어디에도 없다. <code>COR-002</code> 는 저작권 책임을 계약자에게 부과한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3-5. 시험 · 검증</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:26%">문서</th><th style="width:16%">RFP 근거</th><th style="width:20%">현행 위치</th><th style="width:9%">상태</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="c">27</td><td>시험케이스 및 결과서</td><td><code>TER-001~003</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>요건별 시험 항목과 수행 결과</td></tr>
+      <tr><td class="c">28</td><td>테스트 전략 및 이력</td><td><code>TER-001</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>시험 범위와 수행 이력</td></tr>
+      <tr><td class="c">29</td><td>결함관리대장</td><td><code>QUR</code></td><td>감리정본 · r12</td><td class="c ok">보유</td><td>결함 등록·조치·확인 이력</td></tr>
+      <tr><td class="c">30</td><td><b>보안 취약점 점검 결과 · 조치 이행 결과</b></td><td><code>SER-003</code> 명시</td><td>—</td><td class="c gap">부재</td><td>독립 문서가 없다. 소프트웨어 개발보안 적용 내역에 언급만 있다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3-6. 운영 · 배포</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:26%">문서</th><th style="width:16%">RFP 근거</th><th style="width:20%">현행 위치</th><th style="width:9%">상태</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="c">31</td><td>운영 매뉴얼(관리자용)</td><td><code>PSR-004</code></td><td>사용자매뉴얼_검수관리자 (감리정본 · r12)</td><td class="c ok">보유</td><td>검수 관리자 업무 절차</td></tr>
+      <tr><td class="c">32</td><td>운영 매뉴얼(사용자용)</td><td><code>PSR-004</code></td><td>골든셋_관리콘솔_사용매뉴얼 (<b>KL묶음에만</b>)</td><td class="c part">보완</td><td>관리자용·사용자용 구분은 제안요청서 문구다. 감리 산출물 편입 여부를 판단해야 한다</td></tr>
+      <tr><td class="c">33</td><td>시나리오별 문제 해결 가이드</td><td><code>PSR-004</code></td><td>운영_런북 (의존성 장애 런북 · 롤백/DR 절)</td><td class="c part">보완</td><td>운영 런북이 일부를 대신한다. 독립 문서를 요구하는지 확인해야 한다</td></tr>
+      <tr><td class="c">34</td><td>폐쇄망 설치 · 배포 설계서</td><td>인프라 요구</td><td>감리정본 · r12</td><td class="c ok">보유</td><td>이미지 반입부터 기동까지 설치 절차</td></tr>
+      <tr><td class="c">35</td><td>하자보수 처리 결과 보고서</td><td><code>PER-002</code> <code>QUR-002</code></td><td>—</td><td class="c gap">부재</td><td>하자보수 기간 산출물로 사업 종료 후 작성한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+
+  <h2>4. 이 폴더의 문서</h2>
+  <p><code>doc/감리문서/</code> 를 작업 정본으로 둔다. 신규 문서와 정비 대상 문서를 이 폴더에서 작성하고,
+  기존 문서는 내용을 수정할 때 함께 이관한다. 이관이 완료되면 <code>docs_registry.yaml</code> 의
+  <code>active_public_root</code> 를 이 폴더로 변경한다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:28%">문서</th><th style="width:16%">RFP 근거</th><th style="width:12%">상태</th><th>생성 원본</th></tr></thead>
+    <tbody>
+      <tr><td class="c">0</td><td><code>감리문서_대장.html</code></td><td>관리 문서</td><td class="c ok">작성</td><td>제안요청서 산출정보 50블록 · 4개 폴더 교차 대조</td></tr>
+      <tr><td class="c">1</td><td><code>등급분류_알고리즘_명세서.html</code></td><td><code>FUN-023</code></td><td class="c ok">작성</td><td>rule_engine · pipeline · classify_service 코드 실행 순서</td></tr>
+      <tr><td class="c">2</td><td><code>API_정의서.html</code></td><td><code>INT-001</code></td><td class="c ok">작성</td><td>OpenAPI 스펙 — 엔드포인트 64 · 스키마 81</td></tr>
+      <tr><td class="c">3</td><td><code>테이블_정의서.html</code></td><td><code>DAR-005</code></td><td class="c ok">작성</td><td>SQLAlchemy 메타데이터 — 테이블 19 · 컬럼 236</td></tr>
+      <tr><td class="c">4</td><td><code>ERD_개체관계도.html</code></td><td>완료보고 개체관계도</td><td class="c ok">작성</td><td>ORM 외래키 25개 관계</td></tr>
+      <tr><td class="c">5</td><td><code>오픈소스_기술스택_명세.html</code></td><td><code>COR-002</code></td><td class="c ok">작성</td><td>pyproject · uv.lock · 라이선스 인벤토리 178항목</td></tr>
+      <tr><td class="c">6</td><td><code>시스템_서버_구조.html</code></td><td>인프라 · 완료보고</td><td class="c ok">작성</td><td>compose · Dockerfile · 프로파일 · 시험서버 실측</td></tr>
+      <tr><td class="c">7</td><td><code>KL_연동_규약.html</code></td><td><code>INT-001</code></td><td class="c ok">작성</td><td>등록·판정 2단계 확정 · 책임 분담 · 연동 시험 시나리오</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    여섯 문서는 모두 소스 코드, 설정 파일, 서버 실측값에서 생성했다. 문서를 다른 문서에서 옮겨 적으면
+    구현에 없는 내용이 문서에만 남을 수 있기 때문이다. 각 문서의 문서정보 표에 생성 원본과 재현 방법을
+    기재했으므로, 수치의 근거를 확인해야 할 때는 해당 명령을 실행하면 된다.
+  </div>
+
+  <h2>5. 우선 작성 대상 6 종의 처리 결과</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">요청 문서</th><th style="width:10%">상태</th><th style="width:34%">지금 무엇이 문제인가</th><th>처리 결과</th></tr></thead>
+    <tbody>
+      <tr><td>API 정의서</td><td class="c part">보완</td><td>백서 부록B(내부 API)와 ICD(KL 연동)로 갈려 있고, 둘 다 독립 산출물이 아니다</td><td class="ok">완료. <code>API_정의서.html</code> 에 엔드포인트 64 건을 분류별 표로 정리하고 인증 3 개 모드, 오류 구분 방식, 프로파일별 노출 차이를 수록했다. ICD 는 대외 연동 규약으로 분리해 유지한다</td></tr>
+      <tr><td>테이블 정의서</td><td class="c gap">감리 트랙 부재</td><td><code>테이블정의서_ERD.html</code> 이 KL묶음에만 있다. <code>DAR-005</code> 가 이름을 대고 요구한 산출물이다</td><td class="ok">완료. <code>테이블_정의서.html</code> 에 테이블 19 개, 컬럼 236 개를 ORM 메타데이터에서 생성했다. 컬럼 주석이 0 건인 점은 보완 대상으로 표기했다</td></tr>
+      <tr><td>ERD</td><td class="c gap">감리 트랙 부재</td><td>테이블 정의서와 한 파일에 합쳐져 있다</td><td class="ok">완료. <code>ERD_개체관계도.html</code> 로 분리하고 외래키 25 개 관계를 관계도와 목록으로 수록했다</td></tr>
+      <tr><td>등급분류 공식 연산 알고리즘</td><td class="c part">보완</td><td>기준서(v2.2)는 있으나 <b>실제 연산 순서가 문서와 다르다</b> — 곱셈식이 최종 등급을 바꾸는 경우가 16분기 중 1개, 993건 실측 발동 0건</td><td class="ok">완료. <code>등급분류_알고리즘_명세서.html</code> 에 서빙 5 단계, 룰 3 단계, 검수 게이트 15 종, 운영 파라미터 실측값을 수록했다. 기준서 v2.2 는 법적 기준 문서로 존치한다</td></tr>
+      <tr><td>서버 구조</td><td class="c part">보완</td><td>시스템 설계도 v4 가 현행인데 v1·v2·v3 이 같은 폴더에 남아 감리에서 어느 것이 정본인지 물을 수 있다</td><td class="part">문서 작성은 완료했다. <code>시스템_서버_구조.html</code> 에 프로파일 4 종, 컨테이너 구성, 시험 서버 실측값, 노드 역할 분리를 수록했다. 다만 이전 판 v1·v2·v3 정리는 아직 하지 않았다</td></tr>
+      <tr><td>사용 오픈소스</td><td class="c gap">감리 트랙 부재</td><td>라이선스 검토서·기술스택 버전표가 KL묶음에만 있다. <code>COR-002</code> 는 저작권 책임을 계약자에게 둔다</td><td class="ok">완료. <code>오픈소스_기술스택_명세.html</code> 에 선언 의존성과 배포 이미지 설치분을 구분해 기술하고, 카피레프트 건별 판단과 라이선스 목록의 수치 불일치 1 건을 표기했다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>6. 남은 항목</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">갭 유형</th><th style="width:10%">건수</th><th>대상</th></tr></thead>
+    <tbody>
+      <tr><td class="part">감리 트랙 부재 → 해소</td><td class="c n">4</td><td>테이블 정의서, ERD, 오픈소스, 기술스택. §4 와 같이 본 폴더에 신규 작성했다. KL 묶음 사본과의 통합 여부는 별도 판단이 필요하다</td></tr>
+      <tr><td class="gap">감리 트랙 부재 (잔여)</td><td class="c n">1</td><td>사용자용 운영 매뉴얼. KL 묶음에만 존재한다</td></tr>
+      <tr><td class="gap">문서 자체 부재</td><td class="c n">2</td><td>보안 취약점 점검 결과·조치 이행 결과(<code>SER-003</code>) · 자료 인수인계 대장·완전삭제 확인서(<code>PMR-004</code>, 종료 시)</td></tr>
+      <tr><td class="part">부록 종속 (잔여)</td><td class="c n">2</td><td>DB 스키마(부록A)와 지표 용어 해설(부록C). API 명세(부록B)는 §4 의 2 번 문서로 승격했다</td></tr>
+      <tr><td class="part">서술 ↔ 구현 불일치</td><td class="c n">1</td><td>등급분류 기준 적용서 v2.2 와 백서의 “독립 판독”·“100% 곱셈식” 서술</td></tr>
+      <tr><td class="part">옛판 잔존</td><td class="c n">4</td><td>시스템 설계도 v1·v2·v3, 골든셋 분류근거 v4</td></tr>
+      <tr><td class="part">확인 필요</td><td class="c n">3</td><td>사용자인터페이스 설계서(<code>INT-001</code>) · SW사업정보 제출(<code>PMR-005</code>) · 시나리오별 문제해결 가이드(<code>PSR-004</code>)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>7. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. 제안요청서 산출정보 50 블록을 추출하고 4 개 폴더를 교차 대조하여 기본 문서 35 항목을 정리했으며, 신규 6 종을 작성했다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">
+    근거 파일 —
+    <code>doc/[참고] AI 영업비밀 관리시스템 구축 사업 제안요청서.pdf</code> ·
+    <code>doc/releases/2026-08-사전진단-r12/manifest.yaml</code> ·
+    <code>doc/docs_registry.yaml</code> ·
+    <code>doc/result/감리정본/</code> ·
+    <code>doc/result/KL_AI자료_2026-08/</code> ·
+    <code>doc/internal/룰_판정식_감사.html</code>
+  </div>
+</div>
+
+</body>
+</html>

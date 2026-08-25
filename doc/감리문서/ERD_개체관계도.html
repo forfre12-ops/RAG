@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ERD 개체관계도</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">ERD 개체관계도</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 데이터</div>
+    <h1>ERD 개체관계도</h1>
+    <div class="meta">완료보고 제출물(개체관계도) · 테이블 19 · 관계 25 · 2026-08-26</div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>요구사항</th><td>완료보고 제출물 “데이터베이스 스키마 및 개체관계도” · <code>DAR-005</code></td></tr>
+      <tr><th>생성 원본</th><td><code>poc/src/koipa/db/models.py</code> — SQLAlchemy <code>Base.metadata</code> 외래키</td></tr>
+      <tr><th>짝 문서</th><td><code>테이블_정의서</code> (컬럼 상세)</td></tr>
+      <tr><th>작성일</th><td>2026-08-26</td></tr>
+      <tr><th>근거 커밋</th><td><code>d3fe51c3</code></td></tr>
+    </tbody>
+  </table>
+
+
+  <div class="note">
+    AI 엔진 스키마의 개체 관계를 나타낸다. 상자는 테이블, 화살표는 외래키이며 자식 테이블에서
+    부모 테이블 방향이다. ORM 메타데이터에서 생성했으며 컬럼 상세는 <code>테이블_정의서</code> 에 있다.
+  </div>
+
+  <h2>1. 개체 관계도</h2>
+  <div class="tw">
+  <svg viewBox="0 0 1178 320" width="100%" style="max-width:1178px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="개체 관계도">
+<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#71717a"/></marker></defs>
+<path d="M678,57 C580,57 580,109 482,109" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M482,57 C348,57 348,109 214,109" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M482,109 C348,109 348,57 214,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M482,109 C464,109 464,213 446,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M482,161 C348,161 348,57 214,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M482,161 C348,161 348,57 214,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M678,161 C580,161 580,109 482,109" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M678,161 C696,161 696,213 714,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M446,109 C348,109 348,213 250,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M250,109 C232,109 232,109 214,109" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M250,161 C232,161 232,57 214,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M446,161 C348,161 348,213 250,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M214,161 C116,161 116,57 18,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M214,161 C116,161 116,109 18,109" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M946,265 C580,265 580,57 214,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M946,265 C580,265 580,57 214,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M946,265 C696,265 696,213 446,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M1142,265 C1044,265 1044,213 946,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M1142,265 C1044,265 1044,213 946,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M1142,265 C1044,265 1044,213 946,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M714,109 C464,109 464,57 214,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M714,109 C580,109 580,213 446,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M910,109 C812,109 812,213 714,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M910,161 C812,161 812,213 714,213" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<path d="M910,213 C812,213 812,57 714,57" fill="none" stroke="#a1a1aa" stroke-width="1.1" marker-end="url(#a)" opacity=".85"/>
+<rect x="946" y="40" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="954" y="54" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">감사 로그</text>
+<text x="954" y="67" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_audit_log · 13열</text>
+<rect x="250" y="40" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="258" y="54" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">문서 청크</text>
+<text x="258" y="67" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_chunks · 12열</text>
+<rect x="482" y="40" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="490" y="54" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">분류 판정 근거</text>
+<text x="490" y="67" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_classification_evidence · 13열</text>
+<rect x="18" y="40" width="196" height="34" fill="#e4e4e7" stroke="#0a0a0a" stroke-width="1"/>
+<text x="26" y="54" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">등급 체계</text>
+<text x="26" y="67" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_classification_levels · 11열</text>
+<rect x="482" y="92" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="490" y="106" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">분류 결과</text>
+<text x="490" y="119" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_classifications · 16열</text>
+<rect x="482" y="144" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="490" y="158" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">검수 교정 이력</text>
+<text x="490" y="171" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_corrections · 10열</text>
+<rect x="250" y="92" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="258" y="106" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">문서 평가요소 점수</text>
+<text x="258" y="119" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_document_factor_scores · 3열</text>
+<rect x="250" y="144" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="258" y="158" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">문서 라벨</text>
+<text x="258" y="171" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_document_labels · 11열</text>
+<rect x="250" y="196" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="258" y="210" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">문서</text>
+<text x="258" y="223" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_documents · 20열</text>
+<rect x="18" y="92" width="196" height="34" fill="#e4e4e7" stroke="#0a0a0a" stroke-width="1"/>
+<text x="26" y="106" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">평가요소</text>
+<text x="26" y="119" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_evaluation_factors · 8열</text>
+<rect x="946" y="92" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="954" y="106" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">가이드 문서</text>
+<text x="954" y="119" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_guides · 13열</text>
+<rect x="18" y="144" width="196" height="34" fill="#e4e4e7" stroke="#0a0a0a" stroke-width="1"/>
+<text x="26" y="158" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">등급 키워드</text>
+<text x="26" y="171" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_level_keywords · 10열</text>
+<rect x="946" y="144" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="954" y="158" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">LLM 사용량</text>
+<text x="954" y="171" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_llm_usage · 15열</text>
+<rect x="714" y="40" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="722" y="54" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">모델 버전</text>
+<text x="722" y="67" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_model_versions · 18열</text>
+<rect x="946" y="196" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="954" y="210" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">프롬프트 버전</text>
+<text x="954" y="223" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_prompt_versions · 9열</text>
+<rect x="946" y="248" width="196" height="34" fill="#fafafa" stroke="#0a0a0a" stroke-width="1"/>
+<text x="954" y="262" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">합성·샘플 문서</text>
+<text x="954" y="275" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_sample_documents · 21열</text>
+<rect x="714" y="92" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="722" y="106" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">학습셋 구성</text>
+<text x="722" y="119" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_training_datasets · 5열</text>
+<rect x="714" y="144" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="722" y="158" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">학습 에폭 지표</text>
+<text x="722" y="171" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_training_epochs · 7열</text>
+<rect x="714" y="196" width="196" height="34" fill="#f4f4f5" stroke="#0a0a0a" stroke-width="1"/>
+<text x="722" y="210" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0a0a0a">학습 실행</text>
+<text x="722" y="223" font-family="ui-monospace,monospace" font-size="8.5" fill="#71717a">tb_training_runs · 21열</text>
+</svg>
+  </div>
+  <p class="src">테이블 19 개, 외래키 관계 25 개. 열 배치는 기준, 문서, 분류, 학습, 데이터·운영 순이다.</p>
+
+  <h2>2. 관계 목록</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:32%">자식 테이블</th><th style="width:22%">외래키 컬럼</th><th style="width:32%">부모 테이블</th><th style="width:14%">영역</th></tr></thead>
+    <tbody>
+      <tr><td>분류 판정 근거 <span class="src">tb_classification_evidence</span></td><td><code>classification_id</code></td><td>분류 결과 <span class="src">tb_classifications</span></td><td>분류</td></tr>
+      <tr><td>분류 판정 근거 <span class="src">tb_classification_evidence</span></td><td><code>factor_id</code></td><td>평가요소 <span class="src">tb_evaluation_factors</span></td><td>분류</td></tr>
+      <tr><td>분류 결과 <span class="src">tb_classifications</span></td><td><code>predicted_level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>분류</td></tr>
+      <tr><td>분류 결과 <span class="src">tb_classifications</span></td><td><code>doc_id</code></td><td>문서 <span class="src">tb_documents</span></td><td>분류</td></tr>
+      <tr><td>검수 교정 이력 <span class="src">tb_corrections</span></td><td><code>corrected_level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>분류</td></tr>
+      <tr><td>검수 교정 이력 <span class="src">tb_corrections</span></td><td><code>original_level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>분류</td></tr>
+      <tr><td>검수 교정 이력 <span class="src">tb_corrections</span></td><td><code>classification_id</code></td><td>분류 결과 <span class="src">tb_classifications</span></td><td>분류</td></tr>
+      <tr><td>검수 교정 이력 <span class="src">tb_corrections</span></td><td><code>consumed_in_run</code></td><td>학습 실행 <span class="src">tb_training_runs</span></td><td>분류</td></tr>
+      <tr><td>문서 평가요소 점수 <span class="src">tb_document_factor_scores</span></td><td><code>doc_id</code></td><td>문서 <span class="src">tb_documents</span></td><td>문서</td></tr>
+      <tr><td>문서 평가요소 점수 <span class="src">tb_document_factor_scores</span></td><td><code>factor_id</code></td><td>평가요소 <span class="src">tb_evaluation_factors</span></td><td>문서</td></tr>
+      <tr><td>문서 라벨 <span class="src">tb_document_labels</span></td><td><code>level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>문서</td></tr>
+      <tr><td>문서 라벨 <span class="src">tb_document_labels</span></td><td><code>doc_id</code></td><td>문서 <span class="src">tb_documents</span></td><td>문서</td></tr>
+      <tr><td>등급 키워드 <span class="src">tb_level_keywords</span></td><td><code>level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>기준</td></tr>
+      <tr><td>등급 키워드 <span class="src">tb_level_keywords</span></td><td><code>factor_id</code></td><td>평가요소 <span class="src">tb_evaluation_factors</span></td><td>기준</td></tr>
+      <tr><td>합성·샘플 문서 <span class="src">tb_sample_documents</span></td><td><code>corrected_level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>데이터</td></tr>
+      <tr><td>합성·샘플 문서 <span class="src">tb_sample_documents</span></td><td><code>target_level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>데이터</td></tr>
+      <tr><td>합성·샘플 문서 <span class="src">tb_sample_documents</span></td><td><code>doc_id</code></td><td>문서 <span class="src">tb_documents</span></td><td>데이터</td></tr>
+      <tr><td>합성·샘플 문서 <span class="src">tb_sample_documents</span></td><td><code>body_prompt_version</code></td><td>프롬프트 버전 <span class="src">tb_prompt_versions</span></td><td>데이터</td></tr>
+      <tr><td>합성·샘플 문서 <span class="src">tb_sample_documents</span></td><td><code>outline_prompt_version</code></td><td>프롬프트 버전 <span class="src">tb_prompt_versions</span></td><td>데이터</td></tr>
+      <tr><td>합성·샘플 문서 <span class="src">tb_sample_documents</span></td><td><code>qc_prompt_version</code></td><td>프롬프트 버전 <span class="src">tb_prompt_versions</span></td><td>데이터</td></tr>
+      <tr><td>학습셋 구성 <span class="src">tb_training_datasets</span></td><td><code>level_id</code></td><td>등급 체계 <span class="src">tb_classification_levels</span></td><td>학습</td></tr>
+      <tr><td>학습셋 구성 <span class="src">tb_training_datasets</span></td><td><code>doc_id</code></td><td>문서 <span class="src">tb_documents</span></td><td>학습</td></tr>
+      <tr><td>학습셋 구성 <span class="src">tb_training_datasets</span></td><td><code>run_id</code></td><td>학습 실행 <span class="src">tb_training_runs</span></td><td>학습</td></tr>
+      <tr><td>학습 에폭 지표 <span class="src">tb_training_epochs</span></td><td><code>run_id</code></td><td>학습 실행 <span class="src">tb_training_runs</span></td><td>학습</td></tr>
+      <tr><td>학습 실행 <span class="src">tb_training_runs</span></td><td><code>model_version</code></td><td>모델 버전 <span class="src">tb_model_versions</span></td><td>학습</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><code>tb_model_versions.rolled_back_from</code> 은 같은 테이블의 <code>version_id</code> 를 참조하는 자기참조 관계로, 롤백 대상 버전을 가리킨다. 관계도에는 표시하지 않았다.</p>
+
+  <h2>3. 읽는 법 — 세 갈래</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:16%">갈래</th><th style="width:40%">경로</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td>판정</td><td>문서 → 분류 결과 → 분류 판정 근거<br><span class="src">tb_documents → tb_classifications → tb_classification_evidence</span></td><td>문서 1 건이 분류 결과를 가지고, 그 결과가 평가요소별 근거를 가진다</td></tr>
+      <tr><td>기준</td><td>등급 체계 · 평가요소 ← 등급 키워드<br><span class="src">tb_classification_levels · tb_evaluation_factors ← tb_level_keywords</span></td><td>등급과 평가요소가 정본이고 키워드가 이 둘을 참조한다. 운영 중 변경할 수 있다</td></tr>
+      <tr><td>학습</td><td>검수 교정 이력 → 학습 실행 → 모델 버전<br><span class="src">tb_corrections → tb_training_runs → tb_model_versions</span></td><td>사람이 교정한 내용이 학습 실행에 반영되고, 학습 실행이 모델 버전을 생성한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>4. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. ORM 외래키에서 관계도와 관계 목록을 생성했으며 감리 산출물로 신규 편입했다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 — <code>poc/src/koipa/db/models.py</code> · <code>poc/alembic/</code></div>
+</div>
+</body>
+</html>
