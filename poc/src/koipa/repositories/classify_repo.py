@@ -491,6 +491,19 @@ class ClassifyRepo:
             return "overclass"
         return "confirm"
 
+    def latest_correction_for_classification(self, classification_id: uuid.UUID):
+        """분류 1건의 가장 최근 교정 기록 (없으면 None).
+
+        confirm/relabel 은 예측 등급을 덮어쓰지 않고 여기에 사람 판단을 남긴다.
+        따라서 '확정 등급'의 정본은 이 행의 corrected_level_id 다.
+        """
+        return (
+            self.db.query(Correction)
+            .filter(Correction.classification_id == classification_id)
+            .order_by(Correction.corrected_at.desc(), Correction.correction_id.desc())
+            .first()
+        )
+
     def unconsumed_corrections(self) -> list[Correction]:
         return list(
             self.db.execute(

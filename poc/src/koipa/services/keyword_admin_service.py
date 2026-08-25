@@ -63,6 +63,24 @@ def validate_pattern(keyword: str, pattern_type: str) -> None:
         ) from exc
 
 
+# semantic 은 계약상 유효한 값이라 거부하지 않는다. 다만 현행 구현으로는 **한 번도
+# 매칭되지 않는다** — `_semantic_match` 가 시드 구를 문서 **전체** 임베딩과 비교하는데,
+# 실측(2026-08-26 · 223 · 실문서 40건 x 시드 3개 = 120쌍)에서 코사인 최대가 0.551 로
+# 임계 0.75 에 닿은 적이 없다. 조용히 죽는 규칙을 만들지 않도록 응답에 경고를 싣는다.
+# (임계만 낮추는 것은 답이 아니다. 문서 단위 코사인은 평범한 문서가 0.31~0.55 에 고르게
+#  깔려 변별력이 없다. 문장·청크 단위 비교가 들어와야 열 수 있다.)
+_SEMANTIC_INERT_NOTE = (
+    "pattern_type=semantic 은 현행 구현에서 매칭되지 않습니다 "
+    "(시드 구 vs 문서 전체 임베딩, 실측 코사인 최대 0.551 < 임계 0.75). "
+    "이 규칙은 저장되지만 판정에 관여하지 않습니다 — exact 또는 regex 를 쓰십시오."
+)
+
+
+def semantic_warning(pattern_type: str) -> list[str]:
+    """semantic 이면 '저장은 되지만 발동하지 않는다'는 경고 한 줄. 아니면 빈 목록."""
+    return [_SEMANTIC_INERT_NOTE] if pattern_type == "semantic" else []
+
+
 def resolve_grade_id(level_code_to_id: dict[str, int], grade: str) -> int:
     """등급 코드 → level_id. 활성 등급이 아니면 400."""
     lid = level_code_to_id.get(grade)
@@ -186,6 +204,7 @@ class KeywordAdminService:
                 seeded = self._ensure_seeded(db, grade_to_id, factor_to_id)
                 level_id = resolve_grade_id(grade_to_id, req.grade)
                 factor_id, warns = resolve_factor_id(factor_to_id, req.factor)
+                warns += semantic_warning(req.pattern_type)
                 kw = LevelKeyword(
                     level_id=level_id,
                     keyword=req.keyword.strip(),
@@ -246,6 +265,7 @@ class KeywordAdminService:
                     changed.append("keyword")
                 if req.pattern_type is not None:
                     kw.pattern_type = req.pattern_type
+                    warns += semantic_warning(req.pattern_type)
                     changed.append("pattern_type")
                 if req.factor is not None:
                     fid, w = resolve_factor_id(factor_to_id, req.factor)

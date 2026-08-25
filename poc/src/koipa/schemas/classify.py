@@ -145,3 +145,17 @@ class ClassifyResponse(BaseModel):
     decision_path: Optional[str] = None
     # 자동확정 위험도 보정 전의 그림자 관측치. 정책을 바꾸지 않고 검수 결과와 연결한다.
     automation_assessment: Optional[AutomationAssessment] = None
+
+    # [KL 연동 2026-08-26] 사람이 확정한 등급. 예측(label)과 별개다.
+    #
+    # 왜. confirm 은 예측 등급을 덮어쓰지 않는다 — 모델이 뭐라 했는지와 사람이 뭘로 정했는지를
+    # 둘 다 남기는 설계이고, 사람 판단은 tb_corrections 에 적힌다. 그래서 확정 뒤에도
+    # GET /classify/{doc_id} 의 label 은 예측 등급 그대로다(실측 2026-08-26: 예측 S2 를
+    # S1 으로 확정했는데 조회는 S2). KL 이 확정 등급을 받으려면 승격 대기 목록을 우회
+    # 조회해야 했다 — 이름도 의미도 맞지 않고 승격되면 목록에서 사라진다.
+    #
+    # 아래 세 필드는 교정 기록에서 읽어 채운다. 교정이 없으면 None 이라 기존 응답과 같다
+    # (추가 전용 · 하위호환). label 은 예측으로 남겨 감사 증적을 보존한다.
+    confirmed_label: Optional[str] = None
+    confirmed_by: Optional[str] = None
+    confirmed_at: Optional[str] = None

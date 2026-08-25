@@ -76,6 +76,17 @@ def classify_recent_for_doc(doc_id: str):
                 code = alt.get("level_code")
                 if code:
                     scores[code] = float(alt.get("confidence", 0.0))
+            # [KL 연동] 확정 등급 — 사람이 확정했으면 교정 기록에서 읽어 함께 내려 준다.
+            # label 은 예측 그대로 둔다(감사 증적 보존). 교정이 없으면 세 필드 모두 None 이라
+            # 기존 응답과 동일하다.
+            confirmed_label = confirmed_by = confirmed_at = None
+            corr = repo.latest_correction_for_classification(cls.classification_id)
+            if corr is not None:
+                clvl = db.get(ClassificationLevel, corr.corrected_level_id)
+                confirmed_label = clvl.level_code if clvl else None
+                confirmed_by = corr.corrected_by
+                confirmed_at = corr.corrected_at.isoformat() if corr.corrected_at else None
+
             return ClassifyResponse(
                 inference_id=cls.classification_id,
                 doc_id=doc_id,
@@ -85,6 +96,9 @@ def classify_recent_for_doc(doc_id: str):
                 model_version=cls.model_version,
                 elapsed_ms=cls.inference_ms or 0,
                 status=cls.status,
+                confirmed_label=confirmed_label,
+                confirmed_by=confirmed_by,
+                confirmed_at=confirmed_at,
             )
     except HTTPException:
         raise

@@ -1012,7 +1012,7 @@ details.adv[open]{padding-bottom:12px;}
               <select id="kw-n-pattern">
                 <option value="exact">exact — 부분문자열</option>
                 <option value="regex">regex — 정규식</option>
-                <option value="semantic">semantic — 임베딩 유사</option>
+                <option value="semantic" disabled>semantic — 임베딩 유사 (현재 비활성: 문장 단위 비교 도입 전)</option>
               </select>
             </div>
           </div>
@@ -1036,7 +1036,7 @@ details.adv[open]{padding-bottom:12px;}
             <tbody id="kw-body"><tr><td colspan="8" style="color:var(--text-dim)">「키워드 조회」를 누르면 태깅 규칙이 나옵니다</td></tr></tbody>
           </table>
         </div>
-        <p class="sec-note">변경은 <b>핫리로드</b>로 재기동 없이 반영됩니다. 삭제하면 <b>비활성 처리</b>되고 이력은 남습니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히 — 다중 워커 · 가중치 상한</summary>응답의 <code>serving_reloaded</code> 는 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code> 를 워커 수만큼 호출하거나 롤링 재기동하세요. 삭제는 <code>is_active=false</code> 이며 FK·감사 이력이 보존됩니다. 가중치는 <b>0.01 ~ 9.99</b> 입니다 — 0은 등급 점수에 기여하지 않으면서 근거로만 집계돼 허용하지 않습니다. 규칙을 끄려면 삭제(비활성)를 쓰십시오.</details></p>
+        <p class="sec-note">변경은 <b>핫리로드</b>로 재기동 없이 반영됩니다. 삭제하면 <b>비활성 처리</b>되고 이력은 남습니다.<details style="margin-top:4px"><summary style="cursor:pointer">자세히 — 다중 워커 · 가중치 · semantic 비활성</summary>응답의 <code>serving_reloaded</code> 는 <b>요청을 처리한 워커</b>의 반영 여부입니다. <b>다중 워커(gunicorn) 운영에서는 나머지 워커가 재기동·다음 리로드까지 이전 규칙을 유지</b>하므로, 전 워커 즉시 반영이 필요하면 <code>POST /admin/model/reload</code> 를 워커 수만큼 호출하거나 롤링 재기동하세요. 삭제는 <code>is_active=false</code> 이며 FK·감사 이력이 보존됩니다. <b>semantic(임베딩 유사)은 현재 고를 수 없습니다.</b> 지금 구현은 시드 구를 <b>문서 전체</b> 임베딩과 비교하는데, 실측(2026-08-26 · 실문서 40건 × 시드 3개 = 120쌍) 코사인이 최대 <code>0.551</code> 로 임계 <code>0.75</code> 에 한 번도 닿지 않았습니다. 즉 골라도 그 규칙은 영영 매칭되지 않습니다. 임계만 낮추면 평범한 문서가 대량으로 걸리므로(문서 단위 코사인은 0.31~0.55 에 고르게 깔림), 문장·청크 단위 비교를 넣은 뒤에 다시 엽니다. 가중치는 <b>0.01 ~ 9.99</b> 입니다 — 0은 등급 점수에 기여하지 않으면서 근거로만 집계돼 허용하지 않습니다. 규칙을 끄려면 삭제(비활성)를 쓰십시오.</details></p>
       </div>
     </section>
 
@@ -2801,7 +2801,7 @@ function renderKeywords(){
       <td class="mono">${k.keyword_id}</td>
       <td>${gradeTag(k.grade)}</td>
       <td><input id="kw-k-${i}" type="text" value="${esc(k.keyword)}" /></td>
-      <td><select id="kw-p-${i}">${['exact','regex','semantic'].map(p=>`<option value="${p}" ${p===k.pattern_type?'selected':''}>${p}</option>`).join('')}</select></td>
+      <td><select id="kw-p-${i}">${['exact','regex','semantic'].map(p=>`<option value="${p}" ${p===k.pattern_type?'selected':''} ${p==='semantic'&&k.pattern_type!=='semantic'?'disabled':''}>${p}${p==='semantic'?' (비활성)':''}</option>`).join('')}</select></td>
       <td><select id="kw-fa-${i}">${['','SECRECY','VALUE','MANAGEMENT'].map(f=>`<option value="${f}" ${f===(k.factor||'')?'selected':''}>${f||'(없음)'}</option>`).join('')}</select></td>
       <td><input id="kw-w-${i}" type="number" min="0.01" max="9.99" step="0.05" value="${Number(k.weight)}" style="width:82px" /></td>
       <td>${k.is_active?'<span class="pill ok">활성</span>':'<span class="pill">비활성</span>'}</td>
