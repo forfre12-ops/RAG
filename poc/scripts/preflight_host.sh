@@ -76,22 +76,39 @@ else
 fi
 
 # ── 3. SELinux ──────────────────────────────────────────────────────────
+# getenforce(libselinux-utils)가 없는 최소 설치도 있으므로 커널 인터페이스를 먼저 본다.
+# /sys/fs/selinux/enforce 는 1=Enforcing · 0=Permissive, 파일 자체가 없으면 비활성이다.
 head_ "3. SELinux"
-if command -v getenforce >/dev/null 2>&1; then
-  MODE="$(getenforce 2>/dev/null)"
-  case "$MODE" in
-    Enforcing)
-      warning "SELinux 가 Enforcing 이다"
-      note "bind mount 경로에 라벨이 필요하다. 동봉 compose 는 ../models 와 mtls 경로에"
-      note "이미 ':z' 라벨을 붙여 두었으므로 그대로 사용하면 된다."
-      note "그래도 접근 거부가 나면 확인: sudo ausearch -m avc -ts recent" ;;
-    Permissive) ok "SELinux Permissive — 라벨 문제로 막히지 않는다" ;;
-    Disabled)   ok "SELinux 비활성" ;;
-    *)          warning "SELinux 상태를 판별하지 못했다: ${MODE:-없음}" ;;
+case "$OS_ID $OS_LIKE" in
+  *rhel*|*fedora*|*rocky*|*centos*) RHEL_FAMILY=1 ;;
+  *)                                RHEL_FAMILY=0 ;;
+esac
+MODE=""
+if [ -r /sys/fs/selinux/enforce ]; then
+  case "$(cat /sys/fs/selinux/enforce 2>/dev/null)" in
+    1) MODE=Enforcing ;;
+    0) MODE=Permissive ;;
   esac
-else
-  ok "SELinux 도구 없음 (비-RHEL 계열로 보인다)"
+elif command -v getenforce >/dev/null 2>&1; then
+  MODE="$(getenforce 2>/dev/null)"
 fi
+case "$MODE" in
+  Enforcing)
+    warning "SELinux 가 Enforcing 이다"
+    note "bind mount 경로에 라벨이 필요하다. 동봉 compose 는 ../models 와 mtls 경로에"
+    note "이미 ':z' 라벨을 붙여 두었으므로 그대로 사용하면 된다."
+    note "그래도 접근 거부가 나면 확인: sudo ausearch -m avc -ts recent" ;;
+  Permissive) ok "SELinux Permissive — 라벨 문제로 막히지 않는다" ;;
+  "")
+    if [ "$RHEL_FAMILY" = 1 ]; then
+      warning "RHEL 계열인데 SELinux 상태를 읽지 못했다"
+      note "커널 인터페이스(/sys/fs/selinux)와 getenforce 둘 다 없다. 비활성일 수도 있고"
+      note "도구가 빠진 것일 수도 있다. 확인: sudo dnf install -y libselinux-utils && getenforce"
+    else
+      ok "SELinux 비활성 (비-RHEL 계열)"
+    fi ;;
+  *) warning "SELinux 상태를 판별하지 못했다: $MODE" ;;
+esac
 
 # ── 4. 방화벽 · 포트 ────────────────────────────────────────────────────
 head_ "4. 방화벽 · 포트"
@@ -140,6 +157,12 @@ if command -v free >/dev/null 2>&1; then
   MEMG="$(free -g | awk '/^Mem:/{print $2}')"
   ok "메모리 ${MEMG} GB"
   [ "${MEMG:-0}" -lt 16 ] 2>/dev/null && warning "16GB 미만이다 — 분류기 적재에 부족할 수 있다"
+elif [ -r /proc/meminfo ]; then
+  MEMG="$(awk '/^MemTotal:/{printf "%d", $2/1024/1024}' /proc/meminfo)"
+  ok "메모리 ${MEMG} GB (/proc/meminfo)"
+  [ "${MEMG:-0}" -lt 16 ] 2>/dev/null && warning "16GB 미만이다 — 분류기 적재에 부족할 수 있다"
+else
+  warning "메모리 크기를 확인하지 못했다 (free·/proc/meminfo 모두 없음)"
 fi
 AVAIL_GB="$(df -BG . 2>/dev/null | awk 'NR==2{gsub("G","",$4); print $4}')"
 if [ -n "${AVAIL_GB:-}" ]; then
