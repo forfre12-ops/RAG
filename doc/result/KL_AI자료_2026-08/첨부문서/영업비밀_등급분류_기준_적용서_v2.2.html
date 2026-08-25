@@ -440,9 +440,9 @@ footer strong{color:var(--text-dim);}
     <table>
       <thead><tr><th>항목</th><th>내용</th><th>상태</th></tr></thead>
       <tbody>
-        <tr><td><strong>R1</strong> 룰↔모델 분리</td><td>BERT 분류기는 텍스트→등급을 직접 학습·추론한다. S×V×M은 학습 라벨·룰 후보·근거(evidence) 산정 계층이지 모델의 추론식이 아님 → 곱셈의 "급변(cliff)"이 모델 추론에 직접 전가되지 않는다.</td><td><span class="tag mid">기설계 내포</span></td></tr>
-        <tr><td><strong>R2</strong> 추론단 미탐 안전장치</td><td>출처(비공지성) 게이트는 공개문서 과분류를 대폭 억제한다(구 판례 legacy 실험 93%→0%; 현행 v5_clean 정본 공개 <b>판례</b> 과분류 79%→4%). 곱셈 게이트는 출처/비공지성(S) 축에만 하드 적용, 내용(V·M) 축은 콘텐츠 미탐 가드 + 상향충돌 시 검수 라우팅 유지(silent 하향 금지).</td><td><span class="tag mid">기설계 내포</span></td></tr>
-        <tr><td><strong>R3</strong> 등급체계·매핑 설정화</td><td>등급 개수와 S×V×M→등급 매핑(8/4/1·2/0)을 하드코딩하지 않고 DB·설정 주도로 둔다(FUN-005 관리자 등급체계 변경 요구사항).</td><td><span class="tag light">신규 반영</span></td></tr>
+        <tr><td><strong>R1</strong> 룰↔모델 분리</td><td>BERT 분류기는 텍스트→등급을 직접 학습·추론한다. S×V×M은 학습 라벨·룰 후보·근거(evidence) 산정 계층이지 모델의 추론식이 아님 → 곱셈의 "급변(cliff)"이 모델 추론에 직접 전가되지 않는다. <strong>귀결 — 배포본은 등급 우선·요소 후행이다.</strong> 모델·룰이 먼저 등급을 내고, 화면에 표시되는 S/V/M 은 그 등급에서 역산한다(<code>svm_levels_for_grade()</code>). 따라서 표시 요소값은 법리 근거가 아니라 <strong>등급의 재진술</strong>이며, 요소 근거가 실제로 검출되지 않았으면 응답이 <code>factors_source=model_estimated</code> 로 그 사실을 공시한다.</td><td><span class="tag mid">기설계 내포</span></td></tr>
+        <tr><td><strong>R2</strong> 추론단 미탐 안전장치</td><td>출처(비공지성) 게이트는 공개문서 과분류를 대폭 억제한다(구 판례 legacy 실험 93%→0%; 현행 v5_clean 정본 공개 <b>판례</b> 과분류 79%→4%). 곱셈 게이트의 <strong>하드 적용은 KL 메타데이터 출처</strong>(<code>source_type</code>)에 한한다 — 공개 출처면 등급을 <code>S3</code> 로 캡하고, 그 캡이 TS·S1 을 덮으면 자동확정하지 않고 검수로 보낸다(<code>cap-conflict</code>). <strong>본문 텍스트에서 검출된 공개 신호는 등급을 내리지 않고 경고로만 남긴다</strong> — 하향은 미탐 방향이라 사람이 본다. 내용(V·M) 축은 콘텐츠 미탐 가드 + 상향충돌 시 검수 라우팅 유지(silent 하향 금지).</td><td><span class="tag mid">기설계 내포</span></td></tr>
+        <tr><td><strong>R3</strong> 등급체계·매핑 설정화</td><td><strong>등급 개수·코드·순서</strong>는 하드코딩하지 않고 DB 주도로 둔다 — <code>tb_classification_levels</code> + <code>GET·PUT /schema/grades</code>(FUN-005a 관리자 등급체계 추가/변경/삭제). 반면 <strong>S×V×M→등급 매핑(8/4/1·2/0)은 판정 정본이라 코드에 고정</strong>돼 있다(<code>grade_from_svm()</code>). 매핑 설정화는 §3.7 의 보정 토글 분리와 같은 성격이므로 함께 §7.2 승인 항목으로 둔다.</td><td><span class="tag light">신규 반영</span> <span class="tag light">매핑은 승인 대기</span></td></tr>
         <tr><td><strong>R4</strong> 유출영향도 처리</td><td>정본 3요건에 없음. 등급 서열 + <code>loss_weight</code>(고등급 오분류 가중) + 등급별 FNR로 보존(별도 입력 요소 아님).</td><td><span class="tag light">신규 반영</span></td></tr>
         <tr><td><strong>R5</strong> 특급 표본·기대치</td><td>특급은 희소. 골든셋 특급은 합성·수동 시드로 별도 확보, 내용만으로 특급을 못 만들어도 미탐으로 과벌하지 않는다.</td><td><span class="tag light">신규 반영</span></td></tr>
         <tr><td><strong>R6</strong> S·M은 메타데이터 의존</td><td>비밀관리성(M)과 사실적 비공지성(S)은 본문 텍스트만으로 판정 곤란. KL 웹계층의 출처·보안표시·접근범위 메타데이터를 S/M 산정 입력으로 받는다.</td><td><span class="tag light">신규 반영</span></td></tr>
@@ -896,6 +896,11 @@ A안 없음             → B안(AI)이 1차 자동분류
           <td><code><strong>v2.2.2</strong></code></td>
           <td><strong>2026-08-02</strong></td>
           <td><strong>곱셈식 내부 정합 정정(감리 제출본).</strong> §0·§1.2·§2 등급카드·§6.1의 "곱=4 → S1" 표기를 실코드 <code>grade_from_svm()</code> 운영로직(§4.6)에 통일 — <strong>곱=4(s=2·v=2·m=1) → TS</strong>, <strong>S1은 (2·2·0) 곱=0 특례</strong>로만 산출(<code>SVM_GRADE_MAP={8:TS,4:TS,2:S2,1:S2,0:S3}</code>). 과분류 실측치(§3.3 85%·§3.5 93%→0%)를 <strong>구 판례 legacy 실험</strong>으로 귀속하고 현행 배포본 v5_clean(<code>v-fe4b386b</code>) 공개 <b>판례</b> 과분류 79%→4%(n=400) 병기. 4등급 정의·임계 불변, 표기 정합만 정정.</td>
+        </tr>
+        <tr style="background:var(--bg-surface);">
+          <td><code><strong>v2.2.3</strong></code></td>
+          <td><strong>2026-08-26</strong></td>
+          <td><strong>서술↔구현 대조 정정(코드 실측).</strong> 배포 코드를 직접 태워 §3.5 R1~R3 서술을 실동작에 맞춘다. <strong>R1</strong> — 배포본이 <strong>등급 우선·요소 후행</strong>(등급을 먼저 내고 표시 S/V/M 을 <code>svm_levels_for_grade()</code> 로 역산)이라는 방향을 명문화하고, 요소 근거 미검출 시 <code>factors_source=model_estimated</code> 공시를 병기. <strong>R2</strong> — "S 축 하드 적용"의 실제 범위를 <strong>KL 메타데이터 출처</strong>(<code>source_type</code> → S3 캡 + <code>cap-conflict</code> 검수 라우팅)로 한정하고, 본문 텍스트의 공개 신호는 등급을 내리지 않고 경고로만 남는다는 점을 명시. <strong>R3</strong> — 등급 개수·코드·순서는 DB 주도로 구현 완료(<code>tb_classification_levels</code>·<code>PUT /schema/grades</code>)이나 <strong>S×V×M→등급 매핑은 코드 고정</strong>임을 분리 표기하고 매핑 설정화를 §7.2 승인 항목으로 이관. <strong>4등급 정의·임계값·판정식 불변 — 서술 정합만 정정.</strong></td>
         </tr>
       </tbody>
     </table>
