@@ -9,6 +9,10 @@ S2 로 돌아왔다 — KL 이 확정 등급을 받으려면 승격 대기 목�
 이 테스트는 조회 응답이 확정 등급을 함께 내려 주는 것을 잠근다:
   · 교정 기록이 있으면  confirmed_label/by/at 가 채워지고 label 은 예측 그대로 남는다
   · 교정 기록이 없으면  세 필드가 None (기존 응답과 동일 — 추가 전용·하위호환)
+
+⚠ 조회는 **문서** 기준이다. 교정은 확정 당시의 분류 행에 붙는데 같은 문서를 다시
+분류하면 교정 없는 새 행이 생긴다. 분류 행 기준으로 찾으면 재분류 직후 확정 등급이
+사라진 것처럼 보인다(실측 2026-08-26, 배포 검증에서 발견).
 """
 
 from __future__ import annotations
@@ -64,8 +68,8 @@ class _FakeRepo:
             )
         ]
 
-    def latest_correction_for_classification(self, classification_id):
-        assert classification_id == _CLS
+    def latest_correction_for_doc(self, doc_id):
+        assert doc_id == _DOC
         return type(self).correction
 
 

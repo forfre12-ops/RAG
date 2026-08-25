@@ -80,7 +80,7 @@ def classify_recent_for_doc(doc_id: str):
             # label 은 예측 그대로 둔다(감사 증적 보존). 교정이 없으면 세 필드 모두 None 이라
             # 기존 응답과 동일하다.
             confirmed_label = confirmed_by = confirmed_at = None
-            corr = repo.latest_correction_for_classification(cls.classification_id)
+            corr = repo.latest_correction_for_doc(doc_uuid)
             if corr is not None:
                 clvl = db.get(ClassificationLevel, corr.corrected_level_id)
                 confirmed_label = clvl.level_code if clvl else None

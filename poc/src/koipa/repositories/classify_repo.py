@@ -491,15 +491,22 @@ class ClassifyRepo:
             return "overclass"
         return "confirm"
 
-    def latest_correction_for_classification(self, classification_id: uuid.UUID):
-        """분류 1건의 가장 최근 교정 기록 (없으면 None).
+    def latest_correction_for_doc(self, doc_id: uuid.UUID):
+        """문서의 가장 최근 교정 기록 (없으면 None).
 
         confirm/relabel 은 예측 등급을 덮어쓰지 않고 여기에 사람 판단을 남긴다.
         따라서 '확정 등급'의 정본은 이 행의 corrected_level_id 다.
+
+        ⚠ 분류 1건이 아니라 **문서** 기준으로 찾는다. 교정은 확정 당시의 분류 행에
+        붙는데, 같은 문서를 다시 분류하면 교정이 없는 새 행이 생긴다. 분류 행 기준으로
+        찾으면 그 순간 확정 등급이 사라진 것처럼 보인다(실측 2026-08-26: 배치 재분류
+        직후 confirmed_label 이 None 으로 떨어졌다). 사람이 내린 판단은 재분류로
+        지워지지 않으므로 문서 단위로 본다.
         """
         return (
             self.db.query(Correction)
-            .filter(Correction.classification_id == classification_id)
+            .join(Classification, Classification.classification_id == Correction.classification_id)
+            .filter(Classification.doc_id == doc_id)
             .order_by(Correction.corrected_at.desc(), Correction.correction_id.desc())
             .first()
         )
