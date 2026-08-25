@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -41,6 +42,27 @@ class KeywordAdminError(Exception):
 
 
 # ── 순수 헬퍼 (DB 무관, 단위 테스트 용이) ──────────────────────────────────────
+def validate_pattern(keyword: str, pattern_type: str) -> None:
+    """pattern_type='regex' 면 컴파일 가능한지 본다. 아니면 400.
+
+    왜 여기서 막는가. 룰 엔진은 시드를 `re.findall(kw, text)` 로 그대로 쓴다. 깨진 정규식이
+    DB 에 들어가면 핫리로드된 워커에서 label() 이 매 문서마다 죽고, 호출부가 그것을
+    fail-open 으로 삼켜 FNR-safe 상향·합의 게이트가 **무음으로** 멈춘다(실측 2026-08-26).
+    런타임 쪽에도 방어를 뒀지만(rule_engine._count) 거기서는 그 시드가 조용히 0 이 될 뿐이라
+    관리자는 자기 키워드가 죽은 줄 모른다. 저장 시점에 막아야 알 수 있다.
+    """
+    if pattern_type != "regex":
+        return
+    try:
+        re.compile(keyword)
+    except re.error as exc:
+        raise KeywordAdminError(
+            400,
+            f"invalid regex pattern: {keyword!r} — {exc}. "
+            "정규식이 아니면 pattern_type 을 exact 로 두십시오.",
+        ) from exc
+
+
 def resolve_grade_id(level_code_to_id: dict[str, int], grade: str) -> int:
     """등급 코드 → level_id. 활성 등급이 아니면 400."""
     lid = level_code_to_id.get(grade)
@@ -153,6 +175,7 @@ class KeywordAdminService:
 
     # ── 추가 ──────────────────────────────────────────────────────────────────
     def create(self, req: KeywordCreateRequest) -> KeywordMutationResponse:
+        validate_pattern(req.keyword.strip(), req.pattern_type)
         seeded = 0
         try:
             with session_scope() as db:
@@ -204,6 +227,14 @@ class KeywordAdminService:
                 )
                 if kw is None:
                     raise KeywordAdminError(404, f"keyword_id {keyword_id} not found")
+
+                # PATCH 는 부분 수정이라 keyword 만·pattern_type 만 바뀔 수 있다. 검증은
+                # 둘 중 하나가 아니라 **저장 뒤에 남을 조합**을 대상으로 해야 한다
+                # (예: 정규식 본문은 그대로 두고 pattern_type 만 exact→regex 로 바꾸는 경우).
+                validate_pattern(
+                    (req.keyword.strip() if req.keyword is not None else kw.keyword),
+                    (req.pattern_type if req.pattern_type is not None else kw.pattern_type),
+                )
 
                 _grade_to_id, id_to_grade = self._grade_maps(db)
                 factor_to_id, id_to_factor = self._factor_maps(db)

@@ -17,6 +17,9 @@ from .common import Actor
 # 룰엔진 _count 가 지원하는 매칭 방식(rule_engine.py): exact(부분문자열)·regex·semantic(임베딩).
 _PATTERN_TYPES = r"^(exact|regex|semantic)$"
 # tb_level_keywords.weight = Numeric(3,2) → 최대 9.99.
+# 하한은 0 이 아니라 0 초과다. weight=0 은 등급 점수에 한 푼도 기여하지 않으면서
+# matched_keywords 에는 남아 has_real_evidence 를 True 로 만든다 — 점수 없는 키워드가
+# 합의 게이트를 발동시킨다(실측 2026-08-26). 비활성은 is_active=false 로 한다.
 _WEIGHT_MAX = 9.99
 
 
@@ -45,7 +48,7 @@ class KeywordCreateRequest(BaseModel):
         default=None,
         description="평가요소 코드(정본 SECRECY·VALUE·MANAGEMENT 또는 레거시 4요소). 생략 시 NULL.",
     )
-    weight: float = Field(default=1.0, ge=0.0, le=_WEIGHT_MAX)
+    weight: float = Field(default=1.0, gt=0.0, le=_WEIGHT_MAX)
     actor: Actor
 
 
@@ -55,7 +58,7 @@ class KeywordUpdateRequest(BaseModel):
     keyword: Optional[str] = Field(default=None, min_length=1, max_length=200)
     pattern_type: Optional[str] = Field(default=None, pattern=_PATTERN_TYPES)
     factor: Optional[str] = None
-    weight: Optional[float] = Field(default=None, ge=0.0, le=_WEIGHT_MAX)
+    weight: Optional[float] = Field(default=None, gt=0.0, le=_WEIGHT_MAX)
     is_active: Optional[bool] = None
     actor: Actor
 

@@ -420,7 +420,10 @@ KEYWORD_SEEDS: list[dict] = [
     # 등급 표기 확장 — 본 시스템은 TS(특급) > S1(1급) > S2(2급) > S3(공개) 순.
     # "2급 비밀"은 S2 시드와 충돌 가능해 의도적으로 S1에 두지 않음.
     {"grade": "S1", "keyword": "Restricted", "weight": 0.85, "factor": "LEAK_IMPACT"},
-    {"grade": "S1", "keyword": "Confidential High", "weight": 0.8, "factor": "LEAK_IMPACT"},
+    # exact 매칭이 부분 문자열이라 "Confidential High" 는 S2 시드 "Confidential"(0.85)도
+    # 함께 매치시킨다. 0.8 이면 더 구체적인 S1 시드가 덜 구체적인 S2 시드에 져서 등급이
+    # S2 로 내려갔다(실측 2026-08-26). 포함하는 쪽이 반드시 더 무겁도록 0.9 로 올린다.
+    {"grade": "S1", "keyword": "Confidential High", "weight": 0.9, "factor": "LEAK_IMPACT"},
     {"grade": "S1", "keyword": "1급비밀", "weight": 0.95, "factor": "LEAK_IMPACT"},
     {"grade": "S1", "keyword": "내부 1급", "weight": 0.85, "factor": "LEAK_IMPACT"},
 

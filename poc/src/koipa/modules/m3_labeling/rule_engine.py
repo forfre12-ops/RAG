@@ -35,6 +35,9 @@ _CANONICAL_FACTORS = frozenset(f["code"] for f in FACTOR_SEEDS)
 # semantic 매칭 기본 코사인 임계값. EMB_SEMANTIC_THRESHOLD 환경변수로 오버라이드 가능.
 _DEFAULT_SEMANTIC_THRESHOLD = 0.75
 
+# 컴파일이 안 되는 정규식 시드 — 문서마다 같은 오류를 다시 찍지 않도록 한 번만 남긴다.
+_BAD_REGEX_SEEDS: set[str] = set()
+
 
 def _settings_semantic_threshold() -> float:
     """[P1a] settings.rule_semantic_threshold (중앙 설정) → 없거나 오류면 하드 폴백 0.75."""
@@ -700,7 +703,19 @@ class LabelRuleEngine:
         self, text: str, kw: str, pattern_type: str, *, query_vec: Optional[list[float]] = None
     ) -> int:
         if pattern_type == "regex":
-            return len(re.findall(kw, text))
+            # 시드는 DB(tb_level_keywords)에서도 오고, 콘솔 §T 가 정규식을 그대로 넣는다.
+            # 깨진 정규식 하나가 re.error 로 올라오면 label() 전체가 죽고, 호출부는 그것을
+            # fail-open 으로 삼켜(_record_gate_fail_open) FNR-safe 상향·합의 게이트가 통째로
+            # 무음 정지한다(실측 2026-08-26). 그 시드 하나만 0 으로 떨구고 나머지는 살린다.
+            try:
+                return len(re.findall(kw, text))
+            except re.error as exc:
+                if kw not in _BAD_REGEX_SEEDS:
+                    _BAD_REGEX_SEEDS.add(kw)
+                    logger.error(
+                        "rule seed regex is invalid, seed skipped (matches 0): %r (%s)", kw, exc
+                    )
+                return 0
         if pattern_type == "semantic":
             # #22: label()이 1회 계산한 문서 벡터를 그대로 전달(중복 임베딩 제거).
             return self._semantic_match(text, kw, query_vec=query_vec)
