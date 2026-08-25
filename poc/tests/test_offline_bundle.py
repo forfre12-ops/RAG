@@ -259,13 +259,16 @@ def test_extract_components_handles_missing_file(tmp_path: Path):
 
 
 def test_extract_components_real_project_compose():
-    """실제 프로젝트 docker-compose.yml에서 postgres·minio·redis·mlflow가 추출되어야 함."""
+    """실제 프로젝트 docker-compose.yml에서 postgres·redis·mlflow가 추출되어야 함."""
     real = Path(__file__).resolve().parents[1] / "docker-compose.yml"
     components = extract_components_from_compose(real)
-    for expected in ("postgres", "minio", "redis", "mlflow"):
+    for expected in ("postgres", "redis", "mlflow"):
         assert expected in components, f"missing: {expected}"
     # ES 제거(의사결정_대장 §03 ⓑ) — elasticsearch 서비스는 더 이상 없어야 한다.
     assert "elasticsearch" not in components
+    # minio 제거(e10e4246) — 실배포 프로파일이 전부 storage_backend=local 이라 뺐다.
+    # 폐쇄망 번들에 minio 이미지를 다시 담지 않도록 여기서 못박는다.
+    assert "minio" not in components
     # postgres는 pgvector 이미지(dense 백엔드)
     assert "pgvector" in components["postgres"].image
 
