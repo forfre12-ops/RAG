@@ -253,6 +253,15 @@ a{color:#0a0a0a}
   </table>
   </div>
   <p>따라서 KL 은 <b>한 번의 조회로 예측 등급과 확정 등급을 모두 받는다.</b></p>
+  <div class="note">
+    <b>확정 등급은 문서 단위로 유지된다.</b> 교정 기록은 확정 당시의 분류 결과에 붙는데, 같은 문서를 다시
+    분류하면 교정이 없는 새 결과가 생긴다. 조회는 <b>문서</b> 기준으로 확정 등급을 찾으므로 재분류가 있어도
+    사람이 내린 판단은 사라지지 않는다. 이 경우 <code>status</code> 는 <code>needs_review</code>,
+    <code>confirmed_label</code> 은 이전 확정값으로 함께 나온다 — “예전에 확정했고 그 뒤 다시 분류되어 아직
+    확정 전”이라는 뜻이다.
+    <br><span class="src">실측 2026-08-26 — 문서 기준으로 바꾸기 전에는 배치 재분류 직후
+    <code>confirmed_label</code> 이 <code>null</code> 로 떨어졌다.</span>
+  </div>
   <div class="flow">GET /api/v1/classify/{doc_id}
 
 { "label": "S2",                       ← 모델 예측 (확정해도 바뀌지 않는다)
@@ -263,10 +272,7 @@ a{color:#0a0a0a}
   <div class="note">
     확정 전에는 <code>confirmed_label</code>·<code>confirmed_by</code>·<code>confirmed_at</code> 이 <code>null</code> 이다.
     KL 은 <code>confirmed_label</code> 이 채워졌는지로 확정 여부를 판단해도 되고 <code>status</code> 를 봐도 된다.
-    <br><b>적용 시점.</b> 이 세 필드는 2026-08-26 에 추가되었다. 시험 서버에는 다음 재배포 때 반영되며,
-    그 전까지는 <code>GET /api/v1/promotions/pending</code> 의 <code>proposed_label</code> 로 확인한다.
-    <br>실측 2026-08-26(추가 전) — 예측 S2 인 문서를 S1 으로 확정한 뒤 조회했을 때 <code>label</code> 은 S2 로
-    반환되었고, 교정 기록에는 <code>S2 → S1 · underclass</code> 가 정상 기록되었다. 이 관측이 필드 추가의 근거다.
+    <br><b>시험 서버에 반영되어 있다</b>(2026-08-26 배포·검증 완료).
   </div>
 
   <h2>6. 오류 · 재시도</h2>
@@ -339,14 +345,14 @@ a{color:#0a0a0a}
       <tr><td class="c">2</td><td>공개 출처 문서 판정</td><td><code>source_type=public</code> 전달 시 등급이 공개(S3)로 상한 처리될 것</td><td class="c ok">통과</td></tr>
       <tr><td class="c">3</td><td>보안표시 있는 문서 판정</td><td><code>security_marking=top_secret</code> 전달 시 등급이 TS 로 상향될 것</td><td class="c ok">통과</td></tr>
       <tr><td class="c">4</td><td>검수 대기 처리</td><td><code>status=needs_review</code> 문서가 <code>GET /review-queue</code> 에 나타날 것</td><td class="c ok">통과</td></tr>
-      <tr><td class="c">5</td><td>검수 확정과 교정 기록</td><td>확정 후 <code>status</code> 가 <code>confirmed</code> 가 되고 교정 기록이 남을 것. 조회 응답의 <code>confirmed_label</code> 이 확정 등급과 일치할 것</td><td class="c part">조건부<br><span class="src">확정·교정 기록은 통과. <code>confirmed_label</code> 은 재배포 후 재확인</span></td></tr>
+      <tr><td class="c">5</td><td>검수 확정과 교정 기록</td><td>확정 후 <code>status</code> 가 <code>confirmed</code> 가 되고 교정 기록이 남을 것. 조회 응답의 <code>confirmed_label</code> 이 확정 등급과 일치할 것</td><td class="c ok">통과</td></tr>
       <tr><td class="c">6</td><td>대량 배치</td><td>배치 요청이 202 를 반환하고 완료 건수를 확인할 것</td><td class="c ok">통과</td></tr>
       <tr><td class="c">7</td><td>재시도 중복 방지</td><td>같은 <code>Idempotency-Key</code> 재요청이 <code>X-Idempotent-Replay: true</code> 와 함께 최초 응답을 반환할 것</td><td class="c ok">통과</td></tr>
       <tr><td class="c">8</td><td>추출 불가 문서</td><td>본문이 추출되지 않는 문서가 자동확정되지 않고 검수로 라우팅될 것</td><td class="c ok">통과</td></tr>
     </tbody>
   </table>
   </div>
-  <p class="src">사전 검증은 2026-08-26 시험 서버에서 수행했다. 시나리오 8 의 경우 등록 응답은
+  <p class="src">사전 검증은 2026-08-26 시험 서버에서 수행했다. 8 건 중 7 건 통과이며 미수행 1 건은 배치 폴링 상세다. 시나리오 8 의 경우 등록 응답은
   <code>requires_review=false</code> 로 오지만 문서 처리 상태가 <code>failed</code> 로 기록되어, 판정 단계에서
   “수집 단계 격리” 사유로 검수 라우팅된다. KL 은 등록 응답의 <code>warnings</code> 에
   <code>no text extracted</code> 가 있으면 그 문서가 검수 대상이 됨을 알 수 있다.</p>
@@ -356,7 +362,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. 미합의 항목 6 건을 확정하고 시험 서버에서 시나리오 8 건 중 6 건을 실행해 확인했다. 확정 등급 회수 경로의 결함을 실측으로 확인하고 조회 응답에 확정 등급 3 필드를 추가했다(§5-1)</td></tr>
+      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. 미합의 항목 6 건을 확정하고 시험 서버에서 시나리오 7 건을 실행해 확인했다. 확정 등급 회수 결함을 실측으로 찾아 조회 응답에 확정 등급 3 필드를 추가하고 배포·검증까지 마쳤다(§5-1)</td></tr>
     </tbody>
   </table>
   </div>
