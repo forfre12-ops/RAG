@@ -453,7 +453,7 @@ def expected_files(
     models: list[ModelEntry],
     observability_images: list[str] | None = None,
 ) -> list[str]:
-    files: list[str] = ["README.md", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
+    files: list[str] = ["README.md", "preflight_host.sh", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
     for svc in components:
         files.append(f"docker-images/{svc}.tar")
     for m in models:
@@ -1287,10 +1287,17 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "set -euo pipefail\n"
         "BUNDLE_DIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\n\n"
         "echo '=== Koipa Airgap Bundle Install ==='\n"
-        "# 1) docker load\n"
+        "# 0) 컨테이너 런타임 판별 — 운영 대상이 RHEL 계열(Rocky)이면 기본이 podman 이다.\n"
+        "#    docker 를 하드코딩하면 그 호스트에서 설치가 첫 줄부터 멈춘다(2026-08-26).\n"
+        "if command -v docker >/dev/null 2>&1; then CRT=docker\n"
+        "elif command -v podman >/dev/null 2>&1; then CRT=podman\n"
+        "else echo '[ERROR] 컨테이너 런타임 미탑재 — docker 또는 podman 이 필요하다' >&2; exit 1\n"
+        "fi\n"
+        "echo \"[runtime] $CRT\"\n\n"
+        "# 1) 이미지 적재\n"
         "for tar in \"$BUNDLE_DIR/docker-images\"/*.tar; do\n"
         "  echo \"Loading $tar ...\"\n"
-        "  docker load -i \"$tar\"\n"
+        "  \"$CRT\" load -i \"$tar\"\n"
         "done\n\n"
         "# 2) (옵션) 호스트 파이썬 deps — 컨테이너 배포는 deps 가 이미지에 포함(INSTALL.md).\n"
         "#    번들 wheel 은 타깃 인터프리터(cp311) 전용이다. Ubuntu 22.04 기본 파이썬은 3.10 이라\n"
@@ -1353,7 +1360,9 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     # 경로 전체가 죽는다**(실측 2026-08-03 리허설: deploy_airgap.sh·verify_install.sh 둘 다 미실행).
     # 빌드 호스트가 어떤 환경이든 번들 산출물만은 LF 로 고정한다.
     import shutil as _sh
-    for _script in ("deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh"):
+    # preflight_host.sh — install.sh 앞에서 호스트를 점검한다(읽기 전용). 설치를 발주처가
+    # 수행하므로 현장에서 처음 만나는 실패를 줄이려면 이 스크립트가 번들에 함께 있어야 한다.
+    for _script in ("preflight_host.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh"):
         _src = _REPO_ROOT / "scripts" / _script
         if _src.exists():
             _dst = out_dir / _script

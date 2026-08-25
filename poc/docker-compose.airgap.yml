@@ -70,7 +70,11 @@ services:
       HF_HUB_OFFLINE: "1"           # 폐쇄망 — 외부 다운로드 차단 (모델은 ../models 에서 로드)
       TRANSFORMERS_OFFLINE: "1"
     volumes:
-      - ../models:/models:ro        # 사전 동봉 모델 (분류기 학습본·임베딩·HF 캐시)
+      # [SELinux] `z` 는 공유 라벨(container_file_t) 재지정이다. RHEL·Rocky 계열은 SELinux 가
+      # 기본 enforcing 이라 라벨 없이 bind mount 하면 컨테이너가 이 경로를 못 읽고 **모델 적재가
+      # 실패한다**. api·worker 가 같은 ../models 를 공유하므로 `Z`(전용)가 아니라 `z`(공유)다.
+      # Ubuntu 등 SELinux 가 없는 호스트에서는 무시되므로 양쪽 모두에서 안전하다.
+      - ../models:/models:ro,z      # 사전 동봉 모델 (분류기 학습본·임베딩·HF 캐시)
       - storagedata:/app/.storage   # 로컬FS 문서·원본 보관(WORKDIR=/app, LocalStorage root=.storage)
     depends_on:
       postgres: { condition: service_healthy }
@@ -111,7 +115,7 @@ services:
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
     volumes:
-      - ../models:/models:ro
+      - ../models:/models:ro,z      # [SELinux] api 와 같은 공유 라벨 — 위 api 블록 주석 참조
       - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본
     depends_on:
       - redis
@@ -158,8 +162,10 @@ services:
     ports:
       - "443:443"
     volumes:
-      - ./mtls/nginx.mtls.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./mtls/certs:/etc/nginx/mtls:ro
+      # [SELinux] 인증서·설정도 bind mount 라 라벨이 필요하다 — 없으면 nginx 가 기동 직후
+      # "Permission denied" 로 죽는다(RHEL·Rocky enforcing). 위 api 블록 주석 참조.
+      - ./mtls/nginx.mtls.conf:/etc/nginx/conf.d/default.conf:ro,z
+      - ./mtls/certs:/etc/nginx/mtls:ro,z
 
 volumes:
   pgdata:

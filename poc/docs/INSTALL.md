@@ -9,9 +9,16 @@
 
 ## 0. 사전 요건 (설치 전 확인)
 
+> **먼저 실행한다.** 아래 표의 항목을 자동으로 점검하는 스크립트가 번들에 있다.
+> ```bash
+> bash preflight_host.sh          # 읽기 전용 — 아무것도 설치·변경하지 않는다
+> ```
+> 차단 항목이 있으면 종료 코드 1과 함께 조치 방법을 출력한다. RHEL 계열(Rocky Linux)에
+> 설치하는 경우 **§0-1 을 반드시 함께 읽는다.**
+
 | 항목 | 확인 명령 / 기준 |
 |---|---|
-| OS | Ubuntu 22.04 LTS |
+| OS | RHEL 계열(Rocky Linux) 또는 Ubuntu 22.04 LTS — 컨테이너 배포라 호스트 배포판에 종속되지 않는다 |
 | Docker | `docker version` (Engine 24+), `docker compose version` (v2) |
 | GPU | **불요**(기본 CPU). GPU 노드에서만 §5의 GPU 오버레이를 덧붙인다 |
 | 커널 | `sysctl vm.max_map_count` ≥ 262144 (미만 시 `sudo sysctl -w vm.max_map_count=262144`) |
@@ -19,6 +26,21 @@
 | 포트 | 5432·6379·8000 (+ mTLS 443, + 관측성 9090·9093·3000·3100) 내부 가용 — **이미 쓰는 중이면 `.env`의 `API_PORT`·`PG_PORT`·`REDIS_PORT`로 바꾼다**(YAML 수정 불요) |
 
 **GPU**: 본 시스템의 운영(추론·야간 증분재학습) 경로는 **CPU 전용으로 성립**한다. compose 기본값에 GPU 예약이 없으므로 GPU 없는 서버에서 그대로 기동된다. GPU 노드(학습 공장)만 §5에서 `-f infra-config/docker-compose.gpu.yml`을 추가한다.
+
+### 0-1. RHEL 계열(Rocky Linux)에 설치하는 경우
+
+애플리케이션은 전부 컨테이너 안에서 돌고 이미지 내부는 Debian 계열(`python:3.11-slim`)이다. 호스트가 Rocky여도 컨테이너 내부는 바뀌지 않으며, `install.sh` 는 `docker load` 만 수행하므로 호스트 패키지 관리자(apt/dnf)를 쓰지 않는다. 다만 RHEL 계열에서만 걸리는 지점이 넷 있다.
+
+| 항목 | 무엇이 다른가 | 조치 |
+|---|---|---|
+| **SELinux** | 기본 `enforcing`. 라벨 없는 bind mount는 컨테이너가 읽지 못해 **모델 적재가 실패**한다 | 동봉 compose의 `../models`·`mtls` 경로에 `:z` 라벨을 이미 적용해 두었다. 그대로 사용한다. 접근 거부가 나면 `sudo ausearch -m avc -ts recent` 로 확인 |
+| **컨테이너 런타임** | RHEL 계열 기본은 podman이다 | 설치·기동 스크립트가 **런타임을 스스로 판별**한다. `docker` 를 먼저 찾고 없으면 `podman` 으로 진행하며, compose는 `compose` 하위명령 → `podman-compose` → `docker-compose` 순으로 고른다. 둘 중 하나만 있으면 된다 |
+| **firewalld** | 기본 활성 | `sudo firewall-cmd --add-port=8000/tcp --permanent && sudo firewall-cmd --reload` |
+| **uid/gid** | 운영 이미지는 비-root(uid 1000)로 돈다. 호스트 계정 uid가 다르면 호스트가 만든 디렉터리를 컨테이너가 쓰지 못한다 | `ls -ln` 으로 **숫자 uid** 를 확인한다(이름이 아니라 숫자). 동봉 모델은 읽기 전용 마운트라 대개 문제되지 않는다 |
+
+`preflight_host.sh` 가 위 넷을 모두 점검한다.
+
+> **미검증 고지.** 본 번들은 Rocky Linux에서 설치 시험을 수행한 이력이 없다. 위 항목은 코드·구성 검토와 RHEL 계열의 알려진 동작에 근거한 것이며, 실제 설치 전에 동일 버전의 Rocky에서 리허설을 한 번 수행할 것을 권한다.
 
 ---
 

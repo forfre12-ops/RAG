@@ -51,12 +51,32 @@ else
 fi
 cd "$ROOT"
 COMPOSE_DIR="$(cd "$(dirname "$COMPOSE")" && pwd)"
-dc_air() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE" "$@"; }
+
+# ── 컨테이너 런타임 판별 ────────────────────────────────────
+# 왜(2026-08-26). 운영 설치 대상이 Rocky Linux 로 정해졌고 설치는 발주처가 수행한다.
+# RHEL 계열 기본 런타임은 podman 이라 docker 를 하드코딩하면 현장에서 스크립트가 통째로
+# 멈춘다 — 그 자리에 우리가 없다. docker 를 우선하되 없으면 podman 으로 진행한다.
+# CRT=런타임 명령 · CRT_COMPOSE=compose 하위명령(문자열, 호출부에서 그대로 전개).
+if command -v docker >/dev/null 2>&1; then
+  CRT=docker
+elif command -v podman >/dev/null 2>&1; then
+  CRT=podman
+else
+  die "컨테이너 런타임 미탑재 — docker 또는 podman 이 필요하다"
+fi
+if $CRT compose version >/dev/null 2>&1; then
+  CRT_COMPOSE="$CRT compose"
+elif [ "$CRT" = podman ] && command -v podman-compose >/dev/null 2>&1; then
+  CRT_COMPOSE="podman-compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  CRT_COMPOSE="docker-compose"
+else
+  die "compose 미탑재 — '$CRT compose'(v2) 또는 podman-compose/docker-compose 가 필요하다"
+fi
+dc_air() { $CRT_COMPOSE --env-file "$ENV_FILE" -f "$COMPOSE" "$@"; }
 
 # ── 0. 사전 요건 ────────────────────────────────────────────
-log "0/7  사전 요건 (layout=$LAYOUT · root=$ROOT)"
-command -v docker >/dev/null 2>&1 || die "docker 미탑재"
-docker compose version >/dev/null 2>&1 || die "docker compose v2 미탑재"
+log "0/7  사전 요건 (layout=$LAYOUT · root=$ROOT · runtime=$CRT · compose=$CRT_COMPOSE)"
 
 # .env: 없으면 템플릿 안내 후 중단. env_file: .env 는 compose 파일 기준으로도 해석될 수 있어
 # infra-config/ 에도 동일 .env 를 보장(양쪽 resolution 안전) — CLI --env-file 과 서비스 env_file 불일치 예방.
@@ -108,8 +128,8 @@ fi
 # ── 2. 이미지 적재 확인 (install.sh 선행) ──────────────────
 log "2/7  적재 이미지 확인"
 _tag="$(_env_val IMAGE_TAG || true)"; _tag="${_tag:-1.0.0-rc1}"
-if ! docker image inspect "koipa-api:${_tag}" >/dev/null 2>&1; then
-  die "koipa-api:${_tag} 이미지 없음. 먼저 'sudo bash install.sh' 로 docker load(§2). IMAGE_TAG 도 확인."
+if ! $CRT image inspect "koipa-api:${_tag}" >/dev/null 2>&1; then
+  die "koipa-api:${_tag} 이미지 없음. 먼저 'sudo bash install.sh' 로 이미지 적재(§2). IMAGE_TAG 도 확인."
 fi
 info "koipa-api:${_tag} 적재됨"
 
@@ -154,7 +174,7 @@ if [ "$WITH_MTLS" = "1" ]; then
 fi
 if [ "$WITH_OBS" = "1" ]; then
   obs="$COMPOSE_DIR/../observability/docker-compose.observability.airgap.yml"
-  [ -f "$obs" ] && { info "관측성 스택 기동"; docker compose --env-file "$ENV_FILE" -f "$obs" up -d; } \
+  [ -f "$obs" ] && { info "관측성 스택 기동"; $CRT_COMPOSE --env-file "$ENV_FILE" -f "$obs" up -d; } \
                  || info "[skip] 관측성 overlay 없음(빌드 시 --skip-observability?)"
 fi
 
@@ -180,8 +200,8 @@ fi
 log "완료 ✓  폐쇄망 배포 성공 (onprem-local)"
 cat <<EOF
 ${c_dim}
-  상태:   docker compose --env-file $ENV_FILE -f $COMPOSE ps
-  로그:   docker compose --env-file $ENV_FILE -f $COMPOSE logs -f api
+  상태:   $CRT_COMPOSE --env-file $ENV_FILE -f $COMPOSE ps
+  로그:   $CRT_COMPOSE --env-file $ENV_FILE -f $COMPOSE logs -f api
   beat 는 단일 인스턴스만(drift·auto-rollback·outbox·파티션 발행기). 누락 시 자동화 정지.
   worker 는 -Q classify,index,synthesis,learning,celery 전큐 구독(compose 반영).
 ${c_off}
