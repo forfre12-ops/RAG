@@ -92,11 +92,34 @@ if [ "$LAYOUT" = "bundle" ]; then
 fi
 _env_val() { grep -E "^${1}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' '; }
 # 하드닝 프로파일(onprem-local)은 저장암호화를 강제 → ENABLED 가 명시적 off 가 아니면 KEY 도 필수.
-_req_keys="POSTGRES_PASSWORD API_KEY"
+# [2026-08-26 리허설 실측] 종전 목록에 감사체인·서명URL 비밀키가 빠져 있었다. 템플릿에는
+# replace_me_ 로 들어 있는데 검사 대상이 아니라 그대로 통과했고, 마이그레이션까지 다 돈 뒤
+# api 가 startup 에서 죽어 **ready 300초 대기 후에야** 원인을 알게 됐다(RuntimeError:
+# 필수 자격증명 누락: KOIPA_AUDIT_CHAIN_SECRET). 설치자는 현장에 혼자 있다 — 0단계에서
+# 이름을 대고 멈춰야 한다.
+#   KOIPA_AUDIT_CHAIN_SECRET : 없으면 api 가 뜨지 않는다(NFR-SEC-01 감사체인 HMAC).
+#   GOLDEN_HTML_URL_SECRET   : 없으면 골든 검수·서명 화면이 무인증으로 열린다.
+_req_keys="POSTGRES_PASSWORD API_KEY KOIPA_AUDIT_CHAIN_SECRET GOLDEN_HTML_URL_SECRET"
 case "$(printf '%s' "$(_env_val STORAGE_ENCRYPTION_ENABLED || true)" | tr 'A-Z' 'a-z')" in
   0|false|no|off) : ;;
   *)              _req_keys="$_req_keys STORAGE_ENCRYPTION_KEY" ;;
 esac
+# [2026-08-26 리허설 실측] 이 스크립트의 사전 검사가 앱의 기동 계약보다 느슨했다.
+# STORAGE_ENCRYPTION_ENABLED=0 이면 "키가 필요 없다"고만 판단하고 통과시켰는데, 하드닝
+# 프로파일의 앱은 그 상태로 뜨지 않는다(RuntimeError: 안전 게이트가 꺼져 있습니다).
+# 그 결과 마이그레이션까지 다 돌고 ready 300초를 기다린 뒤에야 원인을 알게 됐다.
+# 앱과 같은 규칙을 0단계에서 적용한다 — 하드닝 프로파일에서 안전 게이트를 끄려면
+# REQUIRE_SAFETY_GATES=0 으로 의도를 명시해야 한다(앱이 요구하는 것과 동일).
+_falsy() { case "$(printf '%s' "$1" | tr 'A-Z' 'a-z')" in 0|false|no|off) return 0 ;; *) return 1 ;; esac; }
+if ! _falsy "$(_env_val REQUIRE_SAFETY_GATES || echo 1)"; then
+  for _g in STORAGE_ENCRYPTION_ENABLED AGREEMENT_GATE_ENABLED METADATA_FLOOR_ENABLED; do
+    _v="$(_env_val "$_g" || true)"
+    [ -n "$_v" ] && _falsy "$_v" && die "하드닝 프로파일인데 안전 게이트가 꺼져 있다: $_g=$_v
+  폐쇄망 운영은 룰·모델 합의 게이트·메타데이터 상향 floor·원본 at-rest 암호화가 필수다.
+  해당 값을 1 로 켜거나, 의도된 비보안 배포면 REQUIRE_SAFETY_GATES=0 을 $ENV_FILE 에 명시할 것.
+  (이 검사가 없으면 마이그레이션까지 돈 뒤 api 가 startup 에서 죽어 300초 뒤에야 알게 된다)"
+  done
+fi
 for k in $_req_keys; do
   v="$(_env_val "$k" || true)"
   { [ -z "$v" ] || printf '%s' "$v" | grep -qiE 'change[_-]?me|replace[_-]?me|placeholder|your[_-]'; } \
