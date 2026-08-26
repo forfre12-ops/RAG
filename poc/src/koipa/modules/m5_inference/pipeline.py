@@ -133,6 +133,23 @@ _MISS_DIRECTION_GATES = frozenset(
 )
 GATE_FAIL_OPEN_WARNING = "gate-fail-open"
 
+# [2026-08-27] 설정 읽기 실패를 삼키고 하드코딩 기본값으로 조용히 진행하던 자리들을
+# 가시화한다. 값이 다르면 판정면이 통째로 움직이는데 아무 신호도 없었다 — 서빙
+# temperature 가 프로파일 값에 덮여 3.0 으로 돌던 드리프트(2026-08-22 정정)가 그 예다.
+# 제어 흐름은 그대로 둔다(폴백 유지). 문서마다 찍히면 로그가 쓸모없어지므로 1회만 남긴다.
+_SETTING_FALLBACK_SEEN: set[str] = set()
+
+
+def _warn_setting_fallback(name: str, fallback, exc: BaseException) -> None:
+    """설정을 못 읽어 폴백을 쓴다는 사실을 프로세스당 한 번 남긴다."""
+    if name in _SETTING_FALLBACK_SEEN:
+        return
+    _SETTING_FALLBACK_SEEN.add(name)
+    logger.warning(
+        "설정 %s 를 읽지 못해 기본값 %r 로 진행한다 — 운영값과 다르면 판정이 달라진다 (%s: %s)",
+        name, fallback, type(exc).__name__, exc,
+    )
+
 
 def _record_gate_fail_open(gate: str, result: "InferenceResult | None" = None) -> None:
     """[obs] 서빙 파이프라인 게이트가 예외로 fail-open(미적용)했음을 가시화 — best-effort.
@@ -159,8 +176,13 @@ def _record_gate_fail_open(gate: str, result: "InferenceResult | None" = None) -
             f"{GATE_FAIL_OPEN_WARNING}: {gate} 가 예외로 미적용됐다 — 미탐 방향이라 "
             "등급을 그대로 두고 검수로 보낸다"
         ]
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        # 이 경고가 붙어야 classify_service 가 needs_review 로 돌린다. 부착이 실패하면
+        # 그 라우팅이 통째로 사라지는데 종전에는 흔적조차 없었다.
+        logger.warning(
+            "gate-fail-open 경고 부착 실패 — %s 의 검수 라우팅 신호가 유실됐다 (%s: %s)",
+            gate, type(exc).__name__, exc,
+        )
 
 
 # ── 요소 경계 게이트 — 만들었다가 측정하고 뺐다 (2026-08-12) ──────────────
@@ -538,7 +560,8 @@ class InferencePipeline:
         try:
             from koipa.config import settings  # noqa: PLC0415
             return float(settings.fnr_rule_ts_threshold)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지, 사실만 남긴다
+            _warn_setting_fallback("fnr_rule_ts_threshold", 3.0, exc)
             return 3.0
 
     @property
@@ -546,7 +569,8 @@ class InferencePipeline:
         try:
             from koipa.config import settings  # noqa: PLC0415
             return float(settings.fnr_rule_s1_threshold)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지, 사실만 남긴다
+            _warn_setting_fallback("fnr_rule_s1_threshold", 2.2, exc)
             return 2.2
 
     @property
@@ -554,7 +578,8 @@ class InferencePipeline:
         try:
             from koipa.config import settings  # noqa: PLC0415
             return float(settings.fnr_rule_s2_threshold)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지, 사실만 남긴다
+            _warn_setting_fallback("fnr_rule_s2_threshold", 1.6, exc)
             return 1.6
 
     @property
@@ -572,8 +597,8 @@ class InferencePipeline:
             t = float(t)
             if 0.0 < t < 1.0:
                 return t
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지(τ 없음 = 순수 argmax)
+            _warn_setting_fallback("classifier_escalation_tau", None, exc)
         return None
 
     def _code_at(self, idx: int) -> str:
@@ -620,8 +645,11 @@ class InferencePipeline:
             t = float(settings.classifier_temperature)
             if t > 0 and abs(t - 1.0) > 1e-9:
                 return t  # .env로 명시 주입된 값이 최우선
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지(모델 동봉값으로 진행)
+            # 여기가 무음이면 온도 보정이 조용히 달라진다. 2026-08-22 에 프로파일 값이
+            # 모델 동봉 temperature.json(2.03)을 3.0 으로 덮던 드리프트를 고쳤는데,
+            # 그때도 신호가 없어 지표를 뜯어보고서야 알았다.
+            _warn_setting_fallback("classifier_temperature", "모델 동봉값", exc)
         # [A1] settings 미지정(=1.0)이면 모델 동봉 temperature.json 사용(보정 자동연결).
         if self._model_temperature and self._model_temperature > 0:
             return self._model_temperature

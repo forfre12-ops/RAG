@@ -11,9 +11,12 @@ OCR 엔진: Tesseract 5.x + 한국어팩 (kor.traineddata) — Apache 2.0.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Tesseract 실행파일 경로 — 환경변수 > Windows 기본 경로 > PATH
 _TESS_DEFAULT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -59,8 +62,9 @@ def _ocr_max_pages() -> int:
         v = getattr(settings, "ocr_max_pages", None)
         if v is not None:
             return int(v)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 — 폴백 유지
+        logger.warning("설정 ocr_max_pages 를 읽지 못해 기본값으로 진행 (%s: %s)",
+                       type(exc).__name__, exc)
     return _OCR_MAX_PAGES_DEFAULT
 
 
@@ -606,7 +610,8 @@ def _hwpx_uncaptured_table_cells(hwpx_bytes: bytes, extracted_text: str) -> bool
     for n in names:
         try:
             xml = z.read(n).decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — 이 항목만 건너뛴다
+            logger.warning("문서 내부 XML 읽기 실패 — 표 유실 가능 (%s: %s)", type(exc).__name__, exc)
             continue
         for tbl in _re.findall(r"<(?:\w+:)?tbl\b[^>]*>(.*?)</(?:\w+:)?tbl>", xml, _re.S):
             for cell in _re.findall(r"<(?:\w+:)?t\b[^>]*>(.*?)</(?:\w+:)?t>", tbl, _re.S):
@@ -635,7 +640,8 @@ def _hwpx_tables(hwpx_bytes: bytes, *, source: str = "hwpx") -> list[ExtractedTa
     for name in names:
         try:
             xml = z.read(name).decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — 이 항목만 건너뛴다
+            logger.warning("문서 내부 XML 읽기 실패 — 표 유실 가능 (%s: %s)", type(exc).__name__, exc)
             continue
         for tbl in _re.findall(r"<(?:\w+:)?tbl\b[^>]*>(.*?)</(?:\w+:)?tbl>", xml, _re.S):
             rows: list[list[str]] = []
@@ -682,7 +688,10 @@ def _hwpx_bytes_has_table(hwpx_bytes: bytes) -> bool:
             continue
         try:
             xml = z.read(n).decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — 이 항목만 건너뛴다
+            # 표가 통째로 빠진 채 본문만 나가면 표 안의 등급·원가·담당 정보가
+            # 분류기에 안 보인다 — 조용한 미탐이다. 건너뛴 사실은 남긴다.
+            logger.warning("문서 내부 XML 읽기 실패 — 표 유실 가능 (%s: %s)", type(exc).__name__, exc)
             continue
         if _re.search(r"<(?:\w+:)?tbl\b", xml):
             return True
@@ -1471,8 +1480,8 @@ def _extract_pdf(p: Path) -> ExtractResult:
                 tables=tables,
                 warnings=table_warnings + sparse_w,
             )
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 — 폴백 유지(빈 결과 반환)
+        logger.warning("PDF 표 추출 실패 — 표 없이 진행한다 (%s: %s)", type(exc).__name__, exc)
 
     # 2순위: PyMuPDF (AGPL 옵트인)
     try:
@@ -1501,8 +1510,8 @@ def _extract_pdf(p: Path) -> ExtractResult:
             )
         # 텍스트 레이어 없음 → OCR 시도
         return _ocr_pdf_pages(p, n_pages)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 — 폴백 유지(빈 결과 반환)
+        logger.warning("PDF 텍스트 추출 실패 — 빈 결과로 진행한다 (%s: %s)", type(exc).__name__, exc)
 
     # 3순위: pdfminer로 읽혔지만 빈 텍스트 → OCR 시도
     return _ocr_pdf_pages(p, None)
@@ -1552,8 +1561,10 @@ def _ocr_pdf_pages(p: Path, n_pages: int | None) -> ExtractResult:
                 ocr_used=True, pages=len(images), total_pages=n_pages,
                 error=note, warnings=warnings,
             )
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 — 폴백 유지(빈 결과 반환)
+        # 스캔 PDF OCR 경로가 통째로 실패해도 흔적이 없었다. 아래 빈 ExtractResult 가
+        # 나가면 본문 0자 → 수집 격리로 이어지지만, 왜 실패했는지가 사라진다.
+        logger.warning("PDF OCR 추출 실패 — 빈 결과로 진행한다 (%s: %s)", type(exc).__name__, exc)
     return ExtractResult(
         text="", method="ocr", quality=0.0, ocr_used=False,
         pages=n_pages, total_pages=n_pages,

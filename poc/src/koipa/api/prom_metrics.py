@@ -490,6 +490,11 @@ SERVING_FAIL_OPEN_GATES: frozenset[str] = frozenset({
     "metadata_floor",         # 보안표시·접근범위 상향(floor)
     "ts_tie_break",           # TS/S1 동점 브레이크(opt-in)
     "s2_underclass_risk",     # S3 예측의 미달분류 의심 → 검수 라우팅(등급은 안 바꾼다)
+    # [2026-08-27] ICD 규약값 적합성 검사(services/classify_service.py). security_marking·
+    # access_scope 는 상향 게이트의 입력이라 검사가 죽으면 상향이 안 걸려 미탐이 된다.
+    # 종전에는 이 블록이 except: pass 라 실패해도 흔적이 없었다 — 무음 실패를 막으려고
+    # 만든 검사가 정작 무음으로 실패했다.
+    "icd_conformance",
 })
 
 SERVING_GATE_FAIL_OPEN_TOTAL = Counter(

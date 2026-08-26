@@ -17,8 +17,11 @@ NER 백엔드(KLUE-NER 등)는 lazy import + 옵션. 의존성 미설치면 룰�
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 _PII_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     # (name, pattern, mask_template)
@@ -173,7 +176,10 @@ def _mask_with_ner(text: str) -> tuple[str, dict[str, int]]:
     """KLUE-NER로 PERSON/ORG/LOC 토큰 마스킹. lazy import — 실패시 noop."""
     try:
         from transformers import pipeline  # type: ignore
-    except Exception:
+    except Exception as exc:
+        # transformers 미설치는 정상 구성이다(선택 의존성). 다만 그 경우 NER 마스킹이
+        # 동작하지 않는다는 사실은 남긴다 — 켜져 있다고 오해하면 안 된다.
+        logger.info("NER 마스킹 비활성 — transformers 미가용 (%s)", type(exc).__name__)
         return text, {}
 
     try:
@@ -183,7 +189,10 @@ def _mask_with_ner(text: str) -> tuple[str, dict[str, int]]:
             aggregation_strategy="simple",
         )
         ents = ner(text)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 — 폴백 유지(마스킹 없이 원문 반환)
+        # 개인정보 마스킹이 조용히 꺼진 채 원문이 흘러간다. 반드시 보여야 한다.
+        logger.warning("NER 기반 개인정보 마스킹 실패 — 마스킹 없이 진행한다 (%s: %s)",
+                       type(exc).__name__, exc)
         return text, {}
 
     counts: dict[str, int] = {}

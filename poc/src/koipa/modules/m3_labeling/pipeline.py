@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,8 @@ from koipa.modules.m3_labeling.rule_engine import (
     RuleLabelResult,
     build_rule_engine_from_db,
 )
+
+logger = logging.getLogger(__name__)
 
 # ClassifyService 호환 스키마 (있으면 import, 없으면 dataclass 폴백)
 try:
@@ -72,8 +75,9 @@ def _get_factor_field_map() -> dict[str, str]:
         try:
             from koipa.schemas.common import FactorRegistry  # noqa: PLC0415
             return FactorRegistry.get_field_map()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 — 폴백 유지(기본 요소 맵)
+            logger.warning("FactorRegistry 조회 실패 — 기본 요소 맵으로 진행 (%s: %s)",
+                           type(exc).__name__, exc)
     return {
         "SECRECY": "secrecy",
         "VALUE": "value",
@@ -159,8 +163,11 @@ class LabelingPipeline:
                             method="rule+llm",
                         )
                     method = "rule+llm"
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001 — 폴백 유지(룰 단독 판정)
+                # 병합이 죽으면 LLM 의견이 통째로 빠진 채 룰 단독 결과가 나간다.
+                # 판정이 달라지는데 흔적이 없었다.
+                logger.warning("룰+LLM 병합 실패 — 룰 단독으로 진행한다 (%s: %s)",
+                               type(exc).__name__, exc)
 
         if _HAS_SCHEMA:
             factors = EvaluationFactors.from_factor_scores(r.factor_scores)

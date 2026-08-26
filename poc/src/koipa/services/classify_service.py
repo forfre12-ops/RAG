@@ -452,8 +452,16 @@ class ClassifyService:
                     warnings_acc.extend(icd_warns)
                     if status != "needs_review" and any("미탐 위험" in w for w in icd_warns):
                         status = "needs_review"
-            except Exception:  # noqa: BLE001 — 적합성 검사 실패가 분류를 막지 않는다
-                pass
+            except Exception as exc:  # noqa: BLE001 — 적합성 검사 실패가 분류를 막지 않는다
+                # [2026-08-27] 무음 실패를 막으려고 만든 이 블록이 정작 무음으로 실패했다.
+                # 검사가 예외로 죽으면 '미탐 위험' 문서가 검수로 안 가고 자동확정되는데,
+                # 다른 게이트와 달리 fail-open 기록조차 없어 대시보드에도 안 보였다.
+                # 제어 흐름은 그대로 둔다(분류를 막지 않는다는 원칙 유지) — 보이게만 만든다.
+                logger.warning(
+                    "ICD 적합성 검사 실패 — 상향 게이트 입력 검증이 미적용됐다(등급 무변경): %s: %s",
+                    type(exc).__name__, exc,
+                )
+                self._record_gate_fail_open("icd_conformance")
 
             # [요소 모델 섀도] v8 을 같은 입력에 나란히 돌려 **계량만** 한다.
             # 등급도 status 도 바꾸지 않는다 — 배포본은 등급 우선·요소 후행이고 v8 은
