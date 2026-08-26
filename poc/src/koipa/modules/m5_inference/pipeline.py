@@ -347,7 +347,8 @@ class InferencePipeline:
         try:
             from koipa.config import settings as _settings  # noqa: PLC0415
             _env_t = float(getattr(_settings, "classifier_temperature", 1.0))
-        except Exception:  # noqa: BLE001
+        except Exception as _exc:  # noqa: BLE001
+            logger.warning("설정에서 온도를 못 읽음 - 보정 없음(T=1.0)으로 진행한다 (%s: %s)", type(_exc).__name__, _exc)
             _env_t = 1.0
         if _env_t > 0 and abs(_env_t - 1.0) > 1e-9:
             self.calibrated = True
@@ -531,7 +532,8 @@ class InferencePipeline:
         try:
             for k, v in raw.items():
                 mapping[int(k)] = str(v)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as _exc:
+            logger.warning("라벨 매핑(id2label)이 정수 키로 해석되지 않음 - 매핑 미사용 (%s: %s)", type(_exc).__name__, _exc)
             return None
 
         n = len(mapping)

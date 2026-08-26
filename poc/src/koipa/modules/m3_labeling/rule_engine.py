@@ -44,7 +44,8 @@ def _settings_semantic_threshold() -> float:
     try:
         from koipa.config import settings  # noqa: PLC0415
         return float(getattr(settings, "rule_semantic_threshold", _DEFAULT_SEMANTIC_THRESHOLD))
-    except Exception:  # noqa: BLE001
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("룰 시맨틱 임계를 설정에서 못 읽음 - 기본값으로 폴백 (%s: %s)", type(_exc).__name__, _exc)
         return _DEFAULT_SEMANTIC_THRESHOLD
 
 
@@ -420,7 +421,8 @@ class LabelRuleEngine:
                 self.high_risk_weight_multiplier = float(
                     getattr(settings, "rule_high_risk_weight_multiplier", 1.0)
                 )
-            except Exception:  # noqa: BLE001
+            except Exception as _exc:  # noqa: BLE001
+                logger.warning("고위험 가중 배수를 설정에서 못 읽음 - 1.0 으로 폴백 (%s: %s)", type(_exc).__name__, _exc)
                 self.high_risk_weight_multiplier = 1.0
         self._factor_weights = {f["code"]: f["weight"] for f in FACTOR_SEEDS}
         # semantic 매칭 전용 자원 (lazy)
@@ -507,7 +509,8 @@ class LabelRuleEngine:
             # #22: 호출자가 미리 계산한 문서 벡터가 있으면 재사용, 없으면 1회 계산.
             if query_vec is None:
                 query_vec = self._embed_text(text)
-        except Exception:  # noqa: BLE001 — 임베딩 실패는 라벨링 전체를 막지 않음
+        except Exception as _exc:  # noqa: BLE001 — 임베딩 실패는 라벨링 전체를 막지 않음
+            logger.warning("시드 임베딩 실패 - 이 시드는 미매치(0점)로 처리한다 (%s: %s)", type(_exc).__name__, _exc)
             return 0
         sim = self._cosine(query_vec, seed_vec)
         return 1 if sim >= self.semantic_threshold else 0
@@ -540,7 +543,8 @@ class LabelRuleEngine:
         if has_semantic:
             try:
                 doc_query_vec = self._embed_text(text)
-            except Exception:  # noqa: BLE001 — 임베딩 실패는 라벨링 전체를 막지 않음(폴백 보존)
+            except Exception as _exc:  # noqa: BLE001 — 임베딩 실패는 라벨링 전체를 막지 않음(폴백 보존)
+                logger.warning("문서 임베딩 실패 - 시맨틱 시드 전부 미매치로 처리한다 (%s: %s)", type(_exc).__name__, _exc)
                 doc_query_vec = None
 
         for seed in self.seeds:

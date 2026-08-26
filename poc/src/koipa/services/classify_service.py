@@ -85,7 +85,8 @@ def _skip_optional_db_work() -> bool:
         from koipa.db import database_reachable_fast  # noqa: PLC0415
 
         return not database_reachable_fast()
-    except Exception:  # noqa: BLE001
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("DB 도달성 확인 자체가 실패 - 도달 가능으로 간주하고 진행한다 (%s: %s)", type(_exc).__name__, _exc)
         return False
 
 
@@ -691,7 +692,8 @@ class ClassifyService:
                     except ValueError:
                         continue
             return Grade.TS.value
-        except Exception:  # noqa: BLE001
+        except Exception as _exc:  # noqa: BLE001
+            logger.warning("최고 등급 코드를 레지스트리에서 못 읽음 - 'TS' 로 폴백 (%s: %s)", type(_exc).__name__, _exc)
             return "TS"
 
     def _agreement_gate(self, pred, text: str) -> str | None:
@@ -832,7 +834,8 @@ class ClassifyService:
             from koipa.schemas.common import GradeRegistry  # noqa: PLC0415
             codes = GradeRegistry.get_codes()  # level_order asc(비밀이 선두) → [-1]=최하(공개)
             return codes[-1] if codes else "S3"
-        except Exception:  # noqa: BLE001
+        except Exception as _exc:  # noqa: BLE001
+            logger.warning("공개 등급 코드를 레지스트리에서 못 읽음 - 'S3' 로 폴백 (%s: %s)", type(_exc).__name__, _exc)
             return "S3"
 
     @classmethod
@@ -859,7 +862,8 @@ class ClassifyService:
             if str(predicted_code) == cls._public_grade_code():
                 return float(pub)
             return base
-        except Exception:  # noqa: BLE001
+        except Exception as _exc:  # noqa: BLE001
+            logger.warning("검수 임계를 설정에서 못 읽음 - 0.7 로 폴백(현행 배포값은 0.50) (%s: %s)", type(_exc).__name__, _exc)
             return 0.7
 
     # ------------------------------------------------------------

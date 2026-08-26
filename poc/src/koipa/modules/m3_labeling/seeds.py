@@ -40,6 +40,8 @@ from __future__ import annotations
 import logging
 import os
 
+logger = logging.getLogger(__name__)
+
 _logger = logging.getLogger(__name__)
 
 GRADE_ORDER = {"TS": 1, "S1": 2, "S2": 3, "S3": 4}
@@ -58,7 +60,8 @@ def _skip_optional_db_load() -> bool:
         from koipa.db import database_reachable_fast  # noqa: PLC0415
 
         return not database_reachable_fast()
-    except Exception:  # noqa: BLE001
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("DB 도달성 확인 자체가 실패 - 도달 가능으로 간주하고 진행한다 (%s: %s)", type(_exc).__name__, _exc)
         return False
 
 
@@ -70,7 +73,8 @@ def get_factor_codes() -> list[str]:
     try:
         from koipa.schemas.common import FactorRegistry  # noqa: PLC0415
         return FactorRegistry.get_codes()
-    except Exception:  # noqa: BLE001
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("요소 코드를 레지스트리에서 못 읽음 - 내장 FACTOR_SEEDS 로 폴백 (%s: %s)", type(_exc).__name__, _exc)
         return [f["code"] for f in FACTOR_SEEDS]
 
 
@@ -83,7 +87,8 @@ def get_grade_order() -> dict[str, int]:
     try:
         from koipa.schemas.common import GradeRegistry  # noqa: PLC0415
         return GradeRegistry.get_order()
-    except Exception:  # noqa: BLE001
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("등급 순서를 레지스트리에서 못 읽음 - 내장 GRADE_ORDER 로 폴백 (%s: %s)", type(_exc).__name__, _exc)
         return GRADE_ORDER
 
 
