@@ -254,3 +254,7 @@ poc/datasets/labeled_v7_diverse/*.jsonl
 !poc/datasets/labeled_v7_diverse/manifest.json
 # 채점용 정규화 사본(doc_id·family 부여). 원본 raw.jsonl 에서 재생성된다.
 poc/datasets/mundane_s3/raw.scored.jsonl
+
+# 컨테이너 런타임 RPM 스테이징(폐쇄망 번들용). 수백 MB 바이너리라 리포에 넣지 않는다.
+# 채우는 법은 poc/scripts/build_offline_bundle.py 의 rpm_source_dir 주석 참조.
+poc/rpms/

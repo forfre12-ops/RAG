@@ -73,7 +73,16 @@ elif command -v docker-compose >/dev/null 2>&1; then
 else
   die "compose 미탑재 — '$CRT compose'(v2) 또는 podman-compose/docker-compose 가 필요하다"
 fi
-dc_air() { $CRT_COMPOSE --env-file "$ENV_FILE" -f "$COMPOSE" "$@"; }
+# GPU 오버레이(선택). compose 기본값에는 GPU 예약이 없다 — GPU 없는 호스트에서 기동
+# 자체가 막히던 문제로 base 에서 뺐다. 학습 노드(지재원)에서만 setup.sh 가 넘겨 준다.
+# 값이 있는데 파일이 없으면 조용히 무시하지 않고 중단한다.
+GPU_OVERLAY="${GPU_OVERLAY:-}"
+_gpu_args=""
+if [ -n "$GPU_OVERLAY" ]; then
+  [ -f "$GPU_OVERLAY" ] || die "GPU_OVERLAY=$GPU_OVERLAY 파일이 없다"
+  _gpu_args="-f $GPU_OVERLAY"
+fi
+dc_air() { $CRT_COMPOSE --env-file "$ENV_FILE" -f "$COMPOSE" $_gpu_args "$@"; }
 
 # ── 0. 사전 요건 ────────────────────────────────────────────
 log "0/7  사전 요건 (layout=$LAYOUT · root=$ROOT · runtime=$CRT · compose=$CRT_COMPOSE)"

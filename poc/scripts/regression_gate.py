@@ -173,6 +173,23 @@ def take() -> dict:
 
 def compare(base: dict, now: dict) -> int:
     regressions = 0
+    # 기준을 뜬 프로파일과 지금 프로파일이 다르면 비교가 성립하지 않는다.
+    # 온도·합의게이트·메타데이터 floor 가 프로파일 소속이라 판정면이 통째로 달라지고,
+    # 코드를 한 줄도 안 건드려도 회귀가 수십 건 뜬다(2026-08-27 실측: 기준 full-train
+    # 인데 기본값 lite-noapi 로 돌려 26건). 세지 말고 조건을 맞추라고 말한다.
+    _bp = base["settings"].get("deploy_profile")
+    _np = now["settings"].get("deploy_profile")
+    if _bp != _np:
+        print("=" * 74)
+        print(" 비교 불가 — 프로파일이 다르다")
+        print("=" * 74)
+        print(f"  기준 스냅샷 : {_bp!r}")
+        print(f"  이번 실행   : {_np!r}")
+        print("")
+        print("  프로파일이 온도보정·합의게이트·메타데이터 floor 를 함께 바꾸므로")
+        print("  판정면이 통째로 달라진다. 이 상태의 델타는 회귀가 아니다.")
+        print(f"  같은 조건으로 다시 실행할 것:  DEPLOY_PROFILE={_bp} python scripts/regression_gate.py")
+        return 2
     print("=" * 74)
     print(" ① 판정면 — 문서별 등급·신뢰도·근거·경고")
     print("=" * 74)
@@ -221,6 +238,9 @@ def compare(base: dict, now: dict) -> int:
     print("=" * 74)
     diff = [(k, base["settings"].get(k), now["settings"].get(k))
             for k in base["settings"] if base["settings"].get(k) != now["settings"].get(k)]
+    # 프로파일이 다르면 여기 값 대부분이 함께 움직인다. 그걸 회귀로 세면 코드를 하나도
+    # 안 건드려도 "회귀 26건" 이 뜬다(2026-08-27 실측: 기준은 full-train, 실행은 기본값
+    # lite-noapi 였다). 코드 문제와 환경 문제는 대응이 다르므로 갈라서 말한다.
     for k, a, c in diff:
         print(f"  [델타] {k}: {a!r} → {c!r}")
         regressions += 1

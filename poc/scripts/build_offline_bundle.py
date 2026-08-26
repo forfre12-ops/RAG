@@ -448,12 +448,41 @@ def estimate_total_size(
     return round(total, 1)
 
 
+# 컨테이너 런타임 RPM 스테이징 디렉터리.
+# 왜(2026-08-27). 설치 대상이 둘인데 **둘 다 인터넷 저장소를 쓸 수 없다** —
+#   지재원 서버 : 공공망. KL 이 원격 접속해 설치한다.
+#   고객사 서버 : 폐쇄망. 매체로 반입해 직접 설치한다.
+# 즉 `dnf install docker-ce` 가 양쪽 다 불가능하다. 런타임을 전제조건으로만 적어 두면
+# 현장에서 담당자가 첫 단계에서 막히고 그 자리에 우리는 없다. RPM 을 번들에 넣는다.
+#
+# RPM 은 이 빌더가 만들어 내지 못한다(인터넷 되는 Rocky 8.10 호스트가 필요하다).
+# 그 호스트에서 아래를 한 번 돌려 rpms/ 를 채운 뒤 빌드한다:
+#   dnf download --resolve --destdir=poc/rpms #       docker-ce docker-ce-cli containerd.io docker-compose-plugin
+# (podman 계열로 갈 경우: dnf download --resolve --destdir=poc/rpms podman podman-compose)
+_RPM_DIR_ENV = "KOIPA_RPM_DIR"
+
+
+def rpm_source_dir() -> Path:
+    """런타임 RPM 을 담아 둔 디렉터리. 기본은 poc/rpms."""
+    return Path(os.environ.get(_RPM_DIR_ENV) or (_REPO_ROOT / "rpms"))
+
+
+def staged_rpms() -> list[Path]:
+    """스테이징된 .rpm 목록(정렬). 없으면 빈 목록."""
+    d = rpm_source_dir()
+    return sorted(d.glob("*.rpm")) if d.is_dir() else []
+
+
 def expected_files(
     components: dict[str, ComponentEntry],
     models: list[ModelEntry],
     observability_images: list[str] | None = None,
 ) -> list[str]:
-    files: list[str] = ["README.md", "preflight_host.sh", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
+    files: list[str] = ["README.md", "preflight_host.sh", "setup.sh", "install.sh", "verify.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh", "manifest.yaml", "CHECKSUMS.sha256"]
+    # 런타임 RPM 은 스테이징된 경우에만 기대 목록에 넣는다. 없는데 선언하면
+    # verify_install 이 항상 실패해 진짜 결손과 구분이 안 된다.
+    if staged_rpms():
+        files.append("rpms/")
     for svc in components:
         files.append(f"docker-images/{svc}.tar")
     for m in models:
@@ -1280,6 +1309,36 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     # 보내고 있었다. 게다가 빌더가 Windows .dll/.exe 를 복사해 Linux 폐쇄망 번들에 넣던 터라
     # 설치도 되지 않는 사양이었다. 스캔 PDF 는 본문 0자 → processing_status='failed' 격리된다.
 
+    # 컨테이너 런타임 RPM 스테이징. 없으면 경고만 하고 계속한다 — 런타임이 이미 깔린
+    # 호스트도 있고, 번들 빌드 자체를 막으면 나머지 산출물 검증까지 못 하게 된다.
+    _rpms = staged_rpms()
+    if _rpms:
+        _rpm_out = out_dir / "rpms"
+        _rpm_out.mkdir(parents=True, exist_ok=True)
+        import shutil as _sh_rpm
+        for _r in _rpms:
+            _sh_rpm.copy2(_r, _rpm_out / _r.name)
+        _mb = sum(_r.stat().st_size for _r in _rpms) / 1024 / 1024
+        print(f"  [rpms] {len(_rpms)}개 동봉 ({_mb:.1f} MB) <- {rpm_source_dir()}", file=sys.stderr)
+    else:
+        print(
+            f"  [WARN] 컨테이너 런타임 RPM 미동봉 ({rpm_source_dir()} 비어 있음).",
+            file=sys.stderr,
+        )
+        print(
+            "         지재원(공공망)·고객사(폐쇄망) 모두 dnf 저장소를 못 쓴다. 런타임이 이미",
+            file=sys.stderr,
+        )
+        print(
+            "         깔린 호스트가 아니면 install.sh 0단계에서 멈춘다. 인터넷 되는 Rocky",
+            file=sys.stderr,
+        )
+        print(
+            "         8.10 호스트에서: dnf download --resolve --destdir=poc/rpms "
+            "docker-ce docker-ce-cli containerd.io docker-compose-plugin",
+            file=sys.stderr,
+        )
+
     # install.sh
     install_sh = out_dir / "install.sh"
     install_sh.write_text(
@@ -1289,9 +1348,36 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
         "echo '=== Koipa Airgap Bundle Install ==='\n"
         "# 0) 컨테이너 런타임 판별 — 운영 대상이 RHEL 계열(Rocky)이면 기본이 podman 이다.\n"
         "#    docker 를 하드코딩하면 그 호스트에서 설치가 첫 줄부터 멈춘다(2026-08-26).\n"
+        "#    런타임이 아예 없으면 번들의 rpms/ 로 설치한다 — 설치 대상 두 곳(지재원 공공망·\n"
+        "#    고객사 폐쇄망) 모두 인터넷 저장소를 못 쓰므로 dnf install 로 받아올 수 없다.\n"
+        "if ! command -v docker >/dev/null 2>&1 && ! command -v podman >/dev/null 2>&1; then\n"
+        "  if ls \"$BUNDLE_DIR/rpms\"/*.rpm >/dev/null 2>&1; then\n"
+        "    echo '[runtime] 컨테이너 런타임 없음 — 번들 rpms/ 로 설치'\n"
+        "    if [ \"$(id -u)\" != 0 ]; then\n"
+        "      echo '[ERROR] RPM 설치는 root 권한이 필요하다 — sudo bash install.sh' >&2; exit 1\n"
+        "    fi\n"
+        "    # --disablerepo=* : 폐쇄망에서 저장소 메타데이터를 받으러 나가면 타임아웃으로 멈춘다.\n"
+        "    if command -v dnf >/dev/null 2>&1; then\n"
+        "      dnf install -y --disablerepo='*' \"$BUNDLE_DIR/rpms\"/*.rpm\n"
+        "    elif command -v yum >/dev/null 2>&1; then\n"
+        "      yum install -y --disablerepo='*' \"$BUNDLE_DIR/rpms\"/*.rpm\n"
+        "    else\n"
+        "      rpm -Uvh --replacepkgs \"$BUNDLE_DIR/rpms\"/*.rpm\n"
+        "    fi\n"
+        "    # docker-ce 는 설치만으로 데몬이 뜨지 않는다. podman 은 데몬이 없어 이 단계가 불필요.\n"
+        "    if command -v docker >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then\n"
+        "      systemctl enable --now docker || echo '[WARN] docker 데몬 기동 실패 — systemctl status docker 로 확인'\n"
+        "    fi\n"
+        "  else\n"
+        "    echo '[ERROR] 컨테이너 런타임 미탑재이고 번들에 rpms/ 도 없다.' >&2\n"
+        "    echo '        인터넷 되는 Rocky 8.10 호스트에서 아래를 돌려 번들을 다시 만들어야 한다:' >&2\n"
+        "    echo '          dnf download --resolve --destdir=poc/rpms docker-ce docker-ce-cli containerd.io docker-compose-plugin' >&2\n"
+        "    exit 1\n"
+        "  fi\n"
+        "fi\n"
         "if command -v docker >/dev/null 2>&1; then CRT=docker\n"
         "elif command -v podman >/dev/null 2>&1; then CRT=podman\n"
-        "else echo '[ERROR] 컨테이너 런타임 미탑재 — docker 또는 podman 이 필요하다' >&2; exit 1\n"
+        "else echo '[ERROR] 컨테이너 런타임 설치 후에도 명령을 찾지 못했다' >&2; exit 1\n"
         "fi\n"
         "echo \"[runtime] $CRT\"\n\n"
         "# 1) 이미지 적재\n"
@@ -1362,7 +1448,9 @@ def _copy_infra(out_dir: Path, version: str = "1.0.0-rc1") -> None:
     import shutil as _sh
     # preflight_host.sh — install.sh 앞에서 호스트를 점검한다(읽기 전용). 설치를 발주처가
     # 수행하므로 현장에서 처음 만나는 실패를 줄이려면 이 스크립트가 번들에 함께 있어야 한다.
-    for _script in ("preflight_host.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh"):
+    # setup.sh — 원커맨드 설치기. 설치를 발주처(지재원)·고객사가 직접 수행하므로
+    # 번들 안에 없으면 원커맨드 경로 자체가 존재하지 않는다.
+    for _script in ("preflight_host.sh", "setup.sh", "deploy.sh", "deploy_airgap.sh", "verify_install.sh", "deploy_rollback.sh"):
         _src = _REPO_ROOT / "scripts" / _script
         if _src.exists():
             _dst = out_dir / _script

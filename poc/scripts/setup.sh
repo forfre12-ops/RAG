@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # ============================================================================
-# setup.sh — 폐쇄망 원커맨드 설치 (Rocky Linux 8.10 대상)
+# setup.sh — 원커맨드 설치 (Rocky Linux 8.10)
 # ----------------------------------------------------------------------------
-#   bash setup.sh
+#   bash setup.sh                 # 대상 자동 판별(GPU 있으면 학습 노드)
+#   NODE=jjw       bash setup.sh  # 지재원 학습·골든 노드로 강제
+#   NODE=customer  bash setup.sh  # 고객사 운영 노드로 강제
 #
 # 이 스크립트 하나로 끝난다. 설치자는 .env 를 손으로 편집하지 않는다.
+#
+# 설치 대상이 둘이고 성격이 다르다:
+#   지재원 서버   공공망 · KL 이 원격 접속해 설치 · 학습·골든 노드(GPU) · full-train
+#   고객사 서버   폐쇄망 · USB 등 매체로 반입해 직접 설치 · 운영 추론(CPU) · onprem-local
+# 둘 다 인터넷 저장소를 쓸 수 없다 — 컨테이너 런타임이 없으면 번들의 rpms/ 로 설치한다.
 #
 # 왜 원커맨드인가. 설치는 발주처가 우리 없이 수행한다. 종전 절차는 5 단계였고
 # 그중 '.env 의 replace_me 를 손으로 채우기' 에서 두 번 막혔다(2026-08-26 리허설 실측):
@@ -21,6 +28,7 @@
 #   · cgroup v1 기본 → 컨테이너 동작에 지장 없음
 #
 # 옵션(환경변수):
+#   NODE=jjw|customer    설치 대상. 미지정이면 GPU 유무로 판별한다
 #   API_PORT=8000        노출 포트
 #   DRY_RUN=1            무엇을 할지만 출력하고 아무것도 바꾸지 않는다
 #   OPEN_FIREWALL=1      firewalld 에 API 포트를 연다(기본 0 — 안내만)
@@ -38,13 +46,35 @@ DRY_RUN="${DRY_RUN:-0}"
 OPEN_FIREWALL="${OPEN_FIREWALL:-0}"
 FORCE_ENV="${FORCE_ENV:-0}"
 
+# 설치 대상 판별. 지재원 학습 노드는 GPU 가 있고 학습 라우터가 필요하다(full-train).
+# 고객사 운영 노드는 CPU 전용이고 학습 경로가 아예 등록되지 않는다(onprem-local).
+# 자동 판별은 GPU 유무로 한다 — 틀리면 NODE 로 강제한다.
+if [ -z "${NODE:-}" ]; then
+  if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+    NODE=jjw
+  else
+    NODE=customer
+  fi
+  NODE_AUTO=1
+else
+  NODE_AUTO=0
+fi
+case "$NODE" in
+  jjw)      PROFILE=full-train;   NODE_LABEL="지재원 학습·골든 노드" ;;
+  customer) PROFILE=onprem-local; NODE_LABEL="고객사 운영 노드" ;;
+  *) printf "NODE 는 jjw 또는 customer 여야 한다 (받은 값: %s)\n" "$NODE" >&2; exit 1 ;;
+esac
+
 b()   { printf '\n\033[1m>> %s\033[0m\n' "$*"; }
 ok()  { printf '   \033[32m[ok]\033[0m %s\n' "$*"; }
 inf() { printf '   \033[2m%s\033[0m\n' "$*"; }
 die() { printf '\n\033[31m[setup][중단] %s\033[0m\n' "$*" >&2; exit 1; }
 run() { if [ "$DRY_RUN" = "1" ]; then inf "(dry-run) $*"; else eval "$@"; fi; }
 
-printf '\033[1m====== Koipa 폐쇄망 설치 ======\033[0m\n'
+printf '\033[1m====== Koipa 설치 — %s ======\033[0m\n' "$NODE_LABEL"
+[ "$NODE_AUTO" = "1" ] && inf "대상 자동 판별(GPU 유무). 다르면 NODE=jjw 또는 NODE=customer 로 재실행"
+inf "프로파일 $PROFILE"
+
 [ "$DRY_RUN" = "1" ] && inf "DRY_RUN=1 — 아무것도 바꾸지 않는다"
 
 # ── 0. 호스트 점검 ─────────────────────────────────────────────
@@ -132,7 +162,7 @@ else
     umask 077
     cat > "$ENV_FILE" <<ENVEOF
 # setup.sh 가 생성했다 — 비밀값은 자동 생성된 것이다. 외부에 공유하지 않는다.
-DEPLOY_PROFILE=onprem-local
+DEPLOY_PROFILE=${PROFILE}
 POC_MODE=full
 IMAGE_TAG=${IMAGE_TAG_DEFAULT}
 API_PORT=${API_PORT}
@@ -184,7 +214,21 @@ b "6. 스택 기동"
 if [ "$DRY_RUN" = "1" ]; then
   inf "(dry-run) deploy_airgap.sh 실행 — 무결성→이미지→모델→인프라→마이그레이션→앱→스모크"
 else
-  SKIP_VERIFY=1 API_PORT="$API_PORT" ENV_FILE="$ENV_FILE" bash "$BUNDLE/deploy_airgap.sh"
+  # 학습 노드에서 GPU 가 실제로 잡히면 GPU 오버레이를 얹는다. compose 기본값에는 GPU 예약이
+  # 없다 — GPU 없는 호스트에서 기동 자체가 막히던 문제 때문에 기본에서 뺐다.
+  _gpu_overlay=""
+  if [ "$NODE" = "jjw" ] && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+    for _c in "$BUNDLE/infra-config/docker-compose.gpu.yml" "$BUNDLE/docker-compose.gpu.yml"; do
+      [ -f "$_c" ] && { _gpu_overlay="$_c"; break; }
+    done
+    if [ -n "$_gpu_overlay" ]; then
+      inf "GPU 감지 — 오버레이 적용: $(basename "$_gpu_overlay")"
+    else
+      inf "[주의] GPU 는 있는데 docker-compose.gpu.yml 이 번들에 없다 — CPU 로 기동한다"
+    fi
+  fi
+  SKIP_VERIFY=1 API_PORT="$API_PORT" ENV_FILE="$ENV_FILE" GPU_OVERLAY="$_gpu_overlay" \
+    bash "$BUNDLE/deploy_airgap.sh"
 fi
 
 # ── 7. 설치 검증 ───────────────────────────────────────────────
@@ -204,6 +248,8 @@ cat <<DONE
   검수 콘솔 :  http://<서버주소>:${API_PORT}/console/admin.html
   상태 보기 :  ${CRT_COMPOSE} --env-file ${ENV_FILE} -f infra-config/docker-compose.airgap.yml ps
   로그 보기 :  ${CRT_COMPOSE} --env-file ${ENV_FILE} -f infra-config/docker-compose.airgap.yml logs -f api
+
+  설치 대상 : ${NODE_LABEL} (프로파일 ${PROFILE})
 
   ${ENV_FILE} 에 자동 생성된 비밀값이 들어 있다(권한 600). 백업하고 외부에 공유하지 않는다.
   API_KEY 는 KL 포털이 호출할 때 X-API-Key 헤더에 넣는 값이다.
