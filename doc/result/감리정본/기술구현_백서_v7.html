@@ -966,8 +966,8 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
           <tbody>
             <tr><td><b>접수됨</b></td><td>① 원문 저장 + 작업 발행 완료</td><td>→ 처리 중</td></tr>
             <tr><td><b>처리 중</b></td><td>worker가 ②–⑥ 비동기 수행</td><td>→ 자동 분류 / needs_review / 실패</td></tr>
-            <tr><td><b>자동 분류 (staging)</b></td><td>confidence ≥ 0.7</td><td>→ 관리자 검토(⑧) → <b>확정</b></td></tr>
-            <tr><td class="td-code"><b>needs_review</b></td><td>confidence &lt; 0.5 (분류는 됐으나 사람 검증 필요)</td><td>→ 검수자 라벨링(⑧) → <b>확정</b> (+ tb_corrections 적재)</td></tr>
+            <tr><td><b>자동 분류 (staging)</b></td><td>confidence ≥ 임계(배포 0.50 · <code>review_confidence_threshold</code>)</td><td>→ 관리자 검토(⑧) → <b>확정</b></td></tr>
+            <tr><td class="td-code"><b>needs_review</b></td><td>confidence &lt; 임계 (분류는 됐으나 사람 검증 필요)</td><td>→ 검수자 라벨링(⑧) → <b>확정</b> (+ tb_corrections 적재)</td></tr>
             <tr><td><b>확정 (verified)</b></td><td>관리자 확정 또는 검수 완료</td><td>최종 등급. 이후 동일 문서 재분류 시 즉시 override · KL측 후속 기능의 입력</td></tr>
             <tr><td><b>실패</b></td><td>비동기 처리 오류</td><td>→ DLQ 적재 → 재처리(§2.3). 유실 없음</td></tr>
           </tbody>

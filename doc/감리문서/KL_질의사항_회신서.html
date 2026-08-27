@@ -109,7 +109,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-1</td><td>분류 기법 종류</td><td>회신</td><td>등급을 정하는 것은 <b>모델·룰 둘</b>이다. 나머지 둘은 등급을 바꾸지 않는다</td></tr>
       <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>귀사 파악 정확</b></td><td>6단계 그대로 맞다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일하다</td></tr>
-      <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td><b>미측정</b></td><td>실측이 없다. 추정치를 수치로 제시하지 않는다</td></tr>
+      <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>실측 있음 — CPU 코어 수에 비례한다. 6 CPU 기준 100쪽 약 <b>312초</b></td></tr>
       <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 18필드. GPU 유무로 달라지지 않는다</td></tr>
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td><b>정정</b></td><td>3요건은 독립 판독되지 않는다. 곱셈은 교차 확인이다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td><b>정정</b></td><td>Attention·Gradient Saliency 를 쓰지 않는다</td></tr>
@@ -219,38 +219,67 @@ a{color:#0a0a0a}
   <h2>4. 가-2-2 &mdash; 100쪽 이상 문서 처리 시간</h2>
   <div class="q">대용량 문서 예상 처리 시간 및 전처리 방법</div>
 
-  <div class="note warn">
-    <b>측정하지 않았다.</b> 대용량 문서에 대한 실측 자료가 없다. 청크 수에 대략 비례할 것으로
-    보이나, <b>측정하지 않은 값을 수치로 제시하지 않는다.</b> 측정이 필요하시면 문서 규모 조건을
-    지정해 주시면 실측해 회신하겠다.
+  <div class="note">
+    <b>실측이 있다.</b> 대용량 문서 처리 시간은 <b>쪽수가 아니라 청크 수</b>에 비례하고,
+    청크당 시간은 <b>할당 CPU 코어 수</b>에 반비례한다. 아래는 전부 측정값이며 추정이 아니다.
   </div>
 
-  <p>현재 보유한 실측은 다음이 전부다.</p>
+  <h3>4-1. 측정값</h3>
 
   <div class="tw">
   <table>
-    <thead><tr><th style="width:34%">측정</th><th style="width:16%">값</th><th>조건</th></tr></thead>
+    <thead><tr>
+      <th style="width:16%">환경</th><th style="width:14%">입력</th>
+      <th style="width:14%">청크</th><th style="width:14%">소요</th><th>측정</th>
+    </tr></thead>
     <tbody>
-      <tr><td>분류 p95 지연</td><td>112 ms</td><td>일반 규모 문서 · KL 서버(223) 시나리오 실측</td></tr>
+      <tr><td rowspan="5">6 CPU<br>테스트서버</td><td>&mdash;</td><td class="c">4</td><td class="c">4.3 초</td><td rowspan="5">2026-08-02</td></tr>
+      <tr><td>&mdash;</td><td class="c">18</td><td class="c">16.1 초</td></tr>
+      <tr><td>&mdash;</td><td class="c">36</td><td class="c">32.4 초</td></tr>
+      <tr><td>&mdash;</td><td class="c">88</td><td class="c">79.8 초</td></tr>
+      <tr><td><b>100 쪽</b><br>(180,000자)</td><td class="c"><b>351</b></td><td class="c"><b>320.3 초</b></td></tr>
+      <tr><td>6 CPU (223)</td><td>&mdash;</td><td class="c">14</td><td class="c">6.2 초</td><td>2026-08-21</td></tr>
+      <tr><td rowspan="2">2 CPU 제한</td><td>1 쪽 (1,800자)</td><td class="c">&mdash;</td><td class="c">12.7 초</td><td rowspan="2">2026-08-02</td></tr>
+      <tr><td>5 쪽 (9,000자)</td><td class="c">&mdash;</td><td class="c">45.3 초</td></tr>
     </tbody>
   </table>
   </div>
 
-  <p>대용량 문서 처리 구조만 먼저 답한다.</p>
+  <p>6 CPU 에서 회귀식은 <b>고정비 약 2.9초 + 청크당 약 0.82초</b>다. CPU 에 거의 정확히
+  비례하며 2 CPU 대비 2.8~3.0 배 빠르다.</p>
+
+  <div class="note">
+    <b>답:</b> 100쪽(약 180,000자 · 351청크) 문서는 <b>6 CPU 에서 약 312~320초</b>다.
+    2 CPU 로 내려가면 약 3배, 즉 <b>15~16분</b>이 된다. 반대로 CPU 를 늘리면 그만큼 줄어든다.
+    <br><br>
+    이 수치는 추정이 아니라 배포 파라미터의 <b>산정 근거</b>로 실제 쓰였다 &mdash;
+    워커 soft/hard 타임아웃 900/1200초가 이 312초에서 3배 여유를 잡은 값이다.
+  </div>
+
+  <h3>4-2. 처리 경로</h3>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:26%">항목</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td>분할</td><td>512 token 청크. 문서가 길수록 청크 수가 늘고 추론 횟수가 그만큼 는다</td></tr>
-      <tr><td>동기 경로 상한</td><td>청크 수 상한을 두어 대용량은 동기 응답에서 막는다(<code>analyze_sync_max_chunks</code>)</td></tr>
+      <tr><td>분할</td><td>512 token 청크. 비용 동인은 업로드 크기가 아니라 <b>청크 수</b>다</td></tr>
+      <tr><td>동기 경로 상한</td><td>기본 34청크(약 9쪽). 60초 예산의 절반을 안전선으로 두고 역산한 값이다</td></tr>
       <tr><td>대용량 경로</td><td><b>비동기 처리가 유일한 수단</b>이다. 접수 즉시 job 을 반환하고 완료 시 콜백한다</td></tr>
+      <tr><td>워커 타임아웃</td><td>soft 900초 / hard 1200초 &mdash; 100쪽 312초 기준 약 3배 여유</td></tr>
       <tr><td>본문 상한</td><td>1,048,576자. <b>귀사 제안 문서의 값과 동일</b>하다</td></tr>
     </tbody>
   </table>
   </div>
 
-  <h2>5. 가-3 &mdash; 반환 항목</h2>
+  <div class="note warn">
+    <b>다만 역프록시 설정에 확인할 점이 있다.</b> 콘솔 앞단 nginx 의
+    <code>proxy_read_timeout</code> 이 <b>120초</b>인데, 앱은 동기 분석 상한을 400청크
+    (약 170초)까지 허용하도록 설정된 구성이 있다. 그 구간(약 120~170초)에서는 앱이
+    처리를 마치기 전에 프록시가 먼저 끊는다. 대용량은 비동기 경로로 보내는 것이 정답이며,
+    당사는 이 설정 정합을 별도로 정리하고 있다.
+  </div>
+
+<h2>5. 가-3 &mdash; 반환 항목</h2>
   <div class="q">현행 반환 항목이 최종 확정인가 · GPU 여부에 따른 구분</div>
 
   <p>현행 <code>ClassifyResponse</code> 는 <b>18필드</b>다. GPU 유무로 달라지지 않는다.</p>
@@ -522,7 +551,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:8%">#</th><th style="width:30%">항목</th><th>내용</th></tr></thead>
     <tbody>
       <tr><td class="c">1</td><td>결과 수신 항목 확대</td><td><code>confidence</code> · <code>status</code> · <code>warnings</code> 수신 &mdash; 없으면 검수 라우팅이 성립하지 않는다</td></tr>
-      <tr><td class="c">2</td><td>대용량 문서 조건 지정</td><td>쪽수·형식·본문 분량 기준을 주시면 처리 시간을 실측해 회신한다(가-2-2)</td></tr>
+      <tr><td class="c">2</td><td>대용량 처리 CPU 할당</td><td>100쪽 처리 시간은 CPU 코어 수에 반비례한다(가-2-2). 목표 응답 시간이 있으시면 알려 주시면 필요한 코어 수를 산출해 회신한다</td></tr>
       <tr><td class="c">3</td><td>실데이터 제공 여부</td><td>평가정답 확보의 전제다(나-3)</td></tr>
       <tr><td class="c">4</td><td>XAI 범위 확정</td><td>모델 내부 신호 기반 기법이 필요하면 요건으로 확정 요청(가-3-2)</td></tr>
     </tbody>

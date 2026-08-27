@@ -535,7 +535,7 @@ V = 2,  M = 1
           <tbody>
             <tr><td><b>FNR-safe 상향</b></td><td>모델이 낮은 등급을 줘도, 키워드 규칙이 TS를 강하게(점수 ≥ 3.0) 잡으면 <b>강제로 TS로 올림</b></td><td>고급 비밀을 낮게 매겨 흘리는 사고(미탐) 방지</td></tr>
             <tr><td><b>출처 기반 하향</b></td><td>출처가 공개 문서(판례·공시·<b>공개특허</b> 등)면 상위등급을 S3로 <b>내림</b> (기본 ON — 비공지성 게이트)</td><td>이미 공개된 건 비밀일 수 없으니 과분류 방지 (실데이터 과분류 0.85→0.002)</td></tr>
-            <tr><td><b>검수 게이트</b></td><td>신뢰도가 <b>0.7 미만</b>이거나, <b>출처 하향이 고급 비밀(TS·S1) 신호를 덮을 때</b>(cap-conflict)면 거부가 아니라 <code>needs_review</code>(사람 확인) 표시</td><td>애매하거나 출처-내용 충돌인 건 사람이 최종 판단 (공개로 오태깅된 비밀이 새지 않게)</td></tr>
+            <tr><td><b>검수 게이트</b></td><td>신뢰도가 <b>검수 임계(배포 0.50) 미만</b>이거나, <b>출처 하향이 고급 비밀(TS·S1) 신호를 덮을 때</b>(cap-conflict)면 거부가 아니라 <code>needs_review</code>(사람 확인) 표시</td><td>애매하거나 출처-내용 충돌인 건 사람이 최종 판단 (공개로 오태깅된 비밀이 새지 않게)</td></tr>
             <tr><td><b>희소근거 게이트</b><br><span style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">rule_fallback_min_evidence=0.9 · 기본 ON (룰-폴백 경로)</span></td><td><b>단일 약한 키워드만으로 신뢰도 1.0</b>이 되는 룰-폴백 자동확정을 차단. 근거가 희소하면 자동확정 대신 사람 검수로 보냄 (학습모델 서빙 경로에선 비활성)</td><td>신뢰도는 분류기가 학습한 값이 아니라 softmax 파생값이라 근거 한 조각만으로도 1.0이 될 수 있음 — 무성(無聲) TS 미탐 방지 (golden100 무성 TS 미탐 5→0)</td></tr>
             <tr><td><b>합의 게이트</b><br><span style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">agreement_gate_enabled · opt-in·기본 OFF</span></td><td>자동확정은 예측이 <b>공개등급(S3)</b>이거나 <b>룰등급 == 모델등급</b>일 때만 허용. 그 외 불일치는 사람 검수로 보냄. TS·S1 자동확정분은 표본감사 (기본 동작은 변하지 않음)</td><td>신뢰도는 OOD에서 과신해 정답/오답 판별력이 낮음(골든500 AUROC 0.58). 룰·모델이 합의할 때만 자동확정 (자동확정 정밀도 63→81%, 고등급 TS/S1 미탐 46→8)</td></tr>
             <tr><td><b>메타데이터 게이트 (ICD R6)</b><br><span style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">metadata_floor_enabled · opt-in·기본 OFF</span></td><td>KL 연동이 주는 <b>보안표시·접근범위</b>로 내용분류기의 사각지대를 보완: 표기 등급이 예측보다 높으면 그 등급으로 <b>상향(floor)</b>, 표기 없고 접근범위가 제한적인데 예측이 낮으면 <code>needs_review</code></td><td>내용분류기는 비밀관리성(M)·출처(S)를 본문만으론 못 봄 — 인사·재무 비밀이 일상 내부문서(S2)로 보이는 사각지대를 KL 메타로 결정론적 차단</td></tr>
@@ -554,7 +554,7 @@ V = 2,  M = 1
           <p>등급이 정해진 뒤, 시스템은 아래를 <b>전부 통과</b>해야 자동확정(<code>staging</code>)으로 둡니다. <b>하나라도 걸리면</b> 등급은 그대로 둔 채 <code>needs_review</code>(검수 큐)로 보냅니다 — 거부가 아니라 사람 확인이에요.</p>
           <ol style="margin-top:8px">
             <li>① 사람이 이미 확정한 <b>검증 라벨</b>이 있으면 → 그 값 사용(AI 추론 건너뜀)</li>
-            <li>② <b>신뢰도 ≥ 0.7</b> — 미만이면 검수</li>
+            <li>② <b>신뢰도 ≥ 검수 임계(배포 0.50)</b> — 미만이면 검수</li>
             <li>③ 예측이 <b>공개등급(S3)</b>이거나 <b>룰등급 == 모델등급</b> <span style="color:var(--text-dim)">(합의 게이트 · 켰을 때)</span></li>
             <li>④ <b>희소근거 아님</b> — 단일 약한 키워드로 신뢰도 1.0 자동확정 차단(룰-폴백 경로)</li>
             <li>⑤ 출처 하향이 고급비밀(TS·S1)을 덮는 <b>cap-conflict 아님</b></li>

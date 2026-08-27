@@ -369,7 +369,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
         <table>
           <thead><tr><th style="width:9%;">분류</th><th style="width:15%;">항목</th><th style="width:24%;">설정 키</th><th style="width:13%;">기본값(base)</th><th style="width:12%;">운영(onprem)</th><th>효과·방향</th></tr></thead>
           <tbody>
-            <tr><td>보정</td><td>온도보정</td><td class="td-code">classifier_temperature</td><td>1.0 (무보정)</td><td>3.0 (onprem-local·full-train baking)</td><td>T&gt;1=과신↓(conf 신뢰성↑) — 하드닝 프로파일이 3.0 강제(§04)</td></tr>
+            <tr><td>보정</td><td>온도보정</td><td class="td-code">classifier_temperature</td><td>1.0 (무보정)</td><td>2.03 (onprem-local·full-train baking)</td><td>T&gt;1=과신↓(conf 신뢰성↑) — 하드닝 프로파일이 2.03 강제(§04). 값의 출처는 배포 모델 <code>v-fe4b386b</code> 동봉 <code>temperature.json</code>(보정셋 256건 실측, ECE 0.0592→0.0196)이다. 2026-08-22 이전에는 일반 추정치 3.0 이 이 실측값을 덮어쓰고 있었다</td></tr>
             <tr><td>신뢰도</td><td>confidence</td><td class="td-code">(산출값, 설정 아님)</td><td>scores[pred]</td><td>—</td><td>높을수록 확신(단, 단독 신뢰 불가)</td></tr>
             <tr><td>게이트</td><td>conf 게이트</td><td class="td-code">review_confidence_threshold</td><td>0.7</td><td>—</td><td>미만이면 검수(↑=검수↑·안전↑)</td></tr>
             <tr><td>게이트</td><td>escalation τ</td><td class="td-code">classifier_escalation_tau</td><td>None (argmax)</td><td class="td-pass">0.30</td><td>τ↓=고등급 적극채택(FNR↓·과분류↑)</td></tr>
@@ -393,7 +393,7 @@ footer{border-top:1px solid var(--border);padding:32px;margin-top:40px;font-size
       <div class="card-grid col4" style="margin:16px 0;">
         <div class="card"><div class="card-label">설정 키</div><div class="card-value sm">classifier_<br>temperature</div><div class="card-desc">float, 양수만</div></div>
         <div class="card"><div class="card-label">기본값</div><div class="card-value sm">1.0</div><div class="card-desc">무보정(동작 보존)</div></div>
-        <div class="card"><div class="card-label">온도 보정 T</div><div class="card-value sm">운영 3.0</div><div class="card-desc">측정 최적 2.0(ECE 0.045) 대비 FNR-보수 마진</div></div>
+        <div class="card"><div class="card-label">온도 보정 T</div><div class="card-value sm">운영 2.03</div><div class="card-desc">배포 모델 동봉 temperature.json 실측(ECE 0.0592→0.0196)</div></div>
         <div class="card card-warn"><div class="card-label">OOD 잔존</div><div class="card-value sm">ECE 0.184</div><div class="card-desc">구 후보셋 golden500 — 전이 안 됨</div></div>
       </div>
       <p><b>무엇:</b> softmax 직전 logit을 T로 나눠 분포를 평탄화한다 — <code>temp = self._temperature; if temp != 1.0: logits = logits / temp</code> (<code>m5_inference/pipeline.py</code> <code>_run_model</code>). T&gt;1이면 과신(overconfident)이 완화된다.</p>
