@@ -151,7 +151,7 @@ footer strong{color:var(--text-dim);}
         </tr>
         <tr>
           <td><code>FUN-023</code></td>
-          <td>가이드 기반 라벨링 — 3요건(S·V·M) 독립 판독(각 0·1·2) → 곱셈 등급 + 근거(키워드·문맥) 출력 <span style="font-size:.92em;color:#666;">— 판단요소는 라벨링·결정·설명 계층에서 활용하고, 모델 파인튜닝은 등급 단일 지도학습이다(RFP 구현현황 FUN-023 주석).</span></td>
+          <td>가이드 기반 라벨링 — 키워드 룰 등급 → 3요건(S·V·M) 레벨 파생(각 0·1·2) → 곱셈 매핑 교차 확인(FNR-safe 상향만) + 근거(키워드·문맥) 출력 <span style="font-size:.92em;color:#666;">— 판단요소는 라벨링·결정·설명 계층에서 활용하고, 모델 파인튜닝은 등급 단일 지도학습이다(RFP 구현현황 FUN-023 주석).</span></td>
           <td class="center">M3</td>
           <td><strong>적용서 v2.2 §1.2·§3.7·§4</strong></td>
           <td><code>modules/m3_labeling/rule_engine.py</code> <code>grade_from_svm()</code><br/>
