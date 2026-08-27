@@ -37,7 +37,7 @@ function apiUrl(path) {
 //      시연 시작 화면에서 물었다(실측 2026-08-24 223: 자격증명 없이 GET /healthz → 200).
 //   ② 배포 서버는 auth_mode=jwt 라 X-API-Key 를 보지도 않는다 — 무엇을 넣든 판정은
 //      401 이었다(실측: 자격증명 없는 POST /classify → {"detail":"missing authorization"}).
-// 인증은 같은 오리진 HttpOnly 쿠키(koipa_access_token)가 대신한다. fetch 는 same-origin
+// 인증은 같은 오리진 쿠키(koipa_access_token)가 대신한다. fetch 는 same-origin
 // 이면 쿠키를 자동으로 싣는다(credentials 기본값). 쿠키가 없거나 만료면 401 이 오고,
 // bounceToLogin() 이 로그인 화면으로 한 번 보낸다 — 그 화면이 스스로 로그인하고 돌아온다.
 function authHeaders() {

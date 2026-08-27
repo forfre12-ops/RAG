@@ -1263,6 +1263,23 @@ def assert_production_credentials() -> None:
             ", ".join(_sg["off"]),
         )
 
+    # [무인증 노출 차단] 골든 검수·서명 HTML(review.html·signoff.html)은 브라우저
+    # 네비게이션용 무인증 라우터에 있고, 유일한 관문이 ?t= HMAC 토큰이다. 그런데 그 강제가
+    # golden_html_url_secret 이 있을 때만 켜진다(golden.py _verify_html_token: 키가 없으면
+    # 무조건 통과). 키를 안 넣으면 후보 원문(TS·S1 본문 포함)이 URL 하나로 열리는데도
+    # startup 은 통과했다. 설치 스크립트(deploy_airgap.sh)는 이미 필수로 검사하고 있어
+    # 앱만 느슨했다 — 하드닝 배포에서 같은 계약으로 맞춘다.
+    if getattr(settings, "require_safety_gates", False):
+        _ghs = str(getattr(settings, "golden_html_url_secret", "") or "").strip()
+        if not _ghs:
+            raise RuntimeError(
+                "SECURITY: GOLDEN_HTML_URL_SECRET 미설정. 하드닝 배포"
+                "(onprem-local/full-train)에서 골든 검수·서명 화면은 무인증 라우터에 있고 "
+                "?t= 토큰 강제가 이 키에 달려 있습니다. 키가 없으면 TS·S1 후보 원문이 "
+                "URL 만으로 열립니다. 값을 설정하거나 REQUIRE_SAFETY_GATES=0 으로 "
+                "의도를 명시하세요(권장하지 않음)."
+            )
+
     # CORS=["*"] 운영에서 오류
     if settings.cors_allow_origins == ["*"]:
         raise RuntimeError(
@@ -1334,6 +1351,20 @@ def assert_production_credentials() -> None:
             "SECURITY: API_KEY_TRUST_ACTOR_ROLE_HEADER=True 는 운영 모드에서 허용되지 않습니다. "
             "X-Actor-Role 헤더로 누구나 admin 자칭이 가능합니다. "
             "역할 분리가 필요하면 AUTH_MODE=jwt 를 사용하세요."
+        )
+
+    # [무인증 콘솔 자동로그인 차단] login.html 은 무인증 라우터인데, 이 값이 있으면
+    # 관리자 JWT 를 본문에 실어 자동으로 로그인시킨다 = 사실상 인증 해제. 후보 원문 열람과
+    # 관리 API 가 그대로 열린다. 형제 토글(RATE_LIMIT_DISABLED·API_KEY_TRUST_ACTOR_ROLE_HEADER)과
+    # 같은 취급으로 하드닝 배포에서만 막는다 — 시연 tier(lite-*)는 종전대로 동작한다.
+    if getattr(settings, "require_safety_gates", False) and str(
+        getattr(settings, "console_login_prefill_token", "") or ""
+    ).strip():
+        raise RuntimeError(
+            "SECURITY: CONSOLE_LOGIN_PREFILL_TOKEN 은 하드닝 배포"
+            "(onprem-local/full-train)에서 허용되지 않습니다. 무인증 login.html 이 이 토큰으로 "
+            "관리자 세션을 자동 생성해 인증이 사실상 해제됩니다. 값을 비우거나, 시연 목적이면 "
+            "REQUIRE_SAFETY_GATES=0 으로 의도를 명시하세요(권장하지 않음)."
         )
 
     # rule-fallback-v0 운영 차단 — 모델 디렉토리가 명시됐으면 존재+내용물(config.json·가중치) 검증.

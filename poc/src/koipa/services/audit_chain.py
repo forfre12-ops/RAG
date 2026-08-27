@@ -151,6 +151,12 @@ class ChainVerificationResult:
     # 스캔이 limit 캡에 걸려 스코프 전체를 못 봤는지 — True면 total_rows는 부분집합이라
     # broken=0/integrity_ok가 '변조 없음'이 아니라 '스캔된 부분엔 없음'을 뜻한다(무음 부분검증).
     scan_truncated: bool = False
+    # 검증이 실제로 수행됐는가. False = DB 미가용으로 스캔 자체를 못 했다.
+    # [2026-08-28] 측정 불가를 broken=0 으로 돌려주면 integrity_ok() 가 True 가 되어
+    # "검증 못 했다"가 "검증했고 깨끗하다"로 바뀐다(거짓 all-clear). 같은 함정을
+    # ensure_partitions_tick 은 status="db_unavailable" 로 이미 막고 있다 — 같은 규율을 쓴다.
+    # 기본 True 라 정상 경로·기존 호출부는 변화 없다.
+    checked: bool = True
 
     def ok(self) -> bool:
         # break만 본다(동작 보존). nil 행은 별개 신호로 노출 — integrity_ok로 종합 판정.
@@ -206,8 +212,13 @@ def verify_chain(
             except Exception:  # noqa: BLE001 — 절단 탐지 COUNT 는 검증을 절대 깨선 안 됨(best-effort)
                 total_in_scope = None
     except SQLAlchemyError as e:
-        logger.debug("audit chain verify skipped (db unavailable): %s", e)
-        return ChainVerificationResult(total_rows=0, verified=0, broken=0)
+        # [거짓 all-clear 금지] 측정 불가 != broken 0. checked=False 로 상태를 실어 보내고
+        # 호출부가 게시를 건너뛴다. NFR-SEC-01 일별 검증이 수행되지 않은 날이므로
+        # debug 가 아니라 warning 이다.
+        logger.warning("audit chain verify NOT RUN (db unavailable): %s", e)
+        return ChainVerificationResult(
+            total_rows=0, verified=0, broken=0, checked=False,
+        )
 
     scan_truncated = scan_was_truncated(len(rows), total_in_scope)
     if scan_truncated:

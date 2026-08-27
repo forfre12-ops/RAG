@@ -63,7 +63,7 @@
            웹 화면에서 키·토큰을 입력받지 않는다. 근거로도 그 칸은 죽은 칸이었다 —
            배포 서버는 auth_mode=jwt 라 X-API-Key 를 보지 않는다(실측 2026-08-24 223:
            자격증명 없는 POST /classify → {"detail":"missing authorization"}).
-           인증은 같은 오리진 HttpOnly 쿠키가 맡는다(static/app.js authHeaders 주석). -->
+           인증은 같은 오리진 쿠키가 맡는다(static/app.js authHeaders 주석). -->
       <!-- 앵커 id="sec-parse" — 옛 파싱·분류 시연 화면의 주소가 사용설명서·배포 가이드·
            console_nav 에 인쇄돼 있다. 그 주소로 온 사람이 떨어져야 하는 자리는
            「파일을 올리는 곳」이므로 업로드 칸에 둔다(파싱 세부는 §2 결과 안에 있다). -->

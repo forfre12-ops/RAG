@@ -328,8 +328,17 @@ def is_locked_eval(record: dict) -> bool:
     대신 **평가셋 구성(실문서/합성 비율)은 항상 함께 보고**한다(eval_readiness 의
     real_per_grade/synthetic_per_grade). 수치를 인용할 때 구성으로 한정할 수 있게 하기 위함이며,
     구성 은폐가 아니라 명시가 목적이다.
+
+    [2026-08-28] 검수자의 용도 선택(intended_use)을 반영한다. 화면에는 「골든셋(평가정답)」과
+    「학습후보」 선택지가 떠 있고 그 값이 서명 레코드에 저장되고 있었는데, 여기서 읽지 않아
+    **학습후보로 표시한 문서가 평가정답으로 집계되고 학습에서는 빠졌다** — 사람의 선택과
+    시스템의 처리가 정확히 반대였다. 서명 자체는 유효하므로 tier 는 TIER_LOCKED 로 두고
+    (원장 보존), 평가 pool 편입만 가른다. 키가 없는 기존 레코드는 'locked_eval' 로 읽혀
+    동작이 변하지 않는다.
     """
-    return is_valid_signoff(record)
+    if not is_valid_signoff(record):
+        return False
+    return str(record.get("intended_use") or "locked_eval") != "train"
 
 
 def tier_of(record: dict) -> str:

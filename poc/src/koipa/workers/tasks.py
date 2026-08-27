@@ -732,6 +732,23 @@ def verify_audit_chain_tick(limit: int = 100000) -> dict:
     # [P0 관측성] 워커→API 브리지: AUDIT_CHAIN_BROKEN_TOTAL 은 워커 레지스트리(비스크랩)에만
     # inc 되므로 authoritative full-scan 결과를 Redis 에 게시 → API _refresh_audit_integrity_gauges
     # 가 읽어 현재-상태 게이지로 재노출(P0 AuditChainBroken 알람이 실제로 발화하게 함).
+    if not res.checked:
+        # [2026-08-28] DB 미가용이면 게시하지 않는다 — 측정 불가를 broken=0 으로 올리면
+        # AUDIT_CHAIN_INTEGRITY_OK 가 1 로 세팅돼 P0 AuditChainBroken 알람이 영구 침묵한다.
+        # 직전 게시값이 TTL 안에서 유지되고, 노후는 별도 stale 알람이 잡는다.
+        # (ensure_partitions_tick 과 동일 규율)
+        logger.warning(
+            "verify_audit_chain_tick: DB 미가용 — 무결성 신호 게시 skip(거짓 all-clear 방지)"
+        )
+        return {
+            "checked": False,
+            "status": "db_unavailable",
+            "total_rows": 0,
+            "verified": 0,
+            "broken": 0,
+            "ok": None,
+        }
+
     from koipa.services.worker_metrics_bridge import AUDIT_INTEGRITY, publish_signal
     publish_signal(AUDIT_INTEGRITY, {
         "broken": res.broken,

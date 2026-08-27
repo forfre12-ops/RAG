@@ -109,7 +109,10 @@ def evaluate_kill_gate(
 def run_kill_gate_check() -> dict:
     """신호를 DB에서 best-effort 집계 → evaluate_kill_gate → 게이지 set + 로그(경보만).
 
-    DB 미가용/오류 → 신호 0 + 미발동(안전). 자동 중단 없음(비파괴).
+    DB 미가용/오류 → **마지막 판정을 유지**하고 캐시·게이지를 덮지 않는다.
+    [2026-08-28] 종전엔 신호 0 으로 계속 진행해 tripped=False 가 나왔고, 그 값이
+    이미 발동돼 있던 브레이크를 풀고 게이지를 0 으로 만들어 알람이 거짓 all-clear 가 됐다.
+    브레이크에서 '미발동'은 안전 방향이 아니라 미탐 방향이다. 자동 중단 없음(비파괴).
     """
     from koipa.config import settings  # noqa: PLC0415
     from koipa.db import session_scope  # noqa: PLC0415
@@ -122,6 +125,7 @@ def run_kill_gate_check() -> dict:
         _correction_admissible,
     )
 
+    gathered = True
     high_grade_miss = 0
     daily = 0
     nonconfirm = 0
@@ -167,7 +171,21 @@ def run_kill_gate_check() -> dict:
                     if direction == "underclass" and lvl in high_ids:
                         high_grade_miss += 1
     except SQLAlchemyError as exc:
-        logger.debug("kill-gate gather skipped: %s", exc)
+        # 측정 불가 != 신호 0. 0 으로 진행하면 tripped=False 가 되어 마지막 판정을 덮는다.
+        gathered = False
+        logger.warning("kill-gate 점검 불가(DB 오류) — 마지막 판정 유지: %s", exc)
+
+    global _LAST_RESULT, _LAST_CHECK_TS
+    if not gathered:
+        # 재시도 폭주만 막고 결과 캐시·게이지는 손대지 않는다.
+        _LAST_CHECK_TS = time.monotonic()
+        if _LAST_RESULT is not None:
+            out = _LAST_RESULT.to_dict()
+        else:
+            out = {"tripped": False, "reasons": [], "signals": {}}
+        out["checked"] = False
+        out["status"] = "db_unavailable"
+        return out
 
     overturn_rate = (nonconfirm / total) if total >= _OVERTURN_MIN_SAMPLES else 0.0
     res = evaluate_kill_gate(
@@ -181,7 +199,6 @@ def run_kill_gate_check() -> dict:
     )
     # [번들 E] 캐시 갱신 — 안전브레이크(should_suppress_autoconfirm)가 읽는 tripped 상태.
     # _LAST_CHECK_TS 도 갱신해 gauge-loop/지연갱신 양쪽이 신선도를 공유(중복 refresh 방지).
-    global _LAST_RESULT, _LAST_CHECK_TS
     _LAST_RESULT = res
     _LAST_CHECK_TS = time.monotonic()
     try:

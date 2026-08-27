@@ -1073,7 +1073,7 @@ let AUTO_TIMER=null, AUTO_SILENT=false, AUTO_INFLIGHT=false, AUTO_TICK_OK=true;
 const $ = id => document.getElementById(id);
 const cfg = () => ({
   base: $('cfg-base').value.replace(/\/$/,''),
-  // [2026-08-24] 화면에서 키를 받지 않는다(사용자 지시). 인증은 같은 오리진 HttpOnly
+  // [2026-08-24] 화면에서 키를 받지 않는다(사용자 지시). 인증은 같은 오리진
   // 쿠키(koipa_access_token)가 맡는다 — fetch 가 자동으로 싣는다. 이 값은 예전에
   // 이 브라우저에 저장돼 있던 것을 그대로 쓸 때만 채워진다(api_key 모드로 도는 다른
   // 설치본 호환). 새로 넣을 경로는 없앴다 — 입력칸도 ?key= 주소도 없다.
@@ -2885,7 +2885,7 @@ function syncActiveGrades(codes){
 }
 
 /* [2026-08-24] 「API 키 자동 채움」 블록을 없앴다. 주소에 ?key= 를 붙여 여는 경로였는데,
- * 사용자 지시로 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 HttpOnly 쿠키가
+ * 사용자 지시로 **웹 화면에서 키·토큰을 받지 않는다**. 인증은 같은 오리진 쿠키가
  * 맡고, 없으면 401 → 로그인 화면으로 보낸다(위 bounceToLogin). */
 
 /* init */

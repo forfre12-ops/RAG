@@ -320,7 +320,11 @@ def require_auth(
         if mode == "api_key":
             raise HTTPException(status_code=401, detail="invalid api key")
     if mode in ("jwt", "both"):
-        # 포털이 동일 사이트 HttpOnly 쿠키로 전달한 JWT를 콘솔 브라우저 요청에도 사용한다.
+        # 포털·콘솔 로그인 화면이 심는 동일 사이트 쿠키의 JWT 를 브라우저 요청에도 사용한다.
+        # [2026-08-28 정정] 이 쿠키는 **HttpOnly 가 아니다** — 로그인 화면이 document.cookie 로
+        # 심으므로(golden.py) JS 로 읽힌다. Secure 도 붙지 않는다. 종전 주석 5곳이 HttpOnly
+        # 라고 적어 실제보다 강한 보호를 주장하고 있었다. 서버가 Set-Cookie 를 내리도록
+        # 바꾸기 전까지 이 쿠키는 XSS 로부터 보호되지 않는다(화면의 이스케이프가 유일 방어선).
         # 자바스크립트가 토큰을 읽거나 화면에 노출할 필요가 없으며, Authorization 헤더가 있으면
         # 그것이 우선한다(서비스 간 호출 호환성 유지).
         if not authorization and koipa_access_token:
