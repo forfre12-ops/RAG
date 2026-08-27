@@ -23,8 +23,15 @@ celery_app.conf.task_soft_time_limit = settings.celery_task_soft_time_limit
 celery_app.conf.task_time_limit = settings.celery_task_time_limit
 celery_app.conf.worker_max_tasks_per_child = settings.celery_worker_max_tasks_per_child
 celery_app.conf.task_acks_late = True
-celery_app.conf.task_reject_on_worker_lost = True
+# [2026-08-28] 전역 True 는 워커 소실(cgroup OOM SIGKILL) 시 메시지를 큐 **머리**로 되돌린다.
+# 이 되돌림은 retry 가 아니라 redelivery 라 max_retries 가 세지 않는다 — 상한이 없다.
+# 메모리를 넘겨 죽은 작업이 되살아나 또 죽는 순환이 실측됐다(182 서버 재학습 워커).
+# False 로 두면 소실된 작업은 유실되지만, 유실은 로그·지표에 남고 사람이 다시 걸 수 있다.
+# 무한 순환은 워커를 통째로 못 쓰게 만든다 — 둘 중에는 유실이 낫다.
+celery_app.conf.task_reject_on_worker_lost = False
 celery_app.conf.worker_prefetch_multiplier = 1
+# prefork 기본 동시성 = 호스트 코어 수. 컨테이너 한도를 못 보므로 명시한다(config 주석 참조).
+celery_app.conf.worker_concurrency = settings.celery_worker_concurrency
 
 # [실측 2026-08-08] Redis 브로커의 visibility_timeout 기본값은 **3600초(1시간)** 다.
 # 이 시간 안에 ack 되지 않은 메시지를 브로커가 "워커가 죽었다"고 보고 **다시 배달**한다.

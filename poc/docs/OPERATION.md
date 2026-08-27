@@ -39,7 +39,7 @@ $COMPOSE down                          # 전체 정지 (named 볼륨은 보존)
 | `agreement_gate_enabled` | `True` | 룰등급≠모델등급 불일치 → 검수(자동확정 정밀도↑) |
 | `metadata_floor_enabled` | `True` | KL 보안표시/접근범위로 등급 하한 상향(비밀관리성 보완) |
 | `rule_fallback_min_evidence` | `0.9` | 단일 약한 키워드만으로 conf=1.0 자동확정 차단 |
-| `classifier_temperature` | `3.0` | 서빙 보정(과신 완화). 활성 모델 dir의 `temperature.json`이 우선 |
+| `classifier_temperature` | `2.03` | 서빙 보정(과신 완화). **프로파일/.env 값이 모델 dir 의 `temperature.json` 보다 우선**한다. 모델을 교체하면 이 값도 새 모델의 `temperature.json` 값으로 다시 맞출 것 — 안 맞추면 다른 T 로 보정된 모델을 넣어도 서빙은 계속 옛 값을 쓴다 |
 | `require_safety_gates` | `True` | 위 게이트 중 하나라도 꺼지면 **기동 fail-fast** |
 
 - 서빙은 의도적으로 **안전방향 과분류**(고등급 미탐 0 우선)다 — 정확 등급일치가 아니라 미탐 없음이 합격 기준.

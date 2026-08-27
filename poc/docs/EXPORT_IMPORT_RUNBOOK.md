@@ -52,6 +52,22 @@ ls artifacts/<VERSION>/temperature.json                     # 존재 필수(목�
   - degenerate(한 클래스 >99%) 아님
 - baseline이 없는 **최초 배포**는 degenerate만 아니면 통과다(그래서 A1 보정·A2 평가가 더 중요).
 
+### A3-0. 서비스 이미지 빌드 (번들 빌드 전 **필수**)
+
+번들 빌더는 **이미 있는 이미지를 `docker save` 할 뿐 빌드하지 않는다.** 이 단계를 건너뛰면
+A3 이 부분 빌드로 끝나고 체크섬 파일이 생성되지 않아, 현장에서 `verify.sh` 가 실패한다.
+
+```bash
+cd poc
+export IMAGE_TAG=1.0.0-rc1          # A3 의 --version 과 반드시 같은 문자열
+docker build -f Dockerfile.api.prod -t koipa-api:$IMAGE_TAG     --build-arg KOIPA_BUILD_SHA=$(git rev-parse HEAD) .
+docker build -f Dockerfile.worker  -t koipa-worker:$IMAGE_TAG     --build-arg KOIPA_BUILD_SHA=$(git rev-parse HEAD) .
+# 둘 다 존재해야 A3 로 진행한다
+docker image inspect koipa-api:$IMAGE_TAG koipa-worker:$IMAGE_TAG >/dev/null
+```
+
+이 둘이 api·worker·beat 세 구성요소를 모두 덮는다(beat 는 worker 이미지를 공유한다).
+
 ### A3. 번들 빌드
 ```bash
 # 먼저 dry-run 으로 manifest 만 검증(다운로드 없음)

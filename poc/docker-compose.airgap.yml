@@ -69,6 +69,14 @@ services:
       HF_HOME: /models/hf
       HF_HUB_OFFLINE: "1"           # 폐쇄망 — 외부 다운로드 차단 (모델은 ../models 에서 로드)
       TRANSFORMERS_OFFLINE: "1"
+      # [NFR-OPS-01] 이미지 기본값은 4워커다. 멀티워커면 모델 핫리로드가 요청이 닿은 워커
+      # 하나만 갱신하고 나머지는 옛 모델을 계속 서빙한다(서비스 인스턴스가 프로세스 싱글톤).
+      # onprem-local 은 야간 증분 재학습이 켜져 있어 승격이 실제로 일어나는 프로파일이라
+      # 이 어긋남이 운영 중에 발생한다. prod.yml 과 같은 이유로 1 로 묶는다.
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-1}"
+      # [스레드 정합] torch 는 cgroup CPU 한도를 보지 못한다 — 아래 cpus 한도와 같은 값으로 묶는다.
+      OMP_NUM_THREADS: "${API_CPU_LIMIT:-4}"
+      MKL_NUM_THREADS: "${API_CPU_LIMIT:-4}"
     volumes:
       # [SELinux] `z` 는 공유 라벨(container_file_t) 재지정이다. RHEL·Rocky 계열은 SELinux 가
       # 기본 enforcing 이라 라벨 없이 bind mount 하면 컨테이너가 이 경로를 못 읽고 **모델 적재가
@@ -76,6 +84,14 @@ services:
       # Ubuntu 등 SELinux 가 없는 호스트에서는 무시되므로 양쪽 모두에서 안전하다.
       - ../models:/models:ro,z      # 사전 동봉 모델 (분류기 학습본·임베딩·HF 캐시)
       - storagedata:/app/.storage   # 로컬FS 문서·원본 보관(WORKDIR=/app, LocalStorage root=.storage)
+      # [골든] 골든 후보·검수 산출물. datasets 는 .dockerignore 라 이미지에 들어 있지 않다 —
+      # 이 볼륨이 없으면 /golden/build 를 실행한 worker 가 자기 컨테이너 FS 에 결과를 쓰고,
+      # 검수 화면을 렌더하는 api 는 경로 자체가 없어 화면이 영원히 빈다. 검수 원장과
+      # 사람 서명 파일도 컨테이너 재생성 시 사라진다. prod·dual 은 이미 고쳐져 있었다.
+      - golden_data:/app/datasets
+      # [학습 산출] 야간 증분 재학습·학습 노드 산출물. 없으면 후보 모델이 워커 임시 레이어에
+      # 남아 api 가 모델 경로를 열지 못한다.
+      - artifacts_out:/app/artifacts_out
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }
@@ -114,9 +130,14 @@ services:
       HF_HOME: /models/hf
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
+      # [스레드 정합] api 와 같은 이유 — cgroup 한도를 코드에 알려 준다.
+      OMP_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
+      MKL_NUM_THREADS: "${WORKER_CPU_LIMIT:-4}"
     volumes:
       - ../models:/models:ro,z      # [SELinux] api 와 같은 공유 라벨 — 위 api 블록 주석 참조
       - storagedata:/app/.storage   # api 와 공유 — 로컬FS 문서·원본
+      - golden_data:/app/datasets       # api 와 공유 — 골든 후보·검수 원장(위 api 주석 참조)
+      - artifacts_out:/app/artifacts_out # 재학습 산출물 — api 가 같은 경로로 읽는다
     depends_on:
       - redis
       - postgres
@@ -171,3 +192,5 @@ volumes:
   pgdata:
   redisdata:
   storagedata:     # 로컬FS 문서·원본 보관(api·worker 공유) — minio/mlflowdata 대체
+  golden_data:     # 골든 후보·검수 원장·사람 서명(api·worker 공유). 이미지에 없는 경로다
+  artifacts_out:   # 재학습 산출 모델(api·worker 공유)

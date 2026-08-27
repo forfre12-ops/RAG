@@ -63,7 +63,7 @@ in-memory 폴백` (또는 동일 취지의 idempotency 메시지)으로 **fail-f
 **증상**: confidence가 비정상적으로 1.0에 가깝고 OOD 문서에 과신.
 
 **원인**: 활성 모델 dir에 `temperature.json`이 없어 서빙이 T=1.0(무보정)로 동작.
-(onprem-local 프로파일은 `classifier_temperature=3.0`으로 완충하나, 모델별 보정값이 최선.)
+(onprem-local 프로파일은 `classifier_temperature=2.03`으로 완충하나, 모델별 보정값이 최선.)
 
 **조치**: 학습 시 산출된 `temperature.json`을 모델 dir에 동봉하거나 `make calibrate CAL_MODEL_DIR=<dir>`로 재산출.
 

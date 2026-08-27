@@ -349,6 +349,12 @@ class Settings(BaseSettings):
     celery_task_soft_time_limit: int = 900
     celery_task_time_limit: int = 1200
     celery_worker_max_tasks_per_child: int = 100
+    # [프로세스 정합] celery prefork 기본 동시성은 호스트 코어 수다 — 컨테이너 cpus 한도를
+    # 보지 못한다(torch 스레드가 같은 이유로 어긋났던 것과 동일). 자식 프로세스마다 분류
+    # 모델이 한 벌씩 올라가므로(실측 약 1.08GiB/프로세스) 워커 메모리 한도 4GiB 안에서는
+    # 2 가 상한이다. 3 이면 약 3.3GiB 로 한도에 붙는다.
+    # CLI 로 -c 를 주면 그쪽이 이긴다 — 여기 값은 안전한 기본선이다.
+    celery_worker_concurrency: int = 2
 
     # CORS allow-origins. 운영에서는 .env로 origin allowlist 설정.
     # 기본값 ["*"]은 PoC·dryrun·테스트 편의를 위함. 운영 배포 시 명시적 origin 필수.
@@ -911,6 +917,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "celery_task_soft_time_limit",
+        "celery_worker_concurrency",
         "celery_task_time_limit",
         "celery_result_expires",
         "celery_worker_max_tasks_per_child",

@@ -91,13 +91,22 @@ log "0/7  사전 요건 (layout=$LAYOUT · root=$ROOT · runtime=$CRT · compose
 # infra-config/ 에도 동일 .env 를 보장(양쪽 resolution 안전) — CLI --env-file 과 서비스 env_file 불일치 예방.
 if [ ! -f "$ENV_FILE" ]; then
   tmpl="$COMPOSE_DIR/.env.template"
-  [ -f "$tmpl" ] && cp "$tmpl" "$ENV_FILE" && die "$ENV_FILE 생성함 — IMAGE_TAG·POSTGRES_PASSWORD·API_KEY 채운 뒤 재실행."
+  # 비밀값 파일 — 생성 시점부터 소유자 전용.
+  if [ -f "$tmpl" ]; then
+    (umask 077; cp "$tmpl" "$ENV_FILE")
+    chmod 600 "$ENV_FILE" 2>/dev/null || true
+    die "$ENV_FILE 생성함(권한 600) — IMAGE_TAG·POSTGRES_PASSWORD·API_KEY 채운 뒤 재실행."
+  fi
   die "$ENV_FILE 없음. 'cp infra-config/.env.template $ENV_FILE' 후 실값 입력."
 fi
 if [ "$LAYOUT" = "bundle" ]; then
   # 서비스 env_file: .env 는 compose 파일 기준(infra-config/)으로 해석될 수 있어 항상 미러(최신화).
   # cp 대상이 원본과 동일 파일이면 오류 → 무시.
-  cp -f "$ENV_FILE" "$COMPOSE_DIR/.env" 2>/dev/null && info "infra-config/.env 미러(서비스 env_file 로드 보장)" || true
+  # 미러도 원본과 같은 비밀값을 담는다 — 권한을 같이 건다.
+  if cp -f "$ENV_FILE" "$COMPOSE_DIR/.env" 2>/dev/null; then
+    chmod 600 "$COMPOSE_DIR/.env" 2>/dev/null || true
+    info "infra-config/.env 미러(권한 600 · 서비스 env_file 로드 보장)"
+  fi
 fi
 _env_val() { grep -E "^${1}=" "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' '; }
 # 하드닝 프로파일(onprem-local)은 저장암호화를 강제 → ENABLED 가 명시적 off 가 아니면 KEY 도 필수.
