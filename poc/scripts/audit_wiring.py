@@ -8,7 +8,7 @@ grep 해서 답했다. 그건 하한선이지 총계가 아닌데 총계처럼 �
 세 가지를 본다:
   ① 죽은 정의   src/koipa 안에서 정의됐는데 참조가 한 곳도 없는 함수·메서드
   ② 수동 구간   src/ 가 문자열·주석으로만 언급하는 scripts/*.py — 사람이 손으로 돌려야 이어진다
-  ③ 꺼진 기능   현재 프로파일에서 opt-in 플래그의 실제 값
+  ③ 꺼진 기능   배포 프로파일별 opt-in 플래그 값(lite/onprem/full 나란히)
 
 참조 판정은 **AST** 로 한다(ast.Name·ast.Attribute). 문자열 매칭이면 함수가 자기 이름을
 로그 문자열에 쓰거나 docstring 에 언급되기만 해도 '쓰이는 중'으로 보인다 — 실제로 그 두
@@ -25,6 +25,8 @@ from __future__ import annotations
 import ast
 import io
 import re
+import os
+import importlib
 import sys
 from pathlib import Path
 
@@ -204,26 +206,47 @@ def main() -> int:
     print(f"\n  {len(dead_cols)}건 / 검사한 컬럼 {len(cols)}개\n")
 
     print("=" * 76)
-    print(" ④ opt-in 플래그 — 현재 프로파일 실제 값")
+    print(" 4. opt-in 플래그 - 배포 프로파일별 실제 값")
     print("=" * 76)
+    # 프로파일 하나만 찍으면 오해가 난다. 기본값 lite-noapi 는 이 사업의 배포 대상이
+    # 아니라서 "안전 게이트가 잔뜩 꺼져 있다"고 잘못 읽힌다. 셋을 나란히 놓는다.
+    PROFILES = ("lite-noapi", "onprem-local", "full-train")
+    DEPLOYED = ("onprem-local", "full-train")
     try:
         sys.path.insert(0, str(_ROOT / "src"))
-        from koipa.config import settings  # noqa: PLC0415
-        print(f"  프로파일: {getattr(settings, 'deploy_profile', '?')}\n")
-        on, off = [], []
-        for n in sorted(dir(settings)):
-            if not (n.endswith(("_enabled", "_on")) or n.startswith("enable_")):
-                continue
-            v = getattr(settings, n, None)
-            if isinstance(v, bool):
-                (on if v else off).append(n)
-        for n in on:
-            print(f"   ON   {n}")
-        for n in off:
-            print(f"   off  {n}")
-        print(f"\n  켜짐 {len(on)} · 꺼짐 {len(off)}")
+        table: dict[str, dict[str, bool]] = {}
+        for prof in PROFILES:
+            os.environ["DEPLOY_PROFILE"] = prof
+            import koipa.config as _cfg  # noqa: PLC0415
+            importlib.reload(_cfg)
+            st = _cfg.settings
+            row = {}
+            for n in sorted(dir(st)):
+                if not (n.endswith(("_enabled", "_on")) or n.startswith("enable_")):
+                    continue
+                v = getattr(st, n, None)
+                if isinstance(v, bool):
+                    row[n] = v
+            table[prof] = row
+        names = sorted({n for r in table.values() for n in r})
+        print(f"  {'플래그':<38}{'lite-noapi':>12}{'onprem-local':>14}{'full-train':>12}")
+        print("  " + "-" * 74)
+        for n in names:
+            cells = "".join(
+                f"{('ON' if table[p].get(n) else 'off'):>{w}}"
+                for p, w in zip(PROFILES, (12, 14, 12))
+            )
+            # 배포 프로파일 둘 다에서 꺼진 것에만 표시를 단다.
+            mark = "  <-- 배포본에서 꺼짐" if not any(table[p].get(n) for p in DEPLOYED) else ""
+            print(f"  {n:<38}{cells}{mark}")
+        off_in_deploy = [n for n in names if not any(table[p].get(n) for p in DEPLOYED)]
+        print(f"\n  배포 프로파일(onprem-local/full-train) 양쪽에서 꺼진 플래그 "
+              f"{len(off_in_deploy)} / {len(names)}")
+        print("  (꺼짐 자체가 결함은 아니다. 코드 주석에 적힌 의도를 확인할 것)")
     except Exception as exc:  # noqa: BLE001
         print(f"  설정 로드 실패: {type(exc).__name__}: {exc}")
+    finally:
+        os.environ.pop("DEPLOY_PROFILE", None)
     return 0
 
 
