@@ -106,7 +106,7 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:8%">질의</th><th style="width:26%">항목</th><th style="width:14%">상태</th><th>요지</th></tr></thead>
     <tbody>
-      <tr><td class="c">가-1</td><td>분류 기법 종류</td><td>회신</td><td>모델·룰에 더해 <b>유사문서 검색 에스컬레이션</b>이 하나 더 있다</td></tr>
+      <tr><td class="c">가-1</td><td>분류 기법 종류</td><td>회신</td><td>등급을 정하는 것은 <b>모델·룰 둘</b>이다. 나머지 둘은 등급을 바꾸지 않는다</td></tr>
       <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>귀사 파악 정확</b></td><td>6단계 그대로 맞다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일하다</td></tr>
       <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td><b>미측정</b></td><td>실측이 없다. 추정치를 수치로 제시하지 않는다</td></tr>
@@ -135,7 +135,7 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td>모델 기반</td><td>KF-DeBERTa 미세조정 분류기</td><td><b>주 판정자</b></td></tr>
       <tr><td>룰 기반</td><td>키워드 시드 404개 가중합</td><td>보조 &mdash; 합의 게이트 입력 · FNR-safe 상향</td></tr>
-      <tr><td><b>유사문서 검색 에스컬레이션</b></td><td>저마진 고등급 건을 유사 사례로 승격 판정</td><td>관여 &mdash; 미탐 축소 목적</td></tr>
+      <tr><td><b>유사문서 검색 에스컬레이션</b></td><td>사람이 검증한 고등급 문서와 유사하면 신호를 남긴다</td><td><b>배포본 기본 꺼짐.</b> 켜져도 <b>등급을 바꾸지 않고</b> 검수로 보낼 뿐이다</td></tr>
       <tr><td>RAG 근거 검색</td><td>유사 기준문서 Top-K 첨부</td><td><b>관여하지 않음</b> &mdash; 근거 표시 전용 · 기본 OFF</td></tr>
     </tbody>
   </table>
@@ -143,6 +143,17 @@ a{color:#0a0a0a}
 
   <p>RAG 를 &ldquo;분류 기법&rdquo;으로 세지 않는 이유는 <b>등급을 바꾸지 않기 때문</b>이다. 검색이
   실패해도 분류는 그대로 진행된다.</p>
+
+  <div class="note">
+    <b>유사문서 에스컬레이션이 꺼져 있는 이유.</b> 이 기능은 <b>사람이 검증한 고등급 문서가
+    벡터스토어에 쌓여 있어야</b> 동작한다. 현재는 그 자료가 없어 켜도 아무 일도 하지 않는다
+    (무음 no-op). 강제로 켜면 &ldquo;켜져 있는데 발동은 0&rdquo;인 상태가 되어 오히려 오해를
+    만든다. 검증 자료가 확보된 뒤 켜는 것으로 두었다.
+    <br><br>
+    한편 6단계의 <b>임계 검사(&tau;=0.30)</b>는 이것과 <b>다른 기능</b>이며
+    배포본에서 켜져 있다. 이름이 비슷하나 별개 설정이다
+    (<code>classifier_escalation_tau</code> vs <code>similarity_escalation_enabled</code>).
+  </div>
 
   <h2>2. 가-2 &mdash; 전체 워크플로우</h2>
   <div class="q">기재된 6단계가 실제와 같은가</div>
