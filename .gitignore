@@ -258,3 +258,6 @@ poc/datasets/mundane_s3/raw.scored.jsonl
 # 컨테이너 런타임 RPM 스테이징(폐쇄망 번들용). 수백 MB 바이너리라 리포에 넣지 않는다.
 # 채우는 법은 poc/scripts/build_offline_bundle.py 의 rpm_source_dir 주석 참조.
 poc/rpms/
+
+# 용량 측정용 임시 산출물(대용량 파일). 재생성 가능하므로 추적하지 않는다.
+poc/.tmp_capacity/

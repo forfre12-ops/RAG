@@ -109,7 +109,7 @@ a{color:#0a0a0a}
       <tr><td class="c">가-1</td><td>분류 기법 종류</td><td>회신</td><td>등급을 정하는 것은 <b>모델·룰 둘</b>이다. 나머지 둘은 등급을 바꾸지 않는다</td></tr>
       <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>귀사 파악 정확</b></td><td>6단계 그대로 맞다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일하다</td></tr>
-      <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>실측 있음 — CPU 코어 수에 비례한다. 6 CPU 기준 100쪽 약 <b>312초</b></td></tr>
+      <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>실문서 100쪽을 만들어 <b>파싱부터 판정까지 종단 실측</b>했다. 6 CPU 기준 <b>약 5분</b> · 텍스트 문서는 파싱이 전체의 1~4%. <b>스캔 문서는 납품 번들에서 처리되지 않는다</b>(OCR 미동봉)</td></tr>
       <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 18필드. GPU 유무로 달라지지 않는다</td></tr>
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td><b>정정</b></td><td>3요건은 독립 판독되지 않는다. 곱셈은 교차 확인이다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td><b>정정</b></td><td>Attention·Gradient Saliency 를 쓰지 않는다</td></tr>
@@ -224,55 +224,80 @@ a{color:#0a0a0a}
     청크당 시간은 <b>할당 CPU 코어 수</b>에 반비례한다. 아래는 전부 측정값이며 추정이 아니다.
   </div>
 
-  <h3>4-1. 측정값</h3>
+  <h3>4-1. 종단 측정 &mdash; 파일을 올린 순간부터 등급이 나올 때까지</h3>
+
+  <p>실제 업무 서식 116건에서 본문을 뽑아 <b>100쪽 파일을 만들어</b> 파서를 그대로
+  통과시켰다. 아래는 파싱&middot;전처리&middot;판정 세 구간을 나눠 잰 값이며 <b>합계가
+  사용자가 겪는 시간</b>이다.</p>
 
   <div class="tw">
   <table>
     <thead><tr>
-      <th style="width:16%">환경</th><th style="width:14%">입력</th>
-      <th style="width:14%">청크</th><th style="width:14%">소요</th><th>측정</th>
+      <th style="width:20%">문서</th><th style="width:8%">쪽</th><th style="width:12%">글자</th>
+      <th style="width:9%">파싱</th><th style="width:10%">전처리</th>
+      <th style="width:9%">판정</th><th style="width:10%">합계</th><th>추출기</th>
     </tr></thead>
     <tbody>
-      <tr><td rowspan="5">6 CPU<br>테스트서버</td><td>&mdash;</td><td class="c">4</td><td class="c">4.3 초</td><td rowspan="5">2026-08-02</td></tr>
-      <tr><td>&mdash;</td><td class="c">18</td><td class="c">16.1 초</td></tr>
-      <tr><td>&mdash;</td><td class="c">36</td><td class="c">32.4 초</td></tr>
-      <tr><td>&mdash;</td><td class="c">88</td><td class="c">79.8 초</td></tr>
-      <tr><td><b>100 쪽</b><br>(180,000자)</td><td class="c"><b>351</b></td><td class="c"><b>320.3 초</b></td></tr>
-      <tr><td>6 CPU (223)</td><td>&mdash;</td><td class="c">14</td><td class="c">6.2 초</td><td>2026-08-21</td></tr>
-      <tr><td rowspan="2">2 CPU 제한</td><td>1 쪽 (1,800자)</td><td class="c">&mdash;</td><td class="c">12.7 초</td><td rowspan="2">2026-08-02</td></tr>
-      <tr><td>5 쪽 (9,000자)</td><td class="c">&mdash;</td><td class="c">45.3 초</td></tr>
+      <tr><td>DOCX 100쪽</td><td class="c">99</td><td class="c">179,887</td>
+          <td class="c">0.5초</td><td class="c">0.1초</td><td class="c">78초</td>
+          <td class="c"><b>79초</b></td><td>내장 파서</td></tr>
+      <tr><td>PDF 100쪽</td><td class="c">100</td><td class="c">188,241</td>
+          <td class="c">3.2초</td><td class="c">0.1초</td><td class="c">78초</td>
+          <td class="c"><b>81초</b></td><td>내장 파서</td></tr>
+      <tr><td>HWP 32쪽</td><td class="c">32</td><td class="c">58,711</td>
+          <td class="c">1.4초</td><td class="c">0.0초</td><td class="c">29초</td>
+          <td class="c"><b>31초</b></td><td>내장 파서</td></tr>
+      <tr><td>PDF 8쪽</td><td class="c">8</td><td class="c">4,557</td>
+          <td class="c">0.3초</td><td class="c">0.0초</td><td class="c">2.0초</td>
+          <td class="c"><b>2.3초</b></td><td>내장 파서</td></tr>
     </tbody>
   </table>
   </div>
 
-  <p>6 CPU 에서 회귀식은 <b>고정비 약 2.9초 + 청크당 약 0.82초</b>다. CPU 에 거의 정확히
-  비례하며 2 CPU 대비 2.8~3.0 배 빠르다.</p>
+  <p class="src">측정 장비 &mdash; 개발용 PC(추론 스레드 8). 발주처 테스트서버(6 CPU)에서는
+  같은 작업이 약 <b>3.8배</b> 더 걸린다(아래 &sect;4-2 환산 참조).</p>
 
   <div class="note">
-    <b>답:</b> 100쪽(약 180,000자 · 351청크) 문서의 <b>등급 판정</b>은
-    <b>6 CPU 에서 약 312~320초</b>다. 2 CPU 로 내려가면 약 3배, 즉 <b>15~16분</b>이 된다.
-    반대로 CPU 를 늘리면 그만큼 줄어든다.
-    <br><br>
-    이 수치는 추정이 아니라 배포 파라미터의 <b>산정 근거</b>로 실제 쓰였다 &mdash;
-    워커 soft/hard 타임아웃 900/1200초가 이 312초에서 3배 여유를 잡은 값이다.
+    <b>텍스트 문서에서는 파싱이 전체의 1~4% 다.</b> 100쪽 DOCX 는 79초 중 0.5초,
+    PDF 는 81초 중 3.2초가 파싱이다. 나머지는 전부 등급 판정이다 &mdash;
+    <b>비용을 정하는 것은 파일 크기가 아니라 본문 분량</b>이다.
   </div>
+
+  <h3>4-2. 발주처 환경 환산</h3>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">환경</th><th style="width:22%">100쪽 종단</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td>6 CPU (테스트서버)</td><td class="c"><b>약 5분</b></td>
+          <td>2026-08-02 실측 320초(판정) + 파싱 환산. 워커 타임아웃 900초는 여기서 3배 여유를 잡은 값이다</td></tr>
+      <tr><td>2 CPU</td><td class="c"><b>약 15~16분</b></td>
+          <td>2 CPU ↔ 6 CPU 실측 배수 2.8~3.0배 적용</td></tr>
+      <tr><td>개발 PC (스레드 8)</td><td class="c">약 1분 20초</td>
+          <td>2026-08-28 종단 실측(위 표)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>처리 시간은 <b>할당 CPU 코어 수에 거의 반비례</b>한다(실측 배수 2.8~3.0). 목표 응답
+  시간을 정해 주시면 필요한 코어 수를 산출해 회신드리겠다.</p>
 
   <div class="note warn">
-    <b>측정 조건을 밝힌다.</b> 위 수치는 다음 조건에서 잰 값이며, 실제 운영과 두 가지가 다르다.
+    <b>스캔 문서는 다르다 &mdash; 반드시 확인이 필요하다.</b> 글자가 이미지로만 들어 있는
+    문서(스캔본)는 본문을 뽑는 데 OCR 이 필요하다. 측정해 보면 비용 구조가 뒤집힌다 &mdash;
+    16쪽 스캔 PDF 에서 <b>파싱 28.5초 · 판정 3.9초</b>로 파싱이 7배였다.
     <br><br>
-    <b>① 파일 파싱 시간이 포함되어 있지 않다.</b> 본문 텍스트를 분류기에 직접 넣어 잰 값이라,
-    HWP·PDF 파일에서 글자를 뽑는 구간이 빠져 있다. 사용자가 체감하는 시간은 여기에
-    추출 시간이 더해진다.
-    <br>
-    <b>② 합성 본문으로 측정했다.</b> 실제 업무 문서가 아니라 정형 문장을 이어 붙여
-    글자 수를 맞춘 본문이다. 청크 수는 같지만 어휘 분포가 달라 근거 추출 비용이
-    다를 수 있다.
+    그런데 <b>납품 번들에는 OCR 이 들어 있지 않다.</b> OCR 은 요건에 없고(FUN-022 는
+    전자문서 텍스트 추출까지), 관련 오픈소스가 GPL 이라 반출 번들에서 제외했다.
+    따라서 <b>스캔 문서는 느린 것이 아니라 처리되지 않는다</b> &mdash; 본문 0자로
+    <code>failed</code> 상태로 격리되어 무음 통과하지 않는다.
     <br><br>
-    두 조건을 포함한 <b>종단 측정을 별도로 수행</b>하고 있으며, 결과가 나오는 대로
-    갱신해 회신드리겠다. 발주처에서 대표 문서를 지정해 주시면 그 문서로 측정한다.
+    회원사가 올리는 문서에 스캔본이 포함될 예정이면 <b>OCR 을 요건으로 확정</b>해 주시기
+    바란다. 요건화되면 라이선스가 맞는 엔진으로 번들을 다시 구성한다.
   </div>
 
-  <h3>4-2. 처리 경로</h3>
+  <h3>4-3. 처리 경로</h3>
+
 
   <div class="tw">
   <table>
@@ -676,6 +701,7 @@ a{color:#0a0a0a}
       <tr><td class="c">2</td><td>대용량 처리 CPU 할당</td><td>100쪽 처리 시간은 CPU 코어 수에 반비례한다(가-2-2). 목표 응답 시간이 있으시면 알려 주시면 필요한 코어 수를 산출해 회신한다</td></tr>
       <tr><td class="c">3</td><td>실데이터 제공 여부</td><td>평가정답 확보의 전제다(나-3)</td></tr>
       <tr><td class="c">4</td><td>XAI 범위 확정</td><td>모델 내부 신호 기반 기법이 필요하면 요건으로 확정 요청(가-3-2)</td></tr>
+      <tr><td class="c">5</td><td><b>스캔 문서 취급</b></td><td>회원사가 올릴 문서에 스캔본이 포함되면 <b>OCR 요건화</b>가 필요하다. 현재 번들에는 없어 해당 문서는 처리되지 않는다(가-2-2)</td></tr>
     </tbody>
   </table>
   </div>
