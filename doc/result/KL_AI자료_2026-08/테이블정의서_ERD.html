@@ -240,58 +240,129 @@ table.spec td.c-nn{text-align:center;}
 <section id="erd"><h2><span class="num">02</span> ERD 관계도</h2>
 <p class="spec-note">박스 21개는 이 시스템이 소유한 테이블 전부다. 실선은 데이터베이스 FK 제약, 점선은 제약 없이 애플리케이션이 정합을 보증하는 참조다(파티션 테이블·RAG 저장소는 FK 를 걸지 않는다). 진한 테두리는 대부분의 참조가 모이는 중심 테이블 <code>tb_documents</code> 다.</p>
 <div style="overflow-x:auto;border:1px solid rgba(0,0,0,.12);padding:16px;margin:14px 0;background:#fafafa;">
-<svg viewBox="0 0 1080 420" width="100%" role="img" aria-label="전체 테이블 관계도" style="min-width:940px">
-<defs><marker id="tsarr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker></defs>
-<path class="ts-edge" data-from="tb_classification_levels" data-to="tb_level_keywords" d="M220,53.0 C260.0,53.0 260.0,53.0 300,53.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_evaluation_factors" data-to="tb_level_keywords" d="M220,109.0 C260.0,109.0 260.0,53.0 300,53.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_documents" data-to="tb_document_labels" d="M220,189.0 C260.0,189.0 260.0,117.0 300,117.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_classification_levels" data-to="tb_document_labels" d="M220,53.0 C260.0,53.0 260.0,117.0 300,117.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_documents" data-to="tb_document_factor_scores" d="M220,189.0 C260.0,189.0 260.0,157.0 300,157.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_evaluation_factors" data-to="tb_document_factor_scores" d="M220,109.0 C260.0,109.0 260.0,157.0 300,157.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_documents" data-to="tb_classifications" d="M220,189.0 C260.0,189.0 260.0,245.0 300,245.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_classification_levels" data-to="tb_classifications" d="M220,53.0 C260.0,53.0 260.0,245.0 300,245.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_classifications" data-to="tb_classification_evidence" d="M496,245.0 C536.0,245.0 536.0,221.0 576,221.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_evaluation_factors" data-to="tb_classification_evidence" d="M220,109.0 C398.0,109.0 398.0,221.0 576,221.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_model_versions" data-to="tb_model_versions" d="M24,306 C2,298 2,328 24,320" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_model_versions" data-to="tb_training_runs" d="M220,313.0 C260.0,313.0 260.0,313.0 300,313.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_training_runs" data-to="tb_training_epochs" d="M496,313.0 C536.0,313.0 536.0,317.0 576,317.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_training_runs" data-to="tb_training_datasets" d="M496,313.0 C536.0,313.0 536.0,365.0 576,365.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_documents" data-to="tb_training_datasets" d="M220,189.0 C398.0,189.0 398.0,365.0 576,365.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_classification_levels" data-to="tb_training_datasets" d="M220,53.0 C398.0,53.0 398.0,365.0 576,365.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_classifications" data-to="tb_corrections" d="M496,245.0 C536.0,245.0 536.0,269.0 576,269.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_classification_levels" data-to="tb_corrections" d="M220,53.0 C398.0,53.0 398.0,269.0 576,269.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_training_runs" data-to="tb_corrections" d="M496,313.0 C536.0,313.0 536.0,269.0 576,269.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_documents" data-to="tb_sample_documents" d="M220,189.0 C260.0,189.0 260.0,369.0 300,369.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_classification_levels" data-to="tb_sample_documents" d="M220,53.0 C260.0,53.0 260.0,369.0 300,369.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge" data-from="tb_prompt_versions" data-to="tb_sample_documents" d="M220,369.0 C260.0,369.0 260.0,369.0 300,369.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge ts-soft" data-from="tb_documents" data-to="tb_chunks" d="M220,189.0 C260.0,189.0 260.0,197.0 300,197.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge ts-soft" data-from="tb_chunks" data-to="tb_classification_evidence" d="M496,197.0 C536.0,197.0 536.0,221.0 576,221.0" marker-end="url(#tsarr)"/>
-<path class="ts-edge ts-soft" data-from="tb_rag_vectors" data-to="tb_rag_aliases" d="M852,193.0 C852.0,193.0 852.0,233.0 852,233.0" marker-end="url(#tsarr)"/>
-<g class="ts-node" data-t="tb_classification_levels"><rect x="24" y="40" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="33" y="57" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_classification_levels</text><text x="211" y="57" font-size="9.5" text-anchor="end" fill="#94a3b8">A</text></g>
-<g class="ts-node" data-t="tb_evaluation_factors"><rect x="24" y="96" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="33" y="113" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_evaluation_factors</text><text x="211" y="113" font-size="9.5" text-anchor="end" fill="#94a3b8">A</text></g>
-<g class="ts-node" data-t="tb_documents"><rect x="24" y="176" width="196" height="26" rx="3" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/><text x="33" y="193" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_documents</text><text x="211" y="193" font-size="9.5" text-anchor="end" fill="#94a3b8">B</text></g>
-<g class="ts-node" data-t="tb_model_versions"><rect x="24" y="300" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="33" y="317" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_model_versions</text><text x="211" y="317" font-size="9.5" text-anchor="end" fill="#94a3b8">E</text></g>
-<g class="ts-node" data-t="tb_prompt_versions"><rect x="24" y="356" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="33" y="373" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_prompt_versions</text><text x="211" y="373" font-size="9.5" text-anchor="end" fill="#94a3b8">G</text></g>
-<g class="ts-node" data-t="tb_level_keywords"><rect x="300" y="40" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="309" y="57" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_level_keywords</text><text x="487" y="57" font-size="9.5" text-anchor="end" fill="#94a3b8">A</text></g>
-<g class="ts-node" data-t="tb_document_labels"><rect x="300" y="104" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="309" y="121" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_document_labels</text><text x="487" y="121" font-size="9.5" text-anchor="end" fill="#94a3b8">C</text></g>
-<g class="ts-node" data-t="tb_document_factor_scores"><rect x="300" y="144" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="309" y="161" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_document_factor_scores</text><text x="487" y="161" font-size="9.5" text-anchor="end" fill="#94a3b8">C</text></g>
-<g class="ts-node" data-t="tb_chunks"><rect x="300" y="184" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="309" y="201" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_chunks</text><text x="487" y="201" font-size="9.5" text-anchor="end" fill="#94a3b8">B</text></g>
-<g class="ts-node" data-t="tb_classifications"><rect x="300" y="232" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="309" y="249" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_classifications</text><text x="487" y="249" font-size="9.5" text-anchor="end" fill="#94a3b8">D</text></g>
-<g class="ts-node" data-t="tb_training_runs"><rect x="300" y="300" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="309" y="317" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_training_runs</text><text x="487" y="317" font-size="9.5" text-anchor="end" fill="#94a3b8">E</text></g>
-<g class="ts-node" data-t="tb_sample_documents"><rect x="300" y="356" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="309" y="373" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_sample_documents</text><text x="487" y="373" font-size="9.5" text-anchor="end" fill="#94a3b8">G</text></g>
-<g class="ts-node" data-t="tb_classification_evidence"><rect x="576" y="208" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="585" y="225" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_classification_evidence</text><text x="763" y="225" font-size="9.5" text-anchor="end" fill="#94a3b8">D</text></g>
-<g class="ts-node" data-t="tb_corrections"><rect x="576" y="256" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="585" y="273" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_corrections</text><text x="763" y="273" font-size="9.5" text-anchor="end" fill="#94a3b8">F</text></g>
-<g class="ts-node" data-t="tb_training_epochs"><rect x="576" y="304" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="585" y="321" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_training_epochs</text><text x="763" y="321" font-size="9.5" text-anchor="end" fill="#94a3b8">E</text></g>
-<g class="ts-node" data-t="tb_training_datasets"><rect x="576" y="352" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="585" y="369" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_training_datasets</text><text x="763" y="369" font-size="9.5" text-anchor="end" fill="#94a3b8">E</text></g>
-<g class="ts-node" data-t="tb_llm_usage"><rect x="852" y="40" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="861" y="57" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_llm_usage</text><text x="1039" y="57" font-size="9.5" text-anchor="end" fill="#94a3b8">H</text></g>
-<g class="ts-node" data-t="tb_audit_log"><rect x="852" y="80" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="861" y="97" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_audit_log</text><text x="1039" y="97" font-size="9.5" text-anchor="end" fill="#94a3b8">H</text></g>
-<g class="ts-node" data-t="tb_guides"><rect x="852" y="120" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="861" y="137" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_guides</text><text x="1039" y="137" font-size="9.5" text-anchor="end" fill="#94a3b8">H</text></g>
-<g class="ts-node" data-t="tb_rag_vectors"><rect x="852" y="180" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="861" y="197" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_rag_vectors</text><text x="1039" y="197" font-size="9.5" text-anchor="end" fill="#94a3b8">I</text></g>
-<g class="ts-node" data-t="tb_rag_aliases"><rect x="852" y="220" width="196" height="26" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/><text x="861" y="237" font-size="11.5" font-family="ui-monospace,monospace" fill="#1e293b">tb_rag_aliases</text><text x="1039" y="237" font-size="9.5" text-anchor="end" fill="#94a3b8">I</text></g>
-<text x="24" y="18" font-size="10.5" fill="#64748b" font-weight="600">부모(기준)</text>
-<text x="300" y="18" font-size="10.5" fill="#64748b" font-weight="600">자식</text>
-<text x="576" y="18" font-size="10.5" fill="#64748b" font-weight="600">손자(파생)</text>
-<text x="852" y="18" font-size="10.5" fill="#64748b" font-weight="600">독립(운영·검색)</text>
+<svg viewBox="0 0 888 598" width="100%" style="max-width:888px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="개체 관계도">
+<defs><marker id="erd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#18181b"/></marker></defs>
+<rect x="24" y="384" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="403" font-size="12.5" font-weight="700" fill="#0a0a0a">감사 로그</text>
+<text x="34" y="419" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_audit_log · 13칼럼</text>
+<rect x="340" y="528" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="547" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 청크</text>
+<text x="350" y="563" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_chunks · 12칼럼</text>
+<rect x="656" y="276" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="666" y="295" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 판정 근거</text>
+<text x="666" y="311" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_classification_evidence · 13칼럼</text>
+<rect x="24" y="24" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="43" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 체계</text>
+<text x="34" y="59" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_classification_levels · 11칼럼</text>
+<rect x="340" y="96" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="115" font-size="12.5" font-weight="700" fill="#0a0a0a">분류 결과</text>
+<text x="350" y="131" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_classifications · 16칼럼</text>
+<rect x="656" y="132" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="666" y="151" font-size="12.5" font-weight="700" fill="#0a0a0a">검수 교정 이력</text>
+<text x="666" y="167" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_corrections · 10칼럼</text>
+<rect x="340" y="240" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="259" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 평가요소 점수</text>
+<text x="350" y="275" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_document_factor_scores · 3칼럼</text>
+<rect x="340" y="312" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="331" font-size="12.5" font-weight="700" fill="#0a0a0a">문서 라벨</text>
+<text x="350" y="347" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_document_labels · 11칼럼</text>
+<rect x="24" y="96" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="115" font-size="12.5" font-weight="700" fill="#0a0a0a">문서</text>
+<text x="34" y="131" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_documents · 20칼럼</text>
+<rect x="24" y="168" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="187" font-size="12.5" font-weight="700" fill="#0a0a0a">평가요소</text>
+<text x="34" y="203" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_evaluation_factors · 8칼럼</text>
+<rect x="24" y="456" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="475" font-size="12.5" font-weight="700" fill="#0a0a0a">가이드 문서</text>
+<text x="34" y="491" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_guides · 13칼럼</text>
+<rect x="340" y="384" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="403" font-size="12.5" font-weight="700" fill="#0a0a0a">등급 키워드</text>
+<text x="350" y="419" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_level_keywords · 10칼럼</text>
+<rect x="24" y="528" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="547" font-size="12.5" font-weight="700" fill="#0a0a0a">LLM 사용량</text>
+<text x="34" y="563" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_llm_usage · 15칼럼</text>
+<rect x="24" y="240" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="259" font-size="12.5" font-weight="700" fill="#0a0a0a">모델 버전</text>
+<text x="34" y="275" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_model_versions · 18칼럼</text>
+<rect x="24" y="312" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="34" y="331" font-size="12.5" font-weight="700" fill="#0a0a0a">프롬프트 버전</text>
+<text x="34" y="347" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_prompt_versions · 9칼럼</text>
+<rect x="656" y="348" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="666" y="367" font-size="12.5" font-weight="700" fill="#0a0a0a">컬렉션 별칭</text>
+<text x="666" y="383" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_rag_aliases · 3칼럼</text>
+<rect x="340" y="456" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="475" font-size="12.5" font-weight="700" fill="#0a0a0a">벡터 저장소</text>
+<text x="350" y="491" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_rag_vectors · 10칼럼</text>
+<rect x="340" y="24" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="43" font-size="12.5" font-weight="700" fill="#0a0a0a">합성·샘플 문서</text>
+<text x="350" y="59" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_sample_documents · 21칼럼</text>
+<rect x="656" y="204" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="666" y="223" font-size="12.5" font-weight="700" fill="#0a0a0a">학습셋 구성</text>
+<text x="666" y="239" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_training_datasets · 5칼럼</text>
+<rect x="656" y="420" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="666" y="439" font-size="12.5" font-weight="700" fill="#0a0a0a">학습 에폭 지표</text>
+<text x="666" y="455" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_training_epochs · 7칼럼</text>
+<rect x="340" y="168" width="208" height="46" rx="4" fill="#ffffff" stroke="#18181b" stroke-width="1.2"/>
+<text x="350" y="187" font-size="12.5" font-weight="700" fill="#0a0a0a">학습 실행</text>
+<text x="350" y="203" font-size="10" font-family="ui-monospace,monospace" fill="#52525b">tb_training_runs · 21칼럼</text>
+<path d="M340,407 C277,407 277,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,407 C277,407 277,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,407 C286,407 286,191 232,191" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,407 C286,407 286,191 232,191" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,335 C295,335 295,119 232,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,335 C295,335 295,119 232,119" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,335 C304,335 304,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,335 C304,335 304,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,263 C268,263 268,119 232,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,263 C268,263 268,119 232,119" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,263 C277,263 277,191 232,191" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,263 C277,263 277,191 232,191" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,119 C286,119 286,119 232,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,119 C286,119 286,119 232,119" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,119 C295,119 295,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,119 C295,119 295,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,299 C593,299 593,119 548,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,299 C593,299 593,119 548,119" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,299 C435,299 435,191 232,191" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,299 C435,299 435,191 232,191" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M232,254 C276,246 276,280 232,272" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M232,254 C276,246 276,280 232,272" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,191 C304,191 304,263 232,263" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,191 C304,191 304,263 232,263" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,443 C602,443 602,191 548,191" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,443 C602,443 602,191 548,191" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,227 C611,227 611,191 548,191" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,227 C611,227 611,191 548,191" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,227 C444,227 444,119 232,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,227 C444,227 444,119 232,119" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,227 C453,227 453,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,227 C453,227 453,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,155 C620,155 620,119 548,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,155 C620,155 620,119 548,119" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,155 C462,155 462,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,155 C462,155 462,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,155 C426,155 426,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,155 C426,155 426,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M656,155 C584,155 584,191 548,191" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,155 C584,155 584,191 548,191" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,47 C268,47 268,119 232,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,47 C268,47 268,119 232,119" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,47 C277,47 277,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,47 C277,47 277,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,47 C286,47 286,47 232,47" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,47 C286,47 286,47 232,47" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,47 C295,47 295,335 232,335" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,47 C295,47 295,335 232,335" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,47 C304,47 304,335 232,335" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,47 C304,47 304,335 232,335" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,47 C268,47 268,335 232,335" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,47 C268,47 268,335 232,335" fill="none" stroke="#3f3f46" stroke-width="1.5" marker-end="url(#erd-arrow)"/>
+<path d="M340,551 C277,551 277,119 232,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,551 C277,551 277,119 232,119" fill="none" stroke="#3f3f46" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#erd-arrow)"/>
+<path d="M340,479 C286,479 286,119 232,119" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M340,479 C286,479 286,119 232,119" fill="none" stroke="#3f3f46" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#erd-arrow)"/>
+<path d="M656,371 C593,371 593,479 548,479" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.95"/>
+<path d="M656,371 C593,371 593,479 548,479" fill="none" stroke="#3f3f46" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#erd-arrow)"/>
 </svg>
 </div>
 <p class="spec-note">관계 수 — FK 제약 26개, 제약 없는 참조 3개. 전체 목록은 §04 참조.</p>

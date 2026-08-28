@@ -51,6 +51,8 @@ LOGICAL = {
     "tb_audit_log": "감사 로그",
     "tb_guides": "가이드 문서",
     "tb_llm_usage": "LLM 사용량",
+    "tb_rag_vectors": "벡터 저장소",
+    "tb_rag_aliases": "컬렉션 별칭",
 }
 
 
@@ -106,10 +108,21 @@ LOGICAL_FK = [
     ("tb_chunks", "doc_id", "tb_documents"),
 ]
 
+# 마이그레이션으로만 만들어지는 검색용 표(ORM 매핑 없음). --with-rag 로 포함한다.
+# 두 표는 외래키를 두지 않으므로(대량 적재·재색인 비용) 관계는 전부 논리 참조다.
+RAG_TABLES = {"tb_rag_vectors": 10, "tb_rag_aliases": 3}
+RAG_LOGICAL_FK = [
+    ("tb_rag_vectors", "doc_id", "tb_documents"),
+    ("tb_rag_aliases", "collection", "tb_rag_vectors"),
+]
 
-def build_svg() -> str:
+
+def build_svg(with_rag: bool = False) -> str:
     cols, fks = parse_models()
     fks = fks + LOGICAL_FK
+    if with_rag:
+        cols = {**cols, **RAG_TABLES}
+        fks = fks + RAG_LOGICAL_FK
     tables = sorted(cols)
     edges = [(c, p) for c, _f, p in fks]
     depth = layer_of(tables, edges)
@@ -197,7 +210,7 @@ def build_svg() -> str:
         # 흰 테두리(아래) → 본선(위). 상자 위를 지나가도 선이 읽힌다.
         out.append(f'<path d="{d}" fill="none" stroke="#ffffff" stroke-width="4.5" '
                    f'stroke-linecap="round" opacity="0.95"/>')
-        dash = ' stroke-dasharray="6 4"' if (child, field, parent) in LOGICAL_FK else ''
+        dash = ' stroke-dasharray="6 4"' if (child, field, parent) in (LOGICAL_FK + RAG_LOGICAL_FK) else ''
         out.append(f'<path d="{d}" fill="none" stroke="#3f3f46" stroke-width="1.5"{dash} '
                    f'marker-end="url(#erd-arrow)"/>')
 
@@ -208,16 +221,21 @@ def build_svg() -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="ERD 문서의 <svg> 를 교체한다")
+    ap.add_argument("--with-rag", action="store_true",
+                    help="검색용 표 2종(tb_rag_*)까지 포함해 21표로 그린다")
     args = ap.parse_args(argv)
 
-    svg = build_svg()
+    svg = build_svg(with_rag=args.with_rag)
     if not args.apply:
         sys.stdout.write(svg + "\n")
         return 0
 
+    name = "테이블정의서_ERD.html" if args.with_rag else "ERD_개체관계도.html"
     targets = [
-        _ROOT.parent / "doc" / "감리문서" / "ERD_개체관계도.html",
-        _ROOT.parent / "doc" / "result" / "KL_회신_2026-08-28" / "첨부" / "ERD_개체관계도.html",
+        _ROOT.parent / "doc" / "감리문서" / name,
+        _ROOT.parent / "doc" / "result" / "KL_회신_2026-08-28" / "첨부" / name,
+        _ROOT.parent / "doc" / "result" / "KL_AI자료_2026-08" / name,
+        _ROOT.parent / "doc" / "result" / "KL_AI자료_2026-08" / "첨부문서" / name,
     ]
     n = 0
     for p in targets:
