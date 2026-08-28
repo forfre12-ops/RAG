@@ -104,6 +104,11 @@ class ChunkRepo:
                 char_count=int(getattr(c, "char_count", len(text))),
                 overlap_prev=int(getattr(c, "overlap_prev", 0) or 0),
                 overlap_next=int(getattr(c, "overlap_next", 0) or 0),
+                # [2026-08-29] 청커가 heading_path 를 이미 실어 보내는데 저장에서 빠져
+                # section_path 가 영원히 NULL 이었다(전수조사에서 확인). 스키마 변경 없이
+                # 값만 채운다 — 검수자가 근거의 문서 내 위치를 찾는 데 쓰인다.
+                # 빈 목록은 NULL 로 둔다(있는 척하지 않는다).
+                section_path=(list(getattr(c, "heading_path", None) or []) or None),
             )
             self.db.add(row)
             rows.append(row)

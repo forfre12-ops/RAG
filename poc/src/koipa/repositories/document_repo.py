@@ -98,6 +98,14 @@ class DocumentRepo:
             extraction_quality=extraction_quality,
             ocr_used=ocr_used,
             processing_status=processing_status,
+            # [2026-08-29] 추출·적재가 끝난 시각. 세팅하는 곳이 없어 영원히 NULL 이었다
+            # (전수조사에서 확인). 아직 처리 중인 상태에는 넣지 않는다 — 값이 있으면
+            # "추출이 끝났다"는 뜻이어야 한다.
+            processed_at=(
+                dt.datetime.now(dt.timezone.utc)
+                if processing_status in ("ready", "needs_review", "failed")
+                else None
+            ),
             external_ref=external_ref,
             metadata_=metadata or {},
             created_by=created_by,

@@ -1019,3 +1019,11 @@ documents:
     audience: customer
     status: current
     version: 2026-08-28-회신묶음
+
+  - id: DOC-INT-013
+    title: 미사용 자산 전수조사
+    path: doc/internal/미사용_자산_전수조사.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08-29
