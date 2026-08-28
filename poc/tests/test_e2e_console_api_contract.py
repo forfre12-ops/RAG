@@ -328,7 +328,7 @@ def test_fixtures_without_response_model_are_listed(fixtures, routes):
     #  필수 필드를 빠뜨렸고 이 파일의 다른 시험이 그것을 잡았다.)
     assert len(unbound) <= 11, (
         "response_model 없이 dict 를 돌려주는 엔드포인트가 늘었다 — 본보기 드리프트를"
-        f" 자동으로 못 잡는다:\n  " + "\n  ".join(unbound)
+        " 자동으로 못 잡는다:\n  " + "\n  ".join(unbound)
     )
 
 

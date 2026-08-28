@@ -25,7 +25,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
 
 from koipa.api.golden import _render_console_login_html, _render_specledger_gold_console_html
 from koipa.golden_review_html import _nav_html

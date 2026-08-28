@@ -49,7 +49,8 @@ def test_stratified_holdout_split_is_deterministic_and_no_straddle():
     ] + [
         {"text": f"S3 문서 {i}", "label_source": "llm", "label": "S3"} for i in range(10)
     ]
-    sk = lambda r: (r["label_source"], r["label"])
+    def sk(r):
+        return (r["label_source"], r["label"])
     h1 = stratified_holdout_split(rows, frac=0.3, strata_key=sk)
     h2 = stratified_holdout_split(rows, frac=0.3, strata_key=sk)
     assert h1 == h2                      # 결정론적

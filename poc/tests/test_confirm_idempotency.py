@@ -12,7 +12,6 @@ tenant 제거: 격리는 KL 포털 전담(단일 고객사 엔진).
 
 from __future__ import annotations
 
-import uuid
 
 import pytest
 from sqlalchemy import delete, text

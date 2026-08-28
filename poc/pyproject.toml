@@ -283,6 +283,13 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**/*.py" = ["E402", "E701", "E702", "E731", "E741", "F841"]
+# 테스트는 import 뒤 pytestmark·환경 변수를 선언해, 무거운 앱·모델을 불러오기
+# 전에 실행 조건을 드러낸다. 또한 임시 파일 준비를 한 줄로 적은 fixture가 있다.
+# 이 세 규칙만 테스트에 한정해 허용하고, 미사용 import 등 실제 오류는 계속 막는다.
+"tests/**/*.py" = ["E402", "E702", "E741"]
+# 저장소 루트(rag/)에서 pre-commit·CI가 실행될 때는 위 경로가 `poc/tests`로
+# 보인다. ruff의 파일 패턴은 실행 기준이므로 같은 정책을 명시한다.
+"poc/tests/**/*.py" = ["E402", "E702", "E741"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

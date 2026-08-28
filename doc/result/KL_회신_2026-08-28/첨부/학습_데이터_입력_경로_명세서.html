@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>학습 데이터 입력 경로 명세서</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+pre{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 14px;margin:10px 0;font-size:11.5px;font-family:ui-monospace,monospace;overflow-x:auto;line-height:1.55}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style></head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">학습 데이터 입력 경로 명세서</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 데이터·학습</div>
+    <h1>학습 데이터 입력 경로 명세서</h1>
+    <div class="meta">검수 결과가 학습셋으로 들어가는 세 경로 · 계층별 학습 허용 계약 · 2026-08-27</div>
+  </div>
+
+    <table class="docinfo">
+    <tbody>
+      <tr><th>요구사항</th><td><code>FUN-003</code> (합성문서 생성 &mdash; 검수 후 학습셋 편입) · <code>FUN-004</code> (분류 모델 학습) 연계</td></tr>
+      <tr><th>대상 코드</th><td><code>services/synthesis_service.py</code> · <code>golden_split.py</code> · <code>golden_tiers.py</code> · <code>m6_evaluation/corrections_rebuild.py</code> · <code>workers/tasks.py</code></td></tr>
+      <tr><th>짝 문서</th><td><code>골든셋_종합</code> (계층 정의) ↔ 본 문서 (학습 입력 경로)</td></tr>
+      <tr><th>작성일</th><td>2026-08-27</td></tr>
+      <tr><th>근거 커밋</th><td><code>465bb7ad</code></td></tr>
+      <tr><th>검증</th><td><code>cd poc &amp;&amp; python scripts/build_synth_training_set.py --out &lt;경로&gt;</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    본 문서는 <b>&ldquo;사람이 검수한 결과가 학습에 어떻게 들어가는가&rdquo;</b> 하나에 답한다.
+    등급을 어떻게 정하는지는 <code>등급분류 알고리즘 명세서</code>, 계층이 무엇인지는
+    <code>골든셋 종합</code>이 다룬다. 서술은 전부 코드에서 확인한 것이며, 확인하지 못한 것은
+    &sect;8 에 그렇게 적었다.
+  </div>
+
+
+  <h2>1. 세 경로 &mdash; 한눈에</h2>
+
+  <p>학습셋에 사람의 판단이 들어오는 길은 셋이고, 성격이 다르다. 하나는 합성 문서 검수,
+  하나는 골든셋 계층 분할, 하나는 운영 중 교정이다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th style="width:5%">#</th><th style="width:22%">경로</th><th style="width:26%">입력 &rarr; 출력</th>
+      <th style="width:14%">실행</th><th>요건</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td class="c">1</td>
+        <td>합성 검수 승인 &rarr; 학습행</td>
+        <td><code>tb_sample_documents</code>(승인분) &rarr; <code>{doc_id,text,label,source,domain}</code> JSONL</td>
+        <td>사람이 실행</td>
+        <td><code>FUN-003</code> &ldquo;검수 후 학습셋 편입&rdquo;</td>
+      </tr>
+      <tr>
+        <td class="c">2</td>
+        <td>골든 후보 &rarr; 학습 시드</td>
+        <td><code>gold_candidate</code> &rarr; <code>silver_train.jsonl</code> / <code>synthetic_holdout.jsonl</code></td>
+        <td>사람이 실행</td>
+        <td><code>FUN-004</code> 학습 입력</td>
+      </tr>
+      <tr>
+        <td class="c">3</td>
+        <td>운영 교정 &rarr; 학습셋 증강</td>
+        <td><code>tb_corrections</code>(미소비) &rarr; 기본 train.jsonl 에 병합</td>
+        <td>자동(조건부)</td>
+        <td><code>FUN-004</code> 재학습</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">경로 1&middot;2 는 <b>사람이 명령을 실행해야 진행된다.</b> 요건 문장은
+  &ldquo;검수 후 학습셋 편입&rdquo;까지이고 자동 편입을 요구하지 않는다. 경로 3 만 자동이며,
+  그마저 아래 &sect;4 의 조건을 모두 만족해야 발화한다.</div>
+
+  <h2>2. 경로 1 &mdash; 합성 검수 승인이 학습행이 되는 절차</h2>
+
+  <p>검수자가 승인한 합성 문서를 학습행으로 바꾼다.
+  <code>SynthesisService.build_training_rows()</code> 가 이 일을 한다.</p>
+
+  <h3>2-1. 라벨을 무엇으로 삼는가</h3>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:30%">상황</th><th style="width:30%">학습행의 라벨</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td>검수자가 등급을 고쳤다</td><td><code>corrected_level_id</code></td><td>승인 단계의 판단이 생성 요청 시점의 목표 등급보다 뒤이고 더 정확하다</td></tr>
+      <tr><td>고치지 않고 승인했다</td><td><code>target_level_id</code></td><td>생성 시 요구한 등급이 그대로 유효하다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>두 값을 한 칸에 뭉개지 않고 따로 둔다. 한 칸에 덮어쓰면 <b>교정이 있었다는 사실 자체가
+  사라진다.</b> 산출물에 <code>grade_corrected</code> 카운트를 함께 내보내므로, 학습셋 파일을
+  열어 보지 않고도 교정이 몇 건 반영됐는지 확인할 수 있다.</p>
+
+  <h3>2-2. 무엇을 걸러내는가</h3>
+
+  <p>승인됐어도 학습에 넣지 않는 것이 있다. 합성 생성기가 정상 산출을 내지 못한 경우다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">표시(label_source)</th><th style="width:34%">무엇인가</th><th>처리</th></tr></thead>
+    <tbody>
+      <tr><td><code>noop_fallback</code></td><td>본문 생성이 실패해 자리표시 문자열이 들어간 산출</td><td>학습 편입 금지 &mdash; <code>excluded_noise</code> 로 계수</td></tr>
+      <tr><td><code>llm_nonjson</code></td><td>LLM 이 규정 형식(JSON)이 아닌 응답을 낸 산출</td><td>학습 편입 금지 &mdash; <code>excluded_noise</code> 로 계수</td></tr>
+      <tr><td>&mdash;(본문이 빈 문자열)</td><td>본문 길이 0</td><td>제외 &mdash; <code>excluded_empty</code> 로 계수</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">제외를 <b>조용히 버리지 않는다.</b> 반환값에
+  <code>approved_total</code> / <code>included</code> / <code>excluded_noise</code> /
+  <code>excluded_empty</code> / <code>grade_corrected</code> 를 사유별로 함께 낸다.
+  승인 건수와 학습행 수가 다를 때 그 차이가 어디서 왔는지 숫자로 설명된다.</div>
+
+  <h3>2-3. 실행</h3>
+
+  <pre>cd poc
+python scripts/build_synth_training_set.py --out datasets/synth_approved/train.jsonl</pre>
+
+  <p>매 호출이 승인분 전체에서 다시 만든다(결정적&middot;중복 없음). 이어 붙이는 방식이
+  아니므로 같은 명령을 두 번 돌려도 결과가 같다.</p>
+
+  <div class="note warn">
+    <b>선행 조건 &mdash; DB 스키마.</b> 이 경로는 <code>tb_sample_documents.corrected_level_id</code>
+    칸을 읽는다. 해당 칸은 2026-08-24 커밋 <code>48405949</code> 의 마이그레이션
+    <code>f0a1b2c3d4e5</code> 가 만든다. <b>마이그레이션이 적용되지 않은 서버에서는 이 경로뿐
+    아니라 합성 검수 목록 조회 자체가 실패한다</b> &mdash; 조회가 표의 모든 칸을 읽기 때문이다
+    (<code>synth_repo.py</code> <code>select(SampleDocument)</code>). 적용 여부는
+    <code>select version_num from alembic_version;</code> 한 줄로 확인한다.
+  </div>
+
+  <h2>3. 경로 2 &mdash; 골든 후보가 학습 시드가 되는 절차</h2>
+
+  <p>골든셋은 한 덩어리가 아니라 계층으로 나뉘고, <b>계층마다 쓸 수 있는 용도가 다르다.</b>
+  이 구분이 무너지면 시험 문제로 공부하고 그 시험을 보는 것(train-on-test)이 된다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th style="width:20%">계층</th><th style="width:12%">학습</th><th style="width:12%">평가</th><th>무엇인가</th>
+    </tr></thead>
+    <tbody>
+      <tr><td><code>locked_gold_eval</code></td><td class="c"><b>금지</b></td><td class="c">허용</td><td>사람 서명이 끝난 평가정답. 학습에 넣으면 성능 수치가 무의미해진다</td></tr>
+      <tr><td><code>gold_candidate</code></td><td class="c">허용</td><td class="c">&mdash;</td><td>자동 게이트를 통과했고 사람 서명을 기다리는 것</td></tr>
+      <tr><td><code>silver_train</code></td><td class="c">허용</td><td class="c"><b>금지</b></td><td>학습 시드 전용</td></tr>
+      <tr><td><code>legal_floor</code></td><td class="c">허용</td><td class="c">보조</td><td>법적 기준으로 등급이 정해지는 것</td></tr>
+      <tr><td><code>held_review</code></td><td class="c"><b>금지</b></td><td class="c"><b>금지</b></td><td>서명이 유효하지 않거나 본문이 합성인 격리분. 어느 쪽으로도 쓰지 않는다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p><code>held_review</code> 는 서명 자격을 잃은 것이 학습 연료로 흘러드는 역방향 누수를
+  막으려고 명시적으로 둔 칸이다. &ldquo;평가에서 뺐으니 학습에는 써도 되겠지&rdquo;가
+  성립하지 않는다는 뜻이다.</p>
+
+  <h3>3-1. 분할</h3>
+
+  <p><code>golden_split.split_run_dir()</code> 이 <code>gold_candidate</code> 를 등급으로
+  층화해 75/25 로 나눈다. 누수 행을 먼저 떨어내고 나누므로 결과가 결정적이다.</p>
+
+  <pre>cd poc
+python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
+  &rarr; silver_train.jsonl / synthetic_holdout.jsonl / split_stats.json</pre>
+
+  <h2>4. 경로 3 &mdash; 운영 교정이 재학습에 반영되는 절차</h2>
+
+  <p>회원사에서 검수자가 등급을 고치면 <code>tb_corrections</code> 에 쌓인다. 이것이 자동으로
+  학습셋에 병합되는 유일한 경로다.</p>
+
+  <h3>4-1. 라벨과 병합</h3>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">항목</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td>정답 라벨</td><td>해당 분류의 <b>가장 최신 교정</b>의 <code>corrected_level_code</code> (검수자 최종 동의)</td></tr>
+      <tr><td>병합 대상</td><td><b>train 만</b> 증강한다. val&middot;test(홀드아웃)는 건드리지 않는다</td></tr>
+      <tr><td>소비 규칙</td><td><b>실제로 학습셋에 들어간 <code>correction_id</code> 만</b> 소비 처리한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">소비 규칙이 중요한 이유 &mdash; 반영하지 않은 채 &ldquo;소비했다&rdquo;고
+  표시하면 <b>그 교정은 영영 학습에 들어가지 못한다.</b> 제외된 교정은 소비하지 않으므로
+  다음 실행에 다시 후보로 올라온다.</div>
+
+  <h3>4-2. 누수 차단</h3>
+
+  <p>교정 행이 홀드아웃(val&middot;test)과 <code>doc_id</code> 또는 본문이 겹치면 train 병합에서
+  뺀다. 이 검사가 없으면 시험 문제가 학습셋에 섞여 배포 게이트가 재는 미탐률이 실제보다
+  좋게 나온다.</p>
+
+  <h3>4-3. 언제 도는가</h3>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">방아쇠</th><th style="width:18%">주기</th><th>발화 조건</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>active_learning_tick</code></td><td>30 분</td>
+        <td>미탐 누적이 임계에 닿으면 즉시 재학습을 큐에 넣는다</td>
+      </tr>
+      <tr>
+        <td><code>nightly_incremental_retrain_tick</code></td><td>매일 02:00 (KST)</td>
+        <td><b>기본은 등록되지 않는다.</b> <code>enable_nightly_retrain_schedule</code> 을 켠 회원사에서만 등록된다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>야간 무인 실행을 기본에서 뺀 이유는 새벽에 실패하면 알아차릴 사람이 없기 때문이다.
+  관리자가 버튼을 눌러도 목적(<b>고객사 교정을 반출하지 않고 현장에서 반영</b>)은 그대로
+  달성된다 &mdash; 반출은 어느 쪽이든 0 이다.</p>
+
+  <h3>4-4. 어느 서버에서 도는가</h3>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">노드</th><th style="width:20%">프로파일</th><th style="width:22%">학습 가드</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>지재원 학습&middot;골든</td><td><code>full-train</code></td><td><code>enable_training</code></td><td>미탐 임계 도달 시 자동 재학습</td></tr>
+      <tr><td>고객사 운영</td><td><code>onprem-local</code></td><td><code>enable_incremental_retrain</code></td><td>CPU 증분 재학습</td></tr>
+      <tr><td>순수 추론</td><td><code>lite-*</code></td><td>둘 다 꺼짐</td><td>어떤 경로로 요청이 들어와도 학습하지 않는다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>4-5. 학습이 끝나면</h3>
+
+  <div class="note">재학습본은 <b>후보로만 등록되고 자동으로 서비스에 올라가지 않는다.</b>
+  <code>retrain_auto_activate</code> 의 기본값이 꺼짐이다. 검증되지 않은 모델이 사람 확인 없이
+  운영에 나가는 것을 막는다.</div>
+
+  <h2>5. 기본 학습셋 경로</h2>
+
+  <p>위 세 경로가 증강하는 <b>바탕</b> 학습셋은 설정에서 온다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">항목</th><th>값</th></tr></thead>
+    <tbody>
+      <tr><td>디렉터리</td><td><code>settings.training_dataset_dir</code></td></tr>
+      <tr><td>분할 파일</td><td><code>train.jsonl</code> · <code>val.jsonl</code> · <code>test.jsonl</code></td></tr>
+      <tr><td>교정 병합 산출</td><td><code>settings.retrain_dataset_dir/train_corr_&lt;8자리&gt;.jsonl</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>이 경로가 종전에는 코드에 <code>datasets/labeled/…</code> 로 박혀 있었고, 그 디렉터리는
+  리포에도 배포본에도 없었다. 그래서 하이퍼파라미터 없이 호출되는 경로(콘솔의 재학습 트리거,
+  <code>POST /train</code> 기본형)가 배포 서버에서 항상 파일 없음으로 끝났다(2026-08-08 실측).
+  설정에서 끌어오도록 바꿔 학습셋 세대가 바뀌어도 코드를 고치지 않는다.</p>
+
+  <h2>6. 문서 출처 &mdash; 라벨과 별개의 축</h2>
+
+  <p>계층은 <b>라벨이 얼마나 믿을 만한가</b>를 말하고, 출처는 <b>본문이 실제 문서인가</b>를
+  말한다. 둘은 직교한다. 사람이 서명한 합성 문서가 있을 수 있고, 라벨이 약한 실문서도 있다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">출처</th><th>무엇인가</th></tr></thead>
+    <tbody>
+      <tr><td><code>public_real</code></td><td>공개 실문서(판례&middot;금융보고서 등)</td></tr>
+      <tr><td><code>customer_real</code></td><td>고객사 실(비식별)문서 &mdash; 최종 운영 성능 근거</td></tr>
+      <tr><td><code>synthetic</code></td><td>합성 생성물</td></tr>
+      <tr><td><code>unknown</code></td><td>명시도 유도도 안 되는 것. <b>기본값이며 real 로 취급하지 않는다</b></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">최종 운영 성능의 근거는 실문서에서만 나온다. 합성만으로 학습한 분류기를
+  실문서에 적용했을 때 F1 이 0.26 이었다 &mdash; 안전하지만 자동화에는 쓸 수 없는 수준이다.
+  <b>검수를 거쳤다고 해서 합성이 실문서가 되지는 않는다.</b></div>
+
+  <h2>7. 현재 상태 &mdash; 실측</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:34%">항목</th><th style="width:14%">값</th><th>세는 방법</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>골든 실행 디렉터리</td><td class="c">8</td>
+        <td><code>ls -d poc/datasets/golden_runs/*/</code></td>
+      </tr>
+      <tr>
+        <td>그중 분할이 수행된 것</td><td class="c">1</td>
+        <td><code>find poc/datasets/golden_runs -name silver_train.jsonl</code></td>
+      </tr>
+      <tr>
+        <td>경로 1 로직 시험</td><td class="c">8 통과</td>
+        <td><code>pytest tests/test_synth_training_build.py</code> &mdash; 위생 게이트 제외, 교정 라벨 우선, 미승인 무시, 교정의 표본 간 누출 없음</td>
+      </tr>
+      <tr>
+        <td>개발 DB 스키마 판</td><td class="c"><code>f0a1b2c3d4e5</code></td>
+        <td><code>select version_num from alembic_version;</code> &mdash; 코드 head 와 일치</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>8. 확인하지 못한 것</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:34%">항목</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>운영 서버의 승인&middot;교정 건수</td>
+        <td>측정하지 않았다. 감리 시연에 쓰이는 서버라 조회를 하지 않기로 했다(2026-08-27 결정)</td>
+      </tr>
+      <tr>
+        <td>운영 서버의 마이그레이션 적용 여부</td>
+        <td>확인하지 않았다. <code>f0a1b2c3d4e5</code> 미적용이면 &sect;2 경로와 합성 검수 화면이 동작하지 않는다</td>
+      </tr>
+      <tr>
+        <td>경로 1 의 종단 실행 실적</td>
+        <td>실측하지 못했다. 개발 DB 에 합성 표본이 0 건이고, 변환 명령은 응용 컨테이너 안에서만 실행된다(DB 포트가 호스트로 게시돼 있지 않다). 로직 자체는 &sect;7 의 시험 8 건으로 확인했다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>9. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-27</td><td><code>465bb7ad</code></td><td>최초 작성 &mdash; 코드에서 세 경로를 확인해 신규 작성. 계층별 학습 허용 계약&middot;누수 차단&middot;발화 조건 반영</td></tr>
+      <tr><td class="c">2</td><td class="n">2026-08-27</td><td><code>1d865f6c</code></td><td>개발 DB 스키마를 코드 head 로 맞추고 &sect;7 에 시험 실적&middot;스키마 판을 추가. &sect;8 의 미측정 사유를 구체화</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 &mdash; <code>poc/src/koipa/services/synthesis_service.py</code> · <code>poc/src/koipa/golden_split.py</code> · <code>poc/src/koipa/golden_tiers.py</code> · <code>poc/src/koipa/modules/m6_evaluation/corrections_rebuild.py</code> · <code>poc/src/koipa/workers/tasks.py</code> · <code>poc/src/koipa/workers/celery_app.py</code> · <code>poc/src/koipa/config.py</code> · <code>poc/src/koipa/modules/m4_training/trainer.py</code> · <code>poc/scripts/build_synth_training_set.py</code> · <code>poc/scripts/run_golden_split_signoff.py</code></div>
+</div>
+</body>
+</html>

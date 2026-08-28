@@ -938,3 +938,84 @@ documents:
     audience: customer
     status: current
     version: 2026-08-28-질의회신
+
+  # -- KL 회신 묶음(2026-08-28 접수분) ---------------------------
+  - id: DOC-KLR-001
+    title: KL_API_통신방안_검토회신
+    path: doc/result/KL_회신_2026-08-28/KL_API_통신방안_검토회신.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-002
+    title: KL_질의사항_회신서
+    path: doc/result/KL_회신_2026-08-28/KL_질의사항_회신서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-003
+    title: index
+    path: doc/result/KL_회신_2026-08-28/index.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-004
+    title: "[AI 영업비밀관리시스템 구축] AI 분류 엔진 연계를 위한 API 예상 통신 방안"
+    path: doc/result/KL_회신_2026-08-28/접수원본/[AI 영업비밀관리시스템 구축] AI 분류 엔진 연계를 위한 API 예상 통신 방안.pdf
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-005
+    title: "[AI 영업비밀관리시스템 구축] 질의사항 정리본"
+    path: doc/result/KL_회신_2026-08-28/접수원본/[AI 영업비밀관리시스템 구축] 질의사항 정리본.pdf
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-006
+    title: ERD_개체관계도
+    path: doc/result/KL_회신_2026-08-28/첨부/ERD_개체관계도.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-007
+    title: 등급분류_알고리즘_명세서
+    path: doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_명세서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-008
+    title: 테이블_정의서
+    path: doc/result/KL_회신_2026-08-28/첨부/테이블_정의서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-009
+    title: 테이블정의서_ERD
+    path: doc/result/KL_회신_2026-08-28/첨부/테이블정의서_ERD.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음
+
+  - id: DOC-KLR-010
+    title: 학습_데이터_입력_경로_명세서
+    path: doc/result/KL_회신_2026-08-28/첨부/학습_데이터_입력_경로_명세서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-회신묶음

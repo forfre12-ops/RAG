@@ -119,6 +119,9 @@ doc/result/*
 # 새 파일이 조용히 누락되므로(README 가 실제로 그랬다) 규칙을 의도대로 적는다.
 !doc/result/KL_AI자료_2026-08/
 !doc/result/KL_AI자료_2026-08_미첨부문서/
+# [2026-08-28] 발주처 접수분 회신 묶음. 나가는 자료라 폴더째 추적한다 —
+# 여기 빠지면 회신이 리포에 안 남고, 다음 사람이 무엇을 보냈는지 알 수 없다.
+!doc/result/KL_회신_2026-08-28/
 doc/temp_pptx.zip
 doc/temp_pptx/
 doc/temp_xlsx.zip

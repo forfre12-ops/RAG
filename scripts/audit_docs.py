@@ -28,6 +28,8 @@ ACTIVE_DIRS = (
     # 조용히 묶음에 섞여 나간다.
     DOC / "result" / "KL_AI자료_2026-08",
     DOC / "감리문서",
+    # [2026-08-28] 발주처 회신 묶음. 나가는 자료이므로 검사 대상이다.
+    DOC / "result" / "KL_회신_2026-08-28",
 )
 
 ALLOWED_ACTIVE_DIR_NAMES = {"assets", "real"}

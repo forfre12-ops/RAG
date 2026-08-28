@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>등급분류 알고리즘 명세서</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">등급분류 알고리즘 명세서</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 요구·설계</div>
+    <h1>등급분류 알고리즘 명세서</h1>
+    <div class="meta">FUN-023 가이드 기반 라벨링 매핑 · 등급 결정의 실제 연산 순서 · 2026-08-26</div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>요구사항</th><td><code>FUN-023</code> (가이드 기반 라벨링 매핑) · <code>FUN-004</code> <code>FUN-024</code> 연계</td></tr>
+      <tr><th>대상 코드</th><td><code>m3_labeling/rule_engine.py</code> · <code>m5_inference/pipeline.py</code> · <code>services/classify_service.py</code></td></tr>
+      <tr><th>짝 문서</th><td><code>영업비밀_등급분류_기준_적용서_v2.2</code> (법적 기준) ↔ 본 문서 (연산 명세)</td></tr>
+      <tr><th>작성일</th><td>2026-08-26</td></tr>
+      <tr><th>근거 커밋</th><td><code>d3fe51c3</code></td></tr>
+      <tr><th>검증</th><td><code>cd poc &amp;&amp; TESTING=1 python scripts/audit_rule_formula.py</code></td></tr>
+    </tbody>
+  </table>
+
+
+  <div class="note">
+    본 명세는 등급 결정의 연산 절차를 코드 실행 순서대로 기술한다. 법적 판단 기준(부정경쟁방지법
+    제2조제2호 3요건 및 발주처 정본 가이드)은 <code>영업비밀_등급분류_기준_적용서_v2.2</code> 에 있으며,
+    본 문서는 그 기준의 구현 절차를 다룬다.
+  </div>
+
+  <h2>1. 등급 체계</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:10%">등급</th><th style="width:20%">명칭</th><th style="width:34%">정의 (유출 시 영향)</th><th>표준 S/V/M</th></tr></thead>
+    <tbody>
+      <tr><td class="c">TS</td><td>특급기밀</td><td>회사 존립 위협</td><td class="n">2 · 2 · 2</td></tr>
+      <tr><td class="c">S1</td><td>1급 비밀</td><td>중대한 손해</td><td class="n">2 · 2 · 0</td></tr>
+      <tr><td class="c">S2</td><td>2급 대외비</td><td>경쟁상 불이익</td><td class="n">1 · 1 · 1</td></tr>
+      <tr><td class="c">S3</td><td>3급 공개</td><td>영향 미미 · 일반 사내자료</td><td class="n">0 · 0 · 0</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>S = 비공지성 · V = 경제적 유용성 · M = 비밀관리성. 각 0·1·2. 등급 코드·순서는 DB <code>tb_classification_levels</code> 가 정본이며 코드 <code>GradeRegistry</code> 가 이를 읽는다.</p>
+
+  <h2>2. 정본 매핑 — 곱셈식과 v2.2 보정</h2>
+  <p>발주처 정본 가이드(11~12p)의 곱셈 매핑을 코드화한 함수가 <code>grade_from_svm(s, v, m)</code> 이다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:30%">조건</th><th style="width:16%">곱 (S×V×M)</th><th style="width:14%">등급</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td><code>s==2 AND v==2</code> · m≥1</td><td class="n">≥ 4</td><td class="c">TS</td><td>세 요건 모두 충족</td></tr>
+      <tr><td><code>s==2 AND v==2</code> · m==0</td><td class="n">0</td><td class="c">S1</td><td>v2.2 보정. 관리체계가 공식화되지 않은 고가치 영업비밀이며, 곱만 적용하면 S3 로 떨어지는 경계 사례다</td></tr>
+      <tr><td>그 외 · 곱 ≥ 1</td><td class="n">≥ 1</td><td class="c">S2</td><td>S 또는 V 가 불완전하여 S1·TS 에 해당하지 않는다</td></tr>
+      <tr><td>그 외 · 곱 == 0</td><td class="n">0</td><td class="c">S3</td><td>한 요건이라도 입증된 결격</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    요소값 0 은 “근거 없음”이 아니라 공개·무가치·무관리가 입증된 경우에만 부여한다. 본문에 언급이
+    없을 뿐이면 하한을 1 로 둔다(<code>grade_from_svm_floored</code>). 이 구분이 없으면 곱이 0 이 되어
+    S2 문서가 S3 로 과소분류된다.
+  </div>
+
+  <h2>3. 실제 연산 순서 — 서빙 경로</h2>
+  <p>등급은 아래 순서로 결정된다. 2·4 단계만 등급을 산출하거나 변경하고 3·5 단계는 등급을 바꾸지 않는다.
+  3 단계의 룰 등급은 5 단계 합의 판정의 입력으로 쓰이며, 분류기 가중치가 적재되지 않은 경우에 한해
+  등급 산출을 대신한다.</p>
+  <div class="flow">입력 (문서 또는 텍스트 + ICD 메타데이터)
+  │
+  ├─ 1  전처리         텍스트 추출 → 정규화 → 개인정보(PII) 마스킹 → 청크 분할
+  │
+  ├─ 2  <b>분류기 추론</b>      KF-DeBERTa 청크별 softmax          [등급 산출]
+  │                     · 온도 보정(temperature scaling), 배포 모델 동봉값 적용
+  │                     · 청크 집계: TS·S1 은 최댓값 선택, 그 외 등급은 길이 가중 평균
+  │                     · 승격 임계값 τ 로 위험도 순 선택(τ 미설정 시 argmax)
+  │
+  ├─ 3  룰 등급 산출      키워드 argmax → 요소 정합 → 상위 등급 채택  (§4)
+  │                     [등급 변경 없음. 5 단계 합의 판정의 입력]
+  │
+  ├─ 4  <b>등급 보정</b>        [등급 변경]
+  │                     · 보안표시 하한: ICD 보안표시가 예측보다 높으면 상향(하향 없음)
+  │                     · 출처 상한: 출처가 공개 문서이면 S3 로 상한
+  │                     · 동점 시 상위 등급 채택, 미탐 방지 보정
+  │
+  ├─ 5  검수 라우팅       §5 게이트 중 하나라도 해당하면 needs_review
+  │
+  └─ 출력              등급 · 신뢰도(confidence) · 근거 · 상태값
+                       staging = 자동확정 / needs_review = 사람 검수 대기</div>
+  <p class="src">koipa/modules/m5_inference/pipeline.py · koipa/services/classify_service.py</p>
+
+  <h2>4. 룰 등급 산출 — 3단계</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:6%">단계</th><th style="width:22%">하는 일</th><th style="width:42%">계산</th><th>최종 등급에 미치는 영향</th></tr></thead>
+    <tbody>
+      <tr><td class="c">4-1</td><td>키워드 argmax</td><td>키워드마다 <code>본문 출현횟수 × 가중치</code> 를 등급별로 누산한 뒤 최고점 등급을 택한다(argmax). 동점이면 상위 등급을 택한다. 매칭이 0 건이면 기본값 S3 이며 이때 신뢰도는 0 이다</td><td class="on"><b>여기서 결정된다</b></td></tr>
+      <tr><td class="c">4-2</td><td>요소 정합</td><td>S/V/M 레벨을 4-1 결과에서 산출 → <code>grade_from_svm()</code></td><td class="off">요소를 독립 관측하지 않는다</td></tr>
+      <tr><td class="c">4-3</td><td>상위 등급 채택</td><td>곱셈 등급과 키워드 등급 중 더 높은(민감한) 등급을 채택한다</td><td class="off">곱셈 결과가 더 낮으면 채택하지 않는다</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    4-2 의 입력은 키워드 등급, 공개 신호 유무, 관리 키워드 매치 유무 세 가지이므로 조합이 16 개로 닫힌다.
+    전수 열거 결과 최종 등급이 바뀌는 조합은 “키워드 등급 S1 · 공개 신호 없음 · 관리 키워드 매치” 하나이며,
+    나머지 15 개에서는 4-3 이 키워드 등급을 그대로 유지한다. 평가셋 993 건 실측에서 해당 조합의 발동은
+    0 건이었다. 재현 명령은 문서정보의 검증 항목에 있다.
+  </div>
+  <p>따라서 룰 경로를 “3요건을 독립 판독하여 곱한다”로 기술하면 실제 동작과 맞지 않는다. 정확한 기술은
+  “키워드 등급을 먼저 판정하고, 3요건 레벨을 그 등급에 정합시킨 뒤, 곱셈 매핑이 더 높은 등급을 가리킬
+  때에만 상향한다”이다.</p>
+
+  <h2>5. 검수 라우팅 게이트</h2>
+  <p>검수 게이트는 등급을 바꾸지 않고 자동확정 여부만 결정한다. 위에서부터 순서대로 평가하며, 하나라도 해당하면 상태값이 <code>needs_review</code> 가 된다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:24%">게이트</th><th style="width:44%">조건</th><th>기본</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>저신뢰</td><td>confidence &lt; 임계 (§6)</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">2</td><td>열화추출 격리</td><td>수집 단계에서 추출 품질 미달로 격리된 문서</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">3</td><td>cap-conflict</td><td>출처 상한(하향)이 TS·S1 상향 신호를 덮은 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">4</td><td>sparse-evidence</td><td>분류기 미적재 시 룰 경로의 근거 점수가 하한에 못 미치는 경우(단일·저가중 매치)</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">5</td><td>abbrev-only-escalation</td><td>청크 단위 승격의 근거가 영문 약어뿐인 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">6</td><td>무음 빈본문</td><td>추출은 되었으나 판정할 본문이 없는 문서</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">7</td><td>metadata-access-conflict</td><td>ICD 접근범위가 제한적인데 본문 기준 예측 등급이 낮은 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">8</td><td>metadata-management-conflict</td><td>M=0(관리 부재 입증)과 내용 예측이 충돌하는 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">9</td><td>ICD 규약값 부적합</td><td>규약을 벗어난 메타데이터 값. 요청을 거부(422)하지 않고 미탐 위험으로 표시한다</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">10</td><td>s2-underclass-risk</td><td>내부·비공개 신호가 있는데 S3 로 예측한 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">11</td><td>gate-fail-open</td><td>미탐 방향 게이트가 예외로 미적용된 경우. 게이트가 동작하지 않은 채 자동확정되는 것을 막는다</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">12</td><td>룰·모델 합의</td><td>비공개 등급 예측이면서 룰이 실제 근거를 냈고, 룰 등급과 모델 등급이 다른 경우</td><td class="c ok">ON</td></tr>
+      <tr><td class="c">13</td><td>LLM 2차 의견</td><td>LLM 이 더 높은 등급을 제시하면 검수로 보낸다. 등급은 바꾸지 않는다</td><td class="c off">OFF</td></tr>
+      <tr><td class="c">14</td><td>kill-gate 안전브레이크</td><td>배포 차단 신호가 발동된 동안 고등급 자동확정을 억제</td><td class="c off">OFF</td></tr>
+      <tr><td class="c">15</td><td>유사도 escalation</td><td>사람이 더 높은 등급으로 확정한 문서와 유사도가 임계 이상인 경우</td><td class="c off">OFF</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>게이트는 예외가 발생해도 분류를 중단하지 않고 기존 동작을 유지하며, 미적용 사실을 경고와 지표 카운터로 남긴다. 미탐 방향 게이트가 이렇게 미적용된 경우는 11 번 게이트가 다시 검수로 보낸다.</p>
+
+  <h2>6. 운영 파라미터 — 시험 서버(223) 실측</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">항목</th><th style="width:20%">값</th><th>출처</th></tr></thead>
+    <tbody>
+      <tr><td>배포 프로파일</td><td><code>full-train</code></td><td><code>docker inspect koipa-jjw-api-1</code> 환경변수</td></tr>
+      <tr><td>배포 모델</td><td><code>artifacts/classifier_p1_v5_clean/v-fe4b386b</code></td><td>같음 (<code>CLASSIFIER_MODEL_DIR</code>)</td></tr>
+      <tr><td>동기 분석 청크 상한</td><td class="n">400</td><td>같음 (<code>ANALYZE_SYNC_MAX_CHUNKS</code>)</td></tr>
+      <tr><td>요청 타임아웃</td><td class="n">600초</td><td>같음 (<code>GUNICORN_TIMEOUT</code>)</td></tr>
+      <tr><td>검수 라우팅 confidence 임계</td><td class="n">0.50</td><td>프로파일 기본값. 컨테이너 환경변수에 지정되어 있지 않다</td></tr>
+      <tr><td>서빙 temperature</td><td class="n">2.03</td><td>프로파일 기본값. 배포 모델에 동봉된 <code>temperature.json</code> 측정값에 맞춘 값이다</td></tr>
+      <tr><td>룰·모델 합의 게이트</td><td class="c ok">ON</td><td>프로파일 기본값</td></tr>
+      <tr><td>metadata_floor</td><td class="c ok">ON</td><td>프로파일 기본값</td></tr>
+      <tr><td>승격 임계값 τ</td><td class="n">0.30</td><td>프로파일 기본값</td></tr>
+      <tr><td>출처 상한</td><td>활성 · 상한 등급 S3</td><td>프로파일 기본값. 공개 출처 문서를 S3 로 상한</td></tr>
+      <tr><td>청크 최댓값 선택 대상</td><td>TS · S1</td><td>이 두 등급만 최댓값 선택, 나머지는 길이 가중 평균</td></tr>
+      <tr><td>안전 게이트 강제</td><td class="c ok">ON</td><td>프로파일 기본값. 게이트가 꺼진 상태로는 기동하지 않는다</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">컨테이너 환경변수에 없는 값은 <code>KOIPA_DEPLOY_PROFILE</code> 이 지정한 프로파일 기본값이 적용된다(koipa/config.py). 임계값과 온도 보정값은 .env 로 개별 지정할 수 있다.</p>
+
+  <h2>7. 적용 한계</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">항목</th><th style="width:34%">실측</th><th>영향</th></tr></thead>
+    <tbody>
+      <tr><td>룰 경로는 사전 분포에 갇힌다</td><td>사전 어휘 밖 평가셋 800 건에서 룰이 전건을 S3 로 판정했다. 등급 일치율 30.0% 는 해당 평가셋의 S3 기저율과 같은 값이다</td><td>등급에는 영향이 없다(분류기가 결정한다). 다만 합의 게이트가 불일치로 판정하여 검수 대상이 늘어난다</td></tr>
+      <tr><td>S/V/M 은 독립 관측이 아니다</td><td>요소 정확도 MAE 는 S·V 각 1.44, M 은 0.94 이며 과검출은 0.0% 다</td><td>화면에 표시되는 요소값은 참고값이며, 판정 근거는 키워드 등급이다</td></tr>
+      <tr><td>평가셋에 사람 서명이 없다</td><td>사람이 서명한 평가정답(<code>locked_gold_eval</code>)이 0 건이며, 현행 지표는 전부 기계 라벨 기준이다</td><td>정확도 수치는 모델 간 상대 비교와 회귀 여부 확인에 사용하며, 운영 정확도를 보증하지 않는다</td></tr>
+      <tr><td>과검출은 0, 미탐 방향으로만 틀린다</td><td>평가셋 4 종 전부에서 요소 과검출 0.0%</td><td>미탐 최소화라는 설계 의도와 일치한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>8. 개정 이력</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성 — 코드 실행 순서 기준으로 신규 작성. 분기 전수열거·993건 실측 반영</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 — <code>poc/src/koipa/modules/m3_labeling/rule_engine.py</code> · <code>poc/src/koipa/modules/m5_inference/pipeline.py</code> · <code>poc/src/koipa/services/classify_service.py</code> · <code>poc/src/koipa/config.py</code> · <code>poc/scripts/audit_rule_formula.py</code> · <code>doc/internal/룰_판정식_감사.html</code></div>
+</div>
+</body>
+</html>
