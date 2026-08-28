@@ -31,6 +31,50 @@ _LABEL_LIST: list[str] = [g.value for g in (Grade.TS, Grade.S1, Grade.S2, Grade.
 _LABEL2ID = {label: i for i, label in enumerate(_LABEL_LIST)}
 _ID2LABEL = {i: label for label, i in _LABEL2ID.items()}
 
+
+def _is_identity(arr) -> bool:
+    """가중치 배열이 전부 1.0 인가 — 곱해도 결과가 같으면 적용을 건너뛴다."""
+    try:
+        return all(abs(float(v) - 1.0) < 1e-9 for v in arr)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _level_loss_weights():
+    """등급별 손실 가중을 DB(tb_classification_levels.loss_weight)에서 읽는다.
+
+    반환은 _LABEL_LIST 순서의 numpy 배열이며, 읽지 못한 등급은 1.0 이다.
+    DB 미가용은 정상 상황으로 본다 — 오프라인 학습·시험에서 전부 1.0 으로 진행한다.
+    """
+    import logging  # noqa: PLC0415
+
+    import numpy as np  # noqa: PLC0415
+
+    log = logging.getLogger(__name__)
+    out = np.ones(len(_LABEL_LIST), dtype=np.float64)
+    try:
+        from koipa.db import session_scope  # noqa: PLC0415
+        from koipa.db.models import ClassificationLevel  # noqa: PLC0415
+        from sqlalchemy import select  # noqa: PLC0415
+
+        with session_scope() as db:
+            rows = db.execute(
+                select(ClassificationLevel.level_code, ClassificationLevel.loss_weight)
+            ).all()
+        found = {}
+        for code, w in rows:
+            if code in _LABEL2ID and w is not None:
+                v = float(w)
+                if v > 0:
+                    out[_LABEL2ID[code]] = v
+                    found[code] = v
+        if found and not _is_identity(out):
+            log.info("등급별 손실 가중 적용(DB): %s", found)
+    except Exception as exc:  # noqa: BLE001 — DB 미가용은 정상. 전부 1.0 으로 간다.
+        log.info("등급별 손실 가중을 DB 에서 읽지 못해 1.0 으로 진행 (%s: %s)",
+                 type(exc).__name__, exc)
+    return out
+
 TrainInputMode = Literal["auto", "documents", "pre_chunked"]
 _PRE_CHUNK_FIELDS = ("chunk_id", "source_doc_id", "chunk_label_strength")
 _CHUNK_SENTINEL_FIELDS = (
@@ -907,6 +951,13 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
     # 고등급 id (TS/S1 등) — 미탐 비대칭 가중·fnr_high 계산 공통 기준
     high_ids = [_LABEL2ID[c] for c in spec.high_grade_codes if c in _LABEL2ID]
 
+    # [2026-08-29] 등급별 손실 가중을 DB 에서 읽는다.
+    # 적용서 v2.2 R4 가 "유출영향도 의미는 등급 서열 + loss_weight + 등급별 FNR 로
+    # 보존한다"고 선언했는데, 정작 이 컬럼을 읽는 코드가 없었다(전수조사에서 확인).
+    # 관리자가 DB 로 등급 체계를 조정한다는 R3 방침과도 맞으므로 여기서 읽는다.
+    # DB 미가용이거나 값이 없으면 전부 1.0 — 기존 동작 그대로다.
+    level_loss_weights = _level_loss_weights()
+
     # class weight (불균형 보정) + FNR 비대칭 cost
     if spec.class_weighted:
         counts = np.bincount(
@@ -919,13 +970,18 @@ def train_classifier(spec: Optional[TrainSpec] = None) -> TrainReport:
         if spec.fnr_cost_multiplier != 1.0:
             for hid in high_ids:
                 weights[hid] *= spec.fnr_cost_multiplier
+        weights = weights * level_loss_weights
         class_weights = torch.tensor(weights, dtype=torch.float32)
     elif spec.fnr_cost_multiplier != 1.0:
         # 균형 가중치를 끈 경우라도 비대칭 cost는 적용 (고등급만 배수, 나머지 1.0)
         weights = np.ones(len(_LABEL_LIST), dtype=np.float32)
         for hid in high_ids:
             weights[hid] *= spec.fnr_cost_multiplier
+        weights = weights * level_loss_weights
         class_weights = torch.tensor(weights, dtype=torch.float32)
+    elif not _is_identity(level_loss_weights):
+        # 균형 가중·비대칭 cost 를 둘 다 끈 경우라도 DB 의 등급 가중은 반영한다.
+        class_weights = torch.tensor(level_loss_weights, dtype=torch.float32)
     else:
         class_weights = None
 
