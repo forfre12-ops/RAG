@@ -81,7 +81,7 @@ a{color:#0a0a0a}
   <div class="top">
     <div class="eyebrow">감리 산출물 · 데이터</div>
     <h1>테이블 정의서</h1>
-    <div class="meta">DAR-005 데이터 구조 · 테이블 19 · 컬럼 236 · ORM 메타데이터에서 생성 · 2026-08-26</div>
+    <div class="meta">DAR-005 데이터 구조 · 테이블 21 · 컬럼 249 · ORM 메타데이터 + 마이그레이션 정의에서 생성 · 2026-08-26</div>
   </div>
 
   <table class="docinfo">
@@ -97,7 +97,7 @@ a{color:#0a0a0a}
 
 
   <div class="note">
-    <b>범위.</b> AI 엔진이 소유한 스키마 <b>테이블 19 개, 컬럼 236 개</b>다.
+    <b>범위.</b> AI 엔진이 소유한 스키마 <b>테이블 21 개, 컬럼 249 개</b>다.
     ORM 메타데이터에서 생성했으므로 구동 중인 코드와 일치한다. KL 포털의 스키마는 별도이며
     두 시스템의 연계는 <code>tb_documents.external_ref</code> 로 한다.
   </div>
@@ -107,8 +107,8 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:22%">항목</th><th style="width:14%">수</th><th>비고</th></tr></thead>
     <tbody>
-      <tr><td>테이블</td><td class="n">19</td><td>월별 파티션 부모 테이블 3 개 포함(<code>tb_chunks</code>, <code>tb_llm_usage</code>, <code>tb_audit_log</code>)</td></tr>
-      <tr><td>컬럼</td><td class="n">236</td><td>물리명·논리명·데이터 타입·NULL 허용 여부·키·기본값·참조를 표기했다</td></tr>
+      <tr><td>테이블</td><td class="n">21</td><td>ORM 매핑 19 + 마이그레이션 생성 2(검색용). 월별 파티션 부모 테이블 3 개 포함(<code>tb_chunks</code>, <code>tb_llm_usage</code>, <code>tb_audit_log</code>)</td></tr>
+      <tr><td>컬럼</td><td class="n">249</td><td>물리명·논리명·데이터 타입·NULL 허용 여부·키·기본값·참조를 표기했다</td></tr>
       <tr><td>인덱스</td><td class="n">43</td><td>PK 제외</td></tr>
       <tr><td>외래키</td><td class="n">26</td><td>관계도는 <code>ERD_개체관계도</code></td></tr>
       <tr><td>컬럼 주석</td><td class="n gap">0</td><td class="gap">스키마에 <code>COMMENT ON COLUMN</code> 이 정의되어 있지 않다(보완 대상)</td></tr>

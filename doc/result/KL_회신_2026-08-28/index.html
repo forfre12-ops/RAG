@@ -55,7 +55,10 @@ a{color:#0a0a0a}
   table{font-size:8.5pt}
   thead{display:table-header-group}
   tr{break-inside:avoid;page-break-inside:avoid}
-  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
   a{text-decoration:none;color:#000}
 }
 .docinfo{font-size:12px;margin:14px 0}
@@ -168,7 +171,7 @@ a{color:#0a0a0a}
   <h2>3. 우선 협의 요청 사항</h2>
 
   <div class="note">
-    회신 전체를 전체를 검토하지 않으시더라도 <b>아래 셋은 협의가 필요</b>합니다. 세 가지 모두 구현이 아니라
+    회신 전체를 검토하지 않으시더라도 <b>아래 셋은 협의가 필요</b>합니다. 세 가지 모두 구현이 아니라
     <b>규약·범위</b>에 관한 것이라 당사가 단독으로 결정할 수 없는 사항입니다.
   </div>
 

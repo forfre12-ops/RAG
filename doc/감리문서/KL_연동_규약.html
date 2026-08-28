@@ -54,7 +54,10 @@ a{color:#0a0a0a}
   table{font-size:8.5pt}
   thead{display:table-header-group}
   tr{break-inside:avoid;page-break-inside:avoid}
-  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
   a{text-decoration:none;color:#000}
 }
 .docinfo{font-size:12px;margin:14px 0}

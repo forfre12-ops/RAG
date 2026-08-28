@@ -56,7 +56,10 @@ a{color:#0a0a0a}
   table{font-size:8.5pt}
   thead{display:table-header-group}
   tr{break-inside:avoid;page-break-inside:avoid}
-  .note,.docinfo{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
   a{text-decoration:none;color:#000}
 }
 .docinfo{font-size:12px;margin:14px 0}
@@ -164,17 +167,38 @@ a{color:#0a0a0a}
   <h3>2-1. 실제 절차</h3>
 
   <pre>① 문서 등록
-   POST /api/v1/documents          multipart/form-data (파일)
-   → doc_id 발급 · 원본은 AES-256-GCM 으로 암호화 저장
+   POST /api/v1/documents
+   Content-Type: multipart/form-data
+   Authorization: Bearer &lt;토큰&gt;          (또는 동일 오리진 세션 쿠키)
+
+   form-data
+     file          (필수) 원본 파일
+     actor         (필수) Actor JSON 문자열 — 없으면 422
+                   예: {"user_id":"kl-portal","role":"kl_backend"}
+     external_ref  (선택) KL 문서번호. 예: KL-2026-000123
+     security_marking / access_scope   (선택) 상향 게이트 입력
+   → 응답에 doc_id(UUID) 발급 · 원본은 AES-256-GCM 으로 암호화 저장
 
 ② 분류 요청
-   POST /api/v1/classify/async     application/json
-   { "doc_id": "...", "content": "...", "callback_url": "https://..." }
+   POST /api/v1/classify/async
+   Content-Type: application/json
+   Authorization: Bearer &lt;토큰&gt;
+
+   { "doc_id": "3f2a9c14-...",              ← ①이 발급한 UUID
+     "callback_url": "https://portal/…/callback" }
+   ※ content 는 넣지 않습니다. 생략하면 ①에서 저장한 본문을 사용합니다.
    → job_id 즉시 반환
 
 ③ 완료 통보 (엔진 → 관리시스템)
    POST {callback_url}
-   { "job_id": "...", "status": "done", "results": [ { ... 18필드 ... } ] }</pre>
+   { "job_id": "...", "status": "done", "results": [ { ... 21필드 ... } ] }</pre>
+
+  <div class="note">
+    <b>인증.</b> 화면이나 요청 본문으로 자격증명을 받지 않습니다. 서버가 같은 오리진
+    세션 쿠키 또는 <code>Authorization</code> 헤더로 신원을 확인하며, 미인증이면 401 을
+    반환합니다. 실제 자격증명은 본 문서를 포함한 어떤 문서에도 기재하지 않고 별도 안전
+    경로로 전달합니다.
+  </div>
 
   <h3>2-2. 저장이 건너뛰어지는 지점</h3>
 
@@ -191,7 +215,7 @@ a{color:#0a0a0a}
   <h2>3. 결과 반환 항목 &mdash; 확대 요청</h2>
 
   <p>초안의 콜백 항목은 5개(<code>doc_id</code> · <code>success</code> · <code>etc</code> ·
-  <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>18필드</b>이며, 그중
+  <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>21필드</b>이며, 그중
   <b>검수 라우팅에 반드시 필요한 것</b>이 빠져 있습니다.</p>
 
   <div class="tw">
