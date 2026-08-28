@@ -905,3 +905,28 @@ documents:
     audience: customer
     status: current
     version: 2026-08
+
+  # -- 2026-08-28 접수 요청 회신 --------------------------------
+  - id: DOC-KL08-030
+    title: KL 질의사항 회신서
+    path: doc/result/KL_AI자료_2026-08/KL_질의사항_회신서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-질의회신
+
+  - id: DOC-KL08-031
+    title: API 통신 방안 검토 회신
+    path: doc/result/KL_AI자료_2026-08/KL_API_통신방안_검토회신.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-질의회신
+
+  - id: DOC-KL08-032
+    title: 학습 데이터 입력 경로 명세서 (첨부)
+    path: doc/result/KL_AI자료_2026-08/첨부문서/학습_데이터_입력_경로_명세서.html
+    owner: pm
+    audience: customer
+    status: current
+    version: 2026-08-28-질의회신
