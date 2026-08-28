@@ -10,6 +10,7 @@ import contextlib
 import datetime as dt
 import hashlib
 import json
+import logging
 import os
 import re
 import tempfile
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import Any, Iterator
 from uuid import uuid4
 
+
+logger = logging.getLogger(__name__)
 
 _POC_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_ROOT = _POC_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
@@ -684,10 +687,15 @@ class ProxyGoldCandidateService:
             meta_path = self.root / meta_name
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
+            except (OSError, json.JSONDecodeError) as exc:
+                # 후보가 목록에서 조용히 사라지던 자리. 검수자는 "왜 안 보이지"를
+                # 알 방법이 없었다. 건너뛰는 동작은 그대로 두고 사실만 남긴다.
+                logger.warning("골든 후보 건너뜀 — 메타를 읽지 못함: %s (%s: %s)",
+                               meta_name, type(exc).__name__, exc)
                 continue
             doc_id = str(meta.get("doc_id") or "")
             if not doc_id:
+                logger.warning("골든 후보 건너뜀 — 메타에 doc_id 가 없음: %s", meta_name)
                 continue
             revision = str(meta.get("content_revision_path") or "").strip()
             revision_path = (self.root / revision).resolve() if revision else None
@@ -696,11 +704,19 @@ class ProxyGoldCandidateService:
             else:
                 names = docs_by_id.get(doc_id) or []
                 if len(names) != 1:
+                    # 본문 파일을 하나로 특정하지 못하면 화면에서 사라진다.
+                    # 0건이면 없는 것이고, 2건 이상이면 어느 것인지 못 정한 것이다.
+                    logger.warning(
+                        "골든 후보 건너뜀 — 본문 파일 특정 실패: doc_id=%s 후보 %d건",
+                        doc_id, len(names),
+                    )
                     continue
                 source = self.root / names[0]
             try:
                 text = source.read_text(encoding="utf-8")
-            except OSError:
+            except OSError as exc:
+                logger.warning("골든 후보 건너뜀 — 본문을 읽지 못함: doc_id=%s path=%s (%s)",
+                               doc_id, source.name, type(exc).__name__)
                 continue
             decision = latest.get(doc_id, {})
             document_origin = str(meta.get("document_origin") or "unknown")

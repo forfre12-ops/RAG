@@ -915,7 +915,11 @@ async def _gauge_refresh_loop(interval: float) -> None:
     """
     while True:
         try:
-            _refresh_business_gauges()
+            # [2026-08-28] 동기 I/O(DB session_scope · Redis)를 이벤트 루프에서 직접 돌리면
+            # 그동안 이 프로세스의 모든 요청이 멈춘다. 스레드로 뺀다.
+            # 취소(CancelledError)는 BaseException 이라 아래 except 에 안 걸리고 그대로
+            # 전파돼 루프가 즉시 끝난다 — 종료 경로가 그것을 수거한다.
+            await asyncio.to_thread(_refresh_business_gauges)
         except Exception as exc:  # noqa: BLE001
             _logger.warning("gauge refresh failed: %s", exc)
         try:

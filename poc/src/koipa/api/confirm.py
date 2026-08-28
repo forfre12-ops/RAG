@@ -21,7 +21,7 @@ from koipa.services.confirm_service import (
     RelabelService,
     list_review_queue,
     load_review_evidence,
-    resolve_review_statuses,
+    resolve_queue_statuses,
     to_confirm_response,
     to_relabel_response,
 )
@@ -89,6 +89,14 @@ def review_queue(
         default="pending",
         description="pending(기본=needs_review+needs_second_review) | needs_review | needs_second_review | all",
     ),
+    include_staging: bool = Query(
+        default=False,
+        description=(
+            "확정 대기(staging) 포함 여부. 게이트를 통과해 자동확정된 분류로, "
+            "FUN-005 의 '임시저장 → 관리자 최종확정' 대상이다. 기본 False 라 "
+            "기존 호출은 동작이 같다. status=staging 과 함께 주면 확정 대기만 조회한다."
+        ),
+    ),
     auth: dict = Depends(require_role("admin", "reviewer", "kl_backend")),
 ):
     """검수 대기(승인 대기) 분류 목록 — DB에 쌓인 needs_review 를 서버측에서 조회(FUN-024).
@@ -96,8 +104,14 @@ def review_queue(
     admin 콘솔의 세션-only 큐를 대체·보강한다: 브라우저 세션과 무관하게 실제 대기 건을 FIFO 로
     반환해, 검수자가 페이지를 열면 '승인 대기 문서'를 바로 본다. DB 미가용 시 items=[] +
     warnings(빈 큐와 조회실패 구분). 확정/재라벨은 기존 /confirm·/relabel 로.
+
+    [2026-08-28] include_staging=true 로 확정 대기 목록을 조회한다(FUN-005). 종전에는
+    staging 분류를 목록으로 볼 서버 경로가 아예 없었다.
     """
-    statuses = resolve_review_statuses(status)
+    # `is True` 로 좁히는 이유: 이 함수를 HTTP 를 거치지 않고 직접 호출하면(테스트가 그렇게 한다)
+    # FastAPI 가 값을 채우지 않아 Query 기본값 객체가 그대로 들어온다. 그 객체는 truthy 라
+    # bool 로 캐스팅하면 확정 대기가 켜져 버린다 — 명시적으로 True 일 때만 켠다.
+    statuses = resolve_queue_statuses(status, include_staging=include_staging is True)
     items, total, warnings = list_review_queue(limit=limit, offset=offset, statuses=statuses)
     return ReviewQueueResponse(items=items, total=total, limit=limit, offset=offset, warnings=warnings)
 

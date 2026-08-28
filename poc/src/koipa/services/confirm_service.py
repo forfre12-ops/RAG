@@ -84,6 +84,11 @@ def count_needs_second_review_by_grade() -> dict[str, int]:
 
 # 검수 대기 상태 — 자동확정되지 않아 사람 판정을 기다리는 분류(승인 대기).
 _REVIEW_STATUSES: tuple[str, ...] = ("needs_review", "needs_second_review")
+# 확정 대기 — 게이트를 통과해 자동확정된 분류. FUN-005 의 "임시저장 → 관리자 최종확정"
+# 에서 임시저장에 해당한다. 종전에는 status=all 로 불러도 이 상태가 반환되지 않아
+# 관리자가 확정 대기 목록을 볼 서버 경로가 아예 없었다(2026-08-28 감사).
+_STAGING_STATUS = "staging"
+_PENDING_ALL: tuple[str, ...] = (*_REVIEW_STATUSES, _STAGING_STATUS)
 
 
 def resolve_review_statuses(status: str | None) -> tuple[str, ...]:
@@ -92,6 +97,11 @@ def resolve_review_statuses(status: str | None) -> tuple[str, ...]:
     pending/all/빈값(기본) = needs_review + needs_second_review. 허용 집합 내 특정값이면
     그것만. 그 외(임의 문자열)는 기본으로 폴백 — 임의 status 주입으로 confirmed 등을 노출하는
     경로를 차단(검수 큐는 '대기'만 보인다).
+
+    [2026-08-28] staging(확정 대기)은 여기서 열지 않는다. 이 함수는 문자열 하나로
+    조회 범위를 정하는 자리라, 여기에 staging 을 넣으면 임의 status 주입 차단이라는
+    기존 계약이 함께 흔들린다. 확정 대기 목록은 별도 인자(include_staging)로만 연다 —
+    아래 resolve_queue_statuses 참조.
     """
     s = (status or "").strip().lower()
     if s in ("", "pending", "all"):
@@ -99,6 +109,25 @@ def resolve_review_statuses(status: str | None) -> tuple[str, ...]:
     if s in _REVIEW_STATUSES:
         return (s,)
     return _REVIEW_STATUSES
+
+
+def resolve_queue_statuses(
+    status: str | None, *, include_staging: bool = False
+) -> tuple[str, ...]:
+    """검수 큐 조회 범위 — 확정 대기(staging)를 명시적으로 켤 때만 포함한다.
+
+    FUN-005 는 "임시저장 → 관리자 최종확정"을 요구하는데, 종전에는 staging 분류를
+    목록으로 볼 서버 경로가 없었다(2026-08-28 감사). status 문자열로 열지 않는 이유는
+    위 resolve_review_statuses 주석 참조 — 임의 status 주입 차단 계약을 건드리지 않는다.
+
+    include_staging=False(기본)면 종전과 완전히 동일하다.
+    """
+    base = resolve_review_statuses(status)
+    if not include_staging:
+        return base
+    if (status or "").strip().lower() == _STAGING_STATUS:
+        return (_STAGING_STATUS,)
+    return (*base, _STAGING_STATUS)
 
 
 def list_review_queue(
