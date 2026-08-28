@@ -314,6 +314,34 @@ a{color:#0a0a0a}
     함께 수신하실 것을 요청드린다. 상세는 「API 통신 방안 검토 회신」에 적었다.
   </div>
 
+  <h3>5-1. 최종 확정 여부와 추후 추가 항목</h3>
+
+  <p>위 18필드는 <b>현재 배포본의 확정 규격</b>이며, 연동 규약서(ICD)에 그대로 반영되어 있다.
+  당사가 임의로 필드를 빼거나 이름을 바꾸지 않는다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">추가 예정 항목</th><th style="width:16%">시점</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>confirmed_label</code><br /><code>confirmed_by</code><br /><code>confirmed_at</code></td>
+        <td>배포 완료</td>
+        <td><b>사람이 확정한 등급</b>과 확정자·확정 시각. 예측 등급(<code>label</code>)은
+        확정 후에도 바뀌지 않으므로 별도 필드로 제공한다. 문서 단위 조회
+        (<code>GET /classify/{doc_id}</code>)에서 나온다</td>
+      </tr>
+      <tr>
+        <td>협의에 따라 추가</td>
+        <td>미정</td>
+        <td>귀사 포털 화면에 필요한 항목이 더 있으면 알려 주시면 규약에 반영한다.
+        <b>필드 추가는 기존 항목을 건드리지 않는 방향으로만</b> 한다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="src">GPU 유무로 달라지는 항목은 <b>없다</b>(&sect;3 참조).</p>
+
   <h2>6. 가-3-1 &mdash; SVM 점수 산정 방식 <span style="font-size:11px;color:var(--dim)">[정정]</span></h2>
   <div class="q">등급 판정 결과의 SVM 점수 산정 방식</div>
 
@@ -426,7 +454,8 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:34%">문서</th><th style="width:16%">규모</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td><code>테이블정의서_ERD</code></td><td class="c">21표</td><td>표·칼럼별 물리명 · 논리명 · 타입 · 제약 · 설명 + 외래키 관계 도식. <b>이 문서 한 건으로 제공한다</b></td></tr>
+      <tr><td><a href="테이블정의서_ERD.html"><code>테이블정의서_ERD</code></a></td><td class="c">21표</td><td><b>표 수준</b> — 표명·논리명·칼럼 수·기본키·파티션·용도 + 외래키 관계 도식(ERD)</td></tr>
+      <tr><td><a href="첨부문서/테이블_정의서.html"><code>테이블_정의서</code></a></td><td class="c">21표 249칼럼</td><td><b>칼럼 수준</b> — 칼럼별 물리명·논리명·데이터 타입·NULL·키·기본값·참조. 질의가 요청하신 &ldquo;칼럼 명세서&rdquo;가 이 문서다</td></tr>
     </tbody>
   </table>
   </div>
@@ -482,6 +511,39 @@ a{color:#0a0a0a}
     활성화는 사람이 결정한다. 검증되지 않은 모델이 무인으로 운영에 나가는 것을 막는다.
   </div>
 
+  <h3>11-1. 소요 시간 · 자원 · 성능 검증</h3>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">항목</th><th style="width:18%">값</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>CPU 증분 재학습 소요</td><td class="c"><b>약 1시간 / 1,000건</b></td>
+        <td>회원사 노드(CPU 전용) 실측. GPU 불요 &mdash; 야간 배치로 무인 수행 가능하다</td>
+      </tr>
+      <tr>
+        <td>자원</td><td class="c">CPU 전용</td>
+        <td>학습 중 별도 GPU 를 요구하지 않는다. 워커 메모리 한도 안에서 돈다</td>
+      </tr>
+      <tr>
+        <td>반출</td><td class="c"><b>0</b></td>
+        <td>회원사 교정 데이터가 밖으로 나가지 않는다. 현장에서 학습하고 현장에 남는다</td>
+      </tr>
+      <tr>
+        <td>성능 검증</td><td class="c">배포 게이트</td>
+        <td>재학습본은 <b>후보로만 등록</b>되고 자동으로 서비스에 올라가지 않는다.
+        고등급 미탐률(FNR)이 나빠지면 게이트가 승격을 막는다</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note warn">
+    <b>고지 &mdash; 품질 개선 폭은 아직 측정하지 않았다.</b> 위 &ldquo;1시간/1,000건&rdquo;은
+    <b>처리 시간</b>의 실측이며, 재학습으로 F1 이 얼마나 오르는지는 측정된 바 없다.
+    회원사 실데이터가 쌓여야 잴 수 있는 값이라, 현시점에서 개선 폭을 수치로 제시하지 않는다.
+  </div>
+
   <h2>12. 나-1 &mdash; 샘플 문서 생성 워크플로우</h2>
   <div class="q">확정된 샘플 문서 생성 기법 및 전체 워크플로우</div>
 
@@ -525,6 +587,41 @@ a{color:#0a0a0a}
 
   <p><b>당사가 보는 실질 레버는 운영 학습이다</b> &mdash; 회원사 현장에서 검수자가 교정한
   실문서를 학습에 반영하는 경로(&sect;11 세 번째 행). 반출 없이 현장에서 돈다.</p>
+
+  <h3>13-1. 보안 가이드라인 기반 라벨링 매핑 방법</h3>
+
+  <p>질의에 포함된 항목이라 함께 답한다. 매핑은 <b>발주처 정본 가이드(11~12쪽)의 4단계
+  곱셈표를 그대로 옮긴 것</b>이며 당사가 새로 만든 기준이 아니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">단계</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>① 요건 정의</td>
+        <td>가이드의 3요건(비공지성 S · 경제적 유용성 V · 비밀관리성 M)을 각 0·1·2 레벨로 둔다</td>
+      </tr>
+      <tr>
+        <td>② 곱셈 매핑</td>
+        <td>곱(S&times;V&times;M) &rarr; 등급. 8&rarr;TS · 4&rarr;S1 · 1·2&rarr;S2 · 0&rarr;S3.
+        <b>가이드 원본 표와 동일</b>하며, 골든셋 실증으로 2곳을 보정했다(적용서 v2.2)</td>
+      </tr>
+      <tr>
+        <td>③ 키워드 시드</td>
+        <td>가이드의 등급별 예시·설명에서 <b>404개</b> 키워드를 뽑아 등급·요인별로 태깅했다
+        (TS 114 · S1 107 · S2 87 · S3 96). 전부 정확 일치 방식이다</td>
+      </tr>
+      <tr>
+        <td>④ 관리자 수정</td>
+        <td>키워드·등급 체계는 <code>tb_level_keywords</code> 로 관리하며
+        <b>코드 변경·재배포 없이</b> 추가·수정·삭제할 수 있다(&sect;8-2)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="src">실제 판정에서 곱셈 단계가 어떻게 작동하는지는 &sect;6 을 참조하시기 바란다 &mdash;
+  매핑 자체는 가이드 그대로이나, 구현에서 S&middot;V&middot;M 은 독립 판독되지 않는다.</p>
 
   <h2>14. 나-3 &mdash; 성능 지표</h2>
   <div class="q">모델·룰·전체 엔진의 성능 지표</div>

@@ -930,3 +930,11 @@ documents:
     audience: customer
     status: current
     version: 2026-08-28-질의회신
+
+  - id: DOC-KL08-033
+    title: 테이블 정의서 (칼럼 수준·첨부)
+    path: doc/result/KL_AI자료_2026-08/첨부문서/테이블_정의서.html
+    owner: engineering
+    audience: customer
+    status: current
+    version: 2026-08-28-질의회신
