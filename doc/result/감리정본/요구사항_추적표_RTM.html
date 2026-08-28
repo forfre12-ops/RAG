@@ -127,7 +127,7 @@ footer strong{color:var(--text-dim);}
           <td class="center">M1</td>
           <td>백서 §05 데이터 구축</td>
           <td><code>m1_synthesis/generator.py</code> · <code>p3_generate_synthetic.py</code></td>
-          <td>골든셋 777건(gold_real) · 합성 라벨 검수</td>
+          <td>합성 생성·검수 루프 회귀시험 — <code>tests/test_m1_synthesis.py</code> · <code>test_synth_review_corrected_grade.py</code> · <code>test_synth_training_build.py</code>(승인분 → 학습행 변환)<br /><span style="font-size:11px;color:#71717a;">골든셋 777건(gold_real)은 합성 산출물이 아니라 분류기 학습·상대비교용 라벨셋이다. 라벨 판정 주체 실측 — LLM 591 · 공개 정본 수집 148 · 기계 리뷰 19 · 사람 서명 <strong>1</strong>. 머리말의 &ldquo;빌드 검수 0&rdquo;과 어긋나지 않는다</span></td>
           <td class="center"><span class="tag done">완료</span></td>
         </tr>
         <tr>
@@ -145,7 +145,7 @@ footer strong{color:var(--text-dim);}
           <td class="center">M3</td>
           <td><strong>적용서 v2.2 §1.2·§3.7·§4</strong></td>
           <td><code>m3_labeling/rule_engine.py</code> <code>grade_from_svm()</code></td>
-          <td><code>tests/test_svm_grade.py</code> (10/10) · 골든셋</td>
+          <td><code>tests/test_svm_grade.py</code> · 골든셋</td>
           <td class="center"><span class="tag done">완료</span> <span style="font-size:11px;color:#b45309;">⚠ 부분</span><br /><span style="font-size:11px;color:#71717a;">등급·판단요소 동시학습은 부분(백서 §)</span></td>
         </tr>
         <tr>
@@ -155,7 +155,7 @@ footer strong{color:var(--text-dim);}
           <td>백서 §03 모델선정 · §06 검증</td>
           <td><code>m4_training/trainer</code> · <code>p1_train_classifier.py</code></td>
           <td>확정 포착·admission gate·MLflow/감사 기록(재학습은 잠금)</td>
-          <td class="center"><span class="tag wip">정밀화</span></td>
+          <td class="center"><span class="tag done">완료</span> <span style="font-size:11px;color:#b45309;">&#9888; 부분</span><br /><span style="font-size:11px;color:#71717a;">RAG 규정보완은 증거(rag_context) 제공까지 · 판정 투입은 선택(기본 OFF)</span></td>
         </tr>
         <tr>
           <td><code>FUN-005</code></td>
@@ -173,7 +173,7 @@ footer strong{color:var(--text-dim);}
           <td>적용서 §3.4 · 테스트전략 §03</td>
           <td><code>confirm/relabel</code> · <code>m6_evaluation</code> · 거버넌스 콘솔</td>
           <td>검수→확정 admission gate→집계 진단 환류 · 검수자 신뢰도</td>
-          <td class="center"><span class="tag wip">정밀화</span></td>
+          <td class="center"><span class="tag done">완료</span></td>
         </tr>
       </tbody>
     </table>
@@ -212,7 +212,7 @@ footer strong{color:var(--text-dim);}
         <tr><td><code>PER-002</code></td><td>응답 성능(분류 ≤3s · 색인 ≤30s) · 자원 임계(CPU·MEM) — 협의 조절</td><td>서빙 운영점 파라미터 명세 · 테스트전략 §PSH · 부록C</td><td>PSH KPI 성능시나리오(<code>run_perf_scenarios.py</code>·<code>test_kpi_module_map</code>)로 자동 게이트 · 실측치는 발주기관 제공 하드웨어 의존</td><td class="center"><span class="tag dep">발주처</span></td></tr>
         <tr><td><code>PMR-002</code></td><td>운영 확정 기반 성능 기준 + 자동확정 확대 게이트</td><td>테스트전략 §02 · 안건서 A3·A5</td><td>측정 기준·실데이터 발주처 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
         <tr><td><code>R6</code></td><td>S/M 메타데이터 인터페이스 (KL 연동)</td><td><strong>KL ICD v0.9</strong> · 적용서 §3.5</td><td>출처 1필드만 명세 — 보안표시·접근범위 합의 필요</td><td class="center"><span class="tag dep">발주처</span></td></tr>
-        <tr><td><code>R6.1</code></td><td>KL 보안표시·접근범위 → metadata-floor 상향 게이트 (<code>security_marking</code> top_secret/secret/confidential → TS/S1/S2 상향 floor · <code>access_scope</code> 제한 시 검수 라우팅)</td><td>KL ICD §3.2·§3.3 · 적용서 §3.4·§3.5</td><td><code>metadata_floor_enabled</code> opt-in·기본 OFF — 인사·재무 S1 사각지대의 데이터 독립적 결정론 차단(KL 마킹 신뢰 전제)</td><td class="center"><span class="tag dep">발주처</span></td></tr>
+        <tr><td><code>R6.1</code></td><td>KL 보안표시·접근범위 → metadata-floor 상향 게이트 (<code>security_marking</code> top_secret/secret/confidential → TS/S1/S2 상향 floor · <code>access_scope</code> 제한 시 검수 라우팅)</td><td>KL ICD §3.2·§3.3 · 적용서 §3.4·§3.5</td><td><code>metadata_floor_enabled</code> — Settings 기본값은 OFF 이나 <strong>배포 프로파일(onprem-local·full-train)에서는 ON</strong>이며 <code>require_safety_gates</code> 가 개별 비활성을 막는다. 상향 전용이라 KL 메타가 없으면 no-op — 인사·재무 S1 사각지대의 데이터 독립적 결정론 차단(KL 마킹 신뢰 전제)</td><td class="center"><span class="tag dep">발주처</span></td></tr>
         <tr><td><code>FUN-005a</code></td><td>등급체계 관리자 추가/변경/삭제 (설정화)</td><td>적용서 §3.5 R3 · 부록A</td><td><code>schema/grades</code> API · DB 주도</td><td class="center"><span class="tag done">완료</span></td></tr>
       </tbody>
     </table>
@@ -220,7 +220,7 @@ footer strong{color:var(--text-dim);}
 
   <div class="callout">
     <div class="callout-label">추적 요약</div>
-    <p>기능 요건(FUN) 6모듈 — <strong>4건 완료 · 2건 본개발 정밀화</strong>. 가이드 등급기준 — 핵심 곱셈·예시 <strong>완료</strong>, 보정·공개특허·A안은 발주처 결정/협조 의존. 성능·연동(PMR/R6) — <strong>발주처 합의 후 확정</strong>(발주처 안건 A2·A3·A5 + KL ICD).</p>
+    <p>기능 요건(FUN) 6모듈 — <strong>6건 완료</strong>(FUN-004 는 RAG 규정보완 부분 유보). 가이드 등급기준 — 핵심 곱셈·예시 <strong>완료</strong>, 보정·공개특허·A안은 발주처 결정/협조 의존. 성능·연동(PMR/R6) — <strong>발주처 합의 후 확정</strong>(발주처 안건 A2·A3·A5 + KL ICD).</p>
   </div>
 
   <div class="section-sep" id="sp0"><span class="section-sep-num">★</span><span class="section-sep-line"></span><span class="section-sep-title">본개발 보강 요구 (P0)</span></div>
@@ -240,7 +240,7 @@ footer strong{color:var(--text-dim);}
   <div class="footnote">
     <p>근거: 제안요청서(FUN-003·004·005·022·023·024 / PMR-002 / PER-002) · 발주처 정본 가이드 PDF · 적용서 v2.2 · 테스트 전략 문서</p>
     <p>관련: <a href="영업비밀_등급분류_기준_적용서_v2.2.html">적용서 v2.2</a> · <a href="기술구현_백서_v7.html">기술구현 백서 v7</a> · <a href="테스트_전략_및_이력.html">테스트 전략·이력</a> · <a href="시험케이스_및_결과서.html">시험케이스·결과서</a> · <a href="결함관리대장.html">결함관리대장</a> · <a href="발주처_의사결정_안건서.html">의사결정 안건서</a> · <a href="WBS_본개발_작업분해구조.html">WBS</a></p>
-    <p><strong>P0 NFR 상태(부분구현):</strong> 하드닝 조치가 구현·커밋되었으나 완전충족은 잔여다 — <code>NFR-DAT-01</code> 사람서명 locked 500건(readiness strict 블로커)·<code>NFR-SEC-01</code> 빈 키 기동 거부(현재 warn-only)·<code>NFR-SEC-02</code> Postgres RLS. 요건→시험은 <a href="시험케이스_및_결과서.html">시험케이스·결과서</a>의 요건–시험 대응표, 조치 이력은 <a href="결함관리대장.html">결함관리대장</a> 참조.</p>
+    <p><strong>P0 NFR 상태(부분구현):</strong> 하드닝 조치가 구현·커밋되었으나 완전충족은 잔여다 — <code>NFR-DAT-01</code> 사람서명 locked 500건(readiness strict 블로커)·<code>NFR-SEC-02</code> Postgres RLS. 요건→시험은 <a href="시험케이스_및_결과서.html">시험케이스·결과서</a>의 요건–시험 대응표, 조치 이력은 <a href="결함관리대장.html">결함관리대장</a> 참조.</p>
   </div>
 
 </article>

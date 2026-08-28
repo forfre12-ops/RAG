@@ -263,7 +263,9 @@ class RedisOutboxStore(OutboxStore):
         self._client.ping()
         self._ttl = msg_ttl_seconds
         self._url = redis_url
-        logger.info("RedisOutboxStore connected: url=%s ttl=%ds", redis_url, msg_ttl_seconds)
+        from koipa.services.secrets_manager import mask_url_credentials  # noqa: PLC0415
+        logger.info("RedisOutboxStore connected: url=%s ttl=%ds",
+                    mask_url_credentials(redis_url), msg_ttl_seconds)
 
     def enqueue(self, msg: OutboxMessage) -> None:
         with self._client.pipeline() as pipe:
@@ -570,8 +572,11 @@ def get_outbox_store(
             _default_store = InMemoryOutboxStore()
             return _default_store
         except Exception as exc:  # noqa: BLE001
+            from koipa.services.secrets_manager import (  # noqa: PLC0415
+                mask_url_credentials,
+            )
             logger.error("outbox redis 연결 실패 — memory 폴백 url=%s err=%s",
-                         redis_url, type(exc).__name__)
+                         mask_url_credentials(redis_url), type(exc).__name__)
             _default_store = InMemoryOutboxStore()
             return _default_store
 

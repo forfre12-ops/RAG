@@ -13,6 +13,7 @@ import logging
 import os
 import time
 from typing import Optional, Protocol, runtime_checkable
+from urllib.parse import urlsplit, urlunsplit
 
 logger = logging.getLogger(__name__)
 
@@ -236,3 +237,25 @@ def invalidate_secrets_cache() -> None:
         invalidate = getattr(sm, "invalidate", None)
         if callable(invalidate):
             invalidate()
+
+
+def mask_url_credentials(url: str) -> str:
+    """연결 URL 의 비밀번호를 가린 진단용 문자열.
+
+    redis://:pw@host:6379/0  ->  redis://:***@host:6379/0
+    자격증명이 없으면 원문 그대로 돌려준다. 로그 경로에서만 쓰이므로
+    어떤 입력에도 예외를 올리지 않는다.
+    """
+    if not url:
+        return ""
+    try:
+        p = urlsplit(url)
+        if p.password is None:
+            return url
+        host = p.hostname or ""
+        if p.port:
+            host = f"{host}:{p.port}"
+        netloc = f"{p.username or ''}:***@{host}"
+        return urlunsplit((p.scheme, netloc, p.path, p.query, p.fragment))
+    except Exception:  # noqa: BLE001 — 로그 경로에서 절대 실패하지 않는다
+        return "<unparseable-url>"

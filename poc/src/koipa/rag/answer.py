@@ -185,6 +185,47 @@ def synthesize_answer(
         warnings_acc.append("noop provider — using deterministic answer")
         chosen = None
 
+    # [반출 게이트] 프롬프트에는 검색된 청크 **본문**이 실린다. 그 본문이 회원사 실문서인지
+    # RAG 인덱스는 모른다 — 저장하는 것은 doc_id·chunk_idx·text·heading_path 뿐이다.
+    # 상용 LLM(Anthropic/OpenAI/Google)을 쓰는 프로파일에서는 출처를 확인하지 못한 본문을
+    # 밖으로 내보내게 된다. 골든 빌드 경로에 이미 있는 원칙을 여기에도 적용한다:
+    # 판단 근거는 등급이 아니라 출처이고, 모르면 보내지 않는다(fail-closed).
+    # 차단되면 LLM 을 쓰지 않고 결정적 답변으로 내려간다 — 기능이 죽지는 않는다.
+    if chosen is not None and hits:
+        try:
+            from koipa.golden_tiers import may_send_to_commercial_llm  # noqa: PLC0415
+            from koipa.modules.m3_labeling.judge import COMMERCIAL  # noqa: PLC0415
+
+            _provider_name = str(getattr(chosen, "name", "") or "").lower()
+            if _provider_name in COMMERCIAL:
+                # 히트마다 출처를 확인한다. 하나라도 확인되지 않으면 실행분 전체를 막는다
+                # (한 건이 섞여도 프롬프트는 한 번에 나간다).
+                _blocked = [
+                    h for h in hits
+                    if not may_send_to_commercial_llm(
+                        {"document_origin": getattr(h, "document_origin", None)}
+                    )
+                ]
+                if _blocked:
+                    logger.warning(
+                        "rag_answer: 상용 LLM(%s) 반출 차단 — 출처 미확인 청크 %d/%d건. "
+                        "결정적 답변으로 진행한다.",
+                        _provider_name, len(_blocked), len(hits),
+                    )
+                    warnings_acc.append(
+                        f"commercial-llm-egress-blocked: {len(_blocked)}/{len(hits)} "
+                        "chunks have unverified origin"
+                    )
+                    chosen = None
+        except Exception as exc:  # noqa: BLE001
+            # 게이트 자체가 실패하면 보내지 않는다 — 안전한 쪽으로 닫는다.
+            logger.warning(
+                "rag_answer: 반출 게이트 판정 실패 — 결정적 답변으로 진행 (%s: %s)",
+                type(exc).__name__, exc,
+            )
+            warnings_acc.append("commercial-llm-egress-gate-error")
+            chosen = None
+
     if chosen is None:
         return RagAnswerResult(
             answer=_deterministic_answer(query=query, hits=hits, grade=grade, grade_descriptions=desc_map),

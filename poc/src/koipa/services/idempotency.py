@@ -135,7 +135,9 @@ def get_idempotency_store():
             )
             client.ping()
             _store = _RedisStore(client)
-            logger.info("idempotency store: redis (%s)", settings.redis_url)
+            from koipa.services.secrets_manager import mask_url_credentials  # noqa: PLC0415
+            logger.info("idempotency store: redis (%s)",
+                        mask_url_credentials(settings.redis_url))
         except Exception as exc:  # noqa: BLE001 — redis 미설치/미가용 모두 폴백
             logger.warning(
                 "idempotency store: in-memory fallback (redis unavailable: %s)", exc

@@ -168,7 +168,9 @@ class RedisJobStore:
         self._client.ping()
         self._ttl = ttl_seconds
         self._url = redis_url
-        logger.info("RedisJobStore connected: url=%s ttl=%ds", redis_url, ttl_seconds)
+        from koipa.services.secrets_manager import mask_url_credentials  # noqa: PLC0415
+        logger.info("RedisJobStore connected: url=%s ttl=%ds",
+                    mask_url_credentials(redis_url), ttl_seconds)
 
     @staticmethod
     def _key(job_id: uuid.UUID) -> str:

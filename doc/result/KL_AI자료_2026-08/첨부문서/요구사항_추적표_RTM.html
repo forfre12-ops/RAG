@@ -136,7 +136,7 @@ footer strong{color:var(--text-dim);}
           <td><code>api/synthesis.py</code> → <code>services/synthesis_service.py</code> → <code>modules/m1_synthesis/generator.py</code><br/>
               골든셋: <code>api/golden.py</code> → <code>services/golden_build_service.py</code> → <code>golden_builder.py</code> · <code>golden_tiers.py</code> · <code>golden_signoff.py</code><br/>
               <span style="color:#666;">데이터셋 구축: <code>scripts/p3_generate_synthetic.py</code></span></td>
-          <td>골든셋 777건(gold_real) · 합성 라벨 검수</td>
+          <td>합성 생성·검수 루프 회귀시험 — <code>tests/test_m1_synthesis.py</code> · <code>test_synth_review_corrected_grade.py</code> · <code>test_synth_training_build.py</code>(승인분 → 학습행 변환)<br /><span style="font-size:11px;color:#71717a;">골든셋 777건(gold_real)은 합성 산출물이 아니라 분류기 학습·상대비교용 라벨셋이다. 라벨 판정 주체 실측 — LLM 591 · 공개 정본 수집 148 · 기계 리뷰 19 · 사람 서명 <strong>1</strong>. 머리말의 &ldquo;빌드 검수 0&rdquo;과 어긋나지 않는다</span></td>
           <td class="center nowrap"><span class="tag done">완료</span></td>
         </tr>
         <tr>
@@ -156,7 +156,7 @@ footer strong{color:var(--text-dim);}
           <td><strong>적용서 v2.2 §1.2·§3.7·§4</strong></td>
           <td><code>modules/m3_labeling/rule_engine.py</code> <code>grade_from_svm()</code><br/>
               키워드 관리: <code>api/keyword_admin.py</code> → <code>services/keyword_admin_service.py</code> → <code>modules/m3_labeling/seeds.py</code></td>
-          <td><code>tests/test_svm_grade.py</code> (10/10) · 골든셋</td>
+          <td><code>tests/test_svm_grade.py</code> · 골든셋</td>
           <td class="center nowrap"><span class="tag done">완료</span></td>
         </tr>
         <tr>
