@@ -1450,22 +1450,25 @@ paths:
       tags: [golden]
       summary: 골든셋 관리 콘솔 문서 업로드
       description: >-
-        출처(origin)·사용권한(usage_right)이 필수다 — 이 기록이 없으면 나중에 평가셋으로
-        쓸 수 없다. 적재 후 분류 큐에 등록하고 status_url 을 반환한다.
+        업로드 자체는 골든 승격이 아니다 — 미확정 검수 항목으로만 저장된다.
+        출처(source_reference)·사용권한 근거(authorization_basis)는 선택이지만, 비워 두면
+        미완(partial) 상태로 남아 나중에 평가셋으로 쓸 수 없다. 나중에 채우려면
+        POST /golden/candidates/{doc_id}/provenance 를 쓴다.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required: [file, origin, usage_right]
+              required: [file]
               properties:
                 file: { type: string, format: binary }
-                origin: { type: string }
-                usage_right: { type: string }
+                document_origin: { type: string, default: uploaded_document }
+                source_reference: { type: string, default: "" }
+                authorization_basis: { type: string, default: "" }
       responses:
-        '200':
-          description: 적재 결과 + status_url
+        '201':
+          description: 적재 결과 (미확정 검수 항목)
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
@@ -1577,6 +1580,76 @@ paths:
             text/html:
               schema: { type: string }
         '401': { description: "포털 JWT 쿠키 필요 — login.html 경유" }
+
+  /rag/search:
+    post:
+      tags: [answer]
+      summary: 유사 문서·청크 Top-K 검색 (LLM 미호출)
+      description: >-
+        /answer 와 달리 LLM 을 호출하지 않는다 — 요건상 RAG 는 검색이고 답변 생성은
+        요건 외이므로 LLM-free 고객사에서도 이 경로는 동작한다. 인증(require_auth)만
+        요구하고 등급별 접근제어는 두지 않는다(단일 고객사 폐쇄망·상류 KL 포털 격리 전제).
+        한도 60/분.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RagAnswerRequest' }
+      responses:
+        '200':
+          description: "{query, count, elapsed_ms, hits:[{source_doc, chunk_id, score, text}]}"
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /dashboard/summary:
+    get:
+      tags: [metrics]
+      summary: 운영 현황 실측 카운트
+      description: >-
+        모두 DB 실측 COUNT 이며 가공·추정값이 없다. 실문서 정답이 없어 '정밀도'는 산출
+        불가하므로 측정 가능한 지표만 노출한다. DB 미가용 시 예외 대신 db="unavailable"
+        + 전 카운트 0 을 반환한다(운영 화면 무중단).
+      responses:
+        '200':
+          description: "{total_classifications, by_grade, by_status, review_queue, auto_confirmed, reviewed, corrections, verified_labels, db}"
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /metrics-prom:
+    get:
+      tags: [metrics]
+      summary: Prometheus 메트릭 노출 (내부 scrape 전용)
+      description: >-
+        Prometheus exposition format. include_in_schema=False 라 서비스의 실제
+        OpenAPI 스키마에는 나타나지 않으며, 본 규약서에는 운영 연동용으로만 기재한다.
+        미탐율(FNR)은 게이지로 나가지 않고 koipa_classify_correct_total /
+        koipa_classify_total 에서 Prometheus 룰이 계산한다. 검색 Recall@5 메트릭은 없다.
+      responses:
+        '200':
+          description: Prometheus text format
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /admin/demo/purge:
+    post:
+      tags: [admin]
+      summary: "[시연] 데모 실적재 데이터 초기화 (물리삭제)"
+      description: >-
+        삭제 대상이 created_by='demo-console' + RAG collection='demo' 로 하드코딩돼 있어
+        다른 created_by 는 매칭 자체가 불가하다. demo_console_enabled=false(운영 프로파일
+        기본)면 404 로 거부한다 — 납품 운영본에는 이 엔드포인트가 존재하지 않는다.
+      responses:
+        '200':
+          description: "{documents, classifications, chunks, rag_vectors, warnings[]}"
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '403': { description: "admin role required" }
+        '404': { description: "데모 콘솔 비활성(운영 기본)" }
 
 components:
   securitySchemes:

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>기능 사용 결정 대장 — 내부</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:14px;font-weight:800;margin:30px 0 10px;padding-left:10px;border-left:4px solid var(--band)}
+h3{font-size:13px;font-weight:800;margin:20px 0 6px}
+p{margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);border-left:4px solid var(--band);padding:12px 16px;margin:14px 0;font-size:13px}
+.tw{overflow-x:auto}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">기능 사용 결정 대장</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">내부 · 미제출</span></div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">내부 문서 · 제출 대상 아님</div>
+    <h1>기능 사용 결정 대장</h1>
+    <div class="meta">담당 요건 6건 · 세부 33항목 전수 · 코드 기본값 및 운영 서버 실측 대조 · 2026-08-25</div>
+  </div>
+
+  
+
+  <h2>1. 요건 33항목 — 구현 · 사용 현황</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr>
+      <th style="width:9%">세부ID</th><th style="width:26%">요건 내용</th>
+      <th style="width:7%">구현</th><th style="width:8%">실행 이력</th>
+      <th style="width:29%">확인 근거</th><th style="width:22%">판단</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="grp" colspan="6">FUN-003 · 샘플 문서 생성 및 관리</td></tr>
+      <tr><td>③-①</td><td>학습용 샘플 문서를 생성하기 위해 LLM 활용</td><td class="c on">O</td><td class="c on">O</td><td>운영 서버에서 23건 생성 확인</td><td>유지</td></tr>
+      <tr><td>③-②</td><td>AI Hub·공공데이터로 모의 학습·테스트 데이터 구축</td><td class="c on">O</td><td class="c on">O</td><td>학습셋에 반영됨</td><td>유지</td></tr>
+      <tr><td>③-③</td><td>온프렘 + 상용 API(GPT·Claude·Gemini) 연계</td><td class="c on">O</td><td class="c">운영 미사용</td><td>어댑터 5종 존재. 운영 서버는 <code>LLM_PROVIDER=noop</code></td><td>배선 유지 · 운영 미사용</td></tr>
+      <tr><td>③-④</td><td>LangChain 기반 프롬프트 체인</td><td class="c">자체 구현</td><td class="c on">동작 중</td><td>프롬프트 체인을 자체 모듈로 구현. <code>import langchain</code> 0건</td><td class="warn">현행 유지 · §3 표 6번</td></tr>
+      <tr><td>③-⑤</td><td>생성 문서에 등급 라벨 자동 부여</td><td class="c on">O</td><td class="c on">O</td><td>생성 시 목표 등급 보존</td><td>유지</td></tr>
+      <tr><td>③-⑥</td><td>LLM 종류가 바뀌어도 동일 체인 동작</td><td class="c on">O</td><td class="c on">O</td><td>생성 모델 2종으로 각 60건 무실패 실증</td><td>유지</td></tr>
+      <tr><td>③-⑦</td><td>검수 후 학습 데이터셋 편입</td><td class="c on">O</td><td class="c">승인 0건</td><td>생성 23건 → 반려 21 · 대기 2 · 승인 0. 편입은 수동 명령</td><td><b>요건 충족.</b> 편입 <i>기능</i>이 요건 · 자동화는 §3 표 4번</td></tr>
+
+      <tr><td class="grp" colspan="6">FUN-004 · AI 기반 등급 분류 학습</td></tr>
+      <tr><td>④-①</td><td>BERT 계열 모델로 등급 분류 학습</td><td class="c on">O</td><td class="c on">O</td><td>학습 이력 6건 기록</td><td>유지</td></tr>
+      <tr><td>④-②</td><td>사내 규정을 RAG 로 적용해 등급 분류 보완<br /><b>(요건이 「선택적 옵션」으로 명시)</b></td><td class="c on">O</td><td class="c off">OFF</td><td><code>use_rag=False</code> · 등급 판정 경로에서 검색 호출 0건</td><td>켜지 않음 · §2 표 · 결정은 §3 표 1번</td></tr>
+      <tr><td>④-③</td><td>문서 Chunk 단위 학습</td><td class="c on">O</td><td class="c off">OFF</td><td><code>chunk_expand=False</code></td><td>켜지 않음 · §2 표</td></tr>
+      <tr><td>④-④</td><td>Train/Validation/Test 자동 분리</td><td class="c on">O</td><td class="c on">O</td><td>층화 분할 + 중복 제거 가드</td><td>유지</td></tr>
+      <tr><td>④-⑤</td><td>Accuracy·Precision·Recall·F1 리포트</td><td class="c on">O</td><td class="c on">O</td><td>학습 산출물 27건에 리포트 동봉</td><td>유지</td></tr>
+      <tr><td>④-⑥</td><td>GPU 환경에서 학습 수행</td><td class="c on">O</td><td class="c on">O</td><td>운영 서버 <code>DEPLOY_PROFILE=full-train</code></td><td>유지</td></tr>
+
+      <tr><td class="grp" colspan="6">FUN-005 · AI 문서 등급 분류</td></tr>
+      <tr><td>⑤-①</td><td>관리자가 등급체계를 추가·변경·삭제</td><td class="c on">O</td><td class="c">변경 0건</td><td>관리 화면(§E)·API 존재. 등급 4건 초기 구성 유지</td><td><b>요건 충족.</b> 변경 <i>기능</i>이 요건이며 변경 실행은 요건 아님 · 정책은 §3 표 2번</td></tr>
+      <tr><td>⑤-②</td><td>BERT 기반 자동 등급 판별</td><td class="c on">O</td><td class="c on">O</td><td>분류 기록 23건</td><td>유지</td></tr>
+      <tr><td>⑤-③</td><td>인코더 중심 사전학습 언어모델 적용</td><td class="c on">O</td><td class="c on">O</td><td><code>kf-deberta-base</code> 학습·추론 동일</td><td>유지</td></tr>
+      <tr><td>⑤-④</td><td>보안등급 정보를 화면에 표시</td><td class="c on">O</td><td class="c on">O</td><td>콘솔 등급 배지·판정 경로 표시</td><td>유지</td></tr>
+      <tr><td>⑤-⑤</td><td>임시 저장 후 관리자가 최종 등급 확정</td><td class="c on">O</td><td class="c on">O</td><td>교정 기록 10건</td><td>유지</td></tr>
+
+      <tr><td class="grp" colspan="6">FUN-022 · 전자문서 텍스트 파싱 및 정규화</td></tr>
+      <tr><td>㉒-①</td><td>HWP·DOCX·PDF 등에서 텍스트 자동 추출</td><td class="c on">O</td><td class="c on">O</td><td>문서 15건 처리 기록</td><td>유지</td></tr>
+      <tr><td>㉒-②</td><td>머리글·바닥글·표 등 구조 차이 고려</td><td class="c on">O</td><td class="c on">O</td><td>표·글상자 보존. PDF 표 추출기는 옵트인·미설치</td><td>유지</td></tr>
+      <tr><td>㉒-③</td><td>불용어 제거·특수문자·공백 정규화</td><td class="c on">O</td><td class="c">정규화만</td><td class="warn">정규화 동작. <b>불용어 제거는 구현돼 있으나 켜지 않음</b></td><td class="warn">켜지 않음 · §2 표</td></tr>
+      <tr><td>㉒-④</td><td>의미 훼손 없는 노이즈 제거 기준 정의</td><td class="c on">O</td><td class="c on">O</td><td>보수적 페이지번호 판정 · 손실 의심 시 검수 라우팅</td><td>유지</td></tr>
+      <tr><td>㉒-⑤</td><td>전처리 결과를 구조화해 재사용</td><td class="c on">O</td><td class="c on">O</td><td>청크 170건 적재. 분류·검색 공용</td><td>유지</td></tr>
+
+      <tr><td class="grp" colspan="6">FUN-023 · 가이드라인 기반 라벨링 매핑</td></tr>
+      <tr><td>㉓-①</td><td>등급체계를 학습용 라벨로 매핑</td><td class="c on">O</td><td class="c on">O</td><td>등급 4건 · 판단 3요건 조합식</td><td>유지</td></tr>
+      <tr><td>㉓-②</td><td>등급 판단 근거 요소를 속성 정보로 정의</td><td class="c on">O</td><td class="c">정의 7건</td><td>요소 7건 + 키워드 404건에 요소 태그. 문서별 점수는 미저장</td><td><b>요건 충족.</b> 요건은 “정의할 수 있어야” — 문서별 점수 저장은 요구사항 아님 · §3 표 3번</td></tr>
+      <tr><td>㉓-③</td><td>키워드·표현패턴·메타데이터 태깅</td><td class="c on">O</td><td class="c on">O</td><td>코드 시드 404건 사용 중(DB 키워드 0건 → 폴백)</td><td>유지</td></tr>
+      <tr><td>㉓-④</td><td>라벨링·태깅 규칙을 수정·확장</td><td class="c on">O</td><td class="c">등록 0건</td><td>관리 화면(§T)·API 존재. 코드 시드 404건으로 동작 중</td><td><b>요건 충족.</b> 수정·확장 <i>기능</i>이 요건</td></tr>
+      <tr><td>㉓-⑤</td><td>판단 요소를 활용하는 학습 구조</td><td class="c on">O</td><td class="c on">O</td><td>라벨링·판정·설명 계층에서 활용</td><td>유지 · 아래 주석</td></tr>
+
+      <tr><td class="grp" colspan="6">FUN-024 · 심층 지표 분석</td></tr>
+      <tr><td>㉔-①</td><td>정확도·정밀도·재현율·미탐율 산출</td><td class="c on">O</td><td class="c on">O</td><td>지표 API · 콘솔 카드 · 리포트</td><td>유지</td></tr>
+      <tr><td>㉔-②</td><td>미탐 최소화를 핵심 목표로 분석·관리</td><td class="c on">O</td><td class="c on">O</td><td>배포 게이트가 실제로 후보 1건 차단(8/16)</td><td>유지</td></tr>
+      <tr><td>㉔-③</td><td>판단결과 분류표 시각 확인</td><td class="c on">O</td><td class="c on">O</td><td>콘솔 격자 표시. 이미지 산출은 CLI 전용</td><td>유지</td></tr>
+      <tr><td>㉔-④</td><td>수정 라벨 부여 시 재학습하는 능동 학습</td><td class="c on">O</td><td class="c on">O</td><td>학습 이력 6건 · 교정 10건. 후보 등록까지만 자동</td><td>유지</td></tr>
+      <tr><td>㉔-⑤</td><td>성능 결과 이력 관리·조회</td><td class="c on">O</td><td class="c on">O</td><td>모델 버전 4건 · 학습 이력 조회 API</td><td>유지</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">실측: 운영 서버 DB 테이블 행수(2026-08-25) · 코드 기본값 poc/src/koipa/config.py · 컨테이너 환경변수</p>
+
+  <div class="note"><b>㉓-⑤ 에 대한 정직성 주석.</b> 판단 3요건은 라벨링·판정·설명 계층에서 활용하지만, 분류 신경망 자체는 「본문 → 등급」 단일 지도학습입니다. 3요건을 신경망 학습 목표로 직접 주입하지는 않습니다. 요건이 요구한 “학습 구조에 활용”은 충족하나, 표현을 과장하지 않습니다.</div>
+
+    <h2>2. 켜지 않은 기능과 이유</h2>
+  <p>모두 <b>만들어져 있고 켜지 않은 것</b>입니다. 요건은 “~할 수 있어야 한다”이므로 기능을 갖춘 것으로 충족되며, 켜고 끄는 것은 운영 판단입니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:18%">기능</th><th style="width:12%">현재</th><th>켜지 않는 이유 — 한 줄</th></tr></thead>
+    <tbody>
+      <tr><td><b>RAG 검색</b><br /><span class="src">④-②</span></td><td class="c">꺼짐</td>
+          <td>요건이 “선택 옵션”으로 규정. 켜면 판정이 <b>0.4초 → 1.4초</b>가 되어 성능 요건(0.5초)을 넘습니다</td></tr>
+      <tr><td><b>불용어 제거</b><br /><span class="src">㉒-③</span></td><td class="c">꺼짐</td>
+          <td>지우면 <b>금액·수량이 함께 사라져</b> 놓치는 문서가 생깁니다. 분류 모델은 조사·어미로 문맥을 읽어 단어를 지우면 손해입니다</td></tr>
+      <tr><td><b>Chunk 학습</b><br /><span class="src">④-③</span></td><td class="c">꺼짐</td>
+          <td>한 문서의 조각이 학습과 평가에 <b>갈라져 들어가</b> 점수가 부풀려집니다</td></tr>
+      <tr><td><b>상용 LLM API</b><br /><span class="src">③-③</span></td><td class="c">운영 미사용</td>
+          <td>폐쇄망이라 외부 호출이 불가합니다. 연계 배선은 유지합니다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>2-1. RAG — 켤 때 확인할 것</h3>
+  <p><b>검색을 켜도 등급은 바뀌지 않습니다.</b> 검색 결과는 참고 맥락으로만 쓰이고 판정에는 넘어가지 않습니다. 이 경계를 넘으면 <b>모델이 매긴 옛 등급이 새 판정의 근거가 되는 순환 구조</b>가 되므로 그대로 둡니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:20%">확인할 것</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td>넣을 선례가<br />아직 없음</td><td>사람이 등급을 확정한 문서가 <b>4건뿐</b>(전부 테스트 계정)입니다. 검수가 쌓인 뒤에 그 확정분을 색인하면 됩니다. <span class="src">현재 색인에 든 3,754문서는 검색 성능 측정용 시험 데이터이며 선례용이 아닙니다</span></td></tr>
+      <tr><td>검색 범위</td><td>엔진 하나가 고객사 한 곳만 담당하는 구조라 <b>범위 제한을 두지 않는 설계</b>입니다(격리는 포털 담당). 화면 표시 용도로는 그대로 문제없습니다. <b>검색 결과를 상용 LLM 에 보내는 경우에만</b> 출처 확인이 필요합니다 — 허용 범위 밖 문서가 섞이면 실행분 전체가 외부 전송 차단됩니다</td></tr>
+      <tr><td>유지 비용</td><td>등급이 바뀌거나 문서가 늘면 색인을 다시 만들어야 합니다. CPU 서버에 임베딩 모델이 상주해야 합니다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>2-2. RAG 실행시간 — 운영 서버 실측</h3>
+  <p>배포 모델 <code>v-fe4b386b</code> · CPU · 본문 952자 · 매 회 새 본문으로 7회.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:32%">조건</th><th style="width:16%">p50</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>분류만 (검색 끔)</td><td class="n">394 ms</td><td>현행</td></tr>
+      <tr><td>검색 켬</td><td class="n">1,449 ms</td><td>3.7배 · 검색 구간만 1,071 ms</td></tr>
+      <tr><td>프로세스 첫 요청</td><td class="n">+22 초</td><td>임베딩 모델 로드 · 1회</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="src">같은 본문을 다시 열면 캐시(24시간)로 700ms 대. 캐시에 걸린 값을 대표값으로 인용하지 말 것</p>
+  <p><b>등급 판정 경로에는 켜지 않습니다.</b> 검수 화면처럼 사람이 문서를 여는 자리는 성능 요건 대상이 아니고, 미리 계산해 두면 조회만으로 끝납니다(115건 기준 배치 약 2분).</p>
+
+<h2>3. 결정이 필요한 항목</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:5%">#</th><th style="width:22%">항목</th><th style="width:38%">쟁점</th><th style="width:35%">권고</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td><td>RAG 옵션 처리</td>
+        <td>GPU 보유 고객사에 한해 켤 수 있게 남길지, 전면 OFF 로 못박을지</td>
+        <td><b>옵션으로 남긴다.</b> 요건이 선택 옵션으로 규정했으므로 제거하면 오히려 요건에서 멀어진다</td>
+      </tr>
+      <tr>
+        <td>2</td><td>등급 추가 시 동작 정책</td>
+        <td>화면에서 새 등급을 만들 수 있다. 그런데 <b>현행 모델은 학습된 4개 등급만 출력</b>하므로 새 등급을 절대 내놓지 못한다. 지금은 “재학습 필요” 신호만 띄우고 그 다음 동작이 정해져 있지 않아, 모델이 옛 등급으로 답한 것을 그대로 확정해 버린다</td>
+        <td><b>재학습 전까지는 자동 확정을 막고 검수로 보낸다.</b> 새 등급이 걸린 문서는 사람이 판단하게 한다</td>
+      </tr>
+      <tr>
+        <td>3</td><td>판단요소 점수 테이블</td>
+        <td>문서별 판단 점수(비공지성·경제가치·관리수준 각 0~2점)를 저장하려고 만든 표가 <b>한 줄도 없이 비어 있다</b>. 점수는 계산해서 화면에 보여주고 저장은 하지 않는다. 감리가 DB 설계를 열면 빈 표가 보인다</td>
+        <td><b>표는 그대로 두고 설명만 준비한다.</b> 요건은 “요소를 정의할 수 있어야”이지 “문서마다 점수를 저장하라”가 아니다. 감리 직전 스키마 변경은 위험 대비 이득이 없다</td>
+      </tr>
+      <tr>
+        <td>4</td><td>검수 승인 → 학습 자동 호출</td>
+        <td><b>자동 호출이 없다.</b> 승인분을 학습행으로 만드는 기능은 있고 명령(<code>build_synth_training_set.py</code>)으로 실행한다. 학습을 돌릴 때 이것이 자동으로 불리지는 않는다. 별개로 <b>검증문서 후보를 학습행으로 바꾸는 코드는 존재하지 않는다</b>(요건에도 없음)</td>
+        <td><b>붙일지 결정 필요.</b> 함수·스크립트가 이미 있어 작업은 작다. 다만 현재 승인 건수가 0이라 붙여도 도는 것은 없다</td>
+      </tr>
+      <tr>
+        <td>5</td><td>검수 화면 유사 선례 표시</td>
+        <td>참고 정보로 유용하나, 지금 켜면 보여줄 선례가 사람 확정 0건이라 모델의 옛 출력을 선례로 제시하게 되고 앵커링으로 사람 서명의 독립성이 깨진다</td>
+        <td><b>지금은 켜지 않는다.</b> 켤 조건 셋 — ① 등급을 가린 채 본문만 먼저 보여준다 ② 사람이 확정한 선례만 후보로 쓴다 ③ 검수자가 자기 결정을 저장한 뒤에 이웃 등급을 공개한다</td>
+      </tr>
+      <tr>
+        <td>6</td><td>LangChain 미사용 사유 기재</td>
+        <td>제출본에 미사용 사유 박스가 들어가 있다. 「안 쓰는 것을 나열하지 않는다」는 원칙과 충돌해 보인다</td>
+        <td><b>존치.</b> 요건이 제품명을 지목한 유일한 항목이라, 설명을 빼면 “미구현”으로 읽힐 위험이 더 크다</td>
+      </tr>
+          <tr>
+        <td>7</td><td>요소 어휘 두 벌</td>
+        <td>등급 계산은 신 3요건(S·V·M)으로 하는데, 키워드 404개 중 <b>41개가 구 요소 <code>LEAK_IMPACT</code>(유출 시 영향도)</b>를 가리킨다. 신 3요건에는 없는 요소라 설명 화면에서 어디에도 매칭되지 않는다</td>
+        <td><b>41개를 <code>VALUE</code> 로 재매핑</b>하거나 구 요소를 비활성 처리. 동작에 지장은 없어 급하지 않음</td>
+      </tr>
+</tbody>
+  </table>
+  </div>
+
+  <h2>4. 화면 존폐</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">화면</th><th style="width:12%">현재</th><th>판단과 근거</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>학습 후보 생성·검수</td><td>유지 중</td>
+        <td><b>유지.</b> ③-⑦ 의 증빙 화면으로 제출본이 직접 지목하고 있다. 다만 운영 서버 생성기가 고정 문장을 반환하는 구성이라, 화면이 그 사실을 먼저 설명하도록 문구를 정비할 것</td>
+      </tr>
+      <tr>
+        <td>검증문서 후보 생성</td><td>2026-08-24 제거</td>
+        <td><b>되살리지 않는다.</b> ① 제출본 요건 대응표에 이 개념이 인용된 적이 없어 증빙 구멍이 생기지 않고, ② 되살리면 “AI 가 정답지를 만들고 같은 계열이 검증한다”는 순환 구조를 화면에 노출한다. ③ 현재 병목은 후보 부족이 아니라 기존 120건의 검수 미시작이다. 생성 API·서비스·시험은 그대로 남아 있어 필요 시 명령으로 산출 가능</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">
+    내부 문서 · 제출 대상 아님 · 작성 2026-08-25<br />
+    「구현」은 코드·설정·스키마의 존재, 「사용」은 요청 처리 경로가 실제로 그것을 타는지를 뜻합니다. 확인하지 못한 항목은 채우지 않았습니다.
+  </div>
+</div>
+</body>
+</html>

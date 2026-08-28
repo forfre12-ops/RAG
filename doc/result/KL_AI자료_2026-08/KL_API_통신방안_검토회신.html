@@ -88,7 +88,7 @@ a{color:#0a0a0a}
     <table class="docinfo">
     <tbody>
       <tr><th>검토 대상</th><td>「AI 분류 엔진 연계를 위한 API 예상 통신 방안」 (2026-08-28 · 8쪽)</td></tr>
-      <tr><th>회신 요지</th><td><b>REST 직접 연동(1안) 채택 권고.</b> 다만 요청·응답 규격에 조정이 필요하다</td></tr>
+      <tr><th>회신 요지</th><td><b>REST 직접 연동(1안) 채택 권고.</b> 다만 요청·응답 규격에 조정이 필요합니다</td></tr>
       <tr><th>근거</th><td>현행 배포 API 스펙(OpenAPI) 직접 조회 · 소스 코드 확인</td></tr>
       <tr><th>작성일</th><td>2026-08-28</td></tr>
       <tr><th>근거 커밋</th><td><code>d3bcb712</code></td></tr>
@@ -96,9 +96,9 @@ a{color:#0a0a0a}
   </table>
 
   <div class="note">
-    본 회신은 귀사 초안을 <b>대체하지 않는다.</b> 초안의 구조(비동기 요청 + 완료 콜백)는 그대로
-    유효하며, <b>이미 구현되어 있는 부분</b>과 <b>규격을 맞춰야 하는 부분</b>을 갈라 적는다.
-    협의사항 15건에 대한 당사 의견은 &sect;6 에 표로 정리했다.
+    본 회신은 귀사 초안을 <b>대체하지 않습니다.</b> 초안의 구조(비동기 요청 + 완료 콜백)는 그대로
+    유효하며, <b>이미 구현되어 있는 부분</b>과 <b>규격을 맞춰야 하는 부분</b>을 갈라 적습니다.
+    협의사항 15건에 대한 당사 의견은 &sect;6 에 표로 정리했습니다.
   </div>
 
   <h2>0. 결론 세 줄</h2>
@@ -109,16 +109,16 @@ a{color:#0a0a0a}
       <tr>
         <td class="c">1</td><td>연계 방식</td>
         <td><b>1안(REST 직접 연동) 채택 권고.</b> 2안(Redis Stream)은 당사에 소비자 구현이 없어
-        신규 개발이 필요하고, 1안이 제공하는 신뢰 전달(재시도·DLQ)을 이미 갖추고 있다</td>
+        신규 개발이 필요하고, 1안이 제공하는 신뢰 전달(재시도·DLQ)을 이미 갖추고 있습니다</td>
       </tr>
       <tr>
         <td class="c">2</td><td>결과 반환 항목</td>
-        <td><b><code>label</code> 만으로는 연동이 성립하지 않는다.</b>
-        <code>confidence</code> · <code>status</code> · <code>warnings</code> 를 함께 받으셔야 한다</td>
+        <td><b><code>label</code> 만으로는 연동이 성립하지 않습니다.</b>
+        <code>confidence</code> · <code>status</code> · <code>warnings</code> 를 함께 받으셔야 합니다</td>
       </tr>
       <tr>
         <td class="c">3</td><td>요청 절차</td>
-        <td><b>등록 &rarr; 분류 2단계</b>다. 등록을 건너뛰면 200 응답을 받고도 결과가 저장되지 않는다</td>
+        <td><b>등록 &rarr; 분류 2단계</b>다. 등록을 건너뛰면 200 응답을 받고도 결과가 저장되지 않습니다</td>
       </tr>
     </tbody>
   </table>
@@ -126,7 +126,7 @@ a{color:#0a0a0a}
 
   <h2>1. 초안의 표기 오류 &mdash; 확인 요청</h2>
 
-  <p>규약 문서라 먼저 짚는다. 인터페이스 목록과 상세의 메서드가 어긋나 있다.</p>
+  <p>규약 문서라 먼저 짚는다. 인터페이스 목록과 상세의 메서드가 어긋나 있습니다.</p>
 
   <div class="tw">
   <table>
@@ -138,7 +138,7 @@ a{color:#0a0a0a}
   </table>
   </div>
 
-  <p>또한 IF-01 의 경로는 당사 실제 구현과 다르다.</p>
+  <p>또한 IF-01 의 경로는 당사 실제 구현과 다릅니다.</p>
 
   <div class="tw">
   <table>
@@ -150,14 +150,14 @@ a{color:#0a0a0a}
   </div>
 
   <p class="src">참고 &mdash; 준비 상태를 더 정확히 보시려면 <code>GET /api/v1/healthz/ready</code>
-  (의존 구성요소 포함 준비 완료) 또는 <code>GET /api/v1/healthz/deep</code>(심층 점검)을 쓰실 수 있다.</p>
+  (의존 구성요소 포함 준비 완료) 또는 <code>GET /api/v1/healthz/deep</code>(심층 점검)을 쓰실 수 있습니다.</p>
 
   <h2>2. 요청 절차 &mdash; 2단계다</h2>
 
   <div class="note warn">
     <b>가장 중요한 조정 사항.</b> 초안은 <code>POST /classify</code> 하나에 파일을 실어 보내는
     1단계 구조다. 당사 엔진은 <b>문서 등록과 분류가 분리</b>되어 있고, 등록 없이 분류를 호출하면
-    <b>HTTP 200 을 반환하면서도 분류 결과가 저장되지 않는다.</b> 응답만 보면 정상으로 보이므로
+    <b>HTTP 200 을 반환하면서도 분류 결과가 저장되지 않습니다.</b> 응답만 보면 정상으로 보이므로
     현장에서 발견하기 어렵다.
   </div>
 
@@ -186,13 +186,13 @@ a{color:#0a0a0a}
   <p class="src"><code>poc/src/koipa/services/classify_service.py</code></p>
 
   <p><code>doc_id</code> 가 문서 테이블에 없으면 분류는 수행되지만 <b>이력·조회·검수 대상 목록에
-  남지 않는다.</b> 경고 문자열 하나만 응답에 붙는다. 따라서 ①을 생략할 수 없다.</p>
+  남지 않습니다.</b> 경고 문자열 하나만 응답에 붙는다. 따라서 ①을 생략할 수 없습니다.</p>
 
   <h2>3. 결과 반환 항목 &mdash; 확대 요청</h2>
 
   <p>초안의 콜백 항목은 5개(<code>doc_id</code> · <code>success</code> · <code>etc</code> ·
   <code>file_name</code> · <code>label</code>)다. 당사 응답은 <b>18필드</b>이며, 그중
-  <b>검수 라우팅에 반드시 필요한 것</b>이 빠져 있다.</p>
+  <b>검수 라우팅에 반드시 필요한 것</b>이 빠져 있습니다.</p>
 
   <div class="tw">
   <table>
@@ -200,9 +200,9 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td class="c"><b>필수</b></td><td><code>status</code></td><td><b>이 건을 사람이 봐야 하는지</b>를 알 수 없다(<code>needs_review</code>)</td></tr>
       <tr><td class="c"><b>필수</b></td><td><code>confidence</code></td><td>검수 우선순위를 매길 수 없다(저신뢰 우선 정렬)</td></tr>
-      <tr><td class="c"><b>필수</b></td><td><code>warnings</code></td><td><b>왜</b> 검수로 보냈는지 설명할 수 없다</td></tr>
-      <tr><td class="c">권장</td><td><code>evidence</code></td><td>검수자가 근거 없이 본문 전체를 다시 읽어야 한다</td></tr>
-      <tr><td class="c">권장</td><td><code>rule_grade</code> · <code>model_grade</code></td><td>룰·모델 불일치를 화면에 표시할 수 없다</td></tr>
+      <tr><td class="c"><b>필수</b></td><td><code>warnings</code></td><td><b>왜</b> 검수로 보냈는지 설명할 수 없습니다</td></tr>
+      <tr><td class="c">권장</td><td><code>evidence</code></td><td>검수자가 근거 없이 본문 전체를 다시 읽어야 합니다</td></tr>
+      <tr><td class="c">권장</td><td><code>rule_grade</code> · <code>model_grade</code></td><td>룰·모델 불일치를 화면에 표시할 수 없습니다</td></tr>
       <tr><td class="c">권장</td><td><code>model_version</code></td><td>어느 모델이 판정했는지 추적할 수 없다(감사 대응)</td></tr>
       <tr><td class="c">참고</td><td><code>scores</code> · <code>decision_path</code> · <code>automation_assessment</code></td><td>판정 근거 심층 확인용</td></tr>
     </tbody>
@@ -211,21 +211,21 @@ a{color:#0a0a0a}
 
   <div class="note">
     <b>왜 이것이 규격 문제가 아니라 설계 문제인가.</b> 본 시스템의 목표는 정확도가 아니라
-    <b>미탐 최소화</b>이며(RFP 성능요건), 그 목표는 <b>확신이 낮은 건을 사람에게 돌려</b> 달성한다.
-    등급만 전달되면 모든 건이 자동확정된 것과 같아지고, 검수 라우팅 설계 전체가 작동하지 않는다.
+    <b>미탐 최소화</b>이며(RFP 성능요건), 그 목표는 <b>확신이 낮은 건을 사람에게 돌려</b> 달성합니다.
+    등급만 전달되면 모든 건이 자동확정된 것과 같아지고, 검수 라우팅 설계 전체가 작동하지 않습니다.
   </div>
 
-  <h2>4. 콜백 &mdash; 이미 구현되어 있다</h2>
+  <h2>4. 콜백 &mdash; 이미 구현되어 있습니다</h2>
 
-  <p>초안 협의사항의 &ldquo;Callback 실패 처리 · 재시도 기준&rdquo;은 <b>신규 개발 항목이 아니다.</b>
-  현행 구현이 다음을 이미 제공한다.</p>
+  <p>초안 협의사항의 &ldquo;Callback 실패 처리 · 재시도 기준&rdquo;은 <b>신규 개발 항목이 아닙니다.</b>
+  현행 구현이 다음을 이미 제공합니다.</p>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:26%">기능</th><th>구현 내용</th></tr></thead>
     <tbody>
       <tr><td>콜백 주소 지정</td><td>요청 본문의 <code>callback_url</code> 필드</td></tr>
-      <tr><td>신뢰 전달</td><td>Outbox 패턴 &mdash; 결과를 먼저 적재하고 별도 배송기가 발송한다</td></tr>
+      <tr><td>신뢰 전달</td><td>Outbox 패턴 &mdash; 결과를 먼저 적재하고 별도 배송기가 발송합니다</td></tr>
       <tr><td>재시도</td><td>지수 백오프. 발송 주기 60초</td></tr>
       <tr><td>영구 실패 처리</td><td>최대 시도 소진 시 <b>DLQ</b> 이동 + 지표 노출(<code>koipa_outbox_dlq_total</code>)</td></tr>
       <tr><td>SSRF 차단</td><td>루프백·클라우드 메타데이터·사설 대역 주소를 콜백 대상에서 거부</td></tr>
@@ -233,13 +233,13 @@ a{color:#0a0a0a}
   </table>
   </div>
 
-  <p>따라서 귀사에서는 <b>콜백 수신 엔드포인트만</b> 준비하시면 된다.</p>
+  <p>따라서 귀사에서는 <b>콜백 수신 엔드포인트만</b> 준비하시면 됩니다.</p>
 
   <h2>5. Redis Stream 방식(2안)에 대한 의견</h2>
 
   <div class="note warn">
-    <b>권고하지 않는다.</b> 기술적으로 불가능해서가 아니라, <b>1안이 이미 제공하는 것을
-    새로 만들어야 하기 때문</b>이다.
+    <b>권고하지 않습니다.</b> 기술적으로 불가능해서가 아니라, <b>1안이 이미 제공하는 것을
+    새로 만들어야 하기 때문</b>입니다.
   </div>
 
   <div class="tw">
@@ -248,13 +248,13 @@ a{color:#0a0a0a}
     <tbody>
       <tr>
         <td>Stream 소비자</td>
-        <td><b>구현되어 있지 않다.</b> 당사 Redis 용도는 작업 큐 브로커와 Outbox 저장소이며,
-        Stream 자료구조는 DLQ 한 곳에서만 쓴다. 요청 소비 루프는 신규 개발이다</td>
+        <td><b>구현되어 있지 않습니다.</b> 당사 Redis 용도는 작업 큐 브로커와 Outbox 저장소이며,
+        Stream 자료구조는 DLQ 한 곳에서만 씁니다. 요청 소비 루프는 신규 개발입니다</td>
       </tr>
       <tr>
         <td>미소비 Timeout 감시</td>
         <td>초안은 관리시스템 Scheduler 가 미소비 요청을 감시하는 구조인데, <b>1안에서는 불필요</b>하다
-        &mdash; 엔진이 job 상태를 보유하고 콜백으로 통보하며, 조회 엔드포인트도 있다</td>
+        &mdash; 엔진이 job 상태를 보유하고 콜백으로 통보하며, 조회 엔드포인트도 있습니다</td>
       </tr>
       <tr>
         <td>파일 전달</td>
@@ -267,7 +267,7 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td>접속 비밀번호</td>
-        <td>초안 5쪽에 실값이 기재되어 있다. <b>문서에서 제거</b>하고 별도 안전 경로로 전달하실 것을 요청드린다</td>
+        <td>초안 5쪽에 실값이 기재되어 있습니다. <b>문서에서 제거</b>하고 별도 안전 경로로 전달하실 것을 요청드립니다</td>
       </tr>
     </tbody>
   </table>
@@ -275,10 +275,10 @@ a{color:#0a0a0a}
 
   <h3>5-1. 파일 공유 mount 방식에 대한 별도 의견</h3>
 
-  <p>초안은 &ldquo;같은 환경에서 구동되므로 mount 로 읽을 수 있을 것&rdquo;이라 적고 있다.
-  당사 폐쇄망 설계는 <b>원본 문서를 AES-256-GCM 으로 암호화해 저장</b>한다. 관리시스템이 평문
-  원본 경로를 넘기고 엔진이 그 경로를 직접 읽으면 <b>이 암호화 저장 경로를 지나치게 된다.</b>
-  등록 API(<code>POST /api/v1/documents</code>)를 통해 반입하시면 암호화 저장이 보장된다.</p>
+  <p>초안은 &ldquo;같은 환경에서 구동되므로 mount 로 읽을 수 있을 것&rdquo;이라 적고 있습니다.
+  당사 폐쇄망 설계는 <b>원본 문서를 AES-256-GCM 으로 암호화해 저장</b>합니다. 관리시스템이 평문
+  원본 경로를 넘기고 엔진이 그 경로를 직접 읽으면 <b>이 암호화 저장 경로를 지나치게 됩니다.</b>
+  등록 API(<code>POST /api/v1/documents</code>)를 통해 반입하시면 암호화 저장이 보장됩니다.</p>
 
   <h2>6. 협의사항 15건 &mdash; 당사 의견</h2>
 
@@ -287,14 +287,14 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:8%">구분</th><th style="width:22%">협의 항목</th><th>당사 의견</th></tr></thead>
     <tbody>
       <tr><td class="c">공통</td><td>연계 방식</td><td><b>REST 직접 연동(1안)</b> 권고 (&sect;5)</td></tr>
-      <tr><td class="c">공통</td><td>인증 방식</td><td>현행 인증 체계를 그대로 사용한다. 자격증명은 본 문서를 포함한 <b>어떤 문서에도 기재하지 않고</b> 별도 안전 경로로 전달한다</td></tr>
-      <tr><td class="c">공통</td><td>중복 요청 처리</td><td>동일 파일 재업로드는 파일 해시로 판별해 <b>기존 문서로 연결</b>한다. 다만 이때 <b>메타·외부 참조는 갱신되지 않는다</b> &mdash; 메타 변경이 필요하면 별도 갱신 호출이 필요하다</td></tr>
-      <tr><td class="c">공통</td><td>장애·예외 처리</td><td>당사 API 는 <b>HTTP 상태코드로 분기</b>한다. 심볼릭 오류코드 체계는 없으므로 상태코드 기준으로 처리 로직을 세워 주시기 바란다</td></tr>
+      <tr><td class="c">공통</td><td>인증 방식</td><td>현행 인증 체계를 그대로 사용합니다. 자격증명은 본 문서를 포함한 <b>어떤 문서에도 기재하지 않고</b> 별도 안전 경로로 전달합니다</td></tr>
+      <tr><td class="c">공통</td><td>중복 요청 처리</td><td>동일 파일 재업로드는 파일 해시로 판별해 <b>기존 문서로 연결</b>합니다. 다만 이때 <b>메타·외부 참조는 갱신되지 않습니다</b> &mdash; 메타 변경이 필요하면 별도 갱신 호출이 필요합니다</td></tr>
+      <tr><td class="c">공통</td><td>장애·예외 처리</td><td>당사 API 는 <b>HTTP 상태코드로 분기</b>합니다. 심볼릭 오류코드 체계는 없으므로 상태코드 기준으로 처리 로직을 세워 주시기 바랍니다</td></tr>
       <tr><td class="c">REST</td><td>파일 업로드 용량</td><td>본문 상한 1,048,576자는 <b>초안과 동일</b>. 멀티파트 상한은 실측 후 확정 회신하겠다</td></tr>
-      <tr><td class="c">REST</td><td>요청 Timeout</td><td>비동기 경로이므로 결과 대기 Timeout 이 불필요하다. 접수 응답은 즉시 반환된다</td></tr>
+      <tr><td class="c">REST</td><td>요청 Timeout</td><td>비동기 경로이므로 결과 대기 Timeout 이 불필요합니다. 접수 응답은 즉시 반환됩니다</td></tr>
       <tr><td class="c">REST</td><td>Callback 실패 처리</td><td><b>이미 구현</b> &mdash; 재시도·DLQ·SSRF 차단 (&sect;4)</td></tr>
       <tr><td class="c">REST</td><td>추가 전달 항목</td><td><b>&sect;3 의 필수 3필드 수신 요청</b></td></tr>
-      <tr><td class="c">Redis</td><td>접속 정보</td><td rowspan="6" style="vertical-align:top">2안 미채택 권고에 따라 <b>보류</b>. 채택 결정 시 별도 회신하겠다. 단 <b>비밀번호 문서 기재 제거</b>와 <b>키 접두사 <code>koipa:</code> 통일</b>은 채택 여부와 무관하게 요청드린다</td></tr>
+      <tr><td class="c">Redis</td><td>접속 정보</td><td rowspan="6" style="vertical-align:top">2안 미채택 권고에 따라 <b>보류</b>. 채택 결정 시 별도 회신하겠습니다. 단 <b>비밀번호 문서 기재 제거</b>와 <b>키 접두사 <code>koipa:</code> 통일</b>은 채택 여부와 무관하게 요청드립니다</td></tr>
       <tr><td class="c">Redis</td><td>인증</td></tr>
       <tr><td class="c">Redis</td><td>파일 전달 방식</td></tr>
       <tr><td class="c">Redis</td><td>파일 공유 환경</td></tr>
@@ -322,9 +322,9 @@ a{color:#0a0a0a}
 
   <div class="note">
     <b>IF-06 에 대한 보충.</b> 사람이 검수로 등급을 확정해도 <code>label</code>(예측 등급)은
-    바뀌지 않는다. 모델이 무엇이라 했는지와 사람이 무엇으로 정했는지를 <b>둘 다 남기는 설계</b>이기
-    때문이다. 확정 등급은 별도 필드(<code>confirmed_label</code> · <code>confirmed_by</code> ·
-    <code>confirmed_at</code>)로 제공된다.
+    바뀌지 않습니다. 모델이 무엇이라 했는지와 사람이 무엇으로 정했는지를 <b>두 가지 모두 남기는 설계</b>이기
+    때문입니다. 확정 등급은 별도 필드(<code>confirmed_label</code> · <code>confirmed_by</code> ·
+    <code>confirmed_at</code>)로 제공됩니다.
   </div>
 
   <h2>8. 다음 단계 제안</h2>
@@ -336,7 +336,7 @@ a{color:#0a0a0a}
       <tr><td class="c">1</td><td>연계 방식 확정</td><td>1안·2안 중 선택. 당사 권고는 1안</td></tr>
       <tr><td class="c">2</td><td>결과 수신 항목 확정</td><td>&sect;3 필수 3필드 포함 여부</td></tr>
       <tr><td class="c">3</td><td>규약서 정본화</td><td>확정 후 당사 <b>「KL 연동 인터페이스 규약서(ICD)」</b>에 반영해 정본으로 관리. 질의 회신은 <a href="KL_질의사항_회신서.html">「KL 질의사항 회신서」</a> 참조</td></tr>
-      <tr><td class="c">4</td><td>연동 시험</td><td>시험 시나리오 8건 준비되어 있다. 일정 협의 요청</td></tr>
+      <tr><td class="c">4</td><td>연동 시험</td><td>시험 시나리오 8건 준비되어 있습니다. 일정 협의 요청</td></tr>
     </tbody>
   </table>
   </div>
