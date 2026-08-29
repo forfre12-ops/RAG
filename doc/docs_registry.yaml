@@ -931,15 +931,6 @@ documents:
     status: current
     version: 2026-08-28-질의회신
 
-  - id: DOC-KL08-033
-    title: 테이블 정의서 (칼럼 수준·첨부)
-    path: doc/result/KL_AI자료_2026-08/첨부문서/테이블_정의서.html
-    owner: engineering
-    audience: customer
-    status: current
-    version: 2026-08-28-질의회신
-
-  # -- KL 회신 묶음(2026-08-28 접수분) ---------------------------
   - id: DOC-KLR-001
     title: KL_API_통신방안_검토회신
     path: doc/result/KL_회신_2026-08-28/KL_API_통신방안_검토회신.html
@@ -980,25 +971,9 @@ documents:
     status: current
     version: 2026-08-28-회신묶음
 
-  - id: DOC-KLR-006
-    title: ERD_개체관계도
-    path: doc/result/KL_회신_2026-08-28/첨부/ERD_개체관계도.html
-    owner: pm
-    audience: customer
-    status: current
-    version: 2026-08-28-회신묶음
-
   - id: DOC-KLR-007
     title: 등급분류_알고리즘_명세서
     path: doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_명세서.html
-    owner: pm
-    audience: customer
-    status: current
-    version: 2026-08-28-회신묶음
-
-  - id: DOC-KLR-008
-    title: 테이블_정의서
-    path: doc/result/KL_회신_2026-08-28/첨부/테이블_정의서.html
     owner: pm
     audience: customer
     status: current
@@ -1023,6 +998,22 @@ documents:
   - id: DOC-INT-013
     title: 미사용 자산 전수조사
     path: doc/internal/미사용_자산_전수조사.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08-29
+
+  - id: DOC-INT-014
+    title: KL서버 배포절차서
+    path: doc/internal/KL서버_배포절차서_1ae9054a.html
+    owner: engineering
+    audience: internal
+    status: current
+    version: 2026-08-29
+
+  - id: DOC-GAMRI-011
+    title: DB 대리키 표준화 전환계획
+    path: doc/감리문서/DB_대리키_표준화_전환계획.html
     owner: engineering
     audience: internal
     status: current
