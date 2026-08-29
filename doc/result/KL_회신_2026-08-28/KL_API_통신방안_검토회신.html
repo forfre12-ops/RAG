@@ -123,7 +123,7 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td class="c">3</td><td>요청 절차</td>
-        <td><b>등록 &rarr; 분류 2단계</b>다. 등록을 건너뛰면 200 응답을 받고도 결과가 저장되지 않습니다</td>
+        <td><b>등록 &rarr; 분류 2단계</b>입니다. 등록을 건너뛰면 200 응답을 받고도 결과가 저장되지 않습니다</td>
       </tr>
     </tbody>
   </table>
@@ -131,14 +131,14 @@ a{color:#0a0a0a}
 
   <h2>1. 초안의 표기 오류 &mdash; 확인 요청</h2>
 
-  <p>규약 문서라 먼저 짚는다. 인터페이스 목록과 상세의 메서드가 어긋나 있습니다.</p>
+  <p>규약 문서라 먼저 짚습니다. 인터페이스 목록과 상세의 메서드가 어긋나 있습니다.</p>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:12%">항목</th><th style="width:28%">목록(2쪽)</th><th style="width:28%">상세(3~4쪽)</th><th>비고</th></tr></thead>
     <tbody>
-      <tr><td>IF-02</td><td><code>POST /classify</code></td><td><code>GET /api/v1/classify</code></td><td>파일 전송이므로 <b>POST</b> 가 맞다</td></tr>
-      <tr><td>IF-03</td><td><code>POST /classify/callback</code></td><td><code>GET /api/v1/classify/callback</code></td><td>본문 전송이므로 <b>POST</b> 가 맞다</td></tr>
+      <tr><td>IF-02</td><td><code>POST /classify</code></td><td><code>GET /api/v1/classify</code></td><td>파일 전송이므로 <b>POST</b> 가 맞습니다</td></tr>
+      <tr><td>IF-03</td><td><code>POST /classify/callback</code></td><td><code>GET /api/v1/classify/callback</code></td><td>본문 전송이므로 <b>POST</b> 가 맞습니다</td></tr>
     </tbody>
   </table>
   </div>
@@ -157,13 +157,13 @@ a{color:#0a0a0a}
   <p class="src">참고 &mdash; 준비 상태를 더 정확히 보시려면 <code>GET /api/v1/healthz/ready</code>
   (의존 구성요소 포함 준비 완료) 또는 <code>GET /api/v1/healthz/deep</code>(심층 점검)을 쓰실 수 있습니다.</p>
 
-  <h2>2. 요청 절차 &mdash; 2단계다</h2>
+  <h2>2. 요청 절차 &mdash; 등록 후 분류 2단계</h2>
 
   <div class="note warn">
     <b>가장 중요한 조정 사항.</b> 초안은 <code>POST /classify</code> 하나에 파일을 실어 보내는
-    1단계 구조다. 본 엔진은 <b>문서 등록과 분류가 분리</b>되어 있고, 등록 없이 분류를 호출하면
+    1단계 구조입니다. 본 엔진은 <b>문서 등록과 분류가 분리</b>되어 있고, 등록 없이 분류를 호출하면
     <b>HTTP 200 을 반환하면서도 분류 결과가 저장되지 않습니다.</b> 응답만 보면 정상으로 보이므로
-    현장에서 발견하기 어렵다.
+    현장에서 발견하기 어렵습니다.
   </div>
 
   <h3>2-1. 실제 절차</h3>
@@ -212,7 +212,7 @@ a{color:#0a0a0a}
   <p class="src"><code>poc/src/koipa/services/classify_service.py</code></p>
 
   <p><code>doc_id</code> 가 문서 테이블에 없으면 분류는 수행되지만 <b>이력·조회·검수 대상 목록에
-  남지 않습니다.</b> 경고 문자열 하나만 응답에 붙는다. 따라서 ①을 생략할 수 없습니다.</p>
+  남지 않습니다.</b> 경고 문자열 하나만 응답에 붙습니다. 따라서 ①을 생략할 수 없습니다.</p>
 
   <h3>2-3. 1단계 경로도 있습니다 &mdash; 다만 결과가 남지 않습니다</h3>
 
@@ -226,7 +226,7 @@ a{color:#0a0a0a}
   등급을 확정하는 절차(FUN-024)가 성립하지 않으므로, 연동에는 쓸 수 없습니다.
   이 경로는 시연&middot;진단 화면 전용입니다.</p>
 
-  <p>즉 2단계를 요청드리는 것은 당사 구조의 편의가 아니라
+  <p>즉 2단계를 요청드리는 것은 구현 편의가 아니라
   <b>검수&middot;이력&middot;감사를 남기기 위한 요건</b> 때문입니다.</p>
 
   <h3>2-4. 파일 크기 상한 &mdash; 확정 회신</h3>
@@ -249,7 +249,7 @@ a{color:#0a0a0a}
   </div>
 
   <p>둘 중 낮은 값이 걸리므로 <b>실질 상한은 20MB</b> 입니다. 시험 서버 앞단에 별도 프록시가
-  없어 이 값이 곧 실제 한계입니다. 참고로 당사가 측정에 쓴 100쪽 PDF 가 14MB 였습니다 &mdash;
+  없어 이 값이 곧 실제 한계입니다. 참고로 측정에 쓴 100쪽 PDF 가 14MB 였습니다 &mdash;
   도면&middot;이미지가 포함된 문서는 20MB 를 넘길 수 있습니다.</p>
 
   <p><b>상한은 환경변수(<code>MAX_UPLOAD_MB</code>)로 조정 가능합니다.</b> 필요한 최대 파일
@@ -328,7 +328,7 @@ a{color:#0a0a0a}
       </tr>
       <tr>
         <td>미소비 Timeout 감시</td>
-        <td>초안은 관리시스템 Scheduler 가 미소비 요청을 감시하는 구조인데, <b>1안에서는 불필요</b>하다
+        <td>초안은 관리시스템 Scheduler 가 미소비 요청을 감시하는 구조인데, <b>1안에서는 불필요</b>합니다
         &mdash; 엔진이 job 상태를 보유하고 콜백으로 통보하며, 조회 엔드포인트도 있습니다</td>
       </tr>
       <tr>
