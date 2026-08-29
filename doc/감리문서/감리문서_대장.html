@@ -255,11 +255,15 @@ a{color:#0a0a0a}
       <tr><td class="c">5</td><td><code>오픈소스_기술스택_명세.html</code></td><td><code>COR-002</code></td><td class="c ok">작성</td><td>pyproject · uv.lock · 라이선스 인벤토리 178항목</td></tr>
       <tr><td class="c">6</td><td><code>시스템_서버_구조.html</code></td><td>인프라 · 완료보고</td><td class="c ok">작성</td><td>compose · Dockerfile · 프로파일 · 시험서버 실측</td></tr>
       <tr><td class="c">7</td><td><code>KL_연동_규약.html</code></td><td><code>INT-001</code></td><td class="c ok">작성</td><td>등록·판정 2단계 확정 · 책임 분담 · 연동 시험 시나리오</td></tr>
+      <tr><td class="c">8</td><td><code>학습_데이터_입력_경로_명세서.html</code></td><td><code>FUN-003</code> &middot; <code>FUN-004</code></td><td>작성</td><td>synthesis_service &middot; golden_split &middot; golden_tiers &middot; corrections_rebuild &middot; workers/tasks 코드 &mdash; 검수 결과가 학습셋에 들어가는 세 경로</td></tr>
+      <tr><td class="c">9</td><td><code>KL_질의사항_회신서.html</code></td><td>발주처 질의 회신</td><td>작성</td><td>2026-08-28 접수 질의 14건 &mdash; 소스 코드 직접 확인 &middot; 평가셋 실측</td></tr>
+      <tr><td class="c">10</td><td><code>KL_API_통신방안_검토회신.html</code></td><td><code>INT-001</code> 연계</td><td>작성</td><td>현행 배포 API 스펙(OpenAPI) 직접 조회 &middot; 소스 코드 확인</td></tr>
+      <tr><td class="c">11</td><td><code>DB_대리키_표준화_전환계획.html</code></td><td><code>DAR-005</code> 연계</td><td>적용 완료</td><td>models.py &middot; alembic <code>c9e1f2a3b4d5</code>(SERIAL &rarr; IDENTITY)</td></tr>
     </tbody>
   </table>
   </div>
   <div class="note">
-    여섯 문서는 모두 소스 코드, 설정 파일, 서버 실측값에서 생성했다. 문서를 다른 문서에서 옮겨 적으면
+    열두 문서는 모두 소스 코드, 설정 파일, 서버 실측값에서 생성했다. 8~11 번은 종전 이 표에 빠져 있어 2026-08-29 에 등재했다 &mdash; 폴더에는 있는데 대장에는 없는 문서가 4 종이었다. 문서를 다른 문서에서 옮겨 적으면
     구현에 없는 내용이 문서에만 남을 수 있기 때문이다. 각 문서의 문서정보 표에 생성 원본과 재현 방법을
     기재했으므로, 수치의 근거를 확인해야 할 때는 해당 명령을 실행하면 된다.
   </div>
@@ -301,6 +305,7 @@ a{color:#0a0a0a}
     <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
     <tbody>
       <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. 제안요청서 산출정보 50 블록을 추출하고 4 개 폴더를 교차 대조하여 기본 문서 35 항목을 정리했으며, 신규 6 종을 작성했다</td></tr>
+      <tr><td class="c">2</td><td class="n">2026-08-29</td><td><code>20d8b0f7</code></td><td>&sect;4 표에 <b>4 종을 등재</b>한다 &mdash; 폴더에는 12 종이 있는데 표에는 8 종만 있었다(학습 데이터 입력 경로 명세서 &middot; KL 질의사항 회신서 &middot; KL API 통신방안 검토회신 &middot; DB 대리키 표준화 전환계획). &sect;6 의 미결 &ldquo;서술 &harr; 구현 불일치&rdquo; 1 건은 곱셈식 서술 정정으로 해소해 0 건으로 내린다</td></tr>
     </tbody>
   </table>
   </div>

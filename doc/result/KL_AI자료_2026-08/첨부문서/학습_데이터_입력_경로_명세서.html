@@ -309,6 +309,33 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
   <code>retrain_auto_activate</code> 의 기본값이 꺼짐이다. 검증되지 않은 모델이 사람 확인 없이
   운영에 나가는 것을 막는다.</div>
 
+  <p>활성화 여부는 사람의 인상이 아니라 <b>자동 게이트</b>가 정한다. 판정은
+  <code>m6_evaluation/deploy_gate.py</code> 의 <code>evaluate_deploy_gate()</code> 한 곳에서 하고,
+  결과는 <code>tb_training_runs.final_metrics-&gt;'deploy'-&gt;'gate'</code> 에 남는다.
+  원칙은 <b>fail-closed</b> 다 &mdash; 지표가 없거나 리포트가 깨져 <b>판정할 수 없으면 통과가 아니라 거부</b>다.
+  미탐을 치명으로 보는 설계에서 &ldquo;측정 못 함&rdquo;을 &ldquo;이상 없음&rdquo;으로 읽지 않기 위해서다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:26%">검사</th><th style="width:40%">거부 조건</th><th>왜</th></tr></thead>
+    <tbody>
+      <tr><td><code>degenerate</code></td><td>혼동행렬의 한 예측 열이 <b>99% 이상</b> 차지</td><td>전부 한 등급으로 찍는 모델은 지표가 좋아 보여도 분류가 아니다. 기준선 유무와 무관하게 무조건 거부한다</td></tr>
+      <tr><td><code>fnr_high_present</code></td><td>후보에 <code>fnr_high</code> 지표가 <b>없음</b></td><td>고등급 미탐율을 못 재면 회귀 검증이 불가능하다. 보류한다(fail-closed)</td></tr>
+      <tr><td><code>fnr_high_regression</code></td><td>후보 <code>fnr_high</code> &gt; 기준선 <b>+ 0.02</b></td><td>미탐이 나빠지는 모델은 다른 지표가 좋아도 올리지 않는다. 이 시스템의 1순위 축이다</td></tr>
+      <tr><td><code>f1_regression</code></td><td>후보 F1-macro &lt; 기준선 <b>&minus; 0.05</b></td><td>미탐이 같아도 전반 성능이 크게 떨어지면 회귀다</td></tr>
+      <tr><td><code>first_deploy_fnr_floor</code></td><td>기준선이 없을 때 <code>fnr_high</code> &gt; <b>0.10</b></td><td>비교 대상이 없는 최초 배포에도 절대 상한을 둔다</td></tr>
+      <tr><td><code>anchor</code></td><td>앵커 평가에서 고등급(TS&middot;S1) 미탐 칸이 <b>1개라도</b> FAIL</td><td>등급별 최소 보증을 지표 평균이 가리지 못하게 한다</td></tr>
+      <tr><td><code>metamorphic_forward_regression</code></td><td>사실을 유지한 채 문체만 바꾼 쌍에서 등급이 내려간 위반율의 <b>신뢰구간 하한 &gt; 0</b></td><td>표현이 바뀌었다고 등급이 내려가면 미탐 경로다. 표본이 5 쌍 미만이면 측정 불가로 두고 통과시키지 않는 대신 검사를 생략한다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="src">근거 &mdash; <code>poc/src/koipa/modules/m6_evaluation/deploy_gate.py</code>(검사 정의) &middot;
+  <code>poc/src/koipa/config.py</code>(<code>retrain_fnr_high_tolerance</code> 0.02 &middot;
+  <code>deploy_gate_first_deploy_fnr_high_max</code> 0.10). <b>강제 옵트인</b>으로 앵커&middot;메타모픽을
+  켜 둔 운영에서는 리포트가 없다는 사실 자체가 거부 사유다 &mdash; 리포트 생성이 조용히 깨졌는데
+  게이트가 통과하는 경로를 막는다.</p>
+
   <h2>5. 기본 학습셋 경로</h2>
 
   <p>위 세 경로가 증강하는 <b>바탕</b> 학습셋은 설정에서 온다.</p>
@@ -391,6 +418,16 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         <td><b>적용돼 있다</b>(2026-08-29 실측). 시험서버(223)의 alembic 판은 <code>c9e1f2a3b4d5</code> 로 <code>f0a1b2c3d4e5</code> 보다 뒤이므로 &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
       </tr>
       <tr>
+        <td>재학습 소요 시간&middot;자원</td>
+        <td><b>측정하지 않았다.</b> 기록할 자리는 스키마에 있으나(<code>tb_training_runs</code> 의
+        <code>duration_sec</code> &middot; <code>started_at</code> &middot; <code>completed_at</code> &middot;
+        <code>total_samples</code>) 배포 모델 아티팩트의 <code>report.json</code> 에는 지표만 있고 시간 키가 없다.
+        운영 서버 조회는 하지 않기로 했으므로(위 결정) 값을 채우려면 별도 계측이 필요하다.
+        재는 방법 &mdash; 학습을 1 회 돌린 뒤
+        <code>select duration_sec, total_samples, trigger_type from tb_training_runs order by created_at desc limit 5</code>.
+        추정치를 쓰지 않고 비워 둔다</td>
+      </tr>
+      <tr>
         <td>경로 1 의 종단 실행 실적</td>
         <td>실측하지 못했다. 개발 DB 에 합성 표본이 0 건이고, 변환 명령은 응용 컨테이너 안에서만 실행된다(DB 포트가 호스트로 게시돼 있지 않다). 로직 자체는 &sect;7 의 시험 8 건으로 확인했다</td>
       </tr>
@@ -405,6 +442,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
     <tbody>
       <tr><td class="c">1</td><td class="n">2026-08-27</td><td><code>465bb7ad</code></td><td>최초 작성 &mdash; 코드에서 세 경로를 확인해 신규 작성. 계층별 학습 허용 계약&middot;누수 차단&middot;발화 조건 반영</td></tr>
       <tr><td class="c">2</td><td class="n">2026-08-27</td><td><code>1d865f6c</code></td><td>개발 DB 스키마를 코드 head 로 맞추고 &sect;7 에 시험 실적&middot;스키마 판을 추가. &sect;8 의 미측정 사유를 구체화</td></tr>
+      <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>20d8b0f7</code></td><td>귀사 질의 가-7 이 물은 네 항목에 맞춰 두 곳을 채운다. &sect;4-5 에 <b>성능 검증 방법</b>을 넣었다 &mdash; 종전에는 &ldquo;후보로만 등록된다&rdquo;는 활성화 정책만 있었고 무엇으로 판정하는지가 없었다. 자동 게이트 7 개 검사(<code>degenerate</code> &middot; <code>fnr_high_present</code> &middot; <code>fnr_high_regression</code> 허용 +0.02 &middot; <code>f1_regression</code> 허용 &minus;0.05 &middot; <code>first_deploy_fnr_floor</code> 0.10 &middot; <code>anchor</code> &middot; <code>metamorphic_forward_regression</code>)와 fail-closed 원칙을 코드에서 옮겨 적었다. &sect;8 에는 <b>재학습 소요 시간&middot;자원이 미측정</b>임을 명시하고 재는 명령을 함께 적었다 &mdash; 기록 자리는 <code>tb_training_runs.duration_sec</code> 에 있으나 아티팩트 <code>report.json</code> 에는 시간 키가 없다. 추정치로 채우지 않는다. 경로&middot;계약&middot;코드는 불변이며 서술만 늘린다</td></tr>
     </tbody>
   </table>
   </div>
