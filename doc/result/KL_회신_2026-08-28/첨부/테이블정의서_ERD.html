@@ -207,7 +207,7 @@ table.spec td.c-nn{text-align:center;}
 스키마가 바뀌면 <code>python scripts/build_table_spec.py</code> 를 다시 돌린다.<br>
 <b>기준 소스</b> — <code>poc/src/koipa/db/models.py</code>(ORM 19테이블) ·
 <code>poc/alembic/versions/a1b2c3d4e5f6_pg_rag_vectorstore.py</code>(RAG 2테이블)<br>
-<b>기준 커밋</b> — <code>203f7abf</code> · <b>생성일</b> 2026-08-29<br>
+<b>기준 커밋</b> — <code>c9bf70f8</code> · <b>생성일</b> 2026-08-29<br>
 컬럼의 이름·물리타입·NULL 허용·기본값·키·인덱스·제약은 모두 위 파일에서 읽은 값이고,
 한국어 논리명과 설명만 <code>scripts/table_spec_meta.py</code> 에 사람이 적는다.
 설명이 없는 컬럼은 생성 때 경고로 잡히므로 컬럼을 추가하고 문서를 빠뜨릴 수 없다.
@@ -407,7 +407,7 @@ table.spec td.c-nn{text-align:center;}
 <tr><td class="c-name">factor_code</td><td class="c-type">VARCHAR(30)</td><td class="c-nn">●</td><td class="c-key"><span class="k-uq">UQ</span></td><td class="c-type"></td><td>요건 코드 — 정본 SECRECY · VALUE · MANAGEMENT. 레거시 4요소는 is_active=FALSE 로 보존</td></tr>
 <tr><td class="c-name">factor_name</td><td class="c-type">VARCHAR(100)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type"></td><td>요건명 — 비공지성(S) · 경제적 유용성(V) · 비밀관리성(M)</td></tr>
 <tr><td class="c-name">description</td><td class="c-type">TEXT</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type"></td><td>요건 정의 문구</td></tr>
-<tr><td class="c-name">weight</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">0.25</td><td>미사용. 등급은 가중합이 아니라 S×V×M 곱으로 정한다. 하위호환 기본 1.0</td></tr>
+<tr><td class="c-name">weight</td><td class="c-type">NUMERIC(3,2)</td><td class="c-nn">●</td><td class="c-key"></td><td class="c-type">0.25</td><td>미사용. 요건 가중치는 등급 산정에 쓰지 않는다 — 등급은 키워드 룰이 정하고 S×V×M 은 상향 교차 확인이다. 하위호환 기본 1.0</td></tr>
 <tr><td class="c-name">is_active</td><td class="c-type">BOOLEAN</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">true</td><td>정본 3요건 TRUE · 레거시 4요소 FALSE</td></tr>
 <tr><td class="c-name">created_at</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>생성 시각</td></tr>
 <tr><td class="c-name">updated_at</td><td class="c-type">TIMESTAMPTZ</td><td class="c-nn"></td><td class="c-key"></td><td class="c-type">now()</td><td>수정 시각</td></tr>
@@ -781,6 +781,6 @@ table.spec td.c-nn{text-align:center;}
 </tbody></table></div>
 </section>
 </article></div>
-<footer><span>테이블정의서 · ERD — KOIPA AI 영업비밀 등급분류 시스템</span><span>기준 커밋 203f7abf · 2026-08-29 생성</span></footer>
+<footer><span>테이블정의서 · ERD — KOIPA AI 영업비밀 등급분류 시스템</span><span>기준 커밋 c9bf70f8 · 2026-08-29 생성</span></footer>
 </body>
 </html>

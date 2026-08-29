@@ -71,7 +71,7 @@ COLS = {
         "factor_code": "요건 코드 — 정본 SECRECY · VALUE · MANAGEMENT. 레거시 4요소는 is_active=FALSE 로 보존",
         "factor_name": "요건명 — 비공지성(S) · 경제적 유용성(V) · 비밀관리성(M)",
         "description": "요건 정의 문구",
-        "weight": "미사용. 등급은 가중합이 아니라 S×V×M 곱으로 정한다. 하위호환 기본 1.0",
+        "weight": "미사용. 요건 가중치는 등급 산정에 쓰지 않는다 — 등급은 키워드 룰이 정하고 S×V×M 은 상향 교차 확인이다. 하위호환 기본 1.0",
         "is_active": "정본 3요건 TRUE · 레거시 4요소 FALSE",
     },
     "tb_level_keywords": {
