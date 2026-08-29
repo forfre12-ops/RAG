@@ -32,7 +32,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================
 
 CREATE TABLE classification_levels (
-    level_id        SERIAL          PRIMARY KEY,
+    level_id        INTEGER GENERATED ALWAYS AS IDENTITY          PRIMARY KEY,
     level_code      VARCHAR(20)     NOT NULL UNIQUE,    -- TS/S1/S2/S3 (OpenAPI Grade enum 정합)
     level_name      VARCHAR(50)     NOT NULL,
     level_order     SMALLINT        NOT NULL,           -- 1=최고등급
@@ -61,7 +61,7 @@ ON CONFLICT DO NOTHING;
 
 
 CREATE TABLE evaluation_factors (
-    factor_id       SERIAL          PRIMARY KEY,
+    factor_id       INTEGER GENERATED ALWAYS AS IDENTITY          PRIMARY KEY,
     factor_code     VARCHAR(30)     NOT NULL UNIQUE,
     factor_name     VARCHAR(100)    NOT NULL,
     description     TEXT,
@@ -83,7 +83,7 @@ ON CONFLICT DO NOTHING;
 
 
 CREATE TABLE level_keywords (
-    keyword_id      SERIAL          PRIMARY KEY,
+    keyword_id      INTEGER GENERATED ALWAYS AS IDENTITY          PRIMARY KEY,
     level_id        INT             NOT NULL REFERENCES classification_levels(level_id) ON DELETE RESTRICT,
     keyword         VARCHAR(200)    NOT NULL,
     pattern_type    VARCHAR(20)     NOT NULL DEFAULT 'exact',  -- exact/regex/semantic
@@ -255,7 +255,7 @@ CREATE INDEX idx_cls_staging ON classifications(classified_at DESC) WHERE status
 
 
 CREATE TABLE classification_evidence (
-    evidence_id         BIGSERIAL       PRIMARY KEY,
+    evidence_id         BIGINT GENERATED ALWAYS AS IDENTITY       PRIMARY KEY,
     classification_id   UUID            NOT NULL REFERENCES classifications(classification_id) ON DELETE CASCADE,
     chunk_id            UUID            NOT NULL,
     -- 주: chunks가 파티션 테이블이라 FK 미설정. 무결성은 애플리케이션 레벨에서 보장.
@@ -374,7 +374,7 @@ COMMENT ON TABLE training_epochs IS 'epoch별 학습 로그. training_runs와 �
 
 
 CREATE TABLE training_datasets (
-    id              BIGSERIAL       PRIMARY KEY,
+    id              BIGINT GENERATED ALWAYS AS IDENTITY       PRIMARY KEY,
     run_id          UUID            NOT NULL REFERENCES training_runs(run_id) ON DELETE CASCADE,
     doc_id          UUID            NOT NULL REFERENCES documents(doc_id) ON DELETE RESTRICT,
     split_type      VARCHAR(10)     NOT NULL,  -- train/val/test
@@ -391,7 +391,7 @@ CREATE INDEX idx_td_doc ON training_datasets(doc_id);
 -- ============================================================
 
 CREATE TABLE corrections (
-    correction_id       BIGSERIAL       PRIMARY KEY,
+    correction_id       BIGINT GENERATED ALWAYS AS IDENTITY       PRIMARY KEY,
     classification_id   UUID            NOT NULL REFERENCES classifications(classification_id) ON DELETE CASCADE,
 
     -- corrections 자체가 진실 소스. classifications에는 status만.
@@ -477,7 +477,7 @@ CREATE INDEX idx_sd_level ON sample_documents(target_level_id);
 -- ============================================================
 
 CREATE TABLE llm_usage (
-    usage_id            BIGSERIAL,
+    usage_id            BIGINT GENERATED ALWAYS AS IDENTITY,
     provider            VARCHAR(30)     NOT NULL,    -- anthropic/openai/google/vllm
     model               VARCHAR(50)     NOT NULL,
 
@@ -520,7 +520,7 @@ CREATE INDEX idx_lu_ref ON llm_usage(reference_type, reference_id);
 -- ============================================================
 
 CREATE TABLE audit_log (
-    audit_id        BIGSERIAL,
+    audit_id        BIGINT GENERATED ALWAYS AS IDENTITY,
     request_id      UUID,
     actor_id        VARCHAR(50),
     actor_role      VARCHAR(30),       -- admin/reviewer/system/kl_backend

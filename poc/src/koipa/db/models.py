@@ -27,6 +27,7 @@ import datetime as dt
 import uuid
 
 from sqlalchemy import (
+    Identity,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -61,7 +62,7 @@ from koipa.db.session import Base
 class ClassificationLevel(Base):
     __tablename__ = "tb_classification_levels"
 
-    level_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    level_id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
     level_code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     level_name: Mapped[str] = mapped_column(String(50), nullable=False)
     level_order: Mapped[int] = mapped_column(SmallInteger, nullable=False)
@@ -81,7 +82,7 @@ class ClassificationLevel(Base):
 class EvaluationFactor(Base):
     __tablename__ = "tb_evaluation_factors"
 
-    factor_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    factor_id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
     factor_code: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
     factor_name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -94,7 +95,7 @@ class EvaluationFactor(Base):
 class LevelKeyword(Base):
     __tablename__ = "tb_level_keywords"
 
-    keyword_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    keyword_id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
     level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     keyword: Mapped[str] = mapped_column(String(200), nullable=False)
     pattern_type: Mapped[str] = mapped_column(String(20), nullable=False, default="exact", server_default=text("'exact'::character varying"))
@@ -293,7 +294,7 @@ class Classification(Base):
 class ClassificationEvidence(Base):
     __tablename__ = "tb_classification_evidence"
 
-    evidence_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    evidence_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
     chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     evidence_type: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -400,7 +401,7 @@ class TrainingEpoch(Base):
 class TrainingDataset(Base):
     __tablename__ = "tb_training_datasets"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), nullable=False)
     doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
     split_type: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -422,7 +423,7 @@ class TrainingDataset(Base):
 class Correction(Base):
     __tablename__ = "tb_corrections"
 
-    correction_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    correction_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
     original_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     corrected_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
@@ -522,7 +523,7 @@ class LlmUsage(Base):
     """월별 파티션 부모. INSERT는 called_at 기준 자동 라우팅."""
     __tablename__ = "tb_llm_usage"
 
-    usage_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
+    usage_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True))
     provider: Mapped[str] = mapped_column(String(30), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
     purpose: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -555,7 +556,7 @@ class AuditLog(Base):
     """월별 파티션 부모. 모든 API 호출 기록 (영업비밀 시스템 필수, doc/04 §9.5)."""
     __tablename__ = "tb_audit_log"
 
-    audit_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True)
+    audit_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True))
     request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     actor_id: Mapped[str | None] = mapped_column(String(50))
     actor_role: Mapped[str | None] = mapped_column(String(30))
@@ -585,7 +586,7 @@ class Guide(Base):
     """가이드 문서 업로드 이력 — GuideService in-memory 대체."""
     __tablename__ = "tb_guides"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     guide_id: Mapped[str] = mapped_column(String(200), nullable=False)
     version: Mapped[str] = mapped_column(String(50), nullable=False)
     effective_date: Mapped[str | None] = mapped_column(String(30))
