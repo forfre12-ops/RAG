@@ -237,30 +237,78 @@ a{color:#0a0a0a}
 
   <h3>2-4. 파일 크기 상한 &mdash; 확정 회신</h3>
 
-  <div class="note warn">
-    <b>초안 전제와 다릅니다.</b> 초안 3쪽은 멀티파트 업로드 <b>500MB</b> 를 전제로 적혀
-    있으나, 현행 배포본의 상한은 <b>20MB</b> 입니다. 이대로 설계하시면 20MB 를 넘는 문서에서
-    <b>전부 413 을 받게 됩니다.</b>
+  <div class="note">
+    <b>초안 2쪽 「본문 상한」 칸의 비고에 &ldquo;멀티파트 업로드 용량 제한 협의 필요&rdquo;로
+    적어 주신 사항에 대한 회신입니다.</b> 초안 기재값은 <b>500MB</b> 이고 현행 배포본의
+    상한은 <b>20MB</b> 입니다. 20MB 를 넘는 문서는 <b>413</b> 을 받으므로, 실제 필요하신
+    최대 파일 크기를 회신하여 주시면 그 값에 맞추어 조정하겠습니다.
   </div>
+
+  <p><b>현행 상한</b></p>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:30%">구분</th><th style="width:14%">상한</th><th>동작</th></tr></thead>
     <tbody>
-      <tr><td>멀티파트 업로드(<code>POST /documents</code> 등)</td><td class="c"><b>20MB</b></td><td>초과 시 <b>413</b></td></tr>
-      <tr><td>요청 본문 전체(JSON 포함)</td><td class="c"><b>25MB</b></td><td>본문을 읽기 전에 <b>413</b> 반환(<code>KOIPA_BODY_TOO_LARGE</code>)</td></tr>
+      <tr><td>멀티파트 업로드(<code>POST /documents</code> 등)</td><td class="c"><b>20MB</b></td><td>초과 시 <b>413</b> <code>file too large</code></td></tr>
+      <tr><td>요청 본문 전체(멀티파트 포함)</td><td class="c"><b>25MB</b></td><td>본문을 읽기 전에 <b>413</b> 반환(<code>KOIPA_BODY_TOO_LARGE</code>)</td></tr>
+      <tr><td>역프록시 본문 상한(납품 구성)</td><td class="c"><b>25M</b></td><td><code>infra/mtls/nginx.mtls.conf</code> &mdash; 시험 서버에는 앞단 프록시가 없습니다</td></tr>
       <tr><td>JSON <code>content</code> 문자열</td><td class="c">1,048,576자</td><td>초안 기재값과 동일</td></tr>
     </tbody>
   </table>
   </div>
 
-  <p>둘 중 낮은 값이 걸리므로 <b>실질 상한은 20MB</b> 입니다. 시험 서버 앞단에 별도 프록시가
-  없어 이 값이 곧 실제 한계입니다. 참고로 측정에 쓴 100쪽 PDF 가 14MB 였습니다 &mdash;
-  도면&middot;이미지가 포함된 문서는 20MB 를 넘길 수 있습니다.</p>
+  <p>세 값 중 가장 낮은 것이 먼저 걸리므로 <b>실질 상한은 20MB</b> 입니다.</p>
 
-  <p><b>상한은 환경변수(<code>MAX_UPLOAD_MB</code>)로 조정 가능합니다.</b> 필요한 최대 파일
-  크기를 회신하여 주시면 그 값으로 설정해 배포하겠습니다. 다만 큰 파일은 처리 시간이 함께
-  늘어나므로(&sect;4 참조) 비동기 경로 사용을 함께 권합니다.</p>
+  <p><b>시험 서버 실측(2026-08-29)</b></p>
+
+  <p>멀티파트 업로드 경로가 정상 동작하는지, 그리고 어느 지점에서 막히는지를 실제로
+  보내서 확인했습니다(<code>POST /api/v1/documents/analyze</code>).</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:22%">보낸 파일</th><th style="width:10%">응답</th><th>본문</th></tr></thead>
+    <tbody>
+      <tr><td>91 bytes (txt)</td><td class="c"><b>200</b></td><td>추출&middot;청킹까지 정상 &mdash; 멀티파트 경로 자체는 문제없이 동작합니다</td></tr>
+      <tr><td>22,000,000 bytes</td><td class="c"><b>413</b></td><td><code>file too large: 22000000 &gt; 20971520 bytes (20MB)</code></td></tr>
+      <tr><td>30,000,000 bytes</td><td class="c"><b>413</b></td><td><code>{"detail":"request body too large","code":"KOIPA_BODY_TOO_LARGE"}</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>30MB 는 요청 본문 한도(25MB)에 먼저 걸려 <b>인증 검사 이전에</b> 차단됩니다.
+  즉 멀티파트 업로드에도 <b>두 한도가 모두 적용</b>되며, 낮은 쪽이 먼저 걸립니다.</p>
+
+  <p><b>상한을 올리려면 조정해야 하는 것</b></p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:24%">걸리는 지점</th><th style="width:16%">현행</th><th>조정 방법</th></tr></thead>
+    <tbody>
+      <tr><td>멀티파트 업로드 상한</td><td class="c">20MB</td><td>환경변수 <code>MAX_UPLOAD_MB</code> &mdash; 설정만으로 가능</td></tr>
+      <tr><td>요청 본문 상한</td><td class="c">25MB</td><td>환경변수 <code>MAX_REQUEST_BODY_MB</code> &mdash; <b>같이 올리지 않으면 25MB 에서 먼저 413</b> 입니다</td></tr>
+      <tr><td>역프록시 본문 상한</td><td class="c">25M</td><td><code>client_max_body_size</code> &mdash; 납품 구성에서 함께 조정</td></tr>
+      <tr><td>동기 분석 청크 상한</td><td class="c">400청크</td><td><code>ANALYZE_SYNC_MAX_CHUNKS</code> &mdash; 대용량은 비동기 경로를 권합니다</td></tr>
+      <tr><td>처리 시간 한도</td><td class="c">600초 / 900&middot;1200초</td><td>요청 타임아웃 600초 &middot; 비동기 soft 900초&middot;hard 1200초 &mdash; 큰 파일은 크기보다 여기에 먼저 부딪힙니다</td></tr>
+      <tr><td>메모리</td><td class="c">전량 적재</td><td><b>코드 수정 필요</b> &mdash; 아래 설명</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p><b>앞의 다섯은 설정 조정이고, 마지막 하나가 500MB 를 그대로 열어 드리지 못하는
+  이유입니다.</b> 현재 구현은 업로드된 파일을 <b>통째로 메모리에 올린 뒤</b> 추출로
+  넘깁니다(스트리밍 처리가 아닙니다). 시험 서버의 API 컨테이너는 메모리 10GiB &middot;
+  워커 3개 구성이므로, 500MB 문서가 동시 3건이면 원본만 1.5GB 이고 추출 본문&middot;청크
+  사본이 그 위에 더 얹힙니다. 정확한 배수는 아직 측정하지 않았습니다 &mdash; 목표 상한을
+  주시면 그 값으로 부하 실측을 돌려 확정 회신하겠습니다.</p>
+
+  <div class="note">
+    <b>요청.</b> 실제 다루시는 문서의 최대 크기를 회신하여 주십시오. 설정 조정만으로 되는
+    값이면 바로 반영해 배포하겠고, 코드 수정이 필요한 값이면 일정을 함께 회신드리겠습니다.
+    참고로 <b>측정에 쓴 100쪽 PDF 가 14MB</b> 였습니다 &mdash; 도면&middot;이미지가 포함된
+    문서는 20MB 를 넘길 수 있습니다. 어느 값으로 정하시든 대용량은 비동기 경로 사용을
+    함께 권합니다(&sect;4 참조).
+  </div>
 
   <h2>3. 결과 반환 항목 &mdash; 확대 요청</h2>
 
@@ -392,7 +440,7 @@ a{color:#0a0a0a}
       <tr><td class="c">공통</td><td>인증 방식</td><td>현행 인증 체계를 그대로 사용합니다. 자격증명은 본 문서를 포함한 <b>어떤 문서에도 기재하지 않고</b> 별도 안전 경로로 전달합니다</td></tr>
       <tr><td class="c">공통</td><td>중복 요청 처리</td><td>동일 파일 재업로드는 파일 해시로 판별해 <b>기존 문서로 연결</b>합니다. 다만 이때 <b>메타·외부 참조는 갱신되지 않습니다</b> &mdash; 메타 변경이 필요하면 별도 갱신 호출이 필요합니다</td></tr>
       <tr><td class="c">공통</td><td>장애·예외 처리</td><td>본 API 는 <b>HTTP 상태코드로 분기</b>합니다. 심볼릭 오류코드 체계는 없으므로 상태코드 기준으로 처리 로직을 세워 주시기 바랍니다</td></tr>
-      <tr><td class="c">REST</td><td>파일 업로드 용량</td><td><b>멀티파트 20MB · 요청 본문 25MB</b>(초과 시 413). 초안 전제 500MB 와 다릅니다 &mdash; <b>&sect;2-4 참조</b>. JSON <code>content</code> 상한 1,048,576자는 초안과 동일</td></tr>
+      <tr><td class="c">REST</td><td>파일 업로드 용량</td><td><b>멀티파트 20MB · 요청 본문 25MB</b>(초과 시 413 · 실측 확인). 초안 2쪽에 &ldquo;협의 필요&rdquo;로 적어 주신 칸에 대한 회신입니다 &mdash; 기재값 500MB 와의 차이와 조정에 필요한 것은 <b>&sect;2-4 참조</b>. JSON <code>content</code> 상한 1,048,576자는 초안과 동일</td></tr>
       <tr><td class="c">REST</td><td>요청 Timeout</td><td>비동기 경로이므로 결과 대기 Timeout 이 불필요합니다. 접수 응답은 즉시 반환됩니다</td></tr>
       <tr><td class="c">REST</td><td>Callback 실패 처리</td><td><b>이미 구현</b> &mdash; 재시도·DLQ·SSRF 차단 (&sect;4)</td></tr>
       <tr><td class="c">REST</td><td>추가 전달 항목</td><td><b>&sect;3 의 필수 3필드 수신 요청</b></td></tr>
@@ -451,6 +499,7 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td class="c">1</td><td class="n">2026-08-28</td><td><code>d3bcb712</code></td><td>최초 작성 &mdash; 초안 검토 회신. 표기 오류 3건·설계 조정 3건·협의사항 15건 의견</td></tr>
       <tr><td class="c">2</td><td class="n">2026-08-29</td><td><code>&mdash;</code></td><td><b>파일 크기 상한을 확정 회신</b>(&sect;2-4 · 멀티파트 20MB · 요청 본문 25MB · 초과 시 413) &mdash; 종전에는 &ldquo;실측 후 회신&rdquo;으로 비워 두었으나 설정값으로 확인되는 사안이었다. &sect;2-3 에 1단계 경로(<code>/documents/analyze</code>)와 그 경로에서 결과가 남지 않는 이유를 적어 2단계 요청의 근거를 밝혔다. &sect;5 머리에 Stream 용어 구분을 넣고, &sect;5-2 에 실시간 진행 표시 수단(SSE <code>/classify/stream</code> · 구현 완료)을 신설했다. &sect;7 표를 필수 3 / 보조 3 으로 갈랐다</td></tr>
+      <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>&mdash;</code></td><td><b>&sect;2-4 를 실측 근거로 보강</b> &mdash; 시험 서버에 91B&middot;22MB&middot;30MB 멀티파트를 실제로 보내 <b>200 / 413(20MB 상한) / 413(25MB 본문 상한)</b> 을 확인했다. 멀티파트에도 요청 본문 한도가 함께 걸린다는 사실(<code>MAX_UPLOAD_MB</code> 만 올리면 25MB 에서 먼저 413)과, 상한을 올릴 때 조정해야 하는 여섯 지점(설정 다섯 &middot; 코드 수정 하나)을 표로 적었다. 초안 인용 쪽수를 <b>3쪽 &rarr; 2쪽</b>으로 바로잡고, 초안이 그 칸에 &ldquo;협의 필요&rdquo;라 적어 둔 점을 반영해 &ldquo;전제가 다르다&rdquo;는 표현을 회신 형식으로 고쳤다</td></tr>
     </tbody>
   </table>
   </div>
