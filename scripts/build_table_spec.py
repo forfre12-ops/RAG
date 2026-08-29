@@ -43,7 +43,9 @@ ROOT = Path(__file__).resolve().parent.parent
 MODELS = ROOT / "poc" / "src" / "koipa" / "db" / "models.py"
 MIG_RAG = ROOT / "poc" / "alembic" / "versions" / "a1b2c3d4e5f6_pg_rag_vectorstore.py"
 MIG_RAG_COMMENT = ROOT / "poc" / "alembic" / "versions" / "a7b8c9d0e1f2_rag_vectors_column_comments.py"
-SKELETON = ROOT / "doc" / "result" / "KL_AI자료_2026-08" / "기술구현_백서_부록A_DB스키마.html"
+# [2026-08-29] 서식 정본. 지시에 따라 감리 회신서의 style·nav 를 그대로 쓴다.
+# 종전 골격(부록A)은 자체 클래스 68개·타원 배지·인쇄 규격 없음이라 정본과 어긋났다.
+SKELETON = ROOT / "doc" / "result" / "KL_회신_2026-08-28" / "KL_질의사항_회신서.html"
 # 같은 문서가 제출 묶음마다 사본으로 놓인다. 한 곳만 쓰면 나머지가 뒤처진다 —
 # 실측 2026-08-29: 칼럼 10개를 뺀 뒤 KL_AI자료 사본만 239 로 갱신되고 회신 첨부본은
 # 249 인 채로 남아 두 사본이 어긋났다. build_erd.py 와 같이 존재하는 사본 전부에 쓴다.
@@ -59,8 +61,8 @@ REVISIONS = [
      "최초 작성. ORM 메타데이터와 마이그레이션 정의에서 생성해 감리 산출물로 편입"),
     ("2", "2026-08-29", "fca08e04",
      "관계선이 상자에 가려지던 도식을 다시 그리고, 검색용 표 2종을 포함해 21표로 확장. "
-     "별도로 있던 <code>테이블_정의서</code> 를 이 문서로 통합(칼럼 249개가 양쪽에 "
-     "중복 수록돼 있었다). 표별 인덱스·FK 개수를 §01 에 추가"),
+     "칼럼 목록이 두 곳에 중복 수록돼 있던 것을 이 문서로 일원화. "
+     "표별 인덱스·FK 개수를 §01 에 추가"),
     ("3", "2026-08-29", "이 문서 머리말의 커밋",
      "어떤 코드도 읽지 않고 실 데이터도 전부 비어 있던 <b>칼럼 10개를 삭제</b>"
      "(249 → 239). 대리키를 <code>SERIAL</code> 에서 표준 "
@@ -483,14 +485,11 @@ def col_desc(table: str, col: dict) -> str:
 def render(tables: list[dict], erd: str, commit: str, today: str) -> str:
     skel = SKELETON.read_text(encoding="utf-8")
     style = re.search(r"<style>(.*?)</style>", skel, re.S).group(1)
-    header = re.search(r"<header class=\"nav\">.*?</header>", skel, re.S).group(0)
-    header = re.sub(r'<div class="nav-actions">.*?</div>\s*</div>',
-                    '<div class="nav-actions">'
-                    '<a class="nav-link" href="index.html">← 목록</a>'
-                    '<a class="nav-link" href="#erd">ERD</a>'
-                    '<a class="nav-link hide-sm" href="#tables">테이블정의</a>'
-                    '<a class="nav-link hide-sm" href="#fk">관계정의</a>'
-                    "</div>\n  </div>", header, flags=re.S)
+    header = re.search(r"<nav class=\"nav\">.*?</nav>", skel, re.S).group(0)
+    # 문서 이름만 바꿔 단다. 목록 링크는 걷는다 — 같은 파일이 폴더 여러 곳에 놓이는데
+    # 상대 경로가 폴더마다 달라 한쪽에서는 반드시 깨진다(2026-08-29 실제로 깨져 있었다).
+    header = re.sub(r'<span class="brand-sub">[^<]*</span>',
+                    '<span class="brand-sub">테이블정의서 · ERD</span>', header)
 
     by_name = {t["name"]: t for t in tables}
     e = html.escape
@@ -534,27 +533,30 @@ table.spec td.c-nn{text-align:center;}
 .srcbox{border-left:3px solid #18181b;background:#fafafa;padding:11px 14px;margin:14px 0;
   font-size:12.5px;line-height:1.7;color:#3f3f46;}
 .tbl-wrap{overflow-x:auto;}
+.num{font-family:ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--dim);
+  padding:2px 7px;background:var(--mid);border:1px solid var(--line);margin-right:6px}
+.group-header{display:flex;align-items:center;gap:10px;margin:40px 0 10px}
+.group-header h2{margin:0}
+@media print{
+  table.spec{font-size:8pt}
+  .tbl-wrap{overflow:visible}
+  section{break-inside:auto}
+}
 </style>""")
     A("</head>\n<body>\n<div id=\"top\"></div>")
     A(header)
-    A('<div class="page"><article style="grid-column:1/-1;max-width:1180px;margin:0 auto;">')
+    A('<div class="wrap">')
 
-    # ── 표지
-    A('<div class="meta-row">'
-      '<span class="badge">감리 산출물</span>'
-      '<span class="badge outline">테이블정의서 · ERD</span>'
-      f'<span style="color:var(--text-dim);font-size:12px;">·</span>'
-      f'<span style="color:var(--text-dim);font-size:12px;">PostgreSQL 16 · '
-      f'{len(tables)}테이블 · {total_cols}컬럼</span>'
-      f'<span style="color:var(--text-dim);font-size:12px;">·</span>'
-      f'<span style="color:var(--text-dim);font-size:12px;">{today} 생성</span></div>')
-    A('<h1 class="title">테이블정의서 · ERD</h1>')
-    A('<p class="lede">KOIPA AI 영업비밀 등급분류 시스템이 소유한 데이터베이스 개체 전체의 '
-      '물리 정의와 관계도다. 등급체계·문서·라벨링·추론·학습·보정·합성·운영·검색 9개 그룹, '
-      f'{len(tables)}개 테이블 {total_cols}개 컬럼을 다룬다.</p>')
+    # ── 표지 (정본 서식: eyebrow · h1 · meta)
+    A('  <div class="top">')
+    A('    <div class="eyebrow">감리 산출물 · 데이터베이스 정의</div>')
+    A('    <h1>테이블정의서 · ERD</h1>')
+    A(f'    <div class="meta">PostgreSQL 16 · {len(tables)}테이블 {total_cols}칼럼 · '
+      f'등급체계·문서·라벨링·추론·학습·보정·합성·운영·검색 9개 그룹 · {today} 생성</div>')
+    A('  </div>')
     A(f'''<div class="srcbox">
-<b>이 문서는 소스코드에서 자동 생성한다.</b> 손으로 쓰지 않는다.
-스키마가 바뀌면 <code>python scripts/build_table_spec.py</code> 를 다시 돌린다.<br>
+<b>표·칼럼의 값은 소스 코드에서 뽑았다.</b> 코드의 테이블 집합과 이 정의서가 일치하는지는
+<code>python scripts/build_table_spec.py --check</code> 로 확인할 수 있다.<br>
 <b>기준 소스</b> — <code>poc/src/koipa/db/models.py</code>(ORM 19테이블) ·
 <code>poc/alembic/versions/a1b2c3d4e5f6_pg_rag_vectorstore.py</code>(RAG 2테이블)<br>
 <b>기준 커밋</b> — <code>{commit}</code> · <b>생성일</b> {today}<br>
@@ -564,7 +566,6 @@ table.spec td.c-nn{text-align:center;}
 </div>''')
 
     # ── 그룹·테이블 목록
-    A('<hr class="hero-sep">')
     A('<section id="tables-index"><h2><span class="num">01</span> 테이블 목록</h2>')
     A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
       "<th>그룹</th><th>물리명</th><th>논리명</th><th>컬럼</th><th>기본키</th>"
@@ -695,9 +696,9 @@ table.spec td.c-nn{text-align:center;}
     A("</tbody></table></div>")
     A("</section>")
 
-    A("</article></div>")
-    A('<footer><span>테이블정의서 · ERD — KOIPA AI 영업비밀 등급분류 시스템</span>'
-      f"<span>기준 커밋 {commit} · {today} 생성</span></footer>")
+    A('<div class="foot">테이블정의서 · ERD — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · '
+      f'기준 커밋 <code>{commit}</code> · {today} 생성</div>')
+    A("</div>")
     A("</body>\n</html>")
     return "\n".join(o), missing
 
@@ -707,6 +708,8 @@ table.spec td.c-nn{text-align:center;}
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="파일을 쓰지 않고 검증만 한다")
+    ap.add_argument("--force", action="store_true",
+                    help="생성물에 없는 요소(클릭형 관계도·인쇄 규격)가 기존 문서에 있어도 덮어쓴다")
     args = ap.parse_args()
 
     tables = parse_models() + parse_rag()
@@ -744,6 +747,18 @@ def main() -> int:
                 # 있는 사본만 갱신한다. 없는 자리에 새로 만들면 제출 묶음의 구성이
                 # 소리 없이 바뀐다(build_erd.py 와 같은 규칙).
                 print(f"  [없음] {out.relative_to(ROOT)}")
+                continue
+            # [2026-08-29] 덮어쓰기 가드. 배포 중인 정의서는 이 생성기가 아직 못 만드는
+            # 것을 담고 있다 — 클릭형 관계도(erd-box)와 감리 정본 서식(@page 인쇄 규격).
+            # 확인 없이 돌리면 그것들이 조용히 사라진다(2026-08-29 실제로 사라졌다).
+            # 생성기가 그 둘을 낼 수 있게 되면 이 가드를 지운다.
+            cur = out.read_text(encoding="utf-8", errors="replace")
+            lost = [n for n, mark in (("클릭형 관계도", "erd-box"), ("인쇄 규격", "@page"))
+                    if mark in cur and mark not in doc]
+            if lost and not args.force:
+                print(f"  [보호] {out.relative_to(ROOT)} — 덮어쓰지 않았다. "
+                      f"생성물에 없는 것: {' · '.join(lost)}. 그래도 쓰려면 --force")
+                ok = False
                 continue
             out.write_text(doc, encoding="utf-8")
             print(f"  → {out.relative_to(ROOT)} ({len(doc):,} bytes)")
