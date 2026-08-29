@@ -695,15 +695,6 @@ table.spec td.c-nn{text-align:center;}
 <section id="scope"><h2><span class="num">05</span> 범위</h2>
 <p class="spec-note">이 정의서는 <b>본 시스템이 생성·소유하는 개체</b>만 다룬다. KL 원천 문서 저장소·EDMS·회원/권한·자가진단은 외부 시스템이며, 연동 키는 <code>tb_documents.external_ref</code> 와 <code>tb_documents.metadata</code> 로 다룬다. 월별 자식 파티션(<code>tb_chunks_2026_07</code> 등)은 부모 정의를 그대로 상속하므로 개별 정의를 싣지 않는다.</p>
 </section>
-<section id="revisions"><h2><span class="num">06</span> 개정 이력</h2>
-<div class="tw"><table>
-<thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:18%">근거 커밋</th><th>내용</th></tr></thead><tbody>
-<tr><td>1</td><td>2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성. ORM 메타데이터와 마이그레이션 정의에서 생성해 감리 산출물로 편입</td></tr>
-<tr><td>2</td><td>2026-08-29</td><td><code>fca08e04</code></td><td>관계선이 상자에 가려지던 도식을 다시 그리고, 검색용 표 2종을 포함해 21표로 확장. 칼럼 목록이 두 곳에 중복 수록돼 있던 것을 이 문서로 일원화. 표별 인덱스·FK 개수를 §01 에 추가</td></tr>
-<tr><td>3</td><td>2026-08-29</td><td>이 문서 머리말의 커밋</td><td>어떤 코드도 읽지 않고 실 데이터도 전부 비어 있던 <b>칼럼 10개를 삭제</b>(249 → 239). 대리키를 <code>SERIAL</code> 에서 표준 <code>GENERATED ALWAYS AS IDENTITY</code> 로 전환</td></tr>
-<tr><td>4</td><td>2026-08-29</td><td>이 문서 머리말의 커밋</td><td>정의서와 <b>실제 데이터베이스의 차이 2건</b>을 머리말에 고지한다 &mdash; <code>tb_llm_usage.total_tokens</code>(생성 칼럼)와 집계 뷰 <code>v_monthly_llm_cost</code> 는 ORM 매핑이 없어 정의서 생성 대상에서 빠진다. 실제 DB 는 21표 240칼럼 + 뷰 1개다.</td></tr>
-</tbody></table></div>
-</section>
 <div class="foot">테이블정의서 · ERD — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · 기준 커밋 <code>c9bf70f8</code> · 2026-08-29 생성</div>
 </div>
 </body>

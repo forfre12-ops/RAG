@@ -500,6 +500,269 @@ def ladder_svg() -> str:
     return "".join(p)
 
 
+# ── ⑦ 세 경로 합류 ───────────────────────────────────────────────────────────
+def paths_svg() -> str:
+    """세 경로가 하나의 학습셋으로 합류하는 그림. 허용 계층은 코드에서 읽는다."""
+    from koipa import golden_tiers as gt  # noqa: PLC0415
+    # 그림이 주장하는 것 — 평가정답과 격리분은 어느 경로로도 학습에 들어오지 않는다.
+    for tier in (gt.TIER_LOCKED, gt.TIER_HELD):
+        if tier in gt.TRAIN_TIERS:
+            raise SystemExit("학습 허용 계층이 바뀌었다 — 그림의 주장이 깨진다: %s" % tier)
+    nightly = bool(_profile("enable_nightly_retrain_schedule", False))
+    dsdir = _profile("training_dataset_dir", "")
+
+    W, H = 940, 466
+    bx, bw = 8, 470
+    tx, tw = 610, 300
+    rows = [
+        ("1", "합성 검수 승인", "tb_sample_documents (승인분)", "사람이 실행", False,
+         "위생 게이트 3종 제외 &#183; 교정 등급이 라벨"),
+        ("2", "골든 후보 분할", "gold_candidate", "사람이 실행", False,
+         "등급 층화 75/25 &#183; 누수 행 선제거"),
+        ("3", "운영 교정", "tb_corrections (미소비)",
+         "자동" if nightly else "자동(조건부)", True,
+         "홀드아웃과 겹치면 병합 제외 &#183; 반영분만 소비"),
+    ]
+    p = []
+    a = p.append
+    a('<svg viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;height:auto" '
+      'xmlns="http://www.w3.org/2000/svg" role="img" '
+      'aria-label="사람의 판단이 학습셋으로 들어오는 세 경로가 하나의 학습셋으로 합류하는 도식. '
+      '둘은 사람이 실행하고 하나만 조건부 자동이다">' % (W, H, W))
+    a('<style>.t{font:12px %s;fill:%s}.th{font:700 12.5px %s;fill:%s}'
+      '.m{font:10.5px ui-monospace,monospace;fill:%s}.d{font:11px %s;fill:%s}'
+      '.n{font:700 11px %s;fill:#fff}.bgo{font:700 10.5px %s;fill:%s}'
+      '.no{font:700 11.5px %s;fill:%s}</style>'
+      % (FONT, INK, FONT, INK, DIM, FONT, DIM, FONT, FONT, DIM, FONT, BAD))
+    a('<text class="th" x="8" y="26">사람의 판단이 학습셋에 닿는 길은 셋이다</text>')
+    a('<text class="d" x="8" y="46">셋 중 <tspan class="th">둘은 사람이 명령을 실행해야</tspan> 진행된다. '
+      '자동인 것은 3 하나뿐이고, 그마저 조건을 모두 만족해야 발화한다.</text>')
+
+    y0, rh, gap = 74, 86, 20
+    for i, (num, title, src, run, auto, note) in enumerate(rows):
+        y = y0 + i * (rh + gap)
+        a('<rect x="%d" y="%d" width="%d" height="%d" fill="#fafafa" stroke="%s"/>' % (bx, y, bw, rh, LINE))
+        a('<rect x="%d" y="%d" width="24" height="22" fill="%s"/>' % (bx, y, INK))
+        a('<text class="n" x="%d" y="%d" text-anchor="middle">%s</text>' % (bx + 12, y + 16, num))
+        a('<text class="th" x="%d" y="%d">%s</text>' % (bx + 34, y + 16, title))
+        a('<text class="m" x="%d" y="%d">%s</text>' % (bx + 12, y + 38, src))
+        a('<text class="d" x="%d" y="%d">%s</text>' % (bx + 12, y + 58, note))
+        a('<rect x="%d" y="%d" width="96" height="20" fill="%s" stroke="%s"/>'
+          % (bx + bw - 106, y + 6, INK if auto else "#fff", INK if auto else LINE))
+        a('<text class="%s" x="%d" y="%d" text-anchor="middle">%s</text>'
+          % ("n" if auto else "bgo", bx + bw - 58, y + 20, run))
+        my = y + rh // 2
+        a('<path d="M%d,%d H%d V%d H%d" fill="none" stroke="%s" marker-end="url(#pah)"/>'
+          % (bx + bw, my, 560, 215, tx - 6, INK))
+
+    a('<rect x="%d" y="%d" width="%d" height="76" fill="%s"/>' % (tx, 177, tw, INK))
+    a('<text class="n" x="%d" y="%d">학습셋</text>' % (tx + 14, 200))
+    a('<text class="n" x="%d" y="%d">train.jsonl &#183; val.jsonl &#183; test.jsonl</text>' % (tx + 14, 222))
+    a('<text class="n" x="%d" y="%d">%s</text>' % (tx + 14, 242, dsdir))
+
+    yb = y0 + 3 * (rh + gap) + 8
+    a('<rect x="%d" y="%d" width="%d" height="46" fill="#fff" stroke="%s"/>' % (bx, yb, W - 16, BAD))
+    a('<text class="no" x="%d" y="%d">어느 경로로도 들어오지 않는 것 &#8212; '
+      '<tspan class="m">%s</tspan>(평가정답) &#183; <tspan class="m">%s</tspan>(격리분)</text>'
+      % (bx + 12, yb + 20, gt.TIER_LOCKED, gt.TIER_HELD))
+    a('<text class="d" x="%d" y="%d">학습 허용 계층은 <tspan class="m">golden_tiers.TRAIN_TIERS</tspan> '
+      '허용목록이 정한다 &#8212; 목록에 없는 계층은 기본이 제외다.</text>' % (bx + 12, yb + 38))
+    a('<defs><marker id="pah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">'
+      '<path d="M0,0 L8,3 L0,6 z" fill="%s"/></marker></defs>' % INK)
+    a('</svg>')
+    return "".join(p)
+
+
+# ── ⑧ 계층별 학습·평가 허용 격자 ─────────────────────────────────────────────
+TIER_LABELS = {
+    "locked_gold_eval": ("사람 서명이 끝난 평가정답", "학습에 넣으면 성능 수치가 무의미해진다"),
+    "gold_candidate": ("자동 게이트 통과 &#183; 서명 대기", "라벨이 믿을 만해 학습에 쓴다"),
+    "silver_train": ("그 밖의 기계 라벨", "학습 시드 전용"),
+    "legal_floor": ("법적 기준으로 등급이 정해지는 것", "평가정답이 빌 때만 임시 평가로 쓴다"),
+    "held_review": ("서명이 무효이거나 본문이 합성인 격리분", "어느 쪽으로도 쓰지 않는다"),
+}
+
+
+def tiers_svg() -> str:
+    """계층 계약을 golden_tiers 에서 읽어 격자로 그린다."""
+    from koipa import golden_tiers as gt  # noqa: PLC0415
+    tiers = [v for k, v in sorted(vars(gt).items())
+             if k.startswith("TIER_") and isinstance(v, str)]
+    missing = [t for t in tiers if t not in TIER_LABELS]
+    if missing:
+        raise SystemExit("계층이 늘었는데 이름이 없다 — TIER_LABELS 를 갱신할 것: %s" % missing)
+    order = ["locked_gold_eval", "gold_candidate", "silver_train", "legal_floor", "held_review"]
+    order = [t for t in order if t in tiers] + [t for t in tiers if t not in order]
+
+    W = 940
+    rh, top = 40, 108
+    H = top + rh * len(order) + 76
+    cx1, cx2, cw = 660, 780, 100
+    p = []
+    a = p.append
+    a('<svg viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;height:auto" '
+      'xmlns="http://www.w3.org/2000/svg" role="img" '
+      'aria-label="골든셋 계층마다 학습과 평가에 쓸 수 있는지를 표시한 격자. '
+      '평가정답 계층은 학습 금지, 격리 계층은 양쪽 다 금지다">' % (W, H, W))
+    a('<style>.t{font:12px %s;fill:%s}.th{font:700 12.5px %s;fill:%s}'
+      '.m{font:10.5px ui-monospace,monospace;fill:%s}.d{font:11px %s;fill:%s}'
+      '.y{font:700 12px %s;fill:#fff}.n{font:700 12px %s;fill:%s}</style>'
+      % (FONT, INK, FONT, INK, DIM, FONT, DIM, FONT, FONT, BAD))
+    a('<text class="th" x="8" y="26">계층마다 쓸 수 있는 곳이 다르다 &#8212; 이 구분이 무너지면 '
+      '시험 문제로 공부하고 그 시험을 본다</text>')
+    a('<text class="d" x="8" y="46">허용은 <tspan class="m">golden_tiers.TRAIN_TIERS</tspan> 와 '
+      '<tspan class="m">eval_records()</tspan> 가 정본이다. 이 그림은 그 둘을 불러 칠한다.</text>')
+    a('<text class="d" x="8" y="66"><tspan class="th">양쪽 다 금지인 칸이 있다</tspan> &#8212; '
+      '&ldquo;평가에서 뺐으니 학습에는 써도 되겠지&rdquo;가 성립하지 않는다는 뜻이다.</text>')
+    a('<text class="th" x="%d" y="%d" text-anchor="middle">학습</text>' % (cx1 + cw // 2, top - 12))
+    a('<text class="th" x="%d" y="%d" text-anchor="middle">평가</text>' % (cx2 + cw // 2, top - 12))
+
+    for i, tier in enumerate(order):
+        y = top + i * rh
+        train = tier in gt.TRAIN_TIERS
+        if tier == gt.TIER_LOCKED:
+            ev = "허용"
+        elif tier == gt.TIER_LEGAL_FLOOR:
+            ev = "보조"
+        else:
+            ev = "금지"
+        what, why = TIER_LABELS[tier]
+        both_no = (not train) and ev == "금지"
+        a('<rect x="8" y="%d" width="%d" height="%d" fill="%s" stroke="%s"/>'
+          % (y, W - 16, rh - 4, "#fff5f5" if both_no else "#fafafa", BAD if both_no else LINE))
+        a('<text class="m" x="20" y="%d">%s</text>' % (y + 16, tier))
+        a('<text class="d" x="20" y="%d">%s &#183; %s</text>' % (y + 30, what, why))
+        for cx, txt in ((cx1, "허용" if train else "금지"), (cx2, ev)):
+            solid = txt == "허용"
+            a('<rect x="%d" y="%d" width="%d" height="22" fill="%s" stroke="%s"/>'
+              % (cx, y + 6, cw, INK if solid else "#fff",
+                 INK if solid else (LINE if txt == "보조" else BAD)))
+            a('<text class="%s" x="%d" y="%d" text-anchor="middle">%s</text>'
+              % ("y" if solid else ("d" if txt == "보조" else "n"), cx + cw // 2, y + 22, txt))
+
+    yb = top + rh * len(order) + 14
+    a('<text class="d" x="8" y="%d">&ldquo;보조&rdquo;는 평가정답이 비었을 때만 쓰는 임시값이다 '
+      '(<tspan class="m">eval_records(allow_floor_fallback=True)</tspan>) &#8212; '
+      '호출부가 그 사실을 경고로 함께 낸다.</text>' % yb)
+    a('<text class="d" x="8" y="%d">계층은 <tspan class="th">라벨이 얼마나 믿을 만한가</tspan>를 말하고, '
+      '출처(<tspan class="m">public_real / customer_real / synthetic / unknown</tspan>)는 '
+      '<tspan class="th">본문이 실제 문서인가</tspan>를 말한다 &#8212; 둘은 직교한다.</text>' % (yb + 20))
+    a('</svg>')
+    return "".join(p)
+
+
+# ── ⑨ 배포 게이트 사다리 ─────────────────────────────────────────────────────
+CHECK_LABELS = {
+    "degenerate": "한 등급으로만 찍는가",
+    "fnr_high_present": "고등급 미탐율을 잴 수 있는가",
+    "fnr_high_regression": "미탐이 기준선보다 나빠졌는가",
+    "f1_regression": "전반 성능이 크게 떨어졌는가",
+    "baseline_present": "비교할 기준선이 있는가",
+    "first_deploy_fnr_floor": "최초 배포 절대 상한을 넘는가",
+    "anchor_high_grade_miss": "앵커에서 고등급을 놓쳤는가",
+    "anchor_eval_skipped": "앵커 리포트가 있는가",
+    "metamorphic_forward_regression": "문체만 바꿨는데 등급이 내려갔는가",
+    "metamorphic_eval_skipped": "메타모픽 리포트가 있는가",
+}
+
+
+def gate_svg() -> str:
+    """deploy_gate.py 에 실제로 있는 검사만 순서대로 그린다."""
+    src = io.open(_HERE.parent / "src" / "koipa" / "modules" / "m6_evaluation" / "deploy_gate.py",
+                  encoding="utf-8").read()
+    names = []
+    for m in re.finditer(r'GateCheck\(\s*"([a-z0-9_]+)"', src):
+        if m.group(1) not in names:
+            names.append(m.group(1))
+    if not names:
+        raise SystemExit("deploy_gate.py 에서 검사 이름을 못 읽었다 — 정규식을 고칠 것")
+    missing = [n for n in names if n not in CHECK_LABELS]
+    if missing:
+        raise SystemExit("검사가 늘었는데 이름이 없다 — CHECK_LABELS 를 갱신할 것: %s" % missing)
+    must = ("degenerate", "fnr_high_present", "fnr_high_regression", "f1_regression",
+            "first_deploy_fnr_floor")
+    gone = [n for n in must if n not in names]
+    if gone:
+        raise SystemExit("문서가 이름을 대는 검사가 코드에서 사라졌다 — 문서와 함께 고칠 것: %s" % gone)
+    fnr_tol = _profile("retrain_fnr_high_tolerance", 0.02)
+    floor = _profile("deploy_gate_first_deploy_fnr_high_max", None)
+
+    always = [n for n in ("degenerate", "fnr_high_present") if n in names]
+    with_base = [n for n in ("fnr_high_regression", "f1_regression") if n in names]
+    no_base = [n for n in ("baseline_present", "first_deploy_fnr_floor") if n in names]
+    tail = [n for n in names if n not in always + with_base + no_base]
+
+    W = 940
+    rh, top = 30, 130
+    nrow = len(always) + max(len(with_base), len(no_base)) + len(tail)
+    H = top + rh * nrow + 160
+    p = []
+    a = p.append
+    a('<svg viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;height:auto" '
+      'xmlns="http://www.w3.org/2000/svg" role="img" '
+      'aria-label="재학습본을 서비스에 올릴지 정하는 배포 게이트 검사들을 순서대로 그린 도식. '
+      '판정할 수 없으면 통과가 아니라 거부다">' % (W, H, W))
+    a('<style>.t{font:12px %s;fill:%s}.th{font:700 12.5px %s;fill:%s}'
+      '.m{font:10.5px ui-monospace,monospace;fill:%s}.d{font:11px %s;fill:%s}'
+      '.n{font:700 11px %s;fill:#fff}.no{font:700 11.5px %s;fill:%s}</style>'
+      % (FONT, INK, FONT, INK, DIM, FONT, DIM, FONT, FONT, BAD))
+    a('<text class="th" x="8" y="26">학습이 끝나면 &#8212; 사람의 인상이 아니라 이 검사들이 승격을 정한다</text>')
+    a('<text class="d" x="8" y="46">원칙은 <tspan class="th">fail-closed</tspan> 다. '
+      '지표가 없거나 리포트가 깨져 <tspan class="th">판정할 수 없으면 통과가 아니라 거부</tspan>다 &#8212; '
+      '미탐을 치명으로 보는 설계에서</text>')
+    a('<text class="d" x="8" y="64">&ldquo;측정 못 함&rdquo;을 &ldquo;이상 없음&rdquo;으로 읽지 않기 위해서다.</text>')
+    a('<rect x="8" y="82" width="%d" height="24" fill="%s"/>' % (W - 16, MID))
+    a('<text class="d" x="20" y="98">입력 &#8212; 재학습 후보 1건. 자동 활성화는 기본 꺼짐'
+      '(<tspan class="m">retrain_auto_activate=False</tspan>)</text>')
+
+    def row(y, i, name, x=8, w=W - 16):
+        a('<rect x="%d" y="%d" width="%d" height="%d" fill="#fafafa" stroke="%s"/>'
+          % (x, y, w, rh - 5, LINE))
+        a('<rect x="%d" y="%d" width="22" height="%d" fill="%s"/>' % (x, y, rh - 5, INK))
+        a('<text class="n" x="%d" y="%d" text-anchor="middle">%s</text>' % (x + 11, y + 17, i))
+        a('<text class="t" x="%d" y="%d">%s</text>' % (x + 32, y + 17, CHECK_LABELS[name]))
+        a('<text class="m" x="%d" y="%d" text-anchor="end">%s</text>' % (x + w - 10, y + 17, name))
+
+    y, i = top, 1
+    for n in always:
+        row(y, i, n)
+        y += rh
+        i += 1
+    a('<text class="d" x="8" y="%d">기준선이 <tspan class="th">있으면</tspan> 왼쪽, '
+      '<tspan class="th">없으면</tspan>(최초 배포) 오른쪽을 본다</text>' % (y + 16))
+    y += 26
+    half = (W - 26) // 2
+    for k in range(max(len(with_base), len(no_base))):
+        if k < len(with_base):
+            row(y, i, with_base[k], 8, half)
+        if k < len(no_base):
+            row(y, i, no_base[k], 18 + half, half)
+        y += rh
+        i += 1
+    for n in tail:
+        row(y, i, n)
+        y += rh
+        i += 1
+
+    a('<rect x="8" y="%d" width="%d" height="26" fill="%s"/>' % (y + 6, W - 16, INK))
+    a('<text class="n" x="20" y="%d">전부 통과해야 승격 &#8212; 판정 결과는 '
+      'tb_training_runs.final_metrics 의 deploy.gate 한 곳에 남는다</text>' % (y + 24))
+    a('<text class="d" x="8" y="%d">허용폭은 설정에서 읽는다 &#8212; '
+      '미탐 악화 허용 <tspan class="th">+%.2f</tspan>%s. 값이 바뀌면 이 그림도 함께 바뀐다.</text>'
+      % (y + 56, fnr_tol,
+         (' &#183; 최초 배포 절대 상한 <tspan class="th">%.2f</tspan>' % floor) if floor else ''))
+    a('<text class="no" x="8" y="%d">미탐(고등급을 낮게 본 것)이 나빠지는 모델은 '
+      '다른 지표가 좋아도 올라가지 않는다 &#8212; 이 시스템의 1순위 축이다.</text>' % (y + 76))
+    a('</svg>')
+    return "".join(p)
+
+
+# 「학습 데이터 입력 경로 명세서」는 세 곳에 같은 본문으로 둔다 — 셋 다 갈아 끼운다.
+_SPEC = ["doc/result/KL_회신_2026-08-28/첨부/학습_데이터_입력_경로_명세서.html",
+         "doc/result/KL_AI자료_2026-08/첨부문서/학습_데이터_입력_경로_명세서.html",
+         "doc/감리문서/학습_데이터_입력_경로_명세서.html"]
+
+
 # ── 주입 ─────────────────────────────────────────────────────────────────────
 FIGS = {
     "seq": (seq_svg, ["doc/result/KL_회신_2026-08-28/KL_API_통신방안_검토회신.html",
@@ -513,6 +776,9 @@ FIGS = {
                         "doc/result/KL_회신_2026-08-28/KL_질의사항_회신서.html",
                         "doc/result/KL_AI자료_2026-08/KL_질의사항_회신서.html"]),
     "ladder": (ladder_svg, ["doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_쉬운설명서.html"]),
+    "paths": (paths_svg, _SPEC),
+    "tiers": (tiers_svg, _SPEC),
+    "gate": (gate_svg, _SPEC),
     "grid": (grid_svg, ["doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_명세서.html",
                         "doc/result/KL_회신_2026-08-28/KL_질의사항_회신서.html",
                         "doc/result/KL_AI자료_2026-08/KL_질의사항_회신서.html"]),

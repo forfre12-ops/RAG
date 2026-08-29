@@ -93,7 +93,7 @@ a{color:#0a0a0a}
       <tr><th>요구사항</th><td><code>FUN-003</code> (합성문서 생성 &mdash; 검수 후 학습셋 편입) · <code>FUN-004</code> (분류 모델 학습) 연계</td></tr>
       <tr><th>대상 코드</th><td><code>services/synthesis_service.py</code> · <code>golden_split.py</code> · <code>golden_tiers.py</code> · <code>m6_evaluation/corrections_rebuild.py</code> · <code>workers/tasks.py</code></td></tr>
       <tr><th>작성일</th><td>2026-08-27</td></tr>
-      <tr><th>최종 개정</th><td>2026-08-29 — 표기 정합 보완</td></tr>
+      <tr><th>도식</th><td>본문 도식은 <code>poc/scripts/build_reply_figures.py</code> 가 코드에서 생성한다 — <code>--check</code> 로 문서와 생성 결과가 같은지 확인한다</td></tr>
       <tr><th>근거 커밋</th><td><code>465bb7ad</code></td></tr>
       <tr><th>검증</th><td><code>cd poc &amp;&amp; python scripts/build_synth_training_set.py --out &lt;경로&gt;</code></td></tr>
     </tbody>
@@ -111,6 +111,8 @@ a{color:#0a0a0a}
 
   <p>학습셋에 사람의 판단이 들어오는 길은 셋이고, 성격이 다르다. 하나는 합성 문서 검수,
   하나는 골든셋 계층 분할, 하나는 운영 중 교정이다.</p>
+
+  <div class="tw"><!-- FIG:paths --><svg viewBox="0 0 940 466" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="사람의 판단이 학습셋으로 들어오는 세 경로가 하나의 학습셋으로 합류하는 도식. 둘은 사람이 실행하고 하나만 조건부 자동이다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:10.5px ui-monospace,monospace;fill:#71717a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 11px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.bgo{font:700 10.5px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.no{font:700 11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><text class="th" x="8" y="26">사람의 판단이 학습셋에 닿는 길은 셋이다</text><text class="d" x="8" y="46">셋 중 <tspan class="th">둘은 사람이 명령을 실행해야</tspan> 진행된다. 자동인 것은 3 하나뿐이고, 그마저 조건을 모두 만족해야 발화한다.</text><rect x="8" y="74" width="470" height="86" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="74" width="24" height="22" fill="#0a0a0a"/><text class="n" x="20" y="90" text-anchor="middle">1</text><text class="th" x="42" y="90">합성 검수 승인</text><text class="m" x="20" y="112">tb_sample_documents (승인분)</text><text class="d" x="20" y="132">위생 게이트 3종 제외 &#183; 교정 등급이 라벨</text><rect x="372" y="80" width="96" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="420" y="94" text-anchor="middle">사람이 실행</text><path d="M478,117 H560 V215 H604" fill="none" stroke="#0a0a0a" marker-end="url(#pah)"/><rect x="8" y="180" width="470" height="86" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="180" width="24" height="22" fill="#0a0a0a"/><text class="n" x="20" y="196" text-anchor="middle">2</text><text class="th" x="42" y="196">골든 후보 분할</text><text class="m" x="20" y="218">gold_candidate</text><text class="d" x="20" y="238">등급 층화 75/25 &#183; 누수 행 선제거</text><rect x="372" y="186" width="96" height="20" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="bgo" x="420" y="200" text-anchor="middle">사람이 실행</text><path d="M478,223 H560 V215 H604" fill="none" stroke="#0a0a0a" marker-end="url(#pah)"/><rect x="8" y="286" width="470" height="86" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="286" width="24" height="22" fill="#0a0a0a"/><text class="n" x="20" y="302" text-anchor="middle">3</text><text class="th" x="42" y="302">운영 교정</text><text class="m" x="20" y="324">tb_corrections (미소비)</text><text class="d" x="20" y="344">홀드아웃과 겹치면 병합 제외 &#183; 반영분만 소비</text><rect x="372" y="292" width="96" height="20" fill="#0a0a0a" stroke="#0a0a0a"/><text class="n" x="420" y="306" text-anchor="middle">자동(조건부)</text><path d="M478,329 H560 V215 H604" fill="none" stroke="#0a0a0a" marker-end="url(#pah)"/><rect x="610" y="177" width="300" height="76" fill="#0a0a0a"/><text class="n" x="624" y="200">학습셋</text><text class="n" x="624" y="222">train.jsonl &#183; val.jsonl &#183; test.jsonl</text><text class="n" x="624" y="242">datasets/labeled_p1_v5_clean</text><rect x="8" y="400" width="924" height="46" fill="#fff" stroke="#7f1d1d"/><text class="no" x="20" y="420">어느 경로로도 들어오지 않는 것 &#8212; <tspan class="m">locked_gold_eval</tspan>(평가정답) &#183; <tspan class="m">held_review</tspan>(격리분)</text><text class="d" x="20" y="438">학습 허용 계층은 <tspan class="m">golden_tiers.TRAIN_TIERS</tspan> 허용목록이 정한다 &#8212; 목록에 없는 계층은 기본이 제외다.</text><defs><marker id="pah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#0a0a0a"/></marker></defs></svg><!-- /FIG:paths --></div>
 
   <div class="tw">
   <table>
@@ -211,6 +213,8 @@ python scripts/build_synth_training_set.py --out datasets/synth_approved/train.j
   <p>골든셋은 한 덩어리가 아니라 계층으로 나뉘고, <b>계층마다 쓸 수 있는 용도가 다르다.</b>
   이 구분이 무너지면 시험 문제로 공부하고 그 시험을 보는 것(train-on-test)이 된다.</p>
 
+  <div class="tw"><!-- FIG:tiers --><svg viewBox="0 0 940 384" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="골든셋 계층마다 학습과 평가에 쓸 수 있는지를 표시한 격자. 평가정답 계층은 학습 금지, 격리 계층은 양쪽 다 금지다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:10.5px ui-monospace,monospace;fill:#71717a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.y{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.n{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><text class="th" x="8" y="26">계층마다 쓸 수 있는 곳이 다르다 &#8212; 이 구분이 무너지면 시험 문제로 공부하고 그 시험을 본다</text><text class="d" x="8" y="46">허용은 <tspan class="m">golden_tiers.TRAIN_TIERS</tspan> 와 <tspan class="m">eval_records()</tspan> 가 정본이다. 이 그림은 그 둘을 불러 칠한다.</text><text class="d" x="8" y="66"><tspan class="th">양쪽 다 금지인 칸이 있다</tspan> &#8212; &ldquo;평가에서 뺐으니 학습에는 써도 되겠지&rdquo;가 성립하지 않는다는 뜻이다.</text><text class="th" x="710" y="96" text-anchor="middle">학습</text><text class="th" x="830" y="96" text-anchor="middle">평가</text><rect x="8" y="108" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="124">locked_gold_eval</text><text class="d" x="20" y="138">사람 서명이 끝난 평가정답 &#183; 학습에 넣으면 성능 수치가 무의미해진다</text><rect x="660" y="114" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="710" y="130" text-anchor="middle">금지</text><rect x="780" y="114" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="830" y="130" text-anchor="middle">허용</text><rect x="8" y="148" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="164">gold_candidate</text><text class="d" x="20" y="178">자동 게이트 통과 &#183; 서명 대기 &#183; 라벨이 믿을 만해 학습에 쓴다</text><rect x="660" y="154" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="710" y="170" text-anchor="middle">허용</text><rect x="780" y="154" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="830" y="170" text-anchor="middle">금지</text><rect x="8" y="188" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="204">silver_train</text><text class="d" x="20" y="218">그 밖의 기계 라벨 &#183; 학습 시드 전용</text><rect x="660" y="194" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="710" y="210" text-anchor="middle">허용</text><rect x="780" y="194" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="830" y="210" text-anchor="middle">금지</text><rect x="8" y="228" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="244">legal_floor</text><text class="d" x="20" y="258">법적 기준으로 등급이 정해지는 것 &#183; 평가정답이 빌 때만 임시 평가로 쓴다</text><rect x="660" y="234" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="710" y="250" text-anchor="middle">허용</text><rect x="780" y="234" width="100" height="22" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="d" x="830" y="250" text-anchor="middle">보조</text><rect x="8" y="268" width="924" height="36" fill="#fff5f5" stroke="#7f1d1d"/><text class="m" x="20" y="284">held_review</text><text class="d" x="20" y="298">서명이 무효이거나 본문이 합성인 격리분 &#183; 어느 쪽으로도 쓰지 않는다</text><rect x="660" y="274" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="710" y="290" text-anchor="middle">금지</text><rect x="780" y="274" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="830" y="290" text-anchor="middle">금지</text><text class="d" x="8" y="322">&ldquo;보조&rdquo;는 평가정답이 비었을 때만 쓰는 임시값이다 (<tspan class="m">eval_records(allow_floor_fallback=True)</tspan>) &#8212; 호출부가 그 사실을 경고로 함께 낸다.</text><text class="d" x="8" y="342">계층은 <tspan class="th">라벨이 얼마나 믿을 만한가</tspan>를 말하고, 출처(<tspan class="m">public_real / customer_real / synthetic / unknown</tspan>)는 <tspan class="th">본문이 실제 문서인가</tspan>를 말한다 &#8212; 둘은 직교한다.</text></svg><!-- /FIG:tiers --></div>
+
   <div class="tw">
   <table>
     <thead><tr>
@@ -285,7 +289,11 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
   </table>
   </div>
 
-  <p>야간 무인 실행을 기본에서 뺀 이유는 새벽에 실패하면 알아차릴 사람이 없기 때문이다.
+  <p>야간 무인 실행을 기본에서 뺀 이유는 셋이고, 전부 실측 근거다(&sect;7).
+  ① 이 틱이 태우는 것은 증분분이 아니라 기본 <code>TrainSpec</code> &mdash; 5에폭 전체 미세조정이다.
+  2,042행에 약 4.5시간이라(AVX-512 &middot; 8스레드) 야간 안에 끝나지 않는다(&sect;7 실측).
+  ② 고객사 프로파일 워커 4GiB 에서는 40초 만에 OOM 으로 죽는다.
+  ③ 새벽에 실패하면 알아차릴 사람이 없다.
   관리자가 버튼을 눌러도 목적(<b>고객사 교정을 반출하지 않고 현장에서 반영</b>)은 그대로
   달성된다 &mdash; 반출은 어느 쪽이든 0 이다.</p>
 
@@ -323,11 +331,19 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       <tr><td><code>fnr_high_regression</code></td><td>후보 <code>fnr_high</code> &gt; 기준선 <b>+ 0.02</b></td><td>미탐이 나빠지는 모델은 다른 지표가 좋아도 올리지 않는다. 이 시스템의 1순위 축이다</td></tr>
       <tr><td><code>f1_regression</code></td><td>후보 F1-macro &lt; 기준선 <b>&minus; 0.05</b></td><td>미탐이 같아도 전반 성능이 크게 떨어지면 회귀다</td></tr>
       <tr><td><code>first_deploy_fnr_floor</code></td><td>기준선이 없을 때 <code>fnr_high</code> &gt; <b>0.10</b></td><td>비교 대상이 없는 최초 배포에도 절대 상한을 둔다</td></tr>
-      <tr><td><code>anchor</code></td><td>앵커 평가에서 고등급(TS&middot;S1) 미탐 칸이 <b>1개라도</b> FAIL</td><td>등급별 최소 보증을 지표 평균이 가리지 못하게 한다</td></tr>
+      <tr><td><code>anchor_high_grade_miss</code></td><td>앵커 평가에서 고등급(TS&middot;S1) 미탐 칸이 <b>1개라도</b> FAIL</td><td>등급별 최소 보증을 지표 평균이 가리지 못하게 한다</td></tr>
       <tr><td><code>metamorphic_forward_regression</code></td><td>사실을 유지한 채 문체만 바꾼 쌍에서 등급이 내려간 위반율의 <b>신뢰구간 하한 &gt; 0</b></td><td>표현이 바뀌었다고 등급이 내려가면 미탐 경로다. 표본이 5 쌍 미만이면 측정 불가로 두고 통과시키지 않는 대신 검사를 생략한다</td></tr>
     </tbody>
   </table>
   </div>
+
+  <div class="tw"><!-- FIG:gate --><svg viewBox="0 0 940 530" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="재학습본을 서비스에 올릴지 정하는 배포 게이트 검사들을 순서대로 그린 도식. 판정할 수 없으면 통과가 아니라 거부다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:10.5px ui-monospace,monospace;fill:#71717a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 11px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.no{font:700 11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><text class="th" x="8" y="26">학습이 끝나면 &#8212; 사람의 인상이 아니라 이 검사들이 승격을 정한다</text><text class="d" x="8" y="46">원칙은 <tspan class="th">fail-closed</tspan> 다. 지표가 없거나 리포트가 깨져 <tspan class="th">판정할 수 없으면 통과가 아니라 거부</tspan>다 &#8212; 미탐을 치명으로 보는 설계에서</text><text class="d" x="8" y="64">&ldquo;측정 못 함&rdquo;을 &ldquo;이상 없음&rdquo;으로 읽지 않기 위해서다.</text><rect x="8" y="82" width="924" height="24" fill="#f4f4f5"/><text class="d" x="20" y="98">입력 &#8212; 재학습 후보 1건. 자동 활성화는 기본 꺼짐(<tspan class="m">retrain_auto_activate=False</tspan>)</text><rect x="8" y="130" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="130" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="147" text-anchor="middle">1</text><text class="t" x="40" y="147">한 등급으로만 찍는가</text><text class="m" x="922" y="147" text-anchor="end">degenerate</text><rect x="8" y="160" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="160" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="177" text-anchor="middle">2</text><text class="t" x="40" y="177">고등급 미탐율을 잴 수 있는가</text><text class="m" x="922" y="177" text-anchor="end">fnr_high_present</text><text class="d" x="8" y="206">기준선이 <tspan class="th">있으면</tspan> 왼쪽, <tspan class="th">없으면</tspan>(최초 배포) 오른쪽을 본다</text><rect x="8" y="216" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="216" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="233" text-anchor="middle">3</text><text class="t" x="40" y="233">미탐이 기준선보다 나빠졌는가</text><text class="m" x="455" y="233" text-anchor="end">fnr_high_regression</text><rect x="475" y="216" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="475" y="216" width="22" height="25" fill="#0a0a0a"/><text class="n" x="486" y="233" text-anchor="middle">3</text><text class="t" x="507" y="233">비교할 기준선이 있는가</text><text class="m" x="922" y="233" text-anchor="end">baseline_present</text><rect x="8" y="246" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="246" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="263" text-anchor="middle">4</text><text class="t" x="40" y="263">전반 성능이 크게 떨어졌는가</text><text class="m" x="455" y="263" text-anchor="end">f1_regression</text><rect x="475" y="246" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="475" y="246" width="22" height="25" fill="#0a0a0a"/><text class="n" x="486" y="263" text-anchor="middle">4</text><text class="t" x="507" y="263">최초 배포 절대 상한을 넘는가</text><text class="m" x="922" y="263" text-anchor="end">first_deploy_fnr_floor</text><rect x="8" y="276" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="276" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="293" text-anchor="middle">5</text><text class="t" x="40" y="293">앵커에서 고등급을 놓쳤는가</text><text class="m" x="922" y="293" text-anchor="end">anchor_high_grade_miss</text><rect x="8" y="306" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="306" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="323" text-anchor="middle">6</text><text class="t" x="40" y="323">앵커 리포트가 있는가</text><text class="m" x="922" y="323" text-anchor="end">anchor_eval_skipped</text><rect x="8" y="336" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="336" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="353" text-anchor="middle">7</text><text class="t" x="40" y="353">문체만 바꿨는데 등급이 내려갔는가</text><text class="m" x="922" y="353" text-anchor="end">metamorphic_forward_regression</text><rect x="8" y="366" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="366" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="383" text-anchor="middle">8</text><text class="t" x="40" y="383">메타모픽 리포트가 있는가</text><text class="m" x="922" y="383" text-anchor="end">metamorphic_eval_skipped</text><rect x="8" y="402" width="924" height="26" fill="#0a0a0a"/><text class="n" x="20" y="420">전부 통과해야 승격 &#8212; 판정 결과는 tb_training_runs.final_metrics 의 deploy.gate 한 곳에 남는다</text><text class="d" x="8" y="452">허용폭은 설정에서 읽는다 &#8212; 미탐 악화 허용 <tspan class="th">+0.02</tspan> &#183; 최초 배포 절대 상한 <tspan class="th">0.10</tspan>. 값이 바뀌면 이 그림도 함께 바뀐다.</text><text class="no" x="8" y="472">미탐(고등급을 낮게 본 것)이 나빠지는 모델은 다른 지표가 좋아도 올라가지 않는다 &#8212; 이 시스템의 1순위 축이다.</text></svg><!-- /FIG:gate --></div>
+
+  <div class="note">검사 이름은 코드에 9 개가 있고, <b>한 실행에서 도는 것은 기준선 유무에 따라 갈린다</b> &mdash;
+  기준선이 있으면 <code>fnr_high_regression</code> &middot; <code>f1_regression</code> 을,
+  없으면(최초 배포) <code>baseline_present</code> &middot; <code>first_deploy_fnr_floor</code> 를 본다.
+  앵커&middot;메타모픽은 리포트가 없으면 <code>*_eval_skipped</code> 로 기록된다 &mdash;
+  강제 옵트인 운영에서는 리포트 부재 자체가 거부 사유다. 위 도식이 이 갈래를 그린 것이다.</div>
 
   <p class="src">근거 &mdash; <code>poc/src/koipa/modules/m6_evaluation/deploy_gate.py</code>(검사 정의) &middot;
   <code>poc/src/koipa/config.py</code>(<code>retrain_fnr_high_tolerance</code> 0.02 &middot;
@@ -395,10 +411,32 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         <td><code>pytest tests/test_synth_training_build.py</code> &mdash; 위생 게이트 제외, 교정 라벨 우선, 미승인 무시, 교정의 표본 간 누출 없음</td>
       </tr>
       <tr>
-        <td>CPU 증분 재학습 소요</td><td class="c">약 1시간 / 1,000건</td>
-        <td>2026-07-20 회원사 노드(CPU 전용) 별도 계측 &mdash; 처리 시간만이다.
-        이 저장소에는 해당 계측 리포트 파일이 없다(<code>poc/reports</code> 557개 대조, 2026-08-29).
-        다시 재는 방법은 &sect;8 에 적었다</td>
+        <td>재학습 소요 &mdash; 실측</td><td class="c">1,000행 약 2시간<br>(AVX-512 &middot; 8스레드)</td>
+        <td><b>단일 숫자가 아니다 &mdash; CPU 사양과 스레드 수로 갈린다.</b>
+        아래는 기본 <code>TrainSpec</code>(5에폭 &middot; batch 8 &middot; max_seq 512) 기준이며
+        스텝 수는 <code>ceil(행수 / batch_size) &times; epochs</code> 로 정해진다.
+        <br>
+        <table style="margin:6px 0">
+          <thead><tr><th>환경</th><th>스텝당</th><th>1,000행(625스텝)</th><th>2,042행(1,280스텝)</th></tr></thead>
+          <tbody>
+            <tr><td>AVX-512 &middot; 8스레드</td><td class="c">10.9&ndash;11.9초</td>
+                <td class="c"><b>약 2시간</b></td><td class="c">약 4.5시간</td></tr>
+            <tr><td>AVX-512 &middot; 4스레드</td><td class="c">15.4초</td>
+                <td class="c">약 2.7시간</td><td class="c">&mdash;</td></tr>
+          </tbody>
+        </table>
+        두 줄 모두 2026-08-30 실측(AMD Zen4 &middot; CPU 전용 &middot; 30스텝 안정값).
+        <b>스레드를 4에서 8로 늘려 얻는 것은 1.3배</b>다.
+        <br>재는 방법 &mdash;
+        <code>cd poc &amp;&amp; python scripts/measure_train_step_rate.py --rows 1000 --threads 4 8</code>.
+        <b>학습 구간만이다</b> &mdash; 에폭별 평가와 체크포인트 저장은 빠져 있어 실제 벽시계는 이보다 길다</td>
+      </tr>
+      <tr>
+        <td>재학습 자원 &mdash; 실측</td><td class="c">4GiB 에서 OOMKilled</td>
+        <td>고객사 프로파일 워커(<code>WORKER_MEM_LIMIT</code> 기본 <code>4G</code> &middot;
+        <code>docker-compose.prod.yml</code>)에서 같은 태스크를 발화하니 <b>40초 만에</b> 죽었다(2026-08-08).
+        메모리는 CPU 속도와 무관해 하드웨어를 바꿔도 그대로다. 이것이 야간 무인 발화를 기본에서 뺀
+        이유다(&sect;4-3) &mdash; <code>enable_nightly_retrain_schedule</code> 기본값 <code>False</code></td>
       </tr>
       <tr>
         <td>코드 스키마 head</td><td class="c"><code>d1a2b3c4e5f7</code></td>
@@ -425,7 +463,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       </tr>
       <tr>
         <td>재학습 소요 시간의 <b>시스템 자동 기록</b></td>
-        <td>비어 있다. 처리 시간 자체는 &sect;7 에 실측치를 적었으나, 그것은 별도 계측이고
+        <td>비어 있다. 소요 시간은 &sect;7 에 실측치가 있으나 사람이 따로 잰 값이고,
         시스템이 스스로 남긴 값이 아니다. 기록할 자리는 스키마에 있으나(<code>tb_training_runs</code> 의
         <code>duration_sec</code> &middot; <code>started_at</code> &middot; <code>completed_at</code> &middot;
         <code>total_samples</code>) 배포 모델 아티팩트의 <code>report.json</code> 에는 지표만 있고 시간 키가 없다.
@@ -436,7 +474,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       </tr>
       <tr>
         <td>재학습의 <b>품질 개선 폭</b></td>
-        <td>측정하지 않았다. &sect;7 의 &ldquo;1시간 / 1,000건&rdquo;은 <b>처리 시간</b>이며,
+        <td>측정하지 않았다. &sect;7 의 값은 <b>처리 시간</b>이며,
         재학습으로 F1 이 얼마나 오르는지는 잰 적이 없다. 회원사 실데이터가 쌓여야 잴 수 있는 값이라
         추정치로 채우지 않는다</td>
       </tr>
@@ -444,20 +482,6 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         <td>경로 1 의 종단 실행 실적</td>
         <td>실측하지 못했다. 개발 DB 에 합성 표본이 0 건이고, 변환 명령은 응용 컨테이너 안에서만 실행된다(DB 포트가 호스트로 게시돼 있지 않다). 로직 자체는 &sect;7 의 시험 8 건으로 확인했다</td>
       </tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>9. 개정 이력</h2>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
-    <tbody>
-      <tr><td class="c">1</td><td class="n">2026-08-27</td><td><code>465bb7ad</code></td><td>최초 작성 &mdash; 코드에서 세 경로를 확인해 신규 작성. 계층별 학습 허용 계약&middot;누수 차단&middot;발화 조건 반영</td></tr>
-      <tr><td class="c">2</td><td class="n">2026-08-27</td><td><code>1d865f6c</code></td><td>개발 DB 스키마를 코드 head 로 맞추고 &sect;7 에 시험 실적&middot;스키마 판을 추가. &sect;8 의 미측정 사유를 구체화</td></tr>
-      <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>20d8b0f7</code></td><td>질의 가-7 이 물은 네 항목에 맞춰 두 곳을 채운다. &sect;4-5 에 <b>성능 검증 방법</b>을 넣었다 &mdash; 종전에는 &ldquo;후보로만 등록된다&rdquo;는 활성화 정책만 있었고 무엇으로 판정하는지가 없었다. 자동 게이트 7 개 검사(<code>degenerate</code> &middot; <code>fnr_high_present</code> &middot; <code>fnr_high_regression</code> 허용 +0.02 &middot; <code>f1_regression</code> 허용 &minus;0.05 &middot; <code>first_deploy_fnr_floor</code> 0.10 &middot; <code>anchor</code> &middot; <code>metamorphic_forward_regression</code>)와 fail-closed 원칙을 코드에서 옮겨 적었다. &sect;8 에는 <b>재학습 소요 시간&middot;자원이 미측정</b>임을 명시하고 재는 명령을 함께 적었다 &mdash; 기록 자리는 <code>tb_training_runs.duration_sec</code> 에 있으나 아티팩트 <code>report.json</code> 에는 시간 키가 없다. 추정치로 채우지 않는다. 경로&middot;계약&middot;코드는 불변이며 서술만 늘린다</td></tr>
-      <tr><td class="c">4</td><td class="n">2026-08-29</td><td><code>(본 커밋)</code></td><td>묶음 안에서 <b>가-7 의 소요 시간&middot;자원</b>이 서로 다른 말을 하던 것을 맞춘다 &mdash; 「질의사항 회신서」 &sect;11-1 은 &ldquo;약 1시간 / 1,000건 실측&rdquo;이라 적고 본 문서 &sect;8 은 &ldquo;측정하지 않았다&rdquo;고 적어, 같은 질의의 답이 두 갈래였다. 실제로는 <b>처리 시간은 2026-07-20 에 쟀고</b>(회원사 CPU 노드 · 별도 계측), <b>안 잰 것은 품질 개선 폭과 시스템 자동 기록</b>이다. 실측치는 &sect;7 로 옮기고 &sect;8 은 그 둘만 남겼다. 아울러 세 경로&middot;계층 계약&middot;배포 게이트를 코드에서 생성한 도식 셋을 넣었다(<code>scripts/build_reply_figures.py</code>). 경로&middot;계약&middot;코드는 불변이다</td></tr>
-      <tr><td class="c">5</td><td class="n">2026-08-29</td><td><code>&mdash;</code></td><td>스키마 판 표기를 실측에 맞춘다 &mdash; <b>코드 head 와 시험 서버(223)의 판이 모두 <code>d1a2b3c4e5f7</code></b> 로 같다(미사용 칼럼 10개를 뺀 판이 head 다). 종전에는 두 곳 모두 구판을 적어 서버가 뒤처져 있는 것으로 읽혔다.</td></tr>
     </tbody>
   </table>
   </div>
