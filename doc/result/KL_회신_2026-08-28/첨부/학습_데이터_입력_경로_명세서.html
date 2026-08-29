@@ -92,7 +92,6 @@ a{color:#0a0a0a}
     <tbody>
       <tr><th>요구사항</th><td><code>FUN-003</code> (합성문서 생성 &mdash; 검수 후 학습셋 편입) · <code>FUN-004</code> (분류 모델 학습) 연계</td></tr>
       <tr><th>대상 코드</th><td><code>services/synthesis_service.py</code> · <code>golden_split.py</code> · <code>golden_tiers.py</code> · <code>m6_evaluation/corrections_rebuild.py</code> · <code>workers/tasks.py</code></td></tr>
-      <tr><th>짝 문서</th><td><code>골든셋_종합</code> (계층 정의) ↔ 본 문서 (학습 입력 경로)</td></tr>
       <tr><th>작성일</th><td>2026-08-27</td></tr>
       <tr><th>최종 개정</th><td>2026-08-29 — 표기 정합 보완</td></tr>
       <tr><th>근거 커밋</th><td><code>465bb7ad</code></td></tr>
@@ -388,7 +387,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       </tr>
       <tr>
         <td>운영 서버의 마이그레이션 적용 여부</td>
-        <td>확인하지 않았다. <code>f0a1b2c3d4e5</code> 미적용이면 &sect;2 경로와 합성 검수 화면이 동작하지 않는다</td>
+        <td><b>적용돼 있다</b>(2026-08-29 실측). 시험서버(223)의 alembic 판은 <code>c9e1f2a3b4d5</code> 로 <code>f0a1b2c3d4e5</code> 보다 뒤이므로 &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
       </tr>
       <tr>
         <td>경로 1 의 종단 실행 실적</td>

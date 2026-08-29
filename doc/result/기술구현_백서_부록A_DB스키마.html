@@ -305,7 +305,7 @@ document.addEventListener("click",function(e){if(!e.target.closest(".erd-node"))
       <span class="group-title">등급체계</span>
     </div>
     <div class="group-desc">TS·S1·S2·S3 등급 정의, 평가 인자(정본 3요건 S·V·M), 키워드 시드.</div>
-    <div class="group-desc"><b>정수 대리키 채번 방식.</b> 아래 표들의 자동채번 정수 PK 9 개를 표준 <code>GENERATED ALWAYS AS IDENTITY</code> 로 정의한다. <code>SERIAL</code> 은 PostgreSQL 고유 표기라 표준 SQL 이 아니고, 임의 값 삽입을 막지 못한다. 소스와 마이그레이션은 전환을 마쳤다(<code>c9e1f2a3b4d5</code> · 223 실데이터 트랜잭션 검증 완료). <b>시험서버(223) 반영은 설계 감리 종료 후</b>이며, 감리 기간에는 서버를 바꾸지 않는다. 전환 계획과 검증 결과는 「DB 대리키 표준화 전환계획」 참조.</div>
+    <div class="group-desc"><b>정수 대리키 채번 방식.</b> 아래 표들의 자동채번 정수 PK 9 개를 표준 <code>GENERATED ALWAYS AS IDENTITY</code> 로 정의한다. <code>SERIAL</code> 은 PostgreSQL 고유 표기라 표준 SQL 이 아니고, 임의 값 삽입을 막지 못한다. 소스와 마이그레이션은 전환을 마쳤다(<code>c9e1f2a3b4d5</code> · 223 실데이터 트랜잭션 검증 완료). <b>시험서버(223)에도 2026-08-29 적용을 마쳤다</b> — alembic 판 <code>c9e1f2a3b4d5</code> · GENERATED ALWAYS 9개 · <code>nextval</code> 기본값 0 · 명시 id INSERT 거부 확인. 전환 절차와 확인 항목은 「DB 대리키 표준화 전환계획」에 있다. 전환 계획과 검증 결과는 「DB 대리키 표준화 전환계획」 참조.</div>
 
     <section id="t-classification-levels">
       <h3>tb_classification_levels</h3>

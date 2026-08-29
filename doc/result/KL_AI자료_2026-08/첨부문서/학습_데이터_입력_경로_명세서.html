@@ -388,7 +388,7 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       </tr>
       <tr>
         <td>운영 서버의 마이그레이션 적용 여부</td>
-        <td>확인하지 않았다. <code>f0a1b2c3d4e5</code> 미적용이면 &sect;2 경로와 합성 검수 화면이 동작하지 않는다</td>
+        <td><b>적용돼 있다</b>(2026-08-29 실측). 시험서버(223)의 alembic 판은 <code>c9e1f2a3b4d5</code> 로 <code>f0a1b2c3d4e5</code> 보다 뒤이므로 &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
       </tr>
       <tr>
         <td>경로 1 의 종단 실행 실적</td>
