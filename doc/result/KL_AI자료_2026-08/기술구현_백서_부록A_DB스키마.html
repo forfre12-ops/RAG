@@ -309,13 +309,14 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
       <span class="group-title">등급체계</span>
     </div>
     <div class="group-desc">TS·S1·S2·S3 등급 정의, 평가 인자(정본 3요건 S·V·M), 키워드 시드.</div>
+    <div class="group-desc"><b>정수 대리키 채번 방식.</b> 아래 표들의 자동채번 정수 PK 9 개는 현재 <code>SERIAL</code> / <code>BIGSERIAL</code> 로 생성된다. <code>SERIAL</code> 은 표준 SQL 이 아니어서 표준 <code>GENERATED ALWAYS AS IDENTITY</code> 로의 전환을 준비해 두었다(마이그레이션 <code>a1b2c3d4e5f6</code> · 223 실데이터 트랜잭션 검증 완료 · <b>설계 감리 후 적용</b>). 전환 계획과 검증 결과는 「DB 대리키 표준화 전환계획」 참조.</div>
 
     <section id="t-classification-levels">
       <h3>tb_classification_levels<span class="logical-name">분류 등급</span></h3>
       <div class="tbl-wrap"><table>
         <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
         <tbody>
-          <tr><td class="td-pk">level_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-pk">level_id</td><td class="td-type">INTEGER PK · 자동채번 SERIAL</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">level_code</td><td class="td-type">VARCHAR(20) UNIQUE</td><td class="td-nn yes">●</td><td>TS · S1 · S2 · S3</td></tr>
           <tr><td class="td-col">level_name</td><td class="td-type">VARCHAR(50)</td><td class="td-nn yes">●</td><td>특급기밀 / 기밀 / 대외비 / 일반</td></tr>
           <tr><td class="td-col">level_order</td><td class="td-type">SMALLINT</td><td class="td-nn yes">●</td><td>정렬 순서 (1=최고등급)</td></tr>
@@ -334,7 +335,7 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
       <div class="tbl-wrap"><table>
         <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
         <tbody>
-          <tr><td class="td-pk">factor_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-pk">factor_id</td><td class="td-type">INTEGER PK · 자동채번 SERIAL</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">factor_code</td><td class="td-type">VARCHAR(30) UNIQUE</td><td class="td-nn yes">●</td><td>정본: SECRECY · VALUE · MANAGEMENT (is_active=TRUE) / 레거시(is_active=FALSE): NON_PUBLICITY · ECONOMIC_VALUE · MANAGEMENT_LEVEL · LEAK_IMPACT</td></tr>
           <tr><td class="td-col">factor_name</td><td class="td-type">VARCHAR(100)</td><td class="td-nn yes">●</td><td>비공지성(S) / 경제적 유용성(V) / 비밀관리성(M)</td></tr>
           <tr><td class="td-col">weight</td><td class="td-type">NUMERIC(3,2)</td><td class="td-nn yes">●</td><td>미사용 (곱셈식 등급 = S×V×M, 가중치 가산 안 함). 하위호환 기본 1.0. weight 합계=1.0 트리거 제거됨</td></tr>
@@ -349,7 +350,7 @@ btns.forEach(function(b){b.addEventListener("click",function(){apply(b.dataset.m
       <div class="tbl-wrap"><table>
         <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
         <tbody>
-          <tr><td class="td-pk">keyword_id</td><td class="td-type">INTEGER PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-pk">keyword_id</td><td class="td-type">INTEGER PK · 자동채번 SERIAL</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-fk">level_id</td><td class="td-type">FK → tb_classification_levels</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">keyword</td><td class="td-type">VARCHAR(200)</td><td class="td-nn yes">●</td><td>예: "영업비밀" · "M&A" · "연구노트"</td></tr>
           <tr><td class="td-col">pattern_type</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>exact / regex / semantic</td></tr>
@@ -518,7 +519,7 @@ LIMIT  5;</pre>
       <div class="tbl-wrap"><table>
         <thead><tr><th>컬럼</th><th>타입</th><th>NOT NULL</th><th>설명</th></tr></thead>
         <tbody>
-          <tr><td class="td-pk">evidence_id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td class="td-nn yes">●</td><td></td></tr>
+          <tr><td class="td-pk">evidence_id</td><td class="td-type">BIGINT PK · 자동채번 BIGSERIAL</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-fk">classification_id</td><td class="td-type">FK → tb_classifications CASCADE</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">chunk_id</td><td class="td-type">UUID</td><td class="td-nn yes">●</td><td></td></tr>
           <tr><td class="td-col">evidence_type</td><td class="td-type">VARCHAR(20)</td><td class="td-nn yes">●</td><td>keyword / rag / model</td></tr>
@@ -608,7 +609,7 @@ LIMIT  5;</pre>
       <div class="tbl-wrap"><table>
         <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
         <tbody>
-          <tr><td class="td-pk">id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td></td></tr>
+          <tr><td class="td-pk">id</td><td class="td-type">BIGINT PK · 자동채번 BIGSERIAL</td><td></td></tr>
           <tr><td class="td-fk">run_id</td><td class="td-type">FK → tb_training_runs CASCADE</td><td></td></tr>
           <tr><td class="td-fk">doc_id</td><td class="td-type">FK → tb_documents</td><td></td></tr>
           <tr><td class="td-col">split_type</td><td class="td-type">VARCHAR(10)</td><td>train / val / test</td></tr>
@@ -627,7 +628,7 @@ LIMIT  5;</pre>
     <div class="tbl-wrap"><table>
       <thead><tr><th>컬럼</th><th>타입</th><th>설명</th></tr></thead>
       <tbody>
-        <tr><td class="td-pk">correction_id</td><td class="td-type">BIGINT PK AUTOINCREMENT</td><td></td></tr>
+        <tr><td class="td-pk">correction_id</td><td class="td-type">BIGINT PK · 자동채번 BIGSERIAL</td><td></td></tr>
         <tr><td class="td-fk">classification_id</td><td class="td-type">FK → tb_classifications CASCADE</td><td></td></tr>
         <tr><td class="td-fk">original_level_id</td><td class="td-type">FK → tb_classification_levels</td><td>AI 예측 등급</td></tr>
         <tr><td class="td-fk">corrected_level_id</td><td class="td-type">FK → tb_classification_levels</td><td>검수자 확정 등급 (confirm 시 predicted와 동일)</td></tr>

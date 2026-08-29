@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DB 대리키 표준화 전환계획</title>
+<style>
+:root{--bg:#fff;--ink:#0a0a0a;--dim:#71717a;--line:rgba(0,0,0,.1);--band:#0a0a0a;--surf:#fafafa;--mid:#f4f4f5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.7;letter-spacing:-.01em}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px 80px}
+.top{border-bottom:2px solid var(--band);padding:28px 0 16px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-family:ui-monospace,monospace}
+h1{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:10px 0 6px}
+.meta{font-size:12.5px;color:var(--dim)}
+h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:38px 0 12px}
+h3{font-size:14.5px;font-weight:700;margin:22px 0 6px 18px}
+p{margin:8px 0 8px 18px}
+ul,ol{margin:8px 0 8px 18px;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--mid);font-weight:700}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{text-align:center;white-space:nowrap;font-weight:700}
+code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
+.note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
+.tw{overflow-x:auto;margin-left:18px}
+.src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
+.foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+.on{color:#0a0a0a}
+.off{color:#71717a}
+.warn{background:#fff8e1}
+.grp{background:var(--mid);font-weight:800}
+a{color:#0a0a0a}
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.9);backdrop-filter:saturate(160%) blur(16px);-webkit-backdrop-filter:saturate(160%) blur(16px);border-bottom:1px solid rgba(0,0,0,.14)}
+.nav-inner{max-width:1000px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:inline-flex;align-items:center;gap:8px;color:#0a0a0a;text-decoration:none;min-width:0}
+.brand-mark{width:36px;height:36px;display:grid;place-items:center;flex-shrink:0;background:#fff;border-radius:8px;padding:4px;border:1px solid rgba(0,0,0,.12)}
+.brand-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:4px}
+.brand-name{font-weight:700;font-size:14.5px;letter-spacing:-.02em;white-space:nowrap}
+.brand-sep{color:#a1a1aa;font-size:13px;margin:0 4px;flex-shrink:0}
+.brand-sub{font-size:12.5px;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-badge{background:#7f1d1d;color:#fff;font-family:ui-monospace,monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;white-space:nowrap}
+
+/* 인쇄본(제안요청서 PMR-003 "인쇄본 및 관련 원본파일") 대응 */
+@page{size:A4;margin:18mm 14mm}
+@media print{
+  .nav{display:none}
+  .wrap{max-width:none;padding:0}
+  body{font-size:10pt;color:#000}
+  h1{font-size:18pt}
+  h2{font-size:12pt;break-after:avoid;page-break-after:avoid}
+  h3{break-after:avoid;page-break-after:avoid}
+  table{font-size:8.5pt}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  .docinfo{break-inside:avoid;page-break-inside:avoid}
+  /* [2026-08-29] .note 까지 통째로 avoid 하면 긴 안내 상자가 다음 쪽으로 밀리면서
+     앞쪽에 빈 면이 생긴다(인쇄 실측). 상자는 나뉘도록 두되 첫/끝 줄만 붙잡는다. */
+  .note{orphans:3;widows:3}
+  a{text-decoration:none;color:#000}
+}
+.docinfo{font-size:12px;margin:14px 0}
+.docinfo th{width:110px;background:var(--mid);white-space:nowrap}
+.ok{color:#166534;font-weight:700}
+.gap{color:#7f1d1d;font-weight:700}
+.part{color:#92400e;font-weight:700}
+.flow{background:var(--surf);border:1px solid var(--line);padding:14px 16px;margin:12px 0;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;white-space:pre}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <span class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADsAAAA1CAYAAAD/L5PDAAADFklEQVR4nOXayWsTURwH8O/7vTcvM5M0W1OqTauhdkEaxBUUXFChiPQiUtCLePJgQRFR/wAvghcPLoh6VkSP4k0ERbF4EKXuC2il2mpMamua9ckIHmdK24E4vg/MKd/Hjx9kkrcxpRTmY6pSx4WRgrry+ide5cuuuagknFzbjF2ZcF9HRDxHAxE0IhBgdQXUZvlmcgYQY8FudnS62vN+srJvvFjb5JXrjRvnMk3yepPBgtvsnc+/bl9+Odl578uMZ+7oisTm/T1NtWxS3tTqnSVohKARMZYvrvEKMMYqgtjPZER++PurFlTi1pMvjz0DnCERlrn+bGuzJTmCTJy4/swzYArC8rZockNXc48l+WsEmMhNuU/1HJbBMVmsQP0H7zdBI6KRxd+NT+/+MV3e6PY5Y6hKTt+XpuyzUcuYCmyzSilcffjxxsO3OdcMMaA1FsLB7cuSqzOJ44FsVimFSg14+qmAO8+/uuY4MWRSYexZ37HZj7oCDaKgUK7WMVOpezZbqtad1Y3hR02CRggaIWiEoBGCRggaIWiEoBGCRgQCKibpRabJ6Pxecp+BOVotjhBn3xbUrLNBE5ZUTZkkCpb7DkbEINic5TihCB/1JUOnDE65rW3WNs9cQp5OmfzRgpoVxNAbk+d3tNuHJlI111yIGLpjxiVb0Ch81BU17jvPXMaI+RYLcYbtaeuw8yAgCBohaISgEbGQ3YZcLrcln88Plkqlbrcc57zQ0tJyJhqNPhCisf90Yr4Dy+UyRkZG7g4PD2NiYsI1Z5om+vv7B7PZbF8sFgvuybuawxUFpZQvWyuBaPZfQNAIQSMEjRA0QtCIaERRxtifVdPAysVYmrJdc85JfzIssSRpX/SjrkCDcAJ2r0svGljV1uKZYyhFLeONHzUFGigRls6plvvJls8IGiFoRBzY2ukZMDhDW9xyLpKMIeDEsZ09e2e7ByUFjUdMUUDAia7WyDVogqARMd+BRATbtsvxeFzW6+4b1VJKZwE/TkS/ENRmOedob28fMk1zqFgsrvTI5dPp9JFQKOTLxGAhfgMbGsiRQlMzJgAAAABJRU5ErkJggg==" alt="Koipa" /></span>
+      <span class="brand-name">한국지식재산보호원</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">DB 대리키 표준화 전환계획</span>
+    </a>
+    <div class="nav-right"><span class="nav-badge">감리 산출물</span></div>
+  </div>
+</nav>
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">감리 산출물 · 변경 계획</div>
+    <h1>DB 대리키 표준화 전환계획</h1>
+    <div class="meta">정수 대리키 9개 · SERIAL &rarr; GENERATED ALWAYS AS IDENTITY · 설계 감리 후 적용</div>
+  </div>
+
+  <table class="docinfo">
+    <tbody>
+      <tr><th>대상</th><td>정수 자동채번 대리키 <b>9개 칼럼</b>(표 9개). UUID 기본키 6개는 대상이 아니다</td></tr>
+      <tr><th>대상 코드</th><td><code>poc/src/koipa/db/models.py</code> · <code>poc/alembic/versions/a1b2c3d4e5f6_serial_to_identity.py</code></td></tr>
+      <tr><th>짝 문서</th><td><code>기술구현_백서_부록A_DB스키마</code> (현행 상태) &harr; 본 문서 (전환 계획)</td></tr>
+      <tr><th>작성일</th><td>2026-08-29</td></tr>
+      <tr><th>근거 커밋</th><td><code>b78e46a8</code> — 코드·마이그레이션 준비 완료 · <b>미적용</b></td></tr>
+      <tr><th>적용 시점</th><td><b>설계 감리 종료 후.</b> 감리 기간 중에는 시험서버를 변경하지 않는다</td></tr>
+      <tr><th>검증</th><td><code>cd poc &amp;&amp; alembic upgrade head</code> 후 &sect;5 확인 항목</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    본 문서는 <b>아직 적용하지 않은 변경</b>의 계획서다. 현행 배포 상태는
+    <code>기술구현_백서_부록A_DB스키마</code> 에 적힌 그대로 <code>SERIAL</code> 이며,
+    시험서버(223)의 alembic 판은 <code>f0a1b2c3d4e5</code> 로 본 마이그레이션 이전이다.
+    <b>감리 시점의 문서 · 코드 · 실서버는 모두 현행 상태로 일치한다.</b>
+  </div>
+
+  <h2>1. 왜 바꾸는가</h2>
+
+  <p><code>SERIAL</code> 은 표준 SQL 이 아니다. PostgreSQL 10 부터 표준은
+  <code>GENERATED ... AS IDENTITY</code> 이고 <code>SERIAL</code> 은 남겨둔 옛 표기다.
+  표기 문제로 그치지 않고 동작이 다르다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:20%">항목</th><th style="width:40%">SERIAL (현행)</th><th>IDENTITY ALWAYS (전환 후)</th></tr></thead>
+    <tbody>
+      <tr><td><b>임의 값 삽입</b></td>
+          <td><code>INSERT INTO t (id) VALUES (999)</code> 를 <b>막지 못한다.</b> 시퀀스는 그대로
+          1 부터 올라가다 999 에 부딪혀 중복키로 실패한다. 언제 터질지가 적재량에 달려 있어
+          운영 중에 드러난다</td>
+          <td>그 <code>INSERT</code> 자체를 거부한다</td></tr>
+      <tr><td><b>표준 여부</b></td><td>PostgreSQL 고유 표기. 표준 SQL 아님</td><td>SQL 표준</td></tr>
+      <tr><td><b>권한 관리</b></td><td>시퀀스에 별도 <code>USAGE</code> 권한이 필요해 표와 갈라진다</td>
+          <td>칼럼에 속하므로 표 권한만 보면 된다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>2. 대상 — 정수 대리키 9개</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:34%">테이블</th><th style="width:20%">칼럼</th><th style="width:14%">타입</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td><code>tb_classification_levels</code></td><td><code>level_id</code></td><td>INTEGER</td><td>등급 체계</td></tr>
+      <tr><td><code>tb_evaluation_factors</code></td><td><code>factor_id</code></td><td>INTEGER</td><td>평가요소</td></tr>
+      <tr><td><code>tb_level_keywords</code></td><td><code>keyword_id</code></td><td>INTEGER</td><td>등급 키워드</td></tr>
+      <tr><td><code>tb_classification_evidence</code></td><td><code>evidence_id</code></td><td>BIGINT</td><td>분류 판정 근거</td></tr>
+      <tr><td><code>tb_corrections</code></td><td><code>correction_id</code></td><td>BIGINT</td><td>검수 교정 이력</td></tr>
+      <tr><td><code>tb_llm_usage</code></td><td><code>usage_id</code></td><td>BIGINT</td><td><b>월별 파티션</b></td></tr>
+      <tr><td><code>tb_audit_log</code></td><td><code>audit_id</code></td><td>BIGINT</td><td><b>월별 파티션</b></td></tr>
+      <tr><td><code>tb_training_datasets</code></td><td><code>id</code></td><td>BIGINT</td><td>학습셋 구성</td></tr>
+      <tr><td><code>tb_guides</code></td><td><code>id</code></td><td>BIGINT</td><td>가이드 문서</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <b>UUID 기본키 6개는 대상이 아니다.</b> <code>tb_documents</code> · <code>tb_chunks</code> ·
+    <code>tb_classifications</code> · <code>tb_model_versions</code> · <code>tb_training_runs</code> ·
+    <code>tb_sample_documents</code> 는 <code>gen_random_uuid()</code> 를 쓴다.
+    <code>doc_id</code> 는 <code>GET /classify/&#123;doc_id&#125;</code> 로 외부에 노출되는
+    식별자라 순번을 쓰지 않는다. 다만 그 선택의 근거가 문서에 기록돼 있지 않아 별도 정리가
+    필요하다(본 계획 범위 밖).
+  </div>
+
+  <h2>3. 이미 마친 검증</h2>
+
+  <p>계획만 세운 것이 아니라 <b>시험서버 실데이터에 걸어 보고 되돌렸다</b>(2026-08-29 ·
+  PostgreSQL 16.14). DDL 이 트랜잭션 안에서 동작하므로 커밋하지 않으면 흔적이 남지 않는다.
+  롤백 여부는 새 연결로 재확인했다.</p>
+
+  <h3>3-1. 파티션 표에 IDENTITY 가 되는가</h3>
+  <p>대상 9개 중 둘이 월별 파티션이라 추측하지 않고 먼저 확인했다.</p>
+  <pre>1) 파티션 부모에 IDENTITY 생성 : OK
+2) 자식 파티션 생성          : OK
+3) 자동 채번 INSERT          : OK
+4) 명시 id INSERT            : 거부
+5) SERIAL -&gt; IDENTITY 전환    : OK</pre>
+
+  <h3>3-2. 실데이터 전환 (트랜잭션 적용 후 롤백)</h3>
+  <pre>표                          칼럼            전 -&gt; 후      행수
+tb_classification_levels   level_id       SERIAL -&gt; a   4행 · 다음 id 5
+tb_evaluation_factors      factor_id      SERIAL -&gt; a   7행 · 다음 id 8
+tb_level_keywords          keyword_id     SERIAL -&gt; a   0행 · 다음 id 1
+tb_classification_evidence evidence_id    SERIAL -&gt; a   14행 · 다음 id 15
+tb_corrections             correction_id  SERIAL -&gt; a   12행 · 다음 id 14
+tb_llm_usage               usage_id       SERIAL -&gt; a   214행 · 다음 id 215
+tb_audit_log               audit_id       SERIAL -&gt; a   38,502행 · 다음 id 38,503
+tb_training_datasets       id             SERIAL -&gt; a   0행 · 다음 id 1
+tb_guides                  id             SERIAL -&gt; a   0행 · 다음 id 1
+
+전환 후 INSERT 자동채번 : OK · audit_id = 38503
+명시 id INSERT          : 거부 -&gt; ProgrammingError
+롤백 후 재확인          : identity='' (원상)</pre>
+  <p class="src">a = always. <code>pg_attribute.attidentity</code> 값이다.</p>
+
+  <div class="note">
+    <b>시퀀스 현재값 이관을 확인한 것이 핵심이다.</b> 전환 절차의 마지막 단계
+    (<code>ALTER ... RESTART WITH max+1</code>)를 빼먹으면 새 시퀀스가 1 부터 시작해
+    기존 행과 중복키로 충돌한다. 위 표의 "다음 id" 가 그 확인이다.
+  </div>
+
+  <h2>4. 적용 절차</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:6%">#</th><th style="width:26%">단계</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>작업 창 확보</td>
+          <td><code>ALTER TABLE</code> 이 짧게 배타 잠금을 잡는다. 요청이 없는 시간대에 수행한다.
+          대상 중 <code>tb_audit_log</code> 가 가장 크다(38,502행)</td></tr>
+      <tr><td class="c">2</td><td>복구 지점 확보</td>
+          <td>적용 전 백업 또는 스냅샷. 마이그레이션에 <code>downgrade</code> 를 넣어 두었으나
+          백업이 우선이다</td></tr>
+      <tr><td class="c">3</td><td>적용</td>
+          <td><code>alembic upgrade head</code> — 판 <code>a1b2c3d4e5f6</code>.
+          재실행해도 안전하다(이미 IDENTITY 면 건너뛴다)</td></tr>
+      <tr><td class="c">4</td><td>즉시 확인</td><td>&sect;5 항목 전부</td></tr>
+      <tr><td class="c">5</td><td>관찰</td>
+          <td>며칠 운영하며 채번 오류·중복키 발생 여부를 본다. 이상 시
+          <code>alembic downgrade -1</code></td></tr>
+      <tr><td class="c">6</td><td>증적 보관</td>
+          <td>적용 일시 · 적용 전후 <code>attidentity</code> 값 · 스모크 결과를 본 문서
+          개정 이력에 기재</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>5. 적용 직후 확인 항목</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">확인</th><th style="width:36%">방법</th><th>기대</th></tr></thead>
+    <tbody>
+      <tr><td>9개 칼럼이 IDENTITY ALWAYS</td>
+          <td><code>select attidentity from pg_attribute</code></td><td><code>a</code> 9건</td></tr>
+      <tr><td>옛 시퀀스 제거</td>
+          <td><code>select pg_get_serial_sequence(t, c)</code></td><td>전부 <code>NULL</code></td></tr>
+      <tr><td>신규 INSERT 채번</td><td>각 표에 1건 삽입</td><td>기존 최대값+1 부터</td></tr>
+      <tr><td>명시 id 차단</td><td><code>INSERT (id) VALUES (1)</code></td><td>거부</td></tr>
+      <tr><td>주요 API 스모크</td>
+          <td><code>/api/v1/healthz</code> · 문서 업로드 &rarr; 분류 &rarr; 검수 큐</td><td>정상</td></tr>
+      <tr><td>alembic 판</td><td><code>select version_num from alembic_version</code></td>
+          <td><code>a1b2c3d4e5f6</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>6. 영향 범위</h2>
+
+  <p>이 변경은 <b>API 계약과 업무 데이터의 의미를 바꾸지 않는다.</b> 칼럼 타입 · 값 · 외래키
+  관계가 모두 그대로이고, 바뀌는 것은 값을 <b>누가 어떻게 채우느냐</b>뿐이다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:28%">영역</th><th>영향</th></tr></thead>
+    <tbody>
+      <tr><td>API 응답 필드</td><td>없음. 대상 9개는 외부로 나가지 않는 내부 키다</td></tr>
+      <tr><td>외래키 관계</td><td>없음. 타입 · 값 불변</td></tr>
+      <tr><td>기존 데이터</td><td>없음. 행을 건드리지 않는다</td></tr>
+      <tr><td>애플리케이션 코드</td>
+          <td>없음. 이 9개 칼럼에 값을 직접 넣는 코드가 없다 — 서비스의 ORM 생성자는 외래키만
+          채우고 씨딩 <code>INSERT</code> 도 칼럼 목록에서 빠져 있다. 그래서
+          <code>BY DEFAULT</code> 가 아니라 <code>ALWAYS</code> 를 선택했다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>7. 개정 이력</h2>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th style="width:6%">판</th><th style="width:16%">일자</th><th style="width:16%">근거 커밋</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td class="n">2026-08-29</td><td><code>b78e46a8</code></td>
+          <td>최초 작성. 전환 준비 완료 · <b>미적용</b>. 파티션 표 시험과 실데이터 트랜잭션
+          검증(롤백)까지 마쳤다</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="foot">근거 파일 — <code>poc/src/koipa/db/models.py</code> ·
+  <code>poc/alembic/versions/a1b2c3d4e5f6_serial_to_identity.py</code> ·
+  <code>doc/07_DB_스키마_v2.sql</code> · <code>기술구현_백서_부록A_DB스키마.html</code></div>
+</div>
+</body>
+</html>
