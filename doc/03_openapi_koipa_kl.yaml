@@ -6,8 +6,26 @@ info:
     KL 웹시스템 연동용 REST API 명세.
 
     담당 기능: FUN-003, FUN-004, FUN-005, FUN-022, FUN-023, FUN-024
-    호출 주체: KL 웹시스템 (Backend)
     제공 주체: Koipa AI Engine (FastAPI)
+
+    ## 이 문서가 담는 범위
+
+    본 명세는 **엔진이 서빙하는 전체 API**를 담는다. 그중 **KL 웹시스템이 호출하는 것은
+    아래 5개 경로**이며, 「API 통신 방안 검토 회신」의 IF-01~IF-06 과 같다.
+
+      IF-01  GET  /healthz                    준비 상태 확인
+      IF-02  POST /documents                  문서 등록(multipart) -> doc_id
+      IF-03  POST /classify/async             비동기 분류 요청(callback_url 포함)
+      IF-04  POST {callback_url}              엔진 -> 관리. 완료 통보(본 명세 대상 아님)
+      IF-05  GET  /classify/jobs/{job_id}     상태 조회(콜백 유실 대비)
+      IF-06  GET  /classify/{doc_id}          문서 단위 결과 조회
+
+    각 오퍼레이션에 `x-audience` 를 달았다 — `kl` 은 KL 연동면, `internal` 은 당사
+    운영면이다. 운영면(골든셋 검수·관리자·학습·합성)은 KL 이 호출하지 않는다.
+
+    검수·골든셋 검증 화면의 운영형태는 ICD 합의 안건 **K7** 에서 확정한다. 당사는
+    ⓑ(KL 포털 통합)를 전제로 진행 중이며, 현재 콘솔은 그때까지의 과도기 화면이다.
+    따라서 `golden`·`admin` 계열 경로는 그 화면이 쓰는 것으로 KL 연동 대상이 아니다.
 
     인증: API Key (서버 간 통신) + 선택적 JWT (관리자 행위 추적)
     모든 응답은 application/json. 파일 업로드는 multipart/form-data.
@@ -49,7 +67,7 @@ tags:
   - name: documents
     description: 등급 판정 대상 문서 업로드·ingestion (FUN-005 연계)
   - name: answer
-    description: RAG 기반 질의응답 합성
+    description: "[요건 외] RAG 기반 질의응답 합성 — RFP 요건이 아닌 부가 기능. /rag/search(검색)는 요건 범위이고 /answer(LLM 답변 생성)는 요건 외다"
   - name: health
     description: 상태 확인
   - name: admin
@@ -62,6 +80,7 @@ tags:
 paths:
   /healthz:
     get:
+      x-audience: kl          # IF-01 — KL 웹시스템이 호출한다
       tags: [health]
       summary: 헬스 체크
       security: []
@@ -79,6 +98,7 @@ paths:
 
   /healthz/live:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [health]
       summary: Liveness Probe
       security: []
@@ -91,6 +111,7 @@ paths:
 
   /healthz/ready:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [health]
       summary: Readiness Probe
       security: []
@@ -105,6 +126,7 @@ paths:
 
   /healthz/deep:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [health]
       summary: 상세 의존성 진단
       security: []
@@ -117,6 +139,7 @@ paths:
 
   /classify:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [classify]
       summary: 단일 문서 등급 분류 (동기)
       description: |
@@ -145,6 +168,7 @@ paths:
 
   /classify/stream:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [classify]
       summary: 단일 문서 등급 분류 — SSE 스트리밍 (실시간 진척 수신)
       description: |
@@ -169,6 +193,7 @@ paths:
 
   /classify/explain:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [classify]
       summary: 분류 결과 상세 근거 조회 (리뷰어용)
       description: |
@@ -193,6 +218,7 @@ paths:
 
   /classify/async:
     post:
+      x-audience: kl          # IF-03 — KL 웹시스템이 호출한다
       tags: [classify]
       summary: 분류 작업 큐 등록 (비동기, 대용량/RAG ON)
       requestBody:
@@ -215,6 +241,7 @@ paths:
 
   /classify/batch:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [classify]
       summary: 다건 문서 일괄 분류 (비동기 큐, 최대 1000건)
       requestBody:
@@ -270,6 +297,7 @@ paths:
 
   /classify/jobs/{job_id}:
     get:
+      x-audience: kl          # IF-05 — KL 웹시스템이 호출한다
       tags: [classify]
       summary: 비동기 분류 작업 상태·결과 조회
       parameters:
@@ -288,6 +316,7 @@ paths:
 
   /classify/{doc_id}:
     get:
+      x-audience: kl          # IF-06 — KL 웹시스템이 호출한다
       tags: [classify]
       summary: 문서별 최근 분류 결과 조회
       parameters:
@@ -305,6 +334,7 @@ paths:
 
   /confirm:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [confirm]
       summary: 관리자 분류 결과 확정 (staging -> production)
       description: |
@@ -337,6 +367,7 @@ paths:
 
   /review-queue:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [confirm]
       summary: Review queue lookup
       description: |
@@ -380,6 +411,7 @@ paths:
 
   /relabel:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [confirm]
       summary: 오분류 수정 라벨 등록 (능동학습 입력)
       description: |
@@ -413,6 +445,7 @@ paths:
 
   /train:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [training]
       summary: 모델 학습·재학습 트리거
       description: |
@@ -452,6 +485,7 @@ paths:
 
   /train/jobs/{train_job_id}:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [training]
       summary: 학습 작업 진행 상태 조회
       parameters:
@@ -483,6 +517,7 @@ paths:
 
   /train/jobs:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [training]
       summary: 학습 작업 이력 목록
       parameters:
@@ -510,6 +545,7 @@ paths:
 
   /synth/generate:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [synthesis]
       summary: LLM 기반 학습용 샘플 문서 생성
       description: |
@@ -551,6 +587,7 @@ paths:
 
   /synth/queue:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [synthesis]
       summary: 검수 대기 중인 합성 문서 목록 (KL 검수 UI용)
       parameters:
@@ -578,6 +615,7 @@ paths:
 
   /synth/{synth_id}/review:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [synthesis]
       summary: 합성 문서 검수 결과 등록 (승인/반려)
       parameters:
@@ -621,6 +659,7 @@ paths:
 
   /documents:
     post:
+      x-audience: kl          # IF-02 — KL 웹시스템이 호출한다
       tags: [documents]
       summary: 분류 대상 문서 업로드·ingestion
       description: |
@@ -664,6 +703,7 @@ paths:
 
   /documents/analyze:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [documents]
       summary: 업로드 문서 파싱·검수게이트·분류 단계별 진단
       description: |
@@ -699,6 +739,7 @@ paths:
 
   /guide/documents:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [guide]
       summary: 학습 가이드 문서 등록·갱신 (FUN-002 연계)
       description: |
@@ -742,6 +783,7 @@ paths:
 
   /guide/documents/{guide_id}:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [guide]
       summary: 가이드 문서 버전 목록 조회
       parameters:
@@ -773,6 +815,7 @@ paths:
 
   /schema/grades:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [schema]
       summary: 현재 등급체계 조회
       responses:
@@ -789,6 +832,7 @@ paths:
                     items: { $ref: '#/components/schemas/GradeDefinition' }
 
     put:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [schema]
       summary: 등급체계 변경 (관리자 권한, 재학습 필요성 응답)
       requestBody:
@@ -817,6 +861,7 @@ paths:
 
   /metrics/latest:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [metrics]
       summary: 운영 중 모델의 최신 성능 지표
       responses:
@@ -829,6 +874,7 @@ paths:
 
   /metrics/history:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [metrics]
       summary: 모델 버전별 성능 이력
       parameters:
@@ -849,6 +895,7 @@ paths:
 
   /metrics/confusion-matrix/{model_version}:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [metrics]
       summary: 버전별 Confusion Matrix
       parameters:
@@ -880,6 +927,7 @@ paths:
 
   /golden/build:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든 후보 빌드 작업 생성
       requestBody:
@@ -898,6 +946,7 @@ paths:
 
   /golden/jobs/{job_id}:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든 빌드 작업 상태 조회
       parameters:
@@ -915,6 +964,7 @@ paths:
 
   /golden/jobs/{job_id}/review.html:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든 빌드 검수 HTML
       parameters:
@@ -932,6 +982,7 @@ paths:
 
   /golden/builds:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 등록할 수 있는 슬레이트 파일 목록 (admin/kl_backend/system)
       description: >-
@@ -968,6 +1019,7 @@ paths:
 
   /golden/jobs/register:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 큐레이트 슬레이트를 재라벨링 없이 골든 잡으로 등록 (admin/kl_backend/system)
       description: >-
@@ -995,6 +1047,7 @@ paths:
 
   /golden/jobs/{job_id}/signoff.html:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든 후보 화면 서명용 HTML (브라우저 직접 접속, 무인증 뷰)
       description: >-
@@ -1021,6 +1074,7 @@ paths:
 
   /golden/jobs/{job_id}/signoff/preflight:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: Preview Golden-set signoff blockers without changing state
       parameters:
@@ -1043,6 +1097,7 @@ paths:
 
   /golden/jobs/{job_id}/signoff:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든 후보 검수 서명 → locked_gold_eval 승격 (admin/reviewer/kl_backend)
       description: >-
@@ -1081,6 +1136,7 @@ paths:
 
   /promotions/pending:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [promotion]
       summary: 검증 라벨 승급 대기 목록
       responses:
@@ -1092,6 +1148,7 @@ paths:
 
   /promotions/promote:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [promotion]
       summary: 교정 라벨을 검증 라벨로 승급
       requestBody:
@@ -1108,6 +1165,7 @@ paths:
 
   /admin/model/reload:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 활성 모델 핫리로드
       responses:
@@ -1120,6 +1178,7 @@ paths:
 
   /admin/model/activate:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 특정 ModelVersion 수동 활성화
       requestBody:
@@ -1142,6 +1201,7 @@ paths:
 
   /admin/escalation-held:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 이중검토 보류 건수
       responses:
@@ -1154,6 +1214,7 @@ paths:
 
   /admin/locked-readiness:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: locked_gold_eval readiness
       responses:
@@ -1166,6 +1227,7 @@ paths:
 
   /admin/dashboard:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 운영 검수 대시보드 종합
       responses:
@@ -1178,6 +1240,7 @@ paths:
 
   /admin/keywords:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 태깅 키워드 목록 (등급·요소·활성 필터) — FUN-023
       parameters:
@@ -1194,6 +1257,7 @@ paths:
               schema: { type: object, additionalProperties: true }
         '403': { description: "admin/reviewer role required" }
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 태깅 키워드 추가 (룰엔진 핫리로드) — FUN-023
       requestBody:
@@ -1222,6 +1286,7 @@ paths:
 
   /admin/keywords/{keyword_id}:
     patch:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 태깅 키워드 수정·비활성 (is_active=false=소프트 삭제, 룰엔진 핫리로드) — FUN-023
       parameters:
@@ -1252,8 +1317,10 @@ paths:
 
   /answer:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [answer]
-      summary: RAG 답안 합성 — query + RAG hits → LLM 답안 + 인용
+      summary: "[요건 외] RAG 답안 합성 — query + RAG hits → LLM 답안 + 인용"
+      x-scope: out-of-requirement   # RFP 요건 아님. 산출물 문서에서 제외했고 코드는 존치(휴면)
       description: |
         분류와 별개 단계. 질의를 받아 RAG 검색(facade)으로 컨텍스트 hits를 모은 뒤
         LLM(원격/로컬/noop)으로 답안을 합성한다. 인용 출처(citations)는 hits 순서대로
@@ -1285,6 +1352,7 @@ paths:
   # 쓰는 내부 경로이지만, 명세에 없으면 감리에서 "구현 미기술"로 읽힌다.
   /admin/audit-log:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 감사 로그 조회 — 누가 언제 무엇을 했는가
       description: >-
@@ -1306,6 +1374,7 @@ paths:
 
   /admin/model/rollback:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: 활성 모델을 직전 활성본으로 롤백 + 무중단 리로드
       description: >-
@@ -1331,6 +1400,7 @@ paths:
 
   /review-queue/{classification_id}/evidence:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [confirm]
       summary: 검수 1건의 근거 — "왜 이 등급인가"
       description: >-
@@ -1353,6 +1423,7 @@ paths:
 
   /golden/summary:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 정본 골든셋 구성 집계 (tier·등급·출처·라벨출처)
       description: >-
@@ -1371,6 +1442,7 @@ paths:
 
   /golden/jobs:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든 빌드 작업 목록
       description: >-
@@ -1387,6 +1459,7 @@ paths:
 
   /golden/candidates:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 합성 Proxy Gold 후보 목록
       description: >-
@@ -1408,6 +1481,7 @@ paths:
 
   /golden/candidates/summary:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든셋 관리 콘솔 집계
       responses:
@@ -1420,6 +1494,7 @@ paths:
 
   /golden/candidates/decisions:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 결정 원장 최근 기록 (보류·폐기·번복 포함)
       description: 원장은 append-only 라 기록을 지울 수 없다.
@@ -1435,6 +1510,7 @@ paths:
 
   /golden/candidates/session:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든셋 관리 콘솔 로그인 신원
       responses:
@@ -1447,6 +1523,7 @@ paths:
 
   /golden/candidates/upload:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든셋 관리 콘솔 문서 업로드
       description: >-
@@ -1476,6 +1553,7 @@ paths:
 
   /golden/candidates/{doc_id}:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 합성 Proxy Gold 후보 상세
       parameters:
@@ -1494,6 +1572,7 @@ paths:
 
   /golden/candidates/{doc_id}/decision:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 합성 Proxy Gold 후보의 관리자 결정 기록
       description: >-
@@ -1526,6 +1605,7 @@ paths:
 
   /golden/candidates/{doc_id}/provenance:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: Record source and authorization evidence for an existing candidate
       parameters:
@@ -1556,6 +1636,7 @@ paths:
 
   /golden/candidates/login.html:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든셋 관리 콘솔 진입 화면 (무인증)
       description: >-
@@ -1571,6 +1652,7 @@ paths:
 
   /golden/candidates/manage.html:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [golden]
       summary: 골든셋 후보 관리 화면
       responses:
@@ -1583,6 +1665,7 @@ paths:
 
   /rag/search:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [answer]
       summary: 유사 문서·청크 Top-K 검색 (LLM 미호출)
       description: >-
@@ -1605,6 +1688,7 @@ paths:
 
   /dashboard/summary:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [metrics]
       summary: 운영 현황 실측 카운트
       description: >-
@@ -1620,6 +1704,7 @@ paths:
 
   /metrics-prom:
     get:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [metrics]
       summary: Prometheus 메트릭 노출 (내부 scrape 전용)
       description: >-
@@ -1636,6 +1721,7 @@ paths:
 
   /admin/demo/purge:
     post:
+      x-audience: internal    # 당사 운영면 — KL 은 호출하지 않는다
       tags: [admin]
       summary: "[시연] 데모 실적재 데이터 초기화 (물리삭제)"
       description: >-
