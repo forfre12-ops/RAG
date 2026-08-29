@@ -92,9 +92,10 @@ a{color:#0a0a0a}
     <tbody>
       <tr><th>요구사항</th><td><code>DAR-005</code> (관련 산출물: 데이터 사전, 테이블 정의서) · <code>DAR-006</code></td></tr>
       <tr><th>생성 원본</th><td><code>poc/src/koipa/db/models.py</code> — SQLAlchemy <code>Base.metadata</code></td></tr>
-      <tr><th>짝 문서</th><td><code>ERD_개체관계도</code> (관계) · <code>데이터_거버넌스_계획</code> (표준·보존)</td></tr>
+      <tr><th>짝 문서</th><td><code>테이블정의서 · ERD</code> (표 수준 + 관계도) · <code>데이터_거버넌스_계획</code> (표준·보존)</td></tr>
       <tr><th>DBMS</th><td>PostgreSQL · 확장 <code>pgvector</code></td></tr>
       <tr><th>작성일</th><td>2026-08-26</td></tr>
+      <tr><th>최종 개정</th><td>2026-08-29 — 표기 정합 보완</td></tr>
       <tr><th>근거 커밋</th><td><code>d3fe51c3</code></td></tr>
     </tbody>
   </table>
@@ -114,8 +115,8 @@ a{color:#0a0a0a}
       <tr><td>테이블</td><td class="n">21</td><td>ORM 매핑 19 + 마이그레이션 생성 2(검색용). 월별 파티션 부모 테이블 3 개 포함(<code>tb_chunks</code>, <code>tb_llm_usage</code>, <code>tb_audit_log</code>)</td></tr>
       <tr><td>컬럼</td><td class="n">249</td><td>물리명·논리명·데이터 타입·NULL 허용 여부·키·기본값·참조를 표기했다</td></tr>
       <tr><td>인덱스</td><td class="n">43</td><td>PK 제외</td></tr>
-      <tr><td>외래키</td><td class="n">26</td><td>관계도는 <code>ERD_개체관계도</code></td></tr>
-      <tr><td>컬럼 주석</td><td class="n gap">0</td><td class="gap">스키마에 <code>COMMENT ON COLUMN</code> 이 정의되어 있지 않다(보완 대상)</td></tr>
+      <tr><td>외래키</td><td class="n">26</td><td>관계도는 <code>테이블정의서 · ERD</code> 문서에 함께 실었다</td></tr>
+      <tr><td>컬럼 주석</td><td class="n gap">13</td><td class="gap">DB 자체의 <code>COMMENT ON COLUMN</code> 은 검색용 표 2종에만 있다 — <code>tb_rag_vectors</code> 10개 · <code>tb_rag_aliases</code> 3개(운영 DB 적용 확인). ORM 매핑 19개 표는 0개이며, 그 칼럼 설명은 본 정의서로 제공한다(DB 주석화는 보완 대상)</td></tr>
     </tbody>
   </table>
   </div>
