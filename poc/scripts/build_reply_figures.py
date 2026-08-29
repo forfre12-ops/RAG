@@ -329,6 +329,177 @@ def grid_svg() -> str:
     return "".join(p)
 
 
+# ── 보정 순서 — 코드에서 읽는다 ──────────────────────────────────────────────
+# 순서가 곧 결과다(출처 상한이 먼저 내리고 보안표시 하한이 뒤에 올린다). 손으로 적으면
+# 누가 순서를 바꿔도 그림만 옛것으로 남으므로 pipeline.py 의 등장 순서를 그대로 읽는다.
+CORRECTIONS = [
+    ("fnr_safe_override", "미탐 방지 상향", "룰 점수가 임계를 넘으면 분류기 등급을 올린다", "up"),
+    ("source_prior_enabled", "출처 상한", "출처가 공개 문서면 S3 로 내린다 — 유일한 하향", "down"),
+    ("metadata_floor_enabled", "보안표시 하한", "문서에 찍힌 보안표시가 예측보다 높으면 올린다", "up"),
+]
+
+
+def correction_order() -> list:
+    """pipeline.py 에서 세 보정이 나오는 순서를 확인하고 CORRECTIONS 를 그 순서로 돌려준다."""
+    src = io.open(_HERE.parent / "src" / "koipa" / "modules" / "m5_inference" / "pipeline.py",
+                  encoding="utf-8").read().split("\n")
+    pos = {}
+    for key, _, _, _ in CORRECTIONS:
+        for i, line in enumerate(src):
+            if key in line and ("_record_gate_fail_open" in line or "getattr(" in line):
+                pos.setdefault(key, i)
+    missing = [k for k, *_ in CORRECTIONS if k not in pos]
+    if missing:
+        raise SystemExit("보정을 코드에서 못 찾았다 — CORRECTIONS 를 갱신할 것: %s" % missing)
+    ordered = sorted(CORRECTIONS, key=lambda c: pos[c[0]])
+    if [c[0] for c in ordered] != [c[0] for c in CORRECTIONS]:
+        raise SystemExit("코드의 보정 순서가 바뀌었다 — 그림과 문서를 함께 고칠 것: %s"
+                         % [c[0] for c in ordered])
+    return ordered
+
+
+def _profile(key, default=None):
+    from koipa.config import _PROFILE_DEFAULTS, Settings  # noqa: PLC0415
+    prof = _PROFILE_DEFAULTS.get("full-train", {})
+    if key in prof:
+        return prof[key]
+    f = Settings.model_fields.get(key)
+    return f.default if f is not None else default
+
+
+# ── ① 서빙 워크플로우 세로 플로우 ────────────────────────────────────────────
+def flow_svg() -> str:
+    corr = correction_order()
+    tau = _profile("classifier_escalation_tau")
+    temp = _profile("classifier_temperature")
+    conf = _profile("review_confidence_threshold")
+    ts_th = _profile("fnr_rule_ts_threshold")
+    s1_th = _profile("fnr_rule_s1_threshold")
+    s2_th = _profile("fnr_rule_s2_threshold")
+    from koipa.services.review_reasons import REVIEW_GATE_TAGS  # noqa: PLC0415
+    n_gate = len([t for t in REVIEW_GATE_TAGS if t != "extraction-gate"])
+
+    W = 940
+    bx, bw = 150, 470          # 본문 상자
+    rx = bx + bw + 26          # 오른쪽 설명
+    steps = [
+        ("1", "전처리", "텍스트 추출 → 정규화 → PII 마스킹 → 청크 분할", None, 44),
+        ("2", "분류기 추론", "KF-DeBERTa 청크별 softmax · 온도 보정 %.2f · TS·S1 은 최댓값, "
+                         "그 외 길이 가중 평균 · 위험도 순 선택 τ=%.2f" % (temp, tau), "등급 결정", 62),
+        ("3", "룰 등급 산출", "키워드 argmax → 요소 정합 → 상위 등급 채택", "등급 결정 아님", 44),
+        ("4", "등급 보정", "; ".join("%s(%s)" % (c[1], "올림" if c[3] == "up" else "내림") for c in corr)
+                       + " · 룰 상향 임계 TS %.1f · S1 %.1f · S2 %.1f" % (ts_th, s1_th, s2_th),
+         "등급 변경", 62),
+        ("5", "검수 라우팅", "게이트 %d개를 순서대로 · 신뢰도 임계 %.2f" % (n_gate, conf), "라우팅", 44),
+    ]
+    gap = 26
+    H = 96 + sum(h + gap for _, _, _, _, h in steps) + 96
+    p = []
+    a = p.append
+    a('<svg viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;height:auto" '
+      'xmlns="http://www.w3.org/2000/svg" role="img" '
+      'aria-label="서빙 경로 다섯 단계를 세로로 그린 도식. 등급을 산출하거나 바꾸는 단계는 둘뿐이다">'
+      % (W, H, W))
+    a('<style>.t{font:12px %s;fill:%s}.th{font:700 13px %s;fill:%s}'
+      '.d{font:11px %s;fill:%s}.n{font:700 12px %s;fill:#fff}'
+      '.bg{font:700 10.5px %s;fill:#fff}.bgo{font:700 10.5px %s;fill:%s}</style>'
+      % (FONT, INK, FONT, INK, FONT, DIM, FONT, FONT, FONT, DIM))
+    a('<text class="th" x="8" y="26">문서 한 건이 등급을 받기까지 &#8212; 서빙 경로 다섯 단계</text>')
+    a('<text class="d" x="8" y="46">등급을 <tspan class="th">산출하거나 바꾸는 단계는 2·4 둘뿐</tspan>이다. '
+      '3 은 등급을 정하지 않고, 5 는 자동확정 여부만 정한다.</text>')
+    a('<rect x="%d" y="66" width="%d" height="24" fill="%s" stroke="%s"/>' % (bx, bw, MID, LINE))
+    a('<text class="t" x="%d" y="83">입력 &#8212; 문서 또는 텍스트 + ICD 메타데이터</text>' % (bx + 12))
+
+    y = 104
+    for num, title, desc, badge, h in steps:
+        a('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" marker-end="url(#fah)"/>'
+          % (bx + 24, y - 14, bx + 24, y - 2, INK))
+        a('<rect x="%d" y="%d" width="%d" height="%d" fill="#fafafa" stroke="%s"/>' % (bx, y, bw, h, LINE))
+        a('<rect x="%d" y="%d" width="24" height="22" fill="%s"/>' % (bx, y, INK))
+        a('<text class="n" x="%d" y="%d" text-anchor="middle">%s</text>' % (bx + 12, y + 16, num))
+        a('<text class="th" x="%d" y="%d">%s</text>' % (bx + 34, y + 16, title))
+        # 설명은 상자 폭에 맞춰 두 줄까지
+        words, line, lines = desc.split(" "), "", []
+        for w in words:
+            if len(line) + len(w) > 46:
+                lines.append(line); line = w
+            else:
+                line = (line + " " + w).strip()
+        lines.append(line)
+        for k, ln in enumerate(lines[:3]):
+            a('<text class="d" x="%d" y="%d">%s</text>' % (bx + 12, y + 34 + k * 15, ln))
+        if badge:
+            solid = badge in ("등급 결정", "등급 변경")
+            a('<rect x="%d" y="%d" width="86" height="20" fill="%s" stroke="%s"/>'
+              % (rx, y, INK if solid else "#fff", INK if solid else LINE))
+            a('<text class="%s" x="%d" y="%d" text-anchor="middle">%s</text>'
+              % ("bg" if solid else "bgo", rx + 43, y + 14, badge))
+        y += h + gap
+
+    a('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" marker-end="url(#fah)"/>'
+      % (bx + 24, y - 14, bx + 24, y - 2, INK))
+    a('<rect x="%d" y="%d" width="%d" height="26" fill="%s"/>' % (bx, y, bw, INK))
+    a('<text class="n" x="%d" y="%d">출력 &#8212; 등급 · 신뢰도 · 근거 · 상태(staging / needs_review)</text>' % (bx + 12, y + 18))
+    a('<defs><marker id="fah" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">'
+      '<path d="M0,0 L8,3 L0,6 z" fill="%s"/></marker></defs>' % INK)
+    a('<text class="d" x="8" y="%d">값은 배포 프로파일(full-train)에서 읽어 그린다 &#8212; '
+      '설정이 바뀌면 이 그림도 함께 바뀐다.</text>' % (y + 52))
+    a('</svg>')
+    return "".join(p)
+
+
+# ── ③ 보정 사다리 ────────────────────────────────────────────────────────────
+def ladder_svg() -> str:
+    corr = correction_order()
+    W, H = 940, 320
+    grades = ["TS", "S1", "S2", "S3"]
+    lane_y = {g: 84 + i * 46 for i, g in enumerate(grades)}
+    x0, x1 = 210, 800
+    p = []
+    a = p.append
+    a('<svg viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;height:auto" '
+      'xmlns="http://www.w3.org/2000/svg" role="img" '
+      'aria-label="보정이 적용되는 순서를 등급 사다리 위에 그린 도식. 출처 상한이 먼저 내리고 보안표시 하한이 뒤에 올린다">'
+      % (W, H, W))
+    a('<style>.t{font:12px %s;fill:%s}.th{font:700 12.5px %s;fill:%s}'
+      '.d{font:11px %s;fill:%s}.up{font:700 11.5px %s;fill:%s}'
+      '.dn{font:700 11.5px %s;fill:%s}</style>'
+      % (FONT, INK, FONT, INK, FONT, DIM, FONT, INK, FONT, BAD))
+    a('<defs><marker id="lu" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">'
+      '<path d="M0,0 L8,3 L0,6 z" fill="%s"/></marker>'
+      '<marker id="ld" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">'
+      '<path d="M0,0 L8,3 L0,6 z" fill="%s"/></marker></defs>' % (INK, BAD))
+    a('<text class="th" x="8" y="26">보정은 순서대로 적용된다 &#8212; 순서가 곧 결과다</text>')
+    a('<text class="d" x="8" y="46">예: 공개 출처로 들어온 문서에 <tspan class="th">기밀 도장</tspan>이 찍혀 있으면 '
+      'S3 로 내려갔다가 다시 올라온다. 둘이 충돌하면 <tspan class="th">문서에 찍힌 표시가 이긴다</tspan>.</text>')
+    for g in grades:
+        y = lane_y[g]
+        a('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-dasharray="3 4"/>' % (x0 - 40, y, x1, y, LINE))
+        a('<text class="th" x="%d" y="%d" text-anchor="end">%s</text>' % (x0 - 52, y + 5, g))
+    # 예시 경로 — 모델 S1 → 출처 상한 S3 → 보안표시 하한 S1
+    pts = [(x0, "S1", "모델 판정"), (x0 + 200, "S3", corr[1][1]), (x0 + 430, "S1", corr[2][1])]
+    for i in range(len(pts) - 1):
+        (xa, ga, _), (xb, gb, lb) = pts[i], pts[i + 1]
+        down = grades.index(gb) > grades.index(ga)
+        a('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="2" marker-end="url(#%s)"/>'
+          % (xa, lane_y[ga], xb, lane_y[gb], BAD if down else INK, "ld" if down else "lu"))
+        mx, my = (xa + xb) / 2, (lane_y[ga] + lane_y[gb]) / 2
+        a('<text class="%s" x="%d" y="%d" text-anchor="middle">%d. %s</text>'
+          % ("dn" if down else "up", mx, my - 8, i + 2, lb))
+        a('<text class="d" x="%d" y="%d" text-anchor="middle">%s</text>'
+          % (mx, my + 8, "내림" if down else "올림"))
+    for x, g, label in pts:
+        a('<circle cx="%d" cy="%d" r="5" fill="%s"/>' % (x, lane_y[g], INK))
+        a('<text class="d" x="%d" y="%d" text-anchor="middle">%s</text>' % (x, lane_y[g] - 12, label))
+    a('<text class="up" x="%d" y="%d">1. %s &#8212; 이 예시에서는 발동하지 않는다</text>'
+      % (x0, 276, corr[0][1]))
+    a('<text class="d" x="%d" y="%d">%s</text>' % (x0, 296, corr[0][2]))
+    a('<text class="dn" x="8" y="%d">내림은 하나뿐이고, 그것도 고등급 예측을 덮으면 자동확정하지 않는다 '
+      '&#8212; cap-conflict 로 검수에 넘긴다.</text>' % 276)
+    a('</svg>')
+    return "".join(p)
+
+
 # ── 주입 ─────────────────────────────────────────────────────────────────────
 FIGS = {
     "seq": (seq_svg, ["doc/result/KL_회신_2026-08-28/KL_API_통신방안_검토회신.html",
@@ -337,6 +508,11 @@ FIGS = {
                       "doc/result/KL_AI자료_2026-08/KL_질의사항_회신서.html"]),
     "funnel": (funnel_svg, ["doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_명세서.html",
                             "doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_쉬운설명서.html"]),
+    "flow": (flow_svg, ["doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_명세서.html",
+                        "doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_쉬운설명서.html",
+                        "doc/result/KL_회신_2026-08-28/KL_질의사항_회신서.html",
+                        "doc/result/KL_AI자료_2026-08/KL_질의사항_회신서.html"]),
+    "ladder": (ladder_svg, ["doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_쉬운설명서.html"]),
     "grid": (grid_svg, ["doc/result/KL_회신_2026-08-28/첨부/등급분류_알고리즘_명세서.html",
                         "doc/result/KL_회신_2026-08-28/KL_질의사항_회신서.html",
                         "doc/result/KL_AI자료_2026-08/KL_질의사항_회신서.html"]),
