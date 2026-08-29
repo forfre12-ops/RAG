@@ -132,7 +132,7 @@ footer strong{color:var(--text-dim);}
   </div>
 
   <h1 class="title">KL 연동 인터페이스 규약서<br>R6 S/V/M 메타데이터 (ICD)</h1>
-  <p class="lede">KL 웹수집 계층이 Koipa AI 코어로 전달하는 <strong>출처·보안표시·접근범위 메타데이터</strong>의 인터페이스 정의서(Interface Control Document). 이 메타데이터는 비공지성(S)·비밀관리성(M) 산정의 핵심 입력으로, 본문 텍스트만으로 판정 곤란한 축을 보완한다. <strong>본 문서는 협의안(v0.9)이며 화요일 미팅에서 필드·값 도메인을 확정한다.</strong></p>
+  <p class="lede">KL 웹수집 계층이 Koipa AI 코어로 전달하는 <strong>출처·보안표시·접근범위 메타데이터</strong>의 인터페이스 정의서(Interface Control Document). 이 메타데이터는 비공지성(S)·비밀관리성(M) 산정의 핵심 입력으로, 본문 텍스트만으로 판정 곤란한 축을 보완한다. <strong>본 문서는 협의안(v0.9)이며 KL 협의에서 필드·값 도메인을 확정한다(설계 감리 전 확정 목표).</strong></p>
 
   <div class="callout warn">
     <div class="callout-label">합의 필요 — 현재 갭</div>
@@ -395,7 +395,7 @@ Content-Type: application/json
   <div class="section-sep" id="s7">
     <span class="section-sep-num">07</span><span class="section-sep-line"></span><span class="section-sep-title">합의 안건</span>
   </div>
-  <h2>화요일 미팅 — KL 합의 필요 항목</h2>
+  <h2>KL 합의 필요 항목</h2>
   <div class="table-wrap">
     <table>
       <thead><tr><th class="center">No</th><th>합의 항목</th><th>한국지식재산보호원 제안</th><th class="center">KL 확인</th></tr></thead>
@@ -413,7 +413,8 @@ Content-Type: application/json
 
   <div class="footnote">
     <p>근거: 등급분류 기준 적용서 v2.2 §3.5(R6)·§4.4(명시표기 우선)·§4.7(S/V/M 앵커) · 기술구현 백서 부록B(API 명세, KL↔Koipa 통신 기준)</p>
-    <p>상태: <strong>협의안 v0.9</strong> — 화요일 미팅 후 v1.0 확정 예정. 확정 시 부록B API 명세에 정식 반영.</p>
+    <p>상태: <strong>협의안 v0.9</strong> — KL 협의 확정 후 v1.0 반영 예정. 확정 시 부록B API 명세에 정식 반영.</p>
+    <p><strong>확정 절차 개시.</strong> 2026-08-28 KL 회신서 &sect;3 을 통해 연계 규약 및 메타데이터 필드·값 도메인의 확정을 요청하였으며, KL 협의 완료 후 본 ICD 를 <strong>v1.0 정본</strong>으로 개정한다. (2026-08-29 기재)</p>
     <p>관련: <a href="기술구현_백서_부록B_API명세.html">부록B API 명세</a> · <a href="영업비밀_등급분류_기준_적용서_v2.2.html">등급분류 기준 적용서 v2.2</a> · <a href="기술구현_백서_부록A_DB스키마.html">부록A DB 스키마</a></p>
   </div>
 
