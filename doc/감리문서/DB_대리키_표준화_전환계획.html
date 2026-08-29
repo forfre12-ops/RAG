@@ -110,7 +110,7 @@ a{color:#0a0a0a}
       <tr><th>명시 id 차단</th><td><code>INSERT (factor_id) VALUES (999)</code> → <code>cannot insert a non-DEFAULT value into column "factor_id"</code> 로 거부</td></tr>
       <tr><th>서비스</th><td><code>/api/v1/healthz</code> 200</td></tr>
     </tbody></table>
-    <b>칼럼 10개 삭제</b>(<code>d1a2b3c4e5f7</code>)는 아직 223 에 적용하지 않았다 — 설계 감리 종료 후에 돌린다</div>
+    <b>칼럼 10개 삭제</b>(<code>d1a2b3c4e5f7</code>)도 같은 날 이어서 적용했다 — 판 <code>d1a2b3c4e5f7</code> · 삭제 대상 잔존 0 · 남긴 값 보존(<code>split_method</code> 6/6 · <code>model_type</code> 9/9) · ORM↔DB 차이 0. 적용 후 업로드→파싱→청킹→분류를 실제로 태워 칼럼을 뺀 세 표에 새 행이 들어가는 것까지 확인했다(청크 10 · 분류 1 · 근거 6, 검사 문서는 지웠다)</div>
 
   <h2>1. 왜 바꾸는가</h2>
 
@@ -279,6 +279,11 @@ tb_guides                  id             SERIAL -&gt; a   0행 · 다음 id 1
           앞당겨 같은 날 적용했다. §5 확인 항목 전부 통과 — alembic 판 <code>c9e1f2a3b4d5</code> ·
           GENERATED ALWAYS 9개 · BY DEFAULT 0 · <code>nextval</code> 기본값 0 ·
           INSERT 채번 <code>factor_id=8</code> · 명시 id INSERT 거부 · <code>/api/v1/healthz</code> 200</td></tr>
+      <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>d1a2b3c4e5f7</code></td>
+          <td><b>안 쓰는 칼럼 10개 삭제를 223 에 적용.</b> 값이 하나도 없던 칼럼이라
+          잃은 데이터가 없다(적용 전 실측 — 10개 전부 값있음 0). 적용 전 전체 덤프를
+          받아 두었고(<code>~/backup/koipa_pre_d1a2b3c4e5f7_202608291134.dump</code>),
+          되돌리려면 <code>alembic downgrade -1</code> 이다</td></tr>
     </tbody>
   </table>
   </div>
