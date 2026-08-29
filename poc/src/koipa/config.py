@@ -314,6 +314,19 @@ class Settings(BaseSettings):
     # 얻는다(= 사실상 인증 해제). 폐쇄망·시연 서버에서만 쓰고, 외부 노출 서버에서는 비워 둘 것.
     # 화면에도 경고를 띄운다(무음 위험 금지). 기본은 빈 값.
     console_login_prefill_token: str = ""
+    # 위 토큰을 하드닝 배포에서도 허용한다는 **명시적 선언**. 기본 False.
+    #
+    # 왜 REQUIRE_SAFETY_GATES=0 을 쓰지 않는가. 그 값은 합의 게이트·메타데이터 floor 게이트의
+    # 강제까지 함께 놓는다(_SAFETY_GATES). 자동로그인 하나 때문에 판정 안전장치의 강제를
+    # 푸는 것은 교환이 맞지 않는다. 이 플래그는 **이 검사 하나만** 연다.
+    #
+    # 왜 여는가. 골든셋 콘솔은 **임시 화면**이다 - 검수 UI 는 KL 포털에 통합되고(ICD 안건 K7)
+    # 우리 콘솔은 그때까지의 과도기 화면·시연·사용설명서 촬영용이다. 없어질 화면에 인증
+    # 설계를 새로 하는 대신, 자동로그인을 유지하되 **예외를 한 줄로 남겨** 추적 가능하게 한다.
+    #
+    # ⚠ 구멍은 그대로 열린다. 이 값이 True 이고 토큰이 있으면 login.html 주소를 여는 누구나
+    #   관리자 토큰을 얻는다. 외부 노출 서버에서는 포트를 127.0.0.1 로 묶어 함께 막을 것.
+    console_login_prefill_allow_unsafe: bool = False
 
     # NFR-SEC-01: 감사체인 HMAC 비밀키. 설정 시 audit_log hash chain을 HMAC-SHA256으로 링크해
     # 키 없는 과거 row 재작성(rewrite)을 차단(audit_chain._link_hex). 빈 값이면 레거시 sha256
@@ -1364,14 +1377,17 @@ def assert_production_credentials() -> None:
     # 관리자 JWT 를 본문에 실어 자동으로 로그인시킨다 = 사실상 인증 해제. 후보 원문 열람과
     # 관리 API 가 그대로 열린다. 형제 토글(RATE_LIMIT_DISABLED·API_KEY_TRUST_ACTOR_ROLE_HEADER)과
     # 같은 취급으로 하드닝 배포에서만 막는다 — 시연 tier(lite-*)는 종전대로 동작한다.
-    if getattr(settings, "require_safety_gates", False) and str(
-        getattr(settings, "console_login_prefill_token", "") or ""
-    ).strip():
+    if (
+        getattr(settings, "require_safety_gates", False)
+        and not getattr(settings, "console_login_prefill_allow_unsafe", False)
+        and str(getattr(settings, "console_login_prefill_token", "") or "").strip()
+    ):
         raise RuntimeError(
             "SECURITY: CONSOLE_LOGIN_PREFILL_TOKEN 은 하드닝 배포"
             "(onprem-local/full-train)에서 허용되지 않습니다. 무인증 login.html 이 이 토큰으로 "
             "관리자 세션을 자동 생성해 인증이 사실상 해제됩니다. 값을 비우거나, 시연 목적이면 "
-            "REQUIRE_SAFETY_GATES=0 으로 의도를 명시하세요(권장하지 않음)."
+            "CONSOLE_LOGIN_PREFILL_ALLOW_UNSAFE=1 로 이 검사만 명시적으로 여십시오"
+            "(REQUIRE_SAFETY_GATES=0 은 판정 안전게이트 강제까지 함께 풀리므로 쓰지 마십시오)."
         )
 
     # rule-fallback-v0 운영 차단 — 모델 디렉토리가 명시됐으면 존재+내용물(config.json·가중치) 검증.
