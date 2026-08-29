@@ -123,6 +123,11 @@ a{color:#0a0a0a}
 
   <h2>2. 정본 매핑 — 곱셈식과 v2.2 보정</h2>
   <p>발주처 정본 가이드(11~12p)의 곱셈 매핑을 코드화한 함수가 <code>grade_from_svm(s, v, m)</code> 이다.</p>
+  <p>이 매핑은 <b>정본 기준</b>이며, 서빙에서 등급을 정하는 판정자가 아니다. 서빙 등급은 §3·§4 의 키워드
+  등급이 정하고, S·V·M 레벨은 그 등급에서 파생되어 화면·API 로 나가는 요소 표시값을 등급에 정합시킨다.
+  곱셈 매핑은 그 위에서 상향 방향의 교차 확인으로만 작동한다 — 평가셋 4 종 993 건에서 곱셈 단계가
+  최종 등급을 바꾼 사례는 <b>0 건</b>이다(<code>poc/scripts/audit_rule_formula.py</code>).
+  business35 를 더한 5 종 1,028 건으로 넓혀도 같다(<code>audit_rule_alternatives.py</code>).</p>
   <div class="tw">
   <table>
     <thead><tr><th style="width:30%">조건</th><th style="width:16%">곱 (S×V×M)</th><th style="width:14%">등급</th><th>근거</th></tr></thead>
@@ -143,7 +148,8 @@ a{color:#0a0a0a}
   <h2>3. 실제 연산 순서 — 서빙 경로</h2>
   <p>등급은 아래 순서로 결정된다. 2·4 단계만 등급을 산출하거나 변경하고 3·5 단계는 등급을 바꾸지 않는다.
   3 단계의 룰 등급은 5 단계 합의 판정의 입력으로 쓰이며, 분류기 가중치가 적재되지 않은 경우에 한해
-  등급 산출을 대신한다.</p>
+  등급 산출을 대신한다. <b>다만 룰이 등급 판정에 전혀 관여하지 않는다는 뜻은 아니다</b> &mdash;
+  룰의 <b>등급별 점수</b>는 4 단계의 FNR-safe 상향 입력으로 쓰이며, 임계를 넘으면 분류기 등급을 위로 덮어쓴다.</p>
   <div class="flow">입력 (문서 또는 텍스트 + ICD 메타데이터)
   │
   ├─ 1  전처리         텍스트 추출 → 정규화 → 개인정보(PII) 마스킹 → 청크 분할
@@ -154,11 +160,14 @@ a{color:#0a0a0a}
   │                     · 승격 임계값 τ 로 위험도 순 선택(τ 미설정 시 argmax)
   │
   ├─ 3  룰 등급 산출      키워드 argmax → 요소 정합 → 상위 등급 채택  (§4)
-  │                     [등급 변경 없음. 5 단계 합의 판정의 입력]
+  │                     [룰의 <b>최종 등급</b>은 분류기 등급을 대체하지 않는다]
+  │                     [룰의 <b>등급별 점수</b>는 4 단계 FNR-safe 상향의 입력이다]
   │
   ├─ 4  <b>등급 보정</b>        [등급 변경]
   │                     · 보안표시 하한: ICD 보안표시가 예측보다 높으면 상향(하향 없음)
   │                     · 출처 상한: 출처가 공개 문서이면 S3 로 상한
+  │                     · FNR-safe 상향: 룰 점수가 임계(TS 3.0·S1 2.2·S2 1.6) 이상이면
+  │                       분류기 등급을 그 등급으로 상향(하향 없음) &mdash; §6
   │                     · 동점 시 상위 등급 채택, 미탐 방지 보정
   │
   ├─ 5  검수 라우팅       §5 게이트 중 하나라도 해당하면 needs_review
@@ -219,6 +228,13 @@ a{color:#0a0a0a}
     </tbody>
   </table>
   </div>
+  <p class="src">정본 &mdash; <code>services/review_reasons.py</code> 의 <code>REVIEW_GATES</code>.
+  같은 목록에 16번째 항목 <code>extraction-gate</code> 가 있으나 이는 진단·시연 엔드포인트
+  <code>POST /documents/analyze</code> 전용이다(<code>api/documents.py:572</code>). 운영 적재 경로
+  (<code>POST /documents</code> &rarr; <code>POST /classify</code>)에서는 같은 조건(열화 추출)을
+  위 표 2번 <b>열화추출 격리</b> 가 처리한다 &mdash; 수집 단계가 남긴 처리 상태를 분류 시점에 다시 읽는다
+  (<code>classify_service.py:364</code>).</p>
+
   <p>게이트는 예외가 발생해도 분류를 중단하지 않고 기존 동작을 유지하며, 미적용 사실을 경고와 지표 카운터로 남긴다. 미탐 방향 게이트가 이렇게 미적용된 경우는 11 번 게이트가 다시 검수로 보낸다.</p>
   <div class="note">관리 화면에서 등록한 <strong>태깅 규칙 하나가 게이트 전체를 멈추던 경로를 차단했다</strong>(<code>02b660ef</code>). 정규식 규칙이 컴파일되지 않으면 룰 라벨링이 문서마다 예외로 중단됐고, 호출부가 그것을 위 fail-open 으로 흡수해 <strong>미탐 방지 상향과 룰·모델 합의(12 번)가 함께 정지</strong>했다. 현재는 등록 시점에 정규식을 검사해 거부(400)하고, 이미 저장된 규칙이 깨져 있으면 해당 규칙만 미매치로 처리하고 나머지 판정은 유지한다.</div>
 
@@ -235,6 +251,7 @@ a{color:#0a0a0a}
       <tr><td>서빙 temperature</td><td class="n">2.03</td><td>프로파일 기본값. 배포 모델에 동봉된 <code>temperature.json</code> 측정값에 맞춘 값이다</td></tr>
       <tr><td>룰·모델 합의 게이트</td><td class="c ok">ON</td><td>프로파일 기본값</td></tr>
       <tr><td>metadata_floor</td><td class="c ok">ON</td><td>프로파일 기본값</td></tr>
+      <tr><td>룰 상향 임계(FNR-safe)</td><td class="n">TS 3.0 · S1 2.2 · S2 1.6</td><td>프로파일 기본값. 룰 점수가 이 값 이상이면 분류기 등급을 상향한다(<code>fnr_rule_*_threshold</code>)</td></tr>
       <tr><td>승격 임계값 τ</td><td class="n">0.30</td><td>프로파일 기본값</td></tr>
       <tr><td>출처 상한</td><td>활성 · 상한 등급 S3</td><td>프로파일 기본값. 공개 출처 문서를 S3 로 상한</td></tr>
       <tr><td>청크 최댓값 선택 대상</td><td>TS · S1</td><td>이 두 등급만 최댓값 선택, 나머지는 길이 가중 평균</td></tr>
@@ -249,10 +266,10 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:26%">항목</th><th style="width:34%">실측</th><th>영향</th></tr></thead>
     <tbody>
-      <tr><td>룰 경로는 사전 분포에 갇힌다</td><td>사전 어휘 밖 평가셋 800 건에서 룰이 전건을 S3 로 판정했다. 등급 일치율 30.0% 는 해당 평가셋의 S3 기저율과 같은 값이다</td><td>등급에는 영향이 없다(분류기가 결정한다). 다만 합의 게이트가 불일치로 판정하여 검수 대상이 늘어난다</td></tr>
-      <tr><td>S/V/M 은 독립 관측이 아니다</td><td>요소 정확도 MAE 는 S·V 각 1.44, M 은 0.94 이며 과검출은 0.0% 다</td><td>화면에 표시되는 요소값은 참고값이며, 판정 근거는 키워드 등급이다</td></tr>
-      <tr><td>평가셋에 사람 서명이 없다</td><td>사람이 서명한 평가정답(<code>locked_gold_eval</code>)이 0 건이며, 현행 지표는 전부 기계 라벨 기준이다</td><td>정확도 수치는 모델 간 상대 비교와 회귀 여부 확인에 사용하며, 운영 정확도를 보증하지 않는다</td></tr>
-      <tr><td>과검출은 0, 미탐 방향으로만 틀린다</td><td>평가셋 4 종 전부에서 요소 과검출 0.0%</td><td>미탐 최소화라는 설계 의도와 일치한다</td></tr>
+      <tr><td>룰 경로는 사전 분포에 갇힌다</td><td>사전 어휘 밖 평가셋 800 건에서 룰이 전건을 S3 로 판정했다. 등급 일치율 30.0% 는 해당 평가셋의 S3 기저율과 같은 값이다</td><td>해당 평가셋에서는 등급이 바뀌지 않았다 — 룰 점수가 §6 의 상향 임계(TS 3.0·S1 2.2·S2 1.6)에 미달했기 때문이다. 임계를 넘으면 <code>pipeline.py</code> 의 FNR-safe 상향이 분류기 등급을 위로 덮어쓴다(실측 2026-08-24: <code>grade_scores</code> S1 2.35 · 모델 S2 → 최종 S1). 아울러 합의 게이트가 불일치로 판정하여 검수 대상이 늘어난다</td></tr>
+      <tr><td>S/V/M 은 독립 관측이 아니다</td><td>요소 정확도 MAE 는 S·V 각 1.44, M 은 0.94 이며 요소값 상향 오차는 0.0% 다(v3 final_800 · N=800 기준)</td><td>화면에 표시되는 요소값은 참고값이며, 판정 근거는 키워드 등급이다</td></tr>
+      <tr><td>평가셋에 사람 서명이 없다</td><td>사람이 서명한 평가정답(<code>locked_gold_eval</code>)이 0 건이며(2026-08-26 개발 DB 기준 · 시연 서버는 감리 중이라 조회하지 않았다), 현행 지표는 전부 기계 라벨 기준이다</td><td>정확도 수치는 모델 간 상대 비교와 회귀 여부 확인에 사용하며, 운영 정확도를 보증하지 않는다</td></tr>
+      <tr><td>요소값은 상향 오차가 없다 — 등급 과분류는 별개다</td><td>요소값 상향 오차 0.0%(v3 final_800). 등급 과분류는 0 이 아니다 — 경화42 2 · clean42 2 · holdout109 22 · v3 final_800 0(N=42·42·109·800)</td><td>등급 과분류는 검수로 되돌릴 수 있는 방향이므로 미탐 최소화 설계와 상충하지 않는다. 다만 <b>요소값의 단방향 오차를 등급 과분류 부재로 읽어서는 안 된다</b></td></tr>
     </tbody>
   </table>
   </div>
@@ -264,11 +281,12 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성 — 코드 실행 순서 기준으로 신규 작성. 분기 전수열거·993건 실측 반영</td></tr>
       <tr><td class="c">2</td><td class="n">2026-08-29</td><td><code>faaf0c0e</code></td><td>근거 판을 판정 경로 변경분까지 올린다(<code>02b660ef</code> 태깅 규칙 오류의 게이트 정지 차단 · <code>05fe50ce</code>·<code>465bb7ad</code> 무음 폴백 가시화). §4 에 <strong>공개 신호의 역할</strong>(등급 하향이 아니라 상향 차단)을 명시하고, §5 에 게이트 정지 경로 차단을 기록. 검증 항목에 전수·불변식 회귀 테스트 164 항목을 추가 — 판정식 27 조합 명세 대조·단조성·가이드 워크드 예시 5 건·ICD M 매핑 49 조합·코퍼스 불변식·결정성. 변이 주입 4 종으로 탐지력을 확인했다. <strong>등급 정의·임계값·판정식은 불변이며 서술과 근거 판만 갱신한다.</strong></td></tr>
+      <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>423c34a2</code></td><td>&sect;2 에 정본 매핑과 서빙 판정자의 구분을 명시한다. 곱셈 매핑은 정본 기준이며 서빙 등급은 키워드 등급이 정하고 S·V·M 은 그 등급에 정합된 표시값이라는 사실을 &sect;2 머리에 올렸다 — 종전에는 &sect;4-3 에만 적혀 있어 &sect;2 만 읽으면 곱셈이 판정자로 읽혔다. 실측 근거: 평가셋 4 종 993 건에서 곱셈 단계의 등급 변경 0 건(<code>audit_rule_formula.py</code>), 집계식 6 종 비교에서 실질미탐 전 종 동일(<code>audit_rule_alternatives.py</code>), 곱셈 블록 해제 시 등급 변화 0 건 · factor_scores 변화 42 건 중 29 건. 판정식·임계값은 불변이며 서술만 갱신한다</td></tr>
     </tbody>
   </table>
   </div>
 
-  <div class="foot">근거 파일 — <code>poc/src/koipa/modules/m3_labeling/rule_engine.py</code> · <code>poc/src/koipa/modules/m5_inference/pipeline.py</code> · <code>poc/src/koipa/services/classify_service.py</code> · <code>poc/src/koipa/config.py</code> · <code>poc/scripts/audit_rule_formula.py</code> · <code>poc/tests/test_svm_grade_invariants.py</code> · <code>poc/scripts/measure_rule_variants.py</code> · <code>doc/internal/룰_판정식_감사.html</code></div>
+  <div class="foot">근거 파일 — <code>poc/src/koipa/modules/m3_labeling/rule_engine.py</code> · <code>poc/src/koipa/modules/m5_inference/pipeline.py</code> · <code>poc/src/koipa/services/classify_service.py</code> · <code>poc/src/koipa/config.py</code> · <code>poc/scripts/audit_rule_formula.py</code> · <code>poc/tests/test_svm_grade_invariants.py</code> · <code>poc/scripts/measure_rule_variants.py</code></div>
 </div>
 </body>
 </html>

@@ -122,6 +122,11 @@ a{color:#0a0a0a}
 
   <h2>2. 정본 매핑 — 곱셈식과 v2.2 보정</h2>
   <p>발주처 정본 가이드(11~12p)의 곱셈 매핑을 코드화한 함수가 <code>grade_from_svm(s, v, m)</code> 이다.</p>
+  <p>이 매핑은 <b>정본 기준</b>이며, 서빙에서 등급을 정하는 판정자가 아니다. 서빙 등급은 §3·§4 의 키워드
+  등급이 정하고, S·V·M 레벨은 그 등급에서 파생되어 화면·API 로 나가는 요소 표시값을 등급에 정합시킨다.
+  곱셈 매핑은 그 위에서 상향 방향의 교차 확인으로만 작동한다 — 평가셋 4 종 993 건에서 곱셈 단계가
+  최종 등급을 바꾼 사례는 <b>0 건</b>이다(<code>poc/scripts/audit_rule_formula.py</code>).
+  business35 를 더한 5 종 1,028 건으로 넓혀도 같다(<code>audit_rule_alternatives.py</code>).</p>
   <div class="tw">
   <table>
     <thead><tr><th style="width:30%">조건</th><th style="width:16%">곱 (S×V×M)</th><th style="width:14%">등급</th><th>근거</th></tr></thead>
@@ -263,6 +268,7 @@ a{color:#0a0a0a}
     <tbody>
       <tr><td class="c">1</td><td class="n">2026-08-26</td><td><code>d3fe51c3</code></td><td>최초 작성 — 코드 실행 순서 기준으로 신규 작성. 분기 전수열거·993건 실측 반영</td></tr>
       <tr><td class="c">2</td><td class="n">2026-08-29</td><td><code>faaf0c0e</code></td><td>근거 판을 판정 경로 변경분까지 올린다(<code>02b660ef</code> 태깅 규칙 오류의 게이트 정지 차단 · <code>05fe50ce</code>·<code>465bb7ad</code> 무음 폴백 가시화). §4 에 <strong>공개 신호의 역할</strong>(등급 하향이 아니라 상향 차단)을 명시하고, §5 에 게이트 정지 경로 차단을 기록. 검증 항목에 전수·불변식 회귀 테스트 164 항목을 추가 — 판정식 27 조합 명세 대조·단조성·가이드 워크드 예시 5 건·ICD M 매핑 49 조합·코퍼스 불변식·결정성. 변이 주입 4 종으로 탐지력을 확인했다. <strong>등급 정의·임계값·판정식은 불변이며 서술과 근거 판만 갱신한다.</strong></td></tr>
+      <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>423c34a2</code></td><td>&sect;2 에 정본 매핑과 서빙 판정자의 구분을 명시한다. 곱셈 매핑은 정본 기준이며 서빙 등급은 키워드 등급이 정하고 S·V·M 은 그 등급에 정합된 표시값이라는 사실을 &sect;2 머리에 올렸다 — 종전에는 &sect;4-3 에만 적혀 있어 &sect;2 만 읽으면 곱셈이 판정자로 읽혔다. 실측 근거: 평가셋 4 종 993 건에서 곱셈 단계의 등급 변경 0 건(<code>audit_rule_formula.py</code>), 집계식 6 종 비교에서 실질미탐 전 종 동일(<code>audit_rule_alternatives.py</code>), 곱셈 블록 해제 시 등급 변화 0 건 · factor_scores 변화 42 건 중 29 건. 판정식·임계값은 불변이며 서술만 갱신한다</td></tr>
     </tbody>
   </table>
   </div>
