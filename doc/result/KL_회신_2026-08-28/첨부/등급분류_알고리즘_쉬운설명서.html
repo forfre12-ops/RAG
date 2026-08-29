@@ -96,7 +96,7 @@ a{color:#0a0a0a}
       <tr><th>대상 독자</th><td>인공지능·기계학습 배경지식이 없는 독자. 검수 담당자 · 발주처 담당자 · 신규 합류자</td></tr>
       <tr><th>짝 문서</th><td><code>등급분류_알고리즘_명세서</code> (연산 명세) ↔ 본 문서 (같은 내용의 해설)<br />서로 <b>같은 코드</b>를 설명한다. 두 문서가 어긋나면 명세서가 정본이다</td></tr>
       <tr><th>대상 코드</th><td><code>m5_inference/pipeline.py</code> · <code>m3_labeling/rule_engine.py</code> · <code>services/classify_service.py</code> · <code>services/review_reasons.py</code> · <code>config.py</code></td></tr>
-      <tr><th>본 문서가 아닌 것</th><td>법적 판단 기준이 아니다. 어떤 문서가 왜 영업비밀인지는 <code>영업비밀_등급분류_기준_적용서_v2.2</code> 에 있다</td></tr>
+      <tr><th>본 문서가 아닌 것</th><td>법적 판단 기준이 아니다. 어떤 문서가 왜 영업비밀인지(부정경쟁방지법 제2조제2호 3요건 · 발주처 정본 가이드)는 다루지 않는다</td></tr>
       <tr><th>작성일</th><td>2026-08-29</td></tr>
       <tr><th>근거 커밋</th><td><code>0cba0342</code></td></tr>
     </tbody>
@@ -337,7 +337,7 @@ a{color:#0a0a0a}
 
   <p>보정까지 끝나면 등급은 확정이다. 마지막 단계는 <b>이 판정을 자동으로 확정해도 되는가</b>만 정한다.
   여기서 말하는 <b>검수 게이트</b>는 <b>등급을 바꾸지 않는다</b>. 상태만 둘 중 하나로 정한다.
-  등급을 바꾸는 것은 그 앞 단계인 <b>보정</b>이다 &mdash; 보안표시 하한(S2→S1 상향) · 출처 상한(공개 문서 S3 하향) · 룰 상향(§8 임계). 이름에 &ldquo;게이트&rdquo;가 붙어 있어도 이 셋은 등급을 움직인다.</p>
+  등급을 바꾸는 것은 그 앞 단계인 <b>보정</b>이다 &mdash; 보안표시 하한(S2→S1 상향) · 출처 상한(공개 문서 S3 하향) · 룰 상향(§7 임계). 이름에 &ldquo;게이트&rdquo;가 붙어 있어도 이 셋은 등급을 움직인다.</p>
 
   <ul>
     <li><code>staging</code> — 자동확정. 사람이 안 봐도 된다</li>
@@ -441,24 +441,7 @@ agreement (룰·모델 모두 S2 일치 → 자동 확정)</pre>
   섞어 재학습한다. 재학습된 모델은 <b>후보로만 등록되고 자동으로 서비스에 올라가지 않는다</b> — 올리려면
   성능 게이트를 통과하고 사람이 활성화해야 한다.</p>
 
-  <h2>7. 이 시스템이 못 하는 것</h2>
-
-  <p>측정한 값과 <b>어느 평가셋에서 잰 값인지</b>를 함께 적는다. 셋 이름이 없는 수치는 없다.</p>
-
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:24%">한계</th><th style="width:36%">실측</th><th>무슨 영향이 있나</th></tr></thead>
-    <tbody>
-      <tr><td>룰은 사전 밖 문서를 못 본다</td><td>사전 어휘 밖 평가셋 800건에서 룰이 <b>전건을 S3</b>로 판정했다. 등급 일치율 30.0%는 그 평가셋의 S3 비율과 같은 값이다</td><td><b>이 평가셋에서는</b> 등급이 바뀌지 않았다 — 룰 점수가 §8 의 상향 임계(TS 3.0·S1 2.2·S2 1.6)에 못 미쳤기 때문이다. 룰 점수가 그 임계를 넘으면 <b>룰이 AI 등급을 위로 올린다</b>(실측 2026-08-24: 모델 S2 → 최종 S1). 또 12번 합의 게이트가 불일치를 내면서 검수 대상이 늘어난다</td></tr>
-      <tr><td>S·V·M 은 독립 관측이 아니다</td><td>요소 오차(MAE)가 S·V 각 1.44 · M 0.94, 요소값을 높게 본 비율 0.0% (v3 평가셋 800건 기준)</td><td>화면의 요소값은 참고값이다. “세 요건을 각각 판독한다”고 설명하면 실제 동작과 어긋난다</td></tr>
-      <tr><td>사람이 서명한 평가정답이 없다</td><td><code>locked_gold_eval</code> 0건(2026-08-26 개발 DB 기준. 시연 서버는 감리 중이라 조회하지 않았다). 현재 지표는 전부 기계가 붙인 정답 기준이다</td><td>정확도 수치는 <b>모델끼리 비교</b>하고 <b>나빠졌는지 확인</b>하는 데 쓴다. 운영 정확도를 보증하는 값이 아니다</td></tr>
-      <tr><td>학습 데이터가 합성 위주다</td><td><b>회원사</b> 실문서·현장 검수자·데이터 반출이 0인 환경에서 합성 데이터로 부트스트랩했다 (공개 실문서 — 판례·금융보고서 — 는 쓰고 있다)</td><td>회원사 실문서 분포에서는 재측정이 필요하다. 현장 운영 학습이 실질적인 성능 지렛대다</td></tr>
-      <tr><td>요소값(S·V·M)은 낮게만 틀린다 — <b>등급은 다르다</b></td><td>요소값을 높게 본 비율은 0.0% 다(v3 800건). 다만 <b>등급 과분류는 0 이 아니다</b> — 평가셋 4종에서 경화42 2건 · clean42 2건 · holdout109 22건 · v3 800건 0건</td><td>등급 과분류는 검수자가 되돌릴 수 있는 방향이라 설계상 허용한 대가다(§6 Q6). 요소값이 한쪽으로만 틀리는 것과 등급이 과분류되지 않는 것은 <b>다른 이야기다</b></td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>8. 지금 돌아가는 값</h2>
+  <h2>7. 지금 돌아가는 값</h2>
 
   <p>아래는 <b>223 배포 프로파일(full-train)이 적용하는 값</b>이다. 컨테이너 환경변수로 따로 지정한 값이 없으면
   이 프로파일 기본값이 그대로 쓰인다. <b>어느 행이 서버에서 직접 읽은 값이고 어느 행이 프로파일 기본값인지는
@@ -483,7 +466,7 @@ agreement (룰·모델 모두 S2 일치 → 자동 확정)</pre>
   </div>
   <p class="src">근거 — 값은 poc/src/koipa/config.py (onprem-local · full-train 두 프로파일의 해당 값은 동일하다) · 223 서버 실측(docker inspect koipa-jjw-api-1)은 등급분류_알고리즘_명세서 §6</p>
 
-  <h2>9. 용어</h2>
+  <h2>8. 용어</h2>
 
   <div class="tw">
   <table>
@@ -505,34 +488,11 @@ agreement (룰·모델 모두 S2 일치 → 자동 확정)</pre>
   </table>
   </div>
 
-  <h2>10. 더 자세히 보려면</h2>
+  <h2>9. 더 자세히 보려면</h2>
 
-  <p>어느 것이 이 묶음에 들어 있고 어느 것이 별도 제출인지 함께 적는다.</p>
-
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:28%">알고 싶은 것</th><th style="width:32%">볼 문서</th><th style="width:14%">이 묶음</th><th>비고</th></tr></thead>
-    <tbody>
-      <tr><td>정확한 연산 순서와 조건식</td><td><code>등급분류_알고리즘_명세서</code></td><td class="c">동봉</td><td>본 문서의 정본. 어긋나면 그쪽이 맞다</td></tr>
-      <tr><td>룰 판정식의 전수 검증</td><td><code>등급분류_알고리즘_명세서</code> &sect;4-2~4-3</td><td class="c">동봉</td><td>16조합 전수 열거와 평가셋 4종 993건 실측</td></tr>
-      <tr><td>어떤 문서가 왜 몇 급인가 (법적 기준)</td><td><code>영업비밀_등급분류_기준_적용서_v2.2</code></td><td class="c">별도</td><td>감리 산출물로 제출. 발주처 정본 가이드 기반</td></tr>
-      <tr><td>운영 파라미터의 근거와 측정</td><td><code>서빙_운영점_파라미터_명세</code></td><td class="c">별도</td><td>감리 산출물로 제출. 임계값을 어떻게 정했는지</td></tr>
-      <tr><td>정확도를 어떻게 재는가</td><td><code>분류_정확도_테스트방식</code></td><td class="c">별도</td><td>감리 산출물로 제출. 평가셋 구성과 지표 정의</td></tr>
-      <tr><td>KL 시스템과 주고받는 값</td><td><code>KL연동_인터페이스_규약서_ICD</code></td><td class="c">미발행</td><td>현행 v0.9 협의안. 규약 확정 후 발행한다 &mdash; 「API 통신 방안 검토 회신」 &sect;3 참조</td></tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>11. 개정 이력</h2>
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:8%">판</th><th style="width:14%">일자</th><th>내용</th></tr></thead>
-    <tbody>
-      <tr><td class="c">1</td><td class="n">2026-08-29</td><td>최초 작성. 명세서와 같은 코드를 근거로, 배경지식 없이 읽도록 다시 씀</td></tr>
-      <tr><td class="c">2</td><td class="n">2026-08-29</td><td>양식을 감리문서 표준 서식으로 교체(<code>KL_회신_2026-08-28</code> 묶음과 동일한 head·nav·본문 클래스·인쇄 규칙). 내용·수치·판정 서술은 불변</td></tr>
-    </tbody>
-  </table>
-  </div>
+  <p>정확한 연산 순서와 조건식은 함께 동봉한 <code>등급분류_알고리즘_명세서</code> 에 있다.
+  본 문서와 어긋나면 <b>명세서가 정본이다.</b> 룰 판정식의 전수 검증(16조합 전수 열거와
+  평가셋 4종 993건 실측)은 그 문서 &sect;4-2~4-3 이다.</p>
 
   <div class="foot">근거 파일 &mdash; <code>poc/src/koipa/modules/m5_inference/pipeline.py</code> · <code>poc/src/koipa/modules/m3_labeling/rule_engine.py</code> · <code>poc/src/koipa/services/classify_service.py</code> · <code>poc/src/koipa/services/review_reasons.py</code> · <code>poc/src/koipa/config.py</code> · <code>poc/src/koipa/api/static/admin.html</code> · 본 묶음 첨부 「등급분류 알고리즘 명세서」</div>
 
