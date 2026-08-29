@@ -102,7 +102,7 @@ a{color:#0a0a0a}
 
   <div class="note">
     질의 <b>2번(등급분류 워크플로우)</b>에 기재하신 6단계는 <b>실제 구현과 일치</b>합니다.
-    별도 정정 없이 그대로 확인해 드립니다. 나머지 항목 중 <b>4</b>는 귀사 파악 내용과
+    별도 정정 없이 그대로 확인해 드립니다. 나머지 항목 중 <b>4</b>는 질의서 기재 내용과
     실제가 다르므로 아래에 갈라 적었습니다.
   </div>
 
@@ -111,14 +111,14 @@ a{color:#0a0a0a}
   <table>
     <thead><tr><th style="width:8%">질의</th><th style="width:26%">항목</th><th style="width:14%">상태</th><th>요지</th></tr></thead>
     <tbody>
-      <tr><td class="c">가-1</td><td>분류 기법 종류</td><td>회신</td><td>등급을 정하는 것은 <b>모델·룰 둘</b>입니다 &mdash; 귀사 파악과 같습니다</td></tr>
-      <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>귀사 파악 정확</b></td><td>6단계 그대로 맞습니다. 전후 보정 2건만 보강</td></tr>
+      <tr><td class="c">가-1</td><td>분류 기법 종류</td><td>회신</td><td>등급을 정하는 것은 <b>모델·룰 둘</b>입니다 &mdash; 질의서 기재와 같습니다</td></tr>
+      <tr><td class="c">가-2</td><td>전체 워크플로우</td><td><b>기재 정확</b></td><td>6단계 그대로 맞습니다. 전후 보정 2건만 보강</td></tr>
       <tr><td class="c">가-2-1</td><td>GPU 환경 변경점</td><td>회신</td><td>등급 결정 경로는 GPU 유무와 무관하게 동일합니다</td></tr>
       <tr><td class="c">가-2-2</td><td>100쪽 문서 처리 시간</td><td>회신</td><td>실문서 100쪽을 만들어 <b>파싱부터 판정까지 종단 실측</b>했습니다. 6 CPU 기준 <b>약 5분</b> · 텍스트 문서는 파싱이 전체의 1~4%. <b>스캔 문서는 납품 번들에서 처리되지 않습니다</b>(OCR 미동봉)</td></tr>
       <tr><td class="c">가-3</td><td>반환 항목</td><td>회신</td><td>현행 21필드. GPU 유무로 달라지지 않습니다</td></tr>
       <tr><td class="c">가-3-1</td><td>SVM 점수 산정</td><td>회신</td><td>키워드 등급이 먼저 정해지고, 곱셈(S&times;V&times;M)은 그 위의 교차 확인입니다</td></tr>
       <tr><td class="c">가-3-2</td><td>XAI 방법</td><td>회신</td><td>Attention·Gradient Saliency 는 쓰지 않습니다. 매칭 구간·판정 경로로 근거를 제시합니다</td></tr>
-      <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>귀사 파악 상이</b></td><td>출현 빈도가 아니라 가중합 argmax 다. 시드 404개</td></tr>
+      <tr><td class="c">가-4</td><td>룰 기반 방식</td><td><b>기재 상이</b></td><td>출현 빈도가 아니라 가중합 argmax 다. 시드 404개</td></tr>
       <tr><td class="c">가-5</td><td>DB·Vector DB 명세</td><td>제공</td><td><code>테이블정의서_ERD</code> 동봉(21표). Vector DB 는 별도 제품이 아니라 pgvector 다</td></tr>
       <tr><td class="c">가-6</td><td>통신 방법</td><td>별도 회신</td><td>「API 통신 방안 검토 회신」으로 분리</td></tr>
       <tr><td class="c">가-7</td><td>능동 학습</td><td>제공</td><td>「학습 데이터 입력 경로 명세서」 동봉</td></tr>
@@ -132,7 +132,7 @@ a{color:#0a0a0a}
   <h2>1. 가-1 &mdash; 분류 기법 종류</h2>
   <div class="q">확정된 분류 기법 목록은 무엇인가</div>
 
-  <p><b>귀사가 파악하신 두 가지가 맞습니다.</b> 등급을 정하는 것은 이 둘뿐입니다.</p>
+  <p><b>질의서의 두 가지가 맞습니다.</b> 등급을 정하는 것은 이 둘뿐입니다.</p>
 
   <div class="tw">
   <table>
@@ -158,7 +158,7 @@ a{color:#0a0a0a}
 
   <div class="tw">
   <table>
-    <thead><tr><th style="width:6%">단계</th><th style="width:40%">귀사 기재</th><th>실제 운영값</th></tr></thead>
+    <thead><tr><th style="width:6%">단계</th><th style="width:40%">질의서 기재</th><th>실제 운영값</th></tr></thead>
     <tbody>
       <tr><td class="c">1</td><td>텍스트 추출 · 정규화 · PII 마스킹</td><td>일치</td></tr>
       <tr><td class="c">2</td><td>최대 512 token 청크 &rarr; 청크별 추론</td><td>일치 (<code>chunk_size=512</code> · <code>max_seq_len=512</code>)</td></tr>
@@ -303,7 +303,7 @@ a{color:#0a0a0a}
       <tr><td>동기 경로 상한</td><td><b>코드 기본값 34청크</b>(약 9쪽) &mdash; 60초 예산의 절반을 안전선으로 두고 역산한 값입니다. <b>시험 서버(223)에는 400청크로 설정되어 있습니다</b>(<code>ANALYZE_SYNC_MAX_CHUNKS</code> · <code>docker inspect</code> 실측). 아래 역프록시 항목과 함께 보시기 바랍니다</td></tr>
       <tr><td>대용량 경로</td><td><b>비동기 처리가 유일한 수단</b>입니다. 접수 즉시 job 을 반환하고 완료 시 콜백합니다</td></tr>
       <tr><td>워커 타임아웃</td><td>soft 900초 / hard 1200초(100쪽 312초 기준 약 3배 여유)</td></tr>
-      <tr><td>본문 상한</td><td>1,048,576자. <b>귀사 제안 문서의 값과 동일</b>합니다</td></tr>
+      <tr><td>본문 상한</td><td>1,048,576자. <b>제안 문서의 값과 동일</b>합니다</td></tr>
     </tbody>
   </table>
   </div>
@@ -313,7 +313,7 @@ a{color:#0a0a0a}
     <code>proxy_read_timeout</code> 이 <b>120초</b>인데, 앱은 동기 분석 상한을 400청크
     (약 170초)까지 허용하도록 설정된 구성이 있습니다. 그 구간(약 120~170초)에서는 앱이
     처리를 마치기 전에 프록시가 먼저 끊습니다. 대용량은 비동기 경로로 보내는 것이 정답이며,
-    당사는 이 설정 정합을 별도로 정리하고 있습니다.
+    이 설정 정합은 별도로 정리하고 있습니다.
   </div>
 
 <h2>5. 가-3 &mdash; 반환 항목</h2>
@@ -344,7 +344,7 @@ a{color:#0a0a0a}
   </div>
 
   <div class="note">
-    <b>연동 시 반드시 함께 받으셔야 하는 것.</b> 귀사 API 제안서의 결과 반환 항목은
+    <b>연동 시 반드시 함께 받으셔야 하는 것.</b> API 제안서의 결과 반환 항목은
     <code>label</code> 중심으로 되어 있습니다. <b>등급만 전달되면 검수 대상을 고를 수 없습니다.</b>
     본 시스템의 설계 목표는 미탐 최소화이고, 그것은 확신이 낮은 건을 사람 검수로 돌려 달성합니다.
     최소한 <code>confidence</code> · <code>status</code> · <code>warnings</code> 세 가지는
@@ -353,7 +353,7 @@ a{color:#0a0a0a}
 
   <h3>5-1. 확정 여부와 추가 항목</h3>
 
-  <p>위 21필드는 <b>현재 배포본이 실제로 반환하는 규격</b>입니다. 당사가 임의로 필드를 빼거나
+  <p>위 21필드는 <b>현재 배포본이 실제로 반환하는 규격</b>입니다. 임의로 필드를 빼거나
   이름을 바꾸지 않습니다.</p>
 
   <div class="note">
@@ -378,7 +378,7 @@ a{color:#0a0a0a}
       <tr>
         <td>협의에 따라 추가</td>
         <td>미정</td>
-        <td>귀사 포털 화면에 필요한 항목이 더 있으면 회신하여 주시면 규약에 반영합니다.
+        <td>포털 화면에 필요한 항목이 더 있으면 회신하여 주시면 규약에 반영합니다.
         <b>필드 추가는 기존 항목을 건드리지 않는 방향으로만</b> 합니다</td>
       </tr>
     </tbody>
@@ -456,12 +456,12 @@ a{color:#0a0a0a}
   <p>모델 내부 신호 기반 기법 도입이 필요하시면 별도 협의 항목으로 올려 주시면 검토하겠습니다.
   다만 <b>현행 요건(FUN-023)에는 포함되어 있지 않습니다.</b></p>
 
-  <h2>8. 가-4 &mdash; 룰 기반 분류 방식 <span style="font-size:11px;color:var(--dim)">[귀사 파악 상이]</span></h2>
+  <h2>8. 가-4 &mdash; 룰 기반 분류 방식 <span style="font-size:11px;color:var(--dim)">[기재 상이]</span></h2>
   <div class="q">약 400개 키워드가 출현 빈도에 따라 등급 판정 · 개선 예정 · 관리자 관리 가능 여부</div>
 
   <div class="tw">
   <table>
-    <thead><tr><th style="width:26%">귀사 파악</th><th style="width:16%">판정</th><th>실제</th></tr></thead>
+    <thead><tr><th style="width:26%">질의서 기재</th><th style="width:16%">판정</th><th>실제</th></tr></thead>
     <tbody>
       <tr><td>약 400개 키워드</td><td class="c">정확</td><td><b>404개</b> &mdash; TS 114 · S1 107 · S2 87 · S3 96</td></tr>
       <tr><td><b>출현 빈도에 따라</b> 판정</td><td class="c"><b>상이</b></td><td>빈도가 아니라 <b>등급별 가중합의 argmax</b> 다. 같은 키워드가 여러 번 나와도 가중치는 시드에 정의된 값을 따른다</td></tr>
@@ -603,7 +603,7 @@ a{color:#0a0a0a}
   <div class="q">모델 성능이 목표치에 못 미칠 경우 조치 &mdash; 샘플 추가 생성 · 프롬프트 변경 등</div>
 
   <div class="note warn">
-    <b>당사 방침은 합성 문서 추가 생성이 아닙니다</b>(2026-08-24 결정). 예시로 드신 두 조치
+    <b>방침은 합성 문서 추가 생성이 아닙니다</b>(2026-08-24 결정). 예시로 드신 두 조치
     (샘플 추가 생성 · 생성 프롬프트 변경)는 <b>성능을 올리는 레버가 아니라고 판단</b>하고 있으며,
     근거는 아래와 같습니다. 기능 자체는 요건(FUN-003)이므로 유지합니다.
   </div>
@@ -628,13 +628,13 @@ a{color:#0a0a0a}
   </table>
   </div>
 
-  <p><b>당사가 보는 실질 레버는 운영 학습입니다</b> &mdash; 회원사 현장에서 검수자가 교정한
+  <p><b>실질 레버는 운영 학습입니다</b> &mdash; 회원사 현장에서 검수자가 교정한
   실문서를 학습에 반영하는 경로(&sect;11 세 번째 행). 반출 없이 현장에서 동작합니다.</p>
 
   <h3>13-1. 보안 가이드라인 기반 라벨링 매핑 방법</h3>
 
   <p>질의에 포함된 항목이라 함께 답합니다. 매핑은 <b>발주처 정본 가이드(11~12쪽)의 4단계
-  곱셈표를 그대로 옮긴 것</b>이며 당사가 새로 만든 기준이 아닙니다.</p>
+  곱셈표를 그대로 옮긴 것</b>이며 새로 만든 기준이 아닙니다.</p>
 
   <div class="tw">
   <table>
@@ -748,7 +748,7 @@ a{color:#0a0a0a}
     악화되면 승격을 차단합니다. 게이트 기준값과 최근 판정 결과는 요청하시면 제공드립니다.
   </div>
 
-  <h2>15. 당사가 요청드리는 사항</h2>
+  <h2>15. 요청 사항</h2>
 
   <div class="tw">
   <table>
