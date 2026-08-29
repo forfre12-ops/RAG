@@ -31,6 +31,11 @@ KNOWN_PHANTOMS = {
     # 2026-08-19 현재 HEAD 규약서에 남아 있다. 워킹트리에서 이미 제거되는 중이라
     # 그 커밋이 들어오면 이 항목을 지우면 된다.
     "/golden/candidates/actual-intake.html",
+    # include_in_schema=False 로 **일부러** 스키마에서 감춘 경로다(prom_metrics.py:875).
+    # 서비스가 실제로 서빙하므로 유령이 아니고, 운영 연동에 필요해 규약서에는 적어 두었다
+    # (규약서 본문도 그 사유를 밝힌다). app.openapi() 로는 볼 수 없으니 여기 예외로 둔다 —
+    # 아래 KNOWN_GAPS 주석이 말하는 "후자를 쓴다"가 이 경우다.
+    "/metrics-prom",
 }
 
 # 코드에는 있으나 규약서에 없는 것 — 없애거나 문서에 넣기로 정하기 전까지의 유예 목록.

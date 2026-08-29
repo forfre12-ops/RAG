@@ -25,8 +25,11 @@ tb_audit_log · tb_chunks 가 월별 파티션이라 이것을 먼저 확인했�
 다음으로 재시작한다. 마지막 단계를 빼먹으면 새 시퀀스가 1 부터 시작해 기존 행과
 충돌한다. 빈 표는 1 로 둔다.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: c9e1f2a3b4d5
 Revises: f0a1b2c3d4e5
+
+⚠ 초안은 a1b2c3d4e5f6 을 썼는데 그것이 이미 pg_rag_vectorstore 가 쓰는 번호였다.
+로컬 DB 에 alembic upgrade head 를 돌려 "Cycle is detected" 로 잡았다.
 Create Date: 2026-08-29
 """
 from __future__ import annotations
@@ -34,7 +37,7 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-revision = "a1b2c3d4e5f6"
+revision = "c9e1f2a3b4d5"
 down_revision = "f0a1b2c3d4e5"
 branch_labels = None
 depends_on = None
