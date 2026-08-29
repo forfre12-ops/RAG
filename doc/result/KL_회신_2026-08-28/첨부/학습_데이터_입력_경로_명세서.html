@@ -395,6 +395,12 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         <td><code>pytest tests/test_synth_training_build.py</code> &mdash; 위생 게이트 제외, 교정 라벨 우선, 미승인 무시, 교정의 표본 간 누출 없음</td>
       </tr>
       <tr>
+        <td>CPU 증분 재학습 소요</td><td class="c">약 1시간 / 1,000건</td>
+        <td>2026-07-20 회원사 노드(CPU 전용) 별도 계측 &mdash; 처리 시간만이다.
+        이 저장소에는 해당 계측 리포트 파일이 없다(<code>poc/reports</code> 557개 대조, 2026-08-29).
+        다시 재는 방법은 &sect;8 에 적었다</td>
+      </tr>
+      <tr>
         <td>코드 스키마 head</td><td class="c"><code>d1a2b3c4e5f7</code></td>
         <td>마이그레이션 18판 중 자식이 없는 판(<code>alembic/versions/</code>) &mdash;
         2026-08-29 에 미사용 칼럼 10개를 뺀 판이 head 다</td>
@@ -418,14 +424,21 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         <td><b>적용돼 있다</b>(2026-08-29 실측). 시험서버(223)의 alembic 판은 <code>d1a2b3c4e5f7</code> 로 <b>코드 head 와 같다</b> &mdash; &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
       </tr>
       <tr>
-        <td>재학습 소요 시간&middot;자원</td>
-        <td><b>측정하지 않았다.</b> 기록할 자리는 스키마에 있으나(<code>tb_training_runs</code> 의
+        <td>재학습 소요 시간의 <b>시스템 자동 기록</b></td>
+        <td>비어 있다. 처리 시간 자체는 &sect;7 에 실측치를 적었으나, 그것은 별도 계측이고
+        시스템이 스스로 남긴 값이 아니다. 기록할 자리는 스키마에 있으나(<code>tb_training_runs</code> 의
         <code>duration_sec</code> &middot; <code>started_at</code> &middot; <code>completed_at</code> &middot;
         <code>total_samples</code>) 배포 모델 아티팩트의 <code>report.json</code> 에는 지표만 있고 시간 키가 없다.
-        운영 서버 조회는 하지 않기로 했으므로(위 결정) 값을 채우려면 별도 계측이 필요하다.
-        재는 방법 &mdash; 학습을 1 회 돌린 뒤
+        운영 서버 조회는 하지 않기로 했으므로(위 결정) 이 저장소에서 값을 다시 얻으려면 학습을 1 회 돌려야 한다.
+        재는 방법 &mdash;
         <code>select duration_sec, total_samples, trigger_type from tb_training_runs order by created_at desc limit 5</code>.
-        추정치를 쓰지 않고 비워 둔다</td>
+        추정치를 쓰지 않는다</td>
+      </tr>
+      <tr>
+        <td>재학습의 <b>품질 개선 폭</b></td>
+        <td>측정하지 않았다. &sect;7 의 &ldquo;1시간 / 1,000건&rdquo;은 <b>처리 시간</b>이며,
+        재학습으로 F1 이 얼마나 오르는지는 잰 적이 없다. 회원사 실데이터가 쌓여야 잴 수 있는 값이라
+        추정치로 채우지 않는다</td>
       </tr>
       <tr>
         <td>경로 1 의 종단 실행 실적</td>
@@ -443,6 +456,8 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
       <tr><td class="c">1</td><td class="n">2026-08-27</td><td><code>465bb7ad</code></td><td>최초 작성 &mdash; 코드에서 세 경로를 확인해 신규 작성. 계층별 학습 허용 계약&middot;누수 차단&middot;발화 조건 반영</td></tr>
       <tr><td class="c">2</td><td class="n">2026-08-27</td><td><code>1d865f6c</code></td><td>개발 DB 스키마를 코드 head 로 맞추고 &sect;7 에 시험 실적&middot;스키마 판을 추가. &sect;8 의 미측정 사유를 구체화</td></tr>
       <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>20d8b0f7</code></td><td>질의 가-7 이 물은 네 항목에 맞춰 두 곳을 채운다. &sect;4-5 에 <b>성능 검증 방법</b>을 넣었다 &mdash; 종전에는 &ldquo;후보로만 등록된다&rdquo;는 활성화 정책만 있었고 무엇으로 판정하는지가 없었다. 자동 게이트 7 개 검사(<code>degenerate</code> &middot; <code>fnr_high_present</code> &middot; <code>fnr_high_regression</code> 허용 +0.02 &middot; <code>f1_regression</code> 허용 &minus;0.05 &middot; <code>first_deploy_fnr_floor</code> 0.10 &middot; <code>anchor</code> &middot; <code>metamorphic_forward_regression</code>)와 fail-closed 원칙을 코드에서 옮겨 적었다. &sect;8 에는 <b>재학습 소요 시간&middot;자원이 미측정</b>임을 명시하고 재는 명령을 함께 적었다 &mdash; 기록 자리는 <code>tb_training_runs.duration_sec</code> 에 있으나 아티팩트 <code>report.json</code> 에는 시간 키가 없다. 추정치로 채우지 않는다. 경로&middot;계약&middot;코드는 불변이며 서술만 늘린다</td></tr>
+      <tr><td class="c">4</td><td class="n">2026-08-29</td><td><code>(본 커밋)</code></td><td>묶음 안에서 <b>가-7 의 소요 시간&middot;자원</b>이 서로 다른 말을 하던 것을 맞춘다 &mdash; 「질의사항 회신서」 &sect;11-1 은 &ldquo;약 1시간 / 1,000건 실측&rdquo;이라 적고 본 문서 &sect;8 은 &ldquo;측정하지 않았다&rdquo;고 적어, 같은 질의의 답이 두 갈래였다. 실제로는 <b>처리 시간은 2026-07-20 에 쟀고</b>(회원사 CPU 노드 · 별도 계측), <b>안 잰 것은 품질 개선 폭과 시스템 자동 기록</b>이다. 실측치는 &sect;7 로 옮기고 &sect;8 은 그 둘만 남겼다. 아울러 세 경로&middot;계층 계약&middot;배포 게이트를 코드에서 생성한 도식 셋을 넣었다(<code>scripts/build_reply_figures.py</code>). 경로&middot;계약&middot;코드는 불변이다</td></tr>
+      <tr><td class="c">5</td><td class="n">2026-08-29</td><td><code>&mdash;</code></td><td>스키마 판 표기를 실측에 맞춘다 &mdash; <b>코드 head 와 시험 서버(223)의 판이 모두 <code>d1a2b3c4e5f7</code></b> 로 같다(미사용 칼럼 10개를 뺀 판이 head 다). 종전에는 두 곳 모두 구판을 적어 서버가 뒤처져 있는 것으로 읽혔다.</td></tr>
     </tbody>
   </table>
   </div>

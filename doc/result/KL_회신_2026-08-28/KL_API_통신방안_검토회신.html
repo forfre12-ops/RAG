@@ -500,6 +500,7 @@ a{color:#0a0a0a}
       <tr><td class="c">1</td><td class="n">2026-08-28</td><td><code>d3bcb712</code></td><td>최초 작성 &mdash; 초안 검토 회신. 표기 오류 3건·설계 조정 3건·협의사항 15건 의견</td></tr>
       <tr><td class="c">2</td><td class="n">2026-08-29</td><td><code>&mdash;</code></td><td><b>파일 크기 상한을 확정 회신</b>(&sect;2-4 · 멀티파트 20MB · 요청 본문 25MB · 초과 시 413) &mdash; 종전에는 &ldquo;실측 후 회신&rdquo;으로 비워 두었으나 설정값으로 확인되는 사안이었다. &sect;2-3 에 1단계 경로(<code>/documents/analyze</code>)와 그 경로에서 결과가 남지 않는 이유를 적어 2단계 요청의 근거를 밝혔다. &sect;5 머리에 Stream 용어 구분을 넣고, &sect;5-2 에 실시간 진행 표시 수단(SSE <code>/classify/stream</code> · 구현 완료)을 신설했다. &sect;7 표를 필수 3 / 보조 3 으로 갈랐다</td></tr>
       <tr><td class="c">3</td><td class="n">2026-08-29</td><td><code>&mdash;</code></td><td><b>&sect;2-4 를 실측 근거로 보강</b> &mdash; 시험 서버에 91B&middot;22MB&middot;30MB 멀티파트를 실제로 보내 <b>200 / 413(20MB 상한) / 413(25MB 본문 상한)</b> 을 확인했다. 멀티파트에도 요청 본문 한도가 함께 걸린다는 사실(<code>MAX_UPLOAD_MB</code> 만 올리면 25MB 에서 먼저 413)과, 상한을 올릴 때 조정해야 하는 여섯 지점(설정 다섯 &middot; 코드 수정 하나)을 표로 적었다. 초안 인용 쪽수를 <b>3쪽 &rarr; 2쪽</b>으로 바로잡고, 초안이 그 칸에 &ldquo;협의 필요&rdquo;라 적어 둔 점을 반영해 &ldquo;전제가 다르다&rdquo;는 표현을 회신 형식으로 고쳤다</td></tr>
+      <tr><td class="c">4</td><td class="n">2026-08-29</td><td><code>&mdash;</code></td><td><b>2단계 연동 시퀀스 도식</b>을 &sect;2-1 에 신설한다 &mdash; 등록 &rarr; 분류 &rarr; 콜백의 정상 경로와, 등록을 건너뛴 경로를 붉은 점선으로 한 그림에 병기했다.</td></tr>
     </tbody>
   </table>
   </div>
