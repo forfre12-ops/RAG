@@ -24,7 +24,6 @@ td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
 td.c{text-align:center;white-space:nowrap;font-weight:700}
 code{font-family:ui-monospace,monospace;font-size:11px;background:var(--mid);border:1px solid var(--line);padding:1px 4px}
 .note{background:var(--surf);border:1px solid var(--line);padding:12px 16px;margin:14px 0 14px 18px;font-size:13px}
-.hl{background:var(--mid);padding:10px 14px;margin:14px 0 14px 18px;font-size:13px}
 .tw{overflow-x:auto;margin-left:18px}
 .src{font-size:11.5px;color:var(--dim);font-family:ui-monospace,monospace;margin-left:18px}
 .foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
@@ -53,7 +52,7 @@ a{color:#0a0a0a}
   h1{font-size:18pt}
   h2{font-size:12pt;margin:16px 0 7px;break-after:avoid;page-break-after:avoid}
   p{margin:5px 0 5px 18px}
-  .note,.hl{padding:7px 11px;margin:8px 0 8px 18px}
+  .note{padding:7px 11px;margin:8px 0 8px 18px}
   .tw{margin:0 0 0 18px}
   .top{padding:12px 0 9px}
   .foot{margin-top:14px;padding-top:9px}
@@ -178,7 +177,7 @@ a{color:#0a0a0a}
   <h2>3. 우선 협의 요청 사항</h2>
 
   <div class="note">
-    회신 전체를 검토하지 않으시더라도 <b>아래 셋은 협의가 필요</b>합니다. 세 가지 모두 구현이 아니라
+    회신 전체를 검토하지 않으시더라도 <b>아래 넷은 협의가 필요</b>합니다. 네 가지 모두 구현이 아니라
     <b>규약·범위</b>에 관한 것이라 당사가 단독으로 결정할 수 없는 사항입니다.
   </div>
 
@@ -205,6 +204,17 @@ a{color:#0a0a0a}
         (요건 외 · 관련 오픈소스 GPL). 스캔본은 느린 것이 아니라 <b>처리되지 않습니다</b>.
         회원사 문서에 포함될 예정이면 요건 확정을 요청드린다 (회신서 &sect;4)</td>
       </tr>
+      <tr>
+        <td class="c">4</td><td><b>검수 화면을 어디에 두는가</b></td>
+        <td>ICD 합의 안건 <b>K7</b> — 검수·등급확정 화면을 ⓐ 당사 독립 콘솔로 둘지
+        ⓑ 귀사 포털에 통합할지(API 는 당사 제공)가 아직 미확정입니다.
+        <b>당사는 ⓑ 를 전제로 진행 중</b>이며, 현재 제공 중인 골든셋 콘솔은 그때까지의
+        <b>과도기 화면</b>(시연·사용설명서·내부 검수용)입니다.
+        근거 — 귀사 초안의 콜백 항목이 5개(<code>doc_id</code>·<code>success</code>·
+        <code>etc</code>·<code>file_name</code>·<code>label</code>)로 화면은 귀사 포털이
+        담당하는 구성입니다. 범위를 가르는 사항이라 <b>확정 회신을 요청드린다</b>
+        (ICD &sect;06 K7)</td>
+      </tr>
     </tbody>
   </table>
   </div>
@@ -218,8 +228,10 @@ a{color:#0a0a0a}
       <tr><td><code>(루트)</code></td><td class="c">2 + 1</td>
           <td>본 색인 + 회신 본문 2종</td></tr>
       <tr><td><code>첨부/</code></td><td class="c">4</td>
-          <td>등급분류 알고리즘 명세서 · <b>등급분류 알고리즘 쉬운 설명서</b> ·
-          테이블정의서·ERD(표 명세 + 칼럼 명세 + 관계도) · 학습 데이터 입력 경로 명세서</td></tr>
+          <td><a href="첨부/등급분류_알고리즘_명세서.html">등급분류 알고리즘 명세서</a> ·
+          <b><a href="첨부/등급분류_알고리즘_쉬운설명서.html">등급분류 알고리즘 쉬운 설명서</a></b> ·
+          <a href="첨부/테이블정의서_ERD.html">테이블정의서·ERD</a>(표 명세 + 칼럼 명세 + 관계도) ·
+          <a href="첨부/학습_데이터_입력_경로_명세서.html">학습 데이터 입력 경로 명세서</a></td></tr>
       <tr><td><code>접수원본/</code></td><td class="c">2</td>
           <td>귀사에서 송부하신 원본 2종. 대조용으로 함께 수록하였습니다</td></tr>
     </tbody>

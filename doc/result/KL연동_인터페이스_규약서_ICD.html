@@ -161,7 +161,7 @@ footer strong{color:var(--text-dim);}
   <div class="callout inset">
     <div class="callout-label">책임 경계</div>
     <p><strong>KL</strong> = 메타데이터를 수집·정규화해 <em>채워서</em> 전달(채울 수 없으면 명시적 null). <strong>한국지식재산보호원</strong> = 전달된 메타데이터를 S/M 점수로 환산하고 미전달 시 텍스트 기반 폴백. 메타데이터 <em>값의 정확성</em>은 KL, <em>점수 환산 로직</em>은 한국지식재산보호원 책임.</p>
-      <p style="margin-top:8px;"><strong>화면 경계:</strong> 검수·등급확정 UI(검수자 UI, FUN-024)와 골든셋 검증 화면은 <strong>"등급 확정까지"의 Koipa(AI 코어) 구간</strong>이고, 등급 확정 <em>이후</em> 활용(반출승인·워터마크·이력)은 <strong>KL 담당</strong>이다. 단, 검수 화면을 ⓐ Koipa 독립 콘솔로 둘지 ⓑ KL 포털에 통합할지(API는 Koipa)는 합의 안건 <strong>K7</strong>에서 확정한다.</p>
+      <p style="margin-top:8px;"><strong>화면 경계:</strong> 검수·등급확정 UI(검수자 UI, FUN-024)와 골든셋 검증 화면은 <strong>"등급 확정까지"의 Koipa(AI 코어) 구간</strong>이고, 등급 확정 <em>이후</em> 활용(반출승인·워터마크·이력)은 <strong>KL 담당</strong>이다. 단, 검수 화면을 ⓐ Koipa 독립 콘솔로 둘지 ⓑ KL 포털에 통합할지(API는 Koipa)는 합의 안건 <strong>K7</strong>에서 확정한다. <strong>당사는 ⓑ(KL 포털 통합)를 전제로 진행 중</strong>이며, 현재 콘솔은 과도기 화면이다.</p>
   </div>
 
   <hr/>
@@ -406,7 +406,7 @@ Content-Type: application/json
         <tr><td class="center">K4</td><td>접근범위 산출 가능 시점(수집 시 / 별도 조회)</td><td>수집 시 동시</td><td class="center">☐</td></tr>
         <tr><td class="center">K5</td><td>채울 수 없는 필드의 <strong>null 명시</strong> 합의</td><td>빈 문자열 금지·null</td><td class="center">☐</td></tr>
         <tr><td class="center">K6</td><td>인터페이스 버전·변경 통지 절차</td><td>ICD 버전 태그</td><td class="center">☐</td></tr>
-        <tr><td class="center">K7</td><td><strong>검수·골든셋 검증 UI 책임</strong> — 검수/등급확정·골든셋 검증 화면을 누가 만들고 어디서 운영하나</td><td>화면·로직은 <strong>Koipa 구간</strong>(백서: 등급확정까지). 운영형태 협의 — ⓐ Koipa 독립 콘솔 / ⓑ KL 포털에 화면 통합(API는 Koipa 제공)</td><td class="center">☐</td></tr>
+        <tr><td class="center">K7</td><td><strong>검수·골든셋 검증 UI 책임</strong> — 검수/등급확정·골든셋 검증 화면을 누가 만들고 어디서 운영하나</td><td>화면·로직은 <strong>Koipa 구간</strong>(백서: 등급확정까지). 운영형태 협의 — ⓐ Koipa 독립 콘솔 / ⓑ KL 포털에 화면 통합(API는 Koipa 제공).<br /><strong>당사는 ⓑ 를 전제로 진행 중</strong>이며 현재 제공 중인 골든셋 콘솔은 그때까지의 <strong>과도기 화면</strong>(시연·사용설명서·내부 검수용)이다. 근거 — 2026-08-28 접수 「API 예상 통신 방안」의 콜백 항목이 5개(<code>doc_id</code>·<code>success</code>·<code>etc</code>·<code>file_name</code>·<code>label</code>)로 화면은 귀사 포털이 담당하는 구성이다. <strong>확정 회신을 요청드린다.</strong></td><td class="center">☐</td></tr>
       </tbody>
     </table>
   </div>
@@ -414,7 +414,7 @@ Content-Type: application/json
   <div class="footnote">
     <p>근거: 등급분류 기준 적용서 v2.2 §3.5(R6)·§4.4(명시표기 우선)·§4.7(S/V/M 앵커) · 기술구현 백서 부록B(API 명세, KL↔Koipa 통신 기준)</p>
     <p>상태: <strong>협의안 v0.9</strong> — KL 협의 확정 후 v1.0 반영 예정. 확정 시 부록B API 명세에 정식 반영.</p>
-    <p><strong>확정 절차 개시.</strong> 2026-08-28 KL 회신서 &sect;3 을 통해 연계 규약 및 메타데이터 필드·값 도메인의 확정을 요청하였으며, KL 협의 완료 후 본 ICD 를 <strong>v1.0 정본</strong>으로 개정한다. (2026-08-29 기재)</p>
+    <p><strong>확정 절차 개시.</strong> 2026-08-28 KL 회신서 &sect;3 을 통해 연계 규약 및 메타데이터 필드·값 도메인(K1~K6)의 확정을 요청하였으며, KL 협의 완료 후 본 ICD 를 <strong>v1.0 정본</strong>으로 개정한다. <strong>K7(검수 UI 운영형태)은 그 요청에 빠져 있어 별도로 확정 회신을 요청드린다</strong> — 당사는 ⓑ 를 전제로 진행 중이다. (2026-08-29 기재)</p>
     <p>관련: <a href="기술구현_백서_부록B_API명세.html">부록B API 명세</a> · <a href="영업비밀_등급분류_기준_적용서_v2.2.html">등급분류 기준 적용서 v2.2</a> · <a href="기술구현_백서_부록A_DB스키마.html">부록A DB 스키마</a></p>
   </div>
 
