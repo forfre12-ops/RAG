@@ -16,6 +16,14 @@
 사용:
     python scripts/build_table_spec.py            # 생성 + 자기검증
     python scripts/build_table_spec.py --check    # 생성 없이 검증만(문서-코드 차이 보고)
+
+⚠ 순서가 있다. 이 스크립트는 문서를 통째로 다시 쓰므로 §02 관계도의 <svg> 도 임시본으로
+   덮는다. 반드시 뒤이어 아래를 돌려 정본 관계도를 다시 넣는다.
+
+    python poc/scripts/build_erd.py --apply --with-rag
+
+   (정본 관계도 = 상자에 선이 가리지 않게 통로로 우회시키고, 상자에 마우스를 올리거나
+    키보드로 고르면 그 표에 붙은 관계선만 파랗게 칠하는 CSS 를 <svg> 안에 담은 것)
 """
 from __future__ import annotations
 
@@ -36,7 +44,28 @@ MODELS = ROOT / "poc" / "src" / "koipa" / "db" / "models.py"
 MIG_RAG = ROOT / "poc" / "alembic" / "versions" / "a1b2c3d4e5f6_pg_rag_vectorstore.py"
 MIG_RAG_COMMENT = ROOT / "poc" / "alembic" / "versions" / "a7b8c9d0e1f2_rag_vectors_column_comments.py"
 SKELETON = ROOT / "doc" / "result" / "KL_AI자료_2026-08" / "기술구현_백서_부록A_DB스키마.html"
-OUT = ROOT / "doc" / "result" / "KL_AI자료_2026-08" / "테이블정의서_ERD.html"
+# 같은 문서가 제출 묶음마다 사본으로 놓인다. 한 곳만 쓰면 나머지가 뒤처진다 —
+# 실측 2026-08-29: 칼럼 10개를 뺀 뒤 KL_AI자료 사본만 239 로 갱신되고 회신 첨부본은
+# 249 인 채로 남아 두 사본이 어긋났다. build_erd.py 와 같이 존재하는 사본 전부에 쓴다.
+OUTS = [
+    ROOT / "doc" / "result" / "KL_AI자료_2026-08" / "테이블정의서_ERD.html",
+    ROOT / "doc" / "result" / "KL_회신_2026-08-28" / "첨부" / "테이블정의서_ERD.html",
+    ROOT / "doc" / "result" / "KL_AI자료_2026-08" / "첨부문서" / "테이블정의서_ERD.html",
+]
+
+# 개정 이력. 손으로 붙여 두면 생성기가 다시 돌 때 지워지므로 여기에 둔다.
+REVISIONS = [
+    ("1", "2026-08-26", "d3fe51c3",
+     "최초 작성. ORM 메타데이터와 마이그레이션 정의에서 생성해 감리 산출물로 편입"),
+    ("2", "2026-08-29", "fca08e04",
+     "관계선이 상자에 가려지던 도식을 다시 그리고, 검색용 표 2종을 포함해 21표로 확장. "
+     "별도로 있던 <code>테이블_정의서</code> 를 이 문서로 통합(칼럼 249개가 양쪽에 "
+     "중복 수록돼 있었다). 표별 인덱스·FK 개수를 §01 에 추가"),
+    ("3", "2026-08-29", "이 문서 머리말의 커밋",
+     "어떤 코드도 읽지 않고 실 데이터도 전부 비어 있던 <b>칼럼 10개를 삭제</b>"
+     "(249 → 239). 대리키를 <code>SERIAL</code> 에서 표준 "
+     "<code>GENERATED ALWAYS AS IDENTITY</code> 로 전환"),
+]
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -655,6 +684,17 @@ table.spec td.c-nn{text-align:center;}
       "개별 정의를 싣지 않는다.</p>")
     A("</section>")
 
+    # ── 개정 이력
+    A('<section id="revisions"><h2><span class="num">06</span> 개정 이력</h2>')
+    A('<div class="tw"><table>')
+    A('<thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th>'
+      '<th style="width:18%">근거 커밋</th><th>내용</th></tr></thead><tbody>')
+    for rev, day, ref, what in REVISIONS:
+        cell = ref if ref.startswith("이 문서") else f"<code>{ref}</code>"
+        A(f"<tr><td>{rev}</td><td>{day}</td><td>{cell}</td><td>{what}</td></tr>")
+    A("</tbody></table></div>")
+    A("</section>")
+
     A("</article></div>")
     A('<footer><span>테이블정의서 · ERD — KOIPA AI 영업비밀 등급분류 시스템</span>'
       f"<span>기준 커밋 {commit} · {today} 생성</span></footer>")
@@ -699,8 +739,14 @@ def main() -> int:
         print("  설명 누락 0 · 코드와 정의서 테이블 집합 일치")
 
     if not args.check:
-        OUT.write_text(doc, encoding="utf-8")
-        print(f"  → {OUT.relative_to(ROOT)} ({len(doc):,} bytes)")
+        for out in OUTS:
+            if not out.exists():
+                # 있는 사본만 갱신한다. 없는 자리에 새로 만들면 제출 묶음의 구성이
+                # 소리 없이 바뀐다(build_erd.py 와 같은 규칙).
+                print(f"  [없음] {out.relative_to(ROOT)}")
+                continue
+            out.write_text(doc, encoding="utf-8")
+            print(f"  → {out.relative_to(ROOT)} ({len(doc):,} bytes)")
     return 0 if ok else 1
 
 

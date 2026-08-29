@@ -90,7 +90,6 @@ CREATE TABLE level_keywords (
     factor_id       INT             REFERENCES evaluation_factors(factor_id) ON DELETE RESTRICT,
     weight          DECIMAL(3,2)    DEFAULT 1.0,
     source          VARCHAR(30)     DEFAULT 'manual',
-    example_context TEXT,
     is_active       BOOLEAN         DEFAULT TRUE,
     created_at      TIMESTAMPTZ     DEFAULT NOW()
 );
@@ -154,8 +153,6 @@ CREATE TABLE chunks (
     token_count     INT             NOT NULL,
     char_count      INT             NOT NULL,
 
-    page_start      SMALLINT,
-    page_end        SMALLINT,
     section_path    TEXT[],
 
     -- 임베딩 벡터는 ES `secrets-guides-koipa-*` 인덱스에 저장 (chunk_id로 연결)
@@ -234,7 +231,6 @@ CREATE TABLE classifications (
 
     rag_used            BOOLEAN         DEFAULT FALSE,
     rag_top_k           SMALLINT,
-    rag_agreement       BOOLEAN,
 
     status              VARCHAR(20)     DEFAULT 'staging',
     -- staging → confirmed/corrected/rejected (확정 라벨은 corrections.corrected_level_id가 진실 소스)
@@ -268,7 +264,6 @@ CREATE TABLE classification_evidence (
     excerpt_end         INT,
     contribution        DECIMAL(4,3)    NOT NULL,
 
-    attention_scores    JSONB,
     rag_ref_doc_id      UUID,
     rag_similarity      DECIMAL(4,3),
 
@@ -299,7 +294,6 @@ CREATE TABLE model_versions (
     -- 스키마: {accuracy, f1_macro, fnr_overall, per_class:{TS:{precision,recall,f1,fnr},...}, confusion_matrix}
 
     model_uri           VARCHAR(500),                     -- s3://koipa/models/{version_id}/
-    model_size_mb       INT,
 
     mlflow_run_id       VARCHAR(64),                      -- v1에 누락된 MLflow 추적 키
 
@@ -340,7 +334,6 @@ CREATE TABLE training_runs (
     split_seed          INT,
 
     hyperparameters     JSONB           NOT NULL DEFAULT '{}',
-    gpu_info            JSONB,
     final_metrics       JSONB,
 
     trigger_type        VARCHAR(30)     DEFAULT 'manual',  -- manual/active_learning/schedule/level_change
@@ -427,9 +420,6 @@ CREATE TABLE prompt_versions (
     prompt_version      VARCHAR(30)     PRIMARY KEY,
     chain_stage         VARCHAR(20)     NOT NULL,   -- outline/body/quality_check
     template            TEXT            NOT NULL,
-    avg_quality_score   DECIMAL(3,2),
-    usage_count         INT             DEFAULT 0,
-    approval_rate       DECIMAL(3,2),
     created_at          TIMESTAMPTZ     DEFAULT NOW(),
     created_by          VARCHAR(50),
     notes               TEXT

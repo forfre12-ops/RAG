@@ -84,7 +84,7 @@ a{color:#0a0a0a}
   <div class="top">
     <div class="eyebrow">감리 산출물 · 데이터</div>
     <h1>테이블 정의서</h1>
-    <div class="meta">DAR-005 데이터 구조 · 테이블 21 · 컬럼 249 · ORM 메타데이터 + 마이그레이션 정의에서 생성 · 2026-08-26</div>
+    <div class="meta">DAR-005 데이터 구조 · 테이블 21 · 컬럼 239 · ORM 메타데이터 + 마이그레이션 정의에서 생성 · 2026-08-26</div>
   </div>
 
   <table class="docinfo">
@@ -100,7 +100,7 @@ a{color:#0a0a0a}
 
 
   <div class="note">
-    <b>범위.</b> AI 엔진이 소유한 스키마 <b>테이블 21 개, 컬럼 249 개</b>다.
+    <b>범위.</b> AI 엔진이 소유한 스키마 <b>테이블 21 개, 컬럼 239개</b>다.
     ORM 메타데이터에서 생성했으므로 구동 중인 코드와 일치한다. KL 포털의 스키마는 별도이며
     두 시스템의 연계는 <code>tb_documents.external_ref</code> 로 한다.
   </div>
@@ -202,7 +202,6 @@ a{color:#0a0a0a}
       <tr><td><code>factor_id</code></td><td>평가요소 식별자</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">FK</td><td class="src">—</td><td class="src">tb_evaluation_factors.factor_id</td></tr>
       <tr><td><code>weight</code></td><td>가중치</td><td class="src">NUMERIC(3, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">1.0</td><td class="src">—</td></tr>
       <tr><td><code>source</code></td><td>출처</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">manual</td><td class="src">—</td></tr>
-      <tr><td><code>example_context</code></td><td>예시 문맥</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>is_active</code></td><td>사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">True</td><td class="src">—</td></tr>
       <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
     </tbody>
@@ -222,8 +221,6 @@ a{color:#0a0a0a}
       <tr><td><code>content</code></td><td>본문</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>token_count</code></td><td>토큰 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>char_count</code></td><td>글자 수</td><td class="src">INTEGER</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>page_start</code></td><td>시작 페이지</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>page_end</code></td><td>종료 페이지</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>section_path</code></td><td>문서 내 위치</td><td class="src">ARRAY</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>overlap_prev</code></td><td>이전 청크 중첩 길이</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">0</td><td class="src">—</td></tr>
       <tr><td><code>overlap_next</code></td><td>다음 청크 중첩 길이</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">0</td><td class="src">—</td></tr>
@@ -312,7 +309,6 @@ a{color:#0a0a0a}
       <tr><td><code>excerpt_start</code></td><td>발췌 시작 위치</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>excerpt_end</code></td><td>발췌 종료 위치</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>contribution</code></td><td>판정 기여도</td><td class="src">NUMERIC(4, 3)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>attention_scores</code></td><td>어텐션 점수</td><td class="src">JSONB</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>rag_ref_doc_id</code></td><td>RAG 참조 문서 식별자</td><td class="src">UUID</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>rag_similarity</code></td><td>RAG 유사도</td><td class="src">NUMERIC(4, 3)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
@@ -337,7 +333,6 @@ a{color:#0a0a0a}
       <tr><td><code>chunk_count</code></td><td>청크 수</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>rag_used</code></td><td>RAG 사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">False</td><td class="src">—</td></tr>
       <tr><td><code>rag_top_k</code></td><td>RAG 참조 건수</td><td class="src">SMALLINT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>rag_agreement</code></td><td>RAG 일치 여부</td><td class="src">BOOLEAN</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>status</code></td><td>상태</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">staging</td><td class="src">—</td></tr>
       <tr><td><code>initial_status</code></td><td>초기 상태</td><td class="src">VARCHAR(20)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>inference_ms</code></td><td>추론 소요시간(ms)</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
@@ -382,7 +377,6 @@ a{color:#0a0a0a}
       <tr><td><code>training_data_count</code></td><td>학습 데이터 건수</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>metrics</code></td><td>평가 지표</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
       <tr><td><code>model_uri</code></td><td>모델 저장 경로</td><td class="src">VARCHAR(500)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>model_size_mb</code></td><td>모델 크기(MB)</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>mlflow_run_id</code></td><td>MLflow 실행 식별자</td><td class="src">VARCHAR(64)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>is_active</code></td><td>사용 여부</td><td class="src">BOOLEAN</td><td class="c">N</td><td class="c">—</td><td class="src">False</td><td class="src">—</td></tr>
       <tr><td><code>activated_at</code></td><td>활성화 일시</td><td class="src">DATETIME</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
@@ -447,7 +441,6 @@ a{color:#0a0a0a}
       <tr><td><code>split_method</code></td><td>분할 방식</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">stratified</td><td class="src">—</td></tr>
       <tr><td><code>split_seed</code></td><td>분할 난수 시드</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>hyperparameters</code></td><td>하이퍼파라미터</td><td class="src">JSONB</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
-      <tr><td><code>gpu_info</code></td><td>GPU 정보</td><td class="src">JSONB</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>final_metrics</code></td><td>최종 지표</td><td class="src">JSONB</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>trigger_type</code></td><td>실행 계기 유형</td><td class="src">VARCHAR(30)</td><td class="c">Y</td><td class="c">—</td><td class="src">manual</td><td class="src">—</td></tr>
       <tr><td><code>trigger_ref</code></td><td>실행 계기 참조</td><td class="src">VARCHAR(100)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
@@ -468,9 +461,6 @@ a{color:#0a0a0a}
       <tr><td><code>prompt_version</code></td><td>프롬프트 버전</td><td class="src">VARCHAR(30)</td><td class="c">N</td><td class="c">PK</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>chain_stage</code></td><td>체인 단계</td><td class="src">VARCHAR(20)</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>template</code></td><td>템플릿</td><td class="src">TEXT</td><td class="c">N</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>avg_quality_score</code></td><td>평균 품질 점수</td><td class="src">NUMERIC(3, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
-      <tr><td><code>usage_count</code></td><td>사용 횟수</td><td class="src">INTEGER</td><td class="c">Y</td><td class="c">—</td><td class="src">0</td><td class="src">—</td></tr>
-      <tr><td><code>approval_rate</code></td><td>승인률</td><td class="src">NUMERIC(3, 2)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>created_at</code></td><td>생성 일시</td><td class="src">DATETIME</td><td class="c">N</td><td class="c">—</td><td class="src">server_default</td><td class="src">—</td></tr>
       <tr><td><code>created_by</code></td><td>생성자</td><td class="src">VARCHAR(50)</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
       <tr><td><code>notes</code></td><td>비고</td><td class="src">TEXT</td><td class="c">Y</td><td class="c">—</td><td class="src">—</td><td class="src">—</td></tr>
