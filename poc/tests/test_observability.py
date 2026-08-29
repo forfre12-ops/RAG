@@ -16,14 +16,10 @@ pytestmark = pytest.mark.slow
 
 
 def _pg_ok() -> bool:
-    """Postgres 5432 빠른 연결 확인 — conftest._check_postgres 와 같은 방식."""
-    import socket
-    try:
-        sock = socket.create_connection(("localhost", 5432), timeout=0.5)
-        sock.close()
-        return True
-    except OSError:
-        return False
+    """판정은 _pg_probe 한 곳에만 둔다."""
+    from _pg_probe import postgres_available
+
+    return postgres_available()
 
 
 _PG = _pg_ok()

@@ -9,7 +9,6 @@ SynthDoc 에 실제로 파생시키는지, (2) **실 PG** 에 적재 시 신규 
 
 from __future__ import annotations
 
-import socket
 import uuid
 
 import pytest
@@ -42,12 +41,10 @@ class _FakeProvider:
 
 
 def _pg_up() -> bool:
-    try:
-        s = socket.create_connection(("localhost", 5432), timeout=0.5)
-        s.close()
-        return True
-    except OSError:
-        return False
+    """판정은 _pg_probe 한 곳에만 둔다 — DATABASE_URL 의 host·port 를 본다."""
+    from _pg_probe import postgres_available
+
+    return postgres_available()
 
 
 def test_generator_clean_path_threads_model():
@@ -76,7 +73,7 @@ def test_generator_fallback_markers_carry():
     assert d1.llm_model == "m-raw"
 
 
-@pytest.mark.skipif(not _pg_up(), reason="postgres not available (5432)")
+@pytest.mark.skipif(not _pg_up(), reason="postgres not available (DATABASE_URL 기준)")
 def test_persist_to_review_queue_preserves_markers():
     """워커 적재 헬퍼가 검수큐에 pending_review 로 쌓고 label_source/parse_error 를 보존한다."""
     from sqlalchemy import select
@@ -109,7 +106,7 @@ def test_persist_to_review_queue_preserves_markers():
     assert all(r.parse_error == "non-json response" for r in rows)          # parse_error 보존
 
 
-@pytest.mark.skipif(not _pg_up(), reason="postgres not available (5432)")
+@pytest.mark.skipif(not _pg_up(), reason="postgres not available (DATABASE_URL 기준)")
 def test_persisted_samples_visible_in_synth_queue():
     """적재분이 SynthesisService.queue(검수큐 조회)에 실제로 노출되는지 — 루프 연결 E2E."""
     from koipa.services.synthesis_service import SynthesisService

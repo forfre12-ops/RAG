@@ -67,16 +67,18 @@ _SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+# conftest 는 tests/ 가 sys.path 에 오르기 **전에** 로드되므로 여기서 직접 넣는다.
+# 이걸 안 하면 아래 _pg_probe 임포트가 ModuleNotFoundError 로 죽는다.
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
 
 def _check_postgres() -> bool:
-    """Postgres 5432 포트 빠른 연결 확인 (0.5초 이내)."""
-    import socket
-    try:
-        sock = socket.create_connection(("localhost", 5432), timeout=0.5)
-        sock.close()
-        return True
-    except OSError:
-        return False
+    """Postgres 가용성 — 판정은 _pg_probe 한 곳에만 둔다(같은 검사를 복제하지 않는다)."""
+    from _pg_probe import postgres_available
+
+    return postgres_available()
 
 
 def _check_es() -> bool:
