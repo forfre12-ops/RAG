@@ -6,6 +6,8 @@
 #   make api / worker         # 로컬 기동
 
 PY ?= python
+# 시험용 DB — make test-db-up 이 띄우는 일회용 컨테이너를 가리킨다.
+TEST_DB_URL ?= postgresql+psycopg://koipa:koipa_dev@localhost:15432/koipa
 VENV_DIR ?= .venv
 ACTIVATE = . $(VENV_DIR)/bin/activate
 # uv — 의존성 락(uv.lock, 해시핀·유니버설) 생성/검사. 미설치 시 `pip install uv`.
@@ -453,6 +455,15 @@ test-lite-cov: ## test-lite + coverage 측정·리포트 (CI용 — 소프트, �
 	$(PY) -m pytest -q -m "not fullstack and not model_download and not slow" \
 	    --cov=koipa --cov-report=term-missing:skip-covered --cov-report=xml
 
+test-db-up: ## 시험용 PostgreSQL 을 일회용으로 띄운다 (호스트 15432)
+	@docker rm -f koipa-testdb >/dev/null 2>&1 || true
+	docker run -d --rm --name koipa-testdb -p 15432:5432 	    -e POSTGRES_USER=koipa -e POSTGRES_PASSWORD=koipa_dev -e POSTGRES_DB=koipa 	    pgvector/pgvector:pg16
+	@echo "  기동 대기..." && sleep 8
+	DATABASE_URL=$(TEST_DB_URL) $(PY) -m alembic upgrade head
+
+test-db-down: ## 시험용 PostgreSQL 정리
+	@docker rm -f koipa-testdb >/dev/null 2>&1 || true
+
 test-slow: ## slow marker tests only
 	$(PY) -m pytest -q -m slow
 
@@ -490,8 +501,10 @@ test-kl-integration: ## KL 연동 계약(doc/19) + W3 라우터 + audit 통합 �
 test-model-download: ## model_download marker tests only
 	$(PY) -m pytest -q -m model_download
 
-test-full: ## 전체 테스트 suite (인프라 + GPU 필요)
-	$(PY) -m pytest -q
+test-full: ## 전체 테스트 suite — DB 를 붙여 fullstack 까지 돈다 (배포 전 확인용)
+	@echo "== DATABASE_URL 없이 돌리면 fullstack 100여 건이 조용히 skip 된다(실측 2026-08-29)."
+	@echo "== DB 가 없으면 먼저 make test-db-up 을 실행할 것."
+	TESTING=1 DATABASE_URL=$(TEST_DB_URL) $(PY) -m pytest -q
 
 p5:
 	$(PY) scripts/p5_e2e_smoke.py --mode inproc
