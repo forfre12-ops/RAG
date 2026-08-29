@@ -132,7 +132,9 @@ async def upload_document(
 
     파일을 받아 포맷 자동 감지(HWP/PDF/DOCX/TXT) → 텍스트 추출(필요 시 OCR) →
     원본 object storage 저장 → documents/chunks 적재.
-    이후 POST /classify?doc_id=... 로 등급 판정 요청.
+    이후 POST /classify 본문에 {"doc_id": ...} 를 실어 등급 판정 요청
+    (/classify 는 쿼리 파라미터를 받지 않는다). enqueue_classification=True 면 업로드와
+    동시에 비동기 분류를 큐에 건다.
     """
     try:
         actor_obj = Actor.model_validate(json.loads(actor))
@@ -268,7 +270,7 @@ def _index_uploaded_doc(
 # POST /documents/analyze — 업로드 1회로 파싱→검수게이트→분류 전 구간을 단계별로 반환.
 # 시연/관리자 콘솔이 "이 문서가 어떻게 파싱됐고, 어떤 게이트를 거쳐, 어떤 등급이 됐는지"를
 # 한 화면에 보여주기 위한 백본. DB/스토리지 없이 in-process로 동작(persist=False, content 분류).
-# 운영 적재 경로(POST /documents → /classify?doc_id)와 별개의 read-only 진단 엔드포인트.
+# 운영 적재 경로(POST /documents → POST /classify 본문 doc_id)와 별개의 read-only 진단 엔드포인트.
 # ---------------------------------------------------------------------------
 class AnalyzeStage(BaseModel):
     name: str          # 업로드 | 추출 | 정규화·PII마스킹 | 청킹 | 검수게이트 | 분류 | 결과
@@ -554,7 +556,7 @@ async def analyze_document(
     # box4('검수 필요')와 box5(최종 status)가 모순되지 않게 하고 실 doc_id 서빙과 일치시킨다.
     # [2026-08-21] `persistence skipped: doc_id=... is not a UUID` 를 화면 경고에서 뺀다.
     # 이 엔드포인트는 **설계상 저장하지 않는다**(위 주석: DB/스토리지 없이 in-process,
-    # 운영 적재 경로 POST /documents → /classify?doc_id 와 별개인 read-only 진단).
+    # 운영 적재 경로 POST /documents → POST /classify(본문 doc_id) 와 별개인 read-only 진단).
     # doc_id 로 파일명을 넘기는 것도 의도된 것이고, 영속화 가드가 그것을 정상 거절한다.
     # 그런데 그 문구가 실제 문제(저신뢰·열화추출 등)와 같은 ⚠ 줄로 나란히 떠서, 사용자가
     # 무언가 실패한 것으로 읽었다(2026-08-21 지적). 설계대로 동작한 것을 경고로 알리지 않는다.

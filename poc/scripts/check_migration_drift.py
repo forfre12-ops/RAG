@@ -24,8 +24,10 @@ def compare_heads(db_heads, script_heads) -> dict:
     """적용 리비전 집합 vs 기대 head 집합 비교(순수 함수 — 단위 테스트 가능)."""
     db = set(db_heads or [])
     expected = set(script_heads or [])
-    missing = sorted(expected - db)   # 적용돼야 하는데 안 된 것(=upgrade 필요)
-    unknown = sorted(db - expected)   # DB엔 있는데 스크립트에 없는 것(=다운그레이드/리비전 삭제)
+    missing = sorted(expected - db)  # 적용돼야 하는데 안 된 것(=upgrade 필요)
+    unknown = sorted(
+        db - expected
+    )  # DB엔 있는데 스크립트에 없는 것(=다운그레이드/리비전 삭제)
     return {
         "db_current": sorted(db),
         "expected_heads": sorted(expected),
@@ -35,12 +37,34 @@ def compare_heads(db_heads, script_heads) -> dict:
     }
 
 
-def _db_heads(database_url: str) -> list[str]:
+def _connect_args(database_url: str, connect_timeout: int) -> dict[str, int]:
+    """Return driver options that bound a production PostgreSQL connection."""
+    if database_url.startswith("postgresql") and connect_timeout > 0:
+        return {"connect_timeout": connect_timeout}
+    return {}
+
+
+def _resolve_connect_timeout(requested: int | None, configured: int | None) -> int:
+    """Choose a bounded timeout; this operational check must never wait forever."""
+    timeout = requested if requested is not None else int(configured or 0)
+    if timeout <= 0:
+        raise ValueError(
+            "connect timeout must be positive to avoid an unbounded drift check"
+        )
+    return timeout
+
+
+def _db_heads(database_url: str, *, connect_timeout: int) -> list[str]:
     from alembic.runtime.migration import MigrationContext
     from sqlalchemy import create_engine
     from sqlalchemy.pool import NullPool
 
-    engine = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+    engine = create_engine(
+        database_url,
+        poolclass=NullPool,
+        pool_pre_ping=True,
+        connect_args=_connect_args(database_url, connect_timeout),
+    )
     try:
         with engine.connect() as conn:
             ctx = MigrationContext.configure(conn)
@@ -62,31 +86,53 @@ def main() -> int:
     # (import 시 stdout 교체는 pytest capture를 깨뜨림).
     import io  # noqa: PLC0415
     import sys  # noqa: PLC0415
+
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
     ap = argparse.ArgumentParser(description="Alembic applied-vs-head drift check")
     ap.add_argument("--alembic-ini", default="alembic.ini")
     ap.add_argument("--out", default="reports/migration_drift.json")
     ap.add_argument(
-        "--exit-zero-on-fail", action="store_true",
+        "--connect-timeout",
+        type=int,
+        default=None,
+        metavar="SECONDS",
+        help="PostgreSQL connection timeout; defaults to DB_CONNECT_TIMEOUT (5 seconds)",
+    )
+    ap.add_argument(
+        "--exit-zero-on-fail",
+        action="store_true",
         help="드리프트/오류여도 exit 0 (점검 리포트만 — 비차단 모드)",
     )
     args = ap.parse_args()
 
     result: dict
+    connect_timeout: int | None = None
     try:
         from koipa.config import settings  # noqa: PLC0415
 
+        connect_timeout = _resolve_connect_timeout(
+            args.connect_timeout,
+            getattr(settings, "db_connect_timeout", 5),
+        )
+
         expected = _script_heads(args.alembic_ini)
-        applied = _db_heads(settings.database_url)
+        applied = _db_heads(settings.database_url, connect_timeout=connect_timeout)
         result = compare_heads(applied, expected)
         result["ok"] = not result["drift"]
         result["error"] = None
+        result["connect_timeout_seconds"] = connect_timeout
     except Exception as exc:  # noqa: BLE001
         # DB 미가용 등 — 점검 자체 실패. 드리프트 여부 미확정이므로 비-OK.
         result = {
-            "db_current": [], "expected_heads": [], "missing": [], "unknown": [],
-            "drift": None, "ok": False, "error": f"{type(exc).__name__}: {exc}",
+            "db_current": [],
+            "expected_heads": [],
+            "missing": [],
+            "unknown": [],
+            "drift": None,
+            "ok": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "connect_timeout_seconds": connect_timeout,
         }
 
     out = Path(args.out)
