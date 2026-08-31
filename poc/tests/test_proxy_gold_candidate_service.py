@@ -150,3 +150,39 @@ def test_verified_public_intake_proposes_s3_without_fixing_a_grade(tmp_path):
     assert item["proposed_grade"] == "S3"
     assert item["proposed_grade_basis"] == "public source recorded; human confirmation pending"
     assert item["final_grade"] is None and item["status"] == "under_review"
+
+def test_second_decision_is_not_masked_by_a_coarse_filesystem_clock(tmp_path):
+    """[2026-08-31] 같은 mtime 틱 안에 들어온 두 번째 결정이 캐시에 가려지면 안 된다.
+
+    실측(223 · 30회): 등급 확정 직후 보류를 걸면 11회가 옛 상태를 돌려줬다. 그 컨테이너
+    파일시스템의 mtime 해상도가 4ms 라, 두 기록이 같은 틱에 떨어지면 캐시 키가 충돌했다.
+    원장에는 defer 가 정확히 적혀 있는데 화면만 확정으로 남는다 - 검수자가 방금 누른
+    결정이 사라진 것처럼 보인다.
+
+    시계 해상도는 기계마다 다르므로(개발 PC 에서는 재현되지 않았다) **강제로 같게 만들어**
+    본다. 캐시 키에 바이트 크기가 들어 있으면 mtime 이 같아도 무효화된다.
+    """
+    import os
+
+    svc = ProxyGoldCandidateService(tmp_path)
+    doc_id = "CAND-001"
+    _candidate(tmp_path, doc_id=doc_id)
+    ledger = tmp_path / "candidate_decisions.jsonl"
+
+    svc.decide(doc_id=doc_id, action="change", grade="S2", reason="확정", actor_id="admin")
+    assert svc.get_candidate(doc_id)["final_grade"] == "S2"   # 이 읽기가 캐시를 채운다
+    frozen = os.stat(ledger).st_mtime_ns
+
+    # 두 번째 결정이 첫 번째와 **같은 mtime 틱**에 기록된 상황을 그대로 만든다.
+    # 원장에 defer 를 덧붙인 뒤 mtime 을 되돌리면, 시계만 보는 캐시는 무효화되지 않는다.
+    with ledger.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps({
+            "schema_version": 1, "doc_id": doc_id, "action": "defer",
+            "status": "deferred", "final_grade": None, "reason": "재검토",
+            "actor_id": "admin", "decided_at": "2026-08-31T00:00:00+00:00",
+        }, ensure_ascii=False, sort_keys=True) + "\n")
+    os.utime(ledger, ns=(frozen, frozen))
+
+    fresh = ProxyGoldCandidateService(tmp_path).get_candidate(doc_id)
+    assert fresh["status"] == "deferred", "mtime 이 같다는 이유로 캐시가 옛 상태를 돌려줬다"
+    assert fresh["final_grade"] is None

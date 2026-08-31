@@ -26,8 +26,10 @@ _POC_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_ROOT = _POC_ROOT / "datasets" / "proxy_gold" / "single_document_candidates"
 _LEDGER_NAME = "candidate_decisions.jsonl"
 
-# 후보 목록 캐시 — 키에 (루트·파일수·최신 mtime·원장 mtime) 이 들어 있어 파일이 하나라도
-# 바뀌면 자동 무효화된다. 캐시가 없으면 매 요청 30MB 본문을 다시 읽고 해시한다.
+# 후보 목록 캐시 — 키에 (루트·파일수·최신 mtime·전체 바이트·원장 mtime·원장 바이트) 가
+# 들어 있어 파일이 하나라도 바뀌면 자동 무효화된다. 캐시가 없으면 매 요청 30MB 본문을
+# 다시 읽고 해시한다. 크기를 함께 보는 이유는 _scan() 주석에 있다 — mtime 만으로는
+# 파일시스템 시계 해상도(223 실측 4ms) 안에서 일어난 두 번째 기록을 놓친다.
 _CANDIDATE_CACHE: dict[tuple, list[dict[str, Any]]] = {}
 _VALID_GRADES = {"TS", "S1", "S2", "S3"}
 # [B2 2026-08-18] exclude = '검수 대상 아님'. deferred(나중에 볼 것)·discarded(폐기)와
@@ -660,6 +662,18 @@ class ProxyGoldCandidateService:
         docs: dict[str, list[str]] = {}
         newest = 0
         count = 0
+        # [2026-08-31] 캐시 키에 **바이트 크기**를 함께 넣는다 — mtime 만으로는 부족하다.
+        #
+        # 실측(223 · 30회 반복): 등급 확정 직후 보류를 걸면 30회 중 11회가 옛 상태를
+        # 돌려줬다. 원인은 이 컨테이너 파일시스템의 mtime 해상도가 4ms 라는 것이다.
+        # 두 기록이 같은 4ms 틱에 떨어지면 ledger_mtime 이 같아 캐시 키가 충돌하고,
+        # 원장에는 defer 가 정확히 적혀 있는데 화면은 확정 상태를 그대로 보여준다.
+        # (간격 0 이던 횟수 11 = 상태가 안 바뀐 횟수 11 로 정확히 일치했다)
+        #
+        # 원장은 append-only 라 **크기가 반드시 커진다.** 크기를 키에 넣으면 시계 해상도와
+        # 무관해진다. 메타 수정도 대개 크기를 바꾸므로 mtime 과 함께 쓰면 더 촘촘해진다.
+        # 비용은 없다 — stat() 은 이미 부르고 있고 st_size 를 같이 읽을 뿐이다.
+        total_size = 0
         with os.scandir(self.root) as it:
             for entry in it:
                 if not entry.is_file():
@@ -667,22 +681,28 @@ class ProxyGoldCandidateService:
                 name = entry.name
                 count += 1
                 try:
-                    mtime = entry.stat().st_mtime_ns
+                    stat = entry.stat()
+                    mtime, size = stat.st_mtime_ns, stat.st_size
                 except OSError:
-                    mtime = 0
+                    mtime, size = 0, 0
                 if mtime > newest:
                     newest = mtime
+                total_size += size
                 if name.endswith(".metadata.json"):
                     metas.append(name)
                 elif name.endswith(".md") and "_" in name:
                     docs.setdefault(name.split("_", 1)[0], []).append(name)
         metas.sort()
         ledger_mtime = 0
+        ledger_size = -1
         try:
-            ledger_mtime = self.ledger_path.stat().st_mtime_ns
+            ledger_stat = self.ledger_path.stat()
+            ledger_mtime, ledger_size = ledger_stat.st_mtime_ns, ledger_stat.st_size
         except OSError:
             pass
-        return (str(self.root), count, newest, ledger_mtime), metas, docs
+        return (
+            str(self.root), count, newest, total_size, ledger_mtime, ledger_size,
+        ), metas, docs
 
     def _candidates(self) -> list[dict[str, Any]]:
         if not self.root.exists():
