@@ -96,18 +96,20 @@ def test_actual_s2_s3_intake_requires_provenance_and_stays_unlocked(tmp_path):
     svc = ProxyGoldCandidateService(tmp_path)
     payload = ("실제 조직 운영 문서이며 S2 또는 S3 분류 검토를 위한 근거를 포함합니다. " * 20).encode("utf-8")
 
-    # [2026-08-23] 업로드는 더 이상 출처를 강제하지 않는다 — 게이트가 등급 확정으로 옮겨졌다.
-    # 근거 없이 올라간 실문서는 **등록은 되고 등급 확정만 막힌다.**
+    # [2026-08-31] 출처는 등록도 등급 확정도 막지 않는다 — 발주처 지시로 게이트를 걷었다.
+    # 남은 계약은 "막지 않되 원장에 남긴다" 하나다.
     partial = svc.create_uploaded_candidate(
         filename="operations_partial.txt", content=payload, actor_id="admin",
         document_origin="organization_real", authorization_basis="소유부서 승인",
     )
     assert partial["provenance"]["status"] == "partial"   # 권한만 있고 원천 위치 없음
-    with pytest.raises(ValueError, match="missing_provenance"):
-        svc.decide(
-            doc_id=partial["doc_id"], action="change", grade="S2",
-            reason="등급 확정 시도", actor_id="admin",
-        )
+    fixed = svc.decide(
+        doc_id=partial["doc_id"], action="change", grade="S2",
+        reason="본문 검토 결과 조직 내부 문서", actor_id="admin",
+    )
+    assert fixed["final_grade"] == "S2"
+    assert svc.get_candidate(partial["doc_id"])["decision_history"][-1][
+        "provenance_at_decision"] == "partial"
     # 확정이 아닌 결정은 막지 않는다 — 막으면 검수 큐가 닫히지 않는다.
     deferred = svc.decide(
         doc_id=partial["doc_id"], action="defer",

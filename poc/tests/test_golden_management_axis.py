@@ -21,25 +21,33 @@ def _upload(svc, **kw):
     return svc.create_uploaded_candidate(**kw)
 
 
-# ── ① 업로드 완화 · 게이트 이동 ────────────────────────────────────────────
-def test_upload_without_provenance_is_registered_but_cannot_fix_a_grade(tmp_path):
+# ── ① 출처는 등급 확정을 막지 않는다 (2026-08-31 발주처 지시) ───────────────
+def test_grade_can_be_fixed_without_provenance_but_the_ledger_records_it(tmp_path):
+    """출처가 비어 있어도 등급은 확정된다 — 등급의 근거는 검수자의 판단이다.
+
+    [2026-08-31] 종전에는 여기서 missing_provenance 로 막았다. 발주처(지재원) 지시로
+    걷었다. 대신 **막지 않되 센다** — 결정 원장에 그 시점의 출처 상태가 남아야
+    "출처 없이 확정된 것이 몇 건인가"에 답할 수 있다.
+    """
     svc = ProxyGoldCandidateService(tmp_path)
     c = _upload(svc)
     assert c["status"] == "under_review"
     assert c["provenance"]["status"] == "pending"      # 둘 다 없음
 
-    with pytest.raises(ValueError, match="missing_provenance"):
-        svc.decide(doc_id=c["doc_id"], action="change", grade="S2",
-                   reason="확정 시도", actor_id="admin-kim")
+    fixed = svc.decide(doc_id=c["doc_id"], action="change", grade="S2",
+                       reason="본문 검토 결과 조직 내부 문서", actor_id="admin-kim")
+    assert fixed["status"] == "grade_fixed_unlocked" and fixed["final_grade"] == "S2"
 
-    # 출처를 채우면 같은 확정이 통과한다 — 막던 것은 문서가 아니라 근거 부재였다.
+    # 막지 않는 대신 원장에 남는다.
+    last = svc.get_candidate(c["doc_id"])["decision_history"][-1]
+    assert last["provenance_at_decision"] == "pending"
+
+    # 나중에 출처를 채워도 등급은 그대로다.
     svc.record_provenance(
         doc_id=c["doc_id"], source_reference="품질관리/운영절차/2026",
         authorization_basis="소유부서 검수용 사용 승인", actor_id="admin-kim",
     )
-    fixed = svc.decide(doc_id=c["doc_id"], action="change", grade="S2",
-                       reason="근거 확인 완료", actor_id="admin-kim")
-    assert fixed["status"] == "grade_fixed_unlocked" and fixed["final_grade"] == "S2"
+    assert svc.get_candidate(c["doc_id"])["final_grade"] == "S2"
 
 
 def test_synthetic_candidate_is_not_subject_to_the_provenance_gate(tmp_path):
@@ -114,10 +122,16 @@ def _intake(doc_id, prov=None):
     return rec
 
 
-def test_intake_without_provenance_is_rejected_at_promotion():
+def test_intake_without_provenance_still_promotes_but_is_flagged():
+    """[2026-08-31] 출처 부재는 승격을 막지 않는다 — 대신 레코드에 표시가 남는다.
+
+    등급 확정 게이트를 걷으면서 여기만 남기면, 검수는 통과하고 승격에서 한꺼번에
+    막힌다(실측 kl-ff5a822c 배치의 공개 실문서 33건이 그 대상이었다).
+    """
     res = promote_to_locked([_intake("d1")], [Signoff("d1", "admin_kim", "S2", "2026-09-10")])
-    assert res.stats["locked"] == 0
-    assert res.stats["rejected_reasons"] == {"missing_provenance": 1}
+    assert res.stats["locked"] == 1
+    assert res.stats["rejected_reasons"] == {}
+    assert res.locked[0]["provenance_state"] == "missing"
 
 
 def test_intake_with_recorded_provenance_promotes():
@@ -126,6 +140,7 @@ def test_intake_with_recorded_provenance_promotes():
     res = promote_to_locked([_intake("d1", prov)], [Signoff("d1", "admin_kim", "S2", "2026-09-10")])
     assert res.stats["locked"] == 1
     assert res.locked[0]["label_source"] == "human_review"
+    assert res.locked[0]["provenance_state"] == "recorded"
 
 
 def test_records_without_an_intake_marker_are_unaffected():
@@ -153,14 +168,20 @@ def test_manage_screen_has_the_management_inputs():
     assert "전 임직원 열람 가능" in html
 
 
-def test_upload_modal_no_longer_forces_provenance():
+def test_console_does_not_present_provenance_as_required():
+    """[2026-08-31] 화면이 출처를 필수처럼 보이게 하면 안 된다.
+
+    막는 코드를 걷어도 빨간 「필수」 배지와 "확정할 수 없습니다" 문구가 남아 있으면
+    검수자는 여전히 필수로 읽는다 — 화면이 곧 계약이다.
+    """
     from koipa.api.golden import _render_specledger_gold_console_html
 
     html = _render_specledger_gold_console_html()
-    assert "등급을 확정할 수 없습니다" in html, "언제 막히는지 모달이 말해야 한다"
-    assert "출처와 권한을 남기지 않으면 나중에 평가셋으로 쓸 수 없습니다" not in html, (
-        "게이트를 옮겼는데 옛 문구가 남아 있으면 사용자는 여전히 필수로 읽는다"
-    )
+    for stale in ("등급을 확정할 수 없습니다",
+                  "출처와 권한을 남기지 않으면 나중에 평가셋으로 쓸 수 없습니다",
+                  'class="req"'):
+        assert stale not in html, f"필수로 읽히는 옛 표현이 남았다: {stale}"
+    assert "등급 결정과는 무관합니다" in html, "무관하다는 사실을 화면이 말해야 한다"
 
 
 # ── 요청 계약 ──────────────────────────────────────────────────────────────

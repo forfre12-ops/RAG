@@ -118,12 +118,16 @@ PROVENANCE_RECORDED = "recorded"
 
 
 def _provenance_status(is_actual_intake: bool, source_reference: str, authorization_basis: str) -> str:
-    """출처 기록 상태. 한 자리에서만 정한다 — 세는 곳마다 다르면 게이트가 어긋난다.
+    """출처 기록 상태. 한 자리에서만 정한다 — 세는 곳마다 다르면 집계가 어긋난다.
 
         not_declared  실문서 인테이크가 아니다(합성·일반 업로드) → 출처 개념이 없다
-        recorded      원천 위치·사용 권한 근거가 **둘 다** 있다 → 등급 확정 가능
+        recorded      원천 위치·사용 권한 근거가 **둘 다** 있다
         partial       하나만 있다
         pending       둘 다 없다
+
+    [2026-08-31] 이 값은 더 이상 **게이트가 아니다.** 등급 확정도 평가 정답지 승격도
+    막지 않는다(발주처 지시). 남은 쓰임은 보고다 — 실문서 중 출처를 아직 못 적은 것이
+    몇 건인지 세는 것.
     """
     if not is_actual_intake:
         return "not_declared"
@@ -377,21 +381,21 @@ class ProxyGoldCandidateService:
         if action == "approve" and (not is_synthetic or candidate["proposed_grade"] not in _VALID_GRADES):
             raise ValueError("approve is allowed only for a synthetic candidate with a proposed grade")
 
-        # [2026-08-23] 등급 확정 게이트 — 업로드에서 옮겨 온 자리다.
+        # [2026-08-31] 출처 기록은 등급 확정을 **막지 않는다** — 발주처(지재원) 지시.
         #
-        # 실문서는 원천 위치와 사용 권한 근거가 **둘 다** 기록돼야 등급을 확정할 수 있다.
-        # 화면은 오래 전부터 "출처와 권한을 남기지 않으면 나중에 평가셋으로 쓸 수 없습니다"
-        # 라고 적어 놓고도 강제하는 코드가 어디에도 없었다. 그 약속을 여기서 실제로 지킨다.
+        # 종전(2026-08-23)에는 실문서에 원천 위치·사용 권한 근거가 둘 다 없으면 등급 확정
+        # 자체를 거부했다. 걷는 이유는 등급의 근거가 검수자의 판단이지 출처 칸이 아니기
+        # 때문이다. 출처는 "이 문서를 어디서 가져왔나"를 나중에 답하기 위한 별개 기록이고,
+        # 요구사항 추적표에도 이 요구는 없다(RTM 에 '권한' 0건 · 2026-08-31 확인).
         #
-        # 확정하지 않는 결정(보류·폐기·대상 아님·재검토)은 막지 않는다 — 출처가 없다고
-        # 폐기조차 못 하면 검수 큐가 영영 닫히지 않는다.
-        if action == "change" and candidate.get("is_actual_document"):
-            prov = candidate.get("provenance") or {}
-            if prov.get("status") != PROVENANCE_RECORDED:
-                raise ValueError(
-                    "missing_provenance: 실문서는 원천 위치와 사용 권한 근거를 모두 기록해야 "
-                    "등급을 확정할 수 있습니다 — 문서 상세의 「출처 기록」에서 채우십시오"
-                )
+        # 막지 않는 대신 **결정 시점의 출처 상태를 원장에 함께 남긴다.** 안 세면 "출처 없이
+        # 확정된 것이 몇 건인가"에 답할 수 없고, 그건 감리에서 실제로 받는 질문이다.
+        #
+        # 상용 LLM 반출 차단은 이 값과 무관하다 — golden_tiers.may_send_to_commercial_llm
+        # 은 document_origin 만 본다. 이 완화로 반출 경계가 넓어지지 않는다.
+        provenance_at_decision = None
+        if candidate.get("is_actual_document"):
+            provenance_at_decision = (candidate.get("provenance") or {}).get("status") or "pending"
 
         final_grade = candidate["proposed_grade"] if action == "approve" else grade
         status = {
@@ -421,6 +425,8 @@ class ProxyGoldCandidateService:
             "document_sha256": candidate["document_sha256"],
             "document_origin": candidate["document_origin"],
             "claim_scope": candidate["claim_scope"],
+            # 실문서만 값이 있다(합성은 None). 등급 확정을 막지는 않지만 사후에 셀 수 있게 남긴다.
+            "provenance_at_decision": provenance_at_decision,
         }
 
         # 비밀관리성(M). 이번 결정에서 준 값만 덮고 나머지는 이전 값을 잇는다 — 한 칸만
@@ -486,8 +492,11 @@ class ProxyGoldCandidateService:
         """
         source_reference = (source_reference or "").strip()
         authorization_basis = (authorization_basis or "").strip()
-        if not source_reference or not authorization_basis:
-            raise ValueError("source_reference and authorization_basis are both required")
+        # [2026-08-31] 아는 만큼만 적어도 저장된다 — 종전에는 둘 다 없으면 거부했다.
+        # 출처가 등급 확정을 막지 않게 된 이상, 반쪽 기록을 거부해 봐야 아무것도 안 남을 뿐이다.
+        # 둘 다 비었을 때만 거부한다(빈 저장은 원장에 뜻 없는 줄을 남긴다).
+        if not source_reference and not authorization_basis:
+            raise ValueError("source_reference or authorization_basis is required")
         candidate = self.get_candidate(doc_id)
         if candidate is None:
             return None
@@ -502,7 +511,7 @@ class ProxyGoldCandidateService:
         meta["provenance"] = {
             "source_reference": source_reference,
             "authorization_basis": authorization_basis,
-            "status": "recorded",
+            "status": _provenance_status(True, source_reference, authorization_basis),
             "origin": "console_record",
             "recorded_by": actor_id,
             "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -555,8 +564,9 @@ class ProxyGoldCandidateService:
         source_reference = source_reference.strip()
         authorization_basis = authorization_basis.strip()
         is_actual_intake = document_origin in {"public_real", "organization_real"}
-        # [2026-08-23] 출처·권한 근거는 업로드에서 강제하지 않는다 — 게이트를 등급 확정·승격
-        # 자리로 옮겼다(decide() · promote_to_locked 의 missing_provenance).
+        # [2026-08-23] 출처·권한 근거는 업로드에서 강제하지 않는다.
+        # [2026-08-31] 옮겨 갔던 게이트(decide · promote_to_locked)도 발주처 지시로 걷었다 —
+        # 이제 출처는 어느 자리에서도 막지 않는다. 남은 것은 기록과 집계뿐이다.
         # 강제가 현관에만 있고 목적지에는 없어서, 실제로 일어난 일은 평가셋 보호가 아니라 등록
         # 실패였다 — 223 실측 2026-08-17: 실문서 74건 중 62건이 권한 근거 없이 미완으로 남았다.
         # 후보 등록 자체는 해가 없다(후보는 평가 정답지가 아니고, locked 승격은 사람 서명이다).

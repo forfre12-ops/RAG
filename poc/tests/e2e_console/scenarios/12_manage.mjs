@@ -348,7 +348,7 @@ export const scenarios = [
       await page.settle();
 
       check.ok(page.visible('provBox'), '실문서에는 출처 기록 칸이 뜬다');
-      check.includes(page.text('provStatus'), '미완', '사용 권한 근거가 없다고 표시된다');
+      check.includes(page.text('provStatus'), '일부 기록됨', '한쪽만 적혔다고 표시된다');
       check.eq(page.$('provSrc')?.value, '기관 공개 게시판', '이미 적힌 원천 위치가 채워져 있다');
       check.eq(page.$('provBasis')?.value, '', '빈 것은 빈 채로 보인다');
       check.eq(page.$('provSave')?.disabled, false, '아직 미완이라 저장 버튼이 열려 있다');
@@ -381,14 +381,14 @@ export const scenarios = [
       page.click(page.qa('#rows .candidate')[2]);   // 3번째 = 공개 실문서
       await page.settle();
 
-      check.includes(page.text('provNote'), '등급을 확정할 때만 필요합니다', '출처 칸이 언제 필요한지 못박는다');
-      check.includes(page.text('provNote'), '보류·폐기에는 필요 없고', '폐기에는 필요 없다고 같은 줄에 적는다');
+      check.includes(page.text('provNote'), '등급 결정과는 무관합니다', '출처 칸이 등급과 무관하다고 못박는다');
+      check.includes(page.text('provNote'), '아는 것만', '아는 만큼만 적으면 된다고 같은 줄에 적는다');
       check.includes(page.$('provBox')?.className || '', 'apartBox', '등급 결정과 별개인 블록으로 떼어 보인다');
 
       page.set('action', 'discard');
       check.ok(!page.visible('mgmtWrap'), '폐기에는 비밀관리성 칸이 아예 안 보인다');
       check.eq(page.$('secMarking')?.disabled, true, '감춘 칸은 잠겨 있다');
-      check.includes(page.text('provNote'), '등급을 확정할 때만 필요합니다', '출처 안내는 결정에 따라 흔들리지 않는다');
+      check.includes(page.text('provNote'), '등급 결정과는 무관합니다', '출처 안내는 결정에 따라 흔들리지 않는다');
 
       page.set('action', 'change');
       check.ok(page.visible('mgmtWrap'), '등급을 정할 때는 비밀관리성 칸이 나온다');
@@ -419,10 +419,10 @@ export const scenarios = [
   },
 
   {
-    id: 'manage.provenance.basis-required-is-marked-and-answered',
-    title: '사용 권한 근거는 필수라고 적혀 있고, 비우고 누르면 그 자리에서 말해 준다',
-    why: '화면(2026-08-24)에서 근거 칸이 비어 있는 채로 「출처 저장」을 누르면 fetch 도 '
-       + '가지 않고 throw 하는데, 그 말이 페이지 맨 위에만 찍혀 무반응으로 보였다',
+    id: 'manage.provenance.optional-but-not-empty',
+    title: '출처 두 칸은 선택이라고 적혀 있고, 둘 다 비우고 누르면 그 자리에서 말해 준다',
+    why: '[2026-08-31] 발주처 지시로 필수를 걷었다 — 화면에 「필수」가 남아 있으면 '
+       + '검수자는 여전히 필수로 읽는다. 다만 둘 다 빈 저장은 원장에 뜻 없는 줄을 남긴다',
     needsMock: true,
     needsData: true,
     async run({ server, check }) {
@@ -434,13 +434,21 @@ export const scenarios = [
       page.click(page.qa('#rows .candidate')[2]);
       await page.settle();
 
-      check.includes(page.html('provBox'), '필수', '두 칸이 필수라고 화면에 적혀 있다');
+      check.ok(!page.html('provBox').includes('class="req"'), '필수 배지가 없다');
+      check.includes(page.html('provBox'), '(선택)', '두 칸이 선택이라고 화면에 적혀 있다');
       check.eq(page.$('provBasis')?.value, '', '근거 칸은 비어 있다');
 
+      // 한쪽만 있어도 저장된다 — 아는 만큼 적는 것이 새 계약이다.
       page.click('provSave');
       await page.settle();
-      check.eq(server.countCalls('POST', '/golden/candidates/PGC-0003/provenance'), 0, '비어 있으면 보내지 않는다');
-      check.includes(page.text('provMsg'), '사용 권한 근거', '무엇이 없어서 막혔는지 버튼 옆에서 말한다');
+      check.eq(server.countCalls('POST', '/golden/candidates/PGC-0003/provenance'), 1, '원천 위치만 있어도 보낸다');
+
+      // 둘 다 비우면 그때만 막고, 그 사실을 버튼 옆에서 말한다.
+      page.set('provSrc', '');
+      page.click('provSave');
+      await page.settle();
+      check.eq(server.countCalls('POST', '/golden/candidates/PGC-0003/provenance'), 1, '둘 다 비면 보내지 않는다');
+      check.includes(page.text('provMsg'), '하나는 적어야', '무엇이 없어서 막혔는지 버튼 옆에서 말한다');
       check.includes(page.$('provMsg')?.className || '', 'error', '오류 표시로 뜬다');
       assertNoScriptErrors(check, page);
       return page;
@@ -469,7 +477,7 @@ export const scenarios = [
       // 실제로 말하고 있는지 본다(안 그러면 사용자는 여전히 필수로 읽는다).
       const modalText = page.text('modal');
       check.includes(modalText, '(선택)', '두 칸이 선택 입력으로 표시된다');
-      check.includes(modalText, '등급을 확정할 수 없습니다', '언제 막히는지를 모달이 말한다');
+      check.includes(modalText, '등급 확정을 막지는 않습니다', '막지 않는다는 사실을 모달이 말한다');
 
       page.click('cancelUpload');
       check.ok(!page.visible('modal'), '취소하면 모달이 닫힌다');

@@ -59,16 +59,14 @@ _INTAKE_ORIGINS = frozenset({"public_real", "organization_real"})
 def _provenance_ok(candidate: dict) -> bool:
     """실문서라면 원천 위치·사용 권한 근거가 둘 다 기록됐는가.
 
-    왜 여기에 두는가. 화면은 "출처와 권한을 남기지 않으면 나중에 평가셋으로 쓸 수
-    없습니다" 라고 오래 전부터 적어 놨는데, 강제하는 코드는 **업로드 폼에만** 있었고
-    정작 승격 경로에는 없었다. 그 결과 실제로 일어난 일은 평가셋 보호가 아니라 등록
-    실패였다(실측 2026-08-17 · 223: 실문서 74건 중 62건이 권한 근거 없이 미완).
-    강제를 현관에서 걷고 여기로 옮긴다.
+    ⚠ **[2026-08-31] 이것은 더 이상 게이트가 아니다.** 발주처(지재원) 지시로 승격 차단을
+      걷었다 — 등급의 근거는 검수자의 판단이지 출처 칸이 아니다. 지금 이 술어의 쓰임은
+      승격 레코드에 실을 `provenance_state` 하나뿐이고, 평가셋 구성 보고에서 "실문서 중
+      출처를 못 적은 것이 몇 건인가"를 세는 데 쓴다.
 
-    ⚠ **표식이 없으면 통과시킨다(fail-open).** 실측 2026-08-23: 기존 검수 전달본 5종
-      (777·200·120·106·120건)에는 document_origin 도 provenance 도 없다. 무조건 막으면
-      KL 검수 전달본 전량이 승격 거부가 된다. 막아야 할 대상은 "실문서인데 근거가 없는
-      것" 이지 "실문서 표식이 없는 합성 후보" 가 아니다.
+    ⚠ **표식이 없으면 True 다.** 실측 2026-08-23: 기존 검수 전달본 5종
+      (777·200·120·106·120건)에는 document_origin 도 provenance 도 없다. 표식이 없는 것을
+      "출처 없음"으로 세면 합성 후보까지 미기록으로 잡혀 집계가 부풀려진다.
     """
     origin = str(candidate.get("document_origin") or "")
     if origin not in _INTAKE_ORIGINS:
@@ -122,9 +120,11 @@ def promote_to_locked(
         doc_id = c.get("doc_id")
         sl = by_doc.get(doc_id, [])
         grade, reason, reviewers = _evaluate(sl)
-        # 서명이 유효해도 실문서에 반출 근거가 없으면 평가 정답지로 올리지 않는다.
-        if grade is not None and not _provenance_ok(c):
-            grade, reason = None, "missing_provenance"
+        # [2026-08-31] 출처 근거는 승격을 **막지 않는다** — 발주처(지재원) 지시.
+        # 등급 확정 게이트(decide)를 걷으면서 여기만 남기면 검수는 통과하고 승격에서
+        # 한꺼번에 막힌다. 대신 승격 레코드에 출처 상태를 실어 평가셋 구성 보고에서
+        # "출처 미기록 몇 건"을 그대로 셀 수 있게 한다.
+        provenance_state = "recorded" if _provenance_ok(c) else "missing"
         if grade is not None:
             rec = dict(c)
             rec.update(
@@ -139,6 +139,9 @@ def promote_to_locked(
                 note=next((s.note for s in sl if s.note), ""),  # [#3] 검수자 메모 영속(사후 감사·이의제기 근거)
                 # [2026-08-22 최소구현] 표시만 영속화 — tier는 여전히 TIER_LOCKED 그대로다.
                 intended_use=next((s.intended_use for s in sl if s.intended_use), "locked_eval"),
+                # [2026-08-31] 승격을 막지는 않되 출처 상태는 레코드에 남긴다 —
+                # 평가셋 구성 보고에서 실문서 출처 미기록 건수를 셀 수 있어야 한다.
+                provenance_state=provenance_state,
             )
             locked.append(rec)
         else:

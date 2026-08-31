@@ -57,18 +57,15 @@ def test_record_completes_it(tmp_path):
 def test_recording_does_not_overwrite_the_grade(tmp_path):
     """가장 중요한 성질 — 출처 기록이 등급 확정을 지우면 안 된다.
 
-    [2026-08-23] 순서가 바뀌었다. 실문서는 출처가 **먼저** 기록돼야 등급을 확정할 수 있다
-    (decide 의 missing_provenance 게이트). 지키려는 성질은 그대로다 — 등급을 확정한 뒤에
-    출처를 **다시** 기록해도 등급·상태가 살아 있어야 한다.
+    [2026-08-31] 출처는 더 이상 확정의 선행 조건이 아니다(발주처 지시). 지키려는 성질은
+    그대로다 — 등급을 확정한 뒤에 출처를 **다시** 기록해도 등급·상태가 살아 있어야 한다.
     """
     svc = _svc(tmp_path)
-    # 게이트: 출처가 미완(partial)인 동안에는 확정이 막힌다.
-    with pytest.raises(ValueError, match="missing_provenance"):
-        svc.decide(doc_id=DOC, action="change", grade="S3", actor_id="kim.cs", reason="확정")
+    # 출처가 미완(partial)이어도 확정은 통과한다.
+    svc.decide(doc_id=DOC, action="change", grade="S3", actor_id="kim.cs", reason="확정")
 
     svc.record_provenance(doc_id=DOC, source_reference="출처", authorization_basis="근거",
                           actor_id="kim.cs")
-    svc.decide(doc_id=DOC, action="change", grade="S3", actor_id="kim.cs", reason="확정")
     assert svc.summary()["fixed"] == 1
 
     # 확정 뒤에 출처를 고쳐 적어도 등급이 살아 있어야 한다.
@@ -91,11 +88,27 @@ def test_ledger_marks_the_event_kind(tmp_path):
     assert rows[-1]["provenance_before"] != rows[-1]["provenance_after"], "변경 전후가 안 남았다"
 
 
-@pytest.mark.parametrize(("src", "basis"), [("", "근거"), ("출처", ""), ("   ", "근거")])
-def test_both_fields_required(tmp_path, src, basis):
+@pytest.mark.parametrize(("src", "basis", "expected"), [
+    ("", "근거", "partial"), ("출처", "", "partial"), ("   ", "근거", "partial"),
+    ("출처", "근거", "recorded"),
+])
+def test_records_what_is_known(tmp_path, src, basis, expected):
+    """[2026-08-31] 아는 만큼만 적어도 저장된다.
+
+    종전에는 둘 다 없으면 거부했다. 출처가 등급 확정을 막지 않게 된 이상 반쪽 기록을
+    거부해 봐야 아무것도 안 남을 뿐이다. 상태는 recorded / partial 로 갈려 그대로 셀 수 있다.
+    """
+    svc = _svc(tmp_path)
+    svc.record_provenance(doc_id=DOC, source_reference=src, authorization_basis=basis,
+                          actor_id="x")
+    assert svc.get_candidate(DOC)["provenance"]["status"] == expected
+
+
+def test_empty_provenance_is_still_rejected(tmp_path):
+    """빈 저장은 원장에 뜻 없는 줄을 남긴다 — 둘 다 비면 거부한다."""
     svc = _svc(tmp_path)
     with pytest.raises(ValueError):
-        svc.record_provenance(doc_id=DOC, source_reference=src, authorization_basis=basis,
+        svc.record_provenance(doc_id=DOC, source_reference="  ", authorization_basis="",
                               actor_id="x")
 
 
