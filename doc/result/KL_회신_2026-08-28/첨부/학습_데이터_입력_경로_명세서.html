@@ -101,9 +101,7 @@ a{color:#0a0a0a}
 
   <div class="note">
     본 문서는 <b>&ldquo;사람이 검수한 결과가 학습에 어떻게 들어가는가&rdquo;</b> 하나에 답한다.
-    등급을 어떻게 정하는지는 <code>등급분류 알고리즘 명세서</code>, 계층이 무엇인지는
-    <code>골든셋 종합</code>이 다룬다. 서술은 전부 코드에서 확인한 것이며, 확인하지 못한 것은
-    &sect;8 에 그렇게 적었다.
+    등급을 어떻게 정하는지는 「등급분류 알고리즘 명세서」가 다룬다.
   </div>
 
 
@@ -167,20 +165,19 @@ a{color:#0a0a0a}
   </table>
   </div>
 
-  <p>두 값을 한 칸에 뭉개지 않고 따로 둔다. 한 칸에 덮어쓰면 <b>교정이 있었다는 사실 자체가
-  사라진다.</b> 산출물에 <code>grade_corrected</code> 카운트를 함께 내보내므로, 학습셋 파일을
+  <p>두 값은 따로 기록한다. 산출물에 교정 건수를 함께 내보내므로 학습셋 파일을
   열어 보지 않고도 교정이 몇 건 반영됐는지 확인할 수 있다.</p>
 
   <h3>2-2. 무엇을 걸러내는가</h3>
 
-  <p>승인됐어도 학습에 넣지 않는 것이 있다. 합성 생성기가 정상 산출을 내지 못한 경우다.</p>
+  <p>승인됐어도 학습에 넣지 않는 것이 있다. 형식 검증을 통과하지 못한 산출이다.</p>
 
   <div class="tw">
   <table>
     <thead><tr><th style="width:22%">표시(label_source)</th><th style="width:34%">무엇인가</th><th>처리</th></tr></thead>
     <tbody>
-      <tr><td><code>noop_fallback</code></td><td>본문 생성이 실패해 자리표시 문자열이 들어간 산출</td><td>학습 편입 금지 &mdash; <code>excluded_noise</code> 로 계수</td></tr>
-      <tr><td><code>llm_nonjson</code></td><td>LLM 이 규정 형식(JSON)이 아닌 응답을 낸 산출</td><td>학습 편입 금지 &mdash; <code>excluded_noise</code> 로 계수</td></tr>
+      <tr><td><code>noop_fallback</code></td><td>본문이 채워지지 않은 산출</td><td>학습 편입 금지 &mdash; <code>excluded_noise</code> 로 계수</td></tr>
+      <tr><td><code>llm_nonjson</code></td><td>규정 형식(JSON)과 일치하지 않는 산출</td><td>학습 편입 금지 &mdash; <code>excluded_noise</code> 로 계수</td></tr>
       <tr><td>&mdash;(본문이 빈 문자열)</td><td>본문 길이 0</td><td>제외 &mdash; <code>excluded_empty</code> 로 계수</td></tr>
     </tbody>
   </table>
@@ -211,7 +208,7 @@ python scripts/build_synth_training_set.py --out datasets/synth_approved/train.j
   <h2>3. 경로 2 &mdash; 골든 후보가 학습 시드가 되는 절차</h2>
 
   <p>골든셋은 한 덩어리가 아니라 계층으로 나뉘고, <b>계층마다 쓸 수 있는 용도가 다르다.</b>
-  이 구분이 무너지면 시험 문제로 공부하고 그 시험을 보는 것(train-on-test)이 된다.</p>
+  평가에 쓰는 것과 학습에 쓰는 것을 나누어 둔다.</p>
 
   <div class="tw"><!-- FIG:tiers --><svg viewBox="0 0 940 384" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="골든셋 계층마다 학습과 평가에 쓸 수 있는지를 표시한 격자. 평가정답 계층은 학습 금지, 격리 계층은 양쪽 다 금지다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:10.5px ui-monospace,monospace;fill:#71717a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.y{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.n{font:700 12px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><text class="th" x="8" y="26">계층마다 쓸 수 있는 곳이 다르다 &#8212; 이 구분이 무너지면 시험 문제로 공부하고 그 시험을 본다</text><text class="d" x="8" y="46">허용은 <tspan class="m">golden_tiers.TRAIN_TIERS</tspan> 와 <tspan class="m">eval_records()</tspan> 가 정본이다. 이 그림은 그 둘을 불러 칠한다.</text><text class="d" x="8" y="66"><tspan class="th">양쪽 다 금지인 칸이 있다</tspan> &#8212; &ldquo;평가에서 뺐으니 학습에는 써도 되겠지&rdquo;가 성립하지 않는다는 뜻이다.</text><text class="th" x="710" y="96" text-anchor="middle">학습</text><text class="th" x="830" y="96" text-anchor="middle">평가</text><rect x="8" y="108" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="124">locked_gold_eval</text><text class="d" x="20" y="138">사람 서명이 끝난 평가정답 &#183; 학습에 넣으면 성능 수치가 무의미해진다</text><rect x="660" y="114" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="710" y="130" text-anchor="middle">금지</text><rect x="780" y="114" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="830" y="130" text-anchor="middle">허용</text><rect x="8" y="148" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="164">gold_candidate</text><text class="d" x="20" y="178">자동 게이트 통과 &#183; 서명 대기 &#183; 라벨이 믿을 만해 학습에 쓴다</text><rect x="660" y="154" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="710" y="170" text-anchor="middle">허용</text><rect x="780" y="154" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="830" y="170" text-anchor="middle">금지</text><rect x="8" y="188" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="204">silver_train</text><text class="d" x="20" y="218">그 밖의 기계 라벨 &#183; 학습 시드 전용</text><rect x="660" y="194" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="710" y="210" text-anchor="middle">허용</text><rect x="780" y="194" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="830" y="210" text-anchor="middle">금지</text><rect x="8" y="228" width="924" height="36" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><text class="m" x="20" y="244">legal_floor</text><text class="d" x="20" y="258">법적 기준으로 등급이 정해지는 것 &#183; 평가정답이 빌 때만 임시 평가로 쓴다</text><rect x="660" y="234" width="100" height="22" fill="#0a0a0a" stroke="#0a0a0a"/><text class="y" x="710" y="250" text-anchor="middle">허용</text><rect x="780" y="234" width="100" height="22" fill="#fff" stroke="rgba(0,0,0,.18)"/><text class="d" x="830" y="250" text-anchor="middle">보조</text><rect x="8" y="268" width="924" height="36" fill="#fff5f5" stroke="#7f1d1d"/><text class="m" x="20" y="284">held_review</text><text class="d" x="20" y="298">서명이 무효이거나 본문이 합성인 격리분 &#183; 어느 쪽으로도 쓰지 않는다</text><rect x="660" y="274" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="710" y="290" text-anchor="middle">금지</text><rect x="780" y="274" width="100" height="22" fill="#fff" stroke="#7f1d1d"/><text class="n" x="830" y="290" text-anchor="middle">금지</text><text class="d" x="8" y="322">&ldquo;보조&rdquo;는 평가정답이 비었을 때만 쓰는 임시값이다 (<tspan class="m">eval_records(allow_floor_fallback=True)</tspan>) &#8212; 호출부가 그 사실을 경고로 함께 낸다.</text><text class="d" x="8" y="342">계층은 <tspan class="th">라벨이 얼마나 믿을 만한가</tspan>를 말하고, 출처(<tspan class="m">public_real / customer_real / synthetic / unknown</tspan>)는 <tspan class="th">본문이 실제 문서인가</tspan>를 말한다 &#8212; 둘은 직교한다.</text></svg><!-- /FIG:tiers --></div>
 
@@ -261,15 +258,10 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
   </table>
   </div>
 
-  <div class="note">소비 규칙이 중요한 이유 &mdash; 반영하지 않은 채 &ldquo;소비했다&rdquo;고
-  표시하면 <b>그 교정은 영영 학습에 들어가지 못한다.</b> 제외된 교정은 소비하지 않으므로
-  다음 실행에 다시 후보로 올라온다.</div>
-
   <h3>4-2. 누수 차단</h3>
 
-  <p>교정 행이 홀드아웃(val&middot;test)과 <code>doc_id</code> 또는 본문이 겹치면 train 병합에서
-  뺀다. 이 검사가 없으면 시험 문제가 학습셋에 섞여 배포 게이트가 재는 미탐률이 실제보다
-  좋게 나온다.</p>
+  <p>교정 행이 홀드아웃(val&middot;test)과 문서 또는 본문이 겹치면 train 병합에서 뺀다.
+  평가용 문서가 학습셋에 섞이지 않도록 하기 위해서다.</p>
 
   <h3>4-3. 언제 도는가</h3>
 
@@ -289,11 +281,11 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
   </table>
   </div>
 
-  <p>야간 무인 실행을 기본에서 뺀 이유는 셋이고, 전부 실측 근거다(&sect;7).
-  ① 이 틱이 태우는 것은 증분분이 아니라 기본 <code>TrainSpec</code> &mdash; 5에폭 전체 미세조정이다.
-  2,042행에 약 4.5시간이라(AVX-512 &middot; 8스레드) 야간 안에 끝나지 않는다(&sect;7 실측).
-  ② 고객사 프로파일 워커 4GiB 에서는 40초 만에 OOM 으로 죽는다.
-  ③ 새벽에 실패하면 알아차릴 사람이 없다.
+  <p>야간 무인 실행을 기본에서 뺀 이유는 둘이고, 전부 실측 근거다(&sect;7).
+  ① 이 틱이 태우는 것은 증분분이 아니라 <b>기본 학습 설정</b> &mdash; 5에폭 전체 미세조정이다.
+  2,042행에 약 4시간이라(AVX-512 &middot; 8스레드) 야간 창 안에 안정적으로 끝나지 않는다(&sect;7 실측).
+  ② 고객사 프로파일 워커 기본값 4GiB 에서는 기본형 학습이 완주하지 못한다 &mdash;
+  재학습을 운용할 노드는 워커 메모리 상향이 필요하다.
   관리자가 버튼을 눌러도 목적(<b>고객사 교정을 반출하지 않고 현장에서 반영</b>)은 그대로
   달성된다 &mdash; 반출은 어느 쪽이든 0 이다.</p>
 
@@ -305,7 +297,6 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
     <tbody>
       <tr><td>지재원 학습&middot;골든</td><td><code>full-train</code></td><td><code>enable_training</code></td><td>미탐 임계 도달 시 자동 재학습</td></tr>
       <tr><td>고객사 운영</td><td><code>onprem-local</code></td><td><code>enable_incremental_retrain</code></td><td>CPU 증분 재학습</td></tr>
-      <tr><td>순수 추론</td><td><code>lite-*</code></td><td>둘 다 꺼짐</td><td>어떤 경로로 요청이 들어와도 학습하지 않는다</td></tr>
     </tbody>
   </table>
   </div>
@@ -339,12 +330,6 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
 
   <div class="tw"><!-- FIG:gate --><svg viewBox="0 0 940 530" width="100%" style="max-width:940px;height:auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="재학습본을 서비스에 올릴지 정하는 배포 게이트 검사들을 순서대로 그린 도식. 판정할 수 없으면 통과가 아니라 거부다"><style>.t{font:12px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.th{font:700 12.5px "Pretendard","Noto Sans KR",sans-serif;fill:#0a0a0a}.m{font:10.5px ui-monospace,monospace;fill:#71717a}.d{font:11px "Pretendard","Noto Sans KR",sans-serif;fill:#71717a}.n{font:700 11px "Pretendard","Noto Sans KR",sans-serif;fill:#fff}.no{font:700 11.5px "Pretendard","Noto Sans KR",sans-serif;fill:#7f1d1d}</style><text class="th" x="8" y="26">학습이 끝나면 &#8212; 사람의 인상이 아니라 이 검사들이 승격을 정한다</text><text class="d" x="8" y="46">원칙은 <tspan class="th">fail-closed</tspan> 다. 지표가 없거나 리포트가 깨져 <tspan class="th">판정할 수 없으면 통과가 아니라 거부</tspan>다 &#8212; 미탐을 치명으로 보는 설계에서</text><text class="d" x="8" y="64">&ldquo;측정 못 함&rdquo;을 &ldquo;이상 없음&rdquo;으로 읽지 않기 위해서다.</text><rect x="8" y="82" width="924" height="24" fill="#f4f4f5"/><text class="d" x="20" y="98">입력 &#8212; 재학습 후보 1건. 자동 활성화는 기본 꺼짐(<tspan class="m">retrain_auto_activate=False</tspan>)</text><rect x="8" y="130" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="130" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="147" text-anchor="middle">1</text><text class="t" x="40" y="147">한 등급으로만 찍는가</text><text class="m" x="922" y="147" text-anchor="end">degenerate</text><rect x="8" y="160" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="160" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="177" text-anchor="middle">2</text><text class="t" x="40" y="177">고등급 미탐율을 잴 수 있는가</text><text class="m" x="922" y="177" text-anchor="end">fnr_high_present</text><text class="d" x="8" y="206">기준선이 <tspan class="th">있으면</tspan> 왼쪽, <tspan class="th">없으면</tspan>(최초 배포) 오른쪽을 본다</text><rect x="8" y="216" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="216" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="233" text-anchor="middle">3</text><text class="t" x="40" y="233">미탐이 기준선보다 나빠졌는가</text><text class="m" x="455" y="233" text-anchor="end">fnr_high_regression</text><rect x="475" y="216" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="475" y="216" width="22" height="25" fill="#0a0a0a"/><text class="n" x="486" y="233" text-anchor="middle">3</text><text class="t" x="507" y="233">비교할 기준선이 있는가</text><text class="m" x="922" y="233" text-anchor="end">baseline_present</text><rect x="8" y="246" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="246" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="263" text-anchor="middle">4</text><text class="t" x="40" y="263">전반 성능이 크게 떨어졌는가</text><text class="m" x="455" y="263" text-anchor="end">f1_regression</text><rect x="475" y="246" width="457" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="475" y="246" width="22" height="25" fill="#0a0a0a"/><text class="n" x="486" y="263" text-anchor="middle">4</text><text class="t" x="507" y="263">최초 배포 절대 상한을 넘는가</text><text class="m" x="922" y="263" text-anchor="end">first_deploy_fnr_floor</text><rect x="8" y="276" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="276" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="293" text-anchor="middle">5</text><text class="t" x="40" y="293">앵커에서 고등급을 놓쳤는가</text><text class="m" x="922" y="293" text-anchor="end">anchor_high_grade_miss</text><rect x="8" y="306" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="306" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="323" text-anchor="middle">6</text><text class="t" x="40" y="323">앵커 리포트가 있는가</text><text class="m" x="922" y="323" text-anchor="end">anchor_eval_skipped</text><rect x="8" y="336" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="336" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="353" text-anchor="middle">7</text><text class="t" x="40" y="353">문체만 바꿨는데 등급이 내려갔는가</text><text class="m" x="922" y="353" text-anchor="end">metamorphic_forward_regression</text><rect x="8" y="366" width="924" height="25" fill="#fafafa" stroke="rgba(0,0,0,.18)"/><rect x="8" y="366" width="22" height="25" fill="#0a0a0a"/><text class="n" x="19" y="383" text-anchor="middle">8</text><text class="t" x="40" y="383">메타모픽 리포트가 있는가</text><text class="m" x="922" y="383" text-anchor="end">metamorphic_eval_skipped</text><rect x="8" y="402" width="924" height="26" fill="#0a0a0a"/><text class="n" x="20" y="420">전부 통과해야 승격 &#8212; 판정 결과는 tb_training_runs.final_metrics 의 deploy.gate 한 곳에 남는다</text><text class="d" x="8" y="452">허용폭은 설정에서 읽는다 &#8212; 미탐 악화 허용 <tspan class="th">+0.02</tspan> &#183; 최초 배포 절대 상한 <tspan class="th">0.10</tspan>. 값이 바뀌면 이 그림도 함께 바뀐다.</text><text class="no" x="8" y="472">미탐(고등급을 낮게 본 것)이 나빠지는 모델은 다른 지표가 좋아도 올라가지 않는다 &#8212; 이 시스템의 1순위 축이다.</text></svg><!-- /FIG:gate --></div>
 
-  <div class="note">검사 이름은 코드에 9 개가 있고, <b>한 실행에서 도는 것은 기준선 유무에 따라 갈린다</b> &mdash;
-  기준선이 있으면 <code>fnr_high_regression</code> &middot; <code>f1_regression</code> 을,
-  없으면(최초 배포) <code>baseline_present</code> &middot; <code>first_deploy_fnr_floor</code> 를 본다.
-  앵커&middot;메타모픽은 리포트가 없으면 <code>*_eval_skipped</code> 로 기록된다 &mdash;
-  강제 옵트인 운영에서는 리포트 부재 자체가 거부 사유다. 위 도식이 이 갈래를 그린 것이다.</div>
-
   <p class="src">근거 &mdash; <code>poc/src/koipa/modules/m6_evaluation/deploy_gate.py</code>(검사 정의) &middot;
   <code>poc/src/koipa/config.py</code>(<code>retrain_fnr_high_tolerance</code> 0.02 &middot;
   <code>deploy_gate_first_deploy_fnr_high_max</code> 0.10). <b>강제 옵트인</b>으로 앵커&middot;메타모픽을
@@ -361,15 +346,12 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
     <tbody>
       <tr><td>디렉터리</td><td><code>settings.training_dataset_dir</code></td></tr>
       <tr><td>분할 파일</td><td><code>train.jsonl</code> · <code>val.jsonl</code> · <code>test.jsonl</code></td></tr>
-      <tr><td>교정 병합 산출</td><td><code>settings.retrain_dataset_dir/train_corr_&lt;8자리&gt;.jsonl</code></td></tr>
+      <tr><td>교정 병합 산출</td><td>재학습 산출 디렉터리의 교정 병합 파일</td></tr>
     </tbody>
   </table>
   </div>
 
-  <p>이 경로가 종전에는 코드에 <code>datasets/labeled/…</code> 로 박혀 있었고, 그 디렉터리는
-  리포에도 배포본에도 없었다. 그래서 하이퍼파라미터 없이 호출되는 경로(콘솔의 재학습 트리거,
-  <code>POST /train</code> 기본형)가 배포 서버에서 항상 파일 없음으로 끝났다(2026-08-08 실측).
-  설정에서 끌어오도록 바꿔 학습셋 세대가 바뀌어도 코드를 고치지 않는다.</p>
+  <p>학습셋 경로는 설정에서 읽는다. 학습셋 세대가 바뀌어도 코드를 고치지 않는다.</p>
 
   <h2>6. 문서 출처 &mdash; 라벨과 별개의 축</h2>
 
@@ -389,38 +371,26 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
   </div>
 
   <div class="note">최종 운영 성능의 근거는 실문서에서만 나온다. 합성만으로 학습한 분류기를
-  실문서에 적용했을 때 F1 이 0.26 이었다 &mdash; 안전하지만 자동화에는 쓸 수 없는 수준이다.
+  실문서에 적용하면 미탐은 낮으나 과분류가 커져 자동확정 비율이 실용 수준에 미치지 못한다.
   <b>검수를 거쳤다고 해서 합성이 실문서가 되지는 않는다.</b></div>
 
   <h2>7. 현재 상태 &mdash; 실측</h2>
 
   <div class="tw">
   <table>
-    <thead><tr><th style="width:34%">항목</th><th style="width:14%">값</th><th>세는 방법</th></tr></thead>
+    <thead><tr><th style="width:34%">항목</th><th style="width:14%">값</th><th>내용</th></tr></thead>
     <tbody>
-      <tr>
-        <td>골든 실행 디렉터리</td><td class="c">8</td>
-        <td><code>ls -d poc/datasets/golden_runs/*/</code></td>
-      </tr>
-      <tr>
-        <td>그중 분할이 수행된 것</td><td class="c">1</td>
-        <td><code>find poc/datasets/golden_runs -name silver_train.jsonl</code></td>
-      </tr>
-      <tr>
-        <td>경로 1 로직 시험</td><td class="c">8 통과</td>
-        <td><code>pytest tests/test_synth_training_build.py</code> &mdash; 위생 게이트 제외, 교정 라벨 우선, 미승인 무시, 교정의 표본 간 누출 없음</td>
-      </tr>
       <tr>
         <td>재학습 소요 &mdash; 실측</td><td class="c">1,000행 약 2시간<br>(AVX-512 &middot; 8스레드)</td>
         <td><b>단일 숫자가 아니다 &mdash; CPU 사양과 스레드 수로 갈린다.</b>
-        아래는 기본 <code>TrainSpec</code>(5에폭 &middot; batch 8 &middot; max_seq 512) 기준이며
-        스텝 수는 <code>ceil(행수 / batch_size) &times; epochs</code> 로 정해진다.
+        아래는 기본 학습 설정(5에폭 &middot; 배치 8 &middot; 최대 길이 512) 기준이며
+        스텝 수는 <b>행수 &divide; 배치 크기 &times; 에폭 수</b> 로 정해진다.
         <br>
         <table style="margin:6px 0">
           <thead><tr><th>환경</th><th>스텝당</th><th>1,000행(625스텝)</th><th>2,042행(1,280스텝)</th></tr></thead>
           <tbody>
             <tr><td>AVX-512 &middot; 8스레드</td><td class="c">10.9&ndash;11.9초</td>
-                <td class="c"><b>약 2시간</b></td><td class="c">약 4.5시간</td></tr>
+                <td class="c"><b>약 2시간</b></td><td class="c">약 4시간</td></tr>
             <tr><td>AVX-512 &middot; 4스레드</td><td class="c">15.4초</td>
                 <td class="c">약 2.7시간</td><td class="c">&mdash;</td></tr>
           </tbody>
@@ -432,61 +402,17 @@ python scripts/run_golden_split_signoff.py datasets/golden_runs/&lt;run_dir&gt;
         <b>학습 구간만이다</b> &mdash; 에폭별 평가와 체크포인트 저장은 빠져 있어 실제 벽시계는 이보다 길다</td>
       </tr>
       <tr>
-        <td>재학습 자원 &mdash; 실측</td><td class="c">4GiB 에서 OOMKilled</td>
-        <td>고객사 프로파일 워커(<code>WORKER_MEM_LIMIT</code> 기본 <code>4G</code> &middot;
-        <code>docker-compose.prod.yml</code>)에서 같은 태스크를 발화하니 <b>40초 만에</b> 죽었다(2026-08-08).
-        메모리는 CPU 속도와 무관해 하드웨어를 바꿔도 그대로다. 이것이 야간 무인 발화를 기본에서 뺀
-        이유다(&sect;4-3) &mdash; <code>enable_nightly_retrain_schedule</code> 기본값 <code>False</code></td>
-      </tr>
-      <tr>
-        <td>코드 스키마 head</td><td class="c"><code>d1a2b3c4e5f7</code></td>
-        <td>마이그레이션 18판 중 자식이 없는 판(<code>alembic/versions/</code>) &mdash;
-        2026-08-29 에 미사용 칼럼 10개를 뺀 판이 head 다</td>
+        <td>재학습 자원 &mdash; 실측</td><td class="c">4GiB 로는 부족</td>
+        <td>고객사 프로파일 워커 기본값 4GiB 에서는 기본형 학습이 완주하지 못한다(2026-08-08 실측).
+        메모리는 CPU 속도와 무관해 하드웨어를 바꿔도 그대로다 &mdash; 재학습을 운용할 노드는
+        워커 메모리 상향이 필요하며, 도입 노드가 정해지면 필요한 값을 실측해 회신드린다.
+        야간 무인 발화를 기본에서 뺀 이유이기도 하다(&sect;4-3)</td>
       </tr>
     </tbody>
   </table>
   </div>
 
-  <h2>8. 확인하지 못한 것</h2>
-
-  <div class="tw">
-  <table>
-    <thead><tr><th style="width:34%">항목</th><th>상태</th></tr></thead>
-    <tbody>
-      <tr>
-        <td>운영 서버의 승인&middot;교정 건수</td>
-        <td>측정하지 않았다. 감리 시연에 쓰이는 서버라 조회를 하지 않기로 했다(2026-08-27 결정)</td>
-      </tr>
-      <tr>
-        <td>운영 서버의 마이그레이션 적용 여부</td>
-        <td><b>적용돼 있다</b>(2026-08-29 실측). 시험서버(223)의 alembic 판은 <code>d1a2b3c4e5f7</code> 로 <b>코드 head 와 같다</b> &mdash; &sect;2 경로와 합성 검수 화면의 전제가 갖춰져 있다. 확인 명령 — <code>psql -tAc "select version_num from alembic_version"</code></td>
-      </tr>
-      <tr>
-        <td>재학습 소요 시간의 <b>시스템 자동 기록</b></td>
-        <td>비어 있다. 소요 시간은 &sect;7 에 실측치가 있으나 사람이 따로 잰 값이고,
-        시스템이 스스로 남긴 값이 아니다. 기록할 자리는 스키마에 있으나(<code>tb_training_runs</code> 의
-        <code>duration_sec</code> &middot; <code>started_at</code> &middot; <code>completed_at</code> &middot;
-        <code>total_samples</code>) 배포 모델 아티팩트의 <code>report.json</code> 에는 지표만 있고 시간 키가 없다.
-        운영 서버 조회는 하지 않기로 했으므로(위 결정) 이 저장소에서 값을 다시 얻으려면 학습을 1 회 돌려야 한다.
-        재는 방법 &mdash;
-        <code>select duration_sec, total_samples, trigger_type from tb_training_runs order by created_at desc limit 5</code>.
-        추정치를 쓰지 않는다</td>
-      </tr>
-      <tr>
-        <td>재학습의 <b>품질 개선 폭</b></td>
-        <td>측정하지 않았다. &sect;7 의 값은 <b>처리 시간</b>이며,
-        재학습으로 F1 이 얼마나 오르는지는 잰 적이 없다. 회원사 실데이터가 쌓여야 잴 수 있는 값이라
-        추정치로 채우지 않는다</td>
-      </tr>
-      <tr>
-        <td>경로 1 의 종단 실행 실적</td>
-        <td>실측하지 못했다. 개발 DB 에 합성 표본이 0 건이고, 변환 명령은 응용 컨테이너 안에서만 실행된다(DB 포트가 호스트로 게시돼 있지 않다). 로직 자체는 &sect;7 의 시험 8 건으로 확인했다</td>
-      </tr>
-    </tbody>
-  </table>
-  </div>
-
-  <div class="foot">근거 파일 &mdash; <code>poc/src/koipa/services/synthesis_service.py</code> · <code>poc/src/koipa/golden_split.py</code> · <code>poc/src/koipa/golden_tiers.py</code> · <code>poc/src/koipa/modules/m6_evaluation/corrections_rebuild.py</code> · <code>poc/src/koipa/workers/tasks.py</code> · <code>poc/src/koipa/workers/celery_app.py</code> · <code>poc/src/koipa/config.py</code> · <code>poc/src/koipa/modules/m4_training/trainer.py</code> · <code>poc/scripts/build_synth_training_set.py</code> · <code>poc/scripts/run_golden_split_signoff.py</code></div>
+<div class="foot">학습 데이터 입력 경로 명세서 — 한국지식재산보호원 AI 영업비밀 등급분류 시스템</div>
 </div>
 </body>
 </html>

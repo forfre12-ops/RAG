@@ -37,6 +37,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# [2026-09-03] Windows 기본 콘솔(cp949)에서 진단 문구의 em dash 가 UnicodeEncodeError 를 내며
+# **파일을 쓰기 전에** 죽었다. 표준 출력만 UTF-8 로 돌린다 — 호출자가 환경변수를 붙이지
+# 않아도 돌아야 한다.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):      # 파이프·리다이렉트 등 재설정 불가한 경우
+        pass
+
 import table_spec_meta as META  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -63,11 +72,24 @@ REVISIONS = [
      "관계선이 상자에 가려지던 도식을 다시 그리고, 검색용 표 2종을 포함해 21표로 확장. "
      "칼럼 목록이 두 곳에 중복 수록돼 있던 것을 이 문서로 일원화. "
      "표별 인덱스·FK 개수를 §01 에 추가"),
+
     ("3", "2026-08-29", "이 문서 머리말의 커밋",
      "어떤 코드도 읽지 않고 실 데이터도 전부 비어 있던 <b>칼럼 10개를 삭제</b>"
      "(249 → 239). 대리키를 <code>SERIAL</code> 에서 표준 "
      "<code>GENERATED ALWAYS AS IDENTITY</code> 로 전환"),
-]
+    ("4", "2026-09-03", "이 문서 머리말의 커밋",
+     "<b>유사문서 조회 폐기</b> — 검색용 표 2종(21 → 19표)에 이어 표 1개와 칼럼 9개를 더 "
+     "뺐다(19표 226칼럼 → <b>18표 214칼럼</b>). "
+     "<b>⚠ 뺀 것은 소스에 아직 남아 있다</b> — 정의서가 코드보다 앞선 상태이며 소스 정리는 "
+     "다음 차수다.<br>"
+     "납품 DB 를 <b>MariaDB 10.11</b> 로 맞췄다. 물리 타입·기본값·인덱스·파티션·채번을 "
+     "MariaDB 정본으로 적고 현행 PostgreSQL 표기를 대조용으로 병기했다. 스토리지 엔진·문자셋·"
+     "콜레이션 선언을 머리말에 넣었다.<br>"
+     "§02 <b>서버별 배포 구분</b>을 신설했다 — 근거는 "
+     "<code>poc/scripts/audit_table_placement.py</code> 전수 조사. "
+     "절 번호가 03 에서 겹치던 것을 바로잡고, 제약 없는 참조 목록과 제외 칼럼을 "
+     "<code>table_spec_meta.py</code> 한 곳에 두어 도식·캡션·본문이 같은 값을 쓰도록 "
+     "고쳤습니다"),]
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -86,6 +108,10 @@ _TYPE_MAP = {
 }
 
 
+# 제약 없는 참조. 정본은 table_spec_meta.SOFT_REFS 이며 build_erd.py 도 같은 목록을 본다.
+# 여기 형식은 (자식, 부모, 칼럼) 이고 정본은 (자식, 칼럼, 부모) 이므로 순서를 맞춘다.
+SOFT_REFS = [(ch, pa, col) for ch, col, pa in getattr(META, "SOFT_REFS", [])]
+
 def _phys_type(expr: str) -> str:
     """mapped_column 첫 인자에서 PostgreSQL 물리 타입 문자열을 만든다."""
     expr = expr.strip()
@@ -103,6 +129,51 @@ def _phys_type(expr: str) -> str:
     return _TYPE_MAP.get(expr, expr)
 
 
+# ── MariaDB 전환 (2026-09-02) ────────────────────────────────────────────────
+#
+# 유사문서 검색을 쓰지 않기로 하면서 pgvector 가 필요 없어졌고, 납품 DB 를 KL 포털이
+# 쓰는 MariaDB 로 맞춘다. 아래는 **현행 PostgreSQL 물리 타입 -> MariaDB 타입** 대응이다.
+#
+# 타입을 그냥 갈아끼우면 안 되는 자리가 셋이라 여기 근거를 남긴다.
+#
+#   TIMESTAMPTZ  MariaDB 에는 시간대를 담는 타입이 없다. DATETIME(6) 에 **UTC 로 저장**하고
+#                시간대 변환은 응용에서 한다. TIMESTAMP 를 쓰면 2038 년 상한에 걸린다.
+#   ARRAY        MariaDB 에는 배열 타입이 없다. 해당 칼럼은 tb_chunks.section_path 하나뿐이고
+#                읽는 쪽이 목록으로만 다루므로 JSON 배열로 담는다.
+#   UUID         MariaDB 10.7+ 의 UUID 타입은 정렬·인덱스 특성이 다르다. 이식성을 위해
+#                CHAR(36) 로 적는다. 저장 효율이 문제가 되면 BINARY(16) 으로 바꿀 수 있다.
+#
+# JSONB -> JSON 은 이름만 같고 성질이 다르다. MariaDB 의 JSON 은 LONGTEXT + 검증 제약이라
+# PostgreSQL JSONB 처럼 색인된 이진 형태가 아니다. JSON 안의 키로 자주 거르는 질의가
+# 있으면 생성 칼럼(generated column) + 인덱스가 필요하다.
+_MARIA_MAP = {
+    "INTEGER": "INT",
+    "BIGINT": "BIGINT",
+    "SMALLINT": "SMALLINT",
+    "REAL": "FLOAT",
+    "BOOLEAN": "TINYINT(1)",
+    "TEXT": "TEXT",
+    "JSONB": "JSON",
+    "INET": "VARCHAR(45)",
+    "UUID": "CHAR(36)",
+    "TIMESTAMPTZ": "DATETIME(6)",
+    "TIMESTAMP": "DATETIME(6)",
+}
+
+
+def _maria_type(pg: str) -> str:
+    """현행 PostgreSQL 물리 타입 문자열 -> MariaDB 타입 문자열."""
+    pg = (pg or "").strip()
+    if not pg:
+        return ""
+    if pg.endswith("[]"):                       # ARRAY -> JSON 배열
+        return "JSON"
+    if pg.startswith("VARCHAR("):
+        return pg
+    if m := re.match(r"NUMERIC\((\d+),(\d+)\)", pg):
+        return f"DECIMAL({m.group(1)},{m.group(2)})"
+    return _MARIA_MAP.get(pg, pg)
+
 def _sql_default(expr: str) -> str:
     """server_default 표현식을 DB 가 보는 기본값 문자열로 정규화한다."""
     expr = expr.strip()
@@ -119,6 +190,63 @@ def _sql_default(expr: str) -> str:
         return re.sub(r"::[\w ]+$", "", str(lit)).strip()
     return expr
 
+
+# MariaDB 기본값 대응. 타입과 같은 이유로 여기 한 곳에서만 정한다.
+#
+#   now()               CURRENT_TIMESTAMP(6)  — 마이크로초 정밀도를 DATETIME(6) 과 맞춘다
+#   true / false        1 / 0                 — MariaDB BOOLEAN 은 TINYINT(1) 의 별칭이다
+#   gen_random_uuid()   응용 생성              — MariaDB UUID() 는 v1(시간 기반)이라 v4 와
+#                                              성질이 다르다(인덱스 국부성·예측 가능성).
+#                                              DB 기본값으로 바꿔 끼우지 않고 응용이 만든다.
+_MARIA_DEFAULT = {
+    "now()": "CURRENT_TIMESTAMP(6)",
+    "true": "1",
+    "false": "0",
+    "gen_random_uuid()": "(응용 생성)",
+}
+
+
+def _maria_default(pg: str) -> str:
+    pg = (pg or "").strip()
+    if not pg:
+        return ""
+    return _MARIA_DEFAULT.get(pg, pg)
+
+
+# MariaDB 인덱스 대응. PostgreSQL 전용 문법을 쓰는 7개만 여기서 정하고 나머지는 그대로다.
+#
+# 부분 인덱스(WHERE) 는 MariaDB 에 없다. 다섯 중 넷은 성능용이라 복합·일반 인덱스로 충분하고,
+# idx_mv_active 하나만 **불변식**("활성 모델 버전은 항상 1개")을 인덱스로 보증하고 있어
+# 대체 설계가 필요하다.
+#   idx_doc_hash  는 조건을 떼도 같다 — MariaDB 는 UNIQUE 칼럼에 NULL 을 여러 개 허용한다.
+# 두 인덱스는 MariaDB 정본에 두지 않는다.
+#   idx_lk_keyword_trgm  pg_trgm 트라이그램 인덱스에 대응하는 것이 MariaDB 에 없다.
+#                        FULLTEXT+ngram 은 MySQL 번들 파서라 MariaDB 에서 보장되지 않고,
+#                        접두 인덱스는 중간일치를 못 탄다. 현행 병기 칸에만 남긴다.
+#   idx_doc_metadata     JSON 경로 색인에 대응하는 것이 없다. 뽑을 키를 정하면 그때
+#                        생성 칼럼으로 선언하고 인덱스를 건다.
+_MARIA_INDEX = {
+    "idx_lk_keyword_trgm": "(MariaDB 정본에 두지 않습니다 — 대응 인덱스 없음)",
+    "idx_doc_metadata": "(MariaDB 정본에 두지 않습니다 — 대응 인덱스 없음)",
+    "idx_doc_hash":
+        "UNIQUE INDEX idx_doc_hash (file_hash)",
+    "idx_doc_pending":
+        "INDEX idx_doc_pending (processing_status, uploaded_at)",
+    "idx_cls_staging":
+        "INDEX idx_cls_staging (status, classified_at DESC)",
+    "idx_mv_active":
+        "UNIQUE INDEX idx_mv_active (active_key)",
+    "idx_corr_unconsumed":
+        "INDEX idx_corr_unconsumed (consumed_in_run)",
+}
+
+
+def _maria_constraint(pg: str) -> str:
+    """현행 인덱스 표기 -> MariaDB 표기. 바뀌지 않는 것은 그대로 돌려준다."""
+    m = re.search(r"INDEX\s+([a-z_0-9]+)", pg or "")
+    if m and m.group(1) in _MARIA_INDEX:
+        return _MARIA_INDEX[m.group(1)]
+    return pg
 
 def _default_cell(col: dict) -> str:
     """DB 기본값을 우선 보이고, 없을 때만 애플리케이션 기본값을 표시한다."""
@@ -251,6 +379,8 @@ def parse_models() -> list[dict]:
                     col["default"] = _sql_default(a.split("=", 1)[1])
                 elif a.startswith("default="):
                     col["app_default"] = a.split("=", 1)[1]
+                elif a.startswith("Identity("):
+                    col["identity"] = True
                 elif not col["type"] and not a.startswith(("autoincrement", "index=", "comment=")):
                     col["type"] = _phys_type(a)
             if col["pk"]:
@@ -349,9 +479,19 @@ def parse_rag() -> list[dict]:
 
 
 # 파티션 부모는 ORM 이 표현하지 않는다 — models.py 도크스트링이 명시한 사실을 옮긴다.
+# 월별 RANGE 파티션을 두는 표. [2026-09-03] 셋에서 하나로 줄였다.
+#
+# 실측(223 · 2026-09-03): tb_audit_log 63,697행 / tb_llm_usage 214행 / tb_chunks 193행.
+# 뒤 둘은 파티션 16개를 두고도 파티션당 열 몇 행이라 이득이 없고, MariaDB 로 가면 비용만
+# 는다 — 파티션 키가 **기본키에 포함돼야** 해서 단일 키를 복합키로 바꿔야 하고,
+# tb_chunks 는 tb_classification_evidence.chunk_id 참조까지 영향을 받는다.
+#
+# tb_audit_log 만 남긴다. 보존기간이 지난 파티션을 통째로 DROP 하는 것이 목적이고,
+# 행이 계속 쌓이는 유일한 표다.
+#
+# ⚠ tb_chunks 는 회원사 운영이 시작되면 늘어난다(문서 1건당 청크 수십 개). 운영 규모에서
+#   다시 판단할 것 — 지금 안 두는 것이지 영영 두지 않는다는 뜻이 아니다.
 PARTITIONS = {
-    "tb_chunks": "created_at",
-    "tb_llm_usage": "called_at",
     "tb_audit_log": "occurred_at",
 }
 
@@ -383,8 +523,6 @@ LAYOUT = [
     ("tb_llm_usage", 3, 40),
     ("tb_audit_log", 3, 80),
     ("tb_guides", 3, 120),
-    ("tb_rag_vectors", 3, 180),
-    ("tb_rag_aliases", 3, 220),
 ]
 
 
@@ -398,10 +536,7 @@ def build_erd(tables: list[dict]) -> str:
             if c["fk"]:
                 parent = c["fk"].split(".")[0]
                 edges.append((t["name"], parent, c["name"]))
-    # 애플리케이션이 지키는 참조(제약 없음) — 점선으로 구분해 그린다.
-    soft = [("tb_chunks", "tb_documents", "doc_id"),
-            ("tb_classification_evidence", "tb_chunks", "chunk_id"),
-            ("tb_rag_aliases", "tb_rag_vectors", "collection")]
+    soft = SOFT_REFS
 
     # 같은 (자식,부모) 쌍의 여러 FK 는 선 하나로 합치고 라벨만 모은다.
     merged: dict[tuple[str, str], list[str]] = {}
@@ -473,6 +608,32 @@ def build_erd(tables: list[dict]) -> str:
 # 3. 렌더링
 # ──────────────────────────────────────────────────────────────────────
 
+# MariaDB 정본에만 존재하는 생성 칼럼. 현행 PostgreSQL 에는 없다(부분 인덱스로 대신하므로).
+# 인덱스가 참조하는 칼럼이 표에 없으면 그 인덱스는 만들어지지 않는다 — 실제로
+# idx_mv_active 하나가 '활성 모델 1건' 불변식을 지키는 유일한 장치다.
+GENERATED_COLUMNS = {
+    "tb_model_versions": [{
+        "name": "active_key",
+        "type": "TINYINT(1) GENERATED ALWAYS AS (IF(is_active=1,1,NULL)) VIRTUAL",
+        "legacy": "(없음 — 현행은 부분 인덱스)",
+        "notnull": False, "pk": False, "fk": "", "ondelete": "", "unique": False,
+        "default": "", "identity": False,
+        "desc": "활성일 때만 1, 아니면 NULL. UNIQUE 인덱스 idx_mv_active 가 "
+                "활성 1건만 허용하도록 보증합니다",
+    }],
+}
+
+def _placement_cell(name: str) -> str:
+    """배치 칸. 지재원 전용만 표시를 달고 공통은 담백하게 둔다."""
+    # 근거를 title 툴팁에 담지 않는다 — 인쇄·PDF 에서 사라진다. 배치 값만 표시하고
+    # 사유는 §02 에 한 번 적는다.
+    where, _why = getattr(META, "PLACEMENT", {}).get(name, ("둘 다", ""))
+    if where == "지재원":
+        return '<td class="c-key"><span class="k-pk">지재원만</span></td>'
+    if where == "고객사":
+        return '<td class="c-key"><span class="k-fk">고객사만</span></td>'
+    return '<td class="c-key">둘 다</td>'
+
 def col_desc(table: str, col: dict) -> str:
     if col.get("desc_override"):
         return col["desc_override"]
@@ -509,8 +670,8 @@ def render(tables: list[dict], erd: str, commit: str, today: str) -> str:
     A("<title>테이블정의서 · ERD | KOIPA AI 영업비밀 등급분류 시스템</title>")
     A(f"<style>{style}</style>")
     A("""<style>
-.ts-edge{stroke:#94a3b8;stroke-width:1.1;fill:none;}
-.ts-edge.ts-soft{stroke-dasharray:4 3;stroke:#cbd5e1;}
+
+.ts-edge
 .ts-node rect{transition:stroke .12s;}
 .ts-node:hover rect{stroke:#1e293b;stroke-width:2;}
 table.spec{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -530,8 +691,7 @@ table.spec td.c-nn{text-align:center;}
 .spec-note{font-size:12.5px;color:#52525b;margin:2px 0 8px;line-height:1.6;}
 .spec-idx{font-size:11.5px;color:#52525b;margin:6px 0 0;line-height:1.7;}
 .spec-idx code{font-size:11px;}
-.srcbox{border-left:3px solid #18181b;background:#fafafa;padding:11px 14px;margin:14px 0;
-  font-size:12.5px;line-height:1.7;color:#3f3f46;}
+
 .tbl-wrap{overflow-x:auto;}
 .num{font-family:ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--dim);
   padding:2px 7px;background:var(--mid);border:1px solid var(--line);margin-right:6px}
@@ -551,25 +711,21 @@ table.spec td.c-nn{text-align:center;}
     A('  <div class="top">')
     A('    <div class="eyebrow">감리 산출물 · 데이터베이스 정의</div>')
     A('    <h1>테이블정의서 · ERD</h1>')
-    A(f'    <div class="meta">PostgreSQL 16 · {len(tables)}테이블 {total_cols}칼럼 · '
-      f'등급체계·문서·라벨링·추론·학습·보정·합성·운영·검색 9개 그룹 · {today} 생성</div>')
+    A(f'    <div class="meta">MariaDB 10.11 · InnoDB · utf8mb4 / utf8mb4_bin · '
+      f'{len(tables)}테이블 {total_cols}칼럼 · '
+      f'등급체계·문서·라벨링·추론·학습·보정·합성·운영 8개 그룹 · {today} 생성</div>')
     A('  </div>')
-    A(f'''<div class="srcbox">
-<b>표·칼럼의 값은 소스 코드에서 뽑았다.</b> 코드의 테이블 집합과 이 정의서가 일치하는지는
-<code>python scripts/build_table_spec.py --check</code> 로 확인할 수 있다.<br>
-<b>기준 소스</b> — <code>poc/src/koipa/db/models.py</code>(ORM 19테이블) ·
-<code>poc/alembic/versions/a1b2c3d4e5f6_pg_rag_vectorstore.py</code>(RAG 2테이블)<br>
-<b>기준 커밋</b> — <code>{commit}</code> · <b>생성일</b> {today}<br>
-컬럼의 이름·물리타입·NULL 허용·기본값·키·인덱스·제약은 모두 위 파일에서 읽은 값이고,
-한국어 논리명과 설명만 <code>scripts/table_spec_meta.py</code> 에 사람이 적는다.
-설명이 없는 컬럼은 생성 때 경고로 잡히므로 컬럼을 추가하고 문서를 빠뜨릴 수 없다.
-</div>''')
-
     # ── 그룹·테이블 목록
     A('<section id="tables-index"><h2><span class="num">01</span> 테이블 목록</h2>')
+    A('<p class="spec-note"><b>물리 타입 전환 규약</b> — '
+      '<code>DATETIME(6)</code> 는 UTC 로 저장하며 시간대 변환은 응용이 수행합니다. '
+      '<code>CHAR(36)</code> UUID 는 소문자 표준형으로만 저장합니다'
+      '(콜레이션이 <code>utf8mb4_bin</code> 이므로 대소문자가 섞이면 다른 값이 됩니다). '
+      '<code>JSON</code> 은 LONGTEXT + 검증 제약이므로 키로 거르는 질의에는 생성 칼럼과 '
+      '인덱스가 필요합니다. 배열은 JSON 배열로 담습니다.</p>')
     A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
       "<th>그룹</th><th>물리명</th><th>논리명</th><th>컬럼</th><th>기본키</th>"
-      "<th>파티션</th><th>용도</th></tr></thead><tbody>")
+      "<th>배치</th><th>파티션</th></tr></thead><tbody>")
     for gid, gname, _ in META.GROUPS:
         for name, (g, logical, purpose) in META.TABLES.items():
             if g != gid or name not in by_name:
@@ -580,26 +736,52 @@ table.spec td.c-nn{text-align:center;}
               f'<td class="c-name"><a href="#t-{name}">{name}</a></td>'
               f"<td>{e(logical)}</td><td class=\"c-nn\">{len(t['cols'])}</td>"
               f"<td class=\"c-type\">{e(', '.join(t['pk']))}</td>"
-              f'<td class="c-type">{("월별 RANGE(" + part + ")") if part else "—"}</td>'
-              f"<td>{e(purpose)}</td></tr>")
+              + _placement_cell(name)
+              + f'<td class="c-type">{("월별 RANGE(" + part + ")") if part else "—"}</td></tr>')
     A("</tbody></table></div></section>")
 
+    # ── 서버별 배포 구분
+    PL = getattr(META, "PLACEMENT", {})
+    jjw_only = [n for n in by_name if PL.get(n, ("둘 다", ""))[0] == "지재원"]
+    cust_only = [n for n in by_name if PL.get(n, ("둘 다", ""))[0] == "고객사"]
+    both = [n for n in by_name if PL.get(n, ("둘 다", ""))[0] not in ("지재원", "고객사")]
+    common = both + cust_only          # 고객사 서버가 만드는 표
+    A('<section id="placement"><h2><span class="num">02</span> 서버별 배포 구분</h2>')
+    A('<p class="spec-note">서버별로 생성하는 표를 구분합니다.</p>')
+    A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
+      '<th>구분</th><th>표 수</th><th>어느 서버에 만드는가</th>'
+      '<th>표</th></tr></thead><tbody>')
+    A(f'<tr><td class="c-name">둘 다</td><td class="c-nn">{len(both)}</td>'
+      '<td>지재원 · 고객사 양쪽</td>'
+      f'<td class="c-type">{e(", ".join(sorted(both)))}</td></tr>')
+    A(f'<tr><td class="c-name">지재원만</td><td class="c-nn">{len(jjw_only)}</td>'
+      '<td>지재원 서버에만</td>'
+      f'<td class="c-type">{e(", ".join(sorted(jjw_only))) or "—"}</td></tr>')
+    if cust_only:
+        A(f'<tr><td class="c-name">고객사만</td><td class="c-nn">{len(cust_only)}</td>'
+          '<td>고객사 서버에만</td>'
+          f'<td class="c-type">{e(", ".join(sorted(cust_only)))}</td></tr>')
+    A("</tbody></table></div>")
+    A(f'<p class="spec-note" style="margin-top:12px">지재원 '
+      f'{len(both) + len(jjw_only)}종 · 고객사 {len(both) + len(cust_only)}종을 생성합니다.</p>')
+
+    # [2026-09-03] 표별 상세표를 여기 두지 않는다 — §01 목록에 이미 배치 칸이 있어
+    # 같은 행을 근거 문구까지 그대로 되풀이하던 자리였다.
+    A("</section>")
+
     # ── ERD
-    A('<section id="erd"><h2><span class="num">02</span> ERD 관계도</h2>')
-    A('<p class="spec-note">박스 21개는 이 시스템이 소유한 테이블 전부다. 실선은 데이터베이스 '
-      'FK 제약, 점선은 제약 없이 애플리케이션이 정합을 보증하는 참조다(파티션 테이블·RAG '
-      '저장소는 FK 를 걸지 않는다). 진한 테두리는 대부분의 참조가 모이는 중심 테이블 '
-      '<code>tb_documents</code> 다.</p>')
+    A('<section id="erd"><h2><span class="num">03</span> ERD 관계도</h2>')
+    A(f'<p class="spec-note">실선은 FK 제약, 점선은 제약 없는 참조입니다.</p>')
     A('<div style="overflow-x:auto;border:1px solid rgba(0,0,0,.12);padding:16px;'
       'margin:14px 0;background:#fafafa;">')
     A(erd)
     A("</div>")
-    A('<p class="spec-note">관계 수 — FK 제약 '
-      f'{len(fks)}개, 제약 없는 참조 3개. 전체 목록은 §04 참조.</p>')
+    A(f'<p class="spec-note">FK 제약 {len(fks)}건 · 제약 없는 참조 {len(SOFT_REFS)}건 '
+      '(§05 참조).</p>')
     A("</section>")
 
     # ── 테이블별 정의
-    A('<section id="tables"><h2><span class="num">03</span> 테이블별 정의</h2>')
+    A('<section id="tables"><h2><span class="num">04</span> 테이블별 정의</h2>')
     for gid, gname, gdesc in META.GROUPS:
         members = [n for n, (g, _, _) in META.TABLES.items() if g == gid and n in by_name]
         if not members:
@@ -616,9 +798,12 @@ table.spec td.c-nn{text-align:center;}
               + "</div>")
             A(f'<p class="spec-note">{e(purpose)}</p>')
             A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
-              "<th>컬럼</th><th>물리 타입</th><th>NULL</th><th>키</th>"
-              "<th>기본값</th><th>설명</th></tr></thead><tbody>")
-            for c in t["cols"]:
+              "<th>컬럼</th><th>물리 타입 (MariaDB)</th>"
+              "<th>현행 (PostgreSQL)</th>"
+              "<th>NULL</th><th>키</th>"
+              "<th>기본값 (MariaDB)</th><th>현행 (PostgreSQL)</th>"
+              "<th>설명</th></tr></thead><tbody>")
+            for c in t["cols"] + GENERATED_COLUMNS.get(name, []):
                 keys = []
                 if c["name"] in t["pk"] or c["pk"]:
                     keys.append('<span class="k-pk">PK</span>')
@@ -626,7 +811,7 @@ table.spec td.c-nn{text-align:center;}
                     keys.append('<span class="k-fk">FK</span>')
                 if c["unique"]:
                     keys.append('<span class="k-uq">UQ</span>')
-                d = col_desc(name, c)
+                d = c.get("desc") or col_desc(name, c)
                 if c["fk"]:
                     tail = f' <span style="color:#71717a">→ {e(c["fk"])}'
                     tail += f' ON DELETE {e(c["ondelete"])}' if c["ondelete"] else ""
@@ -635,10 +820,12 @@ table.spec td.c-nn{text-align:center;}
                 else:
                     d = e(d)
                 A(f'<tr><td class="c-name">{c["name"]}</td>'
-                  f'<td class="c-type">{e(c["type"])}</td>'
+                  f'<td class="c-type">{e(c["type"] if c.get("legacy") else _maria_type(c["type"]))}</td>'
+                  f'<td class="c-type">{e(c.get("legacy") or c["type"])}</td>'
                   f'<td class="c-nn">{"●" if c["notnull"] else ""}</td>'
                   f'<td class="c-key">{" ".join(keys)}</td>'
-                  f'<td class="c-type">{_default_cell(c)}</td>'
+                  f'<td class="c-type">{"AUTO_INCREMENT" if c.get("identity") else (e(_maria_default(_sql_default(c["default"]))) if c.get("default") else _default_cell(c))}</td>'
+                  f'<td class="c-type">{"GENERATED ALWAYS AS IDENTITY" if c.get("identity") else _default_cell(c)}</td>'
                   f"<td>{d}</td></tr>")
             A("</tbody></table></div>")
             lines = []
@@ -649,18 +836,33 @@ table.spec td.c-nn{text-align:center;}
             for ck in t["checks"]:
                 lines.append(f"<code>{e(_fmt_constraint(ck))}</code>")
             for ix in t["indexes"]:
-                lines.append(f"<code>{e(_fmt_constraint(ix) if ix.startswith(chr(73)+chr(110)+chr(100)+chr(101)+chr(120)+chr(40)) else ix)}</code>")
+                raw = _fmt_constraint(ix) if ix.startswith(chr(73)+chr(110)+chr(100)+chr(101)+chr(120)+chr(40)) else ix
+                maria = _maria_constraint(raw)
+                if maria != raw:
+                    lines.append(f"<code>{e(maria)}</code><br>"
+                                 f'<span style="color:#71717a">현행 PostgreSQL — '
+                                 f"<code>{e(raw)}</code></span>")
+                else:
+                    lines.append(f"<code>{e(raw)}</code>")
             if part:
-                lines.append(f"<b>PARTITION</b> <code>RANGE ({part})</code> — 월별 자식 "
-                             "파티션으로 자동 라우팅. ORM 은 부모만 매핑한다.")
+                lines.append(
+                    f"<b>PARTITION</b> <code>PARTITION BY RANGE COLUMNS ({part})</code> — 월별. "
+                    "파티션 키가 기본키에 포함되어야 하므로 기본키는 (기존 키 + 파티션 키) "
+                    "복합키입니다. 마지막 파티션으로 "
+                    "<code>PARTITION pmax VALUES LESS THAN (MAXVALUE)</code> 를 두어 범위 밖 "
+                    "행을 받고, 월별 파티션은 일간 작업이 "
+                    "<code>ALTER TABLE … REORGANIZE PARTITION pmax INTO (…)</code> 로 "
+                    "미리 연장합니다.")
+                lines.append(
+                    f'<span style="color:#71717a">현행 PostgreSQL — '
+                    f"<code>PARTITION BY RANGE ({part})</code></span>")
             if lines:
                 A('<p class="spec-idx">' + "<br>".join(lines) + "</p>")
     A("</section>")
 
     # ── 관계 정의
-    A('<section id="fk"><h2><span class="num">04</span> 관계 정의</h2>')
-    A(f'<p class="spec-note">데이터베이스에 실제로 걸린 FK 제약 {len(fks)}건 전부다. '
-      "소스는 ORM 선언이며 이 표는 코드에서 그대로 뽑았다.</p>")
+    A('<section id="fk"><h2><span class="num">05</span> 관계 정의</h2>')
+    A(f'<p class="spec-note">FK 제약 {len(fks)}건입니다.</p>')
     A('<div class="tbl-wrap"><table class="spec"><thead><tr>'
       "<th>자식 테이블</th><th>자식 컬럼</th><th>부모</th><th>ON DELETE</th>"
       "</tr></thead><tbody>")
@@ -668,36 +870,33 @@ table.spec td.c-nn{text-align:center;}
         A(f'<tr><td class="c-name">{ch}</td><td class="c-name">{col}</td>'
           f'<td class="c-name">{e(tgt)}</td><td class="c-type">{e(od)}</td></tr>')
     A("</tbody></table></div>")
-    A('<p class="spec-note" style="margin-top:12px;"><b>제약 없는 참조 3건</b> — '
-      "<code>tb_chunks.doc_id → tb_documents</code> · "
-      "<code>tb_classification_evidence.chunk_id → tb_chunks</code> · "
-      "<code>tb_rag_aliases.collection → tb_rag_vectors.collection</code>. "
-      "앞의 둘은 상대가 RANGE 파티션 테이블이라 제약을 걸지 않고 애플리케이션이 정합을 "
-      "보증한다. RAG 저장소는 Alembic SQL 로만 생성해 ORM 관계에 들어오지 않는다.</p>")
+    A(f'<p class="spec-note" style="margin-top:12px;"><b>제약 없는 참조 {len(SOFT_REFS)}건</b> — '
+      + " · ".join(f"<code>{ch}.{col} → {pa}</code>" for ch, pa, col in SOFT_REFS)
+      + ". 애플리케이션이 정합을 보증합니다.</p>")
     A("</section>")
 
     # ── 범위 밖
-    A('<section id="scope"><h2><span class="num">05</span> 범위</h2>')
-    A('<p class="spec-note">이 정의서는 <b>본 시스템이 생성·소유하는 개체</b>만 다룬다. '
+    A('<section id="scope"><h2><span class="num">06</span> 범위</h2>')
+    A('<p class="spec-note">본 시스템이 생성·소유하는 개체만 수록합니다. '
       "KL 원천 문서 저장소·EDMS·회원/권한·자가진단은 외부 시스템이며, 연동 키는 "
-      "<code>tb_documents.external_ref</code> 와 <code>tb_documents.metadata</code> 로 다룬다. "
-      "월별 자식 파티션(<code>tb_chunks_2026_07</code> 등)은 부모 정의를 그대로 상속하므로 "
-      "개별 정의를 싣지 않는다.</p>")
+      "<code>tb_documents.external_ref</code> · <code>tb_documents.metadata</code> 입니다.</p>")
     A("</section>")
 
     # ── 개정 이력
-    A('<section id="revisions"><h2><span class="num">06</span> 개정 이력</h2>')
+    A('<section id="revisions"><h2><span class="num">07</span> 개정 이력</h2>')
     A('<div class="tw"><table>')
     A('<thead><tr><th style="width:8%">판</th><th style="width:16%">일자</th>'
       '<th style="width:18%">근거 커밋</th><th>내용</th></tr></thead><tbody>')
     for rev, day, ref, what in REVISIONS:
-        cell = ref if ref.startswith("이 문서") else f"<code>{ref}</code>"
+        # 머리말 블록을 걷어 "이 문서 머리말의 커밋" 이 가리킬 곳이 없어졌다.
+        # 생성 시점의 HEAD 를 그대로 적는다.
+        cell = f"<code>{commit}</code>" if ref.startswith("이 문서") else f"<code>{ref}</code>"
         A(f"<tr><td>{rev}</td><td>{day}</td><td>{cell}</td><td>{what}</td></tr>")
     A("</tbody></table></div>")
     A("</section>")
 
     A('<div class="foot">테이블정의서 · ERD — 한국지식재산보호원 AI 영업비밀 등급분류 시스템 · '
-      f'기준 커밋 <code>{commit}</code> · {today} 생성</div>')
+      f'{today} 생성</div>')
     A("</div>")
     A("</body>\n</html>")
     return "\n".join(o), missing
@@ -712,12 +911,50 @@ def main() -> int:
                     help="생성물에 없는 요소(클릭형 관계도·인쇄 규격)가 기존 문서에 있어도 덮어쓴다")
     args = ap.parse_args()
 
-    tables = parse_models() + parse_rag()
+    # [2026-09-02] 유사문서 검색을 쓰지 않기로 해 RAG 2표(tb_rag_vectors·tb_rag_aliases)를
+    # 정의서에서 뺀다. 두 표는 ORM 매핑이 없고 외래키가 0개라 나머지 19표에 영향이 없다.
+    # parse_rag() 는 지우지 않고 남겨 둔다 — 되살릴 때 다시 쓰기 위해서다.
+    tables = parse_models()
+
+    # [2026-09-03] 정의서에서 빼는 표·칼럼을 여기서 걷는다.
+    # 소스(poc/src)를 고치지 않기로 했으므로 models.py 는 그대로 두고 문서에서만 뺀다.
+    # 사유는 table_spec_meta.EXCLUDED_* 에 적혀 있다.
+    ex_tables = getattr(META, "EXCLUDED_TABLES", {})
+    ex_cols = getattr(META, "EXCLUDED_COLUMNS", {})
+    dropped_tables = sorted(t["name"] for t in tables if t["name"] in ex_tables)
+    tables = [t for t in tables if t["name"] not in ex_tables]
+    dropped_cols = 0
+    for t in tables:
+        drop = ex_cols.get(t["name"])
+        if not drop:
+            continue
+        before = len(t["cols"])
+        t["cols"] = [c for c in t["cols"] if c["name"] not in drop]
+        dropped_cols += before - len(t["cols"])
+        # 빠진 칼럼을 가리키던 인덱스·제약도 함께 걷는다 — 남기면 없는 칼럼을 가리킨다.
+        for key in ("indexes", "uniques", "checks"):
+            if key in t:
+                t[key] = [x for x in t[key] if not any(d in x for d in drop)]
+    # 빠진 표로 가던 FK 는 상대가 없으므로 함께 걷는다.
+    for t in tables:
+        for c in t["cols"]:
+            if c.get("fk") and c["fk"].split(".")[0] in ex_tables:
+                c["fk"] = ""
+                c["ondelete"] = ""
+
     for t in tables:
         t["partition"] = PARTITIONS.get(t["name"])
 
+    # 제외 목록이 코드보다 뒤처지면 조용히 아무것도 안 뺀다 — 그것을 오류로 잡는다.
+    live = {t["name"] for t in parse_models()}
+    ghost_t = [n for n in ex_tables if n not in live]
+    ghost_c = [f"{tn}.{cn}" for tn, cols in ex_cols.items() for cn in cols
+               if tn in live and cn not in {c["name"] for t in parse_models()
+                                            if t["name"] == tn for c in t["cols"]}]
+
     unknown = [t["name"] for t in tables if t["name"] not in META.TABLES]
-    stale = [n for n in META.TABLES if n not in {t["name"] for t in tables}]
+    stale = [n for n in META.TABLES if n not in {t["name"] for t in tables}
+             and n not in ex_tables]
 
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
                             capture_output=True, text=True).stdout.strip() or "unknown"
@@ -726,7 +963,14 @@ def main() -> int:
 
     total = sum(len(t["cols"]) for t in tables)
     print(f"테이블 {len(tables)} · 컬럼 {total}")
+    if dropped_tables or dropped_cols:
+        print(f"  [제외] 표 {len(dropped_tables)}개 · 칼럼 {dropped_cols}개 "
+              f"— 소스에는 남아 있고 정의서에서만 뺀다 ({', '.join(dropped_tables) or '표 없음'})")
     ok = True
+    if ghost_t or ghost_c:
+        print("  [오류] 제외 목록이 코드보다 뒤처졌다 — 이미 없는 것을 빼려 한다:",
+              ", ".join(ghost_t + ghost_c))
+        ok = False
     if unknown:
         print("  [오류] 코드에 있는데 table_spec_meta.TABLES 에 없음:", ", ".join(unknown))
         ok = False

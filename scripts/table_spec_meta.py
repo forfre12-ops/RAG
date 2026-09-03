@@ -19,17 +19,105 @@ GROUPS = [
     ("F", "보정", "검수자 확정·교정 결과. 운영 재학습의 진실 소스."),
     ("G", "합성", "학습용 합성 문서 생성 이력과 프롬프트 버전."),
     ("H", "운영", "비용·감사·가이드 이력."),
-    ("I", "검색", "RAG 벡터스토어. Alembic SQL 로만 생성한다(ORM 매핑 없음)."),
 ]
+
+# ── 제약 없는 참조 (DB FK 없이 애플리케이션이 정합을 보증) ──────────────────
+#
+# 정본은 여기 하나다. build_table_spec.py 의 캡션·§05 와 poc/scripts/build_erd.py 의 점선이
+# **모두 이 목록을 본다.** 2026-09-03 이전에는 두 생성기가 각각 상수를 들고 있어 도식 1건,
+# 캡션·본문 2건으로 갈렸다.
+#
+# 형식: (자식표, 자식칼럼, 부모표)
+SOFT_REFS = [
+    ("tb_chunks", "doc_id", "tb_documents"),
+    ("tb_classification_evidence", "chunk_id", "tb_chunks"),
+    ("tb_model_versions", "training_run_id", "tb_training_runs"),
+]
+# ── 정의서에서 빼는 것 (2026-09-03 결정) ────────────────────────────────────
+#
+# 유사문서 조회를 쓰지 않기로 하면서 정의서에서 빼는 표·칼럼이다.
+#
+# ⚠ 이것들은 "안 쓰는 것"이 아니라 **"안 쓰기로 한 것"**이다. 계수 도구
+#   (poc/scripts/audit_unused.py)는 대부분을 미사용으로 집지 않았다 — 코드가 지금도
+#   쓴다(classify_service.py:1104 · classify_repo.py:195 · guide_service.py:152).
+#   소스를 고치기 전까지 **정의서가 코드보다 앞선 상태**가 되므로, 이 사실을 §07 개정
+#   이력에 반드시 남긴다. 소스를 정리하면 이 목록을 비우고 생성기를 다시 돌린다.
+#
+# ⚠ 도구가 '미사용'으로 집었지만 **빼지 않은 것**도 있다. 요건이 있거나 오검출이다.
+#     tb_evaluation_factors  쓰기 0 이지만 3요건(S·V·M) 정의를 담는 시드 표 — 읽기 8
+#     tb_prompt_versions     읽기 0 이지만 합성 화면이 요건(FUN-003-⑦)
+#     evidence_id · usage_id            Identity 기본키 — DB 가 채운다(오검출)
+#     labeled_at · logged_at            server_default now() (오검출)
+#     model_type · split_method         실 데이터에 값이 있어 2026-08-29 에도 보류
+EXCLUDED_TABLES = {
+    # 표: 빼는 사유
+    "tb_document_factor_scores":
+        "쓰기·읽기 참조 0 · 실 DB 0행. 요건 점수는 tb_classifications 에 저장된다",
+}
+
+EXCLUDED_COLUMNS = {
+    # 표: {칼럼: 빼는 사유}
+    "tb_classifications": {
+        "rag_used": "유사문서 조회 폐기",
+        "rag_top_k": "유사문서 조회 폐기",
+    },
+    "tb_classification_evidence": {
+        "rag_ref_doc_id": "유사문서 조회 폐기",
+        "rag_similarity": "유사문서 조회 폐기",
+    },
+    "tb_guides": {
+        "indexed": "벡터 색인 폐기",
+        "embedding_vector_count": "벡터 색인 폐기",
+        "index_name": "벡터 색인 폐기",
+        "alias": "벡터 색인 폐기",
+        "model": "벡터 색인 폐기",
+    },
+}
+# ── 배치 — 이 표를 어느 서버에 두는가 (2026-09-02 조사) ─────────────────────
+#
+# 근거는 `poc/scripts/audit_table_placement.py` 전수 조사다(표 19개 · src 203파일).
+# 판단축은 config.py 의 배포 플래그 실측이다.
+#
+#     enable_training              full-train   에서만 True  -> 지재원 모델공장
+#     enable_incremental_retrain   onprem-local 에서만 True  -> 고객사 야간 증분 재학습
+#
+# 학습 3표(runs·epochs·datasets)를 고객사에도 두는 이유가 여기 있다. 고객사는 야간
+# 증분 재학습을 돌리므로 그 이력이 고객사 DB 에 남아야 한다. 반대로 합성 2표는
+# 합성 라우터가 enable_training 에서만 등록돼 고객사에는 열리지 않는다.
+#
+# ⚠ 표 구조는 두 서버가 같다. 다른 것은 **채워지는 규모와 용도**다 — 실측 2026-09-02
+#   지재원 시험서버(223): 문서 20 · 분류 33 · 청크 193 행. 시연·검증 규모이지
+#   운영 적재가 아니다. 회원사 실적재는 고객사 서버에서 일어난다.
+PLACEMENT = {
+    # 표: (배치, 근거)
+    "tb_classification_levels":   ("둘 다", "등급 기준 시드. 양쪽이 읽는다"),
+    "tb_evaluation_factors":      ("둘 다", "판정 요건 시드 — 런타임 쓰기 0. 값은 alembic 이 채우고 양쪽이 읽는다"),
+    "tb_level_keywords":          ("둘 다", "룰 1차 판정 키워드 사전"),
+    "tb_documents":               ("둘 다", "업로드·분류 운영의 중심 표"),
+    "tb_chunks":                  ("둘 다", "분류가 저장하고 근거·청크학습이 읽는다"),
+    "tb_document_labels":         ("둘 다", "문서 확정 등급"),
+    "tb_classifications":         ("둘 다", "추론 결과"),
+    "tb_classification_evidence": ("둘 다", "판단 근거"),
+    "tb_model_versions":          ("둘 다", "배포 모델 레지스트리"),
+    "tb_training_runs":           ("둘 다", "고객사도 야간 증분 재학습 이력을 남긴다"),
+    "tb_training_epochs":         ("둘 다", "학습 실행의 에폭 기록"),
+    "tb_training_datasets":       ("둘 다", "학습 실행이 쓴 데이터 구성"),
+    "tb_corrections":             ("둘 다", "회원사 검수 교정이 재학습 입력이 된다"),
+    "tb_prompt_versions":         ("지재원", "합성 프롬프트 버전. 합성은 지재원 전용"),
+    "tb_sample_documents":        ("지재원", "합성 문서. 합성 라우터가 고객사에는 안 열린다"),
+    "tb_llm_usage":               ("지재원", "유사문서 조회 폐기 후 LLM 을 부르는 경로는 골든셋 빌드뿐이고 그것은 지재원 작업이다. 고객사 프로파일에도 로컬 LLM(ollama)이 설정돼 있으나 부르는 자리가 없다"),
+    "tb_audit_log":               ("둘 다", "감사 로그. 양쪽 모두 필수"),
+    "tb_guides":                  ("둘 다", "등급 판정 가이드 이력"),
+}
 
 TABLES = {
     "tb_classification_levels": ("A", "분류 등급", "영업비밀 등급(TS·S1·S2·S3) 정의. 등급을 참조하는 모든 테이블의 부모."),
     "tb_evaluation_factors": ("A", "평가 요건", "등급 판정 요건. 정본은 3요건 — 비공지성(S)·경제적 유용성(V)·비밀관리성(M)."),
     "tb_level_keywords": ("A", "등급 키워드", "룰 기반 1차 판정에 쓰는 등급별 키워드 사전."),
     "tb_documents": ("B", "문서", "업로드 문서의 메타·추출 텍스트 위치·처리 상태. 청크·분류·라벨·학습셋이 모두 참조하는 중심 허브."),
-    "tb_chunks": ("B", "청크", "문서를 512 토큰 단위로 자른 조각. created_at 기준 월별 RANGE 파티션."),
-    "tb_document_labels": ("C", "문서 라벨", "문서 1건의 확정 등급 1행. 라벨 주체(사람·LLM·룰)를 함께 기록한다."),
-    "tb_document_factor_scores": ("C", "문서 요건 점수", "문서 × 요건(S·V·M) 별 0~2점. 등급은 세 점수의 곱으로 정해진다."),
+    "tb_chunks": ("B", "청크", "문서를 512 토큰 단위로 자른 조각."),
+    "tb_document_labels": ("C", "문서 라벨", "문서 1건의 확정 등급 1행. 라벨 주체(사람·LLM·룰)를 함께 기록합니다."),
+    "tb_document_factor_scores": ("C", "문서 요건 점수", "문서 × 요건(S·V·M) 별 0~2점. 표시·교차 확인용 값이며 등급을 정하는 판정자가 아니다(등급분류 알고리즘 명세서 §4)."),
     "tb_classifications": ("D", "분류 결과", "모델 추론 1회의 결과. 등급·확신도·게이트 판정을 남긴다."),
     "tb_classification_evidence": ("D", "분류 근거", "분류 1건이 어느 청크의 어느 구간을 근거로 삼았는지."),
     "tb_model_versions": ("E", "모델 버전", "학습된 분류기 버전 레지스트리. 활성 버전은 항상 1개."),
@@ -39,11 +127,9 @@ TABLES = {
     "tb_corrections": ("F", "보정", "검수자의 확정·교정 기록. 재학습에 반영된 행만 소비 표시가 붙는다."),
     "tb_prompt_versions": ("G", "프롬프트 버전", "합성 문서 생성에 쓴 프롬프트 템플릿 버전."),
     "tb_sample_documents": ("G", "합성 문서", "LLM 이 생성한 학습용 문서와 그 검수 상태."),
-    "tb_llm_usage": ("H", "LLM 사용량", "LLM 호출별 토큰·비용·지연. called_at 기준 월별 RANGE 파티션."),
+    "tb_llm_usage": ("H", "LLM 사용량", "LLM 호출별 토큰·비용·지연."),
     "tb_audit_log": ("H", "감사 로그", "전 API 호출 기록. occurred_at 기준 월별 RANGE 파티션."),
     "tb_guides": ("H", "가이드 버전", "가이드 문서 업로드·색인 버전 이력."),
-    "tb_rag_vectors": ("I", "RAG 벡터", "RAG 검색용 임베딩·어휘 색인. dense(HNSW 코사인) + bigram tsvector 하이브리드."),
-    "tb_rag_aliases": ("I", "RAG 별칭", "논리 이름 → 물리 컬렉션 매핑. 무중단 재색인 blue/green 스왑."),
 }
 
 # 여러 테이블에 같은 뜻으로 나오는 컬럼 — 테이블별 설명이 없을 때만 쓴다.
@@ -71,7 +157,7 @@ COLS = {
         "factor_code": "요건 코드 — 정본 SECRECY · VALUE · MANAGEMENT. 레거시 4요소는 is_active=FALSE 로 보존",
         "factor_name": "요건명 — 비공지성(S) · 경제적 유용성(V) · 비밀관리성(M)",
         "description": "요건 정의 문구",
-        "weight": "미사용. 요건 가중치는 등급 산정에 쓰지 않는다 — 등급은 키워드 룰이 정하고 S×V×M 은 상향 교차 확인이다. 하위호환 기본 1.0",
+        "weight": "미사용. 요건 가중치는 등급 산정에 쓰지 않습니다. 등급은 키워드 룰이 정하며 S×V×M 은 상향 교차 확인용입니다. 하위호환 기본 1.0",
         "is_active": "정본 3요건 TRUE · 레거시 4요소 FALSE",
     },
     "tb_level_keywords": {
@@ -92,7 +178,7 @@ COLS = {
         "source_format": "원본 포맷 — hwp · hwpx · pdf · docx · xlsx · txt 등",
         "file_size_bytes": "원본 파일 크기(바이트)",
         "file_hash": "원본 SHA-256. 같은 파일 재업로드 판별",
-        "metadata": "문서 속성 JSON. 출처(source_type)·보안표시·접근범위 등 등급 판정 입력이 여기 들어간다",
+        "metadata": "문서 속성 JSON. 출처(source_type)·보안표시·접근범위 등 등급 판정 입력을 담습니다",
         "raw_text_uri": "추출 원문 텍스트 저장 위치",
         "normalized_text_uri": "정규화 텍스트 저장 위치",
         "text_preview": "본문 앞부분 미리보기(최대 2,000자)",
@@ -105,11 +191,11 @@ COLS = {
         "uploaded_at": "업로드 시각",
         "processed_at": "처리 완료 시각",
         "created_by": "업로드 주체 ID",
-        "deleted_at": "논리 삭제 시각. NULL 이면 활성이며 조회는 NULL 행만 노출한다",
+        "deleted_at": "논리 삭제 시각. NULL 이면 활성이며 조회는 NULL 행만 노출합니다",
     },
     "tb_chunks": {
-        "chunk_id": "청크 PK(파티션 키와 복합)",
-        "doc_id": "원문 문서. 파티션 테이블이라 FK 제약은 걸지 않고 애플리케이션이 정합을 보증한다",
+        "chunk_id": "청크 PK",
+        "doc_id": "원문 문서. FK 제약 없이 애플리케이션이 정합을 보증합니다",
         "chunk_index": "문서 내 청크 순번(0-base)",
         "content": "청크 본문",
         "token_count": "토큰 수(최대 512)",
@@ -119,7 +205,7 @@ COLS = {
         "section_path": "계층 섹션 경로 — 예: {3장, 3.1절}",
         "overlap_prev": "앞 청크와 겹친 토큰 수(기본 64)",
         "overlap_next": "뒤 청크와 겹친 토큰 수(기본 64)",
-        "created_at": "생성 시각. 월별 RANGE 파티션 키",
+        "created_at": "생성 시각",
     },
     "tb_document_labels": {
         "doc_id": "대상 문서(PK)",
@@ -137,7 +223,7 @@ COLS = {
     "tb_document_factor_scores": {
         "doc_id": "대상 문서(복합 PK)",
         "factor_id": "평가 요건(복합 PK)",
-        "score": "요건 점수 0·1·2. DB CHECK 제약 ck_dfs_score_0_2 로 범위를 강제한다",
+        "score": "요건 점수 0·1·2. CHECK 제약 ck_dfs_score_0_2 로 범위를 강제합니다",
     },
     "tb_classifications": {
         "classification_id": "분류 PK",
@@ -152,7 +238,7 @@ COLS = {
         "rag_used": "RAG 근거 사용 여부",
         "rag_top_k": "RAG 조회 상위 K",
         "rag_agreement": "RAG 근거가 모델 예측과 일치했는지",
-        "status": "현재 상태 — staging · confirmed · needs_review. 검수·보정이 이후에 바꾼다",
+        "status": "현재 상태 — staging · confirmed · needs_review",
         "initial_status": "게이트의 최초 판정을 생성 시점에 동결한 값. 이후 검수·보정이 건드리지 않는다. 도입 전 행은 NULL",
         "inference_ms": "추론 소요 시간(밀리초)",
         "classified_at": "분류 시각",
@@ -161,7 +247,7 @@ COLS = {
         "evidence_id": "근거 PK",
         "classification_id": "대상 분류",
         "chunk_id": "근거가 된 청크",
-        "evidence_type": "근거 종류 — keyword · attention · rag 등",
+        "evidence_type": "근거 종류 — keyword · attention 등",
         "factor_id": "이 근거가 뒷받침하는 요건. NULL 이면 요건 무관",
         "excerpt": "근거 발췌 원문",
         "excerpt_start": "발췌 시작 위치(청크 내 문자 오프셋)",
@@ -180,10 +266,10 @@ COLS = {
         "training_run_id": "이 모델을 만든 학습 실행 ID",
         "training_data_count": "학습 샘플 수",
         "metrics": "최종 지표 JSON — F1 · FNR · Recall 등",
-        "model_uri": "모델 저장 경로. 핫리로드가 이 경로로 재구성한다",
+        "model_uri": "모델 저장 경로",
         "model_size_mb": "모델 크기(MB)",
         "mlflow_run_id": "MLflow 실험 추적 ID",
-        "is_active": "활성 여부. 부분 UNIQUE 인덱스로 활성 1개만 허용한다",
+        "is_active": "활성 여부. 생성 칼럼 active_key 의 UNIQUE 제약으로 활성 1건만 허용합니다",
         "activated_at": "활성화 시각",
         "deactivated_at": "비활성화 시각",
         "rolled_back_from": "자동 롤백 출처 버전(자기 참조)",
@@ -206,7 +292,7 @@ COLS = {
         "split_seed": "분할 난수 시드. 재현에 필요하다",
         "hyperparameters": "하이퍼파라미터 JSON — epochs · lr · batch_size 등",
         "gpu_info": "GPU 모델·VRAM·CUDA 버전 JSON",
-        "final_metrics": "최종 지표 JSON. 배포 게이트 판정도 이 안에 들어간다",
+        "final_metrics": "최종 지표 JSON. 배포 게이트 판정을 포함합니다",
         "trigger_type": "기동 방식 — manual · scheduled · active_learning",
         "trigger_ref": "기동 근거 식별자",
         "error_message": "실패 사유. 학습 잡 조회 API 가 이 값을 그대로 내보낸다",
@@ -254,7 +340,7 @@ COLS = {
         "sample_id": "합성 문서 PK",
         "doc_id": "문서 테이블에 적재됐을 때의 문서 ID. 미적재면 NULL",
         "target_level_id": "생성 때 요구한 등급",
-        "corrected_level_id": "검수자가 고친 등급. NULL 이면 교정 없음. 학습행 라벨은 이 값을 우선한다",
+        "corrected_level_id": "검수자가 고친 등급. NULL 이면 교정 없음. 학습행 라벨은 이 값을 우선합니다",
         "doc_type": "문서 종류",
         "outline_prompt_version": "개요 생성에 쓴 프롬프트 버전",
         "body_prompt_version": "본문 생성에 쓴 프롬프트 버전",
@@ -273,7 +359,7 @@ COLS = {
         "rejection_reason": "반려 사유",
     },
     "tb_llm_usage": {
-        "usage_id": "사용 기록 PK(파티션 키와 복합)",
+        "usage_id": "사용 기록 PK",
         "provider": "LLM 제공자",
         "model": "모델명",
         "purpose": "호출 목적 — 합성 · 라벨링 · 질의응답 등",
@@ -287,7 +373,7 @@ COLS = {
         "latency_ms": "응답 지연(밀리초)",
         "success": "호출 성공 여부",
         "error_code": "실패 코드",
-        "called_at": "호출 시각. 월별 RANGE 파티션 키",
+        "called_at": "호출 시각",
     },
     "tb_audit_log": {
         "audit_id": "감사 PK(파티션 키와 복합)",
