@@ -27,10 +27,12 @@ import datetime as dt
 import uuid
 
 from sqlalchemy import (
+    JSON,
     Identity,
     BigInteger,
     Boolean,
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -38,6 +40,7 @@ from sqlalchemy import (
     Numeric,
     REAL,
     PrimaryKeyConstraint,
+    Uuid,
     SmallInteger,
     String,
     Text,
@@ -46,10 +49,19 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from koipa.db.session import Base
+
+# [2026-09] MariaDB 이식 타입. PostgreSQL 은 그대로(_JSON_PORTABLE·ARRAY·INET 네이티브), 다른
+# dialect(MariaDB/MySQL)에서는 .with_variant() 로 등록한 대체 타입을 쓴다. 223 은 아직
+# PostgreSQL 이므로 기존 저장 형식·질의를 그대로 유지해야 한다 — 타입을 갈아엎지 않고
+# dialect 별로 렌더링만 바꾼다.
+_JSON_PORTABLE = JSONB().with_variant(JSON(), "mariadb").with_variant(JSON(), "mysql")
+_ARRAY_TEXT_PORTABLE = ARRAY(Text).with_variant(JSON(), "mariadb").with_variant(JSON(), "mysql")
+_INET_PORTABLE = INET().with_variant(String(45), "mariadb").with_variant(String(45), "mysql")
+
 
 # tenant 제거: 격리는 KL 포털 전담 (2026-06-24 멀티테넌트 전면 제거 결정).
 # Koipa는 단일 고객사 엔진 — per-customer 경계는 상류(KL 포털 라우팅)가 보장.
@@ -67,7 +79,7 @@ class ClassificationLevel(Base):
     level_name: Mapped[str] = mapped_column(String(50), nullable=False)
     level_order: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    color_hex: Mapped[str | None] = mapped_column(String(7), default="#808080", server_default=text("'#808080'::character varying"))
+    color_hex: Mapped[str | None] = mapped_column(String(7), default="#808080", server_default=text("'#808080'"))
     loss_weight: Mapped[float | None] = mapped_column(Numeric(4, 2), default=1.0, server_default=text("1.0"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -98,10 +110,10 @@ class LevelKeyword(Base):
     keyword_id: Mapped[int] = mapped_column(Integer, Identity(always=True), primary_key=True)
     level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     keyword: Mapped[str] = mapped_column(String(200), nullable=False)
-    pattern_type: Mapped[str] = mapped_column(String(20), nullable=False, default="exact", server_default=text("'exact'::character varying"))
+    pattern_type: Mapped[str] = mapped_column(String(20), nullable=False, default="exact", server_default=text("'exact'"))
     factor_id: Mapped[int | None] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"))
     weight: Mapped[float | None] = mapped_column(Numeric(3, 2), default=1.0, server_default=text("1.0"))
-    source: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'::character varying"))
+    source: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -124,25 +136,25 @@ class LevelKeyword(Base):
 class Document(Base):
     __tablename__ = "tb_documents"
 
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    doc_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     external_ref: Mapped[str | None] = mapped_column(String(100))
     filename: Mapped[str] = mapped_column(String(500), nullable=False)
     source_format: Mapped[str] = mapped_column(String(10), nullable=False)
     file_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     file_hash: Mapped[str | None] = mapped_column(String(64))
 
-    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, server_default=text("'{}'::jsonb"))
+    metadata_: Mapped[dict] = mapped_column("metadata", _JSON_PORTABLE, default=dict, server_default=text("'{}'"))
 
     raw_text_uri: Mapped[str | None] = mapped_column(String(500))
     normalized_text_uri: Mapped[str | None] = mapped_column(String(500))
     text_preview: Mapped[str | None] = mapped_column(String(2000))
     char_count: Mapped[int | None] = mapped_column(Integer)
 
-    extraction_method: Mapped[str | None] = mapped_column(String(30), default="parser", server_default=text("'parser'::character varying"))
+    extraction_method: Mapped[str | None] = mapped_column(String(30), default="parser", server_default=text("'parser'"))
     extraction_quality: Mapped[float | None] = mapped_column(Numeric(3, 2))
     ocr_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
-    processing_status: Mapped[str] = mapped_column(String(20), default="pending", server_default=text("'pending'::character varying"))
+    processing_status: Mapped[str] = mapped_column(String(20), default="pending", server_default=text("'pending'"))
     error_message: Mapped[str | None] = mapped_column(Text)
 
     uploaded_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -186,13 +198,13 @@ class Chunk(Base):
     """청크 파티션 부모. 실제 INSERT는 월별 子 파티션으로 자동 라우팅."""
     __tablename__ = "tb_chunks"
 
-    chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    chunk_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), default=uuid.uuid4)
+    doc_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
     char_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    section_path: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    section_path: Mapped[list[str] | None] = mapped_column(_ARRAY_TEXT_PORTABLE)
     overlap_prev: Mapped[int | None] = mapped_column(SmallInteger, default=0, server_default=text("0"))
     overlap_next: Mapped[int | None] = mapped_column(SmallInteger, default=0, server_default=text("0"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -212,7 +224,7 @@ class Chunk(Base):
 class DocumentLabel(Base):
     __tablename__ = "tb_document_labels"
 
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
+    doc_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
     level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     labeled_by: Mapped[str] = mapped_column(String(30), nullable=False)
     labeler_id: Mapped[str | None] = mapped_column(String(50))
@@ -233,7 +245,7 @@ class DocumentLabel(Base):
 class DocumentFactorScore(Base):
     __tablename__ = "tb_document_factor_scores"
 
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
+    doc_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="CASCADE"), primary_key=True)
     factor_id: Mapped[int] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"), primary_key=True)
     score: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
 
@@ -251,19 +263,19 @@ class DocumentFactorScore(Base):
 class Classification(Base):
     __tablename__ = "tb_classifications"
 
-    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
+    classification_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    doc_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     predicted_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
-    alternatives: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    alternatives: Mapped[list] = mapped_column(_JSON_PORTABLE, nullable=False, default=list, server_default=text("'[]'"))
     # 자동확정 정책 학습용 결정 시점 스냅샷. 기존 행은 원본 신호를 복원할 수 없어 NULL 유지.
-    automation_assessment: Mapped[dict | None] = mapped_column(JSONB)
-    aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid", server_default=text("'hybrid'::character varying"))
+    automation_assessment: Mapped[dict | None] = mapped_column(_JSON_PORTABLE)
+    aggregation_method: Mapped[str | None] = mapped_column(String(20), default="hybrid", server_default=text("'hybrid'"))
     chunk_count: Mapped[int | None] = mapped_column(SmallInteger)
     rag_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     rag_top_k: Mapped[int | None] = mapped_column(SmallInteger)
-    status: Mapped[str] = mapped_column(String(20), default="staging", server_default=text("'staging'::character varying"))
+    status: Mapped[str] = mapped_column(String(20), default="staging", server_default=text("'staging'"))
     # 게이트 최종 결정을 생성 시점에 동결(status와 달리 이후 confirm/correction이 건드리지 않음).
     # nullable: 이 컬럼 도입 이전 행은 최초값을 복원할 수 없어 NULL로 남는다.
     initial_status: Mapped[str | None] = mapped_column(String(20))
@@ -291,15 +303,15 @@ class ClassificationEvidence(Base):
     __tablename__ = "tb_classification_evidence"
 
     evidence_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
-    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
-    chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    classification_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
+    chunk_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     evidence_type: Mapped[str] = mapped_column(String(20), nullable=False)
     factor_id: Mapped[int | None] = mapped_column(ForeignKey("tb_evaluation_factors.factor_id", ondelete="RESTRICT"))
     excerpt: Mapped[str] = mapped_column(Text, nullable=False)
     excerpt_start: Mapped[int | None] = mapped_column(Integer)
     excerpt_end: Mapped[int | None] = mapped_column(Integer)
     contribution: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
-    rag_ref_doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    rag_ref_doc_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
     rag_similarity: Mapped[float | None] = mapped_column(Numeric(4, 3))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -316,32 +328,34 @@ class ClassificationEvidence(Base):
 class ModelVersion(Base):
     __tablename__ = "tb_model_versions"
 
-    version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    version_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     version_label: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     base_model: Mapped[str] = mapped_column(String(100), nullable=False)
-    model_type: Mapped[str | None] = mapped_column(String(20), default="classifier", server_default=text("'classifier'::character varying"))
+    model_type: Mapped[str | None] = mapped_column(String(20), default="classifier", server_default=text("'classifier'"))
     trained_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
-    training_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    training_run_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
     training_data_count: Mapped[int | None] = mapped_column(Integer)
-    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    metrics: Mapped[dict] = mapped_column(_JSON_PORTABLE, nullable=False, default=dict, server_default=text("'{}'"))
     model_uri: Mapped[str | None] = mapped_column(String(500))
     mlflow_run_id: Mapped[str | None] = mapped_column(String(64))
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    # [2026-09] MariaDB 는 부분 인덱스(WHERE)가 없다. "활성은 최대 1개" 불변식을 두 dialect
+    # 모두에서 같은 방식으로 지키도록, is_active 대신 파생 칼럼에 유니크를 건다 — 활성일 때만
+    # 1, 아니면 NULL. UNIQUE 인덱스는 NULL 을 여러 개 허용하므로 비활성 행은 몇 개든 공존하고
+    # 활성 행만 하나로 묶인다. Postgres·MariaDB 양쪽에서 GENERATED ALWAYS AS ... STORED 로
+    # 동일하게 동작함을 실측 확인했다(둘 다 두 번째 활성 삽입에서 IntegrityError).
+    active_key: Mapped[int | None] = mapped_column(
+        SmallInteger, Computed("CASE WHEN is_active THEN 1 END", persisted=True)
+    )
     activated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     deactivated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
-    rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
+    rolled_back_from: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     rollback_reason: Mapped[str | None] = mapped_column(Text)
-    level_snapshot: Mapped[dict | None] = mapped_column(JSONB)
+    level_snapshot: Mapped[dict | None] = mapped_column(_JSON_PORTABLE)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        # init.sql 보유 — ORM 동기화 (drift 방지)
-        Index(
-            "idx_mv_active",
-            "is_active",
-            unique=True,
-            postgresql_where=text("is_active = TRUE"),
-        ),
+        Index("idx_mv_active", "active_key", unique=True),
         Index("idx_mv_mlflow", "mlflow_run_id"),
     )
 
@@ -349,10 +363,10 @@ class ModelVersion(Base):
 class TrainingRun(Base):
     __tablename__ = "tb_training_runs"
 
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    model_version: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
+    run_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    model_version: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_model_versions.version_id"))
     mlflow_run_id: Mapped[str | None] = mapped_column(String(64))
-    status: Mapped[str] = mapped_column(String(20), default="queued", server_default=text("'queued'::character varying"))
+    status: Mapped[str] = mapped_column(String(20), default="queued", server_default=text("'queued'"))
     started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     duration_sec: Mapped[int | None] = mapped_column(Integer)
@@ -360,11 +374,11 @@ class TrainingRun(Base):
     train_count: Mapped[int | None] = mapped_column(Integer)
     val_count: Mapped[int | None] = mapped_column(Integer)
     test_count: Mapped[int | None] = mapped_column(Integer)
-    split_method: Mapped[str | None] = mapped_column(String(30), default="stratified", server_default=text("'stratified'::character varying"))
+    split_method: Mapped[str | None] = mapped_column(String(30), default="stratified", server_default=text("'stratified'"))
     split_seed: Mapped[int | None] = mapped_column(Integer)
-    hyperparameters: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
-    final_metrics: Mapped[dict | None] = mapped_column(JSONB)
-    trigger_type: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'::character varying"))
+    hyperparameters: Mapped[dict] = mapped_column(_JSON_PORTABLE, nullable=False, default=dict, server_default=text("'{}'"))
+    final_metrics: Mapped[dict | None] = mapped_column(_JSON_PORTABLE)
+    trigger_type: Mapped[str | None] = mapped_column(String(30), default="manual", server_default=text("'manual'"))
     trigger_ref: Mapped[str | None] = mapped_column(String(100))
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -382,11 +396,11 @@ class TrainingRun(Base):
 class TrainingEpoch(Base):
     __tablename__ = "tb_training_epochs"
 
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), primary_key=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), primary_key=True)
     epoch: Mapped[int] = mapped_column(Integer, primary_key=True)
     train_loss: Mapped[float | None] = mapped_column(REAL)
     val_loss: Mapped[float | None] = mapped_column(REAL)
-    val_metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    val_metrics: Mapped[dict] = mapped_column(_JSON_PORTABLE, nullable=False, default=dict, server_default=text("'{}'"))
     learning_rate: Mapped[float | None] = mapped_column(REAL)
     logged_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -395,8 +409,8 @@ class TrainingDataset(Base):
     __tablename__ = "tb_training_datasets"
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
-    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), nullable=False)
-    doc_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
+    run_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_training_runs.run_id", ondelete="CASCADE"), nullable=False)
+    doc_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_documents.doc_id", ondelete="RESTRICT"), nullable=False)
     split_type: Mapped[str] = mapped_column(String(10), nullable=False)
     level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
 
@@ -417,14 +431,14 @@ class Correction(Base):
     __tablename__ = "tb_corrections"
 
     correction_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
-    classification_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
+    classification_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_classifications.classification_id", ondelete="CASCADE"), nullable=False)
     original_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     corrected_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)
     corrected_by: Mapped[str] = mapped_column(String(50), nullable=False)
     corrected_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    consumed_in_run: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_training_runs.run_id"))
+    consumed_in_run: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_training_runs.run_id"))
     consumed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
@@ -468,8 +482,8 @@ class PromptVersion(Base):
 class SampleDocument(Base):
     __tablename__ = "tb_sample_documents"
 
-    sample_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    doc_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tb_documents.doc_id"))
+    sample_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    doc_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("tb_documents.doc_id"))
     target_level_id: Mapped[int] = mapped_column(ForeignKey("tb_classification_levels.level_id", ondelete="RESTRICT"), nullable=False)
     # 검수자가 승인하면서 고친 등급. NULL=교정 없음(target_level_id 그대로).
     # target_level_id 를 덮어쓰지 않는 이유: "생성 때 요구한 등급"과 "사람이 고친 등급"이
@@ -485,13 +499,13 @@ class SampleDocument(Base):
     generated_outline: Mapped[str | None] = mapped_column(Text)
     generated_content: Mapped[str] = mapped_column(Text, nullable=False)
     quality_score: Mapped[float | None] = mapped_column(Numeric(3, 2))
-    quality_report: Mapped[dict | None] = mapped_column(JSONB)
+    quality_report: Mapped[dict | None] = mapped_column(_JSON_PORTABLE)
     # [P0#1] 본문 출처 마커 — 생성기(SynthDoc.label_source)에서 보존. None=정상 JSON 생성,
     # "noop_fallback"=placeholder 본문(학습 편입 금지), "llm_nonjson"=실 LLM 비-JSON 응답.
     # 워커가 이 마커 없이 list[dict]만 반환하던 시절엔 검수큐 적재 자체가 없어 마커도 소실됐다.
     label_source: Mapped[str | None] = mapped_column(String(30))
     parse_error: Mapped[str | None] = mapped_column(Text)
-    review_status: Mapped[str | None] = mapped_column(String(20), default="pending_review", server_default=text("'pending_review'::character varying"))
+    review_status: Mapped[str | None] = mapped_column(String(20), default="pending_review", server_default=text("'pending_review'"))
     reviewed_by: Mapped[str | None] = mapped_column(String(50))
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
@@ -513,7 +527,9 @@ class LlmUsage(Base):
     """월별 파티션 부모. INSERT는 called_at 기준 자동 라우팅."""
     __tablename__ = "tb_llm_usage"
 
-    usage_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True))
+    usage_id: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=True), autoincrement=True,
+    )
     provider: Mapped[str] = mapped_column(String(30), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
     purpose: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -524,7 +540,7 @@ class LlmUsage(Base):
     # total_tokens는 DB측 generated column. ORM은 server_default 미설정으로 read-only처럼 처리.
     cost_usd: Mapped[float] = mapped_column(Numeric(10, 6), nullable=False)
     cost_krw: Mapped[float | None] = mapped_column(Numeric(12, 2))
-    billing_phase: Mapped[str] = mapped_column(String(20), nullable=False, default="development", server_default=text("'development'::character varying"))
+    billing_phase: Mapped[str] = mapped_column(String(20), nullable=False, default="development", server_default=text("'development'"))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     success: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     error_code: Mapped[str | None] = mapped_column(String(50))
@@ -546,15 +562,17 @@ class AuditLog(Base):
     """월별 파티션 부모. 모든 API 호출 기록 (영업비밀 시스템 필수, doc/04 §9.5)."""
     __tablename__ = "tb_audit_log"
 
-    audit_id: Mapped[int] = mapped_column(BigInteger, Identity(always=True))
-    request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    audit_id: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=True), autoincrement=True,
+    )
+    request_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True))
     actor_id: Mapped[str | None] = mapped_column(String(50))
     actor_role: Mapped[str | None] = mapped_column(String(30))
     action: Mapped[str] = mapped_column(String(50), nullable=False)
     target_type: Mapped[str | None] = mapped_column(String(30))
     target_id: Mapped[str | None] = mapped_column(String(100))
     payload_hash: Mapped[str | None] = mapped_column(String(64))
-    ip_address: Mapped[str | None] = mapped_column(INET)
+    ip_address: Mapped[str | None] = mapped_column(_INET_PORTABLE)
     user_agent: Mapped[str | None] = mapped_column(String(500))
     success: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     error_code: Mapped[str | None] = mapped_column(String(50))

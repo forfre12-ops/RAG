@@ -27,35 +27,43 @@ class Base(DeclarativeBase):
     """모든 ORM 모델의 베이스 클래스."""
 
 
+# [2026-09] MariaDB 전환 — psycopg(libpq)와 PyMySQL 둘 다 connect_timeout 키워드를
+# 그대로 받는다(이름까지 같다). "네트워크로 붙는 dialect" 판정을 한 곳에 둔다 —
+# 아래 두 함수가 각자 접두어 목록을 따로 들고 있으면 하나만 늘렸을 때 나머지가 뒤처진다.
+_NETWORKED_DIALECTS = ("postgresql", "mariadb", "mysql")
+_DEFAULT_PORT = {"postgresql": 5432, "mariadb": 3306, "mysql": 3306}
+
+
 def _engine_connect_args() -> dict:
     """연결이 무한 대기하지 않도록 connect_timeout 주입 (운영 부팅 행 방지).
 
-    PG가 일시 불가일 때 GradeRegistry·FactorRegistry·세션이 연결 대기로 워커 부팅·
+    DB가 일시 불가일 때 GradeRegistry·FactorRegistry·세션이 연결 대기로 워커 부팅·
     추론기 생성을 무한 블록하는 것을 막는다 — 타임아웃 후 빠르게 예외 → 각 호출부의
-    try/except가 폴백 처리한다. connect_timeout(초)은 PostgreSQL(psycopg/libpq) 전용이라
-    해당 드라이버 URL에만 주입한다(SQLite 등에는 미적용).
+    try/except가 폴백 처리한다. connect_timeout(초)은 네트워크 dialect(PostgreSQL·
+    MariaDB/MySQL) 드라이버 URL에만 주입한다(SQLite 등에는 미적용).
     """
     url = settings.database_url or ""
     timeout = int(getattr(settings, "db_connect_timeout", 5) or 0)
-    if url.startswith("postgresql") and timeout > 0:
+    if url.startswith(_NETWORKED_DIALECTS) and timeout > 0:
         return {"connect_timeout": timeout}
     return {}
 
 
 def database_reachable_fast(timeout: float = 0.05) -> bool:
-    """Return whether the configured PostgreSQL endpoint accepts TCP quickly.
+    """Return whether the configured DB endpoint accepts TCP quickly.
 
     This is intentionally a shallow preflight for optional/best-effort DB paths
     in local tests. It does not validate credentials or schema; real DB work is
     still performed by SQLAlchemy when the endpoint is reachable.
     """
     url = settings.database_url or ""
-    if not url.startswith("postgresql"):
+    if not url.startswith(_NETWORKED_DIALECTS):
         return True
     try:
         parsed = make_url(url)
+        dialect = (parsed.get_backend_name() or "postgresql")
         host = parsed.host or "localhost"
-        port = int(parsed.port or 5432)
+        port = int(parsed.port or _DEFAULT_PORT.get(dialect, 5432))
         with socket.create_connection((host, port), timeout=timeout):
             return True
     except OSError:
